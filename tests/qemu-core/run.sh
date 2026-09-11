@@ -44,4 +44,5 @@ COPYFILE_DISABLE=1 tar --format=ustar -cf "$work/initramfs.tar" \
 python3 "$repo/tests/qemu-core/run_vm.py" \
 	--init "$work/init" \
 	--initramfs "$work/initramfs.tar" \
+	--state-dir "$work/vm" \
 	--timeout "${VINIX_QEMU_TIMEOUT:-300}"

@@ -17,6 +17,7 @@ import time
 
 
 PASS_MARKER = b"VINIX QEMU CORE: PASS"
+PERSIST_MARKER = b"VINIX QEMU CORE PERSIST: PASS"
 FAIL_MARKERS = (
     b"VINIX QEMU CORE: FAIL",
     b"QEMU CORE FAIL line",
@@ -31,6 +32,7 @@ FEATURE_MARKERS = (
     b"QEMU CORE PASS: permissions, umask, and resource limits",
     b"QEMU CORE PASS: inotify events",
     b"QEMU CORE PASS: priority, affinity, and accounting",
+    b"QEMU CORE PASS: persistence marker synchronized",
 )
 
 
@@ -81,9 +83,21 @@ def stop_child(pid: int, master: int) -> None:
         pass
 
 
-def run_vm(root: Path, guest_init: Path, initramfs: Path, timeout: int) -> int:
+def run_phase(
+    root: Path,
+    guest_init: Path,
+    initramfs: Path,
+    state_dir: Path,
+    timeout: int,
+    verification_boot: bool,
+) -> int:
     environment = os.environ.copy()
     environment["VINIX_INITRAMFS"] = str(initramfs)
+    environment["VINIX_BOOT_DISK"] = str(state_dir / "boot.img")
+    environment["VINIX_EFIVARS"] = str(state_dir / "efivars.fd")
+    environment["VINIX_QEMU_PACKAGE_STORE"] = str(state_dir / "packages.tar")
+    environment["VINIX_QEMU_PERSIST_DISK"] = str(state_dir / "root.ext2")
+    environment["VINIX_KEEP_TEMP_BOOT_DISK"] = "1"
     environment.setdefault("VINIX_QEMU_PACKAGE_STORE_PORT", available_port())
     if platform.system() != "Darwin":
         environment.setdefault("USE_TCG", "1")
@@ -91,13 +105,15 @@ def run_vm(root: Path, guest_init: Path, initramfs: Path, timeout: int) -> int:
     command = [
         str(root / "run-aarch64.sh"),
         "--serial",
-        "--ephemeral",
         "--persist=64",
         "--mem=2048",
         f"--guest-init={guest_init}",
     ]
-    if os.environ.get("VINIX_QEMU_CORE_NO_BUILD") == "1":
+    if verification_boot or os.environ.get("VINIX_QEMU_CORE_NO_BUILD") == "1":
         command.insert(1, "--no-build")
+
+    phase = "persistence verification" if verification_boot else "core feature"
+    print(f"==> Starting AArch64 QEMU {phase} boot")
 
     pid, master = pty.fork()
     if pid == 0:
@@ -130,7 +146,8 @@ def run_vm(root: Path, guest_init: Path, initramfs: Path, timeout: int) -> int:
                     sys.stdout.buffer.flush()
 
             recent = bytes(transcript[-131072:])
-            finished = PASS_MARKER in recent or any(
+            expected_final = PERSIST_MARKER if verification_boot else PASS_MARKER
+            finished = expected_final in recent or any(
                 marker in recent for marker in FAIL_MARKERS
             )
             if finished and shutdown_deadline is None:
@@ -149,13 +166,12 @@ def run_vm(root: Path, guest_init: Path, initramfs: Path, timeout: int) -> int:
         os.close(master)
 
     output = bytes(transcript)
-    missing = [
-        marker.decode("ascii")
-        for marker in FEATURE_MARKERS
-        if output.count(marker) != 1
-    ]
-    if output.count(PASS_MARKER) != 1:
-        missing.append("one final guest PASS marker")
+    expected_markers = (PERSIST_MARKER,) if verification_boot else (
+        *FEATURE_MARKERS,
+        PASS_MARKER,
+    )
+    missing = [marker.decode("ascii") for marker in expected_markers
+               if output.count(marker) != 1]
     failures = [
         marker.decode("ascii", errors="replace")
         for marker in FAIL_MARKERS
@@ -171,21 +187,39 @@ def run_vm(root: Path, guest_init: Path, initramfs: Path, timeout: int) -> int:
         for item in failures:
             print(f"ERROR: observed QEMU failure: {item}", file=sys.stderr)
         return 1
-    print("==> AArch64 QEMU core regression passed")
+    print(f"==> AArch64 QEMU {phase} boot passed")
     return 0
+
+
+def run_vm(
+    root: Path,
+    guest_init: Path,
+    initramfs: Path,
+    state_dir: Path,
+    timeout: int,
+) -> int:
+    state_dir.mkdir(parents=True, exist_ok=True)
+    result = run_phase(root, guest_init, initramfs, state_dir, timeout, False)
+    if result != 0:
+        return result
+    result = run_phase(root, guest_init, initramfs, state_dir, timeout, True)
+    if result == 0:
+        print("==> AArch64 QEMU core regression passed across reboot")
+    return result
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--init", type=Path, required=True)
     parser.add_argument("--initramfs", type=Path, required=True)
+    parser.add_argument("--state-dir", type=Path, required=True)
     parser.add_argument("--timeout", type=int, default=300)
     arguments = parser.parse_args()
     if arguments.timeout <= 0:
         parser.error("--timeout must be positive")
     root = Path(__file__).resolve().parents[2]
     return run_vm(root, arguments.init.resolve(), arguments.initramfs.resolve(),
-                  arguments.timeout)
+                  arguments.state_dir.resolve(), arguments.timeout)
 
 
 if __name__ == "__main__":

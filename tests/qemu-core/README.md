@@ -6,6 +6,10 @@ copy-on-write fork, cached EXT2 I/O and shared mappings, synchronization,
 namespace persistence, permissions, file locks, resource limits, inotify,
 affinity, priority, and resource accounting.
 
+The runner boots twice against the same disposable EXT2 image. The first boot
+synchronizes a marker through the shared page cache; the second boot remounts
+the volume and verifies the marker before removing the temporary VM state.
+
 Build the AArch64 userland once to provide the musl test sysroot, then run:
 
 ```sh

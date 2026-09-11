@@ -33,6 +33,8 @@ static const char *test_dir = "/root/vinix-qemu-core";
 static const char *file_a = "/root/vinix-qemu-core/a";
 static const char *file_b = "/root/vinix-qemu-core/b";
 static const char *file_c = "/root/vinix-qemu-core/c";
+static const char *persist_file = "/root/vinix-qemu-core/persist";
+static const char persist_payload[] = "vinix-ext2-cache-writeback-v1";
 
 static int reap_ok(pid_t child)
 {
@@ -41,6 +43,27 @@ static int reap_ok(pid_t child)
 	CHECK(waitpid(child, &status, 0) == child);
 	CHECK(WIFEXITED(status) && WEXITSTATUS(status) == 0);
 	return 0;
+}
+
+/* Return one for the verification boot, zero for a fresh volume, and minus
+ * one for a malformed or unreadable persistence marker. */
+static int verify_persistence_boot(void)
+{
+	int fd = open(persist_file, O_RDONLY);
+	if (fd < 0)
+		return errno == ENOENT ? 0 : -1;
+	char observed[sizeof(persist_payload)] = {0};
+	ssize_t length = read(fd, observed, sizeof(observed));
+	close(fd);
+	if (length != (ssize_t)(sizeof(persist_payload) - 1) ||
+	    memcmp(observed, persist_payload, sizeof(persist_payload) - 1) != 0) {
+		errno = EIO;
+		return -1;
+	}
+	if (unlink(persist_file) != 0)
+		return -1;
+	puts("VINIX QEMU CORE PERSIST: PASS");
+	return 1;
 }
 
 static int test_random(void)
@@ -297,6 +320,10 @@ static int test_scheduler_and_accounting(void)
 
 static int run_tests(void)
 {
+	int persistence_boot = verify_persistence_boot();
+	CHECK(persistence_boot >= 0);
+	if (persistence_boot == 1)
+		return 0;
 	CHECK(test_random() == 0);
 	CHECK(test_cow() == 0);
 	CHECK(prepare_directory() == 0);
@@ -308,6 +335,13 @@ static int run_tests(void)
 	CHECK(unlink(file_a) == 0);
 	CHECK(unlink(file_b) == 0);
 	CHECK(unlink(file_c) == 0);
+	int fd = open(persist_file, O_CREAT | O_EXCL | O_WRONLY | O_SYNC, 0600);
+	CHECK(fd >= 0);
+	CHECK(write(fd, persist_payload, sizeof(persist_payload) - 1) ==
+	    (ssize_t)(sizeof(persist_payload) - 1));
+	CHECK(fsync(fd) == 0);
+	CHECK(close(fd) == 0);
+	puts("QEMU CORE PASS: persistence marker synchronized");
 	puts("VINIX QEMU CORE: PASS");
 	return 0;
 }
