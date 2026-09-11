@@ -523,10 +523,19 @@ fn (mut this Console) mmap(_handle voidptr, _page u64, _flags int) voidptr {
 
 fn (mut this Console) read(_handle voidptr, void_buf voidptr, _loc u64, count u64) ?i64 {
 	latest_thread = proc.current_thread()
+	if count == 0 {
+		return 0
+	}
+	handle := unsafe { &file.Handle(_handle) }
+	nonblocking := handle != unsafe { nil } && handle.flags & resource.o_nonblock != 0
 
 	mut buf := unsafe { &u8(void_buf) }
 
 	for console_read_lock.test_and_acquire() == false {
+		if nonblocking {
+			errno.set(errno.ewouldblock)
+			return none
+		}
 		mut events := [&console_event]
 		event.await(mut events, true) or {
 			unsafe { events.free() }
@@ -555,6 +564,13 @@ fn (mut this Console) read(_handle voidptr, void_buf voidptr, _loc u64, count u6
 			wait = false
 		} else {
 			if wait == true {
+				// The desktop polls this descriptor each frame. Do not wait
+				// for a keystroke when the caller requested O_NONBLOCK.
+				if nonblocking {
+					console_read_lock.release()
+					errno.set(errno.ewouldblock)
+					return none
+				}
 				console_read_lock.release()
 				for {
 					mut events := [&console_event]
