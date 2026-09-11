@@ -205,6 +205,7 @@ fn (mut this DevTmpFS) link(parent &VFSNode, path string, mut old_node VFSNode) 
 	mut new_node := create_node(this, parent, path, false)
 
 	katomic.inc(mut &old_node.resource.refcount)
+	katomic.inc(mut &old_node.resource.stat.nlink)
 
 	new_node.resource = old_node.resource
 	new_node.children = old_node.children

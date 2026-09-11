@@ -326,7 +326,7 @@ pub fn mount_at_root(source string, target string, filesystem string) ? {
 	return mount(vfs_root, source, target, filesystem)
 }
 
-fn (mut node VFSNode) create_dotentries(parent &VFSNode) {
+pub fn (mut node VFSNode) create_dotentries(parent &VFSNode) {
 	// Create . and .. entries
 	mut dot := create_node(node.filesystem, node, '.', false)
 	mut dotdot := create_node(node.filesystem, node, '..', false)
@@ -378,7 +378,7 @@ pub fn symlink(parent &VFSNode, dest string, target string) ?&VFSNode {
 	require_access(parent_of_tgt_node, access_write | access_exec)?
 	target_node = parent_of_tgt_node.filesystem.symlink(parent_of_tgt_node, dest, basename)
 	if target_node == unsafe { nil } { return none }
-	apply_creation_identity(mut target_node, parent_of_tgt_node)
+	apply_creation_identity(mut target_node, parent_of_tgt_node)?
 
 	unsafe {
 		parent_of_tgt_node.children[basename] = target_node
@@ -475,7 +475,7 @@ pub fn internal_create(parent &VFSNode, name string, mode u32) ?&VFSNode {
 	require_access(parent_of_tgt_node, access_write | access_exec)?
 	target_node = parent_of_tgt_node.filesystem.create(parent_of_tgt_node, basename, mode)
 	if target_node == unsafe { nil } { return none }
-	apply_creation_identity(mut target_node, parent_of_tgt_node)
+	apply_creation_identity(mut target_node, parent_of_tgt_node)?
 
 	unsafe {
 		parent_of_tgt_node.children[basename] = target_node
@@ -1072,8 +1072,6 @@ pub fn syscall_linkat(_ voidptr, olddirfd int, _oldpath charptr, newdirfd int, _
 		return errno.err, errno.get()
 	}
 
-	new_node.resource.link(unsafe { nil }) or { return errno.err, errno.get() }
-
 	unsafe {
 		newparent.children[basename] = new_node
 	}
@@ -1101,8 +1099,14 @@ pub fn syscall_fchmod(_ voidptr, fdnum int, mode u32) (u64, u64) {
 	if !owns_resource(fd.handle.resource.stat.uid) {
 		return errno.err, errno.eperm
 	}
-	// Preserve file type bits (upper 4 bits), only change permission bits
-	fd.handle.resource.stat.mode = (fd.handle.resource.stat.mode & stat.ifmt) | (mode & 0o7777)
+	// Preserve file type bits (upper 4 bits), only change permission bits.
+	mut res := fd.handle.resource
+	old_mode := res.stat.mode
+	res.stat.mode = (res.stat.mode & stat.ifmt) | (mode & 0o7777)
+	resource.persist_metadata(mut res) or {
+		res.stat.mode = old_mode
+		return errno.err, errno.get()
+	}
 	return 0, 0
 }
 
@@ -1124,7 +1128,12 @@ pub fn syscall_fchmodat(_ voidptr, dirfd int, _path charptr, mode u32) (u64, u64
 	// Preserve the object type and update only permission/special bits, just as
 	// fchmod does. Archive extractors use fchmodat after creating each file.
 	mut node_resource := node.resource
+	old_mode := node_resource.stat.mode
 	node_resource.stat.mode = (node_resource.stat.mode & stat.ifmt) | (mode & 0o7777)
+	resource.persist_metadata(mut node_resource) or {
+		node_resource.stat.mode = old_mode
+		return errno.err, errno.get()
+	}
 	return 0, 0
 }
 
@@ -1610,6 +1619,19 @@ fn set_owner(mut res resource.Resource, uid u32, gid u32) {
 	}
 }
 
+fn change_owner(mut res resource.Resource, uid u32, gid u32) ? {
+	old_uid := res.stat.uid
+	old_gid := res.stat.gid
+	old_mode := res.stat.mode
+	set_owner(mut res, uid, gid)
+	resource.persist_metadata(mut res) or {
+		res.stat.uid = old_uid
+		res.stat.gid = old_gid
+		res.stat.mode = old_mode
+		return none
+	}
+}
+
 pub fn syscall_fchownat(_ voidptr, dirfd int, _path charptr, uid u32, gid u32, flags int) (u64, u64) {
 	path := unsafe { cstring_to_vstring(_path) }
 
@@ -1631,7 +1653,7 @@ pub fn syscall_fchownat(_ voidptr, dirfd int, _path charptr, uid u32, gid u32, f
 		if !may_chown(res.stat.uid, uid, gid) {
 			return errno.err, errno.eperm
 		}
-		set_owner(mut res, uid, gid)
+		change_owner(mut res, uid, gid) or { return errno.err, errno.get() }
 		return 0, 0
 	}
 
@@ -1645,7 +1667,7 @@ pub fn syscall_fchownat(_ voidptr, dirfd int, _path charptr, uid u32, gid u32, f
 		return errno.err, errno.eperm
 	}
 
-	set_owner(mut res, uid, gid)
+	change_owner(mut res, uid, gid) or { return errno.err, errno.get() }
 
 	return 0, 0
 }
@@ -1664,7 +1686,7 @@ pub fn syscall_fchown(_ voidptr, fdnum int, uid u32, gid u32) (u64, u64) {
 	if !may_chown(res.stat.uid, uid, gid) {
 		return errno.err, errno.eperm
 	}
-	set_owner(mut res, uid, gid)
+	change_owner(mut res, uid, gid) or { return errno.err, errno.get() }
 
 	return 0, 0
 }

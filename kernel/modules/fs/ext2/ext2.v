@@ -11,6 +11,7 @@ import fs as vfs
 import pagecache
 import katomic
 import time
+import errno
 
 @[packed]
 struct EXT2Superblock {
@@ -120,11 +121,17 @@ fn (mut this EXT2Resource) read(handle voidptr, buf voidptr, loc u64, count u64)
 }
 
 fn (mut this EXT2Resource) write(handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
+	this.filesystem.l.acquire()
+	defer { this.filesystem.l.release() }
 	mut current_inode := &EXT2Inode{}
 
 	current_inode.read_entry(mut this.filesystem, u32(this.stat.ino)) or { return none }
-
-	return current_inode.write(mut this.filesystem, buf, u32(this.stat.ino), loc, count)
+	written := current_inode.write(mut this.filesystem, buf, u32(this.stat.ino), loc, count)?
+	this.stat.size = i64(u64(current_inode.size32l) | (u64(current_inode.size32h) << 32))
+	this.stat.blocks = current_inode.sector_cnt
+	this.stat.mtim = time.TimeSpec{i64(current_inode.mod_time), 0}
+	this.stat.ctim = time.TimeSpec{i64(current_inode.creation_time), 0}
+	return written
 }
 
 fn (mut this EXT2Resource) ioctl(handle voidptr, request u64, argp voidptr) ?int {
@@ -132,27 +139,44 @@ fn (mut this EXT2Resource) ioctl(handle voidptr, request u64, argp voidptr) ?int
 }
 
 fn (mut this EXT2Resource) unref(handle voidptr) ? {
-	if !katomic.dec(mut &this.refcount) {
-		// No periodic flusher exists yet. Last-close writeback prevents quiet
-		// files from remaining dirty indefinitely. Failure leaves pages dirty;
-		// callers requiring an observable durability result must use fsync.
-		this.sync(handle) or { return none }
+	if katomic.dec(mut &this.refcount) {
+		// The VFS name owns one reference. Reaching it means the last open file
+		// description closed; make ordinary buffered writes persistent.
+		if this.refcount == 1 {
+			this.sync(handle)?
+		}
+		return
 	}
-}
-
-fn (mut this EXT2Resource) link(_handle voidptr) ? {
-	return none
-}
-
-fn (mut this EXT2Resource) unlink(_handle voidptr) ? {
-	return none
+	if this.stat.nlink == 0 {
+		this.filesystem.l.acquire()
+		mut inode := EXT2Inode{}
+		inode.read_entry(mut this.filesystem, u32(this.stat.ino)) or {
+			this.refcount = 1
+			this.filesystem.l.release()
+			return none
+		}
+		inode.free_entry(mut this.filesystem, u32(this.stat.ino)) or {
+			this.refcount = 1
+			this.filesystem.l.release()
+			return none
+		}
+		this.filesystem.flush() or {
+			this.refcount = 1
+			this.filesystem.l.release()
+			return none
+		}
+		this.filesystem.l.release()
+	}
+	memory.free(voidptr(this))
 }
 
 fn (mut this EXT2Resource) grow(handle voidptr, new_size u64) ? {
 	this.l.acquire()
+	this.filesystem.l.acquire()
 	// Both failure paths below used to return with the lock still held, which
 	// wedged every later access to the file.
 	defer {
+		this.filesystem.l.release()
 		this.l.release()
 	}
 
@@ -163,7 +187,7 @@ fn (mut this EXT2Resource) grow(handle voidptr, new_size u64) ? {
 	current_inode.resize(mut this.filesystem, u32(this.stat.ino), 0, new_size) or { return none }
 
 	this.stat.size = i64(new_size)
-	this.stat.blocks = i64(lib.div_roundup(new_size, u64(this.stat.blksize)))
+	this.stat.blocks = current_inode.sector_cnt
 }
 
 struct EXT2Filesystem {
@@ -192,11 +216,21 @@ fn (mut this EXT2Filesystem) populate(node &vfs.VFSNode) {
 	mut parent := &EXT2Inode{}
 	parent.read_entry(mut this, u32(node.resource.stat.ino)) or { return }
 
-	buffer := &voidptr(memory.calloc(parent.size32l, 1))
+	buffer := memory.calloc(parent.size32l, 1)
+	if buffer == unsafe { nil } { return }
+	defer { memory.free(buffer) }
 	parent.read(mut this, buffer, 0, parent.size32l) or { return }
 
 	for i := u32(0); i < parent.size32l; {
 		dir_entry := &EXT2DirectoryEntry(u64(buffer) + i)
+		if dir_entry.entry_size < sizeof(EXT2DirectoryEntry)
+			|| u32(dir_entry.entry_size) > parent.size32l - i {
+			break
+		}
+		if dir_entry.inode_index == 0 {
+			i += dir_entry.entry_size
+			continue
+		}
 
 		name_buffer := memory.calloc(dir_entry.name_length + 1, 1)
 		unsafe {
@@ -205,9 +239,10 @@ fn (mut this EXT2Filesystem) populate(node &vfs.VFSNode) {
 		}
 		name := unsafe { tos(&u8(name_buffer), int(dir_entry.name_length)) }
 
-		if dir_entry.inode_index == 0 {
-			memory.free(buffer)
-			return
+		if name == '.' || name == '..' {
+			memory.free(name_buffer)
+			i += dir_entry.entry_size
+			continue
 		}
 
 		mut inode := &EXT2Inode{}
@@ -229,13 +264,14 @@ fn (mut this EXT2Filesystem) populate(node &vfs.VFSNode) {
 		mut vfs_node := vfs.create_node(this, node, name, stat.isdir(mode))
 		mut resource := &EXT2Resource{
 			filesystem: unsafe { this }
+			refcount:   1
 		}
 
 		resource.stat.mode = mode
 		resource.stat.uid = inode.user_id
 		resource.stat.gid = inode.group_id
 		resource.stat.ino = dir_entry.inode_index
-		resource.stat.size = inode.size32l | (u64(inode.size32h) >> 32)
+		resource.stat.size = u64(inode.size32l) | (u64(inode.size32h) << 32)
 		resource.stat.nlink = inode.hard_link_cnt
 		resource.stat.blksize = this.block_size
 		resource.stat.blocks = lib.div_roundup(resource.stat.size, resource.stat.blksize)
@@ -243,11 +279,26 @@ fn (mut this EXT2Filesystem) populate(node &vfs.VFSNode) {
 		resource.stat.atim = time.TimeSpec{i64(inode.access_time), 0}
 		resource.stat.ctim = time.TimeSpec{i64(inode.creation_time), 0}
 		resource.stat.mtim = time.TimeSpec{i64(inode.mod_time), 0}
+		resource.can_mmap = stat.isreg(mode)
 
 		vfs_node.resource = resource
+		if stat.islnk(mode) && inode.size32l != 0 {
+			target_buffer := memory.calloc(u64(inode.size32l) + 1, 1)
+			if target_buffer != unsafe { nil } {
+				inode.read(mut this, target_buffer, 0, inode.size32l) or {}
+				vfs_node.symlink_target = unsafe {
+					tos(&u8(target_buffer), int(inode.size32l)).clone()
+				}
+				memory.free(target_buffer)
+			}
+		}
 
 		unsafe {
 			vfs_node.parent.children[name] = vfs_node
+		}
+		if stat.isdir(mode) && name != '.' && name != '..' {
+			vfs_node.create_dotentries(node)
+			this.populate(vfs_node)
 		}
 		i += dir_entry.entry_size
 	}
@@ -284,86 +335,20 @@ fn (mut bro EXT2Filesystem) instantiate() &vfs.FileSystem {
 }
 
 fn (mut this EXT2Filesystem) symlink(parent &vfs.VFSNode, dest string, target string) &vfs.VFSNode {
-	mut new_node := vfs.create_node(this, parent, target, false)
-
-	mut resource := &EXT2Resource{
-		filesystem: unsafe { this }
-	}
-
-	resource.stat.size = u64(target.len)
-	resource.stat.blocks = 0
-	resource.stat.blksize = 512
-	resource.stat.dev = this.dev_id
-	resource.stat.ino = parent.resource.stat.ino
-	resource.stat.nlink = 1
-
-	resource.stat.atim = realtime_clock
-	resource.stat.ctim = realtime_clock
-	resource.stat.mtim = realtime_clock
-
-	new_node.symlink_target = dest
-	new_node.resource = resource
-
-	return new_node
+	return this.create_persistent(parent, target, stat.iflnk | 0o777, dest)
 }
 
-fn (mut this EXT2Filesystem) rename(_old_parent &vfs.VFSNode, _old_name string,
-	_new_parent &vfs.VFSNode, _new_name string, _flags int) ? {}
+fn (mut this EXT2Filesystem) rename(old_parent &vfs.VFSNode, old_name string,
+	new_parent &vfs.VFSNode, new_name string, flags int) ? {
+	this.rename_persistent(old_parent, old_name, new_parent, new_name, flags)?
+}
 
 fn (mut this EXT2Filesystem) create(parent &vfs.VFSNode, name string, mode u32) &vfs.VFSNode {
-	mut new_node := vfs.create_node(this, parent, name, stat.isdir(mode))
-
-	mut resource := &EXT2Resource{
-		filesystem: unsafe { this }
-	}
-
-	resource.stat.size = 0
-	resource.stat.blocks = 0
-	resource.stat.blksize = this.block_size
-	resource.stat.dev = this.dev_id
-	resource.stat.mode = mode
-	resource.stat.nlink = 1
-
-	resource.stat.atim = realtime_clock
-	resource.stat.ctim = realtime_clock
-	resource.stat.mtim = realtime_clock
-
-	resource.stat.ino = this.allocate_inode() or { return 0 }
-
-	mut parent_inode := &EXT2Inode{}
-	parent_inode.read_entry(mut this, u32(parent.resource.stat.ino)) or { return 0 }
-
-	mut file_type := u8(0)
-
-	if stat.isreg(mode) {
-		file_type = 1
-	} else if stat.isdir(mode) {
-		file_type = 2
-	} else if stat.ischr(mode) {
-		file_type = 3
-	} else if stat.isblk(mode) {
-		file_type = 4
-	} else if stat.isifo(mode) {
-		file_type = 5
-	} else if stat.issock(mode) {
-		file_type = 6
-	} else if stat.islnk(mode) {
-		file_type = 7
-	}
-
-	this.dir_create_entry(mut parent_inode, u32(parent.resource.stat.ino), u32(resource.stat.ino),
-		file_type, name) or { return 0 }
-
-	new_node.resource = resource
-
-	return new_node
+	return this.create_persistent(parent, name, mode, '')
 }
 
-// The on-disk hard-link operation has not been implemented by this small ext2
-// writer.  Keep the VFS contract explicit rather than manufacturing a link
-// that would disappear after the next mount.
-fn (mut this EXT2Filesystem) link(_parent &vfs.VFSNode, _path string, mut _old_node vfs.VFSNode) ?&vfs.VFSNode {
-	return none
+fn (mut this EXT2Filesystem) link(parent &vfs.VFSNode, path string, mut old_node vfs.VFSNode) ?&vfs.VFSNode {
+	return this.link_persistent(parent, path, mut old_node)
 }
 
 fn (mut this EXT2Filesystem) mount(parent &vfs.VFSNode, name string, source &vfs.VFSNode) ?&vfs.VFSNode {
@@ -373,9 +358,10 @@ fn (mut this EXT2Filesystem) mount(parent &vfs.VFSNode, name string, source &vfs
 
 	mut resource := &EXT2Resource{
 		filesystem: unsafe { this }
+		refcount:   1
 	}
 
-	resource.stat.size = this.root_inode.size32l | (u64(this.root_inode.size32h) >> 32)
+	resource.stat.size = u64(this.root_inode.size32l) | (u64(this.root_inode.size32h) << 32)
 	resource.stat.blksize = this.block_size
 	resource.stat.blocks = lib.div_roundup(resource.stat.size, resource.stat.blksize)
 	resource.stat.dev = this.dev_id
@@ -395,50 +381,6 @@ fn (mut this EXT2Filesystem) mount(parent &vfs.VFSNode, name string, source &vfs
 	this.populate(target)
 
 	return target
-}
-
-fn (mut filesystem EXT2Filesystem) dir_create_entry(mut parent EXT2Inode, parent_inode_index u32, new_inode u32, dir_type u8, name string) ?int {
-	buffer := &voidptr(memory.calloc(parent.size32l, 1))
-	parent.read(mut filesystem, buffer, 0, parent.size32l) or { return none }
-
-	mut found := false
-
-	for i := u32(0); i < parent.size32l; {
-		mut dir_entry := &EXT2DirectoryEntry(u64(buffer) + i)
-
-		if found == true {
-			dir_entry.inode_index = new_inode
-			dir_entry.dir_type = dir_type
-			dir_entry.name_length = u8(name.len)
-			dir_entry.entry_size = u16(parent.size32l - i)
-
-			unsafe {
-				C.memcpy(voidptr(u64(dir_entry) + sizeof(EXT2DirectoryEntry)), name.str,
-					name.len)
-			}
-
-			parent.write(mut filesystem, buffer, parent_inode_index, 0, parent.size32l) or { return none }
-
-			return 0
-		}
-
-		expected_size := lib.align_up(sizeof(EXT2DirectoryEntry) + dir_entry.name_length,
-			4)
-		if dir_entry.entry_size != expected_size {
-			dir_entry.entry_size = u16(expected_size)
-			i += u32(expected_size)
-
-			found = true
-
-			continue
-		}
-
-		i += dir_entry.entry_size
-	}
-
-	memory.free(buffer)
-
-	return none
 }
 
 fn (mut inode EXT2Inode) read(mut filesystem EXT2Filesystem, buf voidptr, off u64, cnt u64) ?i64 {
@@ -463,9 +405,12 @@ fn (mut inode EXT2Inode) read(mut filesystem EXT2Filesystem, buf voidptr, off u6
 		}
 
 		disk_block := inode.get_block(mut filesystem, u32(iblock)) or { return none }
-
-		filesystem.raw_device_read(voidptr(u64(buf) + headway), disk_block * filesystem.block_size + offset,
-			size) or { return none }
+		if disk_block == 0 {
+			unsafe { C.memset(voidptr(u64(buf) + headway), 0, size) }
+		} else {
+			filesystem.raw_device_read(voidptr(u64(buf) + headway),
+				disk_block * filesystem.block_size + offset, size) or { return none }
+		}
 
 		headway += size
 	}
@@ -475,25 +420,54 @@ fn (mut inode EXT2Inode) read(mut filesystem EXT2Filesystem, buf voidptr, off u6
 
 fn (mut inode EXT2Inode) resize(mut filesystem EXT2Filesystem, inode_index u32, start u64, cnt u64) ?int {
 	sector_size := filesystem.backing_device.resource.stat.blksize
-
-	if (start + cnt) < (inode.sector_cnt * sector_size) {
-		return 0
+	if start > u64(0xffffffff) || cnt > u64(0xffffffff) - start {
+		errno.set(errno.efbig)
+		return none
 	}
-
-	iblock_start := lib.div_roundup(inode.sector_cnt * sector_size, filesystem.block_size)
-	iblock_end := lib.div_roundup(start + cnt, filesystem.block_size)
-
-	if inode.size32l < (start + cnt) {
-		inode.size32l = u32(start + cnt)
+	new_size := start + cnt
+	old_blocks := lib.div_roundup(u64(inode.size32l), filesystem.block_size)
+	new_blocks := lib.div_roundup(new_size, filesystem.block_size)
+	if new_blocks < old_blocks {
+		for i := new_blocks; i < old_blocks; i++ {
+			disk_block := inode.get_block(mut filesystem, u32(i)) or { return none }
+			if disk_block != 0 {
+				filesystem.free_block(disk_block)?
+				inode.set_block(mut filesystem, inode_index, u32(i), 0)?
+				sectors := u32(filesystem.block_size / sector_size)
+				inode.sector_cnt = if inode.sector_cnt >= sectors {
+					inode.sector_cnt - sectors
+				} else { 0 }
+			}
+		}
+		if new_size != 0 && new_size % filesystem.block_size != 0 {
+			disk_block := inode.get_block(mut filesystem,
+				u32(new_size / filesystem.block_size))?
+			if disk_block != 0 {
+				tail_offset := new_size % filesystem.block_size
+				tail_size := filesystem.block_size - tail_offset
+				zero := memory.calloc(tail_size, 1)
+				if zero == unsafe { nil } { errno.set(errno.enomem); return none }
+				filesystem.raw_device_write(zero,
+					u64(disk_block) * filesystem.block_size + tail_offset, tail_size) or {
+					memory.free(zero)
+					return none
+				}
+				memory.free(zero)
+			}
+		}
+	} else if new_blocks > old_blocks {
+		for i := old_blocks; i < new_blocks; i++ {
+			if inode.get_block(mut filesystem, u32(i)) or { u32(0) } != 0 { continue }
+			disk_block := filesystem.allocate_block() or { return none }
+			inode.set_block(mut filesystem, inode_index, u32(i), disk_block) or {
+				filesystem.free_block(disk_block) or {}
+				return none
+			}
+			inode.sector_cnt += u32(filesystem.block_size / sector_size)
+		}
 	}
-
-	for i := iblock_start; i < iblock_end; i++ {
-		disk_block := filesystem.allocate_block() or { return none }
-
-		inode.sector_cnt = u32(filesystem.block_size / sector_size)
-
-		inode.set_block(mut filesystem, inode_index, u32(i), disk_block) or { return none }
-	}
+	inode.size32l = u32(new_size)
+	inode.size32h = 0
 
 	inode.write_entry(mut filesystem, inode_index) or { return none }
 
@@ -501,7 +475,14 @@ fn (mut inode EXT2Inode) resize(mut filesystem EXT2Filesystem, inode_index u32, 
 }
 
 fn (mut inode EXT2Inode) write(mut filesystem EXT2Filesystem, buf voidptr, inode_index u32, off u64, cnt u64) ?i64 {
-	inode.resize(mut filesystem, inode_index, off, cnt) or { return none }
+	if off > u64(0xffffffff) || cnt > u64(0xffffffff) - off {
+		errno.set(errno.efbig)
+		return none
+	}
+	end := off + cnt
+	if end > u64(inode.size32l) {
+		inode.resize(mut filesystem, inode_index, 0, end) or { return none }
+	}
 
 	for headway := u64(0); headway < cnt; {
 		iblock := (off + headway) / filesystem.block_size
@@ -520,20 +501,27 @@ fn (mut inode EXT2Inode) write(mut filesystem EXT2Filesystem, buf voidptr, inode
 
 		headway += size
 	}
+	inode.mod_time = ext2_now()
+	inode.creation_time = inode.mod_time
+	inode.write_entry(mut filesystem, inode_index)?
 
 	return i64(cnt)
 }
 
 fn (mut inode EXT2Inode) free_entry(mut filesystem EXT2Filesystem, inode_index u32) ?int {
-	for i := u64(0); i < lib.div_roundup(inode.sector_cnt * filesystem.backing_device.resource.stat.blksize,
-		filesystem.block_size); i++ {
+	for i := u64(0); i < lib.div_roundup(u64(inode.size32l), filesystem.block_size); i++ {
 		block_index := inode.get_block(mut filesystem, u32(i)) or { return none }
-
-		filesystem.free_block(block_index) or { return none }
-
-		inode.set_block(mut filesystem, inode_index, u32(i), 0) or { return none }
+		if block_index != 0 {
+			filesystem.free_block(block_index) or { return none }
+			inode.set_block(mut filesystem, inode_index, u32(i), 0) or { return none }
+		}
 	}
-
+	inode.size32l = 0
+	inode.size32h = 0
+	inode.sector_cnt = 0
+	inode.permissions = 0
+	inode.hard_link_cnt = 0
+	inode.write_entry(mut filesystem, inode_index)?
 	filesystem.free_inode(inode_index) or { return none }
 
 	return 0
@@ -698,7 +686,22 @@ fn (mut filesystem EXT2Filesystem) allocate_block() ?u32 {
 
 		block_index := bgd.allocate_block(mut filesystem, i) or { continue }
 
-		return u32(block_index + i * filesystem.superblock.blocks_per_group)
+		absolute := u32(block_index + i * filesystem.superblock.blocks_per_group +
+			filesystem.superblock.sb_block)
+		zero := memory.calloc(filesystem.block_size, 1)
+		if zero == unsafe { nil } {
+			filesystem.free_block(absolute) or {}
+			errno.set(errno.enomem)
+			return none
+		}
+		filesystem.raw_device_write(zero, u64(absolute) * filesystem.block_size,
+			filesystem.block_size) or {
+			memory.free(zero)
+			filesystem.free_block(absolute) or {}
+			return none
+		}
+		memory.free(zero)
+		return absolute
 	}
 
 	return none
@@ -712,16 +715,18 @@ fn (mut filesystem EXT2Filesystem) allocate_inode() ?u64 {
 
 		inode_index := bgd.allocate_inode(mut filesystem, i) or { continue }
 
-		return inode_index + i * filesystem.superblock.blocks_per_group
+		return inode_index + i * filesystem.superblock.inodes_per_group + 1
 	}
 
 	return none
 }
 
 fn (mut filesystem EXT2Filesystem) free_block(block u32) ?int {
-	bgd_index := block / filesystem.superblock.blocks_per_group
-	bitmap_index := block - bgd_index * filesystem.superblock.blocks_per_group
-	bitmap := memory.calloc(lib.div_roundup(filesystem.block_size, u64(8)), 1)
+	if block < filesystem.superblock.sb_block { errno.set(errno.eio); return none }
+	relative := block - filesystem.superblock.sb_block
+	bgd_index := relative / filesystem.superblock.blocks_per_group
+	bitmap_index := relative % filesystem.superblock.blocks_per_group
+	bitmap := memory.calloc(filesystem.block_size, 1)
 
 	mut bgd := &EXT2BlockGroupDescriptor{}
 	bgd.read_entry(mut filesystem, bgd_index)
@@ -745,6 +750,8 @@ fn (mut filesystem EXT2Filesystem) free_block(block u32) ?int {
 
 	bgd.unallocated_blocks++
 	bgd.write_entry(mut filesystem, bgd_index)
+	filesystem.superblock.unallocated_blocks++
+	filesystem.write_superblock()?
 
 	memory.free(bitmap)
 
@@ -752,9 +759,10 @@ fn (mut filesystem EXT2Filesystem) free_block(block u32) ?int {
 }
 
 fn (mut filesystem EXT2Filesystem) free_inode(inode u32) ?int {
-	bgd_index := inode / filesystem.superblock.inodes_per_group
-	bitmap_index := inode - bgd_index * filesystem.superblock.inodes_per_group
-	bitmap := memory.calloc(lib.div_roundup(filesystem.block_size, u64(8)), 1)
+	if inode == 0 { errno.set(errno.eio); return none }
+	bgd_index := (inode - 1) / filesystem.superblock.inodes_per_group
+	bitmap_index := (inode - 1) % filesystem.superblock.inodes_per_group
+	bitmap := memory.calloc(filesystem.block_size, 1)
 
 	mut bgd := &EXT2BlockGroupDescriptor{}
 	bgd.read_entry(mut filesystem, bgd_index)
@@ -778,6 +786,8 @@ fn (mut filesystem EXT2Filesystem) free_inode(inode u32) ?int {
 
 	bgd.unallocated_inodes++
 	bgd.write_entry(mut filesystem, bgd_index)
+	filesystem.superblock.unallocated_inodes++
+	filesystem.write_superblock()?
 
 	memory.free(bitmap)
 
@@ -825,14 +835,19 @@ fn (mut bgd EXT2BlockGroupDescriptor) allocate_block(mut filesystem EXT2Filesyst
 		return none
 	}
 
-	bitmap := memory.calloc(lib.div_roundup(filesystem.block_size, u64(8)), 1)
+	bitmap := memory.calloc(filesystem.block_size, 1)
 
 	filesystem.raw_device_read(bitmap, bgd.block_addr_bitmap * filesystem.block_size, filesystem.block_size) or {
 		print('ext2: unable to read bgd bitmap\n')
 		return none
 	}
 
-	for i := u64(0); i < filesystem.block_size; i++ {
+	mut group_blocks := u64(filesystem.superblock.blocks_per_group)
+	group_start := u64(filesystem.superblock.sb_block) + u64(bgd_index) * group_blocks
+	if group_start + group_blocks > filesystem.superblock.block_cnt {
+		group_blocks = u64(filesystem.superblock.block_cnt) - group_start
+	}
+	for i := u64(0); i < group_blocks; i++ {
 		if lib.bittest(bitmap, i) == false {
 			lib.bitset(bitmap, i)
 
@@ -843,6 +858,8 @@ fn (mut bgd EXT2BlockGroupDescriptor) allocate_block(mut filesystem EXT2Filesyst
 
 			bgd.unallocated_blocks--
 			bgd.write_entry(mut filesystem, bgd_index)
+			filesystem.superblock.unallocated_blocks--
+			filesystem.write_superblock()?
 
 			memory.free(bitmap)
 
@@ -852,22 +869,27 @@ fn (mut bgd EXT2BlockGroupDescriptor) allocate_block(mut filesystem EXT2Filesyst
 
 	memory.free(bitmap)
 
-	return -1
+	return none
 }
 
 fn (mut bgd EXT2BlockGroupDescriptor) allocate_inode(mut filesystem EXT2Filesystem, bgd_index u32) ?u64 {
-	if bgd.unallocated_blocks == 0 {
+	if bgd.unallocated_inodes == 0 {
 		return none
 	}
 
-	bitmap := memory.calloc(lib.div_roundup(filesystem.block_size, u64(8)), 1)
+	bitmap := memory.calloc(filesystem.block_size, 1)
 
 	filesystem.raw_device_read(bitmap, bgd.block_addr_inode * filesystem.block_size, filesystem.block_size) or {
 		print('ext2: unable to read inode bitmap\n')
 		return none
 	}
 
-	for i := u64(0); i < filesystem.block_size; i++ {
+	mut group_inodes := u64(filesystem.superblock.inodes_per_group)
+	group_start := u64(bgd_index) * group_inodes
+	if group_start + group_inodes > filesystem.superblock.inode_cnt {
+		group_inodes = u64(filesystem.superblock.inode_cnt) - group_start
+	}
+	for i := u64(0); i < group_inodes; i++ {
 		if lib.bittest(bitmap, i) == false {
 			lib.bitset(bitmap, i)
 
@@ -878,6 +900,8 @@ fn (mut bgd EXT2BlockGroupDescriptor) allocate_inode(mut filesystem EXT2Filesyst
 
 			bgd.unallocated_inodes--
 			bgd.write_entry(mut filesystem, bgd_index)
+			filesystem.superblock.unallocated_inodes--
+			filesystem.write_superblock()?
 
 			memory.free(bitmap)
 
@@ -887,7 +911,11 @@ fn (mut bgd EXT2BlockGroupDescriptor) allocate_inode(mut filesystem EXT2Filesyst
 
 	memory.free(bitmap)
 
-	return -1
+	return none
+}
+
+fn (mut filesystem EXT2Filesystem) write_superblock() ? {
+	filesystem.raw_device_write(filesystem.superblock, 1024, sizeof(EXT2Superblock))?
 }
 
 fn (mut inode EXT2Inode) read_entry(mut filesystem EXT2Filesystem, inode_index u32) ?int {

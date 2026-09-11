@@ -2,6 +2,7 @@ module fs
 
 import errno
 import proc
+import resource
 import stat
 
 pub const access_exec = u32(1)
@@ -81,17 +82,26 @@ fn may_chown(uid u32, new_uid u32, new_gid u32) bool {
 	return new_gid == u32(-1) || credential_in_group(process, new_gid, true)
 }
 
-fn apply_creation_identity(mut node VFSNode, parent &VFSNode) {
+fn apply_creation_identity(mut node VFSNode, parent &VFSNode) ? {
 	process := proc.current_thread().process
-	node.resource.stat.uid = process.euid
-	node.resource.stat.gid = if parent.resource.stat.mode & 0o2000 != 0 {
+	desired_gid := if parent.resource.stat.mode & 0o2000 != 0 {
 		parent.resource.stat.gid
 	} else {
 		process.egid
 	}
+	mut desired_mode := node.resource.stat.mode
 	if stat.isdir(node.resource.stat.mode) && parent.resource.stat.mode & 0o2000 != 0 {
-		node.resource.stat.mode |= 0o2000
+		desired_mode |= 0o2000
 	}
+	if node.resource.stat.uid == process.euid && node.resource.stat.gid == desired_gid
+		&& node.resource.stat.mode == desired_mode {
+		return
+	}
+	node.resource.stat.uid = process.euid
+	node.resource.stat.gid = desired_gid
+	node.resource.stat.mode = desired_mode
+	mut res := node.resource
+	resource.persist_metadata(mut res)?
 }
 
 pub fn syscall_umask(_ voidptr, mask u32) (u64, u64) {

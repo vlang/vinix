@@ -359,6 +359,8 @@ fn (mut this AnsDataFS) link(parent &fs.VFSNode, name string, mut old_node fs.VF
 		return none
 	}
 	mut node := fs.create_node(this, parent, name, false)
+	katomic.inc(mut &old_node.resource.refcount)
+	katomic.inc(mut &old_node.resource.stat.nlink)
 	node.resource = old_node.resource
 	node.symlink_target = old_node.symlink_target
 	return node
