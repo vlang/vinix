@@ -464,48 +464,39 @@ fn syscall_linux_getrusage(_ voidptr, who int, usage u64) (u64, u64) {
 	return 0, 0
 }
 
-// prlimit64(2). The limits are fixed, but a caller asking about one this kernel
-// does not model should not be told it is unlimited by accident.
-const rlimit_nofile = 7
-
-const rlimit_nlimits = 16
-
 fn syscall_linux_prlimit64(_ voidptr, pid int, res int, new_rlim u64, old_rlim u64) (u64, u64) {
-	if res < 0 || res >= rlimit_nlimits {
+	if res != proc.rlimit_nofile {
 		return errno.err, errno.einval
 	}
-	if pid != 0 {
-		if pid < 0 || pid >= proc.max_pid {
-			return errno.err, errno.esrch
-		}
-		if processes[pid] == unsafe { nil } {
-			return errno.err, errno.esrch
-		}
+	mut process := proc.current_thread().process
+	if pid != 0 && pid != process.pid {
+		return errno.err, errno.esrch
 	}
 
+	process.fds_lock.acquire()
+	defer { process.fds_lock.release() }
+	old := process.rlimits[res]
 	if old_rlim != 0 {
-		// RLIMIT_NOFILE has to be a real number, not RLIM_INFINITY: xtrans
-		// casts rlim_cur to int and compares fd >= limit, and infinity becomes
-		// -1 there.
-		mut limits := [2]u64{}
-		if res == rlimit_nofile {
-			limits[0] = u64(proc.max_fds)
-			limits[1] = u64(proc.max_fds)
-		} else {
-			limits[0] = 0xffffffffffffffff
-			limits[1] = 0xffffffffffffffff
-		}
-		if !usercopy.copy_to_user(old_rlim, voidptr(&limits[0]), sizeof(u64) * 2) {
+		if !usercopy.copy_to_user(old_rlim, voidptr(&old), sizeof(proc.RLimit)) {
 			return errno.err, errno.efault
 		}
 	}
 
-	// Lowering a limit is accepted and then ignored; nothing here enforces one.
 	if new_rlim != 0 {
-		mut wanted := [2]u64{}
-		if !usercopy.copy_from_user(voidptr(&wanted[0]), new_rlim, sizeof(u64) * 2) {
+		mut wanted := proc.RLimit{}
+		if !usercopy.copy_from_user(voidptr(&wanted), new_rlim, sizeof(proc.RLimit)) {
 			return errno.err, errno.efault
 		}
+		if wanted.cur > wanted.max {
+			return errno.err, errno.einval
+		}
+		if wanted.max > old.max && process.euid != 0 {
+			return errno.err, errno.eperm
+		}
+		if wanted.max > u64(proc.max_fds) {
+			return errno.err, errno.eperm
+		}
+		process.rlimits[res] = wanted
 	}
 
 	return 0, 0

@@ -16,6 +16,31 @@ pub const max_events = 32
 
 pub const max_pid = 65536
 
+pub const rlimit_nofile = 7
+pub const rlimit_nlimits = 16
+pub const rlim_infinity = u64(-1)
+
+pub struct RLimit {
+pub mut:
+	cur u64
+	max u64
+}
+
+pub fn default_rlimits() [rlimit_nlimits]RLimit {
+	mut limits := [rlimit_nlimits]RLimit{}
+	for i := 0; i < rlimit_nlimits; i++ {
+		limits[i] = RLimit{
+			cur: rlim_infinity
+			max: rlim_infinity
+		}
+	}
+	limits[rlimit_nofile] = RLimit{
+		cur: u64(max_fds)
+		max: u64(max_fds)
+	}
+	return limits
+}
+
 pub struct Process {
 pub mut:
 	pid                      int
@@ -60,6 +85,7 @@ pub mut:
 	egid   u32
 	sgid   u32
 	groups []u32
+	rlimits [rlimit_nlimits]RLimit
 
 	// The controlling terminal's session, from setsid(2). A process is a
 	// session leader when sid == pid.

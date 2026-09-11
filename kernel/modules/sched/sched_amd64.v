@@ -601,6 +601,7 @@ pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) ?&proc.Pr
 		new_proc.mmap_anon_non_fixed_base = old_process.mmap_anon_non_fixed_base
 		new_proc.current_directory = old_process.current_directory
 		new_proc.linux_abi = old_process.linux_abi
+		new_proc.rlimits = old_process.rlimits
 	} else {
 		new_proc.ppid = 0
 		new_proc.pgid = new_proc.pid
@@ -609,6 +610,7 @@ pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) ?&proc.Pr
 		new_proc.thread_stack_top = elf.initial_stack_top()
 		new_proc.mmap_anon_non_fixed_base = elf.initial_mmap_base()
 		new_proc.current_directory = voidptr(vfs_root)
+		new_proc.rlimits = proc.default_rlimits()
 	}
 
 	return new_proc

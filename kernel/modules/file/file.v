@@ -361,15 +361,29 @@ pub fn fdnum_create_from_fd(_process &proc.Process, fd &FD, oldfd int, specific 
 		process.fds_lock.release()
 	}
 
+	limit := if process.rlimits[proc.rlimit_nofile].cur < u64(proc.max_fds) {
+		int(process.rlimits[proc.rlimit_nofile].cur)
+	} else {
+		proc.max_fds
+	}
+	if oldfd < 0 {
+		errno.set(errno.einval)
+		return none
+	}
 	if specific == false {
-		for i := oldfd; i < proc.max_fds; i++ {
+		for i := oldfd; i < limit; i++ {
 			if process.fds[i] == unsafe { nil } {
 				process.fds[i] = voidptr(fd)
 				return i
 			}
 		}
+		errno.set(errno.emfile)
 		return none
 	} else {
+		if oldfd >= limit {
+			errno.set(errno.ebadf)
+			return none
+		}
 		fdnum_close(process, oldfd, false) or {}
 		process.fds[oldfd] = voidptr(fd)
 		return oldfd
@@ -393,7 +407,12 @@ pub fn fd_create_from_resource(mut res resource.Resource, flags int) ?&FD {
 
 pub fn fdnum_create_from_resource(_process &proc.Process, mut res resource.Resource, flags int, oldfd int, specific bool) ?int {
 	new_fd := fd_create_from_resource(mut res, flags) or { return none }
-	return fdnum_create_from_fd(_process, new_fd, oldfd, specific)
+	return fdnum_create_from_fd(_process, new_fd, oldfd, specific) or {
+		mut handle := new_fd.handle
+		unsafe { free(voidptr(new_fd)) }
+		handle.unref()
+		return none
+	}
 }
 
 pub fn fd_from_fdnum(_process &proc.Process, fdnum int) ?&FD {

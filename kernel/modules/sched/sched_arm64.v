@@ -800,6 +800,7 @@ pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) ?&proc.Pr
 		new_proc.sgid = old_process.sgid
 		new_proc.groups = old_process.groups.clone()
 		new_proc.executable_path = old_process.executable_path.clone()
+		new_proc.rlimits = old_process.rlimits
 		new_proc.pagemap = mmap.fork_pagemap(old_process.pagemap) or { return none }
 		new_proc.thread_stack_top = old_process.thread_stack_top
 		new_proc.mmap_anon_non_fixed_base = old_process.mmap_anon_non_fixed_base
@@ -812,6 +813,7 @@ pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) ?&proc.Pr
 		new_proc.thread_stack_top = elf.initial_stack_top()
 		new_proc.mmap_anon_non_fixed_base = elf.initial_mmap_base()
 		new_proc.current_directory = voidptr(vfs_root)
+		new_proc.rlimits = proc.default_rlimits()
 	}
 
 	return new_proc

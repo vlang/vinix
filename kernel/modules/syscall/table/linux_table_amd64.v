@@ -284,28 +284,36 @@ fn syscall_linux_gettid(_ voidptr) (u64, u64) {
 }
 
 fn syscall_linux_prlimit64(_ voidptr, pid int, resource int, new_limit u64, old_limit u64) (u64, u64) {
-	if pid != 0 && pid != proc.current_thread().process.pid {
+	mut process := proc.current_thread().process
+	if pid != 0 && pid != process.pid {
 		return errno.err, errno.esrch
 	}
-	if resource != 7 { // RLIMIT_NOFILE
+	if resource != proc.rlimit_nofile {
 		return errno.err, errno.einval
 	}
+	process.fds_lock.acquire()
+	defer { process.fds_lock.release() }
+	old := process.rlimits[resource]
 	if old_limit != 0 {
-		mut limit := [2]u64{}
-		limit[0] = u64(proc.max_fds)
-		limit[1] = u64(proc.max_fds)
-		if !usercopy.copy_to_user(old_limit, voidptr(&limit[0]), 16) {
+		if !usercopy.copy_to_user(old_limit, voidptr(&old), sizeof(proc.RLimit)) {
 			return errno.err, errno.efault
 		}
 	}
 	if new_limit != 0 {
-		mut requested := [2]u64{}
-		if !usercopy.copy_from_user(voidptr(&requested[0]), new_limit, 16) {
+		mut requested := proc.RLimit{}
+		if !usercopy.copy_from_user(voidptr(&requested), new_limit, sizeof(proc.RLimit)) {
 			return errno.err, errno.efault
 		}
-		if requested[0] > proc.max_fds || requested[1] > proc.max_fds {
+		if requested.cur > requested.max {
+			return errno.err, errno.einval
+		}
+		if requested.max > old.max && process.euid != 0 {
 			return errno.err, errno.eperm
 		}
+		if requested.max > u64(proc.max_fds) {
+			return errno.err, errno.eperm
+		}
+		process.rlimits[resource] = requested
 	}
 	return 0, 0
 }
