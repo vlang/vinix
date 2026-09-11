@@ -97,6 +97,9 @@ pub mut:
 	// stays counted. It only ever grows, so a reader that wants a rate takes
 	// two samples and divides the difference by the wall clock between them.
 	cpu_time_ns u64
+	// POSIX nice value. The scheduler scales this process' timeslices from
+	// -20 (highest normal priority) through 19 (lowest).
+	nice int
 }
 
 pub struct SigAction {
@@ -267,4 +270,31 @@ pub fn thread_by_tid(tid int) &Thread {
 	}
 
 	return threads_by_tid[tid]
+}
+
+pub fn thread_affinity(tid int) ?u64 {
+	if tid <= 0 || tid >= max_pid {
+		return none
+	}
+	pid_lock.acquire()
+	defer { pid_lock.release() }
+	t := threads_by_tid[tid]
+	if t == unsafe { nil } {
+		return none
+	}
+	return t.affinity_mask
+}
+
+pub fn set_thread_affinity(tid int, mask u64) bool {
+	if tid <= 0 || tid >= max_pid {
+		return false
+	}
+	pid_lock.acquire()
+	defer { pid_lock.release() }
+	mut t := threads_by_tid[tid]
+	if t == unsafe { nil } {
+		return false
+	}
+	t.affinity_mask = mask
+	return true
 }

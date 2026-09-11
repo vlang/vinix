@@ -636,6 +636,7 @@ pub fn syscall_fork(gpr_state &cpulocal.GPRState) (u64, u64) {
 		sigentry:       old_thread.sigentry
 		sigactions:     old_thread.sigactions
 		masked_signals: old_thread.masked_signals
+		affinity_mask:  old_thread.affinity_mask
 		stacks:         stacks
 		fpu_storage:    unsafe { malloc(fpu_storage_size) }
 	}

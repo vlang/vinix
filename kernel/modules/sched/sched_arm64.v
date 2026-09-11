@@ -92,6 +92,11 @@ fn get_next_thread() &proc.Thread {
 		mut t := scheduler_running_queue[index]
 
 		if unsafe { t != 0 } {
+			cpu_number := cpu_local.cpu_number
+			if cpu_number < 64 && t.affinity_mask & (u64(1) << cpu_number) == 0 {
+				index++
+				continue
+			}
 			if t.l.test_and_acquire() == true {
 				cpu_local.last_run_queue_index = index
 				return t
@@ -107,6 +112,15 @@ fn get_next_thread() &proc.Thread {
 
 	cpu_local.last_run_queue_index = index
 	return unsafe { nil }
+}
+
+fn effective_timeslice(t &proc.Thread) u64 {
+	weight := u64(20 - t.process.nice)
+	mut slice := t.timeslice * weight / 20
+	if slice == 0 {
+		slice = 1
+	}
+	return slice
 }
 
 fn scheduler_timer_handler(_gpr_state voidptr) {
@@ -147,7 +161,7 @@ fn scheduler_timer_handler(_gpr_state voidptr) {
 			// A blocked current thread must instead fall through: otherwise a
 			// later wakeup selects that same stale current thread and charges
 			// its entire sleep interval as CPU time.
-			timer.oneshot(current_thread.timeslice)
+			timer.oneshot(effective_timeslice(current_thread))
 			return
 		}
 		// Past the early return above, this thread really is coming off the
@@ -205,7 +219,7 @@ fn scheduler_timer_handler(_gpr_state voidptr) {
 		print('\nSCHED RESTORE: pid=3 x30=0x220000! pc=0x${current_thread.gpr_state.pc:x} sp=0x${current_thread.gpr_state.sp:x} pstate=0x${current_thread.gpr_state.pstate:x}\n')
 	}
 
-	timer.oneshot(current_thread.timeslice)
+	timer.oneshot(effective_timeslice(current_thread))
 
 	// Restore ARM64 GPR state and return via eret (does not return).
 	C.sched_switch_context(voidptr(&current_thread.gpr_state), current_thread.kernel_stack)
@@ -376,7 +390,7 @@ pub fn yield(save_ctx bool) {
 	}
 
 	// Thread re-enqueued. Re-arm timer for normal scheduling.
-	timer.oneshot(current_thread.timeslice)
+	timer.oneshot(effective_timeslice(current_thread))
 	cpu.interrupt_toggle(true)
 }
 
@@ -453,7 +467,7 @@ pub fn reschedule() {
 
 	mut current_thread := proc.current_thread()
 	if unsafe { current_thread != 0 } {
-		timer.oneshot(current_thread.timeslice)
+		timer.oneshot(effective_timeslice(current_thread))
 	}
 	cpu.interrupt_toggle(true)
 }
@@ -757,6 +771,7 @@ pub fn new_cloned_thread(_process &proc.Process, _source &proc.Thread, state &cp
 		sigentry:         source.sigentry
 		sigactions:       source.sigactions
 		masked_signals:   source.masked_signals
+		affinity_mask:    source.affinity_mask
 	}
 
 	t.self = voidptr(t)
@@ -799,6 +814,7 @@ pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) ?&proc.Pr
 		new_proc.egid = old_process.egid
 		new_proc.sgid = old_process.sgid
 		new_proc.groups = old_process.groups.clone()
+		new_proc.nice = old_process.nice
 		new_proc.executable_path = old_process.executable_path.clone()
 		new_proc.rlimits = old_process.rlimits
 		new_proc.pagemap = mmap.fork_pagemap(old_process.pagemap) or { return none }

@@ -978,13 +978,47 @@ fn syscall_linux_fstatfs(_ voidptr, _fd int, buf u64) (u64, u64) {
 	return 0, 0
 }
 
-// setpriority / getpriority: stubs.
-fn syscall_linux_setpriority(_ voidptr, _which int, _who int, _prio int) (u64, u64) {
+const prio_process = 0
+
+fn syscall_linux_setpriority(_ voidptr, which int, who int, prio int) (u64, u64) {
+	if which != prio_process || who < 0 {
+		return errno.err, errno.einval
+	}
+	mut caller := proc.current_thread().process
+	target_pid := if who == 0 { caller.pid } else { who }
+	mut wanted := prio
+	if wanted < -20 { wanted = -20 }
+	if wanted > 19 { wanted = 19 }
+
+	proc.lock_table()
+	defer { proc.unlock_table() }
+	mut target := proc.process_at(target_pid)
+	if target == unsafe { nil } {
+		return errno.err, errno.esrch
+	}
+	if caller.euid != 0 && caller.euid != target.euid && caller.euid != target.uid {
+		return errno.err, errno.eperm
+	}
+	if wanted < target.nice && caller.euid != 0 {
+		return errno.err, errno.eacces
+	}
+	target.nice = wanted
 	return 0, 0
 }
 
-fn syscall_linux_getpriority(_ voidptr, _which int, _who int) (u64, u64) {
-	return 20, 0 // default nice value
+fn syscall_linux_getpriority(_ voidptr, which int, who int) (u64, u64) {
+	if which != prio_process || who < 0 {
+		return errno.err, errno.einval
+	}
+	target_pid := if who == 0 { proc.current_thread().process.pid } else { who }
+	proc.lock_table()
+	defer { proc.unlock_table() }
+	target := proc.process_at(target_pid)
+	if target == unsafe { nil } {
+		return errno.err, errno.esrch
+	}
+	// The raw syscall returns 20 - nice so every successful result is positive.
+	return u64(20 - target.nice), 0
 }
 
 // ── Syscall table initialization with Linux aarch64 numbers ──

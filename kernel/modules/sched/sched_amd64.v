@@ -46,6 +46,11 @@ fn get_next_thread() &proc.Thread {
 		mut t := scheduler_running_queue[index]
 
 		if unsafe { t != 0 } {
+			cpu_number := cpu_local.cpu_number
+			if cpu_number < 64 && t.affinity_mask & (u64(1) << cpu_number) == 0 {
+				index++
+				continue
+			}
 			if t.l.test_and_acquire() == true {
 				cpu_local.last_run_queue_index = index
 				return t
@@ -61,6 +66,15 @@ fn get_next_thread() &proc.Thread {
 
 	cpu_local.last_run_queue_index = index
 	return unsafe { nil }
+}
+
+fn effective_timeslice(t &proc.Thread) u64 {
+	weight := u64(20 - t.process.nice)
+	mut slice := t.timeslice * weight / 20
+	if slice == 0 {
+		slice = 1
+	}
+	return slice
 }
 
 fn C.userland__dispatch_a_signal(context &cpulocal.GPRState)
@@ -81,7 +95,8 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 
 		if unsafe { next_thread == nil } && current_thread.is_in_queue {
 			apic.lapic_eoi()
-			apic.lapic_timer_oneshot(mut cpu_local, scheduler_vector, current_thread.timeslice)
+			apic.lapic_timer_oneshot(mut cpu_local, scheduler_vector,
+				effective_timeslice(current_thread))
 			return
 		}
 		// Past the early return above this thread really is coming off the
@@ -131,7 +146,7 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 	katomic.store(mut &current_thread.running_on, cpu_local.cpu_number)
 
 	apic.lapic_eoi()
-	apic.lapic_timer_oneshot(mut cpu_local, scheduler_vector, current_thread.timeslice)
+	apic.lapic_timer_oneshot(mut cpu_local, scheduler_vector, effective_timeslice(current_thread))
 
 	new_gpr_state := &current_thread.gpr_state
 
@@ -601,6 +616,7 @@ pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) ?&proc.Pr
 		new_proc.mmap_anon_non_fixed_base = old_process.mmap_anon_non_fixed_base
 		new_proc.current_directory = old_process.current_directory
 		new_proc.linux_abi = old_process.linux_abi
+		new_proc.nice = old_process.nice
 		new_proc.rlimits = old_process.rlimits
 	} else {
 		new_proc.ppid = 0

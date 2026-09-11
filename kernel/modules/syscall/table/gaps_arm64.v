@@ -126,6 +126,9 @@ fn syscall_linux_sched_getaffinity(_ voidptr, pid int, size u64, mask u64) (u64,
 	for i := 0; i < cpus; i++ {
 		bits |= u64(1) << u64(i)
 	}
+	tid := if pid == 0 { proc.current_thread().tid } else { pid }
+	configured := proc.thread_affinity(tid) or { return errno.err, errno.esrch }
+	bits &= configured
 
 	mut written := size
 	if written > sizeof(u64) {
@@ -139,8 +142,6 @@ fn syscall_linux_sched_getaffinity(_ voidptr, pid int, size u64, mask u64) (u64,
 	return written, 0
 }
 
-// Every thread already runs anywhere, so an affinity mask that includes at
-// least one present processor is accepted and one that does not is refused.
 fn syscall_linux_sched_setaffinity(_ voidptr, pid int, size u64, mask u64) (u64, u64) {
 	if pid < 0 || size < sizeof(u64) {
 		return errno.err, errno.einval
@@ -165,6 +166,10 @@ fn syscall_linux_sched_setaffinity(_ voidptr, pid int, size u64, mask u64) (u64,
 
 	if bits & present == 0 {
 		return errno.err, errno.einval
+	}
+	tid := if pid == 0 { proc.current_thread().tid } else { pid }
+	if !proc.set_thread_affinity(tid, bits & present) {
+		return errno.err, errno.esrch
 	}
 
 	return 0, 0
