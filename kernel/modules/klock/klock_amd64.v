@@ -24,8 +24,11 @@ pub fn (mut l Lock) acquire() {
 }
 
 pub fn (mut l Lock) release() {
+	// Snapshot before unlocking: another CPU can then overwrite l.ints.
+	// Keep the same ordering as the ARM64 implementation.
+	ints := l.ints
 	katomic.store(mut &l.l, false)
-	cpu.interrupt_toggle(l.ints)
+	cpu.interrupt_toggle(ints)
 }
 
 pub fn (mut l Lock) test_and_acquire() bool {

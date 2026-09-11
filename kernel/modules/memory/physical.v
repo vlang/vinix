@@ -163,16 +163,25 @@ pub fn pmm_init() {
 	}
 	print_free()
 
-	// Initialise slabs
-	slabs[0].init(8)
-	slabs[1].init(16)
-	slabs[2].init(32)
+	// Size classes are initialized without allocating backing pages.
+	slabs[0].init(16)
+	slabs[1].init(32)
+	slabs[2].init(48)
 	slabs[3].init(64)
-	slabs[4].init(128)
-	slabs[5].init(256)
-	slabs[6].init(512)
-	slabs[7].init(1024)
-	slabs[8].init(2048)
+	slabs[4].init(96)
+	slabs[5].init(128)
+	slabs[6].init(192)
+	slabs[7].init(256)
+	slabs[8].init(384)
+	slabs[9].init(512)
+	slabs[10].init(768)
+	slabs[11].init(1024)
+	slabs[12].init(1536)
+	slabs[13].init(2048)
+
+	$if heap_selftest ? {
+		heap_selftest()
+	}
 }
 
 fn inner_alloc(count u64, limit u64) voidptr {
@@ -345,83 +354,8 @@ pub fn pmm_free(ptr voidptr, count u64) {
 	free_pages += count
 }
 
-pub struct Slab {
-mut:
-	@lock      klock.Lock
-	first_free u64
-	ent_size   u64
-}
-
-struct SlabHeader {
-mut:
-	slab &Slab
-}
-
-pub fn (mut this Slab) init(ent_size u64) {
-	this.ent_size = ent_size
-	this.first_free = u64(pmm_alloc_nozero(1))
-	this.first_free += higher_half
-
-	avl_size := page_size - lib.align_up(sizeof(SlabHeader), ent_size)
-	mut slabptr := unsafe { &SlabHeader(this.first_free) }
-	unsafe {
-		(*slabptr).slab = this
-	}
-	this.first_free += lib.align_up(sizeof(SlabHeader), ent_size)
-
-	mut arr := unsafe { &u64(this.first_free) }
-	max := avl_size / ent_size - 1
-	fact := ent_size / 8
-	for i := u64(0); i < max; i++ {
-		unsafe {
-			arr[i * fact] = u64(&arr[(i + 1) * fact])
-		}
-	}
-
-	unsafe {
-		arr[max * fact] = u64(0)
-	}
-}
-
-pub fn (mut this Slab) alloc() voidptr {
-	this.@lock.acquire()
-	defer {
-		this.@lock.release()
-	}
-
-	if this.first_free == 0 {
-		this.init(this.ent_size)
-	}
-
-	mut old_free := unsafe { &u64(this.first_free) }
-	this.first_free = *old_free
-
-	unsafe { C.memset(voidptr(old_free), 0, this.ent_size) }
-
-	return voidptr(old_free)
-}
-
-pub fn (mut this Slab) sfree(ptr voidptr) {
-	this.@lock.acquire()
-	defer {
-		this.@lock.release()
-	}
-
-	if ptr == unsafe { nil } {
-		return
-	}
-
-	unsafe { C.memset(ptr, 0xaa, this.ent_size) }
-
-	mut new_head := unsafe { &u64(ptr) }
-	unsafe {
-		*new_head = this.first_free
-	}
-	this.first_free = u64(new_head)
-}
-
 __global (
-	slabs [9]Slab
+	slabs [14]Slab
 )
 
 struct MallocMetadata {
@@ -436,13 +370,17 @@ pub fn free(ptr voidptr) {
 		return
 	}
 
-	if u64(ptr) & u64(0xfff) == 0 {
+	if u64(ptr) & (page_size - 1) == 0 {
 		big_free(ptr)
 		return
 	}
 
-	mut slab_hdr := unsafe { &SlabHeader(u64(ptr) & ~u64(0xfff)) }
+	mut slab_hdr := unsafe { &SlabHeader(u64(ptr) & ~(page_size - 1)) }
 
+	if slab_hdr.magic != slab_magic {
+		lib.kpanic(unsafe { nil }, c'Slab: invalid free')
+		return
+	}
 	slab_hdr.slab.sfree(ptr)
 }
 
@@ -470,6 +408,10 @@ pub fn malloc(size u64) voidptr {
 }
 
 fn big_alloc(size u64) voidptr {
+	// Include the metadata page without overflowing rounding or byte counts.
+	if size > (u64(-1) / page_size - 1) * page_size {
+		return unsafe { nil }
+	}
 	page_count := lib.div_roundup(size, page_size)
 
 	ptr := pmm_alloc(page_count + 1)
@@ -492,15 +434,22 @@ pub fn realloc(ptr voidptr, new_size u64) voidptr {
 		return malloc(new_size)
 	}
 
-	if u64(ptr) & u64(0xfff) == 0 {
+	if u64(ptr) & (page_size - 1) == 0 {
 		return big_realloc(ptr, new_size)
 	}
 
-	slab_hdr := unsafe { &SlabHeader(u64(ptr) & ~u64(0xfff)) }
+	slab_hdr := unsafe { &SlabHeader(u64(ptr) & ~(page_size - 1)) }
+	if slab_hdr.magic != slab_magic {
+		lib.kpanic(unsafe { nil }, c'Slab: invalid realloc')
+		return unsafe { nil }
+	}
 	mut slab := slab_hdr.slab
 
 	if new_size > slab.ent_size {
 		mut new_ptr := malloc(new_size)
+		if new_ptr == unsafe { nil } {
+			return unsafe { nil }
+		}
 		unsafe { C.memcpy(new_ptr, ptr, slab.ent_size) }
 		slab.sfree(ptr)
 		return new_ptr
@@ -510,6 +459,9 @@ pub fn realloc(ptr voidptr, new_size u64) voidptr {
 }
 
 fn big_realloc(ptr voidptr, new_size u64) voidptr {
+	if new_size > (u64(-1) / page_size - 1) * page_size {
+		return unsafe { nil }
+	}
 	mut metadata := unsafe { &MallocMetadata(u64(ptr) - page_size) }
 
 	if lib.div_roundup(metadata.size, page_size) == lib.div_roundup(new_size, page_size) {
@@ -535,5 +487,8 @@ fn big_realloc(ptr voidptr, new_size u64) voidptr {
 
 @[export: 'calloc']
 pub fn calloc(a u64, b u64) voidptr {
+	if b != 0 && a > u64(-1) / b {
+		return unsafe { nil }
+	}
 	return unsafe { malloc(a * b) }
 }
