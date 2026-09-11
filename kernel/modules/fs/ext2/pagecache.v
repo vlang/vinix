@@ -70,7 +70,7 @@ fn (mut this EXT2Resource) sync(_handle voidptr) ? {
 	// Drivers may additionally implement a hardware cache/barrier operation.
 	// Without one, success means completion at the backing Resource, not a
 	// promise that volatile controller caches survive loss of power.
-	resource_mod.sync_resource(mut device, 0) or { return none }
+	resource_mod.sync_resource(mut device, unsafe { nil }) or { return none }
 }
 
 fn (mut this EXT2Resource) advise(_handle voidptr, offset u64, length u64, advice int) ? {
