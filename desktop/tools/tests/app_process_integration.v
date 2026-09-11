@@ -86,5 +86,20 @@ fn main() {
 	assert tree_has_id(settings_tree, settings_scale_100_action)
 	free_tree(settings_tree)
 	close_remote(mut settings)
+
+	mut capture := start_remote_app_at(arguments()[0], available_apps[15], mut desktop) or {
+		panic(err)
+	}
+	capture_tree := capture.build(ui2.rect(0, 0, 560, 396)) or { panic(err) }
+	assert tree_has_id(capture_tree, capture_action_take_screenshot)
+	free_tree(capture_tree)
+	capture.handle(capture_action_delay_5) or { panic(err) }
+	capture.handle(capture_action_take_screenshot) or { panic(err) }
+	assert desktop.capture.request.command == .screenshot
+	assert desktop.capture.request.delay == 5
+	assert desktop.capture.report.phase == .screenshot_countdown
+	capture.handle(capture_action_stop) or { panic(err) }
+	assert desktop.capture.report.phase == .cancelled
+	close_remote(mut capture)
 	desktop_restore_requested_scale()
 }

@@ -16,9 +16,9 @@ import math.bits
 import ui2
 
 const app_protocol_magic = u32(0x56415050) // VAPP
-const app_protocol_version = u8(1)
-const app_request_header_size = 44
-const app_response_header_size = 36
+const app_protocol_version = u8(2)
+const app_request_header_size = 108
+const app_response_header_size = 100
 const app_protocol_max_payload = 16 * 1024 * 1024
 const app_protocol_max_string = 64 * 1024
 const app_protocol_max_elements = 16 * 1024
@@ -65,6 +65,8 @@ struct AppProcessOptions {
 struct AppWireState {
 	settings        Settings
 	requested_scale int = desktop_scale_100
+	capture_request CaptureRequest
+	capture_report  CaptureReport
 }
 
 struct AppReply {
@@ -170,6 +172,19 @@ fn wire_put_state(mut out []u8, state AppWireState) {
 	wire_put_i32(mut out, state.settings.wallpaper_color)
 	wire_put_i32(mut out, state.settings.wallpaper_image)
 	wire_put_i32(mut out, state.requested_scale)
+	wire_put_u32(mut out, state.capture_request.sequence)
+	wire_put_i32(mut out, int(state.capture_request.command))
+	wire_put_i32(mut out, state.capture_request.delay)
+	wire_put_i32(mut out, state.capture_request.fps)
+	wire_put_u32(mut out, state.capture_report.handled_sequence)
+	wire_put_i32(mut out, int(state.capture_report.phase))
+	wire_put_u64(mut out, state.capture_report.file_id)
+	wire_put_u64(mut out, state.capture_report.started_ms)
+	wire_put_u64(mut out, state.capture_report.elapsed_ms)
+	wire_put_i32(mut out, state.capture_report.frames)
+	wire_put_i32(mut out, state.capture_report.width)
+	wire_put_i32(mut out, state.capture_report.height)
+	wire_put_i32(mut out, state.capture_report.fps)
 }
 
 fn wire_take_state(mut reader WireReader) !AppWireState {
@@ -179,10 +194,30 @@ fn wire_take_state(mut reader WireReader) !AppWireState {
 	wallpaper_color := reader.take_i32()!
 	wallpaper_image := reader.take_i32()!
 	requested_scale := reader.take_i32()!
+	capture_sequence := reader.take_u32()!
+	capture_command := reader.take_i32()!
+	capture_delay := reader.take_i32()!
+	capture_fps := reader.take_i32()!
+	capture_handled_sequence := reader.take_u32()!
+	capture_phase := reader.take_i32()!
+	capture_file_id := reader.take_u64()!
+	capture_started_ms := reader.take_u64()!
+	capture_elapsed_ms := reader.take_u64()!
+	capture_frames := reader.take_i32()!
+	capture_width := reader.take_i32()!
+	capture_height := reader.take_i32()!
+	capture_report_fps := reader.take_i32()!
 	if button_side < int(ButtonSide.right) || button_side > int(ButtonSide.left)
 		|| taskbar_mode < int(TaskbarMode.standard) || taskbar_mode > int(TaskbarMode.combined)
 		|| theme < int(ThemeKind.default_) || theme > int(ThemeKind.macos)
-		|| !desktop_scale_valid(requested_scale) {
+		|| !desktop_scale_valid(requested_scale)
+		|| capture_command < int(CaptureCommand.none_)
+		|| capture_command > int(CaptureCommand.stop) || capture_delay < 0
+		|| capture_delay > 10 || capture_fps < 0 || capture_fps > 30
+		|| capture_phase < int(CapturePhase.idle)
+		|| capture_phase > int(CapturePhase.cancelled) || capture_frames < 0
+		|| capture_width < 0 || capture_height < 0 || capture_report_fps < 0
+		|| capture_report_fps > 30 {
 		return error('invalid application state')
 	}
 	return AppWireState{
@@ -194,6 +229,23 @@ fn wire_take_state(mut reader WireReader) !AppWireState {
 			wallpaper_image: wallpaper_image
 		}
 		requested_scale: requested_scale
+		capture_request: CaptureRequest{
+			sequence: capture_sequence
+			command: unsafe { CaptureCommand(capture_command) }
+			delay: capture_delay
+			fps: capture_fps
+		}
+		capture_report: CaptureReport{
+			handled_sequence: capture_handled_sequence
+			phase: unsafe { CapturePhase(capture_phase) }
+			file_id: capture_file_id
+			started_ms: capture_started_ms
+			elapsed_ms: capture_elapsed_ms
+			frames: capture_frames
+			width: capture_width
+			height: capture_height
+			fps: capture_report_fps
+		}
 	}
 }
 
@@ -365,6 +417,8 @@ fn app_current_state(desktop &Desktop) AppWireState {
 	return AppWireState{
 		settings: desktop.settings
 		requested_scale: desktop_requested_scale()
+		capture_request: desktop.capture.request
+		capture_report: desktop.capture.report
 	}
 }
 
@@ -372,6 +426,7 @@ fn apply_app_state(mut desktop Desktop, state AppWireState) {
 	wallpaper_changed := desktop.settings.wallpaper_color != state.settings.wallpaper_color
 		|| desktop.settings.wallpaper_image != state.settings.wallpaper_image
 	desktop.settings = state.settings
+	desktop.accept_capture_request(state.capture_request)
 	if wallpaper_changed {
 		desktop.invalidate_wallpaper()
 	}
@@ -542,6 +597,8 @@ fn run_app_process(options AppProcessOptions) {
 			break
 		}
 		desktop.settings = state.settings
+		desktop.capture.request = state.capture_request
+		desktop.capture.report = state.capture_report
 		desktop_request_scale(state.requested_scale)
 		match command {
 			.build {

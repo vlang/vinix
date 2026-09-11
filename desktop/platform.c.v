@@ -55,6 +55,8 @@ fn C.mmap(base voidptr, length usize, prot int, flags int, fd int, offset i64) v
 
 fn C.munmap(base voidptr, length usize) int
 
+fn C.lseek(fd int, offset i64, whence int) i64
+
 struct C.pollfd {
 	fd      int
 	events  i16
@@ -70,12 +72,23 @@ fn desktop_open_rw(path string) int {
 	return C.open(&char(path.str), C.O_RDWR)
 }
 
+fn desktop_create_truncated(path string) int {
+	return C.open(&char(path.str), C.O_WRONLY | C.O_CREAT | C.O_TRUNC, 0o644)
+}
+
 fn desktop_open_ro_nonblock(path string) int {
 	return C.open(&char(path.str), C.O_RDONLY | C.O_NONBLOCK)
 }
 
 fn desktop_close(fd int) int {
 	return C.close(fd)
+}
+
+fn desktop_seek_start(fd int, offset u64) bool {
+	if offset > u64(0x7fffffffffffffff) {
+		return false
+	}
+	return C.lseek(fd, i64(offset), C.SEEK_SET) == i64(offset)
 }
 
 fn desktop_read(fd int, buffer voidptr, count u64) i64 {

@@ -413,6 +413,7 @@ fn activity_name_of(record &ActivitySample) string {
 		'vinix-editor' { 'Text Editor' }
 		'vinix-calendar' { 'Calendar' }
 		'vinix-clock' { 'Clock' }
+		'vinix-capture' { capture_app_title }
 		else {
 			return name
 		}

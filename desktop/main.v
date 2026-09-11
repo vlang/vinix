@@ -148,10 +148,12 @@ fn main() {
 		desktop.poll_apps()
 		desktop.pump_pointer(mut pointer, desktop.canvas.width, desktop.canvas.height)
 		desktop.pump_keyboard(mut keyboard)
+		desktop.capture_tick()
 		// Xorg, unlike a native ui2 application, needs the physical display and
 		// input devices. Stop the compositor at a frame boundary, restore the
 		// console, and reopen everything after the external application exits.
 		if desktop.pending_external != '' {
+			desktop.capture_close()
 			command := desktop.pending_external
 			desktop.pending_external = ''
 			keyboard.close()
@@ -180,7 +182,8 @@ fn main() {
 		// its timeout only drives application housekeeping.
 		if !desktop.dirty {
 			elapsed := monotonic_millis() - frame_started
-			interval := desktop.idle_wait_interval(options.idle_interval, options.frame_interval)
+			app_interval := desktop.idle_wait_interval(options.idle_interval, options.frame_interval)
+			interval := desktop.capture_idle_interval(app_interval, options.frame_interval)
 			wait := desktop_frame_wait_ms(elapsed, interval)
 			desktop_wait_for_input(pointer.fd, keyboard.fd, wait)
 			continue
@@ -195,6 +198,7 @@ fn main() {
 		after_render := monotonic_millis()
 
 		fb.present(&desktop.canvas, desktop_current_scale())
+		desktop.capture_presented(&desktop.canvas)
 		after_present := monotonic_millis()
 
 		free_tree(tree)
@@ -210,6 +214,7 @@ fn main() {
 	// Leave the console the way it was found rather than on top of a desktop
 	// that is no longer being redrawn.
 	desktop.close_apps()
+	desktop.capture_close()
 	desktop.canvas.clip = Clip{
 		x: 0
 		y: 0

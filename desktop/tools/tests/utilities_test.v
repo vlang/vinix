@@ -144,6 +144,83 @@ fn test_clock_stopwatch_format_and_elapsed_time() {
 	assert clock.elapsed(2_500) == 1_750
 }
 
+fn test_capture_png_encoder_writes_standard_truecolour_image() {
+	mut canvas := new_canvas(2, 2)
+	defer {
+		unsafe { free(canvas.pixels) }
+	}
+	unsafe {
+		canvas.pixels[0] = 0xff0000
+		canvas.pixels[1] = 0x00ff00
+		canvas.pixels[2] = 0x0000ff
+		canvas.pixels[3] = 0xffffff
+	}
+	bytes := capture_png_bytes(&canvas)!
+	defer {
+		unsafe { bytes.free() }
+	}
+	assert bytes[..8] == [u8(0x89), `P`, `N`, `G`, `\r`, `\n`, 0x1a, `\n`]
+	assert bytes[12..16].bytestr() == 'IHDR'
+	assert bytes[16..20] == [u8(0), 0, 0, 2]
+	assert bytes[20..24] == [u8(0), 0, 0, 2]
+	assert bytes[24] == 8
+	assert bytes[25] == 2
+	assert bytes[bytes.len - 8..bytes.len - 4].bytestr() == 'IEND'
+}
+
+fn test_capture_avi_writer_indexes_every_video_frame() {
+	path := os.join_path(os.temp_dir(), 'vinix-capture-test.avi')
+	defer {
+		os.rm(path) or {}
+	}
+	mut canvas := new_canvas(4, 2)
+	defer {
+		unsafe { free(canvas.pixels) }
+	}
+	canvas.clear(0x3264c8)
+	mut writer := capture_open_avi(path, &canvas, 10)!
+	total_offset := writer.total_frames_offset
+	stream_offset := writer.stream_length_offset
+	assert writer.add_frame(&canvas)
+	canvas.clear(0xc86432)
+	assert writer.add_frame(&canvas)
+	assert writer.frames == 2
+	assert writer.finish()
+	bytes := os.read_bytes(path)!
+	defer {
+		unsafe { bytes.free() }
+	}
+	assert bytes[..4].bytestr() == 'RIFF'
+	assert bytes[8..12].bytestr() == 'AVI '
+	assert bytes[total_offset..total_offset + 4] == [u8(2), 0, 0, 0]
+	assert bytes[stream_offset..stream_offset + 4] == [u8(2), 0, 0, 0]
+	assert bytes[bytes.len - 40..bytes.len - 36].bytestr() == 'idx1'
+}
+
+fn test_capture_ui_issues_compositor_requests() {
+	mut desktop := Desktop{}
+	mut app := CaptureApp{
+		desktop: &desktop
+	}
+	app.handle(capture_action_delay_5)!
+	app.handle(capture_action_take_screenshot)!
+	assert desktop.capture.request.command == .screenshot
+	assert desktop.capture.request.delay == 5
+	assert desktop.capture.request.sequence == 1
+	app.handle(capture_action_video_tab)!
+	app.handle(capture_action_fps_5)!
+	app.handle(capture_action_start_video)!
+	assert app.page == .video
+	assert desktop.capture.request.command == .start_video
+	assert desktop.capture.request.fps == 5
+	assert desktop.capture.request.sequence == 2
+	begin_frame_elements()
+	tree := app.build(ui2.rect(0, 0, 560, 396))!
+	assert utility_tree_has_text(tree, 'Record the desktop')
+	assert utility_tree_has_text(tree, 'Smooth  10 fps')
+	free_tree(tree)
+}
+
 fn test_native_calculator_matches_the_example_layout_and_actions() {
 	mut calculator := new_calculator_app()
 	defer { calculator.close_app() }
@@ -246,7 +323,7 @@ fn test_terminal_renders_pty_echo_and_carriage_return_updates() {
 }
 
 fn test_available_utility_applications_and_shortcut_layouts() {
-	assert available_apps.len == 15
+	assert available_apps.len == 16
 	assert available_apps[0].process_name == 'vinix-files'
 	assert available_apps[1].title == 'Firefox'
 	assert available_apps[1].exclusive_command == ''
@@ -281,6 +358,10 @@ fn test_available_utility_applications_and_shortcut_layouts() {
 	assert available_apps[14].process_name == 'vinix-blender'
 	assert available_apps[14].width == blender_window_width
 	assert available_apps[14].height == blender_window_height + default_title_height
+	assert available_apps[15].title == capture_app_title
+	assert available_apps[15].process_name == 'vinix-capture'
+	assert available_apps[15].icon == 'builtin:camera'
+	assert available_apps[15].polling
 	assert available_apps[14].keyboard && available_apps[14].polling
 	assert available_apps[14].pointer
 	assert app_start_actions.len == available_apps.len

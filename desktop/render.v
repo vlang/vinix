@@ -718,6 +718,20 @@ fn (mut d Desktop) draw_builtin_glyph(path string, x int, y int, w int, h int, c
 			d.canvas.draw_line(cx, cy, cx + radius / 2, cy + radius / 3, color, 2)
 			d.canvas.fill_circle(cx, cy, 2, color)
 		}
+		'camera' {
+			body_width := w * 4 / 5
+			body_height := h * 3 / 5
+			left := cx - body_width / 2
+			top := cy - body_height / 2 + h / 12
+			behind := d.surface_under(x, y)
+			// Lens housing and the small viewfinder bump are one compact,
+			// filled silhouette, legible at both shortcut and title sizes.
+			d.canvas.fill_round_rect(left, top, body_width, body_height, 3, color)
+			d.canvas.fill_round_rect(left + body_width / 6, top - body_height / 4, body_width / 3, body_height / 3, 2, color)
+			lens := if body_width < body_height { body_width / 4 } else { body_height / 3 }
+			d.canvas.fill_circle(cx, top + body_height / 2, lens, behind)
+			d.canvas.fill_circle(cx, top + body_height / 2, if lens > 2 { lens - 2 } else { 1 }, color)
+		}
 		'search' {
 			radius := if w < h { w / 4 } else { h / 4 }
 			d.canvas.fill_circle(cx - 2, cy - 2, radius, color)

@@ -553,7 +553,7 @@ chmod +x "$STAGING/sbin/init" "$STAGING/usr/bin/vinix-desktop" \
 for app_name in vinix-files vinix-calculator vinix-terminal vinix-settings \
     vinix-activity vinix-editor vinix-calendar vinix-clock vinix-cocoa-calculator \
     vinix-firefox vinix-minecraft vinix-wine-calculator vinix-wine-notepad \
-    vinix-wine-word2013 vinix-blender; do
+    vinix-wine-word2013 vinix-blender vinix-capture; do
     ln -sf vinix-desktop "$STAGING/usr/bin/$app_name"
 done
 

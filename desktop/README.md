@@ -30,6 +30,8 @@ What it does:
   cursor navigation and keyboard shortcuts
 - a **calendar** with month navigation, date selection and a jump back to today
 - a **clock** with a large local-time display and a tenth-second stopwatch
+- **Capture**, a native screenshot and screen-recording app with delayed PNG
+  screenshots, 5/10 fps AVI recording, automatic self-hiding and live status
 - a **settings application**: window button side, taskbar style, theme,
   wallpaper, display, battery and experimental M1 Wi-Fi controls
 - **native ui2 applications**: every Files, Calculator, Terminal, Settings and
@@ -60,6 +62,7 @@ typing any word with a q in it drop the user back to the console.
     editor.v       the plain-text editor and its keyboard editing model
     calendar.v     Gregorian month layout and the calendar application
     clock_app.v    the large clock and stopwatch application
+    capture.v      the ui2 capture app, PNG encoder and AVI recorder
     switcher.v     Cmd-Tab: the session it opens and the panel it shows
     settings.v     preferences shared by the desktop and Settings application
     settings_app.v the settings application
@@ -202,6 +205,23 @@ full six-week Gregorian month. Its arrow buttons cross year boundaries, a day
 can be selected for a full date in the footer, and **Today** returns to the
 current month. The Clock expands the same local time into an across-the-room
 display and adds a start/stop/reset stopwatch with tenth-second updates.
+
+Capture is another pure V/ui2 utility. A screenshot can be immediate or delayed
+by three or five seconds and is written as `/root/Screenshot-<timestamp>.png`.
+Video uses a self-contained, uncompressed AVI writer at either 5 or 10 frames
+per second, scales large desktops to at most 640x480 while preserving their
+aspect ratio, and writes `/root/Recording-<timestamp>.avi`. Both modes include
+the compositor-drawn pointer. The Capture window hides before the first frame;
+it returns after a screenshot, while a recording is stopped by restoring its
+taskbar entry and pressing **Stop recording**. Closing Capture or leaving the
+desktop finalizes an active AVI so the recording remains playable. Audio is not
+recorded.
+
+The application process only sends capture requests and renders status. The
+compositor owns the pixel stream and writes each frame immediately after it is
+presented, so Capture neither opens `/dev/fb0` nor introduces a second display
+owner. Its PNG and AVI encoders are implemented in `capture.v` and require no
+external image or media library.
 
 Utility windows are sized for the logical MacBook desktop rather than the old
 1024×768 QEMU screenshot. Shortcuts fill the available height and flow into a

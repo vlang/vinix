@@ -85,6 +85,9 @@ mut:
 	external_error_hint    string
 
 	settings Settings
+	// Screenshot and video requests originate in the native Capture app, but
+	// the compositor owns the pixels and the output stream.
+	capture CaptureService
 	// Cmd-Tab's session: which windows it is stepping through and whether it
 	// has been held long enough to show them.
 	switcher Switcher
@@ -192,6 +195,7 @@ fn (mut d Desktop) raise(id int) {
 
 fn (mut d Desktop) close_window(id int) {
 	index := d.window_index(id) or { return }
+	closing_capture := d.windows[index].title == capture_app_title
 	app_index := d.windows[index].app_index
 	if app_index >= 0 && app_index < d.apps.len {
 		mut app := d.apps[app_index]
@@ -200,6 +204,9 @@ fn (mut d Desktop) close_window(id int) {
 		}
 	}
 	d.windows.delete(index)
+	if closing_capture {
+		d.capture_close()
+	}
 	if d.focus == id {
 		d.focus = if d.windows.len > 0 { d.windows.last().id } else { 0 }
 	}
@@ -624,6 +631,13 @@ fn (mut d Desktop) forward_to_app(x int, y int, action string) {
 			eprintln('vinix-desktop: ${window.title}: ${err}')
 		}
 		d.raise(window.id)
+		// Capture the desktop, not the Capture window. The compositor will wait
+		// until it has presented a frame with this window hidden before writing
+		// the first pixel. Its taskbar entry remains the way back to Stop.
+		if action == capture_action_take_screenshot || action == capture_action_start_video {
+			d.capture.owner_window_id = window.id
+			d.minimize(window.id)
+		}
 		d.dirty = true
 		return
 	}
