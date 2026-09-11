@@ -10,7 +10,6 @@ module table
 import errno
 import file
 import fs
-import klock
 import memory.mmap
 import net
 import pipe
@@ -20,15 +19,13 @@ import stat
 import time.sys
 import usercopy
 import userland
-import x86.cpu
 import x86.msr
+import krandom
 
 const linux_syscall_max = 512
 
 __global (
 	linux_syscall_table [linux_syscall_max]voidptr
-	linux_random_pool   = u64(0x9e3779b97f4a7c15)
-	linux_random_lock   klock.Lock
 )
 
 fn syscall_linux_vacant(_ voidptr) (u64, u64) {
@@ -313,18 +310,6 @@ fn syscall_linux_prlimit64(_ voidptr, pid int, resource int, new_limit u64, old_
 	return 0, 0
 }
 
-// splitmix64 is used here as a small kernel PRNG. The state persists between
-// calls and is stirred from the cycle counter; the lock makes updates safe on
-// SMP systems. The kernel's /dev/urandom uses the stronger Salsa20 generator,
-// but getrandom still needs a direct implementation that never opens a file.
-fn linux_random_next() u64 {
-	linux_random_pool += 0x9e3779b97f4a7c15
-	mut value := linux_random_pool
-	value = (value ^ (value >> 30)) * 0xbf58476d1ce4e5b9
-	value = (value ^ (value >> 27)) * 0x94d049bb133111eb
-	return value ^ (value >> 31)
-}
-
 fn syscall_linux_getrandom(_ voidptr, buf u64, count u64, flags u32) (u64, u64) {
 	if flags & ~u32(7) != 0 {
 		return errno.err, errno.einval
@@ -335,20 +320,21 @@ fn syscall_linux_getrandom(_ voidptr, buf u64, count u64, flags u32) (u64, u64) 
 	if buf == 0 {
 		return errno.err, errno.efault
 	}
-	linux_random_lock.acquire()
-	defer {
-		linux_random_lock.release()
+	allow_insecure := flags & u32(4) != 0
+	if !krandom.is_ready() && !allow_insecure {
+		return errno.err, errno.eagain
 	}
-	linux_random_pool ^= cpu.rdtsc() ^ buf ^ (count << 17)
-
+	mut bounce := [256]u8{}
 	mut written := u64(0)
 	for written < count {
-		word := linux_random_next()
 		mut amount := count - written
-		if amount > sizeof(u64) {
-			amount = sizeof(u64)
+		if amount > bounce.len {
+			amount = u64(bounce.len)
 		}
-		if !usercopy.copy_to_user(buf + written, voidptr(&word), amount) {
+		if !krandom.fill(&bounce[0], amount, allow_insecure) {
+			return errno.err, errno.eagain
+		}
+		if !usercopy.copy_to_user(buf + written, voidptr(&bounce[0]), amount) {
 			if written != 0 {
 				return written, 0
 			}
@@ -356,6 +342,7 @@ fn syscall_linux_getrandom(_ voidptr, buf u64, count u64, flags u32) (u64, u64) 
 		}
 		written += amount
 	}
+	unsafe { C.memset(&bounce[0], 0, sizeof(bounce)) }
 	return written, 0
 }
 

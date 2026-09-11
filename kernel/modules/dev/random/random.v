@@ -1,4 +1,3 @@
-@[has_globals]
 module random
 
 import resource
@@ -8,62 +7,17 @@ import klock
 import event.eventstruct
 import memory
 import katomic
+import errno
+import krandom
 
 struct URandom {
 mut:
-	stat       stat.Stat
-	refcount   int
-	l          klock.Lock
-	event      eventstruct.Event
-	status     int
-	can_mmap   bool
-	rng_lock   klock.Lock
-	buffer     [16]u32
-	key        [16]u32
-	reseed_ctr u64
-}
-
-@[inline]
-fn rotl32(a u32, shift u32) u32 {
-	return (a << shift) | (a >> (32 - shift))
-}
-
-@[inline]
-fn qr(a &u32, b &u32, c &u32, d &u32) {
-	unsafe {
-		*b = *b ^ rotl32(*a + *d, 7)
-		*c = *c ^ rotl32(*b + *a, 9)
-		*d = *d ^ rotl32(*c + *b, 13)
-		*a = *a ^ rotl32(*d + *c, 18)
-	}
-}
-
-// not threadsafe!
-fn (mut this URandom) do_salsa20_block(mut out [16]u32) {
-	mut x := [16]u32{}
-	for i := 0; i < 16; i++ {
-		x[i] = this.buffer[i]
-	}
-
-	for i := 0; i < 10; i++ {
-		qr(&x[0], &x[4], &x[8], &x[12])
-		qr(&x[5], &x[9], &x[13], &x[1])
-		qr(&x[10], &x[14], &x[2], &x[6])
-		qr(&x[15], &x[3], &x[7], &x[11])
-
-		qr(&x[0], &x[1], &x[2], &x[3])
-		qr(&x[5], &x[6], &x[7], &x[4])
-		qr(&x[10], &x[11], &x[8], &x[9])
-		qr(&x[15], &x[12], &x[13], &x[14])
-	}
-
-	for i := 0; i < 16; i++ {
-		out[i] = x[i] + this.key[i]
-	}
-
-	for i := 0; i < 16; i++ {
-		this.buffer[i] = x[i]
-	}
+	stat     stat.Stat
+	refcount int
+	l        klock.Lock
+	event    eventstruct.Event
+	status   int
+	can_mmap bool
 }
 
 fn (mut this URandom) mmap(_handle voidptr, _page u64, _flags int) voidptr {
@@ -74,36 +28,10 @@ fn (mut this URandom) read(_handle voidptr, buf voidptr, _loc u64, count u64) ?i
 	if count == 0 {
 		return i64(0)
 	}
-
-	this.rng_lock.acquire()
-
-	mut cnt := count
-	mut out := [16]u32{}
-	mut cbuf := buf
-
-	this.reseed_ctr += cnt
-	if this.reseed_ctr >= 2048 {
-		this.reseed_ctr = 0
-		this.reseed()
+	if !krandom.fill(buf, count, false) {
+		errno.set(errno.eagain)
+		return none
 	}
-
-	for {
-		unsafe {
-			if cnt > 64 {
-				this.do_salsa20_block(mut out)
-				C.memcpy(cbuf, voidptr(&out[0]), 64)
-				cbuf = voidptr(u64(cbuf) + u64(64))
-				cnt -= 64
-			} else {
-				this.do_salsa20_block(mut out)
-				C.memcpy(cbuf, voidptr(&out[0]), cnt)
-				break
-			}
-		}
-	}
-
-	this.rng_lock.release()
-
 	return i64(count)
 }
 
@@ -127,26 +55,18 @@ fn (mut this URandom) unlink(_handle voidptr) ? {
 	katomic.dec(mut &this.stat.nlink)
 }
 
-fn (mut this URandom) grow(_handle voidptr, _new_size u64) ? {
-}
-
-fn (mut this URandom) reseed() {
-	architecture_reseed(mut this)
-}
+fn (mut this URandom) grow(_handle voidptr, _new_size u64) ? {}
 
 pub fn initialise() {
-	// todo improve entropy via interrupts and other random events
+	krandom.initialise()
 	mut rng := &URandom{}
-
-	rng.stat.size = 0
-	rng.stat.blocks = 0
 	rng.stat.blksize = 4096
 	rng.stat.rdev = resource.create_dev_id()
 	rng.stat.mode = 0o666 | stat.ifchr
-
 	rng.can_mmap = true
 
-	architecture_seed(mut rng)
-
+	if !krandom.is_ready() {
+		println('random: no trusted boot entropy; secure reads return EAGAIN')
+	}
 	fs.devtmpfs_add_device(rng, 'urandom')
 }

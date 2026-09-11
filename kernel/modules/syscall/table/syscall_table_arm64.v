@@ -21,6 +21,7 @@ import stat
 import aarch64.cpu.local as cpulocal
 import aarch64.uart
 import sysvshm
+import krandom
 
 // Linux aarch64 syscall numbers (from asm-generic/unistd.h).
 // Table size covers all syscalls we map (max used = 441, epoll_pwait2).
@@ -920,41 +921,11 @@ fn syscall_linux_readv(gpr_state voidptr, fdnum int, iov_ptr u64, iovcnt int) (u
 	return total, 0
 }
 
-// getrandom(2). The pool is stirred with the cycle counter on every call and
-// carried across calls, so two calls landing in the same timer tick no longer
-// produce the same bytes — which the old per-call xorshift seeded straight from
-// the counter did, and which stack canaries and ASLR are handed.
-//
-// This is not a cryptographic generator and does not claim to be; it is the
-// best available before an entropy source is wired up.
-__global (
-	random_pool = u64(0x9e3779b97f4a7c15)
-)
-
 const grnd_nonblock = 0x0001
 
 const grnd_random = 0x0002
 
 const grnd_insecure = 0x0004
-
-fn random_counter() u64 {
-	mut counter := u64(0)
-	asm volatile aarch64 {
-		mrs counter, CNTVCT_EL0
-		; =r (counter)
-	}
-	return counter
-}
-
-// splitmix64: cheap, and unlike a raw xorshift it does not leak its state in
-// the low bits of consecutive outputs.
-fn random_next() u64 {
-	random_pool += 0x9e3779b97f4a7c15
-	mut z := random_pool
-	z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9
-	z = (z ^ (z >> 27)) * 0x94d049bb133111eb
-	return z ^ (z >> 31)
-}
 
 fn syscall_linux_getrandom(_ voidptr, buf u64, count u64, flags u32) (u64, u64) {
 	if flags & ~u32(grnd_nonblock | grnd_random | grnd_insecure) != 0 {
@@ -967,16 +938,21 @@ fn syscall_linux_getrandom(_ voidptr, buf u64, count u64, flags u32) (u64, u64) 
 		return errno.err, errno.efault
 	}
 
-	random_pool ^= random_counter()
-
+	allow_insecure := flags & u32(grnd_insecure) != 0
+	if !krandom.is_ready() && !allow_insecure {
+		return errno.err, errno.eagain
+	}
+	mut bounce := [256]u8{}
 	mut written := u64(0)
 	for written < count {
-		word := random_next()
 		mut chunk := count - written
-		if chunk > sizeof(u64) {
-			chunk = sizeof(u64)
+		if chunk > bounce.len {
+			chunk = u64(bounce.len)
 		}
-		if !usercopy.copy_to_user(buf + written, voidptr(&word), chunk) {
+		if !krandom.fill(&bounce[0], chunk, allow_insecure) {
+			return errno.err, errno.eagain
+		}
+		if !usercopy.copy_to_user(buf + written, voidptr(&bounce[0]), chunk) {
 			// Report the bytes that did land, as the manual page requires.
 			if written > 0 {
 				return written, 0
@@ -985,6 +961,7 @@ fn syscall_linux_getrandom(_ voidptr, buf u64, count u64, flags u32) (u64, u64) 
 		}
 		written += chunk
 	}
+	unsafe { C.memset(&bounce[0], 0, sizeof(bounce)) }
 
 	return written, 0
 }
