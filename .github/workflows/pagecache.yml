@@ -1,0 +1,21 @@
+name: Page cache tests
+on:
+  pull_request:
+    paths:
+      - 'kernel/modules/pagecache/**'
+      - 'kernel/modules/resource/cache.v'
+      - 'kernel/modules/fs/ext2/**'
+      - 'kernel/modules/file/**'
+      - 'tests/pagecache/**'
+      - '.github/workflows/pagecache.yml'
+permissions:
+  contents: read
+jobs:
+  host-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Build current V
+        run: git clone --depth=1 https://github.com/vlang/v.git /tmp/v && make -C /tmp/v
+      - name: Test the kernel cache with instrumented backing I/O
+        run: V=/tmp/v/v sh tests/pagecache/run.sh
