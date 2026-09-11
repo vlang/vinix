@@ -292,6 +292,10 @@ pub fn (mut this Handle) write(buf voidptr, count u64) ?i64 {
 	}
 	ret := this.resource.write(voidptr(this), buf, u64(this.loc), count) or { return none }
 	this.loc += ret
+	if this.flags & resource.o_dsync != 0 {
+		mut res := this.resource
+		resource.sync_resource(mut res, voidptr(this)) or { return none }
+	}
 	return ret
 }
 
@@ -512,14 +516,23 @@ pub fn syscall_close_range(_ voidptr, first u32, last u32, flags u32) (u64, u64)
 	return 0, 0
 }
 
-// fsync/fdatasync. Writes here reach the resource as they are made — there is
-// no dirty page cache between a write and its backing store — so there is
-// nothing to flush. The descriptor is still validated, because reporting
-// success for a closed one would hide a real bug in the caller.
+// fsync/fdatasync flush dirty pages through the resource's optional sync hook.
+// In-memory resources need no callback; streams cannot be synchronized.
 pub fn syscall_fsync(_ voidptr, fdnum int) (u64, u64) {
 	mut fd := fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.ebadf }
-	fd.unref()
-
+	defer { fd.unref() }
+	mut handle := fd.handle
+	handle.l.acquire()
+	defer { handle.l.release() }
+	if handle.flags & resource.o_path != 0 {
+		return errno.err, errno.ebadf
+	}
+	mut res := handle.resource
+	mode := res.stat.mode
+	if !stat.isreg(mode) && !stat.isdir(mode) && !stat.isblk(mode) {
+		return errno.err, errno.einval
+	}
+	resource.sync_resource(mut res, voidptr(handle)) or { return errno.err, errno.get() }
 	return 0, 0
 }
 
@@ -618,6 +631,9 @@ pub fn syscall_pwrite(_ voidptr, fdnum int, buf voidptr, count u64, offset i64) 
 	ret := res.write(voidptr(handle), buf, u64(offset), count) or {
 		return errno.err, errno.get()
 	}
+	if handle.flags & resource.o_dsync != 0 {
+		resource.sync_resource(mut res, voidptr(handle)) or { return errno.err, errno.get() }
+	}
 	return u64(ret), 0
 }
 
@@ -660,8 +676,7 @@ pub fn syscall_fallocate(_ voidptr, fdnum int, mode int, offset i64, length i64)
 	return 0, 0
 }
 
-// There is no page cache whose policy can be changed yet.  Validate the call
-// exactly where Linux would, then accept the advice as a harmless hint.
+// Dispatch cache advice when supported; other resources may ignore hints.
 pub fn syscall_fadvise64(_ voidptr, fdnum int, offset i64, length i64, advice int) (u64, u64) {
 	if offset < 0 || length < 0 || advice < 0 || advice > 5 {
 		return errno.err, errno.einval
@@ -672,15 +687,24 @@ pub fn syscall_fadvise64(_ voidptr, fdnum int, offset i64, length i64, advice in
 		fd.unref()
 	}
 
-	mode := fd.handle.resource.stat.mode
+	mut handle := fd.handle
+	if handle.flags & resource.o_path != 0 {
+		return errno.err, errno.ebadf
+	}
+	mut res := handle.resource
+	mode := res.stat.mode
 	if stat.isifo(mode) || stat.issock(mode) || mode & stat.ifmt == stat.ifpipe {
 		return errno.err, errno.espipe
+	}
+	resource.advise_resource(mut res, voidptr(handle), u64(offset), u64(length), advice) or {
+		return errno.err, errno.get()
 	}
 	return 0, 0
 }
 
 pub fn syscall_sync_file_range(_ voidptr, fdnum int, offset i64, count i64, flags u32) (u64, u64) {
-	if offset < 0 || count < 0 || flags & ~u32(0x7) != 0 {
+	if offset < 0 || count < 0 || flags & ~u32(0x7) != 0
+		|| u64(count) > u64(0x7fffffffffffffff) - u64(offset) {
 		return errno.err, errno.einval
 	}
 
@@ -695,7 +719,12 @@ pub fn syscall_sync_file_range(_ voidptr, fdnum int, offset i64, count i64, flag
 	if !stat.isreg(fd.handle.resource.stat.mode) {
 		return errno.err, errno.espipe
 	}
-	// Writes are synchronous today, so every valid range is already durable.
+	// A synchronous whole-resource flush is a conservative implementation of
+	// range writeback until resources expose independent writeback ranges.
+	if flags != 0 {
+		mut res := fd.handle.resource
+		resource.sync_resource(mut res, voidptr(fd.handle)) or { return errno.err, errno.get() }
+	}
 	return 0, 0
 }
 
