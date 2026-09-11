@@ -384,6 +384,7 @@ pub fn symlink(parent &VFSNode, dest string, target string) ?&VFSNode {
 	unsafe {
 		parent_of_tgt_node.children[basename] = target_node
 	}
+	inotify_emit(parent_of_tgt_node, basename, in_create, 0)
 	return target_node
 }
 
@@ -407,6 +408,8 @@ pub fn link(parent &VFSNode, dest string, target string) ?&VFSNode {
 	unsafe {
 		parent_of_tgt_node.children[basename] = target_node
 	}
+	inotify_emit(parent_of_tgt_node, basename, in_create, 0)
+	inotify_emit(dest_node, '', in_attrib, 0)
 	return target_node
 }
 
@@ -416,12 +419,20 @@ pub fn unlink(parent &VFSNode, name string, remove_dir bool) ? {
 	if node.read_only || parent_of_tgt.read_only { errno.set(errno.erofs); return none }
 	if !may_remove(parent_of_tgt, node) { errno.set(errno.eacces); return none }
 	if basename == '.' || basename == '..' || basename == '' { errno.set(errno.einval); return none }
+	if remove_dir && !stat.isdir(node.resource.stat.mode) {
+		errno.set(errno.enotdir)
+		return none
+	}
 	if stat.isdir(node.resource.stat.mode) {
 		if !remove_dir { errno.set(errno.eisdir); return none }
 		if node.children.len > 2 { errno.set(errno.enotempty); return none }
 	}
 	// A read-only or failing backend must leave the namespace intact.
 	node.resource.unlink(voidptr(node))?
+	dir_flag := if stat.isdir(node.resource.stat.mode) { in_isdir } else { u32(0) }
+	inotify_emit(parent_of_tgt, basename, in_delete | dir_flag, 0)
+	inotify_emit(node, '', in_delete_self, 0)
+	inotify_forget(node)
 	if stat.isdir(node.resource.stat.mode) {
 		unsafe {
 			free(node.children['.'].children)
@@ -484,6 +495,8 @@ pub fn internal_create(parent &VFSNode, name string, mode u32) ?&VFSNode {
 	if stat.isdir(target_node.resource.stat.mode) {
 		target_node.create_dotentries(parent_of_tgt_node)
 	}
+	dir_flag := if stat.isdir(target_node.resource.stat.mode) { in_isdir } else { u32(0) }
+	inotify_emit(parent_of_tgt_node, basename, in_create | dir_flag, 0)
 
 	return target_node
 }
@@ -546,38 +559,7 @@ pub fn syscall_rmdirat(_ voidptr, dirfd int, _path charptr) (u64, u64) {
 	}
 
 	parent := get_parent_dir(dirfd, path) or { return errno.err, errno.get() }
-
-	mut parent_of_tgt_node, mut target_node, basename := path2node(parent, path)
-
-	if unsafe { parent_of_tgt_node == 0 } {
-		return errno.err, errno.enoent
-	}
-
-	if unsafe { target_node == 0 } {
-		return errno.err, errno.enoent
-	}
-
-	if !stat.isdir(target_node.resource.stat.mode) {
-		return errno.err, errno.enotdir
-	}
-
-	if target_node.children.len > 2 {
-		return errno.err, errno.enotempty
-	}
-
-	if target_node.read_only || parent_of_tgt_node.read_only { return errno.err, errno.erofs }
-	if !may_remove(parent_of_tgt_node, target_node) { return errno.err, errno.eacces }
-	target_node.resource.unlink(voidptr(target_node)) or { return errno.err, errno.get() }
-	target_node.resource.unref(unsafe { nil }) or {}
-
-	unsafe {
-		free(target_node.children['.'].children)
-		free(target_node.children['.'])
-		free(target_node.children['..'].children)
-		free(target_node.children['..'])
-		free(target_node.children)
-	}
-	parent_of_tgt_node.children.delete(basename)
+	unlink(parent, path, true) or { return errno.err, errno.get() }
 
 	return 0, 0
 }
@@ -791,6 +773,7 @@ pub fn syscall_openat(_ voidptr, dirfd int, _path charptr, flags int, mode u32) 
 		res.grow(unsafe { nil }, 0) or { return errno.err, errno.get() }
 	}
 	fdnum := fdnum_create_from_node(mut node, flags, 0, false) or { return errno.err, errno.get() }
+	inotify_emit(node, '', in_open, 0)
 
 	return u64(fdnum), 0
 }
@@ -814,6 +797,9 @@ pub fn syscall_read(_ voidptr, fdnum int, buf voidptr, count u64) (u64, u64) {
 		return errno.err, errno.ebadf
 	}
 	ret := fd.handle.read(buf, count) or { return errno.err, errno.get() }
+	if ret > 0 && fd.handle.node != unsafe { nil } {
+		inotify_emit(unsafe { &VFSNode(fd.handle.node) }, '', in_access, 0)
+	}
 	return u64(ret), 0
 }
 
@@ -836,6 +822,9 @@ pub fn syscall_write(_ voidptr, fdnum int, buf voidptr, count u64) (u64, u64) {
 		return errno.err, errno.ebadf
 	}
 	ret := fd.handle.write(buf, count) or { return errno.err, errno.get() }
+	if ret > 0 && fd.handle.node != unsafe { nil } {
+		inotify_emit(unsafe { &VFSNode(fd.handle.node) }, '', in_modify, 0)
+	}
 	return u64(ret), 0
 }
 
@@ -848,7 +837,19 @@ pub fn syscall_close(_ voidptr, fdnum int) (u64, u64) {
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
+	mut node := &VFSNode(unsafe { nil })
+	mut close_mask := in_close_nowrite
+	mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.get() }
+	if fd.handle.node != unsafe { nil } {
+		node = unsafe { &VFSNode(fd.handle.node) }
+		access := fd.handle.flags & resource.o_accmode
+		if access == resource.o_wronly || access == resource.o_rdwr {
+			close_mask = in_close_write
+		}
+	}
+	fd.unref()
 	file.fdnum_close(unsafe { nil }, fdnum, true) or { return errno.err, errno.get() }
+	if unsafe { node != nil } { inotify_emit(node, '', close_mask, 0) }
 	return 0, 0
 }
 
@@ -1108,6 +1109,9 @@ pub fn syscall_fchmod(_ voidptr, fdnum int, mode u32) (u64, u64) {
 		res.stat.mode = old_mode
 		return errno.err, errno.get()
 	}
+	if fd.handle.node != unsafe { nil } {
+		inotify_emit(unsafe { &VFSNode(fd.handle.node) }, '', in_attrib, 0)
+	}
 	return 0, 0
 }
 
@@ -1135,6 +1139,7 @@ pub fn syscall_fchmodat(_ voidptr, dirfd int, _path charptr, mode u32) (u64, u64
 		node_resource.stat.mode = old_mode
 		return errno.err, errno.get()
 	}
+	inotify_emit(node, '', in_attrib, 0)
 	return 0, 0
 }
 
@@ -1415,6 +1420,16 @@ pub fn rename(oldparent &VFSNode, oldpath string, newparent &VFSNode, newpath st
 		}
 		adopt(mut old_node, mut new_parent_of, new_basename)
 		adopt(mut new_node, mut old_parent_of, old_basename)
+		first_cookie := inotify_next_cookie()
+		old_dir_flag := if stat.isdir(old_node.resource.stat.mode) { in_isdir } else { u32(0) }
+		new_dir_flag := if stat.isdir(new_node.resource.stat.mode) { in_isdir } else { u32(0) }
+		inotify_emit(old_parent_of, old_basename, in_moved_from | old_dir_flag, first_cookie)
+		inotify_emit(new_parent_of, new_basename, in_moved_to | old_dir_flag, first_cookie)
+		second_cookie := inotify_next_cookie()
+		inotify_emit(new_parent_of, new_basename, in_moved_from | new_dir_flag, second_cookie)
+		inotify_emit(old_parent_of, old_basename, in_moved_to | new_dir_flag, second_cookie)
+		inotify_emit(old_node, '', in_move_self, 0)
+		inotify_emit(new_node, '', in_move_self, 0)
 		return
 	}
 
@@ -1465,6 +1480,8 @@ pub fn rename(oldparent &VFSNode, oldpath string, newparent &VFSNode, newpath st
 		// The filesystem rename hook already removed the destination name. Drop
 		// the VFS link without invoking a second backend unlink.
 		if new_node.resource.stat.nlink > 0 { new_node.resource.stat.nlink-- }
+		inotify_emit(new_node, '', in_delete_self, 0)
+		inotify_forget(new_node)
 		new_parent_of.children.delete(new_basename)
 		new_node.resource.unref(unsafe { nil })?
 	}
@@ -1474,6 +1491,11 @@ pub fn rename(oldparent &VFSNode, oldpath string, newparent &VFSNode, newpath st
 		new_parent_of.children[new_basename] = old_node
 	}
 	adopt(mut old_node, mut new_parent_of, new_basename)
+	cookie := inotify_next_cookie()
+	dir_flag := if stat.isdir(old_node.resource.stat.mode) { in_isdir } else { u32(0) }
+	inotify_emit(old_parent_of, old_basename, in_moved_from | dir_flag, cookie)
+	inotify_emit(new_parent_of, new_basename, in_moved_to | dir_flag, cookie)
+	inotify_emit(old_node, '', in_move_self, 0)
 }
 
 // Re-parent a node after a move, keeping the "." and ".." entries a directory
@@ -1655,6 +1677,9 @@ pub fn syscall_fchownat(_ voidptr, dirfd int, _path charptr, uid u32, gid u32, f
 			return errno.err, errno.eperm
 		}
 		change_owner(mut res, uid, gid) or { return errno.err, errno.get() }
+		if fd.handle.node != unsafe { nil } {
+			inotify_emit(unsafe { &VFSNode(fd.handle.node) }, '', in_attrib, 0)
+		}
 		return 0, 0
 	}
 
@@ -1669,6 +1694,7 @@ pub fn syscall_fchownat(_ voidptr, dirfd int, _path charptr, uid u32, gid u32, f
 	}
 
 	change_owner(mut res, uid, gid) or { return errno.err, errno.get() }
+	inotify_emit(node, '', in_attrib, 0)
 
 	return 0, 0
 }
@@ -1688,6 +1714,9 @@ pub fn syscall_fchown(_ voidptr, fdnum int, uid u32, gid u32) (u64, u64) {
 		return errno.err, errno.eperm
 	}
 	change_owner(mut res, uid, gid) or { return errno.err, errno.get() }
+	if fd.handle.node != unsafe { nil } {
+		inotify_emit(unsafe { &VFSNode(fd.handle.node) }, '', in_attrib, 0)
+	}
 
 	return 0, 0
 }
@@ -1819,6 +1848,7 @@ pub fn syscall_utimensat(_ voidptr, dirfd int, _path charptr, times u64, flags i
 		res.stat.ctim = old_ctim
 		return errno.err, errno.get()
 	}
+	inotify_emit(node, '', in_attrib, 0)
 	return 0, 0
 }
 

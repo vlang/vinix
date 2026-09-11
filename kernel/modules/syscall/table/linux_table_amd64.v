@@ -48,6 +48,10 @@ fn syscall_linux_access(gpr_state voidptr, path charptr, mode u32) (u64, u64) {
 	return fs.syscall_faccessat(gpr_state, fs.at_fdcwd, path, mode, 0)
 }
 
+fn syscall_linux_inotify_init(gpr_state voidptr) (u64, u64) {
+	return fs.syscall_inotify_init(gpr_state, 0)
+}
+
 fn syscall_linux_faccessat(gpr_state voidptr, dirfd int, path charptr, mode u32) (u64, u64) {
 	return fs.syscall_faccessat(gpr_state, dirfd, path, mode, 0)
 }
@@ -499,12 +503,16 @@ pub fn init_linux_syscall_table() {
 	linux_syscall_table[229] = voidptr(sys.syscall_clock_getres)
 	linux_syscall_table[230] = voidptr(sys.syscall_clock_nanosleep)
 	linux_syscall_table[231] = voidptr(syscall_linux_exit_group)
+	linux_syscall_table[253] = voidptr(syscall_linux_inotify_init)
+	linux_syscall_table[254] = voidptr(fs.syscall_inotify_add_watch)
+	linux_syscall_table[255] = voidptr(fs.syscall_inotify_rm_watch)
 	linux_syscall_table[257] = voidptr(fs.syscall_openat)
 	linux_syscall_table[262] = voidptr(fs.syscall_fstatat)
 	linux_syscall_table[269] = voidptr(syscall_linux_faccessat)
 	linux_syscall_table[273] = voidptr(syscall_linux_set_robust_list)
 	linux_syscall_table[280] = voidptr(fs.syscall_utimensat)
 	linux_syscall_table[293] = voidptr(pipe.syscall_pipe)
+	linux_syscall_table[294] = voidptr(fs.syscall_inotify_init)
 	linux_syscall_table[302] = voidptr(syscall_linux_prlimit64)
 	linux_syscall_table[318] = voidptr(syscall_linux_getrandom)
 	linux_syscall_table[334] = voidptr(syscall_linux_rseq)

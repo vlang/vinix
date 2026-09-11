@@ -40,14 +40,6 @@ fn syscall_vacant(gpr_state voidptr) (u64, u64) {
 	return u64(-1), errno.enosys
 }
 
-// The common inotify object is only a placeholder: it cannot add watches or
-// produce events.  Returning a descriptor from inotify_init1 makes callers
-// wait forever after inotify_add_watch fails.  Report the facility as absent
-// so Linux applications can select their polling fallback instead.
-fn syscall_linux_inotify_init1(_ voidptr, _flags int) (u64, u64) {
-	return errno.err, errno.enosys
-}
-
 // Vinix filesystems do not expose extended attributes yet. Linux software
 // probes every xattr entry point during prefix and cache setup; ENOTSUP is the
 // defined filesystem answer and avoids treating each harmless probe as an
@@ -964,7 +956,9 @@ pub fn init_syscall_table() {
 	syscall_table[23] = voidptr(syscall_linux_dup) // __NR_dup
 	syscall_table[24] = voidptr(file.syscall_dup3) // __NR_dup3
 	syscall_table[25] = voidptr(file.syscall_fcntl) // __NR_fcntl
-	syscall_table[26] = voidptr(syscall_linux_inotify_init1) // __NR_inotify_init1
+	syscall_table[26] = voidptr(fs.syscall_inotify_init) // __NR_inotify_init1
+	syscall_table[27] = voidptr(fs.syscall_inotify_add_watch) // __NR_inotify_add_watch
+	syscall_table[28] = voidptr(fs.syscall_inotify_rm_watch) // __NR_inotify_rm_watch
 	syscall_table[29] = voidptr(fs.syscall_ioctl) // __NR_ioctl
 	syscall_table[34] = voidptr(fs.syscall_mkdirat) // __NR_mkdirat
 	syscall_table[35] = voidptr(fs.syscall_unlinkat) // __NR_unlinkat
