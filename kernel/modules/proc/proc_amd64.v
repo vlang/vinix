@@ -45,7 +45,8 @@ pub mut:
 	// moment it is switched away, so the running total never counts a span
 	// twice and never counts one that has not finished.
 	scheduled_at_ns u64
-	affinity_mask  u64 = u64(-1)
+	cpu_time_ns     u64
+	affinity_mask   u64 = u64(-1)
 }
 
 pub fn current_thread() &Thread {

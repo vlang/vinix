@@ -669,6 +669,7 @@ fn release_child(mut current_process proc.Process, child &proc.Process) {
 	}
 	current_process.children_lock.release()
 
+	proc.account_reaped_child(mut current_process, child)
 	proc.free_pid(child.pid)
 }
 
@@ -679,14 +680,16 @@ fn put_back(mut child proc.Process) u64 {
 	return errno.efault
 }
 
-// We do not account per-process CPU time yet, so report zeroes rather than
-// leaving the caller's struct untouched.
-fn write_empty_rusage(rusage_ptr u64) bool {
+fn write_child_rusage(rusage_ptr u64, child &proc.Process) bool {
 	if rusage_ptr == 0 {
 		return true
 	}
 
-	usage := Rusage{}
+	ns := katomic.load(&child.cpu_time_ns)
+	usage := Rusage{
+		ru_utime_sec:  i64(ns / 1000000000)
+		ru_utime_usec: i64((ns % 1000000000) / 1000)
+	}
 	return usercopy.copy_to_user(rusage_ptr, voidptr(&usage), sizeof(Rusage))
 }
 
@@ -708,7 +711,7 @@ pub fn syscall_wait4(_ voidptr, pid int, status_ptr u64, options int, rusage_ptr
 	if status_ptr != 0 && !usercopy.copy_to_user(status_ptr, voidptr(&status), sizeof(int)) {
 		return errno.err, put_back(mut child)
 	}
-	if !write_empty_rusage(rusage_ptr) {
+	if !write_child_rusage(rusage_ptr, child) {
 		return errno.err, put_back(mut child)
 	}
 
@@ -779,7 +782,7 @@ pub fn syscall_waitid(_ voidptr, idtype int, id u64, infop u64, options int, rus
 	if infop != 0 && !usercopy.copy_to_user(infop, voidptr(&info), sizeof(SigInfoChld)) {
 		return errno.err, put_back(mut child)
 	}
-	if !write_empty_rusage(rusage_ptr) {
+	if !write_child_rusage(rusage_ptr, child) {
 		return errno.err, put_back(mut child)
 	}
 

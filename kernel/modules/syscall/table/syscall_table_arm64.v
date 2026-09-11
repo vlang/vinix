@@ -439,31 +439,6 @@ fn syscall_linux_prctl(_ voidptr, option int, arg2 u64, _arg3 u64, _arg4 u64, _a
 	}
 }
 
-// getrusage(2). No per-process CPU time is accounted yet, so the times are
-// zero — but `who` is checked, because a caller passing a bad one should hear
-// about it rather than get a zeroed struct back.
-const rusage_self = 0
-
-const rusage_children = -1
-
-const rusage_thread = 1
-
-fn syscall_linux_getrusage(_ voidptr, who int, usage u64) (u64, u64) {
-	if who != rusage_self && who != rusage_children && who != rusage_thread {
-		return errno.err, errno.einval
-	}
-	if usage == 0 {
-		return errno.err, errno.efault
-	}
-
-	mut blank := [18]i64{}
-	if !usercopy.copy_to_user(usage, voidptr(&blank[0]), sizeof(i64) * 18) {
-		return errno.err, errno.efault
-	}
-
-	return 0, 0
-}
-
 fn syscall_linux_prlimit64(_ voidptr, pid int, res int, new_rlim u64, old_rlim u64) (u64, u64) {
 	if res != proc.rlimit_nofile {
 		return errno.err, errno.einval
@@ -505,23 +480,6 @@ fn syscall_linux_prlimit64(_ voidptr, pid int, res int, new_rlim u64, old_rlim u
 fn syscall_linux_gettid(_ voidptr) (u64, u64) {
 	current := proc.current_thread()
 	return u64(current.tid), 0
-}
-
-// sysinfo: return basic system info (stub with 2GB RAM, 1 CPU)
-fn syscall_linux_sysinfo(_ voidptr, info voidptr) (u64, u64) {
-	if info != unsafe { nil } {
-		unsafe {
-			C.memset(info, 0, 112) // sizeof(struct sysinfo) = 112 on aarch64
-			mut p := &u64(info)
-			p[0] = 0 // uptime
-			p[1] = 0 // loads[0]
-			p[2] = 0 // loads[1]
-			p[3] = 0 // loads[2]
-			p[4] = u64(2) * 1024 * 1024 * 1024 // totalram (2GB)
-			p[5] = u64(1) * 1024 * 1024 * 1024 // freeram (1GB)
-		}
-	}
-	return 0, 0
 }
 
 // ── X11 / dynamic-linking syscall stubs ──
@@ -625,11 +583,6 @@ fn syscall_linux_pread64(gpr_state voidptr, fdnum int, buf voidptr, count u64, o
 // pwrite64: write at offset without changing file position.
 fn syscall_linux_pwrite64(gpr_state voidptr, fdnum int, buf voidptr, count u64, offset i64) (u64, u64) {
 	return file.syscall_pwrite(gpr_state, fdnum, buf, count, offset)
-}
-
-// utimensat: stub — timestamps not tracked.
-fn syscall_linux_utimensat(_ voidptr, _dirfd int, _path charptr, _times u64, _flags int) (u64, u64) {
-	return 0, 0
 }
 
 // setitimer / getitimer: ITIMER_REAL delivers SIGALRM via scheduler tick.
@@ -948,27 +901,6 @@ fn syscall_linux_getrandom(_ voidptr, buf u64, count u64, flags u32) (u64, u64) 
 	return written, 0
 }
 
-// fstatfs: return filesystem statistics for an open fd.
-// Stub: report a tmpfs-like filesystem.
-fn syscall_linux_fstatfs(_ voidptr, _fd int, buf u64) (u64, u64) {
-	if buf == 0 {
-		return errno.err, errno.efault
-	}
-	unsafe {
-		C.memset(voidptr(buf), 0, 120) // sizeof(struct statfs) on aarch64
-		*&u64(buf + 0) = 0x01021994 // f_type = TMPFS_MAGIC
-		*&u64(buf + 8) = 4096 // f_bsize
-		*&u64(buf + 16) = 262144 // f_blocks (1GB / 4KB)
-		*&u64(buf + 24) = 131072 // f_bfree
-		*&u64(buf + 32) = 131072 // f_bavail
-		*&u64(buf + 40) = 65536 // f_files
-		*&u64(buf + 48) = 65536 // f_ffree
-		*&u64(buf + 64) = 255 // f_namelen
-		*&u64(buf + 72) = 4096 // f_frsize
-	}
-	return 0, 0
-}
-
 const prio_process = 0
 
 fn syscall_linux_setpriority(_ voidptr, which int, who int, prio int) (u64, u64) {
@@ -1150,7 +1082,7 @@ pub fn init_syscall_table() {
 	syscall_table[176] = voidptr(userland.syscall_getgid) // __NR_getgid
 	syscall_table[177] = voidptr(userland.syscall_getegid) // __NR_getegid
 	syscall_table[178] = voidptr(syscall_linux_gettid) // __NR_gettid
-	syscall_table[179] = voidptr(syscall_linux_sysinfo) // __NR_sysinfo
+	syscall_table[179] = voidptr(sys.syscall_sysinfo) // __NR_sysinfo
 	syscall_table[168] = voidptr(syscall_linux_getcpu) // __NR_getcpu
 
 	// Resource / file locking
@@ -1162,18 +1094,18 @@ pub fn init_syscall_table() {
 	syscall_table[32] = voidptr(file.syscall_flock) // __NR_flock
 	syscall_table[46] = voidptr(file.syscall_ftruncate) // __NR_ftruncate
 	syscall_table[71] = voidptr(syscall_linux_sendfile) // __NR_sendfile
-	syscall_table[88] = voidptr(syscall_linux_utimensat) // __NR_utimensat
+	syscall_table[88] = voidptr(fs.syscall_utimensat) // __NR_utimensat
 	syscall_table[102] = voidptr(syscall_linux_getitimer) // __NR_getitimer
 	syscall_table[103] = voidptr(syscall_linux_setitimer) // __NR_setitimer
 	syscall_table[153] = voidptr(syscall_linux_times) // __NR_times
 	syscall_table[154] = voidptr(syscall_linux_setpgid) // __NR_setpgid
 	syscall_table[155] = voidptr(syscall_linux_getpgid) // __NR_getpgid
-	syscall_table[165] = voidptr(syscall_linux_getrusage) // __NR_getrusage
+	syscall_table[165] = voidptr(sys.syscall_getrusage) // __NR_getrusage
 	syscall_table[167] = voidptr(syscall_linux_prctl) // __NR_prctl
 	syscall_table[38] = voidptr(fs.syscall_renameat) // __NR_renameat
 	syscall_table[276] = voidptr(fs.syscall_renameat2) // __NR_renameat2
 	syscall_table[43] = voidptr(fs.syscall_statfs) // __NR_statfs
-	syscall_table[44] = voidptr(syscall_linux_fstatfs) // __NR_fstatfs
+	syscall_table[44] = voidptr(fs.syscall_fstatfs) // __NR_fstatfs
 	syscall_table[45] = voidptr(fs.syscall_truncate) // __NR_truncate
 	syscall_table[278] = voidptr(syscall_linux_getrandom) // __NR_getrandom
 	syscall_table[435] = voidptr(userland.syscall_clone3) // __NR_clone3

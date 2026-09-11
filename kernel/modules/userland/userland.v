@@ -535,6 +535,7 @@ pub fn syscall_waitpid(_ voidptr, pid int, _status &int, options int) (u64, u64)
 	}
 	ret := child.pid
 
+	proc.account_reaped_child(mut current_process, child)
 	proc.free_pid(ret)
 
 	current_process.children.delete(current_process.children.index(child))

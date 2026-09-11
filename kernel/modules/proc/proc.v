@@ -99,6 +99,8 @@ pub mut:
 	// stays counted. It only ever grows, so a reader that wants a rate takes
 	// two samples and divides the difference by the wall clock between them.
 	cpu_time_ns u64
+	// CPU time from children this process has successfully waited for.
+	children_cpu_time_ns u64
 	// POSIX nice value. The scheduler scales this process' timeslices from
 	// -20 (highest normal priority) through 19 (lowest).
 	nice int
@@ -190,6 +192,12 @@ pub fn charge_cpu_time(mut t Thread, now_ns u64) {
 		return
 	}
 	span := now_ns - started
+	for {
+		total := katomic.load(&t.cpu_time_ns)
+		if katomic.cas(mut &t.cpu_time_ns, total, total + span) {
+			break
+		}
+	}
 	mut process := t.process
 	for {
 		total := katomic.load(&process.cpu_time_ns)
@@ -197,6 +205,48 @@ pub fn charge_cpu_time(mut t Thread, now_ns u64) {
 			return
 		}
 	}
+}
+
+pub fn thread_cpu_time(t &Thread, now_ns u64) u64 {
+	mut total := katomic.load(&t.cpu_time_ns)
+	started := t.scheduled_at_ns
+	if started != 0 && now_ns > started {
+		total += now_ns - started
+	}
+	return total
+}
+
+pub fn process_cpu_time(process &Process, now_ns u64) u64 {
+	mut total := katomic.load(&process.cpu_time_ns)
+	current := current_thread()
+	if unsafe { current != nil } && voidptr(current.process) == voidptr(process) {
+		started := current.scheduled_at_ns
+		if started != 0 && now_ns > started {
+			total += now_ns - started
+		}
+	}
+	return total
+}
+
+pub fn account_reaped_child(mut parent Process, child &Process) {
+	child_time := katomic.load(&child.cpu_time_ns)
+	for {
+		total := katomic.load(&parent.children_cpu_time_ns)
+		if katomic.cas(mut &parent.children_cpu_time_ns, total, total + child_time) {
+			return
+		}
+	}
+}
+
+pub fn process_count() u16 {
+	lock_table()
+	defer { unlock_table() }
+	mut count := u32(0)
+	for i := 1; i < max_pid; i++ {
+		if processes[i] != unsafe { nil } { count++ }
+	}
+	if count > 0xffff { return 0xffff }
+	return u16(count)
 }
 
 // ── Reading the process table ──────────────────────────────────────

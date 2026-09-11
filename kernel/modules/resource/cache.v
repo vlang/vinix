@@ -19,6 +19,25 @@ mut:
 	persist_metadata() ?
 }
 
+pub struct FileSystemStat {
+pub mut:
+	@type    u64
+	bsize    u64
+	blocks   u64
+	bfree    u64
+	bavail   u64
+	files    u64
+	ffree    u64
+	namelen  u64 = 255
+	frsize   u64
+	flags    u64
+}
+
+pub interface FileSystemStatResource {
+mut:
+	filesystem_stat() FileSystemStat
+}
+
 pub fn sync_resource(mut res Resource, handle voidptr) ? {
 	if mut res is SyncableResource {
 		res.sync(handle) or { return none }
@@ -34,5 +53,17 @@ pub fn advise_resource(mut res Resource, handle voidptr, offset u64, length u64,
 pub fn persist_metadata(mut res Resource) ? {
 	if mut res is MetadataResource {
 		res.persist_metadata()?
+	}
+}
+
+pub fn filesystem_stat(mut res Resource) FileSystemStat {
+	if mut res is FileSystemStatResource {
+		return res.filesystem_stat()
+	}
+	return FileSystemStat{
+		@type:   0
+		bsize:   4096
+		namelen: 255
+		frsize:  4096
 	}
 }

@@ -184,6 +184,20 @@ fn (mut this TmpFSResource) ioctl(handle voidptr, request u64, argp voidptr) ?in
 	return resource.default_ioctl(handle, request, argp)
 }
 
+fn (mut this TmpFSResource) filesystem_stat() resource.FileSystemStat {
+	return resource.FileSystemStat{
+		@type:   0x01021994
+		bsize:   page_size
+		blocks:  memory.total_bytes() / page_size
+		bfree:   memory.free_bytes() / page_size
+		bavail:  memory.free_bytes() / page_size
+		files:   u64(-1)
+		ffree:   u64(-1)
+		namelen: 255
+		frsize:  page_size
+	}
+}
+
 fn (mut this TmpFSResource) unref(_handle voidptr) ? {
 	katomic.dec(mut &this.refcount)
 

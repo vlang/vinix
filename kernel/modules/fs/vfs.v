@@ -8,6 +8,7 @@ import proc
 import file
 import errno
 import ioctl
+import time
 import usercopy
 
 pub const at_fdcwd = -100
@@ -1704,31 +1705,121 @@ pub fn syscall_statfs(_ voidptr, _path charptr, buf u64) (u64, u64) {
 
 	mut process := proc.current_thread().process
 
-	// The path has to exist even though the answer does not depend on it.
-	get_node(process.current_directory, path, true) or { return errno.err, errno.get() }
+	node := get_node(process.current_directory, path, true) or { return errno.err, errno.get() }
 
-	if !fill_statfs(buf) {
+	mut res := node.resource
+	if !fill_statfs_resource(mut res, buf) {
 		return errno.err, errno.efault
 	}
 
 	return 0, 0
 }
 
-// Describe the one filesystem this kernel has anything to say about. Shared
-// with fstatfs so the two cannot drift apart.
-pub fn fill_statfs(buf u64) bool {
+pub fn syscall_fstatfs(_ voidptr, fdnum int, buf u64) (u64, u64) {
+	if buf == 0 { return errno.err, errno.efault }
+	mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or {
+		return errno.err, errno.get()
+	}
+	defer { fd.unref() }
+	mut res := fd.handle.resource
+	if !fill_statfs_resource(mut res, buf) { return errno.err, errno.efault }
+	return 0, 0
+}
+
+fn fill_statfs_resource(mut res resource.Resource, buf u64) bool {
+	info := resource.filesystem_stat(mut res)
 	mut raw := [15]u64{}
-	raw[0] = 0x01021994 // f_type: TMPFS_MAGIC
-	raw[1] = 4096 // f_bsize
-	raw[2] = 262144 // f_blocks
-	raw[3] = 131072 // f_bfree
-	raw[4] = 131072 // f_bavail
-	raw[5] = 65536 // f_files
-	raw[6] = 65536 // f_ffree
-	raw[8] = 255 // f_namelen
-	raw[9] = 4096 // f_frsize
+	raw[0] = info.@type
+	raw[1] = info.bsize
+	raw[2] = info.blocks
+	raw[3] = info.bfree
+	raw[4] = info.bavail
+	raw[5] = info.files
+	raw[6] = info.ffree
+	raw[8] = info.namelen
+	raw[9] = info.frsize
+	raw[10] = info.flags
 
 	return usercopy.copy_to_user(buf, voidptr(&raw[0]), sizeof(u64) * 15)
+}
+
+const utime_now = i64(0x3fffffff)
+const utime_omit = i64(0x3ffffffe)
+
+// utimensat updates the common VFS timestamps and asks persistent filesystems
+// to commit the inode metadata before reporting success.
+pub fn syscall_utimensat(_ voidptr, dirfd int, _path charptr, times u64, flags int) (u64, u64) {
+	if flags & ~(at_symlink_nofollow | at_empty_path) != 0 {
+		return errno.err, errno.einval
+	}
+	path := unsafe { cstring_to_vstring(_path) }
+	mut node := &VFSNode(unsafe { nil })
+	if path.len == 0 {
+		if flags & at_empty_path == 0 { return errno.err, errno.enoent }
+		if dirfd == at_fdcwd {
+			node = proc.current_thread().process.current_directory
+		} else {
+			mut fd := file.fd_from_fdnum(unsafe { nil }, dirfd) or {
+				return errno.err, errno.get()
+			}
+			node = unsafe { &VFSNode(fd.handle.node) }
+			fd.unref()
+			if unsafe { node == nil } { return errno.err, errno.einval }
+		}
+	} else {
+		parent := get_parent_dir(dirfd, path) or { return errno.err, errno.get() }
+		node = get_node(parent, path, flags & at_symlink_nofollow == 0) or {
+			return errno.err, errno.get()
+		}
+	}
+	if node.read_only { return errno.err, errno.erofs }
+
+	now := time.clock_now(time.clock_type_realtime) or { time.TimeSpec{} }
+	mut requested := [2]time.TimeSpec{init: now}
+	mut explicit := false
+	if times != 0 {
+		if !usercopy.copy_from_user(voidptr(&requested[0]), times,
+			sizeof(time.TimeSpec) * 2) {
+			return errno.err, errno.efault
+		}
+		for value in requested {
+			if value.tv_nsec != utime_now && value.tv_nsec != utime_omit
+				&& (value.tv_nsec < 0 || value.tv_nsec >= 1000000000) {
+				return errno.err, errno.einval
+			}
+			if value.tv_nsec != utime_now && value.tv_nsec != utime_omit {
+				explicit = true
+			}
+		}
+	}
+	if explicit {
+		if !owns_resource(node.resource.stat.uid) { return errno.err, errno.eperm }
+	} else if !owns_resource(node.resource.stat.uid)
+		&& !check_access(node, access_write, true) {
+		return errno.err, errno.eacces
+	}
+	if requested[0].tv_nsec == utime_omit && requested[1].tv_nsec == utime_omit {
+		return 0, 0
+	}
+
+	mut res := node.resource
+	old_atim := res.stat.atim
+	old_mtim := res.stat.mtim
+	old_ctim := res.stat.ctim
+	if requested[0].tv_nsec != utime_omit {
+		res.stat.atim = if requested[0].tv_nsec == utime_now { now } else { requested[0] }
+	}
+	if requested[1].tv_nsec != utime_omit {
+		res.stat.mtim = if requested[1].tv_nsec == utime_now { now } else { requested[1] }
+	}
+	res.stat.ctim = now
+	resource.persist_metadata(mut res) or {
+		res.stat.atim = old_atim
+		res.stat.mtim = old_mtim
+		res.stat.ctim = old_ctim
+		return errno.err, errno.get()
+	}
+	return 0, 0
 }
 
 // sync(2) and syncfs(2). Writes reach their resource as they are made, so there

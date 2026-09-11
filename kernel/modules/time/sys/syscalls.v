@@ -4,7 +4,9 @@ import time
 import errno
 import event
 import event.eventstruct
+import memory
 import proc
+import usercopy
 
 pub fn nsleep(ns i64) {
 	mut interval := time.TimeSpec{
@@ -110,5 +112,51 @@ pub fn syscall_nanosleep(_ voidptr, req &time.TimeSpec, mut rem time.TimeSpec) (
 		return errno.err, errno.eintr
 	}
 
+	return 0, 0
+}
+
+pub const rusage_self = 0
+pub const rusage_children = -1
+pub const rusage_thread = 1
+
+// Linux struct rusage consists of 18 signed machine words on both supported
+// 64-bit architectures. CPU time is currently charged as user time because
+// Vinix does not yet split scheduler accounting at the user/kernel boundary.
+pub fn syscall_getrusage(_ voidptr, who int, usage u64) (u64, u64) {
+	if usage == 0 { return errno.err, errno.efault }
+	now_ns := time.monotonic_ns()
+	current := proc.current_thread()
+	mut ns := u64(0)
+	match who {
+		rusage_self { ns = proc.process_cpu_time(current.process, now_ns) }
+		rusage_children { ns = current.process.children_cpu_time_ns }
+		rusage_thread { ns = proc.thread_cpu_time(current, now_ns) }
+		else { return errno.err, errno.einval }
+	}
+	mut result := [18]i64{}
+	result[0] = i64(ns / 1000000000)
+	result[1] = i64((ns % 1000000000) / 1000)
+	if !usercopy.copy_to_user(usage, voidptr(&result[0]), sizeof(i64) * 18) {
+		return errno.err, errno.efault
+	}
+	return 0, 0
+}
+
+// Linux struct sysinfo, represented by raw words to make its ABI padding
+// explicit. RAM values come directly from the PMM and mem_unit is one byte.
+pub fn syscall_sysinfo(_ voidptr, info u64) (u64, u64) {
+	if info == 0 { return errno.err, errno.efault }
+	mut result := [14]u64{}
+	clock := time.clock_now(time.clock_type_monotonic) or { time.TimeSpec{} }
+	result[0] = u64(if clock.tv_sec > 0 { clock.tv_sec } else { 0 })
+	result[4] = memory.total_bytes()
+	result[5] = memory.free_bytes()
+	unsafe {
+		*&u16(u64(&result[0]) + 80) = proc.process_count()
+		*&u32(u64(&result[0]) + 104) = 1
+	}
+	if !usercopy.copy_to_user(info, voidptr(&result[0]), sizeof(u64) * 14) {
+		return errno.err, errno.efault
+	}
 	return 0, 0
 }

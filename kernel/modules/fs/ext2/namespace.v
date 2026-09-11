@@ -65,6 +65,20 @@ fn (mut this EXT2Resource) persist_metadata() ? {
 	}
 }
 
+fn (mut this EXT2Resource) filesystem_stat() resource_mod.FileSystemStat {
+	return resource_mod.FileSystemStat{
+		@type:   0xef53
+		bsize:   this.filesystem.block_size
+		blocks:  this.filesystem.superblock.block_cnt
+		bfree:   this.filesystem.superblock.unallocated_blocks
+		bavail:  this.filesystem.superblock.unallocated_blocks
+		files:   this.filesystem.superblock.inode_cnt
+		ffree:   this.filesystem.superblock.unallocated_inodes
+		namelen: 255
+		frsize:  this.filesystem.frag_size
+	}
+}
+
 fn entry_name_equals(entry &EXT2DirectoryEntry, name string) bool {
 	return int(entry.name_length) == name.len && unsafe {
 		C.memcmp(voidptr(u64(entry) + sizeof(EXT2DirectoryEntry)), name.str,
