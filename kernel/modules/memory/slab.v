@@ -3,8 +3,11 @@ module memory
 
 import klock
 import lib
+import xnualloc
 
-// Independent implementation for Vinix; no XNU implementation is copied.
+// The default bitmap path remains the independent Vinix implementation.
+// -d xnu_bitmap selects the APSL-preserving translation in xnualloc.
+// This does not select XNU magazines, VM expansion, or the full zone allocator.
 // Each size class has a list of nonempty, nonfull pages and at most one
 // empty spare page. Full pages are reached through their objects' headers.
 // Allocation bits live in the header, never in freed object payloads.
@@ -19,6 +22,8 @@ mut:
 	ent_size u64
 	partial  u64
 	spare    u64
+	// XNU scan cursor, serialized by the class lock (not per-CPU yet).
+	alloc_rr u16
 }
 
 struct SlabHeader {
@@ -29,7 +34,7 @@ mut:
 	next     u64
 	capacity u64
 	in_use   u64
-	// 1 = allocated or unavailable tail slot; 0 = available.
+	// Default: 1 = allocated/tail. With xnu_bitmap: 1 = free, 0 = used/tail.
 	used     [4]u64
 }
 
@@ -116,11 +121,15 @@ fn (mut this Slab) grow() {
 	}
 	hdr.magic = slab_magic
 	hdr.capacity = (page_size - slab_data_offset()) / this.ent_size
-	for i := 0; i < 4; i++ {
-		hdr.used[i] = u64(-1)
-	}
-	for i := u64(0); i < hdr.capacity; i++ {
-		hdr.used[int(i / 64)] &= ~(u64(1) << (i % 64))
+	$if xnu_bitmap ? {
+		xnualloc.zone_bits_init_ref(unsafe { &hdr.used[0] }, 4, u32(hdr.capacity))
+	} $else {
+		for i := 0; i < 4; i++ {
+			hdr.used[i] = u64(-1)
+		}
+		for i := u64(0); i < hdr.capacity; i++ {
+			hdr.used[int(i / 64)] &= ~(u64(1) << (i % 64))
+		}
 	}
 	this.add_partial(mut hdr)
 }
@@ -144,12 +153,19 @@ pub fn (mut this Slab) alloc() voidptr {
 	}
 	mut hdr := unsafe { &SlabHeader(this.partial) }
 	mut slot := u64(256)
-	for i := 0; i < 4; i++ {
-		if hdr.used[i] != u64(-1) {
-			bit := slab_first_zero(hdr.used[i])
-			hdr.used[i] |= u64(1) << bit
-			slot = u64(i) * 64 + bit
-			break
+	$if xnu_bitmap ? {
+		slot = xnualloc.zba_scan_bitmap_ref(unsafe { &hdr.used[0] }, 4, u64(this.alloc_rr) + 1)
+		if slot != xnualloc.no_element {
+			this.alloc_rr = u16(slot)
+		}
+	} $else {
+		for i := 0; i < 4; i++ {
+			if hdr.used[i] != u64(-1) {
+				bit := slab_first_zero(hdr.used[i])
+				hdr.used[i] |= u64(1) << bit
+				slot = u64(i) * 64 + bit
+				break
+			}
 		}
 	}
 	if slot >= hdr.capacity {
@@ -178,7 +194,7 @@ pub fn (mut this Slab) sfree(ptr voidptr) {
 	mut hdr := unsafe { &SlabHeader(u64(ptr) & ~(page_size - 1)) }
 	offset := u64(ptr) & (page_size - 1)
 	start := slab_data_offset()
-	if hdr.magic != slab_magic || hdr.slab != this || this.ent_size == 0 || offset < start {
+	if hdr.magic != slab_magic || u64(hdr.slab) != u64(&this) || this.ent_size == 0 || offset < start {
 		this.@lock.release()
 		lib.kpanic(unsafe { nil }, c'Slab: invalid free header')
 		return
@@ -191,7 +207,13 @@ pub fn (mut this Slab) sfree(ptr voidptr) {
 	}
 	word := int(slot / 64)
 	bit := u64(1) << (slot % 64)
-	if hdr.used[word] & bit == 0 || hdr.in_use == 0 {
+	mut is_free := false
+	$if xnu_bitmap ? {
+		is_free = xnualloc.zone_bits_is_free_ref(unsafe { &hdr.used[0] }, 4, slot)
+	} $else {
+		is_free = hdr.used[word] & bit == 0
+	}
+	if is_free || hdr.in_use == 0 {
 		this.@lock.release()
 		lib.kpanic(unsafe { nil }, c'Slab: double free')
 		return
@@ -199,7 +221,16 @@ pub fn (mut this Slab) sfree(ptr voidptr) {
 	was_full := hdr.in_use == hdr.capacity
 	// Poison before publishing the slot as free.
 	unsafe { C.memset(ptr, 0xaa, this.ent_size) }
-	hdr.used[word] &= ~bit
+	$if xnu_bitmap ? {
+		// The class lock and preceding check guarantee success.
+		if !xnualloc.zone_bits_mark_free_ref(unsafe { &hdr.used[0] }, 4, slot) {
+			this.@lock.release()
+			lib.kpanic(unsafe { nil }, c'Slab: corrupt XNU bitmap state')
+			return
+		}
+	} $else {
+		hdr.used[word] &= ~bit
+	}
 	hdr.in_use--
 	mut release_page := u64(0)
 	if hdr.in_use == 0 {
@@ -227,6 +258,9 @@ pub fn (mut this Slab) sfree(ptr voidptr) {
 // called concurrently, but never while holding a slab or PMM lock.
 // Returns bytes released by this call, not a global free-memory snapshot.
 pub fn heap_trim() u64 {
+	$if xnu_zone ? {
+		return xnu_heap_trim()
+	}
 	mut released := u64(0)
 	for mut slab in slabs {
 		slab.@lock.acquire()

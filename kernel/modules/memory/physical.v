@@ -179,6 +179,10 @@ pub fn pmm_init() {
 	slabs[12].init(1536)
 	slabs[13].init(2048)
 
+	$if xnu_zone ? {
+		xnu_heap_init()
+	}
+
 	$if heap_selftest ? {
 		heap_selftest()
 	}
@@ -375,6 +379,11 @@ pub fn free(ptr voidptr) {
 		return
 	}
 
+	$if xnu_zone ? {
+		xnu_heap_free(ptr)
+		return
+	}
+
 	mut slab_hdr := unsafe { &SlabHeader(u64(ptr) & ~(page_size - 1)) }
 
 	if slab_hdr.magic != slab_magic {
@@ -402,6 +411,9 @@ fn slab_for(size u64) ?&Slab {
 
 @[export: 'malloc']
 pub fn malloc(size u64) voidptr {
+	$if xnu_zone ? {
+		return xnu_heap_alloc(size)
+	}
 	mut slab := slab_for(size) or { return big_alloc(size) }
 
 	return slab.alloc()
@@ -436,6 +448,10 @@ pub fn realloc(ptr voidptr, new_size u64) voidptr {
 
 	if u64(ptr) & (page_size - 1) == 0 {
 		return big_realloc(ptr, new_size)
+	}
+
+	$if xnu_zone ? {
+		return xnu_heap_realloc(ptr, new_size)
 	}
 
 	slab_hdr := unsafe { &SlabHeader(u64(ptr) & ~(page_size - 1)) }

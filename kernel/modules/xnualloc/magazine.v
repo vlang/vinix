@@ -63,11 +63,11 @@
 @[manualfree]
 module xnualloc
 
-// Data-structure translations only. These are NOT enabled as Vinix per-CPU
-// caches. Their callers must supply CPU pinning, locks, ownership transitions,
-// refill, accounting and safe reclamation. No SMR grace-period implementation
-// is hidden behind a successful stub. Depot polling requires an explicit poll
-// callback when SMR is requested.
+// Data-structure translations used by zone.v and its opt-in Vinix adapter.
+// Callers supply CPU pinning, locks, ownership transitions, refill, accounting
+// and safe reclamation. No SMR grace-period implementation is hidden behind
+// a successful stub. Depot polling requires an explicit poll callback when
+// SMR is requested; the zone.v backend is strictly non-SMR.
 //
 // Storage adaptation: the flexible C array has a fixed 32-element capacity.
 pub const magazine_capacity = u16(32)
@@ -178,7 +178,7 @@ pub fn (mut d Depot) zone_depot_pop_head_empty(minimum &RecircMinimum) &Magazine
 // Source and destination must be distinct, initialized, externally locked.
 pub fn (mut dst Depot) zone_depot_move_full(mut src Depot, n u32,
 	minimum &RecircMinimum, lifo bool) u64 {
-	assert n > 0 && src.full >= n && &dst != &src
+	assert n > 0 && src.full >= n && u64(&dst) != u64(&src)
 	src.full -= n
 	unsafe {
 		if minimum != nil && minimum.full > src.full {
@@ -212,7 +212,7 @@ pub fn (mut dst Depot) zone_depot_move_full(mut src Depot, n u32,
 
 pub fn (mut dst Depot) zone_depot_move_empty(mut src Depot, n u32,
 	minimum &RecircMinimum) {
-	assert n > 0 && src.empty >= n && &dst != &src
+	assert n > 0 && src.empty >= n && u64(&dst) != u64(&src)
 	src.empty -= n
 	unsafe {
 		if minimum != nil && minimum.empty > src.empty {

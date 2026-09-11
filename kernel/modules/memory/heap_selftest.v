@@ -24,12 +24,16 @@ fn heap_selftest() {
 	heap_trim()
 	baseline := free_bytes()
 	for mut slab in slabs {
-		capacity := (page_size - slab_data_offset()) / slab.ent_size
+		mut offset := slab_data_offset()
+		$if xnu_zone ? {
+			offset = lib.align_up(u64(sizeof(XnuHeapHeader)), 16)
+		}
+		capacity := (page_size - offset) / slab.ent_size
 		count := capacity * 2 + 1
 		heap_test_require(count <= 512)
 		mut objects := [512]voidptr{}
 		for i := u64(0); i < count; i++ {
-			ptr := slab.alloc()
+			ptr := malloc(slab.ent_size)
 			heap_test_require(ptr != unsafe { nil } && u64(ptr) % slab_alignment == 0)
 			for j := u64(0); j < i; j++ {
 				heap_test_require(objects[int(j)] != ptr)
@@ -39,11 +43,11 @@ fn heap_selftest() {
 			objects[int(i)] = ptr
 		}
 		for i := u64(0); i < count; i += 2 {
-			slab.sfree(objects[int(i)])
+			free(objects[int(i)])
 		}
 		for i := u64(1); i < count; i += 2 {
 			heap_test_bytes(objects[int(i)], slab.ent_size, u8(i % 251 + 1))
-			slab.sfree(objects[int(i)])
+			free(objects[int(i)])
 		}
 		// All but one empty page must have been returned automatically.
 		heap_test_require(free_bytes() == baseline - page_size)
