@@ -4,6 +4,7 @@ import lib
 import memory
 import memory.mmap
 import resource
+import krandom
 
 pub struct Auxval {
 pub mut:
@@ -34,6 +35,35 @@ pub const at_hwcap2 = 26
 pub const pt_load = 0x00000001
 pub const pt_interp = 0x00000003
 pub const pt_phdr = 0x00000006
+
+const pie_base = u64(0x00200000)
+const interpreter_base = u64(0x40000000)
+const image_aslr_span = u64(0x40000000)
+const image_alignment = u64(0x200000)
+const stack_base = u64(0x70000000000)
+const mmap_base = u64(0x80000000000)
+const arena_aslr_span = u64(0x10000000)
+
+fn random_offset(span u64, alignment u64) u64 {
+	mut value := u64(0)
+	if span <= alignment || !krandom.fill(&value, sizeof(value), false) {
+		return 0
+	}
+	slots := span / alignment
+	return (value % slots) * alignment
+}
+
+pub fn interpreter_load_base() u64 {
+	return interpreter_base + random_offset(image_aslr_span, image_alignment)
+}
+
+pub fn initial_stack_top() u64 {
+	return stack_base - random_offset(arena_aslr_span, page_size)
+}
+
+pub fn initial_mmap_base() u64 {
+	return mmap_base + random_offset(arena_aslr_span, page_size)
+}
 
 // Keep ordinary binaries on the compact contiguous allocation path. Larger
 // segments are assembled from modest chunks so they do not depend on finding
@@ -142,7 +172,7 @@ pub fn load(_pagemap &memory.Pagemap, _res &resource.Resource, _base u64) !(Auxv
 	// in ld-musl and userspace. Apply a non-zero base for PIE binaries
 	// when no explicit base is given (base=0 means "auto" for ET_DYN).
 	if base == 0 && header.@type == u16(et_dyn) {
-		base = 0x200000
+		base = pie_base + random_offset(image_aslr_span - pie_base, image_alignment)
 	}
 
 	mut auxval := Auxval{
@@ -195,11 +225,10 @@ pub fn load(_pagemap &memory.Pagemap, _res &resource.Resource, _base u64) !(Auxv
 		misalign := phdr.p_vaddr & (page_size - 1)
 		page_count := lib.div_roundup(misalign + phdr.p_memsz, page_size)
 
-		pf := mmap.prot_read | mmap.prot_exec | if phdr.p_flags & pf_w != 0 {
-			mmap.prot_write
-		} else {
-			0
-		}
+		mut pf := 0
+		if phdr.p_flags & pf_r != 0 { pf |= mmap.prot_read }
+		if phdr.p_flags & pf_w != 0 { pf |= mmap.prot_write }
+		if phdr.p_flags & pf_x != 0 { pf |= mmap.prot_exec }
 
 		virt := lib.align_down(base + phdr.p_vaddr, page_size)
 		if page_count > contiguous_page_limit {

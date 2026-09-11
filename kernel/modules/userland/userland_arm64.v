@@ -691,7 +691,9 @@ pub fn start_program(execve bool, dir &fs.VFSNode, path string, argv []string, e
 		ld_node := fs.get_node(vfs_root, ld_path, true)?
 		ld := ld_node.resource
 
-		ld_auxval, interp := elf.load(new_pagemap, ld, 0x40000000) or { return none }
+		ld_auxval, interp := elf.load(new_pagemap, ld, elf.interpreter_load_base()) or {
+			return none
+		}
 
 		if interp != '' {
 			unsafe { interp.free() }
@@ -780,8 +782,8 @@ pub fn start_program(execve bool, dir &fs.VFSNode, path string, argv []string, e
 
 		mmap.delete_pagemap(mut old_pagemap)?
 
-		curr_process.thread_stack_top = u64(0x70000000000)
-		curr_process.mmap_anon_non_fixed_base = u64(0x80000000000)
+		curr_process.thread_stack_top = elf.initial_stack_top()
+		curr_process.mmap_anon_non_fixed_base = elf.initial_mmap_base()
 
 		curr_process.threads_lock.acquire()
 		curr_process.threads = []&proc.Thread{}

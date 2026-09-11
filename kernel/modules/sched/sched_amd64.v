@@ -13,6 +13,7 @@ import elf
 import lib
 import errno
 import time
+import krandom
 
 pub fn initialise() {
 	scheduler_vector = idt.allocate_vector()
@@ -496,8 +497,9 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 			// for the legacy mlibc loader, which ignores unknown entries.
 			stack = &u64(u64(stack) - 16)
 			random_kernel_addr := u64(stack)
-			*&u64(random_kernel_addr) = cpu.rdtsc() ^ random_kernel_addr
-			*&u64(random_kernel_addr + 8) = cpu.rdtsc() ^ u64(process)
+			if !krandom.fill(voidptr(random_kernel_addr), 16, true) {
+				C.memset(voidptr(random_kernel_addr), 0, 16)
+			}
 			random_vma := stack_vma - (u64(stack_top) - random_kernel_addr)
 
 			// Zero auxiliary vector entry
@@ -604,8 +606,8 @@ pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) ?&proc.Pr
 		new_proc.pgid = new_proc.pid
 		new_proc.sid = new_proc.pid
 		new_proc.pagemap = unsafe { pagemap }
-		new_proc.thread_stack_top = u64(0x70000000000)
-		new_proc.mmap_anon_non_fixed_base = u64(0x80000000000)
+		new_proc.thread_stack_top = elf.initial_stack_top()
+		new_proc.mmap_anon_non_fixed_base = elf.initial_mmap_base()
 		new_proc.current_directory = voidptr(vfs_root)
 	}
 

@@ -15,6 +15,7 @@ import elf
 import lib
 import errno
 import time
+import krandom
 
 fn C.sched_switch_context(gpr_state voidptr, kernel_stack u64)
 fn C.vinix_call_void_fn(f voidptr)
@@ -610,12 +611,12 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 				stack = &stack[-1]
 			}
 
-			// Write 16 bytes of "random" data for AT_RANDOM
-			// (musl uses this for stack canary)
+			// AT_RANDOM is shared by libc stack canaries and userspace ASLR.
 			stack = &u64(u64(stack) - 16)
 			random_kernel_addr := u64(stack)
-			*&u64(random_kernel_addr) = 0xdeadbeef12345678
-			*&u64(random_kernel_addr + 8) = 0xabcdef0987654321
+			if !krandom.fill(voidptr(random_kernel_addr), 16, true) {
+				C.memset(voidptr(random_kernel_addr), 0, 16)
+			}
 			random_vma := stack_vma - (u64(stack_top) - random_kernel_addr)
 
 			// Auxiliary vector (NULL-terminated)
@@ -808,8 +809,8 @@ pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) ?&proc.Pr
 		new_proc.pgid = new_proc.pid
 		new_proc.sid = new_proc.pid
 		new_proc.pagemap = unsafe { pagemap }
-		new_proc.thread_stack_top = u64(0x70000000000)
-		new_proc.mmap_anon_non_fixed_base = u64(0x80000000000)
+		new_proc.thread_stack_top = elf.initial_stack_top()
+		new_proc.mmap_anon_non_fixed_base = elf.initial_mmap_base()
 		new_proc.current_directory = voidptr(vfs_root)
 	}
 
