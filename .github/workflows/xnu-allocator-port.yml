@@ -1,0 +1,47 @@
+name: XNU allocator translation tests
+
+on:
+  pull_request:
+    paths:
+      - 'kernel/modules/xnualloc/**'
+      - 'kernel/modules/memory/**'
+      - 'kernel/modules/**/smp/smp.v'
+      - 'tests/xnualloc/**'
+      - '.github/workflows/xnu-allocator-port.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  host-tests:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Fetch pinned V 0.5.2 host toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 \
+            https://github.com/vlang/v/releases/download/0.5.2/v_linux.zip \
+            -o "$RUNNER_TEMP/v_linux.zip"
+          echo "86caf9e70c3342d48ef19eb4f6c47b709f18c90ae86255520d5c29df6b482e23  $RUNNER_TEMP/v_linux.zip" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/xnu-port-v"
+          unzip -q "$RUNNER_TEMP/v_linux.zip" -d "$RUNNER_TEMP/xnu-port-v"
+          chmod +x "$RUNNER_TEMP/xnu-port-v/v/v"
+          "$RUNNER_TEMP/xnu-port-v/v/v" version
+      - name: Retain verified toolchain for reproducing the host tests
+        uses: actions/upload-artifact@v4
+        with:
+          name: xnu-port-host-toolchain
+          path: ${{ runner.temp }}/v_linux.zip
+          retention-days: 1
+      - name: Actual V tests (debug and production)
+        shell: bash
+        run: |
+          set -euo pipefail
+          V="$RUNNER_TEMP/xnu-port-v/v/v"
+          "$V" -cc gcc -gc none -path "@vlib|@vmodules|$GITHUB_WORKSPACE/kernel/modules" test tests/xnualloc
+          "$V" -prod -cc gcc -gc none -path "@vlib|@vmodules|$GITHUB_WORKSPACE/kernel/modules" test tests/xnualloc
