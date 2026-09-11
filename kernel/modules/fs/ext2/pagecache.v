@@ -1,6 +1,7 @@
 module ext2
 
 import errno
+import fs as vfs
 import memory
 import pagecache
 import resource as resource_mod
@@ -28,7 +29,12 @@ fn device_transfer(context voidptr, buf voidptr, loc u64, count u64, writing boo
 	}
 	bounce := voidptr(u64(physical) + higher_half)
 	defer { memory.pmm_free(physical, 1) }
-	mut device := unsafe { &resource_mod.Resource(context) }
+	// Keep the VFS node as the opaque callback context. A V interface is two
+	// words (the object pointer and its method table); converting the interface
+	// itself to voidptr loses the method table and makes the indirect read/write
+	// call jump through address zero on real block devices.
+	backing_device := unsafe { &vfs.VFSNode(context) }
+	mut device := backing_device.resource
 	if writing {
 		unsafe { C.memcpy(bounce, buf, count) }
 		return device.write(0, bounce, loc, count)
@@ -51,7 +57,7 @@ fn device_write(context voidptr, buf voidptr, loc u64, count u64) ?i64 {
 }
 
 fn (mut filesystem EXT2Filesystem) raw_device_read(buf voidptr, loc u64, count u64) ?i64 {
-	ret := filesystem.cache.read(voidptr(filesystem.backing_device.resource), device_read, device_write, buf, loc, count, u64(filesystem.backing_device.resource.stat.size)) or {
+	ret := filesystem.cache.read(voidptr(filesystem.backing_device), device_read, device_write, buf, loc, count, u64(filesystem.backing_device.resource.stat.size)) or {
 		return none
 	}
 	// EXT2's internal callers require exact transfers, unlike the Resource API.
@@ -63,7 +69,7 @@ fn (mut filesystem EXT2Filesystem) raw_device_read(buf voidptr, loc u64, count u
 }
 
 fn (mut filesystem EXT2Filesystem) raw_device_write(buf voidptr, loc u64, count u64) ?i64 {
-	ret := filesystem.cache.write(voidptr(filesystem.backing_device.resource), device_read, device_write, buf, loc, count, u64(filesystem.backing_device.resource.stat.size)) or {
+	ret := filesystem.cache.write(voidptr(filesystem.backing_device), device_read, device_write, buf, loc, count, u64(filesystem.backing_device.resource.stat.size)) or {
 		return none
 	}
 	if ret != i64(count) {
@@ -78,7 +84,7 @@ fn (mut this EXT2Resource) sync(_handle voidptr) ? {
 	// into the inode first, then flush metadata and data through the same cache.
 	this.sync_mapping(_handle, 0, u64(-1))?
 	mut device := this.filesystem.backing_device.resource
-	this.filesystem.cache.sync(voidptr(device), device_write) or { return none }
+	this.filesystem.cache.sync(voidptr(this.filesystem.backing_device), device_write) or { return none }
 	// Drivers may additionally implement a hardware cache/barrier operation.
 	// Without one, success means completion at the backing Resource, not a
 	// promise that volatile controller caches survive loss of power.
@@ -109,7 +115,7 @@ fn (mut this EXT2Resource) advise(_handle voidptr, offset u64, length u64, advic
 		return none
 	}
 	device_size := u64(this.filesystem.backing_device.resource.stat.size)
-	context := voidptr(this.filesystem.backing_device.resource)
+	context := voidptr(this.filesystem.backing_device)
 	// A hint may cover an enormous file. Bound both metadata walks and fills.
 	mut budget := u64(pagecache.default_capacity) * pagecache.page_bytes / block_size
 	mut block := offset / block_size

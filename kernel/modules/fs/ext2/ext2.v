@@ -1066,16 +1066,16 @@ pub fn ext2_init(backing_device &vfs.VFSNode) (&EXT2Filesystem, bool) {
 
 	// The EXT2 superblock is at byte 1024, regardless of device sector size.
 	new_filesystem.raw_device_read(new_filesystem.superblock, 1024, sizeof(EXT2Superblock)) or {
-		new_filesystem.cache.release(voidptr(backing_device.resource), device_write) or {}
+		new_filesystem.cache.release(voidptr(backing_device), device_write) or {}
 		return 0, false
 	}
 
 	if new_filesystem.superblock.signature != 0xef53 {
-		new_filesystem.cache.release(voidptr(backing_device.resource), device_write) or {}
+		new_filesystem.cache.release(voidptr(backing_device), device_write) or {}
 		return 0, false
 	}
 	if !pagecache.register_cache(new_filesystem.cache) {
-		new_filesystem.cache.release(voidptr(backing_device.resource), device_write) or {}
+		new_filesystem.cache.release(voidptr(backing_device), device_write) or {}
 		return 0, false
 	}
 

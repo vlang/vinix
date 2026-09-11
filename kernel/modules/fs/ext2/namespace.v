@@ -36,7 +36,7 @@ fn stat_seconds(value time.TimeSpec) u32 {
 
 fn (mut filesystem EXT2Filesystem) flush() ? {
 	mut device := filesystem.backing_device.resource
-	filesystem.cache.sync(voidptr(device), device_write)?
+	filesystem.cache.sync(voidptr(filesystem.backing_device), device_write)?
 	resource_mod.sync_resource(mut device, unsafe { nil })?
 }
 
