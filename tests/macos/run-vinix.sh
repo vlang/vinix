@@ -6,6 +6,10 @@ set -eu
 
 root=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
 v=${V:-v}
+case "$v" in
+    */*) ;;
+    *) v=$(command -v "$v" 2>/dev/null || printf '%s' "$v") ;;
+esac
 llvm_bin=${LLVM_BIN:-/opt/homebrew/opt/llvm/bin}
 sysroot=${VINIX_AARCH64_SYSROOT:-${VINIX_MUSL_SYSROOT:-"$root/build-aarch64-userland/staging"}}
 gcclib=$(find "$sysroot/usr/lib/gcc/aarch64-alpine-linux-musl" \
@@ -22,6 +26,12 @@ work=$(mktemp -d)
 runner_pid=
 cleanup() {
     if [ -n "$runner_pid" ] && kill -0 "$runner_pid" 2>/dev/null; then
+        # run-aarch64.sh is waiting on QEMU, so stop that child first and let
+        # the runner perform its own package-server and temporary-file cleanup.
+        qemu_pids=$(pgrep -P "$runner_pid" -f qemu-system-aarch64 2>/dev/null || true)
+        if [ -n "$qemu_pids" ]; then
+            kill $qemu_pids 2>/dev/null || true
+        fi
         kill "$runner_pid" 2>/dev/null || true
         wait "$runner_pid" 2>/dev/null || true
     fi
@@ -61,8 +71,13 @@ runner_pid=$!
 elapsed=0
 while [ "$elapsed" -lt 90 ]; do
     if grep -q 'PASS AArch64 Mach-O Objective-C Cocoa calculator' "$work/vinix.log"; then
+        if ! grep -q 'smp: 4 CPUs online' "$work/vinix.log"; then
+            cat "$work/vinix.log" >&2
+            echo 'FAIL: Cocoa calculator ran without all four QEMU CPUs online' >&2
+            exit 1
+        fi
         cat "$work/vinix.log"
-        echo 'PASS Cocoa calculator executed on Vinix'
+        echo 'PASS Cocoa calculator executed on Vinix with four CPUs online'
         exit 0
     fi
     if ! kill -0 "$runner_pid" 2>/dev/null; then

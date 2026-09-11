@@ -24,6 +24,7 @@ RENDERER = re.compile(rb"GL_RENDERER=[^\r\n]*virgl[^\r\n]*Apple", re.IGNORECASE)
 PIXELS = b"gl-triangle-agx: hardware frame rendered successfully"
 VIRGL_PASS = b"VINIX VIRGL RENDER TEST: PASS"
 M1_HARDWARE_PASS = b"VINIX M1 AGX RENDER TEST: PASS"
+FOUR_CPUS_ONLINE = b"smp: 4 CPUs online"
 
 
 def child_exit_code(status: int) -> int:
@@ -107,12 +108,31 @@ def run_vm(root: Path, timeout: int) -> int:
         return 2
 
     kernel = root / "kernel/bin/vinix"
-    image = root / "build-support/init-aarch64/initramfs-desktop.tar"
+    source_image = root / "build-support/init-aarch64/initramfs-desktop.tar"
+    image = root / "build/initramfs-desktop-qemu.tar"
+    root_seed = root / "build/desktop-root-seed.tar.gz"
+    storage_manifest = root / "build/desktop-qemu-storage.json"
+    splitter = root / "tools/split-desktop-initramfs.py"
     guest_init = root / "tests/virtio-gpu-virgl/guest-init.sh"
-    for label, path in (("kernel", kernel), ("desktop initramfs", image)):
+    for label, path in (("kernel", kernel), ("desktop initramfs", source_image)):
         if not path.is_file():
             print(f"ERROR: Vinix {label} is missing: {path}", file=sys.stderr)
             return 2
+
+    split = subprocess.run(
+        [
+            sys.executable,
+            str(splitter),
+            str(source_image),
+            str(image),
+            str(root_seed),
+            str(storage_manifest),
+        ],
+        check=False,
+    )
+    if split.returncode != 0:
+        print("ERROR: could not prepare the split QEMU desktop image", file=sys.stderr)
+        return 2
 
     # Leave 256 MiB for the kernel, loader, configuration and FAT metadata.
     image_mb = (image.stat().st_size + 1024 * 1024 - 1) // (1024 * 1024)
@@ -125,16 +145,22 @@ def run_vm(root: Path, timeout: int) -> int:
     with tempfile.TemporaryDirectory(prefix="vinix-virgl-vm.") as scratch:
         environment = os.environ.copy()
         environment["VINIX_VIRGL_QEMU"] = str(qemu)
+        environment["TMPDIR"] = scratch
         environment["VINIX_INITRAMFS"] = str(image)
         environment["VINIX_BOOT_DISK"] = str(Path(scratch) / "boot.img")
         environment["VINIX_BOOT_DISK_SIZE_MB"] = str(disk_mb)
         environment["VINIX_EFIVARS"] = str(Path(scratch) / "efivars.fd")
+        environment["VINIX_QEMU_PACKAGE_STORE"] = str(Path(scratch) / "packages.tar")
+        environment.pop("VINIX_QEMU_PERSIST", None)
+        environment.pop("VINIX_QEMU_PERSIST_DISK", None)
+        environment.pop("VINIX_QEMU_PERSIST_SEED", None)
         environment.setdefault("VINIX_QEMU_MEM", "8192")
 
         command = [
             str(root / "run-aarch64.sh"),
             "--no-build",
             "--virgl",
+            "--no-persist",
             f"--guest-init={guest_init}",
             f"--disk={disk_mb}",
         ]
@@ -192,6 +218,8 @@ def run_vm(root: Path, timeout: int) -> int:
 
         output = bytes(transcript)
         missing = []
+        if output.count(FOUR_CPUS_ONLINE) != 1:
+            missing.append("exactly four QEMU CPUs online")
         if not RENDERER.search(output):
             missing.append("VirGL renderer backed by an Apple host GPU")
         if output.count(PIXELS) != 1:
