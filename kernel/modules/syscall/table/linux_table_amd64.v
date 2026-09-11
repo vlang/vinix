@@ -421,6 +421,59 @@ fn syscall_linux_getdents64(gpr_state voidptr, fdnum int, dirp u64, count u64) (
 	return offset, 0
 }
 
+// Interactive shells compare their process group with the PTY foreground group.
+fn syscall_linux_getpgrp(_ voidptr) (u64, u64) {
+	return u64(proc.current_thread().process.pgid), 0
+}
+
+fn syscall_linux_getpgid(_ voidptr, pid int) (u64, u64) {
+	if pid == 0 {
+		return u64(proc.current_thread().process.pgid), 0
+	}
+	proc.lock_table()
+	defer { proc.unlock_table() }
+	target := proc.process_at(pid)
+	if target == unsafe { nil } {
+		return errno.err, errno.esrch
+	}
+	return u64(target.pgid), 0
+}
+
+fn syscall_linux_setpgid(_ voidptr, pid int, pgid int) (u64, u64) {
+	if pid < 0 || pgid < 0 {
+		return errno.err, errno.einval
+	}
+	current := proc.current_thread().process
+	proc.lock_table()
+	defer { proc.unlock_table() }
+	mut target := proc.process_at(if pid == 0 { current.pid } else { pid })
+	if target == unsafe { nil } || (target.pid != current.pid && target.ppid != current.pid) {
+		return errno.err, errno.esrch
+	}
+	if target.pid != current.pid && target.execed_since_fork {
+		return errno.err, errno.eacces
+	}
+	if target.sid != current.sid || target.sid == target.pid {
+		return errno.err, errno.eperm
+	}
+	group := if pgid == 0 { target.pid } else { pgid }
+	if group != target.pid {
+		mut found := false
+		for i := 1; i < proc.max_pid; i++ {
+			member := proc.process_at(i)
+			if member != unsafe { nil } && member.pgid == group && member.sid == target.sid {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return errno.err, errno.eperm
+		}
+	}
+	target.pgid = group
+	return 0, 0
+}
+
 pub fn init_linux_syscall_table() {
 	for i := 0; i < linux_syscall_max; i++ {
 		linux_syscall_table[i] = voidptr(syscall_linux_vacant)
@@ -493,8 +546,11 @@ pub fn init_linux_syscall_table() {
 	linux_syscall_table[104] = voidptr(syscall_linux_getgid)
 	linux_syscall_table[107] = voidptr(syscall_linux_geteuid)
 	linux_syscall_table[108] = voidptr(syscall_linux_getegid)
+	linux_syscall_table[109] = voidptr(syscall_linux_setpgid)
 	linux_syscall_table[110] = voidptr(userland.syscall_getppid)
+	linux_syscall_table[111] = voidptr(syscall_linux_getpgrp)
 	linux_syscall_table[112] = voidptr(userland.syscall_setsid)
+	linux_syscall_table[121] = voidptr(syscall_linux_getpgid)
 	linux_syscall_table[137] = voidptr(fs.syscall_statfs)
 	linux_syscall_table[158] = voidptr(syscall_linux_arch_prctl)
 	linux_syscall_table[186] = voidptr(syscall_linux_gettid)
