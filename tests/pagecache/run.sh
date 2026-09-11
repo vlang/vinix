@@ -22,6 +22,7 @@ import sync
 pub struct Lock { mut: mutex sync.Mutex }
 pub fn (mut l Lock) acquire() { l.mutex.lock() }
 pub fn (mut l Lock) release() { l.mutex.unlock() }
+pub fn (mut l Lock) test_and_acquire() bool { return l.mutex.try_lock() }
 VEOF
 cat > "$tmp/modules/errno/errno.v" <<'VEOF'
 @[has_globals]

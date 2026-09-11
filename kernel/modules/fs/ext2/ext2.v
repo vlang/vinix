@@ -942,6 +942,10 @@ pub fn ext2_init(backing_device &vfs.VFSNode) (&EXT2Filesystem, bool) {
 		new_filesystem.cache.release(voidptr(backing_device.resource), device_write) or {}
 		return 0, false
 	}
+	if !pagecache.register_cache(new_filesystem.cache) {
+		new_filesystem.cache.release(voidptr(backing_device.resource), device_write) or {}
+		return 0, false
+	}
 
 	return new_filesystem, true
 }

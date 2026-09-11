@@ -172,6 +172,24 @@ fn test_discard_preserves_dirty_and_partial_pages() {
 	assert d.reads == reads + 1
 }
 
+fn test_reclaim_drops_only_clean_lru_pages() {
+	mut d := device(4 * 4096)
+	mut cache := Cache{capacity: 4}
+	assert read_bytes(mut cache, d, 0, 1)[0] == d.bytes[0]
+	assert read_bytes(mut cache, d, 4096, 1)[0] == d.bytes[4096]
+	write_bytes(mut cache, d, 8192, [u8(0xaa)])
+	assert cache.pages.len == 3
+	assert cache.reclaim_clean(1) == 1
+	assert cache.pages.len == 2
+	assert cache.pages[0].index == 1
+	assert cache.pages[1].index == 2
+	assert cache.pages[1].dirty
+	assert cache.reclaim_clean(8) == 1
+	assert cache.pages.len == 1
+	assert cache.pages[0].dirty
+	cache.release(voidptr(d), store) or { panic('release failed') }
+}
+
 fn test_lru_and_bounded_prefetch() {
 	mut d := device(10 * 4096)
 	mut cache := Cache{capacity: 2}

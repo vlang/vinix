@@ -214,6 +214,30 @@ pub fn (mut this Cache) discard(loc u64, count u64) {
 	}
 }
 
+// Drop up to `budget` clean LRU pages without performing I/O. This is the
+// cache's memory-pressure path: dirty pages remain resident and retryable, and
+// failure to acquire the cache lock simply lets another reclaimer be tried.
+pub fn (mut this Cache) reclaim_clean(budget u64) u64 {
+	if budget == 0 || !this.l.test_and_acquire() {
+		return 0
+	}
+	defer { this.l.release() }
+
+	mut reclaimed := u64(0)
+	mut i := 0
+	for i < this.pages.len && reclaimed < budget {
+		page := this.pages[i]
+		if page.dirty {
+			i++
+			continue
+		}
+		this.pages.delete(i)
+		unsafe { free(page) }
+		reclaimed++
+	}
+	return reclaimed
+}
+
 // Teardown is failure-atomic with respect to dirty data. Callers must not
 // destroy the cache/backing resource if release fails.
 pub fn (mut this Cache) release(context voidptr, store IO) ? {

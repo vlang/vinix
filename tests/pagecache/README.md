@@ -37,8 +37,10 @@ change. Devices, pipes and in-memory files do not acquire meaningless caches.
 
 ## Deliberate limits and merge gates
 
-There is no periodic flusher, global memory-pressure reclaim, inode page mapping,
-shared writable mmap, dirty-PTE tracking, or msync in this first implementation.
+There is no periodic flusher, inode page mapping, shared writable mmap,
+dirty-PTE tracking, or msync in this first implementation. Physical allocation
+failure does reclaim clean LRU cache pages before retrying; dirty pages are never
+discarded by that path.
 Do not enable EXT2 mmap merely because this cache exists: these are physical
 backing pages and can contain bytes from different inodes and metadata.
 

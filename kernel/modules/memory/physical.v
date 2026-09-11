@@ -3,6 +3,7 @@ module memory
 
 import lib
 import klock
+import katomic
 import limine
 
 __global (
@@ -19,6 +20,47 @@ __global (
 	pmm_total_pages     = u64(0)
 	higher_half         = u64(0)
 )
+
+// Subsystems which hold regenerable physical memory can register a bounded
+// reclaimer. The PMM invokes these only after an allocation scan failed and
+// only while its own lock is dropped. That ordering is important: reclaimers
+// eventually call pmm_free(), and may themselves be entered from an allocation
+// made while one of their locks is held.
+const max_reclaimers = 8
+
+__global (
+	reclaimers       [max_reclaimers]fn (u64) u64
+	reclaimers_len   = int(0)
+	reclaimers_lock  klock.Lock
+	reclaim_inflight = bool(false)
+)
+
+pub fn register_reclaimer(reclaimer fn (u64) u64) bool {
+	reclaimers_lock.acquire()
+	defer { reclaimers_lock.release() }
+	if reclaimers_len == max_reclaimers {
+		return false
+	}
+	reclaimers[reclaimers_len] = reclaimer
+	reclaimers_len++
+	return true
+}
+
+fn reclaim_pages(wanted u64) u64 {
+	// A reclaimer may allocate for bookkeeping. Do not recursively enter all
+	// reclaimers in that case, and do not wait on one already running elsewhere.
+	if !katomic.cas(mut &reclaim_inflight, false, true) {
+		return 0
+	}
+	defer { katomic.store(mut &reclaim_inflight, false) }
+
+	mut reclaimed := u64(0)
+	count := reclaimers_len
+	for i := 0; i < count && reclaimed < wanted; i++ {
+		reclaimed += reclaimers[i](wanted - reclaimed)
+	}
+	return reclaimed
+}
 
 @[_linker_section: '.requests']
 @[cinit]
@@ -210,7 +252,7 @@ fn inner_alloc(count u64, limit u64) voidptr {
 	return 0
 }
 
-pub fn pmm_alloc_nozero(count u64) voidptr {
+fn try_alloc_nozero(count u64) voidptr {
 	pmm_lock.acquire()
 	defer {
 		pmm_lock.release()
@@ -224,12 +266,24 @@ pub fn pmm_alloc_nozero(count u64) voidptr {
 
 		ret = inner_alloc(count, last)
 		if ret == 0 {
-			lib.kpanic(unsafe { nil }, c'Out of memory')
+			return unsafe { nil }
 		}
 	}
 
 	free_pages -= count
 
+	return ret
+}
+
+pub fn pmm_alloc_nozero(count u64) voidptr {
+	mut ret := try_alloc_nozero(count)
+	if ret == unsafe { nil } {
+		reclaim_pages(count)
+		ret = try_alloc_nozero(count)
+		if ret == unsafe { nil } {
+			lib.kpanic(unsafe { nil }, c'Out of memory after reclaim')
+		}
+	}
 	return ret
 }
 
@@ -251,23 +305,11 @@ pub fn pmm_alloc(count u64) voidptr {
 // nil on out-of-memory instead of panicking, so resource pressure cannot be
 // turned into a kernel panic by a userspace request.
 pub fn pmm_alloc_nozero_fallible(count u64) voidptr {
-	pmm_lock.acquire()
-	defer {
-		pmm_lock.release()
+	mut ret := try_alloc_nozero(count)
+	if ret == unsafe { nil } {
+		reclaim_pages(count)
+		ret = try_alloc_nozero(count)
 	}
-
-	last := pmm_last_used_index
-	mut ret := inner_alloc(count, pmm_avl_page_count)
-
-	if ret == 0 {
-		pmm_last_used_index = 0
-		ret = inner_alloc(count, last)
-		if ret == 0 {
-			return unsafe { nil }
-		}
-	}
-
-	free_pages -= count
 	return ret
 }
 
