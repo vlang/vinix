@@ -380,7 +380,7 @@ fn test_terminal_renders_pty_echo_and_carriage_return_updates() {
 }
 
 fn test_available_utility_applications_and_shortcut_layouts() {
-	assert available_apps.len == 16
+	assert available_apps.len == 17
 	assert available_apps[0].process_name == 'vinix-files'
 	assert available_apps[1].title == 'Firefox'
 	assert available_apps[1].exclusive_command == ''
@@ -421,6 +421,12 @@ fn test_available_utility_applications_and_shortcut_layouts() {
 	assert available_apps[15].polling
 	assert available_apps[14].keyboard && available_apps[14].polling
 	assert available_apps[14].pointer
+	assert available_apps[16].title == 'GIMP'
+	assert available_apps[16].process_name == 'vinix-gimp'
+	assert available_apps[16].width == gimp_window_width
+	assert available_apps[16].height == gimp_window_height + default_title_height
+	assert available_apps[16].keyboard && available_apps[16].pointer
+	assert available_apps[16].polling && available_apps[16].poll_interval_ms == 50
 	assert app_start_actions.len == available_apps.len
 	assert app_shortcut_actions.len == available_apps.len
 	assert shortcut_rows_for_height(720) == 8
@@ -679,6 +685,14 @@ fn test_taskbar_clock_stays_visible_at_m1_200_percent_scale() {
 fn test_firefox_uses_the_hosted_x11_window_path() {
 	factory := available_apps[1]
 	assert factory.process_name == 'vinix-firefox'
+	assert factory.exclusive_command == ''
+	assert factory.open != unsafe { nil }
+	assert factory.polling && factory.keyboard && factory.pointer
+}
+
+fn test_gimp_uses_the_hosted_x11_window_path() {
+	factory := available_apps[16]
+	assert factory.process_name == 'vinix-gimp'
 	assert factory.exclusive_command == ''
 	assert factory.open != unsafe { nil }
 	assert factory.polling && factory.keyboard && factory.pointer

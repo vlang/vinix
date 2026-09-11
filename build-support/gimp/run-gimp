@@ -1,0 +1,27 @@
+#!/bin/sh
+# Start GIMP with settings suitable for Vinix's private X11 display.
+set -eu
+
+export HOME="${HOME:-/root}"
+export XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
+export XDG_CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}"
+# Vinix does not run an AT-SPI D-Bus service. GTK otherwise spends startup
+# time trying to discover one before creating GIMP's first window.
+export NO_AT_BRIDGE=1
+
+if [ ! -x /usr/bin/gimp ]; then
+	echo "run-gimp: GIMP is not installed; run 'pkg install gimp'" >&2
+	exit 127
+fi
+
+if ! mkdir -p "$XDG_CONFIG_HOME/GIMP/2.10" "$XDG_CACHE_HOME"; then
+	# A damaged or older persistent home must not prevent the editor from
+	# starting. Its preferences can safely fall back to this boot's tmpfs.
+	export XDG_CONFIG_HOME=/tmp/vinix-gimp-config
+	export XDG_CACHE_HOME=/tmp/vinix-gimp-cache
+	mkdir -p "$XDG_CONFIG_HOME/GIMP/2.10" "$XDG_CACHE_HOME"
+fi
+
+exec /usr/bin/gimp \
+	--system-gimprc /etc/gimp/2.0/vinix-gimprc \
+	--no-splash --new-instance "$@"

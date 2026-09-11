@@ -96,12 +96,19 @@ install -m755 "$SCRIPT_DIR/tests/packages/gtk-smoke.sh" \
     "$STAGING/root/gtk-package-smoke.sh"
 install -m755 "$SCRIPT_DIR/tests/packages/gnumeric-smoke.sh" \
     "$STAGING/root/gnumeric-package-smoke.sh"
+install -m755 "$SCRIPT_DIR/tests/packages/gimp-smoke.sh" \
+    "$STAGING/root/gimp-package-smoke.sh"
 install -m755 "$SCRIPT_DIR/tests/packages/blender-smoke.sh" \
     "$STAGING/root/blender-package-smoke.sh"
 install -m755 "$SCRIPT_DIR/tests/packages/sublime-smoke.sh" \
     "$STAGING/root/sublime-package-smoke.sh"
 install -m755 "$SCRIPT_DIR/tests/packages/x-window-check.py" \
     "$STAGING/root/x-window-check.py"
+install -m755 "$SCRIPT_DIR/build-support/gimp/run-gimp" \
+    "$STAGING/usr/bin/run-gimp"
+mkdir -p "$STAGING/etc/gimp/2.0"
+install -m644 "$SCRIPT_DIR/build-support/gimp/vinix-gimprc" \
+    "$STAGING/etc/gimp/2.0/vinix-gimprc"
 clang -target aarch64-linux-musl -fPIC -ffreestanding -fno-stack-protector \
     -nostdlib -c "$SCRIPT_DIR/tests/packages/gtk-smoke-auto-close.c" \
     -o "$BUILD_DIR/gtk-smoke-auto-close.o"
@@ -140,10 +147,11 @@ fi
 
 if [ -e "$STAGING/usr/bin/gtk3-demo" ] \
     || [ -e "$STAGING/usr/bin/gnumeric" ] \
+    || [ -e "$STAGING/usr/bin/gimp" ] \
     || [ -e "$STAGING/usr/bin/blender" ] \
     || find "$STAGING/lib" "$STAGING/usr/lib" -name 'libgtk-3.so*' \
         -print -quit 2>/dev/null | grep -q .; then
-    echo "GTK, Gnumeric, and Blender must not be preinstalled in the network/package layer" >&2
+    echo "GTK, Gnumeric, GIMP, and Blender must not be preinstalled in the network/package layer" >&2
     exit 1
 fi
 

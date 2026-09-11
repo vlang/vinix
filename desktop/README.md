@@ -163,6 +163,13 @@ The direct launcher writes Firefox's upstream graphics and GTK diagnostics to
 enable glamor/DRI3 and Firefox WebRender over X11 EGL. The embedded window uses
 Xvfb's software surface so the native compositor can copy it into the desktop.
 
+GIMP uses the same hosted X11 path. `pkg install gimp` installs Alpine's native
+AArch64/musl build and restores the executable modes for its plug-ins; the
+desktop's `run-gimp` launcher disables the unavailable AT-SPI service and opens
+GIMP without its splash screen inside a movable Vinix window. Its system
+configuration selects the common image-format plug-ins so a first launch stays
+within Vinix's current exited-process reclamation limit.
+
 The Minecraft layer is produced by `build-minecraft-aarch64.sh`. It stages
 Alpine's AArch64/musl Minetest 5.9.1 executable and its runtime closure, plus a
 pinned Minetest Game release. `/usr/bin/minecraft` starts a persistent default

@@ -268,6 +268,16 @@ pkg install gnumeric
 ./gnumeric-package-smoke.sh
 ```
 
+GIMP 2.10 runs through the desktop's private X11 window bridge. Install it on
+demand, then launch it from the wallpaper/Start menu or run its guest smoke
+test:
+
+```sh
+pkg install gimp
+run-gimp
+./gimp-package-smoke.sh
+```
+
 Blender's shared data and runtime libraries are installed directly from
 Alpine's aarch64 package. The desktop launcher uses a native Vinix GHOST build:
 it renders through surfaceless EGL into the Vinix compositor's shared-surface

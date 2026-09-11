@@ -136,6 +136,21 @@ case "$*" in
 						printf 'P:%s\nF:usr/bin\nR:blender\nF:usr/lib\nR:libblender-dependency.so.1\nR:libblender-dependency.so.1.0\nF:usr/share/applications\nR:blender.desktop\nF:usr/share/blender/4.3\nR:payload\n\n' \
 							"$argument"
 						;;
+					gimp)
+						mkdir -p "$VINIX_TEST_ROOT/usr/bin" \
+							"$VINIX_TEST_ROOT/usr/lib/gimp/2.0/plug-ins/test" \
+							"$VINIX_TEST_ROOT/usr/share/applications"
+						printf '#!/bin/sh\nexit 0\n' \
+							>"$VINIX_TEST_ROOT/usr/bin/gimp-2.10"
+						chmod 0755 "$VINIX_TEST_ROOT/usr/bin/gimp-2.10"
+						ln -sf gimp-2.10 "$VINIX_TEST_ROOT/usr/bin/gimp"
+						printf '#!/bin/sh\nexit 0\n' \
+							>"$VINIX_TEST_ROOT/usr/lib/gimp/2.0/plug-ins/test/test"
+						chmod 0755 "$VINIX_TEST_ROOT/usr/lib/gimp/2.0/plug-ins/test/test"
+						: >"$VINIX_TEST_ROOT/usr/share/applications/gimp.desktop"
+						printf 'P:%s\nF:usr/bin\nR:gimp\nR:gimp-2.10\nF:usr/lib/gimp/2.0/plug-ins/test\nR:test\nF:usr/share/applications\nR:gimp.desktop\n\n' \
+							"$argument"
+						;;
 					gtk+3.0)
 						printf 'P:%s\nF:usr/lib\nR:libgtk-3.so.0\n\n' "$argument"
 						;;
@@ -337,5 +352,19 @@ run_pkg remove blender
 test ! -e "$root/usr/libexec/vinix-blender"
 tail -n 1 "$log" | grep -q -- \
 	'--no-progress --no-scripts del blender$'
+
+run_pkg install gimp
+test -x "$root/usr/bin/gimp"
+test -x "$root/usr/bin/gimp-2.10"
+test -x "$root/usr/lib/gimp/2.0/plug-ins/test/test"
+test -f "$root/usr/share/applications/gimp.desktop"
+tail -n 2 "$log" | sed -n '1p' | grep -q -- \
+	'--cache-dir .* --no-progress cache download adwaita-icon-theme font-dejavu gimp$'
+tail -n 1 "$log" | grep -q -- \
+	'--cache-dir .* --no-network --no-progress --no-scripts add adwaita-icon-theme font-dejavu gimp$'
+
+run_pkg remove gimp
+tail -n 1 "$log" | grep -q -- \
+	'--no-progress --no-scripts del gimp adwaita-icon-theme font-dejavu$'
 
 echo "VINIX PACKAGE COMMAND TEST: PASS"

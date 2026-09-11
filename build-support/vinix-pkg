@@ -22,7 +22,7 @@ usage() {
 usage: pkg <command> [package ...]
 
 commands:
-  install PACKAGE...  install packages (includes GTK, Gnumeric, Blender, and Sublime Text)
+  install PACKAGE...  install packages (includes GTK, Gnumeric, GIMP, Blender, and Sublime Text)
   remove PACKAGE...   remove packages
   update              refresh Alpine repository indexes
   upgrade             upgrade installed packages
@@ -273,6 +273,9 @@ resolve_packages() {
 			gnumeric)
 				resolved="$resolved gnumeric adwaita-icon-theme font-dejavu"
 				;;
+			gimp)
+				resolved="$resolved gimp adwaita-icon-theme font-dejavu"
+				;;
 			sublime|sublime-text)
 				resolved="$resolved gcompat gtk+3.0 adwaita-icon-theme font-dejavu libarchive-tools llvm19-libs"
 				;;
@@ -304,6 +307,14 @@ install_packages() {
 				apk_install \
 					adwaita-icon-theme font-dejavu gnumeric
 				finalize_gnumeric
+				;;
+			gimp)
+				# GIMP uses GTK 2, which its Alpine dependency closure supplies.
+				# Add a complete icon theme and readable UI fonts for Vinix's
+				# deliberately toolkit-free base image.
+				apk_install \
+					adwaita-icon-theme font-dejavu gimp
+				finalize_gimp
 				;;
 			blender)
 				VINIX_PKG_CACHE_EXTRAS=python3-pycache-pyc0 \
@@ -558,6 +569,33 @@ finalize_gnumeric() {
 	/usr/bin/update-mime-database /usr/share/mime
 }
 
+finalize_gimp() {
+	[ -n "$ROOT" ] && return 0
+	# Alpine exposes GIMP through a relative link to its versioned executable.
+	# Vinix package extraction cannot yet restore executable modes with
+	# fchmodat(2), so make the real program and its public launcher explicit.
+	if [ ! -x /usr/bin/gimp ]; then
+		set -- /usr/bin/gimp-[0-9]*
+		if [ "$#" -ne 1 ] || [ ! -s "$1" ]; then
+			echo "pkg: GIMP package has no executable launcher" >&2
+			exit 1
+		fi
+		/bin/busybox chmod 0755 "$1"
+		/bin/busybox rm -f /usr/bin/gimp
+		/bin/busybox cp "$1" /usr/bin/gimp
+		/bin/busybox chmod 0755 /usr/bin/gimp
+	fi
+	# GIMP discovers its file-format plug-ins at startup. Their package modes
+	# need the same explicit restoration as the main executable.
+	if [ -d /usr/lib/gimp/2.0/plug-ins ]; then
+		/bin/busybox find /usr/lib/gimp/2.0/plug-ins -type f \
+			-exec /bin/busybox chmod 0755 {} \;
+	fi
+	/usr/bin/gdk-pixbuf-query-loaders --update-cache
+	/usr/bin/glib-compile-schemas /usr/share/glib-2.0/schemas
+	/usr/bin/update-mime-database /usr/share/mime
+}
+
 finalize_blender() {
 	launcher=$(root_path /usr/bin/blender)
 	real_binary=$(root_path /usr/libexec/vinix-blender)
@@ -689,6 +727,9 @@ case "$command_name" in
 		if [ -e "$(root_path /usr/bin/blender)" ] \
 			|| [ -e "$(root_path /usr/libexec/vinix-blender)" ]; then
 			finalize_blender
+		fi
+		if [ -e "$(root_path /usr/bin/gimp)" ]; then
+			finalize_gimp
 		fi
 		;;
 	search)

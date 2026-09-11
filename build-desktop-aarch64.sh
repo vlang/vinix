@@ -460,6 +460,7 @@ if [ "$COMPACT_INITRAMFS" -eq 0 ] && [ -x "$HYPRLAND_STAGING/usr/bin/start-hyprl
 fi
 mkdir -p "$STAGING/sbin" "$STAGING/usr/bin" "$STAGING/usr/share/vinix" \
     "$STAGING/root" "$STAGING/dev" "$STAGING/proc" "$STAGING/sys" "$STAGING/tmp"
+mkdir -p "$STAGING/root/.config/GIMP/2.10" "$STAGING/root/.cache"
 chmod 1777 "$STAGING/tmp"
 
 # Keep the display handoff pieces in sync with the desktop source even when the
@@ -471,6 +472,10 @@ install -m755 "$SCRIPT_DIR/build-support/xorg-server/startx" "$STAGING/usr/bin/s
 install -m755 "$X11_STAGING/usr/bin/vinix-xinput" "$STAGING/usr/bin/vinix-xinput"
 install -m755 "$X11_STAGING/usr/bin/vinix-wine-host" "$STAGING/usr/bin/vinix-wine-host"
 install -m755 "$SCRIPT_DIR/build-support/firefox/run-firefox" "$STAGING/usr/bin/run-firefox"
+install -m755 "$SCRIPT_DIR/build-support/gimp/run-gimp" "$STAGING/usr/bin/run-gimp"
+mkdir -p "$STAGING/etc/gimp/2.0"
+install -m644 "$SCRIPT_DIR/build-support/gimp/vinix-gimprc" \
+    "$STAGING/etc/gimp/2.0/vinix-gimprc"
 install -m644 "$SCRIPT_DIR/tests/firefox/smoke.html" "$STAGING/root/firefox-smoke.html"
 mkdir -p "$STAGING/etc/firefox/policies"
 install -m644 "$SCRIPT_DIR/build-support/firefox/policies.json" \
@@ -496,10 +501,10 @@ if [ ! -x "$STAGING/usr/bin/pkg" ] || [ ! -x "$STAGING/sbin/apk" ]; then
     echo "ERROR: desktop image is missing pkg or apk" >&2
     exit 1
 fi
-for runtime_path in usr/bin/Xorg usr/bin/Xvfb usr/bin/startx usr/bin/vinix-xinput usr/bin/vinix-wine-host usr/bin/run-firefox; do
+for runtime_path in usr/bin/Xorg usr/bin/Xvfb usr/bin/startx usr/bin/vinix-xinput usr/bin/vinix-wine-host usr/bin/run-firefox usr/bin/run-gimp; do
     if [ ! -x "$STAGING/$runtime_path" ]; then
-        echo "ERROR: desktop Firefox runtime is missing /$runtime_path" >&2
-        echo "Run ./build-x11-aarch64.sh and ./build-firefox-aarch64.sh, then rebuild the userland." >&2
+        echo "ERROR: desktop hosted-X11 runtime is missing /$runtime_path" >&2
+        echo "Run ./build-x11-aarch64.sh and ./build-firefox-aarch64.sh, then rebuild the desktop." >&2
         exit 1
     fi
 done
@@ -517,7 +522,7 @@ if ! { [ -x "$STAGING/usr/lib/firefox-esr/firefox-esr" ] &&
     exit 1
 fi
 if [ "$COMPACT_INITRAMFS" -eq 1 ]; then
-    for command_path in bin/sh bin/id bin/sed bin/mkdir bin/sleep bin/df bin/du bin/ls bin/tar usr/bin/pkg sbin/apk usr/bin/python3 usr/bin/git usr/bin/Xorg usr/bin/Xvfb usr/bin/startx usr/bin/vinix-xinput usr/bin/vinix-wine-host usr/bin/run-firefox usr/bin/gcc; do
+    for command_path in bin/sh bin/id bin/sed bin/mkdir bin/sleep bin/df bin/du bin/ls bin/tar usr/bin/pkg sbin/apk usr/bin/python3 usr/bin/git usr/bin/Xorg usr/bin/Xvfb usr/bin/startx usr/bin/vinix-xinput usr/bin/vinix-wine-host usr/bin/run-firefox usr/bin/run-gimp usr/bin/gcc; do
         if [ ! -x "$STAGING/$command_path" ]; then
             echo "ERROR: compact desktop is missing /$command_path" >&2
             exit 1
@@ -558,7 +563,7 @@ chmod +x "$STAGING/sbin/init" "$STAGING/usr/bin/vinix-desktop" \
 # same static executable for every native application in the initramfs.
 for app_name in vinix-files vinix-calculator vinix-terminal vinix-settings \
     vinix-activity vinix-editor vinix-calendar vinix-clock vinix-cocoa-calculator \
-    vinix-firefox vinix-minecraft vinix-wine-calculator vinix-wine-notepad \
+    vinix-firefox vinix-gimp vinix-minecraft vinix-wine-calculator vinix-wine-notepad \
     vinix-wine-word2013 vinix-blender vinix-capture; do
     ln -sf vinix-desktop "$STAGING/usr/bin/$app_name"
 done

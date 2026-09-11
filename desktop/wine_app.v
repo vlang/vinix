@@ -10,6 +10,10 @@ const firefox_surface_width = 1280
 const firefox_surface_height = 900
 const firefox_window_width = 1280
 const firefox_window_height = 900
+const gimp_surface_width = 1280
+const gimp_surface_height = 900
+const gimp_window_width = 1280
+const gimp_window_height = 900
 const wine_surface_width = 326
 const wine_surface_height = 430
 const wine_notepad_surface_width = 310
@@ -62,6 +66,19 @@ mut:
 
 fn open_firefox(mut _ Desktop) !NativeApp {
 	return open_hosted_x11_app('firefox', '/usr/bin/run-firefox', firefox_surface_width, firefox_surface_height, 'builtin:browser', 'Starting Firefox…', 'Firefox is not installed in this desktop image.', 'Firefox exited.')
+}
+
+fn open_gimp(mut _ Desktop) !NativeApp {
+	if C.access(c'/usr/bin/gimp', C.X_OK) != 0 {
+		return &HostedX11App{
+			surface_width: gimp_surface_width
+			surface_height: gimp_surface_height
+			icon: 'builtin:editor'
+			failed: true
+			error_message: 'GIMP is not installed. Run pkg install gimp in Terminal.'
+		}
+	}
+	return open_hosted_x11_app('gimp', '/usr/bin/run-gimp', gimp_surface_width, gimp_surface_height, 'builtin:editor', 'Starting GIMP…', 'GIMP is not installed. Run pkg install gimp in Terminal.', 'GIMP exited.')
 }
 
 fn open_wine_calculator(mut _ Desktop) !NativeApp {
