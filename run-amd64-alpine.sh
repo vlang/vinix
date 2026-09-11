@@ -10,9 +10,11 @@ USERLAND_DIR="${VINIX_AMD64_USERLAND_BUILD_DIR:-$SCRIPT_DIR/build-amd64-userland
 QEMU="${VINIX_QEMU_X86_64:-qemu-system-x86_64}"
 TIMEOUT_SECONDS="${VINIX_QEMU_TIMEOUT:-120}"
 ISO="${VINIX_AMD64_ISO:-$BUILD_DIR/vinix.iso}"
+DISK="${VINIX_AMD64_DISK:-$BUILD_DIR/boot.img}"
 SERIAL_LOG="$BUILD_DIR/serial.log"
 BUILD=1
 INTERACTIVE=0
+BOOT_MEDIA_KIND=iso
 
 for arg in "$@"; do
     case "$arg" in
@@ -44,13 +46,39 @@ case "$BUILD_DIR" in
 esac
 
 if [ "$BUILD" -eq 1 ]; then
-    VINIX_AMD64_BUILD_DIR="$BUILD_DIR/kernel" \
-    VINIX_AMD64_USERLAND_BUILD_DIR="$USERLAND_DIR" \
-    VINIX_AMD64_ISO="$ISO" \
-        "$SCRIPT_DIR/build-amd64.sh"
-elif [ ! -f "$ISO" ]; then
-    echo "ERROR: $ISO not found; omit --no-build to create it." >&2
+    if command -v xorriso >/dev/null 2>&1; then
+        VINIX_AMD64_BUILD_DIR="$BUILD_DIR/kernel" \
+        VINIX_AMD64_USERLAND_BUILD_DIR="$USERLAND_DIR" \
+        VINIX_AMD64_ISO="$ISO" \
+            "$SCRIPT_DIR/build-amd64.sh"
+    else
+        echo "==> xorriso is unavailable; building a raw UEFI disk for QEMU..."
+        VINIX_AMD64_BUILD_DIR="$BUILD_DIR/kernel" \
+        VINIX_AMD64_USERLAND_BUILD_DIR="$USERLAND_DIR" \
+            "$SCRIPT_DIR/build-amd64.sh" --no-iso
+        VINIX_AMD64_DISK_BUILD_DIR="$BUILD_DIR/disk" \
+        VINIX_AMD64_KERNEL="$BUILD_DIR/kernel/bin/vinix" \
+        VINIX_AMD64_INITRAMFS="$USERLAND_DIR/initramfs.tar" \
+        VINIX_AMD64_DISK="$DISK" \
+            "$SCRIPT_DIR/build-support/build-amd64-uefi-disk.sh"
+        BOOT_MEDIA_KIND=disk
+    fi
+elif [ -f "$ISO" ]; then
+    BOOT_MEDIA_KIND=iso
+elif [ -f "$DISK" ]; then
+    BOOT_MEDIA_KIND=disk
+else
+    echo "ERROR: neither $ISO nor $DISK exists; omit --no-build to create one." >&2
     exit 1
+fi
+
+if [ "$BOOT_MEDIA_KIND" = iso ]; then
+    BOOT_MEDIA_ARGS=(-cdrom "$ISO")
+else
+    # Some UEFI implementations update FAT metadata while discovering the
+    # fallback loader. Give the VM a writable temporary overlay while keeping
+    # the reusable host image unchanged.
+    BOOT_MEDIA_ARGS=(-drive "format=raw,snapshot=on,file=$DISK")
 fi
 
 QEMU_BIN="$(command -v "$QEMU")"
@@ -83,7 +111,7 @@ if [ "$INTERACTIVE" -eq 1 ]; then
         -m "${VINIX_QEMU_MEM:-8192}" \
         -smp "${VINIX_QEMU_SMP:-4}" \
         -drive "if=pflash,format=raw,unit=0,readonly=on,file=$OVMF_CODE" \
-        -cdrom "$ISO" \
+        "${BOOT_MEDIA_ARGS[@]}" \
         -vga std \
         -serial stdio
 fi
@@ -98,7 +126,7 @@ echo "==> Booting Alpine amd64 on Vinix in QEMU..."
     -m "${VINIX_QEMU_MEM:-512}" \
     -smp 1 \
     -drive "if=pflash,format=raw,unit=0,readonly=on,file=$OVMF_CODE" \
-    -cdrom "$ISO" \
+    "${BOOT_MEDIA_ARGS[@]}" \
     -display none \
     -monitor none \
     -serial "file:$SERIAL_LOG" \
