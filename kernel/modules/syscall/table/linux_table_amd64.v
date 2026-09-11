@@ -433,6 +433,7 @@ pub fn init_linux_syscall_table() {
 	linux_syscall_table[4] = voidptr(syscall_linux_stat)
 	linux_syscall_table[5] = voidptr(fs.syscall_fstat)
 	linux_syscall_table[6] = voidptr(syscall_linux_lstat)
+	linux_syscall_table[7] = voidptr(file.syscall_poll)
 	linux_syscall_table[8] = voidptr(fs.syscall_seek)
 	linux_syscall_table[9] = voidptr(syscall_linux_mmap)
 	linux_syscall_table[10] = voidptr(mmap.syscall_mprotect)
