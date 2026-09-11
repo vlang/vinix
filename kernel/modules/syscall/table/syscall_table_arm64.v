@@ -1140,7 +1140,7 @@ pub fn init_syscall_table() {
 	syscall_table[222] = voidptr(syscall_linux_mmap) // __NR_mmap
 	syscall_table[226] = voidptr(mmap.syscall_mprotect) // __NR_mprotect
 	syscall_table[232] = voidptr(mmap.syscall_mincore) // __NR_mincore
-	syscall_table[227] = voidptr(syscall_linux_msync) // __NR_msync
+	syscall_table[227] = voidptr(mmap.syscall_msync) // __NR_msync
 	syscall_table[228] = voidptr(syscall_linux_mlock) // __NR_mlock
 	syscall_table[229] = voidptr(syscall_linux_mlock) // __NR_munlock
 	syscall_table[230] = voidptr(syscall_linux_mlockall) // __NR_mlockall

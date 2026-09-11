@@ -129,6 +129,13 @@ fn (mut this TmpFSResource) mmap(_handle voidptr, page u64, flags int) voidptr {
 	return copy_page
 }
 
+fn (mut this TmpFSResource) release_mapping(_handle voidptr, _page u64,
+	physical voidptr, flags int) {
+	if flags & mmap.map_shared == 0 {
+		memory.pmm_free(physical, 1)
+	}
+}
+
 fn (mut this TmpFSResource) read(_handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
 	this.l.acquire()
 	defer {
@@ -186,15 +193,15 @@ fn (mut this TmpFSResource) ioctl(handle voidptr, request u64, argp voidptr) ?in
 
 fn (mut this TmpFSResource) filesystem_stat() resource.FileSystemStat {
 	return resource.FileSystemStat{
-		@type:   0x01021994
-		bsize:   page_size
-		blocks:  memory.total_bytes() / page_size
-		bfree:   memory.free_bytes() / page_size
-		bavail:  memory.free_bytes() / page_size
-		files:   u64(-1)
-		ffree:   u64(-1)
+		@type: 0x01021994
+		bsize: page_size
+		blocks: memory.total_bytes() / page_size
+		bfree: memory.free_bytes() / page_size
+		bavail: memory.free_bytes() / page_size
+		files: u64(-1)
+		ffree: u64(-1)
 		namelen: 255
-		frsize:  page_size
+		frsize: page_size
 	}
 }
 

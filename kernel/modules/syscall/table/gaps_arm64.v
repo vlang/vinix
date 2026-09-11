@@ -82,16 +82,26 @@ fn syscall_linux_sched_setparam(_ voidptr, pid int, param u64) (u64, u64) {
 
 fn syscall_linux_sched_get_priority_max(_ voidptr, policy int) (u64, u64) {
 	match policy {
-		sched_other { return 0, 0 }
-		sched_fifo, sched_rr { return 0, 0 }
-		else { return errno.err, errno.einval }
+		sched_other {
+			return 0, 0
+		}
+		sched_fifo, sched_rr {
+			return 0, 0
+		}
+		else {
+			return errno.err, errno.einval
+		}
 	}
 }
 
 fn syscall_linux_sched_get_priority_min(_ voidptr, policy int) (u64, u64) {
 	match policy {
-		sched_other, sched_fifo, sched_rr { return 0, 0 }
-		else { return errno.err, errno.einval }
+		sched_other, sched_fifo, sched_rr {
+			return 0, 0
+		}
+		else {
+			return errno.err, errno.einval
+		}
 	}
 }
 
@@ -261,20 +271,6 @@ const resource_o_nonblock = 0o4000
 const resource_o_cloexec = 0o2000000
 
 // ── memory hints ─────────────────────────────────────────────────────────────
-
-// Nothing here pages anything out, so a mapping is always resident and always
-// synchronised. These exist so that a program asking for the guarantee is told
-// it has it rather than that the call does not exist.
-fn syscall_linux_msync(_ voidptr, addr u64, _length u64, flags int) (u64, u64) {
-	// MS_ASYNC | MS_INVALIDATE | MS_SYNC
-	if flags & ~0x7 != 0 {
-		return errno.err, errno.einval
-	}
-	if addr % page_size != 0 {
-		return errno.err, errno.einval
-	}
-	return 0, 0
-}
 
 fn syscall_linux_mlock(_ voidptr, _addr u64, _length u64) (u64, u64) {
 	return 0, 0

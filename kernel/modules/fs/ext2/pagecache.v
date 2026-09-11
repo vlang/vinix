@@ -14,10 +14,18 @@ import stat
 // buffers. Cached bytes themselves live in heap allocations and must not be
 // handed straight to a DMA backend. Only misses/writeback allocate a bounce.
 fn device_transfer(context voidptr, buf voidptr, loc u64, count u64, writing bool) ?i64 {
-	if count == 0 { return 0 }
-	if count > pagecache.page_bytes { errno.set(errno.einval); return none }
+	if count == 0 {
+		return 0
+	}
+	if count > pagecache.page_bytes {
+		errno.set(errno.einval)
+		return none
+	}
 	physical := memory.pmm_alloc(1)
-	if physical == unsafe { nil } { errno.set(errno.enomem); return none }
+	if physical == unsafe { nil } {
+		errno.set(errno.enomem)
+		return none
+	}
 	bounce := voidptr(u64(physical) + higher_half)
 	defer { memory.pmm_free(physical, 1) }
 	mut device := unsafe { &resource_mod.Resource(context) }
@@ -26,7 +34,10 @@ fn device_transfer(context voidptr, buf voidptr, loc u64, count u64, writing boo
 		return device.write(0, bounce, loc, count)
 	}
 	ret := device.read(0, bounce, loc, count) or { return none }
-	if ret < 0 || u64(ret) > count { errno.set(errno.eio); return none }
+	if ret < 0 || u64(ret) > count {
+		errno.set(errno.eio)
+		return none
+	}
 	unsafe { C.memcpy(buf, bounce, u64(ret)) }
 	return ret
 }
@@ -40,8 +51,7 @@ fn device_write(context voidptr, buf voidptr, loc u64, count u64) ?i64 {
 }
 
 fn (mut filesystem EXT2Filesystem) raw_device_read(buf voidptr, loc u64, count u64) ?i64 {
-	ret := filesystem.cache.read(voidptr(filesystem.backing_device.resource), device_read,
-		device_write, buf, loc, count, u64(filesystem.backing_device.resource.stat.size)) or {
+	ret := filesystem.cache.read(voidptr(filesystem.backing_device.resource), device_read, device_write, buf, loc, count, u64(filesystem.backing_device.resource.stat.size)) or {
 		return none
 	}
 	// EXT2's internal callers require exact transfers, unlike the Resource API.
@@ -53,8 +63,7 @@ fn (mut filesystem EXT2Filesystem) raw_device_read(buf voidptr, loc u64, count u
 }
 
 fn (mut filesystem EXT2Filesystem) raw_device_write(buf voidptr, loc u64, count u64) ?i64 {
-	ret := filesystem.cache.write(voidptr(filesystem.backing_device.resource), device_read,
-		device_write, buf, loc, count, u64(filesystem.backing_device.resource.stat.size)) or {
+	ret := filesystem.cache.write(voidptr(filesystem.backing_device.resource), device_read, device_write, buf, loc, count, u64(filesystem.backing_device.resource.stat.size)) or {
 		return none
 	}
 	if ret != i64(count) {
@@ -65,6 +74,9 @@ fn (mut filesystem EXT2Filesystem) raw_device_write(buf voidptr, loc u64, count 
 }
 
 fn (mut this EXT2Resource) sync(_handle voidptr) ? {
+	// Shared mmap pages sit above the common backing-device cache. Fold them
+	// into the inode first, then flush metadata and data through the same cache.
+	this.sync_mapping(_handle, 0, u64(-1))?
 	mut device := this.filesystem.backing_device.resource
 	this.filesystem.cache.sync(voidptr(device), device_write) or { return none }
 	// Drivers may additionally implement a hardware cache/barrier operation.
@@ -77,16 +89,25 @@ fn (mut this EXT2Resource) advise(_handle voidptr, offset u64, length u64, advic
 	if advice != pagecache.willneed && advice != pagecache.dontneed {
 		return
 	}
-	if !stat.isreg(this.stat.mode) { return }
+	if !stat.isreg(this.stat.mode) {
+		return
+	}
 	mut inode := EXT2Inode{}
 	inode.read_entry(mut this.filesystem, u32(this.stat.ino)) or { return none }
 	size := u64(inode.size32l)
-	if offset >= size { return }
+	if offset >= size {
+		return
+	}
 	mut end := size
-	if length != 0 && length < size - offset { end = offset + length }
+	if length != 0 && length < size - offset {
+		end = offset + length
+	}
 
 	block_size := this.filesystem.block_size
-	if block_size == 0 { errno.set(errno.eio); return none }
+	if block_size == 0 {
+		errno.set(errno.eio)
+		return none
+	}
 	device_size := u64(this.filesystem.backing_device.resource.stat.size)
 	context := voidptr(this.filesystem.backing_device.resource)
 	// A hint may cover an enormous file. Bound both metadata walks and fills.
@@ -105,7 +126,9 @@ fn (mut this EXT2Resource) advise(_handle voidptr, offset u64, length u64, advic
 				this.advise_run(context, run_start, run_end - run_start, device_size, advice)
 				run_end = 0
 			}
-			if run_end == 0 { run_start = physical }
+			if run_end == 0 {
+				run_start = physical
+			}
 			run_end = physical + block_size
 		} else {
 			if run_end > run_start {

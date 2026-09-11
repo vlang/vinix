@@ -446,6 +446,7 @@ pub fn init_linux_syscall_table() {
 	linux_syscall_table[21] = voidptr(syscall_linux_access)
 	linux_syscall_table[22] = voidptr(syscall_linux_pipe)
 	linux_syscall_table[25] = voidptr(mmap.syscall_mremap)
+	linux_syscall_table[26] = voidptr(mmap.syscall_msync)
 	linux_syscall_table[27] = voidptr(mmap.syscall_mincore)
 	linux_syscall_table[28] = voidptr(mmap.syscall_madvise)
 	linux_syscall_table[32] = voidptr(syscall_linux_dup)

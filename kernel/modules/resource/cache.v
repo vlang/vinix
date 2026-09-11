@@ -19,18 +19,31 @@ mut:
 	persist_metadata() ?
 }
 
+// File-backed mappings may keep physical pages outside the block-device cache.
+// These optional hooks let msync/fsync write those pages back and let the VM
+// return disposable MAP_PRIVATE pages when the final mapping goes away.
+pub interface MappingSyncResource {
+mut:
+	sync_mapping(handle voidptr, offset u64, length u64) ?
+}
+
+pub interface MappingReleaseResource {
+mut:
+	release_mapping(handle voidptr, page u64, physical voidptr, flags int)
+}
+
 pub struct FileSystemStat {
 pub mut:
-	@type    u64
-	bsize    u64
-	blocks   u64
-	bfree    u64
-	bavail   u64
-	files    u64
-	ffree    u64
-	namelen  u64 = 255
-	frsize   u64
-	flags    u64
+	@type   u64
+	bsize   u64
+	blocks  u64
+	bfree   u64
+	bavail  u64
+	files   u64
+	ffree   u64
+	namelen u64 = 255
+	frsize  u64
+	flags   u64
 }
 
 pub interface FileSystemStatResource {
@@ -41,6 +54,18 @@ mut:
 pub fn sync_resource(mut res Resource, handle voidptr) ? {
 	if mut res is SyncableResource {
 		res.sync(handle) or { return none }
+	}
+}
+
+pub fn sync_mapping(mut res Resource, handle voidptr, offset u64, length u64) ? {
+	if mut res is MappingSyncResource {
+		res.sync_mapping(handle, offset, length)?
+	}
+}
+
+pub fn release_mapping(mut res Resource, handle voidptr, page u64, physical voidptr, flags int) {
+	if mut res is MappingReleaseResource {
+		res.release_mapping(handle, page, physical, flags)
 	}
 }
 
@@ -61,9 +86,9 @@ pub fn filesystem_stat(mut res Resource) FileSystemStat {
 		return res.filesystem_stat()
 	}
 	return FileSystemStat{
-		@type:   0
-		bsize:   4096
+		@type: 0
+		bsize: 4096
 		namelen: 255
-		frsize:  4096
+		frsize: 4096
 	}
 }

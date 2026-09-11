@@ -17,6 +17,10 @@ pub const map_fixed_noreplace = 0x100000
 pub const map_anon = 0x20
 pub const map_anonymous = 0x20
 
+const ms_async = 1
+const ms_invalidate = 2
+const ms_sync = 4
+
 // Private bookkeeping flag for the one large brk arena.  Only the committed
 // portion up to brk_current is charged to RLIMIT_AS; the inaccessible reserve
 // exists solely to keep unrelated mappings out of future heap addresses.
@@ -732,7 +736,16 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
 				return none
 			}
 			if page != unsafe { nil } {
-				map_page_in_range(range_global, base + i, u64(page), prot) or {}
+				map_page_in_range(range_global, base + i, u64(page), prot) or {
+					if flags & map_anonymous != 0 {
+						memory.pmm_free(page, 1)
+					} else {
+						resource.release_mapping(mut resource_, handle, u64((offset + i64(i)) / i64(page_size)), page, flags)
+					}
+					munmap(mut pagemap, voidptr(base), length) or {}
+					errno.set(errno.enomem)
+					return none
+				}
 			}
 		}
 	}
@@ -760,6 +773,47 @@ pub fn syscall_mprotect(_ voidptr, addr voidptr, length u64, prot int) (u64, u64
 
 	mprotect(mut process.pagemap, addr, length, prot) or { return errno.err, errno.get() }
 
+	return 0, 0
+}
+
+// Synchronize shared file mappings. Without an asynchronous writeback worker,
+// MS_ASYNC is conservatively completed before return just like MS_SYNC.
+pub fn syscall_msync(_ voidptr, addr u64, _length u64, flags int) (u64, u64) {
+	if addr % page_size != 0 || flags & ~(ms_async | ms_invalidate | ms_sync) != 0
+		|| (flags & ms_async != 0 && flags & ms_sync != 0) {
+		return errno.err, errno.einval
+	}
+	if _length == 0 {
+		return 0, 0
+	}
+	length := lib.align_up(_length, page_size)
+	if length < _length || addr >= memory.user_address_limit()
+		|| length > memory.user_address_limit() - addr {
+		return errno.err, errno.enomem
+	}
+
+	mut pagemap := proc.current_thread().process.pagemap
+	pagemap.l.acquire()
+	defer { pagemap.l.release() }
+	mut current := addr
+	end := addr + length
+	for current < end {
+		local_range, _, _ := addr2range(pagemap, current) or {
+			return errno.err, errno.enomem
+		}
+		range_end := if local_range.base + local_range.length < end {
+			local_range.base + local_range.length
+		} else {
+			end
+		}
+		if local_range.flags & map_shared != 0
+			&& local_range.flags & map_anonymous == 0 {
+			mut res := local_range.global.resource
+			file_offset := u64(local_range.offset) + (current - local_range.base)
+			resource.sync_mapping(mut res, local_range.global.handle, file_offset, range_end - current) or { return errno.err, errno.get() }
+		}
+		current = range_end
+	}
 	return 0, 0
 }
 
@@ -813,6 +867,9 @@ fn populate_missing_pages(mut pagemap memory.Pagemap, address u64, _length u64, 
 		map_page_in_range(global_range, virt, u64(page), prot) or {
 			if flags & map_anonymous != 0 {
 				memory.pmm_free(page, 1)
+			} else {
+				mut res := global_range.resource
+				resource.release_mapping(mut res, handle, file_page, page, flags)
 			}
 			errno.set(errno.enomem)
 			return none
@@ -977,7 +1034,16 @@ pub fn munmap_unlocked(mut pagemap memory.Pagemap, addr voidptr, _length u64) ? 
 						memory.pmm_free(voidptr(phys), 1)
 					}
 				} else {
-					// global_range.resource.munmap(i)
+					mut res := global_range.resource
+					for j := global_range.base; j < global_range.base + global_range.length; j += page_size {
+						phys := global_range.shadow_pagemap.virt2phys(j) or { continue }
+						global_range.shadow_pagemap.unmap_page(j) or {
+							errno.set(errno.einval)
+							return none
+						}
+						file_page := u64(global_range.offset) / page_size + (j - global_range.base) / page_size
+						resource.release_mapping(mut res, global_range.handle, file_page, voidptr(phys), local_range.flags)
+					}
 				}
 				memory.pmm_free(global_range.shadow_pagemap.top_level, 1)
 				if global_range.handle != unsafe { nil }

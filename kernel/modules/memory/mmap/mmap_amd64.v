@@ -4,6 +4,7 @@ import x86.cpu
 import x86.cpu.local as cpulocal
 import memory
 import proc
+import resource
 
 pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
 	if gpr_state.err & 1 != 0 {
@@ -59,8 +60,17 @@ pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
 	} else {
 		page = range_local.global.resource.mmap(range_local.global.handle, file_page, range_local.flags)
 	}
+	if page == unsafe { nil } {
+		return none
+	}
 
 	map_page_in_range(range_local.global, memory_page * page_size, u64(page), range_local.prot) or {
+		if range_local.flags & map_anonymous != 0 {
+			memory.pmm_free(page, 1)
+		} else {
+			mut res := range_local.global.resource
+			resource.release_mapping(mut res, range_local.global.handle, file_page, page, range_local.flags)
+		}
 		return none
 	}
 }

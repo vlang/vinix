@@ -874,9 +874,23 @@ pub fn syscall_mmap(_ voidptr, addr voidptr, length u64, prot_and_flags u64, fdn
 
 	prot := int((prot_and_flags >> 32) & 0xffffffff)
 	flags := int(prot_and_flags & 0xffffffff)
+	sharing := flags & (mmap.map_shared | mmap.map_private)
+	if sharing != mmap.map_shared && sharing != mmap.map_private {
+		return errno.err, errno.einval
+	}
 
 	if flags & mmap.map_anonymous == 0 && voidptr(resource_) == unsafe { nil } {
 		return errno.err, errno.ebadf
+	}
+	if flags & mmap.map_anonymous == 0 {
+		access := fd.handle.flags & resource.o_accmode
+		if access == resource.o_wronly {
+			return errno.err, errno.eacces
+		}
+		if flags & mmap.map_shared != 0 && prot & mmap.prot_write != 0
+			&& access != resource.o_rdwr {
+			return errno.err, errno.eacces
+		}
 	}
 
 	mut mapping_handle := voidptr(0)

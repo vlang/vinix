@@ -39,11 +39,17 @@ fn (mut this DevTmpFSResource) mmap(_handle voidptr, page u64, flags int) voidpt
 	copy_page := memory.pmm_alloc(1)
 
 	unsafe {
-		C.memcpy(voidptr(u64(copy_page) + higher_half), &this.storage[page * page_size],
-			page_size)
+		C.memcpy(voidptr(u64(copy_page) + higher_half), &this.storage[page * page_size], page_size)
 	}
 
 	return copy_page
+}
+
+fn (mut this DevTmpFSResource) release_mapping(_handle voidptr, _page u64,
+	physical voidptr, flags int) {
+	if flags & mmap.map_shared == 0 {
+		memory.pmm_free(physical, 1)
+	}
 }
 
 fn (mut this DevTmpFSResource) read(_handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
@@ -99,15 +105,15 @@ fn (mut this DevTmpFSResource) ioctl(handle voidptr, request u64, argp voidptr) 
 
 fn (mut this DevTmpFSResource) filesystem_stat() resource.FileSystemStat {
 	return resource.FileSystemStat{
-		@type:   0x01021994
-		bsize:   page_size
-		blocks:  memory.total_bytes() / page_size
-		bfree:   memory.free_bytes() / page_size
-		bavail:  memory.free_bytes() / page_size
-		files:   u64(-1)
-		ffree:   u64(-1)
+		@type: 0x01021994
+		bsize: page_size
+		blocks: memory.total_bytes() / page_size
+		bfree: memory.free_bytes() / page_size
+		bavail: memory.free_bytes() / page_size
+		files: u64(-1)
+		ffree: u64(-1)
 		namelen: 255
-		frsize:  page_size
+		frsize: page_size
 	}
 }
 
@@ -188,7 +194,7 @@ fn (mut this DevTmpFS) create(parent &VFSNode, name string, mode u32) &VFSNode {
 	mut new_node := create_node(this, parent, name, stat.isdir(mode))
 
 	mut new_resource := &DevTmpFSResource{
-		storage:  unsafe { nil }
+		storage: unsafe { nil }
 		refcount: 1
 	}
 
@@ -234,7 +240,7 @@ fn (mut this DevTmpFS) symlink(parent &VFSNode, dest string, target string) &VFS
 	mut new_node := create_node(this, parent, target, false)
 
 	mut new_resource := &DevTmpFSResource{
-		storage:  unsafe { nil }
+		storage: unsafe { nil }
 		refcount: 1
 	}
 
@@ -264,7 +270,7 @@ fn ensure_devtmpfs_dir(parent &VFSNode, name string) &VFSNode {
 
 	mut new_node := create_node(unsafe { filesystems['devtmpfs'] }, parent, name, true)
 	mut new_resource := &DevTmpFSResource{
-		storage:  unsafe { nil }
+		storage: unsafe { nil }
 		refcount: 1
 	}
 
