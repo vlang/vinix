@@ -67,7 +67,7 @@ fn open_blender(mut _ Desktop) !NativeApp {
 	}
 	app.surface_path = '/tmp/vinix-blender-${C.getpid()}.surface'
 	desktop_unlink(app.surface_path)
-	client := desktop_spawn_native_surface(blender_native_executable, '-noaudio', app.surface_path, blender_surface_width, blender_surface_height) or {
+	client := desktop_spawn_native_surface(blender_native_executable, '--debug-gpu-force-workarounds', '-noaudio', app.surface_path, blender_surface_width, blender_surface_height) or {
 		app.failed = true
 		app.error_message = 'Vinix could not start the native Blender client.'
 		return app

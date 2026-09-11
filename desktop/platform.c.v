@@ -645,7 +645,7 @@ struct SpawnedNativeSurface {
 // Start a native Vinix surface client. The child receives compositor input on
 // stdin and publishes XRGB frames at VINIX_SURFACE_PATH. Deliberately omit all
 // X11 and Wayland environment variables: this is the native window-system ABI.
-fn desktop_spawn_native_surface(path string, argument string, surface_path string, width int, height int) ?SpawnedNativeSurface {
+fn desktop_spawn_native_surface(path string, first_argument string, second_argument string, surface_path string, width int, height int) ?SpawnedNativeSurface {
 	if C.access(&char(path.str), C.X_OK) != 0 || width <= 0 || height <= 0 {
 		return none
 	}
@@ -656,16 +656,27 @@ fn desktop_spawn_native_surface(path string, argument string, surface_path strin
 	desktop_set_cloexec(input[0], true)
 	desktop_set_cloexec(input[1], true)
 
-	argv := [&char(path.str), &char(argument.str), &char(unsafe { nil })]
+	argv := [&char(path.str), &char(first_argument.str), &char(second_argument.str),
+		&char(unsafe { nil })]
 	path_entry := 'PATH=${desktop_command_path}'
 	surface_entry := 'VINIX_SURFACE_PATH=${surface_path}'
 	width_entry := 'VINIX_SURFACE_WIDTH=${width}'
 	height_entry := 'VINIX_SURFACE_HEIGHT=${height}'
-	envp := [&char(path_entry.str), c'HOME=/root', c'TERM=dumb', c'USER=root', c'LOGNAME=root',
+	mut envp := [&char(path_entry.str), c'HOME=/root', c'TERM=dumb', c'USER=root', c'LOGNAME=root',
 		c'SHELL=/bin/sh', c'LD_LIBRARY_PATH=/usr/lib', c'LIBGL_DRIVERS_PATH=/usr/lib/dri',
-		c'EGL_PLATFORM=surfaceless', c'SSL_CA_CERT_FILE=/etc/ssl/certs/ca-certificates.crt',
-		&char(surface_entry.str), &char(width_entry.str), &char(height_entry.str),
-		&char(unsafe { nil })]
+		c'EGL_PLATFORM=surfaceless', c'SSL_CA_CERT_FILE=/etc/ssl/certs/ca-certificates.crt']
+	// QEMU exposes only simpledrm, so select the packaged software renderer
+	// explicitly. Preserve Mesa's native Asahi selection on Vinix hardware.
+	if C.access(c'/dev/dri/renderD128', C.R_OK | C.W_OK) != 0 {
+		envp << c'LIBGL_ALWAYS_SOFTWARE=1'
+		envp << c'GALLIUM_DRIVER=llvmpipe'
+		envp << c'MESA_LOADER_DRIVER_OVERRIDE=swrast'
+		envp << c'MESA_SHADER_CACHE_DISABLE=true'
+	}
+	envp << &char(surface_entry.str)
+	envp << &char(width_entry.str)
+	envp << &char(height_entry.str)
+	envp << &char(unsafe { nil })
 
 	pid := C.fork()
 	if pid < 0 {

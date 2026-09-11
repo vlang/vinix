@@ -147,6 +147,10 @@ bool GHOST_WindowVinix::publishFramebuffer()
 
   const size_t row_size = size_t(m_width) * 4;
   m_readback.resize(row_size * m_height);
+  /* Blender draws editor regions through off-screen framebuffers. Make the
+   * pbuffer explicit before reading the composed window; the final region's
+   * framebuffer may otherwise still be selected by the GL implementation. */
+  glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
   glPixelStorei(GL_PACK_ALIGNMENT, 4);
   glFinish();
   glReadPixels(
@@ -167,9 +171,11 @@ bool GHOST_WindowVinix::publishFramebuffer()
 
 GHOST_TSuccess GHOST_WindowVinix::swapBuffers()
 {
-  const bool published = publishFramebuffer();
-  const GHOST_TSuccess swapped = GHOST_Window::swapBuffers();
-  return published && swapped == GHOST_kSuccess ? GHOST_kSuccess : GHOST_kFailure;
+  /* A Vinix surface is presented from a read-back pbuffer, not from EGL.
+   * Swapping the pbuffer can discard its contents, while Blender redraws only
+   * damaged regions between presentation requests. Keep the same pbuffer
+   * contents so those partial redraws accumulate into a complete frame. */
+  return publishFramebuffer() ? GHOST_kSuccess : GHOST_kFailure;
 }
 
 bool GHOST_WindowVinix::getValid() const
