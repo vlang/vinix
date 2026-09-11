@@ -432,21 +432,53 @@ pub fn sendsig(_thread &proc.Thread, signal u8) {
 	sched.enqueue_thread(t, true)
 }
 
+// Validate process/group selectors before accessing the process table. BusyBox
+// uses kill(0, SIGTTIN) during job-control setup, and kill(pid, 0) to probe PIDs.
 pub fn syscall_kill(_ voidptr, pid int, signal int) (u64, u64) {
-	mut current_thread := proc.current_thread()
-	mut process := current_thread.process
-
-	C.printf(c'\n\e[32m%s\e[m: kill(%d, %d)\n', process.name.str, pid, signal)
-	defer {
-		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
+	if signal < 0 || signal >= 64 {
+		return errno.err, errno.einval
 	}
-
-	if signal > 0 {
-		sendsig(processes[pid].threads[0], u8(signal))
-	} else {
-		panic('sendsig: Values of signal <= 0 not supported')
+	current := proc.current_thread().process
+	group := if pid == 0 { i64(current.pgid) } else { -i64(pid) }
+	mut found := false
+	mut allowed := false
+	proc.lock_table()
+	defer { proc.unlock_table() }
+	for i := 1; i < proc.max_pid; i++ {
+		mut target := proc.process_at(i)
+		if target == unsafe { nil } {
+			continue
+		}
+		if pid > 0 && target.pid != pid {
+			continue
+		}
+		if pid == -1 && (target.pid == 1 || target.pid == current.pid) {
+			continue
+		}
+		if pid <= 0 && pid != -1 && i64(target.pgid) != group {
+			continue
+		}
+		found = true
+		if current.euid != 0 && current.uid != target.uid && current.uid != target.suid
+			&& current.euid != target.uid && current.euid != target.suid
+			&& !(signal == sigcont && current.sid == target.sid) {
+			continue
+		}
+		allowed = true
+		if signal != 0 && !target.exiting {
+			target.threads_lock.acquire()
+			if target.threads.len > 0 {
+				sendsig(target.threads[0], u8(signal))
+			}
+			target.threads_lock.release()
+		}
 	}
-
+	if !found {
+		return errno.err, errno.esrch
+	}
+	if !allowed {
+		return errno.err, errno.eperm
+	}
 	return 0, 0
 }
 
@@ -552,6 +584,11 @@ pub fn syscall_exit(_ voidptr, status int) {
 	defer {
 		C.printf(c'\e[32m%s\e[m: returning\n', current_process.name.str)
 	}
+
+	// Keep kill from waking a thread after its process starts teardown.
+	proc.lock_table()
+	current_process.exiting = true
+	proc.unlock_table()
 
 	// A framebuffer owner can exit without issuing a console ioctl. Restore
 	// the saved text console before its address space and descriptors vanish.
