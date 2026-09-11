@@ -21,8 +21,15 @@ pkg install gimp
 
 test -x /usr/bin/gimp
 test -x /usr/bin/run-gimp
+test -f /etc/gimp/2.0/vinix-sessionrc
 test -d /usr/lib/gimp/2.0/plug-ins
 test -f /usr/share/applications/gimp.desktop
+test -s /usr/share/gimp/2.0/icons/Symbolic/icon-theme.cache
+test -s /usr/share/mime/mime.cache
+/usr/bin/gdk-pixbuf-thumbnailer -s 16 \
+	/usr/share/gimp/2.0/icons/Symbolic/16x16/apps/gimp-tool-crop.png \
+	/tmp/gimp-icon-smoke.png
+test -s /tmp/gimp-icon-smoke.png
 echo "PASS pkg installed GIMP and its GTK runtime"
 
 mkdir -p /tmp/.X11-unix /var/lib/xkb
@@ -72,6 +79,9 @@ if [ "$mapped" != true ]; then
 	echo "GIMP did not map an editor window" >&2
 	exit 1
 fi
+
+grep -q '(position 0 0)' /root/.config/GIMP/2.10/sessionrc
+grep -q '(size 1280 900)' /root/.config/GIMP/2.10/sessionrc
 
 echo "PASS GIMP opened an editor window"
 echo "VINIX GIMP PACKAGE TEST: PASS"

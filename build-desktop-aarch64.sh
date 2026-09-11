@@ -476,6 +476,8 @@ install -m755 "$SCRIPT_DIR/build-support/gimp/run-gimp" "$STAGING/usr/bin/run-gi
 mkdir -p "$STAGING/etc/gimp/2.0"
 install -m644 "$SCRIPT_DIR/build-support/gimp/vinix-gimprc" \
     "$STAGING/etc/gimp/2.0/vinix-gimprc"
+install -m644 "$SCRIPT_DIR/build-support/gimp/vinix-sessionrc" \
+    "$STAGING/etc/gimp/2.0/vinix-sessionrc"
 install -m644 "$SCRIPT_DIR/tests/firefox/smoke.html" "$STAGING/root/firefox-smoke.html"
 mkdir -p "$STAGING/etc/firefox/policies"
 install -m644 "$SCRIPT_DIR/build-support/firefox/policies.json" \

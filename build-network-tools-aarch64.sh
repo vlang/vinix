@@ -109,6 +109,8 @@ install -m755 "$SCRIPT_DIR/build-support/gimp/run-gimp" \
 mkdir -p "$STAGING/etc/gimp/2.0"
 install -m644 "$SCRIPT_DIR/build-support/gimp/vinix-gimprc" \
     "$STAGING/etc/gimp/2.0/vinix-gimprc"
+install -m644 "$SCRIPT_DIR/build-support/gimp/vinix-sessionrc" \
+    "$STAGING/etc/gimp/2.0/vinix-sessionrc"
 clang -target aarch64-linux-musl -fPIC -ffreestanding -fno-stack-protector \
     -nostdlib -c "$SCRIPT_DIR/tests/packages/gtk-smoke-auto-close.c" \
     -o "$BUILD_DIR/gtk-smoke-auto-close.o"

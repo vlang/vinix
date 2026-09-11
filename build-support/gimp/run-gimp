@@ -14,13 +14,52 @@ if [ ! -x /usr/bin/gimp ]; then
 	exit 127
 fi
 
-if ! mkdir -p "$XDG_CONFIG_HOME/GIMP/2.10" "$XDG_CACHE_HOME"; then
+prepare_config() {
+	mkdir -p "$XDG_CONFIG_HOME/GIMP/2.10" "$XDG_CACHE_HOME" || return 1
+	sessionrc="$XDG_CONFIG_HOME/GIMP/2.10/sessionrc"
+	geometry_marker="$XDG_CONFIG_HOME/GIMP/2.10/.vinix-1280x900"
+	if [ ! -e "$geometry_marker" ]; then
+		# Migrate existing installs too: Alpine's 200,100 geometry is visibly
+		# offset because this private X11 display has no window manager.
+		/bin/busybox cp /etc/gimp/2.0/vinix-sessionrc "$sessionrc" || return 1
+		: >"$geometry_marker" || return 1
+	fi
+}
+
+ensure_runtime_caches() {
+	# Package overlays preserve the generated MIME cache after a normal pkg
+	# transaction, but older and manually prepared overlays may not have one.
+	# Alpine's GDK-Pixbuf selects its built-in PNG loader through MIME sniffing;
+	# without this database every valid GIMP icon becomes an error placeholder.
+	if [ ! -s /usr/share/mime/mime.cache ] \
+		&& [ -x /usr/bin/update-mime-database ]; then
+		/usr/bin/update-mime-database /usr/share/mime || true
+	fi
+	if [ ! -s /usr/lib/gdk-pixbuf-2.0/2.10.0/loaders.cache ] \
+		&& [ -x /usr/bin/gdk-pixbuf-query-loaders ]; then
+		/usr/bin/gdk-pixbuf-query-loaders --update-cache || true
+	fi
+	[ -x /usr/bin/gtk-update-icon-cache ] || return 0
+	for icon_theme in /usr/share/gimp/2.0/icons/Symbolic \
+		/usr/share/icons/hicolor /usr/share/icons/Adwaita; do
+		[ -f "$icon_theme/index.theme" ] || continue
+		[ -s "$icon_theme/icon-theme.cache" ] \
+			|| /usr/bin/gtk-update-icon-cache -f -t "$icon_theme" \
+			|| true
+	done
+}
+
+if ! prepare_config; then
 	# A damaged or older persistent home must not prevent the editor from
 	# starting. Its preferences can safely fall back to this boot's tmpfs.
 	export XDG_CONFIG_HOME=/tmp/vinix-gimp-config
 	export XDG_CACHE_HOME=/tmp/vinix-gimp-cache
-	mkdir -p "$XDG_CONFIG_HOME/GIMP/2.10" "$XDG_CACHE_HOME"
+	prepare_config
 fi
+
+# Repair generated runtime indexes for existing package overlays as well as
+# fresh installs, before GTK tries to resolve the editor controls.
+ensure_runtime_caches
 
 exec /usr/bin/gimp \
 	--system-gimprc /etc/gimp/2.0/vinix-gimprc \

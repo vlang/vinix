@@ -594,6 +594,15 @@ finalize_gimp() {
 	/usr/bin/gdk-pixbuf-query-loaders --update-cache
 	/usr/bin/glib-compile-schemas /usr/share/glib-2.0/schemas
 	/usr/bin/update-mime-database /usr/share/mime
+	# GIMP ships private icon themes outside /usr/share/icons. Alpine normally
+	# indexes these through package triggers; without their caches GTK displays
+	# missing-image placeholders throughout the toolbox and dock controls.
+	for icon_theme in /usr/share/gimp/2.0/icons/*; do
+		[ -f "$icon_theme/index.theme" ] || continue
+		/usr/bin/gtk-update-icon-cache -f -t "$icon_theme"
+	done
+	/usr/bin/gtk-update-icon-cache -f -t /usr/share/icons/hicolor
+	/usr/bin/gtk-update-icon-cache -f -t /usr/share/icons/Adwaita
 }
 
 finalize_blender() {
