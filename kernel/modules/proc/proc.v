@@ -16,7 +16,25 @@ pub const max_events = 32
 
 pub const max_pid = 65536
 
+// Linux resource numbers.  Keeping the complete table matters even for limits
+// which are only advisory in Vinix today: prlimit64/getrlimit must preserve a
+// value instead of rejecting a perfectly ordinary libc probe.
+pub const rlimit_cpu = 0
+pub const rlimit_fsize = 1
+pub const rlimit_data = 2
+pub const rlimit_stack = 3
+pub const rlimit_core = 4
+pub const rlimit_rss = 5
+pub const rlimit_nproc = 6
 pub const rlimit_nofile = 7
+pub const rlimit_memlock = 8
+pub const rlimit_as = 9
+pub const rlimit_locks = 10
+pub const rlimit_sigpending = 11
+pub const rlimit_msgqueue = 12
+pub const rlimit_nice = 13
+pub const rlimit_rtprio = 14
+pub const rlimit_rttime = 15
 pub const rlimit_nlimits = 16
 pub const rlim_infinity = u64(-1)
 
@@ -38,6 +56,14 @@ pub fn default_rlimits() [rlimit_nlimits]RLimit {
 		cur: u64(max_fds)
 		max: u64(max_fds)
 	}
+	limits[rlimit_stack] = RLimit{
+		cur: 8 * 1024 * 1024
+		max: rlim_infinity
+	}
+	limits[rlimit_nproc] = RLimit{
+		cur: max_pid - 1
+		max: max_pid - 1
+	}
 	return limits
 }
 
@@ -52,17 +78,18 @@ pub mut:
 	threads                  []&Thread
 	threads_lock             klock.Lock
 	fds_lock                 klock.Lock
+	rlimits_lock             klock.Lock
 	fds                      [max_fds]voidptr
 	children                 []&Process
 	children_lock            klock.Lock
 	mmap_anon_non_fixed_base u64
 	// Program break. It gets its own arena so that growing it can never run
 	// into the anonymous mmap region or the thread stacks.
-	brk_base    u64
-	brk_current u64
-	current_directory        voidptr
-	event                    eventstruct.Event
-	status                   int
+	brk_base          u64
+	brk_current       u64
+	current_directory voidptr
+	event             eventstruct.Event
+	status            int
 	// Set once exit_group() (or a fatal fault) has started tearing the
 	// process down, so late-arriving threads do not try to do it again.
 	exiting bool
@@ -78,13 +105,13 @@ pub mut:
 	// Credentials: the real, effective and saved sets POSIX names, plus the
 	// supplementary groups. Everything starts as root and is inherited across
 	// fork, which is what a system with no login path and no setuid bits gets.
-	uid    u32
-	euid   u32
-	suid   u32
-	gid    u32
-	egid   u32
-	sgid   u32
-	groups []u32
+	uid     u32
+	euid    u32
+	suid    u32
+	gid     u32
+	egid    u32
+	sgid    u32
+	groups  []u32
 	rlimits [rlimit_nlimits]RLimit
 	// Creation mask inherited across fork and preserved by exec.
 	umask u32 = 0o22
@@ -104,6 +131,43 @@ pub mut:
 	// POSIX nice value. The scheduler scales this process' timeslices from
 	// -20 (highest normal priority) through 19 (lowest).
 	nice int
+}
+
+// Read-mostly limits are naturally aligned u64s.  Writers serialize complete
+// {cur,max} replacements with rlimits_lock; enforcement paths only need the
+// current soft value and may take a slightly older value during a concurrent
+// prlimit64, which is also permitted by the syscall's process-wide semantics.
+pub fn soft_limit(process &Process, which int) u64 {
+	if which < 0 || which >= rlimit_nlimits {
+		return 0
+	}
+	return process.rlimits[which].cur
+}
+
+pub fn limit_allows(process &Process, which int, amount u64) bool {
+	limit := soft_limit(process, which)
+	return limit == rlim_infinity || amount <= limit
+}
+
+// RLIMIT_NPROC is charged to the real uid, like Linux.  The check and the PID
+// allocation are individually protected; a pair of simultaneous forks may
+// both observe the last slot.  max_pid remains the hard backstop, while this
+// helper provides the expected deterministic limit for normal callers.
+pub fn may_create_process(process &Process) bool {
+	limit := soft_limit(process, rlimit_nproc)
+	if limit == rlim_infinity {
+		return true
+	}
+	pid_lock.acquire()
+	defer { pid_lock.release() }
+	mut count := u64(0)
+	for i := 1; i < max_pid; i++ {
+		candidate := processes[i]
+		if candidate != unsafe { nil } && candidate.uid == process.uid {
+			count++
+		}
+	}
+	return count < limit
 }
 
 pub struct SigAction {
@@ -245,7 +309,9 @@ pub fn process_count() u16 {
 	for i := 1; i < max_pid; i++ {
 		if processes[i] != unsafe { nil } { count++ }
 	}
-	if count > 0xffff { return 0xffff }
+	if count > 0xffff {
+		return 0xffff
+	}
 	return u16(count)
 }
 

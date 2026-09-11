@@ -18,16 +18,18 @@ import time
 import krandom
 
 fn C.sched_switch_context(gpr_state voidptr, kernel_stack u64)
+
 fn C.vinix_call_void_fn(f voidptr)
+
 fn C.yield_dispatch(handler voidptr)
 
 const max_reap_slots = 256
 
 __global (
 	// Per-CPU parking slot for the thread that most recently died there.
-	reap_slots                  [max_reap_slots]&proc.Thread
-	syscall_input_poll_lock     klock.Lock
-	last_syscall_input_poll_ns  u64
+	reap_slots                 [max_reap_slots]&proc.Thread
+	syscall_input_poll_lock    klock.Lock
+	last_syscall_input_poll_ns u64
 )
 
 pub fn initialise() {
@@ -246,9 +248,7 @@ pub fn enqueue_thread(_thread &proc.Thread, by_signal bool) bool {
 	}
 
 	for i := u64(0); i < max_running_threads; i++ {
-		if katomic.cas[&proc.Thread](mut &scheduler_running_queue[i], unsafe { nil },
-			t)
-		{
+		if katomic.cas[&proc.Thread](mut &scheduler_running_queue[i], unsafe { nil }, t) {
 			t.is_in_queue = true
 
 			// Wake any idle CPUs via SEV
@@ -425,7 +425,8 @@ pub fn dequeue_and_die() {
 	proc.set_current_thread(cpu_local.cpu_number, unsafe { nil })
 	hand_over_to_reaper(cpu_local.cpu_number, t)
 	yield(false)
-	for {}
+	for {
+	}
 }
 
 // Reclaiming a dying thread's kernel stack cannot happen while we are still
@@ -450,8 +451,7 @@ fn hand_over_to_reaper(cpu_number u64, t &proc.Thread) {
 		memory.pmm_free(voidptr(previous.kstack_phys), kernel_stack_size / page_size)
 	}
 	if previous.fpu_storage_phys != 0 {
-		memory.pmm_free(voidptr(previous.fpu_storage_phys), lib.div_roundup(fpu_storage_size,
-			page_size))
+		memory.pmm_free(voidptr(previous.fpu_storage_phys), lib.div_roundup(fpu_storage_size, page_size))
 	}
 	unsafe { free(voidptr(previous)) }
 }
@@ -480,9 +480,9 @@ pub fn new_kernel_thread(pc voidptr, arg voidptr, autoenqueue bool) &proc.Thread
 	stack := u64(stack_phys) + kernel_stack_size + higher_half
 
 	gpr_state := cpulocal.GPRState{
-		pc:     u64(pc) // elr_el1 = entry point
-		x0:     u64(arg) // first argument in x0
-		sp:     stack
+		pc: u64(pc) // elr_el1 = entry point
+		x0: u64(arg) // first argument in x0
+		sp: stack
 		// Kernel-context marker plus masked DAIF. The assembly restore maps
 		// EL1h to the current handler level (EL2h on Apple VHE).
 		pstate: 0x3c5
@@ -491,14 +491,14 @@ pub fn new_kernel_thread(pc voidptr, arg voidptr, autoenqueue bool) &proc.Thread
 	fpu_storage_phys := memory.pmm_alloc(lib.div_roundup(fpu_storage_size, page_size))
 
 	mut t := &proc.Thread{
-		process:          kernel_process
-		ttbr0:            u64(kernel_process.pagemap.top_level)
-		gpr_state:        gpr_state
-		timeslice:        5000
-		running_on:       u64(-1)
-		stacks:           stacks
-		kstack_phys:      u64(stack_phys)
-		fpu_storage:      voidptr(u64(fpu_storage_phys) + higher_half)
+		process: kernel_process
+		ttbr0: u64(kernel_process.pagemap.top_level)
+		gpr_state: gpr_state
+		timeslice: 5000
+		running_on: u64(-1)
+		stacks: stacks
+		kstack_phys: u64(stack_phys)
+		fpu_storage: voidptr(u64(fpu_storage_phys) + higher_half)
 		fpu_storage_phys: u64(fpu_storage_phys)
 	}
 
@@ -527,8 +527,7 @@ pub fn syscall_new_thread(_ voidptr, pc voidptr, stack u64) (u64, u64) {
 		unsafe { empty_string_array.free() }
 	}
 
-	mut new_thread := new_user_thread(process, false, pc, unsafe { nil }, stack, empty_string_array,
-		empty_string_array, unsafe { nil }, false) or { return errno.err, errno.get() }
+	mut new_thread := new_user_thread(process, false, pc, unsafe { nil }, stack, empty_string_array, empty_string_array, unsafe { nil }, false) or { return errno.err, errno.get() }
 
 	enqueue_thread(new_thread, false)
 
@@ -547,16 +546,24 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 	mut stack_vma := u64(0)
 
 	if _stack == 0 {
-		stack_phys := memory.pmm_alloc(stack_size / page_size)
-		stack = unsafe { &u64(u64(stack_phys) + stack_size + higher_half) }
+		mut user_stack_size := stack_size
+		stack_limit := proc.soft_limit(process, proc.rlimit_stack)
+		if stack_limit != proc.rlim_infinity && stack_limit < user_stack_size {
+			user_stack_size = lib.align_down(stack_limit, page_size)
+		}
+		if user_stack_size < page_size {
+			errno.set(errno.enomem)
+			return none
+		}
+		stack_phys := memory.pmm_alloc(user_stack_size / page_size)
+		stack = unsafe { &u64(u64(stack_phys) + user_stack_size + higher_half) }
 
 		stack_vma = process.thread_stack_top
-		process.thread_stack_top -= stack_size
+		process.thread_stack_top -= user_stack_size
 		stack_bottom_vma := process.thread_stack_top
 		process.thread_stack_top -= page_size
 
-		mmap.map_range(mut process.pagemap, stack_bottom_vma, u64(stack_phys), stack_size,
-			mmap.prot_read | mmap.prot_write, mmap.map_anonymous) or { return none }
+		mmap.map_range(mut process.pagemap, stack_bottom_vma, u64(stack_phys), user_stack_size, mmap.prot_read | mmap.prot_write, mmap.map_anonymous) or { return none }
 	} else {
 		stack = &u64(voidptr(_stack))
 		stack_vma = _stack
@@ -569,22 +576,22 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 	fpu_storage_phys := memory.pmm_alloc(lib.div_roundup(fpu_storage_size, page_size))
 
 	gpr_state := cpulocal.GPRState{
-		pc:     u64(pc)
-		x0:     u64(arg)
-		sp:     u64(stack_vma)
+		pc: u64(pc)
+		x0: u64(arg)
+		sp: u64(stack_vma)
 		pstate: 0x000 // EL0t, no DAIF masking
 	}
 
 	mut t := &proc.Thread{
-		process:          process
-		ttbr0:            u64(process.pagemap.top_level)
-		gpr_state:        gpr_state
-		timeslice:        5000
-		running_on:       u64(-1)
-		kernel_stack:     kernel_stack
-		kstack_phys:      u64(kernel_stack_phys)
-		stacks:           stacks
-		fpu_storage:      voidptr(u64(fpu_storage_phys) + higher_half)
+		process: process
+		ttbr0: u64(process.pagemap.top_level)
+		gpr_state: gpr_state
+		timeslice: 5000
+		running_on: u64(-1)
+		kernel_stack: kernel_stack
+		kstack_phys: u64(kernel_stack_phys)
+		stacks: stacks
+		fpu_storage: voidptr(u64(fpu_storage_phys) + higher_half)
 		fpu_storage_phys: u64(fpu_storage_phys)
 	}
 
@@ -759,19 +766,19 @@ pub fn new_cloned_thread(_process &proc.Process, _source &proc.Thread, state &cp
 	}
 
 	mut t := &proc.Thread{
-		process:          process
-		ttbr0:            u64(process.pagemap.top_level)
-		gpr_state:        state
-		timeslice:        source.timeslice
-		running_on:       u64(-1)
-		kernel_stack:     u64(kernel_stack_phys) + kernel_stack_size + higher_half
-		kstack_phys:      u64(kernel_stack_phys)
-		fpu_storage:      voidptr(u64(fpu_storage_phys) + higher_half)
+		process: process
+		ttbr0: u64(process.pagemap.top_level)
+		gpr_state: state
+		timeslice: source.timeslice
+		running_on: u64(-1)
+		kernel_stack: u64(kernel_stack_phys) + kernel_stack_size + higher_half
+		kstack_phys: u64(kernel_stack_phys)
+		fpu_storage: voidptr(u64(fpu_storage_phys) + higher_half)
 		fpu_storage_phys: u64(fpu_storage_phys)
-		sigentry:         source.sigentry
-		sigactions:       source.sigactions
-		masked_signals:   source.masked_signals
-		affinity_mask:    source.affinity_mask
+		sigentry: source.sigentry
+		sigactions: source.sigactions
+		masked_signals: source.masked_signals
+		affinity_mask: source.affinity_mask
 	}
 
 	t.self = voidptr(t)
@@ -797,6 +804,10 @@ pub fn new_cloned_thread(_process &proc.Process, _source &proc.Thread, state &cp
 }
 
 pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) ?&proc.Process {
+	if unsafe { old_process != nil } && !proc.may_create_process(old_process) {
+		errno.set(errno.eagain)
+		return none
+	}
 	mut new_proc := &proc.Process{
 		pagemap: unsafe { nil }
 	}

@@ -242,8 +242,7 @@ fn validate_linux_iov(iov_ptr u64, iovcnt int) (u64, u64) {
 	mut total := u64(0)
 	for i := 0; i < iovcnt; i++ {
 		mut iov := LinuxIOVec{}
-		if !usercopy.copy_from_user(voidptr(&iov), iov_ptr + u64(i) * sizeof(LinuxIOVec),
-			sizeof(LinuxIOVec)) {
+		if !usercopy.copy_from_user(voidptr(&iov), iov_ptr + u64(i) * sizeof(LinuxIOVec), sizeof(LinuxIOVec)) {
 			return 0, errno.efault
 		}
 		if iov.len > u64(0x7fffffffffffffff) - total {
@@ -256,8 +255,7 @@ fn validate_linux_iov(iov_ptr u64, iovcnt int) (u64, u64) {
 
 fn read_linux_iov(iov_ptr u64, index int) ?LinuxIOVec {
 	mut iov := LinuxIOVec{}
-	if !usercopy.copy_from_user(voidptr(&iov), iov_ptr + u64(index) * sizeof(LinuxIOVec),
-		sizeof(LinuxIOVec)) {
+	if !usercopy.copy_from_user(voidptr(&iov), iov_ptr + u64(index) * sizeof(LinuxIOVec), sizeof(LinuxIOVec)) {
 		return none
 	}
 	return iov
@@ -432,7 +430,7 @@ fn syscall_linux_prctl(_ voidptr, option int, arg2 u64, _arg3 u64, _arg4 u64, _a
 }
 
 fn syscall_linux_prlimit64(_ voidptr, pid int, res int, new_rlim u64, old_rlim u64) (u64, u64) {
-	if res != proc.rlimit_nofile {
+	if res < 0 || res >= proc.rlimit_nlimits {
 		return errno.err, errno.einval
 	}
 	mut process := proc.current_thread().process
@@ -440,8 +438,8 @@ fn syscall_linux_prlimit64(_ voidptr, pid int, res int, new_rlim u64, old_rlim u
 		return errno.err, errno.esrch
 	}
 
-	process.fds_lock.acquire()
-	defer { process.fds_lock.release() }
+	process.rlimits_lock.acquire()
+	defer { process.rlimits_lock.release() }
 	old := process.rlimits[res]
 	if old_rlim != 0 {
 		if !usercopy.copy_to_user(old_rlim, voidptr(&old), sizeof(proc.RLimit)) {
@@ -460,7 +458,10 @@ fn syscall_linux_prlimit64(_ voidptr, pid int, res int, new_rlim u64, old_rlim u
 		if wanted.max > old.max && process.euid != 0 {
 			return errno.err, errno.eperm
 		}
-		if wanted.max > u64(proc.max_fds) {
+		if res == proc.rlimit_nofile && wanted.max > u64(proc.max_fds) {
+			return errno.err, errno.eperm
+		}
+		if res == proc.rlimit_nproc && wanted.max >= u64(proc.max_pid) {
 			return errno.err, errno.eperm
 		}
 		process.rlimits[res] = wanted
@@ -690,8 +691,7 @@ fn syscall_linux_sendto(gpr_state voidptr, fdnum int, buf voidptr, len u64, flag
 }
 
 fn syscall_linux_recvfrom(gpr_state voidptr, fdnum int, buf voidptr, len u64, flags int, src_addr voidptr, addrlen voidptr) (u64, u64) {
-	return socket.syscall_recvfrom(gpr_state, fdnum, buf, len, flags, src_addr,
-		unsafe { &u32(addrlen) })
+	return socket.syscall_recvfrom(gpr_state, fdnum, buf, len, flags, src_addr, unsafe { &u32(addrlen) })
 }
 
 fn syscall_linux_sched_yield(_ voidptr) (u64, u64) {
@@ -902,8 +902,12 @@ fn syscall_linux_setpriority(_ voidptr, which int, who int, prio int) (u64, u64)
 	mut caller := proc.current_thread().process
 	target_pid := if who == 0 { caller.pid } else { who }
 	mut wanted := prio
-	if wanted < -20 { wanted = -20 }
-	if wanted > 19 { wanted = 19 }
+	if wanted < -20 {
+		wanted = -20
+	}
+	if wanted > 19 {
+		wanted = 19
+	}
 
 	proc.lock_table()
 	defer { proc.unlock_table() }

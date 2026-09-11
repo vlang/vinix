@@ -292,11 +292,11 @@ fn syscall_linux_prlimit64(_ voidptr, pid int, resource int, new_limit u64, old_
 	if pid != 0 && pid != process.pid {
 		return errno.err, errno.esrch
 	}
-	if resource != proc.rlimit_nofile {
+	if resource < 0 || resource >= proc.rlimit_nlimits {
 		return errno.err, errno.einval
 	}
-	process.fds_lock.acquire()
-	defer { process.fds_lock.release() }
+	process.rlimits_lock.acquire()
+	defer { process.rlimits_lock.release() }
 	old := process.rlimits[resource]
 	if old_limit != 0 {
 		if !usercopy.copy_to_user(old_limit, voidptr(&old), sizeof(proc.RLimit)) {
@@ -314,7 +314,10 @@ fn syscall_linux_prlimit64(_ voidptr, pid int, resource int, new_limit u64, old_
 		if requested.max > old.max && process.euid != 0 {
 			return errno.err, errno.eperm
 		}
-		if requested.max > u64(proc.max_fds) {
+		if resource == proc.rlimit_nofile && requested.max > u64(proc.max_fds) {
+			return errno.err, errno.eperm
+		}
+		if resource == proc.rlimit_nproc && requested.max >= u64(proc.max_pid) {
 			return errno.err, errno.eperm
 		}
 		process.rlimits[resource] = requested

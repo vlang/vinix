@@ -280,6 +280,21 @@ pub fn (mut this Handle) read(buf voidptr, count u64) ?i64 {
 	return ret
 }
 
+fn limited_write_count(res &resource.Resource, location u64, count u64) ?u64 {
+	if !stat.isreg(res.stat.mode) || count == 0 {
+		return count
+	}
+	limit := proc.soft_limit(proc.current_thread().process, proc.rlimit_fsize)
+	if limit == proc.rlim_infinity {
+		return count
+	}
+	if location >= limit {
+		errno.set(errno.efbig)
+		return none
+	}
+	return if count > limit - location { limit - location } else { count }
+}
+
 pub fn (mut this Handle) write(buf voidptr, count u64) ?i64 {
 	this.l.acquire()
 	defer {
@@ -291,7 +306,8 @@ pub fn (mut this Handle) write(buf voidptr, count u64) ?i64 {
 	if this.flags & resource.o_append != 0 {
 		this.loc = this.resource.stat.size
 	}
-	ret := this.resource.write(voidptr(this), buf, u64(this.loc), count) or { return none }
+	allowed := limited_write_count(this.resource, u64(this.loc), count)?
+	ret := this.resource.write(voidptr(this), buf, u64(this.loc), allowed) or { return none }
 	this.loc += ret
 	if this.flags & resource.o_dsync != 0 {
 		mut res := this.resource
@@ -651,7 +667,10 @@ pub fn syscall_pwrite(_ voidptr, fdnum int, buf voidptr, count u64, offset i64) 
 		return errno.err, errno.ebadf
 	}
 
-	ret := res.write(voidptr(handle), buf, u64(offset), count) or {
+	allowed := limited_write_count(res, u64(offset), count) or {
+		return errno.err, errno.get()
+	}
+	ret := res.write(voidptr(handle), buf, u64(offset), allowed) or {
 		return errno.err, errno.get()
 	}
 	if handle.flags & resource.o_dsync != 0 {
@@ -815,7 +834,9 @@ pub fn syscall_fcntl(_ voidptr, fdnum int, cmd int, arg u64) (u64, u64) {
 		f_getlk, f_setlk, f_setlkw {
 			lock_ret, lock_errno := fcntl_lock(mut handle, cmd, arg)
 			fd.unref()
-			if lock_errno != 0 { return lock_ret, lock_errno }
+			if lock_errno != 0 {
+				return lock_ret, lock_errno
+			}
 			ret = lock_ret
 		}
 		else {
@@ -832,8 +853,7 @@ pub fn syscall_mmap(_ voidptr, addr voidptr, length u64, prot_and_flags u64, fdn
 	mut current_thread := proc.current_thread()
 	mut process := current_thread.process
 
-	C.printf(c'\n\e[32m%s\e[m: mmap(0x%llx, 0x%llx, 0x%llx, %d, %lld)\n', process.name.str,
-		addr, length, prot_and_flags, fdnum, offset)
+	C.printf(c'\n\e[32m%s\e[m: mmap(0x%llx, 0x%llx, 0x%llx, %d, %lld)\n', process.name.str, addr, length, prot_and_flags, fdnum, offset)
 	defer {
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
@@ -863,9 +883,7 @@ pub fn syscall_mmap(_ voidptr, addr voidptr, length u64, prot_and_flags u64, fdn
 	if fdnum != -1 {
 		mapping_handle = voidptr(fd.handle)
 	}
-	ret := mmap.mmap(process.pagemap, addr, length, prot, flags, resource_, offset,
-		mapping_handle,
-		retain_mmap_handle, release_mmap_handle) or {
+	ret := mmap.mmap(process.pagemap, addr, length, prot, flags, resource_, offset, mapping_handle, retain_mmap_handle, release_mmap_handle) or {
 		return errno.err, errno.get()
 	}
 

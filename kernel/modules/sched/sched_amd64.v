@@ -95,8 +95,7 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 
 		if unsafe { next_thread == nil } && current_thread.is_in_queue {
 			apic.lapic_eoi()
-			apic.lapic_timer_oneshot(mut cpu_local, scheduler_vector,
-				effective_timeslice(current_thread))
+			apic.lapic_timer_oneshot(mut cpu_local, scheduler_vector, effective_timeslice(current_thread))
 			return
 		}
 		// Past the early return above this thread really is coming off the
@@ -182,7 +181,8 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 		; memory
 	}
 
-	for {}
+	for {
+	}
 }
 
 pub fn enqueue_thread(_thread &proc.Thread, by_signal bool) bool {
@@ -197,9 +197,7 @@ pub fn enqueue_thread(_thread &proc.Thread, by_signal bool) bool {
 	}
 
 	for i := u64(0); i < max_running_threads; i++ {
-		if katomic.cas[&proc.Thread](mut &scheduler_running_queue[i], unsafe { nil },
-			t)
-		{
+		if katomic.cas[&proc.Thread](mut &scheduler_running_queue[i], unsafe { nil }, t) {
 			t.is_in_queue = true
 
 			// Check if any CPU is idle and wake it up
@@ -313,7 +311,8 @@ pub fn dequeue_and_die() {
 	unsafe {
 	}
 	yield(false)
-	for {}
+	for {
+	}
 }
 
 // Give up the rest of this thread's timeslice without leaving the run queue.
@@ -330,26 +329,25 @@ pub fn new_kernel_thread(pc voidptr, arg voidptr, autoenqueue bool) &proc.Thread
 	stack := u64(stack_phys) + stack_size + higher_half
 
 	gpr_state := cpulocal.GPRState{
-		cs:     kernel_code_seg
-		ds:     kernel_data_seg
-		es:     kernel_data_seg
-		ss:     kernel_data_seg
+		cs: kernel_code_seg
+		ds: kernel_data_seg
+		es: kernel_data_seg
+		ss: kernel_data_seg
 		rflags: 0x202
-		rip:    u64(pc)
-		rdi:    u64(arg)
-		rbp:    u64(0)
-		rsp:    stack
+		rip: u64(pc)
+		rdi: u64(arg)
+		rbp: u64(0)
+		rsp: stack
 	}
 
 	mut t := &proc.Thread{
-		process:     kernel_process
-		cr3:         u64(kernel_process.pagemap.top_level)
-		gpr_state:   gpr_state
-		timeslice:   5000
-		running_on:  u64(-1)
-		stacks:      stacks
-		fpu_storage: voidptr(u64(memory.pmm_alloc(lib.div_roundup(fpu_storage_size, page_size))) +
-			higher_half)
+		process: kernel_process
+		cr3: u64(kernel_process.pagemap.top_level)
+		gpr_state: gpr_state
+		timeslice: 5000
+		running_on: u64(-1)
+		stacks: stacks
+		fpu_storage: voidptr(u64(memory.pmm_alloc(lib.div_roundup(fpu_storage_size, page_size))) + higher_half)
 	}
 
 	unsafe { stacks.free() }
@@ -378,8 +376,7 @@ pub fn syscall_new_thread(_ voidptr, pc voidptr, stack u64) (u64, u64) {
 		unsafe { empty_string_array.free() }
 	}
 
-	mut new_thread := new_user_thread(process, false, pc, unsafe { nil }, stack, empty_string_array,
-		empty_string_array, unsafe { nil }, false) or { return errno.err, errno.get() }
+	mut new_thread := new_user_thread(process, false, pc, unsafe { nil }, stack, empty_string_array, empty_string_array, unsafe { nil }, false) or { return errno.err, errno.get() }
 
 	// POSIX threads inherit the creating thread's signal mask, while signal
 	// dispositions are shared by the process. Vinix stores both on Thread, so
@@ -406,16 +403,24 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 	mut stack_vma := u64(0)
 
 	if _stack == 0 {
-		stack_phys := memory.pmm_alloc(stack_size / page_size)
-		stack = unsafe { &u64(u64(stack_phys) + stack_size + higher_half) }
+		mut user_stack_size := stack_size
+		stack_limit := proc.soft_limit(process, proc.rlimit_stack)
+		if stack_limit != proc.rlim_infinity && stack_limit < user_stack_size {
+			user_stack_size = lib.align_down(stack_limit, page_size)
+		}
+		if user_stack_size < page_size {
+			errno.set(errno.enomem)
+			return none
+		}
+		stack_phys := memory.pmm_alloc(user_stack_size / page_size)
+		stack = unsafe { &u64(u64(stack_phys) + user_stack_size + higher_half) }
 
 		stack_vma = process.thread_stack_top
-		process.thread_stack_top -= stack_size
+		process.thread_stack_top -= user_stack_size
 		stack_bottom_vma := process.thread_stack_top
 		process.thread_stack_top -= page_size
 
-		mmap.map_range(mut process.pagemap, stack_bottom_vma, u64(stack_phys), stack_size,
-			mmap.prot_read | mmap.prot_write, mmap.map_anonymous) or { return none }
+		mmap.map_range(mut process.pagemap, stack_bottom_vma, u64(stack_phys), user_stack_size, mmap.prot_read | mmap.prot_write, mmap.map_anonymous) or { return none }
 	} else {
 		stack = &u64(voidptr(_stack))
 		stack_vma = _stack
@@ -430,27 +435,26 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 	pf_stack := u64(pf_stack_phys) + stack_size + higher_half
 
 	gpr_state := cpulocal.GPRState{
-		cs:     user_code_seg
-		ds:     user_data_seg
-		es:     user_data_seg
-		ss:     user_data_seg
+		cs: user_code_seg
+		ds: user_data_seg
+		es: user_data_seg
+		ss: user_data_seg
 		rflags: 0x202
-		rip:    u64(pc)
-		rdi:    u64(arg)
-		rsp:    u64(stack_vma)
+		rip: u64(pc)
+		rdi: u64(arg)
+		rsp: u64(stack_vma)
 	}
 
 	mut t := &proc.Thread{
-		process:      process
-		cr3:          u64(process.pagemap.top_level)
-		gpr_state:    gpr_state
-		timeslice:    5000
-		running_on:   u64(-1)
+		process: process
+		cr3: u64(process.pagemap.top_level)
+		gpr_state: gpr_state
+		timeslice: 5000
+		running_on: u64(-1)
 		kernel_stack: kernel_stack
-		pf_stack:     pf_stack
-		stacks:       stacks
-		fpu_storage:  voidptr(u64(memory.pmm_alloc(lib.div_roundup(fpu_storage_size, page_size))) +
-			higher_half)
+		pf_stack: pf_stack
+		stacks: stacks
+		fpu_storage: voidptr(u64(memory.pmm_alloc(lib.div_roundup(fpu_storage_size, page_size))) + higher_half)
 	}
 
 	t.self = voidptr(t)
@@ -600,6 +604,10 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 }
 
 pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) ?&proc.Process {
+	if unsafe { old_process != nil } && !proc.may_create_process(old_process) {
+		errno.set(errno.eagain)
+		return none
+	}
 	mut new_proc := &proc.Process{
 		pagemap: unsafe { nil }
 	}

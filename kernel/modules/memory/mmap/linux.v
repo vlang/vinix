@@ -110,9 +110,7 @@ pub fn syscall_mremap(_ voidptr, old_address u64, old_size u64, new_size u64, fl
 		destination_offset = source_offset
 	}
 
-	destination := mmap(pagemap, destination_hint, new_length, prot, destination_flags,
-		source_resource, destination_offset, source_handle, source_handle_ref,
-		source_handle_unref) or {
+	destination := mmap_with_credit(pagemap, destination_hint, new_length, prot, destination_flags, source_resource, destination_offset, source_handle, source_handle_ref, source_handle_unref, old_length) or {
 		return errno.err, errno.get()
 	}
 
@@ -140,8 +138,7 @@ fn copy_between_mappings(pagemap &memory.Pagemap, destination u64, source u64, l
 		source_phys := pagemap.virt2phys(source + offset) or { return false }
 		destination_phys := pagemap.virt2phys(destination + offset) or { return false }
 		unsafe {
-			C.memcpy(voidptr(destination_phys + higher_half), voidptr(source_phys + higher_half),
-				page_size)
+			C.memcpy(voidptr(destination_phys + higher_half), voidptr(source_phys + higher_half), page_size)
 		}
 	}
 	return true
@@ -181,7 +178,7 @@ pub fn syscall_mincore(_ voidptr, address u64, length u64, vec u64) (u64, u64) {
 	// pagemap lock dropped: copy_to_user takes that same lock to walk the
 	// caller's tables, and it is not a reentrant one.
 	mut chunk := [mincore_chunk]u8{}
-	for done := u64(0); done < pages; {
+	for done := u64(0); done < pages;  {
 		mut count := pages - done
 		if count > u64(mincore_chunk) {
 			count = u64(mincore_chunk)
@@ -261,9 +258,7 @@ pub fn syscall_brk(_ voidptr, address u64) (u64, u64) {
 		// repeated growth. A single stable reservation also prevents unrelated
 		// mappings from occupying future heap pages.
 		mut pagemap := process.pagemap
-		mmap(pagemap, voidptr(brk_arena_base), brk_arena_size, prot_none,
-			map_anonymous | map_private | map_fixed_noreplace, unsafe { nil }, 0,
-			unsafe { nil }, unsafe { nil }, unsafe { nil }) or {
+		mmap(pagemap, voidptr(brk_arena_base), brk_arena_size, prot_none, map_anonymous | map_private | map_fixed_noreplace | map_brk_reservation, unsafe { nil }, 0, unsafe { nil }, unsafe { nil }, unsafe { nil }) or {
 			return 0, 0
 		}
 		process.brk_base = brk_arena_base
@@ -276,14 +271,23 @@ pub fn syscall_brk(_ voidptr, address u64) (u64, u64) {
 	if address < process.brk_base || address > process.brk_base + brk_arena_size {
 		return process.brk_current, 0
 	}
+	requested_data := address - process.brk_base
+	if !proc.limit_allows(process, proc.rlimit_data, requested_data) {
+		return process.brk_current, 0
+	}
 
 	current_page := lib.align_up(process.brk_current, page_size)
 	wanted_page := lib.align_up(address, page_size)
 
 	if wanted_page > current_page {
+		current_as := address_space_bytes(process.pagemap, process)
+		growth := wanted_page - current_page
+		if growth > u64(-1) - current_as
+			|| !proc.limit_allows(process, proc.rlimit_as, current_as + growth) {
+			return process.brk_current, 0
+		}
 		mut pagemap := process.pagemap
-		mprotect(mut pagemap, voidptr(current_page), wanted_page - current_page,
-			prot_read | prot_write) or {
+		mprotect(mut pagemap, voidptr(current_page), wanted_page - current_page, prot_read | prot_write) or {
 			return process.brk_current, 0
 		}
 	} else if wanted_page < current_page {
