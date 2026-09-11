@@ -752,6 +752,8 @@ set +e
     $ACCEL_FLAGS \
     -m "$QEMU_MEM" \
     -smp 4 \
+    -object rng-random,filename=/dev/urandom,id=vinix-rng \
+    -device virtio-rng-device,rng=vinix-rng \
     -drive if=pflash,format=raw,readonly=on,file="$OVMF" \
     -drive if=pflash,format=raw,file="$OVMF_VARS" \
     -drive format=raw,file="$BOOT_DISK" \
