@@ -209,11 +209,11 @@ hardware-only render test with:
 
 Only "VINIX M1 AGX RENDER TEST: PASS" is proof of native GPU execution: the
 test rejects software/VirGL/fake renderers and validates pixels after glFinish.
-The boot should also report exactly two Vinix CPUs online:
+The boot should also report exactly four Vinix CPUs online:
 
   smp: Discovered CPUs: 8
-  smp: Starting CPUs:   2
-  smp: 2 CPUs online
+  smp: Starting CPUs:   4
+  smp: 4 CPUs online
 
 Use `sudo ~/code/kek.sh desktop-wifi` if the GPU probe prevents the desktop
 from starting; that keeps Wi-Fi and the same desktop image but disables AGX.

@@ -30,8 +30,8 @@
 # from 1 GiB upwards, so anything past --mem=3072 lands above 4 GiB, which is
 # where all of an Apple Silicon machine's RAM lives. 8192 exercises the same
 # high-memory mapping path the M1 takes; the 2048 default keeps boots fast.
-# QEMU supplies two CPUs, and its kernel build enables the Limine MP request
-# needed for Vinix to bring both of them online.
+# QEMU supplies four CPUs, and its kernel build enables the Limine MP request
+# needed for Vinix to bring all of them online.
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -751,7 +751,7 @@ set +e
     -machine virt,gic-version=3 \
     $ACCEL_FLAGS \
     -m "$QEMU_MEM" \
-    -smp 2 \
+    -smp 4 \
     -drive if=pflash,format=raw,readonly=on,file="$OVMF" \
     -drive if=pflash,format=raw,file="$OVMF_VARS" \
     -drive format=raw,file="$BOOT_DISK" \

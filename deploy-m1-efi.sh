@@ -192,7 +192,7 @@ for f in "$KERNEL" "$INITRAMFS" "$LIMINE_EFI" "$LIMINE_CONF"; do
 done
 
 # Starting Apple APs is safe only through the VHE-aware Limine 12.8 path, and
-# the native kernel now deliberately uses two CPUs. Refuse a stale single-core
+# the native kernel now deliberately uses four CPUs. Refuse a stale single-core
 # kernel even if every other deployment input is current.
 SMP_REQUEST_ID=$'\x88\x8b\x4c\xdf\x30\xdd\xb1\xc7\x7b\xf0\x94\xa1\x83\xe8\x82\x0a\x7e\x85\x1b\x9a\x81\x7b\xa6\x95\xe0\x73\x6a\x3b\x72\x1b\xb6\xa0'
 if ! LC_ALL=C grep -aFq "$SMP_REQUEST_ID" "$KERNEL"; then
@@ -200,7 +200,7 @@ if ! LC_ALL=C grep -aFq "$SMP_REQUEST_ID" "$KERNEL"; then
     echo "hint: rebuild with: make -C kernel ARCH=aarch64 CC=clang LIMINE_MP=1" >&2
     exit 1
 fi
-echo "kernel includes Limine MP request (native boot limit: 2 CPUs)"
+echo "kernel includes Limine MP request (native boot limit: 4 CPUs)"
 
 if [ "$ENABLE_APPLE_GPU" -eq 1 ]; then
     echo "APPLE GPU: kernel AGX probe enabled"

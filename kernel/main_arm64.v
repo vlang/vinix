@@ -713,16 +713,16 @@ fn kmain() {
 	print('skipping PCI (ARM64 ECAM setup not implemented)\n')
 
 	// Limine 12.8's VHE-aware trampoline can safely park Apple APs at EL2. Use
-	// two logical CPUs for the first hardware validation while retaining the
-	// existing all-CPU behaviour in virtual machines (currently configured
-	// with two vCPUs). Limine leaves every AP above the limit parked.
+	// four logical CPUs on Apple hardware while retaining the existing all-CPU
+	// behaviour in virtual machines (currently configured with four vCPUs).
+	// Limine leaves every AP above the limit parked.
 	if smp.available() {
 		if use_aic {
-			print('init smp (Apple hardware, 2 CPU limit)...\n')
+			print('init smp (Apple hardware, 4 CPU limit)...\n')
 		} else {
 			print('init smp...\n')
 		}
-		smp.initialise(if use_aic { u64(2) } else { u64(0) })
+		smp.initialise(if use_aic { u64(4) } else { u64(0) })
 		print('smp done\n')
 	} else if use_aic {
 		print('skipping SMP (no bootloader MP response)\n')
