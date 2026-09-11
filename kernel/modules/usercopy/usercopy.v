@@ -42,11 +42,6 @@ fn copy_pagemap(_pagemap &memory.Pagemap, kernel_address voidptr, user_address u
 	}
 
 	mut pagemap := unsafe { _pagemap }
-	pagemap.l.acquire()
-	defer {
-		pagemap.l.release()
-	}
-
 	mut copied := u64(0)
 	for copied < length {
 		address := user_address + copied
@@ -55,17 +50,23 @@ fn copy_pagemap(_pagemap &memory.Pagemap, kernel_address voidptr, user_address u
 		if chunk > length - copied {
 			chunk = length - copied
 		}
-		physical := pagemap.user_page_phys(address, to_user) or { return false }
+		pagemap.l.acquire()
+		physical := pagemap.user_page_phys(address, to_user) or {
+			pagemap.l.release()
+			if to_user && memory.resolve_cow(pagemap, address) {
+				continue
+			}
+			return false
+		}
 		physical_address := physical + page_offset + memory.get_hhdm_offset()
 		unsafe {
 			if to_user {
-				C.memcpy(voidptr(physical_address), voidptr(u64(kernel_address) + copied),
-					chunk)
+				C.memcpy(voidptr(physical_address), voidptr(u64(kernel_address) + copied), chunk)
 			} else {
-				C.memcpy(voidptr(u64(kernel_address) + copied), voidptr(physical_address),
-					chunk)
+				C.memcpy(voidptr(u64(kernel_address) + copied), voidptr(physical_address), chunk)
 			}
 		}
+		pagemap.l.release()
 		copied += chunk
 	}
 	return true

@@ -11,9 +11,17 @@ pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
 	// Permission fault: DFSC = 0b0011xx (0x0C-0x0F)
 	dfsc := esr & 0x3f
 	if dfsc >= 0x0c && dfsc <= 0x0f {
-		// Permission fault — trace details before crashing
 		addr := cpu.read_far_el1()
 		wnr := (esr >> 6) & 1
+		current := proc.current_thread()
+		previous_interrupt_state := cpu.interrupt_toggle(true)
+		resolved := wnr != 0 && addr < higher_half && current != unsafe { nil }
+			&& resolve_cow_fault(current.process.pagemap, addr)
+		cpu.interrupt_toggle(previous_interrupt_state)
+		if resolved {
+			return
+		}
+		// Permission fault — trace details before crashing
 		print('PF_PERM: dfsc=0x')
 		print(dfsc.hex())
 		print(' addr=0x')
@@ -64,8 +72,7 @@ pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
 	if range_local.flags & map_anonymous != 0 {
 		page = memory.pmm_alloc(1)
 	} else {
-		page = range_local.global.resource.mmap(range_local.global.handle, file_page,
-			range_local.flags)
+		page = range_local.global.resource.mmap(range_local.global.handle, file_page, range_local.flags)
 	}
 
 	map_page_in_range(range_local.global, memory_page * page_size, u64(page), range_local.prot) or {

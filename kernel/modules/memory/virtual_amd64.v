@@ -30,7 +30,7 @@ pub fn new_pagemap() &Pagemap {
 		}
 	}
 	return &Pagemap{
-		top_level:   top_level
+		top_level: top_level
 		mmap_ranges: []voidptr{}
 	}
 }
@@ -223,7 +223,10 @@ pub fn (mut pagemap Pagemap) map_page(virt u64, phys u64, flags u64) ? {
 	defer {
 		pagemap.l.release()
 	}
+	pagemap.map_page_unlocked(virt, phys, flags)?
+}
 
+pub fn (mut pagemap Pagemap) map_page_unlocked(virt u64, phys u64, flags u64) ? {
 	pml5_entry := (virt & (u64(0x1ff) << 48)) >> 48
 	pml4_entry := (virt & (u64(0x1ff) << 39)) >> 39
 	pml3_entry := (virt & (u64(0x1ff) << 30)) >> 30
@@ -245,6 +248,10 @@ pub fn (mut pagemap Pagemap) map_page(virt u64, phys u64, flags u64) ? {
 	unsafe {
 		*entry = phys | flags
 	}
+	current_cr3 := cpu.read_cr3()
+	if current_cr3 == u64(pagemap.top_level) {
+		cpu.invlpg(virt)
+	}
 }
 
 @[_linker_section: '.requests']
@@ -253,7 +260,7 @@ __global (
 	volatile paging_mode_req = limine.LiminePagingModeRequest{
 		response: unsafe { nil }
 		revision: 1
-		mode:     limine.limine_paging_mode_x86_64_5lvl
+		mode: limine.limine_paging_mode_x86_64_5lvl
 		max_mode: limine.limine_paging_mode_x86_64_5lvl
 		min_mode: limine.limine_paging_mode_x86_64_4lvl
 	}

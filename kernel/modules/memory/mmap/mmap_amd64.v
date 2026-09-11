@@ -7,6 +7,22 @@ import proc
 
 pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
 	if gpr_state.err & 1 != 0 {
+		// A write-protection fault on a fork-shared private page is the normal
+		// COW path, not a process fault.
+		if gpr_state.err & 2 != 0 {
+			current := proc.current_thread()
+			asm volatile amd64 {
+				sti
+			}
+			resolved := current != unsafe { nil }
+				&& resolve_cow_fault(current.process.pagemap, cpu.read_cr2())
+			asm volatile amd64 {
+				cli
+			}
+			if resolved {
+				return
+			}
+		}
 		// It was a protection violation, crash
 		return none
 	}
@@ -41,8 +57,7 @@ pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
 	if range_local.flags & map_anonymous != 0 {
 		page = memory.pmm_alloc(1)
 	} else {
-		page = range_local.global.resource.mmap(range_local.global.handle, file_page,
-			range_local.flags)
+		page = range_local.global.resource.mmap(range_local.global.handle, file_page, range_local.flags)
 	}
 
 	map_page_in_range(range_local.global, memory_page * page_size, u64(page), range_local.prot) or {

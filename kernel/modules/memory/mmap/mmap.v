@@ -67,6 +67,7 @@ pub mut:
 	offset  i64
 	prot    int
 	flags   int
+	cow     bool
 }
 
 pub struct MmapRangeGlobal {
@@ -263,8 +264,17 @@ pub fn delete_pagemap(mut pagemap memory.Pagemap) ? {
 }
 
 pub fn fork_pagemap(_old_pagemap &memory.Pagemap) ?&memory.Pagemap {
+	memory.register_cow_resolver(resolve_cow_fault)
 	mut old_pagemap := unsafe { _old_pagemap }
 	mut new_pagemap := memory.new_pagemap()
+	mut old_private_globals := []voidptr{}
+	mut new_private_globals := []&MmapRangeGlobal{}
+	defer {
+		unsafe {
+			old_private_globals.free()
+			new_private_globals.free()
+		}
+	}
 
 	old_pagemap.l.acquire()
 	defer {
@@ -272,7 +282,7 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap) ?&memory.Pagemap {
 	}
 
 	for ptr in old_pagemap.mmap_ranges {
-		local_range := unsafe { &MmapRangeLocal(ptr) }
+		mut local_range := unsafe { &MmapRangeLocal(ptr) }
 		mut global_range := local_range.global
 
 		mut new_local_range := &MmapRangeLocal{
@@ -294,46 +304,59 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap) ?&memory.Pagemap {
 				}
 			}
 		} else {
-			mut new_global_range := &MmapRangeGlobal{
-				resource: unsafe { nil }
-				shadow_pagemap: memory.Pagemap{
-					top_level: unsafe { &u64(0) }
+			// Private resident pages start shared and read-only in both address
+			// spaces.  Their original writable protection remains in the range;
+			// the write-fault path uses it to distinguish COW from a real fault.
+			local_range.cow = true
+			new_local_range.cow = true
+			mut new_global_range := &MmapRangeGlobal(unsafe { nil })
+			global_index := old_private_globals.index(voidptr(global_range))
+			if global_index >= 0 {
+				new_global_range = new_private_globals[global_index]
+			} else {
+				new_global_range = &MmapRangeGlobal{
+					resource: global_range.resource
+					handle: global_range.handle
+					handle_ref: global_range.handle_ref
+					handle_unref: global_range.handle_unref
+					base: global_range.base
+					length: global_range.length
+					offset: global_range.offset
+					pte_extra: global_range.pte_extra
+					locals: []&MmapRangeLocal{}
+					shadow_pagemap: memory.Pagemap{
+						top_level: unsafe { &u64(0) }
+					}
 				}
+				new_global_range.shadow_pagemap.top_level = &u64(memory.pmm_alloc(1))
+				if new_global_range.handle != unsafe { nil }
+					&& new_global_range.handle_ref != unsafe { nil } {
+					new_global_range.handle_ref(new_global_range.handle)
+				}
+				old_private_globals << voidptr(global_range)
+				new_private_globals << new_global_range
 			}
-
-			new_global_range.resource = global_range.resource
-			new_global_range.handle = global_range.handle
-			new_global_range.handle_ref = global_range.handle_ref
-			new_global_range.handle_unref = global_range.handle_unref
-			new_global_range.base = global_range.base
-			new_global_range.length = global_range.length
-			new_global_range.offset = global_range.offset
-			new_global_range.pte_extra = global_range.pte_extra
-
 			new_local_range.global = new_global_range
-
-			new_global_range.locals = []&MmapRangeLocal{}
 			new_global_range.locals << new_local_range
-
-			new_global_range.shadow_pagemap.top_level = &u64(memory.pmm_alloc(1))
-			if new_global_range.handle != unsafe { nil }
-				&& new_global_range.handle_ref != unsafe { nil } {
-				new_global_range.handle_ref(new_global_range.handle)
-			}
 
 			for i := local_range.base; i < local_range.base + local_range.length; i += page_size {
 				old_pte := old_pagemap.virt2pte(i, false) or { continue }
 				if unsafe { *old_pte } & 1 == 0 {
 					continue
 				}
+				phys := unsafe { *old_pte } & memory.pte_flags_mask
+				if !memory.pmm_retain(voidptr(phys), 1) {
+					return none
+				}
 				new_pte := new_pagemap.virt2pte(i, true) or { return none }
 				new_spte := new_global_range.shadow_pagemap.virt2pte(i, true) or { return none }
-				page := memory.pmm_alloc_nozero(1)
 				unsafe {
-					C.memcpy(voidptr(u64(page) + higher_half), voidptr((*old_pte & memory.pte_flags_mask) + higher_half), page_size)
-					*new_pte = (*old_pte & ~memory.pte_flags_mask) | u64(page)
+					*new_pte = *old_pte
 					*new_spte = *new_pte
 				}
+				cow_flags := page_table_flags(local_range.prot, global_range.pte_extra, false)
+				old_pagemap.flag_page(i, cow_flags) or { return none }
+				new_pagemap.flag_page(i, cow_flags) or { return none }
 			}
 		}
 
@@ -341,6 +364,20 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap) ?&memory.Pagemap {
 	}
 
 	return new_pagemap
+}
+
+fn page_table_flags(prot int, extra u64, writable bool) u64 {
+	mut flags := memory.pte_present | extra
+	if prot != prot_none {
+		flags |= memory.pte_user
+	}
+	if writable && prot & prot_write != 0 {
+		flags |= memory.pte_writable
+	}
+	if prot & prot_exec == 0 {
+		flags |= memory.pte_noexec
+	}
+	return flags
 }
 
 pub fn map_page_in_range(_g &MmapRangeGlobal, virt_addr u64, phys_addr u64, prot int) ? {
@@ -353,16 +390,7 @@ pub fn map_page_in_range(_g &MmapRangeGlobal, virt_addr u64, phys_addr u64, prot
 	// Process pagemap: PROT_NONE → no pte_user (EL0 cannot access).
 	// Page remains valid (EL1 can still access) so flag_page can
 	// extract the physical address later if mprotect restores access.
-	mut pt_flags := memory.pte_present | g.pte_extra
-	if prot != prot_none {
-		pt_flags |= memory.pte_user
-	}
-	if prot & prot_write != 0 {
-		pt_flags |= memory.pte_writable
-	}
-	if prot & prot_exec == 0 {
-		pt_flags |= memory.pte_noexec
-	}
+	pt_flags := page_table_flags(prot, g.pte_extra, true)
 
 	for i := u64(0); i < g.locals.len; i++ {
 		mut l := g.locals[i]
@@ -371,6 +399,47 @@ pub fn map_page_in_range(_g &MmapRangeGlobal, virt_addr u64, phys_addr u64, prot
 		}
 		l.pagemap.map_page(virt_addr, phys_addr, pt_flags) or { return none }
 	}
+}
+
+// Resolve a write to a private page shared by fork().  A range retains its
+// requested PROT_WRITE bit while its PTE is read-only, so no software-only PTE
+// bit is needed and both architectures use exactly the same state machine.
+pub fn resolve_cow_fault(_pagemap &memory.Pagemap, address u64) bool {
+	mut pagemap := unsafe { _pagemap }
+	virt := lib.align_down(address, page_size)
+	pagemap.l.acquire()
+	defer { pagemap.l.release() }
+
+	mut local_range, _, _ := addr2range(pagemap, virt) or { return false }
+	if !local_range.cow || local_range.flags & map_shared != 0
+		|| local_range.prot & prot_write == 0 {
+		return false
+	}
+	old_phys := pagemap.virt2phys(virt) or { return false }
+	flags := page_table_flags(local_range.prot, local_range.global.pte_extra, true)
+	if memory.pmm_refcount(voidptr(old_phys)) <= 1 {
+		pagemap.flag_page(virt, flags) or { return false }
+		return true
+	}
+
+	new_page := memory.pmm_alloc_nozero_fallible(1)
+	if new_page == unsafe { nil } {
+		return false
+	}
+	unsafe {
+		C.memcpy(voidptr(u64(new_page) + higher_half), voidptr(old_phys + higher_half), page_size)
+	}
+	shadow_flags := memory.pte_present | memory.pte_writable | memory.pte_noexec
+	local_range.global.shadow_pagemap.map_page(virt, u64(new_page), shadow_flags) or {
+		memory.pmm_free(new_page, 1)
+		return false
+	}
+	pagemap.map_page_unlocked(virt, u64(new_page), flags) or {
+		memory.pmm_free(new_page, 1)
+		return false
+	}
+	memory.pmm_free(voidptr(old_phys), 1)
+	return true
 }
 
 pub fn map_range(mut pagemap memory.Pagemap, _virt_addr u64, phys_addr u64, _length u64, prot int, _flags int) ? {
@@ -793,6 +862,7 @@ pub fn mprotect_unlocked(mut pagemap memory.Pagemap, addr voidptr, _length u64, 
 				offset: local_range.offset + i64(snip_end - local_range.base)
 				prot: local_range.prot
 				flags: local_range.flags
+				cow: local_range.cow
 				global: local_range.global
 			}
 			global_range.locals << postsplit_range
@@ -801,16 +871,12 @@ pub fn mprotect_unlocked(mut pagemap memory.Pagemap, addr voidptr, _length u64, 
 		}
 
 		for j := snip_begin; j < snip_end; j += page_size {
-			mut pt_flags := memory.pte_present | global_range.pte_extra
-			if prot != prot_none {
-				pt_flags |= memory.pte_user
+			mut writable := true
+			if local_range.cow && prot & prot_write != 0 {
+				phys := pagemap.virt2phys(j) or { u64(0) }
+				writable = phys == 0 || memory.pmm_refcount(voidptr(phys)) <= 1
 			}
-			if prot & prot_write != 0 {
-				pt_flags |= memory.pte_writable
-			}
-			if prot & prot_exec == 0 {
-				pt_flags |= memory.pte_noexec
-			}
+			pt_flags := page_table_flags(prot, global_range.pte_extra, writable)
 			pagemap.flag_page(j, pt_flags) or {}
 		}
 
@@ -832,6 +898,7 @@ pub fn mprotect_unlocked(mut pagemap memory.Pagemap, addr voidptr, _length u64, 
 				offset: new_offset
 				prot: prot
 				flags: local_range.flags
+				cow: local_range.cow
 				global: local_range.global
 			}
 			global_range.locals << new_range
@@ -886,6 +953,7 @@ pub fn munmap_unlocked(mut pagemap memory.Pagemap, addr voidptr, _length u64) ? 
 				offset: local_range.offset + i64(snip_end - local_range.base)
 				prot: local_range.prot
 				flags: local_range.flags
+				cow: local_range.cow
 				global: local_range.global
 			}
 			global_range.locals << postsplit_range

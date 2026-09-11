@@ -11,6 +11,9 @@ __global (
 	pmm_bitmap          = unsafe { nil }
 	pmm_bitmap_phys     = u64(0)
 	pmm_bitmap_size     = u64(0)
+	pmm_refcounts       = unsafe { nil }
+	pmm_refcounts_phys  = u64(0)
+	pmm_refcounts_size  = u64(0)
 	pmm_avl_page_count  = u64(0)
 	pmm_last_used_index = u64(0)
 	free_pages          = u64(0)
@@ -118,8 +121,7 @@ pub fn pmm_init() {
 
 		// Calculate how big the memory map needs to be.
 		for i := 0; i < memmap.entry_count; i++ {
-			C.printf(c'pmm: Memory map entry %d: 0x%llx->0x%llx  0x%llx\n', i, entries[i].base,
-				entries[i].length, entries[i].@type)
+			C.printf(c'pmm: Memory map entry %d: 0x%llx->0x%llx  0x%llx\n', i, entries[i].base, entries[i].length, entries[i].@type)
 
 			// Size PMM strictly from usable RAM. Including non-usable high
 			// regions (e.g. firmware reclaimable areas at large addresses)
@@ -143,6 +145,8 @@ pub fn pmm_init() {
 		// under-size the bitmap by a page after alignment (e.g. 32769 pages).
 		pmm_avl_page_count = lib.div_roundup(highest_address, page_size)
 		bitmap_size := lib.align_up(lib.div_roundup(pmm_avl_page_count, 8), page_size)
+		refcounts_size := lib.align_up(pmm_avl_page_count * sizeof(u32), page_size)
+		metadata_size := bitmap_size + refcounts_size
 
 		C.printf(c'pmm: Bitmap size: %llu\n', bitmap_size)
 
@@ -158,13 +162,17 @@ pub fn pmm_init() {
 			if entries[i].@type != u32(limine.limine_memmap_usable) {
 				continue
 			}
-			if entries[i].length >= bitmap_size {
+			if entries[i].length >= metadata_size {
 				pmm_bitmap_phys = entries[i].base
 				pmm_bitmap_size = bitmap_size
 				pmm_bitmap = voidptr(pmm_bitmap_phys + higher_half)
+				pmm_refcounts_phys = pmm_bitmap_phys + bitmap_size
+				pmm_refcounts_size = refcounts_size
+				pmm_refcounts = voidptr(pmm_refcounts_phys + higher_half)
 
 				// Initialise entire bitmap to 1 (non-free)
 				C.memset(pmm_bitmap, 0xff, bitmap_size)
+				C.memset(pmm_refcounts, 0, refcounts_size)
 				break
 			}
 		}
@@ -192,8 +200,10 @@ pub fn pmm_init() {
 
 		// The bitmap occupies the head of a usable entry; take those pages
 		// back so they are never handed out.
-		for j := u64(0); j < pmm_bitmap_size; j += page_size {
-			lib.bitset(pmm_bitmap, (pmm_bitmap_phys + j) / page_size)
+		for j := u64(0); j < pmm_bitmap_size + pmm_refcounts_size; j += page_size {
+			page_index := (pmm_bitmap_phys + j) / page_size
+			lib.bitset(pmm_bitmap, page_index)
+			(&u32(pmm_refcounts))[page_index] = 1
 			free_pages--
 		}
 	}
@@ -241,6 +251,7 @@ fn inner_alloc(count u64, limit u64) voidptr {
 				page := pmm_last_used_index - count
 				for i := page; i < pmm_last_used_index; i++ {
 					lib.bitset(pmm_bitmap, i)
+					unsafe { (&u32(pmm_refcounts))[i] = 1 }
 				}
 				return voidptr(page * page_size)
 			}
@@ -383,21 +394,66 @@ pub fn pmm_alloc_aligned_fallible(count u64, alignment_pages u64) voidptr {
 }
 
 pub fn pmm_free(ptr voidptr, count u64) {
+	page := u64(ptr) / page_size
+	if count == 0 || page >= pmm_avl_page_count || count > pmm_avl_page_count - page {
+		return
+	}
 	pmm_lock.acquire()
 	defer {
 		pmm_lock.release()
 	}
-	unsafe {
-		mut p := &u64(u64(ptr) + higher_half)
-		for i := u64(0); i < (count * page_size) / 8; i++ {
-			p[i] = 0xaaaaaaaaaaaaaaaa
+	for i := page; i < page + count; i++ {
+		mut refs := unsafe { &u32(pmm_refcounts) }
+		if unsafe { refs[i] } > 1 {
+			unsafe { refs[i]-- }
+			continue
+		}
+		if unsafe { refs[i] } == 0 {
+			continue
+		}
+		unsafe {
+			mut words := &u64(i * page_size + higher_half)
+			for word := u64(0); word < page_size / 8; word++ {
+				words[word] = 0xaaaaaaaaaaaaaaaa
+			}
+			refs[i] = 0
+		}
+		lib.bitreset(pmm_bitmap, i)
+		free_pages++
+	}
+}
+
+// Retain physical pages which are installed into another private address
+// space by fork.  The bitmap and reference array share pmm_lock, so a final
+// unmap cannot return a page while fork is taking its reference.
+pub fn pmm_retain(ptr voidptr, count u64) bool {
+	page := u64(ptr) / page_size
+	if page >= pmm_avl_page_count || count > pmm_avl_page_count - page {
+		return false
+	}
+	pmm_lock.acquire()
+	defer { pmm_lock.release() }
+	mut refs := unsafe { &u32(pmm_refcounts) }
+	for i := page; i < page + count; i++ {
+		if !lib.bittest(pmm_bitmap, i) || unsafe { refs[i] } == 0
+			|| unsafe { refs[i] } == u32(-1) {
+			return false
 		}
 	}
-	page := u64(ptr) / page_size
 	for i := page; i < page + count; i++ {
-		lib.bitreset(pmm_bitmap, i)
+		unsafe { refs[i]++ }
 	}
-	free_pages += count
+	return true
+}
+
+pub fn pmm_refcount(ptr voidptr) u32 {
+	page := u64(ptr) / page_size
+	if page >= pmm_avl_page_count {
+		return 0
+	}
+	pmm_lock.acquire()
+	defer { pmm_lock.release() }
+	return unsafe { (&u32(pmm_refcounts))[page] }
 }
 
 __global (

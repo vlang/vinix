@@ -6,10 +6,15 @@ import limine
 import klock
 
 fn C.text_start()
+
 fn C.text_end()
+
 fn C.rodata_start()
+
 fn C.rodata_end()
+
 fn C.data_start()
+
 fn C.data_end()
 
 // Portable PTE flags. Callers use these consistently; arch-specific
@@ -25,7 +30,19 @@ __global (
 	page_size       = u64(0x1000)
 	kernel_pagemap  Pagemap
 	vmm_initialised = bool(false)
+	cow_resolver    fn (&Pagemap, u64) bool
 )
+
+pub fn register_cow_resolver(resolver fn (&Pagemap, u64) bool) {
+	cow_resolver = resolver
+}
+
+pub fn resolve_cow(pagemap &Pagemap, address u64) bool {
+	if cow_resolver == unsafe { nil } {
+		return false
+	}
+	return cow_resolver(pagemap, address)
+}
 
 pub struct Pagemap {
 pub mut:
@@ -39,7 +56,7 @@ fn C.get_kernel_end_addr() u64
 @[_linker_section: '.requests']
 @[cinit]
 __global (
-	volatile kaddr_req  = limine.LimineKernelAddressRequest{
+	volatile kaddr_req = limine.LimineKernelAddressRequest{
 		response: unsafe { nil }
 	}
 	volatile memmap_req = limine.LimineMemmapRequest{

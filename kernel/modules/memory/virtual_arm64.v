@@ -162,7 +162,6 @@ pub fn (mut pagemap Pagemap) unmap_page(virt u64) ? {
 // avoids recursively acquiring the non-recursive pagemap lock from munmap(),
 // which serializes a complete range before tearing it down.
 pub fn (mut pagemap Pagemap) unmap_page_unlocked(virt u64) ? {
-
 	l0_entry := (virt & (u64(0x1ff) << 39)) >> 39
 	l1_entry := (virt & (u64(0x1ff) << 30)) >> 30
 	l2_entry := (virt & (u64(0x1ff) << 21)) >> 21
@@ -282,7 +281,10 @@ pub fn (mut pagemap Pagemap) map_page(virt u64, phys u64, flags u64) ? {
 	defer {
 		pagemap.l.release()
 	}
+	pagemap.map_page_unlocked(virt, phys, flags)?
+}
 
+pub fn (mut pagemap Pagemap) map_page_unlocked(virt u64, phys u64, flags u64) ? {
 	l0_entry := (virt & (u64(0x1ff) << 39)) >> 39
 	l1_entry := (virt & (u64(0x1ff) << 30)) >> 30
 	l2_entry := (virt & (u64(0x1ff) << 21)) >> 21
