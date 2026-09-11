@@ -9,4 +9,4 @@ echo "Alpine busybox: $(/bin/busybox | /bin/busybox head -n 1)"
 echo "Machine: $(/bin/uname -m)"
 echo "Shell arithmetic: $((20 + 26))"
 
-exec /bin/sh
+exec /bin/zsh -l

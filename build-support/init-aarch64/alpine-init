@@ -13,4 +13,4 @@ export LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules
 export LIBGL_DRIVERS_PATH=/usr/lib/xorg/modules/dri:/usr/lib/dri
 export SSL_CA_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
 
-exec /bin/sh -l
+exec /bin/zsh -l

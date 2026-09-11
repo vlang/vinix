@@ -40,6 +40,7 @@ on real hardware.
 
 - [x] Alpine Linux/musl userland
 - [x] bash
+- [x] zsh + Oh My Zsh
 - [x] gcc/g++
 - [x] V
 - [x] nano
@@ -99,6 +100,17 @@ the guest image:
 
 ```bash
 VINIX_ALPINE_DEVTOOLS=1 make all
+```
+
+### Zsh and Oh My Zsh
+
+Both Alpine userland images include Zsh and a pinned, local Oh My Zsh
+installation at `/root/.oh-my-zsh`. Vinix boots into a Zsh login shell, and
+the root `.zshrc` loads the bundled `robbyrussell` theme without guest network
+access. Run the following inside Vinix to verify the shell setup:
+
+```sh
+/root/zsh-smoke.sh
 ```
 
 Port maintainers can still build the historical source-based mlibc distro

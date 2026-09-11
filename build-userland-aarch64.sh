@@ -167,6 +167,10 @@ else
     rm -f "$DEVTOOLS_ARCHIVE"
 fi
 
+echo "==> Staging Zsh and Oh My Zsh..."
+stage_alpine_packages "$STAGING" zsh
+"$SCRIPT_DIR/build-support/stage-oh-my-zsh.sh" "$STAGING" "$DOWNLOADS"
+
 # Vinix starts /sbin/init directly. Keep the base userland entirely Alpine:
 # this shell script is interpreted by Alpine's stock /bin/busybox.
 rm -f "$STAGING/sbin/init"

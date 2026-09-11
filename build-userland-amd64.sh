@@ -75,8 +75,10 @@ stage_alpine_packages() {
         fi
         echo "    extracting $filename"
         # APK signatures, metadata, and payload are concatenated tar streams.
-        # bsdtar can report the trailing stream after extracting the payload.
-        tar -ixzf "$package_archive" -C "$STAGING" 2>/dev/null || true
+        # Extract the payload stream; BSD tar can report the trailing stream
+        # after it has done so. Its short -i option is not portable here: it
+        # can leave the payload unextracted on macOS.
+        tar -xzf "$package_archive" -C "$STAGING" 2>/dev/null || true
         rm -f "$STAGING/.PKGINFO" "$STAGING/.SIGN"* \
             "$STAGING/.trigger"* "$STAGING/.pre-"* "$STAGING/.post-"*
     done < "$BUILD_DIR/packages"
@@ -109,6 +111,10 @@ else
     echo "==> Skipping guest development tools (VINIX_ALPINE_DEVTOOLS=0)"
     : > "$BUILD_DIR/packages"
 fi
+
+echo "==> Staging Zsh and Oh My Zsh..."
+stage_alpine_packages zsh
+"$SCRIPT_DIR/build-support/stage-oh-my-zsh.sh" "$STAGING" "$DOWNLOADS"
 
 # Vinix starts /sbin/init itself. Use Alpine's unmodified /bin/busybox through
 # its normal /bin/sh applet and leave an interactive shell after the smoke
