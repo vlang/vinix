@@ -43,9 +43,10 @@ Do not enable EXT2 mmap merely because this cache exists: these are physical
 backing pages and can contain bytes from different inodes and metadata.
 
 The cache uses the existing kernel lock across backing I/O. Its current ATA
-consumer polls completion and copies through its own DMA buffer. Before using
-other backends, verify buffer/DMA constraints and that completion does not require
-interrupts disabled by that lock; an interrupt-dependent backend needs a
+consumer polls completion. Cache misses and writeback retain the old EXT2
+adapter's physically contiguous, page-aligned PMM bounce buffers, releasing them
+on both success and failure. Before using interrupt-dependent backends, verify
+that completion does not require interrupts disabled by that lock; an interrupt-dependent backend needs a
 sleepable lock/explicit in-flight page state. Direct raw-device access outside
 EXT2 is not coherent with this cache, and must not modify a mounted filesystem.
 The existing EXT2 allocator, resize/truncate and concurrent metadata-update
