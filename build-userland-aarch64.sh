@@ -118,8 +118,10 @@ stage_alpine_packages() {
         fi
         echo "    extracting $filename"
         # APK signatures, metadata, and payload are concatenated tar streams.
-        # bsdtar can report the trailing stream after extracting the payload.
-        tar -ixzf "$package_archive" -C "$destination" 2>/dev/null || true
+        # bsdtar extracts the payload but can report the trailing stream. Do
+        # not use its short -i option here: unlike GNU tar's --ignore-zeros,
+        # that option can leave the payload unextracted on macOS.
+        tar -xzf "$package_archive" -C "$destination" 2>/dev/null || true
         rm -f "$destination/.PKGINFO" "$destination/.SIGN"* \
             "$destination/.trigger"* "$destination/.pre-"* "$destination/.post-"*
     done < "$BUILD_DIR/packages"
