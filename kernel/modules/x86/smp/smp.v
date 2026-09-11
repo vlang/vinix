@@ -55,6 +55,11 @@ pub fn initialise() {
 		for katomic.load(&cpu_local.online) == 0 {}
 	}
 
+	// All GS/TPIDR CPU numbers are now installed; publish cache readiness.
+	memory.heap_enable_cpu_caches(u64(cpu_locals.len))
+	$if heap_benchmark ? {
+		memory.heap_benchmark()
+	}
 	smp_ready = true
 
 	print('smp: All CPUs online!\n')

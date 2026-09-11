@@ -13,5 +13,6 @@ typedef struct __file FILE;
 int printf(const char *restrict format, ...);
 int fprintf(FILE *restrict stream, const char *restrict format, ...);
 int printf_panic(const char *restrict format, ...);
+int printf_benchmark(const char *restrict format, ...);
 
 #endif

@@ -88,6 +88,8 @@ pub fn initialise(max_cpus u64) {
 		logical_cpu++
 	}
 
+	// All GS/TPIDR CPU numbers are now installed; publish cache readiness.
+	memory.heap_enable_cpu_caches(u64(cpu_locals.len))
 	smp_ready = true
 
 	println('smp: ${logical_cpu} CPUs online')
