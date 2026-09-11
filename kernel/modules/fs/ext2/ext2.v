@@ -8,6 +8,8 @@ import event
 import event.eventstruct
 import memory
 import fs as vfs
+import pagecache
+import katomic
 
 @[packed]
 struct EXT2Superblock {
@@ -129,7 +131,12 @@ fn (mut this EXT2Resource) ioctl(handle voidptr, request u64, argp voidptr) ?int
 }
 
 fn (mut this EXT2Resource) unref(handle voidptr) ? {
-	this.refcount--
+	if !katomic.dec(mut &this.refcount) {
+		// No periodic flusher exists yet. Last-close writeback prevents quiet
+		// files from remaining dirty indefinitely. Failure leaves pages dirty;
+		// callers requiring an observable durability result must use fsync.
+		this.sync(handle) or { return none }
+	}
 }
 
 fn (mut this EXT2Resource) link(_handle voidptr) ? {
@@ -177,6 +184,7 @@ pub mut:
 	bgd_cnt    u64
 
 	backing_device &vfs.VFSNode
+	cache          &pagecache.Cache = unsafe { nil }
 }
 
 fn (mut this EXT2Filesystem) populate(node &vfs.VFSNode) {
@@ -249,6 +257,7 @@ fn (mut bro EXT2Filesystem) instantiate() &vfs.FileSystem {
 		backing_device: bro.backing_device
 		superblock:     bro.superblock
 		root_inode:     bro.root_inode
+		cache:          bro.cache
 	}
 
 	this.block_size = 1024 << this.superblock.block_size
@@ -908,80 +917,29 @@ fn (mut inode EXT2Inode) write_entry(mut filesystem EXT2Filesystem, inode_index 
 	return 0
 }
 
-fn (mut filesystem EXT2Filesystem) raw_device_read(buf voidptr, loc u64, count u64) ?i64 {
-	lba_size := u64(filesystem.backing_device.resource.stat.blksize)
-
-	mut alignment := u64(0)
-	if (loc & (lba_size - 1)) + count > lba_size {
-		alignment = 0
-	}
-
-	lba_start := u64(loc / lba_size)
-	lba_cnt := u64(lib.div_roundup(count, lba_size) + alignment)
-
-	buffer := voidptr(u64(memory.pmm_alloc(lib.div_roundup(lba_cnt * lba_size, page_size))) +
-		higher_half)
-
-	filesystem.backing_device.resource.read(0, buffer, lba_start * lba_size, lba_cnt * lba_size) or {
-		print('ext2: unable to read from device\n')
-		return none
-	}
-
-	lba_offset := loc % lba_size
-
-	unsafe { C.memcpy(buf, voidptr(u64(buffer) + lba_offset), count) }
-
-	memory.pmm_free(voidptr(u64(buffer) - higher_half), lib.div_roundup(lba_cnt * lba_size,
-		page_size))
-
-	return i64(count)
-}
-
-fn (mut filesystem EXT2Filesystem) raw_device_write(buf voidptr, loc u64, count u64) ?i64 {
-	lba_size := u64(filesystem.backing_device.resource.stat.blksize)
-
-	mut alignment := u64(0)
-	if (loc & (lba_size - 1)) + count > lba_size {
-		alignment = 0
-	}
-
-	lba_start := u64(loc / lba_size)
-	lba_cnt := u64(lib.div_roundup(count, lba_size) + alignment)
-
-	buffer := voidptr(u64(memory.pmm_alloc(lib.div_roundup(lba_cnt * lba_size, page_size))) +
-		higher_half)
-
-	filesystem.backing_device.resource.read(0, buffer, lba_start * lba_size, lba_cnt * lba_size) or {
-		print('ext2: unable to write from device\n')
-		return none
-	}
-
-	lba_offset := loc % lba_size
-
-	unsafe { C.memcpy(voidptr(u64(buffer) + lba_offset), buf, count) }
-
-	filesystem.backing_device.resource.write(0, buffer, lba_start * lba_size, lba_cnt * lba_size) or {
-		print('ext2: unable to read from device\n')
-		return none
-	}
-
-	memory.pmm_free(voidptr(u64(buffer) - higher_half), lib.div_roundup(lba_cnt * lba_size,
-		page_size))
-
-	return i64(count)
-}
-
 pub fn ext2_init(backing_device &vfs.VFSNode) (&EXT2Filesystem, bool) {
+	sector_size := u64(backing_device.resource.stat.blksize)
+	if sector_size == 0 || sector_size > pagecache.page_bytes
+		|| pagecache.page_bytes % sector_size != 0 || backing_device.resource.stat.size < 2048
+		|| u64(backing_device.resource.stat.size) % sector_size != 0 {
+		return 0, false
+	}
 	mut new_filesystem := &EXT2Filesystem{
 		backing_device: unsafe { backing_device }
 		superblock:     &EXT2Superblock{}
 		root_inode:     &EXT2Inode{}
+		cache:          &pagecache.Cache{}
 	}
 
-	new_filesystem.raw_device_read(new_filesystem.superblock, u64(backing_device.resource.stat.blksize) * 2,
-		sizeof(EXT2Superblock)) or { return 0, false }
+	// The EXT2 superblock is at byte 1024, regardless of device sector size.
+	new_filesystem.raw_device_read(new_filesystem.superblock, 1024,
+		sizeof(EXT2Superblock)) or {
+		new_filesystem.cache.release(voidptr(backing_device.resource), device_write) or {}
+		return 0, false
+	}
 
 	if new_filesystem.superblock.signature != 0xef53 {
+		new_filesystem.cache.release(voidptr(backing_device.resource), device_write) or {}
 		return 0, false
 	}
 
