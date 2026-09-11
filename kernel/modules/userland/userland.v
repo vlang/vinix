@@ -19,6 +19,7 @@ import strings
 import resource
 import term
 import usercopy
+import stat
 
 pub const wnohang = 1
 
@@ -660,6 +661,11 @@ pub fn syscall_fork(gpr_state &cpulocal.GPRState) (u64, u64) {
 
 pub fn start_program(execve bool, dir &fs.VFSNode, path string, argv []string, envp []string, stdin string, stdout string, stderr string) ?&proc.Process {
 	prog_node := fs.get_node(dir, path, true)?
+	if !stat.isreg(prog_node.resource.stat.mode)
+		|| !fs.check_access(prog_node, fs.access_exec, true) {
+		errno.set(errno.eacces)
+		return none
+	}
 	mut prog := prog_node.resource
 
 	mut new_pagemap := memory.new_pagemap()
@@ -692,6 +698,11 @@ pub fn start_program(execve bool, dir &fs.VFSNode, path string, argv []string, e
 		entry_point = voidptr(auxval.at_entry)
 	} else {
 		ld_node := fs.get_node(vfs_root, ld_path, true)?
+		if !stat.isreg(ld_node.resource.stat.mode)
+			|| !fs.check_access(ld_node, fs.access_exec, true) {
+			errno.set(errno.eacces)
+			return none
+		}
 		ld := ld_node.resource
 
 		ld_auxval, interp := elf.load(new_pagemap, ld, elf.interpreter_load_base()) or {
@@ -731,6 +742,7 @@ pub fn start_program(execve bool, dir &fs.VFSNode, path string, argv []string, e
 			resource: stdout_node.resource
 			node:     stdout_node
 			refcount: 1
+			flags:    resource.o_wronly
 		}
 		stdout_fd := &file.FD{
 			handle: stdout_handle
@@ -742,6 +754,7 @@ pub fn start_program(execve bool, dir &fs.VFSNode, path string, argv []string, e
 			resource: stderr_node.resource
 			node:     stderr_node
 			refcount: 1
+			flags:    resource.o_wronly
 		}
 		stderr_fd := &file.FD{
 			handle: stderr_handle

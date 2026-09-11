@@ -86,6 +86,8 @@ pub mut:
 	sgid   u32
 	groups []u32
 	rlimits [rlimit_nlimits]RLimit
+	// Creation mask inherited across fork and preserved by exec.
+	umask u32 = 0o22
 
 	// The controlling terminal's session, from setsid(2). A process is a
 	// session leader when sid == pid.

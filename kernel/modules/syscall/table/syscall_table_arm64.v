@@ -749,10 +749,6 @@ fn syscall_linux_recvfrom(gpr_state voidptr, fdnum int, buf voidptr, len u64, fl
 		unsafe { &u32(addrlen) })
 }
 
-fn syscall_linux_umask(_ voidptr, _mask int) (u64, u64) {
-	return 0o22, 0
-}
-
 fn syscall_linux_sched_yield(_ voidptr) (u64, u64) {
 	// yield(false) is the dying-thread path and never returns to the caller;
 	// giving up the timeslice while staying runnable is what is wanted here.
@@ -1136,7 +1132,7 @@ pub fn init_syscall_table() {
 	syscall_table[163] = voidptr(syscall_linux_getrlimit) // __NR_getrlimit
 	syscall_table[164] = voidptr(syscall_linux_setrlimit) // __NR_setrlimit
 	syscall_table[169] = voidptr(sys.syscall_gettimeofday) // __NR_gettimeofday
-	syscall_table[166] = voidptr(syscall_linux_umask) // __NR_umask
+	syscall_table[166] = voidptr(fs.syscall_umask) // __NR_umask
 	syscall_table[172] = voidptr(userland.syscall_getpid) // __NR_getpid
 	syscall_table[173] = voidptr(userland.syscall_getppid) // __NR_getppid
 	// 143 is setregid and 147 is setresuid. The table used to put setregid at

@@ -10,6 +10,7 @@ import memory
 import fs as vfs
 import pagecache
 import katomic
+import time
 
 @[packed]
 struct EXT2Superblock {
@@ -212,7 +213,7 @@ fn (mut this EXT2Filesystem) populate(node &vfs.VFSNode) {
 		mut inode := &EXT2Inode{}
 		inode.read_entry(mut this, dir_entry.inode_index) or { return }
 
-		mut mode := u16(0)
+		mut mode := inode.permissions
 
 		match dir_entry.dir_type {
 			1 { mode |= stat.ifreg }
@@ -230,16 +231,18 @@ fn (mut this EXT2Filesystem) populate(node &vfs.VFSNode) {
 			filesystem: unsafe { this }
 		}
 
-		resource.stat.mode = 0o644 | mode
+		resource.stat.mode = mode
+		resource.stat.uid = inode.user_id
+		resource.stat.gid = inode.group_id
 		resource.stat.ino = dir_entry.inode_index
 		resource.stat.size = inode.size32l | (u64(inode.size32h) >> 32)
 		resource.stat.nlink = inode.hard_link_cnt
 		resource.stat.blksize = this.block_size
 		resource.stat.blocks = lib.div_roundup(resource.stat.size, resource.stat.blksize)
 
-		resource.stat.atim = realtime_clock
-		resource.stat.ctim = realtime_clock
-		resource.stat.mtim = realtime_clock
+		resource.stat.atim = time.TimeSpec{i64(inode.access_time), 0}
+		resource.stat.ctim = time.TimeSpec{i64(inode.creation_time), 0}
+		resource.stat.mtim = time.TimeSpec{i64(inode.mod_time), 0}
 
 		vfs_node.resource = resource
 
@@ -376,13 +379,15 @@ fn (mut this EXT2Filesystem) mount(parent &vfs.VFSNode, name string, source &vfs
 	resource.stat.blksize = this.block_size
 	resource.stat.blocks = lib.div_roundup(resource.stat.size, resource.stat.blksize)
 	resource.stat.dev = this.dev_id
-	resource.stat.mode = 0o644 | stat.ifdir
+	resource.stat.mode = this.root_inode.permissions
+	resource.stat.uid = this.root_inode.user_id
+	resource.stat.gid = this.root_inode.group_id
 	resource.stat.nlink = this.root_inode.hard_link_cnt
 	resource.stat.ino = 2
 
-	resource.stat.atim = realtime_clock
-	resource.stat.ctim = realtime_clock
-	resource.stat.mtim = realtime_clock
+	resource.stat.atim = time.TimeSpec{i64(this.root_inode.access_time), 0}
+	resource.stat.ctim = time.TimeSpec{i64(this.root_inode.creation_time), 0}
+	resource.stat.mtim = time.TimeSpec{i64(this.root_inode.mod_time), 0}
 
 	target.filesystem = unsafe { this }
 	target.resource = resource

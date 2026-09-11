@@ -370,10 +370,6 @@ fn syscall_linux_readlink(gpr_state voidptr, path charptr, buf voidptr, size u64
 	return fs.syscall_readlinkat(gpr_state, fs.at_fdcwd, path, buf, size)
 }
 
-fn syscall_linux_umask(_ voidptr, _mask u32) (u64, u64) {
-	return 0o22, 0
-}
-
 fn syscall_linux_exit_group(gpr_state voidptr, status int) {
 	userland.syscall_exit(gpr_state, status)
 }
@@ -483,7 +479,7 @@ pub fn init_linux_syscall_table() {
 	linux_syscall_table[87] = voidptr(syscall_linux_unlink)
 	linux_syscall_table[89] = voidptr(syscall_linux_readlink)
 	linux_syscall_table[91] = voidptr(fs.syscall_fchmod)
-	linux_syscall_table[95] = voidptr(syscall_linux_umask)
+	linux_syscall_table[95] = voidptr(fs.syscall_umask)
 	linux_syscall_table[96] = voidptr(sys.syscall_gettimeofday)
 	linux_syscall_table[102] = voidptr(syscall_linux_getuid)
 	linux_syscall_table[104] = voidptr(syscall_linux_getgid)

@@ -84,33 +84,34 @@ pub fn initialise() {
 }
 
 fn reduce_node(node &VFSNode, follow_symlinks bool) &VFSNode {
-	return reduce_node_bounded(node, follow_symlinks, 0)
+	return reduce_node_bounded(node, follow_symlinks, 0, true)
 }
 
-fn reduce_node_bounded(node &VFSNode, follow_symlinks bool, depth int) &VFSNode {
+fn reduce_node_bounded(node &VFSNode, follow_symlinks bool, depth int, effective bool) &VFSNode {
 	if depth > 64 { errno.set(errno.eloop); return unsafe { nil } }
 	if node == unsafe { nil } { errno.set(errno.enoent); return unsafe { nil } }
 	if unsafe { node.redir != 0 } {
-		return reduce_node_bounded(node.redir, follow_symlinks, depth + 1)
+		return reduce_node_bounded(node.redir, follow_symlinks, depth + 1, effective)
 	}
 	if unsafe { node.mountpoint != 0 } {
-		return reduce_node_bounded(node.mountpoint, follow_symlinks, depth + 1)
+		return reduce_node_bounded(node.mountpoint, follow_symlinks, depth + 1, effective)
 	}
 	if node.symlink_target.len != 0 && follow_symlinks == true {
-		_, next_node, _ := path2node_bounded(node.parent, node.symlink_target, depth + 1)
+		_, next_node, _ := path2node_bounded(node.parent, node.symlink_target, depth + 1,
+			effective)
 		if unsafe { next_node == 0 } {
 			return 0
 		}
-		return reduce_node_bounded(next_node, follow_symlinks, depth + 1)
+		return reduce_node_bounded(next_node, follow_symlinks, depth + 1, effective)
 	}
 	return unsafe { node }
 }
 
 fn path2node(parent &VFSNode, path string) (&VFSNode, &VFSNode, string) {
-	return path2node_bounded(parent, path, 0)
+	return path2node_bounded(parent, path, 0, true)
 }
 
-fn path2node_bounded(parent &VFSNode, path string, depth int) (&VFSNode, &VFSNode, string) {
+fn path2node_bounded(parent &VFSNode, path string, depth int, effective bool) (&VFSNode, &VFSNode, string) {
 	if depth > 64 { errno.set(errno.eloop); return 0, 0, '' }
 	if path.len > 4096 { errno.set(errno.einval); return 0, 0, '' }
 	if path.len == 0 {
@@ -119,10 +120,10 @@ fn path2node_bounded(parent &VFSNode, path string, depth int) (&VFSNode, &VFSNod
 	}
 
 	mut index := u64(0)
-	mut current_node := reduce_node_bounded(parent, false, depth + 1)
+	mut current_node := reduce_node_bounded(parent, false, depth + 1, effective)
 
 	if path[index] == `/` {
-		current_node = reduce_node_bounded(vfs_root, false, depth + 1)
+		current_node = reduce_node_bounded(vfs_root, false, depth + 1, effective)
 		for path[index] == `/` {
 			if index == u64(path.len) - 1 {
 				return current_node, current_node, ''
@@ -152,11 +153,15 @@ fn path2node_bounded(parent &VFSNode, path string, depth int) (&VFSNode, &VFSNod
 
 		elem_str := unsafe { cstring_to_vstring(&elem[0]) }
 
-		current_node = reduce_node_bounded(current_node, false, depth + 1)
+		current_node = reduce_node_bounded(current_node, false, depth + 1, effective)
 
 		if current_node == unsafe { nil } || current_node.resource == unsafe { nil }
 			|| current_node.children == unsafe { nil } || !stat.isdir(current_node.resource.stat.mode) {
 			errno.set(errno.enotdir)
+			return 0, 0, ''
+		}
+		if !check_access(current_node, access_exec, effective) {
+			errno.set(errno.eacces)
 			return 0, 0, ''
 		}
 		if elem_str !in current_node.children {
@@ -167,7 +172,8 @@ fn path2node_bounded(parent &VFSNode, path string, depth int) (&VFSNode, &VFSNod
 			return 0, 0, ''
 		}
 
-		mut new_node := reduce_node_bounded(unsafe { current_node.children[elem_str] }, false, depth + 1)
+		mut new_node := reduce_node_bounded(unsafe { current_node.children[elem_str] }, false,
+			depth + 1, effective)
 
 		if last == true {
 			return current_node, new_node, elem_str
@@ -177,7 +183,7 @@ fn path2node_bounded(parent &VFSNode, path string, depth int) (&VFSNode, &VFSNod
 		current_node = new_node
 
 		if stat.islnk(current_node.resource.stat.mode) {
-			current_node = reduce_node_bounded(current_node, true, depth + 1)
+			current_node = reduce_node_bounded(current_node, true, depth + 1, effective)
 			if voidptr(current_node) == unsafe { nil } {
 				return 0, 0, ''
 			}
@@ -220,12 +226,17 @@ fn get_parent_dir(dirfd int, path string) ?&VFSNode {
 }
 
 pub fn get_node(parent &VFSNode, path string, follow_links bool) ?&VFSNode {
-	_, node, _ := path2node(parent, path)
+	return get_node_with_credentials(parent, path, follow_links, true)
+}
+
+fn get_node_with_credentials(parent &VFSNode, path string, follow_links bool,
+	effective bool) ?&VFSNode {
+	_, node, _ := path2node_bounded(parent, path, 0, effective)
 	if voidptr(node) == unsafe { nil } {
 		return none
 	}
 	if follow_links == true {
-		ret := reduce_node(node, true)
+		ret := reduce_node_bounded(node, true, 0, effective)
 		if unsafe { ret == 0 } {
 			return none
 		}
@@ -242,6 +253,9 @@ pub fn syscall_mount(_ voidptr, src charptr, tgt charptr, fs_type charptr, mount
 		tgt, fs_type, mountflags, data)
 	defer {
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
+	}
+	if process.euid != 0 {
+		return errno.err, errno.eperm
 	}
 
 	source := unsafe { cstring_to_vstring(src) }
@@ -361,8 +375,10 @@ pub fn symlink(parent &VFSNode, dest string, target string) ?&VFSNode {
 	}
 
 	if parent_of_tgt_node.read_only { errno.set(errno.erofs); return none }
+	require_access(parent_of_tgt_node, access_write | access_exec)?
 	target_node = parent_of_tgt_node.filesystem.symlink(parent_of_tgt_node, dest, basename)
 	if target_node == unsafe { nil } { return none }
+	apply_creation_identity(mut target_node, parent_of_tgt_node)
 
 	unsafe {
 		parent_of_tgt_node.children[basename] = target_node
@@ -383,6 +399,7 @@ pub fn link(parent &VFSNode, dest string, target string) ?&VFSNode {
 	if dest_node.read_only { errno.set(errno.erofs); return none }
 
 	if parent_of_tgt_node.read_only { errno.set(errno.erofs); return none }
+	require_access(parent_of_tgt_node, access_write | access_exec)?
 	target_node = parent_of_tgt_node.filesystem.link(parent_of_tgt_node, dest, mut dest_node) ?
 	if target_node == unsafe { nil } { return none }
 
@@ -396,6 +413,7 @@ pub fn unlink(parent &VFSNode, name string, remove_dir bool) ? {
 	mut parent_of_tgt, mut node, basename := path2node(parent, name)
 	if node == unsafe { nil } || parent_of_tgt == unsafe { nil } { return none }
 	if node.read_only || parent_of_tgt.read_only { errno.set(errno.erofs); return none }
+	if !may_remove(parent_of_tgt, node) { errno.set(errno.eacces); return none }
 	if basename == '.' || basename == '..' || basename == '' { errno.set(errno.einval); return none }
 	if stat.isdir(node.resource.stat.mode) {
 		if !remove_dir { errno.set(errno.eisdir); return none }
@@ -454,8 +472,10 @@ pub fn internal_create(parent &VFSNode, name string, mode u32) ?&VFSNode {
 	}
 
 	if parent_of_tgt_node.read_only { errno.set(errno.erofs); return none }
+	require_access(parent_of_tgt_node, access_write | access_exec)?
 	target_node = parent_of_tgt_node.filesystem.create(parent_of_tgt_node, basename, mode)
 	if target_node == unsafe { nil } { return none }
+	apply_creation_identity(mut target_node, parent_of_tgt_node)
 
 	unsafe {
 		parent_of_tgt_node.children[basename] = target_node
@@ -545,6 +565,7 @@ pub fn syscall_rmdirat(_ voidptr, dirfd int, _path charptr) (u64, u64) {
 	}
 
 	if target_node.read_only || parent_of_tgt_node.read_only { return errno.err, errno.erofs }
+	if !may_remove(parent_of_tgt_node, target_node) { return errno.err, errno.eacces }
 	target_node.resource.unlink(voidptr(target_node)) or { return errno.err, errno.get() }
 	target_node.resource.unref(unsafe { nil }) or {}
 
@@ -588,7 +609,8 @@ pub fn syscall_mkdirat(_ voidptr, dirfd int, _path charptr, mode u32) (u64, u64)
 		return errno.err, errno.eexist
 	}
 
-	internal_create(parent_of_tgt_node, basename, mode | stat.ifdir) or {
+	masked_mode := (mode & 0o7777) & ~process.umask
+	internal_create(parent_of_tgt_node, basename, masked_mode | stat.ifdir) or {
 		return errno.err, errno.get()
 	}
 
@@ -705,17 +727,26 @@ pub fn syscall_openat(_ voidptr, dirfd int, _path charptr, flags int, mode u32) 
 	creat_flags := flags & resource.file_creation_flags_mask
 	follow_links := flags & resource.o_nofollow == 0
 
+	mut created := false
 	mut node := get_node(parent, path, follow_links) or {
 		if creat_flags & resource.o_creat == 0 {
+			return errno.err, errno.get()
+		}
+		if errno.get() != errno.enoent {
 			return errno.err, errno.get()
 		}
 		// The Alpine package database creates executables directly with openat;
 		// preserve the requested permission bits instead of forcing every new
 		// regular file to 0644.
-		new_node := internal_create(parent, path, stat.ifreg | (mode & 0o7777)) or {
+		new_node := internal_create(parent, path,
+			stat.ifreg | ((mode & 0o7777) & ~process.umask)) or {
 			return errno.err, errno.get()
 		}
+		created = true
 		new_node
+	}
+	if !created && creat_flags & resource.o_creat != 0 && creat_flags & resource.o_excl != 0 {
+		return errno.err, errno.eexist
 	}
 
 	// A symlink is only an error when the caller asked not to follow one.
@@ -733,6 +764,22 @@ pub fn syscall_openat(_ voidptr, dirfd int, _path charptr, flags int, mode u32) 
 
 	if !stat.isdir(node.resource.stat.mode) && flags & resource.o_directory != 0 {
 		return errno.err, errno.enotdir
+	}
+	mut requested := u32(0)
+	access_mode := flags & resource.o_accmode
+	if access_mode == resource.o_rdonly || access_mode == resource.o_rdwr {
+		requested |= access_read
+	}
+	if access_mode == resource.o_wronly || access_mode == resource.o_rdwr
+		|| flags & resource.o_trunc != 0 {
+		requested |= access_write
+	}
+	if !created && flags & resource.o_path == 0 && requested != 0
+		&& !check_access(node, requested, true) {
+		return errno.err, errno.eacces
+	}
+	if stat.isdir(node.resource.stat.mode) && requested & access_write != 0 {
+		return errno.err, errno.eisdir
 	}
 
 	if node.read_only && ((flags & 3) != 0 || flags & resource.o_trunc != 0) {
@@ -761,6 +808,10 @@ pub fn syscall_read(_ voidptr, fdnum int, buf voidptr, count u64) (u64, u64) {
 	defer {
 		fd.unref()
 	}
+	access := fd.handle.flags & resource.o_accmode
+	if access != resource.o_rdonly && access != resource.o_rdwr {
+		return errno.err, errno.ebadf
+	}
 	ret := fd.handle.read(buf, count) or { return errno.err, errno.get() }
 	return u64(ret), 0
 }
@@ -778,6 +829,10 @@ pub fn syscall_write(_ voidptr, fdnum int, buf voidptr, count u64) (u64, u64) {
 	mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.get() }
 	defer {
 		fd.unref()
+	}
+	access := fd.handle.flags & resource.o_accmode
+	if access != resource.o_wronly && access != resource.o_rdwr {
+		return errno.err, errno.ebadf
 	}
 	ret := fd.handle.write(buf, count) or { return errno.err, errno.get() }
 	return u64(ret), 0
@@ -878,6 +933,9 @@ pub fn syscall_faccessat(_ voidptr, dirfd int, _path charptr, mode u32, flags in
 	}
 
 	path := unsafe { cstring_to_vstring(_path) }
+	if mode & ~u32(7) != 0 || flags & ~(at_eaccess | at_symlink_nofollow) != 0 {
+		return errno.err, errno.einval
+	}
 
 	if path.len == 0 {
 		return errno.err, errno.enoent
@@ -887,7 +945,11 @@ pub fn syscall_faccessat(_ voidptr, dirfd int, _path charptr, mode u32, flags in
 
 	follow_links := flags & at_symlink_nofollow == 0
 
-	get_node(parent, path, follow_links) or { return errno.err, errno.get() }
+	node := get_node_with_credentials(parent, path, follow_links,
+		flags & at_eaccess != 0) or { return errno.err, errno.get() }
+	if mode != 0 && !check_access(node, mode, flags & at_eaccess != 0) {
+		return errno.err, errno.eacces
+	}
 
 	return 0, 0
 }
@@ -974,25 +1036,39 @@ pub fn syscall_linkat(_ voidptr, olddirfd int, _oldpath charptr, newdirfd int, _
 
 	newpath := unsafe { cstring_to_vstring(_newpath) }
 
-	mut oldparent := get_parent_dir(olddirfd, oldpath) or { return errno.err, errno.get() }
-	mut newparent := get_parent_dir(newdirfd, newpath) or { return errno.err, errno.get() }
-
-	mut basename := ''
-
-	oldparent, _, _ = path2node(oldparent, oldpath)
-	newparent, _, basename = path2node(newparent, newpath)
+	oldbase := get_parent_dir(olddirfd, oldpath) or { return errno.err, errno.get() }
+	newbase := get_parent_dir(newdirfd, newpath) or { return errno.err, errno.get() }
+	oldparent, found_old_node, _ := path2node(oldbase, oldpath)
+	mut newparent, found_new_node, basename := path2node(newbase, newpath)
+	if unsafe { oldparent == nil } || unsafe { found_old_node == nil } {
+		return errno.err, errno.enoent
+	}
+	if unsafe { newparent == nil } {
+		return errno.err, errno.enoent
+	}
+	if unsafe { found_new_node != nil } {
+		return errno.err, errno.eexist
+	}
 
 	// Old and new must be on the same filesystem
 	if !same_filesystem(oldparent, newparent) {
 		return errno.err, errno.exdev
 	}
 
-	follow_links := flags & at_symlink_nofollow == 0
-
-	mut old_node := get_node(oldparent, oldpath, follow_links) or { return errno.err, errno.get() }
+	mut old_node := if flags & at_symlink_follow != 0 {
+		reduce_node(found_old_node, true)
+	} else {
+		found_old_node
+	}
+	if stat.isdir(old_node.resource.stat.mode) {
+		return errno.err, errno.eperm
+	}
+	if !check_access(newparent, access_write | access_exec, true) {
+		return errno.err, errno.eacces
+	}
 
 	if newparent.read_only || old_node.read_only { return errno.err, errno.erofs }
-	mut new_node := newparent.filesystem.link(newparent, newpath, mut old_node) or {
+	mut new_node := newparent.filesystem.link(newparent, basename, mut old_node) or {
 		return errno.err, errno.get()
 	}
 
@@ -1022,8 +1098,11 @@ pub fn syscall_fchmod(_ voidptr, fdnum int, mode u32) (u64, u64) {
 		node := unsafe { &VFSNode(fd.handle.node) }
 		if node.read_only { return errno.err, errno.erofs }
 	}
+	if !owns_resource(fd.handle.resource.stat.uid) {
+		return errno.err, errno.eperm
+	}
 	// Preserve file type bits (upper 4 bits), only change permission bits
-	fd.handle.resource.stat.mode = (fd.handle.resource.stat.mode & stat.ifmt) | (mode & ~u32(stat.ifmt))
+	fd.handle.resource.stat.mode = (fd.handle.resource.stat.mode & stat.ifmt) | (mode & 0o7777)
 	return 0, 0
 }
 
@@ -1038,11 +1117,14 @@ pub fn syscall_fchmodat(_ voidptr, dirfd int, _path charptr, mode u32) (u64, u64
 	if node.read_only {
 		return errno.err, errno.erofs
 	}
+	if !owns_resource(node.resource.stat.uid) {
+		return errno.err, errno.eperm
+	}
 
 	// Preserve the object type and update only permission/special bits, just as
 	// fchmod does. Archive extractors use fchmodat after creating each file.
 	mut node_resource := node.resource
-	node_resource.stat.mode = (node_resource.stat.mode & stat.ifmt) | (mode & ~u32(stat.ifmt))
+	node_resource.stat.mode = (node_resource.stat.mode & stat.ifmt) | (mode & 0o7777)
 	return 0, 0
 }
 
@@ -1065,6 +1147,9 @@ pub fn syscall_chdir(_ voidptr, _path charptr) (u64, u64) {
 
 	if !stat.isdir(node.resource.stat.mode) {
 		return errno.err, errno.enotdir
+	}
+	if !check_access(node, access_exec, true) {
+		return errno.err, errno.eacces
 	}
 
 	process.current_directory = node
@@ -1284,6 +1369,19 @@ pub fn rename(oldparent &VFSNode, oldpath string, newparent &VFSNode, newpath st
 		errno.set(errno.erofs)
 		return none
 	}
+	if !may_remove(old_parent_of, old_node) {
+		errno.set(errno.eacces)
+		return none
+	}
+	if unsafe { new_node != nil } {
+		if !may_remove(new_parent_of, new_node) {
+			errno.set(errno.eacces)
+			return none
+		}
+	} else if !check_access(new_parent_of, access_write | access_exec, true) {
+		errno.set(errno.eacces)
+		return none
+	}
 	if !same_filesystem(old_parent_of, new_parent_of) {
 		errno.set(errno.exdev)
 		return none
@@ -1457,6 +1555,9 @@ pub fn syscall_fchdir(_ voidptr, fdnum int) (u64, u64) {
 	if !stat.isdir(fd.handle.resource.stat.mode) {
 		return errno.err, errno.enotdir
 	}
+	if !check_access(node, access_exec, true) {
+		return errno.err, errno.eacces
+	}
 
 	process.current_directory = voidptr(node)
 
@@ -1484,6 +1585,9 @@ pub fn syscall_truncate(_ voidptr, _path charptr, length i64) (u64, u64) {
 	if stat.isdir(res.stat.mode) {
 		return errno.err, errno.eisdir
 	}
+	if !check_access(node, access_write, true) {
+		return errno.err, errno.eacces
+	}
 
 	res.grow(unsafe { nil }, u64(length)) or { return errno.err, errno.get() }
 
@@ -1501,6 +1605,9 @@ fn set_owner(mut res resource.Resource, uid u32, gid u32) {
 	if gid != u32(0xffffffff) {
 		res.stat.gid = gid
 	}
+	if uid != u32(0xffffffff) || gid != u32(0xffffffff) {
+		res.stat.mode &= ~u32(0o6000)
+	}
 }
 
 pub fn syscall_fchownat(_ voidptr, dirfd int, _path charptr, uid u32, gid u32, flags int) (u64, u64) {
@@ -1517,6 +1624,13 @@ pub fn syscall_fchownat(_ voidptr, dirfd int, _path charptr, uid u32, gid u32, f
 			fd.unref()
 		}
 		mut res := fd.handle.resource
+		if fd.handle.node != unsafe { nil }
+			&& unsafe { &VFSNode(fd.handle.node) }.read_only {
+			return errno.err, errno.erofs
+		}
+		if !may_chown(res.stat.uid, uid, gid) {
+			return errno.err, errno.eperm
+		}
 		set_owner(mut res, uid, gid)
 		return 0, 0
 	}
@@ -1525,7 +1639,11 @@ pub fn syscall_fchownat(_ voidptr, dirfd int, _path charptr, uid u32, gid u32, f
 
 	follow_links := flags & at_symlink_nofollow == 0
 	mut node := get_node(parent, path, follow_links) or { return errno.err, errno.get() }
+	if node.read_only { return errno.err, errno.erofs }
 	mut res := node.resource
+	if !may_chown(res.stat.uid, uid, gid) {
+		return errno.err, errno.eperm
+	}
 
 	set_owner(mut res, uid, gid)
 
@@ -1539,6 +1657,13 @@ pub fn syscall_fchown(_ voidptr, fdnum int, uid u32, gid u32) (u64, u64) {
 	}
 
 	mut res := fd.handle.resource
+	if fd.handle.node != unsafe { nil }
+		&& unsafe { &VFSNode(fd.handle.node) }.read_only {
+		return errno.err, errno.erofs
+	}
+	if !may_chown(res.stat.uid, uid, gid) {
+		return errno.err, errno.eperm
+	}
 	set_owner(mut res, uid, gid)
 
 	return 0, 0
