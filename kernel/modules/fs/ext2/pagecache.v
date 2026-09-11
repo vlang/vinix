@@ -1,6 +1,7 @@
 module ext2
 
 import errno
+import memory
 import pagecache
 import resource as resource_mod
 import stat
@@ -9,14 +10,33 @@ import stat
 // Metadata and data therefore share one coherent cache, including byte-sized
 // bitmap updates and sub-sector inode writes. All instances of a detected
 // filesystem share the cache created by ext2_init.
-fn device_read(context voidptr, buf voidptr, loc u64, count u64) ?i64 {
+// Preserve the old raw-I/O adapter's physically contiguous, page-aligned
+// buffers. Cached bytes themselves live in heap allocations and must not be
+// handed straight to a DMA backend. Only misses/writeback allocate a bounce.
+fn device_transfer(context voidptr, buf voidptr, loc u64, count u64, writing bool) ?i64 {
+	if count == 0 { return 0 }
+	if count > pagecache.page_bytes { errno.set(errno.einval); return none }
+	physical := memory.pmm_alloc(1)
+	if physical == unsafe { nil } { errno.set(errno.enomem); return none }
+	bounce := voidptr(u64(physical) + higher_half)
+	defer { memory.pmm_free(physical, 1) }
 	mut device := unsafe { &resource_mod.Resource(context) }
-	return device.read(0, buf, loc, count)
+	if writing {
+		unsafe { C.memcpy(bounce, buf, count) }
+		return device.write(0, bounce, loc, count)
+	}
+	ret := device.read(0, bounce, loc, count) or { return none }
+	if ret < 0 || u64(ret) > count { errno.set(errno.eio); return none }
+	unsafe { C.memcpy(buf, bounce, u64(ret)) }
+	return ret
+}
+
+fn device_read(context voidptr, buf voidptr, loc u64, count u64) ?i64 {
+	return device_transfer(context, buf, loc, count, false)
 }
 
 fn device_write(context voidptr, buf voidptr, loc u64, count u64) ?i64 {
-	mut device := unsafe { &resource_mod.Resource(context) }
-	return device.write(0, buf, loc, count)
+	return device_transfer(context, buf, loc, count, true)
 }
 
 fn (mut filesystem EXT2Filesystem) raw_device_read(buf voidptr, loc u64, count u64) ?i64 {
