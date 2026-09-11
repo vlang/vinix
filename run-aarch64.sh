@@ -729,7 +729,9 @@ DISPLAY_FLAGS="$DISPLAY_DEVICE_FLAGS $DISPLAY_BACKEND_FLAGS -serial mon:stdio"
 
 ACCEL_FLAGS="-accel hvf -cpu host"
 if [ "${USE_TCG:-0}" -eq 1 ]; then
-    ACCEL_FLAGS="-accel tcg -cpu cortex-a72"
+    # The kernel is compiled for ARMv8.4-A. cortex-a72 only implements an
+    # older architecture level and can stall before the serial console.
+    ACCEL_FLAGS="-accel tcg -cpu ${VINIX_QEMU_CPU:-max}"
 fi
 
 # VINIX_QEMU_EXTRA appends raw flags, e.g. a monitor socket to drive
