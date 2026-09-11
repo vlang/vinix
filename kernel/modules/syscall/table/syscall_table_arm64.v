@@ -524,11 +524,6 @@ fn syscall_linux_sysinfo(_ voidptr, info voidptr) (u64, u64) {
 	return 0, 0
 }
 
-// flock: stub — pretend it works.
-fn syscall_linux_flock(_ voidptr, _fd int, _operation int) (u64, u64) {
-	return 0, 0
-}
-
 // ── X11 / dynamic-linking syscall stubs ──
 
 // sendfile(out, in, offset, count).  A page-sized bounce buffer keeps the
@@ -1168,7 +1163,7 @@ pub fn init_syscall_table() {
 	syscall_table[21] = voidptr(file.syscall_epoll_ctl) // __NR_epoll_ctl
 	syscall_table[22] = voidptr(file.syscall_epoll_pwait) // __NR_epoll_pwait
 
-	syscall_table[32] = voidptr(syscall_linux_flock) // __NR_flock
+	syscall_table[32] = voidptr(file.syscall_flock) // __NR_flock
 	syscall_table[46] = voidptr(file.syscall_ftruncate) // __NR_ftruncate
 	syscall_table[71] = voidptr(syscall_linux_sendfile) // __NR_sendfile
 	syscall_table[88] = voidptr(syscall_linux_utimensat) // __NR_utimensat

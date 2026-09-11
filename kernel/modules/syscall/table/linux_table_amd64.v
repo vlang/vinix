@@ -472,6 +472,7 @@ pub fn init_linux_syscall_table() {
 	linux_syscall_table[62] = voidptr(userland.syscall_kill)
 	linux_syscall_table[63] = voidptr(syscall_linux_uname)
 	linux_syscall_table[72] = voidptr(file.syscall_fcntl)
+	linux_syscall_table[73] = voidptr(file.syscall_flock)
 	linux_syscall_table[74] = voidptr(file.syscall_fsync)
 	linux_syscall_table[77] = voidptr(file.syscall_ftruncate)
 	linux_syscall_table[79] = voidptr(fs.syscall_getcwd)

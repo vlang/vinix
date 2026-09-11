@@ -64,6 +64,7 @@ fn (mut this Handle) unref() {
 		return
 	}
 
+	release_flock(this)
 	mut res := this.resource
 	res.unref(voidptr(this)) or {}
 	unsafe { free(voidptr(this)) }
@@ -344,6 +345,9 @@ pub fn fdnum_close(_process &proc.Process, fdnum int, do_lock bool) ? {
 
 	process.fds[fdnum] = unsafe { nil }
 	mut handle := fd.handle
+	// POSIX record locks are process-owned and closing any descriptor for the
+	// inode releases that process' locks, even when another dup remains open.
+	release_posix_locks(handle.resource, process.pid)
 	unsafe { free(voidptr(fd)) }
 	handle.unref()
 }
@@ -809,33 +813,10 @@ pub fn syscall_fcntl(_ voidptr, fdnum int, cmd int, arg u64) (u64, u64) {
 			fd.unref()
 		}
 		f_getlk, f_setlk, f_setlkw {
-			if arg == 0 {
-				fd.unref()
-				return errno.err, errno.efault
-			}
-
-			mut flock := Flock{}
-			if !usercopy.copy_from_user(voidptr(&flock), arg, sizeof(Flock)) {
-				fd.unref()
-				return errno.err, errno.efault
-			}
-			if flock.l_type != f_rdlck && flock.l_type != f_wrlck && flock.l_type != f_unlck {
-				fd.unref()
-				return errno.err, errno.einval
-			}
-
-			// Vinix has no advisory-lock owner table yet. With no locks to
-			// conflict, F_GETLK reports F_UNLCK and the setters succeed. This is
-			// the observable result for the uncontended locks used by SQLite.
-			if cmd == f_getlk {
-				flock.l_type = f_unlck
-				flock.l_pid = 0
-				if !usercopy.copy_to_user(arg, voidptr(&flock), sizeof(Flock)) {
-					fd.unref()
-					return errno.err, errno.efault
-				}
-			}
+			lock_ret, lock_errno := fcntl_lock(mut handle, cmd, arg)
 			fd.unref()
+			if lock_errno != 0 { return lock_ret, lock_errno }
+			ret = lock_ret
 		}
 		else {
 			print('\nfcntl: Unhandled command: ${cmd}\n')
