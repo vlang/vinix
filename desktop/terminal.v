@@ -35,6 +35,16 @@ enum AppPointerPhase {
 	move
 	down
 	up
+	scroll
+}
+
+// Buttons use the conventional toolkit numbering so native clients can map
+// them without knowing the kernel device's bit layout.
+enum AppPointerButton {
+	no_button
+	left
+	middle
+	right
 }
 
 // PointerApp is used by pixel surfaces such as an embedded X server. Ordinary
@@ -43,7 +53,7 @@ enum AppPointerPhase {
 interface PointerApp {
 mut:
 	pointer_input_enabled() bool
-	pointer_event(phase AppPointerPhase, x int, y int, width int, height int)
+	pointer_event(phase AppPointerPhase, button AppPointerButton, scroll int, x int, y int, width int, height int)
 }
 
 // ClosingApp releases subprocesses an application owns before its own process

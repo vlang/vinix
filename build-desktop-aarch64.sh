@@ -44,6 +44,7 @@ FIREFOX_STAGING="${VINIX_FIREFOX_STAGING:-$SCRIPT_DIR/build-aarch64-firefox/stag
 MINECRAFT_STAGING="${VINIX_MINECRAFT_STAGING:-$SCRIPT_DIR/build-aarch64-minecraft/staging}"
 ASAHI_STAGING="${VINIX_ASAHI_STAGING:-$SCRIPT_DIR/build-aarch64-asahi/staging}"
 HYPRLAND_STAGING="${VINIX_HYPRLAND_STAGING:-$SCRIPT_DIR/build-aarch64-hyprland/staging}"
+BLENDER_NATIVE_STAGING="${VINIX_BLENDER_NATIVE_STAGING:-$SCRIPT_DIR/build-aarch64-blender-native/staging}"
 X86_TRANSLATION_STAGING="${VINIX_X86_TRANSLATION_STAGING:-$SCRIPT_DIR/build-aarch64-x86-translation/staging}"
 GPU_SYSROOT="${VINIX_GPU_SYSROOT:-$SCRIPT_DIR/build-aarch64-x11/sysroot}"
 
@@ -380,6 +381,11 @@ else
     # The base archive may predate package support. Always refresh this small
     # layer so the terminal gets pkg/apk without rebuilding the full userland.
     merge_staging_tree "$NETWORK_TOOLS_STAGING"
+fi
+
+if [ -x "$BLENDER_NATIVE_STAGING/usr/libexec/vinix-blender-native" ]; then
+    echo "==> Staging native Blender GHOST executable"
+    merge_staging_tree "$BLENDER_NATIVE_STAGING"
 fi
 
 # Full images pick up locally built optional application layers even when the

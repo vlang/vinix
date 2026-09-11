@@ -16,7 +16,7 @@ import math.bits
 import ui2
 
 const app_protocol_magic = u32(0x56415050) // VAPP
-const app_protocol_version = u8(2)
+const app_protocol_version = u8(3)
 const app_request_header_size = 108
 const app_response_header_size = 100
 const app_protocol_max_payload = 16 * 1024 * 1024
@@ -48,11 +48,13 @@ enum AppCommand as u8 {
 }
 
 struct AppPointerPayload {
-	kind   int
-	x      int
-	y      int
-	width  int
-	height int
+	kind   i32
+	button i32
+	scroll i32
+	x      i32
+	y      i32
+	width  i32
+	height i32
 }
 
 struct AppProcessOptions {
@@ -661,14 +663,17 @@ fn run_app_process(options AppProcessOptions) {
 				}
 				mut pointer := AppPointerPayload{}
 				unsafe { C.memcpy(&pointer, payload.str, sizeof(AppPointerPayload)) }
-				if pointer.kind < int(AppPointerPhase.move) || pointer.kind > int(AppPointerPhase.up)
-					|| pointer.width <= 0 || pointer.height <= 0 {
+				if pointer.kind < int(AppPointerPhase.move)
+					|| pointer.kind > int(AppPointerPhase.scroll)
+					|| pointer.button < int(AppPointerButton.no_button)
+					|| pointer.button > int(AppPointerButton.right) || pointer.width <= 0
+					|| pointer.height <= 0 {
 					send_app_error(options.response_fd, app_current_state(desktop), 'invalid pointer geometry')
 					free_app_payload(payload)
 					continue
 				}
 				if mut app is PointerApp {
-					app.pointer_event(unsafe { AppPointerPhase(pointer.kind) }, pointer.x, pointer.y, pointer.width, pointer.height)
+					app.pointer_event(unsafe { AppPointerPhase(pointer.kind) }, unsafe { AppPointerButton(pointer.button) }, int(pointer.scroll), int(pointer.x), int(pointer.y), int(pointer.width), int(pointer.height))
 				}
 				if !send_app_response(options.response_fd, true, app_current_state(desktop), []u8{}) {
 					free_app_payload(payload)
@@ -823,16 +828,18 @@ fn (a &RemoteApp) pointer_input_enabled() bool {
 	return a.pointer && !a.closed
 }
 
-fn (mut a RemoteApp) pointer_event(phase AppPointerPhase, x int, y int, width int, height int) {
+fn (mut a RemoteApp) pointer_event(phase AppPointerPhase, button AppPointerButton, scroll int, x int, y int, width int, height int) {
 	if !a.pointer || a.closed {
 		return
 	}
 	pointer := AppPointerPayload{
-		kind: int(phase)
-		x: x
-		y: y
-		width: width
-		height: height
+		kind: i32(phase)
+		button: i32(button)
+		scroll: i32(scroll)
+		x: i32(x)
+		y: i32(y)
+		width: i32(width)
+		height: i32(height)
 	}
 	payload := unsafe { tos(&u8(&pointer), int(sizeof(AppPointerPayload))) }
 	reply := a.transact(.pointer, 0, 0, payload) or { return }

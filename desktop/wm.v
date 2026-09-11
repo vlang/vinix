@@ -646,7 +646,7 @@ fn (mut d Desktop) forward_to_app(x int, y int, action string) {
 // forward_pointer_to_app routes raw pointer input only to applications that
 // explicitly request it. A press captures the surface until release so a drag
 // does not get lost merely because it crossed the content edge.
-fn (mut d Desktop) forward_pointer_to_app(x int, y int, phase AppPointerPhase) bool {
+fn (mut d Desktop) forward_pointer_to_app(x int, y int, phase AppPointerPhase, button AppPointerButton, scroll int) bool {
 	mut selected := -1
 	if d.pointer_capture != 0 {
 		selected = d.window_index(d.pointer_capture) or { -1 }
@@ -693,7 +693,7 @@ fn (mut d Desktop) forward_pointer_to_app(x int, y int, phase AppPointerPhase) b
 		if local_y >= body_height {
 			local_y = body_height - 1
 		}
-		app.pointer_event(phase, local_x, local_y, window.width, body_height)
+		app.pointer_event(phase, button, scroll, local_x, local_y, window.width, body_height)
 		if phase == .down {
 			d.pointer_capture = window_id
 			// A foreign surface has no ui2 action id to focus through the
@@ -701,7 +701,8 @@ fn (mut d Desktop) forward_pointer_to_app(x int, y int, phase AppPointerPhase) b
 			// clicking it raises the native frame and gives its keyboard bridge
 			// focus for shortcuts and typing.
 			d.raise(window_id)
-		} else if phase == .up {
+		} else if phase == .up
+			&& d.buttons & (button_left | button_right | button_middle) == 0 {
 			d.pointer_capture = 0
 		}
 		return true
@@ -1058,7 +1059,7 @@ fn (mut d Desktop) on_pointer_move(x int, y int) {
 		return
 	}
 	if !d.start_menu_open && !d.start_menu_pointer {
-		d.forward_pointer_to_app(x, y, .move)
+		d.forward_pointer_to_app(x, y, .move, .no_button, 0)
 	}
 
 	hover := d.hit_action(x, y)
@@ -1136,7 +1137,7 @@ fn (mut d Desktop) on_pointer_down(x int, y int) {
 		d.close_start_menu()
 	}
 
-	if d.forward_pointer_to_app(x, y, .down) {
+	if d.forward_pointer_to_app(x, y, .down, .left, 0) {
 		// Raw-surface clicks were already delivered and focused above. Falling
 		// through would interpret their deliberately action-less content as an
 		// empty-desktop click and immediately clear that focus again.
@@ -1203,11 +1204,31 @@ fn (mut d Desktop) on_pointer_up(x int, y int) {
 	if d.start_menu_pointer {
 		d.start_menu_pointer = false
 	} else {
-		d.forward_pointer_to_app(x, y, .up)
+		d.forward_pointer_to_app(x, y, .up, .left, 0)
 	}
 	d.drag = Drag{}
 	d.hover = d.hit_action(x, y)
 	d.dirty = true
+}
+
+// Non-primary buttons and the wheel have no desktop chrome meaning yet, but a
+// native pixel-surface client needs them for its own interaction model.
+fn (mut d Desktop) on_app_pointer_button(x int, y int, phase AppPointerPhase, button AppPointerButton) {
+	if d.switcher.active || d.start_menu_open {
+		return
+	}
+	if d.forward_pointer_to_app(x, y, phase, button, 0) {
+		d.dirty = true
+	}
+}
+
+fn (mut d Desktop) on_app_pointer_scroll(x int, y int, scroll int) {
+	if scroll == 0 || d.switcher.active || d.start_menu_open {
+		return
+	}
+	if d.forward_pointer_to_app(x, y, .scroll, .no_button, scroll) {
+		d.dirty = true
+	}
 }
 
 // hit_action returns the action id of the topmost target under a point. The

@@ -48,11 +48,68 @@ fn test_vinix_start_glyph_uses_the_wordmark_v_polygon() {
 	assert vinix_v_contains(41.0, 12.0)
 
 	mut canvas := new_canvas(48, 48)
-	defer { unsafe { free(canvas.pixels) }
-	 }
+	defer {
+		unsafe { free(canvas.pixels) }
+	}
 	canvas.clear(0x000000)
 	canvas.draw_vinix_v(0, 0, 48, 48, 0xffffff)
 	assert unsafe { canvas.pixels[24 * canvas.stride + 24] } == 0xffffff
+}
+
+fn surface_test_put_u32(mut bytes []u8, offset int, value u32) {
+	bytes[offset] = u8(value)
+	bytes[offset + 1] = u8(value >> 8)
+	bytes[offset + 2] = u8(value >> 16)
+	bytes[offset + 3] = u8(value >> 24)
+}
+
+fn test_native_vinix_surface_validates_claims_and_draws_active_buffer() {
+	path := os.join_path(os.temp_dir(), 'vinix-native-surface-test.bin')
+	defer { os.rm(path) or {} }
+	// A two-by-one surface has eight bytes in each pixel plane.
+	mut bytes := []u8{len: 48 + 16, init: 0}
+	surface_test_put_u32(mut bytes, 0, vinix_surface_magic)
+	surface_test_put_u32(mut bytes, 4, vinix_surface_version)
+	surface_test_put_u32(mut bytes, 8, u32(vinix_surface_header_size))
+	surface_test_put_u32(mut bytes, 12, 2)
+	surface_test_put_u32(mut bytes, 16, 1)
+	surface_test_put_u32(mut bytes, 20, 8)
+	surface_test_put_u32(mut bytes, 24, vinix_surface_format_xrgb8888)
+	surface_test_put_u32(mut bytes, 28, 1)
+	surface_test_put_u32(mut bytes, 32, ~u32(0))
+	surface_test_put_u32(mut bytes, 40, 8)
+	// Only buffer one is active: red then green in little-endian XRGB8888.
+	bytes[56] = 0x00
+	bytes[57] = 0x00
+	bytes[58] = 0xff
+	bytes[60] = 0x00
+	bytes[61] = 0xff
+	bytes[62] = 0x00
+	os.write_file_array(path, bytes) or { assert false }
+
+	surface := open_vinix_surface(path) or {
+		assert false
+		return
+	}
+	assert surface.width == 2 && surface.height == 1 && surface.stride == 8
+	assert surface.pixel(0, 0) == 0xff0000
+	assert surface.pixel(1, 0) == 0x00ff00
+	assert vinix_surface_u32(unsafe { &u8(surface.mapping) }, 32) == 1
+	surface.close()
+	released := os.read_bytes(path) or {
+		assert false
+		return
+	}
+	assert vinix_surface_u32(released.data, 32) == ~u32(0)
+
+	mut canvas := new_canvas(2, 1)
+	defer {
+		unsafe { free(canvas.pixels) }
+	}
+	canvas.clear(0)
+	assert canvas.draw_vinix_surface(path, 0, 0, 2, 1)
+	assert unsafe { canvas.pixels[0] } == 0xff0000
+	assert unsafe { canvas.pixels[1] } == 0x00ff00
 }
 
 struct PointerFocusTestApp {}
@@ -67,7 +124,7 @@ fn (mut app PointerFocusTestApp) pointer_input_enabled() bool {
 	return true
 }
 
-fn (mut app PointerFocusTestApp) pointer_event(_ AppPointerPhase, _ int, _ int, _ int, _ int) {}
+fn (mut app PointerFocusTestApp) pointer_event(_ AppPointerPhase, _ AppPointerButton, _ int, _ int, _ int, _ int, _ int) {}
 
 fn test_text_editor_inserts_and_navigates() {
 	mut editor := TextEditorApp{
@@ -375,7 +432,33 @@ fn test_pointer_wire_records_have_fixed_cross_compiler_layouts() {
 	// v3, whose `int` has a different width. These records cross into kernel and
 	// C code and must therefore retain their explicit ABI sizes.
 	assert sizeof(PointerPacket) == 32
+	assert sizeof(AppPointerPayload) == 28
 	assert sizeof(WineHostEvent) == 20
+	assert sizeof(VinixInputEvent) == 24
+}
+
+fn test_native_surface_input_preserves_buttons_and_scroll() {
+	mut input_pipe := [2]i32{}
+	assert C.pipe(&input_pipe[0]) == 0
+	mut app := NativeSurfaceApp{
+		input_fd: int(input_pipe[1])
+		surface_width: 100
+		surface_height: 50
+		ready: true
+	}
+
+	app.pointer_event(.down, .right, 0, 100, 100, 200, 200)
+	app.pointer_event(.scroll, .no_button, -2, 100, 100, 200, 200)
+	mut records := [2]VinixInputEvent{}
+	assert C.read(input_pipe[0], &records[0], sizeof(VinixInputEvent) * 2) == sizeof(VinixInputEvent) * 2
+	assert records[0].kind == u32(VinixInputEventKind.button_down)
+	assert records[0].value == int(AppPointerButton.right)
+	assert records[0].x == 50 && records[0].y == 25
+	assert records[1].kind == u32(VinixInputEventKind.wheel)
+	assert records[1].value == -2
+
+	C.close(input_pipe[0])
+	C.close(input_pipe[1])
 }
 
 fn test_xwd_bilinear_filter_preserves_edges_and_blends_the_middle() {

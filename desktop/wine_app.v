@@ -25,10 +25,6 @@ const minecraft_surface_width = 1280
 const minecraft_surface_height = 720
 const minecraft_window_width = 760
 const minecraft_window_height = 428
-const blender_surface_width = 1280
-const blender_surface_height = 900
-const blender_window_width = 1280
-const blender_window_height = 900
 const wine_host_event_magic = u32(0x56574831) // VWH1
 
 enum WineHostEventKind as u32 {
@@ -104,10 +100,6 @@ fn open_wine_word2013(mut _ Desktop) !NativeApp {
 
 fn open_minecraft(mut _ Desktop) !NativeApp {
 	return open_hosted_x11_app('minecraft', '/usr/bin/minecraft', minecraft_surface_width, minecraft_surface_height, 'builtin:block', 'Starting Minecraft…', 'Minecraft is not installed. Build its AArch64 runtime first.', 'Minecraft exited.')
-}
-
-fn open_blender(mut _ Desktop) !NativeApp {
-	return open_hosted_x11_app('blender', '/usr/bin/blender', blender_surface_width, blender_surface_height, 'builtin:block', 'Starting Blender…', 'Blender is not installed. Run pkg install blender in Terminal first.', 'Blender exited.')
 }
 
 fn open_hosted_x11_app(name string, command string, surface_width int, surface_height int,
@@ -209,8 +201,13 @@ fn (mut app HostedX11App) send_host_event(kind WineHostEventKind, x int, y int, 
 	}
 }
 
-fn (mut app HostedX11App) pointer_event(phase AppPointerPhase, x int, y int, width int, height int) {
+fn (mut app HostedX11App) pointer_event(phase AppPointerPhase, button AppPointerButton, _ int, x int, y int, width int, height int) {
 	if !app.pointer_input_enabled() || width <= 0 || height <= 0 {
+		return
+	}
+	// The legacy X host protocol only describes its original left button. The
+	// native Vinix protocol below carries all buttons and wheel input.
+	if phase == .scroll || (phase != .move && button != .left) {
 		return
 	}
 	mut surface_x := x * app.surface_width / width
@@ -231,6 +228,9 @@ fn (mut app HostedX11App) pointer_event(phase AppPointerPhase, x int, y int, wid
 		.move { WineHostEventKind.motion }
 		.down { WineHostEventKind.button_down }
 		.up { WineHostEventKind.button_up }
+		.scroll {
+			return
+		}
 	}
 	app.send_host_event(kind, surface_x, surface_y, '')
 }

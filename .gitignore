@@ -54,5 +54,6 @@ kernel/tmp.v
 /build-aarch64-hyprland/
 /build-aarch64-x86-translation/
 /build-aarch64-minecraft/
+/build-aarch64-blender-native/
 /.claude/
 /deploy-to-m1.sh

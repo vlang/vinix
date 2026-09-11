@@ -57,6 +57,8 @@ fn C.munmap(base voidptr, length usize) int
 
 fn C.lseek(fd int, offset i64, whence int) i64
 
+fn C.unlink(path &char) int
+
 struct C.pollfd {
 	fd      int
 	events  i16
@@ -122,6 +124,10 @@ fn desktop_mmap_readonly(fd int, length u64) voidptr {
 
 fn desktop_munmap(base voidptr, length u64) int {
 	return C.munmap(base, usize(length))
+}
+
+fn desktop_unlink(path string) int {
+	return C.unlink(&char(path.str))
 }
 
 struct TerminalState {
@@ -629,6 +635,72 @@ fn desktop_wait_child(pid int) {
 struct SpawnedWineHost {
 	pid   int
 	input int
+}
+
+struct SpawnedNativeSurface {
+	pid   int
+	input int
+}
+
+// Start a native Vinix surface client. The child receives compositor input on
+// stdin and publishes XRGB frames at VINIX_SURFACE_PATH. Deliberately omit all
+// X11 and Wayland environment variables: this is the native window-system ABI.
+fn desktop_spawn_native_surface(path string, argument string, surface_path string, width int, height int) ?SpawnedNativeSurface {
+	if C.access(&char(path.str), C.X_OK) != 0 || width <= 0 || height <= 0 {
+		return none
+	}
+	mut input := [2]i32{}
+	if C.pipe(&input[0]) != 0 {
+		return none
+	}
+	desktop_set_cloexec(input[0], true)
+	desktop_set_cloexec(input[1], true)
+
+	argv := [&char(path.str), &char(argument.str), &char(unsafe { nil })]
+	path_entry := 'PATH=${desktop_command_path}'
+	surface_entry := 'VINIX_SURFACE_PATH=${surface_path}'
+	width_entry := 'VINIX_SURFACE_WIDTH=${width}'
+	height_entry := 'VINIX_SURFACE_HEIGHT=${height}'
+	envp := [&char(path_entry.str), c'HOME=/root', c'TERM=dumb', c'USER=root', c'LOGNAME=root',
+		c'SHELL=/bin/sh', c'LD_LIBRARY_PATH=/usr/lib', c'LIBGL_DRIVERS_PATH=/usr/lib/dri',
+		c'EGL_PLATFORM=surfaceless', c'SSL_CA_CERT_FILE=/etc/ssl/certs/ca-certificates.crt',
+		&char(surface_entry.str), &char(width_entry.str), &char(height_entry.str),
+		&char(unsafe { nil })]
+
+	pid := C.fork()
+	if pid < 0 {
+		C.close(input[0])
+		C.close(input[1])
+		unsafe {
+			path_entry.free()
+			surface_entry.free()
+			width_entry.free()
+			height_entry.free()
+			argv.free()
+			envp.free()
+		}
+		return none
+	}
+	if pid == 0 {
+		C.dup2(input[0], C.STDIN_FILENO)
+		C.close(input[0])
+		C.close(input[1])
+		C.execve(&char(path.str), argv.data, envp.data)
+		C._exit(127)
+	}
+	C.close(input[0])
+	unsafe {
+		path_entry.free()
+		surface_entry.free()
+		width_entry.free()
+		height_entry.free()
+		argv.free()
+		envp.free()
+	}
+	return SpawnedNativeSurface{
+		pid: pid
+		input: int(input[1])
+	}
 }
 
 // Start the native Xvfb/Wine bridge with a private input pipe. The application

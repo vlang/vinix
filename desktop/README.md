@@ -41,6 +41,9 @@ What it does:
   without hiding the desktop
 - embedded **Minecraft**: the native C++ Minetest client renders into Xvfb and
   is composited as a movable, resizable Vinix window with forwarded input
+- native **Blender**: a Vinix GHOST backend renders with surfaceless EGL and
+  publishes directly into a compositor-owned Vinix window, with no Xorg or
+  Wayland server in the path
 - **Cmd-Tab**, which switches windows on a tap and shows all of them in the
   middle of the screen when it is held
 
@@ -57,6 +60,8 @@ typing any word with a q in it drop the user back to the console.
     window.v       the Window model and the pages windows show
     app.v          native application metadata and factories
     app_process.v  compositor/client IPC, UI-tree encoding and lifecycle
+    native_surface_app.v  native external-client lifecycle and input transport
+    vinix_surface.v       shared XRGB surface validation and presentation
     files.v        the file browser
     activity.v     the activity monitor, over /dev/processes
     editor.v       the plain-text editor and its keyboard editing model
@@ -173,6 +178,15 @@ Wine Calculator, Wine Notepad, and Microsoft Word 2013 use that same private
 Xvfb bridge, so translated Windows programs remain ordinary movable Vinix
 windows. Word uses a dedicated translated Win64 prefix; if it is not installed,
 the launcher starts staged licensed Word 2013 x64 media or explains how to add it.
+
+Blender does not use that Xvfb bridge. `build-blender-native-aarch64.sh` applies
+the Vinix GHOST backend to Blender 4.3 and stages its executable. The backend
+creates a surfaceless EGL pbuffer, publishes completed frames through Vinix's
+versioned double-buffered `VSF1` mapping, and consumes compositor pointer and
+keyboard records from a pipe. The desktop starts it with only `VINIX_SURFACE_*`
+coordinates in its environment; neither `DISPLAY` nor `WAYLAND_DISPLAY` is set.
+The on-demand Alpine package continues to supply Blender's shared data and
+runtime libraries.
 
 ## The file browser
 

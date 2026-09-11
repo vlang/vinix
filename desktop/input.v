@@ -24,8 +24,10 @@ mut:
 	scroll   i32
 }
 
-// Button bits, in the order the driver reports them.
+// Button bits, in the order the kernel pointer ABI reports them.
 const button_left = u32(1)
+const button_right = u32(2)
+const button_middle = u32(4)
 
 struct PointerDevice {
 mut:
