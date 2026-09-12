@@ -10,7 +10,7 @@ permissions:
 
 env:
   UI2_COMMIT: d13259f6167367ad8ebd6b2aa4a1f35c59bb1551
-  V_COMMIT: 9fd548810f09e5b49f0b06e500ef5d6845cc8142
+  V_COMMIT: d622f33b527b88ef6707ad72a65bf084ba96d792
 
 jobs:
   check-build-needed:
