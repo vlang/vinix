@@ -513,7 +513,10 @@ fn (mut d Desktop) poll_apps() {
 		}
 		mut app := d.apps[window.app_index]
 		if mut app is PollingApp {
-			if app.poll() {
+			// A minimised window still has to be polled — a shell pipe has to
+			// be drained whether or not anyone can see it — but recomposing
+			// the screen for a picture nobody is looking at is pure waste.
+			if app.poll() && !window.minimized {
 				d.dirty = true
 			}
 		}

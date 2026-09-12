@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (c) 2026 Alexander Medvednikov
 // Xvfb surfaces embedded in compositor-managed Vinix windows.
+@[has_globals]
 module main
 
 const xwd_image_prefix = 'xwd:'
@@ -38,6 +39,10 @@ struct XwdSurface {
 	red_max        u32
 	green_max      u32
 	blue_max       u32
+	// A 24-bit TrueColor Xvfb stores exactly the compositor's own pixel
+	// layout. Recognising that lets a frame be copied word by word instead of
+	// taking every channel apart, which is what the hosted browsers cost.
+	direct bool
 }
 
 @[inline]
@@ -55,6 +60,42 @@ fn xwd_mask_parts(mask u32) (int, u32) {
 		shift++
 	}
 	return shift, value
+}
+
+// A hosted surface is megabytes of shared pages that the application rewrites
+// continuously. Mapping it afresh for every frame faults all of them back in
+// every time, and on a machine running from a disk that walks the page cache
+// over the very executable pages the hosted application is still demand-paging
+// in — the browser and its own picture evicting each other. So a surface is
+// mapped once and kept.
+struct MappedSurface {
+mut:
+	path    string
+	surface XwdSurface
+}
+
+__global mapped_surfaces = []MappedSurface{}
+
+fn mapped_surface(path string) ?XwdSurface {
+	for entry in mapped_surfaces {
+		if entry.path == path {
+			return entry.surface
+		}
+	}
+	surface := open_xwd_surface(path)?
+	// One live application per hosted window, and a window that closes leaves
+	// its path behind; a handful of entries covers every desktop, and the
+	// oldest is dropped rather than grown into.
+	if mapped_surfaces.len >= 4 {
+		mapped_surfaces[0].surface.close()
+		unsafe { mapped_surfaces[0].path.free() }
+		mapped_surfaces.delete(0)
+	}
+	mapped_surfaces << MappedSurface{
+		path: path.clone()
+		surface: surface
+	}
+	return surface
 }
 
 fn open_xwd_surface(path string) ?XwdSurface {
@@ -103,6 +144,8 @@ fn open_xwd_surface(path string) ?XwdSurface {
 		return none
 	}
 	return XwdSurface{
+		direct: byte_order == 0 && red_mask == 0xff0000 && green_mask == 0xff00
+			&& blue_mask == 0xff && pixel_offset % 4 == 0 && bytes_per_line % 4 == 0
 		mapping: mapping
 		size: info.size
 		pixels: unsafe { &u8(usize(mapping) + usize(pixel_offset)) }
@@ -248,16 +291,89 @@ fn (mut canvas Canvas) draw_office_xwd_surface(path string, x int, y int, width 
 	return canvas.draw_presented_xwd_surface(path, x, y, width, height, true)
 }
 
+@[inline]
+fn (surface &XwdSurface) direct_pixel(x int, y int) u32 {
+	unsafe {
+		return *(&u32(&surface.pixels[y * surface.bytes_per_line + x * 4])) & 0x00ffffff
+	}
+}
+
+// blit_direct_surface is the same picture as the general path below, for the
+// case that covers every hosted browser: a 24-bit surface whose pixels already
+// have the compositor's own layout. Dropping the per-pixel channel decode is
+// what makes a 1280x900 window affordable on an emulated core.
+//
+// A window's rounded corners only reach the first and last few rows, so the
+// decision is taken per row: the rows clear of them are written straight into
+// the canvas, and the rest keep the general blend.
+fn (mut canvas Canvas) blit_direct_surface(surface &XwdSurface, x int, y int, width int, height int) {
+	unscaled := width == surface.width && height == surface.height
+	step_x := if width > 1 { (surface.width - 1) * 65536 / (width - 1) } else { 0 }
+	step_y := if height > 1 { (surface.height - 1) * 65536 / (height - 1) } else { 0 }
+	for destination_y := 0; destination_y < height; destination_y++ {
+		plain := canvas.clip_is_plain(x, y + destination_y, width, 1)
+		if unscaled {
+			source_row := destination_y * surface.bytes_per_line
+			if plain {
+				destination_row := (y + destination_y) * canvas.stride + x
+				for column := 0; column < width; column++ {
+					unsafe {
+						canvas.pixels[destination_row + column] = *(&u32(&surface.pixels[
+							source_row + column * 4])) & 0x00ffffff
+					}
+				}
+			} else {
+				for column := 0; column < width; column++ {
+					canvas.blend_pixel(x + column, y + destination_y, surface.direct_pixel(column,
+						destination_y), 255)
+				}
+			}
+			continue
+		}
+
+		fixed_y := if destination_y + 1 == height {
+			(surface.height - 1) * 65536
+		} else {
+			destination_y * step_y
+		}
+		source_y := fixed_y >> 16
+		next_y := if source_y + 1 < surface.height { source_y + 1 } else { source_y }
+		fraction_y := u32(fixed_y & 0xffff) >> 8
+		destination_row := (y + destination_y) * canvas.stride + x
+		mut fixed_x := 0
+		for destination_x := 0; destination_x < width; destination_x++ {
+			if destination_x + 1 == width {
+				fixed_x = (surface.width - 1) * 65536
+			}
+			source_x := fixed_x >> 16
+			next_x := if source_x + 1 < surface.width { source_x + 1 } else { source_x }
+			fraction_x := u32(fixed_x & 0xffff) >> 8
+			color := xwd_bilinear_color(surface.direct_pixel(source_x, source_y),
+				surface.direct_pixel(next_x, source_y), surface.direct_pixel(source_x,
+				next_y), surface.direct_pixel(next_x, next_y), fraction_x, fraction_y)
+			if plain {
+				unsafe {
+					canvas.pixels[destination_row + destination_x] = color
+				}
+			} else {
+				canvas.blend_pixel(x + destination_x, y + destination_y, color, 255)
+			}
+			fixed_x += step_x
+		}
+	}
+}
+
 fn (mut canvas Canvas) draw_presented_xwd_surface(path string, x int, y int, width int, height int,
 	repair_office_ui bool) (bool, bool) {
 	if width <= 0 || height <= 0 {
 		return false, false
 	}
-	surface := open_xwd_surface(path) or { return false, false }
-	defer {
-		surface.close()
-	}
+	surface := mapped_surface(path) or { return false, false }
 	has_office_ribbon := repair_office_ui && surface.office2013_has_tab_backing()
+	if surface.direct && !has_office_ribbon {
+		canvas.blit_direct_surface(surface, x, y, width, height)
+		return true, has_office_ribbon
+	}
 	if width == surface.width && height == surface.height {
 		for destination_y := 0; destination_y < height; destination_y++ {
 			for destination_x := 0; destination_x < width; destination_x++ {

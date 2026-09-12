@@ -10,6 +10,12 @@ const firefox_surface_width = 1280
 const firefox_surface_height = 900
 const firefox_window_width = 1280
 const firefox_window_height = 900
+// The floor below which a hosted surface is blitted even with no damage
+// reported, so a host that under-reports cannot freeze a window.
+const hosted_refresh_floor_ms = i64(1000)
+// Polls spent looking for a counter that a host may never publish. The X
+// server is up well inside this; after it, stop asking the filesystem.
+const hosted_damage_attempts = 400
 const chromium_surface_width = 1280
 const chromium_surface_height = 900
 const chromium_window_width = 1280
@@ -53,19 +59,24 @@ struct WineHostEvent {
 
 struct HostedX11App {
 mut:
-	host_pid       int = -1
-	input_fd       int = -1
-	directory      string
-	xwd_path       string
-	image_path     string
-	surface_width  int
-	surface_height int
-	icon           string
-	starting_text  string
-	exited_text    string
-	ready          bool
-	failed         bool
-	error_message  string
+	host_pid        int = -1
+	input_fd        int = -1
+	directory       string
+	xwd_path        string
+	damage_path     string
+	image_path      string
+	surface_width   int
+	surface_height  int
+	icon            string
+	starting_text   string
+	exited_text     string
+	ready           bool
+	damage_counter  &u32 = unsafe { nil }
+	damage_attempts int
+	damage_sequence u32
+	last_blit_ms    i64
+	failed          bool
+	error_message   string
 }
 
 fn open_firefox(mut _ Desktop) !NativeApp {
@@ -153,6 +164,7 @@ fn open_hosted_x11_app(name string, command string, surface_width int, surface_h
 	process_id := C.getpid()
 	app.directory = '/tmp/vinix-${name}-${process_id}'
 	app.xwd_path = '${app.directory}/Xvfb_screen0'
+	app.damage_path = '${app.directory}/damage'
 	app.image_path = '${xwd_image_prefix}${app.xwd_path}'
 
 	if C.access(c'/usr/bin/Xvfb', C.X_OK) != 0 {
@@ -212,9 +224,65 @@ fn (mut app HostedX11App) poll() bool {
 		app.ready = true
 		return true
 	}
-	// Xvfb changes its shared XWD mapping in place. Ask the compositor to blit
-	// the next frame even though no ui2 model property changed.
-	return true
+	return app.surface_changed()
+}
+
+// Xvfb changes its shared XWD mapping in place, so nothing in the ui2 model
+// says that a new frame arrived. The host watches the X DAMAGE stream and
+// publishes a counter beside the framebuffer; rescaling 1280x900 pixels only
+// when that counter moves is the difference between a hosted browser sharing
+// the emulated processor and being buried under its own compositor.
+//
+// A host that cannot report damage never writes the file, and every poll blits
+// as Vinix always did.
+fn (mut app HostedX11App) surface_changed() bool {
+	now := monotonic_millis()
+	if app.damage_counter == unsafe { nil } {
+		app.map_damage_counter()
+	}
+	if app.damage_counter == unsafe { nil } {
+		app.last_blit_ms = now
+		return true
+	}
+	// The host writes this through the same file's pages, so asking costs a
+	// load rather than a read() that would queue behind whatever the machine
+	// is paging in.
+	sequence := unsafe { *app.damage_counter }
+	if sequence != app.damage_sequence {
+		app.damage_sequence = sequence
+		app.last_blit_ms = now
+		return true
+	}
+	// A host that reports less than its application draws would otherwise
+	// leave a window stale for ever. Coming back once a second bounds that
+	// mistake to something nobody would call a freeze, and still costs a
+	// twentieth of what blitting every frame did.
+	if now - app.last_blit_ms >= hosted_refresh_floor_ms {
+		app.last_blit_ms = now
+		return true
+	}
+	return false
+}
+
+// The counter file appears once the host's X server is up, which is a moment
+// after the framebuffer does, so this keeps trying until it is there. A host
+// that never publishes one leaves the desktop blitting every frame, which is
+// what it did before the counter existed.
+fn (mut app HostedX11App) map_damage_counter() {
+	if app.damage_attempts >= hosted_damage_attempts {
+		return
+	}
+	app.damage_attempts++
+	fd := desktop_open_ro_nonblock(app.damage_path)
+	if fd < 0 {
+		return
+	}
+	mapping := desktop_mmap_readonly(fd, sizeof(u32))
+	desktop_close(fd)
+	if mapping == unsafe { nil } {
+		return
+	}
+	app.damage_counter = unsafe { &u32(mapping) }
 }
 
 fn (mut app HostedX11App) pointer_input_enabled() bool {

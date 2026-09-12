@@ -8,14 +8,17 @@
 #include <X11/Xlib.h>
 #include <X11/keysym.h>
 #include <X11/extensions/XTest.h>
+#include <X11/extensions/Xdamage.h>
 
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <signal.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/mman.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -386,6 +389,56 @@ static int process_event(Display *display, const struct wine_host_event *event,
     return 1;
 }
 
+/* The compositor cannot see when Xvfb touched its shared framebuffer: the
+ * application draws straight into the mapping, so neither its size nor its
+ * timestamps move. Left to guess, vinix-desktop rescales the whole surface
+ * twenty times a second whether or not anything changed, and on an emulated
+ * core that starves the very browser it is displaying.
+ *
+ * So report drawing as it happens. A counter file next to the framebuffer
+ * carries the damage sequence; the desktop blits only when it advances. */
+/* The counter is shared the same way the framebuffer is — through the file's
+ * pages — so that publishing costs a store and reading it costs a load. The
+ * desktop polls this twenty times a second while the machine is busy paging a
+ * browser in; a read() there would queue behind that. */
+static volatile uint32_t *map_damage_counter(const char *directory) {
+    char path[PATH_MAX];
+    void *mapping;
+    int fd;
+
+    if (snprintf(path, sizeof(path), "%s/damage", directory) >= (int)sizeof(path))
+        return NULL;
+    fd = open(path, O_RDWR | O_CREAT | O_TRUNC, 0600);
+    if (fd < 0)
+        return NULL;
+    if (ftruncate(fd, (off_t)sizeof(uint32_t)) != 0) {
+        close(fd);
+        return NULL;
+    }
+    mapping = mmap(NULL, sizeof(uint32_t), PROT_READ | PROT_WRITE, MAP_SHARED,
+                   fd, 0);
+    close(fd);
+    if (mapping == MAP_FAILED)
+        return NULL;
+    return mapping;
+}
+
+/* Xvfb has no compositing, so every window draws into the root's own pixmap
+ * and damage on the root covers the whole session. Report only that the
+ * screen changed: the desktop rescales the entire surface anyway. */
+static Damage watch_root_damage(Display *display, int *event_base) {
+    int error_base;
+    int major;
+    int minor;
+
+    if (!XDamageQueryExtension(display, event_base, &error_base))
+        return None;
+    if (!XDamageQueryVersion(display, &major, &minor))
+        return None;
+    return XDamageCreate(display, DefaultRootWindow(display),
+                         XDamageReportNonEmpty);
+}
+
 static void stop_child(pid_t pid) {
     int status;
     int attempt;
@@ -421,6 +474,10 @@ int main(int argc, char **argv) {
     int xtest_error_base;
     int xtest_major;
     int xtest_minor;
+    int damage_event_base = 0;
+    volatile uint32_t *damage_counter = NULL;
+    uint32_t damage_sequence = 0;
+    Damage damage;
 
     if (argc != 5) {
         fprintf(stderr, "usage: %s DISPLAY FBDIR GEOMETRY COMMAND\n", argv[0]);
@@ -478,6 +535,18 @@ int main(int argc, char **argv) {
     XClearWindow(display, DefaultRootWindow(display));
     XFlush(display);
 
+    damage = watch_root_damage(display, &damage_event_base);
+    if (damage != None) {
+        damage_counter = map_damage_counter(directory);
+        if (damage_counter == NULL) {
+            XDamageDestroy(display, damage);
+            damage = None;
+        } else {
+            /* The first frame is the one the desktop is waiting for. */
+            *damage_counter = ++damage_sequence;
+        }
+    }
+
     wine_pid = spawn_wine(display_name, command);
     if (wine_pid < 0) {
         perror("vinix-wine-host: fork Wine");
@@ -517,6 +586,24 @@ int main(int argc, char **argv) {
         if (used == sizeof(input))
             running = 0;
 
+        if (damage != None) {
+            int drawn = 0;
+            /* XDamageReportNonEmpty stays quiet until the region is taken
+             * back, so one subtract per pass is enough however much was
+             * drawn in it. */
+            while (XPending(display) > 0) {
+                XEvent event;
+                XNextEvent(display, &event);
+                if (event.type == damage_event_base + XDamageNotify)
+                    drawn = 1;
+            }
+            if (drawn) {
+                XDamageSubtract(display, damage, None, None);
+                XFlush(display);
+                *damage_counter = ++damage_sequence;
+            }
+        }
+
         if (wine_pid > 0 && waitpid(wine_pid, &status, WNOHANG) == wine_pid) {
             wine_pid = -1;
             running = 0;
@@ -525,6 +612,8 @@ int main(int argc, char **argv) {
     }
 
     stop_child(wine_pid);
+    if (damage_counter != NULL)
+        munmap((void *)damage_counter, sizeof(uint32_t));
     XCloseDisplay(display);
     stop_child(xvfb_pid);
     /* Xvfb removes these when it is asked to stop, but not when it has to be
