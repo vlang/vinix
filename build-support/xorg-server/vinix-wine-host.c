@@ -16,8 +16,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/un.h>
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
@@ -59,6 +61,92 @@ static int ignore_x_error(Display *display, XErrorEvent *event) {
 static void sleep_10ms(void) {
     const struct timespec delay = { 0, 10000000 };
     nanosleep(&delay, NULL);
+}
+
+/* The desktop names each hosted display after the process that asked for it,
+ * and a process id is released the moment that process exits — while the host
+ * it started is still stopping its X server. Relaunching an application then
+ * lands on a display number whose old server is alive, or whose lock file it
+ * left behind names a process id that has since been reused, and Xvfb refuses
+ * to start: "Server is already active for display N".
+ *
+ * So the number the desktop asks for is a starting point, not a promise. Take
+ * the first display from there that nothing is serving and nothing holds, and
+ * clear whatever a killed server left behind on it. */
+static int display_number(const char *display_name) {
+    const char *digit = display_name;
+    int number = 0;
+
+    while (*digit == ':')
+        ++digit;
+    if (*digit == '\0')
+        return -1;
+    for (; *digit != '\0'; ++digit) {
+        if (*digit < '0' || *digit > '9')
+            return -1;
+        number = number * 10 + (*digit - '0');
+        if (number > 65535)
+            return -1;
+    }
+    return number;
+}
+
+/* Remove what a killed X server left on a display. Xvfb cleans these up when
+ * it is asked to stop, but not when it has to be killed. */
+static void remove_display_files(int number) {
+    char path[64];
+
+    if (number < 0)
+        return;
+    snprintf(path, sizeof(path), "/tmp/.X11-unix/X%d", number);
+    unlink(path);
+    snprintf(path, sizeof(path), "/tmp/.X%d-lock", number);
+    unlink(path);
+}
+
+/* True when nothing answers on this display. A lock file whose server is gone
+ * is removed on the way: its recorded process id is no help, because the id
+ * has usually been handed to something unrelated by the time anyone looks. */
+static int claim_display_number(int number) {
+    char socket_path[64];
+    struct sockaddr_un address;
+    int probe;
+
+    snprintf(socket_path, sizeof(socket_path), "/tmp/.X11-unix/X%d", number);
+    memset(&address, 0, sizeof(address));
+    address.sun_family = AF_UNIX;
+    snprintf(address.sun_path, sizeof(address.sun_path), "%s", socket_path);
+
+    probe = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (probe >= 0) {
+        int connected = connect(probe, (struct sockaddr *)&address,
+                                sizeof(address)) == 0;
+        close(probe);
+        if (connected)
+            return 0; /* Somebody is serving this display. */
+    }
+    remove_display_files(number);
+    return 1;
+}
+
+/* Fill `storage` with the display to use and return it, or NULL if every
+ * candidate is busy. */
+static const char *claim_display(const char *requested, char *storage,
+                                 size_t size) {
+    int base = display_number(requested);
+
+    if (base < 0)
+        return requested;
+    for (int offset = 0; offset < 64; ++offset) {
+        int number = base + offset;
+        if (number > 65535)
+            break;
+        if (claim_display_number(number)) {
+            snprintf(storage, size, ":%d", number);
+            return storage;
+        }
+    }
+    return NULL;
 }
 
 static pid_t spawn_xvfb(const char *display_name, const char *directory,
@@ -320,6 +408,7 @@ int main(int argc, char **argv) {
     unsigned char input[8192];
     size_t used = 0;
     const char *display_name;
+    char chosen_display[16];
     const char *directory;
     const char *geometry;
     const char *command;
@@ -351,6 +440,13 @@ int main(int argc, char **argv) {
 
     if (mkdir(directory, 0700) != 0 && errno != EEXIST) {
         perror("vinix-wine-host: mkdir");
+        return 1;
+    }
+    display_name = claim_display(display_name, chosen_display,
+                                 sizeof(chosen_display));
+    if (display_name == NULL) {
+        fprintf(stderr, "vinix-wine-host: no free display near %s\n", argv[1]);
+        rmdir(directory);
         return 1;
     }
     xvfb_pid = spawn_xvfb(display_name, directory, geometry);
@@ -431,6 +527,9 @@ int main(int argc, char **argv) {
     stop_child(wine_pid);
     XCloseDisplay(display);
     stop_child(xvfb_pid);
+    /* Xvfb removes these when it is asked to stop, but not when it has to be
+     * killed. Leave nothing behind for the next server on this number. */
+    remove_display_files(display_number(display_name));
     rmdir(directory);
     return 0;
 }
