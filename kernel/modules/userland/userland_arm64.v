@@ -641,7 +641,12 @@ pub fn syscall_execve(_ voidptr, _path charptr, _argv &charptr, _envp &charptr) 
 	return errno.err, errno.get()
 }
 
-pub fn start_program(execve bool, dir &fs.VFSNode, path string, argv []string, envp []string, stdin string, stdout string, stderr string) ?&proc.Process {
+pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, envp []string, stdin string, stdout string, stderr string) ?&proc.Process {
+	// Chromium starts every child process by executing /proc/self/exe. The VFS
+	// resolves that to this process's program, but the new process must record
+	// where the program really is: keeping the literal path would make the
+	// child's own /proc/self/exe point back at itself forever.
+	path := fs.resolve_self_reference(_path)
 	prog_node := fs.get_node(dir, path, true)?
 	if !stat.isreg(prog_node.resource.stat.mode)
 		|| !fs.check_access(prog_node, fs.access_exec, true) {

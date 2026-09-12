@@ -185,15 +185,29 @@ fn kmain_thread(qemu_platform bool) {
 	print('kmain_thread: root mount done\n')
 	fs.create(vfs_root, '/dev', 0o644 | stat.ifdir) or {}
 	fs.mount(vfs_root, '', '/dev', 'devtmpfs') or {}
+	fs.create(vfs_root, '/proc', 0o555 | stat.ifdir) or {}
+	fs.mount(vfs_root, '', '/proc', 'procfs') or {}
 	print('kmain_thread: devtmpfs done\n')
 	if qemu_platform {
 		virtio_blk.initialise(memory.get_hhdm_offset())
 	}
 
-	initramfs.initialise()
-	print('kmain_thread: initramfs done\n')
-	if qemu_platform && !virtio_blk.mount_persistent_home() {
-		panic('QEMU persistent storage was requested but could not be mounted')
+	// A QEMU machine asked to keep its whole filesystem boots off the data
+	// volume instead of unpacking the image into RAM. The initramfs stays in
+	// the boot payload as the fallback for a volume that does not carry a
+	// system, so an unusable disk still reaches a usable machine.
+	disk_root := qemu_platform && virtio_blk.mount_persistent_root()
+	if disk_root {
+		// The image itself is already installed on the volume; the per-run
+		// overlay modules after it are not, and still have to be applied.
+		initramfs.initialise_overlays()
+		print('kmain_thread: persistent root done\n')
+	} else {
+		initramfs.initialise()
+		print('kmain_thread: initramfs done\n')
+		if qemu_platform && !virtio_blk.mount_persistent_home() {
+			panic('QEMU persistent storage was requested but could not be mounted')
+		}
 	}
 
 	if enable_fake_g17 {

@@ -82,6 +82,7 @@ pub fn initialise() {
 	// Install filesystems by name string
 	filesystems['tmpfs'] = &TmpFS{}
 	filesystems['devtmpfs'] = &DevTmpFS{}
+	filesystems['procfs'] = &ProcFS{}
 }
 
 fn reduce_node(node &VFSNode, follow_symlinks bool) &VFSNode {
@@ -98,7 +99,17 @@ fn reduce_node_bounded(node &VFSNode, follow_symlinks bool, depth int, effective
 		return reduce_node_bounded(node.mountpoint, follow_symlinks, depth + 1, effective)
 	}
 	if node.symlink_target.len != 0 && follow_symlinks == true {
-		_, next_node, _ := path2node_bounded(node.parent, node.symlink_target, depth + 1,
+		// /proc/self names the reading process, so its target cannot be a
+		// string stored on the node.
+		mut target := node.symlink_target
+		if procfs_is_self_link(node) {
+			target = procfs_self_target()
+			if target.len == 0 {
+				errno.set(errno.enoent)
+				return 0
+			}
+		}
+		_, next_node, _ := path2node_bounded(node.parent, target, depth + 1,
 			effective)
 		if unsafe { next_node == 0 } {
 			return 0
@@ -118,6 +129,13 @@ fn path2node_bounded(parent &VFSNode, path string, depth int, effective bool) (&
 	if path.len == 0 {
 		errno.set(errno.enoent)
 		return 0, 0, ''
+	}
+	if path.starts_with(proc_self_prefix) {
+		// The substitute is a real pathname, so it never re-enters this branch.
+		resolved := resolve_self_reference(path)
+		if resolved != path {
+			return path2node_bounded(parent, resolved, depth + 1, effective)
+		}
 	}
 
 	mut index := u64(0)
@@ -164,6 +182,9 @@ fn path2node_bounded(parent &VFSNode, path string, depth int, effective bool) (&
 		if !check_access(current_node, access_exec, effective) {
 			errno.set(errno.eacces)
 			return 0, 0, ''
+		}
+		if elem_str !in current_node.children {
+			procfs_refresh(current_node)
 		}
 		if elem_str !in current_node.children {
 			errno.set(errno.enoent)
@@ -600,6 +621,60 @@ pub fn syscall_mkdirat(_ voidptr, dirfd int, _path charptr, mode u32) (u64, u64)
 	return 0, 0
 }
 
+pub const proc_self_prefix = '/proc/self/'
+
+// Substitute the two /proc/self entries the kernel can answer directly: the
+// program a process is running, and the pathname behind one of its descriptors.
+// procfs serves both as ordinary nodes, but resolving them to a real pathname
+// here is what lets exec() record where the program actually is — Chromium
+// starts each of its child processes by executing /proc/self/exe, and a child
+// that kept the literal path would resolve its own /proc/self/exe to itself
+// forever. musl's realpath(3) reopens /proc/self/fd/N, which is the same case.
+//
+// The original path comes back when it names anything else under /proc/self, so
+// a caller can tell the substitution apart from a path that simply is not there.
+pub fn resolve_self_reference(path string) string {
+	mut process := proc.current_thread().process
+	if unsafe { process == 0 } {
+		return path
+	}
+
+	if path == '/proc/self/exe' {
+		if process.executable_path.len == 0 {
+			return path
+		}
+		return process.executable_path
+	}
+
+	fd_prefix := '/proc/self/fd/'
+	if !path.starts_with(fd_prefix) {
+		return path
+	}
+	fd_text := path[fd_prefix.len..]
+	if fd_text.len == 0 {
+		return path
+	}
+	mut fdnum := 0
+	for digit in fd_text {
+		if digit < `0` || digit > `9` {
+			return path
+		}
+		fdnum = fdnum * 10 + int(digit - `0`)
+		if fdnum >= proc.max_fds {
+			return path
+		}
+	}
+
+	mut fd := file.fd_from_fdnum(process, fdnum) or { return path }
+	defer {
+		fd.unref()
+	}
+	if fd.handle.node == unsafe { nil } {
+		return path
+	}
+	return pathname(unsafe { &VFSNode(fd.handle.node) })
+}
+
 pub fn syscall_readlinkat(_ voidptr, dirfd int, _path charptr, buf voidptr, limit u64) (u64, u64) {
 	mut current_thread := proc.current_thread()
 	mut process := current_thread.process
@@ -615,49 +690,11 @@ pub fn syscall_readlinkat(_ voidptr, dirfd int, _path charptr, buf voidptr, limi
 	if path.len == 0 {
 		return errno.err, errno.enoent
 	}
-	if path == '/proc/self/exe' {
-		target := process.executable_path
-		if target.len == 0 {
+	if path.starts_with(proc_self_prefix) {
+		target := resolve_self_reference(path)
+		if target == path {
 			return errno.err, errno.enoent
 		}
-		mut to_copy := u64(target.len)
-		if to_copy > limit {
-			to_copy = limit
-		}
-		if !usercopy.copy_to_user(u64(buf), target.str, to_copy) {
-			return errno.err, errno.efault
-		}
-		return to_copy, 0
-	}
-	proc_fd_prefix := '/proc/self/fd/'
-	if path.starts_with(proc_fd_prefix) {
-		fd_text := path[proc_fd_prefix.len..]
-		if fd_text.len == 0 {
-			return errno.err, errno.enoent
-		}
-
-		mut fdnum := 0
-		for digit in fd_text {
-			if digit < `0` || digit > `9` {
-				return errno.err, errno.enoent
-			}
-			fdnum = fdnum * 10 + int(digit - `0`)
-			if fdnum >= proc.max_fds {
-				return errno.err, errno.enoent
-			}
-		}
-
-		mut fd := file.fd_from_fdnum(process, fdnum) or {
-			return errno.err, errno.enoent
-		}
-		defer {
-			fd.unref()
-		}
-		if fd.handle.node == unsafe { nil } {
-			return errno.err, errno.enoent
-		}
-
-		target := pathname(unsafe { &VFSNode(fd.handle.node) })
 		mut to_copy := u64(target.len)
 		if to_copy > limit {
 			to_copy = limit
@@ -674,6 +711,21 @@ pub fn syscall_readlinkat(_ voidptr, dirfd int, _path charptr, buf voidptr, limi
 
 	if stat.islnk(node.resource.stat.mode) == false {
 		return errno.err, errno.einval
+	}
+
+	if procfs_is_self_link(node) {
+		self_target := procfs_self_target()
+		if self_target.len == 0 {
+			return errno.err, errno.enoent
+		}
+		mut self_copy := u64(self_target.len)
+		if self_copy > limit {
+			self_copy = limit
+		}
+		if !usercopy.copy_to_user(u64(buf), self_target.str, self_copy) {
+			return errno.err, errno.efault
+		}
+		return self_copy, 0
 	}
 
 	// readlink(2) does not terminate the buffer, and reports only the bytes it
@@ -1198,6 +1250,7 @@ pub fn syscall_readdir(_ voidptr, fdnum int, mut buf stat.Dirent) (u64, u64) {
 	mut dir_node := unsafe { &VFSNode(dir_handle.node) }
 
 	if dir_handle.dirlist_valid == false {
+		procfs_refresh(dir_node)
 		dir_handle.dirlist.clear()
 		mut i := u64(0)
 		for name, mut orig_node in dir_node.children {

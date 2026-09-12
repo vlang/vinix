@@ -416,3 +416,112 @@ pub fn set_thread_affinity(tid int, mask u64) bool {
 	t.affinity_mask = mask
 	return true
 }
+
+// ── What /proc reports about a process ──────────────────────────────────────
+// procfs rebuilds its tree from the process table on access, so each of these
+// takes the table lock, reads what it needs and lets go before its caller does
+// anything with the answer. A `&Process` never leaves this file.
+
+// The command name Linux puts in comm and in the parenthesised field of stat.
+// A Vinix process is named for the path it was executed from with its pid
+// appended; the part that corresponds to comm is the basename without that.
+fn command_name(name string) string {
+	mut end := name.len
+	if end > 0 && name[end - 1] == `]` {
+		mut open := end - 1
+		for open > 0 && name[open] != `[` {
+			open--
+		}
+		if name[open] == `[` {
+			end = open
+		}
+	}
+	mut start := 0
+	for i := 0; i < end; i++ {
+		if name[i] == `/` {
+			start = i + 1
+		}
+	}
+	if start >= end {
+		return name
+	}
+	return name[start..end]
+}
+
+// The program a process is running, as an absolute path. Empty when the kernel
+// started the process itself and there is no file behind it.
+pub fn process_program(pid int) string {
+	lock_table()
+	defer { unlock_table() }
+	process := process_at(pid)
+	if process == unsafe { nil } {
+		return ''
+	}
+	return process.executable_path.clone()
+}
+
+pub fn process_command(pid int) string {
+	lock_table()
+	defer { unlock_table() }
+	process := process_at(pid)
+	if process == unsafe { nil } {
+		return ''
+	}
+	return command_name(process.name)
+}
+
+// The thread ids of a process, in the order the process holds them.
+pub fn thread_ids(pid int) []int {
+	mut ids := []int{}
+	lock_table()
+	defer { unlock_table() }
+	mut process := process_at(pid)
+	if process == unsafe { nil } {
+		return ids
+	}
+	// Taken without blocking: this runs under the table lock, and a thread in
+	// the middle of exiting holds its process' thread list while it goes on to
+	// take locks the rest of the kernel takes first. A process that is busy
+	// changing its thread set reports its main thread for one lookup instead.
+	if !process.threads_lock.test_and_acquire() {
+		ids << pid
+		return ids
+	}
+	for i := 0; i < process.threads.len; i++ {
+		member := process.threads[i]
+		if member != unsafe { nil } {
+			ids << member.tid
+		}
+	}
+	process.threads_lock.release()
+	if ids.len == 0 {
+		ids << pid
+	}
+	return ids
+}
+
+// The first fields of /proc/<pid>/stat. Everything Vinix does not account for
+// is reported as zero rather than invented; readers take the fields they know.
+pub fn process_stat_line(pid int) string {
+	lock_table()
+	defer { unlock_table() }
+	process := process_at(pid)
+	if process == unsafe { nil } {
+		return ''
+	}
+	comm := command_name(process.name)
+	threads := if process.threads.len > 0 { process.threads.len } else { 1 }
+	return '${pid} (${comm}) R ${process.ppid} ${process.pgid} ${process.sid} 0 -1 0 0 0 0 0 0 0 0 0 20 0 ${threads} 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n'
+}
+
+pub fn process_status_text(pid int) string {
+	lock_table()
+	defer { unlock_table() }
+	process := process_at(pid)
+	if process == unsafe { nil } {
+		return ''
+	}
+	comm := command_name(process.name)
+	threads := if process.threads.len > 0 { process.threads.len } else { 1 }
+	return 'Name:\t${comm}\nUmask:\t0${process.umask:o}\nState:\tR (running)\nTgid:\t${pid}\nNgid:\t0\nPid:\t${pid}\nPPid:\t${process.ppid}\nTracerPid:\t0\nUid:\t${process.uid}\t${process.euid}\t${process.suid}\t${process.euid}\nGid:\t${process.gid}\t${process.egid}\t${process.sgid}\t${process.egid}\nThreads:\t${threads}\n'
+}
