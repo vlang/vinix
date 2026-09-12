@@ -22,10 +22,14 @@ mut:
 
 pub struct Cache {
 mut:
-	l        klock.Lock
-	pages    []&Page // Least recently used first.
-	owner    voidptr
-	size     u64
+	l     klock.Lock
+	pages []&Page // Least recently used first.
+	owner voidptr
+	size  u64
+	// Recorded by register_cache so a descriptor-less flush -- sync(2), or the
+	// reboot path -- can reach the backing store. Both are nil until then.
+	writeback_context voidptr
+	writeback         IO
 pub:
 	capacity int = default_capacity
 }

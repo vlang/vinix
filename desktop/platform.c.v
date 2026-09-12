@@ -335,6 +335,11 @@ mut:
 // Both architecture images follow Alpine's standard command layout.
 const desktop_command_path = '/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin'
 
+// The session's home. On QEMU this is a separate writable volume; the rest of
+// the image is a read-only system loaded from the initramfs, so it is also the
+// only place a file created here survives a restart.
+const desktop_home = '/root'
+
 enum ExternalProgramResult {
 	success
 	unavailable
@@ -353,7 +358,8 @@ fn desktop_run_external(path string) ExternalProgramResult {
 
 	argv := [&char(path.str), &char(unsafe { nil })]
 	path_entry := 'PATH=${desktop_command_path}'
-	envp := [&char(path_entry.str), c'HOME=/root', c'TERM=linux', c'USER=root', c'LOGNAME=root',
+	home_entry := 'HOME=${desktop_home}'
+	envp := [&char(path_entry.str), &char(home_entry.str), c'TERM=linux', c'USER=root', c'LOGNAME=root',
 		c'SHELL=/bin/zsh', c'LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules',
 		c'LIBGL_DRIVERS_PATH=/usr/lib/xorg/modules/dri:/usr/lib/dri',
 		c'SSL_CA_CERT_FILE=/etc/ssl/certs/ca-certificates.crt', &char(unsafe { nil })]
@@ -422,10 +428,11 @@ fn desktop_spawn_shell(path string, rows int, columns int, width int, height int
 	// async-signal-safe functions, which allocating is not.
 	argv := [&char(path.str), c'-i', &char(unsafe { nil })]
 	path_entry := 'PATH=${desktop_command_path}'
+	home_entry := 'HOME=${desktop_home}'
 	// A valid terminal type is required by terminal applications such as tmux.
 	// `linux` is available in ncurses-terminfo-base, including when tmux is
 	// installed through pkg, and the terminal parser accepts its ANSI output.
-	envp := [&char(path_entry.str), c'HOME=/root', c'TERM=linux', c'USER=root', c'LOGNAME=root',
+	envp := [&char(path_entry.str), &char(home_entry.str), c'TERM=linux', c'USER=root', c'LOGNAME=root',
 		c'SHELL=/bin/zsh', c'LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules',
 		c'LIBGL_DRIVERS_PATH=/usr/lib/xorg/modules/dri:/usr/lib/dri',
 		c'SSL_CA_CERT_FILE=/etc/ssl/certs/ca-certificates.crt', &char(unsafe { nil })]
@@ -447,6 +454,12 @@ fn desktop_spawn_shell(path string, rows int, columns int, width int, height int
 		if slave > 2 {
 			C.close(slave)
 		}
+		// Start in the home directory rather than wherever the compositor was
+		// started from, which is `/` -- a read-only system directory that an
+		// interactive shell has no business writing into. An interactive zsh is
+		// not a login shell, so nothing else moves it there. A failure is not
+		// fatal: a shell in the wrong directory still beats no shell.
+		C.chdir(&char(desktop_home.str))
 		C.execve(&char(path.str), argv.data, envp.data)
 		C._exit(127)
 	}
@@ -650,7 +663,8 @@ fn desktop_spawn_app(path string, app_name string, tz_offset i64) ?SpawnedAppPro
 	argv := [&char(path.str), &char(mode_arg.str), &char(request_arg.str), &char(response_arg.str),
 		&char(tz_arg.str), &char(unsafe { nil })]
 	path_entry := 'PATH=${desktop_command_path}'
-	envp := [&char(path_entry.str), c'HOME=/root', c'TERM=dumb', c'USER=root', c'LOGNAME=root',
+	home_entry := 'HOME=${desktop_home}'
+	envp := [&char(path_entry.str), &char(home_entry.str), c'TERM=dumb', c'USER=root', c'LOGNAME=root',
 		c'SHELL=/bin/zsh', c'LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules',
 		c'LIBGL_DRIVERS_PATH=/usr/lib/xorg/modules/dri:/usr/lib/dri',
 		c'SSL_CA_CERT_FILE=/etc/ssl/certs/ca-certificates.crt', &char(unsafe { nil })]
@@ -745,10 +759,11 @@ fn desktop_spawn_native_surface(path string, first_argument string, second_argum
 	argv := [&char(path.str), &char(first_argument.str), &char(second_argument.str),
 		&char(unsafe { nil })]
 	path_entry := 'PATH=${desktop_command_path}'
+	home_entry := 'HOME=${desktop_home}'
 	surface_entry := 'VINIX_SURFACE_PATH=${surface_path}'
 	width_entry := 'VINIX_SURFACE_WIDTH=${width}'
 	height_entry := 'VINIX_SURFACE_HEIGHT=${height}'
-	mut envp := [&char(path_entry.str), c'HOME=/root', c'TERM=dumb', c'USER=root', c'LOGNAME=root',
+	mut envp := [&char(path_entry.str), &char(home_entry.str), c'TERM=dumb', c'USER=root', c'LOGNAME=root',
 		c'SHELL=/bin/zsh', c'LD_LIBRARY_PATH=/usr/lib', c'LIBGL_DRIVERS_PATH=/usr/lib/dri',
 		c'EGL_PLATFORM=surfaceless', c'SSL_CA_CERT_FILE=/etc/ssl/certs/ca-certificates.crt']
 	// QEMU exposes only simpledrm, so select the packaged software renderer
@@ -820,7 +835,8 @@ fn desktop_spawn_wine_host(directory string, width int, height int, command stri
 	argv := [&char(host.str), &char(display_name.str), &char(directory.str), &char(geometry.str),
 		&char(command.str), &char(unsafe { nil })]
 	path_entry := 'PATH=${desktop_command_path}'
-	envp := [&char(path_entry.str), c'HOME=/root', c'TERM=dumb', c'USER=root', c'LOGNAME=root',
+	home_entry := 'HOME=${desktop_home}'
+	envp := [&char(path_entry.str), &char(home_entry.str), c'TERM=dumb', c'USER=root', c'LOGNAME=root',
 		c'SHELL=/bin/zsh', c'LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules',
 		c'LIBGL_DRIVERS_PATH=/usr/lib/xorg/modules/dri:/usr/lib/dri', &char(unsafe { nil })]
 

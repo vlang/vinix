@@ -35,6 +35,12 @@ static const char *file_b = "/root/vinix-qemu-core/b";
 static const char *file_c = "/root/vinix-qemu-core/c";
 static const char *persist_file = "/root/vinix-qemu-core/persist";
 static const char persist_payload[] = "vinix-ext2-cache-writeback-v1";
+/* The same marker written the way a shell writes a file: buffered, closed, and
+ * pushed out by sync(2) alone. Nothing else drains a small write from the
+ * shared cache, so a restart used to lose it while the O_SYNC marker above
+ * survived, which is exactly what made a persistent /root look empty. */
+static const char *synced_file = "/root/vinix-qemu-core/synced";
+static const char synced_payload[] = "vinix-ext2-sync-writeback-v1";
 static volatile sig_atomic_t posix_timer_callbacks;
 
 static void posix_timer_callback(union sigval value)
@@ -54,20 +60,37 @@ static int reap_ok(pid_t child)
 
 /* Return one for the verification boot, zero for a fresh volume, and minus
  * one for a malformed or unreadable persistence marker. */
+static int verify_marker(const char *path, const char *payload, size_t length)
+{
+	int fd = open(path, O_RDONLY);
+	if (fd < 0)
+		return -1;
+	char observed[64] = {0};
+	if (length >= sizeof(observed)) {
+		close(fd);
+		errno = EINVAL;
+		return -1;
+	}
+	ssize_t got = read(fd, observed, sizeof(observed));
+	close(fd);
+	if (got != (ssize_t)length || memcmp(observed, payload, length) != 0) {
+		errno = EIO;
+		return -1;
+	}
+	return unlink(path);
+}
+
 static int verify_persistence_boot(void)
 {
 	int fd = open(persist_file, O_RDONLY);
 	if (fd < 0)
 		return errno == ENOENT ? 0 : -1;
-	char observed[sizeof(persist_payload)] = {0};
-	ssize_t length = read(fd, observed, sizeof(observed));
 	close(fd);
-	if (length != (ssize_t)(sizeof(persist_payload) - 1) ||
-	    memcmp(observed, persist_payload, sizeof(persist_payload) - 1) != 0) {
-		errno = EIO;
+	if (verify_marker(persist_file, persist_payload,
+	        sizeof(persist_payload) - 1) != 0)
 		return -1;
-	}
-	if (unlink(persist_file) != 0)
+	if (verify_marker(synced_file, synced_payload,
+	        sizeof(synced_payload) - 1) != 0)
 		return -1;
 	puts("VINIX QEMU CORE PERSIST: PASS");
 	return 1;
@@ -368,13 +391,22 @@ static int run_tests(void)
 	CHECK(unlink(file_a) == 0);
 	CHECK(unlink(file_b) == 0);
 	CHECK(unlink(file_c) == 0);
+	int synced = open(synced_file, O_CREAT | O_EXCL | O_WRONLY, 0600);
+	CHECK(synced >= 0);
+	CHECK(write(synced, synced_payload, sizeof(synced_payload) - 1) ==
+	    (ssize_t)(sizeof(synced_payload) - 1));
+	CHECK(close(synced) == 0);
+	/* No O_SYNC and no descriptor left open: sync(2) is the only thing that
+	 * can still get this to the disk. Written before the O_SYNC marker so the
+	 * verification boot cannot pass on that one alone. */
+	sync();
 	int fd = open(persist_file, O_CREAT | O_EXCL | O_WRONLY | O_SYNC, 0600);
 	CHECK(fd >= 0);
 	CHECK(write(fd, persist_payload, sizeof(persist_payload) - 1) ==
 	    (ssize_t)(sizeof(persist_payload) - 1));
 	CHECK(fsync(fd) == 0);
 	CHECK(close(fd) == 0);
-	puts("QEMU CORE PASS: persistence marker synchronized");
+	puts("QEMU CORE PASS: persistence markers synchronized");
 	puts("VINIX QEMU CORE: PASS");
 	return 0;
 }

@@ -30,6 +30,9 @@ import pipe
 import futex
 import socket
 import limine
+import event
+import event.eventstruct
+import pagecache
 import gpu.agx.driver as agx_driver
 import gpu.agx.fake as fake_agx
 import gpu.dcp
@@ -279,12 +282,43 @@ fn kmain_thread(qemu_platform bool) {
 	}
 	boot_stage(12)
 
+	sched.new_kernel_thread(voidptr(writeback_thread), unsafe { nil }, true)
+	print('kmain_thread: writeback done\n')
+
 	print('\n*** aarch64: Kernel initialisation complete ***\n')
 	print('*** Starting /sbin/init ***\n')
 
 	userland.start_program(false, vfs_root, '/sbin/init', ['/sbin/init'], [], '/dev/console', '/dev/console', '/dev/console') or { panic('Could not start init process') }
 
 	sched.dequeue_and_die()
+}
+
+// How long a write may sit in memory before it is pushed to the device.
+const writeback_interval_seconds = i64(5)
+
+// Filesystem writes land in a write-back page cache, which on its own hands a
+// page to the disk only when the LRU evicts it. A small file -- the usual case
+// -- is therefore still in memory when the machine stops, and a restart loses
+// it, which is what made a persistent /root look like it was not persistent at
+// all. Linux answers this with a writeback timer; so does this thread. sync(2)
+// and reboot(2) are still the exact guarantees, and this only bounds the window
+// for everything that never calls them, including a VM window simply closed.
+fn writeback_thread() {
+	for {
+		mut events := []&eventstruct.Event{}
+		mut interval := time.new_timer(time.TimeSpec{
+			tv_sec: writeback_interval_seconds
+			tv_nsec: 0
+		})
+		events << &interval.event
+		event.await(mut events, true) or {}
+		interval.disarm()
+		unsafe { free(interval) }
+		unsafe { events.free() }
+		// A device that cannot take the write keeps its pages dirty and
+		// retryable, so the next round tries again rather than giving up.
+		pagecache.sync_all()
+	}
 }
 
 fn get_dt_base(compat string, default_base u64) u64 {

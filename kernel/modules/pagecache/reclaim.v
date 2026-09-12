@@ -16,7 +16,15 @@ __global (
 // Filesystems register long-lived shared caches once their backing store has
 // been validated. Cache objects are mount-lifetime allocations in Vinix, so a
 // registry entry cannot outlive its target.
-pub fn register_cache(cache &Cache) bool {
+//
+// The writeback callback and its context are recorded here as well. Without
+// them a registered cache could only be reclaimed, never flushed: sync(2) and
+// reboot(2) have no descriptor to recover them from, and dirty pages reached
+// the device only when the LRU happened to evict them.
+pub fn register_cache(cache &Cache, context voidptr, store IO) bool {
+	if context == unsafe { nil } {
+		return false
+	}
 	registered_caches_lock.acquire()
 	defer { registered_caches_lock.release() }
 	for i := 0; i < registered_caches_len; i++ {
@@ -33,9 +41,33 @@ pub fn register_cache(cache &Cache) bool {
 		}
 		reclaimer_registered = true
 	}
-	registered_caches[registered_caches_len] = unsafe { cache }
+	mut target := unsafe { cache }
+	target.writeback_context = context
+	target.writeback = store
+	registered_caches[registered_caches_len] = target
 	registered_caches_len++
 	return true
+}
+
+// Write every registered cache's dirty pages back to its backing store. This
+// is what sync(2), syncfs(2) and the shutdown path need: a filesystem whose
+// pages are only flushed on eviction otherwise loses every small write when
+// the machine restarts. Flushing continues past a failing cache so one broken
+// device cannot strand the others, and the failure is still reported.
+pub fn sync_all() bool {
+	registered_caches_lock.acquire()
+	count := registered_caches_len
+	registered_caches_lock.release()
+
+	mut ok := true
+	for i := 0; i < count; i++ {
+		mut cache := registered_caches[i]
+		if cache.writeback_context == unsafe { nil } {
+			continue
+		}
+		cache.sync(cache.writeback_context, cache.writeback) or { ok = false }
+	}
+	return ok
 }
 
 fn reclaim_caches(wanted u64) u64 {

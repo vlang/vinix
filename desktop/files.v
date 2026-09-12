@@ -224,7 +224,17 @@ mut:
 
 fn open_files(mut _ Desktop) !NativeApp {
 	mut app := &FileBrowserApp{}
-	app.browser.read('/')
+	// Open on the home directory, the way every file manager does. It is also
+	// the only writable, persistent part of this machine -- the rest of the
+	// tree is the immutable system image -- so it is where a file the user
+	// saves or edits actually is. Up still reaches `/`.
+	app.browser.read(desktop_home)
+	if app.browser.error != '' {
+		// A system without the home directory is still browsable from the root.
+		unsafe { app.browser.error.free() }
+		app.browser.error = ''
+		app.browser.read('/')
+	}
 	if app.browser.error != '' {
 		return error(app.browser.error)
 	}
