@@ -559,6 +559,8 @@ back to the CPU Vulkan device in `chromium-swiftshader`; `VINIX_FORCE_SOFTWARE_G
 forces that path, and `VINIX_CHROMIUM_SINGLE_PROCESS=1` collapses the browser
 into one process, which is what separates an IPC failure from a rendering one.
 
+![Chromium in a Vinix window](/chromium-vinix-qemu.png?raw=true "Chromium on the Vinix desktop")
+
 Both browsers render their full interface on the desktop's hosted X11 display.
 The bring-up tests boot QEMU, start a browser through the same bridge the
 compositor uses, and wait for a viewable top-level window:
@@ -572,6 +574,13 @@ python3 tests/browsers/run_vm.py --package    # pkg install chromium, then run i
 One thing to know about the images: a persistent `/root` volume shadows the copy
 of a file the image ships there, so the launchers take their start page from
 `/usr/share/vinix` instead.
+
+Chromium on the *desktop* is not yet steady. It draws its whole interface in a
+Vinix window, as above, and then its renderer usually stops responding and the
+browser exits; one run lost its X server outright, to `ext2: unable to read
+inode entry` followed by a segmentation fault inside Xvfb. Driven directly
+through the same bridge with no compositor competing for the machine, it loads
+and renders the page and stays up, which is what the bring-up test checks.
 
 ### VirtIO-GPU acceleration with KekVM
 
