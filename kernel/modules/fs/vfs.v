@@ -539,6 +539,17 @@ fn fdnum_create_from_node(mut node VFSNode, flags int, oldfd int, specific bool)
 	}
 }
 
+// A path pointer from userspace can be null, and cstring_to_vstring() panics on
+// one -- which let any process stop the machine by passing NULL where a path
+// was expected. Report it as the fault it is instead.
+pub fn user_path(pointer charptr) ?string {
+	if pointer == unsafe { nil } {
+		errno.set(errno.efault)
+		return none
+	}
+	return unsafe { cstring_to_vstring(pointer) }
+}
+
 pub fn syscall_unlinkat(_ voidptr, dirfd int, _path charptr, flags int) (u64, u64) {
 	mut current_thread := proc.current_thread()
 	mut process := current_thread.process
@@ -549,7 +560,7 @@ pub fn syscall_unlinkat(_ voidptr, dirfd int, _path charptr, flags int) (u64, u6
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
-	path := unsafe { cstring_to_vstring(_path) }
+	path := user_path(_path) or { return errno.err, errno.get() }
 
 	if path.len == 0 {
 		return errno.err, errno.enoent
@@ -573,7 +584,7 @@ pub fn syscall_rmdirat(_ voidptr, dirfd int, _path charptr) (u64, u64) {
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
-	path := unsafe { cstring_to_vstring(_path) }
+	path := user_path(_path) or { return errno.err, errno.get() }
 
 	if path.len == 0 {
 		return errno.err, errno.enoent
@@ -595,7 +606,7 @@ pub fn syscall_mkdirat(_ voidptr, dirfd int, _path charptr, mode u32) (u64, u64)
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
-	path := unsafe { cstring_to_vstring(_path) }
+	path := user_path(_path) or { return errno.err, errno.get() }
 
 	if path.len == 0 {
 		return errno.err, errno.enoent
@@ -685,7 +696,7 @@ pub fn syscall_readlinkat(_ voidptr, dirfd int, _path charptr, buf voidptr, limi
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
-	path := unsafe { cstring_to_vstring(_path) }
+	path := user_path(_path) or { return errno.err, errno.get() }
 
 	if path.len == 0 {
 		return errno.err, errno.enoent
@@ -751,7 +762,7 @@ pub fn syscall_openat(_ voidptr, dirfd int, _path charptr, flags int, mode u32) 
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
-	path := unsafe { cstring_to_vstring(_path) }
+	path := user_path(_path) or { return errno.err, errno.get() }
 
 	if path.len == 0 {
 		return errno.err, errno.enoent
@@ -986,7 +997,7 @@ pub fn syscall_faccessat(_ voidptr, dirfd int, _path charptr, mode u32, flags in
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
-	path := unsafe { cstring_to_vstring(_path) }
+	path := user_path(_path) or { return errno.err, errno.get() }
 	if mode & ~u32(7) != 0 || flags & ~(at_eaccess | at_symlink_nofollow) != 0 {
 		return errno.err, errno.einval
 	}
@@ -1020,7 +1031,7 @@ pub fn syscall_fstatat(_ voidptr, dirfd int, _path charptr, statbuf &stat.Stat, 
 
 	current_process := proc.current_thread().process
 
-	path := unsafe { cstring_to_vstring(_path) }
+	path := user_path(_path) or { return errno.err, errno.get() }
 
 	mut statsrc := &stat.Stat(unsafe { nil })
 
@@ -1082,13 +1093,13 @@ pub fn syscall_linkat(_ voidptr, olddirfd int, _oldpath charptr, newdirfd int, _
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
-	oldpath := unsafe { cstring_to_vstring(_oldpath) }
+	oldpath := user_path(_oldpath) or { return errno.err, errno.get() }
 	// TODO handle AT_ENPTY_PATH?
 	if oldpath.len == 0 {
 		return errno.err, errno.enoent
 	}
 
-	newpath := unsafe { cstring_to_vstring(_newpath) }
+	newpath := user_path(_newpath) or { return errno.err, errno.get() }
 
 	oldbase := get_parent_dir(olddirfd, oldpath) or { return errno.err, errno.get() }
 	newbase := get_parent_dir(newdirfd, newpath) or { return errno.err, errno.get() }
@@ -1168,7 +1179,7 @@ pub fn syscall_fchmod(_ voidptr, fdnum int, mode u32) (u64, u64) {
 }
 
 pub fn syscall_fchmodat(_ voidptr, dirfd int, _path charptr, mode u32) (u64, u64) {
-	path := unsafe { cstring_to_vstring(_path) }
+	path := user_path(_path) or { return errno.err, errno.get() }
 	if path.len == 0 {
 		return errno.err, errno.enoent
 	}
@@ -1204,7 +1215,7 @@ pub fn syscall_chdir(_ voidptr, _path charptr) (u64, u64) {
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
-	path := unsafe { cstring_to_vstring(_path) }
+	path := user_path(_path) or { return errno.err, errno.get() }
 
 	if path.len == 0 {
 		return errno.err, errno.enoent
@@ -1381,8 +1392,8 @@ pub fn syscall_seek(_ voidptr, fdnum int, offset i64, whence int) (u64, u64) {
 // The target is never resolved here, so a symlink may name something that does
 // not exist yet.
 pub fn syscall_symlinkat(_ voidptr, _target charptr, newdirfd int, _linkpath charptr) (u64, u64) {
-	target := unsafe { cstring_to_vstring(_target) }
-	linkpath := unsafe { cstring_to_vstring(_linkpath) }
+	target := user_path(_target) or { return errno.err, errno.get() }
+	linkpath := user_path(_linkpath) or { return errno.err, errno.get() }
 
 	if target.len == 0 || linkpath.len == 0 {
 		return errno.err, errno.enoent
@@ -1602,8 +1613,8 @@ fn is_ancestor(ancestor &VFSNode, node &VFSNode) bool {
 
 // renameat2(olddirfd, oldpath, newdirfd, newpath, flags).
 pub fn syscall_renameat2(_ voidptr, olddirfd int, _oldpath charptr, newdirfd int, _newpath charptr, flags int) (u64, u64) {
-	oldpath := unsafe { cstring_to_vstring(_oldpath) }
-	newpath := unsafe { cstring_to_vstring(_newpath) }
+	oldpath := user_path(_oldpath) or { return errno.err, errno.get() }
+	newpath := user_path(_newpath) or { return errno.err, errno.get() }
 
 	if oldpath.len == 0 || newpath.len == 0 {
 		return errno.err, errno.enoent
@@ -1655,7 +1666,7 @@ pub fn syscall_truncate(_ voidptr, _path charptr, length i64) (u64, u64) {
 		return errno.err, errno.einval
 	}
 
-	path := unsafe { cstring_to_vstring(_path) }
+	path := user_path(_path) or { return errno.err, errno.get() }
 	if path.len == 0 {
 		return errno.err, errno.enoent
 	}
@@ -1709,7 +1720,7 @@ fn change_owner(mut res resource.Resource, uid u32, gid u32) ? {
 }
 
 pub fn syscall_fchownat(_ voidptr, dirfd int, _path charptr, uid u32, gid u32, flags int) (u64, u64) {
-	path := unsafe { cstring_to_vstring(_path) }
+	path := user_path(_path) or { return errno.err, errno.get() }
 
 	mut process := proc.current_thread().process
 
@@ -1777,7 +1788,7 @@ pub fn syscall_fchown(_ voidptr, fdnum int, uid u32, gid u32) (u64, u64) {
 // statfs(path, buf). Its by-descriptor twin already existed; both describe the
 // one filesystem this kernel has anything to say about.
 pub fn syscall_statfs(_ voidptr, _path charptr, buf u64) (u64, u64) {
-	path := unsafe { cstring_to_vstring(_path) }
+	path := user_path(_path) or { return errno.err, errno.get() }
 	if path.len == 0 {
 		return errno.err, errno.enoent
 	}
@@ -1834,7 +1845,7 @@ pub fn syscall_utimensat(_ voidptr, dirfd int, _path charptr, times u64, flags i
 	if flags & ~(at_symlink_nofollow | at_empty_path) != 0 {
 		return errno.err, errno.einval
 	}
-	path := unsafe { cstring_to_vstring(_path) }
+	path := user_path(_path) or { return errno.err, errno.get() }
 	mut node := &VFSNode(unsafe { nil })
 	if path.len == 0 {
 		if flags & at_empty_path == 0 { return errno.err, errno.enoent }

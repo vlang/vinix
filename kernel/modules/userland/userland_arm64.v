@@ -615,7 +615,7 @@ fn signal_thread(tgid int, tid int, signal int) (u64, u64) {
 }
 
 pub fn syscall_execve(_ voidptr, _path charptr, _argv &charptr, _envp &charptr) (u64, u64) {
-	path := unsafe { cstring_to_vstring(_path) }
+	path := fs.user_path(_path) or { return errno.err, errno.get() }
 	mut argv := []string{}
 	for i := 0; true; i++ {
 		unsafe {
@@ -888,7 +888,7 @@ pub fn parse_shebang(mut res resource.Resource) ?(string, string) {
 pub fn syscall_execveat(_ voidptr, dirfd int, _path charptr, _argv &charptr, _envp &charptr, flags int) (u64, u64) {
 	mut process := proc.current_thread().process
 
-	path := unsafe { cstring_to_vstring(_path) }
+	path := fs.user_path(_path) or { return errno.err, errno.get() }
 
 	mut directory := &fs.VFSNode(unsafe { nil })
 	mut target := path

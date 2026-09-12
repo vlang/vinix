@@ -305,7 +305,7 @@ pub fn syscall_inotify_add_watch(_ voidptr, fdnum int, _path charptr, mask u32) 
 		|| mask & ~(in_event_mask | in_control_mask) != 0 {
 		return errno.err, errno.einval
 	}
-	path := unsafe { cstring_to_vstring(_path) }
+	path := user_path(_path) or { return errno.err, errno.get() }
 	if path.len == 0 {
 		return errno.err, errno.enoent
 	}
