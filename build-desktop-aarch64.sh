@@ -438,6 +438,12 @@ fi
 if [ "$COMPACT_INITRAMFS" -eq 0 ] && [ -x "$HYPRLAND_STAGING/usr/bin/start-hyprland-vinix" ]; then
     echo "==> Staging Hyprland and the Vinix Aquamarine backend"
     merge_staging_tree "$HYPRLAND_STAGING"
+    # Session scripts and terminal preferences are source-owned, so refresh
+    # them even when --reuse-layers assembles an older compiled staging tree.
+    install -m755 "$SCRIPT_DIR/build-support/hyprland/start-hyprland-vinix" \
+        "$STAGING/usr/bin/start-hyprland-vinix"
+    install -m644 "$SCRIPT_DIR/build-support/hyprland/foot.ini" \
+        "$STAGING/root/.config/foot/foot.ini"
 fi
 
 # Overlay Mesa last so Xorg, Firefox and native EGL applications all use the
@@ -503,6 +509,10 @@ if [ ! -x "$STAGING/bin/busybox" ]; then
     echo "ERROR: base userland has no executable /bin/busybox" >&2
     exit 1
 fi
+if [ ! -x "$STAGING/bin/zsh" ]; then
+    echo "ERROR: desktop image has no executable /bin/zsh" >&2
+    exit 1
+fi
 if [ ! -x "$STAGING/usr/bin/pkg" ] || [ ! -x "$STAGING/sbin/apk" ]; then
     echo "ERROR: desktop image is missing pkg or apk" >&2
     exit 1
@@ -528,7 +538,7 @@ if ! { [ -x "$STAGING/usr/lib/firefox-esr/firefox-esr" ] &&
     exit 1
 fi
 if [ "$COMPACT_INITRAMFS" -eq 1 ]; then
-    for command_path in bin/sh bin/id bin/sed bin/mkdir bin/sleep bin/df bin/du bin/ls bin/tar usr/bin/pkg sbin/apk usr/bin/python3 usr/bin/git usr/bin/Xorg usr/bin/Xvfb usr/bin/startx usr/bin/vinix-xinput usr/bin/vinix-wine-host usr/bin/run-firefox usr/bin/run-gimp usr/bin/gcc; do
+    for command_path in bin/sh bin/zsh bin/id bin/sed bin/mkdir bin/sleep bin/df bin/du bin/ls bin/tar usr/bin/pkg sbin/apk usr/bin/python3 usr/bin/git usr/bin/Xorg usr/bin/Xvfb usr/bin/startx usr/bin/vinix-xinput usr/bin/vinix-wine-host usr/bin/run-firefox usr/bin/run-gimp usr/bin/gcc; do
         if [ ! -x "$STAGING/$command_path" ]; then
             echo "ERROR: compact desktop is missing /$command_path" >&2
             exit 1

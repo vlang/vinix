@@ -346,7 +346,7 @@ fn desktop_run_external(path string) ExternalProgramResult {
 	argv := [&char(path.str), &char(unsafe { nil })]
 	path_entry := 'PATH=${desktop_command_path}'
 	envp := [&char(path_entry.str), c'HOME=/root', c'TERM=linux', c'USER=root', c'LOGNAME=root',
-		c'SHELL=/bin/sh', c'LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules',
+		c'SHELL=/bin/zsh', c'LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules',
 		c'LIBGL_DRIVERS_PATH=/usr/lib/xorg/modules/dri:/usr/lib/dri',
 		c'SSL_CA_CERT_FILE=/etc/ssl/certs/ca-certificates.crt', &char(unsafe { nil })]
 
@@ -418,7 +418,7 @@ fn desktop_spawn_shell(path string, rows int, columns int, width int, height int
 	// `linux` is available in ncurses-terminfo-base, including when tmux is
 	// installed through pkg, and the terminal parser accepts its ANSI output.
 	envp := [&char(path_entry.str), c'HOME=/root', c'TERM=linux', c'USER=root', c'LOGNAME=root',
-		c'SHELL=/bin/sh', c'LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules',
+		c'SHELL=/bin/zsh', c'LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules',
 		c'LIBGL_DRIVERS_PATH=/usr/lib/xorg/modules/dri:/usr/lib/dri',
 		c'SSL_CA_CERT_FILE=/etc/ssl/certs/ca-certificates.crt', &char(unsafe { nil })]
 
@@ -567,7 +567,7 @@ fn desktop_spawn_app(path string, app_name string, tz_offset i64) ?SpawnedAppPro
 		&char(tz_arg.str), &char(unsafe { nil })]
 	path_entry := 'PATH=${desktop_command_path}'
 	envp := [&char(path_entry.str), c'HOME=/root', c'TERM=dumb', c'USER=root', c'LOGNAME=root',
-		c'SHELL=/bin/sh', c'LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules',
+		c'SHELL=/bin/zsh', c'LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules',
 		c'LIBGL_DRIVERS_PATH=/usr/lib/xorg/modules/dri:/usr/lib/dri',
 		c'SSL_CA_CERT_FILE=/etc/ssl/certs/ca-certificates.crt', &char(unsafe { nil })]
 
@@ -665,7 +665,7 @@ fn desktop_spawn_native_surface(path string, first_argument string, second_argum
 	width_entry := 'VINIX_SURFACE_WIDTH=${width}'
 	height_entry := 'VINIX_SURFACE_HEIGHT=${height}'
 	mut envp := [&char(path_entry.str), c'HOME=/root', c'TERM=dumb', c'USER=root', c'LOGNAME=root',
-		c'SHELL=/bin/sh', c'LD_LIBRARY_PATH=/usr/lib', c'LIBGL_DRIVERS_PATH=/usr/lib/dri',
+		c'SHELL=/bin/zsh', c'LD_LIBRARY_PATH=/usr/lib', c'LIBGL_DRIVERS_PATH=/usr/lib/dri',
 		c'EGL_PLATFORM=surfaceless', c'SSL_CA_CERT_FILE=/etc/ssl/certs/ca-certificates.crt']
 	// QEMU exposes only simpledrm, so select the packaged software renderer
 	// explicitly. Preserve Mesa's native Asahi selection on Vinix hardware.
@@ -737,7 +737,7 @@ fn desktop_spawn_wine_host(directory string, width int, height int, command stri
 		&char(command.str), &char(unsafe { nil })]
 	path_entry := 'PATH=${desktop_command_path}'
 	envp := [&char(path_entry.str), c'HOME=/root', c'TERM=dumb', c'USER=root', c'LOGNAME=root',
-		c'SHELL=/bin/sh', c'LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules',
+		c'SHELL=/bin/zsh', c'LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules',
 		c'LIBGL_DRIVERS_PATH=/usr/lib/xorg/modules/dri:/usr/lib/dri', &char(unsafe { nil })]
 
 	pid := C.fork()

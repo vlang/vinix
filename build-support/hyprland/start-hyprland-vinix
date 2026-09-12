@@ -9,7 +9,7 @@ chmod 1777 /dev/shm
 export HOME=/root
 export USER=root
 export LOGNAME=root
-export SHELL=/bin/sh
+export SHELL=/bin/zsh
 export XDG_RUNTIME_DIR=/run/user/0
 export XDG_CONFIG_HOME=/root/.config
 export XDG_CACHE_HOME=/root/.cache

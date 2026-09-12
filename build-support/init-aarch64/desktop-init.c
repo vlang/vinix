@@ -95,7 +95,7 @@ static char *environment[] = {
 	"PS1=vinix# ",
 	"USER=root",
 	"LOGNAME=root",
-	"SHELL=/bin/sh",
+	"SHELL=/bin/zsh",
 	"LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules",
 	"LIBGL_DRIVERS_PATH=/usr/lib/xorg/modules/dri:/usr/lib/dri",
 	"XDG_RUNTIME_DIR=/run/user/0",
@@ -109,7 +109,7 @@ void _start(void) {
 	char *desktop[] = { "/usr/bin/vinix-desktop", (char *)0 };
 	char *gpu_desktop[] = { "/usr/bin/vinix-desktop-gpu", (char *)0 };
 	char *hyprland[] = { "/usr/bin/start-hyprland-vinix", (char *)0 };
-	char *shell[] = { "/bin/busybox", "sh", (char *)0 };
+	char *shell[] = { "/bin/zsh", "-l", (char *)0 };
 	int status = 0;
 	i64 child;
 

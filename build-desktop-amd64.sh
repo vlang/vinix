@@ -122,6 +122,10 @@ mkdir -p "$STAGING/usr/bin" "$STAGING/usr/share/vinix/wallpapers" \
 install -m755 "$BUILD_DIR/vinix-desktop" "$STAGING/usr/bin/vinix-desktop"
 rm -f "$STAGING/sbin/init"
 install -m755 "$SCRIPT_DIR/build-support/init-amd64/desktop-init" "$STAGING/sbin/init"
+if [ ! -x "$STAGING/bin/zsh" ]; then
+    echo "ERROR: desktop image has no executable /bin/zsh" >&2
+    exit 1
+fi
 
 # One immutable multicall image, with the same per-application process names as
 # the aarch64 desktop image.

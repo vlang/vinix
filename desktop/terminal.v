@@ -64,9 +64,8 @@ mut:
 	close_app()
 }
 
-// Both userlands provide the POSIX shell here. ARM64 resolves it to BusyBox;
-// amd64 resolves it to the mlibc distro's shell.
-const terminal_shell = '/bin/sh'
+// Both userlands bundle Zsh and a ready-to-use Oh My Zsh configuration.
+const terminal_shell = '/bin/zsh'
 
 // How much output is kept. A terminal that remembered everything would grow
 // without bound on a system with no garbage collector.

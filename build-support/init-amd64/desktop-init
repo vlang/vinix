@@ -8,7 +8,7 @@ export TERM=linux
 export PATH=/usr/local/bin:/bin:/sbin:/usr/bin:/usr/sbin
 export USER=root
 export LOGNAME=root
-export SHELL=/bin/sh
+export SHELL=/bin/zsh
 export XDG_RUNTIME_DIR=/run
 
 cd /root || exit 1
@@ -17,5 +17,5 @@ while :; do
 	/usr/bin/vinix-desktop
 	status=$?
 	echo "vinix-desktop exited with status $status; starting a recovery shell"
-	/bin/sh -i
+	/bin/zsh -l
 done

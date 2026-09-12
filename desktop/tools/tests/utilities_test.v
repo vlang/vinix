@@ -360,6 +360,10 @@ fn test_terminal_sends_every_keystroke_through_the_pty_master() {
 	C.close(input_pipe[1])
 }
 
+fn test_terminal_starts_zsh_by_default() {
+	assert terminal_shell == '/bin/zsh'
+}
+
 fn test_terminal_renders_pty_echo_and_carriage_return_updates() {
 	mut terminal := TerminalApp{}
 	terminal.ingest_output('progress 10%\rprogress 20%\r\n\$ '.bytes())
