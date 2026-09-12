@@ -144,7 +144,12 @@ if [ ! -x "$CURL" ]; then
 	exit 1
 fi
 bytes=$(bb wc -c <"$archive" | bb tr -d ' ')
-echo "pkg: uploading QEMU package overlay ($bytes bytes)"
-"$CURL" --fail --silent --show-error --connect-timeout 5 --max-time 300 \
+# A flat five minutes is enough for a handful of packages and nowhere near
+# enough for a browser: a 700 MiB overlay was cut off mid-upload and the whole
+# transaction reported failure. Allow for a slow guest -- 256 KiB a second --
+# with the old budget as the floor.
+budget=$((300 + bytes / 262144))
+echo "pkg: uploading QEMU package overlay ($bytes bytes, up to ${budget}s)"
+"$CURL" --fail --silent --show-error --connect-timeout 5 --max-time "$budget" \
 	-H 'Expect:' -X PUT --data-binary "@$archive" "${store_url%/}/packages"
 echo "pkg: saved QEMU package overlay ($bytes bytes); it will load on the next boot"

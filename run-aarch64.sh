@@ -852,8 +852,13 @@ install -m755 "$SCRIPT_DIR/build-support/vinix-pkg-wrapper" \
     "$PACKAGE_RUNTIME_ROOT/usr/bin/pkg"
 install -m755 "$SCRIPT_DIR/build-support/vinix-persist-packages" \
     "$PACKAGE_RUNTIME_ROOT/usr/libexec/vinix-persist-packages"
-printf 'http://10.0.2.100:%s\n' "$PACKAGE_STORE_PORT" \
-    > "$PACKAGE_RUNTIME_ROOT/etc/vinix-pkg/qemu-store-url"
+# VINIX_QEMU_PACKAGE_PERSIST=0 leaves the store address out, which is how the
+# package frontend already recognises a run that does not keep its packages.
+# Saving a browser-sized overlay costs more than the install it follows.
+if [ "${VINIX_QEMU_PACKAGE_PERSIST:-1}" != 0 ]; then
+    printf 'http://10.0.2.100:%s\n' "$PACKAGE_STORE_PORT" \
+        > "$PACKAGE_RUNTIME_ROOT/etc/vinix-pkg/qemu-store-url"
+fi
 COPYFILE_DISABLE=1 tar --format=ustar -cf "$PACKAGE_RUNTIME_TAR" \
     -C "$PACKAGE_RUNTIME_ROOT" .
 mcopy -o -i "$BOOT_DISK" "$PACKAGE_RUNTIME_TAR" ::/boot/qemu-runtime.tar

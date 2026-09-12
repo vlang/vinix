@@ -117,6 +117,9 @@ def run_vm(root: Path, guest_init: Path, initramfs: Path, state_dir: Path,
     environment.pop("VINIX_QEMU_PERSIST", None)
     environment["VINIX_KEEP_TEMP_BOOT_DISK"] = "1"
     environment.setdefault("VINIX_QEMU_PACKAGE_STORE_PORT", available_port())
+    # The package boot is checking that `pkg install` works, not that a QEMU run
+    # can carry a 700 MiB overlay back to the host afterwards.
+    environment.setdefault("VINIX_QEMU_PACKAGE_PERSIST", "0")
     if platform.system() != "Darwin":
         environment.setdefault("USE_TCG", "1")
 
