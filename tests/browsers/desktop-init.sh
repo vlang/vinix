@@ -98,15 +98,17 @@ fi
 painted=false
 k=0
 while [ "$k" -lt 300 ]; do
-	colours=$(/usr/bin/python3 -c '
-import mmap, sys
+	sample=$(/usr/bin/python3 -c '
+import mmap, os, sys
 # Look at the surface the way the compositor does — through a shared mapping.
-# Reading the file instead returns what is on the disk behind it, which is not
-# what the X server has drawn. Sampling rather than scanning keeps this cheap
-# enough to run once a second beside the browser it is watching.
+# Reading the file instead did not reflect what the compositor was showing.
+# Sampling rather than scanning keeps this cheap enough to run once a second
+# beside the browser it is watching.
+#
+# The size is reported with the count so that a check which silently sampled
+# the wrong span cannot pass for the wrong reason.
 f = open(sys.argv[1], "rb")
-f.seek(0, 2)
-size = f.tell()
+size = os.fstat(f.fileno()).st_size
 view = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
 seen = set()
 for i in range(1000):
@@ -114,8 +116,10 @@ for i in range(1000):
     block = view[at:at + 64]
     for offset in range(0, len(block) - 3, 4):
         seen.add(block[offset:offset + 3])
-print(len(seen))' "$surface/Xvfb_screen0" 2>/dev/null)
-	[ -n "$colours" ] || colours=0
+print(size, len(seen))' "$surface/Xvfb_screen0" 2>/dev/null)
+	set -- $sample
+	surface_bytes=${1:-0}
+	colours=${2:-0}
 	if [ "$colours" -gt 8 ]; then
 		painted=true
 		break
@@ -134,5 +138,10 @@ fi
 if [ "$painted" != true ]; then
 	fail "the browser window stayed blank for ${k}s after it was mapped"
 fi
-echo "VINIX DESKTOP FIREFOX PASS: the page was drawn ${k}s after the window appeared"
+# A 1280x900 surface is 4.6 MB. Anything much smaller means the check sampled
+# something that is not the framebuffer, and its verdict means nothing.
+if [ "$surface_bytes" -lt 4000000 ]; then
+	fail "the surface is only ${surface_bytes} bytes, so nothing was really checked"
+fi
+echo "VINIX DESKTOP FIREFOX PASS: the page was drawn ${k}s after the window appeared (${surface_bytes} bytes, ${colours} colours)"
 echo "VINIX DESKTOP FIREFOX TEST: PASS"

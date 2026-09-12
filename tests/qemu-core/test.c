@@ -235,6 +235,13 @@ static int test_shared_mapping_visible_to_readers(void)
 	for (size_t i = 0; i < length; ++i)
 		surface[i] = (unsigned char)(i * 61u + 7u);
 
+	/* Anything that wants to look at a surface has to size it first, and
+	 * seeking to the end is how a reader that did not create it does that.
+	 * A wrong answer here sends a checker to a negative offset, which looks
+	 * exactly like a blank window. */
+	CHECK(lseek(fd, 0, SEEK_END) == (off_t)length);
+	CHECK(lseek(fd, 0, SEEK_SET) == 0);
+
 	/* The writer's own descriptor first, with no msync: a mapping is not a
 	 * write-behind cache that only becomes real when it is flushed. */
 	unsigned char observed[4096];
@@ -249,6 +256,8 @@ static int test_shared_mapping_visible_to_readers(void)
 		int reader = open(surface_file, O_RDONLY);
 		if (reader < 0)
 			_exit(1);
+		if (lseek(reader, 0, SEEK_END) != (off_t)length)
+			_exit(4);
 		/* Read the far end, past anything the writer's descriptor
 		 * touched, and through a fresh descriptor of its own. */
 		if (pread(reader, seen, sizeof(seen), (off_t)(length - sizeof(seen)))
