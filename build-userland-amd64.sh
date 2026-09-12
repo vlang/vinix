@@ -112,8 +112,8 @@ else
     : > "$BUILD_DIR/packages"
 fi
 
-echo "==> Staging Zsh and Oh My Zsh..."
-stage_alpine_packages zsh
+echo "==> Staging Zsh, Vim, and Oh My Zsh..."
+stage_alpine_packages zsh vim
 "$SCRIPT_DIR/build-support/stage-oh-my-zsh.sh" "$STAGING" "$DOWNLOADS"
 
 # Vinix starts /sbin/init itself. Use Alpine's unmodified /bin/busybox through
@@ -134,7 +134,8 @@ int main(void) {
 EOF
 
 if [ ! -x "$STAGING/bin/busybox" ] ||
-   [ ! -e "$STAGING/lib/ld-musl-x86_64.so.1" ]; then
+   [ ! -e "$STAGING/lib/ld-musl-x86_64.so.1" ] ||
+   [ ! -x "$STAGING/usr/bin/vim" ]; then
     echo "ERROR: Alpine base userland is incomplete" >&2
     exit 1
 fi

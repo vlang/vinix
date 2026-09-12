@@ -38,6 +38,8 @@ What it does:
   wallpaper, display, battery and experimental M1 Wi-Fi controls
 - **native ui2 applications**: every Files, Calculator, Terminal, Settings and
   utility window is backed by its own OS process, PID and memory accounting
+- a **VT-compatible built-in terminal** with a real PTY, alternate-screen and
+  cursor-addressed rendering for editing files in the preinstalled Vim
 - embedded **Wine Calculator and Notepad**: their translated Win64 processes
   render into private Xvfb displays and are composited as normal Vinix windows
   without hiding the desktop

@@ -152,7 +152,9 @@ if [ "$ALPINE_DEVTOOLS" = 1 ]; then
     echo "==> Staging Alpine's prebuilt C/C++ toolchain..."
     rm -rf "$DEVTOOLS_STAGING"
     mkdir -p "$DEVTOOLS_STAGING"
-    stage_alpine_packages "$DEVTOOLS_STAGING" build-base
+    # The compact desktop extracts this archive instead of the complete base
+    # image, so keep its interactive editor in the archive as well.
+    stage_alpine_packages "$DEVTOOLS_STAGING" build-base vim
     merge_staging_tree "$DEVTOOLS_STAGING"
     DEVTOOLS_ARCHIVE_TMP="$(mktemp "$BUILD_DIR/.alpine-devtools.tar.XXXXXX")"
     if ! COPYFILE_DISABLE=1 tar --format=ustar -cf "$DEVTOOLS_ARCHIVE_TMP" \
@@ -167,8 +169,8 @@ else
     rm -f "$DEVTOOLS_ARCHIVE"
 fi
 
-echo "==> Staging Zsh and Oh My Zsh..."
-stage_alpine_packages "$STAGING" zsh
+echo "==> Staging Zsh, Vim, and Oh My Zsh..."
+stage_alpine_packages "$STAGING" zsh vim
 "$SCRIPT_DIR/build-support/stage-oh-my-zsh.sh" "$STAGING" "$DOWNLOADS"
 
 # Vinix starts /sbin/init directly. Keep the base userland entirely Alpine:
@@ -200,7 +202,8 @@ int main(void) {
 EOF
 
 if [ ! -x "$STAGING/bin/busybox" ] ||
-   [ ! -e "$STAGING/lib/ld-musl-aarch64.so.1" ]; then
+   [ ! -e "$STAGING/lib/ld-musl-aarch64.so.1" ] ||
+   [ ! -x "$STAGING/usr/bin/vim" ]; then
     echo "ERROR: Alpine base userland is incomplete" >&2
     exit 1
 fi

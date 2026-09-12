@@ -366,21 +366,126 @@ fn test_terminal_starts_zsh_by_default() {
 
 fn test_terminal_renders_pty_echo_and_carriage_return_updates() {
 	mut terminal := TerminalApp{}
+	terminal.set_geometry(4, 40)
 	terminal.ingest_output('progress 10%\rprogress 20%\r\n\$ '.bytes())
-	assert terminal.lines == ['progress 20%']
-	assert terminal.partial.bytestr() == '\$ '
-	assert terminal.partial_text == '\$ _'
+	assert terminal.row_string(0) == 'progress 20%'
+	assert terminal.row_string(1) == '\$ '
+	assert terminal.rendered_row(1) == '\$ _'
 
 	// Canonical erase echo is backspace-space-backspace. Interpret it as cursor
 	// movement and overwrite, just as a terminal display does.
 	terminal.ingest_output('abc\b \bD'.bytes())
-	assert terminal.partial.bytestr() == '\$ abD'
+	assert terminal.row_string(1) == '\$ abD'
 
 	// BusyBox's line editor emits clear-to-end under TERM=linux, and an
 	// escape sequence may straddle two non-blocking reads.
 	terminal.ingest_output('\x1b['.bytes())
 	terminal.ingest_output('J'.bytes())
-	assert terminal.partial.bytestr() == '\$ abD'
+	assert terminal.row_string(1) == '\$ abD'
+}
+
+fn test_terminal_handles_vim_alternate_screen_and_cursor_addressing() {
+	mut terminal := TerminalApp{}
+	terminal.set_geometry(6, 30)
+	terminal.ingest_output('vinix# vim notes.txt'.bytes())
+
+	// This is the core of a TERM=linux Vim redraw: enter the alternate screen,
+	// erase it, position rows independently, set a scroll region, and finally
+	// leave the alternate screen. Split one CSI sequence at a read boundary too.
+	terminal.ingest_output('\x1b[?1049h\x1b[2J\x1b[Hhello\x1b[2;1Hworld'.bytes())
+	terminal.ingest_output('\x1b[3;'.bytes())
+	terminal.ingest_output('1H~\x1b[6;1H"notes.txt" 2L, 12B\x1b[1;6H'.bytes())
+	assert terminal.alternate_screen
+	assert terminal.row_string(0) == 'hello'
+	assert terminal.row_string(1) == 'world'
+	assert terminal.row_string(2) == '~'
+	assert terminal.row_string(5) == '"notes.txt" 2L, 12B'
+	assert terminal.cursor_row == 0
+	assert terminal.cursor_column == 5
+
+	// Vim uses line/character edits for economical redraws instead of repainting
+	// the entire file after every keystroke.
+	terminal.ingest_output('\x1b[2;1H\x1b[2@OK\x1b[1P\x1b[3X'.bytes())
+	assert terminal.row_string(1) == 'OK   d'
+	terminal.ingest_output('\x1b[2;5r\x1b[2;1H\x1b[Linserted'.bytes())
+	assert terminal.row_string(1) == 'inserted'
+	assert terminal.row_string(2) == 'OK   d'
+
+	terminal.ingest_output('\x1b[?1049l'.bytes())
+	assert !terminal.alternate_screen
+	assert terminal.row_string(0) == 'vinix# vim notes.txt'
+}
+
+fn test_terminal_answers_cursor_status_queries() {
+	mut replies := [2]i32{}
+	assert C.pipe(&replies[0]) == 0
+	mut terminal := TerminalApp{
+		terminal: int(replies[1])
+	}
+	terminal.set_geometry(5, 20)
+	// Linux cursor-shape controls end in `c` too, but are not device-attribute
+	// queries and must not inject replies into Vim's keyboard input.
+	terminal.ingest_output('\x1b[?1c\x1b[?8c\x1b[4;7H\x1b[6n'.bytes())
+	mut answer := [32]u8{}
+	count := C.read(replies[0], &answer[0], answer.len)
+	assert count == 6
+	assert unsafe { tos(&answer[0], count) } == '\x1b[4;7R'
+	C.close(replies[0])
+	C.close(replies[1])
+}
+
+fn test_terminal_consumes_linux_palette_controls_without_swallowing_text() {
+	mut terminal := TerminalApp{}
+	terminal.set_geometry(2, 20)
+	// Linux's OSC P and OSC R controls deliberately have no BEL/ST terminator.
+	terminal.ingest_output('\x1b]P1ffffffX\x1b]RY'.bytes())
+	assert terminal.row_string(0) == 'XY'
+}
+
+fn terminal_screen_contains(terminal &TerminalApp, wanted string) bool {
+	for row in 0 .. terminal.rows {
+		if terminal.row_string(row).contains(wanted) {
+			return true
+		}
+	}
+	return false
+}
+
+fn test_terminal_can_edit_a_file_with_vim_over_its_real_pty() {
+	vim_path := '/usr/bin/vim'
+	if !os.exists(vim_path) {
+		return
+	}
+	path := os.join_path(os.temp_dir(), 'vinix-terminal-vim-test.txt')
+	os.rm(path) or {}
+	defer { os.rm(path) or {} }
+
+	mut terminal := TerminalApp{
+		read_buf: []u8{len: terminal_read_chunk}
+	}
+	terminal.set_geometry(12, 60)
+	terminal.start_shell(12, 60, 480, 192)
+	assert terminal.terminal >= 0
+	defer { terminal.close_app() }
+	terminal.key_input('${vim_path} -Nu NONE -n -i NONE ${path}\n')
+	for _ in 0 .. 200 {
+		terminal.poll()
+		if terminal_screen_contains(&terminal, '[New]') {
+			break
+		}
+		desktop_sleep_ms(10)
+	}
+	assert terminal_screen_contains(&terminal, '[New]')
+
+	terminal.key_input('iEdited inside Vinix\x1b:wq\n')
+	for _ in 0 .. 300 {
+		terminal.poll()
+		if os.exists(path) {
+			break
+		}
+		desktop_sleep_ms(10)
+	}
+	assert os.read_file(path)! == 'Edited inside Vinix\n'
 }
 
 fn test_available_utility_applications_and_shortcut_layouts() {
