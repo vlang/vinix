@@ -35,7 +35,11 @@ __global (
 	reclaimers       [max_reclaimers]fn (u64) u64
 	reclaimers_len   = int(0)
 	reclaimers_lock  klock.Lock
-	reclaim_inflight = bool(false)
+	// A word, not a bool: katomic.cas only implements the 32- and 64-bit
+	// widths, and panicked on a one-byte operand. Every attempt to reclaim
+	// memory stopped the machine instead, which is to say the reclaimer had
+	// never run.
+	reclaim_inflight = u32(0)
 )
 
 pub fn register_reclaimer(reclaimer fn (u64) u64) bool {
@@ -52,10 +56,10 @@ pub fn register_reclaimer(reclaimer fn (u64) u64) bool {
 fn reclaim_pages(wanted u64) u64 {
 	// A reclaimer may allocate for bookkeeping. Do not recursively enter all
 	// reclaimers in that case, and do not wait on one already running elsewhere.
-	if !katomic.cas(mut &reclaim_inflight, false, true) {
+	if !katomic.cas(mut &reclaim_inflight, u32(0), u32(1)) {
 		return 0
 	}
-	defer { katomic.store(mut &reclaim_inflight, false) }
+	defer { katomic.store(mut &reclaim_inflight, u32(0)) }
 
 	mut reclaimed := u64(0)
 	count := reclaimers_len
