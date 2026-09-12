@@ -6,6 +6,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <sched.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -441,6 +442,49 @@ static int test_anonymous_descriptor_access(void)
 	return 0;
 }
 
+/* An abstract socket name belongs to the socket that bound it, and has to come
+ * back when that socket goes. Leaking it reserved the name for the life of the
+ * machine: an X server that had been restarted could not bind its own display
+ * again, and every hosted application after the first failed to start. */
+static int test_abstract_socket_reuse(void)
+{
+	struct sockaddr_un address;
+	const char name[] = "\0vinix-core-abstract";
+	socklen_t length = offsetof(struct sockaddr_un, sun_path) + sizeof(name) - 1;
+
+	for (int attempt = 0; attempt < 3; ++attempt) {
+		memset(&address, 0, sizeof(address));
+		address.sun_family = AF_UNIX;
+		memcpy(address.sun_path, name, sizeof(name) - 1);
+
+		int listener = socket(AF_UNIX, SOCK_STREAM, 0);
+		CHECK(listener >= 0);
+		CHECK(bind(listener, (struct sockaddr *)&address, length) == 0);
+		CHECK(listen(listener, 4) == 0);
+
+		int client = socket(AF_UNIX, SOCK_STREAM, 0);
+		CHECK(client >= 0);
+		CHECK(connect(client, (struct sockaddr *)&address, length) == 0);
+		int served = accept(listener, NULL, NULL);
+		CHECK(served >= 0);
+		CHECK(close(served) == 0);
+		CHECK(close(client) == 0);
+		CHECK(close(listener) == 0);
+	}
+
+	/* And a name nobody holds is not connectable. */
+	int probe = socket(AF_UNIX, SOCK_STREAM, 0);
+	CHECK(probe >= 0);
+	memset(&address, 0, sizeof(address));
+	address.sun_family = AF_UNIX;
+	memcpy(address.sun_path, name, sizeof(name) - 1);
+	CHECK(connect(probe, (struct sockaddr *)&address, length) != 0);
+	CHECK(close(probe) == 0);
+
+	puts("QEMU CORE PASS: abstract socket names are released");
+	return 0;
+}
+
 static int run_tests(void)
 {
 	int persistence_boot = verify_persistence_boot();
@@ -457,6 +501,7 @@ static int run_tests(void)
 	CHECK(test_scheduler_and_accounting() == 0);
 	CHECK(test_posix_timer_thread_notification() == 0);
 	CHECK(test_anonymous_descriptor_access() == 0);
+	CHECK(test_abstract_socket_reuse() == 0);
 	CHECK(unlink(file_a) == 0);
 	CHECK(unlink(file_b) == 0);
 	CHECK(unlink(file_c) == 0);

@@ -353,12 +353,42 @@ fn (mut this UnixSocket) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 	}
 }
 
+// Give up the abstract name this socket was bound to, if it had one. The table
+// is the whole of the abstract namespace: an entry left behind by a socket that
+// has gone keeps its name reserved for the life of the machine, so the next
+// server to ask for it is refused, and a connect to it is handed a socket that
+// no longer exists. An X server binds both the filesystem path and the abstract
+// name, which is why restarting one used to fail with "Cannot establish any
+// listening sockets - Make sure an X server isn't already running" even after
+// its socket file was gone.
+fn release_abstract_name(socket &UnixSocket) {
+	abstract_sockets_lock.acquire()
+	defer {
+		abstract_sockets_lock.release()
+	}
+	for i in 0 .. 64 {
+		if abstract_sockets[i].in_use
+			&& voidptr(abstract_sockets[i].socket) == voidptr(socket) {
+			abstract_sockets[i].in_use = false
+			abstract_sockets[i].name_len = 0
+			abstract_sockets[i].socket = unsafe { nil }
+		}
+	}
+}
+
 fn (mut this UnixSocket) unref(_handle voidptr) ? {
 	// Dropping a handle or a VFS name is a successful release operation. The
 	// old implementation returned an Option failure unconditionally, so close
 	// and unlink completed their side effects but leaked a stale errno back to
 	// userspace.
 	katomic.dec(mut &this.refcount)
+	// A socket is created holding one reference of its own, which nothing ever
+	// drops, so the last descriptor closing leaves exactly that one. An
+	// abstract name has no filesystem entry to outlive it and has to come back
+	// at that point or it is reserved until the machine restarts.
+	if this.refcount <= 1 {
+		release_abstract_name(this)
+	}
 }
 
 fn (mut this UnixSocket) link(_handle voidptr) ? {
