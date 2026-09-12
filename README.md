@@ -129,7 +129,7 @@ starts the desktop directly. The runner uses KVM when available and otherwise
 falls back to QEMU TCG; `--no-build`, `--monitor`, and `--mem=MB` are supported.
 The same build works on Apple Silicon and cross-compiles the amd64 executable.
 
-### Complete software image on aarch64
+### Default software image on aarch64
 
 Build the languages, developer tools, X11 applications and alternate desktop
 into one image with a single command:
@@ -139,9 +139,11 @@ into one image with a single command:
 ```
 
 The resulting `build-support/init-aarch64/initramfs-desktop.tar` contains
-Python, Ruby, Go, OpenJDK, network and native developer tools, X11, Firefox,
-Hyprland, Minecraft, Codex, Claude Code, x86 translation and Wine, in addition
-to the native Vinix desktop. It is the image booted by:
+Python, Ruby, Go, network and native developer tools, X11, Firefox, Hyprland,
+x86 translation, Codex and Claude Code, in addition to the native Vinix
+desktop. Java, Minecraft and Wine are deliberately left out of this default
+image so users can install them on demand with `pkg`. It is the image booted
+by:
 
 ```sh
 ./run-desktop-aarch64.sh --no-desktop
@@ -155,12 +157,13 @@ staging trees are present, the desktop builder includes them in this same final
 image automatically. Wi-Fi firmware and proprietary Office media remain
 explicit inputs and are never downloaded by the aggregate build.
 
-The complete archive is larger than FAT32's single-file limit. The desktop
-runner automatically splits its writable `/root` seed, caches a compressed
-QEMU module, and has Limine decompress that module during boot.
+The desktop runner splits the writable `/root` seed from the immutable image
+and caches a compressed QEMU module. This keeps the boot payload small, leaves
+headroom below FAT32's single-file limit, and lets Limine decompress the module
+during boot.
 
 The individual layer builders described below remain available for iterating
-on one component, but are not required for a normal complete-image build.
+on one component, but are not required for a normal default-image build.
 
 ### Python 3 on aarch64
 

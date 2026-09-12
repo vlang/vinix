@@ -487,24 +487,26 @@ installed, one command builds the aarch64 image and boots into the desktop:
 
     ./run-desktop-aarch64.sh
 
-To build a single desktop image with every portable software layer (languages,
-developer tools, X11, Firefox, Hyprland, Minecraft, the CLI tools, and Wine),
-use the aggregate builder and then boot its result:
+To build a single desktop image with the default portable software set
+(Python, Ruby, Go, developer tools, X11, Firefox, Hyprland, x86 translation,
+and the CLI tools), use the aggregate builder and then boot its result. Java,
+Minecraft and Wine remain on-demand `pkg` installs instead of taking space in
+every image:
 
     ./build-all-aarch64.sh
     ./run-desktop-aarch64.sh --no-desktop
 
-The runner caches a gzip-compressed version of the immutable QEMU module so
-the complete image remains compatible with the FAT32 boot disk; Limine expands
-it before handing it to the kernel. `/root` remains the separate persistent
-EXT2 volume.
+The runner caches a gzip-compressed version of the immutable QEMU module to
+keep the boot payload small and comfortably below the FAT32 single-file limit;
+Limine expands it before handing it to the kernel. `/root` remains the separate
+persistent EXT2 volume.
 
 It builds the kernel, builds the desktop, and starts QEMU on the result. The
 launcher reuses `boot-image/boot-desktop-qemu.img` for the immutable system and
 mounts `boot-image/desktop-root.ext2` at `/root`. On the first run it derives a
 smaller QEMU initramfs from the self-contained hardware image and seeds the
-persistent volume with the desktop files and Wine prefixes. Later runs reuse
-those files instead of copying them into another boot image.
+persistent volume with the desktop files and other per-user state. Later runs
+reuse those files instead of copying them into another boot image.
 
 Set `VINIX_BOOT_DISK` to manage another long-lived boot disk, or use
 `--ephemeral` for a concurrent test whose temporary boot disk and package store

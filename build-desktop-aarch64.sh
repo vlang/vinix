@@ -401,7 +401,7 @@ fi
 # /usr/libexec, so they cannot replace native ARM64 libraries.
 if { [ "$COMPACT_INITRAMFS" -eq 0 ] || [ "$WITH_X86_TRANSLATION" -eq 1 ]; } &&
    [ -x "$X86_TRANSLATION_STAGING/usr/bin/qemu-x86_64" ]; then
-    echo "==> Staging x86-64 translation and Wine runtime"
+    echo "==> Staging x86-64 translation layer"
     merge_staging_tree "$X86_TRANSLATION_STAGING"
 
     # Wine's desktop integration invokes the native shared-mime-info updater.

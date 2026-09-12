@@ -595,7 +595,7 @@ else
 fi
 
 if [ -x "$X86_TRANSLATION_STAGING/usr/bin/qemu-x86_64" ]; then
-    echo "==> Integrating x86-64 translation and Wine runtime..."
+    echo "==> Integrating x86-64 translation layer..."
     merge_staging_tree "$X86_TRANSLATION_STAGING"
 
     # Office populates a disposable web cache with names that exceed ustar's
