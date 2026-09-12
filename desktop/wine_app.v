@@ -10,6 +10,10 @@ const firefox_surface_width = 1280
 const firefox_surface_height = 900
 const firefox_window_width = 1280
 const firefox_window_height = 900
+const chromium_surface_width = 1280
+const chromium_surface_height = 900
+const chromium_window_width = 1280
+const chromium_window_height = 900
 const gimp_surface_width = 1280
 const gimp_surface_height = 900
 const gimp_window_width = 1280
@@ -66,6 +70,24 @@ mut:
 
 fn open_firefox(mut _ Desktop) !NativeApp {
 	return open_hosted_x11_app('firefox', '/usr/bin/run-firefox', firefox_surface_width, firefox_surface_height, 'builtin:browser', 'Starting Firefox…', 'Firefox is not installed in this desktop image.', 'Firefox exited.')
+}
+
+// Chromium is not in the image: `pkg install chromium` fetches it from Alpine.
+// Report that from the window itself rather than starting a private X server
+// for a browser that cannot be there.
+fn open_chromium(mut _ Desktop) !NativeApp {
+	if C.access(c'/usr/lib/chromium/chrome', C.X_OK) != 0 {
+		return &HostedX11App{
+			surface_width: chromium_surface_width
+			surface_height: chromium_surface_height
+			icon: 'builtin:browser'
+			failed: true
+			error_message: 'Chromium is not installed. Run pkg install chromium in Terminal.'
+		}
+	}
+	return open_hosted_x11_app('chromium', '/usr/bin/run-chromium', chromium_surface_width,
+		chromium_surface_height, 'builtin:browser', 'Starting Chromium…', 'Chromium is not installed. Run pkg install chromium in Terminal.',
+		'Chromium exited.')
 }
 
 fn open_gimp(mut _ Desktop) !NativeApp {

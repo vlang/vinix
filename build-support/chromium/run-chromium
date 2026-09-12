@@ -1,0 +1,150 @@
+#!/bin/sh
+# Launch the Alpine Chromium build on Vinix's framebuffer-backed Xorg.
+set -eu
+
+CHROMIUM_DIRECTORY=/usr/lib/chromium
+CHROMIUM_BINARY="$CHROMIUM_DIRECTORY/chrome"
+
+if [ ! -x "$CHROMIUM_BINARY" ]; then
+    echo "run-chromium: Chromium is not installed; run 'pkg install chromium'" >&2
+    exit 127
+fi
+
+export HOME="${HOME:-/root}"
+export TMPDIR="${TMPDIR:-/tmp}"
+export XDG_CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}"
+export XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
+export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/tmp/runtime-root}"
+# Chromium writes its profile, cache and singleton socket under one directory.
+# Keeping it out of $XDG_CONFIG_HOME lets a damaged profile be removed without
+# touching the settings of the other applications in the image.
+VINIX_CHROMIUM_PROFILE="${VINIX_CHROMIUM_PROFILE:-$HOME/.chromium/vinix}"
+
+prepare_directories() {
+    mkdir -p "$XDG_CACHE_HOME" "$XDG_CONFIG_HOME" "$XDG_RUNTIME_DIR" \
+        "$VINIX_CHROMIUM_PROFILE" /dev/shm || return 1
+    chmod 700 "$XDG_RUNTIME_DIR" || return 1
+    chmod 1777 /dev/shm || return 1
+}
+
+if ! prepare_directories; then
+    # A read-only or damaged persistent home must not stop the browser. This
+    # boot's tmpfs is always writable and the profile is recreated there.
+    export XDG_CACHE_HOME=/tmp/vinix-chromium-cache
+    export XDG_CONFIG_HOME=/tmp/vinix-chromium-config
+    VINIX_CHROMIUM_PROFILE=/tmp/vinix-chromium-profile
+    prepare_directories
+fi
+export VINIX_CHROMIUM_PROFILE
+
+# Vinix has no AT-SPI bus, no session D-Bus and no keyring daemon. Each of
+# those otherwise costs a multi-second connection timeout during startup.
+export NO_AT_BRIDGE=1
+unset DBUS_SESSION_BUS_ADDRESS || true
+
+# Chromium's own crash handler re-executes the browser to collect a report.
+# Vinix has no crash-reporting endpoint, so keep the failure on the console.
+export CHROME_CRASHPAD_DISABLE=1
+
+# The setuid sandbox helper is only consulted when it is configured. Make sure
+# an inherited value cannot send Chromium looking for a sandbox binary that
+# cannot work without user namespaces.
+unset CHROME_DEVEL_SANDBOX || true
+
+# Vinix implements neither user namespaces nor seccomp-bpf, which are the two
+# layers of Chromium's Linux sandbox. Both have to be switched off explicitly;
+# with them off the zygote adds a fork-from-a-threaded-process step that buys
+# nothing, so each child process is launched directly instead.
+set -- --no-sandbox --disable-setuid-sandbox --disable-gpu-sandbox --no-zygote \
+    --disable-namespace-sandbox "$@"
+
+# Chromium's shared memory lives in /dev/shm on Linux. Vinix's /dev/shm is a
+# small tmpfs shared with the rest of the system, so keep those segments in
+# $TMPDIR where a renderer cannot exhaust it.
+set -- --disable-dev-shm-usage "$@"
+
+# No network is reachable for these background jobs on a first boot, and each
+# failure is retried on a timer for the life of the browser.
+set -- --no-first-run --no-default-browser-check --disable-background-networking \
+    --disable-component-update --disable-breakpad --disable-crash-reporter \
+    --disable-sync --disable-domain-reliability --disable-search-engine-choice-screen \
+    --metrics-recording-only --password-store=basic "$@"
+
+set -- --ozone-platform=x11 --user-data-dir="$VINIX_CHROMIUM_PROFILE" "$@"
+
+# The GPU process rasterises through ANGLE. With a real DRI device and a GBM
+# provider present, ANGLE runs on the Vulkan/GL driver the X11 stack already
+# uses; otherwise it falls back to Chromium's CPU Vulkan device, which Alpine
+# ships in chromium-swiftshader. The software path can also be forced, which is
+# what a graphics bring-up wants when a driver is suspected.
+if [ "${VINIX_FORCE_SOFTWARE_GL:-0}" != 1 ] &&
+   [ -e /dev/dri/renderD128 ] &&
+   [ -e /usr/lib/libgbm.so.1 ] &&
+   { [ -f /usr/share/vinix/mesa-x11-egl ] ||
+     [ -f /usr/share/vinix/asahi-x11-egl ]; }; then
+    unset LIBGL_ALWAYS_SOFTWARE
+    set -- --use-gl=angle --use-angle=gl-egl --enable-gpu-rasterization "$@"
+    echo "run-chromium: enabling hardware ANGLE/EGL"
+else
+    export LIBGL_ALWAYS_SOFTWARE=1
+    if [ -e /usr/lib/chromium/libvk_swiftshader.so ]; then
+        set -- --use-gl=angle --use-angle=swiftshader "$@"
+    else
+        set -- --disable-gpu --disable-software-rasterizer "$@"
+    fi
+fi
+
+# Chromium runs one process per renderer, plus network, storage, GPU and utility
+# services. Vinix schedules those on QEMU's single emulated CPU, where the
+# per-process cost dominates. One renderer for every site keeps the process tree
+# at a size a bring-up can still follow on the serial console.
+set -- --process-per-site --renderer-process-limit="${VINIX_CHROMIUM_RENDERERS:-2}" "$@"
+
+# A single-process browser is not a supported Chromium configuration, but it is
+# the one that isolates a multi-process IPC failure from a rendering failure.
+if [ "${VINIX_CHROMIUM_SINGLE_PROCESS:-0}" = 1 ]; then
+    set -- --single-process --in-process-gpu "$@"
+fi
+
+if [ -n "${VINIX_CHROMIUM_FLAGS:-}" ]; then
+    # Deliberately word-split: this variable is a debugging flag list.
+    # shellcheck disable=SC2086
+    set -- $VINIX_CHROMIUM_FLAGS "$@"
+fi
+
+has_url=0
+for argument in "$@"; do
+    case "$argument" in
+        -*) ;;
+        *) has_url=1 ;;
+    esac
+done
+if [ "$has_url" -eq 0 ]; then
+    # A persistent /root shadows the copy the image ships there, so the start
+    # page the launcher relies on lives under /usr/share.
+    start_page=/usr/share/vinix/chromium-smoke.html
+    if [ ! -s "$start_page" ]; then
+        start_page=/root/chromium-smoke.html
+    fi
+    set -- "$@" "file://$start_page"
+fi
+
+if [ -n "${DISPLAY:-}" ]; then
+    # The native desktop supplies a private 1280x900 Xvfb display with no X11
+    # window manager, so Chromium has to be told the size of the surface it is
+    # hosted in. Callers using a different surface can override both dimensions.
+    hosted_width="${VINIX_CHROMIUM_WINDOW_WIDTH:-1280}"
+    hosted_height="${VINIX_CHROMIUM_WINDOW_HEIGHT:-900}"
+    exec "$CHROMIUM_BINARY" \
+        --window-size="$hosted_width,$hosted_height" --window-position=0,0 "$@"
+fi
+
+if [ ! -x /usr/bin/Xorg ] || [ ! -x /usr/bin/startx ]; then
+    echo "run-chromium: Xorg is required; stage it with build-x11-aarch64.sh" >&2
+    exit 1
+fi
+
+# Chromium logs GPU and DRI probe failures even on a healthy software launch.
+# Keep them off the serial console, where they read like a boot failure.
+export STARTX_CLIENT_LOG="${VINIX_CHROMIUM_LOG:-/var/log/chromium.log}"
+exec /usr/bin/startx "$CHROMIUM_BINARY" "$@"

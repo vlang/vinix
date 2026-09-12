@@ -513,7 +513,7 @@ fn test_terminal_can_edit_a_file_with_vim_over_its_real_pty() {
 }
 
 fn test_available_utility_applications_and_shortcut_layouts() {
-	assert available_apps.len == 18
+	assert available_apps.len == 19
 	assert available_apps[0].process_name == 'vinix-files'
 	assert available_apps[1].title == 'Firefox'
 	assert available_apps[1].exclusive_command == ''
@@ -565,6 +565,13 @@ fn test_available_utility_applications_and_shortcut_layouts() {
 	assert available_apps[17].icon == 'builtin:disk'
 	assert available_apps[17].polling && available_apps[17].poll_interval_ms == 33
 	assert !available_apps[17].keyboard && !available_apps[17].pointer
+	assert available_apps[18].title == 'Chromium'
+	assert available_apps[18].process_name == 'vinix-chromium'
+	assert available_apps[18].icon == 'builtin:browser'
+	assert available_apps[18].width == chromium_window_width
+	assert available_apps[18].height == chromium_window_height + default_title_height
+	assert available_apps[18].keyboard && available_apps[18].pointer
+	assert available_apps[18].polling && available_apps[18].poll_interval_ms == 50
 	assert app_start_actions.len == available_apps.len
 	assert app_shortcut_actions.len == available_apps.len
 	assert shortcut_rows_for_height(720) == 8
@@ -831,6 +838,14 @@ fn test_firefox_uses_the_hosted_x11_window_path() {
 fn test_gimp_uses_the_hosted_x11_window_path() {
 	factory := available_apps[16]
 	assert factory.process_name == 'vinix-gimp'
+	assert factory.exclusive_command == ''
+	assert factory.open != unsafe { nil }
+	assert factory.polling && factory.keyboard && factory.pointer
+}
+
+fn test_chromium_uses_the_hosted_x11_window_path() {
+	factory := available_apps[18]
+	assert factory.process_name == 'vinix-chromium'
 	assert factory.exclusive_command == ''
 	assert factory.open != unsafe { nil }
 	assert factory.polling && factory.keyboard && factory.pointer

@@ -405,6 +405,7 @@ fn activity_name_of(record &ActivitySample) string {
 		'vinix-minecraft' { 'Minecraft' }
 		'vinix-blender' { 'Blender' }
 		'vinix-gimp' { 'GIMP' }
+		'vinix-chromium' { 'Chromium' }
 		'vinix-wine-calculator' { 'Wine Calculator' }
 		'vinix-wine-notepad' { 'Wine Notepad' }
 		'vinix-wine-word2013' { 'Microsoft Word 2013' }

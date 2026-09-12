@@ -106,6 +106,21 @@ install -m755 "$SCRIPT_DIR/tests/packages/x-window-check.py" \
     "$STAGING/root/x-window-check.py"
 install -m755 "$SCRIPT_DIR/build-support/gimp/run-gimp" \
     "$STAGING/usr/bin/run-gimp"
+# Chromium is fetched on demand with `pkg install chromium`, so its launcher,
+# managed policy and start page have to be in the base image before the
+# package exists. The launcher refuses to start until the package is there.
+install -m755 "$SCRIPT_DIR/build-support/chromium/run-chromium" \
+    "$STAGING/usr/bin/run-chromium"
+install -m755 "$SCRIPT_DIR/tests/packages/chromium-smoke.sh" \
+    "$STAGING/root/chromium-package-smoke.sh"
+mkdir -p "$STAGING/usr/share/vinix"
+install -m644 "$SCRIPT_DIR/tests/chromium/smoke.html" \
+    "$STAGING/usr/share/vinix/chromium-smoke.html"
+install -m644 "$SCRIPT_DIR/tests/chromium/smoke.html" \
+    "$STAGING/root/chromium-smoke.html"
+mkdir -p "$STAGING/etc/chromium/policies/managed"
+install -m644 "$SCRIPT_DIR/build-support/chromium/policies.json" \
+    "$STAGING/etc/chromium/policies/managed/vinix.json"
 mkdir -p "$STAGING/etc/gimp/2.0"
 install -m644 "$SCRIPT_DIR/build-support/gimp/vinix-gimprc" \
     "$STAGING/etc/gimp/2.0/vinix-gimprc"

@@ -499,6 +499,64 @@ renderer, as does `VINIX_FORCE_SOFTWARE_GL=1`. Firefox's Linux namespace and
 seccomp sandboxes remain disabled because Vinix does not implement those
 kernel facilities yet, so the browser displays its reduced-protection warning.
 
+### Chromium on aarch64
+
+Chromium runs as a stock Alpine musl application on the same framebuffer-backed
+X11 stack Firefox uses. It is not in the image: the browser and its runtime are
+232 MiB, so they are fetched on demand from the Alpine repositories.
+
+```sh
+pkg install chromium
+run-chromium                     # the bundled start page
+run-chromium https://example.com
+```
+
+The desktop's Start menu and wallpaper have a Chromium launcher beside the
+Firefox one. Until the package is installed the window says so rather than
+starting an X server for a browser that is not there.
+
+A bootable image can carry the browser already installed, which is what the
+Chromium regression test boots:
+
+```sh
+./build-chromium-aarch64.sh
+./build-desktop-aarch64.sh --compact-initramfs --with-chromium
+```
+
+Chromium is a much heavier guest than Firefox, and three kernel facilities were
+added for it:
+
+- **procfs.** Chromium finds its own program through `/proc/self/exe` and
+  re-executes it to start every child process, and each child checks that it is
+  still single-threaded by reading the link count of `/proc/self/task` through a
+  descriptor it opened on `/proc`. Vinix now mounts a small procfs: a directory
+  per live process with `cmdline`, `comm`, `stat`, `statm`, `status`, an `exe`
+  link, `task/` and `fd/`, plus `meminfo`, `uptime`, `version` and the
+  `/proc/sys` entries that are read at startup. The tree is rebuilt from the
+  process table when a directory is looked up or read, so nothing in the clone
+  or exit path has to take a filesystem lock and a directory can never describe
+  a process that has already gone.
+- **`SO_PASSCRED` and `SCM_CREDENTIALS`.** Chromium's crash handler sets up a
+  socket pair that carries the peer's identity with each message, and treated a
+  refusal as fatal. Unix sockets now accept the option and deliver the record.
+- **Userspace faults end the process, not the machine.** A `BRK` instruction —
+  which is how `__builtin_trap()` and the `CHECK` macros of large C++ programs
+  abort — used to reach the kernel's fatal exception handler. It is now
+  delivered as `SIGTRAP`, and any userspace fault with no handler terminates
+  that process the way Linux does.
+
+Vinix implements neither user namespaces nor seccomp-bpf, so `run-chromium`
+turns off both layers of Chromium's Linux sandbox and starts child processes
+directly instead of through the zygote. With no GPU driver present, ANGLE falls
+back to the CPU Vulkan device in `chromium-swiftshader`; `VINIX_FORCE_SOFTWARE_GL=1`
+forces that path, and `VINIX_CHROMIUM_SINGLE_PROCESS=1` collapses the browser
+into one process, which is what separates an IPC failure from a rendering one.
+
+```sh
+python3 tests/chromium/run_vm.py --package    # pkg install chromium, then run it
+python3 tests/chromium/run_vm.py              # drive a staged browser in QEMU
+```
+
 ### VirtIO-GPU acceleration with KekVM
 
 The ARM64 QEMU platform has a render-only VirtIO-GPU DRM driver for VirGL. It

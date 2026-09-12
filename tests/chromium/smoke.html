@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chromium on Vinix</title>
+<style>
+  :root { color-scheme: dark; font-family: sans-serif; }
+  body { margin: 0; min-height: 100vh; display: grid; place-items: center;
+         background: #10161f; color: #e8eef9; }
+  main { max-width: 42rem; padding: 3rem; }
+  h1 { color: #8ab4f8; font-size: 2.6rem; margin-bottom: .5rem; }
+  p { font-size: 1.2rem; line-height: 1.55; }
+  code { color: #a8dab5; }
+  #processes { color: #fdd663; }
+</style>
+<main>
+  <h1>Chromium is running on Vinix</h1>
+  <p>This page came from <code>/root/chromium-smoke.html</code>. Chromium is
+     rendering through GTK 3 and X11; Vinix's Xorg server presents it on the
+     framebuffer.</p>
+  <p>The renderer that drew this text is a separate process talking to the
+     browser over a Unix socket, so Vinix carried
+     <span id="processes">this paragraph</span> across
+     <code>SCM_RIGHTS</code> and shared memory.</p>
+</main>
+<script>
+  document.getElementById('processes').textContent =
+      navigator.userAgent.replace(/^.*Chrome\/([0-9.]+).*$/, 'Chromium $1');
+</script>

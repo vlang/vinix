@@ -17,6 +17,7 @@ boot-image/
 /build-aarch64-runtime/
 /build-aarch64-userland/
 /build-aarch64-x11/
+/build-aarch64-chromium/
 build-support/init-aarch64/init
 build-support/init-aarch64/initramfs.tar
 build-support/init-aarch64/initramfs-minimal.tar

@@ -22,7 +22,7 @@ usage() {
 usage: pkg <command> [package ...]
 
 commands:
-  install PACKAGE...  install packages (includes GTK, Gnumeric, GIMP, Blender, and Sublime Text)
+  install PACKAGE...  install packages (includes GTK, Chromium, Gnumeric, GIMP, Blender, and Sublime Text)
   remove PACKAGE...   remove packages
   update              refresh Alpine repository indexes
   upgrade             upgrade installed packages
@@ -276,6 +276,9 @@ resolve_packages() {
 			gimp)
 				resolved="$resolved gimp adwaita-icon-theme font-dejavu"
 				;;
+			chromium)
+				resolved="$resolved chromium chromium-swiftshader adwaita-icon-theme font-dejavu"
+				;;
 			sublime|sublime-text)
 				resolved="$resolved gcompat gtk+3.0 adwaita-icon-theme font-dejavu libarchive-tools llvm19-libs"
 				;;
@@ -320,6 +323,15 @@ install_packages() {
 				VINIX_PKG_CACHE_EXTRAS=python3-pycache-pyc0 \
 					apk_install blender
 				finalize_blender
+				;;
+			chromium)
+				# Chromium's Alpine dependencies provide GTK, X11 and NSS. The
+				# icon theme and fonts are what a browser needs but Alpine does
+				# not make it depend on, and chromium-swiftshader is the CPU
+				# Vulkan device ANGLE falls back to when no GPU driver exists.
+				apk_install \
+					adwaita-icon-theme font-dejavu chromium chromium-swiftshader
+				finalize_chromium
 				;;
 			sublime|sublime-text)
 				apk_install \
@@ -605,6 +617,45 @@ finalize_gimp() {
 	/usr/bin/gtk-update-icon-cache -f -t /usr/share/icons/Adwaita
 }
 
+finalize_chromium() {
+	[ -n "$ROOT" ] && return 0
+	# Vinix package extraction cannot restore executable modes with fchmodat(2)
+	# yet. Chromium is a launcher script plus a private application directory,
+	# and every program in it has to be made executable explicitly.
+	for program in /usr/lib/chromium/chrome /usr/lib/chromium/chromium \
+		/usr/lib/chromium/chromium-launcher.sh \
+		/usr/lib/chromium/chrome_crashpad_handler \
+		/usr/lib/chromium/chrome-sandbox \
+		/usr/lib/chromium/xdg-mime /usr/lib/chromium/xdg-settings \
+		/usr/bin/chromium /usr/bin/chromium-browser; do
+		[ -e "$program" ] || continue
+		/bin/busybox chmod 0755 "$program"
+	done
+	if [ ! -x /usr/lib/chromium/chrome ]; then
+		echo "pkg: Chromium package has no application binary" >&2
+		exit 1
+	fi
+	# The image ships the launcher, start page and managed policy so that this
+	# transaction only has to supply the browser. Report a base image that
+	# predates them instead of installing a browser nothing can start.
+	if [ ! -x /usr/bin/run-chromium ]; then
+		echo "pkg: this image has no /usr/bin/run-chromium launcher" >&2
+		exit 1
+	fi
+	# Chromium reads its UI fonts, icons and MIME types through the same GTK
+	# caches every other desktop application uses.
+	/usr/bin/gdk-pixbuf-query-loaders --update-cache
+	/usr/bin/glib-compile-schemas /usr/share/glib-2.0/schemas
+	/usr/bin/update-mime-database /usr/share/mime
+	/usr/bin/gtk-update-icon-cache -f -t /usr/share/icons/hicolor
+	/usr/bin/gtk-update-icon-cache -f -t /usr/share/icons/Adwaita
+	# Fontconfig otherwise rebuilds its cache inside every one of Chromium's
+	# processes, on a guest with one CPU.
+	if [ -x /usr/bin/fc-cache ]; then
+		/usr/bin/fc-cache -f
+	fi
+}
+
 finalize_blender() {
 	launcher=$(root_path /usr/bin/blender)
 	real_binary=$(root_path /usr/libexec/vinix-blender)
@@ -739,6 +790,9 @@ case "$command_name" in
 		fi
 		if [ -e "$(root_path /usr/bin/gimp)" ]; then
 			finalize_gimp
+		fi
+		if [ -e "$(root_path /usr/lib/chromium/chrome)" ]; then
+			finalize_chromium
 		fi
 		;;
 	search)
