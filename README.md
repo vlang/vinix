@@ -575,12 +575,16 @@ One thing to know about the images: a persistent `/root` volume shadows the copy
 of a file the image ships there, so the launchers take their start page from
 `/usr/share/vinix` instead.
 
-Chromium on the *desktop* is not yet steady. It draws its whole interface in a
-Vinix window, as above, and then its renderer usually stops responding and the
-browser exits; one run lost its X server outright, to `ext2: unable to read
-inode entry` followed by a segmentation fault inside Xvfb. Driven directly
-through the same bridge with no compositor competing for the machine, it loads
-and renders the page and stays up, which is what the bring-up test checks.
+Chromium on the *desktop* is slow rather than broken. It draws its whole
+interface in a Vinix window, as above, but the compositor blits the hosted
+surface twenty times a second on the same emulated CPUs the browser is trying to
+render on, and the page often takes long enough that Chromium's own hang
+detector offers to exit it. Driven through the same bridge with nothing else
+competing for the machine it loads the page in about a minute, which is what the
+bring-up test checks.
+
+`pkg install chromium` takes roughly half an hour in QEMU: 204 packages and
+698 MiB through the emulated network, unpacked on an emulated CPU.
 
 ### VirtIO-GPU acceleration with KekVM
 
