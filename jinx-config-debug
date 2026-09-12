@@ -1,4 +1,0 @@
-. ${base_dir}/jinx-config
-
-PROD=false
-TARGET_CFLAGS="$TARGET_CFLAGS -g"

@@ -8,9 +8,9 @@ else
 all: amd64-alpine
 endif
 
-# Alpine supplies the amd64 userland and guest toolchain as binaries. The
-# kernel is built directly with the host compiler, avoiding Jinx's historical
-# mlibc, binutils, and cross-GCC bootstrap on the normal build path.
+# Alpine supplies the userland and guest toolchain as binaries. The kernel is
+# built directly with the host compiler, so there is no mlibc, binutils, or
+# cross-GCC bootstrap to run.
 amd64-alpine:
 	./build-amd64.sh
 
@@ -30,19 +30,6 @@ debug:
 	else \
 		PROD=false ./build-amd64.sh; \
 	fi
-
-# Keep the source-built mlibc distribution available to port maintainers, but
-# do not make every kernel or desktop build pay its toolchain bootstrap cost.
-.PHONY: legacy-distro
-legacy-distro: jinx
-	./build-support/makeiso.sh
-
-jinx: build-support/jinx/git-clone-commit.patch
-	git clone https://codeberg.org/mintsuki/jinx.git jinx-repo
-	git -C jinx-repo checkout b3c7da97e5247bee0a876a7a5f6c104f019fcf79
-	patch -d jinx-repo -p1 < build-support/jinx/git-clone-commit.patch
-	mv jinx-repo/jinx ./
-	rm -rf jinx-repo
 
 .PHONY: run-kvm
 run-kvm: amd64-alpine
@@ -70,11 +57,11 @@ run-uefi: vinix.iso ovmf/ovmf-code-x86_64.fd ovmf/ovmf-vars-x86_64.fd
 		$(QEMUFLAGS)
 
 .PHONY: run-bochs
-run-bochs: legacy-distro
+run-bochs: amd64-alpine
 	bochs -f bochsrc
 
 .PHONY: run-lingemu
-run-lingemu: legacy-distro
+run-lingemu: amd64-alpine
 	lingemu runvirt -m 8192 --diskcontroller type=ahci,name=ahcibus1 --disk vinix.iso,disktype=cdrom,controller=ahcibus1
 
 .PHONY: run
@@ -108,4 +95,4 @@ clean:
 .PHONY: distclean
 distclean: clean
 	make -C kernel distclean
-	rm -rf build-amd64-userland build-amd64-qemu build-aarch64-userland .jinx-cache jinx builds host-builds host-pkgs pkgs sources ovmf
+	rm -rf build-amd64-userland build-amd64-qemu build-aarch64-userland ovmf

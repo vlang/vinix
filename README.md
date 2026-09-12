@@ -85,8 +85,9 @@ sudo xbps-install -Suv clang llvm lld make findutils curl git file xz rsync xorr
 ```
 ### Building the distro
 
-The normal build downloads Alpine's pinned minirootfs, builds the kernel
-directly with the host compiler, and assembles a UEFI ISO:
+The build downloads Alpine's pinned minirootfs, builds the kernel directly
+with the host compiler, and assembles a UEFI ISO. Nothing is bootstrapped from
+source -- there is no binutils, GCC, or mlibc toolchain to build first:
 
 ```bash
 make all
@@ -94,7 +95,6 @@ make all
 make ARCHITECTURE=aarch64 all
 ```
 
-This path does not bootstrap binutils, GCC, mlibc, or the userland from source.
 Set `VINIX_ALPINE_DEVTOOLS=1` to include Alpine's prebuilt C/C++ toolchain in
 the guest image:
 
@@ -111,13 +111,6 @@ access. Run the following inside Vinix to verify the shell setup:
 
 ```sh
 /root/zsh-smoke.sh
-```
-
-Port maintainers can still build the historical source-based mlibc distro
-explicitly:
-
-```bash
-PKGS_TO_INSTALL='python sqlite' make legacy-distro
 ```
 
 ### Native desktop on amd64
