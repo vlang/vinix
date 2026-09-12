@@ -437,10 +437,11 @@ if [ "$COMPACT_INITRAMFS" -eq 1 ]; then
     # ls, du, find-like shell tooling, archive tools, and process/filesystem
     # inspection commands preinstalled without bringing the GNU package in.
     for applet in \
-        ash basename cat chgrp chmod chown cp cut date dd df dirname dmesg du \
-        echo env expr false find grep head hostname id kill ln ls mkdir mknod mount \
-        mv ping ps pwd rm rmdir sed sh sleep sort stat sync tail tar touch true \
-        uname wc which whoami xargs; do
+        ash awk basename cat chgrp chmod chown cmp comm cp cut date dd df dirname \
+        dmesg du echo env expr false find grep head hostname id kill ln ls mkdir \
+        mknod mktemp mount mv ping printf ps pwd readlink rm rmdir sed seq sh \
+        sleep sort stat sync tail tar tee touch tr true uname uniq wc which \
+        whoami xargs; do
         ln -sf busybox "$STAGING/bin/$applet"
     done
 

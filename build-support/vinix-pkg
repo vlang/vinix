@@ -152,7 +152,7 @@ apk_install() (
 	wait_for_network
 	cache_parent=$(root_path /var/cache)
 	mkdir -p "$cache_parent"
-	cache=$(mktemp -d "$cache_parent/vinix-pkg.XXXXXX")
+	cache=$(bb mktemp -d "$cache_parent/vinix-pkg.XXXXXX")
 	trap 'rm -rf "$cache"' EXIT INT TERM
 	installed_before="$cache/installed-before"
 	installed_after="$cache/installed-after"
@@ -409,7 +409,7 @@ install_sublime() {
 
 	cache_parent=$(root_path /var/cache)
 	mkdir -p "$cache_parent"
-	temp=$(mktemp -d "$cache_parent/vinix-sublime.XXXXXX")
+	temp=$(bb mktemp -d "$cache_parent/vinix-sublime.XXXXXX")
 	trap 'rm -rf "$temp"' EXIT INT TERM
 	archive="$temp/sublime-text.tar.xz"
 	download_sublime "$archive"
