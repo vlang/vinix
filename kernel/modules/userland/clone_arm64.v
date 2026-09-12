@@ -299,7 +299,22 @@ fn thread_exit(status int, group bool) {
 		sched.dequeue_and_die()
 	}
 
-	exit_process(mut current_process, mut current_thread, status)
+	exit_process(mut current_process, mut current_thread, encode_exit_status(status))
+}
+
+// Terminate the calling process because one of its own instructions raised a
+// fatal signal nothing handled: a BRK, an undefined instruction or a memory
+// fault with no handler and no way to retry. Linux reports that to wait(2) as
+// a death by signal rather than an exit code, and the kernel keeps running.
+@[noreturn]
+pub fn exit_with_fatal_signal(signal u8) {
+	mut current_thread := proc.current_thread()
+	mut current_process := current_thread.process
+
+	release_robust_list(mut current_thread)
+	clear_child_tid(mut current_thread)
+
+	exit_process(mut current_process, mut current_thread, encode_fatal_signal(signal))
 }
 
 // Drop the calling thread from its process, reporting whether it was the last
@@ -395,7 +410,7 @@ fn exit_process(mut current_process proc.Process, mut current_thread proc.Thread
 
 	proc.free_tid(current_thread.tid)
 
-	katomic.store(mut &current_process.status, encode_exit_status(status))
+	katomic.store(mut &current_process.status, status)
 	// Wakes a parent blocked in wait4()/waitid()...
 	event.trigger(mut &current_process.event, false)
 	// ...and tells one that is not waiting yet, which is how a daemon reaps.
@@ -407,6 +422,12 @@ fn exit_process(mut current_process proc.Process, mut current_thread proc.Thread
 // wait(2) reports a normal exit with the code in bits 8..15.
 fn encode_exit_status(status int) int {
 	return (status & 0xff) << 8
+}
+
+// ...and a death by signal with the signal number in bits 0..6, which is what
+// WIFSIGNALED/WTERMSIG read. Bit 7 stays clear: there is no core dump.
+fn encode_fatal_signal(signal u8) int {
+	return int(signal) & 0x7f
 }
 
 // Stop every other thread of the process for good. They are never resumed, so

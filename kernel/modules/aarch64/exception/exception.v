@@ -112,26 +112,54 @@ pub fn sync_handler(esr u64, far u64, gpr_state &cpulocal.GPRState) {
 			fault_handler(ec, esr, far, gpr_state)
 		}
 		0x00, 0x07, 0x19, 0x1d { // Undefined or unavailable FP/SVE/SME instruction
-			if gpr_state.pc < higher_half
-				&& userland.dispatch_sync_signal(gpr_state, u8(userland.sigill)) {
-				return
+			if gpr_state.pc < higher_half {
+				if userland.dispatch_sync_signal(gpr_state, u8(userland.sigill)) {
+					return
+				}
+				terminate_faulting_process(ec, esr, far, gpr_state, u8(userland.sigill))
+			}
+			fault_handler(ec, esr, far, gpr_state)
+		}
+		0x2c { // Trapped floating-point exception
+			if gpr_state.pc < higher_half {
+				if userland.dispatch_sync_signal(gpr_state, u8(userland.sigfpe)) {
+					return
+				}
+				terminate_faulting_process(ec, esr, far, gpr_state, u8(userland.sigfpe))
+			}
+			fault_handler(ec, esr, far, gpr_state)
+		}
+		0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x3c {
+			// Breakpoint, software step, watchpoint and the BRK instruction.
+			// BRK is how __builtin_trap() and the CHECK macros of large C++
+			// programs abort, so it arrives from ordinary applications rather
+			// than only from a debugger.
+			if gpr_state.pc < higher_half {
+				if userland.dispatch_sync_signal(gpr_state, u8(userland.sigtrap)) {
+					return
+				}
+				terminate_faulting_process(ec, esr, far, gpr_state, u8(userland.sigtrap))
 			}
 			fault_handler(ec, esr, far, gpr_state)
 		}
 		0x20, 0x21 { // Instruction Abort from lower/same EL
 			mmap.pf_handler(gpr_state) or {
-				if gpr_state.pc < higher_half
-					&& userland.dispatch_sync_fault(gpr_state, far, esr) {
-					return
+				if gpr_state.pc < higher_half {
+					if userland.dispatch_sync_fault(gpr_state, far, esr) {
+						return
+					}
+					terminate_faulting_process(ec, esr, far, gpr_state, u8(userland.sigsegv))
 				}
 				fault_handler(ec, esr, far, gpr_state)
 			}
 		}
 		0x24, 0x25 { // Data Abort from lower/same EL
 			mmap.pf_handler(gpr_state) or {
-				if gpr_state.pc < higher_half
-					&& userland.dispatch_sync_fault(gpr_state, far, esr) {
-					return
+				if gpr_state.pc < higher_half {
+					if userland.dispatch_sync_fault(gpr_state, far, esr) {
+						return
+					}
+					terminate_faulting_process(ec, esr, far, gpr_state, u8(userland.sigsegv))
 				}
 				fault_handler(ec, esr, far, gpr_state)
 			}
@@ -143,6 +171,26 @@ pub fn sync_handler(esr u64, far u64, gpr_state &cpulocal.GPRState) {
 			fault_handler(ec, esr, far, gpr_state)
 		}
 	}
+}
+
+// A fault raised by a userspace instruction that no handler took over ends that
+// one process, exactly as it would on Linux. Panicking the machine instead
+// would let any crashing application take the system down with it, and a
+// multi-process browser crashes a renderer as a matter of course.
+@[noreturn]
+fn terminate_faulting_process(ec u64, esr u64, far u64, gpr_state &cpulocal.GPRState, signal u8) {
+	mut current_thread := proc.current_thread()
+	mut name := c'?'
+	mut pid := -1
+	if unsafe { current_thread != 0 } {
+		name = current_thread.process.name.str
+		pid = current_thread.process.pid
+	}
+	// One line, not the full register dump: this is an application fault being
+	// reported, not a kernel bug being debugged.
+	C.printf(c'\n\e[31mfault\e[m: %s[%d] killed by signal %d (ec=0x%llx esr=0x%llx far=0x%llx pc=0x%llx)\n',
+		name, pid, int(signal), ec, esr, far, gpr_state.pc)
+	userland.exit_with_fatal_signal(signal)
 }
 
 fn dump_reg(name &u8, val u64) {
