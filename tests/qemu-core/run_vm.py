@@ -28,6 +28,7 @@ FEATURE_MARKERS = (
     b"QEMU CORE PASS: secure getrandom",
     b"QEMU CORE PASS: copy-on-write fork",
     b"QEMU CORE PASS: ext2 cache, mmap, sync, namespace, timestamps",
+    b"QEMU CORE PASS: a shared mapping is visible to every reader",
     b"QEMU CORE PASS: fcntl and flock exclusion",
     b"QEMU CORE PASS: permissions, umask, and resource limits",
     b"QEMU CORE PASS: inotify events",

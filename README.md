@@ -580,10 +580,13 @@ page drawn as soon as it appears.
 
 Two things to know about the images. A persistent `/root` volume shadows the
 copy of a file the image ships there, so the launchers take their start page
-from `/usr/share/vinix` instead. And a hosted surface has to be *mapped* to be
-inspected: `read(2)` on the framebuffer file returns what is behind it on the
-disk, not what the X server has drawn into the shared pages, so a test that
-reads it sees a blank window and concludes the browser is broken.
+from `/usr/share/vinix` instead. And inspect a hosted surface by *mapping* it,
+the way the compositor does: reading the framebuffer file with `read(2)` did
+not reflect what the compositor was displaying, so a checker built on it calls
+a working browser blank. The general case — a sparse file filled only through
+a shared mapping, read back by another process — is covered by
+`tests/qemu-core`, and passes, so whatever the surface hits is narrower than
+that; until it is pinned down, map it.
 
 `pkg install chromium` takes roughly half an hour in QEMU: 204 packages and
 698 MiB through the emulated network, unpacked on an emulated CPU.

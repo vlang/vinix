@@ -39,6 +39,7 @@ static const char *test_dir = "/root/vinix-qemu-core";
 static const char *file_a = "/root/vinix-qemu-core/a";
 static const char *file_b = "/root/vinix-qemu-core/b";
 static const char *file_c = "/root/vinix-qemu-core/c";
+static const char *surface_file = "/root/vinix-qemu-core/surface";
 static const char *persist_file = "/root/vinix-qemu-core/persist";
 static const char persist_payload[] = "vinix-ext2-cache-writeback-v1";
 /* The same marker written the way a shell writes a file: buffered, closed, and
@@ -203,6 +204,69 @@ static int test_ext2_mapping_and_namespace(void)
 	CHECK(statfs(test_dir, &fsinfo) == 0);
 	CHECK(fsinfo.f_bsize > 0 && fsinfo.f_blocks > 0);
 	puts("QEMU CORE PASS: ext2 cache, mmap, sync, namespace, timestamps");
+	return 0;
+}
+
+/* A hosted X11 surface is exactly this: a file sized with ftruncate, never
+ * written through its descriptor, and filled by the X server through a shared
+ * mapping it never synchronises. The compositor maps it to display it, and
+ * anything else -- a test, a screenshot tool, cp -- reads it. All three have to
+ * see the same pixels.
+ *
+ * The interesting reader is a separate process with its own descriptor: it goes
+ * through the same resource only if the cached mapping is found for the inode
+ * rather than for the open file. */
+static int test_shared_mapping_visible_to_readers(void)
+{
+	/* The size matters: a hosted browser's surface is megabytes, and a
+	 * cache that behaves for one page can still lose the far end of a
+	 * mapping that covers a thousand of them. */
+	const size_t length = 4u * 1024u * 1024u;
+	int fd = open(surface_file, O_CREAT | O_TRUNC | O_RDWR, 0640);
+	CHECK(fd >= 0);
+	CHECK(ftruncate(fd, (off_t)length) == 0);
+
+	unsigned char *surface = mmap(NULL, length, PROT_READ | PROT_WRITE,
+	    MAP_SHARED, fd, 0);
+	CHECK(surface != MAP_FAILED);
+	/* A sparse file reads as zeroes until something puts bytes there. */
+	for (size_t i = 0; i < length; i += 512)
+		CHECK(surface[i] == 0);
+	for (size_t i = 0; i < length; ++i)
+		surface[i] = (unsigned char)(i * 61u + 7u);
+
+	/* The writer's own descriptor first, with no msync: a mapping is not a
+	 * write-behind cache that only becomes real when it is flushed. */
+	unsigned char observed[4096];
+	CHECK(pread(fd, observed, sizeof(observed), 0) == (ssize_t)sizeof(observed));
+	for (size_t i = 0; i < sizeof(observed); ++i)
+		CHECK(observed[i] == (unsigned char)(i * 61u + 7u));
+
+	pid_t child = fork();
+	CHECK(child >= 0);
+	if (child == 0) {
+		unsigned char seen[4096];
+		int reader = open(surface_file, O_RDONLY);
+		if (reader < 0)
+			_exit(1);
+		/* Read the far end, past anything the writer's descriptor
+		 * touched, and through a fresh descriptor of its own. */
+		if (pread(reader, seen, sizeof(seen), (off_t)(length - sizeof(seen)))
+		    != (ssize_t)sizeof(seen))
+			_exit(2);
+		for (size_t i = 0; i < sizeof(seen); ++i) {
+			size_t at = length - sizeof(seen) + i;
+			if (seen[i] != (unsigned char)(at * 61u + 7u))
+				_exit(3);
+		}
+		_exit(0);
+	}
+	CHECK(reap_ok(child) == 0);
+
+	CHECK(munmap(surface, length) == 0);
+	CHECK(close(fd) == 0);
+	CHECK(unlink(surface_file) == 0);
+	puts("QEMU CORE PASS: a shared mapping is visible to every reader");
 	return 0;
 }
 
@@ -495,6 +559,7 @@ static int run_tests(void)
 	CHECK(test_cow() == 0);
 	CHECK(prepare_directory() == 0);
 	CHECK(test_ext2_mapping_and_namespace() == 0);
+	CHECK(test_shared_mapping_visible_to_readers() == 0);
 	CHECK(test_locks() == 0);
 	CHECK(test_permissions_and_limits() == 0);
 	CHECK(test_inotify() == 0);
