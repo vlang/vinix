@@ -90,6 +90,7 @@ __global (
 	// and the text waiting to be written there.
 	resolver_published = false
 	pending_resolver   = ''
+	last_poll_ms       = u32(0)
 )
 
 pub fn initialise() {
@@ -161,12 +162,28 @@ fn (mut this InetSocket) refresh_status() {
 // poller.  That keeps packet callbacks out of IRQ context and serialises every
 // lwIP entry point behind one kernel lock.
 pub fn poll() {
+	// The idle loop calls this hundreds of thousands of times a second, and
+	// every call takes the one lock that every socket operation also needs.
+	// lwIP's finest timer runs at 250 ms and received frames arrive through
+	// receive() rather than from here, so there is nothing to gain from
+	// entering the stack more often than once a millisecond -- and plenty to
+	// lose: a thread waiting to send or receive was starved by the poller
+	// holding the lock, and transfers stalled mid-download.
+	now_ms := u32(time.monotonic_ns() / 1000000)
+	if last_poll_ms != 0 && now_ms == last_poll_ms {
+		return
+	}
+	last_poll_ms = now_ms
+
 	mut address := u32(0)
 	mut netmask := u32(0)
 	mut gateway := u32(0)
 	mut dns := [3]u32{}
-	net_lock.acquire()
-	C.vinix_net_poll(u32(time.monotonic_ns() / 1000000))
+	if !net_lock.test_and_acquire() {
+		// Somebody is inside the stack. It will be polled on the next tick.
+		return
+	}
+	C.vinix_net_poll(now_ms)
 	has_configuration := C.vinix_net_config(&address, &netmask, &gateway, &dns[0]) != 0
 	refresh_registered_sockets()
 	net_lock.release()
