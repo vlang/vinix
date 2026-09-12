@@ -84,7 +84,8 @@ def stop_child(pid: int, master: int) -> None:
 
     try:
         os.killpg(pid, signal.SIGTERM)
-    except ProcessLookupError:
+    except (ProcessLookupError, PermissionError):
+        # Gone already, or never became a process group leader.
         return
     deadline = time.monotonic() + 2
     while time.monotonic() < deadline:
@@ -94,7 +95,7 @@ def stop_child(pid: int, master: int) -> None:
         time.sleep(0.05)
     try:
         os.killpg(pid, signal.SIGKILL)
-    except ProcessLookupError:
+    except (ProcessLookupError, PermissionError):
         pass
     try:
         os.waitpid(pid, 0)
@@ -213,18 +214,23 @@ def main() -> int:
     parser.add_argument("--state-dir", type=Path,
                         default=root / "build/browser-vm")
     parser.add_argument("--mem", type=int, default=8192)
-    parser.add_argument("--timeout", type=int, default=1800)
+    # A package boot fetches a quarter of a gigabyte through QEMU's user
+    # networking and unpacks it on an emulated CPU; the browser boots are the
+    # quick ones.
+    parser.add_argument("--timeout", type=int, default=0,
+                        help="seconds to allow (default: 1800, or 5400 with --package)")
     parser.add_argument("--build", action="store_true",
                         help="rebuild the kernel before booting")
     arguments = parser.parse_args()
-    if arguments.timeout <= 0:
+    if arguments.timeout < 0:
         parser.error("--timeout must be positive")
     if arguments.package and arguments.firefox:
         parser.error("--package installs Chromium; it cannot be combined with --firefox")
     profile = PACKAGE if arguments.package else FIREFOX if arguments.firefox else BRING_UP
+    timeout = arguments.timeout or (5400 if arguments.package else 1800)
     guest_init = arguments.init or (root / profile["init"])
     return run_vm(root, guest_init.resolve(), arguments.initramfs.resolve(),
-                  arguments.state_dir.resolve(), arguments.mem, arguments.timeout,
+                  arguments.state_dir.resolve(), arguments.mem, timeout,
                   arguments.build, profile)
 
 

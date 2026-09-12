@@ -30,6 +30,18 @@ if [ ! -s "$STORE_FILE" ]; then
 	exit 0
 fi
 
+# A machine booted from its own volume already keeps everything that was
+# installed; the overlay is what a RAM-backed root needs instead. Copying the
+# same files back out is pure cost, and for something the size of Chromium it is
+# twenty minutes of BusyBox tar followed by a quarter-gigabyte upload that the
+# transfer timeout will not survive -- so `pkg install` reported failure for a
+# package it had installed perfectly well.
+IMAGE_ID=${VINIX_PERSIST_IMAGE_ID:-${ROOT%/}/.vinix-image-id}
+if [ -f "$IMAGE_ID" ]; then
+	echo "pkg: the system volume keeps these packages; no overlay to save"
+	exit 0
+fi
+
 BASE_FILES=${VINIX_PKG_BASE_FILES:-${ROOT%/}/etc/vinix-pkg/base-files}
 if [ ! -s "$BASE_FILES" ]; then
 	echo "pkg: QEMU package base manifest is missing" >&2
