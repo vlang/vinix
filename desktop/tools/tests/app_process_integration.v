@@ -101,5 +101,23 @@ fn main() {
 	capture.handle(capture_action_stop) or { panic(err) }
 	assert desktop.capture.report.phase == .cancelled
 	close_remote(mut capture)
+
+	// Maximising a window asks its application to lay itself out again at the
+	// new size. The terminal rebuilds its grid there, and releasing the old
+	// row cache twice used to abort the application process, leaving the
+	// window able to report only that its application had stopped drawing.
+	mut terminal := start_remote_app_at(arguments()[0], available_apps[3], mut desktop) or {
+		panic(err)
+	}
+	terminal_tree := terminal.build(ui2.rect(0, 0, 560, 316)) or { panic(err) }
+	assert terminal_tree.kind == .screen
+	free_tree(terminal_tree)
+	maximized_tree := terminal.build(ui2.rect(0, 0, 1780, 1264)) or { panic(err) }
+	assert maximized_tree.kind == .screen
+	free_tree(maximized_tree)
+	restored_tree := terminal.build(ui2.rect(0, 0, 560, 316)) or { panic(err) }
+	assert restored_tree.kind == .screen
+	free_tree(restored_tree)
+	close_remote(mut terminal)
 	desktop_restore_requested_scale()
 }

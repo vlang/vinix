@@ -442,6 +442,30 @@ fn test_terminal_consumes_linux_palette_controls_without_swallowing_text() {
 	assert terminal.row_string(0) == 'XY'
 }
 
+fn test_terminal_row_cache_survives_a_window_resize() {
+	mut terminal := TerminalApp{}
+	terminal.set_geometry(4, 20)
+	terminal.ingest_output('first\r\nsecond\r\n'.bytes())
+	for row in 0 .. terminal.rows {
+		terminal.rendered_row(row)
+	}
+
+	// Maximising the window rebuilds the grid, which releases the cached rows.
+	// Freeing an array of strings frees every string in it, so releasing the
+	// rows by hand first handed the same pointers to the allocator twice and
+	// aborted the terminal process.
+	terminal.set_geometry(40, 120)
+	assert terminal.rendered_rows.len == 40
+	assert terminal.dirty_rows.len == 40
+	assert terminal.rendered_row(0) == 'first'
+	assert terminal.rendered_row(1) == 'second'
+
+	terminal.set_geometry(4, 20)
+	assert terminal.rendered_rows.len == 4
+	assert terminal.rendered_row(0) == 'first'
+	assert terminal.rendered_row(1) == 'second'
+}
+
 fn terminal_screen_contains(terminal &TerminalApp, wanted string) bool {
 	for row in 0 .. terminal.rows {
 		if terminal.row_string(row).contains(wanted) {

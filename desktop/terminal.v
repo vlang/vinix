@@ -160,12 +160,12 @@ fn terminal_resize_cells(cells []u8, old_rows int, old_columns int, rows int, co
 	return resized
 }
 
+// Freeing an array of strings already releases every string it holds. Never
+// release the rows here as well: the extra free hands the same pointers to
+// the allocator twice, and musl aborts the process when it notices. The row
+// cache is rebuilt whenever the grid changes size, so that abort killed the
+// terminal the moment its window was maximised or resized.
 fn (mut a TerminalApp) release_rendered_rows() {
-	for text in a.rendered_rows {
-		if text.len > 0 {
-			unsafe { text.free() }
-		}
-	}
 	if a.rendered_rows.cap > 0 {
 		unsafe { a.rendered_rows.free() }
 	}
