@@ -320,12 +320,57 @@ pub fn initialise(hhdm u64) {
 	}
 }
 
-fn persistent_requested() bool {
+fn cmdline_has(option string) bool {
 	kernel_file := limine.kernel_file()
 	if kernel_file == unsafe { nil } || kernel_file.cmdline == unsafe { nil } {
 		return false
 	}
-	return unsafe { cstring_to_vstring(kernel_file.cmdline) }.contains('vinix.qemu_persist=1')
+	return unsafe { cstring_to_vstring(kernel_file.cmdline) }.contains(option)
+}
+
+fn persistent_requested() bool {
+	return cmdline_has('vinix.qemu_persist=1')
+}
+
+fn root_requested() bool {
+	return cmdline_has('vinix.qemu_root=1')
+}
+
+// Mount the QEMU data disk as the root filesystem, so every write survives a
+// restart rather than only the ones below /root. The volume carries a complete
+// system, put there by the runner from the same image the initramfs is built
+// from; the initramfs stays in the boot payload purely as what this falls back
+// to when the volume turns out not to hold one.
+//
+// Returns true only when the root was actually replaced. The caller then has
+// to skip unpacking the initramfs, which would otherwise write the image over
+// the volume's own copy of it on every boot.
+pub fn mount_persistent_root() bool {
+	if !persistent_requested() || !root_requested() {
+		return false
+	}
+	for device in devices {
+		node := fs.get_node(vfs_root, '/dev/${device.name}', true) or { continue }
+		mut filesystem, ok := ext2.ext2_init(node)
+		if !ok {
+			println('virtio-blk: /dev/${device.name} is not a readable ext2 volume')
+			continue
+		}
+		// Not attached anywhere: install_disk_root is what publishes it, and
+		// only once it has checked that the volume really carries a system.
+		mut root := ext2.ext2_root(mut filesystem) or {
+			println('virtio-blk: ext2 volume /dev/${device.name} has no readable root')
+			continue
+		}
+		if !fs.install_disk_root(mut root) {
+			println('virtio-blk: /dev/${device.name} does not carry a bootable system')
+			continue
+		}
+		println('virtio-blk: persistent ext2 root mounted from /dev/${device.name}')
+		return true
+	}
+	println('virtio-blk: no ext2 volume carried a system; using the initramfs root')
+	return false
 }
 
 // Mount the first explicitly supplied QEMU ext2 data disk on /root. Keeping

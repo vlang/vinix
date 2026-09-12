@@ -5,6 +5,7 @@
 #                         [--guest-init=PATH]
 #                         [--mem=MB]
 #                         [--disk=MB] [--persist[=MB]|--no-persist]
+#                         [--disk-root|--no-disk-root] [--reset-disk]
 #                         [--ephemeral] [--replace] [--grab-keys]
 #
 # --grab-keys hands the whole keyboard to the guest. macOS keeps Cmd-Tab for
@@ -17,6 +18,14 @@
 # A separate ext2 volume is mounted at /root by default. The base system still
 # comes from the initramfs, while files below /root survive QEMU restarts.
 # --persist=MB chooses its one-time image size; --no-persist disables it.
+#
+# --disk-root instead installs the whole system onto that volume and boots from
+# it, so every write survives a restart rather than only the ones below /root.
+# The volume is then the machine's disk: it is installed once and left alone,
+# and a rebuilt image is reinstalled over it with /root carried across.
+# --reset-disk asks for the clean install instead. The initramfs stays in the
+# boot payload as the fallback for a volume that turns out not to hold a
+# system, so an unusable disk still reaches a usable machine.
 #
 # --ephemeral gives this run an isolated temporary boot image and deletes it
 # when QEMU exits. Newly created boot images below the host's temporary
@@ -61,6 +70,20 @@ PACKAGE_STORE_PORT="${VINIX_QEMU_PACKAGE_STORE_PORT:-18081}"
 PERSIST_DISK="${VINIX_QEMU_PERSIST_DISK:-$BOOT_DIR/boot.img.root.ext2}"
 PERSIST_SIZE_MB="${VINIX_QEMU_PERSIST_SIZE_MB:-1024}"
 PERSIST_SEED="${VINIX_QEMU_PERSIST_SEED:-}"
+# Whole-filesystem persistence: the volume holds the system itself rather than
+# a home mounted into a RAM one, so every write survives a restart. The image
+# it is installed from is the uncompressed tar the initramfs is built from.
+DISK_ROOT="${VINIX_QEMU_ROOT_DISK:-0}"
+DISK_ROOT_IMAGE="${VINIX_QEMU_ROOT_IMAGE:-}"
+# What goes in the boot payload once the system lives on the volume:
+# `recovery` is a shell to diagnose an unmountable disk with, `image` keeps the
+# full image there so a failed disk root still boots the whole system.
+DISK_ROOT_FALLBACK="${VINIX_QEMU_ROOT_FALLBACK:-recovery}"
+# An older /root-only volume to take the home from when installing for the
+# first time, so switching to a disk root does not look like losing it.
+DISK_ROOT_ADOPT_HOME="${VINIX_QEMU_ROOT_ADOPT_HOME:-}"
+RECOVERY_DIR=""
+RESET_DISK=0
 PACKAGE_RUNTIME_DIR=""
 PACKAGE_SERVER_PID=""
 EPHEMERAL_RUNTIME_DIR=""
@@ -68,6 +91,10 @@ CLEANUP_BOOT_DISK=0
 KEEP_TEMP_BOOT_DISK="${VINIX_KEEP_TEMP_BOOT_DISK:-0}"
 
 cleanup_runtime() {
+    if [ -n "$RECOVERY_DIR" ]; then
+        rm -rf "$RECOVERY_DIR"
+        RECOVERY_DIR=""
+    fi
     if [ -n "$PACKAGE_SERVER_PID" ]; then
         kill "$PACKAGE_SERVER_PID" 2>/dev/null || true
         wait "$PACKAGE_SERVER_PID" 2>/dev/null || true
@@ -117,6 +144,9 @@ for arg in "$@"; do
         --persist)    PERSIST_ENABLED=1 ;;
         --persist=*)  PERSIST_ENABLED=1; PERSIST_SIZE_MB="${arg#*=}" ;;
         --no-persist) PERSIST_ENABLED=0 ;;
+        --disk-root)    PERSIST_ENABLED=1; DISK_ROOT=1 ;;
+        --no-disk-root) DISK_ROOT=0 ;;
+        --reset-disk)   RESET_DISK=1 ;;
         --ephemeral)  EPHEMERAL_BOOT=1 ;;
         --replace)    REPLACE_RUNNING=1 ;;
         --grab-keys)  GRAB_KEYS=1 ;;
@@ -185,6 +215,29 @@ case "$KEEP_TEMP_BOOT_DISK" in
         exit 1
         ;;
 esac
+case "$DISK_ROOT" in
+    0|1) ;;
+    *)
+        echo "ERROR: VINIX_QEMU_ROOT_DISK must be 0 or 1" >&2
+        exit 1
+        ;;
+esac
+if [ "$DISK_ROOT" -eq 1 ] && [ "$PERSIST_ENABLED" -eq 0 ]; then
+    echo "ERROR: --disk-root is the persistent volume; it cannot be combined with --no-persist" >&2
+    exit 1
+fi
+case "$DISK_ROOT_FALLBACK" in
+    recovery|image) ;;
+    *)
+        echo "ERROR: VINIX_QEMU_ROOT_FALLBACK must be recovery or image" >&2
+        exit 1
+        ;;
+esac
+if [ "$DISK_ROOT" -eq 1 ] && [ -n "$GUEST_INIT" ]; then
+    # --guest-init overlays the initramfs, which a disk root does not boot.
+    echo "ERROR: --guest-init overlays the initramfs, which --disk-root does not boot from" >&2
+    exit 1
+fi
 case "$PERSIST_ENABLED" in
     0|1) ;;
     *)
@@ -281,6 +334,10 @@ if [ "$PERSIST_ENABLED" -eq 1 ]; then
     fi
 fi
 
+if [ "$DISK_ROOT" -eq 1 ]; then
+    sed -E -i '' '/^[[:space:]]*cmdline:/ s#$# vinix.qemu_root=1#' "$LIMINE_CONF_QEMU"
+fi
+
 # A compressed module keeps complete desktop images below FAT32's 4 GiB
 # single-file limit. The leading '$' asks Limine to decompress it before the
 # kernel receives the module; its on-disk name stays stable for mtools.
@@ -304,6 +361,123 @@ if [ "$FAKE_G17" -eq 1 ]; then
     sed -E -i '' '/^[[:space:]]*cmdline:/ s#$# vinix.fake_g17=1#' "$LIMINE_CONF_QEMU"
 fi
 
+# Install, or reinstall, the whole system onto the persistent volume.
+#
+# The volume is the machine's disk: it keeps everything, not just a home
+# mounted into a RAM root. It is therefore installed from the image rather
+# than being a copy of it, and is left alone on every later run -- that is the
+# entire point, and it is also why a rebuilt image has to be noticed and put
+# on. A reinstall carries /root across, so the dev loop does not cost the user
+# their files; --reset-disk asks for the clean install instead.
+vinix_install_system_volume() {
+    local image="$DISK_ROOT_IMAGE"
+    local image_id installed carried home_dir needed_mb image_bytes
+
+    if [ -z "$image" ]; then
+        image="$INITRAMFS"
+        if [ "$INITRAMFS_COMPRESSED" -eq 1 ]; then
+            echo "ERROR: --disk-root needs the uncompressed image tar" >&2
+            echo "       Set VINIX_QEMU_ROOT_IMAGE to it." >&2
+            exit 1
+        fi
+    fi
+    if [ ! -f "$image" ]; then
+        echo "ERROR: --disk-root image is missing: $image" >&2
+        exit 1
+    fi
+    if ! image_id="$(vinix_storage_image_id "$image")"; then
+        echo "ERROR: could not read the image identity: $image" >&2
+        exit 1
+    fi
+
+    # ext2 needs room for the tree plus its own metadata, and a machine with no
+    # free space is not a machine. Twice the image plus half a gigabyte, never
+    # below the configured size -- --persist=MB is how a bigger disk is asked
+    # for.
+    image_bytes="$(vinix_storage_file_size "$image")"
+    needed_mb=$(( image_bytes * 2 / 1024 / 1024 + 512 ))
+    if [ "$needed_mb" -lt "$PERSIST_SIZE_MB" ]; then
+        needed_mb="$PERSIST_SIZE_MB"
+    fi
+
+    if [ "$RESET_DISK" -eq 1 ] && [ -f "$PERSIST_DISK" ]; then
+        echo "==> --reset-disk: discarding $PERSIST_DISK"
+        rm -f "$PERSIST_DISK"
+    fi
+
+    if [ -f "$PERSIST_DISK" ]; then
+        installed="$(vinix_storage_installed_image_id "$PERSIST_DISK" || true)"
+        if [ "$installed" = "$image_id" ]; then
+            return 0
+        fi
+        if [ -z "$installed" ]; then
+            echo "ERROR: $PERSIST_DISK is not a Vinix system volume." >&2
+            echo "       It is probably the old /root-only volume. Move it aside," >&2
+            echo "       or pass --reset-disk to install over it." >&2
+            exit 1
+        fi
+        echo "==> Image changed; reinstalling the system and keeping /root..."
+        home_dir="$(mktemp -d "${TMPDIR:-/tmp}/vinix-home.XXXXXX")"
+        if carried="$(vinix_storage_extract_home "$PERSIST_DISK" "$home_dir")"; then
+            echo "    carried $PERSIST_DISK:/root across"
+        else
+            echo "    WARNING: could not read the old /root; installing without it" >&2
+            carried=""
+        fi
+    elif [ -n "$DISK_ROOT_ADOPT_HOME" ] && [ -f "$DISK_ROOT_ADOPT_HOME" ]; then
+        # First install, with the older /root-only volume still on disk. Its
+        # root directory is the home, and leaving it behind would look exactly
+        # like the switch had deleted the user's files.
+        echo "==> Installing the system onto a ${needed_mb} MiB volume (one-time)..."
+        home_dir="$(mktemp -d "${TMPDIR:-/tmp}/vinix-home.XXXXXX")"
+        if carried="$(vinix_storage_extract_home "$DISK_ROOT_ADOPT_HOME" "$home_dir" /)"; then
+            echo "    adopting the home from $(basename "$DISK_ROOT_ADOPT_HOME")"
+        else
+            carried=""
+        fi
+    else
+        echo "==> Installing the system onto a ${needed_mb} MiB volume (one-time)..."
+        home_dir=""
+        carried=""
+    fi
+
+    if ! vinix_storage_create_ext2 "$PERSIST_DISK" "$needed_mb" "$image" \
+        "$image_id" "$carried"; then
+        echo "ERROR: could not install the system volume: $PERSIST_DISK" >&2
+        [ -z "$home_dir" ] || rm -rf "$home_dir"
+        exit 1
+    fi
+    [ -z "$home_dir" ] || rm -rf "$home_dir"
+    echo "    installed from $(basename "$image")"
+}
+
+# Once the system is on the volume, the boot payload only has to be able to say
+# so when the volume cannot be mounted. Shipping the whole image there as well
+# costs a second copy of it on the boot disk and minutes of firmware load on
+# every single boot, for a fallback that is not meant to be reached.
+vinix_select_disk_root_payload() {
+    local minimal="$INIT_DIR/initramfs-minimal.tar"
+
+    [ "$DISK_ROOT_FALLBACK" = recovery ] || return 0
+
+    if [ -f "$minimal" ]; then
+        INITRAMFS="$minimal"
+    elif [ -x "$INIT_DIR/init" ]; then
+        RECOVERY_DIR="$(mktemp -d "${TMPDIR:-/tmp}/vinix-recovery.XXXXXX")"
+        mkdir -p "$RECOVERY_DIR/staging/sbin"
+        cp "$INIT_DIR/init" "$RECOVERY_DIR/staging/sbin/init"
+        chmod +x "$RECOVERY_DIR/staging/sbin/init"
+        COPYFILE_DISABLE=1 tar --format=ustar -cf "$RECOVERY_DIR/initramfs.tar" \
+            -C "$RECOVERY_DIR/staging" .
+        INITRAMFS="$RECOVERY_DIR/initramfs.tar"
+    else
+        echo "    no recovery init available; keeping the full image as the payload"
+        return 0
+    fi
+    INITRAMFS_COMPRESSED=0
+    echo "    boot payload: $(basename "$INITRAMFS") (recovery only)"
+}
+
 # ── Create the persistent ext2 home volume ──
 # It is deliberately a different image from the UEFI/FAT boot disk: the
 # kernel's persistent block driver only considers an ext2 volume, so firmware
@@ -314,7 +488,10 @@ if [ "$PERSIST_ENABLED" -eq 1 ]; then
         echo "ERROR: persistent disk is not a regular file: $PERSIST_DISK" >&2
         exit 1
     fi
-    if [ ! -f "$PERSIST_DISK" ]; then
+    if [ "$DISK_ROOT" -eq 1 ]; then
+        vinix_install_system_volume
+        vinix_select_disk_root_payload
+    elif [ ! -f "$PERSIST_DISK" ]; then
         echo "==> Creating ${PERSIST_SIZE_MB} MiB persistent ext2 volume (one-time)..."
         if ! vinix_storage_create_ext2 "$PERSIST_DISK" "$PERSIST_SIZE_MB" "$PERSIST_SEED"; then
             echo "ERROR: could not create persistent volume: $PERSIST_DISK" >&2
@@ -328,7 +505,11 @@ if [ "$PERSIST_ENABLED" -eq 1 ]; then
         -drive "if=none,format=raw,file=$PERSIST_DISK,id=vinix-persist"
         -device virtio-blk-device,drive=vinix-persist
     )
-    echo "==> Persistent /root volume: $PERSIST_DISK"
+    if [ "$DISK_ROOT" -eq 1 ]; then
+        echo "==> Persistent root volume: $PERSIST_DISK"
+    else
+        echo "==> Persistent /root volume: $PERSIST_DISK"
+    fi
 fi
 
 # A caller may request a QEMU-only GOP mode without changing the hardware-safe
@@ -577,6 +758,13 @@ fi
 case "${VINIX_BOOT_HYPRLAND:-0}" in
     0|'') ;;
     1)
+        # The marker is per-boot only because the root it lands on is thrown
+        # away with it. On a disk root it would stay, and every later boot
+        # would silently be a Hyprland one.
+        if [ "$DISK_ROOT" -eq 1 ]; then
+            echo "ERROR: VINIX_BOOT_HYPRLAND is a per-boot marker and --disk-root keeps it" >&2
+            exit 1
+        fi
         mkdir -p "$PACKAGE_RUNTIME_ROOT/etc/vinix"
         : > "$PACKAGE_RUNTIME_ROOT/etc/vinix/boot-hyprland"
         ;;

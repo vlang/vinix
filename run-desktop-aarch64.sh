@@ -8,6 +8,8 @@
 #   --no-desktop    skip the desktop build (the kernel is what you changed)
 #   --monitor       open a QEMU monitor and QMP socket, so the tools under
 #                   desktop/tools can drive and photograph the running desktop
+#   --no-disk-root  keep the old layout: a RAM system with a persistent /root
+#   --reset-disk    reinstall the system volume from scratch, losing its data
 #   --no-persist    use the full RAM-backed desktop instead of persistent /root
 #   --ephemeral     isolate and automatically delete this run's boot image
 #   --mem=MB        guest RAM (default: 8192 MiB for the desktop image)
@@ -22,10 +24,15 @@
 # The two builds are done here rather than left to run-aarch64.sh so that a
 # failure in either is reported plainly, and so the kernel build gets a V it
 # can actually find.
-# The immutable desktop system is loaded into RAM during boot, while the normal
-# QEMU profile mounts a persistent /root. The generic runner defaults to 2 GiB
-# for small shell images, whereas this image needs at least 8 GiB. An explicit
-# environment setting or --mem=MB still wins.
+# By default the whole system is installed onto a persistent volume and booted
+# from it, so every write survives a restart and not only the ones below /root.
+# The image is reinstalled when it changes, carrying /root across; --reset-disk
+# asks for the clean install and --no-disk-root returns to the old layout, in
+# which the system is loaded into RAM and only /root persists.
+#
+# The generic runner defaults to 2 GiB of guest RAM for small shell images,
+# whereas this image needs at least 8 GiB. An explicit environment setting or
+# --mem=MB still wins.
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -60,6 +67,7 @@ BUILD_KERNEL=1
 BUILD_DESKTOP=1
 WITH_MONITOR=0
 PERSIST_DESKTOP="${VINIX_QEMU_PERSIST:-1}"
+DISK_ROOT_DESKTOP="${VINIX_QEMU_ROOT_DISK:-1}"
 EPHEMERAL_DESKTOP=0
 PASSTHROUGH=()
 
@@ -71,7 +79,9 @@ while [ "$#" -gt 0 ]; do
         --no-desktop) BUILD_DESKTOP=0 ;;
         --monitor)    WITH_MONITOR=1 ;;
         --persist|--persist=*) PERSIST_DESKTOP=1; PASSTHROUGH+=("$arg") ;;
-        --no-persist) PERSIST_DESKTOP=0; PASSTHROUGH+=("$arg") ;;
+        --no-persist) PERSIST_DESKTOP=0; DISK_ROOT_DESKTOP=0; PASSTHROUGH+=("$arg") ;;
+        --disk-root)    DISK_ROOT_DESKTOP=1 ;;
+        --no-disk-root) DISK_ROOT_DESKTOP=0 ;;
         --ephemeral)  EPHEMERAL_DESKTOP=1; PASSTHROUGH+=("$arg") ;;
         --v=*)        VINIX_V_COMPILER="${arg#*=}" ;;
         --v)
@@ -95,6 +105,17 @@ case "$PERSIST_DESKTOP" in
         exit 1
         ;;
 esac
+case "$DISK_ROOT_DESKTOP" in
+    0|1) ;;
+    *)
+        echo "ERROR: VINIX_QEMU_ROOT_DISK must be 0 or 1" >&2
+        exit 1
+        ;;
+esac
+if [ "$DISK_ROOT_DESKTOP" -eq 1 ] && [ "$PERSIST_DESKTOP" -eq 0 ]; then
+    echo "ERROR: --no-persist and --disk-root ask for opposite things" >&2
+    exit 1
+fi
 
 # Keep the chosen compiler in the environment so build-desktop-aarch64.sh
 # resolves the same compiler after this runner invokes it.
@@ -126,10 +147,34 @@ if [ ! -f "$DESKTOP_INITRAMFS" ]; then
     exit 1
 fi
 
-# QEMU keeps mutable desktop data on one stable ext2 volume. The hardware
-# initramfs remains self-contained; this cached QEMU view removes /root from
-# the boot payload and turns it into the one-time seed for that volume.
-if [ "$PERSIST_DESKTOP" -eq 1 ]; then
+# The whole system goes on one ext2 volume and the machine boots from it, so a
+# write anywhere survives a restart. The hardware initramfs is unchanged and
+# stays self-contained; what the boot payload carries here shrinks to a
+# recovery shell, which is also what removes the compressed gigabyte Limine
+# otherwise decompresses on every boot.
+if [ "$DISK_ROOT_DESKTOP" -eq 1 ]; then
+    export VINIX_QEMU_ROOT_DISK=1
+    export VINIX_QEMU_ROOT_IMAGE="$DESKTOP_INITRAMFS"
+    export VINIX_INITRAMFS="$DESKTOP_INITRAMFS"
+    export VINIX_INITRAMFS_COMPRESSED=0
+    export VINIX_QEMU_PERSIST=1
+    if [ "$EPHEMERAL_DESKTOP" -eq 0 ]; then
+        # A different file from the /root-only volume on purpose: that one has
+        # no system on it, and the installer refuses it rather than writing a
+        # system over somebody's home directory.
+        export VINIX_QEMU_PERSIST_DISK="${VINIX_QEMU_PERSIST_DISK:-$SCRIPT_DIR/boot-image/desktop-system.ext2}"
+        export VINIX_BOOT_DISK="${VINIX_BOOT_DISK:-$SCRIPT_DIR/boot-image/boot-desktop-disk.img}"
+        # Machines that ran the /root-only layout keep their home: the first
+        # install takes it out of that volume, which is left untouched.
+        export VINIX_QEMU_ROOT_ADOPT_HOME="${VINIX_QEMU_ROOT_ADOPT_HOME:-$SCRIPT_DIR/boot-image/desktop-root.ext2}"
+    fi
+    # The volume is this machine's disk, not a copy of the image: leave room
+    # for what gets installed on it later. It is sparse, so the size is a
+    # ceiling rather than a cost.
+    export VINIX_QEMU_PERSIST_SIZE_MB="${VINIX_QEMU_PERSIST_SIZE_MB:-8192}"
+    # Only Limine, the kernel and a recovery shell live here now.
+    export VINIX_BOOT_DISK_SIZE_MB="${VINIX_BOOT_DISK_SIZE_MB:-512}"
+elif [ "$PERSIST_DESKTOP" -eq 1 ]; then
     python3 "$SCRIPT_DIR/tools/split-desktop-initramfs.py" \
         "$DESKTOP_INITRAMFS" "$QEMU_DESKTOP_INITRAMFS" \
         "$DESKTOP_ROOT_SEED" "$DESKTOP_STORAGE_MANIFEST"

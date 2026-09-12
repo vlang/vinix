@@ -7,6 +7,8 @@ import klock
 
 pub const page_bytes = u64(4096)
 pub const default_capacity = 128
+// 32 MiB of cached blocks, reached by a 8 GiB device.
+pub const max_capacity = u64(8192)
 pub const willneed = 3
 pub const dontneed = 4
 
@@ -32,6 +34,24 @@ mut:
 	writeback         IO
 pub:
 	capacity int = default_capacity
+}
+
+// A cache sized for its backing store. The default suits a small volume
+// holding user data; a device the whole system runs from needs enough room for
+// the inode tables and directory blocks a path walk touches, or every lookup
+// evicts the metadata the next one wants. Growth is bounded because the
+// reclaimer hands clean pages back under memory pressure.
+pub fn new_cache(device_bytes u64) &Cache {
+	mut pages := device_bytes / (1024 * 1024)
+	if pages < u64(default_capacity) {
+		pages = u64(default_capacity)
+	}
+	if pages > max_capacity {
+		pages = max_capacity
+	}
+	return &Cache{
+		capacity: int(pages)
+	}
 }
 
 // Binding prevents accidentally using resident pages with a different device

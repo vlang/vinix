@@ -250,6 +250,24 @@ fn unpack(initramfs_begin voidptr, initramfs_size u64, module_index u64) {
 
 @[manualfree]
 pub fn initialise() {
+	unpack_modules(0)
+}
+
+// Unpack every module except the first. The first is the system image, which a
+// machine booted from its disk already has installed; the ones after it are the
+// small per-run overlays the runner injects -- the package frontend and its
+// configuration among them -- and those still have to be applied, or a disk
+// root would silently lose them.
+@[manualfree]
+pub fn initialise_overlays() {
+	if module_req.response != unsafe { nil } && module_req.response.module_count < 2 {
+		return
+	}
+	unpack_modules(1)
+}
+
+@[manualfree]
+fn unpack_modules(first u64) {
 	if module_req.response == unsafe { nil } {
 		panic('Modules bootloader response missing')
 	}
@@ -259,7 +277,7 @@ pub fn initialise() {
 	}
 
 	modules := module_req.response.modules
-	for module_index := u64(0); module_index < module_req.response.module_count; module_index++ {
+	for module_index := first; module_index < module_req.response.module_count; module_index++ {
 		archive_module := unsafe { modules[module_index] }
 		if archive_module == unsafe { nil } || archive_module.size < 512 {
 			panic('Invalid initramfs module')

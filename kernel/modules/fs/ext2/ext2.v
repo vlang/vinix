@@ -121,7 +121,14 @@ fn (mut this EXT2Resource) mmap(_handle voidptr, page u64, flags int) voidptr {
 
 	offset := page * page_size
 	file_size := u64(this.stat.size)
-	if offset >= file_size {
+	// A mapping may legitimately reach past the end of the file: a dynamic
+	// loader maps one span covering every segment of an object, and the last
+	// of them ends mid-page. Those pages read as zeroes here, exactly as they
+	// do on tmpfs, which is what lets a shared library be loaded at all.
+	//
+	// A shared mapping is refused there instead, because folding it back into
+	// the inode would grow the file by whatever the mapping happened to cover.
+	if offset >= file_size && flags & mmap_mod.map_shared != 0 {
 		return unsafe { nil }
 	}
 	if flags & mmap_mod.map_shared != 0 {
@@ -141,10 +148,18 @@ fn (mut this EXT2Resource) mmap(_handle voidptr, page u64, flags int) voidptr {
 		memory.pmm_free(physical, 1)
 		return unsafe { nil }
 	}
-	count := if page_size < file_size - offset { page_size } else { file_size - offset }
-	inode.read(mut this.filesystem, voidptr(u64(physical) + higher_half), offset, count) or {
-		memory.pmm_free(physical, 1)
-		return unsafe { nil }
+	// The allocation is already zeroed, so a page wholly past the end of the
+	// file needs no read at all, and a partial one is zero-filled past it.
+	mut count := u64(0)
+	if offset < file_size {
+		count = if page_size < file_size - offset { page_size } else { file_size - offset }
+	}
+	if count != 0 {
+		inode.read(mut this.filesystem, voidptr(u64(physical) + higher_half), offset,
+			count) or {
+			memory.pmm_free(physical, 1)
+			return unsafe { nil }
+		}
 	}
 	if flags & mmap_mod.map_shared != 0 {
 		this.mapped_pages << &EXT2MappedPage{
@@ -396,13 +411,17 @@ fn (mut this EXT2Filesystem) populate(node &vfs.VFSNode) {
 
 		vfs_node.resource = resource
 		if stat.islnk(mode) && inode.size32l != 0 {
-			target_buffer := memory.calloc(u64(inode.size32l) + 1, 1)
-			if target_buffer != unsafe { nil } {
-				inode.read(mut this, target_buffer, 0, inode.size32l) or {}
-				vfs_node.symlink_target = unsafe {
-					tos(&u8(target_buffer), int(inode.size32l)).clone()
+			if target := inode.fast_symlink_target() {
+				vfs_node.symlink_target = target
+			} else {
+				target_buffer := memory.calloc(u64(inode.size32l) + 1, 1)
+				if target_buffer != unsafe { nil } {
+					inode.read(mut this, target_buffer, 0, inode.size32l) or {}
+					vfs_node.symlink_target = unsafe {
+						tos(&u8(target_buffer), int(inode.size32l)).clone()
+					}
+					memory.free(target_buffer)
 				}
-				memory.free(target_buffer)
 			}
 		}
 
@@ -494,6 +513,22 @@ fn (mut this EXT2Filesystem) mount(parent &vfs.VFSNode, name string, source &vfs
 	this.populate(target)
 
 	return target
+}
+
+// The block array is 15 u32s, and a symlink whose target fits in those 60
+// bytes keeps it there instead of allocating a block -- a "fast symlink", which
+// is what mke2fs and every other ext2 tool writes. Reading one as block
+// pointers yields whatever the target's characters happen to address, so a
+// volume prepared on the host has to be recognised rather than followed.
+//
+// This driver's own symlinks are slow ones; both spellings are valid, and this
+// only has to read what it is given.
+fn (inode &EXT2Inode) fast_symlink_target() ?string {
+	if inode.sector_cnt != 0 || inode.size32l == 0
+		|| inode.size32l > u32(sizeof(inode.blocks)) {
+		return none
+	}
+	return unsafe { tos(&u8(&inode.blocks[0]), int(inode.size32l)).clone() }
 }
 
 fn (mut inode EXT2Inode) read(mut filesystem EXT2Filesystem, buf voidptr, off u64, cnt u64) ?i64 {
@@ -1050,6 +1085,17 @@ fn (mut inode EXT2Inode) write_entry(mut filesystem EXT2Filesystem, inode_index 
 	return 0
 }
 
+// Build a root node for an already-detected filesystem without attaching it to
+// the tree. A caller that means to make the volume the system root has to
+// inspect what is on it first, and publish it only if it is a system.
+pub fn ext2_root(mut filesystem EXT2Filesystem) ?&vfs.VFSNode {
+	mut instance := filesystem.instantiate()
+	mut root := instance.mount(unsafe { nil }, '', unsafe { nil })?
+	// A root's parent is itself, so `..` at the top of the tree stays inside it.
+	root.create_dotentries(root)
+	return root
+}
+
 pub fn ext2_init(backing_device &vfs.VFSNode) (&EXT2Filesystem, bool) {
 	sector_size := u64(backing_device.resource.stat.blksize)
 	if sector_size == 0 || sector_size > pagecache.page_bytes
@@ -1061,7 +1107,7 @@ pub fn ext2_init(backing_device &vfs.VFSNode) (&EXT2Filesystem, bool) {
 		backing_device: unsafe { backing_device }
 		superblock: &EXT2Superblock{}
 		root_inode: &EXT2Inode{}
-		cache: &pagecache.Cache{}
+		cache: pagecache.new_cache(u64(backing_device.resource.stat.size))
 	}
 
 	// The EXT2 superblock is at byte 1024, regardless of device sector size.

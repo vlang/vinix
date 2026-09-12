@@ -838,9 +838,18 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
 				return none
 			}
 			if flags & map_anonymous == 0 && page == unsafe { nil } {
-				munmap(mut pagemap, voidptr(base), length) or {}
-				errno.set(errno.einval)
-				return none
+				// Past the end of the file there is nothing to pre-fault, and
+				// a mapping is allowed to reach there: every dynamic loader
+				// maps one span over an object's segments and then replaces
+				// the tail with anonymous memory. Leave the page unmapped --
+				// touching it is the SIGBUS that POSIX asks for -- rather than
+				// refusing a mapping the caller is entitled to.
+				if u64(offset) + i < u64(resource_.stat.size) {
+					munmap(mut pagemap, voidptr(base), length) or {}
+					errno.set(errno.einval)
+					return none
+				}
+				continue
 			}
 			if page != unsafe { nil } {
 				map_page_in_range(range_global, base + i, u64(page), prot) or {
