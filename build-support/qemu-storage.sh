@@ -174,6 +174,20 @@ vinix_storage_create_ext2() {
         return 1
     fi
 
+    # mke2fs -d copies the ownership of the host files it read, so a volume
+    # built on a Mac arrives owned by whoever ran the build. Vinix runs as root
+    # and enforces Unix permissions; Firefox, for one, refuses to start when it
+    # finds that $HOME belongs to somebody else.
+    if [ -n "$seed_dir" ]; then
+        if ! python3 "$(dirname "${BASH_SOURCE[0]}")/ext2-set-root-owner.py" \
+            "$temp_disk"; then
+            echo "ERROR: could not give the new volume to root" >&2
+            rm -rf "$seed_dir"
+            rm -f "$temp_disk"
+            return 1
+        fi
+    fi
+
     rm -rf "$seed_dir"
     if ! mv -f "$temp_disk" "$target"; then
         rm -f "$temp_disk"
