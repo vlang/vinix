@@ -129,6 +129,39 @@ starts the desktop directly. The runner uses KVM when available and otherwise
 falls back to QEMU TCG; `--no-build`, `--monitor`, and `--mem=MB` are supported.
 The same build works on Apple Silicon and cross-compiles the amd64 executable.
 
+### Complete software image on aarch64
+
+Build the languages, developer tools, X11 applications and alternate desktop
+into one image with a single command:
+
+```sh
+./build-all-aarch64.sh
+```
+
+The resulting `build-support/init-aarch64/initramfs-desktop.tar` contains
+Python, Ruby, Go, OpenJDK, network and native developer tools, X11, Firefox,
+Hyprland, Minecraft, Codex, Claude Code, x86 translation and Wine, in addition
+to the native Vinix desktop. It is the image booted by:
+
+```sh
+./run-desktop-aarch64.sh --no-desktop
+```
+
+The aggregate builder rebuilds every owned layer and refuses to publish a
+partial image. Use `--reuse-layers` to validate and reassemble existing layer
+outputs during image work. Asahi Mesa and the native Blender backend require
+their dedicated, mutually different ARM64 Linux build environments; when their
+staging trees are present, the desktop builder includes them in this same final
+image automatically. Wi-Fi firmware and proprietary Office media remain
+explicit inputs and are never downloaded by the aggregate build.
+
+The complete archive is larger than FAT32's single-file limit. The desktop
+runner automatically splits its writable `/root` seed, caches a compressed
+QEMU module, and has Limine decompress that module during boot.
+
+The individual layer builders described below remain available for iterating
+on one component, but are not required for a normal complete-image build.
+
 ### Python 3 on aarch64
 
 The aarch64 image can include Alpine's musl CPython 3.12 runtime and its native
@@ -328,15 +361,16 @@ running root filesystem. Direct Alpine package names also work, for example
 
 ### Persistent files in aarch64 QEMU
 
-The QEMU runner normally keeps the base system in its initramfs-backed tmpfs.
-Pass `--persist` to attach a separate ext2 disk and mount it at `/root`:
+The QEMU runner keeps the base system in its initramfs-backed tmpfs and mounts
+a separate persistent ext2 disk at `/root` by default:
 
 ```sh
-./run-aarch64.sh --persist
+./run-aarch64.sh
 ```
 
 The generic runner creates one fixed `boot-image/boot.img.root.ext2` volume
-(1 GiB by default). Use `--persist=4096` for a 4 GiB new disk, or set
+(1 GiB by default). Use `--persist=4096` for a 4 GiB new disk, `--no-persist`
+for a disposable RAM-backed `/root`, or set
 `VINIX_QEMU_PERSIST_DISK` and `VINIX_QEMU_PERSIST_SIZE_MB` to choose its path
 and initial size. Existing disks are never reformatted. Creating a disk needs
 `mke2fs` from e2fsprogs; on macOS, install it with `brew install e2fsprogs`.

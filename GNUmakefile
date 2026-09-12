@@ -1,7 +1,7 @@
 ARCHITECTURE ?= x86_64
 QEMUFLAGS ?= -M q35,smm=off -m 8G -cdrom vinix.iso -serial stdio -smp 4 -vga std
 
-.PHONY: all amd64-alpine aarch64-alpine
+.PHONY: all amd64-alpine aarch64-alpine aarch64-all
 ifeq ($(ARCHITECTURE),aarch64)
 all: aarch64-alpine
 else
@@ -16,6 +16,9 @@ amd64-alpine:
 
 aarch64-alpine:
 	./build-aarch64.sh
+
+aarch64-all:
+	./build-all-aarch64.sh
 
 .PHONY: vinix.iso
 vinix.iso: amd64-alpine

@@ -97,6 +97,8 @@ def run_phase(
     environment["VINIX_EFIVARS"] = str(state_dir / "efivars.fd")
     environment["VINIX_QEMU_PACKAGE_STORE"] = str(state_dir / "packages.tar")
     environment["VINIX_QEMU_PERSIST_DISK"] = str(state_dir / "root.ext2")
+    environment["VINIX_QEMU_PERSIST_SIZE_MB"] = "64"
+    environment.pop("VINIX_QEMU_PERSIST", None)
     environment["VINIX_KEEP_TEMP_BOOT_DISK"] = "1"
     environment.setdefault("VINIX_QEMU_PACKAGE_STORE_PORT", available_port())
     if platform.system() != "Darwin":
@@ -105,7 +107,6 @@ def run_phase(
     command = [
         str(root / "run-aarch64.sh"),
         "--serial",
-        "--persist=64",
         "--mem=2048",
         f"--guest-init={guest_init}",
     ]

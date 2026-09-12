@@ -33,6 +33,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 KERNEL_DIR="$SCRIPT_DIR/kernel"
 DESKTOP_INITRAMFS="$SCRIPT_DIR/build-support/init-aarch64/initramfs-desktop.tar"
 QEMU_DESKTOP_INITRAMFS="$SCRIPT_DIR/build/initramfs-desktop-qemu.tar"
+QEMU_DESKTOP_INITRAMFS_GZ="$QEMU_DESKTOP_INITRAMFS.gz"
 DESKTOP_ROOT_SEED="$SCRIPT_DIR/build/desktop-root-seed.tar.gz"
 DESKTOP_STORAGE_MANIFEST="$SCRIPT_DIR/build/desktop-qemu-storage.json"
 export VINIX_QEMU_MEM="${VINIX_QEMU_MEM:-8192}"
@@ -130,7 +131,22 @@ if [ "$PERSIST_DESKTOP" -eq 1 ]; then
     python3 "$SCRIPT_DIR/tools/split-desktop-initramfs.py" \
         "$DESKTOP_INITRAMFS" "$QEMU_DESKTOP_INITRAMFS" \
         "$DESKTOP_ROOT_SEED" "$DESKTOP_STORAGE_MANIFEST"
-    export VINIX_INITRAMFS="$QEMU_DESKTOP_INITRAMFS"
+    if [ ! -s "$QEMU_DESKTOP_INITRAMFS_GZ" ] || \
+       [ "$QEMU_DESKTOP_INITRAMFS" -nt "$QEMU_DESKTOP_INITRAMFS_GZ" ]; then
+        echo "==> Compressing the QEMU desktop module for FAT32..."
+        QEMU_DESKTOP_INITRAMFS_GZ_TMP="$(mktemp "$SCRIPT_DIR/build/.initramfs-desktop-qemu.tar.gz.XXXXXX")"
+        if ! gzip -n -1 -c "$QEMU_DESKTOP_INITRAMFS" > "$QEMU_DESKTOP_INITRAMFS_GZ_TMP"; then
+            rm -f "$QEMU_DESKTOP_INITRAMFS_GZ_TMP"
+            exit 1
+        fi
+        mv -f "$QEMU_DESKTOP_INITRAMFS_GZ_TMP" "$QEMU_DESKTOP_INITRAMFS_GZ"
+    fi
+    if ! gzip -t "$QEMU_DESKTOP_INITRAMFS_GZ"; then
+        echo "ERROR: compressed QEMU desktop module is corrupt" >&2
+        exit 1
+    fi
+    export VINIX_INITRAMFS="$QEMU_DESKTOP_INITRAMFS_GZ"
+    export VINIX_INITRAMFS_COMPRESSED=1
     export VINIX_QEMU_PERSIST=1
     if [ "$EPHEMERAL_DESKTOP" -eq 0 ]; then
         export VINIX_QEMU_PERSIST_DISK="${VINIX_QEMU_PERSIST_DISK:-$SCRIPT_DIR/boot-image/desktop-root.ext2}"

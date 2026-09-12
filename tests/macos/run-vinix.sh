@@ -65,7 +65,7 @@ COPYFILE_DISABLE=1 tar --format=ustar -cf "$work/initramfs.tar" -C "$work/rootfs
 VINIX_INITRAMFS="$work/initramfs.tar" \
 VINIX_BOOT_DISK="$work/boot.img" \
 VINIX_EFIVARS="$work/vars.fd" \
-    "$root/run-aarch64.sh" --no-build --serial --disk=256 >"$work/vinix.log" 2>&1 &
+    "$root/run-aarch64.sh" --no-build --serial --no-persist --disk=256 >"$work/vinix.log" 2>&1 &
 runner_pid=$!
 
 elapsed=0

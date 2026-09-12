@@ -487,6 +487,18 @@ installed, one command builds the aarch64 image and boots into the desktop:
 
     ./run-desktop-aarch64.sh
 
+To build a single desktop image with every portable software layer (languages,
+developer tools, X11, Firefox, Hyprland, Minecraft, the CLI tools, and Wine),
+use the aggregate builder and then boot its result:
+
+    ./build-all-aarch64.sh
+    ./run-desktop-aarch64.sh --no-desktop
+
+The runner caches a gzip-compressed version of the immutable QEMU module so
+the complete image remains compatible with the FAT32 boot disk; Limine expands
+it before handing it to the kernel. `/root` remains the separate persistent
+EXT2 volume.
+
 It builds the kernel, builds the desktop, and starts QEMU on the result. The
 launcher reuses `boot-image/boot-desktop-qemu.img` for the immutable system and
 mounts `boot-image/desktop-root.ext2` at `/root`. On the first run it derives a

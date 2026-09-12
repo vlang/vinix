@@ -426,6 +426,10 @@ if { [ "$COMPACT_INITRAMFS" -eq 0 ] || [ "$WITH_X86_TRANSLATION" -eq 1 ]; } &&
     if [ -d "$office_web_cache" ]; then
         rm -rf "$office_web_cache"
     fi
+    office_vsta_metadata="$STAGING/root/.wine-word2013-x86_64/drive_c/Program Files (x86)/Common Files/Microsoft Shared/VSTA/AppInfoDocument/Microsoft.VisualStudio.Tools.Office.AppInfoDocument/Microsoft.VisualStudio.Tools.Office.AppInfoDocument.v9.0.dll"
+    if [ -f "$office_vsta_metadata" ]; then
+        rm -f "$office_vsta_metadata"
+    fi
 fi
 
 # Hyprland is an optional build layer because its patched Aquamarine library

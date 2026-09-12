@@ -492,7 +492,7 @@ fi
 # Asahi so the hardware-specific Mesa runtime remains authoritative on M1.
 if [ -x "$FIREFOX_STAGING/usr/bin/run-firefox" ]; then
     echo "==> Integrating Firefox ESR runtime..."
-    cp -a "$FIREFOX_STAGING/." "$STAGING/"
+    merge_staging_tree "$FIREFOX_STAGING"
 else
     echo "==> Firefox staging not found, skipping (run build-firefox-aarch64.sh first)"
 fi
@@ -512,7 +512,7 @@ fi
 ASAHI_STAGING="$SCRIPT_DIR/build-aarch64-asahi/staging"
 if [ -x "$ASAHI_STAGING/usr/bin/gl-triangle-agx" ]; then
     echo "==> Integrating native Apple GPU userspace..."
-    cp -a "$ASAHI_STAGING/." "$STAGING/"
+    merge_staging_tree "$ASAHI_STAGING"
     install -m755 "$SCRIPT_DIR/gl-triangle/run-gl-triangle" \
         "$STAGING/usr/bin/run-gl-triangle"
     install -m755 "$SCRIPT_DIR/gl-triangle/run-gl-triangle-agx" \
@@ -540,14 +540,14 @@ fi
 
 if [ -x "$PYTHON_STAGING/usr/bin/python3" ]; then
     echo "==> Integrating Python 3 runtime..."
-    cp -a "$PYTHON_STAGING/." "$STAGING/"
+    merge_staging_tree "$PYTHON_STAGING"
 else
     echo "==> Python 3 staging not found, skipping (run build-python-aarch64.sh first)"
 fi
 
 if [ -x "$RUBY_STAGING/usr/bin/ruby" ]; then
     echo "==> Integrating Ruby runtime..."
-    cp -a "$RUBY_STAGING/." "$STAGING/"
+    merge_staging_tree "$RUBY_STAGING"
 else
     echo "==> Ruby staging not found, skipping (run build-ruby-aarch64.sh first)"
 fi
@@ -568,7 +568,7 @@ fi
 
 if [ -x "$NETWORK_TOOLS_STAGING/usr/bin/curl" ]; then
     echo "==> Integrating network developer tools..."
-    cp -a "$NETWORK_TOOLS_STAGING/." "$STAGING/"
+    merge_staging_tree "$NETWORK_TOOLS_STAGING"
 else
     echo "==> Network tools staging not found, skipping (run build-network-tools-aarch64.sh first)"
 fi
@@ -582,14 +582,14 @@ fi
 
 if [ -x "$CODEX_STAGING/usr/bin/codex" ]; then
     echo "==> Integrating Codex CLI runtime..."
-    cp -a "$CODEX_STAGING/." "$STAGING/"
+    merge_staging_tree "$CODEX_STAGING"
 else
     echo "==> Codex staging not found, skipping (run build-codex-aarch64.sh first)"
 fi
 
 if [ -x "$CLAUDE_STAGING/usr/bin/claude" ]; then
     echo "==> Integrating Claude Code CLI runtime..."
-    cp -a "$CLAUDE_STAGING/." "$STAGING/"
+    merge_staging_tree "$CLAUDE_STAGING"
 else
     echo "==> Claude Code staging not found, skipping (run build-claude-aarch64.sh first)"
 fi
@@ -597,6 +597,19 @@ fi
 if [ -x "$X86_TRANSLATION_STAGING/usr/bin/qemu-x86_64" ]; then
     echo "==> Integrating x86-64 translation and Wine runtime..."
     merge_staging_tree "$X86_TRANSLATION_STAGING"
+
+    # Office populates a disposable web cache with names that exceed ustar's
+    # pathname fields. Its VSTA design-time metadata also contains one path
+    # whose prefix cannot be represented in ustar. Neither is used at runtime,
+    # and the kernel accepts ustar rather than pax/GNU extension records.
+    office_web_cache="$STAGING/root/.wine-word2013-x86_64/drive_c/users/root/AppData/Local/Microsoft/Office/15.0/WebServiceCache"
+    office_vsta_metadata="$STAGING/root/.wine-word2013-x86_64/drive_c/Program Files (x86)/Common Files/Microsoft Shared/VSTA/AppInfoDocument/Microsoft.VisualStudio.Tools.Office.AppInfoDocument/Microsoft.VisualStudio.Tools.Office.AppInfoDocument.v9.0.dll"
+    if [ -d "$office_web_cache" ]; then
+        rm -rf "$office_web_cache"
+    fi
+    if [ -f "$office_vsta_metadata" ]; then
+        rm -f "$office_vsta_metadata"
+    fi
 else
     echo "==> x86-64 translation staging not found, skipping (run build-x86-translation-aarch64.sh first)"
 fi

@@ -141,6 +141,7 @@ def run_vm(root: Path, timeout: int) -> int:
             "--no-build",
             "--serial",
             "--fake-g17",
+            "--no-persist",
             "--mem=8192",
         ]
         pid, master = pty.fork()

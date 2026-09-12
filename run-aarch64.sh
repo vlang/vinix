@@ -14,9 +14,9 @@
 # --replace stops a VM already using the boot disk. Without it a second run
 # refuses, rather than writing into the disk of a running one.
 #
-# --persist attaches a separate ext2 volume and mounts it at /root. The base
-# system still comes from the initramfs, while files below /root survive QEMU
-# restarts. --persist=MB chooses its one-time image size.
+# A separate ext2 volume is mounted at /root by default. The base system still
+# comes from the initramfs, while files below /root survive QEMU restarts.
+# --persist=MB chooses its one-time image size; --no-persist disables it.
 #
 # --ephemeral gives this run an isolated temporary boot image and deletes it
 # when QEMU exits. Newly created boot images below the host's temporary
@@ -102,7 +102,7 @@ GUEST_INIT_REQUESTED=0
 REPLACE_RUNNING=0
 GRAB_KEYS=0
 EPHEMERAL_BOOT=0
-PERSIST_ENABLED="${VINIX_QEMU_PERSIST:-0}"
+PERSIST_ENABLED="${VINIX_QEMU_PERSIST:-1}"
 QEMU_MEM="${VINIX_QEMU_MEM:-2048}"
 for arg in "$@"; do
     case "$arg" in
@@ -213,6 +213,20 @@ fi
 # VINIX_INITRAMFS selects a different image, e.g. the one
 # ./build-desktop-aarch64.sh stages to boot straight into the desktop.
 INITRAMFS="${VINIX_INITRAMFS:-$INIT_DIR/initramfs.tar}"
+INITRAMFS_COMPRESSED="${VINIX_INITRAMFS_COMPRESSED:-}"
+if [ -z "$INITRAMFS_COMPRESSED" ]; then
+    case "$INITRAMFS" in
+        *.gz) INITRAMFS_COMPRESSED=1 ;;
+        *)    INITRAMFS_COMPRESSED=0 ;;
+    esac
+fi
+case "$INITRAMFS_COMPRESSED" in
+    0|1) ;;
+    *)
+        echo "ERROR: VINIX_INITRAMFS_COMPRESSED must be 0 or 1" >&2
+        exit 1
+        ;;
+esac
 if [ "$NO_BUILD" -eq 0 ] && [ ! -f "$INITRAMFS" ]; then
     echo "==> Building minimal init program..."
     echo "    (Run ./build-userland-aarch64.sh for full busybox userland)"
@@ -267,11 +281,30 @@ if [ "$PERSIST_ENABLED" -eq 1 ]; then
     fi
 fi
 
+# A compressed module keeps complete desktop images below FAT32's 4 GiB
+# single-file limit. The leading '$' asks Limine to decompress it before the
+# kernel receives the module; its on-disk name stays stable for mtools.
+if [ "$INITRAMFS_COMPRESSED" -eq 1 ]; then
+    LIMINE_CONF_COMPRESSED="$LIMINE_CONF_QEMU.compressed"
+    awk '
+        /^[[:space:]]*module_path:/ && !replaced {
+            print "    module_path: $boot():/boot/initramfs.tar"
+            replaced = 1
+            next
+        }
+        { print }
+        END {
+            if (!replaced) print "    module_path: $boot():/boot/initramfs.tar"
+        }
+    ' "$LIMINE_CONF_QEMU" > "$LIMINE_CONF_COMPRESSED"
+    mv -f "$LIMINE_CONF_COMPRESSED" "$LIMINE_CONF_QEMU"
+fi
+
 if [ "$FAKE_G17" -eq 1 ]; then
     sed -E -i '' '/^[[:space:]]*cmdline:/ s#$# vinix.fake_g17=1#' "$LIMINE_CONF_QEMU"
 fi
 
-# ── Create the opt-in persistent ext2 home volume ──
+# ── Create the persistent ext2 home volume ──
 # It is deliberately a different image from the UEFI/FAT boot disk: the
 # kernel's persistent block driver only considers an ext2 volume, so firmware
 # updates and rebuilds cannot accidentally become user-data writes.
@@ -526,7 +559,7 @@ PACKAGE_RUNTIME_TAR="$PACKAGE_RUNTIME_DIR/qemu-runtime.tar"
 PACKAGE_SERVER_READY="$PACKAGE_RUNTIME_DIR/server.ready"
 PACKAGE_SERVER_LOG="$PACKAGE_RUNTIME_DIR/server.log"
 PACKAGE_BASE_FILES_RAW="$PACKAGE_RUNTIME_DIR/base-files.raw"
-mkdir -p "$PACKAGE_RUNTIME_ROOT/etc/vinix-pkg" \
+mkdir -p "$PACKAGE_RUNTIME_ROOT/etc/vinix-pkg" "$PACKAGE_RUNTIME_ROOT/root" \
     "$PACKAGE_RUNTIME_ROOT/usr/bin" "$PACKAGE_RUNTIME_ROOT/usr/libexec"
 
 # Tests may replace PID 1 without copying and rewriting a multi-gigabyte base
