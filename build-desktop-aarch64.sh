@@ -113,6 +113,35 @@ if [ -n "$WIFI_BUNDLE" ]; then
     done
 fi
 
+archive_has_member() {
+    local archive="$1"
+    local member="$2"
+    [ -f "$archive" ] && tar tf "$archive" "$member" >/dev/null 2>&1
+}
+
+# The desktop runner normally reuses the assembled userland because rebuilding
+# every language and application layer is much slower than iterating on ui2.
+# Refresh it once when a checkout adds a new required base package, rather than
+# failing late after the desktop binaries have already been compiled. Compact
+# images obtain Vim from the development-tools archive; full images obtain it
+# from the complete base archive.
+if [ "$MAKE_INITRAMFS" -eq 1 ]; then
+    VIM_ARCHIVE="$BASE_INITRAMFS"
+    if [ "$COMPACT_INITRAMFS" -eq 1 ]; then
+        VIM_ARCHIVE="$DEVTOOLS_ARCHIVE"
+    fi
+    if ! archive_has_member "$VIM_ARCHIVE" ./usr/bin/vim; then
+        echo "==> AArch64 userland predates the required Vim package; rebuilding it..."
+        VINIX_AARCH64_USERLAND_BUILD_DIR="$USERLAND_BUILD_DIR" \
+        VINIX_AARCH64_INITRAMFS="$BASE_INITRAMFS" \
+            "$SCRIPT_DIR/build-userland-aarch64.sh"
+        if ! archive_has_member "$VIM_ARCHIVE" ./usr/bin/vim; then
+            echo "ERROR: rebuilt AArch64 userland still has no executable /usr/bin/vim" >&2
+            exit 1
+        fi
+    fi
+fi
+
 # ── The Alpine musl sysroot ──
 if [ ! -f "$SYSROOT/usr/lib/libc.a" ] || [ ! -d "$SYSROOT/usr/include" ]; then
     echo "ERROR: Alpine development sysroot is incomplete: $SYSROOT"
