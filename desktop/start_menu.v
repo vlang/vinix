@@ -437,7 +437,7 @@ fn (mut d Desktop) handle_start_action(action string) {
 		}
 		action_start_shutdown {
 			d.close_start_menu()
-			d.running = false
+			d.request_power_off()
 		}
 		else {
 			if action.starts_with(action_start_launch_prefix) {

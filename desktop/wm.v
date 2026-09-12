@@ -56,6 +56,9 @@ mut:
 
 	frames  int
 	running bool = true
+	// What to do with the machine once the loop has ended and the session has
+	// been torn down. Only init may set anything but keep_running.
+	power PowerAction
 	// The screen is only recomposed when something it shows has changed. An
 	// idle desktop then costs almost nothing, and — with no garbage collector
 	// on this target — stops rebuilding a tree it would only throw away.
@@ -571,6 +574,32 @@ fn (mut d Desktop) send_keys_to_focused(keys string) {
 		app.key_input(keys)
 		d.dirty = true
 	}
+}
+
+// End the session, and take the machine with it when this compositor is the
+// machine's init. Started from a shell on the full image it is an ordinary
+// process that happens to own the screen: there, ending the session means
+// giving the console back to that shell and nothing more.
+fn (mut d Desktop) end_session(action PowerAction) {
+	if desktop_is_init() {
+		d.power = action
+	}
+	d.running = false
+}
+
+// The Start menu's power button.
+fn (mut d Desktop) request_power_off() {
+	d.end_session(.power_off)
+}
+
+// A power signal ends the session at a frame boundary, so applications are
+// closed and the console is restored before the machine goes down.
+fn (mut d Desktop) take_power_signal() {
+	action := desktop_pending_power_action()
+	if action == .keep_running {
+		return
+	}
+	d.end_session(action)
 }
 
 // close_apps shuts every native client down before the compositor exits. App

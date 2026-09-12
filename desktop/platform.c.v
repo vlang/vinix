@@ -23,6 +23,8 @@ import term.termios
 
 #include <sys/mman.h>
 
+#include <sys/reboot.h>
+
 #include <sys/stat.h>
 
 #include <sys/wait.h>
@@ -71,6 +73,12 @@ fn C.poll(fds &C.pollfd, count usize, timeout int) int
 
 // Match vlib/net's declaration if a native application also imports it.
 fn C.fcntl(fd int, cmd int, arg ...voidptr) int
+
+// reboot(2) takes an int; the three commands it accepts are spelled as
+// unsigned values because two of them do not fit a positive int.
+fn C.reboot(command u32) int
+
+fn C.sync()
 
 fn desktop_open_rw(path string) int {
 	return C.open(&char(path.str), C.O_RDWR)
@@ -527,6 +535,82 @@ fn desktop_set_cloexec(fd int, enabled bool) bool {
 
 fn desktop_ignore_broken_pipe() {
 	unsafe { C.signal(C.SIGPIPE, C.SIG_IGN) }
+}
+
+// What the session should do once it has finished tearing itself down.
+enum PowerAction {
+	keep_running
+	restart
+	power_off
+	halt
+}
+
+// The commands reboot(2) accepts, as <sys/reboot.h> names them.
+const reboot_restart = u32(0x01234567)
+const reboot_power_off = u32(0x4321fedc)
+const reboot_halt = u32(0xcdef0123)
+
+// The signal number a power signal arrived as, written by the handler and read
+// by the compositor loop. A handler runs between two instructions of whatever
+// the loop was doing, so it may do nothing but this store.
+__global desktop_power_signal = int(0)
+
+// The signal number arrives in a C `int`, which V's own `int` is wider than.
+fn desktop_power_signal_handler(signal i32) {
+	desktop_power_signal = signal
+}
+
+// busybox reboot, poweroff and halt do not call reboot(2) themselves unless
+// they are given -f: they sync, signal pid 1, and leave the machine to init.
+// The desktop image's init execs this compositor, so pid 1 is this process and
+// those signals arrive here. Their meanings are the ones busybox init gives
+// them, which is what busybox halt sends them for.
+fn desktop_install_power_signals() {
+	unsafe {
+		handler := voidptr(desktop_power_signal_handler)
+		C.signal(C.SIGTERM, handler) // reboot
+		C.signal(C.SIGUSR2, handler) // poweroff
+		C.signal(C.SIGUSR1, handler) // halt
+	}
+}
+
+// The power action a signal asked for since this was last called, consuming it.
+fn desktop_pending_power_action() PowerAction {
+	signal := desktop_power_signal
+	if signal == 0 {
+		return .keep_running
+	}
+	desktop_power_signal = 0
+	if signal == C.SIGUSR1 {
+		return .halt
+	}
+	if signal == C.SIGUSR2 {
+		return .power_off
+	}
+	return .restart
+}
+
+// Only the process the kernel started as init may take the machine down. A
+// desktop launched from a shell on the full image is an ordinary process, and
+// ending its session there means returning to that shell.
+fn desktop_is_init() bool {
+	return C.getpid() == 1
+}
+
+// Hand the machine to the kernel. reboot(2) only returns when it refuses, so
+// everything the session wanted to finish must already be done.
+fn desktop_power_apply(action PowerAction) {
+	mut command := u32(0)
+	match action {
+		.keep_running { return }
+		.restart { command = reboot_restart }
+		.power_off { command = reboot_power_off }
+		.halt { command = reboot_halt }
+	}
+	C.sync()
+	if C.reboot(command) != 0 {
+		eprintln('vinix-desktop: the kernel refused the power request')
+	}
 }
 
 // A native application is another invocation of the desktop executable via a

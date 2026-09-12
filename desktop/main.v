@@ -103,6 +103,7 @@ fn main() {
 		return
 	}
 	desktop_ignore_broken_pipe()
+	desktop_install_power_signals()
 	options := parse_options(arguments()[1..])
 
 	mut fb := open_framebuffer(options.framebuffer) or {
@@ -142,6 +143,12 @@ fn main() {
 
 	mut stats := FrameStats{}
 	for desktop.running {
+		// `reboot`, `poweroff` and `halt` signal pid 1 rather than powering the
+		// machine down themselves, and on this image pid 1 is this compositor.
+		desktop.take_power_signal()
+		if !desktop.running {
+			break
+		}
 		frame_started := monotonic_millis()
 
 		desktop.update_taskbar_clock()
@@ -224,6 +231,11 @@ fn main() {
 	desktop.canvas.clear(0x000000)
 	fb.present(&desktop.canvas, desktop_current_scale())
 	println('vinix-desktop: ${desktop.frames} frames')
+
+	// Nothing above has to be undone afterwards: this does not return unless
+	// the kernel refuses, and it is keep_running for a session that was only
+	// closed rather than asked to take the machine with it.
+	desktop_power_apply(desktop.power)
 }
 
 // pump_pointer maps the device's own coordinate space onto the screen and

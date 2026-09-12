@@ -796,8 +796,7 @@ set +e
     -device virtio-keyboard-device \
     -device virtio-tablet-device \
     $NETWORK_FLAGS \
-    $DISPLAY_FLAGS \
-    -no-reboot
+    $DISPLAY_FLAGS
 qemu_status=$?
 set -e
 exit "$qemu_status"

@@ -405,6 +405,14 @@ if [ "$COMPACT_INITRAMFS" -eq 1 ]; then
         ln -sf busybox "$STAGING/bin/$applet"
     done
 
+    # The power commands live in /sbin on a full userland, which compact images
+    # do not stage. BusyBox dispatches on the name it is called by, so a link
+    # under either directory is the same applet.
+    mkdir -p "$STAGING/sbin"
+    for applet in halt poweroff reboot; do
+        ln -sf /bin/busybox "$STAGING/sbin/$applet"
+    done
+
 else
     tar xf "$BASE_INITRAMFS" -C "$STAGING"
     # The base archive may predate package support. Always refresh this small

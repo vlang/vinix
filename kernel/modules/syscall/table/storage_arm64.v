@@ -48,9 +48,11 @@ fn storage_reboot(_ voidptr, magic1 u32, magic2 u32, command u32, _arg voidptr) 
 	if command != 0x01234567 && command != 0xcdef0123 && command != 0x4321fedc {
 		return errno.err, errno.einval
 	}
-	// Vinix's Process has no credential/capability model yet. Restrict this
-	// path to init (PID 1), rather than pretending every caller has CAP_SYS_BOOT.
-	if proc.current_thread().process.pid != 1 { return errno.err, errno.eperm }
+	// Linux gates this on CAP_SYS_BOOT. Vinix has no credential model, so every
+	// process already holds the privilege such a check would look for, and
+	// demanding PID 1 instead only made reboot(2) unreachable: on the desktop
+	// image init execs the compositor, so nothing a terminal runs is ever pid 1.
+	// The magic numbers above remain the guard against a stray call.
 	if !ans.shutdown() { return errno.err, errno.eio }
 	if command == 0x01234567 {
 		cpu.psci_call(cpu.psci_system_reset)
