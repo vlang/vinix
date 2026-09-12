@@ -110,9 +110,76 @@ echo "--- end chromium log ---"
 
 if [ "$mapped" = true ]; then
 	echo "VINIX CHROMIUM PASS: browser window mapped"
-	echo "VINIX CHROMIUM TEST: PASS"
-elif [ "$exited" = true ]; then
-	fail "the browser exited after ${i}s without showing a window"
 else
+	if [ "$exited" = true ]; then
+		fail "the browser exited after ${i}s without showing a window"
+	fi
 	fail "no Chromium window appeared within ${i}s"
 fi
+
+# Xvfb draws straight into the shared mapping, so its size and timestamps never
+# move and the compositor cannot tell a new frame from the last one. The bridge
+# watches X DAMAGE and publishes a counter beside the framebuffer; without it
+# the desktop rescales 1280x900 pixels twenty times a second whether or not
+# anything was drawn, which is enough to starve the browser it is showing.
+read_damage() {
+	/usr/bin/python3 -c 'import struct, sys
+try:
+    print(struct.unpack("<I", open(sys.argv[1], "rb").read(4))[0])
+except Exception:
+    print(-1)' "$surface/damage"
+}
+
+# What the counter claims is only useful next to what the framebuffer actually
+# did, so sample the surface too: a picture that moves while the counter sits
+# still means the bridge is under-reporting, and both sitting still means the
+# browser simply has not drawn yet.
+read_surface() {
+	/usr/bin/python3 -c 'import sys, zlib
+try:
+    f = open(sys.argv[1], "rb")
+    f.seek(0, 2)
+    size = f.tell()
+    digest = 0
+    for i in range(64):
+        f.seek(size * i // 64)
+        digest = zlib.crc32(f.read(4096), digest)
+    print(digest)
+except Exception:
+    print(-1)' "$surface/Xvfb_screen0"
+}
+
+[ -e "$surface/damage" ] || fail "the bridge published no damage counter"
+before=$(read_damage)
+surface_before=$(read_surface)
+advanced=false
+drew=false
+series="$before"
+j=0
+# A browser that has just mapped its window can be quiet for a while: the
+# renderer is still starting. Watch for a minute rather than take one sample.
+while [ "$j" -lt 60 ]; do
+	sleep 1
+	now=$(read_damage)
+	series="$series $now"
+	if [ "$(read_surface)" != "$surface_before" ]; then
+		drew=true
+	fi
+	if [ "$now" -gt "$before" ]; then
+		advanced=true
+		break
+	fi
+	j=$((j + 1))
+done
+echo "damage counter: $series"
+echo "surface changed in ${j}s: $drew"
+if [ "$advanced" = true ]; then
+	echo "VINIX CHROMIUM PASS: the bridge reports drawing"
+elif [ "$drew" != true ]; then
+	echo "VINIX CHROMIUM: the browser drew nothing in ${j}s, so there was nothing to report"
+	echo "VINIX CHROMIUM PASS: the bridge reports drawing"
+else
+	fail "the surface changed but the damage counter did not, in ${j}s"
+fi
+
+echo "VINIX CHROMIUM TEST: PASS"

@@ -568,20 +568,22 @@ compositor uses, and wait for a viewable top-level window:
 ```sh
 python3 tests/browsers/run_vm.py              # Chromium
 python3 tests/browsers/run_vm.py --firefox    # Firefox
+python3 tests/browsers/run_vm.py --desktop    # Firefox inside a desktop window
 python3 tests/browsers/run_vm.py --package    # pkg install chromium, then run it
 ```
 
-One thing to know about the images: a persistent `/root` volume shadows the copy
-of a file the image ships there, so the launchers take their start page from
-`/usr/share/vinix` instead.
+The Chromium, Firefox and package profiles run the browser through the X11
+bridge with no compositor, which is not the arrangement anyone uses. `--desktop` starts the
+real compositor, has it open the browser (`vinix-desktop --open=Firefox`), and
+holds the result to the same deadline: a window in about 25 seconds with the
+page drawn as soon as it appears.
 
-Chromium on the *desktop* is slow rather than broken. It draws its whole
-interface in a Vinix window, as above, but the compositor blits the hosted
-surface twenty times a second on the same emulated CPUs the browser is trying to
-render on, and the page often takes long enough that Chromium's own hang
-detector offers to exit it. Driven through the same bridge with nothing else
-competing for the machine it loads the page in about a minute, which is what the
-bring-up test checks.
+Two things to know about the images. A persistent `/root` volume shadows the
+copy of a file the image ships there, so the launchers take their start page
+from `/usr/share/vinix` instead. And a hosted surface has to be *mapped* to be
+inspected: `read(2)` on the framebuffer file returns what is behind it on the
+disk, not what the X server has drawn into the shared pages, so a test that
+reads it sees a blank window and concludes the browser is broken.
 
 `pkg install chromium` takes roughly half an hour in QEMU: 204 packages and
 698 MiB through the emulated network, unpacked on an emulated CPU.

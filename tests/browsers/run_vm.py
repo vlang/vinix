@@ -31,6 +31,7 @@ BRING_UP = {
         b"VINIX CHROMIUM PASS: version",
         b"VINIX CHROMIUM PASS: the hosted display has a framebuffer",
         b"VINIX CHROMIUM PASS: browser window mapped",
+        b"VINIX CHROMIUM PASS: the bridge reports drawing",
     ),
 }
 FIREFOX = {
@@ -40,6 +41,23 @@ FIREFOX = {
     "features": (
         b"VINIX FIREFOX PASS: the hosted display has a framebuffer",
         b"VINIX FIREFOX PASS: browser window mapped",
+        b"VINIX FIREFOX PASS: the page was drawn",
+    ),
+}
+# The desktop profile is the arrangement users actually see: the compositor
+# hosting the browser's surface in an ordinary window. The other browser
+# profiles run the same X11 bridge without a compositor, so a regression in the
+# hosting path — where the browser was found to be starved by a compositor
+# recomposing the screen twenty times a second for a picture that had not
+# changed — passes them unnoticed.
+DESKTOP = {
+    "init": "tests/browsers/desktop-init.sh",
+    "pass": b"VINIX DESKTOP FIREFOX TEST: PASS",
+    "fail": (b"VINIX DESKTOP FIREFOX TEST: FAIL",),
+    "features": (
+        b"VINIX DESKTOP FIREFOX PASS: the hosted display has a framebuffer",
+        b"VINIX DESKTOP FIREFOX PASS: browser window mapped",
+        b"VINIX DESKTOP FIREFOX PASS: the page was drawn",
     ),
 }
 PACKAGE = {
@@ -209,6 +227,8 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--firefox", action="store_true",
                         help="drive Firefox instead of Chromium")
+    parser.add_argument("--desktop", action="store_true",
+                        help="drive Firefox inside a compositor-managed window")
     parser.add_argument("--package", action="store_true",
                         help="install Chromium with pkg instead of driving a staged one")
     parser.add_argument("--init", type=Path)
@@ -229,7 +249,10 @@ def main() -> int:
         parser.error("--timeout must be positive")
     if arguments.package and arguments.firefox:
         parser.error("--package installs Chromium; it cannot be combined with --firefox")
-    profile = PACKAGE if arguments.package else FIREFOX if arguments.firefox else BRING_UP
+    if arguments.desktop and (arguments.package or arguments.firefox):
+        parser.error("--desktop drives its own browser; it cannot be combined with another profile")
+    profile = (DESKTOP if arguments.desktop else PACKAGE if arguments.package
+               else FIREFOX if arguments.firefox else BRING_UP)
     timeout = arguments.timeout or (5400 if arguments.package else 1800)
     guest_init = arguments.init or (root / profile["init"])
     return run_vm(root, guest_init.resolve(), arguments.initramfs.resolve(),

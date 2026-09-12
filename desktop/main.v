@@ -43,6 +43,11 @@ struct Options {
 	frame_interval i64 = default_frame_interval_ms
 	idle_interval  i64 = default_idle_interval_ms
 	stats          bool
+	// Applications to open at startup, by the title on their shortcut. The
+	// desktop is otherwise only reachable through the pointer, which leaves a
+	// scripted boot no way to ask for the one thing worth measuring: how long
+	// a real application takes to appear in a window.
+	open []string
 }
 
 fn parse_options(args []string) Options {
@@ -67,6 +72,13 @@ fn parse_options(args []string) Options {
 				...options
 				frame_interval: interval
 				idle_interval: interval
+			}
+		} else if arg.starts_with('--open=') {
+			mut titles := options.open.clone()
+			titles << arg[7..]
+			options = Options{
+				...options
+				open: titles
 			}
 		} else if arg == '--stats' {
 			options = Options{
@@ -137,9 +149,15 @@ fn main() {
 	// An opening arrangement, kept clear of the shortcut column down the left
 	// edge. The calculator is not opened: it remains available from its shortcut
 	// and the Start menu, and three windows is enough to show what the taskbar is for.
-	desktop.spawn('Welcome', .welcome, 150, 60, 396, 244)
-	desktop.spawn('System', .system, 580, 60, 372, 232)
-	desktop.launch_titled('Files')
+	if options.open.len == 0 {
+		desktop.spawn('Welcome', .welcome, 150, 60, 396, 244)
+		desktop.spawn('System', .system, 580, 60, 372, 232)
+		desktop.launch_titled('Files')
+	} else {
+		for title in options.open {
+			desktop.launch_titled(title)
+		}
+	}
 
 	mut stats := FrameStats{}
 	for desktop.running {
