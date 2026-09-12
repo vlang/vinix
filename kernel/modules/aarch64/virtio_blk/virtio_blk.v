@@ -154,6 +154,31 @@ fn setup_queue(mut device VirtioBlockDevice) bool {
 	return true
 }
 
+// Wait for the device to hand one buffer back, and consume it. Requests are
+// polled rather than waited on, and `last_used` counts what this driver has
+// collected; the caller submits at most one at a time.
+fn (mut device VirtioBlockDevice) collect_one() bool {
+	deadline := time.monotonic_ns() + request_timeout_ns
+	mut spins := u64(0)
+	for {
+		cpu.dmb_ish()
+		if unsafe { *&u16(device.used + 2) } != device.last_used {
+			break
+		}
+		spins++
+		if spins > 100_000_000 || time.monotonic_ns() >= deadline {
+			return false
+		}
+	}
+	device.last_used++
+	cpu.dmb_ish()
+	interrupts := mmio_r32(device.base + reg_interrupt_status)
+	if interrupts != 0 {
+		mmio_w32(device.base + reg_interrupt_ack, interrupts)
+	}
+	return true
+}
+
 // `read` controls the direction from the device's perspective: reads from the
 // disk make the data descriptor writable by the device.
 fn (mut device VirtioBlockDevice) transfer(buffer voidptr, sector u64, count u64, read bool) bool {
@@ -163,6 +188,18 @@ fn (mut device VirtioBlockDevice) transfer(buffer voidptr, sector u64, count u64
 	device.l.acquire()
 	defer {
 		device.l.release()
+	}
+
+	// Every transfer shares the one request and data buffer, so a request that
+	// timed out still belongs to the device: it may yet complete and write into
+	// them. Collect it before reusing them, or the next completion is mistaken
+	// for this request's and the data read back is whatever the abandoned one
+	// left there. That is how a loaded host turned a slow disk into corrupted
+	// inode tables and executable pages.
+	for device.last_used != device.next_available {
+		if !device.collect_one() {
+			return false
+		}
 	}
 
 	if !read {
@@ -185,23 +222,10 @@ fn (mut device VirtioBlockDevice) transfer(buffer voidptr, sector u64, count u64
 	unsafe { *&u16(device.avail + 2) = device.next_available }
 	mmio_w32(device.base + reg_queue_notify, 0)
 
-	deadline := time.monotonic_ns() + request_timeout_ns
-	mut spins := u64(0)
-	for {
-		cpu.dmb_ish()
-		if unsafe { *&u16(device.used + 2) } != device.last_used {
-			break
-		}
-		spins++
-		if spins > 100_000_000 || time.monotonic_ns() >= deadline {
-			return false
-		}
-	}
-	device.last_used++
-	cpu.dmb_ish()
-	interrupts := mmio_r32(device.base + reg_interrupt_status)
-	if interrupts != 0 {
-		mmio_w32(device.base + reg_interrupt_ack, interrupts)
+	// A timeout leaves the request outstanding on purpose. The loop above
+	// reclaims it before the buffers are used again.
+	if !device.collect_one() {
+		return false
 	}
 	if unsafe { *&u8(device.request_virt + sizeof(RequestHeader)) } != 0 {
 		return false
