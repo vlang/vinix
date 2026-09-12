@@ -411,6 +411,7 @@ fn activity_name_of(record &ActivitySample) string {
 		'vinix-terminal' { 'Terminal' }
 		'vinix-settings' { 'Settings' }
 		'vinix-activity' { 'Activity Monitor' }
+		'vinix-vspace' { 'VSpace' }
 		'vinix-editor' { 'Text Editor' }
 		'vinix-calendar' { 'Calendar' }
 		'vinix-clock' { 'Clock' }

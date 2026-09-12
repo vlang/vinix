@@ -735,6 +735,16 @@ fn (mut d Desktop) draw_builtin_glyph(path string, x int, y int, w int, h int, c
 			d.canvas.fill_circle(cx, top + body_height / 2, lens, behind)
 			d.canvas.fill_circle(cx, top + body_height / 2, if lens > 2 { lens - 2 } else { 1 }, color)
 		}
+		'disk' {
+			// A pie with a quarter taken out. Inside the circle that quadrant
+			// is exactly a quarter of the disc, so cutting a square out of it
+			// leaves the one shape everyone reads as "how full is it".
+			radius := if w < h { w * 3 / 8 } else { h * 3 / 8 }
+			d.canvas.fill_circle(cx, cy, radius, color)
+			behind := d.surface_under(x, y)
+			d.canvas.fill_rect(cx + 1, cy - radius - 1, radius + 2, radius + 1, behind)
+			d.canvas.fill_circle(cx, cy, radius / 4, behind)
+		}
 		'search' {
 			radius := if w < h { w / 4 } else { h / 4 }
 			d.canvas.fill_circle(cx - 2, cy - 2, radius, color)

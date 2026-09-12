@@ -41,6 +41,8 @@ import term.termios
 
 fn C.fstat(fd int, buf &C.stat) int
 
+fn C.lstat(path &char, buf &C.stat) int
+
 fn C.posix_openpt(flags int) int
 
 fn C.grantpt(fd int) int
@@ -818,6 +820,19 @@ struct DesktopFileInfo {
 	is_dir bool
 }
 
+// What a disk inventory needs from one directory entry. The identity pair is
+// what answers "have I already counted these bytes": a file reached through a
+// second hard link, or a directory reached through a second path, has the same
+// device and inode as the first time it was seen.
+struct DesktopNodeInfo {
+	size    u64
+	is_dir  bool
+	is_file bool
+	links   u64
+	device  u64
+	inode   u64
+}
+
 fn desktop_stat(path string) ?DesktopFileInfo {
 	mut info := C.stat{}
 	if unsafe { C.stat(&char(path.str), &info) } != 0 {
@@ -826,6 +841,25 @@ fn desktop_stat(path string) ?DesktopFileInfo {
 	return DesktopFileInfo{
 		size: u64(info.st_size)
 		is_dir: (u32(info.st_mode) & u32(C.S_IFMT)) == u32(C.S_IFDIR)
+	}
+}
+
+// lstat, so a symbolic link is reported as the link and not as whatever it
+// points at. An inventory that followed one would count the target's bytes
+// again under a second name, and a link into an ancestor would never finish.
+fn desktop_lstat(path string) ?DesktopNodeInfo {
+	mut info := C.stat{}
+	if unsafe { C.lstat(&char(path.str), &info) } != 0 {
+		return none
+	}
+	kind := u32(info.st_mode) & u32(C.S_IFMT)
+	return DesktopNodeInfo{
+		size: u64(info.st_size)
+		is_dir: kind == u32(C.S_IFDIR)
+		is_file: kind == u32(C.S_IFREG)
+		links: u64(info.st_nlink)
+		device: u64(info.st_dev)
+		inode: u64(info.st_ino)
 	}
 }
 

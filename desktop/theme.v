@@ -62,6 +62,15 @@ const clock_stopwatch = u32(0x2563a6)
 const clock_button = u32(0xe9edf4)
 const clock_stop = u32(0xc94c4c)
 
+// ── VSpace ─────────────────────────────────────────────────────────
+// Two rankings sit side by side, so folders and files each get a colour and
+// every proportion bar in a panel is drawn in its panel's own.
+const vspace_folders_accent = u32(0xd08a24)
+const vspace_files_accent = u32(0x7c5cd6)
+const vspace_phase_scanning = u32(0x1d4ed8)
+const vspace_phase_complete = u32(0x15803d)
+const vspace_phase_stopped = u32(0xb45309)
+
 // ── Settings ───────────────────────────────────────────────────────
 // ── Terminal ───────────────────────────────────────────────────────
 const terminal_bg = u32(0x1b1d23)

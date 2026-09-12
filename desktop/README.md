@@ -29,6 +29,8 @@ What it does:
 - a **text editor** for plain files, with an editable path, open/save controls,
   cursor navigation and keyboard shortcuts
 - a **calendar** with month navigation, date selection and a jump back to today
+- **VSpace**, a disk usage analyzer: the largest folders and files on the
+  machine, ranked and measured while the walk runs
 - a **clock** with a large local-time display and a tenth-second stopwatch
 - **Capture**, a native screenshot and screen-recording app with delayed PNG
   screenshots, 5/10 fps AVI recording, automatic self-hiding and live status
@@ -64,6 +66,7 @@ typing any word with a q in it drop the user back to the console.
     vinix_surface.v       shared XRGB surface validation and presentation
     files.v        the file browser
     activity.v     the activity monitor, over /dev/processes
+    vspace.v       the disk inventory: a resumable walk and its two rankings
     editor.v       the plain-text editor and its keyboard editing model
     calendar.v     Gregorian month layout and the calendar application
     clock_app.v    the large clock and stopwatch application
@@ -290,6 +293,47 @@ the program. The kernel stores a process' name as the path it ran with its pid
 appended, and a fork appends again — the shell is `/bin/busybox[2]` and a loop
 it starts is `/bin/busybox[2][3]` — so the monitor strips those suffixes. Every
 number in them is an ancestor's pid, and this process' own has a column.
+
+## VSpace, the disk inventory
+
+![VSpace measuring a Vinix image under QEMU](../vinix-vspace-qemu.png)
+
+`vspace.v` is a port of the standalone V/ui2 program of the same name — a disk
+usage analyzer: four metrics across the top, and below them the largest folders
+and the largest files found so far, each row carrying a bar proportional to the
+largest entry in its panel. Its accounting is the original's. Symbolic links
+are not followed, so nothing is counted twice under a second name and a link
+into an ancestor cannot make the walk run forever. A file with several hard
+links is counted once. A directory it cannot open is added to **Skipped** and
+the scan carries on. A folder's size is its whole subtree, which is what makes
+the ranking say where the space went rather than which directory has the most
+bytes directly in it.
+
+The interesting part of the port is that the original is threaded and this is
+not. The standalone program hands the walk to a worker thread, publishes
+snapshots through a mutex and asks its platform window to refresh. A Vinix
+application has neither a window nor an event loop of its own: it answers the
+compositor's requests and is otherwise not running. So the recursion becomes an
+explicit stack of open directories which the compositor advances with the poll
+it already sends every 33 ms, one slice of at most 20 ms per poll. The
+compositor is blocked while a slice runs, which is exactly what the budget is
+for — a scan of the whole disk costs a fraction of each frame instead of a
+frozen desktop, and the rankings fill in while it runs as they do natively.
+
+Two questions are asked of every entry: have I been in this directory before,
+and have I already counted these bytes under another name. Both are "have I
+seen this device and inode", so both are answered by an open-addressed set of
+packed 64-bit identities rather than by a keyed map, which would allocate a
+string per file on a target with no garbage collector. The rankings keep the
+largest two dozen of each kind in order, and anything at or below the floor
+that a full ranking sets is rejected without an insertion.
+
+**Whole disk**, **Home** and **System** are the presets; clicking a ranked
+folder rescans it, which is how the window answers "and what is inside *that*",
+and **Up** comes back out. Folder rows are only clickable once a scan has
+finished, because a ranking that is still moving would not be pointing at the
+same folder by the time the click arrived. `-` and `+` page a panel when a
+ranking holds more than the window has room for.
 
 ## The window switcher
 
