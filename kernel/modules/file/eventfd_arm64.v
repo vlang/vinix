@@ -204,8 +204,20 @@ pub fn syscall_eventfd2(_ voidptr, initial u32, flags int) (u64, u64) {
 		counter.status |= pollin
 	}
 
+	// The eventfd flags are not open flags: EFD_SEMAPHORE shares its bit with
+	// O_WRONLY, so passing them straight through made a semaphore eventfd
+	// unreadable and an ordinary one unwritable. Translate them, and say that
+	// the descriptor is open both ways, which is what an eventfd is for.
+	mut open_flags := resource.o_rdwr
+	if flags & efd_nonblock != 0 {
+		open_flags |= resource.o_nonblock
+	}
+	if flags & efd_cloexec != 0 {
+		open_flags |= resource.o_cloexec
+	}
+
 	mut res := &resource.Resource(unsafe { counter })
-	fdnum := fdnum_create_from_resource(unsafe { nil }, mut res, flags, 0, false) or {
+	fdnum := fdnum_create_from_resource(unsafe { nil }, mut res, open_flags, 0, false) or {
 		return errno.err, errno.get()
 	}
 

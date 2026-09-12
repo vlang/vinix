@@ -6,6 +6,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <sched.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -15,8 +16,12 @@
 #include <sys/random.h>
 #include <sys/resource.h>
 #include <sys/stat.h>
+#include <sys/eventfd.h>
+#include <sys/socket.h>
 #include <sys/statfs.h>
 #include <sys/sysinfo.h>
+#include <sys/uio.h>
+#include <sys/un.h>
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
@@ -373,6 +378,69 @@ static int test_posix_timer_thread_notification(void)
 	return 0;
 }
 
+/* Anonymous descriptors have to carry an access mode. Without one they look
+ * read-only, and write(2) on them is refused with EBADF: an X server answers
+ * its clients with writev(2), so every graphical application on the machine
+ * lost its connection the moment the server tried to reply. */
+static int test_anonymous_descriptor_access(void)
+{
+	int pair[2];
+	CHECK(socketpair(AF_UNIX, SOCK_STREAM, 0, pair) == 0);
+	CHECK((fcntl(pair[0], F_GETFL) & O_ACCMODE) == O_RDWR);
+	struct iovec vector[2];
+	vector[0].iov_base = (void *)"soc";
+	vector[0].iov_len = 3;
+	vector[1].iov_base = (void *)"ket";
+	vector[1].iov_len = 3;
+	CHECK(writev(pair[0], vector, 2) == 6);
+	char received[8] = { 0 };
+	CHECK(read(pair[1], received, sizeof(received)) == 6);
+	CHECK(memcmp(received, "socket", 6) == 0);
+	CHECK(close(pair[0]) == 0);
+	CHECK(close(pair[1]) == 0);
+
+	/* A listening socket hands its access mode to what accept(2) returns. */
+	struct sockaddr_un address;
+	memset(&address, 0, sizeof(address));
+	address.sun_family = AF_UNIX;
+	/* The test image has no /tmp; the working directory is on the volume the
+	 * rest of these tests use. */
+	strcpy(address.sun_path, "/root/vinix-qemu-core/accept.sock");
+	unlink(address.sun_path);
+	int listener = socket(AF_UNIX, SOCK_STREAM, 0);
+	CHECK(listener >= 0);
+	CHECK(bind(listener, (struct sockaddr *)&address, sizeof(address)) == 0);
+	CHECK(listen(listener, 4) == 0);
+	int client = socket(AF_UNIX, SOCK_STREAM, 0);
+	CHECK(client >= 0);
+	CHECK(connect(client, (struct sockaddr *)&address, sizeof(address)) == 0);
+	int served = accept(listener, NULL, NULL);
+	CHECK(served >= 0);
+	CHECK((fcntl(served, F_GETFL) & O_ACCMODE) == O_RDWR);
+	CHECK(write(served, "reply", 5) == 5);
+	char answer[8] = { 0 };
+	CHECK(read(client, answer, sizeof(answer)) == 5);
+	CHECK(memcmp(answer, "reply", 5) == 0);
+	CHECK(close(served) == 0);
+	CHECK(close(client) == 0);
+	CHECK(close(listener) == 0);
+	CHECK(unlink(address.sun_path) == 0);
+
+	/* eventfd counts both ways, and its own flags share a bit with O_WRONLY. */
+	int counter = eventfd(0, EFD_CLOEXEC);
+	CHECK(counter >= 0);
+	CHECK((fcntl(counter, F_GETFL) & O_ACCMODE) == O_RDWR);
+	uint64_t one = 1;
+	CHECK(write(counter, &one, sizeof(one)) == (ssize_t)sizeof(one));
+	uint64_t read_back = 0;
+	CHECK(read(counter, &read_back, sizeof(read_back)) == (ssize_t)sizeof(read_back));
+	CHECK(read_back == 1);
+	CHECK(close(counter) == 0);
+
+	puts("QEMU CORE PASS: anonymous descriptors are open both ways");
+	return 0;
+}
+
 static int run_tests(void)
 {
 	int persistence_boot = verify_persistence_boot();
@@ -388,6 +456,7 @@ static int run_tests(void)
 	CHECK(test_inotify() == 0);
 	CHECK(test_scheduler_and_accounting() == 0);
 	CHECK(test_posix_timer_thread_notification() == 0);
+	CHECK(test_anonymous_descriptor_access() == 0);
 	CHECK(unlink(file_a) == 0);
 	CHECK(unlink(file_b) == 0);
 	CHECK(unlink(file_c) == 0);

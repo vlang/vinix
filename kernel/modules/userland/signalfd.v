@@ -6,6 +6,7 @@ import event.eventstruct
 import proc
 import file
 import errno
+import resource
 
 struct SFDSiginfo {
 	ssi_signo    u32
@@ -98,8 +99,10 @@ pub fn syscall_signalfd(_ voidptr, fdnum int, mask u64, flags int) (u64, u64) {
 			refcount: 1
 		}
 
-		newfd = file.fdnum_create_from_resource(unsafe { nil }, mut signalfd, flags, 0,
-			false) or { return errno.err, errno.get() }
+		// SFD_NONBLOCK and SFD_CLOEXEC already share their bits with the open
+		// flags of the same name; the access mode is what is missing.
+		newfd = file.fdnum_create_from_resource(unsafe { nil }, mut signalfd,
+			flags | resource.o_rdwr, 0, false) or { return errno.err, errno.get() }
 
 		t.signalfds << voidptr(signalfd)
 	} else {

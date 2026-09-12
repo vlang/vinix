@@ -144,7 +144,10 @@ pub fn syscall_socketpair(_ voidptr, domain int, @type int, protocol int, ret &i
 		return errno.err, errno.get()
 	}
 
-	mut flags := int(0)
+	// A socket is always open for both directions. Saying so matters: without
+	// an access mode the descriptor looks read-only, and write(2) — which is
+	// how an X server answers its clients — is refused with EBADF.
+	mut flags := int(resource.o_rdwr)
 	if @type & sock_pub.sock_cloexec != 0 {
 		flags |= resource.o_cloexec
 	}
@@ -178,7 +181,7 @@ pub fn syscall_socket(_ voidptr, domain int, @type int, protocol int) (u64, u64)
 		return errno.err, errno.get()
 	}
 
-	mut flags := int(0)
+	mut flags := int(resource.o_rdwr)
 	if @type & sock_pub.sock_cloexec != 0 {
 		flags |= resource.o_cloexec
 	}
@@ -221,8 +224,8 @@ pub fn syscall_accept(_ voidptr, fdnum int) (u64, u64) {
 
 	mut connection_socket := sock.accept(fd.handle) or { return errno.err, errno.get() }
 
-	ret := file.fdnum_create_from_resource(unsafe { nil }, mut connection_socket, 0, 0,
-		false) or { return errno.err, errno.get() }
+	ret := file.fdnum_create_from_resource(unsafe { nil }, mut connection_socket,
+		resource.o_rdwr, 0, false) or { return errno.err, errno.get() }
 
 	return u64(ret), 0
 }

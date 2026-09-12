@@ -249,7 +249,7 @@ pub fn syscall_timerfd_create(_ voidptr, clock_id int, flags int) (u64, u64) {
 
 	mut res := &resource.Resource(unsafe { timer })
 
-	mut open_flags := 0
+	mut open_flags := resource.o_rdwr
 	if flags & tfd_cloexec != 0 {
 		open_flags |= resource.o_cloexec
 	}

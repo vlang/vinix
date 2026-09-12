@@ -110,7 +110,8 @@ pub fn syscall_epoll_create1(_ voidptr, flags int) (u64, u64) {
 
 	mut r := &resource.Resource(unsafe { res })
 
-	open_flags := if flags & epoll_cloexec != 0 { resource.o_cloexec } else { 0 }
+	open_flags := resource.o_rdwr |
+		if flags & epoll_cloexec != 0 { resource.o_cloexec } else { 0 }
 
 	fdnum := fdnum_create_from_resource(unsafe { nil }, mut r, open_flags, 0, false) or {
 		return errno.err, errno.get()
