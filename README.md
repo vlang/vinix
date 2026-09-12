@@ -523,8 +523,8 @@ Chromium regression test boots:
 ./build-desktop-aarch64.sh --compact-initramfs --with-chromium
 ```
 
-Chromium is a much heavier guest than Firefox, and three kernel facilities were
-added for it:
+Chromium is a much heavier guest than Firefox, and four kernel facilities were
+added or repaired for it:
 
 - **procfs.** Chromium finds its own program through `/proc/self/exe` and
   re-executes it to start every child process, and each child checks that it is
@@ -544,6 +544,13 @@ added for it:
   abort — used to reach the kernel's fatal exception handler. It is now
   delivered as `SIGTRAP`, and any userspace fault with no handler terminates
   that process the way Linux does.
+- **Sockets are open for writing.** Every anonymous descriptor — socket,
+  socketpair, accepted connection, eventfd, timerfd, epoll, signalfd — was
+  created without an access mode, so it looked read-only and `write(2)` on it
+  was refused with `EBADF`. An X server answers its clients with `writev(2)`, so
+  it accepted each connection and then dropped it: no application on the machine
+  could open a window, Firefox included. They now carry `O_RDWR`, which is what
+  Linux gives them.
 
 Vinix implements neither user namespaces nor seccomp-bpf, so `run-chromium`
 turns off both layers of Chromium's Linux sandbox and starts child processes
@@ -552,10 +559,19 @@ back to the CPU Vulkan device in `chromium-swiftshader`; `VINIX_FORCE_SOFTWARE_G
 forces that path, and `VINIX_CHROMIUM_SINGLE_PROCESS=1` collapses the browser
 into one process, which is what separates an IPC failure from a rendering one.
 
+Both browsers render their full interface on the desktop's hosted X11 display.
+The bring-up tests boot QEMU, start a browser through the same bridge the
+compositor uses, and wait for a viewable top-level window:
+
 ```sh
-python3 tests/chromium/run_vm.py --package    # pkg install chromium, then run it
-python3 tests/chromium/run_vm.py              # drive a staged browser in QEMU
+python3 tests/browsers/run_vm.py              # Chromium
+python3 tests/browsers/run_vm.py --firefox    # Firefox
+python3 tests/browsers/run_vm.py --package    # pkg install chromium, then run it
 ```
+
+One thing to know about the images: a persistent `/root` volume shadows the copy
+of a file the image ships there, so the launchers take their start page from
+`/usr/share/vinix` instead.
 
 ### VirtIO-GPU acceleration with KekVM
 

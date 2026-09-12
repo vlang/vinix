@@ -102,6 +102,11 @@ install -m755 "$SCRIPT_DIR/tests/packages/blender-smoke.sh" \
     "$STAGING/root/blender-package-smoke.sh"
 install -m755 "$SCRIPT_DIR/tests/packages/sublime-smoke.sh" \
     "$STAGING/root/sublime-package-smoke.sh"
+# A persistent /root shadows the copy the image ships there, so the checker the
+# guest tests run lives under /usr/share as well.
+mkdir -p "$STAGING/usr/share/vinix"
+install -m755 "$SCRIPT_DIR/tests/packages/x-window-check.py" \
+    "$STAGING/usr/share/vinix/x-window-check.py"
 install -m755 "$SCRIPT_DIR/tests/packages/x-window-check.py" \
     "$STAGING/root/x-window-check.py"
 install -m755 "$SCRIPT_DIR/build-support/gimp/run-gimp" \
@@ -114,9 +119,9 @@ install -m755 "$SCRIPT_DIR/build-support/chromium/run-chromium" \
 install -m755 "$SCRIPT_DIR/tests/packages/chromium-smoke.sh" \
     "$STAGING/root/chromium-package-smoke.sh"
 mkdir -p "$STAGING/usr/share/vinix"
-install -m644 "$SCRIPT_DIR/tests/chromium/smoke.html" \
+install -m644 "$SCRIPT_DIR/tests/browsers/chromium-smoke.html" \
     "$STAGING/usr/share/vinix/chromium-smoke.html"
-install -m644 "$SCRIPT_DIR/tests/chromium/smoke.html" \
+install -m644 "$SCRIPT_DIR/tests/browsers/chromium-smoke.html" \
     "$STAGING/root/chromium-smoke.html"
 mkdir -p "$STAGING/etc/chromium/policies/managed"
 install -m644 "$SCRIPT_DIR/build-support/chromium/policies.json" \

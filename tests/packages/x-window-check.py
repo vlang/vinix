@@ -61,18 +61,59 @@ def configure_xlib(xlib):
     xlib.XFetchName.restype = ctypes.c_int
     xlib.XFree.argtypes = [ctypes.c_void_p]
     xlib.XFree.restype = ctypes.c_int
+    xlib.XInternAtom.argtypes = [Display, ctypes.c_char_p, ctypes.c_int]
+    xlib.XInternAtom.restype = ctypes.c_ulong
+    xlib.XGetWindowProperty.argtypes = [
+        Display,
+        Window,
+        ctypes.c_ulong,
+        ctypes.c_long,
+        ctypes.c_long,
+        ctypes.c_int,
+        ctypes.c_ulong,
+        ctypes.POINTER(ctypes.c_ulong),
+        ctypes.POINTER(ctypes.c_int),
+        ctypes.POINTER(ctypes.c_ulong),
+        ctypes.POINTER(ctypes.c_ulong),
+        ctypes.POINTER(ctypes.c_void_p),
+    ]
+    xlib.XGetWindowProperty.restype = ctypes.c_int
     xlib.XCloseDisplay.argtypes = [Display]
     xlib.XCloseDisplay.restype = ctypes.c_int
 
 
-def window_title(xlib, display, window):
-    title = ctypes.c_void_p()
-    if not xlib.XFetchName(display, window, ctypes.byref(title)) or not title.value:
+def net_wm_name(xlib, display, window):
+    """The UTF-8 title. Chromium sets only this one, not the legacy WM_NAME."""
+    name_atom = xlib.XInternAtom(display, b"_NET_WM_NAME", True)
+    utf8_atom = xlib.XInternAtom(display, b"UTF8_STRING", True)
+    if not name_atom or not utf8_atom:
+        return ""
+    actual_type = ctypes.c_ulong()
+    actual_format = ctypes.c_int()
+    items = ctypes.c_ulong()
+    remaining = ctypes.c_ulong()
+    data = ctypes.c_void_p()
+    status = xlib.XGetWindowProperty(
+        display, window, name_atom, 0, 1024, False, utf8_atom,
+        ctypes.byref(actual_type), ctypes.byref(actual_format),
+        ctypes.byref(items), ctypes.byref(remaining), ctypes.byref(data),
+    )
+    if status != 0 or not data.value:
         return ""
     try:
-        return ctypes.string_at(title.value).decode("utf-8", "replace")
+        return ctypes.string_at(data.value, items.value).decode("utf-8", "replace")
     finally:
-        xlib.XFree(title)
+        xlib.XFree(data)
+
+
+def window_title(xlib, display, window):
+    title = ctypes.c_void_p()
+    if xlib.XFetchName(display, window, ctypes.byref(title)) and title.value:
+        try:
+            return ctypes.string_at(title.value).decode("utf-8", "replace")
+        finally:
+            xlib.XFree(title)
+    return net_wm_name(xlib, display, window)
 
 
 def find_window(xlib, display, window, expected, depth=0):

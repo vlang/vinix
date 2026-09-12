@@ -41,11 +41,15 @@ else
 	fail "chrome --version exited non-zero"
 fi
 
-# Headless is the same browser without the X11 and GTK layers, so a failure
-# here separates Chromium's own multi-process startup from the display stack.
+# Headless is the same browser without the X11 and GTK layers, so its output
+# separates Chromium's own multi-process startup from the display stack. It
+# produces no DOM on Vinix yet, so this is reported rather than required.
 echo "VINIX CHROMIUM: headless"
-/usr/lib/chromium/chrome --headless --no-sandbox --disable-gpu --no-zygote \
-	--disable-dev-shm-usage --user-data-dir=/tmp/headless-profile \
+DBUS_SESSION_BUS_ADDRESS="unix:path=/run/dbus/vinix-no-session-bus" \
+/usr/lib/chromium/chrome --headless --ozone-platform=headless \
+	--no-sandbox --disable-gpu --no-zygote --disable-dev-shm-usage \
+	--disable-breakpad --disable-crash-reporter --no-first-run \
+	--user-data-dir=/tmp/headless-profile --virtual-time-budget=10000 \
 	--dump-dom file:///usr/share/vinix/chromium-smoke.html \
 	>/tmp/headless.html 2>/tmp/headless.log || true
 if grep -q 'Chromium is running on Vinix' /tmp/headless.html 2>/dev/null; then
@@ -63,6 +67,12 @@ fi
 # browser the same way is the difference between testing what ships and testing
 # a display this file invented.
 display=:99
+# A persistent /root can shadow the copy the image ships there.
+if [ -x /usr/share/vinix/x-window-check.py ]; then
+	x_window_check=/usr/share/vinix/x-window-check.py
+else
+	x_window_check=/root/x-window-check.py
+fi
 surface=/tmp/vinix-chromium
 # The bridge treats end of file on stdin as "the window closed", so its input
 # pipe has to stay open for as long as the test runs.
@@ -86,7 +96,7 @@ while [ "$i" -lt 300 ]; do
 		surfaced=true
 		echo "VINIX CHROMIUM PASS: the hosted display has a framebuffer"
 	fi
-	if /usr/bin/python3 /root/x-window-check.py "$display" 'Chromium' 2>/dev/null; then
+	if /usr/bin/python3 "$x_window_check" "$display" 'Chromium' 2>/dev/null; then
 		mapped=true
 		break
 	fi

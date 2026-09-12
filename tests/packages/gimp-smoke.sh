@@ -34,6 +34,12 @@ echo "PASS pkg installed GIMP and its GTK runtime"
 
 mkdir -p /tmp/.X11-unix /var/lib/xkb
 display=:10
+# A persistent /root can shadow the copy the image ships there.
+if [ -x /usr/share/vinix/x-window-check.py ]; then
+	x_window_check=/usr/share/vinix/x-window-check.py
+else
+	x_window_check=/root/x-window-check.py
+fi
 /usr/bin/Xorg "$display" +iglx -noreset \
 	</dev/null >/var/log/Xorg.gimp-package-test.log 2>&1 &
 xorg_pid=$!
@@ -67,7 +73,7 @@ while [ "$i" -lt 180 ]; do
 		echo "GIMP exited before showing its editor window" >&2
 		exit 1
 	fi
-	if /root/x-window-check.py "$display" 'GIMP'; then
+	if "$x_window_check" "$display" 'GIMP'; then
 		mapped=true
 		break
 	fi

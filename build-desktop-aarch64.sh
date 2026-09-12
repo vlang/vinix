@@ -564,14 +564,18 @@ install -m644 "$SCRIPT_DIR/build-support/gimp/vinix-gimprc" \
     "$STAGING/etc/gimp/2.0/vinix-gimprc"
 install -m644 "$SCRIPT_DIR/build-support/gimp/vinix-sessionrc" \
     "$STAGING/etc/gimp/2.0/vinix-sessionrc"
-install -m644 "$SCRIPT_DIR/tests/firefox/smoke.html" "$STAGING/root/firefox-smoke.html"
+install -m644 "$SCRIPT_DIR/tests/browsers/firefox-smoke.html" \
+    "$STAGING/usr/share/vinix/firefox-smoke.html"
+install -m644 "$SCRIPT_DIR/tests/browsers/firefox-smoke.html" "$STAGING/root/firefox-smoke.html"
 mkdir -p "$STAGING/etc/firefox/policies"
 install -m644 "$SCRIPT_DIR/build-support/firefox/policies.json" \
     "$STAGING/etc/firefox/policies/policies.json"
 install -m755 "$SCRIPT_DIR/build-support/chromium/run-chromium" "$STAGING/usr/bin/run-chromium"
-install -m644 "$SCRIPT_DIR/tests/chromium/smoke.html" \
+install -m644 "$SCRIPT_DIR/tests/browsers/chromium-smoke.html" \
     "$STAGING/usr/share/vinix/chromium-smoke.html"
-install -m644 "$SCRIPT_DIR/tests/chromium/smoke.html" "$STAGING/root/chromium-smoke.html"
+install -m755 "$SCRIPT_DIR/tests/packages/x-window-check.py" \
+    "$STAGING/usr/share/vinix/x-window-check.py"
+install -m644 "$SCRIPT_DIR/tests/browsers/chromium-smoke.html" "$STAGING/root/chromium-smoke.html"
 mkdir -p "$STAGING/etc/chromium/policies/managed"
 install -m644 "$SCRIPT_DIR/build-support/chromium/policies.json" \
     "$STAGING/etc/chromium/policies/managed/vinix.json"

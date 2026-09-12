@@ -68,7 +68,13 @@ else
 fi
 
 if [ "$#" -eq 0 ]; then
-    set -- file:///root/firefox-smoke.html
+    # A persistent /root shadows the copy the image ships there, so the start
+    # page the launcher relies on lives under /usr/share.
+    start_page=/usr/share/vinix/firefox-smoke.html
+    if [ ! -s "$start_page" ]; then
+        start_page=/root/firefox-smoke.html
+    fi
+    set -- "file://$start_page"
 fi
 
 if [ -n "${DISPLAY:-}" ]; then

@@ -40,7 +40,10 @@ export VINIX_CHROMIUM_PROFILE
 # Vinix has no AT-SPI bus, no session D-Bus and no keyring daemon. Each of
 # those otherwise costs a multi-second connection timeout during startup.
 export NO_AT_BRIDGE=1
-unset DBUS_SESSION_BUS_ADDRESS || true
+# Pointing at a socket that is not there is answered at once. Leaving this
+# unset sends Chromium down its autolaunch path, which retries for the life of
+# the browser and logs a parse failure every few seconds.
+export DBUS_SESSION_BUS_ADDRESS="unix:path=/run/dbus/vinix-no-session-bus"
 
 # Chromium's own crash handler re-executes the browser to collect a report.
 # Vinix has no crash-reporting endpoint, so keep the failure on the console.
@@ -88,6 +91,12 @@ if [ "${VINIX_FORCE_SOFTWARE_GL:-0}" != 1 ] &&
 else
     export LIBGL_ALWAYS_SOFTWARE=1
     if [ -e /usr/lib/chromium/libvk_swiftshader.so ]; then
+        # The bundled Vulkan loader looks for an installable client driver in
+        # the system directories, and chromium-swiftshader puts its manifest
+        # beside the library instead. Name it, or the loader reports that it
+        # found no drivers and the GPU process falls over.
+        export VK_ICD_FILENAMES=/usr/lib/chromium/vk_swiftshader_icd.json
+        export VK_DRIVER_FILES="$VK_ICD_FILENAMES"
         set -- --use-gl=angle --use-angle=swiftshader "$@"
     else
         set -- --disable-gpu --disable-software-rasterizer "$@"

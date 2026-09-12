@@ -38,6 +38,12 @@ echo "PASS $(cat /tmp/chromium-version.txt)"
 
 mkdir -p /tmp/.X11-unix /var/lib/xkb
 display=:12
+# A persistent /root can shadow the copy the image ships there.
+if [ -x /usr/share/vinix/x-window-check.py ]; then
+	x_window_check=/usr/share/vinix/x-window-check.py
+else
+	x_window_check=/root/x-window-check.py
+fi
 /usr/bin/Xorg "$display" +iglx -noreset \
 	</dev/null >/var/log/Xorg.chromium-package-test.log 2>&1 &
 xorg_pid=$!
@@ -71,7 +77,7 @@ while [ "$i" -lt 300 ]; do
 		echo "Chromium exited before showing its browser window" >&2
 		exit 1
 	fi
-	if /root/x-window-check.py "$display" 'Chromium'; then
+	if "$x_window_check" "$display" 'Chromium'; then
 		mapped=true
 		break
 	fi

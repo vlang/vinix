@@ -95,9 +95,9 @@ mkdir -p "$STAGING/usr/bin" "$STAGING/root" "$STAGING/usr/share/vinix" \
     "$STAGING/etc/chromium/policies/managed"
 install -m755 "$SCRIPT_DIR/build-support/chromium/run-chromium" \
     "$STAGING/usr/bin/run-chromium"
-install -m644 "$SCRIPT_DIR/tests/chromium/smoke.html" \
+install -m644 "$SCRIPT_DIR/tests/browsers/chromium-smoke.html" \
     "$STAGING/usr/share/vinix/chromium-smoke.html"
-install -m644 "$SCRIPT_DIR/tests/chromium/smoke.html" \
+install -m644 "$SCRIPT_DIR/tests/browsers/chromium-smoke.html" \
     "$STAGING/root/chromium-smoke.html"
 install -m644 "$SCRIPT_DIR/build-support/chromium/policies.json" \
     "$STAGING/etc/chromium/policies/managed/vinix.json"
