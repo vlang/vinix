@@ -38,7 +38,31 @@ fn collect_passed_fds(msg &sock_pub.MsgHdr) ?[]&file.FD {
 		}
 		header := unsafe { &CMsgHdr(voidptr(u64(msg.msg_control) + offset)) }
 		if header.cmsg_len < cmsg_header_size || header.cmsg_len > remaining
-			|| header.cmsg_level != sock_pub.sol_socket || header.cmsg_type != sock_pub.scm_rights
+			|| header.cmsg_level != sock_pub.sol_socket {
+			release_passed_fds(mut result)
+			errno.set(errno.einval)
+			return none
+		}
+
+		// A sender may attach its own identity beside the descriptors. Vinix
+		// hands the receiver the credentials captured when the connection was
+		// established, which is the check Linux performs on this record for an
+		// unprivileged sender, so the attached copy carries no new information.
+		if header.cmsg_type == sock_pub.scm_credentials {
+			if header.cmsg_len != cmsg_header_size + sizeof(sock_pub.UCred) {
+				release_passed_fds(mut result)
+				errno.set(errno.einval)
+				return none
+			}
+			next_credentials := (header.cmsg_len + cmsg_align - 1) & ~(cmsg_align - 1)
+			if next_credentials > remaining {
+				break
+			}
+			offset += next_credentials
+			continue
+		}
+
+		if header.cmsg_type != sock_pub.scm_rights
 			|| (header.cmsg_len - cmsg_header_size) % sizeof(int) != 0 {
 			release_passed_fds(mut result)
 			errno.set(errno.einval)

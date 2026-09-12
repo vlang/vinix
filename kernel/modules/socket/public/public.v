@@ -48,6 +48,11 @@ pub const sol_socket = 1
 
 pub const scm_rights = 1
 
+// SCM_CREDENTIALS carries a struct ucred. A receiver asks for it with
+// SO_PASSCRED; a sender may also attach one, which Linux checks against its own
+// identity before delivering.
+pub const scm_credentials = 2
+
 pub const so_reuseaddr = 2
 
 pub const so_type = 3
@@ -67,6 +72,8 @@ pub const so_oobinline = 10
 pub const so_linger = 13
 
 pub const so_reuseport = 15
+
+pub const so_passcred = 16
 
 pub const so_peercred = 17
 

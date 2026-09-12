@@ -92,6 +92,10 @@ pub mut:
 	reuseaddr int
 	keepalive int
 	broadcast int
+	// SO_PASSCRED: every recvmsg on this socket is given the peer's identity as
+	// an SCM_CREDENTIALS record. Crashpad, D-Bus and systemd-style services use
+	// it to find out who is on the other end of a connection they accepted.
+	passcred int
 
 	data      &u8 = unsafe { nil }
 	read_ptr  u64
@@ -453,6 +457,9 @@ fn (mut this UnixSocket) getsockopt(_handle voidptr, level int, optname int) ?in
 		sock_pub.so_broadcast {
 			return this.broadcast
 		}
+		sock_pub.so_passcred {
+			return this.passcred
+		}
 		else {
 			errno.set(errno.enoprotoopt)
 			return none
@@ -489,6 +496,9 @@ fn (mut this UnixSocket) setsockopt(_handle voidptr, level int, optname int, val
 		}
 		sock_pub.so_broadcast {
 			this.broadcast = value
+		}
+		sock_pub.so_passcred {
+			this.passcred = value
 		}
 		sock_pub.so_sndbuf, sock_pub.so_rcvbuf, sock_pub.so_linger, sock_pub.so_oobinline {}
 		else {
@@ -799,25 +809,57 @@ fn (mut this UnixSocket) recvmsg(_handle voidptr, msg &sock_pub.MsgHdr, flags in
 	this.read_ptr = new_ptr_loc
 	this.used -= transferred
 
-	// Linux cmsghdr is 16 bytes on aarch64: size_t, level, type. Return as
-	// many queued SCM_RIGHTS descriptors as fit in the caller's control buffer.
+	// Linux cmsghdr is 16 bytes on aarch64: size_t, level, type. Records are
+	// written in the order the kernel produces them: the peer's credentials
+	// first when SO_PASSCRED asked for them, then any queued SCM_RIGHTS
+	// descriptors that still fit in the caller's control buffer.
 	control_capacity := msg.msg_controllen
 	unsafe {
 		msg.msg_controllen = 0
 		msg.msg_flags = 0
 	}
+	mut control_used := u64(0)
+	if this.passcred != 0 && msg.msg_control != unsafe { nil } {
+		cmsg_len := cmsg_header_size + sizeof(sock_pub.UCred)
+		cmsg_space := (cmsg_len + cmsg_align - 1) & ~(cmsg_align - 1)
+		if cmsg_space <= control_capacity {
+			// A connected stream never changes identity, so the credentials
+			// captured when the connection was established are the sending
+			// process's own.
+			credentials := sock_pub.UCred{
+				pid: this.peer_pid
+				uid: this.peer_uid
+				gid: this.peer_gid
+			}
+			control := unsafe { &u8(msg.msg_control) }
+			unsafe {
+				*(&u64(control)) = cmsg_len
+				*(&int(voidptr(u64(control) + 8))) = sock_pub.sol_socket
+				*(&int(voidptr(u64(control) + 12))) = sock_pub.scm_credentials
+				C.memcpy(voidptr(u64(control) + cmsg_header_size), &credentials,
+					sizeof(sock_pub.UCred))
+			}
+			control_used = cmsg_space
+			unsafe {
+				msg.msg_controllen = control_used
+			}
+		} else {
+			unsafe { msg.msg_flags |= msg_ctrunc }
+		}
+	}
 	if deliver_fd_group {
 		mut pending_fds := unsafe { this.pending_fd_groups[0].fds }
+		remaining_control := control_capacity - control_used
 		mut capacity_fds := u64(0)
-		if msg.msg_control != unsafe { nil } && control_capacity >= cmsg_header_size + sizeof(int) {
-			capacity_fds = (control_capacity - cmsg_header_size) / sizeof(int)
+		if msg.msg_control != unsafe { nil } && remaining_control >= cmsg_header_size + sizeof(int) {
+			capacity_fds = (remaining_control - cmsg_header_size) / sizeof(int)
 			// msg_controllen includes the cmsghdr's trailing alignment. A
 			// CMSG_LEN-sized buffer can hold the bytes but cannot represent a
 			// complete ancillary record, so report truncation instead.
 			for capacity_fds > 0 {
 				cmsg_len := cmsg_header_size + capacity_fds * sizeof(int)
 				cmsg_space := (cmsg_len + cmsg_align - 1) & ~(cmsg_align - 1)
-				if cmsg_space <= control_capacity {
+				if cmsg_space <= remaining_control {
 					break
 				}
 				capacity_fds--
@@ -830,7 +872,7 @@ fn (mut this UnixSocket) recvmsg(_handle voidptr, msg &sock_pub.MsgHdr, flags in
 		}
 
 		if deliver != 0 {
-			control := unsafe { &u8(msg.msg_control) }
+			control := unsafe { &u8(voidptr(u64(msg.msg_control) + control_used)) }
 			unsafe {
 				*(&u64(control)) = cmsg_header_size + deliver * sizeof(int)
 				*(&int(voidptr(u64(control) + 8))) = sock_pub.sol_socket
@@ -857,7 +899,8 @@ fn (mut this UnixSocket) recvmsg(_handle voidptr, msg &sock_pub.MsgHdr, flags in
 				cmsg_len := cmsg_header_size + installed * sizeof(int)
 				unsafe {
 					*(&u64(control)) = cmsg_len
-					msg.msg_controllen = (cmsg_len + cmsg_align - 1) & ~(cmsg_align - 1)
+					msg.msg_controllen = control_used +
+						((cmsg_len + cmsg_align - 1) & ~(cmsg_align - 1))
 				}
 			}
 			deliver = installed
