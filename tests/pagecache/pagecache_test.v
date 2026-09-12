@@ -59,6 +59,18 @@ fn write_bytes(mut cache Cache, d &Device, loc int, bytes []u8) {
 	assert got == bytes.len
 }
 
+// The cache keeps residency as an intrusive list, so a test that cares about
+// eviction order walks it rather than indexing an array.
+fn resident_pages(cache &Cache) []&Page {
+	mut ordered := []&Page{}
+	mut page := cache.lru_first
+	for page != unsafe { nil } {
+		ordered << page
+		page = page.lru_next
+	}
+	return ordered
+}
+
 fn test_hits_cross_page_writes_and_writeback() {
 	mut d := device(3 * 4096)
 	mut cache := Cache{capacity: 3}
@@ -106,7 +118,7 @@ fn test_failed_and_short_fills_are_not_published() {
 		mut failed := false
 		cache.read(voidptr(d), load, store, &out, 0, 1, 4096) or { failed = true }
 		assert failed
-		assert cache.pages.len == 0
+		assert cache.resident == 0
 	}
 	d.fail_read = false
 	d.short_read = false
@@ -125,12 +137,12 @@ fn test_failed_eviction_retains_dirty_victim_and_retry() {
 	mut failed := false
 	cache.read(voidptr(d), load, store, &out, 4096, 1, 8192) or { failed = true }
 	assert failed
-	assert cache.pages.len == 1 && cache.pages[0].index == 0 && cache.pages[0].dirty
+	assert cache.resident == 1 && resident_pages(cache)[0].index == 0 && resident_pages(cache)[0].dirty
 	assert read_bytes(mut cache, d, 0, 4096) == payload
 	d.fail_write = false
 	assert read_bytes(mut cache, d, 4096, 1) == d.bytes[4096..4097]
 	assert d.bytes[..4096] == payload
-	assert cache.pages.len == 1 && cache.pages[0].index == 1
+	assert cache.resident == 1 && resident_pages(cache)[0].index == 1
 }
 
 fn test_failed_and_short_sync_are_retryable() {
@@ -144,14 +156,14 @@ fn test_failed_and_short_sync_are_retryable() {
 		d.short_write = short
 		mut failed := false
 		cache.sync(voidptr(d), store) or { failed = true }
-		assert failed && cache.pages[0].dirty
+		assert failed && resident_pages(cache)[0].dirty
 		assert read_bytes(mut cache, d, 0, 4096) == payload
 	}
 	d.fail_write = false
 	d.short_write = false
 	cache.sync(voidptr(d), store) or { panic('retry failed') }
 	assert d.bytes == payload
-	assert !cache.pages[0].dirty
+	assert !resident_pages(cache)[0].dirty
 }
 
 fn test_discard_preserves_dirty_and_partial_pages() {
@@ -160,13 +172,13 @@ fn test_discard_preserves_dirty_and_partial_pages() {
 	defer { cache.release(voidptr(d), store) or { panic('release failed') } }
 	read_bytes(mut cache, d, 0, 8192)
 	cache.discard(1, 8190)
-	assert cache.pages.len == 2
+	assert cache.resident == 2
 	write_bytes(mut cache, d, 0, [u8(99)])
 	cache.discard(0, 8192)
-	assert cache.pages.len == 1 && cache.pages[0].dirty
+	assert cache.resident == 1 && resident_pages(cache)[0].dirty
 	cache.sync(voidptr(d), store) or { panic('sync failed') }
 	cache.discard(0, 8192)
-	assert cache.pages.len == 0
+	assert cache.resident == 0
 	reads := d.reads
 	assert read_bytes(mut cache, d, 0, 1) == [u8(99)]
 	assert d.reads == reads + 1
@@ -178,15 +190,15 @@ fn test_reclaim_drops_only_clean_lru_pages() {
 	assert read_bytes(mut cache, d, 0, 1)[0] == d.bytes[0]
 	assert read_bytes(mut cache, d, 4096, 1)[0] == d.bytes[4096]
 	write_bytes(mut cache, d, 8192, [u8(0xaa)])
-	assert cache.pages.len == 3
+	assert cache.resident == 3
 	assert cache.reclaim_clean(1) == 1
-	assert cache.pages.len == 2
-	assert cache.pages[0].index == 1
-	assert cache.pages[1].index == 2
-	assert cache.pages[1].dirty
+	assert cache.resident == 2
+	assert resident_pages(cache)[0].index == 1
+	assert resident_pages(cache)[1].index == 2
+	assert resident_pages(cache)[1].dirty
 	assert cache.reclaim_clean(8) == 1
-	assert cache.pages.len == 1
-	assert cache.pages[0].dirty
+	assert cache.resident == 1
+	assert resident_pages(cache)[0].dirty
 	cache.release(voidptr(d), store) or { panic('release failed') }
 }
 
@@ -195,16 +207,16 @@ fn test_lru_and_bounded_prefetch() {
 	mut cache := Cache{capacity: 2}
 	defer { cache.release(voidptr(d), store) or { panic('release failed') } }
 	cache.prefetch(voidptr(d), load, store, 0, u64(d.bytes.len), u64(d.bytes.len))
-	assert cache.pages.len == 2 && d.reads == 2
+	assert cache.resident == 2 && d.reads == 2
 	read_bytes(mut cache, d, 0, 1)
 	read_bytes(mut cache, d, 8192, 1)
-	assert cache.pages[0].index == 0 && cache.pages[1].index == 2
+	assert resident_pages(cache)[0].index == 0 && resident_pages(cache)[1].index == 2
 	write_bytes(mut cache, d, 0, [u8(7)])
 	read_bytes(mut cache, d, 8192, 1) // Dirty page is now LRU.
 	reads := d.reads
 	cache.prefetch(voidptr(d), load, store, 12288, 4096, u64(d.bytes.len))
 	assert d.reads == reads && d.writes == 0
-	assert cache.pages.len == 2
+	assert cache.resident == 2
 }
 
 fn test_bounds_binding_zero_length_and_release_failure() {
@@ -225,10 +237,10 @@ fn test_bounds_binding_zero_length_and_release_failure() {
 	d.fail_write = true
 	failed = false
 	cache.release(voidptr(d), store) or { failed = true }
-	assert failed && cache.pages.len == 1 && cache.pages[0].dirty
+	assert failed && cache.resident == 1 && cache.lru_first.dirty
 	d.fail_write = false
 	cache.release(voidptr(d), store) or { panic('release retry failed') }
-	assert cache.pages.len == 0
+	assert cache.resident == 0
 	assert read_bytes(mut cache, other, 0, 1) == other.bytes[..1]
 	cache.release(voidptr(other), store) or { panic('release failed') }
 }
@@ -254,7 +266,7 @@ fn test_randomized_transfers_match_byte_model_under_pressure() {
 		}
 		if step % 23 == 0 { cache.sync(voidptr(d), store) or { panic('sync failed') } }
 		if step % 27 == 0 { cache.discard(0, u64(expected.len)) }
-		assert cache.pages.len <= 3
+		assert cache.resident <= 3
 	}
 	cache.release(voidptr(d), store) or { panic('release failed') }
 	assert d.bytes == expected
