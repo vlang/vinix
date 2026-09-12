@@ -832,6 +832,9 @@ fn desktop_spawn_wine_host(directory string, width int, height int, command stri
 
 	display_name := ':${C.getpid()}'
 	geometry := '${width}x${height}x24'
+	// Beside the surface directory rather than inside it: the host makes that
+	// directory itself, after this log has to be open.
+	log_path := '${directory}.log'
 	argv := [&char(host.str), &char(display_name.str), &char(directory.str), &char(geometry.str),
 		&char(command.str), &char(unsafe { nil })]
 	path_entry := 'PATH=${desktop_command_path}'
@@ -847,6 +850,7 @@ fn desktop_spawn_wine_host(directory string, width int, height int, command stri
 		unsafe {
 			display_name.free()
 			geometry.free()
+			log_path.free()
 			path_entry.free()
 			argv.free()
 			envp.free()
@@ -857,6 +861,18 @@ fn desktop_spawn_wine_host(directory string, width int, height int, command stri
 		C.dup2(input[0], C.STDIN_FILENO)
 		C.close(input[0])
 		C.close(input[1])
+		// A hosted application's diagnostics belong in a file beside its
+		// framebuffer, not on the system console: the desktop owns the screen
+		// the console writes to, and a browser is talkative enough that
+		// rendering its warnings as console text costs more than running it.
+		log_fd := desktop_create_truncated(log_path)
+		if log_fd >= 0 {
+			C.dup2(log_fd, C.STDOUT_FILENO)
+			C.dup2(log_fd, C.STDERR_FILENO)
+			if log_fd > C.STDERR_FILENO {
+				C.close(log_fd)
+			}
+		}
 		C.execve(&char(host.str), argv.data, envp.data)
 		C._exit(127)
 	}
@@ -864,6 +880,7 @@ fn desktop_spawn_wine_host(directory string, width int, height int, command stri
 	unsafe {
 		display_name.free()
 		geometry.free()
+		log_path.free()
 		path_entry.free()
 		argv.free()
 		envp.free()
