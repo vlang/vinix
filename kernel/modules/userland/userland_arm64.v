@@ -10,6 +10,7 @@ import proc
 import aarch64.cpu.local as cpulocal
 import aarch64.cpu
 import katomic
+import posixtimer
 import errno
 import lib
 import strings
@@ -274,6 +275,8 @@ fn dispatch_a_signal_with_fault(context &cpulocal.GPRState, synchronous bool, fa
 	if which == -1 {
 		return
 	}
+	timer_info := posixtimer.signal_info(t, which)
+	posixtimer.acknowledge_signal(mut t, which)
 
 	sigaction := t.sigactions[which]
 	handler := sigaction.sa_sigaction
@@ -381,7 +384,9 @@ fn dispatch_a_signal_with_fault(context &cpulocal.GPRState, synchronous bool, fa
 				// siginfo_t: signo, errno, positive si_code, then si_addr. Linux
 				// distinguishes an unmapped page from a permission-protected one.
 				*&int(info_address) = which
-				*&int(info_address + 8) = if synchronous && (fault_esr & 0x3f) >= 0x0c {
+				*&int(info_address + 8) = if timer_info.found {
+					timer_info.code
+				} else if synchronous && (fault_esr & 0x3f) >= 0x0c {
 					2 // SEGV_ACCERR
 				} else if synchronous {
 					1 // SEGV_MAPERR (also the first positive code for other faults)
@@ -389,6 +394,10 @@ fn dispatch_a_signal_with_fault(context &cpulocal.GPRState, synchronous bool, fa
 					0
 				}
 				*&u64(info_address + 16) = fault_address
+				if timer_info.found {
+					*&int(info_address + 20) = timer_info.overrun
+					*&u64(info_address + 24) = timer_info.value
+				}
 
 				// musl AArch64 ucontext_t offsets. The signal mask begins at 40;
 				// its 128 bytes are followed by eight bytes of alignment before
@@ -485,6 +494,7 @@ pub fn sendsig(_thread &proc.Thread, signal u8) {
 		return
 	}
 
+	posixtimer.clear_signal_info(mut t, int(signal))
 	katomic.bts(mut &t.pending_signals, signal - 1)
 
 	// Try to stop an event_await()
@@ -782,6 +792,7 @@ pub fn start_program(execve bool, dir &fs.VFSNode, path string, argv []string, e
 		// Every other thread has to be off the CPUs before the address space
 		// they are running in is replaced.
 		kill_sibling_threads(mut curr_process, t)
+		posixtimer.remove_process_timers(curr_process)
 
 		mut old_pagemap := curr_process.pagemap
 

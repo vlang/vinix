@@ -10,6 +10,7 @@ import errno
 import event
 import event.eventstruct
 import katomic
+import posixtimer
 import proc
 import time
 import usercopy
@@ -270,11 +271,12 @@ pub fn syscall_rt_sigtimedwait(_ voidptr, set_ptr u64, info_ptr u64, timeout_ptr
 
 	for {
 		if which := take_pending(mut current_thread, wanted) {
-			if info_ptr != 0 && !write_signal_info(info_ptr, which) {
+			if info_ptr != 0 && !write_signal_info(info_ptr, current_thread, which) {
 				// Hand the signal back rather than losing it.
 				katomic.bts(mut &current_thread.pending_signals, u8(which - 1))
 				return errno.err, errno.efault
 			}
+			posixtimer.acknowledge_signal(mut current_thread, which)
 			return u64(which), 0
 		}
 
@@ -315,15 +317,20 @@ fn take_pending(mut t proc.Thread, wanted u64) ?int {
 	return none
 }
 
-// The 128-byte siginfo_t, filled in the shape a synchronously accepted signal
-// gets: SI_USER, no sender recorded.
-fn write_signal_info(info_ptr u64, signum int) bool {
+// The 128-byte siginfo_t for a synchronously accepted signal. Ordinary signals
+// use SI_USER; POSIX timers retain SI_TIMER, their value, and overrun count.
+fn write_signal_info(info_ptr u64, thrd &proc.Thread, signum int) bool {
 	mut raw := [16]u64{}
+	timer_info := posixtimer.signal_info(thrd, signum)
 	unsafe {
 		mut words := &u32(&raw[0])
 		words[0] = u32(signum) // si_signo
 		words[1] = 0 // si_errno
-		words[2] = 0 // si_code = SI_USER
+		words[2] = u32(timer_info.code) // SI_USER or SI_TIMER
+		if timer_info.found {
+			words[5] = u32(timer_info.overrun) // si_overrun
+			*&u64(u64(&raw[0]) + 24) = timer_info.value // si_value
+		}
 	}
 	return usercopy.copy_to_user(info_ptr, voidptr(&raw[0]), 128)
 }

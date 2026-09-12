@@ -39,6 +39,11 @@ pub mut:
 	pending_signals    u64
 	masked_signals     u64
 	enqueued_by_signal bool
+	// Per-signal origin data for Linux siginfo_t. Ordinary signals keep these
+	// zero; POSIX timers populate them until delivery consumes the pending bit.
+	pending_signal_codes    [64]int
+	pending_signal_values   [64]u64
+	pending_signal_overruns [64]int
 	stacks             []voidptr
 	signalfds_lock     klock.Lock
 	signalfds          []voidptr

@@ -35,6 +35,13 @@ static const char *file_b = "/root/vinix-qemu-core/b";
 static const char *file_c = "/root/vinix-qemu-core/c";
 static const char *persist_file = "/root/vinix-qemu-core/persist";
 static const char persist_payload[] = "vinix-ext2-cache-writeback-v1";
+static volatile sig_atomic_t posix_timer_callbacks;
+
+static void posix_timer_callback(union sigval value)
+{
+	if (value.sival_int == 0x5649)
+		posix_timer_callbacks++;
+}
 
 static int reap_ok(pid_t child)
 {
@@ -318,6 +325,31 @@ static int test_scheduler_and_accounting(void)
 	return 0;
 }
 
+static int test_posix_timer_thread_notification(void)
+{
+	timer_t timer;
+	struct sigevent notification = {
+		.sigev_notify = SIGEV_THREAD,
+		.sigev_notify_function = posix_timer_callback,
+		.sigev_value.sival_int = 0x5649,
+	};
+	CHECK(timer_create(CLOCK_MONOTONIC, &notification, &timer) == 0);
+	struct itimerspec setting = {
+		.it_value = {.tv_nsec = 20000000},
+	};
+	CHECK(timer_settime(timer, 0, &setting, NULL) == 0);
+	for (int attempt = 0; attempt < 100 && posix_timer_callbacks == 0; ++attempt)
+		nanosleep(&(struct timespec){.tv_nsec = 10000000}, NULL);
+	CHECK(posix_timer_callbacks == 1);
+	struct itimerspec current;
+	CHECK(timer_gettime(timer, &current) == 0);
+	CHECK(current.it_value.tv_sec == 0 && current.it_value.tv_nsec == 0);
+	CHECK(timer_getoverrun(timer) == 0);
+	CHECK(timer_delete(timer) == 0);
+	puts("QEMU CORE PASS: POSIX SIGEV_THREAD timer notification");
+	return 0;
+}
+
 static int run_tests(void)
 {
 	int persistence_boot = verify_persistence_boot();
@@ -332,6 +364,7 @@ static int run_tests(void)
 	CHECK(test_permissions_and_limits() == 0);
 	CHECK(test_inotify() == 0);
 	CHECK(test_scheduler_and_accounting() == 0);
+	CHECK(test_posix_timer_thread_notification() == 0);
 	CHECK(unlink(file_a) == 0);
 	CHECK(unlink(file_b) == 0);
 	CHECK(unlink(file_c) == 0);

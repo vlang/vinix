@@ -7,6 +7,7 @@ import aarch64.cpu
 import userland
 import futex
 import pipe
+import posixtimer
 import socket
 import socket.public as sock_pub
 import memory.mmap
@@ -1095,6 +1096,11 @@ pub fn init_syscall_table() {
 	syscall_table[88] = voidptr(fs.syscall_utimensat) // __NR_utimensat
 	syscall_table[102] = voidptr(syscall_linux_getitimer) // __NR_getitimer
 	syscall_table[103] = voidptr(syscall_linux_setitimer) // __NR_setitimer
+	syscall_table[107] = voidptr(posixtimer.syscall_timer_create) // __NR_timer_create
+	syscall_table[108] = voidptr(posixtimer.syscall_timer_gettime) // __NR_timer_gettime
+	syscall_table[109] = voidptr(posixtimer.syscall_timer_getoverrun) // __NR_timer_getoverrun
+	syscall_table[110] = voidptr(posixtimer.syscall_timer_settime) // __NR_timer_settime
+	syscall_table[111] = voidptr(posixtimer.syscall_timer_delete) // __NR_timer_delete
 	syscall_table[153] = voidptr(syscall_linux_times) // __NR_times
 	syscall_table[154] = voidptr(syscall_linux_setpgid) // __NR_setpgid
 	syscall_table[155] = voidptr(syscall_linux_getpgid) // __NR_getpgid
