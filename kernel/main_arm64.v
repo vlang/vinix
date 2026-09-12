@@ -29,6 +29,7 @@ import stat
 import pipe
 import futex
 import socket
+import socket.inet
 import limine
 import event
 import event.eventstruct
@@ -332,6 +333,9 @@ fn writeback_thread() {
 		// A device that cannot take the write keeps its pages dirty and
 		// retryable, so the next round tries again rather than giving up.
 		pagecache.sync_all()
+		// DHCP runs from the scheduler's poll callback, which cannot write to
+		// the root filesystem. This is a thread that can.
+		inet.publish_resolver()
 	}
 }
 

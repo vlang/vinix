@@ -64,6 +64,8 @@ static int link_attached;
 static int active_driver;
 static uint8_t active_mac[6];
 static uint32_t clock_ms;
+static uint32_t clock_anchor_ms;
+static int clock_anchored;
 static uint32_t random_state = 0x6d2b79f5U;
 
 static int linux_error(err_t error) {
@@ -379,7 +381,21 @@ void vinix_net_poll(uint32_t now_ms) {
     if (!stack_initialised) {
         return;
     }
-    clock_ms = now_ms;
+    /* lwIP wants milliseconds that start near zero and only go up. Vinix's
+     * monotonic clock is seeded from the platform's idea of elapsed time and is
+     * already a few weeks along at boot, so feeding it in raw put every timer
+     * lwip_init() had scheduled -- at a sys_now() of 0 -- more than 2^31 ms in
+     * the past, which its wraparound-safe comparison reads as far in the
+     * future. No cyclic timer ever fired: DHCP sent its DISCOVER and REQUEST
+     * from the receive path, then sat in CHECKING for ever because the address
+     * conflict check is timer-driven, and the machine never got a lease.
+     *
+     * Anchor the clock at the first sample instead. */
+    if (!clock_anchored) {
+        clock_anchor_ms = now_ms;
+        clock_anchored = 1;
+    }
+    clock_ms = now_ms - clock_anchor_ms;
     sys_check_timeouts();
     netif_poll_all();
 }

@@ -86,6 +86,10 @@ __global (
 	sockets        [max_sockets]voidptr
 	network_ready  = false
 	last_address   = u32(0)
+	// Whether the resolver file has actually reached the root init will see,
+	// and the text waiting to be written there.
+	resolver_published = false
+	pending_resolver   = ''
 )
 
 pub fn initialise() {
@@ -167,11 +171,14 @@ pub fn poll() {
 	refresh_registered_sockets()
 	net_lock.release()
 
-	if has_configuration && (!network_ready || address != last_address) {
+	if has_configuration && (!resolver_published || address != last_address) {
+		// print(), not the C printf this used: that one is compiled out of a
+		// PROD kernel, so the one line that says whether the machine has an
+		// address was invisible in exactly the builds anyone debugs.
+		if !network_ready {
+			print('net: DHCP lease ${address & 0xff}.${(address >> 8) & 0xff}.${(address >> 16) & 0xff}.${address >> 24}\n')
+		}
 		network_ready = true
-		last_address = address
-		C.printf(c'net: DHCP lease %u.%u.%u.%u\n', address & 0xff, (address >> 8) & 0xff,
-			(address >> 16) & 0xff, (address >> 24) & 0xff)
 		mut contents := ''
 		for server in dns {
 			if server != 0 {
@@ -179,7 +186,28 @@ pub fn poll() {
 			}
 		}
 		contents += 'options attempts:2 timeout:2\n'
-		fs.write_kernel_file('/etc/resolv.conf', contents.str, u64(contents.len))
+		// This runs from the scheduler's poll callback, which is no place to
+		// walk the VFS and write to a disk-backed root. Leave the text for
+		// publish_resolver(), which a kernel thread calls.
+		pending_resolver = contents
+		last_address = address
+	}
+}
+
+// Write out the resolver list DHCP produced, from a context that is allowed to
+// touch the filesystem. DHCP finishes long before the system volume is mounted,
+// so the first attempts land on a root that has no /etc and is about to be
+// replaced; the text is kept until a write succeeds. Publishing it once and
+// latching left the machine with no resolver at all after the root moved to
+// disk, and every package operation failed with "DHCP did not create
+// /etc/resolv.conf" on a machine whose network was working.
+pub fn publish_resolver() {
+	if resolver_published || pending_resolver.len == 0 {
+		return
+	}
+	contents := pending_resolver
+	if fs.write_kernel_file('/etc/resolv.conf', contents.str, u64(contents.len)) {
+		resolver_published = true
 	}
 }
 
@@ -196,6 +224,8 @@ pub fn detach() {
 	net_lock.release()
 	network_ready = false
 	last_address = 0
+	resolver_published = false
+	pending_resolver = ''
 }
 
 pub fn receive(frame voidptr, length u64) bool {
