@@ -311,7 +311,14 @@ def lay_out(
             continue
         member_size, member_align = size_align(member.type_text, structs, consts, target)
         offset = (offset + member_align - 1) & ~(member_align - 1)
-        fields.append({"name": member.name, "offset": offset, "size": member_size})
+        fields.append(
+            {
+                "name": member.name,
+                "offset": offset,
+                "size": member_size,
+                "type": member.type_text.strip().replace("::ver", ""),
+            }
+        )
         offset += member_size
         alignment = max(alignment, member_align)
     size = (offset + alignment - 1) & ~(alignment - 1)
@@ -366,6 +373,104 @@ def verify_encoded_offsets(layouts: dict[str, dict]) -> list[str]:
     return problems
 
 
+# The builders in these files address their structure by bare 12.3 offsets.
+# Every one has to be re-pointed at 13.5, so read them rather than maintaining a
+# second list that can drift from the code it describes.
+REMAPPED = (
+    ("hwdata_a", "HwDataA", "initdata_g13_hwdata_a.v", "g13_hwdata_a_put_u32"),
+    ("globals", "Globals", "initdata_g13_globals.v", "g13_globals_put_u32"),
+)
+KERNEL_FW = Path(__file__).resolve().parents[2] / "kernel/modules/gpu/agx/fw"
+
+
+def written_offsets(source_file: Path, helper: str) -> list[int]:
+    text = source_file.read_text()
+    found = re.findall(re.escape(helper) + r"\(mut data, (0x[0-9a-fA-F]+)", text)
+    return sorted({int(value, 16) for value in found})
+
+
+def translate_offset(
+    offset: int,
+    old_layout: dict,
+    new_layout: dict,
+    structs: dict[str, Struct],
+    consts: dict[str, VersionedConst],
+    path: str,
+) -> int:
+    """Map one 12.3 offset to 13.5 through whatever field holds it.
+
+    An offset landing inside a nested structure has to be followed into it: the
+    two Globals writes that reach into GlobalsSub straddle a field 13.5 inserts,
+    so treating the containing field as opaque would move one of them twelve
+    bytes off target. Only genuinely opaque fields -- arrays and padding -- are
+    translated by adding the offset back, and only while they keep their size.
+    """
+    by_offset = {f["offset"]: f for f in old_layout["fields"]}
+    new_by_name = {f["name"]: f for f in new_layout["fields"]}
+
+    member = by_offset.get(offset)
+    if member is None:
+        owners = [
+            f
+            for f in old_layout["fields"]
+            if f["offset"] <= offset < f["offset"] + f["size"]
+        ]
+        if not owners:
+            raise LayoutError(f"{path}: {offset:#x} addresses no field at 12.3")
+        member = owners[-1]
+
+    replacement = new_by_name.get(member["name"])
+    if replacement is None:
+        raise LayoutError(
+            f"{path}: {offset:#x} is {member['name']}, which 13.5 removed"
+        )
+    delta = offset - member["offset"]
+    if delta == 0:
+        return replacement["offset"]
+
+    if member["type"] in structs:
+        inner = translate_offset(
+            delta,
+            lay_out(member["type"], structs, consts, {"G": "G13", "V": "V12_3"}),
+            lay_out(member["type"], structs, consts, {"G": "G13", "V": "V13_5"}),
+            structs,
+            consts,
+            f"{path}.{member['name']}",
+        )
+        return replacement["offset"] + inner
+
+    if replacement["size"] != member["size"]:
+        raise LayoutError(
+            f"{path}: {offset:#x} is {delta:#x} into {member['name']}, which changes "
+            f"size {member['size']:#x} -> {replacement['size']:#x}"
+        )
+    return replacement["offset"] + delta
+
+
+def remap(
+    offsets: list[int],
+    old_layout: dict,
+    new_layout: dict,
+    structs: dict[str, Struct],
+    consts: dict[str, VersionedConst],
+    struct: str,
+) -> tuple[list[tuple[int, int]], list[str]]:
+    pairs, problems = [], []
+    for offset in offsets:
+        try:
+            pairs.append(
+                (
+                    offset,
+                    translate_offset(
+                        offset, old_layout, new_layout, structs, consts, struct
+                    ),
+                )
+            )
+        except LayoutError as error:
+            problems.append(str(error))
+    return pairs, problems
+
+
 def generate(raw_rs: Path) -> str:
     structs, consts = parse(raw_rs.read_text())
     per_target = {}
@@ -394,6 +499,29 @@ def generate(raw_rs: Path) -> str:
             + "\n  ".join(problems)
         )
 
+    remaps = {}
+    remap_problems: list[str] = []
+    for label, struct, source_name, helper in REMAPPED:
+        source_file = KERNEL_FW / source_name
+        if not source_file.is_file():
+            remap_problems.append(f"missing {source_file}")
+            continue
+        offsets = written_offsets(source_file, helper)
+        pairs, problems = remap(
+            offsets,
+            lay_out(struct, structs, consts, {"G": "G13", "V": "V12_3"}),
+            lay_out(struct, structs, consts, {"G": "G13", "V": "V13_5"}),
+            structs,
+            consts,
+            struct,
+        )
+        remaps[label] = pairs
+        remap_problems += problems
+    if remap_problems:
+        raise LayoutError(
+            "cannot re-point every 12.3 offset at 13.5:\n  " + "\n  ".join(remap_problems)
+        )
+
     lines = [
         "// SPDX-License-Identifier: GPL-2.0-or-later",
         "// Copyright (c) 2026 Alexander Medvednikov",
@@ -417,6 +545,18 @@ def generate(raw_rs: Path) -> str:
             lines.append(
                 f"pub const g13_{label}_{snake}_size = u64({target[name]['size']:#x})"
             )
+        lines.append("")
+
+    lines += [
+        "// Where each offset the 12.3 builders write moves to at 13.5. The two",
+        "// arrays are index-matched, sorted by the 12.3 offset, and cover exactly",
+        "// the offsets those builders address -- generation fails if one of them",
+        "// names a field 13.5 removed or reshaped.",
+    ]
+    for label, pairs in remaps.items():
+        for suffix, column in (("v12_3", 0), ("v13_5", 1)):
+            values = ", ".join(f"u32({pair[column]:#x})" for pair in pairs)
+            lines.append(f"pub const g13_{label}_offsets_{suffix} = [{values}]!")
         lines.append("")
     return "\n".join(lines) + "\n"
 
