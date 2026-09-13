@@ -198,6 +198,19 @@ Note the spelling. An M1 Air carries `apple,firmware-compat` and no
 `apple,firmware-abi` at all, so the fallback name is the one that turns up on
 hardware.
 
+The tuple is not m1n1 guessing. That machine's Asahi install pinned its firmware
+bundle at install time, and it records which:
+
+```
+$ cat "/Volumes/EFI - FEDOR/asahi/SystemVersion.plist"
+        ProductVersion          13.5
+        ProductBuildVersion     22G74
+```
+
+So the GPU firmware is macOS 13.5's, which is also the ABI Asahi's own driver
+targets for G13. Reaching a first accepted command on this machine means meeting
+13.5 somewhere.
+
 There are two honest ways past this, and only two:
 
 1. **Boot firmware that speaks 12.3.** The tuple is not a setting — it reports
