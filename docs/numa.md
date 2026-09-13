@@ -109,15 +109,26 @@ threads at home on this CPU's node, and then accepting anything. A thread
 therefore tends to keep running next to the memory it faulted in, while a node
 with nothing to do still takes work from a busy one rather than idling.
 
-**On aarch64 this is not yet exercised.** The secondary CPUs are brought all the
-way up — per-CPU VBAR, SP_EL1, MAIR, TTBR1, TCR and FP state are all installed —
-and then parked without entering the scheduler, so only the boot CPU runs
-threads. Releasing them brings up four-way scheduling and userspace then faults:
-a thread migrated between CPUs either wedges or takes a null dereference in the
-kernel. See the comment in
-`kernel/modules/aarch64/cpu/initialisation/initialisation.v`. Until that is
-finished, a thread's pages come from the node of the boot CPU, and every other
-node is reached explicitly through `mbind(2)` and `set_mempolicy(2)`.
+Changing a thread's affinity clears its home node. The local-first pass would
+otherwise starve it for good: a thread pinned to the CPUs of one node while at
+home on another is passed over on every scan by anything already at home where
+it is trying to run.
+
+A thread whose affinity stops allowing the CPU it is on is put down even when
+there is nothing to replace it — the CPU goes idle and the thread waits for a CPU
+it may use.
+
+On aarch64 that needed a change to how a CPU parks. The timer handler used to go
+idle by returning, which lands back on the stack of whatever the CPU had been
+running; correct while that thread is still this CPU's, and not once the thread
+has been released and any other CPU may take it off the queue and resume it.
+Two CPUs then run one kernel stack. A CPU which has let go of a thread therefore
+leaves for a stack of its own (`evict_to_idle`) rather than returning. That is
+also what made the blocking yield safe under SMP: a thread waiting on an event
+used to keep polling on its own kernel stack after being released, so waking it
+could start it on a second CPU while the first was still in that loop. amd64
+needs none of this — its idle path already ends in `await()` on the per-CPU
+interrupt stack and never returns.
 
 ## Tests
 

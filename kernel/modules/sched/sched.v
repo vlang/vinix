@@ -17,4 +17,8 @@ __global (
 	scheduler_running_queue [512]&proc.Thread
 	kernel_process          &proc.Process
 	uart_poll_callback      voidptr // Set by console module for HVF UART polling
+	// Published by initialise() once the run queue and the kernel process exist.
+	// A secondary CPU waits for this before it enters await(): until then there
+	// is no kernel_process for it to switch to and no queue to read.
+	scheduler_ready = false
 )

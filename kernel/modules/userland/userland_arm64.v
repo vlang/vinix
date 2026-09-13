@@ -445,6 +445,13 @@ pub fn dispatch_sync_signal(context &cpulocal.GPRState, signal u8) bool {
 		return false
 	}
 	mut current_thread := proc.current_thread()
+	// A CPU with no thread on it has nobody to signal. That should only reach
+	// here through a kernel fault misread as a userspace one, but raising a
+	// signal on a nil thread turns that mistake into a second fault inside the
+	// report, which is how the first one stayed invisible.
+	if current_thread == unsafe { nil } {
+		return false
+	}
 	original_pc := context.pc
 	katomic.bts(mut &current_thread.pending_signals, signal - 1)
 	dispatch_a_signal_with_fault(context, true, context.pc, 0)
@@ -455,6 +462,9 @@ pub fn dispatch_sync_signal(context &cpulocal.GPRState, signal u8) bool {
 // for an SA_SIGINFO handler.
 pub fn dispatch_sync_fault(context &cpulocal.GPRState, fault_address u64, fault_esr u64) bool {
 	mut current_thread := proc.current_thread()
+	if current_thread == unsafe { nil } {
+		return false
+	}
 	original_pc := context.pc
 	katomic.bts(mut &current_thread.pending_signals, u8(sigsegv - 1))
 	dispatch_a_signal_with_fault(context, true, fault_address, fault_esr)

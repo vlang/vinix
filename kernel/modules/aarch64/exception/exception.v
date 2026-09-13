@@ -127,6 +127,17 @@ fn install_exception_stack(cpu_number u64) {
 	cpu.isb()
 }
 
+// Did the instruction that faulted belong to userspace?
+//
+// SPSR's mode field is the exact answer: M[3:0] is zero only for EL0t. The PC
+// is not -- a kernel that branches through a corrupted pointer faults at a low
+// address, and reading that as "userspace faulted" sends a kernel bug into the
+// signal path, where it raises SIGSEGV on a current thread that an idle CPU
+// does not have.
+fn from_userspace(gpr_state &cpulocal.GPRState) bool {
+	return gpr_state.pstate & 0xf == 0
+}
+
 // Called from vectors.S for synchronous exceptions
 @[export: 'exception__sync_handler']
 pub fn sync_handler(esr u64, far u64, gpr_state &cpulocal.GPRState) {
@@ -136,7 +147,7 @@ pub fn sync_handler(esr u64, far u64, gpr_state &cpulocal.GPRState) {
 		0x01 { // Trapped WFI/WFE from userspace
 			// WFI and WFE are architectural hints at EL0. Hypervisors may trap
 			// them to EL1, but userspace must be allowed to resume afterwards.
-			if gpr_state.pc < higher_half {
+			if from_userspace(gpr_state) {
 				mut state := unsafe { &cpulocal.GPRState(gpr_state) }
 				state.pc += 4
 				return
@@ -144,7 +155,7 @@ pub fn sync_handler(esr u64, far u64, gpr_state &cpulocal.GPRState) {
 			fault_handler(ec, esr, far, gpr_state)
 		}
 		0x00, 0x07, 0x19, 0x1d { // Undefined or unavailable FP/SVE/SME instruction
-			if gpr_state.pc < higher_half {
+			if from_userspace(gpr_state) {
 				if userland.dispatch_sync_signal(gpr_state, u8(userland.sigill)) {
 					return
 				}
@@ -153,7 +164,7 @@ pub fn sync_handler(esr u64, far u64, gpr_state &cpulocal.GPRState) {
 			fault_handler(ec, esr, far, gpr_state)
 		}
 		0x2c { // Trapped floating-point exception
-			if gpr_state.pc < higher_half {
+			if from_userspace(gpr_state) {
 				if userland.dispatch_sync_signal(gpr_state, u8(userland.sigfpe)) {
 					return
 				}
@@ -166,7 +177,7 @@ pub fn sync_handler(esr u64, far u64, gpr_state &cpulocal.GPRState) {
 			// BRK is how __builtin_trap() and the CHECK macros of large C++
 			// programs abort, so it arrives from ordinary applications rather
 			// than only from a debugger.
-			if gpr_state.pc < higher_half {
+			if from_userspace(gpr_state) {
 				if userland.dispatch_sync_signal(gpr_state, u8(userland.sigtrap)) {
 					return
 				}
@@ -174,25 +185,24 @@ pub fn sync_handler(esr u64, far u64, gpr_state &cpulocal.GPRState) {
 			}
 			fault_handler(ec, esr, far, gpr_state)
 		}
-		0x20, 0x21 { // Instruction Abort from lower/same EL
+		0x20, 0x24 { // Instruction or Data Abort from a lower EL: userspace
 			mmap.pf_handler(gpr_state) or {
-				if gpr_state.pc < higher_half {
-					if userland.dispatch_sync_fault(gpr_state, far, esr) {
-						return
-					}
-					terminate_faulting_process(ec, esr, far, gpr_state, u8(userland.sigsegv))
+				if userland.dispatch_sync_fault(gpr_state, far, esr) {
+					return
 				}
-				fault_handler(ec, esr, far, gpr_state)
+				terminate_faulting_process(ec, esr, far, gpr_state, u8(userland.sigsegv))
 			}
 		}
-		0x24, 0x25 { // Data Abort from lower/same EL
+		0x21, 0x25 { // Instruction or Data Abort from the same EL: the kernel
+			// A kernel fault is a kernel bug and is reported as one. It used to
+			// be told apart from a userspace fault by testing the faulting PC
+			// against the higher half, which is not the same question: a kernel
+			// that branches through a corrupted pointer faults at a low PC and
+			// was then handed to the userspace signal path, which raises SIGSEGV
+			// on the current thread. On an idle CPU there is no current thread,
+			// so the report itself faulted and the original branch was never
+			// named. The exception class already says which EL faulted.
 			mmap.pf_handler(gpr_state) or {
-				if gpr_state.pc < higher_half {
-					if userland.dispatch_sync_fault(gpr_state, far, esr) {
-						return
-					}
-					terminate_faulting_process(ec, esr, far, gpr_state, u8(userland.sigsegv))
-				}
 				fault_handler(ec, esr, far, gpr_state)
 			}
 		}
@@ -308,8 +318,10 @@ fn fault_handler(ec u64, esr u64, far u64, gpr_state &cpulocal.GPRState) {
 		}
 	}
 
-	// For UDF/uncategorized (ec=0x0) or any userspace crash, dump PTE and memory at PC
-	if ec == 0x0 && gpr_state.pc < higher_half {
+	// For UDF/uncategorized (ec=0x0) or any userspace crash, dump PTE and memory
+	// at PC. Only where there is a userspace address space to read it out of:
+	// this walks the faulting thread's pagemap.
+	if ec == 0x0 && from_userspace(gpr_state) && proc.current_thread() != unsafe { nil } {
 		mut current_thread := proc.current_thread()
 		pc_page := gpr_state.pc & ~u64(0xfff)
 		phys := current_thread.process.pagemap.virt2phys(pc_page) or { u64(0) }
@@ -533,10 +545,12 @@ fn fault_handler(ec u64, esr u64, far u64, gpr_state &cpulocal.GPRState) {
 	}
 	// Dump syscall ring buffer on any crash
 	C.sc_dump_ring()
-	// For user-space faults (lower EL), kill the process instead of hanging.
-	// Check if PC is in user-space (below higher_half) — covers EC=0x00 (UDF/abort),
-	// EC=0x20 (instruction abort from lower EL), EC=0x24 (data abort from lower EL), etc.
-	if gpr_state.pc < higher_half && segfault_kill_fn != unsafe { nil } {
+	// For user-space faults, kill the process instead of hanging. Decided from
+	// the saved mode and not from the faulting PC: a kernel branch through a
+	// corrupted pointer lands at a low PC too, and exiting a process on its
+	// behalf needs a current thread that the CPU which took it may not have.
+	if from_userspace(gpr_state) && proc.current_thread() != unsafe { nil }
+		&& segfault_kill_fn != unsafe { nil } {
 		mut signum := 139 // 128 + 11 (SIGSEGV) — default
 		if ec == 0x0 {
 			signum = 134 // 128 + 6 (SIGABRT)

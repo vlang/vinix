@@ -27,6 +27,19 @@ pub fn initialise() {
 	}
 }
 
+// May this thread run on this CPU at all? Asked by the run-queue scan before it
+// picks a thread up, and by the timer handler about the thread already on the
+// CPU: an affinity change while a thread is running has to take effect, so a CPU
+// it may no longer use puts it down even with nothing to replace it. Safe to do
+// here because this scheduler's idle path never returns to the caller -- it ends
+// in await(), on the per-CPU interrupt stack.
+fn may_run_here(t &proc.Thread, cpu_number u64) bool {
+	if cpu_number >= 64 {
+		return true
+	}
+	return t.affinity_mask & (u64(1) << cpu_number) != 0
+}
+
 // Pick a thread for this CPU. On a machine with more than one memory node this
 // runs twice: once accepting only threads already at home on this CPU's node,
 // and then accepting anything. A thread therefore tends to keep running next to
@@ -46,46 +59,39 @@ fn get_next_thread() &proc.Thread {
 
 // `want_node` of -1 accepts every thread; otherwise only those whose home node
 // matches, plus those no CPU has claimed yet.
+//
+// Exactly one lap of the queue, from wherever this CPU last stopped, so the
+// order stays round-robin. The lap is counted rather than compared against a
+// starting index: the skip cases used to `continue` straight past the
+// wrap-around check, so a slot that this CPU could not take and that happened
+// to sit at the start index sent the scan round the queue for ever. Nothing was
+// skipped before affinity masks and memory nodes existed, which is why it took
+// until a pinned thread on another node to find.
 fn scan_run_queue(mut cpu_local cpulocal.Local, want_node int) &proc.Thread {
-	mut orig_i := cpu_local.last_run_queue_index
-
-	if orig_i >= max_running_threads {
-		orig_i = 0
+	mut start := cpu_local.last_run_queue_index
+	if start < 0 || start >= max_running_threads {
+		start = 0
 	}
 
-	mut index := orig_i + 1
-
-	for {
-		if index >= max_running_threads {
-			index = 0
-		}
+	for step := 1; step <= max_running_threads; step++ {
+		index := (start + step) % max_running_threads
 
 		mut t := scheduler_running_queue[index]
-
-		if unsafe { t != 0 } {
-			cpu_number := cpu_local.cpu_number
-			if cpu_number < 64 && t.affinity_mask & (u64(1) << cpu_number) == 0 {
-				index++
-				continue
-			}
-			if want_node >= 0 && t.numa_node >= 0 && t.numa_node != want_node {
-				index++
-				continue
-			}
-			if t.l.test_and_acquire() == true {
-				cpu_local.last_run_queue_index = index
-				return t
-			}
+		if unsafe { t == nil } {
+			continue
 		}
-
-		if index == orig_i {
-			break
+		if !may_run_here(t, cpu_local.cpu_number) {
+			continue
 		}
-
-		index++
+		if want_node >= 0 && t.numa_node >= 0 && t.numa_node != want_node {
+			continue
+		}
+		if t.l.test_and_acquire() == true {
+			cpu_local.last_run_queue_index = index
+			return t
+		}
 	}
 
-	cpu_local.last_run_queue_index = index
 	return unsafe { nil }
 }
 
@@ -114,7 +120,8 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 	if unsafe { current_thread != 0 } {
 		current_thread.yield_await.release()
 
-		if unsafe { next_thread == nil } && current_thread.is_in_queue {
+		if unsafe { next_thread == nil } && current_thread.is_in_queue
+			&& may_run_here(current_thread, cpu_local.cpu_number) {
 			apic.lapic_eoi()
 			apic.lapic_timer_oneshot(mut cpu_local, scheduler_vector, effective_timeslice(current_thread))
 			return

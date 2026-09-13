@@ -27,7 +27,7 @@ FAIL_MARKERS = (
 # once: a missing line is a check that never ran, which is not a pass.
 FEATURE_MARKERS = (
     b"QEMU NUMA PASS: sysfs reports two nodes, two CPUs each, 1 GiB each",
-    b"QEMU NUMA PASS: getcpu names the node whose CPU list holds the running CPU",
+    b"QEMU NUMA PASS: getcpu reports the node of the CPU a thread is pinned to",
     b"QEMU NUMA PASS: mempolicy reports and validates what it is given",
     b"QEMU NUMA PASS: a bound process takes its pages from the node it asked for",
     b"QEMU NUMA PASS: mbind places the pages of the range it named",

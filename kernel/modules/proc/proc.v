@@ -445,6 +445,14 @@ pub fn set_thread_affinity(tid int, mask u64) bool {
 		return false
 	}
 	t.affinity_mask = mask
+	// Forget which memory node this thread was at home on. The scheduler looks
+	// for threads whose home node matches the CPU it is picking for before it
+	// will take any thread at all, so a thread pinned to the CPUs of a
+	// different node than the one it last ran on would be passed over on every
+	// scan by any thread already at home there -- for ever. The next CPU to run
+	// it claims it again, which is the right answer anyway: a thread told to run
+	// somewhere else does not belong where it used to be.
+	t.numa_node = -1
 	return true
 }
 

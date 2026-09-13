@@ -19,16 +19,52 @@ import krandom
 
 fn C.sched_switch_context(gpr_state voidptr, kernel_stack u64)
 
+fn C.vinix_enter_idle(stack_top u64, entry voidptr)
+
+// Go idle on this CPU's own stack instead of returning.
+//
+// The scheduler normally parks a CPU by returning from the timer handler, which
+// lands back in await()'s polling loop -- correct while the caller's stack still
+// belongs to this CPU. It does not when the CPU has just let go of a runnable
+// thread: that thread's saved context points into this very stack, and another
+// CPU is free to resume it, so returning would put two CPUs on one stack. Leave
+// for a stack nobody else can be using.
+@[noreturn]
+fn evict_to_idle(cpu_number u64) {
+	mut index := cpu_number
+	if index >= max_idle_stacks {
+		index = max_idle_stacks - 1
+	}
+	mut top := u64(voidptr(&idle_stacks[index][0])) + u64(idle_stack_size)
+	top &= ~u64(0xf)
+	C.vinix_enter_idle(top, voidptr(await))
+	for {}
+}
+
 fn C.vinix_call_void_fn(f voidptr)
 
 fn C.yield_dispatch(handler voidptr)
 
 const max_reap_slots = 256
 
+// The same count as the per-CPU exception stacks. A CPU past the end shares the
+// last stack, which is only reached when that CPU is idling anyway.
+const max_idle_stacks = 8
+
+const idle_stack_size = 32768
+
 __global (
 	// Per-CPU parking slot for the thread that most recently died there.
-	reap_slots                 [max_reap_slots]&proc.Thread
-	syscall_input_poll_lock    klock.Lock
+	reap_slots [max_reap_slots]&proc.Thread
+	// One idle stack per CPU, for the case where a CPU has to leave a thread's
+	// stack behind rather than return onto it: see evict_to_idle(). 32 KiB is
+	// what await() and one pass of the scheduler need.
+	idle_stacks [max_idle_stacks][idle_stack_size]u8
+	// Held by whichever CPU is running the platform's input poll. Every caller
+	// of poll_platform_input() competes for it, including the syscall fallback
+	// below: the drivers behind that callback expect one poller, and the idle
+	// loop, a blocking yield and a timeslice can be on three different CPUs.
+	input_poll_lock            klock.Lock
 	last_syscall_input_poll_ns u64
 )
 
@@ -37,6 +73,9 @@ pub fn initialise() {
 		pagemap: &kernel_pagemap
 	}
 
+	// Release the secondary CPUs into the scheduler.
+	katomic.store(mut &scheduler_ready, true)
+
 	println('sched: ARM64 scheduler initialised')
 }
 
@@ -44,6 +83,28 @@ pub fn initialise() {
 // Used by the console module to poll UART without a separate thread.
 pub fn set_uart_poll_callback(cb voidptr) {
 	uart_poll_callback = cb
+}
+
+// Run the platform's input poll, if this CPU can have it to itself.
+//
+// The callback drives lwIP, VirtIO networking, VirtIO input and the console's
+// own byte buffer, none of which is reentrant, and it is called from three
+// places that can each be on a different CPU at the same time: the idle loop,
+// a blocking yield, and the boot CPU's timeslice. A try-lock rather than a
+// wait: a CPU which finds another one already polling has nothing to contribute
+// and should carry on with whatever else its loop does, and a poll skipped here
+// is picked up microseconds later by whichever loop comes round next.
+fn poll_platform_input() {
+	if uart_poll_callback == voidptr(0) {
+		return
+	}
+	if !input_poll_lock.test_and_acquire() {
+		return
+	}
+	defer {
+		input_poll_lock.release()
+	}
+	C.vinix_call_void_fn(uart_poll_callback)
 }
 
 // Keep the syscall fallback narrower than the scheduler's normal platform
@@ -55,11 +116,11 @@ pub fn poll_syscall_input() {
 	defer {
 		cpu.interrupt_toggle(ints)
 	}
-	if !syscall_input_poll_lock.test_and_acquire() {
+	if !input_poll_lock.test_and_acquire() {
 		return
 	}
 	defer {
-		syscall_input_poll_lock.release()
+		input_poll_lock.release()
 	}
 	now_ns := timer.get_ns()
 	if now_ns - last_syscall_input_poll_ns < 1_000_000 {
@@ -73,6 +134,20 @@ pub fn poll_syscall_input() {
 // interrupt controller (GIC or AIC).
 pub fn get_timer_handler() fn (voidptr) {
 	return scheduler_timer_handler
+}
+
+// May this thread run on this CPU at all? Asked by the run-queue scan before it
+// picks a thread up, and by the timer handler about the thread already on the
+// CPU: an affinity change while a thread is running has to take effect, so a CPU
+// it may no longer use puts it down even with nothing to replace it.
+//
+// Putting it down is the part that needs care on this architecture -- see
+// evict_to_idle().
+fn may_run_here(t &proc.Thread, cpu_number u64) bool {
+	if cpu_number >= 64 {
+		return true
+	}
+	return t.affinity_mask & (u64(1) << cpu_number) != 0
 }
 
 // Pick a thread for this CPU. On a machine with more than one memory node this
@@ -94,46 +169,39 @@ fn get_next_thread() &proc.Thread {
 
 // `want_node` of -1 accepts every thread; otherwise only those whose home node
 // matches, plus those no CPU has claimed yet.
+//
+// Exactly one lap of the queue, from wherever this CPU last stopped, so the
+// order stays round-robin. The lap is counted rather than compared against a
+// starting index: the skip cases used to `continue` straight past the
+// wrap-around check, so a slot that this CPU could not take and that happened
+// to sit at the start index sent the scan round the queue for ever. Nothing was
+// skipped before affinity masks and memory nodes existed, which is why it took
+// until a pinned thread on another node to find.
 fn scan_run_queue(mut cpu_local cpulocal.Local, want_node int) &proc.Thread {
-	mut orig_i := cpu_local.last_run_queue_index
-
-	if orig_i >= max_running_threads {
-		orig_i = 0
+	mut start := cpu_local.last_run_queue_index
+	if start < 0 || start >= max_running_threads {
+		start = 0
 	}
 
-	mut index := orig_i + 1
-
-	for {
-		if index >= max_running_threads {
-			index = 0
-		}
+	for step := 1; step <= max_running_threads; step++ {
+		index := (start + step) % max_running_threads
 
 		mut t := scheduler_running_queue[index]
-
-		if unsafe { t != 0 } {
-			cpu_number := cpu_local.cpu_number
-			if cpu_number < 64 && t.affinity_mask & (u64(1) << cpu_number) == 0 {
-				index++
-				continue
-			}
-			if want_node >= 0 && t.numa_node >= 0 && t.numa_node != want_node {
-				index++
-				continue
-			}
-			if t.l.test_and_acquire() == true {
-				cpu_local.last_run_queue_index = index
-				return t
-			}
+		if unsafe { t == nil } {
+			continue
 		}
-
-		if index == orig_i {
-			break
+		if !may_run_here(t, cpu_local.cpu_number) {
+			continue
 		}
-
-		index++
+		if want_node >= 0 && t.numa_node >= 0 && t.numa_node != want_node {
+			continue
+		}
+		if t.l.test_and_acquire() == true {
+			cpu_local.last_run_queue_index = index
+			return t
+		}
 	}
 
-	cpu_local.last_run_queue_index = index
 	return unsafe { nil }
 }
 
@@ -168,22 +236,28 @@ fn scheduler_timer_handler(_gpr_state voidptr) {
 	// on idle time alone strands keyboard and pointer reports in their VirtIO
 	// queues. Poll once per CPU-0 timeslice as well; using one CPU preserves the
 	// drivers' single-poller assumption while keeping the desktop interactive.
-	if cpu_local.cpu_number == 0 && uart_poll_callback != voidptr(0) {
-		C.vinix_call_void_fn(uart_poll_callback)
+	if cpu_local.cpu_number == 0 {
+		poll_platform_input()
 	}
 	katomic.store(mut &cpu_local.is_idle, false)
 
 	mut current_thread := proc.current_thread()
 	mut next_thread := get_next_thread()
+	// Set once this CPU has let go of the thread it was running, which decides
+	// whether the idle path below may return to its caller.
+	mut released_current := false
 
 	if unsafe { current_thread != 0 } {
 		current_thread.yield_await.release()
 
-		if unsafe { next_thread == nil } && current_thread.is_in_queue {
-			// No other thread is runnable, so the current one keeps its CPU.
-			// A blocked current thread must instead fall through: otherwise a
-			// later wakeup selects that same stale current thread and charges
-			// its entire sleep interval as CPU time.
+		if unsafe { next_thread == nil } && current_thread.is_in_queue
+			&& may_run_here(current_thread, cpu_local.cpu_number) {
+			// Nothing else is runnable and this thread is still entitled to the
+			// CPU, so it keeps it. The two exceptions fall through instead: a
+			// blocked thread, or a later wakeup would select that same stale
+			// current thread and charge its whole sleep as CPU time; and one
+			// whose affinity no longer allows this CPU, which has to be put down
+			// even with nothing to replace it.
 			timer.oneshot(effective_timeslice(current_thread))
 			return
 		}
@@ -210,6 +284,7 @@ fn scheduler_timer_handler(_gpr_state voidptr) {
 		fpu_save(current_thread.fpu_storage)
 		katomic.store(mut &current_thread.running_on, u64(-1))
 		current_thread.l.release()
+		released_current = true
 	}
 
 	if unsafe { next_thread == nil } {
@@ -219,6 +294,16 @@ fn scheduler_timer_handler(_gpr_state voidptr) {
 		proc.set_current_thread(cpu_local.cpu_number, unsafe { nil })
 		katomic.store(mut &cpu_local.is_idle, true)
 		kernel_pagemap.switch_to()
+		if released_current {
+			// The call below this one is standing on the stack of the thread
+			// just released, and that thread is now resumable by any CPU that
+			// takes it off the queue. Returning would leave this CPU executing
+			// on a stack another CPU may already be using. Idle on our own
+			// instead; whoever picks the thread up restores its context in full.
+			evict_to_idle(cpu_local.cpu_number)
+		}
+		// Nothing was running here: this is await()'s own poll asking for work
+		// and finding none, so returning to its loop is exactly right.
 		return
 	}
 
@@ -381,10 +466,9 @@ pub fn yield(save_ctx bool) {
 			cpu.write_cntv_ctl_el0(1)
 		}
 
-		// Poll UART for console input.
-		if uart_poll_callback != voidptr(0) {
-			C.vinix_call_void_fn(uart_poll_callback)
-		}
+		// Poll UART for console input. Another CPU may be in this same loop
+		// for a thread of its own, so the poll itself is serialized.
+		poll_platform_input()
 
 		// Check if we've been re-enqueued by an event trigger
 		if current_thread.is_in_queue {
@@ -397,11 +481,13 @@ pub fn yield(save_ctx bool) {
 		}
 	}
 
-	// With no other runnable thread, scheduler_timer_handler parks the CPU by
-	// clearing its current-thread slot and switching to the kernel pagemap, then
-	// returns to this polling loop. If an interrupt wakes this same thread, there
-	// is no sched_switch_context round trip to restore that per-CPU state for us.
-	// Reclaim the CPU here before the blocking syscall resumes.
+	// A safety net rather than the normal path. A CPU that parks now leaves this
+	// stack for one of its own instead of returning here (see evict_to_idle), so
+	// every way out of the loop above either never lost the CPU or came back
+	// through sched_switch_context, which restores the per-CPU state itself. Left
+	// in place for the case where this thread's slot was cleared without that
+	// round trip, since resuming a blocking syscall on a CPU that still thinks it
+	// is idle would be much worse than an unnecessary check.
 	if proc.current_thread() == unsafe { nil } {
 		mut cpu_local := cpulocal.current()
 		current_thread.l.acquire()
@@ -901,11 +987,6 @@ pub fn await() {
 	// scheduler timer handler directly when the timer fires.
 	cpu.interrupt_toggle(false)
 
-	// Which CPU this is, read once. Only the boot CPU polls, because the input
-	// drivers below assume a single poller and any CPU released into this loop
-	// would otherwise become a second one.
-	polls_input := cpu.read_tpidr_el1() == 0
-
 	for {
 		vctl := cpu.read_cntv_ctl_el0()
 		if vctl & 0x4 != 0 {
@@ -919,9 +1000,7 @@ pub fn await() {
 
 		// Poll UART input while idle (no separate thread — HVF workaround).
 		// Uses a callback set by the console module to avoid circular imports.
-		if polls_input && uart_poll_callback != voidptr(0) {
-			C.vinix_call_void_fn(uart_poll_callback)
-		}
+		poll_platform_input()
 
 		asm volatile aarch64 {
 			yield

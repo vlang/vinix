@@ -6,14 +6,12 @@
 // kernel reports that machine and honours a request to allocate from one node
 // of it.
 //
-// Nothing here pins a thread to a particular CPU. Vinix on AArch64 schedules
-// only on the boot CPU today -- see the comment in
-// kernel/modules/aarch64/cpu/initialisation/initialisation.v -- so a thread
-// asked to move would simply stop. What that leaves testable is every part of
-// NUMA that does not need a second scheduling CPU: the topology the kernel
-// read, the node a running thread is on, and where its pages come from both by
-// default and under an explicit policy. The remote node in particular is
-// reached the only way it can be, through mbind(2) and set_mempolicy(2).
+// The checks that matter most here move a thread between the two nodes with
+// sched_setaffinity(2) and then look at where its pages come from, because that
+// is the whole point of the feature: a thread should be fed by the memory
+// controller attached to the CPU it is on. Both nodes are exercised as the local
+// one, so neither result can come from a kernel that simply always answers
+// "node 0".
 //
 // The runner boots with:
 //   -smp 4
@@ -25,6 +23,7 @@
 #define _GNU_SOURCE
 #include <errno.h>
 #include <fcntl.h>
+#include <sched.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -174,55 +173,115 @@ static int current_cpu_and_node(unsigned *cpu, unsigned *node) {
 	return (int)syscall(SYS_getcpu, cpu, node, NULL);
 }
 
-// Does the node a thread is told it is on agree with the node whose CPU list
-// contains the CPU it is told it is on?
-static void check_getcpu_agrees_with_sysfs(void) {
-	int before = failures;
-
-	unsigned cpu, node;
-	if (current_cpu_and_node(&cpu, &node) != 0) {
-		fail("getcpu: %s", strerror(errno));
-		return;
-	}
-	if (cpu > 3) {
-		fail("getcpu reports cpu %u on a four-CPU machine", cpu);
-		return;
-	}
-	if (node > 1) {
-		fail("getcpu reports node %u on a two-node machine", node);
-		return;
-	}
-
+// The set of CPUs a node claims, read out of sysfs rather than assumed.
+static int node_cpu_range(unsigned node, unsigned *first, unsigned *last) {
 	char path[128];
 	char list[256];
 	snprintf(path, sizeof(path), "/sys/devices/system/node/node%u/cpulist", node);
 	if (read_line(path, list, sizeof(list)) != 0) {
 		fail("cannot read %s", path);
-		return;
+		return -1;
 	}
-	// The lists this machine produces are "0-1" and "2-3", so membership is
-	// decided by the two endpoints.
-	unsigned first = 0, last = 0;
-	if (sscanf(list, "%u-%u", &first, &last) != 2) {
+	// The lists this machine produces are "0-1" and "2-3".
+	if (sscanf(list, "%u-%u", first, last) != 2) {
 		fail("node %u cpulist is \"%s\", which is not a range", node, list);
-		return;
+		return -1;
 	}
-	if (cpu < first || cpu > last) {
-		fail("getcpu says cpu %u node %u, but node %u holds cpus %s", cpu, node, node,
-				list);
+	return 0;
+}
+
+// Which node sysfs says a CPU belongs to, or -1 if none claims it.
+static int sysfs_node_of_cpu(unsigned cpu) {
+	int found = -1;
+	for (unsigned node = 0; node < 2; node++) {
+		unsigned first, last;
+		if (node_cpu_range(node, &first, &last) != 0) {
+			return -1;
+		}
+		if (cpu >= first && cpu <= last) {
+			if (found >= 0) {
+				fail("cpu %u is claimed by node %d and node %u", cpu, found, node);
+				return -1;
+			}
+			found = (int)node;
+		}
+	}
+	return found;
+}
+
+// Move onto `cpu` and wait until the kernel agrees that is where we are.
+//
+// One yield is enough on a working kernel, including when this thread is the
+// only runnable one on the machine: a CPU whose thread may no longer run there
+// goes idle rather than keeping it. The retries are so that a kernel which
+// cannot do the handover fails this test instead of hanging it.
+static int pin_to_cpu(int cpu) {
+	cpu_set_t set;
+	CPU_ZERO(&set);
+	CPU_SET(cpu, &set);
+	if (sched_setaffinity(0, sizeof(set), &set) != 0) {
+		fail("sched_setaffinity to cpu %d: %s", cpu, strerror(errno));
+		return -1;
 	}
 
-	// The other node must not claim this CPU as well.
-	snprintf(path, sizeof(path), "/sys/devices/system/node/node%u/cpulist", 1 - node);
-	if (read_line(path, list, sizeof(list)) == 0
-			&& sscanf(list, "%u-%u", &first, &last) == 2) {
-		if (cpu >= first && cpu <= last) {
-			fail("cpu %u is claimed by node %u as well", cpu, 1 - node);
+	for (int attempt = 0; attempt < 1000; attempt++) {
+		sched_yield();
+		unsigned here, node;
+		if (current_cpu_and_node(&here, &node) != 0) {
+			fail("getcpu while moving to cpu %d: %s", cpu, strerror(errno));
+			return -1;
+		}
+		if (here == (unsigned)cpu) {
+			return 0;
+		}
+	}
+	fail("still not on cpu %d after 1000 yields", cpu);
+	return -1;
+}
+
+static void unpin(void) {
+	cpu_set_t all;
+	CPU_ZERO(&all);
+	for (int i = 0; i < 4; i++) {
+		CPU_SET(i, &all);
+	}
+	if (sched_setaffinity(0, sizeof(all), &all) != 0) {
+		fail("sched_setaffinity back to every cpu: %s", strerror(errno));
+	}
+}
+
+// Pinned to each CPU in turn, does the kernel agree about which CPU that is and
+// which node holds it?
+static void check_getcpu_follows_affinity(void) {
+	int before = failures;
+
+	for (int target = 0; target < 4; target++) {
+		if (pin_to_cpu(target) != 0) {
+			continue;
+		}
+		unsigned cpu, node;
+		if (current_cpu_and_node(&cpu, &node) != 0) {
+			fail("getcpu on cpu %d: %s", target, strerror(errno));
+			continue;
+		}
+		if (cpu != (unsigned)target) {
+			fail("pinned to cpu %d but getcpu says %u", target, cpu);
+			continue;
+		}
+		int want = sysfs_node_of_cpu(cpu);
+		if (want < 0) {
+			continue;
+		}
+		if (node != (unsigned)want) {
+			fail("cpu %d is on node %u, but sysfs puts it on node %d", target, node,
+					want);
 		}
 	}
 
+	unpin();
+
 	if (failures == before) {
-		pass("getcpu names the node whose CPU list holds the running CPU");
+		pass("getcpu reports the node of the CPU a thread is pinned to");
 	}
 }
 
@@ -403,34 +462,49 @@ static void check_mbind_places_pages(void) {
 }
 
 // Without a policy, a page comes from the node running the thread that faulted
-// it -- Linux's first-touch rule. Check the allocation against the node the
-// kernel says this thread is on, whichever one that turns out to be.
+// it -- Linux's first-touch rule. Pin to a CPU on each node in turn and check
+// that the allocation followed the CPU rather than staying where it was.
 static void check_first_touch_follows_the_cpu(void) {
 	int before = failures;
 	const size_t bytes = 128u * 1024u * 1024u;
 	const long wanted_kb = (long)(bytes / 1024) * 3 / 4;
 
-	unsigned cpu, node;
-	if (current_cpu_and_node(&cpu, &node) != 0) {
-		fail("getcpu before first touch: %s", strerror(errno));
-		return;
-	}
-	if (node > 1) {
-		fail("getcpu reports node %u on a two-node machine", node);
-		return;
+	// One CPU from each node, taken from sysfs rather than assumed.
+	for (unsigned node = 0; node < 2; node++) {
+		unsigned first, last;
+		if (node_cpu_range(node, &first, &last) != 0) {
+			continue;
+		}
+		if (pin_to_cpu((int)first) != 0) {
+			continue;
+		}
+
+		unsigned cpu, running_node;
+		if (current_cpu_and_node(&cpu, &running_node) != 0) {
+			fail("getcpu before first touch: %s", strerror(errno));
+			continue;
+		}
+		if (running_node != node) {
+			fail("pinned to cpu %u for node %u, but running on node %u", first, node,
+					running_node);
+			continue;
+		}
+
+		long from0, from1;
+		measure_allocation(bytes, &from0, &from1);
+		long local = node == 0 ? from0 : from1;
+		long remote = node == 0 ? from1 : from0;
+		if (local < wanted_kb) {
+			fail("faulting on cpu %u (node %u) took only %ld kB of %zu from that node",
+					first, node, local, bytes / 1024);
+		}
+		if (remote > wanted_kb / 4) {
+			fail("faulting on cpu %u (node %u) took %ld kB from node %u instead", first,
+					node, remote, 1 - node);
+		}
 	}
 
-	long from0, from1;
-	measure_allocation(bytes, &from0, &from1);
-	long local = node == 0 ? from0 : from1;
-	long remote = node == 0 ? from1 : from0;
-	if (local < wanted_kb) {
-		fail("running on node %u, but only %ld kB of %zu came from it", node, local,
-				bytes / 1024);
-	}
-	if (remote > wanted_kb / 4) {
-		fail("running on node %u, yet node %u lost %ld kB", node, 1 - node, remote);
-	}
+	unpin();
 
 	if (failures == before) {
 		pass("first touch takes pages from the node that faulted them");
@@ -442,7 +516,7 @@ int main(void) {
 	fflush(stdout);
 
 	check_sysfs_topology();
-	check_getcpu_agrees_with_sysfs();
+	check_getcpu_follows_affinity();
 	check_mempolicy_interface();
 	check_binding_places_pages();
 	check_mbind_places_pages();

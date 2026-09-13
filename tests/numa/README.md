@@ -11,30 +11,28 @@ The guest side runs as PID 1 and checks:
 - `/sys/devices/system/node/` reports the nodes, their CPU lists, their CPU
   maps, their distances and roughly a gigabyte each, and
   `/sys/devices/system/cpu/{present,online}` reports all four CPUs.
-- `getcpu(2)` names the node whose CPU list contains the CPU it reports, and no
-  other node claims that CPU.
+- `getcpu(2)`, with the thread pinned to each of the four CPUs in turn, reports
+  that CPU and the node whose sysfs CPU list contains it.
 - `get_mempolicy(2)` reports MPOL_DEFAULT for a fresh process, the machine's
   node set for `MPOL_F_MEMS_ALLOWED`, and the caller's own node for
   `MPOL_F_NODE`; `set_mempolicy(2)` rejects an absent node, an unknown mode and
   an empty binding.
 - `set_mempolicy(MPOL_BIND)` to each node in turn actually places 192 MiB of
   anonymous memory on that node, measured through the per-node free-memory
-  figures. Node 1 holds no CPU this kernel schedules on, so that case is the
-  remote-allocation path end to end.
+  figures, regardless of which node the thread is running on.
 - `mbind(2)` on a live mapping places that range's pages on the node it named,
   and rejects an unaligned address.
-- With no policy at all, first touch places pages on the node the running
-  thread is reported to be on.
+- With no policy at all, first touch places 128 MiB on the node of the CPU the
+  thread is pinned to, for a CPU on each node in turn. This is the check that
+  the whole feature exists for, and it runs both nodes as the local one, so
+  neither result can come from a kernel that always answers "node 0".
 
-## What this cannot check yet
-
-Nothing here pins a thread to a CPU, because Vinix on AArch64 schedules only on
-the boot CPU: the secondary CPUs are brought up and then parked, so a thread
-told to move would simply stop. The scheduler's node preference — keep a thread
-next to the memory it faulted in, and only take work from another node when
-this one has none — is therefore written and compiled but not exercised. See
-the comment in `kernel/modules/aarch64/cpu/initialisation/initialisation.v` for
-what is in place and what is missing.
+Every check that moves the thread relies on the secondary CPUs actually
+scheduling, which on AArch64 they now do. A thread pinned away from the CPU it
+is on is handed over on the first `sched_yield(2)` even when it is the only
+runnable thread on the machine; the pin helper retries a bounded number of times
+so that a kernel which cannot do the handover fails this test rather than
+hanging it.
 
 Build the AArch64 userland once to provide the musl test sysroot, then run:
 

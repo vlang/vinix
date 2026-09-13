@@ -42,25 +42,11 @@ pub fn initialise(smp_info &limine.LimineSMPInfo) {
 	katomic.inc(mut &cpu_local.online)
 
 	if cpu_number != 0 {
-		// A secondary CPU is fully set up by this point but does not schedule.
-		// The loop below waits for scheduler_vector, which only the amd64
-		// scheduler ever sets -- this architecture has no interrupt vectors to
-		// allocate -- so in practice it parks here for good.
-		//
-		// That is deliberate for now rather than an oversight left in place.
-		// Releasing these CPUs into await() brings up four-way scheduling and
-		// userspace then faults: a thread migrated between CPUs either wedges
-		// or takes a null dereference in the kernel. Everything needed to
-		// release them is in place -- per-CPU VBAR, SP_EL1, MAIR, TTBR1 and
-		// TCR, all installed above -- and the scheduler already prefers a
-		// thread's own memory node when it picks one. What is missing is
-		// whatever the migration path still shares between CPUs, and finding
-		// it is its own piece of work.
-		//
-		// Until then: a thread's pages come from the node of the CPU it runs
-		// on, which is this machine's node 0, and mbind(2)/set_mempolicy(2)
-		// reach every other node explicitly.
-		for katomic.load(&scheduler_vector) == 0 {
+		// Into the scheduler. This used to wait on scheduler_vector, which only
+		// the amd64 scheduler ever sets -- this architecture allocates no
+		// interrupt vectors -- so every CPU but the first spun here for the life
+		// of the machine and never ran a thread.
+		for !katomic.load(&scheduler_ready) {
 			asm volatile aarch64 {
 				wfe
 				; ; ; memory
