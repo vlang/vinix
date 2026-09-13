@@ -174,9 +174,9 @@ override VFLAGS += \
     -enable-globals \
     -nofloat \
     -manualfree \
-    -experimental \
     -message-limit 10000 \
     -gc none \
+    -target-libc-headers \
     -d no_backtrace
 
 ifeq ($(ARCH),aarch64)
