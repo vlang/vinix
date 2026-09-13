@@ -90,6 +90,14 @@ case "${1:-desktop}" in
         FLAGS=(--apple-gpu --gpu-probe-only --native-resolution)
         MODE="shell + Apple GPU probe only"
         ;;
+    gpu-diag)
+        # The GPU probe with nothing else running. gpu-probe above boots the
+        # 2.9 GB base initramfs, which does not fit a 512 MB ESP; this one is a
+        # few KB. Unlike diag it keeps flanterm, because the point here is to
+        # read what the probe printed rather than to count stage bars.
+        FLAGS=(--apple-gpu --gpu-probe-only --native-resolution --minimal-initramfs)
+        MODE="diagnostic + Apple GPU probe"
+        ;;
     desktop-gpu)
         FLAGS=(--apple-gpu --native-resolution --desktop-initramfs)
         MODE="desktop + Apple GPU"
@@ -128,7 +136,7 @@ case "${1:-desktop}" in
         exit 0
         ;;
     *)
-        echo "error: unknown mode '$1' (use: desktop | studio | full | gpu | gpu-probe | desktop-gpu | desktop-wifi | battery | dcp | storage | drivers | desktop-drivers | diag | halt N | selftest)" >&2
+        echo "error: unknown mode '$1' (use: desktop | studio | full | gpu | gpu-probe | gpu-diag | desktop-gpu | desktop-wifi | battery | dcp | storage | drivers | desktop-drivers | diag | halt N | selftest)" >&2
         exit 1
         ;;
 esac
@@ -190,6 +198,27 @@ After recovery, the next boot should select a 5120x2880 external framebuffer.
 This mode owns one firmware framebuffer. Reconnecting that established output
 works live; switching between the internal and external outputs crosses a boot.
 STUDIO
+    ;;
+diagnostic\ +\ Apple\ GPU\ probe)
+    cat <<'GPUDIAG'
+
+Nothing runs after the probe in this mode: what is on screen is the probe's own
+output. On a base M1 booted from Apple boot data, expect it to stop here without
+touching a power domain or an ASC register, because the native DeviceTree is
+short of four inputs G13 firmware data needs:
+
+  agx: Probing Apple GPU
+  agx: t8103 boot data has no gpu-core-leak-coef
+  agx: native t8103 GPU boot data is incomplete
+  agx:   perf-states: 7 states, max 6, 14 words
+  agx:   power controller: incomplete
+  agx:   missing: per-state power, minimum SRAM voltage, core and SRAM leakage
+  agx: native t8103 boot data carries no firmware ABI tuple
+
+Anything else -- a different state count, a complete power controller, or a
+line past the ABI tuple -- means the machine's device tree and the recovery in
+docs/m1-agx-bringup.md have diverged. Photograph the screen either way.
+GPUDIAG
     ;;
 *Apple\ GPU*)
     cat <<'GPU'

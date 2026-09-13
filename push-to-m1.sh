@@ -67,12 +67,17 @@ echo "==> Comparing files; changed files show a live percentage..."
 # fill the Mac's data volume before the actual desktop initramfs is reached.
 # The amd64 build trees and application-probe disk images are QEMU-only too;
 # in particular, partially transferring a multi-GB probe disk can strand an
-# M1 with no room for the deployment inputs that it actually needs.
+# M1 with no room for the deployment inputs that it actually needs.  The .ext2
+# volumes beside those disks are the same thing one layer down -- the persistent
+# roots QEMU boots against, several GB each -- and only boot*.img was named, so
+# every deployment was quietly dragging desktop-root.ext2 across the network at
+# link speed before reaching anything it would actually install.
 if ! rsync -a --partial --progress --stats \
     --exclude '.claude/' \
     --exclude '.git/' \
     --exclude 'vinix.iso' \
     --exclude 'boot-image/boot*.img' \
+    --exclude 'boot-image/*.ext2' \
     --exclude 'boot-image/edk2-aarch64-code-*.fd' \
     --exclude 'build-*-probe/*.img' \
     --exclude 'build-amd64-*/' \
