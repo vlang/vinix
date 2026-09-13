@@ -168,7 +168,7 @@ pub fn build_g13_initdata(unk_buffer u64, runtime_pointers u64, globals u64,
 pub fn validate_g13_initdata_layouts() bool {
 	return sizeof(G13PipeChannels) == 0x30
 		&& sizeof(G13RuntimePointers) == g13_runtime_pointers_size
-		&& sizeof(G13Globals) == g13_globals_size && sizeof(G13FwStatus) == 0x80
+		&& sizeof(G13Globals) == g13_v13_5_globals_size && sizeof(G13FwStatus) == 0x80
 		&& sizeof(G13UatLevelInfo) == 0x20 && sizeof(G13InitData) == g13_initdata_size
 		&& sizeof(G13GlobalStatsVertex) == 0x3004
 		&& sizeof(G13GlobalStatsFragment) == 0x1124

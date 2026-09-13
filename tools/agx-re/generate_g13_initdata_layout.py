@@ -64,6 +64,10 @@ class LayoutError(Exception):
     pass
 
 
+class DroppedField(Exception):
+    """A 12.3 field with no counterpart at 13.5."""
+
+
 @dataclass
 class Field:
     name: str
@@ -376,17 +380,43 @@ def verify_encoded_offsets(layouts: dict[str, dict]) -> list[str]:
 # The builders in these files address their structure by bare 12.3 offsets.
 # Every one has to be re-pointed at 13.5, so read them rather than maintaining a
 # second list that can drift from the code it describes.
+# Every write helper counts, not just the 32-bit one: the 16-bit Globals writes
+# land inside the nested GlobalsSub and the 64-bit HwDataA ones move too.
 REMAPPED = (
-    ("hwdata_a", "HwDataA", "initdata_g13_hwdata_a.v", "g13_hwdata_a_put_u32"),
-    ("globals", "Globals", "initdata_g13_globals.v", "g13_globals_put_u32"),
+    (
+        "hwdata_a",
+        "HwDataA",
+        "initdata_g13_hwdata_a.v",
+        ("g13_hwdata_a_put_u32", "g13_hwdata_a_put_u64"),
+    ),
+    (
+        "globals",
+        "Globals",
+        "initdata_g13_globals.v",
+        ("g13_globals_put_u32", "g13_globals_put_u16"),
+    ),
 )
 KERNEL_FW = Path(__file__).resolve().parents[2] / "kernel/modules/gpu/agx/fw"
 
 
-def written_offsets(source_file: Path, helper: str) -> list[int]:
+# Offsets the builders compute rather than spell out: the base of an array they
+# walk in a loop. A literal scan cannot see them, and leaving them untranslated
+# would write a 13.5 structure at 12.3 addresses. Each is checked below to be a
+# field whose size 13.5 leaves alone, so only the base needs moving.
+LOOP_BASES = {
+    "globals": (0x893C, 0x89F8, 0x8AA0),
+    "hwdata_a": (0x3648, 0x36F0, 0x3718),
+}
+
+
+def written_offsets(source_file: Path, helpers: tuple[str, ...]) -> list[int]:
     text = source_file.read_text()
-    found = re.findall(re.escape(helper) + r"\(mut data, (0x[0-9a-fA-F]+)", text)
-    return sorted({int(value, 16) for value in found})
+    found: set[int] = set()
+    for helper in helpers:
+        # The abi argument may already have been threaded through.
+        pattern = re.escape(helper) + r"\(mut data, (?:abi, )?(0x[0-9a-fA-F]+)"
+        found.update(int(value, 16) for value in re.findall(pattern, text))
+    return sorted(found)
 
 
 def translate_offset(
@@ -421,9 +451,11 @@ def translate_offset(
 
     replacement = new_by_name.get(member["name"])
     if replacement is None:
-        raise LayoutError(
-            f"{path}: {offset:#x} is {member['name']}, which 13.5 removed"
-        )
+        # The field is 12.3-only, so there is nothing to point at. That is a
+        # write which simply does not happen at 13.5, not a failure -- but it
+        # has to be listed, because silently writing it at its 12.3 offset
+        # would land on whatever 13.5 put there.
+        raise DroppedField(member["name"])
     delta = offset - member["offset"]
     if delta == 0:
         return replacement["offset"]
@@ -455,7 +487,7 @@ def remap(
     consts: dict[str, VersionedConst],
     struct: str,
 ) -> tuple[list[tuple[int, int]], list[str]]:
-    pairs, problems = [], []
+    pairs, dropped, problems = [], [], []
     for offset in offsets:
         try:
             pairs.append(
@@ -466,9 +498,11 @@ def remap(
                     ),
                 )
             )
+        except DroppedField:
+            dropped.append(offset)
         except LayoutError as error:
             problems.append(str(error))
-    return pairs, problems
+    return pairs, dropped, problems
 
 
 def generate(raw_rs: Path) -> str:
@@ -500,14 +534,17 @@ def generate(raw_rs: Path) -> str:
         )
 
     remaps = {}
+    drops: dict[str, list[int]] = {}
     remap_problems: list[str] = []
-    for label, struct, source_name, helper in REMAPPED:
+    for label, struct, source_name, helpers in REMAPPED:
         source_file = KERNEL_FW / source_name
         if not source_file.is_file():
             remap_problems.append(f"missing {source_file}")
             continue
-        offsets = written_offsets(source_file, helper)
-        pairs, problems = remap(
+        offsets = sorted(
+            set(written_offsets(source_file, helpers)) | set(LOOP_BASES.get(label, ()))
+        )
+        pairs, dropped, problems = remap(
             offsets,
             lay_out(struct, structs, consts, {"G": "G13", "V": "V12_3"}),
             lay_out(struct, structs, consts, {"G": "G13", "V": "V13_5"}),
@@ -516,6 +553,7 @@ def generate(raw_rs: Path) -> str:
             struct,
         )
         remaps[label] = pairs
+        drops[label] = dropped
         remap_problems += problems
     if remap_problems:
         raise LayoutError(
@@ -548,6 +586,36 @@ def generate(raw_rs: Path) -> str:
         lines.append("")
 
     lines += [
+        "// PowerZone member offsets at each ABI. 13.5 inserts two fields in the",
+        "// middle of the entry, so the array's stride and the position of the two",
+        "// members after the insertion both change: a per-entry base plus fixed",
+        "// member offsets would write the filter coefficients into the wrong",
+        "// words. The array base itself is in the remap table below.",
+    ]
+    for label, (gpu, version) in TARGETS.items():
+        zone = lay_out("PowerZone", structs, consts, {"G": gpu, "V": version})
+        for member in zone["fields"]:
+            lines.append(
+                f"pub const g13_{label}_power_zone_{member['name']}_offset = "
+                f"u32({member['offset']:#x})"
+            )
+        lines.append("")
+
+    lines += [
+        "// Fields 13.5 adds that need a value written, at their 13.5 offsets.",
+        "// These do not exist at 12.3, so there is nothing to translate: the",
+        "// builders write them only when the 13.5 layout is selected. Members of",
+        "// a nested block are expanded, which is what unk_e10_0 -- the SE control",
+        "// block 13.5 grows HwDataA by -- mostly consists of.",
+    ]
+    for label, entries in fields_needing_values(raw_rs).items():
+        for member_name, offset, kind in entries:
+            lines.append(
+                f"pub const g13_v13_5_{label}_{member_name}_offset = u32({offset:#x}) // {kind}"
+            )
+        lines.append("")
+
+    lines += [
         "// Where each offset the 12.3 builders write moves to at 13.5. The two",
         "// arrays are index-matched, sorted by the 12.3 offset, and cover exactly",
         "// the offsets those builders address -- generation fails if one of them",
@@ -558,6 +626,22 @@ def generate(raw_rs: Path) -> str:
             values = ", ".join(f"u32({pair[column]:#x})" for pair in pairs)
             lines.append(f"pub const g13_{label}_offsets_{suffix} = [{values}]!")
         lines.append("")
+
+    lines += [
+        "// 12.3 offsets whose field 13.5 does not have. The write is skipped",
+        "// there rather than failing: the value has nowhere to go, and putting",
+        "// it at the 12.3 offset would land on whatever 13.5 placed there.",
+    ]
+    for label, offsets in drops.items():
+        # A slice rather than a fixed array: V cannot spell an empty one, and
+        # Globals happens to drop nothing.
+        rendered = (
+            "[" + ", ".join(f"u32({offset:#x})" for offset in offsets) + "]"
+            if offsets
+            else "[]u32{}"
+        )
+        lines.append(f"pub const g13_{label}_offsets_dropped_v13_5 = {rendered}")
+    lines.append("")
     return "\n".join(lines) + "\n"
 
 
@@ -677,6 +761,47 @@ def classify_additions(raw_rs: Path) -> str:
         for member, why in skipped:
             out.append(f"    skip   {member['name']:32s} ({why})")
     return "\n".join(out)
+
+
+def fields_needing_values(
+    raw_rs: Path,
+) -> dict[str, list[tuple[str, int, str]]]:
+    """Named 13.5 offsets for every added field that needs a value written.
+
+    Returns {struct_label: [(name, offset, note)]}. A field whose type is itself
+    a structure is expanded: unk_e10_0 is the SE control block 13.5 adds to
+    HwDataA, and its two dozen members are what actually get written.
+    """
+    structs, consts = parse(raw_rs.read_text())
+    initdata = (raw_rs.parent / "initdata.rs").read_text()
+    result: dict[str, list[tuple[str, int, str]]] = {}
+    for name, label in (("HwDataA", "hwdata_a"), ("Globals", "globals"), ("HwDataB", "hwdata_b")):
+        old_names = {
+            f["name"]
+            for f in lay_out(name, structs, consts, {"G": "G13", "V": "V12_3"})["fields"]
+        }
+        entries: list[tuple[str, int, str]] = []
+        for member in lay_out(name, structs, consts, {"G": "G13", "V": "V13_5"})["fields"]:
+            if member["name"] in old_names or member["name"] in INAPPLICABLE_TO_G13:
+                continue
+            if member["type"] in structs:
+                inner = lay_out(member["type"], structs, consts, {"G": "G13", "V": "V13_5"})
+                for sub in inner["fields"]:
+                    entries.append(
+                        (
+                            f"{member['name']}_{sub['name']}",
+                            member["offset"] + sub["offset"],
+                            sub["type"],
+                        )
+                    )
+                continue
+            if assignment_for(initdata, member["name"]) is None and not re.search(
+                r"\braw\." + re.escape(member["name"]) + r"\b", initdata
+            ):
+                continue
+            entries.append((member["name"], member["offset"], member["type"]))
+        result[label] = entries
+    return result
 
 
 def report(raw_rs: Path) -> str:

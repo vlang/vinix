@@ -850,7 +850,10 @@ fn (mut mgr GpuManager) init_firmware_data() bool {
 	graph.runtime_pointers = mgr.alloc_g13_buffer_with_protection(fw.g13_runtime_pointers_size, pgtable.gpu_prot_fw_private_rw) or {
 		return false
 	}
-	graph.globals = mgr.alloc_g13_buffer_with_protection(fw.g13_globals_size, pgtable.gpu_prot_fw_private_rw) or {
+	// Allocate what the selected ABI publishes, not what the type can hold:
+	// the blob structs are sized for the larger of the two layouts.
+	globals_size := fw.g13_globals_active_size(mgr.hw_config.firmware_abi) or { return false }
+	graph.globals = mgr.alloc_g13_buffer_with_protection(globals_size, pgtable.gpu_prot_fw_private_rw) or {
 		return false
 	}
 	unsafe {
@@ -874,7 +877,8 @@ fn (mut mgr GpuManager) init_firmware_data() bool {
 			return false
 		}
 	}
-	graph.hwdata_a = mgr.alloc_g13_buffer_with_protection(fw.g13_hwdata_a_size, pgtable.gpu_prot_fw_private_rw) or {
+	hwdata_a_size := fw.g13_hwdata_a_active_size(mgr.hw_config.firmware_abi) or { return false }
+	graph.hwdata_a = mgr.alloc_g13_buffer_with_protection(hwdata_a_size, pgtable.gpu_prot_fw_private_rw) or {
 		return false
 	}
 	unsafe {
