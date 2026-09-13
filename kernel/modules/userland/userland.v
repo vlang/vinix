@@ -775,6 +775,11 @@ pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, 
 		mut t := proc.current_thread()
 		mut process := t.process
 
+		// Serialize the successful exec transition with parent setpgid.
+		proc.lock_table()
+		process.execed_since_fork = true
+		proc.unlock_table()
+
 		mut old_pagemap := process.pagemap
 
 		process.pagemap = new_pagemap
