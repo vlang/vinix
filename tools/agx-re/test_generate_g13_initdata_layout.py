@@ -134,6 +134,45 @@ class LayoutTests(unittest.TestCase):
             layout.size_align("Mystery", self.structs, self.consts, G13_12_3)
 
 
+INITDATA_SAMPLE = textwrap.dedent(
+    """
+        raw.unk_b38_4 = 1;
+        #[ver(V >= V13_0B4 && V < V13_3)]
+        raw.unk_c3c = 0x19;
+        #[ver(V >= V13_3)]
+        raw.unk_c3c = 0x1a;
+        #[ver(V >= V13_0B4)]
+        raw.avg_power_target_filter_tc_clks =
+            period_ms * cfg.avg_power_target_filter_tc * base_clock_khz;
+        raw.not_gated = 7;
+    """
+)
+
+
+class AssignmentTests(unittest.TestCase):
+    """Assignments carry version gates too, not just the fields they target."""
+
+    def test_gated_assignment_picks_the_arm_for_13_5(self) -> None:
+        # Taking the first textual match writes 0x19 into a structure that
+        # wants 0x1a at 13.5.
+        self.assertEqual(
+            layout.assignment_for(INITDATA_SAMPLE, "unk_c3c"), "0x1a"
+        )
+
+    def test_ungated_assignment_is_taken_as_is(self) -> None:
+        self.assertEqual(layout.assignment_for(INITDATA_SAMPLE, "not_gated"), "7")
+        self.assertEqual(layout.assignment_for(INITDATA_SAMPLE, "unk_b38_4"), "1")
+
+    def test_assignment_spanning_lines_is_joined(self) -> None:
+        self.assertEqual(
+            layout.assignment_for(INITDATA_SAMPLE, "avg_power_target_filter_tc_clks"),
+            "period_ms * cfg.avg_power_target_filter_tc * base_clock_khz",
+        )
+
+    def test_absent_field_has_no_assignment(self) -> None:
+        self.assertIsNone(layout.assignment_for(INITDATA_SAMPLE, "never_here"))
+
+
 class TreeAgreementTests(unittest.TestCase):
     """The engine has to reproduce the 12.3 layout this tree already had."""
 

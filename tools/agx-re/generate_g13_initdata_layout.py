@@ -573,6 +573,8 @@ def main() -> int:
 
     if args.report:
         print(report(args.raw_rs))
+        print()
+        print(classify_additions(args.raw_rs))
         return 0
     source = generate(args.raw_rs)
     if args.check:
@@ -581,6 +583,100 @@ def main() -> int:
     else:
         args.output.write_text(source)
     return 0
+
+
+# Gates in m1n1's initdata.rs that never hold for a base M1, so the fields they
+# populate stay zero here. t8103 sets has_csafr: false, and G13G is not G14X.
+INAPPLICABLE_TO_G13 = {
+    "aux_leak_coef": "csafr, which t8103 does not have",
+    "aux_ps": "csafr, which t8103 does not have",
+    "unk_hws2": "G >= G14X",
+}
+
+
+def assignment_for(initdata: str, field: str) -> str | None:
+    """The value m1n1 assigns to a field at 13.5, honouring the gate on it.
+
+    Assignments are version-gated too, not just fields: unk_c3c is 0x19 below
+    13.3 and 0x1a at or above it, and taking the first textual match writes the
+    wrong constant into a structure firmware reads. Evaluate the gate on the
+    statement the same way as the gate on the field.
+    """
+    lines = initdata.splitlines()
+    # The value may begin on the next line, so allow an empty tail here and let
+    # the continuation loop below gather it.
+    pattern = re.compile(r"\s*raw\." + re.escape(field) + r"\s*=(?!=)\s*(.*)")
+    target = {"G": "G13", "V": "V13_5"}
+    for index, line in enumerate(lines):
+        match = pattern.match(line)
+        if not match:
+            continue
+        value = match.group(1)
+        # An assignment may run on past its line; stop at the statement end.
+        cursor = index
+        while ";" not in value and cursor + 1 < len(lines):
+            cursor += 1
+            value += " " + lines[cursor].strip()
+        value = value.split(";")[0]
+        gate = None
+        for previous in range(index - 1, max(index - 3, -1), -1):
+            text = lines[previous].strip()
+            if not text or text in ("{", "}"):
+                continue
+            gate = extract_gate(lines[previous])
+            break
+        if gate is not None and not evaluate(gate, target):
+            continue
+        return " ".join(value.split())
+    return None
+
+
+def classify_additions(raw_rs: Path) -> str:
+    """List the fields 13.5 adds and what m1n1 puts in each.
+
+    Moving the existing offsets is only half of 13.5; the other half is the
+    structures it grows. Most of the additions are never assigned and stay
+    zero, so this separates the ones that actually need a value from the ones
+    that do not, and names the reason for each exclusion rather than leaving it
+    to be rediscovered.
+    """
+    structs, consts = parse(raw_rs.read_text())
+    initdata = (raw_rs.parent / "initdata.rs").read_text()
+    out = []
+    for name in ("HwDataA", "Globals", "HwDataB"):
+        old_names = {
+            f["name"]
+            for f in lay_out(name, structs, consts, {"G": "G13", "V": "V12_3"})["fields"]
+        }
+        added = [
+            f
+            for f in lay_out(name, structs, consts, {"G": "G13", "V": "V13_5"})["fields"]
+            if f["name"] not in old_names
+        ]
+        needed, zeroed, skipped = [], [], []
+        for member in added:
+            if member["name"] in INAPPLICABLE_TO_G13:
+                skipped.append((member, INAPPLICABLE_TO_G13[member["name"]]))
+                continue
+            direct = assignment_for(initdata, member["name"])
+            mentioned = re.search(
+                r"\braw\." + re.escape(member["name"]) + r"\b", initdata
+            )
+            if direct is not None:
+                needed.append((member, direct))
+            elif mentioned:
+                needed.append((member, "<assigned indirectly>"))
+            else:
+                zeroed.append(member)
+        out.append(
+            f"{name}: {len(added)} added -- {len(needed)} need a value, "
+            f"{len(zeroed)} stay zero, {len(skipped)} not applicable"
+        )
+        for member, value in needed:
+            out.append(f"    value  {member['name']:32s} @ {member['offset']:#7x} = {value}")
+        for member, why in skipped:
+            out.append(f"    skip   {member['name']:32s} ({why})")
+    return "\n".join(out)
 
 
 def report(raw_rs: Path) -> str:
