@@ -17,12 +17,12 @@ Scope is base M1 only. `hw.get_config()` recognises exactly two chip IDs,
 | Firmware ABI | 12.3.0, published as `apple,firmware-abi = <12 3 0>`. |
 | Firmware image | The macOS 12.3-era G13 firmware. The ABI tuple is checked, the image is not: a newer image behind a 12.3 tuple will be accepted and will then disagree with every structure in `gpu/agx/fw`. |
 
-`gpu,t8103` selects the native Apple DeviceTree path instead. That path is
-**not** supported: it carries no OPP-v2 table and no ABI tuple, and both
-`report_native_t8103_opp_gap()` and `validate_g13_firmware_compat()` refuse it
-before any power domain or ASC register is touched. Anyone completing it has to
-supply the ABI tuple as well as the performance data — the firmware check is not
-optional just because a later gate happens to also stop the boot.
+`gpu,t8103` selects the native Apple DeviceTree path instead. That path is not
+supported yet, but the gap is now a short named list rather than an open
+question. See [native Apple DeviceTree](#native-apple-devicetree) below.
+`validate_g13_firmware_compat()` also refuses it, because an ADT carries no ABI
+tuple: whoever finishes the native path has to supply one, and the firmware
+check is not optional just because a later gate happens to also stop the boot.
 
 ## Device-tree properties the driver consumes
 
@@ -86,6 +86,46 @@ Every coefficient is carried through as a raw IEEE-754 word and is rejected if
 it is not finite. The kernel never executes a floating-point instruction to
 build InitData.
 
+## Native Apple DeviceTree
+
+`tools/agx-re/recover_t8103_adt.py` reads a base-M1 Apple DeviceTree and Apple's
+own `AGXG13G` and reports what the native path is actually short of. Both are
+staged under `/System/Volumes/Preboot/*/restore-staged` on **any** Apple Silicon
+Mac — a macOS install keeps one kernel collection and one DeviceTree per
+supported board for restore — so none of this needs an M1 to reproduce:
+
+```sh
+make -C tools/agx-re recover-t8103-adt
+```
+
+Apple publishes the GPU control loop as little-endian `gpu-*` DeviceTree
+scalars. m1n1 republishes the identical set as big-endian `apple,*` FDT cells,
+and the names differ by that prefix and nothing else. So
+`load_t8103_power_controller_config()` reads either spelling through one
+implementation, and **22 of the 26 inputs it requires are already in a native
+tree**, including the whole PID/filter coefficient set and the power zone.
+
+Four are not there, at any spelling:
+
+| Missing input | Where Apple gets it |
+| --- | --- |
+| per-state power | Nowhere. `perf-states` is `{frequency_hz, voltage_mV}` pairs with no power column, and `AGXFirmware::setupConfig` reads a *published* maximum — `gpu-device-max-power`, else `gpu-max-power` — with no computed fallback behind it. Neither name is in a base-M1 tree. G13 firmware refuses a zero `max_power_mw`, so this one blocks the performance table. |
+| minimum SRAM voltage | An m1n1 invention. It clamps the ADT core voltages to a floor Apple's boot data never states. |
+| core and SRAM leakage coefficients | Fused, not published. `AGXAcceleratorG13G_B0::calculateGPULeakage` reads one 64-bit word from the fuse aperture, shifts it, masks it, adds one and scales it by a driver-held `f32`. HwDataA wants the two resulting coefficients at `0x3cf4` and `0x3d14`. |
+
+Two things worth knowing before trying to finish it:
+
+* A **staged DeviceTree is a template.** Its `perf-states` is zero-filled and
+  `perf-state-count` is 0; iBoot writes the fused table in at boot. Property
+  names and shapes can be read from the staged image, values cannot.
+* `AGXAccelerator::applyLeakageEquation` is a double-precision, `pow()`-based
+  *thermal* model. It is not the per-pstate table, and it could not be used in
+  this kernel anyway — the AArch64 build is `-mgeneral-regs-only`, which is why
+  every coefficient here is carried as a raw IEEE-754 word.
+
+So the remaining work is reproducing a fuse read and finding a source for a
+maximum power, not reconstructing a power model.
+
 ## Acceptance sequence
 
 A `/dev/dri` node and an "initialized" log line are not evidence that the GPU
@@ -107,6 +147,8 @@ executed anything. In order:
 ## Known unproven
 
 * No step of the sequence above has been run on hardware from this tree.
+* The native Apple DeviceTree path is still gated; see above for the four
+  inputs it is short of.
 * The 12.3.0 gate checks the device tree's claim, not the firmware image.
 * Userspace is a separate acceptance criterion. The submission interface is
   pinned to a particular Mesa-era UAPI (`drm_ioctl.validate_asahi_25_layouts()`),

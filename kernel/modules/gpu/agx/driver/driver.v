@@ -339,47 +339,46 @@ fn load_t6050_power_sample_period(gpu_node &devicetree.DTNode, mut cfg hw.HwConf
 	return true
 }
 
-// The native Apple DeviceTree carries no OPP-v2 table, and the gap is larger
-// than a rename. G13's hwdata refuses to initialise with a zero max_power_mw,
-// but the Apple GPU node carries only frequency and voltage: on a live M5 Max
-// tree the sgx node's 66 properties include perf-states, perf-states-sram and
-// gpu-pwr-perf-scale0/1, and no per-state power under any spelling.
+// Report what a native Apple DeviceTree boot is still missing for G13.
 //
-// Apple's driver does not read that figure, it computes it: the recovered G17
-// ABI exposes per-domain leakage equations and a fused chip-leakage table
-// (calculateVddGpuLeakage, applyLeakageEquation, populateChipLeakageData) that
-// turn voltage, frequency and per-die fuses into power. Reproducing that for
-// G13 needs the equivalent model out of an M1's AGXG13X kext, which is not
-// available here. So this is not a translation that can be written from the
-// device tree at all, on any chip.
+// This used to say the translation could not be written from the device tree at
+// all, on any chip. It can, mostly: tools/agx-re/recover_t8103_adt.py reads a
+// base-M1 DeviceTree and AGXG13G -- both staged under Preboot on any Mac, no M1
+// needed -- and finds 22 of the 26 inputs load_t8103_* requires already there
+// under gpu-* names, carrying the same values m1n1 republishes as apple,* FDT
+// cells. load_t8103_power_controller_config() now reads either spelling.
 //
-// Report what the node actually carries instead of guessing property names for
-// a path whose whole purpose is to open GPU hardware access.
-fn report_native_t8103_opp_gap(gpu_node &devicetree.DTNode) {
-	println('agx: native t8103 OPP translation is not implemented')
-	println('agx: expected an m1n1/Linux FDT (apple,agx-g13g) with operating-points-v2;')
-	println('agx: this boot supplied the Apple DeviceTree (gpu,t8103) instead.')
-	C.printf(c'agx: native t8103 GPU node exposes %u properties:\n',
-		u32(gpu_node.properties.len))
-	for property in gpu_node.properties {
-		if property.len == 4 {
-			C.printf(c'agx:   %s len=%u value=0x%x\n', property.name.str, property.len,
-				read_le_u32_at(property.data, 0))
-		} else if property.len >= 8 && property.len % 4 == 0 {
-			C.printf(c'agx:   %s len=%u first=0x%x,0x%x\n', property.name.str,
-				property.len, read_le_u32_at(property.data, 0),
-				read_le_u32_at(property.data, 4))
-		} else {
-			C.printf(c'agx:   %s len=%u\n', property.name.str, property.len)
-		}
-	}
-}
-
-fn read_le_u32_at(data voidptr, offset u32) u32 {
-	value := unsafe { &u8(u64(data) + offset) }
-	return unsafe {
-		u32(value[0]) | (u32(value[1]) << 8) | (u32(value[2]) << 16) | (u32(value[3]) << 24)
-	}
+// Four inputs have no Apple DeviceTree source at any spelling:
+//
+//   per-state power    perf-states is {frequency_hz, voltage_mV} pairs and
+//                      carries no power column. Apple does not compute one
+//                      either: AGXFirmware::setupConfig reads a published
+//                      figure (gpu-device-max-power, else gpu-max-power) with
+//                      no fallback behind it, and neither name is in a base-M1
+//                      tree. Firmware refuses a zero max_power_mw, so the
+//                      performance table stays unbuildable until this has a
+//                      source.
+//   min SRAM voltage   an m1n1 invention: it clamps the ADT core voltages to a
+//                      floor that Apple's own boot data never states.
+//   core/SRAM leakage  fused, not published. AGXAcceleratorG13G_B0::
+//                      calculateGPULeakage reads one 64-bit word from the fuse
+//                      aperture, shifts it, masks it, adds one and scales it by
+//                      a driver-held f32. HwDataA wants the two resulting
+//                      coefficients at 0x3cf4 and 0x3d14, so reproducing that
+//                      read is the remaining work, not inventing a power model.
+//
+// A staged DeviceTree is only a template as well: its perf-states is
+// zero-filled and iBoot writes the fused table in at boot, so a live tree is
+// the only place the frequencies and voltages exist.
+fn report_native_t8103_performance_gap(gpu_node &devicetree.DTNode, power_loaded bool) {
+	state_count := devicetree.get_le_u32(gpu_node, 'perf-state-count') or { u32(0) }
+	max_state := devicetree.get_le_u32(gpu_node, 'gpu-num-perf-states') or { u32(0) }
+	state_words := (devicetree.get_le_u32_array(gpu_node, 'perf-states') or { []u32{} }).len
+	println('agx: native t8103 GPU boot data is incomplete')
+	println('agx:   perf-states: ${state_count} states, max ${max_state}, ${state_words} words')
+	println('agx:   power controller: ${if power_loaded { 'complete' } else { 'incomplete' }}')
+	println('agx:   missing: per-state power, minimum SRAM voltage, core and SRAM leakage')
+	println('agx:   see tools/agx-re/recover_t8103_adt.py for where each one comes from')
 }
 
 // G13 receives its operating points through the standard OPP-v2 FDT binding.
@@ -459,9 +458,46 @@ fn load_t8103_performance_config(gpu_node &devicetree.DTNode, mut cfg hw.HwConfi
 	return true
 }
 
-fn get_g13_required_u32(node &devicetree.DTNode, name string) ?u32 {
-	value := devicetree.get_u32(node, name) or {
-		C.printf(c'agx: t8103 has no %s\n', name.str)
+// One GPU control-loop scalar, under whichever spelling the boot data uses.
+//
+// Apple's DeviceTree publishes these as little-endian gpu-* scalars; m1n1
+// republishes the identical set as big-endian apple,* FDT cells, and the names
+// differ by that prefix and nothing else. The rule and its exceptions were
+// recovered from a base-M1 DeviceTree and AGXG13G's own string table by
+// tools/agx-re/recover_t8103_adt.py, so both boot paths can share one reader
+// instead of keeping two transcriptions of forty-two property names in step.
+fn g13_power_property(native_adt bool, name string) string {
+	return if native_adt { 'gpu-${name}' } else { 'apple,${name}' }
+}
+
+fn get_g13_power_u32(node &devicetree.DTNode, native_adt bool, name string) ?u32 {
+	property := g13_power_property(native_adt, name)
+	if native_adt {
+		return devicetree.get_le_u32(node, property)
+	}
+	return devicetree.get_u32(node, property)
+}
+
+fn get_g13_power_required_u32(node &devicetree.DTNode, native_adt bool, name string) ?u32 {
+	value := get_g13_power_u32(node, native_adt, name) or {
+		println('agx: t8103 boot data has no ${g13_power_property(native_adt, name)}')
+		return none
+	}
+	return value
+}
+
+fn get_g13_power_u32_array(node &devicetree.DTNode, native_adt bool, name string) ?[]u32 {
+	property := g13_power_property(native_adt, name)
+	if native_adt {
+		return devicetree.get_le_u32_array(node, property)
+	}
+	return devicetree.get_u32_array(node, property)
+}
+
+fn get_g13_power_required_u32_array(node &devicetree.DTNode, native_adt bool,
+	name string) ?[]u32 {
+	value := get_g13_power_u32_array(node, native_adt, name) or {
+		println('agx: t8103 boot data has no ${g13_power_property(native_adt, name)}')
 		return none
 	}
 	return value
@@ -474,7 +510,7 @@ fn valid_f32_bits(value u32) bool {
 // Preserve all PID/filter coefficients as raw IEEE-754 words. The values are
 // consumed by the G13 firmware ABI and must not make the ARM kernel execute
 // floating-point instructions while constructing InitData.
-fn load_t8103_power_controller_config(gpu_node &devicetree.DTNode,
+fn load_t8103_power_controller_config(gpu_node &devicetree.DTNode, native_adt bool,
 	mut cfg hw.HwConfig) bool {
 	mut power := hw.G13PowerConfig{
 		fast_die0_release_temp: 80
@@ -499,13 +535,13 @@ fn load_t8103_power_controller_config(gpu_node &devicetree.DTNode,
 		se_kp_1_f32: 0xc1200000 // -10.0f
 		se_reset_criteria: 50
 	}
-	if _ := devicetree.get_property(gpu_node, 'apple,power-zones') {
-		zones := devicetree.get_u32_array(gpu_node, 'apple,power-zones') or {
-			println('agx: malformed t8103 apple,power-zones')
+	if _ := devicetree.get_property(gpu_node, g13_power_property(native_adt, 'power-zones')) {
+		zones := get_g13_power_u32_array(gpu_node, native_adt, 'power-zones') or {
+			println('agx: malformed t8103 ${g13_power_property(native_adt, "power-zones")}')
 			return false
 		}
 		if zones.len > 15 || zones.len % 3 != 0 {
-			println('agx: invalid t8103 apple,power-zones length')
+			println('agx: invalid t8103 ${g13_power_property(native_adt, "power-zones")} length')
 			return false
 		}
 		power.power_zone_count = u32(zones.len / 3)
@@ -523,12 +559,10 @@ fn load_t8103_power_controller_config(gpu_node &devicetree.DTNode,
 		}
 	}
 
-	core_leak := devicetree.get_u32_array(gpu_node, 'apple,core-leak-coef') or {
-		println('agx: t8103 has no apple,core-leak-coef')
+	core_leak := get_g13_power_required_u32_array(gpu_node, native_adt, 'core-leak-coef') or {
 		return false
 	}
-	sram_leak := devicetree.get_u32_array(gpu_node, 'apple,sram-leak-coef') or {
-		println('agx: t8103 has no apple,sram-leak-coef')
+	sram_leak := get_g13_power_required_u32_array(gpu_node, native_adt, 'sram-leak-coef') or {
 		return false
 	}
 	if core_leak.len != int(cfg.num_clusters) || sram_leak.len != int(cfg.num_clusters) {
@@ -544,51 +578,51 @@ fn load_t8103_power_controller_config(gpu_node &devicetree.DTNode,
 		power.sram_leak_coef_f32[cluster] = sram_leak[cluster]
 	}
 
-	power.avg_power_filter_tc_ms = get_g13_required_u32(gpu_node, 'apple,avg-power-filter-tc-ms') or { return false }
-	power.avg_power_ki_only_f32 = get_g13_required_u32(gpu_node, 'apple,avg-power-ki-only') or { return false }
-	power.avg_power_kp_f32 = get_g13_required_u32(gpu_node, 'apple,avg-power-kp') or { return false }
-	power.avg_power_min_duty_cycle = get_g13_required_u32(gpu_node, 'apple,avg-power-min-duty-cycle') or { return false }
-	power.avg_power_target_filter_tc = get_g13_required_u32(gpu_node, 'apple,avg-power-target-filter-tc') or { return false }
-	power.fast_die0_integral_gain_f32 = get_g13_required_u32(gpu_node, 'apple,fast-die0-integral-gain') or { return false }
-	power.fast_die0_proportional_gain_f32 = get_g13_required_u32(gpu_node, 'apple,fast-die0-proportional-gain') or { return false }
-	power.fast_die0_prop_tgt_delta = devicetree.get_u32(gpu_node, 'apple,fast-die0-prop-tgt-delta') or { u32(0) }
-	power.fast_die0_release_temp = devicetree.get_u32(gpu_node, 'apple,fast-die0-release-temp') or { u32(80) }
-	power.fender_idle_off_delay_ms = devicetree.get_u32(gpu_node, 'apple,fender-idle-off-delay-ms') or { u32(40) }
-	power.fw_early_wake_timeout_ms = devicetree.get_u32(gpu_node, 'apple,fw-early-wake-timeout-ms') or { u32(5) }
-	power.idle_off_delay_ms = devicetree.get_u32(gpu_node, 'apple,idle-off-delay-ms') or { u32(2) }
-	power.idle_off_standby_timer = devicetree.get_u32(gpu_node, 'apple,idleoff-standby-timer') or { u32(0) }
-	power.perf_boost_ce_step = devicetree.get_u32(gpu_node, 'apple,perf-boost-ce-step') or { u32(25) }
-	power.perf_boost_min_util = devicetree.get_u32(gpu_node, 'apple,perf-boost-min-util') or { u32(100) }
-	power.perf_filter_drop_threshold = get_g13_required_u32(gpu_node, 'apple,perf-filter-drop-threshold') or { return false }
-	power.perf_filter_time_constant2 = get_g13_required_u32(gpu_node, 'apple,perf-filter-time-constant2') or { return false }
-	power.perf_filter_time_constant = get_g13_required_u32(gpu_node, 'apple,perf-filter-time-constant') or { return false }
-	power.perf_integral_gain2_f32 = get_g13_required_u32(gpu_node, 'apple,perf-integral-gain2') or { return false }
-	power.perf_integral_gain_f32 = devicetree.get_u32(gpu_node, 'apple,perf-integral-gain') or { u32(0x40fca970) }
-	power.perf_integral_min_clamp = get_g13_required_u32(gpu_node, 'apple,perf-integral-min-clamp') or { return false }
-	power.perf_proportional_gain2_f32 = get_g13_required_u32(gpu_node, 'apple,perf-proportional-gain2') or { return false }
-	power.perf_proportional_gain_f32 = devicetree.get_u32(gpu_node, 'apple,perf-proportional-gain') or { u32(0x416b53d1) }
-	power.perf_reset_iters = devicetree.get_u32(gpu_node, 'apple,perf-reset-iters') or { u32(6) }
-	power.perf_tgt_utilization = get_g13_required_u32(gpu_node, 'apple,perf-tgt-utilization') or { return false }
-	power.ppm_filter_time_constant_ms = get_g13_required_u32(gpu_node, 'apple,ppm-filter-time-constant-ms') or { return false }
-	power.ppm_ki_f32 = get_g13_required_u32(gpu_node, 'apple,ppm-ki') or { return false }
-	power.ppm_kp_f32 = get_g13_required_u32(gpu_node, 'apple,ppm-kp') or { return false }
-	power.pwr_filter_time_constant = devicetree.get_u32(gpu_node, 'apple,pwr-filter-time-constant') or { u32(313) }
-	power.pwr_integral_gain_f32 = devicetree.get_u32(gpu_node, 'apple,pwr-integral-gain') or { u32(0x3ca59586) }
-	power.pwr_integral_min_clamp = devicetree.get_u32(gpu_node, 'apple,pwr-integral-min-clamp') or { u32(0) }
-	power.pwr_min_duty_cycle = get_g13_required_u32(gpu_node, 'apple,pwr-min-duty-cycle') or { return false }
-	power.pwr_proportional_gain_f32 = devicetree.get_u32(gpu_node, 'apple,pwr-proportional-gain') or { u32(0x40a90fdb) }
-	power.se_engagement_criteria = i32(devicetree.get_u32(gpu_node, 'apple,se-engagement-criteria') or { u32(-1) })
-	power.se_filter_time_constant = devicetree.get_u32(gpu_node, 'apple,se-filter-time-constant') or { u32(9) }
-	power.se_filter_time_constant_1 = devicetree.get_u32(gpu_node, 'apple,se-filter-time-constant-1') or { u32(3) }
-	power.se_inactive_threshold = devicetree.get_u32(gpu_node, 'apple,se-inactive-threshold') or { u32(2500) }
-	power.se_ki_f32 = devicetree.get_u32(gpu_node, 'apple,se-ki') or { u32(0xc2480000) }
-	power.se_ki_1_f32 = devicetree.get_u32(gpu_node, 'apple,se-ki-1') or { u32(0xc2c80000) }
-	power.se_kp_f32 = devicetree.get_u32(gpu_node, 'apple,se-kp') or { u32(0xc0a00000) }
-	power.se_kp_1_f32 = devicetree.get_u32(gpu_node, 'apple,se-kp-1') or { u32(0xc1200000) }
-	power.se_reset_criteria = devicetree.get_u32(gpu_node, 'apple,se-reset-criteria') or { u32(50) }
+	power.avg_power_filter_tc_ms = get_g13_power_required_u32(gpu_node, native_adt, 'avg-power-filter-tc-ms') or { return false }
+	power.avg_power_ki_only_f32 = get_g13_power_required_u32(gpu_node, native_adt, 'avg-power-ki-only') or { return false }
+	power.avg_power_kp_f32 = get_g13_power_required_u32(gpu_node, native_adt, 'avg-power-kp') or { return false }
+	power.avg_power_min_duty_cycle = get_g13_power_required_u32(gpu_node, native_adt, 'avg-power-min-duty-cycle') or { return false }
+	power.avg_power_target_filter_tc = get_g13_power_required_u32(gpu_node, native_adt, 'avg-power-target-filter-tc') or { return false }
+	power.fast_die0_integral_gain_f32 = get_g13_power_required_u32(gpu_node, native_adt, 'fast-die0-integral-gain') or { return false }
+	power.fast_die0_proportional_gain_f32 = get_g13_power_required_u32(gpu_node, native_adt, 'fast-die0-proportional-gain') or { return false }
+	power.fast_die0_prop_tgt_delta = get_g13_power_u32(gpu_node, native_adt, 'fast-die0-prop-tgt-delta') or { u32(0) }
+	power.fast_die0_release_temp = get_g13_power_u32(gpu_node, native_adt, 'fast-die0-release-temp') or { u32(80) }
+	power.fender_idle_off_delay_ms = get_g13_power_u32(gpu_node, native_adt, 'fender-idle-off-delay-ms') or { u32(40) }
+	power.fw_early_wake_timeout_ms = get_g13_power_u32(gpu_node, native_adt, 'fw-early-wake-timeout-ms') or { u32(5) }
+	power.idle_off_delay_ms = get_g13_power_u32(gpu_node, native_adt, 'idle-off-delay-ms') or { u32(2) }
+	power.idle_off_standby_timer = get_g13_power_u32(gpu_node, native_adt, 'idleoff-standby-timer') or { u32(0) }
+	power.perf_boost_ce_step = get_g13_power_u32(gpu_node, native_adt, 'perf-boost-ce-step') or { u32(25) }
+	power.perf_boost_min_util = get_g13_power_u32(gpu_node, native_adt, 'perf-boost-min-util') or { u32(100) }
+	power.perf_filter_drop_threshold = get_g13_power_required_u32(gpu_node, native_adt, 'perf-filter-drop-threshold') or { return false }
+	power.perf_filter_time_constant2 = get_g13_power_required_u32(gpu_node, native_adt, 'perf-filter-time-constant2') or { return false }
+	power.perf_filter_time_constant = get_g13_power_required_u32(gpu_node, native_adt, 'perf-filter-time-constant') or { return false }
+	power.perf_integral_gain2_f32 = get_g13_power_required_u32(gpu_node, native_adt, 'perf-integral-gain2') or { return false }
+	power.perf_integral_gain_f32 = get_g13_power_u32(gpu_node, native_adt, 'perf-integral-gain') or { u32(0x40fca970) }
+	power.perf_integral_min_clamp = get_g13_power_required_u32(gpu_node, native_adt, 'perf-integral-min-clamp') or { return false }
+	power.perf_proportional_gain2_f32 = get_g13_power_required_u32(gpu_node, native_adt, 'perf-proportional-gain2') or { return false }
+	power.perf_proportional_gain_f32 = get_g13_power_u32(gpu_node, native_adt, 'perf-proportional-gain') or { u32(0x416b53d1) }
+	power.perf_reset_iters = get_g13_power_u32(gpu_node, native_adt, 'perf-reset-iters') or { u32(6) }
+	power.perf_tgt_utilization = get_g13_power_required_u32(gpu_node, native_adt, 'perf-tgt-utilization') or { return false }
+	power.ppm_filter_time_constant_ms = get_g13_power_required_u32(gpu_node, native_adt, 'ppm-filter-time-constant-ms') or { return false }
+	power.ppm_ki_f32 = get_g13_power_required_u32(gpu_node, native_adt, 'ppm-ki') or { return false }
+	power.ppm_kp_f32 = get_g13_power_required_u32(gpu_node, native_adt, 'ppm-kp') or { return false }
+	power.pwr_filter_time_constant = get_g13_power_u32(gpu_node, native_adt, 'pwr-filter-time-constant') or { u32(313) }
+	power.pwr_integral_gain_f32 = get_g13_power_u32(gpu_node, native_adt, 'pwr-integral-gain') or { u32(0x3ca59586) }
+	power.pwr_integral_min_clamp = get_g13_power_u32(gpu_node, native_adt, 'pwr-integral-min-clamp') or { u32(0) }
+	power.pwr_min_duty_cycle = get_g13_power_required_u32(gpu_node, native_adt, 'pwr-min-duty-cycle') or { return false }
+	power.pwr_proportional_gain_f32 = get_g13_power_u32(gpu_node, native_adt, 'pwr-proportional-gain') or { u32(0x40a90fdb) }
+	power.se_engagement_criteria = i32(get_g13_power_u32(gpu_node, native_adt, 'se-engagement-criteria') or { u32(-1) })
+	power.se_filter_time_constant = get_g13_power_u32(gpu_node, native_adt, 'se-filter-time-constant') or { u32(9) }
+	power.se_filter_time_constant_1 = get_g13_power_u32(gpu_node, native_adt, 'se-filter-time-constant-1') or { u32(3) }
+	power.se_inactive_threshold = get_g13_power_u32(gpu_node, native_adt, 'se-inactive-threshold') or { u32(2500) }
+	power.se_ki_f32 = get_g13_power_u32(gpu_node, native_adt, 'se-ki') or { u32(0xc2480000) }
+	power.se_ki_1_f32 = get_g13_power_u32(gpu_node, native_adt, 'se-ki-1') or { u32(0xc2c80000) }
+	power.se_kp_f32 = get_g13_power_u32(gpu_node, native_adt, 'se-kp') or { u32(0xc0a00000) }
+	power.se_kp_1_f32 = get_g13_power_u32(gpu_node, native_adt, 'se-kp-1') or { u32(0xc1200000) }
+	power.se_reset_criteria = get_g13_power_u32(gpu_node, native_adt, 'se-reset-criteria') or { u32(50) }
 
 	default_clocks := cfg.base_clock_hz / 1000 * u64(cfg.gpu_power_sample_period)
-	clocks := devicetree.get_u32(gpu_node, 'apple,pwr-sample-period-aic-clks') or {
+	clocks := get_g13_power_u32(gpu_node, native_adt, 'pwr-sample-period-aic-clks') or {
 		if default_clocks > 0xffff_ffff {
 			return false
 		}
@@ -838,10 +872,14 @@ pub fn initialise() {
 	mut g13_performance_config_complete := false
 	if chip_id == 0x8103 {
 		if native_adt {
-			report_native_t8103_opp_gap(gpu_node)
+			// Load everything the native tree does carry. The gate further
+			// down stays shut on the four inputs it does not.
+			native_power_loaded := load_t8103_power_controller_config(gpu_node, true, mut
+				cfg)
+			report_native_t8103_performance_gap(gpu_node, native_power_loaded)
 		} else {
 			g13_performance_config_complete = load_t8103_performance_config(gpu_node, mut cfg)
-				&& load_t8103_power_controller_config(gpu_node, mut cfg)
+				&& load_t8103_power_controller_config(gpu_node, false, mut cfg)
 		}
 	}
 	if chip_id == 0x6050 {
