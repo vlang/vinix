@@ -15,7 +15,7 @@ import struct
 from dataclasses import dataclass
 from pathlib import Path
 
-from extract_firmware import der_item
+from extract_firmware import unwrap_im4p
 from extract_fileset import LC_SEGMENT_64
 from recover_g17_abi import (
     decode_add_immediate,
@@ -379,24 +379,9 @@ def align_up(value: int, alignment: int) -> int:
 
 
 def device_tree_im4p_payload(blob: bytes) -> bytes:
-    outer, end = der_item(blob, 0, 0x30)
-    if end != len(blob):
-        raise ValueError("trailing data after IMG4 DER sequence")
-    kind, offset = der_item(outer, 0, 0x16)
-    im4p, _offset = der_item(outer, offset, 0x30)
-    if kind != b"IMG4":
-        raise ValueError(f"not an IMG4 container (kind={kind!r})")
-
-    inner_kind, inner_offset = der_item(im4p, 0, 0x16)
-    image_type, inner_offset = der_item(im4p, inner_offset, 0x16)
-    _description, inner_offset = der_item(im4p, inner_offset, 0x16)
-    payload, _inner_offset = der_item(im4p, inner_offset, 0x04)
-    if inner_kind != b"IM4P" or image_type != b"dtre":
-        raise ValueError(
-            f"not a DeviceTree IM4P (kind={inner_kind!r}, type={image_type!r})"
-        )
-    # Signed IMG4s may append compression and payload-signature metadata.  The
-    # OCTET STRING remains the complete compressed DeviceTree.
+    image_type, payload, _has_extra_fields = unwrap_im4p(blob)
+    if image_type != b"dtre":
+        raise ValueError(f"not a DeviceTree IM4P (type={image_type!r})")
     return payload
 
 

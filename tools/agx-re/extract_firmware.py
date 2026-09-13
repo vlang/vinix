@@ -38,17 +38,40 @@ def der_item(blob: bytes, offset: int, expected_tag: int) -> tuple[bytes, int]:
     return blob[content:end], end
 
 
-def im4p_payload(blob: bytes) -> bytes:
+def unwrap_im4p(blob: bytes) -> tuple[bytes, bytes, bool]:
+    """Return (image_type, payload, has_extra_fields) for an IM4P.
+
+    Images installed for the running machine are IMG4-wrapped: a signed
+    manifest sits beside the IM4P.  The per-platform images Apple stages under
+    Preboot for every other Mac are bare IM4Ps with no manifest, and they are
+    the only way to read another SoC's kernel collection or DeviceTree from
+    here.  Accept both shapes rather than only the one this machine boots.
+
+    Modern signed images append compression and payload-signature metadata
+    after the OCTET STRING.  The OCTET STRING is still the complete payload;
+    the caller decides whether trailing fields are acceptable, and the metadata
+    is deliberately neither interpreted nor reproduced.
+    """
     sequence, end = der_item(blob, 0, 0x30)
     if end != len(blob):
         raise ValueError("trailing data after IM4P DER sequence")
     kind, offset = der_item(sequence, 0, 0x16)
+    if kind == b"IMG4":
+        sequence, _ = der_item(sequence, offset, 0x30)
+        kind, offset = der_item(sequence, 0, 0x16)
+    if kind != b"IM4P":
+        raise ValueError(f"not an IM4P payload (kind={kind!r})")
     image_type, offset = der_item(sequence, offset, 0x16)
     _description, offset = der_item(sequence, offset, 0x16)
     payload, offset = der_item(sequence, offset, 0x04)
-    if kind != b"IM4P" or image_type not in (b"gfxf", b"gf1f"):
-        raise ValueError(f"not an AGX firmware IM4P (kind={kind!r}, type={image_type!r})")
-    if offset != len(sequence):
+    return image_type, payload, offset != len(sequence)
+
+
+def im4p_payload(blob: bytes) -> bytes:
+    image_type, payload, has_extra_fields = unwrap_im4p(blob)
+    if image_type not in (b"gfxf", b"gf1f"):
+        raise ValueError(f"not an AGX firmware IM4P (type={image_type!r})")
+    if has_extra_fields:
         raise ValueError("unsupported extra IM4P fields")
     return payload
 
