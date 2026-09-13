@@ -155,6 +155,31 @@ runtime identity path. Its `AGXAccelerator` publishes `gpu_gen` 13, `gpu_var`
 decoder exists to handle, so `apply_g13_identity()` should see
 `total_active_cores` 7 against a `core_masks[0]` of `0xfe` there.
 
+### What a native boot should print
+
+Nothing here has been booted yet. Against the live tree above, the native branch
+of `initialise()` is predicted to reach exactly this and stop, without touching a
+power domain or an ASC register — `vinix.apple_gpu=1` is needed to get that far,
+since the probe is off by default:
+
+```
+agx: Probing Apple GPU
+agx: t8103 boot data has no gpu-core-leak-coef
+agx: native t8103 GPU boot data is incomplete
+agx:   perf-states: 7 states, max 6, 14 words
+agx:   power controller: incomplete
+agx:   missing: per-state power, minimum SRAM voltage, core and SRAM leakage
+agx:   see tools/agx-re/recover_t8103_adt.py for where each one comes from
+agx: native t8103 boot data carries no firmware ABI tuple
+```
+
+The two loaders fail on different halves of the four. The power controller
+resolves 28 properties, defaults 23 more, and fails only on the two leakage
+arrays; per-state power and the minimum SRAM voltage block the performance table
+instead. A boot that prints anything else — a different state count, a
+resolved power controller, or any line past the ABI tuple — means the live tree
+and this recovery have diverged.
+
 One more thing worth knowing before trying to finish it:
 
 * `AGXAccelerator::applyLeakageEquation` is a double-precision, `pow()`-based
