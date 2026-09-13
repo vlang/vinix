@@ -321,6 +321,43 @@ run-gimp
 ./gimp-package-smoke.sh
 ```
 
+LibreOffice Writer and Calc run through the same private X11 window bridge,
+drawn by the GTK 3 VCL plugin. Install the suite on demand, then launch it from
+the wallpaper/Start menu or from a shell:
+
+```sh
+pkg install libreoffice
+run-libreoffice
+```
+
+A bootable image can carry it already installed, which is what the office
+regression test boots:
+
+```sh
+./build-libreoffice-aarch64.sh
+./build-desktop-aarch64.sh --compact-initramfs --with-libreoffice
+./tests/office/run.sh
+```
+
+Alpine builds the toolkit's runtime indexes from package triggers, which a
+staged image never runs. `run-libreoffice` rebuilds the ones VCL needs on its
+first start — the MIME database, the GDK-Pixbuf loader cache, the compiled
+GSettings schemas and the icon-theme caches. Without them GTK cannot load a
+single icon, and the suite exits before it maps a window rather than saying so.
+It also seeds a profile: the hosted display has no window manager, so nothing
+would size the document window to the surface, and a first run would open the
+Tip of the Day dialog on top of the document.
+
+The suite is much heavier on the kernel than the browsers are — its start-up
+alone builds those indexes, then runs a UNO service manager over several
+hundred shared objects — and the machine under it is not reliable there yet.
+The same image reaches a drawn page in 15 s in one run and, in another, loses
+the whole hosted process tree without a message, or stops in
+`scheduler_timer_handler` with *Attempted to get current CPU struct without
+disabling ints*: interrupts are enabled inside the scheduler's timer handler,
+which is a pre-existing SMP fault this workload is simply the first to reach
+often.
+
 Blender's shared data and runtime libraries are installed directly from
 Alpine's aarch64 package. The desktop launcher uses a native Vinix GHOST build:
 it renders through surfaceless EGL into the Vinix compositor's shared-surface

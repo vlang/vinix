@@ -513,7 +513,7 @@ fn test_terminal_can_edit_a_file_with_vim_over_its_real_pty() {
 }
 
 fn test_available_utility_applications_and_shortcut_layouts() {
-	assert available_apps.len == 19
+	assert available_apps.len == 20
 	assert available_apps[0].process_name == 'vinix-files'
 	assert available_apps[1].title == 'Firefox'
 	assert available_apps[1].exclusive_command == ''
@@ -841,6 +841,17 @@ fn test_gimp_uses_the_hosted_x11_window_path() {
 	assert factory.exclusive_command == ''
 	assert factory.open != unsafe { nil }
 	assert factory.polling && factory.keyboard && factory.pointer
+}
+
+fn test_libreoffice_uses_the_hosted_x11_window_path() {
+	factory := available_apps[18]
+	assert factory.title == 'LibreOffice'
+	assert factory.process_name == 'vinix-libreoffice'
+	assert factory.exclusive_command == ''
+	assert factory.open != unsafe { nil }
+	assert factory.polling && factory.keyboard && factory.pointer
+	assert factory.width == libreoffice_window_width
+	assert factory.height == libreoffice_window_height + default_title_height
 }
 
 fn test_chromium_uses_the_hosted_x11_window_path() {

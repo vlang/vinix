@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Boot the AArch64 QEMU machine and enforce a browser bring-up result."""
+"""Boot the AArch64 QEMU machine and enforce a hosted-application bring-up result."""
 
 from __future__ import annotations
 
@@ -58,6 +58,20 @@ DESKTOP = {
         b"VINIX DESKTOP FIREFOX PASS: the hosted display has a framebuffer",
         b"VINIX DESKTOP FIREFOX PASS: browser window mapped",
         b"VINIX DESKTOP FIREFOX PASS: the page was drawn",
+    ),
+}
+# LibreOffice is the same hosting path as the browsers, driven by a much
+# heavier client: VCL builds a UNO service manager and reads its configuration
+# registry before it maps a window at all, so the deadlines here are longer and
+# the two halves — the window, then the page — are reported separately.
+LIBREOFFICE = {
+    "init": "tests/office/libreoffice-init.sh",
+    "pass": b"VINIX LIBREOFFICE TEST: PASS",
+    "fail": (b"VINIX LIBREOFFICE TEST: FAIL",),
+    "features": (
+        b"VINIX LIBREOFFICE PASS: the hosted display has a framebuffer",
+        b"VINIX LIBREOFFICE PASS: Writer window mapped",
+        b"VINIX LIBREOFFICE PASS: the document was drawn",
     ),
 }
 PACKAGE = {
@@ -231,6 +245,8 @@ def main() -> int:
                         help="drive Firefox inside a compositor-managed window")
     parser.add_argument("--package", action="store_true",
                         help="install Chromium with pkg instead of driving a staged one")
+    parser.add_argument("--libreoffice", action="store_true",
+                        help="drive LibreOffice Writer instead of a browser")
     parser.add_argument("--init", type=Path)
     parser.add_argument("--initramfs", type=Path,
                         default=root / "build-support/init-aarch64/initramfs-desktop.tar")
@@ -251,7 +267,11 @@ def main() -> int:
         parser.error("--package installs Chromium; it cannot be combined with --firefox")
     if arguments.desktop and (arguments.package or arguments.firefox):
         parser.error("--desktop drives its own browser; it cannot be combined with another profile")
-    profile = (DESKTOP if arguments.desktop else PACKAGE if arguments.package
+    if arguments.libreoffice and (arguments.desktop or arguments.package
+                                  or arguments.firefox):
+        parser.error("--libreoffice drives the office suite; it cannot be combined with another profile")
+    profile = (LIBREOFFICE if arguments.libreoffice
+               else DESKTOP if arguments.desktop else PACKAGE if arguments.package
                else FIREFOX if arguments.firefox else BRING_UP)
     timeout = arguments.timeout or (5400 if arguments.package else 1800)
     guest_init = arguments.init or (root / profile["init"])

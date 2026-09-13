@@ -3,7 +3,7 @@
 # initramfs that boots straight into it.
 #
 # Usage: ./build-desktop-aarch64.sh [--no-initramfs] [--compact-initramfs]
-#        [--with-x86-translation] [--wifi-bundle=DIR]
+#        [--with-libreoffice] [--with-x86-translation] [--wifi-bundle=DIR]
 # Set V or VINIX_V_COMPILER to a V executable or checkout directory to select
 # a compiler explicitly (for example VINIX_V_COMPILER=~/code/v7).
 #
@@ -44,6 +44,7 @@ NETWORK_TOOLS_STAGING="${VINIX_NETWORK_TOOLS_STAGING:-$SCRIPT_DIR/build-aarch64-
 X11_STAGING="${VINIX_X11_STAGING:-$SCRIPT_DIR/build-aarch64-x11/staging}"
 FIREFOX_STAGING="${VINIX_FIREFOX_STAGING:-$SCRIPT_DIR/build-aarch64-firefox/staging}"
 CHROMIUM_STAGING="${VINIX_CHROMIUM_STAGING:-$SCRIPT_DIR/build-aarch64-chromium/staging}"
+LIBREOFFICE_STAGING="${VINIX_LIBREOFFICE_STAGING:-$SCRIPT_DIR/build-aarch64-libreoffice/staging}"
 MINECRAFT_STAGING="${VINIX_MINECRAFT_STAGING:-$SCRIPT_DIR/build-aarch64-minecraft/staging}"
 ASAHI_STAGING="${VINIX_ASAHI_STAGING:-$SCRIPT_DIR/build-aarch64-asahi/staging}"
 HYPRLAND_STAGING="${VINIX_HYPRLAND_STAGING:-$SCRIPT_DIR/build-aarch64-hyprland/staging}"
@@ -81,6 +82,7 @@ MAKE_INITRAMFS=1
 COMPACT_INITRAMFS=0
 WITH_X86_TRANSLATION=0
 WITH_CHROMIUM=0
+WITH_LIBREOFFICE=0
 WIFI_BUNDLE="${VINIX_WIFI_BUNDLE:-}"
 for arg in "$@"; do
     case "$arg" in
@@ -88,11 +90,13 @@ for arg in "$@"; do
         --compact-initramfs) COMPACT_INITRAMFS=1 ;;
         --with-x86-translation) WITH_X86_TRANSLATION=1 ;;
         --with-chromium) WITH_CHROMIUM=1 ;;
+        --with-libreoffice) WITH_LIBREOFFICE=1 ;;
         --wifi-bundle=*) WIFI_BUNDLE="${arg#*=}" ;;
         --help|-h)
-            echo "usage: $0 [--no-initramfs] [--compact-initramfs] [--with-chromium] [--with-x86-translation] [--wifi-bundle=DIR]"
+            echo "usage: $0 [--no-initramfs] [--compact-initramfs] [--with-chromium] [--with-libreoffice] [--with-x86-translation] [--wifi-bundle=DIR]"
             echo "  --compact-initramfs stages the desktop, core developer tools and Firefox"
             echo "  --with-chromium adds a previously staged Chromium; otherwise it is a pkg install"
+            echo "  --with-libreoffice adds a previously staged LibreOffice; otherwise it is a pkg install"
             echo "  --with-x86-translation adds a previously built x86/Wine runtime"
             echo "  --wifi-bundle stages a package.py output and loads it before the desktop"
             exit 0
@@ -339,6 +343,12 @@ if [ "$WITH_CHROMIUM" -eq 1 ] &&
     echo "Run ./build-chromium-aarch64.sh first." >&2
     exit 1
 fi
+if [ "$WITH_LIBREOFFICE" -eq 1 ] &&
+   [ ! -x "$LIBREOFFICE_STAGING/usr/lib/libreoffice/program/soffice.bin" ]; then
+    echo "ERROR: --with-libreoffice needs $LIBREOFFICE_STAGING/usr/lib/libreoffice/program/soffice.bin" >&2
+    echo "Run ./build-libreoffice-aarch64.sh first." >&2
+    exit 1
+fi
 if [ "$WITH_X86_TRANSLATION" -eq 1 ] &&
    [ ! -x "$X86_TRANSLATION_STAGING/usr/bin/qemu-x86_64" ]; then
     echo "ERROR: --with-x86-translation needs $X86_TRANSLATION_STAGING/usr/bin/qemu-x86_64" >&2
@@ -390,6 +400,13 @@ mkdir -p "$STAGING"
 if [ "$WITH_CHROMIUM" -eq 1 ]; then
     echo "    staging Chromium"
     merge_staging_tree "$CHROMIUM_STAGING"
+fi
+# LibreOffice is a 900 MiB closure for the same reason, and it repeats the same
+# GTK, X11 and font stack. Stage it before them, so the layers below stay the
+# qualified copy of everything the suite shares with the browsers.
+if [ "$WITH_LIBREOFFICE" -eq 1 ]; then
+    echo "    staging LibreOffice"
+    merge_staging_tree "$LIBREOFFICE_STAGING"
 fi
 if [ "$COMPACT_INITRAMFS" -eq 1 ]; then
     echo "    compact image: staging BusyBox, Python, Git, GCC and Firefox"
@@ -560,6 +577,15 @@ install -m755 "$X11_STAGING/usr/bin/vinix-xinput" "$STAGING/usr/bin/vinix-xinput
 install -m755 "$X11_STAGING/usr/bin/vinix-wine-host" "$STAGING/usr/bin/vinix-wine-host"
 install -m755 "$SCRIPT_DIR/build-support/firefox/run-firefox" "$STAGING/usr/bin/run-firefox"
 install -m755 "$SCRIPT_DIR/build-support/gimp/run-gimp" "$STAGING/usr/bin/run-gimp"
+install -m755 "$SCRIPT_DIR/build-support/libreoffice/run-libreoffice" \
+    "$STAGING/usr/bin/run-libreoffice"
+mkdir -p "$STAGING/etc/libreoffice"
+install -m644 "$SCRIPT_DIR/build-support/libreoffice/vinix-registrymodifications.xcu" \
+    "$STAGING/etc/libreoffice/vinix-registrymodifications.xcu"
+install -m644 "$SCRIPT_DIR/build-support/libreoffice/welcome.fodt" \
+    "$STAGING/usr/share/vinix/libreoffice-welcome.fodt"
+install -m644 "$SCRIPT_DIR/build-support/libreoffice/welcome.fodt" \
+    "$STAGING/root/libreoffice-welcome.fodt"
 mkdir -p "$STAGING/etc/gimp/2.0"
 install -m644 "$SCRIPT_DIR/build-support/gimp/vinix-gimprc" \
     "$STAGING/etc/gimp/2.0/vinix-gimprc"
@@ -618,7 +644,7 @@ if [ ! -x "$STAGING/usr/bin/pkg" ] || [ ! -x "$STAGING/sbin/apk" ]; then
     echo "ERROR: desktop image is missing pkg or apk" >&2
     exit 1
 fi
-for runtime_path in usr/bin/Xorg usr/bin/Xvfb usr/bin/startx usr/bin/vinix-xinput usr/bin/vinix-wine-host usr/bin/run-firefox usr/bin/run-gimp usr/bin/run-chromium; do
+for runtime_path in usr/bin/Xorg usr/bin/Xvfb usr/bin/startx usr/bin/vinix-xinput usr/bin/vinix-wine-host usr/bin/run-firefox usr/bin/run-gimp usr/bin/run-chromium usr/bin/run-libreoffice; do
     if [ ! -x "$STAGING/$runtime_path" ]; then
         echo "ERROR: desktop hosted-X11 runtime is missing /$runtime_path" >&2
         echo "Run ./build-x11-aarch64.sh and ./build-firefox-aarch64.sh, then rebuild the desktop." >&2
@@ -639,7 +665,7 @@ if ! { [ -x "$STAGING/usr/lib/firefox-esr/firefox-esr" ] &&
     exit 1
 fi
 if [ "$COMPACT_INITRAMFS" -eq 1 ]; then
-    for command_path in bin/sh bin/zsh bin/id bin/sed bin/mkdir bin/sleep bin/df bin/du bin/ls bin/tar usr/bin/pkg sbin/apk usr/bin/vim usr/bin/python3 usr/bin/git usr/bin/Xorg usr/bin/Xvfb usr/bin/startx usr/bin/vinix-xinput usr/bin/vinix-wine-host usr/bin/run-firefox usr/bin/run-gimp usr/bin/run-chromium usr/bin/gcc; do
+    for command_path in bin/sh bin/zsh bin/id bin/sed bin/mkdir bin/sleep bin/df bin/du bin/ls bin/tar usr/bin/pkg sbin/apk usr/bin/vim usr/bin/python3 usr/bin/git usr/bin/Xorg usr/bin/Xvfb usr/bin/startx usr/bin/vinix-xinput usr/bin/vinix-wine-host usr/bin/run-firefox usr/bin/run-gimp usr/bin/run-chromium usr/bin/run-libreoffice usr/bin/gcc; do
         if [ ! -x "$STAGING/$command_path" ]; then
             echo "ERROR: compact desktop is missing /$command_path" >&2
             exit 1
@@ -689,7 +715,7 @@ chmod +x "$STAGING/sbin/init" "$STAGING/usr/bin/vinix-desktop" \
 for app_name in vinix-files vinix-calculator vinix-terminal vinix-settings \
     vinix-activity vinix-editor vinix-calendar vinix-clock vinix-cocoa-calculator \
     vinix-vspace \
-    vinix-firefox vinix-chromium vinix-gimp vinix-minecraft vinix-wine-calculator vinix-wine-notepad \
+    vinix-firefox vinix-chromium vinix-gimp vinix-libreoffice vinix-minecraft vinix-wine-calculator vinix-wine-notepad \
     vinix-wine-word2013 vinix-blender vinix-capture; do
     ln -sf vinix-desktop "$STAGING/usr/bin/$app_name"
 done

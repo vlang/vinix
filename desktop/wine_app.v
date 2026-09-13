@@ -24,6 +24,13 @@ const gimp_surface_width = 1280
 const gimp_surface_height = 900
 const gimp_window_width = 1280
 const gimp_window_height = 900
+// Writer lays a page out for the width it is given. 1280x900 is the same
+// surface the browsers use, and wide enough for a document page beside the
+// sidebar without the toolbars wrapping onto a third row.
+const libreoffice_surface_width = 1280
+const libreoffice_surface_height = 900
+const libreoffice_window_width = 1280
+const libreoffice_window_height = 900
 const wine_surface_width = 326
 const wine_surface_height = 430
 const wine_notepad_surface_width = 310
@@ -112,6 +119,24 @@ fn open_gimp(mut _ Desktop) !NativeApp {
 		}
 	}
 	return open_hosted_x11_app('gimp', '/usr/bin/run-gimp', gimp_surface_width, gimp_surface_height, 'builtin:editor', 'Starting GIMP…', 'GIMP is not installed. Run pkg install gimp in Terminal.', 'GIMP exited.')
+}
+
+// LibreOffice is a 900 MiB closure that an image can reasonably be built
+// without, exactly like Chromium. Report that from the window rather than
+// starting a private X server for a suite that cannot be there.
+fn open_libreoffice(mut _ Desktop) !NativeApp {
+	if C.access(c'/usr/lib/libreoffice/program/soffice.bin', C.X_OK) != 0 {
+		return &HostedX11App{
+			surface_width: libreoffice_surface_width
+			surface_height: libreoffice_surface_height
+			icon: 'builtin:editor'
+			failed: true
+			error_message: 'LibreOffice is not installed. Run pkg install libreoffice-writer in Terminal.'
+		}
+	}
+	return open_hosted_x11_app('libreoffice', '/usr/bin/run-libreoffice', libreoffice_surface_width,
+		libreoffice_surface_height, 'builtin:editor', 'Starting LibreOffice…', 'LibreOffice is not installed. Run pkg install libreoffice-writer in Terminal.',
+		'LibreOffice exited.')
 }
 
 fn open_wine_calculator(mut _ Desktop) !NativeApp {

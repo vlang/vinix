@@ -279,6 +279,12 @@ resolve_packages() {
 			chromium)
 				resolved="$resolved chromium chromium-swiftshader adwaita-icon-theme font-dejavu"
 				;;
+			libreoffice|libreoffice-writer|libreoffice-calc)
+				# One name for the suite. The two document modules share the
+				# 311 MiB libreoffice-common, and the GTK 3 VCL plugin is what
+				# draws them on Vinix; Alpine leaves the plugin optional.
+				resolved="$resolved libreoffice-writer libreoffice-calc libreoffice-gtk libreoffice-lang-en_us adwaita-icon-theme font-dejavu ttf-liberation"
+				;;
 			sublime|sublime-text)
 				resolved="$resolved gcompat gtk+3.0 adwaita-icon-theme font-dejavu libarchive-tools llvm19-libs"
 				;;
@@ -332,6 +338,17 @@ install_packages() {
 				apk_install \
 					adwaita-icon-theme font-dejavu chromium chromium-swiftshader
 				finalize_chromium
+				;;
+			libreoffice|libreoffice-writer|libreoffice-calc)
+				# LibreOffice's Alpine dependencies provide GTK, X11 and its
+				# own UNO Python. The icon theme, UI font and the metric
+				# document fonts are what an office suite needs and Alpine
+				# does not make it depend on.
+				apk_install \
+					adwaita-icon-theme font-dejavu ttf-liberation \
+					libreoffice-writer libreoffice-calc libreoffice-gtk \
+					libreoffice-lang-en_us
+				finalize_libreoffice
 				;;
 			sublime|sublime-text)
 				apk_install \
@@ -651,6 +668,53 @@ finalize_chromium() {
 	/usr/bin/gtk-update-icon-cache -f -t /usr/share/icons/Adwaita
 	# Fontconfig otherwise rebuilds its cache inside every one of Chromium's
 	# processes, on a guest with one CPU.
+	if [ -x /usr/bin/fc-cache ]; then
+		/usr/bin/fc-cache -f
+	fi
+}
+
+finalize_libreoffice() {
+	[ -n "$ROOT" ] && return 0
+	# Vinix package extraction cannot restore executable modes with fchmodat(2)
+	# yet. LibreOffice is a private program directory whose members are execed
+	# by each other rather than by the shell, so every one of them has to be
+	# made executable explicitly.
+	for program in /usr/lib/libreoffice/program/soffice.bin \
+		/usr/lib/libreoffice/program/soffice \
+		/usr/lib/libreoffice/program/oosplash \
+		/usr/lib/libreoffice/program/unopkg.bin \
+		/usr/lib/libreoffice/program/uno.bin \
+		/usr/lib/libreoffice/program/senddoc \
+		/usr/bin/libreoffice /usr/bin/soffice; do
+		[ -e "$program" ] || continue
+		/bin/busybox chmod 0755 "$program"
+	done
+	if [ ! -x /usr/lib/libreoffice/program/soffice.bin ]; then
+		echo "pkg: LibreOffice package has no program binary" >&2
+		exit 1
+	fi
+	# The launcher pins SAL_USE_VCLPLUGIN=gtk3, so an image whose closure left
+	# the plugin out would start a suite that cannot open a window.
+	if [ ! -e /usr/lib/libreoffice/program/libvclplug_gtk3lo.so ]; then
+		echo "pkg: LibreOffice package has no GTK 3 VCL plugin" >&2
+		exit 1
+	fi
+	# The image ships the launcher and the profile the desktop starts from, so
+	# this transaction only has to supply the suite. Report a base image that
+	# predates them instead of installing an office nothing can start.
+	if [ ! -x /usr/bin/run-libreoffice ]; then
+		echo "pkg: this image has no /usr/bin/run-libreoffice launcher" >&2
+		exit 1
+	fi
+	# VCL reads its UI fonts, icons and MIME types through the same GTK caches
+	# every other desktop application uses.
+	/usr/bin/gdk-pixbuf-query-loaders --update-cache
+	/usr/bin/glib-compile-schemas /usr/share/glib-2.0/schemas
+	/usr/bin/update-mime-database /usr/share/mime
+	/usr/bin/gtk-update-icon-cache -f -t /usr/share/icons/hicolor
+	/usr/bin/gtk-update-icon-cache -f -t /usr/share/icons/Adwaita
+	# Writer asks for the whole font list while drawing its first window, and a
+	# cache miss then scans every font directory on a guest with one CPU.
 	if [ -x /usr/bin/fc-cache ]; then
 		/usr/bin/fc-cache -f
 	fi

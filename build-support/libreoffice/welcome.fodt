@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The document Writer opens on the Vinix desktop when no file is named.
+     Flat ODF (a single XML file) rather than a zipped .odt, so the image
+     carries a document that can be read, diffed and edited in this tree. -->
+<office:document
+    xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+    xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0"
+    xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
+    xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"
+    xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"
+    xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0"
+    xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0"
+    xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0"
+    office:version="1.3"
+    office:mimetype="application/vnd.oasis.opendocument.text">
+  <office:meta>
+    <meta:generator>Vinix</meta:generator>
+    <dc:title xmlns:dc="http://purl.org/dc/elements/1.1/">LibreOffice on Vinix</dc:title>
+  </office:meta>
+  <office:font-face-decls>
+    <style:font-face style:name="Liberation Serif" svg:font-family="'Liberation Serif'"
+        style:font-family-generic="roman" style:font-pitch="variable"/>
+    <style:font-face style:name="Liberation Sans" svg:font-family="'Liberation Sans'"
+        style:font-family-generic="swiss" style:font-pitch="variable"/>
+  </office:font-face-decls>
+  <office:styles>
+    <style:style style:name="Standard" style:family="paragraph" style:class="text">
+      <style:text-properties style:font-name="Liberation Serif" fo:font-size="12pt"/>
+    </style:style>
+    <style:style style:name="Title" style:family="paragraph"
+        style:parent-style-name="Standard" style:class="chapter">
+      <style:paragraph-properties fo:margin-bottom="0.17in" fo:keep-with-next="always"/>
+      <style:text-properties style:font-name="Liberation Sans" fo:font-size="28pt"
+          fo:font-weight="bold"/>
+    </style:style>
+    <style:style style:name="Heading_20_1" style:display-name="Heading 1"
+        style:family="paragraph" style:parent-style-name="Standard" style:class="text">
+      <style:paragraph-properties fo:margin-top="0.17in" fo:margin-bottom="0.08in"
+          fo:keep-with-next="always"/>
+      <style:text-properties style:font-name="Liberation Sans" fo:font-size="16pt"
+          fo:font-weight="bold"/>
+    </style:style>
+    <style:style style:name="Quotations" style:family="paragraph"
+        style:parent-style-name="Standard" style:class="html">
+      <style:paragraph-properties fo:margin-left="0.4in" fo:margin-top="0.1in"
+          fo:margin-bottom="0.1in"/>
+      <style:text-properties style:font-name="Liberation Sans" fo:font-size="11pt"
+          fo:font-style="italic"/>
+    </style:style>
+  </office:styles>
+  <office:automatic-styles>
+    <style:style style:name="P_Lead" style:family="paragraph"
+        style:parent-style-name="Standard">
+      <style:text-properties fo:font-size="13pt"/>
+    </style:style>
+    <style:style style:name="T_Code" style:family="text">
+      <style:text-properties style:font-name="Liberation Sans" fo:font-size="11pt"/>
+    </style:style>
+    <style:style style:name="Table_Vinix" style:family="table">
+      <style:table-properties style:width="5.9in" table:align="left"/>
+    </style:style>
+    <style:style style:name="Table_Vinix.A" style:family="table-column">
+      <style:table-column-properties style:column-width="2.2in"/>
+    </style:style>
+    <style:style style:name="Table_Vinix.B" style:family="table-column">
+      <style:table-column-properties style:column-width="3.7in"/>
+    </style:style>
+    <style:style style:name="Table_Vinix.Cell" style:family="table-cell">
+      <style:table-cell-properties fo:padding="0.06in" fo:border="0.5pt solid #b0b0b0"/>
+    </style:style>
+  </office:automatic-styles>
+  <office:body>
+    <office:text>
+      <text:p text:style-name="Title">LibreOffice on Vinix</text:p>
+      <text:p text:style-name="P_Lead">This document is open in LibreOffice Writer,
+        running as an ordinary process on Vinix — a kernel written in V. Nothing
+        about VCL, UNO or ODF is implemented in the kernel: Writer is the
+        unmodified Alpine aarch64 build, drawing through its GTK 3 plugin onto a
+        private X server that the Vinix compositor maps into this window.</text:p>
+      <text:p text:style-name="Heading_20_1">What is underneath it</text:p>
+      <table:table table:name="VinixStack" table:style-name="Table_Vinix">
+        <table:table-column table:style-name="Table_Vinix.A"/>
+        <table:table-column table:style-name="Table_Vinix.B"/>
+        <table:table-row>
+          <table:table-cell table:style-name="Table_Vinix.Cell" office:value-type="string">
+            <text:p><text:span text:style-name="T_Code">soffice.bin</text:span></text:p>
+          </table:table-cell>
+          <table:table-cell table:style-name="Table_Vinix.Cell" office:value-type="string">
+            <text:p>LibreOffice 25.2, musl/aarch64, with the GTK 3 VCL plugin</text:p>
+          </table:table-cell>
+        </table:table-row>
+        <table:table-row>
+          <table:table-cell table:style-name="Table_Vinix.Cell" office:value-type="string">
+            <text:p><text:span text:style-name="T_Code">Xvfb + vinix-wine-host</text:span></text:p>
+          </table:table-cell>
+          <table:table-cell table:style-name="Table_Vinix.Cell" office:value-type="string">
+            <text:p>A private X11 display whose framebuffer the desktop blits</text:p>
+          </table:table-cell>
+        </table:table-row>
+        <table:table-row>
+          <table:table-cell table:style-name="Table_Vinix.Cell" office:value-type="string">
+            <text:p><text:span text:style-name="T_Code">vinix-desktop</text:span></text:p>
+          </table:table-cell>
+          <table:table-cell table:style-name="Table_Vinix.Cell" office:value-type="string">
+            <text:p>The native compositor, windows and taskbar, written in V</text:p>
+          </table:table-cell>
+        </table:table-row>
+        <table:table-row>
+          <table:table-cell table:style-name="Table_Vinix.Cell" office:value-type="string">
+            <text:p><text:span text:style-name="T_Code">Vinix kernel</text:span></text:p>
+          </table:table-cell>
+          <table:table-cell table:style-name="Table_Vinix.Cell" office:value-type="string">
+            <text:p>Scheduler, VFS, mmap and the POSIX syscalls all of the above use</text:p>
+          </table:table-cell>
+        </table:table-row>
+      </table:table>
+      <text:p text:style-name="Heading_20_1">Try it</text:p>
+      <text:p>Type here — this is a real document. Save it with Ctrl+S and it
+        lands in <text:span text:style-name="T_Code">/root</text:span>, on the
+        ext2 volume that survives a restart.</text:p>
+      <text:p text:style-name="Quotations">An operating system is finished when
+        it can bore you with a word processor.</text:p>
+    </office:text>
+  </office:body>
+</office:document>
