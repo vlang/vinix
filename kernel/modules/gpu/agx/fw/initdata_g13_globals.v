@@ -194,5 +194,5 @@ pub fn populate_g13_globals(mut data G13Globals, config &hw.HwConfig) bool {
 	ok = ok && g13_globals_put_u32(mut data, abi, 0x11034, power.fender_idle_off_delay_ms)
 	ok = ok && g13_globals_put_u32(mut data, abi, 0x11038, power.fw_early_wake_timeout_ms)
 	ok = ok && g13_globals_put_u32(mut data, abi, 0x118e0, 40)
-	return ok
+	return ok && g13_globals_write_v13_5_additions(mut data, abi, power)
 }

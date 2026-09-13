@@ -201,8 +201,9 @@ pub fn populate_g13_hwdata_a(mut data G13HwDataA, config &hw.HwConfig) bool {
 	ok = ok && g13_hwdata_a_put_u32(mut data, abi, 0x040, 1)
 	ok = ok && g13_hwdata_a_put_u32(mut data, abi, 0x044, max_scaled)
 	ok = ok && g13_hwdata_a_put_u32(mut data, abi, 0x04c, 100)
+	sram_k_base := g13_hwdata_a_offset(abi, 0x074) or { return false }
 	for state := u32(0); state < config.perf_state_count; state++ {
-		ok = ok && g13_hwdata_a_put_u32(mut data, abi, 0x074 + state * 4, 0x3f82_8f5c)
+		ok = ok && g13_hwdata_a_put_raw_u32(mut data, abi, sram_k_base + state * 4, 0x3f82_8f5c)
 	}
 
 	ok = ok && g13_hwdata_a_put_u32(mut data, abi, 0x64c, 625)
@@ -317,11 +318,27 @@ pub fn populate_g13_hwdata_a(mut data G13HwDataA, config &hw.HwConfig) bool {
 	ok = ok && g13_hwdata_a_put_u32(mut data, abi, 0x163c, 1)
 	ok = ok && g13_set_t8103_shared_data(mut data, abi)
 	ok = ok && g13_hwdata_a_put_u32(mut data, abi, 0x3ce8, 1)
+	// Translate each array base once; indexing a 12.3 offset and translating
+	// the result only finds an entry for cluster zero.
+	core_leak_base := g13_hwdata_a_offset(abi, 0x3cf4) or { return false }
+	sram_leak_base := g13_hwdata_a_offset(abi, 0x3d14) or { return false }
 	for cluster := u32(0); cluster < config.num_clusters; cluster++ {
-		ok = ok && g13_hwdata_a_put_u32(mut data, abi, 0x3cf4 + cluster * 4, power.core_leak_coef_f32[cluster])
-		ok = ok && g13_hwdata_a_put_u32(mut data, abi, 0x3d14 + cluster * 4, power.sram_leak_coef_f32[cluster])
+		ok = ok && g13_hwdata_a_put_raw_u32(mut data, abi, core_leak_base + cluster * 4, power.core_leak_coef_f32[cluster])
+		ok = ok && g13_hwdata_a_put_raw_u32(mut data, abi, sram_leak_base + cluster * 4, power.sram_leak_coef_f32[cluster])
 	}
-	return ok
+	if config.base_clock_hz == 0 {
+		return false
+	}
+	inputs := G13V135Inputs{
+		period_ms: period_ms
+		period_s_f32: period_s
+		base_clock_khz: u32(config.base_clock_hz / 1000)
+		clocks_per_period: power.pwr_sample_period_aic_clks
+		ppm_filter_tc_periods: ppm_periods
+		avg_filter_tc_periods: avg_periods
+		max_pstate_scaled: max_scaled
+	}
+	return ok && g13_hwdata_a_write_v13_5_additions(mut data, abi, power, inputs)
 }
 
 pub fn validate_g13_hwdata_a_layout() bool {

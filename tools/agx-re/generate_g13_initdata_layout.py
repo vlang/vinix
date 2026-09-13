@@ -405,17 +405,37 @@ KERNEL_FW = Path(__file__).resolve().parents[2] / "kernel/modules/gpu/agx/fw"
 # field whose size 13.5 leaves alone, so only the base needs moving.
 LOOP_BASES = {
     "globals": (0x893C, 0x89F8, 0x8AA0),
-    "hwdata_a": (0x3648, 0x36F0, 0x3718),
+    # 0x74 sram_k, 0xc58 power_zones, 0x3648/0x36f0/0x3718 the shared-data
+    # blocks, 0x3cf4/0x3d14 the leakage coefficients. All are walked in loops,
+    # so the literal is the array base and never appears in a write call.
+    "hwdata_a": (0x74, 0xC58, 0x3648, 0x36F0, 0x3718, 0x3CF4, 0x3D14),
 }
 
 
-def written_offsets(source_file: Path, helpers: tuple[str, ...]) -> list[int]:
+# Helpers that take offsets as arguments rather than writing directly. Missing
+# one leaves its offsets untranslated, which at 13.5 means writing a filter
+# coefficient wherever 12.3 happened to keep it.
+OFFSET_ARGUMENT_CALLS = {
+    "hwdata_a": (("g13_set_filter", 2),),
+    "globals": (),
+}
+
+
+def written_offsets(
+    source_file: Path, helpers: tuple[str, ...], argument_calls: tuple = ()
+) -> list[int]:
     text = source_file.read_text()
     found: set[int] = set()
     for helper in helpers:
         # The abi argument may already have been threaded through.
         pattern = re.escape(helper) + r"\(mut data, (?:abi, )?(0x[0-9a-fA-F]+)"
         found.update(int(value, 16) for value in re.findall(pattern, text))
+    for helper, count in argument_calls:
+        arguments = r",\s*(0x[0-9a-fA-F]+)" * count
+        pattern = re.escape(helper) + r"\(mut data(?:, abi)?" + arguments
+        for match in re.findall(pattern, text):
+            values = match if isinstance(match, tuple) else (match,)
+            found.update(int(value, 16) for value in values)
     return sorted(found)
 
 
@@ -542,7 +562,12 @@ def generate(raw_rs: Path) -> str:
             remap_problems.append(f"missing {source_file}")
             continue
         offsets = sorted(
-            set(written_offsets(source_file, helpers)) | set(LOOP_BASES.get(label, ()))
+            set(
+                written_offsets(
+                    source_file, helpers, OFFSET_ARGUMENT_CALLS.get(label, ())
+                )
+            )
+            | set(LOOP_BASES.get(label, ()))
         )
         pairs, dropped, problems = remap(
             offsets,

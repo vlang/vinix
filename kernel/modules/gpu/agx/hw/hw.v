@@ -138,7 +138,6 @@ pub:
 	chip_id               u32
 	gpu_gen               GpuGen
 	gpu_variant           GpuVariant
-	firmware_abi          FirmwareAbi
 	firmware_gpu_core_id  u32
 	gpu_feat_compat       u32
 	gpu_feat_incompat     u32
@@ -188,6 +187,9 @@ pub:
 pub mut:
 	// Runtime topology is read from hardware on G13 because fused-off cores
 	// differ between otherwise identical t8103 products.
+	// The probe records the ABI the boot data declares, which decides which
+	// InitData layout gets built.
+	firmware_abi          FirmwareAbi
 	gpu_rev               GpuRevision
 	gpu_core_count        u32
 	num_clusters          u32
