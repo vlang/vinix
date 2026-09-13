@@ -855,6 +855,39 @@ fn enable_device_power_domains(node &devicetree.DTNode, depth u32) bool {
 	return true
 }
 
+// Run the G13 firmware ABI self-checks and name whichever ones failed.
+//
+// These are all deterministic layout and decoder checks, so a failure is a bug
+// in this tree rather than anything about the machine. They used to sit behind
+// one `||` chain and one message, which is how a fragment command whose two
+// parameter blocks were eight bytes short of their recovered sizes cost a
+// deploy and a reboot to identify. Every check is run and every failure is
+// named, so one boot reports all of them.
+fn g13_abi_check(passed bool, name string) bool {
+	if !passed {
+		println('agx: G13 ABI self-check failed: ${name}')
+	}
+	return passed
+}
+
+fn report_g13_internal_abi() bool {
+	mut ok := true
+	ok = g13_abi_check(regs.validate_g13_identity_decoder(), 'register identity decoder') && ok
+	ok = g13_abi_check(regs.validate_g13_fault_decoder(), 'register fault decoder') && ok
+	ok = g13_abi_check(fw.validate_g13_channel_layouts(), 'channel layouts') && ok
+	ok = g13_abi_check(fw.validate_g13_initdata_layouts(), 'InitData layouts') && ok
+	ok = g13_abi_check(fw.validate_g13_hwdata_layouts(), 'HwData layouts') && ok
+	ok = g13_abi_check(fw.validate_g13_workqueue_layouts(), 'work-queue layouts') && ok
+	ok = g13_abi_check(fw.validate_g13_event_layouts(), 'event layouts') && ok
+	ok = g13_abi_check(fw.validate_g13_microsequence_layouts(), 'microsequence layouts') && ok
+	ok = g13_abi_check(fw.validate_g13_job_layouts(), 'job layouts') && ok
+	ok = g13_abi_check(fw.validate_g13_compute_layouts(), 'compute command layouts') && ok
+	ok = g13_abi_check(fw.validate_g13_buffer_layouts(), 'buffer layouts') && ok
+	ok = g13_abi_check(fw.validate_g13_vertex_layouts(), 'vertex command layouts') && ok
+	ok = g13_abi_check(fw.validate_g13_fragment_layouts(), 'fragment command layouts') && ok
+	return ok
+}
+
 // Probe GPU from device tree and bring up all supported subsystems.
 pub fn initialise() {
 	println('agx: Probing Apple GPU')
@@ -892,15 +925,7 @@ pub fn initialise() {
 			return
 		}
 	}
-	if chip_id == 0x8103
-		&& (!regs.validate_g13_identity_decoder() || !regs.validate_g13_fault_decoder()
-			|| !fw.validate_g13_channel_layouts() || !fw.validate_g13_initdata_layouts()
-			|| !fw.validate_g13_hwdata_layouts()
-			|| !fw.validate_g13_workqueue_layouts() || !fw.validate_g13_event_layouts()
-			|| !fw.validate_g13_microsequence_layouts() || !fw.validate_g13_job_layouts()
-			|| !fw.validate_g13_compute_layouts() || !fw.validate_g13_buffer_layouts()
-			|| !fw.validate_g13_vertex_layouts() || !fw.validate_g13_fragment_layouts()) {
-		println('agx: internal G13 register/queue ABI validation failed')
+	if chip_id == 0x8103 && !report_g13_internal_abi() {
 		return
 	}
 	if !drm_ioctl.validate_asahi_25_layouts() {

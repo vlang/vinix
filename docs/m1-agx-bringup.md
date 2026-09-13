@@ -155,30 +155,39 @@ runtime identity path. Its `AGXAccelerator` publishes `gpu_gen` 13, `gpu_var`
 decoder exists to handle, so `apply_g13_identity()` should see
 `total_active_cores` 7 against a `core_masks[0]` of `0xfe` there.
 
-### What a native boot should print
+### What the M1 Air actually boots
 
-Nothing here has been booted yet. Against the live tree above, the native branch
-of `initialise()` is predicted to reach exactly this and stop, without touching a
-power domain or an ASC register — `vinix.apple_gpu=1` is needed to get that far,
-since the probe is off by default:
+The native path above is not the one this machine takes, which a boot with
+`vinix.apple_gpu=1` settled. The M1 Air starts through its existing
+m1n1/U-Boot chain and Limine is handed **m1n1's FDT**, so `find_gpu_node()`
+matches `apple,agx-g13g` and the m1n1 branch runs. Observed:
 
 ```
+kmain_thread: init GPU driver...
 agx: Probing Apple GPU
-agx: t8103 boot data has no gpu-core-leak-coef
-agx: native t8103 GPU boot data is incomplete
-agx:   perf-states: 7 states, max 6, 14 words
-agx:   power controller: incomplete
-agx:   missing: per-state power, minimum SRAM voltage, core and SRAM leakage
-agx:   see tools/agx-re/recover_t8103_adt.py for where each one comes from
-agx: native t8103 boot data carries no firmware ABI tuple
+agx: loaded 7 t8103 operating points (1 off, 396..1278 MHz, 19488 mW max)
+agx: G13 ABI self-check failed: fragment command layouts
+kmain_thread: GPU driver done
 ```
 
-The two loaders fail on different halves of the four. The power controller
-resolves 28 properties, defaults 23 more, and fails only on the two leakage
-arrays; per-state power and the minimum SRAM voltage block the performance table
-instead. A boot that prints anything else — a different state count, a
-resolved power controller, or any line past the ABI tuple — means the live tree
-and this recovery have diverged.
+Two things follow from that first line, on hardware:
+
+* The operating-point table loads, off state and all. Seven states with one off
+  and a 396..1278 MHz active range is the fused ladder above, arriving through
+  m1n1's OPP-v2 translation. Before the off-state fix this table was rejected
+  outright and the probe stopped at "performance configuration is incomplete".
+* m1n1 supplies all four inputs the native Apple DeviceTree lacks — the 19488 mW
+  maximum is `opp-microwatt` summed by m1n1's own power calculation. **The
+  native-ADT gap is therefore not on this machine's critical path**; it matters
+  for booting an M1 without m1n1, not for the bring-up in progress.
+
+The self-check line was the next blocker and is fixed. Two blocks of the
+fragment work command were eight bytes short of their recovered sizes, which put
+`job_params_2` at `0x3b8` instead of the `0x3c0` that `g13.v` publishes to the
+microsequence, leaving every later field in the command adrift of a pointer
+firmware would dereference. `tests/agx-g13-layouts/` now pins every job-command
+offset against the field it names, and the probe reports which self-check failed
+rather than which of thirteen.
 
 One more thing worth knowing before trying to finish it:
 

@@ -1,6 +1,13 @@
 module fw
 
 // Byte-exact G13/macOS 12.3 fragment work command.
+//
+// The offsets below are the ones g13.v hands to the microsequence, so firmware
+// dereferences them directly and they are the authority on where each region
+// starts. Both parameter blocks carry trailing bytes that no recovered field
+// names: without them job_params_2 lands at 0x3b8 instead of 0x3c0 and every
+// later offset in the command is eight bytes adrift of the pointers already
+// published to firmware. validate_g13_fragment_layouts() is what catches that.
 
 pub const g13_fragment_job_params_1_offset = u64(0x78)
 pub const g13_fragment_job_params_2_offset = u64(0x3c0)
@@ -92,7 +99,7 @@ pub mut:
 	helper_arg                   u64
 	unk_158                      u64
 	unk_160                      u64
-	padding                      [0x1d8]u8
+	padding                      [0x1e0]u8
 }
 
 @[packed]
@@ -161,6 +168,7 @@ pub mut:
 	unk_380                      u64
 	unk_388                      u64
 	depth_dimensions             u64
+	unk_398_padding              [8]u8
 }
 
 @[packed]
