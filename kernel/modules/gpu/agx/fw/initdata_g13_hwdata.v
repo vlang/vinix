@@ -221,7 +221,14 @@ pub fn populate_g13_hwdata_b(mut data G13HwDataB, config &hw.HwConfig,
 	for state := u32(0); state < config.perf_state_count; state++ {
 		frequency := config.perf_state_frequencies[state]
 		power := config.perf_state_powers[state]
-		if frequency == 0 || power == 0 {
+		if config.perf_state_is_active(state) {
+			if power == 0 {
+				return false
+			}
+		} else if power != 0 || state >= config.perf_state_base {
+			// A stock t8103 table opens with an off state, and firmware wants
+			// it published as zero frequency at zero power rather than dropped.
+			// Only states below the base pstate may be off.
 			return false
 		}
 		data.frequencies_mhz[state] = frequency / 1_000_000

@@ -91,12 +91,14 @@ fn find_native_asc_node(role u32) ?&devicetree.DTNode {
 fn validate_g13_firmware_compat(gpu_node &devicetree.DTNode, native_adt bool) bool {
 	// m1n1 patches apple,firmware-abi with the negotiated tuple as standard
 	// big-endian FDT cells. Native Apple DeviceTree does not expose this Linux
-	// property. Its missing OPP-v2 data keeps that path fail-closed before
-	// hardware access. Accept the old Vinix property as a compatibility aid,
-	// but prefer the property used by current m1n1/Linux device trees.
+	// property, so there is nothing to check the loaded firmware against and
+	// this returns false rather than deferring to a later gate: whoever
+	// implements the native ADT path has to supply the ABI tuple here too.
+	// Accept the old Vinix property as a compatibility aid, but prefer the
+	// property used by current m1n1/Linux device trees.
 	if native_adt {
-		C.printf(c'agx: native t8103 firmware compatibility is unavailable\n')
-		return true
+		println('agx: native t8103 boot data carries no firmware ABI tuple')
+		return false
 	}
 	mut property_name := 'apple,firmware-abi'
 	compat := devicetree.get_u32_array(gpu_node, property_name) or {
@@ -384,6 +386,11 @@ fn read_le_u32_at(data voidptr, offset u32) u32 {
 // m1n1 derives this table from the machine's Apple DeviceTree, so it reflects
 // the exact voltage and power data for both seven- and eight-core t8103 parts.
 // Native Apple DeviceTree does not contain the phandle-based representation.
+//
+// The table m1n1 emits starts at an off state: opp00 is enabled and carries a
+// zero frequency with zero power, because calc_power_t8103() yields zero there.
+// Read it verbatim and let hw.apply_opp_table() decide what a valid table is,
+// so that the firmware state numbering matches the device tree index for index.
 fn load_t8103_performance_config(gpu_node &devicetree.DTNode, mut cfg hw.HwConfig) bool {
 	opp_table := devicetree.get_phandle_node(gpu_node, 'operating-points-v2', 0) or {
 		println('agx: t8103 has no operating-points-v2 table')
@@ -393,32 +400,33 @@ fn load_t8103_performance_config(gpu_node &devicetree.DTNode, mut cfg hw.HwConfi
 		C.printf(c'agx: invalid t8103 OPP count %u\n', u32(opp_table.children.len))
 		return false
 	}
-
-	mut frequencies := [16]u32{}
-	mut powers := [16]u32{}
-	mut voltages := [256]u32{}
-	mut sram_voltages := [256]u32{}
 	min_sram_microvolt := devicetree.get_u32(gpu_node, 'apple,min-sram-microvolt') or {
 		println('agx: t8103 has no apple,min-sram-microvolt')
 		return false
 	}
-	if min_sram_microvolt < 1000 {
-		println('agx: t8103 has an invalid minimum SRAM voltage')
+	base_state := devicetree.get_u32(gpu_node, 'apple,perf-base-pstate') or { u32(1) }
+	power_sample_period := devicetree.get_u32(gpu_node, 'apple,power-sample-period') or {
+		println('agx: t8103 has no apple,power-sample-period')
 		return false
 	}
-	min_sram_mv := min_sram_microvolt / 1000
-	mut state_count := u32(0)
-	mut max_power_mw := u32(0)
+	if power_sample_period == 0 {
+		println('agx: t8103 has a zero power sample period')
+		return false
+	}
+
+	mut entries := []hw.OppEntry{cap: opp_table.children.len}
 	for opp in opp_table.children {
 		if status := devicetree.get_string_list(opp, 'status') {
 			if status.len > 0 && status[0] == 'disabled' {
 				continue
 			}
 		}
-		if state_count >= 16 {
+		if u32(entries.len) >= hw.perf_state_capacity {
 			println('agx: t8103 has too many enabled OPPs')
 			return false
 		}
+		// A zero opp-hz or opp-microwatt is data, not a missing property, so
+		// each value still has to be present before the entry is accepted.
 		frequency_hz := devicetree.get_u64(opp, 'opp-hz') or {
 			println('agx: t8103 OPP has no 64-bit opp-hz')
 			return false
@@ -431,67 +439,23 @@ fn load_t8103_performance_config(gpu_node &devicetree.DTNode, mut cfg hw.HwConfi
 			println('agx: t8103 OPP has no opp-microwatt value')
 			return false
 		}
-		if frequency_hz == 0 || frequency_hz > 0xffff_ffff || voltage_uv.len != int(cfg.num_clusters)
-			|| power_uw < 1000 {
-			C.printf(c'agx: invalid t8103 OPP %u dimensions or values\n', state_count)
-			return false
+		entries << hw.OppEntry{
+			frequency_hz: frequency_hz
+			voltage_uv: voltage_uv
+			power_uw: power_uw
 		}
-		frequency := u32(frequency_hz)
-		if state_count > 0 && frequency <= frequencies[state_count - 1] {
-			C.printf(c'agx: t8103 OPP %u is not frequency ordered\n', state_count)
-			return false
-		}
-		frequencies[state_count] = frequency
-		power_mw := power_uw / 1000
-		powers[state_count] = power_mw
-		if power_mw > max_power_mw {
-			max_power_mw = power_mw
-		}
-		for cluster := u32(0); cluster < cfg.num_clusters; cluster++ {
-			if voltage_uv[cluster] < 1000 {
-				C.printf(c'agx: invalid t8103 OPP %u cluster %u voltage\n', state_count, cluster)
-				return false
-			}
-			voltage_mv := voltage_uv[cluster] / 1000
-			destination := state_count * 16 + cluster
-			voltages[destination] = voltage_mv
-			sram_voltages[destination] = if voltage_mv > min_sram_mv {
-				voltage_mv
-			} else {
-				min_sram_mv
-			}
-		}
-		state_count++
 	}
-	if state_count < 2 || max_power_mw == 0 {
-		println('agx: t8103 has too few valid operating points')
-		return false
-	}
-	base_state := devicetree.get_u32(gpu_node, 'apple,perf-base-pstate') or { u32(1) }
-	if base_state >= state_count {
-		C.printf(c'agx: invalid t8103 base performance state %u/%u\n', base_state, state_count)
-		return false
-	}
-	power_sample_period := devicetree.get_u32(gpu_node, 'apple,power-sample-period') or {
-		println('agx: t8103 has no apple,power-sample-period')
-		return false
-	}
-	if power_sample_period == 0 {
-		println('agx: t8103 has a zero power sample period')
+	if !cfg.apply_opp_table(entries, min_sram_microvolt, base_state) {
+		println('agx: t8103 operating-point table was rejected')
 		return false
 	}
 
-	cfg.perf_state_count = state_count
-	cfg.min_sram_microvolt = min_sram_microvolt
-	cfg.perf_state_base = base_state
-	cfg.perf_state_table_count = cfg.num_clusters
-	cfg.perf_state_frequencies = frequencies
-	cfg.perf_state_powers = powers
-	cfg.perf_state_voltages = voltages
-	cfg.perf_state_sram_voltages = sram_voltages
-	cfg.max_power_mw = max_power_mw
 	cfg.gpu_power_sample_period = power_sample_period
-	C.printf(c'agx: loaded %u t8103 operating points (%u..%u MHz, %u mW max)\n', state_count, frequencies[base_state] / 1000000, frequencies[state_count - 1] / 1000000, max_power_mw)
+	// println, not C.printf: kernel/c/printf.c makes _putchar a no-op under
+	// -DPROD, so this bring-up evidence would never reach a real serial log.
+	base_mhz := cfg.perf_state_frequencies[cfg.perf_state_base] / 1_000_000
+	max_mhz := cfg.perf_state_frequencies[cfg.perf_state_count - 1] / 1_000_000
+	println('agx: loaded ${cfg.perf_state_count} t8103 operating points (${cfg.perf_state_off_count()} off, ${base_mhz}..${max_mhz} MHz, ${cfg.max_power_mw} mW max)')
 	return true
 }
 
@@ -923,12 +887,12 @@ pub fn initialise() {
 		println('agx: platform resources are incomplete')
 		return
 	}
-	if chip_id == 0x8103 && !validate_g13_firmware_compat(gpu_node, native_adt) {
-		return
-	}
 	cfg.gpu_mmio_base = platform.sgx_base
 	cfg.gpu_mmio_size = platform.sgx_size
 	agx_driver_inst.detected = true
+	if chip_id == 0x8103 && !validate_g13_firmware_compat(gpu_node, native_adt) {
+		return
+	}
 	if platform.ttbs_size < 64 * 16 {
 		println('agx: TTB region is too small for 64 UAT contexts')
 		return
