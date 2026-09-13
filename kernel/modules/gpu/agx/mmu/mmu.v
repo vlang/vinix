@@ -128,21 +128,21 @@ pub fn new_manager(ttbs_base u64, handoff_base u64, pagetables_base u64, ias u32
 	map_kernel_to_user bool, handoff_abi UatHandoffAbi) ?&UatManager {
 	if ttbs_base & pgtable.uat_pg_mask != 0 || handoff_base & pgtable.uat_pg_mask != 0
 		|| pagetables_base & pgtable.uat_pg_mask != 0 {
-		C.printf(c'uat mmu: reserved regions are not 16 KiB aligned\n')
+		println('uat mmu: reserved regions are not 16 KiB aligned')
 		return none
 	}
 	if sizeof(UatHandoff) != handoff_size || sizeof(SlotTtbs) != 16 {
-		C.printf(c'uat mmu: firmware structure layout mismatch\n')
+		println('uat mmu: firmware structure layout mismatch')
 		return none
 	}
 
 	lower := pgtable.new_pgtable(ias, oas) or {
-		C.printf(c'uat mmu: failed to allocate lower kernel page table\n')
+		println('uat mmu: failed to allocate lower kernel page table')
 		return none
 	}
 	mut upper := pgtable.new_pgtable_with_root(pagetables_base, ias, oas) or {
 		pgtable.destroy(lower)
-		C.printf(c'uat mmu: invalid reserved TTBR1 page table\n')
+		println('uat mmu: invalid reserved TTBR1 page table')
 		return none
 	}
 	if handoff_abi == .v12_3 {
@@ -152,7 +152,7 @@ pub fn new_manager(ttbs_base u64, handoff_base u64, pagetables_base u64, ias u32
 		// to firmware and are left untouched.
 		if ias != 39 || !upper.clear_external_root_entry(2) {
 			pgtable.destroy(lower)
-			C.printf(c'uat mmu: invalid G13 reserved TTBR1 geometry\n')
+			println('uat mmu: invalid G13 reserved TTBR1 geometry')
 			return none
 		}
 		cpu.dsb_sy()
@@ -176,7 +176,7 @@ pub fn new_manager(ttbs_base u64, handoff_base u64, pagetables_base u64, ias u32
 	}
 	uat_mgr = mgr
 
-	C.printf(c'uat mmu: attached IAS=%u OAS=%u TTBs=0x%llx handoff=0x%llx TTBR1=0x%llx\n', ias, oas, ttbs_base, handoff_base, pagetables_base)
+	println('uat mmu: attached IAS=${ias} OAS=${oas} TTBs=0x${ttbs_base:x} handoff=0x${handoff_base:x} TTBR1=0x${pagetables_base:x}')
 	return mgr
 }
 
@@ -292,7 +292,7 @@ pub fn (mut mgr UatManager) initialize_handoff() bool {
 		timer.busywait_us(10000)
 	}
 	if !ready {
-		C.printf(c'uat mmu: firmware handoff magic timed out\n')
+		println('uat mmu: firmware handoff magic timed out')
 		return false
 	}
 

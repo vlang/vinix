@@ -128,7 +128,7 @@ fn (mut rtk RTKit) send_start_endpoint(ep u8) bool {
 }
 
 fn (mut rtk RTKit) fail(message &char) bool {
-	C.printf(c'rtkit[%s]: %s\n', rtk.name.str, message)
+	println('rtkit[${rtk.name}]: ${message}')
 	rtk.state = .error
 	return false
 }
@@ -176,7 +176,7 @@ pub fn (mut rtk RTKit) boot() bool {
 				min_version := u16(msg.data0 & 0xffff)
 				max_version := u16((msg.data0 >> 16) & 0xffff)
 				if min_version > max_supported_version || max_version < min_supported_version {
-					C.printf(c'rtkit[%s]: unsupported protocol range %u-%u\n', rtk.name.str, min_version, max_version)
+					println('rtkit[${rtk.name}]: unsupported protocol range ${min_version}-${max_version}')
 					rtk.state = .error
 					return false
 				}
@@ -201,8 +201,7 @@ pub fn (mut rtk RTKit) boot() bool {
 					// Never observed. If it ever fires, the upper group bits
 					// carry something this decoder does not model.
 					rtk.epmap_group_warned = true
-					C.printf(c'rtkit[%s]: endpoint-map group %u exceeds the addressable range\n',
-						rtk.name.str, group)
+					println('rtkit[${rtk.name}]: endpoint-map group ${group} exceeds the addressable range')
 				}
 				last := msg.data0 & epmap_last != 0
 				base := block * epmap_group_endpoints
@@ -246,7 +245,7 @@ pub fn (mut rtk RTKit) boot() bool {
 				rtk.ap_power_state = u16(msg.data0 & 0xffff)
 			}
 			else {
-				C.printf(c'rtkit[%s]: ignoring management message type 0x%x\n', rtk.name.str, kind)
+				println('rtkit[${rtk.name}]: ignoring management message type 0x${kind:x}')
 			}
 		}
 
@@ -276,7 +275,7 @@ fn (mut rtk RTKit) allocate_system_buffer(ep u8, msg u64) bool {
 		return false
 	}
 	if rtk.system_iovas[ep] != 0 {
-		C.printf(c'rtkit[%s]: duplicate buffer request on endpoint %u\n', rtk.name.str, ep)
+		println('rtkit[${rtk.name}]: duplicate buffer request on endpoint ${ep}')
 		return false
 	}
 
@@ -293,13 +292,13 @@ fn (mut rtk RTKit) allocate_system_buffer(ep u8, msg u64) bool {
 	// chosen by firmware. Current Apple GPU firmware requests allocation with
 	// IOVA zero, matching the Asahi RTKit client contract.
 	if size == 0 || size > max_system_buffer_size || requested_iova != 0 {
-		C.printf(c'rtkit[%s]: invalid buffer request ep=%u size=0x%llx iova=0x%llx\n', rtk.name.str, ep, size, requested_iova)
+		println('rtkit[${rtk.name}]: invalid buffer request ep=${ep} size=0x${size:x} iova=0x${requested_iova:x}')
 		return false
 	}
 
 	iova := rtk.shmem_alloc(rtk.shmem_context, size)
 	if iova == 0 {
-		C.printf(c'rtkit[%s]: failed to allocate 0x%llx-byte buffer for ep=%u\n', rtk.name.str, size, ep)
+		println('rtkit[${rtk.name}]: failed to allocate 0x${size:x}-byte buffer for ep=${ep}')
 		return false
 	}
 	rtk.system_iovas[ep] = iova
@@ -332,7 +331,7 @@ pub fn (mut rtk RTKit) handle_system_message(msg mailbox.MboxMsg) bool {
 					rtk.ap_power_state = u16(msg.data0 & 0xffff)
 				}
 				else {
-					C.printf(c'rtkit[%s]: ignoring runtime management message 0x%x\n', rtk.name.str, kind)
+					println('rtkit[${rtk.name}]: ignoring runtime management message 0x${kind:x}')
 				}
 			}
 		}
@@ -340,7 +339,7 @@ pub fn (mut rtk RTKit) handle_system_message(msg mailbox.MboxMsg) bool {
 			if management_type(msg.data0) == buffer_request && rtk.system_iovas[ep] == 0 {
 				return rtk.allocate_system_buffer(ep, msg.data0)
 			}
-			C.printf(c'rtkit[%s]: coprocessor crash notification\n', rtk.name.str)
+			println('rtkit[${rtk.name}]: coprocessor crash notification')
 			rtk.state = .error
 			return false
 		}
@@ -393,11 +392,11 @@ fn start_system_endpoints(mut rtk RTKit) bool {
 // Start an application endpoint after RTKit has reached the ON state.
 pub fn (mut rtk RTKit) start_endpoint(ep u8) bool {
 	if !rtk.endpoints[ep] {
-		C.printf(c'rtkit[%s]: Endpoint %d not available\n', rtk.name.str, ep)
+		println('rtkit[${rtk.name}]: Endpoint ${ep} not available')
 		return false
 	}
 	if ep >= app_endpoint_start && rtk.state != .running {
-		C.printf(c'rtkit[%s]: Endpoint %d requested before RTKit is running\n', rtk.name.str, ep)
+		println('rtkit[${rtk.name}]: Endpoint ${ep} requested before RTKit is running')
 		return false
 	}
 	return rtk.send_start_endpoint(ep)

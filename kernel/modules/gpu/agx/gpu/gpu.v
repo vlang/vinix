@@ -652,7 +652,7 @@ fn (mut mgr GpuManager) allocate_g13_channels() ?&G13ChannelAllocations {
 fn (mut mgr GpuManager) init_channels() bool {
 	if sizeof(channel.RingHeader) != 0x30 || sizeof(channel.FwCtlRingHeader) != 0x20
 		|| !fw.validate_g13_channel_layouts() {
-		C.printf(c'agx: G13 channel ABI layout validation failed\n')
+		println('agx: G13 channel ABI layout validation failed')
 		return false
 	}
 	if mgr.g13_channels != unsafe { nil } {
@@ -735,7 +735,7 @@ pub fn (mut mgr GpuManager) init() bool {
 	// Step 1: Start every firmware role's independent ASC CPU via ASC_CTL.
 	for role := u32(0); role < mgr.firmware_roles; role++ {
 		if !mgr.res.start_cpu(role) {
-			C.printf(c'agx: Failed to start ASC role %u\n', role)
+			println('agx: Failed to start ASC role ${role}')
 			mgr.stop_firmware_cpus(role)
 			mgr.state = .error
 			return false
@@ -743,25 +743,25 @@ pub fn (mut mgr GpuManager) init() bool {
 	}
 	if mgr.hw_config.gpu_gen == .g13 {
 		identity := mgr.res.get_g13_identity() or {
-			C.printf(c'agx: Invalid G13 identity registers\n')
+			println('agx: Invalid G13 identity registers')
 			mgr.stop_firmware_cpus(mgr.firmware_roles)
 			mgr.state = .error
 			return false
 		}
 		if !mgr.hw_config.apply_g13_identity(identity.revision_code, identity.num_clusters, identity.num_cores_per_cluster, identity.num_frags_per_cluster, identity.num_gps_per_cluster, identity.total_active_cores, identity.core_masks) {
-			C.printf(c'agx: G13 identity exceeds t8103 hardware limits\n')
+			println('agx: G13 identity exceeds t8103 hardware limits')
 			mgr.stop_firmware_cpus(mgr.firmware_roles)
 			mgr.state = .error
 			return false
 		}
-		C.printf(c'agx: G13 topology: %u/%u active cores, mask 0x%x\n', identity.total_active_cores, identity.num_cores_per_cluster * identity.num_clusters, identity.core_masks[0])
+		println('agx: G13 topology: ${identity.total_active_cores}/${identity.num_cores_per_cluster * identity.num_clusters} active cores, mask 0x${identity.core_masks[0]:x}')
 	}
 
 	// Step 2: Complete the uPPL handoff as soon as the ASC is running. RTKit
 	// system endpoints may request and access UAT-backed buffers during boot,
 	// so context-zero roots must be visible before transport negotiation.
 	if uat_mgr == unsafe { nil } || !uat_mgr.initialize_handoff() {
-		C.printf(c'agx: UAT firmware handoff failed\n')
+		println('agx: UAT firmware handoff failed')
 		return mgr.fail_g13_initialization()
 	}
 
@@ -769,27 +769,27 @@ pub fn (mut mgr GpuManager) init() bool {
 	// before negotiating RTKit. The reference G13 driver also publishes the
 	// device-control Initialize command before rtk.boot().
 	if !mgr.init_channels() {
-		C.printf(c'agx: Failed to initialize channels\n')
+		println('agx: Failed to initialize channels')
 		return mgr.fail_g13_initialization()
 	}
 
 	// Step 4: Allocate and initialize firmware init data.
 	if !mgr.init_firmware_data() {
-		C.printf(c'agx: Failed to initialize firmware data\n')
+		println('agx: Failed to initialize firmware data')
 		return mgr.fail_g13_initialization()
 	}
 
 	// Step 5: Publish the v12.3 Initialize command before making InitData live.
 	initialize := fw.make_device_control_initialize()
 	if !mgr.channels.device_ctrl.enqueue(voidptr(&initialize)) {
-		C.printf(c'agx: Failed to queue device-control Initialize\n')
+		println('agx: Failed to queue device-control Initialize')
 		return mgr.fail_g13_initialization()
 	}
 
 	// Step 6: Negotiate the RTKit transport independently for every role.
 	for role := u32(0); role < mgr.firmware_roles; role++ {
 		if !mgr.boot_firmware_role(role) {
-			C.printf(c'agx: RTKit boot failed for role %u\n', role)
+			println('agx: RTKit boot failed for role ${role}')
 			return mgr.fail_g13_initialization()
 		}
 	}
@@ -797,7 +797,7 @@ pub fn (mut mgr GpuManager) init() bool {
 	// Step 7: Start GPU-specific firmware endpoint (0x20) on each role.
 	for role := u32(0); role < mgr.firmware_roles; role++ {
 		if !mgr.start_firmware_endpoint(role, u8(ep_firmware)) {
-			C.printf(c'agx: Failed to start firmware endpoint for role %u\n', role)
+			println('agx: Failed to start firmware endpoint for role ${role}')
 			return mgr.fail_g13_initialization()
 		}
 	}
@@ -805,14 +805,14 @@ pub fn (mut mgr GpuManager) init() bool {
 	// Step 8: Start doorbell endpoint (0x21) on each role.
 	for role := u32(0); role < mgr.firmware_roles; role++ {
 		if !mgr.start_firmware_endpoint(role, u8(ep_doorbell)) {
-			C.printf(c'agx: Failed to start doorbell endpoint for role %u\n', role)
+			println('agx: Failed to start doorbell endpoint for role ${role}')
 			return mgr.fail_g13_initialization()
 		}
 	}
 
 	// Step 9: Build and send MSG_INIT with initdata VA.
 	if !mgr.send_fw_msg(msg_init, mgr.initdata_va) {
-		C.printf(c'agx: Failed to send MSG_INIT\n')
+		println('agx: Failed to send MSG_INIT')
 		return mgr.fail_g13_initialization()
 	}
 
@@ -820,7 +820,7 @@ pub fn (mut mgr GpuManager) init() bool {
 	// has no synchronous reply; consuming an arbitrary RTKit message as an
 	// acknowledgement can steal the first real firmware notification.
 	if !mgr.ring_device_control() || !mgr.kick_firmware() {
-		C.printf(c'agx: Failed to ring G13 initialization doorbells\n')
+		println('agx: Failed to ring G13 initialization doorbells')
 		return mgr.fail_g13_initialization()
 	}
 
@@ -836,7 +836,7 @@ fn (mut mgr GpuManager) init_firmware_data() bool {
 	}
 	if mgr.g13_channels == unsafe { nil } || !fw.validate_g13_initdata_layouts()
 		|| !fw.validate_g13_hwdata_layouts() {
-		C.printf(c'agx: G13 InitData outer layout validation failed\n')
+		println('agx: G13 InitData outer layout validation failed')
 		return false
 	}
 	mut graph := unsafe { mgr.g13_channels }
@@ -1031,14 +1031,14 @@ pub fn (mut mgr GpuManager) flush_g13_uat_range(slot u32, addr u64, size u64) bo
 	started := timer.get_ns()
 	for mgr.channels.fw_ctrl.read_pointer() != token {
 		if timer.get_ns() - started >= u64(1_000_000_000) {
-			C.printf(c'agx: firmware-control UAT flush timed out\n')
+			println('agx: firmware-control UAT flush timed out')
 			mgr.state = .error
 			return false
 		}
 		sched.yield(false)
 	}
 	if !uat_mgr.complete_flush(slot) {
-		C.printf(c'agx: firmware-control UAT handoff did not complete\n')
+		println('agx: firmware-control UAT handoff did not complete')
 		mgr.state = .error
 		return false
 	}
@@ -1070,20 +1070,17 @@ pub fn (mut mgr GpuManager) handle_event() {
 				event.scan_all_completions()
 			}
 			fw.fw_event_fault {
-				C.printf(c'agx: GPU firmware error event\n')
+				println('agx: GPU firmware error event')
 				if info := mgr.res.get_g13_fault_info() {
-					C.printf(c'agx: Fault addr=0x%llx unit=%u vm=%u reason=%u %s\n', info.address, info.unit_code, info.vm_slot, info.reason_code, if info.read {
-						c'read'
-					} else {
-						c'write'
-					})
+					access := if info.read { 'read' } else { 'write' }
+					println('agx: Fault addr=0x${info.address:x} unit=${info.unit_code} vm=${info.vm_slot} reason=${info.reason_code} ${access}')
 				} else {
-					C.printf(c'agx: fault event without a valid G13 fault register\n')
+					println('agx: fault event without a valid G13 fault register')
 				}
 				mgr.state = .error
 			}
 			fw.fw_event_timeout {
-				C.printf(c'agx: GPU firmware timeout event\n')
+				println('agx: GPU firmware timeout event')
 				mgr.state = .error
 			}
 			fw.fw_event_grow_tvb {
@@ -1091,7 +1088,7 @@ pub fn (mut mgr GpuManager) handle_event() {
 				mgr.handle_g13_grow_tvb(grow)
 			}
 			else {
-				C.printf(c'agx: Unhandled event type %d\n', event_type)
+				println('agx: Unhandled event type ${event_type}')
 			}
 		}
 	}
@@ -1128,7 +1125,7 @@ fn (mut mgr GpuManager) poll_rtkit_messages() bool {
 			if ep == u8(ep_firmware) && msg.data0 == msg_rx_doorbell {
 				continue
 			}
-			C.printf(c'agx: unexpected RTKit role=%u ep=0x%x message=0x%llx\n', role, ep, msg.data0)
+			println('agx: unexpected RTKit role=${role} ep=0x${ep:x} message=0x${msg.data0:x}')
 		}
 	}
 	return true
@@ -1149,7 +1146,7 @@ fn (mut mgr GpuManager) drain_auxiliary_channels() {
 fn event_worker(mut mgr GpuManager) {
 	for mgr.state == .running {
 		if !mgr.poll_rtkit_messages() {
-			C.printf(c'agx: RTKit system endpoint failed\n')
+			println('agx: RTKit system endpoint failed')
 			mgr.state = .error
 			break
 		}

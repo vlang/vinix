@@ -205,7 +205,7 @@ fn (mut mgr GpuManager) begin_g13_operation_locked() bool {
 	katomic.store(mut pending, old_pending + 1)
 	if !mgr.kick_firmware() {
 		katomic.store(mut pending, old_pending)
-		C.printf(c'agx: failed to wake G13 firmware for submission\n')
+		println('agx: failed to wake G13 firmware for submission')
 		mgr.state = .error
 		return false
 	}
@@ -216,7 +216,7 @@ fn (mut mgr GpuManager) end_g13_operation_locked() bool {
 	mut pending := mgr.g13_pending_submissions_locked() or { return false }
 	old_pending := katomic.load(pending)
 	if old_pending == 0 {
-		C.printf(c'agx: G13 pending submission counter underflow\n')
+		println('agx: G13 pending submission counter underflow')
 		if mgr.state == .running {
 			mgr.state = .error
 		}
@@ -517,14 +517,14 @@ fn (mut mgr GpuManager) handle_g13_grow_tvb(event_msg &fw.FwGrowTVBEvent) {
 		}
 	}
 	if !found {
-		C.printf(c'agx: GrowTVB requested unknown slot=%u vm=%u\n', event_msg.buffer_slot, event_msg.vm_slot)
+		println('agx: GrowTVB requested unknown slot=${event_msg.buffer_slot} vm=${event_msg.vm_slot}')
 	} else if !grew {
-		C.printf(c'agx: failed to grow TVB slot=%u vm=%u\n', event_msg.buffer_slot, event_msg.vm_slot)
+		println('agx: failed to grow TVB slot=${event_msg.buffer_slot} vm=${event_msg.vm_slot}')
 	}
 
 	ack := fw.make_grow_tvb_ack(event_msg.buffer_slot, event_msg.vm_slot, event_msg.counter)
 	if !mgr.channels.device_ctrl.enqueue(voidptr(&ack)) || !mgr.ring_device_control() {
-		C.printf(c'agx: failed to acknowledge GrowTVB slot=%u vm=%u\n', event_msg.buffer_slot, event_msg.vm_slot)
+		println('agx: failed to acknowledge GrowTVB slot=${event_msg.buffer_slot} vm=${event_msg.vm_slot}')
 		mgr.state = .error
 	}
 }
@@ -788,7 +788,7 @@ fn (mut mgr GpuManager) submit_g13_queue_commands(resources &G13QueueResources,
 		// Both rings already own the command at this point. Keep reporting the
 		// ownership transfer as successful so the caller retains its backing,
 		// but stop further submissions because firmware was not notified.
-		C.printf(c'agx: failed to ring G13 work-pipe doorbell\n')
+		println('agx: failed to ring G13 work-pipe doorbell')
 		mgr.state = .error
 	}
 	return true
@@ -1675,7 +1675,7 @@ fn (mut mgr GpuManager) publish_g13_render_job_locked(mut job G13RenderJobResour
 	if !fragment_rang || !vertex_rang {
 		// Both queue pairs already own the commands. Retain all job backing and
 		// stop new submissions even when either notification fails.
-		C.printf(c'agx: failed to ring paired G13 render doorbells\n')
+		println('agx: failed to ring paired G13 render doorbells')
 		mgr.state = .error
 	}
 	return true
