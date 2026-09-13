@@ -218,12 +218,12 @@ pub fn (cfg &HwConfig) can_boot_firmware() bool {
 	return cfg.gpu_gen == .g13 && cfg.firmware_abi == .v12_3
 }
 
-pub fn (cfg &HwConfig) firmware_abi_name() &char {
+pub fn (cfg &HwConfig) firmware_abi_name() string {
 	return match cfg.firmware_abi {
-		.unknown { c'unknown' }
-		.v12_3_partial { c'G13 v12.3 (partial)' }
-		.v12_3 { c'G13 v12.3' }
-		.g17_26_5_partial { c'G17 26.5 (partial)' }
+		.unknown { 'unknown' }
+		.v12_3_partial { 'G13 v12.3 (partial)' }
+		.v12_3 { 'G13 v12.3' }
+		.g17_26_5_partial { 'G17 26.5 (partial)' }
 	}
 }
 
