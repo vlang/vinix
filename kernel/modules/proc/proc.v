@@ -187,11 +187,34 @@ __global (
 	pid_lock       klock.Lock
 )
 
+// A process group or a session outlives the process that named it: the leader
+// can exit while its members keep running, and the number stays theirs. Handing
+// that number to an unrelated new process makes that process a group leader by
+// accident, and a program which then asks for a session of its own is told it
+// cannot have one. Chromium's crash handler, four processes below the browser,
+// treats that refusal as fatal and takes the browser down with it.
+fn id_is_a_live_group(id int) bool {
+	for i := int(1); i < max_pid; i++ {
+		process := processes[i]
+		if process == unsafe { nil } {
+			continue
+		}
+		if process.pgid == id || process.sid == id {
+			return true
+		}
+	}
+	return false
+}
+
 fn find_free_id() ?int {
 	for i := int(1); i < max_pid; i++ {
-		if processes[i] == unsafe { nil } && threads_by_tid[i] == unsafe { nil } {
-			return i
+		if processes[i] != unsafe { nil } || threads_by_tid[i] != unsafe { nil } {
+			continue
 		}
+		if id_is_a_live_group(i) {
+			continue
+		}
+		return i
 	}
 	return none
 }

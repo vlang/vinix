@@ -279,6 +279,58 @@ static int test_shared_mapping_visible_to_readers(void)
 	return 0;
 }
 
+/* A process group outlives the process that named it. If the leader's pid is
+ * handed to a new process while the group still has members, that process can
+ * be given a pid equal to the group it inherits -- making it a group leader by
+ * accident, and refusing it a session of its own. Chromium's crash handler,
+ * four processes below the browser, treats that refusal as fatal.
+ *
+ * A: leader of its own session. B: its child, which keeps the group alive
+ * after A exits. C: B's child, which must not be handed A's released pid. */
+static int test_released_pid_is_not_reused_while_its_group_lives(void)
+{
+	int result[2];
+	CHECK(pipe(result) == 0);
+
+	pid_t a = fork();
+	CHECK(a >= 0);
+	if (a == 0) {
+		close(result[0]);
+		if (setsid() == -1)
+			_exit(1);
+		pid_t b = fork();
+		if (b < 0)
+			_exit(1);
+		if (b == 0) {
+			/* Outlive A, so its pid is free while its group is not. */
+			sleep(2);
+			pid_t c = fork();
+			if (c < 0)
+				_exit(1);
+			if (c == 0) {
+				unsigned char inherited_its_own_group =
+				    (getpid() == getpgid(0)) ? 1 : 0;
+				ssize_t wrote = write(result[1],
+				    &inherited_its_own_group, 1);
+				_exit(wrote == 1 ? 0 : 1);
+			}
+			int status = 0;
+			waitpid(c, &status, 0);
+			_exit(0);
+		}
+		_exit(0);
+	}
+
+	CHECK(close(result[1]) == 0);
+	CHECK(reap_ok(a) == 0);
+	unsigned char inherited_its_own_group = 1;
+	CHECK(read(result[0], &inherited_its_own_group, 1) == 1);
+	CHECK(inherited_its_own_group == 0);
+	CHECK(close(result[0]) == 0);
+	puts("QEMU CORE PASS: a released pid stays out of use while its group lives");
+	return 0;
+}
+
 static int test_locks(void)
 {
 	int fd = open(file_c, O_RDWR);
@@ -569,6 +621,7 @@ static int run_tests(void)
 	CHECK(prepare_directory() == 0);
 	CHECK(test_ext2_mapping_and_namespace() == 0);
 	CHECK(test_shared_mapping_visible_to_readers() == 0);
+	CHECK(test_released_pid_is_not_reused_while_its_group_lives() == 0);
 	CHECK(test_locks() == 0);
 	CHECK(test_permissions_and_limits() == 0);
 	CHECK(test_inotify() == 0);
