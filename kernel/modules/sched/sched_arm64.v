@@ -75,9 +75,26 @@ pub fn get_timer_handler() fn (voidptr) {
 	return scheduler_timer_handler
 }
 
+// Pick a thread for this CPU. On a machine with more than one memory node this
+// runs twice: once accepting only threads already at home on this CPU's node,
+// and then accepting anything. A thread therefore tends to keep running next to
+// the memory it faulted in, while a node with nothing to do still takes work
+// from a busy one rather than idling.
 fn get_next_thread() &proc.Thread {
 	mut cpu_local := cpulocal.current()
 
+	if numa_multinode {
+		local_thread := scan_run_queue(mut cpu_local, int(cpu_local.numa_node))
+		if unsafe { local_thread != nil } {
+			return local_thread
+		}
+	}
+	return scan_run_queue(mut cpu_local, -1)
+}
+
+// `want_node` of -1 accepts every thread; otherwise only those whose home node
+// matches, plus those no CPU has claimed yet.
+fn scan_run_queue(mut cpu_local cpulocal.Local, want_node int) &proc.Thread {
 	mut orig_i := cpu_local.last_run_queue_index
 
 	if orig_i >= max_running_threads {
@@ -96,6 +113,10 @@ fn get_next_thread() &proc.Thread {
 		if unsafe { t != 0 } {
 			cpu_number := cpu_local.cpu_number
 			if cpu_number < 64 && t.affinity_mask & (u64(1) << cpu_number) == 0 {
+				index++
+				continue
+			}
+			if want_node >= 0 && t.numa_node >= 0 && t.numa_node != want_node {
 				index++
 				continue
 			}
@@ -204,6 +225,13 @@ fn scheduler_timer_handler(_gpr_state voidptr) {
 	current_thread = next_thread
 	proc.set_current_thread(cpu_local.cpu_number, current_thread)
 	proc.begin_cpu_time(mut current_thread, now_ns)
+
+	// The first CPU to run a thread claims it for its node, so that the pages
+	// the thread goes on to fault in and the CPU it keeps returning to are on
+	// the same side of the machine.
+	if current_thread.numa_node < 0 {
+		current_thread.numa_node = int(cpu_local.numa_node)
+	}
 
 	cpu.write_tpidr_el0(current_thread.tpidr_el0)
 
@@ -829,6 +857,10 @@ pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) ?&proc.Pr
 		new_proc.nice = old_process.nice
 		new_proc.executable_path = old_process.executable_path.clone()
 		new_proc.rlimits = old_process.rlimits
+		// A NUMA memory policy is process state, like nice and the rlimits, so
+		// a fork keeps the placement its parent asked for.
+		new_proc.mempolicy_mode = old_process.mempolicy_mode
+		new_proc.mempolicy_nodemask = old_process.mempolicy_nodemask
 		new_proc.pagemap = mmap.fork_pagemap(old_process.pagemap) or { return none }
 		new_proc.thread_stack_top = old_process.thread_stack_top
 		new_proc.mmap_anon_non_fixed_base = old_process.mmap_anon_non_fixed_base
@@ -869,6 +901,11 @@ pub fn await() {
 	// scheduler timer handler directly when the timer fires.
 	cpu.interrupt_toggle(false)
 
+	// Which CPU this is, read once. Only the boot CPU polls, because the input
+	// drivers below assume a single poller and any CPU released into this loop
+	// would otherwise become a second one.
+	polls_input := cpu.read_tpidr_el1() == 0
+
 	for {
 		vctl := cpu.read_cntv_ctl_el0()
 		if vctl & 0x4 != 0 {
@@ -882,7 +919,7 @@ pub fn await() {
 
 		// Poll UART input while idle (no separate thread — HVF workaround).
 		// Uses a callback set by the console module to avoid circular imports.
-		if uart_poll_callback != voidptr(0) {
+		if polls_input && uart_poll_callback != voidptr(0) {
 			C.vinix_call_void_fn(uart_poll_callback)
 		}
 

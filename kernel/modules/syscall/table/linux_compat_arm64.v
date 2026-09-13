@@ -7,7 +7,6 @@ module table
 // positioned-I/O family), so their argument layout must follow the kernel ABI
 // rather than the C library function prototype.
 
-import aarch64.cpu
 import errno
 import file
 import fs
@@ -248,18 +247,6 @@ fn syscall_linux_getrlimit(gpr_state voidptr, which_resource int, old_limit u64)
 
 fn syscall_linux_setrlimit(gpr_state voidptr, which_resource int, new_limit u64) (u64, u64) {
 	return syscall_linux_prlimit64(gpr_state, 0, which_resource, new_limit, 0)
-}
-
-fn syscall_linux_getcpu(_ voidptr, cpu_ptr u64, node_ptr u64, _cache u64) (u64, u64) {
-	cpu_number := u32(cpu.read_tpidr_el1())
-	node := u32(0)
-	if cpu_ptr != 0 && !usercopy.copy_to_user(cpu_ptr, voidptr(&cpu_number), sizeof(u32)) {
-		return errno.err, errno.efault
-	}
-	if node_ptr != 0 && !usercopy.copy_to_user(node_ptr, voidptr(&node), sizeof(u32)) {
-		return errno.err, errno.efault
-	}
-	return 0, 0
 }
 
 fn syscall_linux_sched_rr_get_interval(_ voidptr, pid int, interval_ptr u64) (u64, u64) {

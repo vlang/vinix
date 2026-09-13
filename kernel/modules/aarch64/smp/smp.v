@@ -59,6 +59,7 @@ pub fn initialise(max_cpus u64) {
 	mut bsp_info := unsafe { smp_info_array[bsp_index] }
 	bsp_info.extra_argument = u64(bsp_local)
 	bsp_local.cpu_number = 0
+	bsp_local.mpidr = bsp_info.mpidr
 	cpuinit.initialise(bsp_info)
 
 	mut logical_cpu := u64(1)
@@ -73,6 +74,7 @@ pub fn initialise(max_cpus u64) {
 
 		smp_info.extra_argument = u64(cpu_local)
 		cpu_local.cpu_number = logical_cpu
+		cpu_local.mpidr = smp_info.mpidr
 
 		// The Limine MP contract requires release ordering: extra_argument and
 		// the Local contents must be visible before the parked AP observes its

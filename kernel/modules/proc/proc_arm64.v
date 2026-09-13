@@ -73,6 +73,10 @@ pub mut:
 	scheduled_at_ns u64
 	cpu_time_ns     u64
 	affinity_mask   u64 = u64(-1)
+	// The memory node this thread is at home on. Unset until a CPU first picks
+	// it up, which is what claims it: the scheduler then prefers to keep it
+	// there, next to the pages it faulted in. -1 means no CPU has run it yet.
+	numa_node int = -1
 }
 
 pub fn current_thread() &Thread {

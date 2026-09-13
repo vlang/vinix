@@ -54,6 +54,13 @@ pub mut:
 	abort_stack          [abort_stack_size]u64
 	aborted              bool
 	timer_freq           u64
+	// The affinity bits of this CPU's MPIDR_EL1, which is the name firmware
+	// uses for it in a device tree or an MADT. Kept so the NUMA topology can be
+	// matched against the logical numbering smp hands out.
+	mpidr u64
+	// Which memory node this CPU belongs to. Zero on a machine with one node,
+	// which is every machine until numa.attach_cpus() says otherwise.
+	numa_node u32
 }
 
 __global (

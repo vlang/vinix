@@ -257,10 +257,36 @@ fn inner_alloc(count u64, limit u64) voidptr {
 					lib.bitset(pmm_bitmap, i)
 					unsafe { (&u32(pmm_refcounts))[i] = 1 }
 				}
+				charge_node_pages(page, count)
 				return voidptr(page * page_size)
 			}
 		} else {
 			pmm_last_used_index++
+			p = 0
+		}
+	}
+	return 0
+}
+
+// inner_alloc confined to one window of the bitmap, [start, limit). This is
+// how a node-restricted allocation scans only the pages its node owns; see
+// physical_numa.v. Accounting for the pages it takes is the caller's, which
+// already knows the node and so does not have to look each page up again.
+fn inner_alloc_range(count u64, start u64, limit u64) voidptr {
+	mut p := u64(0)
+
+	for i := start; i < limit; i++ {
+		if !lib.bittest(pmm_bitmap, i) {
+			p++
+			if p == count {
+				page := i + 1 - count
+				for j := page; j <= i; j++ {
+					lib.bitset(pmm_bitmap, j)
+					unsafe { (&u32(pmm_refcounts))[j] = 1 }
+				}
+				return voidptr(page * page_size)
+			}
+		} else {
 			p = 0
 		}
 	}
@@ -423,6 +449,7 @@ pub fn pmm_free(ptr voidptr, count u64) {
 			refs[i] = 0
 		}
 		lib.bitreset(pmm_bitmap, i)
+		discharge_node_page(i)
 		free_pages++
 	}
 }

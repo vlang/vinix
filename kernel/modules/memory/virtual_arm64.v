@@ -483,18 +483,43 @@ pub fn vmm_init() {
 	}
 	print('vmm: framebuffer 0x${vmm_framebuffer_base:x} +0x${vmm_framebuffer_len:x} mapped (memmap FB entries: ${fb_entries}, HHDM 0x${higher_half:x})\n')
 
-	// Set up MAIR_EL1:
+	// Activate the kernel page tables. This is a live switch: the MMU is already
+	// on (Limine handed off with it enabled), so the running instruction stream,
+	// stack and framebuffer must stay mapped across it. The kernel's tables map
+	// all three, and its TCR matches Limine's geometry (both 4KB granule, 48-bit,
+	// T0SZ=T1SZ=16), so no fetch changes meaning mid-switch.
+	print('vmm: activating kernel page tables\n')
+	vmm_activate_on_cpu()
+
+	// Only reached if the switch did not fault: the framebuffer alias in the
+	// new tables is live and flanterm can still render. On a machine with no
+	// console this line is how a successful switch is told apart from one that
+	// faulted into silence.
+	print('vmm: kernel page tables live\n')
+
+	vmm_initialised = true
+}
+
+// Put this CPU on the kernel's page tables and memory attributes.
+//
+// Every one of these registers is per-CPU, so a secondary CPU has to run this
+// too: writing only TTBR0 leaves it translating the higher half through the
+// bootloader's TTBR1, which does not have the mappings made after hand-off and
+// whose MAIR indices mean something else. It got away with that for as long as
+// it never ran a thread -- and stopped the moment one of its threads switched
+// TTBR0 to a private address space.
+pub fn vmm_activate_on_cpu() {
+	// MAIR_EL1:
 	//   Index 0: Normal Write-Back Cacheable (0xFF)
 	//   Index 1: Device-nGnRnE (0x00)
 	//   Index 2: Normal Non-Cacheable (0x44)
-	// Written only at the switch below. Limine's live tables use index 1 for
-	// the framebuffer with a different attribute, so nothing may touch the
-	// framebuffer between this write and the new tables going live.
+	// Limine's live tables use index 1 for the framebuffer with a different
+	// attribute, so nothing may touch the framebuffer between this write and
+	// the new tables going live.
 	mair := u64(0xFF) | (u64(0x00) << 8) | (u64(0x44) << 16)
 
-	// Set up TCR_EL1 for 4KB granule, 48-bit VA and a runtime-detected
-	// physical address size from ID_AA64MMFR0_EL1.PARange.
-	// PARange and TCR.IPS use the same encoding.
+	// TCR_EL1 for 4KB granule, 48-bit VA and a physical address size read from
+	// this CPU's ID_AA64MMFR0_EL1.PARange. PARange and TCR.IPS share an encoding.
 	mmfr0 := cpu.read_id_aa64mmfr0_el1()
 	mut tcr_ips := (mmfr0 >> 0) & 0xf
 	if tcr_ips > 6 {
@@ -512,17 +537,11 @@ pub fn vmm_init() {
 	(u64(0b01) << 26) | // ORGN1 = Write-Back
 	(u64(0b01) << 8) | // IRGN0 = Write-Back
 	(u64(0b01) << 24) // IRGN1 = Write-Back
-	// Activate the kernel page tables. This is a live switch: the MMU is already
-	// on (Limine handed off with it enabled), so the running instruction stream,
-	// stack and framebuffer must stay mapped across it. The kernel's tables map
-	// all three, and its TCR matches Limine's geometry (both 4KB granule, 48-bit,
-	// T0SZ=T1SZ=16), so no fetch changes meaning mid-switch.
-	//
+
 	// Order matters and follows Limine's own hand-off: install the translation
 	// bases first, write TCR last. TCR is the register that re-interprets an
 	// in-flight table walk, so it is written only once the correct bases are
 	// already live. Each writer ends in an ISB.
-	print('vmm: activating kernel page tables\n')
 	cpu.write_mair_el1(mair)
 	cpu.write_ttbr0_el1(u64(kernel_pagemap.top_level))
 	cpu.write_ttbr1_el1(u64(kernel_pagemap.top_level))
@@ -531,12 +550,4 @@ pub fn vmm_init() {
 	cpu.tlbi_vmalle1()
 	cpu.dsb_sy()
 	cpu.isb()
-
-	// Only reached if the switch did not fault: the framebuffer alias in the
-	// new tables is live and flanterm can still render. On a machine with no
-	// console this line is how a successful switch is told apart from one that
-	// faulted into silence.
-	print('vmm: kernel page tables live\n')
-
-	vmm_initialised = true
 }

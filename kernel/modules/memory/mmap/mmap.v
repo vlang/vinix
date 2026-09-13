@@ -1,6 +1,7 @@
 module mmap
 
 import memory
+import numa
 import resource
 import proc
 import errno
@@ -418,7 +419,10 @@ fn acquire_range_page(local &MmapRangeLocal, virt u64, file_page u64) ?voidptr {
 	global := local.global
 	if local.flags & map_anonymous != 0
 		|| (global.segmented_file && !range_page_has_file_data(global, virt)) {
-		page := memory.pmm_alloc_fallible(1)
+		// First touch decides where anonymous memory lives: the page comes from
+		// the node running the thread that faulted, unless set_mempolicy(2) or
+		// mbind(2) named somewhere else.
+		page := numa.alloc_user_page()
 		if page == unsafe { nil } {
 			errno.set(errno.enomem)
 			return none
@@ -507,7 +511,10 @@ pub fn resolve_cow_fault(_pagemap &memory.Pagemap, address u64) bool {
 		return true
 	}
 
-	new_page := memory.pmm_alloc_nozero_fallible(1)
+	// A private copy is written by, and then read by, the thread taking this
+	// fault, so it belongs on that thread's node rather than next to the shared
+	// page it was copied from.
+	new_page := numa.alloc_user_page_nozero()
 	if new_page == unsafe { nil } {
 		return false
 	}

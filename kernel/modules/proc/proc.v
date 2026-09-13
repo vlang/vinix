@@ -131,6 +131,14 @@ pub mut:
 	// POSIX nice value. The scheduler scales this process' timeslices from
 	// -20 (highest normal priority) through 19 (lowest).
 	nice int
+	// NUMA memory policy, from set_mempolicy(2) and mbind(2). Zero is
+	// MPOL_DEFAULT: an anonymous page comes from the node the faulting thread
+	// is running on. Inherited across fork and preserved by exec, as on Linux.
+	mempolicy_mode     int
+	mempolicy_nodemask u64
+	// Where MPOL_INTERLEAVE is up to. It lives on the process so that its
+	// threads interleave together instead of each starting from node zero.
+	mempolicy_interleave u64
 }
 
 // Read-mostly limits are naturally aligned u64s.  Writers serialize complete

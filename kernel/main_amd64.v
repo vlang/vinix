@@ -11,6 +11,7 @@ import x86.idt
 import x86.isr
 import x86.smp
 import initramfs
+import numa
 import fs
 import sched
 import stat
@@ -54,6 +55,12 @@ fn kmain_thread() {
 	hypervisor.initialise()
 
 	initramfs.initialise()
+
+	// The CPU and memory-node topology, at the paths Linux userspace reads it
+	// from. Mounted after the initramfs has been unpacked so the mount point is
+	// not one of the directories that unpack creates.
+	fs.create(vfs_root, '/sys', 0o555 | stat.ifdir) or {}
+	fs.mount(vfs_root, '', '/sys', 'sysfs') or {}
 
 	streams.initialise()
 	random.initialise()
@@ -134,7 +141,15 @@ fn kmain() {
 		panic('uacpi_namespace_initialize(): ${C.uacpi_status_to_string(uacpi_status)}')
 	}
 
+	// The machine's memory topology, read after ACPI has located the tables that
+	// describe it and before smp hands out the logical CPU numbers its nodes are
+	// matched against.
+	numa.initialise()
+
 	smp.initialise()
+
+	// Every logical CPU now exists, so each can be told which node it sits on.
+	numa.attach_cpus()
 
 	time.initialise()
 

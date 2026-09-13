@@ -83,6 +83,7 @@ pub fn initialise() {
 	filesystems['tmpfs'] = &TmpFS{}
 	filesystems['devtmpfs'] = &DevTmpFS{}
 	filesystems['procfs'] = &ProcFS{}
+	filesystems['sysfs'] = &SysFS{}
 }
 
 fn reduce_node(node &VFSNode, follow_symlinks bool) &VFSNode {

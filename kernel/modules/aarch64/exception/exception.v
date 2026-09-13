@@ -4,6 +4,7 @@ module exception
 import aarch64.cpu
 import aarch64.cpu.local as cpulocal
 import aarch64.uart
+import klock
 import lib
 import memory
 import memory.mmap
@@ -14,17 +15,30 @@ import userland
 fn C.exception_vectors()
 fn C.sc_dump_ring()
 
-// Dedicated stack for exceptions taken while early boot runs on SP_EL0. When a
+// Dedicated stacks for exceptions taken while a CPU runs on SP_EL0. When a
 // fault is taken to EL1 the CPU switches to SP_EL1; Limine never set it, so it
 // would be garbage. 32 KiB is enough for the deep fault dump.
+//
+// One per CPU: a secondary CPU is on SP_EL0 from the moment Limine releases it
+// until the scheduler gives it a thread, and two CPUs reporting a fault on one
+// shared stack would each overwrite the other's frame.
+pub const max_exception_stacks = 8
+
+const exception_stack_size = 32768
+
 __global (
-	exception_stack [32768]u8
+	exception_stacks [max_exception_stacks][exception_stack_size]u8
 	// Static line buffer for the fatal report. The report must not allocate:
 	// a fault inside the allocator (or on memory it relies on) would otherwise
 	// re-fault while being reported, recursing into silence. That is exactly
 	// what happened on the M1 when the PMM bitmap was left unmapped.
 	fatal_line     [256]u8
 	fatal_line_len = int(0)
+	// The report is built in the static buffers above and printed a field at a
+	// time, so two CPUs faulting together would interleave into one unreadable
+	// line. Serialize the whole dump; a CPU that faulted can afford to wait for
+	// another CPU that faulted.
+	fatal_report_lock klock.Lock
 )
 
 fn fatal_put_str(s string) {
@@ -86,10 +100,28 @@ pub fn initialise() {
 	cpu.write_vbar_el1(u64(voidptr(C.exception_vectors)))
 	cpu.isb()
 
-	// Give SP_EL1 a real stack so a Current-EL/SP_EL0 fault (anything before the
-	// scheduler, which runs at EL1t) reaches the handler instead of faulting
-	// again on an uninitialised stack. 16-byte aligned per the ABI.
-	mut sp_top := u64(voidptr(&exception_stack[0])) + u64(sizeof(exception_stack))
+	install_exception_stack(0)
+}
+
+// The per-CPU half of exception setup, for a secondary CPU that Limine released
+// straight into the kernel and which therefore never ran initialise().
+pub fn initialise_secondary(cpu_number u64) {
+	cpu.write_vbar_el1(u64(voidptr(C.exception_vectors)))
+	cpu.isb()
+	install_exception_stack(cpu_number)
+}
+
+// Give SP_EL1 a real stack so a Current-EL/SP_EL0 fault (anything before this
+// CPU is running a thread, which is at EL1t) reaches the handler instead of
+// faulting again on an uninitialised stack. 16-byte aligned per the ABI.
+fn install_exception_stack(cpu_number u64) {
+	// A CPU past the table shares the last stack. It is the reporting path for a
+	// fault that is already fatal, so sharing is better than no stack at all.
+	mut index := cpu_number
+	if index >= max_exception_stacks {
+		index = max_exception_stacks - 1
+	}
+	mut sp_top := u64(voidptr(&exception_stacks[index][0])) + u64(exception_stack_size)
 	sp_top &= ~u64(0xf)
 	cpu.set_sp_el1(sp_top)
 	cpu.isb()
@@ -207,6 +239,10 @@ fn fault_handler(ec u64, esr u64, far u64, gpr_state &cpulocal.GPRState) {
 	// A red bar at row 56, drawn without locks or allocation, marks a fault
 	// even if the text path below cannot run (lock held, allocator wedged).
 	term.early_stage_mark(56)
+	fatal_report_lock.acquire()
+	defer {
+		fatal_report_lock.release()
+	}
 	emit_fatal_line(ec, esr, far, gpr_state)
 
 	uart.puts(c'FATAL EXCEPTION: ec=0x')

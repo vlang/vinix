@@ -27,9 +27,26 @@ pub fn initialise() {
 	}
 }
 
+// Pick a thread for this CPU. On a machine with more than one memory node this
+// runs twice: once accepting only threads already at home on this CPU's node,
+// and then accepting anything. A thread therefore tends to keep running next to
+// the memory it faulted in, while a node with nothing to do still takes work
+// from a busy one rather than idling.
 fn get_next_thread() &proc.Thread {
 	mut cpu_local := cpulocal.current()
 
+	if numa_multinode {
+		local_thread := scan_run_queue(mut cpu_local, int(cpu_local.numa_node))
+		if unsafe { local_thread != nil } {
+			return local_thread
+		}
+	}
+	return scan_run_queue(mut cpu_local, -1)
+}
+
+// `want_node` of -1 accepts every thread; otherwise only those whose home node
+// matches, plus those no CPU has claimed yet.
+fn scan_run_queue(mut cpu_local cpulocal.Local, want_node int) &proc.Thread {
 	mut orig_i := cpu_local.last_run_queue_index
 
 	if orig_i >= max_running_threads {
@@ -48,6 +65,10 @@ fn get_next_thread() &proc.Thread {
 		if unsafe { t != 0 } {
 			cpu_number := cpu_local.cpu_number
 			if cpu_number < 64 && t.affinity_mask & (u64(1) << cpu_number) == 0 {
+				index++
+				continue
+			}
+			if want_node >= 0 && t.numa_node >= 0 && t.numa_node != want_node {
 				index++
 				continue
 			}
@@ -125,6 +146,13 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 
 	current_thread = next_thread
 	proc.begin_cpu_time(mut current_thread, time.monotonic_ns())
+
+	// The first CPU to run a thread claims it for its node, so that the pages
+	// the thread goes on to fault in and the CPU it keeps returning to are on
+	// the same side of the machine.
+	if current_thread.numa_node < 0 {
+		current_thread.numa_node = int(cpu_local.numa_node)
+	}
 
 	cpu.set_gs_base(u64(current_thread))
 	if current_thread.gpr_state.cs == 0x43 {
@@ -634,6 +662,10 @@ pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) ?&proc.Pr
 		new_proc.umask = old_process.umask
 		new_proc.nice = old_process.nice
 		new_proc.rlimits = old_process.rlimits
+		// A NUMA memory policy is process state, like nice and the rlimits, so
+		// a fork keeps the placement its parent asked for.
+		new_proc.mempolicy_mode = old_process.mempolicy_mode
+		new_proc.mempolicy_nodemask = old_process.mempolicy_nodemask
 	} else {
 		new_proc.ppid = 0
 		new_proc.pgid = new_proc.pid

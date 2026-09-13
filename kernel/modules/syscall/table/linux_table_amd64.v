@@ -11,6 +11,7 @@ import errno
 import file
 import fs
 import memory.mmap
+import numa
 import net
 import pipe
 import proc
@@ -518,6 +519,10 @@ pub fn init_linux_syscall_table() {
 	linux_syscall_table[293] = voidptr(pipe.syscall_pipe)
 	linux_syscall_table[294] = voidptr(fs.syscall_inotify_init)
 	linux_syscall_table[302] = voidptr(syscall_linux_prlimit64)
+	linux_syscall_table[237] = voidptr(numa.syscall_mbind)
+	linux_syscall_table[238] = voidptr(numa.syscall_set_mempolicy)
+	linux_syscall_table[239] = voidptr(numa.syscall_get_mempolicy)
+	linux_syscall_table[309] = voidptr(numa.syscall_getcpu)
 	linux_syscall_table[318] = voidptr(syscall_linux_getrandom)
 	linux_syscall_table[334] = voidptr(syscall_linux_rseq)
 	linux_syscall_table[439] = voidptr(fs.syscall_faccessat)

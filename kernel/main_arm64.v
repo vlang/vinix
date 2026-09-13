@@ -23,6 +23,7 @@ import apple.ans
 import apple.typec
 import devicetree
 import initramfs
+import numa
 import fs
 import sched
 import stat
@@ -210,6 +211,13 @@ fn kmain_thread(qemu_platform bool) {
 			panic('QEMU persistent storage was requested but could not be mounted')
 		}
 	}
+
+	// /sys after the root is settled rather than alongside /dev and /proc: a
+	// disk root replaces the tree those two are carried across into, and this
+	// one has nothing in it that the block device was read through.
+	fs.create(vfs_root, '/sys', 0o555 | stat.ifdir) or {}
+	fs.mount(vfs_root, '', '/sys', 'sysfs') or {}
+	print('kmain_thread: sysfs done\n')
 
 	if enable_fake_g17 {
 		print('kmain_thread: init fake G17 DRM driver...\n')
@@ -769,6 +777,14 @@ fn kmain() {
 	// ARM64 PCI ECAM setup is not wired yet; skip to avoid unsafe probing.
 	print('skipping PCI (ARM64 ECAM setup not implemented)\n')
 
+	// The machine's memory topology. Read after the higher half is live, since
+	// the ACPI tables a UEFI machine describes it in are reached through it, and
+	// before smp, which hands out the logical CPU numbers the nodes are then
+	// matched against.
+	print('init numa...\n')
+	numa.initialise()
+	print('numa done\n')
+
 	// Limine 12.8's VHE-aware trampoline can safely park Apple APs at EL2. Use
 	// four logical CPUs on Apple hardware while retaining the existing all-CPU
 	// behaviour in virtual machines (currently configured with four vCPUs).
@@ -791,6 +807,9 @@ fn kmain() {
 		print('skipping SMP (no device tree)\n')
 		bootstrap_cpu0()
 	}
+
+	// Every logical CPU now exists, so each can be told which node it sits on.
+	numa.attach_cpus()
 
 	print('init time...\n')
 	time.initialise()

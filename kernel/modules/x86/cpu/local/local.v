@@ -64,6 +64,9 @@ pub mut:
 	last_run_queue_index int
 	abort_stack          [abort_stack_size]u64
 	aborted              bool
+	// Which memory node this CPU belongs to. Zero on a machine with one node,
+	// which is every machine until numa.attach_cpus() says otherwise.
+	numa_node u32
 }
 
 __global (
