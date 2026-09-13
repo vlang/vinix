@@ -49,3 +49,8 @@ kernel/tmp.v
 /build-aarch64-blender-native/
 /.claude/
 /deploy-to-m1.sh
+/build-office2019-probe/
+/build-word2013-probe/
+/build-word2013-msi-probe/
+/build-word2013-prefix/
+/build-word55-probe/
