@@ -35,6 +35,10 @@ fn check_layout_validators() {
 	assert fw.validate_g13_buffer_layouts()
 	assert fw.validate_g13_vertex_layouts()
 	assert fw.validate_g13_fragment_layouts()
+	// The generated 12.3 column has to describe the same structures the builders
+	// in this directory write into, or the 13.5 translation is off a different
+	// layout than the one it claims to translate.
+	assert fw.validate_g13_initdata_layout_tables()
 }
 
 // Firmware dereferences these addresses, so the constant and the field it names
@@ -64,6 +68,38 @@ fn check_vertex_offsets() {
 	assert __offsetof(fw.G13RunVertex, end_ts) == fw.g13_vertex_end_ts_offset
 }
 
+// Translation is identity at 12.3 and a table lookup at 13.5. An offset the
+// generator never saw has no answer at all, rather than a 12.3 offset handed to
+// 13.5 firmware.
+fn check_abi_offset_translation() {
+	// Identity at 12.3.
+	assert (fw.g13_hwdata_a_offset(.v12_3, 0x004) or { 0 }) == 0x004
+	assert (fw.g13_hwdata_a_offset(.v12_3, 0x64c) or { 0 }) == 0x64c
+	// HwDataA 0xc is one of the 106 that move.
+	assert (fw.g13_hwdata_a_offset(.v13_5_partial, 0x00c) or { 0 }) == 0x010
+	// Both Globals writes that reach into the nested GlobalsSub. The second
+	// also crosses a field 13.5 inserts inside it, so it moves by more than
+	// the containing field does.
+	assert (fw.g13_globals_offset(.v13_5_partial, 0x5e) or { 0 }) == 0x6e
+	assert (fw.g13_globals_offset(.v13_5_partial, 0x66) or { 0 }) == 0x82
+
+	// An offset the generator never saw has no answer, rather than a 12.3
+	// offset handed to 13.5 firmware.
+	if _ := fw.g13_hwdata_a_offset(.v13_5_partial, 0x1) {
+		assert false, 'an unknown offset must not translate'
+	}
+	if _ := fw.g13_hwdata_a_offset(.g17_26_5_partial, 0x004) {
+		assert false, 'only the two G13 ABIs translate'
+	}
+
+	assert (fw.g13_hwdata_a_active_size(.v12_3) or { 0 }) == 0x3d6c
+	assert (fw.g13_hwdata_a_active_size(.v13_5_partial) or { 0 }) == 0x421c
+	assert (fw.g13_hwdata_b_active_size(.v13_5_partial) or { 0 }) == 0x1884
+	assert (fw.g13_globals_active_size(.v13_5_partial) or { 0 }) == 0x12394
+	assert (fw.g13_active_io_mapping_count(.v12_3) or { 0 }) == 20
+	assert (fw.g13_active_io_mapping_count(.v13_5_partial) or { 0 }) == 25
+}
+
 fn check_compute_offsets() {
 	assert __offsetof(fw.G13RunCompute, job_params_1) == fw.g13_compute_job_params_1_offset
 	assert __offsetof(fw.G13RunCompute, job_params_2) == fw.g13_compute_job_params_2_offset
@@ -79,5 +115,6 @@ fn main() {
 	check_fragment_offsets()
 	check_vertex_offsets()
 	check_compute_offsets()
+	check_abi_offset_translation()
 	println('G13 work-command layout tests passed')
 }

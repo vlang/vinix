@@ -40,6 +40,12 @@ pub enum FirmwareAbi {
 	// The macOS 26.5 G17C root header and RTKit transport are identified,
 	// but its nested InitData/channel/work layouts are not complete.
 	g17_26_5_partial
+	// An M1 shipped by the Asahi installer speaks this: 13.0b4 moved HwDataB
+	// and the InitData graph, so it is a different layout of the same G13
+	// protocol. The offsets are computed rather than transcribed, by
+	// tools/agx-re/generate_g13_initdata_layout.py. Not yet complete: the
+	// structures 13.5 adds still need values, so can_boot_firmware() refuses it.
+	v13_5_partial
 }
 
 pub struct IoMapping {
@@ -224,6 +230,7 @@ pub fn (cfg &HwConfig) firmware_abi_name() string {
 		.v12_3_partial { 'G13 v12.3 (partial)' }
 		.v12_3 { 'G13 v12.3' }
 		.g17_26_5_partial { 'G17 26.5 (partial)' }
+		.v13_5_partial { 'G13 v13.5 (partial)' }
 	}
 }
 

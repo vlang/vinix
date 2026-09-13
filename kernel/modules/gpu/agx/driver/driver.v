@@ -891,6 +891,7 @@ fn report_g13_internal_abi() bool {
 	ok = g13_abi_check(fw.validate_g13_buffer_layouts(), 'buffer layouts') && ok
 	ok = g13_abi_check(fw.validate_g13_vertex_layouts(), 'vertex command layouts') && ok
 	ok = g13_abi_check(fw.validate_g13_fragment_layouts(), 'fragment command layouts') && ok
+	ok = g13_abi_check(fw.validate_g13_initdata_layout_tables(), 'InitData layout tables') && ok
 	return ok
 }
 
