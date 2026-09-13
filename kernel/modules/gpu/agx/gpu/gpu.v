@@ -698,6 +698,27 @@ fn (mut mgr GpuManager) fail_g13_initialization() bool {
 	return false
 }
 
+// Allocate the completion-tracking resources the firmware bootstrap depends
+// on, for the generation actually present.
+//
+// This is deliberately a dispatch and not a call straight into the G13
+// initializer: the two stamp arrays and event.configure_event_manager() are
+// specific to the G13 12.3 ABI, and G17 tracks completion through its own
+// firmware graph. A new generation has to declare its own bring-up here rather
+// than be made to pass a G13-only check.
+pub fn (mut mgr GpuManager) initialize_event_resources() bool {
+	match mgr.hw_config.gpu_gen {
+		.g13 {
+			return mgr.initialize_g13_event_resources()
+		}
+		else {
+			generation := u32(mgr.hw_config.gpu_gen)
+			println('agx: no event-resource bring-up for GPU generation ${generation}')
+			return false
+		}
+	}
+}
+
 // Full GPU initialization sequence
 pub fn (mut mgr GpuManager) init() bool {
 	mgr.lock.acquire()

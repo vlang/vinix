@@ -260,7 +260,7 @@ fn (mut f GpuFile) cleanup_closed_mappings_locked(vm_id u32) bool {
 			continue
 		}
 		pt.unmap(mapping.addr, mapping.size)
-		if !flush_g13_mapping(ctx, mapping.addr, mapping.size) {
+		if !flush_firmware_mapping(ctx, mapping.addr, mapping.size) {
 			success = false
 		}
 		gem.unref(mapping.obj)
@@ -354,12 +354,18 @@ fn ranges_overlap(first_addr u64, first_size u64, second_addr u64, second_size u
 	return first_addr < second_addr + second_size && second_addr < first_addr + first_size
 }
 
-// G13 firmware may retain both UAT translations and noncoherent cache lines.
-// Break large mappings into the 16-bit page counts accepted by FwCtlMsg.
-fn flush_g13_mapping(ctx &mmu.UatContext, addr u64, size u64) bool {
+// Firmware may retain both UAT translations and noncoherent cache lines after
+// a mapping changes, so every bind and unbind has to invalidate them.
+//
+// Only G13's protocol is implemented: it breaks the range into the 16-bit page
+// counts accepted by FwCtlMsg. Any other generation fails closed. Returning
+// success without flushing would hand userspace a mapping the GPU may never
+// observe, or keep a freed page live in a firmware translation.
+fn flush_firmware_mapping(ctx &mmu.UatContext, addr u64, size u64) bool {
 	manager := gpu.get_global_manager() or { return false }
 	if manager.hw_config.gpu_gen != .g13 {
-		return true
+		println('agx: no firmware mapping-flush protocol for this GPU generation')
+		return false
 	}
 	mut gpu_manager := unsafe { manager }
 	max_flush_size := u64(0xffff) * pgtable.uat_pgsz
@@ -595,7 +601,7 @@ pub fn (mut f GpuFile) ioctl_gem_bind(data &ioctl.DrmAsahiGemBind) int {
 				gem.unref(obj)
 				return -12
 			}
-			if !flush_g13_mapping(ctx, request.addr, request.range) {
+			if !flush_firmware_mapping(ctx, request.addr, request.range) {
 				pt.unmap(request.addr, request.range)
 				f.lock.release()
 				gem.unref(obj)
@@ -622,7 +628,7 @@ pub fn (mut f GpuFile) ioctl_gem_bind(data &ioctl.DrmAsahiGemBind) int {
 				if mapping.vm_id == request.vm_id && mapping.addr == request.addr
 					&& mapping.size == request.range {
 					pt.unmap(request.addr, request.range)
-					flush_ok := flush_g13_mapping(ctx, request.addr, request.range)
+					flush_ok := flush_firmware_mapping(ctx, request.addr, request.range)
 					gem.unref(mapping.obj)
 					f.mappings.delete(i)
 					f.lock.release()
@@ -646,7 +652,7 @@ pub fn (mut f GpuFile) ioctl_gem_bind(data &ioctl.DrmAsahiGemBind) int {
 				mapping := f.mappings[i]
 				if mapping.vm_id == request.vm_id && voidptr(mapping.obj) == voidptr(obj) {
 					pt.unmap(mapping.addr, mapping.size)
-					if !flush_g13_mapping(ctx, mapping.addr, mapping.size) {
+					if !flush_firmware_mapping(ctx, mapping.addr, mapping.size) {
 						flush_ok = false
 					}
 					gem.unref(mapping.obj)

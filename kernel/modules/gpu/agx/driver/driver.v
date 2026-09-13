@@ -1006,8 +1006,8 @@ pub fn initialise() {
 		println('agx: Failed to create GPU manager')
 		return
 	}
-	if !mgr.initialize_g13_event_resources() {
-		println('agx: Failed to initialize native G13 event stamps')
+	if !mgr.initialize_event_resources() {
+		println('agx: Failed to initialize firmware event resources')
 		return
 	}
 

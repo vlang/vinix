@@ -17,6 +17,7 @@ import apple.mailbox
 import klock
 import lib
 import memory
+import sched
 
 // GART range 10 in the pinned G17C host driver. Apple dedicates this 20 MiB
 // canonical-high interval to firmware PIO mappings. Vinix leaves a deliberate
@@ -850,8 +851,91 @@ fn (mut mgr GpuManager) init_g17() bool {
 	}
 
 	mgr.state = .running
+	spawn g17_event_worker(mut mgr)
 	println('agx: G17 dual-role firmware bootstrap complete')
 	return true
+}
+
+// Mailbox messages consumed per role per sweep, bounding one role's traffic
+// from starving the other.
+const g17_worker_messages_per_role = 256
+
+// Consume one mailbox message from a firmware role.
+//
+// Draining the firmware event rings is the caller's job, so an AKF callback
+// only has to be recognised here: the sweep that follows reads whatever the
+// callback was announcing, and coalesces several callbacks into one pass.
+fn (mut mgr GpuManager) dispatch_g17_role_message(role u32, msg mailbox.MboxMsg) bool {
+	endpoint := mailbox.msg_endpoint(&msg)
+	if endpoint < u8(ep_firmware) {
+		return mgr.handle_role_system_message(role, msg)
+	}
+	if endpoint == u8(ep_doorbell) {
+		// Doorbells are notifications only. The work they announce is read out
+		// of the per-role firmware event rings.
+		return true
+	}
+	if endpoint != u8(ep_firmware) {
+		C.printf(c'agx: unexpected G17 endpoint 0x%x on role %u\n', endpoint, role)
+		return true
+	}
+	kind := fw.g17_akf_message_type(msg.data0)
+	if kind == fw.g17_akf_callback_type {
+		return true
+	}
+	if kind == fw.g17_akf_ready_type {
+		// A second ready means firmware restarted the role. Apple rebuilds the
+		// accelerator state before acknowledging it; Vinix has no such recovery
+		// lifecycle, and acknowledging would expose stale roots and rings.
+		C.printf(c'agx: G17 role %u re-signalled ready after bootstrap\n', role)
+		return false
+	}
+	C.printf(c'agx: unhandled G17 firmware message type %u on role %u\n', kind, role)
+	return true
+}
+
+// Service both GFX firmware roles for as long as the GPU is running.
+//
+// G13's event_worker() polls the InitData event channel. G17 has no such
+// channel: its firmware raises AKF callbacks on either role's mailbox, and the
+// completion, growth and error records land in the per-role firmware event
+// rings that handle_g17_akf_callback() drains. Without this loop the bootstrap
+// handshake would be the only reader those rings ever get, so no job submitted
+// after init_g17() could be observed complete.
+fn g17_event_worker(mut mgr GpuManager) {
+	for mgr.state == .running {
+		mut serviced := false
+		for role := u32(0); role < mgr.firmware_roles && mgr.state == .running; role++ {
+			for _ in 0 .. g17_worker_messages_per_role {
+				msg := mgr.recv_role_message(role) or { break }
+				serviced = true
+				if !mgr.dispatch_g17_role_message(role, msg) {
+					mgr.state = .error
+					break
+				}
+			}
+		}
+		if mgr.state != .running {
+			break
+		}
+		// Sweep unconditionally: firmware can append to a ring under a callback
+		// this loop has already consumed, and handle_g17_akf_callback() signals
+		// completion stamps and reports ring corruption on both roles.
+		if !mgr.handle_g17_akf_callback() {
+			// Every real failure inside the sweep already moved the manager to
+			// .error; a missing graph has not, and is equally fatal.
+			mgr.state = .error
+			break
+		}
+		if !serviced {
+			sched.yield(false)
+		}
+	}
+	if mgr.state == .error {
+		// Stop every firmware CPU before failure callbacks release userspace
+		// mappings. shutdown() then signals all retained jobs as failed.
+		mgr.shutdown()
+	}
 }
 
 // Apple decodes bits 53:48. Type 9 consumes a one-shot guard and broadcasts
