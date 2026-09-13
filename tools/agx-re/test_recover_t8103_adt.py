@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import pathlib
+import plistlib
 import re
 import struct
+import tempfile
 import unittest
 from unittest import mock
 
@@ -156,8 +158,11 @@ class DeviceTreeRecoveryTests(unittest.TestCase):
         with mock.patch.object(
             recover_t8103_adt, "load_device_tree", return_value=root
         ):
+            root = recover_t8103_adt.load_device_tree(
+                recover_t8103_adt.Path("device-tree.im4p")
+            )
             return recover_t8103_adt.recover(
-                recover_t8103_adt.Path("device-tree.im4p"), None
+                recover_t8103_adt.sgx_inventory(root), "device-tree.im4p", False, None
             )
 
     def test_reports_the_four_inputs_the_device_tree_cannot_supply(self) -> None:
@@ -205,6 +210,93 @@ class DeviceTreeRecoveryTests(unittest.TestCase):
         root = recover_t8103_adt.parse_adt(adt_node("device-tree", {}, []))
         with self.assertRaisesRegex(ValueError, "has no /device-tree/arm-io/sgx"):
             recover_t8103_adt.sgx_inventory(root)
+
+
+# The fused GPU performance table read off a MacBookAir10,1 (j313ap, t8103)
+# running macOS 26.3.1, which is the only place it exists: a staged DeviceTree
+# leaves perf-states zero-filled for iBoot to write at boot.  Seven states whose
+# first is the off state, one voltage column, base pstate 1.
+LIVE_M1_PERF_STATES = (
+    (0, 400),
+    (396_000_000, 618),
+    (528_000_000, 650),
+    (720_000_000, 687),
+    (924_000_000, 778),
+    (1_128_000_000, 868),
+    (1_278_000_000, 928),
+)
+
+
+def live_sgx_plist(properties: dict[str, bytes]) -> bytes:
+    return plistlib.dumps([properties])
+
+
+class LivePerformanceTableTests(unittest.TestCase):
+    def perf_states_blob(self) -> bytes:
+        return b"".join(
+            struct.pack("<II", frequency, voltage)
+            for frequency, voltage in LIVE_M1_PERF_STATES
+        )
+
+    def test_decodes_the_fused_ladder_as_frequency_voltage_pairs(self) -> None:
+        decoded = recover_t8103_adt.decode_perf_states(self.perf_states_blob())
+        self.assertEqual(len(decoded), 7)
+        self.assertEqual(decoded[0], {"frequency_hz": 0, "voltage_mv": 400})
+        self.assertEqual(
+            decoded[6], {"frequency_hz": 1_278_000_000, "voltage_mv": 928}
+        )
+
+    def test_a_partial_pair_is_rejected(self) -> None:
+        with self.assertRaisesRegex(ValueError, "not an array of 32-bit pairs"):
+            recover_t8103_adt.decode_perf_states(b"\0" * 12)
+
+    def test_live_inventory_drops_ioregistry_bookkeeping(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory) / "sgx.plist"
+            path.write_bytes(
+                live_sgx_plist(
+                    {
+                        "gpu-ppm-ki": u32(1119289344),
+                        "perf-states": self.perf_states_blob(),
+                        "IORegistryEntryID": u32(7),
+                    }
+                )
+            )
+            inventory = recover_t8103_adt.live_sgx_inventory(path)
+            self.assertIn("gpu-ppm-ki", inventory)
+            self.assertIn("perf-states", inventory)
+            self.assertNotIn("IORegistryEntryID", inventory)
+            self.assertEqual(recover_t8103_adt.read_perf_states(path), self.perf_states_blob())
+
+    def test_a_live_tree_is_not_a_template_and_is_still_short_the_same_four(self) -> None:
+        properties = {name: value for name, value in SGX_PROPERTIES.items()}
+        properties["perf-states"] = self.perf_states_blob()
+        properties["perf-state-count"] = u32(7)
+        properties["perf-state-table-count"] = u32(1)
+        properties["gpu-num-perf-states"] = u32(6)
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory) / "sgx.plist"
+            path.write_bytes(live_sgx_plist(properties))
+            recovered = recover_t8103_adt.recover(
+                recover_t8103_adt.live_sgx_inventory(path),
+                str(path),
+                True,
+                None,
+                recover_t8103_adt.read_perf_states(path),
+            )
+        self.assertTrue(recovered["live"])
+        self.assertFalse(recovered["perf_states_is_template"])
+        # A live tree supplies the values, not new inputs.
+        self.assertEqual(
+            recovered["missing_required_inputs"],
+            [
+                "opp-microwatt",
+                "apple,min-sram-microvolt",
+                "apple,core-leak-coef",
+                "apple,sram-leak-coef",
+            ],
+        )
+        self.assertEqual(recovered["perf_states"][1]["frequency_hz"], 396_000_000)
 
 
 class LeakageRecoveryTests(unittest.TestCase):

@@ -109,15 +109,54 @@ Four are not there, at any spelling:
 
 | Missing input | Where Apple gets it |
 | --- | --- |
-| per-state power | Nowhere. `perf-states` is `{frequency_hz, voltage_mV}` pairs with no power column, and `AGXFirmware::setupConfig` reads a *published* maximum — `gpu-device-max-power`, else `gpu-max-power` — with no computed fallback behind it. Neither name is in a base-M1 tree. G13 firmware refuses a zero `max_power_mw`, so this one blocks the performance table. |
+| per-state power | Nowhere. `perf-states` is `{frequency_hz, voltage_mV}` pairs with no power column, and `AGXFirmware::setupConfig` reads a *published* maximum — `gpu-device-max-power`, else `gpu-max-power` — with no computed fallback behind it. Neither name is in a base-M1 tree, staged **or live**. G13 firmware refuses a zero `max_power_mw`, so this one blocks the performance table. |
 | minimum SRAM voltage | An m1n1 invention. It clamps the ADT core voltages to a floor Apple's boot data never states. |
 | core and SRAM leakage coefficients | Fused, not published. `AGXAcceleratorG13G_B0::calculateGPULeakage` reads one 64-bit word from the fuse aperture, shifts it, masks it, adds one and scales it by a driver-held `f32`. HwDataA wants the two resulting coefficients at `0x3cf4` and `0x3d14`. |
 
-Two things worth knowing before trying to finish it:
+### Confirmed against a live M1
 
-* A **staged DeviceTree is a template.** Its `perf-states` is zero-filled and
-  `perf-state-count` is 0; iBoot writes the fused table in at boot. Property
-  names and shapes can be read from the staged image, values cannot.
+A staged DeviceTree is only a template: its `perf-states` is zero-filled and
+`perf-state-count` is 0, because iBoot writes the fused table in at boot. So the
+above was re-run against a real MacBookAir10,1 (j313ap, t8103) on macOS 26.3.1:
+
+```sh
+# on the M1
+ioreg -rw0 -p IODeviceTree -n sgx -d1 -a > sgx.plist
+# here
+./recover_t8103_adt.py --live-sgx sgx.plist
+```
+
+A live tree has 68 sgx properties against the template's 53, and it supplies
+**values, not new inputs** — the same four are still missing. In particular
+neither `gpu-max-power` nor `gpu-device-max-power` appears on real hardware, so
+the missing per-state power is not an artefact of reading a template.
+
+The fused table it does supply, seven states with the off state first and one
+voltage column, `gpu-perf-base-pstate` 1:
+
+| state | MHz | mV |
+| ---: | ---: | ---: |
+| 0 | 0 (off) | 400 |
+| 1 | 396 | 618 |
+| 2 | 528 | 650 |
+| 3 | 720 | 687 |
+| 4 | 924 | 778 |
+| 5 | 1128 | 868 |
+| 6 | 1278 | 928 |
+
+`tests/agx-t8103-opp/` uses this ladder. Its power column still cannot come from
+hardware, and is m1n1-shaped.
+
+The same machine also confirms the static configuration in `hw/t8103.v` and the
+runtime identity path. Its `AGXAccelerator` publishes `gpu_gen` 13, `gpu_var`
+`G`, `num_cores` 8, `num_frags` 8, `num_gps` 4, `num_mgpus` 1 — matching
+`t8103_config()` field for field — with `gpu-core-count` 7 and
+`core_mask_list` `[0xfe]`. That is the fused-off seven-core Air the identity
+decoder exists to handle, so `apply_g13_identity()` should see
+`total_active_cores` 7 against a `core_masks[0]` of `0xfe` there.
+
+One more thing worth knowing before trying to finish it:
+
 * `AGXAccelerator::applyLeakageEquation` is a double-precision, `pow()`-based
   *thermal* model. It is not the per-pstate table, and it could not be used in
   this kernel anyway — the AArch64 build is `-mgeneral-regs-only`, which is why

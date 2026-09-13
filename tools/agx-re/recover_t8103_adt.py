@@ -12,6 +12,11 @@ G13 firmware data needs.  This answers that with evidence instead:
     itself and AGXG13G's own string table.
   * Where Apple's AGXG13G gets the figures the DeviceTree does not carry.
 
+Both a staged image and a live capture can be read.  That distinction matters:
+a staged DeviceTree is a template whose fused performance table is zero-filled
+until iBoot writes it at boot, so names and shapes come from the image and
+values come from a machine.  The two agree on which inputs are missing.
+
 Every base-M1 kext and DeviceTree is available on any Mac, not just an M1:
 a macOS install stages one kernel collection and one DeviceTree per supported
 board under Preboot for restore.
@@ -24,6 +29,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import plistlib
 import struct
 from pathlib import Path
 
@@ -144,10 +150,11 @@ OPTIONAL_FDT_PROPERTIES = (
 )
 
 # AGXFirmware::setupConfig reads a maximum GPU power straight out of the
-# DeviceTree, preferring the device-scoped name.  Recovering the order matters
-# because neither name exists in the staged tree: whatever supplies one on a
-# live machine is the only source of the figure, and there is no computed
-# fallback behind it.
+# DeviceTree, preferring the device-scoped name, and has no computed fallback
+# behind either.  Neither name is in a staged base-M1 tree, and neither is in a
+# live one: a MacBookAir10,1 running macOS 26.3.1 publishes 68 sgx properties
+# and none of them is a power.  So the figure G13 firmware data needs has no
+# Apple DeviceTree source on this chip at all, template or not.
 MAX_POWER_PROPERTIES = ("gpu-device-max-power", "gpu-max-power")
 SETUP_CONFIG_SYMBOL = "__ZN11AGXFirmware11setupConfigEv"
 LEAKAGE_SYMBOLS = (
@@ -201,6 +208,50 @@ def sgx_inventory(root) -> dict[str, dict[str, object]]:
         name: describe_value(prop.data)
         for name, prop in sorted(node.properties.items())
     }
+
+
+def live_sgx_inventory(plist_path: Path) -> dict[str, dict[str, object]]:
+    """Inventory an sgx node captured from a running M1's IORegistry.
+
+    A staged DeviceTree is only a template, so the fused performance table can
+    be read nowhere but a live machine.  Capture it with:
+
+        ioreg -rw0 -p IODeviceTree -n sgx -d1 -a > sgx.plist
+
+    IORegistry adds its own IO* bookkeeping keys to the node; those are not
+    DeviceTree properties and are dropped here.
+    """
+    with plist_path.open("rb") as handle:
+        loaded = plistlib.load(handle)
+    node = loaded[0] if isinstance(loaded, list) else loaded
+    return {
+        name: describe_value(value)
+        for name, value in sorted(node.items())
+        if isinstance(value, bytes) and not name.startswith("IO")
+    }
+
+
+def read_perf_states(plist_path: Path) -> bytes | None:
+    with plist_path.open("rb") as handle:
+        loaded = plistlib.load(handle)
+    node = loaded[0] if isinstance(loaded, list) else loaded
+    value = node.get("perf-states")
+    return value if isinstance(value, bytes) else None
+
+
+def decode_perf_states(data: bytes) -> list[dict[str, int]]:
+    """Decode perf-states, which is {frequency_hz, voltage_mV} pairs.
+
+    There is no third column.  This is the whole reason the native path cannot
+    build a G13 performance table: m1n1's opp-microwatt has no source here.
+    """
+    if len(data) % 8:
+        raise ValueError("perf-states is not an array of 32-bit pairs")
+    states = []
+    for offset in range(0, len(data), 8):
+        frequency_hz, voltage_mv = struct.unpack_from("<II", data, offset)
+        states.append({"frequency_hz": frequency_hz, "voltage_mv": voltage_mv})
+    return states
 
 
 def recover_mapping(
@@ -339,9 +390,13 @@ def recover_max_power_properties(image: bytes) -> dict[str, object]:
     }
 
 
-def recover(device_tree: Path, agx_g13g: Path | None) -> dict[str, object]:
-    root = load_device_tree(device_tree)
-    inventory = sgx_inventory(root)
+def recover(
+    inventory: dict[str, dict[str, object]],
+    source: str,
+    live: bool,
+    agx_g13g: Path | None,
+    perf_states: bytes | None = None,
+) -> dict[str, object]:
     driver_strings: set[str] = set()
     driver: dict[str, object] = {"available": False}
     if agx_g13g is not None and agx_g13g.is_file():
@@ -379,10 +434,11 @@ def recover(device_tree: Path, agx_g13g: Path | None) -> dict[str, object]:
             or not all(entry["in_device_tree"] for entry in record["adt"])
         )
     ]
-    perf_states = inventory.get("perf-states")
+    perf_states_described = inventory.get("perf-states")
     return {
-        "schema": 1,
-        "device_tree": str(device_tree),
+        "schema": 2,
+        "source": source,
+        "live": live,
         "platform": BASE_M1_PLATFORM,
         "sgx_property_count": len(inventory),
         "sgx_properties": inventory,
@@ -393,7 +449,10 @@ def recover(device_tree: Path, agx_g13g: Path | None) -> dict[str, object]:
         # table in at boot.  An all-zero perf-states here is the image saying so,
         # not a parse failure, and it is why no real frequency or voltage can be
         # read out of this file.
-        "perf_states_is_template": bool(perf_states and perf_states["all_zero"]),
+        "perf_states_is_template": bool(
+            perf_states_described and perf_states_described["all_zero"]
+        ),
+        "perf_states": decode_perf_states(perf_states) if perf_states else None,
         "driver": driver,
     }
 
@@ -409,6 +468,13 @@ def main() -> int:
     )
     parser.add_argument("--device-tree", type=Path, help="override the DeviceTree image")
     parser.add_argument(
+        "--live-sgx",
+        type=Path,
+        help="an sgx node captured on a running M1 with "
+        "`ioreg -rw0 -p IODeviceTree -n sgx -d1 -a`; the only place the fused "
+        "performance table exists",
+    )
+    parser.add_argument(
         "--agx-g13g",
         type=Path,
         default=DEFAULT_AGX_G13G,
@@ -417,8 +483,19 @@ def main() -> int:
     args = parser.parse_args()
 
     try:
-        device_tree = args.device_tree or find_platform_device_tree(args.preboot, args.board)
-        recovered = recover(device_tree, args.agx_g13g)
+        if args.live_sgx:
+            source = str(args.live_sgx)
+            live = True
+            inventory = live_sgx_inventory(args.live_sgx)
+            perf_states = read_perf_states(args.live_sgx)
+        else:
+            source = str(
+                args.device_tree or find_platform_device_tree(args.preboot, args.board)
+            )
+            live = False
+            inventory = sgx_inventory(load_device_tree(Path(source)))
+            perf_states = None
+        recovered = recover(inventory, source, live, args.agx_g13g, perf_states)
     except (OSError, ValueError) as error:
         parser.error(str(error))
 

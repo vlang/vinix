@@ -12,18 +12,25 @@ module main
 // firmware indexes this table directly: perf_state_base, num_pstates and
 // max_pstate are all positions in it.
 //
-// The frequency ladder, cluster count and minimum SRAM voltage below are the
-// t8103 values. The per-state voltage and power columns are representative of
-// one m1n1 handoff rather than a captured boot; what the test pins is the
-// derivation and the state numbering, not those particular microwatts.
+// The frequency and voltage columns are the fused table read off a
+// MacBookAir10,1 (j313ap, t8103) running macOS 26.3.1, via
+// `tools/agx-re/recover_t8103_adt.py --live-sgx`: seven states whose first is
+// the off state at 0 Hz and 400 mV, one voltage column, base pstate 1. A
+// staged DeviceTree leaves that table zero-filled for iBoot, so a live machine
+// is the only place it exists.
+//
+// The power column is not from hardware and cannot be: Apple's DeviceTree has
+// no per-state power at any spelling, and m1n1 computes opp-microwatt itself.
+// These are m1n1-shaped figures, and what the test pins is the derivation and
+// the state numbering rather than those particular microwatts.
 
 import gpu.agx.hw
 import gpu.agx.fw
 
 const stock_frequencies_hz = [u64(0), 396_000_000, 528_000_000, 720_000_000, 924_000_000,
 	1_128_000_000, 1_278_000_000]
-const stock_voltages_uv = [u32(400_000), 612_000, 632_000, 678_000, 756_000, 846_000,
-	897_000]
+const stock_voltages_uv = [u32(400_000), 618_000, 650_000, 687_000, 778_000, 868_000,
+	928_000]
 const stock_powers_uw = [u32(0), 1_911_000, 2_478_000, 3_559_000, 5_107_000, 7_000_000,
 	8_791_000]
 const stock_min_sram_uv = u32(790_000)
@@ -84,8 +91,8 @@ fn check_loaded_table() {
 	assert cfg.perf_state_table_count == 1
 
 	// SRAM voltage is the core voltage clamped up to the platform minimum.
-	expected_mv := [u32(400), 612, 632, 678, 756, 846, 897]
-	expected_sram_mv := [u32(790), 790, 790, 790, 790, 846, 897]
+	expected_mv := [u32(400), 618, 650, 687, 778, 868, 928]
+	expected_sram_mv := [u32(790), 790, 790, 790, 790, 868, 928]
 	for state in 0 .. 7 {
 		assert cfg.perf_state_voltages[state * 16] == expected_mv[state]
 		assert cfg.perf_state_sram_voltages[state * 16] == expected_sram_mv[state]
@@ -106,8 +113,8 @@ fn check_firmware_table() {
 	expected_mhz := [u32(0), 396, 528, 720, 924, 1128, 1278]
 	expected_rel_power := [u32(0), 21, 28, 40, 58, 79, 100]
 	expected_boost := [u32(0), 0, 14, 36, 59, 82, 100]
-	expected_mv := [u32(400), 612, 632, 678, 756, 846, 897]
-	expected_sram_mv := [u32(790), 790, 790, 790, 790, 846, 897]
+	expected_mv := [u32(400), 618, 650, 687, 778, 868, 928]
+	expected_sram_mv := [u32(790), 790, 790, 790, 790, 868, 928]
 	for state in 0 .. 7 {
 		assert hwdata.frequencies_mhz[state] == expected_mhz[state]
 		assert hwdata.rel_max_powers[state] == expected_rel_power[state]
@@ -131,7 +138,7 @@ fn check_rejected_tables() {
 	mut moved := stock_table()
 	moved[3] = hw.OppEntry{
 		frequency_hz: 0
-		voltage_uv: [u32(678_000)]
+		voltage_uv: [u32(687_000)]
 		power_uw: 0
 	}
 	assert rejects(moved, stock_min_sram_uv, stock_base_pstate)
@@ -150,7 +157,7 @@ fn check_rejected_tables() {
 	mut weak := stock_table()
 	weak[2] = hw.OppEntry{
 		frequency_hz: 528_000_000
-		voltage_uv: [u32(632_000)]
+		voltage_uv: [u32(650_000)]
 		power_uw: 999
 	}
 	assert rejects(weak, stock_min_sram_uv, stock_base_pstate)
@@ -158,7 +165,7 @@ fn check_rejected_tables() {
 	mut unordered := stock_table()
 	unordered[4] = hw.OppEntry{
 		frequency_hz: 700_000_000
-		voltage_uv: [u32(756_000)]
+		voltage_uv: [u32(778_000)]
 		power_uw: 5_107_000
 	}
 	assert rejects(unordered, stock_min_sram_uv, stock_base_pstate)
@@ -175,7 +182,7 @@ fn check_rejected_tables() {
 	mut wide := stock_table()
 	wide[1] = hw.OppEntry{
 		frequency_hz: 396_000_000
-		voltage_uv: [u32(612_000), 612_000]
+		voltage_uv: [u32(618_000), 618_000]
 		power_uw: 1_911_000
 	}
 	assert rejects(wide, stock_min_sram_uv, stock_base_pstate)
