@@ -158,36 +158,59 @@ decoder exists to handle, so `apply_g13_identity()` should see
 ### What the M1 Air actually boots
 
 The native path above is not the one this machine takes, which a boot with
-`vinix.apple_gpu=1` settled. The M1 Air starts through its existing
-m1n1/U-Boot chain and Limine is handed **m1n1's FDT**, so `find_gpu_node()`
-matches `apple,agx-g13g` and the m1n1 branch runs. Observed:
+`vinix.apple_gpu=1` settled. The M1 Air starts through its existing m1n1/U-Boot
+chain and Limine is handed **m1n1's FDT**, so `find_gpu_node()` matches
+`apple,agx-g13g` and the m1n1 branch runs. Observed:
 
 ```
 kmain_thread: init GPU driver...
 agx: Probing Apple GPU
 agx: loaded 7 t8103 operating points (1 off, 396..1278 MHz, 19488 mW max)
-agx: G13 ABI self-check failed: fragment command layouts
+agx: loaded t8103 power controller (1 zone, 8 ms period)
+agx: detected chip 0x8103, up to 8 cores
+agx: t8103 apple,firmware-compat 13.5.0
+agx: only the G13 12.3.0 firmware ABI is being implemented
 kmain_thread: GPU driver done
 ```
 
-Two things follow from that first line, on hardware:
+Everything before the last two lines is bring-up working on hardware:
 
-* The operating-point table loads, off state and all. Seven states with one off
-  and a 396..1278 MHz active range is the fused ladder above, arriving through
-  m1n1's OPP-v2 translation. Before the off-state fix this table was rejected
-  outright and the probe stopped at "performance configuration is incomplete".
-* m1n1 supplies all four inputs the native Apple DeviceTree lacks — the 19488 mW
-  maximum is `opp-microwatt` summed by m1n1's own power calculation. **The
-  native-ADT gap is therefore not on this machine's critical path**; it matters
-  for booting an M1 without m1n1, not for the bring-up in progress.
+* **The operating-point table loads, off state and all.** Seven states with one
+  off over 396..1278 MHz is the fused ladder above, arriving through m1n1's
+  OPP-v2 translation. Before the off-state fix this table was rejected outright.
+* **The power controller loads** — one zone, 8 ms sample period — so m1n1
+  supplies all four inputs the native Apple DeviceTree lacks. The 19488 mW
+  maximum is `opp-microwatt`, which m1n1 computes itself. **The native-ADT gap
+  is not on this machine's critical path**; it matters for booting an M1 without
+  m1n1, not for the bring-up in progress.
+* **All thirteen G13 ABI self-checks pass.** They print only on failure, and the
+  fragment command layout that failed the previous boot was the last one wrong.
 
-The self-check line was the next blocker and is fixed. Two blocks of the
-fragment work command were eight bytes short of their recovered sizes, which put
-`job_params_2` at `0x3b8` instead of the `0x3c0` that `g13.v` publishes to the
-microsequence, leaving every later field in the command adrift of a pointer
-firmware would dereference. `tests/agx-g13-layouts/` now pins every job-command
-offset against the field it names, and the probe reports which self-check failed
-rather than which of thirteen.
+### The firmware ABI is the live blocker
+
+`apple,firmware-compat 13.5.0`. This machine's installed GPU firmware speaks the
+**13.5** ABI; `gpu/agx/fw` implements **12.3** and nothing else — its HwDataB is
+explicitly the pre-13.0b4 layout. The probe refuses and touches no power domain
+or ASC register, which is correct: the structures it would publish describe a
+different firmware.
+
+Note the spelling. An M1 Air carries `apple,firmware-compat` and no
+`apple,firmware-abi` at all, so the fallback name is the one that turns up on
+hardware.
+
+There are two honest ways past this, and only two:
+
+1. **Boot firmware that speaks 12.3.** The tuple is not a setting — it reports
+   what m1n1 found installed — so this means installing a 12.3-era AGX firmware
+   bundle on the machine. It matches what this tree already implements and is
+   the shortest route to a first accepted command.
+2. **Implement the 13.5 ABI.** The 12.3 structures here are complete and
+   byte-validated; 13.0b4 moved HwDataB and the InitData graph, so this is a
+   real port, not a version bump.
+
+Editing the accepted tuple is not a third option. It would publish 12.3
+structures to firmware expecting 13.5 — the exact failure the check exists to
+prevent, moved from a refusal at boot to undefined behaviour after power-up.
 
 One more thing worth knowing before trying to finish it:
 

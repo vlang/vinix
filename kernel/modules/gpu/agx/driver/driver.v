@@ -89,13 +89,15 @@ fn find_native_asc_node(role u32) ?&devicetree.DTNode {
 }
 
 fn validate_g13_firmware_compat(gpu_node &devicetree.DTNode, native_adt bool) bool {
-	// m1n1 patches apple,firmware-abi with the negotiated tuple as standard
-	// big-endian FDT cells. Native Apple DeviceTree does not expose this Linux
-	// property, so there is nothing to check the loaded firmware against and
-	// this returns false rather than deferring to a later gate: whoever
-	// implements the native ADT path has to supply the ABI tuple here too.
-	// Accept the old Vinix property as a compatibility aid, but prefer the
-	// property used by current m1n1/Linux device trees.
+	// The tuple arrives as standard big-endian FDT cells. An M1 Air booted
+	// through m1n1 supplies apple,firmware-compat and no apple,firmware-abi at
+	// all, so the fallback below is the spelling that actually turns up on
+	// hardware; the preferred name is kept for trees that do carry it.
+	//
+	// Native Apple DeviceTree exposes neither, so there is nothing to check the
+	// loaded firmware against and this returns false rather than deferring to a
+	// later gate: whoever implements the native ADT path has to supply the ABI
+	// tuple here too.
 	if native_adt {
 		println('agx: native t8103 boot data carries no firmware ABI tuple')
 		return false
@@ -133,6 +135,9 @@ fn load_fdt_firmware_version(gpu_node &devicetree.DTNode, native_adt bool,
 	for index := 0; index < version.len; index++ {
 		cfg.firmware_version[index] = version[index]
 	}
+	// The compat tuple says which ABI the firmware speaks; this says which
+	// firmware it is. A bring-up that stops on the ABI needs both.
+	println('agx: t8103 apple,firmware-version ${cfg.firmware_version[0]}.${cfg.firmware_version[1]}.${cfg.firmware_version[2]}')
 }
 
 fn get_platform_resources(gpu_node &devicetree.DTNode, native_adt bool,
@@ -652,7 +657,8 @@ fn load_t8103_power_controller_config(gpu_node &devicetree.DTNode, native_adt bo
 	}
 	power.valid = true
 	cfg.g13_power = power
-	println('agx: loaded t8103 power controller (${power.power_zone_count} zones, ${period} ms period)')
+	zone_word := if power.power_zone_count == 1 { 'zone' } else { 'zones' }
+	println('agx: loaded t8103 power controller (${power.power_zone_count} ${zone_word}, ${period} ms period)')
 	return true
 }
 
