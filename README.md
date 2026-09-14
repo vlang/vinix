@@ -154,10 +154,14 @@ by:
 The aggregate builder rebuilds every owned layer and refuses to publish a
 partial image. Use `--reuse-layers` to validate and reassemble existing layer
 outputs during image work. Asahi Mesa and the native Blender backend require
-their dedicated, mutually different ARM64 Linux build environments; when their
-staging trees are present, the desktop builder includes them in this same final
-image automatically. Wi-Fi firmware and proprietary Office media remain
-explicit inputs and are never downloaded by the aggregate build.
+their dedicated, mutually different ARM64 Linux build environments. The desktop
+builder includes the native Blender backend automatically when its staging tree
+is present, but Asahi Mesa only with `--with-asahi-gpu`, because that Mesa is
+built for a real Apple GPU and carries no llvmpipe: on any other machine it
+replaces a software renderer good for OpenGL 4.5 with one that stops at 3.3.
+The M1 deployment scripts pass the flag; a QEMU image should not. Wi-Fi
+firmware and proprietary Office media remain explicit inputs and are never
+downloaded by the aggregate build.
 
 The desktop runner splits the writable `/root` seed from the immutable image
 and caches a compressed QEMU module. This keeps the boot payload small, leaves

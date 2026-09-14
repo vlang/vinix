@@ -164,7 +164,7 @@ LIMINE_EFI="$LIMINE_EFI_BIN"
 if [ "$USE_DESKTOP_INITRAMFS" -eq 1 ]; then
     if [ ! -f "$DESKTOP_INITRAMFS_GZ" ]; then
         echo "error: compressed desktop initramfs not built: $DESKTOP_INITRAMFS_GZ" >&2
-        echo "hint: run ./build-desktop-aarch64.sh --compact-initramfs" >&2
+        echo "hint: run ./build-desktop-aarch64.sh --compact-initramfs --with-asahi-gpu" >&2
         exit 1
     fi
     if ! gzip -t "$DESKTOP_INITRAMFS_GZ"; then
