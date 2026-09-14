@@ -185,6 +185,26 @@ pub fn sync_handler(esr u64, far u64, gpr_state &cpulocal.GPRState) {
 			}
 			fault_handler(ec, esr, far, gpr_state)
 		}
+		0x22, 0x26 { // PC or SP alignment fault
+			// Raised when a branch target or the stack pointer is not aligned,
+			// which is what a corrupted pointer looks like the moment it is
+			// jumped through rather than merely dereferenced. Unlike the aborts
+			// below, neither has separate lower-EL and same-EL encodings, so
+			// the saved mode is the only thing that says whose fault it was.
+			//
+			// Without this the class fell through to fault_handler(), and a
+			// misaligned branch in any application halted the machine instead
+			// of ending that one process -- the opposite of what every other
+			// userspace fault here does, and it hides which program was at
+			// fault. Linux reports both as SIGBUS.
+			if from_userspace(gpr_state) {
+				if userland.dispatch_sync_signal(gpr_state, u8(userland.sigbus)) {
+					return
+				}
+				terminate_faulting_process(ec, esr, far, gpr_state, u8(userland.sigbus))
+			}
+			fault_handler(ec, esr, far, gpr_state)
+		}
 		0x20, 0x24 { // Instruction or Data Abort from a lower EL: userspace
 			mmap.pf_handler(gpr_state) or {
 				if userland.dispatch_sync_fault(gpr_state, far, esr) {
