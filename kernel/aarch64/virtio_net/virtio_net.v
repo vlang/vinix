@@ -54,11 +54,11 @@ mut:
 }
 
 __global (
-	device_base = u64(0)
-	rx_queue    Queue
-	tx_queue    Queue
-	mac_address [6]u8
-	ready       = false
+	device_base      = u64(0)
+	rx_queue         Queue
+	tx_queue         Queue
+	mac_address      [6]u8
+	virtio_net_ready = false
 )
 
 fn mmio_r32(address u64) u32 {
@@ -137,7 +137,7 @@ fn setup_queue(index u16, hhdm u64, receive bool) ?Queue {
 }
 
 fn reap_tx() {
-	if !ready && device_base == 0 {
+	if !virtio_net_ready && device_base == 0 {
 		return
 	}
 	cpu.dmb_ish()
@@ -156,7 +156,7 @@ fn reap_tx() {
 // frame was accepted and a negative value when the ring is temporarily full.
 @[export: 'vinix_virtio_net_send']
 pub fn send(frame voidptr, length u64) int {
-	if !ready || frame == unsafe { nil } || length > buffer_size - net_header_size {
+	if !virtio_net_ready || frame == unsafe { nil } || length > buffer_size - net_header_size {
 		return -1
 	}
 	reap_tx()
@@ -222,9 +222,9 @@ pub fn initialise(hhdm u64) {
 			return
 		}
 		mmio_w32(base + reg_status, status_acknowledge | status_driver | status_driver_ok)
-		ready = true
+		virtio_net_ready = true
 		if !inet.attach(&mac_address, inet.driver_virtio) {
-			ready = false
+			virtio_net_ready = false
 			uart.puts(c'virtio-net: IP stack attach failed\n')
 			return
 		}
@@ -236,7 +236,7 @@ pub fn initialise(hhdm u64) {
 }
 
 pub fn poll() {
-	if !ready {
+	if !virtio_net_ready {
 		return
 	}
 	reap_tx()
