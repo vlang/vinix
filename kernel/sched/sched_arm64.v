@@ -150,6 +150,225 @@ fn may_run_here(t &proc.Thread, cpu_number u64) bool {
 	return t.affinity_mask & (u64(1) << cpu_number) != 0
 }
 
+// ── Real-time scheduling ─────────────────────────────────────────────────────
+
+// How many laps the ranked scan makes before it gives up. A lap that loses the
+// thread it settled on to another CPU looks again, where that thread's lock is
+// now held and is skipped like any other; a CPU that still comes away with
+// nothing simply idles until its next tick.
+const pick_attempts = 4
+
+// What an ordinary thread's timeslice is shortened to while anything on the
+// machine is scheduled by policy. See effective_timeslice().
+const realtime_preempt_slice_us = u64(1000)
+
+// SCHED_IDLE only runs when no other thread will have the CPU, and hands it
+// back quickly when it does get one.
+const idle_policy_slice_us = u64(1000)
+
+// How often a CPU with nothing to run looks for real-time work, rather than
+// waiting for its next idle tick. See await(): this, and not the tick, is what
+// bounds how long a real-time thread waits on a machine that has a CPU free.
+const realtime_poll_interval_ns = u64(25000)
+
+// The real-time bandwidth cap, at Linux's default of 950 ms in every second.
+// Without one, a SCHED_FIFO loop at any priority takes a CPU and never gives
+// it back, which on a single-processor machine means the whole machine --
+// including the shell that would have to kill it.
+//
+// A throttled CPU does not stop running real-time threads. It demotes them
+// behind every ordinary thread instead, so one that is holding a lock somebody
+// else is waiting on still gets to finish with it.
+const rt_period_ns = u64(1000000000)
+
+const rt_runtime_ns = u64(950000000)
+
+const max_rt_cpus = 64
+
+__global (
+	// When this CPU's bandwidth window opened and how much of it real-time
+	// threads have spent. Written only by the CPU they belong to.
+	rt_window_start_ns [max_rt_cpus]u64
+	rt_window_used_ns  [max_rt_cpus]u64
+	// The reading this CPU last billed for, so a turn spanning several trips
+	// through the scheduler is charged once, in pieces.
+	rt_account_last_ns [max_rt_cpus]u64
+)
+
+// Where a thread sits in the picking order as the queue stands now. A deadline
+// thread with nothing left of this period's budget, and every real-time thread
+// on a CPU that has spent its bandwidth, drops behind the ordinary threads
+// rather than being passed over altogether.
+fn runnable_rank(mut t proc.Thread, now_ns u64, throttled bool) int {
+	rank := t.sched.rank()
+	if rank < proc.rank_realtime_base {
+		return rank
+	}
+	if throttled {
+		return proc.rank_idle
+	}
+	if t.sched.policy == proc.sched_deadline && !replenish_deadline(mut t, now_ns) {
+		return proc.rank_idle
+	}
+	return rank
+}
+
+// Open a deadline thread's next period if the last one has ended, and report
+// whether it has runtime left in the one it is now in.
+fn replenish_deadline(mut t proc.Thread, now_ns u64) bool {
+	if t.sched.dl_period == 0 {
+		return true
+	}
+	if now_ns >= t.sched.dl_period_end {
+		t.sched.dl_period_end = now_ns + t.sched.dl_period
+		t.sched.dl_abs_deadline = now_ns + t.sched.dl_deadline
+		t.sched.dl_budget_ns = t.sched.dl_runtime
+	}
+	return t.sched.dl_budget_ns > 0
+}
+
+// What is left of this period's budget, capped at an ordinary timeslice. The
+// cap is not a limit on the turn -- a deadline thread with budget left is not
+// preempted, so it simply carries on after the tick -- it is there because the
+// clocks, the interval timers and every sleeping thread's wakeup are driven by
+// the timer coming round.
+fn deadline_timeslice(t &proc.Thread) u64 {
+	mut slice := t.sched.dl_budget_ns / 1000
+	if slice == 0 {
+		slice = 1
+	}
+	if slice > t.timeslice {
+		slice = t.timeslice
+	}
+	return slice
+}
+
+fn realtime_throttled(cpu_number u64, now_ns u64) bool {
+	if cpu_number >= max_rt_cpus {
+		return false
+	}
+	start := rt_window_start_ns[cpu_number]
+	if start == 0 || now_ns - start >= rt_period_ns {
+		return false
+	}
+	return rt_window_used_ns[cpu_number] >= rt_runtime_ns
+}
+
+// Bill the span since this CPU last came through the scheduler to whatever was
+// running on it. A deadline thread pays for it out of this period's budget;
+// every real-time thread pays it into this CPU's bandwidth window.
+fn account_realtime_time(cpu_number u64, current &proc.Thread, now_ns u64) {
+	if cpu_number >= max_rt_cpus {
+		return
+	}
+
+	last := rt_account_last_ns[cpu_number]
+	rt_account_last_ns[cpu_number] = now_ns
+
+	if unsafe { current == nil } || last == 0 || now_ns <= last {
+		return
+	}
+	mut t := unsafe { current }
+	if !t.sched.is_realtime() {
+		return
+	}
+	span := now_ns - last
+
+	if t.sched.policy == proc.sched_deadline {
+		if t.sched.dl_budget_ns <= span {
+			t.sched.dl_budget_ns = 0
+		} else {
+			t.sched.dl_budget_ns -= span
+		}
+	}
+
+	start := rt_window_start_ns[cpu_number]
+	if start == 0 || now_ns - start >= rt_period_ns {
+		rt_window_start_ns[cpu_number] = now_ns
+		rt_window_used_ns[cpu_number] = span
+		return
+	}
+	rt_window_used_ns[cpu_number] += span
+}
+
+// Does the thread the scan came back with take the CPU, or does the one on it
+// keep it? Rank decides. A tie goes to the thread already running, unless its
+// policy hands the CPU on at the end of a turn, or it has just asked to give
+// the rest of its turn away, or both are deadline threads and the waiting one
+// has the earlier deadline to meet.
+fn should_preempt(mut current proc.Thread, next &proc.Thread, now_ns u64, throttled bool) bool {
+	if unsafe { next == nil } {
+		return false
+	}
+	mut candidate := unsafe { next }
+
+	current_rank := runnable_rank(mut current, now_ns, throttled)
+	next_rank := runnable_rank(mut candidate, now_ns, throttled)
+	if next_rank != current_rank {
+		return next_rank > current_rank
+	}
+	if current.yield_requested {
+		return true
+	}
+	if current_rank == proc.rank_deadline {
+		return candidate.sched.dl_abs_deadline < current.sched.dl_abs_deadline
+	}
+	return !current.sched.runs_to_completion()
+}
+
+// What a new thread gets from the one that created it. Policy and priority are
+// inherited -- a program that starts a worker to share the job it is doing
+// expects it to be scheduled the same way -- unless the creator carries
+// SCHED_RESET_ON_FORK, whose entire purpose is that it does not hand what it
+// holds to anything it starts. The flag itself is not passed on either, so a
+// child cannot be made to strip a grandchild it never asked to.
+//
+// The deadline bookkeeping is left behind in any case: a new thread is at the
+// start of its first period, not part-way through its parent's.
+fn inherited_sched_params(source &proc.Thread) proc.SchedParams {
+	if source.sched.reset_on_fork {
+		return proc.SchedParams{
+			policy: proc.sched_other
+		}
+	}
+
+	mut inherited := source.sched
+	inherited.dl_budget_ns = 0
+	inherited.dl_period_end = 0
+	inherited.dl_abs_deadline = 0
+	return inherited
+}
+
+// Is there a real-time thread waiting for a CPU that this one could give it?
+// Asked by the idle loop, which would otherwise not look at the run queue again
+// until its next tick. Answering it costs a lap of the queue, so it is only
+// ever asked on a machine that has a real-time thread to answer it about.
+fn realtime_work_pending(cpu_number u64) bool {
+	now_ns := timer.get_ns()
+	if realtime_throttled(cpu_number, now_ns) {
+		return false
+	}
+
+	for i := 0; i < max_running_threads; i++ {
+		mut t := scheduler_running_queue[i]
+		if unsafe { t == nil } {
+			continue
+		}
+		if !t.sched.is_realtime() || t.l.is_held() {
+			continue
+		}
+		if !may_run_here(t, cpu_number) {
+			continue
+		}
+		if t.sched.policy == proc.sched_deadline && !replenish_deadline(mut t, now_ns) {
+			continue
+		}
+		return true
+	}
+
+	return false
+}
+
 // Pick a thread for this CPU. On a machine with more than one memory node this
 // runs twice: once accepting only threads already at home on this CPU's node,
 // and then accepting anything. A thread therefore tends to keep running next to
@@ -170,6 +389,17 @@ fn get_next_thread() &proc.Thread {
 // `want_node` of -1 accepts every thread; otherwise only those whose home node
 // matches, plus those no CPU has claimed yet.
 //
+// A machine where every thread is scheduled by turn takes the first runnable
+// thread it finds; one where anything has asked for a policy weighs the whole
+// queue instead. The two are the same lap, and the split exists so that the
+// ordinary machine goes on paying exactly what it used to.
+fn scan_run_queue(mut cpu_local cpulocal.Local, want_node int) &proc.Thread {
+	if proc.scheduling_policies_in_use() {
+		return scan_run_queue_ranked(mut cpu_local, want_node)
+	}
+	return scan_run_queue_in_turn(mut cpu_local, want_node)
+}
+
 // Exactly one lap of the queue, from wherever this CPU last stopped, so the
 // order stays round-robin. The lap is counted rather than compared against a
 // starting index: the skip cases used to `continue` straight past the
@@ -177,7 +407,7 @@ fn get_next_thread() &proc.Thread {
 // to sit at the start index sent the scan round the queue for ever. Nothing was
 // skipped before affinity masks and memory nodes existed, which is why it took
 // until a pinned thread on another node to find.
-fn scan_run_queue(mut cpu_local cpulocal.Local, want_node int) &proc.Thread {
+fn scan_run_queue_in_turn(mut cpu_local cpulocal.Local, want_node int) &proc.Thread {
 	mut start := cpu_local.last_run_queue_index
 	if start < 0 || start >= max_running_threads {
 		start = 0
@@ -205,9 +435,113 @@ fn scan_run_queue(mut cpu_local cpulocal.Local, want_node int) &proc.Thread {
 	return unsafe { nil }
 }
 
+// The same lap, ending at the most urgent thread this CPU may run rather than
+// at the first one it can have. Equal ranks keep the round-robin order: the lap
+// starts where the last one stopped, and a thread found later has to beat the
+// one already in hand rather than tie it. Deadline threads are the exception
+// and are ordered by the deadline each of them is trying to meet.
+//
+// A thread running on another CPU is still in the queue, holding its own lock.
+// The lap has to see past those rather than stop at them, so it peeks at each
+// lock and only takes the one it has settled on. If another CPU takes that one
+// first, it looks again -- and on that pass the lock it lost to is held, and
+// skipped like any other.
+fn scan_run_queue_ranked(mut cpu_local cpulocal.Local, want_node int) &proc.Thread {
+	now_ns := timer.get_ns()
+	throttled := realtime_throttled(cpu_local.cpu_number, now_ns)
+
+	for attempt := 0; attempt < pick_attempts; attempt++ {
+		mut start := cpu_local.last_run_queue_index
+		if start < 0 || start >= max_running_threads {
+			start = 0
+		}
+
+		mut best := &proc.Thread(unsafe { nil })
+		mut best_index := -1
+		mut best_rank := -1
+		mut best_deadline := u64(0)
+
+		for step := 1; step <= max_running_threads; step++ {
+			index := (start + step) % max_running_threads
+
+			mut t := scheduler_running_queue[index]
+			if unsafe { t == nil } {
+				continue
+			}
+			if !may_run_here(t, cpu_local.cpu_number) {
+				continue
+			}
+			if want_node >= 0 && t.numa_node >= 0 && t.numa_node != want_node {
+				continue
+			}
+			if t.l.is_held() {
+				continue
+			}
+			rank := runnable_rank(mut t, now_ns, throttled)
+			if rank < best_rank {
+				continue
+			}
+			if rank == best_rank {
+				if rank != proc.rank_deadline || t.sched.dl_abs_deadline >= best_deadline {
+					continue
+				}
+			}
+			best = t
+			best_index = index
+			best_rank = rank
+			best_deadline = t.sched.dl_abs_deadline
+		}
+
+		if best_index < 0 {
+			return unsafe { nil }
+		}
+		if best.l.test_and_acquire() == true {
+			cpu_local.last_run_queue_index = best_index
+			return best
+		}
+	}
+
+	return unsafe { nil }
+}
+
 fn effective_timeslice(t &proc.Thread) u64 {
-	weight := u64(20 - t.process.nice)
-	mut slice := t.timeslice * weight / 20
+	mut slice := u64(0)
+
+	match t.sched.policy {
+		proc.sched_fifo {
+			// Nothing here ends a FIFO thread's turn. The timer only has to
+			// come round often enough to notice something more urgent becoming
+			// runnable, and to keep the clocks moving.
+			slice = t.timeslice
+		}
+		proc.sched_rr {
+			// A fixed quantum, and the one sched_rr_get_interval(2) reports.
+			// Nice does not scale it: what a real-time thread is entitled to is
+			// decided by its priority and by nothing else.
+			slice = t.timeslice
+		}
+		proc.sched_deadline {
+			slice = deadline_timeslice(t)
+		}
+		proc.sched_idle {
+			slice = idle_policy_slice_us
+		}
+		else {
+			weight := u64(20 - t.process.nice)
+			slice = t.timeslice * weight / 20
+		}
+	}
+
+	// An ordinary thread gives the CPU back promptly while anything on this
+	// machine is scheduled by policy. Lacking a way to interrupt another CPU on
+	// demand, the next time it comes through here is the soonest a real-time
+	// thread that has just woken can be given the CPU it is sitting on -- so
+	// this interval is the machine's worst-case dispatch latency under load.
+	if !t.sched.is_special() && proc.scheduling_policies_in_use()
+		&& slice > realtime_preempt_slice_us {
+		slice = realtime_preempt_slice_us
+	}
+
 	if slice == 0 {
 		slice = 1
 	}
@@ -264,6 +598,14 @@ fn scheduler_timer_handler(_gpr_state voidptr) {
 	katomic.store(mut &cpu_local.is_idle, false)
 
 	mut current_thread := proc.current_thread()
+
+	// Charge the turn that has just ended against the real-time entitlements it
+	// was spending: this period's budget for a deadline thread, and this CPU's
+	// bandwidth window for any real-time one. It is billed before the pick
+	// below, so a thread that has just run out of budget is passed over on the
+	// scan it has run out on rather than on the next.
+	account_realtime_time(cpu_local.cpu_number, current_thread, now_ns)
+
 	mut next_thread := get_next_thread()
 	// Set once this CPU has let go of the thread it was running, which decides
 	// whether the idle path below may return to its caller.
@@ -272,17 +614,35 @@ fn scheduler_timer_handler(_gpr_state voidptr) {
 	if unsafe { current_thread != 0 } {
 		current_thread.yield_await.release()
 
-		if unsafe { next_thread == nil } && current_thread.is_in_queue
-			&& may_run_here(current_thread, cpu_local.cpu_number) {
-			// Nothing else is runnable and this thread is still entitled to the
-			// CPU, so it keeps it. The two exceptions fall through instead: a
+		entitled := current_thread.is_in_queue
+			&& may_run_here(current_thread, cpu_local.cpu_number)
+		mut keeps_cpu := unsafe { next_thread == nil } && entitled
+		if unsafe { next_thread != nil } && entitled {
+			// Something else is runnable, but whether it takes the CPU is the
+			// policies' business: a FIFO thread is not interrupted by an equal,
+			// and no thread at all is interrupted by something ranked below it.
+			throttled := realtime_throttled(cpu_local.cpu_number, now_ns)
+			if !should_preempt(mut current_thread, next_thread, now_ns, throttled) {
+				// Hand back the thread the scan took for us. Nothing else can
+				// pick it up while this CPU holds its lock.
+				next_thread.l.release()
+				next_thread = unsafe { nil }
+				keeps_cpu = true
+			}
+		}
+
+		if keeps_cpu {
+			// This thread is still entitled to the CPU and nothing is taking it
+			// away, so it keeps it. The two exceptions fall through instead: a
 			// blocked thread, or a later wakeup would select that same stale
 			// current thread and charge its whole sleep as CPU time; and one
 			// whose affinity no longer allows this CPU, which has to be put down
 			// even with nothing to replace it.
+			current_thread.yield_requested = false
 			timer.oneshot(effective_timeslice(current_thread))
 			return
 		}
+		current_thread.yield_requested = false
 		// Past the early return above, this thread really is coming off the
 		// CPU, so the turn it has just had is charged to its process.
 		proc.charge_cpu_time(mut current_thread, now_ns)
@@ -471,6 +831,8 @@ pub fn yield(save_ctx bool) {
 	cpu.write_cntv_tval_el0(ticks)
 	cpu.write_cntv_ctl_el0(1)
 
+	mut last_realtime_poll_ns := u64(0)
+
 	for {
 		// Process timer ticks — dispatch scheduler to run other threads
 		vctl := cpu.read_cntv_ctl_el0()
@@ -486,6 +848,23 @@ pub fn yield(save_ctx bool) {
 			// Re-arm timer for next polling tick
 			cpu.write_cntv_tval_el0(ticks)
 			cpu.write_cntv_ctl_el0(1)
+		} else if proc.scheduling_policies_in_use() {
+			// This CPU is parked on a blocked thread's stack and would not look
+			// at the run queue again until its next tick. A real-time thread
+			// waiting for a CPU should not have to wait for that, so look for
+			// one between ticks, at the same rate and for the same reason as
+			// the idle loop does. See await().
+			now_ns := timer.get_ns()
+			if now_ns - last_realtime_poll_ns >= realtime_poll_interval_ns {
+				last_realtime_poll_ns = now_ns
+				time.advance_to_ns(now_ns)
+				if realtime_work_pending(cpu.read_tpidr_el1()) {
+					cpu.write_cntv_ctl_el0(0x2)
+					C.yield_dispatch(voidptr(scheduler_timer_handler))
+					cpu.write_cntv_tval_el0(ticks)
+					cpu.write_cntv_ctl_el0(1)
+				}
+			}
 		}
 
 		// Poll UART for console input. Another CPU may be in this same loop
@@ -608,9 +987,20 @@ pub fn reschedule() {
 	cpu.interrupt_toggle(false)
 	timer.stop()
 
+	// Say so, rather than leave the scheduler to infer it from the timer. A
+	// SCHED_FIFO thread is not taken off the CPU by an equal, and sched_yield(2)
+	// asking for exactly that is the one case where it should be: the thread
+	// goes behind the others of its priority instead of keeping the CPU.
+	mut current_thread := proc.current_thread()
+	if unsafe { current_thread != 0 } {
+		current_thread.yield_requested = true
+	}
+
 	C.yield_dispatch(voidptr(scheduler_timer_handler))
 
-	mut current_thread := proc.current_thread()
+	// Read again: this is the far side of a context switch, and the thread that
+	// comes back here is not necessarily the one that left.
+	current_thread = proc.current_thread()
 	if unsafe { current_thread != 0 } {
 		timer.oneshot(effective_timeslice(current_thread))
 	}
@@ -924,6 +1314,7 @@ pub fn new_cloned_thread(_process &proc.Process, _source &proc.Thread, state &cp
 		sigactions: source.sigactions
 		masked_signals: source.masked_signals
 		affinity_mask: source.affinity_mask
+		sched: inherited_sched_params(source)
 	}
 
 	t.self = voidptr(t)
@@ -1018,6 +1409,8 @@ pub fn await() {
 	// scheduler timer handler directly when the timer fires.
 	cpu.interrupt_toggle(false)
 
+	mut last_realtime_poll_ns := u64(0)
+
 	for {
 		vctl := cpu.read_cntv_ctl_el0()
 		if vctl & 0x4 != 0 {
@@ -1027,6 +1420,28 @@ pub fn await() {
 			// Re-arm timer for next tick
 			cpu.write_cntv_tval_el0(ticks)
 			cpu.write_cntv_ctl_el0(1)
+		} else if proc.scheduling_policies_in_use() {
+			// A real-time thread must not wait for the idle tick. This loop
+			// runs at a thousand ticks a second, which is the granularity a
+			// sleeping thread's wakeup is noticed at and the granularity the
+			// run queue is looked at again -- a millisecond of dispatch latency
+			// on a CPU that has nothing else to do.
+			//
+			// So look more often than that, at a rate set by how long a real-
+			// time thread should have to wait rather than by how often the
+			// clocks need moving. Bringing the clocks up to date is what
+			// expires the timer such a thread is sleeping on, and the check
+			// after it is what hands it the CPU.
+			now_ns := timer.get_ns()
+			if now_ns - last_realtime_poll_ns >= realtime_poll_interval_ns {
+				last_realtime_poll_ns = now_ns
+				time.advance_to_ns(now_ns)
+				if realtime_work_pending(cpu.read_tpidr_el1()) {
+					scheduler_timer_handler(unsafe { nil })
+					cpu.write_cntv_tval_el0(ticks)
+					cpu.write_cntv_ctl_el0(1)
+				}
+			}
 		}
 
 		// Poll UART input while idle (no separate thread — HVF workaround).

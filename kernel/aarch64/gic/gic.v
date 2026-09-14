@@ -29,11 +29,18 @@ const gicd_ctlr = u64(0x0000)
 const gicd_ctlr_enable_grp1_ns = u64(1) << 1
 const gicd_ctlr_are_ns = u64(1) << 4
 
-// GICR register offsets (from GICR base)
+// GICR register offsets, from the base of one CPU's redistributor frame. The
+// ones past 0x10000 are in the frame's second 64 KiB page, which is where a
+// GICv3 redistributor keeps everything to do with its own SGIs and PPIs.
+const gicr_waker = u64(0x0014) // ProcessorSleep / ChildrenAsleep
 const gicr_igroupr0 = u64(0x10080) // Interrupt group (0=G0, 1=G1NS)
 const gicr_isenabler0 = u64(0x10100) // Set-enable
 const gicr_icpendr0 = u64(0x10280) // Clear-pending
 const gicr_ipriorityr_base = u64(0x10400) // Priority (byte per INTID)
+
+// Every CPU has a redistributor frame of its own, laid out one after another
+// from the base of the region: two 64 KiB pages each, RD then SGI.
+const gicr_stride = u64(0x20000)
 
 __global (
 	gic_timer_callback fn (voidptr)
@@ -61,14 +68,35 @@ fn gicd_write32(offset u64, val u32) {
 }
 
 fn gicr_read32(offset u64) u32 {
-	addr := gicr_base + offset
+	return frame_read32(gicr_base, offset)
+}
+
+fn gicr_write32(offset u64, val u32) {
+	frame_write32(gicr_base, offset, val)
+}
+
+// A redistributor is addressed by the frame it lives in, because each CPU has
+// one of its own.
+//
+// Both of these stay out of line, and it matters. Inlined into a run of
+// accesses at fixed offsets from one base -- which is exactly what configuring
+// a redistributor is -- the compiler keeps the base in a register and folds the
+// first offset into the store as `str w8, [x9, #0x80]!`. A store that writes
+// its base register back leaves a data abort with no instruction syndrome, and
+// a hypervisor with nothing to decode the access from: QEMU under HVF asserts
+// and takes the machine with it. Out of line, the address arrives as a plain
+// register and the access is one the syndrome can describe.
+@[noinline]
+fn frame_read32(frame u64, offset u64) u32 {
+	addr := frame + offset
 	val := unsafe { *&u32(addr) }
 	cpu.dmb_ish()
 	return val
 }
 
-fn gicr_write32(offset u64, val u32) {
-	addr := gicr_base + offset
+@[noinline]
+fn frame_write32(frame u64, offset u64, val u32) {
+	addr := frame + offset
 	cpu.dmb_ish()
 	unsafe {
 		*&u32(addr) = val
@@ -171,6 +199,13 @@ fn gic_put_hex(val u64) {
 
 // ── Public API ──
 
+// Was the GIC the interrupt controller this machine turned out to have? Apple
+// hardware has an AIC instead and never calls initialise(), so a CPU coming up
+// has to ask before it configures a redistributor that is not there.
+pub fn is_initialised() bool {
+	return gicd_base != 0
+}
+
 pub fn initialise(hhdm u64) {
 	gicd_base = hhdm + gicd_base_phys
 	gicr_base = hhdm + gicr_base_phys
@@ -222,6 +257,64 @@ pub fn initialise(hhdm u64) {
 
 	// Register as global IRQ dispatch handler
 	exception.register_irq_dispatch(gic_dispatch)
+}
+
+// Bring a secondary CPU's side of the GIC up.
+//
+// Everything in initialise() below the distributor is per-CPU state: the CPU's
+// own redistributor frame, and its own ICC system registers. A CPU which has
+// not done this receives no interrupts at all -- Group 1 is disabled at its
+// CPU interface and its timer PPI is not even enabled -- and until it did,
+// the scheduler's timer fired on the boot CPU and nowhere else.
+//
+// What that cost is worth spelling out, because it is not a missing feature so
+// much as a missing half of the scheduler: a thread busy in userspace on any
+// CPU but the first ran until it made a syscall. Its timeslice never expired,
+// affinity changes did not move it, and nothing more urgent could take the CPU
+// from it. Preemption, and with it every guarantee a scheduling policy makes,
+// begins here.
+pub fn initialise_secondary(cpu_number u64) {
+	// The CPU interface is reached through system registers, which have to be
+	// turned on for this CPU before any of the writes below mean anything.
+	write_icc_sre(read_icc_sre() | 0x7)
+	cpu.isb()
+
+	// The frames are laid out in CPU order from the base of the region, which
+	// is how this machine describes itself and all this driver claims to
+	// support -- GICR_TYPER would name the CPU each frame serves, but reading
+	// its two halves next to each other is exactly the paired load that leaves
+	// a hypervisor with no syndrome to decode the MMIO access from.
+	frame := gicr_base + cpu_number * gicr_stride
+
+	wake_redistributor(frame)
+	configure_redistributor(frame)
+
+	write_icc_pmr(0xFF) // Accept all priorities
+	write_icc_bpr1(0) // No sub-priority bits
+	write_icc_ctlr(0) // EOImode=0
+	write_icc_igrpen1(1) // Enable Group 1 interrupts
+	cpu.isb()
+}
+
+// Clear ProcessorSleep and wait for the redistributor to come out of it.
+fn wake_redistributor(frame u64) {
+	waker := frame_read32(frame, gicr_waker)
+	if waker & 0x2 != 0 {
+		frame_write32(frame, gicr_waker, waker & ~u32(0x2))
+		for frame_read32(frame, gicr_waker) & 0x4 != 0 {
+		}
+	}
+}
+
+// The SGIs and PPIs this CPU is to receive: Group 1 Non-Secure, nothing left
+// pending from the firmware, one priority for all of them, and the timer.
+fn configure_redistributor(frame u64) {
+	frame_write32(frame, gicr_igroupr0, u32(0xFFFFFFFF))
+	frame_write32(frame, gicr_icpendr0, u32(0xFFFFFFFF))
+	for off := u64(0); off < 32; off += 4 {
+		frame_write32(frame, gicr_ipriorityr_base + off, u32(0xA0A0A0A0))
+	}
+	frame_write32(frame, gicr_isenabler0, u32(1) << 27 | u32(0xFFFF))
 }
 
 pub fn set_timer_handler(handler fn (voidptr)) {

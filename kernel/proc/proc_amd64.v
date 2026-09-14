@@ -47,6 +47,15 @@ pub mut:
 	scheduled_at_ns u64
 	cpu_time_ns     u64
 	affinity_mask   u64 = u64(-1)
+	// Scheduling policy, priority and, under SCHED_DEADLINE, the budget left
+	// in this period. Inherited by fork and by every thread a process clones,
+	// and kept across exec, so `chrt -f 50 ./program` gives the program the
+	// priority and not just the shell that asked for it.
+	sched SchedParams
+	// Set by a thread that has asked to give up the rest of its turn. It is
+	// what tells the scheduler that an equally ranked thread may take the CPU
+	// from a policy which otherwise runs to completion.
+	yield_requested bool
 	// The memory node this thread is at home on. Unset until a CPU first picks
 	// it up, which is what claims it: the scheduler then prefers to keep it
 	// there, next to the pages it faulted in. -1 means no CPU has run it yet.

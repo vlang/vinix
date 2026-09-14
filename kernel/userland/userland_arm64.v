@@ -835,8 +835,16 @@ pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, 
 			proc.free_tid(t.tid)
 		}
 
-		sched.new_user_thread(curr_process, true, entry_point, unsafe { nil }, 0, argv, envp,
-			auxval, true)?
+		// The program keeps the scheduling policy of the thread that execs it.
+		// `chrt -f 50 ./program` is one process: it gives itself the priority
+		// and then becomes the program that was meant to have it. Installed
+		// before the thread is enqueued, so it is never picked up as an
+		// ordinary thread first.
+		inherited_sched := t.sched
+		mut new_thread := sched.new_user_thread(curr_process, true, entry_point, unsafe { nil },
+			0, argv, envp, auxval, false)?
+		proc.set_thread_sched_params(new_thread.tid, inherited_sched)
+		sched.enqueue_thread(new_thread, false)
 
 		unsafe {
 			argv.free()

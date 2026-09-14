@@ -31,6 +31,14 @@ pub fn (mut l Lock) release() {
 	cpu.interrupt_toggle(ints)
 }
 
+// Peek at the lock without taking it. The scheduler's run-queue scan needs to
+// look past the threads other CPUs are already running -- a running thread
+// stays in the queue holding its own lock -- to reach the one this CPU should
+// pick, and it cannot find that out by taking every lock it looks at.
+pub fn (l &Lock) is_held() bool {
+	return katomic.load(&l.l)
+}
+
 pub fn (mut l Lock) test_and_acquire() bool {
 	ints := cpu.interrupt_toggle(false)
 

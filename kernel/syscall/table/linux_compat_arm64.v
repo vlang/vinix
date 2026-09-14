@@ -250,23 +250,18 @@ fn syscall_linux_setrlimit(gpr_state voidptr, which_resource int, new_limit u64)
 }
 
 fn syscall_linux_sched_rr_get_interval(_ voidptr, pid int, interval_ptr u64) (u64, u64) {
-	if pid < 0 {
-		return errno.err, errno.einval
-	}
 	if interval_ptr == 0 {
 		return errno.err, errno.efault
 	}
-	if pid != 0 {
-		proc.lock_table()
-		exists := proc.process_at(pid) != unsafe { nil }
-		proc.unlock_table()
-		if !exists {
-			return errno.err, errno.esrch
-		}
-	}
-	// The scheduler's ordinary round-robin timeslice is five milliseconds.
-	interval := time.TimeSpec{
-		tv_nsec: 5000000
+	tid := sched_target_tid(pid) or { return errno.err, sched_target_errno(pid) }
+	params := proc.thread_sched_params(tid) or { return errno.err, errno.esrch }
+
+	// Only SCHED_RR rotates on a quantum. Every other policy has none to
+	// report, and says so with a zero interval, as Linux does.
+	mut interval := time.TimeSpec{}
+	if params.policy == proc.sched_rr {
+		// The scheduler's round-robin timeslice is five milliseconds.
+		interval.tv_nsec = 5000000
 	}
 	if !usercopy.copy_to_user(interval_ptr, voidptr(&interval), sizeof(time.TimeSpec)) {
 		return errno.err, errno.efault

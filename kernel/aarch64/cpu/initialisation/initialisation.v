@@ -3,6 +3,7 @@ module initialisation
 import aarch64.cpu
 import aarch64.cpu.local as cpulocal
 import aarch64.exception
+import aarch64.gic
 import limine
 import memory
 import katomic
@@ -29,6 +30,19 @@ pub fn initialise(smp_info &limine.LimineSMPInfo) {
 	// that only switched TTBR0 kept translating the higher half through the
 	// bootloader's tables.
 	memory.vmm_activate_on_cpu()
+
+	// This CPU's own half of the interrupt controller. Without it the CPU takes
+	// no interrupts at all, which means its scheduler timer never fires, which
+	// means a thread busy in userspace on it is never taken off: no timeslice,
+	// no affinity change, and nothing more urgent able to take the CPU.
+	//
+	// It has to come after the page tables above, not before: the redistributor
+	// is device memory, and reaching it through the bootloader's mapping gets it
+	// accessed as ordinary memory, by an instruction a hypervisor is then unable
+	// to decode the access from.
+	if cpu_number != 0 && gic.is_initialised() {
+		gic.initialise_secondary(cpu_number)
+	}
 
 	// Configure timer frequency
 	cpu_local.timer_freq = cpu.read_cntfrq_el0()

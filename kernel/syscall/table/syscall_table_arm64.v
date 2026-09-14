@@ -1044,6 +1044,8 @@ pub fn init_syscall_table() {
 	syscall_table[125] = voidptr(syscall_linux_sched_get_priority_max) // __NR_sched_get_priority_max
 	syscall_table[126] = voidptr(syscall_linux_sched_get_priority_min) // __NR_sched_get_priority_min
 	syscall_table[127] = voidptr(syscall_linux_sched_rr_get_interval) // __NR_sched_rr_get_interval
+	syscall_table[274] = voidptr(syscall_linux_sched_setattr) // __NR_sched_setattr
+	syscall_table[275] = voidptr(syscall_linux_sched_getattr) // __NR_sched_getattr
 	syscall_table[129] = voidptr(userland.syscall_kill) // __NR_kill
 	syscall_table[130] = voidptr(userland.syscall_tkill) // __NR_tkill
 	syscall_table[131] = voidptr(userland.syscall_tgkill) // __NR_tgkill

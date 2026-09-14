@@ -2,6 +2,7 @@
 module time
 
 import event.eventstruct
+import katomic
 import klock
 
 pub const timer_frequency = u64(1000)
@@ -135,6 +136,16 @@ pub fn register_tick_hook(hook fn ()) bool {
 	return true
 }
 
+// Time that has passed but has not been taken off the armed timers yet,
+// because the CPU it passed on found another one already walking them. It is
+// added to the next interval that does get through, so a timer counts down by
+// every nanosecond that has elapsed rather than only by the ones nobody
+// collided over -- otherwise a sleep runs long by however much tick time was
+// dropped, and it runs longer the more CPUs there are to collide.
+__global (
+	timers_unapplied_ns = u64(0)
+)
+
 // advance_clocks moves both clocks forward by `interval` and expires every
 // armed timer that interval covers.
 pub fn advance_clocks(interval TimeSpec) {
@@ -142,18 +153,32 @@ pub fn advance_clocks(interval TimeSpec) {
 	realtime_clock.add(interval)
 
 	if timers_lock.test_and_acquire() == true {
+		mut applied := interval
+		carried := katomic.load(&timers_unapplied_ns)
+		if carried > 0 && katomic.cas(mut &timers_unapplied_ns, carried, u64(0)) {
+			applied.add(TimeSpec{i64(carried / 1000000000), i64(carried % 1000000000)})
+		}
+
 		for i := 0; i < armed_timers.len; i++ {
 			mut timer := armed_timers[i]
 			if timer.fired == true {
 				continue
 			}
-			if timer.when.sub(interval) {
+			if timer.when.sub(applied) {
 				C.event__trigger(mut &timer.event, false)
 				timer.fired = true
 			}
 		}
 
 		timers_lock.release()
+	} else {
+		missed := u64(interval.tv_sec) * 1000000000 + u64(interval.tv_nsec)
+		for {
+			carried := katomic.load(&timers_unapplied_ns)
+			if katomic.cas(mut &timers_unapplied_ns, carried, carried + missed) {
+				break
+			}
+		}
 	}
 
 	count := tick_hooks_len

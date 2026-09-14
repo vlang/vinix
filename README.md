@@ -52,6 +52,7 @@ on real hardware.
 - [x] Wayland (Hyprland on aarch64)
 - [x] Hypervisor (Intel VT-x; see [documentation](docs/hypervisor.md))
 - [x] NUMA / multi-socket memory topology (see [documentation](docs/numa.md))
+- [x] Real-time scheduling: SCHED_FIFO/RR/DEADLINE (see [documentation](docs/realtime.md))
 - [x] V-UI 2
 - [ ] Intel HD graphics driver (Linux port)
 ## Build instructions

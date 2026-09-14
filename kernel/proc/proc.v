@@ -16,6 +16,117 @@ pub const max_events = 32
 
 pub const max_pid = 65536
 
+// ── Scheduling policies ─────────────────────────────────────────────────────
+//
+// Linux's numbers, because the syscalls that carry them are Linux's. Policy
+// and priority belong to the thread, not the process: sched_setscheduler(2)
+// takes a tid, and a program that gives one thread a deadline to keep leaves
+// the rest of itself alone.
+pub const sched_other = 0
+pub const sched_fifo = 1
+pub const sched_rr = 2
+pub const sched_batch = 3
+pub const sched_idle = 5
+pub const sched_deadline = 6
+
+// SCHED_RESET_ON_FORK, as ORed into the policy argument. It is state rather
+// than a policy of its own: a thread carrying it hands its children an
+// ordinary SCHED_OTHER slot instead of the real-time one it holds, so a
+// privileged program cannot leak its priority into everything it starts.
+pub const sched_reset_on_fork = 0x40000000
+
+// The real-time band. 1 is the lowest urgency that still outranks every
+// ordinary thread; 99 outranks everything else.
+pub const rt_priority_min = 1
+pub const rt_priority_max = 99
+
+// Where a thread sits in the order the scheduler picks in. Higher wins.
+// Deadline threads come first, then the real-time band by priority, then
+// ordinary threads, then SCHED_IDLE, which only runs when a CPU would
+// otherwise have nothing to do.
+pub const rank_deadline = 200
+pub const rank_realtime_base = 100
+pub const rank_normal = 1
+pub const rank_idle = 0
+
+// A thread's scheduling parameters: what it is entitled to and, for a deadline
+// thread, how much of that entitlement is left.
+pub struct SchedParams {
+pub mut:
+	policy        int = sched_other
+	priority      int // 1..99 under SCHED_FIFO/RR, 0 under every other policy
+	reset_on_fork bool
+	// SCHED_DEADLINE, all in nanoseconds: at most `dl_runtime` of CPU every
+	// `dl_period`, to be finished `dl_deadline` after the period opens.
+	dl_runtime  u64
+	dl_deadline u64
+	dl_period   u64
+	// Where the current instance is up to, on the monotonic clock the
+	// scheduler bills CPU time with. `dl_budget_ns` is what is left of this
+	// period's runtime; a thread that spends it all waits for `dl_period_end`
+	// rather than running on.
+	dl_budget_ns    u64
+	dl_period_end   u64
+	dl_abs_deadline u64
+}
+
+pub fn (s &SchedParams) is_realtime() bool {
+	return s.policy == sched_fifo || s.policy == sched_rr || s.policy == sched_deadline
+}
+
+// Is this thread scheduled by something other than its turn? SCHED_BATCH is
+// not: it ranks with SCHED_OTHER and differs only in the timeslice it is
+// given, so a machine running nothing but those two is the uniform machine the
+// scheduler's cheapest path is written for.
+pub fn (s &SchedParams) is_special() bool {
+	return s.policy != sched_other && s.policy != sched_batch
+}
+
+// Ties are broken round-robin by the run-queue scan, except between deadline
+// threads, where the earlier absolute deadline wins.
+pub fn (s &SchedParams) rank() int {
+	return match s.policy {
+		sched_deadline { rank_deadline }
+		sched_fifo, sched_rr { rank_realtime_base + s.priority }
+		sched_idle { rank_idle }
+		else { rank_normal }
+	}
+}
+
+// Does a thread of this policy keep the CPU when an equally ranked thread is
+// waiting for it? SCHED_FIFO is the policy that does: it runs until it blocks,
+// yields, or something more urgent than it turns up. A deadline thread keeps
+// the CPU for the same reason, until its budget for this period runs out.
+pub fn (s &SchedParams) runs_to_completion() bool {
+	return s.policy == sched_fifo || s.policy == sched_deadline
+}
+
+// How many threads on this machine are scheduled by policy rather than by
+// turn. Everything the real-time support costs is conditional on this being
+// non-zero: a machine where nobody has asked for a policy keeps the run-queue
+// scan, the timeslices and the idle poll it had before any of this existed.
+//
+// It is a hint, and deliberately so. Every use of it trades latency against
+// throughput; none of them decides whether a thread may run.
+__global (
+	special_policy_threads = int(0)
+)
+
+pub fn scheduling_policies_in_use() bool {
+	return katomic.load(&special_policy_threads) > 0
+}
+
+fn adjust_policy_count(was_special bool, now_special bool) {
+	if was_special == now_special {
+		return
+	}
+	if now_special {
+		katomic.inc(mut &special_policy_threads)
+	} else {
+		katomic.dec(mut &special_policy_threads)
+	}
+}
+
 // Linux resource numbers.  Keeping the complete table matters even for limits
 // which are only advisory in Vinix today: prlimit64/getrlimit must preserve a
 // value instead of rejecting a perfectly ordinary libc probe.
@@ -250,7 +361,17 @@ pub fn free_pid(pid int) {
 
 	processes[pid] = unsafe { nil }
 	// The main thread's tid aliases the pid, so it is released together.
-	threads_by_tid[pid] = unsafe { nil }
+	release_thread_slot(pid)
+}
+
+// Drop a thread out of the tid table, taking its real-time entitlement with
+// it. Called with pid_lock held.
+fn release_thread_slot(tid int) {
+	t := threads_by_tid[tid]
+	if t != unsafe { nil } {
+		adjust_policy_count(t.sched.is_special(), false)
+	}
+	threads_by_tid[tid] = unsafe { nil }
 }
 
 // ── CPU time accounting ────────────────────────────────────────────
@@ -377,6 +498,7 @@ pub fn allocate_tid(thrd &Thread) ?int {
 
 	i := find_free_id()?
 	threads_by_tid[i] = unsafe { thrd }
+	adjust_policy_count(false, thrd.sched.is_special())
 	return i
 }
 
@@ -393,6 +515,7 @@ pub fn bind_tid(tid int, thrd &Thread) {
 	}
 
 	threads_by_tid[tid] = unsafe { thrd }
+	adjust_policy_count(false, thrd.sched.is_special())
 }
 
 pub fn free_tid(tid int) {
@@ -405,7 +528,7 @@ pub fn free_tid(tid int) {
 		pid_lock.release()
 	}
 
-	threads_by_tid[tid] = unsafe { nil }
+	release_thread_slot(tid)
 }
 
 pub fn thread_by_tid(tid int) &Thread {
@@ -454,6 +577,67 @@ pub fn set_thread_affinity(tid int, mask u64) bool {
 	// somewhere else does not belong where it used to be.
 	t.numa_node = -1
 	return true
+}
+
+pub fn thread_sched_params(tid int) ?SchedParams {
+	if tid <= 0 || tid >= max_pid {
+		return none
+	}
+	pid_lock.acquire()
+	defer { pid_lock.release() }
+	t := threads_by_tid[tid]
+	if t == unsafe { nil } {
+		return none
+	}
+	return t.sched
+}
+
+// Install a thread's scheduling parameters. The deadline bookkeeping is reset
+// rather than carried over: a thread that has just been given a period has not
+// started one yet, and one leaving SCHED_DEADLINE owes nothing to a period it
+// is no longer in.
+pub fn set_thread_sched_params(tid int, params SchedParams) bool {
+	if tid <= 0 || tid >= max_pid {
+		return false
+	}
+	pid_lock.acquire()
+	defer { pid_lock.release() }
+	mut t := threads_by_tid[tid]
+	if t == unsafe { nil } {
+		return false
+	}
+	was_special := t.sched.is_special()
+	mut next := params
+	next.dl_budget_ns = 0
+	next.dl_period_end = 0
+	next.dl_abs_deadline = 0
+	t.sched = next
+	adjust_policy_count(was_special, next.is_special())
+	return true
+}
+
+// The share of one CPU that the deadline threads already admitted have been
+// promised, in parts per million, ignoring `except_tid` so that a thread
+// changing its own parameters is measured against everyone else.
+//
+// Admission control is what makes SCHED_DEADLINE a promise rather than a
+// priority: a thread is only given a deadline the machine can still meet
+// alongside every deadline it has already agreed to.
+pub fn deadline_bandwidth_ppm(except_tid int) u64 {
+	pid_lock.acquire()
+	defer { pid_lock.release() }
+	mut total := u64(0)
+	for i := 1; i < max_pid; i++ {
+		t := threads_by_tid[i]
+		if t == unsafe { nil } || i == except_tid {
+			continue
+		}
+		if t.sched.policy != sched_deadline || t.sched.dl_period == 0 {
+			continue
+		}
+		total += t.sched.dl_runtime * 1000000 / t.sched.dl_period
+	}
+	return total
 }
 
 // ── What /proc reports about a process ──────────────────────────────────────
@@ -550,7 +734,28 @@ pub fn process_stat_line(pid int) string {
 	}
 	comm := command_name(process.name)
 	threads := if process.threads.len > 0 { process.threads.len } else { 1 }
-	return '${pid} (${comm}) R ${process.ppid} ${process.pgid} ${process.sid} 0 -1 0 0 0 0 0 0 0 0 0 20 0 ${threads} 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n'
+
+	// The main thread's policy is what `ps -c` and `top` report for the
+	// process. Under a real-time policy Linux puts -1 - rt_priority in the
+	// priority field, which is how those tools tell the two bands apart.
+	params := threads_by_tid[pid].sched_or_default()
+	mut priority := 20 + process.nice
+	if params.policy == sched_fifo || params.policy == sched_rr {
+		priority = -1 - params.priority
+	}
+
+	// Fields 21 to 39, which nothing here keeps, and then rt_priority and
+	// policy in 40 and 41.
+	return '${pid} (${comm}) R ${process.ppid} ${process.pgid} ${process.sid} 0 -1 0 0 0 0 0 0 0 0 0 ${priority} ${process.nice} ${threads} 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 ${params.priority} ${params.policy}\n'
+}
+
+// The scheduling parameters of a thread that may not be there. Called with the
+// table locked, where the tid-keyed lookups cannot be.
+fn (t &Thread) sched_or_default() SchedParams {
+	if t == unsafe { nil } {
+		return SchedParams{}
+	}
+	return t.sched
 }
 
 pub fn process_status_text(pid int) string {
