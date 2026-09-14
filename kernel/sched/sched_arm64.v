@@ -215,6 +215,28 @@ fn effective_timeslice(t &proc.Thread) u64 {
 }
 
 fn scheduler_timer_handler(_gpr_state voidptr) {
+	// The timer interrupt delivers this handler with interrupts already off,
+	// but yield()'s polling loop also calls it directly through
+	// C.yield_dispatch(), and that loop can have been resumed by
+	// sched_switch_context -- which returns to a thread with interrupts
+	// enabled. cpulocal.current() below panics outright when it is entered
+	// that way, which is what a thread pool eventually produces:
+	//
+	//     V panic: Attempted to get current CPU struct without disabling ints
+	//
+	// Take them off for the handler and give the caller its own state back.
+	// Holding them off for the whole of that loop instead would stop this CPU
+	// taking device interrupts for as long as a thread stays blocked, and the
+	// machine stalls with no output rather than panicking.
+	//
+	// The two paths that leave without returning -- evict_to_idle() and
+	// C.sched_switch_context() -- skip the restore on purpose: neither comes
+	// back here, and whatever resumes next sets its own interrupt state.
+	ints := cpu.interrupt_toggle(false)
+	defer {
+		cpu.interrupt_toggle(ints)
+	}
+
 	gpr_state := unsafe { &cpulocal.GPRState(_gpr_state) }
 	timer.stop()
 
