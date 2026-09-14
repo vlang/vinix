@@ -3,7 +3,7 @@
 # initramfs that boots straight into it.
 #
 # Usage: ./build-desktop-aarch64.sh [--no-initramfs] [--compact-initramfs]
-#        [--with-libreoffice] [--with-minecraft] [--with-x86-translation] [--wifi-bundle=DIR]
+#        [--with-libreoffice] [--with-minecraft] [--with-asahi-gpu] [--with-x86-translation] [--wifi-bundle=DIR]
 # Set V or VINIX_V_COMPILER to a V executable or checkout directory to select
 # a compiler explicitly (for example VINIX_V_COMPILER=~/code/v7).
 #
@@ -84,6 +84,9 @@ WITH_X86_TRANSLATION=0
 WITH_CHROMIUM=0
 WITH_LIBREOFFICE=0
 WITH_MINECRAFT=0
+# The Apple GPU userspace is only correct on Apple hardware; see the overlay
+# below for why its mere presence on disk must not select it.
+WITH_ASAHI_GPU="${VINIX_WITH_ASAHI_GPU:-0}"
 WIFI_BUNDLE="${VINIX_WIFI_BUNDLE:-}"
 for arg in "$@"; do
     case "$arg" in
@@ -93,13 +96,15 @@ for arg in "$@"; do
         --with-chromium) WITH_CHROMIUM=1 ;;
         --with-libreoffice) WITH_LIBREOFFICE=1 ;;
         --with-minecraft) WITH_MINECRAFT=1 ;;
+        --with-asahi-gpu) WITH_ASAHI_GPU=1 ;;
         --wifi-bundle=*) WIFI_BUNDLE="${arg#*=}" ;;
         --help|-h)
-            echo "usage: $0 [--no-initramfs] [--compact-initramfs] [--with-chromium] [--with-libreoffice] [--with-minecraft] [--with-x86-translation] [--wifi-bundle=DIR]"
+            echo "usage: $0 [--no-initramfs] [--compact-initramfs] [--with-chromium] [--with-libreoffice] [--with-minecraft] [--with-asahi-gpu] [--with-x86-translation] [--wifi-bundle=DIR]"
             echo "  --compact-initramfs stages the desktop, core developer tools and Firefox"
             echo "  --with-chromium adds a previously staged Chromium; otherwise it is a pkg install"
             echo "  --with-libreoffice adds a previously staged LibreOffice; otherwise it is a pkg install"
             echo "  --with-minecraft adds a previously staged Minecraft; otherwise it is a pkg install"
+            echo "  --with-asahi-gpu overlays the Apple GPU Mesa; only correct for an M1 image"
             echo "  --with-x86-translation adds a previously built x86/Wine runtime"
             echo "  --wifi-bundle stages a package.py output and loads it before the desktop"
             exit 0
@@ -553,12 +558,53 @@ fi
 # Overlay Mesa last so Xorg, Firefox and native EGL applications all use the
 # exact userspace built for Vinix's Asahi kernel UAPI rather than Alpine's
 # unrelated Mesa build.
-if [ "$GPU_DESKTOP_BUILT" -eq 1 ]; then
+#
+# Only when this image is actually for Apple hardware. That Mesa is built for a
+# real GPU and carries no llvmpipe at all -- its only software rasteriser is
+# softpipe, which stops at OpenGL 3.3. Overlaying it on a QEMU image therefore
+# replaces a 4.5-capable software renderer with a 3.3-capable one, and anything
+# needing more than 3.3 stops working: native Blender asks for a 4.3 core
+# context and gets EGL_BAD_MATCH, having rendered fine before. Selecting it
+# from the mere presence of the staging directory is what made that happen
+# silently, with no commit to point at.
+if [ "$GPU_DESKTOP_BUILT" -eq 1 ] && [ "$WITH_ASAHI_GPU" -eq 1 ]; then
     merge_staging_tree "$ASAHI_STAGING"
     # Keep the native hardware proof in sync with the source tree even when
     # the Mesa staging directory was built before this desktop image.
     install -m755 "$SCRIPT_DIR/gl-triangle/run-m1-agx-smoke" \
         "$STAGING/usr/bin/run-m1-agx-smoke"
+elif [ -d "$X11_STAGING/usr/lib/xorg/modules/dri" ]; then
+    # Nothing else fills /usr/lib/dri: the Apple overlay was the only thing
+    # putting drivers there, so skipping it leaves Mesa with none at all. The
+    # X11 layer already stages the generic Alpine set, and that one does carry
+    # llvmpipe, so software OpenGL reaches 4.5 rather than softpipe's 3.3.
+    echo "==> Staging the generic Mesa DRI drivers"
+    mkdir -p "$STAGING/usr/lib/dri"
+    # Only the software entries. That directory is 49 names for one 27 MiB
+    # object, 48 of them links, and the pass below turns every link into a real
+    # file -- copying all of them would add 1.3 GiB of the same driver. A
+    # machine with no GPU needs exactly these.
+    cp -a "$X11_STAGING/usr/lib/xorg/modules/dri/libgallium_dri.so" \
+        "$STAGING/usr/lib/dri/"
+    for software_driver in swrast_dri.so kms_swrast_dri.so; do
+        cp -a "$X11_STAGING/usr/lib/xorg/modules/dri/$software_driver" \
+            "$STAGING/usr/lib/dri/" 2>/dev/null || true
+    done
+    # libEGL names its Gallium by version in DT_NEEDED, and the Apple overlay
+    # was the only thing supplying one. Take the X11 sysroot's, which is the
+    # build these drivers belong to.
+    for gallium in "$GPU_SYSROOT"/usr/lib/libgallium-*.so; do
+        [ -f "$gallium" ] || continue
+        cp -a "$gallium" "$STAGING/usr/lib/"
+    done
+    # llvmpipe is a JIT, so that Gallium names libLLVM in DT_NEEDED. The Apple
+    # build has no llvmpipe and so never needed it, which is why a compact
+    # image carries no LLVM at all. It is 144 MiB and it is what buys OpenGL
+    # 4.5 instead of softpipe's 3.3.
+    for llvm in "$SYSROOT"/usr/lib/libLLVM.so.*; do
+        [ -f "$llvm" ] || continue
+        cp -a "$llvm" "$STAGING/usr/lib/"
+    done
 fi
 # Hyprland edge uses libstdc++ formatting entry points newer than the base and
 # Mesa 25 layers. Keep its backward-compatible C++ runtime as the final copy;
