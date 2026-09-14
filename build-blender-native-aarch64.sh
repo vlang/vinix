@@ -148,5 +148,22 @@ if ! strings "$STAGING/usr/libexec/vinix-blender-native" | grep VINIX_SURFACE_PA
     exit 1
 fi
 
+# Blender's runtime comes from `pkg install blender`, but this build is not
+# Alpine's: it links GMP's C++ bindings, which Alpine's blender package does
+# not depend on. A library needed here and absent there cannot be loaded at
+# all, and the only symptom is a desktop window that never fills — so hold the
+# installer to the extras this executable actually asks for.
+for extra_library in libgmpxx.so.4; do
+    readelf -d "$STAGING/usr/libexec/vinix-blender-native" | \
+        grep -q "Shared library: \[$extra_library\]" || continue
+    extra_package=${extra_library%%.so.*}
+    if ! grep -q "apk_install blender .*$extra_package" \
+        "$SCRIPT_DIR/build-support/vinix-pkg"; then
+        echo "native Blender needs $extra_library, which Alpine's blender package does not" >&2
+        echo "provide: add $extra_package to the blender case in build-support/vinix-pkg" >&2
+        exit 1
+    fi
+done
+
 echo "==> Staged $STAGING/usr/libexec/vinix-blender-native"
 echo "Install Blender's runtime data in Vinix with: pkg install blender"

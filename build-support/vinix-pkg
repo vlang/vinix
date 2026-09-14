@@ -326,8 +326,13 @@ install_packages() {
 				finalize_gimp
 				;;
 			blender)
+				# libgmpxx is what the native Vinix backend adds to Alpine's
+				# own dependency list: that build links GMP's C++ bindings,
+				# and Alpine's blender package declares only libgmp. Without
+				# it /usr/libexec/vinix-blender-native cannot be loaded at
+				# all, and the desktop shows a window that never fills.
 				VINIX_PKG_CACHE_EXTRAS=python3-pycache-pyc0 \
-					apk_install blender
+					apk_install blender libgmpxx
 				finalize_blender
 				;;
 			chromium)
