@@ -769,6 +769,34 @@ cp "$SCRIPT_DIR/desktop"/*.v "$SCRIPT_DIR/desktop"/*.c "$SCRIPT_DIR/desktop"/*.h
     "$SCRIPT_DIR/desktop/README.md" \
     "$STAGING/root/desktop/"
 
+# Vinix's loader opens a shared object without following links, and current
+# Mesa ships every DRI driver as a link to one libdril_dri.so. A dlopen of
+# /usr/lib/dri/swrast_dri.so therefore finds nothing, EGL cannot create a
+# screen, and an application that renders through it -- native Blender, whose
+# GHOST backend needs a surfaceless EGL context -- dies on EGL_NOT_INITIALIZED
+# with no hint that a link was the cause. build-userland-aarch64.sh resolves
+# these already; a compact image builds its own tree and has to do it too.
+# They all point at one 100 KiB object, so materialising them costs very little.
+if [ -d "$STAGING/usr/lib/dri" ]; then
+    echo "==> Materialising DRI driver links"
+    find "$STAGING/usr/lib/dri" -type l -name '*.so*' | while IFS= read -r link; do
+        target=$(readlink "$link")
+        case "$target" in
+            /*) real="$STAGING$target" ;;
+            *) real="$(dirname "$link")/$target" ;;
+        esac
+        if [ -f "$real" ]; then
+            rm "$link"
+            cp "$real" "$link"
+        fi
+    done
+    if [ -L "$STAGING/usr/lib/dri/swrast_dri.so" ] ||
+       [ ! -f "$STAGING/usr/lib/dri/swrast_dri.so" ]; then
+        echo "ERROR: /usr/lib/dri/swrast_dri.so is not a regular file; EGL will not start" >&2
+        exit 1
+    fi
+fi
+
 # COPYFILE_DISABLE keeps macOS from adding ._ resource-fork members that the
 # kernel's tar reader would try to unpack as real files.
 # The deploy script may start rsync as soon as this build exits. Publish the
