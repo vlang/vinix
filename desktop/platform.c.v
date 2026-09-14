@@ -770,7 +770,14 @@ fn desktop_spawn_native_surface(path string, first_argument string, second_argum
 	// explicitly. Preserve Mesa's native Asahi selection on Vinix hardware.
 	if C.access(c'/dev/dri/renderD128', C.R_OK | C.W_OK) != 0 {
 		envp << c'LIBGL_ALWAYS_SOFTWARE=1'
-		envp << c'GALLIUM_DRIVER=llvmpipe'
+		// Not GALLIUM_DRIVER=llvmpipe. That names a pipe driver for Mesa's
+		// pipe loader to open as gallium-pipe/pipe_llvmpipe.so, and the only
+		// one staged is pipe_swrast.so -- so it asks for a file that is not
+		// there and eglInitialize returns EGL_NOT_INITIALIZED. The failure
+		// surfaces as "libEGL warning: egl: failed to create dri2 screen",
+		// which names neither the variable nor the driver. Measured on this
+		// image: software alone initialises EGL 1.5, adding this one fails,
+		// and MESA_LOADER_DRIVER_OVERRIDE below is harmless either way.
 		envp << c'MESA_LOADER_DRIVER_OVERRIDE=swrast'
 		envp << c'MESA_SHADER_CACHE_DISABLE=true'
 	}

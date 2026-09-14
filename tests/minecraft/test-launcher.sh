@@ -49,7 +49,7 @@ esac
 # placeholder Mojang's template uses.
 output=$(env $common_env DISPLAY=:7 "$launcher")
 case "$output" in
-    *'display=:7'*'software=1'*'gallium=llvmpipe'*'--demo'*) ;;
+    *'display=:7'*'software=1'*'gallium='*'--demo'*) ;;
     *) echo "demo launch failed: $output" >&2; exit 1 ;;
 esac
 if printf '%s' "$output" | grep -q '\${'; then
@@ -57,6 +57,9 @@ if printf '%s' "$output" | grep -q '\${'; then
     exit 1
 fi
 printf '%s\n' "$output" | grep -q '^indirect=$'
+# GALLIUM_DRIVER=llvmpipe names gallium-pipe/pipe_llvmpipe.so, which is not
+# staged; asking for it fails EGL outright. It has to stay unset.
+printf '%s\n' "$output" | grep -q '^gallium=$'
 printf '%s' "$output" | grep -q 'net.minecraft.client.main.Main'
 printf '%s' "$output" | grep -q 'natives-linux-arm64'
 # musl needs Alpine's OpenAL and jemalloc instead of LWJGL's bundled copies.

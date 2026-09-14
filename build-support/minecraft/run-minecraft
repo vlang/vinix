@@ -123,7 +123,10 @@ fi
 # renderer inside the X server, which Vinix does not support.
 if [ "${VINIX_MINECRAFT_HARDWARE_GL:-0}" != 1 ]; then
 	export LIBGL_ALWAYS_SOFTWARE=1
-	export GALLIUM_DRIVER=${GALLIUM_DRIVER:-llvmpipe}
+	# Deliberately not GALLIUM_DRIVER=llvmpipe. That name is what Mesa's pipe
+	# loader turns into gallium-pipe/pipe_llvmpipe.so, and the only pipe driver
+	# staged is pipe_swrast.so, so asking for it fails EGL outright. Leaving it
+	# unset lets Mesa pick the software renderer it actually has.
 	unset LIBGL_ALWAYS_INDIRECT
 fi
 
