@@ -481,6 +481,15 @@ pub fn yield(save_ctx bool) {
 		}
 	}
 
+	// Interrupts were disabled on the way in, but the loop above can lose the
+	// CPU at C.yield_dispatch() and come back through sched_switch_context,
+	// which resumes a thread with interrupts enabled. Everything below reads
+	// and writes per-CPU state, so take them off again rather than assume
+	// which way this was reached: cpulocal.current() panics outright if it is
+	// called with interrupts on, which is what a thread that blocks often
+	// enough — anything using a thread pool — eventually hits.
+	cpu.interrupt_toggle(false)
+
 	// A safety net rather than the normal path. A CPU that parks now leaves this
 	// stack for one of its own instead of returning here (see evict_to_idle), so
 	// every way out of the loop above either never lost the CPU or came back
