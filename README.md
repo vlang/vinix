@@ -440,25 +440,43 @@ from first boot:
 tmux
 ```
 
-### C++ Minecraft client on aarch64
+### Minecraft: Java Edition on aarch64
 
-Vinix can run the native AArch64 Minetest 5.9.1 client, a C++ Minecraft-style
-voxel sandbox, through its SDL2/X11/OpenGL compatibility stack. The optional
-layer also bundles Minetest Game, so the default world works without fetching
-content after boot:
+Vinix runs Mojang's own Minecraft client on AArch64, on OpenJDK 25 through its
+X11 and software-OpenGL stack. The game is not part of this repository: the
+build downloads it from Mojang's distribution endpoints on your machine, the
+way any third-party launcher does.
 
 ```sh
 ./build-x11-aarch64.sh
+./build-java-aarch64.sh
 ./build-minecraft-aarch64.sh
 ./build-desktop-aarch64.sh
 ./run-desktop-aarch64.sh --no-desktop
 ```
 
-Open **Minecraft** from the desktop or run `minecraft` in a terminal. The
-launcher creates and reuses `$HOME/.minetest/worlds/Vinix World`; use
-`minecraft --menu` for Minetest's main menu and `minecraft --check` for a
-display-free runtime check. Software OpenGL and muted audio are the safe
-defaults. Set `VINIX_MINECRAFT_HARDWARE_GL=1` to experiment with hardware GL.
+`VINIX_MINECRAFT_VERSION` selects the version (default: the current release);
+`VINIX_MINECRAFT_ASSETS=none` stages the code without the ~500 MiB of assets.
+
+Open **Minecraft** from the desktop or run `minecraft` in a terminal. With no
+account signed in it starts Mojang's free demo. `minecraft --login` signs in to
+a Microsoft account that owns the game with the standard OAuth device-code
+flow, after which `minecraft` plays the full game; `--demo`, `--play`,
+`--logout` and a display-free `--check` are also accepted. Worlds and options
+live under `$HOME/.minecraft`.
+
+Microsoft requires every launcher to use its own registered application, so set
+`VINIX_MINECRAFT_MSA_CLIENT_ID` to the application id of an Azure registration
+approved for Minecraft sign-in before using `--login`. The demo needs no
+account and no application id.
+
+Two things make the stock Linux build work on Vinix. Mojang ships no AArch64
+Linux natives, so the LWJGL natives come from the same LWJGL release on Maven
+Central; and those are glibc objects, so they load through `gcompat`, with
+Alpine's native OpenAL and jemalloc substituted for the bundled copies that do
+not survive that translation. Rendering uses Mesa's llvmpipe, the only software
+rasteriser here that reaches the OpenGL 3.2 core profile the client requires.
+Set `VINIX_MINECRAFT_HARDWARE_GL=1` to experiment with hardware GL.
 
 GTK and Gnumeric are deliberately not included in the base or network-tools
 package layer. GTK is downloaded only when it or an application that needs it

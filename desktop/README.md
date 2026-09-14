@@ -43,8 +43,8 @@ What it does:
 - embedded **Wine Calculator and Notepad**: their translated Win64 processes
   render into private Xvfb displays and are composited as normal Vinix windows
   without hiding the desktop
-- embedded **Minecraft**: the native C++ Minetest client renders into Xvfb and
-  is composited as a movable, resizable Vinix window with forwarded input
+- embedded **Minecraft**: Mojang's Java Edition client renders into Xvfb and is
+  composited as a movable, resizable Vinix window with forwarded input
 - native **Blender**: a Vinix GHOST backend renders with surfaceless EGL and
   publishes directly into a compositor-owned Vinix window, with no Xorg or
   Wayland server in the path
@@ -175,11 +175,13 @@ GIMP without its splash screen inside a movable Vinix window. Its system
 configuration selects the common image-format plug-ins so a first launch stays
 within Vinix's current exited-process reclamation limit.
 
-The Minecraft layer is produced by `build-minecraft-aarch64.sh`. It stages
-Alpine's AArch64/musl Minetest 5.9.1 executable and its runtime closure, plus a
-pinned Minetest Game release. `/usr/bin/minecraft` starts a persistent default
-world with settings kept under `$HOME/.minetest`; its conservative
-software-OpenGL profile keeps the client usable on framebuffer Xorg. From the
+The Minecraft layer is produced by `build-minecraft-aarch64.sh`. It stages the
+OpenJDK 25 runtime, the musl libraries Mojang's Linux build does not account
+for, and Mesa's llvmpipe software rasteriser, then downloads Minecraft: Java
+Edition itself from Mojang's own distribution endpoints. The game is never part
+of this repository. `/usr/bin/minecraft` starts Mojang's free demo when no
+account is signed in and the full game after `minecraft --login`; worlds and
+options are kept under `$HOME/.minecraft`. From the
 desktop, Minecraft uses the same Xvfb/XWD bridge as translated Wine apps and is
 scaled into a native window without surrendering the desktop framebuffer.
 Keyboard and pointer events are forwarded into the private X11 display. The

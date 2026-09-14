@@ -500,10 +500,10 @@ else
     echo "==> Firefox staging not found, skipping (run build-firefox-aarch64.sh first)"
 fi
 
-# Minetest is a native C++/SDL/OpenGL client. Merge it before Asahi so the
-# hardware-specific Mesa userspace remains the final graphics implementation.
+# Minecraft renders with Mesa's software rasteriser. Merge it before Asahi so
+# the hardware-specific Mesa userspace remains the final graphics implementation.
 if [ -x "$MINECRAFT_STAGING/usr/bin/minecraft" ]; then
-    echo "==> Integrating C++ Minecraft runtime..."
+    echo "==> Integrating Minecraft runtime..."
     merge_staging_tree "$MINECRAFT_STAGING"
 else
     echo "==> Minecraft staging not found, skipping (run build-minecraft-aarch64.sh first)"

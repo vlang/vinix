@@ -3,7 +3,7 @@
 # initramfs that boots straight into it.
 #
 # Usage: ./build-desktop-aarch64.sh [--no-initramfs] [--compact-initramfs]
-#        [--with-libreoffice] [--with-x86-translation] [--wifi-bundle=DIR]
+#        [--with-libreoffice] [--with-minecraft] [--with-x86-translation] [--wifi-bundle=DIR]
 # Set V or VINIX_V_COMPILER to a V executable or checkout directory to select
 # a compiler explicitly (for example VINIX_V_COMPILER=~/code/v7).
 #
@@ -83,6 +83,7 @@ COMPACT_INITRAMFS=0
 WITH_X86_TRANSLATION=0
 WITH_CHROMIUM=0
 WITH_LIBREOFFICE=0
+WITH_MINECRAFT=0
 WIFI_BUNDLE="${VINIX_WIFI_BUNDLE:-}"
 for arg in "$@"; do
     case "$arg" in
@@ -91,12 +92,14 @@ for arg in "$@"; do
         --with-x86-translation) WITH_X86_TRANSLATION=1 ;;
         --with-chromium) WITH_CHROMIUM=1 ;;
         --with-libreoffice) WITH_LIBREOFFICE=1 ;;
+        --with-minecraft) WITH_MINECRAFT=1 ;;
         --wifi-bundle=*) WIFI_BUNDLE="${arg#*=}" ;;
         --help|-h)
-            echo "usage: $0 [--no-initramfs] [--compact-initramfs] [--with-chromium] [--with-libreoffice] [--with-x86-translation] [--wifi-bundle=DIR]"
+            echo "usage: $0 [--no-initramfs] [--compact-initramfs] [--with-chromium] [--with-libreoffice] [--with-minecraft] [--with-x86-translation] [--wifi-bundle=DIR]"
             echo "  --compact-initramfs stages the desktop, core developer tools and Firefox"
             echo "  --with-chromium adds a previously staged Chromium; otherwise it is a pkg install"
             echo "  --with-libreoffice adds a previously staged LibreOffice; otherwise it is a pkg install"
+            echo "  --with-minecraft adds a previously staged Minecraft; otherwise it is a pkg install"
             echo "  --with-x86-translation adds a previously built x86/Wine runtime"
             echo "  --wifi-bundle stages a package.py output and loads it before the desktop"
             exit 0
@@ -349,6 +352,12 @@ if [ "$WITH_LIBREOFFICE" -eq 1 ] &&
     echo "Run ./build-libreoffice-aarch64.sh first." >&2
     exit 1
 fi
+if [ "$WITH_MINECRAFT" -eq 1 ] &&
+   [ ! -x "$MINECRAFT_STAGING/usr/bin/minecraft" ]; then
+    echo "ERROR: --with-minecraft needs $MINECRAFT_STAGING/usr/bin/minecraft" >&2
+    echo "Run ./build-minecraft-aarch64.sh first." >&2
+    exit 1
+fi
 if [ "$WITH_X86_TRANSLATION" -eq 1 ] &&
    [ ! -x "$X86_TRANSLATION_STAGING/usr/bin/qemu-x86_64" ]; then
     echo "ERROR: --with-x86-translation needs $X86_TRANSLATION_STAGING/usr/bin/qemu-x86_64" >&2
@@ -486,8 +495,9 @@ fi
 # base archive predates them. Compact images deliberately stop at the GPU,
 # desktop and Firefox qualification closure unless one optional layer is
 # explicitly requested.
-if [ "$COMPACT_INITRAMFS" -eq 0 ] && [ -x "$MINECRAFT_STAGING/usr/bin/minecraft" ]; then
-    echo "==> Staging C++ Minecraft runtime"
+if { [ "$COMPACT_INITRAMFS" -eq 0 ] || [ "$WITH_MINECRAFT" -eq 1 ]; } &&
+   [ -x "$MINECRAFT_STAGING/usr/bin/minecraft" ]; then
+    echo "==> Staging Minecraft runtime"
     merge_staging_tree "$MINECRAFT_STAGING"
 fi
 
