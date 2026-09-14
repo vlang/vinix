@@ -7,9 +7,16 @@
 #
 # Mojang publishes no musl natives. LWJGL's own AArch64 natives are glibc
 # builds that load through gcompat, but not all of them survive that: OpenAL
-# and jemalloc misbehave, and freetype segfaults outright while the font atlas
-# is built. Each is pointed at Alpine's native build instead — the same
-# substitution Alpine makes for Prism Launcher.
+# misbehaves and freetype segfaults while the font atlas is built, so both are
+# pointed at Alpine's native builds — the substitution Alpine makes for Prism
+# Launcher too.
+#
+# jemalloc is worse than either and cannot be fixed by substitution. LWJGL uses
+# it as its own allocator, so the first memAlloc lazily dlopens it — and that
+# happens *inside* loading the OpenGL library, where LWJGL is asking a
+# half-initialised library for its path. That nested dlopen segfaults here
+# whichever jemalloc it points at. Selecting the libc allocator removes the
+# library, the lazy init and the re-entrancy in one go.
 set -eu
 
 game_root=${VINIX_MINECRAFT_ROOT:-/usr/share/minecraft}
@@ -187,7 +194,7 @@ exec "$java_bin" \
 	"-Xmx$memory" \
 	-XX:+UseSerialGC \
 	-Dos.name=Linux \
-	-Dorg.lwjgl.system.jemalloc.libname=/usr/lib/libjemalloc.so.2 \
+	-Dorg.lwjgl.system.allocator=system \
 	-Dorg.lwjgl.openal.libname=/usr/lib/libopenal.so.1 \
 	-Dorg.lwjgl.freetype.libname=/usr/lib/libfreetype.so.6 \
 	-Dorg.lwjgl.harfbuzz.libname=/usr/lib/libharfbuzz.so.0 \

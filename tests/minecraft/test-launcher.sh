@@ -61,7 +61,8 @@ printf '%s' "$output" | grep -q 'net.minecraft.client.main.Main'
 printf '%s' "$output" | grep -q 'natives-linux-arm64'
 # musl needs Alpine's OpenAL and jemalloc instead of LWJGL's bundled copies.
 printf '%s' "$output" | grep -q 'org.lwjgl.openal.libname=/usr/lib/libopenal.so.1'
-printf '%s' "$output" | grep -q 'org.lwjgl.system.jemalloc.libname=/usr/lib/libjemalloc.so.2'
+# LWJGL's own jemalloc cannot be loaded here at all; use the libc allocator.
+printf '%s' "$output" | grep -q 'org.lwjgl.system.allocator=system'
 # LWJGL aborts with "Unknown platform: Vinix" unless it is told the ABI name.
 printf '%s' "$output" | grep -q '\-Dos.name=Linux'
 
