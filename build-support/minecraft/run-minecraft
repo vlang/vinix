@@ -123,6 +123,12 @@ fi
 # renderer inside the X server, which Vinix does not support.
 if [ "${VINIX_MINECRAFT_HARDWARE_GL:-0}" != 1 ]; then
 	export LIBGL_ALWAYS_SOFTWARE=1
+	# Mesa's on-disk shader cache never completes here: with it enabled
+	# eglCreateContext does not return, and the process sits at full CPU
+	# indefinitely rather than failing. Measured: cache on, no context after 20
+	# minutes; cache off, a 4.5 core context in 0.3 s.
+	export MESA_SHADER_CACHE_DISABLE=true
+	export MESA_GLSL_CACHE_DISABLE=true
 	# Deliberately not GALLIUM_DRIVER=llvmpipe. That name is what Mesa's pipe
 	# loader turns into gallium-pipe/pipe_llvmpipe.so, and the only pipe driver
 	# staged is pipe_swrast.so, so asking for it fails EGL outright. Leaving it
