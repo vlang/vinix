@@ -8,4 +8,4 @@ __global (
 	kpanic_lock klock.Lock
 )
 
-fn C.printf_panic(charptr, ...voidptr)
+fn C.printf_panic(charptr, ...voidptr) i32

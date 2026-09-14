@@ -71,7 +71,7 @@ pub fn strncpy(dest &char, src &char, n u64) &char {
 }
 
 @[export: 'strcmp']
-pub fn strcmp(_s1 &char, _s2 &char) int {
+pub fn strcmp(_s1 &char, _s2 &char) i32 {
 	unsafe {
 		mut i := u64(0)
 		s1 := &u8(_s1)
@@ -96,7 +96,7 @@ pub fn strcmp(_s1 &char, _s2 &char) int {
 }
 
 @[export: 'strncmp']
-pub fn strncmp(_s1 &char, _s2 &char, size u64) int {
+pub fn strncmp(_s1 &char, _s2 &char, size u64) i32 {
 	unsafe {
 		s1 := &u8(_s1)
 		s2 := &u8(_s2)

@@ -17,7 +17,7 @@ extern FILE *stderr;
 int printf(const char *restrict format, ...);
 int snprintf(char *restrict str, size_t size, const char *restrict format, ...);
 int fprintf(FILE *restrict stream, const char *restrict format, ...);
-int printf_panic(const char *restrict format, ...);
+int printf_panic(char *format, ...);
 int printf_benchmark(const char *restrict format, ...);
 
 #endif
