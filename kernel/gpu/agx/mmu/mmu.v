@@ -281,17 +281,17 @@ pub fn (mut mgr UatManager) initialize_handoff() bool {
 
 	// Drop the lock periodically so firmware can finish its side of init.
 	// Match the reference driver's one-second deadline and 10 ms cadence.
-	mut ready := false
+	mut is_ready := false
 	for _ in 0 .. 100 {
 		handoff_lock(mgr.handoff)
-		ready = katomic.load(&mgr.handoff.magic_fw) == ppl_magic
+		is_ready = katomic.load(&mgr.handoff.magic_fw) == ppl_magic
 		handoff_unlock(mgr.handoff)
-		if ready {
+		if is_ready {
 			break
 		}
 		timer.busywait_us(10000)
 	}
-	if !ready {
+	if !is_ready {
 		println('uat mmu: firmware handoff magic timed out')
 		return false
 	}

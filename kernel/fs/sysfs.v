@@ -80,8 +80,8 @@ fn (mut this SysFS) mount(parent &VFSNode, name string, _source &VFSNode) ?&VFSN
 	root.resource = new_sysfs_resource(.directory, stat.ifdir | 0o555, 0)
 	sysfs_root = root
 
-	mut devices := add_sysfs_directory(mut root, 'devices')
-	mut system := add_sysfs_directory(mut devices, 'system')
+	mut devices_dir := add_sysfs_directory(mut root, 'devices')
+	mut system := add_sysfs_directory(mut devices_dir, 'system')
 	build_cpu_tree(mut system)
 	build_node_tree(mut system)
 

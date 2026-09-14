@@ -86,19 +86,19 @@ fn find_acpi_table(signature string) ?AcpiTable {
 	if rsdp_address == 0 {
 		return none
 	}
-	rsdp := table_virt(rsdp_address)
-	if !signature_at(rsdp, 'RSD ') || read_u8(rsdp, 4) != `P` || read_u8(rsdp, 5) != `T`
-		|| read_u8(rsdp, 6) != `R` || read_u8(rsdp, 7) != ` ` {
+	rsdp_table := table_virt(rsdp_address)
+	if !signature_at(rsdp_table, 'RSD ') || read_u8(rsdp_table, 4) != `P` || read_u8(rsdp_table, 5) != `T`
+		|| read_u8(rsdp_table, 6) != `R` || read_u8(rsdp_table, 7) != ` ` {
 		return none
 	}
 
-	revision := read_u8(rsdp, 15)
-	xsdt_address := read_u64(rsdp, 24)
+	revision := read_u8(rsdp_table, 15)
+	xsdt_address := read_u64(rsdp_table, 24)
 	use_xsdt := revision >= 2 && xsdt_address != 0
 	root := if use_xsdt {
 		table_virt(xsdt_address)
 	} else {
-		table_virt(u64(read_u32(rsdp, 16)))
+		table_virt(u64(read_u32(rsdp_table, 16)))
 	}
 
 	length := read_u32(root, 4)
@@ -255,12 +255,12 @@ fn add_acpi_uid(uid u32, node int) {
 }
 
 fn resolve_acpi_uids() {
-	madt := find_acpi_table('APIC') or { return }
-	if madt.length <= 44 {
+	madt_table := find_acpi_table('APIC') or { return }
+	if madt_table.length <= 44 {
 		return
 	}
-	base := madt.base
-	end := u64(madt.length)
+	base := madt_table.base
+	end := u64(madt_table.length)
 
 	// Entries begin after the header, the local controller address and the flags.
 	mut offset := u64(44)

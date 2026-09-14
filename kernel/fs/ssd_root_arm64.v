@@ -13,7 +13,7 @@ pub fn install_ssd_root(mut root VFSNode) bool {
 		return false
 	}
 	old_root := vfs_root
-	mut devices := get_node(old_root, '/dev', true) or { return false }
+	mut dev_dir := get_node(old_root, '/dev', true) or { return false }
 	// Reject symlink or missing mountpoint directories; never overlay an
 	// unexpected path supplied by an on-disk image.
 	for name in ['dev', 'tmp', 'run'] {
@@ -35,7 +35,7 @@ pub fn install_ssd_root(mut root VFSNode) bool {
 		target.mountpoint = mounted
 	}
 	mut dev_target := unsafe { root.children['dev'] }
-	dev_target.mountpoint = devices
+	dev_target.mountpoint = dev_dir
 	// Validate after staging overlays: /sbin/init must not resolve to a file
 	// hidden by /tmp or /run, or escape through old /dev/.. into initramfs.
 	init := get_node(root, '/sbin/init', true) or { return false }
@@ -44,9 +44,9 @@ pub fn install_ssd_root(mut root VFSNode) bool {
 		return false
 	}
 	// The only mutation to old-root objects happens after every fallible step.
-	devices.parent = root
-	if '..' in devices.children {
-		mut dotdot := unsafe { devices.children['..'] }
+	dev_dir.parent = root
+	if '..' in dev_dir.children {
+		mut dotdot := unsafe { dev_dir.children['..'] }
 		dotdot.redir = root
 	}
 	committed = true

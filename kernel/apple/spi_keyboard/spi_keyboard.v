@@ -256,9 +256,9 @@ fn discover(node &devicetree.DTNode, mut plan Plan) bool {
 		return false
 	}
 	plan.enable = enable_gpio(node) or { return false }
-	if ready := ready_gpio(node) {
-		if ready.region.base != plan.enable.region.base || ready.pin != plan.enable.pin {
-			plan.ready = ready
+	if ready_pin := ready_gpio(node) {
+		if ready_pin.region.base != plan.enable.region.base || ready_pin.pin != plan.enable.pin {
+			plan.ready = ready_pin
 			plan.has_ready = true
 		}
 	}

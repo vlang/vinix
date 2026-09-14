@@ -1842,29 +1842,29 @@ fn validate_u32_array(node &devicetree.DTNode, property string, expected []u32) 
 fn validate_pmgr_device(pmgr_node &devicetree.DTNode, handle u16,
 	expected_name string, expected_index u32, expected_flags u8, expected_selector u8,
 	expected_virtual_class u8) bool {
-	devices := devicetree.get_property(pmgr_node, 'devices') or {
+	device_names := devicetree.get_property(pmgr_node, 'devices') or {
 		println('agx: t6050 PMGR has no device table')
 		return false
 	}
-	if devices.len == 0 || devices.len % pmgr_device_record_size != 0 {
+	if device_names.len == 0 || device_names.len % pmgr_device_record_size != 0 {
 		println('agx: t6050 PMGR device table is malformed')
 		return false
 	}
 	mut matches := u32(0)
-	for record := u32(0); record < devices.len; record += pmgr_device_record_size {
-		if read_native_u16(devices.data, record + pmgr_device_handle_offset) != handle {
+	for record := u32(0); record < device_names.len; record += pmgr_device_record_size {
+		if read_native_u16(device_names.data, record + pmgr_device_handle_offset) != handle {
 			continue
 		}
-		name := unsafe { voidptr(u64(devices.data) + record + pmgr_device_name_offset) }
+		name := unsafe { voidptr(u64(device_names.data) + record + pmgr_device_name_offset) }
 		if !fixed_native_name_matches(name, pmgr_device_name_size, expected_name) {
 			C.printf(c'agx: t6050 PMGR handle 0x%x has an unexpected device name\n', u32(handle))
 			return false
 		}
 		index := record / pmgr_device_record_size
 		if index != expected_index
-			|| read_native_u8(devices.data, record + pmgr_device_flags_offset) != expected_flags
-			|| read_native_u8(devices.data, record + pmgr_device_selector_offset) != expected_selector
-			|| read_native_u8(devices.data, record + pmgr_device_virtual_class_offset) != expected_virtual_class {
+			|| read_native_u8(device_names.data, record + pmgr_device_flags_offset) != expected_flags
+			|| read_native_u8(device_names.data, record + pmgr_device_selector_offset) != expected_selector
+			|| read_native_u8(device_names.data, record + pmgr_device_virtual_class_offset) != expected_virtual_class {
 			C.printf(c'agx: t6050 PMGR device %s changed dispatch fields\n', expected_name.str)
 			return false
 		}

@@ -138,18 +138,18 @@ fn refresh_registered_sockets() {
 }
 
 fn (mut this InetSocket) refresh_status() {
-	ready := C.vinix_socket_ready(this.handle)
+	is_ready := C.vinix_socket_ready(this.handle)
 	mut status := int(0)
-	if ready & ready_read != 0 {
+	if is_ready & ready_read != 0 {
 		status |= file.pollin
 	}
-	if ready & ready_write != 0 {
+	if is_ready & ready_write != 0 {
 		status |= file.pollout
 	}
-	if ready & ready_error != 0 {
+	if is_ready & ready_error != 0 {
 		status |= file.pollerr
 	}
-	if ready & ready_hangup != 0 {
+	if is_ready & ready_hangup != 0 {
 		status |= file.pollhup
 	}
 	if status != this.status {

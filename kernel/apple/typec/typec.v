@@ -341,16 +341,16 @@ fn (controller &Controller) write_bytes(address u8, bytes &u8, length int, start
 fn (controller &Controller) read_bytes(mut output &u8, length int) bool {
 	for index in 0 .. length {
 		mut value := u32(0)
-		mut ready := false
+		mut is_ready := false
 		for _ in 0 .. 5000 {
 			value = controller.read_reg(fifo_rx)
 			if value & rx_empty == 0 {
-				ready = true
+				is_ready = true
 				break
 			}
 			timer.busywait_us(10)
 		}
-		if !ready {
+		if !is_ready {
 			return false
 		}
 		unsafe {

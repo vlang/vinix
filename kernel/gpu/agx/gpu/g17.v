@@ -777,15 +777,15 @@ fn (mut mgr GpuManager) init_g17_firmware_data() bool {
 	} else {
 		C.printf(c'agx: G17 graph ready; hardware config still has gaps 0x%x\n', gaps)
 	}
-	ready := graph.structurally_ready && graph.runtime_policy_ready && graph.platform_values_ready
+	graph_ready := graph.structurally_ready && graph.runtime_policy_ready && graph.platform_values_ready
 		&& graph.pio_mappings_ready && graph.leakage_fuses_ready && graph.hardware_config_ready
 		&& graph.command_pools_ready
-	if ready {
+	if graph_ready {
 		mgr.g17_graph = graph
 	} else {
 		mgr.free_g17_firmware_graph(mut graph)
 	}
-	return ready
+	return graph_ready
 }
 
 // Bring up the two G17 AKF transports without passing through the legacy G13
