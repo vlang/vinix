@@ -27,6 +27,7 @@ FAIL_MARKERS = (
 FEATURE_MARKERS = (
     b"QEMU CORE PASS: secure getrandom",
     b"QEMU CORE PASS: copy-on-write fork",
+    b"QEMU CORE PASS: default signal dispositions",
     b"QEMU CORE PASS: ext2 cache, mmap, sync, namespace, timestamps",
     b"QEMU CORE PASS: a shared mapping is visible to every reader",
     b"QEMU CORE PASS: a released pid stays out of use while its group lives",

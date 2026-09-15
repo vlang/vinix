@@ -118,6 +118,13 @@ pub const sa_nocldwait = 1 << 5
 
 pub const sa_nodefer = 1 << 6
 
+// Linux ignores these signals when the process has not installed a handler.
+// Discard them before queueing so an ignored signal cannot spuriously wake and
+// interrupt a blocking syscall.
+fn has_default_ignore_action(signum int) bool {
+	return signum == sigchld || signum == sigurg || signum == sigwinch
+}
+
 union SigVal {
 	sival_int i32
 	sival_ptr voidptr
@@ -285,8 +292,15 @@ fn dispatch_a_signal_with_fault(context &cpulocal.GPRState, synchronous bool, fa
 	if handler == sig_ign {
 		return
 	}
-	// SIG_DFL (0): default action. For now, ignore instead of terminating.
+	// SIG_DFL (0): terminate unless Linux defines an ignored, stop, or
+	// continue disposition. Process stop/continue accounting is not implemented
+	// yet, so those dispositions remain no-ops; ordinary terminating signals
+	// must still tear the process down so kill(2) and shell cleanup work.
 	if handler == sig_dfl {
+		if !has_default_ignore_action(which) && which != sigcont && which != sigstop
+			&& which != sigtstp && which != sigttin && which != sigttou {
+			exit_with_fatal_signal(u8(which))
+		}
 		return
 	}
 
@@ -501,6 +515,11 @@ pub fn sendsig(_thread &proc.Thread, signal u8) {
 	mut t := unsafe { _thread }
 
 	if signal == 0 || signal > 64 {
+		return
+	}
+
+	handler := t.sigactions[signal].sa_sigaction
+	if handler == sig_ign || (handler == sig_dfl && has_default_ignore_action(int(signal))) {
 		return
 	}
 

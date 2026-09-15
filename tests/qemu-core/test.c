@@ -7,6 +7,7 @@
 #include <fcntl.h>
 #include <poll.h>
 #include <sched.h>
+#include <signal.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -138,6 +139,36 @@ static int test_cow(void)
 	CHECK(page[0] == 0x31 && page[4095] == 0x73);
 	CHECK(munmap((void *)page, 4096) == 0);
 	puts("QEMU CORE PASS: copy-on-write fork");
+	return 0;
+}
+
+static int test_default_terminating_signals(void)
+{
+	pid_t child = fork();
+	CHECK(child >= 0);
+	if (child == 0) {
+		for (;;)
+			pause();
+	}
+	CHECK(kill(child, SIGTERM) == 0);
+	int status = -1;
+	CHECK(waitpid(child, &status, 0) == child);
+	CHECK(WIFSIGNALED(status) && WTERMSIG(status) == SIGTERM);
+
+	child = fork();
+	CHECK(child >= 0);
+	if (child == 0) {
+		for (;;)
+			pause();
+	}
+	CHECK(kill(child, SIGKILL) == 0);
+	status = -1;
+	CHECK(waitpid(child, &status, 0) == child);
+	CHECK(WIFSIGNALED(status) && WTERMSIG(status) == SIGKILL);
+
+	/* These signals have ignored default dispositions on Linux. */
+	CHECK(kill(getpid(), SIGWINCH) == 0);
+	puts("QEMU CORE PASS: default signal dispositions");
 	return 0;
 }
 
@@ -694,6 +725,7 @@ static int run_tests(void)
 		return 0;
 	CHECK(test_random() == 0);
 	CHECK(test_cow() == 0);
+	CHECK(test_default_terminating_signals() == 0);
 	CHECK(prepare_directory() == 0);
 	CHECK(test_ext2_mapping_and_namespace() == 0);
 	CHECK(test_shared_mapping_visible_to_readers() == 0);
