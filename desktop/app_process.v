@@ -23,6 +23,11 @@ const app_protocol_max_payload = 16 * 1024 * 1024
 const app_protocol_max_string = 64 * 1024
 const app_protocol_max_elements = 16 * 1024
 const app_protocol_max_depth = 64
+// A native application runs in a separate process, so a lost child must not
+// park the compositor in a pipe read forever. This is especially important at
+// boot: an application requested with --open starts before the first frame, and
+// an unbounded wait leaves the firmware console with no desktop able to accept input.
+const app_response_timeout_ms = 5000
 const remote_owned_element_key = '__vinix.remote.owned'
 const native_app_directory = '/usr/bin/'
 
@@ -519,7 +524,28 @@ fn send_app_error(fd int, state AppWireState, message string) bool {
 	return written
 }
 
-fn receive_app_response(fd int) !AppReply {
+fn app_response_ready(fd int, timeout_ms int) bool {
+	if fd < 0 || timeout_ms < 0 {
+		return false
+	}
+	mut descriptor := C.pollfd{
+		fd:     fd
+		events: i16(C.POLLIN)
+	}
+	for {
+		ready := C.poll(&descriptor, 1, timeout_ms)
+		if ready < 0 && C.errno == C.EINTR {
+			continue
+		}
+		return ready > 0
+			&& descriptor.revents & i16(C.POLLIN | C.POLLHUP | C.POLLERR) != 0
+	}
+}
+
+fn receive_app_response_with_timeout(fd int, timeout_ms int) !AppReply {
+	if !app_response_ready(fd, timeout_ms) {
+		return error('application response timed out')
+	}
 	mut header := []u8{len: app_response_header_size}
 	if !desktop_read_all(fd, header.data, u64(header.len)) {
 		unsafe { header.free() }
@@ -548,6 +574,10 @@ fn receive_app_response(fd int) !AppReply {
 		state: state
 		payload: payload
 	}
+}
+
+fn receive_app_response(fd int) !AppReply {
+	return receive_app_response_with_timeout(fd, app_response_timeout_ms)
 }
 
 fn app_reply_error(reply AppReply) IError {
@@ -739,11 +769,11 @@ fn start_remote_app_at(path string, factory AppFactory, mut desktop Desktop) !Na
 		desktop: desktop
 	}
 	reply := receive_app_response(remote.response_fd) or {
-		remote.close_transport()
+		remote.abort_transport()
 		return error('cannot start ${factory.title}: ${err}')
 	}
 	if !reply.ok {
-		remote.close_transport()
+		remote.abort_transport()
 		return app_reply_error(reply)
 	}
 	if reply.payload.cap > 0 {
@@ -770,11 +800,11 @@ fn (mut a RemoteApp) transact(command AppCommand, width int, height int, payload
 		AppWireState{}
 	}
 	if !send_app_request(a.request_fd, command, width, height, state, payload) {
-		a.close_transport()
+		a.abort_transport()
 		return error('application request pipe closed')
 	}
 	reply := receive_app_response(a.response_fd) or {
-		a.close_transport()
+		a.abort_transport()
 		return err
 	}
 	if unsafe { a.desktop != nil } {
@@ -896,6 +926,26 @@ fn (mut a RemoteApp) close_transport() {
 	}
 	if a.pid > 0 {
 		desktop_wait_child(a.pid)
+		a.pid = -1
+	}
+	a.closed = true
+}
+
+// A failed transaction cannot assume the child reached its request loop. In
+// particular, merely closing its pipes does not stop a process hung while
+// opening an application, and waiting for that process would replace one
+// permanent compositor stall with another. Terminate it before reaping it.
+fn (mut a RemoteApp) abort_transport() {
+	if a.request_fd >= 0 {
+		desktop_close(a.request_fd)
+		a.request_fd = -1
+	}
+	if a.response_fd >= 0 {
+		desktop_close(a.response_fd)
+		a.response_fd = -1
+	}
+	if a.pid > 0 {
+		desktop_terminate_child(a.pid)
 		a.pid = -1
 	}
 	a.closed = true

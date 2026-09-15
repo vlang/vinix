@@ -151,10 +151,14 @@ fn main() {
 	// An opening arrangement, kept clear of the shortcut column down the left
 	// edge. The calculator is not opened: it remains available from its shortcut
 	// and the Start menu, and three windows is enough to show what the taskbar is for.
+	mut launch_default_files := false
 	if options.open.len == 0 {
 		desktop.spawn('Welcome', .welcome, 150, 60, 396, 244)
 		desktop.spawn('System', .system, 580, 60, 372, 232)
-		desktop.launch_titled('Files')
+		// Files is a separate process. Paint the compositor-owned windows first,
+		// so a delayed application handshake cannot leave the firmware console
+		// looking like the desktop failed to start.
+		launch_default_files = true
 	} else {
 		for title in options.open {
 			desktop.launch_titled(title)
@@ -233,6 +237,11 @@ fn main() {
 		after_present := monotonic_millis()
 
 		free_tree(tree)
+
+		if launch_default_files {
+			launch_default_files = false
+			desktop.launch_titled('Files')
+		}
 
 		sleep_to_next_frame(frame_started, options.frame_interval)
 
