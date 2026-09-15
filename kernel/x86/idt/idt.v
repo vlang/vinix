@@ -38,9 +38,9 @@ pub fn allocate_vector() u8 {
 	return ret
 }
 
-__global (
-	interrupt_table [256]voidptr
-)
+// The assembly interrupt thunks address this table by its linker symbol.
+@[export: 'interrupt_table']
+__global interrupt_table [256]voidptr
 
 pub fn initialise() {
 	reload()
