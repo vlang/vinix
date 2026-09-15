@@ -64,13 +64,14 @@ merge_staging_tree() {
     local overlay="$1"
     local source relative destination
 
-    # macOS cp follows an existing destination symlink. The Python and network
-    # closures share a few libraries, so remove a destination link before the
-    # later overlay replaces it instead of overwriting its target.
+    # macOS cp follows an existing destination symlink and cannot replace a
+    # read-only regular file in place. Package closures share both kinds (the
+    # JDK legal files are deliberately 0444), so unlink non-directory entries
+    # before the later overlay recreates them with its own mode and contents.
     while IFS= read -r -d '' source; do
         relative="${source#"$overlay/"}"
         destination="$STAGING/$relative"
-        if [ -L "$destination" ]; then
+        if [ ! -d "$source" ] && { [ -e "$destination" ] || [ -L "$destination" ]; }; then
             rm -f "$destination"
         fi
     done < <(find "$overlay" -mindepth 1 -print0)
@@ -229,7 +230,10 @@ echo "==> Building Cocoa compatibility fixture..."
 # -gc none because Vinix has no Boehm GC, and -d ui2_headless so importing ui2
 # brings in its declarative core without its gg/Sokol backend.
 echo "==> Translating V to C..."
-"$V" -new-compiler -os linux -arch arm64 -gc none -manualfree -enable-globals -prod \
+# The generated ui2/VML program is large enough to cross V3's general-purpose
+# 10176 MiB watchdog while it is still making forward declarations. This is a
+# host-side release build, so let the machine's own memory limit govern it.
+"$V" -new-compiler -no-memory-limit -os linux -arch arm64 -gc none -manualfree -enable-globals -prod \
     -d ui2_headless \
     -path "@vlib|$UI2_MODULES|@vmodules|$SCRIPT_DIR|$SCRIPT_DIR/third_party" \
     -o "$BUILD_DIR/desktop.c" "$APP_SRC"
@@ -262,7 +266,7 @@ if [ -f "$ASAHI_STAGING/usr/lib/libEGL.so" ] &&
    [ -f "$ASAHI_STAGING/usr/include/EGL/egl.h" ] &&
    [ -f "$GPU_SYSROOT/usr/lib/Scrt1.o" ]; then
     echo "==> Translating the GPU-enabled desktop to C..."
-    "$V" -new-compiler -os linux -arch arm64 -gc none -manualfree -enable-globals -prod \
+    "$V" -new-compiler -no-memory-limit -os linux -arch arm64 -gc none -manualfree -enable-globals -prod \
         -d ui2_headless -d vinix_gpu_present \
         -path "@vlib|$UI2_MODULES|@vmodules|$SCRIPT_DIR|$SCRIPT_DIR/third_party" \
         -o "$BUILD_DIR/desktop-gpu.c" "$APP_SRC"
