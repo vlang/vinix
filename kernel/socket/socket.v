@@ -102,7 +102,7 @@ fn socketpair_create(domain int, @type int, _protocol int) ?(&resource.Resource,
 	match domain {
 		sock_pub.af_unix {
 			socket0, socket1 := sock_unix.create_pair(@type)?
-			return &resource.Resource(*socket0), &resource.Resource(*socket1)
+			return &resource.Resource(socket0), &resource.Resource(socket1)
 		}
 		else {
 			C.printf(c'socket: Unknown domain: %d\n', domain)
@@ -130,7 +130,7 @@ fn socket_create(domain int, @type int, protocol int) ?&resource.Resource {
 	}
 }
 
-pub fn syscall_socketpair(_ voidptr, domain int, @type int, protocol int, ret &int) (u64, u64) {
+pub fn syscall_socketpair(_ voidptr, domain int, @type int, protocol int, ret &i32) (u64, u64) {
 	mut current_thread := proc.current_thread()
 	mut process := current_thread.process
 
@@ -156,13 +156,13 @@ pub fn syscall_socketpair(_ voidptr, domain int, @type int, protocol int, ret &i
 	}
 
 	unsafe {
-		ret[0] = file.fdnum_create_from_resource(nil, mut socket0, flags, 0, false) or {
+		ret[0] = i32(file.fdnum_create_from_resource(nil, mut socket0, flags, 0, false) or {
 			return errno.err, errno.get()
-		}
+		})
 
-		ret[1] = file.fdnum_create_from_resource(nil, mut socket1, flags, 0, false) or {
+		ret[1] = i32(file.fdnum_create_from_resource(nil, mut socket1, flags, 0, false) or {
 			return errno.err, errno.get()
-		}
+		})
 	}
 	return 0, 0
 }

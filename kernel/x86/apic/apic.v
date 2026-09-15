@@ -117,6 +117,7 @@ pub fn lapic_enable(spurious_vect u8) {
 	lapic_write(lapic_reg_spurious, lapic_read(lapic_reg_spurious) | (1 << 8) | spurious_vect)
 }
 
+@[export: 'x86__apic__lapic_eoi']
 pub fn lapic_eoi() {
 	lapic_write(lapic_reg_eoi, 0)
 }
@@ -181,6 +182,7 @@ pub fn io_apic_set_gsi_redirect(lapic_id u32, vector u8, gsi u32, flags u16, sta
 	io_apic_write(io_apic, ioredtbl + 1, u32(redirect >> 32))
 }
 
+@[export: 'x86__apic__io_apic_set_irq_redirect']
 pub fn io_apic_set_irq_redirect(lapic_id u32, vector u8, irq u8, status bool) {
 	for i := 0; i < madt_isos.len; i++ {
 		if madt_isos[i].irq_source == irq {

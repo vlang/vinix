@@ -15,6 +15,7 @@ import net
 import sched
 import errno
 
+@[export: 'syscall_table']
 __global (
 	syscall_table [66]voidptr
 )

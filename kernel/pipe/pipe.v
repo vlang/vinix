@@ -52,7 +52,7 @@ pub fn create() ?&Pipe {
 	return p
 }
 
-pub fn syscall_pipe(_ voidptr, pipefds &int, flags int) (u64, u64) {
+pub fn syscall_pipe(_ voidptr, pipefds &i32, flags int) (u64, u64) {
 	mut current_thread := proc.current_thread()
 	mut process := current_thread.process
 
@@ -72,8 +72,8 @@ pub fn syscall_pipe(_ voidptr, pipefds &int, flags int) (u64, u64) {
 	}
 
 	unsafe {
-		pipefds[0] = rd_fd
-		pipefds[1] = wr_fd
+		pipefds[0] = i32(rd_fd)
+		pipefds[1] = i32(wr_fd)
 	}
 	return 0, 0
 }

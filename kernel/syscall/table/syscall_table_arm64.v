@@ -30,6 +30,7 @@ import krandom
 // Keep in sync with the bounds check in asm/aarch64/vectors.S.
 const linux_syscall_max = 512
 
+@[export: 'syscall_table']
 __global (
 	syscall_table [linux_syscall_max]voidptr
 )

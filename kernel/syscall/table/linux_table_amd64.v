@@ -25,6 +25,7 @@ import krandom
 
 const linux_syscall_max = 512
 
+@[export: 'linux_syscall_table']
 __global (
 	linux_syscall_table [linux_syscall_max]voidptr
 )
@@ -144,7 +145,7 @@ fn syscall_linux_dup2(gpr_state voidptr, oldfd int, newfd int) (u64, u64) {
 	return file.syscall_dup3(gpr_state, oldfd, newfd, 0)
 }
 
-fn syscall_linux_pipe(gpr_state voidptr, pipefds &int) (u64, u64) {
+fn syscall_linux_pipe(gpr_state voidptr, pipefds &i32) (u64, u64) {
 	return pipe.syscall_pipe(gpr_state, pipefds, 0)
 }
 

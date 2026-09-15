@@ -52,6 +52,8 @@ pub fn putc_raw(c u8) {
 	}
 }
 
+// Keep the C ABI name used by the early console and initramfs bridges stable.
+@[export: 'aarch64__uart__putc']
 pub fn putc(c u8) {
 	if uart_base == 0 {
 		return
