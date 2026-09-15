@@ -177,13 +177,16 @@ override VFLAGS += \
     -message-limit 10000 \
     -gc none \
     -target-libc-headers \
+    -no-closures \
     -d no_backtrace
 
 ifeq ($(ARCH),aarch64)
-    override VFLAGS += -d aarch64
+    override VFLAGS += -arch arm64 -d aarch64
     ifeq ($(LIMINE_MP),1)
         override VFLAGS += -d limine_mp
     endif
+else
+    override VFLAGS += -arch amd64
 endif
 
 # V build tags change the generated kernel C even though no source timestamp

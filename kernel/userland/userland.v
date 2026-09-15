@@ -660,7 +660,7 @@ pub fn syscall_fork(gpr_state &cpulocal.GPRState) (u64, u64) {
 	return u64(new_process.pid), u64(0)
 }
 
-pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, envp []string, stdin string, stdout string, stderr string) ?&proc.Process {
+pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, envp []string, stdin_path string, stdout_path string, stderr_path string) ?&proc.Process {
 	// Chromium starts every child process by executing /proc/self/exe. The VFS
 	// resolves that to this process's program, but the new process must record
 	// where the program really is: keeping the literal path would make the
@@ -688,8 +688,8 @@ pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, 
 		final_argv << path
 		final_argv << argv[1..]
 
-		return start_program(execve, dir, real_path, final_argv, envp, stdin, stdout,
-			stderr)
+		return start_program(execve, dir, real_path, final_argv, envp, stdin_path, stdout_path,
+			stderr_path)
 	}
 
 	mut auxval, ld_path := elf.load(new_pagemap, prog, 0) or { return none }
@@ -732,7 +732,7 @@ pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, 
 		new_process.executable_path = path.clone()
 		new_process.linux_abi = linux_abi
 
-		stdin_node := fs.get_node(vfs_root, stdin, true)?
+		stdin_node := fs.get_node(vfs_root, stdin_path, true)?
 		stdin_handle := &file.Handle{
 			resource: stdin_node.resource
 			node:     stdin_node
@@ -743,7 +743,7 @@ pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, 
 		}
 		new_process.fds[0] = voidptr(stdin_fd)
 
-		stdout_node := fs.get_node(vfs_root, stdout, true)?
+		stdout_node := fs.get_node(vfs_root, stdout_path, true)?
 		stdout_handle := &file.Handle{
 			resource: stdout_node.resource
 			node:     stdout_node
@@ -755,7 +755,7 @@ pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, 
 		}
 		new_process.fds[1] = voidptr(stdout_fd)
 
-		stderr_node := fs.get_node(vfs_root, stderr, true)?
+		stderr_node := fs.get_node(vfs_root, stderr_path, true)?
 		stderr_handle := &file.Handle{
 			resource: stderr_node.resource
 			node:     stderr_node
