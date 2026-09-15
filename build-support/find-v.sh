@@ -48,17 +48,7 @@ find_v() {
     fi
 
     if command -v v >/dev/null 2>&1; then
-        candidate="$(command -v v)"
-        candidate_dir="$(CDPATH= cd -- "$(dirname -- "$candidate")" && pwd)"
-        # A V source checkout intentionally keeps `v` as its bootstrap
-        # compiler while developers build the current sources into `vnew`.
-        # If that checkout is on PATH, selecting its older `v` makes modern
-        # Vinix-only flags fail even though the usable compiler is beside it.
-        if [ -f "$candidate_dir/cmd/v/v.v" ] && [ -x "$candidate_dir/vnew" ]; then
-            V="$candidate_dir/vnew"
-        else
-            V="$candidate"
-        fi
+        V="$(command -v v)"
         return 0
     fi
 

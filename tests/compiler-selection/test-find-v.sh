@@ -38,12 +38,13 @@ selected=$(VINIX_V_COMPILER="$work/explicit-checkout" sh -c \
 	'. "$1"; printf "%s" "$V"' sh "$repo/build-support/find-v.sh")
 test "$selected" = "$work/explicit-checkout/vnew"
 
-# The same preference applies when the checkout's bootstrap `v` is on PATH.
+# PATH selects the exact `v` executable; an adjacent development build does
+# not override the user's shell configuration.
 mkdir -p "$work/path-checkout/cmd/v"
 : >"$work/path-checkout/cmd/v/v.v"
 make_executable "$work/path-checkout/v"
 make_executable "$work/path-checkout/vnew"
-assert_selected "$work/path-checkout/vnew" env PATH="$work/path-checkout:$PATH"
+assert_selected "$work/path-checkout/v" env PATH="$work/path-checkout:$PATH"
 
 # An installed compiler with no source checkout beside it is used as-is.
 make_executable "$work/installed/v"
