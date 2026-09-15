@@ -19,6 +19,7 @@
 #include <sys/resource.h>
 #include <sys/stat.h>
 #include <sys/eventfd.h>
+#include <sys/epoll.h>
 #include <sys/socket.h>
 #include <sys/statfs.h>
 #include <sys/sysinfo.h>
@@ -594,6 +595,41 @@ static int test_pollfd_abi(void)
 	return 0;
 }
 
+/* qemu-user translates an x86 epoll_event into the native AArch64 layout
+ * before entering Vinix. Verify both that layout and the syscall result: a
+ * wrong stride or a returned byte count makes userspace consume uninitialised
+ * events, which is especially destructive to Wine's server protocol. */
+static int test_epoll_abi_and_count(void)
+{
+	int pair[2];
+	CHECK(pipe(pair) == 0);
+	int epoll = epoll_create1(EPOLL_CLOEXEC);
+	CHECK(epoll >= 0);
+	struct epoll_event requested = {
+		.events = EPOLLIN,
+		.data.u64 = UINT64_C(0x56494e495845504f),
+	};
+	CHECK(epoll_ctl(epoll, EPOLL_CTL_ADD, pair[0], &requested) == 0);
+
+	struct epoll_event observed[4];
+	memset(observed, 0xa5, sizeof(observed));
+	CHECK(epoll_wait(epoll, observed, 4, 0) == 0);
+	CHECK(write(pair[1], "e", 1) == 1);
+	CHECK(epoll_wait(epoll, observed, 4, 1000) == 1);
+	CHECK((observed[0].events & EPOLLIN) != 0);
+	CHECK(observed[0].data.u64 == requested.data.u64);
+
+	char byte = 0;
+	CHECK(read(pair[0], &byte, 1) == 1);
+	CHECK(byte == 'e');
+	CHECK(epoll_wait(epoll, observed, 4, 0) == 0);
+	CHECK(close(epoll) == 0);
+	CHECK(close(pair[0]) == 0);
+	CHECK(close(pair[1]) == 0);
+	puts("QEMU CORE PASS: Linux epoll ABI and event count");
+	return 0;
+}
+
 /* The AArch64 syscall ABI leaves the unused high half of C-int arguments
  * unspecified. qemu-user zero-extends AT_FDCWD while translating x86 open(2),
  * and the kernel must truncate it before interpreting the signed value. */
@@ -669,6 +705,7 @@ static int run_tests(void)
 	CHECK(test_posix_timer_thread_notification() == 0);
 	CHECK(test_anonymous_descriptor_access() == 0);
 	CHECK(test_pollfd_abi() == 0);
+	CHECK(test_epoll_abi_and_count() == 0);
 	CHECK(test_syscall_int_truncation() == 0);
 	CHECK(test_abstract_socket_reuse() == 0);
 	CHECK(unlink(file_a) == 0);
