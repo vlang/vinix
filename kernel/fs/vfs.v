@@ -957,8 +957,8 @@ pub fn syscall_ioctl(_ voidptr, fdnum int, request u64, argp voidptr) (u64, u64)
 			} else {
 				resource.o_async
 			}
-			mut on := int(0)
-			if !usercopy.copy_from_user(&on, u64(argp), sizeof(int)) {
+			mut on := i32(0)
+			if !usercopy.copy_from_user(&on, u64(argp), sizeof(i32)) {
 				return errno.err, errno.efault
 			}
 			mut handle := fd.handle

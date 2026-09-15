@@ -857,15 +857,15 @@ fn (mut this UnixSocket) recvmsg(_handle voidptr, msg &sock_pub.MsgHdr, flags in
 			// captured when the connection was established are the sending
 			// process's own.
 			credentials := sock_pub.UCred{
-				pid: this.peer_pid
+				pid: i32(this.peer_pid)
 				uid: this.peer_uid
 				gid: this.peer_gid
 			}
 			control := unsafe { &u8(msg.msg_control) }
 			unsafe {
 				*(&u64(control)) = cmsg_len
-				*(&int(voidptr(u64(control) + 8))) = sock_pub.sol_socket
-				*(&int(voidptr(u64(control) + 12))) = sock_pub.scm_credentials
+				*(&i32(voidptr(u64(control) + 8))) = i32(sock_pub.sol_socket)
+				*(&i32(voidptr(u64(control) + 12))) = i32(sock_pub.scm_credentials)
 				C.memcpy(voidptr(u64(control) + cmsg_header_size), &credentials,
 					sizeof(sock_pub.UCred))
 			}
@@ -881,13 +881,13 @@ fn (mut this UnixSocket) recvmsg(_handle voidptr, msg &sock_pub.MsgHdr, flags in
 		mut pending_fds := unsafe { this.pending_fd_groups[0].fds }
 		remaining_control := control_capacity - control_used
 		mut capacity_fds := u64(0)
-		if msg.msg_control != unsafe { nil } && remaining_control >= cmsg_header_size + sizeof(int) {
-			capacity_fds = (remaining_control - cmsg_header_size) / sizeof(int)
+		if msg.msg_control != unsafe { nil } && remaining_control >= cmsg_header_size + sizeof(i32) {
+			capacity_fds = (remaining_control - cmsg_header_size) / sizeof(i32)
 			// msg_controllen includes the cmsghdr's trailing alignment. A
 			// CMSG_LEN-sized buffer can hold the bytes but cannot represent a
 			// complete ancillary record, so report truncation instead.
 			for capacity_fds > 0 {
-				cmsg_len := cmsg_header_size + capacity_fds * sizeof(int)
+				cmsg_len := cmsg_header_size + capacity_fds * sizeof(i32)
 				cmsg_space := (cmsg_len + cmsg_align - 1) & ~(cmsg_align - 1)
 				if cmsg_space <= remaining_control {
 					break
@@ -904,9 +904,9 @@ fn (mut this UnixSocket) recvmsg(_handle voidptr, msg &sock_pub.MsgHdr, flags in
 		if deliver != 0 {
 			control := unsafe { &u8(voidptr(u64(msg.msg_control) + control_used)) }
 			unsafe {
-				*(&u64(control)) = cmsg_header_size + deliver * sizeof(int)
-				*(&int(voidptr(u64(control) + 8))) = sock_pub.sol_socket
-				*(&int(voidptr(u64(control) + 12))) = sock_pub.scm_rights
+				*(&u64(control)) = cmsg_header_size + deliver * sizeof(i32)
+				*(&i32(voidptr(u64(control) + 8))) = i32(sock_pub.sol_socket)
+				*(&i32(voidptr(u64(control) + 12))) = i32(sock_pub.scm_rights)
 			}
 
 			mut installed := u64(0)
@@ -920,13 +920,13 @@ fn (mut this UnixSocket) recvmsg(_handle voidptr, msg &sock_pub.MsgHdr, flags in
 					break
 				}
 				unsafe {
-					*(&int(voidptr(u64(control) + cmsg_header_size + installed * sizeof(int)))) = new_fdnum
+					*(&i32(voidptr(u64(control) + cmsg_header_size + installed * sizeof(i32)))) = i32(new_fdnum)
 				}
 				installed++
 			}
 
 			if installed != 0 {
-				cmsg_len := cmsg_header_size + installed * sizeof(int)
+				cmsg_len := cmsg_header_size + installed * sizeof(i32)
 				unsafe {
 					*(&u64(control)) = cmsg_len
 					msg.msg_controllen = control_used +

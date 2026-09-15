@@ -3,12 +3,12 @@ module stubs
 import lib
 
 @[export: '__ctype_tolower_loc']
-pub fn ctype_tolower_loc() &&int {
+pub fn ctype_tolower_loc() &&i32 {
 	lib.kpanic(unsafe { nil }, c'__ctype_tolower_loc is a stub')
 }
 
 @[export: '__ctype_toupper_loc']
-pub fn ctype_toupper_loc() &&int {
+pub fn ctype_toupper_loc() &&i32 {
 	lib.kpanic(unsafe { nil }, c'__ctype_toupper_loc is a stub')
 }
 

@@ -116,28 +116,28 @@ fn (mut dev OssDevice) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 			return 0
 		}
 		ctl_dsp_speed {
-			dev.sample_rate = u32(unsafe { *&int(argp) })
+			dev.sample_rate = u32(unsafe { *&i32(argp) })
 			return 0
 		}
 		ctl_dsp_setfmt {
-			ptr := unsafe { &int(argp) }
+			ptr := unsafe { &i32(argp) }
 			fmt := u8(unsafe { *ptr })
 			refined := dev.device.refine_fmt(fmt)
 			if fmt != refined {
 				unsafe {
-					*ptr = refined
+					*ptr = i32(refined)
 				}
 			}
 			dev.fmt = refined
 			return 0
 		}
 		ctl_dsp_channels {
-			ptr := unsafe { &int(argp) }
+			ptr := unsafe { &i32(argp) }
 			channels := u8(unsafe { *ptr })
 			refined := dev.device.refine_channels(channels)
 			if channels != refined {
 				unsafe {
-					*ptr = refined
+					*ptr = i32(refined)
 				}
 			}
 			dev.channels = refined

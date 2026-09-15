@@ -5,12 +5,12 @@ module spi_keyboard
 
 #include "apple_spi_keyboard.h"
 
-fn C.vinix_apple_spi_touchpad_read(output &int) int
+fn C.vinix_apple_spi_touchpad_read(output &i32) int
 
 __global (
 	apple_spi_touchpad_reported = false
 	apple_spi_touchpad_cached   = false
-	apple_spi_touchpad_cache    = [8]int{}
+	apple_spi_touchpad_cache    = [8]i32{}
 )
 
 // The shared keyboard poller pumps BOTH devices. A pointer read only takes a
@@ -23,7 +23,7 @@ __global (
 // that produces the reports -- the cursor then moves in steps, the harder it
 // is asked the worse it gets. The pointer device also holds its own lock
 // across this call, so the wait would spin with interrupts already masked.
-pub fn read_pointer(output &int) bool {
+pub fn read_pointer(output &i32) bool {
 	if !apple_spi_keyboard_lock.test_and_acquire() {
 		return replay_pointer(output)
 	}
@@ -50,7 +50,7 @@ pub fn read_pointer(output &int) bool {
 // lock. Position and held buttons still describe the device. The edges do not:
 // `pressed`, `released` and `scroll` are each reported once, so repeating them
 // would deliver a second click, or a second release, that nobody made.
-fn replay_pointer(output &int) bool {
+fn replay_pointer(output &i32) bool {
 	if !apple_spi_touchpad_cached {
 		return false
 	}

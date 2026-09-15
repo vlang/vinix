@@ -137,6 +137,14 @@ fn syscall_linux_faccessat(gpr_state voidptr, dirfd int, path charptr, mode u32)
 	return fs.syscall_faccessat(gpr_state, dirfd, path, mode, 0)
 }
 
+// Linux only defines the low 32 bits of arguments declared as C `int` at the
+// syscall boundary. In particular, qemu-user passes AT_FDCWD as 0xffffff9c
+// when translating the x86 open syscall. Keep the boundary parameters i32 so
+// V3 performs the required truncation before VFS compares dirfd with -100.
+fn syscall_linux_openat(gpr_state voidptr, dirfd i32, path charptr, flags i32, mode u32) (u64, u64) {
+	return fs.syscall_openat(gpr_state, int(dirfd), path, int(flags), mode)
+}
+
 fn syscall_linux_faccessat2(gpr_state voidptr, dirfd int, path charptr, mode u32, flags int) (u64, u64) {
 	// R_OK | W_OK | X_OK; AT_EACCESS, AT_SYMLINK_NOFOLLOW, AT_EMPTY_PATH.
 	if mode & ~u32(0x7) != 0 || flags & ~0x1300 != 0 {

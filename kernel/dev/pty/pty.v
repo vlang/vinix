@@ -725,16 +725,16 @@ fn terminal_ioctl(mut pair PtyPair, slave_side bool, request u64, argp voidptr) 
 			return 0
 		}
 		ioctl.tiocgpgrp {
-			value := pair.foreground_pgid
-			if !usercopy.copy_to_user(u64(argp), voidptr(&value), sizeof(int)) {
+			value := i32(pair.foreground_pgid)
+			if !usercopy.copy_to_user(u64(argp), voidptr(&value), sizeof(i32)) {
 				errno.set(errno.efault)
 				return none
 			}
 			return 0
 		}
 		ioctl.tiocspgrp {
-			mut value := int(0)
-			if !usercopy.copy_from_user(voidptr(&value), u64(argp), sizeof(int)) {
+			mut value := i32(0)
+			if !usercopy.copy_from_user(voidptr(&value), u64(argp), sizeof(i32)) {
 				errno.set(errno.efault)
 				return none
 			}
@@ -742,7 +742,7 @@ fn terminal_ioctl(mut pair PtyPair, slave_side bool, request u64, argp voidptr) 
 				errno.set(errno.einval)
 				return none
 			}
-			pair.foreground_pgid = value
+			pair.foreground_pgid = int(value)
 			return 0
 		}
 		ioctl.tiocgsid {
@@ -750,8 +750,8 @@ fn terminal_ioctl(mut pair PtyPair, slave_side bool, request u64, argp voidptr) 
 				errno.set(errno.enotty)
 				return none
 			}
-			value := pair.session
-			if !usercopy.copy_to_user(u64(argp), voidptr(&value), sizeof(int)) {
+			value := i32(pair.session)
+			if !usercopy.copy_to_user(u64(argp), voidptr(&value), sizeof(i32)) {
 				errno.set(errno.efault)
 				return none
 			}
@@ -786,20 +786,20 @@ fn terminal_ioctl(mut pair PtyPair, slave_side bool, request u64, argp voidptr) 
 			return 0
 		}
 		ioctl.fionread {
-			value := int(if slave_side { pair.input.used } else { pair.output.used })
-			if !usercopy.copy_to_user(u64(argp), voidptr(&value), sizeof(int)) {
+			value := i32(if slave_side { pair.input.used } else { pair.output.used })
+			if !usercopy.copy_to_user(u64(argp), voidptr(&value), sizeof(i32)) {
 				errno.set(errno.efault)
 				return none
 			}
 			return 0
 		}
 		ioctl.tiocoutq {
-			value := int(if slave_side {
+			value := i32(if slave_side {
 				pair.output.used
 			} else {
 				pair.input.used + pair.canonical_len
 			})
-			if !usercopy.copy_to_user(u64(argp), voidptr(&value), sizeof(int)) {
+			if !usercopy.copy_to_user(u64(argp), voidptr(&value), sizeof(i32)) {
 				errno.set(errno.efault)
 				return none
 			}
@@ -844,8 +844,8 @@ fn (mut this PtyMaster) ioctl(_handle voidptr, request u64, argp voidptr) ?int {
 			return 0
 		}
 		ioctl.tiocsptlck {
-			mut value := int(0)
-			if !usercopy.copy_from_user(voidptr(&value), u64(argp), sizeof(int)) {
+			mut value := i32(0)
+			if !usercopy.copy_from_user(voidptr(&value), u64(argp), sizeof(i32)) {
 				errno.set(errno.efault)
 				return none
 			}
@@ -853,8 +853,8 @@ fn (mut this PtyMaster) ioctl(_handle voidptr, request u64, argp voidptr) ?int {
 			return 0
 		}
 		ioctl.tiocgptlck {
-			value := if pair.locked { 1 } else { 0 }
-			if !usercopy.copy_to_user(u64(argp), voidptr(&value), sizeof(int)) {
+			value := i32(if pair.locked { 1 } else { 0 })
+			if !usercopy.copy_to_user(u64(argp), voidptr(&value), sizeof(i32)) {
 				errno.set(errno.efault)
 				return none
 			}

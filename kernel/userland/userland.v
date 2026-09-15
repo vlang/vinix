@@ -130,19 +130,19 @@ const amd64_sigreturn_rflags_mask = cpu.rflags_cf | cpu.rflags_pf | cpu.rflags_a
 const amd64_sigreturn_rflags_fixed = cpu.rflags_fixed | cpu.rflags_if
 
 union SigVal {
-	sival_int int
+	sival_int i32
 	sival_ptr voidptr
 }
 
 pub struct SigInfo {
 pub mut:
-	si_signo  int
-	si_code   int
-	si_errno  int
-	si_pid    int
-	si_uid    int
+	si_signo  i32
+	si_code   i32
+	si_errno  i32
+	si_pid    i32
+	si_uid    i32
 	si_addr   voidptr
-	si_status int
+	si_status i32
 	si_value  SigVal
 }
 
@@ -389,9 +389,9 @@ fn dispatch_signal(context &cpulocal.GPRState, info_signum int, info_code int, i
 	mut siginfo := unsafe { &SigInfo(t.gpr_state.rsp) }
 
 	unsafe { C.memset(voidptr(siginfo), 0, sizeof(SigInfo)) }
-	siginfo.si_signo = which
+	siginfo.si_signo = i32(which)
 	if info_signum == which {
-		siginfo.si_code = info_code
+		siginfo.si_code = i32(info_code)
 		siginfo.si_addr = voidptr(info_addr)
 	}
 
@@ -484,7 +484,7 @@ pub fn syscall_execve(_ voidptr, _path charptr, _argv &charptr, _envp &charptr) 
 	return errno.err, errno.get()
 }
 
-pub fn syscall_waitpid(_ voidptr, pid int, _status &int, options int) (u64, u64) {
+pub fn syscall_waitpid(_ voidptr, pid int, _status &i32, options int) (u64, u64) {
 	mut current_thread := proc.current_thread()
 	mut current_process := current_thread.process
 
@@ -531,7 +531,7 @@ pub fn syscall_waitpid(_ voidptr, pid int, _status &int, options int) (u64, u64)
 	}
 
 	unsafe {
-		*status = child.status
+		*status = i32(child.status)
 	}
 	ret := child.pid
 

@@ -396,8 +396,8 @@ fn (mut this Console) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 			return 0
 		}
 		ioctl.kdgetmode {
-			mode := if term.graphics_mode() { ioctl.kd_graphics } else { ioctl.kd_text }
-			if !usercopy.copy_to_user(u64(argp), voidptr(&mode), sizeof(int)) {
+			mode := i32(if term.graphics_mode() { ioctl.kd_graphics } else { ioctl.kd_text })
+			if !usercopy.copy_to_user(u64(argp), voidptr(&mode), sizeof(i32)) {
 				errno.set(errno.efault)
 				return none
 			}
@@ -492,8 +492,8 @@ fn (mut this Console) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 				errno.set(errno.enotty)
 				return none
 			}
-			value := this.session
-			if !usercopy.copy_to_user(u64(argp), voidptr(&value), sizeof(int)) {
+			value := i32(this.session)
+			if !usercopy.copy_to_user(u64(argp), voidptr(&value), sizeof(i32)) {
 				errno.set(errno.efault)
 				return none
 			}
@@ -502,19 +502,19 @@ fn (mut this Console) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 		ioctl.tiocgpgrp {
 			// Reporting no foreground group is what made every shell give up on
 			// job control at startup.
-			mut value := this.foreground_pgid
+			mut value := i32(this.foreground_pgid)
 			if value == 0 {
-				value = process.pgid
+				value = i32(process.pgid)
 			}
-			if !usercopy.copy_to_user(u64(argp), voidptr(&value), sizeof(int)) {
+			if !usercopy.copy_to_user(u64(argp), voidptr(&value), sizeof(i32)) {
 				errno.set(errno.efault)
 				return none
 			}
 			return 0
 		}
 		ioctl.tiocspgrp {
-			mut value := int(0)
-			if !usercopy.copy_from_user(voidptr(&value), u64(argp), sizeof(int)) {
+			mut value := i32(0)
+			if !usercopy.copy_from_user(voidptr(&value), u64(argp), sizeof(i32)) {
 				errno.set(errno.efault)
 				return none
 			}
@@ -522,12 +522,12 @@ fn (mut this Console) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 				errno.set(errno.einval)
 				return none
 			}
-			this.foreground_pgid = value
+			this.foreground_pgid = int(value)
 			return 0
 		}
 		ioctl.fionread {
-			value := int(this.input_pending())
-			if !usercopy.copy_to_user(u64(argp), voidptr(&value), sizeof(int)) {
+			value := i32(this.input_pending())
+			if !usercopy.copy_to_user(u64(argp), voidptr(&value), sizeof(i32)) {
 				errno.set(errno.efault)
 				return none
 			}
@@ -535,8 +535,8 @@ fn (mut this Console) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 		}
 		ioctl.tiocoutq {
 			// Writes go straight out, so nothing is ever queued.
-			value := int(0)
-			if !usercopy.copy_to_user(u64(argp), voidptr(&value), sizeof(int)) {
+			value := i32(0)
+			if !usercopy.copy_to_user(u64(argp), voidptr(&value), sizeof(i32)) {
 				errno.set(errno.efault)
 				return none
 			}

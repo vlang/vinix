@@ -119,19 +119,19 @@ pub const sa_nocldwait = 1 << 5
 pub const sa_nodefer = 1 << 6
 
 union SigVal {
-	sival_int int
+	sival_int i32
 	sival_ptr voidptr
 }
 
 pub struct SigInfo {
 pub mut:
-	si_signo  int
-	si_code   int
-	si_errno  int
-	si_pid    int
-	si_uid    int
+	si_signo  i32
+	si_code   i32
+	si_errno  i32
+	si_pid    i32
+	si_uid    i32
 	si_addr   voidptr
-	si_status int
+	si_status i32
 	si_value  SigVal
 }
 
@@ -334,7 +334,7 @@ fn dispatch_a_signal_with_fault(context &cpulocal.GPRState, synchronous bool, fa
 		mut siginfo := unsafe { &SigInfo(t.gpr_state.sp) }
 
 		unsafe { C.memset(voidptr(siginfo), 0, sizeof(SigInfo)) }
-		siginfo.si_signo = which
+		siginfo.si_signo = i32(which)
 
 		t.gpr_state.pc = t.sigentry
 		t.gpr_state.x0 = u64(which)
@@ -383,9 +383,9 @@ fn dispatch_a_signal_with_fault(context &cpulocal.GPRState, synchronous bool, fa
 
 				// siginfo_t: signo, errno, positive si_code, then si_addr. Linux
 				// distinguishes an unmapped page from a permission-protected one.
-				*&int(info_address) = which
-				*&int(info_address + 8) = if timer_info.found {
-					timer_info.code
+				*&i32(info_address) = i32(which)
+				*&i32(info_address + 8) = if timer_info.found {
+					i32(timer_info.code)
 				} else if synchronous && (fault_esr & 0x3f) >= 0x0c {
 					2 // SEGV_ACCERR
 				} else if synchronous {
@@ -395,7 +395,7 @@ fn dispatch_a_signal_with_fault(context &cpulocal.GPRState, synchronous bool, fa
 				}
 				*&u64(info_address + 16) = fault_address
 				if timer_info.found {
-					*&int(info_address + 20) = timer_info.overrun
+					*&i32(info_address + 20) = i32(timer_info.overrun)
 					*&u64(info_address + 24) = timer_info.value
 				}
 

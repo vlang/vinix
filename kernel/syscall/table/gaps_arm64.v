@@ -123,10 +123,11 @@ fn syscall_linux_sched_setscheduler(_ voidptr, pid int, policy int, param u64) (
 	if param == 0 {
 		return errno.err, errno.efault
 	}
-	mut priority := int(0)
-	if !usercopy.copy_from_user(voidptr(&priority), param, sizeof(int)) {
+	mut priority32 := i32(0)
+	if !usercopy.copy_from_user(voidptr(&priority32), param, sizeof(i32)) {
 		return errno.err, errno.efault
 	}
+	priority := int(priority32)
 
 	checked := validate_sched_priority(wanted, priority) or { return errno.err, errno.einval }
 	if !may_set_sched_params(tid, wanted, checked) {
@@ -152,8 +153,8 @@ fn syscall_linux_sched_getparam(_ voidptr, pid int, param u64) (u64, u64) {
 	tid := sched_target_tid(pid) or { return errno.err, sched_target_errno(pid) }
 	params := proc.thread_sched_params(tid) or { return errno.err, errno.esrch }
 
-	priority := params.priority
-	if !usercopy.copy_to_user(param, voidptr(&priority), sizeof(int)) {
+	priority := i32(params.priority)
+	if !usercopy.copy_to_user(param, voidptr(&priority), sizeof(i32)) {
 		return errno.err, errno.efault
 	}
 	return 0, 0
@@ -166,10 +167,11 @@ fn syscall_linux_sched_setparam(_ voidptr, pid int, param u64) (u64, u64) {
 	tid := sched_target_tid(pid) or { return errno.err, sched_target_errno(pid) }
 	mut params := proc.thread_sched_params(tid) or { return errno.err, errno.esrch }
 
-	mut priority := int(0)
-	if !usercopy.copy_from_user(voidptr(&priority), param, sizeof(int)) {
+	mut priority32 := i32(0)
+	if !usercopy.copy_from_user(voidptr(&priority32), param, sizeof(i32)) {
 		return errno.err, errno.efault
 	}
+	priority := int(priority32)
 
 	// A deadline thread's parameters have to be checked against each other and
 	// against the machine, which is sched_setattr(2)'s job and not this call's.
@@ -227,7 +229,7 @@ mut:
 	size           u32
 	sched_policy   u32
 	sched_flags    u64
-	sched_nice     int
+	sched_nice     i32
 	sched_priority u32
 	sched_runtime  u64
 	sched_deadline u64
@@ -323,7 +325,7 @@ fn syscall_linux_sched_setattr(_ voidptr, pid int, attr_ptr u64, flags u32) (u64
 		if target != unsafe { nil } && unsafe { target.process != nil } {
 			if attr.sched_nice >= target.process.nice
 				|| proc.current_thread().process.euid == 0 {
-				target.process.nice = attr.sched_nice
+				target.process.nice = int(attr.sched_nice)
 			}
 		}
 	}
@@ -353,7 +355,7 @@ fn syscall_linux_sched_getattr(_ voidptr, pid int, attr_ptr u64, size u32, flags
 	mut attr := SchedAttr{
 		size: u32(sizeof(SchedAttr))
 		sched_policy: u32(params.policy)
-		sched_nice: nice
+		sched_nice: i32(nice)
 		sched_priority: u32(params.priority)
 		sched_runtime: params.dl_runtime
 		sched_deadline: params.dl_deadline

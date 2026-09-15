@@ -14,8 +14,8 @@ const cmsg_align = u64(8)
 
 struct CMsgHdr {
 	cmsg_len   u64
-	cmsg_level int
-	cmsg_type  int
+	cmsg_level i32
+	cmsg_type  i32
 }
 
 fn release_passed_fds(mut fds []&file.FD) {
@@ -63,16 +63,16 @@ fn collect_passed_fds(msg &sock_pub.MsgHdr) ?[]&file.FD {
 		}
 
 		if header.cmsg_type != sock_pub.scm_rights
-			|| (header.cmsg_len - cmsg_header_size) % sizeof(int) != 0 {
+			|| (header.cmsg_len - cmsg_header_size) % sizeof(i32) != 0 {
 			release_passed_fds(mut result)
 			errno.set(errno.einval)
 			return none
 		}
 
-		fd_count := (header.cmsg_len - cmsg_header_size) / sizeof(int)
+		fd_count := (header.cmsg_len - cmsg_header_size) / sizeof(i32)
 		for i := u64(0); i < fd_count; i++ {
-			fdnum := unsafe { *(&int(voidptr(u64(header) + cmsg_header_size + i * sizeof(int)))) }
-			mut source := file.fd_from_fdnum(unsafe { nil }, fdnum) or {
+			fdnum := unsafe { *(&i32(voidptr(u64(header) + cmsg_header_size + i * sizeof(i32)))) }
+			mut source := file.fd_from_fdnum(unsafe { nil }, int(fdnum)) or {
 				release_passed_fds(mut result)
 				return none
 			}
@@ -590,14 +590,15 @@ pub fn syscall_getsockopt(_ voidptr, fdnum int, level int, optname int, optval u
 		}
 		return errno.err, errno.enoprotoopt
 	}
-	if capacity < sizeof(int) {
+	if capacity < sizeof(i32) {
 		return errno.err, errno.einval
 	}
 
 	value := sock.getsockopt(fd.handle, level, optname) or { return errno.err, errno.get() }
 
-	written := u32(sizeof(int))
-	if !usercopy.copy_to_user(optval, voidptr(&value), sizeof(int)) {
+	written := u32(sizeof(i32))
+	value32 := i32(value)
+	if !usercopy.copy_to_user(optval, voidptr(&value32), sizeof(i32)) {
 		return errno.err, errno.efault
 	}
 	if !usercopy.copy_to_user(optlen, voidptr(&written), sizeof(u32)) {
@@ -616,16 +617,16 @@ pub fn syscall_setsockopt(_ voidptr, fdnum int, level int, optname int, optval u
 
 	// SO_LINGER and the timeout options carry a struct; take the leading int,
 	// which is all any of the options handled here look at.
-	mut value := int(0)
-	if optval != 0 && optlen >= u32(sizeof(int)) {
-		if !usercopy.copy_from_user(voidptr(&value), optval, sizeof(int)) {
+	mut value32 := i32(0)
+	if optval != 0 && optlen >= u32(sizeof(i32)) {
+		if !usercopy.copy_from_user(voidptr(&value32), optval, sizeof(i32)) {
 			return errno.err, errno.efault
 		}
 	} else if optval == 0 && optlen != 0 {
 		return errno.err, errno.efault
 	}
 
-	sock.setsockopt(fd.handle, level, optname, value) or { return errno.err, errno.get() }
+	sock.setsockopt(fd.handle, level, optname, int(value32)) or { return errno.err, errno.get() }
 
 	return 0, 0
 }

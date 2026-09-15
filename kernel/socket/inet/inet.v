@@ -37,7 +37,7 @@ fn C.vinix_socket_ready(socket &C.vinix_socket) int
 fn C.vinix_socket_error(socket &C.vinix_socket, clear int) int
 fn C.vinix_socket_available(socket &C.vinix_socket) int
 fn C.vinix_socket_set_option(socket &C.vinix_socket, level int, option int, value int) int
-fn C.vinix_socket_get_option(socket &C.vinix_socket, level int, option int, value &int) int
+fn C.vinix_socket_get_option(socket &C.vinix_socket, level int, option int, value &i32) int
 
 const max_sockets = 256
 const ready_read = 1
@@ -643,20 +643,20 @@ fn (mut this InetSocket) getsockopt(_handle voidptr, level int, optname int) ?in
 			else {}
 		}
 	} else if level == ipproto_ip && optname in [ip_tos, ip_ttl] {
-		mut value := int(0)
+		mut value := i32(0)
 		net_lock.acquire()
 		ret := C.vinix_socket_get_option(this.handle, level, optname, &value)
 		net_lock.release()
 		if ret == 0 {
-			return value
+			return int(value)
 		}
 	} else if level == ipproto_tcp && optname == tcp_nodelay && this.socktype == sock_pub.sock_stream {
-		mut value := int(0)
+		mut value := i32(0)
 		net_lock.acquire()
 		ret := C.vinix_socket_get_option(this.handle, level, optname, &value)
 		net_lock.release()
 		if ret == 0 {
-			return value
+			return int(value)
 		}
 	}
 	errno.set(errno.enoprotoopt)
@@ -711,7 +711,7 @@ fn (mut this InetSocket) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 		net_lock.acquire()
 		value := C.vinix_socket_available(this.handle)
 		net_lock.release()
-		unsafe { *&int(argp) = value }
+		unsafe { *&i32(argp) = i32(value) }
 		return 0
 	}
 	return resource.default_ioctl(handle, request, argp)

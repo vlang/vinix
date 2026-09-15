@@ -244,7 +244,7 @@ fn syscall_linux_rt_sigprocmask(gpr_state voidptr, how int, set_ptr u64, oldset_
 	return userland.syscall_sigprocmask(gpr_state, how, set_arg, oldset_arg)
 }
 
-fn syscall_linux_wait4(gpr_state voidptr, pid int, status &int, options int, _rusage u64) (u64, u64) {
+fn syscall_linux_wait4(gpr_state voidptr, pid int, status &i32, options int, _rusage u64) (u64, u64) {
 	return userland.syscall_waitpid(gpr_state, pid, status, options)
 }
 

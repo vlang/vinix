@@ -622,9 +622,9 @@ fn ioctl_version(dev &DrmDevice, data voidptr) int {
 		|| !copy_version_field(version.desc, desc_capacity, dev.driver.desc) {
 		return -14
 	}
-	version.version_major = dev.driver.major
-	version.version_minor = dev.driver.minor
-	version.version_patchlevel = dev.driver.patchlevel
+	version.version_major = i32(dev.driver.major)
+	version.version_minor = i32(dev.driver.minor)
+	version.version_patchlevel = i32(dev.driver.patchlevel)
 	version.name_len = u64(dev.driver.name.len)
 	version.date_len = 8
 	version.desc_len = u64(dev.driver.desc.len)

@@ -67,7 +67,7 @@ fn (mut this Pointer) read(_handle voidptr, buf voidptr, _loc u64, count u64) ?i
 
 	this.l.acquire()
 
-	mut apple := [8]int{}
+	mut apple := [8]i32{}
 	mut packet := PointerPacket{}
 	if spi_keyboard.read_pointer(&apple[0]) {
 		packet = PointerPacket{

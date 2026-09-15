@@ -5,6 +5,7 @@
 #define _GNU_SOURCE
 #include <errno.h>
 #include <fcntl.h>
+#include <poll.h>
 #include <sched.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -21,6 +22,7 @@
 #include <sys/socket.h>
 #include <sys/statfs.h>
 #include <sys/sysinfo.h>
+#include <sys/syscall.h>
 #include <sys/uio.h>
 #include <sys/un.h>
 #include <sys/wait.h>
@@ -567,6 +569,44 @@ static int test_anonymous_descriptor_access(void)
 	return 0;
 }
 
+/* V3 makes the V `int` type pointer-width. Linux still defines pollfd.fd as a
+ * 32-bit C int, so exercise the structure from a real libc caller: widening
+ * the kernel field makes it combine fd/events into one invalid descriptor. */
+static int test_pollfd_abi(void)
+{
+	int pair[2];
+	CHECK(pipe(pair) == 0);
+	struct pollfd descriptor = {
+		.fd = pair[0],
+		.events = POLLIN,
+	};
+	CHECK(poll(&descriptor, 1, 0) == 0);
+	CHECK(descriptor.revents == 0);
+	CHECK(write(pair[1], "p", 1) == 1);
+	CHECK(poll(&descriptor, 1, 1000) == 1);
+	CHECK((descriptor.revents & POLLIN) != 0);
+	char byte = 0;
+	CHECK(read(pair[0], &byte, 1) == 1);
+	CHECK(byte == 'p');
+	CHECK(close(pair[0]) == 0);
+	CHECK(close(pair[1]) == 0);
+	puts("QEMU CORE PASS: Linux pollfd ABI");
+	return 0;
+}
+
+/* The AArch64 syscall ABI leaves the unused high half of C-int arguments
+ * unspecified. qemu-user zero-extends AT_FDCWD while translating x86 open(2),
+ * and the kernel must truncate it before interpreting the signed value. */
+static int test_syscall_int_truncation(void)
+{
+	long descriptor = syscall(SYS_openat, UINT64_C(0x00000000ffffff9c), ".",
+	    O_RDONLY, 0);
+	CHECK(descriptor >= 0);
+	CHECK(close((int)descriptor) == 0);
+	puts("QEMU CORE PASS: syscall C-int truncation");
+	return 0;
+}
+
 /* An abstract socket name belongs to the socket that bound it, and has to come
  * back when that socket goes. Leaking it reserved the name for the life of the
  * machine: an X server that had been restarted could not bind its own display
@@ -628,6 +668,8 @@ static int run_tests(void)
 	CHECK(test_scheduler_and_accounting() == 0);
 	CHECK(test_posix_timer_thread_notification() == 0);
 	CHECK(test_anonymous_descriptor_access() == 0);
+	CHECK(test_pollfd_abi() == 0);
+	CHECK(test_syscall_int_truncation() == 0);
 	CHECK(test_abstract_socket_reuse() == 0);
 	CHECK(unlink(file_a) == 0);
 	CHECK(unlink(file_b) == 0);

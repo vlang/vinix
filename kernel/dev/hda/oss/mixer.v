@@ -16,44 +16,44 @@ const ctl_mixerinfo = u64(0xc470580a)
 
 struct OssMixerInfo {
 pub mut:
-	dev            int
+	dev            i32
 	id             [16]char
 	name           [32]char
-	modify_counter int
-	card_number    int
-	port_number    int
+	modify_counter i32
+	card_number    i32
+	port_number    i32
 	handle         [32]char
-	magic          int
-	enabled        int
-	caps           int
-	flags          int
-	nrext          int
-	priority       int
+	magic          i32
+	enabled        i32
+	caps           i32
+	flags          i32
+	nrext          i32
+	priority       i32
 	devnode        [32]char
-	legacy_device  int
-	filler         [245]int
+	legacy_device  i32
+	filler         [245]i32
 }
 
 struct OssMixExt {
 pub mut:
-	dev            int
-	ctrl           int
-	entry_type     int
-	max_value      int
-	min_value      int
-	flags          int
+	dev            i32
+	ctrl           i32
+	entry_type     i32
+	max_value      i32
+	min_value      i32
+	flags          i32
 	id             [16]char
-	parent         int
-	dummy          int
-	timestamp      int
+	parent         i32
+	dummy          i32
+	timestamp      i32
 	data           [64]char
 	enum_present   [32]u8
-	control_no     int
+	control_no     i32
 	desc           u32
 	ext_name       [32]char
-	update_counter int
-	rgb_color      int
-	filler         [6]int
+	update_counter i32
+	rgb_color      i32
+	filler         [6]i32
 }
 
 const mixt_devroot = 0
@@ -108,12 +108,12 @@ pub mut:
 
 struct OssMixerValue {
 pub mut:
-	dev       int
-	ctrl      int
-	value     int
-	flags     int
-	timestamp int
-	filler    [8]int
+	dev       i32
+	ctrl      i32
+	value     i32
+	flags     i32
+	timestamp i32
+	filler    [8]i32
 }
 
 pub struct OssMixerDevice {
@@ -169,7 +169,7 @@ fn (mut dev OssMixerDevice) ioctl(handle voidptr, request u64, argp voidptr) ?in
 			mut value := unsafe { &OssMixerValue(argp) }
 			match value.ctrl {
 				2 {
-					value.value = dev.current_volume
+					value.value = i32(dev.current_volume)
 					return 0
 				}
 				else {
@@ -182,10 +182,10 @@ fn (mut dev OssMixerDevice) ioctl(handle voidptr, request u64, argp voidptr) ?in
 			mut value := unsafe { &OssMixerValue(argp) }
 			match value.ctrl {
 				2 {
-					dev.current_volume = value.value
+					dev.current_volume = int(value.value)
 					dev.modify_counter += 1
 					mut stream := dev.main_device.device.get_output_stream()
-					stream.change_volume(value.value)
+					stream.change_volume(int(value.value))
 					return 0
 				}
 				else {
@@ -244,14 +244,14 @@ fn (mut dev OssMixerDevice) ioctl(handle voidptr, request u64, argp voidptr) ?in
 				C.memcpy(&info.name, name.str, name.len + 1)
 				C.memcpy(&info.devnode, dev_name.str, dev_name.len + 1)
 			}
-			info.modify_counter = dev.modify_counter
+			info.modify_counter = i32(dev.modify_counter)
 			info.card_number = -1
 			info.port_number = 0
 			info.enabled = 1
 			info.caps = 0
 			info.nrext = 3
 			info.priority = 1
-			info.legacy_device = dev.index
+			info.legacy_device = i32(dev.index)
 			return 0
 		}
 		else {

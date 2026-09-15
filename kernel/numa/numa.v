@@ -622,8 +622,8 @@ pub fn syscall_get_mempolicy(_ voidptr, mode_ptr u64, nodemask u64, maxnode u64,
 	}
 
 	if mode_ptr != 0 {
-		value := int(reported_mode)
-		if !usercopy.copy_to_user(mode_ptr, voidptr(&value), sizeof(int)) {
+		value := i32(reported_mode)
+		if !usercopy.copy_to_user(mode_ptr, voidptr(&value), sizeof(i32)) {
 			return errno.err, errno.efault
 		}
 	}

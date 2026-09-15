@@ -110,7 +110,7 @@ pub fn wake(virt u64) u64 {
 	return event.trigger(mut e, true)
 }
 
-pub fn syscall_futex_wait(_ voidptr, ptr &int, expected int) (u64, u64) {
+pub fn syscall_futex_wait(_ voidptr, ptr &i32, expected int) (u64, u64) {
 	mut current_thread := proc.current_thread()
 	mut process := current_thread.process
 
@@ -123,7 +123,7 @@ pub fn syscall_futex_wait(_ voidptr, ptr &int, expected int) (u64, u64) {
 	return wait(u64(ptr), expected)
 }
 
-pub fn syscall_futex_wake(_ voidptr, ptr &int) (u64, u64) {
+pub fn syscall_futex_wake(_ voidptr, ptr &i32) (u64, u64) {
 	mut current_thread := proc.current_thread()
 	mut process := current_thread.process
 

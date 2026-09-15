@@ -124,7 +124,7 @@ fn (mut this AnsBlock) ioctl(_handle voidptr, request u64, argp voidptr) ?int {
 	// Linux block geometry queries only. No NVMe admin/I/O passthrough or BLKROSET.
 	match request {
 		0x1268 { // BLKSSZGET
-			value := int(this.stat.blksize)
+			value := i32(this.stat.blksize)
 			unsafe { C.memcpy(argp, &value, sizeof(value)) }
 		}
 		0x80081272 { // BLKGETSIZE64: size of THIS namespace/partition view
@@ -139,7 +139,7 @@ fn (mut this AnsBlock) ioctl(_handle voidptr, request u64, argp voidptr) ?int {
 			ans_lock.acquire()
 			writable := this.partition >= 0 && C.vinix_ans_partition_writable(this.ns_index, u32(this.partition)) != 0
 			ans_lock.release()
-			value := if writable { int(0) } else { int(1) }
+			value := i32(if writable { 0 } else { 1 })
 			unsafe { C.memcpy(argp, &value, sizeof(value)) }
 		}
 		else {

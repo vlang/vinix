@@ -69,9 +69,9 @@ pub mut:
 
 pub struct DrmVersion {
 pub mut:
-	version_major      int
-	version_minor      int
-	version_patchlevel int
+	version_major      i32
+	version_minor      i32
+	version_patchlevel i32
 	name_len           u64
 	name               u64
 	date_len           u64

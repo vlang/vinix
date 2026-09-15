@@ -60,14 +60,14 @@ pub mut:
 // framebuffer applications do not need a legacy x86 input path of their own.
 struct PointerPacket {
 mut:
-	x        int
-	y        int
-	max_x    int
-	max_y    int
+	x        i32
+	y        i32
+	max_x    i32
+	max_y    i32
 	buttons  u32
 	pressed  u32
 	released u32
-	scroll   int
+	scroll   i32
 }
 
 struct Pointer {
@@ -117,10 +117,10 @@ fn (mut this Pointer) read(_handle voidptr, buf voidptr, _loc u64, count u64) ?i
 	this.l.acquire()
 	mouse_res.l.acquire()
 	packet := PointerPacket{
-		x: mouse_res.pointer_x
-		y: mouse_res.pointer_y
-		max_x: mouse_res.pointer_max_x
-		max_y: mouse_res.pointer_max_y
+		x: i32(mouse_res.pointer_x)
+		y: i32(mouse_res.pointer_y)
+		max_x: i32(mouse_res.pointer_max_x)
+		max_y: i32(mouse_res.pointer_max_y)
 		buttons: mouse_res.pointer_buttons
 		pressed: mouse_res.pointer_pressed
 		released: mouse_res.pointer_released

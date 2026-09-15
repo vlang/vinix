@@ -420,8 +420,8 @@ fn syscall_linux_prctl(_ voidptr, option int, arg2 u64, _arg3 u64, _arg4 u64, _a
 			return 0, 0
 		}
 		pr_get_pdeathsig, pr_get_no_new_privs {
-			value := int(0)
-			if !usercopy.copy_to_user(arg2, voidptr(&value), sizeof(int)) {
+			value := i32(0)
+			if !usercopy.copy_to_user(arg2, voidptr(&value), sizeof(i32)) {
 				return errno.err, errno.efault
 			}
 			return 0, 0
@@ -981,7 +981,7 @@ pub fn init_syscall_table() {
 	syscall_table[53] = voidptr(fs.syscall_fchmodat) // __NR_fchmodat
 	syscall_table[54] = voidptr(fs.syscall_fchownat) // __NR_fchownat
 	syscall_table[55] = voidptr(fs.syscall_fchown) // __NR_fchown
-	syscall_table[56] = voidptr(fs.syscall_openat) // __NR_openat
+	syscall_table[56] = voidptr(syscall_linux_openat) // __NR_openat
 	syscall_table[57] = voidptr(fs.syscall_close) // __NR_close
 	syscall_table[59] = voidptr(pipe.syscall_pipe) // __NR_pipe2
 	syscall_table[61] = voidptr(syscall_linux_getdents64) // __NR_getdents64

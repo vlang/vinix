@@ -71,8 +71,8 @@ pub fn syscall_gettimeofday(_ voidptr, tv u64, tz u64) (u64, u64) {
 	}
 
 	if tz != 0 {
-		mut zone := [2]int{}
-		if !usercopy.copy_to_user(tz, voidptr(&zone[0]), sizeof(int) * 2) {
+		mut zone := [2]i32{}
+		if !usercopy.copy_to_user(tz, voidptr(&zone[0]), sizeof(i32) * 2) {
 			return errno.err, errno.efault
 		}
 	}

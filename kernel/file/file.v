@@ -38,7 +38,7 @@ mut:
 	l_whence i16
 	l_start  i64
 	l_len    i64
-	l_pid    int
+	l_pid    i32
 }
 
 pub const fd_cloexec = 1
@@ -88,7 +88,10 @@ fn release_mmap_handle(handle voidptr) {
 
 struct PollFD {
 mut:
-	fd      int
+	// Linux and mlibc expose pollfd.fd as a signed 32-bit C int. V3's plain
+	// `int` is pointer-width, so spelling this field explicitly keeps the
+	// userspace ABI at its required eight-byte layout on 64-bit kernels.
+	fd      i32
 	events  i16
 	revents i16
 }
@@ -150,7 +153,7 @@ fn ppoll(fds &PollFD, nfds u64, tmo_p &time.TimeSpec, sigmask &u64) (u64, u64) {
 			continue
 		}
 
-		mut fd := fd_from_fdnum(unsafe { nil }, fdd.fd) or {
+		mut fd := fd_from_fdnum(unsafe { nil }, int(fdd.fd)) or {
 			fdd.revents = pollnval
 			ret++
 			continue

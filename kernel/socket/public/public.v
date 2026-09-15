@@ -87,7 +87,7 @@ pub const so_protocol = 38
 // client with this record before it creates the wl_client.
 pub struct UCred {
 pub:
-	pid int
+	pid i32
 	uid u32
 	gid u32
 }
@@ -129,5 +129,5 @@ pub mut:
 	msg_iovlen     u64
 	msg_control    voidptr
 	msg_controllen u64
-	msg_flags      int
+	msg_flags      i32
 }

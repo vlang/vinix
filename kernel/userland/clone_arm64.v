@@ -89,14 +89,14 @@ mut:
 // The SIGCHLD arm of siginfo_t, padded to the full 128-byte structure.
 struct SigInfoChld {
 mut:
-	si_signo  int
-	si_errno  int
-	si_code   int
-	pad0      int
-	si_pid    int
+	si_signo  i32
+	si_errno  i32
+	si_code   i32
+	pad0      i32
+	si_pid    i32
 	si_uid    u32
-	si_status int
-	pad1      int
+	si_status i32
+	pad1      i32
 	si_utime  i64
 	si_stime  i64
 	pad       [80]u8
@@ -728,10 +728,10 @@ pub fn syscall_wait4(_ voidptr, pid int, status_ptr u64, options int, rusage_ptr
 		return 0, 0
 	}
 
-	status := child.status
+	status := i32(child.status)
 	reaped := child.pid
 
-	if status_ptr != 0 && !usercopy.copy_to_user(status_ptr, voidptr(&status), sizeof(int)) {
+	if status_ptr != 0 && !usercopy.copy_to_user(status_ptr, voidptr(&status), sizeof(i32)) {
 		return errno.err, put_back(mut child)
 	}
 	if !write_child_rusage(rusage_ptr, child) {
@@ -792,14 +792,14 @@ pub fn syscall_waitid(_ voidptr, idtype int, id u64, infop u64, options int, rus
 
 	status := child.status
 	mut info := SigInfoChld{
-		si_signo:  sigchld
-		si_code:   cld_exited
-		si_pid:    child.pid
-		si_status: (status >> 8) & 0xff
+		si_signo:  i32(sigchld)
+		si_code:   i32(cld_exited)
+		si_pid:    i32(child.pid)
+		si_status: i32((status >> 8) & 0xff)
 	}
 	if status & 0x7f != 0 {
-		info.si_code = cld_killed
-		info.si_status = status & 0x7f
+		info.si_code = i32(cld_killed)
+		info.si_status = i32(status & 0x7f)
 	}
 
 	if infop != 0 && !usercopy.copy_to_user(infop, voidptr(&info), sizeof(SigInfoChld)) {
