@@ -121,6 +121,7 @@ fi
 # resolves the same compiler after this runner invokes it.
 if [ "$BUILD_KERNEL" -eq 1 ] || [ "$BUILD_DESKTOP" -eq 1 ]; then
     . "$SCRIPT_DIR/build-support/find-v.sh"
+    echo "==> V compiler: $V ($("$V" -version 2>/dev/null || echo unknown version))"
 fi
 
 # ── The kernel ──
