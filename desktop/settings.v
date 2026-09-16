@@ -3,42 +3,11 @@
 // What the desktop looks like and how its chrome behaves, and the two themes
 // it can wear.
 //
-// Everything the Settings application changes lives here. The window manager
+// The preference model lives in settings_model.v. The window manager
 // reads `Desktop.settings` for behaviour and `Desktop.theme()` for colour, so
 // a preference takes effect on the next frame without anything being rebuilt
 // or reopened — the tree is composed from scratch each time anyway.
 module main
-
-// Which end of the title bar the close, zoom and minimise buttons sit at.
-// Right is what Windows does; left is what macOS does.
-enum ButtonSide {
-	right
-	left
-}
-
-// How the taskbar lists what is open. `standard` gives every window its own
-// entry, the way Windows XP did. `combined` gives each application one entry
-// however many windows it has, the way Windows 7 did.
-enum TaskbarMode {
-	standard
-	combined
-}
-
-enum ThemeKind {
-	default_
-	macos
-}
-
-struct Settings {
-mut:
-	button_side  ButtonSide
-	taskbar_mode TaskbarMode
-	theme        ThemeKind
-	// Index into wallpaper_colors, used when no image is chosen.
-	wallpaper_color int
-	// Index into the wallpaper images, or -1 for the colour above.
-	wallpaper_image int = -1
-}
 
 // ── Themes ─────────────────────────────────────────────────────────
 
@@ -61,15 +30,18 @@ struct Theme {
 	window_radius int
 	shadow_alpha  u32
 	// Title bar
-	title_height        int
-	title_active_bg     u32
-	title_inactive_bg   u32
-	title_divider       u32
-	title_text_active   u32
-	title_text_inactive u32
-	title_centered      bool
-	title_bold          bool
-	title_size          int
+	title_height             int
+	title_active_bg          u32
+	title_inactive_bg        u32
+	title_highlight          u32
+	title_inactive_highlight u32
+	title_divider            u32
+	title_inactive_divider   u32
+	title_text_active        u32
+	title_text_inactive      u32
+	title_centered           bool
+	title_bold               bool
+	title_size               int
 	// A second colour for the title bar, blended down its height. A theme that
 	// wants a flat bar names the same colour twice.
 	title_active_bg2   u32
@@ -87,10 +59,17 @@ struct Theme {
 	glyph_on_close     u32
 	// The three discs, in close/minimise/zoom order, and the grey they all go
 	// when the window is not the focused one.
-	traffic_close    u32
-	traffic_minimize u32
-	traffic_zoom     u32
-	traffic_idle     u32
+	traffic_close          u32
+	traffic_minimize       u32
+	traffic_zoom           u32
+	traffic_idle           u32
+	traffic_close_edge     u32
+	traffic_minimize_edge  u32
+	traffic_zoom_edge      u32
+	traffic_idle_edge      u32
+	traffic_close_glyph    u32
+	traffic_minimize_glyph u32
+	traffic_zoom_glyph     u32
 	// The bar along the bottom: full width like a taskbar, or a centred rounded
 	// panel like a dock.
 	dock         bool
@@ -124,9 +103,12 @@ const theme_default = Theme{
 	title_height: 34
 	title_active_bg: 0xffffff
 	title_inactive_bg: 0xf1f3f6
+	title_highlight: 0
+	title_inactive_highlight: 0
 	title_active_bg2: 0xffffff
 	title_inactive_bg2: 0xf1f3f6
 	title_divider: 0xe4e8ee
+	title_inactive_divider: 0xe4e8ee
 	title_text_active: 0x18202f
 	title_text_inactive: 0x99a2b1
 	title_centered: false
@@ -146,6 +128,13 @@ const theme_default = Theme{
 	traffic_minimize: 0xfebc2e
 	traffic_zoom: 0x28c840
 	traffic_idle: 0xd6d6d6
+	traffic_close_edge: 0xb9c2d0
+	traffic_minimize_edge: 0xb9c2d0
+	traffic_zoom_edge: 0xb9c2d0
+	traffic_idle_edge: 0xb9c2d0
+	traffic_close_glyph: 0x3b465a
+	traffic_minimize_glyph: 0x3b465a
+	traffic_zoom_glyph: 0x3b465a
 	dock: false
 	dock_bg: 0xd8dce4
 	dock_radius: 12
@@ -165,22 +154,26 @@ const theme_default = Theme{
 	shortcut_panel: 0x141d33
 }
 
-// macOS as it looked from Yosemite through Mojave: light grey window chrome
-// with the title centred over it, three coloured discs at the leading edge,
-// and a dock rather than a taskbar.
+// macOS Catalina 10.15.7: the measurements and colours below come from a
+// native 1x AppKit window in Apple's 19H2 recovery system. The one-pixel top
+// highlight is separate from the 20-step title gradient, just as it is in the
+// reference window.
 const theme_macos = Theme{
 	name: 'macOS'
-	window_body: 0xffffff
+	window_body: 0xececec
 	window_edge: 0x9a9a9a
 	window_radius: 6
 	shadow_alpha: 120
-	title_height: 24
-	title_active_bg: 0xeaeaea
-	title_active_bg2: 0xd8d8d8
+	title_height: 22
+	title_active_bg: 0xe4e4e4
+	title_active_bg2: 0xd1d1d1
 	title_inactive_bg: 0xf6f6f6
-	title_inactive_bg2: 0xf0f0f0
-	title_divider: 0xb4b4b4
-	title_text_active: 0x3a3a3c
+	title_inactive_bg2: 0xf6f6f6
+	title_highlight: 0xf3f3f3
+	title_inactive_highlight: 0xfbfbfb
+	title_divider: 0xababab
+	title_inactive_divider: 0xd1d1d1
+	title_text_active: 0x333333
 	title_text_inactive: 0xa8a8a8
 	title_centered: true
 	title_bold: true
@@ -196,9 +189,16 @@ const theme_macos = Theme{
 	glyph_color: 0x4d0000
 	glyph_on_close: 0x4d0000
 	traffic_close: 0xff5f57
-	traffic_minimize: 0xfebc2e
-	traffic_zoom: 0x28c840
-	traffic_idle: 0xd6d6d6
+	traffic_minimize: 0xffbd2e
+	traffic_zoom: 0x28c940
+	traffic_idle: 0xdcdcdc
+	traffic_close_edge: 0xe0463e
+	traffic_minimize_edge: 0xdea123
+	traffic_zoom_edge: 0x1aab29
+	traffic_idle_edge: 0xd1d1d1
+	traffic_close_glyph: 0x4d0000
+	traffic_minimize_glyph: 0x995700
+	traffic_zoom_glyph: 0x006500
 	dock: true
 	dock_bg: 0xe8e8ea
 	dock_radius: 12
@@ -224,23 +224,3 @@ fn (d &Desktop) theme() Theme {
 		.macos { theme_macos }
 	}
 }
-
-// ── Wallpaper ──────────────────────────────────────────────────────
-
-// WallpaperColor is a flat backdrop. Each is a pair, because the desktop
-// paints a vertical gradient; a colour that wants to be flat names itself
-// twice.
-struct WallpaperColor {
-	name   string
-	top    u32
-	bottom u32
-}
-
-const wallpaper_colors = [
-	WallpaperColor{'Midnight', 0x141d33, 0x3c5a86},
-	WallpaperColor{'Slate', 0x2b3038, 0x4d545e},
-	WallpaperColor{'Forest', 0x11301f, 0x2f6b46},
-	WallpaperColor{'Plum', 0x2a1533, 0x5d3a70},
-	WallpaperColor{'Ember', 0x33190f, 0x8a4426},
-	WallpaperColor{'Graphite', 0x6e6e73, 0x6e6e73},
-]

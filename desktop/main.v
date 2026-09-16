@@ -71,7 +71,7 @@ fn parse_options(args []string) Options {
 			options = Options{
 				...options
 				frame_interval: interval
-				idle_interval: interval
+				idle_interval:  interval
 			}
 		} else if arg.starts_with('--open=') {
 			mut titles := options.open.clone()
@@ -126,10 +126,12 @@ fn main() {
 		fb.close()
 	}
 
-	scale := desktop_configure_scale(fb.width, fb.height)
+	mut preferences := desktop_load_preferences(desktop_home)
+	scale := preferences.configure_scale(fb.width, fb.height)
 	mut desktop := Desktop{
-		canvas: new_canvas(desktop_scaled_extent(fb.width, scale), desktop_scaled_extent(fb.height, scale))
-		fonts: load_fonts()
+		settings:          preferences.settings
+		canvas:            new_scaled_canvas(desktop_scaled_extent(fb.width, scale), desktop_scaled_extent(fb.height, scale), fb.width, fb.height, scale)
+		fonts:             load_fonts()
 		tz_offset_seconds: options.tz_offset
 	}
 
@@ -150,10 +152,14 @@ fn main() {
 	// An opening arrangement, kept clear of the shortcut column down the left
 	// edge. The calculator is not opened: it remains available from its shortcut
 	// and the Start menu, and three windows is enough to show what the taskbar is for.
+	mut launch_default_files := false
 	if options.open.len == 0 {
 		desktop.spawn('Welcome', .welcome, 150, 60, 396, 244)
 		desktop.spawn('System', .system, 580, 60, 372, 232)
-		desktop.launch_titled('Files')
+		// Files is a separate process. Paint the compositor-owned windows first,
+		// so a delayed application handshake cannot leave the firmware console
+		// looking like the desktop failed to start.
+		launch_default_files = true
 	} else {
 		for title in options.open {
 			desktop.launch_titled(title)
@@ -172,10 +178,21 @@ fn main() {
 
 		desktop.update_taskbar_clock()
 		desktop.poll_apps()
-		titlebar_click = desktop.pump_pointer(mut pointer, desktop.canvas.width, desktop.canvas.height,
-			titlebar_click)
+		// Keep a drag's pointer-only damage separate from independent changes
+		// (a clock tick, an app frame, keyboard input, etc.). A partial compose
+		// is valid only when the pointer is the sole source of new pixels.
+		background_dirty := desktop.dirty
+		desktop.dirty = false
+		titlebar_click = desktop.pump_pointer(mut pointer, desktop.canvas.width,
+			desktop.canvas.height, titlebar_click)
+		pointer_dirty := desktop.dirty
+		desktop.dirty = false
 		desktop.pump_keyboard(mut keyboard)
+		keyboard_dirty := desktop.dirty
+		desktop.dirty = false
 		desktop.capture_tick()
+		capture_dirty := desktop.dirty
+		desktop.dirty = false
 		// Xorg, unlike a native ui2 application, needs the physical display and
 		// input devices. Stop the compositor at a frame boundary, restore the
 		// console, and reopen everything after the external application exits.
@@ -200,8 +217,15 @@ fn main() {
 		}
 		// Settings only requests a new scale. Apply it after all input from this
 		// frame and before layout so drawing and hit targets share one space.
+		previous_scale := desktop_current_scale()
 		desktop.apply_requested_scale()
+		if !preferences.save_changes(desktop.settings, previous_scale, desktop_home) {
+			eprintln('vinix-desktop: could not save desktop settings; changes may reset on restart')
+		}
 		desktop.update_switcher()
+		other_dirty := desktop.dirty
+		desktop.dirty = background_dirty || pointer_dirty || keyboard_dirty || capture_dirty
+			|| other_dirty
 		after_input := monotonic_millis()
 
 		// Nothing has changed: the framebuffer already holds the right
@@ -222,14 +246,30 @@ fn main() {
 		tree := desktop.build_tree()
 		after_build := monotonic_millis()
 
-		desktop.render(tree)
+		partial_drag_frame := desktop.drag.kind == .move && desktop.drag_damage.valid
+			&& pointer_dirty && !background_dirty && !keyboard_dirty && !capture_dirty && !other_dirty
+		if partial_drag_frame {
+			desktop.render_drag_damage(tree, desktop.drag_damage)
+		} else {
+			desktop.render(tree)
+		}
 		after_render := monotonic_millis()
 
-		fb.present(&desktop.canvas, desktop_current_scale())
+		if partial_drag_frame {
+			fb.present_damage(&desktop.canvas, desktop.drag_damage)
+		} else {
+			fb.present(&desktop.canvas, desktop_current_scale())
+		}
 		desktop.capture_presented(&desktop.canvas)
 		after_present := monotonic_millis()
+		desktop.drag_damage = DamageRect{}
 
 		free_tree(tree)
+
+		if launch_default_files {
+			launch_default_files = false
+			desktop.launch_titled('Files')
+		}
 
 		sleep_to_next_frame(frame_started, options.frame_interval)
 

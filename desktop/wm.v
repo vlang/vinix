@@ -35,6 +35,18 @@ mut:
 	offset_y int
 }
 
+// DamageRect describes the part of the composed canvas that differs from the
+// last presented frame. It stays in logical coordinates; Canvas and
+// Framebuffer each map it to their physical pixels.
+struct DamageRect {
+mut:
+	x     int
+	y     int
+	w     int
+	h     int
+	valid bool
+}
+
 struct Desktop {
 mut:
 	canvas  Canvas
@@ -63,6 +75,9 @@ mut:
 	// idle desktop then costs almost nothing, and — with no garbage collector
 	// on this target — stops rebuilding a tree it would only throw away.
 	dirty bool = true
+	// A moving top-level window can reuse the last complete canvas. Motion
+	// accumulates its old and new bounds here until the next frame consumes it.
+	drag_damage DamageRect
 	// The taskbar clock owns its text so unchanged seconds do not allocate. It
 	// occupies a fixed logical status area, which the framebuffer presenter
 	// scales together with every other desktop coordinate.
@@ -329,7 +344,13 @@ fn (mut d Desktop) window_element(window_index int) ui2.Element {
 	set_hovered := d.hover == window.id_close || d.hover == window.id_minimize
 		|| d.hover == window.id_maximize
 
-	maximize_glyph := if window.maximized { 'builtin:restore' } else { 'builtin:maximize' }
+	maximize_glyph := if theme.button_look == .traffic {
+		// Catalina calls this the zoom control. Its mark stays a plus while the
+		// standard window frame toggles between its two sizes.
+		'builtin:zoom'
+	} else {
+		if window.maximized { 'builtin:restore' } else { 'builtin:maximize' }
+	}
 
 	// Traffic lights are read as a group, and red-yellow-green left to right is
 	// the whole of what makes them recognisable — so they keep that order at
@@ -349,13 +370,20 @@ fn (mut d Desktop) window_element(window_index int) ui2.Element {
 		close_x = left_edge
 		middle_x = left_edge + stride
 		inner_x = left_edge + 2 * stride
+		middle_glyph = 'builtin:traffic_minimize'
+		inner_glyph = 'builtin:zoom'
 	} else if !buttons_left {
 		// Inward from close on the right: zoom, then minimise.
 		middle, inner = window.id_maximize, window.id_minimize
 		middle_glyph, inner_glyph = maximize_glyph, 'builtin:minimize'
 	}
 
-	close := d.title_button(window.id_close, 'builtin:close', close_x, active, set_hovered)
+	close_glyph := if theme.button_look == .traffic {
+		'builtin:traffic_close'
+	} else {
+		'builtin:close'
+	}
+	close := d.title_button(window.id_close, close_glyph, close_x, active, set_hovered)
 	maximize := d.title_button(middle, middle_glyph, middle_x, active, set_hovered)
 	minimize := d.title_button(inner, inner_glyph, inner_x, active, set_hovered)
 
@@ -385,7 +413,7 @@ fn (mut d Desktop) window_element(window_index int) ui2.Element {
 	}, title_children)
 
 	divider := ui2.view(window.id_divider, ui2.rect(0, f64(theme.title_height - 1), f64(window.width), 1), ui2.BoxStyle{
-		bg: theme.title_divider
+		bg: if active { theme.title_divider } else { theme.title_inactive_divider }
 	}, [])
 
 	background, contents := d.window_contents(window_index, body_height)
@@ -808,26 +836,48 @@ fn (d &Desktop) title_button(id string, glyph string, x int, active bool, set_ho
 	theme := d.theme()
 	y := (theme.title_height - theme.button_size) / 2
 	hovered := d.hover == id
-	is_close := glyph == 'builtin:close'
+	is_close := glyph == 'builtin:close' || glyph == 'builtin:traffic_close'
 
 	if theme.button_look == .traffic {
 		// A disc: coloured when the window is focused, grey when it is not, and
 		// carrying its glyph only while the pointer is over the set. Radius is
 		// half the size, which is how a rounded rect becomes a circle.
+		is_minimize := glyph == 'builtin:minimize' || glyph == 'builtin:traffic_minimize'
 		fill := if !active {
 			theme.traffic_idle
 		} else if is_close {
 			theme.traffic_close
-		} else if glyph == 'builtin:minimize' {
+		} else if is_minimize {
 			theme.traffic_minimize
 		} else {
 			theme.traffic_zoom
 		}
+		edge := if !active {
+			theme.traffic_idle_edge
+		} else if is_close {
+			theme.traffic_close_edge
+		} else if is_minimize {
+			theme.traffic_minimize_edge
+		} else {
+			theme.traffic_zoom_edge
+		}
+		glyph_color := if is_close {
+			theme.traffic_close_glyph
+		} else if is_minimize {
+			theme.traffic_minimize_glyph
+		} else {
+			theme.traffic_zoom_glyph
+		}
 		return ui2.button_with_image(id, '', if set_hovered { glyph } else { '' }, ui2.rect(f64(x), f64(y), f64(theme.button_size), f64(theme.button_size)), ui2.BoxStyle{
 			bg: fill
 			radius: theme.button_size / 2
+			border_color: edge
+			border_left: 1
+			border_top: 1
+			border_right: 1
+			border_bottom: 1
 		}, ui2.TextStyle{
-			color: theme.glyph_color
+			color: glyph_color
 		})
 	}
 
@@ -1052,6 +1102,8 @@ fn (d &Desktop) taskbar_entries() []TaskbarEntry {
 
 fn (mut d Desktop) on_pointer_move(x int, y int) {
 	pointer_moved := x != d.pointer_x || y != d.pointer_y
+	old_pointer_x := d.pointer_x
+	old_pointer_y := d.pointer_y
 	if pointer_moved {
 		d.dirty = true
 	}
@@ -1085,6 +1137,14 @@ fn (mut d Desktop) on_pointer_move(x int, y int) {
 		d.windows[moved].x = x - d.drag.offset_x
 		d.windows[moved].y = y - d.drag.offset_y
 		d.clamp_to_screen(moved)
+		if pointer_moved {
+			// Repaint the old location to reveal what was behind the window and
+			// the new one to draw it again. The cursor is composed into the same
+			// canvas, so both of its footprints need refreshing too.
+			d.add_drag_damage(old_x, old_y, d.windows[moved].x, d.windows[moved].y,
+				old_pointer_x, old_pointer_y, x, y, d.windows[moved].width,
+				d.windows[moved].height)
+		}
 		if d.windows[moved].x != old_x || d.windows[moved].y != old_y {
 			d.dirty = true
 		}
@@ -1099,6 +1159,52 @@ fn (mut d Desktop) on_pointer_move(x int, y int) {
 		d.hover = hover
 		d.dirty = true
 	}
+}
+
+// add_drag_damage includes the outside edge of the shadow and both cursor
+// positions. Rendering clips it to the canvas, so edge coordinates may be
+// negative here.
+fn (mut d Desktop) add_drag_damage(old_x int, old_y int, new_x int, new_y int,
+	old_pointer_x int, old_pointer_y int, pointer_x int, pointer_y int, width int, height int) {
+	d.add_damage_rect(old_x - 7, old_y - 5, width + 14, height + 14)
+	d.add_damage_rect(new_x - 7, new_y - 5, width + 14, height + 14)
+	// draw_cursor paints a one-pixel halo around a 12×19 mask.
+	d.add_damage_rect(old_pointer_x - 1, old_pointer_y - 1, 14, 21)
+	d.add_damage_rect(pointer_x - 1, pointer_y - 1, 14, 21)
+}
+
+fn (mut d Desktop) add_damage_rect(x int, y int, width int, height int) {
+	if width <= 0 || height <= 0 {
+		return
+	}
+	if !d.drag_damage.valid {
+		d.drag_damage = DamageRect{
+			x:     x
+			y:     y
+			w:     width
+			h:     height
+			valid: true
+		}
+		return
+	}
+	right := if d.drag_damage.x + d.drag_damage.w > x + width {
+		d.drag_damage.x + d.drag_damage.w
+	} else {
+		x + width
+	}
+	bottom := if d.drag_damage.y + d.drag_damage.h > y + height {
+		d.drag_damage.y + d.drag_damage.h
+	} else {
+		y + height
+	}
+	if x < d.drag_damage.x {
+		d.drag_damage.x = x
+	}
+	if y < d.drag_damage.y {
+		d.drag_damage.y = y
+	}
+	d.drag_damage.w = right - d.drag_damage.x
+	d.drag_damage.h = bottom - d.drag_damage.y
 }
 
 // clamp_to_screen keeps a window wholly visible when it fits. Oversized
@@ -1215,6 +1321,7 @@ fn (mut d Desktop) on_pointer_down(x int, y int) {
 					offset_x: x - d.windows[index].x
 					offset_y: y - d.windows[index].y
 				}
+				d.drag_damage = DamageRect{}
 			}
 			'close' {
 				d.close_window(id)
@@ -1239,6 +1346,7 @@ fn (mut d Desktop) on_pointer_up(x int, y int) {
 		d.forward_pointer_to_app(x, y, .up, .left, 0)
 	}
 	d.drag = Drag{}
+	d.drag_damage = DamageRect{}
 	d.hover = d.hit_action(x, y)
 	d.dirty = true
 }

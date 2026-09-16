@@ -203,21 +203,17 @@ diagnostic\ +\ Apple\ GPU\ probe)
     cat <<'GPUDIAG'
 
 Nothing runs after the probe in this mode: what is on screen is the probe's own
-output. On a base M1 booted from Apple boot data, expect it to stop here without
-touching a power domain or an ASC register, because the native DeviceTree is
-short of four inputs G13 firmware data needs:
+output. The M1 Air is handed m1n1's FDT, not Apple boot data, so the m1n1 branch
+runs and the operating-point table loads:
 
   agx: Probing Apple GPU
-  agx: t8103 boot data has no gpu-core-leak-coef
-  agx: native t8103 GPU boot data is incomplete
-  agx:   perf-states: 7 states, max 6, 14 words
-  agx:   power controller: incomplete
-  agx:   missing: per-state power, minimum SRAM voltage, core and SRAM leakage
-  agx: native t8103 boot data carries no firmware ABI tuple
+  agx: loaded 7 t8103 operating points (1 off, 396..1278 MHz, 19488 mW max)
 
-Anything else -- a different state count, a complete power controller, or a
-line past the ABI tuple -- means the machine's device tree and the recovery in
-docs/m1-agx-bringup.md have diverged. Photograph the screen either way.
+Seven states with one off, over 396..1278 MHz, is that machine's fused ladder.
+A different count, a missing "1 off", or a narrower range means the boot device
+tree changed. Any "G13 ABI self-check failed" line names a layout in this tree
+that no longer matches the recovered firmware ABI; see docs/m1-agx-bringup.md.
+Photograph the screen either way.
 GPUDIAG
     ;;
 *Apple\ GPU*)

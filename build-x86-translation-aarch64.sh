@@ -254,6 +254,14 @@ find "$I386_ROOT" -type l | while IFS= read -r link; do
     fi
 done
 
+# Wine derives its data directory from the private runtime loader and probes
+# $root/share/wine, while Alpine installs the NLS tables under
+# $root/usr/share/wine. Keep the relocated sysroots self-contained: without
+# this link Wine leaves its locale tables unset and dereferences NULL before
+# ntdll can start.
+ln -snf usr/share "$X86_ROOT/share"
+ln -snf usr/share "$I386_ROOT/share"
+
 if [ "$WITH_WINE" -eq 1 ]; then
     # Windows MSXML treats encoding="unicode" as UTF-16/UCS-2. Office 2013
     # uses that declaration, while Alpine's libxml2 rejects it by default.
@@ -287,6 +295,14 @@ if [ "$WITH_WINE" -eq 1 ]; then
         "$X86_ROOT/usr/lib/wine/x86_64-windows/services.exe"
     python3 "$SCRIPT_DIR/build-support/x86-translation/patch-wine-service-timeout.py" \
         "$I386_ROOT/usr/lib/wine/i386-windows/services.exe"
+
+    # run-x86-64 starts Wine through the private musl loader so translated
+    # library paths do not leak into native Vinix helpers. Wine consequently
+    # derives its child re-exec paths beside that loader. qemu-user handles a
+    # translated execve of another x86-64 ELF in-process, so point those paths
+    # back at Alpine's real Wine binaries.
+    ln -snf ../usr/bin/wine "$X86_ROOT/lib/wine"
+    ln -snf ../usr/bin/wine-preloader "$X86_ROOT/lib/wine-preloader"
 
     # Wine's i386 preloader reserves the low Windows address space before the
     # PIE loader starts. Without it qemu-i386 maps Wine at 0x00400000, where a

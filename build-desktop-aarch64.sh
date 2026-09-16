@@ -3,7 +3,7 @@
 # initramfs that boots straight into it.
 #
 # Usage: ./build-desktop-aarch64.sh [--no-initramfs] [--compact-initramfs]
-#        [--with-x86-translation] [--wifi-bundle=DIR]
+#        [--with-libreoffice] [--with-minecraft] [--with-asahi-gpu] [--with-x86-translation] [--wifi-bundle=DIR]
 # Set V or VINIX_V_COMPILER to a V executable or checkout directory to select
 # a compiler explicitly (for example VINIX_V_COMPILER=~/code/v7).
 #
@@ -44,6 +44,7 @@ NETWORK_TOOLS_STAGING="${VINIX_NETWORK_TOOLS_STAGING:-$SCRIPT_DIR/build-aarch64-
 X11_STAGING="${VINIX_X11_STAGING:-$SCRIPT_DIR/build-aarch64-x11/staging}"
 FIREFOX_STAGING="${VINIX_FIREFOX_STAGING:-$SCRIPT_DIR/build-aarch64-firefox/staging}"
 CHROMIUM_STAGING="${VINIX_CHROMIUM_STAGING:-$SCRIPT_DIR/build-aarch64-chromium/staging}"
+LIBREOFFICE_STAGING="${VINIX_LIBREOFFICE_STAGING:-$SCRIPT_DIR/build-aarch64-libreoffice/staging}"
 MINECRAFT_STAGING="${VINIX_MINECRAFT_STAGING:-$SCRIPT_DIR/build-aarch64-minecraft/staging}"
 ASAHI_STAGING="${VINIX_ASAHI_STAGING:-$SCRIPT_DIR/build-aarch64-asahi/staging}"
 HYPRLAND_STAGING="${VINIX_HYPRLAND_STAGING:-$SCRIPT_DIR/build-aarch64-hyprland/staging}"
@@ -63,13 +64,14 @@ merge_staging_tree() {
     local overlay="$1"
     local source relative destination
 
-    # macOS cp follows an existing destination symlink. The Python and network
-    # closures share a few libraries, so remove a destination link before the
-    # later overlay replaces it instead of overwriting its target.
+    # macOS cp follows an existing destination symlink and cannot replace a
+    # read-only regular file in place. Package closures share both kinds (the
+    # JDK legal files are deliberately 0444), so unlink non-directory entries
+    # before the later overlay recreates them with its own mode and contents.
     while IFS= read -r -d '' source; do
         relative="${source#"$overlay/"}"
         destination="$STAGING/$relative"
-        if [ -L "$destination" ]; then
+        if [ ! -d "$source" ] && { [ -e "$destination" ] || [ -L "$destination" ]; }; then
             rm -f "$destination"
         fi
     done < <(find "$overlay" -mindepth 1 -print0)
@@ -81,6 +83,11 @@ MAKE_INITRAMFS=1
 COMPACT_INITRAMFS=0
 WITH_X86_TRANSLATION=0
 WITH_CHROMIUM=0
+WITH_LIBREOFFICE=0
+WITH_MINECRAFT=0
+# The Apple GPU userspace is only correct on Apple hardware; see the overlay
+# below for why its mere presence on disk must not select it.
+WITH_ASAHI_GPU="${VINIX_WITH_ASAHI_GPU:-0}"
 WIFI_BUNDLE="${VINIX_WIFI_BUNDLE:-}"
 for arg in "$@"; do
     case "$arg" in
@@ -88,11 +95,17 @@ for arg in "$@"; do
         --compact-initramfs) COMPACT_INITRAMFS=1 ;;
         --with-x86-translation) WITH_X86_TRANSLATION=1 ;;
         --with-chromium) WITH_CHROMIUM=1 ;;
+        --with-libreoffice) WITH_LIBREOFFICE=1 ;;
+        --with-minecraft) WITH_MINECRAFT=1 ;;
+        --with-asahi-gpu) WITH_ASAHI_GPU=1 ;;
         --wifi-bundle=*) WIFI_BUNDLE="${arg#*=}" ;;
         --help|-h)
-            echo "usage: $0 [--no-initramfs] [--compact-initramfs] [--with-chromium] [--with-x86-translation] [--wifi-bundle=DIR]"
+            echo "usage: $0 [--no-initramfs] [--compact-initramfs] [--with-chromium] [--with-libreoffice] [--with-minecraft] [--with-asahi-gpu] [--with-x86-translation] [--wifi-bundle=DIR]"
             echo "  --compact-initramfs stages the desktop, core developer tools and Firefox"
             echo "  --with-chromium adds a previously staged Chromium; otherwise it is a pkg install"
+            echo "  --with-libreoffice adds a previously staged LibreOffice; otherwise it is a pkg install"
+            echo "  --with-minecraft adds a previously staged Minecraft; otherwise it is a pkg install"
+            echo "  --with-asahi-gpu overlays the Apple GPU Mesa; only correct for an M1 image"
             echo "  --with-x86-translation adds a previously built x86/Wine runtime"
             echo "  --wifi-bundle stages a package.py output and loads it before the desktop"
             exit 0
@@ -217,7 +230,10 @@ echo "==> Building Cocoa compatibility fixture..."
 # -gc none because Vinix has no Boehm GC, and -d ui2_headless so importing ui2
 # brings in its declarative core without its gg/Sokol backend.
 echo "==> Translating V to C..."
-"$V" -new-compiler -os linux -arch arm64 -gc none -manualfree -enable-globals -prod \
+# The generated ui2/VML program is large enough to cross V3's general-purpose
+# 10176 MiB watchdog while it is still making forward declarations. This is a
+# host-side release build, so let the machine's own memory limit govern it.
+"$V" -new-compiler -no-memory-limit -os linux -arch arm64 -gc none -manualfree -enable-globals -prod \
     -d ui2_headless \
     -path "@vlib|$UI2_MODULES|@vmodules|$SCRIPT_DIR|$SCRIPT_DIR/third_party" \
     -o "$BUILD_DIR/desktop.c" "$APP_SRC"
@@ -250,7 +266,7 @@ if [ -f "$ASAHI_STAGING/usr/lib/libEGL.so" ] &&
    [ -f "$ASAHI_STAGING/usr/include/EGL/egl.h" ] &&
    [ -f "$GPU_SYSROOT/usr/lib/Scrt1.o" ]; then
     echo "==> Translating the GPU-enabled desktop to C..."
-    "$V" -new-compiler -os linux -arch arm64 -gc none -manualfree -enable-globals -prod \
+    "$V" -new-compiler -no-memory-limit -os linux -arch arm64 -gc none -manualfree -enable-globals -prod \
         -d ui2_headless -d vinix_gpu_present \
         -path "@vlib|$UI2_MODULES|@vmodules|$SCRIPT_DIR|$SCRIPT_DIR/third_party" \
         -o "$BUILD_DIR/desktop-gpu.c" "$APP_SRC"
@@ -339,6 +355,18 @@ if [ "$WITH_CHROMIUM" -eq 1 ] &&
     echo "Run ./build-chromium-aarch64.sh first." >&2
     exit 1
 fi
+if [ "$WITH_LIBREOFFICE" -eq 1 ] &&
+   [ ! -x "$LIBREOFFICE_STAGING/usr/lib/libreoffice/program/soffice.bin" ]; then
+    echo "ERROR: --with-libreoffice needs $LIBREOFFICE_STAGING/usr/lib/libreoffice/program/soffice.bin" >&2
+    echo "Run ./build-libreoffice-aarch64.sh first." >&2
+    exit 1
+fi
+if [ "$WITH_MINECRAFT" -eq 1 ] &&
+   [ ! -x "$MINECRAFT_STAGING/usr/bin/minecraft" ]; then
+    echo "ERROR: --with-minecraft needs $MINECRAFT_STAGING/usr/bin/minecraft" >&2
+    echo "Run ./build-minecraft-aarch64.sh first." >&2
+    exit 1
+fi
 if [ "$WITH_X86_TRANSLATION" -eq 1 ] &&
    [ ! -x "$X86_TRANSLATION_STAGING/usr/bin/qemu-x86_64" ]; then
     echo "ERROR: --with-x86-translation needs $X86_TRANSLATION_STAGING/usr/bin/qemu-x86_64" >&2
@@ -390,6 +418,13 @@ mkdir -p "$STAGING"
 if [ "$WITH_CHROMIUM" -eq 1 ]; then
     echo "    staging Chromium"
     merge_staging_tree "$CHROMIUM_STAGING"
+fi
+# LibreOffice is a 900 MiB closure for the same reason, and it repeats the same
+# GTK, X11 and font stack. Stage it before them, so the layers below stay the
+# qualified copy of everything the suite shares with the browsers.
+if [ "$WITH_LIBREOFFICE" -eq 1 ]; then
+    echo "    staging LibreOffice"
+    merge_staging_tree "$LIBREOFFICE_STAGING"
 fi
 if [ "$COMPACT_INITRAMFS" -eq 1 ]; then
     echo "    compact image: staging BusyBox, Python, Git, GCC and Firefox"
@@ -469,8 +504,9 @@ fi
 # base archive predates them. Compact images deliberately stop at the GPU,
 # desktop and Firefox qualification closure unless one optional layer is
 # explicitly requested.
-if [ "$COMPACT_INITRAMFS" -eq 0 ] && [ -x "$MINECRAFT_STAGING/usr/bin/minecraft" ]; then
-    echo "==> Staging C++ Minecraft runtime"
+if { [ "$COMPACT_INITRAMFS" -eq 0 ] || [ "$WITH_MINECRAFT" -eq 1 ]; } &&
+   [ -x "$MINECRAFT_STAGING/usr/bin/minecraft" ]; then
+    echo "==> Staging Minecraft runtime"
     merge_staging_tree "$MINECRAFT_STAGING"
 fi
 
@@ -526,12 +562,53 @@ fi
 # Overlay Mesa last so Xorg, Firefox and native EGL applications all use the
 # exact userspace built for Vinix's Asahi kernel UAPI rather than Alpine's
 # unrelated Mesa build.
-if [ "$GPU_DESKTOP_BUILT" -eq 1 ]; then
+#
+# Only when this image is actually for Apple hardware. That Mesa is built for a
+# real GPU and carries no llvmpipe at all -- its only software rasteriser is
+# softpipe, which stops at OpenGL 3.3. Overlaying it on a QEMU image therefore
+# replaces a 4.5-capable software renderer with a 3.3-capable one, and anything
+# needing more than 3.3 stops working: native Blender asks for a 4.3 core
+# context and gets EGL_BAD_MATCH, having rendered fine before. Selecting it
+# from the mere presence of the staging directory is what made that happen
+# silently, with no commit to point at.
+if [ "$GPU_DESKTOP_BUILT" -eq 1 ] && [ "$WITH_ASAHI_GPU" -eq 1 ]; then
     merge_staging_tree "$ASAHI_STAGING"
     # Keep the native hardware proof in sync with the source tree even when
     # the Mesa staging directory was built before this desktop image.
     install -m755 "$SCRIPT_DIR/gl-triangle/run-m1-agx-smoke" \
         "$STAGING/usr/bin/run-m1-agx-smoke"
+elif [ -d "$X11_STAGING/usr/lib/xorg/modules/dri" ]; then
+    # Nothing else fills /usr/lib/dri: the Apple overlay was the only thing
+    # putting drivers there, so skipping it leaves Mesa with none at all. The
+    # X11 layer already stages the generic Alpine set, and that one does carry
+    # llvmpipe, so software OpenGL reaches 4.5 rather than softpipe's 3.3.
+    echo "==> Staging the generic Mesa DRI drivers"
+    mkdir -p "$STAGING/usr/lib/dri"
+    # Only the software entries. That directory is 49 names for one 27 MiB
+    # object, 48 of them links, and the pass below turns every link into a real
+    # file -- copying all of them would add 1.3 GiB of the same driver. A
+    # machine with no GPU needs exactly these.
+    cp -a "$X11_STAGING/usr/lib/xorg/modules/dri/libgallium_dri.so" \
+        "$STAGING/usr/lib/dri/"
+    for software_driver in swrast_dri.so kms_swrast_dri.so; do
+        cp -a "$X11_STAGING/usr/lib/xorg/modules/dri/$software_driver" \
+            "$STAGING/usr/lib/dri/" 2>/dev/null || true
+    done
+    # libEGL names its Gallium by version in DT_NEEDED, and the Apple overlay
+    # was the only thing supplying one. Take the X11 sysroot's, which is the
+    # build these drivers belong to.
+    for gallium in "$GPU_SYSROOT"/usr/lib/libgallium-*.so; do
+        [ -f "$gallium" ] || continue
+        cp -a "$gallium" "$STAGING/usr/lib/"
+    done
+    # llvmpipe is a JIT, so that Gallium names libLLVM in DT_NEEDED. The Apple
+    # build has no llvmpipe and so never needed it, which is why a compact
+    # image carries no LLVM at all. It is 144 MiB and it is what buys OpenGL
+    # 4.5 instead of softpipe's 3.3.
+    for llvm in "$SYSROOT"/usr/lib/libLLVM.so.*; do
+        [ -f "$llvm" ] || continue
+        cp -a "$llvm" "$STAGING/usr/lib/"
+    done
 fi
 # Hyprland edge uses libstdc++ formatting entry points newer than the base and
 # Mesa 25 layers. Keep its backward-compatible C++ runtime as the final copy;
@@ -560,6 +637,15 @@ install -m755 "$X11_STAGING/usr/bin/vinix-xinput" "$STAGING/usr/bin/vinix-xinput
 install -m755 "$X11_STAGING/usr/bin/vinix-wine-host" "$STAGING/usr/bin/vinix-wine-host"
 install -m755 "$SCRIPT_DIR/build-support/firefox/run-firefox" "$STAGING/usr/bin/run-firefox"
 install -m755 "$SCRIPT_DIR/build-support/gimp/run-gimp" "$STAGING/usr/bin/run-gimp"
+install -m755 "$SCRIPT_DIR/build-support/libreoffice/run-libreoffice" \
+    "$STAGING/usr/bin/run-libreoffice"
+mkdir -p "$STAGING/etc/libreoffice"
+install -m644 "$SCRIPT_DIR/build-support/libreoffice/vinix-registrymodifications.xcu" \
+    "$STAGING/etc/libreoffice/vinix-registrymodifications.xcu"
+install -m644 "$SCRIPT_DIR/build-support/libreoffice/welcome.fodt" \
+    "$STAGING/usr/share/vinix/libreoffice-welcome.fodt"
+install -m644 "$SCRIPT_DIR/build-support/libreoffice/welcome.fodt" \
+    "$STAGING/root/libreoffice-welcome.fodt"
 mkdir -p "$STAGING/etc/gimp/2.0"
 install -m644 "$SCRIPT_DIR/build-support/gimp/vinix-gimprc" \
     "$STAGING/etc/gimp/2.0/vinix-gimprc"
@@ -618,7 +704,7 @@ if [ ! -x "$STAGING/usr/bin/pkg" ] || [ ! -x "$STAGING/sbin/apk" ]; then
     echo "ERROR: desktop image is missing pkg or apk" >&2
     exit 1
 fi
-for runtime_path in usr/bin/Xorg usr/bin/Xvfb usr/bin/startx usr/bin/vinix-xinput usr/bin/vinix-wine-host usr/bin/run-firefox usr/bin/run-gimp usr/bin/run-chromium; do
+for runtime_path in usr/bin/Xorg usr/bin/Xvfb usr/bin/startx usr/bin/vinix-xinput usr/bin/vinix-wine-host usr/bin/run-firefox usr/bin/run-gimp usr/bin/run-chromium usr/bin/run-libreoffice; do
     if [ ! -x "$STAGING/$runtime_path" ]; then
         echo "ERROR: desktop hosted-X11 runtime is missing /$runtime_path" >&2
         echo "Run ./build-x11-aarch64.sh and ./build-firefox-aarch64.sh, then rebuild the desktop." >&2
@@ -639,7 +725,7 @@ if ! { [ -x "$STAGING/usr/lib/firefox-esr/firefox-esr" ] &&
     exit 1
 fi
 if [ "$COMPACT_INITRAMFS" -eq 1 ]; then
-    for command_path in bin/sh bin/zsh bin/id bin/sed bin/mkdir bin/sleep bin/df bin/du bin/ls bin/tar usr/bin/pkg sbin/apk usr/bin/vim usr/bin/python3 usr/bin/git usr/bin/Xorg usr/bin/Xvfb usr/bin/startx usr/bin/vinix-xinput usr/bin/vinix-wine-host usr/bin/run-firefox usr/bin/run-gimp usr/bin/run-chromium usr/bin/gcc; do
+    for command_path in bin/sh bin/zsh bin/id bin/sed bin/mkdir bin/sleep bin/df bin/du bin/ls bin/tar usr/bin/pkg sbin/apk usr/bin/vim usr/bin/python3 usr/bin/git usr/bin/Xorg usr/bin/Xvfb usr/bin/startx usr/bin/vinix-xinput usr/bin/vinix-wine-host usr/bin/run-firefox usr/bin/run-gimp usr/bin/run-chromium usr/bin/run-libreoffice usr/bin/gcc; do
         if [ ! -x "$STAGING/$command_path" ]; then
             echo "ERROR: compact desktop is missing /$command_path" >&2
             exit 1
@@ -689,7 +775,7 @@ chmod +x "$STAGING/sbin/init" "$STAGING/usr/bin/vinix-desktop" \
 for app_name in vinix-files vinix-calculator vinix-terminal vinix-settings \
     vinix-activity vinix-editor vinix-calendar vinix-clock vinix-cocoa-calculator \
     vinix-vspace \
-    vinix-firefox vinix-chromium vinix-gimp vinix-minecraft vinix-wine-calculator vinix-wine-notepad \
+    vinix-firefox vinix-chromium vinix-gimp vinix-libreoffice vinix-minecraft vinix-wine-calculator vinix-wine-notepad \
     vinix-wine-word2013 vinix-blender vinix-capture; do
     ln -sf vinix-desktop "$STAGING/usr/bin/$app_name"
 done
@@ -732,6 +818,34 @@ mkdir -p "$STAGING/root/desktop"
 cp "$SCRIPT_DIR/desktop"/*.v "$SCRIPT_DIR/desktop"/*.c "$SCRIPT_DIR/desktop"/*.h \
     "$SCRIPT_DIR/desktop/README.md" \
     "$STAGING/root/desktop/"
+
+# Vinix's loader opens a shared object without following links, and current
+# Mesa ships every DRI driver as a link to one libdril_dri.so. A dlopen of
+# /usr/lib/dri/swrast_dri.so therefore finds nothing, EGL cannot create a
+# screen, and an application that renders through it -- native Blender, whose
+# GHOST backend needs a surfaceless EGL context -- dies on EGL_NOT_INITIALIZED
+# with no hint that a link was the cause. build-userland-aarch64.sh resolves
+# these already; a compact image builds its own tree and has to do it too.
+# They all point at one 100 KiB object, so materialising them costs very little.
+if [ -d "$STAGING/usr/lib/dri" ]; then
+    echo "==> Materialising DRI driver links"
+    find "$STAGING/usr/lib/dri" -type l -name '*.so*' | while IFS= read -r link; do
+        target=$(readlink "$link")
+        case "$target" in
+            /*) real="$STAGING$target" ;;
+            *) real="$(dirname "$link")/$target" ;;
+        esac
+        if [ -f "$real" ]; then
+            rm "$link"
+            cp "$real" "$link"
+        fi
+    done
+    if [ -L "$STAGING/usr/lib/dri/swrast_dri.so" ] ||
+       [ ! -f "$STAGING/usr/lib/dri/swrast_dri.so" ]; then
+        echo "ERROR: /usr/lib/dri/swrast_dri.so is not a regular file; EGL will not start" >&2
+        exit 1
+    fi
+fi
 
 # COPYFILE_DISABLE keeps macOS from adding ._ resource-fork members that the
 # kernel's tar reader would try to unpack as real files.

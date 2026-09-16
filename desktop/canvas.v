@@ -32,21 +32,35 @@ mut:
 
 struct Canvas {
 mut:
-	width  int
-	height int
-	stride int
-	pixels &u32 = unsafe { nil }
-	clip   Clip
+	// width and height stay in logical desktop coordinates. The backing store
+	// is allowed to be denser, so HiDPI text can be rasterised at the panel's
+	// native resolution without changing any window geometry or hit targets.
+	width           int
+	height          int
+	physical_width  int
+	physical_height int
+	scale           int = 1
+	stride          int
+	pixels          &u32 = unsafe { nil }
+	clip            Clip
 }
 
 fn new_canvas(width int, height int) Canvas {
-	pixels := unsafe { &u32(malloc(width * height * 4)) }
+	return new_scaled_canvas(width, height, width, height, 1)
+}
+
+fn new_scaled_canvas(width int, height int, physical_width int, physical_height int,
+	scale int) Canvas {
+	pixels := unsafe { &u32(malloc(physical_width * physical_height * 4)) }
 	return Canvas{
-		width: width
-		height: height
-		stride: width
-		pixels: pixels
-		clip: Clip{
+		width:           width
+		height:          height
+		physical_width:  physical_width
+		physical_height: physical_height
+		scale:           scale
+		stride:          physical_width
+		pixels:          pixels
+		clip:            Clip{
 			x: 0
 			y: 0
 			w: width
@@ -196,16 +210,121 @@ fn (mut c Canvas) blend_pixel(x int, y int, color u32, coverage u32) {
 		return
 	}
 	a := if clip == 255 { coverage } else { coverage * clip / 255 }
-	unsafe {
-		idx := y * c.stride + x
-		c.pixels[idx] = blend(c.pixels[idx], color, a)
+	physical_x := x * c.scale
+	physical_y := y * c.scale
+	for offset_y := 0; offset_y < c.scale && physical_y + offset_y < c.physical_height; offset_y++ {
+		row := (physical_y + offset_y) * c.stride
+		for offset_x := 0; offset_x < c.scale && physical_x + offset_x < c.physical_width; offset_x++ {
+			unsafe {
+				idx := row + physical_x + offset_x
+				c.pixels[idx] = blend(c.pixels[idx], color, a)
+			}
+		}
 	}
 }
 
+// blend_physical_pixel is used by assets that have a native HiDPI raster,
+// notably the 2x font atlases. Clips are still declared in logical units, but
+// their edges and rounded masks are evaluated on the physical pixel grid.
+@[inline]
+fn (mut c Canvas) blend_physical_pixel(x int, y int, color u32, coverage u32) {
+	if coverage == 0 || x < 0 || y < 0 || x >= c.physical_width || y >= c.physical_height {
+		return
+	}
+	clip_x := c.clip.x * c.scale
+	clip_y := c.clip.y * c.scale
+	clip_w := c.clip.w * c.scale
+	clip_h := c.clip.h * c.scale
+	if x < clip_x || y < clip_y || x >= clip_x + clip_w || y >= clip_y + clip_h {
+		return
+	}
+
+	mut clip := u32(255)
+	if c.clip.mask_radius > 0 {
+		mask_x := c.clip.mask_x * c.scale
+		mask_y := c.clip.mask_y * c.scale
+		mask_w := c.clip.mask_w * c.scale
+		mask_h := c.clip.mask_h * c.scale
+		radius := c.clip.mask_radius * c.scale
+		mut center_x := 0
+		mut center_y := 0
+		mut in_corner := true
+		if x < mask_x + radius {
+			center_x = mask_x + radius
+		} else if x >= mask_x + mask_w - radius {
+			center_x = mask_x + mask_w - radius
+		} else {
+			in_corner = false
+		}
+		if y < mask_y + radius {
+			center_y = mask_y + radius
+		} else if y >= mask_y + mask_h - radius {
+			center_y = mask_y + mask_h - radius
+		} else {
+			in_corner = false
+		}
+		if in_corner {
+			clip = corner_coverage(f64(x) + 0.5, f64(y) + 0.5, f64(center_x), f64(center_y), f64(radius))
+		}
+	}
+	if clip == 0 {
+		return
+	}
+	a := if clip == 255 { coverage } else { coverage * clip / 255 }
+	unsafe {
+		index := y * c.stride + x
+		c.pixels[index] = blend(c.pixels[index], color, a)
+	}
+}
+
+@[inline]
+fn (c &Canvas) logical_pixel(x int, y int) u32 {
+	return unsafe { c.pixels[y * c.scale * c.stride + x * c.scale] }
+}
+
 fn (mut c Canvas) clear(color u32) {
-	for i := 0; i < c.stride * c.height; i++ {
+	for i := 0; i < c.stride * c.physical_height; i++ {
 		unsafe {
 			c.pixels[i] = color
+		}
+	}
+}
+
+// copy_logical_pixels expands a cached logical image onto the backing pixel
+// grid. Wallpaper generation therefore stays cheap while the text drawn over
+// it can use the full native-resolution canvas.
+fn (mut c Canvas) copy_logical_pixels(source []u32) {
+	if source.len < c.width * c.height {
+		return
+	}
+	x0 := if c.clip.x > 0 { c.clip.x } else { 0 }
+	y0 := if c.clip.y > 0 { c.clip.y } else { 0 }
+	x1 := if c.clip.x + c.clip.w < c.width { c.clip.x + c.clip.w } else { c.width }
+	y1 := if c.clip.y + c.clip.h < c.height { c.clip.y + c.clip.h } else { c.height }
+	if x1 <= x0 || y1 <= y0 {
+		return
+	}
+	if c.scale == 1 && c.width == c.physical_width && c.height == c.physical_height {
+		for y := y0; y < y1; y++ {
+			unsafe {
+				C.memcpy(&c.pixels[y * c.stride + x0], &source[y * c.width + x0], usize((x1 - x0) * 4))
+			}
+		}
+		return
+	}
+	for y := y0; y < y1; y++ {
+		for x := x0; x < x1; x++ {
+			color := source[y * c.width + x]
+			physical_x := x * c.scale
+			physical_y := y * c.scale
+			for offset_y := 0; offset_y < c.scale
+				&& physical_y + offset_y < c.physical_height; offset_y++ {
+				row := (physical_y + offset_y) * c.stride
+				for offset_x := 0; offset_x < c.scale
+					&& physical_x + offset_x < c.physical_width; offset_x++ {
+					unsafe { c.pixels[row + physical_x + offset_x] = color }
+				}
+			}
 		}
 	}
 }
@@ -233,19 +352,27 @@ fn (mut c Canvas) blend_rect(x int, y int, w int, h int, color u32, alpha u32) {
 	}
 
 	if c.clip_is_plain(x0, y0, x1 - x0, y1 - y0) {
+		physical_x0 := x0 * c.scale
+		physical_y0 := y0 * c.scale
+		physical_x1 := if x1 * c.scale < c.physical_width { x1 * c.scale } else { c.physical_width }
+		physical_y1 := if y1 * c.scale < c.physical_height {
+			y1 * c.scale
+		} else {
+			c.physical_height
+		}
 		if alpha >= 255 {
-			for py := y0; py < y1; py++ {
+			for py := physical_y0; py < physical_y1; py++ {
 				row := py * c.stride
-				for px := x0; px < x1; px++ {
+				for px := physical_x0; px < physical_x1; px++ {
 					unsafe {
 						c.pixels[row + px] = color
 					}
 				}
 			}
 		} else {
-			for py := y0; py < y1; py++ {
+			for py := physical_y0; py < physical_y1; py++ {
 				row := py * c.stride
-				for px := x0; px < x1; px++ {
+				for px := physical_x0; px < physical_x1; px++ {
 					unsafe {
 						c.pixels[row + px] = blend(c.pixels[row + px], color, alpha)
 					}
@@ -270,6 +397,23 @@ fn (mut c Canvas) vertical_gradient(x int, y int, w int, h int, top u32, bottom 
 	}
 	for row := 0; row < h; row++ {
 		c.fill_rect(x, y + row, w, 1, mix(top, bottom, u32(row * 255 / h)))
+	}
+}
+
+// vertical_gradient_inclusive reaches both declared colours. Window chrome
+// needs that exact contract because its first and last gradient rows were
+// measured independently; wallpaper gradients use the half-open variant
+// above so adjacent tiles would not repeat an endpoint.
+fn (mut c Canvas) vertical_gradient_inclusive(x int, y int, w int, h int, top u32, bottom u32) {
+	if h <= 0 {
+		return
+	}
+	if h == 1 {
+		c.fill_rect(x, y, w, 1, top)
+		return
+	}
+	for row := 0; row < h; row++ {
+		c.fill_rect(x, y + row, w, 1, mix(top, bottom, u32(row * 255 / (h - 1))))
 	}
 }
 
@@ -351,8 +495,7 @@ fn (mut c Canvas) stroke_round_rect(x int, y int, w int, h int, radius int, colo
 fn (mut c Canvas) drop_shadow(x int, y int, w int, h int, radius int, spread int, alpha u32) {
 	for i := spread; i >= 1; i-- {
 		layer := alpha * u32(spread - i + 1) / u32(spread * 3)
-		c.blend_round_rect(x - i, y - i + 2, w + 2 * i, h + 2 * i, radius + i, 0x000000,
-			layer)
+		c.blend_round_rect(x - i, y - i + 2, w + 2 * i, h + 2 * i, radius + i, 0x000000, layer)
 	}
 }
 
@@ -360,8 +503,7 @@ fn (mut c Canvas) fill_circle(cx int, cy int, radius int, color u32) {
 	rf := f64(radius)
 	for dy := -radius; dy <= radius; dy++ {
 		for dx := -radius; dx <= radius; dx++ {
-			c.blend_pixel(cx + dx, cy + dy, color, corner_coverage(f64(dx), f64(dy), 0,
-				0, rf))
+			c.blend_pixel(cx + dx, cy + dy, color, corner_coverage(f64(dx), f64(dy), 0, 0, rf))
 		}
 	}
 }

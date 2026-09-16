@@ -385,10 +385,14 @@ fn (mut a SettingsApp) handle(event_id string) ! {
 		return
 	}
 	if event_id.starts_with(settings_action_theme) {
-		a.desktop.settings.theme = if event_id.ends_with('1') {
-			ThemeKind.macos
+		if event_id.ends_with('1') {
+			a.desktop.settings.theme = .macos
+			// A freshly selected Catalina theme starts with Catalina geometry.
+			// Appearance remains independent, so the user can deliberately move
+			// the controls afterwards.
+			a.desktop.settings.button_side = .left
 		} else {
-			ThemeKind.default_
+			a.desktop.settings.theme = .default_
 		}
 		return
 	}

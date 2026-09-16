@@ -174,16 +174,19 @@ override VFLAGS += \
     -enable-globals \
     -nofloat \
     -manualfree \
-    -experimental \
     -message-limit 10000 \
     -gc none \
+    -target-libc-headers \
+    -no-closures \
     -d no_backtrace
 
 ifeq ($(ARCH),aarch64)
-    override VFLAGS += -d aarch64
+    override VFLAGS += -arch arm64 -d aarch64
     ifeq ($(LIMINE_MP),1)
         override VFLAGS += -d limine_mp
     endif
+else
+    override VFLAGS += -arch amd64
 endif
 
 # V build tags change the generated kernel C even though no source timestamp
@@ -210,20 +213,20 @@ override CPPFLAGS += -D__vinix__
 ifeq ($(ARCH),aarch64)
 override VFILES := $(shell find -L * -type f -name '*.v' \
     ! -path 'obj/*' \
-    ! -path 'modules/x86/*' \
-    ! -path 'modules/acpi/*' \
-    ! -path 'modules/uacpi/*' \
-    ! -path 'modules/dev/ata/*' \
-    ! -path 'modules/dev/console/console.v' \
-    ! -path 'modules/dev/hda/*' \
-    ! -path 'modules/dev/mouse/*' \
-    ! -path 'modules/dev/nvme/*' \
-    ! -path 'modules/dev/serial/*' \
-    ! -path 'modules/time/pit.v' \
-    ! -path 'modules/syscall/syscall.v' \
-    ! -path 'modules/syscall/table/syscall_table.v' \
-    ! -path 'modules/userland/userland.v' \
-    ! -path 'modules/event/event.v' \
+    ! -path 'x86/*' \
+    ! -path 'acpi/*' \
+    ! -path 'uacpi/*' \
+    ! -path 'dev/ata/*' \
+    ! -path 'dev/console/console.v' \
+    ! -path 'dev/hda/*' \
+    ! -path 'dev/mouse/*' \
+    ! -path 'dev/nvme/*' \
+    ! -path 'dev/serial/*' \
+    ! -path 'time/pit.v' \
+    ! -path 'syscall/syscall.v' \
+    ! -path 'syscall/table/syscall_table.v' \
+    ! -path 'userland/userland.v' \
+    ! -path 'event/event.v' \
     ! -name 'katomic.v' \
     ! -name 'klock.v' \
     ! -name '*_amd64.v' \
@@ -234,13 +237,13 @@ override ASFILES := $(shell cd asm && find -L * -type f -name '*.S' \
 else
 override VFILES := $(shell find -L * -type f -name '*.v' \
     ! -path 'obj/*' \
-    ! -path 'modules/aarch64/*' \
-    ! -path 'modules/apple/*' \
-    ! -path 'modules/devicetree/*' \
-    ! -path 'modules/drm/*' \
-    ! -path 'modules/gpu/*' \
-    ! -path 'modules/dev/pointerdev/*' \
-    ! -path 'modules/syscall/common.v' \
+    ! -path 'aarch64/*' \
+    ! -path 'apple/*' \
+    ! -path 'devicetree/*' \
+    ! -path 'drm/*' \
+    ! -path 'gpu/*' \
+    ! -path 'dev/pointerdev/*' \
+    ! -path 'syscall/common.v' \
     ! -name '*_aarch64.v' \
     ! -name '*_arm64.v' \
     | LC_ALL=C sort)
@@ -252,7 +255,7 @@ endif
 override CFILES := $(shell cd c && find -L * -type f -name '*.c' | LC_ALL=C sort)
 # Keep generated C and assembly objects below distinct subdirectories. In
 # particular, c/uacpi used to create obj/uacpi, which V then mistook for the
-# imported modules/uacpi package while compiling obj/vsrc.
+# imported `uacpi` package while compiling obj/vsrc.
 override COBJ := $(addprefix obj/c/,$(CFILES:.c=.c.o))
 override ASOBJ := $(addprefix obj/asm/,$(ASFILES:.S=.S.o))
 override OBJ := $(COBJ) $(ASOBJ)
@@ -297,6 +300,11 @@ obj/blob.c.o: GNUmakefile $(VFILES) $(V_CONFIG_STAMP)
 	mkdir -p "$$(dirname $@)"
 	rm -rf obj/vsrc
 	for f in $(VFILES); do mkdir -p "obj/vsrc/$$(dirname $$f)" && ln -sf "$(CURDIR)/$$f" "obj/vsrc/$$f"; done
+# The modules live beside main.v, so V looks them up under the nearest v.mod.
+# Give the filtered tree its own v.mod, or that root would be $(CURDIR) and the
+# arch-specific files this build deliberately left out of VFILES would be read
+# back from the originals.
+	cp v.mod obj/vsrc/v.mod
 	$(V) $(VFLAGS) -o obj/blob.c obj/vsrc
 	sed 's/call 0(/call *(/g;/Wimplicit-function-declaration/d' < obj/blob.c > obj/blob.c.tmp
 	mv obj/blob.c.tmp obj/blob.c

@@ -64,9 +64,11 @@ FONT_DIR = os.path.join(
     "assets", "fonts",
 )
 
-# (name, file, pixel size, bold). The sizes are the ones the desktop's own
-# chrome uses, those ui2's calculator example asks for (18 for its keys, 28 for
-# its display), and one monospaced face for the terminal.
+# (name, file, logical pixel size, bold). The sizes are the ones the desktop's
+# own chrome uses, those ui2's calculator example asks for (18 for its keys, 28
+# for its display), and one monospaced face for the terminal. Each is baked at
+# both 1x and 2x: enlarging an already-antialiased 1x mask makes its soft edge
+# two physical pixels wide on a HiDPI panel.
 #
 # A face whose file name contains "Mono" is marked monospaced in the generated
 # data, which is how a text style asking for that family finds it.
@@ -82,6 +84,8 @@ FACES = [
     # up is not a terminal.
     ("mono", "RobotoMono-Regular.ttf", 13, False),
 ]
+
+RASTER_SCALES = [1, 2]
 
 
 def open_font(file_name, size):
@@ -132,14 +136,19 @@ def supported_extras(faces):
     return kept
 
 
-def build_face(file_name, size, extras):
-    font = open_font(file_name, size)
-    ascent, descent = font.getmetrics()
+def build_face(file_name, size, raster_scale, extras):
+    logical_font = open_font(file_name, size)
+    font = open_font(file_name, size * raster_scale)
+    ascent, descent = logical_font.getmetrics()
 
     header = bytearray()
     pixels = bytearray()
     for code_point in list(range(FIRST_CHAR, LAST_CHAR + 1)) + extras:
-        width, height, bx, by, advance, mask = rasterise(font, code_point)
+        width, height, bx, by, _, mask = rasterise(font, code_point)
+        # Keep layout exactly the same at both scales. FreeType hinting can
+        # otherwise make a run baked at 26 px a different logical width from
+        # the same run baked at 13 px.
+        advance = int(round(logical_font.getlength(chr(code_point)))) * raster_scale
         if bx < -128 or bx > 127:
             sys.exit("left bearing out of range for U+%04X" % code_point)
         header += bytes([width, height, bx & 0xFF, by & 0xFF, advance & 0xFF])
@@ -169,8 +178,8 @@ def main():
     out.append("// under the SIL Open Font License 1.1; see desktop/FONT-LICENSE.txt.")
     out.append("module main")
     out.append("")
-    out.append("// FaceBlob is one rasterised face. `bold` and `size` are what it was baked")
-    out.append("// at, which is how the renderer picks between faces. `ascent` + `descent`")
+    out.append("// FaceBlob is one rasterised face. `bold`, logical `size` and `raster_scale`")
+    out.append("// are how the renderer picks between faces. `ascent` + `descent`")
     out.append("// is the height of a line. `parts` join into base64 of a metrics header")
     out.append("// (width, height, left bearing, top bearing, advance for each glyph)")
     out.append("// followed by every glyph's coverage bytes in the same order. It is split")
@@ -180,6 +189,7 @@ def main():
     out.append("\tbold    bool")
     out.append("\tmono    bool")
     out.append("\tsize    int")
+    out.append("\traster_scale int")
     out.append("\tascent  int")
     out.append("\tdescent int")
     out.append("\tparts   []string")
@@ -199,22 +209,26 @@ def main():
     out.append("")
 
     names = []
-    for name, file_name, size, bold in FACES:
-        face = build_face(file_name, size, extras)
-        names.append(name)
-        out.append("// %s: %s at %dpx" % (name, file_name, size))
-        out.append("const face_%s = FaceBlob{" % name)
-        out.append("\tbold:    %s" % ("true" if bold else "false"))
-        out.append("\tmono:    %s" % ("true" if "Mono" in file_name else "false"))
-        out.append("\tsize:    %d" % size)
-        out.append("\tascent:  %d" % face["ascent"])
-        out.append("\tdescent: %d" % face["descent"])
-        out.append("\tparts:   [")
-        for line in wrap(face["blob"]):
-            out.append("\t\t'%s'," % line)
-        out.append("\t]")
-        out.append("}")
-        out.append("")
+    for raster_scale in RASTER_SCALES:
+        for name, file_name, size, bold in FACES:
+            face = build_face(file_name, size, raster_scale, extras)
+            scaled_name = "%s_%dx" % (name, raster_scale)
+            names.append(scaled_name)
+            out.append("// %s: %s at %dpx (%dx raster)" %
+                       (name, file_name, size, raster_scale))
+            out.append("const face_%s = FaceBlob{" % scaled_name)
+            out.append("\tbold:    %s" % ("true" if bold else "false"))
+            out.append("\tmono:    %s" % ("true" if "Mono" in file_name else "false"))
+            out.append("\tsize:    %d" % size)
+            out.append("\traster_scale: %d" % raster_scale)
+            out.append("\tascent:  %d" % face["ascent"])
+            out.append("\tdescent: %d" % face["descent"])
+            out.append("\tparts:   [")
+            for line in wrap(face["blob"]):
+                out.append("\t\t'%s'," % line)
+            out.append("\t]")
+            out.append("}")
+            out.append("")
 
     out.append("// font_blobs is the set the renderer chooses from.")
     out.append("const font_blobs = [")

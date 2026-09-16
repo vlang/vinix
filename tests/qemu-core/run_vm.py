@@ -27,6 +27,7 @@ FAIL_MARKERS = (
 FEATURE_MARKERS = (
     b"QEMU CORE PASS: secure getrandom",
     b"QEMU CORE PASS: copy-on-write fork",
+    b"QEMU CORE PASS: default signal dispositions",
     b"QEMU CORE PASS: ext2 cache, mmap, sync, namespace, timestamps",
     b"QEMU CORE PASS: a shared mapping is visible to every reader",
     b"QEMU CORE PASS: a released pid stays out of use while its group lives",
@@ -36,6 +37,9 @@ FEATURE_MARKERS = (
     b"QEMU CORE PASS: priority, affinity, and accounting",
     b"QEMU CORE PASS: POSIX SIGEV_THREAD timer notification",
     b"QEMU CORE PASS: anonymous descriptors are open both ways",
+    b"QEMU CORE PASS: Linux pollfd ABI",
+    b"QEMU CORE PASS: Linux epoll ABI and event count",
+    b"QEMU CORE PASS: syscall C-int truncation",
     b"QEMU CORE PASS: abstract socket names are released",
     b"QEMU CORE PASS: persistence markers synchronized",
 )

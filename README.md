@@ -52,6 +52,7 @@ on real hardware.
 - [x] Wayland (Hyprland on aarch64)
 - [x] Hypervisor (Intel VT-x; see [documentation](docs/hypervisor.md))
 - [x] NUMA / multi-socket memory topology (see [documentation](docs/numa.md))
+- [x] Real-time scheduling: SCHED_FIFO/RR/DEADLINE (see [documentation](docs/realtime.md))
 - [x] V-UI 2
 - [ ] Intel HD graphics driver (Linux port)
 ## Build instructions
@@ -154,10 +155,14 @@ by:
 The aggregate builder rebuilds every owned layer and refuses to publish a
 partial image. Use `--reuse-layers` to validate and reassemble existing layer
 outputs during image work. Asahi Mesa and the native Blender backend require
-their dedicated, mutually different ARM64 Linux build environments; when their
-staging trees are present, the desktop builder includes them in this same final
-image automatically. Wi-Fi firmware and proprietary Office media remain
-explicit inputs and are never downloaded by the aggregate build.
+their dedicated, mutually different ARM64 Linux build environments. The desktop
+builder includes the native Blender backend automatically when its staging tree
+is present, but Asahi Mesa only with `--with-asahi-gpu`, because that Mesa is
+built for a real Apple GPU and carries no llvmpipe: on any other machine it
+replaces a software renderer good for OpenGL 4.5 with one that stops at 3.3.
+The M1 deployment scripts pass the flag; a QEMU image should not. Wi-Fi
+firmware and proprietary Office media remain explicit inputs and are never
+downloaded by the aggregate build.
 
 The desktop runner splits the writable `/root` seed from the immutable image
 and caches a compressed QEMU module. This keeps the boot payload small, leaves
@@ -321,6 +326,43 @@ run-gimp
 ./gimp-package-smoke.sh
 ```
 
+LibreOffice Writer and Calc run through the same private X11 window bridge,
+drawn by the GTK 3 VCL plugin. Install the suite on demand, then launch it from
+the wallpaper/Start menu or from a shell:
+
+```sh
+pkg install libreoffice
+run-libreoffice
+```
+
+A bootable image can carry it already installed, which is what the office
+regression test boots:
+
+```sh
+./build-libreoffice-aarch64.sh
+./build-desktop-aarch64.sh --compact-initramfs --with-libreoffice
+./tests/office/run.sh
+```
+
+Alpine builds the toolkit's runtime indexes from package triggers, which a
+staged image never runs. `run-libreoffice` rebuilds the ones VCL needs on its
+first start — the MIME database, the GDK-Pixbuf loader cache, the compiled
+GSettings schemas and the icon-theme caches. Without them GTK cannot load a
+single icon, and the suite exits before it maps a window rather than saying so.
+It also seeds a profile: the hosted display has no window manager, so nothing
+would size the document window to the surface, and a first run would open the
+Tip of the Day dialog on top of the document.
+
+The suite is much heavier on the kernel than the browsers are — its start-up
+alone builds those indexes, then runs a UNO service manager over several
+hundred shared objects — and the machine under it is not reliable there yet.
+The same image reaches a drawn page in 15 s in one run and, in another, loses
+the whole hosted process tree without a message, or stops in
+`scheduler_timer_handler` with *Attempted to get current CPU struct without
+disabling ints*: interrupts are enabled inside the scheduler's timer handler,
+which is a pre-existing SMP fault this workload is simply the first to reach
+often.
+
 Blender's shared data and runtime libraries are installed directly from
 Alpine's aarch64 package. The desktop launcher uses a native Vinix GHOST build:
 it renders through surfaceless EGL into the Vinix compositor's shared-surface
@@ -403,25 +445,43 @@ from first boot:
 tmux
 ```
 
-### C++ Minecraft client on aarch64
+### Minecraft: Java Edition on aarch64
 
-Vinix can run the native AArch64 Minetest 5.9.1 client, a C++ Minecraft-style
-voxel sandbox, through its SDL2/X11/OpenGL compatibility stack. The optional
-layer also bundles Minetest Game, so the default world works without fetching
-content after boot:
+Vinix runs Mojang's own Minecraft client on AArch64, on OpenJDK 25 through its
+X11 and software-OpenGL stack. The game is not part of this repository: the
+build downloads it from Mojang's distribution endpoints on your machine, the
+way any third-party launcher does.
 
 ```sh
 ./build-x11-aarch64.sh
+./build-java-aarch64.sh
 ./build-minecraft-aarch64.sh
 ./build-desktop-aarch64.sh
 ./run-desktop-aarch64.sh --no-desktop
 ```
 
-Open **Minecraft** from the desktop or run `minecraft` in a terminal. The
-launcher creates and reuses `$HOME/.minetest/worlds/Vinix World`; use
-`minecraft --menu` for Minetest's main menu and `minecraft --check` for a
-display-free runtime check. Software OpenGL and muted audio are the safe
-defaults. Set `VINIX_MINECRAFT_HARDWARE_GL=1` to experiment with hardware GL.
+`VINIX_MINECRAFT_VERSION` selects the version (default: the current release);
+`VINIX_MINECRAFT_ASSETS=none` stages the code without the ~500 MiB of assets.
+
+Open **Minecraft** from the desktop or run `minecraft` in a terminal. With no
+account signed in it starts Mojang's free demo. `minecraft --login` signs in to
+a Microsoft account that owns the game with the standard OAuth device-code
+flow, after which `minecraft` plays the full game; `--demo`, `--play`,
+`--logout` and a display-free `--check` are also accepted. Worlds and options
+live under `$HOME/.minecraft`.
+
+Microsoft requires every launcher to use its own registered application, so set
+`VINIX_MINECRAFT_MSA_CLIENT_ID` to the application id of an Azure registration
+approved for Minecraft sign-in before using `--login`. The demo needs no
+account and no application id.
+
+Two things make the stock Linux build work on Vinix. Mojang ships no AArch64
+Linux natives, so the LWJGL natives come from the same LWJGL release on Maven
+Central; and those are glibc objects, so they load through `gcompat`, with
+Alpine's native OpenAL and jemalloc substituted for the bundled copies that do
+not survive that translation. Rendering uses Mesa's llvmpipe, the only software
+rasteriser here that reaches the OpenGL 3.2 core profile the client requires.
+Set `VINIX_MINECRAFT_HARDWARE_GL=1` to experiment with hardware GL.
 
 GTK and Gnumeric are deliberately not included in the base or network-tools
 package layer. GTK is downloaded only when it or an application that needs it

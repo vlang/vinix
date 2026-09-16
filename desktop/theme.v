@@ -100,8 +100,8 @@ const taskbar_item_width = 168
 // down to here — narrower than this and a title says nothing useful.
 const taskbar_item_min_width = 84
 // The bottom-right clock keeps this much logical room, independently of the
-// framebuffer's physical density. At 200% the presenter expands it along with
-// the rest of the desktop, so task buttons can never paint over it on an M1.
+// framebuffer's physical density. At 200% the canvas expands it along with the
+// rest of the desktop, so task buttons can never paint over it on an M1.
 const taskbar_clock_width = 132
 // A dock's entries are narrower than a taskbar's, and the panel floats this
 // far clear of the screen's bottom edge.

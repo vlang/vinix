@@ -2,7 +2,7 @@ CC := xcrun clang
 CFLAGS := -O2 -Wall -Wextra -Werror
 BUILD := build
 
-.PHONY: all firmware pmp-firmware inspect kernel-kexts recover-t6050-power recover-t8103-adt g13g-kexts recover-g17-abi generate-g17-power-model check-g17-power-model generate-fake-g17-encoder check-fake-g17-encoder layout test trace trace-resources trace-depth-resources trace-stencil-resources clean
+.PHONY: report-g13-initdata-layout all firmware pmp-firmware inspect kernel-kexts recover-t6050-power recover-t8103-adt g13g-kexts generate-g13-initdata-layout check-g13-initdata-layout recover-g17-abi generate-g17-power-model check-g17-power-model generate-fake-g17-encoder check-fake-g17-encoder layout test trace trace-resources trace-depth-resources trace-stencil-resources clean
 all: $(BUILD)/agx_trace.dylib $(BUILD)/metal_triangle $(BUILD)/objc_layout
 
 $(BUILD):
@@ -48,6 +48,17 @@ recover-g17-abi: firmware kernel-kexts
 	./recover_g17_abi.py > $(BUILD)/recovered-g17-abi.json.tmp
 	mv $(BUILD)/recovered-g17-abi.json.tmp $(BUILD)/recovered-g17-abi.json
 
+# The 13.5 firmware ABI layout, computed from m1n1's versioned definitions.
+# Needs the m1n1 checkout: git clone https://github.com/AsahiLinux/m1n1 ~/code/3rd/m1n1
+generate-g13-initdata-layout:
+	./generate_g13_initdata_layout.py
+
+check-g13-initdata-layout:
+	./generate_g13_initdata_layout.py --check
+
+report-g13-initdata-layout:
+	./generate_g13_initdata_layout.py --report
+
 generate-g17-power-model:
 	./generate_g17_power_model.py
 
@@ -64,6 +75,7 @@ test:
 	python3 -m unittest -v test_inspect_macos.py test_extract_firmware.py \
 		test_extract_pmp_firmware.py test_extract_fileset.py \
 		test_recover_t6050_power.py test_recover_t8103_adt.py \
+		test_generate_g13_initdata_layout.py \
 		test_recover_g17_abi.py \
 		test_generate_g17_power_model.py \
 		test_generate_fake_g17_3d_encoder.py \

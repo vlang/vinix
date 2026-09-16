@@ -74,6 +74,7 @@ fn (mut d Desktop) titlebar_pointer_down_at(previous TitlebarClick, x int, y int
 		// pixel or two before release, put the window back where the first press
 		// found it before applying the maximise button's exact toggle semantics.
 		d.drag = Drag{}
+		d.drag_damage = DamageRect{}
 		d.windows[index].x = previous.window_x
 		d.windows[index].y = previous.window_y
 		d.windows[index].width = previous.window_width

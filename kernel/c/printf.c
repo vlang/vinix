@@ -68,7 +68,7 @@ int printf(const char *restrict fmt, ...) {
 }
 
 
-int printf_panic(const char *restrict fmt, ...) {
+int printf_panic(char *fmt, ...) {
     va_list l;
     va_start(l, fmt);
     int ret = npf_vpprintf(_putchar_panic, NULL, fmt, l);

@@ -5,7 +5,9 @@
 #define _GNU_SOURCE
 #include <errno.h>
 #include <fcntl.h>
+#include <poll.h>
 #include <sched.h>
+#include <signal.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -18,9 +20,11 @@
 #include <sys/resource.h>
 #include <sys/stat.h>
 #include <sys/eventfd.h>
+#include <sys/epoll.h>
 #include <sys/socket.h>
 #include <sys/statfs.h>
 #include <sys/sysinfo.h>
+#include <sys/syscall.h>
 #include <sys/uio.h>
 #include <sys/un.h>
 #include <sys/wait.h>
@@ -135,6 +139,36 @@ static int test_cow(void)
 	CHECK(page[0] == 0x31 && page[4095] == 0x73);
 	CHECK(munmap((void *)page, 4096) == 0);
 	puts("QEMU CORE PASS: copy-on-write fork");
+	return 0;
+}
+
+static int test_default_terminating_signals(void)
+{
+	pid_t child = fork();
+	CHECK(child >= 0);
+	if (child == 0) {
+		for (;;)
+			pause();
+	}
+	CHECK(kill(child, SIGTERM) == 0);
+	int status = -1;
+	CHECK(waitpid(child, &status, 0) == child);
+	CHECK(WIFSIGNALED(status) && WTERMSIG(status) == SIGTERM);
+
+	child = fork();
+	CHECK(child >= 0);
+	if (child == 0) {
+		for (;;)
+			pause();
+	}
+	CHECK(kill(child, SIGKILL) == 0);
+	status = -1;
+	CHECK(waitpid(child, &status, 0) == child);
+	CHECK(WIFSIGNALED(status) && WTERMSIG(status) == SIGKILL);
+
+	/* These signals have ignored default dispositions on Linux. */
+	CHECK(kill(getpid(), SIGWINCH) == 0);
+	puts("QEMU CORE PASS: default signal dispositions");
 	return 0;
 }
 
@@ -567,6 +601,79 @@ static int test_anonymous_descriptor_access(void)
 	return 0;
 }
 
+/* V3 makes the V `int` type pointer-width. Linux still defines pollfd.fd as a
+ * 32-bit C int, so exercise the structure from a real libc caller: widening
+ * the kernel field makes it combine fd/events into one invalid descriptor. */
+static int test_pollfd_abi(void)
+{
+	int pair[2];
+	CHECK(pipe(pair) == 0);
+	struct pollfd descriptor = {
+		.fd = pair[0],
+		.events = POLLIN,
+	};
+	CHECK(poll(&descriptor, 1, 0) == 0);
+	CHECK(descriptor.revents == 0);
+	CHECK(write(pair[1], "p", 1) == 1);
+	CHECK(poll(&descriptor, 1, 1000) == 1);
+	CHECK((descriptor.revents & POLLIN) != 0);
+	char byte = 0;
+	CHECK(read(pair[0], &byte, 1) == 1);
+	CHECK(byte == 'p');
+	CHECK(close(pair[0]) == 0);
+	CHECK(close(pair[1]) == 0);
+	puts("QEMU CORE PASS: Linux pollfd ABI");
+	return 0;
+}
+
+/* qemu-user translates an x86 epoll_event into the native AArch64 layout
+ * before entering Vinix. Verify both that layout and the syscall result: a
+ * wrong stride or a returned byte count makes userspace consume uninitialised
+ * events, which is especially destructive to Wine's server protocol. */
+static int test_epoll_abi_and_count(void)
+{
+	int pair[2];
+	CHECK(pipe(pair) == 0);
+	int epoll = epoll_create1(EPOLL_CLOEXEC);
+	CHECK(epoll >= 0);
+	struct epoll_event requested = {
+		.events = EPOLLIN,
+		.data.u64 = UINT64_C(0x56494e495845504f),
+	};
+	CHECK(epoll_ctl(epoll, EPOLL_CTL_ADD, pair[0], &requested) == 0);
+
+	struct epoll_event observed[4];
+	memset(observed, 0xa5, sizeof(observed));
+	CHECK(epoll_wait(epoll, observed, 4, 0) == 0);
+	CHECK(write(pair[1], "e", 1) == 1);
+	CHECK(epoll_wait(epoll, observed, 4, 1000) == 1);
+	CHECK((observed[0].events & EPOLLIN) != 0);
+	CHECK(observed[0].data.u64 == requested.data.u64);
+
+	char byte = 0;
+	CHECK(read(pair[0], &byte, 1) == 1);
+	CHECK(byte == 'e');
+	CHECK(epoll_wait(epoll, observed, 4, 0) == 0);
+	CHECK(close(epoll) == 0);
+	CHECK(close(pair[0]) == 0);
+	CHECK(close(pair[1]) == 0);
+	puts("QEMU CORE PASS: Linux epoll ABI and event count");
+	return 0;
+}
+
+/* The AArch64 syscall ABI leaves the unused high half of C-int arguments
+ * unspecified. qemu-user zero-extends AT_FDCWD while translating x86 open(2),
+ * and the kernel must truncate it before interpreting the signed value. */
+static int test_syscall_int_truncation(void)
+{
+	long descriptor = syscall(SYS_openat, UINT64_C(0x00000000ffffff9c), ".",
+	    O_RDONLY, 0);
+	CHECK(descriptor >= 0);
+	CHECK(close((int)descriptor) == 0);
+	puts("QEMU CORE PASS: syscall C-int truncation");
+	return 0;
+}
+
 /* An abstract socket name belongs to the socket that bound it, and has to come
  * back when that socket goes. Leaking it reserved the name for the life of the
  * machine: an X server that had been restarted could not bind its own display
@@ -618,6 +725,7 @@ static int run_tests(void)
 		return 0;
 	CHECK(test_random() == 0);
 	CHECK(test_cow() == 0);
+	CHECK(test_default_terminating_signals() == 0);
 	CHECK(prepare_directory() == 0);
 	CHECK(test_ext2_mapping_and_namespace() == 0);
 	CHECK(test_shared_mapping_visible_to_readers() == 0);
@@ -628,6 +736,9 @@ static int run_tests(void)
 	CHECK(test_scheduler_and_accounting() == 0);
 	CHECK(test_posix_timer_thread_notification() == 0);
 	CHECK(test_anonymous_descriptor_access() == 0);
+	CHECK(test_pollfd_abi() == 0);
+	CHECK(test_epoll_abi_and_count() == 0);
+	CHECK(test_syscall_int_truncation() == 0);
 	CHECK(test_abstract_socket_reuse() == 0);
 	CHECK(unlink(file_a) == 0);
 	CHECK(unlink(file_b) == 0);

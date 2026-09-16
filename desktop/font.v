@@ -27,14 +27,15 @@ struct Glyph {
 struct FontFace {
 mut:
 	// What the face was baked at, which is how a text style picks between them.
-	bold        bool
-	mono        bool
-	size        int
-	ascent      int
-	descent     int
-	line_height int
-	glyphs      []Glyph
-	pixels      []u8
+	bold         bool
+	mono         bool
+	size         int
+	raster_scale int
+	ascent       int
+	descent      int
+	line_height  int
+	glyphs       []Glyph
+	pixels       []u8
 }
 
 const glyph_header_size = 5
@@ -51,25 +52,26 @@ fn load_face(data FaceBlob) FontFace {
 		width := int(raw[base])
 		height := int(raw[base + 1])
 		glyphs << Glyph{
-			width: width
-			height: height
+			width:     width
+			height:    height
 			bearing_x: int(i8(raw[base + 2]))
 			bearing_y: int(raw[base + 3])
-			advance: int(raw[base + 4])
-			offset: offset
+			advance:   int(raw[base + 4])
+			offset:    offset
 		}
 		offset += width * height
 	}
 
 	return FontFace{
-		bold: data.bold
-		mono: data.mono
-		size: data.size
-		ascent: data.ascent
-		descent: data.descent
-		line_height: data.ascent + data.descent
-		glyphs: glyphs
-		pixels: raw[header_bytes..].clone()
+		bold:         data.bold
+		mono:         data.mono
+		size:         data.size
+		raster_scale: data.raster_scale
+		ascent:       data.ascent
+		descent:      data.descent
+		line_height:  data.ascent + data.descent
+		glyphs:       glyphs
+		pixels:       raw[header_bytes..].clone()
 	}
 }
 
@@ -126,7 +128,7 @@ fn (f &FontFace) text_width(text string) int {
 	mut i := 0
 	for i < text.len {
 		code_point, size := next_rune(text, i)
-		width += f.glyph_for(code_point).advance
+		width += f.glyph_for(code_point).advance / f.raster_scale
 		i += size
 	}
 	return width
@@ -147,7 +149,7 @@ fn (f &FontFace) truncate(text string, limit int) (string, bool) {
 	mut i := 0
 	for i < text.len {
 		code_point, size := next_rune(text, i)
-		advance := f.glyph_for(code_point).advance
+		advance := f.glyph_for(code_point).advance / f.raster_scale
 		if width + advance + tail > limit {
 			break
 		}
@@ -167,37 +169,37 @@ fn (f &FontFace) truncate(text string, limit int) (string, bool) {
 // draw_text places the run's line box at (x, y) and returns the pen position
 // it ended at.
 fn (mut c Canvas) draw_text(face &FontFace, x int, y int, text string, color u32) int {
-	mut pen := x
+	mut pen := x * c.scale
 	mut i := 0
 	for i < text.len {
 		code_point, size := next_rune(text, i)
 		glyph := face.glyph_for(code_point)
 		if glyph.width > 0 && glyph.height > 0 {
-			c.blit_glyph(face, glyph, pen + glyph.bearing_x, y + glyph.bearing_y, color)
+			c.blit_glyph(face, glyph, pen + glyph.bearing_x, y * c.scale + glyph.bearing_y, color)
 		}
 		pen += glyph.advance
 		i += size
 	}
-	return pen
+	return x + face.text_width(text)
 }
 
 fn (mut c Canvas) blit_glyph(face &FontFace, glyph Glyph, x int, y int, color u32) {
 	for row := 0; row < glyph.height; row++ {
 		py := y + row
-		if py < 0 || py >= c.height {
+		if py < 0 || py >= c.physical_height {
 			continue
 		}
 		src := glyph.offset + row * glyph.width
 		for col := 0; col < glyph.width; col++ {
 			px := x + col
-			if px < 0 || px >= c.width {
+			if px < 0 || px >= c.physical_width {
 				continue
 			}
 			coverage := u32(face.pixels[src + col])
 			if coverage == 0 {
 				continue
 			}
-			c.blend_pixel(px, py, color, coverage)
+			c.blend_physical_pixel(px, py, color, coverage)
 		}
 	}
 }

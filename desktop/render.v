@@ -151,6 +151,9 @@ fn (d &Desktop) face_for(style ui2.TextStyle) &FontFace {
 	mut best_score := 1 << 30
 	for i, face in d.fonts {
 		mut score := abs_int(face.size - wanted)
+		if face.raster_scale != d.canvas.scale {
+			score += 1000000
+		}
 		if face.mono != want_mono {
 			score += 100000
 		}
@@ -192,18 +195,49 @@ fn free_tree(el ui2.Element) {
 }
 
 fn (mut d Desktop) render(root ui2.Element) {
+	d.render_clipped(root, Clip{
+		x: 0
+		y: 0
+		w: d.canvas.width
+		h: d.canvas.height
+	})
+}
+
+// render_drag_damage refreshes only the pixels a moving top-level window can
+// have changed. The element walk still records every hit target, so click
+// routing is correct as soon as the drag ends.
+fn (mut d Desktop) render_drag_damage(root ui2.Element, damage DamageRect) {
+	left := if damage.x > 0 { damage.x } else { 0 }
+	top := if damage.y > 0 { damage.y } else { 0 }
+	right := if damage.x + damage.w < d.canvas.width { damage.x + damage.w } else { d.canvas.width }
+	bottom := if damage.y + damage.h < d.canvas.height {
+		damage.y + damage.h
+	} else {
+		d.canvas.height
+	}
+	d.render_clipped(root, Clip{
+		x: left
+		y: top
+		w: if right > left { right - left } else { 0 }
+		h: if bottom > top { bottom - top } else { 0 }
+	})
+}
+
+fn (mut d Desktop) render_clipped(root ui2.Element, clip Clip) {
 	// clear() keeps the buffer, so a steady desktop stops allocating one per
 	// frame.
 	d.targets.clear()
+	d.canvas.clip = clip
+	d.paint_wallpaper()
+	d.render_element(root, 0, 0, 0)
+	d.draw_cursor()
+	// A partial frame must not leak its clip into the next full one.
 	d.canvas.clip = Clip{
 		x: 0
 		y: 0
 		w: d.canvas.width
 		h: d.canvas.height
 	}
-	d.paint_wallpaper()
-	d.render_element(root, 0, 0, 0)
-	d.draw_cursor()
 }
 
 fn (mut d Desktop) render_element(el ui2.Element, off_x int, off_y int, depth int) {
@@ -231,8 +265,7 @@ fn (mut d Desktop) render_element(el ui2.Element, off_x int, off_y int, depth in
 		}
 		.image {
 			if el.image_path.starts_with(vinix_surface_image_prefix) {
-				d.canvas.draw_vinix_surface(el.image_path[vinix_surface_image_prefix.len..], x,
-					y, w, h)
+				d.canvas.draw_vinix_surface(el.image_path[vinix_surface_image_prefix.len..], x, y, w, h)
 			} else if el.image_path.starts_with(office_xwd_image_prefix) {
 				drawn, has_ribbon := d.canvas.draw_office_xwd_surface(el.image_path[office_xwd_image_prefix.len..], x, y, w, h)
 				if drawn && has_ribbon {
@@ -305,10 +338,10 @@ fn (mut d Desktop) record_target(el ui2.Element, x int, y int, w int, h int) {
 	}
 	d.targets << HitTarget{
 		action_id: action
-		x: x
-		y: y
-		width: w
-		height: h
+		x:         x
+		y:         y
+		width:     w
+		height:    h
 	}
 }
 
@@ -328,15 +361,7 @@ fn (mut d Desktop) draw_surface(el ui2.Element, x int, y int, w int, h int, dept
 	// below it is keyed off the window manager's own id.
 	translucent := el.id == switcher_panel_id
 	if floating {
-		saved := d.canvas.clip
-		d.canvas.clip = Clip{
-			x: 0
-			y: 0
-			w: d.canvas.width
-			h: d.canvas.height
-		}
 		d.canvas.drop_shadow(x, y, w, h, radius, 7, d.theme().shadow_alpha)
-		d.canvas.restore_clip(saved)
 	}
 	if translucent {
 		d.canvas.blend_round_rect(x, y, w, h, radius, el.box.bg, switcher_alpha)
@@ -363,13 +388,25 @@ fn (mut d Desktop) draw_surface(el ui2.Element, x int, y int, w int, h int, dept
 	// names the same colour twice and costs nothing extra.
 	theme := d.theme()
 	if el.id.ends_with('.titlebar') {
-		bottom := if el.box.bg == theme.title_active_bg {
+		active := el.box.bg == theme.title_active_bg
+		bottom := if active {
 			theme.title_active_bg2
 		} else {
 			theme.title_inactive_bg2
 		}
+		highlight := if active { theme.title_highlight } else { theme.title_inactive_highlight }
 		if bottom != el.box.bg {
-			d.canvas.vertical_gradient(x, y, w, h, el.box.bg, bottom)
+			if highlight != 0 && h > 2 {
+				// Catalina reserves the first and last title-bar rows for its top
+				// highlight and divider. The 20 rows between them reach both
+				// measured gradient colours.
+				d.canvas.vertical_gradient_inclusive(x, y + 1, w, h - 2, el.box.bg, bottom)
+			} else {
+				d.canvas.vertical_gradient(x, y, w, h, el.box.bg, bottom)
+			}
+		}
+		if highlight != 0 {
+			d.canvas.fill_rect(x, y, w, 1, highlight)
 		}
 	}
 }
@@ -416,9 +453,7 @@ fn (mut d Desktop) paint_wallpaper() {
 		d.wallpaper_valid = true
 	}
 
-	unsafe {
-		C.memcpy(d.canvas.pixels, d.wallpaper.data, usize(width * height * 4))
-	}
+	d.canvas.copy_logical_pixels(d.wallpaper)
 }
 
 fn (mut d Desktop) draw_label(el ui2.Element, x int, y int, w int, h int) {
@@ -473,6 +508,15 @@ fn (mut d Desktop) draw_button(el ui2.Element, x int, y int, w int, h int) {
 			d.canvas.fill_round_rect(x, y, w, h, radius, el.box.bg)
 		} else {
 			d.canvas.fill_rect(x, y, w, h, el.box.bg)
+		}
+		// Catalina's traffic lights have a one-pixel role-coloured ring. BoxStyle
+		// carries it on the local title buttons; keep this renderer deliberately
+		// to the uniform border ui2 can express as one rounded outline.
+		is_title_button := el.id.ends_with('.close') || el.id.ends_with('.minimize')
+			|| el.id.ends_with('.maximize')
+		if is_title_button && el.box.border_left == 1 && el.box.border_top == 1 && el.box.border_right == 1
+			&& el.box.border_bottom == 1 {
+			d.canvas.stroke_round_rect(x, y, w, h, radius, el.box.border_color, 255)
 		}
 	}
 
@@ -548,8 +592,18 @@ fn (mut d Desktop) draw_builtin_glyph(path string, x int, y int, w int, h int, c
 		'minimize' {
 			d.canvas.fill_rect(cx - half, cy, 2 * half, 1, color)
 		}
+		'traffic_minimize' {
+			// The Catalina collapse mark is a 6x2 dash in a 12-pixel disc.
+			d.canvas.fill_rect(cx - 2, cy - 1, 6, 2, color)
+		}
 		'maximize' {
 			d.canvas.stroke_round_rect(cx - half, cy - half, 2 * half, 2 * half, 1, color, 255)
+		}
+		'zoom' {
+			// Measured from Catalina's 12-pixel standard zoom control: the mark
+			// is a 6x6 plus with two-pixel strokes.
+			d.canvas.fill_rect(cx - 2, cy - 1, 6, 2, color)
+			d.canvas.fill_rect(cx, cy - 3, 2, 6, color)
 		}
 		'restore' {
 			// Two offset outlines, the back one clipped by the front's fill.
@@ -560,6 +614,10 @@ fn (mut d Desktop) draw_builtin_glyph(path string, x int, y int, w int, h int, c
 		'close' {
 			d.canvas.draw_line(cx - half, cy - half, cx + half, cy + half, color, 1)
 			d.canvas.draw_line(cx + half, cy - half, cx - half, cy + half, color, 1)
+		}
+		'traffic_close' {
+			d.canvas.draw_line(cx - 2, cy - 3, cx + 3, cy + 2, color, 1)
+			d.canvas.draw_line(cx + 3, cy - 3, cx - 2, cy + 2, color, 1)
 		}
 
 		// Application and file icons. These are filled shapes rather than
@@ -763,7 +821,7 @@ fn (d &Desktop) surface_under(x int, y int) u32 {
 	if x < 0 || y < 0 || x >= d.canvas.width || y >= d.canvas.height {
 		return d.theme().title_active_bg
 	}
-	return unsafe { d.canvas.pixels[y * d.canvas.stride + x] }
+	return d.canvas.logical_pixel(x, y)
 }
 
 // The pointer is drawn last, over everything, from a small mask: '#' is the

@@ -74,7 +74,7 @@ mut:
 // every consumer indexes the mapping as u32.
 struct Framebuffer {
 mut:
-	fd     int = -1
+	fd     int  = -1
 	base   &u32 = unsafe { nil }
 	width  int
 	height int
@@ -125,13 +125,13 @@ fn open_framebuffer(path string) !Framebuffer {
 	}
 
 	return Framebuffer{
-		fd: fd
-		base: unsafe { &u32(mapping) }
-		width: width
-		height: height
-		stride: stride
-		size: size
-		direct: var.red.offset == 16 && var.green.offset == 8 && var.blue.offset == 0
+		fd:      fd
+		base:    unsafe { &u32(mapping) }
+		width:   width
+		height:  height
+		stride:  stride
+		size:    size
+		direct:  var.red.offset == 16 && var.green.offset == 8 && var.blue.offset == 0
 		r_shift: var.red.offset
 		g_shift: var.green.offset
 		b_shift: var.blue.offset
@@ -143,54 +143,20 @@ fn (fb &Framebuffer) pack_pixel(pixel u32) u32 {
 	if fb.direct {
 		return pixel
 	}
-	return ((pixel >> 16) & 0xff) << fb.r_shift | ((pixel >> 8) & 0xff) << fb.g_shift |
-		(pixel & 0xff) << fb.b_shift
+	return ((pixel >> 16) & 0xff) << fb.r_shift | ((pixel >> 8) & 0xff) << fb.g_shift | (pixel & 0xff) << fb.b_shift
 }
 
-// present copies a finished frame out in one pass. At 200% the desktop composes
-// at half resolution and each logical pixel is expanded to a crisp 2x2 block.
-// On the usual XRGB8888 framebuffer the 100% path remains one memcpy per frame.
-fn (mut fb Framebuffer) present(canvas &Canvas, scale int) {
+// present copies a finished native-resolution frame out in one pass. Canvas
+// keeps logical geometry separately from its backing dimensions, allowing 2x
+// font masks to remain sharp while this final transfer stays scale-agnostic.
+fn (mut fb Framebuffer) present(canvas &Canvas, _ int) {
 	// On an M1 build this creates a surfaceless EGL context lazily and lets AGX
-	// scale/composite the CPU canvas into the firmware framebuffer. The static
+	// composite the CPU canvas into the firmware framebuffer. The static
 	// desktop and any failed GPU initialization continue through this file's
 	// existing software paths.
 	if fb.direct && fb.gpu.present(canvas, fb.base, fb.width, fb.height, fb.stride) {
 		return
 	}
-	if scale == desktop_scale_200 {
-		for source_y := 0; source_y < canvas.height; source_y++ {
-			physical_y := source_y * desktop_scale_200
-			if physical_y >= fb.height {
-				break
-			}
-			source := source_y * canvas.stride
-			destination := physical_y * fb.stride
-			mut physical_x := 0
-			for source_x := 0; source_x < canvas.width; source_x++ {
-				if physical_x >= fb.width {
-					break
-				}
-				pixel := unsafe { canvas.pixels[source + source_x] }
-				packed := fb.pack_pixel(pixel)
-				unsafe {
-					fb.base[destination + physical_x] = packed
-					if physical_x + 1 < fb.width {
-						fb.base[destination + physical_x + 1] = packed
-					}
-				}
-				physical_x += desktop_scale_200
-			}
-			if physical_y + 1 < fb.height {
-				unsafe {
-					vmemcpy(&fb.base[(physical_y + 1) * fb.stride], &fb.base[destination],
-						usize(fb.width * 4))
-				}
-			}
-		}
-		return
-	}
-
 	if fb.direct {
 		if canvas.stride == fb.stride {
 			unsafe {
@@ -210,6 +176,45 @@ fn (mut fb Framebuffer) present(canvas &Canvas, scale int) {
 		src := y * canvas.stride
 		dst := y * fb.stride
 		for x := 0; x < fb.width; x++ {
+			pixel := unsafe { canvas.pixels[src + x] }
+			unsafe { fb.base[dst + x] = fb.pack_pixel(pixel) }
+		}
+	}
+}
+
+// present_damage transfers only a changed logical rectangle. The GPU presenter
+// owns a full-frame hardware path, so it remains preferable when active;
+// software fbdev output otherwise avoids copying untouched desktop pixels.
+fn (mut fb Framebuffer) present_damage(canvas &Canvas, damage DamageRect) {
+	if !damage.valid {
+		return
+	}
+	if fb.direct && fb.gpu.present(canvas, fb.base, fb.width, fb.height, fb.stride) {
+		return
+	}
+	x0 := if damage.x > 0 { damage.x } else { 0 }
+	y0 := if damage.y > 0 { damage.y } else { 0 }
+	x1 := if damage.x + damage.w < canvas.width { damage.x + damage.w } else { canvas.width }
+	y1 := if damage.y + damage.h < canvas.height { damage.y + damage.h } else { canvas.height }
+	if x1 <= x0 || y1 <= y0 {
+		return
+	}
+	physical_x0 := x0 * canvas.scale
+	physical_y0 := y0 * canvas.scale
+	physical_x1 := if x1 * canvas.scale < fb.width { x1 * canvas.scale } else { fb.width }
+	physical_y1 := if y1 * canvas.scale < fb.height { y1 * canvas.scale } else { fb.height }
+	if fb.direct {
+		for y := physical_y0; y < physical_y1; y++ {
+			unsafe {
+				vmemcpy(&fb.base[y * fb.stride + physical_x0], &canvas.pixels[y * canvas.stride + physical_x0], usize((physical_x1 - physical_x0) * 4))
+			}
+		}
+		return
+	}
+	for y := physical_y0; y < physical_y1; y++ {
+		src := y * canvas.stride
+		dst := y * fb.stride
+		for x := physical_x0; x < physical_x1; x++ {
 			pixel := unsafe { canvas.pixels[src + x] }
 			unsafe { fb.base[dst + x] = fb.pack_pixel(pixel) }
 		}

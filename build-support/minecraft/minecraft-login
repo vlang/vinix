@@ -1,0 +1,203 @@
+#!/usr/bin/env python3
+"""Sign in to a Microsoft account that owns Minecraft, on Vinix.
+
+This is the ordinary OAuth 2.0 device-code flow every third-party launcher
+uses: Microsoft issues a code, the player approves it in a browser on any
+device, and the resulting token is exchanged through Xbox Live and XSTS for a
+Minecraft session. Nothing here works around a purchase — the account must own
+the game, and the entitlement is checked before a session is written.
+
+Microsoft requires each launcher to use its own registered application. Set
+VINIX_MINECRAFT_MSA_CLIENT_ID (or pass --client-id) to the application ID of an
+Azure registration approved for Minecraft sign-in. Without one, only Mojang's
+free demo is available, which needs no account at all.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import sys
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+from pathlib import Path
+
+DEVICE_CODE_URL = "https://login.microsoftonline.com/consumers/oauth2/v2.0/devicecode"
+TOKEN_URL = "https://login.microsoftonline.com/consumers/oauth2/v2.0/token"
+XBL_URL = "https://user.auth.xboxlive.com/user/authenticate"
+XSTS_URL = "https://xsts.auth.xboxlive.com/xsts/authorize"
+MC_LOGIN_URL = "https://api.minecraftservices.com/authentication/login_with_xbox"
+MC_ENTITLEMENTS_URL = "https://api.minecraftservices.com/entitlements/mcstore"
+MC_PROFILE_URL = "https://api.minecraftservices.com/minecraft/profile"
+SCOPE = "XboxLive.signin offline_access"
+
+
+def post_json(url: str, payload: dict, token: str | None = None) -> dict:
+    headers = {"Content-Type": "application/json", "Accept": "application/json"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    request = urllib.request.Request(
+        url, data=json.dumps(payload).encode(), headers=headers, method="POST"
+    )
+    with urllib.request.urlopen(request, timeout=60) as response:
+        return json.loads(response.read())
+
+
+def get_json(url: str, token: str) -> dict:
+    request = urllib.request.Request(url, headers={"Authorization": f"Bearer {token}"})
+    with urllib.request.urlopen(request, timeout=60) as response:
+        return json.loads(response.read())
+
+
+def post_form(url: str, fields: dict) -> tuple[int, dict]:
+    data = urllib.parse.urlencode(fields).encode()
+    request = urllib.request.Request(url, data=data, method="POST")
+    try:
+        with urllib.request.urlopen(request, timeout=60) as response:
+            return response.status, json.loads(response.read())
+    except urllib.error.HTTPError as error:
+        return error.code, json.loads(error.read())
+
+
+def microsoft_token(client_id: str) -> str:
+    status, start = post_form(
+        DEVICE_CODE_URL, {"client_id": client_id, "scope": SCOPE}
+    )
+    if status >= 400:
+        raise SystemExit(
+            f"minecraft-login: Microsoft rejected the application id: "
+            f"{start.get('error_description', start)}"
+        )
+    print()
+    print(f"  Open {start['verification_uri']} and enter the code {start['user_code']}")
+    print("  Waiting for approval…", flush=True)
+
+    interval = int(start.get("interval", 5))
+    deadline = time.time() + int(start.get("expires_in", 900))
+    while time.time() < deadline:
+        time.sleep(interval)
+        status, token = post_form(
+            TOKEN_URL,
+            {
+                "client_id": client_id,
+                "grant_type": "urn:ietf:params:oauth:grant-type:device_code",
+                "device_code": start["device_code"],
+            },
+        )
+        if status < 400:
+            return token["access_token"]
+        error = token.get("error")
+        if error == "authorization_pending":
+            continue
+        if error == "slow_down":
+            interval += 5
+            continue
+        raise SystemExit(
+            f"minecraft-login: sign-in failed: {token.get('error_description', error)}"
+        )
+    raise SystemExit("minecraft-login: the code expired before it was approved")
+
+
+def minecraft_session(microsoft_access_token: str) -> dict:
+    xbl = post_json(
+        XBL_URL,
+        {
+            "Properties": {
+                "AuthMethod": "RPS",
+                "SiteName": "user.auth.xboxlive.com",
+                "RpsTicket": f"d={microsoft_access_token}",
+            },
+            "RelyingParty": "http://auth.xboxlive.com",
+            "TokenType": "JWT",
+        },
+    )
+    try:
+        xsts = post_json(
+            XSTS_URL,
+            {
+                "Properties": {"SandboxId": "RETAIL", "UserTokens": [xbl["Token"]]},
+                "RelyingParty": "rp://api.minecraftservices.com/",
+                "TokenType": "JWT",
+            },
+        )
+    except urllib.error.HTTPError as error:
+        detail = json.loads(error.read()) if error.code == 401 else {}
+        if detail.get("XErr") == 2148916233:
+            raise SystemExit(
+                "minecraft-login: this Microsoft account has no Xbox profile"
+            ) from error
+        if detail.get("XErr") == 2148916238:
+            raise SystemExit(
+                "minecraft-login: this is a child account and needs to join a family"
+            ) from error
+        raise
+
+    user_hash = xsts["DisplayClaims"]["xui"][0]["uhs"]
+    xuid = xsts["DisplayClaims"]["xui"][0].get("xid", "0")
+    session = post_json(
+        MC_LOGIN_URL,
+        {"identityToken": f"XBL3.0 x={user_hash};{xsts['Token']}"},
+    )
+    token = session["access_token"]
+
+    entitlements = get_json(MC_ENTITLEMENTS_URL, token)
+    if not entitlements.get("items"):
+        raise SystemExit(
+            "minecraft-login: this account does not own Minecraft: Java Edition. "
+            "Run 'minecraft --demo' to play Mojang's free demo instead."
+        )
+    profile = get_json(MC_PROFILE_URL, token)
+    return {
+        "name": profile["name"],
+        "uuid": profile["id"],
+        "token": token,
+        "xuid": xuid,
+    }
+
+
+def shell_quote(value: str) -> str:
+    return "'" + value.replace("'", "'\\''") + "'"
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--session", required=True, type=Path)
+    parser.add_argument(
+        "--client-id", default=os.environ.get("VINIX_MINECRAFT_MSA_CLIENT_ID", "")
+    )
+    options = parser.parse_args()
+
+    if not options.client_id:
+        print(
+            "minecraft-login: no Microsoft application id configured.\n"
+            "  Register an Azure application approved for Minecraft sign-in and set\n"
+            "  VINIX_MINECRAFT_MSA_CLIENT_ID to its application id.\n"
+            "  Mojang's free demo needs no account: run 'minecraft --demo'.",
+            file=sys.stderr,
+        )
+        return 1
+
+    account = minecraft_session(microsoft_token(options.client_id))
+    options.session.parent.mkdir(parents=True, exist_ok=True)
+    options.session.write_text(
+        "\n".join(
+            [
+                "# Written by minecraft-login. Contains a Minecraft session token.",
+                f"MC_PLAYER_NAME={shell_quote(account['name'])}",
+                f"MC_PLAYER_UUID={shell_quote(account['uuid'])}",
+                f"MC_PLAYER_XUID={shell_quote(account['xuid'])}",
+                f"MC_ACCESS_TOKEN={shell_quote(account['token'])}",
+            ]
+        )
+        + "\n"
+    )
+    options.session.chmod(0o600)
+    print(f"minecraft-login: signed in as {account['name']}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

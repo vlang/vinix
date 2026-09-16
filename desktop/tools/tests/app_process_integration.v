@@ -32,6 +32,20 @@ fn main() {
 	}
 	desktop_ignore_broken_pipe()
 
+	// A silent application process must not be able to hold PID 1 before its
+	// first framebuffer present (or during a later Settings action). Keep the
+	// test timeout tiny; production allows a slow Vinix child five seconds.
+	mut silent_pipe := [2]i32{}
+	assert C.pipe(&silent_pipe[0]) == 0
+	mut response_timed_out := false
+	receive_app_response_with_timeout(int(silent_pipe[0]), 10) or {
+		assert err.msg() == 'application response timed out'
+		response_timed_out = true
+	}
+	assert response_timed_out
+	desktop_close(int(silent_pipe[0]))
+	desktop_close(int(silent_pipe[1]))
+
 	// Remote polling is paced before a pipe request is sent. In particular,
 	// the once-a-second Activity Monitor must not wake itself and the compositor
 	// on every 16 ms desktop pass just to answer "not yet".

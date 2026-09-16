@@ -500,10 +500,10 @@ else
     echo "==> Firefox staging not found, skipping (run build-firefox-aarch64.sh first)"
 fi
 
-# Minetest is a native C++/SDL/OpenGL client. Merge it before Asahi so the
-# hardware-specific Mesa userspace remains the final graphics implementation.
+# Minecraft renders with Mesa's software rasteriser. Merge it before Asahi so
+# the hardware-specific Mesa userspace remains the final graphics implementation.
 if [ -x "$MINECRAFT_STAGING/usr/bin/minecraft" ]; then
-    echo "==> Integrating C++ Minecraft runtime..."
+    echo "==> Integrating Minecraft runtime..."
     merge_staging_tree "$MINECRAFT_STAGING"
 else
     echo "==> Minecraft staging not found, skipping (run build-minecraft-aarch64.sh first)"
@@ -512,8 +512,18 @@ fi
 # The native Asahi build is produced in the Debian ARM64 VM. Once its staging
 # directory has been copied back beside this script, merge it last so its EGL,
 # GLES and Gallium libraries replace any software-only Mesa copies from X11.
+#
+# Only for a userland that is actually going to run on Apple hardware, which is
+# what VINIX_WITH_ASAHI_GPU says. That Mesa is built for a real GPU and carries
+# no llvmpipe at all, so its only software rasteriser is softpipe -- an OpenGL
+# 3.3 ceiling where the generic build reaches 4.5. Merging it into the shared
+# userland therefore downgrades software rendering for every image built from
+# it, and because that happens on the mere presence of a staging directory
+# rather than a commit, the day it lands nothing in git explains why an
+# application needing more than 3.3 stopped working. Native Blender, which asks
+# for a 4.3 core context, is how this was found.
 ASAHI_STAGING="$SCRIPT_DIR/build-aarch64-asahi/staging"
-if [ -x "$ASAHI_STAGING/usr/bin/gl-triangle-agx" ]; then
+if [ "${VINIX_WITH_ASAHI_GPU:-0}" = 1 ] && [ -x "$ASAHI_STAGING/usr/bin/gl-triangle-agx" ]; then
     echo "==> Integrating native Apple GPU userspace..."
     merge_staging_tree "$ASAHI_STAGING"
     install -m755 "$SCRIPT_DIR/gl-triangle/run-gl-triangle" \

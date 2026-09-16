@@ -92,7 +92,7 @@ fn mapped_surface(path string) ?XwdSurface {
 		mapped_surfaces.delete(0)
 	}
 	mapped_surfaces << MappedSurface{
-		path: path.clone()
+		path:    path.clone()
 		surface: surface
 	}
 	return surface
@@ -144,24 +144,24 @@ fn open_xwd_surface(path string) ?XwdSurface {
 		return none
 	}
 	return XwdSurface{
-		direct: byte_order == 0 && red_mask == 0xff0000 && green_mask == 0xff00
+		direct:         byte_order == 0 && red_mask == 0xff0000 && green_mask == 0xff00
 			&& blue_mask == 0xff && pixel_offset % 4 == 0 && bytes_per_line % 4 == 0
-		mapping: mapping
-		size: info.size
-		pixels: unsafe { &u8(usize(mapping) + usize(pixel_offset)) }
-		width: int(width)
-		height: int(height)
+		mapping:        mapping
+		size:           info.size
+		pixels:         unsafe { &u8(usize(mapping) + usize(pixel_offset)) }
+		width:          int(width)
+		height:         int(height)
 		bytes_per_line: int(bytes_per_line)
-		byte_order: byte_order
-		red_mask: red_mask
-		green_mask: green_mask
-		blue_mask: blue_mask
-		red_shift: red_shift
-		green_shift: green_shift
-		blue_shift: blue_shift
-		red_max: red_max
-		green_max: green_max
-		blue_max: blue_max
+		byte_order:     byte_order
+		red_mask:       red_mask
+		green_mask:     green_mask
+		blue_mask:      blue_mask
+		red_shift:      red_shift
+		green_shift:    green_shift
+		blue_shift:     blue_shift
+		red_max:        red_max
+		green_max:      green_max
+		blue_max:       blue_max
 	}
 }
 
@@ -311,21 +311,21 @@ fn (mut canvas Canvas) blit_direct_surface(surface &XwdSurface, x int, y int, wi
 	step_x := if width > 1 { (surface.width - 1) * 65536 / (width - 1) } else { 0 }
 	step_y := if height > 1 { (surface.height - 1) * 65536 / (height - 1) } else { 0 }
 	for destination_y := 0; destination_y < height; destination_y++ {
-		plain := canvas.clip_is_plain(x, y + destination_y, width, 1)
+		// The direct row path addresses backing pixels. At HiDPI the arguments
+		// are logical, so use blend_pixel to expand them onto the denser canvas.
+		plain := canvas.scale == 1 && canvas.clip_is_plain(x, y + destination_y, width, 1)
 		if unscaled {
 			source_row := destination_y * surface.bytes_per_line
 			if plain {
 				destination_row := (y + destination_y) * canvas.stride + x
 				for column := 0; column < width; column++ {
 					unsafe {
-						canvas.pixels[destination_row + column] = *(&u32(&surface.pixels[
-							source_row + column * 4])) & 0x00ffffff
+						canvas.pixels[destination_row + column] = *(&u32(&surface.pixels[source_row + column * 4])) & 0x00ffffff
 					}
 				}
 			} else {
 				for column := 0; column < width; column++ {
-					canvas.blend_pixel(x + column, y + destination_y, surface.direct_pixel(column,
-						destination_y), 255)
+					canvas.blend_pixel(x + column, y + destination_y, surface.direct_pixel(column, destination_y), 255)
 				}
 			}
 			continue
@@ -348,9 +348,7 @@ fn (mut canvas Canvas) blit_direct_surface(surface &XwdSurface, x int, y int, wi
 			source_x := fixed_x >> 16
 			next_x := if source_x + 1 < surface.width { source_x + 1 } else { source_x }
 			fraction_x := u32(fixed_x & 0xffff) >> 8
-			color := xwd_bilinear_color(surface.direct_pixel(source_x, source_y),
-				surface.direct_pixel(next_x, source_y), surface.direct_pixel(source_x,
-				next_y), surface.direct_pixel(next_x, next_y), fraction_x, fraction_y)
+			color := xwd_bilinear_color(surface.direct_pixel(source_x, source_y), surface.direct_pixel(next_x, source_y), surface.direct_pixel(source_x, next_y), surface.direct_pixel(next_x, next_y), fraction_x, fraction_y)
 			if plain {
 				unsafe {
 					canvas.pixels[destination_row + destination_x] = color

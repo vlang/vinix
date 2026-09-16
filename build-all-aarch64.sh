@@ -98,8 +98,10 @@ fi
 
 # Do not silently publish a partial "all" image. These are the portable layers
 # the aggregate builder owns. Hardware-specific Asahi Mesa and native Blender
-# are produced on mutually different Linux builders; build-desktop-aarch64.sh
-# also merges those trees when they have been copied into this checkout.
+# are produced on mutually different Linux builders. build-desktop-aarch64.sh
+# merges the Blender tree when it has been copied into this checkout, but takes
+# the Asahi Mesa only with --with-asahi-gpu, which this image does not pass: it
+# is the portable one, and that Mesa has no llvmpipe to render with.
 require_file "Python" build-aarch64-python/staging/usr/bin/python3
 require_file "Ruby" build-aarch64-ruby/staging/usr/bin/ruby
 if [ ! -x "$SCRIPT_DIR/build-aarch64-go/staging/usr/bin/go" ] &&
