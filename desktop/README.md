@@ -9,7 +9,7 @@ It maps `/dev/fb0`, reads the pointer from `/dev/pointer` and the keyboard from
 its controlling terminal, and composes every frame itself without a display
 server or toolkit underneath it. The normal binary is entirely software. An
 M1 image that contains the Asahi Mesa runtime also carries a GPU-enabled binary
-which uses AGX to scale and present that canvas when `/dev/dri/renderD128`
+which uses AGX to present that canvas when `/dev/dri/renderD128`
 exists, with an automatic fallback to the static software binary.
 
 What it does:

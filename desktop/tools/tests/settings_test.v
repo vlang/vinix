@@ -199,6 +199,46 @@ fn test_desktop_scale_defaults_and_extents() {
 	assert desktop_scaled_extent(1920, desktop_scale_100) == 1920
 }
 
+fn test_200_percent_text_uses_native_resolution_glyphs() {
+	initial_scale := desktop_configure_scale(240, 60)
+	assert initial_scale == desktop_scale_100
+	mut desktop := Desktop{
+		canvas: new_scaled_canvas(240, 60, 240, 60, initial_scale)
+		fonts: load_fonts()
+	}
+	defer {
+		unsafe { free(voidptr(desktop.canvas.pixels)) }
+		desktop_configure_scale(1920, 1080)
+	}
+	desktop_request_scale(desktop_scale_200)
+	desktop.apply_requested_scale()
+	assert desktop.canvas.width == 120 && desktop.canvas.height == 30
+	assert desktop.canvas.physical_width == 240 && desktop.canvas.physical_height == 60
+	assert desktop.canvas.scale == desktop_scale_200
+	desktop.canvas.clear(0xffffff)
+	face := desktop.face_for(ui2.TextStyle{
+		size: 13
+	})
+	assert face.raster_scale == desktop_scale_200
+	desktop.canvas.draw_text(face, 2, 2, 'Settings', 0x000000)
+
+	// Enlarging a 1x mask makes both pixels in every physical pair identical.
+	// A glyph rasterised at the panel resolution has independent coverage at
+	// those pixels, which preserves its one-physical-pixel antialiased edge.
+	mut native_edge := false
+	for y := 0; y < desktop.canvas.physical_height && !native_edge; y++ {
+		for x := 0; x + 1 < desktop.canvas.physical_width; x += desktop_scale_200 {
+			left := unsafe { desktop.canvas.pixels[y * desktop.canvas.stride + x] }
+			right := unsafe { desktop.canvas.pixels[y * desktop.canvas.stride + x + 1] }
+			if left != right {
+				native_edge = true
+				break
+			}
+		}
+	}
+	assert native_edge
+}
+
 fn test_catalina_theme_uses_measured_window_chrome() {
 	assert theme_macos.title_height == 22
 	assert theme_macos.button_size == 12

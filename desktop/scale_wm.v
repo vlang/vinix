@@ -73,7 +73,7 @@ fn (mut d Desktop) apply_requested_scale() {
 	}
 
 	old_pixels := d.canvas.pixels
-	d.canvas = new_canvas(new_width, new_height)
+	d.canvas = new_scaled_canvas(new_width, new_height, desktop_physical_width, desktop_physical_height, target)
 	unsafe { free(voidptr(old_pixels)) }
 
 	d.pointer_x = desktop_rescale_coordinate(d.pointer_x, old_width, new_width)
@@ -92,14 +92,10 @@ fn (mut d Desktop) apply_requested_scale() {
 	for i := 0; i < d.windows.len; i++ {
 		d.windows[i].x = desktop_rescale_coordinate(d.windows[i].x, old_width, new_width)
 		d.windows[i].y = desktop_rescale_coordinate(d.windows[i].y, old_height, new_height)
-		d.windows[i].restore_x = desktop_rescale_coordinate(d.windows[i].restore_x, old_width,
-			new_width)
-		d.windows[i].restore_y = desktop_rescale_coordinate(d.windows[i].restore_y, old_height,
-			new_height)
+		d.windows[i].restore_x = desktop_rescale_coordinate(d.windows[i].restore_x, old_width, new_width)
+		d.windows[i].restore_y = desktop_rescale_coordinate(d.windows[i].restore_y, old_height, new_height)
 
-		restore_x, restore_y := desktop_clamp_scaled_position(d.windows[i].restore_x,
-			d.windows[i].restore_y, d.windows[i].restore_width, d.windows[i].restore_height,
-			new_width, new_height)
+		restore_x, restore_y := desktop_clamp_scaled_position(d.windows[i].restore_x, d.windows[i].restore_y, d.windows[i].restore_width, d.windows[i].restore_height, new_width, new_height)
 		d.windows[i].restore_x = restore_x
 		d.windows[i].restore_y = restore_y
 
@@ -109,8 +105,7 @@ fn (mut d Desktop) apply_requested_scale() {
 			d.windows[i].width = new_width
 			d.windows[i].height = desktop_usable_height(new_height)
 		} else {
-			window_x, window_y := desktop_clamp_scaled_position(d.windows[i].x, d.windows[i].y,
-				d.windows[i].width, d.windows[i].height, new_width, new_height)
+			window_x, window_y := desktop_clamp_scaled_position(d.windows[i].x, d.windows[i].y, d.windows[i].width, d.windows[i].height, new_width, new_height)
 			d.windows[i].x = window_x
 			d.windows[i].y = window_y
 		}

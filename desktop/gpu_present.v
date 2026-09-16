@@ -3,10 +3,13 @@
 module main
 
 #flag -I @VMODROOT
+
 #include "gpu_present.h"
 
 fn C.vinix_gpu_present_create(width int, height int) voidptr
+
 fn C.vinix_gpu_present_frame(handle voidptr, source &u32, source_width int, source_height int, source_stride int, destination &u32, destination_width int, destination_height int, destination_stride int) int
+
 fn C.vinix_gpu_present_destroy(handle voidptr)
 
 struct GpuPresenter {
@@ -29,8 +32,7 @@ fn (mut presenter GpuPresenter) present(source &Canvas, destination &u32, width 
 				return false
 			}
 		}
-		if C.vinix_gpu_present_frame(presenter.handle, source.pixels, source.width,
-			source.height, source.stride, destination, width, height, stride) != 0 {
+		if C.vinix_gpu_present_frame(presenter.handle, source.pixels, source.physical_width, source.physical_height, source.stride, destination, width, height, stride) != 0 {
 			return true
 		}
 		C.vinix_gpu_present_destroy(presenter.handle)

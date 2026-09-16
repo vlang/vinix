@@ -71,7 +71,7 @@ fn parse_options(args []string) Options {
 			options = Options{
 				...options
 				frame_interval: interval
-				idle_interval: interval
+				idle_interval:  interval
 			}
 		} else if arg.starts_with('--open=') {
 			mut titles := options.open.clone()
@@ -129,9 +129,9 @@ fn main() {
 	mut preferences := desktop_load_preferences(desktop_home)
 	scale := preferences.configure_scale(fb.width, fb.height)
 	mut desktop := Desktop{
-		settings: preferences.settings
-		canvas: new_canvas(desktop_scaled_extent(fb.width, scale), desktop_scaled_extent(fb.height, scale))
-		fonts: load_fonts()
+		settings:          preferences.settings
+		canvas:            new_scaled_canvas(desktop_scaled_extent(fb.width, scale), desktop_scaled_extent(fb.height, scale), fb.width, fb.height, scale)
+		fonts:             load_fonts()
 		tz_offset_seconds: options.tz_offset
 	}
 

@@ -151,6 +151,9 @@ fn (d &Desktop) face_for(style ui2.TextStyle) &FontFace {
 	mut best_score := 1 << 30
 	for i, face in d.fonts {
 		mut score := abs_int(face.size - wanted)
+		if face.raster_scale != d.canvas.scale {
+			score += 1000000
+		}
 		if face.mono != want_mono {
 			score += 100000
 		}
@@ -231,8 +234,7 @@ fn (mut d Desktop) render_element(el ui2.Element, off_x int, off_y int, depth in
 		}
 		.image {
 			if el.image_path.starts_with(vinix_surface_image_prefix) {
-				d.canvas.draw_vinix_surface(el.image_path[vinix_surface_image_prefix.len..], x,
-					y, w, h)
+				d.canvas.draw_vinix_surface(el.image_path[vinix_surface_image_prefix.len..], x, y, w, h)
 			} else if el.image_path.starts_with(office_xwd_image_prefix) {
 				drawn, has_ribbon := d.canvas.draw_office_xwd_surface(el.image_path[office_xwd_image_prefix.len..], x, y, w, h)
 				if drawn && has_ribbon {
@@ -305,10 +307,10 @@ fn (mut d Desktop) record_target(el ui2.Element, x int, y int, w int, h int) {
 	}
 	d.targets << HitTarget{
 		action_id: action
-		x: x
-		y: y
-		width: w
-		height: h
+		x:         x
+		y:         y
+		width:     w
+		height:    h
 	}
 }
 
@@ -428,9 +430,7 @@ fn (mut d Desktop) paint_wallpaper() {
 		d.wallpaper_valid = true
 	}
 
-	unsafe {
-		C.memcpy(d.canvas.pixels, d.wallpaper.data, usize(width * height * 4))
-	}
+	d.canvas.copy_logical_pixels(d.wallpaper)
 }
 
 fn (mut d Desktop) draw_label(el ui2.Element, x int, y int, w int, h int) {
@@ -798,7 +798,7 @@ fn (d &Desktop) surface_under(x int, y int) u32 {
 	if x < 0 || y < 0 || x >= d.canvas.width || y >= d.canvas.height {
 		return d.theme().title_active_bg
 	}
-	return unsafe { d.canvas.pixels[y * d.canvas.stride + x] }
+	return d.canvas.logical_pixel(x, y)
 }
 
 // The pointer is drawn last, over everything, from a small mask: '#' is the

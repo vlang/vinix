@@ -117,10 +117,11 @@ Open **Settings** from its wallpaper shortcut or the Start menu, then select
 
 Display scale has two integer choices: **100%** and **200%**. Changing it takes
 effect immediately for the whole desktop. At 200%, the compositor lays the UI
-out on a half-size logical canvas and the framebuffer presenter expands each
-logical pixel to a 2x2 physical block. Windows, text, icons, the cursor and hit
-targets therefore stay in one coordinate space instead of carrying separate
-per-widget scale factors.
+out in half-size logical coordinates backed by a native-resolution canvas.
+Geometry still expands each logical pixel into a 2x2 physical block, while
+text uses dedicated 2x font masks so its antialiased edges remain one physical
+pixel wide. Windows, icons, the cursor and hit targets therefore stay in one
+coordinate space without sacrificing sharp type.
 
 Vinix's simple framebuffer currently reports pixel geometry but no useful panel
 DPI or model name to desktop userspace. Native Retina MacBook modes are therefore
