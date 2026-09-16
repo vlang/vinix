@@ -1,7 +1,7 @@
 #!/bin/sh
 # PID 1 for the amd64 desktop image. The regular distro already supplies the
-# shell and runtime libraries; this only selects the framebuffer desktop as the
-# initial program and leaves an interactive recovery shell if it exits.
+# shell and runtime libraries; this keeps the framebuffer desktop running and
+# leaves an interactive recovery shell only when the executable cannot start.
 
 export HOME=/root
 export TERM=linux
@@ -10,12 +10,43 @@ export USER=root
 export LOGNAME=root
 export SHELL=/bin/zsh
 export XDG_RUNTIME_DIR=/run
+export VINIX_SYSTEM_SESSION=1
 
 cd /root || exit 1
 
+desktop_pid=
+
+forward_desktop_signal() {
+	signal=$1
+	if [ -n "$desktop_pid" ]; then
+		kill "-$signal" "$desktop_pid" 2>/dev/null || true
+	fi
+}
+
+# BusyBox reboot, poweroff and halt signal PID 1. Forward those requests to the
+# supervised compositor so it can close applications and restore the console
+# before invoking reboot(2).
+trap 'forward_desktop_signal TERM' TERM
+trap 'forward_desktop_signal USR1' USR1
+trap 'forward_desktop_signal USR2' USR2
+
 while :; do
-	/usr/bin/vinix-desktop
+	/usr/bin/vinix-desktop &
+	desktop_pid=$!
+	wait "$desktop_pid"
 	status=$?
-	echo "vinix-desktop exited with status $status; starting a recovery shell"
-	/bin/zsh -l
+	# A trapped power signal can interrupt wait before the compositor has
+	# finished. Wait again rather than launching a second display server.
+	while kill -0 "$desktop_pid" 2>/dev/null; do
+		wait "$desktop_pid"
+		status=$?
+	done
+	desktop_pid=
+	if [ "$status" -eq 126 ] || [ "$status" -eq 127 ]; then
+		echo "vinix-desktop could not start; opening a recovery shell"
+		/bin/zsh -l
+	else
+		echo "vinix-desktop exited with status $status; restarting in one second"
+		sleep 1
+	fi
 done

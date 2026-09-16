@@ -188,7 +188,10 @@ fn (mut b FileBrowser) go_up() {
 	if b.path == '/' {
 		return
 	}
-	b.read(parent_path(b.path))
+	// parent_path may be a slice of b.path. read() takes ownership of its
+	// argument and releases the old b.path, so passing that slice directly
+	// leaves the new path pointing into freed storage.
+	b.read(parent_path(b.path).clone())
 }
 
 // human_size keeps a listing's last column narrow. Sizes are shown to three

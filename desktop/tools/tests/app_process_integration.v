@@ -32,9 +32,9 @@ fn main() {
 	}
 	desktop_ignore_broken_pipe()
 
-	// A silent application process must not be able to hold PID 1 before its
-	// first framebuffer present (or during a later Settings action). Keep the
-	// test timeout tiny; production allows a slow Vinix child five seconds.
+	// A silent application process must not be able to hold the system session
+	// before its first framebuffer present (or during a later Settings action).
+	// Keep the test timeout tiny; production allows a slow Vinix child five seconds.
 	mut silent_pipe := [2]i32{}
 	assert C.pipe(&silent_pipe[0]) == 0
 	mut response_timed_out := false
@@ -85,6 +85,28 @@ fn main() {
 	files.handle(files_action_up) or { panic(err) }
 	free_tree(files_tree)
 	close_remote(mut files)
+
+	// A native application may abort for reasons outside the protocol. Its
+	// process must be the only casualty: the compositor side closes the broken
+	// transport and remains able to launch and render another application.
+	mut crashing_files := start_remote_app_at(arguments()[0], available_apps[0], mut desktop) or {
+		panic(err)
+	}
+	mut crashed_pid := -1
+	if mut crashing_files is RemoteApp {
+		crashed_pid = crashing_files.pid
+	}
+	assert crashed_pid > 0
+	assert C.kill(crashed_pid, C.SIGKILL) == 0
+	desktop_wait_child(crashed_pid)
+	mut failure_was_isolated := false
+	crashing_files.build(ui2.rect(0, 0, 460, 326)) or {
+		failure_was_isolated = true
+	}
+	assert failure_was_isolated
+	if mut crashing_files is RemoteApp {
+		assert crashing_files.closed
+	}
 
 	mut settings := start_remote_app_at(arguments()[0], available_apps[4], mut desktop) or {
 		panic(err)

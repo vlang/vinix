@@ -168,8 +168,9 @@ fn main() {
 
 	mut stats := FrameStats{}
 	for desktop.running {
-		// `reboot`, `poweroff` and `halt` signal pid 1 rather than powering the
-		// machine down themselves, and on this image pid 1 is this compositor.
+		// `reboot`, `poweroff` and `halt` signal PID 1 rather than powering the
+		// machine down themselves. The supervising init forwards those signals
+		// to this system-session compositor for an orderly teardown.
 		desktop.take_power_signal()
 		if !desktop.running {
 			break

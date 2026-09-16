@@ -604,15 +604,16 @@ Under QEMU on a Mac, `./run-desktop-aarch64.sh --grab-keys` is what lets the
 chord through: macOS keeps Cmd-Tab for its own application switcher until QEMU
 is allowed to capture every key. The price is that Cmd-Q no longer quits QEMU.
 
-It also needs `reboot(2)`, because on this image the compositor is PID 1: init
-execs it, so the desktop is what `reboot`, `poweroff` and `halt` talk to. Those
-commands sync and signal PID 1 — SIGTERM, SIGUSR2 and SIGUSR1 respectively —
-rather than powering the machine down themselves. The compositor takes the
-signal at a frame boundary, closes its applications, restores the console and
-only then calls `reboot(2)`, which does not return. The Start menu's **Shut
-down** button is the same path. Started from a shell instead of from init, the
-desktop is an ordinary process: both then only end the session and give the
-console back to that shell, as they always have.
+It also needs `reboot(2)`. The image's PID 1 supervises the compositor and
+restarts it if it exits, while `VINIX_SYSTEM_SESSION=1` tells that supervised
+child it owns the system session. `reboot`, `poweroff` and `halt` sync and
+signal PID 1 — SIGTERM, SIGUSR2 and SIGUSR1 respectively — rather than powering
+the machine down themselves; init forwards that request to the compositor. The
+compositor takes it at a frame boundary, closes its applications, restores the
+console and only then calls `reboot(2)`, which does not return. The Start menu's
+**Shut down** button is the same path. Started from a shell instead of from
+init, the desktop is an ordinary process: both then only end the session and
+give the console back to that shell, as they always have.
 
 ## Native V platform and device code
 

@@ -607,12 +607,12 @@ fn (mut d Desktop) send_keys_to_focused(keys string) {
 	}
 }
 
-// End the session, and take the machine with it when this compositor is the
-// machine's init. Started from a shell on the full image it is an ordinary
-// process that happens to own the screen: there, ending the session means
-// giving the console back to that shell and nothing more.
+// End the session, and take the machine with it when this compositor owns the
+// supervised system session. Started from a shell on the full image it is an
+// ordinary process that happens to own the screen: there, ending the session
+// means giving the console back to that shell and nothing more.
 fn (mut d Desktop) end_session(action PowerAction) {
-	if desktop_is_init() {
+	if desktop_is_system_session() {
 		d.power = action
 	}
 	d.running = false
