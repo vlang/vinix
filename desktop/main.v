@@ -140,6 +140,7 @@ fn main() {
 	desktop.pointer_present = pointer.available()
 	desktop.pointer_x = desktop.canvas.width / 2
 	desktop.pointer_y = desktop.canvas.height / 2
+	mut titlebar_click := TitlebarClick{}
 
 	mut keyboard := open_keyboard()
 	defer {
@@ -171,13 +172,15 @@ fn main() {
 
 		desktop.update_taskbar_clock()
 		desktop.poll_apps()
-		desktop.pump_pointer(mut pointer, desktop.canvas.width, desktop.canvas.height)
+		titlebar_click = desktop.pump_pointer(mut pointer, desktop.canvas.width, desktop.canvas.height,
+			titlebar_click)
 		desktop.pump_keyboard(mut keyboard)
 		desktop.capture_tick()
 		// Xorg, unlike a native ui2 application, needs the physical display and
 		// input devices. Stop the compositor at a frame boundary, restore the
 		// console, and reopen everything after the external application exits.
 		if desktop.pending_external != '' {
+			titlebar_click = TitlebarClick{}
 			desktop.capture_close()
 			command := desktop.pending_external
 			desktop.pending_external = ''
@@ -258,15 +261,15 @@ fn main() {
 
 // pump_pointer maps the device's own coordinate space onto the screen and
 // turns the button mask into press and release events.
-fn (mut d Desktop) pump_pointer(mut pointer PointerDevice, width int, height int) {
-	packet := pointer.poll() or { return }
+fn (mut d Desktop) pump_pointer(mut pointer PointerDevice, width int, height int, titlebar_click TitlebarClick) TitlebarClick {
+	packet := pointer.poll() or { return titlebar_click }
 
 	// The node exists even on a machine with no pointer hardware, and says so
 	// by reporting an empty coordinate range. Without a device there is nothing
 	// to draw a cursor for.
 	if packet.max_x <= 0 || packet.max_y <= 0 {
 		d.pointer_present = false
-		return
+		return TitlebarClick{}
 	}
 	d.pointer_present = true
 
@@ -277,8 +280,13 @@ fn (mut d Desktop) pump_pointer(mut pointer PointerDevice, width int, height int
 	d.buttons = packet.buttons
 	d.on_pointer_move(pointer_x, pointer_y)
 
+	mut click := titlebar_click
+	// A different pointer gesture breaks a pending double-click sequence.
+	if packet.pressed & (button_middle | button_right) != 0 || packet.scroll != 0 {
+		click = TitlebarClick{}
+	}
 	if packet.pressed & button_left != 0 {
-		d.on_pointer_down(pointer_x, pointer_y)
+		click = d.titlebar_pointer_down_at(click, pointer_x, pointer_y, desktop_monotonic_ms())
 	}
 	if packet.released & button_left != 0 {
 		d.on_pointer_up(pointer_x, pointer_y)
@@ -298,6 +306,7 @@ fn (mut d Desktop) pump_pointer(mut pointer PointerDevice, width int, height int
 	if packet.scroll != 0 {
 		d.on_app_pointer_scroll(pointer_x, pointer_y, int(packet.scroll))
 	}
+	return click
 }
 
 fn (mut d Desktop) pump_keyboard(mut keyboard Keyboard) {
