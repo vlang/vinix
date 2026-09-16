@@ -765,7 +765,16 @@ fn desktop_spawn_native_surface(path string, first_argument string, second_argum
 	height_entry := 'VINIX_SURFACE_HEIGHT=${height}'
 	mut envp := [&char(path_entry.str), &char(home_entry.str), c'TERM=dumb', c'USER=root', c'LOGNAME=root',
 		c'SHELL=/bin/zsh', c'LD_LIBRARY_PATH=/usr/lib', c'LIBGL_DRIVERS_PATH=/usr/lib/dri',
-		c'EGL_PLATFORM=surfaceless', c'SSL_CA_CERT_FILE=/etc/ssl/certs/ca-certificates.crt']
+		c'EGL_PLATFORM=surfaceless', c'SSL_CA_CERT_FILE=/etc/ssl/certs/ca-certificates.crt',
+		// jemalloc's background thread never makes progress here. Native
+		// Blender links libjemalloc directly, and with the thread enabled the
+		// process stops dead after its EGL context is created: three minutes
+		// of held time with the CPU column stuck at 0:00 and {jemalloc_bg_thd}
+		// the only thread left to show for it. That is a block, not slow
+		// software rendering, and no amount of waiting clears it. LWJGL's copy
+		// of the same allocator broke Minecraft in its own way (a821af83), so
+		// this is the second thing jemalloc has cost us on Vinix.
+		c'MALLOC_CONF=background_thread:false']
 	// QEMU exposes only simpledrm, so select the packaged software renderer
 	// explicitly. Preserve Mesa's native Asahi selection on Vinix hardware.
 	if C.access(c'/dev/dri/renderD128', C.R_OK | C.W_OK) != 0 {

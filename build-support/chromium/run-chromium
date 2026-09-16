@@ -75,11 +75,10 @@ set -- --no-first-run --no-default-browser-check --disable-background-networking
 
 set -- --ozone-platform=x11 --user-data-dir="$VINIX_CHROMIUM_PROFILE" "$@"
 
-# The GPU process rasterises through ANGLE. With a real DRI device and a GBM
-# provider present, ANGLE runs on the Vulkan/GL driver the X11 stack already
-# uses; otherwise it falls back to Chromium's CPU Vulkan device, which Alpine
-# ships in chromium-swiftshader. The software path can also be forced, which is
-# what a graphics bring-up wants when a driver is suspected.
+# The GPU process rasterises through ANGLE when a real DRI device and GBM
+# provider are present. Chromium's bundled SwiftShader Vulkan device still
+# requires XCB features that Vinix's hosted X server does not provide, so the
+# QEMU/simplefb path uses Chromium's CPU compositor without a GPU process.
 if [ "${VINIX_FORCE_SOFTWARE_GL:-0}" != 1 ] &&
    [ -e /dev/dri/renderD128 ] &&
    [ -e /usr/lib/libgbm.so.1 ] &&
@@ -90,17 +89,7 @@ if [ "${VINIX_FORCE_SOFTWARE_GL:-0}" != 1 ] &&
     echo "run-chromium: enabling hardware ANGLE/EGL"
 else
     export LIBGL_ALWAYS_SOFTWARE=1
-    if [ -e /usr/lib/chromium/libvk_swiftshader.so ]; then
-        # The bundled Vulkan loader looks for an installable client driver in
-        # the system directories, and chromium-swiftshader puts its manifest
-        # beside the library instead. Name it, or the loader reports that it
-        # found no drivers and the GPU process falls over.
-        export VK_ICD_FILENAMES=/usr/lib/chromium/vk_swiftshader_icd.json
-        export VK_DRIVER_FILES="$VK_ICD_FILENAMES"
-        set -- --use-gl=angle --use-angle=swiftshader "$@"
-    else
-        set -- --disable-gpu --disable-software-rasterizer "$@"
-    fi
+    set -- --disable-gpu --disable-software-rasterizer "$@"
 fi
 
 # Chromium runs one process per renderer, plus network, storage, GPU and utility
