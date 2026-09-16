@@ -108,6 +108,11 @@ fn test_drag_redraws_only_after_pointer_motion() {
 	assert desktop.dirty
 	assert desktop.pointer_x == 120 && desktop.pointer_y == 105
 	assert desktop.windows[index].x == 50 && desktop.windows[index].y == 45
+	assert desktop.drag_damage.valid
+	// The union includes old and new shadow bounds, not just the opaque body.
+	assert desktop.drag_damage.x <= 23 && desktop.drag_damage.y <= 25
+	assert desktop.drag_damage.x + desktop.drag_damage.w >= 357
+	assert desktop.drag_damage.y + desktop.drag_damage.h >= 254
 }
 
 // hold_past_reveal takes the session back in time rather than sleeping for

@@ -177,9 +177,20 @@ fn main() {
 
 		desktop.update_taskbar_clock()
 		desktop.poll_apps()
+		// Keep a drag's pointer-only damage separate from independent changes
+		// (a clock tick, an app frame, keyboard input, etc.). A partial compose
+		// is valid only when the pointer is the sole source of new pixels.
+		background_dirty := desktop.dirty
+		desktop.dirty = false
 		desktop.pump_pointer(mut pointer, desktop.canvas.width, desktop.canvas.height)
+		pointer_dirty := desktop.dirty
+		desktop.dirty = false
 		desktop.pump_keyboard(mut keyboard)
+		keyboard_dirty := desktop.dirty
+		desktop.dirty = false
 		desktop.capture_tick()
+		capture_dirty := desktop.dirty
+		desktop.dirty = false
 		// Xorg, unlike a native ui2 application, needs the physical display and
 		// input devices. Stop the compositor at a frame boundary, restore the
 		// console, and reopen everything after the external application exits.
@@ -209,6 +220,9 @@ fn main() {
 			eprintln('vinix-desktop: could not save desktop settings; changes may reset on restart')
 		}
 		desktop.update_switcher()
+		other_dirty := desktop.dirty
+		desktop.dirty = background_dirty || pointer_dirty || keyboard_dirty || capture_dirty
+			|| other_dirty
 		after_input := monotonic_millis()
 
 		// Nothing has changed: the framebuffer already holds the right
@@ -229,12 +243,23 @@ fn main() {
 		tree := desktop.build_tree()
 		after_build := monotonic_millis()
 
-		desktop.render(tree)
+		partial_drag_frame := desktop.drag.kind == .move && desktop.drag_damage.valid
+			&& pointer_dirty && !background_dirty && !keyboard_dirty && !capture_dirty && !other_dirty
+		if partial_drag_frame {
+			desktop.render_drag_damage(tree, desktop.drag_damage)
+		} else {
+			desktop.render(tree)
+		}
 		after_render := monotonic_millis()
 
-		fb.present(&desktop.canvas, desktop_current_scale())
+		if partial_drag_frame {
+			fb.present_damage(&desktop.canvas, desktop.drag_damage)
+		} else {
+			fb.present(&desktop.canvas, desktop_current_scale())
+		}
 		desktop.capture_presented(&desktop.canvas)
 		after_present := monotonic_millis()
+		desktop.drag_damage = DamageRect{}
 
 		free_tree(tree)
 

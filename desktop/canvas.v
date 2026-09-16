@@ -297,14 +297,23 @@ fn (mut c Canvas) copy_logical_pixels(source []u32) {
 	if source.len < c.width * c.height {
 		return
 	}
+	x0 := if c.clip.x > 0 { c.clip.x } else { 0 }
+	y0 := if c.clip.y > 0 { c.clip.y } else { 0 }
+	x1 := if c.clip.x + c.clip.w < c.width { c.clip.x + c.clip.w } else { c.width }
+	y1 := if c.clip.y + c.clip.h < c.height { c.clip.y + c.clip.h } else { c.height }
+	if x1 <= x0 || y1 <= y0 {
+		return
+	}
 	if c.scale == 1 && c.width == c.physical_width && c.height == c.physical_height {
-		unsafe {
-			C.memcpy(c.pixels, source.data, usize(c.width * c.height * 4))
+		for y := y0; y < y1; y++ {
+			unsafe {
+				C.memcpy(&c.pixels[y * c.stride + x0], &source[y * c.width + x0], usize((x1 - x0) * 4))
+			}
 		}
 		return
 	}
-	for y := 0; y < c.height; y++ {
-		for x := 0; x < c.width; x++ {
+	for y := y0; y < y1; y++ {
+		for x := x0; x < x1; x++ {
 			color := source[y * c.width + x]
 			physical_x := x * c.scale
 			physical_y := y * c.scale

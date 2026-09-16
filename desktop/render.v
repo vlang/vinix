@@ -195,18 +195,49 @@ fn free_tree(el ui2.Element) {
 }
 
 fn (mut d Desktop) render(root ui2.Element) {
+	d.render_clipped(root, Clip{
+		x: 0
+		y: 0
+		w: d.canvas.width
+		h: d.canvas.height
+	})
+}
+
+// render_drag_damage refreshes only the pixels a moving top-level window can
+// have changed. The element walk still records every hit target, so click
+// routing is correct as soon as the drag ends.
+fn (mut d Desktop) render_drag_damage(root ui2.Element, damage DamageRect) {
+	left := if damage.x > 0 { damage.x } else { 0 }
+	top := if damage.y > 0 { damage.y } else { 0 }
+	right := if damage.x + damage.w < d.canvas.width { damage.x + damage.w } else { d.canvas.width }
+	bottom := if damage.y + damage.h < d.canvas.height {
+		damage.y + damage.h
+	} else {
+		d.canvas.height
+	}
+	d.render_clipped(root, Clip{
+		x: left
+		y: top
+		w: if right > left { right - left } else { 0 }
+		h: if bottom > top { bottom - top } else { 0 }
+	})
+}
+
+fn (mut d Desktop) render_clipped(root ui2.Element, clip Clip) {
 	// clear() keeps the buffer, so a steady desktop stops allocating one per
 	// frame.
 	d.targets.clear()
+	d.canvas.clip = clip
+	d.paint_wallpaper()
+	d.render_element(root, 0, 0, 0)
+	d.draw_cursor()
+	// A partial frame must not leak its clip into the next full one.
 	d.canvas.clip = Clip{
 		x: 0
 		y: 0
 		w: d.canvas.width
 		h: d.canvas.height
 	}
-	d.paint_wallpaper()
-	d.render_element(root, 0, 0, 0)
-	d.draw_cursor()
 }
 
 fn (mut d Desktop) render_element(el ui2.Element, off_x int, off_y int, depth int) {
@@ -330,15 +361,7 @@ fn (mut d Desktop) draw_surface(el ui2.Element, x int, y int, w int, h int, dept
 	// below it is keyed off the window manager's own id.
 	translucent := el.id == switcher_panel_id
 	if floating {
-		saved := d.canvas.clip
-		d.canvas.clip = Clip{
-			x: 0
-			y: 0
-			w: d.canvas.width
-			h: d.canvas.height
-		}
 		d.canvas.drop_shadow(x, y, w, h, radius, 7, d.theme().shadow_alpha)
-		d.canvas.restore_clip(saved)
 	}
 	if translucent {
 		d.canvas.blend_round_rect(x, y, w, h, radius, el.box.bg, switcher_alpha)

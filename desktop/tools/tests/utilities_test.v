@@ -56,6 +56,27 @@ fn test_vinix_start_glyph_uses_the_wordmark_v_polygon() {
 	assert unsafe { canvas.pixels[24 * canvas.stride + 24] } == 0xffffff
 }
 
+fn test_wallpaper_copy_respects_canvas_clip() {
+	mut canvas := new_canvas(4, 3)
+	defer {
+		unsafe { free(canvas.pixels) }
+	}
+	canvas.clear(0x010203)
+	wallpaper := []u32{u32(0x100000), 0x100001, 0x100002, 0x100003, 0x100004, 0x100005,
+		0x100006, 0x100007, 0x100008, 0x100009, 0x10000a, 0x10000b]
+	canvas.clip = Clip{
+		x: 1
+		y: 1
+		w: 2
+		h: 1
+	}
+	canvas.copy_logical_pixels(wallpaper)
+	assert unsafe { canvas.pixels[0] } == 0x010203
+	assert unsafe { canvas.pixels[1 * canvas.stride + 1] } == 0x100005
+	assert unsafe { canvas.pixels[1 * canvas.stride + 2] } == 0x100006
+	assert unsafe { canvas.pixels[1 * canvas.stride + 3] } == 0x010203
+}
+
 fn surface_test_put_u32(mut bytes []u8, offset int, value u32) {
 	bytes[offset] = u8(value)
 	bytes[offset + 1] = u8(value >> 8)
