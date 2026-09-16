@@ -8,12 +8,12 @@ command -v "$v" >/dev/null 2>&1 || { echo 'ERROR: V is required.' >&2; exit 1; }
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT HUP INT TERM
 mkdir "$work/clients"
-for name in device_io.v platform.c.v backlight_client.v battery_client.v wifi_client.v scale.v scale_preferences.c.v; do
+for name in device_io.v platform.c.v backlight_client.v battery_client.v wifi_client.v scale.v settings_model.v preferences.v preferences.c.v; do
     cp "$root/desktop/$name" "$work/clients/"
 done
 cp "$root/desktop/libc_compat.h" "$work/clients/"
 cp "$root/desktop/tools/tests/device_io_mock.v" "$work/clients/"
-for name in backlight_client battery_client wifi_client platform scale_preferences; do
+for name in backlight_client battery_client wifi_client platform preferences; do
     cp "$root/desktop/tools/tests/${name}_test.v" "$work/clients/"
     # Invoke the test file directly so older vtest runners cannot lose the
     # shell quoting around a module path containing '|'. V runs its tests.
@@ -37,13 +37,14 @@ python3 "$root/desktop/tools/stage_app.py" "$work/ui" "$root/desktop" \
     "$root/third_party/ui2/examples/calculator" >/dev/null
 rm -f "$work/ui/main.v"
 cp "$root/desktop/tools/tests/settings_test.v" "$work/ui/"
+cp "$root/desktop/tools/tests/settings_persistence_test.v" "$work/ui/"
 cp "$root/desktop/tools/tests/switcher_test.v" "$work/ui/"
 cp "$root/desktop/tools/tests/memory_test.v" "$work/ui/"
 cp "$root/desktop/tools/tests/heap_tracker.h" "$work/ui/"
 # Both sets share fixture_app and element_named in one translation unit.
 sed '1,/^import ui2$/d' "$root/desktop/tools/tests/battery_test.v" >> "$work/ui/settings_test.v"
 printf "Module { name: 'settings_tests' }\n" > "$work/ui/v.mod"
-for name in settings switcher; do
+for name in settings switcher settings_persistence; do
     "$v" -new-compiler -nocache -gc none -manualfree -enable-globals -stats -d ui2_headless \
         -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/${name}_test.v"
 done

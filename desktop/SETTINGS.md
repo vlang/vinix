@@ -1,5 +1,70 @@
 # Settings
 
+## Saved desktop preferences
+
+All desktop preferences use **one file**, `/root/.vinix-desktop-settings`:
+window-button side, taskbar grouping, theme, wallpaper colour and image, and
+scale. It is a versioned, human-readable snapshot, for example:
+
+```ini
+version=1
+scale=2
+button_side=left
+taskbar_mode=combined
+theme=macos
+wallpaper_color=4
+wallpaper_image=2
+```
+
+`scale` is `auto`, `1` (100%) or `2` (200%). The other choices are `right`/`left`,
+`standard`/`combined` and `default`/`macos`. Wallpaper values are the same
+zero-based catalogue indices used by Settings; image `-1` selects the colour.
+If an image is not available in the current build, the renderer uses the saved
+colour instead.
+
+The compositor loads the snapshot before allocating its canvas or launching
+applications. After accepting Settings changes and applying any scale change,
+it atomically saves the **whole** snapshot. A theme-only or wallpaper-only
+change is saved too and does not discard other preferences. Until scale has
+actually been changed, saves retain `scale=auto`, so appearance changes do not
+pin the current display's automatic scale. Unchanged frames, device refreshes,
+and unapplied or rejected scale requests do not trigger saves.
+
+Missing keys use their defaults and unknown keys are ignored. Missing,
+unreadable, malformed, unsupported-version or oversized files fall back to the
+default settings and geometry policy. Known keys may occur only once; loading
+never evaluates shell commands. A normal first boot does not create a file.
+Remove the file to reset all preferences, or edit it while the desktop is
+stopped; the next successful save rewrites the complete supported snapshot.
+
+The earlier `/root/.vinix-desktop-scale` format is migrated only when the unified
+file is absent. The old file is removed **after** the new snapshot is saved and
+synced. An existing unified file always takes precedence, even if damaged, so
+an old scale cannot unexpectedly override a reset or corrupt configuration.
+No new scale-only file is written.
+
+Saves use a private mode-0600 temporary file, flush it, rename it over the old
+snapshot and flush the directory update. Failed writes leave the previous file
+intact; save failures are reported on stderr without undoing live changes. A
+failed save is not retried every frame; the next settings change retries the
+complete current state.
+
+The file lives in the desktop's writable home, not `/etc` in the initramfs.
+On the AArch64 QEMU desktop launcher, reuse the same persistent `/root` volume
+(`boot-image/desktop-root.ext2`). `--no-persist` uses RAM and `--ephemeral`
+removes its private volume on exit; neither preserves settings for the next
+launch. Continue to shut down writable ext2 guests cleanly.
+
+Brightness and Wi-Fi controls operate on devices; their live/pending readbacks,
+scan results and battery measurements are not desktop preferences and are not
+serialized or replayed at startup.
+
+To verify in QEMU, change each appearance option, choose a wallpaper and switch
+scale to 200%. Inspect `cat /root/.vinix-desktop-settings`, shut down cleanly,
+and relaunch with the same volume. All choices should be restored. Change only
+the theme or wallpaper and repeat to verify the scale and other values survive.
+Also check 100%, resetting the file, and migration from a legacy `2\n` record.
+
 ## Wi-Fi
 
 Select **Wi-Fi** to inspect `/dev/wlan0`. After the experimental Apple Wi-Fi
@@ -55,32 +120,6 @@ screen, maximized windows are refit, and old hit targets are discarded before
 the next frame. Oversized windows are kept at the top-left so Settings remains
 reachable even after manually selecting 200% on a small framebuffer.
 
-### Saving the scale
-
-After the compositor applies a scale change, it saves the choice in
-`/root/.vinix-desktop-scale` (`1` for 100%, `2` for 200%). The next desktop
-startup loads it before allocating the logical canvas. Missing, unreadable or
-malformed preferences fall back to the geometry policy above; startup never
-writes that automatic default back as a user preference.
-
-The save uses a private temporary file, flushes it, then renames it over the
-previous preference and flushes the directory update. A failed save is reported
-on the desktop's stderr without undoing the live scale change. A rejected scale
-request does not overwrite the preference. Remove the file to restore automatic
-scale selection on the next startup.
-
-The file lives in the desktop's writable home, not `/etc` in the initramfs.
-On the AArch64 QEMU desktop launcher, keep using the same persistent `/root`
-volume (`boot-image/desktop-root.ext2`). `--no-persist` uses RAM instead and
-`--ephemeral` removes its private volume when QEMU exits; neither preserves
-preferences for the next launch. Continue to shut down writable ext2 guests
-cleanly.
-
-To check the fix in QEMU, switch from 100% to 200% in Settings, confirm that
-`cat /root/.vinix-desktop-scale` prints `2`, shut down cleanly, and relaunch with
-the same volume. The desktop should start at 200%. Repeat with 100%, then remove
-the preference and restart to check the geometry fallback.
-
 ### Brightness
 
 The click-to-set bar has 5% steps; **- 5%** and **+ 5%** adjust the current
@@ -116,7 +155,9 @@ positive short write is an error and its suffix is never retried as a command.
 ## Implementation and tests
 
 `settings_app.v` implements `NativeApp`; `app.v` registers the launcher, and
-`settings.v` stores the desktop preferences and themes. `scale.v`
+`settings_model.v` holds the shared preference data while `settings.v` holds
+the themes. `preferences.v` owns the complete file schema and
+`preferences.c.v` its bounded POSIX I/O and legacy migration. `scale.v`
 owns the requested/applied integer scale and default policy. `scale_wm.v` swaps
 the compositor's logical canvas between physical size and half size, remaps
 window/pointer positions and invalidates stale hit targets. `framebuffer.v`
@@ -152,11 +193,13 @@ records, arithmetic and parser limits, permissions, offline and missing devices,
 short writes, bounded interruptions, exact descriptor cleanup, and a round-trip
 with the actual **V kernel backlight core**. The POSIX tests exercise real files,
 shared mapping, directories, `/dev/null`, monotonic clocks and a PTY, including
-restoration of both terminal attributes and descriptor flags. The scale
-preference tests also run with `CLIENTS_ONLY=1` and use temporary homes, never
-`/root`. They cover both saved choices, startup fallback, strict bounded parsing,
-commit-before-save ordering, atomic replacement, failed saves and temporary-file
-cleanup, and a FIFO at the preference path.
+restoration of both terminal attributes and descriptor flags. Preference tests
+also run with `CLIENTS_ONLY=1` and use temporary homes, never `/root`. They cover
+every saved field, both scale overrides, auto-scale preservation, defaults,
+strict bounded parsing, legacy migration and precedence, commit-before-save
+ordering, atomic replacement, failed saves and cleanup, FIFOs and symlinks. The
+full UI suite additionally exercises actual Settings actions and compositor
+scale application before saving and restoring the complete snapshot.
 
 Desktop scaling is independent of the DCP backlight transport and never changes
 the status of physical brightness adjustment.

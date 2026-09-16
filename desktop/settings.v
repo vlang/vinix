@@ -3,42 +3,11 @@
 // What the desktop looks like and how its chrome behaves, and the two themes
 // it can wear.
 //
-// Everything the Settings application changes lives here. The window manager
+// The preference model lives in settings_model.v. The window manager
 // reads `Desktop.settings` for behaviour and `Desktop.theme()` for colour, so
 // a preference takes effect on the next frame without anything being rebuilt
 // or reopened — the tree is composed from scratch each time anyway.
 module main
-
-// Which end of the title bar the close, zoom and minimise buttons sit at.
-// Right is what Windows does; left is what macOS does.
-enum ButtonSide {
-	right
-	left
-}
-
-// How the taskbar lists what is open. `standard` gives every window its own
-// entry, the way Windows XP did. `combined` gives each application one entry
-// however many windows it has, the way Windows 7 did.
-enum TaskbarMode {
-	standard
-	combined
-}
-
-enum ThemeKind {
-	default_
-	macos
-}
-
-struct Settings {
-mut:
-	button_side  ButtonSide
-	taskbar_mode TaskbarMode
-	theme        ThemeKind
-	// Index into wallpaper_colors, used when no image is chosen.
-	wallpaper_color int
-	// Index into the wallpaper images, or -1 for the colour above.
-	wallpaper_image int = -1
-}
 
 // ── Themes ─────────────────────────────────────────────────────────
 
@@ -224,23 +193,3 @@ fn (d &Desktop) theme() Theme {
 		.macos { theme_macos }
 	}
 }
-
-// ── Wallpaper ──────────────────────────────────────────────────────
-
-// WallpaperColor is a flat backdrop. Each is a pair, because the desktop
-// paints a vertical gradient; a colour that wants to be flat names itself
-// twice.
-struct WallpaperColor {
-	name   string
-	top    u32
-	bottom u32
-}
-
-const wallpaper_colors = [
-	WallpaperColor{'Midnight', 0x141d33, 0x3c5a86},
-	WallpaperColor{'Slate', 0x2b3038, 0x4d545e},
-	WallpaperColor{'Forest', 0x11301f, 0x2f6b46},
-	WallpaperColor{'Plum', 0x2a1533, 0x5d3a70},
-	WallpaperColor{'Ember', 0x33190f, 0x8a4426},
-	WallpaperColor{'Graphite', 0x6e6e73, 0x6e6e73},
-]
