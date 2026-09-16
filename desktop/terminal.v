@@ -839,7 +839,7 @@ fn (mut a TerminalApp) close_app() {
 		a.terminal = -1
 	}
 	if a.pid >= 0 && !a.exited {
-		desktop_terminate_child(a.pid)
+		_ = desktop_terminate_child(a.pid)
 	}
 	a.pid = -1
 	a.exited = true

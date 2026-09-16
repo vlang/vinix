@@ -98,7 +98,6 @@ fn main() {
 	}
 	assert crashed_pid > 0
 	assert C.kill(crashed_pid, C.SIGKILL) == 0
-	desktop_wait_child(crashed_pid)
 	mut failure_was_isolated := false
 	crashing_files.build(ui2.rect(0, 0, 460, 326)) or {
 		failure_was_isolated = true

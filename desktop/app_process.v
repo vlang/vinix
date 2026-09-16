@@ -729,6 +729,7 @@ fn run_app_process(options AppProcessOptions) {
 @[heap]
 struct RemoteApp {
 mut:
+	title            string
 	pid              int
 	request_fd       int
 	response_fd      int
@@ -759,6 +760,7 @@ fn start_remote_app_at(path string, factory AppFactory, mut desktop Desktop) !Na
 		return error('cannot execute ${path}')
 	}
 	mut remote := &RemoteApp{
+		title: factory.title
 		pid: process.pid
 		request_fd: process.to_child
 		response_fd: process.from_child
@@ -925,7 +927,7 @@ fn (mut a RemoteApp) close_transport() {
 		a.response_fd = -1
 	}
 	if a.pid > 0 {
-		desktop_wait_child(a.pid)
+		_ = desktop_wait_child(a.pid)
 		a.pid = -1
 	}
 	a.closed = true
@@ -945,7 +947,9 @@ fn (mut a RemoteApp) abort_transport() {
 		a.response_fd = -1
 	}
 	if a.pid > 0 {
-		desktop_terminate_child(a.pid)
+		pid := a.pid
+		status := desktop_terminate_child(pid)
+		desktop_log_app_exit(a.title, pid, status)
 		a.pid = -1
 	}
 	a.closed = true

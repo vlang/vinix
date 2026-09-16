@@ -66,6 +66,62 @@ static void print(const char *text) {
 	syscall3(64 /* write */, 1, (u64)text, string_length(text));
 }
 
+static void print_number(u64 value) {
+	char digits[24];
+	u64 index = sizeof(digits);
+	do {
+		digits[--index] = (char)('0' + value % 10);
+		value /= 10;
+	} while (value);
+	syscall3(64 /* write */, 1, (u64)&digits[index], sizeof(digits) - index);
+}
+
+static const char *signal_name(int signal) {
+	switch (signal) {
+	case 1: return "SIGHUP";
+	case 2: return "SIGINT";
+	case 3: return "SIGQUIT";
+	case 4: return "SIGILL";
+	case 5: return "SIGTRAP";
+	case 6: return "SIGABRT";
+	case 7: return "SIGBUS";
+	case 8: return "SIGFPE";
+	case 9: return "SIGKILL";
+	case 10: return "SIGUSR1";
+	case 11: return "SIGSEGV";
+	case 12: return "SIGUSR2";
+	case 13: return "SIGPIPE";
+	case 14: return "SIGALRM";
+	case 15: return "SIGTERM";
+	case 24: return "SIGXCPU";
+	case 25: return "SIGXFSZ";
+	case 31: return "SIGSYS";
+	default: return "unknown signal";
+	}
+}
+
+static void report_desktop_exit(i64 child, int status) {
+	int signal = status & 0x7f;
+	print("init: vinix-desktop (pid ");
+	print_number((u64)child);
+	if (signal && signal != 0x7f) {
+		print(") crashed with ");
+		print(signal_name(signal));
+		print(" (signal ");
+		print_number((u64)signal);
+		print(")");
+	} else {
+		int code = (status >> 8) & 0xff;
+		if (code == 0) {
+			print(") exited cleanly");
+		} else {
+			print(") exited with status ");
+			print_number((u64)code);
+		}
+	}
+	print("; restarting in one second\n");
+}
+
 /* BusyBox's reboot tools signal PID 1. Catch those requests and forward them
  * to the compositor, which owns the orderly application/framebuffer teardown.
  * The raw ARM64 signal ABI needs an rt_sigreturn restorer because this init has
@@ -281,7 +337,7 @@ void _start(void) {
 				print("init: no recovery shell either; retrying the desktop\n");
 			continue;
 		}
-		print("init: vinix-desktop exited; restarting in one second\n");
+		report_desktop_exit(child, status);
 		stop_desktop_group(child);
 	}
 }
