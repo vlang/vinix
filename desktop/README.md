@@ -387,11 +387,12 @@ as Windows does, left as macOS does, with the inner two swapping order to match
 each convention — and switches the taskbar between one entry per window, as
 Windows XP had, and one per application with a count, as Windows 7 had.
 
-**Theme** chooses between the desktop's own look and *macOS*, as it looked from
-Yosemite through Mojave: light grey window chrome shaded down its height with
-the title centred over it, three coloured discs at the leading edge, and a
-dock — a rounded panel sized to its contents and centred clear of the bottom
-edge — in place of the full-width taskbar.
+**Theme** chooses between the desktop's own look and *macOS*, matched to a
+native 1x AppKit window from macOS Catalina 10.15.7 (19H2): a 22-pixel light
+grey title bar, centred title, 12-pixel traffic lights on 20-pixel centres, and
+a dock — a rounded panel sized to its contents and centred clear of the bottom
+edge — in place of the full-width taskbar. The QEMU captures and measurements
+used as the reference live in `docs/catalina-reference/`.
 
 The discs are grey until a window is focused and show their glyphs only while
 the pointer is over the set, as macOS does. They also keep red-yellow-green

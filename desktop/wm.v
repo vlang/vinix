@@ -329,7 +329,13 @@ fn (mut d Desktop) window_element(window_index int) ui2.Element {
 	set_hovered := d.hover == window.id_close || d.hover == window.id_minimize
 		|| d.hover == window.id_maximize
 
-	maximize_glyph := if window.maximized { 'builtin:restore' } else { 'builtin:maximize' }
+	maximize_glyph := if theme.button_look == .traffic {
+		// Catalina calls this the zoom control. Its mark stays a plus while the
+		// standard window frame toggles between its two sizes.
+		'builtin:zoom'
+	} else {
+		if window.maximized { 'builtin:restore' } else { 'builtin:maximize' }
+	}
 
 	// Traffic lights are read as a group, and red-yellow-green left to right is
 	// the whole of what makes them recognisable — so they keep that order at
@@ -349,13 +355,20 @@ fn (mut d Desktop) window_element(window_index int) ui2.Element {
 		close_x = left_edge
 		middle_x = left_edge + stride
 		inner_x = left_edge + 2 * stride
+		middle_glyph = 'builtin:traffic_minimize'
+		inner_glyph = 'builtin:zoom'
 	} else if !buttons_left {
 		// Inward from close on the right: zoom, then minimise.
 		middle, inner = window.id_maximize, window.id_minimize
 		middle_glyph, inner_glyph = maximize_glyph, 'builtin:minimize'
 	}
 
-	close := d.title_button(window.id_close, 'builtin:close', close_x, active, set_hovered)
+	close_glyph := if theme.button_look == .traffic {
+		'builtin:traffic_close'
+	} else {
+		'builtin:close'
+	}
+	close := d.title_button(window.id_close, close_glyph, close_x, active, set_hovered)
 	maximize := d.title_button(middle, middle_glyph, middle_x, active, set_hovered)
 	minimize := d.title_button(inner, inner_glyph, inner_x, active, set_hovered)
 
@@ -385,7 +398,7 @@ fn (mut d Desktop) window_element(window_index int) ui2.Element {
 	}, title_children)
 
 	divider := ui2.view(window.id_divider, ui2.rect(0, f64(theme.title_height - 1), f64(window.width), 1), ui2.BoxStyle{
-		bg: theme.title_divider
+		bg: if active { theme.title_divider } else { theme.title_inactive_divider }
 	}, [])
 
 	background, contents := d.window_contents(window_index, body_height)
@@ -808,26 +821,48 @@ fn (d &Desktop) title_button(id string, glyph string, x int, active bool, set_ho
 	theme := d.theme()
 	y := (theme.title_height - theme.button_size) / 2
 	hovered := d.hover == id
-	is_close := glyph == 'builtin:close'
+	is_close := glyph == 'builtin:close' || glyph == 'builtin:traffic_close'
 
 	if theme.button_look == .traffic {
 		// A disc: coloured when the window is focused, grey when it is not, and
 		// carrying its glyph only while the pointer is over the set. Radius is
 		// half the size, which is how a rounded rect becomes a circle.
+		is_minimize := glyph == 'builtin:minimize' || glyph == 'builtin:traffic_minimize'
 		fill := if !active {
 			theme.traffic_idle
 		} else if is_close {
 			theme.traffic_close
-		} else if glyph == 'builtin:minimize' {
+		} else if is_minimize {
 			theme.traffic_minimize
 		} else {
 			theme.traffic_zoom
 		}
+		edge := if !active {
+			theme.traffic_idle_edge
+		} else if is_close {
+			theme.traffic_close_edge
+		} else if is_minimize {
+			theme.traffic_minimize_edge
+		} else {
+			theme.traffic_zoom_edge
+		}
+		glyph_color := if is_close {
+			theme.traffic_close_glyph
+		} else if is_minimize {
+			theme.traffic_minimize_glyph
+		} else {
+			theme.traffic_zoom_glyph
+		}
 		return ui2.button_with_image(id, '', if set_hovered { glyph } else { '' }, ui2.rect(f64(x), f64(y), f64(theme.button_size), f64(theme.button_size)), ui2.BoxStyle{
 			bg: fill
 			radius: theme.button_size / 2
+			border_color: edge
+			border_left: 1
+			border_top: 1
+			border_right: 1
+			border_bottom: 1
 		}, ui2.TextStyle{
-			color: theme.glyph_color
+			color: glyph_color
 		})
 	}
 

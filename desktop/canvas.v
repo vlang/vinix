@@ -273,6 +273,23 @@ fn (mut c Canvas) vertical_gradient(x int, y int, w int, h int, top u32, bottom 
 	}
 }
 
+// vertical_gradient_inclusive reaches both declared colours. Window chrome
+// needs that exact contract because its first and last gradient rows were
+// measured independently; wallpaper gradients use the half-open variant
+// above so adjacent tiles would not repeat an endpoint.
+fn (mut c Canvas) vertical_gradient_inclusive(x int, y int, w int, h int, top u32, bottom u32) {
+	if h <= 0 {
+		return
+	}
+	if h == 1 {
+		c.fill_rect(x, y, w, 1, top)
+		return
+	}
+	for row := 0; row < h; row++ {
+		c.fill_rect(x, y + row, w, 1, mix(top, bottom, u32(row * 255 / (h - 1))))
+	}
+}
+
 // fill_round_rect draws the body as plain spans and only pays for coverage
 // inside the four corner squares.
 fn (mut c Canvas) fill_round_rect(x int, y int, w int, h int, radius int, color u32) {

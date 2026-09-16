@@ -363,13 +363,25 @@ fn (mut d Desktop) draw_surface(el ui2.Element, x int, y int, w int, h int, dept
 	// names the same colour twice and costs nothing extra.
 	theme := d.theme()
 	if el.id.ends_with('.titlebar') {
-		bottom := if el.box.bg == theme.title_active_bg {
+		active := el.box.bg == theme.title_active_bg
+		bottom := if active {
 			theme.title_active_bg2
 		} else {
 			theme.title_inactive_bg2
 		}
+		highlight := if active { theme.title_highlight } else { theme.title_inactive_highlight }
 		if bottom != el.box.bg {
-			d.canvas.vertical_gradient(x, y, w, h, el.box.bg, bottom)
+			if highlight != 0 && h > 2 {
+				// Catalina reserves the first and last title-bar rows for its top
+				// highlight and divider. The 20 rows between them reach both
+				// measured gradient colours.
+				d.canvas.vertical_gradient_inclusive(x, y + 1, w, h - 2, el.box.bg, bottom)
+			} else {
+				d.canvas.vertical_gradient(x, y, w, h, el.box.bg, bottom)
+			}
+		}
+		if highlight != 0 {
+			d.canvas.fill_rect(x, y, w, 1, highlight)
 		}
 	}
 }
@@ -474,6 +486,15 @@ fn (mut d Desktop) draw_button(el ui2.Element, x int, y int, w int, h int) {
 		} else {
 			d.canvas.fill_rect(x, y, w, h, el.box.bg)
 		}
+		// Catalina's traffic lights have a one-pixel role-coloured ring. BoxStyle
+		// carries it on the local title buttons; keep this renderer deliberately
+		// to the uniform border ui2 can express as one rounded outline.
+		is_title_button := el.id.ends_with('.close') || el.id.ends_with('.minimize')
+			|| el.id.ends_with('.maximize')
+		if is_title_button && el.box.border_left == 1 && el.box.border_top == 1 && el.box.border_right == 1
+			&& el.box.border_bottom == 1 {
+			d.canvas.stroke_round_rect(x, y, w, h, radius, el.box.border_color, 255)
+		}
 	}
 
 	// An icon on its own gets the whole control; an icon with a label gets a
@@ -548,8 +569,18 @@ fn (mut d Desktop) draw_builtin_glyph(path string, x int, y int, w int, h int, c
 		'minimize' {
 			d.canvas.fill_rect(cx - half, cy, 2 * half, 1, color)
 		}
+		'traffic_minimize' {
+			// The Catalina collapse mark is a 6x2 dash in a 12-pixel disc.
+			d.canvas.fill_rect(cx - 2, cy - 1, 6, 2, color)
+		}
 		'maximize' {
 			d.canvas.stroke_round_rect(cx - half, cy - half, 2 * half, 2 * half, 1, color, 255)
+		}
+		'zoom' {
+			// Measured from Catalina's 12-pixel standard zoom control: the mark
+			// is a 6x6 plus with two-pixel strokes.
+			d.canvas.fill_rect(cx - 2, cy - 1, 6, 2, color)
+			d.canvas.fill_rect(cx, cy - 3, 2, 6, color)
 		}
 		'restore' {
 			// Two offset outlines, the back one clipped by the front's fill.
@@ -560,6 +591,10 @@ fn (mut d Desktop) draw_builtin_glyph(path string, x int, y int, w int, h int, c
 		'close' {
 			d.canvas.draw_line(cx - half, cy - half, cx + half, cy + half, color, 1)
 			d.canvas.draw_line(cx + half, cy - half, cx - half, cy + half, color, 1)
+		}
+		'traffic_close' {
+			d.canvas.draw_line(cx - 2, cy - 3, cx + 3, cy + 2, color, 1)
+			d.canvas.draw_line(cx + 3, cy - 3, cx - 2, cy + 2, color, 1)
 		}
 
 		// Application and file icons. These are filled shapes rather than

@@ -199,6 +199,108 @@ fn test_desktop_scale_defaults_and_extents() {
 	assert desktop_scaled_extent(1920, desktop_scale_100) == 1920
 }
 
+fn test_catalina_theme_uses_measured_window_chrome() {
+	assert theme_macos.title_height == 22
+	assert theme_macos.button_size == 12
+	assert theme_macos.button_size + theme_macos.button_gap == 20
+	assert theme_macos.button_inset == 8
+	assert theme_macos.title_active_bg == 0xe4e4e4
+	assert theme_macos.title_active_bg2 == 0xd1d1d1
+	assert theme_macos.title_highlight == 0xf3f3f3
+	assert theme_macos.title_divider == 0xababab
+	assert theme_macos.title_inactive_bg == 0xf6f6f6
+	assert theme_macos.title_inactive_bg2 == 0xf6f6f6
+	assert theme_macos.title_inactive_highlight == 0xfbfbfb
+	assert theme_macos.title_inactive_divider == 0xd1d1d1
+	assert theme_macos.window_body == 0xececec
+	mut gradient := new_canvas(1, 20)
+	defer {
+		unsafe { free(gradient.pixels) }
+	}
+	gradient.vertical_gradient_inclusive(0, 0, 1, 20, theme_macos.title_active_bg, theme_macos.title_active_bg2)
+	for row in 0 .. 20 {
+		expected := u32(0xe4e4e4) - u32(row) * u32(0x010101)
+		unsafe {
+			assert gradient.pixels[row] == expected
+		}
+	}
+
+	d := Desktop{
+		settings: Settings{
+			theme:       .macos
+			button_side: .left
+		}
+	}
+	close := d.title_button('close', 'builtin:traffic_close', theme_macos.button_inset, true, true)
+	minimize := d.title_button('minimize', 'builtin:traffic_minimize', 28, true, true)
+	zoom := d.title_button('zoom', 'builtin:zoom', 48, true, true)
+	assert int(close.frame.x) == 8 && int(close.frame.y) == 5
+	assert close.box.bg == 0xff5f57 && close.box.border_color == 0xe0463e
+	assert close.box.border_left == 1 && close.box.border_top == 1
+	assert close.box.border_right == 1 && close.box.border_bottom == 1
+	assert close.text_style.color == 0x4d0000
+	assert minimize.box.bg == 0xffbd2e && minimize.box.border_color == 0xdea123
+	assert minimize.text_style.color == 0x995700
+	assert zoom.box.bg == 0x28c940 && zoom.box.border_color == 0x1aab29
+	assert zoom.text_style.color == 0x006500
+	assert close.image_path == 'builtin:traffic_close'
+	assert zoom.image_path == 'builtin:zoom'
+
+	idle := d.title_button('idle', 'builtin:close', 8, false, false)
+	assert idle.box.bg == 0xdcdcdc && idle.box.border_color == 0xd1d1d1
+	assert idle.image_path == ''
+}
+
+fn test_catalina_chrome_renders_measured_rows() {
+	mut desktop := Desktop{
+		canvas: new_canvas(640, 480)
+		fonts:  load_fonts()
+		settings: Settings{
+			theme:       .macos
+			button_side: .left
+		}
+	}
+	defer {
+		unsafe { free(desktop.canvas.pixels) }
+	}
+	desktop.spawn('Inactive', .notes, 20, 20, 260, 160)
+	desktop.spawn('Active', .welcome, 320, 20, 260, 160)
+	root := desktop.build_tree()
+	desktop.render(root)
+	free_tree(root)
+
+	// Away from text and controls, every native 22-pixel title-bar row has a
+	// direct counterpart in the rendered frame.
+	unsafe {
+		assert desktop.canvas.pixels[20 * desktop.canvas.stride + 420] == 0xf3f3f3
+		assert desktop.canvas.pixels[21 * desktop.canvas.stride + 420] == 0xe4e4e4
+		assert desktop.canvas.pixels[40 * desktop.canvas.stride + 420] == 0xd1d1d1
+		assert desktop.canvas.pixels[41 * desktop.canvas.stride + 420] == 0xababab
+		assert desktop.canvas.pixels[20 * desktop.canvas.stride + 120] == 0xfbfbfb
+		assert desktop.canvas.pixels[21 * desktop.canvas.stride + 120] == 0xf6f6f6
+		assert desktop.canvas.pixels[40 * desktop.canvas.stride + 120] == 0xf6f6f6
+		assert desktop.canvas.pixels[41 * desktop.canvas.stride + 120] == 0xd1d1d1
+		assert desktop.canvas.pixels[31 * desktop.canvas.stride + 334] == 0xff5f57
+		assert desktop.canvas.pixels[31 * desktop.canvas.stride + 34] == 0xdcdcdc
+	}
+}
+
+fn test_selecting_catalina_theme_starts_with_controls_on_left() {
+	mut desktop := Desktop{
+		settings: Settings{
+			theme:       .default_
+			button_side: .right
+		}
+	}
+	mut app := &SettingsApp{
+		category: .theme
+		desktop:  &desktop
+	}
+	app.handle('${settings_action_theme}1') or { panic(err) }
+	assert desktop.settings.theme == .macos
+	assert desktop.settings.button_side == .left
+}
+
 fn test_settings_missing_offline_readonly_and_stale_hits() {
 	for failure in 0 .. 3 {
 		mut app := fixture_app()
