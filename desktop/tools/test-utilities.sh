@@ -39,6 +39,13 @@ cp "$root/desktop/tools/tests/titlebar_click_test.v" "$work/ui/"
     -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/titlebar_click_test.v"
 rm -f "$work/ui/titlebar_click_test.v"
 
+# Miller columns use real directory listings and their own retained navigation
+# state, so exercise them independently from the broader utility model tests.
+cp "$root/desktop/tools/tests/files_columns_test.v" "$work/ui/"
+"$v" -new-compiler -nocache -gc none -manualfree -enable-globals -stats -d ui2_headless \
+    -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/files_columns_test.v"
+rm -f "$work/ui/files_columns_test.v"
+
 # Build a real executable as well as V's generated test runner. It execs
 # itself twice in native-app mode and verifies UI, actions, state sync and
 # clean shutdown across actual process boundaries.
