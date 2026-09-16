@@ -43,11 +43,25 @@ synced. An existing unified file always takes precedence, even if damaged, so
 an old scale cannot unexpectedly override a reset or corrupt configuration.
 No new scale-only file is written.
 
-Saves use a private mode-0600 temporary file, flush it, rename it over the old
-snapshot and flush the directory update. Failed writes leave the previous file
-intact; save failures are reported on stderr without undoing live changes. A
-failed save is not retried every frame; the next settings change retries the
-complete current state.
+File I/O uses V's standard library: `os.lstat` and `os.read_file` for loading,
+`io.util.temp_file` for a mode-0600 sibling, `os.File.write_string` for saving,
+and `os.rename_dir`/`os.rm` for publication and cleanup. The exact-destination
+rename deliberately rejects a directory at the settings path. Writes are
+unbuffered so errors are reported before publication. A small `fsync` bridge
+remains because `os.File.flush()` only flushes stdio, not persistent storage;
+it syncs the file before rename and flushes the directory update afterwards.
+Vinix's existing file-fsync fallback handles unsupported directory syncing.
+Failed writes leave the previous file intact; save failures are reported on
+stderr without undoing live changes. The next settings change retries the
+complete current state, rather than retrying every frame.
+
+Loading checks file type and size before `os.read_file`, then checks the
+returned length and validates the record. Existing symlinks, special files
+and records over 4 KiB are rejected. These are configuration-file checks, not
+a race-free sandbox: the settings file is in the desktop's own home and should
+not be replaced or grown concurrently with startup. In particular, `read_file`
+allocates for the file it reads; the size checks are not a hard allocation cap
+under concurrent modification.
 
 The file lives in the desktop's writable home, not `/etc` in the initramfs.
 On the AArch64 QEMU desktop launcher, reuse the same persistent `/root` volume
@@ -157,7 +171,7 @@ positive short write is an error and its suffix is never retried as a command.
 `settings_app.v` implements `NativeApp`; `app.v` registers the launcher, and
 `settings_model.v` holds the shared preference data while `settings.v` holds
 the themes. `preferences.v` owns the complete file schema and
-`preferences.c.v` its bounded POSIX I/O and legacy migration. `scale.v`
+`preferences.c.v` its vlib file I/O, durability bridge and legacy migration. `scale.v`
 owns the requested/applied integer scale and default policy. `scale_wm.v` swaps
 the compositor's logical canvas between physical size and half size, remaps
 window/pointer positions and invalidates stale hit targets. `framebuffer.v`
@@ -197,8 +211,11 @@ restoration of both terminal attributes and descriptor flags. Preference tests
 also run with `CLIENTS_ONLY=1` and use temporary homes, never `/root`. They cover
 every saved field, both scale overrides, auto-scale preservation, defaults,
 strict bounded parsing, legacy migration and precedence, commit-before-save
-ordering, atomic replacement, failed saves and cleanup, FIFOs and symlinks. The
-full UI suite additionally exercises actual Settings actions and compositor
+ordering, atomic replacement through `os.File`, failed saves and cleanup, and
+pre-read rejection of existing FIFOs and symlinks. They also check that a
+dangling unified-file symlink does not trigger legacy migration and that a
+legacy directory is not removed. The full UI suite additionally exercises
+actual Settings actions and compositor
 scale application before saving and restoring the complete snapshot.
 
 Desktop scaling is independent of the DCP backlight transport and never changes

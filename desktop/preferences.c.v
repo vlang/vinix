@@ -2,12 +2,15 @@
 // Persist a complete desktop settings snapshot in the writable home.
 module main
 
-#include <stdio.h>
+import os
+import io.util
 
-fn C.mkstemp(template &char) int
+#include <errno.h>
 
-fn C.rename(old_path &char, new_path &char) int
+#include <unistd.h>
 
+// os.File.flush() flushes stdio, not the device. Keep only the durability
+// primitive here; opening, reading, writing, renaming and cleanup use vlib.
 fn C.fsync(fd int) int
 
 enum PreferenceFileState {
@@ -20,38 +23,23 @@ fn desktop_preferences_path(home string) string {
 	return '${home}/${desktop_preferences_name}'
 }
 
-// Nonblocking open plus fstat prevents a FIFO/device at this path from hanging
-// startup. The extra byte rejects oversized records instead of valid prefixes.
+// Check ordinary configuration mistakes before the whole-file read. These
+// path checks are not a race-free sandbox: the desktop owns its home, and the
+// file must not be replaced or grown concurrently with startup.
 fn desktop_read_preference_record(path string) (string, PreferenceFileState) {
-	fd := C.open(&char(path.str), C.O_RDONLY | C.O_NONBLOCK | C.O_CLOEXEC | C.O_NOFOLLOW)
-	if fd < 0 {
-		return '', if C.errno == C.ENOENT { PreferenceFileState.missing } else { PreferenceFileState.invalid }
+	info := os.lstat(path) or {
+		return '', if err.code() == C.ENOENT { PreferenceFileState.missing } else { PreferenceFileState.invalid }
 	}
-	defer { C.close(fd) }
-	mut info := C.stat{}
-	if C.fstat(fd, &info) != 0
-		|| (u32(info.st_mode) & u32(C.S_IFMT)) != u32(C.S_IFREG) {
+	if info.get_filetype() != .regular || info.size == 0
+		|| info.size > u64(desktop_preferences_max_bytes) {
 		return '', .invalid
 	}
-	mut data := [4097]u8{}
-	mut total := 0
-	mut interruptions := 0
-	for total < data.len {
-		got := desktop_read(fd, &data[total], u64(data.len - total))
-		if got < 0 {
-			if C.errno == C.EINTR && interruptions < 4 {
-				interruptions++
-				continue
-			}
-			return '', .invalid
-		}
-		if got == 0 { break }
-		total += int(got)
-	}
-	if total == 0 || total > desktop_preferences_max_bytes {
+	record := os.read_file(path) or { return '', .invalid }
+	if record.len == 0 || record.len > desktop_preferences_max_bytes {
+		unsafe { record.free() }
 		return '', .invalid
 	}
-	return unsafe { (&data[0]).vbytes(total).bytestr() }, .loaded
+	return record, .loaded
 }
 
 fn desktop_load_preferences(home string) DesktopPreferences {
@@ -114,12 +102,9 @@ fn desktop_preferences_fsync(fd int) bool {
 }
 
 fn desktop_preferences_sync_directory(home string, file_fd int) bool {
-	fd := C.open(&char(home.str), C.O_RDONLY | C.O_DIRECTORY | C.O_CLOEXEC)
-	if fd < 0 {
-		return false
-	}
-	defer { C.close(fd) }
-	if desktop_preferences_fsync(fd) {
+	mut directory := os.open(home) or { return false }
+	defer { directory.close() }
+	if desktop_preferences_fsync(directory.fd) {
 		return true
 	}
 	// Vinix can reject fsync on a directory. Its ARM64 file fsync also drains
@@ -131,74 +116,48 @@ fn desktop_preferences_sync_directory(home string, file_fd int) bool {
 	return false
 }
 
-// Write and sync a private sibling before publishing it. Failed writes must
-// not truncate the last good preference. mkstemp creates mode 0600 with O_EXCL
-// and avoids following a pre-existing temporary-file symlink. All allocations,
-// descriptors and unpublished temporary files have a single cleanup path.
+// vlib owns file creation and whole-string writes. Publish a complete synced
+// sibling rather than truncating the last good snapshot in place.
 fn desktop_save_preferences(home string, p DesktopPreferences) bool {
-	if home == '' {
+	if home == '' || !os.is_dir(home) {
 		return false
 	}
 	data := desktop_encode_preferences(p) or { return false }
 	defer { unsafe { data.free() } }
 	path := desktop_preferences_path(home)
-	temporary := '${path}.XXXXXX'
-	defer {
-		unsafe {
-			temporary.free()
-			path.free()
-		}
-	}
-	// Interpolation owns this writable buffer; mkstemp replaces its final Xs.
-	mut fd := C.mkstemp(&char(temporary.str))
-	if fd < 0 {
+	defer { unsafe { path.free() } }
+	mut file, temporary := util.temp_file(path: home, pattern: '${desktop_preferences_name}.*') or {
 		return false
 	}
 	mut published := false
 	defer {
-		if fd >= 0 {
-			C.close(fd)
-		}
+		file.close()
 		if !published {
-			C.unlink(&char(temporary.str))
+			os.rm(temporary) or {}
 		}
+		unsafe { temporary.free() }
 	}
-	if C.fcntl(fd, C.F_SETFD, C.FD_CLOEXEC) != 0 {
+	// Unbuffered writes report their errors here, not in File.close(), whose
+	// API has no result. write_string handles short/interrupted writes in vlib.
+	file.set_unbuffered()
+	file.write_string(data) or { return false }
+	if !desktop_preferences_fsync(file.fd) {
 		return false
 	}
-	mut total := 0
-	mut interruptions := 0
-	for total < data.len {
-		wrote := desktop_write(fd, unsafe { voidptr(data.str + total) }, u64(data.len - total))
-		if wrote < 0 {
-			if C.errno == C.EINTR && interruptions < 4 {
-				interruptions++
-				continue
-			}
-			return false
-		}
-		if wrote == 0 {
-			return false
-		}
-		total += int(wrote)
-	}
-	if !desktop_preferences_fsync(fd) || C.rename(&char(temporary.str), &char(path.str)) != 0 {
-		return false
-	}
+	// Use the exact-destination API: os.rename() would move the file INSIDE
+	// an existing directory at `path`, instead of rejecting that destination.
+	os.rename_dir(temporary, path) or { return false }
 	published = true
-	if !desktop_preferences_sync_directory(home, fd) {
+	if !desktop_preferences_sync_directory(home, file.fd) {
 		return false
 	}
-	// A successful unified save is also the end of legacy migration. Never
-	// remove the old preference before the new snapshot is durable.
+	// Do not delete a directory accidentally placed at the legacy path.
 	legacy := '${home}/${desktop_legacy_scale_name}'
 	defer { unsafe { legacy.free() } }
-	if C.unlink(&char(legacy.str)) == 0 {
-		if !desktop_preferences_sync_directory(home, fd) { return false }
-	} else if C.errno != C.ENOENT {
+	info := os.lstat(legacy) or { return err.code() == C.ENOENT }
+	if info.get_filetype() == .directory {
 		return false
 	}
-	closed := C.close(fd)
-	fd = -1
-	return closed == 0
+	os.rm(legacy) or { return false }
+	return desktop_preferences_sync_directory(home, file.fd)
 }

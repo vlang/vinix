@@ -123,7 +123,7 @@ fn test_preferences_reject_invalid_versions_fields_duplicates_and_overflow() {
 }
 
 fn test_preferences_reads_reject_oversized_valid_prefixes() {
-	home := preference_test_home('bounded')
+	home := preference_test_home('size-limit')
 	defer { os.rmdir_all(home) or {} }
 	path := desktop_preferences_path(home)
 	prefix := 'version=1\nscale=2\n#'
@@ -163,20 +163,18 @@ fn test_preferences_atomic_replacement_keeps_old_open_file() {
 	old_preferences := preference_test_custom()
 	old_record := desktop_encode_preferences(old_preferences)?
 	assert desktop_save_preferences(home, old_preferences)
-	fd := desktop_open_rw(path)
-	assert fd >= 0
-	defer { desktop_close(fd) }
+	mut old_file := os.open(path)!
+	defer { old_file.close() }
+	old_info := os.stat(path)!
+	assert old_info.mode & 0o777 == 0o600
 	assert desktop_save_preferences(home, DesktopPreferences{})
-	mut data := [4096]u8{}
-	got := desktop_read(fd, &data[0], u64(data.len))
-	assert got == old_record.len
-	for index, byte in old_record {
-		assert data[index] == byte
-	}
+	mut data := []u8{len: old_record.len}
+	assert old_file.read(mut data)! == old_record.len
+	assert data.bytestr() == old_record
 	assert desktop_load_preferences(home) == DesktopPreferences{}
-	mut info := C.stat{}
-	assert C.fstat(fd, &info) == 0
-	assert u32(info.st_mode) & 0o777 == 0o600
+	info := os.stat(path)!
+	assert info.mode & 0o777 == 0o600
+	assert info.inode != old_info.inode
 	current := os.read_file(path)!
 	for invalid in [DesktopPreferences{ scale: 3 },
 		DesktopPreferences{ settings: Settings{ wallpaper_color: -1 } },
@@ -245,6 +243,7 @@ fn test_preferences_failed_save_keeps_live_state_and_retries_next_change() {
 	assert p.settings == settings
 	assert p.save_changes(settings, desktop_scale_200, home)
 	assert os.is_dir(path)
+	assert os.ls(path)!.len == 0
 	assert os.read_file(legacy)! == '1\n'
 	assert os.ls(home)!.len == 2
 	os.rmdir(path)!
@@ -255,7 +254,7 @@ fn test_preferences_failed_save_keeps_live_state_and_retries_next_change() {
 	assert os.ls(home)! == [desktop_preferences_name]
 }
 
-fn test_preferences_fifo_and_symlink_do_not_block_or_redirect_startup() {
+fn test_preferences_reject_existing_fifo_and_symlink_before_reading() {
 	home := preference_test_home('special')
 	defer { os.rmdir_all(home) or {} }
 	path := desktop_preferences_path(home)
@@ -273,4 +272,30 @@ fn test_preferences_fifo_and_symlink_do_not_block_or_redirect_startup() {
 	assert desktop_save_preferences(home, DesktopPreferences{})
 	assert os.read_file(target)! == 'version=1\nscale=2\n'
 	assert desktop_load_preferences(home) == DesktopPreferences{}
+}
+
+fn test_preferences_dangling_symlink_does_not_trigger_legacy_migration() {
+	home := preference_test_home('dangling-link')
+	defer { os.rmdir_all(home) or {} }
+	path := desktop_preferences_path(home)
+	legacy := '${home}/${desktop_legacy_scale_name}'
+	target := os.join_path(home, 'absent')
+	os.symlink(target, path)!
+	os.write_file(legacy, '2\n')!
+	assert desktop_load_preferences(home) == DesktopPreferences{}
+	assert os.is_link(path)
+	assert !os.exists(target)
+	assert os.read_file(legacy)! == '2\n'
+}
+
+fn test_preferences_legacy_directory_is_not_removed_by_save() {
+	home := preference_test_home('legacy-directory')
+	defer { os.rmdir_all(home) or {} }
+	legacy := '${home}/${desktop_legacy_scale_name}'
+	os.mkdir(legacy)!
+	assert !desktop_save_preferences(home, preference_test_custom())
+	assert os.is_dir(legacy)
+	// Publication already succeeded; cleanup failure does not corrupt it.
+	assert desktop_load_preferences(home) == preference_test_custom()
+	assert os.ls(home)!.len == 2
 }
