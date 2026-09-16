@@ -341,12 +341,47 @@ pub fn write_cntp_tval_el0(value u64) {
 	}
 }
 
-// Virtual timer (CNTV) registers -- used under HVF where physical timer is trapped
+// Virtual timer (CNTV) registers -- used under HVF where physical timer is trapped.
+//
+// Vinix polls ISTATUS instead of relying on virtual-timer IRQ delivery under
+// HVF. After the host leaves QEMU in the background for long enough, HVF can
+// stop reporting ISTATUS for an already-overdue 32-bit TVAL deadline. With all
+// guest threads asleep, that leaves every CPU spinning in the scheduler's
+// polling loop forever: no scheduler pass means no clock update and no desktop
+// thread to consume the pointer reports that are still being polled.
+//
+// Keep the absolute CNTVCT deadline alongside the hardware timer and synthesize
+// ISTATUS when the free-running counter has passed it. The architectural timer
+// is still programmed and remains the fast path; this is only a recovery path
+// for a status bit lost across a long host stall.
+const cntv_deadline_slots = 256
+
+__global (
+	cntv_deadlines [cntv_deadline_slots]u64
+)
+
+fn cntv_deadline_index() int {
+	cpu_number := read_tpidr_el1()
+	if cpu_number >= cntv_deadline_slots {
+		return -1
+	}
+	return int(cpu_number)
+}
+
 pub fn read_cntv_ctl_el0() u64 {
 	mut ret := u64(0)
 	asm volatile aarch64 {
 		mrs ret, cntv_ctl_el0
 		; =r (ret)
+	}
+	if ret & 1 != 0 && ret & 4 == 0 {
+		index := cntv_deadline_index()
+		if index >= 0 {
+			deadline := cntv_deadlines[index]
+			if deadline != 0 && read_cntvct_el0() >= deadline {
+				ret |= 4
+			}
+		}
 	}
 	return ret
 }
@@ -367,6 +402,19 @@ pub fn write_cntv_tval_el0(value u64) {
 		; ; r (value)
 		; memory
 	}
+
+	index := cntv_deadline_index()
+	if index < 0 {
+		return
+	}
+	// TVAL is architecturally a signed 32-bit countdown. Every Vinix use is a
+	// small positive interval, but preserve the immediate-expiry meaning of a
+	// value whose sign bit is set rather than turning it into a far-future u64.
+	raw := u32(value)
+	delta := if raw & u32(0x80000000) != 0 { u64(0) } else { u64(raw) }
+	now := read_cntvct_el0()
+	deadline := now + delta
+	cntv_deadlines[index] = if deadline < now { ~u64(0) } else { deadline }
 }
 
 pub fn read_daif() u64 {
