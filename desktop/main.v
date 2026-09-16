@@ -126,7 +126,7 @@ fn main() {
 		fb.close()
 	}
 
-	scale := desktop_configure_scale(fb.width, fb.height)
+	scale := desktop_configure_saved_scale(fb.width, fb.height, desktop_home)
 	mut desktop := Desktop{
 		canvas: new_canvas(desktop_scaled_extent(fb.width, scale), desktop_scaled_extent(fb.height, scale))
 		fonts: load_fonts()
@@ -197,7 +197,11 @@ fn main() {
 		}
 		// Settings only requests a new scale. Apply it after all input from this
 		// frame and before layout so drawing and hit targets share one space.
+		previous_scale := desktop_current_scale()
 		desktop.apply_requested_scale()
+		if !desktop_save_scale_change(previous_scale, desktop_home) {
+			eprintln('vinix-desktop: could not save display scale; it may reset on restart')
+		}
 		desktop.update_switcher()
 		after_input := monotonic_millis()
 

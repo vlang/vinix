@@ -55,6 +55,32 @@ screen, maximized windows are refit, and old hit targets are discarded before
 the next frame. Oversized windows are kept at the top-left so Settings remains
 reachable even after manually selecting 200% on a small framebuffer.
 
+### Saving the scale
+
+After the compositor applies a scale change, it saves the choice in
+`/root/.vinix-desktop-scale` (`1` for 100%, `2` for 200%). The next desktop
+startup loads it before allocating the logical canvas. Missing, unreadable or
+malformed preferences fall back to the geometry policy above; startup never
+writes that automatic default back as a user preference.
+
+The save uses a private temporary file, flushes it, then renames it over the
+previous preference and flushes the directory update. A failed save is reported
+on the desktop's stderr without undoing the live scale change. A rejected scale
+request does not overwrite the preference. Remove the file to restore automatic
+scale selection on the next startup.
+
+The file lives in the desktop's writable home, not `/etc` in the initramfs.
+On the AArch64 QEMU desktop launcher, keep using the same persistent `/root`
+volume (`boot-image/desktop-root.ext2`). `--no-persist` uses RAM instead and
+`--ephemeral` removes its private volume when QEMU exits; neither preserves
+preferences for the next launch. Continue to shut down writable ext2 guests
+cleanly.
+
+To check the fix in QEMU, switch from 100% to 200% in Settings, confirm that
+`cat /root/.vinix-desktop-scale` prints `2`, shut down cleanly, and relaunch with
+the same volume. The desktop should start at 200%. Repeat with 100%, then remove
+the preference and restart to check the geometry fallback.
+
 ### Brightness
 
 The click-to-set bar has 5% steps; **- 5%** and **+ 5%** adjust the current
@@ -126,7 +152,11 @@ records, arithmetic and parser limits, permissions, offline and missing devices,
 short writes, bounded interruptions, exact descriptor cleanup, and a round-trip
 with the actual **V kernel backlight core**. The POSIX tests exercise real files,
 shared mapping, directories, `/dev/null`, monotonic clocks and a PTY, including
-restoration of both terminal attributes and descriptor flags.
+restoration of both terminal attributes and descriptor flags. The scale
+preference tests also run with `CLIENTS_ONLY=1` and use temporary homes, never
+`/root`. They cover both saved choices, startup fallback, strict bounded parsing,
+commit-before-save ordering, atomic replacement, failed saves and temporary-file
+cleanup, and a FIFO at the preference path.
 
 Desktop scaling is independent of the DCP backlight transport and never changes
 the status of physical brightness adjustment.
