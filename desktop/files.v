@@ -62,14 +62,24 @@ fn parent_path(path string) string {
 	return trimmed[..index]
 }
 
-// read replaces the listing with the contents of `path`. A directory it cannot
-// open leaves the browser where it was and says so, rather than emptying the
-// window and looking like the directory is empty.
-fn (mut b FileBrowser) read(path string) {
+fn file_path_name(path string) string {
+	if path == '/' {
+		return path
+	}
+	index := path.last_index('/') or { return path }
+	if index + 1 >= path.len {
+		return path
+	}
+	return path[index + 1..]
+}
+
+// read_file_entries is shared by the list and Miller-column views. The action
+// prefix is part of the cached row ids, so every visible column can route a
+// click without allocating an action string on each compositor rebuild.
+fn read_file_entries(path string, action_prefix string) ?[]FileEntry {
 	dir := desktop_opendir(path)
 	if dir == unsafe { nil } {
-		b.error = 'cannot open ${path}'
-		return
+		return none
 	}
 
 	mut entries := []FileEntry{}
@@ -111,7 +121,19 @@ fn (mut b FileBrowser) read(path string) {
 		}
 		return compare_strings(a.name, b.name)
 	})
-	prepare_file_rows(mut entries)
+	prepare_file_rows(mut entries, action_prefix)
+	return entries
+}
+
+// read replaces the listing with the contents of `path`. A directory it cannot
+// open leaves the browser where it was and says so, rather than emptying the
+// window and looking like the directory is empty.
+fn (mut b FileBrowser) read(path string) {
+	entries := read_file_entries(path, files_action_row) or {
+		unsafe { b.error.free() }
+		b.error = 'cannot open ${path}'
+		return
+	}
 
 	b.free_entries()
 	unsafe {
@@ -125,11 +147,11 @@ fn (mut b FileBrowser) read(path string) {
 	b.hover_row = -1
 }
 
-fn prepare_file_rows(mut entries []FileEntry) {
+fn prepare_file_rows(mut entries []FileEntry, action_prefix string) {
 	for index in 0 .. entries.len {
 		if entries[index].row_action.len == 0 {
 			index_text := index.str()
-			entries[index].row_action = files_action_row + index_text
+			entries[index].row_action = action_prefix + index_text
 			unsafe { index_text.free() }
 		}
 		if !entries[index].is_dir && entries[index].size_text.len == 0 {
@@ -209,10 +231,43 @@ const files_action_up = 'files.up'
 const files_action_row = 'files.row.'
 const files_action_scroll_up = 'files.scroll.up'
 const files_action_scroll_down = 'files.scroll.down'
+const files_action_view_toggle = 'files.view.toggle'
+const files_action_column_row = 'files.column.row.'
+const files_action_column_scroll_up = 'files.column.scroll.up.'
+const files_action_column_scroll_down = 'files.column.scroll.down.'
 
 const files_row_height = 24
 const files_header_height = 38
 const files_padding = 10
+const files_column_header_height = 26
+const files_column_min_width = 200
+
+enum FilesViewMode {
+	list
+	columns
+}
+
+// One retained directory listing in Miller-column mode. A stable id, rather
+// than the array position, is embedded in every row action so truncating the
+// columns to follow another branch never invalidates the remaining actions.
+struct MillerColumn {
+mut:
+	id                 int
+	browser            FileBrowser
+	selected_row       int = -1
+	scroll_up_action   string
+	scroll_down_action string
+}
+
+fn (mut c MillerColumn) release() {
+	c.browser.free_entries()
+	unsafe {
+		c.browser.path.free()
+		c.browser.error.free()
+		c.scroll_up_action.free()
+		c.scroll_down_action.free()
+	}
+}
 
 struct FileBrowserApp {
 mut:
@@ -220,6 +275,9 @@ mut:
 	// Rows the window last had space for, so scrolling can clamp against the
 	// window as it actually is rather than as it was when it opened.
 	visible_rows int = 1
+	view_mode FilesViewMode
+	columns []MillerColumn
+	next_column_id int = 1
 }
 
 fn open_files(mut _ Desktop) !NativeApp {
@@ -241,34 +299,251 @@ fn open_files(mut _ Desktop) !NativeApp {
 	return app
 }
 
+fn (mut a FileBrowserApp) new_miller_column(path string) MillerColumn {
+	id := a.next_column_id
+	a.next_column_id++
+	id_text := id.str()
+	row_prefix := '${files_action_column_row}${id_text}.'
+	scroll_up := files_action_column_scroll_up + id_text
+	scroll_down := files_action_column_scroll_down + id_text
+	entries := read_file_entries(path, row_prefix) or {
+		error_text := 'cannot open ${path}'
+		unsafe {
+			id_text.free()
+			row_prefix.free()
+		}
+		return MillerColumn{
+			id: id
+			browser: FileBrowser{
+				path: path
+				error: error_text
+			}
+			scroll_up_action: scroll_up
+			scroll_down_action: scroll_down
+		}
+	}
+	unsafe {
+		id_text.free()
+		row_prefix.free()
+	}
+	return MillerColumn{
+		id: id
+		browser: FileBrowser{
+			path: path
+			entries: entries
+		}
+		scroll_up_action: scroll_up
+		scroll_down_action: scroll_down
+	}
+}
+
+fn (mut a FileBrowserApp) free_miller_columns_from(start int) {
+	mut first := start
+	if first < 0 {
+		first = 0
+	}
+	if first >= a.columns.len {
+		return
+	}
+	for index := a.columns.len - 1; index >= first; index-- {
+		a.columns[index].release()
+		a.columns.delete(index)
+	}
+}
+
+fn (mut a FileBrowserApp) free_miller_columns() {
+	a.free_miller_columns_from(0)
+}
+
+fn (mut a FileBrowserApp) find_miller_entry(column int, name string) int {
+	if column < 0 || column >= a.columns.len {
+		return -1
+	}
+	for index, entry in a.columns[column].browser.entries {
+		if entry.is_dir && entry.name == name {
+			return index
+		}
+	}
+	return -1
+}
+
+// Entering column view starts with the current directory and, when possible,
+// its parent. That gives the default two-column window useful context without
+// rereading every ancestor on a deep path.
+fn (mut a FileBrowserApp) reset_miller_columns(path string) {
+	a.free_miller_columns()
+	if path == '/' {
+		a.columns << a.new_miller_column(path.clone())
+		return
+	}
+	parent := parent_path(path)
+	parent_owned := parent.clone()
+	a.columns << a.new_miller_column(parent_owned)
+	name := file_path_name(path)
+	selected := a.find_miller_entry(0, name)
+	if selected >= 0 {
+		a.columns[0].selected_row = selected
+	}
+	a.columns << a.new_miller_column(path.clone())
+}
+
+fn (mut a FileBrowserApp) set_view_mode(mode FilesViewMode) {
+	if mode == a.view_mode {
+		return
+	}
+	if mode == .columns {
+		a.reset_miller_columns(a.browser.path)
+		a.view_mode = .columns
+		return
+	}
+	if a.columns.len > 0 {
+		path := a.columns.last().browser.path.clone()
+		a.browser.read(path)
+	}
+	a.free_miller_columns()
+	a.view_mode = .list
+}
+
+fn (a &FileBrowserApp) current_path() string {
+	if a.view_mode == .columns && a.columns.len > 0 {
+		return a.columns.last().browser.path
+	}
+	return a.browser.path
+}
+
+fn (mut a FileBrowserApp) go_up_miller() {
+	if a.columns.len == 0 {
+		a.reset_miller_columns(a.browser.path)
+		return
+	}
+	if a.columns.len > 1 {
+		a.free_miller_columns_from(a.columns.len - 1)
+		a.columns[a.columns.len - 1].selected_row = -1
+		return
+	}
+	path := a.columns[0].browser.path
+	if path == '/' {
+		return
+	}
+	parent := parent_path(path).clone()
+	a.free_miller_columns()
+	a.columns << a.new_miller_column(parent)
+}
+
+fn (mut a FileBrowserApp) clamp_column_scroll(index int) {
+	if index < 0 || index >= a.columns.len {
+		return
+	}
+	max_scroll := a.columns[index].browser.entries.len - a.visible_rows
+	if a.columns[index].browser.scroll > max_scroll {
+		a.columns[index].browser.scroll = max_scroll
+	}
+	if a.columns[index].browser.scroll < 0 {
+		a.columns[index].browser.scroll = 0
+	}
+}
+
+fn (mut a FileBrowserApp) select_miller_row(column_id int, row int) {
+	mut column_index := -1
+	for index, column in a.columns {
+		if column.id == column_id {
+			column_index = index
+			break
+		}
+	}
+	if column_index < 0 || row < 0 || row >= a.columns[column_index].browser.entries.len {
+		return
+	}
+
+	entry := a.columns[column_index].browser.entries[row]
+	a.columns[column_index].selected_row = row
+	a.free_miller_columns_from(column_index + 1)
+	if !entry.is_dir {
+		return
+	}
+	child := join_path(a.columns[column_index].browser.path, entry.name)
+	a.columns << a.new_miller_column(child)
+}
+
+struct MillerRowAction {
+	column_id int
+	row       int
+}
+
+fn parse_miller_row_action(event_id string) ?MillerRowAction {
+	if !event_id.starts_with(files_action_column_row) {
+		return none
+	}
+	rest := event_id[files_action_column_row.len..]
+	dot := rest.index('.') or { return none }
+	column_id := rest[..dot].int()
+	row := rest[dot + 1..].int()
+	if column_id <= 0 || row < 0 {
+		return none
+	}
+	return MillerRowAction{
+		column_id: column_id
+		row: row
+	}
+}
+
 fn (mut a FileBrowserApp) build(size ui2.Rect) !ui2.Element {
-	prepare_file_rows(mut a.browser.entries)
+	prepare_file_rows(mut a.browser.entries, files_action_row)
 	width := int(size.width)
 	height := int(size.height)
 	inner := width - 2 * files_padding
 
 	list_top := files_header_height
-	list_height := height - list_top - files_padding
+	content_header := if a.view_mode == .columns { files_column_header_height } else { 0 }
+	list_height := height - list_top - content_header - files_padding
 	a.visible_rows = if list_height > files_row_height {
 		list_height / files_row_height
 	} else {
 		1
 	}
-	a.clamp_scroll()
+	if a.view_mode == .list {
+		a.clamp_scroll()
+	}
 
-	mut children := frame_elements(a.visible_rows + 5)
+	mut slot_count := 1
+	if a.view_mode == .columns && width >= files_column_min_width {
+		slot_count = width / files_column_min_width
+		if slot_count < 1 {
+			slot_count = 1
+		}
+	}
+	mut rendered_columns := if a.view_mode == .columns { a.columns.len } else { 1 }
+	if rendered_columns > slot_count {
+		rendered_columns = slot_count
+	}
+	if rendered_columns < 1 {
+		rendered_columns = 1
+	}
+	mut children := frame_elements(a.visible_rows * rendered_columns + 16)
 
-	// Header: where we are, and the way back out.
+	// Header: where we are, the way back out, and the optional column view.
 	up_width := 40
+	view_width := 64
+	view_x := width - files_padding - view_width
 	children << ui2.button(files_action_up, 'Up', ui2.rect(f64(files_padding), 8, f64(up_width), 22), ui2.BoxStyle{
-		bg: if a.browser.path == '/' { files_up_disabled } else { files_up }
+		bg: if a.current_path() == '/' { files_up_disabled } else { files_up }
 		radius: 5
 	}, ui2.TextStyle{
-		color: if a.browser.path == '/' { body_muted } else { app_on_accent }
+		color: if a.current_path() == '/' { body_muted } else { app_on_accent }
 		size: 12
 		align: .center
 	})
-	children << ui2.label('', a.browser.path, ui2.rect(f64(files_padding + up_width + 10), 8, f64(inner - up_width - 10), 22), ui2.TextStyle{
+	children << ui2.button(files_action_view_toggle, if a.view_mode == .list { 'Columns' } else { 'List' }, ui2.rect(f64(view_x), 8, f64(view_width), 22), ui2.BoxStyle{
+		bg: files_up
+		radius: 5
+	}, ui2.TextStyle{
+		color: app_on_accent
+		size: 11
+		align: .center
+	})
+	path_left := files_padding + up_width + 10
+	path_right := view_x - 8
+	children << ui2.label('', a.current_path(), ui2.rect(f64(path_left), 8, f64(path_right - path_left), 22), ui2.TextStyle{
 		color: body_heading
 		size: 13
 		bold: true
@@ -276,6 +551,13 @@ fn (mut a FileBrowserApp) build(size ui2.Rect) !ui2.Element {
 	children << ui2.view('', ui2.rect(0, f64(list_top - 1), f64(width), 1), ui2.BoxStyle{
 		bg: body_rule
 	}, [])
+
+	if a.view_mode == .columns {
+		if a.columns.len == 0 {
+			a.reset_miller_columns(a.browser.path)
+		}
+		return a.build_miller_columns(width, height, list_top, slot_count, mut children)
+	}
 
 	if a.browser.error != '' {
 		children << ui2.label('', a.browser.error, ui2.rect(f64(files_padding), f64(list_top + 8), f64(inner), 20), ui2.TextStyle{
@@ -329,7 +611,7 @@ fn (mut a FileBrowserApp) build(size ui2.Rect) !ui2.Element {
 	// be nicer, but a button works with the one thing every pointer has.
 	if a.browser.entries.len > a.visible_rows {
 		button_size := 18
-		right := width - files_padding - button_size
+		right := view_x - 8 - button_size
 		children << ui2.button(files_action_scroll_up, '-', ui2.rect(f64(right - button_size - 4), 8, f64(button_size), 22), ui2.BoxStyle{
 			bg: files_up
 			radius: 5
@@ -351,6 +633,106 @@ fn (mut a FileBrowserApp) build(size ui2.Rect) !ui2.Element {
 	return ui2.screen(app_surface, children)
 }
 
+fn (mut a FileBrowserApp) build_miller_columns(width int, height int, list_top int, slot_count int, mut children []ui2.Element) !ui2.Element {
+	mut slots := slot_count
+	if slots < 1 {
+		slots = 1
+	}
+	column_width := width / slots
+	mut start := a.columns.len - slots
+	if start < 0 {
+		start = 0
+	}
+	mut slot := 0
+	for column_index := start; column_index < a.columns.len && slot < slots; column_index++ {
+		a.clamp_column_scroll(column_index)
+		column := &a.columns[column_index]
+		x := slot * column_width
+		mut this_width := column_width
+		if slot + 1 == slots {
+			this_width = width - x
+		}
+		column_name := file_path_name(column.browser.path)
+		children << ui2.label('', column_name, ui2.rect(f64(x + files_padding), f64(list_top + 2), f64(this_width - 2 * files_padding - 46), 22), ui2.TextStyle{
+			color: body_heading
+			size: 12
+			bold: true
+		})
+		if column.browser.entries.len > a.visible_rows {
+			button_size := 18
+			right := x + this_width - files_padding - button_size
+			children << ui2.button(column.scroll_up_action, '-', ui2.rect(f64(right - button_size - 4), f64(list_top + 2), f64(button_size), 21), ui2.BoxStyle{
+				bg: files_up
+				radius: 5
+			}, ui2.TextStyle{
+				color: app_on_accent
+				size: 12
+				align: .center
+			})
+			children << ui2.button(column.scroll_down_action, '+', ui2.rect(f64(right), f64(list_top + 2), f64(button_size), 21), ui2.BoxStyle{
+				bg: files_up
+				radius: 5
+			}, ui2.TextStyle{
+				color: app_on_accent
+				size: 12
+				align: .center
+			})
+		}
+
+		rows_top := list_top + files_column_header_height
+		if column.browser.error != '' {
+			children << ui2.label('', column.browser.error, ui2.rect(f64(x + files_padding), f64(rows_top + 8), f64(this_width - 2 * files_padding), 36), ui2.TextStyle{
+				color: files_error
+				size: 12
+				lines: 2
+			})
+		} else if column.browser.entries.len == 0 {
+			children << ui2.label('', 'Empty', ui2.rect(f64(x + files_padding), f64(rows_top + 8), f64(this_width - 2 * files_padding), 20), ui2.TextStyle{
+				color: body_muted
+				size: 12
+			})
+		} else {
+			mut row_slot := 0
+			for entry_index := column.browser.scroll; entry_index < column.browser.entries.len && row_slot < a.visible_rows; entry_index++ {
+				entry := &column.browser.entries[entry_index]
+				y := rows_top + row_slot * files_row_height
+				selected := column.selected_row == entry_index
+				mut row_children := frame_elements(3)
+				row_children << ui2.button_with_image('', '', if entry.is_dir {
+					'builtin:folder'
+				} else {
+					'builtin:file'
+				}, ui2.rect(f64(files_padding), 4, 16, 16), ui2.BoxStyle{
+					transparent: true
+				}, ui2.TextStyle{
+					color: if entry.is_dir { files_folder_icon } else { files_file_icon }
+				})
+				row_children << ui2.label('', entry.name, ui2.rect(f64(files_padding + 24), 0, f64(this_width - 2 * files_padding - 24 - 34), f64(files_row_height)), ui2.TextStyle{
+					color: if entry.is_dir { body_heading } else { body_text }
+					size: 12
+				})
+				row_children << ui2.label('', if entry.is_dir { '>' } else { entry.size_text }, ui2.rect(f64(this_width - files_padding - 30), 0, 30, f64(files_row_height)), ui2.TextStyle{
+					color: body_muted
+					size: 11
+					align: .right
+				})
+				children << ui2.clickable_view(entry.row_action, ui2.rect(f64(x), f64(y), f64(this_width), f64(files_row_height)), ui2.BoxStyle{
+					bg: files_row_hover
+					transparent: !selected
+				}, row_children)
+				row_slot++
+			}
+		}
+		if slot > 0 {
+			children << ui2.view('', ui2.rect(f64(x), f64(list_top), 1, f64(height - list_top)), ui2.BoxStyle{
+				bg: body_rule
+			}, [])
+		}
+		slot++
+	}
+	return ui2.screen(app_surface, children)
+}
+
 fn (mut a FileBrowserApp) clamp_scroll() {
 	max_scroll := a.browser.entries.len - a.visible_rows
 	if a.browser.scroll > max_scroll {
@@ -364,7 +746,15 @@ fn (mut a FileBrowserApp) clamp_scroll() {
 fn (mut a FileBrowserApp) handle(event_id string) ! {
 	match event_id {
 		files_action_up {
-			a.browser.go_up()
+			if a.view_mode == .columns {
+				a.go_up_miller()
+			} else {
+				a.browser.go_up()
+			}
+			return
+		}
+		files_action_view_toggle {
+			a.set_view_mode(if a.view_mode == .list { .columns } else { .list })
 			return
 		}
 		files_action_scroll_up {
@@ -378,6 +768,30 @@ fn (mut a FileBrowserApp) handle(event_id string) ! {
 			return
 		}
 		else {}
+	}
+	if row := parse_miller_row_action(event_id) {
+		a.select_miller_row(row.column_id, row.row)
+		return
+	}
+	if event_id.starts_with(files_action_column_scroll_up) {
+		id := event_id[files_action_column_scroll_up.len..].int()
+		for index, column in a.columns {
+			if column.id == id {
+				a.columns[index].browser.scroll -= a.visible_rows
+				a.clamp_column_scroll(index)
+				return
+			}
+		}
+	}
+	if event_id.starts_with(files_action_column_scroll_down) {
+		id := event_id[files_action_column_scroll_down.len..].int()
+		for index, column in a.columns {
+			if column.id == id {
+				a.columns[index].browser.scroll += a.visible_rows
+				a.clamp_column_scroll(index)
+				return
+			}
+		}
 	}
 	if event_id.starts_with(files_action_row) {
 		a.browser.enter(event_id[files_action_row.len..].int())
