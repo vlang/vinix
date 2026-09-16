@@ -1,0 +1,86 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+module main
+
+import os
+import ui2
+
+fn files_columns_tree_has_text(element ui2.Element, text string) bool {
+	if element.text == text {
+		return true
+	}
+	for child in element.children {
+		if files_columns_tree_has_text(child, text) {
+			return true
+		}
+	}
+	return false
+}
+
+fn files_columns_entry_index(column &MillerColumn, name string) int {
+	for index, entry in column.browser.entries {
+		if entry.name == name {
+			return index
+		}
+	}
+	return -1
+}
+
+fn test_file_browser_miller_columns_follow_directory_selection() {
+	root := os.join_path(os.temp_dir(), 'vinix-files-columns-test')
+	os.rmdir_all(root) or {}
+	os.mkdir_all(os.join_path(root, 'alpha', 'nested')) or { panic(err) }
+	os.mkdir_all(os.join_path(root, 'beta')) or { panic(err) }
+	os.write_file(os.join_path(root, 'alpha', 'readme.txt'), 'hello') or { panic(err) }
+	defer { os.rmdir_all(root) or {} }
+
+	mut app := FileBrowserApp{}
+	app.browser.read(root.clone())
+	assert app.browser.error == ''
+	app.set_view_mode(.columns)
+	assert app.view_mode == .columns
+	assert app.columns.len == 2
+	assert app.columns.last().browser.path == root
+
+	alpha_column := app.columns.len - 1
+	alpha := files_columns_entry_index(&app.columns[alpha_column], 'alpha')
+	assert alpha >= 0
+	alpha_action := app.columns.last().browser.entries[alpha].row_action
+	app.handle(alpha_action)!
+	assert app.columns.len == 3
+	assert app.columns[app.columns.len - 2].selected_row == alpha
+	assert app.columns.last().browser.path == os.join_path(root, 'alpha')
+
+	nested_column := app.columns.len - 1
+	nested := files_columns_entry_index(&app.columns[nested_column], 'nested')
+	assert nested >= 0
+	nested_action := app.columns.last().browser.entries[nested].row_action
+	app.handle(nested_action)!
+	assert app.columns.len == 4
+	assert app.columns.last().browser.path == os.join_path(root, 'alpha', 'nested')
+
+	// The default 460-pixel Files window has room for two Miller columns. At
+	// the deepest point those are alpha and nested, with List offered as the
+	// way back to the ordinary single-directory view.
+	tree := app.build(ui2.rect(0, 0, 460, 330))!
+	assert files_columns_tree_has_text(tree, 'alpha')
+	assert files_columns_tree_has_text(tree, 'nested')
+	assert files_columns_tree_has_text(tree, 'List')
+	free_tree(tree)
+
+	app.handle(files_action_view_toggle)!
+	assert app.view_mode == .list
+	assert app.columns.len == 0
+	assert app.browser.path == os.join_path(root, 'alpha', 'nested')
+	assert app.browser.entries.len == 0
+	app.browser.free_entries()
+}
+
+fn test_miller_row_actions_keep_column_identity() {
+	action := '${files_action_column_row}42.7'
+	parsed := parse_miller_row_action(action) or { panic('row action did not parse') }
+	assert parsed.column_id == 42
+	assert parsed.row == 7
+	if unexpected := parse_miller_row_action('files.row.7') {
+		assert unexpected.column_id == 0
+	}
+}
