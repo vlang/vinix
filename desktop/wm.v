@@ -1155,7 +1155,7 @@ fn (mut d Desktop) on_pointer_move(x int, y int) {
 		old_y := d.windows[moved].y
 		d.windows[moved].x = x - d.drag.offset_x
 		d.windows[moved].y = y - d.drag.offset_y
-		d.clamp_to_screen(moved)
+		d.clamp_drag_to_screen(moved)
 		if pointer_moved {
 			// Repaint the old location to reveal what was behind the window and
 			// the new one to draw it again. The cursor is composed into the same
@@ -1253,6 +1253,33 @@ fn (mut d Desktop) clamp_to_screen(index int) {
 	}
 	if d.windows[index].x + d.windows[index].width < margin {
 		d.windows[index].x = margin - d.windows[index].width
+	}
+	if d.windows[index].y < 0 {
+		d.windows[index].y = 0
+	}
+	if d.windows[index].y > max_y {
+		d.windows[index].y = max_y
+	}
+}
+
+// clamp_drag_to_screen allows the frame to cross the side and bottom display
+// edges while keeping a small, reachable piece of title bar on-screen. The
+// stricter clamp_to_screen remains for initial window placement.
+fn (mut d Desktop) clamp_drag_to_screen(index int) {
+	mut reachable_width := 60
+	if d.windows[index].width < reachable_width {
+		reachable_width = d.windows[index].width
+	}
+	if d.canvas.width < reachable_width {
+		reachable_width = d.canvas.width
+	}
+	max_x := d.canvas.width - reachable_width
+	max_y := d.canvas.height - taskbar_height - d.theme().title_height
+	if d.windows[index].x > max_x {
+		d.windows[index].x = max_x
+	}
+	if d.windows[index].x + d.windows[index].width < reachable_width {
+		d.windows[index].x = reachable_width - d.windows[index].width
 	}
 	if d.windows[index].y < 0 {
 		d.windows[index].y = 0
