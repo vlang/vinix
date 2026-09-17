@@ -4,14 +4,18 @@ module table
 
 import apple.ans
 import file
+import fs
 import pagecache
 import proc
 import errno
 import aarch64.cpu
 
 // Install after the architecture's generic syscall table, so compatibility
-// stubs cannot silently override durability or shutdown operations.
+// stubs cannot silently override durability, shutdown, or hardened I/O entry
+// points.
 pub fn init_storage_syscalls() {
+	syscall_table[63] = voidptr(fs.syscall_read_checked)
+	syscall_table[64] = voidptr(fs.syscall_write_checked)
 	syscall_table[81] = voidptr(storage_sync)
 	syscall_table[82] = voidptr(storage_fsync)
 	syscall_table[83] = voidptr(storage_fsync) // fdatasync: stronger full flush
