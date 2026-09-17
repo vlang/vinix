@@ -32,6 +32,8 @@ mut:
 	// Clock defaults preserve the desktop's existing taskbar presentation.
 	clock_24_hour      bool = true
 	clock_show_seconds bool = true
+	clock_show_date    bool = true
+	clock_show_weekday bool = true
 	// Index into wallpaper_colors, used when no image is chosen.
 	wallpaper_color int
 	// Index into the wallpaper images, or -1 for the colour above.
