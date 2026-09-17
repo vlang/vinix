@@ -68,6 +68,10 @@ pub fn syscall_mremap(_ voidptr, old_address u64, old_size u64, new_size u64, fl
 		pagemap.l.release()
 		return errno.err, errno.efault
 	}
+	if source.immutable {
+		pagemap.l.release()
+		return errno.err, errno.eperm
+	}
 	prot := source.prot
 	map_flags := source.flags
 	// A move has to re-establish the mapping against whatever backs it, so the
@@ -239,10 +243,17 @@ pub fn syscall_madvise(_ voidptr, address u64, length u64, advice int) (u64, u64
 	mut pagemap := process.pagemap
 
 	pages := lib.div_roundup(length, page_size)
+	aligned_length := pages * page_size
+	if pages != 0 && aligned_length / page_size != pages {
+		return errno.err, errno.einval
+	}
 
 	pagemap.l.acquire()
 	defer {
 		pagemap.l.release()
+	}
+	if immutable_overlap_unlocked(pagemap, address, aligned_length) {
+		return errno.err, errno.eperm
 	}
 
 	for i := u64(0); i < pages; i++ {
