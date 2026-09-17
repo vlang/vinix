@@ -5,15 +5,17 @@ module table
 import apple.ans
 import file
 import pagecache
+import pipe
 import proc
 import errno
 import aarch64.cpu
 import memory.mmap
 
 // Install after the architecture's generic syscall table, so compatibility
-// stubs cannot silently override durability, shutdown, or Vinix extension
-// operations.
+// stubs cannot silently override durability, shutdown, hardened descriptor
+// copy-out, or Vinix extension operations.
 pub fn init_storage_syscalls() {
+	syscall_table[59] = voidptr(pipe.syscall_pipe_checked)
 	syscall_table[81] = voidptr(storage_sync)
 	syscall_table[82] = voidptr(storage_fsync)
 	syscall_table[83] = voidptr(storage_fsync) // fdatasync: stronger full flush

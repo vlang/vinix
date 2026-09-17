@@ -14,6 +14,7 @@ import ui2
 
 enum SettingsCategory {
 	appearance
+	date_time
 	theme
 	wallpaper
 	wifi
@@ -21,12 +22,13 @@ enum SettingsCategory {
 	battery
 }
 
-const settings_categories = [SettingsCategory.appearance, .theme, .wallpaper, .wifi, .display,
-	.battery]
+const settings_categories = [SettingsCategory.appearance, .date_time, .theme, .wallpaper, .wifi,
+	.display, .battery]
 
 fn (c SettingsCategory) title() string {
 	return match c {
 		.appearance { 'Appearance' }
+		.date_time { 'Date & Time' }
 		.theme { 'Theme' }
 		.wallpaper { 'Wallpaper' }
 		.wifi { 'Wi-Fi' }
@@ -38,6 +40,8 @@ fn (c SettingsCategory) title() string {
 const settings_action_category = 'settings.category.'
 const settings_action_side = 'settings.side.'
 const settings_action_taskbar = 'settings.taskbar.'
+const settings_action_clock_format = 'settings.clock.format.'
+const settings_action_clock_seconds = 'settings.clock.seconds.'
 const settings_action_theme = 'settings.theme.'
 const settings_action_color = 'settings.color.'
 const settings_action_image = 'settings.image.'
@@ -136,8 +140,8 @@ fn (mut a SettingsApp) build(size ui2.Rect) !ui2.Element {
 }
 
 // Display and Battery report a device and change nothing here, so they draw
-// without a desktop behind them. The other three are the desktop's own
-// preferences and have nothing to show without one.
+// without a desktop behind them. The remaining panes are desktop preferences
+// and have nothing to show without one.
 fn (a &SettingsApp) pane(width int, height int) []ui2.Element {
 	match a.category {
 		.wifi {
@@ -156,6 +160,7 @@ fn (a &SettingsApp) pane(width int, height int) []ui2.Element {
 	}
 	return match a.category {
 		.appearance { a.appearance_pane(width) }
+		.date_time { a.date_time_pane(width) }
 		.theme { a.theme_pane(width) }
 		.wallpaper { a.wallpaper_pane(width) }
 		else { []ui2.Element{} }
@@ -238,6 +243,32 @@ fn (a &SettingsApp) appearance_pane(width int) []ui2.Element {
 	} else {
 		'Windows XP style: one button per window.'
 	}, y, width)
+
+	return out
+}
+
+fn (a &SettingsApp) date_time_pane(width int) []ui2.Element {
+	settings := a.desktop.settings
+	inner := width - 2 * settings_padding
+	half := (inner - settings_row_gap) / 2
+
+	mut out := frame_elements(10)
+	mut y := settings_padding
+
+	out << settings_heading('Time format', y, width)
+	y += 22
+	out << settings_note('Choose 24-hour time or a 12-hour clock with AM/PM.', y, width)
+	y += 22
+	out << settings_choice('${settings_action_clock_format}0', '24-hour', settings_padding, y, half, settings.clock_24_hour)
+	out << settings_choice('${settings_action_clock_format}1', '12-hour', settings_padding + half + settings_row_gap, y, half, !settings.clock_24_hour)
+	y += 28 + 22
+
+	out << settings_heading('Seconds', y, width)
+	y += 22
+	out << settings_note('Show seconds in the taskbar clock.', y, width)
+	y += 22
+	out << settings_choice('${settings_action_clock_seconds}0', 'Show', settings_padding, y, half, settings.clock_show_seconds)
+	out << settings_choice('${settings_action_clock_seconds}1', 'Hide', settings_padding + half + settings_row_gap, y, half, !settings.clock_show_seconds)
 
 	return out
 }
@@ -382,6 +413,14 @@ fn (mut a SettingsApp) handle(event_id string) ! {
 		} else {
 			TaskbarMode.standard
 		}
+		return
+	}
+	if event_id.starts_with(settings_action_clock_format) {
+		a.desktop.settings.clock_24_hour = !event_id.ends_with('1')
+		return
+	}
+	if event_id.starts_with(settings_action_clock_seconds) {
+		a.desktop.settings.clock_show_seconds = !event_id.ends_with('1')
 		return
 	}
 	if event_id.starts_with(settings_action_theme) {

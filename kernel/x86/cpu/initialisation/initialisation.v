@@ -14,7 +14,9 @@ import memory
 import x86.hypervisor
 
 const cpuid7_ebx_smep = u32(1) << 7
+const cpuid7_ecx_umip = u32(1) << 2
 const cr0_write_protect = u64(1) << 16
+const cr4_umip = u64(1) << 11
 const cr4_smep = u64(1) << 20
 
 pub fn initialise(smp_info &limine.LimineSMPInfo) {
@@ -93,6 +95,19 @@ pub fn initialise(smp_info &limine.LimineSMPInfo) {
 		cpu.write_cr4(cr4)
 		if cpu_number == 0 {
 			println('security: SMEP enabled')
+		}
+	}
+
+	// OpenBSD also enables UMIP when CPUID advertises it. SGDT, SIDT, SLDT,
+	// SMSW and STR then fault in userspace instead of disclosing privileged
+	// descriptor-table state that is useful for kernel-address discovery.
+	umip_supported, _, _, umip_ecx, _ := cpu.cpuid(7, 0)
+	if umip_supported && umip_ecx & cpuid7_ecx_umip != 0 {
+		cr4 = cpu.read_cr4()
+		cr4 |= cr4_umip
+		cpu.write_cr4(cr4)
+		if cpu_number == 0 {
+			println('security: UMIP enabled')
 		}
 	}
 
