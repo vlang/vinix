@@ -24,11 +24,20 @@ enum ThemeKind {
 	macos
 }
 
+// The system language is deliberately a compact preference rather than a
+// process-local locale. Every native app receives the same Settings snapshot,
+// and the compositor's ui2 renderer translates all text with that language.
+enum SystemLanguage {
+	en
+	ru
+}
+
 struct Settings {
 mut:
 	button_side  ButtonSide
 	taskbar_mode TaskbarMode
 	theme        ThemeKind
+	language     SystemLanguage
 	// Clock defaults preserve the desktop's existing taskbar presentation.
 	clock_24_hour      bool = true
 	clock_show_seconds bool = true
