@@ -771,9 +771,11 @@ mut:
 	desktop          &Desktop = unsafe { nil }
 }
 
+/*
 fn start_remote_app(factory AppFactory, mut desktop Desktop) !NativeApp {
 	return start_remote_app_with_timeout(factory, mut desktop, app_response_timeout_ms)
 }
+*/
 
 // Startup applications run while the persistent filesystem is still cold, so
 // their initial response has a distinct (and deliberately longer) deadline.
@@ -788,11 +790,13 @@ fn start_remote_app_with_timeout(factory AppFactory, mut desktop Desktop, timeou
 	return app
 }
 
+/*
 // Kept separate from the installed-path wrapper so the protocol can be
 // exercised by a host integration binary that execs itself as the client.
 fn start_remote_app_at(path string, factory AppFactory, mut desktop Desktop) !NativeApp {
 	return start_remote_app_at_with_timeout(path, factory, mut desktop, app_response_timeout_ms)
 }
+*/
 
 fn start_remote_app_at_with_timeout(path string, factory AppFactory, mut desktop Desktop, timeout_ms int) !NativeApp {
 	process := desktop_spawn_app(path, factory.process_name, desktop.tz_offset_seconds) or {
