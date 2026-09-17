@@ -45,6 +45,7 @@ QEMU_DESKTOP_INITRAMFS="$SCRIPT_DIR/build/initramfs-desktop-qemu.tar"
 QEMU_DESKTOP_INITRAMFS_GZ="$QEMU_DESKTOP_INITRAMFS.gz"
 DESKTOP_ROOT_SEED="$SCRIPT_DIR/build/desktop-root-seed.tar.gz"
 DESKTOP_STORAGE_MANIFEST="$SCRIPT_DIR/build/desktop-qemu-storage.json"
+DESKTOP_BUILD_KEY="$SCRIPT_DIR/build/run-desktop-aarch64.key"
 export VINIX_QEMU_MEM="${VINIX_QEMU_MEM:-8192}"
 # The desktop uses a 2x version of the normal QEMU framebuffer (1024x768),
 # giving it a native 2048x1536 framebuffer without changing the standard
@@ -138,8 +139,78 @@ if [ ! -f "$KERNEL_DIR/bin/vinix" ]; then
 fi
 
 # ── The desktop ──
+# A warm desktop run used to spend most of its time regenerating byte-identical
+# desktop binaries before build-desktop-aarch64.sh could discover that the
+# final 7+ GiB archive was unchanged. Fingerprint all source/tool/layer inputs
+# before entering that pipeline. The marker also records the image identity so
+# a direct/manual image rebuild cannot leave a stale key that skips necessary
+# work on the next runner invocation.
+desktop_image_id() {
+    local image="$1"
+    local size mtime
+
+    if size="$(stat -f%z "$image" 2>/dev/null)"; then
+        mtime="$(stat -f%m "$image")"
+    else
+        size="$(stat -c%s "$image")"
+        mtime="$(stat -c%Y "$image")"
+    fi
+    printf '%s-%s\n' "$size" "$mtime"
+}
+
+desktop_build_key() {
+    python3 "$SCRIPT_DIR/build-support/desktop-build-key.py" \
+        --root "$SCRIPT_DIR" --v "$V"
+}
+
+write_desktop_build_key() {
+    local key="$1"
+    local temp
+
+    [ -n "$key" ] || return 0
+    mkdir -p "$SCRIPT_DIR/build"
+    temp="$(mktemp "$SCRIPT_DIR/build/.run-desktop-aarch64.key.XXXXXX")"
+    {
+        printf '%s\n' "$key"
+        printf '%s\n' "$DESKTOP_INITRAMFS"
+        desktop_image_id "$DESKTOP_INITRAMFS"
+    } > "$temp"
+    mv -f "$temp" "$DESKTOP_BUILD_KEY"
+}
+
 if [ "$BUILD_DESKTOP" -eq 1 ]; then
-    "$SCRIPT_DIR/build-desktop-aarch64.sh"
+    DESKTOP_INPUT_KEY=""
+    if [ "${VINIX_REFRESH_DESKTOP_STAGING:-0}" != 1 ] &&
+       [ -f "$SCRIPT_DIR/build-support/desktop-build-key.py" ]; then
+        DESKTOP_INPUT_KEY="$(desktop_build_key 2>/dev/null || true)"
+    fi
+
+    DESKTOP_KEY_MATCH=0
+    if [ -n "$DESKTOP_INPUT_KEY" ] && [ -s "$DESKTOP_INITRAMFS" ] &&
+       [ -s "$DESKTOP_BUILD_KEY" ]; then
+        DESKTOP_KEY_EXPECTED="$(mktemp "$SCRIPT_DIR/build/.run-desktop-aarch64.expected.XXXXXX")"
+        {
+            printf '%s\n' "$DESKTOP_INPUT_KEY"
+            printf '%s\n' "$DESKTOP_INITRAMFS"
+            desktop_image_id "$DESKTOP_INITRAMFS"
+        } > "$DESKTOP_KEY_EXPECTED"
+        if cmp -s "$DESKTOP_KEY_EXPECTED" "$DESKTOP_BUILD_KEY"; then
+            DESKTOP_KEY_MATCH=1
+        fi
+        rm -f "$DESKTOP_KEY_EXPECTED"
+    fi
+
+    if [ "$DESKTOP_KEY_MATCH" -eq 1 ]; then
+        echo "==> Desktop build inputs unchanged; reusing existing image"
+    else
+        "$SCRIPT_DIR/build-desktop-aarch64.sh"
+        # Recompute after a successful build because the builder may refresh an
+        # old base userland as part of satisfying its prerequisites.
+        if [ -f "$SCRIPT_DIR/build-support/desktop-build-key.py" ]; then
+            DESKTOP_INPUT_KEY="$(desktop_build_key 2>/dev/null || true)"
+            write_desktop_build_key "$DESKTOP_INPUT_KEY"
+        fi
+    fi
 fi
 
 if [ ! -f "$DESKTOP_INITRAMFS" ]; then
