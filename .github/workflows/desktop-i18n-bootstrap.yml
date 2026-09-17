@@ -17,7 +17,7 @@ jobs:
       - name: Apply integration patches
         run: |
           python3 desktop/tools/i18n_integrate.py
-          sed -i "/SettingsCategory.settings/d" desktop/tools/tests/localization_test.v
+          python3 desktop/tools/i18n_test_fixes.py
       - name: Save patched files
         uses: actions/upload-artifact@v4
         with:
