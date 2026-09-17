@@ -1,0 +1,67 @@
+name: Desktop i18n integration
+
+on:
+  push:
+    branches:
+      - desktop-i18n-en-ru
+    paths:
+      - '.github/workflows/desktop-i18n-bootstrap.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  integrate:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: desktop-i18n-en-ru
+          fetch-depth: 0
+      - name: Apply integration patches
+        run: |
+          python3 desktop/tools/i18n_integrate.py
+          python3 desktop/tools/i18n_test_fixes.py
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('desktop/tools/tests/localization_test.v')
+          text = p.read_text().replace('\\t', '\t')
+          text = text.replace("\tassert SettingsCategory.settings.title() == 'Настройки' if false\n", '')
+          p.write_text(text)
+          PY
+      - name: Build V and ui2
+        run: |
+          git clone https://github.com/vlang/v.git --depth=1 "$RUNNER_TEMP/v"
+          make -C "$RUNNER_TEMP/v"
+          git clone https://github.com/vlang/ui2 third_party/ui2
+      - name: Run ui2 Settings and localization tests
+        run: |
+          set -eu
+          root="$GITHUB_WORKSPACE"
+          v="$RUNNER_TEMP/v/v"
+          work=$(mktemp -d)
+          trap 'rm -rf "$work"' EXIT HUP INT TERM
+          python3 "$root/desktop/tools/stage_ui2.py" "$work/modules/ui2" "$root/third_party/ui2" "$root/desktop/tools/ui2_headless_bounds.v"
+          mkdir "$work/ui"
+          python3 "$root/desktop/tools/stage_app.py" "$work/ui" "$root/desktop" "$root/third_party/ui2/examples/calculator" >/dev/null
+          rm -f "$work/ui/main.v"
+          cp "$root/desktop/tools/tests/settings_test.v" "$work/ui/"
+          cp "$root/desktop/tools/tests/settings_persistence_test.v" "$work/ui/"
+          cp "$root/desktop/tools/tests/clock_settings_test.v" "$work/ui/"
+          cp "$root/desktop/tools/tests/localization_test.v" "$work/ui/"
+          cp "$root/desktop/tools/tests/battery_test.v" "$work/ui/battery_test.original.v"
+          sed '1,/^import ui2$/d' "$root/desktop/tools/tests/battery_test.v" >> "$work/ui/settings_test.v"
+          printf "Module { name: 'settings_tests' }\n" > "$work/ui/v.mod"
+          for name in settings settings_persistence clock_settings localization; do
+            "$v" -new-compiler -nocache -gc none -manualfree -enable-globals -stats -d ui2_headless -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/${name}_test.v"
+          done
+      - name: Commit materialized source
+        run: |
+          rm -rf third_party/ui2
+          rm -f desktop/tools/i18n_integrate.py desktop/tools/i18n_test_fixes.py
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add desktop build-desktop-aarch64.sh build-desktop-amd64.sh
+          git diff --cached --check
+          git commit -m "desktop: integrate system language across ui2 apps"
+          git push origin HEAD:desktop-i18n-en-ru

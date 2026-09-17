@@ -5,10 +5,9 @@
 // antialiasing a desktop toolkit would give, without a rasteriser on the
 // target.
 //
-// Runs are decoded as UTF-8 and looked up by code point. The atlases carry
-// printable ASCII plus the handful of supplemental runes in font_extra_runes,
-// which is what lets an application like ui2's calculator, whose keys are
-// labelled with the real division and plus-minus signs, come out right.
+// Runs are decoded as UTF-8 and looked up by code point. The primary atlases
+// carry printable ASCII and common symbols; font_cyrillic.v appends a compact
+// Russian fallback to each face at startup.
 module main
 
 import encoding.base64
@@ -45,7 +44,7 @@ fn load_face(data FaceBlob) FontFace {
 	count := font_last_char - font_first_char + 1 + font_extra_runes.len
 	header_bytes := count * glyph_header_size
 
-	mut glyphs := []Glyph{cap: count}
+	mut glyphs := []Glyph{cap: count + font_cyrillic_runes.len}
 	mut offset := 0
 	for i := 0; i < count; i++ {
 		base := i * glyph_header_size
@@ -62,7 +61,7 @@ fn load_face(data FaceBlob) FontFace {
 		offset += width * height
 	}
 
-	return FontFace{
+	mut face := FontFace{
 		bold:         data.bold
 		mono:         data.mono
 		size:         data.size
@@ -73,6 +72,8 @@ fn load_face(data FaceBlob) FontFace {
 		glyphs:       glyphs
 		pixels:       raw[header_bytes..].clone()
 	}
+	append_cyrillic_glyphs(mut face, data)
+	return face
 }
 
 fn load_fonts() []FontFace {
@@ -107,8 +108,8 @@ fn next_rune(text string, index int) (u32, int) {
 
 // glyph_for maps a code point to its slot. Anything the atlases do not carry
 // is drawn as a space rather than as a missing-glyph box, so an unexpected
-// character costs a gap and not a broken layout. The supplemental block is
-// short enough that scanning it beats carrying a map.
+// character costs a gap and not a broken layout. The supplemental blocks are
+// short enough that scanning them beats carrying a map.
 @[inline]
 fn (f &FontFace) glyph_for(code_point u32) Glyph {
 	if code_point >= u32(font_first_char) && code_point <= u32(font_last_char) {
@@ -118,6 +119,12 @@ fn (f &FontFace) glyph_for(code_point u32) Glyph {
 	for i, extra in font_extra_runes {
 		if extra == code_point {
 			return f.glyphs[ascii_count + i]
+		}
+	}
+	cyrillic_start := ascii_count + font_extra_runes.len
+	for i, rune in font_cyrillic_runes {
+		if rune == code_point {
+			return f.glyphs[cyrillic_start + i]
 		}
 	}
 	return f.glyphs[0]
@@ -167,7 +174,8 @@ fn (f &FontFace) truncate(text string, limit int) (string, bool) {
 }
 
 // draw_text places the run's line box at (x, y) and returns the pen position
-// it ended at.
+// it ended at. Translation happens one layer up in render.v so document,
+// terminal and file-name text can explicitly opt out of UI localization.
 fn (mut c Canvas) draw_text(face &FontFace, x int, y int, text string, color u32) int {
 	mut pen := x * c.scale
 	mut i := 0

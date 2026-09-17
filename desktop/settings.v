@@ -219,6 +219,11 @@ const theme_macos = Theme{
 }
 
 fn (d &Desktop) theme() Theme {
+	// Theme is consulted before virtually every ui2 tree is built and before
+	// every compositor frame is painted. Synchronizing the process-local i18n
+	// catalogue here therefore makes the persisted system language apply to
+	// desktop chrome and local application surfaces immediately.
+	desktop_i18n_set_language(d.settings.language)
 	return match d.settings.theme {
 		.default_ { theme_default }
 		.macos { theme_macos }

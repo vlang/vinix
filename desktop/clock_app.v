@@ -13,6 +13,7 @@ const clock_running_poll_ms = u64(100)
 struct ClockApp {
 mut:
 	tz_offset       i64
+	language        SystemLanguage
 	time_text       string
 	date_text       string
 	stopwatch_text  string
@@ -25,6 +26,7 @@ mut:
 fn open_clock(mut desktop Desktop) !NativeApp {
 	mut app := &ClockApp{
 		tz_offset: desktop.tz_offset_seconds
+		language: desktop_i18n_current_language()
 	}
 	app.refresh()
 	return app
@@ -64,11 +66,20 @@ fn clock_replace_text(old string, next string) string {
 	return next
 }
 
+fn (mut a ClockApp) sync_language() {
+	language := desktop_i18n_current_language()
+	if a.language == language {
+		return
+	}
+	a.language = language
+	a.refresh()
+}
+
 fn (mut a ClockApp) refresh() {
 	seconds, _ := desktop_realtime()
 	if seconds < 0 {
 		a.time_text = clock_replace_text(a.time_text, '--:--:--'.clone())
-		a.date_text = clock_replace_text(a.date_text, 'Clock unavailable'.clone())
+		a.date_text = clock_replace_text(a.date_text, desktop_tr_for(a.language, 'clock.unavailable').clone())
 	} else {
 		civil := civil_from_epoch(seconds + a.tz_offset)
 		hour := pad2(civil.hour)
@@ -82,7 +93,13 @@ fn (mut a ClockApp) refresh() {
 		}
 		day := civil.day.str()
 		year := civil.year.str()
-		next_date := '${weekday_names[civil.weekday]}, ${month_names[civil.month - 1]} ${day}, ${year}'
+		weekday := desktop_weekday_short(a.language, civil.weekday)
+		month := desktop_month_short(a.language, civil.month)
+		next_date := if a.language == .ru {
+			'${weekday}, ${day} ${month} ${year}'
+		} else {
+			'${weekday}, ${month} ${day}, ${year}'
+		}
 		unsafe {
 			day.free()
 			year.free()
@@ -138,6 +155,7 @@ fn (mut a ClockApp) reset_stopwatch() {
 }
 
 fn (mut a ClockApp) build(size ui2.Rect) !ui2.Element {
+	a.sync_language()
 	width := int(size.width)
 	height := int(size.height)
 	pad := 24
