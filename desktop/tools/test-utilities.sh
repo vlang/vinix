@@ -47,6 +47,14 @@ cp "$root/desktop/tools/tests/titlebar_click_test.v" "$work/ui/"
     -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/titlebar_click_test.v"
 rm -f "$work/ui/titlebar_click_test.v"
 
+# First-launch registration owns the whole compositor until its profile is
+# durable. Exercise its exclusive tree, non-dismissible input and verifier file
+# separately because it intentionally never enters the normal desktop loop.
+cp "$root/desktop/tools/tests/registration_test.v" "$work/ui/"
+"$v" -new-compiler -nocache -gc none -manualfree -enable-globals -stats -d ui2_headless \
+    -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/registration_test.v"
+rm -f "$work/ui/registration_test.v"
+
 # Miller columns use real directory listings and their own retained navigation
 # state, so exercise them independently from the broader utility model tests.
 cp "$root/desktop/tools/tests/files_columns_test.v" "$work/ui/"
