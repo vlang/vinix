@@ -1175,3 +1175,95 @@ fn test_vspace_identity_set_answers_each_device_and_inode_once() {
 		assert !seen.add(vspace_identity_key(9, inode))
 	}
 }
+
+
+fn test_shortcut_order_normalizes_without_changing_app_identity() {
+	input := []int{3, 3, -1, available_apps.len + 1, 1}
+	order := normalize_shortcut_order(input)
+	defer { unsafe { order.free() } }
+	assert order.len == available_apps.len
+	assert order[0] == 3
+	assert order[1] == 1
+	assert shortcut_order_contains(order, 0)
+}
+
+fn test_shortcut_click_commits_only_on_release_over_same_icon() {
+	mut desktop := Desktop{
+		shortcut_order: default_shortcut_order()
+	}
+	defer { unsafe { desktop.shortcut_order.free() } }
+	assert desktop.begin_shortcut_press(app_shortcut_actions[0], 10, 10)
+	assert desktop.shortcut_press.app_index == 0
+	launched := desktop.finish_shortcut_press_in(os.temp_dir(), app_shortcut_actions[0]) or { -1 }
+	assert launched == 0
+	assert desktop.begin_shortcut_press(app_shortcut_actions[1], 10, 10)
+	if unexpected := desktop.finish_shortcut_press_in(os.temp_dir(), app_shortcut_actions[0]) {
+		assert unexpected == -1
+	}
+}
+
+fn test_shortcut_drag_reorders_and_persists_by_process_name() {
+	root := os.join_path(os.temp_dir(), 'vinix-shortcut-order-test')
+	os.rmdir_all(root) or {}
+	os.mkdir_all(root) or { panic(err) }
+	defer { os.rmdir_all(root) or {} }
+
+	mut desktop := Desktop{
+		shortcut_order: default_shortcut_order()
+		canvas: new_canvas(1024, 768)
+	}
+	defer {
+		unsafe {
+			desktop.shortcut_order.free()
+			free(desktop.canvas.pixels)
+		}
+	}
+	app_index := desktop.shortcut_order[0]
+	assert desktop.begin_shortcut_press(app_shortcut_actions[app_index], shortcut_left + 2,
+		shortcut_top + 2)
+	desktop.update_shortcut_drag(shortcut_left + 2,
+		shortcut_top + 3 * (shortcut_height + shortcut_gap) + 2)
+	assert desktop.shortcut_press.dragging
+	assert desktop.shortcut_slot_for_app(app_index) == 3
+	if unexpected := desktop.finish_shortcut_press_in(root, '') {
+		panic('dragged shortcut unexpectedly launched app ${unexpected}')
+	}
+
+	loaded := load_shortcut_order(root)
+	defer { unsafe { loaded.free() } }
+	assert loaded == desktop.shortcut_order
+}
+
+fn test_app_icon_loader_accepts_rgba_vai() {
+	root := os.join_path(os.temp_dir(), 'vinix-app-icon-test')
+	os.rmdir_all(root) or {}
+	os.mkdir_all(root) or { panic(err) }
+	defer { os.rmdir_all(root) or {} }
+	path := os.join_path(root, 'sample.vai')
+	mut data := []u8{cap: app_icon_header_size + 8}
+	defer { unsafe { data.free() } }
+	for ch in app_icon_magic {
+		data << ch
+	}
+	data << u8(2)
+	data << u8(0)
+	data << u8(1)
+	data << u8(0)
+	data << u8(0)
+	data << u8(255)
+	data << u8(0)
+	data << u8(0)
+	data << u8(255)
+	data << u8(0)
+	data << u8(255)
+	data << u8(0)
+	data << u8(128)
+	assert desktop_write_file(path, data.data, u64(data.len))
+	image := load_app_icon_file(path) or { panic('icon did not load') }
+	defer { unsafe { image.pixels.free() } }
+	assert image.width == 2
+	assert image.height == 1
+	assert image.pixels.len == 8
+	assert image.pixels[0] == 255
+	assert image.pixels[7] == 128
+}
