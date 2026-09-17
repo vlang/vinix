@@ -60,6 +60,48 @@ file_size() {
     fi
 }
 
+# A layer builder replaces its staging root when that layer is rebuilt. Use the
+# root's generation rather than walking and hashing gigabytes of Blender,
+# Minecraft, Wine or Mesa on every desktop launch. Regular archive inputs use
+# the same cheap identity. The path itself is written beside this value in the
+# manifest, so switching an override to another staging tree also invalidates
+# the cache.
+path_generation() {
+    local path="$1"
+    local value
+
+    if [ ! -e "$path" ] && [ ! -L "$path" ]; then
+        printf 'missing'
+        return 0
+    fi
+    if value="$(stat -f '%d:%i:%m:%z' "$path" 2>/dev/null)"; then
+        printf '%s' "$value"
+    else
+        stat -c '%d:%i:%Y:%s' "$path"
+    fi
+}
+
+write_staging_cache_manifest() {
+    local input
+
+    printf 'version=1\n'
+    printf 'compact=%s\n' "$COMPACT_INITRAMFS"
+    printf 'chromium=%s\n' "$WITH_CHROMIUM"
+    printf 'libreoffice=%s\n' "$WITH_LIBREOFFICE"
+    printf 'minecraft=%s\n' "$WITH_MINECRAFT"
+    printf 'asahi=%s\n' "$WITH_ASAHI_GPU"
+    printf 'x86=%s\n' "$WITH_X86_TRANSLATION"
+    for input in \
+        "$BASE_INITRAMFS" "$DEVTOOLS_ARCHIVE" "$SYSROOT" \
+        "$PYTHON_STAGING" "$NETWORK_TOOLS_STAGING" "$X11_STAGING" \
+        "$FIREFOX_STAGING" "$CHROMIUM_STAGING" "$LIBREOFFICE_STAGING" \
+        "$MINECRAFT_STAGING" "$ASAHI_STAGING" "$HYPRLAND_STAGING" \
+        "$BLENDER_NATIVE_STAGING" "$X86_TRANSLATION_STAGING" \
+        "$GPU_SYSROOT" "$SCRIPT_DIR/build-desktop-aarch64.sh"; do
+        printf '%s=%s\n' "$input" "$(path_generation "$input")"
+    done
+}
+
 merge_staging_tree() {
     local overlay="$1"
     local source relative destination
@@ -85,6 +127,7 @@ WITH_X86_TRANSLATION=0
 WITH_CHROMIUM=0
 WITH_LIBREOFFICE=0
 WITH_MINECRAFT=0
+REFRESH_STAGING="${VINIX_REFRESH_DESKTOP_STAGING:-0}"
 # The Apple GPU userspace is only correct on Apple hardware; see the overlay
 # below for why its mere presence on disk must not select it.
 WITH_ASAHI_GPU="${VINIX_WITH_ASAHI_GPU:-0}"
@@ -108,6 +151,7 @@ for arg in "$@"; do
             echo "  --with-asahi-gpu overlays the Apple GPU Mesa; only correct for an M1 image"
             echo "  --with-x86-translation adds a previously built x86/Wine runtime"
             echo "  --wifi-bundle stages a package.py output and loads it before the desktop"
+            echo "  VINIX_REFRESH_DESKTOP_STAGING=1 discards the cached assembled layers"
             exit 0
             ;;
         *)
@@ -116,6 +160,14 @@ for arg in "$@"; do
             ;;
     esac
 done
+
+case "$REFRESH_STAGING" in
+    0|1) ;;
+    *)
+        echo "ERROR: VINIX_REFRESH_DESKTOP_STAGING must be 0 or 1" >&2
+        exit 1
+        ;;
+esac
 
 if [ "$MAKE_INITRAMFS" -eq 0 ] &&
    { [ -n "$WIFI_BUNDLE" ] || [ "$WITH_X86_TRANSLATION" -eq 1 ]; }; then
@@ -257,27 +309,24 @@ echo "    $BUILD_DIR/vinix-desktop ($(file_size "$BUILD_DIR/vinix-desktop") byte
 
 # Mesa is a dynamic runtime, so keep the always-bootable static desktop and
 # build a second executable only when the exact Asahi userspace is available.
-# desktop-init selects this executable when the M1 render node exists. The UI
-# is still rasterized into its Canvas on the CPU; EGL/GLES moves scaling and
+# Both binaries now use this same generated C translation: the software link
+# gets inline no-op presenter stubs from gpu_present.h, while the GPU link
+# selects the external EGL implementation at C compile/link time. The UI is
+# still rasterized into its Canvas on the CPU; EGL/GLES moves scaling and
 # presentation to AGX before the unavoidable firmware-framebuffer readback.
 GPU_DESKTOP_BUILT=0
 if [ -f "$ASAHI_STAGING/usr/lib/libEGL.so" ] &&
    [ -f "$ASAHI_STAGING/usr/lib/libGLESv2.so" ] &&
    [ -f "$ASAHI_STAGING/usr/include/EGL/egl.h" ] &&
    [ -f "$GPU_SYSROOT/usr/lib/Scrt1.o" ]; then
-    echo "==> Translating the GPU-enabled desktop to C..."
-    "$V" -new-compiler -no-memory-limit -os linux -arch arm64 -gc none -manualfree -enable-globals -prod \
-        -d ui2_headless -d vinix_gpu_present \
-        -path "@vlib|$UI2_MODULES|@vmodules|$SCRIPT_DIR|$SCRIPT_DIR/third_party" \
-        -o "$BUILD_DIR/desktop-gpu.c" "$APP_SRC"
-
     echo "==> Compiling the GPU-enabled desktop for aarch64-linux-musl..."
     "$LLVM_BIN/clang" --target=aarch64-linux-musl \
         --sysroot="$GPU_SYSROOT" --gcc-install-dir="$GCCLIB" -static-libgcc \
         -isystem "$CC_SHIM" \
         -I "$APP_SRC" -I "$ASAHI_STAGING/usr/include" \
+        -DVINIX_GPU_PRESENTER_EXTERNAL=1 \
         -O2 -fPIE -pie -fno-stack-protector -w \
-        "$BUILD_DIR/desktop-gpu.c" "$SCRIPT_DIR/desktop/gpu_present_egl.c" \
+        "$BUILD_DIR/desktop.c" "$SCRIPT_DIR/desktop/gpu_present_egl.c" \
         -L"$ASAHI_STAGING/usr/lib" \
         -Wl,-rpath-link,"$ASAHI_STAGING/usr/lib" \
         -Wl,-dynamic-linker,/lib/ld-musl-aarch64.so.1 \
@@ -408,219 +457,251 @@ fi
 
 echo "==> Staging the desktop initramfs..."
 STAGING="$BUILD_DIR/initramfs-root"
-rm -rf "$STAGING"
-mkdir -p "$STAGING"
-# Chromium is a 690 MiB closure the image does not need: `pkg install chromium`
-# fetches the same Alpine build onto a running system. Stage it only when a
-# bootable image has to carry the browser already installed, and stage it first
-# because its dependency closure repeats much of the X11 and GTK stack that the
-# layers below are the qualified copy of.
-if [ "$WITH_CHROMIUM" -eq 1 ]; then
-    echo "    staging Chromium"
-    merge_staging_tree "$CHROMIUM_STAGING"
-fi
-# LibreOffice is a 900 MiB closure for the same reason, and it repeats the same
-# GTK, X11 and font stack. Stage it before them, so the layers below stay the
-# qualified copy of everything the suite shares with the browsers.
-if [ "$WITH_LIBREOFFICE" -eq 1 ]; then
-    echo "    staging LibreOffice"
-    merge_staging_tree "$LIBREOFFICE_STAGING"
-fi
-if [ "$COMPACT_INITRAMFS" -eq 1 ]; then
-    echo "    compact image: staging BusyBox, Python, Git, GCC and Firefox"
-    if [ ! -f "$DEVTOOLS_ARCHIVE" ]; then
-        echo "ERROR: compact desktop needs $DEVTOOLS_ARCHIVE" >&2
-        echo "Run ./build-userland-aarch64.sh first." >&2
-        exit 1
+STAGING_CACHE="$BUILD_DIR/initramfs-root.layers"
+CONTENT_KEY="$BUILD_DIR/initramfs-root.content-key"
+STAGING_CACHE_EXPECTED="$(mktemp "$BUILD_DIR/.initramfs-root.layers.XXXXXX")"
+CONTENT_KEY_EXPECTED=""
+cleanup_desktop_cache_temps() {
+    rm -f "$STAGING_CACHE_EXPECTED"
+    if [ -n "$CONTENT_KEY_EXPECTED" ]; then
+        rm -f "$CONTENT_KEY_EXPECTED"
     fi
-    tar xf "$BASE_INITRAMFS" -C "$STAGING" ./bin/busybox
-    tar xf "$DEVTOOLS_ARCHIVE" -C "$STAGING"
-
-    # The terminal runs zsh, which the developer-tools archive does not carry.
-    # Take the shell, its modules and its configuration straight out of the
-    # sysroot the desktop was compiled against; the base archive stores the
-    # command as a hard link to a versioned name, which cannot be extracted on
-    # its own. libcap is zsh's own NEEDED library and is in neither archive,
-    # so without it the terminal only ever printed a loader error.
-    for zsh_path in bin/zsh bin/zsh-* etc/zsh usr/lib/zsh usr/share/zsh \
-        usr/lib/libcap.so.2 usr/lib/libcap.so.2.* \
-        root/.zshrc root/.oh-my-zsh; do
-        for zsh_source in "$SYSROOT"/$zsh_path; do
-            [ -e "$zsh_source" ] || continue
-            zsh_relative="${zsh_source#"$SYSROOT/"}"
-            mkdir -p "$STAGING/$(dirname "$zsh_relative")"
-            rm -rf "${STAGING:?}/$zsh_relative"
-            cp -a "$zsh_source" "$STAGING/$zsh_relative"
-        done
-    done
-    merge_staging_tree "$X11_STAGING"
-    merge_staging_tree "$FIREFOX_STAGING"
-    merge_staging_tree "$NETWORK_TOOLS_STAGING"
-    merge_staging_tree "$PYTHON_STAGING"
-
-    # GCC's lto-dump is a standalone compiler-internals inspection utility,
-    # not part of compiling or linking programs. Keeping its second 32 MiB
-    # copy of the LTO frontend can push a Word-enabled compact initramfs above
-    # FAT32's 4 GiB per-file limit, so omit it from the bootable image while
-    # retaining gcc, cc1 and lto1.
-    rm -f "$STAGING/usr/bin/lto-dump"
-
-    # The full userland has GNU coreutils, which replaces some of Alpine's
-    # BusyBox links.  Compact images omit that package, so make its complete
-    # everyday BusyBox command set available explicitly instead of exposing
-    # only the few helpers needed by the desktop launchers.  This keeps df,
-    # ls, du, find-like shell tooling, archive tools, and process/filesystem
-    # inspection commands preinstalled without bringing the GNU package in.
-    for applet in \
-        ash awk basename cat chgrp chmod chown cmp comm cp cut date dd df dirname \
-        dmesg du echo env expr false find grep head hostname id kill ln ls mkdir \
-        mknod mktemp mount mv ping printf ps pwd readlink rm rmdir sed seq sh \
-        sleep sort stat sync tail tar tee touch tr true uname uniq wc which \
-        whoami xargs; do
-        ln -sf busybox "$STAGING/bin/$applet"
-    done
-
-    # The power commands live in /sbin on a full userland, which compact images
-    # do not stage. BusyBox dispatches on the name it is called by, so a link
-    # under either directory is the same applet.
-    mkdir -p "$STAGING/sbin"
-    for applet in halt poweroff reboot; do
-        ln -sf /bin/busybox "$STAGING/sbin/$applet"
-    done
-
+}
+trap cleanup_desktop_cache_temps EXIT
+write_staging_cache_manifest > "$STAGING_CACHE_EXPECTED"
+REUSE_STAGING=0
+if [ "$REFRESH_STAGING" -eq 0 ] &&
+   [ -d "$STAGING" ] && [ -f "$STAGING_CACHE" ] &&
+   cmp -s "$STAGING_CACHE_EXPECTED" "$STAGING_CACHE"; then
+    REUSE_STAGING=1
+    echo "    reusing staged base/application layers"
 else
-    tar xf "$BASE_INITRAMFS" -C "$STAGING"
-    # The base archive may predate package support. Always refresh this small
-    # layer so the terminal gets pkg/apk without rebuilding the full userland.
-    merge_staging_tree "$NETWORK_TOOLS_STAGING"
+    rm -f "$STAGING_CACHE" "$CONTENT_KEY"
+    rm -rf "$STAGING"
+    mkdir -p "$STAGING"
 fi
 
-if [ -x "$BLENDER_NATIVE_STAGING/usr/libexec/vinix-blender-native" ]; then
-    echo "==> Staging native Blender GHOST executable"
-    merge_staging_tree "$BLENDER_NATIVE_STAGING"
-fi
+# The large package closures below are immutable build outputs. Once their
+# generation manifest matches, preserve the assembled tree and only refresh
+# the desktop-owned files later in this script. This turns Blender, Minecraft,
+# Wine/x86, Hyprland and the base userland from per-launch copies into one-time
+# staging work until one of those layer builders runs again.
+if [ "$REUSE_STAGING" -eq 0 ]; then
+    # Chromium is a 690 MiB closure the image does not need: `pkg install chromium`
+    # fetches the same Alpine build onto a running system. Stage it only when a
+    # bootable image has to carry the browser already installed, and stage it first
+    # because its dependency closure repeats much of the X11 and GTK stack that the
+    # layers below are the qualified copy of.
+    if [ "$WITH_CHROMIUM" -eq 1 ]; then
+        echo "    staging Chromium"
+        merge_staging_tree "$CHROMIUM_STAGING"
+    fi
+    # LibreOffice is a 900 MiB closure for the same reason, and it repeats the same
+    # GTK, X11 and font stack. Stage it before them, so the layers below stay the
+    # qualified copy of everything the suite shares with the browsers.
+    if [ "$WITH_LIBREOFFICE" -eq 1 ]; then
+        echo "    staging LibreOffice"
+        merge_staging_tree "$LIBREOFFICE_STAGING"
+    fi
+    if [ "$COMPACT_INITRAMFS" -eq 1 ]; then
+        echo "    compact image: staging BusyBox, Python, Git, GCC and Firefox"
+        if [ ! -f "$DEVTOOLS_ARCHIVE" ]; then
+            echo "ERROR: compact desktop needs $DEVTOOLS_ARCHIVE" >&2
+            echo "Run ./build-userland-aarch64.sh first." >&2
+            exit 1
+        fi
+        tar xf "$BASE_INITRAMFS" -C "$STAGING" ./bin/busybox
+        tar xf "$DEVTOOLS_ARCHIVE" -C "$STAGING"
 
-# Full images pick up locally built optional application layers even when the
-# base archive predates them. Compact images deliberately stop at the GPU,
-# desktop and Firefox qualification closure unless one optional layer is
-# explicitly requested.
-if { [ "$COMPACT_INITRAMFS" -eq 0 ] || [ "$WITH_MINECRAFT" -eq 1 ]; } &&
-   [ -x "$MINECRAFT_STAGING/usr/bin/minecraft" ]; then
-    echo "==> Staging Minecraft runtime"
-    merge_staging_tree "$MINECRAFT_STAGING"
-fi
+        # The terminal runs zsh, which the developer-tools archive does not carry.
+        # Take the shell, its modules and its configuration straight out of the
+        # sysroot the desktop was compiled against; the base archive stores the
+        # command as a hard link to a versioned name, which cannot be extracted on
+        # its own. libcap is zsh's own NEEDED library and is in neither archive,
+        # so without it the terminal only ever printed a loader error.
+        for zsh_path in bin/zsh bin/zsh-* etc/zsh usr/lib/zsh usr/share/zsh \
+            usr/lib/libcap.so.2 usr/lib/libcap.so.2.* \
+            root/.zshrc root/.oh-my-zsh; do
+            for zsh_source in "$SYSROOT"/$zsh_path; do
+                [ -e "$zsh_source" ] || continue
+                zsh_relative="${zsh_source#"$SYSROOT/"}"
+                mkdir -p "$STAGING/$(dirname "$zsh_relative")"
+                rm -rf "${STAGING:?}/$zsh_relative"
+                cp -a "$zsh_source" "$STAGING/$zsh_relative"
+            done
+        done
+        merge_staging_tree "$X11_STAGING"
+        merge_staging_tree "$FIREFOX_STAGING"
+        merge_staging_tree "$NETWORK_TOOLS_STAGING"
+        merge_staging_tree "$PYTHON_STAGING"
 
-# The translator is architecture-isolated: its x86-64 libraries live below
-# /usr/libexec, so they cannot replace native ARM64 libraries.
-if { [ "$COMPACT_INITRAMFS" -eq 0 ] || [ "$WITH_X86_TRANSLATION" -eq 1 ]; } &&
-   [ -x "$X86_TRANSLATION_STAGING/usr/bin/qemu-x86_64" ]; then
-    echo "==> Staging x86-64 translation layer"
-    merge_staging_tree "$X86_TRANSLATION_STAGING"
+        # GCC's lto-dump is a standalone compiler-internals inspection utility,
+        # not part of compiling or linking programs. Keeping its second 32 MiB
+        # copy of the LTO frontend can push a Word-enabled compact initramfs above
+        # FAT32's 4 GiB per-file limit, so omit it from the bootable image while
+        # retaining gcc, cc1 and lto1.
+        rm -f "$STAGING/usr/bin/lto-dump"
 
-    # Wine's desktop integration invokes the native shared-mime-info updater.
-    # Wine may add its private x86 library directory to the child environment,
-    # which makes the AArch64 loader try to relocate guest GLib libraries.
-    # Keep the real helper behind the same environment-sanitizing trampoline
-    # used for ntlm_auth.
-    if [ -x "$STAGING/usr/bin/update-mime-database" ]; then
-        mkdir -p "$STAGING/usr/libexec/vinix-native-helpers"
-        mv "$STAGING/usr/bin/update-mime-database" \
-            "$STAGING/usr/libexec/vinix-native-helpers/update-mime-database"
-        install -m755 \
-            "$SCRIPT_DIR/build-support/x86-translation/run-native-ntlm-auth" \
-            "$STAGING/usr/bin/update-mime-database"
+        # The full userland has GNU coreutils, which replaces some of Alpine's
+        # BusyBox links.  Compact images omit that package, so make its complete
+        # everyday BusyBox command set available explicitly instead of exposing
+        # only the few helpers needed by the desktop launchers.  This keeps df,
+        # ls, du, find-like shell tooling, archive tools, and process/filesystem
+        # inspection commands preinstalled without bringing the GNU package in.
+        for applet in \
+            ash awk basename cat chgrp chmod chown cmp comm cp cut date dd df dirname \
+            dmesg du echo env expr false find grep head hostname id kill ln ls mkdir \
+            mknod mktemp mount mv ping printf ps pwd readlink rm rmdir sed seq sh \
+            sleep sort stat sync tail tar tee touch tr true uname uniq wc which \
+            whoami xargs; do
+            ln -sf busybox "$STAGING/bin/$applet"
+        done
+
+        # The power commands live in /sbin on a full userland, which compact images
+        # do not stage. BusyBox dispatches on the name it is called by, so a link
+        # under either directory is the same applet.
+        mkdir -p "$STAGING/sbin"
+        for applet in halt poweroff reboot; do
+            ln -sf /bin/busybox "$STAGING/sbin/$applet"
+        done
+
+    else
+        tar xf "$BASE_INITRAMFS" -C "$STAGING"
+        # The base archive may predate package support. Always refresh this small
+        # layer so the terminal gets pkg/apk without rebuilding the full userland.
+        merge_staging_tree "$NETWORK_TOOLS_STAGING"
     fi
 
-    # Office populates this disposable cache with generated names that can
-    # exceed ustar's pathname limit after the prefix is exercised. It is not
-    # application state and Word recreates it when needed, so keep it out of
-    # the boot image without modifying the source prefix.
-    office_web_cache="$STAGING/root/.wine-word2013-x86_64/drive_c/users/root/AppData/Local/Microsoft/Office/15.0/WebServiceCache"
-    if [ -d "$office_web_cache" ]; then
-        rm -rf "$office_web_cache"
+    if [ -x "$BLENDER_NATIVE_STAGING/usr/libexec/vinix-blender-native" ]; then
+        echo "==> Staging native Blender GHOST executable"
+        merge_staging_tree "$BLENDER_NATIVE_STAGING"
     fi
-    office_vsta_metadata="$STAGING/root/.wine-word2013-x86_64/drive_c/Program Files (x86)/Common Files/Microsoft Shared/VSTA/AppInfoDocument/Microsoft.VisualStudio.Tools.Office.AppInfoDocument/Microsoft.VisualStudio.Tools.Office.AppInfoDocument.v9.0.dll"
-    if [ -f "$office_vsta_metadata" ]; then
-        rm -f "$office_vsta_metadata"
+
+    # Full images pick up locally built optional application layers even when the
+    # base archive predates them. Compact images deliberately stop at the GPU,
+    # desktop and Firefox qualification closure unless one optional layer is
+    # explicitly requested.
+    if { [ "$COMPACT_INITRAMFS" -eq 0 ] || [ "$WITH_MINECRAFT" -eq 1 ]; } &&
+       [ -x "$MINECRAFT_STAGING/usr/bin/minecraft" ]; then
+        echo "==> Staging Minecraft runtime"
+        merge_staging_tree "$MINECRAFT_STAGING"
+    fi
+
+    # The translator is architecture-isolated: its x86-64 libraries live below
+    # /usr/libexec, so they cannot replace native ARM64 libraries.
+    if { [ "$COMPACT_INITRAMFS" -eq 0 ] || [ "$WITH_X86_TRANSLATION" -eq 1 ]; } &&
+       [ -x "$X86_TRANSLATION_STAGING/usr/bin/qemu-x86_64" ]; then
+        echo "==> Staging x86-64 translation layer"
+        merge_staging_tree "$X86_TRANSLATION_STAGING"
+
+        # Wine's desktop integration invokes the native shared-mime-info updater.
+        # Wine may add its private x86 library directory to the child environment,
+        # which makes the AArch64 loader try to relocate guest GLib libraries.
+        # Keep the real helper behind the same environment-sanitizing trampoline
+        # used for ntlm_auth.
+        if [ -x "$STAGING/usr/bin/update-mime-database" ]; then
+            mkdir -p "$STAGING/usr/libexec/vinix-native-helpers"
+            mv "$STAGING/usr/bin/update-mime-database" \
+                "$STAGING/usr/libexec/vinix-native-helpers/update-mime-database"
+            install -m755 \
+                "$SCRIPT_DIR/build-support/x86-translation/run-native-ntlm-auth" \
+                "$STAGING/usr/bin/update-mime-database"
+        fi
+
+        # Office populates this disposable cache with generated names that can
+        # exceed ustar's pathname limit after the prefix is exercised. It is not
+        # application state and Word recreates it when needed, so keep it out of
+        # the boot image without modifying the source prefix.
+        office_web_cache="$STAGING/root/.wine-word2013-x86_64/drive_c/users/root/AppData/Local/Microsoft/Office/15.0/WebServiceCache"
+        if [ -d "$office_web_cache" ]; then
+            rm -rf "$office_web_cache"
+        fi
+        office_vsta_metadata="$STAGING/root/.wine-word2013-x86_64/drive_c/Program Files (x86)/Common Files/Microsoft Shared/VSTA/AppInfoDocument/Microsoft.VisualStudio.Tools.Office.AppInfoDocument/Microsoft.VisualStudio.Tools.Office.AppInfoDocument.v9.0.dll"
+        if [ -f "$office_vsta_metadata" ]; then
+            rm -f "$office_vsta_metadata"
+        fi
+    fi
+
+    # Hyprland is an optional build layer because its patched Aquamarine library
+    # is produced in the native ARM64 build VM. Its dedicated launcher selects it
+    # at boot; simply having the layer installed leaves the native desktop first.
+    if [ "$COMPACT_INITRAMFS" -eq 0 ] && [ -x "$HYPRLAND_STAGING/usr/bin/start-hyprland-vinix" ]; then
+        echo "==> Staging Hyprland and the Vinix Aquamarine backend"
+        merge_staging_tree "$HYPRLAND_STAGING"
+    fi
+
+    # Overlay Mesa last so Xorg, Firefox and native EGL applications all use the
+    # exact userspace built for Vinix's Asahi kernel UAPI rather than Alpine's
+    # unrelated Mesa build.
+    #
+    # Only when this image is actually for Apple hardware. That Mesa is built for a
+    # real GPU and carries no llvmpipe at all -- its only software rasteriser is
+    # softpipe, which stops at OpenGL 3.3. Overlaying it on a QEMU image therefore
+    # replaces a 4.5-capable software renderer with a 3.3-capable one, and anything
+    # needing more than 3.3 stops working: native Blender asks for a 4.3 core
+    # context and gets EGL_BAD_MATCH, having rendered fine before. Selecting it
+    # from the mere presence of the staging directory is what made that happen
+    # silently, with no commit to point at.
+    if [ "$GPU_DESKTOP_BUILT" -eq 1 ] && [ "$WITH_ASAHI_GPU" -eq 1 ]; then
+        merge_staging_tree "$ASAHI_STAGING"
+    elif [ -d "$X11_STAGING/usr/lib/xorg/modules/dri" ]; then
+        # Nothing else fills /usr/lib/dri: the Apple overlay was the only thing
+        # putting drivers there, so skipping it leaves Mesa with none at all. The
+        # X11 layer already stages the generic Alpine set, and that one does carry
+        # llvmpipe, so software OpenGL reaches 4.5 rather than softpipe's 3.3.
+        echo "==> Staging the generic Mesa DRI drivers"
+        mkdir -p "$STAGING/usr/lib/dri"
+        # Only the software entries. That directory is 49 names for one 27 MiB
+        # object, 48 of them links, and the pass below turns every link into a real
+        # file -- copying all of them would add 1.3 GiB of the same driver. A
+        # machine with no GPU needs exactly these.
+        cp -a "$X11_STAGING/usr/lib/xorg/modules/dri/libgallium_dri.so" \
+            "$STAGING/usr/lib/dri/"
+        for software_driver in swrast_dri.so kms_swrast_dri.so; do
+            cp -a "$X11_STAGING/usr/lib/xorg/modules/dri/$software_driver" \
+                "$STAGING/usr/lib/dri/" 2>/dev/null || true
+        done
+        # libEGL names its Gallium by version in DT_NEEDED, and the Apple overlay
+        # was the only thing supplying one. Take the X11 sysroot's, which is the
+        # build these drivers belong to.
+        for gallium in "$GPU_SYSROOT"/usr/lib/libgallium-*.so; do
+            [ -f "$gallium" ] || continue
+            cp -a "$gallium" "$STAGING/usr/lib/"
+        done
+        # llvmpipe is a JIT, so that Gallium names libLLVM in DT_NEEDED. The Apple
+        # build has no llvmpipe and so never needed it, which is why a compact
+        # image carries no LLVM at all. It is 144 MiB and it is what buys OpenGL
+        # 4.5 instead of softpipe's 3.3.
+        for llvm in "$SYSROOT"/usr/lib/libLLVM.so.*; do
+            [ -f "$llvm" ] || continue
+            cp -a "$llvm" "$STAGING/usr/lib/"
+        done
+    fi
+    # Hyprland edge uses libstdc++ formatting entry points newer than the base and
+    # Mesa 25 layers. Keep its backward-compatible C++ runtime as the final copy;
+    # use regular files because Vinix's musl loader opens DT_NEEDED objects with
+    # O_NOFOLLOW.
+    if [ "$COMPACT_INITRAMFS" -eq 0 ] && [ -x "$HYPRLAND_STAGING/usr/bin/start-hyprland-vinix" ]; then
+        for runtime in libstdc++.so.6 libgcc_s.so.1; do
+            if [ -f "$HYPRLAND_STAGING/usr/lib/$runtime" ]; then
+                rm -f "$STAGING/usr/lib/$runtime"
+                cp -L "$HYPRLAND_STAGING/usr/lib/$runtime" "$STAGING/usr/lib/$runtime"
+            fi
+        done
     fi
 fi
 
-# Hyprland is an optional build layer because its patched Aquamarine library
-# is produced in the native ARM64 build VM. Its dedicated launcher selects it
-# at boot; simply having the layer installed leaves the native desktop first.
+# These files are owned by this checkout, not by a compiled staging layer, so
+# refresh them even when the expensive tree above is reused.
 if [ "$COMPACT_INITRAMFS" -eq 0 ] && [ -x "$HYPRLAND_STAGING/usr/bin/start-hyprland-vinix" ]; then
-    echo "==> Staging Hyprland and the Vinix Aquamarine backend"
-    merge_staging_tree "$HYPRLAND_STAGING"
-    # Session scripts and terminal preferences are source-owned, so refresh
-    # them even when --reuse-layers assembles an older compiled staging tree.
     install -m755 "$SCRIPT_DIR/build-support/hyprland/start-hyprland-vinix" \
         "$STAGING/usr/bin/start-hyprland-vinix"
     install -m644 "$SCRIPT_DIR/build-support/hyprland/foot.ini" \
         "$STAGING/root/.config/foot/foot.ini"
 fi
-
-# Overlay Mesa last so Xorg, Firefox and native EGL applications all use the
-# exact userspace built for Vinix's Asahi kernel UAPI rather than Alpine's
-# unrelated Mesa build.
-#
-# Only when this image is actually for Apple hardware. That Mesa is built for a
-# real GPU and carries no llvmpipe at all -- its only software rasteriser is
-# softpipe, which stops at OpenGL 3.3. Overlaying it on a QEMU image therefore
-# replaces a 4.5-capable software renderer with a 3.3-capable one, and anything
-# needing more than 3.3 stops working: native Blender asks for a 4.3 core
-# context and gets EGL_BAD_MATCH, having rendered fine before. Selecting it
-# from the mere presence of the staging directory is what made that happen
-# silently, with no commit to point at.
 if [ "$GPU_DESKTOP_BUILT" -eq 1 ] && [ "$WITH_ASAHI_GPU" -eq 1 ]; then
-    merge_staging_tree "$ASAHI_STAGING"
-    # Keep the native hardware proof in sync with the source tree even when
-    # the Mesa staging directory was built before this desktop image.
     install -m755 "$SCRIPT_DIR/gl-triangle/run-m1-agx-smoke" \
         "$STAGING/usr/bin/run-m1-agx-smoke"
-elif [ -d "$X11_STAGING/usr/lib/xorg/modules/dri" ]; then
-    # Nothing else fills /usr/lib/dri: the Apple overlay was the only thing
-    # putting drivers there, so skipping it leaves Mesa with none at all. The
-    # X11 layer already stages the generic Alpine set, and that one does carry
-    # llvmpipe, so software OpenGL reaches 4.5 rather than softpipe's 3.3.
-    echo "==> Staging the generic Mesa DRI drivers"
-    mkdir -p "$STAGING/usr/lib/dri"
-    # Only the software entries. That directory is 49 names for one 27 MiB
-    # object, 48 of them links, and the pass below turns every link into a real
-    # file -- copying all of them would add 1.3 GiB of the same driver. A
-    # machine with no GPU needs exactly these.
-    cp -a "$X11_STAGING/usr/lib/xorg/modules/dri/libgallium_dri.so" \
-        "$STAGING/usr/lib/dri/"
-    for software_driver in swrast_dri.so kms_swrast_dri.so; do
-        cp -a "$X11_STAGING/usr/lib/xorg/modules/dri/$software_driver" \
-            "$STAGING/usr/lib/dri/" 2>/dev/null || true
-    done
-    # libEGL names its Gallium by version in DT_NEEDED, and the Apple overlay
-    # was the only thing supplying one. Take the X11 sysroot's, which is the
-    # build these drivers belong to.
-    for gallium in "$GPU_SYSROOT"/usr/lib/libgallium-*.so; do
-        [ -f "$gallium" ] || continue
-        cp -a "$gallium" "$STAGING/usr/lib/"
-    done
-    # llvmpipe is a JIT, so that Gallium names libLLVM in DT_NEEDED. The Apple
-    # build has no llvmpipe and so never needed it, which is why a compact
-    # image carries no LLVM at all. It is 144 MiB and it is what buys OpenGL
-    # 4.5 instead of softpipe's 3.3.
-    for llvm in "$SYSROOT"/usr/lib/libLLVM.so.*; do
-        [ -f "$llvm" ] || continue
-        cp -a "$llvm" "$STAGING/usr/lib/"
-    done
-fi
-# Hyprland edge uses libstdc++ formatting entry points newer than the base and
-# Mesa 25 layers. Keep its backward-compatible C++ runtime as the final copy;
-# use regular files because Vinix's musl loader opens DT_NEEDED objects with
-# O_NOFOLLOW.
-if [ "$COMPACT_INITRAMFS" -eq 0 ] && [ -x "$HYPRLAND_STAGING/usr/bin/start-hyprland-vinix" ]; then
-    for runtime in libstdc++.so.6 libgcc_s.so.1; do
-        if [ -f "$HYPRLAND_STAGING/usr/lib/$runtime" ]; then
-            rm -f "$STAGING/usr/lib/$runtime"
-            cp -L "$HYPRLAND_STAGING/usr/lib/$runtime" "$STAGING/usr/lib/$runtime"
-        fi
-    done
 fi
 mkdir -p "$STAGING/sbin" "$STAGING/usr/bin" "$STAGING/usr/share/vinix" \
     "$STAGING/root" "$STAGING/dev" "$STAGING/proc" "$STAGING/sys" "$STAGING/tmp"
@@ -763,6 +844,8 @@ cp "$BUILD_DIR/vinix-desktop" "$STAGING/usr/bin/vinix-desktop"
 if [ "$GPU_DESKTOP_BUILT" -eq 1 ]; then
     cp "$BUILD_DIR/vinix-desktop-gpu" "$STAGING/usr/bin/vinix-desktop-gpu"
     chmod +x "$STAGING/usr/bin/vinix-desktop-gpu"
+else
+    rm -f "$STAGING/usr/bin/vinix-desktop-gpu"
 fi
 cp "$BUILD_DIR/wifi-ctl" "$STAGING/usr/bin/wifi-ctl"
 chmod +x "$STAGING/sbin/init" "$STAGING/usr/bin/vinix-desktop" \
@@ -786,6 +869,9 @@ install -m644 "$BUILD_DIR/Calculator.app/Contents/Info.plist" \
 install -m755 "$BUILD_DIR/Calculator.app/Contents/MacOS/Calculator" \
     "$STAGING/Applications/Calculator.app/Contents/MacOS/Calculator"
 
+# The bundle is mutable command-line input, so do not let a previous selection
+# survive a cached-layer build that no longer asks for it.
+rm -rf "$STAGING/usr/share/vinix/wifi"
 if [ -n "$WIFI_BUNDLE" ]; then
     echo "==> Staging the selected Wi-Fi firmware bundle..."
     mkdir -p "$STAGING/usr/share/vinix/wifi"
@@ -806,6 +892,7 @@ echo "==> Wallpapers..."
 python3 "$SCRIPT_DIR/desktop/tools/fetch_wallpapers.py" "$BUILD_DIR/wallpapers" \
     --cache "$BUILD_DIR/wallpapers-cache" || true
 
+rm -rf "$STAGING/usr/share/vinix/wallpapers"
 mkdir -p "$STAGING/usr/share/vinix/wallpapers"
 if [ -d "$BUILD_DIR/wallpapers" ]; then
     cp "$BUILD_DIR/wallpapers"/*.vwp "$BUILD_DIR/wallpapers"/index.txt \
@@ -814,6 +901,7 @@ fi
 
 # The desktop's own source travels with the image, so the file browser has
 # something real to show and so the machine carries the code it is running.
+rm -rf "$STAGING/root/desktop"
 mkdir -p "$STAGING/root/desktop"
 cp "$SCRIPT_DIR/desktop"/*.v "$SCRIPT_DIR/desktop"/*.c "$SCRIPT_DIR/desktop"/*.h \
     "$SCRIPT_DIR/desktop/README.md" \
@@ -845,6 +933,55 @@ if [ -d "$STAGING/usr/lib/dri" ]; then
         echo "ERROR: /usr/lib/dri/swrast_dri.so is not a regular file; EGL will not start" >&2
         exit 1
     fi
+fi
+
+# A repeated build with the same immutable layer generations and the same
+# desktop-owned content would produce the same useful image bytes but a fresh
+# tar mtime. The QEMU system-volume identity is intentionally size+mtime, so
+# rewriting that 7+ GiB tar also causes an unnecessary full reinstall. Hash
+# only this comparatively small mutable set; layer changes are already covered
+# by the generation manifest above.
+CONTENT_KEY_EXPECTED="$(mktemp "$BUILD_DIR/.initramfs-root.content-key.XXXXXX")"
+if [ "$GPU_DESKTOP_BUILT" -eq 1 ]; then
+    GPU_CONTENT_KEY_INPUT="$BUILD_DIR/vinix-desktop-gpu"
+else
+    GPU_CONTENT_KEY_INPUT="$BUILD_DIR/.vinix-desktop-gpu-not-built"
+fi
+CONTENT_KEY_INPUTS=(
+    "$BUILD_DIR/desktop-init"
+    "$BUILD_DIR/vinix-desktop"
+    "$GPU_CONTENT_KEY_INPUT"
+    "$BUILD_DIR/wifi-ctl"
+    "$BUILD_DIR/Calculator.app"
+    "$BUILD_DIR/wallpapers"
+    "$SCRIPT_DIR/desktop"
+    "$SCRIPT_DIR/build-support/vinix-pkg"
+    "$SCRIPT_DIR/build-support/xorg-server/startx"
+    "$SCRIPT_DIR/build-support/firefox"
+    "$SCRIPT_DIR/build-support/gimp"
+    "$SCRIPT_DIR/build-support/libreoffice"
+    "$SCRIPT_DIR/build-support/chromium"
+    "$SCRIPT_DIR/build-support/hyprland"
+    "$SCRIPT_DIR/gl-triangle/run-m1-agx-smoke"
+    "$SCRIPT_DIR/tests/browsers/firefox-smoke.html"
+    "$SCRIPT_DIR/tests/browsers/chromium-smoke.html"
+    "$SCRIPT_DIR/tests/packages/x-window-check.py"
+)
+if [ -n "$WIFI_BUNDLE" ]; then
+    CONTENT_KEY_INPUTS+=("$WIFI_BUNDLE")
+fi
+python3 "$SCRIPT_DIR/build-support/content-key.py" \
+    "${CONTENT_KEY_INPUTS[@]}" > "$CONTENT_KEY_EXPECTED"
+
+if [ "$REUSE_STAGING" -eq 1 ] &&
+   [ -f "$CONTENT_KEY" ] && cmp -s "$CONTENT_KEY_EXPECTED" "$CONTENT_KEY" &&
+   [ -s "$DESKTOP_INITRAMFS" ] &&
+   { [ "$COMPACT_INITRAMFS" -eq 0 ] || [ -s "$DESKTOP_INITRAMFS_GZ" ]; }; then
+    echo "==> Desktop image content unchanged; keeping existing archive"
+    echo "    $DESKTOP_INITRAMFS ($(file_size "$DESKTOP_INITRAMFS") bytes)"
+    rm -f "$STAGING_CACHE_EXPECTED" "$CONTENT_KEY_EXPECTED"
+    trap - EXIT
+    exit 0
 fi
 
 # COPYFILE_DISABLE keeps macOS from adding ._ resource-fork members that the
@@ -882,3 +1019,10 @@ else
     # later hardware deployment mistake it for this newly published archive.
     rm -f "$DESKTOP_INITRAMFS_GZ"
 fi
+
+# Publish cache metadata only after every requested image representation has
+# succeeded. A failed tar/gzip can therefore never mark an incomplete build as
+# reusable.
+mv -f "$STAGING_CACHE_EXPECTED" "$STAGING_CACHE"
+mv -f "$CONTENT_KEY_EXPECTED" "$CONTENT_KEY"
+trap - EXIT
