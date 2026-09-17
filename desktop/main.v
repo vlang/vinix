@@ -149,6 +149,11 @@ fn main() {
 		keyboard.close()
 	}
 
+	// First launch is an exclusive setup mode: ordinary windows, shortcuts and
+	// the taskbar do not exist until a persistent user profile has been created.
+	desktop.ensure_registered_user(mut fb, mut pointer, mut keyboard, options.frame_interval,
+		options.idle_interval)
+
 	// An opening arrangement, kept clear of the shortcut column down the left
 	// edge. The calculator is not opened: it remains available from its shortcut
 	// and the Start menu, and three windows is enough to show what the taskbar is for.
