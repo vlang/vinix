@@ -13,6 +13,9 @@ import sched
 import memory
 import x86.hypervisor
 
+const cpuid7_ebx_smep = u32(1) << 7
+const cr4_smep = u64(1) << 20
+
 pub fn initialise(smp_info &limine.LimineSMPInfo) {
 	mut cpu_local := unsafe { &cpulocal.Local(smp_info.extra_argument) }
 	cpu_number := cpu_local.cpu_number
@@ -73,6 +76,19 @@ pub fn initialise(smp_info &limine.LimineSMPInfo) {
 	mut cr4 := cpu.read_cr4()
 	cr4 |= (3 << 9)
 	cpu.write_cr4(cr4)
+
+	// OpenBSD enables SMEP on every CPU that advertises it. This makes a
+	// supervisor-mode instruction fetch from a userspace page fault even when
+	// that page is legitimately executable at CPL3.
+	smep_supported, _, smep_ebx, _, _ := cpu.cpuid(7, 0)
+	if smep_supported && smep_ebx & cpuid7_ebx_smep != 0 {
+		cr4 = cpu.read_cr4()
+		cr4 |= cr4_smep
+		cpu.write_cr4(cr4)
+		if cpu_number == 0 {
+			println('security: SMEP enabled')
+		}
+	}
 
 	mut success, _, mut b, mut c, _ := cpu.cpuid(1, 0)
 	if success == true && c & cpu.cpuid_xsave != 0 {
