@@ -72,7 +72,7 @@ const available_apps = [
 	},
 	AppFactory{
 		title: 'Firefox'
-		icon: 'builtin:browser'
+		icon: 'appicon:firefox'
 		width: firefox_window_width
 		height: firefox_window_height + default_title_height
 		process_name: 'vinix-firefox'
@@ -206,7 +206,7 @@ const available_apps = [
 	},
 	AppFactory{
 		title: 'Blender'
-		icon: 'builtin:block'
+		icon: 'appicon:blender'
 		width: blender_window_width
 		height: blender_window_height + default_title_height
 		process_name: 'vinix-blender'
@@ -228,7 +228,7 @@ const available_apps = [
 	},
 	AppFactory{
 		title: 'GIMP'
-		icon: 'builtin:editor'
+		icon: 'appicon:gimp'
 		width: gimp_window_width
 		height: gimp_window_height + default_title_height
 		process_name: 'vinix-gimp'
@@ -254,7 +254,7 @@ const available_apps = [
 	},
 	AppFactory{
 		title: 'LibreOffice'
-		icon: 'builtin:editor'
+		icon: 'appicon:libreoffice'
 		width: libreoffice_window_width
 		height: libreoffice_window_height + default_title_height
 		process_name: 'vinix-libreoffice'
@@ -266,7 +266,7 @@ const available_apps = [
 	},
 	AppFactory{
 		title: 'Chromium'
-		icon: 'builtin:browser'
+		icon: 'appicon:chromium'
 		width: chromium_window_width
 		height: chromium_window_height + default_title_height
 		process_name: 'vinix-chromium'

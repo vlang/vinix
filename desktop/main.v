@@ -132,6 +132,7 @@ fn main() {
 		settings:          preferences.settings
 		canvas:            new_scaled_canvas(desktop_scaled_extent(fb.width, scale), desktop_scaled_extent(fb.height, scale), fb.width, fb.height, scale)
 		fonts:             load_fonts()
+		shortcut_order:    load_shortcut_order(desktop_home)
 		tz_offset_seconds: options.tz_offset
 	}
 

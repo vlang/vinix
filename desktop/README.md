@@ -420,6 +420,23 @@ anything that does not stays a plain constant in `theme.v`. Application
 interiors deliberately do not follow the theme — an application draws its own
 inside, as ui2's calculator plainly does — so they use the `app_*` constants.
 
+## Desktop shortcuts and application icons
+
+Application shortcuts launch on left-button release rather than press. Moving a
+pressed shortcut by six pixels turns the gesture into a drag instead; dropping
+it over another shortcut changes the desktop order and writes that order to
+`/root/.vinix-shortcut-order`. The persisted file stores stable application
+process names, so adding another application does not renumber an existing
+layout.
+
+Third-party applications use their official high-resolution icons when one is
+available. `tools/prepare_app_icons.py` prefers the largest icon shipped by the
+assembled package and falls back to pinned upstream artwork for Chromium,
+Blender, GIMP and LibreOffice. Build-time decoding writes 256x256 RGBA `.vai`
+files under `/usr/share/vinix/app-icons`; the compositor samples those at the
+physical framebuffer resolution, including 2x displays, and falls back to the
+old builtin glyph if an asset is missing.
+
 ## Wallpapers
 
 Vinix has no JPEG or PNG decoder, and writing one to show a backdrop would be a

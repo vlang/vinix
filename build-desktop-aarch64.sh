@@ -903,6 +903,20 @@ if [ -d "$BUILD_DIR/wallpapers" ]; then
         "$BUILD_DIR/wallpapers"/SOURCES.txt "$STAGING/usr/share/vinix/wallpapers/" 2>/dev/null || true
 fi
 
+# ── Application icons ──
+# Decode application artwork on the build host, just as wallpapers are. Prefer
+# the largest official icon shipped by the assembled package; pinned upstream
+# artwork fills gaps for optional applications.
+echo "==> Application icons..."
+python3 "$SCRIPT_DIR/desktop/tools/prepare_app_icons.py" "$BUILD_DIR/app-icons" \
+    --root "$STAGING" --fallback-dir "$SCRIPT_DIR/desktop/app-icon-fallbacks" || true
+rm -rf "$STAGING/usr/share/vinix/app-icons"
+mkdir -p "$STAGING/usr/share/vinix/app-icons"
+if [ -d "$BUILD_DIR/app-icons" ]; then
+    cp "$BUILD_DIR/app-icons"/*.vai "$BUILD_DIR/app-icons"/SOURCES.txt \
+        "$STAGING/usr/share/vinix/app-icons/" 2>/dev/null || true
+fi
+
 # The desktop's own source travels with the image, so the file browser has
 # something real to show and so the machine carries the code it is running.
 rm -rf "$STAGING/root/desktop"
@@ -958,6 +972,7 @@ CONTENT_KEY_INPUTS=(
     "$BUILD_DIR/wifi-ctl"
     "$BUILD_DIR/Calculator.app"
     "$BUILD_DIR/wallpapers"
+    "$BUILD_DIR/app-icons"
     "$SCRIPT_DIR/desktop"
     "$SCRIPT_DIR/build-support/vinix-pkg"
     "$SCRIPT_DIR/build-support/xorg-server/startx"

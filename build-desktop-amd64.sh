@@ -118,7 +118,7 @@ rm -rf "$STAGING"
 mkdir -p "$STAGING"
 cp -a "$SYSROOT/." "$STAGING/"
 mkdir -p "$STAGING/usr/bin" "$STAGING/usr/share/vinix/wallpapers" \
-    "$STAGING/root/desktop" "$STAGING/run"
+    "$STAGING/usr/share/vinix/app-icons" "$STAGING/root/desktop" "$STAGING/run"
 install -m755 "$BUILD_DIR/vinix-desktop" "$STAGING/usr/bin/vinix-desktop"
 rm -f "$STAGING/sbin/init"
 install -m755 "$SCRIPT_DIR/build-support/init-amd64/desktop-init" "$STAGING/sbin/init"
@@ -144,6 +144,16 @@ if [ -d "$BUILD_DIR/wallpapers" ]; then
     cp "$BUILD_DIR/wallpapers"/*.vwp "$BUILD_DIR/wallpapers"/index.txt \
         "$BUILD_DIR/wallpapers"/SOURCES.txt \
         "$STAGING/usr/share/vinix/wallpapers/" 2>/dev/null || true
+fi
+
+echo "==> Application icons..."
+python3 "$SCRIPT_DIR/desktop/tools/prepare_app_icons.py" "$BUILD_DIR/app-icons" \
+    --root "$STAGING" --fallback-dir "$SCRIPT_DIR/desktop/app-icon-fallbacks" || true
+rm -rf "$STAGING/usr/share/vinix/app-icons"
+mkdir -p "$STAGING/usr/share/vinix/app-icons"
+if [ -d "$BUILD_DIR/app-icons" ]; then
+    cp "$BUILD_DIR/app-icons"/*.vai "$BUILD_DIR/app-icons"/SOURCES.txt \
+        "$STAGING/usr/share/vinix/app-icons/" 2>/dev/null || true
 fi
 cp "$SCRIPT_DIR/desktop"/*.v "$SCRIPT_DIR/desktop"/*.c "$SCRIPT_DIR/desktop"/*.h \
     "$SCRIPT_DIR/desktop/README.md" "$STAGING/root/desktop/"

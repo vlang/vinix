@@ -273,6 +273,12 @@ fn (mut d Desktop) render_element(el ui2.Element, off_x int, off_y int, depth in
 				}
 			} else if el.image_path.starts_with(xwd_image_prefix) {
 				d.canvas.draw_xwd_surface(el.image_path[xwd_image_prefix.len..], x, y, w, h)
+			} else if el.image_path.starts_with(app_icon_prefix) {
+				key := el.image_path[app_icon_prefix.len..]
+				if !d.draw_app_icon(key, x, y, w, h) {
+					d.draw_builtin_glyph(app_icon_fallback(key), x, y, w, h, el.text_style.color)
+				}
+				unsafe { key.free() }
 			} else {
 				d.draw_builtin_glyph(el.image_path, x, y, w, h, el.text_style.color)
 			}
@@ -527,10 +533,29 @@ fn (mut d Desktop) draw_button(el ui2.Element, x int, y int, w int, h int) {
 	mut text_w := w - 2 * text_inset
 	if el.image_path.len > 0 {
 		if el.text.len == 0 {
-			d.draw_builtin_glyph(el.image_path, x, y, w, h, el.text_style.color)
+			if el.image_path.starts_with(app_icon_prefix) {
+				key := el.image_path[app_icon_prefix.len..]
+				if !d.draw_app_icon(key, x, y, w, h) {
+					d.draw_builtin_glyph(app_icon_fallback(key), x, y, w, h, el.text_style.color)
+				}
+				unsafe { key.free() }
+			} else {
+				d.draw_builtin_glyph(el.image_path, x, y, w, h, el.text_style.color)
+			}
 		} else {
 			icon := if h - 8 < button_icon_size { h - 8 } else { button_icon_size }
-			d.draw_builtin_glyph(el.image_path, x + text_inset, y + (h - icon) / 2, icon, icon, el.text_style.color)
+			icon_x := x + text_inset
+			icon_y := y + (h - icon) / 2
+			if el.image_path.starts_with(app_icon_prefix) {
+				key := el.image_path[app_icon_prefix.len..]
+				if !d.draw_app_icon(key, icon_x, icon_y, icon, icon) {
+					d.draw_builtin_glyph(app_icon_fallback(key), icon_x, icon_y, icon, icon,
+						el.text_style.color)
+				}
+				unsafe { key.free() }
+			} else {
+				d.draw_builtin_glyph(el.image_path, icon_x, icon_y, icon, icon, el.text_style.color)
+			}
 			text_x += icon + 6
 			text_w -= icon + 6
 		}
