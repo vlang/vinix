@@ -5,6 +5,7 @@
 module main
 
 import i18n
+import ui2
 
 const desktop_i18n_language_names = ['en', 'ru']
 const desktop_i18n_search_dirs = ['/usr/share/vinix/translations', '/root/desktop/translations',
