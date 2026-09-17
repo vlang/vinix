@@ -16,9 +16,9 @@ import math.bits
 import ui2
 
 const app_protocol_magic = u32(0x56415050) // VAPP
-const app_protocol_version = u8(4)
-const app_request_header_size = 116
-const app_response_header_size = 108
+const app_protocol_version = u8(5)
+const app_request_header_size = 124
+const app_response_header_size = 116
 const app_protocol_max_payload = 16 * 1024 * 1024
 const app_protocol_max_string = 64 * 1024
 const app_protocol_max_elements = 16 * 1024
@@ -182,6 +182,8 @@ fn wire_put_state(mut out []u8, state AppWireState) {
 	wire_put_i32(mut out, int(state.settings.theme))
 	wire_put_i32(mut out, if state.settings.clock_24_hour { 1 } else { 0 })
 	wire_put_i32(mut out, if state.settings.clock_show_seconds { 1 } else { 0 })
+	wire_put_i32(mut out, if state.settings.clock_show_date { 1 } else { 0 })
+	wire_put_i32(mut out, if state.settings.clock_show_weekday { 1 } else { 0 })
 	wire_put_i32(mut out, state.settings.wallpaper_color)
 	wire_put_i32(mut out, state.settings.wallpaper_image)
 	wire_put_i32(mut out, state.requested_scale)
@@ -206,6 +208,8 @@ fn wire_take_state(mut reader WireReader) !AppWireState {
 	theme := reader.take_i32()!
 	clock_24_hour := reader.take_i32()!
 	clock_show_seconds := reader.take_i32()!
+	clock_show_date := reader.take_i32()!
+	clock_show_weekday := reader.take_i32()!
 	wallpaper_color := reader.take_i32()!
 	wallpaper_image := reader.take_i32()!
 	requested_scale := reader.take_i32()!
@@ -227,6 +231,8 @@ fn wire_take_state(mut reader WireReader) !AppWireState {
 		|| theme < int(ThemeKind.default_) || theme > int(ThemeKind.macos)
 		|| clock_24_hour < 0 || clock_24_hour > 1
 		|| clock_show_seconds < 0 || clock_show_seconds > 1
+		|| clock_show_date < 0 || clock_show_date > 1
+		|| clock_show_weekday < 0 || clock_show_weekday > 1
 		|| !desktop_scale_valid(requested_scale)
 		|| capture_command < int(CaptureCommand.none_)
 		|| capture_command > int(CaptureCommand.stop) || capture_delay < 0
@@ -244,6 +250,8 @@ fn wire_take_state(mut reader WireReader) !AppWireState {
 			theme: unsafe { ThemeKind(theme) }
 			clock_24_hour: clock_24_hour == 1
 			clock_show_seconds: clock_show_seconds == 1
+			clock_show_date: clock_show_date == 1
+			clock_show_weekday: clock_show_weekday == 1
 			wallpaper_color: wallpaper_color
 			wallpaper_image: wallpaper_image
 		}
@@ -446,6 +454,8 @@ fn apply_app_state(mut desktop Desktop, state AppWireState) {
 		|| desktop.settings.wallpaper_image != state.settings.wallpaper_image
 	clock_changed := desktop.settings.clock_24_hour != state.settings.clock_24_hour
 		|| desktop.settings.clock_show_seconds != state.settings.clock_show_seconds
+		|| desktop.settings.clock_show_date != state.settings.clock_show_date
+		|| desktop.settings.clock_show_weekday != state.settings.clock_show_weekday
 	desktop.settings = state.settings
 	desktop.accept_capture_request(state.capture_request)
 	if wallpaper_changed {
