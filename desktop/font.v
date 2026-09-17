@@ -5,10 +5,9 @@
 // antialiasing a desktop toolkit would give, without a rasteriser on the
 // target.
 //
-// Runs are decoded as UTF-8 and looked up by code point. The atlases carry
-// printable ASCII plus the handful of supplemental runes in font_extra_runes,
-// which is what lets an application like ui2's calculator, whose keys are
-// labelled with the real division and plus-minus signs, come out right.
+// Runs are decoded as UTF-8 and looked up by code point. The primary atlases
+// carry printable ASCII and common symbols; font_cyrillic.v appends a compact
+// Russian fallback to each face at startup.
 module main
 
 import encoding.base64
@@ -45,7 +44,7 @@ fn load_face(data FaceBlob) FontFace {
 	count := font_last_char - font_first_char + 1 + font_extra_runes.len
 	header_bytes := count * glyph_header_size
 
-	mut glyphs := []Glyph{cap: count}
+	mut glyphs := []Glyph{cap: count + font_cyrillic_runes.len}
 	mut offset := 0
 	for i := 0; i < count; i++ {
 		base := i * glyph_header_size
@@ -62,7 +61,7 @@ fn load_face(data FaceBlob) FontFace {
 		offset += width * height
 	}
 
-	return FontFace{
+	mut face := FontFace{
 		bold:         data.bold
 		mono:         data.mono
 		size:         data.size
@@ -73,6 +72,8 @@ fn load_face(data FaceBlob) FontFace {
 		glyphs:       glyphs
 		pixels:       raw[header_bytes..].clone()
 	}
+	append_cyrillic_glyphs(mut face, data)
+	return face
 }
 
 fn load_fonts() []FontFace {
@@ -107,8 +108,8 @@ fn next_rune(text string, index int) (u32, int) {
 
 // glyph_for maps a code point to its slot. Anything the atlases do not carry
 // is drawn as a space rather than as a missing-glyph box, so an unexpected
-// character costs a gap and not a broken layout. The supplemental block is
-// short enough that scanning it beats carrying a map.
+// character costs a gap and not a broken layout. The supplemental blocks are
+// short enough that scanning them beats carrying a map.
 @[inline]
 fn (f &FontFace) glyph_for(code_point u32) Glyph {
 	if code_point >= u32(font_first_char) && code_point <= u32(font_last_char) {
@@ -120,10 +121,16 @@ fn (f &FontFace) glyph_for(code_point u32) Glyph {
 			return f.glyphs[ascii_count + i]
 		}
 	}
+	cyrillic_start := ascii_count + font_extra_runes.len
+	for i, rune in font_cyrillic_runes {
+		if rune == code_point {
+			return f.glyphs[cyrillic_start + i]
+		}
+	}
 	return f.glyphs[0]
 }
 
-fn (f &FontFace) text_width(text string) int {
+fn (f &FontFace) text_width_raw(text string) int {
 	mut width := 0
 	mut i := 0
 	for i < text.len {
@@ -134,21 +141,28 @@ fn (f &FontFace) text_width(text string) int {
 	return width
 }
 
+// Public-to-the-renderer width measurement always measures what will actually
+// be drawn. That matters for centred labels and truncation after translation.
+fn (f &FontFace) text_width(text string) int {
+	return f.text_width_raw(desktop_i18n_text(text))
+}
+
 // truncate fits a string into `limit` pixels, ending it with an ellipsis when
 // it does not. Window titles are user text of any length and the taskbar gives
 // them a fixed slot, so something has to give. The cut lands on a rune
 // boundary because the scan advances one whole sequence at a time.
 fn (f &FontFace) truncate(text string, limit int) (string, bool) {
-	if f.text_width(text) <= limit {
-		return text, false
+	translated := desktop_i18n_text(text)
+	if f.text_width_raw(translated) <= limit {
+		return translated, false
 	}
 	ellipsis := '...'
-	tail := f.text_width(ellipsis)
+	tail := f.text_width_raw(ellipsis)
 	mut width := 0
 	mut cut := 0
 	mut i := 0
-	for i < text.len {
-		code_point, size := next_rune(text, i)
+	for i < translated.len {
+		code_point, size := next_rune(translated, i)
 		advance := f.glyph_for(code_point).advance / f.raster_scale
 		if width + advance + tail > limit {
 			break
@@ -160,19 +174,21 @@ fn (f &FontFace) truncate(text string, limit int) (string, bool) {
 	if cut == 0 {
 		return ellipsis, false
 	}
-	prefix := text[..cut]
+	prefix := translated[..cut]
 	truncated := prefix + ellipsis
 	unsafe { prefix.free() }
 	return truncated, true
 }
 
 // draw_text places the run's line box at (x, y) and returns the pen position
-// it ended at.
+// it ended at. Localization lives here as the final safety net for direct text
+// drawing; ui2 labels/buttons normally reach the same translation in truncate.
 fn (mut c Canvas) draw_text(face &FontFace, x int, y int, text string, color u32) int {
+	translated := desktop_i18n_text(text)
 	mut pen := x * c.scale
 	mut i := 0
-	for i < text.len {
-		code_point, size := next_rune(text, i)
+	for i < translated.len {
+		code_point, size := next_rune(translated, i)
 		glyph := face.glyph_for(code_point)
 		if glyph.width > 0 && glyph.height > 0 {
 			c.blit_glyph(face, glyph, pen + glyph.bearing_x, y * c.scale + glyph.bearing_y, color)
@@ -180,7 +196,7 @@ fn (mut c Canvas) draw_text(face &FontFace, x int, y int, text string, color u32
 		pen += glyph.advance
 		i += size
 	}
-	return x + face.text_width(text)
+	return x + face.text_width_raw(translated)
 }
 
 fn (mut c Canvas) blit_glyph(face &FontFace, glyph Glyph, x int, y int, color u32) {
