@@ -18,6 +18,14 @@ jobs:
         run: |
           python3 desktop/tools/i18n_integrate.py
           sed -i "/SettingsCategory.settings/d" desktop/tools/tests/localization_test.v
+      - name: Save patched files
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-i18n-patched
+          path: |
+            desktop
+            build-desktop-aarch64.sh
+            build-desktop-amd64.sh
       - name: Build V and ui2
         run: |
           git clone https://github.com/vlang/v.git --depth=1 "$RUNNER_TEMP/v"
@@ -27,11 +35,3 @@ jobs:
         run: V="$RUNNER_TEMP/v/v" ./desktop/tools/test-settings.sh
       - name: Run desktop utility tests
         run: V="$RUNNER_TEMP/v/v" ./desktop/tools/test-utilities.sh
-      - name: Save patched files
-        uses: actions/upload-artifact@v4
-        with:
-          name: desktop-i18n-patched
-          path: |
-            desktop
-            build-desktop-aarch64.sh
-            build-desktop-amd64.sh
