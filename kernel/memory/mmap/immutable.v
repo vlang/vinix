@@ -5,10 +5,6 @@ import lib
 import memory
 import proc
 
-fn range_is_immutable(range_local &MmapRangeLocal) bool {
-	return range_local.immutable
-}
-
 // OpenBSD's mimmutable(2) makes mapping metadata one-way: once a mapped span is
 // immutable its protection or mapping cannot be changed. Unmapped holes are
 // deliberately ignored and do not acquire any latent state.
