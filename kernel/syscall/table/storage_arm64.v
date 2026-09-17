@@ -10,13 +10,14 @@ import errno
 import aarch64.cpu
 
 // Install after the architecture's generic syscall table, so compatibility
-// stubs cannot silently override durability or shutdown operations.
+// stubs cannot silently override durability, shutdown, or security operations.
 pub fn init_storage_syscalls() {
 	syscall_table[81] = voidptr(storage_sync)
 	syscall_table[82] = voidptr(storage_fsync)
 	syscall_table[83] = voidptr(storage_fsync) // fdatasync: stronger full flush
 	syscall_table[267] = voidptr(storage_syncfs)
 	syscall_table[142] = voidptr(storage_reboot)
+	syscall_table[222] = voidptr(syscall_linux_mmap_aslr)
 }
 
 // Push every cached write to its device. Block-backed filesystems keep dirty
