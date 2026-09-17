@@ -24,10 +24,14 @@ const app_protocol_max_string = 64 * 1024
 const app_protocol_max_elements = 16 * 1024
 const app_protocol_max_depth = 64
 // A native application runs in a separate process, so a lost child must not
-// park the compositor in a pipe read forever. This is especially important at
-// boot: an application requested with --open starts before the first frame, and
-// an unbounded wait leaves the firmware console with no desktop able to accept input.
+// park the compositor in a pipe read forever.
 const app_response_timeout_ms = 5000
+// A newly spawned app may do real cold-storage work before it can answer its
+// first protocol message. Files, for example, reads and stats the persistent
+// home directory. Give that one-time setup a larger budget during desktop
+// startup; all requests after the app is running retain the short recovery
+// timeout above.
+const app_startup_response_timeout_ms = 30000
 const remote_owned_element_key = '__vinix.remote.owned'
 const native_app_directory = '/usr/bin/'
 
@@ -744,8 +748,15 @@ mut:
 }
 
 fn start_remote_app(factory AppFactory, mut desktop Desktop) !NativeApp {
+	return start_remote_app_with_timeout(factory, mut desktop, app_response_timeout_ms)
+}
+
+// Startup applications run while the persistent filesystem is still cold, so
+// their initial response has a distinct (and deliberately longer) deadline.
+// The returned app uses app_response_timeout_ms for every later transaction.
+fn start_remote_app_with_timeout(factory AppFactory, mut desktop Desktop, timeout_ms int) !NativeApp {
 	path := native_app_directory + factory.process_name
-	app := start_remote_app_at(path, factory, mut desktop) or {
+	app := start_remote_app_at_with_timeout(path, factory, mut desktop, timeout_ms) or {
 		unsafe { path.free() }
 		return err
 	}
@@ -756,6 +767,10 @@ fn start_remote_app(factory AppFactory, mut desktop Desktop) !NativeApp {
 // Kept separate from the installed-path wrapper so the protocol can be
 // exercised by a host integration binary that execs itself as the client.
 fn start_remote_app_at(path string, factory AppFactory, mut desktop Desktop) !NativeApp {
+	return start_remote_app_at_with_timeout(path, factory, mut desktop, app_response_timeout_ms)
+}
+
+fn start_remote_app_at_with_timeout(path string, factory AppFactory, mut desktop Desktop, timeout_ms int) !NativeApp {
 	process := desktop_spawn_app(path, factory.process_name, desktop.tz_offset_seconds) or {
 		return error('cannot execute ${path}')
 	}
@@ -770,7 +785,7 @@ fn start_remote_app_at(path string, factory AppFactory, mut desktop Desktop) !Na
 		pointer: factory.pointer
 		desktop: desktop
 	}
-	reply := receive_app_response(remote.response_fd) or {
+	reply := receive_app_response_with_timeout(remote.response_fd, timeout_ms) or {
 		remote.abort_transport()
 		return error('cannot start ${factory.title}: ${err}')
 	}

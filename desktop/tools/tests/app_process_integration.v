@@ -45,6 +45,10 @@ fn main() {
 	assert response_timed_out
 	desktop_close(int(silent_pipe[0]))
 	desktop_close(int(silent_pipe[1]))
+	// A cold persistent home can make Files' initial directory scan slower
+	// than a normal interaction. Boot-started apps get that larger budget;
+	// requests after startup still fail promptly through the timeout above.
+	assert app_startup_response_timeout_ms > app_response_timeout_ms
 
 	// Remote polling is paced before a pipe request is sent. In particular,
 	// the once-a-second Activity Monitor must not wake itself and the compositor

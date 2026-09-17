@@ -457,6 +457,12 @@ fn (mut d Desktop) window_contents(window_index int, body_height int) (u32, []ui
 // launch starts a native app process or queues an external application for the main
 // loop to run after releasing the physical display and input devices.
 fn (mut d Desktop) launch(factory AppFactory) {
+	d.launch_with_timeout(factory, app_response_timeout_ms)
+}
+
+// launch_with_timeout keeps normal interactive launches responsive while
+// allowing the boot path to tolerate cold persistent storage.
+fn (mut d Desktop) launch_with_timeout(factory AppFactory, timeout_ms int) {
 	if factory.exclusive_command != '' {
 		d.pending_external = factory.exclusive_command
 		d.pending_external_title = factory.title
@@ -468,7 +474,7 @@ fn (mut d Desktop) launch(factory AppFactory) {
 		eprintln('vinix-desktop: ${factory.title} has no launcher')
 		return
 	}
-	app := start_remote_app(factory, mut d) or {
+	app := start_remote_app_with_timeout(factory, mut d, timeout_ms) or {
 		eprintln('vinix-desktop: cannot start ${factory.title}: ${err}')
 		return
 	}
@@ -661,6 +667,19 @@ fn (mut d Desktop) launch_titled(title string) {
 	for factory in available_apps {
 		if factory.title == title {
 			d.launch(factory)
+			return
+		}
+	}
+	eprintln('vinix-desktop: no application called ${title}')
+}
+
+// launch_titled_at_startup is only for applications requested as the desktop
+// comes up. It prevents a cold Files directory scan from being mistaken for a
+// hung application and killed after the normal interactive timeout.
+fn (mut d Desktop) launch_titled_at_startup(title string) {
+	for factory in available_apps {
+		if factory.title == title {
+			d.launch_with_timeout(factory, app_startup_response_timeout_ms)
 			return
 		}
 	}

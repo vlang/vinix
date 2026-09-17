@@ -162,7 +162,7 @@ fn main() {
 		launch_default_files = true
 	} else {
 		for title in options.open {
-			desktop.launch_titled(title)
+			desktop.launch_titled_at_startup(title)
 		}
 	}
 
@@ -269,7 +269,7 @@ fn main() {
 
 		if launch_default_files {
 			launch_default_files = false
-			desktop.launch_titled('Files')
+			desktop.launch_titled_at_startup('Files')
 		}
 
 		sleep_to_next_frame(frame_started, options.frame_interval)
