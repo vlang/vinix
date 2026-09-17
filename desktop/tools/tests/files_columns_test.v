@@ -114,13 +114,82 @@ fn test_create_context_menu_uses_collision_safe_names() {
 	os.mkdir_all(root) or { panic(err) }
 	defer { os.rmdir_all(root) or {} }
 
-	create_unique_item(root, .folder)!
-	create_unique_item(root, .folder)!
-	create_unique_item(root, .file)!
-	create_unique_item(root, .file)!
+	folder1 := create_unique_item(root, .folder)!
+	folder2 := create_unique_item(root, .folder)!
+	file1 := create_unique_item(root, .file)!
+	file2 := create_unique_item(root, .file)!
 
 	assert os.is_dir(os.join_path(root, 'New Folder'))
 	assert os.is_dir(os.join_path(root, 'New Folder (2)'))
 	assert os.is_file(os.join_path(root, 'New File'))
 	assert os.is_file(os.join_path(root, 'New File (2)'))
+	unsafe {
+		folder1.free()
+		folder2.free()
+		file1.free()
+		file2.free()
+	}
+}
+
+fn test_files_create_enters_rename_mode_and_commits_name() {
+	root := os.join_path(os.temp_dir(), 'vinix-files-create-rename-test')
+	os.rmdir_all(root) or {}
+	os.mkdir_all(root) or { panic(err) }
+	defer { os.rmdir_all(root) or {} }
+
+	mut app := FilesContextApp{}
+	app.files.browser.read(root.clone())
+	app.create_item(.file)!
+	assert app.rename_path == os.join_path(root, 'New File')
+	assert rename_buffer_text(app.rename_text) == 'New File'
+	assert app.rename_select_all
+
+	// The first typed byte replaces the selected default name; Return commits.
+	app.rename_key_input('renamed.txt\r')!
+	assert app.rename_path == ''
+	assert os.is_file(os.join_path(root, 'renamed.txt'))
+	assert !os.exists(os.join_path(root, 'New File'))
+
+	app.clear_context_path()
+	app.files.browser.free_entries()
+	unsafe {
+		app.files.browser.path.free()
+		app.files.browser.error.free()
+		app.rename_text.free()
+	}
+}
+
+fn test_file_context_copy_cut_paste_and_delete_directory_tree() {
+	root := os.join_path(os.temp_dir(), 'vinix-file-context-ops-test')
+	source := os.join_path(root, 'source')
+	copy_parent := os.join_path(root, 'copy-parent')
+	cut_parent := os.join_path(root, 'cut-parent')
+	os.rmdir_all(root) or {}
+	os.mkdir_all(os.join_path(source, 'nested')) or { panic(err) }
+	os.mkdir_all(copy_parent) or { panic(err) }
+	os.mkdir_all(cut_parent) or { panic(err) }
+	os.write_file(os.join_path(source, 'nested', 'hello.txt'), 'hello') or { panic(err) }
+	defer {
+		file_context_clipboard_clear()
+		os.rmdir_all(root) or {}
+	}
+
+	assert file_context_clipboard_store(.copy, source)
+	copied := paste_file_clipboard(copy_parent)!
+	assert os.is_dir(copied)
+	assert os.read_file(os.join_path(copied, 'nested', 'hello.txt'))! == 'hello'
+	assert os.is_dir(source)
+
+	assert file_context_clipboard_store(.cut, copied)
+	moved := paste_file_clipboard(cut_parent)!
+	assert !os.exists(copied)
+	assert os.read_file(os.join_path(moved, 'nested', 'hello.txt'))! == 'hello'
+	assert !file_context_clipboard_available()
+
+	file_context_remove_path(moved)!
+	assert !os.exists(moved)
+	unsafe {
+		copied.free()
+		moved.free()
+	}
 }
