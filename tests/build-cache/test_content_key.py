@@ -10,9 +10,13 @@ ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "build-support" / "content-key.py"
 
 
-def content_key(*paths: Path) -> str:
+def content_key(*paths: Path, metadata: bool = False) -> str:
+    command = ["python3", str(SCRIPT)]
+    if metadata:
+        command.append("--metadata")
+    command.extend(str(path) for path in paths)
     result = subprocess.run(
-        ["python3", str(SCRIPT), *(str(path) for path in paths)],
+        command,
         check=True,
         text=True,
         stdout=subprocess.PIPE,
@@ -40,6 +44,18 @@ class ContentKeyTests(unittest.TestCase):
             file.chmod(0o755)
             self.assertNotEqual(second, content_key(root))
 
+    def test_metadata_mode_tracks_in_place_tree_changes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "tree"
+            nested = root / "usr" / "lib"
+            nested.mkdir(parents=True)
+            file = nested / "libexample.so"
+            file.write_text("same-sized-a\n", encoding="utf-8")
+
+            first = content_key(root, metadata=True)
+            os.utime(file, (1_000_000_000, 1_000_000_000))
+            self.assertNotEqual(first, content_key(root, metadata=True))
+
     def test_tracks_symlink_targets_and_missing_paths(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "tree"
@@ -55,7 +71,7 @@ class ContentKeyTests(unittest.TestCase):
             link.symlink_to("two")
             self.assertNotEqual(first, content_key(root, missing))
 
-    def test_root_location_is_not_part_of_the_key(self) -> None:
+    def test_root_location_is_not_part_of_the_content_key(self) -> None:
         with tempfile.TemporaryDirectory() as left_tmp, tempfile.TemporaryDirectory() as right_tmp:
             left = Path(left_tmp) / "tree"
             right = Path(right_tmp) / "tree"
