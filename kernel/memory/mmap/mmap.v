@@ -81,14 +81,15 @@ fn is_uncached_resource(iface_ptr voidptr) bool {
 
 pub struct MmapRangeLocal {
 pub mut:
-	pagemap &memory.Pagemap = unsafe { nil }
-	global  &MmapRangeGlobal = unsafe { nil }
-	base    u64
-	length  u64
-	offset  i64
-	prot    int
-	flags   int
-	cow     bool
+	pagemap   &memory.Pagemap = unsafe { nil }
+	global    &MmapRangeGlobal = unsafe { nil }
+	base      u64
+	length    u64
+	offset    i64
+	prot      int
+	flags     int
+	cow       bool
+	immutable bool
 }
 
 pub struct MmapRangeGlobal {
@@ -269,14 +270,13 @@ fn find_free_base_unlocked(pagemap &memory.Pagemap, start u64, length u64) ?u64 
 pub fn delete_pagemap(mut pagemap memory.Pagemap) ? {
 	pagemap.l.acquire()
 
-	// munmap_unlocked() removes entries from pagemap.mmap_ranges. Always consume
-	// the current first entry instead of iterating a shallow copy of the array:
-	// deleting while iterating that copy skipped ranges, retained stale pointers,
-	// and then freed the same backing allocation twice.
+	// Address-space destruction is a kernel-internal operation and must be able
+	// to reclaim immutable ranges after the process can no longer observe them.
 	for pagemap.mmap_ranges.len != 0 {
 		local_range := unsafe { &MmapRangeLocal(pagemap.mmap_ranges[0]) }
 		old_len := pagemap.mmap_ranges.len
-		munmap_unlocked(mut pagemap, voidptr(local_range.base), local_range.length) or {
+		munmap_unlocked_impl(mut pagemap, voidptr(local_range.base), local_range.length,
+			false) or {
 			pagemap.l.release()
 			return none
 		}
@@ -933,6 +933,9 @@ pub fn syscall_msync(_ voidptr, addr u64, _length u64, flags int) (u64, u64) {
 	mut pagemap := proc.current_thread().process.pagemap
 	pagemap.l.acquire()
 	defer { pagemap.l.release() }
+	if immutable_overlap_unlocked(pagemap, addr, length) {
+		return errno.err, errno.eperm
+	}
 	mut current := addr
 	end := addr + length
 	for current < end {
@@ -957,6 +960,26 @@ pub fn syscall_msync(_ voidptr, addr u64, _length u64, flags int) (u64, u64) {
 
 pub fn mprotect(mut pagemap memory.Pagemap, addr voidptr, len u64, prot int) ? {
 	validate_protection(prot)?
+	if len == 0 {
+		errno.set(errno.einval)
+		return none
+	}
+	length := lib.align_up(len, page_size)
+	if length < len || u64(addr) > u64(-1) - length {
+		errno.set(errno.einval)
+		return none
+	}
+
+	// Preflight before populating sparse pages. Otherwise a denied protection
+	// change could still allocate physical memory inside an immutable range.
+	pagemap.l.acquire()
+	if immutable_overlap_unlocked(pagemap, u64(addr), length) {
+		pagemap.l.release()
+		errno.set(errno.eperm)
+		return none
+	}
+	pagemap.l.release()
+
 	// mmap() deliberately leaves PROT_NONE reservations without physical pages.
 	// ARM64 HVF cannot reliably resume every paired load/store page fault, so
 	// populate pages here, before an application can touch a newly accessible
@@ -1012,6 +1035,14 @@ pub fn mprotect_unlocked(mut pagemap memory.Pagemap, addr voidptr, _length u64, 
 	}
 
 	length := lib.align_up(_length, page_size)
+	if length < _length || u64(addr) > u64(-1) - length {
+		errno.set(errno.einval)
+		return none
+	}
+	if immutable_overlap_unlocked(pagemap, u64(addr), length) {
+		errno.set(errno.eperm)
+		return none
+	}
 
 	mut i := u64(addr)
 	for i < u64(addr) + length {
@@ -1047,6 +1078,7 @@ pub fn mprotect_unlocked(mut pagemap memory.Pagemap, addr voidptr, _length u64, 
 				prot: local_range.prot
 				flags: local_range.flags
 				cow: local_range.cow
+				immutable: local_range.immutable
 				global: local_range.global
 			}
 			global_range.locals << postsplit_range
@@ -1083,6 +1115,7 @@ pub fn mprotect_unlocked(mut pagemap memory.Pagemap, addr voidptr, _length u64, 
 				prot: prot
 				flags: local_range.flags
 				cow: local_range.cow
+				immutable: local_range.immutable
 				global: local_range.global
 			}
 			global_range.locals << new_range
@@ -1101,6 +1134,11 @@ pub fn munmap(mut pagemap memory.Pagemap, addr voidptr, len u64) ? {
 }
 
 pub fn munmap_unlocked(mut pagemap memory.Pagemap, addr voidptr, _length u64) ? {
+	munmap_unlocked_impl(mut pagemap, addr, _length, true)?
+}
+
+fn munmap_unlocked_impl(mut pagemap memory.Pagemap, addr voidptr, _length u64,
+	enforce_immutable bool) ? {
 	if _length == 0 {
 		C.printf(c'munmap: length is 0\n')
 		errno.set(errno.einval)
@@ -1108,6 +1146,14 @@ pub fn munmap_unlocked(mut pagemap memory.Pagemap, addr voidptr, _length u64) ? 
 	}
 
 	length := lib.align_up(_length, page_size)
+	if length < _length || u64(addr) > u64(-1) - length {
+		errno.set(errno.einval)
+		return none
+	}
+	if enforce_immutable && immutable_overlap_unlocked(pagemap, u64(addr), length) {
+		errno.set(errno.eperm)
+		return none
+	}
 
 	mut i := u64(addr)
 	for i < u64(addr) + length {
@@ -1138,6 +1184,7 @@ pub fn munmap_unlocked(mut pagemap memory.Pagemap, addr voidptr, _length u64) ? 
 				prot: local_range.prot
 				flags: local_range.flags
 				cow: local_range.cow
+				immutable: local_range.immutable
 				global: local_range.global
 			}
 			global_range.locals << postsplit_range

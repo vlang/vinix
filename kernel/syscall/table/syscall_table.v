@@ -74,7 +74,7 @@ pub fn init_syscall_table() {
 	syscall_table[46] = voidptr(socket.syscall_socketpair)
 	syscall_table[47] = voidptr(syscall_vacant)
 	syscall_table[48] = voidptr(mmap.syscall_mprotect)
-	syscall_table[49] = voidptr(syscall_vacant)
+	syscall_table[49] = voidptr(mmap.syscall_mimmutable)
 	syscall_table[50] = voidptr(sys.syscall_clock_get)
 	syscall_table[51] = voidptr(net.syscall_gethostname)
 	syscall_table[52] = voidptr(net.syscall_sethostname)

@@ -9,6 +9,7 @@ import pipe
 import proc
 import errno
 import aarch64.cpu
+import memory.mmap
 
 // kernel/memory/mmap uses this bit only for the reserved brk arena. It is not a
 // Linux mmap flag implemented by Vinix and must never reach VM accounting from
@@ -17,7 +18,7 @@ const vinix_private_map_brk_reservation = u64(0x20000000)
 
 // Install after the architecture's generic syscall table, so compatibility
 // stubs cannot silently override durability, shutdown, hardened descriptor
-// copy-out, or security operations.
+// copy-out, or security/Vinix extension operations.
 pub fn init_storage_syscalls() {
 	syscall_table[59] = voidptr(pipe.syscall_pipe_checked)
 	syscall_table[81] = voidptr(storage_sync)
@@ -26,6 +27,10 @@ pub fn init_storage_syscalls() {
 	syscall_table[267] = voidptr(storage_syncfs)
 	syscall_table[142] = voidptr(storage_reboot)
 	syscall_table[222] = voidptr(security_linux_mmap)
+	// asm-generic intentionally leaves 245-259 unused. Vinix already uses
+	// 245/246 for native arm64 extensions; keep mimmutable in that reserved
+	// block rather than stealing a Linux ABI syscall number.
+	syscall_table[247] = voidptr(mmap.syscall_mimmutable)
 }
 
 fn security_linux_mmap(gpr_state voidptr, addr voidptr, length u64, prot u64,
