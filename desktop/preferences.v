@@ -50,7 +50,9 @@ fn desktop_encode_preferences(p DesktopPreferences) ?string {
 	side := if p.settings.button_side == .left { 'left' } else { 'right' }
 	taskbar := if p.settings.taskbar_mode == .combined { 'combined' } else { 'standard' }
 	theme := if p.settings.theme == .macos { 'macos' } else { 'default' }
-	return 'version=1\nscale=${scale}\nbutton_side=${side}\ntaskbar_mode=${taskbar}\ntheme=${theme}\nwallpaper_color=${p.settings.wallpaper_color}\nwallpaper_image=${p.settings.wallpaper_image}\n'
+	clock_24_hour := if p.settings.clock_24_hour { 'true' } else { 'false' }
+	clock_show_seconds := if p.settings.clock_show_seconds { 'true' } else { 'false' }
+	return 'version=1\nscale=${scale}\nbutton_side=${side}\ntaskbar_mode=${taskbar}\ntheme=${theme}\nclock_24_hour=${clock_24_hour}\nclock_show_seconds=${clock_show_seconds}\nwallpaper_color=${p.settings.wallpaper_color}\nwallpaper_image=${p.settings.wallpaper_image}\n'
 }
 
 // Unlike string.int(), this cannot accept a numeric prefix or wrap on overflow.
@@ -108,10 +110,14 @@ fn desktop_parse_preferences(record string) ?DesktopPreferences {
 			'version' { u32(1) }
 			'scale' { u32(2) }
 			'button_side' { u32(4) }
-			'taskbar_mode' { u32(8) }
-			'theme' { u32(16) }
+		
+'taskbar_mode' { u32(8) }
+		
+'theme' { u32(16) }
 			'wallpaper_color' { u32(32) }
 			'wallpaper_image' { u32(64) }
+			'clock_24_hour' { u32(128) }
+			'clock_show_seconds' { u32(256) }
 			else { u32(0) }
 		}
 		if seen & bit != 0 {
@@ -144,10 +150,25 @@ fn desktop_parse_preferences(record string) ?DesktopPreferences {
 					else { return none }
 				}
 			}
-			'theme' {
+		
+'theme' {
 				p.settings.theme = match value {
 					'default' { ThemeKind.default_ }
 					'macos' { ThemeKind.macos }
+					else { return none }
+				}
+			}
+			'clock_24_hour' {
+				p.settings.clock_24_hour = match value {
+					'true' { true }
+					'false' { false }
+					else { return none }
+				}
+			}
+			'clock_show_seconds' {
+				p.settings.clock_show_seconds = match value {
+					'true' { true }
+					'false' { false }
 					else { return none }
 				}
 			}

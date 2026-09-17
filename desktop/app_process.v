@@ -16,9 +16,9 @@ import math.bits
 import ui2
 
 const app_protocol_magic = u32(0x56415050) // VAPP
-const app_protocol_version = u8(3)
-const app_request_header_size = 108
-const app_response_header_size = 100
+const app_protocol_version = u8(4)
+const app_request_header_size = 116
+const app_response_header_size = 108
 const app_protocol_max_payload = 16 * 1024 * 1024
 const app_protocol_max_string = 64 * 1024
 const app_protocol_max_elements = 16 * 1024
@@ -180,6 +180,8 @@ fn wire_put_state(mut out []u8, state AppWireState) {
 	wire_put_i32(mut out, int(state.settings.button_side))
 	wire_put_i32(mut out, int(state.settings.taskbar_mode))
 	wire_put_i32(mut out, int(state.settings.theme))
+	wire_put_i32(mut out, if state.settings.clock_24_hour { 1 } else { 0 })
+	wire_put_i32(mut out, if state.settings.clock_show_seconds { 1 } else { 0 })
 	wire_put_i32(mut out, state.settings.wallpaper_color)
 	wire_put_i32(mut out, state.settings.wallpaper_image)
 	wire_put_i32(mut out, state.requested_scale)
@@ -202,6 +204,8 @@ fn wire_take_state(mut reader WireReader) !AppWireState {
 	button_side := reader.take_i32()!
 	taskbar_mode := reader.take_i32()!
 	theme := reader.take_i32()!
+	clock_24_hour := reader.take_i32()!
+	clock_show_seconds := reader.take_i32()!
 	wallpaper_color := reader.take_i32()!
 	wallpaper_image := reader.take_i32()!
 	requested_scale := reader.take_i32()!
@@ -221,6 +225,8 @@ fn wire_take_state(mut reader WireReader) !AppWireState {
 	if button_side < int(ButtonSide.right) || button_side > int(ButtonSide.left)
 		|| taskbar_mode < int(TaskbarMode.standard) || taskbar_mode > int(TaskbarMode.combined)
 		|| theme < int(ThemeKind.default_) || theme > int(ThemeKind.macos)
+		|| clock_24_hour < 0 || clock_24_hour > 1
+		|| clock_show_seconds < 0 || clock_show_seconds > 1
 		|| !desktop_scale_valid(requested_scale)
 		|| capture_command < int(CaptureCommand.none_)
 		|| capture_command > int(CaptureCommand.stop) || capture_delay < 0
@@ -236,6 +242,8 @@ fn wire_take_state(mut reader WireReader) !AppWireState {
 			button_side: unsafe { ButtonSide(button_side) }
 			taskbar_mode: unsafe { TaskbarMode(taskbar_mode) }
 			theme: unsafe { ThemeKind(theme) }
+			clock_24_hour: clock_24_hour == 1
+			clock_show_seconds: clock_show_seconds == 1
 			wallpaper_color: wallpaper_color
 			wallpaper_image: wallpaper_image
 		}
@@ -436,10 +444,16 @@ fn app_current_state(desktop &Desktop) AppWireState {
 fn apply_app_state(mut desktop Desktop, state AppWireState) {
 	wallpaper_changed := desktop.settings.wallpaper_color != state.settings.wallpaper_color
 		|| desktop.settings.wallpaper_image != state.settings.wallpaper_image
+	clock_changed := desktop.settings.clock_24_hour != state.settings.clock_24_hour
+		|| desktop.settings.clock_show_seconds != state.settings.clock_show_seconds
 	desktop.settings = state.settings
 	desktop.accept_capture_request(state.capture_request)
 	if wallpaper_changed {
 		desktop.invalidate_wallpaper()
+	}
+	if clock_changed {
+		desktop.taskbar_clock_sampled = false
+		desktop.dirty = true
 	}
 	if desktop_requested_scale() != state.requested_scale {
 		desktop_request_scale(state.requested_scale)
