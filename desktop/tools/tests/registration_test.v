@@ -33,14 +33,18 @@ fn registration_test_home(name string) string {
 	return home
 }
 
-fn test_registration_form_is_the_only_first_launch_surface() {
-	mut desktop := Desktop{
+fn registration_test_desktop() Desktop {
+	return Desktop{
 		canvas: Canvas{
 			width:  1024
 			height: 720
 			scale:  1
 		}
 	}
+}
+
+fn test_registration_form_is_the_only_first_launch_surface() {
+	desktop := registration_test_desktop()
 	mut state := new_registration_state()
 	defer { state.close() }
 	begin_frame_elements()
@@ -57,6 +61,37 @@ fn test_registration_form_is_the_only_first_launch_surface() {
 	assert !registration_test_has_action_prefix(root, 'task.')
 	assert !registration_test_has_action_prefix(root, 'shortcut.')
 	assert !registration_test_has_action_prefix(root, 'win.')
+}
+
+fn test_registration_active_field_has_a_visible_caret() {
+	desktop := registration_test_desktop()
+	mut state := new_registration_state()
+	defer { state.close() }
+
+	begin_frame_elements()
+	root := state.element(&desktop)
+	name_field := registration_test_element_named(root, action_registration_name) or {
+		panic('missing name field')
+	}
+	password_field := registration_test_element_named(root, action_registration_password) or {
+		panic('missing password field')
+	}
+	assert registration_test_element_named(name_field, 'registration.caret') != none
+	assert registration_test_element_named(password_field, 'registration.caret') == none
+	free_tree(root)
+
+	state.advance()
+	begin_frame_elements()
+	password_root := state.element(&desktop)
+	password_active := registration_test_element_named(password_root, action_registration_password) or {
+		panic('missing password field')
+	}
+	name_inactive := registration_test_element_named(password_root, action_registration_name) or {
+		panic('missing name field')
+	}
+	assert registration_test_element_named(password_active, 'registration.caret') != none
+	assert registration_test_element_named(name_inactive, 'registration.caret') == none
+	free_tree(password_root)
 }
 
 fn test_registration_keyboard_cannot_dismiss_setup() {
@@ -85,7 +120,7 @@ fn test_registration_rejects_password_mismatch() {
 	assert !os.exists(desktop_user_record_path(home))
 }
 
-fn test_registration_persists_only_a_password_verifier() {
+fn test_registration_persists_verifier_and_user_home() {
 	home := registration_test_home('persist')
 	defer { os.rmdir_all(home) or {} }
 	mut state := new_registration_state()
@@ -108,4 +143,19 @@ fn test_registration_persists_only_a_password_verifier() {
 	assert record.contains('hash=')
 	info := os.stat(path)!
 	assert info.mode & 0o777 == 0o600
+
+	user_home := desktop_user_home_path(home, 'Alice Example')
+	defer { unsafe { user_home.free() } }
+	assert user_home.ends_with('/alice-example')
+	assert os.is_dir(user_home)
+	home_info := os.stat(user_home)!
+	assert home_info.mode & 0o777 == registration_user_home_mode
+
+	// Profiles written by the first registration implementation did not have a
+	// home directory. A later launch repairs that profile rather than asking the
+	// user to register again.
+	os.rmdir(user_home)!
+	assert !os.exists(user_home)
+	assert desktop_user_registered(home)
+	assert os.is_dir(user_home)
 }
