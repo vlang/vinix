@@ -13,7 +13,7 @@ for name in device_io.v platform.c.v backlight_client.v battery_client.v wifi_cl
 done
 cp "$root/desktop/libc_compat.h" "$work/clients/"
 cp "$root/desktop/tools/tests/device_io_mock.v" "$work/clients/"
-for name in backlight_client battery_client wifi_client platform preferences; do
+for name in backlight_client battery_client wifi_client platform preferences clock_preferences; do
     cp "$root/desktop/tools/tests/${name}_test.v" "$work/clients/"
     # Invoke the test file directly so older vtest runners cannot lose the
     # shell quoting around a module path containing '|'. V runs its tests.
@@ -38,13 +38,14 @@ python3 "$root/desktop/tools/stage_app.py" "$work/ui" "$root/desktop" \
 rm -f "$work/ui/main.v"
 cp "$root/desktop/tools/tests/settings_test.v" "$work/ui/"
 cp "$root/desktop/tools/tests/settings_persistence_test.v" "$work/ui/"
+cp "$root/desktop/tools/tests/clock_settings_test.v" "$work/ui/"
 cp "$root/desktop/tools/tests/switcher_test.v" "$work/ui/"
 cp "$root/desktop/tools/tests/memory_test.v" "$work/ui/"
 cp "$root/desktop/tools/tests/heap_tracker.h" "$work/ui/"
 # Both sets share fixture_app and element_named in one translation unit.
 sed '1,/^import ui2$/d' "$root/desktop/tools/tests/battery_test.v" >> "$work/ui/settings_test.v"
 printf "Module { name: 'settings_tests' }\n" > "$work/ui/v.mod"
-for name in settings switcher settings_persistence; do
+for name in settings switcher settings_persistence clock_settings; do
     "$v" -new-compiler -nocache -gc none -manualfree -enable-globals -stats -d ui2_headless \
         -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/${name}_test.v"
 done

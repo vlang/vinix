@@ -91,3 +91,49 @@ fn test_titlebar_double_click_limits_time_and_pointer_slop() {
 	assert !titlebar_click_matches(previous, 8, 100, 50, 1_100)
 	assert !titlebar_click_matches(previous, 7, 100, 50, 900)
 }
+
+fn test_titlebar_drag_can_move_partly_offscreen() {
+	mut desktop := Desktop{
+		canvas: Canvas{
+			width: 800
+			height: 600
+		}
+	}
+	id := desktop.spawn('Welcome', .welcome, 120, 80, 400, 260)
+	set_titlebar_test_target(mut desktop, id)
+	title_y := 80 + desktop.theme().title_height / 2
+
+	// Taking the pointer to the left edge carries the frame beyond it instead
+	// of pinning x at zero. Enough title bar remains visible to recover it.
+	desktop.on_pointer_down(300, title_y)
+	desktop.buttons = button_left
+	desktop.on_pointer_move(0, title_y)
+	left_index := desktop.window_index(id) or { panic('missing dragged window') }
+	assert desktop.windows[left_index].x < 0
+	assert desktop.windows[left_index].x + desktop.windows[left_index].width >= 60
+	desktop.buttons = 0
+	desktop.on_pointer_up(0, title_y)
+
+	// The right edge behaves the same way.
+	set_titlebar_test_target(mut desktop, id)
+	desktop.on_pointer_down(100, title_y)
+	desktop.buttons = button_left
+	desktop.on_pointer_move(799, title_y)
+	right_index := desktop.window_index(id) or { panic('missing dragged window') }
+	assert desktop.windows[right_index].x + desktop.windows[right_index].width > 800
+	assert desktop.windows[right_index].x <= 800 - 60
+	desktop.buttons = 0
+	desktop.on_pointer_up(799, title_y)
+
+	// Downward movement can hide the body too. The title bar remains above the
+	// taskbar, so the window can still be dragged back onto the desktop.
+	set_titlebar_test_target(mut desktop, id)
+	current := desktop.window_index(id) or { panic('missing dragged window') }
+	grab_x := desktop.windows[current].x + 30
+	desktop.on_pointer_down(grab_x, title_y)
+	desktop.buttons = button_left
+	desktop.on_pointer_move(grab_x, 599)
+	down_index := desktop.window_index(id) or { panic('missing dragged window') }
+	assert desktop.windows[down_index].y == 600 - taskbar_height - desktop.theme().title_height
+	assert desktop.windows[down_index].y + desktop.windows[down_index].height > 600
+}

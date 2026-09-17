@@ -4,21 +4,10 @@
 // created, so there is no taskbar, shortcut, or closable window to get around.
 module main
 
-import crypto.scrypt
-import encoding.hex
-import io.util
-import os
 import ui2
 
-const desktop_user_record_name = '.vinix-user'
-const desktop_user_record_max_bytes = 1024
 const registration_max_name = 48
 const registration_max_password = 128
-const registration_salt_bytes = 16
-const registration_hash_bytes = u64(32)
-const registration_scrypt_n = u64(16_384)
-const registration_scrypt_r = u32(8)
-const registration_scrypt_p = u32(1)
 
 const action_registration_name = 'registration.name'
 const action_registration_password = 'registration.password'
@@ -40,6 +29,7 @@ struct RegistrationState {
 mut:
 	field         RegistrationField
 	name          []u8
+	name_display  []u8
 	password      []u8
 	password_mask []u8
 	confirm       []u8
@@ -51,13 +41,19 @@ mut:
 fn new_registration_state() RegistrationState {
 	mut state := RegistrationState{
 		name:          []u8{cap: registration_max_name}
+		name_display:  []u8{cap: registration_max_name + 1}
 		password:      []u8{cap: registration_max_password}
-		password_mask: []u8{cap: registration_max_password}
+		password_mask: []u8{cap: registration_max_password + 1}
 		confirm:       []u8{cap: registration_max_password}
-		confirm_mask:  []u8{cap: registration_max_password}
+		confirm_mask:  []u8{cap: registration_max_password + 1}
 	}
+	// The caret lives in the ui2 text field's displayed text. It is not a
+	// separate view painted over the field, so text and caret share the
+	// textbox's own clipping, padding and rendering.
+	state.name_display << `|`
 	unsafe {
 		state.name.flags |= .noslices
+		state.name_display.flags |= .noslices
 		state.password.flags |= .noslices
 		state.password_mask.flags |= .noslices
 		state.confirm.flags |= .noslices
@@ -73,40 +69,14 @@ fn registration_text(value []u8) string {
 	return unsafe { tos(value.data, value.len) }
 }
 
-fn registration_zero_and_free(mut value []u8) {
-	for i in 0 .. value.len {
-		value[i] = 0
-	}
-	if value.cap > 0 {
-		unsafe { value.free() }
-	}
-	value = []u8{}
-}
-
 fn (mut r RegistrationState) close() {
 	registration_zero_and_free(mut r.name)
+	registration_zero_and_free(mut r.name_display)
 	registration_zero_and_free(mut r.password)
 	registration_zero_and_free(mut r.password_mask)
 	registration_zero_and_free(mut r.confirm)
 	registration_zero_and_free(mut r.confirm_mask)
 	r.error = ''
-}
-
-fn registration_valid_name(name string) bool {
-	if name.len == 0 || name.len > registration_max_name {
-		return false
-	}
-	mut visible := false
-	for i in 0 .. name.len {
-		ch := name[i]
-		if ch < 0x20 || ch >= 0x7f {
-			return false
-		}
-		if ch != ` ` {
-			visible = true
-		}
-	}
-	return visible
 }
 
 fn registration_bytes_equal(left []u8, right []u8) bool {
@@ -121,152 +91,56 @@ fn registration_bytes_equal(left []u8, right []u8) bool {
 	return true
 }
 
-fn desktop_user_record_path(home string) string {
-	return '${home}/${desktop_user_record_name}'
-}
-
-// A valid profile is the registration marker. Keep enough information for a
-// later login screen to verify the password without ever storing it directly.
-fn desktop_load_user_name(home string) ?string {
-	if home == '' {
-		return none
-	}
-	path := desktop_user_record_path(home)
-	info := os.lstat(path) or { return none }
-	if info.get_filetype() != .regular || info.size == 0
-		|| info.size > u64(desktop_user_record_max_bytes) || info.mode & 0o077 != 0 {
-		return none
-	}
-	record := os.read_file(path) or { return none }
-	if record.len == 0 || record.len > desktop_user_record_max_bytes {
-		unsafe { record.free() }
-		return none
-	}
-	clean := record.trim_space()
-	unsafe { record.free() }
-	lines := clean.split_into_lines()
-	defer {
-		unsafe {
-			lines.free()
-			clean.free()
+fn (mut r RegistrationState) remove_caret() {
+	match r.field {
+		.name {
+			if r.name_display.len > 0 {
+				r.name_display.delete_last()
+			}
+		}
+		.password {
+			if r.password_mask.len > 0 {
+				r.password_mask.delete_last()
+			}
+		}
+		.confirm {
+			if r.confirm_mask.len > 0 {
+				r.confirm_mask.delete_last()
+			}
 		}
 	}
-	if lines.len != 8 || lines[0] != 'version=1' || !lines[1].starts_with('name=')
-		|| lines[2] != 'kdf=scrypt' || lines[3] != 'n=16384' || lines[4] != 'r=8'
-		|| lines[5] != 'p=1' || !lines[6].starts_with('salt=')
-		|| !lines[7].starts_with('hash=') {
-		return none
-	}
-	name_bytes := hex.decode(lines[1][5..]) or { return none }
-	defer { unsafe { name_bytes.free() } }
-	name := name_bytes.bytestr()
-	if !registration_valid_name(name) {
-		unsafe { name.free() }
-		return none
-	}
-	salt := hex.decode(lines[6][5..]) or {
-		unsafe { name.free() }
-		return none
-	}
-	defer { unsafe { salt.free() } }
-	digest := hex.decode(lines[7][5..]) or {
-		unsafe { name.free() }
-		return none
-	}
-	defer { unsafe { digest.free() } }
-	if salt.len != registration_salt_bytes || digest.len != int(registration_hash_bytes) {
-		unsafe { name.free() }
-		return none
-	}
-	return name
 }
 
-fn desktop_user_registered(home string) bool {
-	name := desktop_load_user_name(home) or { return false }
-	unsafe { name.free() }
-	return true
+fn (mut r RegistrationState) add_caret() {
+	match r.field {
+		.name { r.name_display << `|` }
+		.password { r.password_mask << `|` }
+		.confirm { r.confirm_mask << `|` }
+	}
 }
 
-fn registration_random_bytes(count int) ?[]u8 {
-	mut file := os.open('/dev/urandom') or { return none }
-	defer { file.close() }
-	mut bytes := []u8{len: count}
-	mut offset := 0
-	for offset < bytes.len {
-		read := file.read(mut bytes[offset..]) or {
-			registration_zero_and_free(mut bytes)
-			return none
-		}
-		if read <= 0 {
-			registration_zero_and_free(mut bytes)
-			return none
-		}
-		offset += read
-	}
-	return bytes
-}
-
-fn desktop_save_user(home string, name string, password []u8) bool {
-	if home == '' || !os.is_dir(home) || !registration_valid_name(name) || password.len == 0 {
-		return false
-	}
-	mut salt := registration_random_bytes(registration_salt_bytes) or { return false }
-	mut digest := scrypt.scrypt(password, salt, registration_scrypt_n, registration_scrypt_r,
-		registration_scrypt_p, registration_hash_bytes) or {
-		registration_zero_and_free(mut salt)
-		return false
-	}
-	name_bytes := name.bytes()
-	name_hex := hex.encode(name_bytes)
-	unsafe { name_bytes.free() }
-	salt_hex := hex.encode(salt)
-	hash_hex := hex.encode(digest)
-	registration_zero_and_free(mut salt)
-	registration_zero_and_free(mut digest)
-
-	record := 'version=1\nname=${name_hex}\nkdf=scrypt\nn=16384\nr=8\np=1\nsalt=${salt_hex}\nhash=${hash_hex}\n'
-	path := desktop_user_record_path(home)
-	mut file, temporary := util.temp_file(path: home, pattern: '${desktop_user_record_name}.*') or {
-		return false
-	}
-	mut published := false
-	defer {
-		file.close()
-		if !published {
-			os.rm(temporary) or {}
-		}
-		unsafe { temporary.free() }
-	}
-	os.chmod(temporary, 0o600) or { return false }
-	file.set_unbuffered()
-	file.write_string(record) or { return false }
-	if !desktop_preferences_fsync(file.fd) {
-		return false
-	}
-	os.rename_dir(temporary, path) or { return false }
-	published = true
-	if !desktop_preferences_sync_directory(home, file.fd) {
-		os.rm(path) or {}
-		return false
-	}
-	return true
+fn (mut r RegistrationState) focus(field RegistrationField) {
+	r.remove_caret()
+	r.field = field
+	r.add_caret()
+	r.error = ''
 }
 
 fn (mut r RegistrationState) submit(home string) {
 	name := registration_text(r.name).trim_space()
 	defer { unsafe { name.free() } }
 	if !registration_valid_name(name) {
-		r.field = .name
+		r.focus(.name)
 		r.error = 'Enter a name.'
 		return
 	}
 	if r.password.len == 0 {
-		r.field = .password
+		r.focus(.password)
 		r.error = 'Enter a password.'
 		return
 	}
 	if !registration_bytes_equal(r.password, r.confirm) {
-		r.field = .confirm
+		r.focus(.confirm)
 		r.error = 'Passwords do not match.'
 		return
 	}
@@ -281,16 +155,13 @@ fn (mut r RegistrationState) submit(home string) {
 fn (mut r RegistrationState) handle_action(action string, home string) {
 	match action {
 		action_registration_name {
-			r.field = .name
-			r.error = ''
+			r.focus(.name)
 		}
 		action_registration_password {
-			r.field = .password
-			r.error = ''
+			r.focus(.password)
 		}
 		action_registration_confirm {
-			r.field = .confirm
-			r.error = ''
+			r.focus(.confirm)
 		}
 		action_registration_create {
 			r.submit(home)
@@ -300,10 +171,12 @@ fn (mut r RegistrationState) handle_action(action string, home string) {
 }
 
 fn (mut r RegistrationState) backspace() {
+	r.remove_caret()
 	match r.field {
 		.name {
 			if r.name.len > 0 {
 				r.name.delete_last()
+				r.name_display.delete_last()
 			}
 		}
 		.password {
@@ -319,14 +192,17 @@ fn (mut r RegistrationState) backspace() {
 			}
 		}
 	}
+	r.add_caret()
 	r.error = ''
 }
 
 fn (mut r RegistrationState) append(ch u8) {
+	r.remove_caret()
 	match r.field {
 		.name {
 			if r.name.len < registration_max_name {
 				r.name << ch
+				r.name_display << ch
 			}
 		}
 		.password {
@@ -342,16 +218,17 @@ fn (mut r RegistrationState) append(ch u8) {
 			}
 		}
 	}
+	r.add_caret()
 	r.error = ''
 }
 
 fn (mut r RegistrationState) advance() {
-	r.field = match r.field {
-		.name { .password }
-		.password { .confirm }
-		.confirm { .name }
+	next := match r.field {
+		.name { RegistrationField.password }
+		.password { RegistrationField.confirm }
+		.confirm { RegistrationField.name }
 	}
-	r.error = ''
+	r.focus(next)
 }
 
 // Setup owns every byte from the keyboard. Escape and control chords are
@@ -390,28 +267,36 @@ fn (mut r RegistrationState) key_input(keys string, home string) {
 	}
 }
 
-fn registration_field_element(action string, value []u8, placeholder string, active bool,
+// registration_field_element is a real ui2 text field. `clickable` only lets
+// the framebuffer compositor collect it as a hit target; the field itself owns
+// all pixels, including the active caret carried in `display`.
+fn registration_field_element(action string, display []u8, placeholder string, active bool,
 	hovered bool, x int, y int, width int) ui2.Element {
 	mut text := placeholder
 	mut color := body_muted
-	if value.len > 0 {
-		text = registration_text(value)
+	if display.len > 0 {
+		text = registration_text(display)
 		color = body_text
 	}
 	border := if active { 2 } else { 1 }
-	return ui2.button(action, text, ui2.rect(f64(x), f64(y), f64(width), 38), ui2.BoxStyle{
-		bg:            registration_field_bg
-		radius:        6
-		border_color:  if active || hovered { app_accent } else { body_rule }
-		border_left:   border
-		border_top:    border
-		border_right:  border
-		border_bottom: border
-	}, ui2.TextStyle{
-		color: color
-		size:  13
-		align: .left
-	})
+	field := ui2.text_field(action, placeholder, text, ui2.rect(f64(x), f64(y), f64(width), 38),
+		ui2.BoxStyle{
+			bg:            registration_field_bg
+			radius:        6
+			border_color:  if active || hovered { app_accent } else { body_rule }
+			border_left:   border
+			border_top:    border
+			border_right:  border
+			border_bottom: border
+		}, ui2.TextStyle{
+			color: color
+			size:  13
+			align: .left
+		}, ui2.keyboard_default)
+	return ui2.Element{
+		...field
+		clickable: true
+	}
 }
 
 fn (r &RegistrationState) element(d &Desktop) ui2.Element {
@@ -452,8 +337,9 @@ fn (r &RegistrationState) element(d &Desktop) ui2.Element {
 		size:  11
 		bold:  true
 	})
-	card_children << registration_field_element(action_registration_name, r.name, 'Enter your name',
-		r.field == .name, d.hover == action_registration_name, field_x, 124, field_width)
+	card_children << registration_field_element(action_registration_name, r.name_display,
+		'Enter your name', r.field == .name, d.hover == action_registration_name, field_x, 124,
+		field_width)
 
 	card_children << ui2.label('', 'Password', ui2.rect(32, 176, f64(field_width), 18), ui2.TextStyle{
 		color: body_text

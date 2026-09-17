@@ -20,6 +20,8 @@ fn preference_test_custom() DesktopPreferences {
 			button_side: .left
 			taskbar_mode: .combined
 			theme: .macos
+			clock_24_hour: false
+			clock_show_seconds: false
 			wallpaper_color: 4
 			wallpaper_image: 2
 		}
@@ -56,7 +58,7 @@ fn test_preferences_round_trip_every_field_and_both_scale_overrides() {
 	}
 	assert os.ls(home)! == [desktop_preferences_name]
 	record := os.read_file(desktop_preferences_path(home))!
-	assert record == 'version=1\nscale=2\nbutton_side=left\ntaskbar_mode=combined\ntheme=macos\nwallpaper_color=4\nwallpaper_image=2\n'
+	assert record == 'version=1\nscale=2\nbutton_side=left\ntaskbar_mode=combined\ntheme=macos\nclock_24_hour=false\nclock_show_seconds=false\nwallpaper_color=4\nwallpaper_image=2\n'
 }
 
 fn test_preferences_each_change_preserves_the_rest_of_the_snapshot() {
@@ -65,13 +67,15 @@ fn test_preferences_each_change_preserves_the_rest_of_the_snapshot() {
 	mut p := desktop_load_preferences(home)
 	p.configure_scale(1920, 1080)
 	mut settings := Settings{}
-	for field in 0 .. 5 {
+	for field in 0 .. 7 {
 		match field {
 			0 { settings.button_side = .left }
 			1 { settings.taskbar_mode = .combined }
 			2 { settings.theme = .macos }
 			3 { settings.wallpaper_color = 4 }
-			else { settings.wallpaper_image = 2 }
+			4 { settings.wallpaper_image = 2 }
+			5 { settings.clock_24_hour = false }
+			else { settings.clock_show_seconds = false }
 		}
 		assert p.save_changes(settings, desktop_current_scale(), home)
 		loaded := desktop_load_preferences(home)
@@ -94,6 +98,8 @@ fn test_preferences_optional_keys_comments_and_unknown_keys() {
 	assert p.settings.theme == .macos
 	assert p.settings.button_side == .right
 	assert p.settings.taskbar_mode == .standard
+	assert p.settings.clock_24_hour
+	assert p.settings.clock_show_seconds
 	assert p.settings.wallpaper_image == -1
 	assert p.scale == 0
 	assert desktop_preference_index('2147483647')? == 2147483647
