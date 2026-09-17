@@ -30,10 +30,18 @@ printf "Module { name: 'utility_tests' }\n" > "$work/ui/v.mod"
 # the same frontend.
 "$v" -new-compiler -nocache -gc none -manualfree -enable-globals -stats -d ui2_headless \
     -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/utilities_test.v"
+rm -f "$work/ui/utilities_test.v"
+
+# Quick Launch shares the switcher's global keyboard path. Keep its Cmd-Space,
+# query filtering and modal overlay cases isolated from the broader utility
+# suite so sequence state cannot leak between tests.
+cp "$root/desktop/tools/tests/quick_launch_test.v" "$work/ui/"
+"$v" -new-compiler -nocache -gc none -manualfree -enable-globals -stats -d ui2_headless \
+    -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/quick_launch_test.v"
+rm -f "$work/ui/quick_launch_test.v"
 
 # Keep the title-bar gesture cases in their own test entry point so their
 # synthetic pointer timing does not add state to the broader utility suite.
-rm -f "$work/ui/utilities_test.v"
 cp "$root/desktop/tools/tests/titlebar_click_test.v" "$work/ui/"
 "$v" -new-compiler -nocache -gc none -manualfree -enable-globals -stats -d ui2_headless \
     -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/titlebar_click_test.v"

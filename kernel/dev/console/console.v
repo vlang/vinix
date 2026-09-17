@@ -32,6 +32,7 @@ const left_shift_rel = 0xaa
 const ctrl = 0x1d
 const ctrl_rel = 0x9d
 const tab = 0x0f
+const space = 0x39
 // Cmd on a Mac keyboard, Super elsewhere. Both arrive behind the 0xe0 prefix.
 const left_meta = 0x5b
 const right_meta = 0x5c
@@ -51,9 +52,8 @@ __global (
 	console_ctrl_active            = bool(false)
 	console_alt_active             = bool(false)
 	// Cmd, and whether a chord was sent while it was down. The desktop's
-	// window switcher is drawn for as long as Cmd is held, so unlike every
-	// other modifier this one's release has to be reported -- but only to
-	// someone who asked, which is what pressing Cmd-Tab counts as.
+	// global shortcuts need the release so a held key cannot repeat a chord
+	// forever; Cmd-Tab and Cmd-Space both opt into that report.
 	console_meta_active            = bool(false)
 	console_meta_chorded           = bool(false)
 	console_extra_scancodes        = bool(false)
@@ -394,6 +394,16 @@ fn keyboard_handler() {
 			} else {
 				add_to_buf(c'\e[9;9u', 6, true)
 			}
+			console_meta_chorded = true
+			continue
+		}
+
+		// Quick Launch uses the same CSI-u convention as the other input
+		// backends: Space is code point 32 and Super contributes modifier 8.
+		// Keep modified variants as ordinary input; Spotlight is Cmd-Space.
+		if console_meta_active && !console_shift_active && !console_ctrl_active
+			&& !console_alt_active && input_byte == space {
+			add_to_buf(c'\e[32;9u', 7, true)
 			console_meta_chorded = true
 			continue
 		}
