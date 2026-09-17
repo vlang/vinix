@@ -42,6 +42,8 @@ const settings_action_side = 'settings.side.'
 const settings_action_taskbar = 'settings.taskbar.'
 const settings_action_clock_format = 'settings.clock.format.'
 const settings_action_clock_seconds = 'settings.clock.seconds.'
+const settings_action_clock_date = 'settings.clock.date.'
+const settings_action_clock_weekday = 'settings.clock.weekday.'
 const settings_action_theme = 'settings.theme.'
 const settings_action_color = 'settings.color.'
 const settings_action_image = 'settings.image.'
@@ -252,7 +254,7 @@ fn (a &SettingsApp) date_time_pane(width int) []ui2.Element {
 	inner := width - 2 * settings_padding
 	half := (inner - settings_row_gap) / 2
 
-	mut out := frame_elements(10)
+	mut out := frame_elements(16)
 	mut y := settings_padding
 
 	out << settings_heading('Time format', y, width)
@@ -269,6 +271,17 @@ fn (a &SettingsApp) date_time_pane(width int) []ui2.Element {
 	y += 22
 	out << settings_choice('${settings_action_clock_seconds}0', 'Show', settings_padding, y, half, settings.clock_show_seconds)
 	out << settings_choice('${settings_action_clock_seconds}1', 'Hide', settings_padding + half + settings_row_gap, y, half, !settings.clock_show_seconds)
+	y += 28 + 22
+
+	out << settings_heading('Date line', y, width)
+	y += 22
+	out << settings_note('Choose what appears underneath the taskbar time.', y, width)
+	y += 22
+	out << settings_choice('${settings_action_clock_date}0', 'Show date', settings_padding, y, half, settings.clock_show_date)
+	out << settings_choice('${settings_action_clock_date}1', 'Hide date', settings_padding + half + settings_row_gap, y, half, !settings.clock_show_date)
+	y += 28 + settings_row_gap
+	out << settings_choice('${settings_action_clock_weekday}0', 'Show weekday', settings_padding, y, half, settings.clock_show_weekday)
+	out << settings_choice('${settings_action_clock_weekday}1', 'Hide weekday', settings_padding + half + settings_row_gap, y, half, !settings.clock_show_weekday)
 
 	return out
 }
@@ -421,6 +434,14 @@ fn (mut a SettingsApp) handle(event_id string) ! {
 	}
 	if event_id.starts_with(settings_action_clock_seconds) {
 		a.desktop.settings.clock_show_seconds = !event_id.ends_with('1')
+		return
+	}
+	if event_id.starts_with(settings_action_clock_date) {
+		a.desktop.settings.clock_show_date = !event_id.ends_with('1')
+		return
+	}
+	if event_id.starts_with(settings_action_clock_weekday) {
+		a.desktop.settings.clock_show_weekday = !event_id.ends_with('1')
 		return
 	}
 	if event_id.starts_with(settings_action_theme) {

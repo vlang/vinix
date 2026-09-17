@@ -17,7 +17,7 @@ const vinix_private_map_brk_reservation = u64(0x20000000)
 
 // Install after the architecture's generic syscall table, so compatibility
 // stubs cannot silently override durability, shutdown, hardened descriptor
-// copy-out, or hardened mmap entry points.
+// copy-out, or security operations.
 pub fn init_storage_syscalls() {
 	syscall_table[59] = voidptr(pipe.syscall_pipe_checked)
 	syscall_table[81] = voidptr(storage_sync)
@@ -33,8 +33,7 @@ fn security_linux_mmap(gpr_state voidptr, addr voidptr, length u64, prot u64,
 	if flags & vinix_private_map_brk_reservation != 0 {
 		return errno.err, errno.einval
 	}
-	prot_and_flags := (prot << 32) | (flags & u64(0xffffffff))
-	return file.syscall_mmap(gpr_state, addr, length, prot_and_flags, fdnum, offset)
+	return syscall_linux_mmap_aslr(gpr_state, addr, length, prot, flags, fdnum, offset)
 }
 
 // Push every cached write to its device. Block-backed filesystems keep dirty
