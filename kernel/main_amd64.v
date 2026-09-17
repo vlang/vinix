@@ -44,6 +44,7 @@ fn kmain_thread() {
 
 	table.init_syscall_table()
 	table.init_linux_syscall_table()
+	table.init_mmap_aslr_syscalls()
 	socket.initialise()
 	pipe.initialise()
 	futex.initialise()
