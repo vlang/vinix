@@ -10,7 +10,6 @@ const calendar_action_next = 'calendar.next'
 const calendar_action_today = 'calendar.today'
 const calendar_action_day = 'calendar.day.'
 
-const calendar_weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const calendar_days = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14',
 	'15', '16', '17', '18', '19', '20', '21', '22', '23', '24', '25', '26', '27', '28', '29', '30',
 	'31']
@@ -36,6 +35,7 @@ mut:
 	today_month  int
 	today_day    int
 	tz_offset    i64
+	language     SystemLanguage
 	month_title  string
 	selection    string
 }
@@ -43,6 +43,7 @@ mut:
 fn open_calendar(mut desktop Desktop) !NativeApp {
 	mut app := &CalendarApp{
 		tz_offset: desktop.tz_offset_seconds
+		language: desktop_i18n_current_language()
 	}
 	app.go_today()
 	return app
@@ -80,14 +81,20 @@ fn calendar_weekday(year int, month int, day int) int {
 
 fn (mut a CalendarApp) refresh_labels() {
 	year := a.year.str()
-	next_title := '${month_names[a.month - 1]} ${year}'
+	month := desktop_month_short(a.language, a.month)
+	next_title := '${month} ${year}'
 	if a.month_title.len > 0 {
 		unsafe { a.month_title.free() }
 	}
 	a.month_title = next_title
 
 	day := a.selected_day.str()
-	next_selection := '${weekday_names[calendar_weekday(a.year, a.month, a.selected_day)]}, ${month_names[a.month - 1]} ${day}, ${year}'
+	weekday := desktop_weekday_short(a.language, calendar_weekday(a.year, a.month, a.selected_day))
+	next_selection := if a.language == .ru {
+		'${weekday}, ${day} ${month} ${year}'
+	} else {
+		'${weekday}, ${month} ${day}, ${year}'
+	}
 	if a.selection.len > 0 {
 		unsafe { a.selection.free() }
 	}
@@ -96,6 +103,15 @@ fn (mut a CalendarApp) refresh_labels() {
 		day.free()
 		year.free()
 	}
+}
+
+fn (mut a CalendarApp) sync_language() {
+	language := desktop_i18n_current_language()
+	if a.language == language {
+		return
+	}
+	a.language = language
+	a.refresh_labels()
 }
 
 fn (mut a CalendarApp) go_today() {
@@ -132,6 +148,7 @@ fn (mut a CalendarApp) change_month(delta int) {
 }
 
 fn (mut a CalendarApp) build(size ui2.Rect) !ui2.Element {
+	a.sync_language()
 	width := int(size.width)
 	height := int(size.height)
 	inner := width - 2 * calendar_padding
@@ -161,7 +178,8 @@ fn (mut a CalendarApp) build(size ui2.Rect) !ui2.Element {
 	})
 
 	cell_width := if inner > 7 { inner / 7 } else { 1 }
-	for column, weekday in calendar_weekdays {
+	for column in 0 .. desktop_weekday_keys.len {
+		weekday := desktop_weekday_short(a.language, column)
 		children << ui2.label('', weekday, ui2.rect(f64(calendar_padding + column * cell_width), f64(calendar_header_height), f64(cell_width), f64(calendar_weekday_height)), ui2.TextStyle{
 			color: body_muted
 			size: 11
