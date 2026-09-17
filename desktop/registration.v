@@ -19,6 +19,7 @@ const registration_hash_bytes = u64(32)
 const registration_scrypt_n = u64(16_384)
 const registration_scrypt_r = u32(8)
 const registration_scrypt_p = u32(1)
+const registration_user_home_mode = 0o700
 
 const action_registration_name = 'registration.name'
 const action_registration_password = 'registration.password'
@@ -125,6 +126,71 @@ fn desktop_user_record_path(home string) string {
 	return '${home}/${desktop_user_record_name}'
 }
 
+// The system image is disposable while /root is the persistent desktop volume.
+// Turn the display name into one portable directory component under that volume.
+fn registration_directory_name(name string) string {
+	mut bytes := []u8{cap: name.len}
+	mut separator := false
+	for i in 0 .. name.len {
+		ch := name[i]
+		if (ch >= `a` && ch <= `z`) || (ch >= `0` && ch <= `9`) {
+			if separator && bytes.len > 0 {
+				bytes << `-`
+			}
+			bytes << ch
+			separator = false
+		} else if ch >= `A` && ch <= `Z` {
+			if separator && bytes.len > 0 {
+				bytes << `-`
+			}
+			bytes << ch + 32
+			separator = false
+		} else if bytes.len > 0 {
+			separator = true
+		}
+	}
+	if bytes.len == 0 {
+		unsafe { bytes.free() }
+		return 'user'.clone()
+	}
+	result := bytes.bytestr()
+	unsafe { bytes.free() }
+	return result
+}
+
+fn desktop_user_home_path(home string, name string) string {
+	directory := registration_directory_name(name)
+	path := '${home}/${directory}'
+	unsafe { directory.free() }
+	return path
+}
+
+// Registration is still a single-user desktop, but it now has a real persistent
+// home directory. An already-created profile from an older image repairs its
+// missing directory here the next time the desktop starts.
+fn desktop_ensure_user_directory(home string, name string) bool {
+	path := desktop_user_home_path(home, name)
+	defer { unsafe { path.free() } }
+	info := os.lstat(path) or {
+		os.mkdir(path) or { return false }
+		os.chmod(path, registration_user_home_mode) or {
+			os.rmdir(path) or {}
+			return false
+		}
+		$if vinix {
+			// Vinix's persistent /root is a separate block-backed filesystem.
+			// Make a repaired directory durable even when no profile write follows.
+			C.sync()
+		}
+		return true
+	}
+	if info.get_filetype() != .directory {
+		return false
+	}
+	os.chmod(path, registration_user_home_mode) or { return false }
+	return true
+}
+
 // A valid profile is the registration marker. Keep enough information for a
 // later login screen to verify the password without ever storing it directly.
 fn desktop_load_user_name(home string) ?string {
@@ -183,8 +249,9 @@ fn desktop_load_user_name(home string) ?string {
 
 fn desktop_user_registered(home string) bool {
 	name := desktop_load_user_name(home) or { return false }
+	ok := desktop_ensure_user_directory(home, name)
 	unsafe { name.free() }
-	return true
+	return ok
 }
 
 fn registration_random_bytes(count int) ?[]u8 {
@@ -208,6 +275,9 @@ fn registration_random_bytes(count int) ?[]u8 {
 
 fn desktop_save_user(home string, name string, password []u8) bool {
 	if home == '' || !os.is_dir(home) || !registration_valid_name(name) || password.len == 0 {
+		return false
+	}
+	if !desktop_ensure_user_directory(home, name) {
 		return false
 	}
 	mut salt := registration_random_bytes(registration_salt_bytes) or { return false }
@@ -390,7 +460,20 @@ fn (mut r RegistrationState) key_input(keys string, home string) {
 	}
 }
 
-fn registration_field_element(action string, value []u8, placeholder string, active bool,
+fn registration_field_text_width(d &Desktop, value []u8) int {
+	if value.len == 0 {
+		return 0
+	}
+	if d.fonts.len == 0 {
+		return value.len * 7
+	}
+	face := d.face_for(ui2.TextStyle{
+		size: 13
+	})
+	return face.text_width(registration_text(value))
+}
+
+fn registration_field_element(d &Desktop, action string, value []u8, placeholder string, active bool,
 	hovered bool, x int, y int, width int) ui2.Element {
 	mut text := placeholder
 	mut color := body_muted
@@ -399,7 +482,32 @@ fn registration_field_element(action string, value []u8, placeholder string, act
 		color = body_text
 	}
 	border := if active { 2 } else { 1 }
-	return ui2.button(action, text, ui2.rect(f64(x), f64(y), f64(width), 38), ui2.BoxStyle{
+	mut text_x := 10
+	if active && value.len == 0 {
+		// Leave the caret clear of the placeholder when the field is empty.
+		text_x = 15
+	}
+	mut children := frame_elements(2)
+	children << ui2.label('', text, ui2.rect(f64(text_x), 0, f64(width - text_x - 8), 38),
+		ui2.TextStyle{
+			color: color
+			size: 13
+			align: .left
+		})
+	if active {
+		mut caret_x := 10 + registration_field_text_width(d, value) + 1
+		if value.len == 0 {
+			caret_x = 10
+		}
+		if caret_x > width - 12 {
+			caret_x = width - 12
+		}
+		children << ui2.view('registration.caret', ui2.rect(f64(caret_x), 10, 2, 18),
+			ui2.BoxStyle{
+				bg: body_text
+			}, [])
+	}
+	return ui2.clickable_view(action, ui2.rect(f64(x), f64(y), f64(width), 38), ui2.BoxStyle{
 		bg:            registration_field_bg
 		radius:        6
 		border_color:  if active || hovered { app_accent } else { body_rule }
@@ -407,11 +515,7 @@ fn registration_field_element(action string, value []u8, placeholder string, act
 		border_top:    border
 		border_right:  border
 		border_bottom: border
-	}, ui2.TextStyle{
-		color: color
-		size:  13
-		align: .left
-	})
+	}, children)
 }
 
 fn (r &RegistrationState) element(d &Desktop) ui2.Element {
@@ -452,7 +556,7 @@ fn (r &RegistrationState) element(d &Desktop) ui2.Element {
 		size:  11
 		bold:  true
 	})
-	card_children << registration_field_element(action_registration_name, r.name, 'Enter your name',
+	card_children << registration_field_element(d, action_registration_name, r.name, 'Enter your name',
 		r.field == .name, d.hover == action_registration_name, field_x, 124, field_width)
 
 	card_children << ui2.label('', 'Password', ui2.rect(32, 176, f64(field_width), 18), ui2.TextStyle{
@@ -460,7 +564,7 @@ fn (r &RegistrationState) element(d &Desktop) ui2.Element {
 		size:  11
 		bold:  true
 	})
-	card_children << registration_field_element(action_registration_password, r.password_mask,
+	card_children << registration_field_element(d, action_registration_password, r.password_mask,
 		'Enter a password', r.field == .password, d.hover == action_registration_password, field_x,
 		196, field_width)
 
@@ -470,7 +574,7 @@ fn (r &RegistrationState) element(d &Desktop) ui2.Element {
 			size:  11
 			bold:  true
 		})
-	card_children << registration_field_element(action_registration_confirm, r.confirm_mask,
+	card_children << registration_field_element(d, action_registration_confirm, r.confirm_mask,
 		'Repeat the password', r.field == .confirm, d.hover == action_registration_confirm, field_x,
 		268, field_width)
 
