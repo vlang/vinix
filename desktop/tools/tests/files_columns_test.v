@@ -84,3 +84,26 @@ fn test_miller_row_actions_keep_column_identity() {
 		assert unexpected.column_id == 0
 	}
 }
+
+fn test_file_browser_up_keeps_an_owned_parent_path() {
+	root := os.join_path(os.temp_dir(), 'vinix-files-up-test')
+	child := os.join_path(root, 'child')
+	os.rmdir_all(root) or {}
+	os.mkdir_all(child) or { panic(err) }
+	defer { os.rmdir_all(root) or {} }
+
+	mut browser := FileBrowser{}
+	browser.read(child.clone())
+	assert browser.path == child
+	browser.go_up()
+	// go_up used to retain a slice of the path it had just freed. Reading the
+	// value here is deliberately enough for an address sanitizer to catch that
+	// use-after-free, while the equality protects the normal manual-free build.
+	assert browser.path == root
+	assert browser.error == ''
+	browser.free_entries()
+	unsafe {
+		browser.path.free()
+		browser.error.free()
+	}
+}

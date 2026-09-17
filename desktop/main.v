@@ -162,14 +162,15 @@ fn main() {
 		launch_default_files = true
 	} else {
 		for title in options.open {
-			desktop.launch_titled(title)
+			desktop.launch_titled_at_startup(title)
 		}
 	}
 
 	mut stats := FrameStats{}
 	for desktop.running {
-		// `reboot`, `poweroff` and `halt` signal pid 1 rather than powering the
-		// machine down themselves, and on this image pid 1 is this compositor.
+		// `reboot`, `poweroff` and `halt` signal PID 1 rather than powering the
+		// machine down themselves. The supervising init forwards those signals
+		// to this system-session compositor for an orderly teardown.
 		desktop.take_power_signal()
 		if !desktop.running {
 			break
@@ -268,7 +269,7 @@ fn main() {
 
 		if launch_default_files {
 			launch_default_files = false
-			desktop.launch_titled('Files')
+			desktop.launch_titled_at_startup('Files')
 		}
 
 		sleep_to_next_frame(frame_started, options.frame_interval)

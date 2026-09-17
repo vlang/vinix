@@ -468,7 +468,7 @@ fn desktop_spawn_shell(path string, rows int, columns int, width int, height int
 	flags := C.fcntl(master, C.F_GETFL)
 	if flags < 0 || C.fcntl(master, C.F_SETFL, flags | C.O_NONBLOCK) != 0 {
 		C.close(master)
-		desktop_terminate_child(pid)
+		_ = desktop_terminate_child(pid)
 		return none
 	}
 	return SpawnedShell{
@@ -574,10 +574,10 @@ fn desktop_power_signal_handler(signal i32) {
 }
 
 // busybox reboot, poweroff and halt do not call reboot(2) themselves unless
-// they are given -f: they sync, signal pid 1, and leave the machine to init.
-// The desktop image's init execs this compositor, so pid 1 is this process and
-// those signals arrive here. Their meanings are the ones busybox init gives
-// them, which is what busybox halt sends them for.
+// they are given -f: they sync, signal PID 1, and leave the machine to init.
+// The desktop image's supervising init forwards those signals here. Their
+// meanings are the ones busybox init gives them, which is what busybox halt
+// sends them for.
 fn desktop_install_power_signals() {
 	unsafe {
 		handler := voidptr(desktop_power_signal_handler)
@@ -603,11 +603,12 @@ fn desktop_pending_power_action() PowerAction {
 	return .restart
 }
 
-// Only the process the kernel started as init may take the machine down. A
-// desktop launched from a shell on the full image is an ordinary process, and
-// ending its session there means returning to that shell.
-fn desktop_is_init() bool {
-	return C.getpid() == 1
+// The desktop image's init supervises the compositor instead of replacing
+// itself with it. Mark that child as the system session so its power menu still
+// takes the machine down; a desktop launched manually from a shell remains an
+// ordinary process and returns to that shell when its session ends.
+fn desktop_is_system_session() bool {
+	return C.getpid() == 1 || C.getenv(c'VINIX_SYSTEM_SESSION') != unsafe { nil }
 }
 
 // Hand the machine to the kernel. reboot(2) only returns when it refuses, so
@@ -719,17 +720,60 @@ fn desktop_spawn_app(path string, app_name string, tz_offset i64) ?SpawnedAppPro
 	}
 }
 
-fn desktop_wait_child(pid int) {
+// Reap one child and preserve the wait status so callers handling a failure can
+// report whether it exited normally or died from a signal.
+fn desktop_wait_child(pid int) int {
 	if pid <= 0 {
-		return
+		return -1
 	}
 	mut status := 0
 	for {
 		waited := C.waitpid(pid, &status, 0)
-		if waited == pid || (waited < 0 && C.errno != C.EINTR) {
-			return
+		if waited == pid {
+			return status
+		}
+		if waited < 0 && C.errno != C.EINTR {
+			return -1
 		}
 	}
+	return -1
+}
+
+fn desktop_signal_name(signal int) string {
+	return match signal {
+		1 { 'SIGHUP' }
+		2 { 'SIGINT' }
+		3 { 'SIGQUIT' }
+		4 { 'SIGILL' }
+		5 { 'SIGTRAP' }
+		6 { 'SIGABRT' }
+		7 { 'SIGBUS' }
+		8 { 'SIGFPE' }
+		9 { 'SIGKILL' }
+		10 { 'SIGUSR1' }
+		11 { 'SIGSEGV' }
+		12 { 'SIGUSR2' }
+		13 { 'SIGPIPE' }
+		14 { 'SIGALRM' }
+		15 { 'SIGTERM' }
+		24 { 'SIGXCPU' }
+		25 { 'SIGXFSZ' }
+		31 { 'SIGSYS' }
+		else { 'unknown signal' }
+	}
+}
+
+fn desktop_log_app_exit(name string, pid int, status int) {
+	if status < 0 {
+		eprintln('vinix-desktop: ${name} (pid ${pid}) stopped; wait status unavailable')
+		return
+	}
+	signal := status & 0x7f
+	if signal != 0 && signal != 0x7f {
+		eprintln('vinix-desktop: ${name} (pid ${pid}) stopped with ${desktop_signal_name(signal)} (signal ${signal})')
+		return
+	}
+	eprintln('vinix-desktop: ${name} (pid ${pid}) exited with status ${(status >> 8) & 0xff}')
 }
 
 struct SpawnedWineHost {
@@ -907,12 +951,16 @@ fn desktop_spawn_wine_host(directory string, width int, height int, command stri
 	}
 }
 
-fn desktop_terminate_child(pid int) {
+fn desktop_terminate_child(pid int) int {
 	if pid <= 0 {
-		return
+		return -1
+	}
+	mut status := 0
+	if C.waitpid(pid, &status, C.WNOHANG) == pid {
+		return status
 	}
 	C.kill(pid, C.SIGTERM)
-	desktop_wait_child(pid)
+	return desktop_wait_child(pid)
 }
 
 // True once the child has exited, so the terminal can say so.
