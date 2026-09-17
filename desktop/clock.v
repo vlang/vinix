@@ -72,9 +72,10 @@ fn pad2(value int) string {
 // the fixed status area at every desktop scale, leaving the remaining taskbar
 // width entirely for window buttons.
 fn (d &Desktop) taskbar_clock_strings_at(seconds i64) (string, string) {
+	desktop_i18n_set_language(d.settings.language)
 	if seconds < 0 {
 		return if d.settings.clock_show_seconds { '--:--:--'.clone() } else { '--:--'.clone() },
-			'Clock unavailable'.clone()
+			desktop_tr_for(d.settings.language, 'clock.unavailable').clone()
 	}
 	civil := civil_from_epoch(seconds + d.tz_offset_seconds)
 	minute := pad2(civil.minute)
@@ -88,7 +89,7 @@ fn (d &Desktop) taskbar_clock_strings_at(seconds i64) (string, string) {
 		}
 		hour = display_hour.str()
 	}
-	suffix := if civil.hour < 12 { 'AM' } else { 'PM' }
+	suffix := desktop_tr_for(d.settings.language, if civil.hour < 12 { 'clock.am' } else { 'clock.pm' })
 	mut time_text := ''
 	if d.settings.clock_show_seconds {
 		second := pad2(civil.second)
@@ -110,17 +111,19 @@ fn (d &Desktop) taskbar_clock_strings_at(seconds i64) (string, string) {
 		minute.free()
 	}
 
+	weekday := desktop_weekday_short(d.settings.language, civil.weekday)
+	month := desktop_month_short(d.settings.language, civil.month)
 	mut date_text := ''
 	if d.settings.clock_show_date {
 		day := civil.day.str()
 		date_text = if d.settings.clock_show_weekday {
-			'${weekday_names[civil.weekday]} ${day} ${month_names[civil.month - 1]}'
+			'${weekday} ${day} ${month}'
 		} else {
-			'${day} ${month_names[civil.month - 1]}'
+			'${day} ${month}'
 		}
 		unsafe { day.free() }
 	} else if d.settings.clock_show_weekday {
-		date_text = weekday_names[civil.weekday].clone()
+		date_text = weekday.clone()
 	}
 	return time_text, date_text
 }
