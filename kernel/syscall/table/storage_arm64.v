@@ -10,6 +10,11 @@ import proc
 import errno
 import aarch64.cpu
 
+// kernel/memory/mmap uses this bit only for the reserved brk arena. It is not a
+// Linux mmap flag implemented by Vinix and must never reach VM accounting from
+// userspace.
+const vinix_private_map_brk_reservation = u64(0x20000000)
+
 // Install after the architecture's generic syscall table, so compatibility
 // stubs cannot silently override durability, shutdown, hardened descriptor
 // copy-out, or security operations.
@@ -20,7 +25,15 @@ pub fn init_storage_syscalls() {
 	syscall_table[83] = voidptr(storage_fsync) // fdatasync: stronger full flush
 	syscall_table[267] = voidptr(storage_syncfs)
 	syscall_table[142] = voidptr(storage_reboot)
-	syscall_table[222] = voidptr(syscall_linux_mmap_aslr)
+	syscall_table[222] = voidptr(security_linux_mmap)
+}
+
+fn security_linux_mmap(gpr_state voidptr, addr voidptr, length u64, prot u64,
+	flags u64, fdnum int, offset i64) (u64, u64) {
+	if flags & vinix_private_map_brk_reservation != 0 {
+		return errno.err, errno.einval
+	}
+	return syscall_linux_mmap_aslr(gpr_state, addr, length, prot, flags, fdnum, offset)
 }
 
 // Push every cached write to its device. Block-backed filesystems keep dirty
