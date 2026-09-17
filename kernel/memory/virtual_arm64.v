@@ -39,7 +39,15 @@ fn portable_to_arm64_pte(phys u64, flags u64) u64 {
 	}
 	mut pte := (phys & pte_flags_mask) | arm64_pte_valid | arm64_pte_af | sh | attr
 
-	if flags & pte_noexec != 0 {
+	// OpenBSD marks every userspace mapping privileged-XN: EL0 executable pages
+	// may still execute at EL0, but EL1 must never fetch instructions from them.
+	// UXN continues to represent the userspace PROT_EXEC decision itself.
+	if flags & pte_user != 0 {
+		pte |= arm64_pte_ap_user | arm64_pte_pxn
+		if flags & pte_noexec != 0 {
+			pte |= arm64_pte_uxn
+		}
+	} else if flags & pte_noexec != 0 {
 		pte |= arm64_pte_pxn | arm64_pte_uxn
 	}
 
@@ -47,10 +55,6 @@ fn portable_to_arm64_pte(phys u64, flags u64) u64 {
 	// The portable convention: pte_writable SET = writable.
 	if flags & pte_writable == 0 {
 		pte |= arm64_pte_ap_ro
-	}
-
-	if flags & pte_user != 0 {
-		pte |= arm64_pte_ap_user
 	}
 
 	return pte
