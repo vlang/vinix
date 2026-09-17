@@ -12,6 +12,13 @@ const key_cmd_w = '\x1b[119;9u'
 // atomically by the keyboard driver, but scan the full batch so Cmd-W still
 // works beside ordinary typed input.
 fn (mut d Desktop) take_window_shortcuts(keys string) string {
+	// A filename editor temporarily owns typing before normal window/app
+	// shortcuts. Files is otherwise not a KeyboardApp, so the moment rename
+	// ends the desktop's regular shortcut routing is unchanged.
+	if desktop_directory_state.rename_path.len > 0 || create_context_menu.rename_app_index >= 0 {
+		d.file_context_rename_key_input(keys)
+		return ''
+	}
 	if keys.index_u8(0x1b) < 0 {
 		return keys
 	}
