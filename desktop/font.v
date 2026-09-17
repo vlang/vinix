@@ -130,7 +130,7 @@ fn (f &FontFace) glyph_for(code_point u32) Glyph {
 	return f.glyphs[0]
 }
 
-fn (f &FontFace) text_width_raw(text string) int {
+fn (f &FontFace) text_width(text string) int {
 	mut width := 0
 	mut i := 0
 	for i < text.len {
@@ -141,28 +141,21 @@ fn (f &FontFace) text_width_raw(text string) int {
 	return width
 }
 
-// Public-to-the-renderer width measurement always measures what will actually
-// be drawn. That matters for centred labels and truncation after translation.
-fn (f &FontFace) text_width(text string) int {
-	return f.text_width_raw(desktop_i18n_text(text))
-}
-
 // truncate fits a string into `limit` pixels, ending it with an ellipsis when
 // it does not. Window titles are user text of any length and the taskbar gives
 // them a fixed slot, so something has to give. The cut lands on a rune
 // boundary because the scan advances one whole sequence at a time.
 fn (f &FontFace) truncate(text string, limit int) (string, bool) {
-	translated := desktop_i18n_text(text)
-	if f.text_width_raw(translated) <= limit {
-		return translated, false
+	if f.text_width(text) <= limit {
+		return text, false
 	}
 	ellipsis := '...'
-	tail := f.text_width_raw(ellipsis)
+	tail := f.text_width(ellipsis)
 	mut width := 0
 	mut cut := 0
 	mut i := 0
-	for i < translated.len {
-		code_point, size := next_rune(translated, i)
+	for i < text.len {
+		code_point, size := next_rune(text, i)
 		advance := f.glyph_for(code_point).advance / f.raster_scale
 		if width + advance + tail > limit {
 			break
@@ -174,21 +167,20 @@ fn (f &FontFace) truncate(text string, limit int) (string, bool) {
 	if cut == 0 {
 		return ellipsis, false
 	}
-	prefix := translated[..cut]
+	prefix := text[..cut]
 	truncated := prefix + ellipsis
 	unsafe { prefix.free() }
 	return truncated, true
 }
 
 // draw_text places the run's line box at (x, y) and returns the pen position
-// it ended at. Localization lives here as the final safety net for direct text
-// drawing; ui2 labels/buttons normally reach the same translation in truncate.
+// it ended at. Translation happens one layer up in render.v so document,
+// terminal and file-name text can explicitly opt out of UI localization.
 fn (mut c Canvas) draw_text(face &FontFace, x int, y int, text string, color u32) int {
-	translated := desktop_i18n_text(text)
 	mut pen := x * c.scale
 	mut i := 0
-	for i < translated.len {
-		code_point, size := next_rune(translated, i)
+	for i < text.len {
+		code_point, size := next_rune(text, i)
 		glyph := face.glyph_for(code_point)
 		if glyph.width > 0 && glyph.height > 0 {
 			c.blit_glyph(face, glyph, pen + glyph.bearing_x, y * c.scale + glyph.bearing_y, color)
@@ -196,7 +188,7 @@ fn (mut c Canvas) draw_text(face &FontFace, x int, y int, text string, color u32
 		pen += glyph.advance
 		i += size
 	}
-	return x + face.text_width_raw(translated)
+	return x + face.text_width(text)
 }
 
 fn (mut c Canvas) blit_glyph(face &FontFace, glyph Glyph, x int, y int, color u32) {
