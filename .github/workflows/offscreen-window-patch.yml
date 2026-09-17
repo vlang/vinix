@@ -1,0 +1,164 @@
+name: Apply off-screen window drag fix
+
+on:
+  push:
+    branches:
+      - desktop/allow-offscreen-windows
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: desktop/allow-offscreen-windows
+
+      - name: Build current V
+        run: git clone https://github.com/vlang/v.git --depth=1 && cd v && make
+
+      - name: Allow partially off-screen windows
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          wm = Path('desktop/wm.v')
+          text = wm.read_text()
+          old = '''// clamp_to_screen keeps a window wholly visible when it fits. Oversized
+          // windows retain the looser reachable-title-bar rule so they can still be
+          // dragged to every clipped edge.
+          fn (mut d Desktop) clamp_to_screen(index int) {
+          \tmargin := 60
+          \tavailable_width := d.canvas.width
+          \tavailable_height := d.canvas.height - taskbar_height
+          \tif d.windows[index].width <= available_width {
+          \t\tif d.windows[index].x < 0 {
+          \t\t\td.windows[index].x = 0
+          \t\t}
+          \t\tif d.windows[index].x + d.windows[index].width > available_width {
+          \t\t\td.windows[index].x = available_width - d.windows[index].width
+          \t\t}
+          \t}
+          \tif d.windows[index].height <= available_height {
+          \t\tif d.windows[index].y + d.windows[index].height > available_height {
+          \t\t\td.windows[index].y = available_height - d.windows[index].height
+          \t\t}
+          \t}
+          \tmax_x := d.canvas.width - margin
+          \tmax_y := d.canvas.height - taskbar_height - d.theme().title_height
+          \tif d.windows[index].x > max_x {
+          \t\td.windows[index].x = max_x
+          \t}
+          \tif d.windows[index].x + d.windows[index].width < margin {
+          \t\td.windows[index].x = margin - d.windows[index].width
+          \t}
+          \tif d.windows[index].y < 0 {
+          \t\td.windows[index].y = 0
+          \t}
+          \tif d.windows[index].y > max_y {
+          \t\td.windows[index].y = max_y
+          \t}
+          }
+          '''
+          new = '''// clamp_to_screen lets a normal window cross the left, right, and bottom
+          // display edges, like a conventional desktop. Keep only enough of the title
+          // bar reachable to recover it, and do not let that title bar disappear above
+          // the display or below the taskbar.
+          fn (mut d Desktop) clamp_to_screen(index int) {
+          \tmut reachable_width := 60
+          \tif d.windows[index].width < reachable_width {
+          \t\treachable_width = d.windows[index].width
+          \t}
+          \tif d.canvas.width < reachable_width {
+          \t\treachable_width = d.canvas.width
+          \t}
+          \tmax_x := d.canvas.width - reachable_width
+          \tmax_y := d.canvas.height - taskbar_height - d.theme().title_height
+          \tif d.windows[index].x > max_x {
+          \t\td.windows[index].x = max_x
+          \t}
+          \tif d.windows[index].x + d.windows[index].width < reachable_width {
+          \t\td.windows[index].x = reachable_width - d.windows[index].width
+          \t}
+          \tif d.windows[index].y < 0 {
+          \t\td.windows[index].y = 0
+          \t}
+          \tif d.windows[index].y > max_y {
+          \t\td.windows[index].y = max_y
+          \t}
+          }
+          '''
+          if text.count(old) != 1:
+              raise SystemExit('expected clamp_to_screen block not found exactly once')
+          wm.write_text(text.replace(old, new, 1))
+
+          tests = Path('desktop/tools/tests/titlebar_click_test.v')
+          source = tests.read_text()
+          marker = 'fn test_titlebar_drag_can_move_partly_offscreen()'
+          if marker not in source:
+              source += r'''
+
+          fn test_titlebar_drag_can_move_partly_offscreen() {
+          \tmut desktop := Desktop{
+          \t\tcanvas: Canvas{
+          \t\t\twidth: 800
+          \t\t\theight: 600
+          \t\t}
+          \t}
+          \tid := desktop.spawn('Welcome', .welcome, 120, 80, 400, 260)
+          \tset_titlebar_test_target(mut desktop, id)
+          \ttitle_y := 80 + desktop.theme().title_height / 2
+
+          \t// Grabbing well inside the title bar and taking the pointer to the left
+          \t// edge should carry the window past it instead of pinning x at zero.
+          \tdesktop.on_pointer_down(300, title_y)
+          \tdesktop.buttons = button_left
+          \tdesktop.on_pointer_move(0, title_y)
+          \tindex := desktop.window_index(id) or { panic('missing dragged window') }
+          \tassert desktop.windows[index].x < 0
+          \tassert desktop.windows[index].x + desktop.windows[index].width > 60
+          \tdesktop.buttons = 0
+          \tdesktop.on_pointer_up(0, title_y)
+
+          \t// The same applies on the right. A recoverable title-bar strip remains
+          \t// visible, but most of the window may live beyond the display.
+          \tset_titlebar_test_target(mut desktop, id)
+          \tvisible_title_x := 100
+          \tdesktop.on_pointer_down(visible_title_x, title_y)
+          \tdesktop.buttons = button_left
+          \tdesktop.on_pointer_move(799, title_y)
+          \tright_index := desktop.window_index(id) or { panic('missing dragged window') }
+          \tassert desktop.windows[right_index].x + desktop.windows[right_index].width > 800
+          \tassert desktop.windows[right_index].x <= 800 - 60
+          \tdesktop.buttons = 0
+          \tdesktop.on_pointer_up(799, title_y)
+
+          \t// Downward movement may hide the body too. Only the title bar is kept
+          \t// above the taskbar so the user can drag the window back.
+          \tset_titlebar_test_target(mut desktop, id)
+          \tcurrent := desktop.window_index(id) or { panic('missing dragged window') }
+          \tgrab_x := desktop.windows[current].x + 30
+          \tdesktop.on_pointer_down(grab_x, title_y)
+          \tdesktop.buttons = button_left
+          \tdesktop.on_pointer_move(grab_x, 599)
+          \tdown_index := desktop.window_index(id) or { panic('missing dragged window') }
+          \tassert desktop.windows[down_index].y == 600 - taskbar_height - desktop.theme().title_height
+          \tassert desktop.windows[down_index].y + desktop.windows[down_index].height > 600
+          }
+          '''
+              tests.write_text(source)
+          PY
+
+      - name: Run desktop utility tests
+        run: V="$GITHUB_WORKSPACE/v/v" ./desktop/tools/test-utilities.sh
+
+      - name: Commit validated fix
+        run: |
+          rm .github/workflows/offscreen-window-patch.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add desktop/wm.v desktop/tools/tests/titlebar_click_test.v .github/workflows/offscreen-window-patch.yml
+          git commit -m "desktop: allow windows to move partially off-screen"
+          git push origin HEAD:desktop/allow-offscreen-windows
