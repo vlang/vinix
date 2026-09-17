@@ -38,6 +38,17 @@ fn test_taskbar_clock_formats_24_and_12_hour_time() {
 	assert midnight == '12:00:00 AM'
 	noon, _ := desktop.taskbar_clock_strings_at(43_200)
 	assert noon == '12:00:00 PM'
+
+	desktop.settings.clock_show_weekday = false
+	_, date_only := desktop.taskbar_clock_strings_at(seconds)
+	assert date_only == '1 Jan'
+	desktop.settings.clock_show_date = false
+	desktop.settings.clock_show_weekday = true
+	_, weekday_only := desktop.taskbar_clock_strings_at(seconds)
+	assert weekday_only == 'Thu'
+	desktop.settings.clock_show_weekday = false
+	_, no_date_line := desktop.taskbar_clock_strings_at(seconds)
+	assert no_date_line == ''
 }
 
 fn test_date_time_settings_controls_update_desktop_preferences() {
@@ -56,13 +67,25 @@ fn test_date_time_settings_controls_update_desktop_preferences() {
 	seconds_show := clock_test_element(root, '${settings_action_clock_seconds}0') or {
 		panic('missing show-seconds choice')
 	}
+	date_show := clock_test_element(root, '${settings_action_clock_date}0') or {
+		panic('missing show-date choice')
+	}
+	weekday_show := clock_test_element(root, '${settings_action_clock_weekday}0') or {
+		panic('missing show-weekday choice')
+	}
 	assert format_24.box.bg == app_accent
 	assert seconds_show.box.bg == app_accent
+	assert date_show.box.bg == app_accent
+	assert weekday_show.box.bg == app_accent
 
 	app.handle('${settings_action_clock_format}1') or { panic(err) }
 	app.handle('${settings_action_clock_seconds}1') or { panic(err) }
+	app.handle('${settings_action_clock_date}1') or { panic(err) }
+	app.handle('${settings_action_clock_weekday}1') or { panic(err) }
 	assert !desktop.settings.clock_24_hour
 	assert !desktop.settings.clock_show_seconds
+	assert !desktop.settings.clock_show_date
+	assert !desktop.settings.clock_show_weekday
 
 	root = app.build(ui2.rect(0, 0, 620, 376)) or { panic(err) }
 	format_12 := clock_test_element(root, '${settings_action_clock_format}1') or {
@@ -71,8 +94,16 @@ fn test_date_time_settings_controls_update_desktop_preferences() {
 	seconds_hide := clock_test_element(root, '${settings_action_clock_seconds}1') or {
 		panic('missing hide-seconds choice')
 	}
+	date_hide := clock_test_element(root, '${settings_action_clock_date}1') or {
+		panic('missing hide-date choice')
+	}
+	weekday_hide := clock_test_element(root, '${settings_action_clock_weekday}1') or {
+		panic('missing hide-weekday choice')
+	}
 	assert format_12.box.bg == app_accent
 	assert seconds_hide.box.bg == app_accent
+	assert date_hide.box.bg == app_accent
+	assert weekday_hide.box.bg == app_accent
 }
 
 fn test_date_time_settings_actions_save_and_restore() {
@@ -90,10 +121,14 @@ fn test_date_time_settings_actions_save_and_restore() {
 	}
 	app.handle('${settings_action_clock_format}1') or { panic(err) }
 	app.handle('${settings_action_clock_seconds}1') or { panic(err) }
+	app.handle('${settings_action_clock_date}1') or { panic(err) }
+	app.handle('${settings_action_clock_weekday}1') or { panic(err) }
 	assert preferences.save_changes(desktop.settings, previous_scale, home)
 	restored := desktop_load_preferences(home)
 	assert !restored.settings.clock_24_hour
 	assert !restored.settings.clock_show_seconds
+	assert !restored.settings.clock_show_date
+	assert !restored.settings.clock_show_weekday
 	assert restored.scale == 0
 }
 
@@ -102,6 +137,8 @@ fn test_clock_preferences_cross_app_wire_state() {
 		settings: Settings{
 			clock_24_hour: false
 			clock_show_seconds: false
+			clock_show_date: false
+			clock_show_weekday: false
 		}
 		requested_scale: desktop_scale_100
 	}
@@ -112,5 +149,7 @@ fn test_clock_preferences_cross_app_wire_state() {
 	assert reader.index == encoded.len
 	assert !decoded.settings.clock_24_hour
 	assert !decoded.settings.clock_show_seconds
+	assert !decoded.settings.clock_show_date
+	assert !decoded.settings.clock_show_weekday
 	assert decoded.requested_scale == desktop_scale_100
 }

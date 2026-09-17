@@ -109,9 +109,19 @@ fn (d &Desktop) taskbar_clock_strings_at(seconds i64) (string, string) {
 		hour.free()
 		minute.free()
 	}
-	day := civil.day.str()
-	date_text := '${weekday_names[civil.weekday]} ${day} ${month_names[civil.month - 1]}'
-	unsafe { day.free() }
+
+	mut date_text := ''
+	if d.settings.clock_show_date {
+		day := civil.day.str()
+		date_text = if d.settings.clock_show_weekday {
+			'${weekday_names[civil.weekday]} ${day} ${month_names[civil.month - 1]}'
+		} else {
+			'${day} ${month_names[civil.month - 1]}'
+		}
+		unsafe { day.free() }
+	} else if d.settings.clock_show_weekday {
+		date_text = weekday_names[civil.weekday].clone()
+	}
 	return time_text, date_text
 }
 
