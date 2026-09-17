@@ -259,6 +259,7 @@ fn main() {
 		} else {
 			desktop.render(tree)
 		}
+		desktop.render_create_context_menu()
 		after_render := monotonic_millis()
 
 		if partial_drag_frame {
@@ -332,10 +333,16 @@ fn (mut d Desktop) pump_pointer(mut pointer PointerDevice, width int, height int
 		click = TitlebarClick{}
 	}
 	if packet.pressed & button_left != 0 {
-		click = d.titlebar_pointer_down_at(click, pointer_x, pointer_y, desktop_monotonic_ms())
+		if d.create_context_left_down(pointer_x, pointer_y) {
+			click = TitlebarClick{}
+		} else {
+			click = d.titlebar_pointer_down_at(click, pointer_x, pointer_y, desktop_monotonic_ms())
+		}
 	}
 	if packet.released & button_left != 0 {
-		d.on_pointer_up(pointer_x, pointer_y)
+		if !take_create_context_left_release() {
+			d.on_pointer_up(pointer_x, pointer_y)
+		}
 	}
 	if packet.pressed & button_middle != 0 {
 		d.on_app_pointer_button(pointer_x, pointer_y, .down, .middle)
@@ -344,10 +351,16 @@ fn (mut d Desktop) pump_pointer(mut pointer PointerDevice, width int, height int
 		d.on_app_pointer_button(pointer_x, pointer_y, .up, .middle)
 	}
 	if packet.pressed & button_right != 0 {
-		d.on_app_pointer_button(pointer_x, pointer_y, .down, .right)
+		if d.open_create_context_menu(pointer_x, pointer_y) {
+			click = TitlebarClick{}
+		} else {
+			d.on_app_pointer_button(pointer_x, pointer_y, .down, .right)
+		}
 	}
 	if packet.released & button_right != 0 {
-		d.on_app_pointer_button(pointer_x, pointer_y, .up, .right)
+		if !take_create_context_right_release() {
+			d.on_app_pointer_button(pointer_x, pointer_y, .up, .right)
+		}
 	}
 	if packet.scroll != 0 {
 		d.on_app_pointer_scroll(pointer_x, pointer_y, int(packet.scroll))

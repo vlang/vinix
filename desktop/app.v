@@ -68,7 +68,7 @@ const available_apps = [
 		width: 460
 		height: 360
 		process_name: 'vinix-files'
-		open: open_files
+		open: open_files_with_context_menu
 	},
 	AppFactory{
 		title: 'Firefox'
