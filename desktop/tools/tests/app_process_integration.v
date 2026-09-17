@@ -5,6 +5,7 @@
 // installed per-app symlinks do on Vinix.
 module main
 
+import os
 import ui2
 
 fn tree_has_id(element ui2.Element, id string) bool {
@@ -13,6 +14,18 @@ fn tree_has_id(element ui2.Element, id string) bool {
 	}
 	for child in element.children {
 		if tree_has_id(child, id) {
+			return true
+		}
+	}
+	return false
+}
+
+fn tree_contains_text(element ui2.Element, text string) bool {
+	if element.text.contains(text) {
+		return true
+	}
+	for child in element.children {
+		if tree_contains_text(child, text) {
 			return true
 		}
 	}
@@ -50,10 +63,10 @@ fn main() {
 	// requests after startup still fail promptly through the timeout above.
 	assert app_startup_response_timeout_ms > app_response_timeout_ms
 
-	// Remote polling is paced before a pipe request is sent. In particular,
-	// the once-a-second Activity Monitor must not wake itself and the compositor
-	// on every 16 ms desktop pass just to answer "not yet".
-	assert available_apps[3].poll_interval_ms == 1000
+	// Remote polling is paced before a pipe request is sent. Terminal keeps a
+	// short fallback cadence because its PTY echo can arrive just after the
+	// immediate poll forced by a keystroke. Activity Monitor can remain slow.
+	assert available_apps[3].poll_interval_ms == 100
 	assert available_apps[5].poll_interval_ms == 1000
 	assert available_apps[8].poll_interval_ms == 100
 	assert available_apps[10].poll_interval_ms == 0
@@ -157,6 +170,27 @@ fn main() {
 	restored_tree := terminal.build(ui2.rect(0, 0, 560, 316)) or { panic(err) }
 	assert restored_tree.kind == .screen
 	free_tree(restored_tree)
+
+	// Keyboard input crosses the app pipe and then the PTY. The first forced
+	// poll can beat the slave's echo, so prove the Terminal's fallback cadence
+	// makes ordinary typing visible promptly through the real remote process.
+	if os.exists(terminal_shell) {
+		if mut terminal is RemoteApp {
+			terminal.key_input('vinix-remote-input')
+			mut echoed := false
+			for _ in 0 .. 20 {
+				terminal.poll()
+				input_tree := terminal.build(ui2.rect(0, 0, 560, 316)) or { panic(err) }
+				echoed = tree_contains_text(input_tree, 'vinix-remote-input')
+				free_tree(input_tree)
+				if echoed {
+					break
+				}
+				desktop_sleep_ms(10)
+			}
+			assert echoed
+		}
+	}
 	close_remote(mut terminal)
 	desktop_restore_requested_scale()
 }
