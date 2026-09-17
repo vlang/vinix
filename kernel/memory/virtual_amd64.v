@@ -4,8 +4,13 @@ module memory
 import lib
 import limine
 import x86.cpu
+import x86.msr
 
 pub const pte_flags_mask = ~(u64(0xfff) | pte_present | pte_writable | pte_user | pte_noexec)
+
+const amd64_msr_efer = u32(0xc0000080)
+const amd64_efer_nxe = u64(1) << 11
+const amd64_cpuid_nx = u32(1) << 20
 
 __global (
 	la57 = bool(false)
@@ -13,6 +18,20 @@ __global (
 
 pub fn user_address_limit() u64 {
 	return if la57 { u64(1) << 56 } else { u64(1) << 47 }
+}
+
+// Vinix installs bit 63 in non-executable PTEs, so NX is a required amd64
+// facility rather than an optional optimization. Enable EFER.NXE explicitly
+// on every CPU instead of depending on firmware or the bootloader to leave it
+// set. OpenBSD likewise programs EFER.NXE before relying on NX page entries.
+pub fn enable_nx() {
+	supported, _, _, _, edx := cpu.cpuid(0x80000001, 0)
+	if !supported || edx & amd64_cpuid_nx == 0 {
+		panic('security: amd64 CPU does not support NX')
+	}
+	mut efer := msr.rdmsr(amd64_msr_efer)
+	efer |= amd64_efer_nxe
+	msr.wrmsr(amd64_msr_efer, efer)
 }
 
 pub fn new_pagemap() &Pagemap {
@@ -267,6 +286,10 @@ __global (
 )
 
 pub fn vmm_init() {
+	// Enable NXE before the first Vinix-owned page table containing NX entries
+	// becomes active. This removes a hidden dependency on Limine's EFER state.
+	enable_nx()
+
 	if paging_mode_req.response != unsafe { nil } {
 		if paging_mode_req.response.mode == limine.limine_paging_mode_x86_64_5lvl {
 			print('vmm: Using 5 level paging\n')

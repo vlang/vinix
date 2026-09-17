@@ -33,6 +33,9 @@ pub fn initialise(smp_info &limine.LimineSMPInfo) {
 
 	cpu_local.tss.ist4 = u64(&cpu_local.abort_stack[cpulocal.abort_stack_size - 1])
 
+	// EFER is per-CPU. APs must enable NXE before switching to Vinix page
+	// tables, just as the BSP does during vmm_init().
+	memory.enable_nx()
 	kernel_pagemap.switch_to()
 
 	unsafe {
