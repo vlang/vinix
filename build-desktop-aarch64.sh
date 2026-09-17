@@ -60,18 +60,22 @@ file_size() {
     fi
 }
 
-# A layer builder replaces its staging root when that layer is rebuilt. Use the
-# root's generation rather than walking and hashing gigabytes of Blender,
-# Minecraft, Wine or Mesa on every desktop launch. Regular archive inputs use
-# the same cheap identity. The path itself is written beside this value in the
-# manifest, so switching an override to another staging tree also invalidates
-# the cache.
+# Most layer builders replace their staging root when rebuilt, so inode/mtime
+# is enough to notice a new generation without hashing gigabytes of Blender,
+# Minecraft, Wine or Mesa contents. build-x11-aarch64.sh intentionally updates
+# its staging and sysroot trees in place; use a metadata-only tree fingerprint
+# for those two inputs so a nested library rebuild cannot leave this cache
+# stale. Metadata mode never reads file contents.
 path_generation() {
     local path="$1"
     local value
 
     if [ ! -e "$path" ] && [ ! -L "$path" ]; then
         printf 'missing'
+        return 0
+    fi
+    if [ "$path" = "$X11_STAGING" ] || [ "$path" = "$GPU_SYSROOT" ]; then
+        python3 "$SCRIPT_DIR/build-support/content-key.py" --metadata "$path"
         return 0
     fi
     if value="$(stat -f '%d:%i:%m:%z' "$path" 2>/dev/null)"; then
