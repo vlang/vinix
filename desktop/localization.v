@@ -10,6 +10,10 @@ import ui2
 const desktop_i18n_language_names = ['en', 'ru']
 const desktop_i18n_search_dirs = ['/usr/share/vinix/translations', '/root/desktop/translations',
 	'desktop/translations', 'translations']
+const desktop_weekday_keys = ['calendar.sun', 'calendar.mon', 'calendar.tue', 'calendar.wed',
+	'calendar.thu', 'calendar.fri', 'calendar.sat']
+const desktop_month_keys = ['month.jan', 'month.feb', 'month.mar', 'month.apr', 'month.may',
+	'month.jun', 'month.jul', 'month.aug', 'month.sep', 'month.oct', 'month.nov', 'month.dec']
 // ui2 has no translation metadata field. Text carrying this private id is
 // document/user data and must never be interpreted as an interface string.
 const desktop_i18n_raw_text_id = '__vinix.i18n.raw_text'
@@ -82,6 +86,20 @@ fn desktop_tr_for(language SystemLanguage, key string) string {
 // Explicit-key lookup for code that already has a semantic translation key.
 fn desktop_tr(key string) string {
 	return desktop_tr_for(desktop_i18n_language, key)
+}
+
+fn desktop_weekday_short(language SystemLanguage, weekday int) string {
+	if weekday < 0 || weekday >= desktop_weekday_keys.len {
+		return ''
+	}
+	return desktop_tr_for(language, desktop_weekday_keys[weekday])
+}
+
+fn desktop_month_short(language SystemLanguage, month int) string {
+	if month < 1 || month > desktop_month_keys.len {
+		return ''
+	}
+	return desktop_tr_for(language, desktop_month_keys[month - 1])
 }
 
 // ui2 applications historically supplied English literals. The renderer maps
