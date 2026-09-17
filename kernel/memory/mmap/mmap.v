@@ -18,9 +18,25 @@ pub const map_fixed_noreplace = 0x100000
 pub const map_anon = 0x20
 pub const map_anonymous = 0x20
 
+const prot_mask = prot_read | prot_write | prot_exec
 const ms_async = 1
 const ms_invalidate = 2
 const ms_sync = 4
+
+// OpenBSD-style W^X policy. User mappings may be writable or executable, but
+// never both at the same time. RW -> RX transitions remain valid for JITs and
+// dynamic linkers. Keep this in the shared VM layer so every ABI and both
+// architectures inherit the same policy.
+fn validate_protection(prot int) ? {
+	if prot & ~prot_mask != 0 {
+		errno.set(errno.einval)
+		return none
+	}
+	if prot & (prot_write | prot_exec) == (prot_write | prot_exec) {
+		errno.set(errno.enotsup)
+		return none
+	}
+}
 
 // Private bookkeeping flag for the one large brk arena.  Only the committed
 // portion up to brk_current is charged to RLIMIT_AS; the inaccessible reserve
@@ -535,6 +551,7 @@ pub fn resolve_cow_fault(_pagemap &memory.Pagemap, address u64) bool {
 }
 
 pub fn map_range(mut pagemap memory.Pagemap, _virt_addr u64, phys_addr u64, _length u64, prot int, _flags int) ? {
+	validate_protection(prot)?
 	flags := _flags | map_anonymous
 
 	virt_addr := lib.align_down(_virt_addr, page_size)
@@ -577,6 +594,7 @@ pub fn map_range(mut pagemap memory.Pagemap, _virt_addr u64, phys_addr u64, _len
 // pages. Large executable images do not require physically contiguous RAM;
 // keeping one range also lets munmap/mprotect treat the mapping normally.
 pub fn map_pages(mut pagemap memory.Pagemap, virt_addr u64, phys_pages []u64, prot int, _flags int) ? {
+	validate_protection(prot)?
 	if phys_pages.len == 0 || virt_addr != lib.align_down(virt_addr, page_size) {
 		return none
 	}
@@ -647,6 +665,7 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
 	mut pagemap := unsafe { _pagemap }
 	mut resource_ := unsafe { _resource }
 
+	validate_protection(prot)?
 	if _length == 0 {
 		C.printf(c'mmap: length is 0\n')
 		errno.set(errno.einval)
@@ -937,6 +956,7 @@ pub fn syscall_msync(_ voidptr, addr u64, _length u64, flags int) (u64, u64) {
 }
 
 pub fn mprotect(mut pagemap memory.Pagemap, addr voidptr, len u64, prot int) ? {
+	validate_protection(prot)?
 	// mmap() deliberately leaves PROT_NONE reservations without physical pages.
 	// ARM64 HVF cannot reliably resume every paired load/store page fault, so
 	// populate pages here, before an application can touch a newly accessible
@@ -984,6 +1004,7 @@ fn populate_missing_pages(mut pagemap memory.Pagemap, address u64, _length u64, 
 }
 
 pub fn mprotect_unlocked(mut pagemap memory.Pagemap, addr voidptr, _length u64, prot int) ? {
+	validate_protection(prot)?
 	if _length == 0 {
 		C.printf(c'mprotect: length is 0\n')
 		errno.set(errno.einval)
