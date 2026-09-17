@@ -33,6 +33,8 @@ fn desktop_preferences_valid(p DesktopPreferences) bool {
 		&& int(p.settings.taskbar_mode) <= int(TaskbarMode.combined)
 		&& int(p.settings.theme) >= int(ThemeKind.default_)
 		&& int(p.settings.theme) <= int(ThemeKind.macos)
+		&& int(p.settings.language) >= int(SystemLanguage.en)
+		&& int(p.settings.language) <= int(SystemLanguage.ru)
 		&& p.settings.wallpaper_color >= 0
 		&& p.settings.wallpaper_color < wallpaper_colors.len
 		&& p.settings.wallpaper_image >= -1
@@ -50,11 +52,12 @@ fn desktop_encode_preferences(p DesktopPreferences) ?string {
 	side := if p.settings.button_side == .left { 'left' } else { 'right' }
 	taskbar := if p.settings.taskbar_mode == .combined { 'combined' } else { 'standard' }
 	theme := if p.settings.theme == .macos { 'macos' } else { 'default' }
+	language := if p.settings.language == .ru { 'ru' } else { 'en' }
 	clock_24_hour := if p.settings.clock_24_hour { 'true' } else { 'false' }
 	clock_show_seconds := if p.settings.clock_show_seconds { 'true' } else { 'false' }
 	clock_show_date := if p.settings.clock_show_date { 'true' } else { 'false' }
 	clock_show_weekday := if p.settings.clock_show_weekday { 'true' } else { 'false' }
-	return 'version=1\nscale=${scale}\nbutton_side=${side}\ntaskbar_mode=${taskbar}\ntheme=${theme}\nclock_24_hour=${clock_24_hour}\nclock_show_seconds=${clock_show_seconds}\nclock_show_date=${clock_show_date}\nclock_show_weekday=${clock_show_weekday}\nwallpaper_color=${p.settings.wallpaper_color}\nwallpaper_image=${p.settings.wallpaper_image}\n'
+	return 'version=1\nscale=${scale}\nbutton_side=${side}\ntaskbar_mode=${taskbar}\ntheme=${theme}\nlanguage=${language}\nclock_24_hour=${clock_24_hour}\nclock_show_seconds=${clock_show_seconds}\nclock_show_date=${clock_show_date}\nclock_show_weekday=${clock_show_weekday}\nwallpaper_color=${p.settings.wallpaper_color}\nwallpaper_image=${p.settings.wallpaper_image}\n'
 }
 
 // Unlike string.int(), this cannot accept a numeric prefix or wrap on overflow.
@@ -122,6 +125,7 @@ fn desktop_parse_preferences(record string) ?DesktopPreferences {
 			'clock_show_seconds' { u32(256) }
 			'clock_show_date' { u32(512) }
 			'clock_show_weekday' { u32(1024) }
+			'language' { u32(2048) }
 			else { u32(0) }
 		}
 		if seen & bit != 0 {
@@ -147,7 +151,8 @@ fn desktop_parse_preferences(record string) ?DesktopPreferences {
 					else { return none }
 				}
 			}
-			'taskbar_mode' {
+		
+'taskbar_mode' {
 				p.settings.taskbar_mode = match value {
 					'standard' { TaskbarMode.standard }
 					'combined' { TaskbarMode.combined }
@@ -159,6 +164,13 @@ fn desktop_parse_preferences(record string) ?DesktopPreferences {
 				p.settings.theme = match value {
 					'default' { ThemeKind.default_ }
 					'macos' { ThemeKind.macos }
+					else { return none }
+				}
+			}
+			'language' {
+				p.settings.language = match value {
+					'en' { SystemLanguage.en }
+					'ru' { SystemLanguage.ru }
 					else { return none }
 				}
 			}
