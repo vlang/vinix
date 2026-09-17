@@ -73,17 +73,41 @@ fn pad2(value int) string {
 // width entirely for window buttons.
 fn (d &Desktop) taskbar_clock_strings_at(seconds i64) (string, string) {
 	if seconds < 0 {
-		return '--:--:--'.clone(), 'Clock unavailable'.clone()
+		return if d.settings.clock_show_seconds { '--:--:--'.clone() } else { '--:--'.clone() },
+			'Clock unavailable'.clone()
 	}
 	civil := civil_from_epoch(seconds + d.tz_offset_seconds)
-	hour := pad2(civil.hour)
 	minute := pad2(civil.minute)
-	second := pad2(civil.second)
-	time_text := '${hour}:${minute}:${second}'
+	mut hour := ''
+	if d.settings.clock_24_hour {
+		hour = pad2(civil.hour)
+	} else {
+		mut display_hour := civil.hour % 12
+		if display_hour == 0 {
+			display_hour = 12
+		}
+		hour = display_hour.str()
+	}
+	suffix := if civil.hour < 12 { 'AM' } else { 'PM' }
+	mut time_text := ''
+	if d.settings.clock_show_seconds {
+		second := pad2(civil.second)
+		time_text = if d.settings.clock_24_hour {
+			'${hour}:${minute}:${second}'
+		} else {
+			'${hour}:${minute}:${second} ${suffix}'
+		}
+		unsafe { second.free() }
+	} else {
+		time_text = if d.settings.clock_24_hour {
+			'${hour}:${minute}'
+		} else {
+			'${hour}:${minute} ${suffix}'
+		}
+	}
 	unsafe {
 		hour.free()
 		minute.free()
-		second.free()
 	}
 	day := civil.day.str()
 	date_text := '${weekday_names[civil.weekday]} ${day} ${month_names[civil.month - 1]}'

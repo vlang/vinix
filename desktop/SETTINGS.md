@@ -3,8 +3,9 @@
 ## Saved desktop preferences
 
 All desktop preferences use **one file**, `/root/.vinix-desktop-settings`:
-window-button side, taskbar grouping, theme, wallpaper colour and image, and
-scale. It is a versioned, human-readable snapshot, for example:
+window-button side, taskbar grouping, taskbar clock format and seconds, theme,
+wallpaper colour and image, and scale. It is a versioned, human-readable
+snapshot, for example:
 
 ```ini
 version=1
@@ -12,19 +13,23 @@ scale=2
 button_side=left
 taskbar_mode=combined
 theme=macos
+clock_24_hour=false
+clock_show_seconds=false
 wallpaper_color=4
 wallpaper_image=2
 ```
 
 `scale` is `auto`, `1` (100%) or `2` (200%). The other choices are `right`/`left`,
-`standard`/`combined` and `default`/`macos`. Wallpaper values are the same
-zero-based catalogue indices used by Settings; image `-1` selects the colour.
-If an image is not available in the current build, the renderer uses the saved
-colour instead.
+`standard`/`combined` and `default`/`macos`. Clock choices are `true`/`false`;
+both default to `true`, preserving the historical 24-hour clock with seconds
+when an older version-1 snapshot omits the new keys. Wallpaper values are the
+same zero-based catalogue indices used by Settings; image `-1` selects the
+colour. If an image is not available in the current build, the renderer uses
+the saved colour instead.
 
 The compositor loads the snapshot before allocating its canvas or launching
 applications. After accepting Settings changes and applying any scale change,
-it atomically saves the **whole** snapshot. A theme-only or wallpaper-only
+it atomically saves the **whole** snapshot. A theme-, clock- or wallpaper-only
 change is saved too and does not discard other preferences. Until scale has
 actually been changed, saves retain `scale=auto`, so appearance changes do not
 pin the current display's automatic scale. Unchanged frames, device refreshes,
@@ -73,11 +78,27 @@ Brightness and Wi-Fi controls operate on devices; their live/pending readbacks,
 scan results and battery measurements are not desktop preferences and are not
 serialized or replayed at startup.
 
-To verify in QEMU, change each appearance option, choose a wallpaper and switch
-scale to 200%. Inspect `cat /root/.vinix-desktop-settings`, shut down cleanly,
-and relaunch with the same volume. All choices should be restored. Change only
-the theme or wallpaper and repeat to verify the scale and other values survive.
-Also check 100%, resetting the file, and migration from a legacy `2\n` record.
+To verify in QEMU, change each appearance option, switch the clock to 12-hour
+time without seconds, choose a wallpaper and switch scale to 200%. Inspect
+`cat /root/.vinix-desktop-settings`, shut down cleanly, and relaunch with the
+same volume. All choices should be restored. Change only the theme, clock or
+wallpaper and repeat to verify the scale and other values survive. Also check
+100%, resetting the file, and migration from a legacy `2\n` record.
+
+## Date & Time
+
+Select **Date & Time** to control the compact taskbar clock. **Time format**
+switches between a 24-hour clock and a 12-hour clock with AM/PM. **Seconds** can
+be shown or hidden independently. The date line remains visible in either
+format. These settings affect the taskbar clock only; the standalone Clock
+application keeps its own full clock presentation.
+
+Both choices take effect immediately. The Settings process returns the changed
+preference state over the desktop application protocol, the compositor
+invalidates its cached taskbar clock text, and the next frame uses the new
+format. The choices are part of the same atomic preference snapshot described
+above, so they survive restart and older version-1 files continue to use the
+old 24-hour-with-seconds default.
 
 ## Wi-Fi
 
@@ -177,6 +198,9 @@ owns the requested/applied integer scale and default policy. `scale_wm.v` swaps
 the compositor's logical canvas between physical size and half size, remaps
 window/pointer positions and invalidates stale hit targets. `framebuffer.v`
 keeps its existing 100% fast path and expands the half-size canvas at 200%.
+`clock.v` formats the taskbar clock according to the saved clock preferences;
+`app_process.v` carries those preferences between the separate Settings process
+and the compositor.
 
 `backlight_client.v` owns brightness parsing, native
 `BacklightState`/`BacklightResult`, percentage calculations and bounded command
@@ -200,24 +224,25 @@ CLIENTS_ONLY=1 V=/path/to/v sh desktop/tools/test-settings.sh
 The runner requires V and, for UI tests, `third_party/ui2`; it does not silently
 skip missing dependencies. `VFLAGS` can select the compiler/backend or
 sanitizers. Settings regression cases cover both scale choices, stale scale hit
-targets, MacBook/low-density defaults, odd-size logical extents, explicit
-brightness writes, stale brightness hit targets, unknown readback, failed
-writes, category switching, Wi-Fi radio and scan actions, network sorting,
-refresh and narrow layouts. The client tests cover strict snapshots and ioctl
-records, arithmetic and parser limits, permissions, offline and missing devices,
-short writes, bounded interruptions, exact descriptor cleanup, and a round-trip
-with the actual **V kernel backlight core**. The POSIX tests exercise real files,
-shared mapping, directories, `/dev/null`, monotonic clocks and a PTY, including
-restoration of both terminal attributes and descriptor flags. Preference tests
-also run with `CLIENTS_ONLY=1` and use temporary homes, never `/root`. They cover
-every saved field, both scale overrides, auto-scale preservation, defaults,
-strict bounded parsing, legacy migration and precedence, commit-before-save
-ordering, atomic replacement through `os.File`, failed saves and cleanup, and
-pre-read rejection of existing FIFOs and symlinks. They also check that a
-dangling unified-file symlink does not trigger legacy migration and that a
-legacy directory is not removed. The full UI suite additionally exercises
-actual Settings actions and compositor
-scale application before saving and restoring the complete snapshot.
+targets, MacBook/low-density defaults, odd-size logical extents, taskbar clock
+format/seconds, explicit brightness writes, stale brightness hit targets,
+unknown readback, failed writes, category switching, Wi-Fi radio and scan
+actions, network sorting, refresh and narrow layouts. The client tests cover
+strict snapshots and ioctl records, arithmetic and parser limits, permissions,
+offline and missing devices, short writes, bounded interruptions, exact
+descriptor cleanup, and a round-trip with the actual **V kernel backlight core**.
+The POSIX tests exercise real files, shared mapping, directories, `/dev/null`,
+monotonic clocks and a PTY, including restoration of both terminal attributes
+and descriptor flags. Preference tests also run with `CLIENTS_ONLY=1` and use
+temporary homes, never `/root`. They cover every saved field, both scale
+overrides, auto-scale preservation, defaults, strict bounded parsing, legacy
+migration and precedence, commit-before-save ordering, atomic replacement
+through `os.File`, failed saves and cleanup, and pre-read rejection of existing
+FIFOs and symlinks. They also check that a dangling unified-file symlink does
+not trigger legacy migration and that a legacy directory is not removed. The
+full UI suite additionally exercises actual Settings actions, clock formatting,
+application-protocol state, and compositor scale application before saving and
+restoring the complete snapshot.
 
 Desktop scaling is independent of the DCP backlight transport and never changes
 the status of physical brightness adjustment.

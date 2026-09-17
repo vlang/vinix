@@ -2,20 +2,29 @@ module kprint
 
 import dev.serial
 import term
+import usercopy
+
+const syscall_kprint_max = u64(4096)
 
 pub fn syscall_kprint(_ voidptr, message charptr) {
 	$if !prod {
-		msglen := unsafe { u64(C.strlen(message)) }
-
-		kprint_lock.acquire()
-
-		unsafe {
-			for i := 0; i < msglen; i++ {
-				serial.out(message[i])
-			}
-			serial.out(`\n`)
+		if message == unsafe { nil } {
+			return
 		}
-		kprint_lock.release()
+		kprint_lock.acquire()
+		defer { kprint_lock.release() }
+
+		for i := u64(0); i < syscall_kprint_max; i++ {
+			mut ch := u8(0)
+			if !usercopy.copy_from_user(voidptr(&ch), u64(message) + i, 1) {
+				return
+			}
+			if ch == 0 {
+				serial.out(`\n`)
+				return
+			}
+			serial.out(ch)
+		}
 	}
 }
 

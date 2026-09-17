@@ -33,14 +33,18 @@ fn registration_test_home(name string) string {
 	return home
 }
 
-fn test_registration_form_is_the_only_first_launch_surface() {
-	mut desktop := Desktop{
+fn registration_test_desktop() Desktop {
+	return Desktop{
 		canvas: Canvas{
 			width:  1024
 			height: 720
 			scale:  1
 		}
 	}
+}
+
+fn test_registration_form_is_the_only_first_launch_surface() {
+	desktop := registration_test_desktop()
 	mut state := new_registration_state()
 	defer { state.close() }
 	begin_frame_elements()
@@ -49,14 +53,62 @@ fn test_registration_form_is_the_only_first_launch_surface() {
 
 	assert root.kind == .screen
 	assert registration_test_element_named(root, 'registration.window') != none
-	assert registration_test_element_named(root, action_registration_name) != none
-	assert registration_test_element_named(root, action_registration_password) != none
-	assert registration_test_element_named(root, action_registration_confirm) != none
+	name := registration_test_element_named(root, action_registration_name) or {
+		panic('missing name field')
+	}
+	password := registration_test_element_named(root, action_registration_password) or {
+		panic('missing password field')
+	}
+	confirm := registration_test_element_named(root, action_registration_confirm) or {
+		panic('missing confirm field')
+	}
+	assert name.kind == .text_field
+	assert password.kind == .text_field
+	assert confirm.kind == .text_field
 	assert registration_test_element_named(root, action_registration_create) != none
 	assert registration_test_element_named(root, 'taskbar') == none
 	assert !registration_test_has_action_prefix(root, 'task.')
 	assert !registration_test_has_action_prefix(root, 'shortcut.')
 	assert !registration_test_has_action_prefix(root, 'win.')
+}
+
+fn test_registration_caret_is_drawn_by_the_ui2_text_field() {
+	desktop := registration_test_desktop()
+	mut state := new_registration_state()
+	defer { state.close() }
+
+	begin_frame_elements()
+	root := state.element(&desktop)
+	name := registration_test_element_named(root, action_registration_name) or {
+		panic('missing name field')
+	}
+	password := registration_test_element_named(root, action_registration_password) or {
+		panic('missing password field')
+	}
+	assert name.kind == .text_field
+	assert name.text == '|'
+	assert name.children.len == 0
+	assert password.kind == .text_field
+	assert password.text == 'Enter a password'
+	assert registration_test_element_named(root, 'registration.caret') == none
+	free_tree(root)
+
+	state.key_input('alex\tsecret', '')
+	begin_frame_elements()
+	password_root := state.element(&desktop)
+	name_inactive := registration_test_element_named(password_root, action_registration_name) or {
+		panic('missing name field')
+	}
+	password_active := registration_test_element_named(password_root, action_registration_password) or {
+		panic('missing password field')
+	}
+	assert name_inactive.kind == .text_field
+	assert name_inactive.text == 'alex'
+	assert password_active.kind == .text_field
+	assert password_active.text == '******|'
+	assert !password_active.text.contains('secret')
+	assert registration_test_element_named(password_root, 'registration.caret') == none
+	free_tree(password_root)
 }
 
 fn test_registration_keyboard_cannot_dismiss_setup() {
@@ -70,6 +122,7 @@ fn test_registration_keyboard_cannot_dismiss_setup() {
 	assert !state.complete
 	assert state.field == .name
 	assert state.name.len == 0
+	assert registration_text(state.name_display) == '|'
 }
 
 fn test_registration_rejects_password_mismatch() {
@@ -85,7 +138,7 @@ fn test_registration_rejects_password_mismatch() {
 	assert !os.exists(desktop_user_record_path(home))
 }
 
-fn test_registration_persists_only_a_password_verifier() {
+fn test_registration_persists_verifier_and_user_home() {
 	home := registration_test_home('persist')
 	defer { os.rmdir_all(home) or {} }
 	mut state := new_registration_state()
@@ -108,4 +161,21 @@ fn test_registration_persists_only_a_password_verifier() {
 	assert record.contains('hash=')
 	info := os.stat(path)!
 	assert info.mode & 0o777 == 0o600
+
+	user_home := desktop_user_home_path(home, 'Alice Example')
+	defer { unsafe { user_home.free() } }
+	assert user_home.ends_with('/alice-example')
+	assert os.is_dir(user_home)
+	home_info := os.stat(user_home)!
+	assert home_info.mode & 0o777 == registration_user_home_mode
+
+	// Profiles written by the first registration implementation did not have a
+	// home directory. A later launch repairs that profile rather than asking the
+	// user to register again.
+	os.rmdir(user_home)!
+	assert !os.exists(user_home)
+	assert desktop_user_registered(home)
+	assert os.is_dir(user_home)
+	repaired := os.stat(user_home)!
+	assert repaired.mode & 0o777 == registration_user_home_mode
 }

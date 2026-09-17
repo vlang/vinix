@@ -29,6 +29,9 @@ mut:
 	button_side  ButtonSide
 	taskbar_mode TaskbarMode
 	theme        ThemeKind
+	// Clock defaults preserve the desktop's existing taskbar presentation.
+	clock_24_hour      bool = true
+	clock_show_seconds bool = true
 	// Index into wallpaper_colors, used when no image is chosen.
 	wallpaper_color int
 	// Index into the wallpaper images, or -1 for the colour above.
