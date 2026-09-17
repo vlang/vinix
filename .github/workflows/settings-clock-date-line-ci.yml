@@ -1,0 +1,25 @@
+name: Settings date line test
+
+on:
+  push:
+    branches:
+      - settings-clock-date-line-ci
+
+jobs:
+  settings:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Build V
+        run: |
+          git clone https://github.com/vlang/v.git "$RUNNER_TEMP/v" --depth=1
+          make -C "$RUNNER_TEMP/v"
+
+      - name: Fetch ui2
+        run: |
+          git clone https://github.com/vlang/ui2 third_party/ui2
+          git -C third_party/ui2 checkout d13259f6167367ad8ebd6b2aa4a1f35c59bb1551
+
+      - name: Run Settings tests
+        run: V="$RUNNER_TEMP/v/v" ./desktop/tools/test-settings.sh
