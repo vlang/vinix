@@ -98,7 +98,7 @@ jobs:
           source = tests.read_text()
           marker = 'fn test_titlebar_drag_can_move_partly_offscreen()'
           if marker not in source:
-              source += r'''
+              source += '''
 
           fn test_titlebar_drag_can_move_partly_offscreen() {
           \tmut desktop := Desktop{
