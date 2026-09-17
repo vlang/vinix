@@ -14,6 +14,7 @@ import memory
 import x86.hypervisor
 
 const cpuid7_ebx_smep = u32(1) << 7
+const cr0_write_protect = u64(1) << 16
 const cr4_smep = u64(1) << 20
 
 pub fn initialise(smp_info &limine.LimineSMPInfo) {
@@ -70,10 +71,12 @@ pub fn initialise(smp_info &limine.LimineSMPInfo) {
 	cpu.set_gs_base(u64(&cpu_local.cpu_number))
 	cpu.set_kernel_gs_base(u64(&cpu_local.cpu_number))
 
-	// Enable SSE/SSE2
+	// Enable SSE/SSE2 and make supervisor writes obey read-only PTEs. OpenBSD
+	// explicitly enables CR0.WP so kernel text and rodata cannot be modified
+	// merely because the access originates at ring 0.
 	mut cr0 := cpu.read_cr0()
 	cr0 &= ~(1 << 2)
-	cr0 |= (1 << 1)
+	cr0 |= (1 << 1) | cr0_write_protect
 	cpu.write_cr0(cr0)
 
 	mut cr4 := cpu.read_cr4()
