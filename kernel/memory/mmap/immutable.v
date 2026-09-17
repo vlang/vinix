@@ -30,6 +30,17 @@ fn immutable_overlap_unlocked(pagemap &memory.Pagemap, base u64, length u64) boo
 	return false
 }
 
+fn next_mapped_base_unlocked(pagemap &memory.Pagemap, address u64, end u64) u64 {
+	mut next := end
+	for ptr in pagemap.mmap_ranges {
+		range_local := unsafe { &MmapRangeLocal(ptr) }
+		if range_local.base > address && range_local.base < next {
+			next = range_local.base
+		}
+	}
+	return next
+}
+
 pub fn mimmutable(mut pagemap memory.Pagemap, address u64, _length u64) ? {
 	if _length == 0 {
 		return
@@ -58,9 +69,9 @@ fn mimmutable_unlocked(mut pagemap memory.Pagemap, base u64, length u64) ? {
 	mut current := base
 	for current < end {
 		mut local_range, _, _ := addr2range(pagemap, current) or {
-			// OpenBSD does not make holes sticky. A later mapping at this address
-			// is ordinary mutable memory, so just advance over the unmapped page.
-			current += page_size
+			// Holes do not become sticky, but a sparse request may cover terabytes.
+			// Jump to the next mapping instead of walking each absent page.
+			current = next_mapped_base_unlocked(pagemap, current, end)
 			continue
 		}
 		local_end := local_range.base + local_range.length
