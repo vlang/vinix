@@ -97,7 +97,10 @@ const available_apps = [
 		height: 340
 		process_name: 'vinix-terminal'
 		polling: true
-		poll_interval_ms: 1000
+		// Key input gets one immediate poll. If that races PTY echo, come back
+		// quickly enough that typing still feels interactive instead of waiting
+		// for the old one-second idle cadence.
+		poll_interval_ms: 100
 		keyboard: true
 		open: open_terminal
 	},
