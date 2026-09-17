@@ -107,3 +107,20 @@ fn test_file_browser_up_keeps_an_owned_parent_path() {
 		browser.error.free()
 	}
 }
+
+fn test_create_context_menu_uses_collision_safe_names() {
+	root := os.join_path(os.temp_dir(), 'vinix-create-context-test')
+	os.rmdir_all(root) or {}
+	os.mkdir_all(root) or { panic(err) }
+	defer { os.rmdir_all(root) or {} }
+
+	create_unique_item(root, .folder)!
+	create_unique_item(root, .folder)!
+	create_unique_item(root, .file)!
+	create_unique_item(root, .file)!
+
+	assert os.is_dir(os.join_path(root, 'New Folder'))
+	assert os.is_dir(os.join_path(root, 'New Folder (2)'))
+	assert os.is_file(os.join_path(root, 'New File'))
+	assert os.is_file(os.join_path(root, 'New File (2)'))
+}
