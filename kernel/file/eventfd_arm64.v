@@ -12,7 +12,6 @@ import katomic
 import klock
 import resource
 import stat
-import usercopy
 
 const efd_semaphore = 1
 
@@ -99,10 +98,7 @@ fn (mut this EventFD) read(_handle voidptr, buf voidptr, _loc u64, count u64) ?i
 	}
 
 	value := if this.semaphore { u64(1) } else { this.counter }
-	if !usercopy.copy_to_user(u64(buf), voidptr(&value), sizeof(u64)) {
-		errno.set(errno.efault)
-		return none
-	}
+	unsafe { *&u64(buf) = value }
 
 	this.counter -= value
 	if this.counter == 0 {
@@ -124,11 +120,7 @@ fn (mut this EventFD) write(_handle voidptr, buf voidptr, _loc u64, count u64) ?
 		return none
 	}
 
-	mut value := u64(0)
-	if !usercopy.copy_from_user(voidptr(&value), u64(buf), sizeof(u64)) {
-		errno.set(errno.efault)
-		return none
-	}
+	value := unsafe { *&u64(buf) }
 	if value == ~u64(0) {
 		errno.set(errno.einval)
 		return none
