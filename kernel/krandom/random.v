@@ -37,7 +37,8 @@ fn qr(a &u32, b &u32, c &u32, d &u32) {
 	}
 }
 
-// Generate one RFC 8439 ChaCha20 block. The caller serialises access.
+// ChaCha20 with the original 64-bit counter / 64-bit nonce layout.
+// The caller serialises access.
 fn (mut this Generator) block(mut out [16]u32) {
 	mut state := [16]u32{}
 	state[0] = 0x61707865
@@ -101,6 +102,14 @@ fn (mut this Generator) fill_locked(buf voidptr, count u64) {
 		}
 	}
 	securemem.zero(&block[0], usize(sizeof(block)))
+	// Retire the key that produced this request before fill() drops the lock.
+	// rekey() consumes a separate, undisclosed block; caller output is never
+	// reused as key material. Keep the in-loop limit for large requests.
+	// An exact limit-sized request has already rekeyed, and an empty request
+	// must not change generator state.
+	if count != 0 && this.output_ctr != 0 {
+		this.rekey()
+	}
 }
 
 pub fn initialise() {
