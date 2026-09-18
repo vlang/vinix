@@ -59,8 +59,8 @@ fn socket_name_to_user(mut sock sock_pub.Socket, handle voidptr, user_address vo
 		if to_copy > u64(capacity) {
 			to_copy = u64(capacity)
 		}
-		if to_copy > sockaddr_storage_size {
-			to_copy = sockaddr_storage_size
+		if to_copy > u64(sockaddr_storage_size) {
+			to_copy = u64(sockaddr_storage_size)
 		}
 		if to_copy != 0 && !usercopy.copy_to_user(u64(user_address), voidptr(&storage[0]), to_copy) {
 			errno.set(errno.efault)
@@ -525,8 +525,8 @@ pub fn syscall_recvfrom(_ voidptr, fdnum int, buf voidptr, len u64, flags int, s
 		if to_copy > u64(source_capacity) {
 			to_copy = u64(source_capacity)
 		}
-		if to_copy > sockaddr_storage_size {
-			to_copy = sockaddr_storage_size
+		if to_copy > u64(sockaddr_storage_size) {
+			to_copy = u64(sockaddr_storage_size)
 		}
 		if to_copy != 0
 			&& !usercopy.copy_to_user(u64(src_addr), voidptr(&source_storage[0]), to_copy) {
@@ -539,7 +539,7 @@ pub fn syscall_recvfrom(_ voidptr, fdnum int, buf voidptr, len u64, flags int, s
 	return u64(ret), 0
 }
 
-pub fn syscall_sendmsg(gpr_state voidptr, fdnum int, msg &sock_pub.MsgHdr, flags int) (u64, u64) {
+pub fn syscall_sendmsg(_gpr_state voidptr, fdnum int, msg &sock_pub.MsgHdr, flags int) (u64, u64) {
 	if msg == unsafe { nil } {
 		return errno.err, errno.efault
 	}
