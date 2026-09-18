@@ -765,7 +765,11 @@ fn syscall_linux_statx(gpr_state voidptr, dirfd int, path charptr, flags int, _m
 		return ret, err
 	}
 
-	convert_stat_to_statx(&vinix_stat, buf)
+	mut linux_statx := [256]u8{}
+	convert_stat_to_statx(&vinix_stat, u64(&linux_statx[0]))
+	if !usercopy.copy_to_user(buf, voidptr(&linux_statx[0]), u64(linux_statx.len)) {
+		return errno.err, errno.efault
+	}
 	return 0, 0
 }
 
@@ -795,24 +799,30 @@ fn convert_stat_to_linux(src &stat.Stat, dst u64) {
 }
 
 // fstatat wrapper: call Vinix fstatat with a local buffer, then convert to Linux layout.
-fn syscall_linux_fstatat(gpr_state voidptr, dirfd int, path charptr, linux_buf u64, flags int) (u64, u64) {
-	mut vinix_stat := stat.Stat{}
-	ret, err := fs.syscall_fstatat(gpr_state, dirfd, path, &vinix_stat, flags)
-	if err != 0 {
-		return ret, err
+fn syscall_linux_fstatat(_gpr_state voidptr, dirfd int, path charptr, linux_buf u64, flags int) (u64, u64) {
+	if linux_buf == 0 {
+		return errno.err, errno.efault
 	}
-	convert_stat_to_linux(&vinix_stat, linux_buf)
+	vinix_stat := fs.fstatat_value(dirfd, path, flags) or { return errno.err, errno.get() }
+	mut linux_stat := [128]u8{}
+	convert_stat_to_linux(&vinix_stat, u64(&linux_stat[0]))
+	if !usercopy.copy_to_user(linux_buf, voidptr(&linux_stat[0]), u64(linux_stat.len)) {
+		return errno.err, errno.efault
+	}
 	return 0, 0
 }
 
-// fstat wrapper: call Vinix fstat with a local buffer, then convert to Linux layout.
-fn syscall_linux_fstat(gpr_state voidptr, fdnum int, linux_buf u64) (u64, u64) {
-	mut vinix_stat := stat.Stat{}
-	ret, err := fs.syscall_fstat(gpr_state, fdnum, &vinix_stat)
-	if err != 0 {
-		return ret, err
+// fstat wrapper: fetch a kernel Stat value, then convert and copy out.
+fn syscall_linux_fstat(_gpr_state voidptr, fdnum int, linux_buf u64) (u64, u64) {
+	if linux_buf == 0 {
+		return errno.err, errno.efault
 	}
-	convert_stat_to_linux(&vinix_stat, linux_buf)
+	vinix_stat := fs.fstat_value(fdnum) or { return errno.err, errno.get() }
+	mut linux_stat := [128]u8{}
+	convert_stat_to_linux(&vinix_stat, u64(&linux_stat[0]))
+	if !usercopy.copy_to_user(linux_buf, voidptr(&linux_stat[0]), u64(linux_stat.len)) {
+		return errno.err, errno.efault
+	}
 	return 0, 0
 }
 

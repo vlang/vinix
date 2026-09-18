@@ -554,7 +554,7 @@ pub fn syscall_unlinkat(_ voidptr, dirfd int, _path charptr, flags int) (u64, u6
 	mut current_thread := proc.current_thread()
 	mut process := current_thread.process
 
-	C.printf(c'\n\e[32m%s\e[m: unlinkat(%d, %s, 0x%x)\n', process.name.str, dirfd, _path,
+	C.printf(c'\n\e[32m%s\e[m: unlinkat(%d, %p, 0x%x)\n', process.name.str, dirfd, _path,
 		flags)
 	defer {
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
@@ -580,7 +580,7 @@ pub fn syscall_rmdirat(_ voidptr, dirfd int, _path charptr) (u64, u64) {
 	mut current_thread := proc.current_thread()
 	mut process := current_thread.process
 
-	C.printf(c'\n\e[32m%s\e[m: rmdirat(%d, %s)\n', process.name.str, dirfd, _path)
+	C.printf(c'\n\e[32m%s\e[m: rmdirat(%d, %p)\n', process.name.str, dirfd, _path)
 	defer {
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
@@ -602,7 +602,7 @@ pub fn syscall_mkdirat(_ voidptr, dirfd int, _path charptr, mode u32) (u64, u64)
 	mut current_thread := proc.current_thread()
 	mut process := current_thread.process
 
-	C.printf(c'\n\e[32m%s\e[m: mkdirat(%d, %s, 0x%x)\n', process.name.str, dirfd, _path,
+	C.printf(c'\n\e[32m%s\e[m: mkdirat(%d, %p, 0x%x)\n', process.name.str, dirfd, _path,
 		mode)
 	defer {
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
@@ -693,7 +693,7 @@ pub fn syscall_readlinkat(_ voidptr, dirfd int, _path charptr, buf voidptr, limi
 	mut current_thread := proc.current_thread()
 	mut process := current_thread.process
 
-	C.printf(c'\n\e[32m%s\e[m: readlinkat(%d, %s, 0x%llx, 0x%llx)\n', process.name.str,
+	C.printf(c'\n\e[32m%s\e[m: readlinkat(%d, %p, 0x%llx, 0x%llx)\n', process.name.str,
 		dirfd, _path, buf, limit)
 	defer {
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
@@ -751,8 +751,10 @@ pub fn syscall_readlinkat(_ voidptr, dirfd int, _path charptr, buf voidptr, limi
 		to_copy = limit
 	}
 
-	unsafe { C.memcpy(buf, node.symlink_target.str, to_copy) }
-
+	if to_copy != 0
+		&& !usercopy.copy_to_user(u64(buf), node.symlink_target.str, to_copy) {
+		return errno.err, errno.efault
+	}
 	return to_copy, 0
 }
 
@@ -760,7 +762,7 @@ pub fn syscall_openat(_ voidptr, dirfd int, _path charptr, flags int, mode u32) 
 	mut current_thread := proc.current_thread()
 	mut process := current_thread.process
 
-	C.printf(c'\n\e[32m%s\e[m: openat(%d, %s, 0x%x, 0x%x)\n', process.name.str, dirfd,
+	C.printf(c'\n\e[32m%s\e[m: openat(%d, %p, 0x%x, 0x%x)\n', process.name.str, dirfd,
 		_path, flags, mode)
 	defer {
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
@@ -988,7 +990,17 @@ pub fn syscall_getcwd(_ voidptr, buf charptr, len u64) (u64, u64) {
 		return errno.err, errno.erange
 	}
 
-	C.strcpy(buf, cwd.str)
+	if buf == unsafe { nil } || !usercopy.probe_writable(u64(buf), bytes_needed) {
+		return errno.err, errno.efault
+	}
+	if cwd.len != 0
+		&& !usercopy.copy_to_user(u64(buf), voidptr(cwd.str), u64(cwd.len)) {
+		return errno.err, errno.efault
+	}
+	zero := u8(0)
+	if !usercopy.copy_to_user(u64(buf) + u64(cwd.len), voidptr(&zero), 1) {
+		return errno.err, errno.efault
+	}
 	return bytes_needed, 0
 }
 
@@ -996,7 +1008,7 @@ pub fn syscall_faccessat(_ voidptr, dirfd int, _path charptr, mode u32, flags in
 	mut current_thread := proc.current_thread()
 	mut process := current_thread.process
 
-	C.printf(c'\n\e[32m%s\e[m: faccessat(%d, %s, 0x%x, 0x%x)\n', process.name.str, dirfd,
+	C.printf(c'\n\e[32m%s\e[m: faccessat(%d, %p, 0x%x, 0x%x)\n', process.name.str, dirfd,
 		_path, mode, flags)
 	defer {
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
@@ -1025,49 +1037,55 @@ pub fn syscall_faccessat(_ voidptr, dirfd int, _path charptr, mode u32, flags in
 	return 0, 0
 }
 
+pub fn fstatat_value(dirfd int, _path charptr, flags int) ?stat.Stat {
+	current_process := proc.current_thread().process
+	path := user_path(_path)?
+	defer { unsafe { path.free() } }
+
+	if path.len == 0 {
+		if flags & at_empty_path == 0 {
+			errno.set(errno.enoent)
+			return none
+		}
+		if dirfd == at_fdcwd {
+			node := unsafe { &VFSNode(current_process.current_directory) }
+			return node.resource.stat
+		}
+		mut fd := file.fd_from_fdnum(current_process, dirfd)?
+		defer { fd.unref() }
+		return fd.handle.resource.stat
+	}
+
+	parent := get_parent_dir(dirfd, path)?
+	follow_links := flags & at_symlink_nofollow == 0
+	node := get_node(parent, path, follow_links)?
+	return node.resource.stat
+}
+
 pub fn syscall_fstatat(_ voidptr, dirfd int, _path charptr, statbuf &stat.Stat, flags int) (u64, u64) {
 	mut current_thread := proc.current_thread()
 	mut process := current_thread.process
 
-	C.printf(c'\n\e[32m%s\e[m: fstatat(%d, %s, 0x%llx, 0x%x)\n', process.name.str, dirfd,
+	C.printf(c'\n\e[32m%s\e[m: fstatat(%d, %p, 0x%llx, 0x%x)\n', process.name.str, dirfd,
 		_path, statbuf, flags)
 	defer {
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
-	current_process := proc.current_thread().process
-
-	path := user_path(_path) or { return errno.err, errno.get() }
-	defer { unsafe { path.free() } }
-
-	mut statsrc := &stat.Stat(unsafe { nil })
-
-	if path.len == 0 {
-		if flags & at_empty_path == 0 {
-			return errno.err, errno.enoent
-		}
-
-		if dirfd == at_fdcwd {
-			node := unsafe { &VFSNode(current_process.current_directory) }
-			statsrc = &node.resource.stat
-		} else {
-			fd := file.fd_from_fdnum(current_process, dirfd) or { return errno.err, errno.get() }
-			statsrc = &fd.handle.resource.stat
-		}
-	} else {
-		parent := get_parent_dir(dirfd, path) or { return errno.err, errno.get() }
-
-		follow_links := flags & at_symlink_nofollow == 0
-
-		node := get_node(parent, path, follow_links) or { return errno.err, errno.get() }
-
-		statsrc = &node.resource.stat
+	if statbuf == unsafe { nil } {
+		return errno.err, errno.efault
 	}
-
-	unsafe {
-		*statbuf = *statsrc
+	value := fstatat_value(dirfd, _path, flags) or { return errno.err, errno.get() }
+	if !usercopy.copy_to_user(u64(statbuf), voidptr(&value), sizeof(stat.Stat)) {
+		return errno.err, errno.efault
 	}
 	return 0, 0
+}
+
+pub fn fstat_value(fdnum int) ?stat.Stat {
+	mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum)?
+	defer { fd.unref() }
+	return fd.handle.resource.stat
 }
 
 pub fn syscall_fstat(_ voidptr, fdnum int, statbuf &stat.Stat) (u64, u64) {
@@ -1079,13 +1097,12 @@ pub fn syscall_fstat(_ voidptr, fdnum int, statbuf &stat.Stat) (u64, u64) {
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
-	mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.get() }
-	defer {
-		fd.unref()
+	if statbuf == unsafe { nil } {
+		return errno.err, errno.efault
 	}
-
-	unsafe {
-		*statbuf = fd.handle.resource.stat
+	value := fstat_value(fdnum) or { return errno.err, errno.get() }
+	if !usercopy.copy_to_user(u64(statbuf), voidptr(&value), sizeof(stat.Stat)) {
+		return errno.err, errno.efault
 	}
 	return 0, 0
 }
@@ -1094,7 +1111,7 @@ pub fn syscall_linkat(_ voidptr, olddirfd int, _oldpath charptr, newdirfd int, _
 	mut current_thread := proc.current_thread()
 	mut process := current_thread.process
 
-	C.printf(c'\n\e[32m%s\e[m: linkat(%d, %s, %d, %s, 0x%x)\n', process.name.str, olddirfd,
+	C.printf(c'\n\e[32m%s\e[m: linkat(%d, %p, %d, %p, 0x%x)\n', process.name.str, olddirfd,
 		_oldpath, newdirfd, _newpath, flags)
 	defer {
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
@@ -1220,7 +1237,7 @@ pub fn syscall_chdir(_ voidptr, _path charptr) (u64, u64) {
 	mut current_thread := proc.current_thread()
 	mut process := current_thread.process
 
-	C.printf(c'\n\e[32m%s\e[m: chdir(%s)\n', process.name.str, _path)
+	C.printf(c'\n\e[32m%s\e[m: chdir(%p)\n', process.name.str, _path)
 	defer {
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}

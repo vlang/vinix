@@ -481,8 +481,6 @@ pub fn syscall_waitpid(_ voidptr, pid int, _status &i32, options int) (u64, u64)
 		C.printf(c'\e[32m%s\e[m: returning\n', current_process.name.str)
 	}
 
-	mut status := unsafe { _status }
-
 	mut events := []&eventstruct.Event{}
 	defer {
 		unsafe { events.free() }
@@ -517,8 +515,11 @@ pub fn syscall_waitpid(_ voidptr, pid int, _status &i32, options int) (u64, u64)
 		child = current_process.children[which]
 	}
 
-	unsafe {
-		*status = i32(child.status)
+	if _status != unsafe { nil } {
+		status := i32(child.status)
+		if !usercopy.copy_to_user(u64(_status), voidptr(&status), sizeof(i32)) {
+			return errno.err, errno.efault
+		}
 	}
 	ret := child.pid
 
