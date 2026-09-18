@@ -9,7 +9,6 @@ import klock
 import proc
 import resource
 import stat
-import usercopy
 
 pub const in_access = u32(0x00000001)
 pub const in_modify = u32(0x00000002)
@@ -225,10 +224,7 @@ fn (mut this INotify) read(handle_ptr voidptr, buf voidptr, _loc u64, count u64)
 		}
 		amount += record
 	}
-	if !usercopy.copy_to_user(u64(buf), voidptr(&this.queue[0]), amount) {
-		errno.set(errno.efault)
-		return none
-	}
+	unsafe { C.memcpy(buf, voidptr(&this.queue[0]), amount) }
 	this.queue.delete_many(0, int(amount))
 	if this.queue.len == 0 {
 		this.status &= ~file.pollin
