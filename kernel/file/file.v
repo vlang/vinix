@@ -8,6 +8,7 @@ import errno
 import stat
 import event
 import event.eventstruct
+import memory
 import memory.mmap
 import time
 import usercopy
@@ -283,6 +284,44 @@ pub fn (mut this Handle) read(buf voidptr, count u64) ?i64 {
 	return ret
 }
 
+const user_io_bounce_size = u64(64 * 1024)
+
+fn bounded_user_io_count(count u64) u64 {
+	return if count > user_io_bounce_size { user_io_bounce_size } else { count }
+}
+
+// Resource.read/write buffers are kernel memory. Syscall-facing wrappers copy
+// through usercopy so SMAP/PAN can later forbid supervisor dereferences of the
+// caller's address space. Large requests may legally complete as short I/O;
+// PIPE_BUF-sized writes remain within one backend call.
+pub fn (mut this Handle) read_user(user_address u64, count u64) ?i64 {
+	if count == 0 {
+		return 0
+	}
+	chunk := bounded_user_io_count(count)
+	if !usercopy.probe_writable(user_address, chunk) {
+		errno.set(errno.efault)
+		return none
+	}
+	buffer := memory.malloc(chunk)
+	if buffer == unsafe { nil } {
+		errno.set(errno.enomem)
+		return none
+	}
+	defer { memory.free(buffer) }
+
+	ret := this.read(buffer, chunk)?
+	if ret < 0 || u64(ret) > chunk {
+		errno.set(errno.eio)
+		return none
+	}
+	if ret != 0 && !usercopy.copy_to_user(user_address, buffer, u64(ret)) {
+		errno.set(errno.efault)
+		return none
+	}
+	return ret
+}
+
 fn limited_write_count(res &resource.Resource, location u64, count u64) ?u64 {
 	if !stat.isreg(res.stat.mode) || count == 0 {
 		return count
@@ -317,6 +356,24 @@ pub fn (mut this Handle) write(buf voidptr, count u64) ?i64 {
 		resource.sync_resource(mut res, voidptr(this)) or { return none }
 	}
 	return ret
+}
+
+pub fn (mut this Handle) write_user(user_address u64, count u64) ?i64 {
+	if count == 0 {
+		return 0
+	}
+	chunk := bounded_user_io_count(count)
+	buffer := memory.malloc(chunk)
+	if buffer == unsafe { nil } {
+		errno.set(errno.enomem)
+		return none
+	}
+	defer { memory.free(buffer) }
+	if !usercopy.copy_from_user(buffer, user_address, chunk) {
+		errno.set(errno.efault)
+		return none
+	}
+	return this.write(buffer, chunk)
 }
 
 pub fn (mut this Handle) ioctl(request u64, argp voidptr) ?int {
@@ -635,8 +692,26 @@ pub fn syscall_pread(_ voidptr, fdnum int, buf voidptr, count u64, offset i64) (
 		return errno.err, errno.ebadf
 	}
 
-	ret := handle.resource.read(voidptr(handle), buf, u64(offset), count) or {
+	if count == 0 {
+		return 0, 0
+	}
+	chunk := bounded_user_io_count(count)
+	if !usercopy.probe_writable(u64(buf), chunk) {
+		return errno.err, errno.efault
+	}
+	buffer := memory.malloc(chunk)
+	if buffer == unsafe { nil } {
+		return errno.err, errno.enomem
+	}
+	defer { memory.free(buffer) }
+	ret := handle.resource.read(voidptr(handle), buffer, u64(offset), chunk) or {
 		return errno.err, errno.get()
+	}
+	if ret < 0 || u64(ret) > chunk {
+		return errno.err, errno.eio
+	}
+	if ret != 0 && !usercopy.copy_to_user(u64(buf), buffer, u64(ret)) {
+		return errno.err, errno.efault
 	}
 	return u64(ret), 0
 }
@@ -670,10 +745,21 @@ pub fn syscall_pwrite(_ voidptr, fdnum int, buf voidptr, count u64, offset i64) 
 		return errno.err, errno.ebadf
 	}
 
-	allowed := limited_write_count(res, u64(offset), count) or {
+	allowed := limited_write_count(res, u64(offset), bounded_user_io_count(count)) or {
 		return errno.err, errno.get()
 	}
-	ret := res.write(voidptr(handle), buf, u64(offset), allowed) or {
+	if allowed == 0 {
+		return 0, 0
+	}
+	buffer := memory.malloc(allowed)
+	if buffer == unsafe { nil } {
+		return errno.err, errno.enomem
+	}
+	defer { memory.free(buffer) }
+	if !usercopy.copy_from_user(buffer, u64(buf), allowed) {
+		return errno.err, errno.efault
+	}
+	ret := res.write(voidptr(handle), buffer, u64(offset), allowed) or {
 		return errno.err, errno.get()
 	}
 	if handle.flags & resource.o_dsync != 0 {
