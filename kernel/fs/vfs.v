@@ -860,7 +860,7 @@ pub fn syscall_read(_ voidptr, fdnum int, buf voidptr, count u64) (u64, u64) {
 	if access != resource.o_rdonly && access != resource.o_rdwr {
 		return errno.err, errno.ebadf
 	}
-	ret := fd.handle.read(buf, count) or { return errno.err, errno.get() }
+	ret := fd.handle.read_user(u64(buf), count) or { return errno.err, errno.get() }
 	if ret > 0 && fd.handle.node != unsafe { nil } {
 		inotify_emit(unsafe { &VFSNode(fd.handle.node) }, '', in_access, 0)
 	}
@@ -885,7 +885,7 @@ pub fn syscall_write(_ voidptr, fdnum int, buf voidptr, count u64) (u64, u64) {
 	if access != resource.o_wronly && access != resource.o_rdwr {
 		return errno.err, errno.ebadf
 	}
-	ret := fd.handle.write(buf, count) or { return errno.err, errno.get() }
+	ret := fd.handle.write_user(u64(buf), count) or { return errno.err, errno.get() }
 	if ret > 0 && fd.handle.node != unsafe { nil } {
 		inotify_emit(unsafe { &VFSNode(fd.handle.node) }, '', in_modify, 0)
 	}
