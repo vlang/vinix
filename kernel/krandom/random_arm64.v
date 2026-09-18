@@ -6,6 +6,7 @@ import crypto.sha256
 import limine
 import memory
 import time
+import securemem
 
 const virtio_mmio_base = u64(0x0a000000)
 const virtio_mmio_slot_size = u64(0x200)
@@ -153,7 +154,7 @@ fn virtio_entropy_seed(mut output [64]u8) bool {
 		}
 		virtio_w32(base + virtio_reg_status, 0)
 		cpu.dmb_ish()
-		unsafe { C.memset(voidptr(entropy), 0, 4096) }
+		securemem.zero(voidptr(entropy), 4096)
 		memory.pmm_free(entropy_phys_ptr, 1)
 		memory.pmm_free(queue_phys_ptr, virtio_queue_pages)
 		return complete
@@ -188,12 +189,12 @@ fn architecture_seed(mut output [64]u8) bool {
 		digest := sha256.sum(input)
 		unsafe {
 			C.memcpy(&output[i * 32], digest.data, 32)
-			C.memset(digest.data, 0, digest.len)
+			securemem.zero(digest.data, usize(digest.len))
 			digest.free()
 		}
 	}
 	unsafe {
-		C.memset(input.data, 0, input.len)
+		securemem.zero(input.data, usize(input.len))
 		input.free()
 	}
 	return true
