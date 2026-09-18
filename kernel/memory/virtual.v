@@ -30,7 +30,8 @@ __global (
 	page_size       = u64(0x1000)
 	kernel_pagemap  Pagemap
 	vmm_initialised = bool(false)
-	cow_resolver    fn (&Pagemap, u64) bool
+	cow_resolver      fn (&Pagemap, u64) bool
+	user_page_resolver fn (&Pagemap, u64, bool) bool
 )
 
 pub fn register_cow_resolver(resolver fn (&Pagemap, u64) bool) {
@@ -42,6 +43,21 @@ pub fn resolve_cow(pagemap &Pagemap, address u64) bool {
 		return false
 	}
 	return cow_resolver(pagemap, address)
+}
+
+// Checked user copies cannot take a supervisor page fault on the caller's
+// virtual address once SMAP/PAN is enabled. Let the VM materialize a legitimate
+// lazy user page through an architecture-neutral callback, then retry the
+// checked page-table lookup through the direct map.
+pub fn register_user_page_resolver(resolver fn (&Pagemap, u64, bool) bool) {
+	user_page_resolver = resolver
+}
+
+pub fn resolve_user_page(pagemap &Pagemap, address u64, write bool) bool {
+	if user_page_resolver == unsafe { nil } {
+		return false
+	}
+	return user_page_resolver(pagemap, address, write)
 }
 
 pub struct Pagemap {
