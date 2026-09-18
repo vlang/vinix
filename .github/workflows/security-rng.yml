@@ -20,6 +20,18 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y build-essential clang
       - run: python3 tests/security/securemem_test.py
 
+  generator:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - run: sudo apt-get update && sudo apt-get install -y build-essential
+      - name: Build V
+        run: git clone --depth=1 https://github.com/vlang/v.git v && make -C v
+      - name: Test production generator with host fixtures
+        run: V="$(realpath v/v)" sh tests/security/run-krandom.sh
+
   kernel:
     runs-on: ubuntu-latest
     strategy:
