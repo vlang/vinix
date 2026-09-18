@@ -18,7 +18,6 @@ import resource
 import sched
 import stat
 import time
-import usercopy
 
 #include "apple_smc.h"
 
@@ -272,10 +271,7 @@ fn (mut this Battery) read(handle voidptr, buf voidptr, loc u64, count u64) ?i64
 	}
 	remaining := u64(sample.length) - loc
 	n := if count < remaining { count } else { remaining }
-	if !usercopy.copy_to_user(u64(buf), voidptr(&sample.bytes[int(loc)]), n) {
-		errno.set(errno.efault)
-		return none
-	}
+	unsafe { C.memcpy(buf, voidptr(&sample.bytes[int(loc)]), n) }
 	return i64(n)
 }
 
