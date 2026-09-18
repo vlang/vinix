@@ -306,6 +306,7 @@ pub fn syscall_inotify_add_watch(_ voidptr, fdnum int, _path charptr, mask u32) 
 		return errno.err, errno.einval
 	}
 	path := user_path(_path) or { return errno.err, errno.get() }
+	defer { unsafe { path.free() } }
 	if path.len == 0 {
 		return errno.err, errno.enoent
 	}
