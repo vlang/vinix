@@ -645,24 +645,11 @@ fn signal_thread(tgid int, tid int, signal int) (u64, u64) {
 
 pub fn syscall_execve(_ voidptr, _path charptr, _argv &charptr, _envp &charptr) (u64, u64) {
 	path := fs.user_path(_path) or { return errno.err, errno.get() }
-	mut argv := []string{}
-	for i := 0; true; i++ {
-		unsafe {
-			if _argv[i] == nil {
-				break
-			}
-			argv << cstring_to_vstring(_argv[i])
-		}
-	}
-	mut envp := []string{}
-	for i := 0; true; i++ {
-		unsafe {
-			if _envp[i] == nil {
-				break
-			}
-			envp << cstring_to_vstring(_envp[i])
-		}
-	}
+	defer { unsafe { path.free() } }
+	mut argv := copy_exec_vector(u64(_argv)) or { return errno.err, errno.get() }
+	defer { free_exec_strings(mut argv) }
+	mut envp := copy_exec_vector(u64(_envp)) or { return errno.err, errno.get() }
+	defer { free_exec_strings(mut envp) }
 
 	start_program(true, proc.current_thread().process.current_directory, path, argv, envp,
 		'', '', '') or { return errno.err, errno.get() }
@@ -926,6 +913,7 @@ pub fn syscall_execveat(_ voidptr, dirfd int, _path charptr, _argv &charptr, _en
 	mut process := proc.current_thread().process
 
 	path := fs.user_path(_path) or { return errno.err, errno.get() }
+	defer { unsafe { path.free() } }
 
 	mut directory := &fs.VFSNode(unsafe { nil })
 	mut target := path

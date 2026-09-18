@@ -141,6 +141,41 @@ pub fn copy_to_pagemap(pagemap &memory.Pagemap, destination u64, source voidptr,
 	return copy_pagemap(pagemap, source, destination, length, true)
 }
 
+// Copy a NUL-terminated userspace string into owned kernel memory without ever
+// dereferencing the user virtual address directly. The read stops at the first
+// terminator and never crosses into the next user page unless the string does.
+pub fn string_from_user(address u64, max_len u64) ?string {
+	if address == 0 || max_len == 0 || max_len == u64(-1) {
+		return none
+	}
+	buffer := memory.malloc(max_len + 1)
+	if buffer == unsafe { nil } {
+		return none
+	}
+	defer { memory.free(buffer) }
+
+	mut copied := u64(0)
+	for copied < max_len {
+		current := address + copied
+		page_offset := current & (page_size - 1)
+		mut chunk := page_size - page_offset
+		if chunk > max_len - copied {
+			chunk = max_len - copied
+		}
+		if !copy_from_user(voidptr(u64(buffer) + copied), current, chunk) {
+			return none
+		}
+		bytes := unsafe { &u8(buffer) }
+		for i := u64(0); i < chunk; i++ {
+			if unsafe { bytes[copied + i] } == 0 {
+				return unsafe { cstring_to_vstring(charptr(buffer)).clone() }
+			}
+		}
+		copied += chunk
+	}
+	return none
+}
+
 pub fn read_u32(address u64) ?u32 {
 	mut value := u32(0)
 	if !copy_from_user(voidptr(&value), address, sizeof(u32)) {

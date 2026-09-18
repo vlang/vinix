@@ -540,15 +540,14 @@ fn fdnum_create_from_node(mut node VFSNode, flags int, oldfd int, specific bool)
 	}
 }
 
-// A path pointer from userspace can be null, and cstring_to_vstring() panics on
-// one -- which let any process stop the machine by passing NULL where a path
-// was expected. Report it as the fault it is instead.
+// Copy pathname bytes through the checked usercopy path. This remains safe
+// when SMAP/PAN forbids supervisor access to the caller's virtual addresses.
 pub fn user_path(pointer charptr) ?string {
-	if pointer == unsafe { nil } {
+	path := usercopy.string_from_user(u64(pointer), 4096) or {
 		errno.set(errno.efault)
 		return none
 	}
-	return unsafe { cstring_to_vstring(pointer) }
+	return path
 }
 
 pub fn syscall_unlinkat(_ voidptr, dirfd int, _path charptr, flags int) (u64, u64) {
@@ -562,6 +561,7 @@ pub fn syscall_unlinkat(_ voidptr, dirfd int, _path charptr, flags int) (u64, u6
 	}
 
 	path := user_path(_path) or { return errno.err, errno.get() }
+	defer { unsafe { path.free() } }
 
 	if path.len == 0 {
 		return errno.err, errno.enoent
@@ -586,6 +586,7 @@ pub fn syscall_rmdirat(_ voidptr, dirfd int, _path charptr) (u64, u64) {
 	}
 
 	path := user_path(_path) or { return errno.err, errno.get() }
+	defer { unsafe { path.free() } }
 
 	if path.len == 0 {
 		return errno.err, errno.enoent
@@ -608,6 +609,7 @@ pub fn syscall_mkdirat(_ voidptr, dirfd int, _path charptr, mode u32) (u64, u64)
 	}
 
 	path := user_path(_path) or { return errno.err, errno.get() }
+	defer { unsafe { path.free() } }
 
 	if path.len == 0 {
 		return errno.err, errno.enoent
@@ -698,6 +700,7 @@ pub fn syscall_readlinkat(_ voidptr, dirfd int, _path charptr, buf voidptr, limi
 	}
 
 	path := user_path(_path) or { return errno.err, errno.get() }
+	defer { unsafe { path.free() } }
 
 	if path.len == 0 {
 		return errno.err, errno.enoent
@@ -764,6 +767,7 @@ pub fn syscall_openat(_ voidptr, dirfd int, _path charptr, flags int, mode u32) 
 	}
 
 	path := user_path(_path) or { return errno.err, errno.get() }
+	defer { unsafe { path.free() } }
 
 	if path.len == 0 {
 		return errno.err, errno.enoent
@@ -999,6 +1003,7 @@ pub fn syscall_faccessat(_ voidptr, dirfd int, _path charptr, mode u32, flags in
 	}
 
 	path := user_path(_path) or { return errno.err, errno.get() }
+	defer { unsafe { path.free() } }
 	if mode & ~u32(7) != 0 || flags & ~(at_eaccess | at_symlink_nofollow) != 0 {
 		return errno.err, errno.einval
 	}
@@ -1033,6 +1038,7 @@ pub fn syscall_fstatat(_ voidptr, dirfd int, _path charptr, statbuf &stat.Stat, 
 	current_process := proc.current_thread().process
 
 	path := user_path(_path) or { return errno.err, errno.get() }
+	defer { unsafe { path.free() } }
 
 	mut statsrc := &stat.Stat(unsafe { nil })
 
@@ -1095,12 +1101,14 @@ pub fn syscall_linkat(_ voidptr, olddirfd int, _oldpath charptr, newdirfd int, _
 	}
 
 	oldpath := user_path(_oldpath) or { return errno.err, errno.get() }
+	defer { unsafe { oldpath.free() } }
 	// TODO handle AT_ENPTY_PATH?
 	if oldpath.len == 0 {
 		return errno.err, errno.enoent
 	}
 
 	newpath := user_path(_newpath) or { return errno.err, errno.get() }
+	defer { unsafe { newpath.free() } }
 
 	oldbase := get_parent_dir(olddirfd, oldpath) or { return errno.err, errno.get() }
 	newbase := get_parent_dir(newdirfd, newpath) or { return errno.err, errno.get() }
@@ -1181,6 +1189,7 @@ pub fn syscall_fchmod(_ voidptr, fdnum int, mode u32) (u64, u64) {
 
 pub fn syscall_fchmodat(_ voidptr, dirfd int, _path charptr, mode u32) (u64, u64) {
 	path := user_path(_path) or { return errno.err, errno.get() }
+	defer { unsafe { path.free() } }
 	if path.len == 0 {
 		return errno.err, errno.enoent
 	}
@@ -1217,6 +1226,7 @@ pub fn syscall_chdir(_ voidptr, _path charptr) (u64, u64) {
 	}
 
 	path := user_path(_path) or { return errno.err, errno.get() }
+	defer { unsafe { path.free() } }
 
 	if path.len == 0 {
 		return errno.err, errno.enoent
@@ -1394,7 +1404,9 @@ pub fn syscall_seek(_ voidptr, fdnum int, offset i64, whence int) (u64, u64) {
 // not exist yet.
 pub fn syscall_symlinkat(_ voidptr, _target charptr, newdirfd int, _linkpath charptr) (u64, u64) {
 	target := user_path(_target) or { return errno.err, errno.get() }
+	defer { unsafe { target.free() } }
 	linkpath := user_path(_linkpath) or { return errno.err, errno.get() }
+	defer { unsafe { linkpath.free() } }
 
 	if target.len == 0 || linkpath.len == 0 {
 		return errno.err, errno.enoent
@@ -1615,7 +1627,9 @@ fn is_ancestor(ancestor &VFSNode, node &VFSNode) bool {
 // renameat2(olddirfd, oldpath, newdirfd, newpath, flags).
 pub fn syscall_renameat2(_ voidptr, olddirfd int, _oldpath charptr, newdirfd int, _newpath charptr, flags int) (u64, u64) {
 	oldpath := user_path(_oldpath) or { return errno.err, errno.get() }
+	defer { unsafe { oldpath.free() } }
 	newpath := user_path(_newpath) or { return errno.err, errno.get() }
+	defer { unsafe { newpath.free() } }
 
 	if oldpath.len == 0 || newpath.len == 0 {
 		return errno.err, errno.enoent
@@ -1668,6 +1682,7 @@ pub fn syscall_truncate(_ voidptr, _path charptr, length i64) (u64, u64) {
 	}
 
 	path := user_path(_path) or { return errno.err, errno.get() }
+	defer { unsafe { path.free() } }
 	if path.len == 0 {
 		return errno.err, errno.enoent
 	}
@@ -1722,6 +1737,7 @@ fn change_owner(mut res resource.Resource, uid u32, gid u32) ? {
 
 pub fn syscall_fchownat(_ voidptr, dirfd int, _path charptr, uid u32, gid u32, flags int) (u64, u64) {
 	path := user_path(_path) or { return errno.err, errno.get() }
+	defer { unsafe { path.free() } }
 
 	mut process := proc.current_thread().process
 
@@ -1790,6 +1806,7 @@ pub fn syscall_fchown(_ voidptr, fdnum int, uid u32, gid u32) (u64, u64) {
 // one filesystem this kernel has anything to say about.
 pub fn syscall_statfs(_ voidptr, _path charptr, buf u64) (u64, u64) {
 	path := user_path(_path) or { return errno.err, errno.get() }
+	defer { unsafe { path.free() } }
 	if path.len == 0 {
 		return errno.err, errno.enoent
 	}
@@ -1847,6 +1864,7 @@ pub fn syscall_utimensat(_ voidptr, dirfd int, _path charptr, times u64, flags i
 		return errno.err, errno.einval
 	}
 	path := user_path(_path) or { return errno.err, errno.get() }
+	defer { unsafe { path.free() } }
 	mut node := &VFSNode(unsafe { nil })
 	if path.len == 0 {
 		if flags & at_empty_path == 0 { return errno.err, errno.enoent }
