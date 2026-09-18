@@ -133,10 +133,18 @@ fn (mut session HypervisorSession) read(_handle voidptr, buf voidptr, loc u64, c
 	}
 	remaining := session.vm.memory_size() - loc
 	actual := if count < remaining { count } else { remaining }
-	source := voidptr(u64(session.vm.guest_page(loc / page_size)) + memory_page_offset(loc) + memory_hhdm())
-	if !usercopy.copy_to_user(u64(buf), source, actual) {
-		errno.set(errno.efault)
-		return none
+	mut copied := u64(0)
+	for copied < actual {
+		guest_address := loc + copied
+		page_offset := memory_page_offset(guest_address)
+		mut chunk := page_size - page_offset
+		if chunk > actual - copied {
+			chunk = actual - copied
+		}
+		source := voidptr(u64(session.vm.guest_page(guest_address / page_size))
+			+ page_offset + memory_hhdm())
+		unsafe { C.memcpy(voidptr(u64(buf) + copied), source, chunk) }
+		copied += chunk
 	}
 	return i64(actual)
 }
@@ -150,10 +158,18 @@ fn (mut session HypervisorSession) write(_handle voidptr, buf voidptr, loc u64, 
 	if count == 0 {
 		return 0
 	}
-	destination := voidptr(u64(session.vm.guest_page(loc / page_size)) + memory_page_offset(loc) + memory_hhdm())
-	if !usercopy.copy_from_user(destination, u64(buf), count) {
-		errno.set(errno.efault)
-		return none
+	mut copied := u64(0)
+	for copied < count {
+		guest_address := loc + copied
+		page_offset := memory_page_offset(guest_address)
+		mut chunk := page_size - page_offset
+		if chunk > count - copied {
+			chunk = count - copied
+		}
+		destination := voidptr(u64(session.vm.guest_page(guest_address / page_size))
+			+ page_offset + memory_hhdm())
+		unsafe { C.memcpy(destination, voidptr(u64(buf) + copied), chunk) }
+		copied += chunk
 	}
 	return i64(count)
 }
