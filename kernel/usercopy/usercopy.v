@@ -56,6 +56,9 @@ fn copy_pagemap(_pagemap &memory.Pagemap, kernel_address voidptr, user_address u
 			if to_user && memory.resolve_cow(pagemap, address) {
 				continue
 			}
+			if memory.resolve_user_page(pagemap, address, to_user) {
+				continue
+			}
 			return false
 		}
 		physical_address := physical + page_offset + memory.get_hhdm_offset()
