@@ -260,14 +260,21 @@ pub fn syscall_socketpair(_ voidptr, domain int, @type int, protocol int, ret &i
 		flags |= resource.o_nonblock
 	}
 
-	unsafe {
-		ret[0] = i32(file.fdnum_create_from_resource(nil, mut socket0, flags, 0, false) or {
-			return errno.err, errno.get()
-		})
-
-		ret[1] = i32(file.fdnum_create_from_resource(nil, mut socket1, flags, 0, false) or {
-			return errno.err, errno.get()
-		})
+	if ret == unsafe { nil } {
+		return errno.err, errno.efault
+	}
+	fd0 := file.fdnum_create_from_resource(unsafe { nil }, mut socket0, flags, 0, false) or {
+		return errno.err, errno.get()
+	}
+	fd1 := file.fdnum_create_from_resource(unsafe { nil }, mut socket1, flags, 0, false) or {
+		file.fdnum_close(unsafe { nil }, fd0, true) or {}
+		return errno.err, errno.get()
+	}
+	pair := [i32(fd0), i32(fd1)]
+	if !usercopy.copy_to_user(u64(ret), voidptr(&pair[0]), sizeof(pair)) {
+		file.fdnum_close(unsafe { nil }, fd0, true) or {}
+		file.fdnum_close(unsafe { nil }, fd1, true) or {}
+		return errno.err, errno.efault
 	}
 	return 0, 0
 }
