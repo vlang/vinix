@@ -541,7 +541,7 @@ fn update_big_metadata(mut metadata MallocMetadata, pages u64, size u64) {
 	metadata.size = size
 	metadata.pages_inv = ~pages
 	metadata.size_inv = ~size
-	metadata.cookie = malloc_metadata_cookie(u64(&metadata), pages, size)
+	metadata.cookie = malloc_metadata_cookie(u64(metadata), pages, size)
 }
 
 @[export: 'free']
