@@ -34,6 +34,10 @@ pub const file_status_flags_mask = ~(file_creation_flags_mask | file_descriptor_
 // settled at open time and have to survive it.
 pub const file_settable_flags_mask = o_append | o_nonblock | o_dsync | o_sync
 
+// read()/write() always receive kernel virtual buffers. Syscall boundaries are
+// responsible for checked copyin/copyout; internal kernel users (ELF loading,
+// splice/copy paths, drivers) may call Resource I/O directly without pretending
+// their buffers are user addresses.
 pub interface Resource {
 mut:
 	stat     stat.Stat
