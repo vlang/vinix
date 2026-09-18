@@ -458,25 +458,12 @@ pub fn syscall_execve(_ voidptr, _path charptr, _argv &charptr, _envp &charptr) 
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
-	path := unsafe { cstring_to_vstring(_path) }
-	mut argv := []string{}
-	for i := 0; true; i++ {
-		unsafe {
-			if _argv[i] == nil {
-				break
-			}
-			argv << cstring_to_vstring(_argv[i])
-		}
-	}
-	mut envp := []string{}
-	for i := 0; true; i++ {
-		unsafe {
-			if _envp[i] == nil {
-				break
-			}
-			envp << cstring_to_vstring(_envp[i])
-		}
-	}
+	path := fs.user_path(_path) or { return errno.err, errno.get() }
+	defer { unsafe { path.free() } }
+	mut argv := copy_exec_vector(u64(_argv)) or { return errno.err, errno.get() }
+	defer { free_exec_strings(mut argv) }
+	mut envp := copy_exec_vector(u64(_envp)) or { return errno.err, errno.get() }
+	defer { free_exec_strings(mut envp) }
 
 	start_program(true, proc.current_thread().process.current_directory, path, argv, envp,
 		'', '', '') or { return errno.err, errno.get() }
