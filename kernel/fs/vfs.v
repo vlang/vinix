@@ -554,7 +554,7 @@ pub fn syscall_unlinkat(_ voidptr, dirfd int, _path charptr, flags int) (u64, u6
 	mut current_thread := proc.current_thread()
 	mut process := current_thread.process
 
-	C.printf(c'\n\e[32m%s\e[m: unlinkat(%d, %s, 0x%x)\n', process.name.str, dirfd, _path,
+	C.printf(c'\n\e[32m%s\e[m: unlinkat(%d, %p, 0x%x)\n', process.name.str, dirfd, _path,
 		flags)
 	defer {
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
@@ -580,7 +580,7 @@ pub fn syscall_rmdirat(_ voidptr, dirfd int, _path charptr) (u64, u64) {
 	mut current_thread := proc.current_thread()
 	mut process := current_thread.process
 
-	C.printf(c'\n\e[32m%s\e[m: rmdirat(%d, %s)\n', process.name.str, dirfd, _path)
+	C.printf(c'\n\e[32m%s\e[m: rmdirat(%d, %p)\n', process.name.str, dirfd, _path)
 	defer {
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
@@ -602,7 +602,7 @@ pub fn syscall_mkdirat(_ voidptr, dirfd int, _path charptr, mode u32) (u64, u64)
 	mut current_thread := proc.current_thread()
 	mut process := current_thread.process
 
-	C.printf(c'\n\e[32m%s\e[m: mkdirat(%d, %s, 0x%x)\n', process.name.str, dirfd, _path,
+	C.printf(c'\n\e[32m%s\e[m: mkdirat(%d, %p, 0x%x)\n', process.name.str, dirfd, _path,
 		mode)
 	defer {
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
@@ -693,7 +693,7 @@ pub fn syscall_readlinkat(_ voidptr, dirfd int, _path charptr, buf voidptr, limi
 	mut current_thread := proc.current_thread()
 	mut process := current_thread.process
 
-	C.printf(c'\n\e[32m%s\e[m: readlinkat(%d, %s, 0x%llx, 0x%llx)\n', process.name.str,
+	C.printf(c'\n\e[32m%s\e[m: readlinkat(%d, %p, 0x%llx, 0x%llx)\n', process.name.str,
 		dirfd, _path, buf, limit)
 	defer {
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
@@ -751,8 +751,10 @@ pub fn syscall_readlinkat(_ voidptr, dirfd int, _path charptr, buf voidptr, limi
 		to_copy = limit
 	}
 
-	unsafe { C.memcpy(buf, node.symlink_target.str, to_copy) }
-
+	if to_copy != 0
+		&& !usercopy.copy_to_user(u64(buf), node.symlink_target.str, to_copy) {
+		return errno.err, errno.efault
+	}
 	return to_copy, 0
 }
 
@@ -760,7 +762,7 @@ pub fn syscall_openat(_ voidptr, dirfd int, _path charptr, flags int, mode u32) 
 	mut current_thread := proc.current_thread()
 	mut process := current_thread.process
 
-	C.printf(c'\n\e[32m%s\e[m: openat(%d, %s, 0x%x, 0x%x)\n', process.name.str, dirfd,
+	C.printf(c'\n\e[32m%s\e[m: openat(%d, %p, 0x%x, 0x%x)\n', process.name.str, dirfd,
 		_path, flags, mode)
 	defer {
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
@@ -1006,7 +1008,7 @@ pub fn syscall_faccessat(_ voidptr, dirfd int, _path charptr, mode u32, flags in
 	mut current_thread := proc.current_thread()
 	mut process := current_thread.process
 
-	C.printf(c'\n\e[32m%s\e[m: faccessat(%d, %s, 0x%x, 0x%x)\n', process.name.str, dirfd,
+	C.printf(c'\n\e[32m%s\e[m: faccessat(%d, %p, 0x%x, 0x%x)\n', process.name.str, dirfd,
 		_path, mode, flags)
 	defer {
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
@@ -1064,7 +1066,7 @@ pub fn syscall_fstatat(_ voidptr, dirfd int, _path charptr, statbuf &stat.Stat, 
 	mut current_thread := proc.current_thread()
 	mut process := current_thread.process
 
-	C.printf(c'\n\e[32m%s\e[m: fstatat(%d, %s, 0x%llx, 0x%x)\n', process.name.str, dirfd,
+	C.printf(c'\n\e[32m%s\e[m: fstatat(%d, %p, 0x%llx, 0x%x)\n', process.name.str, dirfd,
 		_path, statbuf, flags)
 	defer {
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
@@ -1109,7 +1111,7 @@ pub fn syscall_linkat(_ voidptr, olddirfd int, _oldpath charptr, newdirfd int, _
 	mut current_thread := proc.current_thread()
 	mut process := current_thread.process
 
-	C.printf(c'\n\e[32m%s\e[m: linkat(%d, %s, %d, %s, 0x%x)\n', process.name.str, olddirfd,
+	C.printf(c'\n\e[32m%s\e[m: linkat(%d, %p, %d, %p, 0x%x)\n', process.name.str, olddirfd,
 		_oldpath, newdirfd, _newpath, flags)
 	defer {
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
@@ -1235,7 +1237,7 @@ pub fn syscall_chdir(_ voidptr, _path charptr) (u64, u64) {
 	mut current_thread := proc.current_thread()
 	mut process := current_thread.process
 
-	C.printf(c'\n\e[32m%s\e[m: chdir(%s)\n', process.name.str, _path)
+	C.printf(c'\n\e[32m%s\e[m: chdir(%p)\n', process.name.str, _path)
 	defer {
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
