@@ -988,7 +988,17 @@ pub fn syscall_getcwd(_ voidptr, buf charptr, len u64) (u64, u64) {
 		return errno.err, errno.erange
 	}
 
-	C.strcpy(buf, cwd.str)
+	if buf == unsafe { nil } || !usercopy.probe_writable(u64(buf), bytes_needed) {
+		return errno.err, errno.efault
+	}
+	if cwd.len != 0
+		&& !usercopy.copy_to_user(u64(buf), voidptr(cwd.str), u64(cwd.len)) {
+		return errno.err, errno.efault
+	}
+	zero := u8(0)
+	if !usercopy.copy_to_user(u64(buf) + u64(cwd.len), voidptr(&zero), 1) {
+		return errno.err, errno.efault
+	}
 	return bytes_needed, 0
 }
 
