@@ -408,23 +408,20 @@ pub fn syscall_recvmsg(_ voidptr, fdnum int, msg &sock_pub.MsgHdr, flags int) (u
 // sendto(2), including connected UDP when no destination is supplied.  The
 // old aarch64 compatibility wrapper reduced every call to write(2), losing the
 // destination that DNS and DHCP clients need.
-pub fn syscall_sendto(_ voidptr, fdnum int, buf voidptr, len u64, flags int, dest_addr voidptr, addrlen u32) (u64, u64) {
+fn sendto_kernel(fdnum int, buf voidptr, len u64, flags int, dest_addr voidptr,
+	addrlen u32) (u64, u64) {
 	if flags & ~0x4040 != 0 { // MSG_DONTWAIT | MSG_NOSIGNAL
 		return errno.err, errno.eopnotsupp
 	}
 	mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.get() }
-	defer {
-		fd.unref()
-	}
+	defer { fd.unref() }
 	mut res := fd.handle.resource
 	if mut res is sock_inet.InetSocket {
 		old_flags := fd.handle.flags
 		if flags & 0x40 != 0 {
 			fd.handle.flags |= resource.o_nonblock
 		}
-		defer {
-			fd.handle.flags = old_flags
-		}
+		defer { fd.handle.flags = old_flags }
 		ret := res.sendto(fd.handle, buf, len, dest_addr, addrlen) or {
 			return errno.err, errno.get()
 		}
@@ -440,33 +437,106 @@ pub fn syscall_sendto(_ voidptr, fdnum int, buf voidptr, len u64, flags int, des
 	return errno.err, errno.enotsock
 }
 
+pub fn syscall_sendto(_ voidptr, fdnum int, buf voidptr, len u64, flags int, dest_addr voidptr, addrlen u32) (u64, u64) {
+	chunk := bounded_socket_io(len)
+	buffer := memory.malloc(if chunk == 0 { u64(1) } else { chunk })
+	if buffer == unsafe { nil } {
+		return errno.err, errno.enomem
+	}
+	defer { memory.free(buffer) }
+	if chunk != 0 && !usercopy.copy_from_user(buffer, u64(buf), chunk) {
+		return errno.err, errno.efault
+	}
+
+	mut address_storage := [128]u8{}
+	mut kernel_address := voidptr(0)
+	if dest_addr != unsafe { nil } {
+		copy_sockaddr_from_user(dest_addr, addrlen, voidptr(&address_storage[0])) or {
+			return errno.err, errno.get()
+		}
+		kernel_address = voidptr(&address_storage[0])
+	}
+	return sendto_kernel(fdnum, buffer, chunk, flags, kernel_address, addrlen)
+}
+
 pub fn syscall_recvfrom(_ voidptr, fdnum int, buf voidptr, len u64, flags int, src_addr voidptr, addrlen &u32) (u64, u64) {
 	if flags & ~0x40 != 0 { // MSG_DONTWAIT
 		return errno.err, errno.eopnotsupp
 	}
-	mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.get() }
-	defer {
-		fd.unref()
+	chunk := bounded_socket_io(len)
+	if chunk != 0 && !usercopy.probe_writable(u64(buf), chunk) {
+		return errno.err, errno.efault
 	}
+	buffer := memory.malloc(if chunk == 0 { u64(1) } else { chunk })
+	if buffer == unsafe { nil } {
+		return errno.err, errno.enomem
+	}
+	defer { memory.free(buffer) }
+
+	mut source_storage := [128]u8{}
+	mut source_capacity := u32(0)
+	mut source_length := u32(0)
+	if src_addr != unsafe { nil } {
+		if addrlen == unsafe { nil }
+			|| !usercopy.copy_from_user(voidptr(&source_capacity), u64(addrlen), sizeof(u32)) {
+			return errno.err, errno.efault
+		}
+		source_length = if source_capacity < sockaddr_storage_size {
+			source_capacity
+		} else {
+			sockaddr_storage_size
+		}
+		if source_length != 0
+			&& !usercopy.probe_writable(u64(src_addr), u64(source_length)) {
+			return errno.err, errno.efault
+		}
+	}
+
+	mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.get() }
+	defer { fd.unref() }
 	mut res := fd.handle.resource
+	mut ret := i64(0)
+	mut has_source := false
 	if mut res is sock_inet.InetSocket {
 		old_flags := fd.handle.flags
 		if flags & 0x40 != 0 {
 			fd.handle.flags |= resource.o_nonblock
 		}
-		defer {
-			fd.handle.flags = old_flags
-		}
-		ret := res.recvfrom(fd.handle, buf, len, src_addr, addrlen) or {
+		defer { fd.handle.flags = old_flags }
+		ret = res.recvfrom(fd.handle, buffer, chunk,
+			if src_addr == unsafe { nil } { unsafe { nil } } else { voidptr(&source_storage[0]) },
+			if src_addr == unsafe { nil } { unsafe { nil } } else { &source_length }) or {
 			return errno.err, errno.get()
 		}
-		return u64(ret), 0
+		has_source = src_addr != unsafe { nil }
+	} else if mut res is sock_unix.UnixSocket {
+		ret = fd.handle.read(buffer, chunk) or { return errno.err, errno.get() }
+	} else {
+		return errno.err, errno.enotsock
 	}
-	if mut res is sock_unix.UnixSocket {
-		ret := fd.handle.read(buf, len) or { return errno.err, errno.get() }
-		return u64(ret), 0
+	if ret < 0 || u64(ret) > chunk {
+		return errno.err, errno.eio
 	}
-	return errno.err, errno.enotsock
+	if ret != 0 && !usercopy.copy_to_user(u64(buf), buffer, u64(ret)) {
+		return errno.err, errno.efault
+	}
+	if has_source {
+		mut to_copy := u64(source_length)
+		if to_copy > u64(source_capacity) {
+			to_copy = u64(source_capacity)
+		}
+		if to_copy > sockaddr_storage_size {
+			to_copy = sockaddr_storage_size
+		}
+		if to_copy != 0
+			&& !usercopy.copy_to_user(u64(src_addr), voidptr(&source_storage[0]), to_copy) {
+			return errno.err, errno.efault
+		}
+		if !usercopy.copy_to_user(u64(addrlen), voidptr(&source_length), sizeof(u32)) {
+			return errno.err, errno.efault
+		}
+	}
+	return u64(ret), 0
 }
 
 pub fn syscall_sendmsg(gpr_state voidptr, fdnum int, msg &sock_pub.MsgHdr, flags int) (u64, u64) {
@@ -527,7 +597,15 @@ pub fn syscall_sendmsg(gpr_state voidptr, fdnum int, msg &sock_pub.MsgHdr, flags
 		}
 		return errno.err, errno.eopnotsupp
 	}
-	return syscall_sendto(gpr_state, fdnum, buffer, total, flags, msg.msg_name, msg.msg_namelen)
+	mut address_storage := [128]u8{}
+	mut kernel_address := voidptr(0)
+	if msg.msg_name != unsafe { nil } {
+		copy_sockaddr_from_user(msg.msg_name, msg.msg_namelen, voidptr(&address_storage[0])) or {
+			return errno.err, errno.get()
+		}
+		kernel_address = voidptr(&address_storage[0])
+	}
+	return sendto_kernel(fdnum, buffer, total, flags, kernel_address, msg.msg_namelen)
 }
 
 pub fn syscall_connect(_ voidptr, fdnum int, _addr voidptr, addrlen u32) (u64, u64) {
