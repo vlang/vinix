@@ -75,6 +75,58 @@ fn copy_pagemap(_pagemap &memory.Pagemap, kernel_address voidptr, user_address u
 	return true
 }
 
+fn probe_pagemap(_pagemap &memory.Pagemap, user_address u64, length u64, write bool) bool {
+	if !valid_user_range(user_address, length) || _pagemap == unsafe { nil } {
+		return false
+	}
+	if length == 0 {
+		return true
+	}
+	mut pagemap := unsafe { _pagemap }
+	mut checked := u64(0)
+	for checked < length {
+		address := user_address + checked
+		page_offset := address & (page_size - 1)
+		mut chunk := page_size - page_offset
+		if chunk > length - checked {
+			chunk = length - checked
+		}
+		for {
+			pagemap.l.acquire()
+			if _ := pagemap.user_page_phys(address, write) {
+				pagemap.l.release()
+				break
+			}
+			pagemap.l.release()
+			if write && memory.resolve_cow(pagemap, address) {
+				continue
+			}
+			if memory.resolve_user_page(pagemap, address, write) {
+				continue
+			}
+			return false
+		}
+		checked += chunk
+	}
+	return true
+}
+
+// Validate and, where appropriate, demand-page the current process's user
+// range without copying bytes. Read-like syscalls use the writable form before
+// consuming backend data so an invalid destination can still fail with EFAULT
+// before the resource changes state.
+pub fn probe_readable(address u64, length u64) bool {
+	process := proc.current_thread().process
+	return process != unsafe { nil }
+		&& probe_pagemap(process.pagemap, address, length, false)
+}
+
+pub fn probe_writable(address u64, length u64) bool {
+	process := proc.current_thread().process
+	return process != unsafe { nil }
+		&& probe_pagemap(process.pagemap, address, length, true)
+}
+
 pub fn copy_from_user(destination voidptr, source u64, length u64) bool {
 	return copy_user(destination, source, length, false)
 }
