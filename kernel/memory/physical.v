@@ -491,10 +491,57 @@ __global (
 	slabs [14]Slab
 )
 
+const malloc_metadata_magic = u64(0x56494e4958424947)
+
 struct MallocMetadata {
 mut:
-	pages u64
-	size  u64
+	magic     u64
+	pages     u64
+	size      u64
+	pages_inv u64
+	size_inv  u64
+	cookie    u64
+}
+
+fn malloc_metadata_cookie(address u64, pages u64, size u64) u64 {
+	// This is an integrity check rather than a secret MAC: it binds metadata to
+	// the allocation that owns it and catches linear corruption/reuse before a
+	// forged page count reaches the physical allocator.
+	mut value := address ^ malloc_metadata_magic
+	value ^= pages * u64(0x9e3779b185ebca87)
+	value ^= size * u64(0xc2b2ae3d27d4eb4f)
+	value ^= value >> 33
+	value *= u64(0xff51afd7ed558ccd)
+	value ^= value >> 33
+	return value
+}
+
+fn checked_big_metadata(ptr voidptr) ?&MallocMetadata {
+	if ptr == unsafe { nil } || u64(ptr) < higher_half + page_size
+		|| u64(ptr) & (page_size - 1) != 0 {
+		lib.kpanic(unsafe { nil }, c'Heap: invalid big allocation pointer')
+		return none
+	}
+	mut metadata := unsafe { &MallocMetadata(u64(ptr) - page_size) }
+	if metadata.magic != malloc_metadata_magic
+		|| metadata.pages == 0
+		|| metadata.pages_inv != ~metadata.pages
+		|| metadata.size_inv != ~metadata.size
+		|| lib.div_roundup(metadata.size, page_size) != metadata.pages
+		|| metadata.cookie != malloc_metadata_cookie(u64(metadata), metadata.pages, metadata.size) {
+		lib.kpanic(unsafe { nil }, c'Heap: corrupt big allocation metadata')
+		return none
+	}
+	return metadata
+}
+
+fn update_big_metadata(mut metadata MallocMetadata, pages u64, size u64) {
+	metadata.magic = malloc_metadata_magic
+	metadata.pages = pages
+	metadata.size = size
+	metadata.pages_inv = ~pages
+	metadata.size_inv = ~size
+	metadata.cookie = malloc_metadata_cookie(u64(metadata), pages, size)
 }
 
 @[export: 'free']
@@ -523,9 +570,20 @@ pub fn free(ptr voidptr) {
 }
 
 fn big_free(ptr voidptr) {
-	metadata := unsafe { &MallocMetadata(u64(ptr) - page_size) }
+	mut metadata := checked_big_metadata(ptr) or { return }
+	pages := metadata.pages
+	physical := u64(metadata) - higher_half
 
-	pmm_free(voidptr(u64(metadata) - higher_half), metadata.pages + 1)
+	// Invalidate before publishing the pages back to the PMM. A repeated free
+	// therefore fails metadata validation even if the page has not yet been
+	// reused by another allocation.
+	metadata.magic = 0
+	metadata.pages = 0
+	metadata.size = 0
+	metadata.pages_inv = 0
+	metadata.size_inv = 0
+	metadata.cookie = 0
+	pmm_free(voidptr(physical), pages + 1)
 }
 
 fn slab_for(size u64) ?&Slab {
@@ -562,9 +620,7 @@ fn big_alloc(size u64) voidptr {
 	}
 
 	mut metadata := unsafe { &MallocMetadata(u64(ptr) + higher_half) }
-
-	metadata.pages = page_count
-	metadata.size = size
+	update_big_metadata(mut metadata, page_count, size)
 
 	return voidptr(u64(ptr) + higher_half + page_size)
 }
@@ -607,10 +663,10 @@ fn big_realloc(ptr voidptr, new_size u64) voidptr {
 	if new_size > (u64(-1) / page_size - 1) * page_size {
 		return unsafe { nil }
 	}
-	mut metadata := unsafe { &MallocMetadata(u64(ptr) - page_size) }
+	mut metadata := checked_big_metadata(ptr) or { return unsafe { nil } }
 
-	if lib.div_roundup(metadata.size, page_size) == lib.div_roundup(new_size, page_size) {
-		metadata.size = new_size
+	if metadata.pages == lib.div_roundup(new_size, page_size) {
+		update_big_metadata(mut metadata, metadata.pages, new_size)
 		return ptr
 	}
 
