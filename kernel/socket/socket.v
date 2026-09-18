@@ -14,6 +14,49 @@ const cmsg_header_size = u64(16)
 const cmsg_align = u64(8)
 const sockaddr_storage_size = u32(128)
 const socket_user_io_max = u64(64 * 1024)
+const socket_iov_max = u64(1024)
+const socket_msg_control_max = u64(64 * 1024)
+const socket_msg_payload_max = u64(1024 * 1024)
+
+fn copy_msghdr_from_user(msg &sock_pub.MsgHdr) ?sock_pub.MsgHdr {
+	if msg == unsafe { nil } {
+		errno.set(errno.efault)
+		return none
+	}
+	mut copied := sock_pub.MsgHdr{}
+	if !usercopy.copy_from_user(voidptr(&copied), u64(msg), sizeof(sock_pub.MsgHdr)) {
+		errno.set(errno.efault)
+		return none
+	}
+	if copied.msg_iovlen > socket_iov_max {
+		errno.set(errno.emsgsize)
+		return none
+	}
+	if copied.msg_iovlen != 0 && copied.msg_iov == unsafe { nil } {
+		errno.set(errno.efault)
+		return none
+	}
+	if copied.msg_controllen != 0 && copied.msg_control == unsafe { nil } {
+		errno.set(errno.efault)
+		return none
+	}
+	return copied
+}
+
+fn copy_iovecs_from_user(msg &sock_pub.MsgHdr) ?[]sock_pub.IoVec {
+	mut iovs := []sock_pub.IoVec{len: int(msg.msg_iovlen)}
+	if msg.msg_iovlen == 0 {
+		return iovs
+	}
+	bytes := msg.msg_iovlen * sizeof(sock_pub.IoVec)
+	if bytes / sizeof(sock_pub.IoVec) != msg.msg_iovlen
+		|| !usercopy.copy_from_user(voidptr(&iovs[0]), u64(msg.msg_iov), bytes) {
+		unsafe { iovs.free() }
+		errno.set(errno.efault)
+		return none
+	}
+	return iovs
+}
 
 fn bounded_socket_io(count u64) u64 {
 	return if count > socket_user_io_max { socket_user_io_max } else { count }
