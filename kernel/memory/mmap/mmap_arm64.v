@@ -4,6 +4,10 @@ import aarch64.cpu
 import aarch64.cpu.local as cpulocal
 import proc
 
+fn prepare_executable_user_page(physical u64) {
+	cpu.sync_instruction_cache(physical + higher_half, page_size)
+}
+
 pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
 	esr := cpu.read_esr_el1()
 	// ESR_EL1 ISS field for data aborts: bits [5:0] = DFSC
@@ -69,7 +73,7 @@ pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
 	virt := memory_page * page_size
 	page := acquire_range_page(range_local, virt, file_page) or { return none }
 	if range_local.prot & prot_exec != 0 {
-		cpu.sync_instruction_cache(u64(page) + higher_half, page_size)
+		prepare_executable_user_page(u64(page))
 	}
 
 	map_page_in_range(range_local.global, virt, u64(page), range_local.prot) or {

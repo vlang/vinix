@@ -298,7 +298,7 @@ pub fn delete_pagemap(mut pagemap memory.Pagemap) ? {
 }
 
 pub fn fork_pagemap(_old_pagemap &memory.Pagemap) ?&memory.Pagemap {
-	memory.register_cow_resolver(resolve_cow_fault)
+	register_fault_resolvers()
 	mut old_pagemap := unsafe { _old_pagemap }
 	mut new_pagemap := memory.new_pagemap()
 	mut old_private_globals := []voidptr{}
@@ -408,6 +408,11 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap) ?&memory.Pagemap {
 	return new_pagemap
 }
 
+fn register_fault_resolvers() {
+	memory.register_cow_resolver(resolve_cow_fault)
+	memory.register_user_page_resolver(resolve_lazy_user_page)
+}
+
 fn page_table_flags(prot int, extra u64, writable bool) u64 {
 	mut flags := memory.pte_present | extra
 	if prot != prot_none {
@@ -506,6 +511,48 @@ pub fn map_page_in_range(_g &MmapRangeGlobal, virt_addr u64, phys_addr u64, _pro
 	}
 }
 
+// Materialize one legitimate non-resident user page for checked usercopy.
+// Permission is validated from the VM range before any page is acquired, and a
+// present-but-inaccessible PTE is never "repaired" here (COW is handled by the
+// separate resolver above usercopy's call site).
+pub fn resolve_lazy_user_page(_pagemap &memory.Pagemap, address u64, write bool) bool {
+	mut pagemap := unsafe { _pagemap }
+	virt := lib.align_down(address, page_size)
+
+	pagemap.l.acquire()
+	mut local_range, _, file_page := addr2range(pagemap, virt) or {
+		pagemap.l.release()
+		return false
+	}
+	if local_range.prot == prot_none || (write && local_range.prot & prot_write == 0) {
+		pagemap.l.release()
+		return false
+	}
+	// If a PTE is already present, failure of user_page_phys() was a protection
+	// failure, not a demand-page miss. Do not bypass it by remapping the page.
+	if _ := pagemap.virt2phys(virt) {
+		pagemap.l.release()
+		return false
+	}
+	global_range := local_range.global
+	flags := local_range.flags
+	prot := local_range.prot
+	pagemap.l.release()
+
+	page := acquire_range_page(local_range, virt, file_page) or { return false }
+	if page == unsafe { nil } {
+		return false
+	}
+	if prot & prot_exec != 0 {
+		prepare_executable_user_page(u64(page))
+	}
+	map_page_in_range(global_range, virt, u64(page), prot) or {
+		release_range_page(global_range, virt, file_page, page, flags)
+		return false
+	}
+	return true
+}
+
 // Resolve a write to a private page shared by fork().  A range retains its
 // requested PROT_WRITE bit while its PTE is read-only, so no software-only PTE
 // bit is needed and both architectures use exactly the same state machine.
@@ -551,6 +598,7 @@ pub fn resolve_cow_fault(_pagemap &memory.Pagemap, address u64) bool {
 }
 
 pub fn map_range(mut pagemap memory.Pagemap, _virt_addr u64, phys_addr u64, _length u64, prot int, _flags int) ? {
+	register_fault_resolvers()
 	validate_protection(prot)?
 	flags := _flags | map_anonymous
 
@@ -594,6 +642,7 @@ pub fn map_range(mut pagemap memory.Pagemap, _virt_addr u64, phys_addr u64, _len
 // pages. Large executable images do not require physically contiguous RAM;
 // keeping one range also lets munmap/mprotect treat the mapping normally.
 pub fn map_pages(mut pagemap memory.Pagemap, virt_addr u64, phys_pages []u64, prot int, _flags int) ? {
+	register_fault_resolvers()
 	validate_protection(prot)?
 	if phys_pages.len == 0 || virt_addr != lib.align_down(virt_addr, page_size) {
 		return none
@@ -665,6 +714,7 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
 	mut pagemap := unsafe { _pagemap }
 	mut resource_ := unsafe { _resource }
 
+	register_fault_resolvers()
 	validate_protection(prot)?
 	if _length == 0 {
 		C.printf(c'mmap: length is 0\n')

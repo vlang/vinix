@@ -4,6 +4,10 @@ import x86.cpu
 import x86.cpu.local as cpulocal
 import proc
 
+fn prepare_executable_user_page(_physical u64) {
+	// x86 keeps the instruction and data caches coherent.
+}
+
 pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
 	if gpr_state.err & 1 != 0 {
 		// A write-protection fault on a fork-shared private page is the normal
