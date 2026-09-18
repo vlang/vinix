@@ -414,15 +414,97 @@ pub fn syscall_recvmsg(_ voidptr, fdnum int, msg &sock_pub.MsgHdr, flags int) (u
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
-	mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.get() }
-	defer {
-		fd.unref()
+	mut user_msg := copy_msghdr_from_user(msg) or { return errno.err, errno.get() }
+	if !usercopy.probe_writable(u64(msg), sizeof(sock_pub.MsgHdr)) {
+		return errno.err, errno.efault
+	}
+	mut user_iovs := copy_iovecs_from_user(&user_msg) or { return errno.err, errno.get() }
+	defer { unsafe { user_iovs.free() } }
+
+	// A stream read may legally return short. Bound the bounce buffer while
+	// preserving the caller's iovec scatter layout on copyout.
+	mut wanted := u64(0)
+	for iov in user_iovs {
+		if wanted == socket_user_io_max {
+			break
+		}
+		mut amount := iov.iov_len
+		if amount > socket_user_io_max - wanted {
+			amount = socket_user_io_max - wanted
+		}
+		if amount != 0 {
+			if iov.iov_base == unsafe { nil }
+				|| !usercopy.probe_writable(u64(iov.iov_base), amount) {
+				return errno.err, errno.efault
+			}
+			wanted += amount
+		}
 	}
 
+	payload := memory.malloc(if wanted == 0 { u64(1) } else { wanted })
+	if payload == unsafe { nil } {
+		return errno.err, errno.enomem
+	}
+	defer { memory.free(payload) }
+
+	mut kernel_iov := sock_pub.IoVec{
+		iov_base: payload
+		iov_len: wanted
+	}
+	mut kernel_msg := user_msg
+	if wanted == 0 {
+		kernel_msg.msg_iov = unsafe { nil }
+		kernel_msg.msg_iovlen = 0
+	} else {
+		kernel_msg.msg_iov = &kernel_iov
+		kernel_msg.msg_iovlen = 1
+	}
+	kernel_msg.msg_flags = 0
+
+	mut name_storage := [128]u8{}
+	name_capacity := if user_msg.msg_namelen < sockaddr_storage_size {
+		user_msg.msg_namelen
+	} else {
+		sockaddr_storage_size
+	}
+	if user_msg.msg_name != unsafe { nil } {
+		if name_capacity != 0
+			&& !usercopy.probe_writable(u64(user_msg.msg_name), u64(name_capacity)) {
+			return errno.err, errno.efault
+		}
+		kernel_msg.msg_name = voidptr(&name_storage[0])
+		kernel_msg.msg_namelen = name_capacity
+	} else {
+		kernel_msg.msg_name = unsafe { nil }
+		kernel_msg.msg_namelen = 0
+	}
+
+	mut control := voidptr(0)
+	control_capacity := if user_msg.msg_controllen < socket_msg_control_max {
+		user_msg.msg_controllen
+	} else {
+		socket_msg_control_max
+	}
+	if control_capacity != 0 {
+		if !usercopy.probe_writable(u64(user_msg.msg_control), control_capacity) {
+			return errno.err, errno.efault
+		}
+		control = memory.malloc(control_capacity)
+		if control == unsafe { nil } {
+			return errno.err, errno.enomem
+		}
+		defer { memory.free(control) }
+		kernel_msg.msg_control = control
+		kernel_msg.msg_controllen = control_capacity
+	} else {
+		kernel_msg.msg_control = unsafe { nil }
+		kernel_msg.msg_controllen = 0
+	}
+
+	mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.get() }
+	defer { fd.unref() }
 	mut res := fd.handle.resource
-
 	mut sock := &sock_pub.Socket(unsafe { nil })
-
 	if mut res is sock_unix.UnixSocket {
 		sock = res
 	} else if mut res is sock_inet.InetSocket {
@@ -436,15 +518,61 @@ pub fn syscall_recvmsg(_ voidptr, fdnum int, msg &sock_pub.MsgHdr, flags int) (u
 	if flags & 0x40 != 0 {
 		fd.handle.flags |= resource.o_nonblock
 	}
-	defer {
-		fd.handle.flags = old_flags
-	}
+	defer { fd.handle.flags = old_flags }
 	mut remaining_flags := flags & ~0x40000040 // MSG_CMSG_CLOEXEC | MSG_DONTWAIT
 	if mut res is sock_unix.UnixSocket {
 		remaining_flags = flags & ~0x40 // Unix recvmsg consumes MSG_CMSG_CLOEXEC.
 	}
-	ret := sock.recvmsg(fd.handle, msg, remaining_flags) or { return errno.err, errno.get() }
+	ret := sock.recvmsg(fd.handle, &kernel_msg, remaining_flags) or {
+		return errno.err, errno.get()
+	}
+	if ret > wanted {
+		return errno.err, errno.eio
+	}
 
+	mut copied := u64(0)
+	mut left := ret
+	for iov in user_iovs {
+		if left == 0 {
+			break
+		}
+		amount := if iov.iov_len < left { iov.iov_len } else { left }
+		if amount != 0
+			&& !usercopy.copy_to_user(u64(iov.iov_base), voidptr(u64(payload) + copied), amount) {
+			return errno.err, errno.efault
+		}
+		copied += amount
+		left -= amount
+	}
+
+	if user_msg.msg_name != unsafe { nil } && name_capacity != 0 {
+		mut name_bytes := u64(kernel_msg.msg_namelen)
+		if name_bytes > u64(name_capacity) {
+			name_bytes = u64(name_capacity)
+		}
+		if name_bytes != 0
+			&& !usercopy.copy_to_user(u64(user_msg.msg_name), voidptr(&name_storage[0]), name_bytes) {
+			return errno.err, errno.efault
+		}
+	}
+	if control_capacity != 0 {
+		mut control_bytes := kernel_msg.msg_controllen
+		if control_bytes > control_capacity {
+			control_bytes = control_capacity
+		}
+		if control_bytes != 0
+			&& !usercopy.copy_to_user(u64(user_msg.msg_control), control, control_bytes) {
+			return errno.err, errno.efault
+		}
+	}
+
+	mut output_msg := user_msg
+	output_msg.msg_namelen = kernel_msg.msg_namelen
+	output_msg.msg_controllen = kernel_msg.msg_controllen
+	output_msg.msg_flags = kernel_msg.msg_flags
+	if !usercopy.copy_to_user(u64(msg), voidptr(&output_msg), sizeof(sock_pub.MsgHdr)) {
+		return errno.err, errno.efault
+	}
 	return ret, 0
 }
 
