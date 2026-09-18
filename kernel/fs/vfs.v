@@ -1025,6 +1025,31 @@ pub fn syscall_faccessat(_ voidptr, dirfd int, _path charptr, mode u32, flags in
 	return 0, 0
 }
 
+pub fn fstatat_value(dirfd int, _path charptr, flags int) ?stat.Stat {
+	current_process := proc.current_thread().process
+	path := user_path(_path)?
+	defer { unsafe { path.free() } }
+
+	if path.len == 0 {
+		if flags & at_empty_path == 0 {
+			errno.set(errno.enoent)
+			return none
+		}
+		if dirfd == at_fdcwd {
+			node := unsafe { &VFSNode(current_process.current_directory) }
+			return node.resource.stat
+		}
+		mut fd := file.fd_from_fdnum(current_process, dirfd)?
+		defer { fd.unref() }
+		return fd.handle.resource.stat
+	}
+
+	parent := get_parent_dir(dirfd, path)?
+	follow_links := flags & at_symlink_nofollow == 0
+	node := get_node(parent, path, follow_links)?
+	return node.resource.stat
+}
+
 pub fn syscall_fstatat(_ voidptr, dirfd int, _path charptr, statbuf &stat.Stat, flags int) (u64, u64) {
 	mut current_thread := proc.current_thread()
 	mut process := current_thread.process
@@ -1035,39 +1060,20 @@ pub fn syscall_fstatat(_ voidptr, dirfd int, _path charptr, statbuf &stat.Stat, 
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
-	current_process := proc.current_thread().process
-
-	path := user_path(_path) or { return errno.err, errno.get() }
-	defer { unsafe { path.free() } }
-
-	mut statsrc := &stat.Stat(unsafe { nil })
-
-	if path.len == 0 {
-		if flags & at_empty_path == 0 {
-			return errno.err, errno.enoent
-		}
-
-		if dirfd == at_fdcwd {
-			node := unsafe { &VFSNode(current_process.current_directory) }
-			statsrc = &node.resource.stat
-		} else {
-			fd := file.fd_from_fdnum(current_process, dirfd) or { return errno.err, errno.get() }
-			statsrc = &fd.handle.resource.stat
-		}
-	} else {
-		parent := get_parent_dir(dirfd, path) or { return errno.err, errno.get() }
-
-		follow_links := flags & at_symlink_nofollow == 0
-
-		node := get_node(parent, path, follow_links) or { return errno.err, errno.get() }
-
-		statsrc = &node.resource.stat
+	if statbuf == unsafe { nil } {
+		return errno.err, errno.efault
 	}
-
-	unsafe {
-		*statbuf = *statsrc
+	value := fstatat_value(dirfd, _path, flags) or { return errno.err, errno.get() }
+	if !usercopy.copy_to_user(u64(statbuf), voidptr(&value), sizeof(stat.Stat)) {
+		return errno.err, errno.efault
 	}
 	return 0, 0
+}
+
+pub fn fstat_value(fdnum int) ?stat.Stat {
+	mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum)?
+	defer { fd.unref() }
+	return fd.handle.resource.stat
 }
 
 pub fn syscall_fstat(_ voidptr, fdnum int, statbuf &stat.Stat) (u64, u64) {
@@ -1079,13 +1085,12 @@ pub fn syscall_fstat(_ voidptr, fdnum int, statbuf &stat.Stat) (u64, u64) {
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
-	mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.get() }
-	defer {
-		fd.unref()
+	if statbuf == unsafe { nil } {
+		return errno.err, errno.efault
 	}
-
-	unsafe {
-		*statbuf = fd.handle.resource.stat
+	value := fstat_value(fdnum) or { return errno.err, errno.get() }
+	if !usercopy.copy_to_user(u64(statbuf), voidptr(&value), sizeof(stat.Stat)) {
+		return errno.err, errno.efault
 	}
 	return 0, 0
 }
