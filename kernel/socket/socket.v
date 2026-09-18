@@ -2,6 +2,7 @@ module socket
 
 import resource
 import file
+import memory
 import errno
 import usercopy
 import socket.public as sock_pub
@@ -11,6 +12,67 @@ import proc
 
 const cmsg_header_size = u64(16)
 const cmsg_align = u64(8)
+const sockaddr_storage_size = u32(128)
+const socket_user_io_max = u64(64 * 1024)
+
+fn bounded_socket_io(count u64) u64 {
+	return if count > socket_user_io_max { socket_user_io_max } else { count }
+}
+
+fn copy_sockaddr_from_user(user_address voidptr, length u32, destination voidptr) ? {
+	if user_address == unsafe { nil } {
+		errno.set(errno.efault)
+		return none
+	}
+	if length == 0 || length > sockaddr_storage_size {
+		errno.set(errno.einval)
+		return none
+	}
+	if !usercopy.copy_from_user(destination, u64(user_address), u64(length)) {
+		errno.set(errno.efault)
+		return none
+	}
+}
+
+fn socket_name_to_user(mut sock sock_pub.Socket, handle voidptr, user_address voidptr,
+	user_length &u32, peer bool) ? {
+	if user_length == unsafe { nil } {
+		errno.set(errno.efault)
+		return none
+	}
+	mut capacity := u32(0)
+	if !usercopy.copy_from_user(voidptr(&capacity), u64(user_length), sizeof(u32)) {
+		errno.set(errno.efault)
+		return none
+	}
+	mut storage := [128]u8{}
+	mut kernel_length := if capacity < sockaddr_storage_size { capacity } else { sockaddr_storage_size }
+	if peer {
+		sock.peername(handle, if user_address == unsafe { nil } { unsafe { nil } } else { voidptr(&storage[0]) },
+			&kernel_length)?
+	} else {
+		sock.sockname(handle, if user_address == unsafe { nil } { unsafe { nil } } else { voidptr(&storage[0]) },
+			&kernel_length)?
+	}
+	if user_address != unsafe { nil } && capacity != 0 {
+		mut to_copy := u64(kernel_length)
+		if to_copy > u64(capacity) {
+			to_copy = u64(capacity)
+		}
+		if to_copy > sockaddr_storage_size {
+			to_copy = sockaddr_storage_size
+		}
+		if to_copy != 0 && !usercopy.copy_to_user(u64(user_address), voidptr(&storage[0]), to_copy) {
+			errno.set(errno.efault)
+			return none
+		}
+	}
+	if !usercopy.copy_to_user(u64(user_length), voidptr(&kernel_length), sizeof(u32)) {
+		errno.set(errno.efault)
+		return none
+	}
+}
+
 
 struct CMsgHdr {
 	cmsg_len   u64
@@ -257,7 +319,13 @@ pub fn syscall_bind(_ voidptr, fdnum int, _addr voidptr, addrlen u32) (u64, u64)
 		return errno.err, errno.einval
 	}
 
-	sock.bind(fd.handle, _addr, addrlen) or { return errno.err, errno.get() }
+	mut address_storage := [128]u8{}
+	copy_sockaddr_from_user(_addr, addrlen, voidptr(&address_storage[0])) or {
+		return errno.err, errno.get()
+	}
+	sock.bind(fd.handle, voidptr(&address_storage[0]), addrlen) or {
+		return errno.err, errno.get()
+	}
 
 	return 0, 0
 }
@@ -489,7 +557,13 @@ pub fn syscall_connect(_ voidptr, fdnum int, _addr voidptr, addrlen u32) (u64, u
 		return errno.err, errno.einval
 	}
 
-	sock.connect(fd.handle, _addr, addrlen) or { return errno.err, errno.get() }
+	mut address_storage := [128]u8{}
+	copy_sockaddr_from_user(_addr, addrlen, voidptr(&address_storage[0])) or {
+		return errno.err, errno.get()
+	}
+	sock.connect(fd.handle, voidptr(&address_storage[0]), addrlen) or {
+		return errno.err, errno.get()
+	}
 
 	return 0, 0
 }
@@ -500,12 +574,9 @@ pub fn syscall_getpeername(_ voidptr, fdnum int, _addr voidptr, addrlen &u32) (u
 		fd.unref()
 	}
 
-	if addrlen == unsafe { nil } {
-		return errno.err, errno.efault
+	socket_name_to_user(mut sock, fd.handle, _addr, addrlen, true) or {
+		return errno.err, errno.get()
 	}
-
-	sock.peername(fd.handle, _addr, addrlen) or { return errno.err, errno.get() }
-
 	return 0, 0
 }
 
@@ -536,12 +607,9 @@ pub fn syscall_getsockname(_ voidptr, fdnum int, _addr voidptr, addrlen &u32) (u
 		fd.unref()
 	}
 
-	if addrlen == unsafe { nil } {
-		return errno.err, errno.efault
+	socket_name_to_user(mut sock, fd.handle, _addr, addrlen, false) or {
+		return errno.err, errno.get()
 	}
-
-	sock.sockname(fd.handle, _addr, addrlen) or { return errno.err, errno.get() }
-
 	return 0, 0
 }
 
