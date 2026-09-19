@@ -1,0 +1,4 @@
+#!/bin/sh
+# Keep the executable beside vlib: V derives its installation root from the
+# real compiler path, while users get the conventional /usr/bin/v command.
+exec /usr/lib/vlang/v "$@"

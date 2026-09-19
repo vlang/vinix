@@ -88,6 +88,7 @@ if [ "$REBUILD_LAYERS" -eq 1 ]; then
     build_layer "Go" build-go-aarch64.sh
     build_layer "network tools and package manager" build-network-tools-aarch64.sh
     build_layer "developer tools" build-developer-tools-aarch64.sh
+    build_layer "V compiler" build-v-aarch64.sh
     build_layer "X11" build-x11-aarch64.sh
     build_layer "Firefox" build-firefox-aarch64.sh
     build_layer "Hyprland" build-hyprland-aarch64.sh
@@ -111,6 +112,7 @@ if [ ! -x "$SCRIPT_DIR/build-aarch64-go/staging/usr/bin/go" ] &&
 fi
 require_file "network tools" build-aarch64-network-tools/staging/usr/bin/pkg
 require_file "developer tools" build-aarch64-developer-tools/staging/usr/bin/cmake
+require_file "V compiler" build-aarch64-v/staging/usr/bin/v
 require_file "X11" build-aarch64-x11/staging/usr/bin/Xorg
 require_file "Firefox" build-aarch64-firefox/staging/usr/bin/run-firefox
 require_file "Hyprland" build-aarch64-hyprland/staging/usr/bin/Hyprland
@@ -146,6 +148,9 @@ for image_path in \
     usr/lib/go/bin/go \
     usr/bin/git \
     usr/bin/cmake \
+    usr/bin/v \
+    usr/bin/vinix-desktop-build \
+    usr/bin/vinix-desktop-reload \
     usr/bin/Xorg \
     usr/bin/run-firefox \
     usr/bin/Hyprland \

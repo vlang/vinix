@@ -423,6 +423,10 @@ fn (mut d Desktop) ensure_registered_user(mut fb Framebuffer, mut pointer Pointe
 			desktop_wait_for_input(pointer.fd, keyboard.fd, idle_interval)
 		}
 		power := desktop_pending_power_action()
+		if power == .reload_desktop {
+			d.end_session(power)
+			return
+		}
 		if power != .keep_running {
 			desktop_power_apply(power)
 		}

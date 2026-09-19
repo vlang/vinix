@@ -1,0 +1,76 @@
+#!/bin/sh
+# Compile the editable desktop sources with the native V and GCC toolchains.
+# A successful build is installed atomically and activated unless --no-reload
+# is requested.
+set -eu
+
+source_dir=${VINIX_DESKTOP_SOURCE:-/root/desktop}
+module_dir=${VINIX_DESKTOP_MODULES:-/root/vmodules}
+output=${VINIX_DESKTOP_OUTPUT:-/root/vinix-desktop}
+reload=1
+
+usage() {
+	cat >&2 <<'EOF'
+usage: vinix-desktop-build [--no-reload] [--source=DIR] [--output=FILE]
+
+Builds the editable Vinix desktop with the in-guest V compiler. By default the
+new binary is installed and the running desktop session is reloaded.
+EOF
+	exit 2
+}
+
+for argument in "$@"; do
+	case "$argument" in
+		--no-reload) reload=0 ;;
+		--source=*) source_dir=${argument#*=} ;;
+		--output=*) output=${argument#*=} ;;
+		--help|-h) usage ;;
+		*) echo "vinix-desktop-build: unknown option: $argument" >&2; usage ;;
+	esac
+done
+
+[ -f "$source_dir/main.v" ] || {
+	echo "vinix-desktop-build: desktop source not found: $source_dir" >&2
+	exit 1
+}
+[ -f "$module_dir/ui2/v.mod" ] || {
+	echo "vinix-desktop-build: ui2 module not found: $module_dir/ui2" >&2
+	exit 1
+}
+command -v v >/dev/null 2>&1 || {
+	echo "vinix-desktop-build: V compiler is not installed" >&2
+	exit 1
+}
+command -v gcc >/dev/null 2>&1 || {
+	echo "vinix-desktop-build: GCC is not installed" >&2
+	exit 1
+}
+
+work_dir=$(mktemp -d /tmp/vinix-desktop-build.XXXXXX)
+cleanup() {
+	rm -rf "$work_dir"
+}
+trap cleanup EXIT HUP INT TERM
+
+echo "==> Translating Vinix desktop with $(v version)"
+v -new-compiler -no-memory-limit -os linux -arch arm64 -gc none -manualfree \
+	-enable-globals -prod -d ui2_headless \
+	-path "@vlib|$module_dir|@vmodules|$source_dir" \
+	-o "$work_dir/desktop.c" "$source_dir"
+
+echo "==> Compiling the native desktop with GCC"
+gcc -static -O2 -fno-stack-protector -w -I "$source_dir" \
+	"$work_dir/desktop.c" -lm -o "$work_dir/vinix-desktop"
+chmod 755 "$work_dir/vinix-desktop"
+
+if [ "$reload" -eq 1 ]; then
+	cp "$work_dir/vinix-desktop" "$output"
+	chmod 755 "$output"
+	# A terminal launched by the old compositor disappears during the orderly
+	# session teardown, so leave the stable copy in place before sending SIGHUP.
+	vinix-desktop-reload "$output"
+else
+	cp "$work_dir/vinix-desktop" "$output"
+	chmod 755 "$output"
+	echo "vinix-desktop-build: wrote $output"
+fi

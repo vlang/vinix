@@ -4,7 +4,7 @@
 // exist on Linux/Vinix where no platform window backend is compiled.
 module ui2
 
-$if linux && ui2_headless ? {
+$if (linux || vinix) && ui2_headless ? {
 	pub fn bounds() Rect {
 		return Rect{
 			width: 800

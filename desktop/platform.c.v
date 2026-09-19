@@ -7,8 +7,8 @@ module main
 
 #flag -I @VMODROOT
 
-import os as _
-import time as _
+import os as platform_os
+import time as platform_time
 import term.termios
 
 #include <dirent.h>
@@ -553,6 +553,7 @@ fn desktop_ignore_broken_pipe() {
 // What the session should do once it has finished tearing itself down.
 enum PowerAction {
 	keep_running
+	reload_desktop
 	restart
 	power_off
 	halt
@@ -581,6 +582,7 @@ fn desktop_power_signal_handler(signal i32) {
 fn desktop_install_power_signals() {
 	unsafe {
 		handler := voidptr(desktop_power_signal_handler)
+		C.signal(C.SIGHUP, handler) // replace this desktop binary
 		C.signal(C.SIGTERM, handler) // reboot
 		C.signal(C.SIGUSR2, handler) // poweroff
 		C.signal(C.SIGUSR1, handler) // halt
@@ -594,6 +596,9 @@ fn desktop_pending_power_action() PowerAction {
 		return .keep_running
 	}
 	desktop_power_signal = 0
+	if signal == C.SIGHUP {
+		return .reload_desktop
+	}
 	if signal == C.SIGUSR1 {
 		return .halt
 	}
@@ -616,7 +621,7 @@ fn desktop_is_system_session() bool {
 fn desktop_power_apply(action PowerAction) {
 	mut command := u32(0)
 	match action {
-		.keep_running { return }
+		.keep_running, .reload_desktop { return }
 		.restart { command = reboot_restart }
 		.power_off { command = reboot_power_off }
 		.halt { command = reboot_halt }

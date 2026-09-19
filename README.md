@@ -142,11 +142,11 @@ into one image with a single command:
 ```
 
 The resulting `build-support/init-aarch64/initramfs-desktop.tar` contains
-Python, Ruby, Go, network and native developer tools, X11, Firefox, Hyprland,
-x86 translation, Codex and Claude Code, in addition to the native Vinix
-desktop. Java, Minecraft and Wine are deliberately left out of this default
-image so users can install them on demand with `pkg`. It is the image booted
-by:
+Python, Ruby, Go, the current pinned V compiler, network and native developer
+tools, X11, Firefox, Hyprland, x86 translation, Codex and Claude Code, in
+addition to the native Vinix desktop. Java, Minecraft and Wine are deliberately
+left out of this default image so users can install them on demand with `pkg`.
+It is the image booted by:
 
 ```sh
 ./run-desktop-aarch64.sh --no-desktop
@@ -171,6 +171,28 @@ during boot.
 
 The individual layer builders described below remain available for iterating
 on one component, but are not required for a normal default-image build.
+
+### Develop Vinix desktop inside Vinix
+
+The AArch64 desktop image contains the native V compiler and its matching
+`vlib`, GCC, the editable staged desktop sources in `/root/desktop`, and the
+headless ui2 module in `/root/vmodules`. Verify the compiler or rebuild the
+desktop from a Vinix Terminal with:
+
+```sh
+/root/v-smoke.sh
+vinix-desktop-build
+```
+
+`vinix-desktop-build` translates the desktop with V, links a static AArch64
+binary with GCC, keeps a copy at `/root/vinix-desktop`, atomically replaces
+`/usr/bin/vinix-desktop`, and sends SIGHUP to PID 1. The supervisor lets the
+old compositor close its applications and release the framebuffer, then starts
+the new binary without rebooting the OS. Pass `--no-reload` to build only.
+
+The compiler layer is pinned to the newest V revision qualified by this tree.
+Build it separately with `./build-v-aarch64.sh`; set `VINIX_V_SOURCE` to a V
+checkout when qualifying a newer revision without downloading another copy.
 
 ### Python 3 on aarch64
 

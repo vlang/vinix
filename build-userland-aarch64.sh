@@ -36,6 +36,7 @@ GO_STAGING="${VINIX_GO_STAGING:-$SCRIPT_DIR/build-aarch64-go/staging}"
 JAVA_STAGING="${VINIX_JAVA_STAGING:-$SCRIPT_DIR/build-aarch64-java/staging}"
 NETWORK_TOOLS_STAGING="${VINIX_NETWORK_TOOLS_STAGING:-$SCRIPT_DIR/build-aarch64-network-tools/staging}"
 DEVELOPER_TOOLS_STAGING="${VINIX_DEVELOPER_TOOLS_STAGING:-$SCRIPT_DIR/build-aarch64-developer-tools/staging}"
+VLANG_STAGING="${VINIX_VLANG_STAGING:-$SCRIPT_DIR/build-aarch64-v/staging}"
 FIREFOX_STAGING="${VINIX_FIREFOX_STAGING:-$SCRIPT_DIR/build-aarch64-firefox/staging}"
 MINECRAFT_STAGING="${VINIX_MINECRAFT_STAGING:-$SCRIPT_DIR/build-aarch64-minecraft/staging}"
 CODEX_STAGING="${VINIX_CODEX_STAGING:-$SCRIPT_DIR/build-aarch64-codex/staging}"
@@ -591,6 +592,13 @@ if [ -x "$DEVELOPER_TOOLS_STAGING/usr/bin/cmake" ]; then
     merge_staging_tree "$DEVELOPER_TOOLS_STAGING"
 else
     echo "==> Developer tools staging not found, skipping (run build-developer-tools-aarch64.sh first)"
+fi
+
+if [ -x "$VLANG_STAGING/usr/lib/vlang/v" ]; then
+    echo "==> Integrating the native V compiler..."
+    merge_staging_tree "$VLANG_STAGING"
+else
+    echo "==> V staging not found, skipping (run build-v-aarch64.sh first)"
 fi
 
 if [ -x "$CODEX_STAGING/usr/bin/codex" ]; then

@@ -90,6 +90,28 @@ class DesktopBuildKeyTests(unittest.TestCase):
             write(staging / "usr/bin/minecraft", "game\n")
             self.assertNotEqual(first, MODULE.compute_key(root, v, env))
 
+    def test_replaced_v_layer_invalidates(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            v, env = self.fixture(root)
+            staging = root / "build-aarch64-v/staging"
+            write(staging / "usr/bin/v", "first compiler\n")
+            first = MODULE.compute_key(root, v, env)
+            old = root / "old-v-staging"
+            staging.rename(old)
+            write(staging / "usr/bin/v", "second compiler\n")
+            self.assertNotEqual(first, MODULE.compute_key(root, v, env))
+
+    def test_guest_compatibility_module_change_invalidates(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            v, env = self.fixture(root)
+            module = root / "compat/macos/macho/macho.v"
+            write(module, "module macho\n")
+            first = MODULE.compute_key(root, v, env)
+            write(module, "module macho\nconst changed = true\n")
+            self.assertNotEqual(first, MODULE.compute_key(root, v, env))
+
     def test_compiler_generation_invalidates(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

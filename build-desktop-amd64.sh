@@ -120,6 +120,8 @@ cp -a "$SYSROOT/." "$STAGING/"
 mkdir -p "$STAGING/usr/bin" "$STAGING/usr/share/vinix/wallpapers" \
     "$STAGING/root/desktop" "$STAGING/run"
 install -m755 "$BUILD_DIR/vinix-desktop" "$STAGING/usr/bin/vinix-desktop"
+install -m755 "$SCRIPT_DIR/build-support/vinix-desktop-reload" \
+    "$STAGING/usr/bin/vinix-desktop-reload"
 rm -f "$STAGING/sbin/init"
 install -m755 "$SCRIPT_DIR/build-support/init-amd64/desktop-init" "$STAGING/sbin/init"
 if [ ! -x "$STAGING/bin/zsh" ]; then

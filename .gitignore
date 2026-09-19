@@ -38,6 +38,7 @@ kernel/tmp.v
 /build-aarch64-ruby/
 /build-aarch64-network-tools/
 /build-aarch64-developer-tools/
+/build-aarch64-v/
 /build-aarch64-go/
 /build-aarch64-java/
 /build-aarch64-firefox/

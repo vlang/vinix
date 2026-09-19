@@ -41,6 +41,7 @@ DESKTOP_INITRAMFS="${VINIX_DESKTOP_INITRAMFS:-$SCRIPT_DIR/build-support/init-aar
 DESKTOP_INITRAMFS_GZ="$DESKTOP_INITRAMFS.gz"
 PYTHON_STAGING="${VINIX_PYTHON_STAGING:-$SCRIPT_DIR/build-aarch64-python/staging}"
 NETWORK_TOOLS_STAGING="${VINIX_NETWORK_TOOLS_STAGING:-$SCRIPT_DIR/build-aarch64-network-tools/staging}"
+VLANG_STAGING="${VINIX_VLANG_STAGING:-$SCRIPT_DIR/build-aarch64-v/staging}"
 X11_STAGING="${VINIX_X11_STAGING:-$SCRIPT_DIR/build-aarch64-x11/staging}"
 FIREFOX_STAGING="${VINIX_FIREFOX_STAGING:-$SCRIPT_DIR/build-aarch64-firefox/staging}"
 CHROMIUM_STAGING="${VINIX_CHROMIUM_STAGING:-$SCRIPT_DIR/build-aarch64-chromium/staging}"
@@ -98,6 +99,7 @@ write_staging_cache_manifest() {
     for input in \
         "$BASE_INITRAMFS" "$DEVTOOLS_ARCHIVE" "$SYSROOT" \
         "$PYTHON_STAGING" "$NETWORK_TOOLS_STAGING" "$X11_STAGING" \
+        "$VLANG_STAGING" \
         "$FIREFOX_STAGING" "$CHROMIUM_STAGING" "$LIBREOFFICE_STAGING" \
         "$MINECRAFT_STAGING" "$ASAHI_STAGING" "$HYPRLAND_STAGING" \
         "$BLENDER_NATIVE_STAGING" "$X86_TRANSLATION_STAGING" \
@@ -214,6 +216,22 @@ if [ "$MAKE_INITRAMFS" -eq 1 ]; then
             echo "ERROR: rebuilt AArch64 userland still has no executable /usr/bin/vim" >&2
             exit 1
         fi
+    fi
+fi
+
+if [ "$MAKE_INITRAMFS" -eq 1 ] && [ ! -x "$VLANG_STAGING/usr/lib/vlang/v" ]; then
+    if [ -n "${VINIX_VLANG_STAGING:-}" ]; then
+        echo "ERROR: custom V staging is incomplete: $VLANG_STAGING" >&2
+        exit 1
+    fi
+    echo "==> Native V compiler is missing; building it..."
+    V="$V" \
+    VINIX_AARCH64_USERLAND_BUILD_DIR="$USERLAND_BUILD_DIR" \
+    VINIX_AARCH64_SYSROOT="$SYSROOT" \
+        "$SCRIPT_DIR/build-v-aarch64.sh"
+    if [ ! -x "$VLANG_STAGING/usr/lib/vlang/v" ]; then
+        echo "ERROR: V compiler build did not publish $VLANG_STAGING" >&2
+        exit 1
     fi
 fi
 
@@ -576,6 +594,12 @@ if [ "$REUSE_STAGING" -eq 0 ]; then
         merge_staging_tree "$NETWORK_TOOLS_STAGING"
     fi
 
+    # Always take V from its own pinned layer. The base userland may have been
+    # assembled before that layer was rebuilt, while a compact image never
+    # extracts the full base tree at all.
+    echo "    staging the native V compiler"
+    merge_staging_tree "$VLANG_STAGING"
+
     if [ -x "$BLENDER_NATIVE_STAGING/usr/libexec/vinix-blender-native" ]; then
         echo "==> Staging native Blender GHOST executable"
         merge_staging_tree "$BLENDER_NATIVE_STAGING"
@@ -743,6 +767,10 @@ mkdir -p "$STAGING/etc/firefox/policies"
 install -m644 "$SCRIPT_DIR/build-support/firefox/policies.json" \
     "$STAGING/etc/firefox/policies/policies.json"
 install -m755 "$SCRIPT_DIR/build-support/chromium/run-chromium" "$STAGING/usr/bin/run-chromium"
+install -m755 "$SCRIPT_DIR/build-support/vinix-desktop-build" \
+    "$STAGING/usr/bin/vinix-desktop-build"
+install -m755 "$SCRIPT_DIR/build-support/vinix-desktop-reload" \
+    "$STAGING/usr/bin/vinix-desktop-reload"
 install -m644 "$SCRIPT_DIR/tests/browsers/chromium-smoke.html" \
     "$STAGING/usr/share/vinix/chromium-smoke.html"
 install -m755 "$SCRIPT_DIR/tests/packages/x-window-check.py" \
@@ -789,6 +817,14 @@ if [ ! -x "$STAGING/usr/bin/pkg" ] || [ ! -x "$STAGING/sbin/apk" ]; then
     echo "ERROR: desktop image is missing pkg or apk" >&2
     exit 1
 fi
+for development_path in \
+    usr/bin/v usr/lib/vlang/v usr/bin/gcc \
+    usr/bin/vinix-desktop-build usr/bin/vinix-desktop-reload; do
+    if [ ! -x "$STAGING/$development_path" ]; then
+        echo "ERROR: desktop development environment is missing /$development_path" >&2
+        exit 1
+    fi
+done
 for runtime_path in usr/bin/Xorg usr/bin/Xvfb usr/bin/startx usr/bin/vinix-xinput usr/bin/vinix-wine-host usr/bin/run-firefox usr/bin/run-gimp usr/bin/run-chromium usr/bin/run-libreoffice; do
     if [ ! -x "$STAGING/$runtime_path" ]; then
         echo "ERROR: desktop hosted-X11 runtime is missing /$runtime_path" >&2
@@ -810,7 +846,7 @@ if ! { [ -x "$STAGING/usr/lib/firefox-esr/firefox-esr" ] &&
     exit 1
 fi
 if [ "$COMPACT_INITRAMFS" -eq 1 ]; then
-    for command_path in bin/sh bin/zsh bin/id bin/sed bin/mkdir bin/sleep bin/df bin/du bin/ls bin/tar usr/bin/pkg sbin/apk usr/bin/vim usr/bin/python3 usr/bin/git usr/bin/Xorg usr/bin/Xvfb usr/bin/startx usr/bin/vinix-xinput usr/bin/vinix-wine-host usr/bin/run-firefox usr/bin/run-gimp usr/bin/run-chromium usr/bin/run-libreoffice usr/bin/gcc; do
+    for command_path in bin/sh bin/zsh bin/id bin/sed bin/mkdir bin/sleep bin/df bin/du bin/ls bin/tar usr/bin/pkg sbin/apk usr/bin/vim usr/bin/python3 usr/bin/git usr/bin/Xorg usr/bin/Xvfb usr/bin/startx usr/bin/vinix-xinput usr/bin/vinix-wine-host usr/bin/run-firefox usr/bin/run-gimp usr/bin/run-chromium usr/bin/run-libreoffice usr/bin/gcc usr/bin/v usr/bin/vinix-desktop-build usr/bin/vinix-desktop-reload; do
         if [ ! -x "$STAGING/$command_path" ]; then
             echo "ERROR: compact desktop is missing /$command_path" >&2
             exit 1
@@ -843,7 +879,10 @@ if [ "$COMPACT_INITRAMFS" -eq 0 ] && [ -x "$HYPRLAND_STAGING/usr/bin/start-hyprl
     done
 fi
 
+mkdir -p "$STAGING/usr/libexec"
 cp "$BUILD_DIR/desktop-init" "$STAGING/sbin/init"
+install -m755 "$BUILD_DIR/desktop-init" \
+    "$STAGING/usr/libexec/vinix-desktop-init"
 cp "$BUILD_DIR/vinix-desktop" "$STAGING/usr/bin/vinix-desktop"
 if [ "$GPU_DESKTOP_BUILT" -eq 1 ]; then
     cp "$BUILD_DIR/vinix-desktop-gpu" "$STAGING/usr/bin/vinix-desktop-gpu"
@@ -903,13 +942,23 @@ if [ -d "$BUILD_DIR/wallpapers" ]; then
         "$BUILD_DIR/wallpapers"/SOURCES.txt "$STAGING/usr/share/vinix/wallpapers/" 2>/dev/null || true
 fi
 
-# The desktop's own source travels with the image, so the file browser has
-# something real to show and so the machine carries the code it is running.
+# The editable tree is the exact staged source set used by the host build:
+# desktop sources plus ui2's hosted Calculator model. Dereference the staging
+# links so the guest gets ordinary writable files. The matching headless ui2
+# module overlay is included beside it, making the tree directly compilable by
+# vinix-desktop-build without needing Python or a network checkout.
 rm -rf "$STAGING/root/desktop"
 mkdir -p "$STAGING/root/desktop"
-cp "$SCRIPT_DIR/desktop"/*.v "$SCRIPT_DIR/desktop"/*.c "$SCRIPT_DIR/desktop"/*.h \
-    "$SCRIPT_DIR/desktop/README.md" \
-    "$STAGING/root/desktop/"
+cp -L "$APP_SRC"/*.v "$APP_SRC"/*.vml "$APP_SRC"/*.h \
+    "$SCRIPT_DIR/desktop/README.md" "$STAGING/root/desktop/"
+rm -rf "$STAGING/root/vmodules"
+mkdir -p "$STAGING/root/vmodules/ui2"
+cp -aL "$UI2_MODULES/ui2/." "$STAGING/root/vmodules/ui2/"
+mkdir -p "$STAGING/root/vmodules/compat/macos"
+cp -aL "$SCRIPT_DIR/compat/macos/bundle" \
+    "$STAGING/root/vmodules/compat/macos/bundle"
+cp -aL "$SCRIPT_DIR/compat/macos/macho" \
+    "$STAGING/root/vmodules/compat/macos/macho"
 
 # Vinix's loader opens a shared object without following links, and current
 # Mesa ships every DRI driver as a link to one libdril_dri.so. A dlopen of
@@ -959,7 +1008,11 @@ CONTENT_KEY_INPUTS=(
     "$BUILD_DIR/Calculator.app"
     "$BUILD_DIR/wallpapers"
     "$SCRIPT_DIR/desktop"
+    "$SCRIPT_DIR/compat/macos/bundle"
+    "$SCRIPT_DIR/compat/macos/macho"
     "$SCRIPT_DIR/build-support/vinix-pkg"
+    "$SCRIPT_DIR/build-support/vinix-desktop-build"
+    "$SCRIPT_DIR/build-support/vinix-desktop-reload"
     "$SCRIPT_DIR/build-support/xorg-server/startx"
     "$SCRIPT_DIR/build-support/firefox"
     "$SCRIPT_DIR/build-support/gimp"

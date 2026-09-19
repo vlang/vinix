@@ -95,6 +95,9 @@ def compute_key(root: Path, v_compiler: Path, env: dict[str, str]) -> str:
     network_staging = resolved_env_path(
         env, "VINIX_NETWORK_TOOLS_STAGING", root / "build-aarch64-network-tools/staging"
     )
+    vlang_staging = resolved_env_path(
+        env, "VINIX_VLANG_STAGING", root / "build-aarch64-v/staging"
+    )
     x11_staging = resolved_env_path(
         env, "VINIX_X11_STAGING", root / "build-aarch64-x11/staging"
     )
@@ -140,12 +143,16 @@ def compute_key(root: Path, v_compiler: Path, env: dict[str, str]) -> str:
         root / "third_party/ui2/assets",
         root / "third_party/ui2/examples/calculator",
         root / "compat/macos/apps/Calculator",
+        root / "compat/macos/bundle",
         root / "compat/macos/include",
+        root / "compat/macos/macho",
         root / "build-support/aarch64-cc-shim",
         root / "build-support/init-aarch64/desktop-init.c",
         root / "tools/m1-wifi/wifi-ctl.c",
         root / "kernel/c",
         root / "build-support/vinix-pkg",
+        root / "build-support/vinix-desktop-build",
+        root / "build-support/vinix-desktop-reload",
         root / "build-support/xorg-server/startx",
         root / "build-support/firefox",
         root / "build-support/gimp",
@@ -168,6 +175,7 @@ def compute_key(root: Path, v_compiler: Path, env: dict[str, str]) -> str:
         sysroot,
         python_staging,
         network_staging,
+        vlang_staging,
         firefox_staging,
         chromium_staging,
         libreoffice_staging,

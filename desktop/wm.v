@@ -68,8 +68,9 @@ mut:
 
 	frames  int
 	running bool = true
-	// What to do with the machine once the loop has ended and the session has
-	// been torn down. Only init may set anything but keep_running.
+	// What to do once the loop has ended and the session has been torn down.
+	// Only init may set anything but keep_running; reload_desktop returns to the
+	// supervisor without asking the kernel to power-cycle the machine.
 	power PowerAction
 	// The screen is only recomposed when something it shows has changed. An
 	// idle desktop then costs almost nothing, and — with no garbage collector
@@ -629,8 +630,8 @@ fn (mut d Desktop) request_power_off() {
 	d.end_session(.power_off)
 }
 
-// A power signal ends the session at a frame boundary, so applications are
-// closed and the console is restored before the machine goes down.
+// A supervisor signal ends the session at a frame boundary, so applications
+// are closed and the console is restored before reload or machine powerdown.
 fn (mut d Desktop) take_power_signal() {
 	action := desktop_pending_power_action()
 	if action == .keep_running {

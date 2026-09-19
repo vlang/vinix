@@ -153,6 +153,9 @@ fn main() {
 	// the taskbar do not exist until a persistent user profile has been created.
 	desktop.ensure_registered_user(mut fb, mut pointer, mut keyboard, options.frame_interval,
 		options.idle_interval)
+	if !desktop.running {
+		return
+	}
 
 	// An opening arrangement, kept clear of the shortcut column down the left
 	// edge. The calculator is not opened: it remains available from its shortcut

@@ -15,6 +15,7 @@ export VINIX_SYSTEM_SESSION=1
 cd /root || exit 1
 
 desktop_pid=
+reload_requested=0
 
 forward_desktop_signal() {
 	signal=$1
@@ -58,15 +59,25 @@ report_desktop_exit() {
 	printf '; restarting in one second\n'
 }
 
+request_desktop_reload() {
+	reload_requested=1
+	forward_desktop_signal HUP
+}
+
 # BusyBox reboot, poweroff and halt signal PID 1. Forward those requests to the
 # supervised compositor so it can close applications and restore the console
 # before invoking reboot(2).
 trap 'forward_desktop_signal TERM' TERM
 trap 'forward_desktop_signal USR1' USR1
 trap 'forward_desktop_signal USR2' USR2
+trap 'request_desktop_reload' HUP
 
 while :; do
-	/usr/bin/vinix-desktop &
+	desktop=/usr/bin/vinix-desktop
+	if [ ! -e /run/vinix-desktop-development ] && [ -x /usr/bin/vinix-desktop-gpu ]; then
+		desktop=/usr/bin/vinix-desktop-gpu
+	fi
+	"$desktop" &
 	desktop_pid=$!
 	exited_pid=$desktop_pid
 	wait "$desktop_pid"
@@ -78,6 +89,11 @@ while :; do
 		status=$?
 	done
 	desktop_pid=
+	if [ "$reload_requested" -eq 1 ]; then
+		reload_requested=0
+		echo "init: desktop reload requested; starting the new binary"
+		continue
+	fi
 	if [ "$status" -eq 126 ] || [ "$status" -eq 127 ]; then
 		echo "vinix-desktop could not start; opening a recovery shell"
 		/bin/zsh -l

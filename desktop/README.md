@@ -493,13 +493,25 @@ installed, one command builds the aarch64 image and boots into the desktop:
     ./run-desktop-aarch64.sh
 
 To build a single desktop image with the default portable software set
-(Python, Ruby, Go, developer tools, X11, Firefox, Hyprland, x86 translation,
+(Python, Ruby, Go, V, developer tools, X11, Firefox, Hyprland, x86 translation,
 and the CLI tools), use the aggregate builder and then boot its result. Java,
 Minecraft and Wine remain on-demand `pkg` installs instead of taking space in
 every image:
 
     ./build-all-aarch64.sh
     ./run-desktop-aarch64.sh --no-desktop
+
+That image supports the complete edit-build-reload loop from its own Terminal.
+The files in `/root/desktop` are an editable copy of the exact staged source
+set used for the host build, and `/root/vmodules` contains the matching ui2
+overlay:
+
+    /root/v-smoke.sh
+    vinix-desktop-build
+
+The second command builds `/root/vinix-desktop`, atomically installs it, and
+asks PID 1 to reload the graphical session. `--no-reload` leaves the current
+session running.
 
 The runner caches a gzip-compressed version of the immutable QEMU module to
 keep the boot payload small and comfortably below the FAT32 single-file limit;
@@ -616,6 +628,12 @@ restores the console and only then calls `reboot(2)`, which does not return. The
 **Shut down** button is the same path. Started from a shell instead of from
 init, the desktop is an ordinary process: both then only end the session and
 give the console back to that shell, as they always have.
+
+SIGHUP has a distinct meaning: `vinix-desktop-reload` uses it to ask PID 1 for
+an orderly compositor replacement. It never reaches `reboot(2)`. On a GPU
+system the reload marker deliberately keeps the newly built framebuffer binary
+selected for the rest of that boot instead of reverting to the immutable GPU
+variant on the next supervisor iteration.
 
 ## Native V platform and device code
 
