@@ -2,12 +2,13 @@
 
 These captures are the visual source for Vinix's `macOS` desktop theme. They
 were taken at the guest's native 1280×800 resolution from Apple's macOS
-Catalina 10.15.7 recovery system (build 19H2) running under QEMU. The recovery
-image was downloaded from Apple's signed recovery catalog as product
-`2Z694-25616`, and its chunklist was verified before use.
+Catalina 10.15.7 recovery and installed systems (build 19H2) running under
+QEMU. The recovery image was downloaded from Apple's signed recovery catalog
+as product `2Z694-25616`, and its chunklist was verified before use.
 
-The recovery and installed-system images are deliberately not part of this
-repository. Only the screenshots needed to review the theme are committed.
+The recovery media and installed virtual disk are deliberately not part of
+this repository. Only the screenshots needed to review the theme are
+committed.
 
 ## Captures
 
@@ -25,6 +26,12 @@ repository. Only the screenshots needed to review the theme are committed.
 - `active-inactive-windows.png` — active Disk Utility beside an inactive
   standard Terminal window.
 - `inactive-titlebar.png` — the exact 585×22 inactive title-bar crop.
+- `installed-desktop.png` — the clean installed Catalina desktop in Light
+  appearance after Setup Assistant completed.
+- `installed-finder-window.png` — an active Finder window from the installed
+  system, including its title bar, toolbar and sidebar controls.
+- `installed-finder-traffic-lights-hover.png` — the same Finder window with
+  Catalina's native group-hover traffic-light glyphs visible.
 
 ## Measured standard window chrome
 
