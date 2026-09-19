@@ -21,11 +21,15 @@ import ui2
 
 // HitTarget is one clickable or draggable region, recorded in painting order.
 struct HitTarget {
-	action_id string
-	x         int
-	y         int
-	width     int
-	height    int
+	// A remote application's decoded tree is released as soon as its frame has
+	// been rendered. Interactive action ids must therefore be retained until
+	// the next render replaces this hit-test table.
+	action_id   string
+	owns_action bool
+	x           int
+	y           int
+	width       int
+	height      int
 }
 
 // text_inset is the gap between a control's edge and text aligned against it.
@@ -224,9 +228,9 @@ fn (mut d Desktop) render_drag_damage(root ui2.Element, damage DamageRect) {
 }
 
 fn (mut d Desktop) render_clipped(root ui2.Element, clip Clip) {
-	// clear() keeps the buffer, so a steady desktop stops allocating one per
-	// frame.
-	d.targets.clear()
+	// Keep the target array's buffer, but release action ids retained from the
+	// preceding remote tree before collecting this frame's targets.
+	d.clear_hit_targets()
 	d.canvas.clip = clip
 	d.paint_wallpaper()
 	d.render_element(root, 0, 0, 0)
@@ -336,13 +340,28 @@ fn (mut d Desktop) record_target(el ui2.Element, x int, y int, w int, h int) {
 	if action.len == 0 {
 		return
 	}
+	owns_action := el.key == remote_owned_element_key
 	d.targets << HitTarget{
-		action_id: action
-		x:         x
-		y:         y
-		width:     w
-		height:    h
+		action_id:   if owns_action { action.clone() } else { action }
+		owns_action: owns_action
+		x:           x
+		y:           y
+		width:       w
+		height:      h
 	}
+}
+
+// clear_hit_targets preserves the reusable array while releasing action ids
+// copied out of remote application trees. Local compositor actions are
+// literals or model-owned caches and remain borrowed, as they were before
+// native applications moved into separate processes.
+fn (mut d Desktop) clear_hit_targets() {
+	for target in d.targets {
+		if target.owns_action && target.action_id.len > 0 {
+			unsafe { target.action_id.free() }
+		}
+	}
+	d.targets.clear()
 }
 
 // draw_surface paints a view's background. A rounded view at the top level of

@@ -186,7 +186,7 @@ fn test_activity_device_layout_stays_fixed_across_compilers() {
 
 fn test_remote_application_trees_release_copied_strings_and_arrays() {
 	root := ui2.screen(0x102030, [
-		ui2.view('panel', ui2.rect(0, 0, 320, 200), ui2.BoxStyle{
+		ui2.clickable_view('panel', ui2.rect(0, 0, 320, 200), ui2.BoxStyle{
 			bg: 0xffffff
 		}, [
 			ui2.label('title', 'Separate process', ui2.rect(8, 8, 200, 20), ui2.TextStyle{
@@ -199,10 +199,20 @@ fn test_remote_application_trees_release_copied_strings_and_arrays() {
 	encode_app_element(root, mut encoded)!
 	free_tree(root)
 
+	mut desktop := Desktop{}
+	// The hit-target array is a persistent compositor buffer. Warm its capacity
+	// before measuring the per-frame remote action copies.
+	warm := decode_app_tree(encoded)!
+	desktop.record_target(warm.children[0], 0, 0, 320, 200)
+	free_tree(warm)
+	desktop.clear_hit_targets()
 	C.vinix_heap_begin()
 	for _ in 0 .. 100 {
 		decoded := decode_app_tree(encoded)!
+		desktop.record_target(decoded.children[0], 0, 0, 320, 200)
 		free_tree(decoded)
+		assert desktop.hit_action(10, 10) == 'panel'
+		desktop.clear_hit_targets()
 	}
 	live := C.vinix_heap_end()
 	if live != 0 {

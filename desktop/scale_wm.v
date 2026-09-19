@@ -113,7 +113,7 @@ fn (mut d Desktop) apply_requested_scale() {
 
 	// Hit regions are coordinates from the old render pass. Never route a click
 	// through them after the logical screen changes.
-	d.targets.clear()
+	d.clear_hit_targets()
 	d.set_hover('')
 	d.drag = Drag{}
 	desktop_commit_scale(target)

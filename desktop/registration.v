@@ -452,7 +452,7 @@ fn (mut d Desktop) ensure_registered_user(mut fb Framebuffer, mut pointer Pointe
 	}
 	// Do not let the first ordinary input sample see setup hit targets or a
 	// button level left over from pressing Create user.
-	d.targets.clear()
+	d.clear_hit_targets()
 	d.set_hover('')
 	d.buttons = 0
 	d.drag = Drag{}

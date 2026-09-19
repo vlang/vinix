@@ -843,6 +843,29 @@ fn test_hover_owns_action_past_source_lifetime() {
 	assert desktop.hover == ''
 }
 
+fn test_hit_target_owns_remote_action_past_tree_lifetime() {
+	mut desktop := Desktop{}
+	action := editor_action_document.clone()
+	source_pointer := action.str
+	element := ui2.Element{
+		kind:      .view
+		id:        action
+		key:       remote_owned_element_key
+		clickable: true
+		enabled:   true
+	}
+
+	desktop.record_target(element, 10, 20, 100, 80)
+	assert desktop.targets.len == 1
+	assert desktop.targets[0].owns_action
+	assert desktop.targets[0].action_id.str != source_pointer
+	free_tree(element)
+
+	assert desktop.hit_action(50, 50) == editor_action_document
+	desktop.clear_hit_targets()
+	assert desktop.targets.len == 0
+}
+
 fn test_taskbar_clock_stays_visible_at_m1_200_percent_scale() {
 	// The 3024×1964 M1 framebuffer becomes a 1512×982 logical desktop. The
 	// taskbar reserves a logical status area before allocating task buttons,
