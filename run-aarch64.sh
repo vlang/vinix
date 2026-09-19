@@ -61,7 +61,7 @@ LIMINE_VERSION="12.8.0"
 LIMINE_CONF_SRC="$SCRIPT_DIR/build-support/limine.conf"
 # Keep command-line mutations private to this VM; concurrent runs may select
 # different backends and must not overwrite each other's generated config.
-LIMINE_CONF_QEMU="$(mktemp -t vinix-limine-qemu)"
+LIMINE_CONF_QEMU="$(mktemp -t vinix-limine-qemu.XXXXXX)"
 QEMU_RESOLUTION="${VINIX_QEMU_RESOLUTION:-}"
 # Package state and persistent /root have stable defaults independent of an
 # ephemeral boot image. Desktop runs select their own fixed profile paths.
