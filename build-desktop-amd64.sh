@@ -94,7 +94,7 @@ python3 "$SCRIPT_DIR/desktop/tools/stage_app.py" "$APP_SRC" "$SCRIPT_DIR/desktop
 echo "==> Translating the amd64 desktop to C..."
 BUILD_STAMP="${VINIX_BUILD_STAMP:-$(date '+%m-%d %H:%M')}"
 "$V" -new-compiler -os linux -arch x64 \
-    -gc none -manualfree -enable-globals -prod \
+    -gc none -d no_backtrace -manualfree -enable-globals -prod \
     -d ui2_headless \
     -d "vinix_build_stamp=$BUILD_STAMP" \
     -path "@vlib|$UI2_MODULES|@vmodules|$SCRIPT_DIR|$SCRIPT_DIR/third_party" \
