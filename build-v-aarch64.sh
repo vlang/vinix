@@ -70,9 +70,10 @@ else
 fi
 
 echo "==> Translating V $V_COMMIT for aarch64-linux-musl..."
-# Vinix runs the Alpine/musl hosted user ABI, so both the compiler and the
-# desktop it produces use V's Linux target. V's separate `-os vinix` selector
-# remains available for freestanding kernel builds.
+# The compiler itself uses the mature hosted Linux/musl runtime. The installed
+# `v` command supplies Vinix as the default output target, so programs use the
+# Vinix-specific runtime paths while this large self-hosted compiler retains the
+# process and allocator behavior already exercised by the desktop build.
 "$V" -new-compiler -no-memory-limit -cross -os linux -arch arm64 -musl \
     -gc none -o "$BUILD_DIR/v.c" "$SOURCE_DIR/cmd/v"
 
@@ -125,6 +126,14 @@ mkdir -p "$STAGING/usr/bin" "$STAGING/usr/lib/vlang" "$STAGING/root"
 install -m755 "$BUILD_DIR/v" "$STAGING/usr/lib/vlang/v"
 cp -a "$SOURCE_DIR/vlib" "$STAGING/usr/lib/vlang/vlib"
 cp -a "$SOURCE_DIR/thirdparty" "$STAGING/usr/lib/vlang/thirdparty"
+# `make` populates a V checkout with a bundled TCC for the build host. When a
+# macOS checkout is supplied through VINIX_V_SOURCE that executable is Mach-O,
+# not an AArch64 Linux/musl program. V probes an executable bundled TCC before
+# falling back to `cc`; on Vinix the incompatible probe can enter the Mach-O
+# compatibility path and never return. Do not package host-generated TCC
+# artifacts. The desktop image already contains native GCC/cc, which V uses as
+# its normal fallback and which can link against the same musl userland.
+rm -rf "$STAGING/usr/lib/vlang/thirdparty/tcc"
 printf '%s\n' "$V_COMMIT" > "$STAGING/usr/lib/vlang/VERSION"
 install -m755 "$SCRIPT_DIR/build-support/v-command" "$STAGING/usr/bin/v"
 install -m644 "$SCRIPT_DIR/tests/vlang/hello.v" "$STAGING/root/v-smoke.v"
@@ -133,6 +142,10 @@ install -m755 "$SCRIPT_DIR/tests/vlang/smoke.sh" "$STAGING/root/v-smoke.sh"
 if ! file "$STAGING/usr/lib/vlang/v" | grep -q 'ARM aarch64'; then
     echo "ERROR: staged V compiler is not an AArch64 executable" >&2
     file "$STAGING/usr/lib/vlang/v" >&2
+    exit 1
+fi
+if [ -e "$STAGING/usr/lib/vlang/thirdparty/tcc/tcc.exe" ]; then
+    echo "ERROR: host TCC leaked into the Vinix V layer" >&2
     exit 1
 fi
 

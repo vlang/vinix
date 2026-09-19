@@ -1,4 +1,14 @@
 #!/bin/sh
 # Keep the executable beside vlib: V derives its installation root from the
 # real compiler path, while users get the conventional /usr/bin/v command.
+# Defaults precede caller-supplied VFLAGS and command-line arguments so an
+# explicit -os, -arch, -musl/-glibc, or -cc still wins. Selecting GCC explicitly
+# also tells V that Vinix's Linux-compatible compiler can link its Vinix target.
+vinix_vflags='-os vinix -arch arm64 -musl -cc gcc'
+if [ -n "${VFLAGS:-}" ]; then
+	VFLAGS="$vinix_vflags $VFLAGS"
+else
+	VFLAGS=$vinix_vflags
+fi
+export VFLAGS
 exec /usr/lib/vlang/v "$@"

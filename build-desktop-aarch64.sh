@@ -540,9 +540,12 @@ if [ "$REUSE_STAGING" -eq 0 ]; then
         # sysroot the desktop was compiled against; the base archive stores the
         # command as a hard link to a versioned name, which cannot be extracted on
         # its own. libcap is zsh's own NEEDED library and is in neither archive,
-        # so without it the terminal only ever printed a loader error.
+        # so without it the terminal only ever printed a loader error. V probes
+        # `ldd --version` to select its musl builtins; keep that tiny helper too,
+        # otherwise ordinary debug builds incorrectly emit glibc backtrace calls.
         for zsh_path in bin/zsh bin/zsh-* etc/zsh usr/lib/zsh usr/share/zsh \
             usr/lib/libcap.so.2 usr/lib/libcap.so.2.* \
+            usr/bin/ldd \
             root/.zshrc root/.oh-my-zsh; do
             for zsh_source in "$SYSROOT"/$zsh_path; do
                 [ -e "$zsh_source" ] || continue
@@ -846,7 +849,7 @@ if ! { [ -x "$STAGING/usr/lib/firefox-esr/firefox-esr" ] &&
     exit 1
 fi
 if [ "$COMPACT_INITRAMFS" -eq 1 ]; then
-    for command_path in bin/sh bin/zsh bin/id bin/sed bin/mkdir bin/sleep bin/df bin/du bin/ls bin/tar usr/bin/pkg sbin/apk usr/bin/vim usr/bin/python3 usr/bin/git usr/bin/Xorg usr/bin/Xvfb usr/bin/startx usr/bin/vinix-xinput usr/bin/vinix-wine-host usr/bin/run-firefox usr/bin/run-gimp usr/bin/run-chromium usr/bin/run-libreoffice usr/bin/gcc usr/bin/v usr/bin/vinix-desktop-build usr/bin/vinix-desktop-reload; do
+    for command_path in bin/sh bin/zsh bin/id bin/sed bin/mkdir bin/sleep bin/df bin/du bin/ls bin/tar usr/bin/pkg sbin/apk usr/bin/vim usr/bin/python3 usr/bin/git usr/bin/Xorg usr/bin/Xvfb usr/bin/startx usr/bin/vinix-xinput usr/bin/vinix-wine-host usr/bin/run-firefox usr/bin/run-gimp usr/bin/run-chromium usr/bin/run-libreoffice usr/bin/gcc usr/bin/ldd usr/bin/v usr/bin/vinix-desktop-build usr/bin/vinix-desktop-reload; do
         if [ ! -x "$STAGING/$command_path" ]; then
             echo "ERROR: compact desktop is missing /$command_path" >&2
             exit 1
