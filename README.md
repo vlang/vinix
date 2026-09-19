@@ -193,6 +193,13 @@ the new binary without rebooting the OS. Pass `--no-reload` to build only.
 The compiler layer is pinned to the newest V revision qualified by this tree.
 Build it separately with `./build-v-aarch64.sh`; set `VINIX_V_SOURCE` to a V
 checkout when qualifying a newer revision without downloading another copy.
+The layer includes the matching compiler sources, so `v self` rebuilds and
+replaces `/usr/lib/vlang/v` inside Vinix. Ordinary V builds use the native TCC
+package from Alpine Linux 3.24, and `v self` uses that same TCC toolchain. V's
+worker passes run with `-no-parallel` until their threading is qualified on
+Vinix. `VJOBS=1` and synchronous compiler helper passes keep that contract
+intact. It remains a Linux/musl program that runs on Vinix and continues to
+target Vinix applications by default.
 
 ### Python 3 on aarch64
 

@@ -81,6 +81,8 @@ fn C.reboot(command u32) int
 fn C.sync()
 
 fn desktop_open_rw(path string) int {
+	// Keep `os` imported for its canonical POSIX C declarations.
+	_ = platform_os.path_separator
 	return C.open(&char(path.str), C.O_RDWR)
 }
 
@@ -220,6 +222,8 @@ fn desktop_frame_wait_ms(elapsed i64, interval i64) i64 {
 }
 
 fn desktop_sleep_ms(milliseconds i64) {
+	// Keep `time` imported for its canonical POSIX C declarations.
+	_ = platform_time.nanosecond
 	if milliseconds <= 0 {
 		return
 	}

@@ -1081,7 +1081,7 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 	mut stack_vma := u64(0)
 
 	if _stack == 0 {
-		mut user_stack_size := stack_size
+		mut user_stack_size := default_user_stack_size
 		stack_limit := proc.soft_limit(process, proc.rlimit_stack)
 		if stack_limit != proc.rlim_infinity && stack_limit < user_stack_size {
 			user_stack_size = lib.align_down(stack_limit, page_size)

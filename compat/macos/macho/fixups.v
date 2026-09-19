@@ -25,7 +25,7 @@ mut:
 	index int
 }
 
-fn (mut reader OpcodeReader) byte() !u8 {
+fn (mut reader OpcodeReader) read_byte() !u8 {
 	if reader.index >= reader.data.len {
 		return error('truncated dyld opcode stream')
 	}
@@ -38,7 +38,7 @@ fn (mut reader OpcodeReader) uleb() !u64 {
 	mut value := u64(0)
 	mut shift := 0
 	for count := 0; count < 10; count++ {
-		byte := reader.byte()!
+		byte := reader.read_byte()!
 		payload := u64(byte & 0x7f)
 		if shift == 63 && payload > 1 {
 			return error('overflowing dyld ULEB128')
@@ -57,7 +57,7 @@ fn (mut reader OpcodeReader) sleb() !i64 {
 	mut shift := 0
 	mut byte := u8(0)
 	for count := 0; count < 10; count++ {
-		byte = reader.byte()!
+		byte = reader.read_byte()!
 		payload := u64(byte & 0x7f)
 		if shift == 63 && payload != 0 && payload != 1 {
 			return error('overflowing dyld SLEB128')
@@ -120,7 +120,7 @@ pub fn decode_rebases(stream []u8, segment_count int) ![]Fixup {
 	mut offset := u64(0)
 	mut pointer_rebase := false
 	for reader.index < stream.len {
-		instruction := reader.byte()!
+		instruction := reader.read_byte()!
 		opcode := instruction & opcode_mask
 		immediate := instruction & immediate_mask
 		match opcode {
@@ -200,7 +200,7 @@ pub fn decode_binds(stream []u8, segment_count int, lazy bool) ![]Fixup {
 	// omit an explicit SET_TYPE opcode for each one-symbol program.
 	mut pointer_bind := true
 	for reader.index < stream.len {
-		instruction := reader.byte()!
+		instruction := reader.read_byte()!
 		opcode := instruction & opcode_mask
 		immediate := instruction & immediate_mask
 		match opcode {

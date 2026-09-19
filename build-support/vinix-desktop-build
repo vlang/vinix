@@ -53,7 +53,7 @@ cleanup() {
 trap cleanup EXIT HUP INT TERM
 
 echo "==> Translating Vinix desktop with $(v version)"
-v -new-compiler -no-memory-limit -os linux -arch arm64 -gc none -manualfree \
+v -new-compiler -no-memory-limit -os linux -arch arm64 -cc gcc -gc none -manualfree \
 	-enable-globals -prod -d ui2_headless \
 	-path "@vlib|$module_dir|@vmodules|$source_dir" \
 	-o "$work_dir/desktop.c" "$source_dir"

@@ -14,6 +14,10 @@ fail() {
 
 echo
 echo "VINIX V SELF-HOST TEST: START"
+echo "==> Rebuilding V from its installed source tree"
+v self || fail "compiler self rebuild"
+[ -x /usr/lib/vlang/v_old ] || fail "self rebuild did not retain the old compiler"
+echo "VINIX V SELF REBUILD TEST: PASS"
 /root/v-smoke.sh || fail "native compiler smoke test"
 vinix-desktop-build --no-reload || fail "desktop build"
 [ -x /root/vinix-desktop ] || fail "desktop output is missing"

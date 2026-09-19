@@ -821,10 +821,16 @@ if [ ! -x "$STAGING/usr/bin/pkg" ] || [ ! -x "$STAGING/sbin/apk" ]; then
     exit 1
 fi
 for development_path in \
-    usr/bin/v usr/lib/vlang/v usr/bin/gcc \
+    usr/bin/v usr/lib/vlang/v usr/bin/gcc usr/bin/tcc \
     usr/bin/vinix-desktop-build usr/bin/vinix-desktop-reload; do
     if [ ! -x "$STAGING/$development_path" ]; then
         echo "ERROR: desktop development environment is missing /$development_path" >&2
+        exit 1
+    fi
+done
+for development_file in usr/lib/vlang/cmd/v/v.v usr/lib/libtcc.so; do
+    if [ ! -f "$STAGING/$development_file" ]; then
+        echo "ERROR: desktop development environment is missing /$development_file" >&2
         exit 1
     fi
 done
@@ -849,7 +855,7 @@ if ! { [ -x "$STAGING/usr/lib/firefox-esr/firefox-esr" ] &&
     exit 1
 fi
 if [ "$COMPACT_INITRAMFS" -eq 1 ]; then
-    for command_path in bin/sh bin/zsh bin/id bin/sed bin/mkdir bin/sleep bin/df bin/du bin/ls bin/tar usr/bin/pkg sbin/apk usr/bin/vim usr/bin/python3 usr/bin/git usr/bin/Xorg usr/bin/Xvfb usr/bin/startx usr/bin/vinix-xinput usr/bin/vinix-wine-host usr/bin/run-firefox usr/bin/run-gimp usr/bin/run-chromium usr/bin/run-libreoffice usr/bin/gcc usr/bin/ldd usr/bin/v usr/bin/vinix-desktop-build usr/bin/vinix-desktop-reload; do
+    for command_path in bin/sh bin/zsh bin/id bin/sed bin/mkdir bin/sleep bin/df bin/du bin/ls bin/tar usr/bin/pkg sbin/apk usr/bin/vim usr/bin/python3 usr/bin/git usr/bin/Xorg usr/bin/Xvfb usr/bin/startx usr/bin/vinix-xinput usr/bin/vinix-wine-host usr/bin/run-firefox usr/bin/run-gimp usr/bin/run-chromium usr/bin/run-libreoffice usr/bin/gcc usr/bin/tcc usr/bin/ldd usr/bin/v usr/bin/vinix-desktop-build usr/bin/vinix-desktop-reload; do
         if [ ! -x "$STAGING/$command_path" ]; then
             echo "ERROR: compact desktop is missing /$command_path" >&2
             exit 1

@@ -3,6 +3,7 @@ set -eu
 
 echo "compiler: $(v version)"
 echo "commit:   $(cat /usr/lib/vlang/VERSION)"
+tcc -v
 rm -rf /tmp/v-smoke-test
 mkdir -p /tmp/v-smoke-test
 cp /root/v-smoke.v /tmp/v-smoke-test/hi.v
