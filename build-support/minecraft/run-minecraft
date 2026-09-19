@@ -204,7 +204,16 @@ fi
 # with "Unknown platform: Vinix" before a window is ever created. The natives
 # being loaded are Linux builds running on Vinix's Linux-compatible ABI, so
 # name that ABI for the libraries that ask.
+#
+# HotSpot's Linux port probes an RWX page during startup. Vinix keeps W^X as
+# the default for every other process; this exec-scoped opt-in enables only
+# this JVM and the children it deliberately starts. Generated HotSpot code is
+# not reliable on Vinix yet, so use the interpreter; Minecraft is slower to
+# start, but the official client and renderer run correctly.
+export VINIX_ALLOW_WX=1
 exec "$java_bin" \
+	-Xint \
+	-XX:ActiveProcessorCount=1 \
 	"-Xmx$memory" \
 	-XX:+UseSerialGC \
 	-Dos.name=Linux \

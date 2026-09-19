@@ -697,6 +697,7 @@ pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, 
 	// the amd64 ELF loader follows the Linux syscall ABI; this includes Alpine's
 	// /lib/ld-musl-x86_64.so.1 and static Linux executables.
 	linux_abi := ld_path != '/usr/lib/ld.so'
+	allow_wx := envp.contains('VINIX_ALLOW_WX=1')
 
 	mut entry_point := unsafe { nil }
 
@@ -731,6 +732,7 @@ pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, 
 		new_process.name = '${path}[${new_process.pid}]'
 		new_process.executable_path = path.clone()
 		new_process.linux_abi = linux_abi
+		new_process.allow_wx = allow_wx
 
 		stdin_node := fs.get_node(vfs_root, stdin_path, true)?
 		stdin_handle := &file.Handle{
@@ -782,6 +784,7 @@ pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, 
 		process.name = '${path}[${process.pid}]'
 		process.executable_path = path.clone()
 		process.linux_abi = linux_abi
+		process.allow_wx = allow_wx
 
 		kernel_pagemap.switch_to()
 		t.process = kernel_process

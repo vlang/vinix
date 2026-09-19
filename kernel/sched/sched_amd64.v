@@ -659,6 +659,7 @@ pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) ?&proc.Pr
 		new_proc.mmap_anon_non_fixed_base = old_process.mmap_anon_non_fixed_base
 		new_proc.current_directory = old_process.current_directory
 		new_proc.linux_abi = old_process.linux_abi
+		new_proc.allow_wx = old_process.allow_wx
 		new_proc.uid = old_process.uid
 		new_proc.euid = old_process.euid
 		new_proc.suid = old_process.suid

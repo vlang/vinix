@@ -35,6 +35,7 @@ printf 'display=%s\n' "${DISPLAY:-}"
 printf 'software=%s\n' "${LIBGL_ALWAYS_SOFTWARE:-}"
 printf 'gallium=%s\n' "${GALLIUM_DRIVER:-}"
 printf 'indirect=%s\n' "${LIBGL_ALWAYS_INDIRECT:-}"
+printf 'allow_wx=%s\n' "${VINIX_ALLOW_WX:-}"
 printf 'args=%s\n' "$*"
 EOF
 chmod +x "$work/bin/java"
@@ -78,6 +79,11 @@ printf '%s' "$output" | grep -q 'org.lwjgl.openal.libname=/usr/lib/libopenal.so.
 printf '%s' "$output" | grep -q 'org.lwjgl.system.allocator=system'
 # LWJGL aborts with "Unknown platform: Vinix" unless it is told the ABI name.
 printf '%s' "$output" | grep -q '\-Dos.name=Linux'
+# HotSpot must use its stable interpreter and explicitly request Vinix's
+# process-scoped compatibility exception for the JVM's RWX startup probe.
+printf '%s' "$output" | grep -q '\-Xint'
+printf '%s' "$output" | grep -q '\-XX:ActiveProcessorCount=1'
+printf '%s\n' "$output" | grep -q '^allow_wx=1$'
 
 # The full game requires a real session; refuse rather than fabricate one.
 if env $common_env DISPLAY=:7 "$launcher" --play >/dev/null 2>&1; then

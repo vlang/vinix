@@ -512,6 +512,16 @@ flow, after which `minecraft` plays the full game; `--demo`, `--play`,
 `--logout` and a display-free `--check` are also accepted. Worlds and options
 live under `$HOME/.minecraft`.
 
+For the QEMU desktop, start Vinix with one virtual CPU while running Minecraft:
+
+```sh
+VINIX_QEMU_SMP=1 ./run-desktop-aarch64.sh
+```
+
+The launcher uses HotSpot's interpreter and reports one active processor. This
+avoids the generated-code and SMP races that Vinix still needs to resolve; the
+tradeoff is a slow first client startup.
+
 Microsoft requires every launcher to use its own registered application, so set
 `VINIX_MINECRAFT_MSA_CLIENT_ID` to the application id of an Azure registration
 approved for Minecraft sign-in before using `--login`. The demo needs no

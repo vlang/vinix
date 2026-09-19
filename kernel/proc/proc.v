@@ -212,6 +212,9 @@ pub mut:
 	// Linux convention used by unmodified Alpine binaries. exec sets this from
 	// the ELF interpreter; fork inherits it with the rest of the process ABI.
 	linux_abi bool
+	// Some compatibility runtimes require an RWX probe even when their generated
+	// code runs interpreted. Exec replaces this opt-in; fork preserves it.
+	allow_wx bool
 
 	// Credentials: the real, effective and saved sets POSIX names, plus the
 	// supplementary groups. Everything starts as root and is inherited across

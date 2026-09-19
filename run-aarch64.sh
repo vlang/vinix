@@ -979,7 +979,7 @@ set +e
     -machine virt,gic-version=3 \
     $ACCEL_FLAGS \
     -m "$QEMU_MEM" \
-    -smp 4 \
+    -smp "${VINIX_QEMU_SMP:-4}" \
     -object rng-random,filename=/dev/urandom,id=vinix-rng \
     -device virtio-rng-device,rng=vinix-rng \
     -drive if=pflash,format=raw,readonly=on,file="$OVMF" \
