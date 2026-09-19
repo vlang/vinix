@@ -83,6 +83,9 @@ printf '%s' "$output" | grep -q '\-Dos.name=Linux'
 # process-scoped compatibility exception for the JVM's RWX startup probe.
 printf '%s' "$output" | grep -q '\-Xint'
 printf '%s' "$output" | grep -q '\-XX:ActiveProcessorCount=1'
+# Alpine's jspawnhelper pipe protocol is not implemented on Vinix. Java must
+# use its direct fork path for Minecraft's system probes and helper commands.
+printf '%s' "$output" | grep -q '\-Djdk.lang.Process.launchMechanism=FORK'
 printf '%s\n' "$output" | grep -q '^allow_wx=1$'
 
 # The full game requires a real session; refuse rather than fabricate one.

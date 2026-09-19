@@ -512,10 +512,11 @@ flow, after which `minecraft` plays the full game; `--demo`, `--play`,
 `--logout` and a display-free `--check` are also accepted. Worlds and options
 live under `$HOME/.minecraft`.
 
-For the QEMU desktop, start Vinix with one virtual CPU while running Minecraft:
+For the QEMU desktop, give the preinstalled game layer 10 GiB of RAM and use
+one virtual CPU while running Minecraft:
 
 ```sh
-VINIX_QEMU_SMP=1 ./run-desktop-aarch64.sh
+VINIX_QEMU_MEM=10240 VINIX_QEMU_SMP=1 ./run-desktop-aarch64.sh
 ```
 
 The launcher uses HotSpot's interpreter and reports one active processor. This

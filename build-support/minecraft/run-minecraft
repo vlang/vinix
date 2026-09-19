@@ -210,12 +210,17 @@ fi
 # this JVM and the children it deliberately starts. Generated HotSpot code is
 # not reliable on Vinix yet, so use the interpreter; Minecraft is slower to
 # start, but the official client and renderer run correctly.
+#
+# Alpine's jspawnhelper uses a private pipe handshake that Vinix does not yet
+# implement. Force Java's direct fork path so Minecraft's host probes and
+# integrated-server helpers can start reliably.
 export VINIX_ALLOW_WX=1
 exec "$java_bin" \
 	-Xint \
 	-XX:ActiveProcessorCount=1 \
 	"-Xmx$memory" \
 	-XX:+UseSerialGC \
+	-Djdk.lang.Process.launchMechanism=FORK \
 	-Dos.name=Linux \
 	-Dorg.lwjgl.system.allocator=system \
 	-Dorg.lwjgl.openal.libname=/usr/lib/libopenal.so.1 \
