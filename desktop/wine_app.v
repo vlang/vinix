@@ -217,7 +217,12 @@ fn open_hosted_x11_app(name string, command string, surface_width int, surface_h
 		app.error_message = missing_text
 		return app
 	}
-	host := desktop_spawn_wine_host(app.directory, surface_width, surface_height, command) or {
+	// Minecraft's saved launch description can outlive the package that
+	// generated it. Ask the host to enforce the Xvfb dimensions as well as
+	// passing them to the launcher, so an old or ignored game-size option can
+	// never leave a smaller GLFW window floating in a white root surface.
+	host := desktop_spawn_wine_host(app.directory, surface_width, surface_height, command,
+		name == 'minecraft') or {
 		app.failed = true
 		app.error_message = 'Vinix could not start the embedded X11 host.'
 		return app
