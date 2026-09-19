@@ -551,8 +551,8 @@ fn test_available_utility_applications_and_shortcut_layouts() {
 	assert available_apps[10].title == 'Minecraft'
 	assert available_apps[10].process_name == 'vinix-minecraft'
 	assert available_apps[10].exclusive_command == ''
-	assert available_apps[10].width == 1520
-	assert available_apps[10].height == 856 + default_title_height
+	assert available_apps[10].width == 1976
+	assert available_apps[10].height == 1113 + default_title_height
 	assert available_apps[10].keyboard && available_apps[10].polling
 	assert available_apps[10].pointer
 	assert available_apps[11].title == 'Wine Calculator'

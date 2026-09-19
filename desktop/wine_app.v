@@ -45,11 +45,11 @@ const wine_word2013_window_height = 510
 const minecraft_surface_width = 1280
 const minecraft_surface_height = 720
 // Keep Minecraft windowed, but give its 16:9 game surface enough desktop
-// space to be comfortably playable. These are exactly twice the original
-// 760x428 host dimensions; the compositor still leaves its title bar and the
-// Vinix taskbar visible on the standard 1536x1152 desktop.
-const minecraft_window_width = 1520
-const minecraft_window_height = 856
+// space to be comfortably playable. This is 30% larger than the previous
+// 1520x856 frame and still fits the standard 2048x1536 QEMU desktop with its
+// title bar and the Vinix taskbar visible.
+const minecraft_window_width = 1976
+const minecraft_window_height = 1113
 const wine_host_event_magic = u32(0x56574831) // VWH1
 
 enum WineHostEventKind as u32 {

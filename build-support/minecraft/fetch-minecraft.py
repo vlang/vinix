@@ -315,11 +315,18 @@ def write_launch_env(
             continue
         filtered.append(argument)
 
+    # Mojang guards --width/--height behind this launcher feature. Without it,
+    # GLFW creates its 854x480 default window in the middle of Vinix's
+    # 1280x720 Xvfb surface, leaving a large white border in the native host
+    # window. Advertise the custom resolution that run-minecraft already
+    # expands so the official client occupies the complete hosted surface.
     demo_arguments = flatten_arguments(
-        version.get("arguments", {}).get("game", []), {"is_demo_user": True}
+        version.get("arguments", {}).get("game", []),
+        {"is_demo_user": True, "has_custom_resolution": True},
     )
     full_arguments = flatten_arguments(
-        version.get("arguments", {}).get("game", []), {"is_demo_user": False}
+        version.get("arguments", {}).get("game", []),
+        {"is_demo_user": False, "has_custom_resolution": True},
     )
 
     lines = [

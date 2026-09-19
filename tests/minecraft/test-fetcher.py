@@ -7,6 +7,7 @@ import hashlib
 import importlib.util
 import json
 from pathlib import Path
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -68,6 +69,47 @@ class VersionSelectionTests(unittest.TestCase):
         with patch.object(fetch_minecraft, "fetch", self.fake_fetch):
             with self.assertRaisesRegex(SystemExit, "needs Java 25"):
                 fetch_minecraft.resolve_version("26.2", 21)
+
+    def test_launch_description_requests_the_host_resolution(self) -> None:
+        version = {
+            "type": "release",
+            "mainClass": "net.minecraft.client.main.Main",
+            "javaVersion": {"majorVersion": 21},
+            "arguments": {
+                "game": [
+                    {
+                        "rules": [
+                            {
+                                "action": "allow",
+                                "features": {"has_custom_resolution": True},
+                            }
+                        ],
+                        "value": [
+                            "--width",
+                            "${resolution_width}",
+                            "--height",
+                            "${resolution_height}",
+                        ],
+                    }
+                ]
+            },
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            destination = Path(directory) / "launch.env"
+            fetch_minecraft.write_launch_env(
+                destination,
+                version_id="1.21.5",
+                version=version,
+                classpath=[],
+                asset_index="17",
+                game_root="/usr/share/minecraft",
+            )
+            launch_env = destination.read_text()
+
+        self.assertIn(
+            "--width ${resolution_width} --height ${resolution_height}",
+            launch_env,
+        )
 
 
 if __name__ == "__main__":

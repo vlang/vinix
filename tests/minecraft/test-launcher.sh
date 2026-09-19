@@ -17,8 +17,8 @@ MC_GAME_ROOT='$work/game'
 MC_JAVA_MAJOR='25'
 MC_CLASSPATH='$work/game/libraries/org/lwjgl/lwjgl/3.4.1/lwjgl-3.4.1-natives-linux-arm64.jar:$work/game/versions/26.2/26.2.jar'
 MC_JVM_ARGS='-Dorg.lwjgl.system.SharedLibraryExtractPath=\${natives_directory}/lwjgl -Dminecraft.launcher.brand=\${launcher_name}'
-MC_GAME_ARGS_DEMO='--username \${auth_player_name} --version \${version_name} --gameDir \${game_directory} --assetsDir \${assets_root} --assetIndex \${assets_index_name} --uuid \${auth_uuid} --accessToken \${auth_access_token} --versionType \${version_type} --demo'
-MC_GAME_ARGS_FULL='--username \${auth_player_name} --version \${version_name} --gameDir \${game_directory} --assetsDir \${assets_root} --assetIndex \${assets_index_name} --uuid \${auth_uuid} --accessToken \${auth_access_token} --versionType \${version_type}'
+MC_GAME_ARGS_DEMO='--username \${auth_player_name} --version \${version_name} --gameDir \${game_directory} --assetsDir \${assets_root} --assetIndex \${assets_index_name} --uuid \${auth_uuid} --accessToken \${auth_access_token} --versionType \${version_type} --width \${resolution_width} --height \${resolution_height} --demo'
+MC_GAME_ARGS_FULL='--username \${auth_player_name} --version \${version_name} --gameDir \${game_directory} --assetsDir \${assets_root} --assetIndex \${assets_index_name} --uuid \${auth_uuid} --accessToken \${auth_access_token} --versionType \${version_type} --width \${resolution_width} --height \${resolution_height}'
 EOF
 
 cat > "$work/bin/java" <<'EOF'
@@ -73,6 +73,11 @@ printf '%s\n' "$output" | grep -q '^indirect=$'
 printf '%s\n' "$output" | grep -q '^gallium=$'
 printf '%s' "$output" | grep -q 'net.minecraft.client.main.Main'
 printf '%s' "$output" | grep -q 'natives-linux-arm64'
+printf '%s' "$output" | grep -q -- '--width 1280 --height 720'
+# A custom hosted surface can override the defaults without regenerating the
+# Mojang launch description.
+output=$(env $common_env DISPLAY=:7 VINIX_MINECRAFT_WIDTH=1600 VINIX_MINECRAFT_HEIGHT=900 "$launcher")
+printf '%s' "$output" | grep -q -- '--width 1600 --height 900'
 # musl needs Alpine's OpenAL and jemalloc instead of LWJGL's bundled copies.
 printf '%s' "$output" | grep -q 'org.lwjgl.openal.libname=/usr/lib/libopenal.so.1'
 # LWJGL's own jemalloc cannot be loaded here at all; use the libc allocator.
