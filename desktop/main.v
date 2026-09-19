@@ -158,11 +158,10 @@ fn main() {
 	}
 
 	// An opening arrangement, kept clear of the shortcut column down the left
-	// edge. The calculator is not opened: it remains available from its shortcut
-	// and the Start menu, and three windows is enough to show what the taskbar is for.
+	// edge. The calculator remains available from its shortcut and the Start
+	// menu; the Welcome page is available from Help but is not shown at launch.
 	mut launch_default_files := false
 	if options.open.len == 0 {
-		desktop.spawn('Welcome', .welcome, 150, 60, 396, 244)
 		desktop.spawn('System', .system, 580, 60, 372, 232)
 		// Files is a separate process. Paint the compositor-owned windows first,
 		// so a delayed application handshake cannot leave the firmware console
