@@ -90,6 +90,22 @@ printf '%s\n' \
 printf '%s\n' "${ROOT_PACKAGES[@]}" > "$STAGING/etc/vinix-pkg/base-world"
 install -m755 "$SCRIPT_DIR/build-support/vinix-pkg" "$STAGING/usr/bin/pkg"
 
+# Minecraft is an on-demand package rather than part of the base image. Keep
+# its small, auditable installer and launch scripts here; `pkg install
+# minecraft` downloads the official client and its large asset set only when a
+# user asks for it.
+mkdir -p "$STAGING/usr/libexec/vinix-minecraft"
+install -m755 "$SCRIPT_DIR/build-support/minecraft/fetch-minecraft.py" \
+    "$STAGING/usr/libexec/vinix-minecraft/fetch-minecraft.py"
+install -m755 "$SCRIPT_DIR/build-support/minecraft/run-minecraft" \
+    "$STAGING/usr/libexec/vinix-minecraft/run-minecraft"
+install -m755 "$SCRIPT_DIR/build-support/minecraft/minecraft-login" \
+    "$STAGING/usr/libexec/vinix-minecraft/minecraft-login"
+install -m755 "$SCRIPT_DIR/build-support/minecraft/minecraft-xinitrc" \
+    "$STAGING/usr/libexec/vinix-minecraft/minecraft-xinitrc"
+install -m755 "$SCRIPT_DIR/build-support/java-cacerts.py" \
+    "$STAGING/usr/libexec/vinix-minecraft/java-cacerts.py"
+
 install -m755 "$SCRIPT_DIR/tests/network/tools-smoke.sh" \
     "$STAGING/root/network-tools-smoke.sh"
 install -m755 "$SCRIPT_DIR/tests/packages/gtk-smoke.sh" \

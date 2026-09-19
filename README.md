@@ -476,10 +476,20 @@ tmux
 
 ### Minecraft: Java Edition on aarch64
 
-Vinix runs Mojang's own Minecraft client on AArch64, on OpenJDK 25 through its
-X11 and software-OpenGL stack. The game is not part of this repository: the
-build downloads it from Mojang's distribution endpoints on your machine, the
-way any third-party launcher does.
+Vinix runs Mojang's own Minecraft client on AArch64 through its X11 and
+software-OpenGL stack. The game is not part of this repository. From the
+default Vinix desktop image, install it on demand:
+
+```sh
+pkg install minecraft
+minecraft --check
+```
+
+This installs Alpine's OpenJDK 21 and native runtime packages, then downloads
+the newest official Minecraft release compatible with that JVM from Mojang's
+distribution endpoints. Client, library and asset hashes are verified, and
+the large game data remains outside the base image. To stage the current
+release with OpenJDK 25 directly into a custom image instead, run:
 
 ```sh
 ./build-x11-aarch64.sh
@@ -489,8 +499,11 @@ way any third-party launcher does.
 ./run-desktop-aarch64.sh --no-desktop
 ```
 
-`VINIX_MINECRAFT_VERSION` selects the version (default: the current release);
+`VINIX_MINECRAFT_VERSION` selects an exact version or release channel;
 `VINIX_MINECRAFT_ASSETS=none` stages the code without the ~500 MiB of assets.
+The package install constrains the release channel to Java 21, while the custom
+image builder uses its staged Java 25 runtime and therefore takes the current
+release without that constraint.
 
 Open **Minecraft** from the desktop or run `minecraft` in a terminal. With no
 account signed in it starts Mojang's free demo. `minecraft --login` signs in to

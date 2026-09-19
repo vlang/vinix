@@ -175,18 +175,19 @@ GIMP without its splash screen inside a movable Vinix window. Its system
 configuration selects the common image-format plug-ins so a first launch stays
 within Vinix's current exited-process reclamation limit.
 
-The Minecraft layer is produced by `build-minecraft-aarch64.sh`. It stages the
-OpenJDK 25 runtime, the musl libraries Mojang's Linux build does not account
-for, and Mesa's llvmpipe software rasteriser, then downloads Minecraft: Java
-Edition itself from Mojang's own distribution endpoints. The game is never part
-of this repository. `/usr/bin/minecraft` starts Mojang's free demo when no
-account is signed in and the full game after `minecraft --login`; worlds and
-options are kept under `$HOME/.minecraft`. From the
+`pkg install minecraft` installs Alpine's OpenJDK 21 and native runtime, then
+downloads the newest compatible official Minecraft: Java Edition client from
+Mojang's distribution endpoints. The game is never part of this repository or
+the default image. For custom preinstalled images,
+`build-minecraft-aarch64.sh` stages OpenJDK 25 and the current release instead.
+`/usr/bin/minecraft` starts Mojang's free demo when no account is signed in and
+the full game after `minecraft --login`; worlds and options are kept under
+`$HOME/.minecraft`. From the
 desktop, Minecraft uses the same Xvfb/XWD bridge as translated Wine apps and is
 scaled into a native window without surrendering the desktop framebuffer.
 Keyboard and pointer events are forwarded into the private X11 display. The
-desktop builder picks up this layer when present and otherwise leaves a working
-launcher whose window explains which build is missing.
+desktop builder picks up a prebuilt layer when present; otherwise its Minecraft
+window points to the on-demand package command.
 
 Wine Calculator, Wine Notepad, and Microsoft Word 2013 use that same private
 Xvfb bridge, so translated Windows programs remain ordinary movable Vinix

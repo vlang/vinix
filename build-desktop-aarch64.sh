@@ -744,6 +744,14 @@ chmod 1777 "$STAGING/tmp"
 # package/Firefox launchers and policy files can be installed directly from
 # source.
 install -m755 "$SCRIPT_DIR/build-support/vinix-pkg" "$STAGING/usr/bin/pkg"
+mkdir -p "$STAGING/usr/libexec/vinix-minecraft"
+for minecraft_support in \
+    fetch-minecraft.py run-minecraft minecraft-login minecraft-xinitrc; do
+    install -m755 "$SCRIPT_DIR/build-support/minecraft/$minecraft_support" \
+        "$STAGING/usr/libexec/vinix-minecraft/$minecraft_support"
+done
+install -m755 "$SCRIPT_DIR/build-support/java-cacerts.py" \
+    "$STAGING/usr/libexec/vinix-minecraft/java-cacerts.py"
 install -m755 "$SCRIPT_DIR/build-support/xorg-server/startx" "$STAGING/usr/bin/startx"
 install -m755 "$X11_STAGING/usr/bin/vinix-xinput" "$STAGING/usr/bin/vinix-xinput"
 install -m755 "$X11_STAGING/usr/bin/vinix-wine-host" "$STAGING/usr/bin/vinix-wine-host"
@@ -855,7 +863,7 @@ if ! { [ -x "$STAGING/usr/lib/firefox-esr/firefox-esr" ] &&
     exit 1
 fi
 if [ "$COMPACT_INITRAMFS" -eq 1 ]; then
-    for command_path in bin/sh bin/zsh bin/id bin/sed bin/mkdir bin/sleep bin/df bin/du bin/ls bin/tar usr/bin/pkg sbin/apk usr/bin/vim usr/bin/python3 usr/bin/git usr/bin/Xorg usr/bin/Xvfb usr/bin/startx usr/bin/vinix-xinput usr/bin/vinix-wine-host usr/bin/run-firefox usr/bin/run-gimp usr/bin/run-chromium usr/bin/run-libreoffice usr/bin/gcc usr/bin/tcc usr/bin/ldd usr/bin/v usr/bin/vinix-desktop-build usr/bin/vinix-desktop-reload; do
+    for command_path in bin/sh bin/zsh bin/id bin/sed bin/mkdir bin/sleep bin/df bin/du bin/ls bin/tar usr/bin/pkg sbin/apk usr/bin/vim usr/bin/python3 usr/bin/git usr/bin/Xorg usr/bin/Xvfb usr/bin/startx usr/bin/vinix-xinput usr/bin/vinix-wine-host usr/bin/run-firefox usr/bin/run-gimp usr/bin/run-chromium usr/bin/run-libreoffice usr/libexec/vinix-minecraft/fetch-minecraft.py usr/bin/gcc usr/bin/tcc usr/bin/ldd usr/bin/v usr/bin/vinix-desktop-build usr/bin/vinix-desktop-reload; do
         if [ ! -x "$STAGING/$command_path" ]; then
             echo "ERROR: compact desktop is missing /$command_path" >&2
             exit 1

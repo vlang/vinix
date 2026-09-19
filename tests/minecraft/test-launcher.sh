@@ -24,6 +24,10 @@ EOF
 cat > "$work/bin/java" <<'EOF'
 #!/bin/sh
 if [ "${1:-}" = -version ]; then
+	if [ "${VINIX_TEST_JAVA_FAIL:-0}" = 1 ]; then
+		echo 'cannot load libjvm.so' >&2
+		exit 127
+	fi
     echo 'openjdk version "25" 2026-09-16'
     exit 0
 fi
@@ -44,6 +48,12 @@ case "$output" in
     *'Minecraft 26.2 (release)'*'no account signed in'*'ready'*) ;;
     *) echo "check failed: $output" >&2; exit 1 ;;
 esac
+if VINIX_TEST_JAVA_FAIL=1 env $common_env "$launcher" --check \
+	>"$work/java-failure.log" 2>&1; then
+	echo "check accepted a Java runtime that could not execute" >&2
+	exit 1
+fi
+grep -q 'Java failed to start: cannot load libjvm.so' "$work/java-failure.log"
 
 # With no account, the launcher starts Mojang's free demo and expands every
 # placeholder Mojang's template uses.

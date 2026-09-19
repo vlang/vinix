@@ -174,7 +174,18 @@ fn open_wine_word2013(mut _ Desktop) !NativeApp {
 }
 
 fn open_minecraft(mut _ Desktop) !NativeApp {
-	return open_hosted_x11_app('minecraft', '/usr/bin/minecraft', minecraft_surface_width, minecraft_surface_height, 'builtin:block', 'Starting Minecraft…', 'Minecraft is not installed. Build its AArch64 runtime first.', 'Minecraft exited.')
+	if C.access(c'/usr/bin/minecraft', C.X_OK) != 0 {
+		return &HostedX11App{
+			surface_width:  minecraft_surface_width
+			surface_height: minecraft_surface_height
+			icon:           'builtin:block'
+			failed:         true
+			error_message:  'Minecraft is not installed. Run pkg install minecraft in Terminal.'
+		}
+	}
+	return open_hosted_x11_app('minecraft', '/usr/bin/minecraft', minecraft_surface_width,
+		minecraft_surface_height, 'builtin:block', 'Starting Minecraft…',
+		'Minecraft is not installed. Run pkg install minecraft in Terminal.', 'Minecraft exited.')
 }
 
 fn open_hosted_x11_app(name string, command string, surface_width int, surface_height int,

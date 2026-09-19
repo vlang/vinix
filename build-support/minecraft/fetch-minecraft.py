@@ -122,20 +122,55 @@ def rule_matches(rule: dict, features: dict[str, bool]) -> bool:
     return True
 
 
-def resolve_version(version_id: str) -> tuple[str, dict]:
+def fetch_version(entry: dict) -> dict:
+    payload = fetch(entry["url"])
+    actual = hashlib.sha1(payload).hexdigest()
+    if actual != entry["sha1"]:
+        raise RuntimeError(
+            f"version manifest checksum mismatch for {entry['id']}"
+        )
+    return json.loads(payload)
+
+
+def resolve_version(version_id: str, max_java: int | None = None) -> tuple[str, dict]:
     log(f"=== resolving Minecraft {version_id} ===")
     manifest = json.loads(fetch(VERSION_MANIFEST))
     if version_id in ("release", "snapshot"):
         channel = version_id
-        version_id = manifest["latest"][channel]
-        log(f"  latest {channel} resolves to {version_id}")
+        if max_java is None:
+            version_id = manifest["latest"][channel]
+            log(f"  latest {channel} resolves to {version_id}")
+        else:
+            # Alpine stable may carry an older Java feature release than the
+            # newest client asks for. Walk Mojang's newest-first manifest and
+            # select the first official release that its packaged JVM can run,
+            # instead of pinning a game version that will silently go stale.
+            for entry in manifest["versions"]:
+                if entry.get("type") != channel:
+                    continue
+                version = fetch_version(entry)
+                java_major = int(
+                    version.get("javaVersion", {}).get("majorVersion", 8)
+                )
+                if java_major <= max_java:
+                    log(
+                        f"  newest {channel} for Java {max_java} resolves to "
+                        f"{entry['id']} (Java {java_major})"
+                    )
+                    return entry["id"], version
+            raise SystemExit(
+                f"no Minecraft {channel} supports Java {max_java} or older"
+            )
     for entry in manifest["versions"]:
         if entry["id"] == version_id:
-            payload = fetch(entry["url"])
-            actual = hashlib.sha1(payload).hexdigest()
-            if actual != entry["sha1"]:
-                raise RuntimeError(f"version manifest checksum mismatch for {version_id}")
-            return version_id, json.loads(payload)
+            version = fetch_version(entry)
+            java_major = int(version.get("javaVersion", {}).get("majorVersion", 8))
+            if max_java is not None and java_major > max_java:
+                raise SystemExit(
+                    f"Minecraft {version_id} needs Java {java_major}; "
+                    f"the selected runtime supports up to Java {max_java}"
+                )
+            return version_id, version
     raise SystemExit(f"unknown Minecraft version: {version_id}")
 
 
@@ -306,6 +341,11 @@ def write_launch_env(
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--version", default="release", help="version id, or release/snapshot")
+    parser.add_argument(
+        "--max-java",
+        type=int,
+        help="for a release/snapshot channel, select its newest version supported by this Java feature release",
+    )
     parser.add_argument("--staging", required=True, type=Path)
     parser.add_argument("--game-root", default="/usr/share/minecraft")
     parser.add_argument("--jobs", type=int, default=16)
@@ -316,7 +356,7 @@ def main() -> int:
     )
     options = parser.parse_args()
 
-    version_id, version = resolve_version(options.version)
+    version_id, version = resolve_version(options.version, options.max_java)
     log(f"  Minecraft {version_id} ({version['type']}), Java {version.get('javaVersion', {}).get('majorVersion')}")
 
     root = options.staging / options.game_root.lstrip("/")

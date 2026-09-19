@@ -151,6 +151,8 @@ def compute_key(root: Path, v_compiler: Path, env: dict[str, str]) -> str:
         root / "tools/m1-wifi/wifi-ctl.c",
         root / "kernel/c",
         root / "build-support/vinix-pkg",
+        root / "build-support/java-cacerts.py",
+        root / "build-support/minecraft",
         root / "build-support/vinix-desktop-build",
         root / "build-support/vinix-desktop-reload",
         root / "build-support/xorg-server/startx",
