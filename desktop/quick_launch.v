@@ -46,7 +46,7 @@ fn (mut d Desktop) toggle_quick_launch() {
 	d.switcher.active = true
 	d.switcher.shown = true
 	d.switcher.index = 0
-	d.hover = ''
+	d.set_hover('')
 	d.dirty = true
 }
 

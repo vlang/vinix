@@ -679,7 +679,7 @@ fn (mut d Desktop) close_create_context_menu() {
 	create_context_menu.has_item = false
 	create_context_menu.app_index = -1
 	d.clear_context_item_path()
-	d.hover = ''
+	d.set_hover('')
 	d.dirty = true
 }
 

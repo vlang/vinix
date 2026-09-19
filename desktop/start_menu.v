@@ -103,7 +103,7 @@ fn (mut d Desktop) close_start_menu() {
 	d.start_menu_all_apps = false
 	d.start_menu_searching = false
 	d.free_start_menu_query()
-	d.hover = ''
+	d.set_hover('')
 	d.dirty = true
 }
 

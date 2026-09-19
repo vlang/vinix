@@ -400,7 +400,7 @@ fn (mut r RegistrationState) poll_pointer(mut d Desktop, mut pointer PointerDevi
 	d.pointer_x = int(i64(packet.x) * i64(d.canvas.width - 1) / i64(packet.max_x))
 	d.pointer_y = int(i64(packet.y) * i64(d.canvas.height - 1) / i64(packet.max_y))
 	d.buttons = packet.buttons
-	d.hover = d.hit_action(d.pointer_x, d.pointer_y)
+	d.set_hover(d.hit_action(d.pointer_x, d.pointer_y))
 	if packet.pressed & button_left != 0 {
 		r.handle_action(d.hover, home)
 	}
@@ -449,7 +449,7 @@ fn (mut d Desktop) ensure_registered_user(mut fb Framebuffer, mut pointer Pointe
 	// Do not let the first ordinary input sample see setup hit targets or a
 	// button level left over from pressing Create user.
 	d.targets.clear()
-	d.hover = ''
+	d.set_hover('')
 	d.buttons = 0
 	d.drag = Drag{}
 	d.pointer_capture = 0

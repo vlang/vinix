@@ -62,7 +62,7 @@ fn test_wallpaper_copy_respects_canvas_clip() {
 		unsafe { free(canvas.pixels) }
 	}
 	canvas.clear(0x010203)
-	wallpaper := []u32{u32(0x100000), 0x100001, 0x100002, 0x100003, 0x100004, 0x100005,
+	wallpaper := [u32(0x100000), 0x100001, 0x100002, 0x100003, 0x100004, 0x100005,
 		0x100006, 0x100007, 0x100008, 0x100009, 0x10000a, 0x10000b]
 	canvas.clip = Clip{
 		x: 1
@@ -826,6 +826,21 @@ fn test_clicking_a_taskbar_window_button_focuses_without_minimizing() {
 	desktop.on_pointer_down(80, 575)
 	assert desktop.focus == first
 	assert !desktop.windows.last().minimized
+}
+
+fn test_hover_owns_action_past_source_lifetime() {
+	mut desktop := Desktop{}
+	mut source := 'win.2.close'.clone()
+	source_pointer := source.str
+
+	desktop.set_hover(source)
+	assert desktop.hover == 'win.2.close'
+	assert desktop.hover.str != source_pointer
+
+	unsafe { source.free() }
+	assert desktop.hover == 'win.2.close'
+	desktop.set_hover('')
+	assert desktop.hover == ''
 }
 
 fn test_taskbar_clock_stays_visible_at_m1_200_percent_scale() {

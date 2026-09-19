@@ -55,7 +55,7 @@ mut:
 	next_id int = 1
 	focus   int
 	drag    Drag
-	hover   string
+	hover   string // owned; update through set_hover
 
 	pointer_x       int
 	pointer_y       int
@@ -495,7 +495,7 @@ fn (mut d Desktop) launch_with_timeout(factory AppFactory, timeout_ms int) {
 fn (mut d Desktop) external_finished(result ExternalProgramResult) {
 	d.buttons = 0
 	d.drag = Drag{}
-	d.hover = ''
+	d.set_hover('')
 	d.wallpaper_valid = false
 	d.dirty = true
 	title := if d.pending_external_title == '' {
@@ -1175,7 +1175,7 @@ fn (mut d Desktop) on_pointer_move(x int, y int) {
 
 	hover := d.hit_action(x, y)
 	if hover != d.hover {
-		d.hover = hover
+		d.set_hover(hover)
 		d.dirty = true
 	}
 }
@@ -1291,7 +1291,7 @@ fn (mut d Desktop) clamp_drag_to_screen(index int) {
 
 fn (mut d Desktop) on_pointer_down(x int, y int) {
 	action := d.hit_action(x, y)
-	d.hover = action
+	d.set_hover(action)
 	d.dirty = true
 
 	if d.switcher.active {
@@ -1393,7 +1393,7 @@ fn (mut d Desktop) on_pointer_up(x int, y int) {
 	}
 	d.drag = Drag{}
 	d.drag_damage = DamageRect{}
-	d.hover = d.hit_action(x, y)
+	d.set_hover(d.hit_action(x, y))
 	d.dirty = true
 }
 
@@ -1429,6 +1429,19 @@ fn (d &Desktop) hit_action(x int, y int) string {
 		}
 	}
 	return ''
+}
+
+// Hover outlives the frame that produced its hit target. Keep an owned copy:
+// actions may come from an element tree or an array which is released or moved
+// while an application is being launched.
+fn (mut d Desktop) set_hover(action string) {
+	if d.hover == action {
+		return
+	}
+	if d.hover.len > 0 {
+		unsafe { d.hover.free() }
+	}
+	d.hover = if action.len > 0 { action.clone() } else { '' }
 }
 
 // spawn_scattered opens the next window slightly offset from the last one, the

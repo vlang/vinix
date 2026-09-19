@@ -80,7 +80,7 @@ fn (mut d Desktop) titlebar_pointer_down_at(previous TitlebarClick, x int, y int
 		d.windows[index].width = previous.window_width
 		d.windows[index].height = previous.window_height
 		d.windows[index].maximized = previous.maximized
-		d.hover = action
+		d.set_hover(action)
 		d.dirty = true
 		d.toggle_maximize(id)
 		return TitlebarClick{}
