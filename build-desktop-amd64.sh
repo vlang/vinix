@@ -93,8 +93,11 @@ python3 "$SCRIPT_DIR/desktop/tools/stage_app.py" "$APP_SRC" "$SCRIPT_DIR/desktop
 
 echo "==> Translating the amd64 desktop to C..."
 BUILD_STAMP="${VINIX_BUILD_STAMP:-$(date '+%m-%d %H:%M')}"
+# musl does not provide backtrace() or backtrace_symbols(). Disable V's
+# backtrace generation here, before clang links the generated C against
+# the target sysroot, regardless of the host libc detected by V.
 "$V" -new-compiler -os linux -arch x64 \
-    -gc none -manualfree -enable-globals -prod \
+    -gc none -d no_backtrace -manualfree -enable-globals -prod \
     -d ui2_headless \
     -d "vinix_build_stamp=$BUILD_STAMP" \
     -path "@vlib|$UI2_MODULES|@vmodules|$SCRIPT_DIR|$SCRIPT_DIR/third_party" \
