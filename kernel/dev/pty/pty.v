@@ -274,7 +274,9 @@ fn (mut this Ptmx) open(_flags int) ?&resource.Resource {
 	pair.refresh_status_locked()
 
 	fs.devtmpfs_add_device(slave, pair.path)
-	return &resource.Resource(*master)
+	// Keep the master endpoint's event, status and refcount shared with the
+	// pair. Converting *master would box a copy of the resource instead.
+	return &resource.Resource(unsafe { master })
 }
 
 fn (mut this PtySlave) open(flags int) ?&resource.Resource {
@@ -300,7 +302,8 @@ fn (mut this PtySlave) open(flags int) ?&resource.Resource {
 	pair.refresh_status_locked()
 	pair.l.release()
 	wake_pair(mut pair)
-	return &resource.Resource(*this)
+	// The opened handle must wait on the same event that wake_pair signals.
+	return &resource.Resource(unsafe { this })
 }
 
 fn (pair &PtyPair) input_room_locked() u64 {
