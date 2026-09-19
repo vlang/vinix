@@ -1140,11 +1140,11 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 
 	if want_elf == true {
 		if auxval != unsafe { nil } {
-			uart.puts(c'ELF auxval: base=0x')
+			uart.puts(c'ELF auxval: base=')
 			uart.put_hex(auxval.at_base)
-			uart.puts(c' phdr=0x')
+			uart.puts(c' phdr=')
 			uart.put_hex(auxval.at_phdr)
-			uart.puts(c' entry=0x')
+			uart.puts(c' entry=')
 			uart.put_hex(auxval.at_entry)
 			uart.putc(`\n`)
 		}
