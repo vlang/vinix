@@ -171,6 +171,24 @@ else
 	game_args_template=$MC_GAME_ARGS_FULL
 fi
 
+resolution_width=${VINIX_MINECRAFT_WIDTH:-1280}
+resolution_height=${VINIX_MINECRAFT_HEIGHT:-720}
+
+# launch.env is persistent game data and may have been generated before the
+# fetcher advertised Mojang's has_custom_resolution feature. Keep those
+# existing installations working too: supply whichever dimension is absent
+# from their saved argument template. New descriptions already contain these
+# options, so do not append duplicate jopt-simple arguments.
+host_resolution_args=
+case " $game_args_template " in
+	*' --width '*) ;;
+	*) host_resolution_args="--width $resolution_width" ;;
+esac
+case " $game_args_template " in
+	*' --height '*) ;;
+	*) host_resolution_args="$host_resolution_args --height $resolution_height" ;;
+esac
+
 expand() {
 	# Mojang's templates use ${name}; substitute the ones a launcher supplies.
 	printf '%s' "$1" | sed \
@@ -187,8 +205,8 @@ expand() {
 		-e "s|\${auth_xuid}|$player_xuid|g" \
 		-e "s|\${clientid}|vinix|g" \
 		-e "s|\${version_type}|$MC_VERSION_TYPE|g" \
-		-e "s|\${resolution_width}|${VINIX_MINECRAFT_WIDTH:-1280}|g" \
-		-e "s|\${resolution_height}|${VINIX_MINECRAFT_HEIGHT:-720}|g"
+		-e "s|\${resolution_width}|$resolution_width|g" \
+		-e "s|\${resolution_height}|$resolution_height|g"
 }
 
 glfw_override=
@@ -230,4 +248,5 @@ exec "$java_bin" \
 	$(expand "$MC_JVM_ARGS") \
 	-cp "$MC_CLASSPATH" \
 	"$MC_MAIN_CLASS" \
-	$(expand "$game_args_template")
+	$(expand "$game_args_template") \
+	$host_resolution_args

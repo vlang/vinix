@@ -17,7 +17,9 @@ MC_GAME_ROOT='$work/game'
 MC_JAVA_MAJOR='25'
 MC_CLASSPATH='$work/game/libraries/org/lwjgl/lwjgl/3.4.1/lwjgl-3.4.1-natives-linux-arm64.jar:$work/game/versions/26.2/26.2.jar'
 MC_JVM_ARGS='-Dorg.lwjgl.system.SharedLibraryExtractPath=\${natives_directory}/lwjgl -Dminecraft.launcher.brand=\${launcher_name}'
-MC_GAME_ARGS_DEMO='--username \${auth_player_name} --version \${version_name} --gameDir \${game_directory} --assetsDir \${assets_root} --assetIndex \${assets_index_name} --uuid \${auth_uuid} --accessToken \${auth_access_token} --versionType \${version_type} --width \${resolution_width} --height \${resolution_height} --demo'
+# Model both persistent states: demo arguments from an installation staged
+# before custom-resolution support, and current full-game arguments.
+MC_GAME_ARGS_DEMO='--username \${auth_player_name} --version \${version_name} --gameDir \${game_directory} --assetsDir \${assets_root} --assetIndex \${assets_index_name} --uuid \${auth_uuid} --accessToken \${auth_access_token} --versionType \${version_type} --demo'
 MC_GAME_ARGS_FULL='--username \${auth_player_name} --version \${version_name} --gameDir \${game_directory} --assetsDir \${assets_root} --assetIndex \${assets_index_name} --uuid \${auth_uuid} --accessToken \${auth_access_token} --versionType \${version_type} --width \${resolution_width} --height \${resolution_height}'
 EOF
 
@@ -110,6 +112,16 @@ output=$(env $common_env DISPLAY=:7 "$launcher" --play)
 case "$output" in
     *'--username Steve'*'--accessToken test.access.token'*) ;;
     *) echo "full launch failed: $output" >&2; exit 1 ;;
+esac
+case "$output" in
+    *'--width 1280 --height 720'*) ;;
+    *) echo "current launch description lost its resolution: $output" >&2; exit 1 ;;
+esac
+case "$output" in
+    *'--width '*'--width '* | *'--height '*'--height '*)
+        echo "resolution argument was duplicated: $output" >&2
+        exit 1
+        ;;
 esac
 case "$output" in
     *--demo*) echo "full launch unexpectedly entered the demo" >&2; exit 1 ;;
