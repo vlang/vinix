@@ -301,6 +301,7 @@ echo "==> Translating V to C..."
 # 10176 MiB watchdog while it is still making forward declarations. This is a
 # host-side release build, so let the machine's own memory limit govern it.
 "$V" -new-compiler -no-memory-limit -os linux -arch arm64 -gc none -manualfree -enable-globals -prod \
+    -d glibc \
     -d ui2_headless \
     -path "@vlib|$UI2_MODULES|@vmodules|$SCRIPT_DIR|$SCRIPT_DIR/third_party" \
     -o "$BUILD_DIR/desktop.c" "$APP_SRC"
@@ -313,8 +314,8 @@ echo "==> Compiling for aarch64-linux-musl..."
     -I "$APP_SRC" \
     -O2 -fno-stack-protector -w \
     "$SYSROOT/usr/lib/crt1.o" "$SYSROOT/usr/lib/crti.o" "$GCCLIB/crtbeginT.o" \
-    "$BUILD_DIR/desktop.c" \
-    -L"$SYSROOT/usr/lib" -L"$GCCLIB" -lc -lgcc -lm \
+    "$BUILD_DIR/desktop.c" "$SCRIPT_DIR/desktop/execinfo_compat.c" \
+    -L"$SYSROOT/usr/lib" -L"$GCCLIB" -lgcc_eh -lc -lgcc -lm \
     "$GCCLIB/crtend.o" "$SYSROOT/usr/lib/crtn.o" \
     -fuse-ld=lld -B"$LLVM_BIN" \
     -o "$BUILD_DIR/vinix-desktop"
@@ -341,11 +342,12 @@ if [ -f "$ASAHI_STAGING/usr/lib/libEGL.so" ] &&
         -I "$APP_SRC" -I "$ASAHI_STAGING/usr/include" \
         -DVINIX_GPU_PRESENTER_EXTERNAL=1 \
         -O2 -fPIE -pie -fno-stack-protector -w \
-        "$BUILD_DIR/desktop.c" "$SCRIPT_DIR/desktop/gpu_present_egl.c" \
+        "$BUILD_DIR/desktop.c" "$SCRIPT_DIR/desktop/execinfo_compat.c" \
+        "$SCRIPT_DIR/desktop/gpu_present_egl.c" \
         -L"$ASAHI_STAGING/usr/lib" \
         -Wl,-rpath-link,"$ASAHI_STAGING/usr/lib" \
         -Wl,-dynamic-linker,/lib/ld-musl-aarch64.so.1 \
-        -lEGL -lGLESv2 -ldl -lpthread -lm \
+        -lEGL -lGLESv2 -ldl -lpthread -lgcc_eh -lm \
         -fuse-ld=lld -B"$LLVM_BIN" \
         -o "$BUILD_DIR/vinix-desktop-gpu"
     "$LLVM_BIN/llvm-strip" "$BUILD_DIR/vinix-desktop-gpu"
@@ -986,6 +988,7 @@ DESKTOP_DEV_ROOT="$STAGING/usr/share/vinix/desktop-dev"
 rm -rf "$DESKTOP_DEV_ROOT"
 mkdir -p "$DESKTOP_DEV_ROOT/desktop"
 cp -L "$APP_SRC"/*.v "$APP_SRC"/*.vml "$APP_SRC"/*.h \
+    "$SCRIPT_DIR/desktop/execinfo_compat.c" \
     "$SCRIPT_DIR/desktop/README.md" "$DESKTOP_DEV_ROOT/desktop/"
 mkdir -p "$DESKTOP_DEV_ROOT/vmodules/ui2"
 cp -aL "$UI2_MODULES/ui2/." "$DESKTOP_DEV_ROOT/vmodules/ui2/"

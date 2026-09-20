@@ -94,7 +94,7 @@ python3 "$SCRIPT_DIR/desktop/tools/stage_app.py" "$APP_SRC" "$SCRIPT_DIR/desktop
 echo "==> Translating the amd64 desktop to C..."
 BUILD_STAMP="${VINIX_BUILD_STAMP:-$(date '+%m-%d %H:%M')}"
 "$V" -new-compiler -os linux -arch x64 \
-    -gc none -d no_backtrace -manualfree -enable-globals -prod \
+    -gc none -d glibc -manualfree -enable-globals -prod \
     -d ui2_headless \
     -d "vinix_build_stamp=$BUILD_STAMP" \
     -path "@vlib|$UI2_MODULES|@vmodules|$SCRIPT_DIR|$SCRIPT_DIR/third_party" \
@@ -106,8 +106,8 @@ echo "==> Compiling for x86_64-linux-musl..."
     -I "$APP_SRC" \
     -O2 -fno-stack-protector -w \
     "$SYSROOT/usr/lib/crt1.o" "$SYSROOT/usr/lib/crti.o" "$GCCLIB/crtbeginT.o" \
-    "$BUILD_DIR/desktop.c" \
-    -L"$SYSROOT/usr/lib" -L"$GCCLIB" -lc -lgcc -lm \
+    "$BUILD_DIR/desktop.c" "$SCRIPT_DIR/desktop/execinfo_compat.c" \
+    -L"$SYSROOT/usr/lib" -L"$GCCLIB" -lgcc_eh -lc -lgcc -lm \
     "$GCCLIB/crtend.o" "$SYSROOT/usr/lib/crtn.o" \
     -fuse-ld=lld -o "$BUILD_DIR/vinix-desktop"
 "$LLVM_STRIP" "$BUILD_DIR/vinix-desktop"
