@@ -7,11 +7,22 @@ avoids renaming their `module main` models or silently dropping platform demos.
 
 import argparse
 import concurrent.futures
+import fnmatch
+import hashlib
+import json
 import os
 from pathlib import Path
+import re
 import shutil
+import stat
 import subprocess
 import sys
+
+
+CACHE_VERSION = 1
+CACHE_STATE_NAME = ".vinix-ui2-build-state.json"
+EXCLUDED_MODULE_SUBDIRS = {"appkit"}
+EXAMPLE_IGNORE_PATTERNS = ("*_test.v", "*.o", "*.exe", "build_examples")
 
 
 def inventory(source: Path):
@@ -33,6 +44,190 @@ def run(command, quiet=False):
         if quiet and result.stdout:
             sys.stderr.write(result.stdout)
         raise subprocess.CalledProcessError(result.returncode, command)
+
+
+def add_hash_field(digest, value):
+    if isinstance(value, str):
+        value = value.encode("utf-8", "surrogateescape")
+    digest.update(len(value).to_bytes(8, "big"))
+    digest.update(value)
+
+
+def ignored_example_entry(path: Path, example_name: str) -> bool:
+    patterns = EXAMPLE_IGNORE_PATTERNS + (example_name,)
+    return any(fnmatch.fnmatch(path.name, pattern) for pattern in patterns)
+
+
+def hash_path(digest, path: Path, label: str, metadata_only=False,
+              ignore=None, active_directories=None):
+    """Hash a build input without making its absolute location significant."""
+    if active_directories is None:
+        active_directories = set()
+    add_hash_field(digest, label)
+    try:
+        info = path.lstat()
+    except FileNotFoundError:
+        add_hash_field(digest, "missing")
+        return
+
+    add_hash_field(digest, oct(stat.S_IMODE(info.st_mode)))
+    if metadata_only:
+        for value in (info.st_dev, info.st_ino, info.st_size,
+                      info.st_mtime_ns, info.st_ctime_ns):
+            add_hash_field(digest, str(value))
+
+    if stat.S_ISLNK(info.st_mode):
+        add_hash_field(digest, "symlink")
+        add_hash_field(digest, os.readlink(path))
+        resolved = path.resolve()
+        if resolved != path and resolved.exists():
+            hash_path(digest, resolved, label + "/target", metadata_only,
+                      ignore, active_directories)
+        return
+    if stat.S_ISREG(info.st_mode):
+        add_hash_field(digest, "file")
+        add_hash_field(digest, str(info.st_size))
+        if not metadata_only:
+            with path.open("rb") as handle:
+                while True:
+                    chunk = handle.read(1024 * 1024)
+                    if not chunk:
+                        break
+                    digest.update(chunk)
+        return
+    if stat.S_ISDIR(info.st_mode):
+        add_hash_field(digest, "directory")
+        identity = (info.st_dev, info.st_ino)
+        if identity in active_directories:
+            add_hash_field(digest, "symlink-cycle")
+            return
+        active_directories.add(identity)
+        for child in sorted(path.iterdir(), key=lambda item: os.fsencode(item.name)):
+            if ignore is not None and ignore(child):
+                continue
+            hash_path(digest, child, label + "/" + child.name,
+                      metadata_only, ignore, active_directories)
+        active_directories.remove(identity)
+        return
+    add_hash_field(digest, "special")
+    add_hash_field(digest, str(stat.S_IFMT(info.st_mode)))
+
+
+def module_subdirs(ui2_source: Path):
+    text = (ui2_source / "v.mod").read_text()
+    match = re.search(r"\bsubdirs\s*:\s*\[([^]]*)\]", text, re.DOTALL)
+    if not match:
+        return []
+    return re.findall(r"['\"]([^'\"]+)['\"]", match.group(1))
+
+
+def resolved_tool(path: Path) -> Path:
+    if not path.is_absolute() and path.parent == Path("."):
+        found = shutil.which(str(path))
+        if found:
+            return Path(found).resolve()
+    return path.resolve()
+
+
+def shared_build_key(args):
+    """Fingerprint everything shared by the independently built examples."""
+    digest = hashlib.sha256()
+    v_compiler = resolved_tool(args.v)
+    add_hash_field(digest, "vinix-ui2-example-cache-v%d" % CACHE_VERSION)
+    for name, value in (
+            ("host", str(args.host)),
+            ("arch", args.arch or ""),
+            ("target", args.target or "")):
+        add_hash_field(digest, name)
+        add_hash_field(digest, value)
+
+    for label, path in (
+            ("builder", Path(__file__)),
+            ("manifest", args.repo / "desktop/ui2_examples.txt"),
+            ("stager", args.repo / "desktop/tools/stage_ui2.py"),
+            ("backend", args.repo / "desktop/tools/ui2_vinix_backend.v"),
+            ("ui2-manifest", args.ui2_source / "v.mod"),
+            ("v-compiler", v_compiler)):
+        hash_path(digest, path, label)
+    vlib = v_compiler.parent / "vlib"
+    if vlib.is_dir():
+        hash_path(digest, vlib, "vlib", metadata_only=True)
+
+    ui2_dirs = [name for name in module_subdirs(args.ui2_source)
+                if name not in EXCLUDED_MODULE_SUBDIRS]
+    for name in ui2_dirs:
+        hash_path(digest, args.ui2_source / name, "ui2/" + name)
+    hash_path(digest, args.ui2_source / "assets", "ui2/assets")
+
+    if not args.host:
+        # Executables and large sysroot trees use generation metadata. This is
+        # fast on warm builds, while inode/ctime/mtime still catches normal
+        # package extraction and in-place toolchain updates.
+        for label, path in (
+                ("clang", resolved_tool(args.clang)),
+                ("strip", resolved_tool(args.strip)),
+                ("sysroot-headers", args.sysroot / "usr/include"),
+                ("gcc-headers", args.gcclib / "include"),
+                ("crt1", args.sysroot / "usr/lib/crt1.o"),
+                ("crti", args.sysroot / "usr/lib/crti.o"),
+                ("crtn", args.sysroot / "usr/lib/crtn.o"),
+                ("libc", args.sysroot / "usr/lib/libc.a"),
+                ("libm", args.sysroot / "usr/lib/libm.a"),
+                ("crtbegin", args.gcclib / "crtbeginT.o"),
+                ("crtend", args.gcclib / "crtend.o"),
+                ("libgcc", args.gcclib / "libgcc.a"),
+                ("libgcc-eh", args.gcclib / "libgcc_eh.a")):
+            hash_path(digest, path, label, metadata_only=True)
+        if args.cc_shim:
+            hash_path(digest, args.cc_shim, "cc-shim")
+        if args.llvm_bin:
+            hash_path(digest, args.llvm_bin / "ld.lld", "ld.lld",
+                      metadata_only=True)
+    return digest.hexdigest()
+
+
+def example_build_key(args, shared_key: str, name: str):
+    digest = hashlib.sha256()
+    add_hash_field(digest, shared_key)
+    source = args.ui2_source / "examples" / name
+    hash_path(digest, source, "example/" + name,
+              ignore=lambda path: ignored_example_entry(path, name))
+    return digest.hexdigest()
+
+
+def load_build_state(output: Path):
+    try:
+        state = json.loads((output / CACHE_STATE_NAME).read_text())
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        return {}
+    if state.get("version") != CACHE_VERSION:
+        return {}
+    if not isinstance(state.get("examples"), dict):
+        return {}
+    return state
+
+
+def write_build_state(output: Path, shared_key: str, examples):
+    state = {
+        "version": CACHE_VERSION,
+        "shared_key": shared_key,
+        "examples": examples,
+    }
+    temporary = output / (CACHE_STATE_NAME + ".tmp.%d" % os.getpid())
+    temporary.write_text(json.dumps(state, indent=2, sort_keys=True) + "\n")
+    os.replace(temporary, output / CACHE_STATE_NAME)
+
+
+def output_binary(output: Path, name: str) -> Path:
+    return output / ("vinix-ui2-" + name)
+
+
+def usable_cached_binary(output: Path, name: str) -> bool:
+    binary = output_binary(output, name)
+    try:
+        return binary.is_file() and binary.stat().st_size > 0 and os.access(binary, os.X_OK)
+    except OSError:
+        return False
 
 
 def reset_directory(path: Path, protected):
@@ -70,13 +265,16 @@ def compile_example(args, module_root: Path, name: str):
     work.mkdir(parents=True, exist_ok=True)
     example = stage_example(args, name, work)
     generated = work / (name + ".c")
-    output = args.output / ("vinix-ui2-" + name)
+    # Publish only complete binaries, retaining the previous cached executable
+    # if translation or linking fails midway through an incremental rebuild.
+    output = work / ("vinix-ui2-" + name)
     common = [str(args.v), "-new-compiler", "-no-memory-limit", "-gc", "none",
               "-enable-globals", "-d", "ui2_headless",
               "-path", "@vlib|%s|@vmodules|%s" %
               (module_root, args.ui2_source)]
     if args.host:
         run(common + ["-o", str(output), str(example)], quiet=True)
+        os.replace(output, output_binary(args.output, name))
         return name
 
     v_command = common[0:3] + ["-os", "linux", "-arch", args.arch] + common[3:]
@@ -103,6 +301,7 @@ def compile_example(args, module_root: Path, name: str):
     cc_command += ["-o", str(output)]
     run(cc_command, quiet=True)
     run([str(args.strip), str(output)], quiet=True)
+    os.replace(output, output_binary(args.output, name))
     return name
 
 
@@ -154,7 +353,31 @@ def main():
                  args.ui2_source.resolve()}
     if args.output.resolve() == args.work.resolve():
         sys.exit("ui2 output and work directories must be different")
-    reset_directory(args.output, protected)
+    output_resolved = args.output.resolve()
+    if output_resolved in protected or output_resolved == Path(output_resolved.anchor):
+        sys.exit("refusing unsafe ui2 output directory: %s" % output_resolved)
+    args.output.mkdir(parents=True, exist_ok=True)
+
+    expected_outputs = {"vinix-ui2-" + name for name in found}
+    for binary in args.output.glob("vinix-ui2-*"):
+        if binary.name not in expected_outputs and binary.is_file():
+            binary.unlink()
+
+    shared_key = shared_build_key(args)
+    keys = {name: example_build_key(args, shared_key, name) for name in names}
+    state = load_build_state(args.output)
+    cached_examples = state.get("examples", {})
+    cached_examples = {name: key for name, key in cached_examples.items()
+                       if name in found}
+    if state.get("shared_key") != shared_key:
+        cached_examples = {}
+    dirty = [name for name in names
+             if cached_examples.get(name) != keys[name]
+             or not usable_cached_binary(args.output, name)]
+    if not dirty:
+        print("    reusing %d cached ui2 example applications" % len(names))
+        return
+
     reset_directory(args.work, protected)
     module_root = args.work / "vmodules"
     run([sys.executable, str(args.repo / "desktop/tools/stage_ui2.py"),
@@ -163,7 +386,7 @@ def main():
     jobs = max(1, args.jobs)
     with concurrent.futures.ThreadPoolExecutor(max_workers=jobs) as executor:
         futures = {executor.submit(compile_example, args, module_root, name): name
-                   for name in names}
+                   for name in dirty}
         completed = 0
         failures = []
         for future in concurrent.futures.as_completed(futures):
@@ -175,10 +398,20 @@ def main():
                 failures.append(name)
                 continue
             completed += 1
-            print("    [%d/%d] %s" % (completed, len(names), name), flush=True)
+            print("    [%d/%d] %s" % (completed, len(dirty), name), flush=True)
     if failures:
         sys.exit("failed ui2 examples: " + ",".join(sorted(failures)))
-    print("    built %d ui2 example applications" % len(names))
+    if state.get("shared_key") != shared_key:
+        cached_examples = {}
+    for name in dirty:
+        cached_examples[name] = keys[name]
+    write_build_state(args.output, shared_key, cached_examples)
+    reused = len(names) - len(dirty)
+    if reused:
+        print("    built %d ui2 example applications; reused %d cached" %
+              (len(dirty), reused))
+    else:
+        print("    built %d ui2 example applications" % len(dirty))
 
 
 if __name__ == "__main__":
