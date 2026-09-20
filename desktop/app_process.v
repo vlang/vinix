@@ -16,7 +16,7 @@ import math.bits
 import ui2
 
 const app_protocol_magic = u32(0x56415050) // VAPP
-const app_protocol_version = u8(5)
+const app_protocol_version = u8(6)
 const app_request_header_size = 124
 const app_response_header_size = 116
 const app_protocol_max_payload = 16 * 1024 * 1024
@@ -279,6 +279,8 @@ fn wire_take_state(mut reader WireReader) !AppWireState {
 // Only fields consumed by the framebuffer renderer cross the boundary. ui2's
 // platform-only metadata (native text controls, menus and accessibility hints)
 // has no meaning in this backend and is deliberately absent from the protocol.
+// Native button styling and checked state do affect framebuffer rendering, so
+// keep them in a separate style-flags byte.
 fn encode_app_element(element ui2.Element, mut out []u8) ! {
 	if out.len > app_protocol_max_payload {
 		return error('application tree is too large')
@@ -308,7 +310,14 @@ fn encode_app_element(element ui2.Element, mut out []u8) ! {
 	}
 	wire_put_u8(mut out, flags)
 	wire_put_u8(mut out, u8(element.text_style.align))
-	wire_put_u8(mut out, 0)
+	mut style_flags := u8(0)
+	if element.native_style {
+		style_flags |= 1
+	}
+	if element.checked {
+		style_flags |= 2
+	}
+	wire_put_u8(mut out, style_flags)
 	wire_put_f64(mut out, element.frame.x)
 	wire_put_f64(mut out, element.frame.y)
 	wire_put_f64(mut out, element.frame.width)
@@ -337,7 +346,7 @@ fn decode_app_element(mut reader WireReader, depth int) !ui2.Element {
 	kind_value := int(reader.take_u8()!)
 	flags := reader.take_u8()!
 	align_value := int(reader.take_u8()!)
-	reader.take_u8()!
+	style_flags := reader.take_u8()!
 	if kind_value < int(ui2.Kind.screen) || kind_value > int(ui2.Kind.scroll)
 		|| align_value < int(ui2.Align.left) || align_value > int(ui2.Align.right) {
 		return error('invalid application element')
@@ -387,6 +396,8 @@ fn decode_app_element(mut reader WireReader, depth int) !ui2.Element {
 		draggable: flags & 16 != 0
 		hidden: flags & 32 != 0
 		enabled: flags & 64 != 0
+		native_style: style_flags & 1 != 0
+		checked: style_flags & 2 != 0
 		children: children
 	}
 }

@@ -71,6 +71,7 @@ fn settings_button(id string, text string, frame ui2.Rect, enabled bool) ui2.Ele
 		text: text
 		frame: frame
 		enabled: enabled
+		native_style: true
 		box: ui2.BoxStyle{
 			bg: if enabled { files_up } else { files_up_disabled }
 			radius: 5
@@ -91,15 +92,27 @@ fn settings_label(text string, x int, y int, width int, color u32) ui2.Element {
 }
 
 fn settings_scale_button(id string, text string, x int, selected bool) ui2.Element {
-	return ui2.button(id, text, ui2.rect(f64(x), 40, 60, 30), ui2.BoxStyle{
-		bg: if selected { app_accent } else { files_up }
-		radius: 5
-	}, ui2.TextStyle{
-		color: app_on_accent
-		size: 13
-		bold: selected
-		align: .center
-	})
+	return ui2.Element{
+		kind:                .button
+		id:                  id
+		text:                text
+		frame:               ui2.rect(f64(x), 40, 60, 30)
+		box:                 ui2.BoxStyle{
+			bg:     if selected { app_accent } else { files_up }
+			radius: 5
+		}
+		text_style:          ui2.TextStyle{
+			color: app_on_accent
+			size: 13
+			bold: selected
+			align: .center
+		}
+		native_style:        true
+		checked:             selected
+		accessibility_role:  'radio'
+		accessibility_label: text
+		accessibility_value: if selected { 'selected' } else { 'not selected' }
+	}
 }
 
 fn settings_same_state(a &BacklightState, b &BacklightState) bool {

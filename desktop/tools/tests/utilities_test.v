@@ -985,7 +985,8 @@ fn test_native_process_names_are_presented_as_app_names() {
 }
 
 fn test_application_tree_protocol_round_trip() {
-	child := ui2.button_with_image('save', 'Save', 'builtin:editor', ui2.rect(7, 9, 80, 24), ui2.BoxStyle{
+	child := ui2.Element{
+		...ui2.button_with_image('save', 'Save', 'builtin:editor', ui2.rect(7, 9, 80, 24), ui2.BoxStyle{
 		bg: 0x123456
 		radius: 6
 	}, ui2.TextStyle{
@@ -997,6 +998,9 @@ fn test_application_tree_protocol_round_trip() {
 		shadow: true
 		align: .center
 	})
+		native_style: true
+		checked: true
+	}
 	root := ui2.screen(0xabcdef, [child])
 	mut encoded := []u8{}
 	encode_app_element(root, mut encoded)!
@@ -1013,6 +1017,8 @@ fn test_application_tree_protocol_round_trip() {
 	assert button.text_style.font_family == 'mono'
 	assert button.text_style.bold && button.text_style.shadow
 	assert button.text_style.align == .center
+	assert button.native_style
+	assert button.checked
 	free_tree(root)
 	free_tree(decoded)
 	unsafe { encoded.free() }

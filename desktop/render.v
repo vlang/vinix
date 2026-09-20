@@ -520,6 +520,76 @@ fn shadow_for(color u32) u32 {
 	return if luminance > 128 { u32(0x000000) } else { u32(0xffffff) }
 }
 
+// draw_catalina_button paints the native 1x AppKit push-button bezel measured
+// in docs/catalina-reference/standard-controls.png. The element's frame remains
+// the hit target; a taller frame centres the native 21-pixel bezel vertically.
+fn (mut d Desktop) draw_catalina_button(el ui2.Element, x int, y int, w int, h int) u32 {
+	if w <= 0 || h <= 0 {
+		return catalina_button_text
+	}
+	bezel_height := if h < catalina_button_height { h } else { catalina_button_height }
+	bezel_y := y + (h - bezel_height) / 2
+	radius := if catalina_button_radius < bezel_height / 2 {
+		catalina_button_radius
+	} else {
+		bezel_height / 2
+	}
+	action := if el.action_id.len > 0 { el.action_id } else { el.id }
+	hovered := action.len > 0 && d.hover == action
+	pressed := hovered && d.buttons & button_left != 0
+
+	mut edge_top := catalina_button_edge_top
+	mut edge_bottom := catalina_button_edge_bottom
+	mut face_top := catalina_button_face
+	mut face_bottom := catalina_button_face
+	mut text_color := catalina_button_text
+	if !el.enabled {
+		edge_top = catalina_button_disabled_edge
+		edge_bottom = catalina_button_disabled_edge
+		face_top = catalina_button_disabled_face
+		face_bottom = catalina_button_disabled_face
+		text_color = catalina_button_disabled_text
+	} else if el.checked {
+		edge_top = catalina_button_selected_edge_top
+		edge_bottom = catalina_button_selected_edge_bottom
+		face_top = if pressed {
+			catalina_button_selected_pressed_top
+		} else if hovered {
+			catalina_button_selected_hover_top
+		} else {
+			catalina_button_selected_top
+		}
+		face_bottom = if pressed {
+			catalina_button_selected_pressed_bottom
+		} else {
+			catalina_button_selected_bottom
+		}
+		text_color = app_on_accent
+	} else if pressed {
+		// AppKit reverses the light direction while pressed so the face reads
+		// as inset without moving the label.
+		face_top = catalina_button_pressed_top
+		face_bottom = catalina_button_pressed_bottom
+	} else if hovered {
+		face_bottom = catalina_button_hover_bottom
+	}
+
+	// Two nested rounded gradients reproduce the independently measured outer
+	// edge and inner face. The ordinary control is white at both inner edges.
+	mut saved := d.canvas.push_clip_round_rect(x, bezel_y, w, bezel_height, radius)
+	d.canvas.vertical_gradient_inclusive(x, bezel_y, w, bezel_height, edge_top, edge_bottom)
+	d.canvas.restore_clip(saved)
+	if w > 2 && bezel_height > 2 {
+		inner_radius := if radius > 0 { radius - 1 } else { 0 }
+		saved = d.canvas.push_clip_round_rect(x + 1, bezel_y + 1, w - 2, bezel_height - 2,
+			inner_radius)
+		d.canvas.vertical_gradient_inclusive(x + 1, bezel_y + 1, w - 2, bezel_height - 2,
+			face_top, face_bottom)
+		d.canvas.restore_clip(saved)
+	}
+	return text_color
+}
+
 fn (mut d Desktop) draw_button(el ui2.Element, x int, y int, w int, h int) {
 	// The traffic lights are only twelve logical pixels across. At 200% scale,
 	// rendering their rounded rectangle through logical pixels turns the arc
@@ -528,7 +598,10 @@ fn (mut d Desktop) draw_button(el ui2.Element, x int, y int, w int, h int) {
 	is_title_button := el.id.ends_with('.close') || el.id.ends_with('.minimize')
 		|| el.id.ends_with('.maximize')
 	is_traffic_light := d.theme().button_look == .traffic && is_title_button
-	if !el.box.transparent {
+	mut text_color := el.text_style.color
+	if el.kind == .button && el.native_style && d.settings.theme == .macos {
+		text_color = d.draw_catalina_button(el, x, y, w, h)
+	} else if !el.box.transparent {
 		radius := int(el.box.radius)
 		if is_traffic_light && d.canvas.scale > 1 {
 			d.canvas.fill_stroke_hidpi_circle(x, y, w, h, 1, el.box.bg, el.box.border_color)
@@ -555,10 +628,11 @@ fn (mut d Desktop) draw_button(el ui2.Element, x int, y int, w int, h int) {
 	mut text_w := w - 2 * text_inset
 	if el.image_path.len > 0 {
 		if el.text.len == 0 {
-			d.draw_builtin_glyph(el.image_path, x, y, w, h, el.text_style.color)
+			d.draw_builtin_glyph(el.image_path, x, y, w, h, text_color)
 		} else {
 			icon := if h - 8 < button_icon_size { h - 8 } else { button_icon_size }
-			d.draw_builtin_glyph(el.image_path, x + text_inset, y + (h - icon) / 2, icon, icon, el.text_style.color)
+			d.draw_builtin_glyph(el.image_path, x + text_inset, y + (h - icon) / 2, icon, icon,
+				text_color)
 			text_x += icon + 6
 			text_w -= icon + 6
 		}
@@ -574,17 +648,17 @@ fn (mut d Desktop) draw_button(el ui2.Element, x int, y int, w int, h int) {
 	// A label sharing the control with an icon is always placed after it; the
 	// declared alignment only decides where a label on its own sits.
 	if el.image_path.len > 0 {
-		d.canvas.draw_text(face, text_x, text_y, text, el.text_style.color)
+		d.canvas.draw_text(face, text_x, text_y, text, text_color)
 		if text_owned {
 			unsafe { text.free() }
 		}
 		return
 	}
 	match el.text_style.align {
-		.left { d.canvas.draw_text(face, x + text_inset, text_y, text, el.text_style.color) }
-		.center { d.canvas.draw_text_centered(face, x, text_y, w, text, el.text_style.color) }
+		.left { d.canvas.draw_text(face, x + text_inset, text_y, text, text_color) }
+		.center { d.canvas.draw_text_centered(face, x, text_y, w, text, text_color) }
 		.right {
-			d.canvas.draw_text_right(face, x + w - text_inset, text_y, text, el.text_style.color)
+			d.canvas.draw_text_right(face, x + w - text_inset, text_y, text, text_color)
 		}
 	}
 	if text_owned {

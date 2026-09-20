@@ -418,8 +418,10 @@ immediately and everywhere without anything being told to refresh.
 
 Everything that varies between themes is a field of `Theme` in `settings.v`;
 anything that does not stays a plain constant in `theme.v`. Application
-interiors deliberately do not follow the theme — an application draws its own
-inside, as ui2's calculator plainly does — so they use the `app_*` constants.
+interiors normally keep their declared styles, but controls marked
+`native_style` use Catalina's measured 21-pixel AppKit bezel under the macOS
+theme, including hover, pressed, selected and disabled states. Other controls
+continue to use their declared `app_*` colours.
 
 ## Wallpapers
 

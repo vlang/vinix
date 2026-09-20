@@ -14,11 +14,36 @@ const default_title_height = 34
 
 // ── Window contents ────────────────────────────────────────────────
 // ── Application interiors ──────────────────────────────────────────
-// These do not follow the chrome's theme: an application draws its own inside,
-// as ui2's calculator plainly does.
+// Declared custom controls do not follow the chrome's theme. A button that
+// explicitly requests ui2's native style is the exception: the Catalina theme
+// gives it the measured AppKit bezel below, just as AppKit does on macOS.
 const app_surface = u32(0xfbfcfe)
 const app_accent = u32(0x5b9cf8)
 const app_on_accent = u32(0xffffff)
+
+// Catalina's standard push button is a 21-pixel bezel with a flat white face,
+// a lighter top edge and a darker bottom edge. Selection is not part of an
+// ordinary NSButton, but Vinix's radio-style settings choices use the same
+// shape with Catalina's blue accent so their state remains unambiguous.
+const catalina_button_height = 21
+const catalina_button_radius = 5
+const catalina_button_edge_top = u32(0xcacaca)
+const catalina_button_edge_bottom = u32(0xadadad)
+const catalina_button_face = u32(0xffffff)
+const catalina_button_hover_bottom = u32(0xf1f1f1)
+const catalina_button_pressed_top = u32(0xd7d7d7)
+const catalina_button_pressed_bottom = u32(0xefefef)
+const catalina_button_text = u32(0x222222)
+const catalina_button_disabled_edge = u32(0xd5d5d5)
+const catalina_button_disabled_face = u32(0xf5f5f5)
+const catalina_button_disabled_text = u32(0xa5a5a5)
+const catalina_button_selected_edge_top = u32(0x4d92e7)
+const catalina_button_selected_edge_bottom = u32(0x1f5fa9)
+const catalina_button_selected_top = u32(0x75aff7)
+const catalina_button_selected_bottom = u32(0x3478d4)
+const catalina_button_selected_hover_top = u32(0x82b8f8)
+const catalina_button_selected_pressed_top = u32(0x2869bd)
+const catalina_button_selected_pressed_bottom = u32(0x4b8ddd)
 
 const body_text = u32(0x30394a)
 const body_muted = u32(0x7b8698)

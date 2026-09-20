@@ -286,7 +286,7 @@ fn test_catalina_theme_uses_measured_window_chrome() {
 	assert theme_macos.title_inactive_highlight == 0xfbfbfb
 	assert theme_macos.title_inactive_divider == 0xd1d1d1
 	assert theme_macos.window_body == 0xececec
-	mut gradient := new_canvas(1, 20)
+	mut gradient := new_scaled_canvas(1, 20, 1, 20, 1)
 	defer {
 		unsafe { free(gradient.pixels) }
 	}
@@ -324,9 +324,64 @@ fn test_catalina_theme_uses_measured_window_chrome() {
 	assert idle.image_path == ''
 }
 
+fn test_settings_choices_request_native_catalina_buttons() {
+	idle := settings_choice('settings.theme.0', 'Default', 0, 0, 120, false)
+	selected := settings_choice('settings.theme.1', 'macOS', 128, 0, 120, true)
+	assert idle.native_style
+	assert selected.native_style
+	assert !idle.checked
+	assert selected.checked
+	assert selected.accessibility_role == 'radio'
+	assert selected.accessibility_value == 'selected'
+}
+
+fn test_catalina_native_button_uses_measured_bezel_and_selected_gradient() {
+	mut desktop := Desktop{
+		canvas:   new_scaled_canvas(240, 80, 240, 80, 1)
+		settings: Settings{
+			theme: .macos
+		}
+	}
+	defer {
+		unsafe { free(desktop.canvas.pixels) }
+	}
+	desktop.canvas.clear(theme_macos.window_body)
+
+	normal := ui2.Element{
+		kind:         .button
+		id:           'normal'
+		frame:        ui2.rect(10, 10, 100, 28)
+		native_style: true
+	}
+	desktop.draw_button(normal, 10, 10, 100, 28)
+	// The 21-pixel bezel is centred in the 28-pixel hit target. Its top and
+	// bottom rows are the two independently measured Catalina edge colours.
+	unsafe {
+		assert desktop.canvas.pixels[13 * desktop.canvas.stride + 30] == catalina_button_edge_top
+		assert desktop.canvas.pixels[14 * desktop.canvas.stride + 30] == catalina_button_face
+		assert desktop.canvas.pixels[32 * desktop.canvas.stride + 30] == catalina_button_face
+		assert desktop.canvas.pixels[33 * desktop.canvas.stride + 30] == catalina_button_edge_bottom
+	}
+
+	selected := ui2.Element{
+		kind:         .button
+		id:           'selected'
+		frame:        ui2.rect(126, 10, 100, 28)
+		native_style: true
+		checked:      true
+	}
+	desktop.draw_button(selected, 126, 10, 100, 28)
+	unsafe {
+		assert desktop.canvas.pixels[13 * desktop.canvas.stride + 146] == catalina_button_selected_edge_top
+		assert desktop.canvas.pixels[14 * desktop.canvas.stride + 146] == catalina_button_selected_top
+		assert desktop.canvas.pixels[32 * desktop.canvas.stride + 146] == catalina_button_selected_bottom
+		assert desktop.canvas.pixels[33 * desktop.canvas.stride + 146] == catalina_button_selected_edge_bottom
+	}
+}
+
 fn test_catalina_chrome_renders_measured_rows() {
 	mut desktop := Desktop{
-		canvas: new_canvas(640, 480)
+		canvas: new_scaled_canvas(640, 480, 640, 480, 1)
 		fonts:  load_fonts()
 		settings: Settings{
 			theme:       .macos

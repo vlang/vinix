@@ -20,6 +20,18 @@ fn tree_has_id(element ui2.Element, id string) bool {
 	return false
 }
 
+fn tree_has_native_button(element ui2.Element, id string, checked bool) bool {
+	if element.id == id {
+		return element.kind == .button && element.native_style && element.checked == checked
+	}
+	for child in element.children {
+		if tree_has_native_button(child, id, checked) {
+			return true
+		}
+	}
+	return false
+}
+
 fn tree_contains_text(element ui2.Element, text string) bool {
 	if element.text.contains(text) {
 		return true
@@ -136,6 +148,8 @@ fn main() {
 	settings_tree := settings.build(ui2.rect(0, 0, 620, 386)) or { panic(err) }
 	assert settings_tree.kind == .screen
 	assert tree_has_id(settings_tree, settings_scale_100_action)
+	assert tree_has_native_button(settings_tree, settings_scale_100_action, false)
+	assert tree_has_native_button(settings_tree, settings_scale_200_action, true)
 	free_tree(settings_tree)
 	close_remote(mut settings)
 
