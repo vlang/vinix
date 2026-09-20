@@ -244,6 +244,17 @@ fn syscall_linux_rt_sigprocmask(gpr_state voidptr, how int, set_ptr u64, oldset_
 	return userland.syscall_sigprocmask(gpr_state, how, set_arg, oldset_arg)
 }
 
+fn syscall_linux_rt_sigsuspend(gpr_state voidptr, mask_ptr u64, sigsetsize u64) (u64, u64) {
+	if sigsetsize != 8 {
+		return errno.err, errno.einval
+	}
+	mut mask_arg := &u64(unsafe { nil })
+	if mask_ptr != 0 {
+		mask_arg = unsafe { &u64(mask_ptr) }
+	}
+	return userland.syscall_rt_sigsuspend(gpr_state, mask_arg)
+}
+
 fn syscall_linux_wait4(gpr_state voidptr, pid int, status &i32, options int, _rusage u64) (u64, u64) {
 	return userland.syscall_waitpid(gpr_state, pid, status, options)
 }
@@ -499,6 +510,7 @@ pub fn init_linux_syscall_table() {
 	linux_syscall_table[108] = voidptr(syscall_linux_getegid)
 	linux_syscall_table[110] = voidptr(userland.syscall_getppid)
 	linux_syscall_table[112] = voidptr(userland.syscall_setsid)
+	linux_syscall_table[130] = voidptr(syscall_linux_rt_sigsuspend)
 	linux_syscall_table[137] = voidptr(fs.syscall_statfs)
 	linux_syscall_table[138] = voidptr(fs.syscall_fstatfs)
 	linux_syscall_table[158] = voidptr(syscall_linux_arch_prctl)

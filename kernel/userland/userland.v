@@ -335,6 +335,43 @@ pub fn syscall_sigprocmask(_ voidptr, how int, set &u64, oldset &u64) (u64, u64)
 	return 0, 0
 }
 
+// rt_sigsuspend atomically replaces the calling thread's signal mask and
+// blocks until a signal arrives that isn't masked under the *new* mask, then
+// restores the original mask and returns. It always reports EINTR: per
+// POSIX, this call never "succeeds" and returns 0 -- being woken by a signal
+// is the entire point, not a failure mode.
+//
+// zsh (and job-control shells generally) call this in their main loop once
+// there's nothing left to do but wait for a child to change state, instead
+// of busy-polling. Before this was implemented, the unimplemented-syscall
+// stub made it return immediately with no actual wait, turning that idle
+// wait into a tight spin.
+pub fn syscall_rt_sigsuspend(_ voidptr, mask &u64) (u64, u64) {
+	mut t := proc.current_thread()
+	mut process := t.process
+
+	C.printf(c'\n\e[32m%s\e[m: rt_sigsuspend(0x%llx)\n', process.name.str, voidptr(mask))
+	defer {
+		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
+	}
+
+	if mask == unsafe { nil } {
+		return errno.err, errno.efault
+	}
+
+	old_mask := t.masked_signals
+	// SIGKILL/SIGSTOP can never be blocked, matching resume_sigreturn's own
+	// mask sanitization elsewhere in this file.
+	t.masked_signals = unsafe { *mask } & ~((u64(1) << sigkill) | (u64(1) << sigstop))
+
+	for katomic.load(&t.pending_signals) & ~t.masked_signals == 0 {
+		sched.dequeue_and_yield()
+	}
+
+	t.masked_signals = old_mask
+	return errno.err, errno.eintr
+}
+
 fn dispatch_signal(context &cpulocal.GPRState, info_signum int, info_code int, info_addr u64) {
 	mut t := unsafe { proc.current_thread() }
 
