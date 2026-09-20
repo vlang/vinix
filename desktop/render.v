@@ -520,9 +520,9 @@ fn shadow_for(color u32) u32 {
 	return if luminance > 128 { u32(0x000000) } else { u32(0xffffff) }
 }
 
-// draw_catalina_button paints the native 1x AppKit push-button bezel measured
-// in docs/catalina-reference/standard-controls.png. The element's frame remains
-// the hit target; a taller frame centres the native 21-pixel bezel vertically.
+// draw_catalina_button paints the native AppKit push-button renditions measured
+// in docs/catalina-reference/push-buttons-*.png. The element's frame remains the
+// hit target; a taller frame centres the native 21-pixel bezel vertically.
 fn (mut d Desktop) draw_catalina_button(el ui2.Element, x int, y int, w int, h int) u32 {
 	if w <= 0 || h <= 0 {
 		return catalina_button_text
@@ -537,55 +537,49 @@ fn (mut d Desktop) draw_catalina_button(el ui2.Element, x int, y int, w int, h i
 	action := if el.action_id.len > 0 { el.action_id } else { el.id }
 	hovered := action.len > 0 && d.hover == action
 	pressed := hovered && d.buttons & button_left != 0
+	// While a regular button is held, AppKit temporarily removes the blue
+	// default face from the other button in the group.
+	default_suppressed := el.checked && d.buttons & button_left != 0 && d.hover.len > 0
+		&& d.hover != action
 
-	mut edge_top := catalina_button_edge_top
-	mut edge_bottom := catalina_button_edge_bottom
-	mut face_top := catalina_button_face
-	mut face_bottom := catalina_button_face
 	mut text_color := catalina_button_text
 	if !el.enabled {
-		edge_top = catalina_button_disabled_edge
-		edge_bottom = catalina_button_disabled_edge
-		face_top = catalina_button_disabled_face
-		face_bottom = catalina_button_disabled_face
 		text_color = catalina_button_disabled_text
-	} else if el.checked {
-		edge_top = catalina_button_selected_edge_top
-		edge_bottom = catalina_button_selected_edge_bottom
-		face_top = if pressed {
-			catalina_button_selected_pressed_top
-		} else if hovered {
-			catalina_button_selected_hover_top
-		} else {
-			catalina_button_selected_top
-		}
-		face_bottom = if pressed {
-			catalina_button_selected_pressed_bottom
-		} else {
-			catalina_button_selected_bottom
-		}
+	} else if pressed || (el.checked && !default_suppressed) {
 		text_color = app_on_accent
-	} else if pressed {
-		// AppKit reverses the light direction while pressed so the face reads
-		// as inset without moving the label.
-		face_top = catalina_button_pressed_top
-		face_bottom = catalina_button_pressed_bottom
-	} else if hovered {
-		face_bottom = catalina_button_hover_bottom
 	}
 
-	// Two nested rounded gradients reproduce the independently measured outer
-	// edge and inner face. The ordinary control is white at both inner edges.
-	mut saved := d.canvas.push_clip_round_rect(x, bezel_y, w, bezel_height, radius)
-	d.canvas.vertical_gradient_inclusive(x, bezel_y, w, bezel_height, edge_top, edge_bottom)
-	d.canvas.restore_clip(saved)
+	// AppKit has no hover-only push-button rendition. Mouse-down, however, uses
+	// the darker blue face even when the button was white before the click.
+	if !el.enabled {
+		d.canvas.fill_native_vertical_palette_round_rect(x, bezel_y, w, bezel_height,
+			radius, [catalina_button_disabled_edge, catalina_button_disabled_edge])
+	} else if pressed {
+		d.canvas.fill_native_vertical_palette_round_rect(x, bezel_y, w, bezel_height,
+			radius, catalina_button_pressed_outer)
+	} else if el.checked && !default_suppressed {
+		d.canvas.fill_native_vertical_palette_round_rect(x, bezel_y, w, bezel_height,
+			radius, catalina_button_default_outer)
+	} else {
+		d.canvas.fill_native_vertical_palette_round_rect(x, bezel_y, w, bezel_height,
+			radius, catalina_button_normal_outer)
+	}
 	if w > 2 && bezel_height > 2 {
 		inner_radius := if radius > 0 { radius - 1 } else { 0 }
-		saved = d.canvas.push_clip_round_rect(x + 1, bezel_y + 1, w - 2, bezel_height - 2,
-			inner_radius)
-		d.canvas.vertical_gradient_inclusive(x + 1, bezel_y + 1, w - 2, bezel_height - 2,
-			face_top, face_bottom)
-		d.canvas.restore_clip(saved)
+		if !el.enabled {
+			d.canvas.fill_native_vertical_palette_round_rect(x + 1, bezel_y + 1, w - 2,
+				bezel_height - 2, inner_radius, [catalina_button_disabled_face,
+					catalina_button_disabled_face])
+		} else if pressed {
+			d.canvas.fill_native_vertical_palette_round_rect(x + 1, bezel_y + 1, w - 2,
+				bezel_height - 2, inner_radius, catalina_button_pressed_inner)
+		} else if el.checked && !default_suppressed {
+			d.canvas.fill_native_vertical_palette_round_rect(x + 1, bezel_y + 1, w - 2,
+				bezel_height - 2, inner_radius, catalina_button_default_inner)
+		} else {
+			d.canvas.fill_native_vertical_palette_round_rect(x + 1, bezel_y + 1, w - 2,
+				bezel_height - 2, inner_radius, [catalina_button_face, catalina_button_face])
+		}
 	}
 	return text_color
 }

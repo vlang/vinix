@@ -335,9 +335,9 @@ fn test_settings_choices_request_native_catalina_buttons() {
 	assert selected.accessibility_value == 'selected'
 }
 
-fn test_catalina_native_button_uses_measured_bezel_and_selected_gradient() {
+fn test_catalina_native_button_uses_measured_normal_default_and_pressed_renditions() {
 	mut desktop := Desktop{
-		canvas:   new_scaled_canvas(240, 80, 240, 80, 1)
+		canvas:   new_scaled_canvas(360, 80, 360, 80, 1)
 		settings: Settings{
 			theme: .macos
 		}
@@ -357,10 +357,10 @@ fn test_catalina_native_button_uses_measured_bezel_and_selected_gradient() {
 	// The 21-pixel bezel is centred in the 28-pixel hit target. Its top and
 	// bottom rows are the two independently measured Catalina edge colours.
 	unsafe {
-		assert desktop.canvas.pixels[13 * desktop.canvas.stride + 30] == catalina_button_edge_top
+		assert desktop.canvas.pixels[13 * desktop.canvas.stride + 30] == catalina_button_normal_outer[0]
 		assert desktop.canvas.pixels[14 * desktop.canvas.stride + 30] == catalina_button_face
 		assert desktop.canvas.pixels[32 * desktop.canvas.stride + 30] == catalina_button_face
-		assert desktop.canvas.pixels[33 * desktop.canvas.stride + 30] == catalina_button_edge_bottom
+		assert desktop.canvas.pixels[33 * desktop.canvas.stride + 30] == catalina_button_normal_outer[20]
 	}
 
 	selected := ui2.Element{
@@ -372,10 +372,72 @@ fn test_catalina_native_button_uses_measured_bezel_and_selected_gradient() {
 	}
 	desktop.draw_button(selected, 126, 10, 100, 28)
 	unsafe {
-		assert desktop.canvas.pixels[13 * desktop.canvas.stride + 146] == catalina_button_selected_edge_top
-		assert desktop.canvas.pixels[14 * desktop.canvas.stride + 146] == catalina_button_selected_top
-		assert desktop.canvas.pixels[32 * desktop.canvas.stride + 146] == catalina_button_selected_bottom
-		assert desktop.canvas.pixels[33 * desktop.canvas.stride + 146] == catalina_button_selected_edge_bottom
+		assert desktop.canvas.pixels[13 * desktop.canvas.stride + 146] == catalina_button_default_outer[0]
+		assert desktop.canvas.pixels[14 * desktop.canvas.stride + 146] == catalina_button_default_inner[0]
+		assert desktop.canvas.pixels[32 * desktop.canvas.stride + 146] == catalina_button_default_inner[18]
+		assert desktop.canvas.pixels[33 * desktop.canvas.stride + 146] == catalina_button_default_outer[20]
+	}
+
+	pressed := ui2.Element{
+		kind:         .button
+		id:           'pressed'
+		frame:        ui2.rect(242, 10, 100, 28)
+		native_style: true
+	}
+	desktop.hover = 'pressed'
+	desktop.buttons = button_left
+	desktop.draw_button(pressed, 242, 10, 100, 28)
+	unsafe {
+		assert desktop.canvas.pixels[13 * desktop.canvas.stride + 262] == catalina_button_pressed_outer[0]
+		assert desktop.canvas.pixels[14 * desktop.canvas.stride + 262] == catalina_button_pressed_inner[0]
+		assert desktop.canvas.pixels[32 * desktop.canvas.stride + 262] == catalina_button_pressed_inner[18]
+		assert desktop.canvas.pixels[33 * desktop.canvas.stride + 262] == catalina_button_pressed_outer[20]
+	}
+
+	// Catalina transfers the blue emphasis to the button under the mouse while
+	// it is held. The formerly selected/default button becomes white meanwhile.
+	suppressed_default := ui2.Element{
+		kind:         .button
+		id:           'another-default'
+		frame:        ui2.rect(126, 42, 100, 28)
+		native_style: true
+		checked:      true
+	}
+	desktop.draw_button(suppressed_default, 126, 42, 100, 28)
+	unsafe {
+		assert desktop.canvas.pixels[45 * desktop.canvas.stride + 146] == catalina_button_normal_outer[0]
+		assert desktop.canvas.pixels[46 * desktop.canvas.stride + 146] == catalina_button_face
+	}
+}
+
+fn test_catalina_native_button_rasterizes_curves_and_gradients_at_hidpi_scale() {
+	mut desktop := Desktop{
+		canvas:   new_scaled_canvas(120, 40, 240, 80, 2)
+		settings: Settings{
+			theme: .macos
+		}
+	}
+	defer {
+		unsafe { free(desktop.canvas.pixels) }
+	}
+	desktop.canvas.clear(theme_macos.window_body)
+	button := ui2.Element{
+		kind:         .button
+		id:           'default'
+		frame:        ui2.rect(10, 6, 100, 28)
+		native_style: true
+		checked:      true
+	}
+	desktop.draw_button(button, 10, 6, 100, 28)
+
+	// The two physical rows making up the first logical scanline are sampled
+	// independently. A scaled 1x rounded rectangle would repeat the same row.
+	bezel_top := 9 * 2
+	center_x := 30 * 2
+	unsafe {
+		assert desktop.canvas.pixels[bezel_top * desktop.canvas.stride + center_x] == catalina_button_default_outer[0]
+		assert desktop.canvas.pixels[(bezel_top + 1) * desktop.canvas.stride + center_x] != catalina_button_default_outer[0]
+		assert desktop.canvas.pixels[(bezel_top + 2) * desktop.canvas.stride + center_x] == catalina_button_default_inner[0]
 	}
 }
 

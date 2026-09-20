@@ -32,6 +32,11 @@ committed.
   system, including its title bar, toolbar and sidebar controls.
 - `installed-finder-traffic-lights-hover.png` — the same Finder window with
   Catalina's native group-hover traffic-light glyphs visible.
+- `push-buttons-normal.png` — native-size regular and default Aqua push-button
+  renditions from the installed system's shutdown dialog.
+- `push-buttons-pressed.png` — the same controls while the regular button is
+  held down; Catalina makes the pressed control blue and temporarily returns
+  the former default control to its white rendition.
 
 ## Measured standard window chrome
 
@@ -54,6 +59,10 @@ All measurements are logical pixels at 1x.
 | Inactive fill / edge | `#dcdcdc` / `#d1d1d1` |
 | Disabled fill / edge | `#cfcfcf` / `#b8b8b8` |
 | Standard window body | `#ececec` |
+| Push-button visible bezel | 21 px |
+| Regular button face / top / bottom edge | `#ffffff` / `#c9c9c9` / `#acacac` |
+| Default button face | `#6ba0fb` to `#1164ff` |
+| Pressed button face | `#4c8bfe` to `#0c55e5` |
 
 The control images embedded in Catalina's AppKit `Assets.car` are 13×13
 templates, while the visible coloured disc in the rendered 1x window is 12
@@ -64,3 +73,10 @@ Vinix used before this reference was collected.
 AppKit reveals all available control glyphs when the pointer is over any member
 of the group. Vinix preserves that group-hover behaviour as well as the native
 red-yellow-green order.
+
+Regular push buttons do not have a hover-only visual change. On mouse-down,
+Catalina uses its darker blue pressed rendition for either a regular or default
+button. The source catalog includes distinct Normal, Pressed, Disabled and
+Deeply Pressed images at both 1x and 2x; Vinix likewise samples the measured
+scanlines at the physical backing-store resolution rather than enlarging 1x
+corners into square pixel blocks.

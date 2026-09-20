@@ -419,6 +419,69 @@ fn (mut c Canvas) vertical_gradient_inclusive(x int, y int, w int, h int, top u3
 	}
 }
 
+// fill_native_vertical_palette_round_rect draws a small control at the backing
+// store's physical resolution. `rows` describes the measured 1x scanlines;
+// denser displays interpolate between them instead of enlarging every source
+// pixel into a square scale-by-scale block. This is the same reason the title
+// bar's traffic lights have a native-resolution path below.
+fn (mut c Canvas) fill_native_vertical_palette_round_rect(x int, y int, w int, h int,
+	radius int, rows []u32) {
+	if w <= 0 || h <= 0 || rows.len == 0 || c.scale <= 0 {
+		return
+	}
+	physical_x := x * c.scale
+	physical_y := y * c.scale
+	physical_w := w * c.scale
+	physical_h := h * c.scale
+	mut physical_radius := radius * c.scale
+	half := if physical_w < physical_h { physical_w / 2 } else { physical_h / 2 }
+	if physical_radius > half {
+		physical_radius = half
+	}
+
+	for offset_y := 0; offset_y < physical_h; offset_y++ {
+		mut color := rows[0]
+		if rows.len > 1 && physical_h > 1 {
+			position := offset_y * (rows.len - 1)
+			index := position / (physical_h - 1)
+			if index >= rows.len - 1 {
+				color = rows[rows.len - 1]
+			} else {
+				remainder := position % (physical_h - 1)
+				color = mix(rows[index], rows[index + 1], u32(remainder * 255 / (physical_h - 1)))
+			}
+		}
+		for offset_x := 0; offset_x < physical_w; offset_x++ {
+			mut coverage := u32(255)
+			if physical_radius > 0 {
+				mut center_x := 0
+				mut center_y := 0
+				mut in_corner := true
+				if offset_x < physical_radius {
+					center_x = physical_radius
+				} else if offset_x >= physical_w - physical_radius {
+					center_x = physical_w - physical_radius
+				} else {
+					in_corner = false
+				}
+				if offset_y < physical_radius {
+					center_y = physical_radius
+				} else if offset_y >= physical_h - physical_radius {
+					center_y = physical_h - physical_radius
+				} else {
+					in_corner = false
+				}
+				if in_corner {
+					coverage = corner_coverage(f64(offset_x) + 0.5, f64(offset_y) + 0.5,
+						f64(center_x), f64(center_y), f64(physical_radius))
+				}
+			}
+			c.blend_physical_pixel(physical_x + offset_x, physical_y + offset_y, color,
+				coverage)
+		}
+	}
+}
+
 // fill_round_rect draws the body as plain spans and only pays for coverage
 // inside the four corner squares.
 fn (mut c Canvas) fill_round_rect(x int, y int, w int, h int, radius int, color u32) {

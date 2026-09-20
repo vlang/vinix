@@ -21,29 +21,33 @@ const app_surface = u32(0xfbfcfe)
 const app_accent = u32(0x5b9cf8)
 const app_on_accent = u32(0xffffff)
 
-// Catalina's standard push button is a 21-pixel bezel with a flat white face,
-// a lighter top edge and a darker bottom edge. Selection is not part of an
-// ordinary NSButton, but Vinix's radio-style settings choices use the same
-// shape with Catalina's blue accent so their state remains unambiguous.
+// Catalina's standard push button is a 21-pixel Aqua bezel. These scanlines
+// were sampled from the installed 10.15.7 system in
+// docs/catalina-reference/push-buttons-*.png. AppKit uses the blue default
+// rendition for a selected choice and a darker blue rendition for every
+// enabled button while the mouse is down; pointer hover alone changes nothing.
 const catalina_button_height = 21
 const catalina_button_radius = 5
-const catalina_button_edge_top = u32(0xcacaca)
-const catalina_button_edge_bottom = u32(0xadadad)
+const catalina_button_normal_outer = [u32(0xc9c9c9), 0xc6c6c6, 0xc5c5c5, 0xc4c4c4, 0xc3c3c3, 0xc3c3c3,
+	0xc2c2c2, 0xc2c2c2, 0xc2c2c2, 0xc2c2c2, 0xc2c2c2, 0xc2c2c2, 0xc2c2c2, 0xc2c2c2, 0xc2c2c2, 0xc2c2c2,
+	0xc3c3c3, 0xc2c2c2, 0xc2c2c2, 0xbfbfbf, 0xacacac]
 const catalina_button_face = u32(0xffffff)
-const catalina_button_hover_bottom = u32(0xf1f1f1)
-const catalina_button_pressed_top = u32(0xd7d7d7)
-const catalina_button_pressed_bottom = u32(0xefefef)
 const catalina_button_text = u32(0x222222)
 const catalina_button_disabled_edge = u32(0xd5d5d5)
 const catalina_button_disabled_face = u32(0xf5f5f5)
 const catalina_button_disabled_text = u32(0xa5a5a5)
-const catalina_button_selected_edge_top = u32(0x4d92e7)
-const catalina_button_selected_edge_bottom = u32(0x1f5fa9)
-const catalina_button_selected_top = u32(0x75aff7)
-const catalina_button_selected_bottom = u32(0x3478d4)
-const catalina_button_selected_hover_top = u32(0x82b8f8)
-const catalina_button_selected_pressed_top = u32(0x2869bd)
-const catalina_button_selected_pressed_bottom = u32(0x4b8ddd)
+const catalina_button_default_outer = [u32(0x4c8bfa), 0x4989fa, 0x4787fa, 0x4486fa, 0x4184fb, 0x3e81fb,
+	0x3a7efb, 0x377cfc, 0x3279fc, 0x3077fd, 0x2b73fd, 0x2771fd, 0x236dfe, 0x1e6afe, 0x1b67fe, 0x1864fe,
+	0x1563ff, 0x1260ff, 0x0f5dff, 0x0c5aff, 0x0858ff]
+const catalina_button_default_inner = [u32(0x6ba0fb), 0x689efb, 0x649cfb, 0x6099fc, 0x5b96fc, 0x5592fc,
+	0x508ffc, 0x4a8bfd, 0x4488fd, 0x3e84fd, 0x3980fe, 0x337cfe, 0x2d77fe, 0x2774fe, 0x2270ff, 0x1d6cff,
+	0x196aff, 0x1466ff, 0x1164ff]
+const catalina_button_pressed_outer = [u32(0x2670ff), 0x246efd, 0x236cfc, 0x226bfb, 0x216afa, 0x1f68f8,
+	0x1e67f7, 0x1c64f5, 0x1961f2, 0x1860f1, 0x165def, 0x145aed, 0x1359ec, 0x1056e9, 0x0f54e7, 0x0c50e5,
+	0x0b4fe4, 0x0950e2, 0x074de1, 0x064adf, 0x0448de]
+const catalina_button_pressed_inner = [u32(0x4c8bfe), 0x4989fd, 0x4686fc, 0x4485fb, 0x4082fa, 0x3d80f9,
+	0x397cf7, 0x3478f5, 0x3075f4, 0x2d72f2, 0x296ef1, 0x246aef, 0x2067ed, 0x1d65ec, 0x1961eb, 0x165ee9,
+	0x125be8, 0x0f58e7, 0x0c55e5]
 
 const body_text = u32(0x30394a)
 const body_muted = u32(0x7b8698)
