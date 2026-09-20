@@ -72,7 +72,7 @@ const available_apps = [
 	},
 	AppFactory{
 		title: 'Firefox'
-		icon: 'builtin:browser'
+		icon: 'asset:firefox'
 		width: firefox_window_width
 		height: firefox_window_height + default_title_height
 		process_name: 'vinix-firefox'
@@ -198,7 +198,7 @@ const available_apps = [
 	},
 	AppFactory{
 		title: 'Blender'
-		icon: 'builtin:block'
+		icon: 'asset:blender'
 		width: blender_window_width
 		height: blender_window_height + default_title_height
 		process_name: 'vinix-blender'
@@ -258,7 +258,7 @@ const available_apps = [
 	},
 	AppFactory{
 		title: 'Chromium'
-		icon: 'builtin:browser'
+		icon: 'asset:chromium'
 		width: chromium_window_width
 		height: chromium_window_height + default_title_height
 		process_name: 'vinix-chromium'

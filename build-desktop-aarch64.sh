@@ -750,6 +750,16 @@ mkdir -p "$STAGING/sbin" "$STAGING/usr/bin" "$STAGING/usr/share/vinix" \
 mkdir -p "$STAGING/root/.config/GIMP/2.10" "$STAGING/root/.cache"
 chmod 1777 "$STAGING/tmp"
 
+# The compositor loads its own app artwork rather than depending on whichever
+# icon theme happens to accompany an optional application package.
+mkdir -p "$STAGING/usr/share/vinix/icons"
+install -m644 "$SCRIPT_DIR/desktop/assets/chromium.qoi" \
+    "$STAGING/usr/share/vinix/icons/chromium.qoi"
+install -m644 "$SCRIPT_DIR/desktop/assets/firefox.qoi" \
+    "$STAGING/usr/share/vinix/icons/firefox.qoi"
+install -m644 "$SCRIPT_DIR/desktop/assets/blender.qoi" \
+    "$STAGING/usr/share/vinix/icons/blender.qoi"
+
 # Keep the display handoff pieces in sync with the desktop source even when the
 # full base userland predates them. The bridge is a cross-compiled executable;
 # package/Firefox launchers and policy files can be installed directly from

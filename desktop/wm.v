@@ -54,6 +54,11 @@ struct Desktop {
 mut:
 	canvas  Canvas
 	fonts   []FontFace
+	// Official 512px app artwork, loaded once by the compositor. Native app
+	// helper processes leave these empty because they never rasterize frames.
+	firefox_icon  AppIcon
+	chromium_icon AppIcon
+	blender_icon  AppIcon
 	windows []Window // painting order; the last entry is on top
 	next_id int = 1
 	focus   int

@@ -11,8 +11,8 @@
 // Two conventions extend ui2 for this backend:
 //
 //   - `image_path` of the form `builtin:<name>` draws a vector glyph the
-//     renderer carries itself, because the target has no image files. `xwd:`
-//     names a live off-screen Xvfb surface hosted inside a native window.
+//     renderer carries itself. `asset:<name>` draws a bundled QOI image, and
+//     `xwd:` names a live off-screen Xvfb surface hosted inside a native window.
 //   - a rounded view at the top level of the tree is a floating surface and is
 //     given a drop shadow.
 module main
@@ -277,7 +277,7 @@ fn (mut d Desktop) render_element(el ui2.Element, off_x int, off_y int, depth in
 				}
 			} else if el.image_path.starts_with(xwd_image_prefix) {
 				d.canvas.draw_xwd_surface(el.image_path[xwd_image_prefix.len..], x, y, w, h)
-			} else {
+			} else if !d.draw_app_icon(el.image_path, x, y, w, h) {
 				d.draw_builtin_glyph(el.image_path, x, y, w, h, el.text_style.color)
 			}
 		}
@@ -622,11 +622,15 @@ fn (mut d Desktop) draw_button(el ui2.Element, x int, y int, w int, h int) {
 	mut text_w := w - 2 * text_inset
 	if el.image_path.len > 0 {
 		if el.text.len == 0 {
-			d.draw_builtin_glyph(el.image_path, x, y, w, h, text_color)
+			if !d.draw_app_icon(el.image_path, x, y, w, h) {
+				d.draw_builtin_glyph(el.image_path, x, y, w, h, text_color)
+			}
 		} else {
 			icon := if h - 8 < button_icon_size { h - 8 } else { button_icon_size }
-			d.draw_builtin_glyph(el.image_path, x + text_inset, y + (h - icon) / 2, icon, icon,
-				text_color)
+			if !d.draw_app_icon(el.image_path, x + text_inset, y + (h - icon) / 2, icon, icon) {
+				d.draw_builtin_glyph(el.image_path, x + text_inset, y + (h - icon) / 2, icon, icon,
+					text_color)
+			}
 			text_x += icon + 6
 			text_w -= icon + 6
 		}

@@ -106,9 +106,11 @@ a replacement for its element-tree rasterizer.
 
 Two conventions extend ui2 for this backend, both documented at the top of
 `render.v`: an `image_path` of `builtin:<name>` draws a vector glyph the
-renderer carries itself, since the target has no image files; and a rounded
-view at the top level of the tree is a floating surface, so it gets a drop
-shadow and a hairline edge.
+renderer carries itself, while `asset:<name>` draws one of the bundled,
+official 512px QOI app icons; and a rounded view at the top level of the tree
+is a floating surface, so it gets a drop shadow and a hairline edge. The
+Firefox, Chromium, and Blender sources are recorded in
+[`assets/SOURCES.md`](assets/SOURCES.md).
 
 ## Native ui2 applications
 

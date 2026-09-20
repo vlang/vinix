@@ -134,6 +134,7 @@ fn main() {
 		fonts:             load_fonts()
 		tz_offset_seconds: options.tz_offset
 	}
+	desktop.load_app_icons()
 
 	mut pointer := open_pointer(options.pointer)
 	defer {

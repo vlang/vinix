@@ -118,8 +118,14 @@ rm -rf "$STAGING"
 mkdir -p "$STAGING"
 cp -a "$SYSROOT/." "$STAGING/"
 mkdir -p "$STAGING/usr/bin" "$STAGING/usr/share/vinix/wallpapers" \
-    "$STAGING/root/desktop" "$STAGING/run"
+    "$STAGING/usr/share/vinix/icons" "$STAGING/root/desktop" "$STAGING/run"
 install -m755 "$BUILD_DIR/vinix-desktop" "$STAGING/usr/bin/vinix-desktop"
+install -m644 "$SCRIPT_DIR/desktop/assets/chromium.qoi" \
+    "$STAGING/usr/share/vinix/icons/chromium.qoi"
+install -m644 "$SCRIPT_DIR/desktop/assets/firefox.qoi" \
+    "$STAGING/usr/share/vinix/icons/firefox.qoi"
+install -m644 "$SCRIPT_DIR/desktop/assets/blender.qoi" \
+    "$STAGING/usr/share/vinix/icons/blender.qoi"
 install -m755 "$SCRIPT_DIR/build-support/vinix-desktop-reload" \
     "$STAGING/usr/bin/vinix-desktop-reload"
 rm -f "$STAGING/sbin/init"

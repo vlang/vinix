@@ -39,6 +39,21 @@ fn utility_button_with_text(element ui2.Element, text string) ?ui2.Element {
 	return none
 }
 
+fn test_qoi_icon_decoder_preserves_rgba_and_run_pixels() {
+	// A two-pixel QOI: one RGBA opcode followed by a one-pixel run. This keeps
+	// the tiny asset decoder's most important alpha and run-length paths covered
+	// without making the test depend on host-installed desktop artwork.
+	encoded := [u8(`q`), `o`, `i`, `f`, 0, 0, 0, 2, 0, 0, 0, 1, 4, 0, 0xff, 0x12, 0x34, 0x56, 0x78,
+		0xc0, 0, 0, 0, 0, 0, 0, 0, 1]
+	icon := decode_qoi(encoded) or {
+		assert false
+		return
+	}
+	assert icon.width == 2
+	assert icon.height == 1
+	assert icon.pixels == [u32(0x78123456), 0x78123456]
+}
+
 fn test_vinix_start_glyph_uses_the_wordmark_v_polygon() {
 	// These coordinates are inside the left arm, the open notch and the right
 	// arm of the V in vinix-logo.svg. Keeping this assertion on the shared
@@ -539,6 +554,7 @@ fn test_available_utility_applications_and_shortcut_layouts() {
 	assert available_apps[1].title == 'Firefox'
 	assert available_apps[1].exclusive_command == ''
 	assert available_apps[1].process_name == 'vinix-firefox'
+	assert available_apps[1].icon == 'asset:firefox'
 	assert available_apps[1].width == firefox_window_width
 	assert available_apps[1].height == firefox_window_height + default_title_height
 	assert available_apps[1].polling && available_apps[1].poll_interval_ms == 50
@@ -568,6 +584,7 @@ fn test_available_utility_applications_and_shortcut_layouts() {
 	assert available_apps[12].pointer
 	assert available_apps[13].title == 'Blender'
 	assert available_apps[13].process_name == 'vinix-blender'
+	assert available_apps[13].icon == 'asset:blender'
 	assert available_apps[13].width == blender_window_width
 	assert available_apps[13].height == blender_window_height + default_title_height
 	assert available_apps[14].title == capture_app_title
@@ -589,7 +606,7 @@ fn test_available_utility_applications_and_shortcut_layouts() {
 	assert !available_apps[16].keyboard && !available_apps[16].pointer
 	assert available_apps[18].title == 'Chromium'
 	assert available_apps[18].process_name == 'vinix-chromium'
-	assert available_apps[18].icon == 'builtin:browser'
+	assert available_apps[18].icon == 'asset:chromium'
 	assert available_apps[18].width == chromium_window_width
 	assert available_apps[18].height == chromium_window_height + default_title_height
 	assert available_apps[18].keyboard && available_apps[18].pointer
