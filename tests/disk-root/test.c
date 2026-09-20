@@ -20,6 +20,7 @@
 #include <unistd.h>
 
 static const char *marker = "/etc/vinix-disk-root";
+static const char *host_symlink = "/usr/share/vinix-large-link";
 static const char *installed = "/.vinix-image-id";
 static const char payload[] = "vinix-disk-root-v1";
 /* A file the host put on the volume, big enough to need indirect blocks. Its
@@ -50,6 +51,32 @@ static int booted_from_disk(void)
 		return 0;
 	close(fd);
 	return 1;
+}
+
+static int replace_host_symlink(void)
+{
+	static const char replacement[] = "replaced-fast-symlink";
+	static const char *temporary = "/usr/share/vinix-large-link.new";
+	int fd = open(temporary, O_CREAT | O_EXCL | O_WRONLY, 0644);
+	if (fd < 0) {
+		printf("VINIX DISK ROOT: FAIL create symlink replacement errno=%d\n", errno);
+		return 1;
+	}
+	if (write(fd, replacement, sizeof(replacement) - 1) !=
+	    (ssize_t)(sizeof(replacement) - 1)) {
+		printf("VINIX DISK ROOT: FAIL prepare symlink replacement errno=%d\n", errno);
+		close(fd);
+		return 1;
+	}
+	if (close(fd) != 0) {
+		printf("VINIX DISK ROOT: FAIL close symlink replacement errno=%d\n", errno);
+		return 1;
+	}
+	if (rename(temporary, host_symlink) != 0) {
+		printf("VINIX DISK ROOT: FAIL rename over fast symlink errno=%d\n", errno);
+		return 1;
+	}
+	return 0;
 }
 
 static int write_marker(void)
@@ -213,6 +240,8 @@ int main(void)
 		return 1;
 	}
 	if (write_marker() != 0)
+		return 1;
+	if (replace_host_symlink() != 0)
 		return 1;
 	/* No fsync and no O_SYNC: the restart is what has to get this out. */
 	say("VINIX DISK ROOT: WROTE /etc MARKER, REBOOTING\n");

@@ -720,6 +720,24 @@ if [ "$REUSE_STAGING" -eq 0 ]; then
             fi
         done
     fi
+
+    if [ "$WITH_CHROMIUM" -eq 1 ]; then
+        # Firefox comes from a newer Alpine branch than Chromium and therefore
+        # owns the image-wide GTK/GLib/NSS stack. Chromium 136 crashes before
+        # mapping a window when that mixed closure is loaded underneath it, so
+        # retain the shared libraries from Chromium's resolved package set in
+        # a private directory selected only by run-chromium.
+        chromium_runtime="$STAGING/usr/lib/chromium/vinix-runtime"
+        rm -rf "$chromium_runtime"
+        mkdir -p "$chromium_runtime"
+        cp -a "$CHROMIUM_STAGING"/usr/lib/*.so* "$chromium_runtime/"
+        install -m755 "$CHROMIUM_STAGING/lib/ld-musl-aarch64.so.1" \
+            "$STAGING/lib/ld-chromium.so.1"
+        python3 "$SCRIPT_DIR/build-support/patch-elf-interpreter.py" \
+            "$STAGING/usr/lib/chromium/chrome" \
+            /lib/ld-musl-aarch64.so.1 /lib/ld-chromium.so.1
+        touch "$chromium_runtime/.complete"
+    fi
 fi
 
 # These files are owned by this checkout, not by a compiled staging layer, so

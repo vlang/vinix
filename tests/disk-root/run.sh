@@ -42,6 +42,7 @@ chmod +x "$work/system/sbin/init"
 # the host rather than by the kernel, so what is under test is reading back
 # somebody else's block layout. The guest recomputes every byte from its offset.
 python3 "$repo/tests/disk-root/make-large-file.py" "$work/system/usr/share/vinix-large"
+ln -s vinix-large "$work/system/usr/share/vinix-large-link"
 COPYFILE_DISABLE=1 tar --format=ustar -cf "$work/system.tar" -C "$work/system" .
 
 python3 "$repo/tests/disk-root/run_vm.py" \
