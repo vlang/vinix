@@ -626,6 +626,53 @@ static int test_pollfd_abi(void)
 	return 0;
 }
 
+/* A blocking write larger than PIPE_BUF alternates between filling the pipe
+ * and waiting for the reader to make room. Both directions share the pipe's
+ * event. A reader used to be able to consume the "space available" wake in
+ * the gap before the writer attached, then wait for data itself; the empty
+ * pipe was left with both ends asleep forever. Keep enough transfers in one
+ * syscall to exercise that hand-off repeatedly on the SMP VM. */
+static int test_large_pipe_progress(void)
+{
+	enum { transfer_size = 2 * 1024 * 1024 };
+	unsigned char *payload = malloc(transfer_size);
+	unsigned char *observed = malloc(transfer_size);
+	CHECK(payload != NULL && observed != NULL);
+	for (size_t i = 0; i < transfer_size; ++i)
+		payload[i] = (unsigned char)(i * 73u + 19u);
+
+	int pair[2];
+	CHECK(pipe(pair) == 0);
+	pid_t writer = fork();
+	CHECK(writer >= 0);
+	if (writer == 0) {
+		close(pair[0]);
+		ssize_t wrote = write(pair[1], payload, transfer_size);
+		close(pair[1]);
+		_exit(wrote == transfer_size ? 0 : 1);
+	}
+
+	CHECK(close(pair[1]) == 0);
+	/* Turn a regression into a bounded test failure instead of letting the
+	 * whole VM wait forever on the same deadlock this test is checking. */
+	alarm(20);
+	size_t received = 0;
+	while (received < transfer_size) {
+		ssize_t got = read(pair[0], observed + received,
+		    transfer_size - received);
+		CHECK(got > 0);
+		received += (size_t)got;
+	}
+	alarm(0);
+	CHECK(memcmp(payload, observed, transfer_size) == 0);
+	CHECK(close(pair[0]) == 0);
+	CHECK(reap_ok(writer) == 0);
+	free(observed);
+	free(payload);
+	puts("QEMU CORE PASS: large blocking pipe transfer makes progress");
+	return 0;
+}
+
 /* qemu-user translates an x86 epoll_event into the native AArch64 layout
  * before entering Vinix. Verify both that layout and the syscall result: a
  * wrong stride or a returned byte count makes userspace consume uninitialised
@@ -737,6 +784,7 @@ static int run_tests(void)
 	CHECK(test_posix_timer_thread_notification() == 0);
 	CHECK(test_anonymous_descriptor_access() == 0);
 	CHECK(test_pollfd_abi() == 0);
+	CHECK(test_large_pipe_progress() == 0);
 	CHECK(test_epoll_abi_and_count() == 0);
 	CHECK(test_syscall_int_truncation() == 0);
 	CHECK(test_abstract_socket_reuse() == 0);

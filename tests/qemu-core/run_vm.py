@@ -38,6 +38,7 @@ FEATURE_MARKERS = (
     b"QEMU CORE PASS: POSIX SIGEV_THREAD timer notification",
     b"QEMU CORE PASS: anonymous descriptors are open both ways",
     b"QEMU CORE PASS: Linux pollfd ABI",
+    b"QEMU CORE PASS: large blocking pipe transfer makes progress",
     b"QEMU CORE PASS: Linux epoll ABI and event count",
     b"QEMU CORE PASS: syscall C-int truncation",
     b"QEMU CORE PASS: abstract socket names are released",
