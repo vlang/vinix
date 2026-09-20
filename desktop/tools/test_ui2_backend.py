@@ -9,10 +9,67 @@ import sys
 import time
 
 MAGIC = 0x56415050
-VERSION = 7
+VERSION = 8
 REQUEST_HEADER = 124
 RESPONSE_HEADER = 116
 STATE_SIZE = 104
+ELEMENT_FIXED_SIZE = 274
+
+
+def decode_string(data, offset):
+    length = struct.unpack_from("<I", data, offset)[0]
+    offset += 4
+    end = offset + length
+    if end > len(data):
+        raise RuntimeError("truncated ui2 element string")
+    return data[offset:end].decode("utf-8"), end
+
+
+def decode_element(data, offset=0):
+    """Decode enough of the tree protocol to verify backend-owned input state."""
+    start = offset
+    if offset + ELEMENT_FIXED_SIZE > len(data):
+        raise RuntimeError("truncated ui2 element")
+    kind = data[offset]
+    style_flags = struct.unpack_from("<I", data, offset + 6)[0]
+    selection_anchor, selection_caret = struct.unpack_from(
+        "<ii", data, offset + 138)
+    offset += ELEMENT_FIXED_SIZE
+    names = ("id", "action_id", "submit_id", "text", "image_path",
+             "tooltip", "placeholder", "cursor", "toggle_group",
+             "font_family", "vertical_align", "link")
+    element = {
+        "kind": kind,
+        "style_flags": style_flags,
+        "selection_anchor": selection_anchor,
+        "selection_caret": selection_caret,
+        "wire_offset": start,
+    }
+    for name in names:
+        element[name], offset = decode_string(data, offset)
+    menu_count = struct.unpack_from("<I", data, offset)[0]
+    offset += 4
+    for _ in range(menu_count):
+        _, offset = decode_string(data, offset)
+        _, offset = decode_string(data, offset)
+    child_count = struct.unpack_from("<I", data, offset)[0]
+    offset += 4
+    children = []
+    for _ in range(child_count):
+        child, offset = decode_element(data, offset)
+        children.append(child)
+    element["children"] = children
+    return element, offset
+
+
+def find_element(element, element_id):
+    if element["id"] == element_id:
+        return element
+    for child in element["children"]:
+        found = find_element(child, element_id)
+        if found is not None:
+            return found
+    return None
 
 
 def read_exact(fd, count, timeout=15):
@@ -73,6 +130,23 @@ def exercise(executable):
             _, updated_tree = response(from_child_r)
             if updated_tree == tree:
                 raise RuntimeError("ui2 example action did not update its tree")
+        if app_name == "vinix-ui2-temperature_converter":
+            request(to_child_w, 2, state, b"celsius")
+            response(from_child_r)
+            request(to_child_w, 3, state, b"4")
+            response(from_child_r)
+            request(to_child_w, 1, state, width=600, height=168)
+            _, edited_tree = response(from_child_r)
+            decoded, end = decode_element(edited_tree)
+            if end != len(edited_tree):
+                raise RuntimeError("ui2 example tree has trailing data")
+            celsius = find_element(decoded, "celsius")
+            if celsius is None or celsius["text"] != "4":
+                raise RuntimeError("temperature input did not accept text")
+            if not celsius["style_flags"] & (1 << 16):
+                raise RuntimeError("focused text input was not marked focused")
+            if (celsius["selection_anchor"], celsius["selection_caret"]) != (1, 1):
+                raise RuntimeError("focused text input did not export its caret")
         # This upstream example is itself a native-control integration test.
         # It deliberately verifies text-area selection and exits on its own.
         if app_name == "vinix-ui2-windows_smoke":

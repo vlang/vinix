@@ -19,7 +19,7 @@ import math.bits
 import ui2
 
 const app_protocol_magic = u32(0x56415050) // VAPP
-const app_protocol_version = u8(7)
+const app_protocol_version = u8(8)
 const app_request_header_size = 124
 const app_response_header_size = 116
 const app_protocol_max_payload = 16 * 1024 * 1024
@@ -364,6 +364,9 @@ fn encode_app_element(element ui2.Element, mut out []u8) ! {
 	if element.autocorrect {
 		style_flags |= 1 << 15
 	}
+	if element.focused {
+		style_flags |= 1 << 16
+	}
 	wire_put_u32(mut out, style_flags)
 	wire_put_f64(mut out, element.frame.x)
 	wire_put_f64(mut out, element.frame.y)
@@ -384,6 +387,8 @@ fn encode_app_element(element ui2.Element, mut out []u8) ! {
 	wire_put_f64(mut out, element.text_style.hyphenation_factor)
 	wire_put_i32(mut out, element.text_style.lines)
 	wire_put_i32(mut out, element.keyboard)
+	wire_put_i32(mut out, element.text_selection.anchor)
+	wire_put_i32(mut out, element.text_selection.caret)
 	wire_put_f64(mut out, element.padding_left)
 	wire_put_f64(mut out, element.value)
 	wire_put_f64(mut out, element.min_value)
@@ -463,6 +468,8 @@ fn decode_app_element(mut reader WireReader, depth int) !ui2.Element {
 	text_hyphenation_factor := reader.take_f64()!
 	text_lines := reader.take_i32()!
 	keyboard := reader.take_i32()!
+	selection_anchor := reader.take_i32()!
+	selection_caret := reader.take_i32()!
 	padding_left := reader.take_f64()!
 	value := reader.take_f64()!
 	min_value := reader.take_f64()!
@@ -573,6 +580,11 @@ fn decode_app_element(mut reader WireReader, depth int) !ui2.Element {
 		value_track:               style_flags & (1 << 13) != 0
 		toggle_allow_no_selection: style_flags & (1 << 14) != 0
 		autocorrect:               style_flags & (1 << 15) != 0
+		focused:                   style_flags & (1 << 16) != 0
+		text_selection:            ui2.TextSelection{
+			anchor: selection_anchor
+			caret:  selection_caret
+		}
 		keyboard:                  keyboard
 		padding_left:              padding_left
 		value:                     value

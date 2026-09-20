@@ -684,15 +684,21 @@ fn (mut d Desktop) draw_catalina_text_input(el ui2.Element, x int, y int, w int,
 		catalina_text_input_height
 	}
 	bezel_y := if el.kind == .text_area { y } else { y + (h - bezel_height) / 2 }
-	radius := if bezel_height < 8 { bezel_height / 2 } else { 3 }
-	if el.native_style && el.enabled {
+	radius := if bezel_height < 8 { bezel_height / 2 } else { 2 }
+	if el.focused && el.enabled {
+		// Catalina uses a crisp three-pixel focus ring, not the translucent
+		// double outline produced by the old generic accent treatment.
+		d.canvas.stroke_round_rect(x - 3, bezel_y - 3, w + 6, bezel_height + 6, radius + 3,
+			catalina_text_focus_outer, 255)
 		d.canvas.stroke_round_rect(x - 2, bezel_y - 2, w + 4, bezel_height + 4, radius + 2,
-			catalina_control_focus, 220)
+			catalina_text_focus_ring, 255)
+		d.canvas.stroke_round_rect(x - 1, bezel_y - 1, w + 2, bezel_height + 2, radius + 1,
+			catalina_text_focus_ring, 255)
 	}
 	d.canvas.fill_round_rect(x, bezel_y, w, bezel_height, radius,
 		if el.enabled { catalina_control_face } else { u32(0xf3f3f3) })
 	d.canvas.stroke_round_rect(x, bezel_y, w, bezel_height, radius,
-		if el.native_style && el.enabled { catalina_control_accent } else { catalina_control_edge },
+		if el.focused && el.enabled { catalina_text_focus_edge } else { catalina_control_edge },
 		255)
 	mut shown := el.text
 	mut color := if el.enabled { el.text_style.color } else { catalina_control_disabled_text }
@@ -702,7 +708,7 @@ fn (mut d Desktop) draw_catalina_text_input(el ui2.Element, x int, y int, w int,
 	}
 	if el.kind == .text_area {
 		face := d.face_for(el.text_style)
-		text_width := w - int(el.padding_left) - 6
+		text_width := w - catalina_text_input_inset * 2
 		if text_width <= 0 {
 			return
 		}
@@ -712,7 +718,7 @@ fn (mut d Desktop) draw_catalina_text_input(el ui2.Element, x int, y int, w int,
 				break
 			}
 			display, owned := face.truncate(line, text_width)
-			d.canvas.draw_text(face, x + int(el.padding_left), line_y, display, color)
+			d.canvas.draw_text(face, x + catalina_text_input_inset, line_y, display, color)
 			if owned {
 				unsafe { display.free() }
 			}
@@ -720,8 +726,62 @@ fn (mut d Desktop) draw_catalina_text_input(el ui2.Element, x int, y int, w int,
 		}
 		return
 	}
-	d.draw_catalina_control_text(el, shown, x, bezel_y, w, bezel_height, int(el.padding_left),
-		color)
+	face := d.face_for(el.text_style)
+	content_x := x + catalina_text_input_inset
+	content_width := w - catalina_text_input_inset * 2
+	if content_width <= 0 {
+		return
+	}
+	runes := el.text.runes()
+	mut caret := el.text_selection.caret
+	if caret < 0 {
+		caret = 0
+	} else if caret > runes.len {
+		caret = runes.len
+	}
+	if el.focused && !el.text_selection.collapsed() && runes.len > 0 {
+		mut selection_start, mut selection_end := el.text_selection.ordered()
+		if selection_start < 0 {
+			selection_start = 0
+		}
+		if selection_end > runes.len {
+			selection_end = runes.len
+		}
+		if selection_end > selection_start {
+			before := runes[..selection_start].string()
+			selected := runes[selection_start..selection_end].string()
+			selection_x := content_x + face.text_width(before)
+			mut selection_width := face.text_width(selected)
+			if selection_x + selection_width > content_x + content_width {
+				selection_width = content_x + content_width - selection_x
+			}
+			if selection_width > 0 {
+				d.canvas.fill_rect(selection_x, bezel_y + 3, selection_width, bezel_height - 6,
+					catalina_text_selection)
+			}
+			unsafe {
+				before.free()
+				selected.free()
+			}
+		}
+	}
+	display, owned := face.truncate(shown, content_width)
+	d.canvas.draw_text(face, content_x, bezel_y + (bezel_height - face.line_height) / 2,
+		display, color)
+	if owned {
+		unsafe { display.free() }
+	}
+	if el.focused && el.enabled {
+		before_caret := runes[..caret].string()
+		mut caret_x := content_x + face.text_width(before_caret)
+		if caret_x > content_x + content_width {
+			caret_x = content_x + content_width
+		}
+		caret_color := if el.enabled { el.text_style.color } else { catalina_control_disabled_text }
+		d.canvas.fill_rect(caret_x, bezel_y + 4, 1, bezel_height - 8, caret_color)
+		unsafe { before_caret.free() }
+	}
+	unsafe { runes.free() }
 }
 
 fn (mut d Desktop) draw_catalina_slider(el ui2.Element, x int, y int, w int, h int) {

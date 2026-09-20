@@ -9,7 +9,7 @@ import math.bits
 import os
 
 const vinix_app_magic = u32(0x56415050)
-const vinix_app_version = u8(7)
+const vinix_app_version = u8(8)
 const vinix_request_header_size = 124
 const vinix_response_header_size = 116
 const vinix_state_size = 104
@@ -252,6 +252,9 @@ fn vinix_encode_element(element Element, mut out []u8) {
 	if element.autocorrect {
 		style_flags |= 1 << 15
 	}
+	if element.focused {
+		style_flags |= 1 << 16
+	}
 	vinix_put_u32(mut out, style_flags)
 	vinix_put_f64(mut out, element.frame.x)
 	vinix_put_f64(mut out, element.frame.y)
@@ -272,6 +275,8 @@ fn vinix_encode_element(element Element, mut out []u8) {
 	vinix_put_f64(mut out, element.text_style.hyphenation_factor)
 	vinix_put_i32(mut out, element.text_style.lines)
 	vinix_put_i32(mut out, element.keyboard)
+	vinix_put_i32(mut out, element.text_selection.anchor)
+	vinix_put_i32(mut out, element.text_selection.caret)
 	vinix_put_f64(mut out, element.padding_left)
 	vinix_put_f64(mut out, element.value)
 	vinix_put_f64(mut out, element.min_value)
@@ -358,7 +363,8 @@ fn vinix_runtime_element(element Element, off_x f64, off_y f64) Element {
 	mut text_value := element.text
 	mut checked := element.checked
 	mut slider_value_ := element.value
-	mut native_style := element.native_style
+	mut focused := element.focused
+	mut text_selection := element.text_selection
 	// ui2.text() also exposes labels and buttons. Several examples use that
 	// lookup to verify or coordinate their declarative tree, not only inputs.
 	if element.id.len > 0 && element.kind !in [.text_field, .text_area, .dropdown] {
@@ -380,7 +386,12 @@ fn vinix_runtime_element(element Element, off_x f64, off_y f64) Element {
 			if element.secure {
 				text_value = text_field_display_text(text_value, true)
 			}
-			native_style = native_style || element.id == vinix_focused
+			if element.kind in [.text_field, .text_area] {
+				focused = element.id == vinix_focused
+				text_selection = (vinix_text_editors[element.id] or {
+					text_editor(text_value.clone())
+				}).selection
+			}
 		}
 		.slider {
 			declared := vinix_slider_declared[element.id] or { element.value - 1.0 }
@@ -477,11 +488,12 @@ fn vinix_runtime_element(element Element, off_x f64, off_y f64) Element {
 	}
 	return Element{
 		...element
-		text:         text_value
-		checked:      checked
-		value:        slider_value_
-		native_style: native_style
-		children:     children
+		text:           text_value
+		checked:        checked
+		value:          slider_value_
+		focused:        focused
+		text_selection: text_selection
+		children:       children
 	}
 }
 

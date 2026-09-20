@@ -69,10 +69,16 @@ const catalina_control_face = u32(0xffffff)
 const catalina_control_pressed_face = u32(0xe5e5e5)
 const catalina_control_accent = u32(0x3478f6)
 const catalina_control_accent_pressed = u32(0x1f66dc)
-const catalina_control_focus = u32(0x6aa7ff)
+// The four straight raster rows around a focused NSTextField in Catalina are
+// an outer highlight, two focus-ring rows, then the field edge.
+const catalina_text_focus_outer = u32(0x7aacf1)
+const catalina_text_focus_ring = u32(0x77aaf0)
+const catalina_text_focus_edge = u32(0x6093d9)
+const catalina_text_selection = u32(0xb3d7ff)
 const catalina_checkbox_size = 14
 const catalina_popup_height = 22
 const catalina_text_input_height = 22
+const catalina_text_input_inset = 6
 const catalina_slider_track = u32(0xc8c8c8)
 const catalina_slider_track_edge = u32(0xb4b4b4)
 const catalina_switch_on = u32(0x64c466)

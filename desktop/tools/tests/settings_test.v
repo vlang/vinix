@@ -463,6 +463,73 @@ fn test_catalina_native_button_uses_measured_normal_default_and_pressed_renditio
 	}
 }
 
+fn test_catalina_text_field_uses_measured_focus_ring_inset_and_caret() {
+	mut desktop := Desktop{
+		canvas:   new_scaled_canvas(150, 60, 150, 60, 1)
+		fonts:    load_fonts()
+		settings: Settings{
+			theme: .macos
+		}
+	}
+	defer {
+		unsafe { free(desktop.canvas.pixels) }
+	}
+	desktop.canvas.clear(theme_macos.window_body)
+	field := ui2.Element{
+		kind:           .text_field
+		id:             'temperature'
+		text:           '4'
+		frame:          ui2.rect(10, 10, 120, 42)
+		text_style:     ui2.TextStyle{
+			color: 0x123456
+			size:  13
+		}
+		focused:        true
+		text_selection: ui2.TextSelection{
+			anchor: 1
+			caret:  1
+		}
+	}
+	desktop.draw_button(field, 10, 10, 120, 42)
+	// The 22-pixel bezel is vertically centred at y=20. Its four straight
+	// rows are sampled directly from Catalina's native NSTextField.
+	unsafe {
+		assert desktop.canvas.pixels[17 * desktop.canvas.stride + 40] == catalina_text_focus_outer
+		assert desktop.canvas.pixels[18 * desktop.canvas.stride + 40] == catalina_text_focus_ring
+		assert desktop.canvas.pixels[19 * desktop.canvas.stride + 40] == catalina_text_focus_ring
+		assert desktop.canvas.pixels[20 * desktop.canvas.stride + 40] == catalina_text_focus_edge
+		assert desktop.canvas.pixels[21 * desktop.canvas.stride + 40] == catalina_control_face
+	}
+	face := desktop.face_for(field.text_style)
+	caret_x := 10 + catalina_text_input_inset + face.text_width('4')
+	unsafe {
+		assert desktop.canvas.pixels[24 * desktop.canvas.stride + caret_x] == field.text_style.color
+	}
+}
+
+fn test_application_protocol_preserves_text_focus_and_selection() {
+	root := ui2.screen(0xffffff, [ui2.Element{
+		kind:           .text_field
+		id:             'temperature'
+		text:           '4'
+		focused:        true
+		text_selection: ui2.TextSelection{
+			anchor: 0
+			caret:  1
+		}
+	}])
+	mut encoded := []u8{}
+	encode_app_element(root, mut encoded) or { panic(err) }
+	decoded := decode_app_tree(encoded) or { panic(err) }
+	field := decoded.children[0]
+	assert field.focused
+	assert field.text_selection.anchor == 0
+	assert field.text_selection.caret == 1
+	free_tree(root)
+	free_tree(decoded)
+	unsafe { encoded.free() }
+}
+
 fn test_catalina_native_button_rasterizes_curves_and_gradients_at_hidpi_scale() {
 	mut desktop := Desktop{
 		canvas:   new_scaled_canvas(120, 40, 240, 80, 2)
