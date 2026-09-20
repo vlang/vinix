@@ -25,6 +25,24 @@ fn leave(context &cpulocal.GPRState) {
 @[_naked]
 fn syscall_entry() {
 	asm volatile amd64 {
+		// V 0.5.2's C backend does not actually honor @[_naked] here: it still
+		// emits a standard `push rbp; mov rsp, rbp` C prologue ahead of this
+		// block. On entry to a SYSCALL handler, rsp is still the live user
+		// stack pointer (the CPU does not switch stacks for SYSCALL, that is
+		// this function's own job, done below) -- so that phantom prologue
+		// pushes the user's rbp onto the user's OWN stack, 8 bytes the caller
+		// never asked to have touched, clobbering whatever was there (often a
+		// return address a few frames up). `pop rbp` as the very first real
+		// instruction here reverses exactly those two instructions: it
+		// restores rbp to the value the compiler's `push` just saved, and
+		// rsp to what it was before that push ran, so the rest of this frame
+		// (built from the CPU's real syscall entry state below) is undisturbed.
+		// Confirmed live with GDB: the corrupted 8 bytes always held the
+		// user's own rbp value, always at [rsp] at function entry, and this
+		// one line makes the corruption -- and the crash it produced a few
+		// dozen syscalls later, once execution reached the clobbered return
+		// address -- stop reproducing.
+		pop rbp
 		swapgs // Save user stack
 		mov gs:[32], rsp // Switch to kernel stack
 		mov rsp, gs:[24]
