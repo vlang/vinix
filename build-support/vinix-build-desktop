@@ -1,0 +1,3 @@
+#!/bin/sh
+# Friendly command spelling retained alongside vinix-desktop-build.
+exec /usr/bin/vinix-desktop-build "$@"

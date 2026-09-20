@@ -45,7 +45,12 @@ while [ "$#" -gt 0 ]; do
 done
 exit 1
 EOF
+cat > "$work/bin/vinix-host-sync" <<'EOF'
+#!/bin/sh
+: > "$VINIX_DESKTOP_TEST_SYNCED"
+EOF
 chmod 755 "$work/bin/v" "$work/bin/gcc"
+chmod 755 "$work/bin/vinix-host-sync"
 
 output="$(
 	PATH="$work/bin:/usr/bin:/bin" \
@@ -73,4 +78,44 @@ VINIX_DESKTOP_TEST_V_ARGS="$work/v-args" \
 grep -F "$work/home/desktop" "$work/v-args" >/dev/null
 grep -F "$work/home/vmodules" "$work/v-args" >/dev/null
 
-echo "PASS desktop build helper source-generation selection"
+# A QEMU host share takes precedence over the image-seeded copies. The helper
+# must stage the raw host desktop and ui2 checkout the same way as the host
+# image builder before invoking V.
+host="$work/host"
+mkdir -p "$host/desktop/tools" "$host/third_party/ui2/ui" \
+	"$host/third_party/ui2/examples/calculator"
+printf 'module main\nfn main() {}\n' > "$host/desktop/main.v"
+cp "$repo/desktop/tools/stage_app.py" "$host/desktop/tools/stage_app.py"
+cp "$repo/desktop/tools/stage_ui2.py" "$host/desktop/tools/stage_ui2.py"
+cp "$repo/desktop/tools/ui2_headless_bounds.v" \
+	"$host/desktop/tools/ui2_headless_bounds.v"
+cat > "$host/third_party/ui2/v.mod" <<'EOF'
+Module {
+    name: 'ui2'
+    subdirs: ['ui']
+}
+EOF
+printf 'module ui2\n' > "$host/third_party/ui2/ui/ui.v"
+cat > "$host/third_party/ui2/examples/calculator/main.v" <<'EOF'
+module main
+
+struct CalculatorModel {}
+
+fn main() {
+}
+EOF
+printf 'host service\n' > "$work/host-source-url"
+PATH="$work/bin:/usr/bin:/bin" \
+VINIX_HOST_SOURCE_URL_FILE="$work/host-source-url" \
+VINIX_HOST_MOUNT="$host" \
+VINIX_DESKTOP_HOME_DEV="$work/home" \
+VINIX_DESKTOP_SYSTEM_DEV="$work/system" \
+VINIX_DESKTOP_OUTPUT="$work/vinix-desktop" \
+VINIX_DESKTOP_TEST_SYNCED="$work/synced" \
+VINIX_DESKTOP_TEST_V_ARGS="$work/v-args" \
+	"$repo/build-support/vinix-desktop-build" --no-reload >/dev/null
+test -f "$work/synced"
+grep -F "$host|$host/third_party" "$work/v-args" >/dev/null
+grep -F '/desktop' "$work/v-args" >/dev/null
+
+echo "PASS desktop build helper source selection and host staging"

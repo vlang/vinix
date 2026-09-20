@@ -11,8 +11,11 @@ module_dir=${VINIX_DESKTOP_MODULES:-$home_dev_dir/vmodules}
 output=${VINIX_DESKTOP_OUTPUT:-/root/vinix-desktop}
 system_version_file=$system_dev_dir/.source-version
 home_version_file=$home_dev_dir/.vinix-desktop-dev-version
+host_url_file=${VINIX_HOST_SOURCE_URL_FILE:-/etc/vinix/qemu-host-source-url}
+host_repo=${VINIX_HOST_MOUNT:-/mnt/host/vinix}
 source_explicit=0
 module_explicit=0
+host_source=0
 reload=1
 
 if [ "${VINIX_DESKTOP_SOURCE+x}" = x ]; then
@@ -26,8 +29,10 @@ usage() {
 	cat >&2 <<'EOF'
 usage: vinix-desktop-build [--no-reload] [--source=DIR] [--modules=DIR] [--output=FILE]
 
-Builds the editable Vinix desktop with the in-guest V compiler. By default the
-new binary is installed and the running desktop session is reloaded.
+Builds the editable Vinix desktop with the in-guest V compiler. A QEMU boot
+uses the latest sources from the host checkout by default. The new binary is
+installed and the running desktop session is reloaded unless --no-reload is
+passed.
 EOF
 	exit 2
 }
@@ -43,6 +48,21 @@ for argument in "$@"; do
 	esac
 done
 
+# The QEMU runner publishes the host checkout through a loopback-only service.
+# Refresh it at build time rather than boot time: every invocation then sees
+# edits made while this VM is still running. Explicit source/module paths keep
+# their original meaning and never trigger an implicit host sync.
+if [ "$source_explicit" -eq 0 ] && [ "$module_explicit" -eq 0 ] && \
+	[ -s "$host_url_file" ]; then
+	command -v vinix-host-sync >/dev/null 2>&1 || {
+		echo "vinix-desktop-build: vinix-host-sync is not installed" >&2
+		exit 1
+	}
+	vinix-host-sync
+	source_dir=$host_repo/desktop
+	host_source=1
+fi
+
 # /root is persistent across image upgrades. Older desktop sources can contain
 # only one side of an API change after new packaged files are merged into that
 # directory, producing hundreds of misleading V errors. The marker identifies
@@ -50,7 +70,7 @@ done
 # edits within one generation, but default to the immutable matching pair when
 # the editable tree came from an older image. Explicit paths remain available
 # for intentionally building or repairing such a tree.
-if [ "$source_explicit" -eq 0 ] && [ "$module_explicit" -eq 0 ] && \
+if [ "$host_source" -eq 0 ] && [ "$source_explicit" -eq 0 ] && [ "$module_explicit" -eq 0 ] && \
 	[ -f "$system_version_file" ] && \
 	! cmp -s "$system_version_file" "$home_version_file"; then
 	echo "vinix-desktop-build: editable desktop tree is from another image; using the system source copy"
@@ -63,7 +83,7 @@ if [ ! -f "$source_dir/main.v" ] && [ "$source_dir" = "$home_dev_dir/desktop" ] 
 	echo "vinix-desktop-build: $source_dir is missing; using the system source copy"
 	source_dir=$system_dev_dir/desktop
 fi
-if [ ! -f "$module_dir/ui2/v.mod" ] && [ "$module_dir" = "$home_dev_dir/vmodules" ] \
+if [ "$host_source" -eq 0 ] && [ ! -f "$module_dir/ui2/v.mod" ] && [ "$module_dir" = "$home_dev_dir/vmodules" ] \
 	&& [ -f "$system_dev_dir/vmodules/ui2/v.mod" ]; then
 	echo "vinix-desktop-build: $module_dir is incomplete; using the system module copy"
 	module_dir=$system_dev_dir/vmodules
@@ -73,10 +93,21 @@ fi
 	echo "vinix-desktop-build: desktop source not found: $source_dir" >&2
 	exit 1
 }
-[ -f "$module_dir/ui2/v.mod" ] || {
-	echo "vinix-desktop-build: ui2 module not found: $module_dir/ui2" >&2
-	exit 1
-}
+if [ "$host_source" -eq 1 ]; then
+	[ -f "$host_repo/third_party/ui2/v.mod" ] || {
+		echo "vinix-desktop-build: host ui2 module not found: $host_repo/third_party/ui2" >&2
+		exit 1
+	}
+	command -v python3 >/dev/null 2>&1 || {
+		echo "vinix-desktop-build: Python 3 is required to stage host sources" >&2
+		exit 1
+	}
+else
+	[ -f "$module_dir/ui2/v.mod" ] || {
+		echo "vinix-desktop-build: ui2 module not found: $module_dir/ui2" >&2
+		exit 1
+	}
+fi
 command -v v >/dev/null 2>&1 || {
 	echo "vinix-desktop-build: V compiler is not installed" >&2
 	exit 1
@@ -92,10 +123,26 @@ cleanup() {
 }
 trap cleanup EXIT HUP INT TERM
 
+module_path=$module_dir
+if [ "$host_source" -eq 1 ]; then
+	# Recreate the two disposable trees used by the host image builder. ui2
+	# needs Vinix's headless bounds bridge, and the hosted calculator model is
+	# generated from the current upstream example rather than a stale copy.
+	python3 "$host_repo/desktop/tools/stage_ui2.py" \
+		"$work_dir/vmodules/ui2" "$host_repo/third_party/ui2" \
+		"$host_repo/desktop/tools/ui2_headless_bounds.v"
+	python3 "$host_repo/desktop/tools/stage_app.py" \
+		"$work_dir/desktop" "$host_repo/desktop" \
+		"$host_repo/third_party/ui2/examples/calculator"
+	source_dir=$work_dir/desktop
+	module_dir=$work_dir/vmodules
+	module_path="$module_dir|$host_repo|$host_repo/third_party"
+fi
+
 echo "==> Translating Vinix desktop with $(v version)"
 v -new-compiler -no-memory-limit -os linux -arch arm64 -cc gcc -gc none -manualfree \
 	-enable-globals -prod -d ui2_headless \
-	-path "@vlib|$module_dir|@vmodules|$source_dir" \
+	-path "@vlib|$module_path|@vmodules|$source_dir" \
 	-o "$work_dir/desktop.c" "$source_dir"
 
 echo "==> Compiling the native desktop with GCC"

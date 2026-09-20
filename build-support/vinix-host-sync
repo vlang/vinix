@@ -1,0 +1,92 @@
+#!/bin/sh
+# Refresh the read-only QEMU host-worktree mirror used for in-guest builds.
+# The QEMU runner serves a new archive for every request, so a sync observes
+# edits made on the host after the VM was started.
+set -eu
+
+url_file=${VINIX_HOST_SOURCE_URL_FILE:-/etc/vinix/qemu-host-source-url}
+destination=${VINIX_HOST_MOUNT:-/mnt/host/vinix}
+curl=${VINIX_HOST_CURL:-/usr/bin/curl}
+tar=${VINIX_HOST_TAR:-/bin/tar}
+
+usage() {
+	cat >&2 <<'EOF'
+usage: vinix-host-sync
+
+Refreshes /mnt/host/vinix from the macOS checkout shared by the QEMU runner.
+The mirror is replaced on every invocation and must be treated as read-only.
+EOF
+	exit 2
+}
+
+case "${1:-}" in
+	'') ;;
+	--help|-h) usage ;;
+	*) echo "vinix-host-sync: unknown option: $1" >&2; usage ;;
+esac
+
+[ -s "$url_file" ] || {
+	echo "vinix-host-sync: this boot has no QEMU host source share" >&2
+	echo "vinix-host-sync: start it with ./run-desktop-aarch64.sh" >&2
+	exit 1
+}
+[ -x "$curl" ] || {
+	echo "vinix-host-sync: curl is not installed: $curl" >&2
+	exit 1
+}
+[ -x "$tar" ] || {
+	echo "vinix-host-sync: tar is not installed: $tar" >&2
+	exit 1
+}
+
+url=$(cat "$url_file")
+case "$url" in
+	http://*) ;;
+	*) echo "vinix-host-sync: invalid host source URL" >&2; exit 1 ;;
+esac
+
+parent=${destination%/*}
+[ "$parent" != "$destination" ] || parent=.
+name=${destination##*/}
+mkdir -p "$parent"
+work=$(mktemp -d "$parent/.${name}.sync.XXXXXX")
+archive=$(mktemp /tmp/vinix-host-source.XXXXXX)
+old="$parent/.${name}.old.$$"
+installed=0
+
+cleanup() {
+	rm -f "$archive"
+	[ ! -e "$work" ] || rm -rf "$work"
+	if [ -e "$old" ]; then
+		if [ "$installed" -eq 1 ]; then
+			rm -rf "$old"
+		elif [ ! -e "$destination" ]; then
+			mv "$old" "$destination"
+		fi
+	fi
+}
+trap cleanup EXIT HUP INT TERM
+
+echo "==> Syncing the macOS Vinix checkout to $destination"
+"$curl" --fail --silent --show-error --connect-timeout 5 --max-time 300 \
+	--retry 10 --retry-connrefused --retry-delay 1 \
+	--output "$archive" "${url%/}/vinix-source.tar"
+"$tar" -xf "$archive" -C "$work"
+[ -f "$work/desktop/main.v" ] || {
+	echo "vinix-host-sync: host archive has no desktop/main.v" >&2
+	exit 1
+}
+[ -f "$work/third_party/ui2/v.mod" ] || {
+	echo "vinix-host-sync: host archive has no third_party/ui2/v.mod" >&2
+	exit 1
+}
+
+if [ -e "$destination" ] || [ -L "$destination" ]; then
+	mv "$destination" "$old"
+fi
+mv "$work" "$destination"
+work=
+installed=1
+[ ! -e "$old" ] || rm -rf "$old"
+old=
+echo "vinix-host-sync: host sources are current"

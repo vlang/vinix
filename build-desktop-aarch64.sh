@@ -800,6 +800,10 @@ install -m755 "$SCRIPT_DIR/build-support/vinix-desktop-build" \
     "$STAGING/usr/bin/vinix-desktop-build"
 install -m755 "$SCRIPT_DIR/build-support/vinix-desktop-reload" \
     "$STAGING/usr/bin/vinix-desktop-reload"
+install -m755 "$SCRIPT_DIR/build-support/vinix-host-sync" \
+    "$STAGING/usr/bin/vinix-host-sync"
+install -m755 "$SCRIPT_DIR/build-support/vinix-build-desktop" \
+    "$STAGING/usr/bin/vinix-build-desktop"
 install -m644 "$SCRIPT_DIR/tests/browsers/chromium-smoke.html" \
     "$STAGING/usr/share/vinix/chromium-smoke.html"
 install -m755 "$SCRIPT_DIR/tests/packages/x-window-check.py" \
@@ -848,7 +852,8 @@ if [ ! -x "$STAGING/usr/bin/pkg" ] || [ ! -x "$STAGING/sbin/apk" ]; then
 fi
 for development_path in \
     usr/bin/v usr/lib/vlang/v usr/bin/gcc usr/bin/tcc \
-    usr/bin/vinix-desktop-build usr/bin/vinix-desktop-reload; do
+    usr/bin/vinix-desktop-build usr/bin/vinix-build-desktop \
+    usr/bin/vinix-desktop-reload usr/bin/vinix-host-sync; do
     if [ ! -x "$STAGING/$development_path" ]; then
         echo "ERROR: desktop development environment is missing /$development_path" >&2
         exit 1
@@ -881,7 +886,7 @@ if ! { [ -x "$STAGING/usr/lib/firefox-esr/firefox-esr" ] &&
     exit 1
 fi
 if [ "$COMPACT_INITRAMFS" -eq 1 ]; then
-    for command_path in bin/sh bin/zsh bin/id bin/sed bin/mkdir bin/sleep bin/df bin/du bin/ls bin/tar usr/bin/pkg sbin/apk usr/bin/vim usr/bin/python3 usr/bin/git usr/bin/Xorg usr/bin/Xvfb usr/bin/startx usr/bin/vinix-xinput usr/bin/vinix-wine-host usr/bin/run-firefox usr/bin/run-gimp usr/bin/run-chromium usr/bin/run-libreoffice usr/libexec/vinix-minecraft/fetch-minecraft.py usr/bin/gcc usr/bin/tcc usr/bin/ldd usr/bin/v usr/bin/vinix-desktop-build usr/bin/vinix-desktop-reload; do
+    for command_path in bin/sh bin/zsh bin/id bin/sed bin/mkdir bin/sleep bin/df bin/du bin/ls bin/tar usr/bin/pkg sbin/apk usr/bin/vim usr/bin/python3 usr/bin/git usr/bin/Xorg usr/bin/Xvfb usr/bin/startx usr/bin/vinix-xinput usr/bin/vinix-wine-host usr/bin/run-firefox usr/bin/run-gimp usr/bin/run-chromium usr/bin/run-libreoffice usr/libexec/vinix-minecraft/fetch-minecraft.py usr/bin/gcc usr/bin/tcc usr/bin/ldd usr/bin/v usr/bin/vinix-desktop-build usr/bin/vinix-build-desktop usr/bin/vinix-desktop-reload usr/bin/vinix-host-sync; do
         if [ ! -x "$STAGING/$command_path" ]; then
             echo "ERROR: compact desktop is missing /$command_path" >&2
             exit 1
@@ -1058,7 +1063,9 @@ CONTENT_KEY_INPUTS=(
     "$SCRIPT_DIR/compat/macos/macho"
     "$SCRIPT_DIR/build-support/vinix-pkg"
     "$SCRIPT_DIR/build-support/vinix-desktop-build"
+    "$SCRIPT_DIR/build-support/vinix-build-desktop"
     "$SCRIPT_DIR/build-support/vinix-desktop-reload"
+    "$SCRIPT_DIR/build-support/vinix-host-sync"
     "$SCRIPT_DIR/build-support/xorg-server/startx"
     "$SCRIPT_DIR/build-support/firefox"
     "$SCRIPT_DIR/build-support/gimp"

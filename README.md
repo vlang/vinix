@@ -176,15 +176,22 @@ on one component, but are not required for a normal default-image build.
 
 The AArch64 desktop image contains the native V compiler and its matching
 `vlib`, GCC, the editable staged desktop sources in `/root/desktop`, and the
-headless ui2 module in `/root/vmodules`. Verify the compiler or rebuild the
-desktop from a Vinix Terminal with:
+headless ui2 module in `/root/vmodules`. QEMU also shares the checkout from
+which it was launched at `/mnt/host/vinix`. The share is a read-only mirror
+refreshed from macOS immediately before each build, so edits made after QEMU
+started are included without rebuilding the image or restarting the VM.
+
+Verify the compiler or rebuild and hot-reload the desktop from a Vinix
+Terminal with:
 
 ```sh
 /root/v-smoke.sh
-vinix-desktop-build
+vinix-build-desktop
 ```
 
-`vinix-desktop-build` translates the desktop with V, links a static AArch64
+`vinix-build-desktop` (also available as `vinix-desktop-build`) refreshes the
+host mirror, stages the desktop and ui2 sources exactly as the image builder
+does, translates the desktop with V, links a static AArch64
 binary with GCC, keeps a copy at `/root/vinix-desktop`, atomically replaces
 `/usr/bin/vinix-desktop`, and sends SIGHUP to PID 1. The supervisor lets the
 old compositor close its applications and release the framebuffer, then starts
@@ -194,6 +201,12 @@ persistent home is missing either tree or belongs to another image generation,
 the helper automatically builds the coherent copy in
 `/usr/share/vinix/desktop-dev`. Pass both `--source=DIR` and `--modules=DIR` to
 deliberately build a different source generation.
+
+The runner shares its own checkout by default. Set
+`VINIX_QEMU_HOST_SOURCE=/path/to/vinix` to select another checkout, or set it
+to `0` to disable the host source service. `vinix-host-sync` can be run by
+itself to refresh `/mnt/host/vinix` for inspection. The VirGL runner remains
+offline and therefore uses the image's staged source copy.
 
 The compiler layer is pinned to the newest V revision qualified by this tree.
 Build it separately with `./build-v-aarch64.sh`; set `VINIX_V_SOURCE` to a V

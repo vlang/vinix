@@ -19,6 +19,11 @@
 # comes from the initramfs, while files below /root survive QEMU restarts.
 # --persist=MB chooses its one-time image size; --no-persist disables it.
 #
+# The current Vinix checkout is exposed inside networked QEMU boots at
+# /mnt/host/vinix. vinix-host-sync refreshes that mirror, and
+# vinix-build-desktop does so automatically before compiling. Set
+# VINIX_QEMU_HOST_SOURCE to another checkout, or to 0 to disable the share.
+#
 # --disk-root instead installs the whole system onto that volume and boots from
 # it, so every write survives a restart rather than only the ones below /root.
 # The volume is then the machine's disk: it is installed once and left alone,
@@ -67,6 +72,19 @@ QEMU_RESOLUTION="${VINIX_QEMU_RESOLUTION:-}"
 # ephemeral boot image. Desktop runs select their own fixed profile paths.
 PACKAGE_STORE="${VINIX_QEMU_PACKAGE_STORE:-$BOOT_DIR/boot.img.packages.tar}"
 PACKAGE_STORE_PORT="${VINIX_QEMU_PACKAGE_STORE_PORT:-18081}"
+# The host checkout is served over the same loopback-only guest forward as the
+# package overlay. A fresh archive is made for every request, so a running VM
+# sees host edits without a QEMU restart. Set this to 0 to disable the share or
+# to another Vinix checkout to share that directory instead.
+HOST_SOURCE_EXPLICIT=0
+if [ "${VINIX_QEMU_HOST_SOURCE+x}" = x ]; then
+    HOST_SOURCE_EXPLICIT=1
+fi
+HOST_SOURCE_ROOT="${VINIX_QEMU_HOST_SOURCE:-$SCRIPT_DIR}"
+HOST_SOURCE_ENABLED=1
+case "$HOST_SOURCE_ROOT" in
+    ''|0) HOST_SOURCE_ENABLED=0 ;;
+esac
 PERSIST_DISK="${VINIX_QEMU_PERSIST_DISK:-$BOOT_DIR/boot.img.root.ext2}"
 PERSIST_SIZE_MB="${VINIX_QEMU_PERSIST_SIZE_MB:-1024}"
 PERSIST_SEED="${VINIX_QEMU_PERSIST_SEED:-}"
@@ -185,6 +203,24 @@ fi
 if [ ! -e "$BOOT_DISK" ] && [ "$KEEP_TEMP_BOOT_DISK" -eq 0 ] &&
    vinix_storage_is_temporary_path "$BOOT_DISK"; then
     CLEANUP_BOOT_DISK=1
+fi
+
+if [ "$HOST_SOURCE_ENABLED" -eq 1 ]; then
+    if [ ! -d "$HOST_SOURCE_ROOT" ]; then
+        echo "ERROR: QEMU host source directory does not exist: $HOST_SOURCE_ROOT" >&2
+        exit 1
+    fi
+    HOST_SOURCE_ROOT="$(cd "$HOST_SOURCE_ROOT" && pwd)"
+    if [ ! -f "$HOST_SOURCE_ROOT/desktop/main.v" ] || \
+       [ ! -f "$HOST_SOURCE_ROOT/third_party/ui2/v.mod" ] || \
+       ! command -v git >/dev/null 2>&1 || \
+       ! git -C "$HOST_SOURCE_ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        if [ "$HOST_SOURCE_EXPLICIT" -eq 1 ]; then
+            echo "ERROR: QEMU host source is not a complete Git checkout: $HOST_SOURCE_ROOT" >&2
+            exit 1
+        fi
+        HOST_SOURCE_ENABLED=0
+    fi
 fi
 
 if [ "$GUEST_INIT_REQUESTED" -eq 1 ] && [ -z "$GUEST_INIT" ]; then
@@ -741,7 +777,8 @@ PACKAGE_SERVER_READY="$PACKAGE_RUNTIME_DIR/server.ready"
 PACKAGE_SERVER_LOG="$PACKAGE_RUNTIME_DIR/server.log"
 PACKAGE_BASE_FILES_RAW="$PACKAGE_RUNTIME_DIR/base-files.raw"
 mkdir -p "$PACKAGE_RUNTIME_ROOT/etc/vinix-pkg" "$PACKAGE_RUNTIME_ROOT/root" \
-    "$PACKAGE_RUNTIME_ROOT/usr/bin" "$PACKAGE_RUNTIME_ROOT/usr/libexec"
+    "$PACKAGE_RUNTIME_ROOT/etc/vinix" "$PACKAGE_RUNTIME_ROOT/usr/bin" \
+    "$PACKAGE_RUNTIME_ROOT/usr/libexec"
 
 # Tests may replace PID 1 without copying and rewriting a multi-gigabyte base
 # image. Limine loads this per-run module last, so the override exists only in
@@ -842,7 +879,7 @@ sed -e 's#^\./##' -e 's#/$##' -e '/^\.$/d' -e '/^$/d' \
 # These parent directories belong to the injected runtime module. Treating
 # them as part of the immutable base prevents recursive tar from pulling the
 # control files themselves into an installed-package overlay.
-printf '%s\n' etc/vinix-pkg usr/bin usr/libexec \
+printf '%s\n' etc/vinix etc/vinix-pkg usr/bin usr/libexec \
     >> "$PACKAGE_RUNTIME_ROOT/etc/vinix-pkg/base-files"
 LC_ALL=C sort -u -o "$PACKAGE_RUNTIME_ROOT/etc/vinix-pkg/base-files" \
     "$PACKAGE_RUNTIME_ROOT/etc/vinix-pkg/base-files"
@@ -852,6 +889,25 @@ install -m755 "$SCRIPT_DIR/build-support/vinix-pkg-wrapper" \
     "$PACKAGE_RUNTIME_ROOT/usr/bin/pkg"
 install -m755 "$SCRIPT_DIR/build-support/vinix-persist-packages" \
     "$PACKAGE_RUNTIME_ROOT/usr/libexec/vinix-persist-packages"
+install -m755 "$SCRIPT_DIR/build-support/vinix-host-sync" \
+    "$PACKAGE_RUNTIME_ROOT/usr/bin/vinix-host-sync"
+install -m755 "$SCRIPT_DIR/build-support/vinix-desktop-build" \
+    "$PACKAGE_RUNTIME_ROOT/usr/bin/vinix-desktop-build"
+install -m755 "$SCRIPT_DIR/build-support/vinix-build-desktop" \
+    "$PACKAGE_RUNTIME_ROOT/usr/bin/vinix-build-desktop"
+printf '%s\n' \
+    etc/vinix/qemu-host-source-url \
+    usr/bin/vinix-host-sync \
+    usr/bin/vinix-desktop-build \
+    usr/bin/vinix-build-desktop \
+    >> "$PACKAGE_RUNTIME_ROOT/etc/vinix-pkg/base-files"
+LC_ALL=C sort -u -o "$PACKAGE_RUNTIME_ROOT/etc/vinix-pkg/base-files" \
+    "$PACKAGE_RUNTIME_ROOT/etc/vinix-pkg/base-files"
+: > "$PACKAGE_RUNTIME_ROOT/etc/vinix/qemu-host-source-url"
+if [ "$HOST_SOURCE_ENABLED" -eq 1 ] && [ "$VIRTIO_GPU" -ne 2 ]; then
+    printf 'http://10.0.2.100:%s\n' "$PACKAGE_STORE_PORT" \
+        > "$PACKAGE_RUNTIME_ROOT/etc/vinix/qemu-host-source-url"
+fi
 # VINIX_QEMU_PACKAGE_PERSIST=0 leaves the store address out, which is how the
 # package frontend already recognises a run that does not keep its packages.
 # Saving a browser-sized overlay costs more than the install it follows.
@@ -890,9 +946,15 @@ else
         echo "ERROR: python3 is required for QEMU package persistence" >&2
         exit 1
     fi
+    SOURCE_SERVER_ARGS=()
+    if [ "$HOST_SOURCE_ENABLED" -eq 1 ]; then
+        SOURCE_SERVER_ARGS=(--source-root "$HOST_SOURCE_ROOT" \
+            --source-extra third_party/ui2)
+    fi
     python3 "$SCRIPT_DIR/tools/qemu-package-store.py" \
         --store "$PACKAGE_STORE" --port "$PACKAGE_STORE_PORT" \
-        --ready-file "$PACKAGE_SERVER_READY" >"$PACKAGE_SERVER_LOG" 2>&1 &
+        --ready-file "$PACKAGE_SERVER_READY" "${SOURCE_SERVER_ARGS[@]}" \
+        >"$PACKAGE_SERVER_LOG" 2>&1 &
     PACKAGE_SERVER_PID=$!
     for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
         [ -s "$PACKAGE_SERVER_READY" ] && break
@@ -908,6 +970,9 @@ else
     fi
     NETWORK_FLAGS="-netdev user,id=net0,guestfwd=tcp:10.0.2.100:${PACKAGE_STORE_PORT}-tcp:127.0.0.1:${PACKAGE_STORE_PORT} -device virtio-net-device,netdev=net0,mac=52:54:00:12:34:56"
     echo "==> Package installs persist in: $PACKAGE_STORE"
+    if [ "$HOST_SOURCE_ENABLED" -eq 1 ]; then
+        echo "==> Host sources: $HOST_SOURCE_ROOT -> /mnt/host/vinix"
+    fi
 fi
 echo "==> Starting QEMU (Ctrl-A X to quit)..."
 
