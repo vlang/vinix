@@ -77,6 +77,11 @@ mut:
 	activity_icon   AppIcon
 	calculator_icon AppIcon
 	vspace_icon     AppIcon
+	editor_icon     AppIcon
+	files_icon      AppIcon
+	clock_icon      AppIcon
+	calendar_icon   AppIcon
+	capture_icon    AppIcon
 	// PNG resources loaded lazily for installed native UI2 applications.
 	native_asset_icons map[string]&AppIcon
 	windows            []Window // painting order; the last entry is on top

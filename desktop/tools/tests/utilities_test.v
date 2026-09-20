@@ -576,6 +576,7 @@ fn test_terminal_can_edit_a_file_with_vim_over_its_real_pty() {
 fn test_available_utility_applications_and_shortcut_layouts() {
 	assert available_apps.len == 22
 	assert available_apps[0].process_name == 'vinix-files'
+	assert available_apps[0].icon == 'asset:files'
 	assert available_apps[1].title == 'Firefox'
 	assert available_apps[1].exclusive_command == ''
 	assert available_apps[1].process_name == 'vinix-firefox'
@@ -592,6 +593,9 @@ fn test_available_utility_applications_and_shortcut_layouts() {
 	assert available_apps[5].title == 'Activity Monitor'
 	assert available_apps[5].process_name == 'vinix-activity'
 	assert available_apps[5].icon == 'asset:activity'
+	assert available_apps[6].icon == 'asset:editor'
+	assert available_apps[7].icon == 'asset:calendar'
+	assert available_apps[8].icon == 'asset:clock'
 	assert available_apps[9].title == 'Minecraft'
 	assert available_apps[9].process_name == 'vinix-minecraft'
 	assert available_apps[9].icon == 'asset:minecraft'
@@ -619,7 +623,7 @@ fn test_available_utility_applications_and_shortcut_layouts() {
 	assert available_apps[13].height == blender_window_height + default_title_height
 	assert available_apps[14].title == capture_app_title
 	assert available_apps[14].process_name == 'vinix-capture'
-	assert available_apps[14].icon == 'builtin:camera'
+	assert available_apps[14].icon == 'asset:capture'
 	assert available_apps[14].polling
 	assert available_apps[13].keyboard && available_apps[13].polling
 	assert available_apps[13].pointer

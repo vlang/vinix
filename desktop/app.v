@@ -70,7 +70,7 @@ const app_shortcut_actions = ['shortcut.0', 'shortcut.1', 'shortcut.2', 'shortcu
 const available_apps = [
 	AppFactory{
 		title: 'Files'
-		icon: 'builtin:folder'
+		icon: 'asset:files'
 		width: 460
 		height: 360
 		process_name: 'vinix-files'
@@ -133,7 +133,7 @@ const available_apps = [
 	},
 	AppFactory{
 		title: 'Text Editor'
-		icon: 'builtin:editor'
+		icon: 'asset:editor'
 		width: 700
 		height: 500
 		process_name: 'vinix-editor'
@@ -142,7 +142,7 @@ const available_apps = [
 	},
 	AppFactory{
 		title: 'Calendar'
-		icon: 'builtin:calendar'
+		icon: 'asset:calendar'
 		width: 640
 		height: 500
 		process_name: 'vinix-calendar'
@@ -150,7 +150,7 @@ const available_apps = [
 	},
 	AppFactory{
 		title: 'Clock'
-		icon: 'builtin:clock'
+		icon: 'asset:clock'
 		width: 560
 		height: 410
 		process_name: 'vinix-clock'
@@ -216,7 +216,7 @@ const available_apps = [
 	},
 	AppFactory{
 		title: capture_app_title
-		icon: 'builtin:camera'
+		icon: 'asset:capture'
 		width: 560
 		height: 430
 		process_name: 'vinix-capture'

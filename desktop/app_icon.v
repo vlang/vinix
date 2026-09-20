@@ -268,6 +268,11 @@ fn (mut d Desktop) load_app_icons() {
 	d.activity_icon = load_app_icon('activity')
 	d.calculator_icon = load_app_icon('calculator')
 	d.vspace_icon = load_app_icon('vspace')
+	d.editor_icon = load_app_icon('editor')
+	d.files_icon = load_app_icon('files')
+	d.clock_icon = load_app_icon('clock')
+	d.calendar_icon = load_app_icon('calendar')
+	d.capture_icon = load_app_icon('capture')
 }
 
 fn (d &Desktop) bundled_app_icon(path string) &AppIcon {
@@ -281,6 +286,11 @@ fn (d &Desktop) bundled_app_icon(path string) &AppIcon {
 		'asset:activity' { return &d.activity_icon }
 		'asset:calculator' { return &d.calculator_icon }
 		'asset:vspace' { return &d.vspace_icon }
+		'asset:editor' { return &d.editor_icon }
+		'asset:files' { return &d.files_icon }
+		'asset:clock' { return &d.clock_icon }
+		'asset:calendar' { return &d.calendar_icon }
+		'asset:capture' { return &d.capture_icon }
 		else { return unsafe { nil } }
 	}
 }
