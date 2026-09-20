@@ -41,29 +41,16 @@ if [ -n "${VINIX_DESKTOP_TEST_STAGED_SOURCE:-}" ]; then
 	cp "$last/main.v" "$VINIX_DESKTOP_TEST_STAGED_SOURCE"
 fi
 EOF
-cat > "$work/bin/gcc" <<'EOF'
+cat > "$work/bin/tcc" <<'EOF'
 #!/bin/sh
-[ -z "${VINIX_DESKTOP_TEST_GCC_ARGS:-}" ] || printf '%s\n' "$*" > "$VINIX_DESKTOP_TEST_GCC_ARGS"
-while [ "$#" -gt 0 ]; do
-	if [ "$1" = -o ]; then
-		printf '#!/bin/sh\nexit 0\n' > "$2"
-		chmod 755 "$2"
-		exit 0
-	fi
-	shift
-done
+echo 'test TCC must be driven through V' >&2
 exit 1
-EOF
-cat > "$work/bin/objcopy" <<'EOF'
-#!/bin/sh
-printf '%s\n' "$*" > "$VINIX_DESKTOP_TEST_OBJCOPY_ARGS"
 EOF
 cat > "$work/bin/vinix-host-sync" <<'EOF'
 #!/bin/sh
 : > "$VINIX_DESKTOP_TEST_SYNCED"
 EOF
-chmod 755 "$work/bin/v" "$work/bin/gcc"
-chmod 755 "$work/bin/objcopy"
+chmod 755 "$work/bin/v" "$work/bin/tcc"
 chmod 755 "$work/bin/vinix-host-sync"
 
 output="$(
@@ -138,19 +125,18 @@ VINIX_DESKTOP_SYSTEM_DEV="$work/system" \
 VINIX_DESKTOP_OUTPUT="$work/vinix-desktop" \
 VINIX_DESKTOP_TEST_SYNCED="$work/synced" \
 VINIX_DESKTOP_TEST_V_ARGS="$work/v-args" \
-VINIX_DESKTOP_TEST_GCC_ARGS="$work/gcc-args" \
-VINIX_DESKTOP_TEST_OBJCOPY_ARGS="$work/objcopy-args" \
 VINIX_DESKTOP_TEST_STAGED_SOURCE="$work/staged-main.v" \
 	"$repo/build-support/vinix-desktop-build" --no-reload >/dev/null
 test -f "$work/synced"
 grep -F "$host|$host/third_party" "$work/v-args" >/dev/null
-grep -F -- '-d glibc' "$work/v-args" >/dev/null
+grep -F -- '-cc tcc' "$work/v-args" >/dev/null
+grep -F -- '-no-retry-compilation' "$work/v-args" >/dev/null
+grep -F -- '-cflags -I/usr/include' "$work/v-args" >/dev/null
 grep -F '/desktop' "$work/v-args" >/dev/null
-grep -F "$host/desktop/execinfo_compat.c" "$work/gcc-args" >/dev/null
-grep -F -- '-lgcc_eh' "$work/gcc-args" >/dev/null
-grep -F -- '--weaken-symbol=backtrace ' "$work/objcopy-args" >/dev/null
-grep -F -- '--weaken-symbol=backtrace_symbols ' "$work/objcopy-args" >/dev/null
-grep -F -- '--weaken-symbol=backtrace_symbols_fd ' "$work/objcopy-args" >/dev/null
+if grep -Fq -- '-d glibc' "$work/v-args"; then
+	echo "desktop build selected glibc for its musl/TCC output" >&2
+	exit 1
+fi
 grep -Fqx '// SPDX-License-Identifier: GPL-2.0-or-later' "$work/staged-main.v"
 if grep -Fq 'All rights reserved.' "$work/staged-main.v"; then
 	echo "desktop build retained the V3-incompatible redundant preamble" >&2

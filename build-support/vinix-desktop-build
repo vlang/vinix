@@ -112,8 +112,8 @@ command -v v >/dev/null 2>&1 || {
 	echo "vinix-desktop-build: V compiler is not installed" >&2
 	exit 1
 }
-command -v gcc >/dev/null 2>&1 || {
-	echo "vinix-desktop-build: GCC is not installed" >&2
+command -v tcc >/dev/null 2>&1 || {
+	echo "vinix-desktop-build: TCC is not installed" >&2
 	exit 1
 }
 
@@ -124,7 +124,6 @@ cleanup() {
 trap cleanup EXIT HUP INT TERM
 
 module_path=$module_dir
-execinfo_source=
 if [ "$host_source" -eq 1 ]; then
 	# Recreate the two disposable trees used by the host image builder. ui2
 	# needs Vinix's headless bounds bridge, and the hosted calculator model is
@@ -139,49 +138,20 @@ if [ "$host_source" -eq 1 ]; then
 	module_dir=$work_dir/vmodules
 	module_path="$module_dir|$host_repo|$host_repo/third_party"
 fi
-if [ -f "$source_dir/execinfo_compat.c" ]; then
-	execinfo_source=$source_dir/execinfo_compat.c
-elif [ "$host_source" -eq 1 ] && [ -f "$host_repo/desktop/execinfo_compat.c" ]; then
-	execinfo_source=$host_repo/desktop/execinfo_compat.c
-fi
-if [ -n "$execinfo_source" ]; then
-	command -v objcopy >/dev/null 2>&1 || {
-		echo "vinix-desktop-build: objcopy is required for musl backtrace support" >&2
-		exit 1
-	}
-fi
 
-echo "==> Translating Vinix desktop with $(v version)"
-if [ -n "$execinfo_source" ]; then
-	v -new-compiler -no-memory-limit -os linux -arch arm64 -cc gcc -gc none -manualfree \
-		-enable-globals -prod -d glibc -d ui2_headless \
-		-path "@vlib|$module_path|@vmodules|$source_dir" \
-		-o "$work_dir/desktop.c" "$source_dir"
-else
-	v -new-compiler -no-memory-limit -os linux -arch arm64 -cc gcc -gc none -manualfree \
-		-enable-globals -prod -d ui2_headless \
-		-path "@vlib|$module_path|@vmodules|$source_dir" \
-		-o "$work_dir/desktop.c" "$source_dir"
-fi
-
-echo "==> Compiling the native desktop with GCC"
-if [ -n "$execinfo_source" ]; then
-	# V's musl vlib supplies no-op backtrace fallbacks. They are annotated as
-	# weak in V, but the compiler currently installed in the desktop image emits
-	# strong exported definitions. Weaken those exact symbols in the generated
-	# object so the real unwinder below replaces them at the final link.
-	gcc -static -O2 -fno-stack-protector -w -I "$source_dir" \
-		-c "$work_dir/desktop.c" -o "$work_dir/desktop.o"
-	objcopy --weaken-symbol=backtrace \
-		--weaken-symbol=backtrace_symbols \
-		--weaken-symbol=backtrace_symbols_fd "$work_dir/desktop.o"
-	gcc -static -O2 -fno-stack-protector -w -I "$source_dir" \
-		"$work_dir/desktop.o" "$execinfo_source" -lgcc_eh -lm \
-		-o "$work_dir/vinix-desktop"
-else
-	gcc -static -O2 -fno-stack-protector -w -I "$source_dir" \
-		"$work_dir/desktop.c" -lm -o "$work_dir/vinix-desktop"
-fi
+# Let V drive TCC instead of stopping at generated C. Its TCC driver adds the
+# compiler's backtrace runtime and Vinix's arm64 atomic support object; invoking
+# TCC on the C file by hand would omit both pieces. Do not pass -prod here: V's
+# current driver deliberately follows a production TCC attempt with a system-CC
+# pass, while TCC itself does not provide an optimizing production mode. Put
+# musl's public headers first to avoid TCC's bundled stddef.h redeclaring a
+# wchar_t that an earlier musl header already supplied. Disable compiler retry
+# so a future TCC regression fails explicitly instead of silently using GCC.
+echo "==> Building Vinix desktop with $(v version) and TCC"
+v -new-compiler -no-memory-limit -os linux -arch arm64 -cc tcc -gc none -manualfree \
+	-enable-globals -no-retry-compilation -cflags -I/usr/include -d ui2_headless \
+	-path "@vlib|$module_path|@vmodules|$source_dir" \
+	-o "$work_dir/vinix-desktop" "$source_dir"
 chmod 755 "$work_dir/vinix-desktop"
 
 if [ "$reload" -eq 1 ]; then
