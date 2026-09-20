@@ -508,20 +508,14 @@ fn (mut d Desktop) window_element(window_index int) ui2.Element {
 	window_children << divider
 	window_children << body
 	// Arranged windows already fill a desktop-defined region. A normal window
-	// exposes a small piece of chrome above its content for pointer resizing.
+	// retains an invisible lower-right target for pointer resizing, without
+	// adding chrome over the application's surface.
 	if !window.maximized && window.snap == .none_ {
 		grip_size := window_resize_grip_size
-		mut grip_children := frame_elements(1)
-		grip_children << ui2.button_with_image('', '', 'builtin:resize_grip', ui2.rect(0,
-			0, f64(grip_size), f64(grip_size)), ui2.BoxStyle{
-			transparent: true
-		}, ui2.TextStyle{
-			color: theme.glyph_color
-		})
 		window_children << ui2.draggable_view_with_cursor(window.id_resize, ui2.rect(f64(window.width -
 			grip_size), f64(window.height - grip_size), f64(grip_size), f64(grip_size)), ui2.BoxStyle{
-			bg: theme.window_body
-		}, ui2.cursor_resize_nwse, grip_children)
+			transparent: true
+		}, ui2.cursor_resize_nwse, frame_elements(0))
 	}
 	return ui2.view(window.id_frame, window.frame_rect(), ui2.BoxStyle{
 		bg:     background

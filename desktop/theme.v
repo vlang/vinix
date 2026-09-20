@@ -13,9 +13,9 @@ module main
 // theme is known — an AppFactory declares a height in the abstract.
 const default_title_height = 34
 
-// The lower-right corner is window-manager chrome: it remains large enough to
-// grab at either logical scale, while the frame cannot be collapsed past a
-// useful title bar and a small application body.
+// The invisible lower-right resize target remains large enough to grab at
+// either logical scale, while the frame cannot be collapsed past a useful
+// title bar and a small application body.
 const window_resize_grip_size = 18
 const window_min_width = 180
 const window_min_body_height = 96
