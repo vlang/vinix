@@ -616,10 +616,6 @@ sequences above — `dev/console` for PS/2, `aarch64/virtio_input` for QEMU, and
 `c/apple_spi_keyboard.c` for the built-in keyboard on an M1, where Cmd is a key
 someone actually has under a thumb.
 
-Under QEMU on a Mac, `./run-desktop-aarch64.sh --grab-keys` is what lets the
-chord through: macOS keeps Cmd-Tab for its own application switcher until QEMU
-is allowed to capture every key. The price is that Cmd-Q no longer quits QEMU.
-
 It also needs `reboot(2)`. The image's PID 1 supervises the compositor and
 restarts it if it exits, reporting its PID and decoded exit status or fatal
 signal first. Native-application transport failures report the application's

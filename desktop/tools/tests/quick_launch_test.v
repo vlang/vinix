@@ -79,14 +79,12 @@ fn test_quick_launch_filters_only_available_apps_and_moves_selection() {
 	mut desktop := quick_launch_fixture()
 	desktop.toggle_quick_launch()
 	assert desktop.take_switcher_keys('cal') == ''
-	assert desktop.quick_launch_match_count() == 3
+	assert desktop.quick_launch_match_count() == 2
 
 	first := desktop.quick_launch_app_index(0) or { panic('missing first Calculator result') }
 	second := desktop.quick_launch_app_index(1) or { panic('missing second Calculator result') }
-	third := desktop.quick_launch_app_index(2) or { panic('missing third Calculator result') }
 	assert available_apps[first].title == 'Calculator'
-	assert available_apps[second].title == 'Cocoa Calculator'
-	assert available_apps[third].title == 'Wine Calculator'
+	assert available_apps[second].title == 'Wine Calculator'
 
 	assert desktop.take_switcher_keys('\x1b[B') == ''
 	assert desktop.switcher.index == 1

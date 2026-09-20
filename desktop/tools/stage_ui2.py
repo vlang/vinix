@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Create a disposable ui2 module overlay for Vinix headless builds.
 
-The overlay keeps the upstream checkout untouched. It links all upstream
-sources into a generated module tree and adds Vinix's tiny Linux-headless
-`bounds()` bridge, which compile-time `$vml` builders require.
+The overlay keeps the upstream checkout untouched. It links the portable and
+Vinix-relevant sources into a generated module tree and adds Vinix's tiny
+Linux-headless `bounds()` bridge, which compile-time `$vml` builders require.
 
     stage_ui2.py <output-ui2-dir> <source-ui2-dir> <bridge.v>
 """
@@ -14,6 +14,9 @@ import shutil
 import sys
 
 
+EXCLUDED_SUBDIRS = {"appkit"}
+
+
 def symlink_entries(source, destination):
     os.makedirs(destination, exist_ok=True)
     for name in sorted(os.listdir(source)):
@@ -21,13 +24,20 @@ def symlink_entries(source, destination):
                    os.path.join(destination, name))
 
 
-def module_subdirs(manifest):
-    with open(manifest) as handle:
-        text = handle.read()
+def module_subdirs(text):
     match = re.search(r"\bsubdirs\s*:\s*\[([^]]*)\]", text, re.DOTALL)
     if not match:
         return []
     return re.findall(r"['\"]([^'\"]+)['\"]", match.group(1))
+
+
+def filter_manifest_subdirs(text):
+    match = re.search(r"\bsubdirs\s*:\s*\[([^]]*)\]", text, re.DOTALL)
+    if not match:
+        return text
+    kept = [name for name in module_subdirs(text) if name not in EXCLUDED_SUBDIRS]
+    entries = ", ".join("'%s'" % name for name in kept)
+    return text[:match.start(1)] + entries + text[match.end(1):]
 
 
 def main():
@@ -37,10 +47,13 @@ def main():
     manifest = os.path.join(source, "v.mod")
     if not os.path.isfile(manifest):
         sys.exit("%s: ui2 v.mod not found" % source)
+    with open(manifest) as handle:
+        manifest_text = handle.read()
     if os.path.isdir(output):
         shutil.rmtree(output)
     os.makedirs(output)
-    shutil.copyfile(manifest, os.path.join(output, "v.mod"))
+    with open(os.path.join(output, "v.mod"), "w") as handle:
+        handle.write(filter_manifest_subdirs(manifest_text))
 
     # Root-level resources remain available to @VMODROOT paths. V sources live
     # in v.mod's same-module subdirectories; ui/ is expanded so the bridge can
@@ -48,7 +61,9 @@ def main():
     assets = os.path.join(source, "assets")
     if os.path.exists(assets):
         os.symlink(assets, os.path.join(output, "assets"))
-    for subdir in module_subdirs(manifest):
+    for subdir in module_subdirs(manifest_text):
+        if subdir in EXCLUDED_SUBDIRS:
+            continue
         upstream = os.path.join(source, subdir)
         staged = os.path.join(output, subdir)
         if subdir == "ui":

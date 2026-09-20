@@ -132,7 +132,7 @@ fi
 # One immutable multicall image, with the same per-application process names as
 # the aarch64 desktop image.
 for app_name in vinix-files vinix-calculator vinix-terminal vinix-settings \
-    vinix-activity vinix-editor vinix-calendar vinix-clock vinix-cocoa-calculator \
+    vinix-activity vinix-editor vinix-calendar vinix-clock \
     vinix-vspace \
     vinix-minecraft vinix-wine-calculator vinix-wine-notepad vinix-wine-word2010 \
     vinix-capture; do

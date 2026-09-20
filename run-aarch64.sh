@@ -6,11 +6,7 @@
 #                         [--mem=MB]
 #                         [--disk=MB] [--persist[=MB]|--no-persist]
 #                         [--disk-root|--no-disk-root] [--reset-disk]
-#                         [--ephemeral] [--replace] [--grab-keys]
-#
-# --grab-keys hands the whole keyboard to the guest. macOS keeps Cmd-Tab for
-# its own application switcher, so without it the desktop's Cmd-Tab is never
-# seen -- at the price of Cmd-Q no longer quitting QEMU.
+#                         [--ephemeral] [--replace]
 #
 # --replace stops a VM already using the boot disk. Without it a second run
 # refuses, rather than writing into the disk of a running one.
@@ -145,7 +141,6 @@ FAKE_G17=0
 GUEST_INIT="${VINIX_QEMU_GUEST_INIT:-}"
 GUEST_INIT_REQUESTED=0
 REPLACE_RUNNING=0
-GRAB_KEYS=0
 EPHEMERAL_BOOT=0
 PERSIST_ENABLED="${VINIX_QEMU_PERSIST:-1}"
 QEMU_MEM="${VINIX_QEMU_MEM:-2048}"
@@ -167,7 +162,6 @@ for arg in "$@"; do
         --reset-disk)   RESET_DISK=1 ;;
         --ephemeral)  EPHEMERAL_BOOT=1 ;;
         --replace)    REPLACE_RUNNING=1 ;;
-        --grab-keys)  GRAB_KEYS=1 ;;
         --help|-h)
             awk 'NR > 1 && /^#/ { sub(/^# ?/, ""); print; next } NR > 1 { exit }' "$0"
             exit 0
@@ -977,27 +971,15 @@ if [ "$VIRTIO_GPU" -eq 2 ] && [ "$SERIAL_ONLY" -eq 1 ]; then
     echo "ERROR: --virgl needs a GL-capable display; do not combine it with --serial" >&2
     exit 1
 elif [ "$VIRTIO_GPU" -eq 2 ]; then
-    # KekVM's QEMU build provides a Cocoa OpenGL context backed by Metal.
-    # virglrenderer uses that context to execute the guest's Gallium commands.
-    DISPLAY_BACKEND_FLAGS="-display ${QEMU_DISPLAY_BACKEND:-cocoa,gl=core}"
+    # virglrenderer needs a GL-capable host display context to execute the
+    # guest's Gallium commands. Callers may select a specific QEMU backend.
+    DISPLAY_BACKEND_FLAGS="-display ${QEMU_DISPLAY_BACKEND:-default,gl=on}"
 elif [ "$SERIAL_ONLY" -eq 1 ]; then
     # Use -display none (not -nographic) to keep ramfb for framebuffer/GOP
     # while hiding the QEMU window. -nographic removes display devices entirely.
     DISPLAY_BACKEND_FLAGS="-display none"
 elif [ -n "${QEMU_DISPLAY_BACKEND:-}" ]; then
     DISPLAY_BACKEND_FLAGS="-display ${QEMU_DISPLAY_BACKEND}"
-elif [ "$(uname -s)" = "Darwin" ]; then
-    # System chords -- Cmd-Tab above all -- are the host's until QEMU is told
-    # to capture every key, which is what the desktop's own Cmd-Tab needs.
-    COCOA_OPTIONS="${VINIX_QEMU_COCOA_OPTIONS:-}"
-    if [ "$GRAB_KEYS" -eq 1 ]; then
-        COCOA_OPTIONS="${COCOA_OPTIONS:+${COCOA_OPTIONS},}full-grab=on"
-    fi
-    if [ -n "$COCOA_OPTIONS" ]; then
-        DISPLAY_BACKEND_FLAGS="-display cocoa,$COCOA_OPTIONS"
-    else
-        DISPLAY_BACKEND_FLAGS="-display cocoa"
-    fi
 else
     DISPLAY_BACKEND_FLAGS="-display default"
 fi

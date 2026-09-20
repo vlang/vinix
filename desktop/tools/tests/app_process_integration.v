@@ -81,7 +81,7 @@ fn main() {
 	assert available_apps[3].poll_interval_ms == 100
 	assert available_apps[5].poll_interval_ms == 1000
 	assert available_apps[8].poll_interval_ms == 100
-	assert available_apps[10].poll_interval_ms == 0
+	assert available_apps[9].poll_interval_ms == 0
 	assert remote_app_poll_due(50, false, 0, 1_000)
 	assert !remote_app_poll_due(50, true, 1_000, 1_049)
 	assert remote_app_poll_due(50, true, 1_000, 1_050)
@@ -153,7 +153,7 @@ fn main() {
 	free_tree(settings_tree)
 	close_remote(mut settings)
 
-	mut capture := start_remote_app_at(arguments()[0], available_apps[15], mut desktop) or {
+	mut capture := start_remote_app_at(arguments()[0], available_apps[14], mut desktop) or {
 		panic(err)
 	}
 	capture_tree := capture.build(ui2.rect(0, 0, 560, 396)) or { panic(err) }

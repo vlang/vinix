@@ -534,7 +534,7 @@ fn test_terminal_can_edit_a_file_with_vim_over_its_real_pty() {
 }
 
 fn test_available_utility_applications_and_shortcut_layouts() {
-	assert available_apps.len == 20
+	assert available_apps.len == 19
 	assert available_apps[0].process_name == 'vinix-files'
 	assert available_apps[1].title == 'Firefox'
 	assert available_apps[1].exclusive_command == ''
@@ -547,47 +547,46 @@ fn test_available_utility_applications_and_shortcut_layouts() {
 	assert available_apps[3].keyboard && available_apps[3].polling
 	assert available_apps[5].title == 'Activity Monitor'
 	assert available_apps[5].process_name == 'vinix-activity'
-	assert available_apps[9].process_name == 'vinix-cocoa-calculator'
-	assert available_apps[10].title == 'Minecraft'
-	assert available_apps[10].process_name == 'vinix-minecraft'
-	assert available_apps[10].exclusive_command == ''
-	assert available_apps[10].width == 1976
-	assert available_apps[10].height == 1113 + default_title_height
+	assert available_apps[9].title == 'Minecraft'
+	assert available_apps[9].process_name == 'vinix-minecraft'
+	assert available_apps[9].exclusive_command == ''
+	assert available_apps[9].width == 1976
+	assert available_apps[9].height == 1113 + default_title_height
+	assert available_apps[9].keyboard && available_apps[9].polling
+	assert available_apps[9].pointer
+	assert available_apps[10].title == 'Wine Calculator'
+	assert available_apps[10].process_name == 'vinix-wine-calculator'
 	assert available_apps[10].keyboard && available_apps[10].polling
 	assert available_apps[10].pointer
-	assert available_apps[11].title == 'Wine Calculator'
-	assert available_apps[11].process_name == 'vinix-wine-calculator'
+	assert available_apps[11].title == 'Wine Notepad'
+	assert available_apps[11].process_name == 'vinix-wine-notepad'
 	assert available_apps[11].keyboard && available_apps[11].polling
 	assert available_apps[11].pointer
-	assert available_apps[12].title == 'Wine Notepad'
-	assert available_apps[12].process_name == 'vinix-wine-notepad'
+	assert available_apps[12].title == 'Microsoft Word 2013'
+	assert available_apps[12].process_name == 'vinix-wine-word2013'
 	assert available_apps[12].keyboard && available_apps[12].polling
 	assert available_apps[12].pointer
-	assert available_apps[13].title == 'Microsoft Word 2013'
-	assert available_apps[13].process_name == 'vinix-wine-word2013'
+	assert available_apps[13].title == 'Blender'
+	assert available_apps[13].process_name == 'vinix-blender'
+	assert available_apps[13].width == blender_window_width
+	assert available_apps[13].height == blender_window_height + default_title_height
+	assert available_apps[14].title == capture_app_title
+	assert available_apps[14].process_name == 'vinix-capture'
+	assert available_apps[14].icon == 'builtin:camera'
+	assert available_apps[14].polling
 	assert available_apps[13].keyboard && available_apps[13].polling
 	assert available_apps[13].pointer
-	assert available_apps[14].title == 'Blender'
-	assert available_apps[14].process_name == 'vinix-blender'
-	assert available_apps[14].width == blender_window_width
-	assert available_apps[14].height == blender_window_height + default_title_height
-	assert available_apps[15].title == capture_app_title
-	assert available_apps[15].process_name == 'vinix-capture'
-	assert available_apps[15].icon == 'builtin:camera'
-	assert available_apps[15].polling
-	assert available_apps[14].keyboard && available_apps[14].polling
-	assert available_apps[14].pointer
-	assert available_apps[16].title == 'GIMP'
-	assert available_apps[16].process_name == 'vinix-gimp'
-	assert available_apps[16].width == gimp_window_width
-	assert available_apps[16].height == gimp_window_height + default_title_height
-	assert available_apps[16].keyboard && available_apps[16].pointer
-	assert available_apps[16].polling && available_apps[16].poll_interval_ms == 50
-	assert available_apps[17].title == 'VSpace'
-	assert available_apps[17].process_name == 'vinix-vspace'
-	assert available_apps[17].icon == 'builtin:disk'
-	assert available_apps[17].polling && available_apps[17].poll_interval_ms == 33
-	assert !available_apps[17].keyboard && !available_apps[17].pointer
+	assert available_apps[15].title == 'GIMP'
+	assert available_apps[15].process_name == 'vinix-gimp'
+	assert available_apps[15].width == gimp_window_width
+	assert available_apps[15].height == gimp_window_height + default_title_height
+	assert available_apps[15].keyboard && available_apps[15].pointer
+	assert available_apps[15].polling && available_apps[15].poll_interval_ms == 50
+	assert available_apps[16].title == 'VSpace'
+	assert available_apps[16].process_name == 'vinix-vspace'
+	assert available_apps[16].icon == 'builtin:disk'
+	assert available_apps[16].polling && available_apps[16].poll_interval_ms == 33
+	assert !available_apps[16].keyboard && !available_apps[16].pointer
 	assert available_apps[18].title == 'Chromium'
 	assert available_apps[18].process_name == 'vinix-chromium'
 	assert available_apps[18].icon == 'builtin:browser'
@@ -897,7 +896,7 @@ fn test_firefox_uses_the_hosted_x11_window_path() {
 }
 
 fn test_gimp_uses_the_hosted_x11_window_path() {
-	factory := available_apps[16]
+	factory := available_apps[15]
 	assert factory.process_name == 'vinix-gimp'
 	assert factory.exclusive_command == ''
 	assert factory.open != unsafe { nil }
@@ -905,7 +904,7 @@ fn test_gimp_uses_the_hosted_x11_window_path() {
 }
 
 fn test_libreoffice_uses_the_hosted_x11_window_path() {
-	factory := available_apps[18]
+	factory := available_apps[17]
 	assert factory.title == 'LibreOffice'
 	assert factory.process_name == 'vinix-libreoffice'
 	assert factory.exclusive_command == ''

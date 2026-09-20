@@ -293,13 +293,6 @@ APP_SRC="$BUILD_DIR/app-src"
 python3 "$SCRIPT_DIR/desktop/tools/stage_app.py" "$APP_SRC" "$SCRIPT_DIR/desktop" \
     "$SCRIPT_DIR/third_party/ui2/examples/calculator"
 
-# Build the test application as a normal Apple AArch64 Mach-O. A macOS host
-# records standard Cocoa dylib imports; ld64.lld records flat imports elsewhere.
-# The Vinix image contains no Apple framework binaries: its V runtime resolves
-# the narrow AppKit/Objective-C surface used by this application.
-echo "==> Building Cocoa compatibility fixture..."
-"$SCRIPT_DIR/compat/macos/apps/Calculator/build.sh" "$BUILD_DIR/Calculator.app"
-
 # ── V -> C ──
 # -gc none because Vinix has no Boehm GC, and -d ui2_headless so importing ui2
 # brings in its declarative core without its gg/Sokol backend.
@@ -937,18 +930,12 @@ chmod +x "$STAGING/sbin/init" "$STAGING/usr/bin/vinix-desktop" \
 # distinct names and truthful per-app accounting without storing a copy of the
 # same static executable for every native application in the initramfs.
 for app_name in vinix-files vinix-calculator vinix-terminal vinix-settings \
-    vinix-activity vinix-editor vinix-calendar vinix-clock vinix-cocoa-calculator \
+    vinix-activity vinix-editor vinix-calendar vinix-clock \
     vinix-vspace \
     vinix-firefox vinix-chromium vinix-gimp vinix-libreoffice vinix-minecraft vinix-wine-calculator vinix-wine-notepad \
     vinix-wine-word2013 vinix-blender vinix-capture; do
     ln -sf vinix-desktop "$STAGING/usr/bin/$app_name"
 done
-
-mkdir -p "$STAGING/Applications/Calculator.app/Contents/MacOS"
-install -m644 "$BUILD_DIR/Calculator.app/Contents/Info.plist" \
-    "$STAGING/Applications/Calculator.app/Contents/Info.plist"
-install -m755 "$BUILD_DIR/Calculator.app/Contents/MacOS/Calculator" \
-    "$STAGING/Applications/Calculator.app/Contents/MacOS/Calculator"
 
 # The bundle is mutable command-line input, so do not let a previous selection
 # survive a cached-layer build that no longer asks for it.
@@ -990,11 +977,6 @@ cp -L "$APP_SRC"/*.v "$APP_SRC"/*.vml "$APP_SRC"/*.h \
     "$SCRIPT_DIR/desktop/README.md" "$DESKTOP_DEV_ROOT/desktop/"
 mkdir -p "$DESKTOP_DEV_ROOT/vmodules/ui2"
 cp -aL "$UI2_MODULES/ui2/." "$DESKTOP_DEV_ROOT/vmodules/ui2/"
-mkdir -p "$DESKTOP_DEV_ROOT/vmodules/compat/macos"
-cp -aL "$SCRIPT_DIR/compat/macos/bundle" \
-    "$DESKTOP_DEV_ROOT/vmodules/compat/macos/bundle"
-cp -aL "$SCRIPT_DIR/compat/macos/macho" \
-    "$DESKTOP_DEV_ROOT/vmodules/compat/macos/macho"
 if [ ! -f "$DESKTOP_DEV_ROOT/desktop/main.v" ] || \
    [ ! -f "$DESKTOP_DEV_ROOT/vmodules/ui2/v.mod" ]; then
     echo "ERROR: system desktop development tree is incomplete" >&2
@@ -1054,11 +1036,8 @@ CONTENT_KEY_INPUTS=(
     "$BUILD_DIR/vinix-desktop"
     "$GPU_CONTENT_KEY_INPUT"
     "$BUILD_DIR/wifi-ctl"
-    "$BUILD_DIR/Calculator.app"
     "$BUILD_DIR/wallpapers"
     "$SCRIPT_DIR/desktop"
-    "$SCRIPT_DIR/compat/macos/bundle"
-    "$SCRIPT_DIR/compat/macos/macho"
     "$SCRIPT_DIR/build-support/vinix-pkg"
     "$SCRIPT_DIR/build-support/vinix-desktop-build"
     "$SCRIPT_DIR/build-support/vinix-desktop-reload"

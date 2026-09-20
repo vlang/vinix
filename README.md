@@ -560,16 +560,6 @@ is requested. The GTK smoke test first checks that the base image is GTK-free,
 installs it, then opens both `gtk3-demo` and `gtk3-widget-factory` against the
 Vinix Xorg server. Gnumeric is likewise absent until explicitly installed.
 
-### macOS compatibility on aarch64
-
-The desktop image includes an experimental all-V Mach-O and Objective-C/AppKit
-compatibility runtime. Its **Cocoa Calculator** test application is compiled
-from Objective-C as a normal AArch64 Mach-O bundle, loaded in userspace, and
-drawn by the Vinix compositor without shipping Apple frameworks. This is an
-initial compatibility slice, not general macOS application support; the exact
-supported ABI and reproducible host/Vinix tests are documented in
-[`compat/macos/README.md`](compat/macos/README.md).
-
 ### Firefox on aarch64
 
 Firefox ESR can run as a stock Alpine musl application on Vinix's existing
@@ -750,8 +740,9 @@ run-virgl-smoke
 run-firefox
 ```
 
-`--virgl` selects KekVM's `.tools/qemu-virgl` binary and a Cocoa core-OpenGL
-display. Override its location with `VINIX_VIRGL_QEMU`. The simpler
+`--virgl` selects KekVM's `.tools/qemu-virgl` binary and requests a GL-enabled
+display. Override its location with `VINIX_VIRGL_QEMU` or select a QEMU display
+backend with `QEMU_DISPLAY_BACKEND`. The simpler
 `--virtio-gpu` option exposes the unaccelerated MMIO device and is useful for
 transport probing, but it does not create a render node. KekVM's compact QEMU
 currently omits libslirp, so this launch mode is offline; Firefox can exercise
@@ -774,7 +765,7 @@ to the checkout used to assemble the desktop image:
 ./build-hyprland-aarch64.sh
 # copy build-aarch64-hyprland/staging to the macOS checkout when needed
 ./build-desktop-aarch64.sh
-./run-hyprland-aarch64.sh --no-build --grab-keys
+./run-hyprland-aarch64.sh --no-build
 ```
 
 `run-hyprland-aarch64.sh` selects Hyprland for that boot; the ordinary desktop

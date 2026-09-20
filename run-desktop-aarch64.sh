@@ -17,9 +17,7 @@
 #   --help
 #
 # Anything else is passed through to run-aarch64.sh, which is what actually
-# starts QEMU: --mem=MB, --serial, --virtio-gpu, --virgl, --grab-keys. The
-# last of those is what Cmd-Tab needs on a Mac: macOS keeps the chord for its
-# own application switcher unless QEMU is allowed to capture every key.
+# starts QEMU: --mem=MB, --serial, --virtio-gpu, and --virgl.
 #
 # The two builds are done here rather than left to run-aarch64.sh so that a
 # failure in either is reported plainly, and so the kernel build gets a V it
@@ -51,10 +49,6 @@ export VINIX_QEMU_MEM="${VINIX_QEMU_MEM:-8192}"
 # giving it a native 2048x1536 framebuffer without changing the standard
 # shell runner.
 export VINIX_QEMU_RESOLUTION="${VINIX_QEMU_RESOLUTION:-2048x1536x32}"
-# Do not scale the guest display: the custom OVMF below exposes 2048x1536 to
-# Limine and the kernel. On Retina Macs this naturally occupies 1024x768
-# points while retaining all 2048x1536 guest pixels.
-export VINIX_QEMU_COCOA_OPTIONS="${VINIX_QEMU_COCOA_OPTIONS:-zoom-to-fit=off}"
 if [ -z "${VINIX_OVMF_CODE:-}" ]; then
     export VINIX_OVMF_CODE="$SCRIPT_DIR/boot-image/edk2-aarch64-code-2048x1536.fd"
     if [ ! -f "$VINIX_OVMF_CODE" ]; then
