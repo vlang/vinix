@@ -897,6 +897,21 @@ fn (mut d Desktop) draw_button(el ui2.Element, x int, y int, w int, h int) {
 	if el.text.len == 0 {
 		return
 	}
+	// The compact Roboto files bundled by ui2 have no directional-arrow
+	// codepoints. Treat a button whose whole caption is one of those symbols as
+	// an icon, so controls such as gg2048's movement pad do not become four
+	// empty Catalina bezels.
+	arrow_glyph := match el.text {
+		'←' { 'builtin:arrow_left' }
+		'↑' { 'builtin:arrow_up' }
+		'→' { 'builtin:arrow_right' }
+		'↓' { 'builtin:arrow_down' }
+		else { '' }
+	}
+	if arrow_glyph.len > 0 {
+		d.draw_builtin_glyph(arrow_glyph, x, y, w, h, text_color)
+		return
+	}
 	face := d.face_for(el.text_style)
 	inner := if el.text_style.align == .center && el.image_path.len == 0 { w } else { text_w }
 	text, text_owned := face.truncate(el.text, inner)
@@ -976,6 +991,30 @@ fn (mut d Desktop) draw_builtin_glyph(path string, x int, y int, w int, h int, c
 		'traffic_close' {
 			d.canvas.draw_line(cx - 2, cy - 3, cx + 3, cy + 2, color, 1)
 			d.canvas.draw_line(cx + 3, cy - 3, cx - 2, cy + 2, color, 1)
+		}
+		'arrow_left' {
+			head := if half > 2 { half * 2 / 3 } else { half }
+			d.canvas.draw_line(cx - half, cy, cx + half, cy, color, 1)
+			d.canvas.draw_line(cx - half, cy, cx - half + head, cy - head, color, 1)
+			d.canvas.draw_line(cx - half, cy, cx - half + head, cy + head, color, 1)
+		}
+		'arrow_up' {
+			head := if half > 2 { half * 2 / 3 } else { half }
+			d.canvas.draw_line(cx, cy - half, cx, cy + half, color, 1)
+			d.canvas.draw_line(cx, cy - half, cx - head, cy - half + head, color, 1)
+			d.canvas.draw_line(cx, cy - half, cx + head, cy - half + head, color, 1)
+		}
+		'arrow_right' {
+			head := if half > 2 { half * 2 / 3 } else { half }
+			d.canvas.draw_line(cx - half, cy, cx + half, cy, color, 1)
+			d.canvas.draw_line(cx + half, cy, cx + half - head, cy - head, color, 1)
+			d.canvas.draw_line(cx + half, cy, cx + half - head, cy + head, color, 1)
+		}
+		'arrow_down' {
+			head := if half > 2 { half * 2 / 3 } else { half }
+			d.canvas.draw_line(cx, cy - half, cx, cy + half, color, 1)
+			d.canvas.draw_line(cx, cy + half, cx - head, cy + half - head, color, 1)
+			d.canvas.draw_line(cx, cy + half, cx + head, cy + half - head, color, 1)
 		}
 
 		// Application and file icons. These are filled shapes rather than

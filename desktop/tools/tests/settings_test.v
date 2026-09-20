@@ -494,6 +494,64 @@ fn test_catalina_native_button_rasterizes_curves_and_gradients_at_hidpi_scale() 
 	}
 }
 
+fn test_catalina_directional_button_captions_are_visible_without_font_glyphs() {
+	mut desktop := Desktop{
+		canvas:   new_scaled_canvas(220, 44, 220, 44, 1)
+		settings: Settings{
+			theme: .macos
+		}
+	}
+	defer {
+		unsafe { free(desktop.canvas.pixels) }
+	}
+	desktop.canvas.clear(theme_macos.window_body)
+	for index, caption in ['←', '↑', '→', '↓'] {
+		x := 4 + index * 54
+		button := ui2.Element{
+			kind:         .button
+			id:           'direction'
+			text:         caption
+			frame:        ui2.rect(f64(x), 8, 48, 28)
+			native_style: true
+		}
+		desktop.draw_button(button, x, 8, 48, 28)
+		mut ink := 0
+		for y := 8; y < 36; y++ {
+			for sample_x := x; sample_x < x + 48; sample_x++ {
+				if unsafe { desktop.canvas.pixels[y * desktop.canvas.stride + sample_x] } == catalina_button_text {
+					ink++
+				}
+			}
+		}
+		assert ink >= 12
+	}
+	desktop.hover = 'direction'
+	desktop.buttons = button_left
+	pressed := ui2.Element{
+		kind:         .button
+		id:           'direction'
+		text:         '↑'
+		native_style: true
+	}
+	desktop.draw_button(pressed, 4, 8, 48, 28)
+	mut pressed_ink := 0
+	for y := 8; y < 36; y++ {
+		for x := 4; x < 52; x++ {
+			if unsafe { desktop.canvas.pixels[y * desktop.canvas.stride + x] } == app_on_accent {
+				pressed_ink++
+			}
+		}
+	}
+	assert pressed_ink >= 12
+}
+
+fn test_2048_example_window_has_room_for_its_footer() {
+	game := ui2_example_named('gg2048') or { panic('missing 2048 example') }
+	ordinary := ui2_example_named('counter') or { panic('missing counter example') }
+	assert game.height == ui2_2048_window_height
+	assert game.height > ordinary.height
+}
+
 fn test_catalina_chrome_renders_measured_rows() {
 	mut desktop := Desktop{
 		canvas: new_scaled_canvas(640, 480, 640, 480, 1)

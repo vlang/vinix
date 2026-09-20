@@ -9,6 +9,7 @@ import ui2
 const ui2_example_action_prefix = 'ui2.example.launch.'
 const ui2_example_process_prefix = 'vinix-ui2-'
 const ui2_examples_per_page = 16
+const ui2_2048_window_height = 700
 
 const ui2_example_names = [
 	'accent_color',
@@ -122,7 +123,10 @@ fn ui2_example_named(name string) ?AppFactory {
 				title:            ui2_example_title(name)
 				icon:             'builtin:calculator'
 				width:            800
-				height:           634
+				// gg2048's footer ends at content y=656. Its frame needs room
+				// for that plus the title bar; the generic example height clips
+				// both the status and New game captions.
+				height:           if name == 'gg2048' { ui2_2048_window_height } else { 634 }
 				process_name:     ui2_example_process_prefix + name
 				polling:          true
 				poll_interval_ms: 33
