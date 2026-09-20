@@ -493,23 +493,25 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 	}
 
 	t.self = voidptr(t)
-	// current_thread()'s `mov ret, gs:[8]` trick needs GS_BASE to be this
-	// thread's own pointer whenever kernel code runs on its behalf.
-	// scheduler_isr's cs==user_code_seg branch restores KERNEL_GS_BASE from
-	// current_thread.gs_base before resuming a user thread, on the
-	// understanding that swapgs will later swap it back in as GS_BASE -- so
-	// this needs the same value new_kernel_thread already gives its threads
-	// (t.gs_base = u64(voidptr(t))), not 0. Left at 0, this thread's very
-	// first syscall entry swapgs's GS_BASE to 0, and every current_thread()
-	// call made from inside that syscall (signal dispatch, syscall_leave,
-	// ...) dereferences gs:[8] as address 8, reading and corrupting
-	// unrelated memory instead of this thread's own state -- confirmed live
-	// with GDB: a fresh process's first syscall (arch_prctl, from musl's own
-	// TLS setup) wrote its stale, thread-creation-time rsp onto its own
-	// live stack at an unrelated offset, clobbering a return address and
-	// crashing into it once execution reached it. fs_base is unrelated
-	// (userspace TLS, set by the process's own arch_prctl) and stays 0.
-	t.gs_base = u64(voidptr(t))
+	// gs_base here is the value scheduler_isr loads into KERNEL_GS_BASE
+	// right before returning to userspace (cs == user_code_seg branch),
+	// which becomes ACTIVE GS_BASE the instant that return's own swapgs
+	// executes -- i.e. this is what userspace itself sees in GS, not
+	// anything the kernel-mode current_thread() trick reads. That trick
+	// depends on a *different* value: scheduler_isr unconditionally loads
+	// GS_BASE = current_thread before its swapgs (regardless of gs_base),
+	// which swapgs moves into KERNEL_GS_BASE for the return -- and
+	// syscall_entry's own swapgs, the literal first instruction on entry
+	// (kernel/syscall/syscall.v), swaps that back into GS_BASE before any
+	// current_thread() call can run. Traced both paths end to end;
+	// gs_base structurally cannot reach either one. 0 is correct here the
+	// same way fs_base is: no userspace convention on this port uses GS
+	// for anything, matching new_kernel_thread's own
+	// t.gs_base = u64(voidptr(t)) only because kernel threads never
+	// return to userspace at all -- there is no "user GS" to speak of, so
+	// that slot is free to double as the current_thread() value it never
+	// actually gets read as here.
+	t.gs_base = u64(0)
 	t.fs_base = u64(0)
 
 	// Set up FPU control word and MXCSR as defined in the sysv ABI
