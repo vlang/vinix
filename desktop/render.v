@@ -521,19 +521,28 @@ fn shadow_for(color u32) u32 {
 }
 
 fn (mut d Desktop) draw_button(el ui2.Element, x int, y int, w int, h int) {
+	// The traffic lights are only twelve logical pixels across. At 200% scale,
+	// rendering their rounded rectangle through logical pixels turns the arc
+	// into enlarged square steps. Draw this one tiny, circular control at the
+	// backing-store resolution instead.
+	is_title_button := el.id.ends_with('.close') || el.id.ends_with('.minimize')
+		|| el.id.ends_with('.maximize')
+	is_traffic_light := d.theme().button_look == .traffic && is_title_button
 	if !el.box.transparent {
 		radius := int(el.box.radius)
-		if radius > 0 {
-			d.canvas.fill_round_rect(x, y, w, h, radius, el.box.bg)
+		if is_traffic_light && d.canvas.scale > 1 {
+			d.canvas.fill_stroke_hidpi_circle(x, y, w, h, 1, el.box.bg, el.box.border_color)
 		} else {
-			d.canvas.fill_rect(x, y, w, h, el.box.bg)
+			if radius > 0 {
+				d.canvas.fill_round_rect(x, y, w, h, radius, el.box.bg)
+			} else {
+				d.canvas.fill_rect(x, y, w, h, el.box.bg)
+			}
 		}
 		// Catalina's traffic lights have a one-pixel role-coloured ring. BoxStyle
 		// carries it on the local title buttons; keep this renderer deliberately
 		// to the uniform border ui2 can express as one rounded outline.
-		is_title_button := el.id.ends_with('.close') || el.id.ends_with('.minimize')
-			|| el.id.ends_with('.maximize')
-		if is_title_button && el.box.border_left == 1 && el.box.border_top == 1 && el.box.border_right == 1
+		if !(is_traffic_light && d.canvas.scale > 1) && is_title_button && el.box.border_left == 1 && el.box.border_top == 1 && el.box.border_right == 1
 			&& el.box.border_bottom == 1 {
 			d.canvas.stroke_round_rect(x, y, w, h, radius, el.box.border_color, 255)
 		}

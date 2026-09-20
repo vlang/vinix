@@ -492,6 +492,46 @@ fn (mut c Canvas) stroke_round_rect(x int, y int, w int, h int, radius int, colo
 	}
 }
 
+// fill_stroke_hidpi_circle draws the small circular controls directly on the
+// native pixel grid.  Most chrome is deliberately made from logical pixels so
+// its dimensions remain stable at either display scale.  A 12-point traffic
+// light is different: expanding its 1x edge into 2x2 blocks makes the curve
+// visibly stepped on a HiDPI panel.  Sampling every physical pixel keeps the
+// same logical diameter while giving the disc and its ring a proper smooth
+// edge.
+fn (mut c Canvas) fill_stroke_hidpi_circle(x int, y int, w int, h int, border_width int, fill u32, edge u32) {
+	if c.scale <= 1 || w <= 0 || h <= 0 {
+		return
+	}
+	diameter := if w < h { w } else { h }
+	physical_diameter := diameter * c.scale
+	if physical_diameter <= 0 {
+		return
+	}
+	center_x := x * c.scale + w * c.scale / 2
+	center_y := y * c.scale + h * c.scale / 2
+	radius := f64(physical_diameter) / 2
+	inner_radius := radius - f64(border_width * c.scale)
+	left := center_x - physical_diameter / 2
+	top := center_y - physical_diameter / 2
+
+	for py := top; py < top + physical_diameter; py++ {
+		for px := left; px < left + physical_diameter; px++ {
+			outer := corner_coverage(f64(px) + 0.5, f64(py) + 0.5, f64(center_x), f64(center_y), radius)
+			if outer == 0 {
+				continue
+			}
+			c.blend_physical_pixel(px, py, fill, outer)
+			if inner_radius > 0 {
+				inner := corner_coverage(f64(px) + 0.5, f64(py) + 0.5, f64(center_x), f64(center_y), inner_radius)
+				if outer > inner {
+					c.blend_physical_pixel(px, py, edge, outer - inner)
+				}
+			}
+		}
+	}
+}
+
 // drop_shadow stacks a few translucent rounded rects behind a window.
 // Layering cheap shapes reads as a soft edge without the cost of a real blur.
 fn (mut c Canvas) drop_shadow(x int, y int, w int, h int, radius int, spread int, alpha u32) {

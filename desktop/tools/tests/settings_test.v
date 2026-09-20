@@ -239,6 +239,39 @@ fn test_200_percent_text_uses_native_resolution_glyphs() {
 	assert native_edge
 }
 
+fn test_200_percent_traffic_lights_use_native_resolution_circles() {
+	mut desktop := Desktop{
+		canvas:   new_scaled_canvas(40, 20, 80, 40, desktop_scale_200)
+		settings: Settings{
+			theme:       .macos
+			button_side: .left
+		}
+	}
+	defer {
+		unsafe { free(voidptr(desktop.canvas.pixels)) }
+	}
+	desktop.canvas.clear(0xffffff)
+	close := desktop.title_button('window.close', 'builtin:traffic_close', theme_macos.button_inset, true, false)
+	desktop.draw_button(close, int(close.frame.x), int(close.frame.y), int(close.frame.width), int(close.frame.height))
+
+	// A logical-pixel circle would make every aligned 2x2 physical block the
+	// same colour. The native-rasterised arc has independent coverage within
+	// at least one of those blocks.
+	mut native_edge := false
+	for y := 0; y + 1 < desktop.canvas.physical_height && !native_edge; y += 2 {
+		for x := 0; x + 1 < desktop.canvas.physical_width; x += 2 {
+			base := unsafe { desktop.canvas.pixels[y * desktop.canvas.stride + x] }
+			right := unsafe { desktop.canvas.pixels[y * desktop.canvas.stride + x + 1] }
+			below := unsafe { desktop.canvas.pixels[(y + 1) * desktop.canvas.stride + x] }
+			if base != right || base != below {
+				native_edge = true
+				break
+			}
+		}
+	}
+	assert native_edge
+}
+
 fn test_catalina_theme_uses_measured_window_chrome() {
 	assert theme_macos.title_height == 22
 	assert theme_macos.button_size == 12
