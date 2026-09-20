@@ -113,11 +113,30 @@ fn exception_handler(num u32, mut gpr_state cpulocal.GPRState) {
 		// test_and_acquire() restores whatever the ambient interrupt state
 		// already was on a failed attempt (see klock_amd64.v), so a lock held by
 		// another CPU right now spins this one forever with interrupts
-		// permanently off: it can never take the IPI or timer tick that would
-		// let the holder make progress and release it. mmap_amd64.v's own
-		// pf_handler already re-enables interrupts before this kind of work for
-		// the demand-paging and COW fault paths; this was missing the same
-		// `sti` for the same class of user-mode fault.
+		// permanently off: it can never take the IPI that would let the holder
+		// make progress and release it. mmap_amd64.v's own pf_handler already
+		// re-enables interrupts before this kind of work for the demand-paging
+		// and COW fault paths; this was missing the same `sti` for the same
+		// class of user-mode fault.
+		//
+		// Non-page-fault exceptions (this path; vector 14 uses its own
+		// per-thread ist3 stack) run on tss.rsp0, one shared stack per CPU that
+		// the scheduler never switches per thread -- unlike a nested, properly-
+		// returning interrupt (safe: it unwinds back to exactly where it
+		// nested), the scheduler's own local-timer preemption abandons this
+		// call frame mid-function to run a different thread, which can later
+		// take its own exception on the very same stack region and overwrite
+		// it. Past this point always ends in a non-returning transfer of its
+		// own (dispatch_a_signal_info's yield, or syscall_exit's eventual
+		// thread teardown), so the only thing sti actually needs to permit is
+		// an incoming cross-CPU IPI -- not this CPU's own scheduler preempting
+		// this thread right here. Stopping the local timer first removes
+		// exactly that one mechanism without blocking IPIs or device
+		// interrupts, which arrive through the LAPIC's other vectors, not its
+		// timer LVT. No explicit resume: whichever thread this CPU dispatches
+		// next gets a fresh one-shot timer from the ordinary scheduler_isr
+		// dispatch path regardless of what happened here.
+		apic.lapic_timer_stop()
 		asm volatile amd64 {
 			sti
 		}
