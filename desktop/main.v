@@ -166,12 +166,14 @@ fn main() {
 	// edge. The calculator remains available from its shortcut and the Start
 	// menu; the Welcome page is available from Help but is not shown at launch.
 	mut launch_default_files := false
+	mut launch_development_terminal := false
 	if options.open.len == 0 {
 		desktop.spawn('System', .system, 580, 60, 372, 232)
 		// Files is a separate process. Paint the compositor-owned windows first,
 		// so a delayed application handshake cannot leave the firmware console
 		// looking like the desktop failed to start.
 		launch_default_files = true
+		launch_development_terminal = desktop_is_development_session()
 	} else {
 		for title in options.open {
 			desktop.launch_titled_at_startup(title)
@@ -283,6 +285,10 @@ fn main() {
 		if launch_default_files {
 			launch_default_files = false
 			desktop.launch_titled_at_startup('Files')
+			if launch_development_terminal {
+				launch_development_terminal = false
+				desktop.launch_titled_at_startup('Terminal')
+			}
 		}
 
 		sleep_to_next_frame(frame_started, options.frame_interval)

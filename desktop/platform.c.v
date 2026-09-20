@@ -623,6 +623,14 @@ fn desktop_is_system_session() bool {
 	return C.getpid() == 1 || C.getenv(c'VINIX_SYSTEM_SESSION') != unsafe { nil }
 }
 
+// A self-hosted build marks the rest of this boot as a development session
+// before asking PID 1 to replace the compositor. The Terminal that issued the
+// command belongs to the old compositor, so the replacement uses this marker
+// to restore a useful development window automatically.
+fn desktop_is_development_session() bool {
+	return C.access(c'/run/vinix-desktop-development', 0) == 0
+}
+
 // Hand the machine to the kernel. reboot(2) only returns when it refuses, so
 // everything the session wanted to finish must already be done.
 fn desktop_power_apply(action PowerAction) {

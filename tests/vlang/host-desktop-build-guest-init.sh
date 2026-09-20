@@ -5,6 +5,7 @@ set -eu
 
 export PATH=/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
 export TERM=linux
+export HOME=/root
 
 fail() {
 	echo "VINIX HOST DESKTOP BUILD TEST: FAIL $*"
@@ -26,6 +27,16 @@ vinix-host-sync || fail "first host source sync"
 vinix-host-sync || fail "second host source sync"
 vinix-desktop-build --no-reload || fail "desktop build"
 [ -x /root/vinix-desktop ] || fail "desktop output is missing"
+/root/vinix-desktop &
+desktop_pid=$!
+attempt=0
+while [ "$attempt" -lt 10 ]; do
+	sleep 1
+	kill -0 "$desktop_pid" 2>/dev/null || fail "built desktop exited during startup"
+	attempt=$((attempt + 1))
+done
+kill -HUP "$desktop_pid" 2>/dev/null || fail "cannot stop built desktop"
+wait "$desktop_pid" || fail "built desktop did not stop cleanly"
 echo "VINIX HOST DESKTOP BUILD TEST: PASS"
 sync
 /sbin/poweroff -f 2>/dev/null || exit 0

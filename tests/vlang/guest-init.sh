@@ -62,6 +62,21 @@ echo "VINIX V SELF-HOST BUILD TEST: PASS"
 		echo "VINIX DESKTOP RELOAD TEST: FAIL replacement desktop did not start"
 		/sbin/poweroff -f 2>/dev/null || exit 1
 	fi
+	# A malformed native binary can survive exec long enough for pidof to see
+	# it and then wedge the guest during its first few frames. Keep observing
+	# the same compositor rather than declaring success at process creation.
+	attempt=0
+	while [ "$attempt" -lt 10 ]; do
+		sleep 1
+		case " $(/bin/busybox pidof vinix-desktop 2>/dev/null || true) " in
+			*" $new_pid "*) ;;
+			*)
+				echo "VINIX DESKTOP RELOAD TEST: FAIL replacement desktop did not stay running"
+				/sbin/poweroff -f 2>/dev/null || exit 1
+				;;
+		esac
+		attempt=$((attempt + 1))
+	done
 	if [ ! -e /run/vinix-desktop-development ] \
 		|| ! /bin/busybox cmp -s /root/vinix-desktop /usr/bin/vinix-desktop; then
 		echo "VINIX DESKTOP RELOAD TEST: FAIL replacement was not installed"

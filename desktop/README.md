@@ -558,8 +558,10 @@ build helper recover when an older persistent home lacks either tree:
     vinix-desktop-build
 
 The second command builds `/root/vinix-desktop`, atomically installs it, and
-asks PID 1 to reload the graphical session. `--no-reload` leaves the current
-session running.
+asks PID 1 to reload the graphical session. The replacement session reopens
+Files and Terminal, because the Terminal that ran the build belongs to the old
+session and closes during its orderly teardown. `--no-reload` leaves the
+current session running.
 
 The runner caches a gzip-compressed version of the immutable QEMU module to
 keep the boot payload small and comfortably below the FAT32 single-file limit;
