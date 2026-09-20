@@ -95,6 +95,7 @@ const ui2_example_names = [
 	'treeview',
 	'users',
 	'users_box_layout',
+	'vml_menu',
 	'windows_smoke',
 ]
 

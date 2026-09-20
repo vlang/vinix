@@ -656,7 +656,7 @@ fn test_available_utility_applications_and_shortcut_layouts() {
 	assert available_apps[21].title == 'ui2 Examples'
 	assert available_apps[21].process_name == 'vinix-ui2-examples'
 	assert available_apps[21].open != unsafe { nil }
-	assert ui2_example_names.len == 84
+	assert ui2_example_names.len == 85
 	example := ui2_example_named('toggle_button') or { panic('missing ui2 example') }
 	assert example.process_name == 'vinix-ui2-toggle_button'
 	assert example.standalone && example.keyboard && example.pointer && example.polling

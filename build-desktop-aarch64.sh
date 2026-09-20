@@ -626,6 +626,40 @@ if [ "$REUSE_STAGING" -eq 0 ]; then
 
     else
         tar xf "$BASE_INITRAMFS" -C "$STAGING"
+        # A base userland built with VINIX_ALPINE_DEVTOOLS=0 deliberately
+        # omits GCC, but the desktop still promises an in-guest development
+        # environment. The separately published developer-tools layer is the
+        # authoritative fallback and is already part of this staging cache's
+        # generation key. Avoid overlaying it when the base already carries
+        # GCC, since that keeps the usual full-image path byte-for-byte stable.
+        if [ ! -x "$STAGING/usr/bin/gcc" ]; then
+            if [ ! -f "$DEVTOOLS_ARCHIVE" ]; then
+                echo "ERROR: desktop needs GCC, but neither the base userland nor $DEVTOOLS_ARCHIVE provides it" >&2
+                echo "Run ./build-userland-aarch64.sh first." >&2
+                exit 1
+            fi
+            echo "    base image omits GCC; staging the developer-tools layer"
+            tar xf "$DEVTOOLS_ARCHIVE" -C "$STAGING"
+        fi
+        # Firefox is another independently published closure. A base image
+        # made before (or without) that optional integration is still a valid
+        # userland input, so recover from the dedicated layer before applying
+        # the newer network/runtime overlays below.
+        if ! { [ -x "$STAGING/usr/lib/firefox-esr/firefox-esr" ] &&
+               [ -x "$STAGING/usr/bin/firefox-esr" ]; } &&
+           ! { [ -x "$STAGING/usr/lib/firefox/firefox" ] &&
+               [ -x "$STAGING/usr/bin/firefox" ]; }; then
+            if ! { [ -x "$FIREFOX_STAGING/usr/lib/firefox-esr/firefox-esr" ] &&
+                   [ -x "$FIREFOX_STAGING/usr/bin/firefox-esr" ]; } &&
+               ! { [ -x "$FIREFOX_STAGING/usr/lib/firefox/firefox" ] &&
+                   [ -x "$FIREFOX_STAGING/usr/bin/firefox" ]; }; then
+                echo "ERROR: desktop base omits Firefox and its staging layer is incomplete: $FIREFOX_STAGING" >&2
+                echo "Run ./build-firefox-aarch64.sh first." >&2
+                exit 1
+            fi
+            echo "    base image omits Firefox; staging the Firefox layer"
+            merge_staging_tree "$FIREFOX_STAGING"
+        fi
         # The base archive may predate package support. Always refresh this small
         # layer so the terminal gets pkg/apk without rebuilding the full userland.
         merge_staging_tree "$NETWORK_TOOLS_STAGING"

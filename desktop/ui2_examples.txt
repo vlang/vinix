@@ -81,4 +81,5 @@ tree_view_widget
 treeview
 users
 users_box_layout
+vml_menu
 windows_smoke
