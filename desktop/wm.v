@@ -1513,14 +1513,12 @@ fn (mut d Desktop) finish_window_drag(x int, y int) {
 		return
 	}
 	id := d.drag.window_id
-	if d.drag.maximize_on_release || y <= 0 {
+	if y <= 0 || (d.drag.maximize_on_release && y >= d.canvas.height - 1) {
 		d.maximize(id)
-	} else if d.drag.snap_on_release == .left || (d.drag.snap_on_release == .none_
-		&& x <= 0) {
-		d.snap_window(id, .left)
-	} else if d.drag.snap_on_release == .right || (d.drag.snap_on_release == .none_
-		&& x >= d.canvas.width - 1) {
-		d.snap_window(id, .right)
+	} else if x <= 0 {
+		d.snap_window(id, if d.drag.snap_on_release == .right { .right } else { .left })
+	} else if x >= d.canvas.width - 1 {
+		d.snap_window(id, if d.drag.snap_on_release == .left { .left } else { .right })
 	}
 }
 

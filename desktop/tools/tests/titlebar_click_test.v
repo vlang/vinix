@@ -115,11 +115,9 @@ fn test_titlebar_drag_can_move_partly_offscreen() {
 	left_index := desktop.window_index(id) or { panic('missing dragged window') }
 	assert desktop.windows[left_index].x < 0
 	assert desktop.windows[left_index].x + desktop.windows[left_index].width >= 60
-	// Move back inside while still held so this test can keep exercising free
-	// off-screen movement; exact-edge release is covered by the snap tests.
-	desktop.buttons = button_left
-	desktop.on_pointer_move(1, title_y)
 	desktop.buttons = 0
+	// Release one pixel inside the edge so this test can keep exercising free
+	// off-screen movement; exact-edge release is covered by the snap tests.
 	desktop.on_pointer_up(1, title_y)
 
 	// The right edge behaves the same way.
@@ -130,7 +128,6 @@ fn test_titlebar_drag_can_move_partly_offscreen() {
 	right_index := desktop.window_index(id) or { panic('missing dragged window') }
 	assert desktop.windows[right_index].x + desktop.windows[right_index].width > 800
 	assert desktop.windows[right_index].x <= 800 - 60
-	desktop.on_pointer_move(798, title_y)
 	desktop.buttons = 0
 	desktop.on_pointer_up(798, title_y)
 
