@@ -74,13 +74,16 @@ vinix_storage_find_mke2fs() {
 # one: the kernel's mount points are created, the image identity is recorded so
 # a later run can tell a rebuilt image from the one already installed, and $5,
 # when given, merges in a home carried over from the volume being replaced.
-# Carried files win conflicts while newly packaged home files are retained.
+# $6 may name a package overlay to merge into a system image on the host. That
+# keeps the archive off the boot disk and out of guest RAM. Carried files win
+# conflicts while newly packaged home files are retained.
 vinix_storage_create_ext2() {
     local target="$1"
     local size_mb="$2"
     local seed_archive="${3:-}"
     local image_id="${4:-}"
     local carried_home="${5:-}"
+    local package_overlay="${6:-}"
     local target_dir temp_disk seed_dir mke2fs persist_bytes root_owner_tool
     local -a seed_args
 
@@ -123,6 +126,15 @@ vinix_storage_create_ext2() {
             return 1
         fi
         chmod 1777 "$seed_dir/tmp" 2>/dev/null || true
+        if [ -n "$package_overlay" ]; then
+            if [ ! -f "$package_overlay" ] || \
+               ! tar -xf "$package_overlay" -C "$seed_dir"; then
+                echo "ERROR: package overlay is not a readable tar archive: $package_overlay" >&2
+                rm -rf "$seed_dir"
+                rm -f "$temp_disk"
+                return 1
+            fi
+        fi
         if [ -n "$carried_home" ]; then
             # An old home from before source generations were recorded must
             # not inherit the new seed's marker. Its desktop sources still win

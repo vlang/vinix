@@ -460,14 +460,17 @@ subl
 
 `pkg` disables Alpine maintainer scripts that assume a complete Alpine init
 system.
-When started with `run-aarch64.sh` (including through
-`run-desktop-aarch64.sh`), successful package changes are saved in a fixed
-archive under `boot-image/` and layered over the initramfs on every later
-launch. Thus `pkg install gtk`, shutting down QEMU, and starting it again keeps
-GTK installed. The shell store is
+On an initramfs-root machine started with `run-aarch64.sh`, successful package
+changes are saved in a fixed archive under `boot-image/` and layered over the
+initramfs on every later launch. Thus `pkg install gtk`, shutting down QEMU,
+and starting it again keeps GTK installed. The shell store is
 `boot-image/boot.img.packages.tar`; the desktop store is
 `boot-image/boot-desktop-4096.img.packages.tar`. Override its path with
 `VINIX_QEMU_PACKAGE_STORE`, or delete it to reset installed packages.
+The default desktop boots from a persistent system volume instead: package
+changes are already on that disk. A saved overlay from an older RAM-root run
+is merged into the volume when it is installed or rebuilt, rather than copied
+to the boot image and loaded into guest RAM.
 Ephemeral runs use a private package store that is removed at shutdown unless
 the variable explicitly selects a long-lived store.
 Boot methods that do not use the QEMU runner retain package changes only in the
@@ -494,14 +497,15 @@ paths; only `/root` is persistent. As with other writable ext2 experiments,
 shut down the VM cleanly and use `e2fsck` from the host after an interrupted
 run.
 
-The desktop launcher enables persistence by default. It caches a QEMU-specific
-base without `/root`, seeds `boot-image/desktop-root.ext2` from the desktop
-image once, and reuses both that volume and `boot-image/boot-desktop-qemu.img`.
-Use `--no-persist` for a self-contained RAM-backed image that remains below
-FAT32's 4 GiB file limit. `--ephemeral` creates a private boot disk, seeded
-`/root` volume, and package store for a concurrent test, then removes all three
-when QEMU exits. Other newly created boot images under the host temporary
-directory are also removed unless `VINIX_KEEP_TEMP_BOOT_DISK=1` is set.
+The desktop launcher enables whole-system persistence by default. It installs
+the desktop once on `boot-image/desktop-system.ext2`; `/tmp` and `/run` are
+ordinary directories on that volume too. The boot image contains only Limine,
+the kernel, a small runtime update and a recovery initramfs. Use
+`--no-disk-root` for the older RAM-system/persistent-`/root` split, or
+`--no-persist` for a fully disposable RAM-backed image. `--ephemeral` creates
+private storage for a concurrent test and removes it when QEMU exits. Other
+newly created boot images under the host temporary directory are also removed
+unless `VINIX_KEEP_TEMP_BOOT_DISK=1` is set.
 
 `tmux` is included in the optional native developer-tools overlay. Build that
 overlay before the userland to have tmux and its terminal definitions available

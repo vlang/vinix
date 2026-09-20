@@ -24,6 +24,8 @@
 #include <unistd.h>
 
 static const char *marker = "/etc/vinix-disk-root";
+static const char *scratch_marker = "/tmp/vinix-disk-root";
+static const char *package_marker = "/etc/vinix-package-overlay";
 static const char *host_symlink = "/usr/share/vinix-large-link";
 static const char *installed = "/.vinix-image-id";
 static const char payload[] = "vinix-disk-root-v1";
@@ -83,9 +85,9 @@ static int replace_host_symlink(void)
 	return 0;
 }
 
-static int write_marker(void)
+static int write_marker(const char *path)
 {
-	int fd = open(marker, O_CREAT | O_EXCL | O_WRONLY, 0644);
+	int fd = open(path, O_CREAT | O_EXCL | O_WRONLY, 0644);
 	if (fd < 0) {
 		printf("VINIX DISK ROOT: FAIL create errno=%d\n", errno);
 		return 1;
@@ -101,10 +103,10 @@ static int write_marker(void)
 	return 0;
 }
 
-static int read_marker(void)
+static int read_marker(const char *path)
 {
 	char observed[sizeof(payload)] = {0};
-	int fd = open(marker, O_RDONLY);
+	int fd = open(path, O_RDONLY);
 	if (fd < 0)
 		return -1;
 	ssize_t got = read(fd, observed, sizeof(observed));
@@ -213,27 +215,33 @@ int main(void)
 		return 1;
 	}
 	say("VINIX DISK ROOT: ON VOLUME\n");
+	int package = open(package_marker, O_RDONLY);
+	if (package < 0) {
+		say("VINIX DISK ROOT: FAIL saved package overlay was not installed on the volume\n");
+		return 1;
+	}
+	close(package);
 
-	/* /tmp and /run are deliberately RAM: a disk root must not turn scratch
-	 * into state that accumulates across every boot the machine ever makes. */
+	/* A disk root has no hidden tmpfs. /tmp and /run are ordinary directories
+	 * on the volume, just like /etc, and writes there survive a restart. */
 	struct stat scratch;
 	if (stat("/tmp", &scratch) != 0 || !S_ISDIR(scratch.st_mode) ||
 	    stat("/run", &scratch) != 0 || !S_ISDIR(scratch.st_mode)) {
 		say("VINIX DISK ROOT: FAIL /tmp or /run is not a directory\n");
 		return 1;
 	}
-	if (open("/tmp/vinix-scratch", O_CREAT | O_WRONLY, 0644) < 0) {
-		say("VINIX DISK ROOT: FAIL /tmp is not writable\n");
-		return 1;
-	}
-
 	if (verify_large() != 0)
 		return 1;
 
-	int found = read_marker();
+	int found = read_marker(marker);
 	if (found == 0) {
+		if (read_marker(scratch_marker) != 0) {
+			say("VINIX DISK ROOT: FAIL /tmp did not persist\n");
+			return 1;
+		}
 		say("VINIX DISK ROOT: PASS\n");
 		unlink(marker);
+		unlink(scratch_marker);
 		sync();
 		reboot(RB_POWER_OFF);
 		say("VINIX DISK ROOT: FAIL power off refused\n");
@@ -243,7 +251,9 @@ int main(void)
 		printf("VINIX DISK ROOT: FAIL marker unreadable errno=%d\n", errno);
 		return 1;
 	}
-	if (write_marker() != 0)
+	if (write_marker(marker) != 0)
+		return 1;
+	if (write_marker(scratch_marker) != 0)
 		return 1;
 	if (replace_host_symlink() != 0)
 		return 1;

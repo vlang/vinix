@@ -419,7 +419,7 @@ fi
 # their files; --reset-disk asks for the clean install instead.
 vinix_install_system_volume() {
     local image="$DISK_ROOT_IMAGE"
-    local image_id installed carried home_dir needed_mb image_bytes
+    local image_id installed carried home_dir needed_mb image_bytes package_overlay
 
     if [ -z "$image" ]; then
         image="$INITRAMFS"
@@ -489,8 +489,13 @@ vinix_install_system_volume() {
         carried=""
     fi
 
+    package_overlay=""
+    if [ -s "$PACKAGE_STORE" ]; then
+        package_overlay="$PACKAGE_STORE"
+        echo "    merging saved packages into the system volume"
+    fi
     if ! vinix_storage_create_ext2 "$PERSIST_DISK" "$needed_mb" "$image" \
-        "$image_id" "$carried"; then
+        "$image_id" "$carried" "$package_overlay"; then
         echo "ERROR: could not install the system volume: $PERSIST_DISK" >&2
         [ -z "$home_dir" ] || rm -rf "$home_dir"
         exit 1
@@ -572,10 +577,11 @@ if [ -n "$QEMU_RESOLUTION" ]; then
     fi
 fi
 
-# Limine supplies modules in configuration order. The kernel unpacks the base,
-# the last successfully saved package overlay, and this run's small control
-# layer into the same RAM-backed root.
-if [ -s "$PACKAGE_STORE" ]; then
+# Limine supplies modules in configuration order. A RAM root needs its saved
+# package overlay here. A disk root received the same overlay while its ext2
+# image was installed, so putting it in the boot payload would only make
+# firmware load another potentially multi-gigabyte copy into guest RAM.
+if [ "$DISK_ROOT" -ne 1 ] && [ -s "$PACKAGE_STORE" ]; then
     printf '%s\n' '    module_path: boot():/boot/packages.tar' >> "$LIMINE_CONF_QEMU"
 fi
 printf '%s\n' '    module_path: boot():/boot/qemu-runtime.tar' >> "$LIMINE_CONF_QEMU"
@@ -686,7 +692,7 @@ if [ -f "$INITRAMFS" ]; then
         exit 1
     fi
     package_overlay_bytes=0
-    if [ -s "$PACKAGE_STORE" ]; then
+    if [ "$DISK_ROOT" -ne 1 ] && [ -s "$PACKAGE_STORE" ]; then
         if stat -f%z "$PACKAGE_STORE" >/dev/null 2>&1; then
             package_overlay_bytes="$(stat -f%z "$PACKAGE_STORE")"
         else
@@ -928,7 +934,11 @@ COPYFILE_DISABLE=1 tar --format=ustar -cf "$PACKAGE_RUNTIME_TAR" \
     -C "$PACKAGE_RUNTIME_ROOT" .
 mcopy -o -i "$BOOT_DISK" "$PACKAGE_RUNTIME_TAR" ::/boot/qemu-runtime.tar
 
-if [ -s "$PACKAGE_STORE" ]; then
+if [ "$DISK_ROOT" -eq 1 ]; then
+    # Older runners copied the saved overlay to the FAT image even for a disk
+    # root. It is no longer referenced by Limine; remove that stale copy too.
+    mdel -i "$BOOT_DISK" ::/boot/packages.tar 2>/dev/null || true
+elif [ -s "$PACKAGE_STORE" ]; then
     if ! tar -tf "$PACKAGE_STORE" >/dev/null 2>&1; then
         echo "ERROR: saved QEMU package overlay is not a readable tar: $PACKAGE_STORE" >&2
         exit 1
