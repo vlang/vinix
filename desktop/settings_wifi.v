@@ -3,7 +3,6 @@
 // that can be found in the LICENSE file.
 
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
 // Wi-Fi Settings pane over the bounded /dev/wlan0 ioctl interface.
 module main
 

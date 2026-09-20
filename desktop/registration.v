@@ -3,7 +3,6 @@
 // that can be found in the LICENSE file.
 
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
 // First-launch user registration. This runs before ordinary desktop windows are
 // created, so there is no taskbar, shortcut, or closable window to get around.
 module main

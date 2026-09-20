@@ -3,7 +3,6 @@
 // that can be found in the LICENSE file.
 
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
 // Decoding and drawing the small set of official application icons shipped by
 // the desktop. QOI keeps those source-quality 512px images compact without
 // bringing a PNG library into Vinix's static framebuffer compositor.

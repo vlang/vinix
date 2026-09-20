@@ -3,7 +3,6 @@
 // that can be found in the LICENSE file.
 
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
 // Quick Launch: a Spotlight-style application search overlay.
 module main
 

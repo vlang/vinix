@@ -3,7 +3,6 @@
 // that can be found in the LICENSE file.
 
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
 // The Start menu. Its two-column layout follows Windows 7: frequently used
 // programs on a light pane, system destinations on the tinted pane, an All
 // Programs view, search at the bottom and a session button in the lower right.

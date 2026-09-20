@@ -3,7 +3,6 @@
 // that can be found in the LICENSE file.
 
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
 // A terminal, built into the desktop.
 //
 // It runs the shell on a Unix98 pseudo-terminal. The kernel line discipline

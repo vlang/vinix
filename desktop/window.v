@@ -3,7 +3,6 @@
 // that can be found in the LICENSE file.
 
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
 // Windows and what they show. Native windows contain a built-in page or a
 // ui2 tree received from an application process. External display-owning programs are launched by
 // the window manager and only use a native window to report a startup error.

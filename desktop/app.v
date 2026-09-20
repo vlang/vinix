@@ -3,7 +3,6 @@
 // that can be found in the LICENSE file.
 
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
 // Native ui2 applications shown in the desktop's windows.
 //
 // A ui2 application normally calls `run_vml`, which opens a platform window.

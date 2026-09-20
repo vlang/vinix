@@ -3,7 +3,6 @@
 // that can be found in the LICENSE file.
 
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
 // A small, real text editor for Vinix.
 //
 // It edits plain ASCII files in memory and uses the same whole-file POSIX

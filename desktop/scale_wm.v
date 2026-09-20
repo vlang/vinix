@@ -3,7 +3,6 @@
 // that can be found in the LICENSE file.
 
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
 // Window-manager side of desktop scaling. Kept separate from scale.v so the
 // Settings unit tests can stage scale policy without the whole compositor.
 module main

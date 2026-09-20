@@ -3,7 +3,6 @@
 // that can be found in the LICENSE file.
 
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
 //
 // Host one Wine application on an off-screen Xvfb display. vinix-desktop maps
 // Xvfb's XWD framebuffer into a normal compositor window and sends compact

@@ -3,7 +3,6 @@
 // that can be found in the LICENSE file.
 
 // SPDX-License-Identifier: GPL-2.0-only OR MIT
-// Copyright (c) 2026 Alexander Medvednikov
 module core
 
 fn new_test_state(layout Layout, maximum u32, scale u32, known bool) State {

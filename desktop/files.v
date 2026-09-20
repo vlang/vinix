@@ -3,7 +3,6 @@
 // that can be found in the LICENSE file.
 
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
 // A file browser, built into the desktop.
 //
 // Unlike the calculator it is not a ui2 example but Vinix's own, and it reads

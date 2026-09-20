@@ -3,7 +3,6 @@
 // that can be found in the LICENSE file.
 
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
 // X11 applications embedded in native Vinix windows. Xvfb owns the upstream
 // application's display while the Vinix compositor maps its live XWD surface.
 module main

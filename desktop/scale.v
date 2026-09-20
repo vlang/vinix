@@ -3,7 +3,6 @@
 // that can be found in the LICENSE file.
 
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
 // Desktop-wide integer display scaling shared by Settings and the compositor.
 @[has_globals]
 module main

@@ -3,7 +3,6 @@
 // that can be found in the LICENSE file.
 
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
 // The built-in calculator's compile-time VML desktop adapter.
 //
 // The model comes from ui2's calculator example. The view is parsed and

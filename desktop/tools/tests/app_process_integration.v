@@ -3,7 +3,6 @@
 // that can be found in the LICENSE file.
 
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
 // Standalone host integration test for the compositor/application process
 // boundary. The parent execs this same binary in app mode, exactly as the
 // installed per-app symlinks do on Vinix.

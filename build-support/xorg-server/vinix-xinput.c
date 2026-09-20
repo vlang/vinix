@@ -3,7 +3,6 @@
 // that can be found in the LICENSE file.
 
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
 //
 // Feed Vinix's native pointer and console keyboard into an Xorg server. The
 // server deliberately has no Linux evdev/udev input stack; using XTest here

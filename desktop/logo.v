@@ -3,7 +3,6 @@
 // that can be found in the LICENSE file.
 
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
 // The Vinix wordmark, painted in the middle of a colour wallpaper.
 //
 // The repository's vinix-logo.svg is five shapes on a 200 x 61.9 canvas:
