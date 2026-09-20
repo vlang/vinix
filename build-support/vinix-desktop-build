@@ -4,8 +4,10 @@
 # is requested.
 set -eu
 
-source_dir=${VINIX_DESKTOP_SOURCE:-/root/desktop}
-module_dir=${VINIX_DESKTOP_MODULES:-/root/vmodules}
+system_dev_dir=${VINIX_DESKTOP_SYSTEM_DEV:-/usr/share/vinix/desktop-dev}
+home_dev_dir=${VINIX_DESKTOP_HOME_DEV:-/root}
+source_dir=${VINIX_DESKTOP_SOURCE:-$home_dev_dir/desktop}
+module_dir=${VINIX_DESKTOP_MODULES:-$home_dev_dir/vmodules}
 output=${VINIX_DESKTOP_OUTPUT:-/root/vinix-desktop}
 reload=1
 
@@ -28,6 +30,17 @@ for argument in "$@"; do
 		*) echo "vinix-desktop-build: unknown option: $argument" >&2; usage ;;
 	esac
 done
+
+if [ ! -f "$source_dir/main.v" ] && [ "$source_dir" = "$home_dev_dir/desktop" ] \
+	&& [ -f "$system_dev_dir/desktop/main.v" ]; then
+	echo "vinix-desktop-build: $source_dir is missing; using the system source copy"
+	source_dir=$system_dev_dir/desktop
+fi
+if [ ! -f "$module_dir/ui2/v.mod" ] && [ "$module_dir" = "$home_dev_dir/vmodules" ] \
+	&& [ -f "$system_dev_dir/vmodules/ui2/v.mod" ]; then
+	echo "vinix-desktop-build: $module_dir is incomplete; using the system module copy"
+	module_dir=$system_dev_dir/vmodules
+fi
 
 [ -f "$source_dir/main.v" ] || {
 	echo "vinix-desktop-build: desktop source not found: $source_dir" >&2

@@ -977,23 +977,29 @@ if [ -d "$BUILD_DIR/wallpapers" ]; then
         "$BUILD_DIR/wallpapers"/SOURCES.txt "$STAGING/usr/share/vinix/wallpapers/" 2>/dev/null || true
 fi
 
-# The editable tree is the exact staged source set used by the host build:
-# desktop sources plus ui2's hosted Calculator model. Dereference the staging
-# links so the guest gets ordinary writable files. The matching headless ui2
-# module overlay is included beside it, making the tree directly compilable by
-# vinix-desktop-build without needing Python or a network checkout.
-rm -rf "$STAGING/root/desktop"
-mkdir -p "$STAGING/root/desktop"
+# Keep a system-owned development copy outside persistent /root. It lets an
+# upgraded machine build even when its carried home predates /root/vmodules.
+# The editable home copy is seeded from the same exact host-build sources.
+DESKTOP_DEV_ROOT="$STAGING/usr/share/vinix/desktop-dev"
+rm -rf "$DESKTOP_DEV_ROOT"
+mkdir -p "$DESKTOP_DEV_ROOT/desktop"
 cp -L "$APP_SRC"/*.v "$APP_SRC"/*.vml "$APP_SRC"/*.h \
-    "$SCRIPT_DIR/desktop/README.md" "$STAGING/root/desktop/"
-rm -rf "$STAGING/root/vmodules"
-mkdir -p "$STAGING/root/vmodules/ui2"
-cp -aL "$UI2_MODULES/ui2/." "$STAGING/root/vmodules/ui2/"
-mkdir -p "$STAGING/root/vmodules/compat/macos"
+    "$SCRIPT_DIR/desktop/README.md" "$DESKTOP_DEV_ROOT/desktop/"
+mkdir -p "$DESKTOP_DEV_ROOT/vmodules/ui2"
+cp -aL "$UI2_MODULES/ui2/." "$DESKTOP_DEV_ROOT/vmodules/ui2/"
+mkdir -p "$DESKTOP_DEV_ROOT/vmodules/compat/macos"
 cp -aL "$SCRIPT_DIR/compat/macos/bundle" \
-    "$STAGING/root/vmodules/compat/macos/bundle"
+    "$DESKTOP_DEV_ROOT/vmodules/compat/macos/bundle"
 cp -aL "$SCRIPT_DIR/compat/macos/macho" \
-    "$STAGING/root/vmodules/compat/macos/macho"
+    "$DESKTOP_DEV_ROOT/vmodules/compat/macos/macho"
+if [ ! -f "$DESKTOP_DEV_ROOT/desktop/main.v" ] || \
+   [ ! -f "$DESKTOP_DEV_ROOT/vmodules/ui2/v.mod" ]; then
+    echo "ERROR: system desktop development tree is incomplete" >&2
+    exit 1
+fi
+rm -rf "$STAGING/root/desktop" "$STAGING/root/vmodules"
+cp -a "$DESKTOP_DEV_ROOT/desktop" "$STAGING/root/desktop"
+cp -a "$DESKTOP_DEV_ROOT/vmodules" "$STAGING/root/vmodules"
 
 # Vinix's loader opens a shared object without following links, and current
 # Mesa ships every DRI driver as a link to one libdril_dri.so. A dlopen of

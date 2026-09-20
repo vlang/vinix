@@ -505,7 +505,8 @@ every image:
 That image supports the complete edit-build-reload loop from its own Terminal.
 The files in `/root/desktop` are an editable copy of the exact staged source
 set used for the host build, and `/root/vmodules` contains the matching ui2
-overlay:
+overlay. A matching system copy under `/usr/share/vinix/desktop-dev` lets the
+build helper recover when an older persistent home lacks either tree:
 
     /root/v-smoke.sh
     vinix-desktop-build
