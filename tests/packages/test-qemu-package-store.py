@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import io
 from pathlib import Path
+import shutil
 import subprocess
 import tarfile
 import tempfile
@@ -32,14 +33,36 @@ class PackageStoreTests(unittest.TestCase):
         self.store = root / "packages.tar"
         self.ready = root / "ready"
         self.source = root / "source"
+        self.ui2 = root / "ui2-source"
         (self.source / "desktop").mkdir(parents=True)
-        (self.source / "desktop/main.v").write_text("module main\n", encoding="utf-8")
+        (self.source / "desktop/main.v").write_text(
+            "// Copyright (c) 2026 Test. All rights reserved.\n"
+            "// Use of this source code is governed by a GPL v2 license\n"
+            "// that can be found in the LICENSE file.\n\n"
+            "// SPDX-License-Identifier: GPL-2.0-or-later\n"
+            "module main\n",
+            encoding="utf-8",
+        )
         (self.source / "desktop/local.v").write_text("module main\n", encoding="utf-8")
+        (self.source / "desktop/tools").mkdir()
+        for name in ("stage_app.py", "stage_ui2.py", "ui2_headless_bounds.v"):
+            shutil.copyfile(
+                REPOSITORY / "desktop/tools" / name,
+                self.source / "desktop/tools" / name,
+            )
         (self.source / ".gitignore").write_text("ignored.txt\nthird_party/\n", encoding="utf-8")
         (self.source / "ignored.txt").write_text("not shared\n", encoding="utf-8")
-        (self.source / "third_party/ui2").mkdir(parents=True)
-        (self.source / "third_party/ui2/v.mod").write_text(
-            'Module { name: "ui2" }\n', encoding="utf-8"
+        (self.ui2 / "ui").mkdir(parents=True)
+        (self.ui2 / "examples/calculator").mkdir(parents=True)
+        (self.ui2 / "v.mod").write_text(
+            'Module { name: "ui2", subdirs: ["ui"] }\n', encoding="utf-8"
+        )
+        (self.ui2 / "ui/ui.v").write_text(
+            "module ui2\nconst selected_ui2_source = true\n", encoding="utf-8"
+        )
+        (self.ui2 / "examples/calculator/main.v").write_text(
+            "module main\n\nstruct CalculatorModel {}\n\nfn main() {}\n",
+            encoding="utf-8",
         )
         subprocess.run(["git", "init", "-q", str(self.source)], check=True)
         subprocess.run(
@@ -60,8 +83,8 @@ class PackageStoreTests(unittest.TestCase):
                 str(1024 * 1024),
                 "--source-root",
                 str(self.source),
-                "--source-extra",
-                "third_party/ui2",
+                "--ui2-source",
+                str(self.ui2),
             ],
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
@@ -111,13 +134,48 @@ class PackageStoreTests(unittest.TestCase):
         ) as response:
             return tarfile.open(fileobj=io.BytesIO(response.read()), mode="r:")
 
+    def source_snapshot_bytes(self) -> bytes:
+        with urllib.request.urlopen(
+            f"http://127.0.0.1:{self.port}/vinix-source.tar"
+        ) as response:
+            return response.read()
+
     def test_source_snapshot_reflects_live_tracked_and_untracked_files(self) -> None:
         with self.source_snapshot() as snapshot:
-            self.assertEqual(snapshot.extractfile("desktop/main.v").read(), b"module main\n")
+            self.assertIn(
+                b"SPDX-License-Identifier: GPL-2.0-or-later",
+                snapshot.extractfile("desktop/main.v").read(),
+            )
             self.assertIn("desktop/local.v", snapshot.getnames())
-            self.assertIn("third_party/ui2/v.mod", snapshot.getnames())
+            self.assertIn(".vinix-build/desktop/app_calculator.v", snapshot.getnames())
+            self.assertIn(".vinix-build/vmodules/ui2/v.mod", snapshot.getnames())
+            self.assertIn(
+                ".vinix-build/vmodules/ui2/ui/vinix_headless_backend.v",
+                snapshot.getnames(),
+            )
+            staged_main = snapshot.extractfile(".vinix-build/desktop/main.v")
+            self.assertNotIn(b"All rights reserved.", staged_main.read())
+            self.assertTrue(snapshot.getmember(".vinix-build/desktop/main.v").isfile())
+            self.assertTrue(snapshot.getmember(".vinix-build/vmodules/ui2/ui/ui.v").isfile())
+            self.assertIn(
+                b"selected_ui2_source",
+                snapshot.extractfile(".vinix-build/vmodules/ui2/ui/ui.v").read(),
+            )
             self.assertNotIn("ignored.txt", snapshot.getnames())
             self.assertFalse(any(".git/" in name for name in snapshot.getnames()))
+
+        first = self.source_snapshot_bytes()
+        time.sleep(1.1)
+        self.assertEqual(self.source_snapshot_bytes(), first)
+
+        (self.ui2 / "ui/ui.v").write_text(
+            "module ui2\nconst selected_ui2_source = false\n", encoding="utf-8"
+        )
+        with self.source_snapshot() as snapshot:
+            self.assertIn(
+                b"selected_ui2_source = false",
+                snapshot.extractfile(".vinix-build/vmodules/ui2/ui/ui.v").read(),
+            )
 
         (self.source / "desktop/main.v").write_text(
             "module main\n// changed after server start\n", encoding="utf-8"

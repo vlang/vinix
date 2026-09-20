@@ -1,5 +1,5 @@
 #!/bin/sh
-# Compile the editable desktop sources with the native V and GCC toolchains.
+# Compile the editable desktop sources with the native V and TCC toolchains.
 # A successful build is installed atomically and activated unless --no-reload
 # is requested.
 set -eu
@@ -59,7 +59,8 @@ if [ "$source_explicit" -eq 0 ] && [ "$module_explicit" -eq 0 ] && \
 		exit 1
 	}
 	vinix-host-sync
-	source_dir=$host_repo/desktop
+	source_dir=$host_repo/.vinix-build/desktop
+	module_dir=$host_repo/.vinix-build/vmodules
 	host_source=1
 fi
 
@@ -94,12 +95,9 @@ fi
 	exit 1
 }
 if [ "$host_source" -eq 1 ]; then
-	[ -f "$host_repo/third_party/ui2/v.mod" ] || {
-		echo "vinix-desktop-build: host ui2 module not found: $host_repo/third_party/ui2" >&2
-		exit 1
-	}
-	command -v python3 >/dev/null 2>&1 || {
-		echo "vinix-desktop-build: Python 3 is required to stage host sources" >&2
+	[ -f "$module_dir/ui2/v.mod" ] || {
+		echo "vinix-desktop-build: staged host ui2 module not found: $module_dir/ui2" >&2
+		echo "vinix-desktop-build: restart QEMU once to update the host source service" >&2
 		exit 1
 	}
 else
@@ -125,17 +123,8 @@ trap cleanup EXIT HUP INT TERM
 
 module_path=$module_dir
 if [ "$host_source" -eq 1 ]; then
-	# Recreate the two disposable trees used by the host image builder. ui2
-	# needs Vinix's headless bounds bridge, and the hosted calculator model is
-	# generated from the current upstream example rather than a stale copy.
-	python3 "$host_repo/desktop/tools/stage_ui2.py" \
-		"$work_dir/vmodules/ui2" "$host_repo/third_party/ui2" \
-		"$host_repo/desktop/tools/ui2_headless_bounds.v"
-	python3 "$host_repo/desktop/tools/stage_app.py" \
-		"$work_dir/desktop" "$host_repo/desktop" \
-		"$host_repo/third_party/ui2/examples/calculator"
-	source_dir=$work_dir/desktop
-	module_dir=$work_dir/vmodules
+	# Python staging runs in the macOS source service. The guest consumes its
+	# materialized output directly and therefore needs only V and TCC.
 	module_path="$module_dir|$host_repo|$host_repo/third_party"
 fi
 

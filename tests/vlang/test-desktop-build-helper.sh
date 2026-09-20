@@ -46,11 +46,16 @@ cat > "$work/bin/tcc" <<'EOF'
 echo 'test TCC must be driven through V' >&2
 exit 1
 EOF
+cat > "$work/bin/python3" <<'EOF'
+#!/bin/sh
+echo 'guest Python must not be used for host-source staging' >&2
+exit 1
+EOF
 cat > "$work/bin/vinix-host-sync" <<'EOF'
 #!/bin/sh
 : > "$VINIX_DESKTOP_TEST_SYNCED"
 EOF
-chmod 755 "$work/bin/v" "$work/bin/tcc"
+chmod 755 "$work/bin/v" "$work/bin/tcc" "$work/bin/python3"
 chmod 755 "$work/bin/vinix-host-sync"
 
 output="$(
@@ -79,12 +84,12 @@ VINIX_DESKTOP_TEST_V_ARGS="$work/v-args" \
 grep -F "$work/home/desktop" "$work/v-args" >/dev/null
 grep -F "$work/home/vmodules" "$work/v-args" >/dev/null
 
-# A QEMU host share takes precedence over the image-seeded copies. The helper
-# must stage the raw host desktop and ui2 checkout the same way as the host
-# image builder before invoking V.
+# A QEMU host share takes precedence over the image-seeded copies. Staging is
+# performed by the macOS source service, so the guest helper must consume the
+# materialized trees without invoking Python.
 host="$work/host"
-mkdir -p "$host/desktop/tools" "$host/third_party/ui2/ui" \
-	"$host/third_party/ui2/examples/calculator"
+mkdir -p "$host/desktop" "$host/.vinix-build/desktop" \
+	"$host/.vinix-build/vmodules/ui2" "$host/third_party/ui2"
 cat > "$host/desktop/main.v" <<'EOF'
 // Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
 // Use of this source code is governed by a GPL v2 license
@@ -95,27 +100,12 @@ cat > "$host/desktop/main.v" <<'EOF'
 module main
 fn main() {}
 EOF
-cp "$repo/desktop/tools/stage_app.py" "$host/desktop/tools/stage_app.py"
-cp "$repo/desktop/tools/stage_ui2.py" "$host/desktop/tools/stage_ui2.py"
-cp "$repo/desktop/tools/ui2_headless_bounds.v" \
-	"$host/desktop/tools/ui2_headless_bounds.v"
-cat > "$host/third_party/ui2/v.mod" <<'EOF'
-Module {
-    name: 'ui2'
-    subdirs: ['ui']
-}
-EOF
-printf 'module ui2\n' > "$host/third_party/ui2/ui/ui.v"
-cat > "$host/third_party/ui2/examples/calculator/main.v" <<'EOF'
+cat > "$host/.vinix-build/desktop/main.v" <<'EOF'
+// SPDX-License-Identifier: GPL-2.0-or-later
 module main
-
-struct CalculatorModel {}
-
-fn main() {
-}
+fn main() {}
 EOF
-printf 'int vinix_execinfo_compat;\n' > "$host/desktop/execinfo_compat.c"
-printf 'extern int vinix_execinfo_compat;\n' > "$host/desktop/execinfo_compat.h"
+printf 'Module { name: "ui2" }\n' > "$host/.vinix-build/vmodules/ui2/v.mod"
 printf 'host service\n' > "$work/host-source-url"
 PATH="$work/bin:/usr/bin:/bin" \
 VINIX_HOST_SOURCE_URL_FILE="$work/host-source-url" \

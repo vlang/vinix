@@ -101,8 +101,12 @@ work=$(mktemp -d "$parent/.${name}.snapshot.XXXXXX")
 	echo "vinix-host-sync: host archive has no desktop/main.v" >&2
 	exit 1
 }
-[ -f "$work/third_party/ui2/v.mod" ] || {
-	echo "vinix-host-sync: host archive has no third_party/ui2/v.mod" >&2
+[ -f "$work/.vinix-build/desktop/main.v" ] || {
+	echo "vinix-host-sync: host archive has no staged desktop sources" >&2
+	exit 1
+}
+[ -f "$work/.vinix-build/vmodules/ui2/v.mod" ] || {
+	echo "vinix-host-sync: host archive has no staged ui2 module" >&2
 	exit 1
 }
 # Publish an immutable snapshot by replacing only a symlink. Old snapshots

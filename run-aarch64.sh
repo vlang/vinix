@@ -77,6 +77,7 @@ if [ "${VINIX_QEMU_HOST_SOURCE+x}" = x ]; then
     HOST_SOURCE_EXPLICIT=1
 fi
 HOST_SOURCE_ROOT="${VINIX_QEMU_HOST_SOURCE:-$SCRIPT_DIR}"
+HOST_UI2_SOURCE="${VINIX_UI2_SOURCE:-}"
 HOST_SOURCE_ENABLED=1
 case "$HOST_SOURCE_ROOT" in
     ''|0) HOST_SOURCE_ENABLED=0 ;;
@@ -206,7 +207,6 @@ if [ "$HOST_SOURCE_ENABLED" -eq 1 ]; then
     fi
     HOST_SOURCE_ROOT="$(cd "$HOST_SOURCE_ROOT" && pwd)"
     if [ ! -f "$HOST_SOURCE_ROOT/desktop/main.v" ] || \
-       [ ! -f "$HOST_SOURCE_ROOT/third_party/ui2/v.mod" ] || \
        ! command -v git >/dev/null 2>&1 || \
        ! git -C "$HOST_SOURCE_ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
         if [ "$HOST_SOURCE_EXPLICIT" -eq 1 ]; then
@@ -214,6 +214,24 @@ if [ "$HOST_SOURCE_ENABLED" -eq 1 ]; then
             exit 1
         fi
         HOST_SOURCE_ENABLED=0
+    fi
+    if [ "$HOST_SOURCE_ENABLED" -eq 1 ]; then
+        if [ -z "$HOST_UI2_SOURCE" ]; then
+            if [ -f "$HOST_SOURCE_ROOT/../ui2/v.mod" ]; then
+                HOST_UI2_SOURCE="$HOST_SOURCE_ROOT/../ui2"
+            else
+                HOST_UI2_SOURCE="$HOST_SOURCE_ROOT/third_party/ui2"
+            fi
+        fi
+        if [ ! -f "$HOST_UI2_SOURCE/v.mod" ]; then
+            if [ "$HOST_SOURCE_EXPLICIT" -eq 1 ] || [ -n "${VINIX_UI2_SOURCE:-}" ]; then
+                echo "ERROR: QEMU ui2 source is not a checkout: $HOST_UI2_SOURCE" >&2
+                exit 1
+            fi
+            HOST_SOURCE_ENABLED=0
+        else
+            HOST_UI2_SOURCE="$(cd "$HOST_UI2_SOURCE" && pwd)"
+        fi
     fi
 fi
 
@@ -940,7 +958,7 @@ else
     SOURCE_SERVER_ARGS=()
     if [ "$HOST_SOURCE_ENABLED" -eq 1 ]; then
         SOURCE_SERVER_ARGS=(--source-root "$HOST_SOURCE_ROOT" \
-            --source-extra third_party/ui2)
+            --ui2-source "$HOST_UI2_SOURCE")
     fi
     python3 "$SCRIPT_DIR/tools/qemu-package-store.py" \
         --store "$PACKAGE_STORE" --port "$PACKAGE_STORE_PORT" \
@@ -968,6 +986,7 @@ else
     echo "==> Package installs persist in: $PACKAGE_STORE"
     if [ "$HOST_SOURCE_ENABLED" -eq 1 ]; then
         echo "==> Host sources: $HOST_SOURCE_ROOT -> /mnt/host/vinix"
+        echo "==> Desktop ui2 sources: $HOST_UI2_SOURCE"
     fi
 fi
 echo "==> Starting QEMU (Ctrl-A X to quit)..."
