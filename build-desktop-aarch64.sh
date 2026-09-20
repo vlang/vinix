@@ -764,6 +764,10 @@ install -m644 "$SCRIPT_DIR/desktop/assets/blender.qoi" \
 install -m644 "$SCRIPT_DIR/desktop/assets/minecraft.qoi" \
     "$STAGING/usr/share/vinix/icons/minecraft.qoi"
 
+for app_icon in terminal settings activity calculator vspace; do
+    install -m644 "$SCRIPT_DIR/desktop/assets/${app_icon}.qoi" \
+        "$STAGING/usr/share/vinix/icons/${app_icon}.qoi"
+done
 # Keep the display handoff pieces in sync with the desktop source even when the
 # full base userland predates them. The bridge is a cross-compiled executable;
 # package/Firefox launchers and policy files can be installed directly from

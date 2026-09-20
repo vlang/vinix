@@ -127,6 +127,11 @@ fn (mut d Desktop) load_app_icons() {
 	d.chromium_icon = load_app_icon('chromium')
 	d.blender_icon = load_app_icon('blender')
 	d.minecraft_icon = load_app_icon('minecraft')
+	d.terminal_icon = load_app_icon('terminal')
+	d.settings_icon = load_app_icon('settings')
+	d.activity_icon = load_app_icon('activity')
+	d.calculator_icon = load_app_icon('calculator')
+	d.vspace_icon = load_app_icon('vspace')
 }
 
 fn (d &Desktop) app_icon(path string) &AppIcon {
@@ -135,6 +140,11 @@ fn (d &Desktop) app_icon(path string) &AppIcon {
 		'asset:chromium' { return &d.chromium_icon }
 		'asset:blender' { return &d.blender_icon }
 		'asset:minecraft' { return &d.minecraft_icon }
+		'asset:terminal' { return &d.terminal_icon }
+		'asset:settings' { return &d.settings_icon }
+		'asset:activity' { return &d.activity_icon }
+		'asset:calculator' { return &d.calculator_icon }
+		'asset:vspace' { return &d.vspace_icon }
 		else { return unsafe { nil } }
 	}
 }

@@ -576,10 +576,14 @@ fn test_available_utility_applications_and_shortcut_layouts() {
 	assert available_apps[1].height == firefox_window_height + default_title_height
 	assert available_apps[1].polling && available_apps[1].poll_interval_ms == 50
 	assert available_apps[1].keyboard && available_apps[1].pointer
+	assert available_apps[2].icon == 'asset:calculator'
 	assert available_apps[3].process_name == 'vinix-terminal'
+	assert available_apps[3].icon == 'asset:terminal'
 	assert available_apps[3].keyboard && available_apps[3].polling
+	assert available_apps[4].icon == 'asset:settings'
 	assert available_apps[5].title == 'Activity Monitor'
 	assert available_apps[5].process_name == 'vinix-activity'
+	assert available_apps[5].icon == 'asset:activity'
 	assert available_apps[9].title == 'Minecraft'
 	assert available_apps[9].process_name == 'vinix-minecraft'
 	assert available_apps[9].icon == 'asset:minecraft'
@@ -619,7 +623,7 @@ fn test_available_utility_applications_and_shortcut_layouts() {
 	assert available_apps[15].polling && available_apps[15].poll_interval_ms == 50
 	assert available_apps[16].title == 'VSpace'
 	assert available_apps[16].process_name == 'vinix-vspace'
-	assert available_apps[16].icon == 'builtin:disk'
+	assert available_apps[16].icon == 'asset:vspace'
 	assert available_apps[16].polling && available_apps[16].poll_interval_ms == 33
 	assert !available_apps[16].keyboard && !available_apps[16].pointer
 	assert available_apps[18].title == 'Chromium'

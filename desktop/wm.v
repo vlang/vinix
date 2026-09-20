@@ -64,6 +64,11 @@ mut:
 	blender_icon  AppIcon
 	minecraft_icon AppIcon
 	windows []Window // painting order; the last entry is on top
+	terminal_icon AppIcon
+	settings_icon AppIcon
+	activity_icon AppIcon
+	calculator_icon AppIcon
+	vspace_icon AppIcon
 	next_id int = 1
 	focus   int
 	drag    Drag

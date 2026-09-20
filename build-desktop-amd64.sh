@@ -129,6 +129,10 @@ install -m644 "$SCRIPT_DIR/desktop/assets/blender.qoi" \
 install -m644 "$SCRIPT_DIR/desktop/assets/minecraft.qoi" \
     "$STAGING/usr/share/vinix/icons/minecraft.qoi"
 install -m755 "$SCRIPT_DIR/build-support/vinix-desktop-reload" \
+for app_icon in terminal settings activity calculator vspace; do
+    install -m644 "$SCRIPT_DIR/desktop/assets/${app_icon}.qoi" \
+        "$STAGING/usr/share/vinix/icons/${app_icon}.qoi"
+done
     "$STAGING/usr/bin/vinix-desktop-reload"
 rm -f "$STAGING/sbin/init"
 install -m755 "$SCRIPT_DIR/build-support/init-amd64/desktop-init" "$STAGING/sbin/init"

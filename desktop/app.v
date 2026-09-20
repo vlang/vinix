@@ -87,7 +87,7 @@ const available_apps = [
 	},
 	AppFactory{
 		title: 'Calculator'
-		icon: 'builtin:calculator'
+		icon: 'asset:calculator'
 		width: window_width
 		height: window_height + default_title_height
 		process_name: 'vinix-calculator'
@@ -95,7 +95,7 @@ const available_apps = [
 	},
 	AppFactory{
 		title: 'Terminal'
-		icon: 'builtin:terminal'
+		icon: 'asset:terminal'
 		width: 560
 		height: 340
 		process_name: 'vinix-terminal'
@@ -109,7 +109,7 @@ const available_apps = [
 	},
 	AppFactory{
 		title: 'Settings'
-		icon: 'builtin:settings'
+		icon: 'asset:settings'
 		width: 620
 		height: 410
 		process_name: 'vinix-settings'
@@ -117,7 +117,7 @@ const available_apps = [
 	},
 	AppFactory{
 		title: 'Activity Monitor'
-		icon: 'builtin:activity'
+		icon: 'asset:activity'
 		// Wide enough for four columns without the process names truncating,
 		// and tall enough that the list is worth scrolling rather than a
 		// glimpse of one.
@@ -235,7 +235,7 @@ const available_apps = [
 	},
 	AppFactory{
 		title: 'VSpace'
-		icon: 'builtin:disk'
+		icon: 'asset:vspace'
 		// Two ranking panels side by side, each wide enough for a name, a size
 		// and a path that is not cut in half.
 		width: 880
