@@ -41,7 +41,7 @@ fn decode_qoi(bytes []u8) ?AppIcon {
 		return none
 	}
 	mut pixels := []u32{len: pixel_count}
-	mut index := [u32(0), 64]
+	mut index := [64]u32{}
 	mut at := 14
 	mut r := u8(0)
 	mut g := u8(0)
@@ -100,7 +100,7 @@ fn decode_qoi(bytes []u8) ?AppIcon {
 		}
 		packed := u32(r) << 24 | u32(g) << 16 | u32(b) << 8 | u32(a)
 		index[(u32(r) * 3 + u32(g) * 5 + u32(b) * 7 + u32(a) * 11) % 64] = packed
-		pixels[pixel] = packed
+		pixels[pixel] = u32(a) << 24 | u32(r) << 16 | u32(g) << 8 | u32(b)
 	}
 	return AppIcon{
 		width:  width

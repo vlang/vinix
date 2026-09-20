@@ -54,6 +54,20 @@ fn test_qoi_icon_decoder_preserves_rgba_and_run_pixels() {
 	assert icon.pixels == [u32(0x78123456), 0x78123456]
 }
 
+fn test_qoi_icon_decoder_uses_all_64_index_slots() {
+	// RGBA(3, 0, 0, 255) hashes to slot 62. Decode it once as a literal and
+	// once through QOI_OP_INDEX so a shortened colour index cannot regress.
+	encoded := [u8(`q`), `o`, `i`, `f`, 0, 0, 0, 2, 0, 0, 0, 1, 4, 0, 0xff, 3, 0, 0, 0xff, u8(62),
+		0, 0, 0, 0, 0, 0, 0, 1]
+	icon := decode_qoi(encoded) or {
+		assert false
+		return
+	}
+	assert icon.width == 2
+	assert icon.height == 1
+	assert icon.pixels == [u32(0xff030000), 0xff030000]
+}
+
 fn test_vinix_start_glyph_uses_the_wordmark_v_polygon() {
 	// These coordinates are inside the left arm, the open notch and the right
 	// arm of the V in vinix-logo.svg. Keeping this assertion on the shared
