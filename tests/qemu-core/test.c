@@ -1,3 +1,7 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 /* SPDX-License-Identifier: BSD-2-Clause
  * In-guest regression coverage for the VM, VFS, and Linux ABI fundamentals.
  * The binary is linked statically and installed as PID 1 by run-aarch64.sh's

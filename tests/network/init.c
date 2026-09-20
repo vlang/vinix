@@ -1,3 +1,7 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 /* End-to-end AF_INET smoke test.  It is freestanding so it can be installed as
  * /sbin/init in a tiny diagnostic initramfs without trusting a libc first. */
 typedef unsigned char u8;

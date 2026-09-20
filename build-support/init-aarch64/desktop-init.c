@@ -1,3 +1,7 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 /* Freestanding ARM64 init for the desktop image.
  *
  * Native applications are separate processes, and the compositor is a
