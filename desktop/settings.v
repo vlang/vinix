@@ -71,11 +71,13 @@ struct Theme {
 	traffic_minimize_glyph u32
 	traffic_zoom_glyph     u32
 	// The bar along the bottom: full width like a taskbar, or a centred rounded
-	// panel like a dock.
-	dock         bool
-	dock_bg      u32
-	dock_radius  int
-	dock_padding int
+	// panel like a dock. Some themes use large, icon-only task buttons instead
+	// of labels, in the style of the Windows 7 taskbar.
+	dock               bool
+	taskbar_icon_only  bool
+	dock_bg            u32
+	dock_radius        int
+	dock_padding       int
 	// Taskbar
 	taskbar_bg          u32
 	taskbar_edge        u32
@@ -199,18 +201,21 @@ const theme_macos = Theme{
 	traffic_close_glyph: 0x4d0000
 	traffic_minimize_glyph: 0x995700
 	traffic_zoom_glyph: 0x006500
-	dock: true
-	dock_bg: 0xe8e8ea
+	// Keep the Catalina window chrome, but give its desktop a practical
+	// Windows-7-style taskbar: it spans the bottom edge and uses large icons.
+	dock: false
+	taskbar_icon_only: true
+	dock_bg: 0x4d6f91
 	dock_radius: 12
 	dock_padding: 8
-	taskbar_bg: 0xe8e8ea
-	taskbar_edge: 0xc4c4c8
-	taskbar_text: 0x2c2c2e
-	taskbar_text_active: 0x000000
-	taskbar_muted: 0x8e8e93
-	taskbar_item_bg: 0xdcdce0
-	taskbar_item_hover: 0xcfcfd4
-	taskbar_item_active: 0xc0c0c6
+	taskbar_bg: 0x4d6f91
+	taskbar_edge: 0xa9c0d7
+	taskbar_text: 0xe8f1fb
+	taskbar_text_active: 0xffffff
+	taskbar_muted: 0xd1deeb
+	taskbar_item_bg: 0x5d84ab
+	taskbar_item_hover: 0x7199c0
+	taskbar_item_active: 0x88add0
 	accent: 0x3478d4
 	accent_dim: 0xc9d6ea
 	shortcut_label: 0xffffff

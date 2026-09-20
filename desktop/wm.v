@@ -923,20 +923,22 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 	// A dock is a panel wide enough for what is in it, centred and floating
 	// clear of the screen's edge. A taskbar is the whole width of the bottom.
 	dock := theme.dock
+	icon_only := theme.taskbar_icon_only
 	edge_padding := if dock { theme.dock_padding } else { taskbar_padding }
 
 	mut children := frame_elements(d.windows.len + 4)
-	item_y := (taskbar_height - taskbar_item_height) / 2
+	item_height := if icon_only { taskbar_icon_item_height } else { taskbar_item_height }
+	item_y := (taskbar_height - item_height) / 2
 
 	// The Start orb is the taskbar's anchor. Its standalone V is the first
 	// letterform of the wallpaper wordmark, not a font-dependent character.
-	children << ui2.button_with_image(action_start_toggle, '', 'builtin:vinix', ui2.rect(f64(edge_padding), f64(item_y), f64(start_button_width), f64(taskbar_item_height)), ui2.BoxStyle{
-		bg: if d.start_menu_open || d.hover == action_start_toggle {
+	children << ui2.button_with_image(action_start_toggle, '', 'builtin:vinix', ui2.rect(f64(edge_padding), f64(item_y), f64(start_button_width), f64(item_height)), ui2.BoxStyle{
+		bg:     if d.start_menu_open || d.hover == action_start_toggle {
 			theme.accent
 		} else {
 			theme.accent_dim
 		}
-		radius: taskbar_item_height / 2
+		radius: item_height / 2
 	}, ui2.TextStyle{
 		color: theme.taskbar_text_active
 	})
@@ -958,14 +960,21 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 	// Entries share whatever room is left rather than each taking a fixed
 	// slot: with a fixed one the last window opened simply had no entry, which
 	// is the opposite of what a list of open windows is for.
-	mut item_width := if dock { dock_item_width } else { taskbar_item_width }
+	mut item_width := if dock {
+		dock_item_width
+	} else if icon_only {
+		taskbar_icon_item_width
+	} else {
+		taskbar_item_width
+	}
+	item_min_width := if icon_only { taskbar_icon_item_min_width } else { taskbar_item_min_width }
 	if entries.len > 0 {
 		share := (entry_right - x + taskbar_item_gap) / entries.len - taskbar_item_gap
 		if share < item_width {
 			item_width = share
 		}
-		if item_width < taskbar_item_min_width {
-			item_width = taskbar_item_min_width
+		if item_width < item_min_width {
+			item_width = item_min_width
 		}
 	}
 
@@ -989,14 +998,24 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 		} else {
 			theme.taskbar_text
 		}
-		children << ui2.button(entry.id, entry.label, ui2.rect(f64(x), f64(item_y), f64(item_width), f64(taskbar_item_height)), ui2.BoxStyle{
-			bg: bg
-			radius: 6
-		}, ui2.TextStyle{
-			color: text_color
-			size: 12
-			align: .left
-		})
+		button_frame := ui2.rect(f64(x), f64(item_y), f64(item_width), f64(item_height))
+		button_style := ui2.BoxStyle{
+			bg:     bg
+			radius: if icon_only { 4 } else { 6 }
+		}
+		if icon_only {
+			// An icon consumes the full button when it has no label, making an
+			// app identifiable at a glance without stealing room from the clock.
+			children << ui2.button_with_image(entry.id, '', entry.icon, button_frame, button_style, ui2.TextStyle{
+				color: text_color
+			})
+		} else {
+			children << ui2.button(entry.id, entry.label, button_frame, button_style, ui2.TextStyle{
+				color: text_color
+				size:  12
+				align: .left
+			})
+		}
 		x += item_width + taskbar_item_gap
 	}
 
@@ -1050,6 +1069,7 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 struct TaskbarEntry {
 	id        string
 	label     string
+	icon      string
 	active    bool
 	minimized bool
 }
@@ -1064,9 +1084,10 @@ fn (d &Desktop) taskbar_entries() []TaskbarEntry {
 			window := &d.windows[index]
 			last_id = window.id
 			out << TaskbarEntry{
-				id: window.id_task
-				label: window.title
-				active: window.id == d.focus && !window.minimized
+				id:        window.id_task
+				label:     window.title
+				icon:      window.icon
+				active:    window.id == d.focus && !window.minimized
 				minimized: window.minimized
 			}
 		}
@@ -1108,9 +1129,10 @@ fn (d &Desktop) taskbar_entries() []TaskbarEntry {
 			}
 		}
 		out << TaskbarEntry{
-			id: d.windows[newest_index].id_task
-			label: if count > 1 { '${window.title}  (${count})' } else { window.title }
-			active: active
+			id:        d.windows[newest_index].id_task
+			label:     if count > 1 { '${window.title}  (${count})' } else { window.title }
+			icon:      d.windows[newest_index].icon
+			active:    active
 			minimized: all_minimized
 		}
 	}

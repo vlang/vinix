@@ -799,6 +799,38 @@ fn test_taskbar_keeps_a_bottom_right_clock_and_open_windows() {
 	free_tree(empty)
 }
 
+fn test_macos_taskbar_uses_large_icon_only_buttons_at_screen_edges() {
+	mut desktop := Desktop{
+		canvas: Canvas{
+			width: 1280
+			height: 720
+		}
+		settings: Settings{
+			theme: .macos
+		}
+	}
+	first := desktop.spawn('Files', .welcome, 10, 10, 300, 200)
+	desktop.windows[0].icon = 'builtin:folder'
+	desktop.update_taskbar_clock_at(0)
+
+	root := desktop.build_tree()
+	taskbar := utility_element_named(root, 'taskbar') or { panic('missing macOS taskbar') }
+	start := utility_element_named(taskbar, action_start_toggle) or { panic('missing Start button') }
+	entry := utility_element_named(taskbar, 'task.${first}') or { panic('missing icon task button') }
+	clock := utility_element_named(taskbar, 'clock.time') or { panic('missing taskbar clock') }
+	assert int(taskbar.frame.x) == 0
+	assert int(taskbar.frame.width) == 1280
+	assert int(taskbar.frame.y + taskbar.frame.height) == 720
+	assert int(start.frame.x) == taskbar_padding
+	assert start.image_path == 'builtin:vinix'
+	assert entry.text == ''
+	assert entry.image_path == 'builtin:folder'
+	assert int(entry.frame.width) == taskbar_icon_item_width
+	assert int(entry.frame.height) == taskbar_icon_item_height
+	assert int(clock.frame.x + clock.frame.width) == 1280 - taskbar_padding
+	free_tree(root)
+}
+
 fn test_clicking_a_taskbar_window_button_focuses_without_minimizing() {
 	mut desktop := Desktop{
 		canvas: Canvas{

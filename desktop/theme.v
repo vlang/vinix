@@ -138,6 +138,11 @@ const dock_item_width = 122
 const dock_bottom_gap = 6
 const taskbar_item_gap = 6
 const taskbar_padding = 10
+// Large, label-free buttons used by the Windows-7-style taskbar variant.
+// The V anchor remains its own 42-pixel button at the lower left.
+const taskbar_icon_item_width = 48
+const taskbar_icon_item_min_width = 42
+const taskbar_icon_item_height = 40
 
 // ── Window switcher ────────────────────────────────────────────────
 // Cmd-Tab's panel, in the middle of the screen. It is the same dark slab under
