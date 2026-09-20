@@ -150,7 +150,6 @@ for image_path in \
     usr/bin/cmake \
     usr/bin/v \
     usr/bin/vinix-desktop-build \
-    usr/bin/vinix-build-desktop \
     usr/bin/vinix-desktop-reload \
     usr/bin/vinix-host-sync \
     usr/bin/Xorg \

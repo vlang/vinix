@@ -21,7 +21,7 @@
 #
 # The current Vinix checkout is exposed inside networked QEMU boots at
 # /mnt/host/vinix. vinix-host-sync refreshes that mirror, and
-# vinix-build-desktop does so automatically before compiling. Set
+# vinix-desktop-build does so automatically before compiling. Set
 # VINIX_QEMU_HOST_SOURCE to another checkout, or to 0 to disable the share.
 #
 # --disk-root instead installs the whole system onto that volume and boots from
@@ -893,13 +893,10 @@ install -m755 "$SCRIPT_DIR/build-support/vinix-host-sync" \
     "$PACKAGE_RUNTIME_ROOT/usr/bin/vinix-host-sync"
 install -m755 "$SCRIPT_DIR/build-support/vinix-desktop-build" \
     "$PACKAGE_RUNTIME_ROOT/usr/bin/vinix-desktop-build"
-install -m755 "$SCRIPT_DIR/build-support/vinix-build-desktop" \
-    "$PACKAGE_RUNTIME_ROOT/usr/bin/vinix-build-desktop"
 printf '%s\n' \
     etc/vinix/qemu-host-source-url \
     usr/bin/vinix-host-sync \
     usr/bin/vinix-desktop-build \
-    usr/bin/vinix-build-desktop \
     >> "$PACKAGE_RUNTIME_ROOT/etc/vinix-pkg/base-files"
 LC_ALL=C sort -u -o "$PACKAGE_RUNTIME_ROOT/etc/vinix-pkg/base-files" \
     "$PACKAGE_RUNTIME_ROOT/etc/vinix-pkg/base-files"

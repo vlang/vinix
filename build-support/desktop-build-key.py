@@ -154,7 +154,6 @@ def compute_key(root: Path, v_compiler: Path, env: dict[str, str]) -> str:
         root / "build-support/java-cacerts.py",
         root / "build-support/minecraft",
         root / "build-support/vinix-desktop-build",
-        root / "build-support/vinix-build-desktop",
         root / "build-support/vinix-desktop-reload",
         root / "build-support/vinix-host-sync",
         root / "build-support/xorg-server/startx",

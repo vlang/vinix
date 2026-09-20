@@ -186,12 +186,12 @@ Terminal with:
 
 ```sh
 /root/v-smoke.sh
-vinix-build-desktop
+vinix-desktop-build
 ```
 
-`vinix-build-desktop` (also available as `vinix-desktop-build`) refreshes the
-host mirror, stages the desktop and ui2 sources exactly as the image builder
-does, translates the desktop with V, links a static AArch64
+`vinix-desktop-build` refreshes the host mirror, stages the desktop and ui2
+sources exactly as the image builder does, translates the desktop with V,
+links a static AArch64
 binary with GCC, keeps a copy at `/root/vinix-desktop`, atomically replaces
 `/usr/bin/vinix-desktop`, and sends SIGHUP to PID 1. The supervisor lets the
 old compositor close its applications and release the framebuffer, then starts
