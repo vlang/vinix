@@ -41,6 +41,7 @@ VINIX_HOST_TAR=$(command -v tar) \
 	"$repo/build-support/vinix-host-sync" >/dev/null
 grep -q 'host_revision = 1' "$work/mnt/vinix/desktop/main.v"
 test -f "$work/mnt/vinix/third_party/ui2/v.mod"
+test -L "$work/mnt/vinix"
 
 # The service snapshots at request time, not QEMU launch time.
 printf 'module main\nconst host_revision = 2\n' > "$source_root/desktop/main.v"
@@ -54,5 +55,17 @@ if grep -q 'host_revision = 1' "$work/mnt/vinix/desktop/main.v"; then
 	echo "host source mirror did not replace the old snapshot" >&2
 	exit 1
 fi
+
+# An unchanged checkout reuses the current immutable snapshot rather than
+# recursively deleting a tree or consuming another snapshot's worth of RAM.
+before=$(find "$work/mnt" -maxdepth 1 -type d -name '.vinix.snapshot.*' | wc -l)
+VINIX_HOST_SOURCE_URL_FILE=$work/source-url \
+VINIX_HOST_MOUNT=$work/mnt/vinix \
+VINIX_HOST_CURL=$(command -v curl) \
+VINIX_HOST_TAR=$(command -v tar) \
+	"$repo/build-support/vinix-host-sync" >/dev/null
+after=$(find "$work/mnt" -maxdepth 1 -type d -name '.vinix.snapshot.*' | wc -l)
+test "$before" -eq 2
+test "$after" -eq "$before"
 
 echo "PASS QEMU host source sync"

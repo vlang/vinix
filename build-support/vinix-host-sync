@@ -49,21 +49,35 @@ parent=${destination%/*}
 [ "$parent" != "$destination" ] || parent=.
 name=${destination##*/}
 mkdir -p "$parent"
-work=$(mktemp -d "$parent/.${name}.sync.XXXXXX")
+
+# Disk-root QEMU boots otherwise put this disposable mirror on persistent
+# ext2. Replacing a populated tree there exercises Vinix's still-fragile ext2
+# recursive unlink path and can panic the kernel on the second build. Hide the
+# persistent directory behind a per-boot tmpfs before creating the mirror.
+# Explicit test/custom destinations retain their caller-selected filesystem.
+if [ "$destination" = /mnt/host/vinix ] && \
+	[ ! -e "$parent/.vinix-host-tmpfs" ]; then
+	[ -x /bin/mount ] || {
+		echo "vinix-host-sync: mount is required for the transient host mirror" >&2
+		exit 1
+	}
+	/bin/mount -t tmpfs /dev/null "$parent" || {
+		echo "vinix-host-sync: cannot mount transient storage at $parent" >&2
+		exit 1
+	}
+	: > "$parent/.vinix-host-tmpfs"
+fi
+
 archive=$(mktemp /tmp/vinix-host-source.XXXXXX)
-old="$parent/.${name}.old.$$"
-installed=0
+work=
+next=
 
 cleanup() {
-	rm -f "$archive"
-	[ ! -e "$work" ] || rm -rf "$work"
-	if [ -e "$old" ]; then
-		if [ "$installed" -eq 1 ]; then
-			rm -rf "$old"
-		elif [ ! -e "$destination" ]; then
-			mv "$old" "$destination"
-		fi
-	fi
+	[ -z "$archive" ] || rm -f "$archive"
+	[ -z "$next" ] || rm -f "$next"
+	# Never recursively remove a snapshot here. Vinix's current VFS unlink
+	# path can fault while rm walks a populated tree. Completed and partial
+	# snapshots live on the per-boot tmpfs and disappear when QEMU exits.
 }
 trap cleanup EXIT HUP INT TERM
 
@@ -71,6 +85,17 @@ echo "==> Syncing the macOS Vinix checkout to $destination"
 "$curl" --fail --silent --show-error --connect-timeout 5 --max-time 300 \
 	--retry 10 --retry-connrefused --retry-delay 1 \
 	--output "$archive" "${url%/}/vinix-source.tar"
+
+set -- $(cksum "$archive")
+archive_checksum="$1 $2"
+checksum_file="$parent/.${name}.checksum"
+if [ -e "$destination" ] && [ -s "$checksum_file" ] && \
+	[ "$(cat "$checksum_file")" = "$archive_checksum" ]; then
+	echo "vinix-host-sync: host sources are current"
+	exit 0
+fi
+
+work=$(mktemp -d "$parent/.${name}.snapshot.XXXXXX")
 "$tar" -xf "$archive" -C "$work"
 [ -f "$work/desktop/main.v" ] || {
 	echo "vinix-host-sync: host archive has no desktop/main.v" >&2
@@ -80,13 +105,17 @@ echo "==> Syncing the macOS Vinix checkout to $destination"
 	echo "vinix-host-sync: host archive has no third_party/ui2/v.mod" >&2
 	exit 1
 }
-
-if [ -e "$destination" ] || [ -L "$destination" ]; then
-	mv "$destination" "$old"
+# Publish an immutable snapshot by replacing only a symlink. Old snapshots
+# stay readable by any compiler process that opened the previous mirror and
+# are reclaimed wholesale when the tmpfs goes away at VM shutdown.
+next="$parent/.${name}.next.$$"
+ln -s "${work##*/}" "$next"
+if [ -L "$destination" ]; then
+	rm -f "$destination"
+elif [ -e "$destination" ]; then
+	mv "$destination" "$parent/.${name}.snapshot.legacy.$$"
 fi
-mv "$work" "$destination"
-work=
-installed=1
-[ ! -e "$old" ] || rm -rf "$old"
-old=
+mv -f "$next" "$destination"
+next=
+printf '%s\n' "$archive_checksum" > "$checksum_file"
 echo "vinix-host-sync: host sources are current"

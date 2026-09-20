@@ -144,6 +144,12 @@ if [ -f "$source_dir/execinfo_compat.c" ]; then
 elif [ "$host_source" -eq 1 ] && [ -f "$host_repo/desktop/execinfo_compat.c" ]; then
 	execinfo_source=$host_repo/desktop/execinfo_compat.c
 fi
+if [ -n "$execinfo_source" ]; then
+	command -v objcopy >/dev/null 2>&1 || {
+		echo "vinix-desktop-build: objcopy is required for musl backtrace support" >&2
+		exit 1
+	}
+fi
 
 echo "==> Translating Vinix desktop with $(v version)"
 if [ -n "$execinfo_source" ]; then
@@ -160,8 +166,17 @@ fi
 
 echo "==> Compiling the native desktop with GCC"
 if [ -n "$execinfo_source" ]; then
+	# V's musl vlib supplies no-op backtrace fallbacks. They are annotated as
+	# weak in V, but the compiler currently installed in the desktop image emits
+	# strong exported definitions. Weaken those exact symbols in the generated
+	# object so the real unwinder below replaces them at the final link.
 	gcc -static -O2 -fno-stack-protector -w -I "$source_dir" \
-		"$work_dir/desktop.c" "$execinfo_source" -lgcc_eh -lm \
+		-c "$work_dir/desktop.c" -o "$work_dir/desktop.o"
+	objcopy --weaken-symbol=backtrace \
+		--weaken-symbol=backtrace_symbols \
+		--weaken-symbol=backtrace_symbols_fd "$work_dir/desktop.o"
+	gcc -static -O2 -fno-stack-protector -w -I "$source_dir" \
+		"$work_dir/desktop.o" "$execinfo_source" -lgcc_eh -lm \
 		-o "$work_dir/vinix-desktop"
 else
 	gcc -static -O2 -fno-stack-protector -w -I "$source_dir" \

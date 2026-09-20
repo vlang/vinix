@@ -54,11 +54,16 @@ while [ "$#" -gt 0 ]; do
 done
 exit 1
 EOF
+cat > "$work/bin/objcopy" <<'EOF'
+#!/bin/sh
+printf '%s\n' "$*" > "$VINIX_DESKTOP_TEST_OBJCOPY_ARGS"
+EOF
 cat > "$work/bin/vinix-host-sync" <<'EOF'
 #!/bin/sh
 : > "$VINIX_DESKTOP_TEST_SYNCED"
 EOF
 chmod 755 "$work/bin/v" "$work/bin/gcc"
+chmod 755 "$work/bin/objcopy"
 chmod 755 "$work/bin/vinix-host-sync"
 
 output="$(
@@ -134,6 +139,7 @@ VINIX_DESKTOP_OUTPUT="$work/vinix-desktop" \
 VINIX_DESKTOP_TEST_SYNCED="$work/synced" \
 VINIX_DESKTOP_TEST_V_ARGS="$work/v-args" \
 VINIX_DESKTOP_TEST_GCC_ARGS="$work/gcc-args" \
+VINIX_DESKTOP_TEST_OBJCOPY_ARGS="$work/objcopy-args" \
 VINIX_DESKTOP_TEST_STAGED_SOURCE="$work/staged-main.v" \
 	"$repo/build-support/vinix-desktop-build" --no-reload >/dev/null
 test -f "$work/synced"
@@ -142,6 +148,9 @@ grep -F -- '-d glibc' "$work/v-args" >/dev/null
 grep -F '/desktop' "$work/v-args" >/dev/null
 grep -F "$host/desktop/execinfo_compat.c" "$work/gcc-args" >/dev/null
 grep -F -- '-lgcc_eh' "$work/gcc-args" >/dev/null
+grep -F -- '--weaken-symbol=backtrace ' "$work/objcopy-args" >/dev/null
+grep -F -- '--weaken-symbol=backtrace_symbols ' "$work/objcopy-args" >/dev/null
+grep -F -- '--weaken-symbol=backtrace_symbols_fd ' "$work/objcopy-args" >/dev/null
 grep -Fqx '// SPDX-License-Identifier: GPL-2.0-or-later' "$work/staged-main.v"
 if grep -Fq 'All rights reserved.' "$work/staged-main.v"; then
 	echo "desktop build retained the V3-incompatible redundant preamble" >&2

@@ -896,14 +896,14 @@ LC_ALL=C sort -u -o "$PACKAGE_RUNTIME_ROOT/etc/vinix-pkg/base-files" \
     "$PACKAGE_RUNTIME_ROOT/etc/vinix-pkg/base-files"
 : > "$PACKAGE_RUNTIME_ROOT/etc/vinix/qemu-host-source-url"
 if [ "$HOST_SOURCE_ENABLED" -eq 1 ] && [ "$VIRTIO_GPU" -ne 2 ]; then
-    printf 'http://10.0.2.100:%s\n' "$PACKAGE_STORE_PORT" \
+    printf 'http://10.0.2.2:%s\n' "$PACKAGE_STORE_PORT" \
         > "$PACKAGE_RUNTIME_ROOT/etc/vinix/qemu-host-source-url"
 fi
 # VINIX_QEMU_PACKAGE_PERSIST=0 leaves the store address out, which is how the
 # package frontend already recognises a run that does not keep its packages.
 # Saving a browser-sized overlay costs more than the install it follows.
 if [ "${VINIX_QEMU_PACKAGE_PERSIST:-1}" != 0 ]; then
-    printf 'http://10.0.2.100:%s\n' "$PACKAGE_STORE_PORT" \
+    printf 'http://10.0.2.2:%s\n' "$PACKAGE_STORE_PORT" \
         > "$PACKAGE_RUNTIME_ROOT/etc/vinix-pkg/qemu-store-url"
 fi
 COPYFILE_DISABLE=1 tar --format=ustar -cf "$PACKAGE_RUNTIME_TAR" \
@@ -959,7 +959,12 @@ else
         echo "ERROR: QEMU package store could not start on port $PACKAGE_STORE_PORT" >&2
         exit 1
     fi
-    NETWORK_FLAGS="-netdev user,id=net0,guestfwd=tcp:10.0.2.100:${PACKAGE_STORE_PORT}-tcp:127.0.0.1:${PACKAGE_STORE_PORT} -device virtio-net-device,netdev=net0,mac=52:54:00:12:34:56"
+    # QEMU's user network maps 10.0.2.2 to the host. The service itself stays
+    # bound to 127.0.0.1, so it is reachable by the guest without being
+    # exposed to the host's physical network. Unlike a guestfwd character
+    # backend, the host gateway supports every independent HTTP connection a
+    # long-lived VM makes.
+    NETWORK_FLAGS="-netdev user,id=net0 -device virtio-net-device,netdev=net0,mac=52:54:00:12:34:56"
     echo "==> Package installs persist in: $PACKAGE_STORE"
     if [ "$HOST_SOURCE_ENABLED" -eq 1 ]; then
         echo "==> Host sources: $HOST_SOURCE_ROOT -> /mnt/host/vinix"

@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Persist a QEMU guest package overlay and serve its host source checkout.
 
-The server only listens on loopback. run-aarch64.sh gives QEMU user networking
-an explicit guest-forward from 10.0.2.100; it is not a general network service.
+The server only listens on loopback. QEMU user networking exposes the host's
+loopback services to its guest at 10.0.2.2; this is not a general network
+service.
 """
 
 from __future__ import annotations
@@ -190,7 +191,10 @@ def build_source_snapshot(root: Path, extras: tuple[Path, ...]) -> tempfile.Spoo
         with tarfile.open(
             fileobj=snapshot,
             mode="w:",
-            format=tarfile.PAX_FORMAT,
+            # Every shared worktree path is short enough for ustar. Avoid PAX
+            # extended headers here: Vinix's small in-guest tar spends minutes
+            # processing them before a desktop build can even start.
+            format=tarfile.USTAR_FORMAT,
             dereference=False,
         ) as archive:
             for relative in sorted(set(relative_files), key=os.fspath):
@@ -207,7 +211,7 @@ def build_source_snapshot(root: Path, extras: tuple[Path, ...]) -> tempfile.Spoo
                     continue
         snapshot.seek(0)
         return snapshot
-    except (OSError, tarfile.TarError, SourceSnapshotError) as error:
+    except (OSError, ValueError, tarfile.TarError, SourceSnapshotError) as error:
         snapshot.close()
         if isinstance(error, SourceSnapshotError):
             raise
