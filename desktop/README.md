@@ -39,6 +39,9 @@ What it does:
   wallpaper, display, battery and experimental M1 Wi-Fi controls
 - **native ui2 applications**: every Files, Calculator, Terminal, Settings and
   utility window is backed by its own OS process, PID and memory accounting
+- a paged **ui2 Examples** launcher containing all 84 applications from the
+  sibling `~/code/ui2/examples` checkout, including native input, slider,
+  switch, toggle, menu, file-dialog and custom-window demonstrations
 - a **VT-compatible built-in terminal** with a real PTY, alternate-screen and
   cursor-addressed rendering for editing files in the preinstalled Vim
 - embedded **Wine Calculator and Notepad**: their translated Win64 processes
@@ -131,10 +134,20 @@ remaining client. Settings returns its synchronized preference state with each
 response, allowing theme, wallpaper and scale changes to cross the boundary
 immediately.
 
-The app names are relative symlinks to one static multicall executable. This
-keeps the initramfs small, while each exec creates an independent address space
-and Vinix records the per-app exec path as its process name. Consequently
-`/dev/processes` reports truthful CPU and mapped-memory values for every app.
+Vinix's own app names are relative symlinks to one static multicall executable.
+The upstream examples are separate static executables because each is an
+independent `module main` program and several intentionally reuse model and
+callback names. Both forms create independent address spaces, and Vinix records
+the per-app exec path as its process name. Consequently `/dev/processes`
+reports truthful CPU and mapped-memory values for every app.
+
+`tools/build_ui2_examples.py` inventories the checkout against
+`ui2_examples.txt`, then compiles every example without modifying its source.
+The disposable ui2 overlay adds `tools/ui2_vinix_backend.v`, whose `run_window`
+implements the same versioned pipe protocol as `app_process.v`. The build uses
+`VINIX_UI2_SOURCE` when set, otherwise a sibling `../ui2` checkout when present,
+and finally `third_party/ui2`. This makes the local `~/code/ui2` tree the normal
+development source while retaining a self-contained CI/package fallback.
 
 The Calculator model comes from ui2's own example and is not copied into this
 repository. `tools/stage_app.py` takes it straight from the ui2 checkout at
@@ -153,10 +166,11 @@ mine", an application names its events whatever suits it: the Calculator's `+`
 and the file browser's `files.row.3` both arrive without the window manager
 parsing either.
 
-Add an application by adding an `AppFactory` to `available_apps` in `app.v`;
-it then has a wallpaper shortcut and a Start-menu entry. A ui2 example also
-needs its directory listed in `build-desktop-aarch64.sh` so the staging step
-compiles it in.
+Add a built-in application by adding an `AppFactory` to `available_apps` in
+`app.v`; it then has a wallpaper shortcut and a Start-menu entry. A new ui2
+example only needs its directory name added to `ui2_examples.txt` and the
+parallel constant in `ui2_examples.v`; the inventory check fails rather than
+silently omitting an upstream example.
 
 Firefox is an upstream GTK/X11 application rather than a native ui2 client. It
 runs on a private Xvfb display whose live XWD framebuffer is composited into a

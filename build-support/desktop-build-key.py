@@ -128,19 +128,22 @@ def compute_key(root: Path, v_compiler: Path, env: dict[str, str]) -> str:
     gpu_sysroot = resolved_env_path(
         env, "VINIX_GPU_SYSROOT", root / "build-aarch64-x11/sysroot"
     )
+    sibling_ui2 = root.parent / "ui2"
+    default_ui2 = sibling_ui2 if (sibling_ui2 / "v.mod").is_file() else root / "third_party/ui2"
+    ui2_source = resolved_env_path(env, "VINIX_UI2_SOURCE", default_ui2)
 
     source_paths = [
         root / "build-desktop-aarch64.sh",
         root / "build-support/content-key.py",
         root / "build-support/desktop-build-key.py",
         root / "desktop",
-        root / "third_party/ui2/v.mod",
-        root / "third_party/ui2/ui",
-        root / "third_party/ui2/uikit",
-        root / "third_party/ui2/windows",
-        root / "third_party/ui2/linux",
-        root / "third_party/ui2/assets",
-        root / "third_party/ui2/examples/calculator",
+        ui2_source / "v.mod",
+        ui2_source / "ui",
+        ui2_source / "uikit",
+        ui2_source / "windows",
+        ui2_source / "linux",
+        ui2_source / "assets",
+        ui2_source / "examples",
         root / "build-support/aarch64-cc-shim",
         root / "build-support/init-aarch64/desktop-init.c",
         root / "tools/m1-wifi/wifi-ctl.c",

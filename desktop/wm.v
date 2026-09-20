@@ -533,7 +533,7 @@ fn (mut d Desktop) launch_with_timeout(factory AppFactory, timeout_ms int) {
 		d.dirty = true
 		return
 	}
-	if factory.open == unsafe { nil } || factory.process_name == '' {
+	if (factory.open == unsafe { nil } && !factory.standalone) || factory.process_name == '' {
 		eprintln('vinix-desktop: ${factory.title} has no launcher')
 		return
 	}
@@ -760,6 +760,15 @@ fn (mut d Desktop) launch_index(index int) {
 // `__qml_` — so rather than parse them the window manager routes by where the
 // click landed, which is also what decides it between two open applications.
 fn (mut d Desktop) forward_to_app(x int, y int, action string) {
+	if action.starts_with(ui2_example_action_prefix) {
+		name := action[ui2_example_action_prefix.len..]
+		factory := ui2_example_named(name) or {
+			eprintln('vinix-desktop: unknown ui2 example ${name}')
+			return
+		}
+		d.launch(factory)
+		return
+	}
 	for i := d.windows.len - 1; i >= 0; i-- {
 		window := d.windows[i]
 		if window.minimized || window.app_index < 0 || window.app_index >= d.apps.len {
@@ -1428,7 +1437,7 @@ fn (mut d Desktop) on_pointer_down(x int, y int) {
 		d.close_start_menu()
 	}
 
-	if d.forward_pointer_to_app(x, y, .down, .left, 0) {
+	if d.forward_pointer_to_app(x, y, .down, .left, 0) && action == '' {
 		// Raw-surface clicks were already delivered and focused above. Falling
 		// through would interpret their deliberately action-less content as an
 		// empty-desktop click and immediately clear that focus again.

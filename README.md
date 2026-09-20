@@ -126,6 +126,11 @@ git clone https://github.com/vlang/ui2 third_party/ui2
 ./run-desktop-amd64.sh
 ```
 
+For local development, a sibling `../ui2` checkout (for example
+`~/code/ui2` beside `~/code/vinix`) is selected automatically and all of its
+examples are installed in the desktop's **ui2 Examples** launcher. Set
+`VINIX_UI2_SOURCE` to choose another checkout explicitly.
+
 This stages Alpine's prebuilt musl development packages, compiles
 `vinix-desktop` with Clang, and creates `vinix-desktop-amd64.iso`, whose init
 starts the desktop directly. The runner uses KVM when available and otherwise

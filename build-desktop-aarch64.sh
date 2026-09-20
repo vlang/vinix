@@ -17,6 +17,14 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 . "$SCRIPT_DIR/build-support/find-v.sh"
 
+if [ -n "${VINIX_UI2_SOURCE:-}" ]; then
+    UI2_SOURCE="$VINIX_UI2_SOURCE"
+elif [ -f "$SCRIPT_DIR/../ui2/v.mod" ]; then
+    UI2_SOURCE="$SCRIPT_DIR/../ui2"
+else
+    UI2_SOURCE="$SCRIPT_DIR/third_party/ui2"
+fi
+
 BUILD_DIR="$SCRIPT_DIR/build"
 USERLAND_BUILD_DIR="${VINIX_AARCH64_USERLAND_BUILD_DIR:-$SCRIPT_DIR/build-aarch64-userland}"
 SYSROOT="${VINIX_AARCH64_SYSROOT:-$USERLAND_BUILD_DIR/staging}"
@@ -251,16 +259,16 @@ fi
 # ── ui2 ──
 # The desktop is built on ui2's declarative element tree. It is not vendored;
 # check it out beside the sources and point V's module path at it.
-if [ ! -f "$SCRIPT_DIR/third_party/ui2/v.mod" ]; then
-    echo "ERROR: ui2 not found at third_party/ui2. Clone it there:"
+if [ ! -f "$UI2_SOURCE/v.mod" ]; then
+    echo "ERROR: ui2 not found at $UI2_SOURCE. Clone it at third_party/ui2:"
     echo "    git clone https://github.com/vlang/ui2 third_party/ui2"
     exit 1
 fi
 
 # Calculator uses the v3 compiler's direct `$vml` lowering. Check the renamed
 # API explicitly so an old QML checkout fails before the compiler does.
-if [ ! -f "$SCRIPT_DIR/third_party/ui2/ui/vml_compiled.v" ] || \
-   [ ! -f "$SCRIPT_DIR/third_party/ui2/examples/calculator/calculator.vml" ]; then
+if [ ! -f "$UI2_SOURCE/ui/vml_compiled.v" ] || \
+   [ ! -f "$UI2_SOURCE/examples/calculator/calculator.vml" ]; then
     echo "ERROR: this ui2 checkout has no compile-time VML support."
     echo "Update the checkout:"
     echo "    git -C third_party/ui2 pull"
@@ -279,7 +287,7 @@ mkdir -p "$BUILD_DIR"
 # Vinix's bounds bridge without modifying the upstream checkout.
 UI2_MODULES="$BUILD_DIR/vmodules"
 python3 "$SCRIPT_DIR/desktop/tools/stage_ui2.py" \
-    "$UI2_MODULES/ui2" "$SCRIPT_DIR/third_party/ui2" \
+    "$UI2_MODULES/ui2" "$UI2_SOURCE" \
     "$SCRIPT_DIR/desktop/tools/ui2_headless_bounds.v"
 
 # ── Stage the sources ──
@@ -291,7 +299,7 @@ python3 "$SCRIPT_DIR/desktop/tools/stage_ui2.py" \
 echo "==> Staging sources..."
 APP_SRC="$BUILD_DIR/app-src"
 python3 "$SCRIPT_DIR/desktop/tools/stage_app.py" "$APP_SRC" "$SCRIPT_DIR/desktop" \
-    "$SCRIPT_DIR/third_party/ui2/examples/calculator"
+    "$UI2_SOURCE/examples/calculator"
 
 # ── V -> C ──
 # -gc none because Vinix has no Boehm GC, and -d ui2_headless so importing ui2
@@ -322,6 +330,15 @@ echo "==> Compiling for aarch64-linux-musl..."
 
 "$LLVM_BIN/llvm-strip" "$BUILD_DIR/vinix-desktop"
 echo "    $BUILD_DIR/vinix-desktop ($(file_size "$BUILD_DIR/vinix-desktop") bytes)"
+
+echo "==> Building all ui2 example applications for aarch64..."
+UI2_EXAMPLES_DIR="$BUILD_DIR/ui2-examples"
+python3 "$SCRIPT_DIR/desktop/tools/build_ui2_examples.py" \
+    --repo "$SCRIPT_DIR" --ui2-source "$UI2_SOURCE" \
+    --output "$UI2_EXAMPLES_DIR" --work "$BUILD_DIR/ui2-examples-work" \
+    --v "$V" --arch arm64 --clang "$LLVM_BIN/clang" --strip "$LLVM_BIN/llvm-strip" \
+    --target aarch64-linux-musl --sysroot "$SYSROOT" --gcclib "$GCCLIB" \
+    --cc-shim "$CC_SHIM" --llvm-bin "$LLVM_BIN"
 
 # Mesa is a dynamic runtime, so keep the always-bootable static desktop and
 # build a second executable only when the exact Asahi userspace is available.
@@ -932,6 +949,7 @@ mkdir -p "$STAGING/usr/libexec"
 cp "$BUILD_DIR/desktop-init" "$STAGING/sbin/init"
 install -m755 "$BUILD_DIR/desktop-init" \
     "$STAGING/usr/libexec/vinix-desktop-init"
+install -m755 "$UI2_EXAMPLES_DIR"/vinix-ui2-* "$STAGING/usr/bin/"
 cp "$BUILD_DIR/vinix-desktop" "$STAGING/usr/bin/vinix-desktop"
 if [ "$GPU_DESKTOP_BUILT" -eq 1 ]; then
     cp "$BUILD_DIR/vinix-desktop-gpu" "$STAGING/usr/bin/vinix-desktop-gpu"
@@ -947,7 +965,7 @@ chmod +x "$STAGING/sbin/init" "$STAGING/usr/bin/vinix-desktop" \
 # Vinix records the path passed to execve, so these relative symlinks produce
 # distinct names and truthful per-app accounting without storing a copy of the
 # same static executable for every native application in the initramfs.
-for app_name in vinix-files vinix-calculator vinix-terminal vinix-settings \
+for app_name in vinix-files vinix-calculator vinix-terminal vinix-settings vinix-ui2-examples \
     vinix-activity vinix-editor vinix-calendar vinix-clock \
     vinix-vspace \
     vinix-firefox vinix-chromium vinix-gimp vinix-libreoffice vinix-minecraft vinix-wine-calculator vinix-wine-notepad \

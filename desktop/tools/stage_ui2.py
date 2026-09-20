@@ -68,7 +68,10 @@ def main():
         staged = os.path.join(output, subdir)
         if subdir == "ui":
             symlink_entries(upstream, staged)
-            shutil.copyfile(bridge, os.path.join(staged, "vinix_headless_bounds.v"))
+            bridge_name = ("vinix_headless_backend.c.v"
+                           if bridge.endswith(".c.v")
+                           else "vinix_headless_backend.v")
+            shutil.copyfile(bridge, os.path.join(staged, bridge_name))
         else:
             os.symlink(upstream, staged)
 

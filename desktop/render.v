@@ -189,9 +189,21 @@ fn free_tree(el ui2.Element) {
 		unsafe {
 			if el.id.len > 0 { el.id.free() }
 			if el.action_id.len > 0 { el.action_id.free() }
+			if el.submit_id.len > 0 { el.submit_id.free() }
 			if el.text.len > 0 { el.text.free() }
 			if el.image_path.len > 0 { el.image_path.free() }
+			if el.tooltip.len > 0 { el.tooltip.free() }
+			if el.placeholder.len > 0 { el.placeholder.free() }
+			if el.cursor.len > 0 { el.cursor.free() }
+			if el.toggle_group.len > 0 { el.toggle_group.free() }
 			if el.text_style.font_family.len > 0 { el.text_style.font_family.free() }
+			if el.text_style.vertical_align.len > 0 { el.text_style.vertical_align.free() }
+			if el.text_style.link.len > 0 { el.text_style.link.free() }
+			for entry in el.menu {
+				if entry.id.len > 0 { entry.id.free() }
+				if entry.title.len > 0 { entry.title.free() }
+			}
+			if el.menu.cap > 0 { el.menu.free() }
 		}
 	} else if el.id == frame_owned_text_id {
 		unsafe { el.text.free() }
@@ -267,7 +279,8 @@ fn (mut d Desktop) render_element(el ui2.Element, off_x int, off_y int, depth in
 		.label {
 			d.draw_label(el, x, y, w, h)
 		}
-		.button, .checkbox, .dropdown, .text_field, .text_area {
+		.button, .checkbox, .dropdown, .text_field, .text_area, .slider, .switch_control,
+		.toggle_button {
 			d.draw_button(el, x, y, w, h)
 		}
 		.image {
@@ -335,7 +348,9 @@ fn (mut d Desktop) draw_office2013_tab_labels(x int, y int, width int, height in
 
 fn (mut d Desktop) record_target(el ui2.Element, x int, y int, w int, h int) {
 	interactive := el.kind == .button || el.kind == .checkbox || el.kind == .dropdown
-		|| el.draggable || el.clickable
+		|| el.kind == .text_field || el.kind == .text_area || el.kind == .slider
+		|| el.kind == .switch_control || el.kind == .toggle_button || el.draggable
+		|| el.clickable
 	if !interactive || !el.enabled {
 		return
 	}
@@ -587,7 +602,236 @@ fn (mut d Desktop) draw_catalina_button(el ui2.Element, x int, y int, w int, h i
 	return text_color
 }
 
+fn (mut d Desktop) draw_catalina_control_text(el ui2.Element, text string, x int, y int,
+	w int, h int, inset int, color u32) {
+	if text.len == 0 || w <= inset {
+		return
+	}
+	face := d.face_for(el.text_style)
+	display, owned := face.truncate(text, w - inset)
+	d.canvas.draw_text(face, x + inset, y + (h - face.line_height) / 2, display, color)
+	if owned {
+		unsafe { display.free() }
+	}
+}
+
+fn (mut d Desktop) draw_catalina_checkbox(el ui2.Element, x int, y int, w int, h int) {
+	size := if h < catalina_checkbox_size { h } else { catalina_checkbox_size }
+	control_y := y + (h - size) / 2
+	action := if el.action_id.len > 0 { el.action_id } else { el.id }
+	pressed := action.len > 0 && d.hover == action && d.buttons & button_left != 0
+	mut face := if pressed { catalina_control_pressed_face } else { catalina_control_face }
+	mut edge := catalina_control_edge_dark
+	if el.checked {
+		face = if pressed { catalina_control_accent_pressed } else { catalina_control_accent }
+		edge = face
+	}
+	if !el.enabled {
+		face = 0xf1f1f1
+		edge = 0xcdcdcd
+	}
+	d.canvas.fill_round_rect(x, control_y, size, size, 3, face)
+	d.canvas.stroke_round_rect(x, control_y, size, size, 3, edge, 255)
+	if el.checked && el.enabled && size >= 10 {
+		// Catalina's check is a compact two-segment tick with rounded-looking
+		// two-pixel strokes at normal control size.
+		d.canvas.draw_line(x + 3, control_y + size / 2, x + 6, control_y + size - 4,
+			0xffffff, 2)
+		d.canvas.draw_line(x + 6, control_y + size - 4, x + size - 3, control_y + 3,
+			0xffffff, 2)
+	}
+	text_color := if el.enabled { catalina_control_text } else { catalina_control_disabled_text }
+	d.draw_catalina_control_text(el, el.text, x + size, y, w - size, h, 6, text_color)
+}
+
+fn (mut d Desktop) draw_catalina_dropdown(el ui2.Element, x int, y int, w int, h int) {
+	bezel_height := if h < catalina_popup_height { h } else { catalina_popup_height }
+	bezel_y := y + (h - bezel_height) / 2
+	radius := if bezel_height < 8 { bezel_height / 2 } else { 4 }
+	action := if el.action_id.len > 0 { el.action_id } else { el.id }
+	pressed := action.len > 0 && d.hover == action && d.buttons & button_left != 0
+	accent := if pressed { catalina_control_accent_pressed } else { catalina_control_accent }
+	arrow_width := if w < 36 { w / 3 } else { 18 }
+	if el.enabled {
+		d.canvas.fill_round_rect(x, bezel_y, w, bezel_height, radius, accent)
+		if w > arrow_width + 1 {
+			d.canvas.fill_round_rect(x + 1, bezel_y + 1, w - arrow_width, bezel_height - 2,
+				if radius > 0 { radius - 1 } else { 0 }, catalina_control_face)
+			d.canvas.fill_rect(x + w - arrow_width - 1, bezel_y + 1, 2, bezel_height - 2,
+				catalina_control_face)
+		}
+	} else {
+		d.canvas.fill_round_rect(x, bezel_y, w, bezel_height, radius, 0xf4f4f4)
+	}
+	d.canvas.stroke_round_rect(x, bezel_y, w, bezel_height, radius,
+		if el.enabled { catalina_control_edge } else { u32(0xd3d3d3) }, 255)
+	if el.enabled && arrow_width >= 10 {
+		cx := x + w - arrow_width / 2
+		cy := bezel_y + bezel_height / 2
+		d.canvas.draw_line(cx - 2, cy - 2, cx, cy - 4, 0xffffff, 1)
+		d.canvas.draw_line(cx, cy - 4, cx + 2, cy - 2, 0xffffff, 1)
+		d.canvas.draw_line(cx - 2, cy + 2, cx, cy + 4, 0xffffff, 1)
+		d.canvas.draw_line(cx, cy + 4, cx + 2, cy + 2, 0xffffff, 1)
+	}
+	d.draw_catalina_control_text(el, el.text, x, bezel_y, w - arrow_width, bezel_height, 8,
+		if el.enabled { catalina_control_text } else { catalina_control_disabled_text })
+}
+
+fn (mut d Desktop) draw_catalina_text_input(el ui2.Element, x int, y int, w int, h int) {
+	bezel_height := if el.kind == .text_area || h < catalina_text_input_height {
+		h
+	} else {
+		catalina_text_input_height
+	}
+	bezel_y := if el.kind == .text_area { y } else { y + (h - bezel_height) / 2 }
+	radius := if bezel_height < 8 { bezel_height / 2 } else { 3 }
+	if el.native_style && el.enabled {
+		d.canvas.stroke_round_rect(x - 2, bezel_y - 2, w + 4, bezel_height + 4, radius + 2,
+			catalina_control_focus, 220)
+	}
+	d.canvas.fill_round_rect(x, bezel_y, w, bezel_height, radius,
+		if el.enabled { catalina_control_face } else { u32(0xf3f3f3) })
+	d.canvas.stroke_round_rect(x, bezel_y, w, bezel_height, radius,
+		if el.native_style && el.enabled { catalina_control_accent } else { catalina_control_edge },
+		255)
+	mut shown := el.text
+	mut color := if el.enabled { el.text_style.color } else { catalina_control_disabled_text }
+	if shown.len == 0 {
+		shown = el.placeholder
+		color = 0x9a9a9a
+	}
+	if el.kind == .text_area {
+		face := d.face_for(el.text_style)
+		text_width := w - int(el.padding_left) - 6
+		if text_width <= 0 {
+			return
+		}
+		mut line_y := bezel_y + 5
+		for line in shown.split('\n') {
+			if line_y + face.line_height > bezel_y + bezel_height - 3 {
+				break
+			}
+			display, owned := face.truncate(line, text_width)
+			d.canvas.draw_text(face, x + int(el.padding_left), line_y, display, color)
+			if owned {
+				unsafe { display.free() }
+			}
+			line_y += face.line_height
+		}
+		return
+	}
+	d.draw_catalina_control_text(el, shown, x, bezel_y, w, bezel_height, int(el.padding_left),
+		color)
+}
+
+fn (mut d Desktop) draw_catalina_slider(el ui2.Element, x int, y int, w int, h int) {
+	if w <= 0 || h <= 0 {
+		return
+	}
+	vertical := el.orientation == .vertical
+	extent := if vertical { h } else { w }
+	mut inset := int(el.padding)
+	if inset < 7 {
+		inset = 7
+	}
+	if inset * 2 > extent {
+		inset = extent / 2
+	}
+	range := el.max_value - el.min_value
+	mut normalized := if range > 0 { (el.value - el.min_value) / range } else { 0.0 }
+	if normalized < 0 {
+		normalized = 0
+	} else if normalized > 1 {
+		normalized = 1
+	}
+	if vertical {
+		track_x := x + w / 2 - 2
+		track_y := y + inset
+		track_h := h - inset * 2
+		d.canvas.fill_round_rect(track_x, track_y, 4, track_h, 2, catalina_slider_track)
+		d.canvas.stroke_round_rect(track_x, track_y, 4, track_h, 2, catalina_slider_track_edge,
+			180)
+		thumb_y := y + h - inset - int(normalized * f64(track_h))
+		if el.value_track {
+			d.canvas.fill_round_rect(track_x, thumb_y, 4, y + h - inset - thumb_y, 2,
+				catalina_control_accent)
+		}
+		d.canvas.fill_circle(x + w / 2 + 1, thumb_y + 1, 8, 0x777777)
+		d.canvas.fill_circle(x + w / 2, thumb_y, 8, catalina_control_edge)
+		d.canvas.fill_circle(x + w / 2, thumb_y, 7, catalina_control_face)
+	} else {
+		track_x := x + inset
+		track_y := y + h / 2 - 2
+		track_w := w - inset * 2
+		d.canvas.fill_round_rect(track_x, track_y, track_w, 4, 2, catalina_slider_track)
+		d.canvas.stroke_round_rect(track_x, track_y, track_w, 4, 2, catalina_slider_track_edge,
+			180)
+		thumb_x := x + inset + int(normalized * f64(track_w))
+		if el.value_track {
+			d.canvas.fill_round_rect(track_x, track_y, thumb_x - track_x, 4, 2,
+				catalina_control_accent)
+		}
+		d.canvas.fill_circle(thumb_x + 1, y + h / 2 + 1, 8, 0x777777)
+		d.canvas.fill_circle(thumb_x, y + h / 2, 8, catalina_control_edge)
+		d.canvas.fill_circle(thumb_x, y + h / 2, 7, catalina_control_face)
+	}
+}
+
+fn (mut d Desktop) draw_catalina_switch(el ui2.Element, x int, y int, w int, h int) {
+	if w <= 0 || h <= 0 {
+		return
+	}
+	track_height := if h < 22 { h } else { 22 }
+	mut track_width := track_height * 19 / 11
+	if track_width > w {
+		track_width = w
+	}
+	track_x := x + (w - track_width) / 2
+	track_y := y + (h - track_height) / 2
+	radius := track_height / 2
+	action := if el.action_id.len > 0 { el.action_id } else { el.id }
+	pressed := action.len > 0 && d.hover == action && d.buttons & button_left != 0
+	mut track := if el.checked { catalina_switch_on } else { catalina_switch_off }
+	if pressed {
+		track = if el.checked { u32(0x4ca950) } else { u32(0xa4a4a4) }
+	}
+	if !el.enabled {
+		track = 0xd7d7d7
+	}
+	d.canvas.fill_round_rect(track_x, track_y, track_width, track_height, radius, track)
+	thumb_radius := if radius > 2 { radius - 2 } else { radius }
+	thumb_x := if el.checked { track_x + track_width - radius } else { track_x + radius }
+	d.canvas.fill_circle(thumb_x + 1, track_y + radius + 1, thumb_radius, 0x888888)
+	d.canvas.fill_circle(thumb_x, track_y + radius, thumb_radius,
+		if el.enabled { catalina_control_face } else { u32(0xf3f3f3) })
+}
+
 fn (mut d Desktop) draw_button(el ui2.Element, x int, y int, w int, h int) {
+	if d.settings.theme == .macos {
+		match el.kind {
+			.checkbox {
+				d.draw_catalina_checkbox(el, x, y, w, h)
+				return
+			}
+			.dropdown {
+				d.draw_catalina_dropdown(el, x, y, w, h)
+				return
+			}
+			.text_field, .text_area {
+				d.draw_catalina_text_input(el, x, y, w, h)
+				return
+			}
+			.slider {
+				d.draw_catalina_slider(el, x, y, w, h)
+				return
+			}
+			.switch_control {
+				d.draw_catalina_switch(el, x, y, w, h)
+				return
+			}
+			else {}
+		}
+	}
 	// The traffic lights are only twelve logical pixels across. At 200% scale,
 	// rendering their rounded rectangle through logical pixels turns the arc
 	// into enlarged square steps. Draw this one tiny, circular control at the
@@ -595,18 +839,29 @@ fn (mut d Desktop) draw_button(el ui2.Element, x int, y int, w int, h int) {
 	is_title_button := el.id.ends_with('.close') || el.id.ends_with('.minimize')
 		|| el.id.ends_with('.maximize')
 	is_traffic_light := d.theme().button_look == .traffic && is_title_button
-	mut text_color := el.text_style.color
-	if el.kind == .button && el.native_style && d.settings.theme == .macos {
+	mut text_color := if el.kind == .toggle_button && el.checked {
+		el.toggle_down_text_style.color
+	} else {
+		el.text_style.color
+	}
+	if (el.kind == .button || el.kind == .toggle_button) && el.native_style
+		&& d.settings.theme == .macos {
 		text_color = d.draw_catalina_button(el, x, y, w, h)
 	} else if !el.box.transparent {
-		radius := int(el.box.radius)
+		control_box := if el.kind == .toggle_button && el.checked {
+			el.toggle_down_box
+		} else {
+			el.box
+		}
+		radius := int(control_box.radius)
 		if is_traffic_light && d.canvas.scale > 1 {
-			d.canvas.fill_stroke_hidpi_circle(x, y, w, h, 1, el.box.bg, el.box.border_color)
+			d.canvas.fill_stroke_hidpi_circle(x, y, w, h, 1, control_box.bg,
+				control_box.border_color)
 		} else {
 			if radius > 0 {
-				d.canvas.fill_round_rect(x, y, w, h, radius, el.box.bg)
+				d.canvas.fill_round_rect(x, y, w, h, radius, control_box.bg)
 			} else {
-				d.canvas.fill_rect(x, y, w, h, el.box.bg)
+				d.canvas.fill_rect(x, y, w, h, control_box.bg)
 			}
 		}
 		// Catalina's traffic lights have a one-pixel role-coloured ring. BoxStyle
@@ -614,7 +869,7 @@ fn (mut d Desktop) draw_button(el ui2.Element, x int, y int, w int, h int) {
 		// to the uniform border ui2 can express as one rounded outline.
 		if !(is_traffic_light && d.canvas.scale > 1) && is_title_button && el.box.border_left == 1 && el.box.border_top == 1 && el.box.border_right == 1
 			&& el.box.border_bottom == 1 {
-			d.canvas.stroke_round_rect(x, y, w, h, radius, el.box.border_color, 255)
+			d.canvas.stroke_round_rect(x, y, w, h, radius, control_box.border_color, 255)
 		}
 	}
 

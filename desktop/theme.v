@@ -52,6 +52,25 @@ const catalina_button_pressed_inner = [u32(0x4c8bfe), 0x4989fd, 0x4686fc, 0x4485
 	0x397cf7, 0x3478f5, 0x3075f4, 0x2d72f2, 0x296ef1, 0x246aef, 0x2067ed, 0x1d65ec, 0x1961eb, 0x165ee9,
 	0x125be8, 0x0f58e7, 0x0c55e5]
 
+// Standard AppKit controls measured from the same Catalina installation. The
+// blue is Catalina's system accent, not the lighter desktop application accent.
+const catalina_control_text = u32(0x262626)
+const catalina_control_disabled_text = u32(0xa7a7a7)
+const catalina_control_edge = u32(0xaaaaaa)
+const catalina_control_edge_dark = u32(0x8e8e8e)
+const catalina_control_face = u32(0xffffff)
+const catalina_control_pressed_face = u32(0xe5e5e5)
+const catalina_control_accent = u32(0x3478f6)
+const catalina_control_accent_pressed = u32(0x1f66dc)
+const catalina_control_focus = u32(0x6aa7ff)
+const catalina_checkbox_size = 14
+const catalina_popup_height = 22
+const catalina_text_input_height = 22
+const catalina_slider_track = u32(0xc8c8c8)
+const catalina_slider_track_edge = u32(0xb4b4b4)
+const catalina_switch_on = u32(0x64c466)
+const catalina_switch_off = u32(0xb8b8b8)
+
 const body_text = u32(0x30394a)
 const body_muted = u32(0x7b8698)
 const body_heading = u32(0x141c2b)

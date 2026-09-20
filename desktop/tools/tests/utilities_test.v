@@ -566,7 +566,7 @@ fn test_terminal_can_edit_a_file_with_vim_over_its_real_pty() {
 }
 
 fn test_available_utility_applications_and_shortcut_layouts() {
-	assert available_apps.len == 19
+	assert available_apps.len == 20
 	assert available_apps[0].process_name == 'vinix-files'
 	assert available_apps[1].title == 'Firefox'
 	assert available_apps[1].exclusive_command == ''
@@ -633,6 +633,13 @@ fn test_available_utility_applications_and_shortcut_layouts() {
 	assert available_apps[18].height == chromium_window_height + default_title_height
 	assert available_apps[18].keyboard && available_apps[18].pointer
 	assert available_apps[18].polling && available_apps[18].poll_interval_ms == 50
+	assert available_apps[19].title == 'ui2 Examples'
+	assert available_apps[19].process_name == 'vinix-ui2-examples'
+	assert available_apps[19].open != unsafe { nil }
+	assert ui2_example_names.len == 84
+	example := ui2_example_named('toggle_button') or { panic('missing ui2 example') }
+	assert example.process_name == 'vinix-ui2-toggle_button'
+	assert example.standalone && example.keyboard && example.pointer && example.polling
 	assert app_start_actions.len == available_apps.len
 	assert app_shortcut_actions.len == available_apps.len
 	assert shortcut_rows_for_height(720) == 8

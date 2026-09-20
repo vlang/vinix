@@ -37,6 +37,10 @@ committed.
 - `push-buttons-pressed.png` — the same controls while the regular button is
   held down; Catalina makes the pressed control blue and temporarily returns
   the former default control to its white rendition.
+- The installed desktop and Finder captures also provide the pointer reference:
+  a 14×21 logical-pixel black arrow with a white antialiased rim. Vinix keeps
+  separately reconstructed 1x and native-resolution 2x alpha masks so its
+  HiDPI pointer stays as sharp as Catalina's instead of scaling a 1x bitmap.
 
 ## Measured standard window chrome
 
@@ -63,6 +67,10 @@ All measurements are logical pixels at 1x.
 | Regular button face / top / bottom edge | `#ffffff` / `#c9c9c9` / `#acacac` |
 | Default button face | `#6ba0fb` to `#1164ff` |
 | Pressed button face | `#4c8bfe` to `#0c55e5` |
+| Checkbox visible box | 14 px |
+| Pop-up / text-field bezel | 22 px |
+| Switch track | 38×22 px |
+| Arrow pointer source extent | 14×21 logical px; 28×42 native px at 2x |
 
 The control images embedded in Catalina's AppKit `Assets.car` are 13×13
 templates, while the visible coloured disc in the rendered 1x window is 12
