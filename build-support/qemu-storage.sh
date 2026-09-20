@@ -124,6 +124,15 @@ vinix_storage_create_ext2() {
         fi
         chmod 1777 "$seed_dir/tmp" 2>/dev/null || true
         if [ -n "$carried_home" ]; then
+            # An old home from before source generations were recorded must
+            # not inherit the new seed's marker. Its desktop sources still win
+            # the merge below, so retaining that marker would falsely describe
+            # a mixed, stale tree as current.
+            if { [ -d "$carried_home/desktop" ] || \
+                 [ -d "$carried_home/vmodules" ]; } && \
+               [ ! -f "$carried_home/.vinix-desktop-dev-version" ]; then
+                rm -f "$seed_dir/root/.vinix-desktop-dev-version"
+            fi
             # Replacing this directory wholesale drops files introduced by an
             # image update, such as /root/vmodules. Merge the old home over the
             # packaged seed so user edits win without hiding new seed content.

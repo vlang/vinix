@@ -188,9 +188,12 @@ vinix-desktop-build
 binary with GCC, keeps a copy at `/root/vinix-desktop`, atomically replaces
 `/usr/bin/vinix-desktop`, and sends SIGHUP to PID 1. The supervisor lets the
 old compositor close its applications and release the framebuffer, then starts
-the new binary without rebooting the OS. Pass `--no-reload` to build only. If
-an older persistent home has no `/root/desktop` or `/root/vmodules`, the helper
-automatically uses the matching copy in `/usr/share/vinix/desktop-dev`.
+the new binary without rebooting the OS. Pass `--no-reload` to build only. The
+editable source and module tree carries an image-generation marker. If an older
+persistent home is missing either tree or belongs to another image generation,
+the helper automatically builds the coherent copy in
+`/usr/share/vinix/desktop-dev`. Pass both `--source=DIR` and `--modules=DIR` to
+deliberately build a different source generation.
 
 The compiler layer is pinned to the newest V revision qualified by this tree.
 Build it separately with `./build-v-aarch64.sh`; set `VINIX_V_SOURCE` to a V

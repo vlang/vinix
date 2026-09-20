@@ -997,9 +997,14 @@ if [ ! -f "$DESKTOP_DEV_ROOT/desktop/main.v" ] || \
     echo "ERROR: system desktop development tree is incomplete" >&2
     exit 1
 fi
+python3 "$SCRIPT_DIR/build-support/content-key.py" \
+    "$DESKTOP_DEV_ROOT/desktop" "$DESKTOP_DEV_ROOT/vmodules" \
+    > "$DESKTOP_DEV_ROOT/.source-version"
 rm -rf "$STAGING/root/desktop" "$STAGING/root/vmodules"
 cp -a "$DESKTOP_DEV_ROOT/desktop" "$STAGING/root/desktop"
 cp -a "$DESKTOP_DEV_ROOT/vmodules" "$STAGING/root/vmodules"
+install -m644 "$DESKTOP_DEV_ROOT/.source-version" \
+    "$STAGING/root/.vinix-desktop-dev-version"
 
 # Vinix's loader opens a shared object without following links, and current
 # Mesa ships every DRI driver as a link to one libdril_dri.so. A dlopen of

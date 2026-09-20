@@ -36,6 +36,7 @@ if [ -n "${VINIX_STORAGE_EXPECT_SYSTEM:-}" ]; then
     [ "$(cat "$seed/root/desktop/main.v")" = edited ]
     [ "$(cat "$seed/root/vmodules/ui2/v.mod")" = packaged-module ]
     [ "$(cat "$seed/root/notes.txt")" = preserved ]
+    [ ! -e "$seed/root/.vinix-desktop-dev-version" ]
     [ "$(cat "$seed/.vinix-image-id")" = next-image ]
 else
     [ "$(cat "$seed/.wine/state")" = office ]
@@ -54,6 +55,7 @@ mkdir -p "$work/system-seed/root/desktop" \
     "$work/system-seed/root/vmodules/ui2" "$work/carried/desktop"
 printf '%s\n' packaged > "$work/system-seed/root/desktop/main.v"
 printf '%s\n' packaged-module > "$work/system-seed/root/vmodules/ui2/v.mod"
+printf '%s\n' current-generation > "$work/system-seed/root/.vinix-desktop-dev-version"
 printf '%s\n' edited > "$work/carried/desktop/main.v"
 printf '%s\n' preserved > "$work/carried/notes.txt"
 tar -czf "$work/system-seed.tar.gz" -C "$work/system-seed" .

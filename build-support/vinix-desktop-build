@@ -9,11 +9,22 @@ home_dev_dir=${VINIX_DESKTOP_HOME_DEV:-/root}
 source_dir=${VINIX_DESKTOP_SOURCE:-$home_dev_dir/desktop}
 module_dir=${VINIX_DESKTOP_MODULES:-$home_dev_dir/vmodules}
 output=${VINIX_DESKTOP_OUTPUT:-/root/vinix-desktop}
+system_version_file=$system_dev_dir/.source-version
+home_version_file=$home_dev_dir/.vinix-desktop-dev-version
+source_explicit=0
+module_explicit=0
 reload=1
+
+if [ "${VINIX_DESKTOP_SOURCE+x}" = x ]; then
+	source_explicit=1
+fi
+if [ "${VINIX_DESKTOP_MODULES+x}" = x ]; then
+	module_explicit=1
+fi
 
 usage() {
 	cat >&2 <<'EOF'
-usage: vinix-desktop-build [--no-reload] [--source=DIR] [--output=FILE]
+usage: vinix-desktop-build [--no-reload] [--source=DIR] [--modules=DIR] [--output=FILE]
 
 Builds the editable Vinix desktop with the in-guest V compiler. By default the
 new binary is installed and the running desktop session is reloaded.
@@ -24,12 +35,28 @@ EOF
 for argument in "$@"; do
 	case "$argument" in
 		--no-reload) reload=0 ;;
-		--source=*) source_dir=${argument#*=} ;;
+		--source=*) source_dir=${argument#*=}; source_explicit=1 ;;
+		--modules=*) module_dir=${argument#*=}; module_explicit=1 ;;
 		--output=*) output=${argument#*=} ;;
 		--help|-h) usage ;;
 		*) echo "vinix-desktop-build: unknown option: $argument" >&2; usage ;;
 	esac
 done
+
+# /root is persistent across image upgrades. Older desktop sources can contain
+# only one side of an API change after new packaged files are merged into that
+# directory, producing hundreds of misleading V errors. The marker identifies
+# the coherent source+module generation seeded by this image. Preserve local
+# edits within one generation, but default to the immutable matching pair when
+# the editable tree came from an older image. Explicit paths remain available
+# for intentionally building or repairing such a tree.
+if [ "$source_explicit" -eq 0 ] && [ "$module_explicit" -eq 0 ] && \
+	[ -f "$system_version_file" ] && \
+	! cmp -s "$system_version_file" "$home_version_file"; then
+	echo "vinix-desktop-build: editable desktop tree is from another image; using the system source copy"
+	source_dir=$system_dev_dir/desktop
+	module_dir=$system_dev_dir/vmodules
+fi
 
 if [ ! -f "$source_dir/main.v" ] && [ "$source_dir" = "$home_dev_dir/desktop" ] \
 	&& [ -f "$system_dev_dir/desktop/main.v" ]; then
