@@ -157,19 +157,19 @@ __global (
 	// coordinates spanning 0..max, which is what an absolute device reports;
 	// a relative device is integrated into the same span so both kinds reach
 	// userland as one position.
-	vi_ptr_present  = false
-	vi_ptr_absolute = false
-	vi_ptr_x        = int(0)
-	vi_ptr_y        = int(0)
-	vi_ptr_max_x    = int(0)
-	vi_ptr_max_y    = int(0)
-	vi_ptr_buttons  = u32(0)
+	vi_ptr_present   = false
+	vi_ptr_absolute  = false
+	vi_ptr_x         = int(0)
+	vi_ptr_y         = int(0)
+	vi_ptr_max_x     = int(0)
+	vi_ptr_max_y     = int(0)
+	vi_ptr_buttons   = u32(0)
 	// Edges latched between two reads, so a click shorter than the reader's
 	// frame interval is still seen.
-	vi_ptr_pressed  = u32(0)
-	vi_ptr_released = u32(0)
-	vi_ptr_scroll   = int(0)
-	vi_ptr_callback = voidptr(0)
+	vi_ptr_pressed   = u32(0)
+	vi_ptr_released  = u32(0)
+	vi_ptr_scroll    = int(0)
+	vi_ptr_callback  = voidptr(0)
 )
 
 // /dev/pointer owns readiness and registers this after publishing its resource.
@@ -228,6 +228,27 @@ fn vi_emit_arrow(final u8) {
 	vi_put(0x1b)
 	vi_put(u8(`[`))
 	vi_put(final)
+}
+
+fn vi_emit_arrow_key(final u8) {
+	if !vi_meta_active {
+		vi_emit_arrow(final)
+		return
+	}
+	mut modifiers := u32(8)
+	if vi_shift_active {
+		modifiers |= 1
+	}
+	if vi_alt_active {
+		modifiers |= 2
+	}
+	if vi_ctrl_active {
+		modifiers |= 4
+	}
+	vi_puts(c'\e[1;')
+	vi_put_uint(1 + modifiers)
+	vi_put(final)
+	vi_meta_chorded = true
 }
 
 fn vi_emit_tilde(num u8) {
@@ -347,19 +368,19 @@ fn process_key(code u16, value u32) {
 	// Extended keys (outside conversion table range)
 	match code {
 		key_up {
-			vi_emit_arrow(u8(`A`))
+			vi_emit_arrow_key(u8(`A`))
 			return
 		}
 		key_down {
-			vi_emit_arrow(u8(`B`))
+			vi_emit_arrow_key(u8(`B`))
 			return
 		}
 		key_right {
-			vi_emit_arrow(u8(`C`))
+			vi_emit_arrow_key(u8(`C`))
 			return
 		}
 		key_left {
-			vi_emit_arrow(u8(`D`))
+			vi_emit_arrow_key(u8(`D`))
 			return
 		}
 		key_home {

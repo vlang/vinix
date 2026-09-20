@@ -21,7 +21,7 @@ const action_shortcut_prefix = 'shortcut.'
 // in — which is what lets a native application name its events whatever it
 // likes, ui2's `__qml_...` or the file browser's `files.row.3` alike.
 const desktop_action_prefixes = ['taskbar.', 'task.', 'win.', 'shortcut.', 'start.',
-	action_switch_prefix]
+	action_switch_prefix, action_workspace_prefix]
 
 enum DragKind {
 	none_
@@ -64,8 +64,8 @@ mut:
 
 struct Desktop {
 mut:
-	canvas  Canvas
-	fonts   []FontFace
+	canvas Canvas
+	fonts  []FontFace
 	// Official 512px app artwork, loaded once by the compositor. Native app
 	// helper processes leave these empty because they never rasterize frames.
 	firefox_icon    AppIcon
@@ -87,6 +87,7 @@ mut:
 	windows            []Window // painting order; the last entry is on top
 	next_id            int = 1
 	focus              int
+	current_workspace  int
 	drag               Drag
 	hover              string // owned; update through set_hover
 
@@ -170,27 +171,28 @@ fn (mut d Desktop) spawn(title string, page Page, x int, y int, width int, heigh
 	d.next_id++
 	prefix := 'win.${id}'
 	d.windows << Window{
-		id: id
-		title: title
-		page: page
-		x: x
-		y: y
-		width: width
-		height: height
-		restore_x: x
-		restore_y: y
-		restore_width: width
+		id:             id
+		title:          title
+		page:           page
+		x:              x
+		y:              y
+		width:          width
+		height:         height
+		restore_x:      x
+		restore_y:      y
+		restore_width:  width
 		restore_height: height
-		id_frame: prefix
-		id_titlebar: '${prefix}.titlebar'
-		id_title: '${prefix}.title'
-		id_close: '${prefix}.close'
-		id_maximize: '${prefix}.maximize'
-		id_minimize: '${prefix}.minimize'
-		id_divider: '${prefix}.divider'
-		id_body: '${prefix}.body'
+		workspace:      d.current_workspace
+		id_frame:       prefix
+		id_titlebar:    '${prefix}.titlebar'
+		id_title:       '${prefix}.title'
+		id_close:       '${prefix}.close'
+		id_maximize:    '${prefix}.maximize'
+		id_minimize:    '${prefix}.minimize'
+		id_divider:     '${prefix}.divider'
+		id_body:        '${prefix}.body'
 		id_resize:      '${prefix}.resize'
-		id_task: 'task.${id}'
+		id_task:        'task.${id}'
 	}
 	d.focus = id
 	d.dirty = true
@@ -209,7 +211,7 @@ fn (d &Desktop) window_index(id int) ?int {
 fn (d &Desktop) visible_window_count() int {
 	mut count := 0
 	for window in d.windows {
-		if !window.minimized {
+		if window.workspace == d.current_workspace && !window.minimized {
 			count++
 		}
 	}
@@ -224,7 +226,7 @@ fn (d &Desktop) visible_window_count() int {
 fn (d &Desktop) next_window_by_age(after_id int) ?int {
 	mut found := -1
 	for i, window in d.windows {
-		if window.id <= after_id {
+		if window.workspace != d.current_workspace || window.id <= after_id {
 			continue
 		}
 		if found < 0 || window.id < d.windows[found].id {
@@ -266,7 +268,7 @@ fn (mut d Desktop) close_window(id int) {
 		d.capture_close()
 	}
 	if d.focus == id {
-		d.focus = if d.windows.len > 0 { d.windows.last().id } else { 0 }
+		d.focus_top_window_in_current_workspace()
 	}
 	d.dirty = true
 }
@@ -326,11 +328,7 @@ fn (mut d Desktop) snap_window(id int, snap WindowSnap) {
 	if !d.windows[index].maximized && d.windows[index].snap == .none_ {
 		d.remember_restore_frame(index)
 	}
-	half := d.canvas.width / 2
-	d.windows[index].x = if snap == .left { 0 } else { half }
-	d.windows[index].y = 0
-	d.windows[index].width = if snap == .left { half } else { d.canvas.width - half }
-	d.windows[index].height = d.canvas.height - taskbar_height
+	d.apply_snap_geometry(index, snap, d.canvas.width, d.canvas.height)
 	d.windows[index].maximized = false
 	d.windows[index].snap = snap
 	d.raise(id)
@@ -341,13 +339,7 @@ fn (mut d Desktop) minimize(id int) {
 	d.windows[index].minimized = true
 	d.dirty = true
 	if d.focus == id {
-		d.focus = 0
-		for i := d.windows.len - 1; i >= 0; i-- {
-			if !d.windows[i].minimized {
-				d.focus = d.windows[i].id
-				break
-			}
-		}
+		d.focus_top_window_in_current_workspace()
 	}
 }
 
@@ -355,7 +347,11 @@ fn (mut d Desktop) minimize(id int) {
 // that window on top. A taskbar button is a focus target; only the window's
 // explicit minimise control hides an already focused window.
 fn (mut d Desktop) activate(id int) {
-	index := d.window_index(id) or { return }
+	mut index := d.window_index(id) or { return }
+	if d.windows[index].workspace != d.current_workspace {
+		d.switch_workspace(d.windows[index].workspace)
+	}
+	index = d.window_index(id) or { return }
 	if d.windows[index].minimized {
 		d.windows[index].minimized = false
 	}
@@ -377,7 +373,8 @@ fn (mut d Desktop) build_tree() ui2.Element {
 	// only this temporary outer array is no longer needed.
 	unsafe { shortcuts.free() }
 	for window_index in 0 .. d.windows.len {
-		if d.windows[window_index].minimized {
+		if d.windows[window_index].workspace != d.current_workspace
+			|| d.windows[window_index].minimized {
 			continue
 		}
 		children << d.window_element(window_index)
@@ -480,8 +477,8 @@ fn (mut d Desktop) window_element(window_index int) ui2.Element {
 		text_inset_left
 	}), 0, f64(if theme.title_centered { window.width } else { title_limit }), f64(theme.title_height)), ui2.TextStyle{
 		color: title_text_color
-		size: theme.title_size
-		bold: theme.title_bold
+		size:  theme.title_size
+		bold:  theme.title_bold
 		align: if theme.title_centered { .center } else { .left }
 		lines: 1
 	})
@@ -527,7 +524,7 @@ fn (mut d Desktop) window_element(window_index int) ui2.Element {
 		}, ui2.cursor_resize_nwse, grip_children)
 	}
 	return ui2.view(window.id_frame, window.frame_rect(), ui2.BoxStyle{
-		bg: background
+		bg:     background
 		radius: theme.window_radius
 	}, window_children)
 }
@@ -649,7 +646,7 @@ fn (mut d Desktop) poll_apps() {
 			// A minimised window still has to be polled — a shell pipe has to
 			// be drained whether or not anyone can see it — but recomposing
 			// the screen for a picture nobody is looking at is pure waste.
-			if app.poll() && !window.minimized {
+			if app.poll() && window.workspace == d.current_workspace && !window.minimized {
 				d.dirty = true
 			}
 		}
@@ -807,7 +804,8 @@ fn (mut d Desktop) forward_to_app(x int, y int, action string) {
 	}
 	for i := d.windows.len - 1; i >= 0; i-- {
 		window := d.windows[i]
-		if window.minimized || window.app_index < 0 || window.app_index >= d.apps.len {
+		if window.workspace != d.current_workspace || window.minimized || window.app_index < 0
+			|| window.app_index >= d.apps.len {
 			continue
 		}
 		if x < window.x || y < window.y || x >= window.x + window.width
@@ -841,7 +839,8 @@ fn (mut d Desktop) forward_pointer_to_app(x int, y int, phase AppPointerPhase, b
 		for i := d.windows.len - 1; i >= 0; i-- {
 			window := &d.windows[i]
 			body_top := window.y + d.theme().title_height
-			if !window.minimized && window.app_index >= 0 && x >= window.x
+			if window.workspace == d.current_workspace && !window.minimized
+				&& window.app_index >= 0 && x >= window.x
 				&& x < window.x + window.width && y >= body_top
 				&& y < window.y + window.height {
 				selected = i
@@ -1001,12 +1000,12 @@ fn (d &Desktop) title_button(id string, glyph string, x int, active bool, set_ho
 			theme.traffic_zoom_glyph
 		}
 		return ui2.button_with_image(id, '', if set_hovered { glyph } else { '' }, ui2.rect(f64(x), f64(y), f64(theme.button_size), f64(theme.button_size)), ui2.BoxStyle{
-			bg: fill
-			radius: theme.button_size / 2
-			border_color: edge
-			border_left: 1
-			border_top: 1
-			border_right: 1
+			bg:            fill
+			radius:        theme.button_size / 2
+			border_color:  edge
+			border_left:   1
+			border_top:    1
+			border_right:  1
 			border_bottom: 1
 		}, ui2.TextStyle{
 			color: glyph_color
@@ -1021,8 +1020,8 @@ fn (d &Desktop) title_button(id string, glyph string, x int, active bool, set_ho
 		theme.button_hover
 	}
 	return ui2.button_with_image(id, '', glyph, ui2.rect(f64(x), f64(y), f64(theme.button_size), f64(theme.button_size)), ui2.BoxStyle{
-		bg: bg
-		radius: 5
+		bg:          bg
+		radius:      5
 		transparent: !hovered
 	}, ui2.TextStyle{
 		color: if hovered && is_close { theme.glyph_on_close } else { theme.glyph_color }
@@ -1038,7 +1037,7 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 	icon_only := theme.taskbar_icon_only
 	edge_padding := if dock { theme.dock_padding } else { taskbar_padding }
 
-	mut children := frame_elements(d.windows.len + 4)
+	mut children := frame_elements(d.windows.len + workspace_count + 4)
 	item_height := if icon_only { taskbar_icon_item_height } else { taskbar_item_height }
 	item_y := (taskbar_height - item_height) / 2
 
@@ -1067,7 +1066,10 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 	// at the physical lower-right corner after 2x M1 presentation as well as
 	// on an unscaled framebuffer.
 	clock_width := taskbar_clock_width
-	entry_right := width - edge_padding - clock_width - taskbar_item_gap
+	workspace_width := workspace_count * workspace_button_width +
+		(workspace_count - 1) * workspace_button_gap
+	workspace_x_fixed := width - edge_padding - clock_width - taskbar_item_gap - workspace_width
+	entry_right := if dock { width } else { workspace_x_fixed - taskbar_item_gap }
 
 	// Entries share whatever room is left rather than each taking a fixed
 	// slot: with a fixed one the last window opened simply had no entry, which
@@ -1131,19 +1133,49 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 		x += item_width + taskbar_item_gap
 	}
 
+	// A compact pager makes workspaces discoverable without opening an
+	// overview. Numbered buttons match the Super+1..4 shortcuts and dim empty
+	// workspaces while keeping every destination clickable.
+	workspace_x := if dock { x } else { workspace_x_fixed }
+	for workspace in 0 .. workspace_count {
+		id := workspace_action_ids[workspace]
+		active := workspace == d.current_workspace
+		occupied := d.workspace_window_count(workspace) > 0
+		children << ui2.button(id, workspace_labels[workspace], ui2.rect(f64(workspace_x +
+			workspace * (workspace_button_width + workspace_button_gap)), f64(item_y),
+			f64(workspace_button_width), f64(item_height)), ui2.BoxStyle{
+			bg:     if active {
+				theme.accent
+			} else if d.hover == id {
+				theme.taskbar_item_hover
+			} else {
+				theme.taskbar_item_bg
+			}
+			radius: 5
+		}, ui2.TextStyle{
+			color: if active || occupied { theme.taskbar_text_active } else { theme.taskbar_muted }
+			size:  12
+			bold:  active
+			align: .center
+		})
+	}
+	if dock {
+		x = workspace_x + workspace_width + taskbar_item_gap
+	}
+
 	// A regular taskbar pins the status area to the lower-right corner. A dock
 	// keeps the same clock immediately after its task buttons so it remains
 	// inside the floating panel instead of being stranded at the screen edge.
 	clock_x := if dock { x } else { width - edge_padding - clock_width }
 	children << ui2.label('clock.time', d.taskbar_clock_time, ui2.rect(f64(clock_x), 3, f64(clock_width), 21), ui2.TextStyle{
 		color: theme.taskbar_text_active
-		size: 17
-		bold: true
+		size:  17
+		bold:  true
 		align: .right
 	})
 	children << ui2.label('clock.date', d.taskbar_clock_date, ui2.rect(f64(clock_x), 25, f64(clock_width), 17), ui2.TextStyle{
 		color: theme.taskbar_muted
-		size: 11
+		size:  11
 		align: .right
 	})
 	if dock {
@@ -1165,7 +1197,7 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 		// Clear of the bottom edge, the way a dock sits.
 		panel_y := d.canvas.height - taskbar_height - dock_bottom_gap
 		return ui2.view('taskbar', ui2.rect(f64(panel_x), f64(panel_y), f64(panel_width), f64(taskbar_height)), ui2.BoxStyle{
-			bg: theme.dock_bg
+			bg:     theme.dock_bg
 			radius: theme.dock_radius
 		}, children)
 	}
@@ -1213,6 +1245,9 @@ fn (d &Desktop) taskbar_entries() []TaskbarEntry {
 	unsafe { seen.flags |= .noslices }
 	for window_index in 0 .. d.windows.len {
 		window := &d.windows[window_index]
+		if window.workspace != d.current_workspace {
+			continue
+		}
 		if window.title in seen {
 			continue
 		}
@@ -1222,7 +1257,7 @@ fn (d &Desktop) taskbar_entries() []TaskbarEntry {
 		mut active := false
 		mut all_minimized := true
 		for other in d.windows {
-			if other.title != window.title {
+			if other.workspace != d.current_workspace || other.title != window.title {
 				continue
 			}
 			count++
@@ -1235,7 +1270,8 @@ fn (d &Desktop) taskbar_entries() []TaskbarEntry {
 		}
 		// The last in painting order is the one on top.
 		for i := d.windows.len - 1; i >= 0; i-- {
-			if d.windows[i].title == window.title {
+			if d.windows[i].workspace == d.current_workspace
+				&& d.windows[i].title == window.title {
 				newest_index = i
 				break
 			}
@@ -1566,6 +1602,11 @@ fn (mut d Desktop) on_pointer_down(x int, y int) {
 		return
 	}
 
+	if action.starts_with(action_workspace_prefix) {
+		d.switch_workspace(action[action_workspace_prefix.len..].int())
+		return
+	}
+
 	if action.starts_with('task.') {
 		id := action[5..].int()
 		d.activate(id)
@@ -1582,10 +1623,10 @@ fn (mut d Desktop) on_pointer_down(x int, y int) {
 				d.raise(id)
 				index := d.window_index(id) or { return }
 				d.drag = Drag{
-					kind: .move
+					kind:      .move
 					window_id: id
-					offset_x: x - d.windows[index].x
-					offset_y: y - d.windows[index].y
+					offset_x:  x - d.windows[index].x
+					offset_y:  y - d.windows[index].y
 				}
 				d.chrome_pointer_capture = true
 				d.drag_damage = DamageRect{}

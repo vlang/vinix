@@ -178,6 +178,9 @@ const taskbar_padding = 10
 const taskbar_icon_item_width = 48
 const taskbar_icon_item_min_width = 42
 const taskbar_icon_item_height = 40
+// Four compact numbered desktops, shown between the task buttons and clock.
+const workspace_button_width = 24
+const workspace_button_gap = 4
 
 // ── Window switcher ────────────────────────────────────────────────
 // Cmd-Tab's panel, in the middle of the screen. It is the same dark slab under

@@ -19,6 +19,10 @@ What it does:
 - windows with a title bar, a close, a maximise/restore and a minimise button
 - dragging a window by its title bar, including Windows 7-style top-edge
   maximize and left/right half-screen snapping
+- four workspaces with a taskbar pager, isolated focus/task lists and
+  Super+1..4 switching (Super+Shift+1..4 moves the focused window)
+- Linux-style Super+Arrow keyboard tiling into halves and quarters, with
+  Super+Up/Down maximizing and restoring floating windows
 - resizing a normal window by dragging its lower-right corner
 - a **V Start button** and Windows 7-style two-column Start menu, with recent
   programs, All Programs, type-to-search, system links and a session button
@@ -55,11 +59,13 @@ What it does:
 - native **Blender**: a Vinix GHOST backend renders with surfaceless EGL and
   publishes directly into a compositor-owned Vinix window, with no Xorg or
   Wayland server in the path
-- **Cmd-Tab**, which switches windows on a tap and shows all of them in the
-  middle of the screen when it is held
+- **Cmd-Tab**, which switches windows on the current workspace on a tap and
+  shows all of them in the middle of the screen when it is held
 
 Keys: `Ctrl-Q` leaves the desktop, `Ctrl-N` opens a window, `Ctrl-K` the first
-application. They are chords rather than bare letters because they fire
+application. `Super+Left/Right` tiles, `Super+Up/Down` maximizes or restores,
+`Super+1..4` switches workspace and `Super+Shift+1..4` moves the focused
+window. They are chords rather than bare letters because they fire
 whenever no application holds the keyboard, which on a machine whose pointer
 does not work is most of the time -- and `q` meaning "close the desktop" makes
 typing any word with a q in it drop the user back to the console.
@@ -69,6 +75,8 @@ typing any word with a q in it drop the user back to the console.
     main.v         the event loop: poll input, rebuild, render, present
     wm.v           the window manager — window list, the ui2 tree, hit routing
     window.v       the Window model and the pages windows show
+    workspace.v    four virtual desktops, focus and window migration
+    window_shortcuts.v  Super-key tiling and workspace shortcuts
     app.v          native application metadata and factories
     app_process.v  compositor/client IPC, UI-tree encoding and lifecycle
     native_surface_app.v  native external-client lifecycle and input transport

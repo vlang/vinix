@@ -47,6 +47,13 @@ cp "$root/desktop/tools/tests/titlebar_click_test.v" "$work/ui/"
     -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/titlebar_click_test.v"
 rm -f "$work/ui/titlebar_click_test.v"
 
+# Workspaces and keyboard tiling are compositor state rather than application
+# behavior. Keep their focus, visibility, pager and geometry cases together.
+cp "$root/desktop/tools/tests/workspace_test.v" "$work/ui/"
+"$v" -new-compiler -nocache -gc none -manualfree -enable-globals -stats -d ui2_headless \
+    -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/workspace_test.v"
+rm -f "$work/ui/workspace_test.v"
+
 # First-launch registration owns the whole compositor until its profile is
 # durable. Exercise its exclusive tree, non-dismissible input and verifier file
 # separately because it intentionally never enters the normal desktop loop.

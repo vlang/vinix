@@ -181,6 +181,15 @@ static void csi_u(struct key_bytes *out, unsigned codepoint,
     sequence(out, "u");
 }
 
+static void modified_arrow(struct key_bytes *out, char final,
+    unsigned modifiers)
+{
+    sequence(out, "\033[1;");
+    decimal(out, 1 + modifiers);
+    if (out->len < sizeof(out->data))
+        out->data[out->len++] = (uint8_t)final;
+}
+
 static struct key_bytes encode_key(uint8_t key, uint8_t modifiers,
     int caps, int fn, int application_cursor)
 {
@@ -208,6 +217,14 @@ static struct key_bytes encode_key(uint8_t key, uint8_t modifiers,
     /* Preserve GUI chords in the console stream for graphical compositors. */
     if (gui && key == 43) {
         csi_u(&out, 9, 8u | (unsigned)shift);
+        return out;
+    }
+
+    if (gui && key >= 79 && key <= 82) {
+        static const char finals[] = {'C', 'D', 'B', 'A'};
+        unsigned mods = 8u | (unsigned)shift | ((unsigned)alt << 1) |
+            ((unsigned)ctrl << 2);
+        modified_arrow(&out, finals[key - 79], mods);
         return out;
     }
 

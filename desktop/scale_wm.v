@@ -22,6 +22,50 @@ fn desktop_usable_height(screen_height int) int {
 	return screen_height
 }
 
+// apply_snap_geometry is shared by keyboard/pointer tiling and display-scale
+// changes, so a quarter-tiled window keeps the same region when the logical
+// desktop dimensions change.
+fn (mut d Desktop) apply_snap_geometry(index int, snap WindowSnap, screen_width int, screen_height int) {
+	half_width := screen_width / 2
+	usable_height := desktop_usable_height(screen_height)
+	half_height := usable_height / 2
+	match snap {
+		.left {
+			d.windows[index].x = 0
+			d.windows[index].y = 0
+			d.windows[index].width = half_width
+			d.windows[index].height = usable_height
+		}
+		.right {
+			d.windows[index].x = half_width
+			d.windows[index].y = 0
+			d.windows[index].width = screen_width - half_width
+			d.windows[index].height = usable_height
+		}
+		.top_left, .bottom_left {
+			d.windows[index].x = 0
+			d.windows[index].y = if snap == .top_left { 0 } else { half_height }
+			d.windows[index].width = half_width
+			d.windows[index].height = if snap == .top_left {
+				half_height
+			} else {
+				usable_height - half_height
+			}
+		}
+		.top_right, .bottom_right {
+			d.windows[index].x = half_width
+			d.windows[index].y = if snap == .top_right { 0 } else { half_height }
+			d.windows[index].width = screen_width - half_width
+			d.windows[index].height = if snap == .top_right {
+				half_height
+			} else {
+				usable_height - half_height
+			}
+		}
+		.none_ {}
+	}
+}
+
 fn desktop_clamp_scaled_position(x int, y int, width int, height int, screen_width int, screen_height int) (int, int) {
 	mut next_x := x
 	mut next_y := y
@@ -108,15 +152,7 @@ fn (mut d Desktop) apply_requested_scale() {
 			d.windows[i].width = new_width
 			d.windows[i].height = desktop_usable_height(new_height)
 		} else if d.windows[i].snap != .none_ {
-			half := new_width / 2
-			d.windows[i].x = if d.windows[i].snap == .left { 0 } else { half }
-			d.windows[i].y = 0
-			d.windows[i].width = if d.windows[i].snap == .left {
-				half
-			} else {
-				new_width - half
-			}
-			d.windows[i].height = desktop_usable_height(new_height)
+			d.apply_snap_geometry(i, d.windows[i].snap, new_width, new_height)
 		} else {
 			window_x, window_y := desktop_clamp_scaled_position(d.windows[i].x, d.windows[i].y, d.windows[i].width, d.windows[i].height, new_width, new_height)
 			d.windows[i].x = window_x
