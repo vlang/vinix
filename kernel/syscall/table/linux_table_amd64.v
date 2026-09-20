@@ -248,11 +248,9 @@ fn syscall_linux_rt_sigsuspend(gpr_state voidptr, mask_ptr u64, sigsetsize u64) 
 	if sigsetsize != 8 {
 		return errno.err, errno.einval
 	}
-	mut mask_arg := &u64(unsafe { nil })
-	if mask_ptr != 0 {
-		mask_arg = unsafe { &u64(mask_ptr) }
-	}
-	return userland.syscall_rt_sigsuspend(gpr_state, mask_arg)
+	// mask_ptr is a raw userspace address; syscall_rt_sigsuspend copies it
+	// through usercopy rather than have it dereferenced directly here.
+	return userland.syscall_rt_sigsuspend(gpr_state, mask_ptr)
 }
 
 fn syscall_linux_wait4(gpr_state voidptr, pid int, status &i32, options int, _rusage u64) (u64, u64) {

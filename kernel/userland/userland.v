@@ -346,7 +346,7 @@ pub fn syscall_sigprocmask(_ voidptr, how int, set &u64, oldset &u64) (u64, u64)
 // of busy-polling. Before this was implemented, the unimplemented-syscall
 // stub made it return immediately with no actual wait, turning that idle
 // wait into a tight spin.
-pub fn syscall_rt_sigsuspend(_ voidptr, mask &u64) (u64, u64) {
+pub fn syscall_rt_sigsuspend(_ voidptr, mask u64) (u64, u64) {
 	mut t := proc.current_thread()
 	mut process := t.process
 
@@ -355,27 +355,85 @@ pub fn syscall_rt_sigsuspend(_ voidptr, mask &u64) (u64, u64) {
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
-	if mask == unsafe { nil } {
+	if mask == 0 {
+		return errno.err, errno.efault
+	}
+
+	// mask is a userspace address; the wrapper only validated it's non-null,
+	// not that it's mapped, not noncanonical, and doesn't straddle a page
+	// boundary into unmapped memory. Copy it through usercopy rather than
+	// dereference it directly, the same way syscall_sigreturn resolves its
+	// own userspace frame pointer.
+	mut new_mask := u64(0)
+	if !usercopy.copy_from_user(voidptr(&new_mask), mask, sizeof(u64)) {
 		return errno.err, errno.efault
 	}
 
 	old_mask := t.masked_signals
 	// SIGKILL/SIGSTOP can never be blocked, matching resume_sigreturn's own
 	// mask sanitization elsewhere in this file.
-	t.masked_signals = unsafe { *mask } & ~((u64(1) << sigkill) | (u64(1) << sigstop))
+	t.masked_signals = new_mask & ~((u64(1) << sigkill) | (u64(1) << sigstop))
 
 	for katomic.load(&t.pending_signals) & ~t.masked_signals == 0 {
-		sched.dequeue_and_yield()
+		sched.dequeue_thread(t)
+
+		// sendsig() sets the pending bit and calls enqueue_thread(t, true),
+		// which unconditionally marks enqueued_by_signal even when the
+		// actual queue-slot claim below it no-ops because t looked still
+		// queued at that instant -- exactly the case where the dequeue
+		// above raced ahead of it. Rechecking this flag immediately after
+		// dequeuing, the same pattern event.await_internal() already uses,
+		// catches that race regardless of which side won it: if it's set,
+		// a wakeup already happened (or tried to) and re-enqueuing here
+		// picks it up instead of sleeping with no wakeup left to consume.
+		interrupted_before_yield := katomic.load(&t.enqueued_by_signal)
+		if interrupted_before_yield {
+			sched.enqueue_thread(t, false)
+		} else {
+			sched.yield(true)
+		}
+
+		if katomic.load(&t.enqueued_by_signal) {
+			katomic.store(mut &t.enqueued_by_signal, false)
+		}
 	}
 
-	t.masked_signals = old_mask
+	// Do NOT restore old_mask here. The signal that just woke us is still
+	// only pending -- dispatch_signal() runs later, at this syscall's exit,
+	// and its scan skips any signal masked_signals currently blocks.
+	// Restoring old_mask now would make it invisible again right before the
+	// scan that's supposed to find it, so the handler this whole call
+	// exists to run would never actually execute. Leave the temporary,
+	// unblocking mask active through dispatch and tell dispatch_signal()
+	// to restore old_mask (not itself) once it's done with it.
+	t.sigsuspend_restore_mask = old_mask
+	t.has_sigsuspend_restore_mask = true
 	return errno.err, errno.eintr
 }
 
 fn dispatch_signal(context &cpulocal.GPRState, info_signum int, info_code int, info_addr u64) {
 	mut t := unsafe { proc.current_thread() }
 
+	// rt_sigsuspend leaves its temporary, signal-unblocking mask active in
+	// masked_signals so the scan below can find the signal it woke for --
+	// but the mask it actually owes the caller once this dispatch is done
+	// is whatever was active before rt_sigsuspend was called, not the
+	// temporary one. Consume that now; every return path below either
+	// threads it through as previous_mask (successful dispatch, so
+	// sigreturn eventually restores it) or restores it directly (nothing
+	// to dispatch), so it's never left dangling with the temporary mask
+	// still active.
+	mut sigsuspend_restore := u64(0)
+	has_sigsuspend_restore := t.has_sigsuspend_restore_mask
+	if has_sigsuspend_restore {
+		sigsuspend_restore = t.sigsuspend_restore_mask
+		t.has_sigsuspend_restore_mask = false
+	}
+
 	if t.sigentry == 0 {
+		if has_sigsuspend_restore {
+			t.masked_signals = sigsuspend_restore
+		}
 		return
 	}
 
@@ -392,12 +450,15 @@ fn dispatch_signal(context &cpulocal.GPRState, info_signum int, info_code int, i
 	}
 
 	if which == -1 {
+		if has_sigsuspend_restore {
+			t.masked_signals = sigsuspend_restore
+		}
 		return
 	}
 
 	sigaction := t.sigactions[which]
 
-	previous_mask := t.masked_signals
+	previous_mask := if has_sigsuspend_restore { sigsuspend_restore } else { t.masked_signals }
 
 	t.masked_signals |= sigaction.sa_mask
 	if sigaction.sa_flags & sa_nodefer == 0 {

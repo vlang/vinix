@@ -39,6 +39,14 @@ pub mut:
 	pending_signals    u64
 	masked_signals     u64
 	enqueued_by_signal bool
+	// Set by rt_sigsuspend when it returns with a signal pending: the
+	// temporary, signal-unblocking mask must stay active in masked_signals
+	// long enough for dispatch_signal() to find and dispatch that signal,
+	// but the ORIGINAL pre-suspend mask -- not the temporary one -- is what
+	// the eventual sigreturn should restore. dispatch_signal() reads and
+	// clears this instead of capturing live masked_signals when set.
+	sigsuspend_restore_mask     u64
+	has_sigsuspend_restore_mask bool
 	// Per-signal origin data for Linux siginfo_t. Ordinary signals keep these
 	// zero; POSIX timers populate them until delivery consumes the pending bit.
 	pending_signal_codes    [64]int
