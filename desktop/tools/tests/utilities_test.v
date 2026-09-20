@@ -583,6 +583,7 @@ fn test_available_utility_applications_and_shortcut_layouts() {
 	assert available_apps[5].process_name == 'vinix-activity'
 	assert available_apps[9].title == 'Minecraft'
 	assert available_apps[9].process_name == 'vinix-minecraft'
+	assert available_apps[9].icon == 'asset:minecraft'
 	assert available_apps[9].exclusive_command == ''
 	assert available_apps[9].width == 1976
 	assert available_apps[9].height == 1113 + default_title_height

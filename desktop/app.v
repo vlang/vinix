@@ -158,7 +158,7 @@ const available_apps = [
 	},
 	AppFactory{
 		title: 'Minecraft'
-		icon: 'builtin:block'
+		icon: 'asset:minecraft'
 		width: minecraft_window_width
 		height: minecraft_window_height + default_title_height
 		process_name: 'vinix-minecraft'

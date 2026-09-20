@@ -127,6 +127,7 @@ fn (mut d Desktop) load_app_icons() {
 	d.firefox_icon = load_app_icon('firefox')
 	d.chromium_icon = load_app_icon('chromium')
 	d.blender_icon = load_app_icon('blender')
+	d.minecraft_icon = load_app_icon('minecraft')
 }
 
 fn (d &Desktop) app_icon(path string) &AppIcon {
@@ -134,6 +135,7 @@ fn (d &Desktop) app_icon(path string) &AppIcon {
 		'asset:firefox' { return &d.firefox_icon }
 		'asset:chromium' { return &d.chromium_icon }
 		'asset:blender' { return &d.blender_icon }
+		'asset:minecraft' { return &d.minecraft_icon }
 		else { return unsafe { nil } }
 	}
 }

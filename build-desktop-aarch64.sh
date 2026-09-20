@@ -759,6 +759,8 @@ install -m644 "$SCRIPT_DIR/desktop/assets/firefox.qoi" \
     "$STAGING/usr/share/vinix/icons/firefox.qoi"
 install -m644 "$SCRIPT_DIR/desktop/assets/blender.qoi" \
     "$STAGING/usr/share/vinix/icons/blender.qoi"
+install -m644 "$SCRIPT_DIR/desktop/assets/minecraft.qoi" \
+    "$STAGING/usr/share/vinix/icons/minecraft.qoi"
 
 # Keep the display handoff pieces in sync with the desktop source even when the
 # full base userland predates them. The bridge is a cross-compiled executable;

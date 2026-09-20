@@ -186,13 +186,13 @@ fn open_minecraft(mut _ Desktop) !NativeApp {
 		return &HostedX11App{
 			surface_width:  minecraft_surface_width
 			surface_height: minecraft_surface_height
-			icon:           'builtin:block'
+			icon:           'asset:minecraft'
 			failed:         true
 			error_message:  'Minecraft is not installed. Run pkg install minecraft in Terminal.'
 		}
 	}
 	return open_hosted_x11_app('minecraft', '/usr/bin/minecraft', minecraft_surface_width,
-		minecraft_surface_height, 'builtin:block', 'Starting Minecraft…',
+		minecraft_surface_height, 'asset:minecraft', 'Starting Minecraft…',
 		'Minecraft is not installed. Run pkg install minecraft in Terminal.', 'Minecraft exited.')
 }
 

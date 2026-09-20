@@ -126,6 +126,8 @@ install -m644 "$SCRIPT_DIR/desktop/assets/firefox.qoi" \
     "$STAGING/usr/share/vinix/icons/firefox.qoi"
 install -m644 "$SCRIPT_DIR/desktop/assets/blender.qoi" \
     "$STAGING/usr/share/vinix/icons/blender.qoi"
+install -m644 "$SCRIPT_DIR/desktop/assets/minecraft.qoi" \
+    "$STAGING/usr/share/vinix/icons/minecraft.qoi"
 install -m755 "$SCRIPT_DIR/build-support/vinix-desktop-reload" \
     "$STAGING/usr/bin/vinix-desktop-reload"
 rm -f "$STAGING/sbin/init"

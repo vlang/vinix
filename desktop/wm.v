@@ -63,6 +63,7 @@ mut:
 	firefox_icon  AppIcon
 	chromium_icon AppIcon
 	blender_icon  AppIcon
+	minecraft_icon AppIcon
 	windows []Window // painting order; the last entry is on top
 	next_id int = 1
 	focus   int
