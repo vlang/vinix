@@ -124,6 +124,7 @@ cleanup() {
 trap cleanup EXIT HUP INT TERM
 
 module_path=$module_dir
+execinfo_source=
 if [ "$host_source" -eq 1 ]; then
 	# Recreate the two disposable trees used by the host image builder. ui2
 	# needs Vinix's headless bounds bridge, and the hosted calculator model is
@@ -138,16 +139,34 @@ if [ "$host_source" -eq 1 ]; then
 	module_dir=$work_dir/vmodules
 	module_path="$module_dir|$host_repo|$host_repo/third_party"
 fi
+if [ -f "$source_dir/execinfo_compat.c" ]; then
+	execinfo_source=$source_dir/execinfo_compat.c
+elif [ "$host_source" -eq 1 ] && [ -f "$host_repo/desktop/execinfo_compat.c" ]; then
+	execinfo_source=$host_repo/desktop/execinfo_compat.c
+fi
 
 echo "==> Translating Vinix desktop with $(v version)"
-v -new-compiler -no-memory-limit -os linux -arch arm64 -cc gcc -gc none -manualfree \
-	-enable-globals -prod -d ui2_headless \
-	-path "@vlib|$module_path|@vmodules|$source_dir" \
-	-o "$work_dir/desktop.c" "$source_dir"
+if [ -n "$execinfo_source" ]; then
+	v -new-compiler -no-memory-limit -os linux -arch arm64 -cc gcc -gc none -manualfree \
+		-enable-globals -prod -d glibc -d ui2_headless \
+		-path "@vlib|$module_path|@vmodules|$source_dir" \
+		-o "$work_dir/desktop.c" "$source_dir"
+else
+	v -new-compiler -no-memory-limit -os linux -arch arm64 -cc gcc -gc none -manualfree \
+		-enable-globals -prod -d ui2_headless \
+		-path "@vlib|$module_path|@vmodules|$source_dir" \
+		-o "$work_dir/desktop.c" "$source_dir"
+fi
 
 echo "==> Compiling the native desktop with GCC"
-gcc -static -O2 -fno-stack-protector -w -I "$source_dir" \
-	"$work_dir/desktop.c" -lm -o "$work_dir/vinix-desktop"
+if [ -n "$execinfo_source" ]; then
+	gcc -static -O2 -fno-stack-protector -w -I "$source_dir" \
+		"$work_dir/desktop.c" "$execinfo_source" -lgcc_eh -lm \
+		-o "$work_dir/vinix-desktop"
+else
+	gcc -static -O2 -fno-stack-protector -w -I "$source_dir" \
+		"$work_dir/desktop.c" -lm -o "$work_dir/vinix-desktop"
+fi
 chmod 755 "$work_dir/vinix-desktop"
 
 if [ "$reload" -eq 1 ]; then
