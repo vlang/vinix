@@ -630,15 +630,27 @@ fn (mut d Desktop) draw_catalina_checkbox(el ui2.Element, x int, y int, w int, h
 		face = 0xf1f1f1
 		edge = 0xcdcdcd
 	}
-	d.canvas.fill_round_rect(x, control_y, size, size, 3, face)
-	d.canvas.stroke_round_rect(x, control_y, size, size, 3, edge, 255)
+	if d.canvas.scale > 1 {
+		d.canvas.fill_native_vertical_palette_round_rect(x, control_y, size, size, 3, [edge])
+		if size > 2 {
+			d.canvas.fill_native_vertical_palette_round_rect(x + 1, control_y + 1, size - 2,
+				size - 2, 2, [face])
+		}
+	} else {
+		d.canvas.fill_round_rect(x, control_y, size, size, 3, face)
+		d.canvas.stroke_round_rect(x, control_y, size, size, 3, edge, 255)
+	}
 	if el.checked && el.enabled && size >= 10 {
-		// Catalina's check is a compact two-segment tick with rounded-looking
-		// two-pixel strokes at normal control size.
-		d.canvas.draw_line(x + 3, control_y + size / 2, x + 6, control_y + size - 4,
-			0xffffff, 2)
-		d.canvas.draw_line(x + 6, control_y + size - 4, x + size - 3, control_y + 3,
-			0xffffff, 2)
+		if d.canvas.scale > 1 {
+			d.canvas.draw_hidpi_checkmark(x, control_y, size, 0xffffff)
+		} else {
+			// Catalina's check is a compact two-segment tick with rounded-looking
+			// two-pixel strokes at normal control size.
+			d.canvas.draw_line(x + 3, control_y + size / 2, x + 6, control_y + size - 4,
+				0xffffff, 2)
+			d.canvas.draw_line(x + 6, control_y + size - 4, x + size - 3, control_y + 3,
+				0xffffff, 2)
+		}
 	}
 	text_color := if el.enabled { catalina_control_text } else { catalina_control_disabled_text }
 	d.draw_catalina_control_text(el, el.text, x + size, y, w - size, h, 6, text_color)

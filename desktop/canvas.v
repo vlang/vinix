@@ -598,6 +598,61 @@ fn (mut c Canvas) fill_stroke_hidpi_circle(x int, y int, w int, h int, border_wi
 	}
 }
 
+@[inline]
+fn distance_to_segment(px f64, py f64, x0 f64, y0 f64, x1 f64, y1 f64) f64 {
+	dx := x1 - x0
+	dy := y1 - y0
+	length_squared := dx * dx + dy * dy
+	if length_squared <= 0 {
+		return math.sqrt((px - x0) * (px - x0) + (py - y0) * (py - y0))
+	}
+	mut position := ((px - x0) * dx + (py - y0) * dy) / length_squared
+	if position < 0 {
+		position = 0
+	} else if position > 1 {
+		position = 1
+	}
+	nearest_x := x0 + position * dx
+	nearest_y := y0 + position * dy
+	return math.sqrt((px - nearest_x) * (px - nearest_x) + (py - nearest_y) * (py - nearest_y))
+}
+
+// draw_hidpi_checkmark samples Catalina's compact two-segment tick directly
+// on the backing store. Enlarging the 1x DDA version made every diagonal a
+// staircase of square 2x2 blocks on Retina/HiDPI displays.
+fn (mut c Canvas) draw_hidpi_checkmark(x int, y int, size int, color u32) {
+	if c.scale <= 1 || size < 10 {
+		return
+	}
+	scale := f64(c.scale)
+	x0 := (f64(x) + 3.25) * scale
+	y0 := (f64(y) + f64(size) * 0.52) * scale
+	x1 := (f64(x) + 6.0) * scale
+	y1 := (f64(y) + f64(size) - 3.75) * scale
+	x2 := (f64(x) + f64(size) - 2.75) * scale
+	y2 := (f64(y) + 3.25) * scale
+	radius := 0.9 * scale
+	physical_x := x * c.scale
+	physical_y := y * c.scale
+	physical_size := size * c.scale
+	for py := physical_y; py < physical_y + physical_size; py++ {
+		for px := physical_x; px < physical_x + physical_size; px++ {
+			center_x := f64(px) + 0.5
+			center_y := f64(py) + 0.5
+			first := distance_to_segment(center_x, center_y, x0, y0, x1, y1)
+			second := distance_to_segment(center_x, center_y, x1, y1, x2, y2)
+			distance := if first < second { first } else { second }
+			mut coverage := u32(0)
+			if distance <= radius - 0.5 {
+				coverage = 255
+			} else if distance < radius + 0.5 {
+				coverage = u32((radius + 0.5 - distance) * 255)
+			}
+			c.blend_physical_pixel(px, py, color, coverage)
+		}
+	}
+}
+
 // drop_shadow stacks a few translucent rounded rects behind a window.
 // Layering cheap shapes reads as a soft edge without the cost of a real blur.
 fn (mut c Canvas) drop_shadow(x int, y int, w int, h int, radius int, spread int, alpha u32) {

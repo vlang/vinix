@@ -275,6 +275,64 @@ fn test_200_percent_traffic_lights_use_native_resolution_circles() {
 	assert native_edge
 }
 
+fn test_catalina_checkbox_uses_native_hidpi_curves_and_tick() {
+	mut desktop := Desktop{
+		canvas:   new_scaled_canvas(40, 24, 80, 48, desktop_scale_200)
+		settings: Settings{
+			theme: .macos
+		}
+	}
+	defer {
+		unsafe { free(desktop.canvas.pixels) }
+	}
+	desktop.canvas.clear(0xffffff)
+	checkbox := ui2.Element{
+		kind:    .checkbox
+		id:      'files'
+		checked: true
+		enabled: true
+	}
+	desktop.draw_button(checkbox, 4, 1, 32, 22)
+	desktop.draw_button(ui2.Element{
+		...checkbox
+		id:      'empty'
+		checked: false
+	}, 22, 1, 18, 22)
+
+	// At least one logical corner pixel contains independent physical coverage.
+	// The old 1x raster repeated one value across every 2x2 block.
+	physical_left := 4 * desktop_scale_200
+	physical_top := 5 * desktop_scale_200
+	empty_left := 22 * desktop_scale_200
+	mut native_corner := false
+	for py := physical_top; py < physical_top + 28 && !native_corner; py += 2 {
+		for px := empty_left; px < empty_left + 28; px += 2 {
+			base := unsafe { desktop.canvas.pixels[py * desktop.canvas.stride + px] }
+			right := unsafe { desktop.canvas.pixels[py * desktop.canvas.stride + px + 1] }
+			below := unsafe { desktop.canvas.pixels[(py + 1) * desktop.canvas.stride + px] }
+			if base != right || base != below {
+				native_corner = true
+				break
+			}
+		}
+	}
+	assert native_corner
+
+	// The tick has partially covered edge pixels between its white core and
+	// blue face; a scaled logical DDA can produce only solid 2x2 white blocks.
+	mut antialiased_tick := false
+	for py := physical_top + 6; py < physical_top + 24 && !antialiased_tick; py++ {
+		for px := physical_left + 6; px < physical_left + 24; px++ {
+			pixel := unsafe { desktop.canvas.pixels[py * desktop.canvas.stride + px] }
+			if pixel != catalina_control_accent && pixel != u32(0xffffff) {
+				antialiased_tick = true
+				break
+			}
+		}
+	}
+	assert antialiased_tick
+}
+
 fn test_catalina_cursor_has_complete_native_resolution_masks() {
 	assert catalina_cursor_white_1x.len == catalina_cursor_height
 	assert catalina_cursor_black_1x.len == catalina_cursor_height
