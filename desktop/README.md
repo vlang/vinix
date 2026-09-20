@@ -42,6 +42,8 @@ What it does:
 - a paged **ui2 Examples** launcher containing all 84 applications from the
   sibling `~/code/ui2/examples` checkout, including native input, slider,
   switch, toggle, menu, file-dialog and custom-window demonstrations
+- preinstalled **VOffice Writer and Calc** from the sibling `~/code/office`
+  checkout, running as native ui2 clients inside ordinary Vinix windows
 - a **VT-compatible built-in terminal** with a real PTY, alternate-screen and
   cursor-addressed rendering for editing files in the preinstalled Vim
 - embedded **Wine Calculator and Notepad**: their translated Win64 processes
@@ -148,6 +150,13 @@ implements the same versioned pipe protocol as `app_process.v`. The build uses
 `VINIX_UI2_SOURCE` when set, otherwise a sibling `../ui2` checkout when present,
 and finally `third_party/ui2`. This makes the local `~/code/ui2` tree the normal
 development source while retaining a self-contained CI/package fallback.
+
+`tools/build_voffice.py` uses that same backend to cross-compile VOffice Writer
+and Calc as static musl applications. It reads `VINIX_OFFICE_SOURCE`, then a
+sibling `../office`, and finally `third_party/office`; the image installs both
+executables together with VOffice's translations and ribbon PNGs. The
+compositor decodes those immutable installed PNG assets itself, so VOffice does
+not need a second window system or image service at runtime.
 
 The Calculator model comes from ui2's own example and is not copied into this
 repository. `tools/stage_app.py` takes it straight from the ui2 checkout at

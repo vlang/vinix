@@ -24,6 +24,13 @@ elif [ -f "$SCRIPT_DIR/../ui2/v.mod" ]; then
 else
     UI2_SOURCE="$SCRIPT_DIR/third_party/ui2"
 fi
+if [ -n "${VINIX_OFFICE_SOURCE:-}" ]; then
+    OFFICE_SOURCE="$VINIX_OFFICE_SOURCE"
+elif [ -f "$SCRIPT_DIR/../office/v.mod" ]; then
+    OFFICE_SOURCE="$SCRIPT_DIR/../office"
+else
+    OFFICE_SOURCE="$SCRIPT_DIR/third_party/office"
+fi
 
 BUILD_DIR="$SCRIPT_DIR/build"
 USERLAND_BUILD_DIR="${VINIX_AARCH64_USERLAND_BUILD_DIR:-$SCRIPT_DIR/build-aarch64-userland}"
@@ -264,6 +271,12 @@ if [ ! -f "$UI2_SOURCE/v.mod" ]; then
     echo "    git clone https://github.com/vlang/ui2 third_party/ui2"
     exit 1
 fi
+if [ ! -f "$OFFICE_SOURCE/v.mod" ] || [ ! -f "$OFFICE_SOURCE/cmd/excel/main.v" ] || \
+   [ ! -f "$OFFICE_SOURCE/cmd/word/main.v" ]; then
+    echo "ERROR: VOffice not found at $OFFICE_SOURCE."
+    echo "Set VINIX_OFFICE_SOURCE or check it out beside Vinix as ../office."
+    exit 1
+fi
 
 # Calculator uses the v3 compiler's direct `$vml` lowering. Check the renamed
 # API explicitly so an old QML checkout fails before the compiler does.
@@ -336,6 +349,15 @@ UI2_EXAMPLES_DIR="$BUILD_DIR/ui2-examples"
 python3 "$SCRIPT_DIR/desktop/tools/build_ui2_examples.py" \
     --repo "$SCRIPT_DIR" --ui2-source "$UI2_SOURCE" \
     --output "$UI2_EXAMPLES_DIR" --work "$BUILD_DIR/ui2-examples-work" \
+    --v "$V" --arch arm64 --clang "$LLVM_BIN/clang" --strip "$LLVM_BIN/llvm-strip" \
+    --target aarch64-linux-musl --sysroot "$SYSROOT" --gcclib "$GCCLIB" \
+    --cc-shim "$CC_SHIM" --llvm-bin "$LLVM_BIN"
+
+echo "==> Building VOffice Calc and Writer for aarch64..."
+VOFFICE_DIR="$BUILD_DIR/voffice"
+python3 "$SCRIPT_DIR/desktop/tools/build_voffice.py" \
+    --repo "$SCRIPT_DIR" --office-source "$OFFICE_SOURCE" --ui2-source "$UI2_SOURCE" \
+    --output "$VOFFICE_DIR" --work "$BUILD_DIR/voffice-work" \
     --v "$V" --arch arm64 --clang "$LLVM_BIN/clang" --strip "$LLVM_BIN/llvm-strip" \
     --target aarch64-linux-musl --sysroot "$SYSROOT" --gcclib "$GCCLIB" \
     --cc-shim "$CC_SHIM" --llvm-bin "$LLVM_BIN"
@@ -951,6 +973,12 @@ install -m755 "$BUILD_DIR/desktop-init" \
     "$STAGING/usr/libexec/vinix-desktop-init"
 install -m755 "$UI2_EXAMPLES_DIR"/vinix-ui2-* "$STAGING/usr/bin/"
 cp "$BUILD_DIR/vinix-desktop" "$STAGING/usr/bin/vinix-desktop"
+install -m755 "$VOFFICE_DIR"/voffice-calc "$VOFFICE_DIR"/voffice-writer \
+    "$STAGING/usr/bin/"
+mkdir -p "$STAGING/usr/bin/assets/ribbon" "$STAGING/usr/bin/translations"
+install -m644 "$OFFICE_SOURCE/assets/logo.png" "$STAGING/usr/bin/assets/logo.png"
+install -m644 "$OFFICE_SOURCE"/assets/ribbon/*.png "$STAGING/usr/bin/assets/ribbon/"
+cp -a "$OFFICE_SOURCE/translations/." "$STAGING/usr/bin/translations/"
 if [ "$GPU_DESKTOP_BUILT" -eq 1 ]; then
     cp "$BUILD_DIR/vinix-desktop-gpu" "$STAGING/usr/bin/vinix-desktop-gpu"
     chmod +x "$STAGING/usr/bin/vinix-desktop-gpu"

@@ -41,6 +41,13 @@ elif [ -f "$SCRIPT_DIR/../ui2/v.mod" ]; then
 else
     UI2_SOURCE="$SCRIPT_DIR/third_party/ui2"
 fi
+if [ -n "${VINIX_OFFICE_SOURCE:-}" ]; then
+    OFFICE_SOURCE="$VINIX_OFFICE_SOURCE"
+elif [ -f "$SCRIPT_DIR/../office/v.mod" ]; then
+    OFFICE_SOURCE="$SCRIPT_DIR/../office"
+else
+    OFFICE_SOURCE="$SCRIPT_DIR/third_party/office"
+fi
 
 case "$BUILD_DIR" in
     ''|/|"$SCRIPT_DIR")
@@ -68,6 +75,12 @@ fi
 if [ ! -f "$UI2_SOURCE/v.mod" ]; then
     echo "ERROR: ui2 not found at $UI2_SOURCE. Clone it at third_party/ui2:" >&2
     echo "    git clone https://github.com/vlang/ui2 third_party/ui2" >&2
+    exit 1
+fi
+if [ ! -f "$OFFICE_SOURCE/v.mod" ] || [ ! -f "$OFFICE_SOURCE/cmd/excel/main.v" ] || \
+   [ ! -f "$OFFICE_SOURCE/cmd/word/main.v" ]; then
+    echo "ERROR: VOffice not found at $OFFICE_SOURCE." >&2
+    echo "Set VINIX_OFFICE_SOURCE or check it out beside Vinix as ../office." >&2
     exit 1
 fi
 if [ ! -f "$UI2_SOURCE/ui/vml_compiled.v" ] || \
@@ -130,6 +143,14 @@ python3 "$SCRIPT_DIR/desktop/tools/build_ui2_examples.py" \
     --v "$V" --arch x64 --clang "$CLANG" --strip "$LLVM_STRIP" \
     --target x86_64-linux-musl --sysroot "$SYSROOT" --gcclib "$GCCLIB"
 
+echo "==> Building VOffice Calc and Writer for amd64..."
+VOFFICE_DIR="$BUILD_DIR/voffice"
+python3 "$SCRIPT_DIR/desktop/tools/build_voffice.py" \
+    --repo "$SCRIPT_DIR" --office-source "$OFFICE_SOURCE" --ui2-source "$UI2_SOURCE" \
+    --output "$VOFFICE_DIR" --work "$BUILD_DIR/voffice-work" \
+    --v "$V" --arch x64 --clang "$CLANG" --strip "$LLVM_STRIP" \
+    --target x86_64-linux-musl --sysroot "$SYSROOT" --gcclib "$GCCLIB"
+
 echo "==> Staging the amd64 desktop initramfs..."
 STAGING="$BUILD_DIR/initramfs-root"
 rm -rf "$STAGING"
@@ -139,6 +160,12 @@ mkdir -p "$STAGING/usr/bin" "$STAGING/usr/share/vinix/wallpapers" \
     "$STAGING/usr/share/vinix/icons" "$STAGING/root/desktop" "$STAGING/run"
 install -m755 "$BUILD_DIR/vinix-desktop" "$STAGING/usr/bin/vinix-desktop"
 install -m755 "$UI2_EXAMPLES_DIR"/vinix-ui2-* "$STAGING/usr/bin/"
+install -m755 "$VOFFICE_DIR"/voffice-calc "$VOFFICE_DIR"/voffice-writer \
+    "$STAGING/usr/bin/"
+mkdir -p "$STAGING/usr/bin/assets/ribbon" "$STAGING/usr/bin/translations"
+install -m644 "$OFFICE_SOURCE/assets/logo.png" "$STAGING/usr/bin/assets/logo.png"
+install -m644 "$OFFICE_SOURCE"/assets/ribbon/*.png "$STAGING/usr/bin/assets/ribbon/"
+cp -a "$OFFICE_SOURCE/translations/." "$STAGING/usr/bin/translations/"
 install -m644 "$SCRIPT_DIR/desktop/assets/chromium.qoi" \
     "$STAGING/usr/share/vinix/icons/chromium.qoi"
 install -m644 "$SCRIPT_DIR/desktop/assets/firefox.qoi" \

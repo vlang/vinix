@@ -276,6 +276,14 @@ fn test_capture_png_encoder_writes_standard_truecolour_image() {
 	assert bytes[24] == 8
 	assert bytes[25] == 2
 	assert bytes[bytes.len - 8..bytes.len - 4].bytestr() == 'IEND'
+	icon := decode_png(bytes) or {
+		assert false
+		return
+	}
+	assert icon.width == 2
+	assert icon.height == 2
+	assert icon.pixels == [u32(0xffff0000), 0xff00ff00, 0xff0000ff, 0xffffffff]
+	assert png_paeth(10, 20, 15) == 15
 }
 
 fn test_capture_avi_writer_indexes_every_video_frame() {
@@ -566,7 +574,7 @@ fn test_terminal_can_edit_a_file_with_vim_over_its_real_pty() {
 }
 
 fn test_available_utility_applications_and_shortcut_layouts() {
-	assert available_apps.len == 20
+	assert available_apps.len == 22
 	assert available_apps[0].process_name == 'vinix-files'
 	assert available_apps[1].title == 'Firefox'
 	assert available_apps[1].exclusive_command == ''
@@ -626,16 +634,24 @@ fn test_available_utility_applications_and_shortcut_layouts() {
 	assert available_apps[16].icon == 'asset:vspace'
 	assert available_apps[16].polling && available_apps[16].poll_interval_ms == 33
 	assert !available_apps[16].keyboard && !available_apps[16].pointer
-	assert available_apps[18].title == 'Chromium'
-	assert available_apps[18].process_name == 'vinix-chromium'
-	assert available_apps[18].icon == 'asset:chromium'
-	assert available_apps[18].width == chromium_window_width
-	assert available_apps[18].height == chromium_window_height + default_title_height
-	assert available_apps[18].keyboard && available_apps[18].pointer
-	assert available_apps[18].polling && available_apps[18].poll_interval_ms == 50
-	assert available_apps[19].title == 'ui2 Examples'
-	assert available_apps[19].process_name == 'vinix-ui2-examples'
-	assert available_apps[19].open != unsafe { nil }
+	assert available_apps[17].title == 'VOffice Writer'
+	assert available_apps[17].process_name == 'voffice-writer'
+	assert available_apps[17].standalone && available_apps[17].keyboard
+	assert available_apps[17].pointer && available_apps[17].polling
+	assert available_apps[18].title == 'VOffice Calc'
+	assert available_apps[18].process_name == 'voffice-calc'
+	assert available_apps[18].standalone && available_apps[18].keyboard
+	assert available_apps[18].pointer && available_apps[18].polling
+	assert available_apps[20].title == 'Chromium'
+	assert available_apps[20].process_name == 'vinix-chromium'
+	assert available_apps[20].icon == 'asset:chromium'
+	assert available_apps[20].width == chromium_window_width
+	assert available_apps[20].height == chromium_window_height + default_title_height
+	assert available_apps[20].keyboard && available_apps[20].pointer
+	assert available_apps[20].polling && available_apps[20].poll_interval_ms == 50
+	assert available_apps[21].title == 'ui2 Examples'
+	assert available_apps[21].process_name == 'vinix-ui2-examples'
+	assert available_apps[21].open != unsafe { nil }
 	assert ui2_example_names.len == 84
 	example := ui2_example_named('toggle_button') or { panic('missing ui2 example') }
 	assert example.process_name == 'vinix-ui2-toggle_button'
@@ -982,7 +998,7 @@ fn test_gimp_uses_the_hosted_x11_window_path() {
 }
 
 fn test_libreoffice_uses_the_hosted_x11_window_path() {
-	factory := available_apps[17]
+	factory := available_apps[19]
 	assert factory.title == 'LibreOffice'
 	assert factory.process_name == 'vinix-libreoffice'
 	assert factory.exclusive_command == ''
@@ -993,7 +1009,7 @@ fn test_libreoffice_uses_the_hosted_x11_window_path() {
 }
 
 fn test_chromium_uses_the_hosted_x11_window_path() {
-	factory := available_apps[18]
+	factory := available_apps[20]
 	assert factory.process_name == 'vinix-chromium'
 	assert factory.exclusive_command == ''
 	assert factory.open != unsafe { nil }

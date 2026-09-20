@@ -61,20 +61,22 @@ mut:
 	fonts   []FontFace
 	// Official 512px app artwork, loaded once by the compositor. Native app
 	// helper processes leave these empty because they never rasterize frames.
-	firefox_icon  AppIcon
-	chromium_icon AppIcon
-	blender_icon  AppIcon
-	minecraft_icon AppIcon
-	windows []Window // painting order; the last entry is on top
-	terminal_icon AppIcon
-	settings_icon AppIcon
-	activity_icon AppIcon
+	firefox_icon    AppIcon
+	chromium_icon   AppIcon
+	blender_icon    AppIcon
+	minecraft_icon  AppIcon
+	terminal_icon   AppIcon
+	settings_icon   AppIcon
+	activity_icon   AppIcon
 	calculator_icon AppIcon
-	vspace_icon AppIcon
-	next_id int = 1
-	focus   int
-	drag    Drag
-	hover   string // owned; update through set_hover
+	vspace_icon     AppIcon
+	// PNG resources loaded lazily for installed native UI2 applications.
+	native_asset_icons map[string]&AppIcon
+	windows            []Window // painting order; the last entry is on top
+	next_id            int = 1
+	focus              int
+	drag               Drag
+	hover              string // owned; update through set_hover
 
 	pointer_x       int
 	pointer_y       int

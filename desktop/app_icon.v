@@ -3,11 +3,11 @@
 // that can be found in the LICENSE file.
 
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Decoding and drawing the small set of official application icons shipped by
-// the desktop. QOI keeps those source-quality 512px images compact without
-// bringing a PNG library into Vinix's static framebuffer compositor.
+// Decoding and drawing application images. The desktop's own icons use QOI;
+// trusted native applications can also load their bundled PNG resources.
 module main
 
+import compress.zlib
 import os
 
 const app_icon_dir = '/usr/share/vinix/icons'
@@ -112,6 +112,142 @@ fn decode_qoi(bytes []u8) ?AppIcon {
 	}
 }
 
+fn png_u32_be(bytes []u8, at int) ?u32 {
+	if at < 0 || at + 4 > bytes.len {
+		return none
+	}
+	return u32(bytes[at]) << 24 | u32(bytes[at + 1]) << 16 | u32(bytes[at + 2]) << 8 |
+		u32(bytes[at + 3])
+}
+
+fn png_paeth(left int, above int, upper_left int) int {
+	predicted := left + above - upper_left
+	left_distance := if predicted > left { predicted - left } else { left - predicted }
+	above_distance := if predicted > above { predicted - above } else { above - predicted }
+	upper_left_distance := if predicted > upper_left {
+		predicted - upper_left
+	} else {
+		upper_left - predicted
+	}
+	return if left_distance <= above_distance && left_distance <= upper_left_distance {
+		left
+	} else if above_distance <= upper_left_distance {
+		above
+	} else {
+		upper_left
+	}
+}
+
+// decode_png covers the lossless formats used by VOffice's ribbon artwork:
+// 8-bit RGB/RGBA, standard row filters, and a non-interlaced image. Keeping
+// this narrow avoids pulling a general image stack into the compositor.
+fn decode_png(bytes []u8) ?AppIcon {
+	if bytes.len < 33 || bytes[..8] != [u8(0x89), `P`, `N`, `G`, `\r`, `\n`, 0x1a, `\n`] {
+		return none
+	}
+	mut at := 8
+	mut width := 0
+	mut height := 0
+	mut channels := 0
+	mut saw_header := false
+	mut saw_end := false
+	mut compressed := []u8{}
+	defer {
+		unsafe { compressed.free() }
+	}
+	for at + 12 <= bytes.len {
+		length := int(png_u32_be(bytes, at)?)
+		if length < 0 || at + 12 + length > bytes.len {
+			return none
+		}
+		kind := bytes[at + 4..at + 8].bytestr()
+		data := bytes[at + 8..at + 8 + length]
+		match kind {
+			'IHDR' {
+				if saw_header || length != 13 {
+					return none
+				}
+				width = int(png_u32_be(data, 0)?)
+				height = int(png_u32_be(data, 4)?)
+				channels = if data[9] == 2 {
+					3
+				} else if data[9] == 6 { 4 } else { 0 }
+				if width <= 0 || height <= 0 || width > 4096 || height > 4096
+					|| i64(width) * i64(height) > 16 * 1024 * 1024 || data[8] != 8
+					|| channels == 0 || data[10] != 0 || data[11] != 0 || data[12] != 0 {
+					return none
+				}
+				saw_header = true
+			}
+			'IDAT' {
+				if !saw_header {
+					return none
+				}
+				compressed << data
+			}
+			'IEND' {
+				saw_end = true
+			}
+			else {}
+		}
+		at += length + 12
+		if saw_end {
+			break
+		}
+	}
+	if !saw_header || !saw_end || compressed.len == 0 {
+		return none
+	}
+	raw := zlib.decompress(compressed) or { return none }
+	defer {
+		unsafe { raw.free() }
+	}
+	row_bytes := width * channels
+	if raw.len != (row_bytes + 1) * height {
+		return none
+	}
+	mut decoded := []u8{len: row_bytes * height}
+	defer {
+		unsafe { decoded.free() }
+	}
+	for y in 0 .. height {
+		filter := raw[y * (row_bytes + 1)]
+		if filter > 4 {
+			return none
+		}
+		for x in 0 .. row_bytes {
+			source := int(raw[y * (row_bytes + 1) + 1 + x])
+			left := if x >= channels { int(decoded[y * row_bytes + x - channels]) } else { 0 }
+			above := if y > 0 { int(decoded[(y - 1) * row_bytes + x]) } else { 0 }
+			upper_left := if y > 0 && x >= channels {
+				int(decoded[(y - 1) * row_bytes + x - channels])
+			} else {
+				0
+			}
+			predictor := match filter {
+				1 { left }
+				2 { above }
+				3 { (left + above) / 2 }
+				4 { png_paeth(left, above, upper_left) }
+				else { 0 }
+			}
+			decoded[y * row_bytes + x] = u8(source + predictor)
+		}
+	}
+	mut pixels := []u32{len: width * height}
+	for pixel in 0 .. pixels.len {
+		offset := pixel * channels
+		alpha := if channels == 4 { u32(decoded[offset + 3]) } else { u32(255) }
+		pixels[pixel] = alpha << 24 | u32(decoded[offset]) << 16 |
+			u32(decoded[offset + 1]) << 8 | u32(decoded[offset + 2])
+	}
+	return AppIcon{
+		width:  width
+		height: height
+		pixels: pixels
+	}
+}
+
 fn load_app_icon(name string) AppIcon {
 	bytes := os.read_bytes('${app_icon_dir}/${name}.qoi') or { return AppIcon{} }
 	defer {
@@ -134,7 +270,7 @@ fn (mut d Desktop) load_app_icons() {
 	d.vspace_icon = load_app_icon('vspace')
 }
 
-fn (d &Desktop) app_icon(path string) &AppIcon {
+fn (d &Desktop) bundled_app_icon(path string) &AppIcon {
 	match path {
 		'asset:firefox' { return &d.firefox_icon }
 		'asset:chromium' { return &d.chromium_icon }
@@ -147,6 +283,43 @@ fn (d &Desktop) app_icon(path string) &AppIcon {
 		'asset:vspace' { return &d.vspace_icon }
 		else { return unsafe { nil } }
 	}
+}
+
+fn (mut d Desktop) app_icon(path string) &AppIcon {
+	bundled := d.bundled_app_icon(path)
+	if !isnil(bundled) {
+		return bundled
+	}
+	// Native UI2 apps may only ask the compositor to open installed, immutable
+	// application assets. Do not turn arbitrary document paths into reads by
+	// the privileged desktop process.
+	if !path.starts_with('/usr/bin/assets/') || !path.ends_with('.png')
+		|| path.contains('/../') || path.contains('/./') || path.contains('//') {
+		return unsafe { nil }
+	}
+	if cached := d.native_asset_icons[path] {
+		return cached
+	}
+	bytes := os.read_bytes(path) or {
+		missing := &AppIcon{}
+		d.native_asset_icons[path] = missing
+		return missing
+	}
+	defer {
+		unsafe { bytes.free() }
+	}
+	icon := decode_png(bytes) or {
+		invalid := &AppIcon{}
+		d.native_asset_icons[path] = invalid
+		return invalid
+	}
+	loaded := &AppIcon{
+		width:  icon.width
+		height: icon.height
+		pixels: icon.pixels
+	}
+	d.native_asset_icons[path] = loaded
+	return loaded
 }
 
 // draw_app_icon samples the original 512px artwork on the physical output

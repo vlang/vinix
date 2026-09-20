@@ -17,11 +17,51 @@ import sys
 EXCLUDED_SUBDIRS = {"appkit"}
 
 
+def staged_source(name, source_path):
+    """Return source text for the small V3 compatibility fixes we own.
+
+    V3 currently flattens imported module identifiers while checking globals.
+    An application with a global named ``app`` therefore collides with the
+    receiver name in ui2's generic VML adapter even though they are in separate
+    modules.  VOfficeWriter has exactly that (perfectly valid) layout.  Keep the
+    upstream checkout untouched and give the staged receiver an unambiguous
+    name until the compiler preserves the module boundary here.
+    """
+    if name != "vml_embed.v":
+        return None
+    text = open(source_path).read()
+    replacements = {
+        "(mut app VmlApp[T])": "(mut vml_app VmlApp[T])",
+        "(app &VmlApp[T])": "(vml_app &VmlApp[T])",
+    }
+    for old, new in replacements.items():
+        text = text.replace(old, new)
+    # Only these member accesses belong to the renamed receiver. String
+    # literals such as ``app.field`` are VML expressions and must stay intact.
+    for member in (
+        "control_text",
+        "control_value",
+        "events",
+        "model",
+        "template",
+        "text_of",
+        "value_of",
+    ):
+        text = text.replace("app.%s" % member, "vml_app.%s" % member)
+    return text
+
+
 def symlink_entries(source, destination):
     os.makedirs(destination, exist_ok=True)
     for name in sorted(os.listdir(source)):
-        os.symlink(os.path.abspath(os.path.join(source, name)),
-                   os.path.join(destination, name))
+        source_path = os.path.abspath(os.path.join(source, name))
+        staged = staged_source(name, source_path)
+        destination_path = os.path.join(destination, name)
+        if staged is None:
+            os.symlink(source_path, destination_path)
+        else:
+            with open(destination_path, "w") as handle:
+                handle.write(staged)
 
 
 def module_subdirs(text):
