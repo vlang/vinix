@@ -146,7 +146,8 @@ fn remaining(timer &PosixTimer, now_ns u64) u64 {
 fn timer_target(timer &PosixTimer) &proc.Thread {
 	if timer.notify == sigev_thread_id {
 		target := proc.thread_by_tid(timer.tid)
-		if target == unsafe { nil } || target.is_dead || target.process != timer.owner {
+		if target == unsafe { nil } || katomic.load(&target.is_dead)
+			|| target.process != timer.owner {
 			return unsafe { nil }
 		}
 		return target
@@ -272,7 +273,7 @@ pub fn syscall_timer_create(_ voidptr, clock_id int, event_ptr u64, timer_id_ptr
 	owner := proc.current_thread().process
 	if event.notify == sigev_thread_id {
 		target := proc.thread_by_tid(event.tid)
-		if target == unsafe { nil } || target.is_dead || target.process != owner {
+		if target == unsafe { nil } || katomic.load(&target.is_dead) || target.process != owner {
 			return errno.err, errno.einval
 		}
 	}

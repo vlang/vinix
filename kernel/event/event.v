@@ -213,7 +213,7 @@ pub fn trigger(mut e eventstruct.Event, drop bool) u64 {
 	for i := u64(0); i < e.listeners_i; i++ {
 		mut t := unsafe { &proc.Thread(e.listeners[i].thrd) }
 
-		if t.is_in_queue {
+		if katomic.load(&t.is_in_queue) {
 			preserve_pending = true
 			continue
 		}

@@ -1,6 +1,7 @@
 @[has_globals]
 module sched
 
+import klock
 import proc
 
 const stack_size = u64(0x200000)
@@ -20,6 +21,10 @@ const max_running_threads = int(512)
 __global (
 	scheduler_vector        u8
 	scheduler_running_queue [512]&proc.Thread
+	// Serializes queue membership with the is_in_queue flag. An event can be
+	// triggered on several CPUs at once, so the flag alone cannot prevent two
+	// wakeups from publishing the same Thread pointer in different slots.
+	scheduler_queue_lock klock.Lock
 	kernel_process          &proc.Process
 	uart_poll_callback      voidptr // Set by console module for HVF UART polling
 	// Published by initialise() once the run queue and the kernel process exist.

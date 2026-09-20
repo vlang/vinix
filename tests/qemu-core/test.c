@@ -517,6 +517,103 @@ static int test_scheduler_and_accounting(void)
 	return 0;
 }
 
+struct concurrent_wakeup_state {
+	unsigned generation;
+	unsigned ready;
+	unsigned completed;
+};
+
+/* poll(2) attaches this thread to every descriptor event. Four independent
+ * writers can therefore trigger four event locks at the same instant. The
+ * scheduler used to check is_in_queue without serializing that check with its
+ * slot insertion, allowing the same Thread pointer into several queue slots.
+ */
+static int run_concurrent_wakeup_race(void)
+{
+	enum { workers = 4, rounds = 512 };
+	int channels[workers][2];
+	pid_t children[workers];
+	struct pollfd descriptors[workers];
+	struct concurrent_wakeup_state *state = mmap(NULL, sizeof(*state),
+	    PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+	CHECK(state != MAP_FAILED);
+	memset(state, 0, sizeof(*state));
+
+	for (int i = 0; i < workers; ++i)
+		CHECK(pipe(channels[i]) == 0);
+	for (int i = 0; i < workers; ++i) {
+		children[i] = fork();
+		CHECK(children[i] >= 0);
+		if (children[i] != 0)
+			continue;
+
+		for (int j = 0; j < workers; ++j) {
+			close(channels[j][0]);
+			if (j != i)
+				close(channels[j][1]);
+		}
+		cpu_set_t affinity;
+		CPU_ZERO(&affinity);
+		CPU_SET(i, &affinity);
+		if (sched_setaffinity(0, sizeof(affinity), &affinity) != 0)
+			_exit(2);
+		__atomic_add_fetch(&state->ready, 1, __ATOMIC_RELEASE);
+		for (unsigned round = 1; round <= rounds; ++round) {
+			while (__atomic_load_n(&state->generation, __ATOMIC_ACQUIRE) < round)
+				sched_yield();
+			if (write(channels[i][1], "w", 1) != 1)
+				_exit(3);
+			__atomic_add_fetch(&state->completed, 1, __ATOMIC_RELEASE);
+			while (__atomic_load_n(&state->generation, __ATOMIC_ACQUIRE) == round)
+				sched_yield();
+		}
+		close(channels[i][1]);
+		_exit(0);
+	}
+
+	for (int i = 0; i < workers; ++i) {
+		close(channels[i][1]);
+		descriptors[i].fd = channels[i][0];
+		descriptors[i].events = POLLIN;
+		descriptors[i].revents = 0;
+	}
+	alarm(60);
+	while (__atomic_load_n(&state->ready, __ATOMIC_ACQUIRE) != workers)
+		sched_yield();
+	for (unsigned round = 1; round <= rounds; ++round) {
+		__atomic_store_n(&state->generation, round, __ATOMIC_RELEASE);
+		CHECK(poll(descriptors, workers, 5000) > 0);
+		for (int i = 0; i < workers; ++i) {
+			char byte = 0;
+			CHECK(read(channels[i][0], &byte, 1) == 1);
+			CHECK(byte == 'w');
+		}
+		while (__atomic_load_n(&state->completed, __ATOMIC_ACQUIRE) <
+		    round * workers)
+			sched_yield();
+	}
+	/* Let workers leave their final generation barrier. */
+	__atomic_store_n(&state->generation, rounds + 1, __ATOMIC_RELEASE);
+	for (int i = 0; i < workers; ++i) {
+		CHECK(close(channels[i][0]) == 0);
+		CHECK(reap_ok(children[i]) == 0);
+	}
+	alarm(0);
+	CHECK(munmap(state, sizeof(*state)) == 0);
+	return 0;
+}
+
+static int test_concurrent_wakeups_queue_once(void)
+{
+	pid_t coordinator = fork();
+	CHECK(coordinator >= 0);
+	if (coordinator == 0)
+		_exit(run_concurrent_wakeup_race());
+	CHECK(reap_ok(coordinator) == 0);
+	puts("QEMU CORE PASS: concurrent wakeups enqueue one thread once");
+	return 0;
+}
+
 static int test_posix_timer_thread_notification(void)
 {
 	timer_t timer;
@@ -785,6 +882,7 @@ static int run_tests(void)
 	CHECK(test_permissions_and_limits() == 0);
 	CHECK(test_inotify() == 0);
 	CHECK(test_scheduler_and_accounting() == 0);
+	CHECK(test_concurrent_wakeups_queue_once() == 0);
 	CHECK(test_posix_timer_thread_notification() == 0);
 	CHECK(test_anonymous_descriptor_access() == 0);
 	CHECK(test_pollfd_abi() == 0);

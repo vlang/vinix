@@ -447,7 +447,7 @@ fn kill_sibling_threads(mut current_process proc.Process, current_thread &proc.T
 	for mut victim in victims {
 		// Marked first so that an event trigger racing with us cannot put the
 		// thread back on the run queue behind our back.
-		victim.is_dead = true
+		katomic.store(mut &victim.is_dead, true)
 		sched.intercept_thread(victim) or {}
 		sched.dequeue_thread(victim)
 		sched.set_itimer_real(victim, 0, 0)

@@ -628,7 +628,7 @@ fn signal_thread(tgid int, tid int, signal int) (u64, u64) {
 	}
 
 	mut target := proc.thread_by_tid(tid)
-	if target == unsafe { nil } || target.is_dead {
+	if target == unsafe { nil } || katomic.load(&target.is_dead) {
 		return errno.err, errno.esrch
 	}
 	if tgid > 0 && target.process.pid != tgid {

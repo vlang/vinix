@@ -226,7 +226,7 @@ pub fn trigger(mut e eventstruct.Event, drop bool) u64 {
 
 		// A thread may listen to several events. Once one has made it runnable,
 		// do not overwrite that selection; retain this event for its next await.
-		if t.is_in_queue {
+		if katomic.load(&t.is_in_queue) {
 			preserve_pending = true
 			continue
 		}

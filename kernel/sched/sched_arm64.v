@@ -348,10 +348,17 @@ fn realtime_work_pending(cpu_number u64) bool {
 	if realtime_throttled(cpu_number, now_ns) {
 		return false
 	}
+	scheduler_queue_lock.acquire()
+	defer {
+		scheduler_queue_lock.release()
+	}
 
 	for i := 0; i < max_running_threads; i++ {
 		mut t := scheduler_running_queue[i]
 		if unsafe { t == nil } {
+			continue
+		}
+		if katomic.load(&t.is_dead) {
 			continue
 		}
 		if !t.sched.is_realtime() || t.l.is_held() {
@@ -375,6 +382,10 @@ fn realtime_work_pending(cpu_number u64) bool {
 // the memory it faulted in, while a node with nothing to do still takes work
 // from a busy one rather than idling.
 fn get_next_thread() &proc.Thread {
+	scheduler_queue_lock.acquire()
+	defer {
+		scheduler_queue_lock.release()
+	}
 	mut cpu_local := cpulocal.current()
 
 	if numa_multinode {
@@ -418,6 +429,9 @@ fn scan_run_queue_in_turn(mut cpu_local cpulocal.Local, want_node int) &proc.Thr
 
 		mut t := scheduler_running_queue[index]
 		if unsafe { t == nil } {
+			continue
+		}
+		if katomic.load(&t.is_dead) {
 			continue
 		}
 		if !may_run_here(t, cpu_local.cpu_number) {
@@ -466,6 +480,9 @@ fn scan_run_queue_ranked(mut cpu_local cpulocal.Local, want_node int) &proc.Thre
 
 			mut t := scheduler_running_queue[index]
 			if unsafe { t == nil } {
+				continue
+			}
+			if katomic.load(&t.is_dead) {
 				continue
 			}
 			if !may_run_here(t, cpu_local.cpu_number) {
@@ -614,7 +631,7 @@ fn scheduler_timer_handler(_gpr_state voidptr) {
 	if unsafe { current_thread != 0 } {
 		current_thread.yield_await.release()
 
-		entitled := current_thread.is_in_queue
+		entitled := katomic.load(&current_thread.is_in_queue)
 			&& may_run_here(current_thread, cpu_local.cpu_number)
 		mut keeps_cpu := unsafe { next_thread == nil } && entitled
 		if unsafe { next_thread != nil } && entitled {
@@ -725,17 +742,22 @@ fn scheduler_timer_handler(_gpr_state voidptr) {
 pub fn enqueue_thread(_thread &proc.Thread, by_signal bool) bool {
 	mut t := unsafe { _thread }
 
-	// A torn-down thread may still be referenced by event listener slots it
-	// never got to detach; never let it back onto the run queue.
-	if t.is_dead == true {
-		return false
-	}
-
 	// A signal can arrive while the target is running immediately before it
 	// removes itself from the run queue in event.await(). Publish the reason
 	// first so the waiter can observe it after dequeuing itself.
 	if by_signal {
 		katomic.store(mut &t.enqueued_by_signal, true)
+	}
+
+	scheduler_queue_lock.acquire()
+	defer {
+		scheduler_queue_lock.release()
+	}
+
+	// A torn-down thread may still be referenced by event listener slots it
+	// never got to detach; never let it back onto the run queue.
+	if katomic.load(&t.is_dead) == true {
+		return false
 	}
 
 	if t.is_in_queue == true {
@@ -744,7 +766,7 @@ pub fn enqueue_thread(_thread &proc.Thread, by_signal bool) bool {
 
 	for i := u64(0); i < max_running_threads; i++ {
 		if katomic.cas[&proc.Thread](mut &scheduler_running_queue[i], unsafe { nil }, t) {
-			t.is_in_queue = true
+			katomic.store(mut &t.is_in_queue, true)
 
 			// Wake any idle CPUs via SEV
 			for cpu_entry in cpu_locals {
@@ -763,19 +785,24 @@ pub fn enqueue_thread(_thread &proc.Thread, by_signal bool) bool {
 
 pub fn dequeue_thread(_thread &proc.Thread) bool {
 	mut t := unsafe { _thread }
-
-	if t.is_in_queue == false {
-		return true
+	scheduler_queue_lock.acquire()
+	defer {
+		scheduler_queue_lock.release()
 	}
 
+	was_enqueued := t.is_in_queue
+	mut removed := false
 	for i := u64(0); i < max_running_threads; i++ {
 		if katomic.cas[&proc.Thread](mut &scheduler_running_queue[i], t, unsafe { nil }) {
-			t.is_in_queue = false
-			return true
+			// Remove every occurrence. This also repairs a queue corrupted by an
+			// older kernel's concurrent-wakeup race instead of leaving a stale
+			// pointer behind when the Thread is freed.
+			removed = true
 		}
 	}
+	katomic.store(mut &t.is_in_queue, false)
 
-	return false
+	return removed || !was_enqueued
 }
 
 pub fn intercept_thread(_thread &proc.Thread) ? {
@@ -872,7 +899,7 @@ pub fn yield(save_ctx bool) {
 		poll_platform_input()
 
 		// Check if we've been re-enqueued by an event trigger
-		if current_thread.is_in_queue {
+		if katomic.load(&current_thread.is_in_queue) {
 			break
 		}
 
@@ -928,8 +955,11 @@ pub fn dequeue_and_yield() {
 pub fn dequeue_and_die() {
 	cpu.interrupt_toggle(false)
 	mut t := proc.current_thread()
+	// Publish death before removing the queue entry. A concurrent event wakeup
+	// will then either lose the queue lock and be removed below, or observe the
+	// dead flag and refuse to resurrect this Thread.
+	katomic.store(mut &t.is_dead, true)
 	dequeue_thread(t)
-	t.is_dead = true
 	// This thread leaves the CPU here rather than through the switch in
 	// scheduler_timer_handler, so its last turn is charged here or not at all.
 	// A process that runs briefly and exits would otherwise report no CPU time

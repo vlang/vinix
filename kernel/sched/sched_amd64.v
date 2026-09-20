@@ -46,6 +46,10 @@ fn may_run_here(t &proc.Thread, cpu_number u64) bool {
 // the memory it faulted in, while a node with nothing to do still takes work
 // from a busy one rather than idling.
 fn get_next_thread() &proc.Thread {
+	scheduler_queue_lock.acquire()
+	defer {
+		scheduler_queue_lock.release()
+	}
 	mut cpu_local := cpulocal.current()
 
 	if numa_multinode {
@@ -120,7 +124,7 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 	if unsafe { current_thread != 0 } {
 		current_thread.yield_await.release()
 
-		if unsafe { next_thread == nil } && current_thread.is_in_queue
+		if unsafe { next_thread == nil } && katomic.load(&current_thread.is_in_queue)
 			&& may_run_here(current_thread, cpu_local.cpu_number) {
 			apic.lapic_eoi()
 			apic.lapic_timer_oneshot(mut cpu_local, scheduler_vector, effective_timeslice(current_thread))
@@ -227,13 +231,18 @@ pub fn enqueue_thread(_thread &proc.Thread, by_signal bool) bool {
 		katomic.store(mut &t.enqueued_by_signal, true)
 	}
 
+	scheduler_queue_lock.acquire()
+	defer {
+		scheduler_queue_lock.release()
+	}
+
 	if t.is_in_queue == true {
 		return true
 	}
 
 	for i := u64(0); i < max_running_threads; i++ {
 		if katomic.cas[&proc.Thread](mut &scheduler_running_queue[i], unsafe { nil }, t) {
-			t.is_in_queue = true
+			katomic.store(mut &t.is_in_queue, true)
 
 			// Check if any CPU is idle and wake it up
 			for cpu_entry in cpu_locals {
@@ -252,19 +261,21 @@ pub fn enqueue_thread(_thread &proc.Thread, by_signal bool) bool {
 
 pub fn dequeue_thread(_thread &proc.Thread) bool {
 	mut t := unsafe { _thread }
-
-	if t.is_in_queue == false {
-		return true
+	scheduler_queue_lock.acquire()
+	defer {
+		scheduler_queue_lock.release()
 	}
 
+	was_enqueued := t.is_in_queue
+	mut removed := false
 	for i := u64(0); i < max_running_threads; i++ {
 		if katomic.cas[&proc.Thread](mut &scheduler_running_queue[i], t, unsafe { nil }) {
-			t.is_in_queue = false
-			return true
+			removed = true
 		}
 	}
+	katomic.store(mut &t.is_in_queue, false)
 
-	return false
+	return removed || !was_enqueued
 }
 
 // Like dequeue_thread(), but it stops it immediately

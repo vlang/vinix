@@ -35,6 +35,7 @@ FEATURE_MARKERS = (
     b"QEMU CORE PASS: permissions, umask, and resource limits",
     b"QEMU CORE PASS: inotify events",
     b"QEMU CORE PASS: priority, affinity, and accounting",
+    b"QEMU CORE PASS: concurrent wakeups enqueue one thread once",
     b"QEMU CORE PASS: POSIX SIGEV_THREAD timer notification",
     b"QEMU CORE PASS: anonymous descriptors are open both ways",
     b"QEMU CORE PASS: Linux pollfd ABI",
