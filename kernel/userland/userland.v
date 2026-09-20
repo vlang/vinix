@@ -440,10 +440,27 @@ pub fn syscall_kill(_ voidptr, pid int, signal int) (u64, u64) {
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
+	if pid < 0 || pid >= proc.max_pid || processes[pid] == unsafe { nil } {
+		return errno.err, errno.esrch
+	}
+
 	if signal > 0 {
 		sendsig(processes[pid].threads[0], u8(signal))
+	} else if signal == 0 {
+		// kill(pid, 0) is the standard POSIX "does this process exist, and am
+		// I allowed to signal it" probe: no signal is actually sent. zsh (and
+		// most job-control shells) use exactly this to check whether a
+		// backgrounded job is still alive. The existence check above already
+		// covers it; nothing further to do.
 	} else {
-		panic('sendsig: Values of signal <= 0 not supported')
+		// Negative signal numbers aren't a real ABI (negative *pid* addresses
+		// a process group, a caller concern this function doesn't yet
+		// implement -- but that's a different parameter). Whatever sent one
+		// made a mistake; a malformed syscall argument from an unprivileged
+		// process must never be able to bring down the kernel, so this
+		// reports it as an ordinary error rather than following the old
+		// panic().
+		return errno.err, errno.einval
 	}
 
 	return 0, 0
