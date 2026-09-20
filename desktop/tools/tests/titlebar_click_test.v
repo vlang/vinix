@@ -115,9 +115,11 @@ fn test_titlebar_drag_can_move_partly_offscreen() {
 	left_index := desktop.window_index(id) or { panic('missing dragged window') }
 	assert desktop.windows[left_index].x < 0
 	assert desktop.windows[left_index].x + desktop.windows[left_index].width >= 60
-	desktop.buttons = 0
-	// Release one pixel inside the edge so this test can keep exercising free
+	// Move back inside while still held so this test can keep exercising free
 	// off-screen movement; exact-edge release is covered by the snap tests.
+	desktop.buttons = button_left
+	desktop.on_pointer_move(1, title_y)
+	desktop.buttons = 0
 	desktop.on_pointer_up(1, title_y)
 
 	// The right edge behaves the same way.
@@ -128,6 +130,7 @@ fn test_titlebar_drag_can_move_partly_offscreen() {
 	right_index := desktop.window_index(id) or { panic('missing dragged window') }
 	assert desktop.windows[right_index].x + desktop.windows[right_index].width > 800
 	assert desktop.windows[right_index].x <= 800 - 60
+	desktop.on_pointer_move(798, title_y)
 	desktop.buttons = 0
 	desktop.on_pointer_up(798, title_y)
 
@@ -239,6 +242,45 @@ fn test_titlebar_drag_to_top_maximizes_on_release() {
 	assert desktop.windows[index].width == 800
 	assert desktop.windows[index].height == 600 - taskbar_height
 	assert desktop.drag.kind == .none_
+}
+
+fn test_edge_snap_uses_last_position_seen_while_button_was_held() {
+	mut desktop := Desktop{
+		canvas: Canvas{
+			width:  800
+			height: 600
+		}
+	}
+	id := desktop.spawn('Welcome', .welcome, 120, 80, 400, 260)
+	title_y := 80 + desktop.theme().title_height / 2
+	set_titlebar_test_target(mut desktop, id)
+	desktop.on_pointer_down(320, title_y)
+	desktop.buttons = button_left
+	desktop.on_pointer_move(0, title_y)
+
+	// A wrapped button-up coordinate on the opposite edge must not turn a
+	// left snap into a right snap.
+	desktop.buttons = 0
+	desktop.on_pointer_move(799, title_y)
+	mut index := desktop.window_index(id) or { panic('missing left-snapped window') }
+	assert desktop.windows[index].snap == .left
+	assert desktop.windows[index].x == 0
+	assert desktop.windows[index].width == 400
+
+	// Likewise, wrapping from the top to the bottom while releasing must keep
+	// the maximize gesture captured at the top edge.
+	set_titlebar_test_target(mut desktop, id)
+	desktop.on_pointer_down(200, desktop.theme().title_height / 2)
+	desktop.buttons = button_left
+	desktop.on_pointer_move(400, 0)
+	desktop.buttons = 0
+	desktop.on_pointer_move(400, 599)
+	index = desktop.window_index(id) or { panic('missing maximized window') }
+	assert desktop.windows[index].maximized
+	assert desktop.windows[index].x == 0
+	assert desktop.windows[index].y == 0
+	assert desktop.windows[index].width == 800
+	assert desktop.windows[index].height == 600 - taskbar_height
 }
 
 fn test_clicking_an_edge_touching_titlebar_does_not_snap_without_a_drag() {

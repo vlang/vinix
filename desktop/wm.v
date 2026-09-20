@@ -38,7 +38,9 @@ mut:
 	offset_y int
 	// Edge placement is a drag gesture, not a side effect of clicking an
 	// already edge-touching title bar without moving it.
-	moved bool
+	moved               bool
+	snap_on_release     WindowSnap
+	maximize_on_release bool
 }
 
 // DamageRect describes the part of the composed canvas that differs from the
@@ -1214,6 +1216,21 @@ fn (mut d Desktop) on_pointer_move(x int, y int) {
 	if d.drag.kind == .move && pointer_moved {
 		d.drag.moved = true
 	}
+	if d.drag.kind == .move && d.buttons & button_left != 0 {
+		// Keep the edge seen while the button is down. Some absolute-pointer
+		// backends report the button-up packet after wrapping a cursor that
+		// crossed the host's left or top edge to the opposite side.
+		d.drag.maximize_on_release = y <= 0
+		d.drag.snap_on_release = if y <= 0 {
+			.none_
+		} else if x <= 0 {
+			.left
+		} else if x >= d.canvas.width - 1 {
+			.right
+		} else {
+			.none_
+		}
+	}
 
 	// The button level, not just the release edge, ends a drag. The driver
 	// reports the current state on every read, so a release that was missed
@@ -1493,11 +1510,13 @@ fn (mut d Desktop) finish_window_drag(x int, y int) {
 		return
 	}
 	id := d.drag.window_id
-	if y <= 0 {
+	if d.drag.maximize_on_release || y <= 0 {
 		d.maximize(id)
-	} else if x <= 0 {
+	} else if d.drag.snap_on_release == .left || (d.drag.snap_on_release == .none_
+		&& x <= 0) {
 		d.snap_window(id, .left)
-	} else if x >= d.canvas.width - 1 {
+	} else if d.drag.snap_on_release == .right || (d.drag.snap_on_release == .none_
+		&& x >= d.canvas.width - 1) {
 		d.snap_window(id, .right)
 	}
 }
