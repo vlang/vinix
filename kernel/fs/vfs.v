@@ -1265,7 +1265,7 @@ pub fn syscall_readdir(_ voidptr, fdnum int, mut buf stat.Dirent) (u64, u64) {
 		procfs_refresh(dir_node)
 		dir_handle.dirlist.clear()
 		mut i := u64(0)
-		for name, mut orig_node in dir_node.children {
+		for name, mut orig_node in unsafe { *dir_node.children } {
 			node := reduce_node(unsafe { *orig_node }, false)
 			t := match node.resource.stat.mode & stat.ifmt {
 				stat.ifchr {
