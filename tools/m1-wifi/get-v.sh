@@ -13,10 +13,21 @@
 # performs the equivalent v1/v2 bootstrap internally (confirmed against this
 # exact commit), so replicating it by hand here was solving an already-solved
 # problem and only needed updating in one more place when it broke.
+#
+# V's own bootstrap compiler ("vc") is pinned too, not left to `make`'s
+# default `latest_vc` target: without `local=1`, a clean destination runs
+# `fresh_vc`, which clones vlang/vc with no revision pinned at all, so the
+# V pin above could silently get built by a different, later vc snapshot
+# on a later clean run -- and a later vc can become incompatible with
+# these historical V sources with nothing here to explain why the build
+# suddenly stopped working. Clone vc ourselves at a revision already
+# confirmed to build this exact V pin successfully, and pass local=1 so
+# V's own make leaves it alone instead of pulling a fresh one.
 set -eu
 DEST=${1:-build-tools/v-m1-wifi}
 HOST_CC=${HOST_CC:-clang}
 PIN=7490a8ff04d91dc60eec12b0d9923b4d1bc87960
+VC_PIN=21490f7811a2dd366c3daa39bef8e53c1e3e5727
 if [ -e "$DEST" ]; then
     echo "Destination already exists: $DEST (set V to its v executable instead)" >&2
     exit 1
@@ -28,6 +39,11 @@ git -C "$DEST" remote add origin https://github.com/vlang/v.git
 git -C "$DEST" fetch --depth=1 origin "$PIN"
 git -C "$DEST" checkout --detach FETCH_HEAD
 test "$(git -C "$DEST" rev-parse HEAD)" = "$PIN"
-CC="$HOST_CC" make -C "$DEST"
+git init "$DEST/vc"
+git -C "$DEST/vc" remote add origin https://github.com/vlang/vc.git
+git -C "$DEST/vc" fetch --depth=1 origin "$VC_PIN"
+git -C "$DEST/vc" checkout --detach FETCH_HEAD
+test "$(git -C "$DEST/vc" rev-parse HEAD)" = "$VC_PIN"
+CC="$HOST_CC" make -C "$DEST" local=1
 "$DEST/v" version
 printf 'Compiler ready: %s/v\n' "$DEST"
