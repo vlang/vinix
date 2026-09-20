@@ -22,152 +22,25 @@ fn leave(context &cpulocal.GPRState) {
 	userland.dispatch_a_signal(context)
 }
 
-@[_naked]
-fn syscall_entry() {
-	asm volatile amd64 {
-		// V 0.5.2's C backend does not actually honor @[_naked] here: it still
-		// emits a standard `push rbp; mov rsp, rbp` C prologue ahead of this
-		// block. On entry to a SYSCALL handler, rsp is still the live user
-		// stack pointer (the CPU does not switch stacks for SYSCALL, that is
-		// this function's own job, done below) -- so that phantom prologue
-		// pushes the user's rbp onto the user's OWN stack, 8 bytes the caller
-		// never asked to have touched, clobbering whatever was there (often a
-		// return address a few frames up). `pop rbp` as the very first real
-		// instruction here reverses exactly those two instructions: it
-		// restores rbp to the value the compiler's `push` just saved, and
-		// rsp to what it was before that push ran, so the rest of this frame
-		// (built from the CPU's real syscall entry state below) is undisturbed.
-		// Confirmed live with GDB: the corrupted 8 bytes always held the
-		// user's own rbp value, always at [rsp] at function entry, and this
-		// one line makes the corruption -- and the crash it produced a few
-		// dozen syscalls later, once execution reached the clobbered return
-		// address -- stop reproducing.
-		pop rbp
-		swapgs // Save user stack
-		mov gs:[32], rsp // Switch to kernel stack
-		mov rsp, gs:[24]
-		push 0x3b
-		push gs:[32]
-		push r11
-		push 0x43
-		push rcx
-		push 0
-		push r15
-		push r14
-		push r13
-		push r12
-		push r11
-		push r10
-		push r9
-		push r8
-		push rbp
-		push rdi
-		push rsi
-		push rdx
-		push rcx
-		push rbx
-		push rax
-		mov eax, es
-		push rax
-		mov eax, ds
-		push rax
-		sti
-		call syscall_is_linux
-		test rax, rax
-		jnz f1
+// The actual SYSCALL entry point is kernel/asm/syscall_entry.S, not V code --
+// see that file's own comment for why. It calls back into syscall_is_linux()
+// and leave() above by their linker symbol names, which V's whole-program
+// compiler cannot see: neither @[export] nor @[markused] on either function
+// survived having zero V-visible callers once the only call site (formerly
+// V's own inline asm, in the same translation unit) moved to a separate .S
+// file -- both were silently absent from the generated C entirely, a clean
+// link-time undefined-symbol error rather than a runtime surprise, but
+// still a real gap. A global initialised with their addresses at
+// declaration time did not fix it either; only assigning to it as a real
+// statement inside a function V proves reachable from main() did, matching
+// how interrupt_table's own entries are populated (a runtime assignment
+// inside sched.initialise(), not the array's own initializer) rather than
+// how it looked like it should work from that pattern alone.
+__global (
+	keep_syscall_entry_callees [2]voidptr
+)
 
-		// Native Vinix ABI: rdi is the syscall number and arguments start in
-		// rsi. Reload everything because syscall_is_linux() may clobber it.
-		xor r12, r12
-		mov rbx, [rsp + 56]
-		cmp rbx, 66
-		jae f2
-		mov rsi, [rsp + 48]
-		mov rdx, [rsp + 40]
-		mov rcx, [rsp + 88]
-		mov r8, [rsp + 72]
-		mov r9, [rsp + 80]
-		mov rdi, rsp
-		lea rax, [rip + syscall_table]
-		call [rax + rbx * 8 + 0]
-		jmp f4
-
-		// Linux x86-64 ABI: rax is the number, followed by
-		// rdi,rsi,rdx,r10,r8,r9. Vinix handlers take the saved GPR frame as
-		// their first argument, so shift the six Linux arguments right once;
-		// the last one is passed on the C stack.
-		1:
-		mov r12, 1
-		mov r13, [rsp + 16]
-		cmp r13, 512
-		jae f3
-		mov rax, rsp
-		sub rsp, 16
-		mov rdi, rax
-		mov rsi, [rax + 56]
-		mov rdx, [rax + 48]
-		mov rcx, [rax + 40]
-		mov r8, [rax + 88]
-		mov r9, [rax + 72]
-		mov rbx, [rax + 80]
-		mov [rsp], rbx
-		lea rbx, [rip + linux_syscall_table]
-		call [rbx + r13 * 8 + 0]
-		add rsp, 16
-		jmp f4
-
-		2:
-		xor r12, r12
-		mov rax, 0xffffffffffffffff
-		mov rdx, 38
-		jmp f4
-
-		3:
-		mov r12, 1
-		mov rax, 38
-		neg rax
-		xor rdx, rdx
-
-		4:
-		// Native calls return (result, errno) in rax/rdx. Linux encodes errno
-		// as a negative result and otherwise preserves the caller's rdx.
-		test r12, r12
-		jz f5
-		test rdx, rdx
-		jz f6
-		neg rdx
-		mov rax, rdx
-		6:
-		mov [rsp + 16], rax
-		jmp f7
-		5:
-		mov [rsp + 16], rax
-		mov [rsp + 40], rdx
-		7:
-		mov rdi, rsp
-		call syscall__leave
-		pop rax
-		mov ds, eax
-		pop rax
-		mov es, eax
-		pop rax
-		pop rbx
-		pop rcx
-		pop rdx
-		pop rsi
-		pop rdi
-		pop rbp
-		pop r8
-		pop r9
-		pop r10
-		pop r11
-		pop r12
-		pop r13
-		pop r14
-		pop r15 // Restore user stack
-		mov rsp, gs:[32]
-		swapgs
-		sysretq
-		; ; ; memory
-	}
+pub fn pin_syscall_entry_callees() {
+	keep_syscall_entry_callees[0] = voidptr(syscall_is_linux)
+	keep_syscall_entry_callees[1] = voidptr(leave)
 }
