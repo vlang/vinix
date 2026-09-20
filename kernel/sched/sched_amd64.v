@@ -493,7 +493,23 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 	}
 
 	t.self = voidptr(t)
-	t.gs_base = u64(0)
+	// current_thread()'s `mov ret, gs:[8]` trick needs GS_BASE to be this
+	// thread's own pointer whenever kernel code runs on its behalf.
+	// scheduler_isr's cs==user_code_seg branch restores KERNEL_GS_BASE from
+	// current_thread.gs_base before resuming a user thread, on the
+	// understanding that swapgs will later swap it back in as GS_BASE -- so
+	// this needs the same value new_kernel_thread already gives its threads
+	// (t.gs_base = u64(voidptr(t))), not 0. Left at 0, this thread's very
+	// first syscall entry swapgs's GS_BASE to 0, and every current_thread()
+	// call made from inside that syscall (signal dispatch, syscall_leave,
+	// ...) dereferences gs:[8] as address 8, reading and corrupting
+	// unrelated memory instead of this thread's own state -- confirmed live
+	// with GDB: a fresh process's first syscall (arch_prctl, from musl's own
+	// TLS setup) wrote its stale, thread-creation-time rsp onto its own
+	// live stack at an unrelated offset, clobbering a return address and
+	// crashing into it once execution reached it. fs_base is unrelated
+	// (userspace TLS, set by the process's own arch_prctl) and stays 0.
+	t.gs_base = u64(voidptr(t))
 	t.fs_base = u64(0)
 
 	// Set up FPU control word and MXCSR as defined in the sysv ABI
