@@ -375,6 +375,18 @@ pub fn syscall_rt_sigsuspend(_ voidptr, mask u64) (u64, u64) {
 	t.masked_signals = new_mask & ~((u64(1) << sigkill) | (u64(1) << sigstop))
 
 	for katomic.load(&t.pending_signals) & ~t.masked_signals == 0 {
+		// dequeue_thread() does not disable interrupts itself, so without
+		// this cli a timer tick landing between the dequeue and the
+		// enqueued_by_signal recheck below could preempt this thread while
+		// it's off the run queue but before it's decided whether to
+		// re-enqueue itself. sendsig(), seeing the thread still queued at
+		// that instant, would have skipped re-adding it -- so nothing would
+		// ever schedule it again. event.await_internal() closes the
+		// identical window the same way: cli before dequeuing, sti only
+		// once the decision below has been acted on.
+		asm volatile amd64 {
+			cli
+		}
 		sched.dequeue_thread(t)
 
 		// sendsig() sets the pending bit and calls enqueue_thread(t, true),
@@ -389,8 +401,19 @@ pub fn syscall_rt_sigsuspend(_ voidptr, mask u64) (u64, u64) {
 		interrupted_before_yield := katomic.load(&t.enqueued_by_signal)
 		if interrupted_before_yield {
 			sched.enqueue_thread(t, false)
+			asm volatile amd64 {
+				sti
+			}
 		} else {
+			// yield(true) context-switches away with interrupts still off,
+			// exactly as await_internal's own cli-wrapped yield does; this
+			// thread's saved flags carry that state, so interrupts are still
+			// logically disabled for it the instant it resumes here after
+			// being woken, and this sti is what re-enables them.
 			sched.yield(true)
+			asm volatile amd64 {
+				sti
+			}
 		}
 
 		if katomic.load(&t.enqueued_by_signal) {
