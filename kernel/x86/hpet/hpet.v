@@ -36,12 +36,12 @@ pub mut:
 }
 
 __global (
-	hpet           &HPET
+	hpet_device    &HPET
 	hpet_frequency u64
 )
 
 pub fn read_counter() u64 {
-	return kio.mmin(&hpet.main_counter_value)
+	return kio.mmin(&hpet_device.main_counter_value)
 }
 
 pub fn initialise() {
@@ -49,19 +49,19 @@ pub fn initialise() {
 		&HPETTable(acpi.find_sdt('HPET', 0) or { panic('HPET ACPI table not found') })
 	}
 
-	hpet = unsafe { &HPET(hpet_table.address + higher_half) }
+	hpet_device = unsafe { &HPET(hpet_table.address + higher_half) }
 
-	mut tmp := kio.mmin(&hpet.general_capabilities)
+	mut tmp := kio.mmin(&hpet_device.general_capabilities)
 
 	counter_clk_period := tmp >> 32
 	hpet_frequency = u64(1000000000000000) / counter_clk_period
 
 	println('hpet: Detected frequency of ${hpet_frequency} Hz')
 
-	kio.mmout(&hpet.main_counter_value, 0)
+	kio.mmout(&hpet_device.main_counter_value, 0)
 
 	println('hpet: Enabling')
-	tmp = kio.mmin(&hpet.general_configuration)
+	tmp = kio.mmin(&hpet_device.general_configuration)
 	tmp |= 0b01
-	kio.mmout(&hpet.general_configuration, tmp)
+	kio.mmout(&hpet_device.general_configuration, tmp)
 }
