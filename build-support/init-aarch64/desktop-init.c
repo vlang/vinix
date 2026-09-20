@@ -194,6 +194,12 @@ static void restart_pause(void) {
 	         (u64)&delay, 0);
 }
 
+static void teardown_pause(void) {
+	struct kernel_timespec delay = { 0, 10000000 /* 10 ms */ };
+	syscall4(115 /* clock_nanosleep */, 1 /* CLOCK_MONOTONIC */, 0,
+	         (u64)&delay, 0);
+}
+
 /* Wait for one supervised child. A power signal interrupts wait4; forward it
  * once, then let the compositor perform its normal clean shutdown. */
 static void wait_for_child(i64 child, int *status) {
@@ -232,19 +238,45 @@ static i64 spawn_program(char **arguments, char **fallback, int own_group,
 	return child;
 }
 
-static void stop_desktop_group(i64 child) {
+static void reap_exited_children(void) {
 	int status;
-	if (child > 0) {
-		/* Application children inherit the compositor's process group. If the
-		 * compositor died before closing them, do not carry them into its next
-		 * session. */
-		syscall2(129 /* kill */, (u64)-child, 15 /* SIGTERM */);
-		restart_pause();
-		syscall2(129 /* kill */, (u64)-child, 9 /* SIGKILL */);
-	}
 	while (syscall4(260 /* wait4 */, (u64)(i64)-1, (u64)&status,
 	                1 /* WNOHANG */, 0) > 0) {
 	}
+}
+
+static int wait_for_desktop_group(i64 child, int attempts) {
+	while (attempts-- > 0) {
+		/* The compositor's application children are adopted by PID 1 when it
+		 * exits. Reap first: kill(group, 0) deliberately still sees zombies. */
+		reap_exited_children();
+		if (syscall2(129 /* kill */, (u64)-child, 0) < 0)
+			return 1;
+		teardown_pause();
+	}
+	return 0;
+}
+
+static void stop_desktop_group(i64 child) {
+	if (child <= 0) {
+		reap_exited_children();
+		return;
+	}
+
+	/* Application children inherit the compositor's process group. If the
+	 * compositor died before closing them, do not carry them into its next
+	 * session. More importantly, do not launch a replacement while those old
+	 * processes are still exiting: doing that used to race their address-space
+	 * and scheduler teardown against the new compositor, intermittently
+	 * wedging the whole guest after an in-Terminal desktop rebuild. */
+	syscall2(129 /* kill */, (u64)-child, 15 /* SIGTERM */);
+	if (wait_for_desktop_group(child, 100 /* one second */))
+		return;
+
+	syscall2(129 /* kill */, (u64)-child, 9 /* SIGKILL */);
+	if (!wait_for_desktop_group(child, 500 /* five seconds */))
+		print("init: old desktop process group did not stop within five seconds\n");
+	reap_exited_children();
 }
 
 static int gpu_available(void) {
@@ -366,5 +398,6 @@ void _start(void) {
 		}
 		report_desktop_exit(child, status);
 		stop_desktop_group(child);
+		restart_pause();
 	}
 }
