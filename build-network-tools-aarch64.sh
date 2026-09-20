@@ -116,6 +116,8 @@ install -m755 "$SCRIPT_DIR/tests/packages/gimp-smoke.sh" \
     "$STAGING/root/gimp-package-smoke.sh"
 install -m755 "$SCRIPT_DIR/tests/packages/blender-smoke.sh" \
     "$STAGING/root/blender-package-smoke.sh"
+install -m755 "$SCRIPT_DIR/tests/packages/ffmpeg-smoke.sh" \
+    "$STAGING/root/ffmpeg-package-smoke.sh"
 install -m755 "$SCRIPT_DIR/tests/packages/sublime-smoke.sh" \
     "$STAGING/root/sublime-package-smoke.sh"
 # A persistent /root shadows the copy the image ships there, so the checker the
@@ -187,9 +189,10 @@ if [ -e "$STAGING/usr/bin/gtk3-demo" ] \
     || [ -e "$STAGING/usr/bin/gnumeric" ] \
     || [ -e "$STAGING/usr/bin/gimp" ] \
     || [ -e "$STAGING/usr/bin/blender" ] \
+    || [ -e "$STAGING/usr/bin/ffmpeg" ] \
     || find "$STAGING/lib" "$STAGING/usr/lib" -name 'libgtk-3.so*' \
         -print -quit 2>/dev/null | grep -q .; then
-    echo "GTK, Gnumeric, GIMP, and Blender must not be preinstalled in the network/package layer" >&2
+    echo "GTK, Gnumeric, GIMP, Blender, and FFmpeg must not be preinstalled in the network/package layer" >&2
     exit 1
 fi
 

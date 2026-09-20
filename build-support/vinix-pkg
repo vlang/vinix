@@ -25,7 +25,7 @@ usage() {
 usage: pkg <command> [package ...]
 
 commands:
-  install PACKAGE...  install packages (includes Minecraft, Java, Chromium, GTK, GIMP, Blender, and Sublime Text)
+  install PACKAGE...  install packages (includes FFmpeg, Minecraft, Java, Chromium, GTK, GIMP, Blender, and Sublime Text)
   remove PACKAGE...   remove packages
   update              refresh Alpine repository indexes
   upgrade             upgrade installed packages
@@ -343,6 +343,10 @@ install_packages() {
 				apk_install \
 					adwaita-icon-theme font-dejavu gimp
 				finalize_gimp
+				;;
+			ffmpeg)
+				apk_install ffmpeg
+				finalize_ffmpeg
 				;;
 			blender)
 				# libgmpxx is what the native Vinix backend adds to Alpine's
@@ -697,6 +701,22 @@ finalize_chromium() {
 	fi
 }
 
+finalize_ffmpeg() {
+	# apk creates the command files, but Vinix cannot yet apply the executable
+	# modes from package metadata through fchmodat(2). Restore the complete
+	# command set shipped by Alpine's ffmpeg package rather than making only the
+	# most visible binary work.
+	for program in ffmpeg ffprobe qt-faststart; do
+		path=$(root_path "/usr/bin/$program")
+		[ ! -f "$path" ] || bb chmod 0755 "$path"
+	done
+	if [ ! -x "$(root_path /usr/bin/ffmpeg)" ] \
+		|| [ ! -x "$(root_path /usr/bin/ffprobe)" ]; then
+		echo "pkg: FFmpeg package has no executable tools" >&2
+		exit 1
+	fi
+}
+
 finalize_libreoffice() {
 	[ -n "$ROOT" ] && return 0
 	# Vinix package extraction cannot restore executable modes with fchmodat(2)
@@ -1014,6 +1034,9 @@ case "$command_name" in
 		fi
 		if [ -e "$(root_path /usr/lib/chromium/chrome)" ]; then
 			finalize_chromium
+		fi
+		if [ -e "$(root_path /usr/bin/ffmpeg)" ]; then
+			finalize_ffmpeg
 		fi
 		if [ -e "$(root_path "/usr/lib/jvm/java-${MINECRAFT_JAVA_MAJOR}-openjdk/bin/java")" ]; then
 			finalize_java "$MINECRAFT_JAVA_MAJOR"

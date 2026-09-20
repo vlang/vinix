@@ -165,6 +165,16 @@ case "$*" in
 			if [ "$seen_add" = true ]; then
 				printf '%s\n' "$argument" >>"$VINIX_TEST_INSTALLED_PACKAGES"
 				case "$argument" in
+					ffmpeg)
+						mkdir -p "$VINIX_TEST_ROOT/usr/bin"
+						for program in ffmpeg ffprobe qt-faststart; do
+							printf '#!/bin/sh\nexit 0\n' \
+								>"$VINIX_TEST_ROOT/usr/bin/$program"
+							chmod 0644 "$VINIX_TEST_ROOT/usr/bin/$program"
+						done
+						printf 'P:%s\nF:usr/bin\nR:ffmpeg\nR:ffprobe\nR:qt-faststart\n\n' \
+							"$argument"
+						;;
 					openjdk21-jre|openjdk21-jdk)
 						mkdir -p "$VINIX_TEST_ROOT/usr/lib/jvm/java-21-openjdk/bin" \
 							"$VINIX_TEST_ROOT/usr/lib/jvm/java-21-openjdk/lib/security"
@@ -413,6 +423,19 @@ run_pkg remove blender
 test ! -e "$root/usr/libexec/vinix-blender"
 tail -n 1 "$log" | grep -q -- \
 	'--no-progress --no-scripts del blender$'
+
+run_pkg install ffmpeg
+test -x "$root/usr/bin/ffmpeg"
+test -x "$root/usr/bin/ffprobe"
+test -x "$root/usr/bin/qt-faststart"
+tail -n 2 "$log" | sed -n '1p' | grep -q -- \
+	'--cache-dir .* --no-progress cache download ffmpeg$'
+tail -n 1 "$log" | grep -q -- \
+	'--cache-dir .* --no-network --no-progress --no-scripts add ffmpeg$'
+
+run_pkg remove ffmpeg
+tail -n 1 "$log" | grep -q -- \
+	'--no-progress --no-scripts del ffmpeg$'
 
 run_pkg install gimp
 test -x "$root/usr/bin/gimp"

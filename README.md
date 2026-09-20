@@ -361,6 +361,22 @@ pkg install gtk
 ./gtk-package-smoke.sh
 ```
 
+FFmpeg is installed directly from Alpine together with its codec-library
+dependency closure. The package frontend restores the command modes that apk
+cannot currently apply on Vinix:
+
+```sh
+pkg install ffmpeg
+ffmpeg -version
+```
+
+On a clean image, the packaged smoke test installs FFmpeg, performs an actual
+encode, and probes the result:
+
+```sh
+./ffmpeg-package-smoke.sh
+```
+
 Gnumeric is also installed on demand with its GTK theme and fonts:
 
 ```sh
