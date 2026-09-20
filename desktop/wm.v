@@ -26,6 +26,7 @@ const desktop_action_prefixes = ['taskbar.', 'task.', 'win.', 'shortcut.', 'star
 enum DragKind {
 	none_
 	move
+	resize
 }
 
 struct Drag {
@@ -36,6 +37,12 @@ mut:
 	// to have its corner under the cursor.
 	offset_x int
 	offset_y int
+	// A resize is measured from the frame at pointer-down, so grabbing anywhere
+	// in the corner does not make the edge jump under the pointer.
+	start_pointer_x int
+	start_pointer_y int
+	start_width     int
+	start_height    int
 	// Edge placement is a drag gesture, not a side effect of clicking an
 	// already edge-touching title bar without moving it.
 	moved               bool
@@ -85,6 +92,9 @@ mut:
 	pointer_capture int
 	shortcut_order  []int
 	shortcut_press  ShortcutPress
+	// Window chrome owns the primary-button gesture through its release, even
+	// when the button-up packet ends the drag during the move pass first.
+	chrome_pointer_capture bool
 	// A Start-menu press is consumed through its release even when the press
 	// launches something and closes the menu before that release arrives.
 	start_menu_pointer bool
@@ -174,6 +184,7 @@ fn (mut d Desktop) spawn(title string, page Page, x int, y int, width int, heigh
 		id_minimize: '${prefix}.minimize'
 		id_divider: '${prefix}.divider'
 		id_body: '${prefix}.body'
+		id_resize:      '${prefix}.resize'
 		id_task: 'task.${id}'
 	}
 	d.focus = id
@@ -490,10 +501,26 @@ fn (mut d Desktop) window_element(window_index int) ui2.Element {
 		bg: background
 	}, contents)
 
-	mut window_children := frame_elements(3)
+	mut window_children := frame_elements(4)
 	window_children << title_bar
 	window_children << divider
 	window_children << body
+	// Arranged windows already fill a desktop-defined region. A normal window
+	// exposes a small piece of chrome above its content for pointer resizing.
+	if !window.maximized && window.snap == .none_ {
+		grip_size := window_resize_grip_size
+		mut grip_children := frame_elements(1)
+		grip_children << ui2.button_with_image('', '', 'builtin:resize_grip', ui2.rect(0,
+			0, f64(grip_size), f64(grip_size)), ui2.BoxStyle{
+			transparent: true
+		}, ui2.TextStyle{
+			color: theme.glyph_color
+		})
+		window_children << ui2.draggable_view_with_cursor(window.id_resize, ui2.rect(f64(window.width -
+			grip_size), f64(window.height - grip_size), f64(grip_size), f64(grip_size)), ui2.BoxStyle{
+			bg: theme.window_body
+		}, ui2.cursor_resize_nwse, grip_children)
+	}
 	return ui2.view(window.id_frame, window.frame_rect(), ui2.BoxStyle{
 		bg: background
 		radius: theme.window_radius
@@ -1263,9 +1290,18 @@ fn (mut d Desktop) on_pointer_move(x int, y int) {
 	// The button level, not just the release edge, ends a drag. The driver
 	// reports the current state on every read, so a release that was missed
 	// between two frames cannot leave a window stuck to the cursor.
-	if d.drag.kind == .move && d.buttons & button_left == 0 {
-		d.finish_window_drag(x, y)
+	if d.drag.kind != .none_ && d.buttons & button_left == 0 {
+		if d.drag.kind == .move {
+			d.finish_window_drag(x, y)
+		} else if d.drag.kind == .resize {
+			d.finish_window_resize()
+		}
 		d.drag = Drag{}
+	}
+
+	if d.drag.kind == .resize {
+		d.resize_window_to_pointer(x, y)
+		return
 	}
 
 	if d.drag.kind == .move {
@@ -1310,6 +1346,46 @@ fn (mut d Desktop) on_pointer_move(x int, y int) {
 		d.set_hover(hover)
 		d.dirty = true
 	}
+}
+
+// resize_window_to_pointer changes the lower and right edges while leaving the
+// window's origin fixed. The usable desktop bounds the growing edge; a window
+// already positioned too near an edge still retains the global minimum size.
+fn (mut d Desktop) resize_window_to_pointer(x int, y int) {
+	index := d.window_index(d.drag.window_id) or {
+		d.drag = Drag{}
+		return
+	}
+	mut width := d.drag.start_width + x - d.drag.start_pointer_x
+	mut height := d.drag.start_height + y - d.drag.start_pointer_y
+	min_height := d.theme().title_height + window_min_body_height
+	if width < window_min_width {
+		width = window_min_width
+	}
+	if height < min_height {
+		height = min_height
+	}
+	max_width := d.canvas.width - d.windows[index].x
+	max_height := d.canvas.height - taskbar_height - d.windows[index].y
+	if max_width >= window_min_width && width > max_width {
+		width = max_width
+	}
+	if max_height >= min_height && height > max_height {
+		height = max_height
+	}
+	if width != d.windows[index].width || height != d.windows[index].height {
+		d.windows[index].width = width
+		d.windows[index].height = height
+		d.dirty = true
+	}
+}
+
+fn (mut d Desktop) finish_window_resize() {
+	if d.drag.kind != .resize {
+		return
+	}
+	index := d.window_index(d.drag.window_id) or { return }
+	d.remember_restore_frame(index)
 }
 
 // add_drag_damage includes the outside edge of the shadow and both cursor
@@ -1425,6 +1501,9 @@ fn (mut d Desktop) clamp_drag_to_screen(index int) {
 }
 
 fn (mut d Desktop) on_pointer_down(x int, y int) {
+	// A fresh primary press supersedes any release that an earlier, incomplete
+	// device report failed to deliver.
+	d.chrome_pointer_capture = false
 	action := d.hit_action(x, y)
 	d.set_hover(action)
 	d.dirty = true
@@ -1456,7 +1535,8 @@ fn (mut d Desktop) on_pointer_down(x int, y int) {
 		d.close_start_menu()
 	}
 
-	if d.forward_pointer_to_app(x, y, .down, .left, 0) && action == '' {
+	resizing_window := action.starts_with('win.') && action.ends_with('.resize')
+	if !resizing_window && d.forward_pointer_to_app(x, y, .down, .left, 0) && action == '' {
 		// Raw-surface clicks were already delivered and focused above. Falling
 		// through would interpret their deliberately action-less content as an
 		// empty-desktop click and immediately clear that focus again.
@@ -1502,6 +1582,25 @@ fn (mut d Desktop) on_pointer_down(x int, y int) {
 					offset_x: x - d.windows[index].x
 					offset_y: y - d.windows[index].y
 				}
+				d.chrome_pointer_capture = true
+				d.drag_damage = DamageRect{}
+			}
+			'resize' {
+				index := d.window_index(id) or { return }
+				if d.windows[index].maximized || d.windows[index].snap != .none_ {
+					return
+				}
+				d.raise(id)
+				resized := d.window_index(id) or { return }
+				d.drag = Drag{
+					kind:            .resize
+					window_id:       id
+					start_pointer_x: x
+					start_pointer_y: y
+					start_width:     d.windows[resized].width
+					start_height:    d.windows[resized].height
+				}
+				d.chrome_pointer_capture = true
 				d.drag_damage = DamageRect{}
 			}
 			'close' {
@@ -1534,12 +1633,18 @@ fn (mut d Desktop) on_pointer_up(x int, y int) {
 		d.dirty = true
 		return
 	}
+	was_dragging := d.chrome_pointer_capture || d.drag.kind != .none_
+	d.chrome_pointer_capture = false
 	if d.start_menu_pointer {
 		d.start_menu_pointer = false
-	} else {
+	} else if !was_dragging {
 		d.forward_pointer_to_app(x, y, .up, .left, 0)
 	}
-	d.finish_window_drag(x, y)
+	if d.drag.kind == .move {
+		d.finish_window_drag(x, y)
+	} else if d.drag.kind == .resize {
+		d.finish_window_resize()
+	}
 	d.drag = Drag{}
 	d.drag_damage = DamageRect{}
 	d.set_hover(release_action)

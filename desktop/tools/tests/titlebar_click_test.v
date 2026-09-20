@@ -300,3 +300,77 @@ fn test_clicking_an_edge_touching_titlebar_does_not_snap_without_a_drag() {
 	assert desktop.windows[index].x == 120
 	assert desktop.windows[index].y == 0
 }
+
+fn set_resize_test_target(mut desktop Desktop, id int) {
+	index := desktop.window_index(id) or { panic('missing test window') }
+	window := desktop.windows[index]
+	target := HitTarget{
+		action_id: window.id_resize
+		x:         window.x + window.width - window_resize_grip_size
+		y:         window.y + window.height - window_resize_grip_size
+		width:     window_resize_grip_size
+		height:    window_resize_grip_size
+	}
+	if desktop.targets.len == 0 {
+		desktop.targets << target
+	} else {
+		desktop.targets[0] = target
+	}
+}
+
+fn test_lower_right_corner_resizes_window_and_updates_restore_frame() {
+	mut desktop := Desktop{
+		canvas: Canvas{
+			width:  800
+			height: 600
+		}
+	}
+	id := desktop.spawn('Welcome', .welcome, 120, 80, 400, 260)
+	set_resize_test_target(mut desktop, id)
+	desktop.on_pointer_down(519, 339)
+	assert desktop.drag.kind == .resize
+	desktop.buttons = button_left
+	desktop.on_pointer_move(619, 399)
+	index := desktop.window_index(id) or { panic('missing resized window') }
+	assert desktop.windows[index].x == 120
+	assert desktop.windows[index].y == 80
+	assert desktop.windows[index].width == 500
+	assert desktop.windows[index].height == 320
+	desktop.buttons = 0
+	desktop.on_pointer_up(619, 399)
+	assert desktop.drag.kind == .none_
+	assert desktop.windows[index].restore_x == 120
+	assert desktop.windows[index].restore_y == 80
+	assert desktop.windows[index].restore_width == 500
+	assert desktop.windows[index].restore_height == 320
+}
+
+fn test_corner_resize_respects_minimum_size_and_usable_desktop() {
+	mut desktop := Desktop{
+		canvas: Canvas{
+			width:  800
+			height: 600
+		}
+	}
+	id := desktop.spawn('Welcome', .welcome, 120, 80, 400, 260)
+	set_resize_test_target(mut desktop, id)
+	desktop.on_pointer_down(519, 339)
+	desktop.buttons = button_left
+	desktop.on_pointer_move(0, 0)
+	mut index := desktop.window_index(id) or { panic('missing minimum-sized window') }
+	assert desktop.windows[index].width == window_min_width
+	assert desktop.windows[index].height == desktop.theme().title_height + window_min_body_height
+	desktop.buttons = 0
+	desktop.on_pointer_up(0, 0)
+
+	set_resize_test_target(mut desktop, id)
+	index = desktop.window_index(id) or { panic('missing window before growth') }
+	press_x := desktop.windows[index].x + desktop.windows[index].width - 1
+	press_y := desktop.windows[index].y + desktop.windows[index].height - 1
+	desktop.on_pointer_down(press_x, press_y)
+	desktop.buttons = button_left
+	desktop.on_pointer_move(799, 599)
+	index = desktop.window_index(id) or { panic('missing maximum-sized window') }
+	assert desktop.windows[index].x + desktop.windows[index].width == 800
+	assert desktop.windows[index].y + desktop.windows[index].height == 600 - taskbar_height
+}

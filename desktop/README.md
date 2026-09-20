@@ -19,6 +19,7 @@ What it does:
 - windows with a title bar, a close, a maximise/restore and a minimise button
 - dragging a window by its title bar, including Windows 7-style top-edge
   maximize and left/right half-screen snapping
+- resizing a normal window by dragging its lower-right corner
 - a **V Start button** and Windows 7-style two-column Start menu, with recent
   programs, All Programs, type-to-search, system links and a session button
 - **shortcuts down the left edge of the wallpaper**, and matching Start-menu

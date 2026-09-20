@@ -50,6 +50,7 @@ mut:
 	id_minimize string
 	id_divider  string
 	id_body     string
+	id_resize   string
 	id_task     string
 	// Geometry to come back to when a maximised window is restored.
 	restore_x      int

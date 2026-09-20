@@ -984,6 +984,13 @@ fn (mut d Desktop) draw_builtin_glyph(path string, x int, y int, w int, h int, c
 			d.canvas.fill_rect(cx - half, cy - half + 2, 2 * half - 1, 2 * half - 1, d.surface_under(x, y))
 			d.canvas.stroke_round_rect(cx - half, cy - half + 2, 2 * half - 1, 2 * half - 1, 1, color, 255)
 		}
+		'resize_grip' {
+			// Three parallel diagonals, matching the conventional lower-right
+			// affordance without relying on a font glyph.
+			d.canvas.draw_line(x + w - 3, y + h - 7, x + w - 7, y + h - 3, color, 1)
+			d.canvas.draw_line(x + w - 3, y + h - 12, x + w - 12, y + h - 3, color, 1)
+			d.canvas.draw_line(x + w - 3, y + h - 17, x + w - 17, y + h - 3, color, 1)
+		}
 		'close' {
 			d.canvas.draw_line(cx - half, cy - half, cx + half, cy + half, color, 1)
 			d.canvas.draw_line(cx + half, cy - half, cx - half, cy + half, color, 1)
