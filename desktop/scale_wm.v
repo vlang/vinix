@@ -104,6 +104,16 @@ fn (mut d Desktop) apply_requested_scale() {
 			d.windows[i].y = 0
 			d.windows[i].width = new_width
 			d.windows[i].height = desktop_usable_height(new_height)
+		} else if d.windows[i].snap != .none_ {
+			half := new_width / 2
+			d.windows[i].x = if d.windows[i].snap == .left { 0 } else { half }
+			d.windows[i].y = 0
+			d.windows[i].width = if d.windows[i].snap == .left {
+				half
+			} else {
+				new_width - half
+			}
+			d.windows[i].height = desktop_usable_height(new_height)
 		} else {
 			window_x, window_y := desktop_clamp_scaled_position(d.windows[i].x, d.windows[i].y, d.windows[i].width, d.windows[i].height, new_width, new_height)
 			d.windows[i].x = window_x

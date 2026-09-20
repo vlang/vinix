@@ -18,6 +18,12 @@ enum Page {
 	app
 }
 
+enum WindowSnap {
+	none_
+	left
+	right
+}
+
 struct Window {
 mut:
 	id     int
@@ -48,6 +54,7 @@ mut:
 	restore_width  int
 	restore_height int
 	maximized      bool
+	snap           WindowSnap
 	minimized      bool
 	// Index into Desktop.apps for a `.app` window, or -1 for a built-in page.
 	app_index int = -1

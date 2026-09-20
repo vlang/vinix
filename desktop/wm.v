@@ -33,6 +33,9 @@ mut:
 	// to have its corner under the cursor.
 	offset_x int
 	offset_y int
+	// Edge placement is a drag gesture, not a side effect of clicking an
+	// already edge-touching title bar without moving it.
+	moved bool
 }
 
 // DamageRect describes the part of the composed canvas that differs from the
@@ -232,25 +235,68 @@ fn (mut d Desktop) close_window(id int) {
 	d.dirty = true
 }
 
+fn (mut d Desktop) remember_restore_frame(index int) {
+	d.windows[index].restore_x = d.windows[index].x
+	d.windows[index].restore_y = d.windows[index].y
+	d.windows[index].restore_width = d.windows[index].width
+	d.windows[index].restore_height = d.windows[index].height
+}
+
+fn (mut d Desktop) restore_window(id int) {
+	index := d.window_index(id) or { return }
+	d.windows[index].x = d.windows[index].restore_x
+	d.windows[index].y = d.windows[index].restore_y
+	d.windows[index].width = d.windows[index].restore_width
+	d.windows[index].height = d.windows[index].restore_height
+	d.windows[index].maximized = false
+	d.windows[index].snap = .none_
+	d.raise(id)
+}
+
+fn (mut d Desktop) maximize(id int) {
+	index := d.window_index(id) or { return }
+	if d.windows[index].maximized {
+		return
+	}
+	// A snapped window already remembers the normal frame it should return to.
+	if d.windows[index].snap == .none_ {
+		d.remember_restore_frame(index)
+	}
+	d.windows[index].x = 0
+	d.windows[index].y = 0
+	d.windows[index].width = d.canvas.width
+	d.windows[index].height = d.canvas.height - taskbar_height
+	d.windows[index].maximized = true
+	d.windows[index].snap = .none_
+	d.raise(id)
+}
+
 fn (mut d Desktop) toggle_maximize(id int) {
 	index := d.window_index(id) or { return }
 	if d.windows[index].maximized {
-		d.windows[index].x = d.windows[index].restore_x
-		d.windows[index].y = d.windows[index].restore_y
-		d.windows[index].width = d.windows[index].restore_width
-		d.windows[index].height = d.windows[index].restore_height
-		d.windows[index].maximized = false
+		d.restore_window(id)
 	} else {
-		d.windows[index].restore_x = d.windows[index].x
-		d.windows[index].restore_y = d.windows[index].y
-		d.windows[index].restore_width = d.windows[index].width
-		d.windows[index].restore_height = d.windows[index].height
-		d.windows[index].x = 0
-		d.windows[index].y = 0
-		d.windows[index].width = d.canvas.width
-		d.windows[index].height = d.canvas.height - taskbar_height
-		d.windows[index].maximized = true
+		d.maximize(id)
 	}
+}
+
+fn (mut d Desktop) snap_window(id int, snap WindowSnap) {
+	if snap == .none_ {
+		return
+	}
+	index := d.window_index(id) or { return }
+	// Moving between arranged states must not replace the original normal
+	// frame with a maximized or half-screen frame.
+	if !d.windows[index].maximized && d.windows[index].snap == .none_ {
+		d.remember_restore_frame(index)
+	}
+	half := d.canvas.width / 2
+	d.windows[index].x = if snap == .left { 0 } else { half }
+	d.windows[index].y = 0
+	d.windows[index].width = if snap == .left { half } else { d.canvas.width - half }
+	d.windows[index].height = d.canvas.height - taskbar_height
+	d.windows[index].maximized = false
+	d.windows[index].snap = snap
 	d.raise(id)
 }
 
@@ -1151,11 +1197,15 @@ fn (mut d Desktop) on_pointer_move(x int, y int) {
 	}
 	d.pointer_x = x
 	d.pointer_y = y
+	if d.drag.kind == .move && pointer_moved {
+		d.drag.moved = true
+	}
 
 	// The button level, not just the release edge, ends a drag. The driver
 	// reports the current state on every read, so a release that was missed
 	// between two frames cannot leave a window stuck to the cursor.
 	if d.drag.kind == .move && d.buttons & button_left == 0 {
+		d.finish_window_drag(x, y)
 		d.drag = Drag{}
 	}
 
@@ -1164,11 +1214,11 @@ fn (mut d Desktop) on_pointer_move(x int, y int) {
 			d.drag = Drag{}
 			return
 		}
-		// A maximised window that is dragged goes back to its own size, with
+		// An arranged window that is dragged goes back to its own size, with
 		// the grab kept proportionally along the title bar.
-		if d.windows[index].maximized {
+		if d.windows[index].maximized || d.windows[index].snap != .none_ {
 			ratio := f64(d.drag.offset_x) / f64(d.windows[index].width)
-			d.toggle_maximize(d.drag.window_id)
+			d.restore_window(d.drag.window_id)
 			new_index := d.window_index(d.drag.window_id) or { return }
 			d.drag.offset_x = int(ratio * f64(d.windows[new_index].width))
 			d.drag.offset_y = d.theme().title_height / 2
@@ -1414,10 +1464,28 @@ fn (mut d Desktop) on_pointer_up(x int, y int) {
 	} else {
 		d.forward_pointer_to_app(x, y, .up, .left, 0)
 	}
+	d.finish_window_drag(x, y)
 	d.drag = Drag{}
 	d.drag_damage = DamageRect{}
 	d.set_hover(d.hit_action(x, y))
 	d.dirty = true
+}
+
+// finish_window_drag applies Windows 7-style edge placement when the title
+// bar is released against a display edge. The top edge takes precedence at a
+// corner; the side edges fill their respective half of the usable desktop.
+fn (mut d Desktop) finish_window_drag(x int, y int) {
+	if d.drag.kind != .move || !d.drag.moved {
+		return
+	}
+	id := d.drag.window_id
+	if y <= 0 {
+		d.maximize(id)
+	} else if x <= 0 {
+		d.snap_window(id, .left)
+	} else if x >= d.canvas.width - 1 {
+		d.snap_window(id, .right)
+	}
 }
 
 // Non-primary buttons and the wheel have no desktop chrome meaning yet, but a

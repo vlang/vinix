@@ -17,7 +17,8 @@ What it does:
 - a wallpaper, and a taskbar with Start, open windows and a clock in its
   bottom-right status area
 - windows with a title bar, a close, a maximise/restore and a minimise button
-- dragging a window by its title bar, clicking one to bring it to the front
+- dragging a window by its title bar, including Windows 7-style top-edge
+  maximize and left/right half-screen snapping
 - a **V Start button** and Windows 7-style two-column Start menu, with recent
   programs, All Programs, type-to-search, system links and a session button
 - **shortcuts down the left edge of the wallpaper**, and matching Start-menu
