@@ -956,6 +956,10 @@ const cursor_mask = [
 ]
 
 fn (mut d Desktop) draw_cursor() {
+	if d.settings.theme == .macos {
+		d.draw_catalina_cursor()
+		return
+	}
 	// Keep a visible cursor even while /dev/pointer is between reports (or is
 	// temporarily unavailable). The desktop has a useful initial position at
 	// its centre, and hiding that position makes a working QEMU tablet appear

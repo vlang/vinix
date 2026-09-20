@@ -275,6 +275,56 @@ fn test_200_percent_traffic_lights_use_native_resolution_circles() {
 	assert native_edge
 }
 
+fn test_catalina_cursor_has_complete_native_resolution_masks() {
+	assert catalina_cursor_white_1x.len == catalina_cursor_height
+	assert catalina_cursor_black_1x.len == catalina_cursor_height
+	assert catalina_cursor_white_2x.len == catalina_cursor_height * desktop_scale_200
+	assert catalina_cursor_black_2x.len == catalina_cursor_height * desktop_scale_200
+	for row in catalina_cursor_white_1x {
+		assert row.len == catalina_cursor_width
+	}
+	for row in catalina_cursor_black_1x {
+		assert row.len == catalina_cursor_width
+	}
+	for row in catalina_cursor_white_2x {
+		assert row.len == catalina_cursor_width * desktop_scale_200
+	}
+	for row in catalina_cursor_black_2x {
+		assert row.len == catalina_cursor_width * desktop_scale_200
+	}
+}
+
+fn test_catalina_cursor_uses_clean_hidpi_artwork() {
+	background := u32(0x202020)
+	mut desktop := Desktop{
+		canvas:   new_scaled_canvas(20, 24, 40, 48, desktop_scale_200)
+		settings: Settings{
+			theme: .macos
+		}
+	}
+	defer {
+		unsafe { free(desktop.canvas.pixels) }
+	}
+	desktop.canvas.clear(background)
+	desktop.draw_cursor()
+
+	// The first two physical pixels belong to one logical pixel but have
+	// independent coverage in the native 2x mask. The old enlarged 1x capture
+	// repeated them and looked soft.
+	unsafe {
+		assert desktop.canvas.pixels[0] == background
+		assert desktop.canvas.pixels[1] != background
+	}
+	// The final cursor column is transparent on every row. A missing entry in
+	// the former flat alpha array shifted scanlines into this column, producing
+	// the reported black vertical line.
+	for y in 0 .. catalina_cursor_height * desktop_scale_200 {
+		unsafe {
+			assert desktop.canvas.pixels[y * desktop.canvas.stride + catalina_cursor_width * desktop_scale_200 - 1] == background
+		}
+	}
+}
+
 fn test_catalina_theme_uses_measured_window_chrome() {
 	assert theme_macos.title_height == 22
 	assert theme_macos.button_size == 12

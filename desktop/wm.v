@@ -1291,9 +1291,12 @@ fn (mut d Desktop) add_drag_damage(old_x int, old_y int, new_x int, new_y int,
 	old_pointer_x int, old_pointer_y int, pointer_x int, pointer_y int, width int, height int) {
 	d.add_damage_rect(old_x - 7, old_y - 5, width + 14, height + 14)
 	d.add_damage_rect(new_x - 7, new_y - 5, width + 14, height + 14)
-	// draw_cursor paints a one-pixel halo around a 12×19 mask.
-	d.add_damage_rect(old_pointer_x - 1, old_pointer_y - 1, 14, 21)
-	d.add_damage_rect(pointer_x - 1, pointer_y - 1, 14, 21)
+	// The Catalina pointer includes a soft shadow to the right and below; this
+	// rectangle also covers the default pointer's one-pixel halo.
+	d.add_damage_rect(old_pointer_x - 1, old_pointer_y - 1, catalina_cursor_width + 2,
+		catalina_cursor_height + 2)
+	d.add_damage_rect(pointer_x - 1, pointer_y - 1, catalina_cursor_width + 2,
+		catalina_cursor_height + 2)
 }
 
 fn (mut d Desktop) add_damage_rect(x int, y int, width int, height int) {
