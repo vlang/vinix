@@ -431,6 +431,27 @@ pub fn sendsig(_thread &proc.Thread, signal u8) {
 	sched.enqueue_thread(t, true)
 }
 
+// signal_process safely delivers a signal to a process's first thread,
+// synchronized against thread creation/replacement via the same lock
+// new_user_thread's append and start_program()'s exec-time reset both
+// hold. proc.allocate_pid()/new_process() can publish a process before
+// its first thread is appended, and start_program() briefly empties
+// process.threads mid-exec -- a bare process.threads[0] can land in
+// either window. Returns false, rather than indexing an empty array,
+// when there is currently no thread to signal.
+fn signal_process(_process &proc.Process, signal u8) bool {
+	mut process := unsafe { _process }
+	process.threads_lock.acquire()
+	defer {
+		process.threads_lock.release()
+	}
+	if process.threads.len == 0 {
+		return false
+	}
+	sendsig(process.threads[0], signal)
+	return true
+}
+
 pub fn syscall_kill(_ voidptr, pid int, signal int) (u64, u64) {
 	mut current_thread := proc.current_thread()
 	mut process := current_thread.process
@@ -440,10 +461,45 @@ pub fn syscall_kill(_ voidptr, pid int, signal int) (u64, u64) {
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
+	if signal < 0 {
+		return errno.err, errno.einval
+	}
+
+	if pid == -1 {
+		if signal == 0 {
+			// The same existence/permission probe as kill(pid, 0), just
+			// against "does any eligible target exist" instead of one
+			// specific pid. Signal 0 is never actually sent, so it doesn't
+			// need root's real system-wide broadcast (out of scope here) to
+			// be implemented first -- the calling process itself is always
+			// an eligible target, so this always succeeds.
+			return 0, 0
+		}
+		// Broadcast. Root's true system-wide broadcast (including pid 1) is
+		// out of scope here; a non-root caller gets the real POSIX/Linux
+		// behavior, every process at its own uid, itself included.
+		if process.euid != 0 {
+			for i := 1; i < proc.max_pid; i++ {
+				candidate := processes[i]
+				if candidate != unsafe { nil } && candidate.uid == process.uid {
+					signal_process(candidate, u8(signal))
+				}
+			}
+			return 0, 0
+		}
+		return errno.err, errno.eperm
+	}
+
+	if pid < 0 || pid >= proc.max_pid || processes[pid] == unsafe { nil } {
+		return errno.err, errno.esrch
+	}
+
+	// signal == 0 is the standard POSIX existence/permission probe: no signal
+	// sent, the lookup above already did the check.
 	if signal > 0 {
-		sendsig(processes[pid].threads[0], u8(signal))
-	} else {
-		panic('sendsig: Values of signal <= 0 not supported')
+		if !signal_process(processes[pid], u8(signal)) {
+			return errno.err, errno.esrch
+		}
 	}
 
 	return 0, 0
@@ -796,7 +852,12 @@ pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, 
 
 		// TODO: Kill old threads
 		// old_threads := process.threads
+		// Same lock new_user_thread's append holds: without it, a concurrent
+		// reader of process.threads (syscall_kill's broadcast path) could
+		// observe this array mid-replacement.
+		process.threads_lock.acquire()
 		process.threads = []&proc.Thread{}
+		process.threads_lock.release()
 
 		sched.new_user_thread(process, true, entry_point, unsafe { nil }, 0, argv, envp,
 			auxval, true)?

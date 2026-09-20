@@ -632,8 +632,16 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 		enqueue_thread(t, false)
 	}
 
+	// Published processes (proc.allocate_pid()/new_process()) can be visible
+	// to another CPU -- e.g. syscall_kill's kill(-1, sig) broadcast, which
+	// reads process.threads directly -- before their first thread lands
+	// here, and start_program()'s exec path replaces this same slice under
+	// the identical lock. Hold it across the read-then-append so neither
+	// side can observe or index an array mid-mutation.
+	process.threads_lock.acquire()
 	t.tid = process.threads.len
 	process.threads << t
+	process.threads_lock.release()
 
 	return t
 }
