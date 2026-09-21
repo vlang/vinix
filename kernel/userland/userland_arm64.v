@@ -945,6 +945,11 @@ pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, 
 		}
 		proc.set_thread_sched_params(new_thread.tid, inherited_sched)
 		gpu_exec_trace(trace_gpu, 'inherited scheduler parameters')
+		if trace_gpu {
+			gpu_exec_trace(trace_gpu, 'disabling interrupts for atomic same-CPU handoff')
+			cpu.interrupt_toggle(false)
+			gpu_exec_trace(trace_gpu, 'handoff interrupts disabled')
+		}
 		enqueued := if trace_gpu {
 			sched.enqueue_thread_traced(new_thread, false)
 		} else {

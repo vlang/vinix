@@ -66,7 +66,33 @@ __global (
 	// loop, a blocking yield and a timeslice can be on three different CPUs.
 	input_poll_lock            klock.Lock
 	last_syscall_input_poll_ns u64
+	// The first context switch into vinix-desktop-gpu is the boundary which
+	// differs between QEMU and the M1. Point at that thread's saved register
+	// state so the assembly restore can emit checkpoints without flooding every
+	// ordinary context switch on the machine.
+	gpu_exec_switch_state u64
+	gpu_exec_switch_cpu   = u64(-1)
 )
+
+@[export: 'scheduler_gpu_context_trace']
+fn scheduler_gpu_context_trace(gpr_state voidptr, phase u64) {
+	if katomic.load(&gpu_exec_switch_state) != u64(gpr_state) {
+		return
+	}
+
+	match phase {
+		0 { println('exec[gpu]/switch: entered sched_switch_context assembly') }
+		1 { println('exec[gpu]/switch: ELR and SPSR programmed') }
+		2 {
+			println('exec[gpu]/switch: target stack and TPIDR ready; restoring GPRs and executing eret')
+			// The next observable point is either a userspace page fault or the
+			// first syscall. Do not trace later timeslices of the same thread.
+			katomic.store(mut &gpu_exec_switch_state, u64(0))
+			katomic.store(mut &gpu_exec_switch_cpu, u64(-1))
+		}
+		else { println('exec[gpu]/switch: unknown assembly phase ${phase}') }
+	}
+}
 
 pub fn initialise() {
 	kernel_process = &proc.Process{
@@ -590,6 +616,12 @@ fn effective_timeslice(t &proc.Thread) u64 {
 }
 
 fn scheduler_timer_handler(_gpr_state voidptr) {
+	dispatch_cpu := cpu.read_tpidr_el1()
+	trace_gpu_dispatch := katomic.load(&gpu_exec_switch_state) != 0
+		&& katomic.load(&gpu_exec_switch_cpu) == dispatch_cpu
+	if trace_gpu_dispatch {
+		println('exec[gpu]/sched: immediate scheduler handler entered on CPU ${dispatch_cpu}')
+	}
 	// The timer interrupt delivers this handler with interrupts already off,
 	// but yield()'s polling loop also calls it directly through
 	// C.yield_dispatch(), and that loop can have been resumed by
@@ -614,6 +646,9 @@ fn scheduler_timer_handler(_gpr_state voidptr) {
 
 	gpr_state := unsafe { &cpulocal.GPRState(_gpr_state) }
 	timer.stop()
+	if trace_gpu_dispatch {
+		println('exec[gpu]/sched: scheduler interrupts disabled and timer stopped')
+	}
 
 	// Tick the monotonic/realtime clocks. The interval is measured from the
 	// generic timer's counter rather than assumed, because this handler fires
@@ -623,9 +658,15 @@ fn scheduler_timer_handler(_gpr_state voidptr) {
 	// so a switch neither loses time between the two nor counts it twice.
 	now_ns := timer.get_ns()
 	time.advance_to_ns(now_ns)
+	if trace_gpu_dispatch {
+		println('exec[gpu]/sched: scheduler clock advanced to ${now_ns} ns')
+	}
 
 	// Tick per-process interval timers (SIGALRM)
 	tick_itimers()
+	if trace_gpu_dispatch {
+		println('exec[gpu]/sched: interval timers ticked; reading CPU-local state')
+	}
 
 	mut cpu_local := cpulocal.current()
 	// The idle loop normally polls UART, VirtIO input and networking. A busy
@@ -634,9 +675,18 @@ fn scheduler_timer_handler(_gpr_state voidptr) {
 	// queues. Poll once per CPU-0 timeslice as well; using one CPU preserves the
 	// drivers' single-poller assumption while keeping the desktop interactive.
 	if cpu_local.cpu_number == 0 {
+		if trace_gpu_dispatch {
+			println('exec[gpu]/sched: polling platform input before run-queue selection')
+		}
 		poll_platform_input()
+		if trace_gpu_dispatch {
+			println('exec[gpu]/sched: platform input poll complete')
+		}
 	}
 	katomic.store(mut &cpu_local.is_idle, false)
+	if trace_gpu_dispatch {
+		println('exec[gpu]/sched: CPU marked non-idle; reading current thread')
+	}
 
 	mut current_thread := proc.current_thread()
 
@@ -646,8 +696,22 @@ fn scheduler_timer_handler(_gpr_state voidptr) {
 	// below, so a thread that has just run out of budget is passed over on the
 	// scan it has run out on rather than on the next.
 	account_realtime_time(cpu_local.cpu_number, current_thread, now_ns)
+	if trace_gpu_dispatch {
+		println('exec[gpu]/sched: realtime accounting complete; selecting run-queue thread')
+	}
 
 	mut next_thread := get_next_thread()
+	if trace_gpu_dispatch {
+		println('exec[gpu]/sched: run-queue selection returned')
+	}
+	trace_gpu_next := unsafe { next_thread != nil }
+		&& next_thread.process.executable_path == '/usr/bin/vinix-desktop-gpu'
+	if trace_gpu_next {
+		println('exec[gpu]/sched: CPU ${cpu_local.cpu_number} selected replacement thread from run queue')
+		println('exec[gpu]/sched: target pc=0x${next_thread.gpr_state.pc:x} sp=0x${next_thread.gpr_state.sp:x} ttbr0=0x${next_thread.ttbr0:x}')
+		next_thread.affinity_mask = u64(-1)
+		println('exec[gpu]/sched: first-handoff CPU pin removed')
+	}
 	// Set once this CPU has let go of the thread it was running, which decides
 	// whether the idle path below may return to its caller.
 	mut released_current := false
@@ -731,8 +795,17 @@ fn scheduler_timer_handler(_gpr_state voidptr) {
 	}
 
 	current_thread = next_thread
+	if trace_gpu_next {
+		println('exec[gpu]/sched: publishing replacement as CPU current thread')
+	}
 	proc.set_current_thread(cpu_local.cpu_number, current_thread)
+	if trace_gpu_next {
+		println('exec[gpu]/sched: replacement published; starting CPU-time accounting')
+	}
 	proc.begin_cpu_time(mut current_thread, now_ns)
+	if trace_gpu_next {
+		println('exec[gpu]/sched: CPU-time accounting started')
+	}
 
 	// The first CPU to run a thread claims it for its node, so that the pages
 	// the thread goes on to fault in and the CPU it keeps returning to are on
@@ -740,17 +813,50 @@ fn scheduler_timer_handler(_gpr_state voidptr) {
 	if current_thread.numa_node < 0 {
 		current_thread.numa_node = int(cpu_local.numa_node)
 	}
-
-	cpu.write_tpidr_el0(current_thread.tpidr_el0)
-
-	if cpu.read_ttbr0_el1() != current_thread.ttbr0 {
-		cpu.write_ttbr0_el1(current_thread.ttbr0)
-		cpu.isb()
-		cpu.tlbi_vmalle1()
+	if trace_gpu_next {
+		println('exec[gpu]/sched: NUMA home selected; restoring TPIDR_EL0')
 	}
 
+	cpu.write_tpidr_el0(current_thread.tpidr_el0)
+	if trace_gpu_next {
+		println('exec[gpu]/sched: TPIDR_EL0 restored; reading current TTBR0')
+	}
+
+	old_ttbr0 := cpu.read_ttbr0_el1()
+	if trace_gpu_next {
+		println('exec[gpu]/sched: current TTBR0=0x${old_ttbr0:x}')
+	}
+	if old_ttbr0 != current_thread.ttbr0 {
+		if trace_gpu_next {
+			println('exec[gpu]/sched: writing replacement TTBR0')
+		}
+		cpu.write_ttbr0_el1(current_thread.ttbr0)
+		if trace_gpu_next {
+			println('exec[gpu]/sched: replacement TTBR0 written; executing ISB')
+		}
+		cpu.isb()
+		if trace_gpu_next {
+			println('exec[gpu]/sched: ISB complete; invalidating local TLB')
+		}
+		cpu.tlbi_vmalle1()
+		if trace_gpu_next {
+			println('exec[gpu]/sched: local TLB invalidation complete')
+		}
+	} else if trace_gpu_next {
+		println('exec[gpu]/sched: replacement TTBR0 already active')
+	}
+
+	if trace_gpu_next {
+		println('exec[gpu]/sched: restoring FPU state')
+	}
 	fpu_restore(current_thread.fpu_storage)
+	if trace_gpu_next {
+		println('exec[gpu]/sched: FPU state restored; publishing running CPU')
+	}
 	katomic.store(mut &current_thread.running_on, cpu_local.cpu_number)
+	if trace_gpu_next {
+		println('exec[gpu]/sched: running CPU published; arming timeslice')
+	}
 
 	// Debug: check if x30 is corrupted when restoring state for pid 3
 	if current_thread.process.pid == 3 && current_thread.gpr_state.x30 == u64(0x220000) {
@@ -758,6 +864,9 @@ fn scheduler_timer_handler(_gpr_state voidptr) {
 	}
 
 	timer.oneshot(effective_timeslice(current_thread))
+	if trace_gpu_next {
+		println('exec[gpu]/sched: timeslice armed; entering low-level context restore')
+	}
 
 	// Restore ARM64 GPR state and return via eret (does not return).
 	C.sched_switch_context(voidptr(&current_thread.gpr_state), current_thread.kernel_stack)
@@ -775,6 +884,13 @@ fn enqueue_thread_impl(_thread &proc.Thread, by_signal bool, trace bool) bool {
 	mut t := unsafe { _thread }
 	if trace {
 		println('exec[gpu]/sched: entered enqueue_thread')
+		first_cpu := cpu.read_tpidr_el1()
+		if first_cpu < 64 {
+			t.affinity_mask = u64(1) << first_cpu
+		}
+		katomic.store(mut &gpu_exec_switch_cpu, first_cpu)
+		katomic.store(mut &gpu_exec_switch_state, u64(&t.gpr_state))
+		println('exec[gpu]/sched: armed first-context-switch tracing on CPU ${first_cpu}')
 	}
 
 	// A signal can arrive while the target is running immediately before it
@@ -811,24 +927,22 @@ fn enqueue_thread_impl(_thread &proc.Thread, by_signal bool, trace bool) bool {
 		if katomic.cas[&proc.Thread](mut &scheduler_running_queue[i], unsafe { nil }, t) {
 			katomic.store(mut &t.is_in_queue, true)
 
-			// Wake any idle CPUs via SEV
-			mut woke_idle_cpu := false
-			for cpu_entry in cpu_locals {
-				if katomic.load(&cpu_entry.is_idle) == true {
-					cpu.sev()
-					woke_idle_cpu = true
-					break
+			// Wake an idle CPU for ordinary work. The traced exec handoff stays
+			// pinned to its current CPU until that CPU has acquired the new
+			// thread, avoiding a cross-CPU race while diagnosing the M1 path.
+			if !trace {
+				for cpu_entry in cpu_locals {
+					if katomic.load(&cpu_entry.is_idle) == true {
+						cpu.sev()
+						break
+					}
 				}
 			}
 
 			scheduler_queue_lock.release()
 			if trace {
 				println('exec[gpu]/sched: run-queue lock acquired; installed thread in slot ${i}')
-				if woke_idle_cpu {
-					println('exec[gpu]/sched: sent SEV to wake an idle CPU')
-				} else {
-					println('exec[gpu]/sched: no idle CPU needed a wakeup')
-				}
+				println('exec[gpu]/sched: deferred wakeup for same-CPU exec handoff')
 				println('exec[gpu]/sched: enqueue complete; run-queue lock released')
 			}
 			return true
@@ -886,18 +1000,37 @@ pub fn intercept_thread(_thread &proc.Thread) ? {
 	t.l.release()
 }
 
+@[noreturn]
+fn idle_after_dying_thread(trace bool) {
+	cpu.interrupt_toggle(false)
+	if trace {
+		println('exec[gpu]/sched: idle handoff disabled interrupts')
+	}
+	timer.stop()
+	if trace {
+		println('exec[gpu]/sched: idle handoff stopped old timeslice; arming immediate timer')
+	}
+	timer.oneshot(1)
+	if trace {
+		println('exec[gpu]/sched: immediate timer armed; enabling interrupts')
+	}
+	cpu.interrupt_toggle(true)
+	if trace {
+		println('exec[gpu]/sched: interrupts enabled; entering traced idle loop')
+	}
+	await_impl(trace)
+	for {}
+}
+
 pub fn yield(save_ctx bool) {
+	if save_ctx == false {
+		// Dying thread path (dequeue_and_die). Enter idle scheduler loop.
+		idle_after_dying_thread(false)
+	}
+
 	cpu.interrupt_toggle(false)
 	timer.stop()
 	mut current_thread := proc.current_thread()
-
-	if save_ctx == false {
-		// Dying thread path (dequeue_and_die). Enter idle scheduler loop.
-		timer.oneshot(1)
-		cpu.interrupt_toggle(true)
-		await()
-		return
-	}
 
 	// Blocking yield: HVF workaround.
 	// IRQ delivery to guest is broken, so we can't rely on preemptive context
@@ -1072,7 +1205,12 @@ fn dequeue_and_die_impl(trace bool) {
 	}
 	hand_over_to_reaper(cpu_local.cpu_number, t)
 	if trace {
-		println('exec[gpu]/sched: old thread handed to reaper; entering scheduler yield')
+		println('exec[gpu]/sched: old thread handed to reaper; dispatching scheduler immediately')
+		// The replacement is already runnable. Select it synchronously instead
+		// of depending on the first post-AGX CNTV timer status becoming visible.
+		scheduler_timer_handler(unsafe { nil })
+		println('exec[gpu]/sched: immediate dispatch returned without a target; entering scheduler idle loop')
+		idle_after_dying_thread(true)
 	}
 	yield(false)
 	for {
@@ -1591,6 +1729,13 @@ pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) ?&proc.Pr
 const idle_tick_hz = u64(1000)
 
 pub fn await() {
+	await_impl(false)
+}
+
+fn await_impl(trace_gpu_handoff bool) {
+	if trace_gpu_handoff {
+		println('exec[gpu]/sched: traced idle loop entered; reading timer frequency')
+	}
 	freq := cpu.read_cntfrq_el0()
 	mut ticks := freq / idle_tick_hz
 	if ticks == 0 {
@@ -1598,19 +1743,36 @@ pub fn await() {
 	}
 	cpu.write_cntv_tval_el0(ticks)
 	cpu.write_cntv_ctl_el0(1)
+	if trace_gpu_handoff {
+		println('exec[gpu]/sched: idle timer programmed for ${ticks} ticks; disabling interrupts')
+	}
 
 	// Polling idle loop used on both QEMU/HVF and early Apple bring-up.
 	// Keep interrupts disabled, poll CNTV_CTL ISTATUS, and dispatch the
 	// scheduler timer handler directly when the timer fires.
 	cpu.interrupt_toggle(false)
+	if trace_gpu_handoff {
+		println('exec[gpu]/sched: idle interrupts disabled; polling timer')
+	}
 
 	mut last_realtime_poll_ns := u64(0)
+	mut first_poll := true
 
 	for {
 		vctl := cpu.read_cntv_ctl_el0()
+		if trace_gpu_handoff && first_poll {
+			println('exec[gpu]/sched: first idle timer status=0x${vctl:x}')
+			first_poll = false
+		}
 		if vctl & 0x4 != 0 {
+			if trace_gpu_handoff {
+				println('exec[gpu]/sched: idle timer fired; dispatching scheduler')
+			}
 			// Timer fired. Dispatch scheduler in polling mode.
 			scheduler_timer_handler(unsafe { nil })
+			if trace_gpu_handoff {
+				println('exec[gpu]/sched: idle scheduler dispatch returned without a target; rearming timer')
+			}
 
 			// Re-arm timer for next tick
 			cpu.write_cntv_tval_el0(ticks)

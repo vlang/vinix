@@ -7,6 +7,17 @@
 sched_switch_context:
     // x0 = GPRState pointer, x1 = kernel_stack
 
+    // Keep the target pointers in callee-saved temporaries while the optional
+    // diagnostic hook uses the normal AAPCS. They are overwritten with the
+    // target thread's own x19/x20 values before eret, so the outgoing values
+    // do not need to be restored.
+    mov x19, x0
+    mov x20, x1
+    mov x1, #0
+    bl scheduler_gpu_context_trace
+    mov x0, x19
+    mov x1, x20
+
     // Restore ELR_EL1 (return PC) first. Under VHE these EL1 register names
     // access the corresponding EL2 host registers, which is exactly where the
     // eventual eret takes its state from.
@@ -30,6 +41,12 @@ sched_switch_context:
     orr x2, x2, x3
 .write_spsr:
     msr spsr_el1, x2
+
+    mov x0, x19
+    mov x1, #1
+    bl scheduler_gpu_context_trace
+    mov x0, x19
+    mov x1, x20
 
     // Set the appropriate stack pointer based on target EL.
     // Check saved SPSR.M[3:0]: 0 = EL0t; non-zero = kernel context.
@@ -69,6 +86,11 @@ sched_switch_context:
     mov sp, x2                  // SP_EL1 = thread's SP
 
 .restore_gprs:
+    mov x0, x19
+    mov x1, #2
+    bl scheduler_gpu_context_trace
+    mov x0, x19
+
     // Restore general purpose registers (from GPRState, not stack)
     ldp x2, x3, [x0, #16]
     ldp x4, x5, [x0, #32]
