@@ -155,6 +155,7 @@ pub fn new_gpu_manager(res &regs.GpuResources, cfg &hw.HwConfig, rtk &rtkit.RTKi
 	}
 	if cfg.gpu_gen == .g13 {
 		mgr.rtk.set_shmem_allocator(voidptr(mgr), allocate_rtkit_shmem)
+		mgr.rtk.set_shmem_resolver(resolve_rtkit_shmem)
 	}
 
 	return mgr
@@ -254,6 +255,31 @@ fn allocate_rtkit_shmem(context voidptr, size u64) u64 {
 	mgr.rtkit_buffers << buffer
 	mgr.rtkit_buffer_lock.release()
 	return iova
+}
+
+// RTKit crash logs live in firmware-requested UAT buffers. Resolve only an
+// interval wholly contained in one retained allocation; the crash parser must
+// never follow an arbitrary firmware-provided address through the HHDM.
+fn resolve_rtkit_shmem(context voidptr, iova u64, size u64) voidptr {
+	if context == unsafe { nil } || size == 0 {
+		return unsafe { nil }
+	}
+	mut mgr := unsafe { &GpuManager(context) }
+	mgr.rtkit_buffer_lock.acquire()
+	defer {
+		mgr.rtkit_buffer_lock.release()
+	}
+	for buffer in mgr.rtkit_buffers {
+		if iova < buffer.va || size > buffer.size {
+			continue
+		}
+		offset := iova - buffer.va
+		if offset > buffer.size - size {
+			continue
+		}
+		return voidptr(buffer.phys + higher_half + offset)
+	}
+	return unsafe { nil }
 }
 
 struct G13ChannelAllocations {
@@ -878,7 +904,7 @@ fn (mut mgr GpuManager) init_firmware_data() bool {
 	unsafe {
 		mut hwdata_b := &fw.G13HwDataBBlob(graph.hwdata_b.phys + higher_half)
 		if !fw.populate_g13_hwdata_b_blob(mut hwdata_b, &mgr.hw_config, uat_mgr.ttbs_base,
-			mmu.uat_unknown_page) {
+			mmu.uat_unknown_page, alloc.g13_timestamp_start) {
 			return false
 		}
 	}

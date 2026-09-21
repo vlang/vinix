@@ -249,8 +249,15 @@ fn check_hwdata_b() {
 	cfg := config_for(.v13_5_partial)
 	mut data := fw.G13HwDataBBlob{}
 	assert fw.populate_g13_hwdata_b_blob(mut data, &cfg, 0x1234_0000,
-		0xffff_ffa0_1100_0000)
+		0xffff_ffa0_1100_0000, 0xffff_ffae_1000_0000)
 	assert fw.read_g13_hwdata_b_blob_u32(&data, 0x968) or { 0 } == 0x8103
+	mut bytes := []u8{len: data.bytes.len}
+	for index in 0 .. data.bytes.len {
+		bytes[index] = data.bytes[index]
+	}
+	// HwDataB.timestamp_area_base moves with the expanded YUV table at 13.5,
+	// but must still name the aperture used by the runtime timestamp allocator.
+	assert read_u64(bytes, 0x28) == 0xffff_ffae_1000_0000
 	for index := u32(0); index < 16; index++ {
 		assert fw.read_g13_hwdata_b_blob_u32(&data,
 			fw.g13_v13_5_hwdata_b_unk_arr_0_offset + index * 4) or { 0xffff_ffff } == index
@@ -274,7 +281,7 @@ fn check_hwdata_b() {
 			element_size: 0xbbbb_cccc
 			readwrite: 1
 		})
-	mut bytes := []u8{len: data.bytes.len}
+	bytes = []u8{len: data.bytes.len}
 	for index in 0 .. data.bytes.len {
 		bytes[index] = data.bytes[index]
 	}

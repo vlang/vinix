@@ -164,12 +164,13 @@ fn g13_firmware_revision_id(revision hw.GpuRevision) ?u32 {
 // Populate fields that are independent of the eventual firmware IOVA chosen
 // for each MMIO record. The caller installs io_mappings after mapping them.
 pub fn populate_g13_hwdata_b(mut data G13HwDataB, config &hw.HwConfig,
-	uat_ttb_base u64, unknown_page u64) bool {
+	uat_ttb_base u64, unknown_page u64, timestamp_area_base u64) bool {
 	if config.chip_id != 0x8103 || config.gpu_gen != .g13 || config.perf_state_count < 2
 		|| config.perf_state_count > 16 || config.perf_state_table_count == 0
 		|| config.perf_state_table_count > 8 || config.perf_state_base >= config.perf_state_count
 		|| config.max_power_mw == 0 || config.gpu_power_sample_period == 0 || uat_ttb_base == 0
-		|| unknown_page == 0 || config.min_sram_microvolt < 1000 {
+		|| unknown_page == 0 || timestamp_area_base == 0 || timestamp_area_base & 0x3fff != 0
+		|| config.min_sram_microvolt < 1000 {
 		return false
 	}
 	revision_id := g13_firmware_revision_id(config.gpu_rev) or { return false }
@@ -187,7 +188,7 @@ pub fn populate_g13_hwdata_b(mut data G13HwDataB, config &hw.HwConfig,
 	data.usc_start = 0x11_00000000
 	data.usc_end = 0x11_00000000
 	data.unknown_page = unknown_page
-	data.unkptr_038 = 0xffffffa0_11800000
+	data.unkptr_038 = timestamp_area_base
 	data.chip_id = config.chip_id
 	data.unk_454 = 1
 	data.unk_458 = 1
@@ -292,12 +293,13 @@ fn g13_hwdata_b_blob_put_u64(mut data G13HwDataBBlob, abi hw.FirmwareAbi,
 // move each common field to its 13.5 address. The span table is generated from
 // m1n1's versioned raw structures; arrays whose extent changed are excluded.
 pub fn populate_g13_hwdata_b_blob(mut data G13HwDataBBlob, config &hw.HwConfig,
-	uat_ttb_base u64, unknown_page u64) bool {
+	uat_ttb_base u64, unknown_page u64, timestamp_area_base u64) bool {
 	if !g13_initdata_abi_supported(config.firmware_abi) {
 		return false
 	}
 	mut legacy := G13HwDataB{}
-	if !populate_g13_hwdata_b(mut legacy, config, uat_ttb_base, unknown_page) {
+	if !populate_g13_hwdata_b(mut legacy, config, uat_ttb_base, unknown_page,
+		timestamp_area_base) {
 		return false
 	}
 	legacy_bytes := unsafe { &u8(&legacy) }
