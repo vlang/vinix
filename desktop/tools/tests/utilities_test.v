@@ -1084,19 +1084,55 @@ fn test_native_process_names_are_presented_as_app_names() {
 fn test_application_tree_protocol_round_trip() {
 	child := ui2.Element{
 		...ui2.button_with_image('save', 'Save', 'builtin:editor', ui2.rect(7, 9, 80, 24), ui2.BoxStyle{
-		bg: 0x123456
-		radius: 6
-	}, ui2.TextStyle{
-		color: 0xfefefe
-		background_color: 0x010203
-		size: 13
-		font_family: 'mono'
-		bold: true
-		shadow: true
-		align: .center
-	})
+			bg:            0x123456
+			radius:        6
+			border_color:  0x654321
+			border_left:   1
+			border_top:    2
+			border_right:  3
+			border_bottom: 4
+		}, ui2.TextStyle{
+			color:            0xfefefe
+			background_color: 0x010203
+			size:             13
+			font_family:      'mono'
+			bold:             true
+			italic:           true
+			underline:        true
+			shadow:           true
+			align:            .center
+		})
 		native_style: true
-		checked: true
+		checked:      true
+		submit_id:    'save.submit'
+		placeholder:  'Filename'
+		tooltip:      'Write the document'
+		emit_change:  true
+		secure:       true
+		padding_left: 7
+		value:        42
+		min_value:    2
+		max_value:    82
+		step:         5
+		orientation:  .vertical
+		padding:      9
+		value_track:  true
+		toggle_group: 'format'
+		menu:         [ui2.MenuEntry{ id: 'one', title: 'One' }]
+		slider_style: ui2.SliderStyle{
+			track_color:       0x111111
+			value_track_color: 0x222222
+			thumb_color:       0x333333
+			track_width:       3
+			thumb_size:        17
+		}
+		switch_style: ui2.SwitchStyle{
+			inactive_track_color: 0x444444
+			active_track_color:   0x555555
+			thumb_color:          0x666666
+			disabled_track_color: 0x777777
+			disabled_thumb_color: 0x888888
+		}
 	}
 	root := ui2.screen(0xabcdef, [child])
 	mut encoded := []u8{}
@@ -1111,11 +1147,25 @@ fn test_application_tree_protocol_round_trip() {
 	assert button.image_path == 'builtin:editor'
 	assert button.frame.x == 7 && button.frame.y == 9
 	assert button.box.bg == 0x123456 && button.box.radius == 6
+	assert button.box.border_color == 0x654321 && button.box.border_bottom == 4
 	assert button.text_style.font_family == 'mono'
-	assert button.text_style.bold && button.text_style.shadow
+	assert button.text_style.bold && button.text_style.italic && button.text_style.underline
+	assert button.text_style.shadow
 	assert button.text_style.align == .center
 	assert button.native_style
 	assert button.checked
+	assert button.submit_id == 'save.submit'
+	assert button.placeholder == 'Filename'
+	assert button.tooltip == 'Write the document'
+	assert button.emit_change && button.secure
+	assert button.padding_left == 7
+	assert button.value == 42 && button.min_value == 2 && button.max_value == 82
+	assert button.step == 5 && button.orientation == .vertical && button.padding == 9
+	assert button.value_track && button.toggle_group == 'format'
+	assert button.menu.len == 1 && button.menu[0].title == 'One'
+	assert button.slider_style.track_color == 0x111111
+	assert button.slider_style.thumb_size == 17
+	assert button.switch_style.active_track_color == 0x555555
 	free_tree(root)
 	free_tree(decoded)
 	unsafe { encoded.free() }
