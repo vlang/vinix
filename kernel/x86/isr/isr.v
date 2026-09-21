@@ -130,13 +130,22 @@ fn exception_handler(num u32, mut gpr_state cpulocal.GPRState) {
 		// own (dispatch_a_signal_info's yield, or syscall_exit's eventual
 		// thread teardown), so the only thing sti actually needs to permit is
 		// an incoming cross-CPU IPI -- not this CPU's own scheduler preempting
-		// this thread right here. Stopping the local timer first removes
-		// exactly that one mechanism without blocking IPIs or device
-		// interrupts, which arrive through the LAPIC's other vectors, not its
-		// timer LVT. No explicit resume: whichever thread this CPU dispatches
-		// next gets a fresh one-shot timer from the ordinary scheduler_isr
-		// dispatch path regardless of what happened here.
+		// this thread right here. Stopping the local timer prevents further
+		// expirations, but masking/stopping the timer source does not
+		// withdraw a scheduler-vector interrupt the LAPIC already latched
+		// into its IRR before this line ran -- that one is still delivered
+		// the instant sti executes. defer_preempt is scheduler_isr's own
+		// signal to recognise that case and decline to switch threads even
+		// though it was entered: set it before sti, same as stopping the
+		// timer, and it self-clears the moment this thread reaches its own
+		// deliberate yield (see sched.yield()), which is guaranteed to
+		// happen before this stack is touched by anything else. No explicit
+		// resume otherwise: whichever thread this CPU dispatches next gets a
+		// fresh one-shot timer from the ordinary scheduler_isr dispatch path
+		// regardless of what happened here.
 		apic.lapic_timer_stop()
+		mut cpu_local := cpulocal.current()
+		cpu_local.defer_preempt = true
 		asm volatile amd64 {
 			sti
 		}
