@@ -140,11 +140,16 @@ fi
 # earlier musl header already supplied. Disable compiler retry so a future TCC
 # regression fails explicitly instead of silently using GCC.
 echo "==> Building Vinix desktop with $(v version) and TCC"
-v -new-compiler -no-memory-limit -os linux -arch arm64 -cc tcc -gc none -manualfree \
+build_log=$work_dir/compiler.log
+if ! v -new-compiler -no-memory-limit -os linux -arch arm64 -cc tcc -gc none -manualfree \
 	-enable-globals -no-retry-compilation -cflags -I/usr/include -ldflags -static \
 	-d ui2_headless \
 	-path "@vlib|$module_path|@vmodules|$source_dir" \
-	-o "$work_dir/vinix-desktop" "$source_dir"
+	-o "$work_dir/vinix-desktop" "$source_dir" >"$build_log" 2>&1; then
+	cat "$build_log" >&2
+	echo "vinix-desktop-build: V/TCC compilation failed" >&2
+	exit 1
+fi
 chmod 755 "$work_dir/vinix-desktop"
 
 if [ "$reload" -eq 1 ]; then

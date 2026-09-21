@@ -180,7 +180,7 @@ on one component, but are not required for a normal default-image build.
 ### Develop Vinix desktop inside Vinix
 
 The AArch64 desktop image contains the native V compiler and its matching
-`vlib`, GCC, the editable staged desktop sources in `/root/desktop`, and the
+`vlib`, TCC, the editable staged desktop sources in `/root/desktop`, and the
 headless ui2 module in `/root/vmodules`. QEMU also shares the checkout from
 which it was launched at `/mnt/host/vinix`. The share is a read-only mirror
 refreshed from macOS immediately before each build, so edits made after QEMU
@@ -196,8 +196,8 @@ vinix-desktop-build
 
 `vinix-desktop-build` refreshes the host mirror, stages the desktop and ui2
 sources exactly as the image builder does, translates the desktop with V,
-links a static AArch64
-binary with GCC, keeps a copy at `/root/vinix-desktop`, atomically replaces
+links a static AArch64 binary with TCC, keeps a copy at
+`/root/vinix-desktop`, atomically replaces
 `/usr/bin/vinix-desktop`, and sends SIGHUP to PID 1. The supervisor lets the
 old compositor close its applications and release the framebuffer, then starts
 the new binary without rebooting the OS. Pass `--no-reload` to build only. The

@@ -23,6 +23,8 @@ if [ "${1:-}" = version ]; then
 	echo 'V test'
 	exit 0
 fi
+echo 'test compiler stdout should stay out of an interactive terminal'
+echo 'test compiler stderr should stay out of an interactive terminal' >&2
 printf '%s\n' "$*" > "$VINIX_DESKTOP_TEST_V_ARGS"
 output=
 last=
@@ -64,11 +66,17 @@ output="$(
 	VINIX_DESKTOP_SYSTEM_DEV="$work/system" \
 	VINIX_DESKTOP_OUTPUT="$work/vinix-desktop" \
 	VINIX_DESKTOP_TEST_V_ARGS="$work/v-args" \
-		"$repo/build-support/vinix-desktop-build" --no-reload
+		"$repo/build-support/vinix-desktop-build" --no-reload 2>&1
 )"
 case "$output" in
 	*"editable desktop tree is from another image; using the system source copy"*) ;;
 	*) echo "desktop helper did not reject its stale editable tree" >&2; exit 1 ;;
+esac
+case "$output" in
+	*'test compiler stdout'*|*'test compiler stderr'*)
+		echo "desktop helper leaked successful compiler chatter" >&2
+		exit 1
+		;;
 esac
 grep -F "$work/system/desktop" "$work/v-args" >/dev/null
 grep -F "$work/system/vmodules" "$work/v-args" >/dev/null

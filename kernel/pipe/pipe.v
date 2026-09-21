@@ -10,8 +10,12 @@ import file
 import katomic
 import proc
 
-// A pipe is a circular buffer
+// Keep POSIX's atomic-write guarantee at one page, but give the circular
+// buffer enough room for ordinary protocol messages. A page-sized capacity
+// forces every modest response through several reader/writer sleeps and turns
+// a single message into a scheduler stress test.
 pub const pipe_buf = 4096
+pub const pipe_capacity = 64 * 1024
 
 pub struct Pipe {
 pub mut:
@@ -35,8 +39,8 @@ pub fn initialise() {}
 
 pub fn create() ?&Pipe {
 	mut p := &Pipe{
-		data:     unsafe { malloc(pipe_buf) }
-		capacity: pipe_buf
+		data:     unsafe { malloc(pipe_capacity) }
+		capacity: pipe_capacity
 		// A pipe starts with one read-side and one write-side open-file
 		// description. dup() and fork() share those descriptions, so their
 		// lifetime is already accounted for by file.Handle.refcount.

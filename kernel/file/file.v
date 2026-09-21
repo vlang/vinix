@@ -811,8 +811,9 @@ pub fn syscall_fcntl(_ voidptr, fdnum int, cmd int, arg u64) (u64, u64) {
 				fd.unref()
 				return errno.err, errno.einval
 			}
-			// Pipes currently have one fixed page-sized circular buffer.
-			ret = 4096
+			// Pipes use a fixed Linux-sized circular buffer. PIPE_BUF remains
+			// 4096: capacity and the atomic-write guarantee are independent.
+			ret = 64 * 1024
 			fd.unref()
 		}
 		f_getfd {

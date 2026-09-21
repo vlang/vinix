@@ -744,6 +744,7 @@ static int test_large_pipe_progress(void)
 
 	int pair[2];
 	CHECK(pipe(pair) == 0);
+	CHECK(fcntl(pair[0], F_GETPIPE_SZ) >= 64 * 1024);
 	pid_t writer = fork();
 	CHECK(writer >= 0);
 	if (writer == 0) {
