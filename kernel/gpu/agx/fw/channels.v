@@ -132,11 +132,23 @@ pub mut:
 @[packed]
 pub struct FwFwCtlMsg {
 pub mut:
-	addr       u64
-	unk_8      u32
-	slot       u32
-	page_count u16
-	unk_12     u16
+	addr   u64
+	unk_8  u32
+	slot   u32
+	unk_10 u16
+	unk_12 u16
+}
+
+// Publish one UAT invalidation request. The byte range is carried by the
+// matching handoff slot; offset 0x10 is the fixed cache-flush operation value,
+// not a page count. This matches GPUFWCtlChannel.send_inval in m1n1.
+pub fn make_g13_fwctl_invalidate(addr u64, slot u32) FwFwCtlMsg {
+	return FwFwCtlMsg{
+		addr: addr
+		slot: slot
+		unk_10: 1
+		unk_12: 2
+	}
 }
 
 // Firmware log channel message. Each of the six subchannels uses 0xd8-byte

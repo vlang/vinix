@@ -1045,11 +1045,6 @@ pub fn (mut mgr GpuManager) flush_g13_uat_range(slot u32, addr u64, size u64) bo
 		|| size & pgtable.uat_pg_mask != 0 {
 		return false
 	}
-	pages := size / pgtable.uat_pgsz
-	if pages == 0 || pages >= 0x10000 {
-		return false
-	}
-
 	mgr.fwctl_lock.acquire()
 	defer {
 		mgr.fwctl_lock.release()
@@ -1057,12 +1052,7 @@ pub fn (mut mgr GpuManager) flush_g13_uat_range(slot u32, addr u64, size u64) bo
 	if !uat_mgr.begin_flush(slot, addr, size) {
 		return false
 	}
-	message := fw.FwFwCtlMsg{
-		addr: addr
-		slot: slot
-		page_count: u16(pages)
-		unk_12: 2
-	}
+	message := fw.make_g13_fwctl_invalidate(addr, slot)
 	token := mgr.channels.fw_ctrl.enqueue_with_token(voidptr(&message)) or {
 		uat_mgr.abort_unpublished_flush(slot)
 		return false
