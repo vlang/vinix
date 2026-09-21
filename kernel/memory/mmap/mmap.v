@@ -275,33 +275,73 @@ fn find_free_base_unlocked(pagemap &memory.Pagemap, start u64, length u64) ?u64 
 }
 
 pub fn delete_pagemap(mut pagemap memory.Pagemap) ? {
+	delete_pagemap_impl(mut pagemap, false)?
+}
+
+pub fn delete_pagemap_traced(mut pagemap memory.Pagemap) ? {
+	delete_pagemap_impl(mut pagemap, true)?
+}
+
+fn delete_pagemap_impl(mut pagemap memory.Pagemap, trace bool) ? {
+	if trace {
+		println('exec[gpu]/vm: acquiring old page-map lock')
+	}
 	pagemap.l.acquire()
+	if trace {
+		println('exec[gpu]/vm: old page-map lock acquired; ranges=${pagemap.mmap_ranges.len}')
+	}
 
 	// Address-space destruction is a kernel-internal operation and must be able
 	// to reclaim immutable ranges after the process can no longer observe them.
+	mut range_index := u64(0)
 	for pagemap.mmap_ranges.len != 0 {
 		local_range := unsafe { &MmapRangeLocal(pagemap.mmap_ranges[0]) }
 		old_len := pagemap.mmap_ranges.len
+		if trace {
+			println('exec[gpu]/vm: unmapping range ${range_index} base=0x${local_range.base:x} len=0x${local_range.length:x} remaining=${old_len}')
+		}
 		munmap_unlocked_impl(mut pagemap, voidptr(local_range.base), local_range.length,
 			false) or {
+			if trace {
+				println('exec[gpu]/vm: ERROR unmapping old range ${range_index}')
+			}
 			pagemap.l.release()
 			return none
 		}
 		if pagemap.mmap_ranges.len >= old_len {
+			if trace {
+				println('exec[gpu]/vm: ERROR old range list did not shrink at ${range_index}')
+			}
 			pagemap.l.release()
 			errno.set(errno.einval)
 			return none
 		}
+		if trace {
+			println('exec[gpu]/vm: unmapped range ${range_index}')
+		}
+		range_index++
 	}
 
 	top_level := pagemap.top_level
 	pagemap.l.release()
+	if trace {
+		println('exec[gpu]/vm: old page-map ranges empty; lock released')
+	}
 
 	unsafe {
 		pagemap.mmap_ranges.free()
 	}
+	if trace {
+		println('exec[gpu]/vm: old range array freed; freeing top-level table')
+	}
 	memory.pmm_free(top_level, 1)
+	if trace {
+		println('exec[gpu]/vm: old top-level table freed; freeing page-map object')
+	}
 	unsafe { free(pagemap) }
+	if trace {
+		println('exec[gpu]/vm: old page-map object freed')
+	}
 }
 
 pub fn fork_pagemap(_old_pagemap &memory.Pagemap) ?&memory.Pagemap {

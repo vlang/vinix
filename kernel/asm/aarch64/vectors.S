@@ -269,21 +269,38 @@ handle_svc:
     ldp x5, x6, [sp, #32]     // original x4 -> x5, original x5 -> x6
     mov x0, sp                 // first C arg = GPRState pointer
 
-    // Trace syscall entry
+    // Trace the raw vector boundary before the common hook. Preserve x9 (the
+    // syscall number) and x30 across the ordinary AAPCS call.
     stp x9, x30, [sp, #-16]!
+    mov x0, x9
+    mov x1, #0
+    bl syscall_vector_trace
+    add x0, sp, #16           // Original GPRState, below our saved pair
     bl syscall_trace
     ldp x9, x30, [sp], #16
 
-    // Reload args (trace clobbered them)
-    ldp x1, x2, [sp, #0]
-    ldp x3, x4, [sp, #16]
-    ldp x5, x6, [sp, #32]
-    mov x0, sp
+    stp x9, x30, [sp, #-16]!
+    mov x0, x9
+    mov x1, #1
+    bl syscall_vector_trace
+    ldp x9, x30, [sp], #16
 
     // Bounds check syscall number. Keep in sync with linux_syscall_max in
     // modules/syscall/table/syscall_table_arm64.v.
     cmp x9, #512
     b.ge .svc_invalid
+    stp x9, x30, [sp, #-16]!
+    mov x0, x9
+    mov x1, #2
+    bl syscall_vector_trace
+    ldp x9, x30, [sp], #16
+
+    // Reload args (the trace calls clobbered them).
+    ldp x1, x2, [sp, #0]
+    ldp x3, x4, [sp, #16]
+    ldp x5, x6, [sp, #32]
+    mov x0, sp
+
     // Dispatch via syscall_table[x9]
     adrp x10, syscall_table
     add x10, x10, :lo12:syscall_table
@@ -292,6 +309,10 @@ handle_svc:
 
     // Trace syscall return
     stp x0, x1, [sp, #-16]!
+    ldr x0, [sp, #80]         // Saved GPRState.x8, accounting for return pair
+    mov x1, #3
+    bl syscall_vector_trace
+    ldp x0, x1, [sp]
     bl syscall_trace_ret
     ldp x0, x1, [sp], #16
 

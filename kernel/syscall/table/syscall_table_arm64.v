@@ -78,27 +78,53 @@ __global (
 	gpu_desktop_trace_count = u64(0)
 )
 
+// Called at explicit assembly boundaries around the common syscall hook. The
+// exec handler's own trace is too late to distinguish a vector-entry problem
+// from a stall in input polling or table dispatch.
+@[export: 'syscall_vector_trace']
+pub fn syscall_vector_trace(nr u64, phase u64) {
+	if nr != 221 { // Linux AArch64 __NR_execve
+		return
+	}
+	match phase {
+		0 { println('exec: SVC vector entered; calling common syscall hook') }
+		1 { println('exec: common syscall hook returned') }
+		2 { println('exec: syscall number validated; dispatching execve handler') }
+		3 { println('exec: execve handler returned to vector') }
+		else { println('exec: unknown vector trace phase ${phase}') }
+	}
+}
+
 @[export: 'syscall_trace']
 pub fn syscall_trace(gpr_state voidptr) {
+	gpr := unsafe { &cpulocal.GPRState(gpr_state) }
+	nr := gpr.x8
+	trace_exec := nr == 221
+	if trace_exec {
+		println('exec: common syscall hook entered; polling input')
+	}
 	// A busy userspace workload can keep the HVF scheduler out of its normal
 	// idle polling loop. This throttled, input-only call keeps the desktop
 	// responsive while translated applications occupy every virtual CPU.
-	sched.poll_syscall_input()
-	gpr := unsafe { &cpulocal.GPRState(gpr_state) }
-	nr := gpr.x8
+	sched.poll_syscall_input(trace_exec)
+	if trace_exec {
+		println('exec: input poll returned; reading current thread')
+	}
 	mut current_thread := proc.current_thread()
+	if trace_exec {
+		println('exec: current thread found; recording syscall')
+	}
 	pid := u64(current_thread.process.pid)
 	if current_thread.process.executable_path == '/usr/bin/vinix-desktop-gpu' {
 		if gpu_desktop_trace_pid != pid {
 			gpu_desktop_trace_pid = pid
 			gpu_desktop_trace_count = 0
-			C.printf(c'exec[gpu]: replacement thread entered userspace\n')
+			println('exec[gpu]: replacement thread entered userspace')
 		}
 		sequence := gpu_desktop_trace_count
 		gpu_desktop_trace_count++
 		if sequence < 64 {
-			C.printf(c'exec[gpu]: syscall #%llu enter nr=%llu pc=0x%llx sp=0x%llx\n',
-				sequence, nr, gpr.pc, gpr.sp)
+			println('exec[gpu]: syscall #${sequence} enter nr=${nr} pc=0x${gpr.pc:x} sp=0x${gpr.sp:x}')
 		}
 	}
 	// Debug: detect x30=0x220000 corruption at syscall entry
@@ -127,6 +153,9 @@ pub fn syscall_trace(gpr_state voidptr) {
 	sc_ring[idx].pid = pid
 	sc_trace_gpr_state = u64(gpr_state)
 	sc_trace_active = true
+	if trace_exec {
+		println('exec: syscall ring entry recorded; leaving common hook')
+	}
 }
 
 @[export: 'syscall_trace_ret']
@@ -136,7 +165,7 @@ pub fn syscall_trace_ret(ret u64, err u64) {
 		&& current_thread.process.executable_path == '/usr/bin/vinix-desktop-gpu'
 		&& u64(current_thread.process.pid) == gpu_desktop_trace_pid
 		&& gpu_desktop_trace_count <= 64 {
-		C.printf(c'exec[gpu]: syscall return value=0x%llx errno=%llu\n', ret, err)
+		println('exec[gpu]: syscall return value=0x${ret:x} errno=${err}')
 	}
 
 	if !sc_trace_active {

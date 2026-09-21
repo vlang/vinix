@@ -69,31 +69,62 @@ pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
 		gpu_desktop_fault_count++
 		trace_this_fault = trace_sequence < 32
 		if trace_this_fault {
-			C.printf(c'exec[gpu]: page fault #%llu begin addr=0x%llx pc=0x%llx esr=0x%llx\n',
-				trace_sequence, addr, gpr_state.pc, esr)
+			println('exec[gpu]: page fault #${trace_sequence} begin addr=0x${addr:x} pc=0x${gpr_state.pc:x} esr=0x${esr:x}')
 		}
 	}
 
+	if trace_this_fault {
+		println('exec[gpu]: page fault #${trace_sequence} acquiring page-map lock')
+	}
 	pagemap.l.acquire()
+	if trace_this_fault {
+		println('exec[gpu]: page fault #${trace_sequence} page-map lock acquired')
+	}
 
 	mut range_local, memory_page, file_page := addr2range(pagemap, addr) or {
+		if trace_this_fault {
+			println('exec[gpu]: page fault #${trace_sequence} ERROR address has no range')
+		}
 		pagemap.l.release()
 		return none
 	}
 
 	pagemap.l.release()
+	if trace_this_fault {
+		println('exec[gpu]: page fault #${trace_sequence} range found; acquiring backing page')
+	}
 
 	virt := memory_page * page_size
-	page := acquire_range_page(range_local, virt, file_page) or { return none }
+	page := acquire_range_page(range_local, virt, file_page) or {
+		if trace_this_fault {
+			println('exec[gpu]: page fault #${trace_sequence} ERROR acquiring backing page')
+		}
+		return none
+	}
+	if trace_this_fault {
+		println('exec[gpu]: page fault #${trace_sequence} backing page acquired')
+	}
 	if range_local.prot & prot_exec != 0 {
+		if trace_this_fault {
+			println('exec[gpu]: page fault #${trace_sequence} synchronizing instruction cache')
+		}
 		cpu.sync_instruction_cache(u64(page) + higher_half, page_size)
+		if trace_this_fault {
+			println('exec[gpu]: page fault #${trace_sequence} instruction cache synchronized')
+		}
+	}
+	if trace_this_fault {
+		println('exec[gpu]: page fault #${trace_sequence} installing PTE')
 	}
 
 	map_page_in_range(range_local.global, virt, u64(page), range_local.prot) or {
+		if trace_this_fault {
+			println('exec[gpu]: page fault #${trace_sequence} ERROR installing PTE')
+		}
 		release_range_page(range_local.global, virt, file_page, page, range_local.flags)
 		return none
 	}
 	if trace_this_fault {
-		C.printf(c'exec[gpu]: page fault #%llu resolved\n', trace_sequence)
+		println('exec[gpu]: page fault #${trace_sequence} resolved')
 	}
 }

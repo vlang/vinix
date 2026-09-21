@@ -111,23 +111,47 @@ fn poll_platform_input() {
 // callback. Polling networking or the console from an arbitrary syscall can
 // recurse into facilities that syscall is about to use; VirtIO input has no
 // such dependency and is all a CPU-bound translated GUI needs here.
-pub fn poll_syscall_input() {
+pub fn poll_syscall_input(trace_exec bool) {
+	if trace_exec {
+		println('exec: input poll disabling interrupts')
+	}
 	ints := cpu.interrupt_toggle(false)
 	defer {
 		cpu.interrupt_toggle(ints)
 	}
+	if trace_exec {
+		println('exec: input poll interrupts disabled; trying platform-input lock')
+	}
 	if !input_poll_lock.test_and_acquire() {
+		if trace_exec {
+			println('exec: input poll lock busy; skipping poll')
+		}
 		return
 	}
 	defer {
 		input_poll_lock.release()
 	}
+	if trace_exec {
+		println('exec: input poll lock acquired; reading timer')
+	}
 	now_ns := timer.get_ns()
+	if trace_exec {
+		println('exec: input poll timer read')
+	}
 	if now_ns - last_syscall_input_poll_ns < 1_000_000 {
+		if trace_exec {
+			println('exec: input poll throttled; releasing lock')
+		}
 		return
 	}
 	last_syscall_input_poll_ns = now_ns
+	if trace_exec {
+		println('exec: polling VirtIO input')
+	}
 	virtio_input.poll()
+	if trace_exec {
+		println('exec: VirtIO input poll complete; releasing lock')
+	}
 }
 
 // Returns the scheduler's timer interrupt handler for use by the
@@ -740,7 +764,18 @@ fn scheduler_timer_handler(_gpr_state voidptr) {
 }
 
 pub fn enqueue_thread(_thread &proc.Thread, by_signal bool) bool {
+	return enqueue_thread_impl(_thread, by_signal, false)
+}
+
+pub fn enqueue_thread_traced(_thread &proc.Thread, by_signal bool) bool {
+	return enqueue_thread_impl(_thread, by_signal, true)
+}
+
+fn enqueue_thread_impl(_thread &proc.Thread, by_signal bool, trace bool) bool {
 	mut t := unsafe { _thread }
+	if trace {
+		println('exec[gpu]/sched: entered enqueue_thread')
+	}
 
 	// A signal can arrive while the target is running immediately before it
 	// removes itself from the run queue in event.await(). Publish the reason
@@ -749,18 +784,26 @@ pub fn enqueue_thread(_thread &proc.Thread, by_signal bool) bool {
 		katomic.store(mut &t.enqueued_by_signal, true)
 	}
 
-	scheduler_queue_lock.acquire()
-	defer {
-		scheduler_queue_lock.release()
+	if trace {
+		println('exec[gpu]/sched: acquiring run-queue lock')
 	}
+	scheduler_queue_lock.acquire()
 
 	// A torn-down thread may still be referenced by event listener slots it
 	// never got to detach; never let it back onto the run queue.
 	if katomic.load(&t.is_dead) == true {
+		scheduler_queue_lock.release()
+		if trace {
+			println('exec[gpu]/sched: run-queue lock acquired; ERROR replacement thread already dead')
+		}
 		return false
 	}
 
 	if t.is_in_queue == true {
+		scheduler_queue_lock.release()
+		if trace {
+			println('exec[gpu]/sched: run-queue lock acquired; replacement thread was already queued')
+		}
 		return true
 	}
 
@@ -769,17 +812,33 @@ pub fn enqueue_thread(_thread &proc.Thread, by_signal bool) bool {
 			katomic.store(mut &t.is_in_queue, true)
 
 			// Wake any idle CPUs via SEV
+			mut woke_idle_cpu := false
 			for cpu_entry in cpu_locals {
 				if katomic.load(&cpu_entry.is_idle) == true {
 					cpu.sev()
+					woke_idle_cpu = true
 					break
 				}
 			}
 
+			scheduler_queue_lock.release()
+			if trace {
+				println('exec[gpu]/sched: run-queue lock acquired; installed thread in slot ${i}')
+				if woke_idle_cpu {
+					println('exec[gpu]/sched: sent SEV to wake an idle CPU')
+				} else {
+					println('exec[gpu]/sched: no idle CPU needed a wakeup')
+				}
+				println('exec[gpu]/sched: enqueue complete; run-queue lock released')
+			}
 			return true
 		}
 	}
 
+	scheduler_queue_lock.release()
+	if trace {
+		println('exec[gpu]/sched: run-queue lock acquired; ERROR no free slot; lock released')
+	}
 	return false
 }
 
@@ -953,31 +1012,68 @@ pub fn dequeue_and_yield() {
 
 @[noreturn]
 pub fn dequeue_and_die() {
+	dequeue_and_die_impl(false)
+}
+
+@[noreturn]
+pub fn dequeue_and_die_traced() {
+	dequeue_and_die_impl(true)
+}
+
+@[noreturn]
+fn dequeue_and_die_impl(trace bool) {
+	if trace {
+		println('exec[gpu]/sched: entered dequeue_and_die')
+	}
 	cpu.interrupt_toggle(false)
+	if trace {
+		println('exec[gpu]/sched: old execve thread disabled interrupts')
+	}
 	mut t := proc.current_thread()
 	// Publish death before removing the queue entry. A concurrent event wakeup
 	// will then either lose the queue lock and be removed below, or observe the
 	// dead flag and refuse to resurrect this Thread.
 	katomic.store(mut &t.is_dead, true)
+	if trace {
+		println('exec[gpu]/sched: old execve thread marked dead; dequeuing')
+	}
 	dequeue_thread(t)
+	if trace {
+		println('exec[gpu]/sched: old execve thread dequeued; charging CPU time')
+	}
 	// This thread leaves the CPU here rather than through the switch in
 	// scheduler_timer_handler, so its last turn is charged here or not at all.
 	// A process that runs briefly and exits would otherwise report no CPU time
 	// at all, which is exactly the process worth noticing.
 	proc.charge_cpu_time(mut t, timer.get_ns())
+	if trace {
+		println('exec[gpu]/sched: CPU time charged; disarming interval timer')
+	}
 	// tick_itimers() keeps a raw pointer to every armed thread, so the entry
 	// has to go before the Thread struct can be recycled.
 	set_itimer_real(t, 0, 0)
+	if trace {
+		println('exec[gpu]/sched: interval timer disarmed; releasing thread lock')
+	}
 	// A running thread holds its own lock, taken by get_next_thread(). Nothing
 	// will ever deschedule us to release it, and intercept_thread() would spin
 	// on it forever, so hand it back here.
 	katomic.store(mut &t.running_on, u64(-1))
 	t.l.release()
+	if trace {
+		println('exec[gpu]/sched: old thread lock released; clearing CPU current thread')
+	}
 	// Clear current thread so the scheduler timer handler knows
 	// there is no running thread to save state from.
 	mut cpu_local := cpulocal.current()
 	proc.set_current_thread(cpu_local.cpu_number, unsafe { nil })
+	if trace {
+		println('exec[gpu]/sched: CPU current thread cleared; handing old thread to reaper')
+	}
 	hand_over_to_reaper(cpu_local.cpu_number, t)
+	if trace {
+		println('exec[gpu]/sched: old thread handed to reaper; entering scheduler yield')
+	}
 	yield(false)
 	for {
 	}
@@ -1101,6 +1197,10 @@ pub fn syscall_new_thread(_ voidptr, pc voidptr, stack u64) (u64, u64) {
 
 pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg voidptr, _stack u64, argv []string, envp []string, auxval &elf.Auxval, autoenqueue bool) ?&proc.Thread {
 	mut process := unsafe { _process }
+	trace_gpu_exec := process.executable_path == '/usr/bin/vinix-desktop-gpu'
+	if trace_gpu_exec {
+		println('exec[gpu]/thread: entered new_user_thread')
+	}
 
 	mut stacks := []voidptr{}
 	defer {
@@ -1111,6 +1211,9 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 	mut stack_vma := u64(0)
 
 	if _stack == 0 {
+		if trace_gpu_exec {
+			println('exec[gpu]/thread: calculating user stack size')
+		}
 		mut user_stack_size := default_user_stack_size
 		stack_limit := proc.soft_limit(process, proc.rlimit_stack)
 		if stack_limit != proc.rlim_infinity && stack_limit < user_stack_size {
@@ -1120,7 +1223,13 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 			errno.set(errno.enomem)
 			return none
 		}
+		if trace_gpu_exec {
+			println('exec[gpu]/thread: allocating ${user_stack_size / page_size} physical stack pages')
+		}
 		stack_phys := memory.pmm_alloc(user_stack_size / page_size)
+		if trace_gpu_exec {
+			println('exec[gpu]/thread: physical user stack allocated at 0x${u64(stack_phys):x}')
+		}
 		stack = unsafe { &u64(u64(stack_phys) + user_stack_size + higher_half) }
 
 		stack_vma = process.thread_stack_top
@@ -1128,17 +1237,33 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 		stack_bottom_vma := process.thread_stack_top
 		process.thread_stack_top -= page_size
 
+		if trace_gpu_exec {
+			println('exec[gpu]/thread: mapping user stack at 0x${stack_bottom_vma:x} len=0x${user_stack_size:x}')
+		}
 		mmap.map_range(mut process.pagemap, stack_bottom_vma, u64(stack_phys), user_stack_size, mmap.prot_read | mmap.prot_write, mmap.map_anonymous) or { return none }
+		if trace_gpu_exec {
+			println('exec[gpu]/thread: user stack mapped')
+		}
 	} else {
 		stack = &u64(voidptr(_stack))
 		stack_vma = _stack
 	}
 
+	if trace_gpu_exec {
+		println('exec[gpu]/thread: allocating kernel stack')
+	}
 	kernel_stack_phys := memory.pmm_alloc(kernel_stack_size / page_size)
 	stacks << kernel_stack_phys
 	kernel_stack := u64(kernel_stack_phys) + kernel_stack_size + higher_half
+	if trace_gpu_exec {
+		println('exec[gpu]/thread: kernel stack allocated at 0x${u64(kernel_stack_phys):x}')
+		println('exec[gpu]/thread: allocating FPU storage')
+	}
 
 	fpu_storage_phys := memory.pmm_alloc(lib.div_roundup(fpu_storage_size, page_size))
+	if trace_gpu_exec {
+		println('exec[gpu]/thread: FPU storage allocated at 0x${u64(fpu_storage_phys):x}')
+	}
 
 	gpr_state := cpulocal.GPRState{
 		pc: u64(pc)
@@ -1159,6 +1284,9 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 		fpu_storage: voidptr(u64(fpu_storage_phys) + higher_half)
 		fpu_storage_phys: u64(fpu_storage_phys)
 	}
+	if trace_gpu_exec {
+		println('exec[gpu]/thread: thread object initialized pc=0x${t.gpr_state.pc:x} sp=0x${t.gpr_state.sp:x}')
+	}
 
 	t.self = voidptr(t)
 	t.tpidr_el0 = u64(0)
@@ -1169,6 +1297,9 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 	}
 
 	if want_elf == true {
+		if trace_gpu_exec {
+			println('exec[gpu]/thread: building initial ELF stack')
+		}
 		if auxval != unsafe { nil } {
 			uart.puts(c'ELF auxval: base=')
 			uart.put_hex(auxval.at_base)
@@ -1182,13 +1313,22 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 			stack_top := stack
 			mut orig_stack_vma := stack_vma
 
+			if trace_gpu_exec {
+				println('exec[gpu]/thread: copying ${envp.len} environment strings')
+			}
 			for elem in envp {
 				stack = &u64(u64(stack) - u64(elem.len + 1))
 				C.memcpy(voidptr(stack), elem.str, elem.len + 1)
 			}
+			if trace_gpu_exec {
+				println('exec[gpu]/thread: environment strings copied; copying ${argv.len} arguments')
+			}
 			for elem in argv {
 				stack = &u64(u64(stack) - u64(elem.len + 1))
 				C.memcpy(voidptr(stack), elem.str, elem.len + 1)
+			}
+			if trace_gpu_exec {
+				println('exec[gpu]/thread: argument strings copied; aligning stack')
 			}
 
 			stack = &u64(u64(stack) - (u64(stack) & 0x0f))
@@ -1198,10 +1338,16 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 			}
 
 			// AT_RANDOM is shared by libc stack canaries and userspace ASLR.
+			if trace_gpu_exec {
+				println('exec[gpu]/thread: generating AT_RANDOM bytes')
+			}
 			stack = &u64(u64(stack) - 16)
 			random_kernel_addr := u64(stack)
 			if !krandom.fill(voidptr(random_kernel_addr), 16, true) {
 				C.memset(voidptr(random_kernel_addr), 0, 16)
+			}
+			if trace_gpu_exec {
+				println('exec[gpu]/thread: AT_RANDOM ready; writing auxiliary vector')
 			}
 			random_vma := stack_vma - (u64(stack_top) - random_kernel_addr)
 
@@ -1278,15 +1424,33 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 			stack = &stack[-1]
 
 			t.gpr_state.sp -= u64(stack_top) - u64(stack)
+			if trace_gpu_exec {
+				println('exec[gpu]/thread: initial ELF stack complete sp=0x${t.gpr_state.sp:x}')
+			}
 		}
 	}
 
+	if trace_gpu_exec {
+		println('exec[gpu]/thread: attaching replacement thread to process')
+	}
 	attach_thread(mut process, mut t)?
-
-	if autoenqueue == true {
-		enqueue_thread(t, false)
+	if trace_gpu_exec {
+		println('exec[gpu]/thread: replacement thread attached tid=${t.tid}')
 	}
 
+	if autoenqueue == true {
+		if trace_gpu_exec {
+			println('exec[gpu]/thread: auto-enqueueing replacement thread')
+		}
+		enqueue_thread(t, false)
+		if trace_gpu_exec {
+			println('exec[gpu]/thread: auto-enqueue complete')
+		}
+	}
+
+	if trace_gpu_exec {
+		println('exec[gpu]/thread: leaving new_user_thread')
+	}
 	return t
 }
 
