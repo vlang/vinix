@@ -130,15 +130,19 @@ fi
 
 # Let V drive TCC instead of stopping at generated C. Its TCC driver adds the
 # compiler's backtrace runtime and Vinix's arm64 atomic support object; invoking
-# TCC on the C file by hand would omit both pieces. Do not pass -prod here: V's
-# current driver deliberately follows a production TCC attempt with a system-CC
-# pass, while TCC itself does not provide an optimizing production mode. Put
-# musl's public headers first to avoid TCC's bundled stddef.h redeclaring a
-# wchar_t that an earlier musl header already supplied. Disable compiler retry
-# so a future TCC regression fails explicitly instead of silently using GCC.
+# TCC on the C file by hand would omit both pieces. Link statically, matching
+# the packaged compositor: the dynamic TCC binary can start, but repeatedly
+# loading it through each native application currently wedges Vinix during the
+# replacement session's startup. Do not pass -prod here: V's current driver
+# deliberately follows a production TCC attempt with a system-CC pass, while
+# TCC itself does not provide an optimizing production mode. Put musl's public
+# headers first to avoid TCC's bundled stddef.h redeclaring a wchar_t that an
+# earlier musl header already supplied. Disable compiler retry so a future TCC
+# regression fails explicitly instead of silently using GCC.
 echo "==> Building Vinix desktop with $(v version) and TCC"
 v -new-compiler -no-memory-limit -os linux -arch arm64 -cc tcc -gc none -manualfree \
-	-enable-globals -no-retry-compilation -cflags -I/usr/include -d ui2_headless \
+	-enable-globals -no-retry-compilation -cflags -I/usr/include -ldflags -static \
+	-d ui2_headless \
 	-path "@vlib|$module_path|@vmodules|$source_dir" \
 	-o "$work_dir/vinix-desktop" "$source_dir"
 chmod 755 "$work_dir/vinix-desktop"

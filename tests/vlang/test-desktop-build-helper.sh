@@ -122,6 +122,7 @@ grep -F "$host|$host/third_party" "$work/v-args" >/dev/null
 grep -F -- '-cc tcc' "$work/v-args" >/dev/null
 grep -F -- '-no-retry-compilation' "$work/v-args" >/dev/null
 grep -F -- '-cflags -I/usr/include' "$work/v-args" >/dev/null
+grep -F -- '-ldflags -static' "$work/v-args" >/dev/null
 grep -F '/desktop' "$work/v-args" >/dev/null
 if grep -Fq -- '-d glibc' "$work/v-args"; then
 	echo "desktop build selected glibc for its musl/TCC output" >&2
