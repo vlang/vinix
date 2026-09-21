@@ -1100,6 +1100,11 @@ install -m755 "$BUILD_DIR/desktop-init" \
     "$STAGING/usr/libexec/vinix-desktop-init"
 install -m755 "$UI2_EXAMPLES_DIR"/vinix-ui2-* "$STAGING/usr/bin/"
 cp "$BUILD_DIR/vinix-desktop" "$STAGING/usr/bin/vinix-desktop"
+# Guest hot reloads replace /usr/bin/vinix-desktop so every multicall native
+# application changes generation with the compositor. Keep one unreachable
+# packaged inode for PID 1 to restore on the next persistent disk-root boot.
+install -m755 "$BUILD_DIR/vinix-desktop" \
+    "$STAGING/usr/libexec/vinix-desktop-system"
 install -m755 "$VOFFICE_DIR"/voffice-calc "$VOFFICE_DIR"/voffice-writer \
     "$STAGING/usr/bin/"
 mkdir -p "$STAGING/usr/bin/assets/ribbon" "$STAGING/usr/bin/translations"

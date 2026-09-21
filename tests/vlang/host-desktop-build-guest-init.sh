@@ -33,6 +33,19 @@ printf '%s\n' \
 	> /root/.vinix-user
 chmod 600 /root/.vinix-user
 
+# Simulate what a failed development session leaves on a persistent disk-root:
+# a replaced multicall executable and volatile /run markers. PID 1 must restore
+# the packaged desktop before launching anything, even when the host image ID
+# itself has not changed between boots.
+[ -x /usr/libexec/vinix-desktop-system ] \
+	|| fail "packaged desktop recovery copy is missing"
+cp /bin/busybox /usr/bin/.vinix-desktop-stale
+chmod 755 /usr/bin/.vinix-desktop-stale
+mv -f /usr/bin/.vinix-desktop-stale /usr/bin/vinix-desktop
+mkdir -p /run
+: > /run/vinix-desktop-development
+: > /run/vinix-desktop-ready
+
 wait_for_ready_session() {
 	round=$1
 	attempt=0
@@ -63,6 +76,10 @@ wait_for_ready_session() {
 		attempt=$((attempt + 1))
 	done
 	[ "$attempt" -lt 100 ] || fail "QEMU host source service did not become reachable"
+	/bin/busybox cmp -s /usr/libexec/vinix-desktop-system /usr/bin/vinix-desktop \
+		|| fail "boot did not restore the packaged desktop"
+	[ ! -e /run/vinix-desktop-development ] \
+		|| fail "boot retained the stale development marker"
 
 	old_pid=''
 	attempt=0
@@ -80,6 +97,7 @@ wait_for_ready_session() {
 	[ -x /root/vinix-desktop ] || fail "desktop output is missing"
 	wait_for_ready_session 1
 	first_pid=$(/bin/busybox pidof vinix-desktop)
+	first_ready_inode=$(/bin/busybox stat -c '%i' /run/vinix-desktop-ready)
 
 	# Reload the TCC-built session once more. This is the key liveness check:
 	# a first replacement wedged in app IPC cannot consume the second SIGHUP and
@@ -87,10 +105,16 @@ wait_for_ready_session() {
 	vinix-desktop-reload /root/vinix-desktop || fail "second reload helper"
 	wait_for_ready_session 2
 	second_pid=$(/bin/busybox pidof vinix-desktop)
+	second_ready_inode=$(/bin/busybox stat -c '%i' /run/vinix-desktop-ready)
+	[ "$second_ready_inode" != "$first_ready_inode" ] \
+		|| fail "second reload did not recreate the readiness marker"
 
 	# Keep observing after both native apps have exchanged more frames.
 	sleep 10
 	[ -s /run/vinix-desktop-ready ] || fail "second replacement stopped responding"
+	stable_ready_inode=$(/bin/busybox stat -c '%i' /run/vinix-desktop-ready)
+	[ "$stable_ready_inode" = "$second_ready_inode" ] \
+		|| fail "replacement reloaded again without a new request"
 	/bin/busybox pidof vinix-files >/dev/null 2>&1 \
 		|| fail "second replacement did not keep Files running"
 	/bin/busybox pidof vinix-terminal >/dev/null 2>&1 \

@@ -297,6 +297,40 @@ static int executable_available(const char *path) {
 	return 1;
 }
 
+/* A development reload replaces /usr/bin/vinix-desktop so all of its
+ * multicall application links use the same freshly built program. A disk-root
+ * QEMU machine persists that mutation, including across a host-side image
+ * rebuild whose contents happen to be unchanged. Restore the packaged inode
+ * atomically at boot and clear /run state before deciding which session this
+ * boot should start. The immutable copy is deliberately outside /usr/bin so a
+ * reload can never overwrite it through one of the multicall links. */
+static void prepare_desktop_boot(void) {
+	static const char system_desktop[] =
+		"/usr/libexec/vinix-desktop-system";
+	static const char temporary_desktop[] =
+		"/usr/bin/.vinix-desktop.system";
+	static const char desktop[] = "/usr/bin/vinix-desktop";
+	const u64 at_fdcwd = (u64)(i64)-100;
+
+	syscall3(35 /* unlinkat */, at_fdcwd,
+	         (u64)"/run/vinix-desktop-development", 0);
+	syscall3(35 /* unlinkat */, at_fdcwd,
+	         (u64)"/run/vinix-desktop-ready", 0);
+
+	/* Older images have no immutable copy. Leave their existing desktop alone
+	 * rather than removing the only executable they can start. */
+	if (!executable_available(system_desktop))
+		return;
+	syscall3(35 /* unlinkat */, at_fdcwd, (u64)temporary_desktop, 0);
+	if (syscall5(37 /* linkat */, at_fdcwd, (u64)system_desktop,
+	             at_fdcwd, (u64)temporary_desktop, 0) < 0 ||
+	    syscall4(38 /* renameat */, at_fdcwd, (u64)temporary_desktop,
+	             at_fdcwd, (u64)desktop) < 0) {
+		syscall3(35 /* unlinkat */, at_fdcwd, (u64)temporary_desktop, 0);
+		print("init: could not restore the packaged desktop; keeping the existing binary\n");
+	}
+}
+
 /* A self-hosted desktop build writes this marker before asking PID 1 to
  * reload. On GPU systems that deliberately selects the newly built ordinary
  * framebuffer binary instead of silently going back to the immutable GPU
@@ -342,6 +376,7 @@ void _start(void) {
 	char *shell[] = { "/bin/zsh", "-l", (char *)0 };
 	int status = 0;
 	i64 child;
+	prepare_desktop_boot();
 	install_power_signals();
 
 #ifdef VINIX_WIFI_BUNDLE
@@ -384,6 +419,12 @@ void _start(void) {
 			requested_desktop_reload = 0;
 			print("init: desktop reload requested; starting the new binary\n");
 			stop_desktop_group(child);
+			/* Closing the old Terminal's PTY can deliver another SIGHUP while
+			 * its process group is being dismantled. It belongs to the reload
+			 * already completed above; carrying it into the replacement session
+			 * creates an endless ready/reload loop. A real later build will send
+			 * a new request after the replacement is running. */
+			requested_desktop_reload = 0;
 			continue;
 		}
 		if (child < 0 || status == (127 << 8)) {
