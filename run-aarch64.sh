@@ -42,7 +42,7 @@
 # high-memory mapping path the M1 takes; the 2048 default keeps boots fast.
 # QEMU supplies four CPUs, and its kernel build enables the Limine MP request
 # needed for Vinix to bring all of them online.
-set -e
+set -eo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 . "$SCRIPT_DIR/build-support/qemu-storage.sh"
@@ -340,9 +340,11 @@ fi
 
 # ── Build kernel ──
 if [ "$NO_BUILD" -eq 0 ]; then
+    . "$SCRIPT_DIR/build-support/find-v.sh"
+    echo "==> V compiler: $V ($("$V" -version 2>/dev/null || echo unknown version))"
     echo "==> Building kernel..."
-    make -C "$KERNEL_DIR" CC=clang ARCH=aarch64 LIMINE_MP=1 \
-        -j$(sysctl -n hw.ncpu) 2>&1 | tail -3
+    make -C "$KERNEL_DIR" CC=clang ARCH=aarch64 V="$V" LIMINE_MP=1 \
+        -j"$(sysctl -n hw.ncpu 2>/dev/null || nproc)" 2>&1 | tail -3
 fi
 
 if [ ! -f "$KERNEL_DIR/bin/vinix" ]; then
