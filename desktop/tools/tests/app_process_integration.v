@@ -105,11 +105,16 @@ fn main() {
 	assert cadence_desktop.idle_wait_interval(1000, 16) == 16
 
 	mut desktop := Desktop{}
-	mut files := start_remote_app_at(arguments()[0], available_apps[0], mut desktop) or {
+	mut files := start_remote_app_at_with_timeout(arguments()[0], available_apps[0], mut desktop,
+		app_response_timeout_ms) or {
 		panic(err)
 	}
 	if mut files is RemoteApp {
 		assert files.pid > 0
+		// Large response frames must not depend on a blocking pipe hand-off:
+		// Vinix's compositor and app otherwise can both sleep while transferring
+		// one tree during session startup.
+		assert C.fcntl(files.response_fd, C.F_GETFL) & C.O_NONBLOCK != 0
 	}
 	files_tree := files.build(ui2.rect(0, 0, 460, 326)) or { panic(err) }
 	assert files_tree.kind == .screen
@@ -121,7 +126,8 @@ fn main() {
 	// A native application may abort for reasons outside the protocol. Its
 	// process must be the only casualty: the compositor side closes the broken
 	// transport and remains able to launch and render another application.
-	mut crashing_files := start_remote_app_at(arguments()[0], available_apps[0], mut desktop) or {
+	mut crashing_files := start_remote_app_at_with_timeout(arguments()[0], available_apps[0], mut desktop,
+		app_response_timeout_ms) or {
 		panic(err)
 	}
 	mut crashed_pid := -1
@@ -139,7 +145,8 @@ fn main() {
 		assert crashing_files.closed
 	}
 
-	mut settings := start_remote_app_at(arguments()[0], available_apps[4], mut desktop) or {
+	mut settings := start_remote_app_at_with_timeout(arguments()[0], available_apps[4], mut desktop,
+		app_response_timeout_ms) or {
 		panic(err)
 	}
 	settings.handle('${settings_action_category}1') or { panic(err) }
@@ -156,7 +163,8 @@ fn main() {
 	free_tree(settings_tree)
 	close_remote(mut settings)
 
-	mut capture := start_remote_app_at(arguments()[0], available_apps[14], mut desktop) or {
+	mut capture := start_remote_app_at_with_timeout(arguments()[0], available_apps[14], mut desktop,
+		app_response_timeout_ms) or {
 		panic(err)
 	}
 	capture_tree := capture.build(ui2.rect(0, 0, 560, 396)) or { panic(err) }
@@ -175,7 +183,8 @@ fn main() {
 	// new size. The terminal rebuilds its grid there, and releasing the old
 	// row cache twice used to abort the application process, leaving the
 	// window able to report only that its application had stopped drawing.
-	mut terminal := start_remote_app_at(arguments()[0], available_apps[3], mut desktop) or {
+	mut terminal := start_remote_app_at_with_timeout(arguments()[0], available_apps[3], mut desktop,
+		app_response_timeout_ms) or {
 		panic(err)
 	}
 	terminal_tree := terminal.build(ui2.rect(0, 0, 560, 316)) or { panic(err) }

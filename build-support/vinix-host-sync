@@ -86,7 +86,17 @@ echo "==> Syncing the macOS Vinix checkout to $destination"
 	--retry 10 --retry-connrefused --retry-delay 1 \
 	--output "$archive" "${url%/}/vinix-source.tar"
 
-set -- $(cksum "$archive")
+if command -v cksum >/dev/null 2>&1; then
+	set -- $(cksum "$archive")
+elif [ -x /bin/busybox ]; then
+	# The compact desktop image carries the BusyBox applet even when it does
+	# not install every applet symlink. Host sync is part of the base QEMU
+	# workflow, so it must not depend on an optional `cksum` package/link.
+	set -- $(/bin/busybox cksum "$archive")
+else
+	echo "vinix-host-sync: cksum is not installed" >&2
+	exit 1
+fi
 archive_checksum="$1 $2"
 checksum_file="$parent/.${name}.checksum"
 if [ -e "$destination" ] && [ -s "$checksum_file" ] && \

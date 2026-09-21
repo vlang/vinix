@@ -523,6 +523,13 @@ fn desktop_read_all(fd int, buffer voidptr, count u64) bool {
 		if got < 0 && C.errno == C.EINTR {
 			continue
 		}
+		// Native-app responses use nonblocking pipes. A response can be larger
+		// than the pipe, so let its writer run and continue draining instead of
+		// entering the kernel's contended reader/writer sleep path.
+		if got < 0 && (C.errno == C.EAGAIN || C.errno == C.EWOULDBLOCK) {
+			desktop_sleep_ms(1)
+			continue
+		}
 		return false
 	}
 	return true
@@ -539,9 +546,22 @@ fn desktop_write_all(fd int, buffer voidptr, count u64) bool {
 		if wrote < 0 && C.errno == C.EINTR {
 			continue
 		}
+		if wrote < 0 && (C.errno == C.EAGAIN || C.errno == C.EWOULDBLOCK) {
+			desktop_sleep_ms(1)
+			continue
+		}
 		return false
 	}
 	return true
+}
+
+fn desktop_set_nonblocking(fd int, enabled bool) bool {
+	flags := C.fcntl(fd, C.F_GETFL)
+	if flags < 0 {
+		return false
+	}
+	next := if enabled { flags | C.O_NONBLOCK } else { flags & ~C.O_NONBLOCK }
+	return C.fcntl(fd, C.F_SETFL, next) == 0
 }
 
 fn desktop_set_cloexec(fd int, enabled bool) bool {
@@ -676,6 +696,17 @@ fn desktop_spawn_app(path string, app_name string, tz_offset i64) ?SpawnedAppPro
 	desktop_set_cloexec(request[1], true)
 	desktop_set_cloexec(response[0], true)
 	desktop_set_cloexec(response[1], true)
+	// Application trees can exceed the pipe capacity. Keep the response ends
+	// nonblocking so desktop_read_all/desktop_write_all alternate cooperatively
+	// without relying on two simultaneous kernel pipe sleepers to hand off.
+	if !desktop_set_nonblocking(response[0], true)
+		|| !desktop_set_nonblocking(response[1], true) {
+		C.close(request[0])
+		C.close(request[1])
+		C.close(response[0])
+		C.close(response[1])
+		return none
+	}
 
 	mode_arg := '--vinix-app=${app_name}'
 	request_arg := '--request-fd=${request[0]}'

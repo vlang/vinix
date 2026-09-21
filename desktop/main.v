@@ -39,6 +39,12 @@ const key_f2 = '\x1bOQ'
 // One step of the bar in Settings, so the two agree.
 const brightness_step = 5
 
+// The reload helper removes this before asking PID 1 to replace the session.
+// Recreate it only after the replacement has painted its first frame and
+// completed the startup application handshakes, so an out-of-group watchdog
+// can distinguish a responsive desktop from a process that merely exec'd.
+const desktop_session_ready_path = '/run/vinix-desktop-ready'
+
 struct Options {
 	framebuffer    string = '/dev/fb0'
 	pointer        string = '/dev/pointer'
@@ -104,11 +110,10 @@ fn sleep_ms(ms i64) {
 	desktop_sleep_ms(ms)
 }
 
-fn sleep_to_next_frame(frame_started i64, interval i64) {
-	elapsed := monotonic_millis() - frame_started
-	wait := desktop_frame_wait_ms(elapsed, interval)
-	if wait > 0 {
-		sleep_ms(wait)
+fn desktop_publish_session_ready() {
+	message := 'ready\n'
+	if !desktop_write_file(desktop_session_ready_path, message.str, u64(message.len)) {
+		eprintln('vinix-desktop: could not publish the session-ready marker')
 	}
 }
 
@@ -178,6 +183,7 @@ fn main() {
 		for title in options.open {
 			desktop.launch_titled_at_startup(title)
 		}
+		desktop_publish_session_ready()
 	}
 
 	mut stats := FrameStats{}
@@ -289,6 +295,7 @@ fn main() {
 				launch_development_terminal = false
 				desktop.launch_titled_at_startup('Terminal')
 			}
+			desktop_publish_session_ready()
 		}
 
 		sleep_to_next_frame(frame_started, options.frame_interval)

@@ -164,3 +164,14 @@ fn monotonic_millis() i64 {
 	}
 	return i64(now)
 }
+
+// Shared by the ordinary desktop loop and first-launch registration. Keep it
+// with the monotonic clock so staged registration tests need not import the
+// executable's main entry point.
+fn sleep_to_next_frame(frame_started i64, interval i64) {
+	elapsed := monotonic_millis() - frame_started
+	wait := desktop_frame_wait_ms(elapsed, interval)
+	if wait > 0 {
+		desktop_sleep_ms(wait)
+	}
+}
