@@ -23,13 +23,18 @@ import apple.ans
 import apple.typec
 import devicetree
 import initramfs
+import numa
 import fs
 import sched
 import stat
 import pipe
 import futex
 import socket
+import socket.inet
 import limine
+import event
+import event.eventstruct
+import pagecache
 import gpu.agx.driver as agx_driver
 import gpu.agx.fake as fake_agx
 import gpu.dcp
@@ -54,20 +59,20 @@ fn C.vinix_display_hotplug_choose_action(connected int, reboot_enabled int,
 @[_linker_section: '.requests']
 @[cinit]
 __global (
-	volatile dtb_req = limine.LimineDTBRequest{
+	volatile                       dtb_req = limine.LimineDTBRequest{
 		response: unsafe { nil }
 	}
-	enable_apple_gpu     = false
-	enable_fake_g17      = false
-	enable_apple_dcp     = false
+	enable_apple_gpu               = false
+	enable_fake_g17                = false
+	enable_apple_dcp               = false
 	// The SMC client is read-only and safely declines non-Apple device trees.
-	enable_apple_battery = true
-	enable_apple_display_hotplug = false
-	apple_display_coldplug_reboot = false
+	enable_apple_battery           = true
+	enable_apple_display_hotplug   = false
+	apple_display_coldplug_reboot  = false
 	apple_display_reboot_attempted = false
-	external_display_handoff = false
-	force_qemu_platform  = false
-	aic_timer_irq         = u32(3)
+	external_display_handoff       = false
+	force_qemu_platform            = false
+	aic_timer_irq                  = u32(3)
 )
 
 fn segfault_kill_process(gpr_state voidptr, status int) {
@@ -77,9 +82,7 @@ fn segfault_kill_process(gpr_state voidptr, status int) {
 
 fn apple_display_hotplug(connected bool) {
 	width, height := term.selected_framebuffer_dimensions()
-	action := C.vinix_display_hotplug_choose_action(int(connected),
-		int(apple_display_coldplug_reboot), int(apple_display_reboot_attempted), width,
-		height)
+	action := C.vinix_display_hotplug_choose_action(int(connected), int(apple_display_coldplug_reboot), int(apple_display_reboot_attempted), width, height)
 	if action == 2 {
 		apple_display_reboot_attempted = true
 		println('display: first post-boot Studio Display attach; rebooting once for firmware link training')
@@ -95,7 +98,8 @@ fn apple_display_hotplug(connected bool) {
 		// so a failed conduit cannot safely resume the running desktop.
 		println('display: PSCI reset failed after storage shutdown; powering off')
 		cpu.psci_call(cpu.psci_system_off)
-		for {}
+		for {
+		}
 	}
 	term.display_hotplug(connected)
 }
@@ -183,16 +187,37 @@ fn kmain_thread(qemu_platform bool) {
 	print('kmain_thread: root mount done\n')
 	fs.create(vfs_root, '/dev', 0o644 | stat.ifdir) or {}
 	fs.mount(vfs_root, '', '/dev', 'devtmpfs') or {}
+	fs.create(vfs_root, '/proc', 0o555 | stat.ifdir) or {}
+	fs.mount(vfs_root, '', '/proc', 'procfs') or {}
 	print('kmain_thread: devtmpfs done\n')
 	if qemu_platform {
 		virtio_blk.initialise(memory.get_hhdm_offset())
 	}
 
-	initramfs.initialise()
-	print('kmain_thread: initramfs done\n')
-	if qemu_platform && !virtio_blk.mount_persistent_home() {
-		panic('QEMU persistent storage was requested but could not be mounted')
+	// A QEMU machine asked to keep its whole filesystem boots off the data
+	// volume instead of unpacking the image into RAM. The initramfs stays in
+	// the boot payload as the fallback for a volume that does not carry a
+	// system, so an unusable disk still reaches a usable machine.
+	disk_root := qemu_platform && virtio_blk.mount_persistent_root()
+	if disk_root {
+		// The image itself is already installed on the volume; the per-run
+		// overlay modules after it are not, and still have to be applied.
+		initramfs.initialise_overlays()
+		print('kmain_thread: persistent root done\n')
+	} else {
+		initramfs.initialise()
+		print('kmain_thread: initramfs done\n')
+		if qemu_platform && !virtio_blk.mount_persistent_home() {
+			panic('QEMU persistent storage was requested but could not be mounted')
+		}
 	}
+
+	// /sys after the root is settled rather than alongside /dev and /proc: a
+	// disk root replaces the tree those two are carried across into, and this
+	// one has nothing in it that the block device was read through.
+	fs.create(vfs_root, '/sys', 0o555 | stat.ifdir) or {}
+	fs.mount(vfs_root, '', '/sys', 'sysfs') or {}
+	print('kmain_thread: sysfs done\n')
 
 	if enable_fake_g17 {
 		print('kmain_thread: init fake G17 DRM driver...\n')
@@ -280,15 +305,46 @@ fn kmain_thread(qemu_platform bool) {
 	}
 	boot_stage(12)
 
+	sched.new_kernel_thread(voidptr(writeback_thread), unsafe { nil }, true)
+	print('kmain_thread: writeback done\n')
+
 	print('\n*** aarch64: Kernel initialisation complete ***\n')
 	print('*** Starting /sbin/init ***\n')
 
-	userland.start_program(false, vfs_root, '/sbin/init', ['/sbin/init'], [],
-		'/dev/console', '/dev/console', '/dev/console') or {
-		panic('Could not start init process')
-	}
+	userland.start_program(false, vfs_root, '/sbin/init', ['/sbin/init'], [], '/dev/console', '/dev/console', '/dev/console') or { panic('Could not start init process') }
 
 	sched.dequeue_and_die()
+}
+
+// How long a write may sit in memory before it is pushed to the device.
+const writeback_interval_seconds = i64(5)
+
+// Filesystem writes land in a write-back page cache, which on its own hands a
+// page to the disk only when the LRU evicts it. A small file -- the usual case
+// -- is therefore still in memory when the machine stops, and a restart loses
+// it, which is what made a persistent /root look like it was not persistent at
+// all. Linux answers this with a writeback timer; so does this thread. sync(2)
+// and reboot(2) are still the exact guarantees, and this only bounds the window
+// for everything that never calls them, including a VM window simply closed.
+fn writeback_thread() {
+	for {
+		mut events := []&eventstruct.Event{}
+		mut interval := time.new_timer(time.TimeSpec{
+			tv_sec: writeback_interval_seconds
+			tv_nsec: 0
+		})
+		events << &interval.event
+		event.await(mut events, true) or {}
+		interval.disarm()
+		unsafe { free(interval) }
+		unsafe { events.free() }
+		// A device that cannot take the write keeps its pages dirty and
+		// retryable, so the next round tries again rather than giving up.
+		pagecache.sync_all()
+		// DHCP runs from the scheduler's poll callback, which cannot write to
+		// the root filesystem. This is a thread that can.
+		inet.publish_resolver()
+	}
 }
 
 fn get_dt_base(compat string, default_base u64) u64 {
@@ -383,12 +439,19 @@ fn configure_apple_bringup_from_cmdline() {
 		print('display: external GOP handoff active; native DCP probe disabled\n')
 	}
 
-	C.printf(c'apple bring-up: GPU=%s DCP=%s battery=%s display-hotplug=%s cold-attach=%s\n',
-		if enable_apple_gpu { c'enabled' } else { c'disabled' },
-		if enable_apple_dcp { c'enabled' } else { c'disabled' },
-		if enable_apple_battery { c'enabled' } else { c'disabled' },
-		if enable_apple_display_hotplug { c'enabled' } else { c'disabled' },
-		if apple_display_coldplug_reboot { c'firmware reboot' } else { c'disabled' })
+	C.printf(c'apple bring-up: GPU=%s DCP=%s battery=%s display-hotplug=%s cold-attach=%s\n', if enable_apple_gpu {
+		c'enabled'
+	} else {
+		c'disabled'
+	}, if enable_apple_dcp { c'enabled' } else { c'disabled' }, if enable_apple_battery {
+		c'enabled'
+	} else {
+		c'disabled'
+	}, if enable_apple_display_hotplug { c'enabled' } else { c'disabled' }, if apple_display_coldplug_reboot {
+		c'firmware reboot'
+	} else {
+		c'disabled'
+	})
 }
 
 // Power off at a chosen stage. On a machine with no console and no usable
@@ -405,7 +468,8 @@ fn boot_stage(stage u32) {
 		cpu.psci_call(cpu.psci_system_reset)
 		// Both conduits returned, so PSCI is unavailable: nothing more can be
 		// signalled from here.
-		for {}
+		for {
+		}
 	}
 }
 
@@ -474,7 +538,7 @@ fn early_cmdline_has_token(token string) bool {
 	}
 	text := unsafe { &u8(kernel_file.cmdline) }
 	mut start := 0
-	for index := 0; ; index++ {
+	for index := 0; true; index++ {
 		value := unsafe { text[index] }
 		if value != 0 && value !in [` `, `\t`, `\r`, `\n`] {
 			continue
@@ -519,7 +583,8 @@ fn kmain() {
 	if halt_at_stage == 0 {
 		cpu.psci_call(cpu.psci_system_off)
 		cpu.psci_call(cpu.psci_system_reset)
-		for {}
+		for {
+		}
 	}
 
 	// From here on a fault resets the machine instead of dying quietly, so the
@@ -535,7 +600,7 @@ fn kmain() {
 	// A deliberate null store should reboot the machine; if it does not, PSCI
 	// reset is unavailable here and a quiet machine means nothing.
 	if early_cmdline_contains('vinix.force_fault=1') {
-		fault_probe := unsafe { &u64(voidptr(0)) }
+		fault_probe := unsafe { &u64(nil) }
 		unsafe {
 			*fault_probe = 0
 		}
@@ -553,15 +618,15 @@ fn kmain() {
 	if halt_at_stage == 1 {
 		cpu.psci_call(cpu.psci_system_off)
 		cpu.psci_call(cpu.psci_system_reset)
-		for {}
+		for {
+		}
 	}
 
 	// Do not hard-stop on base revision mismatch. Some real-hardware boot
 	// chains may provide an older Limine build; continue and rely on feature
 	// checks for individual requests.
 	if limine_base_revision.revision != 0 {
-		C.printf(c'limine: base revision negotiation mismatch (value=%llu), continuing\n',
-			limine_base_revision.revision)
+		C.printf(c'limine: base revision negotiation mismatch (value=%llu), continuing\n', limine_base_revision.revision)
 	}
 
 	// Initialize the memory allocator.
@@ -712,17 +777,25 @@ fn kmain() {
 	// ARM64 PCI ECAM setup is not wired yet; skip to avoid unsafe probing.
 	print('skipping PCI (ARM64 ECAM setup not implemented)\n')
 
+	// The machine's memory topology. Read after the higher half is live, since
+	// the ACPI tables a UEFI machine describes it in are reached through it, and
+	// before smp, which hands out the logical CPU numbers the nodes are then
+	// matched against.
+	print('init numa...\n')
+	numa.initialise()
+	print('numa done\n')
+
 	// Limine 12.8's VHE-aware trampoline can safely park Apple APs at EL2. Use
-	// two logical CPUs for the first hardware validation while retaining the
-	// existing all-CPU behaviour in virtual machines (currently configured
-	// with two vCPUs). Limine leaves every AP above the limit parked.
+	// four logical CPUs on Apple hardware while retaining the existing all-CPU
+	// behaviour in virtual machines (currently configured with four vCPUs).
+	// Limine leaves every AP above the limit parked.
 	if smp.available() {
 		if use_aic {
-			print('init smp (Apple hardware, 2 CPU limit)...\n')
+			print('init smp (Apple hardware, 4 CPU limit)...\n')
 		} else {
 			print('init smp...\n')
 		}
-		smp.initialise(if use_aic { u64(2) } else { u64(0) })
+		smp.initialise(if use_aic { u64(4) } else { u64(0) })
 		print('smp done\n')
 	} else if use_aic {
 		print('skipping SMP (no bootloader MP response)\n')
@@ -734,6 +807,9 @@ fn kmain() {
 		print('skipping SMP (no device tree)\n')
 		bootstrap_cpu0()
 	}
+
+	// Every logical CPU now exists, so each can be told which node it sits on.
+	numa.attach_cpus()
 
 	print('init time...\n')
 	time.initialise()

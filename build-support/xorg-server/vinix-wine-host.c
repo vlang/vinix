@@ -1,5 +1,8 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
 //
 // Host one Wine application on an off-screen Xvfb display. vinix-desktop maps
 // Xvfb's XWD framebuffer into a normal compositor window and sends compact
@@ -8,16 +11,21 @@
 #include <X11/Xlib.h>
 #include <X11/keysym.h>
 #include <X11/extensions/XTest.h>
+#include <X11/extensions/Xdamage.h>
 
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <signal.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/mman.h>
+#include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/un.h>
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
@@ -59,6 +67,92 @@ static int ignore_x_error(Display *display, XErrorEvent *event) {
 static void sleep_10ms(void) {
     const struct timespec delay = { 0, 10000000 };
     nanosleep(&delay, NULL);
+}
+
+/* The desktop names each hosted display after the process that asked for it,
+ * and a process id is released the moment that process exits — while the host
+ * it started is still stopping its X server. Relaunching an application then
+ * lands on a display number whose old server is alive, or whose lock file it
+ * left behind names a process id that has since been reused, and Xvfb refuses
+ * to start: "Server is already active for display N".
+ *
+ * So the number the desktop asks for is a starting point, not a promise. Take
+ * the first display from there that nothing is serving and nothing holds, and
+ * clear whatever a killed server left behind on it. */
+static int display_number(const char *display_name) {
+    const char *digit = display_name;
+    int number = 0;
+
+    while (*digit == ':')
+        ++digit;
+    if (*digit == '\0')
+        return -1;
+    for (; *digit != '\0'; ++digit) {
+        if (*digit < '0' || *digit > '9')
+            return -1;
+        number = number * 10 + (*digit - '0');
+        if (number > 65535)
+            return -1;
+    }
+    return number;
+}
+
+/* Remove what a killed X server left on a display. Xvfb cleans these up when
+ * it is asked to stop, but not when it has to be killed. */
+static void remove_display_files(int number) {
+    char path[64];
+
+    if (number < 0)
+        return;
+    snprintf(path, sizeof(path), "/tmp/.X11-unix/X%d", number);
+    unlink(path);
+    snprintf(path, sizeof(path), "/tmp/.X%d-lock", number);
+    unlink(path);
+}
+
+/* True when nothing answers on this display. A lock file whose server is gone
+ * is removed on the way: its recorded process id is no help, because the id
+ * has usually been handed to something unrelated by the time anyone looks. */
+static int claim_display_number(int number) {
+    char socket_path[64];
+    struct sockaddr_un address;
+    int probe;
+
+    snprintf(socket_path, sizeof(socket_path), "/tmp/.X11-unix/X%d", number);
+    memset(&address, 0, sizeof(address));
+    address.sun_family = AF_UNIX;
+    snprintf(address.sun_path, sizeof(address.sun_path), "%s", socket_path);
+
+    probe = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (probe >= 0) {
+        int connected = connect(probe, (struct sockaddr *)&address,
+                                sizeof(address)) == 0;
+        close(probe);
+        if (connected)
+            return 0; /* Somebody is serving this display. */
+    }
+    remove_display_files(number);
+    return 1;
+}
+
+/* Fill `storage` with the display to use and return it, or NULL if every
+ * candidate is busy. */
+static const char *claim_display(const char *requested, char *storage,
+                                 size_t size) {
+    int base = display_number(requested);
+
+    if (base < 0)
+        return requested;
+    for (int offset = 0; offset < 64; ++offset) {
+        int number = base + offset;
+        if (number > 65535)
+            break;
+        if (claim_display_number(number)) {
+            snprintf(storage, size, ":%d", number);
+            return storage;
+        }
+    }
+    return NULL;
 }
 
 static pid_t spawn_xvfb(const char *display_name, const char *directory,
@@ -273,6 +367,31 @@ static void focus_top_window(Display *display) {
         XSetInputFocus(display, target, RevertToPointerRoot, CurrentTime);
 }
 
+/* Xvfb deliberately has no window manager. Most hosted applications request
+ * the root dimensions themselves, but a stale Minecraft launch description
+ * can make GLFW fall back to 854x480 and leave the rest of the captured root
+ * visible as a white border. For applications explicitly hosted with
+ * --fill, take over the one window-manager job they need and keep their
+ * top-level window fitted to the complete private display. */
+static void fill_top_window(Display *display) {
+    Window root = DefaultRootWindow(display);
+    Window target = topmost_substantial_child(display, root);
+    XWindowAttributes attributes;
+    int width = DisplayWidth(display, DefaultScreen(display));
+    int height = DisplayHeight(display, DefaultScreen(display));
+
+    if (target == None ||
+        !XGetWindowAttributes(display, target, &attributes))
+        return;
+    if (attributes.x == 0 && attributes.y == 0 &&
+        attributes.width == width && attributes.height == height)
+        return;
+    XMoveResizeWindow(display, target, 0, 0, (unsigned int)width,
+                      (unsigned int)height);
+    XRaiseWindow(display, target);
+    XFlush(display);
+}
+
 static int process_event(Display *display, const struct wine_host_event *event,
                          const unsigned char *payload) {
     switch (event->kind) {
@@ -298,6 +417,56 @@ static int process_event(Display *display, const struct wine_host_event *event,
     return 1;
 }
 
+/* The compositor cannot see when Xvfb touched its shared framebuffer: the
+ * application draws straight into the mapping, so neither its size nor its
+ * timestamps move. Left to guess, vinix-desktop rescales the whole surface
+ * twenty times a second whether or not anything changed, and on an emulated
+ * core that starves the very browser it is displaying.
+ *
+ * So report drawing as it happens. A counter file next to the framebuffer
+ * carries the damage sequence; the desktop blits only when it advances. */
+/* The counter is shared the same way the framebuffer is — through the file's
+ * pages — so that publishing costs a store and reading it costs a load. The
+ * desktop polls this twenty times a second while the machine is busy paging a
+ * browser in; a read() there would queue behind that. */
+static volatile uint32_t *map_damage_counter(const char *directory) {
+    char path[PATH_MAX];
+    void *mapping;
+    int fd;
+
+    if (snprintf(path, sizeof(path), "%s/damage", directory) >= (int)sizeof(path))
+        return NULL;
+    fd = open(path, O_RDWR | O_CREAT | O_TRUNC, 0600);
+    if (fd < 0)
+        return NULL;
+    if (ftruncate(fd, (off_t)sizeof(uint32_t)) != 0) {
+        close(fd);
+        return NULL;
+    }
+    mapping = mmap(NULL, sizeof(uint32_t), PROT_READ | PROT_WRITE, MAP_SHARED,
+                   fd, 0);
+    close(fd);
+    if (mapping == MAP_FAILED)
+        return NULL;
+    return mapping;
+}
+
+/* Xvfb has no compositing, so every window draws into the root's own pixmap
+ * and damage on the root covers the whole session. Report only that the
+ * screen changed: the desktop rescales the entire surface anyway. */
+static Damage watch_root_damage(Display *display, int *event_base) {
+    int error_base;
+    int major;
+    int minor;
+
+    if (!XDamageQueryExtension(display, event_base, &error_base))
+        return None;
+    if (!XDamageQueryVersion(display, &major, &minor))
+        return None;
+    return XDamageCreate(display, DefaultRootWindow(display),
+                         XDamageReportNonEmpty);
+}
+
 static void stop_child(pid_t pid) {
     int status;
     int attempt;
@@ -320,6 +489,7 @@ int main(int argc, char **argv) {
     unsigned char input[8192];
     size_t used = 0;
     const char *display_name;
+    char chosen_display[16];
     const char *directory;
     const char *geometry;
     const char *command;
@@ -332,10 +502,24 @@ int main(int argc, char **argv) {
     int xtest_error_base;
     int xtest_major;
     int xtest_minor;
+    int damage_event_base = 0;
+    volatile uint32_t *damage_counter = NULL;
+    uint32_t damage_sequence = 0;
+    Damage damage;
+    int fill_surface = 0;
+    unsigned int fill_tick = 0;
 
-    if (argc != 5) {
-        fprintf(stderr, "usage: %s DISPLAY FBDIR GEOMETRY COMMAND\n", argv[0]);
+    if (argc != 5 && argc != 6) {
+        fprintf(stderr, "usage: %s DISPLAY FBDIR GEOMETRY COMMAND [--fill]\n",
+                argv[0]);
         return 2;
+    }
+    if (argc == 6) {
+        if (strcmp(argv[5], "--fill") != 0) {
+            fprintf(stderr, "vinix-wine-host: unknown option: %s\n", argv[5]);
+            return 2;
+        }
+        fill_surface = 1;
     }
     display_name = argv[1];
     directory = argv[2];
@@ -351,6 +535,13 @@ int main(int argc, char **argv) {
 
     if (mkdir(directory, 0700) != 0 && errno != EEXIST) {
         perror("vinix-wine-host: mkdir");
+        return 1;
+    }
+    display_name = claim_display(display_name, chosen_display,
+                                 sizeof(chosen_display));
+    if (display_name == NULL) {
+        fprintf(stderr, "vinix-wine-host: no free display near %s\n", argv[1]);
+        rmdir(directory);
         return 1;
     }
     xvfb_pid = spawn_xvfb(display_name, directory, geometry);
@@ -381,6 +572,18 @@ int main(int argc, char **argv) {
     XSetWindowBackground(display, DefaultRootWindow(display), 0xf3f4f6);
     XClearWindow(display, DefaultRootWindow(display));
     XFlush(display);
+
+    damage = watch_root_damage(display, &damage_event_base);
+    if (damage != None) {
+        damage_counter = map_damage_counter(directory);
+        if (damage_counter == NULL) {
+            XDamageDestroy(display, damage);
+            damage = None;
+        } else {
+            /* The first frame is the one the desktop is waiting for. */
+            *damage_counter = ++damage_sequence;
+        }
+    }
 
     wine_pid = spawn_wine(display_name, command);
     if (wine_pid < 0) {
@@ -421,6 +624,30 @@ int main(int argc, char **argv) {
         if (used == sizeof(input))
             running = 0;
 
+        /* Check at 10 Hz rather than on every bridge iteration. This catches
+         * both the first GLFW mapping and any later client-requested reset,
+         * while the no-op steady state is just one small XQueryTree. */
+        if (fill_surface && fill_tick++ % 10 == 0)
+            fill_top_window(display);
+
+        if (damage != None) {
+            int drawn = 0;
+            /* XDamageReportNonEmpty stays quiet until the region is taken
+             * back, so one subtract per pass is enough however much was
+             * drawn in it. */
+            while (XPending(display) > 0) {
+                XEvent event;
+                XNextEvent(display, &event);
+                if (event.type == damage_event_base + XDamageNotify)
+                    drawn = 1;
+            }
+            if (drawn) {
+                XDamageSubtract(display, damage, None, None);
+                XFlush(display);
+                *damage_counter = ++damage_sequence;
+            }
+        }
+
         if (wine_pid > 0 && waitpid(wine_pid, &status, WNOHANG) == wine_pid) {
             wine_pid = -1;
             running = 0;
@@ -429,8 +656,13 @@ int main(int argc, char **argv) {
     }
 
     stop_child(wine_pid);
+    if (damage_counter != NULL)
+        munmap((void *)damage_counter, sizeof(uint32_t));
     XCloseDisplay(display);
     stop_child(xvfb_pid);
+    /* Xvfb removes these when it is asked to stop, but not when it has to be
+     * killed. Leave nothing behind for the next server on this number. */
+    remove_display_files(display_number(display_name));
     rmdir(directory);
     return 0;
 }

@@ -515,7 +515,7 @@ $CC -O2 -Wall -Wextra -Werror -D__vinix__ -I"$SYSROOT/usr/include" \
     "$SCRIPT_DIR/build-support/xorg-server/vinix-wine-host.c" \
     -fuse-ld=lld -L"$SYSROOT/usr/lib" -L"$SYSROOT/lib" \
     -Wl,-rpath-link,"$SYSROOT/usr/lib" -Wl,-rpath-link,"$SYSROOT/lib" \
-    -lXtst -lX11 -lXext -lxcb -o "$STAGING/usr/bin/vinix-wine-host"
+    -lXtst -lXdamage -lX11 -lXext -lxcb -o "$STAGING/usr/bin/vinix-wine-host"
 
 # Copy XKB data
 if [ -d "$SYSROOT/usr/share/X11/xkb" ]; then

@@ -1,5 +1,8 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
 // Native application processes and the desktop protocol between them and the
 // compositor.
 //
@@ -16,13 +19,22 @@ import math.bits
 import ui2
 
 const app_protocol_magic = u32(0x56415050) // VAPP
-const app_protocol_version = u8(1)
-const app_request_header_size = 44
-const app_response_header_size = 36
+const app_protocol_version = u8(7)
+const app_request_header_size = 124
+const app_response_header_size = 116
 const app_protocol_max_payload = 16 * 1024 * 1024
 const app_protocol_max_string = 64 * 1024
 const app_protocol_max_elements = 16 * 1024
 const app_protocol_max_depth = 64
+// A native application runs in a separate process, so a lost child must not
+// park the compositor in a pipe read forever.
+const app_response_timeout_ms = 5000
+// A newly spawned app may do real cold-storage work before it can answer its
+// first protocol message. Files, for example, reads and stats the persistent
+// home directory. Give that one-time setup a larger budget during desktop
+// startup; all requests after the app is running retain the short recovery
+// timeout above.
+const app_startup_response_timeout_ms = 30000
 const remote_owned_element_key = '__vinix.remote.owned'
 const native_app_directory = '/usr/bin/'
 
@@ -48,11 +60,13 @@ enum AppCommand as u8 {
 }
 
 struct AppPointerPayload {
-	kind   int
-	x      int
-	y      int
-	width  int
-	height int
+	kind   i32
+	button i32
+	scroll i32
+	x      i32
+	y      i32
+	width  i32
+	height i32
 }
 
 struct AppProcessOptions {
@@ -65,6 +79,8 @@ struct AppProcessOptions {
 struct AppWireState {
 	settings        Settings
 	requested_scale int = desktop_scale_100
+	capture_request CaptureRequest
+	capture_report  CaptureReport
 }
 
 struct AppReply {
@@ -167,39 +183,106 @@ fn wire_put_state(mut out []u8, state AppWireState) {
 	wire_put_i32(mut out, int(state.settings.button_side))
 	wire_put_i32(mut out, int(state.settings.taskbar_mode))
 	wire_put_i32(mut out, int(state.settings.theme))
+	wire_put_i32(mut out, if state.settings.clock_24_hour { 1 } else { 0 })
+	wire_put_i32(mut out, if state.settings.clock_show_seconds { 1 } else { 0 })
+	wire_put_i32(mut out, if state.settings.clock_show_date { 1 } else { 0 })
+	wire_put_i32(mut out, if state.settings.clock_show_weekday { 1 } else { 0 })
 	wire_put_i32(mut out, state.settings.wallpaper_color)
 	wire_put_i32(mut out, state.settings.wallpaper_image)
 	wire_put_i32(mut out, state.requested_scale)
+	wire_put_u32(mut out, state.capture_request.sequence)
+	wire_put_i32(mut out, int(state.capture_request.command))
+	wire_put_i32(mut out, state.capture_request.delay)
+	wire_put_i32(mut out, state.capture_request.fps)
+	wire_put_u32(mut out, state.capture_report.handled_sequence)
+	wire_put_i32(mut out, int(state.capture_report.phase))
+	wire_put_u64(mut out, state.capture_report.file_id)
+	wire_put_u64(mut out, state.capture_report.started_ms)
+	wire_put_u64(mut out, state.capture_report.elapsed_ms)
+	wire_put_i32(mut out, state.capture_report.frames)
+	wire_put_i32(mut out, state.capture_report.width)
+	wire_put_i32(mut out, state.capture_report.height)
+	wire_put_i32(mut out, state.capture_report.fps)
 }
 
 fn wire_take_state(mut reader WireReader) !AppWireState {
 	button_side := reader.take_i32()!
 	taskbar_mode := reader.take_i32()!
 	theme := reader.take_i32()!
+	clock_24_hour := reader.take_i32()!
+	clock_show_seconds := reader.take_i32()!
+	clock_show_date := reader.take_i32()!
+	clock_show_weekday := reader.take_i32()!
 	wallpaper_color := reader.take_i32()!
 	wallpaper_image := reader.take_i32()!
 	requested_scale := reader.take_i32()!
+	capture_sequence := reader.take_u32()!
+	capture_command := reader.take_i32()!
+	capture_delay := reader.take_i32()!
+	capture_fps := reader.take_i32()!
+	capture_handled_sequence := reader.take_u32()!
+	capture_phase := reader.take_i32()!
+	capture_file_id := reader.take_u64()!
+	capture_started_ms := reader.take_u64()!
+	capture_elapsed_ms := reader.take_u64()!
+	capture_frames := reader.take_i32()!
+	capture_width := reader.take_i32()!
+	capture_height := reader.take_i32()!
+	capture_report_fps := reader.take_i32()!
 	if button_side < int(ButtonSide.right) || button_side > int(ButtonSide.left)
 		|| taskbar_mode < int(TaskbarMode.standard) || taskbar_mode > int(TaskbarMode.combined)
 		|| theme < int(ThemeKind.default_) || theme > int(ThemeKind.macos)
-		|| !desktop_scale_valid(requested_scale) {
+		|| clock_24_hour < 0 || clock_24_hour > 1
+		|| clock_show_seconds < 0 || clock_show_seconds > 1
+		|| clock_show_date < 0 || clock_show_date > 1
+		|| clock_show_weekday < 0 || clock_show_weekday > 1
+		|| !desktop_scale_valid(requested_scale)
+		|| capture_command < int(CaptureCommand.none_)
+		|| capture_command > int(CaptureCommand.stop) || capture_delay < 0
+		|| capture_delay > 10 || capture_fps < 0 || capture_fps > 30
+		|| capture_phase < int(CapturePhase.idle)
+		|| capture_phase > int(CapturePhase.cancelled) || capture_frames < 0
+		|| capture_width < 0 || capture_height < 0 || capture_report_fps < 0
+		|| capture_report_fps > 30 {
 		return error('invalid application state')
 	}
 	return AppWireState{
-		settings: Settings{
-			button_side: unsafe { ButtonSide(button_side) }
-			taskbar_mode: unsafe { TaskbarMode(taskbar_mode) }
-			theme: unsafe { ThemeKind(theme) }
-			wallpaper_color: wallpaper_color
-			wallpaper_image: wallpaper_image
+		settings:        Settings{
+			button_side:        unsafe { ButtonSide(button_side) }
+			taskbar_mode:       unsafe { TaskbarMode(taskbar_mode) }
+			theme:              unsafe { ThemeKind(theme) }
+			clock_24_hour:      clock_24_hour == 1
+			clock_show_seconds: clock_show_seconds == 1
+			clock_show_date:    clock_show_date == 1
+			clock_show_weekday: clock_show_weekday == 1
+			wallpaper_color:    wallpaper_color
+			wallpaper_image:    wallpaper_image
 		}
 		requested_scale: requested_scale
+		capture_request: CaptureRequest{
+			sequence: capture_sequence
+			command:  unsafe { CaptureCommand(capture_command) }
+			delay:    capture_delay
+			fps:      capture_fps
+		}
+		capture_report:  CaptureReport{
+			handled_sequence: capture_handled_sequence
+			phase:            unsafe { CapturePhase(capture_phase) }
+			file_id:          capture_file_id
+			started_ms:       capture_started_ms
+			elapsed_ms:       capture_elapsed_ms
+			frames:           capture_frames
+			width:            capture_width
+			height:           capture_height
+			fps:              capture_report_fps
+		}
 	}
 }
 
-// Only fields consumed by the framebuffer renderer cross the boundary. ui2's
-// platform-only metadata (native text controls, menus and accessibility hints)
-// has no meaning in this backend and is deliberately absent from the protocol.
+// Keep every portable control field on the wire. ui2 examples deliberately
+// exercise more than push buttons: slider values, switch state, dropdown
+// choices and text-input metadata all have to survive the process boundary for
+// the framebuffer backend to behave like the native backends.
 fn encode_app_element(element ui2.Element, mut out []u8) ! {
 	if out.len > app_protocol_max_payload {
 		return error('application tree is too large')
@@ -229,21 +312,117 @@ fn encode_app_element(element ui2.Element, mut out []u8) ! {
 	}
 	wire_put_u8(mut out, flags)
 	wire_put_u8(mut out, u8(element.text_style.align))
+	wire_put_u8(mut out, u8(element.orientation))
 	wire_put_u8(mut out, 0)
+	wire_put_u8(mut out, 0)
+	mut style_flags := u32(0)
+	if element.native_style {
+		style_flags |= 1
+	}
+	if element.checked {
+		style_flags |= 2
+	}
+	if element.text_style.italic {
+		style_flags |= 1 << 2
+	}
+	if element.text_style.underline {
+		style_flags |= 1 << 3
+	}
+	if element.text_style.strikethrough {
+		style_flags |= 1 << 4
+	}
+	if element.text_style.outline {
+		style_flags |= 1 << 5
+	}
+	if element.emit_change {
+		style_flags |= 1 << 6
+	}
+	if element.readonly {
+		style_flags |= 1 << 7
+	}
+	if element.disable_scroll {
+		style_flags |= 1 << 8
+	}
+	if element.persistent_scrollbars {
+		style_flags |= 1 << 9
+	}
+	if element.secure {
+		style_flags |= 1 << 10
+	}
+	if element.long_press {
+		style_flags |= 1 << 11
+	}
+	if element.swipe_left {
+		style_flags |= 1 << 12
+	}
+	if element.value_track {
+		style_flags |= 1 << 13
+	}
+	if element.toggle_allow_no_selection {
+		style_flags |= 1 << 14
+	}
+	if element.autocorrect {
+		style_flags |= 1 << 15
+	}
+	wire_put_u32(mut out, style_flags)
 	wire_put_f64(mut out, element.frame.x)
 	wire_put_f64(mut out, element.frame.y)
 	wire_put_f64(mut out, element.frame.width)
 	wire_put_f64(mut out, element.frame.height)
 	wire_put_u32(mut out, element.box.bg)
 	wire_put_f64(mut out, element.box.radius)
+	wire_put_u32(mut out, element.box.border_color)
+	wire_put_f64(mut out, element.box.border_left)
+	wire_put_f64(mut out, element.box.border_top)
+	wire_put_f64(mut out, element.box.border_right)
+	wire_put_f64(mut out, element.box.border_bottom)
 	wire_put_u32(mut out, element.text_style.color)
 	wire_put_u32(mut out, element.text_style.background_color)
 	wire_put_f64(mut out, element.text_style.size)
+	wire_put_f64(mut out, element.text_style.head_indent)
+	wire_put_f64(mut out, element.text_style.first_line_indent)
+	wire_put_f64(mut out, element.text_style.hyphenation_factor)
+	wire_put_i32(mut out, element.text_style.lines)
+	wire_put_i32(mut out, element.keyboard)
+	wire_put_f64(mut out, element.padding_left)
+	wire_put_f64(mut out, element.value)
+	wire_put_f64(mut out, element.min_value)
+	wire_put_f64(mut out, element.max_value)
+	wire_put_f64(mut out, element.step)
+	wire_put_f64(mut out, element.padding)
+	wire_put_u32(mut out, element.slider_style.track_color)
+	wire_put_u32(mut out, element.slider_style.value_track_color)
+	wire_put_u32(mut out, element.slider_style.thumb_color)
+	wire_put_f64(mut out, element.slider_style.track_width)
+	wire_put_f64(mut out, element.slider_style.thumb_size)
+	wire_put_u32(mut out, element.switch_style.inactive_track_color)
+	wire_put_u32(mut out, element.switch_style.active_track_color)
+	wire_put_u32(mut out, element.switch_style.thumb_color)
+	wire_put_u32(mut out, element.switch_style.disabled_track_color)
+	wire_put_u32(mut out, element.switch_style.disabled_thumb_color)
+	wire_put_u32(mut out, element.toggle_down_box.bg)
+	wire_put_f64(mut out, element.toggle_down_box.radius)
+	wire_put_u32(mut out, element.toggle_down_box.border_color)
+	wire_put_u32(mut out, element.toggle_down_text_style.color)
+	wire_put_u32(mut out, element.toggle_down_text_style.background_color)
+	wire_put_f64(mut out, element.toggle_down_text_style.size)
 	wire_put_string(mut out, element.id)
 	wire_put_string(mut out, element.action_id)
+	wire_put_string(mut out, element.submit_id)
 	wire_put_string(mut out, element.text)
 	wire_put_string(mut out, element.image_path)
+	wire_put_string(mut out, element.tooltip)
+	wire_put_string(mut out, element.placeholder)
+	wire_put_string(mut out, element.cursor)
+	wire_put_string(mut out, element.toggle_group)
 	wire_put_string(mut out, element.text_style.font_family)
+	wire_put_string(mut out, element.text_style.vertical_align)
+	wire_put_string(mut out, element.text_style.link)
+	wire_put_u32(mut out, u32(element.menu.len))
+	for entry in element.menu {
+		wire_put_string(mut out, entry.id)
+		wire_put_string(mut out, entry.title)
+	}
 	wire_put_u32(mut out, u32(element.children.len))
 	for child in element.children {
 		encode_app_element(child, mut out)!
@@ -258,22 +437,77 @@ fn decode_app_element(mut reader WireReader, depth int) !ui2.Element {
 	kind_value := int(reader.take_u8()!)
 	flags := reader.take_u8()!
 	align_value := int(reader.take_u8()!)
+	orientation_value := int(reader.take_u8()!)
 	reader.take_u8()!
-	if kind_value < int(ui2.Kind.screen) || kind_value > int(ui2.Kind.scroll)
-		|| align_value < int(ui2.Align.left) || align_value > int(ui2.Align.right) {
+	reader.take_u8()!
+	style_flags := reader.take_u32()!
+	if kind_value < int(ui2.Kind.screen) || kind_value > int(ui2.Kind.toggle_button)
+		|| align_value < int(ui2.Align.left) || align_value > int(ui2.Align.right)
+		|| orientation_value < int(ui2.Orientation.horizontal)
+		|| orientation_value > int(ui2.Orientation.vertical) {
 		return error('invalid application element')
 	}
 	frame := ui2.rect(reader.take_f64()!, reader.take_f64()!, reader.take_f64()!, reader.take_f64()!)
 	box_bg := reader.take_u32()!
 	box_radius := reader.take_f64()!
+	box_border_color := reader.take_u32()!
+	box_border_left := reader.take_f64()!
+	box_border_top := reader.take_f64()!
+	box_border_right := reader.take_f64()!
+	box_border_bottom := reader.take_f64()!
 	text_color := reader.take_u32()!
 	text_background := reader.take_u32()!
 	text_size := reader.take_f64()!
+	text_head_indent := reader.take_f64()!
+	text_first_line_indent := reader.take_f64()!
+	text_hyphenation_factor := reader.take_f64()!
+	text_lines := reader.take_i32()!
+	keyboard := reader.take_i32()!
+	padding_left := reader.take_f64()!
+	value := reader.take_f64()!
+	min_value := reader.take_f64()!
+	max_value := reader.take_f64()!
+	step := reader.take_f64()!
+	padding := reader.take_f64()!
+	slider_track_color := reader.take_u32()!
+	slider_value_track_color := reader.take_u32()!
+	slider_thumb_color := reader.take_u32()!
+	slider_track_width := reader.take_f64()!
+	slider_thumb_size := reader.take_f64()!
+	switch_inactive_track_color := reader.take_u32()!
+	switch_active_track_color := reader.take_u32()!
+	switch_thumb_color := reader.take_u32()!
+	switch_disabled_track_color := reader.take_u32()!
+	switch_disabled_thumb_color := reader.take_u32()!
+	toggle_down_bg := reader.take_u32()!
+	toggle_down_radius := reader.take_f64()!
+	toggle_down_border_color := reader.take_u32()!
+	toggle_down_text_color := reader.take_u32()!
+	toggle_down_text_background := reader.take_u32()!
+	toggle_down_text_size := reader.take_f64()!
 	id := reader.take_string()!
 	action_id := reader.take_string()!
+	submit_id := reader.take_string()!
 	text := reader.take_string()!
 	image_path := reader.take_string()!
+	tooltip := reader.take_string()!
+	placeholder := reader.take_string()!
+	cursor := reader.take_string()!
+	toggle_group := reader.take_string()!
 	font_family := reader.take_string()!
+	vertical_align := reader.take_string()!
+	link := reader.take_string()!
+	menu_count := int(reader.take_u32()!)
+	if menu_count < 0 || menu_count > app_protocol_max_elements {
+		return error('invalid application menu count')
+	}
+	mut menu := []ui2.MenuEntry{cap: menu_count}
+	for _ in 0 .. menu_count {
+		menu << ui2.MenuEntry{
+			id:    reader.take_string()!
+			title: reader.take_string()!
+		}
+	}
 	child_count := int(reader.take_u32()!)
 	if child_count < 0 || child_count > app_protocol_max_elements - reader.elements {
 		return error('invalid application child count')
@@ -283,32 +517,97 @@ fn decode_app_element(mut reader WireReader, depth int) !ui2.Element {
 		children << decode_app_element(mut reader, depth + 1)!
 	}
 	return ui2.Element{
-		kind: unsafe { ui2.Kind(kind_value) }
-		id: id
-		action_id: action_id
-		key: remote_owned_element_key
-		text: text
-		image_path: image_path
-		frame: frame
-		box: ui2.BoxStyle{
-			bg: box_bg
-			radius: box_radius
-			transparent: flags & 1 != 0
+		kind:                      unsafe { ui2.Kind(kind_value) }
+		id:                        id
+		action_id:                 action_id
+		submit_id:                 submit_id
+		key:                       remote_owned_element_key
+		text:                      text
+		image_path:                image_path
+		tooltip:                   tooltip
+		placeholder:               placeholder
+		cursor:                    cursor
+		frame:                     frame
+		box:                       ui2.BoxStyle{
+			bg:            box_bg
+			radius:        box_radius
+			transparent:   flags & 1 != 0
+			border_color:  box_border_color
+			border_left:   box_border_left
+			border_top:    box_border_top
+			border_right:  box_border_right
+			border_bottom: box_border_bottom
 		}
-		text_style: ui2.TextStyle{
-			color: text_color
-			background_color: text_background
-			size: text_size
-			font_family: font_family
-			bold: flags & 2 != 0
-			shadow: flags & 4 != 0
-			align: unsafe { ui2.Align(align_value) }
+		text_style:                ui2.TextStyle{
+			color:              text_color
+			background_color:   text_background
+			size:               text_size
+			font_family:        font_family
+			bold:               flags & 2 != 0
+			shadow:             flags & 4 != 0
+			italic:             style_flags & (1 << 2) != 0
+			underline:          style_flags & (1 << 3) != 0
+			strikethrough:      style_flags & (1 << 4) != 0
+			outline:            style_flags & (1 << 5) != 0
+			align:              unsafe { ui2.Align(align_value) }
+			vertical_align:     vertical_align
+			link:               link
+			head_indent:        text_head_indent
+			first_line_indent:  text_first_line_indent
+			hyphenation_factor: text_hyphenation_factor
+			lines:              text_lines
 		}
-		clickable: flags & 8 != 0
-		draggable: flags & 16 != 0
-		hidden: flags & 32 != 0
-		enabled: flags & 64 != 0
-		children: children
+		clickable:                 flags & 8 != 0
+		draggable:                 flags & 16 != 0
+		hidden:                    flags & 32 != 0
+		enabled:                   flags & 64 != 0
+		native_style:              style_flags & 1 != 0
+		checked:                   style_flags & 2 != 0
+		emit_change:               style_flags & (1 << 6) != 0
+		readonly:                  style_flags & (1 << 7) != 0
+		disable_scroll:            style_flags & (1 << 8) != 0
+		persistent_scrollbars:     style_flags & (1 << 9) != 0
+		secure:                    style_flags & (1 << 10) != 0
+		long_press:                style_flags & (1 << 11) != 0
+		swipe_left:                style_flags & (1 << 12) != 0
+		value_track:               style_flags & (1 << 13) != 0
+		toggle_allow_no_selection: style_flags & (1 << 14) != 0
+		autocorrect:               style_flags & (1 << 15) != 0
+		keyboard:                  keyboard
+		padding_left:              padding_left
+		value:                     value
+		min_value:                 min_value
+		max_value:                 max_value
+		step:                      step
+		orientation:               unsafe { ui2.Orientation(orientation_value) }
+		padding:                   padding
+		slider_style:              ui2.SliderStyle{
+			track_color:       slider_track_color
+			value_track_color: slider_value_track_color
+			thumb_color:       slider_thumb_color
+			track_width:       slider_track_width
+			thumb_size:        slider_thumb_size
+		}
+		switch_style:              ui2.SwitchStyle{
+			inactive_track_color: switch_inactive_track_color
+			active_track_color:   switch_active_track_color
+			thumb_color:          switch_thumb_color
+			disabled_track_color: switch_disabled_track_color
+			disabled_thumb_color: switch_disabled_thumb_color
+		}
+		toggle_down_box:           ui2.BoxStyle{
+			bg:           toggle_down_bg
+			radius:       toggle_down_radius
+			border_color: toggle_down_border_color
+		}
+		toggle_down_text_style:    ui2.TextStyle{
+			color:            toggle_down_text_color
+			background_color: toggle_down_text_background
+			size:             toggle_down_text_size
+		}
+		toggle_group:              toggle_group
+		menu:                      menu
+		children:                  children
 	}
 }
 
@@ -345,10 +644,10 @@ fn app_process_options(args []string) ?AppProcessOptions {
 		return none
 	}
 	return AppProcessOptions{
-		name: name
-		request_fd: request_fd
+		name:        name
+		request_fd:  request_fd
 		response_fd: response_fd
-		tz_offset: tz_offset
+		tz_offset:   tz_offset
 	}
 }
 
@@ -363,17 +662,28 @@ fn app_factory_named(name string) ?AppFactory {
 
 fn app_current_state(desktop &Desktop) AppWireState {
 	return AppWireState{
-		settings: desktop.settings
+		settings:        desktop.settings
 		requested_scale: desktop_requested_scale()
+		capture_request: desktop.capture.request
+		capture_report:  desktop.capture.report
 	}
 }
 
 fn apply_app_state(mut desktop Desktop, state AppWireState) {
 	wallpaper_changed := desktop.settings.wallpaper_color != state.settings.wallpaper_color
 		|| desktop.settings.wallpaper_image != state.settings.wallpaper_image
+	clock_changed := desktop.settings.clock_24_hour != state.settings.clock_24_hour
+		|| desktop.settings.clock_show_seconds != state.settings.clock_show_seconds
+		|| desktop.settings.clock_show_date != state.settings.clock_show_date
+		|| desktop.settings.clock_show_weekday != state.settings.clock_show_weekday
 	desktop.settings = state.settings
+	desktop.accept_capture_request(state.capture_request)
 	if wallpaper_changed {
 		desktop.invalidate_wallpaper()
+	}
+	if clock_changed {
+		desktop.taskbar_clock_sampled = false
+		desktop.dirty = true
 	}
 	if desktop_requested_scale() != state.requested_scale {
 		desktop_request_scale(state.requested_scale)
@@ -462,7 +772,28 @@ fn send_app_error(fd int, state AppWireState, message string) bool {
 	return written
 }
 
-fn receive_app_response(fd int) !AppReply {
+fn app_response_ready(fd int, timeout_ms int) bool {
+	if fd < 0 || timeout_ms < 0 {
+		return false
+	}
+	mut descriptor := C.pollfd{
+		fd:     fd
+		events: i16(C.POLLIN)
+	}
+	for {
+		ready := C.poll(&descriptor, 1, timeout_ms)
+		if ready < 0 && C.errno == C.EINTR {
+			continue
+		}
+		return ready > 0
+			&& descriptor.revents & i16(C.POLLIN | C.POLLHUP | C.POLLERR) != 0
+	}
+}
+
+fn receive_app_response_with_timeout(fd int, timeout_ms int) !AppReply {
+	if !app_response_ready(fd, timeout_ms) {
+		return error('application response timed out')
+	}
 	mut header := []u8{len: app_response_header_size}
 	if !desktop_read_all(fd, header.data, u64(header.len)) {
 		unsafe { header.free() }
@@ -487,10 +818,14 @@ fn receive_app_response(fd int) !AppReply {
 		return error('short application response payload')
 	}
 	return AppReply{
-		ok: status == 0
-		state: state
+		ok:      status == 0
+		state:   state
 		payload: payload
 	}
+}
+
+fn receive_app_response(fd int) !AppReply {
+	return receive_app_response_with_timeout(fd, app_response_timeout_ms)
 }
 
 fn app_reply_error(reply AppReply) IError {
@@ -542,6 +877,8 @@ fn run_app_process(options AppProcessOptions) {
 			break
 		}
 		desktop.settings = state.settings
+		desktop.capture.request = state.capture_request
+		desktop.capture.report = state.capture_report
 		desktop_request_scale(state.requested_scale)
 		match command {
 			.build {
@@ -597,21 +934,24 @@ fn run_app_process(options AppProcessOptions) {
 				}
 			}
 			.pointer {
-				if payload.len != sizeof(AppPointerPayload) {
+				if payload.len != int(sizeof(AppPointerPayload)) {
 					send_app_error(options.response_fd, app_current_state(desktop), 'invalid pointer event')
 					free_app_payload(payload)
 					continue
 				}
 				mut pointer := AppPointerPayload{}
 				unsafe { C.memcpy(&pointer, payload.str, sizeof(AppPointerPayload)) }
-				if pointer.kind < int(AppPointerPhase.move) || pointer.kind > int(AppPointerPhase.up)
-					|| pointer.width <= 0 || pointer.height <= 0 {
+				if pointer.kind < int(AppPointerPhase.move)
+					|| pointer.kind > int(AppPointerPhase.scroll)
+					|| pointer.button < int(AppPointerButton.no_button)
+					|| pointer.button > int(AppPointerButton.right) || pointer.width <= 0
+					|| pointer.height <= 0 {
 					send_app_error(options.response_fd, app_current_state(desktop), 'invalid pointer geometry')
 					free_app_payload(payload)
 					continue
 				}
 				if mut app is PointerApp {
-					app.pointer_event(unsafe { AppPointerPhase(pointer.kind) }, pointer.x, pointer.y, pointer.width, pointer.height)
+					app.pointer_event(unsafe { AppPointerPhase(pointer.kind) }, unsafe { AppPointerButton(pointer.button) }, int(pointer.scroll), int(pointer.x), int(pointer.y), int(pointer.width), int(pointer.height))
 				}
 				if !send_app_response(options.response_fd, true, app_current_state(desktop), []u8{}) {
 					free_app_payload(payload)
@@ -637,6 +977,7 @@ fn run_app_process(options AppProcessOptions) {
 @[heap]
 struct RemoteApp {
 mut:
+	title            string
 	pid              int
 	request_fd       int
 	response_fd      int
@@ -650,9 +991,18 @@ mut:
 	desktop          &Desktop = unsafe { nil }
 }
 
+/*
 fn start_remote_app(factory AppFactory, mut desktop Desktop) !NativeApp {
+	return start_remote_app_with_timeout(factory, mut desktop, app_response_timeout_ms)
+}
+*/
+
+// Startup applications run while the persistent filesystem is still cold, so
+// their initial response has a distinct (and deliberately longer) deadline.
+// The returned app uses app_response_timeout_ms for every later transaction.
+fn start_remote_app_with_timeout(factory AppFactory, mut desktop Desktop, timeout_ms int) !NativeApp {
 	path := native_app_directory + factory.process_name
-	app := start_remote_app_at(path, factory, mut desktop) or {
+	app := start_remote_app_at_with_timeout(path, factory, mut desktop, timeout_ms) or {
 		unsafe { path.free() }
 		return err
 	}
@@ -660,28 +1010,35 @@ fn start_remote_app(factory AppFactory, mut desktop Desktop) !NativeApp {
 	return app
 }
 
+/*
 // Kept separate from the installed-path wrapper so the protocol can be
 // exercised by a host integration binary that execs itself as the client.
 fn start_remote_app_at(path string, factory AppFactory, mut desktop Desktop) !NativeApp {
+	return start_remote_app_at_with_timeout(path, factory, mut desktop, app_response_timeout_ms)
+}
+*/
+
+fn start_remote_app_at_with_timeout(path string, factory AppFactory, mut desktop Desktop, timeout_ms int) !NativeApp {
 	process := desktop_spawn_app(path, factory.process_name, desktop.tz_offset_seconds) or {
 		return error('cannot execute ${path}')
 	}
 	mut remote := &RemoteApp{
-		pid: process.pid
-		request_fd: process.to_child
-		response_fd: process.from_child
-		polling: factory.polling
+		title:            factory.title
+		pid:              process.pid
+		request_fd:       process.to_child
+		response_fd:      process.from_child
+		polling:          factory.polling
 		poll_interval_ms: factory.poll_interval_ms
-		keyboard: factory.keyboard
-		pointer: factory.pointer
-		desktop: desktop
+		keyboard:         factory.keyboard
+		pointer:          factory.pointer
+		desktop:          desktop
 	}
-	reply := receive_app_response(remote.response_fd) or {
-		remote.close_transport()
+	reply := receive_app_response_with_timeout(remote.response_fd, timeout_ms) or {
+		remote.abort_transport()
 		return error('cannot start ${factory.title}: ${err}')
 	}
 	if !reply.ok {
-		remote.close_transport()
+		remote.abort_transport()
 		return app_reply_error(reply)
 	}
 	if reply.payload.cap > 0 {
@@ -708,11 +1065,11 @@ fn (mut a RemoteApp) transact(command AppCommand, width int, height int, payload
 		AppWireState{}
 	}
 	if !send_app_request(a.request_fd, command, width, height, state, payload) {
-		a.close_transport()
+		a.abort_transport()
 		return error('application request pipe closed')
 	}
 	reply := receive_app_response(a.response_fd) or {
-		a.close_transport()
+		a.abort_transport()
 		return err
 	}
 	if unsafe { a.desktop != nil } {
@@ -766,16 +1123,18 @@ fn (a &RemoteApp) pointer_input_enabled() bool {
 	return a.pointer && !a.closed
 }
 
-fn (mut a RemoteApp) pointer_event(phase AppPointerPhase, x int, y int, width int, height int) {
+fn (mut a RemoteApp) pointer_event(phase AppPointerPhase, button AppPointerButton, scroll int, x int, y int, width int, height int) {
 	if !a.pointer || a.closed {
 		return
 	}
 	pointer := AppPointerPayload{
-		kind: int(phase)
-		x: x
-		y: y
-		width: width
-		height: height
+		kind:   i32(phase)
+		button: i32(button)
+		scroll: i32(scroll)
+		x:      i32(x)
+		y:      i32(y)
+		width:  i32(width)
+		height: i32(height)
 	}
 	payload := unsafe { tos(&u8(&pointer), int(sizeof(AppPointerPayload))) }
 	reply := a.transact(.pointer, 0, 0, payload) or { return }
@@ -831,7 +1190,29 @@ fn (mut a RemoteApp) close_transport() {
 		a.response_fd = -1
 	}
 	if a.pid > 0 {
-		desktop_wait_child(a.pid)
+		_ = desktop_wait_child(a.pid)
+		a.pid = -1
+	}
+	a.closed = true
+}
+
+// A failed transaction cannot assume the child reached its request loop. In
+// particular, merely closing its pipes does not stop a process hung while
+// opening an application, and waiting for that process would replace one
+// permanent compositor stall with another. Terminate it before reaping it.
+fn (mut a RemoteApp) abort_transport() {
+	if a.request_fd >= 0 {
+		desktop_close(a.request_fd)
+		a.request_fd = -1
+	}
+	if a.response_fd >= 0 {
+		desktop_close(a.response_fd)
+		a.response_fd = -1
+	}
+	if a.pid > 0 {
+		pid := a.pid
+		status := desktop_terminate_child(pid)
+		desktop_log_app_exit(a.title, pid, status)
 		a.pid = -1
 	}
 	a.closed = true

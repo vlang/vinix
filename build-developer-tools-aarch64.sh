@@ -54,6 +54,7 @@ ROOT_PACKAGES=(
     meson
     patch
     pkgconf
+    radare2
     samurai
     sed
     strace
@@ -121,7 +122,8 @@ while IFS= read -r link; do
 done
 
 for binary in autoconf automake cmake diff file find gdb git grep \
-    libtool m4 make meson ninja patch pkg-config sed strace tar tmux xz; do
+    libtool m4 make meson ninja patch pkg-config r2 rabin2 radare2 sed strace \
+    tar tmux xz; do
     if [ ! -x "$STAGING/usr/bin/$binary" ] \
         && [ ! -x "$STAGING/bin/$binary" ]; then
         echo "missing staged binary: $binary" >&2

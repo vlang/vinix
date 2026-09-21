@@ -5,18 +5,28 @@
 #                         [--guest-init=PATH]
 #                         [--mem=MB]
 #                         [--disk=MB] [--persist[=MB]|--no-persist]
-#                         [--ephemeral] [--replace] [--grab-keys]
-#
-# --grab-keys hands the whole keyboard to the guest. macOS keeps Cmd-Tab for
-# its own application switcher, so without it the desktop's Cmd-Tab is never
-# seen -- at the price of Cmd-Q no longer quitting QEMU.
+#                         [--disk-root|--no-disk-root] [--reset-disk]
+#                         [--ephemeral] [--replace]
 #
 # --replace stops a VM already using the boot disk. Without it a second run
 # refuses, rather than writing into the disk of a running one.
 #
-# --persist attaches a separate ext2 volume and mounts it at /root. The base
-# system still comes from the initramfs, while files below /root survive QEMU
-# restarts. --persist=MB chooses its one-time image size.
+# A separate ext2 volume is mounted at /root by default. The base system still
+# comes from the initramfs, while files below /root survive QEMU restarts.
+# --persist=MB chooses its one-time image size; --no-persist disables it.
+#
+# The current Vinix checkout is exposed inside networked QEMU boots at
+# /mnt/host/vinix. vinix-host-sync refreshes that mirror, and
+# vinix-desktop-build does so automatically before compiling. Set
+# VINIX_QEMU_HOST_SOURCE to another checkout, or to 0 to disable the share.
+#
+# --disk-root instead installs the whole system onto that volume and boots from
+# it, so every write survives a restart rather than only the ones below /root.
+# The volume is then the machine's disk: it is installed once and left alone,
+# and a rebuilt image is reinstalled over it with /root carried across.
+# --reset-disk asks for the clean install instead. The initramfs stays in the
+# boot payload as the fallback for a volume that turns out not to hold a
+# system, so an unusable disk still reaches a usable machine.
 #
 # --ephemeral gives this run an isolated temporary boot image and deletes it
 # when QEMU exits. Newly created boot images below the host's temporary
@@ -30,8 +40,8 @@
 # from 1 GiB upwards, so anything past --mem=3072 lands above 4 GiB, which is
 # where all of an Apple Silicon machine's RAM lives. 8192 exercises the same
 # high-memory mapping path the M1 takes; the 2048 default keeps boots fast.
-# QEMU supplies two CPUs, and its kernel build enables the Limine MP request
-# needed for Vinix to bring both of them online.
+# QEMU supplies four CPUs, and its kernel build enables the Limine MP request
+# needed for Vinix to bring all of them online.
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -58,9 +68,36 @@ QEMU_RESOLUTION="${VINIX_QEMU_RESOLUTION:-}"
 # ephemeral boot image. Desktop runs select their own fixed profile paths.
 PACKAGE_STORE="${VINIX_QEMU_PACKAGE_STORE:-$BOOT_DIR/boot.img.packages.tar}"
 PACKAGE_STORE_PORT="${VINIX_QEMU_PACKAGE_STORE_PORT:-18081}"
+# The host checkout is served over the same loopback-only guest forward as the
+# package overlay. A fresh archive is made for every request, so a running VM
+# sees host edits without a QEMU restart. Set this to 0 to disable the share or
+# to another Vinix checkout to share that directory instead.
+HOST_SOURCE_EXPLICIT=0
+if [ "${VINIX_QEMU_HOST_SOURCE+x}" = x ]; then
+    HOST_SOURCE_EXPLICIT=1
+fi
+HOST_SOURCE_ROOT="${VINIX_QEMU_HOST_SOURCE:-$SCRIPT_DIR}"
+HOST_SOURCE_ENABLED=1
+case "$HOST_SOURCE_ROOT" in
+    ''|0) HOST_SOURCE_ENABLED=0 ;;
+esac
 PERSIST_DISK="${VINIX_QEMU_PERSIST_DISK:-$BOOT_DIR/boot.img.root.ext2}"
 PERSIST_SIZE_MB="${VINIX_QEMU_PERSIST_SIZE_MB:-1024}"
 PERSIST_SEED="${VINIX_QEMU_PERSIST_SEED:-}"
+# Whole-filesystem persistence: the volume holds the system itself rather than
+# a home mounted into a RAM one, so every write survives a restart. The image
+# it is installed from is the uncompressed tar the initramfs is built from.
+DISK_ROOT="${VINIX_QEMU_ROOT_DISK:-0}"
+DISK_ROOT_IMAGE="${VINIX_QEMU_ROOT_IMAGE:-}"
+# What goes in the boot payload once the system lives on the volume:
+# `recovery` is a shell to diagnose an unmountable disk with, `image` keeps the
+# full image there so a failed disk root still boots the whole system.
+DISK_ROOT_FALLBACK="${VINIX_QEMU_ROOT_FALLBACK:-recovery}"
+# An older /root-only volume to take the home from when installing for the
+# first time, so switching to a disk root does not look like losing it.
+DISK_ROOT_ADOPT_HOME="${VINIX_QEMU_ROOT_ADOPT_HOME:-}"
+RECOVERY_DIR=""
+RESET_DISK=0
 PACKAGE_RUNTIME_DIR=""
 PACKAGE_SERVER_PID=""
 EPHEMERAL_RUNTIME_DIR=""
@@ -68,6 +105,10 @@ CLEANUP_BOOT_DISK=0
 KEEP_TEMP_BOOT_DISK="${VINIX_KEEP_TEMP_BOOT_DISK:-0}"
 
 cleanup_runtime() {
+    if [ -n "$RECOVERY_DIR" ]; then
+        rm -rf "$RECOVERY_DIR"
+        RECOVERY_DIR=""
+    fi
     if [ -n "$PACKAGE_SERVER_PID" ]; then
         kill "$PACKAGE_SERVER_PID" 2>/dev/null || true
         wait "$PACKAGE_SERVER_PID" 2>/dev/null || true
@@ -100,9 +141,8 @@ FAKE_G17=0
 GUEST_INIT="${VINIX_QEMU_GUEST_INIT:-}"
 GUEST_INIT_REQUESTED=0
 REPLACE_RUNNING=0
-GRAB_KEYS=0
 EPHEMERAL_BOOT=0
-PERSIST_ENABLED="${VINIX_QEMU_PERSIST:-0}"
+PERSIST_ENABLED="${VINIX_QEMU_PERSIST:-1}"
 QEMU_MEM="${VINIX_QEMU_MEM:-2048}"
 for arg in "$@"; do
     case "$arg" in
@@ -117,9 +157,11 @@ for arg in "$@"; do
         --persist)    PERSIST_ENABLED=1 ;;
         --persist=*)  PERSIST_ENABLED=1; PERSIST_SIZE_MB="${arg#*=}" ;;
         --no-persist) PERSIST_ENABLED=0 ;;
+        --disk-root)    PERSIST_ENABLED=1; DISK_ROOT=1 ;;
+        --no-disk-root) DISK_ROOT=0 ;;
+        --reset-disk)   RESET_DISK=1 ;;
         --ephemeral)  EPHEMERAL_BOOT=1 ;;
         --replace)    REPLACE_RUNNING=1 ;;
-        --grab-keys)  GRAB_KEYS=1 ;;
         --help|-h)
             awk 'NR > 1 && /^#/ { sub(/^# ?/, ""); print; next } NR > 1 { exit }' "$0"
             exit 0
@@ -157,6 +199,24 @@ if [ ! -e "$BOOT_DISK" ] && [ "$KEEP_TEMP_BOOT_DISK" -eq 0 ] &&
     CLEANUP_BOOT_DISK=1
 fi
 
+if [ "$HOST_SOURCE_ENABLED" -eq 1 ]; then
+    if [ ! -d "$HOST_SOURCE_ROOT" ]; then
+        echo "ERROR: QEMU host source directory does not exist: $HOST_SOURCE_ROOT" >&2
+        exit 1
+    fi
+    HOST_SOURCE_ROOT="$(cd "$HOST_SOURCE_ROOT" && pwd)"
+    if [ ! -f "$HOST_SOURCE_ROOT/desktop/main.v" ] || \
+       [ ! -f "$HOST_SOURCE_ROOT/third_party/ui2/v.mod" ] || \
+       ! command -v git >/dev/null 2>&1 || \
+       ! git -C "$HOST_SOURCE_ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        if [ "$HOST_SOURCE_EXPLICIT" -eq 1 ]; then
+            echo "ERROR: QEMU host source is not a complete Git checkout: $HOST_SOURCE_ROOT" >&2
+            exit 1
+        fi
+        HOST_SOURCE_ENABLED=0
+    fi
+fi
+
 if [ "$GUEST_INIT_REQUESTED" -eq 1 ] && [ -z "$GUEST_INIT" ]; then
     echo "ERROR: --guest-init needs a path" >&2
     exit 1
@@ -185,6 +245,29 @@ case "$KEEP_TEMP_BOOT_DISK" in
         exit 1
         ;;
 esac
+case "$DISK_ROOT" in
+    0|1) ;;
+    *)
+        echo "ERROR: VINIX_QEMU_ROOT_DISK must be 0 or 1" >&2
+        exit 1
+        ;;
+esac
+if [ "$DISK_ROOT" -eq 1 ] && [ "$PERSIST_ENABLED" -eq 0 ]; then
+    echo "ERROR: --disk-root is the persistent volume; it cannot be combined with --no-persist" >&2
+    exit 1
+fi
+case "$DISK_ROOT_FALLBACK" in
+    recovery|image) ;;
+    *)
+        echo "ERROR: VINIX_QEMU_ROOT_FALLBACK must be recovery or image" >&2
+        exit 1
+        ;;
+esac
+if [ "$DISK_ROOT" -eq 1 ] && [ -n "$GUEST_INIT" ]; then
+    # --guest-init overlays the initramfs, which a disk root does not boot.
+    echo "ERROR: --guest-init overlays the initramfs, which --disk-root does not boot from" >&2
+    exit 1
+fi
 case "$PERSIST_ENABLED" in
     0|1) ;;
     *)
@@ -213,6 +296,20 @@ fi
 # VINIX_INITRAMFS selects a different image, e.g. the one
 # ./build-desktop-aarch64.sh stages to boot straight into the desktop.
 INITRAMFS="${VINIX_INITRAMFS:-$INIT_DIR/initramfs.tar}"
+INITRAMFS_COMPRESSED="${VINIX_INITRAMFS_COMPRESSED:-}"
+if [ -z "$INITRAMFS_COMPRESSED" ]; then
+    case "$INITRAMFS" in
+        *.gz) INITRAMFS_COMPRESSED=1 ;;
+        *)    INITRAMFS_COMPRESSED=0 ;;
+    esac
+fi
+case "$INITRAMFS_COMPRESSED" in
+    0|1) ;;
+    *)
+        echo "ERROR: VINIX_INITRAMFS_COMPRESSED must be 0 or 1" >&2
+        exit 1
+        ;;
+esac
 if [ "$NO_BUILD" -eq 0 ] && [ ! -f "$INITRAMFS" ]; then
     echo "==> Building minimal init program..."
     echo "    (Run ./build-userland-aarch64.sh for full busybox userland)"
@@ -267,11 +364,151 @@ if [ "$PERSIST_ENABLED" -eq 1 ]; then
     fi
 fi
 
+if [ "$DISK_ROOT" -eq 1 ]; then
+    sed -E -i '' '/^[[:space:]]*cmdline:/ s#$# vinix.qemu_root=1#' "$LIMINE_CONF_QEMU"
+fi
+
+# A compressed module keeps complete desktop images below FAT32's 4 GiB
+# single-file limit. The leading '$' asks Limine to decompress it before the
+# kernel receives the module; its on-disk name stays stable for mtools.
+if [ "$INITRAMFS_COMPRESSED" -eq 1 ]; then
+    LIMINE_CONF_COMPRESSED="$LIMINE_CONF_QEMU.compressed"
+    awk '
+        /^[[:space:]]*module_path:/ && !replaced {
+            print "    module_path: $boot():/boot/initramfs.tar"
+            replaced = 1
+            next
+        }
+        { print }
+        END {
+            if (!replaced) print "    module_path: $boot():/boot/initramfs.tar"
+        }
+    ' "$LIMINE_CONF_QEMU" > "$LIMINE_CONF_COMPRESSED"
+    mv -f "$LIMINE_CONF_COMPRESSED" "$LIMINE_CONF_QEMU"
+fi
+
 if [ "$FAKE_G17" -eq 1 ]; then
     sed -E -i '' '/^[[:space:]]*cmdline:/ s#$# vinix.fake_g17=1#' "$LIMINE_CONF_QEMU"
 fi
 
-# ── Create the opt-in persistent ext2 home volume ──
+# Install, or reinstall, the whole system onto the persistent volume.
+#
+# The volume is the machine's disk: it keeps everything, not just a home
+# mounted into a RAM root. It is therefore installed from the image rather
+# than being a copy of it, and is left alone on every later run -- that is the
+# entire point, and it is also why a rebuilt image has to be noticed and put
+# on. A reinstall carries /root across, so the dev loop does not cost the user
+# their files; --reset-disk asks for the clean install instead.
+vinix_install_system_volume() {
+    local image="$DISK_ROOT_IMAGE"
+    local image_id installed carried home_dir needed_mb image_bytes
+
+    if [ -z "$image" ]; then
+        image="$INITRAMFS"
+        if [ "$INITRAMFS_COMPRESSED" -eq 1 ]; then
+            echo "ERROR: --disk-root needs the uncompressed image tar" >&2
+            echo "       Set VINIX_QEMU_ROOT_IMAGE to it." >&2
+            exit 1
+        fi
+    fi
+    if [ ! -f "$image" ]; then
+        echo "ERROR: --disk-root image is missing: $image" >&2
+        exit 1
+    fi
+    if ! image_id="$(vinix_storage_image_id "$image")"; then
+        echo "ERROR: could not read the image identity: $image" >&2
+        exit 1
+    fi
+
+    # ext2 needs room for the tree plus its own metadata, and a machine with no
+    # free space is not a machine. Twice the image plus half a gigabyte, never
+    # below the configured size -- --persist=MB is how a bigger disk is asked
+    # for.
+    image_bytes="$(vinix_storage_file_size "$image")"
+    needed_mb=$(( image_bytes * 2 / 1024 / 1024 + 512 ))
+    if [ "$needed_mb" -lt "$PERSIST_SIZE_MB" ]; then
+        needed_mb="$PERSIST_SIZE_MB"
+    fi
+
+    if [ "$RESET_DISK" -eq 1 ] && [ -f "$PERSIST_DISK" ]; then
+        echo "==> --reset-disk: discarding $PERSIST_DISK"
+        rm -f "$PERSIST_DISK"
+    fi
+
+    if [ -f "$PERSIST_DISK" ]; then
+        installed="$(vinix_storage_installed_image_id "$PERSIST_DISK" || true)"
+        if [ "$installed" = "$image_id" ]; then
+            return 0
+        fi
+        if [ -z "$installed" ]; then
+            echo "ERROR: $PERSIST_DISK is not a Vinix system volume." >&2
+            echo "       It is probably the old /root-only volume. Move it aside," >&2
+            echo "       or pass --reset-disk to install over it." >&2
+            exit 1
+        fi
+        echo "==> Image changed; reinstalling the system and keeping /root..."
+        home_dir="$(mktemp -d "${TMPDIR:-/tmp}/vinix-home.XXXXXX")"
+        if carried="$(vinix_storage_extract_home "$PERSIST_DISK" "$home_dir")"; then
+            echo "    carried $PERSIST_DISK:/root across"
+        else
+            echo "    WARNING: could not read the old /root; installing without it" >&2
+            carried=""
+        fi
+    elif [ -n "$DISK_ROOT_ADOPT_HOME" ] && [ -f "$DISK_ROOT_ADOPT_HOME" ]; then
+        # First install, with the older /root-only volume still on disk. Its
+        # root directory is the home, and leaving it behind would look exactly
+        # like the switch had deleted the user's files.
+        echo "==> Installing the system onto a ${needed_mb} MiB volume (one-time)..."
+        home_dir="$(mktemp -d "${TMPDIR:-/tmp}/vinix-home.XXXXXX")"
+        if carried="$(vinix_storage_extract_home "$DISK_ROOT_ADOPT_HOME" "$home_dir" /)"; then
+            echo "    adopting the home from $(basename "$DISK_ROOT_ADOPT_HOME")"
+        else
+            carried=""
+        fi
+    else
+        echo "==> Installing the system onto a ${needed_mb} MiB volume (one-time)..."
+        home_dir=""
+        carried=""
+    fi
+
+    if ! vinix_storage_create_ext2 "$PERSIST_DISK" "$needed_mb" "$image" \
+        "$image_id" "$carried"; then
+        echo "ERROR: could not install the system volume: $PERSIST_DISK" >&2
+        [ -z "$home_dir" ] || rm -rf "$home_dir"
+        exit 1
+    fi
+    [ -z "$home_dir" ] || rm -rf "$home_dir"
+    echo "    installed from $(basename "$image")"
+}
+
+# Once the system is on the volume, the boot payload only has to be able to say
+# so when the volume cannot be mounted. Shipping the whole image there as well
+# costs a second copy of it on the boot disk and minutes of firmware load on
+# every single boot, for a fallback that is not meant to be reached.
+vinix_select_disk_root_payload() {
+    local minimal="$INIT_DIR/initramfs-minimal.tar"
+
+    [ "$DISK_ROOT_FALLBACK" = recovery ] || return 0
+
+    if [ -f "$minimal" ]; then
+        INITRAMFS="$minimal"
+    elif [ -x "$INIT_DIR/init" ]; then
+        RECOVERY_DIR="$(mktemp -d "${TMPDIR:-/tmp}/vinix-recovery.XXXXXX")"
+        mkdir -p "$RECOVERY_DIR/staging/sbin"
+        cp "$INIT_DIR/init" "$RECOVERY_DIR/staging/sbin/init"
+        chmod +x "$RECOVERY_DIR/staging/sbin/init"
+        COPYFILE_DISABLE=1 tar --format=ustar -cf "$RECOVERY_DIR/initramfs.tar" \
+            -C "$RECOVERY_DIR/staging" .
+        INITRAMFS="$RECOVERY_DIR/initramfs.tar"
+    else
+        echo "    no recovery init available; keeping the full image as the payload"
+        return 0
+    fi
+    INITRAMFS_COMPRESSED=0
+    echo "    boot payload: $(basename "$INITRAMFS") (recovery only)"
+}
+
+# ── Create the persistent ext2 home volume ──
 # It is deliberately a different image from the UEFI/FAT boot disk: the
 # kernel's persistent block driver only considers an ext2 volume, so firmware
 # updates and rebuilds cannot accidentally become user-data writes.
@@ -281,7 +518,10 @@ if [ "$PERSIST_ENABLED" -eq 1 ]; then
         echo "ERROR: persistent disk is not a regular file: $PERSIST_DISK" >&2
         exit 1
     fi
-    if [ ! -f "$PERSIST_DISK" ]; then
+    if [ "$DISK_ROOT" -eq 1 ]; then
+        vinix_install_system_volume
+        vinix_select_disk_root_payload
+    elif [ ! -f "$PERSIST_DISK" ]; then
         echo "==> Creating ${PERSIST_SIZE_MB} MiB persistent ext2 volume (one-time)..."
         if ! vinix_storage_create_ext2 "$PERSIST_DISK" "$PERSIST_SIZE_MB" "$PERSIST_SEED"; then
             echo "ERROR: could not create persistent volume: $PERSIST_DISK" >&2
@@ -295,7 +535,11 @@ if [ "$PERSIST_ENABLED" -eq 1 ]; then
         -drive "if=none,format=raw,file=$PERSIST_DISK,id=vinix-persist"
         -device virtio-blk-device,drive=vinix-persist
     )
-    echo "==> Persistent /root volume: $PERSIST_DISK"
+    if [ "$DISK_ROOT" -eq 1 ]; then
+        echo "==> Persistent root volume: $PERSIST_DISK"
+    else
+        echo "==> Persistent /root volume: $PERSIST_DISK"
+    fi
 fi
 
 # A caller may request a QEMU-only GOP mode without changing the hardware-safe
@@ -526,8 +770,9 @@ PACKAGE_RUNTIME_TAR="$PACKAGE_RUNTIME_DIR/qemu-runtime.tar"
 PACKAGE_SERVER_READY="$PACKAGE_RUNTIME_DIR/server.ready"
 PACKAGE_SERVER_LOG="$PACKAGE_RUNTIME_DIR/server.log"
 PACKAGE_BASE_FILES_RAW="$PACKAGE_RUNTIME_DIR/base-files.raw"
-mkdir -p "$PACKAGE_RUNTIME_ROOT/etc/vinix-pkg" \
-    "$PACKAGE_RUNTIME_ROOT/usr/bin" "$PACKAGE_RUNTIME_ROOT/usr/libexec"
+mkdir -p "$PACKAGE_RUNTIME_ROOT/etc/vinix-pkg" "$PACKAGE_RUNTIME_ROOT/root" \
+    "$PACKAGE_RUNTIME_ROOT/etc/vinix" "$PACKAGE_RUNTIME_ROOT/usr/bin" \
+    "$PACKAGE_RUNTIME_ROOT/usr/libexec"
 
 # Tests may replace PID 1 without copying and rewriting a multi-gigabyte base
 # image. Limine loads this per-run module last, so the override exists only in
@@ -544,6 +789,13 @@ fi
 case "${VINIX_BOOT_HYPRLAND:-0}" in
     0|'') ;;
     1)
+        # The marker is per-boot only because the root it lands on is thrown
+        # away with it. On a disk root it would stay, and every later boot
+        # would silently be a Hyprland one.
+        if [ "$DISK_ROOT" -eq 1 ]; then
+            echo "ERROR: VINIX_BOOT_HYPRLAND is a per-boot marker and --disk-root keeps it" >&2
+            exit 1
+        fi
         mkdir -p "$PACKAGE_RUNTIME_ROOT/etc/vinix"
         : > "$PACKAGE_RUNTIME_ROOT/etc/vinix/boot-hyprland"
         ;;
@@ -621,7 +873,7 @@ sed -e 's#^\./##' -e 's#/$##' -e '/^\.$/d' -e '/^$/d' \
 # These parent directories belong to the injected runtime module. Treating
 # them as part of the immutable base prevents recursive tar from pulling the
 # control files themselves into an installed-package overlay.
-printf '%s\n' etc/vinix-pkg usr/bin usr/libexec \
+printf '%s\n' etc/vinix etc/vinix-pkg usr/bin usr/libexec \
     >> "$PACKAGE_RUNTIME_ROOT/etc/vinix-pkg/base-files"
 LC_ALL=C sort -u -o "$PACKAGE_RUNTIME_ROOT/etc/vinix-pkg/base-files" \
     "$PACKAGE_RUNTIME_ROOT/etc/vinix-pkg/base-files"
@@ -631,8 +883,29 @@ install -m755 "$SCRIPT_DIR/build-support/vinix-pkg-wrapper" \
     "$PACKAGE_RUNTIME_ROOT/usr/bin/pkg"
 install -m755 "$SCRIPT_DIR/build-support/vinix-persist-packages" \
     "$PACKAGE_RUNTIME_ROOT/usr/libexec/vinix-persist-packages"
-printf 'http://10.0.2.100:%s\n' "$PACKAGE_STORE_PORT" \
-    > "$PACKAGE_RUNTIME_ROOT/etc/vinix-pkg/qemu-store-url"
+install -m755 "$SCRIPT_DIR/build-support/vinix-host-sync" \
+    "$PACKAGE_RUNTIME_ROOT/usr/bin/vinix-host-sync"
+install -m755 "$SCRIPT_DIR/build-support/vinix-desktop-build" \
+    "$PACKAGE_RUNTIME_ROOT/usr/bin/vinix-desktop-build"
+printf '%s\n' \
+    etc/vinix/qemu-host-source-url \
+    usr/bin/vinix-host-sync \
+    usr/bin/vinix-desktop-build \
+    >> "$PACKAGE_RUNTIME_ROOT/etc/vinix-pkg/base-files"
+LC_ALL=C sort -u -o "$PACKAGE_RUNTIME_ROOT/etc/vinix-pkg/base-files" \
+    "$PACKAGE_RUNTIME_ROOT/etc/vinix-pkg/base-files"
+: > "$PACKAGE_RUNTIME_ROOT/etc/vinix/qemu-host-source-url"
+if [ "$HOST_SOURCE_ENABLED" -eq 1 ] && [ "$VIRTIO_GPU" -ne 2 ]; then
+    printf 'http://10.0.2.2:%s\n' "$PACKAGE_STORE_PORT" \
+        > "$PACKAGE_RUNTIME_ROOT/etc/vinix/qemu-host-source-url"
+fi
+# VINIX_QEMU_PACKAGE_PERSIST=0 leaves the store address out, which is how the
+# package frontend already recognises a run that does not keep its packages.
+# Saving a browser-sized overlay costs more than the install it follows.
+if [ "${VINIX_QEMU_PACKAGE_PERSIST:-1}" != 0 ]; then
+    printf 'http://10.0.2.2:%s\n' "$PACKAGE_STORE_PORT" \
+        > "$PACKAGE_RUNTIME_ROOT/etc/vinix-pkg/qemu-store-url"
+fi
 COPYFILE_DISABLE=1 tar --format=ustar -cf "$PACKAGE_RUNTIME_TAR" \
     -C "$PACKAGE_RUNTIME_ROOT" .
 mcopy -o -i "$BOOT_DISK" "$PACKAGE_RUNTIME_TAR" ::/boot/qemu-runtime.tar
@@ -664,9 +937,15 @@ else
         echo "ERROR: python3 is required for QEMU package persistence" >&2
         exit 1
     fi
+    SOURCE_SERVER_ARGS=()
+    if [ "$HOST_SOURCE_ENABLED" -eq 1 ]; then
+        SOURCE_SERVER_ARGS=(--source-root "$HOST_SOURCE_ROOT" \
+            --source-extra third_party/ui2)
+    fi
     python3 "$SCRIPT_DIR/tools/qemu-package-store.py" \
         --store "$PACKAGE_STORE" --port "$PACKAGE_STORE_PORT" \
-        --ready-file "$PACKAGE_SERVER_READY" >"$PACKAGE_SERVER_LOG" 2>&1 &
+        --ready-file "$PACKAGE_SERVER_READY" "${SOURCE_SERVER_ARGS[@]}" \
+        >"$PACKAGE_SERVER_LOG" 2>&1 &
     PACKAGE_SERVER_PID=$!
     for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
         [ -s "$PACKAGE_SERVER_READY" ] && break
@@ -680,8 +959,16 @@ else
         echo "ERROR: QEMU package store could not start on port $PACKAGE_STORE_PORT" >&2
         exit 1
     fi
-    NETWORK_FLAGS="-netdev user,id=net0,guestfwd=tcp:10.0.2.100:${PACKAGE_STORE_PORT}-tcp:127.0.0.1:${PACKAGE_STORE_PORT} -device virtio-net-device,netdev=net0,mac=52:54:00:12:34:56"
+    # QEMU's user network maps 10.0.2.2 to the host. The service itself stays
+    # bound to 127.0.0.1, so it is reachable by the guest without being
+    # exposed to the host's physical network. Unlike a guestfwd character
+    # backend, the host gateway supports every independent HTTP connection a
+    # long-lived VM makes.
+    NETWORK_FLAGS="-netdev user,id=net0 -device virtio-net-device,netdev=net0,mac=52:54:00:12:34:56"
     echo "==> Package installs persist in: $PACKAGE_STORE"
+    if [ "$HOST_SOURCE_ENABLED" -eq 1 ]; then
+        echo "==> Host sources: $HOST_SOURCE_ROOT -> /mnt/host/vinix"
+    fi
 fi
 echo "==> Starting QEMU (Ctrl-A X to quit)..."
 
@@ -689,27 +976,15 @@ if [ "$VIRTIO_GPU" -eq 2 ] && [ "$SERIAL_ONLY" -eq 1 ]; then
     echo "ERROR: --virgl needs a GL-capable display; do not combine it with --serial" >&2
     exit 1
 elif [ "$VIRTIO_GPU" -eq 2 ]; then
-    # KekVM's QEMU build provides a Cocoa OpenGL context backed by Metal.
-    # virglrenderer uses that context to execute the guest's Gallium commands.
-    DISPLAY_BACKEND_FLAGS="-display ${QEMU_DISPLAY_BACKEND:-cocoa,gl=core}"
+    # virglrenderer needs a GL-capable host display context to execute the
+    # guest's Gallium commands. Callers may select a specific QEMU backend.
+    DISPLAY_BACKEND_FLAGS="-display ${QEMU_DISPLAY_BACKEND:-default,gl=on}"
 elif [ "$SERIAL_ONLY" -eq 1 ]; then
     # Use -display none (not -nographic) to keep ramfb for framebuffer/GOP
     # while hiding the QEMU window. -nographic removes display devices entirely.
     DISPLAY_BACKEND_FLAGS="-display none"
 elif [ -n "${QEMU_DISPLAY_BACKEND:-}" ]; then
     DISPLAY_BACKEND_FLAGS="-display ${QEMU_DISPLAY_BACKEND}"
-elif [ "$(uname -s)" = "Darwin" ]; then
-    # System chords -- Cmd-Tab above all -- are the host's until QEMU is told
-    # to capture every key, which is what the desktop's own Cmd-Tab needs.
-    COCOA_OPTIONS="${VINIX_QEMU_COCOA_OPTIONS:-}"
-    if [ "$GRAB_KEYS" -eq 1 ]; then
-        COCOA_OPTIONS="${COCOA_OPTIONS:+${COCOA_OPTIONS},}full-grab=on"
-    fi
-    if [ -n "$COCOA_OPTIONS" ]; then
-        DISPLAY_BACKEND_FLAGS="-display cocoa,$COCOA_OPTIONS"
-    else
-        DISPLAY_BACKEND_FLAGS="-display cocoa"
-    fi
 else
     DISPLAY_BACKEND_FLAGS="-display default"
 fi
@@ -729,7 +1004,9 @@ DISPLAY_FLAGS="$DISPLAY_DEVICE_FLAGS $DISPLAY_BACKEND_FLAGS -serial mon:stdio"
 
 ACCEL_FLAGS="-accel hvf -cpu host"
 if [ "${USE_TCG:-0}" -eq 1 ]; then
-    ACCEL_FLAGS="-accel tcg -cpu cortex-a72"
+    # The kernel is compiled for ARMv8.4-A. cortex-a72 only implements an
+    # older architecture level and can stall before the serial console.
+    ACCEL_FLAGS="-accel tcg -cpu ${VINIX_QEMU_CPU:-max}"
 fi
 
 # VINIX_QEMU_EXTRA appends raw flags, e.g. a monitor socket to drive
@@ -751,7 +1028,9 @@ set +e
     -machine virt,gic-version=3 \
     $ACCEL_FLAGS \
     -m "$QEMU_MEM" \
-    -smp 2 \
+    -smp "${VINIX_QEMU_SMP:-4}" \
+    -object rng-random,filename=/dev/urandom,id=vinix-rng \
+    -device virtio-rng-device,rng=vinix-rng \
     -drive if=pflash,format=raw,readonly=on,file="$OVMF" \
     -drive if=pflash,format=raw,file="$OVMF_VARS" \
     -drive format=raw,file="$BOOT_DISK" \
@@ -759,8 +1038,7 @@ set +e
     -device virtio-keyboard-device \
     -device virtio-tablet-device \
     $NETWORK_FLAGS \
-    $DISPLAY_FLAGS \
-    -no-reboot
+    $DISPLAY_FLAGS
 qemu_status=$?
 set -e
 exit "$qemu_status"

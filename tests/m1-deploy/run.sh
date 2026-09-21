@@ -57,7 +57,8 @@ fi
 grep -Fq 'M1 kernel has no Limine MP request' "$work/single-core.log"
 cp "$work/vinix-with-mp" "$fixture/kernel/bin/vinix"
 
-"$fixture/deploy-m1-efi.sh" --desktop-initramfs "$esp" >/dev/null
+"$fixture/deploy-m1-efi.sh" --desktop-initramfs "$esp" >"$work/deploy.log"
+grep -Fq 'native boot limit: 4 CPUs' "$work/deploy.log"
 cmp -s "$fixture/build-support/init-aarch64/initramfs-desktop.tar.gz" \
     "$esp/boot/initramfs.tar"
 grep -Fq 'module_path: $boot():/boot/initramfs.tar' \

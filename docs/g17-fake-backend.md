@@ -164,6 +164,15 @@ make -C kernel ARCH=aarch64
 ./tests/agx-vm/run.sh
 ```
 
+The G13 side has its own host test, pinning the stock t8103 operating-point
+table (including its off state) through both the loader and the firmware
+HwDataB builder. See [m1-agx-bringup.md](m1-agx-bringup.md) for the handoff that
+table arrives in:
+
+```sh
+./tests/agx-t8103-opp/run.sh
+```
+
 Regenerate or verify the checked-in freestanding encoder after recovering a
 new ABI:
 

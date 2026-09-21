@@ -1,5 +1,8 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
 module main
 
 import os
@@ -39,6 +42,129 @@ fn utility_button_with_text(element ui2.Element, text string) ?ui2.Element {
 	return none
 }
 
+fn test_qoi_icon_decoder_preserves_rgba_and_run_pixels() {
+	// A two-pixel QOI: one RGBA opcode followed by a one-pixel run. This keeps
+	// the tiny asset decoder's most important alpha and run-length paths covered
+	// without making the test depend on host-installed desktop artwork.
+	encoded := [u8(`q`), `o`, `i`, `f`, 0, 0, 0, 2, 0, 0, 0, 1, 4, 0, 0xff, 0x12, 0x34, 0x56, 0x78,
+		0xc0, 0, 0, 0, 0, 0, 0, 0, 1]
+	icon := decode_qoi(encoded) or {
+		assert false
+		return
+	}
+	assert icon.width == 2
+	assert icon.height == 1
+	assert icon.pixels == [u32(0x78123456), 0x78123456]
+}
+
+fn test_qoi_icon_decoder_uses_all_64_index_slots() {
+	// RGBA(3, 0, 0, 255) hashes to slot 62. Decode it once as a literal and
+	// once through QOI_OP_INDEX so a shortened colour index cannot regress.
+	encoded := [u8(`q`), `o`, `i`, `f`, 0, 0, 0, 2, 0, 0, 0, 1, 4, 0, 0xff, 3, 0, 0, 0xff, u8(62),
+		0, 0, 0, 0, 0, 0, 0, 1]
+	icon := decode_qoi(encoded) or {
+		assert false
+		return
+	}
+	assert icon.width == 2
+	assert icon.height == 1
+	assert icon.pixels == [u32(0xff030000), 0xff030000]
+}
+
+fn test_vinix_start_glyph_uses_the_wordmark_v_polygon() {
+	// These coordinates are inside the left arm, the open notch and the right
+	// arm of the V in vinix-logo.svg. Keeping this assertion on the shared
+	// polygon prevents the Start mark from quietly becoming a generic stroked V.
+	assert vinix_v_contains(11.0, 12.0)
+	assert !vinix_v_contains(26.3, 12.0)
+	assert vinix_v_contains(41.0, 12.0)
+
+	mut canvas := new_canvas(48, 48)
+	defer {
+		unsafe { free(canvas.pixels) }
+	}
+	canvas.clear(0x000000)
+	canvas.draw_vinix_v(0, 0, 48, 48, 0xffffff)
+	assert unsafe { canvas.pixels[24 * canvas.stride + 24] } == 0xffffff
+}
+
+fn test_wallpaper_copy_respects_canvas_clip() {
+	mut canvas := new_canvas(4, 3)
+	defer {
+		unsafe { free(canvas.pixels) }
+	}
+	canvas.clear(0x010203)
+	wallpaper := [u32(0x100000), 0x100001, 0x100002, 0x100003, 0x100004, 0x100005,
+		0x100006, 0x100007, 0x100008, 0x100009, 0x10000a, 0x10000b]
+	canvas.clip = Clip{
+		x: 1
+		y: 1
+		w: 2
+		h: 1
+	}
+	canvas.copy_logical_pixels(wallpaper)
+	assert unsafe { canvas.pixels[0] } == 0x010203
+	assert unsafe { canvas.pixels[1 * canvas.stride + 1] } == 0x100005
+	assert unsafe { canvas.pixels[1 * canvas.stride + 2] } == 0x100006
+	assert unsafe { canvas.pixels[1 * canvas.stride + 3] } == 0x010203
+}
+
+fn surface_test_put_u32(mut bytes []u8, offset int, value u32) {
+	bytes[offset] = u8(value)
+	bytes[offset + 1] = u8(value >> 8)
+	bytes[offset + 2] = u8(value >> 16)
+	bytes[offset + 3] = u8(value >> 24)
+}
+
+fn test_native_vinix_surface_validates_claims_and_draws_active_buffer() {
+	path := os.join_path(os.temp_dir(), 'vinix-native-surface-test.bin')
+	defer { os.rm(path) or {} }
+	// A two-by-one surface has eight bytes in each pixel plane.
+	mut bytes := []u8{len: 48 + 16, init: 0}
+	surface_test_put_u32(mut bytes, 0, vinix_surface_magic)
+	surface_test_put_u32(mut bytes, 4, vinix_surface_version)
+	surface_test_put_u32(mut bytes, 8, u32(vinix_surface_header_size))
+	surface_test_put_u32(mut bytes, 12, 2)
+	surface_test_put_u32(mut bytes, 16, 1)
+	surface_test_put_u32(mut bytes, 20, 8)
+	surface_test_put_u32(mut bytes, 24, vinix_surface_format_xrgb8888)
+	surface_test_put_u32(mut bytes, 28, 1)
+	surface_test_put_u32(mut bytes, 32, ~u32(0))
+	surface_test_put_u32(mut bytes, 40, 8)
+	// Only buffer one is active: red then green in little-endian XRGB8888.
+	bytes[56] = 0x00
+	bytes[57] = 0x00
+	bytes[58] = 0xff
+	bytes[60] = 0x00
+	bytes[61] = 0xff
+	bytes[62] = 0x00
+	os.write_file_array(path, bytes) or { assert false }
+
+	surface := open_vinix_surface(path) or {
+		assert false
+		return
+	}
+	assert surface.width == 2 && surface.height == 1 && surface.stride == 8
+	assert surface.pixel(0, 0) == 0xff0000
+	assert surface.pixel(1, 0) == 0x00ff00
+	assert vinix_surface_u32(unsafe { &u8(surface.mapping) }, 32) == 1
+	surface.close()
+	released := os.read_bytes(path) or {
+		assert false
+		return
+	}
+	assert vinix_surface_u32(released.data, 32) == ~u32(0)
+
+	mut canvas := new_canvas(2, 1)
+	defer {
+		unsafe { free(canvas.pixels) }
+	}
+	canvas.clear(0)
+	assert canvas.draw_vinix_surface(path, 0, 0, 2, 1)
+	assert unsafe { canvas.pixels[0] } == 0xff0000
+	assert unsafe { canvas.pixels[1] } == 0x00ff00
+}
+
 struct PointerFocusTestApp {}
 
 fn (mut app PointerFocusTestApp) build(size ui2.Rect) !ui2.Element {
@@ -51,7 +177,7 @@ fn (mut app PointerFocusTestApp) pointer_input_enabled() bool {
 	return true
 }
 
-fn (mut app PointerFocusTestApp) pointer_event(_ AppPointerPhase, _ int, _ int, _ int, _ int) {}
+fn (mut app PointerFocusTestApp) pointer_event(_ AppPointerPhase, _ AppPointerButton, _ int, _ int, _ int, _ int, _ int) {}
 
 fn test_text_editor_inserts_and_navigates() {
 	mut editor := TextEditorApp{
@@ -126,6 +252,91 @@ fn test_clock_stopwatch_format_and_elapsed_time() {
 		accumulated_ms: 250
 	}
 	assert clock.elapsed(2_500) == 1_750
+}
+
+fn test_capture_png_encoder_writes_standard_truecolour_image() {
+	mut canvas := new_canvas(2, 2)
+	defer {
+		unsafe { free(canvas.pixels) }
+	}
+	unsafe {
+		canvas.pixels[0] = 0xff0000
+		canvas.pixels[1] = 0x00ff00
+		canvas.pixels[2] = 0x0000ff
+		canvas.pixels[3] = 0xffffff
+	}
+	bytes := capture_png_bytes(&canvas)!
+	defer {
+		unsafe { bytes.free() }
+	}
+	assert bytes[..8] == [u8(0x89), `P`, `N`, `G`, `\r`, `\n`, 0x1a, `\n`]
+	assert bytes[12..16].bytestr() == 'IHDR'
+	assert bytes[16..20] == [u8(0), 0, 0, 2]
+	assert bytes[20..24] == [u8(0), 0, 0, 2]
+	assert bytes[24] == 8
+	assert bytes[25] == 2
+	assert bytes[bytes.len - 8..bytes.len - 4].bytestr() == 'IEND'
+	icon := decode_png(bytes) or {
+		assert false
+		return
+	}
+	assert icon.width == 2
+	assert icon.height == 2
+	assert icon.pixels == [u32(0xffff0000), 0xff00ff00, 0xff0000ff, 0xffffffff]
+	assert png_paeth(10, 20, 15) == 15
+}
+
+fn test_capture_avi_writer_indexes_every_video_frame() {
+	path := os.join_path(os.temp_dir(), 'vinix-capture-test.avi')
+	defer {
+		os.rm(path) or {}
+	}
+	mut canvas := new_canvas(4, 2)
+	defer {
+		unsafe { free(canvas.pixels) }
+	}
+	canvas.clear(0x3264c8)
+	mut writer := capture_open_avi(path, &canvas, 10)!
+	total_offset := writer.total_frames_offset
+	stream_offset := writer.stream_length_offset
+	assert writer.add_frame(&canvas)
+	canvas.clear(0xc86432)
+	assert writer.add_frame(&canvas)
+	assert writer.frames == 2
+	assert writer.finish()
+	bytes := os.read_bytes(path)!
+	defer {
+		unsafe { bytes.free() }
+	}
+	assert bytes[..4].bytestr() == 'RIFF'
+	assert bytes[8..12].bytestr() == 'AVI '
+	assert bytes[total_offset..total_offset + 4] == [u8(2), 0, 0, 0]
+	assert bytes[stream_offset..stream_offset + 4] == [u8(2), 0, 0, 0]
+	assert bytes[bytes.len - 40..bytes.len - 36].bytestr() == 'idx1'
+}
+
+fn test_capture_ui_issues_compositor_requests() {
+	mut desktop := Desktop{}
+	mut app := CaptureApp{
+		desktop: &desktop
+	}
+	app.handle(capture_action_delay_5)!
+	app.handle(capture_action_take_screenshot)!
+	assert desktop.capture.request.command == .screenshot
+	assert desktop.capture.request.delay == 5
+	assert desktop.capture.request.sequence == 1
+	app.handle(capture_action_video_tab)!
+	app.handle(capture_action_fps_5)!
+	app.handle(capture_action_start_video)!
+	assert app.page == .video
+	assert desktop.capture.request.command == .start_video
+	assert desktop.capture.request.fps == 5
+	assert desktop.capture.request.sequence == 2
+	begin_frame_elements()
+	tree := app.build(ui2.rect(0, 0, 560, 396))!
+	assert utility_tree_has_text(tree, 'Record the desktop')
+	assert utility_tree_has_text(tree, 'Smooth  10 fps')
+	free_tree(tree)
 }
 
 fn test_native_calculator_matches_the_example_layout_and_actions() {
@@ -210,57 +421,241 @@ fn test_terminal_sends_every_keystroke_through_the_pty_master() {
 	C.close(input_pipe[1])
 }
 
+fn test_terminal_starts_zsh_by_default() {
+	assert terminal_shell == '/bin/zsh'
+}
+
 fn test_terminal_renders_pty_echo_and_carriage_return_updates() {
 	mut terminal := TerminalApp{}
+	terminal.set_geometry(4, 40)
 	terminal.ingest_output('progress 10%\rprogress 20%\r\n\$ '.bytes())
-	assert terminal.lines == ['progress 20%']
-	assert terminal.partial.bytestr() == '\$ '
-	assert terminal.partial_text == '\$ _'
+	assert terminal.row_string(0) == 'progress 20%'
+	assert terminal.row_string(1) == '\$ '
+	assert terminal.rendered_row(1) == '\$ _'
 
 	// Canonical erase echo is backspace-space-backspace. Interpret it as cursor
 	// movement and overwrite, just as a terminal display does.
 	terminal.ingest_output('abc\b \bD'.bytes())
-	assert terminal.partial.bytestr() == '\$ abD'
+	assert terminal.row_string(1) == '\$ abD'
 
 	// BusyBox's line editor emits clear-to-end under TERM=linux, and an
 	// escape sequence may straddle two non-blocking reads.
 	terminal.ingest_output('\x1b['.bytes())
 	terminal.ingest_output('J'.bytes())
-	assert terminal.partial.bytestr() == '\$ abD'
+	assert terminal.row_string(1) == '\$ abD'
+}
+
+fn test_terminal_handles_vim_alternate_screen_and_cursor_addressing() {
+	mut terminal := TerminalApp{}
+	terminal.set_geometry(6, 30)
+	terminal.ingest_output('vinix# vim notes.txt'.bytes())
+
+	// This is the core of a TERM=linux Vim redraw: enter the alternate screen,
+	// erase it, position rows independently, set a scroll region, and finally
+	// leave the alternate screen. Split one CSI sequence at a read boundary too.
+	terminal.ingest_output('\x1b[?1049h\x1b[2J\x1b[Hhello\x1b[2;1Hworld'.bytes())
+	terminal.ingest_output('\x1b[3;'.bytes())
+	terminal.ingest_output('1H~\x1b[6;1H"notes.txt" 2L, 12B\x1b[1;6H'.bytes())
+	assert terminal.alternate_screen
+	assert terminal.row_string(0) == 'hello'
+	assert terminal.row_string(1) == 'world'
+	assert terminal.row_string(2) == '~'
+	assert terminal.row_string(5) == '"notes.txt" 2L, 12B'
+	assert terminal.cursor_row == 0
+	assert terminal.cursor_column == 5
+
+	// Vim uses line/character edits for economical redraws instead of repainting
+	// the entire file after every keystroke.
+	terminal.ingest_output('\x1b[2;1H\x1b[2@OK\x1b[1P\x1b[3X'.bytes())
+	assert terminal.row_string(1) == 'OK   d'
+	terminal.ingest_output('\x1b[2;5r\x1b[2;1H\x1b[Linserted'.bytes())
+	assert terminal.row_string(1) == 'inserted'
+	assert terminal.row_string(2) == 'OK   d'
+
+	terminal.ingest_output('\x1b[?1049l'.bytes())
+	assert !terminal.alternate_screen
+	assert terminal.row_string(0) == 'vinix# vim notes.txt'
+}
+
+fn test_terminal_answers_cursor_status_queries() {
+	mut replies := [2]i32{}
+	assert C.pipe(&replies[0]) == 0
+	mut terminal := TerminalApp{
+		terminal: int(replies[1])
+	}
+	terminal.set_geometry(5, 20)
+	// Linux cursor-shape controls end in `c` too, but are not device-attribute
+	// queries and must not inject replies into Vim's keyboard input.
+	terminal.ingest_output('\x1b[?1c\x1b[?8c\x1b[4;7H\x1b[6n'.bytes())
+	mut answer := [32]u8{}
+	count := C.read(replies[0], &answer[0], answer.len)
+	assert count == 6
+	assert unsafe { tos(&answer[0], count) } == '\x1b[4;7R'
+	C.close(replies[0])
+	C.close(replies[1])
+}
+
+fn test_terminal_consumes_linux_palette_controls_without_swallowing_text() {
+	mut terminal := TerminalApp{}
+	terminal.set_geometry(2, 20)
+	// Linux's OSC P and OSC R controls deliberately have no BEL/ST terminator.
+	terminal.ingest_output('\x1b]P1ffffffX\x1b]RY'.bytes())
+	assert terminal.row_string(0) == 'XY'
+}
+
+fn test_terminal_row_cache_survives_a_window_resize() {
+	mut terminal := TerminalApp{}
+	terminal.set_geometry(4, 20)
+	terminal.ingest_output('first\r\nsecond\r\n'.bytes())
+	for row in 0 .. terminal.rows {
+		terminal.rendered_row(row)
+	}
+
+	// Maximising the window rebuilds the grid, which releases the cached rows.
+	// Freeing an array of strings frees every string in it, so releasing the
+	// rows by hand first handed the same pointers to the allocator twice and
+	// aborted the terminal process.
+	terminal.set_geometry(40, 120)
+	assert terminal.rendered_rows.len == 40
+	assert terminal.dirty_rows.len == 40
+	assert terminal.rendered_row(0) == 'first'
+	assert terminal.rendered_row(1) == 'second'
+
+	terminal.set_geometry(4, 20)
+	assert terminal.rendered_rows.len == 4
+	assert terminal.rendered_row(0) == 'first'
+	assert terminal.rendered_row(1) == 'second'
+}
+
+fn terminal_screen_contains(terminal &TerminalApp, wanted string) bool {
+	for row in 0 .. terminal.rows {
+		if terminal.row_string(row).contains(wanted) {
+			return true
+		}
+	}
+	return false
+}
+
+fn test_terminal_can_edit_a_file_with_vim_over_its_real_pty() {
+	vim_path := '/usr/bin/vim'
+	if !os.exists(vim_path) {
+		return
+	}
+	path := os.join_path(os.temp_dir(), 'vinix-terminal-vim-test.txt')
+	os.rm(path) or {}
+	defer { os.rm(path) or {} }
+
+	mut terminal := TerminalApp{
+		read_buf: []u8{len: terminal_read_chunk}
+	}
+	terminal.set_geometry(12, 60)
+	terminal.start_shell(12, 60, 480, 192)
+	assert terminal.terminal >= 0
+	defer { terminal.close_app() }
+	terminal.key_input('${vim_path} -Nu NONE -n -i NONE ${path}\n')
+	for _ in 0 .. 200 {
+		terminal.poll()
+		if terminal_screen_contains(&terminal, '[New]') {
+			break
+		}
+		desktop_sleep_ms(10)
+	}
+	assert terminal_screen_contains(&terminal, '[New]')
+
+	terminal.key_input('iEdited inside Vinix\x1b:wq\n')
+	for _ in 0 .. 300 {
+		terminal.poll()
+		if os.exists(path) {
+			break
+		}
+		desktop_sleep_ms(10)
+	}
+	assert os.read_file(path)! == 'Edited inside Vinix\n'
 }
 
 fn test_available_utility_applications_and_shortcut_layouts() {
-	assert available_apps.len == 14
+	assert available_apps.len == 22
 	assert available_apps[0].process_name == 'vinix-files'
 	assert available_apps[1].title == 'Firefox'
 	assert available_apps[1].exclusive_command == ''
 	assert available_apps[1].process_name == 'vinix-firefox'
+	assert available_apps[1].icon == 'asset:firefox'
 	assert available_apps[1].width == firefox_window_width
 	assert available_apps[1].height == firefox_window_height + default_title_height
 	assert available_apps[1].polling && available_apps[1].poll_interval_ms == 50
 	assert available_apps[1].keyboard && available_apps[1].pointer
+	assert available_apps[2].icon == 'asset:calculator'
 	assert available_apps[3].process_name == 'vinix-terminal'
+	assert available_apps[3].icon == 'asset:terminal'
 	assert available_apps[3].keyboard && available_apps[3].polling
+	assert available_apps[4].icon == 'asset:settings'
 	assert available_apps[5].title == 'Activity Monitor'
 	assert available_apps[5].process_name == 'vinix-activity'
-	assert available_apps[9].process_name == 'vinix-cocoa-calculator'
-	assert available_apps[10].title == 'Minecraft'
-	assert available_apps[10].process_name == 'vinix-minecraft'
-	assert available_apps[10].exclusive_command == ''
+	assert available_apps[5].icon == 'asset:activity'
+	assert available_apps[9].title == 'Minecraft'
+	assert available_apps[9].process_name == 'vinix-minecraft'
+	assert available_apps[9].icon == 'asset:minecraft'
+	assert available_apps[9].exclusive_command == ''
+	assert available_apps[9].width == 1976
+	assert available_apps[9].height == 1113 + default_title_height
+	assert available_apps[9].keyboard && available_apps[9].polling
+	assert available_apps[9].pointer
+	assert available_apps[10].title == 'Wine Calculator'
+	assert available_apps[10].process_name == 'vinix-wine-calculator'
 	assert available_apps[10].keyboard && available_apps[10].polling
 	assert available_apps[10].pointer
-	assert available_apps[11].title == 'Wine Calculator'
-	assert available_apps[11].process_name == 'vinix-wine-calculator'
+	assert available_apps[11].title == 'Wine Notepad'
+	assert available_apps[11].process_name == 'vinix-wine-notepad'
 	assert available_apps[11].keyboard && available_apps[11].polling
 	assert available_apps[11].pointer
-	assert available_apps[12].title == 'Wine Notepad'
-	assert available_apps[12].process_name == 'vinix-wine-notepad'
+	assert available_apps[12].title == 'Microsoft Word 2013'
+	assert available_apps[12].process_name == 'vinix-wine-word2013'
 	assert available_apps[12].keyboard && available_apps[12].polling
 	assert available_apps[12].pointer
-	assert available_apps[13].title == 'Microsoft Word 2013'
-	assert available_apps[13].process_name == 'vinix-wine-word2013'
+	assert available_apps[13].title == 'Blender'
+	assert available_apps[13].process_name == 'vinix-blender'
+	assert available_apps[13].icon == 'asset:blender'
+	assert available_apps[13].width == blender_window_width
+	assert available_apps[13].height == blender_window_height + default_title_height
+	assert available_apps[14].title == capture_app_title
+	assert available_apps[14].process_name == 'vinix-capture'
+	assert available_apps[14].icon == 'builtin:camera'
+	assert available_apps[14].polling
 	assert available_apps[13].keyboard && available_apps[13].polling
 	assert available_apps[13].pointer
+	assert available_apps[15].title == 'GIMP'
+	assert available_apps[15].process_name == 'vinix-gimp'
+	assert available_apps[15].width == gimp_window_width
+	assert available_apps[15].height == gimp_window_height + default_title_height
+	assert available_apps[15].keyboard && available_apps[15].pointer
+	assert available_apps[15].polling && available_apps[15].poll_interval_ms == 50
+	assert available_apps[16].title == 'VSpace'
+	assert available_apps[16].process_name == 'vinix-vspace'
+	assert available_apps[16].icon == 'asset:vspace'
+	assert available_apps[16].polling && available_apps[16].poll_interval_ms == 33
+	assert !available_apps[16].keyboard && !available_apps[16].pointer
+	assert available_apps[17].title == 'VOffice Writer'
+	assert available_apps[17].process_name == 'voffice-writer'
+	assert available_apps[17].standalone && available_apps[17].keyboard
+	assert available_apps[17].pointer && available_apps[17].polling
+	assert available_apps[18].title == 'VOffice Calc'
+	assert available_apps[18].process_name == 'voffice-calc'
+	assert available_apps[18].standalone && available_apps[18].keyboard
+	assert available_apps[18].pointer && available_apps[18].polling
+	assert available_apps[20].title == 'Chromium'
+	assert available_apps[20].process_name == 'vinix-chromium'
+	assert available_apps[20].icon == 'asset:chromium'
+	assert available_apps[20].width == chromium_window_width
+	assert available_apps[20].height == chromium_window_height + default_title_height
+	assert available_apps[20].keyboard && available_apps[20].pointer
+	assert available_apps[20].polling && available_apps[20].poll_interval_ms == 50
+	assert available_apps[21].title == 'ui2 Examples'
+	assert available_apps[21].process_name == 'vinix-ui2-examples'
+	assert available_apps[21].open != unsafe { nil }
+	assert ui2_example_names.len == 84
+	example := ui2_example_named('toggle_button') or { panic('missing ui2 example') }
+	assert example.process_name == 'vinix-ui2-toggle_button'
+	assert example.standalone && example.keyboard && example.pointer && example.polling
 	assert app_start_actions.len == available_apps.len
 	assert app_shortcut_actions.len == available_apps.len
 	assert shortcut_rows_for_height(720) == 8
@@ -272,7 +667,33 @@ fn test_pointer_wire_records_have_fixed_cross_compiler_layouts() {
 	// v3, whose `int` has a different width. These records cross into kernel and
 	// C code and must therefore retain their explicit ABI sizes.
 	assert sizeof(PointerPacket) == 32
+	assert sizeof(AppPointerPayload) == 28
 	assert sizeof(WineHostEvent) == 20
+	assert sizeof(VinixInputEvent) == 24
+}
+
+fn test_native_surface_input_preserves_buttons_and_scroll() {
+	mut input_pipe := [2]i32{}
+	assert C.pipe(&input_pipe[0]) == 0
+	mut app := NativeSurfaceApp{
+		input_fd: int(input_pipe[1])
+		surface_width: 100
+		surface_height: 50
+		ready: true
+	}
+
+	app.pointer_event(.down, .right, 0, 100, 100, 200, 200)
+	app.pointer_event(.scroll, .no_button, -2, 100, 100, 200, 200)
+	mut records := [2]VinixInputEvent{}
+	assert C.read(input_pipe[0], &records[0], sizeof(VinixInputEvent) * 2) == sizeof(VinixInputEvent) * 2
+	assert records[0].kind == u32(VinixInputEventKind.button_down)
+	assert records[0].value == int(AppPointerButton.right)
+	assert records[0].x == 50 && records[0].y == 25
+	assert records[1].kind == u32(VinixInputEventKind.wheel)
+	assert records[1].value == -2
+
+	C.close(input_pipe[0])
+	C.close(input_pipe[1])
 }
 
 fn test_xwd_bilinear_filter_preserves_edges_and_blends_the_middle() {
@@ -440,6 +861,38 @@ fn test_taskbar_keeps_a_bottom_right_clock_and_open_windows() {
 	free_tree(empty)
 }
 
+fn test_macos_taskbar_uses_large_icon_only_buttons_at_screen_edges() {
+	mut desktop := Desktop{
+		canvas: Canvas{
+			width: 1280
+			height: 720
+		}
+		settings: Settings{
+			theme: .macos
+		}
+	}
+	first := desktop.spawn('Files', .welcome, 10, 10, 300, 200)
+	desktop.windows[0].icon = 'builtin:folder'
+	desktop.update_taskbar_clock_at(0)
+
+	root := desktop.build_tree()
+	taskbar := utility_element_named(root, 'taskbar') or { panic('missing macOS taskbar') }
+	start := utility_element_named(taskbar, action_start_toggle) or { panic('missing Start button') }
+	entry := utility_element_named(taskbar, 'task.${first}') or { panic('missing icon task button') }
+	clock := utility_element_named(taskbar, 'clock.time') or { panic('missing taskbar clock') }
+	assert int(taskbar.frame.x) == 0
+	assert int(taskbar.frame.width) == 1280
+	assert int(taskbar.frame.y + taskbar.frame.height) == 720
+	assert int(start.frame.x) == taskbar_padding
+	assert start.image_path == 'builtin:vinix'
+	assert entry.text == ''
+	assert entry.image_path == 'builtin:folder'
+	assert int(entry.frame.width) == taskbar_icon_item_width
+	assert int(entry.frame.height) == taskbar_icon_item_height
+	assert int(clock.frame.x + clock.frame.width) == 1280 - taskbar_padding
+	free_tree(root)
+}
+
 fn test_clicking_a_taskbar_window_button_focuses_without_minimizing() {
 	mut desktop := Desktop{
 		canvas: Canvas{
@@ -470,6 +923,44 @@ fn test_clicking_a_taskbar_window_button_focuses_without_minimizing() {
 	assert !desktop.windows.last().minimized
 }
 
+fn test_hover_owns_action_past_source_lifetime() {
+	mut desktop := Desktop{}
+	mut source := 'win.2.close'.clone()
+	source_pointer := source.str
+
+	desktop.set_hover(source)
+	assert desktop.hover == 'win.2.close'
+	assert desktop.hover.str != source_pointer
+
+	unsafe { source.free() }
+	assert desktop.hover == 'win.2.close'
+	desktop.set_hover('')
+	assert desktop.hover == ''
+}
+
+fn test_hit_target_owns_remote_action_past_tree_lifetime() {
+	mut desktop := Desktop{}
+	action := editor_action_document.clone()
+	source_pointer := action.str
+	element := ui2.Element{
+		kind:      .view
+		id:        action
+		key:       remote_owned_element_key
+		clickable: true
+		enabled:   true
+	}
+
+	desktop.record_target(element, 10, 20, 100, 80)
+	assert desktop.targets.len == 1
+	assert desktop.targets[0].owns_action
+	assert desktop.targets[0].action_id.str != source_pointer
+	free_tree(element)
+
+	assert desktop.hit_action(50, 50) == editor_action_document
+	desktop.clear_hit_targets()
+	assert desktop.targets.len == 0
+}
+
 fn test_taskbar_clock_stays_visible_at_m1_200_percent_scale() {
 	// The 3024×1964 M1 framebuffer becomes a 1512×982 logical desktop. The
 	// taskbar reserves a logical status area before allocating task buttons,
@@ -493,6 +984,33 @@ fn test_taskbar_clock_stays_visible_at_m1_200_percent_scale() {
 fn test_firefox_uses_the_hosted_x11_window_path() {
 	factory := available_apps[1]
 	assert factory.process_name == 'vinix-firefox'
+	assert factory.exclusive_command == ''
+	assert factory.open != unsafe { nil }
+	assert factory.polling && factory.keyboard && factory.pointer
+}
+
+fn test_gimp_uses_the_hosted_x11_window_path() {
+	factory := available_apps[15]
+	assert factory.process_name == 'vinix-gimp'
+	assert factory.exclusive_command == ''
+	assert factory.open != unsafe { nil }
+	assert factory.polling && factory.keyboard && factory.pointer
+}
+
+fn test_libreoffice_uses_the_hosted_x11_window_path() {
+	factory := available_apps[19]
+	assert factory.title == 'LibreOffice'
+	assert factory.process_name == 'vinix-libreoffice'
+	assert factory.exclusive_command == ''
+	assert factory.open != unsafe { nil }
+	assert factory.polling && factory.keyboard && factory.pointer
+	assert factory.width == libreoffice_window_width
+	assert factory.height == libreoffice_window_height + default_title_height
+}
+
+fn test_chromium_uses_the_hosted_x11_window_path() {
+	factory := available_apps[20]
+	assert factory.process_name == 'vinix-chromium'
 	assert factory.exclusive_command == ''
 	assert factory.open != unsafe { nil }
 	assert factory.polling && factory.keyboard && factory.pointer
@@ -560,7 +1078,8 @@ fn test_native_process_names_are_presented_as_app_names() {
 }
 
 fn test_application_tree_protocol_round_trip() {
-	child := ui2.button_with_image('save', 'Save', 'builtin:editor', ui2.rect(7, 9, 80, 24), ui2.BoxStyle{
+	child := ui2.Element{
+		...ui2.button_with_image('save', 'Save', 'builtin:editor', ui2.rect(7, 9, 80, 24), ui2.BoxStyle{
 		bg: 0x123456
 		radius: 6
 	}, ui2.TextStyle{
@@ -572,6 +1091,9 @@ fn test_application_tree_protocol_round_trip() {
 		shadow: true
 		align: .center
 	})
+		native_style: true
+		checked: true
+	}
 	root := ui2.screen(0xabcdef, [child])
 	mut encoded := []u8{}
 	encode_app_element(root, mut encoded)!
@@ -588,7 +1110,207 @@ fn test_application_tree_protocol_round_trip() {
 	assert button.text_style.font_family == 'mono'
 	assert button.text_style.bold && button.text_style.shadow
 	assert button.text_style.align == .center
+	assert button.native_style
+	assert button.checked
 	free_tree(root)
 	free_tree(decoded)
 	unsafe { encoded.free() }
+}
+
+// ── VSpace ─────────────────────────────────────────────────────────
+
+fn vspace_test_tree() string {
+	root := os.join_path(os.temp_dir(), 'vinix-vspace-test')
+	os.rmdir_all(root) or {}
+	os.mkdir_all(os.join_path(root, 'big', 'nested')) or { panic(err) }
+	os.mkdir_all(os.join_path(root, 'small')) or { panic(err) }
+	os.write_file(os.join_path(root, 'big', 'a.bin'), 'a'.repeat(4096)) or { panic(err) }
+	os.write_file(os.join_path(root, 'big', 'nested', 'b.bin'), 'b'.repeat(2048)) or { panic(err) }
+	original := os.join_path(root, 'small', 'c.bin')
+	os.write_file(original, 'c'.repeat(512)) or { panic(err) }
+	// The same 512 bytes under a second name, and a directory that is only a
+	// name. Counting either one would overstate the tree.
+	os.link(original, os.join_path(root, 'small', 'c-link.bin')) or { panic(err) }
+	os.symlink(os.join_path(root, 'big'), os.join_path(root, 'big-link')) or { panic(err) }
+	return root
+}
+
+fn vspace_scan_to_completion(mut app VSpaceApp, root string) {
+	app.scan(root)
+	for step := 0; app.scanner.phase == .scanning && step < 1000; step++ {
+		assert app.poll()
+	}
+	assert app.scanner.phase == .complete
+}
+
+fn test_vspace_walk_counts_a_real_tree_once() {
+	root := vspace_test_tree()
+	defer {
+		os.rmdir_all(root) or {}
+	}
+	mut app := VSpaceApp{}
+	defer {
+		app.close_app()
+	}
+	vspace_scan_to_completion(mut app, root)
+
+	// Three regular files: the hard link is the same bytes under a second name
+	// and the symbolic link is followed by nothing.
+	assert app.scanner.files == 3
+	assert app.scanner.total_bytes == 4096 + 2048 + 512
+	assert app.scanner.directories == 4
+	assert app.scanner.unreadable == 0
+
+	// A folder's total is its whole subtree, so `big` outranks the nested
+	// directory whose bytes it also contains.
+	dirs := app.scanner.dirs_rank.entries
+	assert dirs.len == 3
+	assert dirs[0].name == 'big'
+	assert dirs[0].bytes == 4096 + 2048
+	assert dirs[1].name == 'nested'
+	assert dirs[1].bytes == 2048
+	assert dirs[2].name == 'small'
+	assert dirs[2].bytes == 512
+
+	files := app.scanner.files_rank.entries
+	assert files.len == 3
+	assert files[0].name == 'a.bin'
+	assert files[0].bytes == 4096
+	assert files[1].name == 'b.bin'
+	assert files[1].bytes == 2048
+	// Whichever of the two names readdir reported first is the one that was
+	// counted; the other was recognised as the same inode and skipped.
+	assert files[2].bytes == 512
+	assert files[2].name in ['c.bin', 'c-link.bin']
+}
+
+fn test_vspace_scan_is_resumable_and_can_be_stopped() {
+	root := vspace_test_tree()
+	defer {
+		os.rmdir_all(root) or {}
+	}
+	mut app := VSpaceApp{}
+	defer {
+		app.close_app()
+	}
+	app.scan(root)
+	assert app.scanner.phase == .scanning
+	// A scan in progress is a stack of open directories, and stopping is what
+	// closes them without throwing away what has been counted.
+	assert app.scanner.stack.len > 0
+	app.scanner.cancel()
+	assert app.scanner.phase == .cancelled
+	assert app.scanner.stack.len == 0
+	// Nothing polls a stopped scan forward.
+	assert !app.poll()
+
+	vspace_scan_to_completion(mut app, root)
+	assert !app.poll()
+	assert app.scanner.files == 3
+}
+
+fn test_vspace_reports_an_unreadable_root_instead_of_failing() {
+	mut app := VSpaceApp{}
+	defer {
+		app.close_app()
+	}
+	app.scan('/vinix-vspace-does-not-exist')
+	assert app.scanner.phase == .failed
+	assert app.scanner.error == 'cannot open /vinix-vspace-does-not-exist'
+	tree := app.build(ui2.rect(0, 0, 880, 546)) or { panic(err) }
+	assert utility_tree_has_text(tree, 'UNREADABLE')
+	assert utility_tree_has_text(tree, 'cannot open /vinix-vspace-does-not-exist')
+}
+
+fn test_vspace_window_ranks_folders_and_descends_into_one() {
+	root := vspace_test_tree()
+	defer {
+		os.rmdir_all(root) or {}
+	}
+	mut app := VSpaceApp{}
+	defer {
+		app.close_app()
+	}
+	vspace_scan_to_completion(mut app, root)
+
+	tree := app.build(ui2.rect(0, 0, 880, 546)) or { panic(err) }
+	assert utility_tree_has_text(tree, 'VSpace')
+	assert utility_tree_has_text(tree, 'Largest folders')
+	assert utility_tree_has_text(tree, 'Largest files')
+	assert utility_tree_has_text(tree, 'COMPLETE')
+	assert utility_tree_has_text(tree, '6.50 KB')
+	assert utility_tree_has_text(tree, 'a.bin')
+	// A completed scan's folder rows are what a pointer descends with; a
+	// running one's are not, because the ranking moves underneath the click.
+	assert utility_element_named(tree, 'vspace.dir.0') != none
+
+	app.handle('vspace.dir.0') or { panic(err) }
+	assert app.scanner.root == os.join_path(root, 'big')
+	vspace_scan_to_completion(mut app, os.join_path(root, 'big'))
+	assert app.scanner.files == 2
+	assert app.scanner.total_bytes == 4096 + 2048
+
+	app.handle('vspace.up') or { panic(err) }
+	assert app.scanner.root == root
+}
+
+fn test_vspace_formats_sizes_counts_and_durations() {
+	// The standalone program's formatter, to the digit.
+	assert vspace_size_text(0) == '0 B'
+	assert vspace_size_text(1023) == '1023 B'
+	assert vspace_size_text(1024) == '1.00 KB'
+	assert vspace_size_text(1536) == '1.50 KB'
+	assert vspace_size_text(10 * 1024) == '10.0 KB'
+	assert vspace_size_text(100 * 1024) == '100 KB'
+	assert vspace_size_text(1024 * 1024) == '1.00 MB'
+	assert vspace_size_text(u64(3) * 1024 * 1024 * 1024) == '3.00 GB'
+
+	assert vspace_count_text(0) == '0'
+	assert vspace_count_text(999) == '999'
+	assert vspace_count_text(1000) == '1,000'
+	assert vspace_count_text(1234567) == '1,234,567'
+
+	assert vspace_duration_text(940) == '940 ms'
+	assert vspace_duration_text(1500) == '1.5 sec'
+	assert vspace_duration_text(65000) == '1 min 5 sec'
+}
+
+fn test_vspace_ranking_keeps_only_the_largest_entries() {
+	mut ranking := VSpaceRanking{}
+	defer {
+		ranking.release()
+	}
+	// More candidates than the ranking holds, offered smallest first so every
+	// one of them has to displace the floor to get in.
+	for index in 0 .. vspace_rank_limit * 2 {
+		ranking.consider('name'.clone(), 'path'.clone(), u64(index + 1))
+	}
+	assert ranking.entries.len == vspace_rank_limit
+	assert ranking.entries[0].bytes == u64(vspace_rank_limit * 2)
+	assert ranking.entries[vspace_rank_limit - 1].bytes == u64(vspace_rank_limit + 1)
+	assert ranking.floor == u64(vspace_rank_limit + 1)
+	// Anything at or below the floor is rejected without disturbing the order.
+	ranking.consider('name'.clone(), 'path'.clone(), 1)
+	assert ranking.entries[vspace_rank_limit - 1].bytes == u64(vspace_rank_limit + 1)
+}
+
+fn test_vspace_identity_set_answers_each_device_and_inode_once() {
+	mut seen := VSpaceIdentitySet{}
+	defer {
+		seen.release()
+	}
+	seen.reset()
+	assert seen.add(vspace_identity_key(1, 2))
+	assert !seen.add(vspace_identity_key(1, 2))
+	assert seen.add(vspace_identity_key(2, 2))
+	// Past its load factor the table rehashes, and every key it already held
+	// has to still be in it afterwards.
+	for inode in 0 .. u64(vspace_identity_slots * 2) {
+		seen.add(vspace_identity_key(9, inode))
+	}
+	assert !seen.add(vspace_identity_key(1, 2))
+	assert !seen.add(vspace_identity_key(2, 2))
+	for inode in 0 .. u64(vspace_identity_slots * 2) {
+		assert !seen.add(vspace_identity_key(9, inode))
+	}
 }

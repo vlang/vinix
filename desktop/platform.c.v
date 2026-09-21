@@ -1,5 +1,8 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
 // V implementation of the desktop's POSIX boundary. Only declarations and
 // constants come from libc headers; there are no custom C function bodies.
 // Import vlib's declarations rather than inventing incompatible duplicates.
@@ -7,8 +10,8 @@ module main
 
 #flag -I @VMODROOT
 
-import os as _
-import time as _
+import os as platform_os
+import time as platform_time
 import term.termios
 
 #include <dirent.h>
@@ -22,6 +25,8 @@ import term.termios
 #include <sys/ioctl.h>
 
 #include <sys/mman.h>
+
+#include <sys/reboot.h>
 
 #include <sys/stat.h>
 
@@ -41,6 +46,8 @@ import term.termios
 
 fn C.fstat(fd int, buf &C.stat) int
 
+fn C.lstat(path &char, buf &C.stat) int
+
 fn C.posix_openpt(flags int) int
 
 fn C.grantpt(fd int) int
@@ -55,6 +62,10 @@ fn C.mmap(base voidptr, length usize, prot int, flags int, fd int, offset i64) v
 
 fn C.munmap(base voidptr, length usize) int
 
+fn C.lseek(fd int, offset i64, whence int) i64
+
+fn C.unlink(path &char) int
+
 struct C.pollfd {
 	fd      int
 	events  i16
@@ -66,8 +77,20 @@ fn C.poll(fds &C.pollfd, count usize, timeout int) int
 // Match vlib/net's declaration if a native application also imports it.
 fn C.fcntl(fd int, cmd int, arg ...voidptr) int
 
+// reboot(2) takes an int; the three commands it accepts are spelled as
+// unsigned values because two of them do not fit a positive int.
+fn C.reboot(command u32) int
+
+fn C.sync()
+
 fn desktop_open_rw(path string) int {
+	// Keep `os` imported for its canonical POSIX C declarations.
+	_ = platform_os.path_separator
 	return C.open(&char(path.str), C.O_RDWR)
+}
+
+fn desktop_create_truncated(path string) int {
+	return C.open(&char(path.str), C.O_WRONLY | C.O_CREAT | C.O_TRUNC, 0o644)
 }
 
 fn desktop_open_ro_nonblock(path string) int {
@@ -76,6 +99,13 @@ fn desktop_open_ro_nonblock(path string) int {
 
 fn desktop_close(fd int) int {
 	return C.close(fd)
+}
+
+fn desktop_seek_start(fd int, offset u64) bool {
+	if offset > u64(0x7fffffffffffffff) {
+		return false
+	}
+	return C.lseek(fd, i64(offset), C.SEEK_SET) == i64(offset)
 }
 
 fn desktop_read(fd int, buffer voidptr, count u64) i64 {
@@ -109,6 +139,10 @@ fn desktop_mmap_readonly(fd int, length u64) voidptr {
 
 fn desktop_munmap(base voidptr, length u64) int {
 	return C.munmap(base, usize(length))
+}
+
+fn desktop_unlink(path string) int {
+	return C.unlink(&char(path.str))
 }
 
 struct TerminalState {
@@ -191,6 +225,8 @@ fn desktop_frame_wait_ms(elapsed i64, interval i64) i64 {
 }
 
 fn desktop_sleep_ms(milliseconds i64) {
+	// Keep `time` imported for its canonical POSIX C declarations.
+	_ = platform_time.nanosecond
 	if milliseconds <= 0 {
 		return
 	}
@@ -306,6 +342,11 @@ mut:
 // Both architecture images follow Alpine's standard command layout.
 const desktop_command_path = '/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin'
 
+// The session's home. On QEMU this is a separate writable volume; the rest of
+// the image is a read-only system loaded from the initramfs, so it is also the
+// only place a file created here survives a restart.
+const desktop_home = '/root'
+
 enum ExternalProgramResult {
 	success
 	unavailable
@@ -324,8 +365,9 @@ fn desktop_run_external(path string) ExternalProgramResult {
 
 	argv := [&char(path.str), &char(unsafe { nil })]
 	path_entry := 'PATH=${desktop_command_path}'
-	envp := [&char(path_entry.str), c'HOME=/root', c'TERM=linux', c'USER=root', c'LOGNAME=root',
-		c'SHELL=/bin/sh', c'LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules',
+	home_entry := 'HOME=${desktop_home}'
+	envp := [&char(path_entry.str), &char(home_entry.str), c'TERM=linux', c'USER=root', c'LOGNAME=root',
+		c'SHELL=/bin/zsh', c'LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules',
 		c'LIBGL_DRIVERS_PATH=/usr/lib/xorg/modules/dri:/usr/lib/dri',
 		c'SSL_CA_CERT_FILE=/etc/ssl/certs/ca-certificates.crt', &char(unsafe { nil })]
 
@@ -393,11 +435,12 @@ fn desktop_spawn_shell(path string, rows int, columns int, width int, height int
 	// async-signal-safe functions, which allocating is not.
 	argv := [&char(path.str), c'-i', &char(unsafe { nil })]
 	path_entry := 'PATH=${desktop_command_path}'
+	home_entry := 'HOME=${desktop_home}'
 	// A valid terminal type is required by terminal applications such as tmux.
 	// `linux` is available in ncurses-terminfo-base, including when tmux is
 	// installed through pkg, and the terminal parser accepts its ANSI output.
-	envp := [&char(path_entry.str), c'HOME=/root', c'TERM=linux', c'USER=root', c'LOGNAME=root',
-		c'SHELL=/bin/sh', c'LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules',
+	envp := [&char(path_entry.str), &char(home_entry.str), c'TERM=linux', c'USER=root', c'LOGNAME=root',
+		c'SHELL=/bin/zsh', c'LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules',
 		c'LIBGL_DRIVERS_PATH=/usr/lib/xorg/modules/dri:/usr/lib/dri',
 		c'SSL_CA_CERT_FILE=/etc/ssl/certs/ca-certificates.crt', &char(unsafe { nil })]
 
@@ -418,6 +461,12 @@ fn desktop_spawn_shell(path string, rows int, columns int, width int, height int
 		if slave > 2 {
 			C.close(slave)
 		}
+		// Start in the home directory rather than wherever the compositor was
+		// started from, which is `/` -- a read-only system directory that an
+		// interactive shell has no business writing into. An interactive zsh is
+		// not a login shell, so nothing else moves it there. A failure is not
+		// fatal: a shell in the wrong directory still beats no shell.
+		C.chdir(&char(desktop_home.str))
 		C.execve(&char(path.str), argv.data, envp.data)
 		C._exit(127)
 	}
@@ -426,7 +475,7 @@ fn desktop_spawn_shell(path string, rows int, columns int, width int, height int
 	flags := C.fcntl(master, C.F_GETFL)
 	if flags < 0 || C.fcntl(master, C.F_SETFL, flags | C.O_NONBLOCK) != 0 {
 		C.close(master)
-		desktop_terminate_child(pid)
+		_ = desktop_terminate_child(pid)
 		return none
 	}
 	return SpawnedShell{
@@ -508,6 +557,88 @@ fn desktop_ignore_broken_pipe() {
 	unsafe { C.signal(C.SIGPIPE, C.SIG_IGN) }
 }
 
+// What the session should do once it has finished tearing itself down.
+enum PowerAction {
+	keep_running
+	reload_desktop
+	restart
+	power_off
+	halt
+}
+
+// The commands reboot(2) accepts, as <sys/reboot.h> names them.
+const reboot_restart = u32(0x01234567)
+const reboot_power_off = u32(0x4321fedc)
+const reboot_halt = u32(0xcdef0123)
+
+// The signal number a power signal arrived as, written by the handler and read
+// by the compositor loop. A handler runs between two instructions of whatever
+// the loop was doing, so it may do nothing but this store.
+__global desktop_power_signal = int(0)
+
+// The signal number arrives in a C `int`, which V's own `int` is wider than.
+fn desktop_power_signal_handler(signal i32) {
+	desktop_power_signal = signal
+}
+
+// busybox reboot, poweroff and halt do not call reboot(2) themselves unless
+// they are given -f: they sync, signal PID 1, and leave the machine to init.
+// The desktop image's supervising init forwards those signals here. Their
+// meanings are the ones busybox init gives them, which is what busybox halt
+// sends them for.
+fn desktop_install_power_signals() {
+	unsafe {
+		handler := voidptr(desktop_power_signal_handler)
+		C.signal(C.SIGHUP, handler) // replace this desktop binary
+		C.signal(C.SIGTERM, handler) // reboot
+		C.signal(C.SIGUSR2, handler) // poweroff
+		C.signal(C.SIGUSR1, handler) // halt
+	}
+}
+
+// The power action a signal asked for since this was last called, consuming it.
+fn desktop_pending_power_action() PowerAction {
+	signal := desktop_power_signal
+	if signal == 0 {
+		return .keep_running
+	}
+	desktop_power_signal = 0
+	if signal == C.SIGHUP {
+		return .reload_desktop
+	}
+	if signal == C.SIGUSR1 {
+		return .halt
+	}
+	if signal == C.SIGUSR2 {
+		return .power_off
+	}
+	return .restart
+}
+
+// The desktop image's init supervises the compositor instead of replacing
+// itself with it. Mark that child as the system session so its power menu still
+// takes the machine down; a desktop launched manually from a shell remains an
+// ordinary process and returns to that shell when its session ends.
+fn desktop_is_system_session() bool {
+	return C.getpid() == 1 || C.getenv(c'VINIX_SYSTEM_SESSION') != unsafe { nil }
+}
+
+// Hand the machine to the kernel. reboot(2) only returns when it refuses, so
+// everything the session wanted to finish must already be done.
+fn desktop_power_apply(action PowerAction) {
+	mut command := u32(0)
+	match action {
+		.keep_running, .reload_desktop { return }
+		.restart { command = reboot_restart }
+		.power_off { command = reboot_power_off }
+		.halt { command = reboot_halt }
+	}
+	C.sync()
+	if C.reboot(command) != 0 {
+		eprintln('vinix-desktop: the kernel refused the power request')
+	}
+}
+
 // A native application is another invocation of the desktop executable via a
 // per-app symlink. Vinix records the exec path as the process name, so these
 // are distinct `vinix-files`, `vinix-terminal`, ... processes even though the
@@ -545,8 +676,9 @@ fn desktop_spawn_app(path string, app_name string, tz_offset i64) ?SpawnedAppPro
 	argv := [&char(path.str), &char(mode_arg.str), &char(request_arg.str), &char(response_arg.str),
 		&char(tz_arg.str), &char(unsafe { nil })]
 	path_entry := 'PATH=${desktop_command_path}'
-	envp := [&char(path_entry.str), c'HOME=/root', c'TERM=dumb', c'USER=root', c'LOGNAME=root',
-		c'SHELL=/bin/sh', c'LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules',
+	home_entry := 'HOME=${desktop_home}'
+	envp := [&char(path_entry.str), &char(home_entry.str), c'TERM=dumb', c'USER=root', c'LOGNAME=root',
+		c'SHELL=/bin/zsh', c'LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules',
 		c'LIBGL_DRIVERS_PATH=/usr/lib/xorg/modules/dri:/usr/lib/dri',
 		c'SSL_CA_CERT_FILE=/etc/ssl/certs/ca-certificates.crt', &char(unsafe { nil })]
 
@@ -600,17 +732,60 @@ fn desktop_spawn_app(path string, app_name string, tz_offset i64) ?SpawnedAppPro
 	}
 }
 
-fn desktop_wait_child(pid int) {
+// Reap one child and preserve the wait status so callers handling a failure can
+// report whether it exited normally or died from a signal.
+fn desktop_wait_child(pid int) int {
 	if pid <= 0 {
-		return
+		return -1
 	}
 	mut status := 0
 	for {
 		waited := C.waitpid(pid, &status, 0)
-		if waited == pid || (waited < 0 && C.errno != C.EINTR) {
-			return
+		if waited == pid {
+			return status
+		}
+		if waited < 0 && C.errno != C.EINTR {
+			return -1
 		}
 	}
+	return -1
+}
+
+fn desktop_signal_name(signal int) string {
+	return match signal {
+		1 { 'SIGHUP' }
+		2 { 'SIGINT' }
+		3 { 'SIGQUIT' }
+		4 { 'SIGILL' }
+		5 { 'SIGTRAP' }
+		6 { 'SIGABRT' }
+		7 { 'SIGBUS' }
+		8 { 'SIGFPE' }
+		9 { 'SIGKILL' }
+		10 { 'SIGUSR1' }
+		11 { 'SIGSEGV' }
+		12 { 'SIGUSR2' }
+		13 { 'SIGPIPE' }
+		14 { 'SIGALRM' }
+		15 { 'SIGTERM' }
+		24 { 'SIGXCPU' }
+		25 { 'SIGXFSZ' }
+		31 { 'SIGSYS' }
+		else { 'unknown signal' }
+	}
+}
+
+fn desktop_log_app_exit(name string, pid int, status int) {
+	if status < 0 {
+		eprintln('vinix-desktop: ${name} (pid ${pid}) stopped; wait status unavailable')
+		return
+	}
+	signal := status & 0x7f
+	if signal != 0 && signal != 0x7f {
+		eprintln('vinix-desktop: ${name} (pid ${pid}) stopped with ${desktop_signal_name(signal)} (signal ${signal})')
+		return
+	}
+	eprintln('vinix-desktop: ${name} (pid ${pid}) exited with status ${(status >> 8) & 0xff}')
 }
 
 struct SpawnedWineHost {
@@ -618,10 +793,104 @@ struct SpawnedWineHost {
 	input int
 }
 
+struct SpawnedNativeSurface {
+	pid   int
+	input int
+}
+
+// Start a native Vinix surface client. The child receives compositor input on
+// stdin and publishes XRGB frames at VINIX_SURFACE_PATH. Deliberately omit all
+// X11 and Wayland environment variables: this is the native window-system ABI.
+fn desktop_spawn_native_surface(path string, first_argument string, second_argument string, surface_path string, width int, height int) ?SpawnedNativeSurface {
+	if C.access(&char(path.str), C.X_OK) != 0 || width <= 0 || height <= 0 {
+		return none
+	}
+	mut input := [2]i32{}
+	if C.pipe(&input[0]) != 0 {
+		return none
+	}
+	desktop_set_cloexec(input[0], true)
+	desktop_set_cloexec(input[1], true)
+
+	argv := [&char(path.str), &char(first_argument.str), &char(second_argument.str),
+		&char(unsafe { nil })]
+	path_entry := 'PATH=${desktop_command_path}'
+	home_entry := 'HOME=${desktop_home}'
+	surface_entry := 'VINIX_SURFACE_PATH=${surface_path}'
+	width_entry := 'VINIX_SURFACE_WIDTH=${width}'
+	height_entry := 'VINIX_SURFACE_HEIGHT=${height}'
+	mut envp := [&char(path_entry.str), &char(home_entry.str), c'TERM=dumb', c'USER=root', c'LOGNAME=root',
+		c'SHELL=/bin/zsh', c'LD_LIBRARY_PATH=/usr/lib', c'LIBGL_DRIVERS_PATH=/usr/lib/dri',
+		c'EGL_PLATFORM=surfaceless', c'SSL_CA_CERT_FILE=/etc/ssl/certs/ca-certificates.crt',
+		// jemalloc's background thread never makes progress here. Native
+		// Blender links libjemalloc directly, and with the thread enabled the
+		// process stops dead after its EGL context is created: three minutes
+		// of held time with the CPU column stuck at 0:00 and {jemalloc_bg_thd}
+		// the only thread left to show for it. That is a block, not slow
+		// software rendering, and no amount of waiting clears it. LWJGL's copy
+		// of the same allocator broke Minecraft in its own way (a821af83), so
+		// this is the second thing jemalloc has cost us on Vinix.
+		c'MALLOC_CONF=background_thread:false']
+	// QEMU exposes only simpledrm, so select the packaged software renderer
+	// explicitly. Preserve Mesa's native Asahi selection on Vinix hardware.
+	if C.access(c'/dev/dri/renderD128', C.R_OK | C.W_OK) != 0 {
+		envp << c'LIBGL_ALWAYS_SOFTWARE=1'
+		// Not GALLIUM_DRIVER=llvmpipe. That names a pipe driver for Mesa's
+		// pipe loader to open as gallium-pipe/pipe_llvmpipe.so, and the only
+		// one staged is pipe_swrast.so -- so it asks for a file that is not
+		// there and eglInitialize returns EGL_NOT_INITIALIZED. The failure
+		// surfaces as "libEGL warning: egl: failed to create dri2 screen",
+		// which names neither the variable nor the driver. Measured on this
+		// image: software alone initialises EGL 1.5, adding this one fails,
+		// and MESA_LOADER_DRIVER_OVERRIDE below is harmless either way.
+		envp << c'MESA_LOADER_DRIVER_OVERRIDE=swrast'
+		envp << c'MESA_SHADER_CACHE_DISABLE=true'
+	}
+	envp << &char(surface_entry.str)
+	envp << &char(width_entry.str)
+	envp << &char(height_entry.str)
+	envp << &char(unsafe { nil })
+
+	pid := C.fork()
+	if pid < 0 {
+		C.close(input[0])
+		C.close(input[1])
+		unsafe {
+			path_entry.free()
+			surface_entry.free()
+			width_entry.free()
+			height_entry.free()
+			argv.free()
+			envp.free()
+		}
+		return none
+	}
+	if pid == 0 {
+		C.dup2(input[0], C.STDIN_FILENO)
+		C.close(input[0])
+		C.close(input[1])
+		C.execve(&char(path.str), argv.data, envp.data)
+		C._exit(127)
+	}
+	C.close(input[0])
+	unsafe {
+		path_entry.free()
+		surface_entry.free()
+		width_entry.free()
+		height_entry.free()
+		argv.free()
+		envp.free()
+	}
+	return SpawnedNativeSurface{
+		pid: pid
+		input: int(input[1])
+	}
+}
+
 // Start the native Xvfb/Wine bridge with a private input pipe. The application
 // process retains only the write end; the host receives it as stdin and owns
 // every X11 and translated Wine child for the lifetime of the Vinix window.
-fn desktop_spawn_wine_host(directory string, width int, height int, command string) ?SpawnedWineHost {
+fn desktop_spawn_wine_host(directory string, width int, height int, command string, fill_surface bool) ?SpawnedWineHost {
 	host := '/usr/bin/vinix-wine-host'
 	if C.access(&char(host.str), C.X_OK) != 0 || C.access(&char(command.str), C.X_OK) != 0 {
 		return none
@@ -635,11 +904,19 @@ fn desktop_spawn_wine_host(directory string, width int, height int, command stri
 
 	display_name := ':${C.getpid()}'
 	geometry := '${width}x${height}x24'
-	argv := [&char(host.str), &char(display_name.str), &char(directory.str), &char(geometry.str),
-		&char(command.str), &char(unsafe { nil })]
+	// Beside the surface directory rather than inside it: the host makes that
+	// directory itself, after this log has to be open.
+	log_path := '${directory}.log'
+	mut argv := [&char(host.str), &char(display_name.str), &char(directory.str), &char(geometry.str),
+		&char(command.str)]
+	if fill_surface {
+		argv << c'--fill'
+	}
+	argv << &char(unsafe { nil })
 	path_entry := 'PATH=${desktop_command_path}'
-	envp := [&char(path_entry.str), c'HOME=/root', c'TERM=dumb', c'USER=root', c'LOGNAME=root',
-		c'SHELL=/bin/sh', c'LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules',
+	home_entry := 'HOME=${desktop_home}'
+	envp := [&char(path_entry.str), &char(home_entry.str), c'TERM=dumb', c'USER=root', c'LOGNAME=root',
+		c'SHELL=/bin/zsh', c'LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules',
 		c'LIBGL_DRIVERS_PATH=/usr/lib/xorg/modules/dri:/usr/lib/dri', &char(unsafe { nil })]
 
 	pid := C.fork()
@@ -649,6 +926,7 @@ fn desktop_spawn_wine_host(directory string, width int, height int, command stri
 		unsafe {
 			display_name.free()
 			geometry.free()
+			log_path.free()
 			path_entry.free()
 			argv.free()
 			envp.free()
@@ -659,6 +937,18 @@ fn desktop_spawn_wine_host(directory string, width int, height int, command stri
 		C.dup2(input[0], C.STDIN_FILENO)
 		C.close(input[0])
 		C.close(input[1])
+		// A hosted application's diagnostics belong in a file beside its
+		// framebuffer, not on the system console: the desktop owns the screen
+		// the console writes to, and a browser is talkative enough that
+		// rendering its warnings as console text costs more than running it.
+		log_fd := desktop_create_truncated(log_path)
+		if log_fd >= 0 {
+			C.dup2(log_fd, C.STDOUT_FILENO)
+			C.dup2(log_fd, C.STDERR_FILENO)
+			if log_fd > C.STDERR_FILENO {
+				C.close(log_fd)
+			}
+		}
 		C.execve(&char(host.str), argv.data, envp.data)
 		C._exit(127)
 	}
@@ -666,6 +956,7 @@ fn desktop_spawn_wine_host(directory string, width int, height int, command stri
 	unsafe {
 		display_name.free()
 		geometry.free()
+		log_path.free()
 		path_entry.free()
 		argv.free()
 		envp.free()
@@ -676,12 +967,16 @@ fn desktop_spawn_wine_host(directory string, width int, height int, command stri
 	}
 }
 
-fn desktop_terminate_child(pid int) {
+fn desktop_terminate_child(pid int) int {
 	if pid <= 0 {
-		return
+		return -1
+	}
+	mut status := 0
+	if C.waitpid(pid, &status, C.WNOHANG) == pid {
+		return status
 	}
 	C.kill(pid, C.SIGTERM)
-	desktop_wait_child(pid)
+	return desktop_wait_child(pid)
 }
 
 // True once the child has exited, so the terminal can say so.
@@ -722,6 +1017,19 @@ struct DesktopFileInfo {
 	is_dir bool
 }
 
+// What a disk inventory needs from one directory entry. The identity pair is
+// what answers "have I already counted these bytes": a file reached through a
+// second hard link, or a directory reached through a second path, has the same
+// device and inode as the first time it was seen.
+struct DesktopNodeInfo {
+	size    u64
+	is_dir  bool
+	is_file bool
+	links   u64
+	device  u64
+	inode   u64
+}
+
 fn desktop_stat(path string) ?DesktopFileInfo {
 	mut info := C.stat{}
 	if unsafe { C.stat(&char(path.str), &info) } != 0 {
@@ -730,6 +1038,25 @@ fn desktop_stat(path string) ?DesktopFileInfo {
 	return DesktopFileInfo{
 		size: u64(info.st_size)
 		is_dir: (u32(info.st_mode) & u32(C.S_IFMT)) == u32(C.S_IFDIR)
+	}
+}
+
+// lstat, so a symbolic link is reported as the link and not as whatever it
+// points at. An inventory that followed one would count the target's bytes
+// again under a second name, and a link into an ancestor would never finish.
+fn desktop_lstat(path string) ?DesktopNodeInfo {
+	mut info := C.stat{}
+	if unsafe { C.lstat(&char(path.str), &info) } != 0 {
+		return none
+	}
+	kind := u32(info.st_mode) & u32(C.S_IFMT)
+	return DesktopNodeInfo{
+		size: u64(info.st_size)
+		is_dir: kind == u32(C.S_IFDIR)
+		is_file: kind == u32(C.S_IFREG)
+		links: u64(info.st_nlink)
+		device: u64(info.st_dev)
+		inode: u64(info.st_ino)
 	}
 }
 

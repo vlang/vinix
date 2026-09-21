@@ -10,7 +10,7 @@ pref("accessibility.force_disabled", 1);
 
 pref("browser.shell.checkDefaultBrowser", false);
 pref("browser.startup.homepage_override.mstone", "ignore");
-pref("browser.startup.homepage", "file:///root/firefox-smoke.html");
+pref("browser.startup.homepage", "file:///usr/share/vinix/firefox-smoke.html");
 // Vinix can browse normally, but its early pthread/VM implementation is not
 // ready for Firefox's periodic classifier/database maintenance workers. Keep
 // those optional background jobs off instead of letting them take down an

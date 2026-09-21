@@ -62,7 +62,7 @@ while IFS=$'\t' read -r repository filename; do
     # An apk contains concatenated tar streams (signature, metadata, payload).
     # bsdtar extracts the payload but can return non-zero after it; validate the
     # resulting tools below instead of treating that final warning as failure.
-    tar -ixzf "$archive" -C "$STAGING" 2>/dev/null || true
+    tar --ignore-zeros -xzf "$archive" -C "$STAGING" 2>/dev/null || true
     rm -f "$STAGING/.PKGINFO" "$STAGING/.SIGN"* "$STAGING/.trigger"* \
         "$STAGING/.pre-"* "$STAGING/.post-"*
 done < "$BUILD_DIR/packages"
@@ -90,16 +90,63 @@ printf '%s\n' \
 printf '%s\n' "${ROOT_PACKAGES[@]}" > "$STAGING/etc/vinix-pkg/base-world"
 install -m755 "$SCRIPT_DIR/build-support/vinix-pkg" "$STAGING/usr/bin/pkg"
 
+# Minecraft is an on-demand package rather than part of the base image. Keep
+# its small, auditable installer and launch scripts here; `pkg install
+# minecraft` downloads the official client and its large asset set only when a
+# user asks for it.
+mkdir -p "$STAGING/usr/libexec/vinix-minecraft"
+install -m755 "$SCRIPT_DIR/build-support/minecraft/fetch-minecraft.py" \
+    "$STAGING/usr/libexec/vinix-minecraft/fetch-minecraft.py"
+install -m755 "$SCRIPT_DIR/build-support/minecraft/run-minecraft" \
+    "$STAGING/usr/libexec/vinix-minecraft/run-minecraft"
+install -m755 "$SCRIPT_DIR/build-support/minecraft/minecraft-login" \
+    "$STAGING/usr/libexec/vinix-minecraft/minecraft-login"
+install -m755 "$SCRIPT_DIR/build-support/minecraft/minecraft-xinitrc" \
+    "$STAGING/usr/libexec/vinix-minecraft/minecraft-xinitrc"
+install -m755 "$SCRIPT_DIR/build-support/java-cacerts.py" \
+    "$STAGING/usr/libexec/vinix-minecraft/java-cacerts.py"
+
 install -m755 "$SCRIPT_DIR/tests/network/tools-smoke.sh" \
     "$STAGING/root/network-tools-smoke.sh"
 install -m755 "$SCRIPT_DIR/tests/packages/gtk-smoke.sh" \
     "$STAGING/root/gtk-package-smoke.sh"
 install -m755 "$SCRIPT_DIR/tests/packages/gnumeric-smoke.sh" \
     "$STAGING/root/gnumeric-package-smoke.sh"
+install -m755 "$SCRIPT_DIR/tests/packages/gimp-smoke.sh" \
+    "$STAGING/root/gimp-package-smoke.sh"
+install -m755 "$SCRIPT_DIR/tests/packages/blender-smoke.sh" \
+    "$STAGING/root/blender-package-smoke.sh"
 install -m755 "$SCRIPT_DIR/tests/packages/sublime-smoke.sh" \
     "$STAGING/root/sublime-package-smoke.sh"
+# A persistent /root shadows the copy the image ships there, so the checker the
+# guest tests run lives under /usr/share as well.
+mkdir -p "$STAGING/usr/share/vinix"
+install -m755 "$SCRIPT_DIR/tests/packages/x-window-check.py" \
+    "$STAGING/usr/share/vinix/x-window-check.py"
 install -m755 "$SCRIPT_DIR/tests/packages/x-window-check.py" \
     "$STAGING/root/x-window-check.py"
+install -m755 "$SCRIPT_DIR/build-support/gimp/run-gimp" \
+    "$STAGING/usr/bin/run-gimp"
+# Chromium is fetched on demand with `pkg install chromium`, so its launcher,
+# managed policy and start page have to be in the base image before the
+# package exists. The launcher refuses to start until the package is there.
+install -m755 "$SCRIPT_DIR/build-support/chromium/run-chromium" \
+    "$STAGING/usr/bin/run-chromium"
+install -m755 "$SCRIPT_DIR/tests/packages/chromium-smoke.sh" \
+    "$STAGING/root/chromium-package-smoke.sh"
+mkdir -p "$STAGING/usr/share/vinix"
+install -m644 "$SCRIPT_DIR/tests/browsers/chromium-smoke.html" \
+    "$STAGING/usr/share/vinix/chromium-smoke.html"
+install -m644 "$SCRIPT_DIR/tests/browsers/chromium-smoke.html" \
+    "$STAGING/root/chromium-smoke.html"
+mkdir -p "$STAGING/etc/chromium/policies/managed"
+install -m644 "$SCRIPT_DIR/build-support/chromium/policies.json" \
+    "$STAGING/etc/chromium/policies/managed/vinix.json"
+mkdir -p "$STAGING/etc/gimp/2.0"
+install -m644 "$SCRIPT_DIR/build-support/gimp/vinix-gimprc" \
+    "$STAGING/etc/gimp/2.0/vinix-gimprc"
+install -m644 "$SCRIPT_DIR/build-support/gimp/vinix-sessionrc" \
+    "$STAGING/etc/gimp/2.0/vinix-sessionrc"
 clang -target aarch64-linux-musl -fPIC -ffreestanding -fno-stack-protector \
     -nostdlib -c "$SCRIPT_DIR/tests/packages/gtk-smoke-auto-close.c" \
     -o "$BUILD_DIR/gtk-smoke-auto-close.o"
@@ -138,9 +185,11 @@ fi
 
 if [ -e "$STAGING/usr/bin/gtk3-demo" ] \
     || [ -e "$STAGING/usr/bin/gnumeric" ] \
+    || [ -e "$STAGING/usr/bin/gimp" ] \
+    || [ -e "$STAGING/usr/bin/blender" ] \
     || find "$STAGING/lib" "$STAGING/usr/lib" -name 'libgtk-3.so*' \
         -print -quit 2>/dev/null | grep -q .; then
-    echo "GTK and Gnumeric must not be preinstalled in the network/package layer" >&2
+    echo "GTK, Gnumeric, GIMP, and Blender must not be preinstalled in the network/package layer" >&2
     exit 1
 fi
 

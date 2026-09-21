@@ -30,11 +30,41 @@ printf "Module { name: 'utility_tests' }\n" > "$work/ui/v.mod"
 # the same frontend.
 "$v" -new-compiler -nocache -gc none -manualfree -enable-globals -stats -d ui2_headless \
     -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/utilities_test.v"
+rm -f "$work/ui/utilities_test.v"
+
+# Quick Launch shares the switcher's global keyboard path. Keep its Cmd-Space,
+# query filtering and modal overlay cases isolated from the broader utility
+# suite so sequence state cannot leak between tests.
+cp "$root/desktop/tools/tests/quick_launch_test.v" "$work/ui/"
+"$v" -new-compiler -nocache -gc none -manualfree -enable-globals -stats -d ui2_headless \
+    -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/quick_launch_test.v"
+rm -f "$work/ui/quick_launch_test.v"
+
+# Keep the title-bar gesture cases in their own test entry point so their
+# synthetic pointer timing does not add state to the broader utility suite.
+cp "$root/desktop/tools/tests/titlebar_click_test.v" "$work/ui/"
+"$v" -new-compiler -nocache -gc none -manualfree -enable-globals -stats -d ui2_headless \
+    -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/titlebar_click_test.v"
+rm -f "$work/ui/titlebar_click_test.v"
+
+# First-launch registration owns the whole compositor until its profile is
+# durable. Exercise its exclusive tree, non-dismissible input and verifier file
+# separately because it intentionally never enters the normal desktop loop.
+cp "$root/desktop/tools/tests/registration_test.v" "$work/ui/"
+"$v" -new-compiler -nocache -gc none -manualfree -enable-globals -stats -d ui2_headless \
+    -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/registration_test.v"
+rm -f "$work/ui/registration_test.v"
+
+# Miller columns use real directory listings and their own retained navigation
+# state, so exercise them independently from the broader utility model tests.
+cp "$root/desktop/tools/tests/files_columns_test.v" "$work/ui/"
+"$v" -new-compiler -nocache -gc none -manualfree -enable-globals -stats -d ui2_headless \
+    -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/files_columns_test.v"
+rm -f "$work/ui/files_columns_test.v"
 
 # Build a real executable as well as V's generated test runner. It execs
 # itself twice in native-app mode and verifies UI, actions, state sync and
 # clean shutdown across actual process boundaries.
-rm -f "$work/ui/utilities_test.v"
 cp "$root/desktop/tools/tests/app_process_integration.v" "$work/ui/main.v"
 "$v" -new-compiler -nocache -gc none -manualfree -enable-globals -d ui2_headless \
     -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" -o "$work/app-process-integration" "$work/ui"

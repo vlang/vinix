@@ -1,5 +1,8 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
 // The Start menu. Its two-column layout follows Windows 7: frequently used
 // programs on a light pane, system destinations on the tinted pane, an All
 // Programs view, search at the bottom and a session button in the lower right.
@@ -103,7 +106,7 @@ fn (mut d Desktop) close_start_menu() {
 	d.start_menu_all_apps = false
 	d.start_menu_searching = false
 	d.free_start_menu_query()
-	d.hover = ''
+	d.set_hover('')
 	d.dirty = true
 }
 
@@ -437,7 +440,7 @@ fn (mut d Desktop) handle_start_action(action string) {
 		}
 		action_start_shutdown {
 			d.close_start_menu()
-			d.running = false
+			d.request_power_off()
 		}
 		else {
 			if action.starts_with(action_start_launch_prefix) {

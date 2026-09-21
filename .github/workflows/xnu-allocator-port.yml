@@ -1,0 +1,109 @@
+name: XNU allocator translation tests
+
+on:
+  pull_request:
+    paths:
+      - 'kernel/c/printf_benchmark.c'
+      - 'kernel/c/stdio.h'
+      - 'kernel/modules/xnualloc/**'
+      - 'kernel/modules/memory/**'
+      - 'kernel/modules/**/smp/smp.v'
+      - 'tests/xnualloc/**'
+      - '.github/workflows/xnu-allocator-port.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  host-tests:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Fetch pinned V 0.5.2 host toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 \
+            https://github.com/vlang/v/releases/download/0.5.2/v_linux.zip \
+            -o "$RUNNER_TEMP/v_linux.zip"
+          echo "86caf9e70c3342d48ef19eb4f6c47b709f18c90ae86255520d5c29df6b482e23  $RUNNER_TEMP/v_linux.zip" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/xnu-port-v"
+          unzip -q "$RUNNER_TEMP/v_linux.zip" -d "$RUNNER_TEMP/xnu-port-v"
+          chmod +x "$RUNNER_TEMP/xnu-port-v/v/v"
+          "$RUNNER_TEMP/xnu-port-v/v/v" version
+      - name: Retain verified toolchain for reproducing the host tests
+        uses: actions/upload-artifact@v4
+        with:
+          name: xnu-port-host-toolchain
+          path: ${{ runner.temp }}/v_linux.zip
+          retention-days: 1
+      - name: Model and extracted C-reference checks (not V execution)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tests/memory/heap_model_test.py
+          python3 tests/xnualloc/reference_test.py
+          python3 tests/xnualloc/zone_model_test.py
+      - name: Actual V tests (debug and production)
+        shell: bash
+        run: |
+          set -euo pipefail
+          V="$RUNNER_TEMP/xnu-port-v/v/v"
+          export VMODULES="$GITHUB_WORKSPACE/kernel/modules"
+          "$V" -cc gcc -gc none test tests/xnualloc
+          "$V" -prod -cc gcc -gc none test tests/xnualloc
+
+  kernel-smoke:
+    needs: host-tests
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x86_64, aarch64]
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: xnu-port-host-toolchain
+          path: ${{ runner.temp }}/xnu-port-archive
+      - name: Verify and unpack the pinned compiler
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/xnu-port-archive"
+          echo '86caf9e70c3342d48ef19eb4f6c47b709f18c90ae86255520d5c29df6b482e23  v_linux.zip' | sha256sum -c -
+          unzip -q v_linux.zip -d "$RUNNER_TEMP/xnu-port-v"
+          chmod +x "$RUNNER_TEMP/xnu-port-v/v/v"
+      - name: Install native and cross-build dependencies
+        run: sudo apt-get update && sudo apt-get install -y build-essential clang lld llvm
+      - name: Fetch kernel dependencies
+        run: cd kernel && ./get-deps
+      - name: Build flag-off, bitmap-only and zone kernels (debug)
+        shell: bash
+        env:
+          TARGET_ARCH: ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          V="$RUNNER_TEMP/xnu-port-v/v/v"
+          cd kernel
+          for mode in plain bitmap zone; do
+            # Heap flags are not part of the upstream make config stamp.
+            # Cleaning is mandatory when switching them.
+            make clean
+            flags='-d heap_selftest'
+            if [ "$TARGET_ARCH" = x86_64 ]; then
+              flags="$flags -d heap_benchmark"
+            fi
+            case "$mode" in
+              bitmap) flags="$flags -d xnu_bitmap" ;;
+              zone) flags="$flags -d xnu_zone" ;;
+            esac
+            make -j2 ARCH="$TARGET_ARCH" CC=clang AR=llvm-ar PROD=false \
+              V="$V" VFLAGS="$flags" \
+              CFLAGS='-Ulinux -U__linux -U__linux__ -U__gnu_linux__ -D__vinix__ -O2 -g -pipe'
+          done

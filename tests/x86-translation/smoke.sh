@@ -2,7 +2,7 @@
 set -eu
 
 echo "VINIX X86_64 TRANSLATION TEST"
-output="$(/usr/bin/run-x86-64 /usr/share/vinix/x86-translation-smoke)"
+output="$(/usr/bin/run-x86-64 --direct /usr/share/vinix/x86-translation-smoke)"
 if [ "$output" != "VINIX X86_64 TRANSLATION: PASS" ]; then
     echo "unexpected translated program output: $output" >&2
     exit 1

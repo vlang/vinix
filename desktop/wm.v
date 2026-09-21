@@ -1,5 +1,8 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
 // The window manager. It keeps the window list, turns it into a ui2 element
 // tree once per frame, and routes pointer events back to the elements that
 // tree produced — so what is drawn and what is clickable can never drift
@@ -33,17 +36,47 @@ mut:
 	// to have its corner under the cursor.
 	offset_x int
 	offset_y int
+	// Edge placement is a drag gesture, not a side effect of clicking an
+	// already edge-touching title bar without moving it.
+	moved               bool
+	snap_on_release     WindowSnap
+	maximize_on_release bool
+}
+
+// DamageRect describes the part of the composed canvas that differs from the
+// last presented frame. It stays in logical coordinates; Canvas and
+// Framebuffer each map it to their physical pixels.
+struct DamageRect {
+mut:
+	x     int
+	y     int
+	w     int
+	h     int
+	valid bool
 }
 
 struct Desktop {
 mut:
 	canvas  Canvas
 	fonts   []FontFace
-	windows []Window // painting order; the last entry is on top
-	next_id int = 1
-	focus   int
-	drag    Drag
-	hover   string
+	// Official 512px app artwork, loaded once by the compositor. Native app
+	// helper processes leave these empty because they never rasterize frames.
+	firefox_icon    AppIcon
+	chromium_icon   AppIcon
+	blender_icon    AppIcon
+	minecraft_icon  AppIcon
+	terminal_icon   AppIcon
+	settings_icon   AppIcon
+	activity_icon   AppIcon
+	calculator_icon AppIcon
+	vspace_icon     AppIcon
+	// PNG resources loaded lazily for installed native UI2 applications.
+	native_asset_icons map[string]&AppIcon
+	windows            []Window // painting order; the last entry is on top
+	next_id            int = 1
+	focus              int
+	drag               Drag
+	hover              string // owned; update through set_hover
 
 	pointer_x       int
 	pointer_y       int
@@ -56,10 +89,17 @@ mut:
 
 	frames  int
 	running bool = true
+	// What to do once the loop has ended and the session has been torn down.
+	// Only init may set anything but keep_running; reload_desktop returns to the
+	// supervisor without asking the kernel to power-cycle the machine.
+	power PowerAction
 	// The screen is only recomposed when something it shows has changed. An
 	// idle desktop then costs almost nothing, and — with no garbage collector
 	// on this target — stops rebuilding a tree it would only throw away.
 	dirty bool = true
+	// A moving top-level window can reuse the last complete canvas. Motion
+	// accumulates its old and new bounds here until the next frame consumes it.
+	drag_damage DamageRect
 	// The taskbar clock owns its text so unchanged seconds do not allocate. It
 	// occupies a fixed logical status area, which the framebuffer presenter
 	// scales together with every other desktop coordinate.
@@ -85,6 +125,9 @@ mut:
 	external_error_hint    string
 
 	settings Settings
+	// Screenshot and video requests originate in the native Capture app, but
+	// the compositor owns the pixels and the output stream.
+	capture CaptureService
 	// Cmd-Tab's session: which windows it is stepping through and whether it
 	// has been held long enough to show them.
 	switcher Switcher
@@ -192,6 +235,7 @@ fn (mut d Desktop) raise(id int) {
 
 fn (mut d Desktop) close_window(id int) {
 	index := d.window_index(id) or { return }
+	closing_capture := d.windows[index].title == capture_app_title
 	app_index := d.windows[index].app_index
 	if app_index >= 0 && app_index < d.apps.len {
 		mut app := d.apps[app_index]
@@ -200,31 +244,77 @@ fn (mut d Desktop) close_window(id int) {
 		}
 	}
 	d.windows.delete(index)
+	if closing_capture {
+		d.capture_close()
+	}
 	if d.focus == id {
 		d.focus = if d.windows.len > 0 { d.windows.last().id } else { 0 }
 	}
 	d.dirty = true
 }
 
+fn (mut d Desktop) remember_restore_frame(index int) {
+	d.windows[index].restore_x = d.windows[index].x
+	d.windows[index].restore_y = d.windows[index].y
+	d.windows[index].restore_width = d.windows[index].width
+	d.windows[index].restore_height = d.windows[index].height
+}
+
+fn (mut d Desktop) restore_window(id int) {
+	index := d.window_index(id) or { return }
+	d.windows[index].x = d.windows[index].restore_x
+	d.windows[index].y = d.windows[index].restore_y
+	d.windows[index].width = d.windows[index].restore_width
+	d.windows[index].height = d.windows[index].restore_height
+	d.windows[index].maximized = false
+	d.windows[index].snap = .none_
+	d.raise(id)
+}
+
+fn (mut d Desktop) maximize(id int) {
+	index := d.window_index(id) or { return }
+	if d.windows[index].maximized {
+		return
+	}
+	// A snapped window already remembers the normal frame it should return to.
+	if d.windows[index].snap == .none_ {
+		d.remember_restore_frame(index)
+	}
+	d.windows[index].x = 0
+	d.windows[index].y = 0
+	d.windows[index].width = d.canvas.width
+	d.windows[index].height = d.canvas.height - taskbar_height
+	d.windows[index].maximized = true
+	d.windows[index].snap = .none_
+	d.raise(id)
+}
+
 fn (mut d Desktop) toggle_maximize(id int) {
 	index := d.window_index(id) or { return }
 	if d.windows[index].maximized {
-		d.windows[index].x = d.windows[index].restore_x
-		d.windows[index].y = d.windows[index].restore_y
-		d.windows[index].width = d.windows[index].restore_width
-		d.windows[index].height = d.windows[index].restore_height
-		d.windows[index].maximized = false
+		d.restore_window(id)
 	} else {
-		d.windows[index].restore_x = d.windows[index].x
-		d.windows[index].restore_y = d.windows[index].y
-		d.windows[index].restore_width = d.windows[index].width
-		d.windows[index].restore_height = d.windows[index].height
-		d.windows[index].x = 0
-		d.windows[index].y = 0
-		d.windows[index].width = d.canvas.width
-		d.windows[index].height = d.canvas.height - taskbar_height
-		d.windows[index].maximized = true
+		d.maximize(id)
 	}
+}
+
+fn (mut d Desktop) snap_window(id int, snap WindowSnap) {
+	if snap == .none_ {
+		return
+	}
+	index := d.window_index(id) or { return }
+	// Moving between arranged states must not replace the original normal
+	// frame with a maximized or half-screen frame.
+	if !d.windows[index].maximized && d.windows[index].snap == .none_ {
+		d.remember_restore_frame(index)
+	}
+	half := d.canvas.width / 2
+	d.windows[index].x = if snap == .left { 0 } else { half }
+	d.windows[index].y = 0
+	d.windows[index].width = if snap == .left { half } else { d.canvas.width - half }
+	d.windows[index].height = d.canvas.height - taskbar_height
+	d.windows[index].maximized = false
+	d.windows[index].snap = snap
 	d.raise(id)
 }
 
@@ -319,7 +409,13 @@ fn (mut d Desktop) window_element(window_index int) ui2.Element {
 	set_hovered := d.hover == window.id_close || d.hover == window.id_minimize
 		|| d.hover == window.id_maximize
 
-	maximize_glyph := if window.maximized { 'builtin:restore' } else { 'builtin:maximize' }
+	maximize_glyph := if theme.button_look == .traffic {
+		// Catalina calls this the zoom control. Its mark stays a plus while the
+		// standard window frame toggles between its two sizes.
+		'builtin:zoom'
+	} else {
+		if window.maximized { 'builtin:restore' } else { 'builtin:maximize' }
+	}
 
 	// Traffic lights are read as a group, and red-yellow-green left to right is
 	// the whole of what makes them recognisable — so they keep that order at
@@ -339,13 +435,20 @@ fn (mut d Desktop) window_element(window_index int) ui2.Element {
 		close_x = left_edge
 		middle_x = left_edge + stride
 		inner_x = left_edge + 2 * stride
+		middle_glyph = 'builtin:traffic_minimize'
+		inner_glyph = 'builtin:zoom'
 	} else if !buttons_left {
 		// Inward from close on the right: zoom, then minimise.
 		middle, inner = window.id_maximize, window.id_minimize
 		middle_glyph, inner_glyph = maximize_glyph, 'builtin:minimize'
 	}
 
-	close := d.title_button(window.id_close, 'builtin:close', close_x, active, set_hovered)
+	close_glyph := if theme.button_look == .traffic {
+		'builtin:traffic_close'
+	} else {
+		'builtin:close'
+	}
+	close := d.title_button(window.id_close, close_glyph, close_x, active, set_hovered)
 	maximize := d.title_button(middle, middle_glyph, middle_x, active, set_hovered)
 	minimize := d.title_button(inner, inner_glyph, inner_x, active, set_hovered)
 
@@ -375,7 +478,7 @@ fn (mut d Desktop) window_element(window_index int) ui2.Element {
 	}, title_children)
 
 	divider := ui2.view(window.id_divider, ui2.rect(0, f64(theme.title_height - 1), f64(window.width), 1), ui2.BoxStyle{
-		bg: theme.title_divider
+		bg: if active { theme.title_divider } else { theme.title_inactive_divider }
 	}, [])
 
 	background, contents := d.window_contents(window_index, body_height)
@@ -419,6 +522,12 @@ fn (mut d Desktop) window_contents(window_index int, body_height int) (u32, []ui
 // launch starts a native app process or queues an external application for the main
 // loop to run after releasing the physical display and input devices.
 fn (mut d Desktop) launch(factory AppFactory) {
+	d.launch_with_timeout(factory, app_response_timeout_ms)
+}
+
+// launch_with_timeout keeps normal interactive launches responsive while
+// allowing the boot path to tolerate cold persistent storage.
+fn (mut d Desktop) launch_with_timeout(factory AppFactory, timeout_ms int) {
 	if factory.exclusive_command != '' {
 		d.pending_external = factory.exclusive_command
 		d.pending_external_title = factory.title
@@ -426,11 +535,11 @@ fn (mut d Desktop) launch(factory AppFactory) {
 		d.dirty = true
 		return
 	}
-	if factory.open == unsafe { nil } || factory.process_name == '' {
+	if (factory.open == unsafe { nil } && !factory.standalone) || factory.process_name == '' {
 		eprintln('vinix-desktop: ${factory.title} has no launcher')
 		return
 	}
-	app := start_remote_app(factory, mut d) or {
+	app := start_remote_app_with_timeout(factory, mut d, timeout_ms) or {
 		eprintln('vinix-desktop: cannot start ${factory.title}: ${err}')
 		return
 	}
@@ -451,7 +560,7 @@ fn (mut d Desktop) launch(factory AppFactory) {
 fn (mut d Desktop) external_finished(result ExternalProgramResult) {
 	d.buttons = 0
 	d.drag = Drag{}
-	d.hover = ''
+	d.set_hover('')
 	d.wallpaper_valid = false
 	d.dirty = true
 	title := if d.pending_external_title == '' {
@@ -503,7 +612,10 @@ fn (mut d Desktop) poll_apps() {
 		}
 		mut app := d.apps[window.app_index]
 		if mut app is PollingApp {
-			if app.poll() {
+			// A minimised window still has to be polled — a shell pipe has to
+			// be drained whether or not anyone can see it — but recomposing
+			// the screen for a picture nobody is looking at is pure waste.
+			if app.poll() && !window.minimized {
 				d.dirty = true
 			}
 		}
@@ -566,6 +678,32 @@ fn (mut d Desktop) send_keys_to_focused(keys string) {
 	}
 }
 
+// End the session, and take the machine with it when this compositor owns the
+// supervised system session. Started from a shell on the full image it is an
+// ordinary process that happens to own the screen: there, ending the session
+// means giving the console back to that shell and nothing more.
+fn (mut d Desktop) end_session(action PowerAction) {
+	if desktop_is_system_session() {
+		d.power = action
+	}
+	d.running = false
+}
+
+// The Start menu's power button.
+fn (mut d Desktop) request_power_off() {
+	d.end_session(.power_off)
+}
+
+// A supervisor signal ends the session at a frame boundary, so applications
+// are closed and the console is restored before reload or machine powerdown.
+fn (mut d Desktop) take_power_signal() {
+	action := desktop_pending_power_action()
+	if action == .keep_running {
+		return
+	}
+	d.end_session(action)
+}
+
 // close_apps shuts every native client down before the compositor exits. App
 // slots are intentionally stable while windows are open, so walk the slots
 // themselves: a closed window has already closed its process and is harmless.
@@ -600,6 +738,19 @@ fn (mut d Desktop) launch_titled(title string) {
 	eprintln('vinix-desktop: no application called ${title}')
 }
 
+// launch_titled_at_startup is only for applications requested as the desktop
+// comes up. It prevents a cold Files directory scan from being mistaken for a
+// hung application and killed after the normal interactive timeout.
+fn (mut d Desktop) launch_titled_at_startup(title string) {
+	for factory in available_apps {
+		if factory.title == title {
+			d.launch_with_timeout(factory, app_startup_response_timeout_ms)
+			return
+		}
+	}
+	eprintln('vinix-desktop: no application called ${title}')
+}
+
 fn (mut d Desktop) launch_index(index int) {
 	if index >= 0 && index < available_apps.len {
 		d.launch(available_apps[index])
@@ -611,6 +762,15 @@ fn (mut d Desktop) launch_index(index int) {
 // `__qml_` — so rather than parse them the window manager routes by where the
 // click landed, which is also what decides it between two open applications.
 fn (mut d Desktop) forward_to_app(x int, y int, action string) {
+	if action.starts_with(ui2_example_action_prefix) {
+		name := action[ui2_example_action_prefix.len..]
+		factory := ui2_example_named(name) or {
+			eprintln('vinix-desktop: unknown ui2 example ${name}')
+			return
+		}
+		d.launch(factory)
+		return
+	}
 	for i := d.windows.len - 1; i >= 0; i-- {
 		window := d.windows[i]
 		if window.minimized || window.app_index < 0 || window.app_index >= d.apps.len {
@@ -624,6 +784,13 @@ fn (mut d Desktop) forward_to_app(x int, y int, action string) {
 			eprintln('vinix-desktop: ${window.title}: ${err}')
 		}
 		d.raise(window.id)
+		// Capture the desktop, not the Capture window. The compositor will wait
+		// until it has presented a frame with this window hidden before writing
+		// the first pixel. Its taskbar entry remains the way back to Stop.
+		if action == capture_action_take_screenshot || action == capture_action_start_video {
+			d.capture.owner_window_id = window.id
+			d.minimize(window.id)
+		}
 		d.dirty = true
 		return
 	}
@@ -632,7 +799,7 @@ fn (mut d Desktop) forward_to_app(x int, y int, action string) {
 // forward_pointer_to_app routes raw pointer input only to applications that
 // explicitly request it. A press captures the surface until release so a drag
 // does not get lost merely because it crossed the content edge.
-fn (mut d Desktop) forward_pointer_to_app(x int, y int, phase AppPointerPhase) bool {
+fn (mut d Desktop) forward_pointer_to_app(x int, y int, phase AppPointerPhase, button AppPointerButton, scroll int) bool {
 	mut selected := -1
 	if d.pointer_capture != 0 {
 		selected = d.window_index(d.pointer_capture) or { -1 }
@@ -679,7 +846,7 @@ fn (mut d Desktop) forward_pointer_to_app(x int, y int, phase AppPointerPhase) b
 		if local_y >= body_height {
 			local_y = body_height - 1
 		}
-		app.pointer_event(phase, local_x, local_y, window.width, body_height)
+		app.pointer_event(phase, button, scroll, local_x, local_y, window.width, body_height)
 		if phase == .down {
 			d.pointer_capture = window_id
 			// A foreign surface has no ui2 action id to focus through the
@@ -687,7 +854,8 @@ fn (mut d Desktop) forward_pointer_to_app(x int, y int, phase AppPointerPhase) b
 			// clicking it raises the native frame and gives its keyboard bridge
 			// focus for shortcuts and typing.
 			d.raise(window_id)
-		} else if phase == .up {
+		} else if phase == .up
+			&& d.buttons & (button_left | button_right | button_middle) == 0 {
 			d.pointer_capture = 0
 		}
 		return true
@@ -761,26 +929,48 @@ fn (d &Desktop) title_button(id string, glyph string, x int, active bool, set_ho
 	theme := d.theme()
 	y := (theme.title_height - theme.button_size) / 2
 	hovered := d.hover == id
-	is_close := glyph == 'builtin:close'
+	is_close := glyph == 'builtin:close' || glyph == 'builtin:traffic_close'
 
 	if theme.button_look == .traffic {
 		// A disc: coloured when the window is focused, grey when it is not, and
 		// carrying its glyph only while the pointer is over the set. Radius is
 		// half the size, which is how a rounded rect becomes a circle.
+		is_minimize := glyph == 'builtin:minimize' || glyph == 'builtin:traffic_minimize'
 		fill := if !active {
 			theme.traffic_idle
 		} else if is_close {
 			theme.traffic_close
-		} else if glyph == 'builtin:minimize' {
+		} else if is_minimize {
 			theme.traffic_minimize
 		} else {
 			theme.traffic_zoom
 		}
+		edge := if !active {
+			theme.traffic_idle_edge
+		} else if is_close {
+			theme.traffic_close_edge
+		} else if is_minimize {
+			theme.traffic_minimize_edge
+		} else {
+			theme.traffic_zoom_edge
+		}
+		glyph_color := if is_close {
+			theme.traffic_close_glyph
+		} else if is_minimize {
+			theme.traffic_minimize_glyph
+		} else {
+			theme.traffic_zoom_glyph
+		}
 		return ui2.button_with_image(id, '', if set_hovered { glyph } else { '' }, ui2.rect(f64(x), f64(y), f64(theme.button_size), f64(theme.button_size)), ui2.BoxStyle{
 			bg: fill
 			radius: theme.button_size / 2
+			border_color: edge
+			border_left: 1
+			border_top: 1
+			border_right: 1
+			border_bottom: 1
 		}, ui2.TextStyle{
-			color: theme.glyph_color
+			color: glyph_color
 		})
 	}
 
@@ -806,20 +996,22 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 	// A dock is a panel wide enough for what is in it, centred and floating
 	// clear of the screen's edge. A taskbar is the whole width of the bottom.
 	dock := theme.dock
+	icon_only := theme.taskbar_icon_only
 	edge_padding := if dock { theme.dock_padding } else { taskbar_padding }
 
 	mut children := frame_elements(d.windows.len + 4)
-	item_y := (taskbar_height - taskbar_item_height) / 2
+	item_height := if icon_only { taskbar_icon_item_height } else { taskbar_item_height }
+	item_y := (taskbar_height - item_height) / 2
 
 	// The Start orb is the taskbar's anchor. Its standalone V is the first
 	// letterform of the wallpaper wordmark, not a font-dependent character.
-	children << ui2.button_with_image(action_start_toggle, '', 'builtin:vinix', ui2.rect(f64(edge_padding), f64(item_y), f64(start_button_width), f64(taskbar_item_height)), ui2.BoxStyle{
-		bg: if d.start_menu_open || d.hover == action_start_toggle {
+	children << ui2.button_with_image(action_start_toggle, '', 'builtin:vinix', ui2.rect(f64(edge_padding), f64(item_y), f64(start_button_width), f64(item_height)), ui2.BoxStyle{
+		bg:     if d.start_menu_open || d.hover == action_start_toggle {
 			theme.accent
 		} else {
 			theme.accent_dim
 		}
-		radius: taskbar_item_height / 2
+		radius: item_height / 2
 	}, ui2.TextStyle{
 		color: theme.taskbar_text_active
 	})
@@ -841,14 +1033,21 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 	// Entries share whatever room is left rather than each taking a fixed
 	// slot: with a fixed one the last window opened simply had no entry, which
 	// is the opposite of what a list of open windows is for.
-	mut item_width := if dock { dock_item_width } else { taskbar_item_width }
+	mut item_width := if dock {
+		dock_item_width
+	} else if icon_only {
+		taskbar_icon_item_width
+	} else {
+		taskbar_item_width
+	}
+	item_min_width := if icon_only { taskbar_icon_item_min_width } else { taskbar_item_min_width }
 	if entries.len > 0 {
 		share := (entry_right - x + taskbar_item_gap) / entries.len - taskbar_item_gap
 		if share < item_width {
 			item_width = share
 		}
-		if item_width < taskbar_item_min_width {
-			item_width = taskbar_item_min_width
+		if item_width < item_min_width {
+			item_width = item_min_width
 		}
 	}
 
@@ -872,14 +1071,24 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 		} else {
 			theme.taskbar_text
 		}
-		children << ui2.button(entry.id, entry.label, ui2.rect(f64(x), f64(item_y), f64(item_width), f64(taskbar_item_height)), ui2.BoxStyle{
-			bg: bg
-			radius: 6
-		}, ui2.TextStyle{
-			color: text_color
-			size: 12
-			align: .left
-		})
+		button_frame := ui2.rect(f64(x), f64(item_y), f64(item_width), f64(item_height))
+		button_style := ui2.BoxStyle{
+			bg:     bg
+			radius: if icon_only { 4 } else { 6 }
+		}
+		if icon_only {
+			// An icon consumes the full button when it has no label, making an
+			// app identifiable at a glance without stealing room from the clock.
+			children << ui2.button_with_image(entry.id, '', entry.icon, button_frame, button_style, ui2.TextStyle{
+				color: text_color
+			})
+		} else {
+			children << ui2.button(entry.id, entry.label, button_frame, button_style, ui2.TextStyle{
+				color: text_color
+				size:  12
+				align: .left
+			})
+		}
 		x += item_width + taskbar_item_gap
 	}
 
@@ -933,6 +1142,7 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 struct TaskbarEntry {
 	id        string
 	label     string
+	icon      string
 	active    bool
 	minimized bool
 }
@@ -947,9 +1157,10 @@ fn (d &Desktop) taskbar_entries() []TaskbarEntry {
 			window := &d.windows[index]
 			last_id = window.id
 			out << TaskbarEntry{
-				id: window.id_task
-				label: window.title
-				active: window.id == d.focus && !window.minimized
+				id:        window.id_task
+				label:     window.title
+				icon:      window.icon
+				active:    window.id == d.focus && !window.minimized
 				minimized: window.minimized
 			}
 		}
@@ -991,9 +1202,10 @@ fn (d &Desktop) taskbar_entries() []TaskbarEntry {
 			}
 		}
 		out << TaskbarEntry{
-			id: d.windows[newest_index].id_task
-			label: if count > 1 { '${window.title}  (${count})' } else { window.title }
-			active: active
+			id:        d.windows[newest_index].id_task
+			label:     if count > 1 { '${window.title}  (${count})' } else { window.title }
+			icon:      d.windows[newest_index].icon
+			active:    active
 			minimized: all_minimized
 		}
 	}
@@ -1005,16 +1217,37 @@ fn (d &Desktop) taskbar_entries() []TaskbarEntry {
 
 fn (mut d Desktop) on_pointer_move(x int, y int) {
 	pointer_moved := x != d.pointer_x || y != d.pointer_y
+	old_pointer_x := d.pointer_x
+	old_pointer_y := d.pointer_y
 	if pointer_moved {
 		d.dirty = true
 	}
 	d.pointer_x = x
 	d.pointer_y = y
+	if d.drag.kind == .move && pointer_moved {
+		d.drag.moved = true
+	}
+	if d.drag.kind == .move && d.buttons & button_left != 0 {
+		// Keep the edge seen while the button is down. Some absolute-pointer
+		// backends report the button-up packet after wrapping a cursor that
+		// crossed the host's left or top edge to the opposite side.
+		d.drag.maximize_on_release = y <= 0
+		d.drag.snap_on_release = if y <= 0 {
+			.none_
+		} else if x <= 0 {
+			.left
+		} else if x >= d.canvas.width - 1 {
+			.right
+		} else {
+			.none_
+		}
+	}
 
 	// The button level, not just the release edge, ends a drag. The driver
 	// reports the current state on every read, so a release that was missed
 	// between two frames cannot leave a window stuck to the cursor.
 	if d.drag.kind == .move && d.buttons & button_left == 0 {
+		d.finish_window_drag(x, y)
 		d.drag = Drag{}
 	}
 
@@ -1023,11 +1256,11 @@ fn (mut d Desktop) on_pointer_move(x int, y int) {
 			d.drag = Drag{}
 			return
 		}
-		// A maximised window that is dragged goes back to its own size, with
+		// An arranged window that is dragged goes back to its own size, with
 		// the grab kept proportionally along the title bar.
-		if d.windows[index].maximized {
+		if d.windows[index].maximized || d.windows[index].snap != .none_ {
 			ratio := f64(d.drag.offset_x) / f64(d.windows[index].width)
-			d.toggle_maximize(d.drag.window_id)
+			d.restore_window(d.drag.window_id)
 			new_index := d.window_index(d.drag.window_id) or { return }
 			d.drag.offset_x = int(ratio * f64(d.windows[new_index].width))
 			d.drag.offset_y = d.theme().title_height / 2
@@ -1037,21 +1270,78 @@ fn (mut d Desktop) on_pointer_move(x int, y int) {
 		old_y := d.windows[moved].y
 		d.windows[moved].x = x - d.drag.offset_x
 		d.windows[moved].y = y - d.drag.offset_y
-		d.clamp_to_screen(moved)
+		d.clamp_drag_to_screen(moved)
+		if pointer_moved {
+			// Repaint the old location to reveal what was behind the window and
+			// the new one to draw it again. The cursor is composed into the same
+			// canvas, so both of its footprints need refreshing too.
+			d.add_drag_damage(old_x, old_y, d.windows[moved].x, d.windows[moved].y,
+				old_pointer_x, old_pointer_y, x, y, d.windows[moved].width,
+				d.windows[moved].height)
+		}
 		if d.windows[moved].x != old_x || d.windows[moved].y != old_y {
 			d.dirty = true
 		}
 		return
 	}
 	if !d.start_menu_open && !d.start_menu_pointer {
-		d.forward_pointer_to_app(x, y, .move)
+		d.forward_pointer_to_app(x, y, .move, .no_button, 0)
 	}
 
 	hover := d.hit_action(x, y)
 	if hover != d.hover {
-		d.hover = hover
+		d.set_hover(hover)
 		d.dirty = true
 	}
+}
+
+// add_drag_damage includes the outside edge of the shadow and both cursor
+// positions. Rendering clips it to the canvas, so edge coordinates may be
+// negative here.
+fn (mut d Desktop) add_drag_damage(old_x int, old_y int, new_x int, new_y int,
+	old_pointer_x int, old_pointer_y int, pointer_x int, pointer_y int, width int, height int) {
+	d.add_damage_rect(old_x - 7, old_y - 5, width + 14, height + 14)
+	d.add_damage_rect(new_x - 7, new_y - 5, width + 14, height + 14)
+	// The Catalina pointer includes a soft shadow to the right and below; this
+	// rectangle also covers the default pointer's one-pixel halo.
+	d.add_damage_rect(old_pointer_x - 1, old_pointer_y - 1, catalina_cursor_width + 2,
+		catalina_cursor_height + 2)
+	d.add_damage_rect(pointer_x - 1, pointer_y - 1, catalina_cursor_width + 2,
+		catalina_cursor_height + 2)
+}
+
+fn (mut d Desktop) add_damage_rect(x int, y int, width int, height int) {
+	if width <= 0 || height <= 0 {
+		return
+	}
+	if !d.drag_damage.valid {
+		d.drag_damage = DamageRect{
+			x:     x
+			y:     y
+			w:     width
+			h:     height
+			valid: true
+		}
+		return
+	}
+	right := if d.drag_damage.x + d.drag_damage.w > x + width {
+		d.drag_damage.x + d.drag_damage.w
+	} else {
+		x + width
+	}
+	bottom := if d.drag_damage.y + d.drag_damage.h > y + height {
+		d.drag_damage.y + d.drag_damage.h
+	} else {
+		y + height
+	}
+	if x < d.drag_damage.x {
+		d.drag_damage.x = x
+	}
+	if y < d.drag_damage.y {
+		d.drag_damage.y = y
+	}
+	d.drag_damage.w = right - d.drag_damage.x
+	d.drag_damage.h = bottom - d.drag_damage.y
 }
 
 // clamp_to_screen keeps a window wholly visible when it fits. Oversized
@@ -1090,9 +1380,36 @@ fn (mut d Desktop) clamp_to_screen(index int) {
 	}
 }
 
+// clamp_drag_to_screen allows the frame to cross the side and bottom display
+// edges while keeping a small, reachable piece of title bar on-screen. The
+// stricter clamp_to_screen remains for initial window placement.
+fn (mut d Desktop) clamp_drag_to_screen(index int) {
+	mut reachable_width := 60
+	if d.windows[index].width < reachable_width {
+		reachable_width = d.windows[index].width
+	}
+	if d.canvas.width < reachable_width {
+		reachable_width = d.canvas.width
+	}
+	max_x := d.canvas.width - reachable_width
+	max_y := d.canvas.height - taskbar_height - d.theme().title_height
+	if d.windows[index].x > max_x {
+		d.windows[index].x = max_x
+	}
+	if d.windows[index].x + d.windows[index].width < reachable_width {
+		d.windows[index].x = reachable_width - d.windows[index].width
+	}
+	if d.windows[index].y < 0 {
+		d.windows[index].y = 0
+	}
+	if d.windows[index].y > max_y {
+		d.windows[index].y = max_y
+	}
+}
+
 fn (mut d Desktop) on_pointer_down(x int, y int) {
 	action := d.hit_action(x, y)
-	d.hover = action
+	d.set_hover(action)
 	d.dirty = true
 
 	if d.switcher.active {
@@ -1122,7 +1439,7 @@ fn (mut d Desktop) on_pointer_down(x int, y int) {
 		d.close_start_menu()
 	}
 
-	if d.forward_pointer_to_app(x, y, .down) {
+	if d.forward_pointer_to_app(x, y, .down, .left, 0) && action == '' {
 		// Raw-surface clicks were already delivered and focused above. Falling
 		// through would interpret their deliberately action-less content as an
 		// empty-desktop click and immediately clear that focus again.
@@ -1168,6 +1485,7 @@ fn (mut d Desktop) on_pointer_down(x int, y int) {
 					offset_x: x - d.windows[index].x
 					offset_y: y - d.windows[index].y
 				}
+				d.drag_damage = DamageRect{}
 			}
 			'close' {
 				d.close_window(id)
@@ -1189,11 +1507,50 @@ fn (mut d Desktop) on_pointer_up(x int, y int) {
 	if d.start_menu_pointer {
 		d.start_menu_pointer = false
 	} else {
-		d.forward_pointer_to_app(x, y, .up)
+		d.forward_pointer_to_app(x, y, .up, .left, 0)
 	}
+	d.finish_window_drag(x, y)
 	d.drag = Drag{}
-	d.hover = d.hit_action(x, y)
+	d.drag_damage = DamageRect{}
+	d.set_hover(d.hit_action(x, y))
 	d.dirty = true
+}
+
+// finish_window_drag applies Windows 7-style edge placement when the title
+// bar is released against a display edge. The top edge takes precedence at a
+// corner; the side edges fill their respective half of the usable desktop.
+fn (mut d Desktop) finish_window_drag(x int, y int) {
+	if d.drag.kind != .move || !d.drag.moved {
+		return
+	}
+	id := d.drag.window_id
+	if y <= 0 || (d.drag.maximize_on_release && y >= d.canvas.height - 1) {
+		d.maximize(id)
+	} else if x <= 0 {
+		d.snap_window(id, if d.drag.snap_on_release == .right { .right } else { .left })
+	} else if x >= d.canvas.width - 1 {
+		d.snap_window(id, if d.drag.snap_on_release == .left { .left } else { .right })
+	}
+}
+
+// Non-primary buttons and the wheel have no desktop chrome meaning yet, but a
+// native pixel-surface client needs them for its own interaction model.
+fn (mut d Desktop) on_app_pointer_button(x int, y int, phase AppPointerPhase, button AppPointerButton) {
+	if d.switcher.active || d.start_menu_open {
+		return
+	}
+	if d.forward_pointer_to_app(x, y, phase, button, 0) {
+		d.dirty = true
+	}
+}
+
+fn (mut d Desktop) on_app_pointer_scroll(x int, y int, scroll int) {
+	if scroll == 0 || d.switcher.active || d.start_menu_open {
+		return
+	}
+	if d.forward_pointer_to_app(x, y, .scroll, .no_button, scroll) {
+		d.dirty = true
+	}
 }
 
 // hit_action returns the action id of the topmost target under a point. The
@@ -1208,6 +1565,19 @@ fn (d &Desktop) hit_action(x int, y int) string {
 		}
 	}
 	return ''
+}
+
+// Hover outlives the frame that produced its hit target. Keep an owned copy:
+// actions may come from an element tree or an array which is released or moved
+// while an application is being launched.
+fn (mut d Desktop) set_hover(action string) {
+	if d.hover == action {
+		return
+	}
+	if d.hover.len > 0 {
+		unsafe { d.hover.free() }
+	}
+	d.hover = if action.len > 0 { action.clone() } else { '' }
 }
 
 // spawn_scattered opens the next window slightly offset from the last one, the

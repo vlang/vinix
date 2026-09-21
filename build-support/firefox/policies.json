@@ -6,7 +6,7 @@
     "DisableTelemetry": true,
     "DontCheckDefaultBrowser": true,
     "NoDefaultBookmarks": true,
-    "OverrideFirstRunPage": "file:///root/firefox-smoke.html",
+    "OverrideFirstRunPage": "file:///usr/share/vinix/firefox-smoke.html",
     "OverridePostUpdatePage": ""
   }
 }

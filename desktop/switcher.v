@@ -1,6 +1,9 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
-// Cmd-Tab: the window switcher.
+// Cmd-Tab: the window switcher, and the global Cmd-Space keyboard hook.
 //
 // A tap moves to the window under the one on top, the way Alt-Tab and Cmd-Tab
 // have always worked. Holding Cmd down instead asks the question "what else is
@@ -9,13 +12,11 @@
 // each further Tab, and the window it lands on raised when Cmd is let go.
 //
 // A terminal has no way to say "Cmd", so the keyboard drivers say it for it.
-// Cmd-Tab arrives as the CSI-u encoding of Tab with the super bit set, which
-// is what a terminal that reports modified keys at all uses, and the release
-// of Cmd — which no terminal has ever had a reason to report — as the encoding
-// of the left Super key with an event type of "released". Both are taken out
-// of the stream before anything else sees them: Cmd-Tab belongs to the window
-// manager whoever is typing, exactly as it does on the machine this borrows
-// the gesture from.
+// Cmd-Tab and Cmd-Space arrive in CSI-u form with the super bit set, and the
+// release of Cmd — which no terminal has ever had a reason to report — arrives
+// as the encoding of the left Super key with an event type of "released".
+// These sequences are taken out before focused applications see them, so both
+// window switching and Quick Launch remain desktop-global shortcuts.
 module main
 
 import ui2
@@ -29,18 +30,20 @@ const switcher_reveal_ms = i64(400)
 const action_switch_prefix = 'switch.'
 
 // SwitcherKey is one sequence the drivers send and what it does to the
-// selection: forwards, backwards, or `commit`, which is Cmd being let go.
+// selection: forwards, backwards, Quick Launch, or `commit` when Cmd is let go.
 struct SwitcherKey {
 	bytes string
 	step  int
 }
 
 const switch_commit = 0
+const switch_quick_launch = 2
 
 const switcher_keys = [
+	SwitcherKey{quick_launch_key, switch_quick_launch},
 	SwitcherKey{'\x1b[9;9u', 1},
 	SwitcherKey{'\x1b[9;10u', -1},
-	SwitcherKey{'\x1b[57444;1:3u', switch_commit},
+	SwitcherKey{quick_launch_cmd_release, switch_commit},
 ]
 
 // The arrows move the selection too, as they do on macOS, but only while a
@@ -58,7 +61,8 @@ const seq_partial = -1
 
 // Switcher is one press-and-hold of Cmd. It is `active` from the first Tab
 // until Cmd is let go, and `shown` once the hold has gone on long enough for
-// the panel to be worth drawing.
+// the panel to be worth drawing. Quick Launch borrows the same modal overlay
+// and keyboard parser, but remains shown after Cmd is released.
 struct Switcher {
 mut:
 	active  bool
@@ -72,9 +76,14 @@ mut:
 	order []int
 	// Tile action ids. They depend only on a position in the row, so they are
 	// built once and kept: the tree is rebuilt every frame, this target has no
-	// garbage collector, and the count is however many windows have ever been
-	// open at once.
+	// garbage collector, and the count is however many windows or app results
+	// have ever needed to be shown at once.
 	ids []string
+	// Quick Launch lives inside the switcher's global-input path so it can own
+	// typing even when the focused application normally consumes the keyboard.
+	quick_launch            bool
+	quick_launch_chord_held bool
+	query                   []u8
 	// The start of a sequence that the read ended inside, held until the next
 	// read completes it.
 	pending string
@@ -82,9 +91,10 @@ mut:
 
 // ── The keys ───────────────────────────────────────────────────────
 
-// take_switcher_keys acts on every switcher sequence in the input and returns
-// what is left. An empty read still goes through, because a held-back partial
-// sequence has to be let go when nothing arrives to complete it.
+// take_switcher_keys acts on every desktop-global Cmd sequence in the input
+// and returns what is left. An empty read still goes through, because a
+// held-back partial sequence has to be let go when nothing arrives to complete
+// it. While Quick Launch is active, all remaining input belongs to its query.
 fn (mut d Desktop) take_switcher_keys(keys string) string {
 	mut input := keys
 	if d.switcher.pending.len > 0 {
@@ -92,10 +102,21 @@ fn (mut d Desktop) take_switcher_keys(keys string) string {
 			// Nothing completed it, so it was not one of ours after all.
 			held := d.switcher.pending
 			d.switcher.pending = ''
+			if d.switcher.quick_launch {
+				// There is no focused application to release this escape to while
+				// Quick Launch owns input. Treat it as Escape and dismiss instead
+				// of storing the same partial sequence again forever.
+				d.switcher_close()
+				return ''
+			}
 			return held
 		}
 		input = d.switcher.pending + keys
 		d.switcher.pending = ''
+	}
+
+	if d.switcher.quick_launch {
+		return d.quick_launch_take_keys(input)
 	}
 
 	// Every sequence starts with an escape, so a string without one is nothing
@@ -112,6 +133,20 @@ fn (mut d Desktop) take_switcher_keys(keys string) string {
 			taken := d.take_switcher_sequence(input, i)
 			if taken > seq_none {
 				i += taken
+				if d.switcher.quick_launch {
+					// A console read can contain Cmd-Space, its release and the
+					// first typed character together. Everything after the chord
+					// belongs to the newly opened launcher; bytes before it still
+					// belong to the previously focused application.
+					if i < input.len {
+						d.quick_launch_take_keys(input[i..])
+					}
+					if kept.len == 0 {
+						unsafe { kept.free() }
+						return ''
+					}
+					return kept.bytestr()
+				}
 				continue
 			}
 			if taken == seq_partial {
@@ -140,7 +175,15 @@ fn (mut d Desktop) take_switcher_sequence(input string, at int) int {
 		found := match_at(input, at, key.bytes)
 		if found > seq_none {
 			if key.step == switch_commit {
+				d.switcher.quick_launch_chord_held = false
 				d.switcher_commit()
+			} else if key.step == switch_quick_launch {
+				// Key repeat must not alternate open/closed while Cmd-Space is
+				// held. The explicit Cmd-release sequence arms the next press.
+				if !d.switcher.quick_launch_chord_held {
+					d.switcher.quick_launch_chord_held = true
+					d.toggle_quick_launch()
+				}
 			} else {
 				d.switcher_step(key.step)
 			}
@@ -218,6 +261,11 @@ fn (mut d Desktop) switcher_commit() {
 	if !d.switcher.active {
 		return
 	}
+	if d.switcher.quick_launch {
+		// Cmd release does not commit Quick Launch; this guard only protects
+		// callers that deliberately ask to commit its current selection.
+		return
+	}
 	mut id := 0
 	if d.switcher.index >= 0 && d.switcher.index < d.switcher.order.len {
 		id = d.switcher.order[d.switcher.index]
@@ -229,20 +277,43 @@ fn (mut d Desktop) switcher_commit() {
 }
 
 // switcher_close ends the session without switching, which is what a click
-// somewhere else means.
+// somewhere else means. Quick Launch also owns a manual query buffer that must
+// be released when its overlay goes away.
 fn (mut d Desktop) switcher_close() {
 	if !d.switcher.active {
 		return
+	}
+	if d.switcher.quick_launch {
+		d.quick_launch_free_query()
+		d.switcher.quick_launch = false
 	}
 	d.switcher.active = false
 	d.switcher.shown = false
 	d.dirty = true
 }
 
-// switcher_select is a click on a tile: it switches to that window whatever the
-// keyboard had landed on.
+// switcher_select is a click on a tile. Normal mode switches windows; Quick
+// Launch maps the visible result back to available_apps and uses the existing
+// application launcher.
 fn (mut d Desktop) switcher_select(index int) {
-	if !d.switcher.active || index < 0 || index >= d.switcher.order.len {
+	if !d.switcher.active {
+		return
+	}
+	if d.switcher.quick_launch {
+		if index == -2 {
+			d.switcher_close()
+			return
+		}
+		if index < 0 {
+			return
+		}
+		app_index := d.quick_launch_app_index(index) or { return }
+		d.switcher.index = index
+		d.switcher_close()
+		d.launch_index(app_index)
+		return
+	}
+	if index < 0 || index >= d.switcher.order.len {
 		return
 	}
 	d.switcher.index = index
@@ -265,8 +336,13 @@ fn (mut d Desktop) update_switcher() {
 // ── The panel ──────────────────────────────────────────────────────
 
 // switcher_element is the panel: a tile per open window, the selection behind
-// one of them, and its title underneath.
+// one of them, and its title underneath. Quick Launch uses the same top-most
+// compositor slot for its Spotlight-style search panel.
 fn (d &Desktop) switcher_element() ui2.Element {
+	if d.switcher.quick_launch {
+		return d.quick_launch_element()
+	}
+
 	theme := d.theme()
 	count := d.switcher.order.len
 

@@ -1,5 +1,8 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
 // Desktop-wide integer display scaling shared by Settings and the compositor.
 @[has_globals]
 module main
@@ -54,7 +57,7 @@ fn desktop_default_scale(width int, height int) int {
 }
 
 // A scaled canvas is the logical desktop. Round up so an odd final physical
-// row/column is still represented and can be expanded by the presenter.
+// row/column is still represented in the native-resolution backing store.
 fn desktop_scaled_extent(pixels int, scale int) int {
 	if scale != desktop_scale_200 {
 		return pixels

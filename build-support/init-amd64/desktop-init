@@ -1,21 +1,104 @@
 #!/bin/sh
 # PID 1 for the amd64 desktop image. The regular distro already supplies the
-# shell and runtime libraries; this only selects the framebuffer desktop as the
-# initial program and leaves an interactive recovery shell if it exits.
+# shell and runtime libraries; this keeps the framebuffer desktop running and
+# leaves an interactive recovery shell only when the executable cannot start.
 
 export HOME=/root
 export TERM=linux
 export PATH=/usr/local/bin:/bin:/sbin:/usr/bin:/usr/sbin
 export USER=root
 export LOGNAME=root
-export SHELL=/bin/sh
+export SHELL=/bin/zsh
 export XDG_RUNTIME_DIR=/run
+export VINIX_SYSTEM_SESSION=1
 
 cd /root || exit 1
 
+desktop_pid=
+reload_requested=0
+
+forward_desktop_signal() {
+	signal=$1
+	if [ -n "$desktop_pid" ]; then
+		kill "-$signal" "$desktop_pid" 2>/dev/null || true
+	fi
+}
+
+report_desktop_exit() {
+	status=$1
+	pid=$2
+	printf 'init: vinix-desktop (pid %s) ' "$pid"
+	case "$status" in
+		0)   printf 'exited cleanly' ;;
+		129) printf 'crashed with SIGHUP (signal 1)' ;;
+		130) printf 'crashed with SIGINT (signal 2)' ;;
+		131) printf 'crashed with SIGQUIT (signal 3)' ;;
+		132) printf 'crashed with SIGILL (signal 4)' ;;
+		133) printf 'crashed with SIGTRAP (signal 5)' ;;
+		134) printf 'crashed with SIGABRT (signal 6)' ;;
+		135) printf 'crashed with SIGBUS (signal 7)' ;;
+		136) printf 'crashed with SIGFPE (signal 8)' ;;
+		137) printf 'crashed with SIGKILL (signal 9)' ;;
+		138) printf 'crashed with SIGUSR1 (signal 10)' ;;
+		139) printf 'crashed with SIGSEGV (signal 11)' ;;
+		140) printf 'crashed with SIGUSR2 (signal 12)' ;;
+		141) printf 'crashed with SIGPIPE (signal 13)' ;;
+		142) printf 'crashed with SIGALRM (signal 14)' ;;
+		143) printf 'crashed with SIGTERM (signal 15)' ;;
+		152) printf 'crashed with SIGXCPU (signal 24)' ;;
+		153) printf 'crashed with SIGXFSZ (signal 25)' ;;
+		159) printf 'crashed with SIGSYS (signal 31)' ;;
+		*)
+			if [ "$status" -gt 128 ] && [ "$status" -le 192 ]; then
+				printf 'crashed with signal %s' "$((status - 128))"
+			else
+				printf 'exited with status %s' "$status"
+			fi
+			;;
+	esac
+	printf '; restarting in one second\n'
+}
+
+request_desktop_reload() {
+	reload_requested=1
+	forward_desktop_signal HUP
+}
+
+# BusyBox reboot, poweroff and halt signal PID 1. Forward those requests to the
+# supervised compositor so it can close applications and restore the console
+# before invoking reboot(2).
+trap 'forward_desktop_signal TERM' TERM
+trap 'forward_desktop_signal USR1' USR1
+trap 'forward_desktop_signal USR2' USR2
+trap 'request_desktop_reload' HUP
+
 while :; do
-	/usr/bin/vinix-desktop
+	desktop=/usr/bin/vinix-desktop
+	if [ ! -e /run/vinix-desktop-development ] && [ -x /usr/bin/vinix-desktop-gpu ]; then
+		desktop=/usr/bin/vinix-desktop-gpu
+	fi
+	"$desktop" &
+	desktop_pid=$!
+	exited_pid=$desktop_pid
+	wait "$desktop_pid"
 	status=$?
-	echo "vinix-desktop exited with status $status; starting a recovery shell"
-	/bin/sh -i
+	# A trapped power signal can interrupt wait before the compositor has
+	# finished. Wait again rather than launching a second display server.
+	while kill -0 "$desktop_pid" 2>/dev/null; do
+		wait "$desktop_pid"
+		status=$?
+	done
+	desktop_pid=
+	if [ "$reload_requested" -eq 1 ]; then
+		reload_requested=0
+		echo "init: desktop reload requested; starting the new binary"
+		continue
+	fi
+	if [ "$status" -eq 126 ] || [ "$status" -eq 127 ]; then
+		echo "vinix-desktop could not start; opening a recovery shell"
+		/bin/zsh -l
+	else
+		report_desktop_exit "$status" "$exited_pid"
+		sleep 1
+	fi
 done

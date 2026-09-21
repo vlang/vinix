@@ -48,7 +48,17 @@ find_v() {
     fi
 
     if command -v v >/dev/null 2>&1; then
-        V="$(command -v v)"
+        candidate="$(command -v v)"
+        candidate_dir="$(CDPATH= cd -- "$(dirname -- "$candidate")" && pwd)"
+        # A source checkout keeps `v` as its bootstrap compiler and writes a
+        # freshly built development compiler to `vnew`. Automatic discovery
+        # should use that development compiler; setting V to the exact `v`
+        # path above remains the opt-out for callers that need the bootstrap.
+        if [ -f "$candidate_dir/cmd/v/v.v" ] && [ -x "$candidate_dir/vnew" ]; then
+            V="$candidate_dir/vnew"
+        else
+            V="$candidate"
+        fi
         return 0
     fi
 

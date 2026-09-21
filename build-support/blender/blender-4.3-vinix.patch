@@ -1,0 +1,95 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -358,2 +358,5 @@
++option(WITH_GHOST_VINIX "Enable the native Vinix shared-surface window backend" OFF)
++mark_as_advanced(WITH_GHOST_VINIX)
++
+-option(WITH_GHOST_SDL "\
+-Enable building Blender against SDL for windowing rather than the native APIs"
++option(WITH_GHOST_SDL "\
++Enable building Blender against SDL for windowing rather than the native APIs"
+diff --git a/intern/ghost/CMakeLists.txt b/intern/ghost/CMakeLists.txt
+--- a/intern/ghost/CMakeLists.txt
++++ b/intern/ghost/CMakeLists.txt
+@@ -155,1 +155,11 @@
++elseif(WITH_GHOST_VINIX)
++  list(APPEND SRC
++    intern/GHOST_SystemVinix.cc
++    intern/GHOST_WindowVinix.cc
++
++    intern/GHOST_SystemVinix.hh
++    intern/GHOST_VinixProtocol.hh
++    intern/GHOST_WindowVinix.hh
++  )
++  add_definitions(-DWITH_GHOST_VINIX)
+-elseif(WITH_GHOST_SDL)
++elseif(WITH_GHOST_SDL)
+diff --git a/intern/ghost/intern/GHOST_ISystem.cc b/intern/ghost/intern/GHOST_ISystem.cc
+--- a/intern/ghost/intern/GHOST_ISystem.cc
++++ b/intern/ghost/intern/GHOST_ISystem.cc
+@@ -19,1 +19,3 @@
+-#if defined(WITH_GHOST_X11) && defined(WITH_GHOST_WAYLAND)
++#if defined(WITH_GHOST_VINIX)
++#  include "GHOST_SystemVinix.hh"
++#elif defined(WITH_GHOST_X11) && defined(WITH_GHOST_WAYLAND)
+@@ -63,6 +65,18 @@ GHOST_TSuccess GHOST_ISystem::createSystem(bool verbose, [[maybe_unused]] bool ba
+ #if defined(WITH_HEADLESS)
+     /* Pass. */
+-#elif defined(WITH_GHOST_X11) && defined(WITH_GHOST_WAYLAND)
++#elif defined(WITH_GHOST_VINIX)
++    backends_attempted.push_back({"VINIX", {}});
++    try {
++      m_system = new GHOST_SystemVinix();
++    }
++    catch (const std::runtime_error &e) {
++      if (verbose) {
++        backends_attempted.back().failure_msg = e.what();
++      }
++      delete m_system;
++      m_system = nullptr;
++    }
++#elif defined(WITH_GHOST_X11) && defined(WITH_GHOST_WAYLAND)
+     /* Special case, try Wayland, fall back to X11. */
+     if (has_wayland_libraries) {
+       backends_attempted.push_back({"WAYLAND"});
+diff --git a/intern/ghost/intern/GHOST_ContextEGL.hh b/intern/ghost/intern/GHOST_ContextEGL.hh
+--- a/intern/ghost/intern/GHOST_ContextEGL.hh
++++ b/intern/ghost/intern/GHOST_ContextEGL.hh
+@@ -46 +46,3 @@ class GHOST_ContextEGL : public GHOST_Context {
+-                   EGLenum api);
++                   EGLenum api,
++                   EGLint pbufferWidth = 1,
++                   EGLint pbufferHeight = 1);
+@@ -125,1 +125,3 @@ class GHOST_ContextEGL : public GHOST_Context {
+-  EGLint m_swap_interval;
++  EGLint m_swap_interval;
++  const EGLint m_pbufferWidth;
++  const EGLint m_pbufferHeight;
+diff --git a/intern/ghost/intern/GHOST_ContextEGL.cc b/intern/ghost/intern/GHOST_ContextEGL.cc
+--- a/intern/ghost/intern/GHOST_ContextEGL.cc
++++ b/intern/ghost/intern/GHOST_ContextEGL.cc
+@@ -198 +198,3 @@ GHOST_ContextEGL::GHOST_ContextEGL(const GHOST_System *const system,
+-                                   EGLenum api)
++                                   EGLenum api,
++                                   EGLint pbufferWidth,
++                                   EGLint pbufferHeight)
+@@ -213,3 +215,5 @@ GHOST_ContextEGL::GHOST_ContextEGL(const GHOST_System *const system,
+       m_config(EGL_NO_CONFIG_KHR),
+       m_swap_interval(1),
++      m_pbufferWidth(pbufferWidth),
++      m_pbufferHeight(pbufferHeight),
+       m_sharedContext(
+@@ -497,9 +501,9 @@ GHOST_TSuccess GHOST_ContextEGL::initializeDrawingContext()
+   }
+   else {
+-    static const EGLint pb_attrib_list[] = {
++    const EGLint pb_attrib_list[] = {
+         EGL_WIDTH,
+-        1,
++        m_pbufferWidth,
+         EGL_HEIGHT,
+-        1,
++        m_pbufferHeight,
+         EGL_NONE,
+     };

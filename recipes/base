@@ -1,7 +1,0 @@
-#! /bin/sh
-
-name=base
-skip_pkg_check=yes
-version=0.0
-revision=3
-deps="base-files kernel init bash binutils bzip2 coreutils diffutils findutils gawk gcc gl-triangle gmp grep gzip less make mpc mpfr nano ncurses pcre2 readline sed tar tzdata util-vinix v xbps xz zlib zstd"

@@ -62,6 +62,12 @@ DISPLAY="$display" subl --multiinstance --foreground --safe-mode -n \
 	/tmp/sublime-smoke.txt >/tmp/sublime.log 2>&1 &
 sublime_pid=$!
 
+# A persistent /root can shadow the copy the image ships there.
+if [ -x /usr/share/vinix/x-window-check.py ]; then
+	x_window_check=/usr/share/vinix/x-window-check.py
+else
+	x_window_check=/root/x-window-check.py
+fi
 mapped=false
 i=0
 while [ "$i" -lt 20 ]; do
@@ -70,7 +76,7 @@ while [ "$i" -lt 20 ]; do
 		echo "Sublime Text exited before showing its editor window" >&2
 		exit 1
 	fi
-	if /root/x-window-check.py "$display" 'Sublime Text'; then
+	if "$x_window_check" "$display" 'Sublime Text'; then
 		mapped=true
 		break
 	fi

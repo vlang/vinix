@@ -1,5 +1,8 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
 // Input sources: /dev/pointer for the mouse and the controlling terminal for
 // the keyboard. Reads never block. Between active frames the compositor waits
 // for either descriptor to become ready, with a timeout for its housekeeping.
@@ -24,8 +27,10 @@ mut:
 	scroll   i32
 }
 
-// Button bits, in the order the driver reports them.
+// Button bits, in the order the kernel pointer ABI reports them.
 const button_left = u32(1)
+const button_right = u32(2)
+const button_middle = u32(4)
 
 struct PointerDevice {
 mut:

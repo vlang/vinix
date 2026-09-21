@@ -1,5 +1,8 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
 // The Settings application: categories down the left, the chosen category's
 // settings on the right.
 //
@@ -14,6 +17,7 @@ import ui2
 
 enum SettingsCategory {
 	appearance
+	date_time
 	theme
 	wallpaper
 	wifi
@@ -21,12 +25,13 @@ enum SettingsCategory {
 	battery
 }
 
-const settings_categories = [SettingsCategory.appearance, .theme, .wallpaper, .wifi, .display,
-	.battery]
+const settings_categories = [SettingsCategory.appearance, .date_time, .theme, .wallpaper, .wifi,
+	.display, .battery]
 
 fn (c SettingsCategory) title() string {
 	return match c {
 		.appearance { 'Appearance' }
+		.date_time { 'Date & Time' }
 		.theme { 'Theme' }
 		.wallpaper { 'Wallpaper' }
 		.wifi { 'Wi-Fi' }
@@ -38,6 +43,10 @@ fn (c SettingsCategory) title() string {
 const settings_action_category = 'settings.category.'
 const settings_action_side = 'settings.side.'
 const settings_action_taskbar = 'settings.taskbar.'
+const settings_action_clock_format = 'settings.clock.format.'
+const settings_action_clock_seconds = 'settings.clock.seconds.'
+const settings_action_clock_date = 'settings.clock.date.'
+const settings_action_clock_weekday = 'settings.clock.weekday.'
 const settings_action_theme = 'settings.theme.'
 const settings_action_color = 'settings.color.'
 const settings_action_image = 'settings.image.'
@@ -136,8 +145,8 @@ fn (mut a SettingsApp) build(size ui2.Rect) !ui2.Element {
 }
 
 // Display and Battery report a device and change nothing here, so they draw
-// without a desktop behind them. The other three are the desktop's own
-// preferences and have nothing to show without one.
+// without a desktop behind them. The remaining panes are desktop preferences
+// and have nothing to show without one.
 fn (a &SettingsApp) pane(width int, height int) []ui2.Element {
 	match a.category {
 		.wifi {
@@ -156,6 +165,7 @@ fn (a &SettingsApp) pane(width int, height int) []ui2.Element {
 	}
 	return match a.category {
 		.appearance { a.appearance_pane(width) }
+		.date_time { a.date_time_pane(width) }
 		.theme { a.theme_pane(width) }
 		.wallpaper { a.wallpaper_pane(width) }
 		else { []ui2.Element{} }
@@ -197,17 +207,30 @@ fn settings_note(text string, y int, width int) ui2.Element {
 	})
 }
 
-// choice draws one option as a radio-style pill: filled when it is the current
-// setting, outlined when it is not.
+// A choice carries radio state but asks for a native button bezel. The Vinix
+// renderer therefore keeps the existing flat control in the default theme and
+// uses a compact Catalina push-button face in the macOS theme.
 fn settings_choice(id string, label string, x int, y int, width int, selected bool) ui2.Element {
-	return ui2.button(id, label, ui2.rect(f64(x), f64(y), f64(width), 28), ui2.BoxStyle{
-		bg: if selected { app_accent } else { settings_choice_bg }
-		radius: 6
-	}, ui2.TextStyle{
-		color: if selected { app_on_accent } else { body_text }
-		size: 12
-		align: .center
-	})
+	return ui2.Element{
+		kind:                .button
+		id:                  id
+		text:                label
+		frame:               ui2.rect(f64(x), f64(y), f64(width), 28)
+		box:                 ui2.BoxStyle{
+			bg:     if selected { app_accent } else { settings_choice_bg }
+			radius: 6
+		}
+		text_style:          ui2.TextStyle{
+			color: if selected { app_on_accent } else { body_text }
+			size:  12
+			align: .center
+		}
+		native_style:        true
+		checked:             selected
+		accessibility_role:  'radio'
+		accessibility_label: label
+		accessibility_value: if selected { 'selected' } else { 'not selected' }
+	}
 }
 
 fn (a &SettingsApp) appearance_pane(width int) []ui2.Element {
@@ -238,6 +261,43 @@ fn (a &SettingsApp) appearance_pane(width int) []ui2.Element {
 	} else {
 		'Windows XP style: one button per window.'
 	}, y, width)
+
+	return out
+}
+
+fn (a &SettingsApp) date_time_pane(width int) []ui2.Element {
+	settings := a.desktop.settings
+	inner := width - 2 * settings_padding
+	half := (inner - settings_row_gap) / 2
+
+	mut out := frame_elements(16)
+	mut y := settings_padding
+
+	out << settings_heading('Time format', y, width)
+	y += 22
+	out << settings_note('Choose 24-hour time or a 12-hour clock with AM/PM.', y, width)
+	y += 22
+	out << settings_choice('${settings_action_clock_format}0', '24-hour', settings_padding, y, half, settings.clock_24_hour)
+	out << settings_choice('${settings_action_clock_format}1', '12-hour', settings_padding + half + settings_row_gap, y, half, !settings.clock_24_hour)
+	y += 28 + 22
+
+	out << settings_heading('Seconds', y, width)
+	y += 22
+	out << settings_note('Show seconds in the taskbar clock.', y, width)
+	y += 22
+	out << settings_choice('${settings_action_clock_seconds}0', 'Show', settings_padding, y, half, settings.clock_show_seconds)
+	out << settings_choice('${settings_action_clock_seconds}1', 'Hide', settings_padding + half + settings_row_gap, y, half, !settings.clock_show_seconds)
+	y += 28 + 22
+
+	out << settings_heading('Date line', y, width)
+	y += 22
+	out << settings_note('Choose what appears underneath the taskbar time.', y, width)
+	y += 22
+	out << settings_choice('${settings_action_clock_date}0', 'Show date', settings_padding, y, half, settings.clock_show_date)
+	out << settings_choice('${settings_action_clock_date}1', 'Hide date', settings_padding + half + settings_row_gap, y, half, !settings.clock_show_date)
+	y += 28 + settings_row_gap
+	out << settings_choice('${settings_action_clock_weekday}0', 'Show weekday', settings_padding, y, half, settings.clock_show_weekday)
+	out << settings_choice('${settings_action_clock_weekday}1', 'Hide weekday', settings_padding + half + settings_row_gap, y, half, !settings.clock_show_weekday)
 
 	return out
 }
@@ -384,11 +444,31 @@ fn (mut a SettingsApp) handle(event_id string) ! {
 		}
 		return
 	}
+	if event_id.starts_with(settings_action_clock_format) {
+		a.desktop.settings.clock_24_hour = !event_id.ends_with('1')
+		return
+	}
+	if event_id.starts_with(settings_action_clock_seconds) {
+		a.desktop.settings.clock_show_seconds = !event_id.ends_with('1')
+		return
+	}
+	if event_id.starts_with(settings_action_clock_date) {
+		a.desktop.settings.clock_show_date = !event_id.ends_with('1')
+		return
+	}
+	if event_id.starts_with(settings_action_clock_weekday) {
+		a.desktop.settings.clock_show_weekday = !event_id.ends_with('1')
+		return
+	}
 	if event_id.starts_with(settings_action_theme) {
-		a.desktop.settings.theme = if event_id.ends_with('1') {
-			ThemeKind.macos
+		if event_id.ends_with('1') {
+			a.desktop.settings.theme = .macos
+			// A freshly selected Catalina theme starts with Catalina geometry.
+			// Appearance remains independent, so the user can deliberately move
+			// the controls afterwards.
+			a.desktop.settings.button_side = .left
 		} else {
-			ThemeKind.default_
+			a.desktop.settings.theme = .default_
 		}
 		return
 	}

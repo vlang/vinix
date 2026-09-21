@@ -9,7 +9,7 @@ It maps `/dev/fb0`, reads the pointer from `/dev/pointer` and the keyboard from
 its controlling terminal, and composes every frame itself without a display
 server or toolkit underneath it. The normal binary is entirely software. An
 M1 image that contains the Asahi Mesa runtime also carries a GPU-enabled binary
-which uses AGX to scale and present that canvas when `/dev/dri/renderD128`
+which uses AGX to present that canvas when `/dev/dri/renderD128`
 exists, with an automatic fallback to the static software binary.
 
 What it does:
@@ -17,7 +17,8 @@ What it does:
 - a wallpaper, and a taskbar with Start, open windows and a clock in its
   bottom-right status area
 - windows with a title bar, a close, a maximise/restore and a minimise button
-- dragging a window by its title bar, clicking one to bring it to the front
+- dragging a window by its title bar, including Windows 7-style top-edge
+  maximize and left/right half-screen snapping
 - a **V Start button** and Windows 7-style two-column Start menu, with recent
   programs, All Programs, type-to-search, system links and a session button
 - **shortcuts down the left edge of the wallpaper**, and matching Start-menu
@@ -29,16 +30,30 @@ What it does:
 - a **text editor** for plain files, with an editable path, open/save controls,
   cursor navigation and keyboard shortcuts
 - a **calendar** with month navigation, date selection and a jump back to today
+- **VSpace**, a disk usage analyzer: the largest folders and files on the
+  machine, ranked and measured while the walk runs
 - a **clock** with a large local-time display and a tenth-second stopwatch
+- **Capture**, a native screenshot and screen-recording app with delayed PNG
+  screenshots, 5/10 fps AVI recording, automatic self-hiding and live status
 - a **settings application**: window button side, taskbar style, theme,
   wallpaper, display, battery and experimental M1 Wi-Fi controls
 - **native ui2 applications**: every Files, Calculator, Terminal, Settings and
   utility window is backed by its own OS process, PID and memory accounting
+- a paged **ui2 Examples** launcher containing all 84 applications from the
+  sibling `~/code/ui2/examples` checkout, including native input, slider,
+  switch, toggle, menu, file-dialog and custom-window demonstrations
+- preinstalled **VOffice Writer and Calc** from the sibling `~/code/office`
+  checkout, running as native ui2 clients inside ordinary Vinix windows
+- a **VT-compatible built-in terminal** with a real PTY, alternate-screen and
+  cursor-addressed rendering for editing files in the preinstalled Vim
 - embedded **Wine Calculator and Notepad**: their translated Win64 processes
   render into private Xvfb displays and are composited as normal Vinix windows
   without hiding the desktop
-- embedded **Minecraft**: the native C++ Minetest client renders into Xvfb and
-  is composited as a movable, resizable Vinix window with forwarded input
+- embedded **Minecraft**: Mojang's Java Edition client renders into Xvfb and is
+  composited as a movable, resizable Vinix window with forwarded input
+- native **Blender**: a Vinix GHOST backend renders with surfaceless EGL and
+  publishes directly into a compositor-owned Vinix window, with no Xorg or
+  Wayland server in the path
 - **Cmd-Tab**, which switches windows on a tap and shows all of them in the
   middle of the screen when it is held
 
@@ -55,11 +70,15 @@ typing any word with a q in it drop the user back to the console.
     window.v       the Window model and the pages windows show
     app.v          native application metadata and factories
     app_process.v  compositor/client IPC, UI-tree encoding and lifecycle
+    native_surface_app.v  native external-client lifecycle and input transport
+    vinix_surface.v       shared XRGB surface validation and presentation
     files.v        the file browser
     activity.v     the activity monitor, over /dev/processes
+    vspace.v       the disk inventory: a resumable walk and its two rankings
     editor.v       the plain-text editor and its keyboard editing model
     calendar.v     Gregorian month layout and the calendar application
     clock_app.v    the large clock and stopwatch application
+    capture.v      the ui2 capture app, PNG encoder and AVI recorder
     switcher.v     Cmd-Tab: the session it opens and the panel it shows
     settings.v     preferences shared by the desktop and Settings application
     settings_app.v the settings application
@@ -92,9 +111,11 @@ a replacement for its element-tree rasterizer.
 
 Two conventions extend ui2 for this backend, both documented at the top of
 `render.v`: an `image_path` of `builtin:<name>` draws a vector glyph the
-renderer carries itself, since the target has no image files; and a rounded
-view at the top level of the tree is a floating surface, so it gets a drop
-shadow and a hairline edge.
+renderer carries itself, while `asset:<name>` draws one of the bundled,
+official 512px QOI app icons; and a rounded view at the top level of the tree
+is a floating surface, so it gets a drop shadow and a hairline edge. The
+Firefox, Chromium, and Blender sources are recorded in
+[`assets/SOURCES.md`](assets/SOURCES.md).
 
 ## Native ui2 applications
 
@@ -115,10 +136,27 @@ remaining client. Settings returns its synchronized preference state with each
 response, allowing theme, wallpaper and scale changes to cross the boundary
 immediately.
 
-The app names are relative symlinks to one static multicall executable. This
-keeps the initramfs small, while each exec creates an independent address space
-and Vinix records the per-app exec path as its process name. Consequently
-`/dev/processes` reports truthful CPU and mapped-memory values for every app.
+Vinix's own app names are relative symlinks to one static multicall executable.
+The upstream examples are separate static executables because each is an
+independent `module main` program and several intentionally reuse model and
+callback names. Both forms create independent address spaces, and Vinix records
+the per-app exec path as its process name. Consequently `/dev/processes`
+reports truthful CPU and mapped-memory values for every app.
+
+`tools/build_ui2_examples.py` inventories the checkout against
+`ui2_examples.txt`, then compiles every example without modifying its source.
+The disposable ui2 overlay adds `tools/ui2_vinix_backend.v`, whose `run_window`
+implements the same versioned pipe protocol as `app_process.v`. The build uses
+`VINIX_UI2_SOURCE` when set, otherwise a sibling `../ui2` checkout when present,
+and finally `third_party/ui2`. This makes the local `~/code/ui2` tree the normal
+development source while retaining a self-contained CI/package fallback.
+
+`tools/build_voffice.py` uses that same backend to cross-compile VOffice Writer
+and Calc as static musl applications. It reads `VINIX_OFFICE_SOURCE`, then a
+sibling `../office`, and finally `third_party/office`; the image installs both
+executables together with VOffice's translations and ribbon PNGs. The
+compositor decodes those immutable installed PNG assets itself, so VOffice does
+not need a second window system or image service at runtime.
 
 The Calculator model comes from ui2's own example and is not copied into this
 repository. `tools/stage_app.py` takes it straight from the ui2 checkout at
@@ -137,10 +175,11 @@ mine", an application names its events whatever suits it: the Calculator's `+`
 and the file browser's `files.row.3` both arrive without the window manager
 parsing either.
 
-Add an application by adding an `AppFactory` to `available_apps` in `app.v`;
-it then has a wallpaper shortcut and a Start-menu entry. A ui2 example also
-needs its directory listed in `build-desktop-aarch64.sh` so the staging step
-compiles it in.
+Add a built-in application by adding an `AppFactory` to `available_apps` in
+`app.v`; it then has a wallpaper shortcut and a Start-menu entry. A new ui2
+example only needs its directory name added to `ui2_examples.txt` and the
+parallel constant in `ui2_examples.v`; the inventory check fails rather than
+silently omitting an upstream example.
 
 Firefox is an upstream GTK/X11 application rather than a native ui2 client. It
 runs on a private Xvfb display whose live XWD framebuffer is composited into a
@@ -155,21 +194,40 @@ The direct launcher writes Firefox's upstream graphics and GTK diagnostics to
 enable glamor/DRI3 and Firefox WebRender over X11 EGL. The embedded window uses
 Xvfb's software surface so the native compositor can copy it into the desktop.
 
-The Minecraft layer is produced by `build-minecraft-aarch64.sh`. It stages
-Alpine's AArch64/musl Minetest 5.9.1 executable and its runtime closure, plus a
-pinned Minetest Game release. `/usr/bin/minecraft` starts a persistent default
-world with settings kept under `$HOME/.minetest`; its conservative
-software-OpenGL profile keeps the client usable on framebuffer Xorg. From the
+GIMP uses the same hosted X11 path. `pkg install gimp` installs Alpine's native
+AArch64/musl build and restores the executable modes for its plug-ins; the
+desktop's `run-gimp` launcher disables the unavailable AT-SPI service and opens
+GIMP without its splash screen inside a movable Vinix window. Its system
+configuration selects the common image-format plug-ins so a first launch stays
+within Vinix's current exited-process reclamation limit.
+
+`pkg install minecraft` installs Alpine's OpenJDK 21 and native runtime, then
+downloads the newest compatible official Minecraft: Java Edition client from
+Mojang's distribution endpoints. The game is never part of this repository or
+the default image. For custom preinstalled images,
+`build-minecraft-aarch64.sh` stages OpenJDK 25 and the current release instead.
+`/usr/bin/minecraft` starts Mojang's free demo when no account is signed in and
+the full game after `minecraft --login`; worlds and options are kept under
+`$HOME/.minecraft`. From the
 desktop, Minecraft uses the same Xvfb/XWD bridge as translated Wine apps and is
 scaled into a native window without surrendering the desktop framebuffer.
 Keyboard and pointer events are forwarded into the private X11 display. The
-desktop builder picks up this layer when present and otherwise leaves a working
-launcher whose window explains which build is missing.
+desktop builder picks up a prebuilt layer when present; otherwise its Minecraft
+window points to the on-demand package command.
 
 Wine Calculator, Wine Notepad, and Microsoft Word 2013 use that same private
 Xvfb bridge, so translated Windows programs remain ordinary movable Vinix
 windows. Word uses a dedicated translated Win64 prefix; if it is not installed,
 the launcher starts staged licensed Word 2013 x64 media or explains how to add it.
+
+Blender does not use that Xvfb bridge. `build-blender-native-aarch64.sh` applies
+the Vinix GHOST backend to Blender 4.3 and stages its executable. The backend
+creates a surfaceless EGL pbuffer, publishes completed frames through Vinix's
+versioned double-buffered `VSF1` mapping, and consumes compositor pointer and
+keyboard records from a pipe. The desktop starts it with only `VINIX_SURFACE_*`
+coordinates in its environment; neither `DISPLAY` nor `WAYLAND_DISPLAY` is set.
+The on-demand Alpine package continues to supply Blender's shared data and
+runtime libraries.
 
 ## The file browser
 
@@ -202,6 +260,23 @@ full six-week Gregorian month. Its arrow buttons cross year boundaries, a day
 can be selected for a full date in the footer, and **Today** returns to the
 current month. The Clock expands the same local time into an across-the-room
 display and adds a start/stop/reset stopwatch with tenth-second updates.
+
+Capture is another pure V/ui2 utility. A screenshot can be immediate or delayed
+by three or five seconds and is written as `/root/Screenshot-<timestamp>.png`.
+Video uses a self-contained, uncompressed AVI writer at either 5 or 10 frames
+per second, scales large desktops to at most 640x480 while preserving their
+aspect ratio, and writes `/root/Recording-<timestamp>.avi`. Both modes include
+the compositor-drawn pointer. The Capture window hides before the first frame;
+it returns after a screenshot, while a recording is stopped by restoring its
+taskbar entry and pressing **Stop recording**. Closing Capture or leaving the
+desktop finalizes an active AVI so the recording remains playable. Audio is not
+recorded.
+
+The application process only sends capture requests and renders status. The
+compositor owns the pixel stream and writes each frame immediately after it is
+presented, so Capture neither opens `/dev/fb0` nor introduces a second display
+owner. Its PNG and AVI encoders are implemented in `capture.v` and require no
+external image or media library.
 
 Utility windows are sized for the logical MacBook desktop rather than the old
 1024×768 QEMU screenshot. Shortcuts fill the available height and flow into a
@@ -249,6 +324,47 @@ the program. The kernel stores a process' name as the path it ran with its pid
 appended, and a fork appends again — the shell is `/bin/busybox[2]` and a loop
 it starts is `/bin/busybox[2][3]` — so the monitor strips those suffixes. Every
 number in them is an ancestor's pid, and this process' own has a column.
+
+## VSpace, the disk inventory
+
+![VSpace measuring a Vinix image under QEMU](../vinix-vspace-qemu.png)
+
+`vspace.v` is a port of the standalone V/ui2 program of the same name — a disk
+usage analyzer: four metrics across the top, and below them the largest folders
+and the largest files found so far, each row carrying a bar proportional to the
+largest entry in its panel. Its accounting is the original's. Symbolic links
+are not followed, so nothing is counted twice under a second name and a link
+into an ancestor cannot make the walk run forever. A file with several hard
+links is counted once. A directory it cannot open is added to **Skipped** and
+the scan carries on. A folder's size is its whole subtree, which is what makes
+the ranking say where the space went rather than which directory has the most
+bytes directly in it.
+
+The interesting part of the port is that the original is threaded and this is
+not. The standalone program hands the walk to a worker thread, publishes
+snapshots through a mutex and asks its platform window to refresh. A Vinix
+application has neither a window nor an event loop of its own: it answers the
+compositor's requests and is otherwise not running. So the recursion becomes an
+explicit stack of open directories which the compositor advances with the poll
+it already sends every 33 ms, one slice of at most 20 ms per poll. The
+compositor is blocked while a slice runs, which is exactly what the budget is
+for — a scan of the whole disk costs a fraction of each frame instead of a
+frozen desktop, and the rankings fill in while it runs as they do natively.
+
+Two questions are asked of every entry: have I been in this directory before,
+and have I already counted these bytes under another name. Both are "have I
+seen this device and inode", so both are answered by an open-addressed set of
+packed 64-bit identities rather than by a keyed map, which would allocate a
+string per file on a target with no garbage collector. The rankings keep the
+largest two dozen of each kind in order, and anything at or below the floor
+that a full ranking sets is rejected without an insertion.
+
+**Whole disk**, **Home** and **System** are the presets; clicking a ranked
+folder rescans it, which is how the window answers "and what is inside *that*",
+and **Up** comes back out. Folder rows are only clickable once a scan has
+finished, because a ranking that is still moving would not be pointing at the
+same folder by the time the click arrived. `-` and `+` page a panel when a
+ranking holds more than the window has room for.
 
 ## The window switcher
 
@@ -298,11 +414,12 @@ as Windows does, left as macOS does, with the inner two swapping order to match
 each convention — and switches the taskbar between one entry per window, as
 Windows XP had, and one per application with a count, as Windows 7 had.
 
-**Theme** chooses between the desktop's own look and *macOS*, as it looked from
-Yosemite through Mojave: light grey window chrome shaded down its height with
-the title centred over it, three coloured discs at the leading edge, and a
-dock — a rounded panel sized to its contents and centred clear of the bottom
-edge — in place of the full-width taskbar.
+**Theme** chooses between the desktop's own look and *macOS*, matched to a
+native 1x AppKit window from macOS Catalina 10.15.7 (19H2): a 22-pixel light
+grey title bar, centred title, 12-pixel traffic lights on 20-pixel centres, and
+a dock — a rounded panel sized to its contents and centred clear of the bottom
+edge — in place of the full-width taskbar. The QEMU captures and measurements
+used as the reference live in `docs/catalina-reference/`.
 
 The discs are grey until a window is focused and show their glyphs only while
 the pointer is over the set, as macOS does. They also keep red-yellow-green
@@ -327,8 +444,10 @@ immediately and everywhere without anything being told to refresh.
 
 Everything that varies between themes is a field of `Theme` in `settings.v`;
 anything that does not stays a plain constant in `theme.v`. Application
-interiors deliberately do not follow the theme — an application draws its own
-inside, as ui2's calculator plainly does — so they use the `app_*` constants.
+interiors normally keep their declared styles, but controls marked
+`native_style` use Catalina's measured 21-pixel AppKit bezel under the macOS
+theme, including hover, pressed, selected and disabled states. Other controls
+continue to use their declared `app_*` colours.
 
 ## Wallpapers
 
@@ -402,12 +521,39 @@ installed, one command builds the aarch64 image and boots into the desktop:
 
     ./run-desktop-aarch64.sh
 
+To build a single desktop image with the default portable software set
+(Python, Ruby, Go, V, developer tools, X11, Firefox, Hyprland, x86 translation,
+and the CLI tools), use the aggregate builder and then boot its result. Java,
+Minecraft and Wine remain on-demand `pkg` installs instead of taking space in
+every image:
+
+    ./build-all-aarch64.sh
+    ./run-desktop-aarch64.sh --no-desktop
+
+That image supports the complete edit-build-reload loop from its own Terminal.
+The files in `/root/desktop` are an editable copy of the exact staged source
+set used for the host build, and `/root/vmodules` contains the matching ui2
+overlay. A matching system copy under `/usr/share/vinix/desktop-dev` lets the
+build helper recover when an older persistent home lacks either tree:
+
+    /root/v-smoke.sh
+    vinix-desktop-build
+
+The second command builds `/root/vinix-desktop`, atomically installs it, and
+asks PID 1 to reload the graphical session. `--no-reload` leaves the current
+session running.
+
+The runner caches a gzip-compressed version of the immutable QEMU module to
+keep the boot payload small and comfortably below the FAT32 single-file limit;
+Limine expands it before handing it to the kernel. `/root` remains the separate
+persistent EXT2 volume.
+
 It builds the kernel, builds the desktop, and starts QEMU on the result. The
 launcher reuses `boot-image/boot-desktop-qemu.img` for the immutable system and
 mounts `boot-image/desktop-root.ext2` at `/root`. On the first run it derives a
 smaller QEMU initramfs from the self-contained hardware image and seeds the
-persistent volume with the desktop files and Wine prefixes. Later runs reuse
-those files instead of copying them into another boot image.
+persistent volume with the desktop files and other per-user state. Later runs
+reuse those files instead of copying them into another boot image.
 
 Set `VINIX_BOOT_DISK` to manage another long-lived boot disk, or use
 `--ephemeral` for a concurrent test whose temporary boot disk and package store
@@ -496,9 +642,24 @@ sequences above — `dev/console` for PS/2, `aarch64/virtio_input` for QEMU, and
 `c/apple_spi_keyboard.c` for the built-in keyboard on an M1, where Cmd is a key
 someone actually has under a thumb.
 
-Under QEMU on a Mac, `./run-desktop-aarch64.sh --grab-keys` is what lets the
-chord through: macOS keeps Cmd-Tab for its own application switcher until QEMU
-is allowed to capture every key. The price is that Cmd-Q no longer quits QEMU.
+It also needs `reboot(2)`. The image's PID 1 supervises the compositor and
+restarts it if it exits, reporting its PID and decoded exit status or fatal
+signal first. Native-application transport failures report the application's
+name, PID and wait status in the same console log. `VINIX_SYSTEM_SESSION=1`
+tells the supervised child it owns the system session. `reboot`, `poweroff` and
+`halt` sync and signal PID 1 — SIGTERM, SIGUSR2 and SIGUSR1 respectively — rather
+than powering the machine down themselves; init forwards that request to the
+compositor. The compositor takes it at a frame boundary, closes its applications,
+restores the console and only then calls `reboot(2)`, which does not return. The Start menu's
+**Shut down** button is the same path. Started from a shell instead of from
+init, the desktop is an ordinary process: both then only end the session and
+give the console back to that shell, as they always have.
+
+SIGHUP has a distinct meaning: `vinix-desktop-reload` uses it to ask PID 1 for
+an orderly compositor replacement. It never reaches `reboot(2)`. On a GPU
+system the reload marker deliberately keeps the newly built framebuffer binary
+selected for the rest of that boot instead of reverting to the immutable GPU
+variant on the next supervisor iteration.
 
 ## Native V platform and device code
 

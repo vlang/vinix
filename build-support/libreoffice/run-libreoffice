@@ -1,0 +1,153 @@
+#!/bin/sh
+# Start LibreOffice on Vinix's private X11 display.
+#
+# soffice.bin is executed directly rather than through Alpine's `soffice`
+# shell script: that script starts `oosplash`, which forks the office process,
+# draws a splash window and then waits for it. On the desktop's hosted display
+# the splash is the window the compositor would map, and the extra generation
+# of processes only makes a failure harder to follow on the serial console.
+set -eu
+
+LIBREOFFICE_PROGRAM=/usr/lib/libreoffice/program
+LIBREOFFICE_BINARY="$LIBREOFFICE_PROGRAM/soffice.bin"
+
+if [ ! -x "$LIBREOFFICE_BINARY" ]; then
+	echo "run-libreoffice: LibreOffice is not installed; run 'pkg install libreoffice-writer'" >&2
+	exit 127
+fi
+
+export HOME="${HOME:-/root}"
+export TMPDIR="${TMPDIR:-/tmp}"
+export XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
+export XDG_CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}"
+export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/tmp/runtime-root}"
+
+# VCL picks a plugin by probing the session's desktop environment. Vinix has
+# neither, and libreoffice-common hard-depends on the Qt 6 plugin, so name the
+# GTK 3 one — the toolkit the rest of this image already qualifies.
+export SAL_USE_VCLPLUGIN=gtk3
+# Skia's raster path allocates its own surfaces and reimplements the blits
+# cairo already does here. Keep VCL on the cairo/X11 path the browsers use.
+export SAL_DISABLESKIA=1
+# There is no OpenCL device and no Java runtime in this image. Both are probed
+# during startup, and a probe that has to time out delays the first window.
+export SAL_DISABLE_OPENCL=1
+export SAL_DISABLE_JAVALDX=1
+# Vinix has no AT-SPI bus, no session D-Bus and no keyring daemon. Pointing at
+# a socket that is not there is answered at once; leaving this unset sends GIO
+# down its autolaunch path, which retries for the life of the process.
+export NO_AT_BRIDGE=1
+export DBUS_SESSION_BUS_ADDRESS="unix:path=/run/dbus/vinix-no-session-bus"
+# Its own UNO Python is the only one this build can load, and an inherited
+# PYTHONHOME from the image's python3 makes the scripting provider fail.
+unset PYTHONHOME PYTHONPATH || true
+
+# LibreOffice keeps its profile, registry and extension cache under one
+# directory, named as a URL. Keeping it out of $XDG_CONFIG_HOME lets a damaged
+# profile be removed without touching the other applications' settings.
+VINIX_LIBREOFFICE_PROFILE="${VINIX_LIBREOFFICE_PROFILE:-$HOME/.libreoffice-vinix}"
+
+prepare_profile() {
+	mkdir -p "$VINIX_LIBREOFFICE_PROFILE/user" "$XDG_CACHE_HOME" \
+		"$XDG_CONFIG_HOME" "$XDG_RUNTIME_DIR" || return 1
+	chmod 700 "$XDG_RUNTIME_DIR" || return 1
+
+	# The desktop hosts LibreOffice on a 1280x900 X server with no window
+	# manager, so nothing will resize the document window for it and an
+	# unconfigured profile opens a smaller one inside the surface. The
+	# seeded registry also answers the first-run questions — Tip of the Day
+	# and the donate infobar both otherwise cover the document.
+	registry="$VINIX_LIBREOFFICE_PROFILE/user/registrymodifications.xcu"
+	geometry_marker="$VINIX_LIBREOFFICE_PROFILE/user/.vinix-1280x900"
+	if [ ! -e "$geometry_marker" ]; then
+		/bin/busybox cp /etc/libreoffice/vinix-registrymodifications.xcu \
+			"$registry" || return 1
+		: >"$geometry_marker" || return 1
+	fi
+}
+
+if ! prepare_profile; then
+	# A read-only or damaged persistent home must not stop the suite. This
+	# boot's tmpfs is always writable and the profile is recreated there.
+	export XDG_CONFIG_HOME=/tmp/vinix-libreoffice-config
+	export XDG_CACHE_HOME=/tmp/vinix-libreoffice-cache
+	VINIX_LIBREOFFICE_PROFILE=/tmp/vinix-libreoffice-profile
+	prepare_profile
+fi
+
+ensure_runtime_caches() {
+	# Alpine builds these indexes from package triggers, which a staged image
+	# never runs, so an image that has never installed a package has none of
+	# them. GTK then cannot load a single icon — "Could not load a pixbuf from
+	# icon theme" — and VCL gives up while it is building the toolbars, which
+	# looks exactly like an office suite that exits without a window.
+	if [ ! -s /usr/share/mime/mime.cache ] \
+		&& [ -x /usr/bin/update-mime-database ]; then
+		echo "run-libreoffice: building the MIME database (first run)" >&2
+		/usr/bin/update-mime-database /usr/share/mime || true
+	fi
+	if [ ! -s /usr/lib/gdk-pixbuf-2.0/2.10.0/loaders.cache ] \
+		&& [ -x /usr/bin/gdk-pixbuf-query-loaders ]; then
+		/usr/bin/gdk-pixbuf-query-loaders --update-cache || true
+	fi
+	# GTK reads its own settings through GSettings, which needs the compiled
+	# schemas rather than the XML the packages ship.
+	if [ ! -s /usr/share/glib-2.0/schemas/gschemas.compiled ] \
+		&& [ -x /usr/bin/glib-compile-schemas ]; then
+		/usr/bin/glib-compile-schemas /usr/share/glib-2.0/schemas || true
+	fi
+	[ -x /usr/bin/gtk-update-icon-cache ] || return 0
+	for icon_theme in /usr/share/icons/hicolor /usr/share/icons/Adwaita; do
+		[ -f "$icon_theme/index.theme" ] || continue
+		[ -s "$icon_theme/icon-theme.cache" ] \
+			|| /usr/bin/gtk-update-icon-cache -f -t "$icon_theme" \
+			|| true
+	done
+}
+
+# Repair the generated runtime indexes before GTK is asked for an icon. On a
+# persistent root this is a first-boot cost; afterwards the caches are there.
+ensure_runtime_caches
+
+# Fontconfig scans every font directory on a cache miss, which on a first boot
+# happens while VCL is already waiting for a font list. Build the cache first,
+# where the delay is a line on the console rather than a window that has not
+# appeared yet.
+if [ -x /usr/bin/fc-cache ] && [ ! -d "$XDG_CACHE_HOME/fontconfig" ]; then
+	/usr/bin/fc-cache -f >/dev/null 2>&1 || true
+fi
+
+has_document=0
+for argument in "$@"; do
+	case "$argument" in
+		-*) ;;
+		*) has_document=1 ;;
+	esac
+done
+if [ "$has_document" -eq 0 ]; then
+	document=/usr/share/vinix/libreoffice-welcome.fodt
+	if [ ! -s "$document" ]; then
+		document="$HOME/libreoffice-welcome.fodt"
+	fi
+	if [ -s "$document" ]; then
+		# Open a copy: the shipped document is on a read-only path in the
+		# image, and Writer's first save should not have to ask where.
+		working_copy="$HOME/Welcome to Vinix.fodt"
+		if [ ! -s "$working_copy" ]; then
+			/bin/busybox cp "$document" "$working_copy" \
+				|| working_copy="$document"
+		fi
+		set -- "$@" "$working_copy"
+	else
+		set -- "$@" --writer
+	fi
+fi
+
+# soffice.bin resolves its several hundred sibling libraries through $ORIGIN,
+# but the UNO bootstrap also reads the program directory out of the command
+# line, and a relative invocation leaves it looking in the caller's directory.
+cd "$LIBREOFFICE_PROGRAM"
+
+exec "$LIBREOFFICE_BINARY" \
+	-env:UserInstallation="file://$VINIX_LIBREOFFICE_PROFILE" \
+	--norestore --nologo --nolockcheck --nodefault "$@"

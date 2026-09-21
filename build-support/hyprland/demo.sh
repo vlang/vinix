@@ -107,7 +107,7 @@ put 14 31 "${white}Mesa llvmpipe / kms_swrast${reset}"
 put 16 7 "${green}${bold}DISPLAY${reset}"
 put 16 31 "${white}2048 × 1536 @ 60 Hz${reset}"
 put 18 7 "${cyan}${bold}MACHINE${reset}"
-put 18 31 "${white}QEMU virt · 2 vCPU · 8 GiB RAM${reset}"
+put 18 31 "${white}QEMU virt · 4 vCPU · 8 GiB RAM${reset}"
 
 put 22 7 "${muted}framebuffer${reset}"
 put 22 31 "${cyan}████████████████████${muted}  ready${reset}"

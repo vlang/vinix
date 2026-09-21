@@ -1,0 +1,34 @@
+#!/bin/sh
+# Atomically install a self-hosted desktop build and ask the PID 1 supervisor
+# to replace the running session. The old executable remains valid until its
+# process exits; every multicall application symlink sees the new inode.
+set -eu
+
+usage() {
+	echo "usage: vinix-desktop-reload BINARY" >&2
+	exit 2
+}
+
+[ "$#" -eq 1 ] || usage
+source_binary=$1
+[ -f "$source_binary" ] && [ -x "$source_binary" ] || {
+	echo "vinix-desktop-reload: not an executable file: $source_binary" >&2
+	exit 1
+}
+
+destination=/usr/bin/vinix-desktop
+temporary="/usr/bin/.vinix-desktop.new.$$"
+cleanup() {
+	rm -f "$temporary"
+}
+trap cleanup EXIT HUP INT TERM
+
+cp "$source_binary" "$temporary"
+chmod 755 "$temporary"
+mv -f "$temporary" "$destination"
+mkdir -p /run
+: > /run/vinix-desktop-development
+trap - EXIT HUP INT TERM
+
+echo "vinix-desktop-reload: installed $destination; reloading the desktop"
+kill -HUP 1

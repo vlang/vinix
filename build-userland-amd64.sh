@@ -75,8 +75,10 @@ stage_alpine_packages() {
         fi
         echo "    extracting $filename"
         # APK signatures, metadata, and payload are concatenated tar streams.
-        # bsdtar can report the trailing stream after extracting the payload.
-        tar -ixzf "$package_archive" -C "$STAGING" 2>/dev/null || true
+        # Extract the payload stream; BSD tar can report the trailing stream
+        # after it has done so. Its short -i option is not portable here: it
+        # can leave the payload unextracted on macOS.
+        tar -xzf "$package_archive" -C "$STAGING" 2>/dev/null || true
         rm -f "$STAGING/.PKGINFO" "$STAGING/.SIGN"* \
             "$STAGING/.trigger"* "$STAGING/.pre-"* "$STAGING/.post-"*
     done < "$BUILD_DIR/packages"
@@ -110,6 +112,10 @@ else
     : > "$BUILD_DIR/packages"
 fi
 
+echo "==> Staging Zsh, Vim, and Oh My Zsh..."
+stage_alpine_packages zsh vim
+"$SCRIPT_DIR/build-support/stage-oh-my-zsh.sh" "$STAGING" "$DOWNLOADS"
+
 # Vinix starts /sbin/init itself. Use Alpine's unmodified /bin/busybox through
 # its normal /bin/sh applet and leave an interactive shell after the smoke
 # marker, which also makes this image useful for manual compatibility checks.
@@ -128,7 +134,8 @@ int main(void) {
 EOF
 
 if [ ! -x "$STAGING/bin/busybox" ] ||
-   [ ! -e "$STAGING/lib/ld-musl-x86_64.so.1" ]; then
+   [ ! -e "$STAGING/lib/ld-musl-x86_64.so.1" ] ||
+   [ ! -x "$STAGING/usr/bin/vim" ]; then
     echo "ERROR: Alpine base userland is incomplete" >&2
     exit 1
 fi

@@ -90,6 +90,14 @@ case "${1:-desktop}" in
         FLAGS=(--apple-gpu --gpu-probe-only --native-resolution)
         MODE="shell + Apple GPU probe only"
         ;;
+    gpu-diag)
+        # The GPU probe with nothing else running. gpu-probe above boots the
+        # 2.9 GB base initramfs, which does not fit a 512 MB ESP; this one is a
+        # few KB. Unlike diag it keeps flanterm, because the point here is to
+        # read what the probe printed rather than to count stage bars.
+        FLAGS=(--apple-gpu --gpu-probe-only --native-resolution --minimal-initramfs)
+        MODE="diagnostic + Apple GPU probe"
+        ;;
     desktop-gpu)
         FLAGS=(--apple-gpu --native-resolution --desktop-initramfs)
         MODE="desktop + Apple GPU"
@@ -128,7 +136,7 @@ case "${1:-desktop}" in
         exit 0
         ;;
     *)
-        echo "error: unknown mode '$1' (use: desktop | studio | full | gpu | gpu-probe | desktop-gpu | desktop-wifi | battery | dcp | storage | drivers | desktop-drivers | diag | halt N | selftest)" >&2
+        echo "error: unknown mode '$1' (use: desktop | studio | full | gpu | gpu-probe | gpu-diag | desktop-gpu | desktop-wifi | battery | dcp | storage | drivers | desktop-drivers | diag | halt N | selftest)" >&2
         exit 1
         ;;
 esac
@@ -191,6 +199,23 @@ This mode owns one firmware framebuffer. Reconnecting that established output
 works live; switching between the internal and external outputs crosses a boot.
 STUDIO
     ;;
+diagnostic\ +\ Apple\ GPU\ probe)
+    cat <<'GPUDIAG'
+
+Nothing runs after the probe in this mode: what is on screen is the probe's own
+output. The M1 Air is handed m1n1's FDT, not Apple boot data, so the m1n1 branch
+runs and the operating-point table loads:
+
+  agx: Probing Apple GPU
+  agx: loaded 7 t8103 operating points (1 off, 396..1278 MHz, 19488 mW max)
+
+Seven states with one off, over 396..1278 MHz, is that machine's fused ladder.
+A different count, a missing "1 off", or a narrower range means the boot device
+tree changed. Any "G13 ABI self-check failed" line names a layout in this tree
+that no longer matches the recovered firmware ABI; see docs/m1-agx-bringup.md.
+Photograph the screen either way.
+GPUDIAG
+    ;;
 *Apple\ GPU*)
     cat <<'GPU'
 
@@ -209,11 +234,11 @@ hardware-only render test with:
 
 Only "VINIX M1 AGX RENDER TEST: PASS" is proof of native GPU execution: the
 test rejects software/VirGL/fake renderers and validates pixels after glFinish.
-The boot should also report exactly two Vinix CPUs online:
+The boot should also report exactly four Vinix CPUs online:
 
   smp: Discovered CPUs: 8
-  smp: Starting CPUs:   2
-  smp: 2 CPUs online
+  smp: Starting CPUs:   4
+  smp: 4 CPUs online
 
 Use `sudo ~/code/kek.sh desktop-wifi` if the GPU probe prevents the desktop
 from starting; that keeps Wi-Fi and the same desktop image but disables AGX.

@@ -1,32 +1,61 @@
 #!/bin/sh
-# Launch the C++ Minetest client with conservative defaults for Vinix's X11
-# and software-OpenGL stack.
+# Launch Minecraft: Java Edition on Vinix.
+#
+# The build host has already resolved the version manifest into launch.env, so
+# this script only has to expand Mojang's argument templates, apply the musl
+# and software-OpenGL settings Vinix needs, and exec the JVM.
+#
+# Mojang publishes no musl natives. LWJGL's own AArch64 natives are glibc
+# builds that load through gcompat, but not all of them survive that: OpenAL
+# misbehaves and freetype segfaults while the font atlas is built, so both are
+# pointed at Alpine's native builds — the substitution Alpine makes for Prism
+# Launcher too.
+#
+# jemalloc is worse than either and cannot be fixed by substitution. LWJGL uses
+# it as its own allocator, so the first memAlloc lazily dlopens it — and that
+# happens *inside* loading the OpenGL library, where LWJGL is asking a
+# half-initialised library for its path. That nested dlopen segfaults here
+# whichever jemalloc it points at. Selecting the libc allocator removes the
+# library, the lazy init and the re-entrancy in one go.
 set -eu
 
-engine=${VINIX_MINECRAFT_BIN:-/usr/bin/minetest}
+game_root=${VINIX_MINECRAFT_ROOT:-/usr/share/minecraft}
+launch_env=$game_root/launch.env
 startx=${VINIX_MINECRAFT_STARTX:-/usr/bin/startx}
 xinitrc=${VINIX_MINECRAFT_XINITRC:-/usr/share/vinix/minecraft-xinitrc}
-game_path=${VINIX_MINECRAFT_GAME_PATH:-/usr/share/minetest/games/minetest_game}
-user_path=${VINIX_MINECRAFT_USER_PATH:-${HOME:-/root}/.minetest}
-defaults=${VINIX_MINECRAFT_DEFAULTS:-/usr/share/vinix/minecraft.conf}
+login_helper=${VINIX_MINECRAFT_LOGIN:-/usr/bin/minecraft-login}
+user_dir=${VINIX_MINECRAFT_USER_DIR:-${HOME:-/root}/.minecraft}
+memory=${VINIX_MINECRAFT_MEMORY:-1536M}
 
 usage() {
 	cat <<'EOF'
-usage: minecraft [--menu | --check | --help]
+usage: minecraft [--demo | --play | --login | --logout | --check | --help]
 
-With no option, start the persistent "Vinix World" using Minetest Game.
---menu opens Minetest's main menu instead. Worlds and settings are kept below
-$HOME/.minetest.
+  (no option)  start Minecraft; the full game when signed in, otherwise the
+               official free demo
+  --demo       always start the free demo, even when signed in
+  --play       start the full game; fails when no account is signed in
+  --login      sign in to a Microsoft account that owns Minecraft
+  --logout     forget the signed-in account
+  --check      report the staged version and sign-in state, without a display
+
+Worlds, screenshots and options are kept below $HOME/.minecraft.
 EOF
 }
 
-mode=world
+mode=auto
 case "${1:-}" in
 	'') ;;
-	--menu) mode=menu ;;
+	--demo) mode=demo ;;
+	--play) mode=play ;;
+	--login) mode=login ;;
+	--logout) mode=logout ;;
 	--check) mode=check ;;
-	--x11-client) mode=${VINIX_MINECRAFT_MODE:-world} ;;
-	--help|-h) usage; exit 0 ;;
+	--x11-client) mode=${VINIX_MINECRAFT_MODE:-auto} ;;
+	--help | -h)
+		usage
+		exit 0
+		;;
 	*)
 		echo "minecraft: unknown option: $1" >&2
 		usage >&2
@@ -34,57 +63,190 @@ case "${1:-}" in
 		;;
 esac
 
-if [ ! -x "$engine" ]; then
-	echo "minecraft: Minetest is not installed; run ./build-minecraft-aarch64.sh and rebuild the desktop image" >&2
+if [ ! -f "$launch_env" ]; then
+	echo "minecraft: the game is not staged; run ./build-minecraft-aarch64.sh and rebuild the desktop image" >&2
 	exit 1
 fi
-if [ ! -f "$game_path/game.conf" ]; then
-	echo "minecraft: Minetest Game is missing from $game_path" >&2
+# shellcheck source=/dev/null
+. "$launch_env"
+java_home=${JAVA_HOME:-/usr/lib/jvm/java-${MC_JAVA_MAJOR:-21}-openjdk}
+java_bin=${VINIX_MINECRAFT_JAVA:-$java_home/bin/java}
+if [ ! -x "$java_bin" ]; then
+	echo "minecraft: no Java ${MC_JAVA_MAJOR:-compatible} runtime at $java_bin; run 'pkg install minecraft' first" >&2
 	exit 1
 fi
-if [ "$mode" = check ]; then
-	"$engine" --version
-	echo "minecraft: C++ client and game data are ready"
+
+session_file=$user_dir/vinix-session.env
+signed_in=no
+if [ -f "$session_file" ]; then
+	# shellcheck source=/dev/null
+	. "$session_file"
+	[ -n "${MC_ACCESS_TOKEN:-}" ] && signed_in=yes
+fi
+
+case "$mode" in
+login)
+	if [ ! -x "$login_helper" ]; then
+		echo "minecraft: $login_helper is missing" >&2
+		exit 1
+	fi
+	exec "$login_helper" --session "$session_file"
+	;;
+logout)
+	rm -f "$session_file"
+	echo "minecraft: signed out"
 	exit 0
+	;;
+check)
+	if ! runtime_output=$("$java_bin" -version 2>&1); then
+		echo "minecraft: Java failed to start: $runtime_output" >&2
+		exit 1
+	fi
+	runtime=$(printf '%s\n' "$runtime_output" | sed -n '1p')
+	echo "minecraft: Minecraft $MC_VERSION ($MC_VERSION_TYPE), assets $MC_ASSET_INDEX"
+	echo "minecraft: runtime $runtime"
+	if [ "$signed_in" = yes ]; then
+		echo "minecraft: signed in as ${MC_PLAYER_NAME:-unknown}"
+	else
+		echo "minecraft: no account signed in; the free demo is available"
+	fi
+	echo "minecraft: client and game data are ready"
+	exit 0
+	;;
+esac
+
+if [ "$mode" = play ] && [ "$signed_in" != yes ]; then
+	echo "minecraft: --play needs a Microsoft account that owns Minecraft; run 'minecraft --login'" >&2
+	exit 1
+fi
+if [ "$mode" = auto ]; then
+	if [ "$signed_in" = yes ]; then mode=play; else mode=demo; fi
 fi
 
-mkdir -p "$user_path/worlds/Vinix World"
-config=$user_path/minetest.conf
-world="$user_path/worlds/Vinix World"
-if [ ! -f "$config" ]; then
-	cp "$defaults" "$config"
-fi
-if [ ! -f "$world/world.mt" ]; then
-	cat > "$world/world.mt" <<'EOF'
-gameid = minetest
-backend = sqlite3
-player_backend = sqlite3
-auth_backend = sqlite3
-creative_mode = false
-enable_damage = true
-EOF
-fi
-
-# Keep rendering in Minetest's process. Mesa's direct software path presents
-# through Xorg without requiring GPU support, while indirect GLX would execute
-# the renderer inside the X server and is not supported by Vinix yet.
+# Rendering happens in the game's own process: Mesa's software rasteriser
+# presents through Xorg without GPU support, while indirect GLX would run the
+# renderer inside the X server, which Vinix does not support.
 if [ "${VINIX_MINECRAFT_HARDWARE_GL:-0}" != 1 ]; then
 	export LIBGL_ALWAYS_SOFTWARE=1
+	# Mesa's on-disk shader cache never completes here: with it enabled
+	# eglCreateContext does not return, and the process sits at full CPU
+	# indefinitely rather than failing. Measured: cache on, no context after 20
+	# minutes; cache off, a 4.5 core context in 0.3 s.
+	export MESA_SHADER_CACHE_DISABLE=true
+	export MESA_GLSL_CACHE_DISABLE=true
+	# Deliberately not GALLIUM_DRIVER=llvmpipe. That name is what Mesa's pipe
+	# loader turns into gallium-pipe/pipe_llvmpipe.so, and the only pipe driver
+	# staged is pipe_swrast.so, so asking for it fails EGL outright. Leaving it
+	# unset lets Mesa pick the software renderer it actually has.
 	unset LIBGL_ALWAYS_INDIRECT
 fi
-export SDL_AUDIODRIVER=${SDL_AUDIODRIVER:-dummy}
-export MINETEST_USER_PATH=$user_path
 
-if [ -n "${DISPLAY:-}" ] || [ "${1:-}" = --x11-client ]; then
-	if [ "$mode" = menu ]; then
-		exec "$engine" --config "$config"
+if [ -z "${DISPLAY:-}" ]; then
+	if [ ! -x "$startx" ] || [ ! -x "$xinitrc" ]; then
+		echo "minecraft: Xorg launcher is not installed" >&2
+		exit 1
 	fi
-	exec "$engine" --config "$config" --world "$world" --gameid minetest --go
+	export VINIX_MINECRAFT_MODE=$mode
+	exec "$startx" "$xinitrc"
 fi
 
-if [ ! -x "$startx" ] || [ ! -x "$xinitrc" ]; then
-	echo "minecraft: Xorg launcher is not installed" >&2
-	exit 1
+natives_dir=$user_dir/natives
+mkdir -p "$user_dir" "$natives_dir/java" "$natives_dir/jna" \
+	"$natives_dir/lwjgl" "$natives_dir/netty"
+
+# Demo mode is Mojang's own free offering and needs no account, so it runs with
+# a placeholder session. Signed-in play always uses the real credentials the
+# Microsoft sign-in returned.
+if [ "$mode" = demo ]; then
+	player_name=${MC_PLAYER_NAME:-Player}
+	player_uuid=${MC_PLAYER_UUID:-00000000000040008000000000000000}
+	access_token=0
+	player_xuid=0
+	game_args_template=$MC_GAME_ARGS_DEMO
+else
+	player_name=$MC_PLAYER_NAME
+	player_uuid=$MC_PLAYER_UUID
+	access_token=$MC_ACCESS_TOKEN
+	player_xuid=${MC_PLAYER_XUID:-0}
+	game_args_template=$MC_GAME_ARGS_FULL
 fi
-export VINIX_MINECRAFT_MODE=$mode
-exec "$startx" "$xinitrc"
+
+resolution_width=${VINIX_MINECRAFT_WIDTH:-1280}
+resolution_height=${VINIX_MINECRAFT_HEIGHT:-720}
+
+# launch.env is persistent game data and may have been generated before the
+# fetcher advertised Mojang's has_custom_resolution feature. Keep those
+# existing installations working too: supply whichever dimension is absent
+# from their saved argument template. New descriptions already contain these
+# options, so do not append duplicate jopt-simple arguments.
+host_resolution_args=
+case " $game_args_template " in
+	*' --width '*) ;;
+	*) host_resolution_args="--width $resolution_width" ;;
+esac
+case " $game_args_template " in
+	*' --height '*) ;;
+	*) host_resolution_args="$host_resolution_args --height $resolution_height" ;;
+esac
+
+expand() {
+	# Mojang's templates use ${name}; substitute the ones a launcher supplies.
+	printf '%s' "$1" | sed \
+		-e "s|\${natives_directory}|$natives_dir|g" \
+		-e "s|\${launcher_name}|vinix|g" \
+		-e "s|\${launcher_version}|1|g" \
+		-e "s|\${auth_player_name}|$player_name|g" \
+		-e "s|\${version_name}|$MC_VERSION|g" \
+		-e "s|\${game_directory}|$user_dir|g" \
+		-e "s|\${assets_root}|$MC_GAME_ROOT/assets|g" \
+		-e "s|\${assets_index_name}|$MC_ASSET_INDEX|g" \
+		-e "s|\${auth_uuid}|$player_uuid|g" \
+		-e "s|\${auth_access_token}|$access_token|g" \
+		-e "s|\${auth_xuid}|$player_xuid|g" \
+		-e "s|\${clientid}|vinix|g" \
+		-e "s|\${version_type}|$MC_VERSION_TYPE|g" \
+		-e "s|\${resolution_width}|$resolution_width|g" \
+		-e "s|\${resolution_height}|$resolution_height|g"
+}
+
+glfw_override=
+if [ "${VINIX_MINECRAFT_SYSTEM_GLFW:-0}" = 1 ]; then
+	glfw_override=-Dorg.lwjgl.glfw.libname=/usr/lib/libglfw.so.3
+fi
+
+# A small serial-collected heap suits a software renderer in a virtual machine
+# far better than Mojang's desktop defaults of a 4 GiB ZGC heap.
+#
+# LWJGL's Platform class recognises only Windows, Linux and macOS, and Vinix's
+# JVM truthfully reports os.name=Vinix — which aborts native library loading
+# with "Unknown platform: Vinix" before a window is ever created. The natives
+# being loaded are Linux builds running on Vinix's Linux-compatible ABI, so
+# name that ABI for the libraries that ask.
+#
+# HotSpot's Linux port probes an RWX page during startup. Vinix keeps W^X as
+# the default for every other process; this exec-scoped opt-in enables only
+# this JVM and the children it deliberately starts. Generated HotSpot code is
+# not reliable on Vinix yet, so use the interpreter; Minecraft is slower to
+# start, but the official client and renderer run correctly.
+#
+# Alpine's jspawnhelper uses a private pipe handshake that Vinix does not yet
+# implement. Force Java's direct fork path so Minecraft's host probes and
+# integrated-server helpers can start reliably.
+export VINIX_ALLOW_WX=1
+exec "$java_bin" \
+	-Xint \
+	-XX:ActiveProcessorCount=1 \
+	"-Xmx$memory" \
+	-XX:+UseSerialGC \
+	-Djdk.lang.Process.launchMechanism=FORK \
+	-Dos.name=Linux \
+	-Dorg.lwjgl.system.allocator=system \
+	-Dorg.lwjgl.openal.libname=/usr/lib/libopenal.so.1 \
+	-Dorg.lwjgl.freetype.libname=/usr/lib/libfreetype.so.6 \
+	-Dorg.lwjgl.harfbuzz.libname=/usr/lib/libharfbuzz.so.0 \
+	${glfw_override:+"$glfw_override"} \
+	$(expand "$MC_JVM_ARGS") \
+	-cp "$MC_CLASSPATH" \
+	"$MC_MAIN_CLASS" \
+	$(expand "$game_args_template") \
+	$host_resolution_args

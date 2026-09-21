@@ -1,5 +1,8 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
 // vinix-desktop — a small desktop environment for Vinix.
 //
 // It maps /dev/fb0, reads the pointer from /dev/pointer and the keyboard from
@@ -43,6 +46,11 @@ struct Options {
 	frame_interval i64 = default_frame_interval_ms
 	idle_interval  i64 = default_idle_interval_ms
 	stats          bool
+	// Applications to open at startup, by the title on their shortcut. The
+	// desktop is otherwise only reachable through the pointer, which leaves a
+	// scripted boot no way to ask for the one thing worth measuring: how long
+	// a real application takes to appear in a window.
+	open []string
 }
 
 fn parse_options(args []string) Options {
@@ -66,7 +74,14 @@ fn parse_options(args []string) Options {
 			options = Options{
 				...options
 				frame_interval: interval
-				idle_interval: interval
+				idle_interval:  interval
+			}
+		} else if arg.starts_with('--open=') {
+			mut titles := options.open.clone()
+			titles << arg[7..]
+			options = Options{
+				...options
+				open: titles
 			}
 		} else if arg == '--stats' {
 			options = Options{
@@ -103,6 +118,7 @@ fn main() {
 		return
 	}
 	desktop_ignore_broken_pipe()
+	desktop_install_power_signals()
 	options := parse_options(arguments()[1..])
 
 	mut fb := open_framebuffer(options.framebuffer) or {
@@ -113,12 +129,15 @@ fn main() {
 		fb.close()
 	}
 
-	scale := desktop_configure_scale(fb.width, fb.height)
+	mut preferences := desktop_load_preferences(desktop_home)
+	scale := preferences.configure_scale(fb.width, fb.height)
 	mut desktop := Desktop{
-		canvas: new_canvas(desktop_scaled_extent(fb.width, scale), desktop_scaled_extent(fb.height, scale))
-		fonts: load_fonts()
+		settings:          preferences.settings
+		canvas:            new_scaled_canvas(desktop_scaled_extent(fb.width, scale), desktop_scaled_extent(fb.height, scale), fb.width, fb.height, scale)
+		fonts:             load_fonts()
 		tz_offset_seconds: options.tz_offset
 	}
+	desktop.load_app_icons()
 
 	mut pointer := open_pointer(options.pointer)
 	defer {
@@ -127,31 +146,71 @@ fn main() {
 	desktop.pointer_present = pointer.available()
 	desktop.pointer_x = desktop.canvas.width / 2
 	desktop.pointer_y = desktop.canvas.height / 2
+	mut titlebar_click := TitlebarClick{}
 
 	mut keyboard := open_keyboard()
 	defer {
 		keyboard.close()
 	}
 
+	// First launch is an exclusive setup mode: ordinary windows, shortcuts and
+	// the taskbar do not exist until a persistent user profile has been created.
+	desktop.ensure_registered_user(mut fb, mut pointer, mut keyboard, options.frame_interval,
+		options.idle_interval)
+	if !desktop.running {
+		return
+	}
+
 	// An opening arrangement, kept clear of the shortcut column down the left
-	// edge. The calculator is not opened: it remains available from its shortcut
-	// and the Start menu, and three windows is enough to show what the taskbar is for.
-	desktop.spawn('Welcome', .welcome, 150, 60, 396, 244)
-	desktop.spawn('System', .system, 580, 60, 372, 232)
-	desktop.launch_titled('Files')
+	// edge. The calculator remains available from its shortcut and the Start
+	// menu; the Welcome page is available from Help but is not shown at launch.
+	mut launch_default_files := false
+	if options.open.len == 0 {
+		desktop.spawn('System', .system, 580, 60, 372, 232)
+		// Files is a separate process. Paint the compositor-owned windows first,
+		// so a delayed application handshake cannot leave the firmware console
+		// looking like the desktop failed to start.
+		launch_default_files = true
+	} else {
+		for title in options.open {
+			desktop.launch_titled_at_startup(title)
+		}
+	}
 
 	mut stats := FrameStats{}
 	for desktop.running {
+		// `reboot`, `poweroff` and `halt` signal PID 1 rather than powering the
+		// machine down themselves. The supervising init forwards those signals
+		// to this system-session compositor for an orderly teardown.
+		desktop.take_power_signal()
+		if !desktop.running {
+			break
+		}
 		frame_started := monotonic_millis()
 
 		desktop.update_taskbar_clock()
 		desktop.poll_apps()
-		desktop.pump_pointer(mut pointer, desktop.canvas.width, desktop.canvas.height)
+		// Keep a drag's pointer-only damage separate from independent changes
+		// (a clock tick, an app frame, keyboard input, etc.). A partial compose
+		// is valid only when the pointer is the sole source of new pixels.
+		background_dirty := desktop.dirty
+		desktop.dirty = false
+		titlebar_click = desktop.pump_pointer(mut pointer, desktop.canvas.width,
+			desktop.canvas.height, titlebar_click)
+		pointer_dirty := desktop.dirty
+		desktop.dirty = false
 		desktop.pump_keyboard(mut keyboard)
+		keyboard_dirty := desktop.dirty
+		desktop.dirty = false
+		desktop.capture_tick()
+		capture_dirty := desktop.dirty
+		desktop.dirty = false
 		// Xorg, unlike a native ui2 application, needs the physical display and
 		// input devices. Stop the compositor at a frame boundary, restore the
 		// console, and reopen everything after the external application exits.
 		if desktop.pending_external != '' {
+			titlebar_click = TitlebarClick{}
+			desktop.capture_close()
 			command := desktop.pending_external
 			desktop.pending_external = ''
 			keyboard.close()
@@ -170,8 +229,15 @@ fn main() {
 		}
 		// Settings only requests a new scale. Apply it after all input from this
 		// frame and before layout so drawing and hit targets share one space.
+		previous_scale := desktop_current_scale()
 		desktop.apply_requested_scale()
+		if !preferences.save_changes(desktop.settings, previous_scale, desktop_home) {
+			eprintln('vinix-desktop: could not save desktop settings; changes may reset on restart')
+		}
 		desktop.update_switcher()
+		other_dirty := desktop.dirty
+		desktop.dirty = background_dirty || pointer_dirty || keyboard_dirty || capture_dirty
+			|| other_dirty
 		after_input := monotonic_millis()
 
 		// Nothing has changed: the framebuffer already holds the right
@@ -180,7 +246,8 @@ fn main() {
 		// its timeout only drives application housekeeping.
 		if !desktop.dirty {
 			elapsed := monotonic_millis() - frame_started
-			interval := desktop.idle_wait_interval(options.idle_interval, options.frame_interval)
+			app_interval := desktop.idle_wait_interval(options.idle_interval, options.frame_interval)
+			interval := desktop.capture_idle_interval(app_interval, options.frame_interval)
 			wait := desktop_frame_wait_ms(elapsed, interval)
 			desktop_wait_for_input(pointer.fd, keyboard.fd, wait)
 			continue
@@ -191,13 +258,31 @@ fn main() {
 		tree := desktop.build_tree()
 		after_build := monotonic_millis()
 
-		desktop.render(tree)
+		partial_drag_frame := desktop.drag.kind == .move && desktop.drag_damage.valid
+			&& pointer_dirty && !background_dirty && !keyboard_dirty && !capture_dirty && !other_dirty
+		if partial_drag_frame {
+			desktop.render_drag_damage(tree, desktop.drag_damage)
+		} else {
+			desktop.render(tree)
+		}
+		desktop.render_create_context_menu()
 		after_render := monotonic_millis()
 
-		fb.present(&desktop.canvas, desktop_current_scale())
+		if partial_drag_frame {
+			fb.present_damage(&desktop.canvas, desktop.drag_damage)
+		} else {
+			fb.present(&desktop.canvas, desktop_current_scale())
+		}
+		desktop.capture_presented(&desktop.canvas)
 		after_present := monotonic_millis()
+		desktop.drag_damage = DamageRect{}
 
 		free_tree(tree)
+
+		if launch_default_files {
+			launch_default_files = false
+			desktop.launch_titled_at_startup('Files')
+		}
 
 		sleep_to_next_frame(frame_started, options.frame_interval)
 
@@ -210,6 +295,7 @@ fn main() {
 	// Leave the console the way it was found rather than on top of a desktop
 	// that is no longer being redrawn.
 	desktop.close_apps()
+	desktop.capture_close()
 	desktop.canvas.clip = Clip{
 		x: 0
 		y: 0
@@ -219,19 +305,24 @@ fn main() {
 	desktop.canvas.clear(0x000000)
 	fb.present(&desktop.canvas, desktop_current_scale())
 	println('vinix-desktop: ${desktop.frames} frames')
+
+	// Nothing above has to be undone afterwards: this does not return unless
+	// the kernel refuses, and it is keep_running for a session that was only
+	// closed rather than asked to take the machine with it.
+	desktop_power_apply(desktop.power)
 }
 
 // pump_pointer maps the device's own coordinate space onto the screen and
 // turns the button mask into press and release events.
-fn (mut d Desktop) pump_pointer(mut pointer PointerDevice, width int, height int) {
-	packet := pointer.poll() or { return }
+fn (mut d Desktop) pump_pointer(mut pointer PointerDevice, width int, height int, titlebar_click TitlebarClick) TitlebarClick {
+	packet := pointer.poll() or { return titlebar_click }
 
 	// The node exists even on a machine with no pointer hardware, and says so
 	// by reporting an empty coordinate range. Without a device there is nothing
 	// to draw a cursor for.
 	if packet.max_x <= 0 || packet.max_y <= 0 {
 		d.pointer_present = false
-		return
+		return TitlebarClick{}
 	}
 	d.pointer_present = true
 
@@ -242,12 +333,45 @@ fn (mut d Desktop) pump_pointer(mut pointer PointerDevice, width int, height int
 	d.buttons = packet.buttons
 	d.on_pointer_move(pointer_x, pointer_y)
 
+	mut click := titlebar_click
+	// A different pointer gesture breaks a pending double-click sequence.
+	if packet.pressed & (button_middle | button_right) != 0 || packet.scroll != 0 {
+		click = TitlebarClick{}
+	}
 	if packet.pressed & button_left != 0 {
-		d.on_pointer_down(pointer_x, pointer_y)
+		if d.create_context_left_down(pointer_x, pointer_y) {
+			click = TitlebarClick{}
+		} else {
+			click = d.titlebar_pointer_down_at(click, pointer_x, pointer_y, desktop_monotonic_ms())
+		}
 	}
 	if packet.released & button_left != 0 {
-		d.on_pointer_up(pointer_x, pointer_y)
+		if !take_create_context_left_release() {
+			d.on_pointer_up(pointer_x, pointer_y)
+		}
 	}
+	if packet.pressed & button_middle != 0 {
+		d.on_app_pointer_button(pointer_x, pointer_y, .down, .middle)
+	}
+	if packet.released & button_middle != 0 {
+		d.on_app_pointer_button(pointer_x, pointer_y, .up, .middle)
+	}
+	if packet.pressed & button_right != 0 {
+		if d.open_create_context_menu(pointer_x, pointer_y) {
+			click = TitlebarClick{}
+		} else {
+			d.on_app_pointer_button(pointer_x, pointer_y, .down, .right)
+		}
+	}
+	if packet.released & button_right != 0 {
+		if !take_create_context_right_release() {
+			d.on_app_pointer_button(pointer_x, pointer_y, .up, .right)
+		}
+	}
+	if packet.scroll != 0 {
+		d.on_app_pointer_scroll(pointer_x, pointer_y, int(packet.scroll))
+	}
+	return click
 }
 
 fn (mut d Desktop) pump_keyboard(mut keyboard Keyboard) {

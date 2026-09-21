@@ -2,10 +2,10 @@ name: Page cache tests
 on:
   pull_request:
     paths:
-      - 'kernel/modules/pagecache/**'
-      - 'kernel/modules/resource/cache.v'
-      - 'kernel/modules/fs/ext2/**'
-      - 'kernel/modules/file/**'
+      - 'kernel/pagecache/**'
+      - 'kernel/resource/cache.v'
+      - 'kernel/fs/ext2/**'
+      - 'kernel/file/**'
       - 'tests/pagecache/**'
       - '.github/workflows/pagecache.yml'
 permissions:

@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The LibreOffice user profile the Vinix desktop starts from.
+     Two things make an unseeded profile look broken on this display: the
+     hosted X server has no window manager, so nothing resizes the document
+     window to the 1280x900 surface, and a first run opens the Tip of the Day
+     dialog and the donate infobar on top of the document. -->
+<oor:items xmlns:oor="http://openoffice.org/2001/registry"
+    xmlns:xs="http://www.w3.org/2001/XMLSchema"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+ <item oor:path="/org.openoffice.Setup/Office/Factories/org.openoffice.Setup:Factory['com.sun.star.text.TextDocument']">
+  <prop oor:name="ooSetupFactoryWindowAttributes" oor:op="fuse">
+   <value>0,0,1280,900;0;0,0,0,0;</value>
+  </prop>
+ </item>
+ <item oor:path="/org.openoffice.Setup/Office/Factories/org.openoffice.Setup:Factory['com.sun.star.sheet.SpreadsheetDocument']">
+  <prop oor:name="ooSetupFactoryWindowAttributes" oor:op="fuse">
+   <value>0,0,1280,900;0;0,0,0,0;</value>
+  </prop>
+ </item>
+ <item oor:path="/org.openoffice.Setup/Office/Factories/org.openoffice.Setup:Factory['com.sun.star.frame.StartModule']">
+  <prop oor:name="ooSetupFactoryWindowAttributes" oor:op="fuse">
+   <value>0,0,1280,900;0;0,0,0,0;</value>
+  </prop>
+ </item>
+ <!-- First run: no Tip of the Day, no "what's new", no registration prompt. -->
+ <item oor:path="/org.openoffice.Office.Common/Misc">
+  <prop oor:name="FirstRun" oor:op="fuse"><value>false</value></prop>
+ </item>
+ <item oor:path="/org.openoffice.Office.Common/Misc">
+  <prop oor:name="ShowTipOfTheDay" oor:op="fuse"><value>false</value></prop>
+ </item>
+ <item oor:path="/org.openoffice.Setup/Product">
+  <prop oor:name="ooSetupLastVersion" oor:op="fuse"><value>25.2</value></prop>
+ </item>
+ <!-- The donate and get-involved infobars are shown when their timestamp is
+      older than the current release's window. A far-future second puts both
+      outside it for the life of this image. -->
+ <item oor:path="/org.openoffice.Setup/Office">
+  <prop oor:name="LastTimeDonateShown" oor:op="fuse"><value>4102444800</value></prop>
+ </item>
+ <item oor:path="/org.openoffice.Setup/Office">
+  <prop oor:name="LastTimeGetInvolvedShown" oor:op="fuse"><value>4102444800</value></prop>
+ </item>
+ <!-- Vinix has no desktop file-chooser service and no session bus; LibreOffice
+      draws its own dialogs instead of asking a portal that is not there. -->
+ <item oor:path="/org.openoffice.Office.Common/Misc">
+  <prop oor:name="UseSystemFileDialog" oor:op="fuse"><value>false</value></prop>
+ </item>
+ <item oor:path="/org.openoffice.Office.Common/Misc">
+  <prop oor:name="UseSystemPrintDialog" oor:op="fuse"><value>false</value></prop>
+ </item>
+ <!-- No network is reachable on a first boot, and the update check retries on
+      a timer for the life of the process. -->
+ <item oor:path="/org.openoffice.Office.Jobs/Jobs/org.openoffice.Office.Jobs:Job['UpdateCheck']/Arguments">
+  <prop oor:name="AutoCheckEnabled" oor:op="fuse"><value>false</value></prop>
+ </item>
+</oor:items>

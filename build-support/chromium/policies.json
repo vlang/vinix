@@ -1,0 +1,15 @@
+{
+  "MetricsReportingEnabled": false,
+  "DefaultBrowserSettingEnabled": false,
+  "BackgroundModeEnabled": false,
+  "BrowserSignin": 0,
+  "SyncDisabled": true,
+  "ComponentUpdatesEnabled": false,
+  "PromotionalTabsEnabled": false,
+  "PasswordManagerEnabled": false,
+  "SafeBrowsingEnabled": false,
+  "SearchSuggestEnabled": false,
+  "RestoreOnStartup": 4,
+  "RestoreOnStartupURLs": ["file:///usr/share/vinix/chromium-smoke.html"],
+  "HomepageLocation": "file:///usr/share/vinix/chromium-smoke.html"
+}

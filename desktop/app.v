@@ -1,5 +1,8 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
 // Native ui2 applications shown in the desktop's windows.
 //
 // A ui2 application normally calls `run_vml`, which opens a platform window.
@@ -38,6 +41,9 @@ struct AppFactory {
 	poll_interval_ms  u64
 	keyboard          bool
 	pointer           bool
+	// A standalone app implements the pipe protocol in its own executable; it
+	// therefore has no factory callback in the compositor's multicall binary.
+	standalone        bool
 	exclusive_command string
 	// Used only after exec, in the application process. Settings receives that
 	// process' synchronized desktop-state proxy; most apps ignore it.
@@ -50,10 +56,13 @@ struct AppFactory {
 // what launch_index reads back.
 const app_start_actions = ['start.launch.0', 'start.launch.1', 'start.launch.2', 'start.launch.3',
 	'start.launch.4', 'start.launch.5', 'start.launch.6', 'start.launch.7', 'start.launch.8',
-	'start.launch.9', 'start.launch.10', 'start.launch.11', 'start.launch.12', 'start.launch.13']
+	'start.launch.9', 'start.launch.10', 'start.launch.11', 'start.launch.12', 'start.launch.13',
+	'start.launch.14', 'start.launch.15', 'start.launch.16', 'start.launch.17', 'start.launch.18',
+	'start.launch.19', 'start.launch.20', 'start.launch.21']
 const app_shortcut_actions = ['shortcut.0', 'shortcut.1', 'shortcut.2', 'shortcut.3', 'shortcut.4',
 	'shortcut.5', 'shortcut.6', 'shortcut.7', 'shortcut.8', 'shortcut.9', 'shortcut.10', 'shortcut.11',
-	'shortcut.12', 'shortcut.13']
+	'shortcut.12', 'shortcut.13', 'shortcut.14', 'shortcut.15', 'shortcut.16', 'shortcut.17',
+	'shortcut.18', 'shortcut.19', 'shortcut.20', 'shortcut.21']
 
 // available_apps is what the Start menu and the wallpaper offer. The calculator's
 // window is sized from the constants its own source declares, so the window
@@ -65,11 +74,11 @@ const available_apps = [
 		width: 460
 		height: 360
 		process_name: 'vinix-files'
-		open: open_files
+		open: open_files_with_context_menu
 	},
 	AppFactory{
 		title: 'Firefox'
-		icon: 'builtin:browser'
+		icon: 'asset:firefox'
 		width: firefox_window_width
 		height: firefox_window_height + default_title_height
 		process_name: 'vinix-firefox'
@@ -81,7 +90,7 @@ const available_apps = [
 	},
 	AppFactory{
 		title: 'Calculator'
-		icon: 'builtin:calculator'
+		icon: 'asset:calculator'
 		width: window_width
 		height: window_height + default_title_height
 		process_name: 'vinix-calculator'
@@ -89,18 +98,21 @@ const available_apps = [
 	},
 	AppFactory{
 		title: 'Terminal'
-		icon: 'builtin:terminal'
+		icon: 'asset:terminal'
 		width: 560
 		height: 340
 		process_name: 'vinix-terminal'
 		polling: true
-		poll_interval_ms: 1000
+		// Key input gets one immediate poll. If that races PTY echo, come back
+		// quickly enough that typing still feels interactive instead of waiting
+		// for the old one-second idle cadence.
+		poll_interval_ms: 100
 		keyboard: true
 		open: open_terminal
 	},
 	AppFactory{
 		title: 'Settings'
-		icon: 'builtin:settings'
+		icon: 'asset:settings'
 		width: 620
 		height: 410
 		process_name: 'vinix-settings'
@@ -108,7 +120,7 @@ const available_apps = [
 	},
 	AppFactory{
 		title: 'Activity Monitor'
-		icon: 'builtin:activity'
+		icon: 'asset:activity'
 		// Wide enough for four columns without the process names truncating,
 		// and tall enough that the list is worth scrolling rather than a
 		// glimpse of one.
@@ -147,16 +159,8 @@ const available_apps = [
 		open: open_clock
 	},
 	AppFactory{
-		title: 'Cocoa Calculator'
-		icon: 'builtin:calculator'
-		width: 284
-		height: 364 + default_title_height
-		process_name: 'vinix-cocoa-calculator'
-		open: open_cocoa_calculator
-	},
-	AppFactory{
 		title: 'Minecraft'
-		icon: 'builtin:block'
+		icon: 'asset:minecraft'
 		width: minecraft_window_width
 		height: minecraft_window_height + default_title_height
 		process_name: 'vinix-minecraft'
@@ -197,6 +201,110 @@ const available_apps = [
 		keyboard: true
 		pointer: true
 		open: open_wine_word2013
+	},
+	AppFactory{
+		title: 'Blender'
+		icon: 'asset:blender'
+		width: blender_window_width
+		height: blender_window_height + default_title_height
+		process_name: 'vinix-blender'
+		polling: true
+		poll_interval_ms: 50
+		keyboard: true
+		pointer: true
+		open: open_blender
+	},
+	AppFactory{
+		title: capture_app_title
+		icon: 'builtin:camera'
+		width: 560
+		height: 430
+		process_name: 'vinix-capture'
+		polling: true
+		poll_interval_ms: 100
+		open: open_capture
+	},
+	AppFactory{
+		title: 'GIMP'
+		icon: 'builtin:editor'
+		width: gimp_window_width
+		height: gimp_window_height + default_title_height
+		process_name: 'vinix-gimp'
+		polling: true
+		poll_interval_ms: 50
+		keyboard: true
+		pointer: true
+		open: open_gimp
+	},
+	AppFactory{
+		title: 'VSpace'
+		icon: 'asset:vspace'
+		// Two ranking panels side by side, each wide enough for a name, a size
+		// and a path that is not cut in half.
+		width: 880
+		height: 580
+		process_name: 'vinix-vspace'
+		// A scan is a state machine the compositor advances; without polling
+		// the walk would only move when the window was clicked.
+		polling: true
+		poll_interval_ms: 33
+		open: open_vspace
+	},
+	AppFactory{
+		title:            'VOffice Writer'
+		icon:             '/usr/bin/assets/logo.png'
+		width:            900
+		height:           680
+		process_name:     'voffice-writer'
+		polling:          true
+		poll_interval_ms: 50
+		keyboard:         true
+		pointer:          true
+		standalone:       true
+	},
+	AppFactory{
+		title:            'VOffice Calc'
+		icon:             '/usr/bin/assets/logo.png'
+		width:            940
+		height:           680
+		process_name:     'voffice-calc'
+		polling:          true
+		poll_interval_ms: 50
+		keyboard:         true
+		pointer:          true
+		standalone:       true
+	},
+	AppFactory{
+		title:            'LibreOffice'
+		icon:             'builtin:editor'
+		width:            libreoffice_window_width
+		height:           libreoffice_window_height + default_title_height
+		process_name:     'vinix-libreoffice'
+		polling:          true
+		poll_interval_ms: 50
+		keyboard:         true
+		pointer:          true
+		open:             open_libreoffice
+	},
+	AppFactory{
+		title:            'Chromium'
+		icon:             'asset:chromium'
+		width:            chromium_window_width
+		height:           chromium_window_height + default_title_height
+		process_name:     'vinix-chromium'
+		polling:          true
+		poll_interval_ms: 50
+		keyboard:         true
+		pointer:          true
+		open:             open_chromium
+	},
+	AppFactory{
+		title:        'ui2 Examples'
+		icon:         'builtin:calculator'
+		width:        760
+		height:       540
+		process_name: 'vinix-ui2-examples'
+		open:         open_ui2_examples
 	},
 ]
 

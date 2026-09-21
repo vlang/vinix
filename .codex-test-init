@@ -1,0 +1,22 @@
+#!/bin/busybox sh
+exec >/dev/console 2>&1
+export PATH=/aarch64-linux-musl-native/bin:/usr/local/bin:/bin:/sbin:/usr/bin:/usr/sbin
+export HOME=/root
+export USER=root
+export LOGNAME=root
+export SHELL=/bin/busybox
+export TERM=linux
+export LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules
+export LIBGL_DRIVERS_PATH=/usr/lib/xorg/modules/dri:/usr/lib/dri
+export XDG_RUNTIME_DIR=/run/user/0
+export XDG_CONFIG_HOME=/root/.config
+export XDG_CACHE_HOME=/root/.cache
+export SSL_CA_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
+
+echo "GNumeric package proof: installing from a clean Vinix image"
+if [ ! -x /usr/bin/gnumeric ] && ! pkg install gnumeric; then
+	echo "GNumeric package proof: install failed"
+	exec /bin/busybox sh
+fi
+echo "GNumeric package proof: starting Xorg and Gnumeric"
+exec /usr/bin/startx /root/gnumeric-session

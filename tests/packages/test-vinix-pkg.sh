@@ -46,6 +46,52 @@ apk-tools
 curl
 EOF
 
+# Small local stand-ins for the official game downloader and Java trust-store
+# generator. The package frontend still has to install its Alpine dependency
+# set, publish the launchers, record every custom file, and remove it cleanly.
+mkdir -p "$root/usr/libexec/vinix-minecraft" "$work/minecraft-tools"
+for support in run-minecraft minecraft-login minecraft-xinitrc; do
+	cp "$repo/build-support/minecraft/$support" \
+		"$root/usr/libexec/vinix-minecraft/$support"
+done
+cat >"$work/minecraft-tools/fetch-minecraft.py" <<'EOF'
+#!/usr/bin/env python3
+import os
+import sys
+from pathlib import Path
+
+arguments = sys.argv[1:]
+staging = Path(arguments[arguments.index("--staging") + 1])
+game_root = arguments[arguments.index("--game-root") + 1]
+max_java = arguments[arguments.index("--max-java") + 1]
+root = staging / game_root.lstrip("/")
+(root / "libraries/org/lwjgl/lwjgl/3.3.3").mkdir(parents=True, exist_ok=True)
+(root / "versions/1.21.5").mkdir(parents=True, exist_ok=True)
+(root / "libraries/org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3.jar").write_text("core\n")
+(root / "libraries/org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3-natives-linux-arm64.jar").write_text("native\n")
+(root / "versions/1.21.5/1.21.5.jar").write_text("client\n")
+(root / "launch.env").write_text(
+    "MC_VERSION='1.21.5'\n"
+    "MC_VERSION_TYPE='release'\n"
+    "MC_ASSET_INDEX='17'\n"
+    "MC_JAVA_MAJOR='21'\n"
+    "MC_CLASSPATH='/usr/share/minecraft/libraries/org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3.jar:/usr/share/minecraft/libraries/org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3-natives-linux-arm64.jar'\n"
+)
+Path(os.environ["VINIX_TEST_MINECRAFT_FETCH_LOG"]).write_text(
+    " ".join(arguments) + f"\nmax-java={max_java}\n"
+)
+EOF
+cat >"$work/minecraft-tools/java-cacerts.py" <<'EOF'
+#!/usr/bin/env python3
+import sys
+from pathlib import Path
+
+destination = Path(sys.argv[2])
+destination.parent.mkdir(parents=True, exist_ok=True)
+destination.write_text("test Java trust store\n")
+EOF
+chmod +x "$work/minecraft-tools/"*.py
+
 cat > "$work/bin/apk" <<'EOF'
 #!/bin/sh
 case "$*" in
@@ -119,6 +165,49 @@ case "$*" in
 			if [ "$seen_add" = true ]; then
 				printf '%s\n' "$argument" >>"$VINIX_TEST_INSTALLED_PACKAGES"
 				case "$argument" in
+					openjdk21-jre|openjdk21-jdk)
+						mkdir -p "$VINIX_TEST_ROOT/usr/lib/jvm/java-21-openjdk/bin" \
+							"$VINIX_TEST_ROOT/usr/lib/jvm/java-21-openjdk/lib/security"
+						printf '#!/bin/sh\necho "openjdk version 21-test" >&2\n' \
+							>"$VINIX_TEST_ROOT/usr/lib/jvm/java-21-openjdk/bin/java"
+						chmod 0644 "$VINIX_TEST_ROOT/usr/lib/jvm/java-21-openjdk/bin/java"
+						ln -sf /etc/ssl/certs/java/cacerts \
+							"$VINIX_TEST_ROOT/usr/lib/jvm/java-21-openjdk/lib/security/cacerts"
+						printf 'P:%s\nF:usr/lib/jvm/java-21-openjdk/bin\nR:java\nF:usr/lib/jvm/java-21-openjdk/lib/security\nR:cacerts\n\n' \
+							"$argument"
+						;;
+					blender)
+						mkdir -p "$VINIX_TEST_ROOT/usr/bin" \
+							"$VINIX_TEST_ROOT/usr/lib" \
+							"$VINIX_TEST_ROOT/usr/share/applications" \
+							"$VINIX_TEST_ROOT/usr/share/blender/4.3"
+						printf '#!/bin/sh\nprintf "Blender 4.3.0\\n"\n' \
+							>"$VINIX_TEST_ROOT/usr/bin/blender"
+						chmod 0755 "$VINIX_TEST_ROOT/usr/bin/blender"
+						printf 'Blender dependency\n' \
+							>"$VINIX_TEST_ROOT/usr/lib/libblender-dependency.so.1.0"
+						ln -sf libblender-dependency.so.1.0 \
+							"$VINIX_TEST_ROOT/usr/lib/libblender-dependency.so.1"
+						: >"$VINIX_TEST_ROOT/usr/share/applications/blender.desktop"
+						: >"$VINIX_TEST_ROOT/usr/share/blender/4.3/payload"
+						printf 'P:%s\nF:usr/bin\nR:blender\nF:usr/lib\nR:libblender-dependency.so.1\nR:libblender-dependency.so.1.0\nF:usr/share/applications\nR:blender.desktop\nF:usr/share/blender/4.3\nR:payload\n\n' \
+							"$argument"
+						;;
+					gimp)
+						mkdir -p "$VINIX_TEST_ROOT/usr/bin" \
+							"$VINIX_TEST_ROOT/usr/lib/gimp/2.0/plug-ins/test" \
+							"$VINIX_TEST_ROOT/usr/share/applications"
+						printf '#!/bin/sh\nexit 0\n' \
+							>"$VINIX_TEST_ROOT/usr/bin/gimp-2.10"
+						chmod 0755 "$VINIX_TEST_ROOT/usr/bin/gimp-2.10"
+						ln -sf gimp-2.10 "$VINIX_TEST_ROOT/usr/bin/gimp"
+						printf '#!/bin/sh\nexit 0\n' \
+							>"$VINIX_TEST_ROOT/usr/lib/gimp/2.0/plug-ins/test/test"
+						chmod 0755 "$VINIX_TEST_ROOT/usr/lib/gimp/2.0/plug-ins/test/test"
+						: >"$VINIX_TEST_ROOT/usr/share/applications/gimp.desktop"
+						printf 'P:%s\nF:usr/bin\nR:gimp\nR:gimp-2.10\nF:usr/lib/gimp/2.0/plug-ins/test\nR:test\nF:usr/share/applications\nR:gimp.desktop\n\n' \
+							"$argument"
+						;;
 					gtk+3.0)
 						printf 'P:%s\nF:usr/lib\nR:libgtk-3.so.0\n\n' "$argument"
 						;;
@@ -155,6 +244,10 @@ run_pkg() {
 	VINIX_PKG_BSDTAR="${VINIX_PKG_BSDTAR:-$host_tar}" \
 	VINIX_PKG_SHA256SUM="${VINIX_PKG_SHA256SUM:-$work/bin/sha256sum}" \
 	VINIX_PKG_BUSYBOX= \
+	VINIX_PKG_PYTHON="$(command -v python3)" \
+	VINIX_MINECRAFT_FETCHER="$work/minecraft-tools/fetch-minecraft.py" \
+	VINIX_JAVA_CACERTS_HELPER="$work/minecraft-tools/java-cacerts.py" \
+	VINIX_TEST_MINECRAFT_FETCH_LOG="$work/minecraft-fetch.log" \
 	VINIX_TEST_APK_LOG="$log" \
 	VINIX_TEST_ROOT="$root" \
 	VINIX_TEST_INSTALLED_PACKAGES="$installed" \
@@ -298,5 +391,72 @@ test ! -e "$root/usr/bin/subl"
 test ! -e "$root/var/lib/vinix-pkg/sublime-text.files"
 tail -n 1 "$log" | grep -q -- \
 	'--no-progress --no-scripts del gcompat gtk+3.0 adwaita-icon-theme font-dejavu libarchive-tools llvm19-libs$'
+
+run_pkg install blender
+test -x "$root/usr/bin/blender"
+test -x "$root/usr/libexec/vinix-blender"
+test -f "$root/usr/lib/libblender-dependency.so.1"
+test ! -L "$root/usr/lib/libblender-dependency.so.1"
+test -f "$root/usr/share/applications/blender.desktop"
+test -f "$root/usr/share/blender/4.3/payload"
+grep -q '^# Vinix Blender launcher$' "$root/usr/bin/blender"
+grep -q 'vinix-blender -noaudio' "$root/usr/bin/blender"
+grep -qx usr/libexec/vinix-blender \
+	"$root/var/lib/vinix-pkg/package-files"
+test "$("$root/usr/libexec/vinix-blender" --version)" = 'Blender 4.3.0'
+grep -q -- \
+	'--cache-dir .* --no-progress cache download blender libgmpxx python3-pycache-pyc0$' "$log"
+grep -q -- \
+	'--cache-dir .* --no-network --no-progress --no-scripts add blender libgmpxx$' "$log"
+
+run_pkg remove blender
+test ! -e "$root/usr/libexec/vinix-blender"
+tail -n 1 "$log" | grep -q -- \
+	'--no-progress --no-scripts del blender$'
+
+run_pkg install gimp
+test -x "$root/usr/bin/gimp"
+test -x "$root/usr/bin/gimp-2.10"
+test -x "$root/usr/lib/gimp/2.0/plug-ins/test/test"
+test -f "$root/usr/share/applications/gimp.desktop"
+tail -n 2 "$log" | sed -n '1p' | grep -q -- \
+	'--cache-dir .* --no-progress cache download adwaita-icon-theme font-dejavu gimp$'
+tail -n 1 "$log" | grep -q -- \
+	'--cache-dir .* --no-network --no-progress --no-scripts add adwaita-icon-theme font-dejavu gimp$'
+
+run_pkg remove gimp
+tail -n 1 "$log" | grep -q -- \
+	'--no-progress --no-scripts del gimp adwaita-icon-theme font-dejavu$'
+
+run_pkg install minecraft
+test -x "$root/usr/lib/jvm/java-21-openjdk/bin/java"
+test -L "$root/usr/bin/java"
+test -s "$root/etc/ssl/certs/java/cacerts"
+test -x "$root/usr/bin/minecraft"
+test -x "$root/usr/bin/minecraft-login"
+test -x "$root/usr/share/vinix/minecraft-xinitrc"
+test -s "$root/usr/share/minecraft/launch.env"
+grep -q -- '--version release --max-java 21' "$work/minecraft-fetch.log"
+grep -q 'natives-linux-arm64' "$root/usr/share/minecraft/launch.env"
+grep -qx './usr/bin/minecraft' "$root/var/lib/vinix-pkg/minecraft.files"
+grep -qx 'usr/share/minecraft/launch.env' \
+	"$root/var/lib/vinix-pkg/package-files"
+run_pkg list | grep -qx minecraft
+VINIX_MINECRAFT_ROOT="$root/usr/share/minecraft" \
+VINIX_MINECRAFT_JAVA="$root/usr/lib/jvm/java-21-openjdk/bin/java" \
+	"$root/usr/bin/minecraft" --check | grep -q 'Minecraft 1.21.5 (release)'
+tail -n 2 "$log" | sed -n '1p' | grep -q -- \
+	'--cache-dir .* --no-progress cache download openjdk21-jre ca-certificates-bundle gcompat jemalloc openal-soft-libs glfw freetype harfbuzz mesa-dri-gallium mesa-gl mesa-egl mesa-gbm libx11 libxcursor libxrandr libxinerama libxi libxxf86vm wayland-libs-server$'
+
+run_pkg remove minecraft
+test ! -e "$root/usr/bin/minecraft"
+test ! -e "$root/usr/bin/minecraft-login"
+test ! -e "$root/usr/share/minecraft"
+test ! -e "$root/var/lib/vinix-pkg/minecraft.files"
+test -x "$root/usr/lib/jvm/java-21-openjdk/bin/java"
+if run_pkg list | grep -qx minecraft; then
+	echo 'removed Minecraft remained in pkg list' >&2
+	exit 1
+fi
 
 echo "VINIX PACKAGE COMMAND TEST: PASS"

@@ -182,10 +182,13 @@ find "$STAGING" -type l | while IFS= read -r link; do
     fi
 done
 
-mkdir -p "$STAGING/usr/bin" "$STAGING/root" "$STAGING/etc/firefox/policies"
+mkdir -p "$STAGING/usr/bin" "$STAGING/root" "$STAGING/usr/share/vinix" \
+    "$STAGING/etc/firefox/policies"
 install -m755 "$SCRIPT_DIR/build-support/firefox/run-firefox" \
     "$STAGING/usr/bin/run-firefox"
-install -m644 "$SCRIPT_DIR/tests/firefox/smoke.html" \
+install -m644 "$SCRIPT_DIR/tests/browsers/firefox-smoke.html" \
+    "$STAGING/usr/share/vinix/firefox-smoke.html"
+install -m644 "$SCRIPT_DIR/tests/browsers/firefox-smoke.html" \
     "$STAGING/root/firefox-smoke.html"
 install -m644 "$SCRIPT_DIR/build-support/firefox/policies.json" \
     "$STAGING/etc/firefox/policies/policies.json"

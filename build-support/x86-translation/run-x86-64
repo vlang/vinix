@@ -6,8 +6,14 @@ runtime="${VINIX_X86_64_ROOT:-/usr/libexec/vinix-x86_64/root}"
 emulator="${VINIX_X86_64_EMULATOR:-/usr/bin/qemu-x86_64}"
 loader="$runtime/lib/ld-musl-x86_64.so.1"
 
+direct=0
+if [ "${1:-}" = --direct ]; then
+    direct=1
+    shift
+fi
+
 if [ "$#" -eq 0 ]; then
-    echo "usage: run-x86-64 PROGRAM [ARGUMENT ...]" >&2
+    echo "usage: run-x86-64 [--direct] PROGRAM [ARGUMENT ...]" >&2
     exit 2
 fi
 if [ ! -x "$emulator" ]; then
@@ -50,6 +56,10 @@ fi
 # the environment. Starting the guest loader explicitly preserves the same
 # x86 dependency resolution without contaminating native descendants.
 unset LD_LIBRARY_PATH QEMU_LD_PREFIX QEMU_SET_ENV
+if [ "$direct" -eq 1 ]; then
+    exec "$emulator" -B "$guest_base" -L "$runtime" -0 "$program" \
+        "$program" "$@"
+fi
 exec "$emulator" -B "$guest_base" -L "$runtime" "$loader" \
     --library-path "$guest_library_path" --argv0 "$program" -- \
     "$program" "$@"

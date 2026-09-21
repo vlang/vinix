@@ -1,3 +1,7 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 /* SPDX-License-Identifier: GPL-2.0-only */
 /* Read-only M1 SMC client. Protocol references are recorded in docs/m1-battery.md.
  * This is deliberately a synchronous, SMC-only RTKit client: unlike AGX,

@@ -1,5 +1,8 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
 // X11 applications embedded in native Vinix windows. Xvfb owns the upstream
 // application's display while the Vinix compositor maps its live XWD surface.
 module main
@@ -10,6 +13,27 @@ const firefox_surface_width = 1280
 const firefox_surface_height = 900
 const firefox_window_width = 1280
 const firefox_window_height = 900
+// The floor below which a hosted surface is blitted even with no damage
+// reported, so a host that under-reports cannot freeze a window.
+const hosted_refresh_floor_ms = i64(1000)
+// Polls spent looking for a counter that a host may never publish. The X
+// server is up well inside this; after it, stop asking the filesystem.
+const hosted_damage_attempts = 400
+const chromium_surface_width = 1280
+const chromium_surface_height = 900
+const chromium_window_width = 1280
+const chromium_window_height = 900
+const gimp_surface_width = 1280
+const gimp_surface_height = 900
+const gimp_window_width = 1280
+const gimp_window_height = 900
+// Writer lays a page out for the width it is given. 1280x900 is the same
+// surface the browsers use, and wide enough for a document page beside the
+// sidebar without the toolbars wrapping onto a third row.
+const libreoffice_surface_width = 1280
+const libreoffice_surface_height = 900
+const libreoffice_window_width = 1280
+const libreoffice_window_height = 900
 const wine_surface_width = 326
 const wine_surface_height = 430
 const wine_notepad_surface_width = 310
@@ -23,8 +47,12 @@ const wine_word2013_window_width = 680
 const wine_word2013_window_height = 510
 const minecraft_surface_width = 1280
 const minecraft_surface_height = 720
-const minecraft_window_width = 760
-const minecraft_window_height = 428
+// Keep Minecraft windowed, but give its 16:9 game surface enough desktop
+// space to be comfortably playable. This is 30% larger than the previous
+// 1520x856 frame and still fits the standard 2048x1536 QEMU desktop with its
+// title bar and the Vinix taskbar visible.
+const minecraft_window_width = 1976
+const minecraft_window_height = 1113
 const wine_host_event_magic = u32(0x56574831) // VWH1
 
 enum WineHostEventKind as u32 {
@@ -35,8 +63,8 @@ enum WineHostEventKind as u32 {
 }
 
 struct WineHostEvent {
-	magic  u32
-	kind   u32
+	magic u32
+	kind  u32
 	// The receiving C host uses int32_t and asserts a 20-byte wire record.
 	x      i32
 	y      i32
@@ -45,23 +73,77 @@ struct WineHostEvent {
 
 struct HostedX11App {
 mut:
-	host_pid       int = -1
-	input_fd       int = -1
-	directory      string
-	xwd_path       string
-	image_path     string
-	surface_width  int
-	surface_height int
-	icon           string
-	starting_text  string
-	exited_text    string
-	ready          bool
-	failed         bool
-	error_message  string
+	host_pid        int = -1
+	input_fd        int = -1
+	directory       string
+	xwd_path        string
+	damage_path     string
+	image_path      string
+	surface_width   int
+	surface_height  int
+	icon            string
+	starting_text   string
+	exited_text     string
+	ready           bool
+	damage_counter  &u32 = unsafe { nil }
+	damage_attempts int
+	damage_sequence u32
+	last_blit_ms    i64
+	failed          bool
+	error_message   string
 }
 
 fn open_firefox(mut _ Desktop) !NativeApp {
-	return open_hosted_x11_app('firefox', '/usr/bin/run-firefox', firefox_surface_width, firefox_surface_height, 'builtin:browser', 'Starting Firefox…', 'Firefox is not installed in this desktop image.', 'Firefox exited.')
+	return open_hosted_x11_app('firefox', '/usr/bin/run-firefox', firefox_surface_width, firefox_surface_height, 'asset:firefox', 'Starting Firefox…', 'Firefox is not installed in this desktop image.', 'Firefox exited.')
+}
+
+// Chromium is not in the image: `pkg install chromium` fetches it from Alpine.
+// Report that from the window itself rather than starting a private X server
+// for a browser that cannot be there.
+fn open_chromium(mut _ Desktop) !NativeApp {
+	if C.access(c'/usr/lib/chromium/chrome', C.X_OK) != 0 {
+		return &HostedX11App{
+			surface_width: chromium_surface_width
+			surface_height: chromium_surface_height
+			icon: 'asset:chromium'
+			failed: true
+			error_message: 'Chromium is not installed. Run pkg install chromium in Terminal.'
+		}
+	}
+	return open_hosted_x11_app('chromium', '/usr/bin/run-chromium', chromium_surface_width,
+		chromium_surface_height, 'asset:chromium', 'Starting Chromium…', 'Chromium is not installed. Run pkg install chromium in Terminal.',
+		'Chromium exited.')
+}
+
+fn open_gimp(mut _ Desktop) !NativeApp {
+	if C.access(c'/usr/bin/gimp', C.X_OK) != 0 {
+		return &HostedX11App{
+			surface_width: gimp_surface_width
+			surface_height: gimp_surface_height
+			icon: 'builtin:editor'
+			failed: true
+			error_message: 'GIMP is not installed. Run pkg install gimp in Terminal.'
+		}
+	}
+	return open_hosted_x11_app('gimp', '/usr/bin/run-gimp', gimp_surface_width, gimp_surface_height, 'builtin:editor', 'Starting GIMP…', 'GIMP is not installed. Run pkg install gimp in Terminal.', 'GIMP exited.')
+}
+
+// LibreOffice is a 900 MiB closure that an image can reasonably be built
+// without, exactly like Chromium. Report that from the window rather than
+// starting a private X server for a suite that cannot be there.
+fn open_libreoffice(mut _ Desktop) !NativeApp {
+	if C.access(c'/usr/lib/libreoffice/program/soffice.bin', C.X_OK) != 0 {
+		return &HostedX11App{
+			surface_width: libreoffice_surface_width
+			surface_height: libreoffice_surface_height
+			icon: 'builtin:editor'
+			failed: true
+			error_message: 'LibreOffice is not installed. Run pkg install libreoffice-writer in Terminal.'
+		}
+	}
+	return open_hosted_x11_app('libreoffice', '/usr/bin/run-libreoffice', libreoffice_surface_width,
+		libreoffice_surface_height, 'builtin:editor', 'Starting LibreOffice…', 'LibreOffice is not installed. Run pkg install libreoffice-writer in Terminal.',
+		'LibreOffice exited.')
 }
 
 fn open_wine_calculator(mut _ Desktop) !NativeApp {
@@ -99,7 +181,18 @@ fn open_wine_word2013(mut _ Desktop) !NativeApp {
 }
 
 fn open_minecraft(mut _ Desktop) !NativeApp {
-	return open_hosted_x11_app('minecraft', '/usr/bin/minecraft', minecraft_surface_width, minecraft_surface_height, 'builtin:block', 'Starting Minecraft…', 'Minecraft is not installed. Build its AArch64 runtime first.', 'Minecraft exited.')
+	if C.access(c'/usr/bin/minecraft', C.X_OK) != 0 {
+		return &HostedX11App{
+			surface_width:  minecraft_surface_width
+			surface_height: minecraft_surface_height
+			icon:           'asset:minecraft'
+			failed:         true
+			error_message:  'Minecraft is not installed. Run pkg install minecraft in Terminal.'
+		}
+	}
+	return open_hosted_x11_app('minecraft', '/usr/bin/minecraft', minecraft_surface_width,
+		minecraft_surface_height, 'asset:minecraft', 'Starting Minecraft…',
+		'Minecraft is not installed. Run pkg install minecraft in Terminal.', 'Minecraft exited.')
 }
 
 fn open_hosted_x11_app(name string, command string, surface_width int, surface_height int,
@@ -114,6 +207,7 @@ fn open_hosted_x11_app(name string, command string, surface_width int, surface_h
 	process_id := C.getpid()
 	app.directory = '/tmp/vinix-${name}-${process_id}'
 	app.xwd_path = '${app.directory}/Xvfb_screen0'
+	app.damage_path = '${app.directory}/damage'
 	app.image_path = '${xwd_image_prefix}${app.xwd_path}'
 
 	if C.access(c'/usr/bin/Xvfb', C.X_OK) != 0 {
@@ -126,7 +220,12 @@ fn open_hosted_x11_app(name string, command string, surface_width int, surface_h
 		app.error_message = missing_text
 		return app
 	}
-	host := desktop_spawn_wine_host(app.directory, surface_width, surface_height, command) or {
+	// Minecraft's saved launch description can outlive the package that
+	// generated it. Ask the host to enforce the Xvfb dimensions as well as
+	// passing them to the launcher, so an old or ignored game-size option can
+	// never leave a smaller GLFW window floating in a white root surface.
+	host := desktop_spawn_wine_host(app.directory, surface_width, surface_height, command,
+		name == 'minecraft') or {
 		app.failed = true
 		app.error_message = 'Vinix could not start the embedded X11 host.'
 		return app
@@ -173,9 +272,65 @@ fn (mut app HostedX11App) poll() bool {
 		app.ready = true
 		return true
 	}
-	// Xvfb changes its shared XWD mapping in place. Ask the compositor to blit
-	// the next frame even though no ui2 model property changed.
-	return true
+	return app.surface_changed()
+}
+
+// Xvfb changes its shared XWD mapping in place, so nothing in the ui2 model
+// says that a new frame arrived. The host watches the X DAMAGE stream and
+// publishes a counter beside the framebuffer; rescaling 1280x900 pixels only
+// when that counter moves is the difference between a hosted browser sharing
+// the emulated processor and being buried under its own compositor.
+//
+// A host that cannot report damage never writes the file, and every poll blits
+// as Vinix always did.
+fn (mut app HostedX11App) surface_changed() bool {
+	now := monotonic_millis()
+	if app.damage_counter == unsafe { nil } {
+		app.map_damage_counter()
+	}
+	if app.damage_counter == unsafe { nil } {
+		app.last_blit_ms = now
+		return true
+	}
+	// The host writes this through the same file's pages, so asking costs a
+	// load rather than a read() that would queue behind whatever the machine
+	// is paging in.
+	sequence := unsafe { *app.damage_counter }
+	if sequence != app.damage_sequence {
+		app.damage_sequence = sequence
+		app.last_blit_ms = now
+		return true
+	}
+	// A host that reports less than its application draws would otherwise
+	// leave a window stale for ever. Coming back once a second bounds that
+	// mistake to something nobody would call a freeze, and still costs a
+	// twentieth of what blitting every frame did.
+	if now - app.last_blit_ms >= hosted_refresh_floor_ms {
+		app.last_blit_ms = now
+		return true
+	}
+	return false
+}
+
+// The counter file appears once the host's X server is up, which is a moment
+// after the framebuffer does, so this keeps trying until it is there. A host
+// that never publishes one leaves the desktop blitting every frame, which is
+// what it did before the counter existed.
+fn (mut app HostedX11App) map_damage_counter() {
+	if app.damage_attempts >= hosted_damage_attempts {
+		return
+	}
+	app.damage_attempts++
+	fd := desktop_open_ro_nonblock(app.damage_path)
+	if fd < 0 {
+		return
+	}
+	mapping := desktop_mmap_readonly(fd, sizeof(u32))
+	desktop_close(fd)
+	if mapping == unsafe { nil } {
+		return
+	}
+	app.damage_counter = unsafe { &u32(mapping) }
 }
 
 fn (mut app HostedX11App) pointer_input_enabled() bool {
@@ -201,8 +356,13 @@ fn (mut app HostedX11App) send_host_event(kind WineHostEventKind, x int, y int, 
 	}
 }
 
-fn (mut app HostedX11App) pointer_event(phase AppPointerPhase, x int, y int, width int, height int) {
+fn (mut app HostedX11App) pointer_event(phase AppPointerPhase, button AppPointerButton, _ int, x int, y int, width int, height int) {
 	if !app.pointer_input_enabled() || width <= 0 || height <= 0 {
+		return
+	}
+	// The legacy X host protocol only describes its original left button. The
+	// native Vinix protocol below carries all buttons and wheel input.
+	if phase == .scroll || (phase != .move && button != .left) {
 		return
 	}
 	mut surface_x := x * app.surface_width / width
@@ -223,6 +383,9 @@ fn (mut app HostedX11App) pointer_event(phase AppPointerPhase, x int, y int, wid
 		.move { WineHostEventKind.motion }
 		.down { WineHostEventKind.button_down }
 		.up { WineHostEventKind.button_up }
+		.scroll {
+			return
+		}
 	}
 	app.send_host_event(kind, surface_x, surface_y, '')
 }
