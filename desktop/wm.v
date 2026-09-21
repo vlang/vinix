@@ -83,6 +83,8 @@ mut:
 	buttons         u32
 	pointer_present bool
 	pointer_capture int
+	shortcut_order  []int
+	shortcut_press  ShortcutPress
 	// A Start-menu press is consumed through its release even when the press
 	// launches something and closes the menu before that release arrives.
 	start_menu_pointer bool
@@ -870,13 +872,18 @@ fn (mut d Desktop) forward_pointer_to_app(x int, y int, phase AppPointerPhase, b
 fn (d &Desktop) shortcut_elements() []ui2.Element {
 	mut out := frame_elements(available_apps.len)
 	rows := shortcut_rows_for_height(d.canvas.height)
-	for index in 0 .. available_apps.len {
-		factory := &available_apps[index]
-		id := app_shortcut_actions[index]
+	for slot in 0 .. available_apps.len {
+		app_index := d.shortcut_app_at_slot(slot)
+		if app_index < 0 {
+			continue
+		}
+		factory := &available_apps[app_index]
+		id := app_shortcut_actions[app_index]
 		theme := d.theme()
 		hovered := d.hover == id
-		column := index / rows
-		row := index % rows
+		dragging := d.shortcut_press.dragging && d.shortcut_press.app_index == app_index
+		column := slot / rows
+		row := slot % rows
 		x := shortcut_left + column * (shortcut_width + shortcut_gap)
 		y := shortcut_top + row * (shortcut_height + shortcut_gap)
 		icon_x := (shortcut_width - shortcut_icon) / 2
@@ -884,18 +891,18 @@ fn (d &Desktop) shortcut_elements() []ui2.Element {
 		shortcut_children << ui2.button_with_image('', '', factory.icon, ui2.rect(f64(icon_x), 10, f64(shortcut_icon), f64(shortcut_icon)), ui2.BoxStyle{
 			transparent: true
 		}, ui2.TextStyle{
-			color: if hovered { theme.shortcut_hover } else { theme.shortcut_label }
+			color: if hovered || dragging { theme.shortcut_hover } else { theme.shortcut_label }
 		})
 		shortcut_children << ui2.label('', factory.title, ui2.rect(0, f64(shortcut_icon + 16), f64(shortcut_width), 18), ui2.TextStyle{
-			color: if hovered { theme.shortcut_hover } else { theme.shortcut_label }
+			color:  if hovered || dragging { theme.shortcut_hover } else { theme.shortcut_label }
 			shadow: true
-			size: 12
-			align: .center
+			size:   12
+			align:  .center
 		})
 		out << ui2.clickable_view(id, ui2.rect(f64(x), f64(y), f64(shortcut_width), f64(shortcut_height)), ui2.BoxStyle{
-			bg: theme.shortcut_panel
-			radius: 8
-			transparent: !hovered
+			bg:          theme.shortcut_panel
+			radius:      8
+			transparent: !hovered && !dragging
 		}, shortcut_children)
 	}
 	return out
@@ -1243,6 +1250,16 @@ fn (mut d Desktop) on_pointer_move(x int, y int) {
 		}
 	}
 
+	if d.shortcut_press.app_index >= 0 && d.buttons & button_left != 0 {
+		d.update_shortcut_drag(x, y)
+		hover := d.hit_action(x, y)
+		if hover != d.hover {
+			d.set_hover(hover)
+			d.dirty = true
+		}
+		return
+	}
+
 	// The button level, not just the release edge, ends a drag. The driver
 	// reports the current state on every read, so a release that was missed
 	// between two frames cannot leave a window stuck to the cursor.
@@ -1460,7 +1477,7 @@ fn (mut d Desktop) on_pointer_down(x int, y int) {
 	}
 
 	if action.starts_with(action_shortcut_prefix) {
-		d.launch_index(action[action_shortcut_prefix.len..].int())
+		d.begin_shortcut_press(action, x, y)
 		return
 	}
 
@@ -1504,6 +1521,19 @@ fn (mut d Desktop) on_pointer_down(x int, y int) {
 }
 
 fn (mut d Desktop) on_pointer_up(x int, y int) {
+	release_action := d.hit_action(x, y)
+	if d.shortcut_press.app_index >= 0 {
+		// Own the action before launch_index can replace application state that
+		// supplied the current frame's hit targets.
+		d.set_hover(release_action)
+		if app_index := d.finish_shortcut_press(release_action, x, y) {
+			d.launch_index(app_index)
+		}
+		d.drag = Drag{}
+		d.drag_damage = DamageRect{}
+		d.dirty = true
+		return
+	}
 	if d.start_menu_pointer {
 		d.start_menu_pointer = false
 	} else {
@@ -1512,7 +1542,7 @@ fn (mut d Desktop) on_pointer_up(x int, y int) {
 	d.finish_window_drag(x, y)
 	d.drag = Drag{}
 	d.drag_damage = DamageRect{}
-	d.set_hover(d.hit_action(x, y))
+	d.set_hover(release_action)
 	d.dirty = true
 }
 

@@ -449,6 +449,15 @@ interiors normally keep their declared styles, but controls marked
 theme, including hover, pressed, selected and disabled states. Other controls
 continue to use their declared `app_*` colours.
 
+## Desktop shortcuts
+
+Application shortcuts launch on left-button release rather than press. Moving a
+pressed shortcut by six pixels turns the gesture into a drag instead; dropping
+it over another shortcut changes the desktop order and writes that order to
+`/root/.vinix-shortcut-order`. The persisted file stores stable application
+process names, so adding another application does not renumber an existing
+layout.
+
 ## Wallpapers
 
 Vinix has no JPEG or PNG decoder, and writing one to show a backdrop would be a
