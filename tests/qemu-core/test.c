@@ -744,6 +744,38 @@ static int test_anonymous_descriptor_access(void)
 	return 0;
 }
 
+/* Pipes and Unix sockets are resources created by almost every compiler and
+ * shell helper. Their buffers must follow the final open-file description:
+ * keeping one private "owner" reference leaked 64 KiB per pipe and 1 MiB per
+ * Unix endpoint, so one native desktop build exhausted an 8 GiB guest just as
+ * PID 1 started the replacement compositor. */
+static int test_anonymous_ipc_memory_reclamation(void)
+{
+	struct sysinfo before;
+	struct sysinfo after;
+	CHECK(sysinfo(&before) == 0);
+
+	for (int attempt = 0; attempt < 128; ++attempt) {
+		int pair[2];
+		CHECK(socketpair(AF_UNIX, SOCK_STREAM, 0, pair) == 0);
+		CHECK(close(pair[0]) == 0);
+		CHECK(close(pair[1]) == 0);
+	}
+	for (int attempt = 0; attempt < 1024; ++attempt) {
+		int pair[2];
+		CHECK(pipe(pair) == 0);
+		CHECK(close(pair[0]) == 0);
+		CHECK(close(pair[1]) == 0);
+	}
+
+	CHECK(sysinfo(&after) == 0);
+	/* Allow ordinary allocator bookkeeping and concurrently active kernel
+	 * services to retain a modest amount. The old leak consumed 320 MiB. */
+	CHECK(after.freeram + 32UL * 1024 * 1024 >= before.freeram);
+	puts("QEMU CORE PASS: anonymous IPC buffers are reclaimed");
+	return 0;
+}
+
 /* V3 makes the V `int` type pointer-width. Linux still defines pollfd.fd as a
  * 32-bit C int, so exercise the structure from a real libc caller: widening
  * the kernel field makes it combine fd/events into one invalid descriptor. */
@@ -944,6 +976,7 @@ static int run_tests(void)
 	CHECK(test_large_pipe_progress() == 0);
 	CHECK(test_cow() == 0);
 	CHECK(test_interrupted_nanosleep_remaining() == 0);
+	CHECK(test_anonymous_ipc_memory_reclamation() == 0);
 	CHECK(test_default_terminating_signals() == 0);
 	CHECK(prepare_directory() == 0);
 	CHECK(test_ext2_mapping_and_namespace() == 0);

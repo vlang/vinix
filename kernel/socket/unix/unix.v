@@ -96,6 +96,10 @@ pub mut:
 	// an SCM_CREDENTIALS record. Crashpad, D-Bus and systemd-style services use
 	// it to find out who is on the other end of a connection they accepted.
 	passcred int
+	// Keep closed endpoint objects as small tombstones because their peers refer
+	// to them without taking a resource reference; the large receive buffer and
+	// queued state are still reclaimed immediately.
+	closed bool
 
 	data      &u8 = unsafe { nil }
 	read_ptr  u64
@@ -240,14 +244,15 @@ pub fn (mut this UnixSocket) write_with_fds(_handle voidptr, buf voidptr, _count
 		errno.set(errno.enotconn)
 		return none
 	}
-	if peer.read_closed {
-		errno.set(errno.epipe)
-		return none
-	}
-
 	peer.l.acquire()
 	defer {
 		peer.l.release()
+	}
+	// close_endpoint() serialises freeing the receive buffer with writers on
+	// this lock. Recheck after acquiring it rather than racing a peer close.
+	if peer.read_closed || peer.closed {
+		errno.set(errno.epipe)
+		return none
 	}
 
 	handle := unsafe { &file.Handle(_handle) }
@@ -321,8 +326,8 @@ pub fn (mut this UnixSocket) write_with_fds(_handle voidptr, buf voidptr, _count
 	if fds.len != 0 {
 		mut group := PendingFdGroup{
 			offset: fd_offset
-			span: count
-			fds: []&file.FD{}
+			span:   count
+			fds:    []&file.FD{}
 		}
 		group.fds << fds
 		peer.pending_fd_groups << group
@@ -376,19 +381,83 @@ fn release_abstract_name(socket &UnixSocket) {
 	}
 }
 
-fn (mut this UnixSocket) unref(_handle voidptr) ? {
-	// Dropping a handle or a VFS name is a successful release operation. The
-	// old implementation returned an Option failure unconditionally, so close
-	// and unlink completed their side effects but leaked a stale errno back to
-	// userspace.
-	katomic.dec(mut &this.refcount)
-	// A socket is created holding one reference of its own, which nothing ever
-	// drops, so the last descriptor closing leaves exactly that one. An
-	// abstract name has no filesystem entry to outlive it and has to come back
-	// at that point or it is reserved until the machine restarts.
-	if this.refcount <= 1 {
-		release_abstract_name(this)
+// Drop all allocation and peer state owned by an endpoint whose last open file
+// description has gone away. Unix sockets used to keep their initial resource
+// reference and 1 MiB receive buffer forever. A desktop build starts enough
+// short-lived helpers for those leaked buffers to exhaust an 8 GiB VM before
+// the replacement compositor can finish starting.
+fn (mut this UnixSocket) close_endpoint() {
+	this.l.acquire()
+	if this.closed {
+		this.l.release()
+		return
 	}
+	this.closed = true
+	this.listening = false
+	this.read_closed = true
+	this.write_closed = true
+	this.peer_finished = true
+	this.status &= ~file.pollout
+	this.status |= file.pollin | file.pollhup | file.pollerr
+
+	mut peer := this.peer
+	this.peer = unsafe { nil }
+	mut queued := unsafe { this.backlog }
+	this.backlog = []&UnixSocket{}
+	mut pending := unsafe { this.pending_fd_groups }
+	this.pending_fd_groups = []PendingFdGroup{}
+	data := this.data
+	this.data = unsafe { nil }
+	this.capacity = 0
+	this.used = 0
+	this.read_ptr = 0
+	this.write_ptr = 0
+	this.l.release()
+
+	if data != unsafe { nil } {
+		unsafe { free(data) }
+	}
+	for group in pending {
+		mut descriptors := unsafe { group.fds }
+		for mut descriptor in descriptors {
+			descriptor.unref()
+			unsafe { free(voidptr(descriptor)) }
+		}
+		unsafe { descriptors.free() }
+	}
+	unsafe { pending.free() }
+
+	if peer != unsafe { nil } {
+		peer.l.acquire()
+		peer.peer_finished = true
+		peer.status &= ~file.pollout
+		peer.status |= file.pollin | file.pollhup | file.pollerr
+		peer.l.release()
+		event.trigger(mut peer.event, false)
+	}
+
+	// A listener owns accepted endpoints until accept(2) publishes a file
+	// descriptor for them. Closing the listener must release those buffers too.
+	for mut connection in queued {
+		connection.close_endpoint()
+	}
+	unsafe { queued.free() }
+	event.trigger(mut this.event, false)
+}
+
+fn (mut this UnixSocket) unref(handle voidptr) ? {
+	still_referenced := katomic.dec(mut &this.refcount)
+	// A nil handle is the VFS dropping a pathname, not an open socket being
+	// closed. If a descriptor is still alive it must retain the endpoint.
+	if handle == unsafe { nil } && still_referenced {
+		return
+	}
+
+	// Constructors retain one resource reference for unnamed sockets, while a
+	// path-bound socket uses it as its namespace reference. Either way, an
+	// open-handle release at count one is the final descriptor close.
+	release_abstract_name(this)
+	this.close_endpoint()
 }
 
 fn (mut this UnixSocket) link(_handle voidptr) ? {
@@ -633,28 +702,30 @@ fn (mut this UnixSocket) connect(_handle voidptr, _addr voidptr, addrlen u32) ? 
 		}
 	}
 
-	if socket.listening == false {
-		errno.set(errno.econnrefused)
-		return none
-	}
-
 	socket.l.acquire()
 	defer {
 		socket.l.release()
+	}
+	// A pathname keeps the small socket object alive after its descriptor is
+	// closed. Recheck under the listener lock so connect cannot queue a new
+	// endpoint while close_endpoint() is tearing that listener down.
+	if !socket.listening || socket.closed {
+		errno.set(errno.econnrefused)
+		return none
 	}
 
 	// A connected UNIX stream is established when connect() places it in the
 	// listener's queue, not when accept() eventually removes it. This permits a
 	// client to connect and send before the server calls accept(), as Linux does.
 	mut connection_socket := &UnixSocket{
-		refcount: 1
-		peer: this
+		refcount:  1
+		peer:      this
 		connected: true
-		name: socket.name
-		data: unsafe { malloc(sock_buf) }
-		capacity: sock_buf
-		status: file.pollout
-		socktype: this.socktype
+		name:      socket.name
+		data:      unsafe { malloc(sock_buf) }
+		capacity:  sock_buf
+		status:    file.pollout
+		socktype:  this.socktype
 		owner_pid: socket.owner_pid
 		owner_uid: socket.owner_uid
 		owner_gid: socket.owner_gid
@@ -725,8 +796,10 @@ fn (mut this UnixSocket) bind(_handle voidptr, _addr voidptr, addrlen u32) ? {
 		return none
 	}
 
+	mut replaced := node.resource
 	this.stat = node.resource.stat
 	node.resource = unsafe { this }
+	replaced.unref(unsafe { nil }) or {}
 
 	this.name = *addr
 }
@@ -977,10 +1050,10 @@ fn (mut this UnixSocket) recvmsg(_handle voidptr, msg &sock_pub.MsgHdr, flags in
 pub fn create(@type int) ?&UnixSocket {
 	process := proc.current_thread().process
 	mut ret := &UnixSocket{
-		refcount: 1
-		peer: unsafe { nil }
-		data: unsafe { malloc(sock_buf) }
-		capacity: sock_buf
+		refcount:  1
+		peer:      unsafe { nil }
+		data:      unsafe { malloc(sock_buf) }
+		capacity:  sock_buf
 		owner_pid: process.pid
 		owner_uid: process.euid
 		owner_gid: process.egid
@@ -994,10 +1067,10 @@ pub fn create(@type int) ?&UnixSocket {
 pub fn create_pair(@type int) ?(&UnixSocket, &UnixSocket) {
 	process := proc.current_thread().process
 	mut a := &UnixSocket{
-		refcount: 1
-		peer: unsafe { nil }
-		data: unsafe { malloc(sock_buf) }
-		capacity: sock_buf
+		refcount:  1
+		peer:      unsafe { nil }
+		data:      unsafe { malloc(sock_buf) }
+		capacity:  sock_buf
 		owner_pid: process.pid
 		owner_uid: process.euid
 		owner_gid: process.egid
@@ -1006,10 +1079,10 @@ pub fn create_pair(@type int) ?(&UnixSocket, &UnixSocket) {
 	a.socktype = @type & sock_pub.sock_type_mask
 	a.status |= file.pollout
 	mut b := &UnixSocket{
-		refcount: 1
-		peer: unsafe { nil }
-		data: unsafe { malloc(sock_buf) }
-		capacity: sock_buf
+		refcount:  1
+		peer:      unsafe { nil }
+		data:      unsafe { malloc(sock_buf) }
+		capacity:  sock_buf
 		owner_pid: process.pid
 		owner_uid: process.euid
 		owner_gid: process.egid

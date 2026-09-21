@@ -317,9 +317,15 @@ fn (mut this Pipe) unref(handle voidptr) ? {
 		}
 		else {}
 	}
-	katomic.dec(mut &this.refcount)
+	still_referenced := katomic.dec(mut &this.refcount)
 	this.l.release()
 	event.trigger(mut this.event, false)
+	if !still_referenced {
+		unsafe {
+			free(this.data)
+			free(this)
+		}
+	}
 }
 
 fn (mut this Pipe) unlink(_handle voidptr) ? {
