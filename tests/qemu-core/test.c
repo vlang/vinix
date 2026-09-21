@@ -745,6 +745,29 @@ static int test_large_pipe_progress(void)
 	int pair[2];
 	CHECK(pipe(pair) == 0);
 	CHECK(fcntl(pair[0], F_GETPIPE_SZ) >= 64 * 1024);
+	/* Capacity is not the progress mechanism. Force the old one-page size so
+	 * this transfer still has to exercise the blocking wake-up handshake. */
+	CHECK(fcntl(pair[0], F_SETPIPE_SZ, 4096) == 4096);
+	CHECK(fcntl(pair[0], F_GETPIPE_SZ) == 4096);
+
+	/* PIPE_BUF is a distinct atomicity threshold. A larger nonblocking write
+	 * may fill the available buffer partially, whereas a PIPE_BUF-sized write
+	 * must not leak a prefix when even one byte of room is missing. Growing an
+	 * occupied pipe also has to preserve its byte stream. */
+	int writer_flags = fcntl(pair[1], F_GETFL);
+	CHECK(writer_flags >= 0);
+	CHECK(fcntl(pair[1], F_SETFL, writer_flags | O_NONBLOCK) == 0);
+	CHECK(write(pair[1], payload, 8192) == 4096);
+	CHECK(fcntl(pair[0], F_SETPIPE_SZ, 4097) == 8192);
+	CHECK(read(pair[0], observed, 4096) == 4096);
+	CHECK(memcmp(payload, observed, 4096) == 0);
+	CHECK(fcntl(pair[0], F_SETPIPE_SZ, 4096) == 4096);
+	CHECK(write(pair[1], payload, 1) == 1);
+	errno = 0;
+	CHECK(write(pair[1], payload, 4096) == -1 && errno == EAGAIN);
+	CHECK(read(pair[0], observed, 1) == 1 && observed[0] == payload[0]);
+	CHECK(fcntl(pair[1], F_SETFL, writer_flags) == 0);
+
 	pid_t writer = fork();
 	CHECK(writer >= 0);
 	if (writer == 0) {
@@ -873,6 +896,10 @@ static int run_tests(void)
 	if (persistence_boot == 1)
 		return 0;
 	CHECK(test_random() == 0);
+	/* Keep the pipe progress regression ahead of unrelated scheduler stress
+	 * cases so a failure there cannot prevent this foundational hand-off from
+	 * being exercised. */
+	CHECK(test_large_pipe_progress() == 0);
 	CHECK(test_cow() == 0);
 	CHECK(test_default_terminating_signals() == 0);
 	CHECK(prepare_directory() == 0);
@@ -887,7 +914,6 @@ static int run_tests(void)
 	CHECK(test_posix_timer_thread_notification() == 0);
 	CHECK(test_anonymous_descriptor_access() == 0);
 	CHECK(test_pollfd_abi() == 0);
-	CHECK(test_large_pipe_progress() == 0);
 	CHECK(test_epoll_abi_and_count() == 0);
 	CHECK(test_syscall_int_truncation() == 0);
 	CHECK(test_abstract_socket_reuse() == 0);

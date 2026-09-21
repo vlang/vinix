@@ -14,6 +14,15 @@ mut:
 	advise(handle voidptr, offset u64, length u64, advice int) ?
 }
 
+// Anonymous pipes expose their buffer size through fcntl rather than stat.
+// Keep that optional operation out of Resource so ordinary files and devices
+// do not need dummy pipe-capacity methods.
+pub interface PipeCapacityResource {
+mut:
+	pipe_capacity() u64
+	set_pipe_capacity(requested u64) ?u64
+}
+
 // Disk filesystems use this hook after the VFS changes ownership, mode or
 // timestamps in the common Stat object. In-memory resources need no callback.
 pub interface MetadataResource {
@@ -88,6 +97,20 @@ pub fn advise_resource(mut res Resource, handle voidptr, offset u64, length u64,
 	}
 }
 
+pub fn pipe_capacity(mut res Resource) ?u64 {
+	if mut res is PipeCapacityResource {
+		return res.pipe_capacity()
+	}
+	return none
+}
+
+pub fn set_pipe_capacity(mut res Resource, requested u64) ?u64 {
+	if mut res is PipeCapacityResource {
+		return res.set_pipe_capacity(requested)
+	}
+	return none
+}
+
 pub fn persist_metadata(mut res Resource) ? {
 	if mut res is MetadataResource {
 		res.persist_metadata()?
@@ -99,9 +122,9 @@ pub fn filesystem_stat(mut res Resource) FileSystemStat {
 		return res.filesystem_stat()
 	}
 	return FileSystemStat{
-		@type: 0
-		bsize: 4096
+		@type:   0
+		bsize:   4096
 		namelen: 255
-		frsize: 4096
+		frsize:  4096
 	}
 }

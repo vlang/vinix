@@ -12,10 +12,12 @@ import proc
 
 // Keep POSIX's atomic-write guarantee at one page, but give the circular
 // buffer enough room for ordinary protocol messages. A page-sized capacity
-// forces every modest response through several reader/writer sleeps and turns
-// a single message into a scheduler stress test.
+// makes ordinary responses needlessly expensive; it is only a throughput
+// choice, and a writer that fills either capacity must still sleep and resume
+// when the reader frees space.
 pub const pipe_buf = 4096
 pub const pipe_capacity = 64 * 1024
+const pipe_max_capacity = 1024 * 1024
 
 pub struct Pipe {
 pub mut:
@@ -182,13 +184,14 @@ fn (mut this Pipe) write(handle voidptr, buf voidptr, _loc u64, _count u64) ?i64
 	}
 
 	mut written := u64(0)
+	atomic_write := _count <= pipe_buf
 	for written < _count {
 		remaining := _count - written
 		// Writes no larger than PIPE_BUF are atomic: wait for the complete
 		// write to fit instead of exposing a partial record to the reader.
 		// A larger blocking write may be consumed in chunks internally, but
 		// write(2) still reports the full count once all chunks are queued.
-		required_room := if remaining <= this.capacity { remaining } else { u64(1) }
+		required_room := if atomic_write { _count } else { u64(1) }
 		for this.capacity - katomic.load(&this.used) < required_room {
 			if this.readers == 0 {
 				if written != 0 {
@@ -329,6 +332,80 @@ fn (mut this Pipe) link(_handle voidptr) ? {
 
 fn (mut this Pipe) grow(_handle voidptr, _new_size u64) ? {
 	return none
+}
+
+fn (mut this Pipe) pipe_capacity() u64 {
+	this.l.acquire()
+	capacity := this.capacity
+	this.l.release()
+	return capacity
+}
+
+// Linux rounds requested pipe sizes up to a convenient power-of-two multiple
+// of the page size. Vinix has no capabilities yet, so apply the ordinary
+// unprivileged 1 MiB ceiling to every caller.
+fn normalized_capacity(requested u64) ?u64 {
+	if requested > pipe_max_capacity {
+		errno.set(errno.eperm)
+		return none
+	}
+	mut capacity := u64(pipe_buf)
+	for capacity < requested {
+		capacity *= 2
+	}
+	return capacity
+}
+
+fn (mut this Pipe) set_pipe_capacity(requested u64) ?u64 {
+	new_capacity := normalized_capacity(requested)?
+
+	this.l.acquire()
+	if new_capacity == this.capacity {
+		this.l.release()
+		return new_capacity
+	}
+	if new_capacity < this.used {
+		this.l.release()
+		errno.set(errno.ebusy)
+		return none
+	}
+
+	new_data := unsafe { malloc(new_capacity) }
+	if new_data == unsafe { nil } {
+		this.l.release()
+		errno.set(errno.enomem)
+		return none
+	}
+
+	// Re-linearize the ring so resizing preserves the byte stream even when
+	// its readable data currently straddles the end of the old allocation.
+	first := if this.used < this.capacity - this.read_ptr {
+		this.used
+	} else {
+		this.capacity - this.read_ptr
+	}
+	unsafe {
+		C.memcpy(new_data, voidptr(u64(this.data) + this.read_ptr), first)
+		if first < this.used {
+			C.memcpy(voidptr(u64(new_data) + first), this.data, this.used - first)
+		}
+		free(this.data)
+	}
+	this.data = new_data
+	this.capacity = new_capacity
+	this.read_ptr = 0
+	this.write_ptr = if this.used == new_capacity { 0 } else { this.used }
+	if this.used < this.capacity {
+		this.status |= file.pollout
+	} else {
+		this.status &= ~file.pollout
+	}
+	this.l.release()
+
+	// Growing a full pipe creates writable space. Notify both direct writers and
+	// poll/select/epoll waiters after publishing any resized buffer.
+	event.trigger(mut this.event, false)
+	return new_capacity
 }
 
 // Copy up to `count` bytes out of the pipe without consuming them, which is

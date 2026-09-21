@@ -14,6 +14,7 @@ import usercopy
 
 pub const f_dupfd = 0
 pub const f_dupfd_cloexec = 1030
+pub const f_setpipe_sz = 1031
 pub const f_getpipe_sz = 1032
 pub const f_getfd = 1
 pub const f_setfd = 2
@@ -811,9 +812,24 @@ pub fn syscall_fcntl(_ voidptr, fdnum int, cmd int, arg u64) (u64, u64) {
 				fd.unref()
 				return errno.err, errno.einval
 			}
-			// Pipes use a fixed Linux-sized circular buffer. PIPE_BUF remains
-			// 4096: capacity and the atomic-write guarantee are independent.
-			ret = 64 * 1024
+			mut res := handle.resource
+			ret = resource.pipe_capacity(mut res) or {
+				fd.unref()
+				return errno.err, errno.einval
+			}
+			fd.unref()
+		}
+		f_setpipe_sz {
+			if handle.resource.stat.mode & stat.ifmt != stat.ifpipe {
+				fd.unref()
+				return errno.err, errno.einval
+			}
+			mut res := handle.resource
+			ret = resource.set_pipe_capacity(mut res, arg) or {
+				saved_errno := errno.get()
+				fd.unref()
+				return errno.err, saved_errno
+			}
 			fd.unref()
 		}
 		f_getfd {
