@@ -1526,7 +1526,7 @@ fn (mut d Desktop) on_pointer_up(x int, y int) {
 		// Own the action before launch_index can replace application state that
 		// supplied the current frame's hit targets.
 		d.set_hover(release_action)
-		if app_index := d.finish_shortcut_press(release_action) {
+		if app_index := d.finish_shortcut_press(release_action, x, y) {
 			d.launch_index(app_index)
 		}
 		d.drag = Drag{}

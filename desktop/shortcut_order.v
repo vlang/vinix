@@ -228,10 +228,14 @@ fn (mut d Desktop) update_shortcut_drag(x int, y int) {
 	d.dirty = true
 }
 
-fn (mut d Desktop) finish_shortcut_press_in(home string, release_action string) ?int {
+fn (mut d Desktop) finish_shortcut_press_in(home string, release_action string, x int, y int) ?int {
 	if d.shortcut_press.app_index < 0 {
 		return none
 	}
+	// pump_pointer installs the packet's released button level before handling
+	// its coordinates. Fold the release position into the gesture here so a
+	// coalesced final move and button-up cannot be mistaken for a click.
+	d.update_shortcut_drag(x, y)
 	app_index := d.shortcut_press.app_index
 	dragged := d.shortcut_press.dragging
 	d.shortcut_press = ShortcutPress{}
@@ -248,6 +252,6 @@ fn (mut d Desktop) finish_shortcut_press_in(home string, release_action string) 
 	return none
 }
 
-fn (mut d Desktop) finish_shortcut_press(release_action string) ?int {
-	return d.finish_shortcut_press_in(desktop_home, release_action)
+fn (mut d Desktop) finish_shortcut_press(release_action string, x int, y int) ?int {
+	return d.finish_shortcut_press_in(desktop_home, release_action, x, y)
 }
