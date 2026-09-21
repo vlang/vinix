@@ -876,7 +876,9 @@ fn (mut mgr GpuManager) init_firmware_data() bool {
 		return false
 	}
 
-	graph.unknown_buffer = mgr.alloc_g13_buffer_with_protection(0x4000, pgtable.gpu_prot_fw_shared_ro) or {
+	// InitData RegionA is firmware-owned shared scratch. G13 writes its first
+	// state word at +0x10 while the desktop client is starting.
+	graph.unknown_buffer = mgr.alloc_g13_shared_buffer(0x4000) or {
 		return false
 	}
 	graph.runtime_pointers = mgr.alloc_g13_buffer_with_protection(fw.g13_runtime_pointers_size, pgtable.gpu_prot_fw_private_rw) or {
