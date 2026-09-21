@@ -71,6 +71,11 @@ __global (
 	sc_ring_idx        = u64(0)
 	sc_trace_pid       = u64(0) // PID to trace (0 = all)
 	sc_trace_gpr_state = u64(0)
+	// A short framebuffer-visible trace bridges the gap between exec's final
+	// scheduler handoff and vinix-desktop-gpu reaching main(). Keep it bounded:
+	// once userspace is healthy, the desktop becomes syscall-heavy immediately.
+	gpu_desktop_trace_pid   = u64(0)
+	gpu_desktop_trace_count = u64(0)
 )
 
 @[export: 'syscall_trace']
@@ -83,6 +88,19 @@ pub fn syscall_trace(gpr_state voidptr) {
 	nr := gpr.x8
 	mut current_thread := proc.current_thread()
 	pid := u64(current_thread.process.pid)
+	if current_thread.process.executable_path == '/usr/bin/vinix-desktop-gpu' {
+		if gpu_desktop_trace_pid != pid {
+			gpu_desktop_trace_pid = pid
+			gpu_desktop_trace_count = 0
+			C.printf(c'exec[gpu]: replacement thread entered userspace\n')
+		}
+		sequence := gpu_desktop_trace_count
+		gpu_desktop_trace_count++
+		if sequence < 64 {
+			C.printf(c'exec[gpu]: syscall #%llu enter nr=%llu pc=0x%llx sp=0x%llx\n',
+				sequence, nr, gpr.pc, gpr.sp)
+		}
+	}
 	// Debug: detect x30=0x220000 corruption at syscall entry
 	if pid == 3 && gpr.x30 == u64(0x220000) {
 		uart.puts(c'\nSYSCALL ENTRY: pid=3 x30=0x220000! nr=')
@@ -113,6 +131,14 @@ pub fn syscall_trace(gpr_state voidptr) {
 
 @[export: 'syscall_trace_ret']
 pub fn syscall_trace_ret(ret u64, err u64) {
+	current_thread := proc.current_thread()
+	if current_thread != unsafe { nil }
+		&& current_thread.process.executable_path == '/usr/bin/vinix-desktop-gpu'
+		&& u64(current_thread.process.pid) == gpu_desktop_trace_pid
+		&& gpu_desktop_trace_count <= 64 {
+		C.printf(c'exec[gpu]: syscall return value=0x%llx errno=%llu\n', ret, err)
+	}
+
 	if !sc_trace_active {
 		return
 	}

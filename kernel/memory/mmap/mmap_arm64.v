@@ -56,6 +56,23 @@ pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
 
 	mut process := current_thread.process
 	mut pagemap := process.pagemap
+	trace_gpu := process.executable_path == '/usr/bin/vinix-desktop-gpu'
+	mut trace_sequence := u64(0)
+	mut trace_this_fault := false
+	if trace_gpu {
+		pid := u64(process.pid)
+		if gpu_desktop_fault_pid != pid {
+			gpu_desktop_fault_pid = pid
+			gpu_desktop_fault_count = 0
+		}
+		trace_sequence = gpu_desktop_fault_count
+		gpu_desktop_fault_count++
+		trace_this_fault = trace_sequence < 32
+		if trace_this_fault {
+			C.printf(c'exec[gpu]: page fault #%llu begin addr=0x%llx pc=0x%llx esr=0x%llx\n',
+				trace_sequence, addr, gpr_state.pc, esr)
+		}
+	}
 
 	pagemap.l.acquire()
 
@@ -75,5 +92,8 @@ pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
 	map_page_in_range(range_local.global, virt, u64(page), range_local.prot) or {
 		release_range_page(range_local.global, virt, file_page, page, range_local.flags)
 		return none
+	}
+	if trace_this_fault {
+		C.printf(c'exec[gpu]: page fault #%llu resolved\n', trace_sequence)
 	}
 }

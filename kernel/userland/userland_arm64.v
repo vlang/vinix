@@ -89,6 +89,17 @@ pub const sigpoll = sigio
 
 pub const sigpwr = 30
 
+const gpu_desktop_executable = '/usr/bin/vinix-desktop-gpu'
+
+// Keep these messages allocation-free. They run while exec is dismantling the
+// caller's address space, which is exactly the interval this trace is meant to
+// diagnose on the M1.
+fn gpu_exec_trace(enabled bool, stage charptr) {
+	if enabled {
+		C.printf(c'exec[gpu]: %s\n', stage)
+	}
+}
+
 pub const sigsys = 31
 
 pub const sigrtmin = 32
@@ -644,7 +655,13 @@ fn signal_thread(tgid int, tid int, signal int) (u64, u64) {
 }
 
 pub fn syscall_execve(_ voidptr, _path charptr, _argv &charptr, _envp &charptr) (u64, u64) {
+	// This first marker intentionally precedes the user-pointer copy. The
+	// launcher has already named the program in its own last message, and this
+	// distinguishes a syscall-entry failure from a later ELF-loader failure.
+	C.printf(c'exec: syscall entered\n')
 	path := fs.user_path(_path) or { return errno.err, errno.get() }
+	trace_gpu := path == gpu_desktop_executable
+	gpu_exec_trace(trace_gpu, c'user path copied')
 	mut argv := []string{}
 	for i := 0; true; i++ {
 		unsafe {
@@ -654,6 +671,7 @@ pub fn syscall_execve(_ voidptr, _path charptr, _argv &charptr, _envp &charptr) 
 			argv << cstring_to_vstring(_argv[i])
 		}
 	}
+	gpu_exec_trace(trace_gpu, c'argument vector copied')
 	mut envp := []string{}
 	for i := 0; true; i++ {
 		unsafe {
@@ -663,6 +681,7 @@ pub fn syscall_execve(_ voidptr, _path charptr, _argv &charptr, _envp &charptr) 
 			envp << cstring_to_vstring(_envp[i])
 		}
 	}
+	gpu_exec_trace(trace_gpu, c'environment copied; entering ELF loader')
 
 	start_program(true, proc.current_thread().process.current_directory, path, argv, envp,
 		'', '', '') or { return errno.err, errno.get() }
@@ -676,17 +695,22 @@ pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, 
 	// where the program really is: keeping the literal path would make the
 	// child's own /proc/self/exe point back at itself forever.
 	path := fs.resolve_self_reference(_path)
+	trace_gpu := execve && path == gpu_desktop_executable
+	gpu_exec_trace(trace_gpu, c'resolved executable path')
 	prog_node := fs.get_node(dir, path, true)?
+	gpu_exec_trace(trace_gpu, c'opened executable node')
 	if !stat.isreg(prog_node.resource.stat.mode)
 		|| !fs.check_access(prog_node, fs.access_exec, true) {
 		errno.set(errno.eacces)
 		return none
 	}
+	gpu_exec_trace(trace_gpu, c'validated executable permissions')
 	mut prog := prog_node.resource
 
 	// Check for shebang before proceeding as if it was an ELF.
 	mut shebang := [2]char{}
 	prog.read(0, &shebang[0], 0, 2)?
+	gpu_exec_trace(trace_gpu, c'read executable signature')
 	if shebang[0] == char(`#`) && shebang[1] == char(`!`) {
 		real_path, arg := parse_shebang(mut prog)?
 		mut final_argv := [real_path]
@@ -705,6 +729,7 @@ pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, 
 	// the kernel exec path also catches helper programs that Wine starts itself,
 	// rather than only binaries launched through the shell wrapper.
 	architecture := elf.architecture(prog) or { return none }
+	gpu_exec_trace(trace_gpu, c'validated ELF architecture')
 	if architecture == elf.arch_x86_64 {
 		translator := '/usr/bin/qemu-x86_64'
 		guest_root := '/usr/libexec/vinix-x86_64/root'
@@ -731,14 +756,19 @@ pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, 
 	}
 
 	mut new_pagemap := memory.new_pagemap()
+	gpu_exec_trace(trace_gpu, c'allocated replacement page map')
+	gpu_exec_trace(trace_gpu, c'loading program ELF segments')
 	mut auxval, ld_path := elf.load(new_pagemap, prog, 0) or { return none }
+	gpu_exec_trace(trace_gpu, c'program ELF segments loaded')
 	allow_wx := envp.contains('VINIX_ALLOW_WX=1')
 
 	mut entry_point := unsafe { nil }
 
 	if ld_path == '' {
 		entry_point = voidptr(auxval.at_entry)
+		gpu_exec_trace(trace_gpu, c'using program entry point (no interpreter)')
 	} else {
+		gpu_exec_trace(trace_gpu, c'opening ELF interpreter')
 		ld_node := fs.get_node(vfs_root, ld_path, true)?
 		if !stat.isreg(ld_node.resource.stat.mode)
 			|| !fs.check_access(ld_node, fs.access_exec, true) {
@@ -747,9 +777,11 @@ pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, 
 		}
 		ld := ld_node.resource
 
+		gpu_exec_trace(trace_gpu, c'loading ELF interpreter segments')
 		ld_auxval, interp := elf.load(new_pagemap, ld, elf.interpreter_load_base()) or {
 			return none
 		}
+		gpu_exec_trace(trace_gpu, c'ELF interpreter segments loaded')
 
 		if interp != '' {
 			unsafe { interp.free() }
@@ -757,6 +789,10 @@ pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, 
 
 		entry_point = voidptr(ld_auxval.at_entry)
 		auxval.at_base = ld_auxval.at_base
+		if trace_gpu {
+			C.printf(c'exec[gpu]: interpreter entry=0x%llx program entry=0x%llx\n',
+				u64(entry_point), auxval.at_entry)
+		}
 
 		unsafe { ld_path.free() }
 	}
@@ -810,6 +846,7 @@ pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, 
 	} else {
 		mut t := proc.current_thread()
 		mut curr_process := t.process
+		gpu_exec_trace(trace_gpu, c'beginning process image replacement')
 
 		// Close O_CLOEXEC file descriptors before exec.
 		// This is critical for pipe EOF detection: popen creates pipes
@@ -824,11 +861,15 @@ pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, 
 				file.fdnum_close(curr_process, i, true) or {}
 			}
 		}
+		gpu_exec_trace(trace_gpu, c'closed close-on-exec descriptors')
 
 		// Every other thread has to be off the CPUs before the address space
 		// they are running in is replaced.
+		gpu_exec_trace(trace_gpu, c'stopping sibling threads')
 		kill_sibling_threads(mut curr_process, t)
+		gpu_exec_trace(trace_gpu, c'sibling threads stopped')
 		posixtimer.remove_process_timers(curr_process)
+		gpu_exec_trace(trace_gpu, c'process timers removed')
 
 		mut old_pagemap := curr_process.pagemap
 
@@ -837,11 +878,15 @@ pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, 
 		curr_process.name = '${path}[${curr_process.pid}]'
 		curr_process.executable_path = path.clone()
 		curr_process.allow_wx = allow_wx
+		gpu_exec_trace(trace_gpu, c'installed replacement process metadata')
 
 		kernel_pagemap.switch_to()
+		gpu_exec_trace(trace_gpu, c'switched CPU to kernel page map')
 		t.process = kernel_process
 
+		gpu_exec_trace(trace_gpu, c'deleting old process page map')
 		mmap.delete_pagemap(mut old_pagemap)?
+		gpu_exec_trace(trace_gpu, c'old process page map deleted')
 
 		curr_process.thread_stack_top = elf.initial_stack_top()
 		curr_process.mmap_anon_non_fixed_base = elf.initial_mmap_base()
@@ -849,6 +894,7 @@ pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, 
 		curr_process.threads_lock.acquire()
 		curr_process.threads = []&proc.Thread{}
 		curr_process.threads_lock.release()
+		gpu_exec_trace(trace_gpu, c'reset process thread metadata')
 
 		// The program that comes out of exec has one thread and it is the group
 		// leader, so it takes over the pid as its tid. Anything else this
@@ -863,15 +909,27 @@ pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, 
 		// before the thread is enqueued, so it is never picked up as an
 		// ordinary thread first.
 		inherited_sched := t.sched
+		gpu_exec_trace(trace_gpu, c'building replacement user thread and stack')
 		mut new_thread := sched.new_user_thread(curr_process, true, entry_point, unsafe { nil },
 			0, argv, envp, auxval, false)?
+		if trace_gpu {
+			C.printf(c'exec[gpu]: replacement thread built pc=0x%llx sp=0x%llx tid=%lld\n',
+				new_thread.gpr_state.pc, new_thread.gpr_state.sp, i64(new_thread.tid))
+		}
 		proc.set_thread_sched_params(new_thread.tid, inherited_sched)
-		sched.enqueue_thread(new_thread, false)
+		gpu_exec_trace(trace_gpu, c'inherited scheduler parameters')
+		enqueued := sched.enqueue_thread(new_thread, false)
+		if enqueued {
+			gpu_exec_trace(trace_gpu, c'replacement thread enqueued')
+		} else {
+			gpu_exec_trace(trace_gpu, c'ERROR: replacement thread enqueue failed')
+		}
 
 		unsafe {
 			argv.free()
 			envp.free()
 		}
+		gpu_exec_trace(trace_gpu, c'retiring original execve thread')
 		sched.dequeue_and_die()
 	}
 }
