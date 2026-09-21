@@ -419,7 +419,7 @@ fi
 # their files; --reset-disk asks for the clean install instead.
 vinix_install_system_volume() {
     local image="$DISK_ROOT_IMAGE"
-    local image_id installed carried home_dir needed_mb image_bytes package_overlay
+    local image_id installed carried home_dir needed_mb image_bytes existing_bytes existing_mb package_overlay
 
     if [ -z "$image" ]; then
         image="$INITRAMFS"
@@ -446,6 +446,19 @@ vinix_install_system_volume() {
     needed_mb=$(( image_bytes * 2 / 1024 / 1024 + 512 ))
     if [ "$needed_mb" -lt "$PERSIST_SIZE_MB" ]; then
         needed_mb="$PERSIST_SIZE_MB"
+    fi
+
+    # Reinstalling a smaller system image must not shrink an existing machine.
+    # /root is carried into the replacement volume, and it can be much larger
+    # than the new image itself (recordings are a common example). Keeping the
+    # old logical capacity both preserves that data and avoids turning an image
+    # compaction into an out-of-space failure during the next QEMU restart.
+    if [ "$RESET_DISK" -eq 0 ] && [ -f "$PERSIST_DISK" ]; then
+        existing_bytes="$(vinix_storage_file_size "$PERSIST_DISK")"
+        existing_mb=$(( (existing_bytes + 1024 * 1024 - 1) / 1024 / 1024 ))
+        if [ "$needed_mb" -lt "$existing_mb" ]; then
+            needed_mb="$existing_mb"
+        fi
     fi
 
     if [ "$RESET_DISK" -eq 1 ] && [ -f "$PERSIST_DISK" ]; then
