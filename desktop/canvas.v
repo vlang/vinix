@@ -1,5 +1,8 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
 // The software renderer. Everything the desktop puts on screen goes through
 // these primitives: there is no GPU on the machines Vinix boots on yet, so the
 // compositor owns every pixel it draws.
@@ -419,6 +422,69 @@ fn (mut c Canvas) vertical_gradient_inclusive(x int, y int, w int, h int, top u3
 	}
 }
 
+// fill_native_vertical_palette_round_rect draws a small control at the backing
+// store's physical resolution. `rows` describes the measured 1x scanlines;
+// denser displays interpolate between them instead of enlarging every source
+// pixel into a square scale-by-scale block. This is the same reason the title
+// bar's traffic lights have a native-resolution path below.
+fn (mut c Canvas) fill_native_vertical_palette_round_rect(x int, y int, w int, h int,
+	radius int, rows []u32) {
+	if w <= 0 || h <= 0 || rows.len == 0 || c.scale <= 0 {
+		return
+	}
+	physical_x := x * c.scale
+	physical_y := y * c.scale
+	physical_w := w * c.scale
+	physical_h := h * c.scale
+	mut physical_radius := radius * c.scale
+	half := if physical_w < physical_h { physical_w / 2 } else { physical_h / 2 }
+	if physical_radius > half {
+		physical_radius = half
+	}
+
+	for offset_y := 0; offset_y < physical_h; offset_y++ {
+		mut color := rows[0]
+		if rows.len > 1 && physical_h > 1 {
+			position := offset_y * (rows.len - 1)
+			index := position / (physical_h - 1)
+			if index >= rows.len - 1 {
+				color = rows[rows.len - 1]
+			} else {
+				remainder := position % (physical_h - 1)
+				color = mix(rows[index], rows[index + 1], u32(remainder * 255 / (physical_h - 1)))
+			}
+		}
+		for offset_x := 0; offset_x < physical_w; offset_x++ {
+			mut coverage := u32(255)
+			if physical_radius > 0 {
+				mut center_x := 0
+				mut center_y := 0
+				mut in_corner := true
+				if offset_x < physical_radius {
+					center_x = physical_radius
+				} else if offset_x >= physical_w - physical_radius {
+					center_x = physical_w - physical_radius
+				} else {
+					in_corner = false
+				}
+				if offset_y < physical_radius {
+					center_y = physical_radius
+				} else if offset_y >= physical_h - physical_radius {
+					center_y = physical_h - physical_radius
+				} else {
+					in_corner = false
+				}
+				if in_corner {
+					coverage = corner_coverage(f64(offset_x) + 0.5, f64(offset_y) + 0.5,
+						f64(center_x), f64(center_y), f64(physical_radius))
+				}
+			}
+			c.blend_physical_pixel(physical_x + offset_x, physical_y + offset_y, color,
+				coverage)
+		}
+	}
+}
+
 // fill_round_rect draws the body as plain spans and only pays for coverage
 // inside the four corner squares.
 fn (mut c Canvas) fill_round_rect(x int, y int, w int, h int, radius int, color u32) {
@@ -488,6 +554,46 @@ fn (mut c Canvas) stroke_round_rect(x int, y int, w int, h int, radius int, colo
 			c.blend_pixel(x + w - 1 - cx, y + cy, color, a)
 			c.blend_pixel(x + cx, y + h - 1 - cy, color, a)
 			c.blend_pixel(x + w - 1 - cx, y + h - 1 - cy, color, a)
+		}
+	}
+}
+
+// fill_stroke_hidpi_circle draws the small circular controls directly on the
+// native pixel grid.  Most chrome is deliberately made from logical pixels so
+// its dimensions remain stable at either display scale.  A 12-point traffic
+// light is different: expanding its 1x edge into 2x2 blocks makes the curve
+// visibly stepped on a HiDPI panel.  Sampling every physical pixel keeps the
+// same logical diameter while giving the disc and its ring a proper smooth
+// edge.
+fn (mut c Canvas) fill_stroke_hidpi_circle(x int, y int, w int, h int, border_width int, fill u32, edge u32) {
+	if c.scale <= 1 || w <= 0 || h <= 0 {
+		return
+	}
+	diameter := if w < h { w } else { h }
+	physical_diameter := diameter * c.scale
+	if physical_diameter <= 0 {
+		return
+	}
+	center_x := x * c.scale + w * c.scale / 2
+	center_y := y * c.scale + h * c.scale / 2
+	radius := f64(physical_diameter) / 2
+	inner_radius := radius - f64(border_width * c.scale)
+	left := center_x - physical_diameter / 2
+	top := center_y - physical_diameter / 2
+
+	for py := top; py < top + physical_diameter; py++ {
+		for px := left; px < left + physical_diameter; px++ {
+			outer := corner_coverage(f64(px) + 0.5, f64(py) + 0.5, f64(center_x), f64(center_y), radius)
+			if outer == 0 {
+				continue
+			}
+			c.blend_physical_pixel(px, py, fill, outer)
+			if inner_radius > 0 {
+				inner := corner_coverage(f64(px) + 0.5, f64(py) + 0.5, f64(center_x), f64(center_y), inner_radius)
+				if outer > inner {
+					c.blend_physical_pixel(px, py, edge, outer - inner)
+				}
+			}
 		}
 	}
 }

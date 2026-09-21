@@ -1,5 +1,8 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
 @[has_globals]
 module main
 
@@ -239,6 +242,89 @@ fn test_200_percent_text_uses_native_resolution_glyphs() {
 	assert native_edge
 }
 
+fn test_200_percent_traffic_lights_use_native_resolution_circles() {
+	mut desktop := Desktop{
+		canvas:   new_scaled_canvas(40, 20, 80, 40, desktop_scale_200)
+		settings: Settings{
+			theme:       .macos
+			button_side: .left
+		}
+	}
+	defer {
+		unsafe { free(voidptr(desktop.canvas.pixels)) }
+	}
+	desktop.canvas.clear(0xffffff)
+	close := desktop.title_button('window.close', 'builtin:traffic_close', theme_macos.button_inset, true, false)
+	desktop.draw_button(close, int(close.frame.x), int(close.frame.y), int(close.frame.width), int(close.frame.height))
+
+	// A logical-pixel circle would make every aligned 2x2 physical block the
+	// same colour. The native-rasterised arc has independent coverage within
+	// at least one of those blocks.
+	mut native_edge := false
+	for y := 0; y + 1 < desktop.canvas.physical_height && !native_edge; y += 2 {
+		for x := 0; x + 1 < desktop.canvas.physical_width; x += 2 {
+			base := unsafe { desktop.canvas.pixels[y * desktop.canvas.stride + x] }
+			right := unsafe { desktop.canvas.pixels[y * desktop.canvas.stride + x + 1] }
+			below := unsafe { desktop.canvas.pixels[(y + 1) * desktop.canvas.stride + x] }
+			if base != right || base != below {
+				native_edge = true
+				break
+			}
+		}
+	}
+	assert native_edge
+}
+
+fn test_catalina_cursor_has_complete_native_resolution_masks() {
+	assert catalina_cursor_white_1x.len == catalina_cursor_height
+	assert catalina_cursor_black_1x.len == catalina_cursor_height
+	assert catalina_cursor_white_2x.len == catalina_cursor_height * desktop_scale_200
+	assert catalina_cursor_black_2x.len == catalina_cursor_height * desktop_scale_200
+	for row in catalina_cursor_white_1x {
+		assert row.len == catalina_cursor_width
+	}
+	for row in catalina_cursor_black_1x {
+		assert row.len == catalina_cursor_width
+	}
+	for row in catalina_cursor_white_2x {
+		assert row.len == catalina_cursor_width * desktop_scale_200
+	}
+	for row in catalina_cursor_black_2x {
+		assert row.len == catalina_cursor_width * desktop_scale_200
+	}
+}
+
+fn test_catalina_cursor_uses_clean_hidpi_artwork() {
+	background := u32(0x202020)
+	mut desktop := Desktop{
+		canvas:   new_scaled_canvas(20, 24, 40, 48, desktop_scale_200)
+		settings: Settings{
+			theme: .macos
+		}
+	}
+	defer {
+		unsafe { free(desktop.canvas.pixels) }
+	}
+	desktop.canvas.clear(background)
+	desktop.draw_cursor()
+
+	// The first two physical pixels belong to one logical pixel but have
+	// independent coverage in the native 2x mask. The old enlarged 1x capture
+	// repeated them and looked soft.
+	unsafe {
+		assert desktop.canvas.pixels[0] == background
+		assert desktop.canvas.pixels[1] != background
+	}
+	// The final cursor column is transparent on every row. A missing entry in
+	// the former flat alpha array shifted scanlines into this column, producing
+	// the reported black vertical line.
+	for y in 0 .. catalina_cursor_height * desktop_scale_200 {
+		unsafe {
+			assert desktop.canvas.pixels[y * desktop.canvas.stride + catalina_cursor_width * desktop_scale_200 - 1] == background
+		}
+	}
+}
+
 fn test_catalina_theme_uses_measured_window_chrome() {
 	assert theme_macos.title_height == 22
 	assert theme_macos.button_size == 12
@@ -253,7 +339,7 @@ fn test_catalina_theme_uses_measured_window_chrome() {
 	assert theme_macos.title_inactive_highlight == 0xfbfbfb
 	assert theme_macos.title_inactive_divider == 0xd1d1d1
 	assert theme_macos.window_body == 0xececec
-	mut gradient := new_canvas(1, 20)
+	mut gradient := new_scaled_canvas(1, 20, 1, 20, 1)
 	defer {
 		unsafe { free(gradient.pixels) }
 	}
@@ -291,9 +377,126 @@ fn test_catalina_theme_uses_measured_window_chrome() {
 	assert idle.image_path == ''
 }
 
+fn test_settings_choices_request_native_catalina_buttons() {
+	idle := settings_choice('settings.theme.0', 'Default', 0, 0, 120, false)
+	selected := settings_choice('settings.theme.1', 'macOS', 128, 0, 120, true)
+	assert idle.native_style
+	assert selected.native_style
+	assert !idle.checked
+	assert selected.checked
+	assert selected.accessibility_role == 'radio'
+	assert selected.accessibility_value == 'selected'
+}
+
+fn test_catalina_native_button_uses_measured_normal_default_and_pressed_renditions() {
+	mut desktop := Desktop{
+		canvas:   new_scaled_canvas(360, 80, 360, 80, 1)
+		settings: Settings{
+			theme: .macos
+		}
+	}
+	defer {
+		unsafe { free(desktop.canvas.pixels) }
+	}
+	desktop.canvas.clear(theme_macos.window_body)
+
+	normal := ui2.Element{
+		kind:         .button
+		id:           'normal'
+		frame:        ui2.rect(10, 10, 100, 28)
+		native_style: true
+	}
+	desktop.draw_button(normal, 10, 10, 100, 28)
+	// The 21-pixel bezel is centred in the 28-pixel hit target. Its top and
+	// bottom rows are the two independently measured Catalina edge colours.
+	unsafe {
+		assert desktop.canvas.pixels[13 * desktop.canvas.stride + 30] == catalina_button_normal_outer[0]
+		assert desktop.canvas.pixels[14 * desktop.canvas.stride + 30] == catalina_button_face
+		assert desktop.canvas.pixels[32 * desktop.canvas.stride + 30] == catalina_button_face
+		assert desktop.canvas.pixels[33 * desktop.canvas.stride + 30] == catalina_button_normal_outer[20]
+	}
+
+	selected := ui2.Element{
+		kind:         .button
+		id:           'selected'
+		frame:        ui2.rect(126, 10, 100, 28)
+		native_style: true
+		checked:      true
+	}
+	desktop.draw_button(selected, 126, 10, 100, 28)
+	unsafe {
+		assert desktop.canvas.pixels[13 * desktop.canvas.stride + 146] == catalina_button_default_outer[0]
+		assert desktop.canvas.pixels[14 * desktop.canvas.stride + 146] == catalina_button_default_inner[0]
+		assert desktop.canvas.pixels[32 * desktop.canvas.stride + 146] == catalina_button_default_inner[18]
+		assert desktop.canvas.pixels[33 * desktop.canvas.stride + 146] == catalina_button_default_outer[20]
+	}
+
+	pressed := ui2.Element{
+		kind:         .button
+		id:           'pressed'
+		frame:        ui2.rect(242, 10, 100, 28)
+		native_style: true
+	}
+	desktop.hover = 'pressed'
+	desktop.buttons = button_left
+	desktop.draw_button(pressed, 242, 10, 100, 28)
+	unsafe {
+		assert desktop.canvas.pixels[13 * desktop.canvas.stride + 262] == catalina_button_pressed_outer[0]
+		assert desktop.canvas.pixels[14 * desktop.canvas.stride + 262] == catalina_button_pressed_inner[0]
+		assert desktop.canvas.pixels[32 * desktop.canvas.stride + 262] == catalina_button_pressed_inner[18]
+		assert desktop.canvas.pixels[33 * desktop.canvas.stride + 262] == catalina_button_pressed_outer[20]
+	}
+
+	// Catalina transfers the blue emphasis to the button under the mouse while
+	// it is held. The formerly selected/default button becomes white meanwhile.
+	suppressed_default := ui2.Element{
+		kind:         .button
+		id:           'another-default'
+		frame:        ui2.rect(126, 42, 100, 28)
+		native_style: true
+		checked:      true
+	}
+	desktop.draw_button(suppressed_default, 126, 42, 100, 28)
+	unsafe {
+		assert desktop.canvas.pixels[45 * desktop.canvas.stride + 146] == catalina_button_normal_outer[0]
+		assert desktop.canvas.pixels[46 * desktop.canvas.stride + 146] == catalina_button_face
+	}
+}
+
+fn test_catalina_native_button_rasterizes_curves_and_gradients_at_hidpi_scale() {
+	mut desktop := Desktop{
+		canvas:   new_scaled_canvas(120, 40, 240, 80, 2)
+		settings: Settings{
+			theme: .macos
+		}
+	}
+	defer {
+		unsafe { free(desktop.canvas.pixels) }
+	}
+	desktop.canvas.clear(theme_macos.window_body)
+	button := ui2.Element{
+		kind:         .button
+		id:           'default'
+		frame:        ui2.rect(10, 6, 100, 28)
+		native_style: true
+		checked:      true
+	}
+	desktop.draw_button(button, 10, 6, 100, 28)
+
+	// The two physical rows making up the first logical scanline are sampled
+	// independently. A scaled 1x rounded rectangle would repeat the same row.
+	bezel_top := 9 * 2
+	center_x := 30 * 2
+	unsafe {
+		assert desktop.canvas.pixels[bezel_top * desktop.canvas.stride + center_x] == catalina_button_default_outer[0]
+		assert desktop.canvas.pixels[(bezel_top + 1) * desktop.canvas.stride + center_x] != catalina_button_default_outer[0]
+		assert desktop.canvas.pixels[(bezel_top + 2) * desktop.canvas.stride + center_x] == catalina_button_default_inner[0]
+	}
+}
+
 fn test_catalina_chrome_renders_measured_rows() {
 	mut desktop := Desktop{
-		canvas: new_canvas(640, 480)
+		canvas: new_scaled_canvas(640, 480, 640, 480, 1)
 		fonts:  load_fonts()
 		settings: Settings{
 			theme:       .macos

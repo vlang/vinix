@@ -1,5 +1,8 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
 //
 // Host one Wine application on an off-screen Xvfb display. vinix-desktop maps
 // Xvfb's XWD framebuffer into a normal compositor window and sends compact
@@ -364,6 +367,31 @@ static void focus_top_window(Display *display) {
         XSetInputFocus(display, target, RevertToPointerRoot, CurrentTime);
 }
 
+/* Xvfb deliberately has no window manager. Most hosted applications request
+ * the root dimensions themselves, but a stale Minecraft launch description
+ * can make GLFW fall back to 854x480 and leave the rest of the captured root
+ * visible as a white border. For applications explicitly hosted with
+ * --fill, take over the one window-manager job they need and keep their
+ * top-level window fitted to the complete private display. */
+static void fill_top_window(Display *display) {
+    Window root = DefaultRootWindow(display);
+    Window target = topmost_substantial_child(display, root);
+    XWindowAttributes attributes;
+    int width = DisplayWidth(display, DefaultScreen(display));
+    int height = DisplayHeight(display, DefaultScreen(display));
+
+    if (target == None ||
+        !XGetWindowAttributes(display, target, &attributes))
+        return;
+    if (attributes.x == 0 && attributes.y == 0 &&
+        attributes.width == width && attributes.height == height)
+        return;
+    XMoveResizeWindow(display, target, 0, 0, (unsigned int)width,
+                      (unsigned int)height);
+    XRaiseWindow(display, target);
+    XFlush(display);
+}
+
 static int process_event(Display *display, const struct wine_host_event *event,
                          const unsigned char *payload) {
     switch (event->kind) {
@@ -478,10 +506,20 @@ int main(int argc, char **argv) {
     volatile uint32_t *damage_counter = NULL;
     uint32_t damage_sequence = 0;
     Damage damage;
+    int fill_surface = 0;
+    unsigned int fill_tick = 0;
 
-    if (argc != 5) {
-        fprintf(stderr, "usage: %s DISPLAY FBDIR GEOMETRY COMMAND\n", argv[0]);
+    if (argc != 5 && argc != 6) {
+        fprintf(stderr, "usage: %s DISPLAY FBDIR GEOMETRY COMMAND [--fill]\n",
+                argv[0]);
         return 2;
+    }
+    if (argc == 6) {
+        if (strcmp(argv[5], "--fill") != 0) {
+            fprintf(stderr, "vinix-wine-host: unknown option: %s\n", argv[5]);
+            return 2;
+        }
+        fill_surface = 1;
     }
     display_name = argv[1];
     directory = argv[2];
@@ -585,6 +623,12 @@ int main(int argc, char **argv) {
         }
         if (used == sizeof(input))
             running = 0;
+
+        /* Check at 10 Hz rather than on every bridge iteration. This catches
+         * both the first GLFW mapping and any later client-requested reset,
+         * while the no-op steady state is just one small XQueryTree. */
+        if (fill_surface && fill_tick++ % 10 == 0)
+            fill_top_window(display);
 
         if (damage != None) {
             int drawn = 0;

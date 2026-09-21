@@ -1,5 +1,8 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
 // Window-manager side of desktop scaling. Kept separate from scale.v so the
 // Settings unit tests can stage scale policy without the whole compositor.
 module main
@@ -104,6 +107,16 @@ fn (mut d Desktop) apply_requested_scale() {
 			d.windows[i].y = 0
 			d.windows[i].width = new_width
 			d.windows[i].height = desktop_usable_height(new_height)
+		} else if d.windows[i].snap != .none_ {
+			half := new_width / 2
+			d.windows[i].x = if d.windows[i].snap == .left { 0 } else { half }
+			d.windows[i].y = 0
+			d.windows[i].width = if d.windows[i].snap == .left {
+				half
+			} else {
+				new_width - half
+			}
+			d.windows[i].height = desktop_usable_height(new_height)
 		} else {
 			window_x, window_y := desktop_clamp_scaled_position(d.windows[i].x, d.windows[i].y, d.windows[i].width, d.windows[i].height, new_width, new_height)
 			d.windows[i].x = window_x
@@ -113,8 +126,8 @@ fn (mut d Desktop) apply_requested_scale() {
 
 	// Hit regions are coordinates from the old render pass. Never route a click
 	// through them after the logical screen changes.
-	d.targets.clear()
-	d.hover = ''
+	d.clear_hit_targets()
+	d.set_hover('')
 	d.drag = Drag{}
 	desktop_commit_scale(target)
 	d.dirty = true

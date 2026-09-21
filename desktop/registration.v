@@ -1,5 +1,8 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
 // First-launch user registration. This runs before ordinary desktop windows are
 // created, so there is no taskbar, shortcut, or closable window to get around.
 module main
@@ -400,7 +403,7 @@ fn (mut r RegistrationState) poll_pointer(mut d Desktop, mut pointer PointerDevi
 	d.pointer_x = int(i64(packet.x) * i64(d.canvas.width - 1) / i64(packet.max_x))
 	d.pointer_y = int(i64(packet.y) * i64(d.canvas.height - 1) / i64(packet.max_y))
 	d.buttons = packet.buttons
-	d.hover = d.hit_action(d.pointer_x, d.pointer_y)
+	d.set_hover(d.hit_action(d.pointer_x, d.pointer_y))
 	if packet.pressed & button_left != 0 {
 		r.handle_action(d.hover, home)
 	}
@@ -423,6 +426,10 @@ fn (mut d Desktop) ensure_registered_user(mut fb Framebuffer, mut pointer Pointe
 			desktop_wait_for_input(pointer.fd, keyboard.fd, idle_interval)
 		}
 		power := desktop_pending_power_action()
+		if power == .reload_desktop {
+			d.end_session(power)
+			return
+		}
 		if power != .keep_running {
 			desktop_power_apply(power)
 		}
@@ -448,8 +455,8 @@ fn (mut d Desktop) ensure_registered_user(mut fb Framebuffer, mut pointer Pointe
 	}
 	// Do not let the first ordinary input sample see setup hit targets or a
 	// button level left over from pressing Create user.
-	d.targets.clear()
-	d.hover = ''
+	d.clear_hit_targets()
+	d.set_hover('')
 	d.buttons = 0
 	d.drag = Drag{}
 	d.pointer_capture = 0

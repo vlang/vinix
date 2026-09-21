@@ -1,5 +1,8 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
 // Windows and what they show. Native windows contain a built-in page or a
 // ui2 tree received from an application process. External display-owning programs are launched by
 // the window manager and only use a native window to report a startup error.
@@ -16,6 +19,12 @@ enum Page {
 	// A window whose contents come from a native application process rather than
 	// from one of the pages below.
 	app
+}
+
+enum WindowSnap {
+	none_
+	left
+	right
 }
 
 struct Window {
@@ -48,6 +57,7 @@ mut:
 	restore_width  int
 	restore_height int
 	maximized      bool
+	snap           WindowSnap
 	minimized      bool
 	// Index into Desktop.apps for a `.app` window, or -1 for a built-in page.
 	app_index int = -1

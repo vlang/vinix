@@ -1,5 +1,8 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
 module main
 
 import os
@@ -39,6 +42,35 @@ fn utility_button_with_text(element ui2.Element, text string) ?ui2.Element {
 	return none
 }
 
+fn test_qoi_icon_decoder_preserves_rgba_and_run_pixels() {
+	// A two-pixel QOI: one RGBA opcode followed by a one-pixel run. This keeps
+	// the tiny asset decoder's most important alpha and run-length paths covered
+	// without making the test depend on host-installed desktop artwork.
+	encoded := [u8(`q`), `o`, `i`, `f`, 0, 0, 0, 2, 0, 0, 0, 1, 4, 0, 0xff, 0x12, 0x34, 0x56, 0x78,
+		0xc0, 0, 0, 0, 0, 0, 0, 0, 1]
+	icon := decode_qoi(encoded) or {
+		assert false
+		return
+	}
+	assert icon.width == 2
+	assert icon.height == 1
+	assert icon.pixels == [u32(0x78123456), 0x78123456]
+}
+
+fn test_qoi_icon_decoder_uses_all_64_index_slots() {
+	// RGBA(3, 0, 0, 255) hashes to slot 62. Decode it once as a literal and
+	// once through QOI_OP_INDEX so a shortened colour index cannot regress.
+	encoded := [u8(`q`), `o`, `i`, `f`, 0, 0, 0, 2, 0, 0, 0, 1, 4, 0, 0xff, 3, 0, 0, 0xff, u8(62),
+		0, 0, 0, 0, 0, 0, 0, 1]
+	icon := decode_qoi(encoded) or {
+		assert false
+		return
+	}
+	assert icon.width == 2
+	assert icon.height == 1
+	assert icon.pixels == [u32(0xff030000), 0xff030000]
+}
+
 fn test_vinix_start_glyph_uses_the_wordmark_v_polygon() {
 	// These coordinates are inside the left arm, the open notch and the right
 	// arm of the V in vinix-logo.svg. Keeping this assertion on the shared
@@ -62,7 +94,7 @@ fn test_wallpaper_copy_respects_canvas_clip() {
 		unsafe { free(canvas.pixels) }
 	}
 	canvas.clear(0x010203)
-	wallpaper := []u32{u32(0x100000), 0x100001, 0x100002, 0x100003, 0x100004, 0x100005,
+	wallpaper := [u32(0x100000), 0x100001, 0x100002, 0x100003, 0x100004, 0x100005,
 		0x100006, 0x100007, 0x100008, 0x100009, 0x10000a, 0x10000b]
 	canvas.clip = Clip{
 		x: 1
@@ -244,6 +276,14 @@ fn test_capture_png_encoder_writes_standard_truecolour_image() {
 	assert bytes[24] == 8
 	assert bytes[25] == 2
 	assert bytes[bytes.len - 8..bytes.len - 4].bytestr() == 'IEND'
+	icon := decode_png(bytes) or {
+		assert false
+		return
+	}
+	assert icon.width == 2
+	assert icon.height == 2
+	assert icon.pixels == [u32(0xffff0000), 0xff00ff00, 0xff0000ff, 0xffffffff]
+	assert png_paeth(10, 20, 15) == 15
 }
 
 fn test_capture_avi_writer_indexes_every_video_frame() {
@@ -534,65 +574,88 @@ fn test_terminal_can_edit_a_file_with_vim_over_its_real_pty() {
 }
 
 fn test_available_utility_applications_and_shortcut_layouts() {
-	assert available_apps.len == 20
+	assert available_apps.len == 22
 	assert available_apps[0].process_name == 'vinix-files'
 	assert available_apps[1].title == 'Firefox'
 	assert available_apps[1].exclusive_command == ''
 	assert available_apps[1].process_name == 'vinix-firefox'
+	assert available_apps[1].icon == 'asset:firefox'
 	assert available_apps[1].width == firefox_window_width
 	assert available_apps[1].height == firefox_window_height + default_title_height
 	assert available_apps[1].polling && available_apps[1].poll_interval_ms == 50
 	assert available_apps[1].keyboard && available_apps[1].pointer
+	assert available_apps[2].icon == 'asset:calculator'
 	assert available_apps[3].process_name == 'vinix-terminal'
+	assert available_apps[3].icon == 'asset:terminal'
 	assert available_apps[3].keyboard && available_apps[3].polling
+	assert available_apps[4].icon == 'asset:settings'
 	assert available_apps[5].title == 'Activity Monitor'
 	assert available_apps[5].process_name == 'vinix-activity'
-	assert available_apps[9].process_name == 'vinix-cocoa-calculator'
-	assert available_apps[10].title == 'Minecraft'
-	assert available_apps[10].process_name == 'vinix-minecraft'
-	assert available_apps[10].exclusive_command == ''
+	assert available_apps[5].icon == 'asset:activity'
+	assert available_apps[9].title == 'Minecraft'
+	assert available_apps[9].process_name == 'vinix-minecraft'
+	assert available_apps[9].icon == 'asset:minecraft'
+	assert available_apps[9].exclusive_command == ''
+	assert available_apps[9].width == 1976
+	assert available_apps[9].height == 1113 + default_title_height
+	assert available_apps[9].keyboard && available_apps[9].polling
+	assert available_apps[9].pointer
+	assert available_apps[10].title == 'Wine Calculator'
+	assert available_apps[10].process_name == 'vinix-wine-calculator'
 	assert available_apps[10].keyboard && available_apps[10].polling
 	assert available_apps[10].pointer
-	assert available_apps[11].title == 'Wine Calculator'
-	assert available_apps[11].process_name == 'vinix-wine-calculator'
+	assert available_apps[11].title == 'Wine Notepad'
+	assert available_apps[11].process_name == 'vinix-wine-notepad'
 	assert available_apps[11].keyboard && available_apps[11].polling
 	assert available_apps[11].pointer
-	assert available_apps[12].title == 'Wine Notepad'
-	assert available_apps[12].process_name == 'vinix-wine-notepad'
+	assert available_apps[12].title == 'Microsoft Word 2013'
+	assert available_apps[12].process_name == 'vinix-wine-word2013'
 	assert available_apps[12].keyboard && available_apps[12].polling
 	assert available_apps[12].pointer
-	assert available_apps[13].title == 'Microsoft Word 2013'
-	assert available_apps[13].process_name == 'vinix-wine-word2013'
+	assert available_apps[13].title == 'Blender'
+	assert available_apps[13].process_name == 'vinix-blender'
+	assert available_apps[13].icon == 'asset:blender'
+	assert available_apps[13].width == blender_window_width
+	assert available_apps[13].height == blender_window_height + default_title_height
+	assert available_apps[14].title == capture_app_title
+	assert available_apps[14].process_name == 'vinix-capture'
+	assert available_apps[14].icon == 'builtin:camera'
+	assert available_apps[14].polling
 	assert available_apps[13].keyboard && available_apps[13].polling
 	assert available_apps[13].pointer
-	assert available_apps[14].title == 'Blender'
-	assert available_apps[14].process_name == 'vinix-blender'
-	assert available_apps[14].width == blender_window_width
-	assert available_apps[14].height == blender_window_height + default_title_height
-	assert available_apps[15].title == capture_app_title
-	assert available_apps[15].process_name == 'vinix-capture'
-	assert available_apps[15].icon == 'builtin:camera'
-	assert available_apps[15].polling
-	assert available_apps[14].keyboard && available_apps[14].polling
-	assert available_apps[14].pointer
-	assert available_apps[16].title == 'GIMP'
-	assert available_apps[16].process_name == 'vinix-gimp'
-	assert available_apps[16].width == gimp_window_width
-	assert available_apps[16].height == gimp_window_height + default_title_height
-	assert available_apps[16].keyboard && available_apps[16].pointer
-	assert available_apps[16].polling && available_apps[16].poll_interval_ms == 50
-	assert available_apps[17].title == 'VSpace'
-	assert available_apps[17].process_name == 'vinix-vspace'
-	assert available_apps[17].icon == 'builtin:disk'
-	assert available_apps[17].polling && available_apps[17].poll_interval_ms == 33
-	assert !available_apps[17].keyboard && !available_apps[17].pointer
-	assert available_apps[18].title == 'Chromium'
-	assert available_apps[18].process_name == 'vinix-chromium'
-	assert available_apps[18].icon == 'builtin:browser'
-	assert available_apps[18].width == chromium_window_width
-	assert available_apps[18].height == chromium_window_height + default_title_height
-	assert available_apps[18].keyboard && available_apps[18].pointer
-	assert available_apps[18].polling && available_apps[18].poll_interval_ms == 50
+	assert available_apps[15].title == 'GIMP'
+	assert available_apps[15].process_name == 'vinix-gimp'
+	assert available_apps[15].width == gimp_window_width
+	assert available_apps[15].height == gimp_window_height + default_title_height
+	assert available_apps[15].keyboard && available_apps[15].pointer
+	assert available_apps[15].polling && available_apps[15].poll_interval_ms == 50
+	assert available_apps[16].title == 'VSpace'
+	assert available_apps[16].process_name == 'vinix-vspace'
+	assert available_apps[16].icon == 'asset:vspace'
+	assert available_apps[16].polling && available_apps[16].poll_interval_ms == 33
+	assert !available_apps[16].keyboard && !available_apps[16].pointer
+	assert available_apps[17].title == 'VOffice Writer'
+	assert available_apps[17].process_name == 'voffice-writer'
+	assert available_apps[17].standalone && available_apps[17].keyboard
+	assert available_apps[17].pointer && available_apps[17].polling
+	assert available_apps[18].title == 'VOffice Calc'
+	assert available_apps[18].process_name == 'voffice-calc'
+	assert available_apps[18].standalone && available_apps[18].keyboard
+	assert available_apps[18].pointer && available_apps[18].polling
+	assert available_apps[20].title == 'Chromium'
+	assert available_apps[20].process_name == 'vinix-chromium'
+	assert available_apps[20].icon == 'asset:chromium'
+	assert available_apps[20].width == chromium_window_width
+	assert available_apps[20].height == chromium_window_height + default_title_height
+	assert available_apps[20].keyboard && available_apps[20].pointer
+	assert available_apps[20].polling && available_apps[20].poll_interval_ms == 50
+	assert available_apps[21].title == 'ui2 Examples'
+	assert available_apps[21].process_name == 'vinix-ui2-examples'
+	assert available_apps[21].open != unsafe { nil }
+	assert ui2_example_names.len == 84
+	example := ui2_example_named('toggle_button') or { panic('missing ui2 example') }
+	assert example.process_name == 'vinix-ui2-toggle_button'
+	assert example.standalone && example.keyboard && example.pointer && example.polling
 	assert app_start_actions.len == available_apps.len
 	assert app_shortcut_actions.len == available_apps.len
 	assert shortcut_rows_for_height(720) == 8
@@ -798,6 +861,38 @@ fn test_taskbar_keeps_a_bottom_right_clock_and_open_windows() {
 	free_tree(empty)
 }
 
+fn test_macos_taskbar_uses_large_icon_only_buttons_at_screen_edges() {
+	mut desktop := Desktop{
+		canvas: Canvas{
+			width: 1280
+			height: 720
+		}
+		settings: Settings{
+			theme: .macos
+		}
+	}
+	first := desktop.spawn('Files', .welcome, 10, 10, 300, 200)
+	desktop.windows[0].icon = 'builtin:folder'
+	desktop.update_taskbar_clock_at(0)
+
+	root := desktop.build_tree()
+	taskbar := utility_element_named(root, 'taskbar') or { panic('missing macOS taskbar') }
+	start := utility_element_named(taskbar, action_start_toggle) or { panic('missing Start button') }
+	entry := utility_element_named(taskbar, 'task.${first}') or { panic('missing icon task button') }
+	clock := utility_element_named(taskbar, 'clock.time') or { panic('missing taskbar clock') }
+	assert int(taskbar.frame.x) == 0
+	assert int(taskbar.frame.width) == 1280
+	assert int(taskbar.frame.y + taskbar.frame.height) == 720
+	assert int(start.frame.x) == taskbar_padding
+	assert start.image_path == 'builtin:vinix'
+	assert entry.text == ''
+	assert entry.image_path == 'builtin:folder'
+	assert int(entry.frame.width) == taskbar_icon_item_width
+	assert int(entry.frame.height) == taskbar_icon_item_height
+	assert int(clock.frame.x + clock.frame.width) == 1280 - taskbar_padding
+	free_tree(root)
+}
+
 fn test_clicking_a_taskbar_window_button_focuses_without_minimizing() {
 	mut desktop := Desktop{
 		canvas: Canvas{
@@ -826,6 +921,44 @@ fn test_clicking_a_taskbar_window_button_focuses_without_minimizing() {
 	desktop.on_pointer_down(80, 575)
 	assert desktop.focus == first
 	assert !desktop.windows.last().minimized
+}
+
+fn test_hover_owns_action_past_source_lifetime() {
+	mut desktop := Desktop{}
+	mut source := 'win.2.close'.clone()
+	source_pointer := source.str
+
+	desktop.set_hover(source)
+	assert desktop.hover == 'win.2.close'
+	assert desktop.hover.str != source_pointer
+
+	unsafe { source.free() }
+	assert desktop.hover == 'win.2.close'
+	desktop.set_hover('')
+	assert desktop.hover == ''
+}
+
+fn test_hit_target_owns_remote_action_past_tree_lifetime() {
+	mut desktop := Desktop{}
+	action := editor_action_document.clone()
+	source_pointer := action.str
+	element := ui2.Element{
+		kind:      .view
+		id:        action
+		key:       remote_owned_element_key
+		clickable: true
+		enabled:   true
+	}
+
+	desktop.record_target(element, 10, 20, 100, 80)
+	assert desktop.targets.len == 1
+	assert desktop.targets[0].owns_action
+	assert desktop.targets[0].action_id.str != source_pointer
+	free_tree(element)
+
+	assert desktop.hit_action(50, 50) == editor_action_document
+	desktop.clear_hit_targets()
+	assert desktop.targets.len == 0
 }
 
 fn test_taskbar_clock_stays_visible_at_m1_200_percent_scale() {
@@ -857,7 +990,7 @@ fn test_firefox_uses_the_hosted_x11_window_path() {
 }
 
 fn test_gimp_uses_the_hosted_x11_window_path() {
-	factory := available_apps[16]
+	factory := available_apps[15]
 	assert factory.process_name == 'vinix-gimp'
 	assert factory.exclusive_command == ''
 	assert factory.open != unsafe { nil }
@@ -865,7 +998,7 @@ fn test_gimp_uses_the_hosted_x11_window_path() {
 }
 
 fn test_libreoffice_uses_the_hosted_x11_window_path() {
-	factory := available_apps[18]
+	factory := available_apps[19]
 	assert factory.title == 'LibreOffice'
 	assert factory.process_name == 'vinix-libreoffice'
 	assert factory.exclusive_command == ''
@@ -876,7 +1009,7 @@ fn test_libreoffice_uses_the_hosted_x11_window_path() {
 }
 
 fn test_chromium_uses_the_hosted_x11_window_path() {
-	factory := available_apps[18]
+	factory := available_apps[20]
 	assert factory.process_name == 'vinix-chromium'
 	assert factory.exclusive_command == ''
 	assert factory.open != unsafe { nil }
@@ -945,7 +1078,8 @@ fn test_native_process_names_are_presented_as_app_names() {
 }
 
 fn test_application_tree_protocol_round_trip() {
-	child := ui2.button_with_image('save', 'Save', 'builtin:editor', ui2.rect(7, 9, 80, 24), ui2.BoxStyle{
+	child := ui2.Element{
+		...ui2.button_with_image('save', 'Save', 'builtin:editor', ui2.rect(7, 9, 80, 24), ui2.BoxStyle{
 		bg: 0x123456
 		radius: 6
 	}, ui2.TextStyle{
@@ -957,6 +1091,9 @@ fn test_application_tree_protocol_round_trip() {
 		shadow: true
 		align: .center
 	})
+		native_style: true
+		checked: true
+	}
 	root := ui2.screen(0xabcdef, [child])
 	mut encoded := []u8{}
 	encode_app_element(root, mut encoded)!
@@ -973,6 +1110,8 @@ fn test_application_tree_protocol_round_trip() {
 	assert button.text_style.font_family == 'mono'
 	assert button.text_style.bold && button.text_style.shadow
 	assert button.text_style.align == .center
+	assert button.native_style
+	assert button.checked
 	free_tree(root)
 	free_tree(decoded)
 	unsafe { encoded.free() }
@@ -1176,9 +1315,8 @@ fn test_vspace_identity_set_answers_each_device_and_inode_once() {
 	}
 }
 
-
 fn test_shortcut_order_normalizes_without_changing_app_identity() {
-	input := []int{3, 3, -1, available_apps.len + 1, 1}
+	input := [3, 3, -1, available_apps.len + 1, 1]
 	order := normalize_shortcut_order(input)
 	defer { unsafe { order.free() } }
 	assert order.len == available_apps.len
@@ -1210,7 +1348,7 @@ fn test_shortcut_drag_reorders_and_persists_by_process_name() {
 
 	mut desktop := Desktop{
 		shortcut_order: default_shortcut_order()
-		canvas: new_canvas(1024, 768)
+		canvas:         new_canvas(1024, 768)
 	}
 	defer {
 		unsafe {
@@ -1232,38 +1370,4 @@ fn test_shortcut_drag_reorders_and_persists_by_process_name() {
 	loaded := load_shortcut_order(root)
 	defer { unsafe { loaded.free() } }
 	assert loaded == desktop.shortcut_order
-}
-
-fn test_app_icon_loader_accepts_rgba_vai() {
-	root := os.join_path(os.temp_dir(), 'vinix-app-icon-test')
-	os.rmdir_all(root) or {}
-	os.mkdir_all(root) or { panic(err) }
-	defer { os.rmdir_all(root) or {} }
-	path := os.join_path(root, 'sample.vai')
-	mut data := []u8{cap: app_icon_header_size + 8}
-	defer { unsafe { data.free() } }
-	for ch in app_icon_magic {
-		data << ch
-	}
-	data << u8(2)
-	data << u8(0)
-	data << u8(1)
-	data << u8(0)
-	data << u8(0)
-	data << u8(255)
-	data << u8(0)
-	data << u8(0)
-	data << u8(255)
-	data << u8(0)
-	data << u8(255)
-	data << u8(0)
-	data << u8(128)
-	assert desktop_write_file(path, data.data, u64(data.len))
-	image := load_app_icon_file(path) or { panic('icon did not load') }
-	defer { unsafe { image.pixels.free() } }
-	assert image.width == 2
-	assert image.height == 1
-	assert image.pixels.len == 8
-	assert image.pixels[0] == 255
-	assert image.pixels[7] == 128
 }

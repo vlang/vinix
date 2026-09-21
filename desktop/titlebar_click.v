@@ -1,3 +1,7 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 // SPDX-License-Identifier: GPL-2.0-or-later
 module main
 
@@ -19,6 +23,7 @@ struct TitlebarClick {
 	window_width  int
 	window_height int
 	maximized     bool
+	snap          WindowSnap
 	at_ms         u64
 }
 
@@ -80,7 +85,8 @@ fn (mut d Desktop) titlebar_pointer_down_at(previous TitlebarClick, x int, y int
 		d.windows[index].width = previous.window_width
 		d.windows[index].height = previous.window_height
 		d.windows[index].maximized = previous.maximized
-		d.hover = action
+		d.windows[index].snap = previous.snap
+		d.set_hover(action)
 		d.dirty = true
 		d.toggle_maximize(id)
 		return TitlebarClick{}
@@ -95,6 +101,7 @@ fn (mut d Desktop) titlebar_pointer_down_at(previous TitlebarClick, x int, y int
 		window_width: d.windows[index].width
 		window_height: d.windows[index].height
 		maximized: d.windows[index].maximized
+		snap: d.windows[index].snap
 		at_ms: now_ms
 	}
 	d.on_pointer_down(x, y)

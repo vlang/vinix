@@ -198,8 +198,8 @@ fn (mut d Desktop) begin_shortcut_press(action string, x int, y int) bool {
 	d.ensure_shortcut_order()
 	d.shortcut_press = ShortcutPress{
 		app_index: app_index
-		start_x: x
-		start_y: y
+		start_x:   x
+		start_y:   y
 	}
 	d.dirty = true
 	return true

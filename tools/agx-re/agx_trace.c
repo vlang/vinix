@@ -1,3 +1,7 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 #include <IOKit/IOKitLib.h>
 #include <mach/mach.h>
 #include <mach/mach_vm.h>

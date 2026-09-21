@@ -1081,7 +1081,7 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 	mut stack_vma := u64(0)
 
 	if _stack == 0 {
-		mut user_stack_size := stack_size
+		mut user_stack_size := default_user_stack_size
 		stack_limit := proc.soft_limit(process, proc.rlimit_stack)
 		if stack_limit != proc.rlim_infinity && stack_limit < user_stack_size {
 			user_stack_size = lib.align_down(stack_limit, page_size)
@@ -1140,11 +1140,11 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 
 	if want_elf == true {
 		if auxval != unsafe { nil } {
-			uart.puts(c'ELF auxval: base=0x')
+			uart.puts(c'ELF auxval: base=')
 			uart.put_hex(auxval.at_base)
-			uart.puts(c' phdr=0x')
+			uart.puts(c' phdr=')
 			uart.put_hex(auxval.at_phdr)
-			uart.puts(c' entry=0x')
+			uart.puts(c' entry=')
 			uart.put_hex(auxval.at_entry)
 			uart.putc(`\n`)
 		}
@@ -1365,6 +1365,7 @@ pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) ?&proc.Pr
 		new_proc.nice = old_process.nice
 		new_proc.executable_path = old_process.executable_path.clone()
 		new_proc.rlimits = old_process.rlimits
+		new_proc.allow_wx = old_process.allow_wx
 		// A NUMA memory policy is process state, like nice and the rlimits, so
 		// a fork keeps the placement its parent asked for.
 		new_proc.mempolicy_mode = old_process.mempolicy_mode

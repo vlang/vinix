@@ -1,3 +1,7 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 /* Freestanding ARM64 init for the desktop image.
  *
  * Native applications are separate processes, and the compositor is a
@@ -124,12 +128,18 @@ static void report_desktop_exit(i64 child, int status) {
 
 /* BusyBox's reboot tools signal PID 1. Catch those requests and forward them
  * to the compositor, which owns the orderly application/framebuffer teardown.
+ * SIGHUP is the separate development-session reload request: it tears the
+ * compositor down through the same orderly path, but never reaches reboot(2).
  * The raw ARM64 signal ABI needs an rt_sigreturn restorer because this init has
  * no libc trampoline. */
 static volatile int requested_power_signal;
+static volatile int requested_desktop_reload;
 
 static void power_signal_handler(int signal) {
-	requested_power_signal = signal;
+	if (signal == 1 /* SIGHUP */)
+		requested_desktop_reload = 1;
+	else
+		requested_power_signal = signal;
 }
 
 __attribute__((naked)) static void signal_restorer(void) {
@@ -154,6 +164,7 @@ static void install_power_signal(int signal) {
 }
 
 static void install_power_signals(void) {
+	install_power_signal(1 /* SIGHUP: reload desktop */);
 	install_power_signal(15 /* SIGTERM: reboot */);
 	install_power_signal(10 /* SIGUSR1: halt */);
 	install_power_signal(12 /* SIGUSR2: power off */);
@@ -189,6 +200,8 @@ static void wait_for_child(i64 child, int *status) {
 	int forwarded_signal = 0;
 	for (;;) {
 		int signal = requested_power_signal;
+		if (!signal && requested_desktop_reload)
+			signal = 1 /* SIGHUP */;
 		if (signal && signal != forwarded_signal) {
 			syscall2(129 /* kill */, (u64)child, (u64)signal);
 			forwarded_signal = signal;
@@ -250,6 +263,14 @@ static int executable_available(const char *path) {
 		return 0;
 	syscall1(57 /* close */, (u64)fd);
 	return 1;
+}
+
+/* A self-hosted desktop build writes this marker before asking PID 1 to
+ * reload. On GPU systems that deliberately selects the newly built ordinary
+ * framebuffer binary instead of silently going back to the immutable GPU
+ * variant from the boot image. The marker lives in /run and vanishes at boot. */
+static int development_desktop_requested(void) {
+	return executable_available("/run/vinix-desktop-development");
 }
 
 /* Hyprland is an optional alternate session. The QEMU runner adds this
@@ -316,7 +337,7 @@ void _start(void) {
 		char **fallback = (char **)0;
 		if (requested_power_signal)
 			apply_power_request();
-		if (gpu_available()) {
+		if (gpu_available() && !development_desktop_requested()) {
 			selected = gpu_desktop;
 			fallback = desktop;
 			print("\nVinix: starting the GPU-enabled desktop\n");
@@ -327,6 +348,12 @@ void _start(void) {
 		child = spawn_program(selected, fallback, 1, &status, environment);
 		if (requested_power_signal)
 			apply_power_request();
+		if (requested_desktop_reload) {
+			requested_desktop_reload = 0;
+			print("init: desktop reload requested; starting the new binary\n");
+			stop_desktop_group(child);
+			continue;
+		}
 		if (child < 0 || status == (127 << 8)) {
 			print("init: could not start vinix-desktop; opening a recovery shell\n");
 			status = 0;

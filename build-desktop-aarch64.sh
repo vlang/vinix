@@ -17,6 +17,21 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 . "$SCRIPT_DIR/build-support/find-v.sh"
 
+if [ -n "${VINIX_UI2_SOURCE:-}" ]; then
+    UI2_SOURCE="$VINIX_UI2_SOURCE"
+elif [ -f "$SCRIPT_DIR/../ui2/v.mod" ]; then
+    UI2_SOURCE="$SCRIPT_DIR/../ui2"
+else
+    UI2_SOURCE="$SCRIPT_DIR/third_party/ui2"
+fi
+if [ -n "${VINIX_OFFICE_SOURCE:-}" ]; then
+    OFFICE_SOURCE="$VINIX_OFFICE_SOURCE"
+elif [ -f "$SCRIPT_DIR/../office/v.mod" ]; then
+    OFFICE_SOURCE="$SCRIPT_DIR/../office"
+else
+    OFFICE_SOURCE="$SCRIPT_DIR/third_party/office"
+fi
+
 BUILD_DIR="$SCRIPT_DIR/build"
 USERLAND_BUILD_DIR="${VINIX_AARCH64_USERLAND_BUILD_DIR:-$SCRIPT_DIR/build-aarch64-userland}"
 SYSROOT="${VINIX_AARCH64_SYSROOT:-$USERLAND_BUILD_DIR/staging}"
@@ -41,6 +56,7 @@ DESKTOP_INITRAMFS="${VINIX_DESKTOP_INITRAMFS:-$SCRIPT_DIR/build-support/init-aar
 DESKTOP_INITRAMFS_GZ="$DESKTOP_INITRAMFS.gz"
 PYTHON_STAGING="${VINIX_PYTHON_STAGING:-$SCRIPT_DIR/build-aarch64-python/staging}"
 NETWORK_TOOLS_STAGING="${VINIX_NETWORK_TOOLS_STAGING:-$SCRIPT_DIR/build-aarch64-network-tools/staging}"
+VLANG_STAGING="${VINIX_VLANG_STAGING:-$SCRIPT_DIR/build-aarch64-v/staging}"
 X11_STAGING="${VINIX_X11_STAGING:-$SCRIPT_DIR/build-aarch64-x11/staging}"
 FIREFOX_STAGING="${VINIX_FIREFOX_STAGING:-$SCRIPT_DIR/build-aarch64-firefox/staging}"
 CHROMIUM_STAGING="${VINIX_CHROMIUM_STAGING:-$SCRIPT_DIR/build-aarch64-chromium/staging}"
@@ -98,6 +114,7 @@ write_staging_cache_manifest() {
     for input in \
         "$BASE_INITRAMFS" "$DEVTOOLS_ARCHIVE" "$SYSROOT" \
         "$PYTHON_STAGING" "$NETWORK_TOOLS_STAGING" "$X11_STAGING" \
+        "$VLANG_STAGING" \
         "$FIREFOX_STAGING" "$CHROMIUM_STAGING" "$LIBREOFFICE_STAGING" \
         "$MINECRAFT_STAGING" "$ASAHI_STAGING" "$HYPRLAND_STAGING" \
         "$BLENDER_NATIVE_STAGING" "$X86_TRANSLATION_STAGING" \
@@ -217,6 +234,22 @@ if [ "$MAKE_INITRAMFS" -eq 1 ]; then
     fi
 fi
 
+if [ "$MAKE_INITRAMFS" -eq 1 ] && [ ! -x "$VLANG_STAGING/usr/lib/vlang/v" ]; then
+    if [ -n "${VINIX_VLANG_STAGING:-}" ]; then
+        echo "ERROR: custom V staging is incomplete: $VLANG_STAGING" >&2
+        exit 1
+    fi
+    echo "==> Native V compiler is missing; building it..."
+    V="$V" \
+    VINIX_AARCH64_USERLAND_BUILD_DIR="$USERLAND_BUILD_DIR" \
+    VINIX_AARCH64_SYSROOT="$SYSROOT" \
+        "$SCRIPT_DIR/build-v-aarch64.sh"
+    if [ ! -x "$VLANG_STAGING/usr/lib/vlang/v" ]; then
+        echo "ERROR: V compiler build did not publish $VLANG_STAGING" >&2
+        exit 1
+    fi
+fi
+
 # ── The Alpine musl sysroot ──
 if [ ! -f "$SYSROOT/usr/lib/libc.a" ] || [ ! -d "$SYSROOT/usr/include" ]; then
     echo "ERROR: Alpine development sysroot is incomplete: $SYSROOT"
@@ -233,16 +266,22 @@ fi
 # ── ui2 ──
 # The desktop is built on ui2's declarative element tree. It is not vendored;
 # check it out beside the sources and point V's module path at it.
-if [ ! -f "$SCRIPT_DIR/third_party/ui2/v.mod" ]; then
-    echo "ERROR: ui2 not found at third_party/ui2. Clone it there:"
+if [ ! -f "$UI2_SOURCE/v.mod" ]; then
+    echo "ERROR: ui2 not found at $UI2_SOURCE. Clone it at third_party/ui2:"
     echo "    git clone https://github.com/vlang/ui2 third_party/ui2"
+    exit 1
+fi
+if [ ! -f "$OFFICE_SOURCE/v.mod" ] || [ ! -f "$OFFICE_SOURCE/cmd/excel/main.v" ] || \
+   [ ! -f "$OFFICE_SOURCE/cmd/word/main.v" ]; then
+    echo "ERROR: VOffice not found at $OFFICE_SOURCE."
+    echo "Set VINIX_OFFICE_SOURCE or check it out beside Vinix as ../office."
     exit 1
 fi
 
 # Calculator uses the v3 compiler's direct `$vml` lowering. Check the renamed
 # API explicitly so an old QML checkout fails before the compiler does.
-if [ ! -f "$SCRIPT_DIR/third_party/ui2/ui/vml_compiled.v" ] || \
-   [ ! -f "$SCRIPT_DIR/third_party/ui2/examples/calculator/calculator.vml" ]; then
+if [ ! -f "$UI2_SOURCE/ui/vml_compiled.v" ] || \
+   [ ! -f "$UI2_SOURCE/examples/calculator/calculator.vml" ]; then
     echo "ERROR: this ui2 checkout has no compile-time VML support."
     echo "Update the checkout:"
     echo "    git -C third_party/ui2 pull"
@@ -261,7 +300,7 @@ mkdir -p "$BUILD_DIR"
 # Vinix's bounds bridge without modifying the upstream checkout.
 UI2_MODULES="$BUILD_DIR/vmodules"
 python3 "$SCRIPT_DIR/desktop/tools/stage_ui2.py" \
-    "$UI2_MODULES/ui2" "$SCRIPT_DIR/third_party/ui2" \
+    "$UI2_MODULES/ui2" "$UI2_SOURCE" \
     "$SCRIPT_DIR/desktop/tools/ui2_headless_bounds.v"
 
 # ── Stage the sources ──
@@ -273,14 +312,7 @@ python3 "$SCRIPT_DIR/desktop/tools/stage_ui2.py" \
 echo "==> Staging sources..."
 APP_SRC="$BUILD_DIR/app-src"
 python3 "$SCRIPT_DIR/desktop/tools/stage_app.py" "$APP_SRC" "$SCRIPT_DIR/desktop" \
-    "$SCRIPT_DIR/third_party/ui2/examples/calculator"
-
-# Build the test application as a normal Apple AArch64 Mach-O. A macOS host
-# records standard Cocoa dylib imports; ld64.lld records flat imports elsewhere.
-# The Vinix image contains no Apple framework binaries: its V runtime resolves
-# the narrow AppKit/Objective-C surface used by this application.
-echo "==> Building Cocoa compatibility fixture..."
-"$SCRIPT_DIR/compat/macos/apps/Calculator/build.sh" "$BUILD_DIR/Calculator.app"
+    "$UI2_SOURCE/examples/calculator"
 
 # ── V -> C ──
 # -gc none because Vinix has no Boehm GC, and -d ui2_headless so importing ui2
@@ -290,6 +322,7 @@ echo "==> Translating V to C..."
 # 10176 MiB watchdog while it is still making forward declarations. This is a
 # host-side release build, so let the machine's own memory limit govern it.
 "$V" -new-compiler -no-memory-limit -os linux -arch arm64 -gc none -manualfree -enable-globals -prod \
+    -d glibc \
     -d ui2_headless \
     -path "@vlib|$UI2_MODULES|@vmodules|$SCRIPT_DIR|$SCRIPT_DIR/third_party" \
     -o "$BUILD_DIR/desktop.c" "$APP_SRC"
@@ -302,14 +335,32 @@ echo "==> Compiling for aarch64-linux-musl..."
     -I "$APP_SRC" \
     -O2 -fno-stack-protector -w \
     "$SYSROOT/usr/lib/crt1.o" "$SYSROOT/usr/lib/crti.o" "$GCCLIB/crtbeginT.o" \
-    "$BUILD_DIR/desktop.c" \
-    -L"$SYSROOT/usr/lib" -L"$GCCLIB" -lc -lgcc -lm \
+    "$BUILD_DIR/desktop.c" "$SCRIPT_DIR/desktop/execinfo_compat.c" \
+    -L"$SYSROOT/usr/lib" -L"$GCCLIB" -lgcc_eh -lc -lgcc -lm \
     "$GCCLIB/crtend.o" "$SYSROOT/usr/lib/crtn.o" \
     -fuse-ld=lld -B"$LLVM_BIN" \
     -o "$BUILD_DIR/vinix-desktop"
 
 "$LLVM_BIN/llvm-strip" "$BUILD_DIR/vinix-desktop"
 echo "    $BUILD_DIR/vinix-desktop ($(file_size "$BUILD_DIR/vinix-desktop") bytes)"
+
+echo "==> Building all ui2 example applications for aarch64..."
+UI2_EXAMPLES_DIR="$BUILD_DIR/ui2-examples"
+python3 "$SCRIPT_DIR/desktop/tools/build_ui2_examples.py" \
+    --repo "$SCRIPT_DIR" --ui2-source "$UI2_SOURCE" \
+    --output "$UI2_EXAMPLES_DIR" --work "$BUILD_DIR/ui2-examples-work" \
+    --v "$V" --arch arm64 --clang "$LLVM_BIN/clang" --strip "$LLVM_BIN/llvm-strip" \
+    --target aarch64-linux-musl --sysroot "$SYSROOT" --gcclib "$GCCLIB" \
+    --cc-shim "$CC_SHIM" --llvm-bin "$LLVM_BIN"
+
+echo "==> Building VOffice Calc and Writer for aarch64..."
+VOFFICE_DIR="$BUILD_DIR/voffice"
+python3 "$SCRIPT_DIR/desktop/tools/build_voffice.py" \
+    --repo "$SCRIPT_DIR" --office-source "$OFFICE_SOURCE" --ui2-source "$UI2_SOURCE" \
+    --output "$VOFFICE_DIR" --work "$BUILD_DIR/voffice-work" \
+    --v "$V" --arch arm64 --clang "$LLVM_BIN/clang" --strip "$LLVM_BIN/llvm-strip" \
+    --target aarch64-linux-musl --sysroot "$SYSROOT" --gcclib "$GCCLIB" \
+    --cc-shim "$CC_SHIM" --llvm-bin "$LLVM_BIN"
 
 # Mesa is a dynamic runtime, so keep the always-bootable static desktop and
 # build a second executable only when the exact Asahi userspace is available.
@@ -330,11 +381,12 @@ if [ -f "$ASAHI_STAGING/usr/lib/libEGL.so" ] &&
         -I "$APP_SRC" -I "$ASAHI_STAGING/usr/include" \
         -DVINIX_GPU_PRESENTER_EXTERNAL=1 \
         -O2 -fPIE -pie -fno-stack-protector -w \
-        "$BUILD_DIR/desktop.c" "$SCRIPT_DIR/desktop/gpu_present_egl.c" \
+        "$BUILD_DIR/desktop.c" "$SCRIPT_DIR/desktop/execinfo_compat.c" \
+        "$SCRIPT_DIR/desktop/gpu_present_egl.c" \
         -L"$ASAHI_STAGING/usr/lib" \
         -Wl,-rpath-link,"$ASAHI_STAGING/usr/lib" \
         -Wl,-dynamic-linker,/lib/ld-musl-aarch64.so.1 \
-        -lEGL -lGLESv2 -ldl -lpthread -lm \
+        -lEGL -lGLESv2 -ldl -lpthread -lgcc_eh -lm \
         -fuse-ld=lld -B"$LLVM_BIN" \
         -o "$BUILD_DIR/vinix-desktop-gpu"
     "$LLVM_BIN/llvm-strip" "$BUILD_DIR/vinix-desktop-gpu"
@@ -522,9 +574,12 @@ if [ "$REUSE_STAGING" -eq 0 ]; then
         # sysroot the desktop was compiled against; the base archive stores the
         # command as a hard link to a versioned name, which cannot be extracted on
         # its own. libcap is zsh's own NEEDED library and is in neither archive,
-        # so without it the terminal only ever printed a loader error.
+        # so without it the terminal only ever printed a loader error. V probes
+        # `ldd --version` to select its musl builtins; keep that tiny helper too,
+        # otherwise ordinary debug builds incorrectly emit glibc backtrace calls.
         for zsh_path in bin/zsh bin/zsh-* etc/zsh usr/lib/zsh usr/share/zsh \
             usr/lib/libcap.so.2 usr/lib/libcap.so.2.* \
+            usr/bin/ldd \
             root/.zshrc root/.oh-my-zsh; do
             for zsh_source in "$SYSROOT"/$zsh_path; do
                 [ -e "$zsh_source" ] || continue
@@ -575,6 +630,12 @@ if [ "$REUSE_STAGING" -eq 0 ]; then
         # layer so the terminal gets pkg/apk without rebuilding the full userland.
         merge_staging_tree "$NETWORK_TOOLS_STAGING"
     fi
+
+    # Always take V from its own pinned layer. The base userland may have been
+    # assembled before that layer was rebuilt, while a compact image never
+    # extracts the full base tree at all.
+    echo "    staging the native V compiler"
+    merge_staging_tree "$VLANG_STAGING"
 
     if [ -x "$BLENDER_NATIVE_STAGING/usr/libexec/vinix-blender-native" ]; then
         echo "==> Staging native Blender GHOST executable"
@@ -693,6 +754,24 @@ if [ "$REUSE_STAGING" -eq 0 ]; then
             fi
         done
     fi
+
+    if [ "$WITH_CHROMIUM" -eq 1 ]; then
+        # Firefox comes from a newer Alpine branch than Chromium and therefore
+        # owns the image-wide GTK/GLib/NSS stack. Chromium 136 crashes before
+        # mapping a window when that mixed closure is loaded underneath it, so
+        # retain the shared libraries from Chromium's resolved package set in
+        # a private directory selected only by run-chromium.
+        chromium_runtime="$STAGING/usr/lib/chromium/vinix-runtime"
+        rm -rf "$chromium_runtime"
+        mkdir -p "$chromium_runtime"
+        cp -a "$CHROMIUM_STAGING"/usr/lib/*.so* "$chromium_runtime/"
+        install -m755 "$CHROMIUM_STAGING/lib/ld-musl-aarch64.so.1" \
+            "$STAGING/lib/ld-chromium.so.1"
+        python3 "$SCRIPT_DIR/build-support/patch-elf-interpreter.py" \
+            "$STAGING/usr/lib/chromium/chrome" \
+            /lib/ld-musl-aarch64.so.1 /lib/ld-chromium.so.1
+        touch "$chromium_runtime/.complete"
+    fi
 fi
 
 # These files are owned by this checkout, not by a compiled staging layer, so
@@ -712,11 +791,35 @@ mkdir -p "$STAGING/sbin" "$STAGING/usr/bin" "$STAGING/usr/share/vinix" \
 mkdir -p "$STAGING/root/.config/GIMP/2.10" "$STAGING/root/.cache"
 chmod 1777 "$STAGING/tmp"
 
+# The compositor loads its own app artwork rather than depending on whichever
+# icon theme happens to accompany an optional application package.
+mkdir -p "$STAGING/usr/share/vinix/icons"
+install -m644 "$SCRIPT_DIR/desktop/assets/chromium.qoi" \
+    "$STAGING/usr/share/vinix/icons/chromium.qoi"
+install -m644 "$SCRIPT_DIR/desktop/assets/firefox.qoi" \
+    "$STAGING/usr/share/vinix/icons/firefox.qoi"
+install -m644 "$SCRIPT_DIR/desktop/assets/blender.qoi" \
+    "$STAGING/usr/share/vinix/icons/blender.qoi"
+install -m644 "$SCRIPT_DIR/desktop/assets/minecraft.qoi" \
+    "$STAGING/usr/share/vinix/icons/minecraft.qoi"
+
+for app_icon in terminal settings activity calculator vspace; do
+    install -m644 "$SCRIPT_DIR/desktop/assets/${app_icon}.qoi" \
+        "$STAGING/usr/share/vinix/icons/${app_icon}.qoi"
+done
 # Keep the display handoff pieces in sync with the desktop source even when the
 # full base userland predates them. The bridge is a cross-compiled executable;
 # package/Firefox launchers and policy files can be installed directly from
 # source.
 install -m755 "$SCRIPT_DIR/build-support/vinix-pkg" "$STAGING/usr/bin/pkg"
+mkdir -p "$STAGING/usr/libexec/vinix-minecraft"
+for minecraft_support in \
+    fetch-minecraft.py run-minecraft minecraft-login minecraft-xinitrc; do
+    install -m755 "$SCRIPT_DIR/build-support/minecraft/$minecraft_support" \
+        "$STAGING/usr/libexec/vinix-minecraft/$minecraft_support"
+done
+install -m755 "$SCRIPT_DIR/build-support/java-cacerts.py" \
+    "$STAGING/usr/libexec/vinix-minecraft/java-cacerts.py"
 install -m755 "$SCRIPT_DIR/build-support/xorg-server/startx" "$STAGING/usr/bin/startx"
 install -m755 "$X11_STAGING/usr/bin/vinix-xinput" "$STAGING/usr/bin/vinix-xinput"
 install -m755 "$X11_STAGING/usr/bin/vinix-wine-host" "$STAGING/usr/bin/vinix-wine-host"
@@ -743,6 +846,12 @@ mkdir -p "$STAGING/etc/firefox/policies"
 install -m644 "$SCRIPT_DIR/build-support/firefox/policies.json" \
     "$STAGING/etc/firefox/policies/policies.json"
 install -m755 "$SCRIPT_DIR/build-support/chromium/run-chromium" "$STAGING/usr/bin/run-chromium"
+install -m755 "$SCRIPT_DIR/build-support/vinix-desktop-build" \
+    "$STAGING/usr/bin/vinix-desktop-build"
+install -m755 "$SCRIPT_DIR/build-support/vinix-desktop-reload" \
+    "$STAGING/usr/bin/vinix-desktop-reload"
+install -m755 "$SCRIPT_DIR/build-support/vinix-host-sync" \
+    "$STAGING/usr/bin/vinix-host-sync"
 install -m644 "$SCRIPT_DIR/tests/browsers/chromium-smoke.html" \
     "$STAGING/usr/share/vinix/chromium-smoke.html"
 install -m755 "$SCRIPT_DIR/tests/packages/x-window-check.py" \
@@ -789,6 +898,21 @@ if [ ! -x "$STAGING/usr/bin/pkg" ] || [ ! -x "$STAGING/sbin/apk" ]; then
     echo "ERROR: desktop image is missing pkg or apk" >&2
     exit 1
 fi
+for development_path in \
+    usr/bin/v usr/lib/vlang/v usr/bin/gcc usr/bin/tcc \
+    usr/bin/vinix-desktop-build usr/bin/vinix-desktop-reload \
+    usr/bin/vinix-host-sync; do
+    if [ ! -x "$STAGING/$development_path" ]; then
+        echo "ERROR: desktop development environment is missing /$development_path" >&2
+        exit 1
+    fi
+done
+for development_file in usr/lib/vlang/cmd/v/v.v usr/lib/libtcc.so; do
+    if [ ! -f "$STAGING/$development_file" ]; then
+        echo "ERROR: desktop development environment is missing /$development_file" >&2
+        exit 1
+    fi
+done
 for runtime_path in usr/bin/Xorg usr/bin/Xvfb usr/bin/startx usr/bin/vinix-xinput usr/bin/vinix-wine-host usr/bin/run-firefox usr/bin/run-gimp usr/bin/run-chromium usr/bin/run-libreoffice; do
     if [ ! -x "$STAGING/$runtime_path" ]; then
         echo "ERROR: desktop hosted-X11 runtime is missing /$runtime_path" >&2
@@ -810,7 +934,7 @@ if ! { [ -x "$STAGING/usr/lib/firefox-esr/firefox-esr" ] &&
     exit 1
 fi
 if [ "$COMPACT_INITRAMFS" -eq 1 ]; then
-    for command_path in bin/sh bin/zsh bin/id bin/sed bin/mkdir bin/sleep bin/df bin/du bin/ls bin/tar usr/bin/pkg sbin/apk usr/bin/vim usr/bin/python3 usr/bin/git usr/bin/Xorg usr/bin/Xvfb usr/bin/startx usr/bin/vinix-xinput usr/bin/vinix-wine-host usr/bin/run-firefox usr/bin/run-gimp usr/bin/run-chromium usr/bin/run-libreoffice usr/bin/gcc; do
+    for command_path in bin/sh bin/zsh bin/id bin/sed bin/mkdir bin/sleep bin/df bin/du bin/ls bin/tar usr/bin/pkg sbin/apk usr/bin/vim usr/bin/python3 usr/bin/git usr/bin/Xorg usr/bin/Xvfb usr/bin/startx usr/bin/vinix-xinput usr/bin/vinix-wine-host usr/bin/run-firefox usr/bin/run-gimp usr/bin/run-chromium usr/bin/run-libreoffice usr/libexec/vinix-minecraft/fetch-minecraft.py usr/bin/gcc usr/bin/tcc usr/bin/ldd usr/bin/v usr/bin/vinix-desktop-build usr/bin/vinix-desktop-reload usr/bin/vinix-host-sync; do
         if [ ! -x "$STAGING/$command_path" ]; then
             echo "ERROR: compact desktop is missing /$command_path" >&2
             exit 1
@@ -843,8 +967,18 @@ if [ "$COMPACT_INITRAMFS" -eq 0 ] && [ -x "$HYPRLAND_STAGING/usr/bin/start-hyprl
     done
 fi
 
+mkdir -p "$STAGING/usr/libexec"
 cp "$BUILD_DIR/desktop-init" "$STAGING/sbin/init"
+install -m755 "$BUILD_DIR/desktop-init" \
+    "$STAGING/usr/libexec/vinix-desktop-init"
+install -m755 "$UI2_EXAMPLES_DIR"/vinix-ui2-* "$STAGING/usr/bin/"
 cp "$BUILD_DIR/vinix-desktop" "$STAGING/usr/bin/vinix-desktop"
+install -m755 "$VOFFICE_DIR"/voffice-calc "$VOFFICE_DIR"/voffice-writer \
+    "$STAGING/usr/bin/"
+mkdir -p "$STAGING/usr/bin/assets/ribbon" "$STAGING/usr/bin/translations"
+install -m644 "$OFFICE_SOURCE/assets/logo.png" "$STAGING/usr/bin/assets/logo.png"
+install -m644 "$OFFICE_SOURCE"/assets/ribbon/*.png "$STAGING/usr/bin/assets/ribbon/"
+cp -a "$OFFICE_SOURCE/translations/." "$STAGING/usr/bin/translations/"
 if [ "$GPU_DESKTOP_BUILT" -eq 1 ]; then
     cp "$BUILD_DIR/vinix-desktop-gpu" "$STAGING/usr/bin/vinix-desktop-gpu"
     chmod +x "$STAGING/usr/bin/vinix-desktop-gpu"
@@ -859,19 +993,13 @@ chmod +x "$STAGING/sbin/init" "$STAGING/usr/bin/vinix-desktop" \
 # Vinix records the path passed to execve, so these relative symlinks produce
 # distinct names and truthful per-app accounting without storing a copy of the
 # same static executable for every native application in the initramfs.
-for app_name in vinix-files vinix-calculator vinix-terminal vinix-settings \
-    vinix-activity vinix-editor vinix-calendar vinix-clock vinix-cocoa-calculator \
+for app_name in vinix-files vinix-calculator vinix-terminal vinix-settings vinix-ui2-examples \
+    vinix-activity vinix-editor vinix-calendar vinix-clock \
     vinix-vspace \
     vinix-firefox vinix-chromium vinix-gimp vinix-libreoffice vinix-minecraft vinix-wine-calculator vinix-wine-notepad \
     vinix-wine-word2013 vinix-blender vinix-capture; do
     ln -sf vinix-desktop "$STAGING/usr/bin/$app_name"
 done
-
-mkdir -p "$STAGING/Applications/Calculator.app/Contents/MacOS"
-install -m644 "$BUILD_DIR/Calculator.app/Contents/Info.plist" \
-    "$STAGING/Applications/Calculator.app/Contents/Info.plist"
-install -m755 "$BUILD_DIR/Calculator.app/Contents/MacOS/Calculator" \
-    "$STAGING/Applications/Calculator.app/Contents/MacOS/Calculator"
 
 # The bundle is mutable command-line input, so do not let a previous selection
 # survive a cached-layer build that no longer asks for it.
@@ -903,27 +1031,30 @@ if [ -d "$BUILD_DIR/wallpapers" ]; then
         "$BUILD_DIR/wallpapers"/SOURCES.txt "$STAGING/usr/share/vinix/wallpapers/" 2>/dev/null || true
 fi
 
-# ── Application icons ──
-# Decode application artwork on the build host, just as wallpapers are. Prefer
-# the largest official icon shipped by the assembled package; pinned upstream
-# artwork fills gaps for optional applications.
-echo "==> Application icons..."
-python3 "$SCRIPT_DIR/desktop/tools/prepare_app_icons.py" "$BUILD_DIR/app-icons" \
-    --root "$STAGING" --fallback-dir "$SCRIPT_DIR/desktop/app-icon-fallbacks" || true
-rm -rf "$STAGING/usr/share/vinix/app-icons"
-mkdir -p "$STAGING/usr/share/vinix/app-icons"
-if [ -d "$BUILD_DIR/app-icons" ]; then
-    cp "$BUILD_DIR/app-icons"/*.vai "$BUILD_DIR/app-icons"/SOURCES.txt \
-        "$STAGING/usr/share/vinix/app-icons/" 2>/dev/null || true
+# Keep a system-owned development copy outside persistent /root. It lets an
+# upgraded machine build even when its carried home predates /root/vmodules.
+# The editable home copy is seeded from the same exact host-build sources.
+DESKTOP_DEV_ROOT="$STAGING/usr/share/vinix/desktop-dev"
+rm -rf "$DESKTOP_DEV_ROOT"
+mkdir -p "$DESKTOP_DEV_ROOT/desktop"
+cp -L "$APP_SRC"/*.v "$APP_SRC"/*.vml "$APP_SRC"/*.h \
+    "$SCRIPT_DIR/desktop/execinfo_compat.c" \
+    "$SCRIPT_DIR/desktop/README.md" "$DESKTOP_DEV_ROOT/desktop/"
+mkdir -p "$DESKTOP_DEV_ROOT/vmodules/ui2"
+cp -aL "$UI2_MODULES/ui2/." "$DESKTOP_DEV_ROOT/vmodules/ui2/"
+if [ ! -f "$DESKTOP_DEV_ROOT/desktop/main.v" ] || \
+   [ ! -f "$DESKTOP_DEV_ROOT/vmodules/ui2/v.mod" ]; then
+    echo "ERROR: system desktop development tree is incomplete" >&2
+    exit 1
 fi
-
-# The desktop's own source travels with the image, so the file browser has
-# something real to show and so the machine carries the code it is running.
-rm -rf "$STAGING/root/desktop"
-mkdir -p "$STAGING/root/desktop"
-cp "$SCRIPT_DIR/desktop"/*.v "$SCRIPT_DIR/desktop"/*.c "$SCRIPT_DIR/desktop"/*.h \
-    "$SCRIPT_DIR/desktop/README.md" \
-    "$STAGING/root/desktop/"
+python3 "$SCRIPT_DIR/build-support/content-key.py" \
+    "$DESKTOP_DEV_ROOT/desktop" "$DESKTOP_DEV_ROOT/vmodules" \
+    > "$DESKTOP_DEV_ROOT/.source-version"
+rm -rf "$STAGING/root/desktop" "$STAGING/root/vmodules"
+cp -a "$DESKTOP_DEV_ROOT/desktop" "$STAGING/root/desktop"
+cp -a "$DESKTOP_DEV_ROOT/vmodules" "$STAGING/root/vmodules"
+install -m644 "$DESKTOP_DEV_ROOT/.source-version" \
+    "$STAGING/root/.vinix-desktop-dev-version"
 
 # Vinix's loader opens a shared object without following links, and current
 # Mesa ships every DRI driver as a link to one libdril_dri.so. A dlopen of
@@ -970,11 +1101,12 @@ CONTENT_KEY_INPUTS=(
     "$BUILD_DIR/vinix-desktop"
     "$GPU_CONTENT_KEY_INPUT"
     "$BUILD_DIR/wifi-ctl"
-    "$BUILD_DIR/Calculator.app"
     "$BUILD_DIR/wallpapers"
-    "$BUILD_DIR/app-icons"
     "$SCRIPT_DIR/desktop"
     "$SCRIPT_DIR/build-support/vinix-pkg"
+    "$SCRIPT_DIR/build-support/vinix-desktop-build"
+    "$SCRIPT_DIR/build-support/vinix-desktop-reload"
+    "$SCRIPT_DIR/build-support/vinix-host-sync"
     "$SCRIPT_DIR/build-support/xorg-server/startx"
     "$SCRIPT_DIR/build-support/firefox"
     "$SCRIPT_DIR/build-support/gimp"

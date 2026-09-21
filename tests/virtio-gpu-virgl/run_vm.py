@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render in Vinix through VirtIO/VirGL and KekVM's macOS GPU backend."""
+"""Render in Vinix through VirtIO/VirGL and KekVM's host GPU backend."""
 
 from __future__ import annotations
 
@@ -92,12 +92,6 @@ def check_host(root: Path) -> tuple[Path, str | None]:
     if devices.returncode != 0 or b"virtio-gpu-gl-device" not in devices.stdout:
         return qemu, "KekVM QEMU has no MMIO virtio-gpu-gl-device"
 
-    displays = subprocess.run(
-        [qemu, "-display", "help"], capture_output=True, check=False
-    )
-    display_help = displays.stdout + displays.stderr
-    if displays.returncode != 0 or b"cocoa" not in display_help:
-        return qemu, "KekVM QEMU has no Cocoa GL display backend"
     return qemu, None
 
 

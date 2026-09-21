@@ -438,7 +438,7 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 	mut stack_vma := u64(0)
 
 	if _stack == 0 {
-		mut user_stack_size := stack_size
+		mut user_stack_size := default_user_stack_size
 		stack_limit := proc.soft_limit(process, proc.rlimit_stack)
 		if stack_limit != proc.rlim_infinity && stack_limit < user_stack_size {
 			user_stack_size = lib.align_down(stack_limit, page_size)
@@ -632,8 +632,16 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 		enqueue_thread(t, false)
 	}
 
+	// Published processes (proc.allocate_pid()/new_process()) can be visible
+	// to another CPU -- e.g. syscall_kill's kill(-1, sig) broadcast, which
+	// reads process.threads directly -- before their first thread lands
+	// here, and start_program()'s exec path replaces this same slice under
+	// the identical lock. Hold it across the read-then-append so neither
+	// side can observe or index an array mid-mutation.
+	process.threads_lock.acquire()
 	t.tid = process.threads.len
 	process.threads << t
+	process.threads_lock.release()
 
 	return t
 }
@@ -659,6 +667,7 @@ pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) ?&proc.Pr
 		new_proc.mmap_anon_non_fixed_base = old_process.mmap_anon_non_fixed_base
 		new_proc.current_directory = old_process.current_directory
 		new_proc.linux_abi = old_process.linux_abi
+		new_proc.allow_wx = old_process.allow_wx
 		new_proc.uid = old_process.uid
 		new_proc.euid = old_process.euid
 		new_proc.suid = old_process.suid

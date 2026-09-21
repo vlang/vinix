@@ -126,6 +126,11 @@ git clone https://github.com/vlang/ui2 third_party/ui2
 ./run-desktop-amd64.sh
 ```
 
+For local development, a sibling `../ui2` checkout (for example
+`~/code/ui2` beside `~/code/vinix`) is selected automatically and all of its
+examples are installed in the desktop's **ui2 Examples** launcher. Set
+`VINIX_UI2_SOURCE` to choose another checkout explicitly.
+
 This stages Alpine's prebuilt musl development packages, compiles
 `vinix-desktop` with Clang, and creates `vinix-desktop-amd64.iso`, whose init
 starts the desktop directly. The runner uses KVM when available and otherwise
@@ -142,11 +147,11 @@ into one image with a single command:
 ```
 
 The resulting `build-support/init-aarch64/initramfs-desktop.tar` contains
-Python, Ruby, Go, network and native developer tools, X11, Firefox, Hyprland,
-x86 translation, Codex and Claude Code, in addition to the native Vinix
-desktop. Java, Minecraft and Wine are deliberately left out of this default
-image so users can install them on demand with `pkg`. It is the image booted
-by:
+Python, Ruby, Go, the current pinned V compiler, network and native developer
+tools, X11, Firefox, Hyprland, x86 translation, Codex and Claude Code, in
+addition to the native Vinix desktop. Java, Minecraft and Wine are deliberately
+left out of this default image so users can install them on demand with `pkg`.
+It is the image booted by:
 
 ```sh
 ./run-desktop-aarch64.sh --no-desktop
@@ -171,6 +176,53 @@ during boot.
 
 The individual layer builders described below remain available for iterating
 on one component, but are not required for a normal default-image build.
+
+### Develop Vinix desktop inside Vinix
+
+The AArch64 desktop image contains the native V compiler and its matching
+`vlib`, GCC, the editable staged desktop sources in `/root/desktop`, and the
+headless ui2 module in `/root/vmodules`. QEMU also shares the checkout from
+which it was launched at `/mnt/host/vinix`. The share is a read-only mirror
+refreshed from macOS immediately before each build, so edits made after QEMU
+started are included without rebuilding the image or restarting the VM.
+
+Verify the compiler or rebuild and hot-reload the desktop from a Vinix
+Terminal with:
+
+```sh
+/root/v-smoke.sh
+vinix-desktop-build
+```
+
+`vinix-desktop-build` refreshes the host mirror, stages the desktop and ui2
+sources exactly as the image builder does, translates the desktop with V,
+links a static AArch64
+binary with GCC, keeps a copy at `/root/vinix-desktop`, atomically replaces
+`/usr/bin/vinix-desktop`, and sends SIGHUP to PID 1. The supervisor lets the
+old compositor close its applications and release the framebuffer, then starts
+the new binary without rebooting the OS. Pass `--no-reload` to build only. The
+editable source and module tree carries an image-generation marker. If an older
+persistent home is missing either tree or belongs to another image generation,
+the helper automatically builds the coherent copy in
+`/usr/share/vinix/desktop-dev`. Pass both `--source=DIR` and `--modules=DIR` to
+deliberately build a different source generation.
+
+The runner shares its own checkout by default. Set
+`VINIX_QEMU_HOST_SOURCE=/path/to/vinix` to select another checkout, or set it
+to `0` to disable the host source service. `vinix-host-sync` can be run by
+itself to refresh `/mnt/host/vinix` for inspection. The VirGL runner remains
+offline and therefore uses the image's staged source copy.
+
+The compiler layer is pinned to the newest V revision qualified by this tree.
+Build it separately with `./build-v-aarch64.sh`; set `VINIX_V_SOURCE` to a V
+checkout when qualifying a newer revision without downloading another copy.
+The layer includes the matching compiler sources, so `v self` rebuilds and
+replaces `/usr/lib/vlang/v` inside Vinix. Ordinary V builds use the native TCC
+package from Alpine Linux 3.24, and `v self` uses that same TCC toolchain. V's
+worker passes run with `-no-parallel` until their threading is qualified on
+Vinix. `VJOBS=1` and synchronous compiler helper passes keep that contract
+intact. It remains a Linux/musl program that runs on Vinix and continues to
+target Vinix applications by default.
 
 ### Python 3 on aarch64
 
@@ -447,10 +499,20 @@ tmux
 
 ### Minecraft: Java Edition on aarch64
 
-Vinix runs Mojang's own Minecraft client on AArch64, on OpenJDK 25 through its
-X11 and software-OpenGL stack. The game is not part of this repository: the
-build downloads it from Mojang's distribution endpoints on your machine, the
-way any third-party launcher does.
+Vinix runs Mojang's own Minecraft client on AArch64 through its X11 and
+software-OpenGL stack. The game is not part of this repository. From the
+default Vinix desktop image, install it on demand:
+
+```sh
+pkg install minecraft
+minecraft --check
+```
+
+This installs Alpine's OpenJDK 21 and native runtime packages, then downloads
+the newest official Minecraft release compatible with that JVM from Mojang's
+distribution endpoints. Client, library and asset hashes are verified, and
+the large game data remains outside the base image. To stage the current
+release with OpenJDK 25 directly into a custom image instead, run:
 
 ```sh
 ./build-x11-aarch64.sh
@@ -460,8 +522,11 @@ way any third-party launcher does.
 ./run-desktop-aarch64.sh --no-desktop
 ```
 
-`VINIX_MINECRAFT_VERSION` selects the version (default: the current release);
+`VINIX_MINECRAFT_VERSION` selects an exact version or release channel;
 `VINIX_MINECRAFT_ASSETS=none` stages the code without the ~500 MiB of assets.
+The package install constrains the release channel to Java 21, while the custom
+image builder uses its staged Java 25 runtime and therefore takes the current
+release without that constraint.
 
 Open **Minecraft** from the desktop or run `minecraft` in a terminal. With no
 account signed in it starts Mojang's free demo. `minecraft --login` signs in to
@@ -469,6 +534,17 @@ a Microsoft account that owns the game with the standard OAuth device-code
 flow, after which `minecraft` plays the full game; `--demo`, `--play`,
 `--logout` and a display-free `--check` are also accepted. Worlds and options
 live under `$HOME/.minecraft`.
+
+For the QEMU desktop, give the preinstalled game layer 10 GiB of RAM and use
+one virtual CPU while running Minecraft:
+
+```sh
+VINIX_QEMU_MEM=10240 VINIX_QEMU_SMP=1 ./run-desktop-aarch64.sh
+```
+
+The launcher uses HotSpot's interpreter and reports one active processor. This
+avoids the generated-code and SMP races that Vinix still needs to resolve; the
+tradeoff is a slow first client startup.
 
 Microsoft requires every launcher to use its own registered application, so set
 `VINIX_MINECRAFT_MSA_CLIENT_ID` to the application id of an Azure registration
@@ -488,16 +564,6 @@ package layer. GTK is downloaded only when it or an application that needs it
 is requested. The GTK smoke test first checks that the base image is GTK-free,
 installs it, then opens both `gtk3-demo` and `gtk3-widget-factory` against the
 Vinix Xorg server. Gnumeric is likewise absent until explicitly installed.
-
-### macOS compatibility on aarch64
-
-The desktop image includes an experimental all-V Mach-O and Objective-C/AppKit
-compatibility runtime. Its **Cocoa Calculator** test application is compiled
-from Objective-C as a normal AArch64 Mach-O bundle, loaded in userspace, and
-drawn by the Vinix compositor without shipping Apple frameworks. This is an
-initial compatibility slice, not general macOS application support; the exact
-supported ABI and reproducible host/Vinix tests are documented in
-[`compat/macos/README.md`](compat/macos/README.md).
 
 ### Firefox on aarch64
 
@@ -679,8 +745,9 @@ run-virgl-smoke
 run-firefox
 ```
 
-`--virgl` selects KekVM's `.tools/qemu-virgl` binary and a Cocoa core-OpenGL
-display. Override its location with `VINIX_VIRGL_QEMU`. The simpler
+`--virgl` selects KekVM's `.tools/qemu-virgl` binary and requests a GL-enabled
+display. Override its location with `VINIX_VIRGL_QEMU` or select a QEMU display
+backend with `QEMU_DISPLAY_BACKEND`. The simpler
 `--virtio-gpu` option exposes the unaccelerated MMIO device and is useful for
 transport probing, but it does not create a render node. KekVM's compact QEMU
 currently omits libslirp, so this launch mode is offline; Firefox can exercise
@@ -703,7 +770,7 @@ to the checkout used to assemble the desktop image:
 ./build-hyprland-aarch64.sh
 # copy build-aarch64-hyprland/staging to the macOS checkout when needed
 ./build-desktop-aarch64.sh
-./run-hyprland-aarch64.sh --no-build --grab-keys
+./run-hyprland-aarch64.sh --no-build
 ```
 
 `run-hyprland-aarch64.sh` selects Hyprland for that boot; the ordinary desktop

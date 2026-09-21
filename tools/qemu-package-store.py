@@ -1,19 +1,27 @@
 #!/usr/bin/env python3
-"""Receive a Vinix package overlay from a local QEMU guest.
+"""Persist a QEMU guest package overlay and serve its host source checkout.
 
-The server only listens on loopback. run-aarch64.sh gives QEMU user networking
-an explicit guest-forward from 10.0.2.100; it is not a general network service.
+The server only listens on loopback. QEMU user networking exposes the host's
+loopback services to its guest at 10.0.2.2; this is not a general network
+service.
 """
+
+from __future__ import annotations
 
 import argparse
 import http.server
 import os
 from pathlib import Path, PurePosixPath
+import subprocess
 import tarfile
 import tempfile
 
 
 class OverlayError(Exception):
+    pass
+
+
+class SourceSnapshotError(Exception):
     pass
 
 
@@ -50,11 +58,35 @@ class OverlayHandler(http.server.BaseHTTPRequestHandler):
     server_version = "VinixPackageStore/1"
 
     def do_GET(self) -> None:
-        if self.path != "/health":
-            self.send_error(404)
+        if self.path == "/health":
+            self.send_response(204)
+            self.end_headers()
             return
-        self.send_response(204)
-        self.end_headers()
+        if self.path == "/vinix-source.tar" and self.server.source_root is not None:
+            self.send_source_snapshot()
+            return
+        self.send_error(404)
+
+    def send_source_snapshot(self) -> None:
+        try:
+            snapshot = build_source_snapshot(
+                self.server.source_root, self.server.source_extras
+            )
+        except SourceSnapshotError as error:
+            self.send_error(503, str(error))
+            return
+
+        try:
+            self.send_response(200)
+            self.send_header("Content-Type", "application/x-tar")
+            self.send_header("Content-Length", str(snapshot.seek(0, os.SEEK_END)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            snapshot.seek(0)
+            while chunk := snapshot.read(1024 * 1024):
+                self.wfile.write(chunk)
+        finally:
+            snapshot.close()
 
     def do_PUT(self) -> None:
         self.save_overlay()
@@ -111,13 +143,97 @@ class OverlayHandler(http.server.BaseHTTPRequestHandler):
         print(f"qemu-package-store: {format_string % args}", flush=True)
 
 
+def git_worktree_files(root: Path) -> list[Path]:
+    try:
+        result = subprocess.run(
+            [
+                "git",
+                "-C",
+                os.fspath(root),
+                "ls-files",
+                "--cached",
+                "--others",
+                "--exclude-standard",
+                "-z",
+            ],
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+    except (OSError, subprocess.CalledProcessError) as error:
+        raise SourceSnapshotError(f"cannot enumerate host worktree: {error}") from error
+    return [Path(os.fsdecode(name)) for name in result.stdout.split(b"\0") if name]
+
+
+def extra_worktree_files(root: Path, relative: Path) -> list[Path]:
+    extra = root / relative
+    if not extra.is_dir():
+        raise SourceSnapshotError(f"host source extra is missing: {relative}")
+
+    if (extra / ".git").exists():
+        return [relative / path for path in git_worktree_files(extra)]
+
+    files: list[Path] = []
+    for directory, names, filenames in os.walk(extra):
+        names[:] = [name for name in names if name != ".git"]
+        base = Path(directory)
+        files.extend((base / name).relative_to(root) for name in filenames)
+    return files
+
+
+def build_source_snapshot(root: Path, extras: tuple[Path, ...]) -> tempfile.SpooledTemporaryFile:
+    relative_files = git_worktree_files(root)
+    for extra in extras:
+        relative_files.extend(extra_worktree_files(root, extra))
+
+    snapshot = tempfile.SpooledTemporaryFile(max_size=32 * 1024 * 1024)
+    try:
+        with tarfile.open(
+            fileobj=snapshot,
+            mode="w:",
+            # Every shared worktree path is short enough for ustar. Avoid PAX
+            # extended headers here: Vinix's small in-guest tar spends minutes
+            # processing them before a desktop build can even start.
+            format=tarfile.USTAR_FORMAT,
+            dereference=False,
+        ) as archive:
+            for relative in sorted(set(relative_files), key=os.fspath):
+                if relative.is_absolute() or ".." in relative.parts:
+                    raise SourceSnapshotError(f"unsafe host source path: {relative}")
+                source = root / relative
+                try:
+                    if not (source.is_file() or source.is_symlink()):
+                        continue
+                    archive.add(source, arcname=relative.as_posix(), recursive=False)
+                except FileNotFoundError:
+                    # A file can disappear while an editor atomically saves it.
+                    # The next build request will observe its replacement.
+                    continue
+        snapshot.seek(0)
+        return snapshot
+    except (OSError, ValueError, tarfile.TarError, SourceSnapshotError) as error:
+        snapshot.close()
+        if isinstance(error, SourceSnapshotError):
+            raise
+        raise SourceSnapshotError(f"cannot archive host worktree: {error}") from error
+
+
 class OverlayServer(http.server.ThreadingHTTPServer):
     daemon_threads = True
 
-    def __init__(self, address: tuple[str, int], destination: Path, maximum: int):
+    def __init__(
+        self,
+        address: tuple[str, int],
+        destination: Path,
+        maximum: int,
+        source_root: Path | None,
+        source_extras: tuple[Path, ...],
+    ):
         super().__init__(address, OverlayHandler)
         self.destination = destination
         self.maximum_overlay = maximum
+        self.source_root = source_root
+        self.source_extras = source_extras
 
 
 def main() -> None:
@@ -126,15 +242,37 @@ def main() -> None:
     parser.add_argument("--port", type=int, default=18081)
     parser.add_argument("--ready-file", type=Path)
     parser.add_argument("--max-bytes", type=int, default=1024 * 1024 * 1024)
+    parser.add_argument("--source-root", type=Path)
+    parser.add_argument("--source-extra", type=Path, action="append", default=[])
     args = parser.parse_args()
 
-    server = OverlayServer(("127.0.0.1", args.port), args.store.resolve(), args.max_bytes)
+    source_root = args.source_root.resolve() if args.source_root else None
+    source_extras: tuple[Path, ...] = tuple(args.source_extra)
+    if source_root is not None:
+        if not source_root.is_dir():
+            parser.error(f"source root is not a directory: {source_root}")
+        for extra in source_extras:
+            if extra.is_absolute() or ".." in extra.parts:
+                parser.error(f"source extra must stay below source root: {extra}")
+            try:
+                (source_root / extra).resolve().relative_to(source_root)
+            except ValueError:
+                parser.error(f"source extra resolves outside source root: {extra}")
+
+    server = OverlayServer(
+        ("127.0.0.1", args.port),
+        args.store.resolve(),
+        args.max_bytes,
+        source_root,
+        source_extras,
+    )
     actual_port = server.server_address[1]
     if args.ready_file:
         args.ready_file.write_text(f"{actual_port}\n", encoding="ascii")
     print(
         f"qemu-package-store: listening on 127.0.0.1:{actual_port}, "
-        f"storing {server.destination}",
+        f"storing {server.destination}"
+        + (f", sharing {source_root}" if source_root is not None else ""),
         flush=True,
     )
     try:

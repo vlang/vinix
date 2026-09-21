@@ -31,6 +31,21 @@ class PackageStoreTests(unittest.TestCase):
         root = Path(self.temporary.name)
         self.store = root / "packages.tar"
         self.ready = root / "ready"
+        self.source = root / "source"
+        (self.source / "desktop").mkdir(parents=True)
+        (self.source / "desktop/main.v").write_text("module main\n", encoding="utf-8")
+        (self.source / "desktop/local.v").write_text("module main\n", encoding="utf-8")
+        (self.source / ".gitignore").write_text("ignored.txt\nthird_party/\n", encoding="utf-8")
+        (self.source / "ignored.txt").write_text("not shared\n", encoding="utf-8")
+        (self.source / "third_party/ui2").mkdir(parents=True)
+        (self.source / "third_party/ui2/v.mod").write_text(
+            'Module { name: "ui2" }\n', encoding="utf-8"
+        )
+        subprocess.run(["git", "init", "-q", str(self.source)], check=True)
+        subprocess.run(
+            ["git", "-C", str(self.source), "add", ".gitignore", "desktop/main.v"],
+            check=True,
+        )
         self.server = subprocess.Popen(
             [
                 "python3",
@@ -43,6 +58,10 @@ class PackageStoreTests(unittest.TestCase):
                 str(self.ready),
                 "--max-bytes",
                 str(1024 * 1024),
+                "--source-root",
+                str(self.source),
+                "--source-extra",
+                "third_party/ui2",
             ],
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
@@ -85,6 +104,29 @@ class PackageStoreTests(unittest.TestCase):
             self.upload(archive({"../escape": b"bad"}))
         self.assertEqual(failure.exception.code, 400)
         self.assertEqual(self.store.read_bytes(), before)
+
+    def source_snapshot(self) -> tarfile.TarFile:
+        with urllib.request.urlopen(
+            f"http://127.0.0.1:{self.port}/vinix-source.tar"
+        ) as response:
+            return tarfile.open(fileobj=io.BytesIO(response.read()), mode="r:")
+
+    def test_source_snapshot_reflects_live_tracked_and_untracked_files(self) -> None:
+        with self.source_snapshot() as snapshot:
+            self.assertEqual(snapshot.extractfile("desktop/main.v").read(), b"module main\n")
+            self.assertIn("desktop/local.v", snapshot.getnames())
+            self.assertIn("third_party/ui2/v.mod", snapshot.getnames())
+            self.assertNotIn("ignored.txt", snapshot.getnames())
+            self.assertFalse(any(".git/" in name for name in snapshot.getnames()))
+
+        (self.source / "desktop/main.v").write_text(
+            "module main\n// changed after server start\n", encoding="utf-8"
+        )
+        with self.source_snapshot() as snapshot:
+            self.assertIn(
+                b"changed after server start",
+                snapshot.extractfile("desktop/main.v").read(),
+            )
 
 
 if __name__ == "__main__":

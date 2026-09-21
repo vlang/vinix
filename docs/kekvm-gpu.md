@@ -47,7 +47,7 @@ If the harness cannot find the backend, prepare KekVM first:
 make -C ~/code/kekvm setup-gpu
 ```
 
-The harness creates a temporary sparse FAT boot disk, opens a Cocoa graphics
-window while the test runs, exits QEMU after receiving the result marker, and
+The harness creates a temporary sparse FAT boot disk, opens a graphics window
+while the test runs, exits QEMU after receiving the result marker, and
 deletes the temporary disk afterward. Override the backend or timeout with
 `VINIX_VIRGL_QEMU` and `VINIX_VIRGL_VM_TIMEOUT` respectively.

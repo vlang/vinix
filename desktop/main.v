@@ -1,5 +1,8 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
 // vinix-desktop — a small desktop environment for Vinix.
 //
 // It maps /dev/fb0, reads the pointer from /dev/pointer and the keyboard from
@@ -135,6 +138,7 @@ fn main() {
 		shortcut_order:    load_shortcut_order(desktop_home)
 		tz_offset_seconds: options.tz_offset
 	}
+	desktop.load_app_icons()
 
 	mut pointer := open_pointer(options.pointer)
 	defer {
@@ -154,13 +158,15 @@ fn main() {
 	// the taskbar do not exist until a persistent user profile has been created.
 	desktop.ensure_registered_user(mut fb, mut pointer, mut keyboard, options.frame_interval,
 		options.idle_interval)
+	if !desktop.running {
+		return
+	}
 
 	// An opening arrangement, kept clear of the shortcut column down the left
-	// edge. The calculator is not opened: it remains available from its shortcut
-	// and the Start menu, and three windows is enough to show what the taskbar is for.
+	// edge. The calculator remains available from its shortcut and the Start
+	// menu; the Welcome page is available from Help but is not shown at launch.
 	mut launch_default_files := false
 	if options.open.len == 0 {
-		desktop.spawn('Welcome', .welcome, 150, 60, 396, 244)
 		desktop.spawn('System', .system, 580, 60, 372, 232)
 		// Files is a separate process. Paint the compositor-owned windows first,
 		// so a delayed application handshake cannot leave the firmware console

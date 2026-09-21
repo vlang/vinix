@@ -1,5 +1,8 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
 // Civil-time helpers shared by the Clock application and the taskbar clock.
 // Vinix has a real time clock only in the sense that Limine hands the kernel a
 // boot epoch, so it comes from clock_gettime(CLOCK_REALTIME) and the calendar

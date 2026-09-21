@@ -1,3 +1,7 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 /* SPDX-License-Identifier: GPL-2.0-or-later
  * Apple M1 PCIe/DART integration. Register sequences based on U-Boot
  * drivers/pci/pcie_apple.c, Copyright (C) 2021 Alyssa Rosenzweig,

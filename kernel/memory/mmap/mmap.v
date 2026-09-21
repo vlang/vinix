@@ -23,18 +23,20 @@ const ms_async = 1
 const ms_invalidate = 2
 const ms_sync = 4
 
-// OpenBSD-style W^X policy. User mappings may be writable or executable, but
-// never both at the same time. RW -> RX transitions remain valid for JITs and
-// dynamic linkers. Keep this in the shared VM layer so every ABI and both
-// architectures inherit the same policy.
+// OpenBSD-style W^X remains the default. Compatibility launchers can opt a
+// process into simultaneous write/execute mappings before exec; fork inherits
+// the decision, while the next exec replaces it from that program's environment.
 fn validate_protection(prot int) ? {
 	if prot & ~prot_mask != 0 {
 		errno.set(errno.einval)
 		return none
 	}
 	if prot & (prot_write | prot_exec) == (prot_write | prot_exec) {
-		errno.set(errno.enotsup)
-		return none
+		current := proc.current_thread()
+		if current == unsafe { nil } || !current.process.allow_wx {
+			errno.set(errno.enotsup)
+			return none
+		}
 	}
 }
 

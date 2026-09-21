@@ -1,0 +1,30 @@
+--- vlib/v/driver/driver.v
++++ vlib/v/driver/driver.v
+@@ -10708,7 +10708,7 @@
+ 	// Large cache-disabled C builds still have to resolve native inputs before
+ 	// Cgen. When the source does not expose native typedefs to semantic collection,
+ 	// overlap that independent work with the checker's declaration pass.
+-	native_inputs_overlap := should_overlap_v3_native_inputs(backend, cache_state.external_inputs_ready, cache_state.manager.enabled, native_inputs_needed, building_v, scope_prealloc_stages)
++	native_inputs_overlap := !current_no_parallel && should_overlap_v3_native_inputs(backend, cache_state.external_inputs_ready, cache_state.manager.enabled, native_inputs_needed, building_v, scope_prealloc_stages)
+	native_inputs_done := chan bool{cap: 1}
+	native_inputs_release := chan bool{cap: 1}
+	native_inputs_args := PrepareV3CheckerNativeInputsArgs{
+@@ -10782,7 +10782,7 @@
+ 	mut trivial_literal_output := false
+ 	if !cgen_cache_hit {
+ 		pre_tc.verbose = prefs.verbose
+-		if scope_prealloc_check && a.missing_imports.len == 0 {
++		if !current_no_parallel && scope_prealloc_check && a.missing_imports.len == 0 {
+ 			pre_tc.enable_scoped_parallel_workers()
+ 		}
+ 		pre_tc.reject_unsupported_generics = is_selfhost
+@@ -11966,8 +11966,8 @@
+			g.set_program_body_only(generic_cache_hit)
+			g.set_cache_program_files(user_files)
+			g.set_incremental_fn_names(incremental_changed_names)
+			g.set_cached_support_declarations(incremental_known_declarations)
+-			g.set_scope_parallel_workers(!generic_cache_hit)
++			g.set_scope_parallel_workers(!generic_cache_hit && !current_no_parallel)
+ 			g.gen_to_file_with_used_test_options(generated_path, a, cgen_used_fns, &pre_tc, cache_no_parallel_cgen || test_files.len > 0, test_files) or {
+ 				eprintln('error writing ${generated_path}: ${err}')
+ 				cleanup_c_build_dir(cc_dir)

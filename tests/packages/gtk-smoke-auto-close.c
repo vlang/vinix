@@ -1,3 +1,7 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 /* Test-only preload: stop GTK examples at deterministic Xorg/UI boundaries. */
 typedef void (*present_function)(void *);
 typedef int (*xmap_window_function)(void *, unsigned long);

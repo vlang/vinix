@@ -35,13 +35,13 @@ pub fn initialise() {}
 
 pub fn create() ?&Pipe {
 	mut p := &Pipe{
-		data: unsafe { malloc(pipe_buf) }
+		data:     unsafe { malloc(pipe_buf) }
 		capacity: pipe_buf
 		// A pipe starts with one read-side and one write-side open-file
 		// description. dup() and fork() share those descriptions, so their
 		// lifetime is already accounted for by file.Handle.refcount.
-		readers: 1
-		writers: 1
+		readers:  1
+		writers:  1
 	}
 	p.stat.mode = stat.ifpipe
 	// An empty pipe is writable. pollout was only ever raised by read(), when
@@ -104,9 +104,15 @@ fn (mut this Pipe) read(_handle voidptr, buf voidptr, _loc u64, _count u64) ?i64
 			errno.set(errno.eagain)
 			return none
 		}
+		// The same event announces both new data and newly freed space. Sample
+		// its generation while the pipe lock still protects the empty state:
+		// otherwise a writer can fill the pipe after the check, and another
+		// waiter can consume that pending notification before this reader has
+		// attached. The generation change still makes await return in that case.
+		generation := event.generation(mut this.event)
 		this.l.release()
 		mut events := [&this.event]
-		event.await(mut events, true) or {
+		event.await_from_generation(mut events, true, 0, generation) or {
 			unsafe { events.free() }
 			errno.set(errno.eintr)
 			return none
@@ -194,9 +200,15 @@ fn (mut this Pipe) write(handle voidptr, buf voidptr, _loc u64, _count u64) ?i64
 				errno.set(errno.eagain)
 				return none
 			}
+			// A reader and a writer wait on the same event. Remember the
+			// generation while the full state is protected so a reader cannot
+			// drain the pipe, signal it, and consume that wake itself before this
+			// writer attaches. await_from_generation observes the state change
+			// even when the event's pending count has already been consumed.
+			generation := event.generation(mut this.event)
 			this.l.release()
 			mut events := [&this.event]
-			event.await(mut events, true) or {
+			event.await_from_generation(mut events, true, 0, generation) or {
 				unsafe { events.free() }
 				this.l.acquire()
 				if written != 0 {

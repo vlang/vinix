@@ -1,5 +1,8 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
 // Quick Launch: a Spotlight-style application search overlay.
 module main
 
@@ -46,7 +49,7 @@ fn (mut d Desktop) toggle_quick_launch() {
 	d.switcher.active = true
 	d.switcher.shown = true
 	d.switcher.index = 0
-	d.hover = ''
+	d.set_hover('')
 	d.dirty = true
 }
 

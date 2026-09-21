@@ -1,5 +1,8 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
 // Standalone host integration test for the compositor/application process
 // boundary. The parent execs this same binary in app mode, exactly as the
 // installed per-app symlinks do on Vinix.
@@ -14,6 +17,18 @@ fn tree_has_id(element ui2.Element, id string) bool {
 	}
 	for child in element.children {
 		if tree_has_id(child, id) {
+			return true
+		}
+	}
+	return false
+}
+
+fn tree_has_native_button(element ui2.Element, id string, checked bool) bool {
+	if element.id == id {
+		return element.kind == .button && element.native_style && element.checked == checked
+	}
+	for child in element.children {
+		if tree_has_native_button(child, id, checked) {
 			return true
 		}
 	}
@@ -69,7 +84,7 @@ fn main() {
 	assert available_apps[3].poll_interval_ms == 100
 	assert available_apps[5].poll_interval_ms == 1000
 	assert available_apps[8].poll_interval_ms == 100
-	assert available_apps[10].poll_interval_ms == 0
+	assert available_apps[9].poll_interval_ms == 0
 	assert remote_app_poll_due(50, false, 0, 1_000)
 	assert !remote_app_poll_due(50, true, 1_000, 1_049)
 	assert remote_app_poll_due(50, true, 1_000, 1_050)
@@ -136,10 +151,12 @@ fn main() {
 	settings_tree := settings.build(ui2.rect(0, 0, 620, 386)) or { panic(err) }
 	assert settings_tree.kind == .screen
 	assert tree_has_id(settings_tree, settings_scale_100_action)
+	assert tree_has_native_button(settings_tree, settings_scale_100_action, false)
+	assert tree_has_native_button(settings_tree, settings_scale_200_action, true)
 	free_tree(settings_tree)
 	close_remote(mut settings)
 
-	mut capture := start_remote_app_at(arguments()[0], available_apps[15], mut desktop) or {
+	mut capture := start_remote_app_at(arguments()[0], available_apps[14], mut desktop) or {
 		panic(err)
 	}
 	capture_tree := capture.build(ui2.rect(0, 0, 560, 396)) or { panic(err) }

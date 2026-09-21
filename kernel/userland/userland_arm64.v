@@ -732,6 +732,7 @@ pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, 
 
 	mut new_pagemap := memory.new_pagemap()
 	mut auxval, ld_path := elf.load(new_pagemap, prog, 0) or { return none }
+	allow_wx := envp.contains('VINIX_ALLOW_WX=1')
 
 	mut entry_point := unsafe { nil }
 
@@ -765,6 +766,7 @@ pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, 
 
 		new_process.name = '${path}[${new_process.pid}]'
 		new_process.executable_path = path.clone()
+		new_process.allow_wx = allow_wx
 
 		stdin_node := fs.get_node(vfs_root, stdin_path, true)?
 		stdin_handle := &file.Handle{
@@ -834,6 +836,7 @@ pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, 
 
 		curr_process.name = '${path}[${curr_process.pid}]'
 		curr_process.executable_path = path.clone()
+		curr_process.allow_wx = allow_wx
 
 		kernel_pagemap.switch_to()
 		t.process = kernel_process

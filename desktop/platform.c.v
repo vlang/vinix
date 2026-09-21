@@ -1,5 +1,8 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
 // V implementation of the desktop's POSIX boundary. Only declarations and
 // constants come from libc headers; there are no custom C function bodies.
 // Import vlib's declarations rather than inventing incompatible duplicates.
@@ -7,8 +10,8 @@ module main
 
 #flag -I @VMODROOT
 
-import os as _
-import time as _
+import os as platform_os
+import time as platform_time
 import term.termios
 
 #include <dirent.h>
@@ -81,6 +84,8 @@ fn C.reboot(command u32) int
 fn C.sync()
 
 fn desktop_open_rw(path string) int {
+	// Keep `os` imported for its canonical POSIX C declarations.
+	_ = platform_os.path_separator
 	return C.open(&char(path.str), C.O_RDWR)
 }
 
@@ -220,6 +225,8 @@ fn desktop_frame_wait_ms(elapsed i64, interval i64) i64 {
 }
 
 fn desktop_sleep_ms(milliseconds i64) {
+	// Keep `time` imported for its canonical POSIX C declarations.
+	_ = platform_time.nanosecond
 	if milliseconds <= 0 {
 		return
 	}
@@ -553,6 +560,7 @@ fn desktop_ignore_broken_pipe() {
 // What the session should do once it has finished tearing itself down.
 enum PowerAction {
 	keep_running
+	reload_desktop
 	restart
 	power_off
 	halt
@@ -581,6 +589,7 @@ fn desktop_power_signal_handler(signal i32) {
 fn desktop_install_power_signals() {
 	unsafe {
 		handler := voidptr(desktop_power_signal_handler)
+		C.signal(C.SIGHUP, handler) // replace this desktop binary
 		C.signal(C.SIGTERM, handler) // reboot
 		C.signal(C.SIGUSR2, handler) // poweroff
 		C.signal(C.SIGUSR1, handler) // halt
@@ -594,6 +603,9 @@ fn desktop_pending_power_action() PowerAction {
 		return .keep_running
 	}
 	desktop_power_signal = 0
+	if signal == C.SIGHUP {
+		return .reload_desktop
+	}
 	if signal == C.SIGUSR1 {
 		return .halt
 	}
@@ -616,7 +628,7 @@ fn desktop_is_system_session() bool {
 fn desktop_power_apply(action PowerAction) {
 	mut command := u32(0)
 	match action {
-		.keep_running { return }
+		.keep_running, .reload_desktop { return }
 		.restart { command = reboot_restart }
 		.power_off { command = reboot_power_off }
 		.halt { command = reboot_halt }
@@ -878,7 +890,7 @@ fn desktop_spawn_native_surface(path string, first_argument string, second_argum
 // Start the native Xvfb/Wine bridge with a private input pipe. The application
 // process retains only the write end; the host receives it as stdin and owns
 // every X11 and translated Wine child for the lifetime of the Vinix window.
-fn desktop_spawn_wine_host(directory string, width int, height int, command string) ?SpawnedWineHost {
+fn desktop_spawn_wine_host(directory string, width int, height int, command string, fill_surface bool) ?SpawnedWineHost {
 	host := '/usr/bin/vinix-wine-host'
 	if C.access(&char(host.str), C.X_OK) != 0 || C.access(&char(command.str), C.X_OK) != 0 {
 		return none
@@ -895,8 +907,12 @@ fn desktop_spawn_wine_host(directory string, width int, height int, command stri
 	// Beside the surface directory rather than inside it: the host makes that
 	// directory itself, after this log has to be open.
 	log_path := '${directory}.log'
-	argv := [&char(host.str), &char(display_name.str), &char(directory.str), &char(geometry.str),
-		&char(command.str), &char(unsafe { nil })]
+	mut argv := [&char(host.str), &char(display_name.str), &char(directory.str), &char(geometry.str),
+		&char(command.str)]
+	if fill_surface {
+		argv << c'--fill'
+	}
+	argv << &char(unsafe { nil })
 	path_entry := 'PATH=${desktop_command_path}'
 	home_entry := 'HOME=${desktop_home}'
 	envp := [&char(path_entry.str), &char(home_entry.str), c'TERM=dumb', c'USER=root', c'LOGNAME=root',

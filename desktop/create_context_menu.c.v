@@ -1,5 +1,8 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
 // Right-click file operations shared by the wallpaper and Files.
 module main
 
@@ -679,7 +682,7 @@ fn (mut d Desktop) close_create_context_menu() {
 	create_context_menu.has_item = false
 	create_context_menu.app_index = -1
 	d.clear_context_item_path()
-	d.hover = ''
+	d.set_hover('')
 	d.dirty = true
 }
 
