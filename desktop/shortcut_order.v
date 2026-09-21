@@ -9,10 +9,11 @@ const shortcut_order_file_limit = 4096
 
 struct ShortcutPress {
 mut:
-	app_index int = -1
-	start_x   int
-	start_y   int
-	dragging  bool
+	app_index  int = -1
+	start_slot int = -1
+	start_x    int
+	start_y    int
+	dragging   bool
 }
 
 fn default_shortcut_order() []int {
@@ -197,9 +198,10 @@ fn (mut d Desktop) begin_shortcut_press(action string, x int, y int) bool {
 	}
 	d.ensure_shortcut_order()
 	d.shortcut_press = ShortcutPress{
-		app_index: app_index
-		start_x:   x
-		start_y:   y
+		app_index:  app_index
+		start_slot: d.shortcut_slot_for_app(app_index)
+		start_x:    x
+		start_y:    y
 	}
 	d.dirty = true
 	return true
@@ -228,6 +230,18 @@ fn (mut d Desktop) update_shortcut_drag(x int, y int) {
 	d.dirty = true
 }
 
+fn (mut d Desktop) restore_shortcut_drag() {
+	from := d.shortcut_slot_for_app(d.shortcut_press.app_index)
+	to := d.shortcut_press.start_slot
+	if from < 0 || to < 0 || to >= d.shortcut_order.len || from == to {
+		return
+	}
+	app_index := d.shortcut_order[from]
+	d.shortcut_order.delete(from)
+	d.shortcut_order.insert(to, app_index)
+	d.dirty = true
+}
+
 fn (mut d Desktop) finish_shortcut_press_in(home string, release_action string, x int, y int) ?int {
 	if d.shortcut_press.app_index < 0 {
 		return none
@@ -238,9 +252,13 @@ fn (mut d Desktop) finish_shortcut_press_in(home string, release_action string, 
 	d.update_shortcut_drag(x, y)
 	app_index := d.shortcut_press.app_index
 	dragged := d.shortcut_press.dragging
+	valid_drop := release_action.starts_with(action_shortcut_prefix)
+	if dragged && !valid_drop {
+		d.restore_shortcut_drag()
+	}
 	d.shortcut_press = ShortcutPress{}
 	if dragged {
-		if !save_shortcut_order(home, d.shortcut_order) {
+		if valid_drop && !save_shortcut_order(home, d.shortcut_order) {
 			eprintln('vinix-desktop: could not save desktop shortcut order')
 		}
 		d.dirty = true

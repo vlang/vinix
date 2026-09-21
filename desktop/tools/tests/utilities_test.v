@@ -1377,3 +1377,33 @@ fn test_shortcut_release_processes_coalesced_final_drag_position() {
 	defer { unsafe { loaded.free() } }
 	assert loaded == desktop.shortcut_order
 }
+
+fn test_shortcut_release_outside_an_icon_restores_preview_without_persisting() {
+	root := os.join_path(os.temp_dir(), 'vinix-shortcut-invalid-drop-test')
+	os.rmdir_all(root) or {}
+	os.mkdir_all(root) or { panic(err) }
+	defer { os.rmdir_all(root) or {} }
+
+	mut desktop := Desktop{
+		shortcut_order: default_shortcut_order()
+		canvas:         new_canvas(1024, 768)
+	}
+	defer {
+		unsafe {
+			desktop.shortcut_order.free()
+			free(desktop.canvas.pixels)
+		}
+	}
+	app_index := desktop.shortcut_order[0]
+	assert desktop.begin_shortcut_press(app_shortcut_actions[app_index], shortcut_left + 2,
+		shortcut_top + 2)
+	desktop.update_shortcut_drag(shortcut_left + 2,
+		shortcut_top + 3 * (shortcut_height + shortcut_gap) + 2)
+	assert desktop.shortcut_slot_for_app(app_index) == 3
+
+	if unexpected := desktop.finish_shortcut_press_in(root, '', 600, 500) {
+		panic('invalid shortcut drop unexpectedly launched app ${unexpected}')
+	}
+	assert desktop.shortcut_slot_for_app(app_index) == 0
+	assert !os.exists(shortcut_order_path(root))
+}
