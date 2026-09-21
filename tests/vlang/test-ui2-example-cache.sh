@@ -54,6 +54,12 @@ second=$(build_one)
 test "$(cat "$work/count")" -eq 1
 printf '%s\n' "$second" | grep -F 'reusing 1 cached ui2 example applications' >/dev/null
 
+# A compiler output in an input tree is not a source change.
+printf '#!/bin/sh\n' > "$ui2/examples/counter/main"
+chmod 755 "$ui2/examples/counter/main"
+build_one >/dev/null
+test "$(cat "$work/count")" -eq 1
+
 # An unrelated example does not invalidate the requested cached application.
 printf '// unrelated change\n' >> "$ui2/examples/accordion/main.v"
 build_one >/dev/null

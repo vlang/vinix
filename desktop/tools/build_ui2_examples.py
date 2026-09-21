@@ -8,21 +8,26 @@ avoids renaming their `module main` models or silently dropping platform demos.
 import argparse
 import concurrent.futures
 import fnmatch
-import hashlib
 import json
 import os
 from pathlib import Path
-import re
 import shutil
-import stat
 import subprocess
 import sys
+
+from build_cache import add_hash_field, hash_path, ignored_v_source_entry
+from build_cache import ignored_vlib_entry, module_subdirs, new_digest
+from build_cache import resolved_tool
 
 
 CACHE_VERSION = 1
 CACHE_STATE_NAME = ".vinix-ui2-build-state.json"
 EXCLUDED_MODULE_SUBDIRS = {"appkit"}
 EXAMPLE_IGNORE_PATTERNS = ("*_test.v", "*.o", "*.exe", "build_examples")
+EXAMPLE_INPUT_SUFFIXES = (
+    ".bmp", ".c", ".h", ".jpeg", ".jpg", ".json", ".png", ".qml",
+    ".svg", ".ttf", ".txt", ".v", ".vml",
+)
 
 
 def inventory(source: Path):
@@ -46,94 +51,17 @@ def run(command, quiet=False):
         raise subprocess.CalledProcessError(result.returncode, command)
 
 
-def add_hash_field(digest, value):
-    if isinstance(value, str):
-        value = value.encode("utf-8", "surrogateescape")
-    digest.update(len(value).to_bytes(8, "big"))
-    digest.update(value)
-
-
 def ignored_example_entry(path: Path, example_name: str) -> bool:
     patterns = EXAMPLE_IGNORE_PATTERNS + (example_name,)
-    return any(fnmatch.fnmatch(path.name, pattern) for pattern in patterns)
-
-
-def hash_path(digest, path: Path, label: str, metadata_only=False,
-              ignore=None, active_directories=None):
-    """Hash a build input without making its absolute location significant."""
-    if active_directories is None:
-        active_directories = set()
-    add_hash_field(digest, label)
-    try:
-        info = path.lstat()
-    except FileNotFoundError:
-        add_hash_field(digest, "missing")
-        return
-
-    add_hash_field(digest, oct(stat.S_IMODE(info.st_mode)))
-    if metadata_only:
-        for value in (info.st_dev, info.st_ino, info.st_size,
-                      info.st_mtime_ns, info.st_ctime_ns):
-            add_hash_field(digest, str(value))
-
-    if stat.S_ISLNK(info.st_mode):
-        add_hash_field(digest, "symlink")
-        add_hash_field(digest, os.readlink(path))
-        resolved = path.resolve()
-        if resolved != path and resolved.exists():
-            hash_path(digest, resolved, label + "/target", metadata_only,
-                      ignore, active_directories)
-        return
-    if stat.S_ISREG(info.st_mode):
-        add_hash_field(digest, "file")
-        add_hash_field(digest, str(info.st_size))
-        if not metadata_only:
-            with path.open("rb") as handle:
-                while True:
-                    chunk = handle.read(1024 * 1024)
-                    if not chunk:
-                        break
-                    digest.update(chunk)
-        return
-    if stat.S_ISDIR(info.st_mode):
-        add_hash_field(digest, "directory")
-        identity = (info.st_dev, info.st_ino)
-        if identity in active_directories:
-            add_hash_field(digest, "symlink-cycle")
-            return
-        active_directories.add(identity)
-        for child in sorted(path.iterdir(), key=lambda item: os.fsencode(item.name)):
-            if ignore is not None and ignore(child):
-                continue
-            hash_path(digest, child, label + "/" + child.name,
-                      metadata_only, ignore, active_directories)
-        active_directories.remove(identity)
-        return
-    add_hash_field(digest, "special")
-    add_hash_field(digest, str(stat.S_IFMT(info.st_mode)))
-
-
-def module_subdirs(ui2_source: Path):
-    text = (ui2_source / "v.mod").read_text()
-    match = re.search(r"\bsubdirs\s*:\s*\[([^]]*)\]", text, re.DOTALL)
-    if not match:
-        return []
-    return re.findall(r"['\"]([^'\"]+)['\"]", match.group(1))
-
-
-def resolved_tool(path: Path) -> Path:
-    if not path.is_absolute() and path.parent == Path("."):
-        found = shutil.which(str(path))
-        if found:
-            return Path(found).resolve()
-    return path.resolve()
+    if any(fnmatch.fnmatch(path.name, pattern) for pattern in patterns):
+        return True
+    return path.is_file() and not path.name.endswith(EXAMPLE_INPUT_SUFFIXES)
 
 
 def shared_build_key(args):
     """Fingerprint everything shared by the independently built examples."""
-    digest = hashlib.sha256()
+    digest = new_digest("vinix-ui2-example-cache", CACHE_VERSION)
     v_compiler = resolved_tool(args.v)
-    add_hash_field(digest, "vinix-ui2-example-cache-v%d" % CACHE_VERSION)
     for name, value in (
             ("host", str(args.host)),
             ("arch", args.arch or ""),
@@ -143,6 +71,7 @@ def shared_build_key(args):
 
     for label, path in (
             ("builder", Path(__file__)),
+            ("cache-helper", Path(__file__).with_name("build_cache.py")),
             ("manifest", args.repo / "desktop/ui2_examples.txt"),
             ("stager", args.repo / "desktop/tools/stage_ui2.py"),
             ("backend", args.repo / "desktop/tools/ui2_vinix_backend.v"),
@@ -151,12 +80,14 @@ def shared_build_key(args):
         hash_path(digest, path, label)
     vlib = v_compiler.parent / "vlib"
     if vlib.is_dir():
-        hash_path(digest, vlib, "vlib", metadata_only=True)
+        hash_path(digest, vlib, "vlib", metadata_only=True,
+                  ignore=ignored_vlib_entry)
 
     ui2_dirs = [name for name in module_subdirs(args.ui2_source)
                 if name not in EXCLUDED_MODULE_SUBDIRS]
     for name in ui2_dirs:
-        hash_path(digest, args.ui2_source / name, "ui2/" + name)
+        hash_path(digest, args.ui2_source / name, "ui2/" + name,
+                  ignore=ignored_v_source_entry)
     hash_path(digest, args.ui2_source / "assets", "ui2/assets")
 
     if not args.host:
@@ -187,7 +118,7 @@ def shared_build_key(args):
 
 
 def example_build_key(args, shared_key: str, name: str):
-    digest = hashlib.sha256()
+    digest = new_digest("vinix-ui2-example", CACHE_VERSION)
     add_hash_field(digest, shared_key)
     source = args.ui2_source / "examples" / name
     hash_path(digest, source, "example/" + name,

@@ -167,6 +167,13 @@ executables together with VOffice's translations and ribbon PNGs. The
 compositor decodes those immutable installed PNG assets itself, so VOffice does
 not need a second window system or image service at runtime.
 
+Both external application builders keep content-keyed binaries below `build/`.
+An unchanged desktop build reuses every ui2 example, Calc and Writer; changing
+one application's source rebuilds only that application, while shared ui2,
+compiler or sysroot changes invalidate all affected binaries. Outputs are
+replaced only after a successful compile and link, so an interrupted rebuild
+does not destroy the last complete cache entry.
+
 The Calculator model comes from ui2's own example and is not copied into this
 repository. `tools/stage_app.py` takes it straight from the ui2 checkout at
 build time, removes the platform `fn main()` and its now-unused embedded source
