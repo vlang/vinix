@@ -2,6 +2,7 @@ module mmap
 
 import aarch64.cpu
 import aarch64.cpu.local as cpulocal
+import aarch64.timer
 import proc
 
 pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
@@ -54,6 +55,7 @@ pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
 	trace_gpu := process.executable_path == '/usr/bin/vinix-desktop-gpu'
 	mut trace_sequence := u64(0)
 	mut trace_this_fault := false
+	mut trace_timeslice := u64(0)
 	if trace_gpu {
 		pid := u64(process.pid)
 		if gpu_desktop_fault_pid != pid {
@@ -64,8 +66,13 @@ pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
 		gpu_desktop_fault_count++
 		trace_this_fault = trace_sequence < 32
 		if trace_this_fault {
+			trace_timeslice = if current_thread.timeslice != 0 { current_thread.timeslice } else { u64(1) }
+			// Stop before the first slow framebuffer write. Otherwise the slice
+			// expires during the trace and is delivered immediately at vector exit,
+			// before the faulting instruction gets a chance to retry.
+			timer.stop()
 			println('exec[gpu]: page fault #${trace_sequence} begin addr=0x${addr:x} pc=0x${gpr_state.pc:x} esr=0x${esr:x}')
-			println('exec[gpu]: page fault #${trace_sequence} retaining exception interrupt mask during traced resolution')
+			println('exec[gpu]: page fault #${trace_sequence} timer paused and exception interrupt mask retained')
 		}
 	}
 
@@ -75,12 +82,15 @@ pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
 	// consume the freshly armed 5 ms slice. Enabling FIQs here then dispatches
 	// the expired scheduler timer before the first page-fault checkpoint and
 	// makes the diagnostic itself look like a fault-handler hang on the M1.
-	// Keep the exception entry mask for traced faults. The pending timer is
-	// delivered as soon as the vector restores EL0, after the PTE and cache
-	// maintenance are complete; ordinary untraced faults remain preemptible.
+	// Keep the exception entry mask and timer stopped for traced faults, then
+	// arm a fresh slice as the final operation on return. Ordinary untraced
+	// faults remain preemptible and retain their original timer deadline.
 	prev := cpu.interrupt_toggle(!trace_this_fault)
 	defer {
 		cpu.interrupt_toggle(prev)
+		if trace_this_fault {
+			timer.oneshot(trace_timeslice)
+		}
 	}
 
 	if trace_this_fault {
@@ -135,6 +145,6 @@ pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
 		return none
 	}
 	if trace_this_fault {
-		println('exec[gpu]: page fault #${trace_sequence} resolved')
+		println('exec[gpu]: page fault #${trace_sequence} resolved; rearming ${trace_timeslice} us timeslice on fault return')
 	}
 }
