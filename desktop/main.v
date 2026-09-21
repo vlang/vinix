@@ -124,12 +124,17 @@ fn desktop_publish_session_ready() {
 fn main() {
 	gpu_present_startup_stage(c'entered main')
 	if app_options := app_process_options(arguments()[1..]) {
+		gpu_present_startup_stage(c'dispatching application subprocess')
 		run_app_process(app_options)
 		return
 	}
+	gpu_present_startup_stage(c'desktop process selected')
 	desktop_ignore_broken_pipe()
+	gpu_present_startup_stage(c'SIGPIPE ignored')
 	desktop_install_power_signals()
+	gpu_present_startup_stage(c'power signal handlers installed')
 	options := parse_options(arguments()[1..])
+	gpu_present_startup_stage(c'command line parsed')
 
 	gpu_present_startup_stage(c'opening framebuffer')
 	mut fb := open_framebuffer(options.framebuffer) or {
@@ -144,20 +149,31 @@ fn main() {
 		fb.present_starting_screen()
 	}
 
+	gpu_present_startup_stage(c'loading preferences')
 	mut preferences := desktop_load_preferences(desktop_home)
+	gpu_present_startup_stage(c'preferences loaded')
 	scale := preferences.configure_scale(fb.width, fb.height)
-	gpu_present_startup_stage(c'allocating canvas and fonts')
+	gpu_present_startup_stage(c'display scale configured')
+	gpu_present_startup_stage(c'allocating canvas')
+	canvas := new_scaled_canvas(desktop_scaled_extent(fb.width, scale),
+		desktop_scaled_extent(fb.height, scale), fb.width, fb.height, scale)
+	gpu_present_startup_stage(c'canvas allocated')
+	gpu_present_startup_stage(c'loading fonts')
+	fonts := load_fonts()
+	gpu_present_startup_stage(c'fonts loaded')
 	mut desktop := Desktop{
 		settings:          preferences.settings
-		canvas:            new_scaled_canvas(desktop_scaled_extent(fb.width, scale), desktop_scaled_extent(fb.height, scale), fb.width, fb.height, scale)
-		fonts:             load_fonts()
+		canvas:            canvas
+		fonts:             fonts
 		shortcut_order:    load_shortcut_order(desktop_home)
 		tz_offset_seconds: options.tz_offset
 	}
-	gpu_present_startup_stage(c'canvas and fonts ready')
+	gpu_present_startup_stage(c'desktop state allocated')
+	gpu_present_startup_stage(c'loading application icons')
 	desktop.load_app_icons()
 	gpu_present_startup_stage(c'application icons loaded')
 
+	gpu_present_startup_stage(c'opening pointer device')
 	mut pointer := open_pointer(options.pointer)
 	defer {
 		pointer.close()
@@ -166,15 +182,18 @@ fn main() {
 	desktop.pointer_x = desktop.canvas.width / 2
 	desktop.pointer_y = desktop.canvas.height / 2
 	mut titlebar_click := TitlebarClick{}
+	gpu_present_startup_stage(c'pointer device ready')
 
+	gpu_present_startup_stage(c'opening keyboard device')
 	mut keyboard := open_keyboard()
 	defer {
 		keyboard.close()
 	}
-	gpu_present_startup_stage(c'input devices opened')
+	gpu_present_startup_stage(c'keyboard device ready')
 
 	// First launch is an exclusive setup mode: ordinary windows, shortcuts and
 	// the taskbar do not exist until a persistent user profile has been created.
+	gpu_present_startup_stage(c'checking user profile')
 	desktop.ensure_registered_user(mut fb, mut pointer, mut keyboard, options.frame_interval,
 		options.idle_interval)
 	gpu_present_startup_stage(c'user profile ready')
@@ -188,7 +207,9 @@ fn main() {
 	mut launch_default_files := false
 	mut launch_development_terminal := false
 	if options.open.len == 0 {
+		gpu_present_startup_stage(c'creating initial System window')
 		desktop.spawn('System', .system, 580, 60, 372, 232)
+		gpu_present_startup_stage(c'initial System window created')
 		// Files is a separate process. Paint the compositor-owned windows first,
 		// so a delayed application handshake cannot leave the firmware console
 		// looking like the desktop failed to start.
@@ -203,6 +224,9 @@ fn main() {
 
 	mut stats := FrameStats{}
 	for desktop.running {
+		if desktop.frames == 0 {
+			gpu_present_startup_stage(c'first compositor iteration')
+		}
 		// `reboot`, `poweroff` and `halt` signal PID 1 rather than powering the
 		// machine down themselves. The supervising init forwards those signals
 		// to this system-session compositor for an orderly teardown.
@@ -262,6 +286,9 @@ fn main() {
 		other_dirty := desktop.dirty
 		desktop.dirty = background_dirty || pointer_dirty || keyboard_dirty || capture_dirty
 			|| other_dirty
+		if desktop.frames == 0 {
+			gpu_present_startup_stage(c'first input and application poll complete')
+		}
 		after_input := monotonic_millis()
 
 		// Nothing has changed: the framebuffer already holds the right
@@ -278,8 +305,14 @@ fn main() {
 		}
 		desktop.dirty = false
 
+		if desktop.frames == 0 {
+			gpu_present_startup_stage(c'building first element tree')
+		}
 		desktop.frames++
 		tree := desktop.build_tree()
+		if desktop.frames == 1 {
+			gpu_present_startup_stage(c'first element tree built')
+		}
 		after_build := monotonic_millis()
 
 		partial_drag_frame := desktop.drag.kind == .move && desktop.drag_damage.valid
@@ -289,13 +322,22 @@ fn main() {
 		} else {
 			desktop.render(tree)
 		}
+		if desktop.frames == 1 {
+			gpu_present_startup_stage(c'first canvas render complete')
+		}
 		desktop.render_create_context_menu()
 		after_render := monotonic_millis()
 
+		if desktop.frames == 1 {
+			gpu_present_startup_stage(c'presenting first canvas')
+		}
 		if partial_drag_frame {
 			fb.present_damage(&desktop.canvas, desktop.drag_damage)
 		} else {
 			fb.present(&desktop.canvas, desktop_current_scale())
+		}
+		if desktop.frames == 1 {
+			gpu_present_startup_stage(c'first canvas presented')
 		}
 		desktop.capture_presented(&desktop.canvas)
 		after_present := monotonic_millis()

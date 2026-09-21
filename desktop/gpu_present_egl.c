@@ -138,6 +138,7 @@ void *vinix_gpu_present_create(int width, int height)
     const char *renderer;
     int render_fd;
 
+    vinix_gpu_present_startup_stage("presenter creation entered");
     if (width <= 0 || height <= 0)
         return NULL;
     {
@@ -145,14 +146,17 @@ void *vinix_gpu_present_create(int width, int height)
         if (force_software && !strcmp(force_software, "1"))
             return NULL;
     }
+    vinix_gpu_present_startup_stage("presenter arguments validated");
 
     /* Do not let a software EGL implementation turn the opt-in GPU binary
      * into a slower readback path on QEMU or on a failed AGX probe. */
+    vinix_gpu_present_startup_stage("opening render node");
     render_fd = open("/dev/dri/renderD128", O_RDWR | O_CLOEXEC);
     if (render_fd < 0)
         return NULL;
     close(render_fd);
     vinix_gpu_present_startup_stage("render node opened");
+    vinix_gpu_present_startup_stage("allocating presenter state");
     presenter = calloc(1, sizeof(*presenter));
     if (!presenter)
         return NULL;
@@ -161,7 +165,9 @@ void *vinix_gpu_present_create(int width, int height)
     presenter->context = EGL_NO_CONTEXT;
     presenter->width = width;
     presenter->height = height;
+    vinix_gpu_present_startup_stage("presenter state allocated");
 
+    vinix_gpu_present_startup_stage("resolving EGL platform display entrypoint");
     get_platform_display = (PFNEGLGETPLATFORMDISPLAYEXTPROC)
         eglGetProcAddress("eglGetPlatformDisplayEXT");
     vinix_gpu_present_startup_stage("acquiring surfaceless EGL display");
@@ -171,49 +177,65 @@ void *vinix_gpu_present_create(int width, int height)
         : eglGetDisplay(EGL_DEFAULT_DISPLAY);
     if (presenter->display == EGL_NO_DISPLAY)
         goto fail;
+    vinix_gpu_present_startup_stage("surfaceless EGL display acquired");
     vinix_gpu_present_startup_stage("initializing EGL");
     if (!eglInitialize(presenter->display, NULL, NULL))
         goto fail;
+    vinix_gpu_present_startup_stage("EGL initialized");
     vinix_gpu_present_startup_stage("binding OpenGL ES");
     if (!eglBindAPI(EGL_OPENGL_ES_API))
         goto fail;
+    vinix_gpu_present_startup_stage("OpenGL ES bound");
     vinix_gpu_present_startup_stage("choosing EGL config");
     if (!eglChooseConfig(presenter->display, config_attributes, &config, 1,
                          &config_count) || config_count != 1)
         goto fail;
+    vinix_gpu_present_startup_stage("EGL config chosen");
 
     vinix_gpu_present_startup_stage("creating pbuffer surface");
     presenter->surface = eglCreatePbufferSurface(presenter->display, config,
                                                   surface_attributes);
+    if (presenter->surface == EGL_NO_SURFACE)
+        goto fail;
+    vinix_gpu_present_startup_stage("pbuffer surface created");
     vinix_gpu_present_startup_stage("creating EGL context");
     presenter->context = eglCreateContext(presenter->display, config,
                                            EGL_NO_CONTEXT,
                                            context_attributes);
-    if (presenter->surface == EGL_NO_SURFACE ||
-        presenter->context == EGL_NO_CONTEXT)
+    if (presenter->context == EGL_NO_CONTEXT)
         goto fail;
+    vinix_gpu_present_startup_stage("EGL context created");
     vinix_gpu_present_startup_stage("making EGL context current");
     if (!eglMakeCurrent(presenter->display, presenter->surface,
                         presenter->surface, presenter->context))
         goto fail;
+    vinix_gpu_present_startup_stage("EGL context current");
 
     vinix_gpu_present_startup_stage("querying renderer");
     renderer = (const char *)glGetString(GL_RENDERER);
     if (!renderer || strstr(renderer, "llvmpipe") ||
         strstr(renderer, "softpipe") || strstr(renderer, "swrast"))
         goto fail;
+    vinix_gpu_present_startup_stage("hardware renderer accepted");
 
-    vinix_gpu_present_startup_stage("compiling presenter shaders");
+    vinix_gpu_present_startup_stage("compiling vertex shader");
     vertex_shader = compile_shader(GL_VERTEX_SHADER, vertex_shader_source);
+    if (!vertex_shader)
+        goto fail;
+    vinix_gpu_present_startup_stage("vertex shader compiled");
+    vinix_gpu_present_startup_stage("compiling fragment shader");
     fragment_shader = compile_shader(GL_FRAGMENT_SHADER,
                                      fragment_shader_source);
-    if (!vertex_shader || !fragment_shader)
+    if (!fragment_shader)
         goto fail;
+    vinix_gpu_present_startup_stage("fragment shader compiled");
+    vinix_gpu_present_startup_stage("creating shader program");
     presenter->program = glCreateProgram();
     if (!presenter->program)
         goto fail;
     glAttachShader(presenter->program, vertex_shader);
     glAttachShader(presenter->program, fragment_shader);
+    vinix_gpu_present_startup_stage("linking shader program");
     glLinkProgram(presenter->program);
     glGetProgramiv(presenter->program, GL_LINK_STATUS, &linked);
     glDeleteShader(vertex_shader);
@@ -221,12 +243,16 @@ void *vinix_gpu_present_create(int width, int height)
     vertex_shader = fragment_shader = 0;
     if (linked != GL_TRUE)
         goto fail;
+    vinix_gpu_present_startup_stage("shader program linked");
 
+    vinix_gpu_present_startup_stage("querying shader attributes");
     presenter->position = glGetAttribLocation(presenter->program, "position");
     presenter->texcoord = glGetAttribLocation(presenter->program, "texcoord");
     if (presenter->position < 0 || presenter->texcoord < 0)
         goto fail;
+    vinix_gpu_present_startup_stage("shader attributes ready");
 
+    vinix_gpu_present_startup_stage("creating frame texture");
     glGenTextures(1, &presenter->texture);
     if (!presenter->texture)
         goto fail;
@@ -237,7 +263,9 @@ void *vinix_gpu_present_create(int width, int height)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glUseProgram(presenter->program);
     glUniform1i(glGetUniformLocation(presenter->program, "frame"), 0);
+    vinix_gpu_present_startup_stage("frame texture configured");
     fprintf(stderr, "vinix-desktop: GPU presentation enabled on %s\n", renderer);
+    fflush(stderr);
     return presenter;
 
 fail:
@@ -280,12 +308,18 @@ int vinix_gpu_present_frame(void *opaque,
     presenter->first_frame_started = 1;
     if (trace_first_frame)
         vinix_gpu_present_startup_stage("first frame begin");
+    if (trace_first_frame)
+        vinix_gpu_present_startup_stage("making first-frame context current");
     if (!eglMakeCurrent(presenter->display, presenter->surface,
                         presenter->surface, presenter->context))
         return 0;
+    if (trace_first_frame)
+        vinix_gpu_present_startup_stage("first-frame context current");
 
     if (destination_stride != destination_width) {
         if (!presenter->readback) {
+            if (trace_first_frame)
+                vinix_gpu_present_startup_stage("allocating packed readback buffer");
             presenter->readback = malloc((size_t)destination_width *
                                          destination_height * sizeof(uint32_t));
             if (!presenter->readback)
@@ -294,6 +328,8 @@ int vinix_gpu_present_frame(void *opaque,
         output = presenter->readback;
     }
 
+    if (trace_first_frame)
+        vinix_gpu_present_startup_stage("configuring first-frame viewport");
     glViewport(0, 0, destination_width, destination_height);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, presenter->texture);
@@ -302,6 +338,8 @@ int vinix_gpu_present_frame(void *opaque,
         vinix_gpu_present_startup_stage("uploading first frame");
     if (presenter->texture_width != source_width ||
         presenter->texture_height != source_height) {
+        if (trace_first_frame)
+            vinix_gpu_present_startup_stage("allocating and uploading first texture");
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, source_width, source_height, 0,
                      GL_RGBA, GL_UNSIGNED_BYTE, source);
         presenter->texture_width = source_width;
@@ -310,6 +348,10 @@ int vinix_gpu_present_frame(void *opaque,
         glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, source_width, source_height,
                         GL_RGBA, GL_UNSIGNED_BYTE, source);
     }
+    if (trace_first_frame)
+        vinix_gpu_present_startup_stage("first texture upload returned");
+    if (trace_first_frame)
+        vinix_gpu_present_startup_stage("configuring first-frame shader inputs");
     glUseProgram(presenter->program);
     glVertexAttribPointer((GLuint)presenter->position, 2, GL_FLOAT, GL_FALSE,
                           4 * sizeof(GLfloat), vertices);
@@ -320,23 +362,31 @@ int vinix_gpu_present_frame(void *opaque,
     if (trace_first_frame)
         vinix_gpu_present_startup_stage("submitting first draw");
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    if (trace_first_frame)
+        vinix_gpu_present_startup_stage("first draw returned");
     glPixelStorei(GL_PACK_ALIGNMENT, 4);
     if (trace_first_frame)
         vinix_gpu_present_startup_stage("reading back first frame");
     glReadPixels(0, 0, destination_width, destination_height, GL_RGBA,
                  GL_UNSIGNED_BYTE, output);
     if (trace_first_frame)
-        vinix_gpu_present_startup_stage("first frame complete");
+        vinix_gpu_present_startup_stage("first readback returned");
+    if (trace_first_frame)
+        vinix_gpu_present_startup_stage("checking first-frame GL status");
     if (glGetError() != GL_NO_ERROR)
         return 0;
 
     if (output != destination) {
+        if (trace_first_frame)
+            vinix_gpu_present_startup_stage("copying packed readback to framebuffer");
         for (row = 0; row < destination_height; ++row) {
             memcpy(destination + (size_t)row * destination_stride,
                    output + (size_t)row * destination_width,
                    (size_t)destination_width * sizeof(uint32_t));
         }
     }
+    if (trace_first_frame)
+        vinix_gpu_present_startup_stage("first frame complete");
     return 1;
 }
 

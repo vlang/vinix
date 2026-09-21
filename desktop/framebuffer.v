@@ -93,22 +93,28 @@ mut:
 }
 
 fn open_framebuffer(path string) !Framebuffer {
+	gpu_present_startup_stage(c'opening framebuffer device node')
 	fd := desktop_open_rw(path)
 	if fd < 0 {
 		return error('cannot open ${path}')
 	}
+	gpu_present_startup_stage(c'framebuffer device node opened')
 
 	mut var := FBVarScreenInfo{}
+	gpu_present_startup_stage(c'querying framebuffer variable geometry')
 	if desktop_ioctl(fd, fbioget_vscreeninfo, &var) < 0 {
 		desktop_close(fd)
 		return error('FBIOGET_VSCREENINFO failed on ${path}')
 	}
+	gpu_present_startup_stage(c'framebuffer variable geometry received')
 
 	mut fix := FBFixScreenInfo{}
+	gpu_present_startup_stage(c'querying framebuffer fixed geometry')
 	if desktop_ioctl(fd, fbioget_fscreeninfo, &fix) < 0 {
 		desktop_close(fd)
 		return error('FBIOGET_FSCREENINFO failed on ${path}')
 	}
+	gpu_present_startup_stage(c'framebuffer fixed geometry received')
 
 	if var.bits_per_pixel != 32 {
 		desktop_close(fd)
@@ -121,11 +127,13 @@ fn open_framebuffer(path string) !Framebuffer {
 	stride := if fix.line_length > 0 { int(fix.line_length) / 4 } else { width }
 	size := u64(stride) * u64(height) * 4
 
+	gpu_present_startup_stage(c'mapping framebuffer memory')
 	mapping := desktop_mmap_shared(fd, size)
 	if mapping == unsafe { nil } {
 		desktop_close(fd)
 		return error('cannot map ${path}')
 	}
+	gpu_present_startup_stage(c'framebuffer memory mapped')
 
 	return Framebuffer{
 		fd:      fd

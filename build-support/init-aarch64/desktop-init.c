@@ -218,21 +218,33 @@ static void wait_for_child(i64 child, int *status) {
 }
 
 static i64 spawn_program(char **arguments, char **fallback, int own_group,
-					 int *status, char **environment) {
+					 int *status, char **environment, int trace_launch) {
 	i64 child = syscall5(220 /* clone */, 17 /* SIGCHLD */, 0, 0, 0, 0);
 	if (child == 0) {
+		if (trace_launch)
+			print("init: GPU desktop child cloned\n");
 		if (own_group)
 			syscall2(154 /* setpgid */, 0, 0);
+		if (trace_launch)
+			print("init: GPU desktop child process group ready\n");
+		if (trace_launch)
+			print("init: GPU desktop child entering execve\n");
 		syscall3(221 /* execve */, (u64)arguments[0], (u64)arguments,
 		         (u64)environment);
+		if (trace_launch)
+			print("init: GPU desktop execve returned; trying software fallback\n");
 		if (fallback)
 			syscall3(221 /* execve */, (u64)fallback[0], (u64)fallback,
 			         (u64)environment);
+		if (trace_launch)
+			print("init: GPU and software desktop execve both failed\n");
 		syscall1(93 /* exit */, 127);
 	}
 	if (child > 0) {
 		if (own_group)
 			syscall2(154 /* setpgid */, (u64)child, (u64)child);
+		if (trace_launch)
+			print("init: GPU desktop parent waiting for child\n");
 		wait_for_child(child, status);
 	}
 	return child;
@@ -384,7 +396,7 @@ void _start(void) {
 		"/usr/bin/wifi-ctl", "load", "/usr/share/vinix/wifi", (char *)0,
 	};
 	print("\nVinix: loading the selected Wi-Fi firmware\n");
-	child = spawn_program(wifi, (char **)0, 0, &status, environment);
+	child = spawn_program(wifi, (char **)0, 0, &status, environment, 0);
 	if (requested_power_signal)
 		apply_power_request();
 	if (child < 0 || status != 0)
@@ -393,7 +405,7 @@ void _start(void) {
 
 	if (hyprland_requested() && executable_available(hyprland[0])) {
 		print("\nVinix: starting Hyprland\n");
-		child = spawn_program(hyprland, (char **)0, 1, &status, environment);
+		child = spawn_program(hyprland, (char **)0, 1, &status, environment, 0);
 		if (requested_power_signal)
 			apply_power_request();
 		print("init: Hyprland exited; starting the native recovery desktop\n");
@@ -412,7 +424,8 @@ void _start(void) {
 			print("\nVinix: starting the desktop\n");
 		}
 		status = 0;
-		child = spawn_program(selected, fallback, 1, &status, environment);
+		child = spawn_program(selected, fallback, 1, &status, environment,
+		                      selected == gpu_desktop);
 		if (requested_power_signal)
 			apply_power_request();
 		if (requested_desktop_reload) {
@@ -430,7 +443,7 @@ void _start(void) {
 		if (child < 0 || status == (127 << 8)) {
 			print("init: could not start vinix-desktop; opening a recovery shell\n");
 			status = 0;
-			child = spawn_program(shell, (char **)0, 0, &status, environment);
+			child = spawn_program(shell, (char **)0, 0, &status, environment, 0);
 			if (requested_power_signal)
 				apply_power_request();
 			if (child < 0)

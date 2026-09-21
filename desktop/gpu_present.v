@@ -34,15 +34,19 @@ fn (mut presenter GpuPresenter) present(source &Canvas, destination &u32, width 
 	}
 	if !presenter.attempted {
 		presenter.attempted = true
+		gpu_present_startup_stage(c'calling presenter creation')
 		presenter.handle = C.vinix_gpu_present_create(width, height)
 		if presenter.handle == unsafe { nil } {
+			gpu_present_startup_stage(c'presenter creation failed; using software copy')
 			presenter.failed = true
 			return false
 		}
+		gpu_present_startup_stage(c'presenter creation returned successfully')
 	}
 	if C.vinix_gpu_present_frame(presenter.handle, source.pixels, source.physical_width, source.physical_height, source.stride, destination, width, height, stride) != 0 {
 		return true
 	}
+	gpu_present_startup_stage(c'GPU frame failed; disabling GPU presentation')
 	C.vinix_gpu_present_destroy(presenter.handle)
 	presenter.handle = unsafe { nil }
 	presenter.failed = true
