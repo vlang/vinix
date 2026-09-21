@@ -220,15 +220,14 @@ static void wait_for_child(i64 child, int *status) {
 static i64 spawn_program(char **arguments, char **fallback, int own_group,
 					 int *status, char **environment, int trace_launch) {
 	i64 child = syscall5(220 /* clone */, 17 /* SIGCHLD */, 0, 0, 0, 0);
+	/* Keep the post-clone trace on the child only. Concurrent parent/child
+	 * writes to the framebuffer console make the diagnostic itself capable of
+	 * stalling before exec, which hides the boundary it is meant to expose. */
 	if (child == 0) {
-		if (trace_launch)
-			print("init: GPU desktop child cloned\n");
 		if (own_group)
 			syscall2(154 /* setpgid */, 0, 0);
 		if (trace_launch)
-			print("init: GPU desktop child process group ready\n");
-		if (trace_launch)
-			print("init: GPU desktop child entering execve\n");
+			print("init: GPU desktop child process group ready; entering execve\n");
 		syscall3(221 /* execve */, (u64)arguments[0], (u64)arguments,
 		         (u64)environment);
 		if (trace_launch)
@@ -243,8 +242,6 @@ static i64 spawn_program(char **arguments, char **fallback, int own_group,
 	if (child > 0) {
 		if (own_group)
 			syscall2(154 /* setpgid */, (u64)child, (u64)child);
-		if (trace_launch)
-			print("init: GPU desktop parent waiting for child\n");
 		wait_for_child(child, status);
 	}
 	return child;
