@@ -6,6 +6,7 @@ module devicetree
 // Follows the DTSpec (devicetree.org) binary format
 import lib as _
 import memory as _
+import fdtstrings
 
 // FDT header magic
 const fdt_magic = u32(0xd00dfeed)
@@ -162,7 +163,7 @@ fn parse_node(mut offset &u32, parent &DTNode) &DTNode {
 				}
 
 				mut node := &DTNode{
-					name: name
+					name:   name
 					parent: unsafe { parent }
 				}
 
@@ -203,7 +204,7 @@ fn parse_node(mut offset &u32, parent &DTNode) &DTNode {
 						prop := DTProperty{
 							name: get_string(name_off)
 							data: prop_data
-							len: prop_len
+							len:  prop_len
 						}
 						node.properties << prop
 					} else if next == fdt_nop {
@@ -389,26 +390,11 @@ pub fn get_u32_array(node &DTNode, name string) ?[]u32 {
 	return result
 }
 
-// Get a NUL-separated string list from a property.
+// Get a NUL-separated string list from a property. The caller owns the
+// returned array and its strings.
 pub fn get_string_list(node &DTNode, name string) ?[]string {
 	prop := get_property(node, name) or { return none }
-	if prop.len == 0 {
-		return none
-	}
-	mut result := []string{}
-	mut offset := u32(0)
-	for offset < prop.len {
-		value := unsafe { &u8(u64(prop.data) + offset) }
-		mut length := 0
-		for offset + u32(length) < prop.len && unsafe { value[length] } != 0 {
-			length++
-		}
-		if length > 0 {
-			result << unsafe { tos(value, length) }
-		}
-		offset += u32(length) + 1
-	}
-	return result
+	return fdtstrings.clone_nul_list(prop.data, prop.len)
 }
 
 fn find_phandle_in(node &DTNode, phandle u32) ?&DTNode {
@@ -543,7 +529,7 @@ pub fn get_named_reg(node &DTNode, name string) ?DTReg {
 
 // Get reg property (base, size pairs)
 // Returns array of (base, size) tuples
-pub fn get_reg(node &DTNode) ?([]u64) {
+pub fn get_reg(node &DTNode) ?[]u64 {
 	prop := get_property(node, 'reg') or { return none }
 
 	// Determine address/size cells from parent
