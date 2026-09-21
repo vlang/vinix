@@ -141,6 +141,31 @@ fn open_framebuffer(path string) !Framebuffer {
 	}
 }
 
+// A desktop produced by the native TCC toolchain deliberately has no
+// optimiser. Composing its first 2048x1536 frame can consequently take a few
+// seconds. Paint directly into the mapped framebuffer before allocating fonts
+// and the back buffer so a development reload never looks like it froze on
+// the firmware console.
+fn (mut fb Framebuffer) present_starting_screen() {
+	background := fb.pack_pixel(0x17243b)
+	track := fb.pack_pixel(0x2d476b)
+	accent := fb.pack_pixel(0x2f80ed)
+	bar_width := if fb.width / 5 > 160 { fb.width / 5 } else { 160 }
+	bar_height := if fb.height / 100 > 8 { fb.height / 100 } else { 8 }
+	x0 := (fb.width - bar_width) / 2
+	y0 := (fb.height - bar_height) / 2
+	for y := 0; y < fb.height; y++ {
+		row := y * fb.stride
+		for x := 0; x < fb.width; x++ {
+			mut color := background
+			if y >= y0 && y < y0 + bar_height && x >= x0 && x < x0 + bar_width {
+				color = if x < x0 + bar_width / 3 { accent } else { track }
+			}
+			unsafe { fb.base[row + x] = color }
+		}
+	}
+}
+
 @[inline]
 fn (fb &Framebuffer) pack_pixel(pixel u32) u32 {
 	if fb.direct {

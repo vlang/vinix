@@ -114,6 +114,10 @@ fn desktop_publish_session_ready() {
 	message := 'ready\n'
 	if !desktop_write_file(desktop_session_ready_path, message.str, u64(message.len)) {
 		eprintln('vinix-desktop: could not publish the session-ready marker')
+		return
+	}
+	if desktop_is_system_session() {
+		eprintln('vinix-desktop: ready')
 	}
 }
 
@@ -132,6 +136,9 @@ fn main() {
 	}
 	defer {
 		fb.close()
+	}
+	if desktop_is_development_session() {
+		fb.present_starting_screen()
 	}
 
 	mut preferences := desktop_load_preferences(desktop_home)
@@ -310,14 +317,21 @@ fn main() {
 	// that is no longer being redrawn.
 	desktop.close_apps()
 	desktop.capture_close()
-	desktop.canvas.clip = Clip{
-		x: 0
-		y: 0
-		w: desktop.canvas.width
-		h: desktop.canvas.height
+	// Keep the last complete frame visible during a development reload. The
+	// native TCC build needs appreciably longer than the packaged optimised
+	// binary to compose its first frame; blanking here made that normal startup
+	// interval indistinguishable from a crashed VM. Power actions still clear
+	// the display before handing it back to the system console.
+	if desktop.power != .reload_desktop {
+		desktop.canvas.clip = Clip{
+			x: 0
+			y: 0
+			w: desktop.canvas.width
+			h: desktop.canvas.height
+		}
+		desktop.canvas.clear(0x000000)
+		fb.present(&desktop.canvas, desktop_current_scale())
 	}
-	desktop.canvas.clear(0x000000)
-	fb.present(&desktop.canvas, desktop_current_scale())
 	println('vinix-desktop: ${desktop.frames} frames')
 
 	// Nothing above has to be undone afterwards: this does not return unless
