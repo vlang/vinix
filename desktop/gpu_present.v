@@ -9,11 +9,17 @@ module main
 
 #include "gpu_present.h"
 
+fn C.vinix_gpu_present_startup_stage(stage &char)
+
 fn C.vinix_gpu_present_create(width int, height int) voidptr
 
 fn C.vinix_gpu_present_frame(handle voidptr, source &u32, source_width int, source_height int, source_stride int, destination &u32, destination_width int, destination_height int, destination_stride int) int
 
 fn C.vinix_gpu_present_destroy(handle voidptr)
+
+fn gpu_present_startup_stage(stage &char) {
+	C.vinix_gpu_present_startup_stage(stage)
+}
 
 struct GpuPresenter {
 mut:

@@ -42,7 +42,7 @@ struct gpu_presenter {
     uint32_t *readback;
 };
 
-static void gpu_present_stage(const char *stage)
+void vinix_gpu_present_startup_stage(const char *stage)
 {
     fprintf(stderr, "vinix-desktop: GPU init: %s\n", stage);
     fflush(stderr);
@@ -152,7 +152,7 @@ void *vinix_gpu_present_create(int width, int height)
     if (render_fd < 0)
         return NULL;
     close(render_fd);
-    gpu_present_stage("render node opened");
+    vinix_gpu_present_startup_stage("render node opened");
     presenter = calloc(1, sizeof(*presenter));
     if (!presenter)
         return NULL;
@@ -164,46 +164,46 @@ void *vinix_gpu_present_create(int width, int height)
 
     get_platform_display = (PFNEGLGETPLATFORMDISPLAYEXTPROC)
         eglGetProcAddress("eglGetPlatformDisplayEXT");
-    gpu_present_stage("acquiring surfaceless EGL display");
+    vinix_gpu_present_startup_stage("acquiring surfaceless EGL display");
     presenter->display = get_platform_display
         ? get_platform_display(EGL_PLATFORM_SURFACELESS_MESA,
                                EGL_DEFAULT_DISPLAY, NULL)
         : eglGetDisplay(EGL_DEFAULT_DISPLAY);
     if (presenter->display == EGL_NO_DISPLAY)
         goto fail;
-    gpu_present_stage("initializing EGL");
+    vinix_gpu_present_startup_stage("initializing EGL");
     if (!eglInitialize(presenter->display, NULL, NULL))
         goto fail;
-    gpu_present_stage("binding OpenGL ES");
+    vinix_gpu_present_startup_stage("binding OpenGL ES");
     if (!eglBindAPI(EGL_OPENGL_ES_API))
         goto fail;
-    gpu_present_stage("choosing EGL config");
+    vinix_gpu_present_startup_stage("choosing EGL config");
     if (!eglChooseConfig(presenter->display, config_attributes, &config, 1,
                          &config_count) || config_count != 1)
         goto fail;
 
-    gpu_present_stage("creating pbuffer surface");
+    vinix_gpu_present_startup_stage("creating pbuffer surface");
     presenter->surface = eglCreatePbufferSurface(presenter->display, config,
                                                   surface_attributes);
-    gpu_present_stage("creating EGL context");
+    vinix_gpu_present_startup_stage("creating EGL context");
     presenter->context = eglCreateContext(presenter->display, config,
                                            EGL_NO_CONTEXT,
                                            context_attributes);
     if (presenter->surface == EGL_NO_SURFACE ||
         presenter->context == EGL_NO_CONTEXT)
         goto fail;
-    gpu_present_stage("making EGL context current");
+    vinix_gpu_present_startup_stage("making EGL context current");
     if (!eglMakeCurrent(presenter->display, presenter->surface,
                         presenter->surface, presenter->context))
         goto fail;
 
-    gpu_present_stage("querying renderer");
+    vinix_gpu_present_startup_stage("querying renderer");
     renderer = (const char *)glGetString(GL_RENDERER);
     if (!renderer || strstr(renderer, "llvmpipe") ||
         strstr(renderer, "softpipe") || strstr(renderer, "swrast"))
         goto fail;
 
-    gpu_present_stage("compiling presenter shaders");
+    vinix_gpu_present_startup_stage("compiling presenter shaders");
     vertex_shader = compile_shader(GL_VERTEX_SHADER, vertex_shader_source);
     fragment_shader = compile_shader(GL_FRAGMENT_SHADER,
                                      fragment_shader_source);
@@ -279,7 +279,7 @@ int vinix_gpu_present_frame(void *opaque,
     trace_first_frame = !presenter->first_frame_started;
     presenter->first_frame_started = 1;
     if (trace_first_frame)
-        gpu_present_stage("first frame begin");
+        vinix_gpu_present_startup_stage("first frame begin");
     if (!eglMakeCurrent(presenter->display, presenter->surface,
                         presenter->surface, presenter->context))
         return 0;
@@ -299,7 +299,7 @@ int vinix_gpu_present_frame(void *opaque,
     glBindTexture(GL_TEXTURE_2D, presenter->texture);
     glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
     if (trace_first_frame)
-        gpu_present_stage("uploading first frame");
+        vinix_gpu_present_startup_stage("uploading first frame");
     if (presenter->texture_width != source_width ||
         presenter->texture_height != source_height) {
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, source_width, source_height, 0,
@@ -318,15 +318,15 @@ int vinix_gpu_present_frame(void *opaque,
     glEnableVertexAttribArray((GLuint)presenter->position);
     glEnableVertexAttribArray((GLuint)presenter->texcoord);
     if (trace_first_frame)
-        gpu_present_stage("submitting first draw");
+        vinix_gpu_present_startup_stage("submitting first draw");
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     glPixelStorei(GL_PACK_ALIGNMENT, 4);
     if (trace_first_frame)
-        gpu_present_stage("reading back first frame");
+        vinix_gpu_present_startup_stage("reading back first frame");
     glReadPixels(0, 0, destination_width, destination_height, GL_RGBA,
                  GL_UNSIGNED_BYTE, output);
     if (trace_first_frame)
-        gpu_present_stage("first frame complete");
+        vinix_gpu_present_startup_stage("first frame complete");
     if (glGetError() != GL_NO_ERROR)
         return 0;
 

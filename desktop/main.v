@@ -122,6 +122,7 @@ fn desktop_publish_session_ready() {
 }
 
 fn main() {
+	gpu_present_startup_stage(c'entered main')
 	if app_options := app_process_options(arguments()[1..]) {
 		run_app_process(app_options)
 		return
@@ -130,10 +131,12 @@ fn main() {
 	desktop_install_power_signals()
 	options := parse_options(arguments()[1..])
 
+	gpu_present_startup_stage(c'opening framebuffer')
 	mut fb := open_framebuffer(options.framebuffer) or {
 		eprintln('vinix-desktop: ${err}')
 		exit(1)
 	}
+	gpu_present_startup_stage(c'framebuffer mapped')
 	defer {
 		fb.close()
 	}
@@ -143,6 +146,7 @@ fn main() {
 
 	mut preferences := desktop_load_preferences(desktop_home)
 	scale := preferences.configure_scale(fb.width, fb.height)
+	gpu_present_startup_stage(c'allocating canvas and fonts')
 	mut desktop := Desktop{
 		settings:          preferences.settings
 		canvas:            new_scaled_canvas(desktop_scaled_extent(fb.width, scale), desktop_scaled_extent(fb.height, scale), fb.width, fb.height, scale)
@@ -150,7 +154,9 @@ fn main() {
 		shortcut_order:    load_shortcut_order(desktop_home)
 		tz_offset_seconds: options.tz_offset
 	}
+	gpu_present_startup_stage(c'canvas and fonts ready')
 	desktop.load_app_icons()
+	gpu_present_startup_stage(c'application icons loaded')
 
 	mut pointer := open_pointer(options.pointer)
 	defer {
@@ -165,11 +171,13 @@ fn main() {
 	defer {
 		keyboard.close()
 	}
+	gpu_present_startup_stage(c'input devices opened')
 
 	// First launch is an exclusive setup mode: ordinary windows, shortcuts and
 	// the taskbar do not exist until a persistent user profile has been created.
 	desktop.ensure_registered_user(mut fb, mut pointer, mut keyboard, options.frame_interval,
 		options.idle_interval)
+	gpu_present_startup_stage(c'user profile ready')
 	if !desktop.running {
 		return
 	}

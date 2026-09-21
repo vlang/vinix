@@ -7,6 +7,7 @@
 
 #ifdef VINIX_GPU_PRESENTER_EXTERNAL
 
+void vinix_gpu_present_startup_stage(const char *stage);
 void *vinix_gpu_present_create(int width, int height);
 int vinix_gpu_present_frame(void *opaque,
                             const uint32_t *source,
@@ -28,6 +29,11 @@ void vinix_gpu_present_destroy(void *opaque);
  * EGL implementation instead. This avoids translating the whole desktop a
  * second time merely to flip one V compile-time branch.
  */
+static inline void vinix_gpu_present_startup_stage(const char *stage)
+{
+    (void)stage;
+}
+
 static inline void *vinix_gpu_present_create(int width, int height)
 {
     (void)width;

@@ -431,12 +431,17 @@ if [ -f "$ASAHI_STAGING/usr/lib/libEGL.so" ] &&
    [ -f "$ASAHI_STAGING/usr/include/EGL/egl.h" ] &&
    [ -f "$GPU_SYSROOT/usr/lib/Scrt1.o" ]; then
     echo "==> Compiling the GPU-enabled desktop for aarch64-linux-musl..."
+    # Keep the large generated compositor at a fixed address. Building it as
+    # PIE creates more than 8,000 relative relocations which musl has to write
+    # before main(), needlessly exercising thousands of VM faults on the
+    # native multi-core boot path. Mesa and EGL remain ordinary shared
+    # libraries; only the executable itself is non-PIE.
     "$LLVM_BIN/clang" --target=aarch64-linux-musl \
         --sysroot="$GPU_SYSROOT" --gcc-install-dir="$GCCLIB" -static-libgcc \
         -isystem "$CC_SHIM" \
         -I "$APP_SRC" -I "$ASAHI_STAGING/usr/include" \
         -DVINIX_GPU_PRESENTER_EXTERNAL=1 \
-        -O2 -fPIE -pie -fno-stack-protector -w \
+        -O2 -fno-pie -no-pie -fno-stack-protector -w \
         "$BUILD_DIR/desktop.c" "$SCRIPT_DIR/desktop/execinfo_compat.c" \
         "$SCRIPT_DIR/desktop/gpu_present_egl.c" \
         -L"$ASAHI_STAGING/usr/lib" \
@@ -446,6 +451,12 @@ if [ -f "$ASAHI_STAGING/usr/lib/libEGL.so" ] &&
         -fuse-ld=lld -B"$LLVM_BIN" \
         -o "$BUILD_DIR/vinix-desktop-gpu"
     "$LLVM_BIN/llvm-strip" "$BUILD_DIR/vinix-desktop-gpu"
+    GPU_DESKTOP_ELF_TYPE="$("$LLVM_BIN/llvm-readelf" -h \
+        "$BUILD_DIR/vinix-desktop-gpu" | awk '$1 == "Type:" { print $2; exit }')"
+    if [ "$GPU_DESKTOP_ELF_TYPE" != "EXEC" ]; then
+        echo "ERROR: GPU desktop must be a fixed-address ELF executable; got $GPU_DESKTOP_ELF_TYPE" >&2
+        exit 1
+    fi
     echo "    $BUILD_DIR/vinix-desktop-gpu ($(file_size "$BUILD_DIR/vinix-desktop-gpu") bytes)"
     GPU_DESKTOP_BUILT=1
     if [ ! -f "$ASAHI_STAGING/usr/share/vinix/mesa-x11-egl" ] &&
