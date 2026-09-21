@@ -146,9 +146,16 @@ fn parse_aic_guest_virtual_timer_irq() ?u32 {
 // hardware IRQ event, so it must be serviced from the FIQ dispatch path and
 // gated on the timer's own ISTATUS rather than on an AIC IRQ number.
 fn aic_fiq_handler(gpr_state voidptr) {
-	if timer.is_pending() {
+	sched.gpu_exec_fiq_trace(0, 0)
+	ctl := cpu.read_cntv_ctl_el0()
+	sched.gpu_exec_fiq_trace(1, ctl)
+	if ctl & 4 != 0 {
+		sched.gpu_exec_fiq_trace(2, ctl)
 		timer_handler := sched.get_timer_handler()
 		timer_handler(gpr_state)
+		sched.gpu_exec_fiq_trace(3, cpu.read_cntv_ctl_el0())
+	} else {
+		sched.gpu_exec_fiq_trace(4, ctl)
 	}
 }
 

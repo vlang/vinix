@@ -356,8 +356,17 @@ handle_lower64_irq:
     mov x3, #1                 // lower-EL IRQ
     bl scheduler_gpu_lower_exception_trace
     mov x0, sp
+    mov x1, #0
+    bl scheduler_gpu_interrupt_trace
+    mov x0, sp
     bl exception__irq_handler
+    mov x0, sp
+    mov x1, #1
+    bl scheduler_gpu_interrupt_trace
     HVF_SYNC_BARRIER
+    mov x0, sp
+    mov x1, #2
+    bl scheduler_gpu_interrupt_trace
     RESTORE_REGS_TO_EL0
 
 handle_lower64_fiq:
@@ -370,8 +379,17 @@ handle_lower64_fiq:
     mov x3, #2                 // lower-EL FIQ
     bl scheduler_gpu_lower_exception_trace
     mov x0, sp
+    mov x1, #0
+    bl scheduler_gpu_interrupt_trace
+    mov x0, sp
     bl exception__irq_handler
+    mov x0, sp
+    mov x1, #1
+    bl scheduler_gpu_interrupt_trace
     HVF_SYNC_BARRIER
+    mov x0, sp
+    mov x1, #2
+    bl scheduler_gpu_interrupt_trace
     RESTORE_REGS_TO_EL0
 
 handle_lower64_serror:

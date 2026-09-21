@@ -72,7 +72,31 @@ __global (
 	// ordinary context switch on the machine.
 	gpu_exec_switch_state u64
 	gpu_exec_switch_cpu   = u64(-1)
+	// Interrupt-side continuation of the same one-shot trace. The first
+	// lower-EL IRQ/FIQ transfers ownership here so the context-switch marker
+	// does not recursively trace later switches while the interrupt dispatcher
+	// can still identify exactly where that first exception stops.
+	gpu_exec_interrupt_active = u64(0)
+	gpu_exec_interrupt_cpu    = u64(-1)
+	gpu_exec_interrupt_kind   u64
+	gpu_exec_interrupt_state  u64
+	// Printing to the framebuffer is slow enough to consume a short scheduler
+	// slice. Hold the first GPU desktop slice here and arm it only after the
+	// final traced checkpoint immediately before eret.
+	gpu_exec_deferred_timeslice u64
 )
+
+fn gpu_exec_interrupt_trace_active(cpu_number u64) bool {
+	return katomic.load(&gpu_exec_interrupt_active) != 0
+		&& katomic.load(&gpu_exec_interrupt_cpu) == cpu_number
+}
+
+fn clear_gpu_exec_interrupt_trace() {
+	katomic.store(mut &gpu_exec_interrupt_active, u64(0))
+	katomic.store(mut &gpu_exec_interrupt_cpu, u64(-1))
+	katomic.store(mut &gpu_exec_interrupt_kind, u64(0))
+	katomic.store(mut &gpu_exec_interrupt_state, u64(0))
+}
 
 @[export: 'scheduler_gpu_context_trace']
 fn scheduler_gpu_context_trace(gpr_state voidptr, phase u64) {
@@ -87,7 +111,15 @@ fn scheduler_gpu_context_trace(gpr_state voidptr, phase u64) {
 		2 {
 			println('exec[gpu]/switch: eret readback ELR=0x${cpu.read_elr_el1():x} SPSR=0x${cpu.read_spsr_el1():x} CurrentEL=0x${cpu.read_currentel():x}')
 			println('exec[gpu]/switch: saved target pc=0x${state.pc:x} sp=0x${state.sp:x} pstate=0x${state.pstate:x} tls=0x${state.tpidr_el0:x}')
-			println('exec[gpu]/switch: target stack and TPIDR ready; restoring GPRs and executing eret')
+			deferred_slice := katomic.load(&gpu_exec_deferred_timeslice)
+			println('exec[gpu]/switch: target stack and TPIDR ready; arming deferred ${deferred_slice} us timeslice')
+			// Nothing may print after this arm: on the M1 each production log also
+			// redraws the framebuffer, and the old diagnostic path could expire the
+			// new thread's entire slice before assembly reached eret.
+			katomic.store(mut &gpu_exec_deferred_timeslice, u64(0))
+			if deferred_slice != 0 {
+				timer.oneshot(deferred_slice)
+			}
 			// Keep the trace armed across eret. The first lower-EL exception
 			// vector clears it after saving the exception frame, which lets the
 			// M1 distinguish an eret which never completes from an immediate
@@ -113,8 +145,16 @@ fn scheduler_gpu_lower_exception_trace(esr u64, far u64, raw_state voidptr, kind
 		return
 	}
 
-	// Disarm before printing so a nested exception cannot recursively emit the
-	// trace, and so normal later timeslices of this process remain quiet.
+	// IRQ and FIQ dispatch have several important stages after vector entry.
+	// Transfer those two kinds to a separate one-shot state before disarming
+	// the context-switch trace. Synchronous faults and SError already have
+	// dedicated dispatch diagnostics and end the handoff trace here.
+	if kind == 1 || kind == 2 {
+		katomic.store(mut &gpu_exec_interrupt_cpu, cpu_number)
+		katomic.store(mut &gpu_exec_interrupt_kind, kind)
+		katomic.store(mut &gpu_exec_interrupt_state, u64(raw_state))
+		katomic.store(mut &gpu_exec_interrupt_active, u64(1))
+	}
 	katomic.store(mut &gpu_exec_switch_state, u64(0))
 	katomic.store(mut &gpu_exec_switch_cpu, u64(-1))
 	state := unsafe { &cpulocal.GPRState(raw_state) }
@@ -128,6 +168,57 @@ fn scheduler_gpu_lower_exception_trace(esr u64, far u64, raw_state voidptr, kind
 	println('exec[gpu]/eret: crossed into EL0; first lower-EL ${name} vector entered on CPU ${cpu_number}')
 	println('exec[gpu]/eret: ESR=0x${esr:x} EC=0x${esr >> 26:x} FAR=0x${far:x}')
 	println('exec[gpu]/eret: exception frame pc=0x${state.pc:x} sp=0x${state.sp:x} pstate=0x${state.pstate:x} x0=0x${state.x0:x} x8=0x${state.x8:x}')
+}
+
+// Mark the boundaries around the common IRQ dispatcher from the lower-EL
+// vector. Phase 2 is the final operation before restoring the saved EL0 frame;
+// if the scheduler retained this thread, arm its deferred fresh timeslice only
+// after every slow diagnostic print is finished.
+@[export: 'scheduler_gpu_interrupt_trace']
+pub fn scheduler_gpu_interrupt_trace(raw_state voidptr, phase u64) {
+	cpu_number := cpu.read_tpidr_el1()
+	if !gpu_exec_interrupt_trace_active(cpu_number)
+		|| katomic.load(&gpu_exec_interrupt_state) != u64(raw_state) {
+		return
+	}
+
+	kind := if katomic.load(&gpu_exec_interrupt_kind) == 2 { 'FIQ' } else { 'IRQ' }
+	match phase {
+		0 { println('exec[gpu]/${kind}: entering common interrupt dispatcher') }
+		1 { println('exec[gpu]/${kind}: common interrupt dispatcher returned; running exit barrier') }
+		2 {
+			deferred_slice := katomic.load(&gpu_exec_deferred_timeslice)
+			if deferred_slice != 0 {
+				println('exec[gpu]/${kind}: exit barrier complete; arming deferred ${deferred_slice} us timeslice and restoring EL0')
+			} else {
+				println('exec[gpu]/${kind}: exit barrier complete; restoring saved EL0 frame')
+			}
+			clear_gpu_exec_interrupt_trace()
+			katomic.store(mut &gpu_exec_deferred_timeslice, u64(0))
+			if deferred_slice != 0 {
+				timer.oneshot(deferred_slice)
+			}
+		}
+		else { println('exec[gpu]/${kind}: unknown vector phase ${phase}') }
+	}
+}
+
+// The Apple architectural timer arrives through the FIQ callback ahead of the
+// AIC event drain. These markers distinguish a timer-status read, scheduler
+// stall, and AIC_EVENT stall without tracing every interrupt after startup.
+pub fn gpu_exec_fiq_trace(phase u64, cntv_ctl u64) {
+	cpu_number := cpu.read_tpidr_el1()
+	if !gpu_exec_interrupt_trace_active(cpu_number) {
+		return
+	}
+	match phase {
+		0 { println('exec[gpu]/FIQ: platform FIQ callback entered') }
+		1 { println('exec[gpu]/FIQ: CNTV_CTL=0x${cntv_ctl:x} pending=${cntv_ctl & 4 != 0}') }
+		2 { println('exec[gpu]/FIQ: virtual timer pending; entering scheduler timer handler') }
+		3 { println('exec[gpu]/FIQ: scheduler timer handler returned; CNTV_CTL=0x${cntv_ctl:x}') }
+		4 { println('exec[gpu]/FIQ: virtual timer not pending; continuing with AIC event drain') }
+		else { println('exec[gpu]/FIQ: unknown callback phase ${phase}') }
+	}
 }
 
 pub fn initialise() {
@@ -653,8 +744,10 @@ fn effective_timeslice(t &proc.Thread) u64 {
 
 fn scheduler_timer_handler(_gpr_state voidptr) {
 	dispatch_cpu := cpu.read_tpidr_el1()
-	trace_gpu_dispatch := katomic.load(&gpu_exec_switch_state) != 0
+	trace_gpu_switch := katomic.load(&gpu_exec_switch_state) != 0
 		&& katomic.load(&gpu_exec_switch_cpu) == dispatch_cpu
+	trace_gpu_interrupt := gpu_exec_interrupt_trace_active(dispatch_cpu)
+	trace_gpu_dispatch := trace_gpu_switch || trace_gpu_interrupt
 	if trace_gpu_dispatch {
 		println('exec[gpu]/sched: immediate scheduler handler entered on CPU ${dispatch_cpu}')
 	}
@@ -783,7 +876,13 @@ fn scheduler_timer_handler(_gpr_state voidptr) {
 			// whose affinity no longer allows this CPU, which has to be put down
 			// even with nothing to replace it.
 			current_thread.yield_requested = false
-			timer.oneshot(effective_timeslice(current_thread))
+			next_slice := effective_timeslice(current_thread)
+			if trace_gpu_interrupt {
+				println('exec[gpu]/sched: current thread keeps CPU; deferring ${next_slice} us timer rearm until vector exit')
+				katomic.store(mut &gpu_exec_deferred_timeslice, next_slice)
+			} else {
+				timer.oneshot(next_slice)
+			}
 			return
 		}
 		current_thread.yield_requested = false
@@ -814,6 +913,10 @@ fn scheduler_timer_handler(_gpr_state voidptr) {
 	}
 
 	if unsafe { next_thread == nil } {
+		if trace_gpu_interrupt {
+			println('exec[gpu]/sched: no runnable target after first GPU interrupt; ending interrupt trace before idle')
+			clear_gpu_exec_interrupt_trace()
+		}
 		// Called from the idle loop (await): no current thread, no next
 		// thread. Go idle and return to await()'s polling loop.
 		cpu.write_tpidr_el1(cpu_local.cpu_number)
@@ -834,15 +937,16 @@ fn scheduler_timer_handler(_gpr_state voidptr) {
 	}
 
 	current_thread = next_thread
-	if trace_gpu_next {
+	trace_gpu_restore := trace_gpu_next || trace_gpu_interrupt
+	if trace_gpu_restore {
 		println('exec[gpu]/sched: publishing replacement as CPU current thread')
 	}
 	proc.set_current_thread(cpu_local.cpu_number, current_thread)
-	if trace_gpu_next {
+	if trace_gpu_restore {
 		println('exec[gpu]/sched: replacement published; starting CPU-time accounting')
 	}
 	proc.begin_cpu_time(mut current_thread, now_ns)
-	if trace_gpu_next {
+	if trace_gpu_restore {
 		println('exec[gpu]/sched: CPU-time accounting started')
 	}
 
@@ -852,49 +956,49 @@ fn scheduler_timer_handler(_gpr_state voidptr) {
 	if current_thread.numa_node < 0 {
 		current_thread.numa_node = int(cpu_local.numa_node)
 	}
-	if trace_gpu_next {
+	if trace_gpu_restore {
 		println('exec[gpu]/sched: NUMA home selected; restoring TPIDR_EL0')
 	}
 
 	cpu.write_tpidr_el0(current_thread.tpidr_el0)
-	if trace_gpu_next {
+	if trace_gpu_restore {
 		println('exec[gpu]/sched: TPIDR_EL0 restored; reading current TTBR0')
 	}
 
 	old_ttbr0 := cpu.read_ttbr0_el1()
-	if trace_gpu_next {
+	if trace_gpu_restore {
 		println('exec[gpu]/sched: current TTBR0=0x${old_ttbr0:x}')
 	}
 	if old_ttbr0 != current_thread.ttbr0 {
-		if trace_gpu_next {
+		if trace_gpu_restore {
 			println('exec[gpu]/sched: writing replacement TTBR0')
 		}
 		cpu.write_ttbr0_el1(current_thread.ttbr0)
-		if trace_gpu_next {
+		if trace_gpu_restore {
 			println('exec[gpu]/sched: replacement TTBR0 written; executing ISB')
 		}
 		cpu.isb()
-		if trace_gpu_next {
+		if trace_gpu_restore {
 			println('exec[gpu]/sched: ISB complete; invalidating local TLB')
 		}
 		cpu.tlbi_vmalle1()
-		if trace_gpu_next {
+		if trace_gpu_restore {
 			println('exec[gpu]/sched: local TLB invalidation complete')
 		}
-	} else if trace_gpu_next {
+	} else if trace_gpu_restore {
 		println('exec[gpu]/sched: replacement TTBR0 already active')
 	}
 
-	if trace_gpu_next {
+	if trace_gpu_restore {
 		println('exec[gpu]/sched: restoring FPU state')
 	}
 	fpu_restore(current_thread.fpu_storage)
-	if trace_gpu_next {
+	if trace_gpu_restore {
 		println('exec[gpu]/sched: FPU state restored; publishing running CPU')
 	}
 	katomic.store(mut &current_thread.running_on, cpu_local.cpu_number)
-	if trace_gpu_next {
-		println('exec[gpu]/sched: running CPU published; arming timeslice')
+	if trace_gpu_restore {
+		println('exec[gpu]/sched: running CPU published; preparing timeslice')
 	}
 
 	// Debug: check if x30 is corrupted when restoring state for pid 3
@@ -902,9 +1006,20 @@ fn scheduler_timer_handler(_gpr_state voidptr) {
 		print('\nSCHED RESTORE: pid=3 x30=0x220000! pc=0x${current_thread.gpr_state.pc:x} sp=0x${current_thread.gpr_state.sp:x} pstate=0x${current_thread.gpr_state.pstate:x}\n')
 	}
 
-	timer.oneshot(effective_timeslice(current_thread))
+	next_slice := effective_timeslice(current_thread)
 	if trace_gpu_next {
-		println('exec[gpu]/sched: timeslice armed; entering low-level context restore')
+		katomic.store(mut &gpu_exec_deferred_timeslice, next_slice)
+		println('exec[gpu]/sched: deferring ${next_slice} us timeslice until final low-level checkpoint')
+	} else {
+		timer.oneshot(next_slice)
+		if trace_gpu_restore {
+			println('exec[gpu]/sched: timeslice armed; entering low-level context restore')
+		}
+	}
+
+	if trace_gpu_interrupt {
+		println('exec[gpu]/sched: selected another thread; first GPU interrupt frame saved, ending interrupt trace')
+		clear_gpu_exec_interrupt_trace()
 	}
 
 	// Restore ARM64 GPR state and return via eret (does not return).
