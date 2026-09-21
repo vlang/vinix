@@ -4,6 +4,7 @@ module table
 import file
 import fs
 import aarch64.cpu
+import aarch64.timer
 import userland
 import futex
 import pipe
@@ -116,15 +117,24 @@ pub fn syscall_trace(gpr_state voidptr) {
 	}
 	pid := u64(current_thread.process.pid)
 	if current_thread.process.executable_path == '/usr/bin/vinix-desktop-gpu' {
+		new_trace_pid := gpu_desktop_trace_pid != pid
 		if gpu_desktop_trace_pid != pid {
 			gpu_desktop_trace_pid = pid
 			gpu_desktop_trace_count = 0
-			println('exec[gpu]: replacement thread entered userspace')
 		}
 		sequence := gpu_desktop_trace_count
 		gpu_desktop_trace_count++
 		if sequence < 64 {
+			trace_timeslice := if current_thread.timeslice != 0 { current_thread.timeslice } else { u64(1) }
+			// Console diagnostics redraw the framebuffer and can outlive a 5 ms
+			// quantum. Do not let their elapsed time become an immediate FIQ at
+			// the syscall-vector return; restart a fresh slice after the last line.
+			timer.stop()
+			if new_trace_pid {
+				println('exec[gpu]: replacement thread entered userspace')
+			}
 			println('exec[gpu]: syscall #${sequence} enter nr=${nr} pc=0x${gpr.pc:x} sp=0x${gpr.sp:x}')
+			timer.oneshot(trace_timeslice)
 		}
 	}
 	// Debug: detect x30=0x220000 corruption at syscall entry
@@ -161,14 +171,21 @@ pub fn syscall_trace(gpr_state voidptr) {
 @[export: 'syscall_trace_ret']
 pub fn syscall_trace_ret(ret u64, err u64) {
 	current_thread := proc.current_thread()
-	if current_thread != unsafe { nil }
+	trace_gpu_return := current_thread != unsafe { nil }
 		&& current_thread.process.executable_path == '/usr/bin/vinix-desktop-gpu'
 		&& u64(current_thread.process.pid) == gpu_desktop_trace_pid
-		&& gpu_desktop_trace_count <= 64 {
+		&& gpu_desktop_trace_count <= 64
+	mut trace_timeslice := u64(0)
+	if trace_gpu_return {
+		trace_timeslice = if current_thread.timeslice != 0 { current_thread.timeslice } else { u64(1) }
+		timer.stop()
 		println('exec[gpu]: syscall return value=0x${ret:x} errno=${err}')
 	}
 
 	if !sc_trace_active {
+		if trace_gpu_return {
+			timer.oneshot(trace_timeslice)
+		}
 		return
 	}
 	idx := sc_ring_idx % 64
@@ -176,6 +193,11 @@ pub fn syscall_trace_ret(ret u64, err u64) {
 	sc_ring[idx].err = err
 	sc_ring_idx++
 	sc_trace_active = false
+	if trace_gpu_return {
+		// Keep this as the final operation: no slow logging may consume the
+		// fresh userspace slice before the vector restores EL0.
+		timer.oneshot(trace_timeslice)
+	}
 }
 
 @[export: 'sc_dump_ring']
