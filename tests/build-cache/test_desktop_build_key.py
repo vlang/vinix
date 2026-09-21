@@ -67,6 +67,16 @@ class DesktopBuildKeyTests(unittest.TestCase):
             write(root / "desktop/main.v", "module main\nconst changed = true\n")
             self.assertNotEqual(first, MODULE.compute_key(root, v, env))
 
+    def test_m1_triangle_source_change_invalidates(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            v, env = self.fixture(root)
+            triangle = root / "gl-triangle/egl_triangle.c"
+            write(triangle, "int main(void) { return 0; }\n")
+            first = MODULE.compute_key(root, v, env)
+            write(triangle, "int main(void) { return 1; }\n")
+            self.assertNotEqual(first, MODULE.compute_key(root, v, env))
+
     def test_nested_x11_rewrite_invalidates_in_place(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

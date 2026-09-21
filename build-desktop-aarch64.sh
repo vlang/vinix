@@ -817,8 +817,15 @@ if [ "$COMPACT_INITRAMFS" -eq 0 ] && [ -x "$HYPRLAND_STAGING/usr/bin/start-hyprl
         "$STAGING/root/.config/foot/foot.ini"
 fi
 if [ "$GPU_DESKTOP_BUILT" -eq 1 ] && [ "$WITH_ASAHI_GPU" -eq 1 ]; then
+    # The Mesa layer carries the compiled test and a convenience copy of its
+    # source, but that layer can legitimately predate this checkout.  Keep the
+    # source used by --rebuild beside the current smoke launcher so hardware
+    # tests never rebuild an older test program after a cached image build.
+    mkdir -p "$STAGING/usr/share/examples/gl-triangle"
     install -m755 "$SCRIPT_DIR/gl-triangle/run-m1-agx-smoke" \
         "$STAGING/usr/bin/run-m1-agx-smoke"
+    install -m644 "$SCRIPT_DIR/gl-triangle/egl_triangle.c" \
+        "$STAGING/usr/share/examples/gl-triangle/egl_triangle.c"
 fi
 mkdir -p "$STAGING/sbin" "$STAGING/usr/bin" "$STAGING/usr/share/vinix" \
     "$STAGING/root" "$STAGING/dev" "$STAGING/proc" "$STAGING/sys" "$STAGING/tmp"
@@ -1148,6 +1155,7 @@ CONTENT_KEY_INPUTS=(
     "$SCRIPT_DIR/build-support/chromium"
     "$SCRIPT_DIR/build-support/hyprland"
     "$SCRIPT_DIR/gl-triangle/run-m1-agx-smoke"
+    "$SCRIPT_DIR/gl-triangle/egl_triangle.c"
     "$SCRIPT_DIR/tests/browsers/firefox-smoke.html"
     "$SCRIPT_DIR/tests/browsers/chromium-smoke.html"
     "$SCRIPT_DIR/tests/packages/x-window-check.py"

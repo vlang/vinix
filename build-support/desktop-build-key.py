@@ -161,6 +161,7 @@ def compute_key(root: Path, v_compiler: Path, env: dict[str, str]) -> str:
         root / "build-support/chromium",
         root / "build-support/hyprland",
         root / "gl-triangle/run-m1-agx-smoke",
+        root / "gl-triangle/egl_triangle.c",
         root / "tests/browsers/firefox-smoke.html",
         root / "tests/browsers/chromium-smoke.html",
         root / "tests/packages/x-window-check.py",
