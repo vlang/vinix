@@ -26,6 +26,18 @@ module main
 
 import gpu.agx.fw
 
+fn object_u32(value voidptr, offset u32) u32 {
+	unsafe {
+		bytes := &u8(value)
+		return u32(bytes[offset]) | (u32(bytes[offset + 1]) << 8)
+			| (u32(bytes[offset + 2]) << 16) | (u32(bytes[offset + 3]) << 24)
+	}
+}
+
+fn object_u64(value voidptr, offset u32) u64 {
+	return u64(object_u32(value, offset)) | (u64(object_u32(value, offset + 4)) << 32)
+}
+
 fn check_layout_validators() {
 	assert fw.validate_g13_channel_layouts()
 	assert fw.validate_g13_initdata_layouts()
@@ -113,11 +125,180 @@ fn check_compute_offsets() {
 	assert __offsetof(fw.G13RunCompute, end_ts) == fw.g13_compute_end_ts_offset
 }
 
+fn check_channel_offsets() {
+	assert __offsetof(fw.FwRunWorkQueueMsg, pipe_type) == 0
+	assert __offsetof(fw.FwRunWorkQueueMsg, work_queue_addr) == 0x4
+	assert __offsetof(fw.FwRunWorkQueueMsg, write_ptr) == 0xc
+	assert __offsetof(fw.FwRunWorkQueueMsg, event_slot) == 0x10
+	assert __offsetof(fw.FwRunWorkQueueMsg, is_new) == 0x14
+	assert __offsetof(fw.FwRunWorkQueueMsg, timestamp) == 0x18
+	assert __offsetof(fw.FwRunWorkQueueMsg, data) == 0x20
+}
+
+fn check_v13_5_command_repacking() {
+	assert (fw.g13_compute_active_size(.v13_5_partial) or { 0 }) == 0x320
+	assert (fw.g13_vertex_active_size(.v13_5_partial) or { 0 }) == 0x61c
+	assert (fw.g13_fragment_active_size(.v13_5_partial) or { 0 }) == 0x974
+
+	mut compute := fw.G13RunCompute{
+		tag: 3
+		microsequence: 0x1111_2222_3333_4444
+		cur_ts: 0x0102_0304_0506_0708
+		start_ts: 0x1112_1314_1516_1718
+		end_ts: 0x2122_2324_2526_2728
+		client_sequence: 0x5a
+	}
+	compute.job_params_2.preempt_buf_1 = 0x3132_3334_3536_3738
+	compute_new := fw.make_g13_compute_v13_5(&compute)
+	assert object_u64(voidptr(&compute_new), 0x4) == 0
+	assert object_u64(voidptr(&compute_new), 0x1f0) == compute.microsequence
+	assert object_u32(voidptr(&compute_new), 0x1fc) == 0
+	assert object_u64(voidptr(&compute_new), 0x224) == compute.job_params_2.preempt_buf_1
+	assert object_u64(voidptr(&compute_new), 0x2b0) == compute.cur_ts
+	assert object_u64(voidptr(&compute_new), 0x2b8) == compute.start_ts
+	assert object_u64(voidptr(&compute_new), 0x2c0) == compute.end_ts
+	assert object_u32(voidptr(&compute_new), 0x2d8) & 0xff == compute.client_sequence
+
+	mut vertex := fw.G13RunVertex{
+		tag: 0
+		microsequence: 0x4142_4344_4546_4748
+		unk_pointee: 0x5152_5354
+		unk_pad: 0x6162_6364
+		cur_ts: 0x7172_7374_7576_7778
+		start_ts: 0x8182_8384_8586_8788
+		end_ts: 0x9192_9394_9596_9798
+		client_sequence: 0xa5
+	}
+	vertex.job_params_2.unk_480[0] = 0xa1a2_a3a4
+	vertex_new := fw.make_g13_vertex_v13_5(&vertex)
+	assert object_u64(voidptr(&vertex_new), 0x474) == vertex.microsequence
+	assert object_u32(voidptr(&vertex_new), 0x488) == vertex.unk_pointee
+	assert object_u32(voidptr(&vertex_new), 0x48c) == vertex.unk_pad
+	assert object_u32(voidptr(&vertex_new), 0x490) == vertex.job_params_2.unk_480[0]
+	assert object_u64(voidptr(&vertex_new), 0x5b4) == vertex.cur_ts
+	assert object_u64(voidptr(&vertex_new), 0x5bc) == vertex.start_ts
+	assert object_u64(voidptr(&vertex_new), 0x5c4) == vertex.end_ts
+	assert object_u32(voidptr(&vertex_new), 0x5dc) & 0xff == vertex.client_sequence
+
+	fragment := fw.G13RunFragment{
+		tag: 1
+		unk_758_flag: 0xb1b2_b3b4
+		busy_flag: 0xc1c2_c3c4
+		tvb_overflow_count: 0xd1d2_d3d4
+		unk_pointee: 0xe1e2_e3e4
+		cur_ts: 0x0101_0202_0303_0404
+		start_ts: 0x1111_1212_1313_1414
+		end_ts: 0x2121_2222_2323_2424
+		client_sequence: 0x6b
+	}
+	fragment_new := fw.make_g13_fragment_v13_5(&fragment)
+	assert object_u32(voidptr(&fragment_new), 0x770) == fragment.unk_758_flag
+	assert object_u32(voidptr(&fragment_new), 0x888) == fragment.busy_flag
+	assert object_u32(voidptr(&fragment_new), 0x88c) == fragment.tvb_overflow_count
+	// Struct7 gains a four-byte prefix; its first legacy word follows it.
+	assert object_u32(voidptr(&fragment_new), 0x8c8) == 0
+	assert object_u32(voidptr(&fragment_new), 0x8cc) == fragment.unk_pointee
+	assert object_u64(voidptr(&fragment_new), 0x918) == fragment.cur_ts
+	assert object_u64(voidptr(&fragment_new), 0x920) == fragment.start_ts
+	assert object_u64(voidptr(&fragment_new), 0x928) == fragment.end_ts
+	assert object_u32(voidptr(&fragment_new), 0x940) & 0xff == fragment.client_sequence
+}
+
+fn check_v13_5_queue_objects() {
+	assert (fw.g13_workqueue_info_active_size(.v13_5_partial) or { 0 }) == 0xb8
+	mut queue := []u8{len: 0xb8}
+	priority := fw.g13_workqueue_priority(0) or { panic('missing priority') }
+	assert fw.initialize_g13_workqueue_info(queue.data, u64(queue.len), .v13_5_partial,
+		0x1000, 0x2000, 0x3000, 0x4000, -1, priority, 0x55aa, 0x8877_6655_4433_2211)
+	assert object_u64(queue.data, 0) == 0x1000
+	assert object_u32(queue.data, 0xa0) == 0
+	assert object_u64(queue.data, 0xa4) == 0x8877_6655_4433_2211
+	assert object_u32(queue.data, 0xb4) == 0
+
+	assert (fw.g13_buffer_scene_active_size(.v13_5_partial) or { 0 }) == 0x48
+	mut scene := []u8{len: 0x48}
+	assert fw.initialize_g13_buffer_scene(scene.data, u64(scene.len), .v13_5_partial,
+		0x1234_5678_9abc_def0, 0x0fed_cba9_8765_4321)
+	assert object_u64(scene.data, 0x18) == 0x1234_5678_9abc_def0
+	assert object_u64(scene.data, 0x24) == 0
+	assert object_u64(scene.data, 0x2c) == 0x0fed_cba9_8765_4321
+}
+
+fn check_v13_5_microsequences() {
+	timestamp := fw.G13MicroseqTimestamp{
+		header: 0x8000_0019
+		cur_ts: 0x1111_2222_3333_4444
+		uuid: 0x5566_7788
+		pad_30: 0x99aa_bbcc
+	}
+	timestamp_new := fw.g13_microseq_timestamp_v13_5(&timestamp,
+		0xdead_beef_cafe_babe)
+	assert object_u64(voidptr(&timestamp_new), 0x4) == timestamp.cur_ts
+	assert object_u64(voidptr(&timestamp_new), 0x2c) == 0xdead_beef_cafe_babe
+	assert object_u32(voidptr(&timestamp_new), 0x34) == timestamp.uuid
+	assert object_u32(voidptr(&timestamp_new), 0x38) == timestamp.pad_30
+
+	start_vertex := fw.G13MicroseqStartVertex{
+		header: 0x22
+		unk_178: 0x1122_3344
+	}
+	start_vertex_new := fw.g13_microseq_start_vertex_v13_5(&start_vertex,
+		0x0102_0304_0506_0708, 0x1112_1314_1516_1718)
+	assert object_u64(voidptr(&start_vertex_new), 0x178) == 0x0102_0304_0506_0708
+	assert object_u64(voidptr(&start_vertex_new), 0x180) == 0x1112_1314_1516_1718
+	assert object_u32(voidptr(&start_vertex_new), 0x188) == start_vertex.unk_178
+
+	start_fragment := fw.G13MicroseqStartFragment{
+		header: 0x24
+		unk_7c: 0xa1a2_a3a4
+		uuid: 0xb1b2_b3b4
+	}
+	start_fragment_new := fw.g13_microseq_start_fragment_v13_5(&start_fragment,
+		0x2122_2324_2526_2728, 0x3132_3334_3536_3738)
+	assert object_u64(voidptr(&start_fragment_new), 0x7c) == 0
+	assert object_u32(voidptr(&start_fragment_new), 0x84) == start_fragment.unk_7c
+	assert object_u32(voidptr(&start_fragment_new), 0x90) == start_fragment.uuid
+	assert object_u64(voidptr(&start_fragment_new), 0x19c) == 0x2122_2324_2526_2728
+	assert object_u64(voidptr(&start_fragment_new), 0x1a4) == 0x3132_3334_3536_3738
+
+	final_fragment := fw.G13MicroseqFinalizeFragment{
+		header: 0x25
+		unk_6c: 0x4142_4344_4546_4748
+		restart_branch_offset: -0x1234
+	}
+	final_fragment_new := fw.g13_microseq_finalize_fragment_v13_5(&final_fragment)
+	assert object_u64(voidptr(&final_fragment_new), 0x6c) == 0
+	assert object_u64(voidptr(&final_fragment_new), 0x74) == final_fragment.unk_6c
+	assert i32(object_u32(voidptr(&final_fragment_new), 0x9c)) == final_fragment.restart_branch_offset
+
+	start_compute := fw.G13MicroseqStartCompute{
+		header: 0x29
+	}
+	start_compute_new := fw.g13_microseq_start_compute_v13_5(&start_compute,
+		0x5152_5354_5556_5758, 0x6162_6364_6566_6768, 0x7172_7374_7576_7778)
+	assert object_u64(voidptr(&start_compute_new), 0x154) == 0x5152_5354_5556_5758
+	assert object_u64(voidptr(&start_compute_new), 0x15c) == 0x6162_6364_6566_6768
+	assert object_u64(voidptr(&start_compute_new), 0x164) == 0x7172_7374_7576_7778
+
+	final_compute := fw.G13MicroseqFinalizeCompute{
+		header: 0x2a
+		job_params_2: 0x8182_8384_8586_8788
+		restart_branch_offset: -0x2345
+	}
+	final_compute_new := fw.g13_microseq_finalize_compute_v13_5(&final_compute)
+	assert object_u64(voidptr(&final_compute_new), 0x18) == final_compute.job_params_2
+	assert i32(object_u32(voidptr(&final_compute_new), 0x58)) == final_compute.restart_branch_offset
+}
+
 fn main() {
 	check_layout_validators()
 	check_fragment_offsets()
 	check_vertex_offsets()
 	check_compute_offsets()
+	check_channel_offsets()
 	check_abi_offset_translation()
+	check_v13_5_command_repacking()
+	check_v13_5_queue_objects()
+	check_v13_5_microsequences()
 	println('G13 work-command layout tests passed')
 }

@@ -1,5 +1,7 @@
 module fw
 
+import gpu.agx.hw
+
 // Firmware channel state structures
 // Defines the shared memory layout for ring buffer channels
 // Translates fw channel structures from the Asahi Linux GPU driver
@@ -49,7 +51,8 @@ pub:
 // G13 v12.3 device-control messages are a 32-bit discriminant followed by a
 // fixed 0x2c-byte payload. Initialize (0x19) carries an all-zero payload.
 pub const device_control_grow_tvb_ack = u32(0x0d)
-pub const device_control_initialize = u32(0x19)
+pub const device_control_initialize_v12_3 = u32(0x19)
+pub const device_control_initialize_v13_5 = u32(0x1a)
 
 @[packed]
 pub struct FwDeviceControlMsg {
@@ -82,9 +85,14 @@ pub fn make_grow_tvb_ack(buffer_slot u32, vm_slot u32, counter u32) FwGrowTVBAck
 	}
 }
 
-pub fn make_device_control_initialize() FwDeviceControlMsg {
+pub fn make_device_control_initialize(abi hw.FirmwareAbi) ?FwDeviceControlMsg {
+	tag := match abi {
+		.v12_3 { device_control_initialize_v12_3 }
+		.v13_5_partial { device_control_initialize_v13_5 }
+		else { return none }
+	}
 	return FwDeviceControlMsg{
-		tag: device_control_initialize
+		tag: tag
 	}
 }
 
@@ -94,12 +102,12 @@ pub fn make_device_control_initialize() FwDeviceControlMsg {
 pub struct FwRunWorkQueueMsg {
 pub mut:
 	pipe_type       u32
-	pad_04          u32
 	work_queue_addr u64
 	write_ptr       u32
 	event_slot      u32
-	is_new          u8
-	pad_19          [31]u8
+	is_new          u32
+	timestamp       u64
+	data            [0x10]u8
 }
 
 // Event channel message
@@ -131,18 +139,10 @@ pub mut:
 	unk_12     u16
 }
 
-// Firmware log channel message
+// Firmware log channel message. Each of the six subchannels uses 0xd8-byte
+// entries; RegionB repeats the same ring address in fwlog_ring2.
 @[packed]
 pub struct FwLogMsg {
-pub mut:
-	msg_type  u32
-	pad_04    u32
-	msg_index u64
-	pad_10    [40]u8
-}
-
-@[packed]
-pub struct FwLogPayloadMsg {
 pub mut:
 	msg_type  u32
 	sequence  u32
@@ -155,14 +155,12 @@ pub mut:
 pub struct FwKTraceMsg {
 pub mut:
 	msg_type  u32
-	pad_04    u32
 	timestamp u64
 	args      [4]u64
 	code      u8
 	channel   u8
 	pad_32    u8
 	thread    u8
-	pad_34    [4]u8
 	unk_flag  u64
 }
 
@@ -174,14 +172,22 @@ pub mut:
 	payload [11]u32
 }
 
+pub fn g13_stats_entry_size(abi hw.FirmwareAbi) ?u32 {
+	return match abi {
+		.v12_3 { u32(0x30) }
+		.v13_5_partial { u32(0x40) }
+		else { none }
+	}
+}
+
 // Validate only the channel envelopes already ported from the G13 v12.3
 // source. This is intentionally distinct from the full-ABI boot gate.
 pub fn validate_g13_channel_layouts() bool {
 	return sizeof(FwChannelState) == 0x30 && sizeof(FwCtlChannelState) == 0x20
 		&& sizeof(ChannelRingPointers) == 0x10 && sizeof(FwDeviceControlMsg) == 0x30
 		&& sizeof(FwGrowTVBAck) == 0x30 && sizeof(FwGrowTVBEvent) == 0x38
-		&& sizeof(FwRunWorkQueueMsg) == 0x38 && sizeof(FwEventMsg) == 0x38
-		&& sizeof(FwFwCtlMsg) == 0x14 && sizeof(FwLogMsg) == 0x38
-		&& sizeof(FwLogPayloadMsg) == 0xd8 && sizeof(FwKTraceMsg) == 0x40
+		&& sizeof(FwRunWorkQueueMsg) == 0x30 && sizeof(FwEventMsg) == 0x38
+		&& sizeof(FwFwCtlMsg) == 0x14 && sizeof(FwLogMsg) == 0xd8
+		&& sizeof(FwKTraceMsg) == 0x38
 		&& sizeof(FwStatsMsg) == 0x30
 }

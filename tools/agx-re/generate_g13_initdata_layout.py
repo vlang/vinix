@@ -28,7 +28,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 DEFAULT_RAW_RS = Path.home() / "code/3rd/m1n1/rust/src/gpu/raw.rs"
-DEFAULT_OUTPUT = Path("../../kernel/modules/gpu/agx/fw/g13_initdata_layout.v")
+DEFAULT_OUTPUT = Path("../../kernel/gpu/agx/fw/g13_initdata_layout.v")
 
 # tools/agx-re/versions: the AGX_VERSIONS table in m1n1's rust/versions crate.
 AXES = {
@@ -396,7 +396,7 @@ REMAPPED = (
         ("g13_globals_put_u32", "g13_globals_put_u16"),
     ),
 )
-KERNEL_FW = Path(__file__).resolve().parents[2] / "kernel/modules/gpu/agx/fw"
+KERNEL_FW = Path(__file__).resolve().parents[2] / "kernel/gpu/agx/fw"
 
 
 # Offsets the builders compute rather than spell out: the base of an array they
@@ -609,6 +609,47 @@ def generate(raw_rs: Path) -> str:
                 f"pub const g13_{label}_{snake}_size = u64({target[name]['size']:#x})"
             )
         lines.append("")
+
+    # HwDataB is first assembled in its established 12.3 typed layout and then
+    # copied field-by-field into the selected ABI blob. Emit the common spans
+    # from the same versioned definitions as the size table: copying the whole
+    # old object would put every field after the expanded YUV table at the
+    # wrong 13.5 address. Fields whose extent changes (YUV and I/O mappings)
+    # are intentionally excluded and populated by their dedicated builders.
+    old_hwdata_b = per_target["v12_3"]["HwDataB"]
+    new_hwdata_b = per_target["v13_5"]["HwDataB"]
+    new_hwdata_b_fields = {member["name"]: member for member in new_hwdata_b["fields"]}
+    hwdata_b_spans = []
+    for old_member in old_hwdata_b["fields"]:
+        new_member = new_hwdata_b_fields.get(old_member["name"])
+        if new_member is None or new_member["size"] != old_member["size"]:
+            continue
+        hwdata_b_spans.append(
+            (old_member["offset"], new_member["offset"], old_member["size"])
+        )
+    lines += [
+        "// Common HwDataB field spans copied from the established 12.3 builder",
+        "// into the 13.5 blob. Changed-size arrays are populated separately.",
+        "pub const g13_hwdata_b_copy_offsets_v12_3 = ["
+        + ", ".join(f"u32({old:#x})" for old, _, _ in hwdata_b_spans)
+        + "]!",
+        "pub const g13_hwdata_b_copy_offsets_v13_5 = ["
+        + ", ".join(f"u32({new:#x})" for _, new, _ in hwdata_b_spans)
+        + "]!",
+        "pub const g13_hwdata_b_copy_sizes = ["
+        + ", ".join(f"u32({size:#x})" for _, _, size in hwdata_b_spans)
+        + "]!",
+    ]
+    for label in TARGETS:
+        member = next(
+            field
+            for field in per_target[label]["HwDataB"]["fields"]
+            if field["name"] == "io_mappings"
+        )
+        lines.append(
+            f"pub const g13_{label}_hw_data_b_io_mappings_offset = u32({member['offset']:#x})"
+        )
+    lines.append("")
 
     lines += [
         "// PowerZone member offsets at each ABI. 13.5 inserts two fields in the",

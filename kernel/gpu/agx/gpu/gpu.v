@@ -266,7 +266,6 @@ mut:
 	runtime_pointers           SharedBuffer
 	globals                    SharedBuffer
 	fw_status                  SharedBuffer
-	fwlog_payload              SharedBuffer
 	hwdata_b                   SharedBuffer
 	hwdata_a                   SharedBuffer
 	stats_vertex               SharedBuffer
@@ -508,7 +507,7 @@ fn (mut mgr GpuManager) map_g13_io_mappings(mut allocations G13ChannelAllocation
 	mut next_va := g13_mmio_va_start
 	mut mapped_count := u32(0)
 	unsafe {
-		mut data := &fw.G13HwDataB(allocations.hwdata_b.phys + higher_half)
+		mut data := &fw.G13HwDataBBlob(allocations.hwdata_b.phys + higher_half)
 		for index := 0; index < fw.g13_io_mapping_count; index++ {
 			mapping := mgr.hw_config.io_mappings[index]
 			if !mapping.is_present() {
@@ -546,12 +545,16 @@ fn (mut mgr GpuManager) map_g13_io_mappings(mut allocations G13ChannelAllocation
 			}
 			allocations.io_mapping_vas[index] = next_va
 			allocations.io_mapping_sizes[index] = map_size
-			data.io_mappings[index] = fw.G13IoMapping{
+			if !fw.set_g13_hwdata_b_io_mapping(mut data, mgr.hw_config.firmware_abi,
+				index, fw.G13IoMapping{
 				physical_address: mapping.phys
 				virtual_address: next_va + page_offset
 				total_size: u32(mapping.size)
 				element_size: u32(mapping.range_size)
 				readwrite: if mapping.writable { u64(1) } else { u64(0) }
+			}) {
+				unmap_g13_io_mappings(mut allocations)
+				return false
 			}
 			mapped_count++
 
@@ -584,7 +587,6 @@ fn (mut mgr GpuManager) free_g13_channel_allocations(mut allocations G13ChannelA
 	mgr.free_shared_buffer(mut allocations.stats_vertex)
 	mgr.free_shared_buffer(mut allocations.hwdata_a)
 	mgr.free_shared_buffer(mut allocations.hwdata_b)
-	mgr.free_shared_buffer(mut allocations.fwlog_payload)
 	mgr.free_shared_buffer(mut allocations.fw_status)
 	mgr.free_shared_buffer(mut allocations.globals)
 	mgr.free_shared_buffer(mut allocations.runtime_pointers)
@@ -637,7 +639,8 @@ fn (mut mgr GpuManager) allocate_g13_channels() ?&G13ChannelAllocations {
 	if !mgr.alloc_g13_channel_pair(mut allocations, g13_ktrace_index, sizeof(channel.RingHeader), u64(fw.ktrace_size) * sizeof(fw.FwKTraceMsg), pgtable.gpu_prot_fw_shared_rw) {
 		return none
 	}
-	if !mgr.alloc_g13_channel_pair(mut allocations, g13_stats_index, sizeof(channel.RingHeader), u64(fw.stats_size) * sizeof(fw.FwStatsMsg), pgtable.gpu_prot_fw_shared_rw) {
+	stats_entry_size := fw.g13_stats_entry_size(mgr.hw_config.firmware_abi) or { return none }
+	if !mgr.alloc_g13_channel_pair(mut allocations, g13_stats_index, sizeof(channel.RingHeader), u64(fw.stats_size) * u64(stats_entry_size), pgtable.gpu_prot_fw_shared_rw) {
 		return none
 	}
 	for pipe := u32(0); pipe < 12; pipe++ {
@@ -677,7 +680,8 @@ fn (mut mgr GpuManager) init_channels() bool {
 	mgr.channels.ktrace = channel.new_rx_channel('ktrace', ktrace_state.va, ktrace_state.phys, ktrace_ring.va, ktrace_ring.phys, fw.ktrace_size, u32(sizeof(fw.FwKTraceMsg)))
 	stats_state := &allocations.states[g13_stats_index]
 	stats_ring := &allocations.rings[g13_stats_index]
-	mgr.channels.stats = channel.new_rx_channel('stats', stats_state.va, stats_state.phys, stats_ring.va, stats_ring.phys, fw.stats_size, u32(sizeof(fw.FwStatsMsg)))
+	stats_entry_size := fw.g13_stats_entry_size(mgr.hw_config.firmware_abi) or { return false }
+	mgr.channels.stats = channel.new_rx_channel('stats', stats_state.va, stats_state.phys, stats_ring.va, stats_ring.phys, fw.stats_size, stats_entry_size)
 	for pipe := u32(0); pipe < 12; pipe++ {
 		state := &allocations.states[g13_pipe_base_index + pipe]
 		ring := &allocations.rings[g13_pipe_base_index + pipe]
@@ -779,8 +783,10 @@ pub fn (mut mgr GpuManager) init() bool {
 		return mgr.fail_g13_initialization()
 	}
 
-	// Step 5: Publish the v12.3 Initialize command before making InitData live.
-	initialize := fw.make_device_control_initialize()
+	// Step 5: Publish the selected ABI's Initialize command before InitData.
+	initialize := fw.make_device_control_initialize(mgr.hw_config.firmware_abi) or {
+		return mgr.fail_g13_initialization()
+	}
 	if !mgr.channels.device_ctrl.enqueue(voidptr(&initialize)) {
 		println('agx: Failed to queue device-control Initialize')
 		return mgr.fail_g13_initialization()
@@ -865,15 +871,14 @@ fn (mut mgr GpuManager) init_firmware_data() bool {
 	graph.fw_status = mgr.alloc_g13_shared_buffer(sizeof(fw.G13FwStatus)) or {
 		return false
 	}
-	graph.fwlog_payload = mgr.alloc_g13_shared_buffer(u64(fw.g13_fwlog_subchannels) * u64(fw.g13_fwlog_payload_count) * sizeof(fw.FwLogPayloadMsg)) or {
-		return false
-	}
-	graph.hwdata_b = mgr.alloc_g13_buffer_with_protection(fw.g13_hwdata_b_size, pgtable.gpu_prot_fw_private_rw) or {
+	hwdata_b_size := fw.g13_hwdata_b_active_size(mgr.hw_config.firmware_abi) or { return false }
+	graph.hwdata_b = mgr.alloc_g13_buffer_with_protection(hwdata_b_size, pgtable.gpu_prot_fw_private_rw) or {
 		return false
 	}
 	unsafe {
-		mut hwdata_b := &fw.G13HwDataB(graph.hwdata_b.phys + higher_half)
-		if !fw.populate_g13_hwdata_b(mut hwdata_b, &mgr.hw_config, uat_mgr.ttbs_base, mmu.uat_unknown_page) {
+		mut hwdata_b := &fw.G13HwDataBBlob(graph.hwdata_b.phys + higher_half)
+		if !fw.populate_g13_hwdata_b_blob(mut hwdata_b, &mgr.hw_config, uat_mgr.ttbs_base,
+			mmu.uat_unknown_page) {
 			return false
 		}
 	}
@@ -926,7 +931,8 @@ fn (mut mgr GpuManager) init_firmware_data() bool {
 		return false
 	}
 	graph.buffer_manager_high_mapped = true
-	graph.initdata = mgr.alloc_g13_buffer_with_protection(fw.g13_initdata_size, pgtable.gpu_prot_fw_private_rw) or {
+	initdata_size := fw.g13_initdata_active_size(mgr.hw_config.firmware_abi) or { return false }
+	graph.initdata = mgr.alloc_g13_buffer_with_protection(initdata_size, pgtable.gpu_prot_fw_private_rw) or {
 		return false
 	}
 
@@ -951,7 +957,8 @@ fn (mut mgr GpuManager) init_firmware_data() bool {
 		runtime.unkptr_198 = graph.unknown_198.va
 		runtime.hwdata_b = graph.hwdata_b.va
 		runtime.hwdata_b_2 = graph.hwdata_b.va
-		runtime.fwlog_buffer = graph.fwlog_payload.va
+		// RegionB repeats the FWLog channel ring at fwlog_ring2.
+		runtime.fwlog_buffer = mgr.channels.fw_log.ring_base
 		runtime.unkptr_1b8 = graph.unknown_1b8.va
 		runtime.unkptr_1c0 = graph.unknown_1c0.va
 		runtime.unkptr_1c8 = graph.unknown_1c8.va
@@ -964,9 +971,14 @@ fn (mut mgr GpuManager) init_firmware_data() bool {
 		status.fwctl = fw.make_g13_ring_pointers(mgr.channels.fw_ctrl.state_base, mgr.channels.fw_ctrl.ring_base)
 	}
 
-	initdata := fw.build_g13_initdata(graph.unknown_buffer.va, graph.runtime_pointers.va, graph.globals.va, graph.fw_status.va, mgr.hw_config.uat_oas) or { return false }
+	mut initdata := fw.G13InitDataBlob{}
+	if !fw.build_g13_initdata_blob(mut initdata, mgr.hw_config.firmware_abi,
+		graph.unknown_buffer.va, graph.runtime_pointers.va, graph.globals.va, graph.fw_status.va,
+		mgr.hw_config.uat_oas) {
+		return false
+	}
 	unsafe {
-		C.memcpy(voidptr(graph.initdata.phys + higher_half), &initdata, sizeof(fw.G13InitData))
+		C.memcpy(voidptr(graph.initdata.phys + higher_half), &initdata, initdata_size)
 	}
 	mgr.initdata_va = graph.initdata.va
 	mgr.initdata_phys = graph.initdata.phys

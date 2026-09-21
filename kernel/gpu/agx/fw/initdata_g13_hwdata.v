@@ -10,6 +10,15 @@ import gpu.agx.hw
 pub const g13_hwdata_b_size = u64(0xb6c)
 pub const g13_io_mapping_count = 20
 
+// Backing storage for either supported G13 HwDataB layout. The established
+// typed structure below remains the byte authority for 12.3; 13.5 moves most
+// of its fields and expands two arrays, so it is published through this blob.
+@[packed]
+pub struct G13HwDataBBlob {
+pub mut:
+	bytes [0x1884]u8
+}
+
 @[packed]
 pub struct G13IoMapping {
 pub mut:
@@ -175,6 +184,8 @@ pub fn populate_g13_hwdata_b(mut data G13HwDataB, config &hw.HwConfig,
 	data.unk_008 = 0x14_00000000
 	data.unk_010 = 0x1_00000000
 	data.unk_018 = 0xffc00000
+	data.usc_start = 0x11_00000000
+	data.usc_end = 0x11_00000000
 	data.unknown_page = unknown_page
 	data.unkptr_038 = 0xffffffa0_11800000
 	data.chip_id = config.chip_id
@@ -257,7 +268,122 @@ pub fn populate_g13_hwdata_b(mut data G13HwDataB, config &hw.HwConfig,
 	return true
 }
 
+fn g13_hwdata_b_blob_put_u32(mut data G13HwDataBBlob, abi hw.FirmwareAbi,
+	offset u32, value u32) bool {
+	active := g13_hwdata_b_active_size(abi) or { return false }
+	if offset > u32(active) - 4 {
+		return false
+	}
+	index := int(offset)
+	data.bytes[index] = u8(value)
+	data.bytes[index + 1] = u8(value >> 8)
+	data.bytes[index + 2] = u8(value >> 16)
+	data.bytes[index + 3] = u8(value >> 24)
+	return true
+}
+
+fn g13_hwdata_b_blob_put_u64(mut data G13HwDataBBlob, abi hw.FirmwareAbi,
+	offset u32, value u64) bool {
+	return g13_hwdata_b_blob_put_u32(mut data, abi, offset, u32(value))
+		&& g13_hwdata_b_blob_put_u32(mut data, abi, offset + 4, u32(value >> 32))
+}
+
+// Build HwDataB through the already byte-validated 12.3 representation, then
+// move each common field to its 13.5 address. The span table is generated from
+// m1n1's versioned raw structures; arrays whose extent changed are excluded.
+pub fn populate_g13_hwdata_b_blob(mut data G13HwDataBBlob, config &hw.HwConfig,
+	uat_ttb_base u64, unknown_page u64) bool {
+	if !g13_initdata_abi_supported(config.firmware_abi) {
+		return false
+	}
+	mut legacy := G13HwDataB{}
+	if !populate_g13_hwdata_b(mut legacy, config, uat_ttb_base, unknown_page) {
+		return false
+	}
+	legacy_bytes := unsafe { &u8(&legacy) }
+	if config.firmware_abi == .v12_3 {
+		for index := 0; index < int(g13_v12_3_hw_data_b_size); index++ {
+			unsafe {
+				data.bytes[index] = legacy_bytes[index]
+			}
+		}
+		return true
+	}
+	if config.firmware_abi != .v13_5_partial
+		|| g13_hwdata_b_copy_offsets_v12_3.len != g13_hwdata_b_copy_offsets_v13_5.len
+		|| g13_hwdata_b_copy_offsets_v12_3.len != g13_hwdata_b_copy_sizes.len {
+		return false
+	}
+	for span := 0; span < g13_hwdata_b_copy_offsets_v12_3.len; span++ {
+		source := int(g13_hwdata_b_copy_offsets_v12_3[span])
+		destination := int(g13_hwdata_b_copy_offsets_v13_5[span])
+		length := int(g13_hwdata_b_copy_sizes[span])
+		for byte := 0; byte < length; byte++ {
+			unsafe {
+				data.bytes[destination + byte] = legacy_bytes[source + byte]
+			}
+		}
+	}
+
+	// 13.5 additions with non-zero values from m1n1's G13 builder.
+	for index := u32(0); index < 16; index++ {
+		if !g13_hwdata_b_blob_put_u32(mut data, config.firmware_abi,
+			g13_v13_5_hwdata_b_unk_arr_0_offset + index * 4, index) {
+			return false
+		}
+	}
+	if !g13_hwdata_b_blob_put_u32(mut data, config.firmware_abi,
+		g13_v13_5_hwdata_b_unk_b38_0_offset, 1)
+		|| !g13_hwdata_b_blob_put_u32(mut data, config.firmware_abi,
+		g13_v13_5_hwdata_b_unk_b38_4_offset, 1)
+		|| !g13_hwdata_b_blob_put_u32(mut data, config.firmware_abi,
+		g13_v13_5_hwdata_b_unk_c3c_offset, 0x1a) {
+		return false
+	}
+	// unk_ae4 is common to both layouts, but its G13 values narrowed at 13.0.
+	for index, value in [u32(0), 3, 7, 7] {
+		if !g13_hwdata_b_blob_put_u32(mut data, config.firmware_abi,
+			0x16ec + u32(index * 4), value) {
+			return false
+		}
+	}
+	return true
+}
+
+fn g13_hwdata_b_io_mappings_offset(abi hw.FirmwareAbi) ?u32 {
+	return match abi {
+		.v12_3 { g13_v12_3_hw_data_b_io_mappings_offset }
+		.v13_5_partial { g13_v13_5_hw_data_b_io_mappings_offset }
+		else { none }
+	}
+}
+
+pub fn set_g13_hwdata_b_io_mapping(mut data G13HwDataBBlob, abi hw.FirmwareAbi,
+	index u32, mapping G13IoMapping) bool {
+	count := g13_active_io_mapping_count(abi) or { return false }
+	base := g13_hwdata_b_io_mappings_offset(abi) or { return false }
+	if index >= count {
+		return false
+	}
+	offset := base + index * u32(sizeof(G13IoMapping))
+	return g13_hwdata_b_blob_put_u64(mut data, abi, offset, mapping.physical_address)
+		&& g13_hwdata_b_blob_put_u64(mut data, abi, offset + 8, mapping.virtual_address)
+		&& g13_hwdata_b_blob_put_u32(mut data, abi, offset + 16, mapping.total_size)
+		&& g13_hwdata_b_blob_put_u32(mut data, abi, offset + 20, mapping.element_size)
+		&& g13_hwdata_b_blob_put_u64(mut data, abi, offset + 24, mapping.readwrite)
+}
+
+pub fn read_g13_hwdata_b_blob_u32(data &G13HwDataBBlob, offset u32) ?u32 {
+	if offset > u32(g13_v13_5_hw_data_b_size) - 4 {
+		return none
+	}
+	index := int(offset)
+	return u32(data.bytes[index]) | (u32(data.bytes[index + 1]) << 8)
+		| (u32(data.bytes[index + 2]) << 16) | (u32(data.bytes[index + 3]) << 24)
+}
+
 pub fn validate_g13_hwdata_layouts() bool {
 	return sizeof(G13IoMapping) == 0x20 && sizeof(G13HwDataB) == g13_hwdata_b_size
+		&& sizeof(G13HwDataBBlob) == g13_v13_5_hw_data_b_size
 		&& validate_g13_hwdata_a_layout()
 }
