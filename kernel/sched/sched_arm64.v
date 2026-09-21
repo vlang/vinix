@@ -79,19 +79,55 @@ fn scheduler_gpu_context_trace(gpr_state voidptr, phase u64) {
 	if katomic.load(&gpu_exec_switch_state) != u64(gpr_state) {
 		return
 	}
+	state := unsafe { &cpulocal.GPRState(gpr_state) }
 
 	match phase {
 		0 { println('exec[gpu]/switch: entered sched_switch_context assembly') }
 		1 { println('exec[gpu]/switch: ELR and SPSR programmed') }
 		2 {
+			println('exec[gpu]/switch: eret readback ELR=0x${cpu.read_elr_el1():x} SPSR=0x${cpu.read_spsr_el1():x} CurrentEL=0x${cpu.read_currentel():x}')
+			println('exec[gpu]/switch: saved target pc=0x${state.pc:x} sp=0x${state.sp:x} pstate=0x${state.pstate:x} tls=0x${state.tpidr_el0:x}')
 			println('exec[gpu]/switch: target stack and TPIDR ready; restoring GPRs and executing eret')
-			// The next observable point is either a userspace page fault or the
-			// first syscall. Do not trace later timeslices of the same thread.
-			katomic.store(mut &gpu_exec_switch_state, u64(0))
-			katomic.store(mut &gpu_exec_switch_cpu, u64(-1))
+			// Keep the trace armed across eret. The first lower-EL exception
+			// vector clears it after saving the exception frame, which lets the
+			// M1 distinguish an eret which never completes from an immediate
+			// instruction abort, interrupt, FIQ, or SError.
 		}
 		else { println('exec[gpu]/switch: unknown assembly phase ${phase}') }
 	}
+}
+
+// Record the very first exception after the initial context switch into the
+// GPU desktop. This hook is called directly by the lower-EL vector stubs after
+// SAVE_REGS has made the interrupted user register state safe. It intentionally
+// runs before the ordinary syscall, page-fault, and IRQ dispatchers: if one of
+// those paths stalls, the last visible line still identifies the exception
+// which successfully crossed eret.
+@[export: 'scheduler_gpu_lower_exception_trace']
+fn scheduler_gpu_lower_exception_trace(esr u64, far u64, raw_state voidptr, kind u64) {
+	if katomic.load(&gpu_exec_switch_state) == 0 {
+		return
+	}
+	cpu_number := cpu.read_tpidr_el1()
+	if katomic.load(&gpu_exec_switch_cpu) != cpu_number {
+		return
+	}
+
+	// Disarm before printing so a nested exception cannot recursively emit the
+	// trace, and so normal later timeslices of this process remain quiet.
+	katomic.store(mut &gpu_exec_switch_state, u64(0))
+	katomic.store(mut &gpu_exec_switch_cpu, u64(-1))
+	state := unsafe { &cpulocal.GPRState(raw_state) }
+	name := match kind {
+		0 { 'synchronous' }
+		1 { 'IRQ' }
+		2 { 'FIQ' }
+		3 { 'SError' }
+		else { 'unknown' }
+	}
+	println('exec[gpu]/eret: crossed into EL0; first lower-EL ${name} vector entered on CPU ${cpu_number}')
+	println('exec[gpu]/eret: ESR=0x${esr:x} EC=0x${esr >> 26:x} FAR=0x${far:x}')
+	println('exec[gpu]/eret: exception frame pc=0x${state.pc:x} sp=0x${state.sp:x} pstate=0x${state.pstate:x} x0=0x${state.x0:x} x8=0x${state.x8:x}')
 }
 
 pub fn initialise() {
@@ -704,8 +740,11 @@ fn scheduler_timer_handler(_gpr_state voidptr) {
 	if trace_gpu_dispatch {
 		println('exec[gpu]/sched: run-queue selection returned')
 	}
+	// Only the replacement thread whose first handoff was explicitly armed is
+	// interesting here. Matching the executable path alone keeps tracing every
+	// later desktop timeslice and quickly buries the one-shot eret diagnostic.
 	trace_gpu_next := unsafe { next_thread != nil }
-		&& next_thread.process.executable_path == '/usr/bin/vinix-desktop-gpu'
+		&& katomic.load(&gpu_exec_switch_state) == u64(&next_thread.gpr_state)
 	if trace_gpu_next {
 		println('exec[gpu]/sched: CPU ${cpu_local.cpu_number} selected replacement thread from run queue')
 		println('exec[gpu]/sched: target pc=0x${next_thread.gpr_state.pc:x} sp=0x${next_thread.gpr_state.sp:x} ttbr0=0x${next_thread.ttbr0:x}')
