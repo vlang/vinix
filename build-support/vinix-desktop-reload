@@ -35,4 +35,14 @@ rm -f /run/vinix-desktop-ready
 trap - EXIT HUP INT TERM
 
 echo "vinix-desktop-reload: installed $destination; reloading the desktop"
-kill -HUP 1
+desktop_pids=$(/bin/busybox pidof vinix-desktop 2>/dev/null || true)
+set -- $desktop_pids
+if [ "$#" -ne 1 ]; then
+	echo "vinix-desktop-reload: expected one running desktop, found $#: ${desktop_pids:-none}" >&2
+	exit 1
+fi
+# Signal the compositor itself. It execs the newly installed inode in place,
+# preserving the framebuffer's graphics owner across the replacement. Sending
+# this through PID 1 made the old process exit first, which briefly restored
+# the full kernel boot console and looked like a machine crash/reboot.
+kill -HUP "$1"

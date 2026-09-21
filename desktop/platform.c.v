@@ -651,6 +651,24 @@ fn desktop_is_development_session() bool {
 	return C.access(c'/run/vinix-desktop-development', 0) == 0
 }
 
+// Replace the supervised compositor without changing its PID. Vinix ties
+// framebuffer graphics mode to the owning process rather than to an open file
+// descriptor, so exec-in-place keeps the kernel console from repainting its
+// boot log between the old and new program images. The caller has already
+// stopped every application and closed its devices before entering here.
+fn desktop_exec_replacement() {
+	argv := [c'/usr/bin/vinix-desktop', &char(unsafe { nil })]
+	envp := [c'PATH=/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin', c'HOME=/root',
+		c'TERM=linux', c'PS1=vinix# ', c'USER=root', c'LOGNAME=root', c'SHELL=/bin/zsh',
+		c'LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules',
+		c'LIBGL_DRIVERS_PATH=/usr/lib/xorg/modules/dri:/usr/lib/dri',
+		c'XDG_RUNTIME_DIR=/run/user/0', c'XDG_CONFIG_HOME=/root/.config',
+		c'XDG_CACHE_HOME=/root/.cache', c'SSL_CA_CERT_FILE=/etc/ssl/certs/ca-certificates.crt',
+		c'VINIX_SYSTEM_SESSION=1', &char(unsafe { nil })]
+	C.execve(argv[0], argv.data, envp.data)
+	eprintln('vinix-desktop: could not execute the replacement desktop')
+}
+
 // Hand the machine to the kernel. reboot(2) only returns when it refuses, so
 // everything the session wanted to finish must already be done.
 fn desktop_power_apply(action PowerAction) {

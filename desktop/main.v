@@ -145,9 +145,6 @@ fn main() {
 	defer {
 		fb.close()
 	}
-	if desktop_is_development_session() {
-		fb.present_starting_screen()
-	}
 
 	gpu_present_startup_stage(c'loading preferences')
 	mut preferences := desktop_load_preferences(desktop_home)
@@ -367,21 +364,28 @@ fn main() {
 	// that is no longer being redrawn.
 	desktop.close_apps()
 	desktop.capture_close()
-	// Keep the last complete frame visible during a development reload. The
-	// native TCC build needs appreciably longer than the packaged optimised
-	// binary to compose its first frame; blanking here made that normal startup
-	// interval indistinguishable from a crashed VM. Power actions still clear
-	// the display before handing it back to the system console.
-	if desktop.power != .reload_desktop {
-		desktop.canvas.clip = Clip{
-			x: 0
-			y: 0
-			w: desktop.canvas.width
-			h: desktop.canvas.height
-		}
-		desktop.canvas.clear(0x000000)
-		fb.present(&desktop.canvas, desktop_current_scale())
+	if desktop.power == .reload_desktop {
+		// Close every inherited device before exec, but keep this process alive:
+		// graphics-mode ownership is PID based, so the last complete frame stays
+		// visible until the replacement compositor presents its first one.
+		keyboard.close()
+		pointer.close()
+		fb.close()
+		println('vinix-desktop: ${desktop.frames} frames; executing replacement')
+		desktop_exec_replacement()
+		// execve only returns on failure. Let PID 1's ordinary crash recovery
+		// start the installed binary instead of drawing through closed devices.
+		return
 	}
+	// Power actions hand the display back to the system console.
+	desktop.canvas.clip = Clip{
+		x: 0
+		y: 0
+		w: desktop.canvas.width
+		h: desktop.canvas.height
+	}
+	desktop.canvas.clear(0x000000)
+	fb.present(&desktop.canvas, desktop_current_scale())
 	println('vinix-desktop: ${desktop.frames} frames')
 
 	// Nothing above has to be undone afterwards: this does not return unless
