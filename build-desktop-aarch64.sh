@@ -597,9 +597,23 @@ if [ "$REUSE_STAGING" -eq 0 ]; then
         # GCC's lto-dump is a standalone compiler-internals inspection utility,
         # not part of compiling or linking programs. Keeping its second 32 MiB
         # copy of the LTO frontend can push a Word-enabled compact initramfs above
-        # FAT32's 4 GiB per-file limit, so omit it from the bootable image while
-        # retaining gcc, cc1 and lto1.
+        # FAT32's 4 GiB per-file limit, so omit it from the bootable image.
         rm -f "$STAGING/usr/bin/lto-dump"
+
+        # The compact image promises a native C toolchain for rebuilding V
+        # programs in the guest. C++ and link-time optimisation are separate
+        # compiler frontends and together cost about 70 MiB before compression.
+        # Neither is used by vinix-desktop-build, so leave them in full images
+        # while keeping the ESP-bound image small enough to deploy atomically.
+        rm -f \
+            "$STAGING/usr/bin/g++" \
+            "$STAGING/usr/bin/c++" \
+            "$STAGING/usr/bin/aarch64-alpine-linux-musl-g++" \
+            "$STAGING/usr/bin/aarch64-alpine-linux-musl-c++"
+        rm -f \
+            "$STAGING"/usr/libexec/gcc/*/*/cc1plus \
+            "$STAGING"/usr/libexec/gcc/*/*/lto1 \
+            "$STAGING"/usr/libexec/gcc/*/*/lto-wrapper
 
         # The full userland has GNU coreutils, which replaces some of Alpine's
         # BusyBox links.  Compact images omit that package, so make its complete
@@ -671,7 +685,8 @@ if [ "$REUSE_STAGING" -eq 0 ]; then
     echo "    staging the native V compiler"
     merge_staging_tree "$VLANG_STAGING"
 
-    if [ -x "$BLENDER_NATIVE_STAGING/usr/libexec/vinix-blender-native" ]; then
+    if [ "$COMPACT_INITRAMFS" -eq 0 ] &&
+       [ -x "$BLENDER_NATIVE_STAGING/usr/libexec/vinix-blender-native" ]; then
         echo "==> Staging native Blender GHOST executable"
         merge_staging_tree "$BLENDER_NATIVE_STAGING"
     fi
@@ -743,6 +758,19 @@ if [ "$REUSE_STAGING" -eq 0 ]; then
     # silently, with no commit to point at.
     if [ "$GPU_DESKTOP_BUILT" -eq 1 ] && [ "$WITH_ASAHI_GPU" -eq 1 ]; then
         merge_staging_tree "$ASAHI_STAGING"
+
+        # The X11 layer supplies a generic LLVM-backed Mesa closure for QEMU.
+        # The hardware image replaces it with the qualified Asahi build above,
+        # which has its own Gallium and no LLVM dependency. Keeping both copies
+        # wastes more than 190 MiB and makes the compressed image too large for
+        # the M1's 500 MiB ESP. Remove only the generic rendering artifacts; the
+        # X server and the Asahi /usr/lib/dri driver remain intact.
+        rm -rf "${STAGING:?}/usr/lib/xorg/modules/dri"
+        rm -f \
+            "$STAGING"/usr/lib/libLLVM-*.so* \
+            "$STAGING"/usr/lib/libOSMesa.so* \
+            "$STAGING"/usr/lib/libxatracker.so* \
+            "$STAGING"/usr/lib/libGLU.so*
     elif [ -d "$X11_STAGING/usr/lib/xorg/modules/dri" ]; then
         # Nothing else fills /usr/lib/dri: the Apple overlay was the only thing
         # putting drivers there, so skipping it leaves Mesa with none at all. The
