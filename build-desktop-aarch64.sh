@@ -205,6 +205,62 @@ if [ -n "$WIFI_BUNDLE" ]; then
     done
 fi
 
+# Every desktop variant uses the same generated C, compiled binaries, assembled
+# root and (unless explicitly overridden) output archive. In particular, the
+# QEMU runner builds a full generic-Mesa image while the M1 deployment path
+# builds a compact Asahi image. Letting those run together means either build
+# can remove build/initramfs-root while the other is overlaying or validating
+# it; the loser then reports apparently impossible missing base executables.
+# Serialize the complete pipeline, not just the final tar rename, because the
+# compiler outputs and staging tree are shared too.
+DESKTOP_BUILD_LOCK="$BUILD_DIR/.build-desktop-aarch64.lock"
+desktop_build_lock_owner() {
+    if [ -L "$DESKTOP_BUILD_LOCK" ]; then
+        readlink "$DESKTOP_BUILD_LOCK" 2>/dev/null || true
+    elif [ -f "$DESKTOP_BUILD_LOCK/pid" ]; then
+        # Compatibility with a build which started while this change was being
+        # installed and had already acquired the directory-form lock.
+        cat "$DESKTOP_BUILD_LOCK/pid" 2>/dev/null || true
+    fi
+}
+
+release_desktop_build_lock() {
+    local owner
+
+    owner="$(desktop_build_lock_owner)"
+    if [ "$owner" = "$$" ]; then
+        if [ -L "$DESKTOP_BUILD_LOCK" ]; then
+            rm -f "$DESKTOP_BUILD_LOCK"
+        else
+            rm -rf "$DESKTOP_BUILD_LOCK"
+        fi
+    fi
+}
+
+mkdir -p "$BUILD_DIR"
+build_lock_wait_reported=0
+while ! ln -s "$$" "$DESKTOP_BUILD_LOCK" 2>/dev/null; do
+    build_lock_owner="$(desktop_build_lock_owner)"
+    if [ -n "$build_lock_owner" ] && ! kill -0 "$build_lock_owner" 2>/dev/null; then
+        if [ -L "$DESKTOP_BUILD_LOCK" ]; then
+            rm -f "$DESKTOP_BUILD_LOCK"
+        else
+            rm -rf "$DESKTOP_BUILD_LOCK"
+        fi
+        continue
+    fi
+    if [ "$build_lock_wait_reported" -eq 0 ]; then
+        if [ -n "$build_lock_owner" ]; then
+            echo "==> Another desktop build (PID $build_lock_owner) is active; waiting..."
+        else
+            echo "==> Another desktop build is starting; waiting..."
+        fi
+        build_lock_wait_reported=1
+    fi
+    sleep 1
+done
+trap release_desktop_build_lock EXIT
+
 archive_has_member() {
     local archive="$1"
     local member="$2"
@@ -522,13 +578,15 @@ cleanup_desktop_cache_temps() {
     if [ -n "$CONTENT_KEY_EXPECTED" ]; then
         rm -f "$CONTENT_KEY_EXPECTED"
     fi
+    release_desktop_build_lock
 }
 trap cleanup_desktop_cache_temps EXIT
 write_staging_cache_manifest > "$STAGING_CACHE_EXPECTED"
 REUSE_STAGING=0
 if [ "$REFRESH_STAGING" -eq 0 ] &&
    [ -d "$STAGING" ] && [ -f "$STAGING_CACHE" ] &&
-   cmp -s "$STAGING_CACHE_EXPECTED" "$STAGING_CACHE"; then
+   cmp -s "$STAGING_CACHE_EXPECTED" "$STAGING_CACHE" &&
+   [ -x "$STAGING/bin/busybox" ] && [ -x "$STAGING/usr/bin/vim" ]; then
     REUSE_STAGING=1
     echo "    reusing staged base/application layers"
 else
@@ -1201,6 +1259,7 @@ if [ "$REUSE_STAGING" -eq 1 ] &&
     echo "==> Desktop image content unchanged; keeping existing archive"
     echo "    $DESKTOP_INITRAMFS ($(file_size "$DESKTOP_INITRAMFS") bytes)"
     rm -f "$STAGING_CACHE_EXPECTED" "$CONTENT_KEY_EXPECTED"
+    release_desktop_build_lock
     trap - EXIT
     exit 0
 fi
@@ -1246,4 +1305,5 @@ fi
 # reusable.
 mv -f "$STAGING_CACHE_EXPECTED" "$STAGING_CACHE"
 mv -f "$CONTENT_KEY_EXPECTED" "$CONTENT_KEY"
+release_desktop_build_lock
 trap - EXIT

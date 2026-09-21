@@ -643,7 +643,10 @@ fi
 # lock it could not get. Catching it here says which process to deal with, and
 # says it before anything has been modified.
 if [ -f "$BOOT_DISK" ] && command -v lsof >/dev/null 2>&1; then
-    HOLDERS="$(lsof -t -- "$BOOT_DISK" 2>/dev/null | tr '\n' ' ')"
+    # lsof uses status 1 for the ordinary "no matching open files" result.
+    # Under this script's pipefail mode that must not become a silent runner
+    # failure before QEMU has even been launched.
+    HOLDERS="$(lsof -t -- "$BOOT_DISK" 2>/dev/null | tr '\n' ' ' || true)"
     if [ -n "${HOLDERS// /}" ]; then
         # Only a QEMU is safe to stop on the strength of holding this file.
         NON_QEMU=""
@@ -681,7 +684,7 @@ if [ -f "$BOOT_DISK" ] && command -v lsof >/dev/null 2>&1; then
 fi
 
 if [ "$PERSIST_ENABLED" -eq 1 ] && command -v lsof >/dev/null 2>&1; then
-    PERSIST_HOLDERS="$(lsof -t -- "$PERSIST_DISK" 2>/dev/null | tr '\n' ' ')"
+    PERSIST_HOLDERS="$(lsof -t -- "$PERSIST_DISK" 2>/dev/null | tr '\n' ' ' || true)"
     if [ -n "${PERSIST_HOLDERS// /}" ]; then
         echo "ERROR: persistent disk is already in use: $PERSIST_DISK" >&2
         for pid in $PERSIST_HOLDERS; do
