@@ -31,6 +31,13 @@ import krandom
 // Keep in sync with the bounds check in asm/aarch64/vectors.S.
 const linux_syscall_max = 512
 
+// A Mesa-enabled desktop has a substantially larger dynamic-link closure than
+// the framebuffer-only binary.  Keep tracing until the loader reaches the
+// desktop's first diagnostic write instead of guessing how many loader
+// syscalls that will take.  The high guard is only a runaway-safety bound; its
+// exhaustion is reported explicitly rather than making the boot appear hung.
+const gpu_desktop_trace_limit = u64(4096)
+
 @[export: 'syscall_table']
 __global (
 	syscall_table [linux_syscall_max]voidptr
@@ -67,16 +74,22 @@ mut:
 }
 
 __global (
-	sc_trace_active    = bool(false)
-	sc_ring            [64]SyscallTraceEntry
-	sc_ring_idx        = u64(0)
-	sc_trace_pid       = u64(0) // PID to trace (0 = all)
-	sc_trace_gpr_state = u64(0)
+	sc_trace_active                     = bool(false)
+	sc_ring                             [64]SyscallTraceEntry
+	sc_ring_idx                         = u64(0)
+	sc_trace_pid                        = u64(0) // PID to trace (0 = all)
+	sc_trace_gpr_state                  = u64(0)
 	// A short framebuffer-visible trace bridges the gap between exec's final
-	// scheduler handoff and vinix-desktop-gpu reaching main(). Keep it bounded:
-	// once userspace is healthy, the desktop becomes syscall-heavy immediately.
-	gpu_desktop_trace_pid   = u64(0)
-	gpu_desktop_trace_count = u64(0)
+	// scheduler handoff and vinix-desktop-gpu reaching main().  The trace turns
+	// itself off when userspace first writes a diagnostic, at which point the
+	// desktop's finer-grained startup-stage logger takes over.
+	gpu_desktop_trace_pid               = u64(0)
+	gpu_desktop_trace_count             = u64(0)
+	gpu_desktop_trace_pending           = bool(false)
+	gpu_desktop_trace_sequence          = u64(0)
+	gpu_desktop_trace_nr                = u64(0)
+	gpu_desktop_trace_stop_after_return = bool(false)
+	gpu_desktop_trace_finished          = bool(false)
 )
 
 // Called at explicit assembly boundaries around the common syscall hook. The
@@ -121,11 +134,25 @@ pub fn syscall_trace(gpr_state voidptr) {
 		if gpu_desktop_trace_pid != pid {
 			gpu_desktop_trace_pid = pid
 			gpu_desktop_trace_count = 0
+			gpu_desktop_trace_pending = false
+			gpu_desktop_trace_stop_after_return = false
+			gpu_desktop_trace_finished = false
 		}
 		sequence := gpu_desktop_trace_count
 		gpu_desktop_trace_count++
-		if sequence < 64 {
-			trace_timeslice := if current_thread.timeslice != 0 { current_thread.timeslice } else { u64(1) }
+		if !gpu_desktop_trace_finished && sequence < gpu_desktop_trace_limit {
+			trace_timeslice := if current_thread.timeslice != 0 {
+				current_thread.timeslice
+			} else {
+				u64(1)
+			}
+			gpu_desktop_trace_pending = true
+			gpu_desktop_trace_sequence = sequence
+			gpu_desktop_trace_nr = nr
+			// gpu_present_startup_stage() writes to stderr.  Once either standard
+			// stream is active, kernel syscall noise would only hide the much more
+			// useful desktop and EGL stage diagnostics.
+			gpu_desktop_trace_stop_after_return = (nr == 64 || nr == 66) && gpr.x0 <= 2
 			// Console diagnostics redraw the framebuffer and can outlive a 5 ms
 			// quantum. Do not let their elapsed time become an immediate FIQ at
 			// the syscall-vector return; restart a fresh slice after the last line.
@@ -134,6 +161,16 @@ pub fn syscall_trace(gpr_state voidptr) {
 				println('exec[gpu]: replacement thread entered userspace')
 			}
 			println('exec[gpu]: syscall #${sequence} enter nr=${nr} pc=0x${gpr.pc:x} sp=0x${gpr.sp:x}')
+			timer.oneshot(trace_timeslice)
+		} else if !gpu_desktop_trace_finished && sequence == gpu_desktop_trace_limit {
+			trace_timeslice := if current_thread.timeslice != 0 {
+				current_thread.timeslice
+			} else {
+				u64(1)
+			}
+			timer.stop()
+			println('exec[gpu]: syscall trace safety limit ${gpu_desktop_trace_limit} reached before userspace output')
+			gpu_desktop_trace_finished = true
 			timer.oneshot(trace_timeslice)
 		}
 	}
@@ -174,12 +211,22 @@ pub fn syscall_trace_ret(ret u64, err u64) {
 	trace_gpu_return := current_thread != unsafe { nil }
 		&& current_thread.process.executable_path == '/usr/bin/vinix-desktop-gpu'
 		&& u64(current_thread.process.pid) == gpu_desktop_trace_pid
-		&& gpu_desktop_trace_count <= 64
+		&& gpu_desktop_trace_pending
 	mut trace_timeslice := u64(0)
 	if trace_gpu_return {
-		trace_timeslice = if current_thread.timeslice != 0 { current_thread.timeslice } else { u64(1) }
+		trace_timeslice = if current_thread.timeslice != 0 {
+			current_thread.timeslice
+		} else {
+			u64(1)
+		}
 		timer.stop()
-		println('exec[gpu]: syscall return value=0x${ret:x} errno=${err}')
+		println('exec[gpu]: syscall #${gpu_desktop_trace_sequence} nr=${gpu_desktop_trace_nr} return value=0x${ret:x} errno=${err}')
+		gpu_desktop_trace_pending = false
+		if gpu_desktop_trace_stop_after_return {
+			println('exec[gpu]: userspace diagnostics active; continuing with desktop stage trace')
+			gpu_desktop_trace_stop_after_return = false
+			gpu_desktop_trace_finished = true
+		}
 	}
 
 	if !sc_trace_active {
