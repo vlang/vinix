@@ -49,11 +49,6 @@ pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
 		return none
 	}
 
-	prev := cpu.interrupt_toggle(true)
-	defer {
-		cpu.interrupt_toggle(prev)
-	}
-
 	mut process := current_thread.process
 	mut pagemap := process.pagemap
 	trace_gpu := process.executable_path == '/usr/bin/vinix-desktop-gpu'
@@ -70,7 +65,22 @@ pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
 		trace_this_fault = trace_sequence < 32
 		if trace_this_fault {
 			println('exec[gpu]: page fault #${trace_sequence} begin addr=0x${addr:x} pc=0x${gpr_state.pc:x} esr=0x${esr:x}')
+			println('exec[gpu]: page fault #${trace_sequence} retaining exception interrupt mask during traced resolution')
 		}
+	}
+
+	// Normally a demand fault may be preempted while it obtains and installs
+	// the backing page. The bounded GPU-exec trace above is deliberately slow:
+	// every line also redraws the framebuffer, so the first three vector lines
+	// consume the freshly armed 5 ms slice. Enabling FIQs here then dispatches
+	// the expired scheduler timer before the first page-fault checkpoint and
+	// makes the diagnostic itself look like a fault-handler hang on the M1.
+	// Keep the exception entry mask for traced faults. The pending timer is
+	// delivered as soon as the vector restores EL0, after the PTE and cache
+	// maintenance are complete; ordinary untraced faults remain preemptible.
+	prev := cpu.interrupt_toggle(!trace_this_fault)
+	defer {
+		cpu.interrupt_toggle(prev)
 	}
 
 	if trace_this_fault {
