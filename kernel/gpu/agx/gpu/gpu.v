@@ -227,11 +227,13 @@ fn (mut mgr GpuManager) stop_firmware_cpus(count u32) {
 
 struct SharedBuffer {
 mut:
-	va        u64
-	phys      u64
-	size      u64
-	allocator u32
-	mapped    bool
+	va                  u64
+	phys                u64
+	size                u64
+	protection          u64
+	allocator           u32
+	mapped              bool
+	cache_flush_pending bool
 }
 
 @[inline]
@@ -350,8 +352,10 @@ fn alloc_buffer_from_heap(mut heap alloc.HeapAllocator, size u64, protection u64
 		va: va
 		phys: phys
 		size: aligned_size
+		protection: protection
 		allocator: allocator_id
 		mapped: true
+		cache_flush_pending: pgtable.is_cached_noncoherent(protection)
 	}
 }
 
@@ -438,8 +442,10 @@ fn alloc_fixed_buffer(iova u64, size u64, protection u64) ?SharedBuffer {
 		va: iova
 		phys: phys
 		size: aligned_size
+		protection: protection
 		allocator: buffer_allocator_fixed
 		mapped: true
+		cache_flush_pending: pgtable.is_cached_noncoherent(protection)
 	}
 }
 
@@ -454,6 +460,56 @@ fn unmap_shared_buffer(mut buffer SharedBuffer) {
 		uat_mgr.unmap_kernel(buffer.va, buffer.size)
 	}
 	buffer.mapped = false
+}
+
+// Perform the cache-safe teardown sequence recovered by m1n1 and implemented
+// by Asahi's KernelMapping::drop. Cached firmware mappings must remain valid
+// while firmware discards their noncoherent cache lines; only then may their
+// PTEs be removed. The second invalidation retires the uncached translation.
+fn (mut mgr GpuManager) invalidate_g13_shared_buffer(mut buffer SharedBuffer) bool {
+	if buffer.va == 0 || buffer.size == 0 || uat_mgr == unsafe { nil } {
+		return false
+	}
+	// A previous attempt may have removed the PTE and then lost the final
+	// firmware acknowledgement. Keep retrying that final invalidation without
+	// ever remapping or releasing the backing.
+	if !buffer.mapped {
+		return mgr.flush_g13_uat_range(mmu.uat_kernel_flush_slot, buffer.va, buffer.size)
+	}
+	if buffer.cache_flush_pending {
+		if pgtable.is_cached_noncoherent(buffer.protection) {
+			uncached := pgtable.as_uncached(buffer.protection)
+			if !uat_mgr.reprotect_kernel(buffer.va, buffer.size, uncached) {
+				return false
+			}
+			buffer.protection = uncached
+		}
+		if !mgr.flush_g13_uat_range(mmu.uat_kernel_flush_slot, buffer.va, buffer.size) {
+			return false
+		}
+		buffer.cache_flush_pending = false
+	}
+	unmap_shared_buffer(mut buffer)
+	return mgr.flush_g13_uat_range(mmu.uat_kernel_flush_slot, buffer.va, buffer.size)
+}
+
+fn (mut mgr GpuManager) invalidate_g13_driver_buffer(mut context mmu.UatContext,
+	buffer &mmu.UatBuffer) bool {
+	if context == unsafe { nil } || buffer == unsafe { nil } || buffer.va == 0
+		|| buffer.size == 0 {
+		return false
+	}
+	if buffer.needs_cache_flush() {
+		if !context.reprotect_driver_buffer_uncached(buffer)
+			|| !mgr.flush_g13_uat_range(context.id, buffer.va, buffer.size)
+			|| !context.complete_driver_buffer_cache_flush(buffer) {
+			return false
+		}
+	}
+	if !context.unmap_driver_buffer(buffer) {
+		return false
+	}
+	return mgr.flush_g13_uat_range(context.id, buffer.va, buffer.size)
 }
 
 fn (mut mgr GpuManager) release_shared_buffer_backing(mut buffer SharedBuffer) {

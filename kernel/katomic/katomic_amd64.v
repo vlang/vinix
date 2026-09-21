@@ -1,5 +1,15 @@
 module katomic
 
+// Keep the cross-architecture API used by device rings. MFENCE is stronger
+// than the x86 store ordering those rings normally need, matching ARM's full
+// system publication barrier.
+pub fn sync() {
+	asm volatile amd64 {
+		mfence
+		; ; ; memory
+	}
+}
+
 pub fn bts[T](mut var T, bit u8) bool {
 	mut ret := false
 	unsafe {

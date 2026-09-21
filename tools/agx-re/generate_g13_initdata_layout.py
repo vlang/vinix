@@ -23,12 +23,17 @@ offsets, sizes and field names.
 from __future__ import annotations
 
 import argparse
+import os
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
-DEFAULT_RAW_RS = Path.home() / "code/3rd/m1n1/rust/src/gpu/raw.rs"
-DEFAULT_OUTPUT = Path("../../kernel/gpu/agx/fw/g13_initdata_layout.v")
+SCRIPT_DIR = Path(__file__).resolve().parent
+DEFAULT_M1N1 = Path(os.environ.get("VINIX_M1N1", Path.home() / "code/3rd/m1n1"))
+DEFAULT_RAW_RS = DEFAULT_M1N1 / "rust/src/gpu/raw.rs"
+# Keep the generated-tree target stable when the checker is invoked directly
+# from the repository root (or by an editor/test runner with another cwd).
+DEFAULT_OUTPUT = SCRIPT_DIR.parent.parent / "kernel/gpu/agx/fw/g13_initdata_layout.v"
 
 # tools/agx-re/versions: the AGX_VERSIONS table in m1n1's rust/versions crate.
 AXES = {

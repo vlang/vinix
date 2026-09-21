@@ -695,48 +695,17 @@ fn (mut mgr GpuManager) invalidate_g13_queue_mappings_locked(mut resources G13Qu
 	mut buffer := &resources.render_buffer
 	if buffer.initialized {
 		for block in buffer.blocks {
-			if !context.unmap_driver_buffer(block) {
+			if !mgr.invalidate_g13_driver_buffer(mut context, block) {
 				return false
 			}
 		}
-		if !context.unmap_driver_buffer(buffer.block_list)
-			|| !context.unmap_driver_buffer(buffer.page_list) {
-			return false
-		}
-		unmap_shared_buffer(mut buffer.kernel_buffer)
-		unmap_shared_buffer(mut buffer.stats)
-		unmap_shared_buffer(mut buffer.counter)
-		unmap_shared_buffer(mut buffer.block_control)
-		unmap_shared_buffer(mut buffer.info)
-	}
-	for pipe_type := u32(0); pipe_type < 3; pipe_type++ {
-		if resources.channel_mask & (u32(1) << pipe_type) == 0 {
-			continue
-		}
-		mut queue := &resources.subqueues[pipe_type]
-		unmap_shared_buffer(mut queue.info)
-		unmap_shared_buffer(mut queue.ring)
-		unmap_shared_buffer(mut queue.state)
-		unmap_shared_buffer(mut queue.gpu_buffer)
-	}
-	unmap_shared_buffer(mut resources.notifier)
-	unmap_shared_buffer(mut resources.threshold)
-	unmap_shared_buffer(mut resources.notifier_list)
-	unmap_shared_buffer(mut resources.context)
-
-	if buffer.initialized {
-		for block in buffer.blocks {
-			if !mgr.flush_g13_uat_range(context.id, block.va, block.size) {
-				return false
-			}
-		}
-		if !mgr.flush_g13_uat_range(context.id, buffer.block_list.va, buffer.block_list.size)
-			|| !mgr.flush_g13_uat_range(context.id, buffer.page_list.va, buffer.page_list.size)
-			|| !mgr.flush_g13_uat_range(mmu.uat_kernel_flush_slot, buffer.kernel_buffer.va, buffer.kernel_buffer.size)
-			|| !mgr.flush_g13_uat_range(mmu.uat_kernel_flush_slot, buffer.stats.va, buffer.stats.size)
-			|| !mgr.flush_g13_uat_range(mmu.uat_kernel_flush_slot, buffer.counter.va, buffer.counter.size)
-			|| !mgr.flush_g13_uat_range(mmu.uat_kernel_flush_slot, buffer.block_control.va, buffer.block_control.size)
-			|| !mgr.flush_g13_uat_range(mmu.uat_kernel_flush_slot, buffer.info.va, buffer.info.size) {
+		if !mgr.invalidate_g13_driver_buffer(mut context, buffer.block_list)
+			|| !mgr.invalidate_g13_driver_buffer(mut context, buffer.page_list)
+			|| !mgr.invalidate_g13_shared_buffer(mut buffer.kernel_buffer)
+			|| !mgr.invalidate_g13_shared_buffer(mut buffer.stats)
+			|| !mgr.invalidate_g13_shared_buffer(mut buffer.counter)
+			|| !mgr.invalidate_g13_shared_buffer(mut buffer.block_control)
+			|| !mgr.invalidate_g13_shared_buffer(mut buffer.info) {
 			return false
 		}
 	}
@@ -744,18 +713,18 @@ fn (mut mgr GpuManager) invalidate_g13_queue_mappings_locked(mut resources G13Qu
 		if resources.channel_mask & (u32(1) << pipe_type) == 0 {
 			continue
 		}
-		queue := &resources.subqueues[pipe_type]
-		if !mgr.flush_g13_uat_range(mmu.uat_kernel_flush_slot, queue.info.va, queue.info.size)
-			|| !mgr.flush_g13_uat_range(mmu.uat_kernel_flush_slot, queue.ring.va, queue.ring.size)
-			|| !mgr.flush_g13_uat_range(mmu.uat_kernel_flush_slot, queue.state.va, queue.state.size)
-			|| !mgr.flush_g13_uat_range(mmu.uat_kernel_flush_slot, queue.gpu_buffer.va, queue.gpu_buffer.size) {
+		mut queue := &resources.subqueues[pipe_type]
+		if !mgr.invalidate_g13_shared_buffer(mut queue.info)
+			|| !mgr.invalidate_g13_shared_buffer(mut queue.ring)
+			|| !mgr.invalidate_g13_shared_buffer(mut queue.state)
+			|| !mgr.invalidate_g13_shared_buffer(mut queue.gpu_buffer) {
 			return false
 		}
 	}
-	return mgr.flush_g13_uat_range(mmu.uat_kernel_flush_slot, resources.notifier.va, resources.notifier.size)
-		&& mgr.flush_g13_uat_range(mmu.uat_kernel_flush_slot, resources.threshold.va, resources.threshold.size)
-		&& mgr.flush_g13_uat_range(mmu.uat_kernel_flush_slot, resources.notifier_list.va, resources.notifier_list.size)
-		&& mgr.flush_g13_uat_range(mmu.uat_kernel_flush_slot, resources.context.va, resources.context.size)
+	return mgr.invalidate_g13_shared_buffer(mut resources.notifier)
+		&& mgr.invalidate_g13_shared_buffer(mut resources.threshold)
+		&& mgr.invalidate_g13_shared_buffer(mut resources.notifier_list)
+		&& mgr.invalidate_g13_shared_buffer(mut resources.context)
 }
 
 fn (mut mgr GpuManager) free_g13_queue_resources_locked(mut resources G13QueueResources,
@@ -986,38 +955,20 @@ fn (mut mgr GpuManager) free_g13_render_job_locked(mut job G13RenderJobResources
 			return false
 		}
 		mut context := unsafe { job.context }
-		if !context.unmap_driver_buffer(job.scene.aux_framebuffer)
-			|| !context.unmap_driver_buffer(job.scene.preempt)
-			|| !context.unmap_driver_buffer(job.scene.tail_pointer_cache)
-			|| !context.unmap_driver_buffer(job.scene.tilemap)
-			|| !context.unmap_driver_buffer(job.scene.heapmeta)
-			|| !context.unmap_driver_buffer(job.scene.user_buffer) {
-			return false
-		}
-		unmap_shared_buffer(mut job.fragment)
-		unmap_shared_buffer(mut job.vertex)
-		unmap_shared_buffer(mut job.barrier)
-		unmap_shared_buffer(mut job.init_buffer)
-		unmap_shared_buffer(mut job.fragment_microsequence)
-		unmap_shared_buffer(mut job.vertex_microsequence)
-		unmap_shared_buffer(mut job.scene.timestamps)
-		unmap_shared_buffer(mut job.scene.scene)
-		// Every per-scene and context-zero translation must be acknowledged as
-		// gone before any of its physical backing can return to the PMM.
-		if !mgr.flush_g13_uat_range(context.id, job.scene.aux_framebuffer.va, job.scene.aux_framebuffer.size)
-			|| !mgr.flush_g13_uat_range(context.id, job.scene.preempt.va, job.scene.preempt.size)
-			|| !mgr.flush_g13_uat_range(context.id, job.scene.tail_pointer_cache.va, job.scene.tail_pointer_cache.size)
-			|| !mgr.flush_g13_uat_range(context.id, job.scene.tilemap.va, job.scene.tilemap.size)
-			|| !mgr.flush_g13_uat_range(context.id, job.scene.heapmeta.va, job.scene.heapmeta.size)
-			|| !mgr.flush_g13_uat_range(context.id, job.scene.user_buffer.va, job.scene.user_buffer.size)
-			|| !mgr.flush_g13_uat_range(mmu.uat_kernel_flush_slot, job.fragment.va, job.fragment.size)
-			|| !mgr.flush_g13_uat_range(mmu.uat_kernel_flush_slot, job.vertex.va, job.vertex.size)
-			|| !mgr.flush_g13_uat_range(mmu.uat_kernel_flush_slot, job.barrier.va, job.barrier.size)
-			|| !mgr.flush_g13_uat_range(mmu.uat_kernel_flush_slot, job.init_buffer.va, job.init_buffer.size)
-			|| !mgr.flush_g13_uat_range(mmu.uat_kernel_flush_slot, job.fragment_microsequence.va, job.fragment_microsequence.size)
-			|| !mgr.flush_g13_uat_range(mmu.uat_kernel_flush_slot, job.vertex_microsequence.va, job.vertex_microsequence.size)
-			|| !mgr.flush_g13_uat_range(mmu.uat_kernel_flush_slot, job.scene.timestamps.va, job.scene.timestamps.size)
-			|| !mgr.flush_g13_uat_range(mmu.uat_kernel_flush_slot, job.scene.scene.va, job.scene.scene.size) {
+		if !mgr.invalidate_g13_driver_buffer(mut context, job.scene.aux_framebuffer)
+			|| !mgr.invalidate_g13_driver_buffer(mut context, job.scene.preempt)
+			|| !mgr.invalidate_g13_driver_buffer(mut context, job.scene.tail_pointer_cache)
+			|| !mgr.invalidate_g13_driver_buffer(mut context, job.scene.tilemap)
+			|| !mgr.invalidate_g13_driver_buffer(mut context, job.scene.heapmeta)
+			|| !mgr.invalidate_g13_driver_buffer(mut context, job.scene.user_buffer)
+			|| !mgr.invalidate_g13_shared_buffer(mut job.fragment)
+			|| !mgr.invalidate_g13_shared_buffer(mut job.vertex)
+			|| !mgr.invalidate_g13_shared_buffer(mut job.barrier)
+			|| !mgr.invalidate_g13_shared_buffer(mut job.init_buffer)
+			|| !mgr.invalidate_g13_shared_buffer(mut job.fragment_microsequence)
+			|| !mgr.invalidate_g13_shared_buffer(mut job.vertex_microsequence)
+			|| !mgr.invalidate_g13_shared_buffer(mut job.scene.timestamps)
+			|| !mgr.invalidate_g13_shared_buffer(mut job.scene.scene) {
 			return false
 		}
 	}
@@ -1930,18 +1881,10 @@ fn (mut mgr GpuManager) free_g13_compute_job_locked(mut job G13ComputeJobResourc
 			return false
 		}
 		mut context := unsafe { job.context }
-		if !context.unmap_driver_buffer(job.preempt) {
-			return false
-		}
-		unmap_shared_buffer(mut job.command)
-		unmap_shared_buffer(mut job.microsequence)
-		unmap_shared_buffer(mut job.timestamps)
-		// Do not return any physical backing to the PMM until firmware has
-		// discarded every removed translation.
-		if !mgr.flush_g13_uat_range(context.id, job.preempt.va, job.preempt.size)
-			|| !mgr.flush_g13_uat_range(mmu.uat_kernel_flush_slot, job.command.va, job.command.size)
-			|| !mgr.flush_g13_uat_range(mmu.uat_kernel_flush_slot, job.microsequence.va, job.microsequence.size)
-			|| !mgr.flush_g13_uat_range(mmu.uat_kernel_flush_slot, job.timestamps.va, job.timestamps.size) {
+		if !mgr.invalidate_g13_driver_buffer(mut context, job.preempt)
+			|| !mgr.invalidate_g13_shared_buffer(mut job.command)
+			|| !mgr.invalidate_g13_shared_buffer(mut job.microsequence)
+			|| !mgr.invalidate_g13_shared_buffer(mut job.timestamps) {
 			return false
 		}
 	}

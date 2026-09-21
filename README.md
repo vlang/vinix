@@ -807,9 +807,18 @@ uses the Mesa 25.0.5 Asahi Gallium driver for desktop OpenGL and GLES through
 EGL, with surfaceless, GBM and X11 platform support. The native desktop uses a
 surfaceless GPU presenter, while Xorg/Firefox share GPU buffers through PRIME
 and DRI3. Both still copy the completed image to the Limine framebuffer because
-Vinix does not yet have a native DCP/KMS scanout driver. The private GPU
-firmware structures are currently pinned to Apple firmware ABI 12.3.0; the
-driver refuses other firmware ABIs before touching GPU hardware.
+Vinix does not yet have a native DCP/KMS scanout driver. The private G13 GPU
+firmware structures cover Apple firmware ABIs 12.3.0 and 13.5.0; the driver
+refuses other firmware ABIs before touching GPU hardware.
+
+Before assembling a hardware image, run the
+[G13 reference audit](docs/m1-agx-reference-audit.md) to compare the firmware
+contract with the local m1n1 checkout (and an Asahi Linux checkout when
+available):
+
+```sh
+make -C tools/agx-re check-g13-reference
+```
 
 Build Mesa in the Debian ARM64 VM (install `clang`, `lld`, `meson`, `ninja`,
 `pkg-config`, `bison`, `flex`, `python3-mako`, `python3-yaml`,
