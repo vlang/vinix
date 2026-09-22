@@ -44,7 +44,7 @@ What it does:
   wallpaper, display, battery and experimental M1 Wi-Fi controls
 - **native ui2 applications**: every Files, Calculator, Terminal, Settings and
   utility window is backed by its own OS process, PID and memory accounting
-- a paged **ui2 Examples** launcher containing all 84 applications from the
+- a paged **ui2 Examples** launcher containing all 85 applications from the
   sibling `~/code/ui2/examples` checkout, including native input, slider,
   switch, toggle, menu, file-dialog and custom-window demonstrations
 - preinstalled **VOffice Writer and Calc** from the sibling `~/code/office`
@@ -167,12 +167,16 @@ executables together with VOffice's translations and ribbon PNGs. The
 compositor decodes those immutable installed PNG assets itself, so VOffice does
 not need a second window system or image service at runtime.
 
-Both external application builders keep content-keyed binaries below `build/`.
-An unchanged desktop build reuses every ui2 example, Calc and Writer; changing
-one application's source rebuilds only that application, while shared ui2,
-compiler or sysroot changes invalidate all affected binaries. Outputs are
-replaced only after a successful compile and link, so an interrupted rebuild
-does not destroy the last complete cache entry.
+Both external application builders keep content-keyed binaries in the
+persistent `build-aarch64-desktop-apps/` cache, outside the disposable
+compositor and initramfs workspace in `build/`. An unchanged deployment reuses
+every ui2 example, Calc and Writer without invoking their compilers, even after
+`build/` has been cleaned. Changing one application's source rebuilds only
+that application, while shared ui2, compiler or sysroot changes invalidate all
+affected binaries. Outputs are replaced only after a successful compile and
+link, so an interrupted rebuild does not destroy the last complete cache
+entry. Set `VINIX_AARCH64_APP_CACHE` when CI or an isolated build needs a
+different cache root.
 
 The Calculator model comes from ui2's own example and is not copied into this
 repository. `tools/stage_app.py` takes it straight from the ui2 checkout at

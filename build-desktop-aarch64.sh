@@ -33,6 +33,14 @@ else
 fi
 
 BUILD_DIR="$SCRIPT_DIR/build"
+# UI2 examples and VOffice are independent, expensive application builds.
+# Keep their completed binaries outside the disposable compositor workspace so
+# cleaning build/ (or replacing its initramfs staging tree) cannot turn the
+# next deployment into an 87-application rebuild.  Their builders retain
+# content fingerprints and only replace an artifact when its real inputs
+# change.  Override this for CI or isolated builds without moving the normal
+# host cache.
+APP_CACHE_DIR="${VINIX_AARCH64_APP_CACHE:-$SCRIPT_DIR/build-aarch64-desktop-apps}"
 USERLAND_BUILD_DIR="${VINIX_AARCH64_USERLAND_BUILD_DIR:-$SCRIPT_DIR/build-aarch64-userland}"
 SYSROOT="${VINIX_AARCH64_SYSROOT:-$USERLAND_BUILD_DIR/staging}"
 DEVTOOLS_ARCHIVE="${VINIX_AARCH64_DEVTOOLS_ARCHIVE:-$USERLAND_BUILD_DIR/alpine-devtools.tar}"
@@ -173,6 +181,7 @@ for arg in "$@"; do
             echo "  --with-x86-translation adds a previously built x86/Wine runtime"
             echo "  --wifi-bundle stages a package.py output and loads it before the desktop"
             echo "  VINIX_REFRESH_DESKTOP_STAGING=1 discards the cached assembled layers"
+            echo "  VINIX_AARCH64_APP_CACHE changes the persistent ui2/VOffice binary cache"
             exit 0
             ;;
         *)
@@ -238,6 +247,23 @@ release_desktop_build_lock() {
 }
 
 mkdir -p "$BUILD_DIR"
+
+migrate_legacy_app_cache() {
+    local legacy="$1"
+    local destination="$2"
+    local state="$3"
+
+    [ "$legacy" != "$destination" ] || return 0
+    [ ! -e "$destination" ] || return 0
+    [ -f "$legacy/$state" ] || return 0
+    mkdir -p "$(dirname "$destination")"
+    mv "$legacy" "$destination"
+    echo "==> Preserved application cache at $destination"
+}
+
+# Builds predating the persistent cache kept these outputs below build/. Move
+# a complete cache once so upgrading this checkout does not compile everything
+# again merely to establish the new location.
 build_lock_wait_reported=0
 while ! ln -s "$$" "$DESKTOP_BUILD_LOCK" 2>/dev/null; do
     build_lock_owner="$(desktop_build_lock_owner)"
@@ -260,6 +286,11 @@ while ! ln -s "$$" "$DESKTOP_BUILD_LOCK" 2>/dev/null; do
     sleep 1
 done
 trap release_desktop_build_lock EXIT
+
+migrate_legacy_app_cache "$BUILD_DIR/ui2-examples" \
+    "$APP_CACHE_DIR/ui2-examples" ".vinix-ui2-build-state.json"
+migrate_legacy_app_cache "$BUILD_DIR/voffice" \
+    "$APP_CACHE_DIR/voffice" ".vinix-voffice-build-state.json"
 
 archive_has_member() {
     local archive="$1"
@@ -400,8 +431,8 @@ echo "==> Compiling for aarch64-linux-musl..."
 "$LLVM_BIN/llvm-strip" "$BUILD_DIR/vinix-desktop"
 echo "    $BUILD_DIR/vinix-desktop ($(file_size "$BUILD_DIR/vinix-desktop") bytes)"
 
-echo "==> Building all ui2 example applications for aarch64..."
-UI2_EXAMPLES_DIR="$BUILD_DIR/ui2-examples"
+echo "==> Preparing cached ui2 example applications for aarch64..."
+UI2_EXAMPLES_DIR="$APP_CACHE_DIR/ui2-examples"
 python3 "$SCRIPT_DIR/desktop/tools/build_ui2_examples.py" \
     --repo "$SCRIPT_DIR" --ui2-source "$UI2_SOURCE" \
     --output "$UI2_EXAMPLES_DIR" --work "$BUILD_DIR/ui2-examples-work" \
@@ -409,8 +440,8 @@ python3 "$SCRIPT_DIR/desktop/tools/build_ui2_examples.py" \
     --target aarch64-linux-musl --sysroot "$SYSROOT" --gcclib "$GCCLIB" \
     --cc-shim "$CC_SHIM" --llvm-bin "$LLVM_BIN"
 
-echo "==> Building VOffice Calc and Writer for aarch64..."
-VOFFICE_DIR="$BUILD_DIR/voffice"
+echo "==> Preparing cached VOffice Calc and Writer for aarch64..."
+VOFFICE_DIR="$APP_CACHE_DIR/voffice"
 python3 "$SCRIPT_DIR/desktop/tools/build_voffice.py" \
     --repo "$SCRIPT_DIR" --office-source "$OFFICE_SOURCE" --ui2-source "$UI2_SOURCE" \
     --output "$VOFFICE_DIR" --work "$BUILD_DIR/voffice-work" \
@@ -1245,6 +1276,10 @@ CONTENT_KEY_INPUTS=(
     "$GPU_CONTENT_KEY_INPUT"
     "$BUILD_DIR/wifi-ctl"
     "$BUILD_DIR/wallpapers"
+    "$UI2_EXAMPLES_DIR"
+    "$VOFFICE_DIR"
+    "$OFFICE_SOURCE/assets"
+    "$OFFICE_SOURCE/translations"
     "$SCRIPT_DIR/desktop"
     "$SCRIPT_DIR/build-support/vinix-pkg"
     "$SCRIPT_DIR/build-support/vinix-desktop-build"

@@ -50,6 +50,9 @@ build_one() {
 build_one >/dev/null
 test "$(cat "$work/count")" -eq 1
 
+# The compiled application cache is independent of disposable translation and
+# link work, just as it is when a deploy starts after build/ was cleaned.
+rm -rf "$work/build"
 second=$(build_one)
 test "$(cat "$work/count")" -eq 1
 printf '%s\n' "$second" | grep -F 'reusing 1 cached ui2 example applications' >/dev/null

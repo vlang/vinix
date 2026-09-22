@@ -108,6 +108,9 @@ build >/dev/null
 test "$(cat "$work/v-count")" -eq 2
 test "$(cat "$work/cc-count")" -eq 3
 
+# Completed Office binaries live independently from temporary generated C and
+# mbedTLS objects, so cleaning a deploy workspace must remain a cache hit.
+rm -rf "$work/build"
 second=$(build)
 test "$(cat "$work/v-count")" -eq 2
 test "$(cat "$work/cc-count")" -eq 3
