@@ -36,6 +36,7 @@ DESKTOP_REQUIRED_STAGES = (
     b"entered main",
     b"using captured arguments without slicing",
     b"command line parsed",
+    b"first frame ready; entering graphics mode",
     b"first canvas presented",
 )
 DESKTOP_READY = b"vinix-desktop: ready"

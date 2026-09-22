@@ -294,7 +294,7 @@ int vinix_gpu_present_frame(void *opaque,
          1.0f,  1.0f, 1.0f, 1.0f,
     };
     struct gpu_presenter *presenter = opaque;
-    uint32_t *output = destination;
+    uint32_t *output;
     int trace_first_frame;
     int row;
 
@@ -316,17 +316,15 @@ int vinix_gpu_present_frame(void *opaque,
     if (trace_first_frame)
         vinix_gpu_present_startup_stage("first-frame context current");
 
-    if (destination_stride != destination_width) {
-        if (!presenter->readback) {
-            if (trace_first_frame)
-                vinix_gpu_present_startup_stage("allocating packed readback buffer");
-            presenter->readback = malloc((size_t)destination_width *
-                                         destination_height * sizeof(uint32_t));
-            if (!presenter->readback)
-                return 0;
-        }
-        output = presenter->readback;
+    if (!presenter->readback) {
+        if (trace_first_frame)
+            vinix_gpu_present_startup_stage("allocating packed readback buffer");
+        presenter->readback = malloc((size_t)destination_width *
+                                     destination_height * sizeof(uint32_t));
+        if (!presenter->readback)
+            return 0;
     }
+    output = presenter->readback;
 
     if (trace_first_frame)
         vinix_gpu_present_startup_stage("configuring first-frame viewport");
@@ -376,17 +374,14 @@ int vinix_gpu_present_frame(void *opaque,
     if (glGetError() != GL_NO_ERROR)
         return 0;
 
-    if (output != destination) {
-        if (trace_first_frame)
-            vinix_gpu_present_startup_stage("copying packed readback to framebuffer");
-        for (row = 0; row < destination_height; ++row) {
-            memcpy(destination + (size_t)row * destination_stride,
-                   output + (size_t)row * destination_width,
-                   (size_t)destination_width * sizeof(uint32_t));
-        }
-    }
     if (trace_first_frame)
-        vinix_gpu_present_startup_stage("first frame complete");
+        vinix_gpu_present_startup_stage("first frame ready; entering graphics mode");
+    vinix_desktop_set_console_mode(1);
+    for (row = 0; row < destination_height; ++row) {
+        memcpy(destination + (size_t)row * destination_stride,
+               output + (size_t)row * destination_width,
+               (size_t)destination_width * sizeof(uint32_t));
+    }
     return 1;
 }
 

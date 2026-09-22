@@ -17,8 +17,14 @@ fn C.vinix_gpu_present_frame(handle voidptr, source &u32, source_width int, sour
 
 fn C.vinix_gpu_present_destroy(handle voidptr)
 
+fn C.vinix_desktop_set_console_mode(graphics int)
+
 fn gpu_present_startup_stage(stage &char) {
 	C.vinix_gpu_present_startup_stage(stage)
+}
+
+fn desktop_set_console_graphics(graphics bool) {
+	C.vinix_desktop_set_console_mode(if graphics { 1 } else { 0 })
 }
 
 struct GpuPresenter {

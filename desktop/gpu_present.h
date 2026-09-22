@@ -3,7 +3,27 @@
 #ifndef VINIX_DESKTOP_GPU_PRESENT_H
 #define VINIX_DESKTOP_GPU_PRESENT_H
 
+#include <fcntl.h>
 #include <stdint.h>
+#include <sys/ioctl.h>
+#include <unistd.h>
+
+/*
+ * Mapping fbdev does not imply ownership of the display: Linux applications
+ * explicitly switch their console to KD_GRAPHICS when they are ready to put a
+ * frame on it.  Keeping that handoff here lets startup diagnostics remain on
+ * the physical panel throughout ELF loading, framebuffer mmap and EGL setup.
+ */
+static inline void vinix_desktop_set_console_mode(int graphics)
+{
+    int fd = open("/dev/console", O_RDWR | O_CLOEXEC);
+
+    if (fd < 0)
+        return;
+    (void)ioctl(fd, 0x4b3a /* KDSETMODE */,
+                graphics ? 1 /* KD_GRAPHICS */ : 0 /* KD_TEXT */);
+    close(fd);
+}
 
 #ifdef VINIX_GPU_PRESENTER_EXTERNAL
 

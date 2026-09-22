@@ -89,7 +89,8 @@ mut:
 	r_shift u32
 	g_shift u32
 	b_shift u32
-	gpu     GpuPresenter
+	gpu              GpuPresenter
+	graphics_claimed bool
 }
 
 fn open_framebuffer(path string) !Framebuffer {
@@ -157,6 +158,13 @@ fn (fb &Framebuffer) pack_pixel(pixel u32) u32 {
 	return ((pixel >> 16) & 0xff) << fb.r_shift | ((pixel >> 8) & 0xff) << fb.g_shift | (pixel & 0xff) << fb.b_shift
 }
 
+fn (mut fb Framebuffer) claim_graphics() {
+	if !fb.graphics_claimed {
+		desktop_set_console_graphics(true)
+		fb.graphics_claimed = true
+	}
+}
+
 // present copies a finished native-resolution frame out in one pass. Canvas
 // keeps logical geometry separately from its backing dimensions, allowing 2x
 // font masks to remain sharp while this final transfer stays scale-agnostic.
@@ -166,8 +174,10 @@ fn (mut fb Framebuffer) present(canvas &Canvas, _ int) {
 	// desktop and any failed GPU initialization continue through this file's
 	// existing software paths.
 	if fb.direct && fb.gpu.present(canvas, fb.base, fb.width, fb.height, fb.stride) {
+		fb.graphics_claimed = true
 		return
 	}
+	fb.claim_graphics()
 	if fb.direct {
 		if canvas.stride == fb.stride {
 			unsafe {
@@ -201,8 +211,10 @@ fn (mut fb Framebuffer) present_damage(canvas &Canvas, damage DamageRect) {
 		return
 	}
 	if fb.direct && fb.gpu.present(canvas, fb.base, fb.width, fb.height, fb.stride) {
+		fb.graphics_claimed = true
 		return
 	}
+	fb.claim_graphics()
 	x0 := if damage.x > 0 { damage.x } else { 0 }
 	y0 := if damage.y > 0 { damage.y } else { 0 }
 	x1 := if damage.x + damage.w < canvas.width { damage.x + damage.w } else { canvas.width }
@@ -241,5 +253,9 @@ fn (mut fb Framebuffer) close() {
 	if fb.fd >= 0 {
 		desktop_close(fb.fd)
 		fb.fd = -1
+	}
+	if fb.graphics_claimed {
+		desktop_set_console_graphics(false)
+		fb.graphics_claimed = false
 	}
 }
