@@ -130,11 +130,12 @@ fn main() {
 	gpu_present_startup_stage(c'collecting process arguments')
 	all_args := arguments()
 	gpu_present_startup_stage(c'process arguments collected')
-	gpu_present_startup_stage(c'creating command-line argument view')
-	args := all_args[1..]
-	gpu_present_startup_stage(c'command-line argument view ready')
+	// Both parsers only recognise option prefixes, so argv[0] is harmless.
+	// Passing the captured array directly also avoids V's array-slice path,
+	// which is not returning on the native M1 boot.
+	gpu_present_startup_stage(c'using captured arguments without slicing')
 	gpu_present_startup_stage(c'checking application subprocess mode')
-	if app_options := app_process_options(args) {
+	if app_options := app_process_options(all_args) {
 		gpu_present_startup_stage(c'dispatching application subprocess')
 		run_app_process(app_options)
 		return
@@ -146,7 +147,7 @@ fn main() {
 	desktop_install_power_signals()
 	gpu_present_startup_stage(c'power signal handlers installed')
 	gpu_present_startup_stage(c'entering command-line parser')
-	options := parse_options(args)
+	options := parse_options(all_args)
 	gpu_present_startup_stage(c'command line parsed')
 
 	gpu_present_startup_stage(c'opening framebuffer')
