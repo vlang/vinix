@@ -72,6 +72,14 @@ static void check(int condition, const char *description) {
         failures++;
 }
 
+static int denied_with_eperm(long result, const char *operation) {
+    if (result == -1 && errno == EPERM)
+        return 1;
+    printf("%s: result=%ld errno=%d (expected EPERM)\n", operation, result, errno);
+    fflush(stdout);
+    return 0;
+}
+
 static void *eventfd_writer(void *argument) {
     int fd = *(int *)argument;
     struct timespec delay = {.tv_nsec = 10000000};
@@ -296,6 +304,41 @@ int main(void) {
               !strcmp(uts.nodename, "syscall-smoke") &&
               !strcmp(uts.domainname, "vinix.test"),
           "uname hostname and domainname");
+
+    pid_t security_child = fork();
+    if (security_child == 0) {
+        if (setuid(1000) != 0 || geteuid() != 1000) {
+            printf("security child: setuid failed, euid=%u errno=%d\n",
+                   (unsigned)geteuid(), errno);
+            fflush(stdout);
+            _exit(1);
+        }
+        if (!denied_with_eperm(sethostname("untrusted", 9), "sethostname") ||
+            !denied_with_eperm(syscall(SYS_setdomainname, "bad.test", 8), "setdomainname") ||
+            !denied_with_eperm(syscall(SYS_mount, "", "/tmp", "unknownfs", 0, NULL), "mount") ||
+            !denied_with_eperm(syscall(SYS_umount2, "/tmp", 0), "umount2") ||
+            !denied_with_eperm(syscall(SYS_reboot, 0, 0, 0, NULL), "reboot"))
+            _exit(2);
+        _exit(0);
+    }
+    int security_status = 0;
+    pid_t security_waited = -1;
+    if (security_child > 0) {
+        do {
+            security_waited = waitpid(security_child, &security_status, 0);
+        } while (security_waited == -1 && errno == EINTR);
+    }
+    if (security_child <= 0 || security_waited != security_child ||
+        !WIFEXITED(security_status) || WEXITSTATUS(security_status) != 0) {
+        printf("security child pid=%d waited=%d status=0x%x errno=%d\n",
+               (int)security_child, (int)security_waited, security_status, errno);
+    }
+    check(security_child > 0 && security_waited == security_child &&
+              WIFEXITED(security_status) && WEXITSTATUS(security_status) == 0,
+          "privileged selectors deny non-root callers");
+    check(uname(&uts) == 0 && !strcmp(uts.nodename, "syscall-smoke") &&
+              !strcmp(uts.domainname, "vinix.test"),
+          "denied name changes leave system state intact");
 
     close(fd);
     unlink(path);

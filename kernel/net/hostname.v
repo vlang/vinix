@@ -2,6 +2,7 @@
 module net
 
 import errno
+import security
 import usercopy
 
 const uts_name_len = 65
@@ -29,6 +30,9 @@ pub fn syscall_gethostname(_ voidptr, name charptr, len u64) (u64, u64) {
 }
 
 pub fn syscall_sethostname(_ voidptr, name charptr, len u64) (u64, u64) {
+	if !security.permitted(security.system_hostname_set) {
+		return errno.err, errno.eperm
+	}
 	if len > uts_name_len - 1 {
 		return errno.err, errno.einval
 	}
@@ -44,6 +48,9 @@ pub fn syscall_sethostname(_ voidptr, name charptr, len u64) (u64, u64) {
 }
 
 pub fn syscall_setdomainname(_ voidptr, name charptr, len u64) (u64, u64) {
+	if !security.permitted(security.system_domainname_set) {
+		return errno.err, errno.eperm
+	}
 	if len > uts_name_len - 1 {
 		return errno.err, errno.einval
 	}

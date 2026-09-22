@@ -7,6 +7,7 @@ import klock
 import proc
 import file
 import errno
+import security
 import ioctl
 import time
 import usercopy
@@ -269,15 +270,7 @@ fn get_node_with_credentials(parent &VFSNode, path string, follow_links bool,
 }
 
 pub fn syscall_mount(_ voidptr, src charptr, tgt charptr, fs_type charptr, mountflags u64, data voidptr) (u64, u64) {
-	mut current_thread := proc.current_thread()
-	mut process := current_thread.process
-
-	C.printf(c'\n\e[32m%s\e[m: mount(%s, %s, %s, 0x%x, %x)\n', process.name.str, src,
-		tgt, fs_type, mountflags, data)
-	defer {
-		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
-	}
-	if process.euid != 0 {
+	if !security.permitted(security.filesystem_mount) {
 		return errno.err, errno.eperm
 	}
 
@@ -293,12 +286,8 @@ pub fn syscall_mount(_ voidptr, src charptr, tgt charptr, fs_type charptr, mount
 }
 
 pub fn syscall_umount(_ voidptr, tgt charptr, flags u64) (u64, u64) {
-	mut current_thread := proc.current_thread()
-	mut process := current_thread.process
-
-	C.printf(c'\n\e[32m%s\e[m: umount(%s, 0x%x)\n', process.name.str, tgt, flags)
-	defer {
-		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
+	if !security.permitted(security.filesystem_unmount) {
+		return errno.err, errno.eperm
 	}
 
 	// TODO: Implement this once the FS supports it.
