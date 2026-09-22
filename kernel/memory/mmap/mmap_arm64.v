@@ -2,7 +2,6 @@ module mmap
 
 import aarch64.cpu
 import aarch64.cpu.local as cpulocal
-import aarch64.timer
 import proc
 
 pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
@@ -52,99 +51,30 @@ pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
 
 	mut process := current_thread.process
 	mut pagemap := process.pagemap
-	trace_gpu := process.executable_path == '/usr/bin/vinix-desktop-gpu'
-	mut trace_sequence := u64(0)
-	mut trace_this_fault := false
-	mut trace_timeslice := u64(0)
-	if trace_gpu {
-		pid := u64(process.pid)
-		if gpu_desktop_fault_pid != pid {
-			gpu_desktop_fault_pid = pid
-			gpu_desktop_fault_count = 0
-		}
-		trace_sequence = gpu_desktop_fault_count
-		gpu_desktop_fault_count++
-		trace_this_fault = trace_sequence < 32
-		if trace_this_fault {
-			trace_timeslice = if current_thread.timeslice != 0 { current_thread.timeslice } else { u64(1) }
-			// Stop before the first slow framebuffer write. Otherwise the slice
-			// expires during the trace and is delivered immediately at vector exit,
-			// before the faulting instruction gets a chance to retry.
-			timer.stop()
-			println('exec[gpu]: page fault #${trace_sequence} begin addr=0x${addr:x} pc=0x${gpr_state.pc:x} esr=0x${esr:x}')
-			println('exec[gpu]: page fault #${trace_sequence} timer paused and exception interrupt mask retained')
-		}
-	}
-
-	// Normally a demand fault may be preempted while it obtains and installs
-	// the backing page. The bounded GPU-exec trace above is deliberately slow:
-	// every line also redraws the framebuffer, so the first three vector lines
-	// consume the freshly armed 5 ms slice. Enabling FIQs here then dispatches
-	// the expired scheduler timer before the first page-fault checkpoint and
-	// makes the diagnostic itself look like a fault-handler hang on the M1.
-	// Keep the exception entry mask and timer stopped for traced faults, then
-	// arm a fresh slice as the final operation on return. Ordinary untraced
-	// faults remain preemptible and retain their original timer deadline.
-	prev := cpu.interrupt_toggle(!trace_this_fault)
+	prev := cpu.interrupt_toggle(true)
 	defer {
 		cpu.interrupt_toggle(prev)
-		if trace_this_fault {
-			timer.oneshot(trace_timeslice)
-		}
 	}
 
-	if trace_this_fault {
-		println('exec[gpu]: page fault #${trace_sequence} acquiring page-map lock')
-	}
 	pagemap.l.acquire()
-	if trace_this_fault {
-		println('exec[gpu]: page fault #${trace_sequence} page-map lock acquired')
-	}
 
 	mut range_local, memory_page, file_page := addr2range(pagemap, addr) or {
-		if trace_this_fault {
-			println('exec[gpu]: page fault #${trace_sequence} ERROR address has no range')
-		}
 		pagemap.l.release()
 		return none
 	}
 
 	pagemap.l.release()
-	if trace_this_fault {
-		println('exec[gpu]: page fault #${trace_sequence} range found; acquiring backing page')
-	}
 
 	virt := memory_page * page_size
 	page := acquire_range_page(range_local, virt, file_page) or {
-		if trace_this_fault {
-			println('exec[gpu]: page fault #${trace_sequence} ERROR acquiring backing page')
-		}
 		return none
 	}
-	if trace_this_fault {
-		println('exec[gpu]: page fault #${trace_sequence} backing page acquired')
-	}
 	if range_local.prot & prot_exec != 0 {
-		if trace_this_fault {
-			println('exec[gpu]: page fault #${trace_sequence} synchronizing instruction cache')
-		}
 		cpu.sync_instruction_cache(u64(page) + higher_half, page_size)
-		if trace_this_fault {
-			println('exec[gpu]: page fault #${trace_sequence} instruction cache synchronized')
-		}
-	}
-	if trace_this_fault {
-		println('exec[gpu]: page fault #${trace_sequence} installing PTE')
 	}
 
 	map_page_in_range(range_local.global, virt, u64(page), range_local.prot) or {
-		if trace_this_fault {
-			println('exec[gpu]: page fault #${trace_sequence} ERROR installing PTE')
-		}
 		release_range_page(range_local.global, virt, file_page, page, range_local.flags)
 		return none
-	}
-	if trace_this_fault {
-		println('exec[gpu]: page fault #${trace_sequence} resolved; rearming ${trace_timeslice} us timeslice on fault return')
 	}
 }

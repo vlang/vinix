@@ -55,11 +55,6 @@ const lazy_anonymous_threshold = u64(64 * 1024 * 1024)
 __global (
 	uncached_resources     [8]voidptr
 	uncached_resources_cnt = u32(0)
-	// Bounded diagnostics for the first demand faults after the M1 GPU desktop
-	// exec. These show that the replacement thread reached EL0 even if it stalls
-	// before making its first syscall or entering V's main().
-	gpu_desktop_fault_pid   = u64(0)
-	gpu_desktop_fault_count = u64(0)
 )
 
 pub fn register_uncached_resource(res voidptr) {

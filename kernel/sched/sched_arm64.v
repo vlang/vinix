@@ -264,47 +264,23 @@ fn poll_platform_input() {
 // callback. Polling networking or the console from an arbitrary syscall can
 // recurse into facilities that syscall is about to use; VirtIO input has no
 // such dependency and is all a CPU-bound translated GUI needs here.
-pub fn poll_syscall_input(trace_exec bool) {
-	if trace_exec {
-		println('exec: input poll disabling interrupts')
-	}
+pub fn poll_syscall_input() {
 	ints := cpu.interrupt_toggle(false)
 	defer {
 		cpu.interrupt_toggle(ints)
 	}
-	if trace_exec {
-		println('exec: input poll interrupts disabled; trying platform-input lock')
-	}
 	if !input_poll_lock.test_and_acquire() {
-		if trace_exec {
-			println('exec: input poll lock busy; skipping poll')
-		}
 		return
 	}
 	defer {
 		input_poll_lock.release()
 	}
-	if trace_exec {
-		println('exec: input poll lock acquired; reading timer')
-	}
 	now_ns := timer.get_ns()
-	if trace_exec {
-		println('exec: input poll timer read')
-	}
 	if now_ns - last_syscall_input_poll_ns < 1_000_000 {
-		if trace_exec {
-			println('exec: input poll throttled; releasing lock')
-		}
 		return
 	}
 	last_syscall_input_poll_ns = now_ns
-	if trace_exec {
-		println('exec: polling VirtIO input')
-	}
 	virtio_input.poll()
-	if trace_exec {
-		println('exec: VirtIO input poll complete; releasing lock')
-	}
 }
 
 // Returns the scheduler's timer interrupt handler for use by the
