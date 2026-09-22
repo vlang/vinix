@@ -60,8 +60,11 @@ struct Options {
 }
 
 fn parse_options(args []string) Options {
+	gpu_present_startup_stage(c'initializing command-line defaults')
 	mut options := Options{}
+	gpu_present_startup_stage(c'command-line defaults initialized')
 	for arg in args {
+		gpu_present_startup_stage(c'parsing command-line option')
 		if arg.starts_with('--fb=') {
 			options = Options{
 				...options
@@ -103,6 +106,7 @@ fn parse_options(args []string) Options {
 			}
 		}
 	}
+	gpu_present_startup_stage(c'command-line option scan complete')
 	return options
 }
 
@@ -123,17 +127,26 @@ fn desktop_publish_session_ready() {
 
 fn main() {
 	gpu_present_startup_stage(c'entered main')
-	if app_options := app_process_options(arguments()[1..]) {
+	gpu_present_startup_stage(c'collecting process arguments')
+	all_args := arguments()
+	gpu_present_startup_stage(c'process arguments collected')
+	gpu_present_startup_stage(c'creating command-line argument view')
+	args := all_args[1..]
+	gpu_present_startup_stage(c'command-line argument view ready')
+	gpu_present_startup_stage(c'checking application subprocess mode')
+	if app_options := app_process_options(args) {
 		gpu_present_startup_stage(c'dispatching application subprocess')
 		run_app_process(app_options)
 		return
 	}
+	gpu_present_startup_stage(c'application subprocess mode not requested')
 	gpu_present_startup_stage(c'desktop process selected')
 	desktop_ignore_broken_pipe()
 	gpu_present_startup_stage(c'SIGPIPE ignored')
 	desktop_install_power_signals()
 	gpu_present_startup_stage(c'power signal handlers installed')
-	options := parse_options(arguments()[1..])
+	gpu_present_startup_stage(c'entering command-line parser')
+	options := parse_options(args)
 	gpu_present_startup_stage(c'command line parsed')
 
 	gpu_present_startup_stage(c'opening framebuffer')
