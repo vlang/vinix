@@ -51,6 +51,7 @@ kernel/tmp.v
 /build-aarch64-minecraft/
 /build-aarch64-blender-native/
 /build-aarch64-desktop-apps/
+/build-aarch64-voffice/
 /.claude/
 /deploy-to-m1.sh
 /build-office2019-probe/

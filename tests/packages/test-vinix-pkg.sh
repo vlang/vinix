@@ -500,73 +500,49 @@ grep -qx 'usr/lib/firefox-esr/defaults/pref/vinix.js' \
 run_pkg remove firefox
 tail -n 1 "$log" | grep -q -- '--no-progress --no-scripts del firefox-esr$'
 
-# VOffice is compiled from its source archive on the machine. A stand-in V
-# compiler checks the module overlay the frontend hands it: the downloaded
-# checkout as `office` and the image's ui2 copy with the compositor's pipe
-# backend replacing the headless bounds bridge.
-voffice_fixture="$work/voffice-fixture/office-main"
-mkdir -p "$voffice_fixture/cmd/word" "$voffice_fixture/cmd/excel" \
-	"$voffice_fixture/assets/ribbon" "$voffice_fixture/translations"
-printf "Module { name: 'office' }\n" >"$voffice_fixture/v.mod"
-printf 'module main\n' >"$voffice_fixture/cmd/word/main.v"
-printf 'module main\n' >"$voffice_fixture/cmd/excel/main.v"
+# VOffice is a prebuilt release bundle: one directory holding both clients,
+# their artwork and translations, verified against its published checksum.
+voffice_fixture="$work/voffice-fixture/voffice"
+mkdir -p "$voffice_fixture/assets/ribbon" "$voffice_fixture/translations"
+for name in writer calc; do
+	printf '#!/bin/sh\nexit 0\n' >"$voffice_fixture/voffice-$name"
+	chmod 0755 "$voffice_fixture/voffice-$name"
+done
 printf 'logo\n' >"$voffice_fixture/assets/logo.png"
 printf 'bold\n' >"$voffice_fixture/assets/ribbon/bold.png"
 printf 'hello=Hello\n' >"$voffice_fixture/translations/en.txt"
-voffice_archive="$work/office-main.tar.gz"
-tar -czf "$voffice_archive" -C "$work/voffice-fixture" office-main
+printf '0.0.3\n' >"$voffice_fixture/VERSION"
+voffice_archive="$work/VOffice-vinix-aarch64.tar.gz"
+tar -czf "$voffice_archive" -C "$work/voffice-fixture" voffice
+printf '%s  VOffice-vinix-aarch64.tar.gz\n' \
+	"$("$work/bin/sha256sum" "$voffice_archive" | awk '{print $1}')" \
+	>"$voffice_archive.sha256"
+printf '%064d  VOffice-vinix-aarch64.tar.gz\n' 0 >"$work/voffice-wrong.sha256"
 
-desktop_dev="$root/usr/share/vinix/desktop-dev"
-mkdir -p "$desktop_dev/vmodules/ui2/ui" "$root/usr/bin"
-printf "Module { name: 'ui2' }\n" >"$desktop_dev/vmodules/ui2/v.mod"
-printf '// headless bounds bridge\n' \
-	>"$desktop_dev/vmodules/ui2/ui/vinix_headless_backend.v"
-printf '// vinix pipe backend\n' >"$desktop_dev/ui2_vinix_backend.v"
-cat >"$root/usr/bin/v" <<'V_STUB'
-#!/bin/sh
-output=
-module_path=
-previous=
-for argument in "$@"; do
-	case "$previous" in
-		-o) output=$argument ;;
-		-path) module_path=${argument#@vlib|} ;;
-	esac
-	previous=$argument
-done
-source=$argument
-printf '%s\n' "$*" >>"$VINIX_TEST_V_LOG"
-grep -qx '// vinix pipe backend' "$module_path/ui2/ui/vinix_headless_backend.v" || {
-	echo 'ui2 overlay does not use the Vinix pipe backend' >&2
+# A subshell: POSIX sh keeps assignments made in front of a function call.
+if (VINIX_VOFFICE_URL="file://$voffice_archive" \
+	VINIX_VOFFICE_SHA256_URL="file://$work/voffice-wrong.sha256" \
+	run_pkg install voffice 2>"$work/voffice-mismatch.log"); then
+	echo 'VOffice installed despite a checksum mismatch' >&2
 	exit 1
-}
-[ -f "$module_path/office/v.mod" ] && [ -f "$source/main.v" ] || {
-	echo 'VOffice source is not staged as the office module' >&2
-	exit 1
-}
-printf '#!/bin/sh\nexit 0\n' >"$output"
-V_STUB
-chmod +x "$root/usr/bin/v"
+fi
+grep -q 'VOffice archive checksum mismatch' "$work/voffice-mismatch.log"
+test ! -e "$root/usr/bin/voffice-writer"
 
 VINIX_VOFFICE_URL="file://$voffice_archive" \
-VINIX_TEST_V_LOG="$work/v.log" \
-	run_pkg install voffice
+	run_pkg install voffice >"$work/voffice-install.log"
+grep -qx 'pkg: VOffice 0.0.3 Writer and Calc installed' "$work/voffice-install.log"
 test -x "$root/usr/bin/voffice-writer"
 test -x "$root/usr/bin/voffice-calc"
 grep -qx logo "$root/usr/bin/assets/logo.png"
 test -f "$root/usr/bin/assets/ribbon/bold.png"
 test -f "$root/usr/bin/translations/en.txt"
-test "$(wc -l <"$work/v.log")" -eq 2
-grep -q -- '-cc gcc .*-d ui2_headless .*-ldflags -static .*voffice-writer .*/office/cmd/word$' \
-	"$work/v.log"
-grep -q -- 'voffice-calc .*/office/cmd/excel$' "$work/v.log"
+test ! -e "$root/usr/bin/VERSION"
 grep -qx './usr/bin/voffice-writer' "$root/var/lib/vinix-pkg/voffice.files"
 grep -qx './usr/bin/assets/ribbon/bold.png' "$root/var/lib/vinix-pkg/voffice.files"
 grep -qx 'usr/bin/translations/en.txt' "$root/var/lib/vinix-pkg/package-files"
-grep -qx '// headless bounds bridge' \
-	"$desktop_dev/vmodules/ui2/ui/vinix_headless_backend.v"
 if ls "$root/var/cache" | grep -q '^vinix-voffice\.'; then
-	echo 'VOffice build directory was left behind' >&2
+	echo 'VOffice download directory was left behind' >&2
 	exit 1
 fi
 run_pkg list | grep -qx voffice

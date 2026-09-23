@@ -50,9 +50,9 @@ What it does:
 - a **first-run app picker** shown right after the user is created, offering
   Firefox, Chromium, VOffice and Minecraft; the chosen apps install in a
   Terminal window through `pkg`
-- optional **VOffice Writer and Calc** (`pkg install voffice`), compiled on the
-  machine from the public `vlang/office` source and running as native ui2
-  clients inside ordinary Vinix windows
+- optional **VOffice Writer and Calc** (`pkg install voffice`), downloaded from
+  the VOffice releases and running as native ui2 clients inside ordinary Vinix
+  windows
 - a **VT-compatible built-in terminal** with a real PTY, alternate-screen and
   cursor-addressed rendering for editing files in the preinstalled Vim
 - embedded **Wine Calculator and Notepad**: their translated Win64 processes
@@ -166,13 +166,16 @@ implements the same versioned pipe protocol as `app_process.v`. The build uses
 and finally `third_party/ui2`. This makes the local `~/code/ui2` tree the normal
 development source while retaining a self-contained CI/package fallback.
 
-VOffice is not built with the image. The image ships the same backend at
-`/usr/share/vinix/desktop-dev/ui2_vinix_backend.v`, and `pkg install voffice`
-downloads the `vlang/office` source, overlays that backend on the image's ui2
-copy and compiles Writer and Calc with the native V compiler and GCC. It
-installs both executables together with VOffice's translations and ribbon PNGs
-below `/usr/bin`. The compositor decodes those installed PNG assets itself, so
-VOffice does not need a second window system or image service at runtime.
+VOffice is not built with the image. `../build-voffice-aarch64.sh` uses
+`tools/build_voffice.py` and that same backend to cross-compile Writer and Calc
+as static musl applications from `VINIX_OFFICE_SOURCE`, a sibling `../office`,
+or `third_party/office`. It packages both executables with VOffice's
+translations and ribbon PNGs as `VOffice-vinix-aarch64.tar.gz` plus a `.sha256`,
+and `--publish` uploads them to the latest `vlang/office` release.
+`pkg install voffice` downloads that asset, verifies its checksum and installs
+it below `/usr/bin` (`VINIX_VOFFICE_URL` points it at another copy). The
+compositor decodes the installed PNG assets itself, so VOffice does not need a
+second window system or image service at runtime.
 The compositor passes standalone apps their protocol pipes as
 `VINIX_REQUEST_FD` and `VINIX_RESPONSE_FD` environment variables, leaving
 their command line free for document paths.

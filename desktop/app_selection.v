@@ -64,7 +64,7 @@ const first_run_apps = [
 	},
 	FirstRunApp{
 		title:           'VOffice'
-		detail:          'Writer and Calc, compiled on this computer'
+		detail:          'Writer documents and Calc spreadsheets'
 		icon:            'builtin:editor'
 		package_name:    'voffice'
 		action:          'apps.toggle.voffice'

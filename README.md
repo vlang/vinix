@@ -394,6 +394,20 @@ run-gimp
 ./gimp-package-smoke.sh
 ```
 
+VOffice Writer and Calc are native ui2 clients of the desktop rather than X11
+programs, and they are not part of the image either. Right after a new user is
+created, the first-run app picker offers them along with Firefox, Chromium and
+Minecraft and installs the chosen apps in a Terminal. From a shell:
+
+```sh
+pkg install voffice
+```
+
+`pkg` downloads `VOffice-vinix-aarch64.tar.gz` from the latest `vlang/office`
+release and checks it against the published `.sha256`.
+`./build-voffice-aarch64.sh` cross-compiles that asset from a VOffice checkout
+(`VINIX_OFFICE_SOURCE` or `../office`), and `--publish` uploads it with `gh`.
+
 LibreOffice Writer and Calc run through the same private X11 window bridge,
 drawn by the GTK 3 VCL plugin. Install the suite on demand, then launch it from
 the wallpaper/Start menu or from a shell:

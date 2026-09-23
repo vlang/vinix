@@ -1203,9 +1203,10 @@ cp "$BUILD_DIR/vinix-desktop" "$STAGING/usr/bin/vinix-desktop"
 # packaged inode for PID 1 to restore on the next persistent disk-root boot.
 install -m755 "$BUILD_DIR/vinix-desktop" \
     "$STAGING/usr/libexec/vinix-desktop-system"
-# VOffice is not part of the image; `pkg install voffice` compiles it on the
-# machine. A staging tree reused from an older build still carries the copy
-# images used to preinstall, so drop it rather than ship a stale suite.
+# VOffice is not part of the image; `pkg install voffice` downloads the build
+# published with its releases. A staging tree reused from an older build still
+# carries the copy images used to preinstall, so drop it rather than ship a
+# stale suite.
 rm -f "$STAGING/usr/bin/voffice-calc" "$STAGING/usr/bin/voffice-writer"
 rm -rf "$STAGING/usr/bin/assets" "$STAGING/usr/bin/translations"
 if [ "$GPU_DESKTOP_BUILT" -eq 1 ]; then
@@ -1279,10 +1280,6 @@ fi
 python3 "$SCRIPT_DIR/build-support/content-key.py" \
     "$DESKTOP_DEV_ROOT/desktop" "$DESKTOP_DEV_ROOT/vmodules" \
     > "$DESKTOP_DEV_ROOT/.source-version"
-# `pkg install voffice` compiles Writer and Calc against this same ui2 copy,
-# with the compositor's pipe backend in place of the headless bounds bridge.
-install -m644 "$SCRIPT_DIR/desktop/tools/ui2_vinix_backend.v" \
-    "$DESKTOP_DEV_ROOT/ui2_vinix_backend.v"
 rm -rf "$STAGING/root/desktop" "$STAGING/root/vmodules"
 cp -a "$DESKTOP_DEV_ROOT/desktop" "$STAGING/root/desktop"
 cp -a "$DESKTOP_DEV_ROOT/vmodules" "$STAGING/root/vmodules"
