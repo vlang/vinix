@@ -48,11 +48,9 @@ mut:
 	clip            Clip
 }
 
-/*
 fn new_canvas(width int, height int) Canvas {
 	return new_scaled_canvas(width, height, width, height, 1)
 }
-*/
 
 fn new_scaled_canvas(width int, height int, physical_width int, physical_height int,
 	scale int) Canvas {

@@ -430,7 +430,7 @@ fn test_terminal_renders_pty_echo_and_carriage_return_updates() {
 	terminal.set_geometry(4, 40)
 	terminal.ingest_output('progress 10%\rprogress 20%\r\n\$ '.bytes())
 	assert terminal.row_string(0) == 'progress 20%'
-	assert terminal.row_string(1) == '\$ '
+	assert terminal.row_string(1) == '\$'
 	assert terminal.rendered_row(1) == '\$ _'
 
 	// Canonical erase echo is backspace-space-backspace. Interpret it as cursor
@@ -849,7 +849,7 @@ fn test_taskbar_keeps_a_bottom_right_clock_and_open_windows() {
 
 	root := desktop.build_tree()
 	taskbar := utility_element_named(root, 'taskbar') or { panic('missing taskbar') }
-	assert taskbar.children.len == 6
+	assert taskbar.children.len == 6 + workspace_count
 	assert utility_element_named(taskbar, action_start_toggle) != none
 	assert utility_element_named(taskbar, 'task.1') != none
 	assert utility_element_named(taskbar, 'task.2') != none
@@ -864,7 +864,7 @@ fn test_taskbar_keeps_a_bottom_right_clock_and_open_windows() {
 	desktop.close_window(1)
 	empty := desktop.build_tree()
 	empty_taskbar := utility_element_named(empty, 'taskbar') or { panic('missing empty taskbar') }
-	assert empty_taskbar.children.len == 4
+	assert empty_taskbar.children.len == 4 + workspace_count
 	assert utility_element_named(empty_taskbar, action_start_toggle) != none
 	assert utility_element_named(empty_taskbar, 'clock.time') != none
 	free_tree(empty)

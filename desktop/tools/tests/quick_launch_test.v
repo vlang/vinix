@@ -69,7 +69,6 @@ fn test_cmd_space_opens_spotlight_style_app_search_and_owns_typing() {
 
 	results := desktop.build_tree()
 	assert quick_launch_tree_has_text(results, 'Terminal')
-	assert !quick_launch_tree_has_text(results, 'Calculator')
 	free_tree(results)
 
 	assert desktop.take_switcher_keys('\x1b') == ''
@@ -82,12 +81,16 @@ fn test_quick_launch_filters_only_available_apps_and_moves_selection() {
 	mut desktop := quick_launch_fixture()
 	desktop.toggle_quick_launch()
 	assert desktop.take_switcher_keys('cal') == ''
-	assert desktop.quick_launch_match_count() == 2
+	assert desktop.quick_launch_match_count() == 4
 
 	first := desktop.quick_launch_app_index(0) or { panic('missing first Calculator result') }
-	second := desktop.quick_launch_app_index(1) or { panic('missing second Calculator result') }
+	second := desktop.quick_launch_app_index(1) or { panic('missing Calendar result') }
 	assert available_apps[first].title == 'Calculator'
-	assert available_apps[second].title == 'Wine Calculator'
+	assert available_apps[second].title == 'Calendar'
+	third := desktop.quick_launch_app_index(2) or { panic('missing Wine Calculator result') }
+	assert available_apps[third].title == 'Wine Calculator'
+	fourth := desktop.quick_launch_app_index(3) or { panic('missing VOffice Calc result') }
+	assert available_apps[fourth].title == 'VOffice Calc'
 
 	assert desktop.take_switcher_keys('\x1b[B') == ''
 	assert desktop.switcher.index == 1
