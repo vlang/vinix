@@ -72,10 +72,39 @@ static void check(int condition, const char *description) {
         failures++;
 }
 
-static int denied_with_eperm(long result, const char *operation) {
-    if (result == -1 && errno == EPERM)
+static int failed_with_errno(long result, int expected, const char *operation) {
+    if (result == -1 && errno == expected)
         return 1;
-    printf("%s: result=%ld errno=%d (expected EPERM)\n", operation, result, errno);
+    printf("%s: result=%ld errno=%d (expected %d)\n",
+           operation, result, errno, expected);
+    fflush(stdout);
+    return 0;
+}
+
+static int denied_operations(void) {
+    const void *invalid = (const void *)(uintptr_t)1;
+    return failed_with_errno(sethostname("untrusted", 9), EPERM, "sethostname") &&
+           failed_with_errno(syscall(SYS_setdomainname, "bad.test", 8), EPERM, "setdomainname") &&
+           failed_with_errno(syscall(SYS_mount, "", "/tmp", "unknownfs", 0, NULL), EPERM, "mount") &&
+           failed_with_errno(syscall(SYS_umount2, "/tmp", 0), EPERM, "umount2") &&
+           failed_with_errno(syscall(SYS_reboot, 0, 0, 0, NULL), EPERM, "reboot") &&
+           failed_with_errno(syscall(SYS_sethostname, invalid, 1), EPERM, "sethostname invalid pointer") &&
+           failed_with_errno(syscall(SYS_setdomainname, invalid, 1), EPERM, "setdomainname invalid pointer") &&
+           failed_with_errno(syscall(SYS_mount, invalid, invalid, invalid, 0, NULL), EPERM, "mount invalid pointers");
+}
+
+static int security_child_succeeded(pid_t child) {
+    int status = 0;
+    pid_t waited = -1;
+    if (child > 0) {
+        do {
+            waited = waitpid(child, &status, 0);
+        } while (waited == -1 && errno == EINTR);
+    }
+    if (child > 0 && waited == child && WIFEXITED(status) && WEXITSTATUS(status) == 0)
+        return 1;
+    printf("security child pid=%d waited=%d status=0x%x errno=%d\n",
+           (int)child, (int)waited, status, errno);
     fflush(stdout);
     return 0;
 }
@@ -313,32 +342,37 @@ int main(void) {
             fflush(stdout);
             _exit(1);
         }
-        if (!denied_with_eperm(sethostname("untrusted", 9), "sethostname") ||
-            !denied_with_eperm(syscall(SYS_setdomainname, "bad.test", 8), "setdomainname") ||
-            !denied_with_eperm(syscall(SYS_mount, "", "/tmp", "unknownfs", 0, NULL), "mount") ||
-            !denied_with_eperm(syscall(SYS_umount2, "/tmp", 0), "umount2") ||
-            !denied_with_eperm(syscall(SYS_reboot, 0, 0, 0, NULL), "reboot"))
-            _exit(2);
-        _exit(0);
+        _exit(denied_operations() ? 0 : 2);
     }
-    int security_status = 0;
-    pid_t security_waited = -1;
-    if (security_child > 0) {
-        do {
-            security_waited = waitpid(security_child, &security_status, 0);
-        } while (security_waited == -1 && errno == EINTR);
-    }
-    if (security_child <= 0 || security_waited != security_child ||
-        !WIFEXITED(security_status) || WEXITSTATUS(security_status) != 0) {
-        printf("security child pid=%d waited=%d status=0x%x errno=%d\n",
-               (int)security_child, (int)security_waited, security_status, errno);
-    }
-    check(security_child > 0 && security_waited == security_child &&
-              WIFEXITED(security_status) && WEXITSTATUS(security_status) == 0,
+    check(security_child_succeeded(security_child),
           "privileged selectors deny non-root callers");
+
+    pid_t effective_child = fork();
+    if (effective_child == 0) {
+        if (setresuid((uid_t)-1, 1000, (uid_t)-1) != 0 ||
+            getuid() != 0 || geteuid() != 1000)
+            _exit(1);
+        _exit(denied_operations() ? 0 : 2);
+    }
+    check(security_child_succeeded(effective_child),
+          "real root with non-root euid is denied");
     check(uname(&uts) == 0 && !strcmp(uts.nodename, "syscall-smoke") &&
               !strcmp(uts.domainname, "vinix.test"),
           "denied name changes leave system state intact");
+
+    pid_t root_effective_child = fork();
+    if (root_effective_child == 0) {
+        if (setresuid(1000, 0, 0) != 0 || getuid() != 1000 || geteuid() != 0)
+            _exit(1);
+        if (sethostname("syscall-smoke", 13) != 0 ||
+            syscall(SYS_setdomainname, "vinix.test", 10) != 0 ||
+            !failed_with_errno(syscall(SYS_umount2, "/tmp", 0), ENOSYS, "root umount2") ||
+            !failed_with_errno(syscall(SYS_reboot, 0, 0, 0, NULL), EINVAL, "root reboot invalid magic"))
+            _exit(2);
+        _exit(0);
+    }
+    check(security_child_succeeded(root_effective_child),
+          "non-root real uid with root euid is allowed");
 
     close(fd);
     unlink(path);

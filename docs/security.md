@@ -10,7 +10,7 @@ Vinix uses a small part of [SBP's selector-based design](https://github.com/okTu
 | `system/domainname/set` | `setdomainname` | Effective UID 0 |
 | `system/reboot` | `reboot` | Effective UID 0 |
 
-The rule applies to both architecture ABIs where those operations exist. A denied call returns `EPERM`. The AArch64 syscall smoke test drops credentials in a child and checks each denial; it also checks that the host and domain names did not change.
+The rule applies to both architecture ABIs where those operations exist. A denied call returns `EPERM`. The AArch64 syscall smoke test checks full and effective-only privilege drops, invalid userspace pointers, authorized calls with a nonzero real UID, and unchanged host and domain names after denials.
 
 `umount2` still returns `ENOSYS` for an authorized caller because unmounting is not implemented yet.
 
