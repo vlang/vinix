@@ -402,8 +402,9 @@ fn desktop_run_external(path string) ExternalProgramResult {
 // control instead of requiring a private prompt protocol over pipes.
 //
 // The master comes back non-blocking, so polling it once per compositor frame
-// never stalls.
-fn desktop_spawn_shell(path string, rows int, columns int, width int, height int) ?SpawnedShell {
+// never stalls. A non-empty `command` runs through /bin/sh on the same PTY
+// instead; it is expected to exec the interactive shell when it is done.
+fn desktop_spawn_shell(path string, command string, rows int, columns int, width int, height int) ?SpawnedShell {
 	master := C.posix_openpt(C.O_RDWR | C.O_NOCTTY | C.O_CLOEXEC)
 	if master < 0 {
 		return none
@@ -433,7 +434,12 @@ fn desktop_spawn_shell(path string, rows int, columns int, width int, height int
 
 	// Built before the fork. Between fork and execve the child may call only
 	// async-signal-safe functions, which allocating is not.
-	argv := [&char(path.str), c'-i', &char(unsafe { nil })]
+	program := if command.len > 0 { '/bin/sh' } else { path }
+	argv := if command.len > 0 {
+		[c'/bin/sh', c'-c', &char(command.str), &char(unsafe { nil })]
+	} else {
+		[&char(path.str), c'-i', &char(unsafe { nil })]
+	}
 	path_entry := 'PATH=${desktop_command_path}'
 	home_entry := 'HOME=${desktop_home}'
 	// A valid terminal type is required by terminal applications such as tmux.
@@ -467,7 +473,7 @@ fn desktop_spawn_shell(path string, rows int, columns int, width int, height int
 		// not a login shell, so nothing else moves it there. A failure is not
 		// fatal: a shell in the wrong directory still beats no shell.
 		C.chdir(&char(desktop_home.str))
-		C.execve(&char(path.str), argv.data, envp.data)
+		C.execve(&char(program.str), argv.data, envp.data)
 		C._exit(127)
 	}
 

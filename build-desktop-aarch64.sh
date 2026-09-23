@@ -24,19 +24,12 @@ elif [ -f "$SCRIPT_DIR/../ui2/v.mod" ]; then
 else
     UI2_SOURCE="$SCRIPT_DIR/third_party/ui2"
 fi
-if [ -n "${VINIX_OFFICE_SOURCE:-}" ]; then
-    OFFICE_SOURCE="$VINIX_OFFICE_SOURCE"
-elif [ -f "$SCRIPT_DIR/../office/v.mod" ]; then
-    OFFICE_SOURCE="$SCRIPT_DIR/../office"
-else
-    OFFICE_SOURCE="$SCRIPT_DIR/third_party/office"
-fi
 
 BUILD_DIR="$SCRIPT_DIR/build"
-# UI2 examples and VOffice are independent, expensive application builds.
+# The compositor and UI2 examples are independent, expensive application builds.
 # Keep their completed binaries outside the disposable compositor workspace so
 # cleaning build/ (or replacing its initramfs staging tree) cannot turn the
-# next deployment into an 87-application rebuild.  Their builders retain
+# next deployment into an 85-application rebuild.  Their builders retain
 # content fingerprints and only replace an artifact when its real inputs
 # change.  Override this for CI or isolated builds without moving the normal
 # host cache.
@@ -186,7 +179,7 @@ for arg in "$@"; do
             echo "  --with-x86-translation adds a previously built x86/Wine runtime"
             echo "  --wifi-bundle stages a package.py output and loads it before the desktop"
             echo "  VINIX_REFRESH_DESKTOP_STAGING=1 discards the cached assembled layers"
-            echo "  VINIX_AARCH64_APP_CACHE changes the persistent ui2/VOffice binary cache"
+            echo "  VINIX_AARCH64_APP_CACHE changes the persistent desktop/ui2 binary cache"
             exit 0
             ;;
         *)
@@ -294,8 +287,6 @@ trap release_desktop_build_lock EXIT
 
 migrate_legacy_app_cache "$BUILD_DIR/ui2-examples" \
     "$APP_CACHE_DIR/ui2-examples" ".vinix-ui2-build-state.json"
-migrate_legacy_app_cache "$BUILD_DIR/voffice" \
-    "$APP_CACHE_DIR/voffice" ".vinix-voffice-build-state.json"
 
 archive_has_member() {
     local archive="$1"
@@ -361,12 +352,6 @@ fi
 if [ ! -f "$UI2_SOURCE/v.mod" ]; then
     echo "ERROR: ui2 not found at $UI2_SOURCE. Clone it at third_party/ui2:"
     echo "    git clone https://github.com/vlang/ui2 third_party/ui2"
-    exit 1
-fi
-if [ ! -f "$OFFICE_SOURCE/v.mod" ] || [ ! -f "$OFFICE_SOURCE/cmd/excel/main.v" ] || \
-   [ ! -f "$OFFICE_SOURCE/cmd/word/main.v" ]; then
-    echo "ERROR: VOffice not found at $OFFICE_SOURCE."
-    echo "Set VINIX_OFFICE_SOURCE or check it out beside Vinix as ../office."
     exit 1
 fi
 
@@ -555,15 +540,6 @@ UI2_EXAMPLES_DIR="$APP_CACHE_DIR/ui2-examples"
 python3 "$SCRIPT_DIR/desktop/tools/build_ui2_examples.py" \
     --repo "$SCRIPT_DIR" --ui2-source "$UI2_SOURCE" \
     --output "$UI2_EXAMPLES_DIR" --work "$BUILD_DIR/ui2-examples-work" \
-    --v "$V" --arch arm64 --clang "$LLVM_BIN/clang" --strip "$LLVM_BIN/llvm-strip" \
-    --target aarch64-linux-musl --sysroot "$SYSROOT" --gcclib "$GCCLIB" \
-    --cc-shim "$CC_SHIM" --llvm-bin "$LLVM_BIN"
-
-echo "==> Preparing cached VOffice Calc and Writer for aarch64..."
-VOFFICE_DIR="$APP_CACHE_DIR/voffice"
-python3 "$SCRIPT_DIR/desktop/tools/build_voffice.py" \
-    --repo "$SCRIPT_DIR" --office-source "$OFFICE_SOURCE" --ui2-source "$UI2_SOURCE" \
-    --output "$VOFFICE_DIR" --work "$BUILD_DIR/voffice-work" \
     --v "$V" --arch arm64 --clang "$LLVM_BIN/clang" --strip "$LLVM_BIN/llvm-strip" \
     --target aarch64-linux-musl --sysroot "$SYSROOT" --gcclib "$GCCLIB" \
     --cc-shim "$CC_SHIM" --llvm-bin "$LLVM_BIN"
@@ -1090,6 +1066,10 @@ install -m644 "$SCRIPT_DIR/tests/browsers/firefox-smoke.html" "$STAGING/root/fir
 mkdir -p "$STAGING/etc/firefox/policies"
 install -m644 "$SCRIPT_DIR/build-support/firefox/policies.json" \
     "$STAGING/etc/firefox/policies/policies.json"
+# `pkg install firefox` gives an apk-installed browser the same defaults.
+mkdir -p "$STAGING/usr/share/vinix/firefox"
+install -m644 "$SCRIPT_DIR/build-support/firefox/vinix.js" \
+    "$STAGING/usr/share/vinix/firefox/vinix.js"
 install -m755 "$SCRIPT_DIR/build-support/chromium/run-chromium" "$STAGING/usr/bin/run-chromium"
 install -m755 "$SCRIPT_DIR/build-support/vinix-desktop-build" \
     "$STAGING/usr/bin/vinix-desktop-build"
@@ -1223,12 +1203,11 @@ cp "$BUILD_DIR/vinix-desktop" "$STAGING/usr/bin/vinix-desktop"
 # packaged inode for PID 1 to restore on the next persistent disk-root boot.
 install -m755 "$BUILD_DIR/vinix-desktop" \
     "$STAGING/usr/libexec/vinix-desktop-system"
-install -m755 "$VOFFICE_DIR"/voffice-calc "$VOFFICE_DIR"/voffice-writer \
-    "$STAGING/usr/bin/"
-mkdir -p "$STAGING/usr/bin/assets/ribbon" "$STAGING/usr/bin/translations"
-install -m644 "$OFFICE_SOURCE/assets/logo.png" "$STAGING/usr/bin/assets/logo.png"
-install -m644 "$OFFICE_SOURCE"/assets/ribbon/*.png "$STAGING/usr/bin/assets/ribbon/"
-cp -a "$OFFICE_SOURCE/translations/." "$STAGING/usr/bin/translations/"
+# VOffice is not part of the image; `pkg install voffice` compiles it on the
+# machine. A staging tree reused from an older build still carries the copy
+# images used to preinstall, so drop it rather than ship a stale suite.
+rm -f "$STAGING/usr/bin/voffice-calc" "$STAGING/usr/bin/voffice-writer"
+rm -rf "$STAGING/usr/bin/assets" "$STAGING/usr/bin/translations"
 if [ "$GPU_DESKTOP_BUILT" -eq 1 ]; then
     cp "$BUILD_DIR/vinix-desktop-gpu" "$STAGING/usr/bin/vinix-desktop-gpu"
     chmod +x "$STAGING/usr/bin/vinix-desktop-gpu"
@@ -1300,6 +1279,10 @@ fi
 python3 "$SCRIPT_DIR/build-support/content-key.py" \
     "$DESKTOP_DEV_ROOT/desktop" "$DESKTOP_DEV_ROOT/vmodules" \
     > "$DESKTOP_DEV_ROOT/.source-version"
+# `pkg install voffice` compiles Writer and Calc against this same ui2 copy,
+# with the compositor's pipe backend in place of the headless bounds bridge.
+install -m644 "$SCRIPT_DIR/desktop/tools/ui2_vinix_backend.v" \
+    "$DESKTOP_DEV_ROOT/ui2_vinix_backend.v"
 rm -rf "$STAGING/root/desktop" "$STAGING/root/vmodules"
 cp -a "$DESKTOP_DEV_ROOT/desktop" "$STAGING/root/desktop"
 cp -a "$DESKTOP_DEV_ROOT/vmodules" "$STAGING/root/vmodules"
@@ -1353,9 +1336,6 @@ CONTENT_KEY_INPUTS=(
     "$BUILD_DIR/wifi-ctl"
     "$BUILD_DIR/wallpapers"
     "$UI2_EXAMPLES_DIR"
-    "$VOFFICE_DIR"
-    "$OFFICE_SOURCE/assets"
-    "$OFFICE_SOURCE/translations"
     "$SCRIPT_DIR/desktop"
     "$SCRIPT_DIR/build-support/vinix-pkg"
     "$SCRIPT_DIR/build-support/vinix-desktop-build"

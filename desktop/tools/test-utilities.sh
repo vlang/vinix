@@ -62,6 +62,13 @@ cp "$root/desktop/tools/tests/registration_test.v" "$work/ui/"
     -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/registration_test.v"
 rm -f "$work/ui/registration_test.v"
 
+# The app picker follows registration with the same exclusive ownership of the
+# display and keyboard, then hands its choice to the first Terminal.
+cp "$root/desktop/tools/tests/app_selection_test.v" "$work/ui/"
+"$v" -new-compiler -nocache -gc none -manualfree -enable-globals -stats -d ui2_headless \
+    -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/app_selection_test.v"
+rm -f "$work/ui/app_selection_test.v"
+
 # Miller columns use real directory listings and their own retained navigation
 # state, so exercise them independently from the broader utility model tests.
 cp "$root/desktop/tools/tests/files_columns_test.v" "$work/ui/"

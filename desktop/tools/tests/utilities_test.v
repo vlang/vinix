@@ -642,10 +642,12 @@ fn test_available_utility_applications_and_shortcut_layouts() {
 	assert available_apps[17].process_name == 'voffice-writer'
 	assert available_apps[17].standalone && available_apps[17].keyboard
 	assert available_apps[17].pointer && available_apps[17].polling
+	assert available_apps[17].install_package == 'voffice'
 	assert available_apps[18].title == 'VOffice Calc'
 	assert available_apps[18].process_name == 'voffice-calc'
 	assert available_apps[18].standalone && available_apps[18].keyboard
 	assert available_apps[18].pointer && available_apps[18].polling
+	assert available_apps[18].install_package == 'voffice'
 	assert available_apps[20].title == 'Chromium'
 	assert available_apps[20].process_name == 'vinix-chromium'
 	assert available_apps[20].icon == 'asset:chromium'

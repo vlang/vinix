@@ -369,7 +369,15 @@ fn (mut a TerminalApp) put_visible_byte(ch u8) {
 
 fn (mut a TerminalApp) start_shell(rows int, columns int, width int, height int) {
 	a.started = true
-	shell := desktop_spawn_shell(terminal_shell, rows, columns, width, height) or {
+	// The first Terminal after setup installs the apps chosen there, then
+	// hands the same PTY to the ordinary interactive shell.
+	command := desktop_take_first_run_install()
+	defer {
+		if command.len > 0 {
+			unsafe { command.free() }
+		}
+	}
+	shell := desktop_spawn_shell(terminal_shell, command, rows, columns, width, height) or {
 		a.error = 'cannot start ${terminal_shell}'
 		a.ingest_output(a.error.bytes())
 		a.exited = true

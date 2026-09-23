@@ -564,9 +564,21 @@ fn (mut d Desktop) launch_with_timeout(factory AppFactory, timeout_ms int) {
 		eprintln('vinix-desktop: ${factory.title} has no launcher')
 		return
 	}
+	if factory.install_package != '' && !native_app_installed(factory) {
+		d.show_app_not_installed(factory)
+		return
+	}
 	app := start_remote_app_with_timeout(factory, mut d, timeout_ms) or {
 		eprintln('vinix-desktop: cannot start ${factory.title}: ${err}')
 		return
+	}
+	if factory.install_package != '' {
+		// The icon was looked up, and found missing, before pkg installed it.
+		if cached := d.native_asset_icons[factory.icon] {
+			if cached.width == 0 {
+				d.native_asset_icons.delete(factory.icon)
+			}
+		}
 	}
 	d.apps << app
 	// Most windows cascade. Games that leave the centred wallpaper logo visible
@@ -615,6 +627,25 @@ fn (mut d Desktop) external_finished(result ExternalProgramResult) {
 	id := d.spawn(title, .external_error, 180, 120, 560, 220)
 	index := d.window_index(id) or { return }
 	d.windows[index].icon = icon
+	d.clamp_to_screen(index)
+}
+
+fn native_app_installed(factory AppFactory) bool {
+	path := native_app_directory + factory.process_name
+	defer { unsafe { path.free() } }
+	return C.access(&char(path.str), C.X_OK) == 0
+}
+
+// show_app_not_installed answers a shortcut for an optional app with a window
+// naming its package, instead of a launch that fails without any feedback.
+fn (mut d Desktop) show_app_not_installed(factory AppFactory) {
+	d.external_error_title = '${factory.title} is not installed'
+	d.external_error = 'Run pkg install ${factory.install_package} in Terminal to install it.'
+	d.external_error_note = 'The Vinix image does not include this app.'
+	d.external_error_hint = 'Open it again from here once the install has finished.'
+	id := d.spawn(factory.title, .external_error, 180, 120, 560, 220)
+	index := d.window_index(id) or { return }
+	d.windows[index].icon = factory.icon
 	d.clamp_to_screen(index)
 }
 

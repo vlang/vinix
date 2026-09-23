@@ -46,6 +46,9 @@ struct AppFactory {
 	// A standalone app implements the pipe protocol in its own executable; it
 	// therefore has no factory callback in the compositor's multicall binary.
 	standalone        bool
+	// A standalone app the image does not carry names the pkg package that
+	// provides it. Launching it before that install explains how to get it.
+	install_package   string
 	exclusive_command string
 	// Used only after exec, in the application process. Settings receives that
 	// process' synchronized desktop-state proxy; most apps ignore it.
@@ -263,6 +266,7 @@ const available_apps = [
 		keyboard:         true
 		pointer:          true
 		standalone:       true
+		install_package:  'voffice'
 	},
 	AppFactory{
 		title:            'VOffice Calc'
@@ -275,6 +279,7 @@ const available_apps = [
 		keyboard:         true
 		pointer:          true
 		standalone:       true
+		install_package:  'voffice'
 	},
 	AppFactory{
 		title:            'LibreOffice'

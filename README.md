@@ -672,8 +672,8 @@ Chromium regression test boots:
 
 Chromium, Firefox and LibreOffice staging builders reuse their extracted
 package trees when their package archives and build inputs are unchanged.
-Repeated desktop builds also reuse compiled ui2 examples, VOffice and the
-compositor. Use `./build-all-aarch64.sh --reuse-layers` to assemble a new
+Repeated desktop builds also reuse compiled ui2 examples and the compositor.
+Use `./build-all-aarch64.sh --reuse-layers` to assemble a new
 image from the existing language and desktop layers.
 
 Chromium is a much heavier guest than Firefox, and four kernel facilities were

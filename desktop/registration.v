@@ -147,6 +147,11 @@ fn (mut r RegistrationState) submit(home string) {
 		r.error = 'Passwords do not match.'
 		return
 	}
+	// The app picker follows user creation. Mark it first so it still appears
+	// if the machine restarts right after the user record becomes durable.
+	if !desktop_mark_app_selection_pending(home) {
+		eprintln('vinix-desktop: could not mark the first-run app choice as pending')
+	}
 	if !desktop_save_user(home, name, r.password) {
 		r.error = 'Could not save the user. Try again.'
 		return
@@ -453,8 +458,12 @@ fn (mut d Desktop) ensure_registered_user(mut fb Framebuffer, mut pointer Pointe
 		dirty = false
 		sleep_to_next_frame(frame_started, frame_interval)
 	}
-	// Do not let the first ordinary input sample see setup hit targets or a
-	// button level left over from pressing Create user.
+	d.reset_setup_input()
+}
+
+// Do not let the next screen's first input sample see setup hit targets or a
+// button level left over from pressing the setup button that finished it.
+fn (mut d Desktop) reset_setup_input() {
 	d.clear_hit_targets()
 	d.set_hover('')
 	d.buttons = 0

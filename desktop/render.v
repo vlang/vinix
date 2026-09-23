@@ -1014,6 +1014,11 @@ fn (mut d Desktop) draw_button(el ui2.Element, x int, y int, w int, h int) {
 // pixel grid stays crisp at any of the sizes the chrome uses.
 fn (mut d Desktop) draw_builtin_glyph(path string, x int, y int, w int, h int, color u32) {
 	if !path.starts_with('builtin:') {
+		// An optional native app's artwork arrives with its pkg install. Until
+		// then its shortcut shows a document glyph rather than an empty tile.
+		if path.starts_with('/usr/bin/assets/') {
+			d.draw_builtin_glyph('builtin:editor', x, y, w, h, color)
+		}
 		return
 	}
 	name := path[8..]
@@ -1063,6 +1068,12 @@ fn (mut d Desktop) draw_builtin_glyph(path string, x int, y int, w int, h int, c
 		'traffic_close' {
 			d.canvas.draw_line(cx - 2, cy - 3, cx + 3, cy + 2, color, 1)
 			d.canvas.draw_line(cx + 3, cy - 3, cx - 2, cy + 2, color, 1)
+		}
+		'check' {
+			// A two-stroke tick: the baked faces have no check mark character.
+			d.canvas.draw_line(cx - 2 * half, cy, cx - half / 2, cy + 3 * half / 2, color, 2)
+			d.canvas.draw_line(cx - half / 2, cy + 3 * half / 2, cx + 2 * half, cy - 3 * half / 2,
+				color, 2)
 		}
 		'arrow_left' {
 			head := if half > 2 { half * 2 / 3 } else { half }

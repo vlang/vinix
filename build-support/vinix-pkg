@@ -19,13 +19,15 @@ SUBLIME_SHA256=${VINIX_SUBLIME_SHA256:-cf4b6aa74ea2a2aab02e144599cf9e4a423cbb954
 MINECRAFT_VERSION=${VINIX_MINECRAFT_VERSION:-release}
 MINECRAFT_JAVA_MAJOR=21
 MINECRAFT_DOWNLOAD_JOBS=${VINIX_MINECRAFT_DOWNLOAD_JOBS:-8}
+VOFFICE_URL=${VINIX_VOFFICE_URL:-https://github.com/vlang/office/archive/refs/heads/main.tar.gz}
+VOFFICE_CC=${VINIX_VOFFICE_CC:-gcc}
 
 usage() {
 	cat <<'EOF'
 usage: pkg <command> [package ...]
 
 commands:
-  install PACKAGE...  install packages (includes FFmpeg, Minecraft, Java, Chromium, GTK, GIMP, Blender, and Sublime Text)
+  install PACKAGE...  install packages (includes Firefox, Chromium, VOffice, Minecraft, Java, FFmpeg, GTK, GIMP, Blender, and Sublime Text)
   remove PACKAGE...   remove packages
   update              refresh Alpine repository indexes
   upgrade             upgrade installed packages
@@ -271,11 +273,15 @@ resolve_packages() {
 			java)
 				resolved="$resolved openjdk21-jdk ca-certificates-bundle"
 				;;
-			minecraft)
+			minecraft|voffice)
 				# Remove Mojang's client through its own manifest below, but retain
 				# the shared Alpine JVM/X11/Mesa packages. The immutable Vinix base
 				# carries several of those outside apk's database; deleting them here
-				# would remove files Firefox and the desktop still use.
+				# would remove files Firefox and the desktop still use. VOffice is
+				# compiled from source and owns no apk package at all.
+				;;
+			firefox)
+				resolved="$resolved firefox-esr"
 				;;
 			gtk)
 				# Keep GTK out of the image while making the obvious command
@@ -316,6 +322,15 @@ install_packages() {
 				;;
 			minecraft)
 				install_minecraft
+				;;
+			voffice)
+				install_voffice
+				;;
+			firefox)
+				# The image's own browser is Alpine's ESR build; keep a reinstall on
+				# the same release line and give it the same Vinix defaults.
+				apk_install adwaita-icon-theme font-dejavu firefox-esr
+				finalize_firefox
 				;;
 			gtk)
 				apk_install \
@@ -909,17 +924,160 @@ install_minecraft() {
 			./usr/bin/minecraft-login \
 			./usr/share/vinix/minecraft-xinitrc
 	) | LC_ALL=C sort -u >"$custom_manifest"
+	record_custom_files "$custom_manifest"
 
-	# QEMU's RAM-root compatibility mode persists paths from this shared
-	# manifest. Disk-root and hardware installs retain them in place directly.
+	echo "pkg: official Minecraft: Java Edition $MC_VERSION installed"
+}
+
+# QEMU's RAM-root compatibility mode persists paths from this shared manifest.
+# Disk-root and hardware installs retain custom files in place directly.
+record_custom_files() {
+	custom_manifest=$1
 	package_manifest=$(root_path /var/lib/vinix-pkg/package-files)
 	{
 		[ ! -f "$package_manifest" ] || cat "$package_manifest"
 		sed 's#^\./##' "$custom_manifest"
 	} | LC_ALL=C sort -u >"$package_manifest.new"
 	mv "$package_manifest.new" "$package_manifest"
+}
 
-	echo "pkg: official Minecraft: Java Edition $MC_VERSION installed"
+finalize_firefox() {
+	prefs=$(root_path /usr/share/vinix/firefox/vinix.js)
+	policies=$(root_path /etc/firefox/policies/policies.json)
+	custom_manifest=$(root_path /var/lib/vinix-pkg/firefox.files)
+	: >"$custom_manifest"
+	for app in usr/lib/firefox-esr usr/lib/firefox; do
+		directory=$(root_path "/$app")
+		[ -d "$directory" ] || continue
+		if [ -f "$prefs" ]; then
+			mkdir -p "$directory/defaults/pref"
+			bb cp "$prefs" "$directory/defaults/pref/vinix.js"
+			printf './%s\n' "$app/defaults/pref/vinix.js" >>"$custom_manifest"
+		fi
+		if [ -f "$policies" ]; then
+			mkdir -p "$directory/distribution"
+			bb cp "$policies" "$directory/distribution/policies.json"
+			printf './%s\n' "$app/distribution/policies.json" >>"$custom_manifest"
+		fi
+	done
+	record_custom_files "$custom_manifest"
+}
+
+voffice_download() {
+	destination=$1
+	attempt=1
+	while ! "$CURL" --fail --location --output "$destination" "$VOFFICE_URL"; do
+		if [ "$attempt" -ge "$NETWORK_RETRIES" ]; then
+			echo "pkg: VOffice download failed after $attempt attempts" >&2
+			return 1
+		fi
+		echo "pkg: VOffice download failed; retrying ($attempt/$NETWORK_RETRIES)" >&2
+		sleep $((NETWORK_RETRY_DELAY * attempt))
+		attempt=$((attempt + 1))
+	done
+}
+
+# VOffice is not part of the image. Compile Writer and Calc from the public
+# source against the image's own ui2 copy, with the compositor's pipe backend
+# in place of the headless bounds bridge, so the suite always speaks the
+# protocol of the desktop it is installed on.
+install_voffice() {
+	dev=$(root_path /usr/share/vinix/desktop-dev)
+	ui2=${VINIX_VOFFICE_UI2:-$dev/vmodules/ui2}
+	backend=${VINIX_VOFFICE_BACKEND:-$dev/ui2_vinix_backend.v}
+	v=${VINIX_VOFFICE_V:-$(root_path /usr/bin/v)}
+	for required in "$ui2/v.mod" "$ui2/ui/vinix_headless_backend.v" "$backend" "$v"; do
+		if [ ! -f "$required" ]; then
+			echo "pkg: this image lacks VOffice build support: $required" >&2
+			exit 1
+		fi
+	done
+	case "$(uname -m)" in
+		aarch64|arm64) v_arch=arm64 ;;
+		x86_64|amd64) v_arch=x64 ;;
+		*) echo "pkg: VOffice cannot be built for $(uname -m)" >&2; exit 1 ;;
+	esac
+
+	wait_for_network
+	cache_parent=$(root_path /var/cache)
+	mkdir -p "$cache_parent"
+	temp=$(bb mktemp -d "$cache_parent/vinix-voffice.XXXXXX")
+	trap 'rm -rf "$temp"' EXIT INT TERM
+	echo "pkg: downloading VOffice source"
+	voffice_download "$temp/office.tar.gz"
+
+	# V resolves `import office.x` through a module root holding the checkout
+	# under that name, next to the Vinix-hosted ui2 overlay.
+	source="$temp/vmodules/office"
+	mkdir -p "$source"
+	"$BSDTAR" -xzf "$temp/office.tar.gz" -C "$source" --strip-components 1
+	for required in v.mod cmd/excel/main.v cmd/word/main.v assets/logo.png; do
+		if [ ! -f "$source/$required" ]; then
+			echo "pkg: VOffice source archive is missing $required" >&2
+			exit 1
+		fi
+	done
+	if [ ! -d "$source/assets/ribbon" ] || [ ! -d "$source/translations" ]; then
+		echo "pkg: VOffice source archive is missing its ribbon assets or translations" >&2
+		exit 1
+	fi
+	bb cp -a "$ui2" "$temp/vmodules/ui2"
+	bb cp "$backend" "$temp/vmodules/ui2/ui/vinix_headless_backend.v"
+
+	mkdir -p "$temp/bin"
+	for app in writer:cmd/word calc:cmd/excel; do
+		name=${app%%:*}
+		echo "pkg: compiling VOffice $name (this takes a while)"
+		if ! "$v" -new-compiler -no-memory-limit -os linux -arch "$v_arch" \
+			-cc "$VOFFICE_CC" -gc none -manualfree -enable-globals \
+			-d no_backtrace -d ui2_headless -cflags -O2 -ldflags -static \
+			-path "@vlib|$temp/vmodules" \
+			-o "$temp/bin/voffice-$name" "$source/${app#*:}" \
+			>"$temp/$name.log" 2>&1; then
+			cat "$temp/$name.log" >&2
+			echo "pkg: VOffice $name failed to compile" >&2
+			exit 1
+		fi
+		if [ ! -s "$temp/bin/voffice-$name" ]; then
+			echo "pkg: VOffice $name produced no executable" >&2
+			exit 1
+		fi
+	done
+
+	# The applications find their ribbon artwork and translations beside their
+	# executables, and the compositor only reads app icons below /usr/bin/assets.
+	remove_voffice
+	bin=$(root_path /usr/bin)
+	mkdir -p "$bin/assets/ribbon" "$bin/translations" \
+		"$(root_path /var/lib/vinix-pkg)"
+	bb cp "$source/assets/logo.png" "$bin/assets/logo.png"
+	bb cp "$source"/assets/ribbon/*.png "$bin/assets/ribbon/"
+	bb cp -a "$source/translations/." "$bin/translations/"
+	for name in writer calc; do
+		bb cp "$temp/bin/voffice-$name" "$bin/voffice-$name"
+		bb chmod 0755 "$bin/voffice-$name"
+	done
+
+	custom_manifest=$(root_path /var/lib/vinix-pkg/voffice.files)
+	(
+		cd "${ROOT:-/}"
+		printf '%s\n' ./usr/bin/voffice-writer ./usr/bin/voffice-calc \
+			./usr/bin/assets/logo.png
+		bb find ./usr/bin/assets/ribbon ./usr/bin/translations -type f
+	) | LC_ALL=C sort -u >"$custom_manifest"
+	record_custom_files "$custom_manifest"
+
+	rm -rf "$temp"
+	trap - EXIT INT TERM
+	echo "pkg: VOffice Writer and Calc installed"
+}
+
+remove_voffice() {
+	bb rm -f "$(root_path /usr/bin/voffice-writer)" \
+		"$(root_path /usr/bin/voffice-calc)" \
+		"$(root_path /var/lib/vinix-pkg/voffice.files)"
+	# Only VOffice installs below these directories.
+	bb rm -rf "$(root_path /usr/bin/assets)" "$(root_path /usr/bin/translations)"
 }
 
 remove_minecraft() {
@@ -1001,6 +1159,8 @@ case "$command_name" in
 		for requested in "$@"; do
 			case "$requested" in
 				minecraft) remove_minecraft ;;
+				voffice) remove_voffice ;;
+				firefox) bb rm -f "$(root_path /var/lib/vinix-pkg/firefox.files)" ;;
 				gtk|gtk+3.0-demo) remove_gtk_demo ;;
 				blender) remove_blender ;;
 				sublime|sublime-text) remove_sublime ;;
@@ -1060,6 +1220,8 @@ case "$command_name" in
 			|| echo sublime-text
 		[ ! -s "$(root_path /var/lib/vinix-pkg/minecraft.files)" ] \
 			|| echo minecraft
+		[ ! -s "$(root_path /var/lib/vinix-pkg/voffice.files)" ] \
+			|| echo voffice
 		;;
 	*)
 		echo "pkg: unknown command: $command_name" >&2

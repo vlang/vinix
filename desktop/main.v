@@ -211,6 +211,15 @@ fn main() {
 	if !desktop.running {
 		return
 	}
+	// A newly created user then chooses which optional apps to install. The
+	// install itself runs in a Terminal once the ordinary desktop is up.
+	gpu_present_startup_stage(c'checking first-run app choice')
+	launch_install_terminal := desktop.choose_first_run_apps(mut fb, mut pointer, mut keyboard,
+		options.frame_interval, options.idle_interval)
+	gpu_present_startup_stage(c'first-run app choice ready')
+	if !desktop.running {
+		return
+	}
 
 	// An opening arrangement, kept clear of the shortcut column down the left
 	// edge. The calculator remains available from its shortcut and the Start
@@ -225,10 +234,16 @@ fn main() {
 		// so a delayed application handshake cannot leave the firmware console
 		// looking like the desktop failed to start.
 		launch_default_files = true
+		// The install Terminal ends in an ordinary interactive shell, so it
+		// also serves as the development session's Terminal.
 		launch_development_terminal = desktop_is_development_session()
+			|| launch_install_terminal
 	} else {
 		for title in options.open {
 			desktop.launch_titled_at_startup(title)
+		}
+		if launch_install_terminal {
+			desktop.launch_titled_at_startup('Terminal')
 		}
 		desktop_publish_session_ready()
 	}

@@ -47,8 +47,12 @@ What it does:
 - a paged **ui2 Examples** launcher containing all 85 applications from the
   sibling `~/code/ui2/examples` checkout, including native input, slider,
   switch, toggle, menu, file-dialog and custom-window demonstrations
-- preinstalled **VOffice Writer and Calc** from the sibling `~/code/office`
-  checkout, running as native ui2 clients inside ordinary Vinix windows
+- a **first-run app picker** shown right after the user is created, offering
+  Firefox, Chromium, VOffice and Minecraft; the chosen apps install in a
+  Terminal window through `pkg`
+- optional **VOffice Writer and Calc** (`pkg install voffice`), compiled on the
+  machine from the public `vlang/office` source and running as native ui2
+  clients inside ordinary Vinix windows
 - a **VT-compatible built-in terminal** with a real PTY, alternate-screen and
   cursor-addressed rendering for editing files in the preinstalled Vim
 - embedded **Wine Calculator and Notepad**: their translated Win64 processes
@@ -162,20 +166,21 @@ implements the same versioned pipe protocol as `app_process.v`. The build uses
 and finally `third_party/ui2`. This makes the local `~/code/ui2` tree the normal
 development source while retaining a self-contained CI/package fallback.
 
-`tools/build_voffice.py` uses that same backend to cross-compile VOffice Writer
-and Calc as static musl applications. It reads `VINIX_OFFICE_SOURCE`, then a
-sibling `../office`, and finally `third_party/office`; the image installs both
-executables together with VOffice's translations and ribbon PNGs. The
-compositor decodes those immutable installed PNG assets itself, so VOffice does
-not need a second window system or image service at runtime.
+VOffice is not built with the image. The image ships the same backend at
+`/usr/share/vinix/desktop-dev/ui2_vinix_backend.v`, and `pkg install voffice`
+downloads the `vlang/office` source, overlays that backend on the image's ui2
+copy and compiles Writer and Calc with the native V compiler and GCC. It
+installs both executables together with VOffice's translations and ribbon PNGs
+below `/usr/bin`. The compositor decodes those installed PNG assets itself, so
+VOffice does not need a second window system or image service at runtime.
 The compositor passes standalone apps their protocol pipes as
 `VINIX_REQUEST_FD` and `VINIX_RESPONSE_FD` environment variables, leaving
 their command line free for document paths.
 
-The compositor and both external application builders keep content-keyed binaries in the
+The compositor and the ui2 example builder keep content-keyed binaries in the
 persistent `build-aarch64-desktop-apps/` cache, outside the disposable
 compositor and initramfs workspace in `build/`. An unchanged deployment reuses
-the compositor, every ui2 example, Calc and Writer without invoking their compilers, even after
+the compositor and every ui2 example without invoking their compilers, even after
 `build/` has been cleaned. Changing one application's source rebuilds only
 that application, while shared ui2, compiler or sysroot changes invalidate all
 affected binaries. Outputs are replaced only after a successful compile and

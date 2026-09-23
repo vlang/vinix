@@ -482,4 +482,104 @@ if run_pkg list | grep -qx minecraft; then
 	exit 1
 fi
 
+# Firefox reinstalls on the image's ESR line and receives the image's Vinix
+# defaults in its application directory.
+mkdir -p "$root/usr/lib/firefox-esr" "$root/usr/share/vinix/firefox" \
+	"$root/etc/firefox/policies"
+printf 'pref("test", 1);\n' >"$root/usr/share/vinix/firefox/vinix.js"
+printf '{"policies": {}}\n' >"$root/etc/firefox/policies/policies.json"
+run_pkg install firefox
+tail -n 2 "$log" | sed -n '1p' | grep -q -- \
+	'--cache-dir .* --no-progress cache download adwaita-icon-theme font-dejavu firefox-esr$'
+cmp -s "$root/usr/share/vinix/firefox/vinix.js" \
+	"$root/usr/lib/firefox-esr/defaults/pref/vinix.js"
+cmp -s "$root/etc/firefox/policies/policies.json" \
+	"$root/usr/lib/firefox-esr/distribution/policies.json"
+grep -qx 'usr/lib/firefox-esr/defaults/pref/vinix.js' \
+	"$root/var/lib/vinix-pkg/package-files"
+run_pkg remove firefox
+tail -n 1 "$log" | grep -q -- '--no-progress --no-scripts del firefox-esr$'
+
+# VOffice is compiled from its source archive on the machine. A stand-in V
+# compiler checks the module overlay the frontend hands it: the downloaded
+# checkout as `office` and the image's ui2 copy with the compositor's pipe
+# backend replacing the headless bounds bridge.
+voffice_fixture="$work/voffice-fixture/office-main"
+mkdir -p "$voffice_fixture/cmd/word" "$voffice_fixture/cmd/excel" \
+	"$voffice_fixture/assets/ribbon" "$voffice_fixture/translations"
+printf "Module { name: 'office' }\n" >"$voffice_fixture/v.mod"
+printf 'module main\n' >"$voffice_fixture/cmd/word/main.v"
+printf 'module main\n' >"$voffice_fixture/cmd/excel/main.v"
+printf 'logo\n' >"$voffice_fixture/assets/logo.png"
+printf 'bold\n' >"$voffice_fixture/assets/ribbon/bold.png"
+printf 'hello=Hello\n' >"$voffice_fixture/translations/en.txt"
+voffice_archive="$work/office-main.tar.gz"
+tar -czf "$voffice_archive" -C "$work/voffice-fixture" office-main
+
+desktop_dev="$root/usr/share/vinix/desktop-dev"
+mkdir -p "$desktop_dev/vmodules/ui2/ui" "$root/usr/bin"
+printf "Module { name: 'ui2' }\n" >"$desktop_dev/vmodules/ui2/v.mod"
+printf '// headless bounds bridge\n' \
+	>"$desktop_dev/vmodules/ui2/ui/vinix_headless_backend.v"
+printf '// vinix pipe backend\n' >"$desktop_dev/ui2_vinix_backend.v"
+cat >"$root/usr/bin/v" <<'V_STUB'
+#!/bin/sh
+output=
+module_path=
+previous=
+for argument in "$@"; do
+	case "$previous" in
+		-o) output=$argument ;;
+		-path) module_path=${argument#@vlib|} ;;
+	esac
+	previous=$argument
+done
+source=$argument
+printf '%s\n' "$*" >>"$VINIX_TEST_V_LOG"
+grep -qx '// vinix pipe backend' "$module_path/ui2/ui/vinix_headless_backend.v" || {
+	echo 'ui2 overlay does not use the Vinix pipe backend' >&2
+	exit 1
+}
+[ -f "$module_path/office/v.mod" ] && [ -f "$source/main.v" ] || {
+	echo 'VOffice source is not staged as the office module' >&2
+	exit 1
+}
+printf '#!/bin/sh\nexit 0\n' >"$output"
+V_STUB
+chmod +x "$root/usr/bin/v"
+
+VINIX_VOFFICE_URL="file://$voffice_archive" \
+VINIX_TEST_V_LOG="$work/v.log" \
+	run_pkg install voffice
+test -x "$root/usr/bin/voffice-writer"
+test -x "$root/usr/bin/voffice-calc"
+grep -qx logo "$root/usr/bin/assets/logo.png"
+test -f "$root/usr/bin/assets/ribbon/bold.png"
+test -f "$root/usr/bin/translations/en.txt"
+test "$(wc -l <"$work/v.log")" -eq 2
+grep -q -- '-cc gcc .*-d ui2_headless .*-ldflags -static .*voffice-writer .*/office/cmd/word$' \
+	"$work/v.log"
+grep -q -- 'voffice-calc .*/office/cmd/excel$' "$work/v.log"
+grep -qx './usr/bin/voffice-writer' "$root/var/lib/vinix-pkg/voffice.files"
+grep -qx './usr/bin/assets/ribbon/bold.png' "$root/var/lib/vinix-pkg/voffice.files"
+grep -qx 'usr/bin/translations/en.txt' "$root/var/lib/vinix-pkg/package-files"
+grep -qx '// headless bounds bridge' \
+	"$desktop_dev/vmodules/ui2/ui/vinix_headless_backend.v"
+if ls "$root/var/cache" | grep -q '^vinix-voffice\.'; then
+	echo 'VOffice build directory was left behind' >&2
+	exit 1
+fi
+run_pkg list | grep -qx voffice
+
+run_pkg remove voffice
+test ! -e "$root/usr/bin/voffice-writer"
+test ! -e "$root/usr/bin/voffice-calc"
+test ! -e "$root/usr/bin/assets"
+test ! -e "$root/usr/bin/translations"
+test ! -e "$root/var/lib/vinix-pkg/voffice.files"
+if run_pkg list | grep -qx voffice; then
+	echo 'removed VOffice remained in pkg list' >&2
+	exit 1
+fi
+
 echo "VINIX PACKAGE COMMAND TEST: PASS"
