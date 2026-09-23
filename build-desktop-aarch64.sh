@@ -112,7 +112,9 @@ path_generation() {
 write_staging_cache_manifest() {
     local input
 
-    printf 'version=1\n'
+    # Change this when the immutable-layer assembly logic changes. Desktop
+    # source and launcher edits are refreshed below without restaging 6+ GiB.
+    printf 'version=2\n'
     printf 'compact=%s\n' "$COMPACT_INITRAMFS"
     printf 'chromium=%s\n' "$WITH_CHROMIUM"
     printf 'libreoffice=%s\n' "$WITH_LIBREOFFICE"
@@ -126,7 +128,7 @@ write_staging_cache_manifest() {
         "$FIREFOX_STAGING" "$CHROMIUM_STAGING" "$LIBREOFFICE_STAGING" \
         "$MINECRAFT_STAGING" "$ASAHI_STAGING" "$HYPRLAND_STAGING" \
         "$BLENDER_NATIVE_STAGING" "$X86_TRANSLATION_STAGING" \
-        "$GPU_SYSROOT" "$SCRIPT_DIR/build-desktop-aarch64.sh"; do
+        "$GPU_SYSROOT"; do
         printf '%s=%s\n' "$input" "$(path_generation "$input")"
     done
 }
@@ -401,35 +403,149 @@ APP_SRC="$BUILD_DIR/app-src"
 python3 "$SCRIPT_DIR/desktop/tools/stage_app.py" "$APP_SRC" "$SCRIPT_DIR/desktop" \
     "$UI2_SOURCE/examples/calculator"
 
+# Keep the compositor executable outside build/, just like the standalone
+# applications. A direct desktop build can then reuse it even after build/
+# has been cleaned. Bump the command version when its V or C flags change.
+DESKTOP_CACHE_DIR="$APP_CACHE_DIR/desktop"
+mkdir -p "$DESKTOP_CACHE_DIR"
+V_REAL="$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$V")"
+LLD_FOR_CACHE="$(command -v "${LD_LLD:-ld.lld}" || true)"
+DESKTOP_CACHE_ARGS=(
+    --state "$DESKTOP_CACHE_DIR/.build-key" --staging "$DESKTOP_CACHE_DIR"
+    --value desktop-aarch64-command-v1
+    --source "$APP_SRC" --source "$UI2_MODULES/ui2"
+    --source "$V_REAL" --vlib "$(dirname "$V_REAL")/vlib"
+    --source "$CC_SHIM"
+    --source "$SCRIPT_DIR/desktop/execinfo_compat.c"
+    --metadata "$LLVM_BIN/clang" --metadata "$LLVM_BIN/llvm-strip"
+    --metadata "$SYSROOT/usr/include" --metadata "$GCCLIB/include"
+    --metadata "$SYSROOT/usr/lib/crt1.o" --metadata "$SYSROOT/usr/lib/crti.o"
+    --metadata "$SYSROOT/usr/lib/crtn.o" --metadata "$SYSROOT/usr/lib/libc.a"
+    --metadata "$SYSROOT/usr/lib/libm.a" --metadata "$GCCLIB/crtbeginT.o"
+    --metadata "$GCCLIB/crtend.o" --metadata "$GCCLIB/libgcc.a"
+    --metadata "$GCCLIB/libgcc_eh.a"
+    --executable vinix-desktop
+)
+if [ -n "$LLD_FOR_CACHE" ]; then
+    DESKTOP_CACHE_ARGS+=(--metadata "$LLD_FOR_CACHE")
+fi
+GPU_CACHE_AVAILABLE=0
+if [ -f "$ASAHI_STAGING/usr/lib/libEGL.so" ] &&
+   [ -f "$ASAHI_STAGING/usr/lib/libGLESv2.so" ] &&
+   [ -f "$ASAHI_STAGING/usr/include/EGL/egl.h" ] &&
+   [ -f "$GPU_SYSROOT/usr/lib/Scrt1.o" ]; then
+    GPU_CACHE_AVAILABLE=1
+    DESKTOP_CACHE_ARGS+=(
+        --value gpu-enabled --executable vinix-desktop-gpu
+        --source "$SCRIPT_DIR/desktop/gpu_present_egl.c"
+        --metadata "$ASAHI_STAGING/usr/lib" --metadata "$ASAHI_STAGING/usr/include"
+        --metadata "$GPU_SYSROOT/usr/lib" --metadata "$GPU_SYSROOT/usr/include"
+    )
+else
+    DESKTOP_CACHE_ARGS+=(--value gpu-unavailable)
+fi
+DESKTOP_CACHE_HIT=0
+if python3 "$SCRIPT_DIR/build-support/staging-cache.py" check "${DESKTOP_CACHE_ARGS[@]}"; then
+    DESKTOP_CACHE_HIT=1
+    cp -a "$DESKTOP_CACHE_DIR/vinix-desktop" "$BUILD_DIR/vinix-desktop"
+    if [ "$GPU_CACHE_AVAILABLE" -eq 1 ]; then
+        cp -a "$DESKTOP_CACHE_DIR/vinix-desktop-gpu" "$BUILD_DIR/vinix-desktop-gpu"
+    fi
+    echo "==> Reusing cached AArch64 desktop executable"
+fi
+
 # ── V -> C ──
 # -gc none because Vinix has no Boehm GC, and -d ui2_headless so importing ui2
 # brings in its declarative core without its gg/Sokol backend.
-echo "==> Translating V to C..."
-# The generated ui2/VML program is large enough to cross V3's general-purpose
-# 10176 MiB watchdog while it is still making forward declarations. This is a
-# host-side release build, so let the machine's own memory limit govern it.
-"$V" -new-compiler -no-memory-limit -os linux -arch arm64 -gc none -manualfree -enable-globals -prod \
-    -d glibc \
-    -d ui2_headless \
-    -path "@vlib|$UI2_MODULES|@vmodules|$SCRIPT_DIR|$SCRIPT_DIR/third_party" \
-    -o "$BUILD_DIR/desktop.c" "$APP_SRC"
+if [ "$DESKTOP_CACHE_HIT" -eq 0 ]; then
+    echo "==> Translating V to C..."
+    # The generated ui2/VML program is large enough to cross V3's general-purpose
+    # 10176 MiB watchdog while it is still making forward declarations. This is a
+    # host-side release build, so let the machine's own memory limit govern it.
+    "$V" -new-compiler -no-memory-limit -os linux -arch arm64 -gc none -manualfree -enable-globals -prod \
+        -d glibc \
+        -d ui2_headless \
+        -path "@vlib|$UI2_MODULES|@vmodules|$SCRIPT_DIR|$SCRIPT_DIR/third_party" \
+        -o "$BUILD_DIR/desktop.c" "$APP_SRC"
 
-# ── C -> aarch64 static binary ──
-echo "==> Compiling for aarch64-linux-musl..."
-"$LLVM_BIN/clang" --target=aarch64-linux-musl -static -nostdinc -nostdlib \
-    -isystem "$CC_SHIM" \
-    -isystem "$GCCLIB/include" -isystem "$SYSROOT/usr/include" \
-    -I "$APP_SRC" \
-    -O2 -fno-stack-protector -w \
-    "$SYSROOT/usr/lib/crt1.o" "$SYSROOT/usr/lib/crti.o" "$GCCLIB/crtbeginT.o" \
-    "$BUILD_DIR/desktop.c" "$SCRIPT_DIR/desktop/execinfo_compat.c" \
-    -L"$SYSROOT/usr/lib" -L"$GCCLIB" -lgcc_eh -lc -lgcc -lm \
-    "$GCCLIB/crtend.o" "$SYSROOT/usr/lib/crtn.o" \
-    -fuse-ld=lld -B"$LLVM_BIN" \
-    -o "$BUILD_DIR/vinix-desktop"
+    # ── C -> aarch64 static binary ──
+    echo "==> Compiling for aarch64-linux-musl..."
+    "$LLVM_BIN/clang" --target=aarch64-linux-musl -static -nostdinc -nostdlib \
+        -isystem "$CC_SHIM" \
+        -isystem "$GCCLIB/include" -isystem "$SYSROOT/usr/include" \
+        -I "$APP_SRC" \
+        -O2 -fno-stack-protector -w \
+        "$SYSROOT/usr/lib/crt1.o" "$SYSROOT/usr/lib/crti.o" "$GCCLIB/crtbeginT.o" \
+        "$BUILD_DIR/desktop.c" "$SCRIPT_DIR/desktop/execinfo_compat.c" \
+        -L"$SYSROOT/usr/lib" -L"$GCCLIB" -lgcc_eh -lc -lgcc -lm \
+        "$GCCLIB/crtend.o" "$SYSROOT/usr/lib/crtn.o" \
+        -fuse-ld=lld -B"$LLVM_BIN" \
+        -o "$BUILD_DIR/vinix-desktop"
 
-"$LLVM_BIN/llvm-strip" "$BUILD_DIR/vinix-desktop"
-echo "    $BUILD_DIR/vinix-desktop ($(file_size "$BUILD_DIR/vinix-desktop") bytes)"
+    "$LLVM_BIN/llvm-strip" "$BUILD_DIR/vinix-desktop"
+    echo "    $BUILD_DIR/vinix-desktop ($(file_size "$BUILD_DIR/vinix-desktop") bytes)"
+fi
+
+# Mesa is a dynamic runtime, so keep the always-bootable static desktop and
+# build a second executable only when the exact Asahi userspace is available.
+# Both binaries now use this same generated C translation: the software link
+# gets inline no-op presenter stubs from gpu_present.h, while the GPU link
+# selects the external EGL implementation at C compile/link time. The UI is
+# still rasterized into its Canvas on the CPU; EGL/GLES moves scaling and
+# presentation to AGX before the unavoidable firmware-framebuffer readback.
+GPU_DESKTOP_BUILT=0
+if [ "$GPU_CACHE_AVAILABLE" -eq 1 ]; then
+    if [ "$DESKTOP_CACHE_HIT" -eq 1 ]; then
+        echo "==> Reusing cached GPU-enabled desktop executable"
+        GPU_DESKTOP_BUILT=1
+    else
+        echo "==> Compiling the GPU-enabled desktop for aarch64-linux-musl..."
+        # Keep the large generated compositor at a fixed address. Building it as
+        # PIE creates more than 8,000 relative relocations which musl has to write
+        # before main(), needlessly exercising thousands of VM faults on the
+        # native multi-core boot path. Mesa and EGL remain ordinary shared
+        # libraries; only the executable itself is non-PIE.
+        "$LLVM_BIN/clang" --target=aarch64-linux-musl \
+            --sysroot="$GPU_SYSROOT" --gcc-install-dir="$GCCLIB" -static-libgcc \
+            -isystem "$CC_SHIM" \
+            -I "$APP_SRC" -I "$ASAHI_STAGING/usr/include" \
+            -DVINIX_GPU_PRESENTER_EXTERNAL=1 \
+            -O2 -fno-pie -no-pie -fno-stack-protector -w \
+            "$BUILD_DIR/desktop.c" "$SCRIPT_DIR/desktop/execinfo_compat.c" \
+            "$SCRIPT_DIR/desktop/gpu_present_egl.c" \
+            -L"$ASAHI_STAGING/usr/lib" \
+            -Wl,-rpath-link,"$ASAHI_STAGING/usr/lib" \
+            -Wl,-dynamic-linker,/lib/ld-musl-aarch64.so.1 \
+            -lEGL -lGLESv2 -ldl -lpthread -lgcc_eh -lm \
+            -fuse-ld=lld -B"$LLVM_BIN" \
+            -o "$BUILD_DIR/vinix-desktop-gpu"
+        "$LLVM_BIN/llvm-strip" "$BUILD_DIR/vinix-desktop-gpu"
+        GPU_DESKTOP_ELF_TYPE="$("$LLVM_BIN/llvm-readelf" -h \
+            "$BUILD_DIR/vinix-desktop-gpu" | awk '$1 == "Type:" { print $2; exit }')"
+        if [ "$GPU_DESKTOP_ELF_TYPE" != "EXEC" ]; then
+            echo "ERROR: GPU desktop must be a fixed-address ELF executable; got $GPU_DESKTOP_ELF_TYPE" >&2
+            exit 1
+        fi
+        echo "    $BUILD_DIR/vinix-desktop-gpu ($(file_size "$BUILD_DIR/vinix-desktop-gpu") bytes)"
+        GPU_DESKTOP_BUILT=1
+        if [ ! -f "$ASAHI_STAGING/usr/share/vinix/mesa-x11-egl" ] &&
+           [ ! -f "$ASAHI_STAGING/usr/share/vinix/asahi-x11-egl" ]; then
+            echo "    NOTE: this Mesa staging predates X11/GBM support; rebuild it for Firefox acceleration"
+        fi
+    fi
+else
+    echo "==> Asahi EGL staging not found; keeping the static software desktop only"
+fi
+
+if [ "$DESKTOP_CACHE_HIT" -eq 0 ]; then
+    cp -a "$BUILD_DIR/vinix-desktop" "$DESKTOP_CACHE_DIR/vinix-desktop.tmp"
+    mv -f "$DESKTOP_CACHE_DIR/vinix-desktop.tmp" "$DESKTOP_CACHE_DIR/vinix-desktop"
+    if [ "$GPU_DESKTOP_BUILT" -eq 1 ]; then
+        cp -a "$BUILD_DIR/vinix-desktop-gpu" "$DESKTOP_CACHE_DIR/vinix-desktop-gpu.tmp"
+        mv -f "$DESKTOP_CACHE_DIR/vinix-desktop-gpu.tmp" "$DESKTOP_CACHE_DIR/vinix-desktop-gpu"
+    fi
+    python3 "$SCRIPT_DIR/build-support/staging-cache.py" record "${DESKTOP_CACHE_ARGS[@]}"
+fi
 
 echo "==> Preparing cached ui2 example applications for aarch64..."
 UI2_EXAMPLES_DIR="$APP_CACHE_DIR/ui2-examples"
@@ -448,55 +564,6 @@ python3 "$SCRIPT_DIR/desktop/tools/build_voffice.py" \
     --v "$V" --arch arm64 --clang "$LLVM_BIN/clang" --strip "$LLVM_BIN/llvm-strip" \
     --target aarch64-linux-musl --sysroot "$SYSROOT" --gcclib "$GCCLIB" \
     --cc-shim "$CC_SHIM" --llvm-bin "$LLVM_BIN"
-
-# Mesa is a dynamic runtime, so keep the always-bootable static desktop and
-# build a second executable only when the exact Asahi userspace is available.
-# Both binaries now use this same generated C translation: the software link
-# gets inline no-op presenter stubs from gpu_present.h, while the GPU link
-# selects the external EGL implementation at C compile/link time. The UI is
-# still rasterized into its Canvas on the CPU; EGL/GLES moves scaling and
-# presentation to AGX before the unavoidable firmware-framebuffer readback.
-GPU_DESKTOP_BUILT=0
-if [ -f "$ASAHI_STAGING/usr/lib/libEGL.so" ] &&
-   [ -f "$ASAHI_STAGING/usr/lib/libGLESv2.so" ] &&
-   [ -f "$ASAHI_STAGING/usr/include/EGL/egl.h" ] &&
-   [ -f "$GPU_SYSROOT/usr/lib/Scrt1.o" ]; then
-    echo "==> Compiling the GPU-enabled desktop for aarch64-linux-musl..."
-    # Keep the large generated compositor at a fixed address. Building it as
-    # PIE creates more than 8,000 relative relocations which musl has to write
-    # before main(), needlessly exercising thousands of VM faults on the
-    # native multi-core boot path. Mesa and EGL remain ordinary shared
-    # libraries; only the executable itself is non-PIE.
-    "$LLVM_BIN/clang" --target=aarch64-linux-musl \
-        --sysroot="$GPU_SYSROOT" --gcc-install-dir="$GCCLIB" -static-libgcc \
-        -isystem "$CC_SHIM" \
-        -I "$APP_SRC" -I "$ASAHI_STAGING/usr/include" \
-        -DVINIX_GPU_PRESENTER_EXTERNAL=1 \
-        -O2 -fno-pie -no-pie -fno-stack-protector -w \
-        "$BUILD_DIR/desktop.c" "$SCRIPT_DIR/desktop/execinfo_compat.c" \
-        "$SCRIPT_DIR/desktop/gpu_present_egl.c" \
-        -L"$ASAHI_STAGING/usr/lib" \
-        -Wl,-rpath-link,"$ASAHI_STAGING/usr/lib" \
-        -Wl,-dynamic-linker,/lib/ld-musl-aarch64.so.1 \
-        -lEGL -lGLESv2 -ldl -lpthread -lgcc_eh -lm \
-        -fuse-ld=lld -B"$LLVM_BIN" \
-        -o "$BUILD_DIR/vinix-desktop-gpu"
-    "$LLVM_BIN/llvm-strip" "$BUILD_DIR/vinix-desktop-gpu"
-    GPU_DESKTOP_ELF_TYPE="$("$LLVM_BIN/llvm-readelf" -h \
-        "$BUILD_DIR/vinix-desktop-gpu" | awk '$1 == "Type:" { print $2; exit }')"
-    if [ "$GPU_DESKTOP_ELF_TYPE" != "EXEC" ]; then
-        echo "ERROR: GPU desktop must be a fixed-address ELF executable; got $GPU_DESKTOP_ELF_TYPE" >&2
-        exit 1
-    fi
-    echo "    $BUILD_DIR/vinix-desktop-gpu ($(file_size "$BUILD_DIR/vinix-desktop-gpu") bytes)"
-    GPU_DESKTOP_BUILT=1
-    if [ ! -f "$ASAHI_STAGING/usr/share/vinix/mesa-x11-egl" ] &&
-       [ ! -f "$ASAHI_STAGING/usr/share/vinix/asahi-x11-egl" ]; then
-        echo "    NOTE: this Mesa staging predates X11/GBM support; rebuild it for Firefox acceleration"
-    fi
-else
-    echo "==> Asahi EGL staging not found; keeping the static software desktop only"
-fi
 
 if [ "$MAKE_INITRAMFS" -eq 0 ]; then
     exit 0

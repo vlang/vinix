@@ -170,16 +170,17 @@ The compositor passes standalone apps their protocol pipes as
 `VINIX_REQUEST_FD` and `VINIX_RESPONSE_FD` environment variables, leaving
 their command line free for document paths.
 
-Both external application builders keep content-keyed binaries in the
+The compositor and both external application builders keep content-keyed binaries in the
 persistent `build-aarch64-desktop-apps/` cache, outside the disposable
 compositor and initramfs workspace in `build/`. An unchanged deployment reuses
-every ui2 example, Calc and Writer without invoking their compilers, even after
+the compositor, every ui2 example, Calc and Writer without invoking their compilers, even after
 `build/` has been cleaned. Changing one application's source rebuilds only
 that application, while shared ui2, compiler or sysroot changes invalidate all
 affected binaries. Outputs are replaced only after a successful compile and
 link, so an interrupted rebuild does not destroy the last complete cache
 entry. Set `VINIX_AARCH64_APP_CACHE` when CI or an isolated build needs a
-different cache root.
+different cache root. The ui2 example builder uses up to four workers by
+default; `VINIX_UI2_JOBS` overrides that count.
 
 The Calculator model comes from ui2's own example and is not copied into this
 repository. `tools/stage_app.py` takes it straight from the ui2 checkout at

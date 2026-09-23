@@ -254,7 +254,8 @@ def parse_args():
     parser.add_argument("--cc-shim", type=Path)
     parser.add_argument("--llvm-bin", type=Path)
     parser.add_argument("--jobs", type=int,
-                        default=int(os.environ.get("VINIX_UI2_JOBS", "1")))
+                        default=int(os.environ.get(
+                            "VINIX_UI2_JOBS", str(min(4, os.cpu_count() or 1)))))
     parser.add_argument("--only", action="append", default=[],
                         help="build only this named example (repeatable; for validation)")
     return parser.parse_args()

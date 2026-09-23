@@ -11,12 +11,14 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 BUILD_DIR="${VINIX_CHROMIUM_BUILD_DIR:-$SCRIPT_DIR/build-aarch64-chromium}"
 DOWNLOADS="$BUILD_DIR/downloads"
 STAGING="$BUILD_DIR/staging"
+CACHE_STATE="$BUILD_DIR/.staging-cache-key"
 
 # Track the branch `pkg` installs from at runtime, so a staged image and a
 # `pkg install chromium` on a booted system produce the same browser.
 ALPINE_BRANCH="${ALPINE_BRANCH:-v3.21}"
 ALPINE_MIRROR="${ALPINE_MIRROR:-https://dl-cdn.alpinelinux.org/alpine}/$ALPINE_BRANCH"
 ALPINE_ARCH=aarch64
+BRANCH_KEY="$(printf '%s' "$ALPINE_BRANCH" | tr '/:' '__')"
 
 for tool in curl python3 tar; do
     if ! command -v "$tool" >/dev/null 2>&1; then
@@ -26,12 +28,28 @@ for tool in curl python3 tar; do
 done
 
 mkdir -p "$DOWNLOADS"
+CACHE_ARGS=(
+    --state "$CACHE_STATE" --staging "$STAGING"
+    --value "$ALPINE_BRANCH" --value "$ALPINE_MIRROR" --value "$ALPINE_ARCH"
+    --metadata "$DOWNLOADS"
+    --source "$SCRIPT_DIR/build-chromium-aarch64.sh"
+    --source "$SCRIPT_DIR/build-support/staging-cache.py"
+    --source "$SCRIPT_DIR/build-support/alpine-resolve.py"
+    --source "$SCRIPT_DIR/build-support/chromium"
+    --source "$SCRIPT_DIR/tests/browsers/chromium-smoke.html"
+    --executable usr/lib/chromium/chrome --executable usr/bin/run-chromium
+)
+if python3 "$SCRIPT_DIR/build-support/staging-cache.py" check "${CACHE_ARGS[@]}"; then
+    echo "==> Reusing cached Chromium staging"
+    exit 0
+fi
+rm -f "$CACHE_STATE"
 rm -rf "$STAGING"
 mkdir -p "$STAGING"
 
 for repository in main community; do
-    index="$DOWNLOADS/${repository}_APKINDEX"
-    if [ ! -f "$index" ]; then
+    index="$DOWNLOADS/${BRANCH_KEY}_${repository}_APKINDEX"
+    if [ ! -s "$index" ]; then
         echo "  fetching ${repository} index"
         archive="$DOWNLOADS/${repository}_APKINDEX.tar.gz"
         curl -fL --retry 3 -o "$archive" \
@@ -117,3 +135,4 @@ echo "staged packages: $(wc -l < "$BUILD_DIR/packages" | tr -d ' ')"
 echo "staged size: $(du -sh "$STAGING" | cut -f1)"
 echo "manifest: $BUILD_DIR/packages"
 echo "launcher: /usr/bin/run-chromium"
+python3 "$SCRIPT_DIR/build-support/staging-cache.py" record "${CACHE_ARGS[@]}"
