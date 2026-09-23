@@ -127,6 +127,19 @@ static void remove_display_files(int number) {
     unlink(path);
 }
 
+/* The framebuffer and damage counter are temporary files. Without removing
+ * them, a closed application leaves its private tmpfs directory behind and
+ * repeated game launches retain one framebuffer per run. */
+static void remove_surface_files(const char *directory) {
+    char path[PATH_MAX];
+    const char *names[] = { "Xvfb_screen0", "damage" };
+    for (size_t index = 0; index < sizeof(names) / sizeof(names[0]); ++index) {
+        if (snprintf(path, sizeof(path), "%s/%s", directory, names[index]) <
+            (int)sizeof(path))
+            unlink(path);
+    }
+}
+
 /* True when nothing answers on this display. A lock file whose server is gone
  * is removed on the way: its recorded process id is no help, because the id
  * has usually been handed to something unrelated by the time anyone looks. */
@@ -631,6 +644,7 @@ int main(int argc, char **argv) {
     if (display == NULL) {
         fprintf(stderr, "vinix-wine-host: Xvfb did not become ready\n");
         stop_child(xvfb_pid);
+        remove_surface_files(directory);
         rmdir(directory);
         return 1;
     }
@@ -640,6 +654,7 @@ int main(int argc, char **argv) {
         fprintf(stderr, "vinix-wine-host: XTEST extension is unavailable\n");
         XCloseDisplay(display);
         stop_child(xvfb_pid);
+        remove_surface_files(directory);
         rmdir(directory);
         return 1;
     }
@@ -742,6 +757,7 @@ int main(int argc, char **argv) {
     /* Xvfb removes these when it is asked to stop, but not when it has to be
      * killed. Leave nothing behind for the next server on this number. */
     remove_display_files(display_number(display_name));
+    remove_surface_files(directory);
     rmdir(directory);
     return 0;
 }

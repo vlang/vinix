@@ -241,7 +241,10 @@ fn open_hosted_x11_app(name string, command string, surface_width int, surface_h
 	} else {
 		'/tmp'
 	}
-	app.directory = '${base}/vinix-${name}-${process_id}'
+	// PIDs can be reused while the compositor still has the previous XWD file
+	// mapped. Give each launch a new path so its surface cannot resolve to a
+	// cached frame from an earlier X server.
+	app.directory = '${base}/vinix-${name}-${process_id}-${monotonic_millis()}'
 	app.xwd_path = '${app.directory}/Xvfb_screen0'
 	app.damage_path = '${app.directory}/damage'
 	app.image_path = '${xwd_image_prefix}${app.xwd_path}'
