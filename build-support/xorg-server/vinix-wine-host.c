@@ -52,6 +52,7 @@ _Static_assert(sizeof(struct wine_host_event) == 20,
                "Wine host event ABI changed");
 
 static volatile sig_atomic_t running = 1;
+static int hold_game_keys = 0;
 
 static void stop_running(int signal_number) {
     (void)signal_number;
@@ -156,7 +157,7 @@ static const char *claim_display(const char *requested, char *storage,
 }
 
 static pid_t spawn_xvfb(const char *display_name, const char *directory,
-                        const char *geometry) {
+                        const char *geometry, int game_input) {
     pid_t pid = fork();
     const char *xvfb;
     if (pid != 0)
@@ -166,15 +167,21 @@ static pid_t spawn_xvfb(const char *display_name, const char *directory,
     setenv("LIBGL_ALWAYS_SOFTWARE", "1", 1);
     setenv("LIBGL_DRIVERS_PATH", "/usr/lib/xorg/modules/dri", 1);
     setenv("GALLIUM_DRIVER", "softpipe", 1);
-    xvfb = access("/usr/bin/Xvfb-glx", X_OK) == 0
+    xvfb = !game_input && access("/usr/bin/Xvfb-glx", X_OK) == 0
                ? "/usr/bin/Xvfb-glx" : "/usr/bin/Xvfb";
     /* Vinix does not provide SysV shared memory. Do not advertise MIT-SHM to
      * clients only to make every attachment fail with ENOSYS; ordinary X11
      * image transport is reliable for this private local display. */
-    execl(xvfb, "Xvfb", display_name, "-screen", "0", geometry,
-          "-fbdir", directory, "-nolisten", "tcp", "-noreset", "-ac",
-          "-extension", "MIT-SHM", "+extension", "GLX", "+iglx",
-          (char *)NULL);
+    if (game_input) {
+        execl(xvfb, "Xvfb", display_name, "-screen", "0", geometry,
+              "-fbdir", directory, "-nolisten", "tcp", "-noreset", "-ac",
+              "-extension", "MIT-SHM", (char *)NULL);
+    } else {
+        execl(xvfb, "Xvfb", display_name, "-screen", "0", geometry,
+              "-fbdir", directory, "-nolisten", "tcp", "-noreset", "-ac",
+              "-extension", "MIT-SHM", "+extension", "GLX", "+iglx",
+              (char *)NULL);
+    }
     _exit(127);
 }
 
@@ -214,11 +221,19 @@ static void fake_key(Display *display, KeySym symbol, Bool pressed) {
 }
 
 static void tap_key(Display *display, KeySym symbol, int shift, int control) {
+    int tick;
     if (control)
         fake_key(display, XK_Control_L, True);
     if (shift)
         fake_key(display, XK_Shift_L, True);
     fake_key(display, symbol, True);
+    if (hold_game_keys) {
+        /* Doom samples movement state once per game tic. Deliver the press
+         * before its release so both events cannot disappear in one poll. */
+        XFlush(display);
+        for (tick = 0; tick < 10 && running; ++tick)
+            sleep_10ms();
+    }
     fake_key(display, symbol, False);
     if (shift)
         fake_key(display, XK_Shift_L, False);
@@ -507,24 +522,29 @@ int main(int argc, char **argv) {
     uint32_t damage_sequence = 0;
     Damage damage;
     int fill_surface = 0;
+    int game_input = 0;
     unsigned int fill_tick = 0;
 
     if (argc != 5 && argc != 6) {
-        fprintf(stderr, "usage: %s DISPLAY FBDIR GEOMETRY COMMAND [--fill]\n",
+        fprintf(stderr, "usage: %s DISPLAY FBDIR GEOMETRY COMMAND [--fill|--game-input]\n",
                 argv[0]);
         return 2;
     }
     if (argc == 6) {
-        if (strcmp(argv[5], "--fill") != 0) {
+        if (strcmp(argv[5], "--fill") == 0) {
+            fill_surface = 1;
+        } else if (strcmp(argv[5], "--game-input") == 0) {
+            game_input = 1;
+        } else {
             fprintf(stderr, "vinix-wine-host: unknown option: %s\n", argv[5]);
             return 2;
         }
-        fill_surface = 1;
     }
     display_name = argv[1];
     directory = argv[2];
     geometry = argv[3];
     command = argv[4];
+    hold_game_keys = game_input;
 
     memset(&action, 0, sizeof(action));
     action.sa_handler = stop_running;
@@ -544,7 +564,7 @@ int main(int argc, char **argv) {
         rmdir(directory);
         return 1;
     }
-    xvfb_pid = spawn_xvfb(display_name, directory, geometry);
+    xvfb_pid = spawn_xvfb(display_name, directory, geometry, game_input);
     if (xvfb_pid < 0) {
         perror("vinix-wine-host: fork Xvfb");
         rmdir(directory);

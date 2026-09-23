@@ -405,6 +405,7 @@ fn activity_name_of(record &ActivitySample) string {
 		'vinix-files' { 'Files' }
 		'vinix-calculator' { 'Calculator' }
 		'vinix-minecraft' { 'Minecraft' }
+		'vinix-doom' { 'Chocolate Doom' }
 		'vinix-blender' { 'Blender' }
 		'vinix-gimp' { 'GIMP' }
 		'vinix-chromium' { 'Chromium' }

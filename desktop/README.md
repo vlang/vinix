@@ -56,6 +56,8 @@ What it does:
   without hiding the desktop
 - embedded **Minecraft**: Mojang's Java Edition client renders into Xvfb and is
   composited as a movable, resizable Vinix window with forwarded input
+- **Chocolate Doom**: an aarch64 SDL2 build renders into a private Xvfb
+  display and appears in a movable Vinix window with forwarded input
 - native **Blender**: a Vinix GHOST backend renders with surfaceless EGL and
   publishes directly into a compositor-owned Vinix window, with no Xorg or
   Wayland server in the path
@@ -238,6 +240,16 @@ scaled into a native window without surrendering the desktop framebuffer.
 Keyboard and pointer events are forwarded into the private X11 display. The
 desktop builder picks up a prebuilt layer when present; otherwise its Minecraft
 window points to the on-demand package command.
+
+`./build-doom-aarch64.sh` cross-compiles [Chocolate Doom](https://github.com/chocolate-doom/chocolate-doom)
+3.1.1 and stages its SDL2 runtime. It reads the local WAD at
+`../3rd/doom/doom1.wad` by default; set `VINIX_DOOM_WAD` to select another
+file. The WAD stays in ignored build output and is never committed. Rebuild the
+desktop image with `./build-desktop-aarch64.sh`, then launch **Chocolate Doom**
+from its desktop shortcut or Start menu. The launcher opens E1M1 in a 960×720
+window and runs without sound until Vinix provides an SDL audio device.
+Use W/S to move, A/D to strafe, Q/E to turn, Space to use, and the mouse
+button to fire.
 
 Wine Calculator, Wine Notepad, and Microsoft Word 2013 use that same private
 Xvfb bridge, so translated Windows programs remain ordinary movable Vinix

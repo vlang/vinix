@@ -574,7 +574,7 @@ fn test_terminal_can_edit_a_file_with_vim_over_its_real_pty() {
 }
 
 fn test_available_utility_applications_and_shortcut_layouts() {
-	assert available_apps.len == 22
+	assert available_apps.len == 23
 	assert available_apps[0].process_name == 'vinix-files'
 	assert available_apps[0].icon == 'asset:files'
 	assert available_apps[1].title == 'Firefox'
@@ -656,6 +656,9 @@ fn test_available_utility_applications_and_shortcut_layouts() {
 	assert available_apps[21].title == 'ui2 Examples'
 	assert available_apps[21].process_name == 'vinix-ui2-examples'
 	assert available_apps[21].open != unsafe { nil }
+	assert available_apps[22].title == 'Chocolate Doom'
+	assert available_apps[22].process_name == 'vinix-doom'
+	assert available_apps[22].keyboard && available_apps[22].pointer
 	assert ui2_example_names.len == 85
 	example := ui2_example_named('toggle_button') or { panic('missing ui2 example') }
 	assert example.process_name == 'vinix-ui2-toggle_button'

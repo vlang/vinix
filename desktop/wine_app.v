@@ -53,6 +53,10 @@ const minecraft_surface_height = 720
 // title bar and the Vinix taskbar visible.
 const minecraft_window_width = 1976
 const minecraft_window_height = 1113
+const doom_surface_width = 960
+const doom_surface_height = 720
+const doom_window_width = 960
+const doom_window_height = 720
 const wine_host_event_magic = u32(0x56574831) // VWH1
 
 enum WineHostEventKind as u32 {
@@ -195,6 +199,30 @@ fn open_minecraft(mut _ Desktop) !NativeApp {
 		'Minecraft is not installed. Run pkg install minecraft in Terminal.', 'Minecraft exited.')
 }
 
+fn open_doom(mut _ Desktop) !NativeApp {
+	if C.access(c'/usr/bin/chocolate-doom', C.X_OK) != 0 {
+		return &HostedX11App{
+			surface_width: doom_surface_width
+			surface_height: doom_surface_height
+			icon: 'builtin:block'
+			failed: true
+			error_message: 'Chocolate Doom is not installed. Run build-doom-aarch64.sh.'
+		}
+	}
+	if C.access(c'/usr/share/games/doom/doom1.wad', C.R_OK) != 0 {
+		return &HostedX11App{
+			surface_width: doom_surface_width
+			surface_height: doom_surface_height
+			icon: 'builtin:block'
+			failed: true
+			error_message: 'Doom WAD is missing. Set VINIX_DOOM_WAD and rebuild the image.'
+		}
+	}
+	return open_hosted_x11_app('doom', '/usr/bin/run-doom', doom_surface_width,
+		doom_surface_height, 'builtin:block', 'Starting Chocolate Doom…',
+		'Chocolate Doom is not installed. Run build-doom-aarch64.sh.', 'Chocolate Doom exited.')
+}
+
 fn open_hosted_x11_app(name string, command string, surface_width int, surface_height int,
 	icon string, starting_text string, missing_text string, exited_text string) &HostedX11App {
 	mut app := &HostedX11App{
@@ -225,7 +253,7 @@ fn open_hosted_x11_app(name string, command string, surface_width int, surface_h
 	// passing them to the launcher, so an old or ignored game-size option can
 	// never leave a smaller GLFW window floating in a white root surface.
 	host := desktop_spawn_wine_host(app.directory, surface_width, surface_height, command,
-		name == 'minecraft') or {
+		name == 'minecraft', name == 'doom') or {
 		app.failed = true
 		app.error_message = 'Vinix could not start the embedded X11 host.'
 		return app

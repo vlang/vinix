@@ -70,6 +70,7 @@ FIREFOX_STAGING="${VINIX_FIREFOX_STAGING:-$SCRIPT_DIR/build-aarch64-firefox/stag
 CHROMIUM_STAGING="${VINIX_CHROMIUM_STAGING:-$SCRIPT_DIR/build-aarch64-chromium/staging}"
 LIBREOFFICE_STAGING="${VINIX_LIBREOFFICE_STAGING:-$SCRIPT_DIR/build-aarch64-libreoffice/staging}"
 MINECRAFT_STAGING="${VINIX_MINECRAFT_STAGING:-$SCRIPT_DIR/build-aarch64-minecraft/staging}"
+DOOM_STAGING="${VINIX_DOOM_STAGING:-$SCRIPT_DIR/build-aarch64-doom/staging}"
 ASAHI_STAGING="${VINIX_ASAHI_STAGING:-$SCRIPT_DIR/build-aarch64-asahi/staging}"
 HYPRLAND_STAGING="${VINIX_HYPRLAND_STAGING:-$SCRIPT_DIR/build-aarch64-hyprland/staging}"
 BLENDER_NATIVE_STAGING="${VINIX_BLENDER_NATIVE_STAGING:-$SCRIPT_DIR/build-aarch64-blender-native/staging}"
@@ -87,9 +88,9 @@ file_size() {
 # Most layer builders replace their staging root when rebuilt, so inode/mtime
 # is enough to notice a new generation without hashing gigabytes of Blender,
 # Minecraft, Wine or Mesa contents. build-x11-aarch64.sh intentionally updates
-# its staging and sysroot trees in place; use a metadata-only tree fingerprint
-# for those two inputs so a nested library rebuild cannot leave this cache
-# stale. Metadata mode never reads file contents.
+# its staging and sysroot trees in place, as does the Doom builder. Use a
+# metadata-only tree fingerprint for those inputs so a nested library or WAD
+# update cannot leave this cache stale. Metadata mode never reads file contents.
 path_generation() {
     local path="$1"
     local value
@@ -98,7 +99,8 @@ path_generation() {
         printf 'missing'
         return 0
     fi
-    if [ "$path" = "$X11_STAGING" ] || [ "$path" = "$GPU_SYSROOT" ]; then
+    if [ "$path" = "$X11_STAGING" ] || [ "$path" = "$GPU_SYSROOT" ] ||
+       [ "$path" = "$DOOM_STAGING" ]; then
         python3 "$SCRIPT_DIR/build-support/content-key.py" --metadata "$path"
         return 0
     fi
@@ -127,6 +129,7 @@ write_staging_cache_manifest() {
         "$VLANG_STAGING" \
         "$FIREFOX_STAGING" "$CHROMIUM_STAGING" "$LIBREOFFICE_STAGING" \
         "$MINECRAFT_STAGING" "$ASAHI_STAGING" "$HYPRLAND_STAGING" \
+        "$DOOM_STAGING" \
         "$BLENDER_NATIVE_STAGING" "$X86_TRANSLATION_STAGING" \
         "$GPU_SYSROOT"; do
         printf '%s=%s\n' "$input" "$(path_generation "$input")"
@@ -868,6 +871,11 @@ if [ "$REUSE_STAGING" -eq 0 ]; then
         merge_staging_tree "$MINECRAFT_STAGING"
     fi
 
+    if [ -x "$DOOM_STAGING/usr/bin/chocolate-doom" ]; then
+        echo "==> Staging Chocolate Doom"
+        merge_staging_tree "$DOOM_STAGING"
+    fi
+
     # The translator is architecture-isolated: its x86-64 libraries live below
     # /usr/libexec, so they cannot replace native ARM64 libraries.
     if { [ "$COMPACT_INITRAMFS" -eq 0 ] || [ "$WITH_X86_TRANSLATION" -eq 1 ]; } &&
@@ -1061,6 +1069,7 @@ install -m755 "$X11_STAGING/usr/bin/vinix-xinput" "$STAGING/usr/bin/vinix-xinput
 install -m755 "$X11_STAGING/usr/bin/vinix-wine-host" "$STAGING/usr/bin/vinix-wine-host"
 install -m755 "$SCRIPT_DIR/build-support/firefox/run-firefox" "$STAGING/usr/bin/run-firefox"
 install -m755 "$SCRIPT_DIR/build-support/gimp/run-gimp" "$STAGING/usr/bin/run-gimp"
+install -m755 "$SCRIPT_DIR/build-support/doom/run-doom" "$STAGING/usr/bin/run-doom"
 install -m755 "$SCRIPT_DIR/build-support/libreoffice/run-libreoffice" \
     "$STAGING/usr/bin/run-libreoffice"
 mkdir -p "$STAGING/etc/libreoffice"
@@ -1237,7 +1246,7 @@ chmod +x "$STAGING/sbin/init" "$STAGING/usr/bin/vinix-desktop" \
 for app_name in vinix-files vinix-calculator vinix-terminal vinix-settings vinix-ui2-examples \
     vinix-activity vinix-editor vinix-calendar vinix-clock \
     vinix-vspace \
-    vinix-firefox vinix-chromium vinix-gimp vinix-libreoffice vinix-minecraft vinix-wine-calculator vinix-wine-notepad \
+    vinix-firefox vinix-chromium vinix-gimp vinix-libreoffice vinix-minecraft vinix-doom vinix-wine-calculator vinix-wine-notepad \
     vinix-wine-word2013 vinix-blender vinix-capture; do
     ln -sf vinix-desktop "$STAGING/usr/bin/$app_name"
 done

@@ -113,6 +113,9 @@ def compute_key(root: Path, v_compiler: Path, env: dict[str, str]) -> str:
     minecraft_staging = resolved_env_path(
         env, "VINIX_MINECRAFT_STAGING", root / "build-aarch64-minecraft/staging"
     )
+    doom_staging = resolved_env_path(
+        env, "VINIX_DOOM_STAGING", root / "build-aarch64-doom/staging"
+    )
     asahi_staging = resolved_env_path(
         env, "VINIX_ASAHI_STAGING", root / "build-aarch64-asahi/staging"
     )
@@ -151,6 +154,7 @@ def compute_key(root: Path, v_compiler: Path, env: dict[str, str]) -> str:
         root / "build-support/vinix-pkg",
         root / "build-support/java-cacerts.py",
         root / "build-support/minecraft",
+        root / "build-support/doom",
         root / "build-support/vinix-desktop-build",
         root / "build-support/vinix-desktop-reload",
         root / "build-support/vinix-host-sync",
@@ -182,6 +186,7 @@ def compute_key(root: Path, v_compiler: Path, env: dict[str, str]) -> str:
         chromium_staging,
         libreoffice_staging,
         minecraft_staging,
+        doom_staging,
         asahi_staging,
         hyprland_staging,
         blender_staging,
@@ -219,8 +224,8 @@ def compute_key(root: Path, v_compiler: Path, env: dict[str, str]) -> str:
     add_text(digest, "sources", tree_key(source_paths, metadata_only=False))
     add_text(
         digest,
-        "x11-generation",
-        tree_key([x11_staging, gpu_sysroot], metadata_only=True),
+        "inplace-layer-generation",
+        tree_key([x11_staging, gpu_sysroot, doom_staging], metadata_only=True),
     )
     for path in layer_roots:
         add_text(digest, f"layer:{path}", root_generation(path))

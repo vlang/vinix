@@ -964,7 +964,7 @@ fn desktop_spawn_native_surface(path string, first_argument string, second_argum
 // Start the native Xvfb/Wine bridge with a private input pipe. The application
 // process retains only the write end; the host receives it as stdin and owns
 // every X11 and translated Wine child for the lifetime of the Vinix window.
-fn desktop_spawn_wine_host(directory string, width int, height int, command string, fill_surface bool) ?SpawnedWineHost {
+fn desktop_spawn_wine_host(directory string, width int, height int, command string, fill_surface bool, game_input bool) ?SpawnedWineHost {
 	host := '/usr/bin/vinix-wine-host'
 	if C.access(&char(host.str), C.X_OK) != 0 || C.access(&char(command.str), C.X_OK) != 0 {
 		return none
@@ -985,6 +985,8 @@ fn desktop_spawn_wine_host(directory string, width int, height int, command stri
 		&char(command.str)]
 	if fill_surface {
 		argv << c'--fill'
+	} else if game_input {
+		argv << c'--game-input'
 	}
 	argv << &char(unsafe { nil })
 	path_entry := 'PATH=${desktop_command_path}'
