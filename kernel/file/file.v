@@ -127,7 +127,8 @@ fn ppoll(fds &PollFD, nfds u64, tmo_p &time.TimeSpec, sigmask &u64) (u64, u64) {
 
 	oldmask := t.masked_signals
 	if voidptr(sigmask) != unsafe { nil } {
-		t.masked_signals = *sigmask
+		// SIGKILL and SIGSTOP can never be blocked, not even for the wait.
+		t.masked_signals = *sigmask & ~((u64(1) << 8) | (u64(1) << 18))
 	}
 	defer {
 		t.masked_signals = oldmask

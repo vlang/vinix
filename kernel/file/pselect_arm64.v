@@ -92,7 +92,9 @@ pub fn syscall_pselect6(_ voidptr, nfds int, readfds u64, writefds u64, exceptfd
 			if !usercopy.copy_from_user(voidptr(&wanted), arg.mask, sizeof(u64)) {
 				return errno.err, errno.efault
 			}
-			current_thread.masked_signals = wanted
+			// SIGKILL and SIGSTOP can never be blocked, not even for the
+			// duration of the wait.
+			current_thread.masked_signals = wanted & ~((u64(1) << 8) | (u64(1) << 18))
 			masked = true
 		}
 	}

@@ -314,7 +314,8 @@ pub fn syscall_epoll_pwait(_ voidptr, epfd int, events_buf u64, maxevents int, t
 		if !usercopy.copy_from_user(voidptr(&incoming_mask), sigmask, sizeof(u64)) {
 			return errno.err, errno.efault
 		}
-		t.masked_signals = incoming_mask
+		// SIGKILL and SIGSTOP can never be blocked, not even for the wait.
+		t.masked_signals = incoming_mask & ~((u64(1) << 8) | (u64(1) << 18))
 	}
 	defer {
 		t.masked_signals = oldmask
