@@ -1322,6 +1322,18 @@ const cursor_mask = [
 ]
 
 fn (mut d Desktop) draw_cursor() {
+	for i := d.windows.len - 1; i >= 0; i-- {
+		window := d.windows[i]
+		if window.workspace != d.current_workspace || window.minimized
+			|| d.pointer_x < window.x || d.pointer_x >= window.x + window.width
+			|| d.pointer_y < window.y || d.pointer_y >= window.y + window.height {
+			continue
+		}
+		if window.hide_body_cursor && d.pointer_y >= window.y + d.theme().title_height {
+			return
+		}
+		break
+	}
 	if d.settings.theme == .macos {
 		d.draw_catalina_cursor()
 		return

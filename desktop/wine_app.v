@@ -53,10 +53,10 @@ const minecraft_surface_height = 720
 // title bar and the Vinix taskbar visible.
 const minecraft_window_width = 1976
 const minecraft_window_height = 1113
-const doom_surface_width = 960
-const doom_surface_height = 720
-const doom_window_width = 960
-const doom_window_height = 720
+const doom_surface_width = 720
+const doom_surface_height = 540
+const doom_window_width = 720
+const doom_window_height = 540
 const wine_host_event_magic = u32(0x56574831) // VWH1
 
 enum WineHostEventKind as u32 {
@@ -233,7 +233,15 @@ fn open_hosted_x11_app(name string, command string, surface_width int, surface_h
 		exited_text: exited_text
 	}
 	process_id := C.getpid()
-	app.directory = '/tmp/vinix-${name}-${process_id}'
+	// Xvfb writes its framebuffer through a shared mmap. Use the per-boot
+	// scratch mount when init provided it, keeping constant frame updates off
+	// the persistent root filesystem.
+	base := if C.access(c'/run/vinix-hosted-x11/.tmpfs-ready', C.R_OK) == 0 {
+		'/run/vinix-hosted-x11'
+	} else {
+		'/tmp'
+	}
+	app.directory = '${base}/vinix-${name}-${process_id}'
 	app.xwd_path = '${app.directory}/Xvfb_screen0'
 	app.damage_path = '${app.directory}/damage'
 	app.image_path = '${xwd_image_prefix}${app.xwd_path}'

@@ -40,6 +40,7 @@ mut:
 	y      int
 	width  int
 	height int
+	hide_body_cursor bool
 	// The glyph that stands for the window in the switcher. An application
 	// lends its own; a built-in page has none of its own to lend.
 	icon string = 'builtin:window'

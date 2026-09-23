@@ -569,13 +569,16 @@ fn (mut d Desktop) launch_with_timeout(factory AppFactory, timeout_ms int) {
 		return
 	}
 	d.apps << app
-	// Cascade like any other new window, but at the size the application asked
-	// for rather than the desktop's default.
+	// Most windows cascade. Games that leave the centred wallpaper logo visible
+	// open against the right edge with the same small margin as the top edge.
 	step := ((d.next_id - 1) % 6) * 26
-	id := d.spawn(factory.title, .app, 120 + step, 60 + step, factory.width, factory.height)
+	x := if factory.launch_top_right { d.canvas.width - factory.width - 24 } else { 120 + step }
+	y := if factory.launch_top_right { 24 } else { 60 + step }
+	id := d.spawn(factory.title, .app, x, y, factory.width, factory.height)
 	index := d.window_index(id) or { return }
 	d.windows[index].app_index = d.apps.len - 1
 	d.windows[index].icon = factory.icon
+	d.windows[index].hide_body_cursor = factory.hide_body_cursor
 	d.clamp_to_screen(index)
 }
 

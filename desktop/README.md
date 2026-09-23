@@ -246,8 +246,10 @@ window points to the on-demand package command.
 `../3rd/doom/doom1.wad` by default; set `VINIX_DOOM_WAD` to select another
 file. The WAD stays in ignored build output and is never committed. Rebuild the
 desktop image with `./build-desktop-aarch64.sh`, then launch **Chocolate Doom**
-from its desktop shortcut or Start menu. The launcher opens E1M1 in a 960×720
-window and runs without sound until Vinix provides an SDL audio device.
+from its desktop shortcut or Start menu. The launcher opens E1M1 in a 720×540
+window at the top right, leaving the wallpaper logo visible. The pointer is
+hidden over the game content and remains visible over the title bar and other
+desktop areas. Doom runs without sound until Vinix provides an SDL audio device.
 Use W/S to move, A/D to strafe, Q/E to turn, Space to use, and the mouse
 button to fire.
 

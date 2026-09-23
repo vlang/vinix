@@ -41,6 +41,8 @@ struct AppFactory {
 	poll_interval_ms  u64
 	keyboard          bool
 	pointer           bool
+	launch_top_right  bool
+	hide_body_cursor  bool
 	// A standalone app implements the pipe protocol in its own executable; it
 	// therefore has no factory callback in the compositor's multicall binary.
 	standalone        bool
@@ -316,6 +318,8 @@ const available_apps = [
 		poll_interval_ms: 50
 		keyboard: true
 		pointer: true
+		launch_top_right: true
+		hide_body_cursor: true
 		open: open_doom
 	},
 ]

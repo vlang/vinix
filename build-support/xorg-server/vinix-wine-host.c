@@ -53,6 +53,15 @@ _Static_assert(sizeof(struct wine_host_event) == 20,
 
 static volatile sig_atomic_t running = 1;
 static int hold_game_keys = 0;
+#define GAME_KEY_HOLD_MS 500
+#define MAX_HELD_GAME_KEYS 16
+
+struct held_game_key {
+    KeyCode code;
+    uint64_t release_at_ms;
+};
+
+static struct held_game_key held_game_keys[MAX_HELD_GAME_KEYS];
 
 static void stop_running(int signal_number) {
     (void)signal_number;
@@ -68,6 +77,13 @@ static int ignore_x_error(Display *display, XErrorEvent *event) {
 static void sleep_10ms(void) {
     const struct timespec delay = { 0, 10000000 };
     nanosleep(&delay, NULL);
+}
+
+static uint64_t monotonic_millis(void) {
+    struct timespec now;
+    if (clock_gettime(CLOCK_MONOTONIC, &now) != 0)
+        return 0;
+    return (uint64_t)now.tv_sec * 1000 + (uint64_t)now.tv_nsec / 1000000;
 }
 
 /* The desktop names each hosted display after the process that asked for it,
@@ -220,20 +236,58 @@ static void fake_key(Display *display, KeySym symbol, Bool pressed) {
         XTestFakeKeyEvent(display, code, pressed, CurrentTime);
 }
 
+static void hold_game_key(Display *display, KeySym symbol) {
+    KeyCode code = XKeysymToKeycode(display, symbol);
+    int index;
+    int free_slot = -1;
+    uint64_t deadline = monotonic_millis() + GAME_KEY_HOLD_MS;
+
+    if (code == 0)
+        return;
+    for (index = 0; index < MAX_HELD_GAME_KEYS; ++index) {
+        if (held_game_keys[index].code == code) {
+            held_game_keys[index].release_at_ms = deadline;
+            return;
+        }
+        if (free_slot < 0 && held_game_keys[index].code == 0)
+            free_slot = index;
+    }
+    if (free_slot < 0)
+        return;
+    held_game_keys[free_slot].code = code;
+    held_game_keys[free_slot].release_at_ms = deadline;
+    XTestFakeKeyEvent(display, code, True, CurrentTime);
+    XFlush(display);
+}
+
+static void release_expired_game_keys(Display *display) {
+    uint64_t now = monotonic_millis();
+    int index;
+    int released = 0;
+
+    for (index = 0; index < MAX_HELD_GAME_KEYS; ++index) {
+        if (held_game_keys[index].code == 0 ||
+            now < held_game_keys[index].release_at_ms)
+            continue;
+        XTestFakeKeyEvent(display, held_game_keys[index].code, False,
+                          CurrentTime);
+        held_game_keys[index].code = 0;
+        released = 1;
+    }
+    if (released)
+        XFlush(display);
+}
+
 static void tap_key(Display *display, KeySym symbol, int shift, int control) {
-    int tick;
+    if (hold_game_keys && !shift && !control) {
+        hold_game_key(display, symbol);
+        return;
+    }
     if (control)
         fake_key(display, XK_Control_L, True);
     if (shift)
         fake_key(display, XK_Shift_L, True);
     fake_key(display, symbol, True);
-    if (hold_game_keys) {
-        /* Doom samples movement state once per game tic. Deliver the press
-         * before its release so both events cannot disappear in one poll. */
-        XFlush(display);
-        for (tick = 0; tick < 10 && running; ++tick)
-            sleep_10ms();
-    }
     fake_key(display, symbol, False);
     if (shift)
         fake_key(display, XK_Shift_L, False);
@@ -377,7 +431,10 @@ static void focus_top_window(Display *display) {
      * must not receive focus. Descend through substantial input/output
      * children until the real application control or modal dialog is reached.
      */
-    target = topmost_input_window(display, root);
+    /* SDL's game window is the direct root child. Descending into its
+     * helper children sends synthetic keys away from the game event loop. */
+    target = hold_game_keys ? topmost_substantial_child(display, root)
+                            : topmost_input_window(display, root);
     if (target != None)
         XSetInputFocus(display, target, RevertToPointerRoot, CurrentTime);
 }
@@ -672,6 +729,8 @@ int main(int argc, char **argv) {
             wine_pid = -1;
             running = 0;
         }
+        if (hold_game_keys)
+            release_expired_game_keys(display);
         sleep_10ms();
     }
 

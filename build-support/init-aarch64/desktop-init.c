@@ -340,6 +340,29 @@ static void prepare_desktop_boot(void) {
 	}
 }
 
+/* Xvfb's -fbdir file is a live, frequently rewritten mmap. Keeping those
+ * transient framebuffers on the persistent ext2 root drives writeback on
+ * every frame and can leave the X server with msync I/O errors. Give hosted
+ * applications a private RAM-backed directory for this boot. The marker is
+ * created only after the mount succeeds so older kernels fall back to /tmp. */
+static void prepare_hosted_x11_storage(void) {
+	static const char directory[] = "/run/vinix-hosted-x11";
+	static const char marker[] = "/run/vinix-hosted-x11/.tmpfs-ready";
+	const u64 at_fdcwd = (u64)(i64)-100;
+	i64 fd;
+
+	syscall3(34 /* mkdirat */, at_fdcwd, (u64)directory, 0700);
+	if (syscall5(40 /* mount */, (u64)"/dev/null", (u64)directory,
+	             (u64)"tmpfs", 0, 0) < 0) {
+		print("init: hosted X11 scratch mount unavailable; using /tmp\n");
+		return;
+	}
+	fd = syscall4(56 /* openat */, at_fdcwd, (u64)marker,
+	              0x41 /* O_CREAT | O_WRONLY */, 0600);
+	if (fd >= 0)
+		syscall1(57 /* close */, (u64)fd);
+}
+
 /* A self-hosted desktop build writes this marker before asking PID 1 to
  * reload. On GPU systems that deliberately selects the newly built ordinary
  * framebuffer binary instead of silently going back to the immutable GPU
@@ -386,6 +409,7 @@ void _start(void) {
 	int status = 0;
 	i64 child;
 	prepare_desktop_boot();
+	prepare_hosted_x11_storage();
 	install_power_signals();
 
 #ifdef VINIX_WIFI_BUNDLE
