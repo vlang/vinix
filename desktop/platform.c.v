@@ -541,6 +541,38 @@ fn desktop_read_all(fd int, buffer voidptr, count u64) bool {
 	return true
 }
 
+// A response may start with a valid header and then stop midway through its
+// payload. Keep the transaction deadline while draining it so a broken client
+// cannot park the compositor forever after the initial poll succeeded.
+fn desktop_read_all_with_timeout(fd int, buffer voidptr, count u64, timeout_ms int) bool {
+	start := desktop_monotonic_ms()
+	if start == ~u64(0) || timeout_ms < 0 || u64(timeout_ms) > ~u64(0) - start {
+		return false
+	}
+	deadline := start + u64(timeout_ms)
+	mut done := u64(0)
+	for done < count {
+		got := desktop_read(fd, unsafe { voidptr(&u8(buffer) + done) }, count - done)
+		if got > 0 {
+			done += u64(got)
+			continue
+		}
+		if got < 0 && C.errno == C.EINTR {
+			continue
+		}
+		if got < 0 && (C.errno == C.EAGAIN || C.errno == C.EWOULDBLOCK) {
+			now := desktop_monotonic_ms()
+			if now == ~u64(0) || now >= deadline {
+				return false
+			}
+			desktop_sleep_ms(1)
+			continue
+		}
+		return false
+	}
+	return true
+}
+
 fn desktop_write_all(fd int, buffer voidptr, count u64) bool {
 	mut done := u64(0)
 	for done < count {

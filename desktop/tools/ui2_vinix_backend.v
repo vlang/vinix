@@ -7,6 +7,7 @@ module ui2
 
 import math.bits
 import os
+import time
 
 const vinix_app_magic = u32(0x56415050)
 const vinix_app_version = u8(8)
@@ -144,10 +145,25 @@ fn vinix_read_exact(fd int, count int) ?[]u8 {
 }
 
 fn vinix_write_all(fd int, data []u8) {
-	if data.len == 0 {
+	mut done := 0
+	for done < data.len {
+		written := int(C.write(fd, unsafe { &data.data[done] }, usize(data.len - done)))
+		if written > 0 {
+			done += written
+			continue
+		}
+		if written < 0 && C.errno == C.EINTR {
+			continue
+		}
+		// The compositor sets its response pipe nonblocking. A large Calc or
+		// Writer tree can fill it between reads; wait for space and finish the
+		// frame rather than leaving the compositor waiting for missing bytes.
+		if written < 0 && (C.errno == C.EAGAIN || C.errno == C.EWOULDBLOCK) {
+			time.sleep(time.millisecond)
+			continue
+		}
 		return
 	}
-	os.fd_write(fd, unsafe { tos(data.data, data.len) })
 }
 
 fn vinix_default_state() []u8 {

@@ -97,6 +97,31 @@ fn main() {
 	assert response_timed_out
 	desktop_close(int(silent_pipe[0]))
 	desktop_close(int(silent_pipe[1]))
+	// The timeout must also cover a client that sends a valid response header
+	// and only part of its advertised tree, while keeping the pipe open.
+	mut partial_pipe := [2]i32{}
+	assert C.pipe(&partial_pipe[0]) == 0
+	assert desktop_set_nonblocking(int(partial_pipe[0]), true)
+	mut partial_header := []u8{cap: app_response_header_size}
+	wire_put_u32(mut partial_header, app_protocol_magic)
+	wire_put_u8(mut partial_header, app_protocol_version)
+	wire_put_u8(mut partial_header, 0)
+	wire_put_u8(mut partial_header, 0)
+	wire_put_u8(mut partial_header, 0)
+	wire_put_state(mut partial_header, AppWireState{})
+	wire_put_u32(mut partial_header, 4)
+	assert partial_header.len == app_response_header_size
+	assert desktop_write_all(int(partial_pipe[1]), partial_header.data, u64(partial_header.len))
+	assert desktop_write_all(int(partial_pipe[1]), c'x', 1)
+	mut partial_timed_out := false
+	receive_app_response_with_timeout(int(partial_pipe[0]), 20) or {
+		assert err.msg() == 'application response payload timed out or pipe closed'
+		partial_timed_out = true
+	}
+	assert partial_timed_out
+	unsafe { partial_header.free() }
+	desktop_close(int(partial_pipe[0]))
+	desktop_close(int(partial_pipe[1]))
 	// A cold persistent home can make Files' initial directory scan slower
 	// than a normal interaction. Boot-started apps get that larger budget;
 	// requests after startup still fail promptly through the timeout above.

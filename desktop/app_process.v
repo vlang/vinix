@@ -807,9 +807,9 @@ fn receive_app_response_with_timeout(fd int, timeout_ms int) !AppReply {
 		return error('application response timed out')
 	}
 	mut header := []u8{len: app_response_header_size}
-	if !desktop_read_all(fd, header.data, u64(header.len)) {
+	if !desktop_read_all_with_timeout(fd, header.data, u64(header.len), timeout_ms) {
 		unsafe { header.free() }
-		return error('application response pipe closed')
+		return error('application response header timed out or pipe closed')
 	}
 	mut reader := WireReader{ data: header }
 	magic := reader.take_u32()!
@@ -825,9 +825,9 @@ fn receive_app_response_with_timeout(fd int, timeout_ms int) !AppReply {
 		return error('invalid application response')
 	}
 	mut payload := []u8{len: payload_length}
-	if payload_length > 0 && !desktop_read_all(fd, payload.data, u64(payload_length)) {
+	if payload_length > 0 && !desktop_read_all_with_timeout(fd, payload.data, u64(payload_length), timeout_ms) {
 		unsafe { payload.free() }
-		return error('short application response payload')
+		return error('application response payload timed out or pipe closed')
 	}
 	return AppReply{
 		ok:      status == 0
