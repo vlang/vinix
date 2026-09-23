@@ -1485,6 +1485,40 @@ pub fn syscall_new_thread(_ voidptr, pc voidptr, stack u64) (u64, u64) {
 	return u64(new_thread.tid), 0
 }
 
+// The new address space is not necessarily active during exec. Write its
+// initial stack through the direct map, one physical page at a time.
+fn write_initial_stack(pagemap &memory.Pagemap, addr u64, src voidptr, length u64) bool {
+	mut done := u64(0)
+	for done < length {
+		virt := addr + done
+		phys := pagemap.virt2phys(virt) or { return false }
+		offset := virt & (page_size - 1)
+		chunk := if length - done < page_size - offset { length - done } else { page_size - offset }
+		unsafe {
+			C.memcpy(voidptr(phys + higher_half + offset), voidptr(u64(src) + done), chunk)
+		}
+		done += chunk
+	}
+	return true
+}
+
+fn push_initial_bytes(pagemap &memory.Pagemap, bottom u64, mut cursor u64, src voidptr, length u64) bool {
+	if cursor < bottom || length > cursor - bottom {
+		return false
+	}
+	cursor -= length
+	return write_initial_stack(pagemap, cursor, src, length)
+}
+
+fn push_initial_word(pagemap &memory.Pagemap, bottom u64, mut cursor u64, value u64) bool {
+	return push_initial_bytes(pagemap, bottom, mut cursor, voidptr(&value), sizeof(u64))
+}
+
+fn push_initial_pair(pagemap &memory.Pagemap, bottom u64, mut cursor u64, key u64, value u64) bool {
+	return push_initial_word(pagemap, bottom, mut cursor, value)
+		&& push_initial_word(pagemap, bottom, mut cursor, key)
+}
+
 pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg voidptr, _stack u64, argv []string, envp []string, auxval &elf.Auxval, autoenqueue bool) ?&proc.Thread {
 	mut process := unsafe { _process }
 	trace_gpu_exec := process.executable_path == '/usr/bin/vinix-desktop-gpu'
@@ -1497,8 +1531,8 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 		unsafe { stacks.free() }
 	}
 
-	mut stack := unsafe { &u64(0) }
 	mut stack_vma := u64(0)
+	mut stack_bottom_vma := u64(0)
 
 	if _stack == 0 {
 		if trace_gpu_exec {
@@ -1516,26 +1550,28 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 		if trace_gpu_exec {
 			println('exec[gpu]/thread: allocating ${user_stack_size / page_size} physical stack pages')
 		}
-		stack_phys := memory.pmm_alloc(user_stack_size / page_size)
-		if trace_gpu_exec {
-			println('exec[gpu]/thread: physical user stack allocated at 0x${u64(stack_phys):x}')
+		mut stack_pages := []u64{cap: int(user_stack_size / page_size)}
+		for _ in 0 .. int(user_stack_size / page_size) {
+			stack_pages << u64(memory.pmm_alloc(1))
 		}
-		stack = unsafe { &u64(u64(stack_phys) + user_stack_size + higher_half) }
 
 		stack_vma = process.thread_stack_top
 		process.thread_stack_top -= user_stack_size
-		stack_bottom_vma := process.thread_stack_top
+		stack_bottom_vma = process.thread_stack_top
 		process.thread_stack_top -= page_size
 
 		if trace_gpu_exec {
 			println('exec[gpu]/thread: mapping user stack at 0x${stack_bottom_vma:x} len=0x${user_stack_size:x}')
 		}
-		mmap.map_range(mut process.pagemap, stack_bottom_vma, u64(stack_phys), user_stack_size, mmap.prot_read | mmap.prot_write, mmap.map_anonymous) or { return none }
+		mmap.map_pages(mut process.pagemap, stack_bottom_vma, stack_pages, mmap.prot_read | mmap.prot_write, mmap.map_anonymous) or {
+			unsafe { stack_pages.free() }
+			return none
+		}
+		unsafe { stack_pages.free() }
 		if trace_gpu_exec {
 			println('exec[gpu]/thread: user stack mapped')
 		}
 	} else {
-		stack = &u64(voidptr(_stack))
 		stack_vma = _stack
 	}
 
@@ -1599,124 +1635,95 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 			uart.put_hex(auxval.at_entry)
 			uart.putc(`\n`)
 		}
-		unsafe {
-			stack_top := stack
-			mut orig_stack_vma := stack_vma
+		mut cursor := stack_vma
+		mut string_pointer := stack_vma
+		for elem in envp {
+			if !push_initial_bytes(process.pagemap, stack_bottom_vma, mut cursor,
+				voidptr(elem.str), u64(elem.len) + 1) {
+				errno.set(errno.e2big)
+				return none
+			}
+		}
+		for elem in argv {
+			if !push_initial_bytes(process.pagemap, stack_bottom_vma, mut cursor,
+				voidptr(elem.str), u64(elem.len) + 1) {
+				errno.set(errno.e2big)
+				return none
+			}
+		}
+		cursor &= ~u64(0xf)
+		if (argv.len + envp.len + 1) & 1 != 0 {
+			cursor -= sizeof(u64)
+		}
+		mut random_bytes := [16]u8{}
+		if !krandom.fill(voidptr(&random_bytes[0]), 16, true) {
+			unsafe { C.memset(voidptr(&random_bytes[0]), 0, 16) }
+		}
+		if !push_initial_bytes(process.pagemap, stack_bottom_vma, mut cursor,
+			voidptr(&random_bytes[0]), 16) {
+			errno.set(errno.e2big)
+			return none
+		}
+		random_vma := cursor
 
-			if trace_gpu_exec {
-				println('exec[gpu]/thread: copying ${envp.len} environment strings')
+		// Auxiliary vector (NULL-terminated). ARM64 advertises the mandatory
+		// FP/ASIMD baseline and no optional extensions yet.
+		if !push_initial_pair(process.pagemap, stack_bottom_vma, mut cursor, 0, 0)
+			|| !push_initial_pair(process.pagemap, stack_bottom_vma, mut cursor, elf.at_secure, 0)
+			|| !push_initial_pair(process.pagemap, stack_bottom_vma, mut cursor, elf.at_hwcap2, 0)
+			|| !push_initial_pair(process.pagemap, stack_bottom_vma, mut cursor, elf.at_hwcap, 0x3)
+			|| !push_initial_pair(process.pagemap, stack_bottom_vma, mut cursor, elf.at_random, random_vma)
+			|| !push_initial_pair(process.pagemap, stack_bottom_vma, mut cursor, elf.at_pagesz, page_size)
+			|| !push_initial_pair(process.pagemap, stack_bottom_vma, mut cursor, elf.at_uid, u64(process.uid))
+			|| !push_initial_pair(process.pagemap, stack_bottom_vma, mut cursor, elf.at_euid, u64(process.euid))
+			|| !push_initial_pair(process.pagemap, stack_bottom_vma, mut cursor, elf.at_gid, u64(process.gid))
+			|| !push_initial_pair(process.pagemap, stack_bottom_vma, mut cursor, elf.at_egid, u64(process.egid))
+			|| !push_initial_pair(process.pagemap, stack_bottom_vma, mut cursor, elf.at_entry, auxval.at_entry)
+			|| !push_initial_pair(process.pagemap, stack_bottom_vma, mut cursor, elf.at_phdr, auxval.at_phdr)
+			|| !push_initial_pair(process.pagemap, stack_bottom_vma, mut cursor, elf.at_phent, auxval.at_phent)
+			|| !push_initial_pair(process.pagemap, stack_bottom_vma, mut cursor, elf.at_phnum, auxval.at_phnum)
+			|| !push_initial_pair(process.pagemap, stack_bottom_vma, mut cursor, elf.at_base, auxval.at_base)
+			|| !push_initial_word(process.pagemap, stack_bottom_vma, mut cursor, 0) {
+			errno.set(errno.e2big)
+			return none
+		}
+		if cursor < stack_bottom_vma || u64(envp.len) * sizeof(u64) > cursor - stack_bottom_vma {
+			errno.set(errno.e2big)
+			return none
+		}
+		cursor -= u64(envp.len) * sizeof(u64)
+		for i, elem in envp {
+			string_pointer -= u64(elem.len) + 1
+			pointer := string_pointer
+			if !write_initial_stack(process.pagemap, cursor + u64(i) * sizeof(u64),
+				voidptr(&pointer), sizeof(u64)) {
+				return none
 			}
-			for elem in envp {
-				stack = &u64(u64(stack) - u64(elem.len + 1))
-				C.memcpy(voidptr(stack), elem.str, elem.len + 1)
+		}
+		if !push_initial_word(process.pagemap, stack_bottom_vma, mut cursor, 0) {
+			errno.set(errno.e2big)
+			return none
+		}
+		if cursor < stack_bottom_vma || u64(argv.len) * sizeof(u64) > cursor - stack_bottom_vma {
+			errno.set(errno.e2big)
+			return none
+		}
+		cursor -= u64(argv.len) * sizeof(u64)
+		for i, elem in argv {
+			string_pointer -= u64(elem.len) + 1
+			pointer := string_pointer
+			if !write_initial_stack(process.pagemap, cursor + u64(i) * sizeof(u64),
+				voidptr(&pointer), sizeof(u64)) {
+				return none
 			}
-			if trace_gpu_exec {
-				println('exec[gpu]/thread: environment strings copied; copying ${argv.len} arguments')
-			}
-			for elem in argv {
-				stack = &u64(u64(stack) - u64(elem.len + 1))
-				C.memcpy(voidptr(stack), elem.str, elem.len + 1)
-			}
-			if trace_gpu_exec {
-				println('exec[gpu]/thread: argument strings copied; aligning stack')
-			}
-
-			stack = &u64(u64(stack) - (u64(stack) & 0x0f))
-
-			if (argv.len + envp.len + 1) & 1 != 0 {
-				stack = &stack[-1]
-			}
-
-			// AT_RANDOM is shared by libc stack canaries and userspace ASLR.
-			if trace_gpu_exec {
-				println('exec[gpu]/thread: generating AT_RANDOM bytes')
-			}
-			stack = &u64(u64(stack) - 16)
-			random_kernel_addr := u64(stack)
-			if !krandom.fill(voidptr(random_kernel_addr), 16, true) {
-				C.memset(voidptr(random_kernel_addr), 0, 16)
-			}
-			if trace_gpu_exec {
-				println('exec[gpu]/thread: AT_RANDOM ready; writing auxiliary vector')
-			}
-			random_vma := stack_vma - (u64(stack_top) - random_kernel_addr)
-
-			// Auxiliary vector (NULL-terminated)
-			stack[-1] = 0
-			stack = &stack[-1]
-			stack[-1] = 0
-			stack = &stack[-1]
-
-			stack = &stack[-2]
-			stack[0] = elf.at_secure
-			stack[1] = 0
-			// Linux always publishes the ARM capability words. Their absence
-			// makes crypto libraries fall back to executing optional instructions
-			// under SIGILL probes. Advertise the mandatory FP/ASIMD baseline and
-			// no optional extensions until Vinix enumerates ID registers itself.
-			stack = &stack[-2]
-			stack[0] = elf.at_hwcap2
-			stack[1] = 0
-			stack = &stack[-2]
-			stack[0] = elf.at_hwcap
-			stack[1] = 0x3
-			stack = &stack[-2]
-			stack[0] = elf.at_random
-			stack[1] = random_vma
-			stack = &stack[-2]
-			stack[0] = elf.at_pagesz
-			stack[1] = page_size
-			stack = &stack[-2]
-			stack[0] = elf.at_uid
-			stack[1] = u64(process.uid)
-			stack = &stack[-2]
-			stack[0] = elf.at_euid
-			stack[1] = u64(process.euid)
-			stack = &stack[-2]
-			stack[0] = elf.at_gid
-			stack[1] = u64(process.gid)
-			stack = &stack[-2]
-			stack[0] = elf.at_egid
-			stack[1] = u64(process.egid)
-			stack = &stack[-2]
-			stack[0] = elf.at_entry
-			stack[1] = auxval.at_entry
-			stack = &stack[-2]
-			stack[0] = elf.at_phdr
-			stack[1] = auxval.at_phdr
-			stack = &stack[-2]
-			stack[0] = elf.at_phent
-			stack[1] = auxval.at_phent
-			stack = &stack[-2]
-			stack[0] = elf.at_phnum
-			stack[1] = auxval.at_phnum
-			stack = &stack[-2]
-			stack[0] = elf.at_base
-			stack[1] = auxval.at_base
-
-			stack[-1] = 0
-			stack = &stack[-1]
-			stack = &stack[-envp.len]
-			for i := u64(0); i < envp.len; i++ {
-				orig_stack_vma -= u64(envp[i].len) + 1
-				stack[i] = orig_stack_vma
-			}
-
-			stack[-1] = 0
-			stack = &stack[-1]
-			stack = &stack[-argv.len]
-			for i := u64(0); i < argv.len; i++ {
-				orig_stack_vma -= u64(argv[i].len) + 1
-				stack[i] = orig_stack_vma
-			}
-
-			stack[-1] = u64(argv.len)
-			stack = &stack[-1]
-
-			t.gpr_state.sp -= u64(stack_top) - u64(stack)
-			if trace_gpu_exec {
-				println('exec[gpu]/thread: initial ELF stack complete sp=0x${t.gpr_state.sp:x}')
-			}
+		}
+		if !push_initial_word(process.pagemap, stack_bottom_vma, mut cursor, u64(argv.len)) {
+			errno.set(errno.e2big)
+			return none
+		}
+		t.gpr_state.sp = cursor
+		if trace_gpu_exec {
+			println('exec[gpu]/thread: initial ELF stack complete sp=0x${t.gpr_state.sp:x}')
 		}
 	}
 
