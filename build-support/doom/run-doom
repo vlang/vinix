@@ -11,10 +11,11 @@ fi
 export HOME=${HOME:-/root}
 export SDL_VIDEODRIVER=x11
 export SDL_RENDER_DRIVER=software
-export SDL_AUDIODRIVER=dummy
+# The kernel's sound card is an OSS /dev/dsp.
+export SDL_AUDIODRIVER=${SDL_AUDIODRIVER:-dsp}
 export XDG_CONFIG_HOME=${XDG_CONFIG_HOME:-$HOME/.config}
 mkdir -p "$XDG_CONFIG_HOME" /var/log
 
 exec /usr/bin/chocolate-doom -iwad "$iwad" \
     -config /usr/share/games/doom/vinix.cfg -window -geometry 720x540 \
-    -nosound -nomusic -warp 1 1 "$@"
+    -warp 1 1 "$@"

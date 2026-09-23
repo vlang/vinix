@@ -42,6 +42,10 @@
 # high-memory mapping path the M1 takes; the 2048 default keeps boots fast.
 # QEMU supplies four CPUs, and its kernel build enables the Limine MP request
 # needed for Vinix to bring all of them online.
+#
+# VINIX_QEMU_AUDIO picks where the guest's /dev/dsp plays: a QEMU audiodev
+# driver (coreaudio, the default on macOS; none elsewhere), wav:PATH to record
+# everything the guest plays into a WAV file, or off for no sound card.
 set -eo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -1049,6 +1053,29 @@ fi
 # Multiplex the serial console and QEMU monitor so Ctrl-A X exits as advertised.
 DISPLAY_FLAGS="$DISPLAY_DEVICE_FLAGS $DISPLAY_BACKEND_FLAGS -serial mon:stdio"
 
+# One playback stream only: QEMU would otherwise also open a capture voice,
+# which asks the host for a microphone the guest has no driver for.
+QEMU_AUDIO="${VINIX_QEMU_AUDIO:-}"
+if [ -z "$QEMU_AUDIO" ]; then
+    if [ "$(uname -s)" = Darwin ]; then
+        QEMU_AUDIO=coreaudio
+    else
+        QEMU_AUDIO=none
+    fi
+fi
+case "$QEMU_AUDIO" in
+    off) AUDIO_FLAGS=() ;;
+    wav:*)
+        AUDIO_FLAGS=(-audiodev "wav,id=vinix-audio,path=${QEMU_AUDIO#wav:}"
+            -device virtio-sound-device,audiodev=vinix-audio,streams=1)
+        ;;
+    *)
+        AUDIO_FLAGS=(-audiodev "$QEMU_AUDIO,id=vinix-audio"
+            -device virtio-sound-device,audiodev=vinix-audio,streams=1)
+        ;;
+esac
+echo "==> Sound: $QEMU_AUDIO"
+
 ACCEL_FLAGS="-accel hvf -cpu host"
 if [ "${USE_TCG:-0}" -eq 1 ]; then
     # The kernel is compiled for ARMv8.4-A. cortex-a72 only implements an
@@ -1084,6 +1111,7 @@ set +e
     "${PERSIST_DEVICE_ARGS[@]}" \
     -device virtio-keyboard-device \
     -device virtio-tablet-device \
+    "${AUDIO_FLAGS[@]}" \
     $NETWORK_FLAGS \
     $DISPLAY_FLAGS
 qemu_status=$?

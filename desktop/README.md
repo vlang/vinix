@@ -250,14 +250,15 @@ desktop builder picks up a prebuilt layer when present; otherwise its Minecraft
 window points to the on-demand package command.
 
 `./build-doom-aarch64.sh` cross-compiles [Chocolate Doom](https://github.com/chocolate-doom/chocolate-doom)
-3.1.1 and stages its SDL2 runtime. It reads the local WAD at
+3.1.1 and stages its SDL2 and SDL2_mixer runtime. It reads the local WAD at
 `../3rd/doom/doom1.wad` by default; set `VINIX_DOOM_WAD` to select another
 file. The WAD stays in ignored build output and is never committed. Rebuild the
 desktop image with `./build-desktop-aarch64.sh`, then launch **Chocolate Doom**
 from its desktop shortcut or Start menu. The launcher opens E1M1 in a 720×540
 window at the top right, leaving the wallpaper logo visible. The pointer is
 hidden over the game content and remains visible over the title bar and other
-desktop areas. Doom runs without sound until Vinix provides an SDL audio device.
+desktop areas. Its music and sound effects play through the VirtIO sound card
+in QEMU (see "Sound in aarch64 QEMU" in the top-level README).
 Use W/S to move, A/D to strafe, Q/E to turn, Space to use, and the mouse
 button to fire.
 

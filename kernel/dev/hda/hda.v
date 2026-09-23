@@ -4,7 +4,7 @@ module hda
 import pci
 import memory
 import time.sys
-import dev.hda.oss
+import dev.oss
 import x86.idt
 import event
 
@@ -437,7 +437,20 @@ fn (c HDACodec) get_output_stream() &oss.OssAudioStream {
 	return &c.controller.out_streams[0]
 }
 
-fn (c HDACodec) refine_fmt(fmt u8) u8 {
+fn (c HDACodec) name() string {
+	return 'hda'
+}
+
+// The formats refine_fmt() settles on.
+fn (c HDACodec) formats() u32 {
+	return oss.afmt_u8 | oss.afmt_u16_le
+}
+
+fn (c HDACodec) refine_rate(rate u32) u32 {
+	return rate
+}
+
+fn (c HDACodec) refine_fmt(fmt u32) u32 {
 	match fmt {
 		oss.afmt_u8 {
 			return oss.afmt_u8

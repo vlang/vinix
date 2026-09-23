@@ -531,6 +531,24 @@ from first boot:
 tmux
 ```
 
+### Sound in aarch64 QEMU
+
+The QEMU runners attach a VirtIO sound card, which Vinix publishes as the OSS
+`/dev/dsp`, with `/dev/mixer` for its volume. SDL programs play through it with
+`SDL_AUDIODRIVER=dsp`; that is how Chocolate Doom gets its music and sound
+effects. On macOS the guest plays through the host's default output. Set
+`VINIX_QEMU_AUDIO` to another QEMU audio backend, to `wav:PATH` to record
+everything the guest plays, or to `off` to leave the card out:
+
+```sh
+VINIX_QEMU_AUDIO=wav:/tmp/vinix.wav ./run-desktop-aarch64.sh --no-build
+```
+
+Only playback is supported, and only in QEMU; Apple hardware has no sound
+driver yet. `tests/sound/run.sh` boots a test program that drives `/dev/dsp`
+the way SDL does and checks the recording: the pitch and length of each tone,
+no dropouts, and writes that block at the playback rate.
+
 ### Minecraft: Java Edition on aarch64
 
 Vinix runs Mojang's own Minecraft client on AArch64 through its X11 and

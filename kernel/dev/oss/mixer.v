@@ -127,7 +127,6 @@ pub mut:
 	main_device    &OssDevice
 	index          int
 	modify_counter int
-	current_volume int
 }
 
 __global (
@@ -137,16 +136,19 @@ __global (
 fn create_mixer(main_device &OssDevice, index int) {
 	mut oss_mixer := unsafe {
 		&OssMixerDevice{
-			main_device:    main_device
-			index:          index
-			current_volume: 50
+			main_device: main_device
+			index:       index
 		}
 	}
+	oss_mixer.stat.rdev = resource.create_dev_id()
+	oss_mixer.stat.mode = 0o666 | stat.ifchr
 
 	name := 'mixer${index}'
 	fs.devtmpfs_add_device(oss_mixer, name)
-	root := fs.devtmpfs_get_root()
-	fs.symlink(root, name, 'mixer')
+	if index == 0 {
+		root := fs.devtmpfs_get_root()
+		fs.symlink(root, name, 'mixer')
+	}
 
 	oss_mixers << oss_mixer
 }
@@ -163,13 +165,15 @@ fn (mut dev OssMixerDevice) write(_handle voidptr, _buf voidptr, _loc u64, _coun
 	return none
 }
 
-fn (mut dev OssMixerDevice) ioctl(handle voidptr, request u64, argp voidptr) ?int {
+fn (mut dev OssMixerDevice) ioctl(handle voidptr, _request u64, argp voidptr) ?int {
+	request := command(_request)
 	match request {
 		ctl_mix_read {
 			mut value := unsafe { &OssMixerValue(argp) }
 			match value.ctrl {
 				2 {
-					value.value = i32(dev.current_volume)
+					mut stream := dev.main_device.stream
+					value.value = i32(stream.volume())
 					return 0
 				}
 				else {
@@ -182,10 +186,15 @@ fn (mut dev OssMixerDevice) ioctl(handle voidptr, request u64, argp voidptr) ?in
 			mut value := unsafe { &OssMixerValue(argp) }
 			match value.ctrl {
 				2 {
-					dev.current_volume = int(value.value)
+					mut percentage := int(value.value)
+					if percentage < 0 {
+						percentage = 0
+					} else if percentage > 100 {
+						percentage = 100
+					}
 					dev.modify_counter += 1
-					mut stream := dev.main_device.device.get_output_stream()
-					stream.change_volume(int(value.value))
+					mut stream := dev.main_device.stream
+					stream.change_volume(percentage)
 					return 0
 				}
 				else {
@@ -202,7 +211,7 @@ fn (mut dev OssMixerDevice) ioctl(handle voidptr, request u64, argp voidptr) ?in
 					info.entry_type = mixt_devroot
 					root := unsafe { &OssMixExtRoot(&info.data) }
 
-					name := 'hda_main'
+					name := '${dev.main_device.device.name()}_main'
 
 					unsafe {
 						C.memcpy(&root.id, name.str, name.len + 1)
@@ -220,7 +229,7 @@ fn (mut dev OssMixerDevice) ioctl(handle voidptr, request u64, argp voidptr) ?in
 					info.max_value = 100
 					info.flags = mixf_readable | mixf_writable | mixf_mainvol
 
-					name := 'hda_mainvolume'
+					name := '${dev.main_device.device.name()}_mainvolume'
 
 					unsafe {
 						C.memcpy(&info.ext_name, name.str, name.len + 1)
@@ -236,7 +245,7 @@ fn (mut dev OssMixerDevice) ioctl(handle voidptr, request u64, argp voidptr) ?in
 		ctl_mixerinfo {
 			mut info := unsafe { &OssMixerInfo(argp) }
 
-			name := 'HDA Mixer'
+			name := '${dev.main_device.device.name()} mixer'
 			dev_name := '/dev/mixer${dev.index}'
 
 			unsafe {

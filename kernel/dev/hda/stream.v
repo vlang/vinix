@@ -1,7 +1,7 @@
 module hda
 
 import memory
-import dev.hda.oss
+import dev.oss
 import event.eventstruct
 import event
 import katomic
@@ -94,7 +94,7 @@ fn (mut s HDAStream) hda_set_format(fmt PCMFormat) {
 	s.regs.fmt = fmt.value
 }
 
-fn (mut s HDAStream) setup_params(fmt u8, rate u32, channels u8) {
+fn (mut s HDAStream) setup_params(fmt u32, rate u32, channels u8) {
 	mut bits := u8(0)
 
 	match fmt {
@@ -127,6 +127,14 @@ fn (mut s HDAStream) setup_params(fmt u8, rate u32, channels u8) {
 	for mut codec in s.controller.codecs {
 		codec.setup_all_output_paths(rate, bits, channels)
 	}
+}
+
+fn (s HDAStream) volume() int {
+	return int(s.cur_volume)
+}
+
+fn (mut s HDAStream) writable() u64 {
+	return u64(total_buffer_size) - u64(katomic.load(&s.remaining_data))
 }
 
 fn (mut s HDAStream) change_volume(percentage int) {

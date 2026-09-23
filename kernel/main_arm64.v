@@ -18,6 +18,7 @@ import aarch64.virtio_input
 import aarch64.virtio_gpu
 import aarch64.virtio_blk
 import aarch64.virtio_net
+import aarch64.virtio_snd
 import apple.smc
 import apple.ans
 import apple.typec
@@ -279,6 +280,9 @@ fn kmain_thread(qemu_platform bool) {
 	print('kmain_thread: streams done\n')
 	random.initialise()
 	print('kmain_thread: random done\n')
+	if qemu_platform {
+		virtio_snd.initialise(memory.get_hhdm_offset())
+	}
 	if qemu_platform {
 		virtio_gpu.initialise(memory.get_hhdm_offset())
 	}
