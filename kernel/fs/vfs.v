@@ -1508,10 +1508,13 @@ fn adopt(mut node VFSNode, mut parent VFSNode, name string) {
 	if unsafe { node.children == 0 } {
 		return
 	}
+	// ".." is a redirecting node the directory owns, not the parent itself:
+	// rmdir frees it along with its children map. Point it somewhere new
+	// rather than putting the parent in its place, or removing a renamed
+	// directory frees its parent too.
 	if '..' in node.children {
-		unsafe {
-			node.children['..'] = parent
-		}
+		mut dotdot := unsafe { node.children['..'] }
+		dotdot.redir = parent
 	}
 }
 
