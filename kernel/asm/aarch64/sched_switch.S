@@ -172,8 +172,9 @@ yield_dispatch:
     add sp, sp, #288
     ret
 
-// vinix_enter_idle(stack_top, entry)
-// x0 = stack top (16-byte aligned), x1 = function to run there.
+// vinix_enter_idle(stack_top, entry, thread)
+// x0 = stack top (16-byte aligned), x1 = function to run there,
+// x2 = argument passed to it after changing stacks.
 //
 // Abandon the current stack and continue at `entry` on `stack_top`. Used when a
 // CPU has just released the thread whose stack it is standing on -- another CPU
@@ -183,4 +184,5 @@ yield_dispatch:
 .type vinix_enter_idle, %function
 vinix_enter_idle:
     mov sp, x0
+    mov x0, x2
     br x1

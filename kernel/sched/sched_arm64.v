@@ -19,7 +19,21 @@ import krandom
 
 fn C.sched_switch_context(gpr_state voidptr, kernel_stack u64)
 
-fn C.vinix_enter_idle(stack_top u64, entry voidptr)
+fn C.vinix_enter_idle(stack_top u64, entry voidptr, thread voidptr)
+
+// The outgoing thread's lock protects its kernel stack. Release it only after
+// the CPU has switched to its private idle stack; another CPU may otherwise
+// resume that thread and overwrite the scheduler's still-active return frames.
+@[noreturn]
+fn finish_eviction(_thread voidptr) {
+	mut thread := unsafe { &proc.Thread(_thread) }
+	thread.l.release()
+	// A replacement was often already runnable. Dispatch it now instead of
+	// adding an idle-timer tick to every ordinary context switch.
+	scheduler_timer_handler(unsafe { nil })
+	await()
+	for {}
+}
 
 // Go idle on this CPU's own stack instead of returning.
 //
@@ -30,14 +44,14 @@ fn C.vinix_enter_idle(stack_top u64, entry voidptr)
 // CPU is free to resume it, so returning would put two CPUs on one stack. Leave
 // for a stack nobody else can be using.
 @[noreturn]
-fn evict_to_idle(cpu_number u64) {
+fn evict_to_idle(cpu_number u64, thread &proc.Thread) {
 	mut index := cpu_number
 	if index >= max_idle_stacks {
 		index = max_idle_stacks - 1
 	}
 	mut top := u64(voidptr(&idle_stacks[index][0])) + u64(idle_stack_size)
 	top &= ~u64(0xf)
-	C.vinix_enter_idle(top, voidptr(await))
+	C.vinix_enter_idle(top, voidptr(finish_eviction), voidptr(thread))
 	for {}
 }
 
@@ -884,8 +898,24 @@ fn scheduler_timer_handler(_gpr_state voidptr) {
 		current_thread.ttbr0 = cpu.read_ttbr0_el1()
 		fpu_save(current_thread.fpu_storage)
 		katomic.store(mut &current_thread.running_on, u64(-1))
-		current_thread.l.release()
 		released_current = true
+	}
+
+	if released_current {
+		// The run-queue candidate is still eligible for the idle loop's next
+		// scan. Drop its lock before parking, but retain the outgoing thread's
+		// lock until the assembly handoff has changed stacks.
+		if unsafe { next_thread != nil } {
+			next_thread.l.release()
+		}
+		if trace_gpu_interrupt {
+			clear_gpu_exec_interrupt_trace()
+		}
+		cpu.write_tpidr_el1(cpu_local.cpu_number)
+		proc.set_current_thread(cpu_local.cpu_number, unsafe { nil })
+		katomic.store(mut &cpu_local.is_idle, true)
+		kernel_pagemap.switch_to()
+		evict_to_idle(cpu_local.cpu_number, current_thread)
 	}
 
 	if unsafe { next_thread == nil } {
@@ -899,14 +929,6 @@ fn scheduler_timer_handler(_gpr_state voidptr) {
 		proc.set_current_thread(cpu_local.cpu_number, unsafe { nil })
 		katomic.store(mut &cpu_local.is_idle, true)
 		kernel_pagemap.switch_to()
-		if released_current {
-			// The call below this one is standing on the stack of the thread
-			// just released, and that thread is now resumable by any CPU that
-			// takes it off the queue. Returning would leave this CPU executing
-			// on a stack another CPU may already be using. Idle on our own
-			// instead; whoever picks the thread up restores its context in full.
-			evict_to_idle(cpu_local.cpu_number)
-		}
 		// Nothing was running here: this is await()'s own poll asking for work
 		// and finding none, so returning to its loop is exactly right.
 		return
