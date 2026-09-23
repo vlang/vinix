@@ -281,11 +281,16 @@ fn dispatch_a_signal_with_fault(context &cpulocal.GPRState, synchronous bool, fa
 	mut which := -1
 
 	for i := u8(0); i < 64; i++ {
-		if t.masked_signals & (u64(1) << i) != 0 {
+		signum := int(i) + 1
+		// SIGKILL and SIGSTOP can never be blocked, whatever the mask says. A
+		// wait syscall that installed a full temporary mask must not be able to
+		// keep the process alive against kill -9.
+		unblockable := signum == sigkill || signum == sigstop
+		if !unblockable && t.masked_signals & (u64(1) << i) != 0 {
 			continue
 		}
 		if katomic.btr(mut &t.pending_signals, i) == true {
-			which = int(i) + 1
+			which = signum
 			break
 		}
 	}
@@ -346,26 +351,30 @@ fn dispatch_a_signal_with_fault(context &cpulocal.GPRState, synchronous bool, fa
 
 		signal_sp -= sizeof(cpulocal.GPRState)
 		signal_sp = lib.align_down(signal_sp, 16)
-		mut return_context := unsafe { &cpulocal.GPRState(signal_sp) }
+		return_context_addr := signal_sp
 
-		unsafe {
-			*return_context = *context
-		}
-		t.gpr_state = *context
-		t.gpr_state.sp = signal_sp
+		mut siginfo_sp := signal_sp - sizeof(SigInfo)
+		siginfo_sp = lib.align_down(siginfo_sp, 16)
 
-		t.gpr_state.sp -= sizeof(SigInfo)
-		t.gpr_state.sp = lib.align_down(t.gpr_state.sp, 16)
-		mut siginfo := unsafe { &SigInfo(t.gpr_state.sp) }
-
-		unsafe { C.memset(voidptr(siginfo), 0, sizeof(SigInfo)) }
+		mut siginfo := SigInfo{}
 		siginfo.si_signo = i32(which)
 
+		// The stack may be unmapped or too small for the frame, for instance a
+		// preemption signal that arrives with the SP deep in a small stack.
+		// Write it through the pagemap so that turns into a killed process, as
+		// on Linux, rather than a kernel-mode fault that takes the machine down.
+		if !usercopy.copy_to_user(return_context_addr, voidptr(context), sizeof(cpulocal.GPRState))
+			|| !usercopy.copy_to_user(siginfo_sp, voidptr(&siginfo), sizeof(SigInfo)) {
+			exit_with_fatal_signal(u8(sigsegv))
+		}
+
+		t.gpr_state = *context
+		t.gpr_state.sp = siginfo_sp
 		t.gpr_state.pc = t.sigentry
 		t.gpr_state.x0 = u64(which)
-		t.gpr_state.x1 = u64(siginfo)
+		t.gpr_state.x1 = siginfo_sp
 		t.gpr_state.x2 = u64(handler)
-		t.gpr_state.x3 = u64(return_context)
+		t.gpr_state.x3 = return_context_addr
 		t.gpr_state.x4 = previous_mask
 
 		enter_handler(mut t, context)
@@ -388,28 +397,31 @@ fn dispatch_a_signal_with_fault(context &cpulocal.GPRState, synchronous bool, fa
 			context_offset + sizeof(cpulocal.GPRState)
 		}
 		mut signal_sp := lib.align_down(stack_top - frame_size, 16)
+		uc_address := signal_sp + ucontext_offset
 
-		// Store original context into frame on user stack
+		// Build the whole frame in kernel memory, then push it to the user
+		// stack with a single checked copy. A preemption signal can arrive
+		// with the SP deep in a small goroutine stack, so the frame may not
+		// fit; the checked copy turns that into a killed process (Linux
+		// force_sigsegv) instead of a kernel-mode fault that kills the machine.
+		mut frame := []u8{len: int(frame_size)}
+		base := u64(frame.data)
 		unsafe {
-			*&u64(signal_sp) = previous_mask
-			*&u64(signal_sp + 8) = 0
-			C.memcpy(voidptr(signal_sp + context_offset), context, sizeof(cpulocal.GPRState))
+			*&u64(base) = previous_mask
+			// The private header points rt_sigreturn at the public context so
+			// changes made by a three-argument handler are not discarded.
+			*&u64(base + 8) = if wants_siginfo { uc_address } else { u64(0) }
+			C.memcpy(voidptr(base + context_offset), context, sizeof(cpulocal.GPRState))
 		}
 
 		if wants_siginfo {
-			info_address := signal_sp + info_offset
-			uc_address := signal_sp + ucontext_offset
+			info_base := base + info_offset
+			uc_base := base + ucontext_offset
 			unsafe {
-				// The private header points rt_sigreturn at the public context so
-				// changes made by a three-argument handler are not discarded.
-				*&u64(signal_sp + 8) = uc_address
-				C.memset(voidptr(info_address), 0, 128)
-				C.memset(voidptr(uc_address), 0, ucontext_size)
-
 				// siginfo_t: signo, errno, positive si_code, then si_addr. Linux
 				// distinguishes an unmapped page from a permission-protected one.
-				*&i32(info_address) = i32(which)
-				*&i32(info_address + 8) = if timer_info.found {
+				*&i32(info_base) = i32(which)
+				*&i32(info_base + 8) = if timer_info.found {
 					i32(timer_info.code)
 				} else if synchronous && (fault_esr & 0x3f) >= 0x0c {
 					2 // SEGV_ACCERR
@@ -418,31 +430,37 @@ fn dispatch_a_signal_with_fault(context &cpulocal.GPRState, synchronous bool, fa
 				} else {
 					0
 				}
-				*&u64(info_address + 16) = fault_address
+				*&u64(info_base + 16) = fault_address
 				if timer_info.found {
-					*&i32(info_address + 20) = i32(timer_info.overrun)
-					*&u64(info_address + 24) = timer_info.value
+					*&i32(info_base + 20) = i32(timer_info.overrun)
+					*&u64(info_base + 24) = timer_info.value
 				}
 
 				// musl AArch64 ucontext_t offsets. The signal mask begins at 40;
 				// its 128 bytes are followed by eight bytes of alignment before
 				// mcontext at 176. The reserved extension records are 16-byte
 				// aligned after pstate.
-				*&u64(uc_address + 40) = previous_mask
-				*&u64(uc_address + 176) = fault_address
-				C.memcpy(voidptr(uc_address + 184), context, 31 * sizeof(u64))
-				*&u64(uc_address + 432) = context.sp
-				*&u64(uc_address + 440) = context.pc
-				*&u64(uc_address + 448) = context.pstate
+				*&u64(uc_base + 40) = previous_mask
+				*&u64(uc_base + 176) = fault_address
+				C.memcpy(voidptr(uc_base + 184), context, 31 * sizeof(u64))
+				*&u64(uc_base + 432) = context.sp
+				*&u64(uc_base + 440) = context.pc
+				*&u64(uc_base + 448) = context.pstate
 
 				// esr_context lets QEMU distinguish reads from writes without
 				// decoding the faulting AArch64 instruction.
-				*&u32(uc_address + 464) = 0x45535201
-				*&u32(uc_address + 468) = 16
-				*&u64(uc_address + 472) = fault_esr
+				*&u32(uc_base + 464) = 0x45535201
+				*&u32(uc_base + 468) = 16
+				*&u64(uc_base + 472) = fault_esr
 				// A zero header terminates the extension-record chain.
-				*&u64(uc_address + 480) = 0
+				*&u64(uc_base + 480) = 0
 			}
+		}
+
+		pushed := usercopy.copy_to_user(signal_sp, frame.data, frame_size)
+		unsafe { frame.free() }
+		if !pushed {
+			exit_with_fatal_signal(u8(sigsegv))
 		}
 
 		// Set up handler invocation
