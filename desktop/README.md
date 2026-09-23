@@ -166,6 +166,9 @@ sibling `../office`, and finally `third_party/office`; the image installs both
 executables together with VOffice's translations and ribbon PNGs. The
 compositor decodes those immutable installed PNG assets itself, so VOffice does
 not need a second window system or image service at runtime.
+The compositor passes standalone apps their protocol pipes as
+`VINIX_REQUEST_FD` and `VINIX_RESPONSE_FD` environment variables, leaving
+their command line free for document paths.
 
 Both external application builders keep content-keyed binaries in the
 persistent `build-aarch64-desktop-apps/` cache, outside the disposable

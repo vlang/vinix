@@ -695,7 +695,7 @@ struct SpawnedAppProcess {
 	from_child int
 }
 
-fn desktop_spawn_app(path string, app_name string, tz_offset i64) ?SpawnedAppProcess {
+fn desktop_spawn_app(path string, app_name string, tz_offset i64, standalone bool) ?SpawnedAppProcess {
 	if C.access(&char(path.str), C.X_OK) != 0 {
 		return none
 	}
@@ -730,14 +730,27 @@ fn desktop_spawn_app(path string, app_name string, tz_offset i64) ?SpawnedAppPro
 	request_arg := '--request-fd=${request[0]}'
 	response_arg := '--response-fd=${response[1]}'
 	tz_arg := '--app-tz=${tz_offset}'
-	argv := [&char(path.str), &char(mode_arg.str), &char(request_arg.str), &char(response_arg.str),
-		&char(tz_arg.str), &char(unsafe { nil })]
+	// Multicall desktop clients need the app selector and pipe options. Office
+	// clients treat argv[1] as a document path, so pass their pipes in envp.
+	argv := if standalone {
+		[&char(path.str), &char(unsafe { nil })]
+	} else {
+		[&char(path.str), &char(mode_arg.str), &char(request_arg.str), &char(response_arg.str),
+			&char(tz_arg.str), &char(unsafe { nil })]
+	}
 	path_entry := 'PATH=${desktop_command_path}'
 	home_entry := 'HOME=${desktop_home}'
-	envp := [&char(path_entry.str), &char(home_entry.str), c'TERM=dumb', c'USER=root', c'LOGNAME=root',
-		c'SHELL=/bin/zsh', c'LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules',
+	request_env := 'VINIX_REQUEST_FD=${request[0]}'
+	response_env := 'VINIX_RESPONSE_FD=${response[1]}'
+	mut envp := [&char(path_entry.str), &char(home_entry.str), c'TERM=dumb', c'USER=root',
+		c'LOGNAME=root', c'SHELL=/bin/zsh', c'LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules',
 		c'LIBGL_DRIVERS_PATH=/usr/lib/xorg/modules/dri:/usr/lib/dri',
-		c'SSL_CA_CERT_FILE=/etc/ssl/certs/ca-certificates.crt', &char(unsafe { nil })]
+		c'SSL_CA_CERT_FILE=/etc/ssl/certs/ca-certificates.crt']
+	if standalone {
+		envp << &char(request_env.str)
+		envp << &char(response_env.str)
+	}
+	envp << &char(unsafe { nil })
 
 	pid := C.fork()
 	if pid < 0 {
@@ -751,6 +764,8 @@ fn desktop_spawn_app(path string, app_name string, tz_offset i64) ?SpawnedAppPro
 			response_arg.free()
 			tz_arg.free()
 			path_entry.free()
+			request_env.free()
+			response_env.free()
 			argv.free()
 			envp.free()
 		}
@@ -779,6 +794,8 @@ fn desktop_spawn_app(path string, app_name string, tz_offset i64) ?SpawnedAppPro
 		response_arg.free()
 		tz_arg.free()
 		path_entry.free()
+		request_env.free()
+		response_env.free()
 		argv.free()
 		envp.free()
 	}

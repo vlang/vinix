@@ -881,8 +881,9 @@ fn vinix_serve(request_fd int, response_fd int) {
 }
 
 fn vinix_process_fds() ?(int, int) {
-	mut request_fd := -1
-	mut response_fd := -1
+	// Standalone applications keep argv available for document paths.
+	mut request_fd := os.getenv('VINIX_REQUEST_FD').int()
+	mut response_fd := os.getenv('VINIX_RESPONSE_FD').int()
 	for argument in os.args {
 		if argument.starts_with('--request-fd=') {
 			request_fd = argument.all_after('=').int()

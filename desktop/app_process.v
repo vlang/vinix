@@ -1031,7 +1031,8 @@ fn start_remote_app_at(path string, factory AppFactory, mut desktop Desktop) !Na
 */
 
 fn start_remote_app_at_with_timeout(path string, factory AppFactory, mut desktop Desktop, timeout_ms int) !NativeApp {
-	process := desktop_spawn_app(path, factory.process_name, desktop.tz_offset_seconds) or {
+	process := desktop_spawn_app(path, factory.process_name, desktop.tz_offset_seconds,
+		factory.standalone) or {
 		return error('cannot execute ${path}')
 	}
 	mut remote := &RemoteApp{

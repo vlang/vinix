@@ -104,15 +104,22 @@ def request(fd, command, state, payload=b"", width=0, height=0):
     os.write(fd, header + payload)
 
 
-def exercise(executable):
+def exercise(executable, env_only=False):
     app_name = os.path.basename(executable)
     to_child_r, to_child_w = os.pipe()
     from_child_r, from_child_w = os.pipe()
-    process = subprocess.Popen([
-        executable, "--vinix-app=%s" % app_name,
-        "--request-fd=%d" % to_child_r,
-        "--response-fd=%d" % from_child_w,
-    ], pass_fds=(to_child_r, from_child_w), stdout=subprocess.DEVNULL)
+    env = os.environ.copy()
+    if env_only:
+        arguments = [executable]
+        env["VINIX_REQUEST_FD"] = str(to_child_r)
+        env["VINIX_RESPONSE_FD"] = str(from_child_w)
+    else:
+        arguments = [executable, "--vinix-app=%s" % app_name,
+                     "--request-fd=%d" % to_child_r,
+                     "--response-fd=%d" % from_child_w]
+    process = subprocess.Popen(arguments, env=env,
+                               pass_fds=(to_child_r, from_child_w),
+                               stdout=subprocess.DEVNULL)
     os.close(to_child_r)
     os.close(from_child_w)
     try:
@@ -178,6 +185,7 @@ def main():
         sys.exit("usage: test_ui2_backend.py EXAMPLE-EXECUTABLE [...]")
     for executable in sys.argv[1:]:
         exercise(executable)
+    exercise(sys.argv[1], env_only=True)
     print("PASS ui2 example Vinix protocol build and shutdown (%d)" %
           (len(sys.argv) - 1))
 

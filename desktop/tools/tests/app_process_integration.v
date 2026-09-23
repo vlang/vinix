@@ -58,7 +58,31 @@ fn main() {
 		run_app_process(options)
 		return
 	}
+	// Standalone applications receive their pipe descriptors through the
+	// environment, leaving argv empty for applications that open argv[1].
+	if os.getenv('VINIX_RESPONSE_FD') != '' {
+		assert arguments().len == 1
+		assert os.getenv('VINIX_REQUEST_FD').int() >= 3
+		os.fd_write(os.getenv('VINIX_RESPONSE_FD').int(), 'S')
+		return
+	}
 	desktop_ignore_broken_pipe()
+	standalone := desktop_spawn_app(arguments()[0], 'voffice-calc', 0, true) or {
+		panic('could not start standalone app fixture')
+	}
+	mut standalone_marker := [1]u8{}
+	mut standalone_replied := false
+	for _ in 0 .. 100 {
+		if desktop_read(standalone.from_child, &standalone_marker[0], 1) == 1 {
+			standalone_replied = true
+			break
+		}
+		desktop_sleep_ms(10)
+	}
+	assert standalone_replied && standalone_marker[0] == `S`
+	desktop_close(standalone.to_child)
+	desktop_close(standalone.from_child)
+	assert desktop_wait_child(standalone.pid) == 0
 
 	// A silent application process must not be able to hold the system session
 	// before its first framebuffer present (or during a later Settings action).
