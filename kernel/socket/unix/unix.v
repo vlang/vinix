@@ -688,7 +688,7 @@ fn (mut this UnixSocket) connect(_handle voidptr, _addr voidptr, addrlen u32) ? 
 		mut t := proc.current_thread()
 		path := unsafe { cstring_to_vstring(&addr.sun_path[0]) }
 
-		mut target := fs.get_node(t.process.current_directory, path, true) or {
+		mut target := fs.get_node(proc.current_directory_of(t.process), path, true) or {
 			return none
 		}
 
@@ -792,7 +792,7 @@ fn (mut this UnixSocket) bind(_handle voidptr, _addr voidptr, addrlen u32) ? {
 
 	path := unsafe { cstring_to_vstring(&addr.sun_path[0]) }
 
-	mut node := fs.create(t.process.current_directory, path, stat.ifsock | 0o777) or {
+	mut node := fs.create(proc.current_directory_of(t.process), path, stat.ifsock | 0o777) or {
 		return none
 	}
 

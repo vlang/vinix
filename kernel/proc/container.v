@@ -152,6 +152,102 @@ pub fn put_namespace(mut ns Namespace) bool {
 	return !katomic.dec(mut &ns.refcount)
 }
 
+// A thread's own root, working directory and mount namespace. Linux keeps all
+// three per thread; Vinix keeps them per process, which is the same thing
+// until one thread of a multithreaded process asks for its own with
+// unshare(CLONE_FS) or unshare(CLONE_NEWNS). Go programs do exactly that to
+// chroot inside a goroutine locked to its thread while the rest of the
+// program stays put -- dockerd unpacks every image layer that way, and moving
+// the whole daemon into the layer instead loses it everything else it has.
+@[heap]
+pub struct ThreadFS {
+pub mut:
+	root_directory    voidptr
+	current_directory voidptr
+	mnt               &Namespace = unsafe { nil }
+}
+
+// The calling thread's own view of `process`' filesystem, or nil when it sees
+// the process' like every other thread does.
+pub fn thread_fs_of(process &Process) &ThreadFS {
+	t := current_thread()
+	if t == unsafe { nil } || t.fs == unsafe { nil } || voidptr(t.process) != voidptr(process) {
+		return unsafe { nil }
+	}
+	return t.fs
+}
+
+// Split the calling thread's root, working directory and mount namespace off
+// from its process', starting from what they are now.
+pub fn own_thread_fs() &ThreadFS {
+	mut t := current_thread()
+	if t.fs == unsafe { nil } {
+		mut process := t.process
+		mut own := &ThreadFS{
+			root_directory:    process.root_directory
+			current_directory: process.current_directory
+		}
+		if process.ns.mnt != unsafe { nil } {
+			own.mnt = get_namespace(mut process.ns.mnt)
+		}
+		t.fs = own
+	}
+	return t.fs
+}
+
+// Where `process` resolves absolute paths from, as the calling thread sees it.
+// Nil is the global root.
+pub fn root_directory_of(process &Process) voidptr {
+	if unsafe { process == nil } {
+		return unsafe { nil }
+	}
+	own := thread_fs_of(process)
+	if own != unsafe { nil } {
+		return own.root_directory
+	}
+	return process.root_directory
+}
+
+pub fn set_root_directory(mut process Process, directory voidptr) {
+	mut own := thread_fs_of(process)
+	if own != unsafe { nil } {
+		own.root_directory = directory
+		return
+	}
+	process.root_directory = directory
+}
+
+pub fn current_directory_of(process &Process) voidptr {
+	if unsafe { process == nil } {
+		return unsafe { nil }
+	}
+	own := thread_fs_of(process)
+	if own != unsafe { nil } {
+		return own.current_directory
+	}
+	return process.current_directory
+}
+
+pub fn set_current_directory(mut process Process, directory voidptr) {
+	mut own := thread_fs_of(process)
+	if own != unsafe { nil } {
+		own.current_directory = directory
+		return
+	}
+	process.current_directory = directory
+}
+
+pub fn mount_namespace_of(process &Process) &Namespace {
+	if unsafe { process == nil } {
+		return unsafe { nil }
+	}
+	own := thread_fs_of(process)
+	if own != unsafe { nil } {
+		return own.mnt
+	}
+	return process.ns.mnt
+}
+
 // Everything a child takes from its parent at fork. The caller owns the
 // references this takes and gives them back through release_namespaces().
 pub fn inherit_container_state(mut child Process, parent &Process) {
@@ -160,8 +256,13 @@ pub fn inherit_container_state(mut child Process, parent &Process) {
 		child.caps = full_capabilities()
 		return
 	}
+	// A thread with a view of its own passes that on, as on Linux.
+	mut parent_mnt := mount_namespace_of(parent)
+	if unsafe { parent_mnt == nil } {
+		parent_mnt = parent.ns.mnt
+	}
 	child.ns = NamespaceSet{
-		mnt:              get_namespace(mut parent.ns.mnt)
+		mnt:              get_namespace(mut parent_mnt)
 		uts:              get_namespace(mut parent.ns.uts)
 		ipc:              get_namespace(mut parent.ns.ipc)
 		net:              get_namespace(mut parent.ns.net)
@@ -171,7 +272,7 @@ pub fn inherit_container_state(mut child Process, parent &Process) {
 		user:             get_namespace(mut parent.ns.user)
 		time:             get_namespace(mut parent.ns.time)
 	}
-	child.root_directory = parent.root_directory
+	child.root_directory = root_directory_of(parent)
 	child.caps = parent.caps
 	child.no_new_privs = parent.no_new_privs
 	child.cgroup = parent.cgroup

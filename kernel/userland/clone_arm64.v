@@ -347,6 +347,7 @@ fn thread_exit(status int, group bool) {
 	// mapped: robust futexes it holds, and the tid word pthread_join waits on.
 	release_robust_list(mut current_thread)
 	clear_child_tid(mut current_thread)
+	fs.release_thread_fs(mut current_thread)
 
 	if !group && !leave_process(mut current_process, current_thread) {
 		proc.free_tid(current_thread.tid)
@@ -368,6 +369,7 @@ pub fn exit_with_fatal_signal(signal u8) {
 
 	release_robust_list(mut current_thread)
 	clear_child_tid(mut current_thread)
+	fs.release_thread_fs(mut current_thread)
 
 	exit_process(mut current_process, mut current_thread, encode_fatal_signal(signal))
 }

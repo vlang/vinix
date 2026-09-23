@@ -252,7 +252,7 @@ fn get_parent_dir(dirfd int, path string) ?&VFSNode {
 		parent = calling_root()
 	} else {
 		if dirfd == at_fdcwd {
-			parent = unsafe { &VFSNode(current_process.current_directory) }
+			parent = unsafe { &VFSNode(proc.current_directory_of(current_process)) }
 		} else {
 			dir_fd := file.fd_from_fdnum(current_process, dirfd) or { return none }
 			dir_handle := dir_fd.handle
@@ -903,7 +903,7 @@ pub fn syscall_ioctl(_ voidptr, fdnum int, request u64, argp voidptr) (u64, u64)
 }
 
 pub fn syscall_getcwd(_ voidptr, buf charptr, len u64) (u64, u64) {
-	directory := unsafe { &VFSNode(proc.current_thread().process.current_directory) }
+	directory := unsafe { &VFSNode(proc.current_directory_of(proc.current_thread().process)) }
 	// A directory outside the caller's root has no name it could use, which
 	// Linux reports by prefixing the path with "(unreachable)".
 	cwd := path_from_root(directory, calling_root()) or {
@@ -973,7 +973,7 @@ pub fn syscall_fstatat(_ voidptr, dirfd int, _path charptr, statbuf &stat.Stat, 
 		}
 
 		if dirfd == at_fdcwd {
-			node := unsafe { &VFSNode(current_process.current_directory) }
+			node := unsafe { &VFSNode(proc.current_directory_of(current_process)) }
 			statsrc = &node.resource.stat
 		} else {
 			fd := file.fd_from_fdnum(current_process, dirfd) or { return errno.err, errno.get() }
@@ -1153,7 +1153,9 @@ pub fn syscall_chdir(_ voidptr, _path charptr) (u64, u64) {
 		return errno.err, errno.enoent
 	}
 
-	mut node := get_node(process.current_directory, path, true) or { return errno.err, errno.get() }
+	mut node := get_node(proc.current_directory_of(process), path, true) or {
+		return errno.err, errno.get()
+	}
 
 	if !stat.isdir(node.resource.stat.mode) {
 		return errno.err, errno.enotdir
@@ -1162,7 +1164,7 @@ pub fn syscall_chdir(_ voidptr, _path charptr) (u64, u64) {
 		return errno.err, errno.eacces
 	}
 
-	process.current_directory = node
+	proc.set_current_directory(mut process, node)
 
 	return 0, 0
 }
@@ -1587,7 +1589,7 @@ pub fn syscall_fchdir(_ voidptr, fdnum int) (u64, u64) {
 		return errno.err, errno.eacces
 	}
 
-	process.current_directory = voidptr(node)
+	proc.set_current_directory(mut process, voidptr(node))
 
 	return 0, 0
 }
@@ -1605,7 +1607,7 @@ pub fn syscall_truncate(_ voidptr, _path charptr, length i64) (u64, u64) {
 
 	mut process := proc.current_thread().process
 
-	mut node := get_node(process.current_directory, path, true) or {
+	mut node := get_node(proc.current_directory_of(process), path, true) or {
 		return errno.err, errno.get()
 	}
 	mut res := node.resource
@@ -1730,7 +1732,9 @@ pub fn syscall_statfs(_ voidptr, _path charptr, buf u64) (u64, u64) {
 
 	mut process := proc.current_thread().process
 
-	node := get_node(process.current_directory, path, true) or { return errno.err, errno.get() }
+	node := get_node(proc.current_directory_of(process), path, true) or {
+		return errno.err, errno.get()
+	}
 
 	mut res := node.resource
 	if !fill_statfs_resource(mut res, buf) {
@@ -1782,7 +1786,7 @@ pub fn syscall_utimensat(_ voidptr, dirfd int, _path charptr, times u64, flags i
 	if path.len == 0 {
 		if flags & at_empty_path == 0 { return errno.err, errno.enoent }
 		if dirfd == at_fdcwd {
-			node = proc.current_thread().process.current_directory
+			node = proc.current_directory_of(proc.current_thread().process)
 		} else {
 			mut fd := file.fd_from_fdnum(unsafe { nil }, dirfd) or {
 				return errno.err, errno.get()

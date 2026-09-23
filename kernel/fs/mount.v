@@ -93,19 +93,21 @@ fn calling_process() &proc.Process {
 }
 
 fn table_of(process &proc.Process) &MountTable {
-	if process == unsafe { nil } || process.ns.mnt == unsafe { nil }
-		|| process.ns.mnt.data == unsafe { nil } {
+	ns := proc.mount_namespace_of(process)
+	if ns == unsafe { nil } || ns.data == unsafe { nil } {
 		return initial_mount_table
 	}
-	return unsafe { &MountTable(process.ns.mnt.data) }
+	return unsafe { &MountTable(ns.data) }
 }
 
-// The directory a process' absolute paths start from.
+// The directory a process' absolute paths start from, as the calling thread
+// sees it.
 pub fn process_root(process &proc.Process) &VFSNode {
-	if process == unsafe { nil } || process.root_directory == unsafe { nil } {
+	root := proc.root_directory_of(process)
+	if root == unsafe { nil } {
 		return vfs_root
 	}
-	return unsafe { &VFSNode(process.root_directory) }
+	return unsafe { &VFSNode(root) }
 }
 
 fn calling_root() &VFSNode {
@@ -334,11 +336,11 @@ pub fn syscall_mount(_ voidptr, src charptr, tgt charptr, fs_type charptr, mount
 }
 
 fn calling_directory() &VFSNode {
-	process := calling_process()
-	if process == unsafe { nil } || process.current_directory == unsafe { nil } {
+	directory := proc.current_directory_of(calling_process())
+	if directory == unsafe { nil } {
 		return vfs_root
 	}
-	return unsafe { &VFSNode(process.current_directory) }
+	return unsafe { &VFSNode(directory) }
 }
 
 fn mount_request(parent &VFSNode, source string, target string, fstype string, flags u64, options string) ? {
@@ -683,7 +685,7 @@ pub fn syscall_chroot(_ voidptr, _path charptr) (u64, u64) {
 		return errno.err, errno.eacces
 	}
 	mut process := calling_process()
-	process.root_directory = voidptr(node)
+	proc.set_root_directory(mut process, voidptr(node))
 	return 0, 0
 }
 
@@ -723,14 +725,20 @@ pub fn syscall_pivot_root(_ voidptr, _new_root charptr, _put_old charptr) (u64, 
 	table.root_hint = new_root
 
 	// Every process of this namespace that was rooted, or standing, at the
-	// old root moves to the new one.
+	// old root moves to the new one. These are the processes' own roots, not
+	// the calling thread's view of its own process.
+	ns := proc.mount_namespace_of(process)
 	proc.lock_table()
 	for pid := 1; pid < proc.max_pid; pid++ {
 		mut other := proc.process_at(pid)
-		if other == unsafe { nil } || voidptr(other.ns.mnt) != voidptr(process.ns.mnt) {
+		if other == unsafe { nil } || voidptr(other.ns.mnt) != voidptr(ns) {
 			continue
 		}
-		other_root := process_root(other)
+		other_root := if other.root_directory == unsafe { nil } {
+			vfs_root
+		} else {
+			unsafe { &VFSNode(other.root_directory) }
+		}
 		if voidptr(other_root) == voidptr(old_root) || voidptr(other_root) == voidptr(old_top) {
 			other.root_directory = voidptr(new_root)
 		}
@@ -739,6 +747,21 @@ pub fn syscall_pivot_root(_ voidptr, _new_root charptr, _put_old charptr) (u64, 
 		}
 	}
 	proc.unlock_table()
+	// A thread with a view of its own moves by itself.
+	mut own := proc.thread_fs_of(process)
+	if own != unsafe { nil } {
+		own_root := if own.root_directory == unsafe { nil } {
+			vfs_root
+		} else {
+			unsafe { &VFSNode(own.root_directory) }
+		}
+		if voidptr(own_root) == voidptr(old_root) || voidptr(own_root) == voidptr(old_top) {
+			own.root_directory = voidptr(new_root)
+		}
+		if own.current_directory == voidptr(old_root) || own.current_directory == voidptr(old_top) {
+			own.current_directory = voidptr(new_root)
+		}
+	}
 	return 0, 0
 }
 

@@ -60,6 +60,9 @@ pub mut:
 	// it up, which is what claims it: the scheduler then prefers to keep it
 	// there, next to the pages it faulted in. -1 means no CPU has run it yet.
 	numa_node int = -1
+	// Root, working directory and mount namespace of this thread's own, once
+	// unshare(2) has split them off from its process'. See ThreadFS.
+	fs &ThreadFS = unsafe { nil }
 }
 
 pub fn current_thread() &Thread {

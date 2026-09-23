@@ -714,7 +714,7 @@ pub fn syscall_execve(_ voidptr, _path charptr, _argv &charptr, _envp &charptr) 
 	}
 	gpu_exec_trace(trace_gpu, 'environment copied; entering ELF loader')
 
-	start_program(true, proc.current_thread().process.current_directory, path, argv, envp,
+	start_program(true, proc.current_directory_of(proc.current_thread().process), path, argv, envp,
 		'', '', '') or { return errno.err, errno.get() }
 
 	return errno.err, errno.get()
@@ -1091,7 +1091,7 @@ pub fn syscall_execveat(_ voidptr, dirfd int, _path charptr, _argv &charptr, _en
 		directory = if node.parent != unsafe { nil } {
 			node.parent
 		} else {
-			unsafe { &fs.VFSNode(process.current_directory) }
+			unsafe { &fs.VFSNode(proc.current_directory_of(process)) }
 		}
 		target = '/proc/self/fd/${dirfd}'
 	} else {

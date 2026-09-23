@@ -266,11 +266,13 @@ pub fn release_process_namespaces(mut process proc.Process) {
 	}
 }
 
-const unshare_allowed = proc.clone_namespace_flags | u64(0x00000100) | u64(0x00000200) | u64(0x00000400) | u64(0x00040000)
+const clone_fs = u64(0x00000200)
+
+const unshare_allowed = proc.clone_namespace_flags | u64(0x00000100) | clone_fs | u64(0x00000400) | u64(0x00040000)
 
 pub fn syscall_unshare(_ voidptr, flags u64) (u64, u64) {
-	// CLONE_FS, CLONE_FILES, CLONE_SIGHAND and CLONE_SYSVSEM ask to stop sharing
-	// what a Vinix process never shares with another in the first place.
+	// CLONE_FILES, CLONE_SIGHAND and CLONE_SYSVSEM ask to stop sharing what a
+	// Vinix process never shares with another in the first place.
 	if flags & ~unshare_allowed != 0 {
 		return errno.err, errno.einval
 	}
@@ -279,8 +281,33 @@ pub fn syscall_unshare(_ voidptr, flags u64) (u64, u64) {
 		return errno.err, errno.eperm
 	}
 	mut process := proc.current_thread().process
-	create_namespaces(mut process, flags & proc.clone_namespace_flags, false)
+	mut ns_flags := flags & proc.clone_namespace_flags
+	// Root, working directory and mounts are per process until a thread of a
+	// multithreaded one asks to stop sharing them (CLONE_NEWNS implies
+	// CLONE_FS). From then on that thread alone sees what it changes.
+	if flags & (clone_fs | proc.clone_newns) != 0
+		&& (process.threads.len > 1 || proc.thread_fs_of(process) != unsafe { nil }) {
+		mut own := proc.own_thread_fs()
+		if ns_flags & proc.clone_newns != 0 && own.mnt != unsafe { nil } {
+			own.mnt = replace_namespace(process, mut own.mnt)
+			ns_flags &= ~proc.clone_newns
+		}
+	}
+	create_namespaces(mut process, ns_flags, false)
 	return 0, 0
+}
+
+// Give back a thread's own view of the filesystem when it exits.
+pub fn release_thread_fs(mut t proc.Thread) {
+	if t.fs == unsafe { nil } {
+		return
+	}
+	mut own := t.fs
+	t.fs = unsafe { nil }
+	if own.mnt != unsafe { nil } {
+		release_namespace(mut own.mnt)
+	}
+	unsafe { free(own) }
 }
 
 pub fn syscall_setns(_ voidptr, fdnum int, nstype int) (u64, u64) {
@@ -304,9 +331,17 @@ pub fn syscall_setns(_ voidptr, fdnum int, nstype int) (u64, u64) {
 	}
 	match ns.kind {
 		proc.clone_newns {
-			mut old := process.ns.mnt
-			process.ns.mnt = proc.get_namespace(mut ns)
-			release_namespace(mut old)
+			// A thread with a view of its own joins by itself.
+			mut own := proc.thread_fs_of(process)
+			if own != unsafe { nil } && own.mnt != unsafe { nil } {
+				mut old := own.mnt
+				own.mnt = proc.get_namespace(mut ns)
+				release_namespace(mut old)
+			} else {
+				mut old := process.ns.mnt
+				process.ns.mnt = proc.get_namespace(mut ns)
+				release_namespace(mut old)
+			}
 			// Joining a mount namespace puts the caller at its root.
 			table := table_of(process)
 			root := if table.initial || table.root_hint == unsafe { nil } {
@@ -314,12 +349,12 @@ pub fn syscall_setns(_ voidptr, fdnum int, nstype int) (u64, u64) {
 			} else {
 				table.root_hint
 			}
-			process.root_directory = if voidptr(root) == voidptr(vfs_root) {
+			proc.set_root_directory(mut process, if voidptr(root) == voidptr(vfs_root) {
 				unsafe { nil }
 			} else {
 				voidptr(root)
-			}
-			process.current_directory = voidptr(reduce_node(root, false))
+			})
+			proc.set_current_directory(mut process, voidptr(reduce_node(root, false)))
 		}
 		proc.clone_newuts {
 			mut old := process.ns.uts
