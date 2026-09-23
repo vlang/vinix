@@ -383,6 +383,10 @@ const pr_set_no_new_privs = 38
 
 const pr_get_no_new_privs = 39
 
+const pr_set_timerslack = 29
+
+const pr_get_timerslack = 30
+
 const task_comm_len = 16
 
 fn syscall_linux_prctl(_ voidptr, option int, arg2 u64, _arg3 u64, _arg4 u64, _arg5 u64) (u64, u64) {
@@ -414,17 +418,37 @@ fn syscall_linux_prctl(_ voidptr, option int, arg2 u64, _arg3 u64, _arg4 u64, _a
 		pr_get_dumpable {
 			return 1, 0
 		}
-		pr_set_dumpable, pr_set_pdeathsig, pr_set_no_new_privs {
+		pr_set_dumpable, pr_set_timerslack {
 			// Accepted and remembered nowhere: there is no core dump to
-			// suppress, no parent death to notice and no privilege to gain.
+			// suppress and no timer slack to apply.
 			return 0, 0
 		}
-		pr_get_pdeathsig, pr_get_no_new_privs {
-			value := i32(0)
+		pr_get_timerslack {
+			return 50000, 0
+		}
+		pr_set_pdeathsig {
+			if arg2 > 64 {
+				return errno.err, errno.einval
+			}
+			process.pdeathsig = int(arg2)
+			return 0, 0
+		}
+		pr_get_pdeathsig {
+			value := i32(process.pdeathsig)
 			if !usercopy.copy_to_user(arg2, voidptr(&value), sizeof(i32)) {
 				return errno.err, errno.efault
 			}
 			return 0, 0
+		}
+		pr_set_no_new_privs {
+			if arg2 != 1 {
+				return errno.err, errno.einval
+			}
+			process.no_new_privs = true
+			return 0, 0
+		}
+		pr_get_no_new_privs {
+			return if process.no_new_privs { u64(1) } else { u64(0) }, 0
 		}
 		else {
 			return errno.err, errno.einval

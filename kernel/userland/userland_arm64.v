@@ -559,8 +559,34 @@ fn signal_process(mut target proc.Process, signal int) bool {
 	return true
 }
 
+// Send `signal` to process `pid` from inside the kernel: cgroup.kill, the death
+// of a pid namespace's init, and PR_SET_PDEATHSIG all end up here.
+pub fn signal_pid(pid int, signal int) {
+	if pid <= 0 || pid >= proc.max_pid || signal <= 0 || signal > 64 {
+		return
+	}
+	mut target := processes[pid]
+	if target == unsafe { nil } || target.exiting {
+		return
+	}
+	signal_process(mut target, signal)
+}
+
 // kill(2). Signal 0 raises nothing: it is the "does this pid exist?" probe that
 // shells and daemons use, so it must never fail loudly.
+// cgroup.kill: fs asks the signal layer to kill a member of a cgroup. Kept
+// here because fs cannot reach the signal code, which sits above it.
+pub fn cgroup_kill_process(pid int, signal int) {
+	if pid <= 0 || pid >= proc.max_pid {
+		return
+	}
+	mut target := processes[pid]
+	if target == unsafe { nil } {
+		return
+	}
+	signal_process(mut target, signal)
+}
+
 pub fn syscall_kill(_ voidptr, pid int, signal int) (u64, u64) {
 	if signal < 0 || signal > 64 {
 		return errno.err, errno.einval
@@ -700,10 +726,22 @@ pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, 
 	// where the program really is: keeping the literal path would make the
 	// child's own /proc/self/exe point back at itself forever.
 	path := fs.resolve_self_reference(_path)
+	prog_node := fs.get_node(dir, path, true)?
+	return start_program_node(execve, dir, prog_node, path, argv, envp, stdin_path,
+		stdout_path, stderr_path)
+}
+
+// The part of exec that follows finding the program. execveat(2) on a
+// descriptor comes here directly: a memfd has no name to be found by.
+pub fn start_program_node(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, path string, argv []string, envp []string, stdin_path string, stdout_path string, stderr_path string) ?&proc.Process {
 	trace_gpu := execve && path == gpu_desktop_executable
 	gpu_exec_trace(trace_gpu, 'resolved executable path')
-	prog_node := fs.get_node(dir, path, true)?
 	gpu_exec_trace(trace_gpu, 'opened executable node')
+	// A program's interpreter is found from the root of the process that runs
+	// it -- a container's, after pivot_root.
+	caller := proc.current_thread().process
+	root := fs.process_root(caller)
+	program_path := fs.program_path(prog_node, path)
 	if !stat.isreg(prog_node.resource.stat.mode)
 		|| !fs.check_access(prog_node, fs.access_exec, true) {
 		errno.set(errno.eacces)
@@ -756,8 +794,8 @@ pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, 
 			translated_envp << 'LD_LIBRARY_PATH=${guest_root}/lib:${guest_root}/usr/lib'
 		}
 
-		return start_program(execve, vfs_root, translator, translated_argv,
-			translated_envp, stdin_path, stdout_path, stderr_path)
+		return start_program(execve, root, translator, translated_argv, translated_envp,
+			stdin_path, stdout_path, stderr_path)
 	}
 
 	gpu_exec_trace(trace_gpu, 'allocating replacement page map')
@@ -781,7 +819,7 @@ pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, 
 		gpu_exec_trace(trace_gpu, 'using program entry point (no interpreter)')
 	} else {
 		gpu_exec_trace(trace_gpu, 'opening ELF interpreter')
-		ld_node := fs.get_node(vfs_root, ld_path, true)?
+		ld_node := fs.get_node(root, ld_path, true)?
 		if !stat.isreg(ld_node.resource.stat.mode)
 			|| !fs.check_access(ld_node, fs.access_exec, true) {
 			errno.set(errno.eacces)
@@ -821,7 +859,8 @@ pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, 
 		mut new_process := sched.new_process(unsafe { nil }, new_pagemap)?
 
 		new_process.name = '${path}[${new_process.pid}]'
-		new_process.executable_path = path.clone()
+		new_process.executable_path = program_path
+		new_process.exe_node = voidptr(prog_node)
 		new_process.allow_wx = allow_wx
 
 		stdin_node := fs.get_node(vfs_root, stdin_path, true)?
@@ -898,8 +937,13 @@ pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, 
 		curr_process.pagemap = new_pagemap
 
 		curr_process.name = '${path}[${curr_process.pid}]'
-		curr_process.executable_path = path.clone()
+		curr_process.executable_path = program_path
+		curr_process.exe_node = voidptr(prog_node)
 		curr_process.allow_wx = allow_wx
+		// execve recomputes the capability sets from the new credentials and
+		// the bounding set, which is how a container's root ends up with only
+		// the capabilities its runtime left it.
+		proc.capabilities_after_exec(mut curr_process)
 		gpu_exec_trace(trace_gpu, 'installed replacement process metadata')
 
 		gpu_exec_trace(trace_gpu, 'switching CPU to kernel page map')
@@ -1030,21 +1074,26 @@ pub fn syscall_execveat(_ voidptr, dirfd int, _path charptr, _argv &charptr, _en
 	mut directory := &fs.VFSNode(unsafe { nil })
 	mut target := path
 
+	mut direct_node := &fs.VFSNode(unsafe { nil })
 	if path.len == 0 {
 		if flags & fs.at_empty_path == 0 {
 			return errno.err, errno.enoent
 		}
-		// Run whatever the descriptor is open on. Its own name and parent are
-		// what a relative interpreter path then resolves against.
+		// Run whatever the descriptor is open on. Its parent, when it has one,
+		// is what a relative interpreter path then resolves against.
 		mut fd := file.fd_from_fdnum(process, dirfd) or { return errno.err, errno.ebadf }
 		node := unsafe { &fs.VFSNode(fd.handle.node) }
-		if node == unsafe { nil } || node.parent == unsafe { nil } {
-			fd.unref()
+		fd.unref()
+		if node == unsafe { nil } {
 			return errno.err, errno.eacces
 		}
-		directory = node.parent
-		target = node.name
-		fd.unref()
+		direct_node = node
+		directory = if node.parent != unsafe { nil } {
+			node.parent
+		} else {
+			unsafe { &fs.VFSNode(process.current_directory) }
+		}
+		target = '/proc/self/fd/${dirfd}'
 	} else {
 		directory = fs.parent_dir_for(dirfd, path) or { return errno.err, errno.get() }
 	}
@@ -1068,6 +1117,12 @@ pub fn syscall_execveat(_ voidptr, dirfd int, _path charptr, _argv &charptr, _en
 		}
 	}
 
+	if direct_node != unsafe { nil } {
+		start_program_node(true, directory, direct_node, target, argv, envp, '', '', '') or {
+			return errno.err, errno.get()
+		}
+		return errno.err, errno.get()
+	}
 	start_program(true, directory, target, argv, envp, '', '', '') or {
 		return errno.err, errno.get()
 	}

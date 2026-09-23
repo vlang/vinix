@@ -253,6 +253,21 @@ pub mut:
 	// Where MPOL_INTERLEAVE is up to. It lives on the process so that its
 	// threads interleave together instead of each starting from node zero.
 	mempolicy_interleave u64
+
+	// Container state; see container.v. The directory absolute paths start
+	// from (nil means the system root), the namespaces this process is in,
+	// its capability sets and its cgroup.
+	root_directory  voidptr
+	ns              NamespaceSet
+	caps            Capabilities
+	no_new_privs    bool
+	child_subreaper bool
+	pdeathsig       int
+	cgroup          voidptr
+	oom_score_adj   int
+	// The file the process is running. /proc/<pid>/exe leads here when
+	// followed, which is what makes an exec from a memfd resolvable.
+	exe_node voidptr
 }
 
 // Read-mostly limits are naturally aligned u64s.  Writers serialize complete
@@ -770,5 +785,9 @@ pub fn process_status_text(pid int) string {
 	}
 	comm := command_name(process.name)
 	threads := if process.threads.len > 0 { process.threads.len } else { 1 }
-	return 'Name:\t${comm}\nUmask:\t0${process.umask:o}\nState:\tR (running)\nTgid:\t${pid}\nNgid:\t0\nPid:\t${pid}\nPPid:\t${process.ppid}\nTracerPid:\t0\nUid:\t${process.uid}\t${process.euid}\t${process.suid}\t${process.euid}\nGid:\t${process.gid}\t${process.egid}\t${process.sgid}\t${process.egid}\nThreads:\t${threads}\n'
+	caps := process.caps
+	no_new_privs := if process.no_new_privs { 1 } else { 0 }
+	// Seccomp is reported as absent altogether: without the field a runtime
+	// knows the kernel has no seccomp, which is the truth here.
+	return 'Name:\t${comm}\nUmask:\t0${process.umask:o}\nState:\tR (running)\nTgid:\t${pid}\nNgid:\t0\nPid:\t${pid}\nPPid:\t${process.ppid}\nTracerPid:\t0\nUid:\t${process.uid}\t${process.euid}\t${process.suid}\t${process.euid}\nGid:\t${process.gid}\t${process.egid}\t${process.sgid}\t${process.egid}\nNSpid:\t${pid}\nThreads:\t${threads}\nCapInh:\t${caps.inheritable:016x}\nCapPrm:\t${caps.permitted:016x}\nCapEff:\t${caps.effective:016x}\nCapBnd:\t${caps.bounding:016x}\nCapAmb:\t${caps.ambient:016x}\nNoNewPrivs:\t${no_new_privs}\n'
 }

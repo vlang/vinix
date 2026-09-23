@@ -13,13 +13,21 @@ pub const system_domainname_set = 'system/domainname/set'
 pub const system_reboot = 'system/reboot'
 
 // A selector has to be explicitly listed here. Unknown operations fail closed.
-// Vinix does not have fine-grained capabilities yet, so these operations
-// currently require an effective UID of zero.
+// Each operation requires an effective UID of zero and the Linux capability
+// that guards it, so that a container whose runtime dropped CAP_SYS_ADMIN
+// cannot mount or rename the machine even as root.
 pub fn permitted(selector string) bool {
-	if selector != filesystem_mount && selector != filesystem_unmount
-		&& selector != system_hostname_set && selector != system_domainname_set
-		&& selector != system_reboot {
-		return false
+	capability := match selector {
+		filesystem_mount, filesystem_unmount, system_hostname_set, system_domainname_set {
+			proc.cap_sys_admin
+		}
+		system_reboot {
+			proc.cap_sys_boot
+		}
+		else {
+			return false
+		}
 	}
-	return proc.current_thread().process.euid == 0
+	process := proc.current_thread().process
+	return process.euid == 0 && proc.has_capability(process, capability)
 }

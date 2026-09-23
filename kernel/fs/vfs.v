@@ -45,6 +45,15 @@ pub mut:
 	symlink_target string
 	// Enforced independently of mount flags for immutable on-disk trees.
 	read_only bool
+	// A procfs link that leads to a node rather than to a path: an open
+	// descriptor, a namespace or a running program.
+	magic_target &VFSNode = unsafe { nil }
+	// How many mount namespaces other than the initial one mount something
+	// on this node, or unmount what the initial one has there; see mount.v.
+	ns_mounts int
+	// Set once the node has been the root of a mount, which is when `..`
+	// has to consult the mount table instead of following the parent.
+	mount_root bool
 }
 
 __global (
@@ -85,6 +94,8 @@ pub fn initialise() {
 	filesystems['devtmpfs'] = &DevTmpFS{}
 	filesystems['procfs'] = &ProcFS{}
 	filesystems['sysfs'] = &SysFS{}
+	filesystems['cgroup2'] = &CGroupFS{}
+	init_mount_tables()
 }
 
 fn reduce_node(node &VFSNode, follow_symlinks bool) &VFSNode {
@@ -97,20 +108,29 @@ fn reduce_node_bounded(node &VFSNode, follow_symlinks bool, depth int, effective
 	if unsafe { node.redir != 0 } {
 		return reduce_node_bounded(node.redir, follow_symlinks, depth + 1, effective)
 	}
-	if unsafe { node.mountpoint != 0 } {
-		return reduce_node_bounded(node.mountpoint, follow_symlinks, depth + 1, effective)
+	mounted := mount_of(node)
+	if mounted != unsafe { nil } {
+		return reduce_node_bounded(mounted, follow_symlinks, depth + 1, effective)
+	}
+	if follow_symlinks && node.magic_target != unsafe { nil } {
+		return reduce_node_bounded(node.magic_target, follow_symlinks, depth + 1, effective)
+	}
+	if follow_symlinks && procfs_is_dynamic_link(node) {
+		// /proc/self and /proc/thread-self name the reading process, so their
+		// target cannot be a string stored on the node.
+		target := procfs_dynamic_link_target(node)
+		if target.len == 0 {
+			errno.set(errno.enoent)
+			return 0
+		}
+		_, next_node, _ := path2node_bounded(node.parent, target, depth + 1, effective)
+		if unsafe { next_node == 0 } {
+			return 0
+		}
+		return reduce_node_bounded(next_node, follow_symlinks, depth + 1, effective)
 	}
 	if node.symlink_target.len != 0 && follow_symlinks == true {
-		// /proc/self names the reading process, so its target cannot be a
-		// string stored on the node.
-		mut target := node.symlink_target
-		if procfs_is_self_link(node) {
-			target = procfs_self_target()
-			if target.len == 0 {
-				errno.set(errno.enoent)
-				return 0
-			}
-		}
+		target := node.symlink_target
 		_, next_node, _ := path2node_bounded(node.parent, target, depth + 1,
 			effective)
 		if unsafe { next_node == 0 } {
@@ -132,19 +152,11 @@ fn path2node_bounded(parent &VFSNode, path string, depth int, effective bool) (&
 		errno.set(errno.enoent)
 		return 0, 0, ''
 	}
-	if path.starts_with(proc_self_prefix) {
-		// The substitute is a real pathname, so it never re-enters this branch.
-		resolved := resolve_self_reference(path)
-		if resolved != path {
-			return path2node_bounded(parent, resolved, depth + 1, effective)
-		}
-	}
-
 	mut index := u64(0)
 	mut current_node := reduce_node_bounded(parent, false, depth + 1, effective)
 
 	if path[index] == `/` {
-		current_node = reduce_node_bounded(vfs_root, false, depth + 1, effective)
+		current_node = reduce_node_bounded(calling_root(), false, depth + 1, effective)
 		for path[index] == `/` {
 			if index == u64(path.len) - 1 {
 				return current_node, current_node, ''
@@ -185,19 +197,25 @@ fn path2node_bounded(parent &VFSNode, path string, depth int, effective bool) (&
 			errno.set(errno.eacces)
 			return 0, 0, ''
 		}
-		if elem_str !in current_node.children {
-			procfs_refresh(current_node)
-		}
-		if elem_str !in current_node.children {
-			errno.set(errno.enoent)
-			if last == true {
-				return current_node, 0, elem_str
+		mut new_node := &VFSNode(unsafe { nil })
+		if elem_str == '..' {
+			// The way out of a directory depends on how it was reached: see
+			// logical_parent().
+			new_node = reduce_node_bounded(logical_parent(current_node), false, depth + 1,
+				effective)
+		} else {
+			procfs_lookup_refresh(current_node, elem_str)
+			if elem_str !in current_node.children {
+				errno.set(errno.enoent)
+				if last == true {
+					return current_node, 0, elem_str
+				}
+				return 0, 0, ''
 			}
-			return 0, 0, ''
-		}
 
-		mut new_node := reduce_node_bounded(unsafe { current_node.children[elem_str] }, false,
-			depth + 1, effective)
+			new_node = reduce_node_bounded(unsafe { current_node.children[elem_str] }, false,
+				depth + 1, effective)
+		}
 
 		if last == true {
 			return current_node, new_node, elem_str
@@ -231,7 +249,7 @@ fn get_parent_dir(dirfd int, path string) ?&VFSNode {
 	mut parent := &VFSNode(unsafe { nil })
 
 	if is_absolute == true {
-		parent = vfs_root
+		parent = calling_root()
 	} else {
 		if dirfd == at_fdcwd {
 			parent = unsafe { &VFSNode(current_process.current_directory) }
@@ -269,74 +287,6 @@ fn get_node_with_credentials(parent &VFSNode, path string, follow_links bool,
 	return node
 }
 
-pub fn syscall_mount(_ voidptr, src charptr, tgt charptr, fs_type charptr, mountflags u64, data voidptr) (u64, u64) {
-	if !security.permitted(security.filesystem_mount) {
-		return errno.err, errno.eperm
-	}
-
-	// Copy every pathname and type before resolution. The caller may unmap or
-	// change its buffers after the copy, but VFS only sees our owned strings.
-	source := usercopy.copy_cstring_from_user(u64(src), 4096) or { return errno.err, errno.get() }
-	defer { unsafe { source.free() } }
-	target := usercopy.copy_cstring_from_user(u64(tgt), 4096) or { return errno.err, errno.get() }
-	defer { unsafe { target.free() } }
-	fstype := usercopy.copy_cstring_from_user(u64(fs_type), 4096) or { return errno.err, errno.get() }
-	defer { unsafe { fstype.free() } }
-
-	// TODO: Not ignore mountflags and data once the current system supports it.
-	curr_dir := proc.current_thread().process.current_directory
-	mount(curr_dir, source, target, fstype) or { return errno.err, errno.get() }
-
-	return 0, 0
-}
-
-pub fn syscall_umount(_ voidptr, tgt charptr, flags u64) (u64, u64) {
-	if !security.permitted(security.filesystem_unmount) {
-		return errno.err, errno.eperm
-	}
-
-	// TODO: Implement this once the FS supports it.
-	return errno.err, errno.enosys
-}
-
-pub fn mount(parent &VFSNode, source string, target string, filesystem string) ? {
-	if filesystem !in filesystems {
-		errno.set(errno.enodev)
-		return none
-	}
-
-	mut source_node := &VFSNode(unsafe { nil })
-	if source.len != 0 {
-		_, source_node, _ = path2node(parent, source)
-		if voidptr(source_node) == unsafe { nil } || stat.isdir(source_node.resource.stat.mode) {
-			return none
-		}
-	}
-
-	parent_of_tgt_node, mut target_node, basename := path2node(parent, target)
-
-	mounting_root := voidptr(target_node) == voidptr(vfs_root)
-
-	if target_node == unsafe { nil }
-		|| (!mounting_root && !stat.isdir(target_node.resource.stat.mode)) {
-		return none
-	}
-
-	mut f_sys := unsafe { filesystems[filesystem].instantiate() }
-
-	mut mount_node := f_sys.mount(parent_of_tgt_node, basename, source_node)?
-
-	target_node.mountpoint = mount_node
-
-	mount_node.create_dotentries(parent_of_tgt_node)
-
-	if source.len > 0 {
-		print('vfs: Mounted `${source}` to `${target}` with filesystem `${filesystem}`\n')
-	} else {
-		print('vfs: Mounted ${filesystem} to `${target}`\n')
-	}
-}
-
 // Kernel subsystems that discover boot-time storage do not receive a process
 // working directory. Keep the root pointer private and expose only the scoped
 // mount operation they need.
@@ -356,7 +306,17 @@ pub fn (mut node VFSNode) create_dotentries(parent &VFSNode) {
 	}
 }
 
+// The path of a node as the calling process sees it: from its root, through
+// the mounts of its namespace. A node that cannot be reached from there is
+// named by its path from the system root instead.
 pub fn pathname(node &VFSNode) string {
+	if node == unsafe { nil } {
+		return '/'
+	}
+	return path_from_root(node, calling_root()) or { global_pathname(node) }
+}
+
+fn global_pathname(node &VFSNode) string {
 	mut components := []string{}
 	defer {
 		unsafe { components.free() }
@@ -364,7 +324,7 @@ pub fn pathname(node &VFSNode) string {
 
 	mut current_node := unsafe { node }
 
-	for {
+	for current_node != unsafe { nil } {
 		if current_node.name == '' {
 			break
 		}
@@ -413,7 +373,7 @@ pub fn link(parent &VFSNode, dest string, target string) ?&VFSNode {
 		return none
 	}
 
-	_, mut dest_node, _ := path2node(vfs_root, dest)
+	_, mut dest_node, _ := path2node(calling_root(), dest)
 	if dest_node == unsafe { nil } { return none }
 	if dest_node.read_only { errno.set(errno.erofs); return none }
 
@@ -436,12 +396,25 @@ pub fn unlink(parent &VFSNode, name string, remove_dir bool) ? {
 	if node.read_only || parent_of_tgt.read_only { errno.set(errno.erofs); return none }
 	if !may_remove(parent_of_tgt, node) { errno.set(errno.eacces); return none }
 	if basename == '.' || basename == '..' || basename == '' { errno.set(errno.einval); return none }
+	// Something mounted here, in this or any other namespace, keeps the name.
+	if basename in parent_of_tgt.children {
+		covered := unsafe { parent_of_tgt.children[basename] }
+		if covered.mountpoint != unsafe { nil } || covered.ns_mounts > 0 {
+			errno.set(errno.ebusy)
+			return none
+		}
+	}
 	if remove_dir && !stat.isdir(node.resource.stat.mode) {
 		errno.set(errno.enotdir)
 		return none
 	}
 	if stat.isdir(node.resource.stat.mode) {
 		if !remove_dir { errno.set(errno.eisdir); return none }
+		// A cgroup directory is never empty: its interface files come and go
+		// with it, once no process and no child group is left inside.
+		if is_cgroup_resource(node.resource) {
+			cgroup_may_remove(node)?
+		}
 		if node.children.len > 2 { errno.set(errno.enotempty); return none }
 	}
 	// A read-only or failing backend must leave the namespace intact.
@@ -630,56 +603,29 @@ pub fn syscall_mkdirat(_ voidptr, dirfd int, _path charptr, mode u32) (u64, u64)
 
 pub const proc_self_prefix = '/proc/self/'
 
-// Substitute the two /proc/self entries the kernel can answer directly: the
-// program a process is running, and the pathname behind one of its descriptors.
-// procfs serves both as ordinary nodes, but resolving them to a real pathname
-// here is what lets exec() record where the program actually is — Chromium
-// starts each of its child processes by executing /proc/self/exe, and a child
-// that kept the literal path would resolve its own /proc/self/exe to itself
-// forever. musl's realpath(3) reopens /proc/self/fd/N, which is the same case.
-//
-// The original path comes back when it names anything else under /proc/self, so
-// a caller can tell the substitution apart from a path that simply is not there.
+// Chromium starts each of its child processes by executing /proc/self/exe, and
+// a child that kept that literal path would resolve its own /proc/self/exe to
+// itself forever. A path through /proc is therefore replaced by the path of
+// what it leads to, when the caller can reach that by name at all.
 pub fn resolve_self_reference(path string) string {
-	mut process := proc.current_thread().process
-	if unsafe { process == 0 } {
+	if !path.starts_with('/proc/') {
 		return path
 	}
+	node := get_node(calling_directory(), path, true) or { return path }
+	return path_from_root(node, calling_root()) or { path }
+}
 
-	if path == '/proc/self/exe' {
-		if process.executable_path.len == 0 {
-			return path
-		}
-		return process.executable_path
+// What /proc/<pid>/exe says a program is: the path it was run by, unless that
+// went through /proc, in which case the path of the file itself -- or, for a
+// file with no name at all, the "/memfd:... (deleted)" Linux shows.
+pub fn program_path(node &VFSNode, requested string) string {
+	if !requested.starts_with('/proc/') {
+		return requested.clone()
 	}
-
-	fd_prefix := '/proc/self/fd/'
-	if !path.starts_with(fd_prefix) {
-		return path
+	if node.parent == unsafe { nil } && node.name.len > 0 {
+		return '/${node.name} (deleted)'
 	}
-	fd_text := path[fd_prefix.len..]
-	if fd_text.len == 0 {
-		return path
-	}
-	mut fdnum := 0
-	for digit in fd_text {
-		if digit < `0` || digit > `9` {
-			return path
-		}
-		fdnum = fdnum * 10 + int(digit - `0`)
-		if fdnum >= proc.max_fds {
-			return path
-		}
-	}
-
-	mut fd := file.fd_from_fdnum(process, fdnum) or { return path }
-	defer {
-		fd.unref()
-	}
-	if fd.handle.node == unsafe { nil } {
-		return path
-	}
-	return pathname(unsafe { &VFSNode(fd.handle.node) })
+	return pathname(node)
 }
 
 pub fn syscall_readlinkat(_ voidptr, dirfd int, _path charptr, buf voidptr, limit u64) (u64, u64) {
@@ -697,21 +643,6 @@ pub fn syscall_readlinkat(_ voidptr, dirfd int, _path charptr, buf voidptr, limi
 	if path.len == 0 {
 		return errno.err, errno.enoent
 	}
-	if path.starts_with(proc_self_prefix) {
-		target := resolve_self_reference(path)
-		if target == path {
-			return errno.err, errno.enoent
-		}
-		mut to_copy := u64(target.len)
-		if to_copy > limit {
-			to_copy = limit
-		}
-		if !usercopy.copy_to_user(u64(buf), target.str, to_copy) {
-			return errno.err, errno.efault
-		}
-		return to_copy, 0
-	}
-
 	parent := get_parent_dir(dirfd, path) or { return errno.err, errno.get() }
 
 	node := get_node(parent, path, false) or { return errno.err, errno.get() }
@@ -720,8 +651,8 @@ pub fn syscall_readlinkat(_ voidptr, dirfd int, _path charptr, buf voidptr, limi
 		return errno.err, errno.einval
 	}
 
-	if procfs_is_self_link(node) {
-		self_target := procfs_self_target()
+	if procfs_is_dynamic_link(node) {
+		self_target := procfs_dynamic_link_target(node)
 		if self_target.len == 0 {
 			return errno.err, errno.enoent
 		}
@@ -972,7 +903,12 @@ pub fn syscall_ioctl(_ voidptr, fdnum int, request u64, argp voidptr) (u64, u64)
 }
 
 pub fn syscall_getcwd(_ voidptr, buf charptr, len u64) (u64, u64) {
-	cwd := pathname(proc.current_thread().process.current_directory)
+	directory := unsafe { &VFSNode(proc.current_thread().process.current_directory) }
+	// A directory outside the caller's root has no name it could use, which
+	// Linux reports by prefixing the path with "(unreachable)".
+	cwd := path_from_root(directory, calling_root()) or {
+		'(unreachable)' + global_pathname(directory)
+	}
 
 	bytes_needed := u64(cwd.len + 1) // include null terminator
 	if bytes_needed > len {
@@ -1949,14 +1885,21 @@ pub fn syscall_memfd_create(_ voidptr, name u64, flags u32) (u64, u64) {
 		return errno.err, errno.efault
 	}
 
-	// The name is only for show — Linux surfaces it through /proc — but the
+	// The name is only for show -- Linux surfaces it through /proc -- but the
 	// pointer still has to be readable, so a caller passing a bad one is told.
 	mut first := u8(0)
 	if !usercopy.copy_from_user(voidptr(&first), name, 1) {
 		return errno.err, errno.efault
 	}
+	shown := optional_user_string(charptr(name), 249)
 
 	mut res := create_anonymous(0o600)
+	if mut res is TmpFSResource {
+		res.memfd = true
+		// Without MFD_ALLOW_SEALING the one seal a memfd starts with is the
+		// one that forbids adding any other.
+		res.seals = if flags & u32(mfd_allow_sealing) != 0 { u32(0) } else { f_seal_seal }
+	}
 
 	// memfd_create hands back a descriptor open for reading and writing. Saying
 	// so matters: without an access mode the handle looks read-only, and
@@ -1969,6 +1912,15 @@ pub fn syscall_memfd_create(_ voidptr, name u64, flags u32) (u64, u64) {
 	fdnum := file.fdnum_create_from_resource(unsafe { nil }, mut res, open_flags, 0, false) or {
 		return errno.err, errno.get()
 	}
+	// A node that is in no directory. It is what /proc/self/fd/N leads to, and
+	// it is what lets execveat(2) -- or an exec of that /proc path -- run the
+	// file, which is how runc starts its init from a sealed copy of itself.
+	mut node := create_node(unsafe { filesystems['tmpfs'] }, unsafe { nil }, 'memfd:${shown}',
+		false)
+	node.resource = res
+	mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or { return u64(fdnum), 0 }
+	fd.handle.node = voidptr(node)
+	fd.unref()
 
 	return u64(fdnum), 0
 }

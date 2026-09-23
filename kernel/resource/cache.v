@@ -117,6 +117,44 @@ pub fn persist_metadata(mut res Resource) ? {
 	}
 }
 
+// A shared file mapping backed by a movable buffer must reserve its whole
+// extent before any page of it is handed out: a later per-page fault that grew
+// the buffer would move the pages already mapped. tmpfs implements this; a
+// resource whose pages never move does not need to.
+pub interface ReservableMapping {
+mut:
+	reserve_shared_mapping(offset u64, length u64) bool
+}
+
+pub fn reserve_shared_mapping(mut res Resource, offset u64, length u64) bool {
+	if mut res is ReservableMapping {
+		return res.reserve_shared_mapping(offset, length)
+	}
+	return true
+}
+
+// memfd seals, from fcntl(F_ADD_SEALS/F_GET_SEALS). Only a memfd is sealable;
+// every other resource answers EINVAL.
+pub interface SealableResource {
+mut:
+	get_seals() ?u32
+	add_seals(seals u32) ?
+}
+
+pub fn get_seals(mut res Resource) ?u32 {
+	if mut res is SealableResource {
+		return res.get_seals()
+	}
+	return none
+}
+
+pub fn add_seals(mut res Resource, seals u32) ? {
+	if mut res is SealableResource {
+		return res.add_seals(seals)
+	}
+	return none
+}
+
 pub fn filesystem_stat(mut res Resource) FileSystemStat {
 	if mut res is FileSystemStatResource {
 		return res.filesystem_stat()

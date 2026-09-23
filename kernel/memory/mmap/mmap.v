@@ -898,20 +898,41 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
 	// without ISV bit set, which crashes HVF.
 	lazy_anonymous := flags & map_anonymous != 0 && length >= lazy_anonymous_threshold
 	if prot != prot_none && !lazy_anonymous && !options.lazy_file {
+		// A shared file mapping reserves its whole extent up front: the loop
+		// below faults pages in ascending order, and a resource that grows a
+		// movable buffer mid-loop would relocate the pages already mapped.
+		if flags & map_anonymous == 0 && flags & map_shared != 0
+			&& voidptr(resource_) != unsafe { nil } {
+			reserve_length := if u64(offset) < u64(resource_.stat.size) {
+				min_u64(length, u64(resource_.stat.size) - u64(offset))
+			} else {
+				u64(0)
+			}
+			if reserve_length > 0
+				&& !resource.reserve_shared_mapping(mut resource_, u64(offset), reserve_length) {
+				munmap(mut pagemap, voidptr(base), length) or {}
+				errno.set(errno.enomem)
+				return none
+			}
+		}
 		for i := u64(0); i < length; i += page_size {
 			file_page := u64((offset + i64(i)) / i64(page_size))
+			// Past the end of the file there is nothing to pre-fault, and a
+			// mapping is allowed to reach there: a dynamic loader maps one span
+			// over an object's segments and replaces the tail with anonymous
+			// memory, and an ordinary mmap of a rounded-up length covers the
+			// slack past the last page. Leave those pages unmapped -- touching
+			// one is the SIGBUS POSIX asks for -- rather than making the
+			// resource grow to back a page the file does not have.
+			if flags & map_anonymous == 0 && u64(offset) + i >= u64(resource_.stat.size) {
+				continue
+			}
 			page := acquire_range_page(range_local, base + i, file_page) or {
 				munmap(mut pagemap, voidptr(base), length) or {}
 				errno.set(errno.einval)
 				return none
 			}
 			if flags & map_anonymous == 0 && page == unsafe { nil } {
-				// Past the end of the file there is nothing to pre-fault, and
-				// a mapping is allowed to reach there: every dynamic loader
-				// maps one span over an object's segments and then replaces
-				// the tail with anonymous memory. Leave the page unmapped --
-				// touching it is the SIGBUS that POSIX asks for -- rather than
-				// refusing a mapping the caller is entitled to.
 				if u64(offset) + i < u64(resource_.stat.size) {
 					munmap(mut pagemap, voidptr(base), length) or {}
 					errno.set(errno.einval)
@@ -1274,4 +1295,8 @@ fn munmap_unlocked_impl(mut pagemap memory.Pagemap, addr voidptr, _length u64,
 			local_range.length -= snip_size
 		}
 	}
+}
+
+fn min_u64(a u64, b u64) u64 {
+	return if a < b { a } else { b }
 }

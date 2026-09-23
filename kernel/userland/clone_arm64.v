@@ -10,6 +10,7 @@ import errno
 import event
 import event.eventstruct
 import file
+import fs
 import futex
 import katomic
 import lib
@@ -30,6 +31,14 @@ pub const clone_parent_settid = u64(0x00100000)
 pub const clone_child_cleartid = u64(0x00200000)
 
 pub const clone_child_settid = u64(0x01000000)
+
+// The child's parent is the caller's parent, as for a sibling.
+pub const clone_parent = u64(0x00008000)
+
+pub const clone_pidfd = u64(0x00001000)
+
+// clone3 only: start the child in the cgroup the args' directory fd names.
+pub const clone_into_cgroup = u64(0x200000000)
 
 // wait4(2)/waitid(2) options. `wnohang` lives in userland_arm64.v.
 const wstopped = 2
@@ -159,10 +168,40 @@ pub fn syscall_clone3(_gpr_state voidptr, uargs u64, size u64) (u64, u64) {
 		return errno.err, errno.einval
 	}
 
-	return do_clone(state, args.flags, child_sp, args.parent_tid, args.tls, args.child_tid)
+	mut cgroup := voidptr(unsafe { nil })
+	if args.flags & clone_into_cgroup != 0 {
+		if size < sizeof(CloneArgs) {
+			return errno.err, errno.einval
+		}
+		mut cgroup_fd := file.fd_from_fdnum(unsafe { nil }, int(args.cgroup)) or {
+			return errno.err, errno.ebadf
+		}
+		node := unsafe { &fs.VFSNode(cgroup_fd.handle.node) }
+		cgroup_fd.unref()
+		cgroup = fs.cgroup_from_node(node) or { return errno.err, errno.ebadf }
+	}
+
+	return do_clone_into(state, args.flags, child_sp, args.parent_tid, args.tls, args.child_tid,
+		args.flags & clone_into_cgroup != 0, cgroup)
 }
 
 fn do_clone(state &cpulocal.GPRState, flags u64, child_stack u64, parent_tid u64, tls u64, child_tid u64) (u64, u64) {
+	return do_clone_into(state, flags & 0xffffffff, child_stack, parent_tid, tls, child_tid,
+		false, unsafe { nil })
+}
+
+fn do_clone_into(state &cpulocal.GPRState, flags u64, child_stack u64, parent_tid u64, tls u64, child_tid u64, into_cgroup bool, cgroup voidptr) (u64, u64) {
+	// A new namespace other than a user namespace takes CAP_SYS_ADMIN, and none
+	// can be made for a thread, which shares its process' namespaces.
+	if flags & proc.clone_namespace_flags != 0 {
+		if flags & clone_thread != 0 {
+			return errno.err, errno.einval
+		}
+		if flags & proc.clone_namespace_flags & ~proc.clone_newuser != 0
+			&& !proc.current_has_capability(proc.cap_sys_admin) {
+			return errno.err, errno.eperm
+		}
+	}
 	// CLONE_THREAD, not CLONE_VM, decides between a thread and a process:
 	// posix_spawn and vfork ask for CLONE_VM but still expect a child that can
 	// execve without replacing us, which our separate address spaces give them.
@@ -171,7 +210,8 @@ fn do_clone(state &cpulocal.GPRState, flags u64, child_stack u64, parent_tid u64
 			child_tid)
 	}
 
-	return clone_new_process(state, flags, child_stack, parent_tid, tls, child_tid)
+	return clone_new_process(state, flags, child_stack, parent_tid, tls, child_tid, into_cgroup,
+		cgroup)
 }
 
 // CLONE_THREAD: another thread inside the calling process, sharing its address
@@ -211,7 +251,7 @@ fn clone_thread_of_current(state &cpulocal.GPRState, flags u64, child_stack u64,
 
 // Everything else: a new process with a copy of our address space and
 // descriptor table, running a single thread that resumes where we did.
-fn clone_new_process(state &cpulocal.GPRState, flags u64, child_stack u64, parent_tid u64, tls u64, child_tid u64) (u64, u64) {
+fn clone_new_process(state &cpulocal.GPRState, flags u64, child_stack u64, parent_tid u64, tls u64, child_tid u64, into_cgroup bool, cgroup voidptr) (u64, u64) {
 	mut old_thread := proc.current_thread()
 	mut old_process := old_thread.process
 
@@ -220,6 +260,21 @@ fn clone_new_process(state &cpulocal.GPRState, flags u64, child_stack u64, paren
 	}
 
 	new_process.name = '${old_process.name}[${new_process.pid}]'
+	fs.fork_namespaces(mut new_process, flags)
+	if into_cgroup {
+		new_process.cgroup = cgroup
+	}
+
+	// CLONE_PARENT makes the child its creator's sibling: runc's init stages
+	// are all children of the runtime that started the first of them.
+	mut parent_process := old_process
+	if flags & clone_parent != 0 && old_process.ppid > 0 {
+		mut grandparent := processes[old_process.ppid]
+		if grandparent != unsafe { nil } {
+			parent_process = grandparent
+			new_process.ppid = grandparent.pid
+		}
+	}
 
 	// Duplicate the descriptor table, preserving each fd's O_CLOEXEC flag.
 	for i := 0; i < proc.max_fds; i++ {
@@ -259,9 +314,9 @@ fn clone_new_process(state &cpulocal.GPRState, flags u64, child_stack u64, paren
 		usercopy.copy_to_pagemap(new_process.pagemap, child_tid, voidptr(&tid), sizeof(u32))
 	}
 
-	old_process.children_lock.acquire()
-	old_process.children << new_process
-	old_process.children_lock.release()
+	parent_process.children_lock.acquire()
+	parent_process.children << new_process
+	parent_process.children_lock.release()
 
 	sched.enqueue_thread(new_thread, false)
 
@@ -382,23 +437,49 @@ fn exit_process(mut current_process proc.Process, mut current_thread proc.Thread
 		file.fdnum_close(current_process, i, true) or {}
 	}
 
-	// PID 1 adopts whatever children we leave behind. Taken off our own list
-	// first so that the two children locks are never held at the same time.
+	// The nearest ancestor that asked to be a child subreaper, or else PID 1,
+	// adopts whatever children we leave behind. Taken off our own list first
+	// so that the two children locks are never held at the same time.
 	current_process.children_lock.acquire()
 	mut orphans := unsafe { current_process.children }
 	current_process.children = []&proc.Process{}
 	current_process.children_lock.release()
 
-	mut init_process := processes[1]
-	if current_process.pid != 1 && init_process != unsafe { nil } {
-		init_process.children_lock.acquire()
-		for mut child_proc in orphans {
-			child_proc.ppid = 1
-			init_process.children << child_proc
+	// The init of a pid namespace takes every other member with it.
+	mut pid_ns := current_process.ns.pid
+	if pid_ns != unsafe { nil } && !proc.is_initial_namespace(pid_ns)
+		&& pid_ns.init_pid == current_process.pid {
+		for member in proc.pid_namespace_members(pid_ns) {
+			signal_pid(member, 9)
 		}
-		init_process.children_lock.release()
+	}
+
+	mut adopter := find_reaper(current_process)
+	if adopter != unsafe { nil } && voidptr(adopter) != voidptr(current_process) {
+		mut adopted_zombie := false
+		adopter.children_lock.acquire()
+		for mut child_proc in orphans {
+			child_proc.ppid = adopter.pid
+			adopter.children << child_proc
+			if child_proc.exiting {
+				adopted_zombie = true
+			}
+		}
+		adopter.children_lock.release()
+		// A child that had already died is the adopter's to reap now; tell it,
+		// as the dead child's own SIGCHLD went to a parent that is gone.
+		if adopted_zombie {
+			notify_process(adopter)
+		}
+	}
+	for mut child_proc in orphans {
+		if child_proc.pdeathsig > 0 && !child_proc.exiting {
+			signal_pid(child_proc.pid, child_proc.pdeathsig)
+		}
 	}
 	unsafe { orphans.free() }
+
+	fs.release_process_namespaces(mut current_process)
 
 	mmap.delete_pagemap(mut old_pagemap) or {}
 
@@ -455,6 +536,46 @@ fn kill_sibling_threads(mut current_process proc.Process, current_thread &proc.T
 	}
 
 	unsafe { victims.free() }
+}
+
+// Who adopts the children of `process`: its closest living ancestor that set
+// PR_SET_CHILD_SUBREAPER, or PID 1.
+fn find_reaper(process &proc.Process) &proc.Process {
+	mut ppid := process.ppid
+	for _ in 0 .. proc.max_pid {
+		if ppid <= 1 || ppid >= proc.max_pid {
+			break
+		}
+		ancestor := processes[ppid]
+		if ancestor == unsafe { nil } {
+			break
+		}
+		if ancestor.child_subreaper && !ancestor.exiting {
+			return ancestor
+		}
+		ppid = ancestor.ppid
+	}
+	if process.pid == 1 {
+		return unsafe { nil }
+	}
+	return processes[1]
+}
+
+fn notify_process(parent &proc.Process) {
+	parent.threads_lock.acquire()
+	mut target := &proc.Thread(unsafe { nil })
+	if parent.threads.len > 0 {
+		target = parent.threads[0]
+	}
+	parent.threads_lock.release()
+	if target == unsafe { nil } {
+		return
+	}
+	handler := target.sigactions[sigchld].sa_sigaction
+	if handler == sig_dfl || handler == sig_ign {
+		return
+	}
+	sendsig(target, u8(sigchld))
 }
 
 // Raise SIGCHLD in the parent. Only worth doing when it installed a handler:

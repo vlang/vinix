@@ -1,0 +1,10 @@
+{
+  "storage-driver": "vfs",
+  "iptables": false,
+  "ip6tables": false,
+  "bridge": "none",
+  "userland-proxy": false,
+  "features": {
+    "containerd-snapshotter": false
+  }
+}

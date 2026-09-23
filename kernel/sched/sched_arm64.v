@@ -1865,6 +1865,7 @@ pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) ?&proc.Pr
 		new_proc.thread_stack_top = old_process.thread_stack_top
 		new_proc.mmap_anon_non_fixed_base = old_process.mmap_anon_non_fixed_base
 		new_proc.current_directory = old_process.current_directory
+		proc.inherit_container_state(mut new_proc, old_process)
 	} else {
 		new_proc.ppid = 0
 		new_proc.pgid = new_proc.pid
@@ -1874,6 +1875,7 @@ pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) ?&proc.Pr
 		new_proc.mmap_anon_non_fixed_base = elf.initial_mmap_base()
 		new_proc.current_directory = voidptr(vfs_root)
 		new_proc.rlimits = proc.default_rlimits()
+		proc.inherit_container_state(mut new_proc, unsafe { nil })
 	}
 
 	return new_proc

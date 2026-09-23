@@ -23,6 +23,11 @@ pub const f_setfl = 4
 
 // close_range(2) flags.
 pub const close_range_cloexec = u32(1) << 2
+pub const f_add_seals = 1033
+pub const f_get_seals = 1034
+pub const f_ofd_getlk = 36
+pub const f_ofd_setlk = 37
+pub const f_ofd_setlkw = 38
 pub const f_getlk = 5
 pub const f_setlk = 6
 pub const f_setlkw = 7
@@ -850,6 +855,39 @@ pub fn syscall_fcntl(_ voidptr, fdnum int, cmd int, arg u64) (u64, u64) {
 			// writable handle looking read-only.
 			handle.flags = (handle.flags & ~resource.file_settable_flags_mask) | (int(arg) & resource.file_settable_flags_mask)
 			fd.unref()
+		}
+		f_add_seals {
+			mut res := handle.resource
+			resource.add_seals(mut res, u32(arg)) or {
+				saved := errno.get()
+				fd.unref()
+				return errno.err, if saved == 0 { errno.einval } else { saved }
+			}
+			fd.unref()
+		}
+		f_get_seals {
+			mut res := handle.resource
+			ret = u64(resource.get_seals(mut res) or {
+				fd.unref()
+				return errno.err, errno.einval
+			})
+			fd.unref()
+		}
+		f_ofd_getlk, f_ofd_setlk, f_ofd_setlkw {
+			// Open-file-description locks are served by the per-process record
+			// locks: every lock a process holds is on one of its descriptions,
+			// and Vinix threads never contend for one against each other.
+			posix_cmd := match cmd {
+				f_ofd_getlk { f_getlk }
+				f_ofd_setlk { f_setlk }
+				else { f_setlkw }
+			}
+			lock_ret, lock_errno := fcntl_lock(mut handle, posix_cmd, arg)
+			fd.unref()
+			if lock_errno != 0 {
+				return lock_ret, lock_errno
+			}
+			ret = lock_ret
 		}
 		f_getlk, f_setlk, f_setlkw {
 			lock_ret, lock_errno := fcntl_lock(mut handle, cmd, arg)

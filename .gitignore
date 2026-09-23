@@ -60,3 +60,5 @@ kernel/tmp.v
 /build-word2013-prefix/
 /build-word55-probe/
 *repomix*
+/build-aarch64-docker/
+/build-aarch64-userland/

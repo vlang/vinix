@@ -47,6 +47,20 @@ enum ProcFSKind {
 	uptime
 	version
 	text
+	cpuinfo
+	machine_stat
+	filesystems
+	self_mounts
+	mountinfo
+	mounts
+	mountstats
+	oom_score_adj
+	setgroups
+	uid_map
+	gid_map
+	loginuid
+	process_cgroup
+	environ
 }
 
 @[heap]
@@ -75,7 +89,8 @@ __global (
 	procfs_root          &VFSNode
 	// The per-process `self` link. Its target depends on who is reading it, so
 	// path resolution asks this module rather than reading a stored string.
-	procfs_self_node &VFSNode
+	procfs_self_node        &VFSNode
+	procfs_thread_self_node &VFSNode
 	// procfs owns only its own subtree. Keeping it off vfs_lock means a refresh
 	// can run from the middle of path resolution, which does not hold that lock
 	// and must not start to.
@@ -131,6 +146,29 @@ fn (mut this ProcFS) mount(parent &VFSNode, name string, _source &VFSNode) ?&VFS
 		root.children['self'] = self_node
 	}
 	procfs_self_node = self_node
+
+	mut thread_self := create_node(this, root, 'thread-self', false)
+	thread_self.resource = new_procfs_resource(.symlink, stat.iflnk | 0o777, 0, 0)
+	thread_self.symlink_target = 'thread-self'
+	unsafe {
+		root.children['thread-self'] = thread_self
+	}
+	procfs_thread_self_node = thread_self
+
+	// Machine-wide files a container runtime reads at startup.
+	add_procfs_file(mut root, 'cpuinfo', .cpuinfo)
+	add_procfs_file(mut root, 'stat', .machine_stat)
+	add_procfs_file(mut root, 'filesystems', .filesystems)
+	add_procfs_file(mut root, 'mounts', .self_mounts)
+	add_procfs_text(mut sys_kernel, 'cap_last_cap', '${proc.cap_last_cap}\n')
+	add_procfs_text(mut sys_kernel, 'hostname', 'vinix\n')
+	mut sys_vm := add_procfs_directory(mut sys, 'vm')
+	add_procfs_text(mut sys_vm, 'overcommit_memory', '0\n')
+	add_procfs_text(mut sys_vm, 'max_map_count', '1048576\n')
+	add_procfs_text(mut sys_vm, 'mmap_min_addr', '65536\n')
+	mut sys_net := add_procfs_directory(mut sys, 'net')
+	mut sys_net_core := add_procfs_directory(mut sys_net, 'core')
+	add_procfs_text(mut sys_net_core, 'somaxconn', '4096\n')
 
 	return root
 }
@@ -197,6 +235,49 @@ fn add_procfs_file(mut parent VFSNode, name string, kind ProcFSKind) &VFSNode {
 	return node
 }
 
+// A per-process file a container runtime writes to. The id maps and setgroups
+// are writable by definition; oom_score_adj is 0644 as on Linux.
+fn add_process_writable(mut parent VFSNode, name string, kind ProcFSKind, pid int) {
+	mut node := create_node(parent.filesystem, parent, name, false)
+	node.resource = new_procfs_resource(kind, stat.ifreg | 0o644, pid, 0)
+	unsafe {
+		parent.children[name] = node
+	}
+}
+
+// The node /proc/<pid>/root, /cwd and /exe lead to. A magic link, so a runtime
+// entering a container's mount view through /proc/<pid>/root reaches the real
+// directory rather than a stored path.
+fn process_root_node(pid int) &VFSNode {
+	proc.lock_table()
+	defer { proc.unlock_table() }
+	process := proc.process_at(pid)
+	if process == unsafe { nil } || process.root_directory == unsafe { nil } {
+		return vfs_root
+	}
+	return unsafe { &VFSNode(process.root_directory) }
+}
+
+fn process_cwd_node(pid int) &VFSNode {
+	proc.lock_table()
+	defer { proc.unlock_table() }
+	process := proc.process_at(pid)
+	if process == unsafe { nil } || process.current_directory == unsafe { nil } {
+		return unsafe { nil }
+	}
+	return unsafe { &VFSNode(process.current_directory) }
+}
+
+fn process_exe_node(pid int) &VFSNode {
+	proc.lock_table()
+	defer { proc.unlock_table() }
+	process := proc.process_at(pid)
+	if process == unsafe { nil } || process.exe_node == unsafe { nil } {
+		return unsafe { nil }
+	}
+	return unsafe { &VFSNode(process.exe_node) }
+}
+
 fn add_procfs_text(mut parent VFSNode, name string, text string) &VFSNode {
 	mut node := add_procfs_file(mut parent, name, .text)
 	mut file_resource := unsafe { &ProcFSResource(node.resource) }
@@ -244,10 +325,73 @@ fn (this &ProcFSResource) contents() string {
 		.status {
 			return proc.process_status_text(this.pid)
 		}
+		.cpuinfo {
+			return cpuinfo_text()
+		}
+		.machine_stat {
+			return machine_stat_text()
+		}
+		.filesystems {
+			// The `nodev` column matters: a container runtime skips those when
+			// choosing what to mount for a rootfs.
+			return 'nodev\ttmpfs\nnodev\tproc\nnodev\tsysfs\nnodev\tdevtmpfs\nnodev\tcgroup2\nnodev\tdevpts\n\text2\n'
+		}
+		.self_mounts, .mounts {
+			pid := if this.kind == .self_mounts { proc.current_thread().process.pid } else { this.pid }
+			return mounts_text(pid)
+		}
+		.mountinfo {
+			return mountinfo_text(this.pid)
+		}
+		.mountstats {
+			return ''
+		}
+		.oom_score_adj {
+			return '${proc.process_oom_score_adj(this.pid)}\n'
+		}
+		.setgroups {
+			return 'allow\n'
+		}
+		.uid_map {
+			return proc.id_map_text(this.pid, false)
+		}
+		.gid_map {
+			return proc.id_map_text(this.pid, true)
+		}
+		.loginuid {
+			return '4294967295\n'
+		}
+		.process_cgroup {
+			return process_cgroup_text(this.pid)
+		}
+		.environ {
+			return ''
+		}
 		else {
 			return ''
 		}
 	}
+}
+
+fn cpuinfo_text() string {
+	mut text := ''
+	count := numa.cpu_count()
+	for i := 0; i < count; i++ {
+		text += 'processor\t: ${i}\nBogoMIPS\t: 100.00\nFeatures\t: fp asimd\nCPU implementer\t: 0x61\nCPU architecture: 8\nCPU variant\t: 0x0\nCPU part\t: 0x000\nCPU revision\t: 0\n\n'
+	}
+	return text
+}
+
+fn machine_stat_text() string {
+	count := numa.cpu_count()
+	mut text := 'cpu  0 0 0 0 0 0 0 0 0 0\n'
+	for i := 0; i < count; i++ {
+		text += 'cpu${i} 0 0 0 0 0 0 0 0 0 0\n'
+	}
+	seconds := time.monotonic_ns() / 1000000000
+	boot := (realtime_clock.tv_sec - i64(seconds))
+	text += 'intr 0\nctxt 0\nbtime ${boot}\nprocesses ${proc.process_count()}\nprocs_running 1\nprocs_blocked 0\n'
+	return text
 }
 
 fn (mut this ProcFSResource) read(_handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
@@ -268,9 +412,27 @@ fn (mut this ProcFSResource) read(_handle voidptr, buf voidptr, loc u64, count u
 	return i64(actual_count)
 }
 
-fn (mut this ProcFSResource) write(_handle voidptr, _buf voidptr, _loc u64, _count u64) ?i64 {
-	errno.set(errno.eperm)
-	return none
+fn (mut this ProcFSResource) write(_handle voidptr, buf voidptr, _loc u64, count u64) ?i64 {
+	// The writable tunables a container runtime sets. Vinix keeps only what it
+	// can act on -- oom_score_adj is remembered, the user-namespace id maps are
+	// accepted and applied identity-only -- and takes the rest without storing
+	// it so that a runtime configuring a container is not stopped by an EPERM.
+	match this.kind {
+		.oom_score_adj {
+			mut text := []u8{len: int(count)}
+			unsafe { C.memcpy(&text[0], buf, count) }
+			value := text.bytestr().trim_space().int()
+			proc.set_process_oom_score_adj(this.pid, value)
+			return i64(count)
+		}
+		.uid_map, .gid_map, .setgroups, .loginuid {
+			return i64(count)
+		}
+		else {
+			errno.set(errno.eperm)
+			return none
+		}
+	}
 }
 
 fn (mut this ProcFSResource) ioctl(handle voidptr, request u64, argp voidptr) ?int {
@@ -349,18 +511,34 @@ fn resident_bytes(pid int) u64 {
 
 // ── Rebuilding the tree ──────────────────────────────────────────────────────
 
-// The target of /proc/self for the process that is reading it.
-pub fn procfs_self_target() string {
-	mut process := proc.current_thread().process
-	if unsafe { process == 0 } {
-		return ''
-	}
-	return '/proc/${process.pid}'
+// True when the node resolves per reading thread: /proc/self and
+// /proc/thread-self.
+pub fn procfs_is_dynamic_link(node &VFSNode) bool {
+	return (unsafe { procfs_self_node != 0 } && voidptr(node) == voidptr(procfs_self_node))
+		|| (unsafe { procfs_thread_self_node != 0 }
+		&& voidptr(node) == voidptr(procfs_thread_self_node))
 }
 
-// True when the node is the `self` link, which resolves per reading process.
-pub fn procfs_is_self_link(node &VFSNode) bool {
-	return unsafe { procfs_self_node != 0 } && voidptr(node) == voidptr(procfs_self_node)
+// Where /proc/self or /proc/thread-self leads for the thread reading it.
+pub fn procfs_dynamic_link_target(node &VFSNode) string {
+	current := proc.current_thread()
+	if current == unsafe { nil } || unsafe { current.process == nil } {
+		return ''
+	}
+	pid := current.process.pid
+	if unsafe { procfs_thread_self_node != 0 } && voidptr(node) == voidptr(procfs_thread_self_node) {
+		return '/proc/${pid}/task/${current.tid}'
+	}
+	return '/proc/${pid}'
+}
+
+// Kept for callers that only need /proc/self.
+pub fn procfs_self_target() string {
+	current := proc.current_thread()
+	if current == unsafe { nil } || unsafe { current.process == nil } {
+		return ''
+	}
+	return '/proc/${current.process.pid}'
 }
 
 // Bring a procfs directory up to date with the process table. Called from path
@@ -393,7 +571,47 @@ pub fn procfs_refresh(node &VFSNode) {
 			refresh_thread_directories(mut target, directory.pid)
 		} else if target.name == 'fd' {
 			refresh_fd_directory(mut target, directory.pid)
+		} else if target.name == 'ns' {
+			refresh_ns_directory(mut target, directory.pid)
 		}
+	}
+}
+
+// Called for every name looked up in a procfs directory. The descriptor and
+// namespace directories, and a process' exe, cwd and root links, change under
+// a process that is already listed, so they are brought up to date on each
+// lookup; the rest of the tree only when a name is missing.
+pub fn procfs_lookup_refresh(node &VFSNode, name string) {
+	if unsafe { procfs_root == 0 } || node == unsafe { nil } || node.resource == unsafe { nil }
+		|| node.children == unsafe { nil } || !is_procfs_resource(node.resource) {
+		return
+	}
+	directory := unsafe { &ProcFSResource(node.resource) }
+	if directory.pid != 0 && (node.name == 'fd' || node.name == 'ns') {
+		procfs_refresh(node)
+		return
+	}
+	if directory.pid != 0 && name in ['exe', 'cwd', 'root'] && name in node.children {
+		mut link := unsafe { node.children[name] }
+		match name {
+			'exe' {
+				link.symlink_target = proc.process_program(directory.pid)
+				link.magic_target = process_exe_node(directory.pid)
+			}
+			'cwd' {
+				link.magic_target = process_cwd_node(directory.pid)
+			}
+			else {
+				link.magic_target = process_root_node(directory.pid)
+			}
+		}
+		if link.magic_target != unsafe { nil } {
+			link.symlink_target = pathname(link.magic_target)
+		}
+		return
+	}
+	if name !in node.children {
+		procfs_refresh(node)
 	}
 }
 
@@ -443,28 +661,68 @@ fn add_process_directory(mut root VFSNode, pid int) {
 		root.resource.stat.nlink++
 	}
 
-	add_process_file(mut node, 'cmdline', .cmdline, pid)
-	add_process_file(mut node, 'comm', .comm, pid)
-	add_process_file(mut node, 'stat', .process_stat, pid)
-	add_process_file(mut node, 'statm', .statm, pid)
-	add_process_file(mut node, 'status', .status, pid)
-
-	mut exe := create_node(node.filesystem, node, 'exe', false)
-	exe.resource = new_procfs_resource(.symlink, stat.iflnk | 0o777, pid, 0)
-	exe.symlink_target = proc.process_program(pid)
-	unsafe {
-		node.children['exe'] = exe
-	}
+	add_process_entries(mut node, pid)
 
 	mut task := add_procfs_directory(mut node, 'task')
 	mut task_resource := unsafe { &ProcFSResource(task.resource) }
 	task_resource.pid = pid
 	refresh_thread_directories(mut task, pid)
+}
+
+// What /proc/<pid> and /proc/<pid>/task/<tid> both hold. A thread's
+// descriptors, namespaces and mounts are its process', since Vinix threads
+// share all three.
+fn add_process_entries(mut node VFSNode, pid int) {
+	add_process_file(mut node, 'cmdline', .cmdline, pid)
+	add_process_file(mut node, 'comm', .comm, pid)
+	add_process_file(mut node, 'stat', .process_stat, pid)
+	add_process_file(mut node, 'statm', .statm, pid)
+	add_process_file(mut node, 'status', .status, pid)
+	add_process_file(mut node, 'cgroup', .process_cgroup, pid)
+	add_process_file(mut node, 'environ', .environ, pid)
+	add_process_file(mut node, 'mountinfo', .mountinfo, pid)
+	add_process_file(mut node, 'mounts', .mounts, pid)
+	add_process_file(mut node, 'mountstats', .mountstats, pid)
+	add_process_file(mut node, 'loginuid', .loginuid, pid)
+	add_process_writable(mut node, 'oom_score_adj', .oom_score_adj, pid)
+	add_process_writable(mut node, 'uid_map', .uid_map, pid)
+	add_process_writable(mut node, 'gid_map', .gid_map, pid)
+	add_process_writable(mut node, 'setgroups', .setgroups, pid)
+
+	mut root_link := create_node(node.filesystem, node, 'root', false)
+	root_link.resource = new_procfs_resource(.symlink, stat.iflnk | 0o777, pid, 0)
+	root_link.magic_target = process_root_node(pid)
+	unsafe {
+		node.children['root'] = root_link
+	}
+
+	mut cwd_link := create_node(node.filesystem, node, 'cwd', false)
+	cwd_link.resource = new_procfs_resource(.symlink, stat.iflnk | 0o777, pid, 0)
+	cwd_link.magic_target = process_cwd_node(pid)
+	unsafe {
+		node.children['cwd'] = cwd_link
+	}
+
+	mut exe := create_node(node.filesystem, node, 'exe', false)
+	exe.resource = new_procfs_resource(.symlink, stat.iflnk | 0o777, pid, 0)
+	exe.symlink_target = proc.process_program(pid)
+	exe.magic_target = process_exe_node(pid)
+	unsafe {
+		node.children['exe'] = exe
+	}
 
 	mut descriptors := add_procfs_directory(mut node, 'fd')
 	mut fd_resource := unsafe { &ProcFSResource(descriptors.resource) }
 	fd_resource.pid = pid
 	refresh_fd_directory(mut descriptors, pid)
+
+	mut namespaces := add_procfs_directory(mut node, 'ns')
+	mut ns_resource := unsafe { &ProcFSResource(namespaces.resource) }
+	ns_resource.pid = pid
+	refresh_ns_directory(mut namespaces, pid)
+
+	mut attr := add_procfs_directory(mut node, 'attr')
+	add_process_file(mut attr, 'current', .environ, pid)
 }
 
 // One symlink per open descriptor, named by its number. Chromium's sandbox
@@ -472,10 +730,12 @@ fn add_process_directory(mut root VFSNode, pid int) {
 fn refresh_fd_directory(mut descriptors VFSNode, pid int) {
 	mut live := []int{}
 	mut nodes := []&VFSNode{}
+	mut texts := []string{}
 	defer {
 		unsafe {
 			live.free()
 			nodes.free()
+			texts.free()
 		}
 	}
 
@@ -492,15 +752,21 @@ fn refresh_fd_directory(mut descriptors VFSNode, pid int) {
 					continue
 				}
 				entry := unsafe { &file.FD(process.fds[fdnum]) }
-				if entry.handle == unsafe { nil } || entry.handle.node == unsafe { nil } {
+				if entry.handle == unsafe { nil } || entry.handle.resource == unsafe { nil } {
 					continue
 				}
-				// Sockets, pipes and memfds have no node and so no entry here.
-				// Linux names them `socket:[n]` and answers a stat of that name
-				// from the open file itself; a pathname Vinix cannot resolve
-				// would be worse than leaving the descriptor out of the list.
 				live << fdnum
-				nodes << unsafe { &VFSNode(entry.handle.node) }
+				if entry.handle.node == unsafe { nil } {
+					// Pipes, sockets and the anonymous descriptors have no
+					// name. Linux shows their kind and inode instead, and so
+					// does this; opening one again by this name is not
+					// supported.
+					nodes << unsafe { nil }
+					texts << anonymous_descriptor_text(entry.handle.resource)
+				} else {
+					nodes << unsafe { &VFSNode(entry.handle.node) }
+					texts << ''
+				}
 			}
 			process.fds_lock.release()
 		}
@@ -509,22 +775,47 @@ fn refresh_fd_directory(mut descriptors VFSNode, pid int) {
 
 	for index, fdnum in live {
 		name := '${fdnum}'
+		target := nodes[index]
+		text := if target == unsafe { nil } { texts[index] } else { descriptor_link_text(target) }
 		if name in descriptors.children {
 			mut existing := unsafe { descriptors.children[name] }
-			existing.redir = nodes[index]
+			existing.redir = unsafe { nil }
+			existing.magic_target = target
+			existing.symlink_target = text
 			continue
 		}
-		// A redirect rather than a stored pathname: the entry has to lead to
-		// the file the descriptor is open on, and Chromium stats these names
-		// through the directory it opened rather than by path.
+		// A magic link rather than a stored pathname: following it leads to
+		// the file the descriptor is open on, which Chromium relies on when it
+		// stats these names through the directory, and which runc relies on
+		// when it re-executes itself from a memfd.
 		mut link := create_node(descriptors.filesystem, descriptors, name, false)
-		link.resource = new_procfs_resource(.symlink, stat.iflnk | 0o777, pid, 0)
-		link.redir = nodes[index]
+		link.resource = new_procfs_resource(.symlink, stat.iflnk | 0o700, pid, 0)
+		link.magic_target = target
+		link.symlink_target = text
 		unsafe {
 			descriptors.children[name] = link
 		}
 	}
 	prune_directories(mut descriptors, live)
+}
+
+fn descriptor_link_text(node &VFSNode) string {
+	if node.parent == unsafe { nil } && node.name.len > 0 {
+		// A memfd or another file that was never in a directory.
+		return '/${node.name} (deleted)'
+	}
+	return pathname(node)
+}
+
+fn anonymous_descriptor_text(res &resource.Resource) string {
+	mode := res.stat.mode & stat.ifmt
+	if mode == stat.ifpipe || mode == stat.ififo {
+		return 'pipe:[${res.stat.ino}]'
+	}
+	if mode == stat.ifsock {
+		return 'socket:[${res.stat.ino}]'
+	}
+	return 'anon_inode:[${res.stat.ino}]'
 }
 
 fn add_process_file(mut parent VFSNode, name string, kind ProcFSKind, pid int) {
@@ -555,8 +846,7 @@ fn refresh_thread_directories(mut task VFSNode, pid int) {
 			task.children[name] = node
 			task.resource.stat.nlink++
 		}
-		add_process_file(mut node, 'comm', .comm, pid)
-		add_process_file(mut node, 'stat', .process_stat, pid)
+		add_process_entries(mut node, pid)
 	}
 	prune_directories(mut task, live)
 }

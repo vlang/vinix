@@ -93,6 +93,7 @@ pub fn install_disk_root(mut root VFSNode) bool {
 		}
 	}
 	committed = true
+	record_root_switch(root, 'ext2')
 	return true
 }
 
