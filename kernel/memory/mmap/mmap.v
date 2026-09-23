@@ -142,6 +142,18 @@ fn addr2range(pagemap &memory.Pagemap, addr u64) ?(&MmapRangeLocal, u64, u64) {
 	return none
 }
 
+// Whether `addr` lies in a MAP_SHARED mapping, whose pages are the same
+// physical memory in every address space that maps them.
+pub fn is_shared_address(_pagemap &memory.Pagemap, addr u64) bool {
+	mut pagemap := unsafe { _pagemap }
+	pagemap.l.acquire()
+	defer {
+		pagemap.l.release()
+	}
+	local_range, _, _ := addr2range(pagemap, addr) or { return false }
+	return local_range.flags & map_shared != 0
+}
+
 // The caller must hold pagemap.l. MAP_FIXED_NOREPLACE and non-fixed address
 // hints need this check to reserve Windows' preferred image addresses without
 // destroying an existing mapping.
