@@ -97,6 +97,9 @@ fn (mut this Pipe) read(_handle voidptr, buf voidptr, _loc u64, _count u64) ?i64
 	}
 
 	handle := unsafe { &file.Handle(_handle) }
+	// A named FIFO reached through the VFS can be read with no open Handle
+	// (kernel-internal access); treat that as a blocking, read-only handle.
+	handle_flags := if _handle == unsafe { nil } { 0 } else { handle.flags }
 
 	// If pipe is empty, block or return if nonblock
 	for katomic.load(&this.used) == 0 {
@@ -106,7 +109,7 @@ fn (mut this Pipe) read(_handle voidptr, buf voidptr, _loc u64, _count u64) ?i64
 		if this.writers == 0 {
 			return 0
 		}
-		if handle.flags & resource.o_nonblock != 0 {
+		if handle_flags & resource.o_nonblock != 0 {
 			errno.set(errno.eagain)
 			return none
 		}
@@ -174,6 +177,7 @@ fn (mut this Pipe) write(handle voidptr, buf voidptr, _loc u64, _count u64) ?i64
 	}
 
 	open_handle := unsafe { &file.Handle(handle) }
+	open_flags := if handle == unsafe { nil } { 0 } else { open_handle.flags }
 	if _count == 0 {
 		return 0
 	}
@@ -200,7 +204,7 @@ fn (mut this Pipe) write(handle voidptr, buf voidptr, _loc u64, _count u64) ?i64
 				errno.set(errno.epipe)
 				return none
 			}
-			if open_handle.flags & resource.o_nonblock != 0 {
+			if open_flags & resource.o_nonblock != 0 {
 				if written != 0 {
 					return i64(written)
 				}
@@ -288,7 +292,10 @@ fn (mut this Pipe) unref(handle voidptr) ? {
 	open_handle := unsafe { &file.Handle(handle) }
 
 	this.l.acquire()
-	match open_handle.flags & resource.o_accmode {
+	// A named FIFO node unlinked through the VFS is unref'd with no open
+	// Handle: there is no read/write side to account for, only the reference.
+	accmode := if handle == unsafe { nil } { -1 } else { open_handle.flags & resource.o_accmode }
+	match accmode {
 		resource.o_rdonly {
 			this.readers--
 			if this.readers == 0 {

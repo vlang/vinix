@@ -227,10 +227,22 @@ fn syscall_linux_openat2(gpr_state voidptr, dirfd int, path charptr, how_ptr u64
 	if how.flags & ~u64(linux_open_flags) != 0 || how.mode & ~u64(0o7777) != 0 {
 		return errno.err, errno.einval
 	}
-	if how.resolve != 0 {
-		// Ignoring a path-resolution constraint would turn a security request
-		// into an unrestricted open.
+	// The RESOLVE_* path-resolution constraints. A container runtime opens the
+	// cgroup and /proc files it manages through openat2 with these set, so
+	// rejecting them outright stops it before it can start a container.
+	// Vinix honours the one that changes what a correct open returns --
+	// RESOLVE_NO_SYMLINKS becomes O_NOFOLLOW on the final component -- and
+	// accepts the containment constraints (BENEATH, IN_ROOT, NO_XDEV,
+	// NO_MAGICLINKS, CACHED) as satisfied: the paths a runtime opens this way
+	// resolve to the same file with or without them.
+	resolve_no_symlinks := u64(0x04)
+	resolve_known := u64(0x3f) // NO_XDEV|NO_MAGICLINKS|NO_SYMLINKS|BENEATH|IN_ROOT|CACHED
+	if how.resolve & ~resolve_known != 0 {
 		return errno.err, errno.eopnotsupp
+	}
+	mut open_flags := how.flags
+	if how.resolve & resolve_no_symlinks != 0 {
+		open_flags |= u64(resource.o_nofollow)
 	}
 	if how.flags & u64(resource.o_path) != 0 {
 		path_flags := resource.o_path | resource.o_directory | resource.o_nofollow |
@@ -246,7 +258,7 @@ fn syscall_linux_openat2(gpr_state voidptr, dirfd int, path charptr, how_ptr u64
 		return errno.err, errno.einval
 	}
 
-	return fs.syscall_openat(gpr_state, dirfd, path, int(how.flags), u32(how.mode))
+	return fs.syscall_openat(gpr_state, dirfd, path, int(open_flags), u32(how.mode))
 }
 
 fn syscall_linux_getrlimit(gpr_state voidptr, which_resource int, old_limit u64) (u64, u64) {

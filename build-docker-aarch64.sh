@@ -92,13 +92,12 @@ echo "=== assembling the offline busybox test image ==="
 stage_packages "$IMAGE_ROOT" "$BUILD_DIR/image-packages" busybox-static
 python3 "$SCRIPT_DIR/build-support/make-docker-image.py" \
     --busybox "$IMAGE_ROOT/bin/busybox.static" \
-    --tag vinix/busybox:latest \
-    --output "$BUILD_DIR/busybox-image.tar"
+    --output "$BUILD_DIR/busybox-rootfs.tar"
 
 mkdir -p "$STAGING/usr/share/vinix-docker" "$STAGING/root" \
     "$STAGING/etc/docker"
-install -m644 "$BUILD_DIR/busybox-image.tar" \
-    "$STAGING/usr/share/vinix-docker/busybox-image.tar"
+install -m644 "$BUILD_DIR/busybox-rootfs.tar" \
+    "$STAGING/usr/share/vinix-docker/busybox-rootfs.tar"
 install -m755 "$SCRIPT_DIR/tests/docker/smoke.sh" "$STAGING/root/docker-smoke.sh"
 install -m755 "$SCRIPT_DIR/build-support/docker/vinix-dockerd" \
     "$STAGING/usr/bin/vinix-dockerd"

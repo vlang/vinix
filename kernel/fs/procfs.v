@@ -61,6 +61,7 @@ enum ProcFSKind {
 	loginuid
 	process_cgroup
 	environ
+	sysctl
 }
 
 @[heap]
@@ -135,6 +136,12 @@ fn (mut this ProcFS) mount(parent &VFSNode, name string, _source &VFSNode) ?&VFS
 	add_procfs_text(mut sys_kernel, 'ostype', 'Linux\n')
 	add_procfs_text(mut sys_kernel, 'osrelease', '${uname_release}\n')
 	add_procfs_text(mut sys_kernel, 'pid_max', '${proc.max_pid}\n')
+	add_procfs_text(mut sys_kernel, 'threads-max', '${proc.max_pid}\n')
+	mut sys_kernel_keys := add_procfs_directory(mut sys_kernel, 'keys')
+	add_procfs_text(mut sys_kernel_keys, 'root_maxkeys', '1000000\n')
+	add_procfs_text(mut sys_kernel_keys, 'root_maxbytes', '25000000\n')
+	add_procfs_text(mut sys_kernel_keys, 'maxkeys', '1000000\n')
+	add_procfs_text(mut sys_kernel_keys, 'maxbytes', '25000000\n')
 
 	// `self` is a symlink whose target is the reader's own directory. The
 	// stored target is only what a listing shows; resolution goes through
@@ -169,6 +176,7 @@ fn (mut this ProcFS) mount(parent &VFSNode, name string, _source &VFSNode) ?&VFS
 	mut sys_net := add_procfs_directory(mut sys, 'net')
 	mut sys_net_core := add_procfs_directory(mut sys_net, 'core')
 	add_procfs_text(mut sys_net_core, 'somaxconn', '4096\n')
+	build_net_sysctls(mut sys_net)
 
 	return root
 }
@@ -224,6 +232,66 @@ fn add_procfs_directory(mut parent VFSNode, name string) &VFSNode {
 		parent.resource.stat.nlink++
 	}
 	return node
+}
+
+// A writable /proc/sys knob. Vinix does not act on most of these, but a
+// container runtime reads and writes them at startup and refuses to run if one
+// it expects is missing, so each is present, readable and remembers what was
+// written.
+fn add_procfs_sysctl(mut parent VFSNode, name string, default string) &VFSNode {
+	mut node := create_node(parent.filesystem, parent, name, false)
+	mut res := new_procfs_resource(.sysctl, stat.ifreg | 0o644, 0, 0)
+	res.text = default
+	res.stat.size = u64(default.len)
+	node.resource = res
+	unsafe {
+		parent.children[name] = node
+	}
+	return node
+}
+
+// The /proc/sys/net tree Docker's bridge driver and libnetwork consult:
+// forwarding switches per family and per interface class, and a few netfilter
+// and conntrack tunables. ip_forward in particular is read during bridge
+// driver registration, and its absence stops the daemon from starting.
+fn build_net_sysctls(mut sys_net VFSNode) {
+	mut ipv4 := add_procfs_directory(mut sys_net, 'ipv4')
+	add_procfs_sysctl(mut ipv4, 'ip_forward', '1\n')
+	add_procfs_sysctl(mut ipv4, 'ip_local_port_range', '32768\t60999\n')
+	add_procfs_sysctl(mut ipv4, 'ip_unprivileged_port_start', '1024\n')
+	mut ipv4_conf := add_procfs_directory(mut ipv4, 'conf')
+	for scope in ['all', 'default'] {
+		mut dir := add_procfs_directory(mut ipv4_conf, scope)
+		add_procfs_sysctl(mut dir, 'forwarding', '1\n')
+		add_procfs_sysctl(mut dir, 'route_localnet', '0\n')
+		add_procfs_sysctl(mut dir, 'rp_filter', '0\n')
+		add_procfs_sysctl(mut dir, 'accept_redirects', '0\n')
+	}
+	mut ipv4_neigh := add_procfs_directory(mut ipv4, 'neigh')
+	mut ipv4_neigh_default := add_procfs_directory(mut ipv4_neigh, 'default')
+	add_procfs_sysctl(mut ipv4_neigh_default, 'gc_thresh1', '128\n')
+	add_procfs_sysctl(mut ipv4_neigh_default, 'gc_thresh2', '512\n')
+	add_procfs_sysctl(mut ipv4_neigh_default, 'gc_thresh3', '1024\n')
+
+	mut ipv6 := add_procfs_directory(mut sys_net, 'ipv6')
+	add_procfs_sysctl(mut ipv6, 'ip_nonlocal_bind', '0\n')
+	mut ipv6_conf := add_procfs_directory(mut ipv6, 'conf')
+	for scope in ['all', 'default'] {
+		mut dir := add_procfs_directory(mut ipv6_conf, scope)
+		add_procfs_sysctl(mut dir, 'forwarding', '0\n')
+		add_procfs_sysctl(mut dir, 'disable_ipv6', '0\n')
+		add_procfs_sysctl(mut dir, 'accept_ra', '1\n')
+	}
+
+	mut netfilter := add_procfs_directory(mut sys_net, 'netfilter')
+	add_procfs_sysctl(mut netfilter, 'nf_conntrack_max', '131072\n')
+	add_procfs_sysctl(mut netfilter, 'nf_conntrack_tcp_timeout_established', '86400\n')
+
+	mut bridge := add_procfs_directory(mut sys_net, 'bridge')
+	for knob in ['bridge-nf-call-iptables', 'bridge-nf-call-ip6tables',
+		'bridge-nf-call-arptables'] {
+		add_procfs_sysctl(mut bridge, knob, '0\n')
+	}
 }
 
 fn add_procfs_file(mut parent VFSNode, name string, kind ProcFSKind) &VFSNode {
@@ -290,7 +358,7 @@ fn add_procfs_text(mut parent VFSNode, name string, text string) &VFSNode {
 
 fn (this &ProcFSResource) contents() string {
 	match this.kind {
-		.text {
+		.text, .sysctl {
 			return this.text
 		}
 		.meminfo {
@@ -426,6 +494,13 @@ fn (mut this ProcFSResource) write(_handle voidptr, buf voidptr, _loc u64, count
 			return i64(count)
 		}
 		.uid_map, .gid_map, .setgroups, .loginuid {
+			return i64(count)
+		}
+		.sysctl {
+			mut text := []u8{len: int(count)}
+			unsafe { C.memcpy(&text[0], buf, count) }
+			this.text = text.bytestr()
+			this.stat.size = u64(this.text.len)
 			return i64(count)
 		}
 		else {

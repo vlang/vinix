@@ -7,6 +7,7 @@ export PATH=/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
 export HOME=/root
 
 image=vinix/busybox:latest
+rootfs=/usr/share/vinix-docker/busybox-rootfs.tar
 
 fail() {
 	echo "DOCKER SMOKE FAIL: $*"
@@ -26,9 +27,9 @@ vinix-dockerd start || fail "dockerd did not start"
 docker version || fail "docker version"
 pass "daemon answers the API"
 
-docker load -i /usr/share/vinix-docker/busybox-image.tar || fail "docker load"
-docker image inspect "$image" >/dev/null || fail "loaded image is missing"
-pass "image loaded"
+docker import "$rootfs" "$image" || fail "docker import"
+docker image inspect "$image" >/dev/null || fail "imported image is missing"
+pass "image imported"
 
 output=$(docker run --rm "$image" echo hello-from-a-container) ||
 	fail "docker run echo"
