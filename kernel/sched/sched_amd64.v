@@ -106,32 +106,10 @@ fn effective_timeslice(t &proc.Thread) u64 {
 
 fn C.userland__dispatch_a_signal(context &cpulocal.GPRState)
 
-// How soon to recheck defer_preempt below. Short enough that a thread stuck
-// behind it (waiting to reach its own yield()) isn't held off the CPU it
-// already owns for long; long enough not to turn into an interrupt storm
-// while it's set.
-const defer_preempt_recheck_us = u64(100)
-
 fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 	apic.lapic_timer_stop()
 
 	mut cpu_local := cpulocal.current()
-
-	// An exception handler on this CPU re-enabled interrupts while its own
-	// call frames still occupy the shared tss.rsp0 stack (see isr.v). A
-	// scheduler-vector interrupt can reach here either because it was
-	// already latched in the LAPIC's IRR before that handler masked the
-	// timer, or via a stray re-arm -- either way, switching this CPU's
-	// thread right now would abandon those frames for the next thread's own
-	// exception entry to overwrite. EOI, rearm a short recheck, and leave
-	// current_thread/next_thread untouched: this is a plain nested interrupt
-	// that returns to exactly where it was, the same safe case the isr.v
-	// comment already established, not a switch.
-	if cpu_local.defer_preempt {
-		apic.lapic_eoi()
-		apic.lapic_timer_oneshot(mut cpu_local, scheduler_vector, defer_preempt_recheck_us)
-		return
-	}
 
 	katomic.store(mut &cpu_local.is_idle, false)
 
@@ -192,6 +170,15 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 	cpu.set_fs_base(current_thread.fs_base)
 
 	cpu_local.tss.ist3 = current_thread.pf_stack
+	// Interrupts and exceptions from user mode enter on this thread's own
+	// kernel stack, the one its syscalls use, rather than one shared by every
+	// thread on this CPU. Their handlers can then enable interrupts, be
+	// preempted and block, as syscalls do, without a thread switched in
+	// meanwhile starting its own entry on top of their live frames. Kernel
+	// threads have no kernel_stack and never enter from user mode.
+	if current_thread.kernel_stack != 0 {
+		cpu_local.tss.rsp0 = current_thread.kernel_stack
+	}
 
 	if cpu.read_cr3() != current_thread.cr3 {
 		cpu.write_cr3(current_thread.cr3)
@@ -319,15 +306,6 @@ pub fn yield(save_ctx bool) {
 	apic.lapic_timer_stop()
 
 	mut cpu_local := cpulocal.current()
-
-	// Reaching a deliberate yield is exactly the event that ends the window
-	// isr.v's exception_handler opened defer_preempt for: whatever call
-	// frames were live on the shared stack are unwinding right now, on
-	// purpose, and it's safe for scheduler_isr to switch this CPU's thread
-	// again from here on. Every non-returning transfer in this file
-	// (dispatch_a_signal_info's yield, dequeue_and_die's teardown) ends up
-	// here, so clearing it in this one place covers all of them.
-	cpu_local.defer_preempt = false
 
 	mut current_thread := proc.current_thread()
 

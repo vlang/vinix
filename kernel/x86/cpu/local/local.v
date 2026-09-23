@@ -64,16 +64,6 @@ pub mut:
 	last_run_queue_index int
 	abort_stack          [abort_stack_size]u64
 	aborted              bool
-	// Set while an exception handler on this CPU still has live C frames on
-	// the shared, non-per-thread tss.rsp0 stack after re-enabling interrupts
-	// (see isr.v's exception_handler). scheduler_isr() must not switch this
-	// CPU's running thread away while it's set -- not even for a timer
-	// interrupt already latched in the LAPIC's IRR before the handler got a
-	// chance to mask the timer -- because the abandoned call frames would
-	// still occupy that stack region for whatever thread runs next. Only
-	// ever touched by this CPU with interrupts disabled, so it needs no
-	// atomic access, unlike is_idle (which other CPUs do read).
-	defer_preempt bool
 	// Which memory node this CPU belongs to. Zero on a machine with one node,
 	// which is every machine until numa.attach_cpus() says otherwise.
 	numa_node u32
