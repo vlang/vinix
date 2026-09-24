@@ -228,8 +228,15 @@ pub fn (mut pagemap Pagemap) unmap_page_unlocked(virt u64) ? {
 	cpu.isb()
 }
 
+// Change the protection of a page that is mapped. One that is not is left
+// alone: rewriting its empty entry would map physical page 0 in its place.
+// mprotect() reaches pages of a mapping that have not been touched yet, and
+// they are faulted in later with the range's new protection.
 pub fn (mut pagemap Pagemap) flag_page(virt u64, flags u64) ? {
 	mut pte_p := pagemap.virt2pte(virt, false) or { return none }
+	if unsafe { *pte_p } & 1 == 0 {
+		return none
+	}
 	phys := unsafe { *pte_p } & pte_flags_mask
 	new_pte := portable_to_arm64_pte(phys, flags)
 	active := cpu.read_ttbr0_el1() & pte_flags_mask == u64(pagemap.top_level) & pte_flags_mask

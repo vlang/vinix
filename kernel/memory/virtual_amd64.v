@@ -222,8 +222,13 @@ pub fn (mut pagemap Pagemap) unmap_page_unlocked(virt u64) ? {
 	}
 }
 
+// Change the protection of a page that is mapped. One that is not is left
+// alone: rewriting its empty entry would map physical page 0 in its place.
 pub fn (mut pagemap Pagemap) flag_page(virt u64, flags u64) ? {
 	pte_p := pagemap.virt2pte(virt, false) or { return none }
+	if unsafe { *pte_p } & 1 == 0 {
+		return none
+	}
 
 	unsafe {
 		*pte_p &= pte_flags_mask
