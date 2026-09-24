@@ -97,7 +97,18 @@ pub mut:
 	rx [][]u8
 }
 
+// NETLINK_ROUTE is the only family there is. Any other -- kernel uevents,
+// generic netlink, netfilter -- is refused as Linux refuses a family it was
+// built without, so a program sees EPROTONOSUPPORT and takes its fallback.
+// Handing it a socket that answers as rtnetlink would leave a uevent listener
+// waiting for ever, and hand a generic-netlink client replies it cannot parse.
+const netlink_route = 0
+
 pub fn create(@type int, protocol int) ?&NetlinkSocket {
+	if protocol != netlink_route {
+		errno.set(errno.eprotonosupport)
+		return none
+	}
 	mut s := &NetlinkSocket{
 		protocol: protocol
 		status:   file.pollout
