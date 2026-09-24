@@ -582,7 +582,7 @@ pub fn syscall_close_range(_ voidptr, first u32, last u32, flags u32) (u64, u64)
 			fd.unref()
 			continue
 		}
-		fdnum_close(process, int(i), false) or { continue }
+		fdnum_close(process, int(i), true) or { continue }
 	}
 
 	return 0, 0
