@@ -64,7 +64,7 @@ fn copy_name_from_user(name charptr, len u64) ?string {
 		return none
 	}
 	mut incoming := [uts_name_len]char{}
-	if len > 0 && !usercopy.copy_from_user(voidptr(&incoming[0]), u64(name), len) {
+	if len > 0 && !usercopy.copy_from_user(unsafe { voidptr(&incoming[0]) }, u64(name), len) {
 		errno.set(errno.efault)
 		return none
 	}

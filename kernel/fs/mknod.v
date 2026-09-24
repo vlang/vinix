@@ -84,7 +84,7 @@ fn device_by_name(name string) &resource.Resource {
 	if unsafe { devtmpfs_root == 0 } || devtmpfs_root.children == unsafe { nil } {
 		return unsafe { nil }
 	}
-	if name !in devtmpfs_root.children {
+	if unsafe { name !in *devtmpfs_root.children } {
 		return unsafe { nil }
 	}
 	node := unsafe { devtmpfs_root.children[name] }

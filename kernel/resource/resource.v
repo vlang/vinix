@@ -65,7 +65,9 @@ __global (
 )
 
 pub fn create_dev_id() u64 {
-	return dev_id_counter++
+	ret := dev_id_counter
+	dev_id_counter++
+	return ret
 }
 
 pub fn default_ioctl(handle voidptr, request u64, _ voidptr) ?int {

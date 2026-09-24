@@ -154,7 +154,7 @@ fn refresh_ns_directory(mut dir VFSNode, pid int) {
 		mut ns := unsafe { ns_ptr }
 		target := namespace_node(mut ns)
 		text := '${namespace_kind_name(ns.kind)}:[${ns.id}]'
-		if name in dir.children {
+		if unsafe { name in *dir.children } {
 			mut existing := unsafe { dir.children[name] }
 			existing.magic_target = target
 			existing.symlink_target = text

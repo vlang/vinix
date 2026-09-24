@@ -18,11 +18,11 @@ struct C.vinix_socket {}
 
 fn C.vinix_net_init()
 fn C.vinix_net_poll(now_ms u32)
-fn C.vinix_net_attach(mac &u8, driver int) int
-fn C.vinix_net_link(mac &u8, mtu &u32) int
+fn C.vinix_net_attach(mac voidptr, driver int) int
+fn C.vinix_net_link(mac voidptr, mtu voidptr) int
 fn C.vinix_net_detach()
 fn C.vinix_net_input(frame voidptr, length u64) int
-fn C.vinix_net_config(address &u32, netmask &u32, gateway &u32, dns &u32) int
+fn C.vinix_net_config(address voidptr, netmask voidptr, gateway voidptr, dns voidptr) int
 fn C.vinix_socket_new(@type int, protocol int) &C.vinix_socket
 fn C.vinix_socket_free(socket &C.vinix_socket)
 fn C.vinix_socket_bind(socket &C.vinix_socket, address u32, port u16) int
@@ -30,10 +30,10 @@ fn C.vinix_socket_connect(socket &C.vinix_socket, address u32, port u16) int
 fn C.vinix_socket_listen(socket &C.vinix_socket, backlog int) int
 fn C.vinix_socket_accept(socket &C.vinix_socket) &C.vinix_socket
 fn C.vinix_socket_send(socket &C.vinix_socket, data voidptr, length u64, address u32, port u16, has_address int) int
-fn C.vinix_socket_recv(socket &C.vinix_socket, data voidptr, length u64, address &u32, port &u16) int
+fn C.vinix_socket_recv(socket &C.vinix_socket, data voidptr, length u64, address voidptr, port voidptr) int
 fn C.vinix_socket_shutdown(socket &C.vinix_socket, how int) int
-fn C.vinix_socket_local(socket &C.vinix_socket, address &u32, port &u16) int
-fn C.vinix_socket_peer(socket &C.vinix_socket, address &u32, port &u16) int
+fn C.vinix_socket_local(socket &C.vinix_socket, address voidptr, port voidptr) int
+fn C.vinix_socket_peer(socket &C.vinix_socket, address voidptr, port voidptr) int
 fn C.vinix_socket_ready(socket &C.vinix_socket) int
 fn C.vinix_socket_error(socket &C.vinix_socket, clear int) int
 fn C.vinix_socket_available(socket &C.vinix_socket) int
@@ -253,18 +253,11 @@ pub fn receive(frame voidptr, length u64) bool {
 	return ret == 0
 }
 
-pub fn configuration(address &u32, netmask &u32, gateway &u32, dns &[3]u32) bool {
-	net_lock.acquire()
-	ret := unsafe { C.vinix_net_config(address, netmask, gateway, &dns[0]) }
-	net_lock.release()
-	return ret != 0
-}
-
 // The hardware address and MTU of the network interface, once a driver has
 // attached one.
-pub fn link_info(mut mac [6]u8, mut mtu u32) bool {
+pub fn link_info(mut mac [6]u8, mtu &u32) bool {
 	net_lock.acquire()
-	ret := C.vinix_net_link(&mac[0], &mtu)
+	ret := C.vinix_net_link(&mac[0], mtu)
 	net_lock.release()
 	return ret != 0
 }
@@ -442,7 +435,7 @@ pub fn (mut this InetSocket) sendto(handle voidptr, buf voidptr, count u64, _add
 	return none
 }
 
-pub fn (mut this InetSocket) recvfrom(handle voidptr, buf voidptr, count u64, _addr voidptr, addrlen &u32) ?i64 {
+pub fn (mut this InetSocket) recvfrom(handle voidptr, buf voidptr, count u64, _addr voidptr, addrlen voidptr) ?i64 {
 	open_handle := unsafe { &file.Handle(handle) }
 	this.l.acquire()
 	defer {
@@ -568,7 +561,7 @@ fn (mut this InetSocket) accept(handle voidptr) ?&resource.Resource {
 	return none
 }
 
-fn socket_name(mut this InetSocket, peer bool, _addr voidptr, addrlen &u32) ? {
+fn socket_name(mut this InetSocket, peer bool, _addr voidptr, addrlen voidptr) ? {
 	if addrlen == unsafe { nil } {
 		errno.set(errno.efault)
 		return none
@@ -588,11 +581,11 @@ fn socket_name(mut this InetSocket, peer bool, _addr voidptr, addrlen &u32) ? {
 	sock_pub.copy_out_sockaddr(_addr, addrlen, &addr, sizeof(SockaddrIn))
 }
 
-fn (mut this InetSocket) peername(_handle voidptr, _addr voidptr, addrlen &u32) ? {
+fn (mut this InetSocket) peername(_handle voidptr, _addr voidptr, addrlen voidptr) ? {
 	socket_name(mut this, true, _addr, addrlen)?
 }
 
-fn (mut this InetSocket) sockname(_handle voidptr, _addr voidptr, addrlen &u32) ? {
+fn (mut this InetSocket) sockname(_handle voidptr, _addr voidptr, addrlen voidptr) ? {
 	socket_name(mut this, false, _addr, addrlen)?
 }
 
@@ -744,7 +737,7 @@ fn (mut this InetSocket) unref(_handle voidptr) ? {
 	net_lock.acquire()
 	C.vinix_socket_free(this.handle)
 	net_lock.release()
-	unsafe { free(this) }
+	unsafe { free(&this) }
 }
 
 fn (mut this InetSocket) grow(_handle voidptr, _new_size u64) ? {}

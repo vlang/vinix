@@ -246,7 +246,7 @@ fn handler() {
 	mut discard_packet := false
 
 	for {
-		mut events := [&int_events[ps2_mouse_vector]]
+		mut events := [unsafe { &int_events[ps2_mouse_vector] }]
 		event.await(mut events, true) or {}
 		unsafe { events.free() }
 

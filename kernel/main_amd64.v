@@ -37,7 +37,13 @@ import socket
 import time
 import x86.hpet
 import x86.hypervisor
-import limine
+import limine as _
+
+fn initialise_optional_storage_drivers() {
+	ata.initialise()
+	nvme.initialise()
+	ahci.initialise()
+}
 
 fn kmain_thread() {
 	term.framebuffer_init()
@@ -77,9 +83,7 @@ fn kmain_thread() {
 	hda.initialize()
 
 	$if !prod {
-		ata.initialise()
-		nvme.initialise()
-		ahci.initialise()
+		initialise_optional_storage_drivers()
 	}
 
 	userland.start_program(false, vfs_root, '/sbin/init', ['/sbin/init'], [], '/dev/console',

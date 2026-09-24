@@ -42,11 +42,11 @@ fn (q &ByteQueue) room() u64 {
 	return pty_buffer_size - q.used
 }
 
-fn (mut q ByteQueue) put(byte u8) bool {
+fn (mut q ByteQueue) put(octet u8) bool {
 	if q.used == pty_buffer_size {
 		return false
 	}
-	unsafe { q.data[q.write_pos] = byte }
+	unsafe { q.data[q.write_pos] = octet }
 	q.write_pos++
 	if q.write_pos == pty_buffer_size {
 		q.write_pos = 0
@@ -345,8 +345,8 @@ fn (pair &PtyPair) input_room_locked() u64 {
 	return if room > pair.canonical_len { room - pair.canonical_len } else { 0 }
 }
 
-fn output_byte_locked(mut pair PtyPair, byte u8) bool {
-	if pair.termios.c_oflag & termios.opost != 0 && byte == `\n`
+fn output_byte_locked(mut pair PtyPair, octet u8) bool {
+	if pair.termios.c_oflag & termios.opost != 0 && octet == `\n`
 		&& pair.termios.c_oflag & termios.onlcr != 0 {
 		if pair.output.room() < 2 {
 			return false
@@ -355,20 +355,20 @@ fn output_byte_locked(mut pair PtyPair, byte u8) bool {
 		pair.output.put(`\n`)
 		return true
 	}
-	return pair.output.put(byte)
+	return pair.output.put(octet)
 }
 
-fn echo_byte_locked(mut pair PtyPair, byte u8) {
+fn echo_byte_locked(mut pair PtyPair, octet u8) {
 	if pair.termios.c_lflag & termios.echo == 0 {
 		return
 	}
-	if byte < 0x20 && byte != `\n` && byte != `\t`
+	if octet < 0x20 && octet != `\n` && octet != `\t`
 		&& pair.termios.c_lflag & termios.echoctl != 0 {
 		pair.output.put(`^`)
-		pair.output.put(byte + 0x40)
+		pair.output.put(octet + 0x40)
 		return
 	}
-	output_byte_locked(mut pair, byte)
+	output_byte_locked(mut pair, octet)
 }
 
 fn erase_echo_locked(mut pair PtyPair, erased u8) {
@@ -396,29 +396,29 @@ fn flush_canonical_locked(mut pair PtyPair) {
 
 // Returns a signal number when an ISIG character was consumed.
 fn input_byte_locked(mut pair PtyPair, incoming u8) u8 {
-	mut byte := incoming
-	if byte == `\r` {
+	mut octet := incoming
+	if octet == `\r` {
 		if pair.termios.c_iflag & termios.igncr != 0 {
 			return 0
 		}
 		if pair.termios.c_iflag & termios.icrnl != 0 {
-			byte = `\n`
+			octet = `\n`
 		}
-	} else if byte == `\n` && pair.termios.c_iflag & termios.inlcr != 0 {
-		byte = `\r`
+	} else if octet == `\n` && pair.termios.c_iflag & termios.inlcr != 0 {
+		octet = `\r`
 	}
 
 	if pair.termios.c_lflag & termios.isig != 0 {
 		mut signal := u8(0)
-		if byte == pair.termios.c_cc[termios.vintr] {
+		if octet == pair.termios.c_cc[termios.vintr] {
 			signal = u8(userland.sigint)
-		} else if byte == pair.termios.c_cc[termios.vquit] {
+		} else if octet == pair.termios.c_cc[termios.vquit] {
 			signal = u8(userland.sigquit)
-		} else if byte == pair.termios.c_cc[termios.vsusp] {
+		} else if octet == pair.termios.c_cc[termios.vsusp] {
 			signal = u8(userland.sigtstp)
 		}
 		if signal != 0 {
-			echo_byte_locked(mut pair, byte)
+			echo_byte_locked(mut pair, octet)
 			output_byte_locked(mut pair, `\n`)
 			if pair.termios.c_lflag & termios.noflsh == 0 {
 				pair.input.clear()
@@ -430,13 +430,13 @@ fn input_byte_locked(mut pair PtyPair, incoming u8) u8 {
 	}
 
 	if pair.termios.c_lflag & termios.icanon == 0 {
-		if pair.input.put(byte) {
-			echo_byte_locked(mut pair, byte)
+		if pair.input.put(octet) {
+			echo_byte_locked(mut pair, octet)
 		}
 		return 0
 	}
 
-	if byte == pair.termios.c_cc[termios.verase] || byte == `\b` {
+	if octet == pair.termios.c_cc[termios.verase] || octet == `\b` {
 		if pair.canonical_len != 0 {
 			erased := pair.canonical[pair.canonical_len - 1]
 			pair.canonical_len--
@@ -444,7 +444,7 @@ fn input_byte_locked(mut pair PtyPair, incoming u8) u8 {
 		}
 		return 0
 	}
-	if byte == pair.termios.c_cc[termios.vkill] {
+	if octet == pair.termios.c_cc[termios.vkill] {
 		for pair.canonical_len != 0 {
 			erased := pair.canonical[pair.canonical_len - 1]
 			pair.canonical_len--
@@ -455,7 +455,7 @@ fn input_byte_locked(mut pair PtyPair, incoming u8) u8 {
 		}
 		return 0
 	}
-	if byte == pair.termios.c_cc[termios.veof] {
+	if octet == pair.termios.c_cc[termios.veof] {
 		if pair.canonical_len == 0 {
 			pair.eof_pending = true
 		} else {
@@ -464,16 +464,16 @@ fn input_byte_locked(mut pair PtyPair, incoming u8) u8 {
 		return 0
 	}
 
-	delimiter := byte == `\n` || (pair.termios.c_cc[termios.veol] != 0
-		&& byte == pair.termios.c_cc[termios.veol])
-	// Reserve one byte for a canonical delimiter. Once a line reaches that
+	delimiter := octet == `\n` || (pair.termios.c_cc[termios.veol] != 0
+		&& octet == pair.termios.c_cc[termios.veol])
+	// Reserve one octet for a canonical delimiter. Once a line reaches that
 	// limit, additional text is discarded until newline instead of making the
 	// PTY impossible to unblock with the very newline it is waiting for.
 	limit := if delimiter { pty_canonical_size } else { pty_canonical_size - 1 }
 	if pair.canonical_len < limit {
-		pair.canonical[pair.canonical_len] = byte
+		pair.canonical[pair.canonical_len] = octet
 		pair.canonical_len++
-		echo_byte_locked(mut pair, byte)
+		echo_byte_locked(mut pair, octet)
 	}
 	if delimiter {
 		flush_canonical_locked(mut pair)
@@ -494,10 +494,14 @@ fn signal_group(pgid int, signal u8) {
 		if target == unsafe { nil } || target.pgid != pgid {
 			continue
 		}
-		target_thread := proc.get_main_thread(target)
-		if target_thread != unsafe { nil } {
-			userland.sendsig(target_thread, signal)
-			proc.unpin_thread(target_thread)
+		$if amd64 {
+			userland.signal_process(target, signal)
+		} $else {
+			target_thread := proc.get_main_thread(target)
+			if target_thread != unsafe { nil } {
+				userland.sendsig(target_thread, signal)
+				proc.unpin_thread(target_thread)
+			}
 		}
 	}
 }
@@ -574,8 +578,8 @@ fn (mut this PtyMaster) write(handle voidptr, buf voidptr, _loc u64, count u64) 
 			unsafe { events.free() }
 			pair.l.acquire()
 		}
-		byte := unsafe { bytes[written] }
-		signal := input_byte_locked(mut pair, byte)
+		octet := unsafe { bytes[written] }
+		signal := input_byte_locked(mut pair, octet)
 		if signal != 0 {
 			raised_signal = signal
 		}
@@ -653,8 +657,8 @@ fn (mut this PtySlave) write(handle voidptr, buf voidptr, _loc u64, count u64) ?
 	mut written := u64(0)
 	pair.l.acquire()
 	for written < count {
-		byte := unsafe { bytes[written] }
-		needed := if pair.termios.c_oflag & termios.opost != 0 && byte == `\n`
+		octet := unsafe { bytes[written] }
+		needed := if pair.termios.c_oflag & termios.opost != 0 && octet == `\n`
 			&& pair.termios.c_oflag & termios.onlcr != 0 {
 			u64(2)
 		} else {
@@ -687,7 +691,7 @@ fn (mut this PtySlave) write(handle voidptr, buf voidptr, _loc u64, count u64) ?
 			unsafe { events.free() }
 			pair.l.acquire()
 		}
-		output_byte_locked(mut pair, byte)
+		output_byte_locked(mut pair, octet)
 		written++
 	}
 	pair.refresh_status_locked()

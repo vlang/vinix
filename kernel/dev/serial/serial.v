@@ -153,7 +153,7 @@ fn (mut this COMPort) read(_handle voidptr, void_buf voidptr, _loc u64, count u6
 
 	// Wait on the event of the port's IRQ.
 	mut data := unsafe { &u8(void_buf) }
-	mut events := [&int_events[this.port_vector]]
+	mut events := [unsafe { &int_events[this.port_vector] }]
 	defer {
 		unsafe { events.free() }
 	}

@@ -294,7 +294,7 @@ fn keyboard_handler() {
 	}
 
 	for {
-		mut events := [&int_events[vect]]
+		mut events := [unsafe { &int_events[vect] }]
 		event.await(mut events, true) or {}
 		unsafe { events.free() }
 		input_byte := read_ps2()

@@ -49,7 +49,7 @@ fn heap_benchmark_hot() (u64, u64) {
 	mut checksum := u64(0)
 	start := heap_benchmark_ticks()
 	for i := u64(0); i < heap_benchmark_hot_iterations; i++ {
-		ptr := malloc(64)
+		ptr := unsafe { malloc(64) }
 		unsafe { (&u8(ptr))[0] = u8(i) }
 		checksum = (checksum << 7 | checksum >> 57) ^ u64(ptr)
 		free(ptr)
@@ -65,7 +65,7 @@ fn heap_benchmark_batch() (u64, u64) {
 	for round := u64(0); round < heap_benchmark_batch_rounds; round++ {
 		for i := u64(0); i < heap_benchmark_batch_width; i++ {
 			size := heap_benchmark_size(round * heap_benchmark_batch_width + i)
-			ptr := malloc(size)
+			ptr := unsafe { malloc(size) }
 			unsafe {
 				mut bytes := &u8(ptr)
 				bytes[0] = u8(i)
@@ -105,7 +105,7 @@ pub fn heap_benchmark() {
 	baseline := free_bytes()
 	for class := u64(0); class < 14; class++ {
 		for _ in 0 .. 2 {
-			ptr := malloc(heap_benchmark_size(class))
+			ptr := unsafe { malloc(heap_benchmark_size(class)) }
 			free(ptr)
 		}
 	}

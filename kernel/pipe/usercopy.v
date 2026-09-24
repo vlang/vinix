@@ -21,7 +21,7 @@ pub fn syscall_pipe_checked(gpr_state voidptr, pipefds &i32, flags int) (u64, u6
 		return ret, code
 	}
 
-	if !usercopy.copy_to_user(u64(pipefds), voidptr(&local[0]), sizeof(local)) {
+	if !usercopy.copy_to_user(u64(pipefds), unsafe { voidptr(&local[0]) }, sizeof(local)) {
 		mut process := proc.current_thread().process
 		file.fdnum_close(process, int(local[0]), true) or {}
 		file.fdnum_close(process, int(local[1]), true) or {}

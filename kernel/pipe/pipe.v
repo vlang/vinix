@@ -453,7 +453,7 @@ fn (mut this Pipe) unref(handle voidptr) ? {
 	if !still_referenced {
 		unsafe {
 			free(this.data)
-			free(this)
+			free(&this)
 		}
 	}
 }

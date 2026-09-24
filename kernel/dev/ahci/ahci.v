@@ -387,9 +387,9 @@ fn (mut d AHCIDevice) initialise() ?int {
 
 	mut sector_cnt := unsafe { *(&u64(&identity[100])) }
 
-	mut serial_number := &char(memory.malloc(21))
-	mut firmware_revision := &char(memory.malloc(9))
-	mut model_number := &char(memory.malloc(41))
+	mut serial_number := unsafe { &char(memory.malloc(21)) }
+	mut firmware_revision := unsafe { &char(memory.malloc(9)) }
+	mut model_number := unsafe { &char(memory.malloc(41)) }
 
 	unsafe {
 		C.memcpy(serial_number, &u8(identity) + 20, 20)

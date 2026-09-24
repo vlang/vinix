@@ -35,7 +35,7 @@ pub fn enable_nx() {
 }
 
 pub fn new_pagemap() &Pagemap {
-	mut top_level := &u64(pmm_alloc(1))
+	mut top_level := unsafe { &u64(pmm_alloc(1)) }
 	if top_level == 0 {
 		panic('new_pagemap() allocation failure')
 	}

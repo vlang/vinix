@@ -6,7 +6,7 @@
 @[has_globals]
 module numa
 
-import acpi
+import acpi as _
 import x86.cpu.local as cpulocal
 
 fn discover_devicetree() int {

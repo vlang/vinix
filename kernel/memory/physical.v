@@ -207,7 +207,8 @@ pub fn pmm_init() {
 		for j := u64(0); j < pmm_bitmap_size + pmm_refcounts_size; j += page_size {
 			page_index := (pmm_bitmap_phys + j) / page_size
 			lib.bitset(pmm_bitmap, page_index)
-			(&u32(pmm_refcounts))[page_index] = 1
+			refs := &u32(pmm_refcounts)
+			refs[page_index] = 1
 			free_pages--
 		}
 	}
@@ -572,7 +573,7 @@ fn big_alloc(size u64) voidptr {
 @[export: 'realloc']
 pub fn realloc(ptr voidptr, new_size u64) voidptr {
 	if ptr == 0 {
-		return malloc(new_size)
+		return unsafe { malloc(new_size) }
 	}
 
 	if u64(ptr) & (page_size - 1) == 0 {
@@ -591,7 +592,7 @@ pub fn realloc(ptr voidptr, new_size u64) voidptr {
 	mut slab := slab_hdr.slab
 
 	if new_size > slab.ent_size {
-		mut new_ptr := malloc(new_size)
+		mut new_ptr := unsafe { malloc(new_size) }
 		if new_ptr == unsafe { nil } {
 			return unsafe { nil }
 		}

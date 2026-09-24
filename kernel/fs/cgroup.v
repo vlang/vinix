@@ -156,7 +156,8 @@ fn new_cgroup_resource(mode u32) &CGroupResource {
 		refcount: 1
 	}
 	res.stat.dev = cgroup_dev_id
-	res.stat.ino = cgroup_inode_counter++
+	res.stat.ino = cgroup_inode_counter
+	cgroup_inode_counter++
 	res.stat.mode = mode
 	res.stat.blksize = 512
 	res.stat.size = if stat.isdir(mode) { i64(0) } else { i64(4096) }
@@ -335,7 +336,7 @@ fn (mut this CGroupResource) contents() string {
 		}
 		'cgroup.events' {
 			populated := if cgroup_members(group, true).len > 0 { 1 } else { 0 }
-			frozen := if group.node != unsafe { nil } && 'cgroup.freeze' in group.node.children {
+			frozen := if group.node != unsafe { nil } && unsafe { 'cgroup.freeze' in *group.node.children } {
 				freeze_res := unsafe { &CGroupResource(group.node.children['cgroup.freeze'].resource) }
 				freeze_res.text.trim_space()
 			} else {

@@ -127,7 +127,7 @@ pub fn (mut d Depot) zone_depot_insert_tail_full(mut mag Magazine) {
 	d.full++
 	unsafe {
 		mag.next = *d.tail
-		*d.tail = mag
+		*d.tail = &mag
 		d.tail = &mag.next
 	}
 }
@@ -137,7 +137,7 @@ pub fn (mut d Depot) zone_depot_insert_head_empty(mut mag Magazine) {
 	d.empty++
 	unsafe {
 		mag.next = *d.tail
-		*d.tail = mag
+		*d.tail = &mag
 	}
 }
 

@@ -428,7 +428,7 @@ fn (mut this TmpFSResource) unref(_handle voidptr) ? {
 		memory.free(this.storage)
 	}
 
-	unsafe { free(this) }
+	unsafe { free(&this) }
 }
 
 fn (mut this TmpFSResource) link(_handle voidptr) ? {
@@ -521,7 +521,8 @@ fn (mut this TmpFS) create(parent &VFSNode, name string, mode u32) &VFSNode {
 	new_resource.stat.blocks = 0
 	new_resource.stat.blksize = 512
 	new_resource.stat.dev = this.dev_id
-	new_resource.stat.ino = this.inode_counter++
+	new_resource.stat.ino = this.inode_counter
+	this.inode_counter++
 	new_resource.stat.mode = mode
 	new_resource.stat.nlink = 1
 
@@ -562,7 +563,8 @@ fn (mut this TmpFS) symlink(parent &VFSNode, dest string, target string) &VFSNod
 	new_resource.stat.blocks = 0
 	new_resource.stat.blksize = 512
 	new_resource.stat.dev = this.dev_id
-	new_resource.stat.ino = this.inode_counter++
+	new_resource.stat.ino = this.inode_counter
+	this.inode_counter++
 	new_resource.stat.mode = stat.iflnk | 0o777
 	new_resource.stat.nlink = 1
 

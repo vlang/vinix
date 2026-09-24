@@ -85,7 +85,8 @@ fn (mut this Partition) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 }
 
 fn (mut this Partition) unref(handle voidptr) ? {
-	return this.parent_device.unref(handle)
+	this.parent_device.unref(handle)?
+	return
 }
 
 fn (mut this Partition) link(_handle voidptr) ? {
@@ -95,7 +96,8 @@ fn (mut this Partition) unlink(_handle voidptr) ? {
 }
 
 fn (mut this Partition) grow(handle voidptr, new_size u64) ? {
-	return this.parent_device.grow(handle, new_size)
+	this.parent_device.grow(handle, new_size)?
+	return
 }
 
 fn (mut this Partition) mmap(handle voidptr, page u64, flags int) voidptr {
@@ -140,21 +142,21 @@ pub fn scan_partitions(mut parent_device resource.Resource, prefix string) int {
 				continue
 			}
 
-			mut partition := &Partition{
+			mut part := &Partition{
 				device_offset: u64(partition_entry.starting_lba * parent_device.stat.blksize)
 				sector_cnt:    partition_entry.last_lba - partition_entry.starting_lba
 				parent_device: unsafe { parent_device }
 			}
 
-			partition.stat.blocks = partition.sector_cnt
-			partition.stat.blksize = parent_device.stat.blksize
-			partition.stat.size = partition.sector_cnt * partition.stat.blksize
-			partition.stat.rdev = resource.create_dev_id()
-			partition.stat.mode = 0o644 | stat.ifblk
+			part.stat.blocks = part.sector_cnt
+			part.stat.blksize = parent_device.stat.blksize
+			part.stat.size = part.sector_cnt * part.stat.blksize
+			part.stat.rdev = resource.create_dev_id()
+			part.stat.mode = 0o644 | stat.ifblk
 
-			print('gpt: partition detected [start: ${partition.device_offset:x} sector cnt: ${partition.sector_cnt}]\n')
+			print('gpt: partition detected [start: ${part.device_offset:x} sector cnt: ${part.sector_cnt}]\n')
 
-			fs.devtmpfs_add_device(partition, '${prefix}${i}')
+			fs.devtmpfs_add_device(part, '${prefix}${i}')
 		}
 
 		return 0
@@ -178,21 +180,21 @@ pub fn scan_partitions(mut parent_device resource.Resource, prefix string) int {
 
 			partition_entry := unsafe { &MBRPartition(&partitions[i]) }
 
-			mut partition := &Partition{
+			mut part := &Partition{
 				device_offset: u64(partition_entry.starting_lba * parent_device.stat.blksize)
 				sector_cnt:    partition_entry.sector_cnt
 				parent_device: unsafe { parent_device }
 			}
 
-			partition.stat.blocks = partition.sector_cnt
-			partition.stat.blksize = parent_device.stat.blksize
-			partition.stat.size = partition.sector_cnt * partition.stat.blksize
-			partition.stat.rdev = resource.create_dev_id()
-			partition.stat.mode = 0o644 | stat.ifblk
+			part.stat.blocks = part.sector_cnt
+			part.stat.blksize = parent_device.stat.blksize
+			part.stat.size = part.sector_cnt * part.stat.blksize
+			part.stat.rdev = resource.create_dev_id()
+			part.stat.mode = 0o644 | stat.ifblk
 
-			print('mbr: partition detected [start: ${partition.device_offset:x} sector cnt: ${partition.sector_cnt}]\n')
+			print('mbr: partition detected [start: ${part.device_offset:x} sector cnt: ${part.sector_cnt}]\n')
 
-			fs.devtmpfs_add_device(partition, '${prefix}${i}')
+			fs.devtmpfs_add_device(part, '${prefix}${i}')
 		}
 
 		return 0

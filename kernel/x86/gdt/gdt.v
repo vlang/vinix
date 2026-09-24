@@ -143,7 +143,7 @@ pub fn initialise() {
 pub fn reload() {
 	gdt_pointer = GDTPointer{
 		size:    u16(sizeof(GDTEntry) * 13 - 1)
-		address: &gdt_entries
+		address: unsafe { &gdt_entries }
 	}
 
 	asm volatile amd64 {

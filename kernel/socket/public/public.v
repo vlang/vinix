@@ -17,8 +17,8 @@ pub interface Socket {
 mut:
 	bind(handle voidptr, _addr voidptr, addrlen u32) ?
 	connect(handle voidptr, _addr voidptr, addrlen u32) ?
-	peername(handle voidptr, _addr voidptr, addrlen &u32) ?
-	sockname(handle voidptr, _addr voidptr, addrlen &u32) ?
+	peername(handle voidptr, _addr voidptr, addrlen voidptr) ?
+	sockname(handle voidptr, _addr voidptr, addrlen voidptr) ?
 	shutdown(handle voidptr, how int) ?
 	listen(handle voidptr, backlog int) ?
 	accept(handle voidptr) ?&Resource
@@ -96,12 +96,13 @@ pub:
 // write no more than the caller's buffer holds, but report the length the
 // address actually needs, so a short buffer is reported as truncated rather
 // than being overrun.
-pub fn copy_out_sockaddr(dest voidptr, addrlen &u32, source voidptr, full_size u32) {
+pub fn copy_out_sockaddr(dest voidptr, addrlen voidptr, source voidptr, full_size u32) {
 	if addrlen == unsafe { nil } {
 		return
 	}
 
-	capacity := unsafe { *addrlen }
+	mut capacity := u32(0)
+	unsafe { C.memcpy(&capacity, addrlen, sizeof(u32)) }
 	if dest != unsafe { nil } && capacity > 0 {
 		mut to_copy := full_size
 		if to_copy > capacity {
@@ -110,9 +111,7 @@ pub fn copy_out_sockaddr(dest voidptr, addrlen &u32, source voidptr, full_size u
 		unsafe { C.memcpy(dest, source, to_copy) }
 	}
 
-	unsafe {
-		*addrlen = full_size
-	}
+	unsafe { C.memcpy(addrlen, &full_size, sizeof(u32)) }
 }
 
 pub struct IoVec {

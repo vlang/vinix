@@ -5,11 +5,13 @@ import katomic
 // Optional capabilities keep stream/device resources and in-memory files from
 // needing dummy callbacks merely because disk-backed resources cache writes.
 pub interface SyncableResource {
+	Resource
 mut:
 	sync(handle voidptr) ?
 }
 
 pub interface AdvisableResource {
+	Resource
 mut:
 	advise(handle voidptr, offset u64, length u64, advice int) ?
 }
@@ -26,6 +28,7 @@ mut:
 // Disk filesystems use this hook after the VFS changes ownership, mode or
 // timestamps in the common Stat object. In-memory resources need no callback.
 pub interface MetadataResource {
+	Resource
 mut:
 	persist_metadata() ?
 }
@@ -34,6 +37,7 @@ mut:
 // These optional hooks let msync/fsync write those pages back and let the VM
 // return disposable MAP_PRIVATE pages when the final mapping goes away.
 pub interface MappingSyncResource {
+	Resource
 mut:
 	sync_mapping(handle voidptr, offset u64, length u64) ?
 }
@@ -150,7 +154,8 @@ pub fn get_seals(mut res Resource) ?u32 {
 
 pub fn add_seals(mut res Resource, seals u32) ? {
 	if mut res is SealableResource {
-		return res.add_seals(seals)
+		res.add_seals(seals)?
+		return
 	}
 	return none
 }

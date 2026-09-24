@@ -939,7 +939,7 @@ fn irq_handler(mut c HDAController) {
 	print('hda: using irq ${c.irq_vect:x}\n')
 
 	for {
-		mut events := [&int_events[c.irq_vect]]
+		mut events := [unsafe { &int_events[c.irq_vect] }]
 		event.await(mut events, true) or {}
 
 		intsts := c.regs.intsts

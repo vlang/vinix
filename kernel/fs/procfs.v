@@ -28,6 +28,7 @@ import resource
 import event.eventstruct
 import memory.mmap
 import time
+import numa
 
 // Matches what uname(2) reports, so a program that compares the two agrees
 // with itself.
@@ -227,7 +228,8 @@ fn new_procfs_resource(kind ProcFSKind, mode u32, pid int, tid int) &ProcFSResou
 	new_resource.stat.blocks = 0
 	new_resource.stat.blksize = 512
 	new_resource.stat.dev = procfs_dev_id
-	new_resource.stat.ino = procfs_inode_counter++
+	new_resource.stat.ino = procfs_inode_counter
+	procfs_inode_counter++
 	new_resource.stat.mode = mode
 	// A directory starts at two links, for itself and for its `.` entry. Each
 	// subdirectory adds one; Chromium reads exactly this number off
@@ -718,10 +720,10 @@ pub fn procfs_lookup_refresh(node &VFSNode, name string) {
 	}
 	// A process directory is filled in on first use; do that before looking
 	// at what it holds.
-	if name !in node.children {
+	if unsafe { name !in *node.children } {
 		procfs_refresh(node)
 	}
-	if directory.pid != 0 && name in ['exe', 'cwd', 'root'] && name in node.children {
+	if directory.pid != 0 && name in ['exe', 'cwd', 'root'] && unsafe { name in *node.children } {
 		mut link := unsafe { node.children[name] }
 		match name {
 			'exe' {
@@ -761,12 +763,12 @@ fn refresh_process_directories(mut root VFSNode) {
 
 	for pid in live {
 		name := '${pid}'
-		if name in root.children {
+		if unsafe { name in *root.children } {
 			// exec() replaces the program without replacing the process, so
 			// the link has to be taken again rather than only created once.
 			mut existing := unsafe { root.children[name] }
 			if existing != unsafe { nil } && existing.children != unsafe { nil }
-				&& 'exe' in existing.children {
+				&& unsafe { 'exe' in *existing.children } {
 				mut exe := unsafe { existing.children['exe'] }
 				exe.symlink_target = proc.process_program(pid)
 			}
@@ -906,7 +908,7 @@ fn refresh_fd_directory(mut descriptors VFSNode, pid int) {
 					// name. Linux shows their kind and inode instead, and so
 					// does this; opening one again by this name is not
 					// supported.
-					nodes << unsafe { nil }
+					nodes << &VFSNode(unsafe { nil })
 					texts << anonymous_descriptor_text(entry.handle.resource)
 				} else {
 					nodes << unsafe { &VFSNode(entry.handle.node) }
@@ -925,7 +927,7 @@ fn refresh_fd_directory(mut descriptors VFSNode, pid int) {
 		name := '${fdnum}'
 		target := nodes[index]
 		text := if target == unsafe { nil } { texts[index] } else { descriptor_link_text(target) }
-		if name in descriptors.children {
+		if unsafe { name in *descriptors.children } {
 			mut existing := unsafe { descriptors.children[name] }
 			existing.redir = unsafe { nil }
 			existing.magic_target = target
@@ -984,7 +986,7 @@ fn refresh_thread_directories(mut task VFSNode, pid int) {
 
 	for tid in live {
 		name := '${tid}'
-		if name in task.children {
+		if unsafe { name in *task.children } {
 			continue
 		}
 		mut node := create_node(task.filesystem, task, name, true)
