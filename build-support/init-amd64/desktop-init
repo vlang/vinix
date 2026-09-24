@@ -77,7 +77,10 @@ while :; do
 	if [ ! -e /run/vinix-desktop-development ] && [ -x /usr/bin/vinix-desktop-gpu ]; then
 		desktop=/usr/bin/vinix-desktop-gpu
 	fi
-	"$desktop" &
+	# A non-interactive shell starts a background command with stdin on
+	# /dev/null. The compositor reads the keyboard from stdin, so hand it the
+	# console explicitly.
+	"$desktop" </dev/console &
 	desktop_pid=$!
 	exited_pid=$desktop_pid
 	wait "$desktop_pid"
