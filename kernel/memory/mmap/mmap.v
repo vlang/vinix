@@ -353,6 +353,7 @@ fn delete_pagemap_impl(mut pagemap memory.Pagemap, trace bool) ? {
 
 pub fn fork_pagemap(_old_pagemap &memory.Pagemap) ?&memory.Pagemap {
 	memory.register_cow_resolver(resolve_cow_fault)
+	register_page_in_resolver()
 	mut old_pagemap := unsafe { _old_pagemap }
 	mut new_pagemap := memory.new_pagemap()
 	mut old_private_globals := []voidptr{}
@@ -765,6 +766,10 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
 	options MmapOptions) ?voidptr {
 	mut pagemap := unsafe { _pagemap }
 	mut resource_ := unsafe { _resource }
+
+	// Every user mapping, the program's own segments included, is made here,
+	// so the resolver is in place before anything can copy from one.
+	register_page_in_resolver()
 
 	validate_protection(prot)?
 	if _length == 0 {

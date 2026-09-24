@@ -2,6 +2,7 @@ module mmap
 
 import aarch64.cpu
 import aarch64.cpu.local as cpulocal
+import memory
 import proc
 
 pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
@@ -56,6 +57,18 @@ pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
 		cpu.interrupt_toggle(prev)
 	}
 
+	// A translation fault on a page that is mapped by now raced with a
+	// break-before-make update of its descriptor: fork write-protecting it, or
+	// a copy-on-write fault resolved on another CPU. Retrying the access is all
+	// it needs. Paging the range's page in again would map a page still shared
+	// with a fork child writable, behind copy-on-write's back.
+	page_in(mut pagemap, addr, dfsc >= 0x04 && dfsc <= 0x07)?
+}
+
+// Page in the page holding `addr` from the mapping it belongs to. With
+// `present_is_done`, a page that is mapped by the time the lock is held is left
+// as it is.
+fn page_in(mut pagemap memory.Pagemap, addr u64, present_is_done bool) ? {
 	pagemap.l.acquire()
 
 	mut range_local, memory_page, file_page := addr2range(pagemap, addr) or {
@@ -63,12 +76,7 @@ pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
 		return none
 	}
 
-	// A translation fault on a page that is mapped by now raced with a
-	// break-before-make update of its descriptor: fork write-protecting it, or
-	// a copy-on-write fault resolved on another CPU. Retrying the access is all
-	// it needs. Paging the range's page in again would map a page still shared
-	// with a fork child writable, behind copy-on-write's back.
-	if dfsc >= 0x04 && dfsc <= 0x07 {
+	if present_is_done {
 		if _ := pagemap.virt2phys(memory_page * page_size) {
 			pagemap.l.release()
 			return
@@ -86,4 +94,22 @@ pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
 	}
 
 	install_range_page(range_local.global, virt, file_page, page, range_local.flags)?
+}
+
+// Nothing is in the page tables for a page of a mapping that has not been
+// touched yet; the fault handler pages it in when userspace first touches it.
+// The kernel copying to or from such a page on a process' behalf -- a syscall's
+// buffer, a signal set in a binary's read-only data -- has to do the same, or
+// the syscall fails with EFAULT on a perfectly good pointer.
+fn resolve_missing_page(_pagemap &memory.Pagemap, address u64) bool {
+	if address >= higher_half {
+		return false
+	}
+	mut pagemap := unsafe { _pagemap }
+	page_in(mut pagemap, address, true) or { return false }
+	return true
+}
+
+fn register_page_in_resolver() {
+	memory.register_page_in_resolver(resolve_missing_page)
 }

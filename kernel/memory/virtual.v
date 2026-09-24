@@ -27,10 +27,11 @@ pub const pte_uncached = u64(1) << 4 // ARM64: use Normal Non-Cacheable for fram
 pub const pte_noexec = u64(1) << 63
 
 __global (
-	page_size       = u64(0x1000)
-	kernel_pagemap  Pagemap
-	vmm_initialised = bool(false)
-	cow_resolver    fn (&Pagemap, u64) bool
+	page_size        = u64(0x1000)
+	kernel_pagemap   Pagemap
+	vmm_initialised  = bool(false)
+	cow_resolver     fn (&Pagemap, u64) bool
+	page_in_resolver fn (&Pagemap, u64) bool
 )
 
 pub fn register_cow_resolver(resolver fn (&Pagemap, u64) bool) {
@@ -42,6 +43,21 @@ pub fn resolve_cow(pagemap &Pagemap, address u64) bool {
 		return false
 	}
 	return cow_resolver(pagemap, address)
+}
+
+// Registered by mmap, which knows what a mapping is backed by, as the COW
+// resolver above is: this module cannot import it.
+pub fn register_page_in_resolver(resolver fn (&Pagemap, u64) bool) {
+	page_in_resolver = resolver
+}
+
+// Page in the page of a user mapping that holds `address`, as a fault on it
+// would. True once the page is present, whoever put it there.
+pub fn resolve_missing_page(pagemap &Pagemap, address u64) bool {
+	if page_in_resolver == unsafe { nil } {
+		return false
+	}
+	return page_in_resolver(pagemap, address)
 }
 
 pub struct Pagemap {
