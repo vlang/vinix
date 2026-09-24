@@ -406,7 +406,15 @@ pkg install voffice
 `pkg` downloads `VOffice-vinix-aarch64.tar.gz` from the latest `vlang/office`
 release and checks it against the published `.sha256`.
 `./build-voffice-aarch64.sh` cross-compiles that asset from a VOffice checkout
-(`VINIX_OFFICE_SOURCE` or `../office`), and `--publish` uploads it with `gh`.
+(`VINIX_OFFICE_SOURCE` or `../office`). Publish it from the commit the release
+was built from, so it matches the release's other binaries:
+
+```sh
+./build-voffice-aarch64.sh --ref=release-0.0.3-build --publish
+```
+
+`--publish` uploads with `gh` and refuses uncommitted source or a `VERSION`
+that is not the latest release's tag.
 
 LibreOffice Writer and Calc run through the same private X11 window bridge,
 drawn by the GTK 3 VCL plugin. Install the suite on demand, then launch it from

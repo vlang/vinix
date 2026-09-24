@@ -3,9 +3,12 @@
 # `pkg install voffice` downloads. The desktop image never runs this: VOffice
 # is an optional application whose source is a separate checkout.
 #
-# Usage: ./build-voffice-aarch64.sh [--publish]
+# Usage: ./build-voffice-aarch64.sh [--ref=REF] [--publish]
+#   --ref builds from a clean export of REF in the office checkout instead of
+#   its working tree, e.g. the branch a release was built from.
 #   --publish uploads the bundle and its checksum to the latest release of
-#   VINIX_VOFFICE_RELEASE_REPO (default vlang/office) with gh.
+#   VINIX_VOFFICE_RELEASE_REPO (default vlang/office) with gh. It refuses
+#   uncommitted source and a VERSION other than that release's tag.
 #
 # The office source is VINIX_OFFICE_SOURCE, a sibling ../office checkout, or
 # third_party/office. ui2 is chosen the same way as for the desktop.
@@ -15,11 +18,13 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 . "$SCRIPT_DIR/build-support/find-v.sh"
 
 PUBLISH=0
+REF=
 for arg in "$@"; do
     case "$arg" in
         --publish) PUBLISH=1 ;;
+        --ref=*) REF="${arg#*=}" ;;
         --help|-h)
-            sed -n '2,11p' "$0" | sed 's/^# \{0,1\}//'
+            sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'
             exit 0
             ;;
         *)
@@ -84,6 +89,30 @@ if [ ! -x "$LLVM_BIN/clang" ] || [ ! -x "$LLVM_BIN/llvm-strip" ]; then
     exit 1
 fi
 
+# A release asset must be built from committed source that says which release
+# it is. The working tree of a live checkout is neither.
+if [ -n "$REF" ]; then
+    SOURCE_EXPORT="$BUILD_DIR/source"
+    rm -rf "$SOURCE_EXPORT"
+    mkdir -p "$SOURCE_EXPORT"
+    git -C "$OFFICE_SOURCE" archive "$REF" | tar -x -C "$SOURCE_EXPORT"
+    echo "==> Using VOffice $REF ($(git -C "$OFFICE_SOURCE" rev-parse --short "$REF"))"
+    OFFICE_SOURCE="$SOURCE_EXPORT"
+elif [ "$PUBLISH" -eq 1 ] && git -C "$OFFICE_SOURCE" rev-parse --git-dir >/dev/null 2>&1 &&
+     [ -n "$(git -C "$OFFICE_SOURCE" status --porcelain --untracked-files=no)" ]; then
+    echo "ERROR: $OFFICE_SOURCE has uncommitted changes; publish a clean build with --ref=REF" >&2
+    exit 1
+fi
+if [ "$PUBLISH" -eq 1 ]; then
+    command -v gh >/dev/null 2>&1 || { echo "ERROR: --publish needs gh" >&2; exit 1; }
+    RELEASE_TAG="$(gh release view --repo "$RELEASE_REPO" --json tagName --jq .tagName)"
+    SOURCE_VERSION="$(sed -n '1p' "$OFFICE_SOURCE/VERSION" 2>/dev/null || true)"
+    if [ "v$SOURCE_VERSION" != "$RELEASE_TAG" ]; then
+        echo "ERROR: VOffice source is version '${SOURCE_VERSION:-unknown}' but the latest $RELEASE_REPO release is $RELEASE_TAG" >&2
+        exit 1
+    fi
+fi
+
 echo "==> Building VOffice Calc and Writer for aarch64 Vinix..."
 mkdir -p "$BUILD_DIR"
 python3 "$SCRIPT_DIR/desktop/tools/build_voffice.py" \
@@ -129,10 +158,8 @@ echo "    $ARCHIVE"
 echo "    $ARCHIVE.sha256"
 
 if [ "$PUBLISH" -eq 1 ]; then
-    command -v gh >/dev/null 2>&1 || { echo "ERROR: --publish needs gh" >&2; exit 1; }
-    tag="$(gh release view --repo "$RELEASE_REPO" --json tagName --jq .tagName)"
-    echo "==> Uploading to $RELEASE_REPO release $tag..."
-    gh release upload "$tag" "$ARCHIVE" "$ARCHIVE.sha256" --repo "$RELEASE_REPO" --clobber
+    echo "==> Uploading to $RELEASE_REPO release $RELEASE_TAG..."
+    gh release upload "$RELEASE_TAG" "$ARCHIVE" "$ARCHIVE.sha256" --repo "$RELEASE_REPO" --clobber
 else
     echo "Publish with: $0 --publish"
 fi

@@ -171,7 +171,8 @@ VOffice is not built with the image. `../build-voffice-aarch64.sh` uses
 as static musl applications from `VINIX_OFFICE_SOURCE`, a sibling `../office`,
 or `third_party/office`. It packages both executables with VOffice's
 translations and ribbon PNGs as `VOffice-vinix-aarch64.tar.gz` plus a `.sha256`,
-and `--publish` uploads them to the latest `vlang/office` release.
+and `--publish` uploads them to the latest `vlang/office` release. `--ref=REF`
+builds from a clean export of a commit rather than the working tree.
 `pkg install voffice` downloads that asset, verifies its checksum and installs
 it below `/usr/bin` (`VINIX_VOFFICE_URL` points it at another copy). The
 compositor decodes the installed PNG assets itself, so VOffice does not need a
