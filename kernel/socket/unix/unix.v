@@ -17,6 +17,10 @@ pub const sock_buf = 0x100000
 
 const msg_cmsg_cloexec = 0x40000000
 const msg_ctrunc = 0x08
+const msg_peek = 0x02
+const msg_trunc = 0x20
+const msg_dontwait = 0x40
+const msg_waitall = 0x100
 const cmsg_header_size = u64(16)
 const cmsg_align = u64(8)
 
@@ -112,6 +116,28 @@ pub mut:
 	// and reply pipe ends in consecutive messages and expects one descriptor
 	// from each corresponding recvmsg call.
 	pending_fd_groups []PendingFdGroup
+
+	// SOCK_SEQPACKET preserves message boundaries: each send is one record and
+	// each receive returns exactly one, its remainder discarded if it did not
+	// fit. This is the byte length of every buffered record, oldest first. It
+	// stays empty for SOCK_STREAM, which has no boundaries. runc's sync protocol
+	// relies on it: it reads a record's length with
+	// recvfrom(0, MSG_PEEK|MSG_TRUNC) and then reads the record itself.
+	packet_lengths []u64
+}
+
+// Whether this endpoint keeps message boundaries (SOCK_SEQPACKET).
+pub fn (this &UnixSocket) is_seqpacket() bool {
+	return this.socktype & sock_pub.sock_type_mask == sock_pub.sock_seqpacket
+}
+
+// The byte length of the next record to be received, or all buffered bytes for
+// a stream socket that keeps no boundaries.
+fn (this &UnixSocket) next_message_length() u64 {
+	if this.is_seqpacket() && this.packet_lengths.len > 0 {
+		return this.packet_lengths[0]
+	}
+	return this.used
 }
 
 fn (mut this UnixSocket) mmap(_handle voidptr, _page u64, _flags int) voidptr {
@@ -119,6 +145,12 @@ fn (mut this UnixSocket) mmap(_handle voidptr, _page u64, _flags int) voidptr {
 }
 
 fn (mut this UnixSocket) read(_handle voidptr, buf voidptr, _loc u64, _count u64) ?i64 {
+	// A SOCK_SEQPACKET read still returns exactly one record; the framed path
+	// owns the boundary bookkeeping.
+	if this.is_seqpacket() {
+		return this.recv_seqpacket(_handle, buf, _count, 0)
+	}
+
 	mut count := _count
 
 	this.l.acquire()
@@ -224,6 +256,96 @@ fn (mut this UnixSocket) read(_handle voidptr, buf voidptr, _loc u64, _count u64
 	return i64(count)
 }
 
+// Receive one SOCK_SEQPACKET record, honouring the recvfrom(2) flags a length
+// prefix protocol needs: MSG_PEEK leaves the record queued, MSG_TRUNC reports
+// its true length even when the buffer is shorter, and the two together with a
+// zero-length buffer answer "how long is the next record" without consuming it.
+// runc's sync channel drives exactly this. Any descriptors a peeked-past record
+// carried are dropped, as a plain recvfrom does.
+pub fn (mut this UnixSocket) recv_seqpacket(_handle voidptr, buf voidptr, count u64, flags int) ?i64 {
+	peek := flags & msg_peek != 0
+	trunc := flags & msg_trunc != 0
+
+	this.l.acquire()
+	defer {
+		this.l.release()
+	}
+
+	handle := unsafe { &file.Handle(_handle) }
+
+	if this.read_closed {
+		return 0
+	}
+
+	for katomic.load(&this.used) == 0 {
+		if this.peer_finished {
+			return 0
+		}
+		if handle.flags & resource.o_nonblock != 0 {
+			errno.set(errno.ewouldblock)
+			return none
+		}
+		this.l.release()
+		mut events := [&this.event]
+		event.await(mut events, true) or {
+			unsafe { events.free() }
+			errno.set(errno.eintr)
+			return none
+		}
+		unsafe { events.free() }
+		this.l.acquire()
+	}
+
+	message_length := this.next_message_length()
+	mut to_copy := if count < message_length { count } else { message_length }
+
+	if to_copy != 0 {
+		mut before_wrap := to_copy
+		mut after_wrap := u64(0)
+		if this.read_ptr + to_copy > this.capacity {
+			before_wrap = this.capacity - this.read_ptr
+			after_wrap = to_copy - before_wrap
+		}
+		unsafe { C.memcpy(buf, &this.data[this.read_ptr], before_wrap) }
+		if after_wrap != 0 {
+			unsafe { C.memcpy(voidptr(u64(buf) + before_wrap), this.data, after_wrap) }
+		}
+	}
+
+	// MSG_TRUNC reports the record's real length; the default reports how much
+	// was handed back.
+	ret := if trunc { message_length } else { to_copy }
+
+	if !peek {
+		// The whole record leaves the queue even when it did not all fit.
+		this.read_ptr = (this.read_ptr + message_length) % this.capacity
+		this.used -= message_length
+		if this.packet_lengths.len > 0 {
+			this.packet_lengths.delete(0)
+		}
+		// A plain recvfrom past a descriptor-bearing record drops its rights.
+		if this.pending_fd_groups.len != 0 && this.pending_fd_groups[0].offset < message_length {
+			mut pending_fds := unsafe { this.pending_fd_groups[0].fds }
+			for mut dropped in pending_fds {
+				dropped.unref()
+				unsafe { free(voidptr(dropped)) }
+			}
+			unsafe { pending_fds.free() }
+			this.pending_fd_groups.delete(0)
+		}
+		for i in 0 .. this.pending_fd_groups.len {
+			this.pending_fd_groups[i].offset -= message_length
+		}
+		this.peer.status |= file.pollout
+		event.trigger(mut this.peer.event, false)
+		if this.used == 0 {
+			this.status &= ~file.pollin
+		}
+	}
+
+	return i64(ret)
+}
+
 fn (mut this UnixSocket) write(_handle voidptr, buf voidptr, _loc u64, _count u64) ?i64 {
 	return this.write_with_fds(_handle, buf, _count, []&file.FD{})
 }
@@ -242,6 +364,13 @@ pub fn (mut this UnixSocket) write_with_fds(_handle voidptr, buf voidptr, _count
 	mut peer := this.peer
 	if peer == unsafe { nil } {
 		errno.set(errno.enotconn)
+		return none
+	}
+	// A SOCK_SEQPACKET record is all-or-nothing, so one larger than the whole
+	// receive buffer can never be delivered whole and must be refused rather
+	// than truncated into a bogus boundary.
+	if peer.is_seqpacket() && _count > peer.capacity {
+		errno.set(errno.emsgsize)
 		return none
 	}
 	peer.l.acquire()
@@ -332,6 +461,12 @@ pub fn (mut this UnixSocket) write_with_fds(_handle voidptr, buf voidptr, _count
 		group.fds << fds
 		peer.pending_fd_groups << group
 	}
+	// On a SOCK_SEQPACKET peer this send is one record. The write above did not
+	// split it -- a message larger than the buffer is refused, and the wait
+	// loop held out for room for the whole of it -- so its length is `count`.
+	if peer.is_seqpacket() {
+		peer.packet_lengths << count
+	}
 
 	peer.status |= file.pollin
 	event.trigger(mut peer.event, false)
@@ -406,6 +541,8 @@ fn (mut this UnixSocket) close_endpoint() {
 	this.backlog = []&UnixSocket{}
 	mut pending := unsafe { this.pending_fd_groups }
 	this.pending_fd_groups = []PendingFdGroup{}
+	unsafe { this.packet_lengths.free() }
+	this.packet_lengths = []u64{}
 	data := this.data
 	this.data = unsafe { nil }
 	this.capacity = 0
@@ -856,6 +993,16 @@ fn (mut this UnixSocket) recvmsg(_handle voidptr, msg &sock_pub.MsgHdr, flags in
 		count = this.used
 	}
 
+	// A SOCK_SEQPACKET recvmsg returns at most one record; never read across
+	// its boundary.
+	mut seq_msg_len := u64(0)
+	if this.is_seqpacket() {
+		seq_msg_len = this.next_message_length()
+		if count > seq_msg_len {
+			count = seq_msg_len
+		}
+	}
+
 	// SCM_RIGHTS is associated with one sendmsg in the byte stream. Linux
 	// returns any data before it plus that sendmsg's bytes and descriptors, then
 	// stops before subsequently queued data.
@@ -1021,6 +1168,32 @@ fn (mut this UnixSocket) recvmsg(_handle voidptr, msg &sock_pub.MsgHdr, flags in
 	}
 	for i in 0 .. this.pending_fd_groups.len {
 		this.pending_fd_groups[i].offset -= transferred
+	}
+
+	// One SOCK_SEQPACKET recvmsg consumes exactly one record: drop whatever of
+	// it did not fit, and its descriptors, then retire its boundary.
+	if this.is_seqpacket() && seq_msg_len > 0 {
+		remainder := seq_msg_len - transferred
+		if remainder > 0 {
+			for this.pending_fd_groups.len > 0 && this.pending_fd_groups[0].offset < remainder {
+				mut pending_fds := unsafe { this.pending_fd_groups[0].fds }
+				for mut dropped in pending_fds {
+					dropped.unref()
+					unsafe { free(voidptr(dropped)) }
+				}
+				unsafe { pending_fds.free() }
+				this.pending_fd_groups.delete(0)
+			}
+			this.read_ptr = (this.read_ptr + remainder) % this.capacity
+			this.used -= remainder
+			for i in 0 .. this.pending_fd_groups.len {
+				this.pending_fd_groups[i].offset -= remainder
+			}
+			unsafe { msg.msg_flags |= msg_trunc }
+		}
+		if this.packet_lengths.len > 0 {
+			this.packet_lengths.delete(0)
+		}
 	}
 
 	this.peer.status |= file.pollout
