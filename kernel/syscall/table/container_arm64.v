@@ -21,7 +21,7 @@ const linux_capability_version_2 = u32(0x20071026)
 struct CapUserHeader {
 mut:
 	version u32
-	pid     int
+	pid     i32
 }
 
 struct CapUserData {
@@ -36,8 +36,19 @@ fn cap_target(pid int) &proc.Process {
 		return proc.current_thread().process
 	}
 	proc.lock_table()
-	defer { proc.unlock_table() }
-	return proc.process_at(pid)
+	mut target := proc.process_at(pid)
+	proc.unlock_table()
+	if target != unsafe { nil } {
+		return target
+	}
+	// capget/capset name a thread, not a thread group: their "pid" is really a
+	// tid. A runtime applying its own caps passes gettid(), which is not the
+	// group leader's, so resolve it through the thread as well.
+	mut thread := proc.thread_by_tid(pid)
+	if thread != unsafe { nil } {
+		return thread.process
+	}
+	return unsafe { nil }
 }
 
 fn syscall_linux_capget(_ voidptr, header_ptr u64, data_ptr u64) (u64, u64) {
@@ -59,7 +70,7 @@ fn syscall_linux_capget(_ voidptr, header_ptr u64, data_ptr u64) (u64, u64) {
 	if data_ptr == 0 {
 		return 0, 0
 	}
-	target := cap_target(header.pid)
+	target := cap_target(int(header.pid))
 	if target == unsafe { nil } {
 		return errno.err, errno.esrch
 	}
@@ -91,11 +102,18 @@ fn syscall_linux_capset(_ voidptr, header_ptr u64, data_ptr u64) (u64, u64) {
 		&& header.version != linux_capability_version_3 {
 		return errno.err, errno.einval
 	}
-	// capset(2) only ever changes the caller, or a single-threaded process
-	// that is the caller. A non-zero pid naming another process is refused.
+	// capset(2) only ever changes the caller. Its "pid" is a tid, though, and a
+	// runtime applying its own caps passes gettid() rather than 0, so accept any
+	// thread of this process and refuse only a genuinely different one.
 	mut process := proc.current_thread().process
-	if header.pid != 0 && header.pid != process.pid {
-		return errno.err, errno.eperm
+	if header.pid != 0 {
+		target := cap_target(int(header.pid))
+		if target == unsafe { nil } {
+			return errno.err, errno.esrch
+		}
+		if voidptr(target) != voidptr(process) {
+			return errno.err, errno.eperm
+		}
 	}
 	mut data := [2]CapUserData{}
 	if !usercopy.copy_from_user(voidptr(&data[0]), data_ptr, u64(entries) * sizeof(CapUserData)) {

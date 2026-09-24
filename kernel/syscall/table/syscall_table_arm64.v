@@ -460,9 +460,26 @@ fn syscall_linux_prlimit64(_ voidptr, pid int, res int, new_rlim u64, old_rlim u
 	if res < 0 || res >= proc.rlimit_nlimits {
 		return errno.err, errno.einval
 	}
-	mut process := proc.current_thread().process
-	if pid != 0 && pid != process.pid {
-		return errno.err, errno.esrch
+	mut caller := proc.current_thread().process
+	mut process := caller
+	if pid != 0 && pid != caller.pid {
+		// A container runtime sets its init's limits from the parent, so
+		// prlimit has to reach another process, not only the caller.
+		if pid < 0 || pid >= proc.max_pid {
+			return errno.err, errno.esrch
+		}
+		proc.lock_table()
+		target := proc.process_at(pid)
+		proc.unlock_table()
+		if target == unsafe { nil } {
+			return errno.err, errno.esrch
+		}
+		// Linux allows this with CAP_SYS_RESOURCE or a matching real/effective
+		// user; root, which every container runtime runs as here, has both.
+		if caller.euid != 0 && caller.euid != target.euid {
+			return errno.err, errno.eperm
+		}
+		process = target
 	}
 
 	process.rlimits_lock.acquire()
@@ -1036,6 +1053,7 @@ pub fn init_syscall_table() {
 	syscall_table[87] = voidptr(file.syscall_timerfd_gettime) // __NR_timerfd_gettime
 	syscall_table[267] = voidptr(fs.syscall_syncfs) // __NR_syncfs
 	syscall_table[279] = voidptr(fs.syscall_memfd_create) // __NR_memfd_create
+	syscall_table[280] = voidptr(syscall_linux_bpf) // __NR_bpf
 	syscall_table[281] = voidptr(userland.syscall_execveat) // __NR_execveat
 	syscall_table[283] = voidptr(syscall_linux_membarrier) // __NR_membarrier
 	syscall_table[285] = voidptr(pipe.syscall_copy_file_range) // __NR_copy_file_range

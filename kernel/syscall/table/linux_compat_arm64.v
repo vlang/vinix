@@ -293,6 +293,38 @@ fn syscall_linux_sched_rr_get_interval(_ voidptr, pid int, interval_ptr u64) (u6
 // yet have the cross-CPU rendezvous needed to promise any of Linux's barrier
 // commands, so report an empty supported-command mask.  This is preferable to
 // ENOSYS: runtimes can cache the result and select their documented fallback.
+// bpf(2). Vinix runs no eBPF, but a container runtime installs a
+// BPF_CGROUP_DEVICE program to police device access on the container's cgroup.
+// Vinix does not enforce device cgroups, so the program is accepted and
+// ignored: a container starts instead of failing on a missing syscall.
+fn syscall_linux_bpf(_ voidptr, cmd int, attr u64, size u32) (u64, u64) {
+	if cmd == 5 {
+		// BPF_PROG_LOAD: a real descriptor the runtime attaches and then closes.
+		// Nothing reads the "program" it stands for.
+		mut res := fs.create_anonymous(0o600)
+		fdnum := file.fdnum_create_from_resource(unsafe { nil }, mut res, resource.o_rdwr,
+			0, false) or {
+			return errno.err, errno.get()
+		}
+		return u64(fdnum), 0
+	}
+	if cmd == 8 || cmd == 9 {
+		// BPF_PROG_ATTACH / BPF_PROG_DETACH.
+		return 0, 0
+	}
+	if cmd == 16 {
+		// BPF_PROG_QUERY: report no programs attached. prog_cnt is the u32 after
+		// target_fd, attach_type, query_flags, attach_flags and the 8-byte
+		// prog_ids pointer, i.e. at offset 24.
+		if attr != 0 && size >= 28 {
+			zero := u32(0)
+			usercopy.copy_to_user(attr + 24, voidptr(&zero), sizeof(u32))
+		}
+		return 0, 0
+	}
+	return errno.err, errno.enosys
+}
+
 fn syscall_linux_membarrier(_ voidptr, command int, flags u32, _cpu_id int) (u64, u64) {
 	if command == 0 { // MEMBARRIER_CMD_QUERY
 		if flags != 0 {
