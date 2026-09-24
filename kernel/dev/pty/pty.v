@@ -154,6 +154,8 @@ __global (
 	ptmx_res    = &Ptmx(unsafe { nil })
 	pty_id_lock klock.Lock
 	pty_ids     [pty_max_pairs]bool
+	// The live pairs by id, for finding the terminal a session controls.
+	pty_pairs [pty_max_pairs]&PtyPair
 )
 
 fn allocate_id() ?int {
@@ -213,6 +215,10 @@ pub fn initialise() {
 	initialise_stat(mut ptmx_res.stat, 0o666)
 	ptmx_res.status = file.pollout
 	fs.devtmpfs_add_device(ptmx_res, 'ptmx')
+	// A devpts filesystem carries its own ptmx, as on Linux. A container's
+	// /dev/ptmx is a symlink to pts/ptmx inside the devpts runc mounts for it,
+	// and `docker run -t` failed with "open /dev/ptmx: no such file".
+	fs.devtmpfs_add_device(ptmx_res, 'pts/ptmx')
 }
 
 // refresh_status_locked derives readiness from the two queues and endpoint
@@ -273,10 +279,38 @@ fn (mut this Ptmx) open(_flags int) ?&resource.Resource {
 	pair.slave = slave
 	pair.refresh_status_locked()
 
+	pty_id_lock.acquire()
+	pty_pairs[id] = pair
+	pty_id_lock.release()
+
 	fs.devtmpfs_add_device(slave, pair.path)
 	// Keep the master endpoint's event, status and refcount shared with the
 	// pair. Converting *master would box a copy of the resource instead.
 	return &resource.Resource(unsafe { master })
+}
+
+// Open the slave of the terminal that `session` controls, as open(2) of its
+// /dev/pts path would. This is what /dev/tty stands for. The id table's lock
+// is held throughout, so the pair cannot be destroyed underneath the open.
+pub fn open_session_terminal(session int, flags int) ?&resource.Resource {
+	if session == 0 {
+		errno.set(errno.enxio)
+		return none
+	}
+	pty_id_lock.acquire()
+	defer {
+		pty_id_lock.release()
+	}
+	for i := 0; i < pty_max_pairs; i++ {
+		mut pair := pty_pairs[i]
+		if pair == unsafe { nil } || pair.session != session || !pair.master_open {
+			continue
+		}
+		mut slave := pair.slave
+		return slave.open(flags | resource.o_noctty)
+	}
+	errno.set(errno.enxio)
+	return none
 }
 
 fn (mut this PtySlave) open(flags int) ?&resource.Resource {
@@ -879,6 +913,11 @@ fn (mut this PtySlave) ioctl(_handle voidptr, request u64, argp voidptr) ?int {
 }
 
 fn destroy_pair(pair &PtyPair) {
+	pty_id_lock.acquire()
+	if pair.id >= 0 && pair.id < pty_max_pairs {
+		pty_pairs[pair.id] = unsafe { nil }
+	}
+	pty_id_lock.release()
 	release_id(pair.id)
 	unsafe {
 		pair.path.free()

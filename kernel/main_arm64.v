@@ -47,6 +47,7 @@ import dev.fbdev.simple
 import dev.pointerdev
 import dev.procdev
 import dev.pty
+import dev.tty
 import dev.random
 import dev.streams
 import time
@@ -303,6 +304,7 @@ fn kmain_thread(qemu_platform bool) {
 	print('kmain_thread: pty done\n')
 
 	console.initialise()
+	tty.initialise()
 	print('kmain_thread: console done\n')
 
 	// ANS is independent of the GPU, and disabled unless explicitly requested.

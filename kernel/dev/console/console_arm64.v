@@ -216,6 +216,15 @@ pub fn flanterm_callback(p voidptr, t u64, a u64, b u64, c u64) {
 	}
 }
 
+// The console, if `session` controls it: what /dev/tty stands for there.
+pub fn session_terminal(session int) ?&resource.Resource {
+	if console_res == unsafe { nil } || session == 0 || console_res.session != session {
+		errno.set(errno.enxio)
+		return none
+	}
+	return &resource.Resource(unsafe { console_res })
+}
+
 pub fn initialise() {
 	C.flanterm_set_callback(flanterm_ctx, voidptr(flanterm_callback))
 

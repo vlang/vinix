@@ -1845,6 +1845,8 @@ pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) ?&proc.Pr
 		new_proc.ppid = old_process.pid
 		new_proc.pgid = old_process.pgid
 		new_proc.sid = old_process.sid
+		// A child is in its parent's session, so the same terminal controls it.
+		new_proc.tty_session = old_process.tty_session
 		new_proc.uid = old_process.uid
 		new_proc.euid = old_process.euid
 		new_proc.suid = old_process.suid
