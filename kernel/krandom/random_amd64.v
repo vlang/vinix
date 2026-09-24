@@ -1,6 +1,7 @@
 module krandom
 
 import x86.cpu
+import securemem
 
 __global (
 	ur_rdrand = false
@@ -30,6 +31,7 @@ fn architecture_seed(mut output [64]u8) bool {
 			word = u32(stamp ^ (stamp >> 32) ^ u64(i))
 		}
 		unsafe { C.memcpy(&output[i], &word, 4) }
+		securemem.zero(&word, usize(sizeof(word)))
 	}
 	return ur_rdseed || ur_rdrand
 }

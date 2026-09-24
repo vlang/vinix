@@ -1,0 +1,46 @@
+name: Kernel RNG hardening
+
+on:
+  pull_request:
+    paths:
+      - 'kernel/**'
+      - 'tests/security/**'
+      - '.github/workflows/security-rng.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  erasure:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - run: sudo apt-get update && sudo apt-get install -y build-essential clang
+      - run: python3 tests/security/securemem_test.py
+
+  kernel:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            cc: cc
+          - arch: aarch64
+            cc: clang
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - run: sudo apt-get update && sudo apt-get install -y build-essential clang lld
+      - name: Build V
+        run: git clone --depth=1 https://github.com/vlang/v.git v && make -C v
+      - name: Fetch kernel dependencies
+        run: cd kernel && ./get-deps
+      - name: Build production kernel
+        run: |
+          make -C kernel ARCH=${{ matrix.arch }} CC=${{ matrix.cc }} \
+            LD_AARCH64=ld.lld PROD=true V="$(realpath v/v)" \
+            CFLAGS="-Ulinux -U__linux -U__linux__ -U__gnu_linux__ -D__vinix__ -O2 -g -pipe"
