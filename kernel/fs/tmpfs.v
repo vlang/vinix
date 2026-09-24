@@ -40,6 +40,14 @@ pub mut:
 	pages []u64
 }
 
+// A file larger than this lives in individual pages rather than in one buffer.
+// Growing a buffer by doubling needs a contiguous run of physical memory as
+// large as the file, which a fragmented machine eventually cannot supply, and
+// the allocator panics rather than fail: runc copies its ~10 MiB binary into a
+// memfd for every container it starts, and that brought the kernel down after
+// a handful of containers.
+const tmpfs_contiguous_limit = u64(1) << 20
+
 const f_seal_seal = u32(0x1)
 const f_seal_shrink = u32(0x2)
 const f_seal_grow = u32(0x4)
@@ -210,6 +218,24 @@ fn (mut this TmpFSResource) grow_pages_locked(page_count u64) bool {
 	return true
 }
 
+// A truncated file keeps its pages, and they still hold what was there. Zero
+// [from, to) in whichever of them exist, so that growing the file again, by
+// ftruncate or by writing past its end, reads back zeros.
+fn (mut this TmpFSResource) zero_pages_locked(from u64, to u64) {
+	limit := u64(this.pages.len) * page_size
+	end := if to < limit { to } else { limit }
+	mut at := from
+	for at < end {
+		in_page := at % page_size
+		mut chunk := page_size - in_page
+		if chunk > end - at {
+			chunk = end - at
+		}
+		unsafe { C.memset(voidptr(this.pages[int(at / page_size)] + higher_half + in_page), 0, chunk) }
+		at += chunk
+	}
+}
+
 fn (mut this TmpFSResource) mmap(_handle voidptr, page u64, flags int) voidptr {
 	this.l.acquire()
 	defer {
@@ -331,10 +357,17 @@ fn (mut this TmpFSResource) write(_handle voidptr, buf voidptr, loc u64, count u
 		errno.set(errno.eperm)
 		return none
 	}
+	if !this.paged && write_end > tmpfs_contiguous_limit && !this.ensure_paged_locked() {
+		errno.set(errno.enospc)
+		return none
+	}
 	if this.paged {
-		// A hole from a seek past EOF reads back as zero, which freshly
-		// allocated pages already are; only the pages the data lands on are
-		// needed.
+		// A hole from a seek past EOF reads back as zero: freshly allocated
+		// pages already are, and pages kept from before a truncation are
+		// cleared.
+		if loc > u64(this.stat.size) {
+			this.zero_pages_locked(u64(this.stat.size), loc)
+		}
 		if !this.grow_pages_locked(lib.div_roundup(write_end, page_size)) {
 			return none
 		}
@@ -428,21 +461,15 @@ fn (mut this TmpFSResource) grow(_handle voidptr, new_size u64) ? {
 		return
 	}
 
+	if !this.paged && new_size > tmpfs_contiguous_limit && !this.ensure_paged_locked() {
+		errno.set(errno.enospc)
+		return none
+	}
 	if this.paged {
+		// Pages kept past the old end still hold stale bytes; new ones are zero.
+		this.zero_pages_locked(old_size, new_size)
 		if !this.grow_pages_locked(lib.div_roundup(new_size, page_size)) {
 			return none
-		}
-		// A page that was partly inside the file keeps stale bytes past the old
-		// end; zero the tail so the grown region reads back as zero.
-		if old_size % page_size != 0 {
-			index := int(old_size / page_size)
-			if index < this.pages.len {
-				in_page := old_size % page_size
-				unsafe {
-					C.memset(voidptr(this.pages[index] + higher_half + in_page), 0,
-						page_size - in_page)
-				}
-			}
 		}
 	} else {
 		if !this.materialize_locked(new_size) {
