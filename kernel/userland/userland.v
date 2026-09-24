@@ -644,6 +644,12 @@ fn exit_process(wait_status u32) {
 
 	kernel_pagemap.switch_to()
 	current_thread.process = kernel_process
+	// Detached under the process table lock, which cgroup memory accounting
+	// and /proc hold while they walk a process' page map, so none is still
+	// walking the one freed below.
+	proc.lock_table()
+	current_process.pagemap = unsafe { nil }
+	proc.unlock_table()
 
 	// Close all FDs
 	for i := 0; i < proc.max_fds; i++ {
@@ -869,9 +875,13 @@ pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, 
 		mut t := proc.current_thread()
 		mut process := t.process
 
+		// Swapped under the process table lock, which cgroup memory accounting
+		// and /proc hold while they walk a process' page map: the old one is
+		// freed below.
+		proc.lock_table()
 		mut old_pagemap := process.pagemap
-
 		process.pagemap = new_pagemap
+		proc.unlock_table()
 
 		process.name = '${path}[${process.pid}]'
 		process.executable_path = path.clone()

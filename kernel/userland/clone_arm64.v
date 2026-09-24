@@ -309,7 +309,13 @@ fn clone_new_process(state &cpulocal.GPRState, flags u64, child_stack u64, paren
 
 	mut new_thread := sched.new_cloned_thread(new_process, old_thread, state, child_sp,
 		tls, flags & clone_settls != 0) or {
-		mmap.delete_pagemap(mut new_process.pagemap) or {}
+		// Detached under the process table lock first, as exec does, so
+		// nothing walking page maps is on it when it is freed.
+		proc.lock_table()
+		mut doomed := new_process.pagemap
+		new_process.pagemap = unsafe { nil }
+		proc.unlock_table()
+		mmap.delete_pagemap(mut doomed) or {}
 		proc.free_pid(new_process.pid)
 		return errno.err, errno.eagain
 	}
@@ -461,6 +467,12 @@ fn exit_process(mut current_process proc.Process, mut current_thread proc.Thread
 
 	kernel_pagemap.switch_to()
 	current_thread.process = kernel_process
+	// Detached under the process table lock, which cgroup memory accounting
+	// and /proc hold while they walk a process' page map, so none is still
+	// walking the one freed below, and none finds it on the zombie afterwards.
+	proc.lock_table()
+	current_process.pagemap = unsafe { nil }
+	proc.unlock_table()
 
 	for i := 0; i < proc.max_fds; i++ {
 		if current_process.fds[i] == unsafe { nil } {

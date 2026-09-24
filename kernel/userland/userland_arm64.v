@@ -1063,9 +1063,13 @@ pub fn start_program_node(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, p
 		posixtimer.remove_process_timers(curr_process)
 		gpu_exec_trace(trace_gpu, 'process timers removed')
 
+		// Swapped under the process table lock, which cgroup memory accounting
+		// and /proc hold while they walk a process' page map: the old one is
+		// freed below.
+		proc.lock_table()
 		mut old_pagemap := curr_process.pagemap
-
 		curr_process.pagemap = new_pagemap
+		proc.unlock_table()
 
 		curr_process.name = '${path}[${curr_process.pid}]'
 		curr_process.executable_path = program_path
