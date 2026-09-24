@@ -20,17 +20,31 @@
 #include <stdio.h>
 #include <string.h>
 
-/* Drivers are deliberately below the IP stack.  The weak VirtIO symbol keeps
- * the same stack buildable on x86, while Apple's C bridge is already built on
- * both architectures. */
+/* Drivers are deliberately below the IP stack.  Their transmit functions are
+ * weak so that the stack links whichever of them an architecture leaves out:
+ * VirtIO-MMIO and Apple Wi-Fi exist only on arm64, the e1000 driver on both. */
 extern int vinix_virtio_net_send(const void *, uint64_t) __attribute__((weak));
 extern int vinix_apple_wifi_send(const void *, uint64_t) __attribute__((weak));
+extern int vinix_e1000_send(const void *, uint64_t) __attribute__((weak));
 
 enum {
     DRIVER_NONE = 0,
     DRIVER_VIRTIO = 1,
     DRIVER_APPLE_WIFI = 2,
+    DRIVER_E1000 = 3,
 };
+
+typedef int (*driver_send_fn)(const void *, uint64_t);
+
+/* The transmit function of a driver, or NULL if it is not in this kernel. */
+static driver_send_fn driver_send(int driver) {
+    switch (driver) {
+        case DRIVER_VIRTIO:     return vinix_virtio_net_send;
+        case DRIVER_APPLE_WIFI: return vinix_apple_wifi_send;
+        case DRIVER_E1000:      return vinix_e1000_send;
+        default:                return NULL;
+    }
+}
 
 struct packet {
     struct packet *next;
@@ -316,14 +330,8 @@ void vinix_net_init(void) {
 }
 
 static int driver_output(const void *frame, size_t length) {
-    if (active_driver == DRIVER_VIRTIO && vinix_virtio_net_send) {
-        return vinix_virtio_net_send(frame, (uint64_t)length);
-    }
-    if (active_driver == DRIVER_APPLE_WIFI) {
-        return vinix_apple_wifi_send ?
-            vinix_apple_wifi_send(frame, (uint64_t)length) : -1;
-    }
-    return -1;
+    driver_send_fn send = driver_send(active_driver);
+    return send ? send(frame, (uint64_t)length) : -1;
 }
 
 static err_t link_output(struct netif *netif, struct pbuf *p) {
@@ -357,7 +365,7 @@ int vinix_net_attach(const uint8_t mac[6], int driver) {
     if (!stack_initialised) {
         vinix_net_init();
     }
-    if (driver != DRIVER_VIRTIO && driver != DRIVER_APPLE_WIFI) {
+    if (!driver_send(driver)) {
         return -22;
     }
     if (link_attached) {

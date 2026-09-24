@@ -20,6 +20,7 @@ import sched
 import aarch64.uart
 import aarch64.virtio_input
 import aarch64.virtio_net
+import dev.e1000
 import socket.inet
 import apple.wifi
 import apple.spi_keyboard
@@ -162,6 +163,7 @@ pub fn poll_uart_input() {
 	// Networking shares the scheduler's idle poll path with input devices, so
 	// blocking socket operations keep hardware, DHCP and TCP timers moving.
 	virtio_net.poll()
+	e1000.poll()
 	inet.poll()
 	c := uart.getc()
 	if c >= 0 {

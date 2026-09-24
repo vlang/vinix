@@ -46,6 +46,7 @@ import gpu.dcp
 import syscall as _
 import syscall.table
 import dev.console
+import dev.e1000
 import dev.fbdev
 import dev.fbdev.simple
 import dev.pointerdev
@@ -311,9 +312,10 @@ fn kmain_thread(qemu_platform bool, acpi_platform bool) {
 	print('kmain_thread: fbdev done\n')
 
 	// A USB keyboard and pointer, before /dev/pointer takes the pointer's
-	// range. They are all a VirtualBox VM has to type and point with.
+	// range. They are all a VirtualBox VM has to type and point with. Its
+	// network card is on PCIe too.
 	if qemu_platform || acpi_platform {
-		start_usb()
+		start_pci()
 	}
 	pointerdev.initialise()
 	print('kmain_thread: pointer done\n')
@@ -362,9 +364,10 @@ const writeback_interval_seconds = i64(5)
 // all. Linux answers this with a writeback timer; so does this thread. sync(2)
 // and reboot(2) are still the exact guarantees, and this only bounds the window
 // for everything that never calls them, including a VM window simply closed.
-// Map PCIe configuration space from the MCFG, scan it, and start any xHCI
-// controller found there.
-fn start_usb() {
+// Map PCIe configuration space from the MCFG, scan it, and start the drivers
+// for what is there: an xHCI controller for USB input, and an Intel e1000
+// network card unless VirtIO networking already came up.
+fn start_pci() {
 	ecam := firmware.pcie_ecam() or {
 		print('pci: no MCFG; skipping PCIe\n')
 		return
@@ -375,6 +378,7 @@ fn start_usb() {
 	if !xhci.initialise() {
 		print('xhci: no USB controller\n')
 	}
+	e1000.initialise()
 }
 
 fn writeback_thread() {

@@ -63,6 +63,7 @@ const ip_recverr = 11
 // Driver identifiers shared with vinix_net.c.
 pub const driver_virtio = 1
 pub const driver_apple_wifi = 2
+pub const driver_e1000 = 3
 
 pub struct SockaddrIn {
 pub mut:
