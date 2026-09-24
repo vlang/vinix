@@ -712,18 +712,12 @@ fn (mut this Console) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 			return 0
 		}
 		ioctl.tcgets {
-			mut t := unsafe { &termios.Termios(argp) }
-			unsafe {
-				*t = this.termios
-			}
+			unsafe { C.memcpy(argp, &this.termios, termios.user_size()) }
 			return 0
 		}
 		// TODO: handle these differently
 		ioctl.tcsets, ioctl.tcsetsw, ioctl.tcsetsf {
-			mut t := unsafe { &termios.Termios(argp) }
-			unsafe {
-				this.termios = *t
-			}
+			unsafe { C.memcpy(&this.termios, argp, termios.user_size()) }
 			return 0
 		}
 		else {

@@ -452,7 +452,7 @@ fn (mut this Console) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 		}
 		ioctl.tcgets {
 			settings := this.termios
-			if !usercopy.copy_to_user(u64(argp), voidptr(&settings), sizeof(termios.Termios)) {
+			if !usercopy.copy_to_user(u64(argp), voidptr(&settings), termios.user_size()) {
 				errno.set(errno.efault)
 				return none
 			}
@@ -461,8 +461,8 @@ fn (mut this Console) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 		// The three differ only in when they take effect. Nothing here buffers
 		// output, so there is nothing to drain and they are the same.
 		ioctl.tcsets, ioctl.tcsetsw, ioctl.tcsetsf {
-			mut settings := termios.Termios{}
-			if !usercopy.copy_from_user(voidptr(&settings), u64(argp), sizeof(termios.Termios)) {
+			mut settings := this.termios
+			if !usercopy.copy_from_user(voidptr(&settings), u64(argp), termios.user_size()) {
 				errno.set(errno.efault)
 				return none
 			}

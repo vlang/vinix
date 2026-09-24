@@ -702,12 +702,12 @@ fn (mut this PtySlave) write(handle voidptr, buf voidptr, _loc u64, count u64) ?
 
 fn copy_termios_to_user(pair &PtyPair, argp voidptr) bool {
 	settings := pair.termios
-	return usercopy.copy_to_user(u64(argp), voidptr(&settings), sizeof(termios.Termios))
+	return usercopy.copy_to_user(u64(argp), voidptr(&settings), termios.user_size())
 }
 
 fn set_termios_from_user(mut pair PtyPair, request u64, argp voidptr) bool {
-	mut settings := termios.Termios{}
-	if !usercopy.copy_from_user(voidptr(&settings), u64(argp), sizeof(termios.Termios)) {
+	mut settings := pair.termios
+	if !usercopy.copy_from_user(voidptr(&settings), u64(argp), termios.user_size()) {
 		return false
 	}
 	was_canonical := pair.termios.c_lflag & termios.icanon != 0
