@@ -337,8 +337,9 @@ pub fn syscall_sigprocmask(_ voidptr, how int, set &u64, oldset &u64) (u64, u64)
 
 fn dispatch_signal(context &cpulocal.GPRState, info_signum int, info_code int, info_addr u64) {
 	mut t := unsafe { proc.current_thread() }
+	linux := t.process.linux_abi
 
-	if t.sigentry == 0 {
+	if t.sigentry == 0 && !linux {
 		return
 	}
 
@@ -355,6 +356,11 @@ fn dispatch_signal(context &cpulocal.GPRState, info_signum int, info_code int, i
 	}
 
 	if which == -1 {
+		return
+	}
+
+	if linux {
+		dispatch_linux_signal(context, which, info_signum, info_code, info_addr)
 		return
 	}
 
@@ -609,10 +615,23 @@ pub fn syscall_waitpid(_ voidptr, pid int, _status &i32, options int) (u64, u64)
 
 @[noreturn]
 pub fn syscall_exit(_ voidptr, status int) {
+	exit_process(u32(status) << 8)
+}
+
+// End the calling process as one killed by `signal`, which is what wait()
+// then reports instead of an exit status.
+@[noreturn]
+pub fn exit_by_signal(signal int) {
+	exit_process(u32(signal) & 0x7f)
+}
+
+// `wait_status` is what wait() will report, encoded the way Linux does.
+@[noreturn]
+fn exit_process(wait_status u32) {
 	mut current_thread := proc.current_thread()
 	mut current_process := current_thread.process
 
-	C.printf(c'\n\e[32m%s\e[m: exit(%d)\n', current_process.name.str, status)
+	C.printf(c'\n\e[32m%s\e[m: exit(0x%x)\n', current_process.name.str, wait_status)
 	defer {
 		C.printf(c'\e[32m%s\e[m: returning\n', current_process.name.str)
 	}
@@ -644,8 +663,17 @@ pub fn syscall_exit(_ voidptr, status int) {
 
 	mmap.delete_pagemap(mut old_pagemap) or {}
 
-	katomic.store(mut &current_process.status, int(u32(status) << 8))
+	katomic.store(mut &current_process.status, int(wait_status))
 	event.trigger(mut &current_process.event, false)
+
+	// The parent hears of it through SIGCHLD as well as wait(): a shell such as
+	// zsh reaps from its SIGCHLD handler, and sleeps in sigsuspend() until then.
+	if current_process.ppid > 0 && current_process.ppid < proc.max_pid {
+		parent := processes[current_process.ppid]
+		if parent != unsafe { nil } {
+			signal_process(parent, sigchld)
+		}
+	}
 
 	sched.dequeue_and_die()
 }

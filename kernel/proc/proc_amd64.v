@@ -80,6 +80,10 @@ pub mut:
 	// References held by code that found this thread under a lock and went on
 	// using it after letting go. See pin_thread().
 	pins int
+	// A mask sigsuspend(2) installed temporarily. The next handler frame has to
+	// carry the mask from before the call, so that sigreturn restores it.
+	saved_mask       u64
+	saved_mask_valid bool
 }
 
 pub fn current_thread() &Thread {

@@ -202,7 +202,7 @@ fn syscall_linux_rt_sigaction(gpr_state voidptr, signum int, act_ptr u64, oldact
 			sa_sigaction: voidptr(raw[0])
 			sa_flags: int(raw[1])
 			sa_restorer: voidptr(raw[2])
-			sa_mask: raw[3]
+			sa_mask: userland.linux_mask_to_vinix(raw[3])
 		}
 	}
 	mut incoming_arg := &proc.SigAction(unsafe { nil })
@@ -221,7 +221,7 @@ fn syscall_linux_rt_sigaction(gpr_state voidptr, signum int, act_ptr u64, oldact
 		raw[0] = u64(old.sa_sigaction)
 		raw[1] = u64(u32(old.sa_flags))
 		raw[2] = u64(old.sa_restorer)
-		raw[3] = old.sa_mask
+		raw[3] = userland.vinix_mask_to_linux(old.sa_mask)
 		if !usercopy.copy_to_user(oldact_ptr, voidptr(&raw[0]), 32) {
 			return errno.err, errno.efault
 		}
@@ -233,15 +233,28 @@ fn syscall_linux_rt_sigprocmask(gpr_state voidptr, how int, set_ptr u64, oldset_
 	if sigsetsize != 8 {
 		return errno.err, errno.einval
 	}
+	// Linux numbers signal n as bit n-1; the kernel's masks use bit n.
+	mut set := u64(0)
+	mut oldset := u64(0)
 	mut set_arg := &u64(unsafe { nil })
-	mut oldset_arg := &u64(unsafe { nil })
 	if set_ptr != 0 {
-		set_arg = unsafe { &u64(set_ptr) }
+		if !usercopy.copy_from_user(voidptr(&set), set_ptr, 8) {
+			return errno.err, errno.efault
+		}
+		set = userland.linux_mask_to_vinix(set)
+		set_arg = &set
+	}
+	ret, err := userland.syscall_sigprocmask(gpr_state, how, set_arg, &oldset)
+	if err != 0 {
+		return ret, err
 	}
 	if oldset_ptr != 0 {
-		oldset_arg = unsafe { &u64(oldset_ptr) }
+		linux_old := userland.vinix_mask_to_linux(oldset)
+		if !usercopy.copy_to_user(oldset_ptr, voidptr(&linux_old), 8) {
+			return errno.err, errno.efault
+		}
 	}
-	return userland.syscall_sigprocmask(gpr_state, how, set_arg, oldset_arg)
+	return 0, 0
 }
 
 fn syscall_linux_wait4(gpr_state voidptr, pid int, status &i32, options int, _rusage u64) (u64, u64) {
@@ -440,6 +453,8 @@ pub fn init_linux_syscall_table() {
 	linux_syscall_table[12] = voidptr(mmap.syscall_brk)
 	linux_syscall_table[13] = voidptr(syscall_linux_rt_sigaction)
 	linux_syscall_table[14] = voidptr(syscall_linux_rt_sigprocmask)
+	linux_syscall_table[15] = voidptr(userland.syscall_linux_rt_sigreturn)
+	linux_syscall_table[130] = voidptr(userland.syscall_linux_rt_sigsuspend)
 	linux_syscall_table[16] = voidptr(fs.syscall_ioctl)
 	linux_syscall_table[17] = voidptr(file.syscall_pread)
 	linux_syscall_table[18] = voidptr(file.syscall_pwrite)
