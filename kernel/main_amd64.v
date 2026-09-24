@@ -27,6 +27,7 @@ import dev.nvme
 import dev.serial
 import dev.streams
 import dev.ahci
+import dev.e1000
 import dev.hda
 import dev.random
 import dev.mouse
@@ -34,10 +35,39 @@ import dev.procdev
 import dev.pty
 import syscall.table
 import socket
+import socket.inet
 import time
+import event
+import event.eventstruct
 import x86.hpet
 import x86.hypervisor
 import limine
+
+// The scheduler's device poll: hand what the network card received to the IP
+// stack, then run the stack's timers -- DHCP, ARP, TCP retransmission.
+fn poll_network() {
+	e1000.poll()
+	inet.poll()
+}
+
+// DHCP finishes inside the scheduler's poll, which is no place to write a file.
+// This thread writes /etc/resolv.conf for it, retrying until the root it lands
+// on exists.
+fn resolver_thread() {
+	for {
+		mut events := []&eventstruct.Event{}
+		mut interval := time.new_timer(time.TimeSpec{
+			tv_sec:  1
+			tv_nsec: 0
+		})
+		events << &interval.event
+		event.await(mut events, true) or {}
+		interval.disarm()
+		unsafe { free(interval) }
+		unsafe { events.free() }
+		inet.publish_resolver()
+	}
+}
 
 fn kmain_thread() {
 	term.framebuffer_init()
@@ -48,6 +78,10 @@ fn kmain_thread() {
 	table.init_mmap_aslr_syscalls()
 	table.init_security_syscalls()
 	socket.initialise()
+	if e1000.initialise() {
+		sched.set_device_poll_callback(voidptr(poll_network))
+		sched.new_kernel_thread(voidptr(resolver_thread), unsafe { nil }, true)
+	}
 	pipe.initialise()
 	futex.initialise()
 	fs.initialise()

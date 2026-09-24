@@ -14,6 +14,46 @@ import lib
 import errno
 import time
 import krandom
+import klock
+
+fn C.vinix_call_void_fn(f voidptr)
+
+__global (
+	// Hardware that this kernel drives without interrupts -- a network card --
+	// polled from the scheduler. See set_device_poll_callback().
+	device_poll_callback voidptr
+	device_poll_lock     klock.Lock
+)
+
+// How long an idle CPU sleeps before it looks at the run queue again, and how
+// long CPU 0 does when there is a device to poll: a received frame waits in its
+// ring until a CPU comes round, and every round trip on the network pays for
+// that twice. Any CPU can run the poll, so one waking often is enough; the rest
+// keep the slow tick rather than all costing their host a thousand wakeups a
+// second.
+const idle_wakeup_us = u64(20000)
+const idle_poll_wakeup_us = u64(1000)
+
+// Have the scheduler call `cb` on every pass it makes, on whichever CPU makes
+// it, and wake an idle CPU often enough that it keeps being called. This is
+// the counterpart of arm64's platform poll, which drives VirtIO networking
+// from that scheduler's idle loop and timer tick.
+pub fn set_device_poll_callback(cb voidptr) {
+	device_poll_callback = cb
+}
+
+// One CPU at a time runs the poll: what it drives is not reentrant. A CPU that
+// finds another already polling has nothing to add and goes on scheduling.
+fn poll_devices() {
+	if device_poll_callback == voidptr(0) {
+		return
+	}
+	if !device_poll_lock.test_and_acquire() {
+		return
+	}
+	C.vinix_call_void_fn(device_poll_callback)
+	device_poll_lock.release()
+}
 
 pub fn initialise() {
 	scheduler_vector = idt.allocate_vector()
@@ -121,6 +161,10 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 	mut cpu_local := cpulocal.current()
 
 	katomic.store(mut &cpu_local.is_idle, false)
+
+	// Before the run queue is read, so a thread that the poll wakes -- one
+	// waiting on a socket -- can be picked straight away.
+	poll_devices()
 
 	mut current_thread := proc.current_thread()
 
@@ -755,7 +799,12 @@ pub fn await() {
 		cli
 	}
 	mut cpu_local := cpulocal.current()
-	apic.lapic_timer_oneshot(mut cpu_local, scheduler_vector, 20000)
+	wakeup := if device_poll_callback != voidptr(0) && cpu_local.cpu_number == 0 {
+		idle_poll_wakeup_us
+	} else {
+		idle_wakeup_us
+	}
+	apic.lapic_timer_oneshot(mut cpu_local, scheduler_vector, wakeup)
 	asm volatile amd64 {
 		sti
 		1:
