@@ -129,6 +129,38 @@ struct LoadedRange {
 	length u64
 }
 
+// How far past its load base an image's LOAD segments reach.
+fn load_extent(mut res resource.Resource, header Header) !u64 {
+	mut extent := u64(0)
+	for i := u64(0); i < header.ph_num; i++ {
+		mut phdr := ProgramHdr{}
+		read_exact(mut res, unsafe { &phdr }, header.phoff + (sizeof(ProgramHdr) * i),
+			sizeof(ProgramHdr))!
+		if phdr.p_type != pt_load {
+			continue
+		}
+		if phdr.p_memsz > u64(-1) - phdr.p_vaddr {
+			return error('elf: LOAD size overflow')
+		}
+		if phdr.p_vaddr + phdr.p_memsz > extent {
+			extent = phdr.p_vaddr + phdr.p_memsz
+		}
+	}
+	return extent
+}
+
+// The range a PIE's base is picked from. The whole program has to end below
+// interpreter_base, where the interpreter's range starts: a 28 MiB docker
+// placed near the top of its range would otherwise have ld.so mapped over
+// part of it. A program too big to move gets the lowest base.
+fn pie_span(extent u64) u64 {
+	room := interpreter_base - pie_base
+	if extent >= room {
+		return 0
+	}
+	return room - extent
+}
+
 fn read_exact(mut res resource.Resource, buf voidptr, offset u64, length u64) ! {
 	read := res.read(unsafe { nil }, buf, offset, length) or {
 		return error('elf: read failure')
@@ -213,7 +245,8 @@ fn load_impl(_pagemap &memory.Pagemap, _res &resource.Resource, _base u64, trace
 	// when no explicit base is given (base=0 means "auto" for ET_DYN).
 	if base == 0 && header.@type == u16(et_dyn) {
 		exec_trace(trace, image, 'choosing PIE load base')
-		base = pie_base + random_offset(image_aslr_span - pie_base, image_alignment)
+		extent := load_extent(mut res, header)!
+		base = pie_base + random_offset(pie_span(extent), image_alignment)
 	}
 	if trace {
 		println('exec[gpu]/elf ${image}: effective load base=0x${base:x}')
