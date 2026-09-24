@@ -34,10 +34,12 @@ pub:
 }
 
 pub fn (mut dev PCIDevice) read_info() {
-	config0 := dev.read[int](0)
-	config8 := dev.read[int](0x8)
-	configc := dev.read[int](0xc)
-	config3c := dev.read[int](0x3c)
+	// Configuration space is read a dword at a time. V3's int is 64 bits, and
+	// an 8-byte load at 0xc is a misaligned Device access on arm64.
+	config0 := dev.read[u32](0)
+	config8 := dev.read[u32](0x8)
+	configc := dev.read[u32](0xc)
+	config3c := dev.read[u32](0x3c)
 
 	dev.device_id = u16(config0 >> 16)
 	dev.vendor_id = u16(config0)
