@@ -56,11 +56,16 @@ fn may_set_sched_params(target_tid int, policy int, priority int) bool {
 		return true
 	}
 
-	target := proc.thread_by_tid(target_tid)
-	if target == unsafe { nil } || unsafe { target.process == nil } {
+	target := proc.get_thread(target_tid)
+	if target == unsafe { nil } {
 		return false
 	}
-	if caller.euid != target.process.euid && caller.euid != target.process.uid {
+	owner := target.process
+	proc.unpin_thread(target)
+	if owner == unsafe { nil } {
+		return false
+	}
+	if caller.euid != owner.euid && caller.euid != owner.uid {
 		return false
 	}
 
@@ -321,11 +326,13 @@ fn syscall_linux_sched_setattr(_ voidptr, pid int, attr_ptr u64, flags u32) (u64
 	// sched_attr carries nice alongside the policy, and a caller that has
 	// filled it in should not need a second call to have it take effect.
 	if policy != proc.sched_deadline && attr.sched_nice >= -20 && attr.sched_nice <= 19 {
-		mut target := proc.thread_by_tid(tid)
-		if target != unsafe { nil } && unsafe { target.process != nil } {
-			if attr.sched_nice >= target.process.nice
-				|| proc.current_thread().process.euid == 0 {
-				target.process.nice = int(attr.sched_nice)
+		target := proc.get_thread(tid)
+		if target != unsafe { nil } {
+			mut owner := target.process
+			proc.unpin_thread(target)
+			if owner != unsafe { nil } && (attr.sched_nice >= owner.nice
+				|| proc.current_thread().process.euid == 0) {
+				owner.nice = int(attr.sched_nice)
 			}
 		}
 	}
@@ -347,9 +354,13 @@ fn syscall_linux_sched_getattr(_ voidptr, pid int, attr_ptr u64, size u32, flags
 	params := proc.thread_sched_params(tid) or { return errno.err, errno.esrch }
 
 	mut nice := int(0)
-	target := proc.thread_by_tid(tid)
-	if target != unsafe { nil } && unsafe { target.process != nil } {
-		nice = target.process.nice
+	target := proc.get_thread(tid)
+	if target != unsafe { nil } {
+		owner := target.process
+		proc.unpin_thread(target)
+		if owner != unsafe { nil } {
+			nice = owner.nice
+		}
 	}
 
 	mut attr := SchedAttr{

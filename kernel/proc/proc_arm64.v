@@ -2,6 +2,7 @@
 module proc
 
 import klock
+import katomic
 import aarch64.cpu
 import aarch64.cpu.local as cpulocal
 import event.eventstruct
@@ -104,6 +105,15 @@ pub mut:
 	// Set by a sibling's exit_group() or execve(): leave at the next return to
 	// userspace, once the syscall in progress has unwound.
 	must_exit bool
+	// References held by code that found this thread under a lock and went on
+	// using it after letting go. The reaper does not free a pinned corpse. See
+	// pin_thread().
+	pins int
+	// Whoever sets this owns taking the thread down: the thread itself on its
+	// way out, or a sibling tearing the process down that has given up waiting
+	// for it. Never both, so nothing is released twice. A word rather than a
+	// bool, since katomic.cas works on 4 and 8 bytes only.
+	exit_claimed u32
 }
 
 pub fn (t &Thread) current_syscall() (i64, u64) {
@@ -126,4 +136,82 @@ pub fn current_thread() &Thread {
 
 pub fn set_current_thread(cpu_num u64, thrd &Thread) {
 	per_cpu_current_thread[cpu_num] = voidptr(thrd)
+}
+
+// ── Thread lifetime ─────────────────────────────────────────────────────────
+//
+// A Thread's memory goes back to the heap a little after the thread dies: the
+// scheduler's reaper frees each corpse when the next thread dies on the same
+// CPU. Until it dies, the tid table and its process' thread list are how the
+// rest of the kernel finds it, and a dying thread takes itself out of both --
+// under pid_lock and its process' threads_lock -- before it gets that far. So a
+// thread found through either is alive for as long as that lock is held, and
+// not a moment longer.
+//
+// Signalling a thread, reading its process or stopping it all happen after the
+// lock is gone, and with Go's threads coming and going on every CPU a corpse
+// was sometimes freed, and its memory handed to a new thread, in between. The
+// signal or the stop then landed on an unrelated thread. Code that keeps using
+// a thread past the lock it found it under pins it first, while still holding
+// that lock, and unpins it when done; the reaper keeps a pinned corpse until
+// the last pin is gone.
+
+// Pin a thread found under pid_lock or its process' threads_lock, before
+// letting go of that lock.
+pub fn pin_thread(t &Thread) {
+	mut thread := unsafe { t }
+	katomic.inc(mut &thread.pins)
+}
+
+// Give back a pin. The thread may be freed as soon as this returns, so this is
+// the last thing the caller does with it.
+pub fn unpin_thread(t &Thread) {
+	mut thread := unsafe { t }
+	katomic.dec(mut &thread.pins)
+}
+
+pub fn thread_is_pinned(t &Thread) bool {
+	return katomic.load(&t.pins) != 0
+}
+
+// The thread with id `tid`, pinned; the caller unpins it. Nil if there is none.
+pub fn get_thread(tid int) &Thread {
+	if tid <= 0 || tid >= max_pid {
+		return unsafe { nil }
+	}
+
+	pid_lock.acquire()
+	defer {
+		pid_lock.release()
+	}
+
+	t := threads_by_tid[tid]
+	if t != unsafe { nil } {
+		pin_thread(t)
+	}
+	return t
+}
+
+// The first thread of `process`, which is the one signals aimed at the process
+// as a whole wait on, pinned; the caller unpins it. Nil if it has none left.
+pub fn get_main_thread(process &Process) &Thread {
+	mut target := unsafe { process }
+	target.threads_lock.acquire()
+	defer {
+		target.threads_lock.release()
+	}
+
+	if target.threads.len == 0 {
+		return unsafe { nil }
+	}
+	t := target.threads[0]
+	pin_thread(t)
+	return t
+}
+
+// Take charge of `t`'s exit. Exactly one caller -- the thread leaving on its
+// own, or a sibling stopping it -- is told yes.
+pub fn claim_thread_exit(t &Thread) bool {
+	mut thread := unsafe { t }
+	return katomic.cas(mut &thread.exit_claimed, u32(0), u32(1))
 }

@@ -494,14 +494,10 @@ fn signal_group(pgid int, signal u8) {
 		if target == unsafe { nil } || target.pgid != pgid {
 			continue
 		}
-		target.threads_lock.acquire()
-		mut target_thread := &proc.Thread(unsafe { nil })
-		if target.threads.len != 0 {
-			target_thread = target.threads[0]
-		}
-		target.threads_lock.release()
+		target_thread := proc.get_main_thread(target)
 		if target_thread != unsafe { nil } {
 			userland.sendsig(target_thread, signal)
+			proc.unpin_thread(target_thread)
 		}
 	}
 }

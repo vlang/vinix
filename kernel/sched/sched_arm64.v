@@ -61,6 +61,8 @@ fn C.yield_dispatch(handler voidptr)
 
 const max_reap_slots = 256
 
+const max_deferred_reaps = 64
+
 // The same count as the per-CPU exception stacks. A CPU past the end shares the
 // last stack, which is only reached when that CPU is idling anyway.
 const max_idle_stacks = 8
@@ -70,6 +72,9 @@ const idle_stack_size = 32768
 __global (
 	// Per-CPU parking slot for the thread that most recently died there.
 	reap_slots [max_reap_slots]&proc.Thread
+	// Corpses still pinned when their turn to be freed came. See defer_reap().
+	reap_deferred_slots [max_deferred_reaps]&proc.Thread
+	reap_deferred_lock  klock.Lock
 	// One idle stack per CPU, for the case where a CPU has to leave a thread's
 	// stack behind rather than return onto it: see evict_to_idle(). 32 KiB is
 	// what await() and one pass of the scheduler need.
@@ -1369,6 +1374,27 @@ fn dequeue_and_die_impl(trace bool) {
 	}
 }
 
+// Leave the CPU for good without going to the reaper. For a thread whose exit a
+// sibling tearing the process down has already taken charge of (see
+// proc.claim_thread_exit): that sibling is waiting for this thread to be off
+// the CPU, and releases what it holds once it is. Its memory stays allocated,
+// as for every thread a sibling has to stop.
+@[noreturn]
+pub fn park_stopped_thread() {
+	cpu.interrupt_toggle(false)
+	mut t := proc.current_thread()
+	katomic.store(mut &t.is_dead, true)
+	dequeue_thread(t)
+	proc.charge_cpu_time(mut t, timer.get_ns())
+	katomic.store(mut &t.running_on, u64(-1))
+	t.l.release()
+	mut cpu_local := cpulocal.current()
+	proc.set_current_thread(cpu_local.cpu_number, unsafe { nil })
+	yield(false)
+	for {
+	}
+}
+
 // Reclaiming a dying thread's kernel stack cannot happen while we are still
 // executing on it, so each CPU parks its latest corpse in a slot and frees the
 // previous occupant instead. By the time a CPU reaches this point again it has
@@ -1383,17 +1409,66 @@ fn hand_over_to_reaper(cpu_number u64, t &proc.Thread) {
 	mut previous := reap_slots[cpu_number]
 	reap_slots[cpu_number] = unsafe { t }
 
-	if unsafe { previous == nil } {
+	if unsafe { previous != nil } {
+		// Something that found the thread before it died -- a signal on its way
+		// to it, a sibling stopping it -- may still be using it. Hold on to the
+		// corpse until the last of them has let go.
+		if proc.thread_is_pinned(previous) {
+			defer_reap(previous)
+		} else {
+			free_thread_memory(previous)
+		}
+	}
+	reap_deferred()
+}
+
+fn free_thread_memory(t &proc.Thread) {
+	if t.kstack_phys != 0 {
+		memory.pmm_free(voidptr(t.kstack_phys), kernel_stack_size / page_size)
+	}
+	if t.fpu_storage_phys != 0 {
+		memory.pmm_free(voidptr(t.fpu_storage_phys), lib.div_roundup(fpu_storage_size, page_size))
+	}
+	unsafe { free(voidptr(t)) }
+}
+
+// A pinned corpse waits here. Pins last only as long as a signal delivery or a
+// sibling's teardown, so the list stays short; one that does not fit is kept
+// for good rather than freed under somebody's feet.
+fn defer_reap(t &proc.Thread) {
+	reap_deferred_lock.acquire()
+	defer {
+		reap_deferred_lock.release()
+	}
+	for i := 0; i < max_deferred_reaps; i++ {
+		if unsafe { reap_deferred_slots[i] == nil } {
+			reap_deferred_slots[i] = unsafe { t }
+			return
+		}
+	}
+}
+
+// Free every waiting corpse whose last pin has gone. Nothing can pin a corpse
+// again: it left the tid table and its process' thread list before it died.
+fn reap_deferred() {
+	if !reap_deferred_lock.test_and_acquire() {
 		return
 	}
-
-	if previous.kstack_phys != 0 {
-		memory.pmm_free(voidptr(previous.kstack_phys), kernel_stack_size / page_size)
+	mut ready := [max_deferred_reaps]&proc.Thread{}
+	mut count := 0
+	for i := 0; i < max_deferred_reaps; i++ {
+		t := reap_deferred_slots[i]
+		if unsafe { t == nil } || proc.thread_is_pinned(t) {
+			continue
+		}
+		reap_deferred_slots[i] = unsafe { nil }
+		ready[count] = t
+		count++
 	}
-	if previous.fpu_storage_phys != 0 {
-		memory.pmm_free(voidptr(previous.fpu_storage_phys), lib.div_roundup(fpu_storage_size, page_size))
+	reap_deferred_lock.release()
+	for i := 0; i < count; i++ {
+		free_thread_memory(ready[i])
 	}
-	unsafe { free(voidptr(previous)) }
 }
 
 // Give up the rest of this thread's timeslice without leaving the run queue.

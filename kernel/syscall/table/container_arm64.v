@@ -44,9 +44,11 @@ fn cap_target(pid int) &proc.Process {
 	// capget/capset name a thread, not a thread group: their "pid" is really a
 	// tid. A runtime applying its own caps passes gettid(), which is not the
 	// group leader's, so resolve it through the thread as well.
-	mut thread := proc.thread_by_tid(pid)
+	thread := proc.get_thread(pid)
 	if thread != unsafe { nil } {
-		return thread.process
+		owner := thread.process
+		proc.unpin_thread(thread)
+		return owner
 	}
 	return unsafe { nil }
 }

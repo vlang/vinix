@@ -586,14 +586,10 @@ fn signal_foreground(pgid int, signal u8) {
 		if target == unsafe { nil } || target.pgid != pgid {
 			continue
 		}
-		target.threads_lock.acquire()
-		mut main_thread := &proc.Thread(unsafe { nil })
-		if target.threads.len > 0 {
-			main_thread = target.threads[0]
-		}
-		target.threads_lock.release()
+		main_thread := proc.get_main_thread(target)
 		if main_thread != unsafe { nil } {
 			userland.sendsig(main_thread, signal)
+			proc.unpin_thread(main_thread)
 		}
 	}
 }

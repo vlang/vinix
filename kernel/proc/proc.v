@@ -578,19 +578,6 @@ pub fn free_tid(tid int) {
 	release_thread_slot(tid)
 }
 
-pub fn thread_by_tid(tid int) &Thread {
-	if tid <= 0 || tid >= max_pid {
-		return unsafe { nil }
-	}
-
-	pid_lock.acquire()
-	defer {
-		pid_lock.release()
-	}
-
-	return threads_by_tid[tid]
-}
-
 pub fn thread_affinity(tid int) ?u64 {
 	if tid <= 0 || tid >= max_pid {
 		return none
@@ -782,10 +769,19 @@ pub fn dump_tasks() {
 			continue
 		}
 		state := if process.exiting { 'Z' } else { 'R' }
+		// The list is only safe to walk under its lock: a thread leaving takes
+		// itself out and can be freed right after. Taken without blocking, for
+		// the same reason as in the tid listing above.
+		mut owner := unsafe { process }
+		if !owner.threads_lock.test_and_acquire() {
+			print('sysrq: pid=${pid} ppid=${process.ppid} ${state} ${command_name(process.name)} (thread list busy)\n')
+			continue
+		}
 		for t in process.threads {
 			nr, arg0 := t.current_syscall()
 			print('sysrq: pid=${pid} ppid=${process.ppid} tid=${t.tid} ${state} ${command_name(process.name)} syscall=${nr} arg0=0x${arg0:x} ${t.syscall_args_text()}\n')
 		}
+		owner.threads_lock.release()
 	}
 }
 

@@ -344,6 +344,13 @@ fn thread_exit(status int, group bool) {
 	mut current_thread := proc.current_thread()
 	mut current_process := current_thread.process
 
+	// A sibling tearing the process down may already have given up waiting and
+	// taken charge of this thread. Then it is the one releasing what this
+	// thread holds, and this thread only has to get out of its way.
+	if !proc.claim_thread_exit(current_thread) {
+		sched.park_stopped_thread()
+	}
+
 	// Hand back whatever this thread still owns while its address space is
 	// mapped: robust futexes it holds, and the tid word pthread_join waits on.
 	release_robust_list(mut current_thread)
@@ -367,6 +374,10 @@ fn thread_exit(status int, group bool) {
 pub fn exit_with_fatal_signal(signal u8) {
 	mut current_thread := proc.current_thread()
 	mut current_process := current_thread.process
+
+	if !proc.claim_thread_exit(current_thread) {
+		sched.park_stopped_thread()
+	}
 
 	release_robust_list(mut current_thread)
 	clear_child_tid(mut current_thread)
@@ -555,10 +566,14 @@ fn has_other_threads(mut process proc.Process, current_thread &proc.Thread) bool
 // Its kernel stack is deliberately left allocated: it may still be parked
 // mid-syscall on it, and there is no safe moment to free it here.
 fn kill_sibling_threads(mut current_process proc.Process, current_thread &proc.Thread) {
+	// Pinned while still on the list: any of them may leave and die by itself
+	// the moment the lock is let go, and its memory must not be handed to a new
+	// thread while this is still telling it to exit.
 	current_process.threads_lock.acquire()
-	mut others := []&proc.Thread{}
+	mut others := []&proc.Thread{cap: current_process.threads.len}
 	for t in current_process.threads {
 		if voidptr(t) != voidptr(current_thread) {
+			proc.pin_thread(t)
 			others << t
 		}
 	}
@@ -566,6 +581,7 @@ fn kill_sibling_threads(mut current_process proc.Process, current_thread &proc.T
 	for mut other in others {
 		katomic.store(mut &other.must_exit, true)
 		sched.enqueue_thread(other, true)
+		proc.unpin_thread(other)
 	}
 	unsafe { others.free() }
 
@@ -585,15 +601,26 @@ fn kill_sibling_threads(mut current_process proc.Process, current_thread &proc.T
 	}
 
 	current_process.threads_lock.acquire()
-	mut victims := []&proc.Thread{}
+	mut victims := []&proc.Thread{cap: current_process.threads.len}
 	for t in current_process.threads {
 		if voidptr(t) != voidptr(current_thread) {
+			proc.pin_thread(t)
 			victims << t
 		}
 	}
 	current_process.threads_lock.release()
 
 	for mut victim in victims {
+		// One that has started leaving by itself -- it may have been just about
+		// to when the grace period ran out -- gives back its own tid and root.
+		// Doing that here as well freed them twice, and could stop and free the
+		// tid of whatever new thread had taken its place. Wait for it to be off
+		// the list instead, and leave it alone.
+		if !proc.claim_thread_exit(victim) {
+			wait_for_thread_to_leave(mut current_process, victim)
+			proc.unpin_thread(victim)
+			continue
+		}
 		// Marked first so that an event trigger racing with us cannot put the
 		// thread back on the run queue behind our back.
 		katomic.store(mut &victim.is_dead, true)
@@ -614,9 +641,43 @@ fn kill_sibling_threads(mut current_process proc.Process, current_thread &proc.T
 		// directory it has something mounted on, alive for good.
 		fs.release_thread_fs(mut victim)
 		proc.free_tid(victim.tid)
+		proc.unpin_thread(victim)
 	}
 
 	unsafe { victims.free() }
+}
+
+fn thread_listed(mut process proc.Process, t &proc.Thread) bool {
+	process.threads_lock.acquire()
+	defer {
+		process.threads_lock.release()
+	}
+	for listed in process.threads {
+		if voidptr(listed) == voidptr(t) {
+			return true
+		}
+	}
+	return false
+}
+
+// A thread that has claimed its own exit has nothing left to block on, so it
+// is off the list within moments. The bound is only there so that a teardown
+// can never hang on one.
+fn wait_for_thread_to_leave(mut process proc.Process, t &proc.Thread) {
+	deadline := time.monotonic_ns() + sibling_exit_grace_ns
+	for thread_listed(mut process, t) && time.monotonic_ns() < deadline {
+		mut timer := time.new_timer(time.TimeSpec{
+			tv_sec:  0
+			tv_nsec: 1000000
+		})
+		mut timer_events := [&timer.event]
+		event.await(mut timer_events, true) or {}
+		timer.disarm()
+		unsafe {
+			timer_events.free()
+			free(timer)
+		}
+	}
 }
 
 // Who adopts the children of `process`: its closest living ancestor that set
@@ -643,14 +704,12 @@ fn find_reaper(process &proc.Process) &proc.Process {
 }
 
 fn notify_process(parent &proc.Process) {
-	parent.threads_lock.acquire()
-	mut target := &proc.Thread(unsafe { nil })
-	if parent.threads.len > 0 {
-		target = parent.threads[0]
-	}
-	parent.threads_lock.release()
+	mut target := proc.get_main_thread(parent)
 	if target == unsafe { nil } {
 		return
+	}
+	defer {
+		proc.unpin_thread(target)
 	}
 	handler := target.sigactions[sigchld].sa_sigaction
 	if handler == sig_dfl || handler == sig_ign {
@@ -668,15 +727,12 @@ fn notify_parent(current_process &proc.Process) {
 		return
 	}
 
-	parent.threads_lock.acquire()
-	mut target := &proc.Thread(unsafe { nil })
-	if parent.threads.len > 0 {
-		target = parent.threads[0]
-	}
-	parent.threads_lock.release()
-
+	mut target := proc.get_main_thread(parent)
 	if target == unsafe { nil } {
 		return
+	}
+	defer {
+		proc.unpin_thread(target)
 	}
 
 	handler := target.sigactions[sigchld].sa_sigaction
@@ -710,19 +766,20 @@ pub fn syscall_set_robust_list(_ voidptr, head u64, len u64) (u64, u64) {
 }
 
 pub fn syscall_get_robust_list(_ voidptr, tid int, head_ptr u64, len_ptr u64) (u64, u64) {
-	mut target := proc.current_thread()
+	mut head := proc.current_thread().robust_list_head
 	if tid != 0 {
-		target = proc.thread_by_tid(tid)
+		target := proc.get_thread(tid)
 		if target == unsafe { nil } {
 			return errno.err, errno.esrch
 		}
+		head = target.robust_list_head
+		proc.unpin_thread(target)
 	}
 
 	if head_ptr == 0 || len_ptr == 0 {
 		return errno.err, errno.efault
 	}
 
-	head := target.robust_list_head
 	len := robust_list_head_size
 
 	if !usercopy.copy_to_user(head_ptr, voidptr(&head), sizeof(u64)) {

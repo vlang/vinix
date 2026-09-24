@@ -611,6 +611,9 @@ fn signal_process(mut target proc.Process, signal int) bool {
 			break
 		}
 	}
+	if chosen != unsafe { nil } {
+		proc.pin_thread(chosen)
+	}
 	target.threads_lock.release()
 
 	if chosen == unsafe { nil } {
@@ -618,6 +621,7 @@ fn signal_process(mut target proc.Process, signal int) bool {
 	}
 
 	sendsig(chosen, u8(signal))
+	proc.unpin_thread(chosen)
 	return true
 }
 
@@ -726,8 +730,17 @@ fn signal_thread(tgid int, tid int, signal int) (u64, u64) {
 		return errno.err, errno.einval
 	}
 
-	mut target := proc.thread_by_tid(tid)
-	if target == unsafe { nil } || katomic.load(&target.is_dead) {
+	// Go preempts its threads with tgkill(SIGURG) from every CPU, and those
+	// threads come and go all the time; the pin keeps a target that exits in the
+	// meantime from being freed and reused before the signal is on it.
+	mut target := proc.get_thread(tid)
+	if target == unsafe { nil } {
+		return errno.err, errno.esrch
+	}
+	defer {
+		proc.unpin_thread(target)
+	}
+	if katomic.load(&target.is_dead) {
 		return errno.err, errno.esrch
 	}
 	if tgid > 0 && target.process.pid != tgid {
