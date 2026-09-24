@@ -241,8 +241,12 @@ pub fn gpu_exec_fiq_trace(phase u64, cntv_ctl u64) {
 }
 
 pub fn initialise() {
+	// The kernel acts with every capability: file permissions are lifted by
+	// capabilities, not by a uid of zero, and kernel threads create files
+	// wherever the initramfs puts them.
 	kernel_process = &proc.Process{
 		pagemap: &kernel_pagemap
+		caps:    proc.full_capabilities()
 	}
 
 	// Release the secondary CPUs into the scheduler.

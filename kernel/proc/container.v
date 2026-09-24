@@ -82,6 +82,8 @@ pub const cap_all = (u64(1) << (cap_last_cap + 1)) - 1
 
 pub const cap_chown = 0
 pub const cap_dac_override = 1
+pub const cap_dac_read_search = 2
+pub const cap_fowner = 3
 pub const cap_kill = 5
 pub const cap_setgid = 6
 pub const cap_setuid = 7
