@@ -170,7 +170,7 @@ pub fn syscall_mknodat(_ voidptr, dirfd int, _path charptr, mode u32, dev u64) (
 	if unsafe { target_node != 0 } {
 		return errno.err, errno.eexist
 	}
-	if parent_of_tgt_node.read_only {
+	if read_only(parent_of_tgt_node) {
 		return errno.err, errno.erofs
 	}
 	require_access(parent_of_tgt_node, access_write | access_exec) or {

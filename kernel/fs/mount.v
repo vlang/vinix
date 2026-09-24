@@ -606,6 +606,35 @@ fn is_beneath(node &VFSNode, ancestor &VFSNode) bool {
 	return false
 }
 
+// Whether the caller's namespace has made the mount `node` lies in read-only.
+// The nearest mount root above the node decides. A bind mount shares its
+// nodes with the tree it was made from, so the same directory can be
+// read-only in a container, after runc remounts its rootfs with MS_RDONLY,
+// and writable for the daemon outside.
+fn in_read_only_mount(node &VFSNode) bool {
+	mut table := table_of(calling_process())
+	if table == unsafe { nil } {
+		return false
+	}
+	table.lock.acquire()
+	defer {
+		table.lock.release()
+	}
+	mut current := unsafe { node }
+	for _ in 0 .. 4096 {
+		if current == unsafe { nil } {
+			return false
+		}
+		for i := table.mounts.len - 1; i >= 0; i-- {
+			if voidptr(table.mounts[i].root) == voidptr(current) {
+				return table.mounts[i].flags & ms_rdonly != 0
+			}
+		}
+		current = current.parent
+	}
+	return false
+}
+
 fn find_mount(mut table MountTable, root &VFSNode) &Mount {
 	table.lock.acquire()
 	defer {

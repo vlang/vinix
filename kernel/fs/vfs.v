@@ -273,6 +273,12 @@ fn get_parent_dir(dirfd int, path string) ?&VFSNode {
 	return parent
 }
 
+// Whether a change may not be made through `node`: its filesystem is
+// read-only, or the mount it is in has been made so.
+fn read_only(node &VFSNode) bool {
+	return node.read_only || in_read_only_mount(node)
+}
+
 pub fn get_node(parent &VFSNode, path string, follow_links bool) ?&VFSNode {
 	return get_node_with_credentials(parent, path, follow_links, true)
 }
@@ -358,7 +364,7 @@ pub fn symlink(parent &VFSNode, dest string, target string) ?&VFSNode {
 		return none
 	}
 
-	if parent_of_tgt_node.read_only { errno.set(errno.erofs); return none }
+	if read_only(parent_of_tgt_node) { errno.set(errno.erofs); return none }
 	require_access(parent_of_tgt_node, access_write | access_exec)?
 	target_node = parent_of_tgt_node.filesystem.symlink(parent_of_tgt_node, dest, basename)
 	if target_node == unsafe { nil } { return none }
@@ -381,9 +387,9 @@ pub fn link(parent &VFSNode, dest string, target string) ?&VFSNode {
 
 	_, mut dest_node, _ := walk_path(calling_root(), dest, 0, true)
 	if dest_node == unsafe { nil } { return none }
-	if dest_node.read_only { errno.set(errno.erofs); return none }
+	if read_only(dest_node) { errno.set(errno.erofs); return none }
 
-	if parent_of_tgt_node.read_only { errno.set(errno.erofs); return none }
+	if read_only(parent_of_tgt_node) { errno.set(errno.erofs); return none }
 	require_access(parent_of_tgt_node, access_write | access_exec)?
 	target_node = parent_of_tgt_node.filesystem.link(parent_of_tgt_node, dest, mut dest_node) ?
 	if target_node == unsafe { nil } { return none }
@@ -399,7 +405,7 @@ pub fn link(parent &VFSNode, dest string, target string) ?&VFSNode {
 pub fn unlink(parent &VFSNode, name string, remove_dir bool) ? {
 	mut parent_of_tgt, mut node, basename := path2node(parent, name)
 	if node == unsafe { nil } || parent_of_tgt == unsafe { nil } { return none }
-	if node.read_only || parent_of_tgt.read_only { errno.set(errno.erofs); return none }
+	if read_only(node) || read_only(parent_of_tgt) { errno.set(errno.erofs); return none }
 	if !may_remove(parent_of_tgt, node) { errno.set(errno.eacces); return none }
 	if basename == '.' || basename == '..' || basename == '' { errno.set(errno.einval); return none }
 	// Something mounted here, in this or any other namespace, keeps the name.
@@ -479,7 +485,7 @@ pub fn internal_create(parent &VFSNode, name string, mode u32) ?&VFSNode {
 		return none
 	}
 
-	if parent_of_tgt_node.read_only { errno.set(errno.erofs); return none }
+	if read_only(parent_of_tgt_node) { errno.set(errno.erofs); return none }
 	require_access(parent_of_tgt_node, access_write | access_exec)?
 	target_node = parent_of_tgt_node.filesystem.create(parent_of_tgt_node, basename, mode)
 	if target_node == unsafe { nil } { return none }
@@ -777,7 +783,7 @@ pub fn syscall_openat(_ voidptr, dirfd int, _path charptr, flags int, mode u32) 
 		return errno.err, errno.eisdir
 	}
 
-	if node.read_only && ((flags & 3) != 0 || flags & resource.o_trunc != 0) {
+	if read_only(node) && ((flags & 3) != 0 || flags & resource.o_trunc != 0) {
 		return errno.err, errno.erofs
 	}
 	if flags & resource.o_trunc != 0 && stat.isreg(node.resource.stat.mode) {
@@ -1099,7 +1105,7 @@ pub fn syscall_linkat(_ voidptr, olddirfd int, _oldpath charptr, newdirfd int, _
 		return errno.err, errno.eacces
 	}
 
-	if newparent.read_only || old_node.read_only { return errno.err, errno.erofs }
+	if read_only(newparent) || read_only(old_node) { return errno.err, errno.erofs }
 	mut new_node := newparent.filesystem.link(newparent, basename, mut old_node) or {
 		return errno.err, errno.get()
 	}
@@ -1126,7 +1132,7 @@ pub fn syscall_fchmod(_ voidptr, fdnum int, mode u32) (u64, u64) {
 
 	if fd.handle.node != unsafe { nil } {
 		node := unsafe { &VFSNode(fd.handle.node) }
-		if node.read_only { return errno.err, errno.erofs }
+		if read_only(node) { return errno.err, errno.erofs }
 	}
 	if !owns_resource(fd.handle.resource.stat.uid) {
 		return errno.err, errno.eperm
@@ -1156,7 +1162,7 @@ pub fn syscall_fchmodat(_ voidptr, dirfd int, _path charptr, mode u32) (u64, u64
 
 	parent := get_parent_dir(dirfd, path) or { return errno.err, errno.get() }
 	mut node := get_node(parent, path, true) or { return errno.err, errno.get() }
-	if node.read_only {
+	if read_only(node) {
 		return errno.err, errno.erofs
 	}
 	if !owns_resource(node.resource.stat.uid) {
@@ -1421,8 +1427,8 @@ pub fn rename(oldparent &VFSNode, oldpath string, newparent &VFSNode, newpath st
 		return none
 	}
 
-	if old_parent_of.read_only || new_parent_of.read_only || old_node.read_only
-		|| (new_node != unsafe { nil } && new_node.read_only) {
+	if read_only(old_parent_of) || read_only(new_parent_of) || read_only(old_node)
+		|| (new_node != unsafe { nil } && read_only(new_node)) {
 		errno.set(errno.erofs)
 		return none
 	}
@@ -1721,7 +1727,7 @@ pub fn syscall_fchownat(_ voidptr, dirfd int, _path charptr, uid u32, gid u32, f
 		}
 		mut res := fd.handle.resource
 		if fd.handle.node != unsafe { nil }
-			&& unsafe { &VFSNode(fd.handle.node) }.read_only {
+			&& read_only(unsafe { &VFSNode(fd.handle.node) }) {
 			return errno.err, errno.erofs
 		}
 		if !may_chown(res.stat.uid, uid, gid) {
@@ -1738,7 +1744,7 @@ pub fn syscall_fchownat(_ voidptr, dirfd int, _path charptr, uid u32, gid u32, f
 
 	follow_links := flags & at_symlink_nofollow == 0
 	mut node := get_node(parent, path, follow_links) or { return errno.err, errno.get() }
-	if node.read_only { return errno.err, errno.erofs }
+	if read_only(node) { return errno.err, errno.erofs }
 	mut res := node.resource
 	if !may_chown(res.stat.uid, uid, gid) {
 		return errno.err, errno.eperm
@@ -1758,7 +1764,7 @@ pub fn syscall_fchown(_ voidptr, fdnum int, uid u32, gid u32) (u64, u64) {
 
 	mut res := fd.handle.resource
 	if fd.handle.node != unsafe { nil }
-		&& unsafe { &VFSNode(fd.handle.node) }.read_only {
+		&& read_only(unsafe { &VFSNode(fd.handle.node) }) {
 		return errno.err, errno.erofs
 	}
 	if !may_chown(res.stat.uid, uid, gid) {
@@ -1860,7 +1866,7 @@ pub fn syscall_utimensat(_ voidptr, dirfd int, _path charptr, times u64, flags i
 			return errno.err, errno.get()
 		}
 	}
-	if node.read_only { return errno.err, errno.erofs }
+	if read_only(node) { return errno.err, errno.erofs }
 
 	now := time.clock_now(time.clock_type_realtime) or { time.TimeSpec{} }
 	mut requested := [2]time.TimeSpec{init: now}
