@@ -315,8 +315,11 @@ fn syscall_linux_writev(gpr_state voidptr, fdnum int, iov_ptr u64, iovcnt int) (
 fn syscall_linux_getdents64(gpr_state voidptr, fdnum int, dirp u64, count u64) (u64, u64) {
 	mut offset := u64(0)
 	for offset + 19 < count { // minimum dirent64 size: 19 bytes + 1 name char
+		// Passed as `mut`, not `mut &`: V heap-allocates a local whose address
+		// is taken for a call with multiple results, and nothing frees it.
+		// That was a kilobyte for every entry read.
 		mut dirent := stat.Dirent{}
-		ret, err := fs.syscall_readdir(gpr_state, fdnum, mut &dirent)
+		ret, err := fs.syscall_readdir(gpr_state, fdnum, mut dirent)
 		if err != 0 {
 			if offset > 0 {
 				return offset, 0
@@ -808,7 +811,7 @@ fn syscall_linux_statx(gpr_state voidptr, dirfd int, path charptr, flags int, _m
 	}
 
 	mut vinix_stat := stat.Stat{}
-	ret, err := fs.syscall_fstatat(gpr_state, dirfd, path, &vinix_stat, flags)
+	ret, err := fs.syscall_fstatat(gpr_state, dirfd, path, unsafe { &vinix_stat }, flags)
 	if err != 0 {
 		return ret, err
 	}
@@ -845,7 +848,7 @@ fn convert_stat_to_linux(src &stat.Stat, dst u64) {
 // fstatat wrapper: call Vinix fstatat with a local buffer, then convert to Linux layout.
 fn syscall_linux_fstatat(gpr_state voidptr, dirfd int, path charptr, linux_buf u64, flags int) (u64, u64) {
 	mut vinix_stat := stat.Stat{}
-	ret, err := fs.syscall_fstatat(gpr_state, dirfd, path, &vinix_stat, flags)
+	ret, err := fs.syscall_fstatat(gpr_state, dirfd, path, unsafe { &vinix_stat }, flags)
 	if err != 0 {
 		return ret, err
 	}
@@ -856,7 +859,7 @@ fn syscall_linux_fstatat(gpr_state voidptr, dirfd int, path charptr, linux_buf u
 // fstat wrapper: call Vinix fstat with a local buffer, then convert to Linux layout.
 fn syscall_linux_fstat(gpr_state voidptr, fdnum int, linux_buf u64) (u64, u64) {
 	mut vinix_stat := stat.Stat{}
-	ret, err := fs.syscall_fstat(gpr_state, fdnum, &vinix_stat)
+	ret, err := fs.syscall_fstat(gpr_state, fdnum, unsafe { &vinix_stat })
 	if err != 0 {
 		return ret, err
 	}

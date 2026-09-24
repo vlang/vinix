@@ -256,7 +256,8 @@ pub fn syscall_ppoll(_ voidptr, user_fds u64, nfds u64, user_timeout u64, user_s
 		if !usercopy.copy_from_user(voidptr(&timeout), user_timeout, sizeof(time.TimeSpec)) {
 			return errno.err, errno.efault
 		}
-		timeout_ptr = &timeout
+		// In unsafe, so that timeout stays on the stack: see getdents64.
+		timeout_ptr = unsafe { &timeout }
 	}
 
 	mut sigmask := u64(0)

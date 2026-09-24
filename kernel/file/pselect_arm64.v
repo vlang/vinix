@@ -157,7 +157,8 @@ pub fn syscall_pselect6(_ voidptr, nfds int, readfds u64, writefds u64, exceptfd
 
 	mut timeout_ptr := &time.TimeSpec(unsafe { nil })
 	if timed {
-		timeout_ptr = &deadline
+		// In unsafe, so that deadline stays on the stack: see getdents64.
+		timeout_ptr = unsafe { &deadline }
 	}
 
 	ready, err := ppoll(unsafe { &polls[0] }, u64(polls.len), timeout_ptr, unsafe { nil })

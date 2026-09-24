@@ -143,9 +143,11 @@ fn read_exact(mut res resource.Resource, buf voidptr, offset u64, length u64) ! 
 // translator instead of jumping directly into foreign instructions.
 pub fn architecture(_res &resource.Resource) !u16 {
 	mut res := unsafe { _res }
-	mut header := &Header{}
+	// On the stack: `&Header{}` was a heap block that nothing freed, one for
+	// every exec, as was each program header below.
+	mut header := Header{}
 
-	read_exact(mut res, header, 0, sizeof(Header))!
+	read_exact(mut res, unsafe { &header }, 0, sizeof(Header))!
 	if unsafe { C.memcmp(&header.ident, c'\177ELF', 4) } != 0 {
 		return error('elf: Invalid magic')
 	}
@@ -179,10 +181,10 @@ fn load_impl(_pagemap &memory.Pagemap, _res &resource.Resource, _base u64, trace
 	mut pagemap := unsafe { _pagemap }
 	mut base := _base
 
-	mut header := &Header{}
+	mut header := Header{}
 
 	exec_trace(trace, image, 'reading ELF header')
-	read_exact(mut res, header, 0, sizeof(Header))!
+	read_exact(mut res, unsafe { &header }, 0, sizeof(Header))!
 	exec_trace(trace, image, 'ELF header read')
 
 	if unsafe { C.memcmp(&header.ident, c'\177ELF', 4) } != 0 {
@@ -248,12 +250,13 @@ fn load_impl(_pagemap &memory.Pagemap, _res &resource.Resource, _base u64, trace
 	}
 
 	for i := u64(0); i < header.ph_num; i++ {
-		mut phdr := &ProgramHdr{}
+		mut phdr := ProgramHdr{}
 
 		if trace {
 			println('exec[gpu]/elf ${image}: reading program header ${i + 1}/${header.ph_num}')
 		}
-		read_exact(mut res, phdr, header.phoff + (sizeof(ProgramHdr) * i), sizeof(ProgramHdr))!
+		read_exact(mut res, unsafe { &phdr }, header.phoff + (sizeof(ProgramHdr) * i),
+			sizeof(ProgramHdr))!
 		if trace {
 			println('exec[gpu]/elf ${image}: program header ${i + 1} type=${phdr.p_type} flags=0x${phdr.p_flags:x}')
 		}
