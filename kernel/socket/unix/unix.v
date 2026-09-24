@@ -184,7 +184,7 @@ fn (mut this UnixSocket) read(_handle voidptr, buf voidptr, _loc u64, _count u64
 		mut events := [&this.event]
 		event.await(mut events, true) or {
 			unsafe { events.free() }
-			errno.set(errno.eintr)
+			errno.set(proc.interrupted_errno)
 			return none
 		}
 		unsafe { events.free() }
@@ -295,7 +295,10 @@ pub fn (mut this UnixSocket) recv_seqpacket(_handle voidptr, buf voidptr, count 
 		mut events := [&this.event]
 		event.await_from_generation(mut events, true, 0, generation) or {
 			unsafe { events.free() }
-			errno.set(errno.eintr)
+			// Nothing was received: SA_RESTART runs the call again, as on
+			// Linux. runc's init reads its sync socket with a bare recvfrom()
+			// while Go preempts it with SIGURG, and failed with EINTR.
+			errno.set(proc.interrupted_errno)
 			return none
 		}
 		unsafe { events.free() }
@@ -373,8 +376,9 @@ pub fn (mut this UnixSocket) write_with_fds(_handle voidptr, buf voidptr, _count
 	}
 	// A SOCK_SEQPACKET record is all-or-nothing, so one larger than the whole
 	// receive buffer can never be delivered whole and must be refused rather
-	// than truncated into a bogus boundary.
-	if peer.is_seqpacket() && _count > peer.capacity {
+	// than truncated into a bogus boundary. A peer that has closed has no
+	// buffer left at all; that is EPIPE, below, not a message too long.
+	if peer.is_seqpacket() && _count > peer.capacity && !peer.closed {
 		errno.set(errno.emsgsize)
 		return none
 	}
@@ -410,7 +414,7 @@ pub fn (mut this UnixSocket) write_with_fds(_handle voidptr, buf voidptr, _count
 		mut events := [&peer.event]
 		event.await(mut events, true) or {
 			unsafe { events.free() }
-			errno.set(errno.eintr)
+			errno.set(proc.interrupted_errno)
 			return none
 		}
 		unsafe { events.free() }
@@ -772,7 +776,7 @@ fn (mut this UnixSocket) accept(_handle voidptr) ?&resource.Resource {
 		mut events := [&this.event]
 		event.await(mut events, true) or {
 			unsafe { events.free() }
-			errno.set(errno.eintr)
+			errno.set(proc.interrupted_errno)
 			return none
 		}
 		unsafe { events.free() }
@@ -986,7 +990,7 @@ fn (mut this UnixSocket) recvmsg(_handle voidptr, msg &sock_pub.MsgHdr, flags in
 		mut events := [&this.event]
 		event.await(mut events, true) or {
 			unsafe { events.free() }
-			errno.set(errno.eintr)
+			errno.set(proc.interrupted_errno)
 			return none
 		}
 		unsafe { events.free() }

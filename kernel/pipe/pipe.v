@@ -237,7 +237,9 @@ fn (mut this Pipe) read(_handle voidptr, buf voidptr, _loc u64, _count u64) ?i64
 		mut events := [&this.event]
 		event.await_from_generation(mut events, true, 0, generation) or {
 			unsafe { events.free() }
-			errno.set(errno.eintr)
+			// Nothing was read: a signal handler installed with SA_RESTART
+			// has the call run again, as on Linux, instead of failing it.
+			errno.set(proc.interrupted_errno)
 			return none
 		}
 		unsafe { events.free() }
@@ -339,7 +341,7 @@ fn (mut this Pipe) write(handle voidptr, buf voidptr, _loc u64, _count u64) ?i64
 				if written != 0 {
 					return i64(written)
 				}
-				errno.set(errno.eintr)
+				errno.set(proc.interrupted_errno)
 				return none
 			}
 			unsafe { events.free() }
