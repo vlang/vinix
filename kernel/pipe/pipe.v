@@ -9,6 +9,7 @@ import errno
 import file
 import katomic
 import proc
+import time
 
 // Keep POSIX's atomic-write guarantee at one page, but give the circular
 // buffer enough room for ordinary protocol messages. A page-sized capacity
@@ -66,15 +67,23 @@ pub fn create() ?&Pipe {
 
 // A named FIFO. Nothing has it open yet, and the node that names it holds the
 // one reference that keeps it alive between opens.
+// A FIFO's buffer is allocated when an end is first opened and freed when
+// the last one closes. A FIFO that only has a name costs no buffer: a
+// container runtime leaves such names behind, containerd its shim's log FIFO
+// for every container.
 pub fn create_fifo(mode u32) ?&Pipe {
 	mut p := &Pipe{
-		data:     unsafe { malloc(pipe_capacity) }
+		data:     unsafe { nil }
 		capacity: pipe_capacity
 		refcount: 1
 		fifo:     true
 	}
 	p.stat.mode = (mode & 0o7777) | stat.ififo
 	p.stat.nlink = 1
+	now := time.clock_now(time.clock_type_realtime) or { time.TimeSpec{} }
+	p.stat.atim = now
+	p.stat.mtim = now
+	p.stat.ctim = now
 	return p
 }
 
@@ -92,6 +101,14 @@ fn (mut this Pipe) open(flags int) ?&resource.Resource {
 	}
 	nonblock := flags & resource.o_nonblock != 0
 	this.l.acquire()
+	if this.data == unsafe { nil } {
+		this.data = unsafe { malloc(this.capacity) }
+		if this.data == unsafe { nil } {
+			this.l.release()
+			errno.set(errno.enomem)
+			return none
+		}
+	}
 	match flags & resource.o_accmode {
 		resource.o_rdonly {
 			this.readers++
@@ -410,7 +427,12 @@ fn (mut this Pipe) unref(handle voidptr) ? {
 	this.l.acquire()
 	// A named FIFO node unlinked through the VFS is unref'd with no open
 	// Handle: there is no read/write side to account for, only the reference.
-	accmode := if handle == unsafe { nil } { -1 } else { open_handle.flags & resource.o_accmode }
+	// Nor is there for an O_PATH descriptor, which open() did not count.
+	accmode := if handle == unsafe { nil } || (this.fifo && open_handle.flags & resource.o_path != 0) {
+		-1
+	} else {
+		open_handle.flags & resource.o_accmode
+	}
 	match accmode {
 		resource.o_rdonly {
 			this.readers--
@@ -446,6 +468,8 @@ fn (mut this Pipe) unref(handle voidptr) ? {
 		this.used = 0
 		this.read_ptr = 0
 		this.write_ptr = 0
+		unsafe { free(this.data) }
+		this.data = unsafe { nil }
 	}
 	still_referenced := katomic.dec(mut &this.refcount)
 	this.l.release()
