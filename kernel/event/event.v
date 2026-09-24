@@ -29,11 +29,11 @@ fn attach_listeners(mut events []&eventstruct.Event, mut t proc.Thread) {
 	for i := u64(0); i < events.len; i++ {
 		mut e := events[i]
 
-		if e.listeners_i == eventstruct.max_listeners {
+		if !e.reserve() {
 			panic('event listeners exhausted')
 		}
 
-		mut listener := &e.listeners[e.listeners_i]
+		mut listener := e.slot(e.listeners_i)
 
 		listener.thrd = voidptr(t)
 		listener.which = i
@@ -54,14 +54,17 @@ fn detach_listeners(mut t proc.Thread) {
 		mut e := t.attached_events[i]
 
 		for j := u64(0); j < e.listeners_i; j++ {
-			mut listener := &e.listeners[j]
+			mut listener := e.slot(j)
 
 			if listener.thrd != voidptr(t) {
 				continue
 			}
 
-			e.listeners[j] = e.listeners[e.listeners_i - 1]
+			unsafe {
+				*listener = *e.slot(e.listeners_i - 1)
+			}
 			e.listeners_i--
+			e.shrink()
 
 			break
 		}
@@ -211,13 +214,14 @@ pub fn trigger(mut e eventstruct.Event, drop bool) u64 {
 
 	mut preserve_pending := false
 	for i := u64(0); i < e.listeners_i; i++ {
-		mut t := unsafe { &proc.Thread(e.listeners[i].thrd) }
+		listener := e.slot(i)
+		mut t := unsafe { &proc.Thread(listener.thrd) }
 
 		if katomic.load(&t.is_in_queue) {
 			preserve_pending = true
 			continue
 		}
-		t.which_event = e.listeners[i].which
+		t.which_event = listener.which
 
 		if !sched.enqueue_thread(t, false) {
 			preserve_pending = true
@@ -230,6 +234,7 @@ pub fn trigger(mut e eventstruct.Event, drop bool) u64 {
 	ret := e.listeners_i
 
 	e.listeners_i = 0
+	e.shrink()
 
 	return ret
 }
