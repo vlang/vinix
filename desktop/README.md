@@ -202,13 +202,20 @@ constructors at compile time; no document parser or expression interpreter
 runs in the Calculator process. The compiled tree is reused between requests
 and only its display text changes.
 
-The window manager owns five action prefixes — `taskbar.`, `task.`, `win.`,
-`shortcut.` and `start.` — and treats everything else as an application's,
-routing it to whichever window the click landed in. That is also what decides
-it between two open copies of the same application. Because the rule is "not
-mine", an application names its events whatever suits it: the Calculator's `+`
-and the file browser's `files.row.3` both arrive without the window manager
-parsing either.
+The window manager uses reserved prefixes for its own action selectors,
+including `taskbar.`, `task.`, `win.`, `shortcut.`, and `start.`. Each rendered
+hit target also carries its origin. Compositor selectors are interpreted by the
+desktop; selectors supplied by an app remain inside that app's world, even
+when their text matches a compositor prefix. The app world's dynamic fallback
+routes arbitrary selectors over the private application pipe to the window
+that supplied the target, similar to [SBP's star selector](https://github.com/okTurtles/sbp/blob/master/docs/sbp-api.md#sbpselectorsregister).
+That is how two copies of an application keep their actions separate: neither
+the Calculator's `+` nor the file browser's `files.row.3` needs interpretation
+by the window manager.
+
+The compositor has explicit bridges for its own Files context-menu requests.
+Run `vinix-desktop --trace-selectors` to log the world and selector of each
+high-level pointer action; non-printable and long app ids are redacted.
 
 Add a built-in application by adding an `AppFactory` to `available_apps` in
 `app.v`; it then has a wallpaper shortcut and a Start-menu entry. A new ui2

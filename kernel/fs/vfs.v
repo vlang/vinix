@@ -274,9 +274,14 @@ pub fn syscall_mount(_ voidptr, src charptr, tgt charptr, fs_type charptr, mount
 		return errno.err, errno.eperm
 	}
 
-	source := unsafe { cstring_to_vstring(src) }
-	target := unsafe { cstring_to_vstring(tgt) }
-	fstype := unsafe { cstring_to_vstring(fs_type) }
+	// Copy every pathname and type before resolution. The caller may unmap or
+	// change its buffers after the copy, but VFS only sees our owned strings.
+	source := usercopy.copy_cstring_from_user(u64(src), 4096) or { return errno.err, errno.get() }
+	defer { unsafe { source.free() } }
+	target := usercopy.copy_cstring_from_user(u64(tgt), 4096) or { return errno.err, errno.get() }
+	defer { unsafe { target.free() } }
+	fstype := usercopy.copy_cstring_from_user(u64(fs_type), 4096) or { return errno.err, errno.get() }
+	defer { unsafe { fstype.free() } }
 
 	// TODO: Not ignore mountflags and data once the current system supports it.
 	curr_dir := proc.current_thread().process.current_directory
@@ -296,6 +301,7 @@ pub fn syscall_umount(_ voidptr, tgt charptr, flags u64) (u64, u64) {
 
 pub fn mount(parent &VFSNode, source string, target string, filesystem string) ? {
 	if filesystem !in filesystems {
+		errno.set(errno.enodev)
 		return none
 	}
 

@@ -711,7 +711,7 @@ fn (mut d Desktop) open_create_context_menu(x int, y int) bool {
 		return false
 	}
 	d.cancel_file_context_rename()
-	underlying := d.hit_action(x, y)
+	underlying, world := d.hit_action_world(x, y)
 	for i := d.windows.len - 1; i >= 0; i-- {
 		window := &d.windows[i]
 		if window.minimized || x < window.x || x >= window.x + window.width || y < window.y
@@ -723,7 +723,7 @@ fn (mut d Desktop) open_create_context_menu(x int, y int) bool {
 			&& y >= body_top {
 			app_index := window.app_index
 			window_id := window.id
-			has_item := files_context_row_action(underlying)
+			has_item := world == .application && files_context_row_action(underlying)
 			if has_item {
 				payload := files_context_select_prefix + underlying
 				d.apps[app_index].handle(payload) or {
@@ -740,7 +740,7 @@ fn (mut d Desktop) open_create_context_menu(x int, y int) bool {
 		d.close_create_context_menu()
 		return false
 	}
-	if underlying.starts_with(desktop_file_action_prefix) {
+	if world == .desktop && underlying.starts_with(desktop_file_action_prefix) {
 		index := underlying[desktop_file_action_prefix.len..].int()
 		if index >= 0 && index < desktop_directory_state.entries.len {
 			path := create_item_path(desktop_directory, desktop_directory_state.entries[index].name)
@@ -814,8 +814,13 @@ fn (mut d Desktop) create_context_left_down(x int, y int) bool {
 	if !create_context_menu.visible {
 		return false
 	}
-	action := d.hit_action(x, y)
+	action, world := d.hit_action_world(x, y)
+	if world == .application {
+		d.close_create_context_menu()
+		return false
+	}
 	if action == create_context_panel {
+		d.trace_selector(action, world)
 		create_context_menu.swallow_left_release = true
 		return true
 	}
@@ -823,6 +828,7 @@ fn (mut d Desktop) create_context_left_down(x int, y int) bool {
 		d.close_create_context_menu()
 		return false
 	}
+	d.trace_selector(action, world)
 	target := create_context_menu.target
 	app_index := create_context_menu.app_index
 	item_path := if create_context_menu.item_path.len > 0 {

@@ -16,10 +16,9 @@ import ui2
 // its taskbar entry.
 // Wallpaper shortcuts carry the index of the application they open.
 const action_shortcut_prefix = 'shortcut.'
-// The desktop's own actions all begin with one of these. An action that does
-// not is an application's, and is routed to whichever window it was clicked
-// in — which is what lets a native application name its events whatever it
-// likes, ui2's `__qml_...` or the file browser's `files.row.3` alike.
+// These prefixes identify the desktop's own selectors only when the hit target
+// came from the desktop world. An application's selectors are opaque, even if
+// their spelling collides with one of these prefixes.
 const desktop_action_prefixes = ['taskbar.', 'task.', 'win.', 'shortcut.', 'start.',
 	action_switch_prefix, action_workspace_prefix]
 
@@ -128,6 +127,8 @@ mut:
 
 	// Hit targets collected by the last render pass, in painting order.
 	targets []HitTarget
+	// Optional monitor for high-level pointer selectors from both UI worlds.
+	trace_selectors bool
 
 	// Application clients. Native apps live in separate processes; a window
 	// points to its compositor-side proxy by index.
@@ -820,8 +821,8 @@ fn (mut d Desktop) launch_index(index int) {
 // application under the pointer. Hosted ids are ui2's own — it prefixes them
 // `__qml_` — so rather than parse them the window manager routes by where the
 // click landed, which is also what decides it between two open applications.
-fn (mut d Desktop) forward_to_app(x int, y int, action string) {
-	if action.starts_with(ui2_example_action_prefix) {
+fn (mut d Desktop) forward_to_app(x int, y int, action string, world ActionWorld) {
+	if world == .desktop && action.starts_with(ui2_example_action_prefix) {
 		name := action[ui2_example_action_prefix.len..]
 		factory := ui2_example_named(name) or {
 			eprintln('vinix-desktop: unknown ui2 example ${name}')
@@ -847,7 +848,8 @@ fn (mut d Desktop) forward_to_app(x int, y int, action string) {
 		// Capture the desktop, not the Capture window. The compositor will wait
 		// until it has presented a frame with this window hidden before writing
 		// the first pixel. Its taskbar entry remains the way back to Stop.
-		if action == capture_action_take_screenshot || action == capture_action_start_video {
+		if window.title == capture_app_title
+			&& (action == capture_action_take_screenshot || action == capture_action_start_video) {
 			d.capture.owner_window_id = window.id
 			d.minimize(window.id)
 		}
@@ -980,8 +982,8 @@ fn shortcut_rows_for_height(height int) int {
 	return rows
 }
 
-// desktop_owns reports whether an action is the window manager's own. Anything
-// else is an application's, wherever it came from.
+// desktop_owns recognizes compositor selector names after origin has been
+// checked. A matching name supplied by an application remains its own action.
 fn desktop_owns(action string) bool {
 	for prefix in desktop_action_prefixes {
 		if action.starts_with(prefix) {
@@ -1573,21 +1575,22 @@ fn (mut d Desktop) on_pointer_down(x int, y int) {
 	// A fresh primary press supersedes any release that an earlier, incomplete
 	// device report failed to deliver.
 	d.chrome_pointer_capture = false
-	action := d.hit_action(x, y)
+	action, world := d.hit_action_world(x, y)
+	d.trace_selector(action, world)
 	d.set_hover(action)
 	d.dirty = true
 
 	if d.switcher.active {
 		// A click on a tile switches to that window; a click anywhere else
 		// dismisses the switcher and then means whatever it would have meant.
-		if action.starts_with(action_switch_prefix) {
+		if world == .desktop && action.starts_with(action_switch_prefix) {
 			d.switcher_select(action[action_switch_prefix.len..].int())
 			return
 		}
 		d.switcher_close()
 	}
 
-	if action == action_start_toggle {
+	if world == .desktop && action == action_start_toggle {
 		d.start_menu_pointer = true
 		d.toggle_start_menu()
 		return
@@ -1595,7 +1598,7 @@ fn (mut d Desktop) on_pointer_down(x int, y int) {
 
 	if d.start_menu_open {
 		d.start_menu_pointer = true
-		if action.starts_with('start.') {
+		if world == .desktop && action.starts_with('start.') {
 			d.handle_start_action(action)
 			return
 		}
@@ -1604,7 +1607,7 @@ fn (mut d Desktop) on_pointer_down(x int, y int) {
 		d.close_start_menu()
 	}
 
-	resizing_window := action.starts_with('win.') && action.ends_with('.resize')
+	resizing_window := world == .desktop && action.starts_with('win.') && action.ends_with('.resize')
 	if !resizing_window && d.forward_pointer_to_app(x, y, .down, .left, 0) && action == '' {
 		// Raw-surface clicks were already delivered and focused above. Falling
 		// through would interpret their deliberately action-less content as an
@@ -1620,8 +1623,16 @@ fn (mut d Desktop) on_pointer_down(x int, y int) {
 		return
 	}
 
+	// The app world's star selector forwards arbitrary action ids to the app
+	// under the pointer over its private RPC pipe. Their spelling never grants
+	// access to desktop actions, including Start, window chrome and shortcuts.
+	if world == .application {
+		d.forward_to_app(x, y, action, world)
+		return
+	}
+
 	if !desktop_owns(action) {
-		d.forward_to_app(x, y, action)
+		d.forward_to_app(x, y, action, world)
 		return
 	}
 
@@ -1693,8 +1704,29 @@ fn (mut d Desktop) on_pointer_down(x int, y int) {
 	}
 }
 
+fn (d &Desktop) trace_selector(action string, world ActionWorld) {
+	if !d.trace_selectors || action.len == 0 {
+		return
+	}
+	// A remote app supplies its selector text. Keep control bytes and very long
+	// strings out of the compositor log, while retaining readable selectors.
+	mut printable := action.len <= 128
+	for ch in action {
+		if ch < 32 || ch > 126 {
+			printable = false
+			break
+		}
+	}
+	if printable {
+		eprintln('vinix-desktop: selector[${world}] ${action}')
+	} else {
+		eprintln('vinix-desktop: selector[${world}] <${action.len} bytes>')
+	}
+}
+
 fn (mut d Desktop) on_pointer_up(x int, y int) {
-	release_action := d.hit_action(x, y)
+	action, world := d.hit_action_world(x, y)
+	release_action := if world == .desktop { action } else { '' }
 	if d.shortcut_press.app_index >= 0 {
 		// Own the action before launch_index can replace application state that
 		// supplied the current frame's hit targets.
@@ -1762,18 +1794,22 @@ fn (mut d Desktop) on_app_pointer_scroll(x int, y int, scroll int) {
 	}
 }
 
-// hit_action returns the action id of the topmost target under a point. The
-// targets come from the render pass in painting order, so walking backwards
-// finds what the user can actually see.
-fn (d &Desktop) hit_action(x int, y int) string {
+// The render pass records each target's world alongside its selector. Keep
+// that origin attached until dispatch; a string prefix cannot authenticate it.
+fn (d &Desktop) hit_action_world(x int, y int) (string, ActionWorld) {
 	for i := d.targets.len - 1; i >= 0; i-- {
 		target := d.targets[i]
 		if x >= target.x && y >= target.y && x < target.x + target.width
 			&& y < target.y + target.height {
-			return target.action_id
+			return target.action_id, target.world
 		}
 	}
-	return ''
+	return '', .desktop
+}
+
+fn (d &Desktop) hit_action(x int, y int) string {
+	action, _ := d.hit_action_world(x, y)
+	return action
 }
 
 // Hover outlives the frame that produced its hit target. Keep an owned copy:

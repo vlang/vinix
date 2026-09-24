@@ -64,7 +64,11 @@ fn titlebar_click_matches(previous TitlebarClick, id int, x int, y int, now_ms u
 // between the two clicks, so a double click on a maximised title bar restores
 // rather than immediately maximising again.
 fn (mut d Desktop) titlebar_pointer_down_at(previous TitlebarClick, x int, y int, now_ms u64) TitlebarClick {
-	action := d.hit_action(x, y)
+	action, world := d.hit_action_world(x, y)
+	if world == .application {
+		d.on_pointer_down(x, y)
+		return TitlebarClick{}
+	}
 	id := titlebar_action_window_id(action) or {
 		d.on_pointer_down(x, y)
 		return TitlebarClick{}

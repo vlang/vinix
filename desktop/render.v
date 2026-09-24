@@ -22,6 +22,14 @@ module main
 
 import ui2
 
+// Selector names are interpreted only inside the world that produced them.
+// Application ids are opaque to the compositor, even when they use a prefix
+// that also names a desktop command.
+enum ActionWorld {
+	desktop
+	application
+}
+
 // HitTarget is one clickable or draggable region, recorded in painting order.
 struct HitTarget {
 	// A remote application's decoded tree is released as soon as its frame has
@@ -29,6 +37,7 @@ struct HitTarget {
 	// the next render replaces this hit-test table.
 	action_id   string
 	owns_action bool
+	world       ActionWorld
 	x           int
 	y           int
 	width       int
@@ -362,6 +371,7 @@ fn (mut d Desktop) record_target(el ui2.Element, x int, y int, w int, h int) {
 	d.targets << HitTarget{
 		action_id:   if owns_action { action.clone() } else { action }
 		owns_action: owns_action
+		world:       if owns_action { .application } else { .desktop }
 		x:           x
 		y:           y
 		width:       w

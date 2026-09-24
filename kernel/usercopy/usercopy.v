@@ -10,6 +10,7 @@ module usercopy
 
 import memory
 import proc
+import errno
 
 fn valid_user_range(address u64, length u64) bool {
 	if length == 0 {
@@ -74,6 +75,51 @@ fn copy_pagemap(_pagemap &memory.Pagemap, kernel_address voidptr, user_address u
 
 pub fn copy_from_user(destination voidptr, source u64, length u64) bool {
 	return copy_user(destination, source, length, false)
+}
+
+// Copy a NUL-terminated userspace string into owned kernel memory. Read only
+// within the current mapped page before looking for NUL: a terminator at the
+// end of a page must not require the following page to be mapped. max_bytes
+// includes the terminator, as with PATH_MAX-style limits.
+pub fn copy_cstring_from_user(address u64, max_bytes int) ?string {
+	if max_bytes <= 0 {
+		errno.set(errno.einval)
+		return none
+	}
+	if address == 0 {
+		errno.set(errno.efault)
+		return none
+	}
+	mut bytes := []u8{len: max_bytes}
+	defer {
+		unsafe { bytes.free() }
+	}
+	mut copied := 0
+	for copied < max_bytes {
+		if u64(copied) > ~address {
+			errno.set(errno.efault)
+			return none
+		}
+		current := address + u64(copied)
+		page_remaining := int(page_size - (current & (page_size - 1)))
+		chunk := if page_remaining < max_bytes - copied {
+			page_remaining
+		} else {
+			max_bytes - copied
+		}
+		if !copy_from_user(voidptr(&bytes[copied]), current, u64(chunk)) {
+			errno.set(errno.efault)
+			return none
+		}
+		for i in copied .. copied + chunk {
+			if bytes[i] == 0 {
+				return bytes[..i].bytestr()
+			}
+		}
+		copied += chunk
+	}
+	errno.set(errno.enametoolong)
+	return none
 }
 
 pub fn copy_to_user(destination u64, source voidptr, length u64) bool {

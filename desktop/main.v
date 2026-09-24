@@ -46,12 +46,13 @@ const brightness_step = 5
 const desktop_session_ready_path = '/run/vinix-desktop-ready'
 
 struct Options {
-	framebuffer    string = '/dev/fb0'
-	pointer        string = '/dev/pointer'
-	tz_offset      i64
-	frame_interval i64 = default_frame_interval_ms
-	idle_interval  i64 = default_idle_interval_ms
-	stats          bool
+	framebuffer     string = '/dev/fb0'
+	pointer         string = '/dev/pointer'
+	tz_offset       i64
+	frame_interval  i64 = default_frame_interval_ms
+	idle_interval   i64 = default_idle_interval_ms
+	stats           bool
+	trace_selectors bool
 	// Applications to open at startup, by the title on their shortcut. The
 	// desktop is otherwise only reachable through the pointer, which leaves a
 	// scripted boot no way to ask for the one thing worth measuring: how long
@@ -96,6 +97,11 @@ fn parse_options(args []string) Options {
 			options = Options{
 				...options
 				stats: true
+			}
+		} else if arg == '--trace-selectors' {
+			options = Options{
+				...options
+				trace_selectors: true
 			}
 		} else if arg.starts_with('--tz=') {
 			// Hours east of UTC. Vinix has no time zone database, so the
@@ -178,6 +184,7 @@ fn main() {
 		fonts:             fonts
 		shortcut_order:    load_shortcut_order(desktop_home)
 		tz_offset_seconds: options.tz_offset
+		trace_selectors:   options.trace_selectors
 	}
 	gpu_present_startup_stage(c'desktop state allocated')
 	gpu_present_startup_stage(c'loading application icons')

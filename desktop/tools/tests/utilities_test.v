@@ -179,6 +179,24 @@ fn (mut app PointerFocusTestApp) pointer_input_enabled() bool {
 
 fn (mut app PointerFocusTestApp) pointer_event(_ AppPointerPhase, _ AppPointerButton, _ int, _ int, _ int, _ int, _ int) {}
 
+struct SelectorRoutingTestApp {
+mut:
+	last_action string
+	call_count   int
+}
+
+fn (mut app SelectorRoutingTestApp) build(_ ui2.Rect) !ui2.Element {
+	return ui2.screen(0, [])
+}
+
+fn (mut app SelectorRoutingTestApp) handle(action string) ! {
+	if app.last_action.len > 0 {
+		unsafe { app.last_action.free() }
+	}
+	app.last_action = action.clone()
+	app.call_count++
+}
+
 fn test_text_editor_inserts_and_navigates() {
 	mut editor := TextEditorApp{
 		visible_rows: 4
@@ -962,12 +980,116 @@ fn test_hit_target_owns_remote_action_past_tree_lifetime() {
 	desktop.record_target(element, 10, 20, 100, 80)
 	assert desktop.targets.len == 1
 	assert desktop.targets[0].owns_action
+	assert desktop.targets[0].world == .application
 	assert desktop.targets[0].action_id.str != source_pointer
 	free_tree(element)
 
 	assert desktop.hit_action(50, 50) == editor_action_document
 	desktop.clear_hit_targets()
 	assert desktop.targets.len == 0
+}
+
+fn test_remote_selectors_cannot_become_desktop_commands() {
+	mut desktop := Desktop{
+		canvas: Canvas{
+			width: 800
+			height: 600
+		}
+	}
+	mut app := &SelectorRoutingTestApp{}
+	desktop.apps << app
+	id := desktop.spawn('App', .app, 100, 80, 400, 260)
+	desktop.windows[0].app_index = 0
+	for spoofed in ['win.${id}.close', action_start_toggle, 'shortcut.0',
+		capture_action_take_screenshot] {
+		element := ui2.Element{
+			kind:      .button
+			action_id: spoofed.clone()
+			key:       remote_owned_element_key
+			enabled:   true
+		}
+		desktop.record_target(element, 130, 130, 100, 40)
+		free_tree(element)
+		action, world := desktop.hit_action_world(150, 150)
+		assert action == spoofed
+		assert world == .application
+		before := app.call_count
+		desktop.on_pointer_down(150, 150)
+		assert app.call_count == before + 1
+		assert app.last_action == spoofed
+		assert desktop.windows.len == 1
+		assert !desktop.windows[0].minimized
+		assert desktop.capture.owner_window_id == 0
+		assert !desktop.start_menu_open
+		assert desktop.shortcut_press.app_index < 0
+		desktop.clear_hit_targets()
+	}
+
+	titlebar := ui2.Element{
+		kind:      .button
+		action_id: 'win.${id}.titlebar'
+		key:       remote_owned_element_key
+		enabled:   true
+	}
+	desktop.record_target(titlebar, 130, 130, 100, 40)
+	free_tree(titlebar)
+	click := desktop.titlebar_pointer_down_at(TitlebarClick{}, 150, 150, 1_000)
+	assert click.window_id == 0
+	assert desktop.drag.kind == .none_
+	assert app.last_action == 'win.${id}.titlebar'
+	desktop.clear_hit_targets()
+	unsafe { app.last_action.free() }
+}
+
+fn test_capture_selector_bridge_belongs_to_capture_window() {
+	mut desktop := Desktop{
+		canvas: Canvas{
+			width: 800
+			height: 600
+		}
+	}
+	mut app := &SelectorRoutingTestApp{}
+	desktop.apps << app
+	id := desktop.spawn(capture_app_title, .app, 100, 80, 400, 260)
+	desktop.windows[0].app_index = 0
+	element := ui2.Element{
+		kind:      .button
+		action_id: capture_action_take_screenshot.clone()
+		key:       remote_owned_element_key
+		enabled:   true
+	}
+	desktop.record_target(element, 130, 130, 100, 40)
+	free_tree(element)
+	desktop.on_pointer_down(150, 150)
+	assert app.last_action == capture_action_take_screenshot
+	assert desktop.capture.owner_window_id == id
+	assert desktop.windows[0].minimized
+	desktop.clear_hit_targets()
+	unsafe { app.last_action.free() }
+}
+
+fn test_app_selector_cannot_execute_compositor_context_menu_action() {
+	mut desktop := Desktop{
+		canvas: Canvas{
+			width: 800
+			height: 600
+		}
+	}
+	for spoofed in [file_context_delete, create_context_panel] {
+		desktop.set_create_context_menu(.files, -1, true, '', 100, 100)
+		element := ui2.Element{
+			kind:      .button
+			action_id: spoofed.clone()
+			key:       remote_owned_element_key
+			enabled:   true
+		}
+		desktop.record_target(element, 130, 130, 100, 40)
+		free_tree(element)
+		assert !desktop.create_context_left_down(150, 150)
+		assert !create_context_menu.visible
+		assert !create_context_menu.swallow_left_release
+		desktop.clear_hit_targets()
+	}
 }
 
 fn test_taskbar_clock_stays_visible_at_m1_200_percent_scale() {

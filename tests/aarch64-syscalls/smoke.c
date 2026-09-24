@@ -90,7 +90,41 @@ static int denied_operations(void) {
            failed_with_errno(syscall(SYS_reboot, 0, 0, 0, NULL), EPERM, "reboot") &&
            failed_with_errno(syscall(SYS_sethostname, invalid, 1), EPERM, "sethostname invalid pointer") &&
            failed_with_errno(syscall(SYS_setdomainname, invalid, 1), EPERM, "setdomainname invalid pointer") &&
-           failed_with_errno(syscall(SYS_mount, invalid, invalid, invalid, 0, NULL), EPERM, "mount invalid pointers");
+           failed_with_errno(syscall(SYS_mount, invalid, invalid, invalid, 0, NULL), EPERM, "mount invalid pointers") &&
+           failed_with_errno(syscall(SYS_umount2, invalid, 0), EPERM, "umount invalid pointer");
+}
+
+static int mount_rejects_bad_strings(void) {
+    const void *invalid = (const void *)(uintptr_t)1;
+    int valid = failed_with_errno(syscall(SYS_mount, invalid, "/tmp", "tmpfs", 0, NULL),
+                                  EFAULT, "mount source invalid pointer") &&
+                failed_with_errno(syscall(SYS_mount, "", invalid, "tmpfs", 0, NULL),
+                                  EFAULT, "mount target invalid pointer") &&
+                failed_with_errno(syscall(SYS_mount, "", "/tmp", invalid, 0, NULL),
+                                  EFAULT, "mount type invalid pointer") &&
+                failed_with_errno(syscall(SYS_mount, NULL, "/tmp", "tmpfs", 0, NULL),
+                                  EFAULT, "mount null source");
+
+    char overlong[4096];
+    memset(overlong, 'x', sizeof(overlong));
+    valid &= failed_with_errno(syscall(SYS_mount, overlong, "/tmp", "tmpfs", 0, NULL),
+                               ENAMETOOLONG, "mount unterminated source");
+
+    char *pages = mmap(NULL, 8192, PROT_READ | PROT_WRITE,
+                       MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (pages == MAP_FAILED || mprotect(pages + 4096, 4096, PROT_NONE) != 0) {
+        if (pages != MAP_FAILED)
+            munmap(pages, 8192);
+        return 0;
+    }
+    pages[4095] = '\0';
+    valid &= failed_with_errno(syscall(SYS_mount, pages + 4095, "/tmp", "unknownfs", 0, NULL),
+                               ENODEV, "mount terminator at page boundary");
+    pages[4095] = 'x';
+    valid &= failed_with_errno(syscall(SYS_mount, pages + 4095, "/tmp", "tmpfs", 0, NULL),
+                               EFAULT, "mount string crosses into unmapped page");
+    munmap(pages, 8192);
+    return valid;
 }
 
 static int security_child_succeeded(pid_t child) {
@@ -288,8 +322,9 @@ int main(void) {
     check(syscall(SYS_getcpu, &cpu, &node, NULL) == 0 && node == 0,
           "getcpu");
     struct timespec interval;
-    check(sched_rr_get_interval(0, &interval) == 0 && interval.tv_nsec > 0,
-          "sched_rr_get_interval");
+    // The test process uses SCHED_OTHER, which has no round-robin quantum.
+    check(sched_rr_get_interval(0, &interval) == 0 && interval.tv_sec == 0 &&
+              interval.tv_nsec == 0, "sched_rr_get_interval non-RR policy");
     check(membarrier(MEMBARRIER_CMD_QUERY, 0) == 0,
           "membarrier feature query");
 
@@ -334,6 +369,19 @@ int main(void) {
               !strcmp(uts.domainname, "vinix.test"),
           "uname hostname and domainname");
 
+    const char *mount_dir = "/tmp/aarch64-syscall-mount";
+    int mount_ready = mkdir(mount_dir, 0700) == 0 &&
+                      syscall(SYS_mount, "", mount_dir, "tmpfs", 0, NULL) == 0;
+    check(mount_ready, "root mount accepts copied strings");
+    if (mount_ready) {
+        int mounted_file = open("/tmp/aarch64-syscall-mount/probe", O_CREAT | O_RDWR, 0600);
+        check(mounted_file >= 0, "mounted tmpfs remains usable");
+        if (mounted_file >= 0)
+            close(mounted_file);
+    }
+
+    check(mount_rejects_bad_strings(), "root mount checks userspace strings");
+
     pid_t security_child = fork();
     if (security_child == 0) {
         if (setuid(1000) != 0 || geteuid() != 1000) {
@@ -342,7 +390,10 @@ int main(void) {
             fflush(stdout);
             _exit(1);
         }
-        _exit(denied_operations() ? 0 : 2);
+        if (!failed_with_errno(setuid(0), EPERM, "regain root after setuid") ||
+            getuid() != 1000 || geteuid() != 1000)
+            _exit(2);
+        _exit(denied_operations() ? 0 : 3);
     }
     check(security_child_succeeded(security_child),
           "privileged selectors deny non-root callers");
