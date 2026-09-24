@@ -580,7 +580,15 @@ pub fn syscall_waitpid(_ voidptr, pid int, _status &i32, options int) (u64, u64)
 	}
 
 	block := options & wnohang == 0
-	which := event.await(mut events, block) or { return errno.err, errno.eintr }
+	which := event.await(mut events, block) or {
+		// Under WNOHANG this means no child has exited yet, which Linux
+		// reports as 0. EINTR sent libcs that retry interrupted calls -- musl,
+		// and BusyBox's `wait` -- round a loop that never slept.
+		if !block {
+			return 0, 0
+		}
+		return errno.err, errno.eintr
+	}
 
 	if child == unsafe { nil } {
 		child = current_process.children[which]
