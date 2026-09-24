@@ -1652,7 +1652,7 @@ wine.firefox.exited
 Firefox завершил работу.
 -----
 wine.firefox.missing
-Firefox не установлен в этом образе рабочего стола.
+Firefox не установлен. Выполните pkg install firefox в Терминале.
 -----
 wine.firefox.starting
 Запуск Firefox…

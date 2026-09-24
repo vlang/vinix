@@ -1652,7 +1652,7 @@ wine.firefox.exited
 Firefox se ha cerrado.
 -----
 wine.firefox.missing
-Firefox no está instalado en esta imagen del escritorio.
+Firefox no está instalado. Ejecuta pkg install firefox en Terminal.
 -----
 wine.firefox.starting
 Iniciando Firefox…

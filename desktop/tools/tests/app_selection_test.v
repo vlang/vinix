@@ -77,11 +77,17 @@ fn app_selection_test_button_label(state AppSelectionState) string {
 	return button.text
 }
 
-fn test_app_selection_offers_the_four_optional_apps_exclusively() {
-	assert first_run_apps.len == 4
-	assert first_run_apps.map(it.title) == ['Firefox', 'Chromium', 'VOffice', 'Minecraft']
-	assert first_run_apps.map(it.package_name) == ['firefox', 'chromium', 'voffice', 'minecraft']
-	assert app_selection_install_labels.len == first_run_apps.len + 1
+fn test_app_selection_offers_the_optional_apps_this_machine_can_install() {
+	assert first_run_app_catalogue.map(it.title) == ['Firefox', 'Chromium', 'VOffice', 'Minecraft']
+	assert first_run_app_catalogue.map(it.package_name) == ['firefox', 'chromium', 'voffice',
+		'minecraft']
+	$if arm64 {
+		assert first_run_apps.map(it.title) == ['Firefox', 'Chromium', 'VOffice', 'Minecraft']
+	} $else {
+		// VOffice and Minecraft are only packaged for AArch64.
+		assert first_run_apps.map(it.title) == ['Firefox', 'Chromium']
+	}
+	assert app_selection_install_labels.len >= first_run_apps.len + 1
 
 	desktop := app_selection_test_desktop()
 	state := app_selection_test_state()
@@ -108,23 +114,30 @@ fn test_app_selection_clicks_toggle_apps_and_confirm() {
 	assert app_selection_test_button_label(state) == 'Continue'
 	assert state.packages().len == 0
 
-	state.handle_action('apps.toggle.minecraft')
+	state.handle_action('apps.toggle.chromium')
 	state.handle_action('apps.toggle.firefox')
-	state.handle_action('apps.toggle.voffice')
-	state.handle_action('apps.toggle.voffice')
-	assert state.selected_count() == 2
-	assert app_selection_test_button_label(state) == 'Install 2 apps'
-	// Installed in the order offered, not the order clicked.
-	assert state.packages() == ['firefox', 'minecraft']
-	assert !state.complete
+	state.handle_action('apps.toggle.chromium')
+	assert state.selected_count() == 1
+	assert app_selection_test_button_label(state) == 'Install 1 app'
 	desktop := app_selection_test_desktop()
 	begin_frame_elements()
 	root := state.element(&desktop)
 	firefox := app_selection_test_element(root, 'apps.toggle.firefox') or { panic('missing row') }
-	voffice := app_selection_test_element(root, 'apps.toggle.voffice') or { panic('missing row') }
+	chromium := app_selection_test_element(root, 'apps.toggle.chromium') or { panic('missing row') }
 	assert app_selection_test_has_image(firefox, 'builtin:check')
-	assert !app_selection_test_has_image(voffice, 'builtin:check')
+	assert !app_selection_test_has_image(chromium, 'builtin:check')
 	free_tree(root)
+
+	state.handle_action('apps.toggle.chromium')
+	assert app_selection_test_button_label(state) == 'Install 2 apps'
+	// Installed in the order offered, not the order clicked.
+	assert state.packages() == ['firefox', 'chromium']
+	assert !state.complete
+	$if arm64 {
+		state.handle_action('apps.toggle.minecraft')
+		assert state.packages() == ['firefox', 'chromium', 'minecraft']
+		state.handle_action('apps.toggle.minecraft')
+	}
 
 	state.handle_action('unrelated.action')
 	assert state.selected_count() == 2
@@ -166,27 +179,47 @@ fn test_app_selection_skips_apps_the_image_already_has() {
 
 fn test_app_selection_is_keyboard_driven() {
 	mut state := app_selection_test_state()
-	state.installed[1] = true
+	$if arm64 {
+		state.installed[1] = true
 
-	state.key_input(' ')
-	assert state.selected[0]
-	// Tab and Down skip the installed Chromium row; Up wraps back around.
-	state.key_input('\t')
-	assert state.focus == 2
-	state.key_input('\x1b[B')
-	assert state.focus == 3
-	state.key_input('\x1b[B')
-	assert state.focus == 0
-	state.key_input('\x1b[A')
-	assert state.focus == 3
-	state.key_input('3')
-	assert state.selected[2] && state.focus == 2
-	state.key_input('2')
-	assert !state.selected[1]
-	// Control chords and stray escapes never reach desktop shortcuts or the
-	// selection.
-	state.key_input('\x10\x11\x1b')
-	assert state.packages() == ['firefox', 'voffice']
+		state.key_input(' ')
+		assert state.selected[0]
+		// Tab and Down skip the installed Chromium row; Up wraps back around.
+		state.key_input('\t')
+		assert state.focus == 2
+		state.key_input('\x1b[B')
+		assert state.focus == 3
+		state.key_input('\x1b[B')
+		assert state.focus == 0
+		state.key_input('\x1b[A')
+		assert state.focus == 3
+		state.key_input('3')
+		assert state.selected[2] && state.focus == 2
+		state.key_input('2')
+		assert !state.selected[1]
+		// Control chords and stray escapes never reach desktop shortcuts or the
+		// selection.
+		state.key_input('\x10\x11\x1b')
+		assert state.packages() == ['firefox', 'voffice']
+	} $else {
+		state.key_input(' ')
+		assert state.selected[0]
+		// Tab moves to Chromium; Down wraps back to Firefox and Up to Chromium.
+		state.key_input('\t')
+		assert state.focus == 1
+		state.key_input('\x1b[B')
+		assert state.focus == 0
+		state.key_input('\x1b[A')
+		assert state.focus == 1
+		state.key_input('2')
+		assert state.selected[1] && state.focus == 1
+		// A number past the offered apps is ignored.
+		state.key_input('3')
+		// Control chords and stray escapes never reach desktop shortcuts or the
+		// selection.
+		state.key_input('\x10\x11\x1b')
+		assert state.packages() == ['firefox', 'chromium']
+	}
 	assert !state.complete
 
 	state.key_input('\r')
@@ -208,10 +241,14 @@ fn test_app_selection_pending_marker_lifecycle() {
 fn test_first_run_install_command_accepts_only_offered_packages() {
 	assert first_run_install_command('') == ''
 	assert first_run_install_command('gimp ; rm -rf /') == ''
-	command := first_run_install_command('minecraft firefox\nminecraft firefox;reboot\n')
-	assert command.contains('for app in minecraft firefox; do pkg install "\$app"')
+	command := first_run_install_command('chromium firefox\nchromium firefox;reboot\n')
+	assert command.contains('for app in chromium firefox; do pkg install "\$app"')
 	assert !command.contains('reboot')
 	assert command.ends_with('exec /bin/zsh -i')
+	$if !arm64 {
+		// Not offered here, so not installed either.
+		assert first_run_install_command('voffice minecraft') == ''
+	}
 }
 
 fn test_first_run_install_command_reports_failures_and_continues() {
@@ -225,16 +262,16 @@ fn test_first_run_install_command_reports_failures_and_continues() {
 	}
 	os.chmod(fake_pkg, 0o755) or { panic(err) }
 
-	command := first_run_install_command('firefox chromium voffice')
+	command := first_run_install_command('firefox chromium')
 	// Stop where the Terminal would hand over to the interactive shell.
 	script := command.replace('exec /bin/zsh -i', 'exit 0')
 	result := os.execute('PATH="${work}/bin:\$PATH" sh -c ${os.quoted_path(script)}')
 	assert result.exit_code == 0
-	assert os.read_file(log) or { '' } == 'install firefox\ninstall chromium\ninstall voffice\n'
-	assert result.output.contains('Installing the apps chosen during setup: firefox chromium voffice')
+	assert os.read_file(log) or { '' } == 'install firefox\ninstall chromium\n'
+	assert result.output.contains('Installing the apps chosen during setup: firefox chromium')
 	assert result.output.contains('Not installed: chromium. Run pkg install chromium to try again.')
 
-	success := first_run_install_command('voffice').replace('exec /bin/zsh -i', 'exit 0')
+	success := first_run_install_command('firefox').replace('exec /bin/zsh -i', 'exit 0')
 	ok := os.execute('PATH="${work}/bin:\$PATH" sh -c ${os.quoted_path(success)}')
 	assert ok.exit_code == 0
 	assert ok.output.contains('The selected apps are installed.')

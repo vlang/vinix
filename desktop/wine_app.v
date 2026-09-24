@@ -208,8 +208,23 @@ fn (t HostedText) text() string {
 	}
 }
 
+// Release images leave Firefox out: the first-run app page and
+// `pkg install firefox` fetch it from Alpine. Report that from the window
+// rather than starting a private X server for a browser that is not there.
 fn open_firefox(mut _ Desktop) !NativeApp {
-	return open_hosted_x11_app('firefox', '/usr/bin/run-firefox', firefox_surface_width, firefox_surface_height, 'asset:firefox', .firefox_starting, .firefox_missing, .firefox_exited)
+	if C.access(c'/usr/lib/firefox-esr/firefox-esr', C.X_OK) != 0
+		&& C.access(c'/usr/lib/firefox/firefox', C.X_OK) != 0 {
+		return &HostedX11App{
+			surface_width: firefox_surface_width
+			surface_height: firefox_surface_height
+			icon: 'asset:firefox'
+			failed: true
+			failure: .firefox_missing
+		}
+	}
+	return open_hosted_x11_app('firefox', '/usr/bin/run-firefox', firefox_surface_width,
+		firefox_surface_height, 'asset:firefox', .firefox_starting, .firefox_missing,
+		.firefox_exited)
 }
 
 // Chromium is not in the image: `pkg install chromium` fetches it from Alpine.

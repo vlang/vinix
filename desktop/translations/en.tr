@@ -1652,7 +1652,7 @@ wine.firefox.exited
 Firefox exited.
 -----
 wine.firefox.missing
-Firefox is not installed in this desktop image.
+Firefox is not installed. Run pkg install firefox in Terminal.
 -----
 wine.firefox.starting
 Starting Firefox…

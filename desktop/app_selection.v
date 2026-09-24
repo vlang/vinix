@@ -56,16 +56,35 @@ fn (l AppSelectionInstallLabel) text() string {
 // FirstRunApp is one optional application offered during setup. Any one of
 // `installed_paths` being executable means the image already carries it. The
 // title is a product name; detail_text says what it is in the desktop's
-// language.
+// language. `arm64_only` apps have no package for other architectures:
+// VOffice is only published for AArch64, and pkg's Minecraft install uses
+// AArch64 natives.
 struct FirstRunApp {
 	title           string
 	icon            string
 	package_name    string
 	action          string
 	installed_paths []string
+	arm64_only      bool
 }
 
-const first_run_apps = [
+// The apps this machine can install, in the order they are offered.
+const first_run_apps = first_run_app_choices()
+
+fn first_run_app_choices() []FirstRunApp {
+	mut apps := []FirstRunApp{cap: first_run_app_catalogue.len}
+	for app in first_run_app_catalogue {
+		$if !arm64 {
+			if app.arm64_only {
+				continue
+			}
+		}
+		apps << app
+	}
+	return apps
+}
+
+const first_run_app_catalogue = [
 	FirstRunApp{
 		title:           'Firefox'
 		icon:            'asset:firefox'
@@ -86,6 +105,7 @@ const first_run_apps = [
 		package_name:    'voffice'
 		action:          'apps.toggle.voffice'
 		installed_paths: ['/usr/bin/voffice-writer']
+		arm64_only:      true
 	},
 	FirstRunApp{
 		title:           'Minecraft'
@@ -93,6 +113,7 @@ const first_run_apps = [
 		package_name:    'minecraft'
 		action:          'apps.toggle.minecraft'
 		installed_paths: ['/usr/bin/minecraft']
+		arm64_only:      true
 	},
 ]
 
