@@ -208,6 +208,19 @@ fn (mut this TmpFSResource) ensure_paged_locked() bool {
 
 // Add zero-filled pages so the file has at least `page_count` of them.
 fn (mut this TmpFSResource) grow_pages_locked(page_count u64) bool {
+	// Room is made here, doubling, rather than by pushing: an array grown by
+	// << leaves its old buffer behind in this kernel, one for every step of a
+	// file written a page at a time.
+	if page_count > u64(this.pages.cap) {
+		mut wanted := if this.pages.cap < 16 { 16 } else { this.pages.cap * 2 }
+		if u64(wanted) < page_count {
+			wanted = int(page_count)
+		}
+		mut larger := []u64{cap: wanted}
+		larger << this.pages
+		unsafe { this.pages.free() }
+		this.pages = larger
+	}
 	for u64(this.pages.len) < page_count {
 		phys := memory.pmm_alloc(1)
 		if phys == unsafe { nil } {
