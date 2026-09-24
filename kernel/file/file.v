@@ -378,19 +378,23 @@ pub fn fdnum_close(_process &proc.Process, fdnum int, do_lock bool) ? {
 	if do_lock {
 		process.fds_lock.acquire()
 	}
-	defer {
+	mut fd := unsafe { &FD(process.fds[fdnum]) }
+	if fd == unsafe { nil } {
 		if do_lock {
 			process.fds_lock.release()
 		}
-	}
-
-	mut fd := unsafe { &FD(process.fds[fdnum]) }
-	if fd == unsafe { nil } {
 		errno.set(errno.ebadf)
 		return none
 	}
-
 	process.fds[fdnum] = unsafe { nil }
+	// Out of the table, the descriptor is this call's alone, and what closing
+	// it sets going -- a pipe or a socket torn down, a file's pages freed -- is
+	// done without the table held. Exec and exit close descriptor after
+	// descriptor, and /proc/<pid>/fd, which a runtime reads of every process it
+	// starts, gives up on a table that stays held.
+	if do_lock {
+		process.fds_lock.release()
+	}
 	mut handle := fd.handle
 	// POSIX record locks are process-owned and closing any descriptor for the
 	// inode releases that process' locks, even when another dup remains open.
