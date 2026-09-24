@@ -79,6 +79,31 @@ fn (mut this MknodDeviceResource) unlink(_handle voidptr) ? {
 	katomic.dec(mut &this.stat.nlink)
 }
 
+__global (
+	special_inode_counter = u64(1) << 40
+)
+
+// A node mknod(2) makes is numbered as a file of the filesystem it is made in:
+// that filesystem's device, and an inode number of its own. Go's directory
+// reader skips an entry numbered 0 as a deleted one, so a FIFO or an overlay
+// whiteout numbered 0 could not be listed, packed into an image layer or
+// removed by os.RemoveAll.
+fn number_special_node(mut res resource.Resource, parent &VFSNode) {
+	if parent.resource != unsafe { nil } {
+		res.stat.dev = parent.resource.stat.dev
+	}
+	mut filesystem := parent.filesystem
+	if filesystem != unsafe { nil } {
+		if mut filesystem is TmpFS {
+			res.stat.ino = filesystem.inode_counter
+			filesystem.inode_counter++
+			return
+		}
+	}
+	res.stat.ino = special_inode_counter
+	special_inode_counter++
+}
+
 // The device the kernel published under `name`, or nil.
 fn device_by_name(name string) &resource.Resource {
 	if unsafe { devtmpfs_root == 0 } || devtmpfs_root.children == unsafe { nil } {
@@ -157,7 +182,7 @@ fn install_device_node(mut parent VFSNode, name string, mode u32, rdev u64, back
 	}
 	res.stat.mode = mode
 	res.stat.rdev = rdev
-	res.stat.dev = resource.create_dev_id()
+	number_special_node(mut res, parent)
 	res.stat.nlink = 1
 	res.stat.blksize = 512
 	res.can_mmap = backing.can_mmap
@@ -179,6 +204,7 @@ fn make_fifo_node(mut parent VFSNode, name string, mode u32) ?&VFSNode {
 		errno.set(errno.enomem)
 		return none
 	}
+	number_special_node(mut new_pipe, parent)
 	mut node := create_node(parent.filesystem, parent, name, false)
 	node.resource = new_pipe
 	apply_creation_identity(mut node, parent)?

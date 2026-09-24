@@ -212,6 +212,27 @@ static int xattr_operations(void) {
     return valid;
 }
 
+// Nodes mknod(2) makes are numbered like the files around them. Go's
+// directory reader skips an entry whose inode number is 0, so Docker could
+// neither pack an overlay whiteout into an image layer nor remove one.
+static int special_node_numbers(void) {
+    const char *dir = "/tmp/aarch64-syscall-special";
+    const char *fifo = "/tmp/aarch64-syscall-special/fifo";
+    const char *device = "/tmp/aarch64-syscall-special/whiteout";
+    struct stat dir_stat, fifo_stat, device_stat;
+    mkdir(dir, 0755);
+    int valid = mkfifo(fifo, 0644) == 0 && mknod(device, S_IFCHR, 0) == 0 &&
+                stat(dir, &dir_stat) == 0 && lstat(fifo, &fifo_stat) == 0 &&
+                lstat(device, &device_stat) == 0 && fifo_stat.st_ino != 0 &&
+                device_stat.st_ino != 0 && fifo_stat.st_ino != device_stat.st_ino &&
+                fifo_stat.st_dev == dir_stat.st_dev && device_stat.st_dev == dir_stat.st_dev &&
+                S_ISCHR(device_stat.st_mode) && device_stat.st_rdev == 0;
+    unlink(fifo);
+    unlink(device);
+    rmdir(dir);
+    return valid;
+}
+
 static void *eventfd_writer(void *argument) {
     int fd = *(int *)argument;
     struct timespec delay = {.tv_nsec = 10000000};
@@ -514,6 +535,7 @@ int main(void) {
                                    "mkdir in removed directory");
     check(removed_ok, "removed working directory stays usable");
     check(xattr_operations(), "extended attributes on tmpfs");
+    check(special_node_numbers(), "mknod nodes have inode numbers");
     if (chdir(previous_cwd) != 0)
         chdir("/");
 
