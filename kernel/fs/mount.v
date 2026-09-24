@@ -284,7 +284,10 @@ fn logical_parent(node &VFSNode) &VFSNode {
 // from there at all.
 pub fn path_from_root(node &VFSNode, root &VFSNode) ?string {
 	top := reduce_node_bounded(root, false, 0, false)
-	mut components := []string{}
+	// The nodes, not their names: freeing a []string frees every string in
+	// it, and these are the nodes' own names. Sized so that pushing does not
+	// grow it, since a grown array leaves its old buffer behind here.
+	mut components := []&VFSNode{cap: 32}
 	defer {
 		unsafe { components.free() }
 	}
@@ -298,11 +301,7 @@ pub fn path_from_root(node &VFSNode, root &VFSNode) ?string {
 			if components.len == 0 {
 				return '/'
 			}
-			mut path := ''
-			for i := components.len - 1; i >= 0; i-- {
-				path += '/${components[i]}'
-			}
-			return path
+			return join_path(components)
 		}
 		covered := covered_by(current)
 		if covered != unsafe { nil } {
@@ -312,7 +311,7 @@ pub fn path_from_root(node &VFSNode, root &VFSNode) ?string {
 		if current.parent == unsafe { nil } {
 			return none
 		}
-		components << current.name
+		components << current
 		current = current.parent
 	}
 	return none

@@ -329,7 +329,8 @@ pub fn pathname(node &VFSNode) string {
 }
 
 fn global_pathname(node &VFSNode) string {
-	mut components := []string{}
+	// Nodes rather than their names; see path_from_root().
+	mut components := []&VFSNode{cap: 32}
 	defer {
 		unsafe { components.free() }
 	}
@@ -340,7 +341,7 @@ fn global_pathname(node &VFSNode) string {
 		if current_node.name == '' {
 			break
 		}
-		components << current_node.name
+		components << current_node
 		current_node = current_node.parent
 	}
 
@@ -348,12 +349,29 @@ fn global_pathname(node &VFSNode) string {
 		return '/'
 	}
 
-	mut ret := ''
-	for i := components.len - 1; i >= 0; i-- {
-		ret += '/${components[i]}'
-	}
+	return join_path(components)
+}
 
-	return ret
+// `/` and the names of `nodes` in reverse, the order a walk up from a node
+// collects them in. Built in one buffer: appending to a string makes a new one
+// for each component and nothing frees the ones before, which every /proc link
+// refreshed paid for.
+fn join_path(nodes []&VFSNode) string {
+	mut total := 0
+	for node in nodes {
+		total += node.name.len + 1
+	}
+	mut buffer := []u8{cap: total}
+	defer {
+		unsafe { buffer.free() }
+	}
+	for i := nodes.len - 1; i >= 0; i-- {
+		buffer << `/`
+		for c in nodes[i].name {
+			buffer << c
+		}
+	}
+	return buffer.bytestr()
 }
 
 pub fn symlink(parent &VFSNode, dest string, target string) ?&VFSNode {
