@@ -1,5 +1,7 @@
 module fw
 
+import gpu.agx.hw
+
 // Byte-exact G13/macOS 12.3 vertex/tiler work command.
 
 pub const g13_vertex_unk_pointee_offset = u64(0x480)
@@ -10,6 +12,7 @@ pub const g13_vertex_unk_buf_0_offset = u64(0x594)
 pub const g13_vertex_cur_ts_offset = u64(0x5ac)
 pub const g13_vertex_start_ts_offset = u64(0x5b4)
 pub const g13_vertex_end_ts_offset = u64(0x5bc)
+pub const g13_vertex_v13_5_size = u64(0x61c)
 
 @[packed]
 pub struct G13TilingParameters {
@@ -138,8 +141,73 @@ pub mut:
 	tail_padding         [3]u8
 }
 
+@[packed]
+pub struct G13RunVertexV135 {
+pub mut:
+	bytes [0x61c]u8
+}
+
+pub fn g13_vertex_active_size(abi hw.FirmwareAbi) ?u64 {
+	return match abi {
+		.v12_3 { u64(sizeof(G13RunVertex)) }
+		.v13_5_partial { g13_vertex_v13_5_size }
+		else { none }
+	}
+}
+
+pub fn g13_vertex_unk_pointee_offset_for(abi hw.FirmwareAbi) ?u64 {
+	return match abi { .v12_3 { 0x480 } .v13_5_partial { 0x488 } else { none } }
+}
+
+pub fn g13_vertex_job_params_1_offset_for(abi hw.FirmwareAbi) ?u64 {
+	return match abi { .v12_3 { 0x38 } .v13_5_partial { 0x40 } else { none } }
+}
+
+pub fn g13_vertex_tiling_params_offset_for(abi hw.FirmwareAbi) ?u64 {
+	return match abi { .v12_3 { 0x3bc } .v13_5_partial { 0x3c4 } else { none } }
+}
+
+pub fn g13_vertex_job_params_2_offset_for(abi hw.FirmwareAbi) ?u64 {
+	return match abi { .v12_3 { 0x488 } .v13_5_partial { 0x490 } else { none } }
+}
+
+pub fn g13_vertex_unk_buf_0_offset_for(abi hw.FirmwareAbi) ?u64 {
+	return match abi { .v12_3 { 0x594 } .v13_5_partial { 0x59c } else { none } }
+}
+
+pub fn g13_vertex_cur_ts_offset_for(abi hw.FirmwareAbi) ?u64 {
+	return match abi { .v12_3 { 0x5ac } .v13_5_partial { 0x5b4 } else { none } }
+}
+
+pub fn g13_vertex_start_ts_offset_for(abi hw.FirmwareAbi) ?u64 {
+	return match abi { .v12_3 { 0x5b4 } .v13_5_partial { 0x5bc } else { none } }
+}
+
+pub fn g13_vertex_end_ts_offset_for(abi hw.FirmwareAbi) ?u64 {
+	return match abi { .v12_3 { 0x5bc } .v13_5_partial { 0x5c4 } else { none } }
+}
+
+pub fn make_g13_vertex_v13_5(legacy &G13RunVertex) G13RunVertexV135 {
+	mut out := G13RunVertexV135{}
+	// The counter inserted after the tag moves the command prefix and Struct2.
+	g13_copy_bytes(voidptr(&out), 0x000, voidptr(legacy), 0x000, 0x004)
+	g13_put_u64(voidptr(&out), 0x004, 1)
+	g13_copy_bytes(voidptr(&out), 0x00c, voidptr(legacy), 0x004, 0x3b8)
+	// TilingParameters keeps its recovered 0x30-byte prefix; Ventura reserves
+	// 0x60 rather than the 0x70-byte Monterey tail.
+	g13_copy_bytes(voidptr(&out), 0x3c4, voidptr(legacy), 0x3bc, 0x090)
+	// Re-home the pointers between tiling and Struct3 by semantic field.
+	g13_copy_bytes(voidptr(&out), 0x464, voidptr(legacy), 0x45c, 0x024)
+	// Struct3 starts with the two words modelled as outer fields by the 12.3
+	// Vinix structure. Preserve them before its remaining recovered fields.
+	g13_copy_bytes(voidptr(&out), 0x488, voidptr(legacy), 0x480, 0x114)
+	g13_copy_bytes(voidptr(&out), 0x59c, voidptr(legacy), 0x594, 0x041)
+	return out
+}
+
 pub fn validate_g13_vertex_layouts() bool {
 	return sizeof(G13TilingParameters) == 0xa0
 		&& sizeof(G13VertexJobParameters1) == 0x384
 		&& sizeof(G13VertexJobParameters2) == 0xa0 && sizeof(G13RunVertex) == 0x5e0
+		&& sizeof(G13RunVertexV135) == g13_vertex_v13_5_size
 }

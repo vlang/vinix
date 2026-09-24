@@ -46,6 +46,52 @@ apk-tools
 curl
 EOF
 
+# Small local stand-ins for the official game downloader and Java trust-store
+# generator. The package frontend still has to install its Alpine dependency
+# set, publish the launchers, record every custom file, and remove it cleanly.
+mkdir -p "$root/usr/libexec/vinix-minecraft" "$work/minecraft-tools"
+for support in run-minecraft minecraft-login minecraft-xinitrc; do
+	cp "$repo/build-support/minecraft/$support" \
+		"$root/usr/libexec/vinix-minecraft/$support"
+done
+cat >"$work/minecraft-tools/fetch-minecraft.py" <<'EOF'
+#!/usr/bin/env python3
+import os
+import sys
+from pathlib import Path
+
+arguments = sys.argv[1:]
+staging = Path(arguments[arguments.index("--staging") + 1])
+game_root = arguments[arguments.index("--game-root") + 1]
+max_java = arguments[arguments.index("--max-java") + 1]
+root = staging / game_root.lstrip("/")
+(root / "libraries/org/lwjgl/lwjgl/3.3.3").mkdir(parents=True, exist_ok=True)
+(root / "versions/1.21.5").mkdir(parents=True, exist_ok=True)
+(root / "libraries/org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3.jar").write_text("core\n")
+(root / "libraries/org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3-natives-linux-arm64.jar").write_text("native\n")
+(root / "versions/1.21.5/1.21.5.jar").write_text("client\n")
+(root / "launch.env").write_text(
+    "MC_VERSION='1.21.5'\n"
+    "MC_VERSION_TYPE='release'\n"
+    "MC_ASSET_INDEX='17'\n"
+    "MC_JAVA_MAJOR='21'\n"
+    "MC_CLASSPATH='/usr/share/minecraft/libraries/org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3.jar:/usr/share/minecraft/libraries/org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3-natives-linux-arm64.jar'\n"
+)
+Path(os.environ["VINIX_TEST_MINECRAFT_FETCH_LOG"]).write_text(
+    " ".join(arguments) + f"\nmax-java={max_java}\n"
+)
+EOF
+cat >"$work/minecraft-tools/java-cacerts.py" <<'EOF'
+#!/usr/bin/env python3
+import sys
+from pathlib import Path
+
+destination = Path(sys.argv[2])
+destination.parent.mkdir(parents=True, exist_ok=True)
+destination.write_text("test Java trust store\n")
+EOF
+chmod +x "$work/minecraft-tools/"*.py
+
 cat > "$work/bin/apk" <<'EOF'
 #!/bin/sh
 case "$*" in
@@ -119,6 +165,27 @@ case "$*" in
 			if [ "$seen_add" = true ]; then
 				printf '%s\n' "$argument" >>"$VINIX_TEST_INSTALLED_PACKAGES"
 				case "$argument" in
+					ffmpeg)
+						mkdir -p "$VINIX_TEST_ROOT/usr/bin"
+						for program in ffmpeg ffprobe qt-faststart; do
+							printf '#!/bin/sh\nexit 0\n' \
+								>"$VINIX_TEST_ROOT/usr/bin/$program"
+							chmod 0644 "$VINIX_TEST_ROOT/usr/bin/$program"
+						done
+						printf 'P:%s\nF:usr/bin\nR:ffmpeg\nR:ffprobe\nR:qt-faststart\n\n' \
+							"$argument"
+						;;
+					openjdk21-jre|openjdk21-jdk)
+						mkdir -p "$VINIX_TEST_ROOT/usr/lib/jvm/java-21-openjdk/bin" \
+							"$VINIX_TEST_ROOT/usr/lib/jvm/java-21-openjdk/lib/security"
+						printf '#!/bin/sh\necho "openjdk version 21-test" >&2\n' \
+							>"$VINIX_TEST_ROOT/usr/lib/jvm/java-21-openjdk/bin/java"
+						chmod 0644 "$VINIX_TEST_ROOT/usr/lib/jvm/java-21-openjdk/bin/java"
+						ln -sf /etc/ssl/certs/java/cacerts \
+							"$VINIX_TEST_ROOT/usr/lib/jvm/java-21-openjdk/lib/security/cacerts"
+						printf 'P:%s\nF:usr/lib/jvm/java-21-openjdk/bin\nR:java\nF:usr/lib/jvm/java-21-openjdk/lib/security\nR:cacerts\n\n' \
+							"$argument"
+						;;
 					blender)
 						mkdir -p "$VINIX_TEST_ROOT/usr/bin" \
 							"$VINIX_TEST_ROOT/usr/lib" \
@@ -187,6 +254,10 @@ run_pkg() {
 	VINIX_PKG_BSDTAR="${VINIX_PKG_BSDTAR:-$host_tar}" \
 	VINIX_PKG_SHA256SUM="${VINIX_PKG_SHA256SUM:-$work/bin/sha256sum}" \
 	VINIX_PKG_BUSYBOX= \
+	VINIX_PKG_PYTHON="$(command -v python3)" \
+	VINIX_MINECRAFT_FETCHER="$work/minecraft-tools/fetch-minecraft.py" \
+	VINIX_JAVA_CACERTS_HELPER="$work/minecraft-tools/java-cacerts.py" \
+	VINIX_TEST_MINECRAFT_FETCH_LOG="$work/minecraft-fetch.log" \
 	VINIX_TEST_APK_LOG="$log" \
 	VINIX_TEST_ROOT="$root" \
 	VINIX_TEST_INSTALLED_PACKAGES="$installed" \
@@ -343,15 +414,28 @@ grep -q 'vinix-blender -noaudio' "$root/usr/bin/blender"
 grep -qx usr/libexec/vinix-blender \
 	"$root/var/lib/vinix-pkg/package-files"
 test "$("$root/usr/libexec/vinix-blender" --version)" = 'Blender 4.3.0'
-tail -n 2 "$log" | sed -n '1p' | grep -q -- \
-	'--cache-dir .* --no-progress cache download blender python3-pycache-pyc0$'
-tail -n 1 "$log" | grep -q -- \
-	'--cache-dir .* --no-network --no-progress --no-scripts add blender$'
+grep -q -- \
+	'--cache-dir .* --no-progress cache download blender libgmpxx python3-pycache-pyc0$' "$log"
+grep -q -- \
+	'--cache-dir .* --no-network --no-progress --no-scripts add blender libgmpxx$' "$log"
 
 run_pkg remove blender
 test ! -e "$root/usr/libexec/vinix-blender"
 tail -n 1 "$log" | grep -q -- \
 	'--no-progress --no-scripts del blender$'
+
+run_pkg install ffmpeg
+test -x "$root/usr/bin/ffmpeg"
+test -x "$root/usr/bin/ffprobe"
+test -x "$root/usr/bin/qt-faststart"
+tail -n 2 "$log" | sed -n '1p' | grep -q -- \
+	'--cache-dir .* --no-progress cache download ffmpeg$'
+tail -n 1 "$log" | grep -q -- \
+	'--cache-dir .* --no-network --no-progress --no-scripts add ffmpeg$'
+
+run_pkg remove ffmpeg
+tail -n 1 "$log" | grep -q -- \
+	'--no-progress --no-scripts del ffmpeg$'
 
 run_pkg install gimp
 test -x "$root/usr/bin/gimp"
@@ -366,5 +450,115 @@ tail -n 1 "$log" | grep -q -- \
 run_pkg remove gimp
 tail -n 1 "$log" | grep -q -- \
 	'--no-progress --no-scripts del gimp adwaita-icon-theme font-dejavu$'
+
+run_pkg install minecraft
+test -x "$root/usr/lib/jvm/java-21-openjdk/bin/java"
+test -L "$root/usr/bin/java"
+test -s "$root/etc/ssl/certs/java/cacerts"
+test -x "$root/usr/bin/minecraft"
+test -x "$root/usr/bin/minecraft-login"
+test -x "$root/usr/share/vinix/minecraft-xinitrc"
+test -s "$root/usr/share/minecraft/launch.env"
+grep -q -- '--version release --max-java 21' "$work/minecraft-fetch.log"
+grep -q 'natives-linux-arm64' "$root/usr/share/minecraft/launch.env"
+grep -qx './usr/bin/minecraft' "$root/var/lib/vinix-pkg/minecraft.files"
+grep -qx 'usr/share/minecraft/launch.env' \
+	"$root/var/lib/vinix-pkg/package-files"
+run_pkg list | grep -qx minecraft
+VINIX_MINECRAFT_ROOT="$root/usr/share/minecraft" \
+VINIX_MINECRAFT_JAVA="$root/usr/lib/jvm/java-21-openjdk/bin/java" \
+	"$root/usr/bin/minecraft" --check | grep -q 'Minecraft 1.21.5 (release)'
+tail -n 2 "$log" | sed -n '1p' | grep -q -- \
+	'--cache-dir .* --no-progress cache download openjdk21-jre ca-certificates-bundle gcompat jemalloc openal-soft-libs glfw freetype harfbuzz mesa-dri-gallium mesa-gl mesa-egl mesa-gbm libx11 libxcursor libxrandr libxinerama libxi libxxf86vm wayland-libs-server$'
+
+run_pkg remove minecraft
+test ! -e "$root/usr/bin/minecraft"
+test ! -e "$root/usr/bin/minecraft-login"
+test ! -e "$root/usr/share/minecraft"
+test ! -e "$root/var/lib/vinix-pkg/minecraft.files"
+test -x "$root/usr/lib/jvm/java-21-openjdk/bin/java"
+if run_pkg list | grep -qx minecraft; then
+	echo 'removed Minecraft remained in pkg list' >&2
+	exit 1
+fi
+
+# Firefox reinstalls on the image's ESR line and receives the image's Vinix
+# defaults in its application directory.
+mkdir -p "$root/usr/lib/firefox-esr" "$root/usr/share/vinix/firefox" \
+	"$root/etc/firefox/policies"
+printf 'pref("test", 1);\n' >"$root/usr/share/vinix/firefox/vinix.js"
+printf '{"policies": {}}\n' >"$root/etc/firefox/policies/policies.json"
+run_pkg install firefox
+tail -n 2 "$log" | sed -n '1p' | grep -q -- \
+	'--cache-dir .* --no-progress cache download adwaita-icon-theme font-dejavu firefox-esr$'
+cmp -s "$root/usr/share/vinix/firefox/vinix.js" \
+	"$root/usr/lib/firefox-esr/defaults/pref/vinix.js"
+cmp -s "$root/etc/firefox/policies/policies.json" \
+	"$root/usr/lib/firefox-esr/distribution/policies.json"
+grep -qx 'usr/lib/firefox-esr/defaults/pref/vinix.js' \
+	"$root/var/lib/vinix-pkg/package-files"
+run_pkg remove firefox
+tail -n 1 "$log" | grep -q -- '--no-progress --no-scripts del firefox-esr$'
+
+# VOffice is a prebuilt release bundle: one directory holding both clients,
+# their artwork and translations, verified against its published checksum.
+voffice_fixture="$work/voffice-fixture/voffice"
+mkdir -p "$voffice_fixture/assets/ribbon" "$voffice_fixture/translations"
+for name in writer calc; do
+	printf '#!/bin/sh\nexit 0\n' >"$voffice_fixture/voffice-$name"
+	chmod 0755 "$voffice_fixture/voffice-$name"
+done
+printf 'logo\n' >"$voffice_fixture/assets/logo.png"
+printf 'bold\n' >"$voffice_fixture/assets/ribbon/bold.png"
+printf 'hello=Hello\n' >"$voffice_fixture/translations/en.txt"
+printf '0.0.3\n' >"$voffice_fixture/VERSION"
+voffice_archive="$work/VOffice-vinix-aarch64.tar.gz"
+tar -czf "$voffice_archive" -C "$work/voffice-fixture" voffice
+printf '%s  VOffice-vinix-aarch64.tar.gz\n' \
+	"$("$work/bin/sha256sum" "$voffice_archive" | awk '{print $1}')" \
+	>"$voffice_archive.sha256"
+printf '%064d  VOffice-vinix-aarch64.tar.gz\n' 0 >"$work/voffice-wrong.sha256"
+
+# A subshell: POSIX sh keeps assignments made in front of a function call.
+if (VINIX_VOFFICE_URL="file://$voffice_archive" \
+	VINIX_VOFFICE_SHA256_URL="file://$work/voffice-wrong.sha256" \
+	run_pkg install voffice 2>"$work/voffice-mismatch.log"); then
+	echo 'VOffice installed despite a checksum mismatch' >&2
+	exit 1
+fi
+grep -q 'VOffice archive checksum mismatch' "$work/voffice-mismatch.log"
+test ! -e "$root/usr/bin/voffice-writer"
+
+apk_calls_before=$(wc -l <"$log")
+VINIX_VOFFICE_URL="file://$voffice_archive" \
+	run_pkg install voffice >"$work/voffice-install.log"
+# VOffice alone needs no Alpine index refresh or base-package transaction.
+test "$(wc -l <"$log")" -eq "$apk_calls_before"
+grep -qx 'pkg: VOffice 0.0.3 Writer and Calc installed' "$work/voffice-install.log"
+test -x "$root/usr/bin/voffice-writer"
+test -x "$root/usr/bin/voffice-calc"
+grep -qx logo "$root/usr/bin/assets/logo.png"
+test -f "$root/usr/bin/assets/ribbon/bold.png"
+test -f "$root/usr/bin/translations/en.txt"
+test ! -e "$root/usr/bin/VERSION"
+grep -qx './usr/bin/voffice-writer' "$root/var/lib/vinix-pkg/voffice.files"
+grep -qx './usr/bin/assets/ribbon/bold.png' "$root/var/lib/vinix-pkg/voffice.files"
+grep -qx 'usr/bin/translations/en.txt' "$root/var/lib/vinix-pkg/package-files"
+if ls "$root/var/cache" | grep -q '^vinix-voffice\.'; then
+	echo 'VOffice download directory was left behind' >&2
+	exit 1
+fi
+run_pkg list | grep -qx voffice
+
+run_pkg remove voffice
+test ! -e "$root/usr/bin/voffice-writer"
+test ! -e "$root/usr/bin/voffice-calc"
+test ! -e "$root/usr/bin/assets"
+test ! -e "$root/usr/bin/translations"
+test ! -e "$root/var/lib/vinix-pkg/voffice.files"
+if run_pkg list | grep -qx voffice; then
+	echo 'removed VOffice remained in pkg list' >&2
+	exit 1
+fi
 
 echo "VINIX PACKAGE COMMAND TEST: PASS"

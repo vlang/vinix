@@ -87,7 +87,7 @@ MAPPING_EXCEPTIONS: dict[str, tuple[str, ...]] = {
     "apple,firmware-version": (),
 }
 
-# Every apple,* property the t8103 paths in kernel/modules/gpu/agx/driver read.
+# Every apple,* property the t8103 paths in kernel/gpu/agx/driver read.
 # Required means load_t8103_* refuses the tree without it.
 REQUIRED_FDT_PROPERTIES = (
     "operating-points-v2",

@@ -28,13 +28,34 @@ virtual machines.
 ![Screenshot 0](/screenshot0.png?raw=true "Screenshot 0")
 ![Screenshot 1](/screenshot1.png?raw=true "Screenshot 1")
 
-## Download latest nightly image
+## Download an image
 
-You can grab a pre-built nightly Vinix image at https://github.com/vlang/vinix/releases
+The latest release has a bootable desktop image for each architecture:
 
-Make sure to boot the ISO with enough memory (8+GiB) as, for now, Vinix loads its
-entire root filesystem in a ramdisk in order to be able to more easily boot
-on real hardware.
+- [vinix-amd64.iso](https://github.com/vlang/vinix/releases/latest/download/vinix-amd64.iso):
+  x86-64 PCs and VMs, BIOS or UEFI
+- [vinix-arm64.iso](https://github.com/vlang/vinix/releases/latest/download/vinix-arm64.iso):
+  arm64 VMs, UEFI (QEMU, VirtualBox on Apple Silicon Macs)
+
+Older and nightly images are at https://github.com/vlang/vinix/releases.
+
+Give the VM at least 4 GiB of memory: for now Vinix loads its entire root
+filesystem into a ramdisk, which makes it easier to boot on real hardware.
+
+```sh
+qemu-system-x86_64 -machine q35 -accel kvm -cpu host -m 4096 -smp 2 -cdrom vinix-amd64.iso
+
+qemu-system-aarch64 -machine virt -accel hvf -cpu host -m 4096 -smp 4 \
+    -bios "$(brew --prefix qemu)/share/qemu/edk2-aarch64-code.fd" \
+    -device virtio-scsi-pci -device scsi-cd,drive=cd \
+    -drive if=none,id=cd,media=cdrom,file=vinix-arm64.iso \
+    -device ramfb -device qemu-xhci -device usb-kbd -device usb-tablet
+```
+
+In VirtualBox, create a VM of type *Other/Unknown (64-bit)* or *Other/Unknown
+(ARM 64-bit)* with 4096 MB of memory and no hard disk, and attach the ISO; or
+let `./run-iso-virtualbox.sh vinix-arm64.iso` create one. VirtualBox only runs
+guests of its host's architecture.
 
 ## Roadmap
 
@@ -126,6 +147,11 @@ git clone https://github.com/vlang/ui2 third_party/ui2
 ./run-desktop-amd64.sh
 ```
 
+For local development, a sibling `../ui2` checkout (for example
+`~/code/ui2` beside `~/code/vinix`) is selected automatically and all of its
+examples are installed in the desktop's **ui2 Examples** launcher. Set
+`VINIX_UI2_SOURCE` to choose another checkout explicitly.
+
 This stages Alpine's prebuilt musl development packages, compiles
 `vinix-desktop` with Clang, and creates `vinix-desktop-amd64.iso`, whose init
 starts the desktop directly. The runner uses KVM when available and otherwise
@@ -175,24 +201,49 @@ on one component, but are not required for a normal default-image build.
 ### Develop Vinix desktop inside Vinix
 
 The AArch64 desktop image contains the native V compiler and its matching
-`vlib`, GCC, the editable staged desktop sources in `/root/desktop`, and the
-headless ui2 module in `/root/vmodules`. Verify the compiler or rebuild the
-desktop from a Vinix Terminal with:
+`vlib`, TCC, the editable staged desktop sources in `/root/desktop`, and the
+headless ui2 module in `/root/vmodules`. QEMU also shares the checkout from
+which it was launched at `/mnt/host/vinix`. The share is a read-only mirror
+refreshed from macOS immediately before each build, so edits made after QEMU
+started are included without rebuilding the image or restarting the VM.
+
+Verify the compiler or rebuild and hot-reload the desktop from a Vinix
+Terminal with:
 
 ```sh
 /root/v-smoke.sh
 vinix-desktop-build
 ```
 
-`vinix-desktop-build` translates the desktop with V, links a static AArch64
-binary with GCC, keeps a copy at `/root/vinix-desktop`, atomically replaces
+`vinix-desktop-build` refreshes the host mirror, stages the desktop and ui2
+sources exactly as the image builder does, translates the desktop with V,
+links a static AArch64 binary with TCC, keeps a copy at
+`/root/vinix-desktop`, atomically replaces
 `/usr/bin/vinix-desktop`, and sends SIGHUP to PID 1. The supervisor lets the
 old compositor close its applications and release the framebuffer, then starts
-the new binary without rebooting the OS. Pass `--no-reload` to build only.
+the new binary without rebooting the OS. Pass `--no-reload` to build only. The
+editable source and module tree carries an image-generation marker. If an older
+persistent home is missing either tree or belongs to another image generation,
+the helper automatically builds the coherent copy in
+`/usr/share/vinix/desktop-dev`. Pass both `--source=DIR` and `--modules=DIR` to
+deliberately build a different source generation.
+
+The runner shares its own checkout by default. Set
+`VINIX_QEMU_HOST_SOURCE=/path/to/vinix` to select another checkout, or set it
+to `0` to disable the host source service. `vinix-host-sync` can be run by
+itself to refresh `/mnt/host/vinix` for inspection. The VirGL runner remains
+offline and therefore uses the image's staged source copy.
 
 The compiler layer is pinned to the newest V revision qualified by this tree.
 Build it separately with `./build-v-aarch64.sh`; set `VINIX_V_SOURCE` to a V
 checkout when qualifying a newer revision without downloading another copy.
+The layer includes the matching compiler sources, so `v self` rebuilds and
+replaces `/usr/lib/vlang/v` inside Vinix. Ordinary V builds use the native TCC
+package from Alpine Linux 3.24, and `v self` uses that same TCC toolchain. V's
+worker passes run with `-no-parallel` until their threading is qualified on
+Vinix. `VJOBS=1` and synchronous compiler helper passes keep that contract
+intact. It remains a Linux/musl program that runs on Vinix and continues to
+target Vinix applications by default.
 
 ### Python 3 on aarch64
 
@@ -331,6 +382,22 @@ pkg install gtk
 ./gtk-package-smoke.sh
 ```
 
+FFmpeg is installed directly from Alpine together with its codec-library
+dependency closure. The package frontend restores the command modes that apk
+cannot currently apply on Vinix:
+
+```sh
+pkg install ffmpeg
+ffmpeg -version
+```
+
+On a clean image, the packaged smoke test installs FFmpeg, performs an actual
+encode, and probes the result:
+
+```sh
+./ffmpeg-package-smoke.sh
+```
+
 Gnumeric is also installed on demand with its GTK theme and fonts:
 
 ```sh
@@ -347,6 +414,28 @@ pkg install gimp
 run-gimp
 ./gimp-package-smoke.sh
 ```
+
+VOffice Writer and Calc are native ui2 clients of the desktop rather than X11
+programs, and they are not part of the image either. Right after a new user is
+created, the first-run app picker offers them along with Firefox, Chromium and
+Minecraft and installs the chosen apps in a Terminal. From a shell:
+
+```sh
+pkg install voffice
+```
+
+`pkg` downloads `VOffice-vinix-aarch64.tar.gz` from the latest `vlang/office`
+release and checks it against the published `.sha256`.
+`./build-voffice-aarch64.sh` cross-compiles that asset from a VOffice checkout
+(`VINIX_OFFICE_SOURCE` or `../office`). Publish it from the commit the release
+was built from, so it matches the release's other binaries:
+
+```sh
+./build-voffice-aarch64.sh --ref=release-0.0.3-build --publish
+```
+
+`--publish` uploads with `gh` and refuses uncommitted source or a `VERSION`
+that is not the latest release's tag.
 
 LibreOffice Writer and Calc run through the same private X11 window bridge,
 drawn by the GTK 3 VCL plugin. Install the suite on demand, then launch it from
@@ -414,14 +503,17 @@ subl
 
 `pkg` disables Alpine maintainer scripts that assume a complete Alpine init
 system.
-When started with `run-aarch64.sh` (including through
-`run-desktop-aarch64.sh`), successful package changes are saved in a fixed
-archive under `boot-image/` and layered over the initramfs on every later
-launch. Thus `pkg install gtk`, shutting down QEMU, and starting it again keeps
-GTK installed. The shell store is
+On an initramfs-root machine started with `run-aarch64.sh`, successful package
+changes are saved in a fixed archive under `boot-image/` and layered over the
+initramfs on every later launch. Thus `pkg install gtk`, shutting down QEMU,
+and starting it again keeps GTK installed. The shell store is
 `boot-image/boot.img.packages.tar`; the desktop store is
 `boot-image/boot-desktop-4096.img.packages.tar`. Override its path with
 `VINIX_QEMU_PACKAGE_STORE`, or delete it to reset installed packages.
+The default desktop boots from a persistent system volume instead: package
+changes are already on that disk. A saved overlay from an older RAM-root run
+is merged into the volume when it is installed or rebuilt, rather than copied
+to the boot image and loaded into guest RAM.
 Ephemeral runs use a private package store that is removed at shutdown unless
 the variable explicitly selects a long-lived store.
 Boot methods that do not use the QEMU runner retain package changes only in the
@@ -448,14 +540,15 @@ paths; only `/root` is persistent. As with other writable ext2 experiments,
 shut down the VM cleanly and use `e2fsck` from the host after an interrupted
 run.
 
-The desktop launcher enables persistence by default. It caches a QEMU-specific
-base without `/root`, seeds `boot-image/desktop-root.ext2` from the desktop
-image once, and reuses both that volume and `boot-image/boot-desktop-qemu.img`.
-Use `--no-persist` for a self-contained RAM-backed image that remains below
-FAT32's 4 GiB file limit. `--ephemeral` creates a private boot disk, seeded
-`/root` volume, and package store for a concurrent test, then removes all three
-when QEMU exits. Other newly created boot images under the host temporary
-directory are also removed unless `VINIX_KEEP_TEMP_BOOT_DISK=1` is set.
+The desktop launcher enables whole-system persistence by default. It installs
+the desktop once on `boot-image/desktop-system.ext2`; `/tmp` and `/run` are
+ordinary directories on that volume too. The boot image contains only Limine,
+the kernel, a small runtime update and a recovery initramfs. Use
+`--no-disk-root` for the older RAM-system/persistent-`/root` split, or
+`--no-persist` for a fully disposable RAM-backed image. `--ephemeral` creates
+private storage for a concurrent test and removes it when QEMU exits. Other
+newly created boot images under the host temporary directory are also removed
+unless `VINIX_KEEP_TEMP_BOOT_DISK=1` is set.
 
 `tmux` is included in the optional native developer-tools overlay. Build that
 overlay before the userland to have tmux and its terminal definitions available
@@ -467,12 +560,40 @@ from first boot:
 tmux
 ```
 
+### Sound in aarch64 QEMU
+
+The QEMU runners attach a VirtIO sound card, which Vinix publishes as the OSS
+`/dev/dsp`, with `/dev/mixer` for its volume. SDL programs play through it with
+`SDL_AUDIODRIVER=dsp`; that is how Chocolate Doom gets its music and sound
+effects. On macOS the guest plays through the host's default output. Set
+`VINIX_QEMU_AUDIO` to another QEMU audio backend, to `wav:PATH` to record
+everything the guest plays, or to `off` to leave the card out:
+
+```sh
+VINIX_QEMU_AUDIO=wav:/tmp/vinix.wav ./run-desktop-aarch64.sh --no-build
+```
+
+Only playback is supported, and only in QEMU; Apple hardware has no sound
+driver yet. `tests/sound/run.sh` boots a test program that drives `/dev/dsp`
+the way SDL does and checks the recording: the pitch and length of each tone,
+no dropouts, and writes that block at the playback rate.
+
 ### Minecraft: Java Edition on aarch64
 
-Vinix runs Mojang's own Minecraft client on AArch64, on OpenJDK 25 through its
-X11 and software-OpenGL stack. The game is not part of this repository: the
-build downloads it from Mojang's distribution endpoints on your machine, the
-way any third-party launcher does.
+Vinix runs Mojang's own Minecraft client on AArch64 through its X11 and
+software-OpenGL stack. The game is not part of this repository. From the
+default Vinix desktop image, install it on demand:
+
+```sh
+pkg install minecraft
+minecraft --check
+```
+
+This installs Alpine's OpenJDK 21 and native runtime packages, then downloads
+the newest official Minecraft release compatible with that JVM from Mojang's
+distribution endpoints. Client, library and asset hashes are verified, and
+the large game data remains outside the base image. To stage the current
+release with OpenJDK 25 directly into a custom image instead, run:
 
 ```sh
 ./build-x11-aarch64.sh
@@ -482,8 +603,11 @@ way any third-party launcher does.
 ./run-desktop-aarch64.sh --no-desktop
 ```
 
-`VINIX_MINECRAFT_VERSION` selects the version (default: the current release);
+`VINIX_MINECRAFT_VERSION` selects an exact version or release channel;
 `VINIX_MINECRAFT_ASSETS=none` stages the code without the ~500 MiB of assets.
+The package install constrains the release channel to Java 21, while the custom
+image builder uses its staged Java 25 runtime and therefore takes the current
+release without that constraint.
 
 Open **Minecraft** from the desktop or run `minecraft` in a terminal. With no
 account signed in it starts Mojang's free demo. `minecraft --login` signs in to
@@ -491,6 +615,17 @@ a Microsoft account that owns the game with the standard OAuth device-code
 flow, after which `minecraft` plays the full game; `--demo`, `--play`,
 `--logout` and a display-free `--check` are also accepted. Worlds and options
 live under `$HOME/.minecraft`.
+
+For the QEMU desktop, give the preinstalled game layer 10 GiB of RAM and use
+one virtual CPU while running Minecraft:
+
+```sh
+VINIX_QEMU_MEM=10240 VINIX_QEMU_SMP=1 ./run-desktop-aarch64.sh
+```
+
+The launcher uses HotSpot's interpreter and reports one active processor. This
+avoids the generated-code and SMP races that Vinix still needs to resolve; the
+tradeoff is a slow first client startup.
 
 Microsoft requires every launcher to use its own registered application, so set
 `VINIX_MINECRAFT_MSA_CLIENT_ID` to the application id of an Azure registration
@@ -510,16 +645,6 @@ package layer. GTK is downloaded only when it or an application that needs it
 is requested. The GTK smoke test first checks that the base image is GTK-free,
 installs it, then opens both `gtk3-demo` and `gtk3-widget-factory` against the
 Vinix Xorg server. Gnumeric is likewise absent until explicitly installed.
-
-### macOS compatibility on aarch64
-
-The desktop image includes an experimental all-V Mach-O and Objective-C/AppKit
-compatibility runtime. Its **Cocoa Calculator** test application is compiled
-from Objective-C as a normal AArch64 Mach-O bundle, loaded in userspace, and
-drawn by the Vinix compositor without shipping Apple frameworks. This is an
-initial compatibility slice, not general macOS application support; the exact
-supported ABI and reproducible host/Vinix tests are documented in
-[`compat/macos/README.md`](compat/macos/README.md).
 
 ### Firefox on aarch64
 
@@ -605,6 +730,12 @@ Chromium regression test boots:
 ./build-chromium-aarch64.sh
 ./build-desktop-aarch64.sh --compact-initramfs --with-chromium
 ```
+
+Chromium, Firefox and LibreOffice staging builders reuse their extracted
+package trees when their package archives and build inputs are unchanged.
+Repeated desktop builds also reuse compiled ui2 examples and the compositor.
+Use `./build-all-aarch64.sh --reuse-layers` to assemble a new
+image from the existing language and desktop layers.
 
 Chromium is a much heavier guest than Firefox, and four kernel facilities were
 added or repaired for it:
@@ -701,8 +832,9 @@ run-virgl-smoke
 run-firefox
 ```
 
-`--virgl` selects KekVM's `.tools/qemu-virgl` binary and a Cocoa core-OpenGL
-display. Override its location with `VINIX_VIRGL_QEMU`. The simpler
+`--virgl` selects KekVM's `.tools/qemu-virgl` binary and requests a GL-enabled
+display. Override its location with `VINIX_VIRGL_QEMU` or select a QEMU display
+backend with `QEMU_DISPLAY_BACKEND`. The simpler
 `--virtio-gpu` option exposes the unaccelerated MMIO device and is useful for
 transport probing, but it does not create a render node. KekVM's compact QEMU
 currently omits libslirp, so this launch mode is offline; Firefox can exercise
@@ -725,7 +857,7 @@ to the checkout used to assemble the desktop image:
 ./build-hyprland-aarch64.sh
 # copy build-aarch64-hyprland/staging to the macOS checkout when needed
 ./build-desktop-aarch64.sh
-./run-hyprland-aarch64.sh --no-build --grab-keys
+./run-hyprland-aarch64.sh --no-build
 ```
 
 `run-hyprland-aarch64.sh` selects Hyprland for that boot; the ordinary desktop
@@ -742,9 +874,18 @@ uses the Mesa 25.0.5 Asahi Gallium driver for desktop OpenGL and GLES through
 EGL, with surfaceless, GBM and X11 platform support. The native desktop uses a
 surfaceless GPU presenter, while Xorg/Firefox share GPU buffers through PRIME
 and DRI3. Both still copy the completed image to the Limine framebuffer because
-Vinix does not yet have a native DCP/KMS scanout driver. The private GPU
-firmware structures are currently pinned to Apple firmware ABI 12.3.0; the
-driver refuses other firmware ABIs before touching GPU hardware.
+Vinix does not yet have a native DCP/KMS scanout driver. The private G13 GPU
+firmware structures cover Apple firmware ABIs 12.3.0 and 13.5.0; the driver
+refuses other firmware ABIs before touching GPU hardware.
+
+Before assembling a hardware image, run the
+[G13 reference audit](docs/m1-agx-reference-audit.md) to compare the firmware
+contract with the local m1n1 checkout (and an Asahi Linux checkout when
+available):
+
+```sh
+make -C tools/agx-re check-g13-reference
+```
 
 Build Mesa in the Debian ARM64 VM (install `clang`, `lld`, `meson`, `ninja`,
 `pkg-config`, `bison`, `flex`, `python3-mako`, `python3-yaml`,
@@ -863,6 +1004,25 @@ lacks native ATC/external-DCP modesetting. The Studio Display's
 audio/camera/USB devices are not included. See
 [docs/apple-studio-display.md](docs/apple-studio-display.md) for the boot
 procedure, expected log lines, and failure diagnosis.
+
+### Release images
+
+`./deploy-iso.sh` builds both desktop ISOs from a clean checkout of a commit,
+boots each of them to the desktop in QEMU (and in VirtualBox, when it can run
+that architecture here), and publishes them with checksums as a GitHub release:
+
+```sh
+./deploy-iso.sh                # release HEAD, which must already be pushed
+./deploy-iso.sh --no-publish   # build and test only; see build-release/<tag>/
+./deploy-iso.sh --draft --tag=iso-2026-10-01
+```
+
+`./test-iso.sh vinix-amd64.iso vinix-arm64.iso` runs the same boot tests on any
+image: amd64 through BIOS with VirtualBox's defaults and through UEFI, arm64 with
+virtio and with USB input. A boot passes when the desktop is on screen and
+answers the keyboard and the pointer. The arm64 desktop is assembled from the
+package layers the aarch64 build scripts leave in this checkout, so build those
+first (see *Default software image on aarch64*).
 
 ### To test
 

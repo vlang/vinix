@@ -56,6 +56,14 @@ const buffer_request = u8(1)
 const syslog_log = u8(5)
 const syslog_init = u8(8)
 const max_system_buffer_size = u64(16 * 1024 * 1024)
+const crashlog_header_size = u32(0x20)
+const crashlog_entry_header_size = u32(0x10)
+const crashlog_max_entries = u32(128)
+const crashlog_type_header = u32(0x434c4845) // 'CLHE'
+const crashlog_type_version = u32(0x43766572) // 'Cver'
+const crashlog_type_string = u32(0x43737472) // 'Cstr'
+const crashlog_type_registers = u32(0x43726738) // 'Crg8'
+const crashlog_type_stack = u32(0x43637374) // 'Ccst'
 
 pub enum RTKitState {
 	idle
@@ -78,6 +86,7 @@ pub mut:
 	ap_power_state   u16
 	shmem_context    voidptr
 	shmem_alloc      fn (voidptr, u64) u64 = unsafe { nil }
+	shmem_resolve    fn (voidptr, u64, u64) voidptr = unsafe { nil }
 	system_iovas     [16]u64
 	system_sizes     [16]u64
 	syslog_entries   u32
@@ -103,6 +112,137 @@ pub fn (mut rtk RTKit) set_shmem_allocator(context voidptr,
 	allocator fn (voidptr, u64) u64) {
 	rtk.shmem_context = context
 	rtk.shmem_alloc = allocator
+}
+
+// Install the optional reverse mapping used to inspect firmware-written
+// system buffers. The allocator's context owns the mappings and their lifetime.
+pub fn (mut rtk RTKit) set_shmem_resolver(resolver fn (voidptr, u64, u64) voidptr) {
+	rtk.shmem_resolve = resolver
+}
+
+@[inline]
+fn crashlog_u32(data voidptr, offset u32) u32 {
+	value := unsafe { &u8(u64(data) + u64(offset)) }
+	return unsafe {
+		u32(value[0]) | (u32(value[1]) << 8) | (u32(value[2]) << 16) |
+			(u32(value[3]) << 24)
+	}
+}
+
+@[inline]
+fn crashlog_u64(data voidptr, offset u32) u64 {
+	return u64(crashlog_u32(data, offset)) | (u64(crashlog_u32(data, offset + 4)) << 32)
+}
+
+fn crashlog_string(data voidptr, offset u32, available u32) string {
+	bytes := unsafe { &u8(u64(data) + u64(offset)) }
+	mut length := u32(0)
+	// Keep a corrupt record from making the console walk megabytes even when
+	// the entry itself is technically inside the allocated crash buffer.
+	limit := if available < 1024 { available } else { u32(1024) }
+	for length < limit {
+		if unsafe { bytes[length] } == 0 {
+			break
+		}
+		length++
+	}
+	return unsafe { tos(bytes, int(length)) }
+}
+
+fn (rtk &RTKit) print_crashlog_entry_kind(kind u32) {
+	println('rtkit[${rtk.name}]: crash entry ${u8(kind >> 24):c}${u8(kind >> 16):c}${u8(kind >> 8):c}${u8(kind):c}')
+}
+
+fn (rtk &RTKit) dump_crashlog() {
+	iova := rtk.system_iovas[ep_crashlog]
+	allocated := rtk.system_sizes[ep_crashlog]
+	if iova == 0 || allocated < crashlog_header_size || allocated > max_system_buffer_size
+		|| rtk.shmem_resolve == unsafe { nil } {
+		println('rtkit[${rtk.name}]: crash log buffer is unavailable')
+		return
+	}
+	data := rtk.shmem_resolve(rtk.shmem_context, iova, allocated)
+	if data == unsafe { nil } {
+		println('rtkit[${rtk.name}]: cannot resolve crash log at 0x${iova:x}')
+		return
+	}
+	// The mailbox notification is firmware's publication event for this shared
+	// memory. Order subsequent CPU loads after observing it.
+	cpu.dmb_ishld()
+	if crashlog_u32(data, 0) != crashlog_type_header {
+		println('rtkit[${rtk.name}]: invalid crash log header 0x${crashlog_u32(data,
+			0):x}')
+		return
+	}
+	total := crashlog_u32(data, 8)
+	if total < crashlog_header_size || u64(total) > allocated {
+		println('rtkit[${rtk.name}]: invalid crash log size 0x${total:x} (buffer 0x${allocated:x})')
+		return
+	}
+	println('rtkit[${rtk.name}]: crash log version=${crashlog_u32(data, 4)} size=0x${total:x}')
+	mut offset := crashlog_header_size
+	mut entries := u32(0)
+	for offset <= total - crashlog_entry_header_size && entries < crashlog_max_entries {
+		kind := crashlog_u32(data, offset)
+		if kind == crashlog_type_header {
+			return
+		}
+		length := crashlog_u32(data, offset + 0xc)
+		if length < crashlog_entry_header_size || length > total - offset {
+			println('rtkit[${rtk.name}]: invalid crash entry length 0x${length:x} at 0x${offset:x}')
+			return
+		}
+		match kind {
+			crashlog_type_string {
+				if length >= 0x15 {
+					id := crashlog_u32(data, offset + 0x10)
+					message := crashlog_string(data, offset + 0x14, length - 0x14)
+					println('rtkit[${rtk.name}]: crash message ${id}: ${message}')
+				} else {
+					rtk.print_crashlog_entry_kind(kind)
+				}
+			}
+			crashlog_type_version {
+				if length >= 0x21 {
+					version := crashlog_string(data, offset + 0x20, length - 0x20)
+					println('rtkit[${rtk.name}]: crash firmware: ${version}')
+				} else {
+					rtk.print_crashlog_entry_kind(kind)
+				}
+			}
+			crashlog_type_registers {
+				// Crg8 carries 31 GPRs followed by SP/PC/PSR and fault state.
+				if length >= 0x360 {
+					sp := crashlog_u64(data, offset + 0x110)
+					pc := crashlog_u64(data, offset + 0x118)
+					psr := crashlog_u64(data, offset + 0x120)
+					far := crashlog_u64(data, offset + 0x340)
+					esr := crashlog_u64(data, offset + 0x350)
+					println('rtkit[${rtk.name}]: exception pc=0x${pc:x} sp=0x${sp:x} psr=0x${psr:x} far=0x${far:x} esr=0x${esr:x}')
+				} else {
+					rtk.print_crashlog_entry_kind(kind)
+				}
+			}
+			crashlog_type_stack {
+				if length >= 0x18 {
+					println('rtkit[${rtk.name}]: crashed task ${crashlog_u32(data,
+						offset + 0x10)}')
+				} else {
+					rtk.print_crashlog_entry_kind(kind)
+				}
+			}
+			else {
+				rtk.print_crashlog_entry_kind(kind)
+			}
+		}
+		offset += length
+		entries++
+	}
+	if entries == crashlog_max_entries {
+		println('rtkit[${rtk.name}]: crash log entry limit reached')
+	} else {
+		println('rtkit[${rtk.name}]: crash log has no terminator')
+	}
 }
 
 @[inline]
@@ -340,6 +480,7 @@ pub fn (mut rtk RTKit) handle_system_message(msg mailbox.MboxMsg) bool {
 				return rtk.allocate_system_buffer(ep, msg.data0)
 			}
 			println('rtkit[${rtk.name}]: coprocessor crash notification')
+			rtk.dump_crashlog()
 			rtk.state = .error
 			return false
 		}

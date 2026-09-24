@@ -1,5 +1,8 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
 // Civil-time helpers shared by the Clock application and the taskbar clock.
 // Vinix has a real time clock only in the sense that Limine hands the kernel a
 // boot epoch, so it comes from clock_gettime(CLOCK_REALTIME) and the calendar
@@ -160,4 +163,15 @@ fn monotonic_millis() i64 {
 		return 0
 	}
 	return i64(now)
+}
+
+// Shared by the ordinary desktop loop and first-launch registration. Keep it
+// with the monotonic clock so staged registration tests need not import the
+// executable's main entry point.
+fn sleep_to_next_frame(frame_started i64, interval i64) {
+	elapsed := monotonic_millis() - frame_started
+	wait := desktop_frame_wait_ms(elapsed, interval)
+	if wait > 0 {
+		desktop_sleep_ms(wait)
+	}
 }

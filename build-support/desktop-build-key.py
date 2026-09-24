@@ -113,6 +113,9 @@ def compute_key(root: Path, v_compiler: Path, env: dict[str, str]) -> str:
     minecraft_staging = resolved_env_path(
         env, "VINIX_MINECRAFT_STAGING", root / "build-aarch64-minecraft/staging"
     )
+    doom_staging = resolved_env_path(
+        env, "VINIX_DOOM_STAGING", root / "build-aarch64-doom/staging"
+    )
     asahi_staging = resolved_env_path(
         env, "VINIX_ASAHI_STAGING", root / "build-aarch64-asahi/staging"
     )
@@ -128,31 +131,33 @@ def compute_key(root: Path, v_compiler: Path, env: dict[str, str]) -> str:
     gpu_sysroot = resolved_env_path(
         env, "VINIX_GPU_SYSROOT", root / "build-aarch64-x11/sysroot"
     )
+    sibling_ui2 = root.parent / "ui2"
+    default_ui2 = sibling_ui2 if (sibling_ui2 / "v.mod").is_file() else root / "third_party/ui2"
+    ui2_source = resolved_env_path(env, "VINIX_UI2_SOURCE", default_ui2)
 
     source_paths = [
         root / "build-desktop-aarch64.sh",
         root / "build-support/content-key.py",
         root / "build-support/desktop-build-key.py",
         root / "desktop",
-        root / "third_party/ui2/v.mod",
-        root / "third_party/ui2/ui",
-        root / "third_party/ui2/appkit",
-        root / "third_party/ui2/uikit",
-        root / "third_party/ui2/windows",
-        root / "third_party/ui2/linux",
-        root / "third_party/ui2/assets",
-        root / "third_party/ui2/examples/calculator",
-        root / "compat/macos/apps/Calculator",
-        root / "compat/macos/bundle",
-        root / "compat/macos/include",
-        root / "compat/macos/macho",
+        ui2_source / "v.mod",
+        ui2_source / "ui",
+        ui2_source / "uikit",
+        ui2_source / "windows",
+        ui2_source / "linux",
+        ui2_source / "assets",
+        ui2_source / "examples",
         root / "build-support/aarch64-cc-shim",
         root / "build-support/init-aarch64/desktop-init.c",
         root / "tools/m1-wifi/wifi-ctl.c",
         root / "kernel/c",
         root / "build-support/vinix-pkg",
+        root / "build-support/java-cacerts.py",
+        root / "build-support/minecraft",
+        root / "build-support/doom",
         root / "build-support/vinix-desktop-build",
         root / "build-support/vinix-desktop-reload",
+        root / "build-support/vinix-host-sync",
         root / "build-support/xorg-server/startx",
         root / "build-support/firefox",
         root / "build-support/gimp",
@@ -160,6 +165,7 @@ def compute_key(root: Path, v_compiler: Path, env: dict[str, str]) -> str:
         root / "build-support/chromium",
         root / "build-support/hyprland",
         root / "gl-triangle/run-m1-agx-smoke",
+        root / "gl-triangle/egl_triangle.c",
         root / "tests/browsers/firefox-smoke.html",
         root / "tests/browsers/chromium-smoke.html",
         root / "tests/packages/x-window-check.py",
@@ -180,6 +186,7 @@ def compute_key(root: Path, v_compiler: Path, env: dict[str, str]) -> str:
         chromium_staging,
         libreoffice_staging,
         minecraft_staging,
+        doom_staging,
         asahi_staging,
         hyprland_staging,
         blender_staging,
@@ -217,8 +224,8 @@ def compute_key(root: Path, v_compiler: Path, env: dict[str, str]) -> str:
     add_text(digest, "sources", tree_key(source_paths, metadata_only=False))
     add_text(
         digest,
-        "x11-generation",
-        tree_key([x11_staging, gpu_sysroot], metadata_only=True),
+        "inplace-layer-generation",
+        tree_key([x11_staging, gpu_sysroot, doom_staging], metadata_only=True),
     )
     for path in layer_roots:
         add_text(digest, f"layer:{path}", root_generation(path))

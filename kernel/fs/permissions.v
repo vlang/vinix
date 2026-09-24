@@ -20,10 +20,25 @@ fn credential_in_group(process &proc.Process, gid u32, effective bool) bool {
 	return false
 }
 
+// Whether the caller holds `cap`. access(2) asks with the real credentials,
+// for which Linux counts a real uid of zero as holding the permitted set.
+fn holds_capability(process &proc.Process, cap int, effective bool) bool {
+	caps := if effective {
+		process.caps.effective
+	} else if process.uid == 0 {
+		process.caps.permitted
+	} else {
+		u64(0)
+	}
+	return caps & (u64(1) << cap) != 0
+}
+
 // Check owner/group/other mode bits against either the effective credentials
 // used by normal filesystem operations or the real credentials used by
-// access(2). Root bypasses read/write checks, but a regular file still needs at
-// least one execute bit before root may execute it.
+// access(2). Being root is not what lifts the checks, capabilities are, so
+// a container's root that has had them dropped is bound by the mode bits:
+// CAP_DAC_OVERRIDE allows any access except executing a file with no execute
+// bit at all, and CAP_DAC_READ_SEARCH allows reading and searching.
 pub fn check_access(node &VFSNode, requested u32, effective bool) bool {
 	if unsafe { node == nil } || unsafe { node.resource == nil } {
 		return false
@@ -31,11 +46,17 @@ pub fn check_access(node &VFSNode, requested u32, effective bool) bool {
 	process := proc.current_thread().process
 	uid := if effective { process.euid } else { process.uid }
 	mode := node.resource.stat.mode
-	if uid == 0 {
+	if holds_capability(process, proc.cap_dac_override, effective) {
 		if requested & access_exec != 0 && !stat.isdir(mode) && mode & 0o111 == 0 {
 			return false
 		}
 		return true
+	}
+	if holds_capability(process, proc.cap_dac_read_search, effective) {
+		searching := stat.isdir(mode) && requested & ~(access_read | access_exec) == 0
+		if requested & ~access_read == 0 || searching {
+			return true
+		}
 	}
 
 	mut allowed := mode & 0o7
@@ -62,18 +83,18 @@ fn may_remove(parent &VFSNode, target &VFSNode) bool {
 		return true
 	}
 	process := proc.current_thread().process
-	return process.euid == 0 || process.euid == parent.resource.stat.uid
-		|| process.euid == target.resource.stat.uid
+	return holds_capability(process, proc.cap_fowner, true)
+		|| process.euid == parent.resource.stat.uid || process.euid == target.resource.stat.uid
 }
 
 fn owns_resource(uid u32) bool {
 	process := proc.current_thread().process
-	return process.euid == 0 || process.euid == uid
+	return holds_capability(process, proc.cap_fowner, true) || process.euid == uid
 }
 
 fn may_chown(uid u32, new_uid u32, new_gid u32) bool {
 	process := proc.current_thread().process
-	if process.euid == 0 {
+	if holds_capability(process, proc.cap_chown, true) {
 		return true
 	}
 	if process.euid != uid || (new_uid != u32(-1) && new_uid != uid) {

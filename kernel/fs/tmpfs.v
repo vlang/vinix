@@ -1,6 +1,7 @@
 module fs
 
 import stat
+import errno
 import klock
 import memory
 import memory.mmap
@@ -27,6 +28,57 @@ pub mut:
 	// boot.  The first operation which can modify the backing store turns it
 	// into an ordinary tmpfs allocation.
 	storage_owned bool
+	// memfd_create(2) files take seals; nothing else does.
+	memfd bool
+	seals u32
+	// A file that is mapped MAP_SHARED can no longer live in one movable
+	// buffer: growing it would relocate the pages a mapping already points at.
+	// It switches to a list of individually allocated physical pages, which
+	// stay put for the life of the file, and every access goes through those
+	// pages from then on.
+	paged bool
+	pages []u64
+	// Extended attributes, nil until one is set; see xattr.v.
+	xattrs &XAttrSet = unsafe { nil }
+}
+
+// A file larger than this lives in individual pages rather than in one buffer.
+// Growing a buffer by doubling needs a contiguous run of physical memory as
+// large as the file, which a fragmented machine eventually cannot supply, and
+// the allocator panics rather than fail: runc copies its ~10 MiB binary into a
+// memfd for every container it starts, and that brought the kernel down after
+// a handful of containers.
+const tmpfs_contiguous_limit = u64(1) << 20
+
+const f_seal_seal = u32(0x1)
+const f_seal_shrink = u32(0x2)
+const f_seal_grow = u32(0x4)
+const f_seal_write = u32(0x8)
+const f_seal_future_write = u32(0x10)
+const f_seal_exec = u32(0x20)
+
+fn (mut this TmpFSResource) get_seals() ?u32 {
+	if !this.memfd {
+		errno.set(errno.einval)
+		return none
+	}
+	return this.seals
+}
+
+fn (mut this TmpFSResource) add_seals(seals u32) ? {
+	if !this.memfd || seals & ~u32(0x3f) != 0 {
+		errno.set(errno.einval)
+		return none
+	}
+	this.l.acquire()
+	defer {
+		this.l.release()
+	}
+	if this.seals & f_seal_seal != 0 {
+		errno.set(errno.eperm)
+		return none
+	}
+	this.seals |= seals
 }
 
 // materialize_locked gives a borrowed (or as-yet empty) file writable tmpfs
@@ -98,6 +150,107 @@ pub fn tmpfs_borrow_storage(mut res resource.Resource, storage voidptr, size u64
 	return false
 }
 
+// Back the in-file part of a shared mapping with immovable pages before any of
+// them is returned. Only up to the file's end: a page past it must stay absent
+// so touching it faults.
+fn (mut this TmpFSResource) reserve_shared_mapping(offset u64, length u64) bool {
+	if offset > u64(-1) - length {
+		return false
+	}
+	this.l.acquire()
+	defer {
+		this.l.release()
+	}
+	if !this.ensure_paged_locked() {
+		return false
+	}
+	mut end := offset + length
+	if end > u64(this.stat.size) {
+		end = u64(this.stat.size)
+	}
+	return this.grow_pages_locked(lib.div_roundup(end, page_size))
+}
+
+// Give the file discrete, immovable physical pages. Called before it is first
+// shared-mapped. The contiguous buffer, borrowed or owned, is copied across
+// page by page and then let go.
+fn (mut this TmpFSResource) ensure_paged_locked() bool {
+	if this.paged {
+		return true
+	}
+	page_count := lib.div_roundup(u64(this.stat.size), page_size)
+	mut pages := []u64{cap: int(page_count)}
+	size := u64(this.stat.size)
+	for i := u64(0); i < page_count; i++ {
+		phys := memory.pmm_alloc(1)
+		if phys == unsafe { nil } {
+			for allocated in pages {
+				memory.pmm_free(voidptr(allocated), 1)
+			}
+			unsafe { pages.free() }
+			return false
+		}
+		offset := i * page_size
+		if this.storage != unsafe { nil } && offset < size {
+			copy_size := if page_size < size - offset { page_size } else { size - offset }
+			unsafe { C.memcpy(voidptr(u64(phys) + higher_half), &this.storage[offset], copy_size) }
+		}
+		pages << u64(phys)
+	}
+	if this.storage_owned && this.storage != unsafe { nil } {
+		memory.free(this.storage)
+	}
+	this.storage = unsafe { nil }
+	this.capacity = 0
+	this.storage_owned = false
+	this.pages = pages
+	this.paged = true
+	return true
+}
+
+// Add zero-filled pages so the file has at least `page_count` of them.
+fn (mut this TmpFSResource) grow_pages_locked(page_count u64) bool {
+	// Room is made here, doubling, rather than by pushing: an array grown by
+	// << leaves its old buffer behind in this kernel, one for every step of a
+	// file written a page at a time.
+	if page_count > u64(this.pages.cap) {
+		mut wanted := if this.pages.cap < 16 { 16 } else { this.pages.cap * 2 }
+		if u64(wanted) < page_count {
+			wanted = int(page_count)
+		}
+		mut larger := []u64{cap: wanted}
+		larger << this.pages
+		unsafe { this.pages.free() }
+		this.pages = larger
+	}
+	for u64(this.pages.len) < page_count {
+		phys := memory.pmm_alloc(1)
+		if phys == unsafe { nil } {
+			return false
+		}
+		this.pages << u64(phys)
+	}
+	return true
+}
+
+// A truncated file keeps its pages, and they still hold what was there. Zero
+// [from, to) in whichever of them exist, so that growing the file again, by
+// ftruncate or by writing past its end, reads back zeros.
+fn (mut this TmpFSResource) zero_pages_locked(from u64, to u64) {
+	limit := u64(this.pages.len) * page_size
+	end := if to < limit { to } else { limit }
+	mut at := from
+	for at < end {
+		in_page := at % page_size
+		mut chunk := page_size - in_page
+		if chunk > end - at {
+			chunk = end - at
+		}
+		unsafe { C.memset(voidptr(this.pages[int(at / page_size)] + higher_half + in_page), 0, chunk) }
+		at += chunk
+	}
+}
+
 fn (mut this TmpFSResource) mmap(_handle voidptr, page u64, flags int) voidptr {
 	this.l.acquire()
 	defer {
@@ -109,20 +262,37 @@ fn (mut this TmpFSResource) mmap(_handle voidptr, page u64, flags int) voidptr {
 	offset := page * page_size
 
 	if flags & mmap.map_shared != 0 {
-		if offset > u64(-1) - page_size || !this.materialize_locked(offset + page_size) {
+		// Only pages that lie within the file are backed. A shared mapping may
+		// extend past the end -- callers routinely map a rounded-up region --
+		// and a page past the file must fault (SIGBUS) rather than make the
+		// file grow to cover it.
+		if offset >= u64(this.stat.size) {
 			return unsafe { nil }
 		}
-		unsafe {
-			return voidptr(u64(&this.storage[offset]) - higher_half)
+		if !this.ensure_paged_locked() {
+			return unsafe { nil }
 		}
+		if page >= u64(this.pages.len) {
+			return unsafe { nil }
+		}
+		return voidptr(this.pages[int(page)])
 	}
 
 	copy_page := memory.pmm_alloc(1)
 	file_size := u64(this.stat.size)
-	if offset < file_size && this.storage != unsafe { nil } {
+	if offset < file_size {
 		copy_size := if page_size < file_size - offset { page_size } else { file_size - offset }
-		unsafe {
-			C.memcpy(voidptr(u64(copy_page) + higher_half), &this.storage[offset], copy_size)
+		if this.paged {
+			if page < u64(this.pages.len) {
+				unsafe {
+					C.memcpy(voidptr(u64(copy_page) + higher_half),
+						voidptr(this.pages[int(page)] + higher_half), copy_size)
+				}
+			}
+		} else if this.storage != unsafe { nil } {
+			unsafe {
+				C.memcpy(voidptr(u64(copy_page) + higher_half), &this.storage[offset], copy_size)
+			}
 		}
 	}
 
@@ -148,9 +318,40 @@ fn (mut this TmpFSResource) read(_handle voidptr, buf voidptr, loc u64, count u6
 	}
 	actual_count := if count > file_size - loc { file_size - loc } else { count }
 
-	unsafe { C.memcpy(buf, &this.storage[loc], actual_count) }
+	if this.paged {
+		this.paged_copy(buf, loc, actual_count, false)
+	} else {
+		unsafe { C.memcpy(buf, &this.storage[loc], actual_count) }
+	}
 
 	return i64(actual_count)
+}
+
+// Copy between a user/kernel buffer and the file's pages. `to_file` writes the
+// buffer into the pages; otherwise it reads the pages into the buffer.
+fn (mut this TmpFSResource) paged_copy(buf voidptr, loc u64, count u64, to_file bool) {
+	mut done := u64(0)
+	for done < count {
+		absolute := loc + done
+		index := int(absolute / page_size)
+		in_page := absolute % page_size
+		mut chunk := page_size - in_page
+		if chunk > count - done {
+			chunk = count - done
+		}
+		if index < this.pages.len {
+			page_addr := this.pages[index] + higher_half + in_page
+			src_or_dst := u64(buf) + done
+			if to_file {
+				unsafe { C.memcpy(voidptr(page_addr), voidptr(src_or_dst), chunk) }
+			} else {
+				unsafe { C.memcpy(voidptr(src_or_dst), voidptr(page_addr), chunk) }
+			}
+		} else if !to_file {
+			unsafe { C.memset(voidptr(u64(buf) + done), 0, chunk) }
+		}
+		done += chunk
+	}
 }
 
 fn (mut this TmpFSResource) write(_handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
@@ -166,18 +367,39 @@ fn (mut this TmpFSResource) write(_handle voidptr, buf voidptr, loc u64, count u
 		return 0
 	}
 	write_end := loc + count
-	if !this.storage_owned || write_end > this.capacity {
-		if !this.materialize_locked(write_end) {
+	if this.seals & (f_seal_write | f_seal_future_write) != 0
+		|| (this.seals & f_seal_grow != 0 && write_end > u64(this.stat.size)) {
+		errno.set(errno.eperm)
+		return none
+	}
+	if !this.paged && write_end > tmpfs_contiguous_limit && !this.ensure_paged_locked() {
+		errno.set(errno.enospc)
+		return none
+	}
+	if this.paged {
+		// A hole from a seek past EOF reads back as zero: freshly allocated
+		// pages already are, and pages kept from before a truncation are
+		// cleared.
+		if loc > u64(this.stat.size) {
+			this.zero_pages_locked(u64(this.stat.size), loc)
+		}
+		if !this.grow_pages_locked(lib.div_roundup(write_end, page_size)) {
 			return none
 		}
+		this.paged_copy(buf, loc, count, true)
+	} else {
+		if !this.storage_owned || write_end > this.capacity {
+			if !this.materialize_locked(write_end) {
+				return none
+			}
+		}
+		old_size := u64(this.stat.size)
+		if loc > old_size {
+			// A write after a seek beyond EOF creates a zero-filled sparse hole.
+			unsafe { C.memset(&this.storage[old_size], 0, loc - old_size) }
+		}
+		unsafe { C.memcpy(&this.storage[loc], buf, count) }
 	}
-
-	old_size := u64(this.stat.size)
-	if loc > old_size {
-		// A write after a seek beyond EOF creates a zero-filled sparse hole.
-		unsafe { C.memset(&this.storage[old_size], 0, loc - old_size) }
-	}
-	unsafe { C.memcpy(&this.storage[loc], buf, count) }
 
 	if write_end > this.stat.size {
 		this.stat.size = write_end
@@ -206,15 +428,22 @@ fn (mut this TmpFSResource) filesystem_stat() resource.FileSystemStat {
 }
 
 fn (mut this TmpFSResource) unref(_handle voidptr) ? {
-	katomic.dec(mut &this.refcount)
-
-	if this.refcount != 0 {
+	// The count the decrement left, not one read after it: two last
+	// references dropped at once could both read zero and free the file
+	// twice.
+	if katomic.dec(mut &this.refcount) {
 		return
 	}
 
-	if stat.isreg(this.stat.mode) && this.storage_owned {
+	if this.paged {
+		for phys in this.pages {
+			memory.pmm_free(voidptr(phys), 1)
+		}
+		unsafe { this.pages.free() }
+	} else if stat.isreg(this.stat.mode) && this.storage_owned {
 		memory.free(this.storage)
 	}
+	free_xattrs(this.xattrs)
 
 	unsafe { free(this) }
 }
@@ -234,23 +463,38 @@ fn (mut this TmpFSResource) grow(_handle voidptr, new_size u64) ? {
 	}
 
 	old_size := u64(this.stat.size)
+	if (new_size < old_size && this.seals & f_seal_shrink != 0)
+		|| (new_size > old_size && this.seals & f_seal_grow != 0) {
+		errno.set(errno.eperm)
+		return none
+	}
 	if new_size <= old_size {
-		// Borrowed storage can stay borrowed when truncated. If the file grows
-		// again, materialisation copies only the still-visible prefix and its
-		// zero-filled allocation supplies the truncated tail correctly.
+		// A shared-mapped file keeps its pages when truncated: another mapping
+		// may still reach them, and a regrow must show the same page, not a
+		// fresh one. An ordinary file's borrowed storage can stay borrowed and
+		// re-materialise its still-visible prefix on the next grow.
 		this.stat.size = new_size
 		this.stat.blocks = lib.div_roundup(new_size, u64(this.stat.blksize))
 		return
 	}
 
-	if !this.materialize_locked(new_size) {
+	if !this.paged && new_size > tmpfs_contiguous_limit && !this.ensure_paged_locked() {
+		errno.set(errno.enospc)
 		return none
 	}
-
-	// Anything past the old end of the file has to read back as zero, whether
-	// it got there by seeking past the end and writing or by ftruncate. realloc
-	// makes no such promise about the memory it hands back.
-	if new_size > old_size {
+	if this.paged {
+		// Pages kept past the old end still hold stale bytes; new ones are zero.
+		this.zero_pages_locked(old_size, new_size)
+		if !this.grow_pages_locked(lib.div_roundup(new_size, page_size)) {
+			return none
+		}
+	} else {
+		if !this.materialize_locked(new_size) {
+			return none
+		}
+		// Anything past the old end of the file has to read back as zero, whether
+		// it got there by seeking past the end and writing or by ftruncate. realloc
+		// makes no such promise about the memory it hands back.
 		unsafe {
 			C.memset(voidptr(u64(this.storage) + old_size), 0, new_size - old_size)
 		}

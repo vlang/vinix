@@ -192,7 +192,7 @@ fn get_posix_lock(handle &Handle, mut flock Flock) ? {
 	flock.l_whence = 0
 	flock.l_start = i64(conflict.start)
 	flock.l_len = if conflict.end == u64(-1) { 0 } else { i64(conflict.end - conflict.start) }
-	flock.l_pid = i32(conflict.pid)
+	flock.l_pid = i32(proc.pid_seen_by_caller(int(conflict.pid)))
 }
 
 fn release_posix_locks(res &resource.Resource, pid int) {

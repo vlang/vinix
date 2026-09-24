@@ -6,11 +6,7 @@
 #                         [--mem=MB]
 #                         [--disk=MB] [--persist[=MB]|--no-persist]
 #                         [--disk-root|--no-disk-root] [--reset-disk]
-#                         [--ephemeral] [--replace] [--grab-keys]
-#
-# --grab-keys hands the whole keyboard to the guest. macOS keeps Cmd-Tab for
-# its own application switcher, so without it the desktop's Cmd-Tab is never
-# seen -- at the price of Cmd-Q no longer quitting QEMU.
+#                         [--ephemeral] [--replace]
 #
 # --replace stops a VM already using the boot disk. Without it a second run
 # refuses, rather than writing into the disk of a running one.
@@ -18,6 +14,11 @@
 # A separate ext2 volume is mounted at /root by default. The base system still
 # comes from the initramfs, while files below /root survive QEMU restarts.
 # --persist=MB chooses its one-time image size; --no-persist disables it.
+#
+# The current Vinix checkout is exposed inside networked QEMU boots at
+# /mnt/host/vinix. vinix-host-sync refreshes that mirror, and
+# vinix-desktop-build does so automatically before compiling. Set
+# VINIX_QEMU_HOST_SOURCE to another checkout, or to 0 to disable the share.
 #
 # --disk-root instead installs the whole system onto that volume and boots from
 # it, so every write survives a restart rather than only the ones below /root.
@@ -41,7 +42,11 @@
 # high-memory mapping path the M1 takes; the 2048 default keeps boots fast.
 # QEMU supplies four CPUs, and its kernel build enables the Limine MP request
 # needed for Vinix to bring all of them online.
-set -e
+#
+# VINIX_QEMU_AUDIO picks where the guest's /dev/dsp plays: a QEMU audiodev
+# driver (coreaudio, the default on macOS; none elsewhere), wav:PATH to record
+# everything the guest plays into a WAV file, or off for no sound card.
+set -eo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 . "$SCRIPT_DIR/build-support/qemu-storage.sh"
@@ -67,6 +72,20 @@ QEMU_RESOLUTION="${VINIX_QEMU_RESOLUTION:-}"
 # ephemeral boot image. Desktop runs select their own fixed profile paths.
 PACKAGE_STORE="${VINIX_QEMU_PACKAGE_STORE:-$BOOT_DIR/boot.img.packages.tar}"
 PACKAGE_STORE_PORT="${VINIX_QEMU_PACKAGE_STORE_PORT:-18081}"
+# The host checkout is served over the same loopback-only guest forward as the
+# package overlay. A fresh archive is made for every request, so a running VM
+# sees host edits without a QEMU restart. Set this to 0 to disable the share or
+# to another Vinix checkout to share that directory instead.
+HOST_SOURCE_EXPLICIT=0
+if [ "${VINIX_QEMU_HOST_SOURCE+x}" = x ]; then
+    HOST_SOURCE_EXPLICIT=1
+fi
+HOST_SOURCE_ROOT="${VINIX_QEMU_HOST_SOURCE:-$SCRIPT_DIR}"
+HOST_UI2_SOURCE="${VINIX_UI2_SOURCE:-}"
+HOST_SOURCE_ENABLED=1
+case "$HOST_SOURCE_ROOT" in
+    ''|0) HOST_SOURCE_ENABLED=0 ;;
+esac
 PERSIST_DISK="${VINIX_QEMU_PERSIST_DISK:-$BOOT_DIR/boot.img.root.ext2}"
 PERSIST_SIZE_MB="${VINIX_QEMU_PERSIST_SIZE_MB:-1024}"
 PERSIST_SEED="${VINIX_QEMU_PERSIST_SEED:-}"
@@ -127,7 +146,6 @@ FAKE_G17=0
 GUEST_INIT="${VINIX_QEMU_GUEST_INIT:-}"
 GUEST_INIT_REQUESTED=0
 REPLACE_RUNNING=0
-GRAB_KEYS=0
 EPHEMERAL_BOOT=0
 PERSIST_ENABLED="${VINIX_QEMU_PERSIST:-1}"
 QEMU_MEM="${VINIX_QEMU_MEM:-2048}"
@@ -149,7 +167,6 @@ for arg in "$@"; do
         --reset-disk)   RESET_DISK=1 ;;
         --ephemeral)  EPHEMERAL_BOOT=1 ;;
         --replace)    REPLACE_RUNNING=1 ;;
-        --grab-keys)  GRAB_KEYS=1 ;;
         --help|-h)
             awk 'NR > 1 && /^#/ { sub(/^# ?/, ""); print; next } NR > 1 { exit }' "$0"
             exit 0
@@ -185,6 +202,41 @@ fi
 if [ ! -e "$BOOT_DISK" ] && [ "$KEEP_TEMP_BOOT_DISK" -eq 0 ] &&
    vinix_storage_is_temporary_path "$BOOT_DISK"; then
     CLEANUP_BOOT_DISK=1
+fi
+
+if [ "$HOST_SOURCE_ENABLED" -eq 1 ]; then
+    if [ ! -d "$HOST_SOURCE_ROOT" ]; then
+        echo "ERROR: QEMU host source directory does not exist: $HOST_SOURCE_ROOT" >&2
+        exit 1
+    fi
+    HOST_SOURCE_ROOT="$(cd "$HOST_SOURCE_ROOT" && pwd)"
+    if [ ! -f "$HOST_SOURCE_ROOT/desktop/main.v" ] || \
+       ! command -v git >/dev/null 2>&1 || \
+       ! git -C "$HOST_SOURCE_ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        if [ "$HOST_SOURCE_EXPLICIT" -eq 1 ]; then
+            echo "ERROR: QEMU host source is not a complete Git checkout: $HOST_SOURCE_ROOT" >&2
+            exit 1
+        fi
+        HOST_SOURCE_ENABLED=0
+    fi
+    if [ "$HOST_SOURCE_ENABLED" -eq 1 ]; then
+        if [ -z "$HOST_UI2_SOURCE" ]; then
+            if [ -f "$HOST_SOURCE_ROOT/../ui2/v.mod" ]; then
+                HOST_UI2_SOURCE="$HOST_SOURCE_ROOT/../ui2"
+            else
+                HOST_UI2_SOURCE="$HOST_SOURCE_ROOT/third_party/ui2"
+            fi
+        fi
+        if [ ! -f "$HOST_UI2_SOURCE/v.mod" ]; then
+            if [ "$HOST_SOURCE_EXPLICIT" -eq 1 ] || [ -n "${VINIX_UI2_SOURCE:-}" ]; then
+                echo "ERROR: QEMU ui2 source is not a checkout: $HOST_UI2_SOURCE" >&2
+                exit 1
+            fi
+            HOST_SOURCE_ENABLED=0
+        else
+            HOST_UI2_SOURCE="$(cd "$HOST_UI2_SOURCE" && pwd)"
+        fi
+    fi
 fi
 
 if [ "$GUEST_INIT_REQUESTED" -eq 1 ] && [ -z "$GUEST_INIT" ]; then
@@ -292,9 +344,11 @@ fi
 
 # ── Build kernel ──
 if [ "$NO_BUILD" -eq 0 ]; then
+    . "$SCRIPT_DIR/build-support/find-v.sh"
+    echo "==> V compiler: $V ($("$V" -version 2>/dev/null || echo unknown version))"
     echo "==> Building kernel..."
-    make -C "$KERNEL_DIR" CC=clang ARCH=aarch64 LIMINE_MP=1 \
-        -j$(sysctl -n hw.ncpu) 2>&1 | tail -3
+    make -C "$KERNEL_DIR" CC=clang ARCH=aarch64 V="$V" LIMINE_MP=1 \
+        -j"$(sysctl -n hw.ncpu 2>/dev/null || nproc)" 2>&1 | tail -3
 fi
 
 if [ ! -f "$KERNEL_DIR/bin/vinix" ]; then
@@ -371,7 +425,7 @@ fi
 # their files; --reset-disk asks for the clean install instead.
 vinix_install_system_volume() {
     local image="$DISK_ROOT_IMAGE"
-    local image_id installed carried home_dir needed_mb image_bytes
+    local image_id installed carried home_dir needed_mb image_bytes existing_bytes existing_mb package_overlay
 
     if [ -z "$image" ]; then
         image="$INITRAMFS"
@@ -398,6 +452,19 @@ vinix_install_system_volume() {
     needed_mb=$(( image_bytes * 2 / 1024 / 1024 + 512 ))
     if [ "$needed_mb" -lt "$PERSIST_SIZE_MB" ]; then
         needed_mb="$PERSIST_SIZE_MB"
+    fi
+
+    # Reinstalling a smaller system image must not shrink an existing machine.
+    # /root is carried into the replacement volume, and it can be much larger
+    # than the new image itself (recordings are a common example). Keeping the
+    # old logical capacity both preserves that data and avoids turning an image
+    # compaction into an out-of-space failure during the next QEMU restart.
+    if [ "$RESET_DISK" -eq 0 ] && [ -f "$PERSIST_DISK" ]; then
+        existing_bytes="$(vinix_storage_file_size "$PERSIST_DISK")"
+        existing_mb=$(( (existing_bytes + 1024 * 1024 - 1) / 1024 / 1024 ))
+        if [ "$needed_mb" -lt "$existing_mb" ]; then
+            needed_mb="$existing_mb"
+        fi
     fi
 
     if [ "$RESET_DISK" -eq 1 ] && [ -f "$PERSIST_DISK" ]; then
@@ -441,8 +508,13 @@ vinix_install_system_volume() {
         carried=""
     fi
 
+    package_overlay=""
+    if [ -s "$PACKAGE_STORE" ]; then
+        package_overlay="$PACKAGE_STORE"
+        echo "    merging saved packages into the system volume"
+    fi
     if ! vinix_storage_create_ext2 "$PERSIST_DISK" "$needed_mb" "$image" \
-        "$image_id" "$carried"; then
+        "$image_id" "$carried" "$package_overlay"; then
         echo "ERROR: could not install the system volume: $PERSIST_DISK" >&2
         [ -z "$home_dir" ] || rm -rf "$home_dir"
         exit 1
@@ -524,10 +596,11 @@ if [ -n "$QEMU_RESOLUTION" ]; then
     fi
 fi
 
-# Limine supplies modules in configuration order. The kernel unpacks the base,
-# the last successfully saved package overlay, and this run's small control
-# layer into the same RAM-backed root.
-if [ -s "$PACKAGE_STORE" ]; then
+# Limine supplies modules in configuration order. A RAM root needs its saved
+# package overlay here. A disk root received the same overlay while its ext2
+# image was installed, so putting it in the boot payload would only make
+# firmware load another potentially multi-gigabyte copy into guest RAM.
+if [ "$DISK_ROOT" -ne 1 ] && [ -s "$PACKAGE_STORE" ]; then
     printf '%s\n' '    module_path: boot():/boot/packages.tar' >> "$LIMINE_CONF_QEMU"
 fi
 printf '%s\n' '    module_path: boot():/boot/qemu-runtime.tar' >> "$LIMINE_CONF_QEMU"
@@ -574,7 +647,10 @@ fi
 # lock it could not get. Catching it here says which process to deal with, and
 # says it before anything has been modified.
 if [ -f "$BOOT_DISK" ] && command -v lsof >/dev/null 2>&1; then
-    HOLDERS="$(lsof -t -- "$BOOT_DISK" 2>/dev/null | tr '\n' ' ')"
+    # lsof uses status 1 for the ordinary "no matching open files" result.
+    # Under this script's pipefail mode that must not become a silent runner
+    # failure before QEMU has even been launched.
+    HOLDERS="$(lsof -t -- "$BOOT_DISK" 2>/dev/null | tr '\n' ' ' || true)"
     if [ -n "${HOLDERS// /}" ]; then
         # Only a QEMU is safe to stop on the strength of holding this file.
         NON_QEMU=""
@@ -612,7 +688,7 @@ if [ -f "$BOOT_DISK" ] && command -v lsof >/dev/null 2>&1; then
 fi
 
 if [ "$PERSIST_ENABLED" -eq 1 ] && command -v lsof >/dev/null 2>&1; then
-    PERSIST_HOLDERS="$(lsof -t -- "$PERSIST_DISK" 2>/dev/null | tr '\n' ' ')"
+    PERSIST_HOLDERS="$(lsof -t -- "$PERSIST_DISK" 2>/dev/null | tr '\n' ' ' || true)"
     if [ -n "${PERSIST_HOLDERS// /}" ]; then
         echo "ERROR: persistent disk is already in use: $PERSIST_DISK" >&2
         for pid in $PERSIST_HOLDERS; do
@@ -638,7 +714,7 @@ if [ -f "$INITRAMFS" ]; then
         exit 1
     fi
     package_overlay_bytes=0
-    if [ -s "$PACKAGE_STORE" ]; then
+    if [ "$DISK_ROOT" -ne 1 ] && [ -s "$PACKAGE_STORE" ]; then
         if stat -f%z "$PACKAGE_STORE" >/dev/null 2>&1; then
             package_overlay_bytes="$(stat -f%z "$PACKAGE_STORE")"
         else
@@ -741,7 +817,8 @@ PACKAGE_SERVER_READY="$PACKAGE_RUNTIME_DIR/server.ready"
 PACKAGE_SERVER_LOG="$PACKAGE_RUNTIME_DIR/server.log"
 PACKAGE_BASE_FILES_RAW="$PACKAGE_RUNTIME_DIR/base-files.raw"
 mkdir -p "$PACKAGE_RUNTIME_ROOT/etc/vinix-pkg" "$PACKAGE_RUNTIME_ROOT/root" \
-    "$PACKAGE_RUNTIME_ROOT/usr/bin" "$PACKAGE_RUNTIME_ROOT/usr/libexec"
+    "$PACKAGE_RUNTIME_ROOT/etc/vinix" "$PACKAGE_RUNTIME_ROOT/usr/bin" \
+    "$PACKAGE_RUNTIME_ROOT/usr/libexec"
 
 # Tests may replace PID 1 without copying and rewriting a multi-gigabyte base
 # image. Limine loads this per-run module last, so the override exists only in
@@ -842,7 +919,7 @@ sed -e 's#^\./##' -e 's#/$##' -e '/^\.$/d' -e '/^$/d' \
 # These parent directories belong to the injected runtime module. Treating
 # them as part of the immutable base prevents recursive tar from pulling the
 # control files themselves into an installed-package overlay.
-printf '%s\n' etc/vinix-pkg usr/bin usr/libexec \
+printf '%s\n' etc/vinix etc/vinix-pkg usr/bin usr/libexec \
     >> "$PACKAGE_RUNTIME_ROOT/etc/vinix-pkg/base-files"
 LC_ALL=C sort -u -o "$PACKAGE_RUNTIME_ROOT/etc/vinix-pkg/base-files" \
     "$PACKAGE_RUNTIME_ROOT/etc/vinix-pkg/base-files"
@@ -852,18 +929,38 @@ install -m755 "$SCRIPT_DIR/build-support/vinix-pkg-wrapper" \
     "$PACKAGE_RUNTIME_ROOT/usr/bin/pkg"
 install -m755 "$SCRIPT_DIR/build-support/vinix-persist-packages" \
     "$PACKAGE_RUNTIME_ROOT/usr/libexec/vinix-persist-packages"
+install -m755 "$SCRIPT_DIR/build-support/vinix-host-sync" \
+    "$PACKAGE_RUNTIME_ROOT/usr/bin/vinix-host-sync"
+install -m755 "$SCRIPT_DIR/build-support/vinix-desktop-build" \
+    "$PACKAGE_RUNTIME_ROOT/usr/bin/vinix-desktop-build"
+printf '%s\n' \
+    etc/vinix/qemu-host-source-url \
+    usr/bin/vinix-host-sync \
+    usr/bin/vinix-desktop-build \
+    >> "$PACKAGE_RUNTIME_ROOT/etc/vinix-pkg/base-files"
+LC_ALL=C sort -u -o "$PACKAGE_RUNTIME_ROOT/etc/vinix-pkg/base-files" \
+    "$PACKAGE_RUNTIME_ROOT/etc/vinix-pkg/base-files"
+: > "$PACKAGE_RUNTIME_ROOT/etc/vinix/qemu-host-source-url"
+if [ "$HOST_SOURCE_ENABLED" -eq 1 ] && [ "$VIRTIO_GPU" -ne 2 ]; then
+    printf 'http://10.0.2.2:%s\n' "$PACKAGE_STORE_PORT" \
+        > "$PACKAGE_RUNTIME_ROOT/etc/vinix/qemu-host-source-url"
+fi
 # VINIX_QEMU_PACKAGE_PERSIST=0 leaves the store address out, which is how the
 # package frontend already recognises a run that does not keep its packages.
 # Saving a browser-sized overlay costs more than the install it follows.
 if [ "${VINIX_QEMU_PACKAGE_PERSIST:-1}" != 0 ]; then
-    printf 'http://10.0.2.100:%s\n' "$PACKAGE_STORE_PORT" \
+    printf 'http://10.0.2.2:%s\n' "$PACKAGE_STORE_PORT" \
         > "$PACKAGE_RUNTIME_ROOT/etc/vinix-pkg/qemu-store-url"
 fi
 COPYFILE_DISABLE=1 tar --format=ustar -cf "$PACKAGE_RUNTIME_TAR" \
     -C "$PACKAGE_RUNTIME_ROOT" .
 mcopy -o -i "$BOOT_DISK" "$PACKAGE_RUNTIME_TAR" ::/boot/qemu-runtime.tar
 
-if [ -s "$PACKAGE_STORE" ]; then
+if [ "$DISK_ROOT" -eq 1 ]; then
+    # Older runners copied the saved overlay to the FAT image even for a disk
+    # root. It is no longer referenced by Limine; remove that stale copy too.
+    mdel -i "$BOOT_DISK" ::/boot/packages.tar 2>/dev/null || true
+elif [ -s "$PACKAGE_STORE" ]; then
     if ! tar -tf "$PACKAGE_STORE" >/dev/null 2>&1; then
         echo "ERROR: saved QEMU package overlay is not a readable tar: $PACKAGE_STORE" >&2
         exit 1
@@ -890,9 +987,15 @@ else
         echo "ERROR: python3 is required for QEMU package persistence" >&2
         exit 1
     fi
+    SOURCE_SERVER_ARGS=()
+    if [ "$HOST_SOURCE_ENABLED" -eq 1 ]; then
+        SOURCE_SERVER_ARGS=(--source-root "$HOST_SOURCE_ROOT" \
+            --ui2-source "$HOST_UI2_SOURCE")
+    fi
     python3 "$SCRIPT_DIR/tools/qemu-package-store.py" \
         --store "$PACKAGE_STORE" --port "$PACKAGE_STORE_PORT" \
-        --ready-file "$PACKAGE_SERVER_READY" >"$PACKAGE_SERVER_LOG" 2>&1 &
+        --ready-file "$PACKAGE_SERVER_READY" "${SOURCE_SERVER_ARGS[@]}" \
+        >"$PACKAGE_SERVER_LOG" 2>&1 &
     PACKAGE_SERVER_PID=$!
     for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
         [ -s "$PACKAGE_SERVER_READY" ] && break
@@ -906,8 +1009,17 @@ else
         echo "ERROR: QEMU package store could not start on port $PACKAGE_STORE_PORT" >&2
         exit 1
     fi
-    NETWORK_FLAGS="-netdev user,id=net0,guestfwd=tcp:10.0.2.100:${PACKAGE_STORE_PORT}-tcp:127.0.0.1:${PACKAGE_STORE_PORT} -device virtio-net-device,netdev=net0,mac=52:54:00:12:34:56"
+    # QEMU's user network maps 10.0.2.2 to the host. The service itself stays
+    # bound to 127.0.0.1, so it is reachable by the guest without being
+    # exposed to the host's physical network. Unlike a guestfwd character
+    # backend, the host gateway supports every independent HTTP connection a
+    # long-lived VM makes.
+    NETWORK_FLAGS="-netdev user,id=net0 -device virtio-net-device,netdev=net0,mac=52:54:00:12:34:56"
     echo "==> Package installs persist in: $PACKAGE_STORE"
+    if [ "$HOST_SOURCE_ENABLED" -eq 1 ]; then
+        echo "==> Host sources: $HOST_SOURCE_ROOT -> /mnt/host/vinix"
+        echo "==> Desktop ui2 sources: $HOST_UI2_SOURCE"
+    fi
 fi
 echo "==> Starting QEMU (Ctrl-A X to quit)..."
 
@@ -915,27 +1027,15 @@ if [ "$VIRTIO_GPU" -eq 2 ] && [ "$SERIAL_ONLY" -eq 1 ]; then
     echo "ERROR: --virgl needs a GL-capable display; do not combine it with --serial" >&2
     exit 1
 elif [ "$VIRTIO_GPU" -eq 2 ]; then
-    # KekVM's QEMU build provides a Cocoa OpenGL context backed by Metal.
-    # virglrenderer uses that context to execute the guest's Gallium commands.
-    DISPLAY_BACKEND_FLAGS="-display ${QEMU_DISPLAY_BACKEND:-cocoa,gl=core}"
+    # virglrenderer needs a GL-capable host display context to execute the
+    # guest's Gallium commands. Callers may select a specific QEMU backend.
+    DISPLAY_BACKEND_FLAGS="-display ${QEMU_DISPLAY_BACKEND:-default,gl=on}"
 elif [ "$SERIAL_ONLY" -eq 1 ]; then
     # Use -display none (not -nographic) to keep ramfb for framebuffer/GOP
     # while hiding the QEMU window. -nographic removes display devices entirely.
     DISPLAY_BACKEND_FLAGS="-display none"
 elif [ -n "${QEMU_DISPLAY_BACKEND:-}" ]; then
     DISPLAY_BACKEND_FLAGS="-display ${QEMU_DISPLAY_BACKEND}"
-elif [ "$(uname -s)" = "Darwin" ]; then
-    # System chords -- Cmd-Tab above all -- are the host's until QEMU is told
-    # to capture every key, which is what the desktop's own Cmd-Tab needs.
-    COCOA_OPTIONS="${VINIX_QEMU_COCOA_OPTIONS:-}"
-    if [ "$GRAB_KEYS" -eq 1 ]; then
-        COCOA_OPTIONS="${COCOA_OPTIONS:+${COCOA_OPTIONS},}full-grab=on"
-    fi
-    if [ -n "$COCOA_OPTIONS" ]; then
-        DISPLAY_BACKEND_FLAGS="-display cocoa,$COCOA_OPTIONS"
-    else
-        DISPLAY_BACKEND_FLAGS="-display cocoa"
-    fi
 else
     DISPLAY_BACKEND_FLAGS="-display default"
 fi
@@ -952,6 +1052,29 @@ fi
 
 # Multiplex the serial console and QEMU monitor so Ctrl-A X exits as advertised.
 DISPLAY_FLAGS="$DISPLAY_DEVICE_FLAGS $DISPLAY_BACKEND_FLAGS -serial mon:stdio"
+
+# One playback stream only: QEMU would otherwise also open a capture voice,
+# which asks the host for a microphone the guest has no driver for.
+QEMU_AUDIO="${VINIX_QEMU_AUDIO:-}"
+if [ -z "$QEMU_AUDIO" ]; then
+    if [ "$(uname -s)" = Darwin ]; then
+        QEMU_AUDIO=coreaudio
+    else
+        QEMU_AUDIO=none
+    fi
+fi
+case "$QEMU_AUDIO" in
+    off) AUDIO_FLAGS=() ;;
+    wav:*)
+        AUDIO_FLAGS=(-audiodev "wav,id=vinix-audio,path=${QEMU_AUDIO#wav:}"
+            -device virtio-sound-device,audiodev=vinix-audio,streams=1)
+        ;;
+    *)
+        AUDIO_FLAGS=(-audiodev "$QEMU_AUDIO,id=vinix-audio"
+            -device virtio-sound-device,audiodev=vinix-audio,streams=1)
+        ;;
+esac
+echo "==> Sound: $QEMU_AUDIO"
 
 ACCEL_FLAGS="-accel hvf -cpu host"
 if [ "${USE_TCG:-0}" -eq 1 ]; then
@@ -979,7 +1102,7 @@ set +e
     -machine virt,gic-version=3 \
     $ACCEL_FLAGS \
     -m "$QEMU_MEM" \
-    -smp 4 \
+    -smp "${VINIX_QEMU_SMP:-4}" \
     -object rng-random,filename=/dev/urandom,id=vinix-rng \
     -device virtio-rng-device,rng=vinix-rng \
     -drive if=pflash,format=raw,readonly=on,file="$OVMF" \
@@ -988,6 +1111,7 @@ set +e
     "${PERSIST_DEVICE_ARGS[@]}" \
     -device virtio-keyboard-device \
     -device virtio-tablet-device \
+    "${AUDIO_FLAGS[@]}" \
     $NETWORK_FLAGS \
     $DISPLAY_FLAGS
 qemu_status=$?

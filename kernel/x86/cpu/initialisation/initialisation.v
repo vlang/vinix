@@ -4,7 +4,8 @@ import x86.gdt
 import x86.idt
 import x86.cpu
 import x86.msr
-import syscall
+// The syscall module supplies the C symbols syscall_entry calls into.
+import syscall as _
 import x86.cpu.local as cpulocal
 import limine
 import x86.apic
@@ -12,6 +13,9 @@ import katomic
 import sched
 import memory
 import x86.hypervisor
+
+// asm/x86_64/syscall_entry.S
+fn C.syscall_entry()
 
 const cpuid7_ebx_smep = u32(1) << 7
 const cpuid7_ecx_umip = u32(1) << 2
@@ -59,7 +63,7 @@ pub fn initialise(smp_info &limine.LimineSMPInfo) {
 	msr.wrmsr(0xc0000081, 0x0033002800000000)
 
 	// Entry address
-	msr.wrmsr(0xc0000082, u64(voidptr(syscall.syscall_entry)))
+	msr.wrmsr(0xc0000082, u64(voidptr(C.syscall_entry)))
 
 	// Flags mask
 	msr.wrmsr(0xc0000084, u64(~u32(0x002)))

@@ -1,3 +1,7 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 /* SPDX-License-Identifier: BSD-2-Clause
  * In-guest regression coverage for the VM, VFS, and Linux ABI fundamentals.
  * The binary is linked statically and installed as PID 1 by run-aarch64.sh's
@@ -53,11 +57,18 @@ static const char persist_payload[] = "vinix-ext2-cache-writeback-v1";
 static const char *synced_file = "/root/vinix-qemu-core/synced";
 static const char synced_payload[] = "vinix-ext2-sync-writeback-v1";
 static volatile sig_atomic_t posix_timer_callbacks;
+static volatile sig_atomic_t nanosleep_interrupts;
 
 static void posix_timer_callback(union sigval value)
 {
 	if (value.sival_int == 0x5649)
 		posix_timer_callbacks++;
+}
+
+static void nanosleep_interrupt(int signal)
+{
+	(void)signal;
+	nanosleep_interrupts++;
 }
 
 static int reap_ok(pid_t child)
@@ -169,6 +180,41 @@ static int test_default_terminating_signals(void)
 	/* These signals have ignored default dispositions on Linux. */
 	CHECK(kill(getpid(), SIGWINCH) == 0);
 	puts("QEMU CORE PASS: default signal dispositions");
+	return 0;
+}
+
+/* nanosleep(2) reports a relative duration in `rem` when a signal interrupts
+ * it. Returning the absolute monotonic clock here turns libc's retry into an
+ * epoch-sized sleep, which used to wedge a newly reloaded desktop as soon as
+ * one of its startup children changed state. */
+static int test_interrupted_nanosleep_remaining(void)
+{
+	struct sigaction action;
+	memset(&action, 0, sizeof(action));
+	action.sa_handler = nanosleep_interrupt;
+	sigemptyset(&action.sa_mask);
+	CHECK(sigaction(SIGUSR1, &action, NULL) == 0);
+
+	pid_t parent = getpid();
+	pid_t child = fork();
+	CHECK(child >= 0);
+	if (child == 0) {
+		struct timespec delay = {.tv_nsec = 20000000};
+		nanosleep(&delay, NULL);
+		_exit(kill(parent, SIGUSR1) == 0 ? 0 : 1);
+	}
+
+	struct timespec request = {.tv_sec = 1};
+	struct timespec remaining = {.tv_sec = -1, .tv_nsec = -1};
+	errno = 0;
+	CHECK(nanosleep(&request, &remaining) == -1);
+	CHECK(errno == EINTR);
+	CHECK(nanosleep_interrupts == 1);
+	CHECK(remaining.tv_sec == 0);
+	CHECK(remaining.tv_nsec > 0 && remaining.tv_nsec < 1000000000L);
+	CHECK(nanosleep(&remaining, NULL) == 0);
+	CHECK(reap_ok(child) == 0);
+	puts("QEMU CORE PASS: interrupted nanosleep returns a relative remainder");
 	return 0;
 }
 
@@ -513,6 +559,103 @@ static int test_scheduler_and_accounting(void)
 	return 0;
 }
 
+struct concurrent_wakeup_state {
+	unsigned generation;
+	unsigned ready;
+	unsigned completed;
+};
+
+/* poll(2) attaches this thread to every descriptor event. Four independent
+ * writers can therefore trigger four event locks at the same instant. The
+ * scheduler used to check is_in_queue without serializing that check with its
+ * slot insertion, allowing the same Thread pointer into several queue slots.
+ */
+static int run_concurrent_wakeup_race(void)
+{
+	enum { workers = 4, rounds = 512 };
+	int channels[workers][2];
+	pid_t children[workers];
+	struct pollfd descriptors[workers];
+	struct concurrent_wakeup_state *state = mmap(NULL, sizeof(*state),
+	    PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+	CHECK(state != MAP_FAILED);
+	memset(state, 0, sizeof(*state));
+
+	for (int i = 0; i < workers; ++i)
+		CHECK(pipe(channels[i]) == 0);
+	for (int i = 0; i < workers; ++i) {
+		children[i] = fork();
+		CHECK(children[i] >= 0);
+		if (children[i] != 0)
+			continue;
+
+		for (int j = 0; j < workers; ++j) {
+			close(channels[j][0]);
+			if (j != i)
+				close(channels[j][1]);
+		}
+		cpu_set_t affinity;
+		CPU_ZERO(&affinity);
+		CPU_SET(i, &affinity);
+		if (sched_setaffinity(0, sizeof(affinity), &affinity) != 0)
+			_exit(2);
+		__atomic_add_fetch(&state->ready, 1, __ATOMIC_RELEASE);
+		for (unsigned round = 1; round <= rounds; ++round) {
+			while (__atomic_load_n(&state->generation, __ATOMIC_ACQUIRE) < round)
+				sched_yield();
+			if (write(channels[i][1], "w", 1) != 1)
+				_exit(3);
+			__atomic_add_fetch(&state->completed, 1, __ATOMIC_RELEASE);
+			while (__atomic_load_n(&state->generation, __ATOMIC_ACQUIRE) == round)
+				sched_yield();
+		}
+		close(channels[i][1]);
+		_exit(0);
+	}
+
+	for (int i = 0; i < workers; ++i) {
+		close(channels[i][1]);
+		descriptors[i].fd = channels[i][0];
+		descriptors[i].events = POLLIN;
+		descriptors[i].revents = 0;
+	}
+	alarm(60);
+	while (__atomic_load_n(&state->ready, __ATOMIC_ACQUIRE) != workers)
+		sched_yield();
+	for (unsigned round = 1; round <= rounds; ++round) {
+		__atomic_store_n(&state->generation, round, __ATOMIC_RELEASE);
+		CHECK(poll(descriptors, workers, 5000) > 0);
+		for (int i = 0; i < workers; ++i) {
+			char byte = 0;
+			CHECK(read(channels[i][0], &byte, 1) == 1);
+			CHECK(byte == 'w');
+		}
+		while (__atomic_load_n(&state->completed, __ATOMIC_ACQUIRE) <
+		    round * workers)
+			sched_yield();
+	}
+	/* Let workers leave their final generation barrier. */
+	__atomic_store_n(&state->generation, rounds + 1, __ATOMIC_RELEASE);
+	for (int i = 0; i < workers; ++i) {
+		CHECK(close(channels[i][0]) == 0);
+		CHECK(reap_ok(children[i]) == 0);
+	}
+	alarm(0);
+	CHECK(munmap(state, sizeof(*state)) == 0);
+	return 0;
+}
+
+static int test_concurrent_wakeups_queue_once(void)
+{
+	pid_t coordinator = fork();
+	CHECK(coordinator >= 0);
+	if (coordinator == 0)
+		_exit(run_concurrent_wakeup_race());
+	CHECK(reap_ok(coordinator) == 0);
+	puts("QEMU CORE PASS: concurrent wakeups enqueue one thread once");
+	return 0;
+}
+
 static int test_posix_timer_thread_notification(void)
 {
 	timer_t timer;
@@ -601,6 +744,38 @@ static int test_anonymous_descriptor_access(void)
 	return 0;
 }
 
+/* Pipes and Unix sockets are resources created by almost every compiler and
+ * shell helper. Their buffers must follow the final open-file description:
+ * keeping one private "owner" reference leaked 64 KiB per pipe and 1 MiB per
+ * Unix endpoint, so one native desktop build exhausted an 8 GiB guest just as
+ * PID 1 started the replacement compositor. */
+static int test_anonymous_ipc_memory_reclamation(void)
+{
+	struct sysinfo before;
+	struct sysinfo after;
+	CHECK(sysinfo(&before) == 0);
+
+	for (int attempt = 0; attempt < 128; ++attempt) {
+		int pair[2];
+		CHECK(socketpair(AF_UNIX, SOCK_STREAM, 0, pair) == 0);
+		CHECK(close(pair[0]) == 0);
+		CHECK(close(pair[1]) == 0);
+	}
+	for (int attempt = 0; attempt < 1024; ++attempt) {
+		int pair[2];
+		CHECK(pipe(pair) == 0);
+		CHECK(close(pair[0]) == 0);
+		CHECK(close(pair[1]) == 0);
+	}
+
+	CHECK(sysinfo(&after) == 0);
+	/* Allow ordinary allocator bookkeeping and concurrently active kernel
+	 * services to retain a modest amount. The old leak consumed 320 MiB. */
+	CHECK(after.freeram + 32UL * 1024 * 1024 >= before.freeram);
+	puts("QEMU CORE PASS: anonymous IPC buffers are reclaimed");
+	return 0;
+}
+
 /* V3 makes the V `int` type pointer-width. Linux still defines pollfd.fd as a
  * 32-bit C int, so exercise the structure from a real libc caller: widening
  * the kernel field makes it combine fd/events into one invalid descriptor. */
@@ -623,6 +798,77 @@ static int test_pollfd_abi(void)
 	CHECK(close(pair[0]) == 0);
 	CHECK(close(pair[1]) == 0);
 	puts("QEMU CORE PASS: Linux pollfd ABI");
+	return 0;
+}
+
+/* A blocking write larger than PIPE_BUF alternates between filling the pipe
+ * and waiting for the reader to make room. Both directions share the pipe's
+ * event. A reader used to be able to consume the "space available" wake in
+ * the gap before the writer attached, then wait for data itself; the empty
+ * pipe was left with both ends asleep forever. Keep enough transfers in one
+ * syscall to exercise that hand-off repeatedly on the SMP VM. */
+static int test_large_pipe_progress(void)
+{
+	enum { transfer_size = 2 * 1024 * 1024 };
+	unsigned char *payload = malloc(transfer_size);
+	unsigned char *observed = malloc(transfer_size);
+	CHECK(payload != NULL && observed != NULL);
+	for (size_t i = 0; i < transfer_size; ++i)
+		payload[i] = (unsigned char)(i * 73u + 19u);
+
+	int pair[2];
+	CHECK(pipe(pair) == 0);
+	CHECK(fcntl(pair[0], F_GETPIPE_SZ) >= 64 * 1024);
+	/* Capacity is not the progress mechanism. Force the old one-page size so
+	 * this transfer still has to exercise the blocking wake-up handshake. */
+	CHECK(fcntl(pair[0], F_SETPIPE_SZ, 4096) == 4096);
+	CHECK(fcntl(pair[0], F_GETPIPE_SZ) == 4096);
+
+	/* PIPE_BUF is a distinct atomicity threshold. A larger nonblocking write
+	 * may fill the available buffer partially, whereas a PIPE_BUF-sized write
+	 * must not leak a prefix when even one byte of room is missing. Growing an
+	 * occupied pipe also has to preserve its byte stream. */
+	int writer_flags = fcntl(pair[1], F_GETFL);
+	CHECK(writer_flags >= 0);
+	CHECK(fcntl(pair[1], F_SETFL, writer_flags | O_NONBLOCK) == 0);
+	CHECK(write(pair[1], payload, 8192) == 4096);
+	CHECK(fcntl(pair[0], F_SETPIPE_SZ, 4097) == 8192);
+	CHECK(read(pair[0], observed, 4096) == 4096);
+	CHECK(memcmp(payload, observed, 4096) == 0);
+	CHECK(fcntl(pair[0], F_SETPIPE_SZ, 4096) == 4096);
+	CHECK(write(pair[1], payload, 1) == 1);
+	errno = 0;
+	CHECK(write(pair[1], payload, 4096) == -1 && errno == EAGAIN);
+	CHECK(read(pair[0], observed, 1) == 1 && observed[0] == payload[0]);
+	CHECK(fcntl(pair[1], F_SETFL, writer_flags) == 0);
+
+	pid_t writer = fork();
+	CHECK(writer >= 0);
+	if (writer == 0) {
+		close(pair[0]);
+		ssize_t wrote = write(pair[1], payload, transfer_size);
+		close(pair[1]);
+		_exit(wrote == transfer_size ? 0 : 1);
+	}
+
+	CHECK(close(pair[1]) == 0);
+	/* Turn a regression into a bounded test failure instead of letting the
+	 * whole VM wait forever on the same deadlock this test is checking. */
+	alarm(20);
+	size_t received = 0;
+	while (received < transfer_size) {
+		ssize_t got = read(pair[0], observed + received,
+		    transfer_size - received);
+		CHECK(got > 0);
+		received += (size_t)got;
+	}
+	alarm(0);
+	CHECK(memcmp(payload, observed, transfer_size) == 0);
+	CHECK(close(pair[0]) == 0);
+	CHECK(reap_ok(writer) == 0);
+	free(observed);
+	free(payload);
+	puts("QEMU CORE PASS: large blocking pipe transfer makes progress");
 	return 0;
 }
 
@@ -724,7 +970,13 @@ static int run_tests(void)
 	if (persistence_boot == 1)
 		return 0;
 	CHECK(test_random() == 0);
+	/* Keep the pipe progress regression ahead of unrelated scheduler stress
+	 * cases so a failure there cannot prevent this foundational hand-off from
+	 * being exercised. */
+	CHECK(test_large_pipe_progress() == 0);
 	CHECK(test_cow() == 0);
+	CHECK(test_interrupted_nanosleep_remaining() == 0);
+	CHECK(test_anonymous_ipc_memory_reclamation() == 0);
 	CHECK(test_default_terminating_signals() == 0);
 	CHECK(prepare_directory() == 0);
 	CHECK(test_ext2_mapping_and_namespace() == 0);
@@ -734,6 +986,7 @@ static int run_tests(void)
 	CHECK(test_permissions_and_limits() == 0);
 	CHECK(test_inotify() == 0);
 	CHECK(test_scheduler_and_accounting() == 0);
+	CHECK(test_concurrent_wakeups_queue_once() == 0);
 	CHECK(test_posix_timer_thread_notification() == 0);
 	CHECK(test_anonymous_descriptor_access() == 0);
 	CHECK(test_pollfd_abi() == 0);

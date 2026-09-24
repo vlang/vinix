@@ -8,6 +8,11 @@ __global (
 	ecam_base = u64(0)
 )
 
+// Point configuration space at a mapped ECAM window, which covers buses from 0.
+pub fn set_ecam(virt u64) {
+	ecam_base = virt
+}
+
 // ECAM config space: each device's 4KB config space is memory-mapped
 // at ecam_base + (bus << 20 | slot << 15 | func << 12 | offset).
 fn ecam_address(bus u8, slot u8, function u8, offset u32) u64 {

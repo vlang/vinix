@@ -84,6 +84,20 @@ PACKAGE = {
         b"VINIX CHROMIUM PASS: the installed browser runs",
     ),
 }
+# First-run setup is the compositor's own flow rather than a hosted app: the
+# registration screen, the app picker that follows it, and the Terminal that
+# installs the chosen apps.
+FIRST_RUN = {
+    "init": "tests/desktop/first-run-apps-init.sh",
+    "pass": b"VINIX FIRST RUN TEST: PASS",
+    "fail": (b"VINIX FIRST RUN TEST: FAIL",),
+    "features": (
+        b"VINIX FIRST RUN PASS: registration created the user",
+        b"VINIX FIRST RUN PASS: the app picker follows registration",
+        b"VINIX FIRST RUN PASS: the picker finished and the desktop started",
+        b"VINIX FIRST RUN PASS: the Terminal installed the chosen apps",
+    ),
+}
 COMMON_FAIL_MARKERS = (b"FATAL EXCEPTION", b"KERNEL PANIC")
 
 
@@ -247,6 +261,8 @@ def main() -> int:
                         help="install Chromium with pkg instead of driving a staged one")
     parser.add_argument("--libreoffice", action="store_true",
                         help="drive LibreOffice Writer instead of a browser")
+    parser.add_argument("--first-run", action="store_true",
+                        help="drive first-run registration and the app picker")
     parser.add_argument("--init", type=Path)
     parser.add_argument("--initramfs", type=Path,
                         default=root / "build-support/init-aarch64/initramfs-desktop.tar")
@@ -270,7 +286,11 @@ def main() -> int:
     if arguments.libreoffice and (arguments.desktop or arguments.package
                                   or arguments.firefox):
         parser.error("--libreoffice drives the office suite; it cannot be combined with another profile")
-    profile = (LIBREOFFICE if arguments.libreoffice
+    if arguments.first_run and (arguments.libreoffice or arguments.desktop
+                                or arguments.package or arguments.firefox):
+        parser.error("--first-run drives setup itself; it cannot be combined with another profile")
+    profile = (FIRST_RUN if arguments.first_run
+               else LIBREOFFICE if arguments.libreoffice
                else DESKTOP if arguments.desktop else PACKAGE if arguments.package
                else FIREFOX if arguments.firefox else BRING_UP)
     timeout = arguments.timeout or (5400 if arguments.package else 1800)

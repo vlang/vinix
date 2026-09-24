@@ -6,6 +6,7 @@ import event.eventstruct
 import errno
 import proc
 import fs
+import socket.inet
 import socket.public as sock_pub
 import event
 import file
@@ -17,6 +18,10 @@ pub const sock_buf = 0x100000
 
 const msg_cmsg_cloexec = 0x40000000
 const msg_ctrunc = 0x08
+const msg_peek = 0x02
+const msg_trunc = 0x20
+const msg_dontwait = 0x40
+const msg_waitall = 0x100
 const cmsg_header_size = u64(16)
 const cmsg_align = u64(8)
 
@@ -96,6 +101,10 @@ pub mut:
 	// an SCM_CREDENTIALS record. Crashpad, D-Bus and systemd-style services use
 	// it to find out who is on the other end of a connection they accepted.
 	passcred int
+	// Keep closed endpoint objects as small tombstones because their peers refer
+	// to them without taking a resource reference; the large receive buffer and
+	// queued state are still reclaimed immediately.
+	closed bool
 
 	data      &u8 = unsafe { nil }
 	read_ptr  u64
@@ -108,6 +117,28 @@ pub mut:
 	// and reply pipe ends in consecutive messages and expects one descriptor
 	// from each corresponding recvmsg call.
 	pending_fd_groups []PendingFdGroup
+
+	// SOCK_SEQPACKET preserves message boundaries: each send is one record and
+	// each receive returns exactly one, its remainder discarded if it did not
+	// fit. This is the byte length of every buffered record, oldest first. It
+	// stays empty for SOCK_STREAM, which has no boundaries. runc's sync protocol
+	// relies on it: it reads a record's length with
+	// recvfrom(0, MSG_PEEK|MSG_TRUNC) and then reads the record itself.
+	packet_lengths []u64
+}
+
+// Whether this endpoint keeps message boundaries (SOCK_SEQPACKET).
+pub fn (this &UnixSocket) is_seqpacket() bool {
+	return this.socktype & sock_pub.sock_type_mask == sock_pub.sock_seqpacket
+}
+
+// The byte length of the next record to be received, or all buffered bytes for
+// a stream socket that keeps no boundaries.
+fn (this &UnixSocket) next_message_length() u64 {
+	if this.is_seqpacket() && this.packet_lengths.len > 0 {
+		return this.packet_lengths[0]
+	}
+	return this.used
 }
 
 fn (mut this UnixSocket) mmap(_handle voidptr, _page u64, _flags int) voidptr {
@@ -115,6 +146,12 @@ fn (mut this UnixSocket) mmap(_handle voidptr, _page u64, _flags int) voidptr {
 }
 
 fn (mut this UnixSocket) read(_handle voidptr, buf voidptr, _loc u64, _count u64) ?i64 {
+	// A SOCK_SEQPACKET read still returns exactly one record; the framed path
+	// owns the boundary bookkeeping.
+	if this.is_seqpacket() {
+		return this.recv_seqpacket(_handle, buf, _count, 0)
+	}
+
 	mut count := _count
 
 	this.l.acquire()
@@ -148,7 +185,7 @@ fn (mut this UnixSocket) read(_handle voidptr, buf voidptr, _loc u64, _count u64
 		mut events := [&this.event]
 		event.await(mut events, true) or {
 			unsafe { events.free() }
-			errno.set(errno.eintr)
+			errno.set(proc.interrupted_errno)
 			return none
 		}
 		unsafe { events.free() }
@@ -201,7 +238,6 @@ fn (mut this UnixSocket) read(_handle voidptr, buf voidptr, _loc u64, _count u64
 		mut pending_fds := unsafe { this.pending_fd_groups[0].fds }
 		for mut dropped in pending_fds {
 			dropped.unref()
-			unsafe { free(voidptr(dropped)) }
 		}
 		unsafe { pending_fds.free() }
 		this.pending_fd_groups.delete(0)
@@ -218,6 +254,105 @@ fn (mut this UnixSocket) read(_handle voidptr, buf voidptr, _loc u64, _count u64
 	}
 
 	return i64(count)
+}
+
+// Receive one SOCK_SEQPACKET record, honouring the recvfrom(2) flags a length
+// prefix protocol needs: MSG_PEEK leaves the record queued, MSG_TRUNC reports
+// its true length even when the buffer is shorter, and the two together with a
+// zero-length buffer answer "how long is the next record" without consuming it.
+// runc's sync channel drives exactly this. Any descriptors a peeked-past record
+// carried are dropped, as a plain recvfrom does.
+pub fn (mut this UnixSocket) recv_seqpacket(_handle voidptr, buf voidptr, count u64, flags int) ?i64 {
+	peek := flags & msg_peek != 0
+	trunc := flags & msg_trunc != 0
+
+	this.l.acquire()
+	defer {
+		this.l.release()
+	}
+
+	handle := unsafe { &file.Handle(_handle) }
+
+	if this.read_closed {
+		return 0
+	}
+
+	for katomic.load(&this.used) == 0 {
+		if this.peer_finished {
+			return 0
+		}
+		if handle.flags & resource.o_nonblock != 0 {
+			errno.set(errno.ewouldblock)
+			return none
+		}
+		// Sample the event's generation while the socket lock still protects the
+		// empty state. A writer that fills the socket after this check and
+		// before the wait attaches raises the generation, so the generation-aware
+		// wait returns at once instead of sleeping on a notification another
+		// reader has already consumed. runc's synchronous sync channel deadlocked
+		// on exactly that lost wakeup.
+		generation := event.generation(mut this.event)
+		this.l.release()
+		mut events := [&this.event]
+		event.await_from_generation(mut events, true, 0, generation) or {
+			unsafe { events.free() }
+			// Nothing was received: SA_RESTART runs the call again, as on
+			// Linux. runc's init reads its sync socket with a bare recvfrom()
+			// while Go preempts it with SIGURG, and failed with EINTR.
+			errno.set(proc.interrupted_errno)
+			return none
+		}
+		unsafe { events.free() }
+		this.l.acquire()
+	}
+
+	message_length := this.next_message_length()
+	mut to_copy := if count < message_length { count } else { message_length }
+
+	if to_copy != 0 {
+		mut before_wrap := to_copy
+		mut after_wrap := u64(0)
+		if this.read_ptr + to_copy > this.capacity {
+			before_wrap = this.capacity - this.read_ptr
+			after_wrap = to_copy - before_wrap
+		}
+		unsafe { C.memcpy(buf, &this.data[this.read_ptr], before_wrap) }
+		if after_wrap != 0 {
+			unsafe { C.memcpy(voidptr(u64(buf) + before_wrap), this.data, after_wrap) }
+		}
+	}
+
+	// MSG_TRUNC reports the record's real length; the default reports how much
+	// was handed back.
+	ret := if trunc { message_length } else { to_copy }
+
+	if !peek {
+		// The whole record leaves the queue even when it did not all fit.
+		this.read_ptr = (this.read_ptr + message_length) % this.capacity
+		this.used -= message_length
+		if this.packet_lengths.len > 0 {
+			this.packet_lengths.delete(0)
+		}
+		// A plain recvfrom past a descriptor-bearing record drops its rights.
+		if this.pending_fd_groups.len != 0 && this.pending_fd_groups[0].offset < message_length {
+			mut pending_fds := unsafe { this.pending_fd_groups[0].fds }
+			for mut dropped in pending_fds {
+				dropped.unref()
+			}
+			unsafe { pending_fds.free() }
+			this.pending_fd_groups.delete(0)
+		}
+		for i in 0 .. this.pending_fd_groups.len {
+			this.pending_fd_groups[i].offset -= message_length
+		}
+		this.peer.status |= file.pollout
+		event.trigger(mut this.peer.event, false)
+		if this.used == 0 {
+			this.status &= ~file.pollin
+		}
+	}
+
+	return i64(ret)
 }
 
 fn (mut this UnixSocket) write(_handle voidptr, buf voidptr, _loc u64, _count u64) ?i64 {
@@ -240,14 +375,23 @@ pub fn (mut this UnixSocket) write_with_fds(_handle voidptr, buf voidptr, _count
 		errno.set(errno.enotconn)
 		return none
 	}
-	if peer.read_closed {
-		errno.set(errno.epipe)
+	// A SOCK_SEQPACKET record is all-or-nothing, so one larger than the whole
+	// receive buffer can never be delivered whole and must be refused rather
+	// than truncated into a bogus boundary. A peer that has closed has no
+	// buffer left at all; that is EPIPE, below, not a message too long.
+	if peer.is_seqpacket() && _count > peer.capacity && !peer.closed {
+		errno.set(errno.emsgsize)
 		return none
 	}
-
 	peer.l.acquire()
 	defer {
 		peer.l.release()
+	}
+	// close_endpoint() serialises freeing the receive buffer with writers on
+	// this lock. Recheck after acquiring it rather than racing a peer close.
+	if peer.read_closed || peer.closed {
+		errno.set(errno.epipe)
+		return none
 	}
 
 	handle := unsafe { &file.Handle(_handle) }
@@ -271,7 +415,7 @@ pub fn (mut this UnixSocket) write_with_fds(_handle voidptr, buf voidptr, _count
 		mut events := [&peer.event]
 		event.await(mut events, true) or {
 			unsafe { events.free() }
-			errno.set(errno.eintr)
+			errno.set(proc.interrupted_errno)
 			return none
 		}
 		unsafe { events.free() }
@@ -321,11 +465,17 @@ pub fn (mut this UnixSocket) write_with_fds(_handle voidptr, buf voidptr, _count
 	if fds.len != 0 {
 		mut group := PendingFdGroup{
 			offset: fd_offset
-			span: count
-			fds: []&file.FD{}
+			span:   count
+			fds:    []&file.FD{}
 		}
 		group.fds << fds
 		peer.pending_fd_groups << group
+	}
+	// On a SOCK_SEQPACKET peer this send is one record. The write above did not
+	// split it -- a message larger than the buffer is refused, and the wait
+	// loop held out for room for the whole of it -- so its length is `count`.
+	if peer.is_seqpacket() {
+		peer.packet_lengths << count
 	}
 
 	peer.status |= file.pollin
@@ -335,6 +485,10 @@ pub fn (mut this UnixSocket) write_with_fds(_handle voidptr, buf voidptr, _count
 }
 
 fn (mut this UnixSocket) ioctl(handle voidptr, request u64, argp voidptr) ?int {
+	// musl's if_nametoindex and if_indextoname ask on an AF_UNIX socket.
+	if inet.is_interface_ioctl(request) {
+		return inet.interface_ioctl(request, argp)
+	}
 	match request {
 		ioctl.fionread {
 			if this.listening {
@@ -376,19 +530,84 @@ fn release_abstract_name(socket &UnixSocket) {
 	}
 }
 
-fn (mut this UnixSocket) unref(_handle voidptr) ? {
-	// Dropping a handle or a VFS name is a successful release operation. The
-	// old implementation returned an Option failure unconditionally, so close
-	// and unlink completed their side effects but leaked a stale errno back to
-	// userspace.
-	katomic.dec(mut &this.refcount)
-	// A socket is created holding one reference of its own, which nothing ever
-	// drops, so the last descriptor closing leaves exactly that one. An
-	// abstract name has no filesystem entry to outlive it and has to come back
-	// at that point or it is reserved until the machine restarts.
-	if this.refcount <= 1 {
-		release_abstract_name(this)
+// Drop all allocation and peer state owned by an endpoint whose last open file
+// description has gone away. Unix sockets used to keep their initial resource
+// reference and 1 MiB receive buffer forever. A desktop build starts enough
+// short-lived helpers for those leaked buffers to exhaust an 8 GiB VM before
+// the replacement compositor can finish starting.
+fn (mut this UnixSocket) close_endpoint() {
+	this.l.acquire()
+	if this.closed {
+		this.l.release()
+		return
 	}
+	this.closed = true
+	this.listening = false
+	this.read_closed = true
+	this.write_closed = true
+	this.peer_finished = true
+	this.status &= ~file.pollout
+	this.status |= file.pollin | file.pollhup | file.pollerr
+
+	mut peer := this.peer
+	this.peer = unsafe { nil }
+	mut queued := unsafe { this.backlog }
+	this.backlog = []&UnixSocket{}
+	mut pending := unsafe { this.pending_fd_groups }
+	this.pending_fd_groups = []PendingFdGroup{}
+	unsafe { this.packet_lengths.free() }
+	this.packet_lengths = []u64{}
+	data := this.data
+	this.data = unsafe { nil }
+	this.capacity = 0
+	this.used = 0
+	this.read_ptr = 0
+	this.write_ptr = 0
+	this.l.release()
+
+	if data != unsafe { nil } {
+		unsafe { free(data) }
+	}
+	for group in pending {
+		mut descriptors := unsafe { group.fds }
+		for mut descriptor in descriptors {
+			descriptor.unref()
+		}
+		unsafe { descriptors.free() }
+	}
+	unsafe { pending.free() }
+
+	if peer != unsafe { nil } {
+		peer.l.acquire()
+		peer.peer_finished = true
+		peer.status &= ~file.pollout
+		peer.status |= file.pollin | file.pollhup | file.pollerr
+		peer.l.release()
+		event.trigger(mut peer.event, false)
+	}
+
+	// A listener owns accepted endpoints until accept(2) publishes a file
+	// descriptor for them. Closing the listener must release those buffers too.
+	for mut connection in queued {
+		connection.close_endpoint()
+	}
+	unsafe { queued.free() }
+	event.trigger(mut this.event, false)
+}
+
+fn (mut this UnixSocket) unref(handle voidptr) ? {
+	still_referenced := katomic.dec(mut &this.refcount)
+	// A nil handle is the VFS dropping a pathname, not an open socket being
+	// closed. If a descriptor is still alive it must retain the endpoint.
+	if handle == unsafe { nil } && still_referenced {
+		return
+	}
+
+	// Constructors retain one resource reference for unnamed sockets, while a
+	// path-bound socket uses it as its namespace reference. Either way, an
+	// open-handle release at count one is the final descriptor close.
+	release_abstract_name(this)
+	this.close_endpoint()
 }
 
 fn (mut this UnixSocket) link(_handle voidptr) ? {
@@ -503,7 +722,7 @@ pub fn (this &UnixSocket) peer_credentials() ?sock_pub.UCred {
 		return none
 	}
 	return sock_pub.UCred{
-		pid: this.peer_pid
+		pid: proc.pid_seen_by_caller(this.peer_pid)
 		uid: this.peer_uid
 		gid: this.peer_gid
 	}
@@ -562,7 +781,7 @@ fn (mut this UnixSocket) accept(_handle voidptr) ?&resource.Resource {
 		mut events := [&this.event]
 		event.await(mut events, true) or {
 			unsafe { events.free() }
-			errno.set(errno.eintr)
+			errno.set(proc.interrupted_errno)
 			return none
 		}
 		unsafe { events.free() }
@@ -619,7 +838,7 @@ fn (mut this UnixSocket) connect(_handle voidptr, _addr voidptr, addrlen u32) ? 
 		mut t := proc.current_thread()
 		path := unsafe { cstring_to_vstring(&addr.sun_path[0]) }
 
-		mut target := fs.get_node(t.process.current_directory, path, true) or {
+		mut target := fs.get_node(proc.current_directory_of(t.process), path, true) or {
 			return none
 		}
 
@@ -633,28 +852,30 @@ fn (mut this UnixSocket) connect(_handle voidptr, _addr voidptr, addrlen u32) ? 
 		}
 	}
 
-	if socket.listening == false {
-		errno.set(errno.econnrefused)
-		return none
-	}
-
 	socket.l.acquire()
 	defer {
 		socket.l.release()
+	}
+	// A pathname keeps the small socket object alive after its descriptor is
+	// closed. Recheck under the listener lock so connect cannot queue a new
+	// endpoint while close_endpoint() is tearing that listener down.
+	if !socket.listening || socket.closed {
+		errno.set(errno.econnrefused)
+		return none
 	}
 
 	// A connected UNIX stream is established when connect() places it in the
 	// listener's queue, not when accept() eventually removes it. This permits a
 	// client to connect and send before the server calls accept(), as Linux does.
 	mut connection_socket := &UnixSocket{
-		refcount: 1
-		peer: this
+		refcount:  1
+		peer:      this
 		connected: true
-		name: socket.name
-		data: unsafe { malloc(sock_buf) }
-		capacity: sock_buf
-		status: file.pollout
-		socktype: this.socktype
+		name:      socket.name
+		data:      unsafe { malloc(sock_buf) }
+		capacity:  sock_buf
+		status:    file.pollout
+		socktype:  this.socktype
 		owner_pid: socket.owner_pid
 		owner_uid: socket.owner_uid
 		owner_gid: socket.owner_gid
@@ -721,12 +942,14 @@ fn (mut this UnixSocket) bind(_handle voidptr, _addr voidptr, addrlen u32) ? {
 
 	path := unsafe { cstring_to_vstring(&addr.sun_path[0]) }
 
-	mut node := fs.create(t.process.current_directory, path, stat.ifsock | 0o777) or {
+	mut node := fs.create(proc.current_directory_of(t.process), path, stat.ifsock | 0o777) or {
 		return none
 	}
 
+	mut replaced := node.resource
 	this.stat = node.resource.stat
 	node.resource = unsafe { this }
+	replaced.unref(unsafe { nil }) or {}
 
 	this.name = *addr
 }
@@ -772,7 +995,7 @@ fn (mut this UnixSocket) recvmsg(_handle voidptr, msg &sock_pub.MsgHdr, flags in
 		mut events := [&this.event]
 		event.await(mut events, true) or {
 			unsafe { events.free() }
-			errno.set(errno.eintr)
+			errno.set(proc.interrupted_errno)
 			return none
 		}
 		unsafe { events.free() }
@@ -781,6 +1004,16 @@ fn (mut this UnixSocket) recvmsg(_handle voidptr, msg &sock_pub.MsgHdr, flags in
 
 	if this.used < count {
 		count = this.used
+	}
+
+	// A SOCK_SEQPACKET recvmsg returns at most one record; never read across
+	// its boundary.
+	mut seq_msg_len := u64(0)
+	if this.is_seqpacket() {
+		seq_msg_len = this.next_message_length()
+		if count > seq_msg_len {
+			count = seq_msg_len
+		}
 	}
 
 	// SCM_RIGHTS is associated with one sendmsg in the byte stream. Linux
@@ -857,7 +1090,7 @@ fn (mut this UnixSocket) recvmsg(_handle voidptr, msg &sock_pub.MsgHdr, flags in
 			// captured when the connection was established are the sending
 			// process's own.
 			credentials := sock_pub.UCred{
-				pid: i32(this.peer_pid)
+				pid: i32(proc.pid_seen_by_caller(this.peer_pid))
 				uid: this.peer_uid
 				gid: this.peer_gid
 			}
@@ -941,13 +1174,37 @@ fn (mut this UnixSocket) recvmsg(_handle voidptr, msg &sock_pub.MsgHdr, flags in
 		for i in int(deliver) .. pending_fds.len {
 			mut dropped := pending_fds[i]
 			dropped.unref()
-			unsafe { free(voidptr(dropped)) }
 		}
 		unsafe { pending_fds.free() }
 		this.pending_fd_groups.delete(0)
 	}
 	for i in 0 .. this.pending_fd_groups.len {
 		this.pending_fd_groups[i].offset -= transferred
+	}
+
+	// One SOCK_SEQPACKET recvmsg consumes exactly one record: drop whatever of
+	// it did not fit, and its descriptors, then retire its boundary.
+	if this.is_seqpacket() && seq_msg_len > 0 {
+		remainder := seq_msg_len - transferred
+		if remainder > 0 {
+			for this.pending_fd_groups.len > 0 && this.pending_fd_groups[0].offset < remainder {
+				mut pending_fds := unsafe { this.pending_fd_groups[0].fds }
+				for mut dropped in pending_fds {
+					dropped.unref()
+				}
+				unsafe { pending_fds.free() }
+				this.pending_fd_groups.delete(0)
+			}
+			this.read_ptr = (this.read_ptr + remainder) % this.capacity
+			this.used -= remainder
+			for i in 0 .. this.pending_fd_groups.len {
+				this.pending_fd_groups[i].offset -= remainder
+			}
+			unsafe { msg.msg_flags |= msg_trunc }
+		}
+		if this.packet_lengths.len > 0 {
+			this.packet_lengths.delete(0)
+		}
 	}
 
 	this.peer.status |= file.pollout
@@ -977,10 +1234,10 @@ fn (mut this UnixSocket) recvmsg(_handle voidptr, msg &sock_pub.MsgHdr, flags in
 pub fn create(@type int) ?&UnixSocket {
 	process := proc.current_thread().process
 	mut ret := &UnixSocket{
-		refcount: 1
-		peer: unsafe { nil }
-		data: unsafe { malloc(sock_buf) }
-		capacity: sock_buf
+		refcount:  1
+		peer:      unsafe { nil }
+		data:      unsafe { malloc(sock_buf) }
+		capacity:  sock_buf
 		owner_pid: process.pid
 		owner_uid: process.euid
 		owner_gid: process.egid
@@ -994,10 +1251,10 @@ pub fn create(@type int) ?&UnixSocket {
 pub fn create_pair(@type int) ?(&UnixSocket, &UnixSocket) {
 	process := proc.current_thread().process
 	mut a := &UnixSocket{
-		refcount: 1
-		peer: unsafe { nil }
-		data: unsafe { malloc(sock_buf) }
-		capacity: sock_buf
+		refcount:  1
+		peer:      unsafe { nil }
+		data:      unsafe { malloc(sock_buf) }
+		capacity:  sock_buf
 		owner_pid: process.pid
 		owner_uid: process.euid
 		owner_gid: process.egid
@@ -1006,10 +1263,10 @@ pub fn create_pair(@type int) ?(&UnixSocket, &UnixSocket) {
 	a.socktype = @type & sock_pub.sock_type_mask
 	a.status |= file.pollout
 	mut b := &UnixSocket{
-		refcount: 1
-		peer: unsafe { nil }
-		data: unsafe { malloc(sock_buf) }
-		capacity: sock_buf
+		refcount:  1
+		peer:      unsafe { nil }
+		data:      unsafe { malloc(sock_buf) }
+		capacity:  sock_buf
 		owner_pid: process.pid
 		owner_uid: process.euid
 		owner_gid: process.egid

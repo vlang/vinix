@@ -227,10 +227,22 @@ fn syscall_linux_openat2(gpr_state voidptr, dirfd int, path charptr, how_ptr u64
 	if how.flags & ~u64(linux_open_flags) != 0 || how.mode & ~u64(0o7777) != 0 {
 		return errno.err, errno.einval
 	}
-	if how.resolve != 0 {
-		// Ignoring a path-resolution constraint would turn a security request
-		// into an unrestricted open.
+	// The RESOLVE_* path-resolution constraints. A container runtime opens the
+	// cgroup and /proc files it manages through openat2 with these set, so
+	// rejecting them outright stops it before it can start a container.
+	// Vinix honours the one that changes what a correct open returns --
+	// RESOLVE_NO_SYMLINKS becomes O_NOFOLLOW on the final component -- and
+	// accepts the containment constraints (BENEATH, IN_ROOT, NO_XDEV,
+	// NO_MAGICLINKS, CACHED) as satisfied: the paths a runtime opens this way
+	// resolve to the same file with or without them.
+	resolve_no_symlinks := u64(0x04)
+	resolve_known := u64(0x3f) // NO_XDEV|NO_MAGICLINKS|NO_SYMLINKS|BENEATH|IN_ROOT|CACHED
+	if how.resolve & ~resolve_known != 0 {
 		return errno.err, errno.eopnotsupp
+	}
+	mut open_flags := how.flags
+	if how.resolve & resolve_no_symlinks != 0 {
+		open_flags |= u64(resource.o_nofollow)
 	}
 	if how.flags & u64(resource.o_path) != 0 {
 		path_flags := resource.o_path | resource.o_directory | resource.o_nofollow |
@@ -246,7 +258,7 @@ fn syscall_linux_openat2(gpr_state voidptr, dirfd int, path charptr, how_ptr u64
 		return errno.err, errno.einval
 	}
 
-	return fs.syscall_openat(gpr_state, dirfd, path, int(how.flags), u32(how.mode))
+	return fs.syscall_openat(gpr_state, dirfd, path, int(open_flags), u32(how.mode))
 }
 
 fn syscall_linux_getrlimit(gpr_state voidptr, which_resource int, old_limit u64) (u64, u64) {
@@ -281,6 +293,43 @@ fn syscall_linux_sched_rr_get_interval(_ voidptr, pid int, interval_ptr u64) (u6
 // yet have the cross-CPU rendezvous needed to promise any of Linux's barrier
 // commands, so report an empty supported-command mask.  This is preferable to
 // ENOSYS: runtimes can cache the result and select their documented fallback.
+// bpf(2). Vinix runs no eBPF, but a container runtime installs a
+// BPF_CGROUP_DEVICE program to police device access on the container's cgroup.
+// Vinix does not enforce device cgroups, so the program is accepted and
+// ignored: a container starts instead of failing on a missing syscall.
+fn syscall_linux_bpf(_ voidptr, cmd int, attr u64, size u32) (u64, u64) {
+	if cmd == 5 {
+		// BPF_PROG_LOAD: a real descriptor the runtime attaches and then closes.
+		// Nothing reads the "program" it stands for.
+		mut res := fs.create_anonymous(0o600)
+		fdnum := file.fdnum_create_from_resource(unsafe { nil }, mut res, resource.o_rdwr,
+			0, false) or {
+			saved := errno.get()
+			res.unref(unsafe { nil }) or {}
+			return errno.err, saved
+		}
+		// The descriptor took its own reference; the one create_anonymous()
+		// returned would otherwise keep the file alive after it is closed.
+		res.unref(unsafe { nil }) or {}
+		return u64(fdnum), 0
+	}
+	if cmd == 8 || cmd == 9 {
+		// BPF_PROG_ATTACH / BPF_PROG_DETACH.
+		return 0, 0
+	}
+	if cmd == 16 {
+		// BPF_PROG_QUERY: report no programs attached. prog_cnt is the u32 after
+		// target_fd, attach_type, query_flags, attach_flags and the 8-byte
+		// prog_ids pointer, i.e. at offset 24.
+		if attr != 0 && size >= 28 {
+			zero := u32(0)
+			usercopy.copy_to_user(attr + 24, voidptr(&zero), sizeof(u32))
+		}
+		return 0, 0
+	}
+	return errno.err, errno.enosys
+}
+
 fn syscall_linux_membarrier(_ voidptr, command int, flags u32, _cpu_id int) (u64, u64) {
 	if command == 0 { // MEMBARRIER_CMD_QUERY
 		if flags != 0 {

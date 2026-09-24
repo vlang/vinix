@@ -1,0 +1,135 @@
+#!/bin/sh
+# Refresh the read-only QEMU host-worktree mirror used for in-guest builds.
+# The QEMU runner serves a new archive for every request, so a sync observes
+# edits made on the host after the VM was started.
+set -eu
+
+url_file=${VINIX_HOST_SOURCE_URL_FILE:-/etc/vinix/qemu-host-source-url}
+destination=${VINIX_HOST_MOUNT:-/mnt/host/vinix}
+curl=${VINIX_HOST_CURL:-/usr/bin/curl}
+tar=${VINIX_HOST_TAR:-/bin/tar}
+
+usage() {
+	cat >&2 <<'EOF'
+usage: vinix-host-sync
+
+Refreshes /mnt/host/vinix from the macOS checkout shared by the QEMU runner.
+The mirror is replaced on every invocation and must be treated as read-only.
+EOF
+	exit 2
+}
+
+case "${1:-}" in
+	'') ;;
+	--help|-h) usage ;;
+	*) echo "vinix-host-sync: unknown option: $1" >&2; usage ;;
+esac
+
+[ -s "$url_file" ] || {
+	echo "vinix-host-sync: this boot has no QEMU host source share" >&2
+	echo "vinix-host-sync: start it with ./run-desktop-aarch64.sh" >&2
+	exit 1
+}
+[ -x "$curl" ] || {
+	echo "vinix-host-sync: curl is not installed: $curl" >&2
+	exit 1
+}
+[ -x "$tar" ] || {
+	echo "vinix-host-sync: tar is not installed: $tar" >&2
+	exit 1
+}
+
+url=$(cat "$url_file")
+case "$url" in
+	http://*) ;;
+	*) echo "vinix-host-sync: invalid host source URL" >&2; exit 1 ;;
+esac
+
+parent=${destination%/*}
+[ "$parent" != "$destination" ] || parent=.
+name=${destination##*/}
+mkdir -p "$parent"
+
+# Disk-root QEMU boots otherwise put this disposable mirror on persistent
+# ext2. Replacing a populated tree there exercises Vinix's still-fragile ext2
+# recursive unlink path and can panic the kernel on the second build. Hide the
+# persistent directory behind a per-boot tmpfs before creating the mirror.
+# Explicit test/custom destinations retain their caller-selected filesystem.
+if [ "$destination" = /mnt/host/vinix ] && \
+	[ ! -e "$parent/.vinix-host-tmpfs" ]; then
+	[ -x /bin/mount ] || {
+		echo "vinix-host-sync: mount is required for the transient host mirror" >&2
+		exit 1
+	}
+	/bin/mount -t tmpfs /dev/null "$parent" || {
+		echo "vinix-host-sync: cannot mount transient storage at $parent" >&2
+		exit 1
+	}
+	: > "$parent/.vinix-host-tmpfs"
+fi
+
+archive=$(mktemp /tmp/vinix-host-source.XXXXXX)
+work=
+next=
+
+cleanup() {
+	[ -z "$archive" ] || rm -f "$archive"
+	[ -z "$next" ] || rm -f "$next"
+	# Never recursively remove a snapshot here. Vinix's current VFS unlink
+	# path can fault while rm walks a populated tree. Completed and partial
+	# snapshots live on the per-boot tmpfs and disappear when QEMU exits.
+}
+trap cleanup EXIT HUP INT TERM
+
+echo "==> Syncing the macOS Vinix checkout to $destination"
+"$curl" --fail --silent --show-error --connect-timeout 5 --max-time 300 \
+	--retry 10 --retry-connrefused --retry-delay 1 \
+	--output "$archive" "${url%/}/vinix-source.tar"
+
+if command -v cksum >/dev/null 2>&1; then
+	set -- $(cksum "$archive")
+elif [ -x /bin/busybox ]; then
+	# The compact desktop image carries the BusyBox applet even when it does
+	# not install every applet symlink. Host sync is part of the base QEMU
+	# workflow, so it must not depend on an optional `cksum` package/link.
+	set -- $(/bin/busybox cksum "$archive")
+else
+	echo "vinix-host-sync: cksum is not installed" >&2
+	exit 1
+fi
+archive_checksum="$1 $2"
+checksum_file="$parent/.${name}.checksum"
+if [ -e "$destination" ] && [ -s "$checksum_file" ] && \
+	[ "$(cat "$checksum_file")" = "$archive_checksum" ]; then
+	echo "vinix-host-sync: host sources are current"
+	exit 0
+fi
+
+work=$(mktemp -d "$parent/.${name}.snapshot.XXXXXX")
+"$tar" -xf "$archive" -C "$work"
+[ -f "$work/desktop/main.v" ] || {
+	echo "vinix-host-sync: host archive has no desktop/main.v" >&2
+	exit 1
+}
+[ -f "$work/.vinix-build/desktop/main.v" ] || {
+	echo "vinix-host-sync: host archive has no staged desktop sources" >&2
+	exit 1
+}
+[ -f "$work/.vinix-build/vmodules/ui2/v.mod" ] || {
+	echo "vinix-host-sync: host archive has no staged ui2 module" >&2
+	exit 1
+}
+# Publish an immutable snapshot by replacing only a symlink. Old snapshots
+# stay readable by any compiler process that opened the previous mirror and
+# are reclaimed wholesale when the tmpfs goes away at VM shutdown.
+next="$parent/.${name}.next.$$"
+ln -s "${work##*/}" "$next"
+if [ -L "$destination" ]; then
+	rm -f "$destination"
+elif [ -e "$destination" ]; then
+	mv "$destination" "$parent/.${name}.snapshot.legacy.$$"
+fi
+mv -f "$next" "$destination"
+next=
+printf '%s\n' "$archive_checksum" > "$checksum_file"
+echo "vinix-host-sync: host sources are current"

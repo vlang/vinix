@@ -16,13 +16,19 @@ NETWORK_WAIT_SECONDS=${VINIX_PKG_NETWORK_WAIT_SECONDS:-60}
 SUBLIME_BUILD=${VINIX_SUBLIME_BUILD:-4200}
 SUBLIME_URL=${VINIX_SUBLIME_URL:-https://download.sublimetext.com/sublime_text_build_${SUBLIME_BUILD}_arm64.tar.xz}
 SUBLIME_SHA256=${VINIX_SUBLIME_SHA256:-cf4b6aa74ea2a2aab02e144599cf9e4a423cbb9543c221f7da1095a95495566a}
+MINECRAFT_VERSION=${VINIX_MINECRAFT_VERSION:-release}
+MINECRAFT_JAVA_MAJOR=21
+MINECRAFT_DOWNLOAD_JOBS=${VINIX_MINECRAFT_DOWNLOAD_JOBS:-8}
+# build-voffice-aarch64.sh produces this asset for the vlang/office releases.
+VOFFICE_URL=${VINIX_VOFFICE_URL:-https://github.com/vlang/office/releases/latest/download/VOffice-vinix-aarch64.tar.gz}
+VOFFICE_SHA256_URL=${VINIX_VOFFICE_SHA256_URL:-$VOFFICE_URL.sha256}
 
 usage() {
 	cat <<'EOF'
 usage: pkg <command> [package ...]
 
 commands:
-  install PACKAGE...  install packages (includes GTK, Chromium, Gnumeric, GIMP, Blender, and Sublime Text)
+  install PACKAGE...  install packages (includes Firefox, Chromium, VOffice, Minecraft, Java, FFmpeg, GTK, GIMP, Blender, and Sublime Text)
   remove PACKAGE...   remove packages
   update              refresh Alpine repository indexes
   upgrade             upgrade installed packages
@@ -265,6 +271,19 @@ resolve_packages() {
 	resolved=
 	for requested in "$@"; do
 		case "$requested" in
+			java)
+				resolved="$resolved openjdk21-jdk ca-certificates-bundle"
+				;;
+			minecraft|voffice)
+				# Remove Mojang's client through its own manifest below, but retain
+				# the shared Alpine JVM/X11/Mesa packages. The immutable Vinix base
+				# carries several of those outside apk's database; deleting them here
+				# would remove files Firefox and the desktop still use. VOffice is
+				# compiled from source and owns no apk package at all.
+				;;
+			firefox)
+				resolved="$resolved firefox-esr"
+				;;
 			gtk)
 				# Keep GTK out of the image while making the obvious command
 				# produce a complete, demonstrably useful desktop install.
@@ -298,6 +317,22 @@ resolve_packages() {
 install_packages() {
 	for requested in "$@"; do
 		case "$requested" in
+			java)
+				apk_install openjdk21-jdk ca-certificates-bundle
+				finalize_java "$MINECRAFT_JAVA_MAJOR"
+				;;
+			minecraft)
+				install_minecraft
+				;;
+			voffice)
+				install_voffice
+				;;
+			firefox)
+				# The image's own browser is Alpine's ESR build; keep a reinstall on
+				# the same release line and give it the same Vinix defaults.
+				apk_install adwaita-icon-theme font-dejavu firefox-esr
+				finalize_firefox
+				;;
 			gtk)
 				apk_install \
 					adwaita-icon-theme font-dejavu gtk+3.0 libarchive-tools
@@ -324,6 +359,10 @@ install_packages() {
 				apk_install \
 					adwaita-icon-theme font-dejavu gimp
 				finalize_gimp
+				;;
+			ffmpeg)
+				apk_install ffmpeg
+				finalize_ffmpeg
 				;;
 			blender)
 				# libgmpxx is what the native Vinix backend adds to Alpine's
@@ -678,6 +717,22 @@ finalize_chromium() {
 	fi
 }
 
+finalize_ffmpeg() {
+	# apk creates the command files, but Vinix cannot yet apply the executable
+	# modes from package metadata through fchmodat(2). Restore the complete
+	# command set shipped by Alpine's ffmpeg package rather than making only the
+	# most visible binary work.
+	for program in ffmpeg ffprobe qt-faststart; do
+		path=$(root_path "/usr/bin/$program")
+		[ ! -f "$path" ] || bb chmod 0755 "$path"
+	done
+	if [ ! -x "$(root_path /usr/bin/ffmpeg)" ] \
+		|| [ ! -x "$(root_path /usr/bin/ffprobe)" ]; then
+		echo "pkg: FFmpeg package has no executable tools" >&2
+		exit 1
+	fi
+}
+
 finalize_libreoffice() {
 	[ -n "$ROOT" ] && return 0
 	# Vinix package extraction cannot restore executable modes with fchmodat(2)
@@ -761,6 +816,273 @@ EOF
 	mv "$manifest.new" "$manifest"
 }
 
+finalize_java() {
+	java_major=$1
+	java_home=$(root_path "/usr/lib/jvm/java-${java_major}-openjdk")
+	java_bin="$java_home/bin/java"
+	if [ ! -s "$java_bin" ]; then
+		echo "pkg: OpenJDK $java_major package has no Java executable" >&2
+		exit 1
+	fi
+
+	# apk's fchmodat mode restoration is not effective on Vinix yet. Restore the
+	# JRE command modes and publish the alternatives that Alpine's disabled
+	# maintainer scripts would ordinarily create.
+	for command_path in "$java_home/bin/"*; do
+		[ -f "$command_path" ] || continue
+		bb chmod 0755 "$command_path"
+		command_name=$(basename "$command_path")
+		mkdir -p "$(root_path /usr/bin)"
+		bb ln -sf "../lib/jvm/java-${java_major}-openjdk/bin/$command_name" \
+			"$(root_path "/usr/bin/$command_name")"
+	done
+	if [ ! -x "$java_bin" ]; then
+		echo "pkg: OpenJDK $java_major executable mode could not be restored" >&2
+		exit 1
+	fi
+
+	# java-cacerts is normally populated by an Alpine trigger. Package installs
+	# deliberately disable triggers, so build the same JKS trust store directly.
+	python=${VINIX_PKG_PYTHON:-$(root_path /usr/bin/python3)}
+	helper=${VINIX_JAVA_CACERTS_HELPER:-$(root_path /usr/libexec/vinix-minecraft/java-cacerts.py)}
+	certificates=$(root_path /usr/share/ca-certificates/mozilla)
+	cacerts=$(root_path /etc/ssl/certs/java/cacerts)
+	if [ ! -x "$python" ] || [ ! -f "$helper" ]; then
+		echo "pkg: this image lacks the Python Minecraft/Java installer support" >&2
+		exit 1
+	fi
+	"$python" "$helper" "$certificates" "$cacerts"
+}
+
+install_minecraft() {
+	# Alpine supplies the JVM and every musl-native dependency. Mojang supplies
+	# the client, libraries and assets; fetch-minecraft verifies their hashes and
+	# substitutes the matching LWJGL AArch64 natives from Maven Central.
+	apk_install \
+		openjdk21-jre ca-certificates-bundle \
+		gcompat jemalloc openal-soft-libs glfw freetype harfbuzz \
+		mesa-dri-gallium mesa-gl mesa-egl mesa-gbm \
+		libx11 libxcursor libxrandr libxinerama libxi libxxf86vm \
+		wayland-libs-server
+	finalize_java "$MINECRAFT_JAVA_MAJOR"
+	materialize_gcompat_links
+
+	support=$(root_path /usr/libexec/vinix-minecraft)
+	python=${VINIX_PKG_PYTHON:-$(root_path /usr/bin/python3)}
+	fetcher=${VINIX_MINECRAFT_FETCHER:-$support/fetch-minecraft.py}
+	for required in \
+		"$python" "$fetcher" "$support/run-minecraft" \
+		"$support/minecraft-login" "$support/minecraft-xinitrc"; do
+		if [ ! -f "$required" ]; then
+			echo "pkg: this image lacks Minecraft installer support: $required" >&2
+			exit 1
+		fi
+	done
+
+	set -- "$fetcher" \
+		--version "$MINECRAFT_VERSION" \
+		--max-java "$MINECRAFT_JAVA_MAJOR" \
+		--staging "${ROOT:-/}" \
+		--game-root /usr/share/minecraft \
+		--jobs "$MINECRAFT_DOWNLOAD_JOBS"
+	if [ "${VINIX_MINECRAFT_ASSETS:-full}" = none ]; then
+		set -- "$@" --no-assets
+	fi
+	"$python" "$@"
+
+	game=$(root_path /usr/share/minecraft)
+	launch_env="$game/launch.env"
+	if [ ! -f "$launch_env" ] \
+		|| ! grep -q 'natives-linux-arm64' "$launch_env"; then
+		echo "pkg: downloaded Minecraft has no AArch64 launch description" >&2
+		exit 1
+	fi
+	# shellcheck source=/dev/null
+	. "$launch_env"
+	if ! printf '%s' "$MC_CLASSPATH" | tr ':' '\n' \
+		| grep -Eq '/org/lwjgl/lwjgl/[^/]+/lwjgl-[^/]+\.jar$'; then
+		echo "pkg: downloaded Minecraft has no LWJGL core classes" >&2
+		exit 1
+	fi
+
+	mkdir -p "$(root_path /usr/bin)" "$(root_path /usr/share/vinix)" \
+		"$(root_path /var/lib/vinix-pkg)"
+	bb cp "$support/run-minecraft" "$(root_path /usr/bin/minecraft)"
+	bb cp "$support/minecraft-login" "$(root_path /usr/bin/minecraft-login)"
+	bb cp "$support/minecraft-xinitrc" \
+		"$(root_path /usr/share/vinix/minecraft-xinitrc)"
+	bb chmod 0755 \
+		"$(root_path /usr/bin/minecraft)" \
+		"$(root_path /usr/bin/minecraft-login)" \
+		"$(root_path /usr/share/vinix/minecraft-xinitrc)"
+
+	custom_manifest=$(root_path /var/lib/vinix-pkg/minecraft.files)
+	(
+		cd "${ROOT:-/}"
+		bb find ./usr/share/minecraft -type f -o -type l
+		printf '%s\n' \
+			./usr/bin/minecraft \
+			./usr/bin/minecraft-login \
+			./usr/share/vinix/minecraft-xinitrc
+	) | LC_ALL=C sort -u >"$custom_manifest"
+	record_custom_files "$custom_manifest"
+
+	echo "pkg: official Minecraft: Java Edition $MC_VERSION installed"
+}
+
+# QEMU's RAM-root compatibility mode persists paths from this shared manifest.
+# Disk-root and hardware installs retain custom files in place directly.
+record_custom_files() {
+	custom_manifest=$1
+	package_manifest=$(root_path /var/lib/vinix-pkg/package-files)
+	{
+		[ ! -f "$package_manifest" ] || cat "$package_manifest"
+		sed 's#^\./##' "$custom_manifest"
+	} | LC_ALL=C sort -u >"$package_manifest.new"
+	mv "$package_manifest.new" "$package_manifest"
+}
+
+finalize_firefox() {
+	prefs=$(root_path /usr/share/vinix/firefox/vinix.js)
+	policies=$(root_path /etc/firefox/policies/policies.json)
+	custom_manifest=$(root_path /var/lib/vinix-pkg/firefox.files)
+	: >"$custom_manifest"
+	for app in usr/lib/firefox-esr usr/lib/firefox; do
+		directory=$(root_path "/$app")
+		[ -d "$directory" ] || continue
+		if [ -f "$prefs" ]; then
+			mkdir -p "$directory/defaults/pref"
+			bb cp "$prefs" "$directory/defaults/pref/vinix.js"
+			printf './%s\n' "$app/defaults/pref/vinix.js" >>"$custom_manifest"
+		fi
+		if [ -f "$policies" ]; then
+			mkdir -p "$directory/distribution"
+			bb cp "$policies" "$directory/distribution/policies.json"
+			printf './%s\n' "$app/distribution/policies.json" >>"$custom_manifest"
+		fi
+	done
+	record_custom_files "$custom_manifest"
+}
+
+download_file() {
+	url=$1
+	destination=$2
+	label=$3
+	attempt=1
+	while ! "$CURL" --fail --location --output "$destination" "$url"; do
+		if [ "$attempt" -ge "$NETWORK_RETRIES" ]; then
+			echo "pkg: $label download failed after $attempt attempts" >&2
+			return 1
+		fi
+		echo "pkg: $label download failed; retrying ($attempt/$NETWORK_RETRIES)" >&2
+		sleep $((NETWORK_RETRY_DELAY * attempt))
+		attempt=$((attempt + 1))
+	done
+}
+
+# VOffice is not part of the image. Its releases carry a Vinix build of Writer
+# and Calc, cross-compiled by build-voffice-aarch64.sh as native clients of the
+# compositor's pipe protocol, together with their artwork and translations.
+install_voffice() {
+	case "$(uname -m)" in
+		aarch64|arm64) ;;
+		*)
+			echo "pkg: VOffice is only published for AArch64 Vinix" >&2
+			exit 1
+			;;
+	esac
+	wait_for_network
+	cache_parent=$(root_path /var/cache)
+	mkdir -p "$cache_parent"
+	temp=$(bb mktemp -d "$cache_parent/vinix-voffice.XXXXXX")
+	trap 'rm -rf "$temp"' EXIT INT TERM
+	archive="$temp/voffice.tar.gz"
+	download_file "$VOFFICE_URL" "$archive" VOffice
+	download_file "$VOFFICE_SHA256_URL" "$archive.sha256" "VOffice checksum"
+	expected=$(awk 'NR == 1 { print $1 }' "$archive.sha256")
+	case "$expected" in
+		''|*[!0-9a-f]*)
+			echo "pkg: VOffice checksum file is malformed" >&2
+			exit 1
+			;;
+	esac
+	# SHA256SUM may contain a command plus arguments (BusyBox's applet form).
+	# shellcheck disable=SC2086
+	actual=$($SHA256SUM "$archive" | awk '{ print $1 }')
+	if [ "$actual" != "$expected" ]; then
+		echo "pkg: VOffice archive checksum mismatch" >&2
+		exit 1
+	fi
+
+	# BusyBox tar is always present, unlike bsdtar. The bundle holds one
+	# top-level directory.
+	mkdir -p "$temp/extract"
+	bb tar -xzf "$archive" -C "$temp/extract"
+	set -- "$temp/extract"/*
+	if [ "$#" -ne 1 ] || [ ! -d "$1" ]; then
+		echo "pkg: VOffice archive does not hold a single application directory" >&2
+		exit 1
+	fi
+	payload=$1
+	for required in voffice-writer voffice-calc assets/logo.png; do
+		if [ ! -s "$payload/$required" ]; then
+			echo "pkg: VOffice archive is missing $required" >&2
+			exit 1
+		fi
+	done
+	if [ ! -d "$payload/assets/ribbon" ] || [ ! -d "$payload/translations" ]; then
+		echo "pkg: VOffice archive is missing its ribbon assets or translations" >&2
+		exit 1
+	fi
+
+	# The applications find their ribbon artwork and translations beside their
+	# executables, and the compositor only reads app icons below /usr/bin/assets.
+	remove_voffice
+	bin=$(root_path /usr/bin)
+	mkdir -p "$bin/assets" "$bin/translations" "$(root_path /var/lib/vinix-pkg)"
+	# Plain recursive copies: the files belong to root, not the packager's uid.
+	bb cp -R "$payload/assets/." "$bin/assets/"
+	bb cp -R "$payload/translations/." "$bin/translations/"
+	for name in writer calc; do
+		bb cp "$payload/voffice-$name" "$bin/voffice-$name"
+		bb chmod 0755 "$bin/voffice-$name"
+	done
+
+	custom_manifest=$(root_path /var/lib/vinix-pkg/voffice.files)
+	(
+		cd "${ROOT:-/}"
+		printf '%s\n' ./usr/bin/voffice-writer ./usr/bin/voffice-calc
+		bb find ./usr/bin/assets ./usr/bin/translations -type f
+	) | LC_ALL=C sort -u >"$custom_manifest"
+	record_custom_files "$custom_manifest"
+
+	version=
+	if [ -f "$payload/VERSION" ]; then
+		version=$(sed -n '1p' "$payload/VERSION")
+	fi
+	rm -rf "$temp"
+	trap - EXIT INT TERM
+	echo "pkg: VOffice ${version:+$version }Writer and Calc installed"
+}
+
+remove_voffice() {
+	bb rm -f "$(root_path /usr/bin/voffice-writer)" \
+		"$(root_path /usr/bin/voffice-calc)" \
+		"$(root_path /var/lib/vinix-pkg/voffice.files)"
+	# Only VOffice installs below these directories.
+	bb rm -rf "$(root_path /usr/bin/assets)" "$(root_path /usr/bin/translations)"
+}
+
+remove_minecraft() {
+	manifest=$(root_path /var/lib/vinix-pkg/minecraft.files)
+	bb rm -rf "$(root_path /usr/share/minecraft)"
+	bb rm -f \
+		"$(root_path /usr/bin/minecraft)" \
+		"$(root_path /usr/bin/minecraft-login)" \
+		"$(root_path /usr/share/vinix/minecraft-xinitrc)" \
+		"$manifest"
+}
+
 remove_gtk_demo() {
 	if [ -n "$ROOT" ]; then
 		apk --no-progress --no-scripts del gtk+3.0-demo
@@ -818,8 +1140,16 @@ case "$command_name" in
 	install|add)
 		[ "$#" -gt 0 ] || { echo "pkg: install needs a package name" >&2; exit 1; }
 		require_root
-		ensure_repository_indexes
-		bootstrap_database
+		# VOffice is a release download that never touches apk, so installing it
+		# alone must not wait on the Alpine mirror or register the base packages.
+		needs_apk=false
+		for requested in "$@"; do
+			[ "$requested" = voffice ] || needs_apk=true
+		done
+		if [ "$needs_apk" = true ]; then
+			ensure_repository_indexes
+			bootstrap_database
+		fi
 		install_packages "$@"
 		;;
 	remove|delete|del)
@@ -829,6 +1159,9 @@ case "$command_name" in
 		bootstrap_database
 		for requested in "$@"; do
 			case "$requested" in
+				minecraft) remove_minecraft ;;
+				voffice) remove_voffice ;;
+				firefox) bb rm -f "$(root_path /var/lib/vinix-pkg/firefox.files)" ;;
 				gtk|gtk+3.0-demo) remove_gtk_demo ;;
 				blender) remove_blender ;;
 				sublime|sublime-text) remove_sublime ;;
@@ -863,6 +1196,12 @@ case "$command_name" in
 		if [ -e "$(root_path /usr/lib/chromium/chrome)" ]; then
 			finalize_chromium
 		fi
+		if [ -e "$(root_path /usr/bin/ffmpeg)" ]; then
+			finalize_ffmpeg
+		fi
+		if [ -e "$(root_path "/usr/lib/jvm/java-${MINECRAFT_JAVA_MAJOR}-openjdk/bin/java")" ]; then
+			finalize_java "$MINECRAFT_JAVA_MAJOR"
+		fi
 		;;
 	search)
 		[ "$#" -gt 0 ] || { echo "pkg: search needs a query" >&2; exit 1; }
@@ -880,6 +1219,10 @@ case "$command_name" in
 			|| echo gtk+3.0-demo
 		[ ! -s "$(root_path /var/lib/vinix-pkg/sublime-text.files)" ] \
 			|| echo sublime-text
+		[ ! -s "$(root_path /var/lib/vinix-pkg/minecraft.files)" ] \
+			|| echo minecraft
+		[ ! -s "$(root_path /var/lib/vinix-pkg/voffice.files)" ] \
+			|| echo voffice
 		;;
 	*)
 		echo "pkg: unknown command: $command_name" >&2

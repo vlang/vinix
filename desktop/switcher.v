@@ -1,5 +1,8 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
 // Cmd-Tab: the window switcher, and the global Cmd-Space keyboard hook.
 //
 // A tap moves to the window under the one on top, the way Alt-Tab and Cmd-Tab
@@ -231,7 +234,9 @@ fn (mut d Desktop) switcher_step(step int) {
 	if !d.switcher.active {
 		d.switcher.order.clear()
 		for i := d.windows.len - 1; i >= 0; i-- {
-			d.switcher.order << d.windows[i].id
+			if d.windows[i].workspace == d.current_workspace {
+				d.switcher.order << d.windows[i].id
+			}
 		}
 		if d.switcher.order.len == 0 {
 			return
@@ -378,8 +383,8 @@ fn (d &Desktop) switcher_element() ui2.Element {
 			switcher_icon
 		}
 		children << ui2.clickable_view(d.switcher.ids[i], ui2.rect(f64(x), f64(y), f64(switcher_tile), f64(switcher_tile)), ui2.BoxStyle{
-			bg: theme.accent
-			radius: switcher_select_radius
+			bg:          theme.accent
+			radius:      switcher_select_radius
 			transparent: !selected
 		}, frame_child(ui2.button_with_image('', '', window.icon, ui2.rect(f64(icon_inset), f64(icon_inset), f64(switcher_icon_size), f64(switcher_icon_size)), ui2.BoxStyle{
 			transparent: true
@@ -390,14 +395,14 @@ fn (d &Desktop) switcher_element() ui2.Element {
 
 	children << ui2.label('switcher.title', d.switcher_title(), ui2.rect(0, f64(panel_height - switcher_label_height - switcher_padding / 2), f64(panel_width), f64(switcher_label_height)), ui2.TextStyle{
 		color: switcher_text
-		size: 15
-		bold: true
+		size:  15
+		bold:  true
 		align: .center
 		lines: 1
 	})
 
 	return ui2.view(switcher_panel_id, ui2.rect(f64((d.canvas.width - panel_width) / 2), f64((d.canvas.height - panel_height) / 2), f64(panel_width), f64(panel_height)), ui2.BoxStyle{
-		bg: switcher_bg
+		bg:     switcher_bg
 		radius: switcher_radius
 	}, children)
 }

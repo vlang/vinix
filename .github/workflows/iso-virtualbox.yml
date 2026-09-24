@@ -1,0 +1,56 @@
+name: Boot the release ISO in VirtualBox
+
+# VirtualBox only runs guests of its host's architecture, so the amd64 image
+# cannot be booted in it on the Apple Silicon machines releases are usually
+# made on. This boots it on an x86 runner once the release is published, with
+# the same test the release script runs: the desktop has to come up and answer
+# the keyboard.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag whose vinix-amd64.iso to boot
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  amd64:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Download the image
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
+        run: gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern vinix-amd64.iso --dir iso
+
+      - name: Install VirtualBox
+        run: |
+          set -euo pipefail
+          curl -fsSL https://www.virtualbox.org/download/oracle_vbox_2016.asc |
+            sudo gpg --dearmor -o /usr/share/keyrings/oracle-virtualbox-2016.gpg
+          echo "deb [arch=amd64 signed-by=/usr/share/keyrings/oracle-virtualbox-2016.gpg] https://download.virtualbox.org/virtualbox/debian noble contrib" |
+            sudo tee /etc/apt/sources.list.d/virtualbox.list
+          sudo apt-get update
+          sudo apt-get install -y "linux-headers-$(uname -r)" virtualbox-7.2 xorriso
+          # KVM holds the CPU's virtualisation extensions; VirtualBox needs them.
+          sudo modprobe -r kvm_intel kvm_amd kvm || true
+          sudo /sbin/vboxconfig
+          VBoxManage --version
+
+      - name: Boot it
+        run: sudo --preserve-env=PATH ./test-iso.sh --no-qemu --virtualbox --timeout=600 --out=test iso/vinix-amd64.iso
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: virtualbox-amd64
+          path: test/
+          if-no-files-found: ignore

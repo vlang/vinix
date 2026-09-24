@@ -6,7 +6,13 @@ import gpu.agx.hw
 
 // Host/firmware operation guard used to keep the GPU awake while submitted
 // work is outstanding. This is an AtomicU32 in the v12.3 firmware ABI.
-pub const g13_globals_pending_submissions_offset = u64(0x8904)
+pub fn g13_globals_pending_submissions_offset(abi hw.FirmwareAbi) ?u64 {
+	return match abi {
+		.v12_3 { u64(0x8904) }
+		.v13_5_partial { u64(0x8974) }
+		else { none }
+	}
+}
 
 // macOS 12.3 / G13 global firmware state. Firmware mutates most of this
 // object, so preserve the full ABI extent and initialize only host-owned
@@ -107,7 +113,7 @@ fn g13_globals_set_t8103_shared_data(mut data G13Globals, abi hw.FirmwareAbi) bo
 		}
 	}
 	for index := u32(0); index < 0x10; index++ {
-		data.bytes[int(0x8ac8 + index)] = 0xff
+		data.bytes[int(hws2_base + 0x28 + index)] = 0xff
 	}
 	return g13_globals_put_u32(mut data, abi, 0x8fa8, 0x00c0_0007)
 }

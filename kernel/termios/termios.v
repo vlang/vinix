@@ -92,6 +92,12 @@ pub mut:
 	obaud   u32
 }
 
+// Linux's TCGETS and TCSETS copy only the flag words, c_line and 19 control
+// characters. The C libraries' structs are larger (musl has 32 characters and
+// two speed words) and Go's is 44 bytes on the stack, so copying all of
+// Termios overwrote the caller's saved frame pointer and return address.
+pub const linux_size = u64(36)
+
 pub fn ctrl(c u8) u8 {
 	return c & 0o37
 }

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Create a disposable ui2 module overlay for Vinix headless builds.
 
-The overlay keeps the upstream checkout untouched. It links all upstream
-sources into a generated module tree and adds Vinix's tiny Linux-headless
-`bounds()` bridge, which compile-time `$vml` builders require.
+The overlay keeps the upstream checkout untouched. It links the portable and
+Vinix-relevant sources into a generated module tree and adds Vinix's tiny
+Linux-headless `bounds()` bridge, which compile-time `$vml` builders require.
 
     stage_ui2.py <output-ui2-dir> <source-ui2-dir> <bridge.v>
 """
@@ -14,20 +14,70 @@ import shutil
 import sys
 
 
+EXCLUDED_SUBDIRS = {"appkit"}
+
+
+def staged_source(name, source_path):
+    """Return source text for the small V3 compatibility fixes we own.
+
+    V3 currently flattens imported module identifiers while checking globals.
+    An application with a global named ``app`` therefore collides with the
+    receiver name in ui2's generic VML adapter even though they are in separate
+    modules.  VOfficeWriter has exactly that (perfectly valid) layout.  Keep the
+    upstream checkout untouched and give the staged receiver an unambiguous
+    name until the compiler preserves the module boundary here.
+    """
+    if name != "vml_embed.v":
+        return None
+    text = open(source_path).read()
+    replacements = {
+        "(mut app VmlApp[T])": "(mut vml_app VmlApp[T])",
+        "(app &VmlApp[T])": "(vml_app &VmlApp[T])",
+    }
+    for old, new in replacements.items():
+        text = text.replace(old, new)
+    # Only these member accesses belong to the renamed receiver. String
+    # literals such as ``app.field`` are VML expressions and must stay intact.
+    for member in (
+        "control_text",
+        "control_value",
+        "events",
+        "model",
+        "template",
+        "text_of",
+        "value_of",
+    ):
+        text = text.replace("app.%s" % member, "vml_app.%s" % member)
+    return text
+
+
 def symlink_entries(source, destination):
     os.makedirs(destination, exist_ok=True)
     for name in sorted(os.listdir(source)):
-        os.symlink(os.path.abspath(os.path.join(source, name)),
-                   os.path.join(destination, name))
+        source_path = os.path.abspath(os.path.join(source, name))
+        staged = staged_source(name, source_path)
+        destination_path = os.path.join(destination, name)
+        if staged is None:
+            os.symlink(source_path, destination_path)
+        else:
+            with open(destination_path, "w") as handle:
+                handle.write(staged)
 
 
-def module_subdirs(manifest):
-    with open(manifest) as handle:
-        text = handle.read()
+def module_subdirs(text):
     match = re.search(r"\bsubdirs\s*:\s*\[([^]]*)\]", text, re.DOTALL)
     if not match:
         return []
     return re.findall(r"['\"]([^'\"]+)['\"]", match.group(1))
+
+
+def filter_manifest_subdirs(text):
+    match = re.search(r"\bsubdirs\s*:\s*\[([^]]*)\]", text, re.DOTALL)
+    if not match:
+        return text
+    kept = [name for name in module_subdirs(text) if name not in EXCLUDED_SUBDIRS]
+    entries = ", ".join("'%s'" % name for name in kept)
+    return text[:match.start(1)] + entries + text[match.end(1):]
 
 
 def main():
@@ -37,10 +87,13 @@ def main():
     manifest = os.path.join(source, "v.mod")
     if not os.path.isfile(manifest):
         sys.exit("%s: ui2 v.mod not found" % source)
+    with open(manifest) as handle:
+        manifest_text = handle.read()
     if os.path.isdir(output):
         shutil.rmtree(output)
     os.makedirs(output)
-    shutil.copyfile(manifest, os.path.join(output, "v.mod"))
+    with open(os.path.join(output, "v.mod"), "w") as handle:
+        handle.write(filter_manifest_subdirs(manifest_text))
 
     # Root-level resources remain available to @VMODROOT paths. V sources live
     # in v.mod's same-module subdirectories; ui/ is expanded so the bridge can
@@ -48,12 +101,17 @@ def main():
     assets = os.path.join(source, "assets")
     if os.path.exists(assets):
         os.symlink(assets, os.path.join(output, "assets"))
-    for subdir in module_subdirs(manifest):
+    for subdir in module_subdirs(manifest_text):
+        if subdir in EXCLUDED_SUBDIRS:
+            continue
         upstream = os.path.join(source, subdir)
         staged = os.path.join(output, subdir)
         if subdir == "ui":
             symlink_entries(upstream, staged)
-            shutil.copyfile(bridge, os.path.join(staged, "vinix_headless_bounds.v"))
+            bridge_name = ("vinix_headless_backend.c.v"
+                           if bridge.endswith(".c.v")
+                           else "vinix_headless_backend.v")
+            shutil.copyfile(bridge, os.path.join(staged, bridge_name))
         else:
             os.symlink(upstream, staged)
 

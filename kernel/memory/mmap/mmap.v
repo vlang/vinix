@@ -23,18 +23,20 @@ const ms_async = 1
 const ms_invalidate = 2
 const ms_sync = 4
 
-// OpenBSD-style W^X policy. User mappings may be writable or executable, but
-// never both at the same time. RW -> RX transitions remain valid for JITs and
-// dynamic linkers. Keep this in the shared VM layer so every ABI and both
-// architectures inherit the same policy.
+// OpenBSD-style W^X remains the default. Compatibility launchers can opt a
+// process into simultaneous write/execute mappings before exec; fork inherits
+// the decision, while the next exec replaces it from that program's environment.
 fn validate_protection(prot int) ? {
 	if prot & ~prot_mask != 0 {
 		errno.set(errno.einval)
 		return none
 	}
 	if prot & (prot_write | prot_exec) == (prot_write | prot_exec) {
-		errno.set(errno.enotsup)
-		return none
+		current := proc.current_thread()
+		if current == unsafe { nil } || !current.process.allow_wx {
+			errno.set(errno.enotsup)
+			return none
+		}
 	}
 }
 
@@ -138,6 +140,18 @@ fn addr2range(pagemap &memory.Pagemap, addr u64) ?(&MmapRangeLocal, u64, u64) {
 		}
 	}
 	return none
+}
+
+// Whether `addr` lies in a MAP_SHARED mapping, whose pages are the same
+// physical memory in every address space that maps them.
+pub fn is_shared_address(_pagemap &memory.Pagemap, addr u64) bool {
+	mut pagemap := unsafe { _pagemap }
+	pagemap.l.acquire()
+	defer {
+		pagemap.l.release()
+	}
+	local_range, _, _ := addr2range(pagemap, addr) or { return false }
+	return local_range.flags & map_shared != 0
 }
 
 // The caller must hold pagemap.l. MAP_FIXED_NOREPLACE and non-fixed address
@@ -268,37 +282,78 @@ fn find_free_base_unlocked(pagemap &memory.Pagemap, start u64, length u64) ?u64 
 }
 
 pub fn delete_pagemap(mut pagemap memory.Pagemap) ? {
+	delete_pagemap_impl(mut pagemap, false)?
+}
+
+pub fn delete_pagemap_traced(mut pagemap memory.Pagemap) ? {
+	delete_pagemap_impl(mut pagemap, true)?
+}
+
+fn delete_pagemap_impl(mut pagemap memory.Pagemap, trace bool) ? {
+	if trace {
+		println('exec[gpu]/vm: acquiring old page-map lock')
+	}
 	pagemap.l.acquire()
+	if trace {
+		println('exec[gpu]/vm: old page-map lock acquired; ranges=${pagemap.mmap_ranges.len}')
+	}
 
 	// Address-space destruction is a kernel-internal operation and must be able
 	// to reclaim immutable ranges after the process can no longer observe them.
+	mut range_index := u64(0)
 	for pagemap.mmap_ranges.len != 0 {
 		local_range := unsafe { &MmapRangeLocal(pagemap.mmap_ranges[0]) }
 		old_len := pagemap.mmap_ranges.len
+		if trace {
+			println('exec[gpu]/vm: unmapping range ${range_index} base=0x${local_range.base:x} len=0x${local_range.length:x} remaining=${old_len}')
+		}
 		munmap_unlocked_impl(mut pagemap, voidptr(local_range.base), local_range.length,
 			false) or {
+			if trace {
+				println('exec[gpu]/vm: ERROR unmapping old range ${range_index}')
+			}
 			pagemap.l.release()
 			return none
 		}
 		if pagemap.mmap_ranges.len >= old_len {
+			if trace {
+				println('exec[gpu]/vm: ERROR old range list did not shrink at ${range_index}')
+			}
 			pagemap.l.release()
 			errno.set(errno.einval)
 			return none
 		}
+		if trace {
+			println('exec[gpu]/vm: unmapped range ${range_index}')
+		}
+		range_index++
 	}
 
 	top_level := pagemap.top_level
 	pagemap.l.release()
+	if trace {
+		println('exec[gpu]/vm: old page-map ranges empty; lock released')
+	}
 
 	unsafe {
 		pagemap.mmap_ranges.free()
 	}
+	if trace {
+		println('exec[gpu]/vm: old range array freed; freeing top-level table')
+	}
 	memory.pmm_free(top_level, 1)
+	if trace {
+		println('exec[gpu]/vm: old top-level table freed; freeing page-map object')
+	}
 	unsafe { free(pagemap) }
+	if trace {
+		println('exec[gpu]/vm: old page-map object freed')
+	}
 }
 
 pub fn fork_pagemap(_old_pagemap &memory.Pagemap) ?&memory.Pagemap {
 	memory.register_cow_resolver(resolve_cow_fault)
+	register_page_in_resolver()
 	mut old_pagemap := unsafe { _old_pagemap }
 	mut new_pagemap := memory.new_pagemap()
 	mut old_private_globals := []voidptr{}
@@ -506,6 +561,47 @@ pub fn map_page_in_range(_g &MmapRangeGlobal, virt_addr u64, phys_addr u64, _pro
 	}
 }
 
+// Install a page just obtained for `virt` unless another thread got there
+// first. Faults, pre-faults and mprotect commits all drop the address-space
+// lock before allocating, so two threads touching the same absent page can
+// each come back with a fresh one; mapping both would let the second silently
+// replace a page the first has already written to -- a Go program's heap
+// metadata or a futex word vanishing into a zeroed page. The range's shadow
+// pagemap decides: the first page installed there backs the address, and a
+// loser gives its own page back and maps the winner's.
+//
+// Nothing is left for the caller to release: a page that loses is released
+// here, and one that wins belongs to the range.
+pub fn install_range_page(_g &MmapRangeGlobal, virt u64, file_page u64, page voidptr, flags int) ? {
+	mut g := unsafe { _g }
+	shadow_flags := memory.pte_present | memory.pte_writable | memory.pte_noexec
+	mut phys := u64(page)
+	g.shadow_pagemap.l.acquire()
+	if existing := g.shadow_pagemap.virt2phys(virt) {
+		g.shadow_pagemap.l.release()
+		release_range_page(g, virt, file_page, page, flags)
+		phys = existing
+	} else {
+		g.shadow_pagemap.map_page_unlocked(virt, phys, shadow_flags) or {
+			g.shadow_pagemap.l.release()
+			release_range_page(g, virt, file_page, page, flags)
+			return none
+		}
+		g.shadow_pagemap.l.release()
+	}
+	for i := u64(0); i < g.locals.len; i++ {
+		mut l := g.locals[i]
+		if virt < l.base || virt >= l.base + l.length {
+			continue
+		}
+		// A private page that a fork child still shares stays read-only, so
+		// that the first write copies it instead of changing both processes.
+		writable := !(l.cow && memory.pmm_refcount(voidptr(phys)) > 1)
+		pt_flags := page_table_flags(l.prot, g.pte_extra, writable)
+		l.pagemap.map_page(virt, phys, pt_flags) or { return none }
+	}
+}
+
 // Resolve a write to a private page shared by fork().  A range retains its
 // requested PROT_WRITE bit while its PTE is read-only, so no software-only PTE
 // bit is needed and both architectures use exactly the same state machine.
@@ -521,6 +617,12 @@ pub fn resolve_cow_fault(_pagemap &memory.Pagemap, address u64) bool {
 		return false
 	}
 	old_phys := pagemap.virt2phys(virt) or { return false }
+	// Another thread resolved this page while we waited for the lock, and its
+	// writes already go to the page mapped now. Copying that page again would
+	// lose whatever they change before the new mapping reaches every CPU.
+	if _ := pagemap.user_page_phys(virt, true) {
+		return true
+	}
 	flags := page_table_flags(local_range.prot, local_range.global.pte_extra, true)
 	if memory.pmm_refcount(voidptr(old_phys)) <= 1 {
 		pagemap.flag_page(virt, flags) or { return false }
@@ -664,6 +766,10 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
 	options MmapOptions) ?voidptr {
 	mut pagemap := unsafe { _pagemap }
 	mut resource_ := unsafe { _resource }
+
+	// Every user mapping, the program's own segments included, is made here,
+	// so the resolver is in place before anything can copy from one.
+	register_page_in_resolver()
 
 	validate_protection(prot)?
 	if _length == 0 {
@@ -856,20 +962,41 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
 	// without ISV bit set, which crashes HVF.
 	lazy_anonymous := flags & map_anonymous != 0 && length >= lazy_anonymous_threshold
 	if prot != prot_none && !lazy_anonymous && !options.lazy_file {
+		// A shared file mapping reserves its whole extent up front: the loop
+		// below faults pages in ascending order, and a resource that grows a
+		// movable buffer mid-loop would relocate the pages already mapped.
+		if flags & map_anonymous == 0 && flags & map_shared != 0
+			&& voidptr(resource_) != unsafe { nil } {
+			reserve_length := if u64(offset) < u64(resource_.stat.size) {
+				min_u64(length, u64(resource_.stat.size) - u64(offset))
+			} else {
+				u64(0)
+			}
+			if reserve_length > 0
+				&& !resource.reserve_shared_mapping(mut resource_, u64(offset), reserve_length) {
+				munmap(mut pagemap, voidptr(base), length) or {}
+				errno.set(errno.enomem)
+				return none
+			}
+		}
 		for i := u64(0); i < length; i += page_size {
 			file_page := u64((offset + i64(i)) / i64(page_size))
+			// Past the end of the file there is nothing to pre-fault, and a
+			// mapping is allowed to reach there: a dynamic loader maps one span
+			// over an object's segments and replaces the tail with anonymous
+			// memory, and an ordinary mmap of a rounded-up length covers the
+			// slack past the last page. Leave those pages unmapped -- touching
+			// one is the SIGBUS POSIX asks for -- rather than making the
+			// resource grow to back a page the file does not have.
+			if flags & map_anonymous == 0 && u64(offset) + i >= u64(resource_.stat.size) {
+				continue
+			}
 			page := acquire_range_page(range_local, base + i, file_page) or {
 				munmap(mut pagemap, voidptr(base), length) or {}
 				errno.set(errno.einval)
 				return none
 			}
 			if flags & map_anonymous == 0 && page == unsafe { nil } {
-				// Past the end of the file there is nothing to pre-fault, and
-				// a mapping is allowed to reach there: every dynamic loader
-				// maps one span over an object's segments and then replaces
-				// the tail with anonymous memory. Leave the page unmapped --
-				// touching it is the SIGBUS that POSIX asks for -- rather than
-				// refusing a mapping the caller is entitled to.
 				if u64(offset) + i < u64(resource_.stat.size) {
 					munmap(mut pagemap, voidptr(base), length) or {}
 					errno.set(errno.einval)
@@ -878,8 +1005,9 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
 				continue
 			}
 			if page != unsafe { nil } {
-				map_page_in_range(range_global, base + i, u64(page), prot) or {
-					release_range_page(range_global, base + i, file_page, page, flags)
+				// The range is already visible to the process' other threads,
+				// which may fault on this very page while it is pre-faulted.
+				install_range_page(range_global, base + i, file_page, page, flags) or {
 					munmap(mut pagemap, voidptr(base), length) or {}
 					errno.set(errno.enomem)
 					return none
@@ -1018,8 +1146,7 @@ fn populate_missing_pages(mut pagemap memory.Pagemap, address u64, _length u64, 
 			errno.set(errno.enomem)
 			return none
 		}
-		map_page_in_range(global_range, virt, u64(page), prot) or {
-			release_range_page(global_range, virt, file_page, page, flags)
+		install_range_page(global_range, virt, file_page, page, flags) or {
 			errno.set(errno.enomem)
 			return none
 		}
@@ -1232,4 +1359,8 @@ fn munmap_unlocked_impl(mut pagemap memory.Pagemap, addr voidptr, _length u64,
 			local_range.length -= snip_size
 		}
 	}
+}
+
+fn min_u64(a u64, b u64) u64 {
+	return if a < b { a } else { b }
 }

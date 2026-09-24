@@ -34,10 +34,12 @@ pub:
 }
 
 pub fn (mut dev PCIDevice) read_info() {
-	config0 := dev.read[int](0)
-	config8 := dev.read[int](0x8)
-	configc := dev.read[int](0xc)
-	config3c := dev.read[int](0x3c)
+	// Configuration space is read a dword at a time. V3's int is 64 bits, and
+	// an 8-byte load at 0xc is a misaligned Device access on arm64.
+	config0 := dev.read[u32](0)
+	config8 := dev.read[u32](0x8)
+	configc := dev.read[u32](0xc)
+	config3c := dev.read[u32](0x3c)
 
 	dev.device_id = u16(config0 >> 16)
 	dev.vendor_id = u16(config0)
@@ -67,7 +69,9 @@ pub fn (dev &PCIDevice) get_bar(bar u8) PCIBar {
 	is_64_bits := is_mmio && ((bar_low >> 1) & 0b11) == 0b10
 	bar_high := if is_64_bits { dev.read[u32](reg_index + 4) } else { 0 }
 
-	base := ((u64(bar_high) << 32) | bar_low) & ~u32(if is_mmio { 0b1111 } else { 0b11 })
+	// The mask has to be 64 bits wide: ~u32 zero-extends and would drop the
+	// upper half of a BAR above 4 GiB.
+	base := ((u64(bar_high) << 32) | bar_low) & ~u64(if is_mmio { 0b1111 } else { 0b11 })
 
 	dev.write[u32](reg_index, 0xFFFFFFFF)
 	bar_size_low = dev.read[u32](reg_index)

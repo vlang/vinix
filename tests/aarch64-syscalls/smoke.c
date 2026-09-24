@@ -1,3 +1,7 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 #define _GNU_SOURCE
 
 #include <errno.h>
@@ -21,7 +25,9 @@
 #include <sys/uio.h>
 #include <sys/utsname.h>
 #include <sys/wait.h>
+#include <sys/xattr.h>
 #include <sys/membarrier.h>
+#include <sys/mount.h>
 #include <sys/mman.h>
 #include <time.h>
 #include <unistd.h>
@@ -66,6 +72,243 @@ static void check(int condition, const char *description) {
     fflush(stdout);
     if (!condition)
         failures++;
+}
+
+static int failed_with_errno(long result, int expected, const char *operation) {
+    if (result == -1 && errno == expected)
+        return 1;
+    printf("%s: result=%ld errno=%d (expected %d)\n",
+           operation, result, errno, expected);
+    fflush(stdout);
+    return 0;
+}
+
+static int denied_operations(void) {
+    const void *invalid = (const void *)(uintptr_t)1;
+    return failed_with_errno(sethostname("untrusted", 9), EPERM, "sethostname") &&
+           failed_with_errno(syscall(SYS_setdomainname, "bad.test", 8), EPERM, "setdomainname") &&
+           failed_with_errno(syscall(SYS_mount, "", "/tmp", "unknownfs", 0, NULL), EPERM, "mount") &&
+           failed_with_errno(syscall(SYS_umount2, "/tmp", 0), EPERM, "umount2") &&
+           failed_with_errno(syscall(SYS_reboot, 0, 0, 0, NULL), EPERM, "reboot") &&
+           failed_with_errno(syscall(SYS_sethostname, invalid, 1), EPERM, "sethostname invalid pointer") &&
+           failed_with_errno(syscall(SYS_setdomainname, invalid, 1), EPERM, "setdomainname invalid pointer") &&
+           failed_with_errno(syscall(SYS_mount, invalid, invalid, invalid, 0, NULL), EPERM, "mount invalid pointers") &&
+           failed_with_errno(syscall(SYS_umount2, invalid, 0), EPERM, "umount invalid pointer");
+}
+
+static int mount_rejects_bad_strings(void) {
+    const void *invalid = (const void *)(uintptr_t)1;
+    int valid = failed_with_errno(syscall(SYS_mount, invalid, "/tmp", "tmpfs", 0, NULL),
+                                  EFAULT, "mount source invalid pointer") &&
+                failed_with_errno(syscall(SYS_mount, "", invalid, "tmpfs", 0, NULL),
+                                  EFAULT, "mount target invalid pointer") &&
+                failed_with_errno(syscall(SYS_mount, "", "/tmp", invalid, 0, NULL),
+                                  EFAULT, "mount type invalid pointer") &&
+                failed_with_errno(syscall(SYS_mount, NULL, "/tmp", "tmpfs", 0, NULL),
+                                  EFAULT, "mount null source");
+
+    char overlong[4096];
+    memset(overlong, 'x', sizeof(overlong));
+    valid &= failed_with_errno(syscall(SYS_mount, overlong, "/tmp", "tmpfs", 0, NULL),
+                               ENAMETOOLONG, "mount unterminated source");
+
+    char *pages = mmap(NULL, 8192, PROT_READ | PROT_WRITE,
+                       MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (pages == MAP_FAILED || mprotect(pages + 4096, 4096, PROT_NONE) != 0) {
+        if (pages != MAP_FAILED)
+            munmap(pages, 8192);
+        return 0;
+    }
+    pages[4095] = '\0';
+    valid &= failed_with_errno(syscall(SYS_mount, pages + 4095, "/tmp", "unknownfs", 0, NULL),
+                               ENODEV, "mount terminator at page boundary");
+    pages[4095] = 'x';
+    valid &= failed_with_errno(syscall(SYS_mount, pages + 4095, "/tmp", "tmpfs", 0, NULL),
+                               EFAULT, "mount string crosses into unmapped page");
+    munmap(pages, 8192);
+    return valid;
+}
+
+static int security_child_succeeded(pid_t child) {
+    int status = 0;
+    pid_t waited = -1;
+    if (child > 0) {
+        do {
+            waited = waitpid(child, &status, 0);
+        } while (waited == -1 && errno == EINTR);
+    }
+    if (child > 0 && waited == child && WIFEXITED(status) && WEXITSTATUS(status) == 0)
+        return 1;
+    printf("security child pid=%d waited=%d status=0x%x errno=%d\n",
+           (int)child, (int)waited, status, errno);
+    fflush(stdout);
+    return 0;
+}
+
+// Extended attributes on tmpfs, as Docker's overlay2 driver and archive
+// extractors use them.
+static int xattr_operations(void) {
+    const char *xattr_file = "/tmp/aarch64-syscall-xattr";
+    const char *xattr_dir = "/tmp/aarch64-syscall-xattr-dir";
+    const char *xattr_link = "/tmp/aarch64-syscall-xattr-link";
+    char value[16] = {0};
+    char names[128] = {0};
+    unlink(xattr_file);
+    unlink(xattr_link);
+    rmdir(xattr_dir);
+    int xattr_fd = open(xattr_file, O_CREAT | O_RDWR, 0644);
+    if (xattr_fd < 0 || mkdir(xattr_dir, 0755) != 0 || symlink(xattr_file, xattr_link) != 0)
+        return 0;
+    int valid = setxattr(xattr_file, "user.test", "hello", 5, 0) == 0 &&
+                getxattr(xattr_file, "user.test", NULL, 0) == 5 &&
+                getxattr(xattr_file, "user.test", value, sizeof(value)) == 5 &&
+                !memcmp(value, "hello", 5) &&
+                failed_with_errno(getxattr(xattr_file, "user.test", value, 2), ERANGE,
+                                  "getxattr small buffer") &&
+                failed_with_errno(setxattr(xattr_file, "user.test", "x", 1, XATTR_CREATE),
+                                  EEXIST, "setxattr XATTR_CREATE") &&
+                failed_with_errno(setxattr(xattr_file, "user.none", "x", 1, XATTR_REPLACE),
+                                  ENODATA, "setxattr XATTR_REPLACE") &&
+                setxattr(xattr_file, "user.test", "hi", 2, XATTR_REPLACE) == 0 &&
+                fgetxattr(xattr_fd, "user.test", value, sizeof(value)) == 2 &&
+                !memcmp(value, "hi", 2) &&
+                fsetxattr(xattr_fd, "user.second", "", 0, 0) == 0 &&
+                listxattr(xattr_file, NULL, 0) == 22 &&
+                listxattr(xattr_file, names, sizeof(names)) == 22 &&
+                !memcmp(names, "user.test\0user.second\0", 22) &&
+                removexattr(xattr_file, "user.test") == 0 &&
+                failed_with_errno(getxattr(xattr_file, "user.test", value, sizeof(value)),
+                                  ENODATA, "getxattr removed") &&
+                fremovexattr(xattr_fd, "user.second") == 0 &&
+                listxattr(xattr_file, names, sizeof(names)) == 0 &&
+                setxattr(xattr_dir, "trusted.overlay.opaque", "y", 1, 0) == 0 &&
+                getxattr(xattr_dir, "trusted.overlay.opaque", value, sizeof(value)) == 1 &&
+                value[0] == 'y' &&
+                failed_with_errno(setxattr(xattr_file, "system.posix_acl_access", "x", 1, 0),
+                                  EOPNOTSUPP, "setxattr system namespace") &&
+                failed_with_errno(lsetxattr(xattr_link, "user.test", "x", 1, 0), EPERM,
+                                  "lsetxattr user namespace on symlink") &&
+                failed_with_errno(setxattr("/proc/self/status", "user.test", "x", 1, 0),
+                                  EOPNOTSUPP, "setxattr on procfs");
+
+    pid_t unprivileged = fork();
+    if (unprivileged == 0) {
+        if (setresuid(1000, 1000, 1000) != 0)
+            _exit(1);
+        char seen[16];
+        if (!failed_with_errno(getxattr(xattr_dir, "trusted.overlay.opaque", seen, sizeof(seen)),
+                               ENODATA, "unprivileged getxattr trusted") ||
+            listxattr(xattr_dir, seen, sizeof(seen)) != 0 ||
+            !failed_with_errno(setxattr(xattr_dir, "trusted.other", "x", 1, 0), EPERM,
+                               "unprivileged setxattr trusted"))
+            _exit(2);
+        _exit(0);
+    }
+    valid = valid && security_child_succeeded(unprivileged);
+
+    close(xattr_fd);
+    unlink(xattr_file);
+    unlink(xattr_link);
+    rmdir(xattr_dir);
+    return valid;
+}
+
+// Nodes mknod(2) makes are numbered like the files around them. Go's
+// directory reader skips an entry whose inode number is 0, so Docker could
+// neither pack an overlay whiteout into an image layer nor remove one.
+static int special_node_numbers(void) {
+    const char *dir = "/tmp/aarch64-syscall-special";
+    const char *fifo = "/tmp/aarch64-syscall-special/fifo";
+    const char *device = "/tmp/aarch64-syscall-special/whiteout";
+    struct stat dir_stat, fifo_stat, device_stat;
+    mkdir(dir, 0755);
+    int valid = mkfifo(fifo, 0644) == 0 && mknod(device, S_IFCHR, 0) == 0 &&
+                stat(dir, &dir_stat) == 0 && lstat(fifo, &fifo_stat) == 0 &&
+                lstat(device, &device_stat) == 0 && fifo_stat.st_ino != 0 &&
+                device_stat.st_ino != 0 && fifo_stat.st_ino != device_stat.st_ino &&
+                fifo_stat.st_dev == dir_stat.st_dev && device_stat.st_dev == dir_stat.st_dev &&
+                S_ISCHR(device_stat.st_mode) && device_stat.st_rdev == 0;
+    unlink(fifo);
+    unlink(device);
+    rmdir(dir);
+    return valid;
+}
+
+static int write_text(const char *path, const char *text) {
+    int fd = open(path, O_CREAT | O_WRONLY | O_TRUNC, 0644);
+    if (fd < 0)
+        return 0;
+    ssize_t length = (ssize_t)strlen(text);
+    int valid = write(fd, text, (size_t)length) == length;
+    close(fd);
+    return valid;
+}
+
+static int has_text(const char *path, const char *text) {
+    char buffer[64] = {0};
+    int fd = open(path, O_RDONLY);
+    if (fd < 0)
+        return 0;
+    ssize_t length = read(fd, buffer, sizeof(buffer) - 1);
+    close(fd);
+    return length == (ssize_t)strlen(text) && !memcmp(buffer, text, (size_t)length);
+}
+
+// An overlay of one directory tree on another, as Docker's overlay2 driver
+// mounts every container.
+static int overlay_semantics(void) {
+    const char *merged = "/tmp/aarch64-syscall-ovl/merged";
+    struct stat whiteout_stat;
+    mkdir("/tmp/aarch64-syscall-ovl", 0755);
+    mkdir("/tmp/aarch64-syscall-ovl/lower", 0755);
+    mkdir("/tmp/aarch64-syscall-ovl/lower/d", 0755);
+    mkdir("/tmp/aarch64-syscall-ovl/lower2", 0755);
+    mkdir("/tmp/aarch64-syscall-ovl/upper", 0755);
+    mkdir("/tmp/aarch64-syscall-ovl/work", 0755);
+    mkdir(merged, 0755);
+    if (!write_text("/tmp/aarch64-syscall-ovl/lower/a", "lower") ||
+        !write_text("/tmp/aarch64-syscall-ovl/lower/keep", "keep") ||
+        !write_text("/tmp/aarch64-syscall-ovl/lower/d/f", "f") ||
+        !write_text("/tmp/aarch64-syscall-ovl/lower/hidden", "hidden") ||
+        mknod("/tmp/aarch64-syscall-ovl/lower2/hidden", S_IFCHR, 0) != 0)
+        return 0;
+    const char *options = "lowerdir=/tmp/aarch64-syscall-ovl/lower2:/tmp/aarch64-syscall-ovl/lower,"
+                          "upperdir=/tmp/aarch64-syscall-ovl/upper,workdir=/tmp/aarch64-syscall-ovl/work";
+    if (mount("overlay", merged, "overlay", 0, options) != 0) {
+        printf("overlay mount: errno=%d\n", errno);
+        return 0;
+    }
+    int valid = has_text("/tmp/aarch64-syscall-ovl/merged/a", "lower") &&
+                failed_with_errno(access("/tmp/aarch64-syscall-ovl/merged/hidden", F_OK), ENOENT,
+                                  "whiteout in a lower layer") &&
+                write_text("/tmp/aarch64-syscall-ovl/merged/a", "upper") &&
+                has_text("/tmp/aarch64-syscall-ovl/merged/a", "upper") &&
+                has_text("/tmp/aarch64-syscall-ovl/upper/a", "upper") &&
+                has_text("/tmp/aarch64-syscall-ovl/lower/a", "lower") &&
+                unlink("/tmp/aarch64-syscall-ovl/merged/keep") == 0 &&
+                failed_with_errno(access("/tmp/aarch64-syscall-ovl/merged/keep", F_OK), ENOENT,
+                                  "removed lower file") &&
+                lstat("/tmp/aarch64-syscall-ovl/upper/keep", &whiteout_stat) == 0 &&
+                S_ISCHR(whiteout_stat.st_mode) && whiteout_stat.st_rdev == 0 &&
+                has_text("/tmp/aarch64-syscall-ovl/lower/keep", "keep") &&
+                failed_with_errno(rename("/tmp/aarch64-syscall-ovl/merged/d",
+                                         "/tmp/aarch64-syscall-ovl/merged/e"),
+                                  EXDEV, "rename of a lower directory") &&
+                failed_with_errno(rmdir("/tmp/aarch64-syscall-ovl/merged/d"), ENOTEMPTY,
+                                  "rmdir of a merged directory") &&
+                mkdir("/tmp/aarch64-syscall-ovl/merged/n", 0755) == 0 &&
+                write_text("/tmp/aarch64-syscall-ovl/merged/n/x", "x") &&
+                has_text("/tmp/aarch64-syscall-ovl/upper/n/x", "x");
+    valid = umount("/tmp/aarch64-syscall-ovl/merged") == 0 && valid;
+
+    if (mount("overlay", merged, "overlay", 0,
+              "lowerdir=/tmp/aarch64-syscall-ovl/upper:/tmp/aarch64-syscall-ovl/lower") != 0)
+        return 0;
+    valid = valid && has_text("/tmp/aarch64-syscall-ovl/merged/a", "upper") &&
+            failed_with_errno(open("/tmp/aarch64-syscall-ovl/merged/new", O_CREAT | O_WRONLY, 0644),
+                              EROFS, "create in a read-only overlay");
+    valid = umount("/tmp/aarch64-syscall-ovl/merged") == 0 && valid;
+    return valid;
 }
 
 static void *eventfd_writer(void *argument) {
@@ -247,8 +490,9 @@ int main(void) {
     check(syscall(SYS_getcpu, &cpu, &node, NULL) == 0 && node == 0,
           "getcpu");
     struct timespec interval;
-    check(sched_rr_get_interval(0, &interval) == 0 && interval.tv_nsec > 0,
-          "sched_rr_get_interval");
+    // The test process uses SCHED_OTHER, which has no round-robin quantum.
+    check(sched_rr_get_interval(0, &interval) == 0 && interval.tv_sec == 0 &&
+              interval.tv_nsec == 0, "sched_rr_get_interval non-RR policy");
     check(membarrier(MEMBARRIER_CMD_QUERY, 0) == 0,
           "membarrier feature query");
 
@@ -292,6 +536,87 @@ int main(void) {
               !strcmp(uts.nodename, "syscall-smoke") &&
               !strcmp(uts.domainname, "vinix.test"),
           "uname hostname and domainname");
+
+    const char *mount_dir = "/tmp/aarch64-syscall-mount";
+    int mount_ready = mkdir(mount_dir, 0700) == 0 &&
+                      syscall(SYS_mount, "", mount_dir, "tmpfs", 0, NULL) == 0;
+    check(mount_ready, "root mount accepts copied strings");
+    if (mount_ready) {
+        int mounted_file = open("/tmp/aarch64-syscall-mount/probe", O_CREAT | O_RDWR, 0600);
+        check(mounted_file >= 0, "mounted tmpfs remains usable");
+        if (mounted_file >= 0)
+            close(mounted_file);
+    }
+
+    check(mount_rejects_bad_strings(), "root mount checks userspace strings");
+
+    pid_t security_child = fork();
+    if (security_child == 0) {
+        if (setuid(1000) != 0 || geteuid() != 1000) {
+            printf("security child: setuid failed, euid=%u errno=%d\n",
+                   (unsigned)geteuid(), errno);
+            fflush(stdout);
+            _exit(1);
+        }
+        if (!failed_with_errno(setuid(0), EPERM, "regain root after setuid") ||
+            getuid() != 1000 || geteuid() != 1000)
+            _exit(2);
+        _exit(denied_operations() ? 0 : 3);
+    }
+    check(security_child_succeeded(security_child),
+          "privileged selectors deny non-root callers");
+
+    pid_t effective_child = fork();
+    if (effective_child == 0) {
+        if (setresuid((uid_t)-1, 1000, (uid_t)-1) != 0 ||
+            getuid() != 0 || geteuid() != 1000)
+            _exit(1);
+        _exit(denied_operations() ? 0 : 2);
+    }
+    check(security_child_succeeded(effective_child),
+          "real root with non-root euid is denied");
+    check(uname(&uts) == 0 && !strcmp(uts.nodename, "syscall-smoke") &&
+              !strcmp(uts.domainname, "vinix.test"),
+          "denied name changes leave system state intact");
+
+    pid_t root_effective_child = fork();
+    if (root_effective_child == 0) {
+        if (setresuid(1000, 0, 0) != 0 || getuid() != 1000 || geteuid() != 0)
+            _exit(1);
+        if (sethostname("syscall-smoke", 13) != 0 ||
+            syscall(SYS_setdomainname, "vinix.test", 10) != 0 ||
+            (mount_ready && syscall(SYS_umount2, mount_dir, 0) != 0) ||
+            !failed_with_errno(syscall(SYS_reboot, 0, 0, 0, NULL), EINVAL, "root reboot invalid magic"))
+            _exit(2);
+        _exit(0);
+    }
+    check(security_child_succeeded(root_effective_child),
+          "non-root real uid with root euid is allowed");
+    if (mount_ready)
+        check(access("/tmp/aarch64-syscall-mount/probe", F_OK) != 0,
+              "root umount2 detaches the mount");
+
+    // A directory removed while it is the working directory is still there
+    // to stand in: it has no links and nothing can be made in it.
+    const char *removed_dir = "/tmp/aarch64-syscall-removed";
+    char previous_cwd[256];
+    struct stat removed_stat;
+    int removed_ok = getcwd(previous_cwd, sizeof(previous_cwd)) != NULL &&
+                     mkdir(removed_dir, 0755) == 0 && chdir(removed_dir) == 0 &&
+                     rmdir(removed_dir) == 0;
+    removed_ok = removed_ok && stat(".", &removed_stat) == 0 &&
+                 removed_stat.st_nlink == 0;
+    removed_ok = removed_ok &&
+                 failed_with_errno(open("file", O_CREAT | O_WRONLY, 0644), ENOENT,
+                                   "create in removed directory") &&
+                 failed_with_errno(mkdir("dir", 0755), ENOENT,
+                                   "mkdir in removed directory");
+    check(removed_ok, "removed working directory stays usable");
+    check(xattr_operations(), "extended attributes on tmpfs");
+    check(special_node_numbers(), "mknod nodes have inode numbers");
+    check(overlay_semantics(), "overlay mount");
+    if (chdir(previous_cwd) != 0)
+        chdir("/");
 
     close(fd);
     unlink(path);

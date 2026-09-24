@@ -25,6 +25,7 @@ void vinix_net_detach(void);
 int vinix_net_input(const void *frame, size_t length);
 int vinix_net_config(uint32_t *address, uint32_t *netmask, uint32_t *gateway,
                      uint32_t dns[3]);
+int vinix_net_link(uint8_t mac[6], uint32_t *mtu);
 
 struct vinix_socket *vinix_socket_new(int type, int protocol);
 void vinix_socket_free(struct vinix_socket *socket);

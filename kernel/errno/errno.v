@@ -139,6 +139,11 @@ pub const enotrecoverable = 131
 pub const erfkill = 132
 pub const ehwpoison = 133
 
+// Never seen by userspace: a syscall that a signal interrupted before it had
+// done anything asks with this to be run again once the signal has been dealt
+// with, which the architecture's syscall exit turns into a restart or EINTR.
+pub const erestartsys = 512
+
 pub fn get() u64 {
 	return proc.current_thread().errno
 }
