@@ -277,6 +277,7 @@ fn kmain_thread(qemu_platform bool, acpi_platform bool) {
 	table.init_container_syscalls()
 	// cgroup.kill sends a signal, which lives above fs; hand it the entry point.
 	fs.set_cgroup_signal_hook(voidptr(userland.cgroup_kill_process))
+	sched.register_user_signal_hook(voidptr(userland.dispatch_fatal_signal))
 	print('kmain_thread: syscall table done\n')
 
 	// Register segfault handler so user-space crashes kill the process

@@ -281,6 +281,36 @@ pub fn dispatch_a_signal(context &cpulocal.GPRState) {
 	dispatch_a_signal_with_fault(context, false, 0, 0)
 }
 
+// The part of signal delivery that may happen at any instruction: a signal
+// whose action is to end the process. The scheduler tick calls this for a
+// thread it has interrupted in userspace, so a loop that makes no syscalls can
+// still be killed. A signal with a handler waits for the thread's next
+// syscall, as before: running a handler at an arbitrary instruction would need
+// the frame to carry the FP/SIMD registers, which it does not.
+pub fn dispatch_fatal_signal(_ &cpulocal.GPRState) {
+	t := proc.current_thread()
+	if unsafe { t == nil } {
+		return
+	}
+	pending := katomic.load(&t.pending_signals)
+	if pending & (u64(1) << (sigkill - 1)) != 0 {
+		exit_with_fatal_signal(u8(sigkill))
+	}
+	for i := u8(0); i < 64; i++ {
+		bit := u64(1) << i
+		if pending & bit == 0 || t.masked_signals & bit != 0 {
+			continue
+		}
+		signum := int(i) + 1
+		if t.sigactions[signum].sa_sigaction != sig_dfl || has_default_ignore_action(signum)
+			|| signum == sigcont || signum == sigstop || signum == sigtstp
+			|| signum == sigttin || signum == sigttou {
+			continue
+		}
+		exit_with_fatal_signal(u8(signum))
+	}
+}
+
 const linux_sa_restart = 0x10000000
 
 // A syscall that a signal interrupted before it had done anything returns

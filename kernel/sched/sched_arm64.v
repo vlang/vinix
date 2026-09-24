@@ -553,6 +553,36 @@ fn realtime_work_pending(cpu_number u64) bool {
 	return false
 }
 
+__global (
+	user_signal_hook voidptr
+)
+
+type UserSignalHook = fn (&cpulocal.GPRState)
+
+// userland registers its fatal-signal dispatch here; it cannot be imported.
+pub fn register_user_signal_hook(hook voidptr) {
+	user_signal_hook = hook
+}
+
+// A thread that never makes a syscall -- a loop that only computes -- would
+// otherwise never take a signal, since the syscall exit and the fault handlers
+// are the only places one is delivered: kill -9 could not stop it, and a
+// container spinning like that could never be removed. So a tick that
+// interrupts a thread in userspace ends it if it has a fatal signal pending.
+// `state` is the frame the thread was interrupted in.
+fn deliver_signal_on_tick(t &proc.Thread, state &cpulocal.GPRState) {
+	if user_signal_hook == unsafe { nil } || state.pstate & 0xf != 0 {
+		return
+	}
+	// SIGKILL gets through whatever the mask says.
+	deliverable := ~t.masked_signals | (u64(1) << 8)
+	if katomic.load(&t.pending_signals) & deliverable == 0 {
+		return
+	}
+	hook := unsafe { UserSignalHook(user_signal_hook) }
+	hook(state)
+}
+
 // Pick a thread for this CPU. On a machine with more than one memory node this
 // runs twice: once accepting only threads already at home on this CPU's node,
 // and then accepting anything. A thread therefore tends to keep running next to
@@ -825,6 +855,9 @@ fn scheduler_timer_handler(_gpr_state voidptr) {
 	// below, so a thread that has just run out of budget is passed over on the
 	// scan it has run out on rather than on the next.
 	account_realtime_time(cpu_local.cpu_number, current_thread, now_ns)
+	if unsafe { current_thread != 0 } && unsafe { _gpr_state != nil } {
+		deliver_signal_on_tick(current_thread, gpr_state)
+	}
 	if trace_gpu_dispatch {
 		println('exec[gpu]/sched: realtime accounting complete; selecting run-queue thread')
 	}
