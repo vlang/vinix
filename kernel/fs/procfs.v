@@ -81,6 +81,13 @@ pub mut:
 	pid  int
 	tid  int
 	text string
+	// A /proc/<pid> or /proc/<pid>/task/<tid> directory is filled in the first
+	// time something looks inside it. Building every entry of every process
+	// and thread on each refresh of /proc cost a few hundred nodes per Go
+	// program, which outlive the process: pruning cannot free nodes a
+	// concurrent path walk may still be standing on.
+	lazy      bool
+	populated bool
 }
 
 struct ProcFS {}
@@ -665,11 +672,21 @@ pub fn procfs_refresh(node &VFSNode) {
 	if !is_procfs_resource(target.resource) {
 		return
 	}
-	directory := unsafe { &ProcFSResource(target.resource) }
+	mut directory := unsafe { &ProcFSResource(target.resource) }
 
 	procfs_lock.acquire()
 	defer {
 		procfs_lock.release()
+	}
+
+	if directory.lazy && !directory.populated {
+		directory.populated = true
+		if directory.tid == 0 {
+			populate_process_directory(mut target, directory.pid)
+		} else {
+			add_process_entries(mut target, directory.pid)
+		}
+		return
 	}
 
 	if voidptr(target) == voidptr(procfs_root) {
@@ -699,6 +716,11 @@ pub fn procfs_lookup_refresh(node &VFSNode, name string) {
 		procfs_refresh(node)
 		return
 	}
+	// A process directory is filled in on first use; do that before looking
+	// at what it holds.
+	if name !in node.children {
+		procfs_refresh(node)
+	}
 	if directory.pid != 0 && name in ['exe', 'cwd', 'root'] && name in node.children {
 		mut link := unsafe { node.children[name] }
 		match name {
@@ -716,10 +738,6 @@ pub fn procfs_lookup_refresh(node &VFSNode, name string) {
 		if link.magic_target != unsafe { nil } {
 			link.symlink_target = pathname(link.magic_target)
 		}
-		return
-	}
-	if name !in node.children {
-		procfs_refresh(node)
 	}
 }
 
@@ -762,13 +780,18 @@ fn refresh_process_directories(mut root VFSNode) {
 fn add_process_directory(mut root VFSNode, pid int) {
 	name := '${pid}'
 	mut node := create_node(root.filesystem, root, name, true)
-	node.resource = new_procfs_resource(.directory, stat.ifdir | 0o555, pid, 0)
+	mut directory := new_procfs_resource(.directory, stat.ifdir | 0o555, pid, 0)
+	directory.lazy = true
+	node.resource = directory
 	node.create_dotentries(root)
 	unsafe {
 		root.children[name] = node
 		root.resource.stat.nlink++
 	}
+}
 
+// What a /proc/<pid> directory holds, made the first time it is looked in.
+fn populate_process_directory(mut node VFSNode, pid int) {
 	add_process_entries(mut node, pid)
 
 	mut task := add_procfs_directory(mut node, 'task')
@@ -800,6 +823,9 @@ fn add_process_entries(mut node VFSNode, pid int) {
 	mut root_link := create_node(node.filesystem, node, 'root', false)
 	root_link.resource = new_procfs_resource(.symlink, stat.iflnk | 0o777, pid, 0)
 	root_link.magic_target = process_root_node(pid)
+	if root_link.magic_target != unsafe { nil } {
+		root_link.symlink_target = pathname(root_link.magic_target)
+	}
 	unsafe {
 		node.children['root'] = root_link
 	}
@@ -807,6 +833,9 @@ fn add_process_entries(mut node VFSNode, pid int) {
 	mut cwd_link := create_node(node.filesystem, node, 'cwd', false)
 	cwd_link.resource = new_procfs_resource(.symlink, stat.iflnk | 0o777, pid, 0)
 	cwd_link.magic_target = process_cwd_node(pid)
+	if cwd_link.magic_target != unsafe { nil } {
+		cwd_link.symlink_target = pathname(cwd_link.magic_target)
+	}
 	unsafe {
 		node.children['cwd'] = cwd_link
 	}
@@ -959,13 +988,14 @@ fn refresh_thread_directories(mut task VFSNode, pid int) {
 			continue
 		}
 		mut node := create_node(task.filesystem, task, name, true)
-		node.resource = new_procfs_resource(.directory, stat.ifdir | 0o555, pid, tid)
+		mut directory := new_procfs_resource(.directory, stat.ifdir | 0o555, pid, tid)
+		directory.lazy = true
+		node.resource = directory
 		node.create_dotentries(task)
 		unsafe {
 			task.children[name] = node
 			task.resource.stat.nlink++
 		}
-		add_process_entries(mut node, pid)
 	}
 	prune_directories(mut task, live)
 }
