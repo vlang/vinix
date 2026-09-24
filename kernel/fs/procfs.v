@@ -598,6 +598,7 @@ fn (mut this ProcFSResource) write(_handle voidptr, buf voidptr, _loc u64, count
 			if count > 0 && unsafe { *&u8(buf) } == `t` {
 				proc.dump_tasks()
 			}
+
 			return i64(count)
 		}
 		.sysctl {
@@ -818,7 +819,7 @@ pub fn procfs_lookup_refresh(node &VFSNode, name string) {
 		mut link := unsafe { node.children[name] }
 		match name {
 			'exe' {
-				link.symlink_target = proc.process_program(directory.pid)
+				set_link_text(mut link, proc.process_program(directory.pid))
 				link.magic_target = process_exe_node(directory.pid)
 			}
 			'cwd' {
@@ -829,9 +830,21 @@ pub fn procfs_lookup_refresh(node &VFSNode, name string) {
 			}
 		}
 		if link.magic_target != unsafe { nil } {
-			link.symlink_target = pathname(link.magic_target)
+			set_link_text(mut link, pathname(link.magic_target))
 		}
 	}
+}
+
+// Give a link freshly made text, keeping what it has if that is the same.
+// Links are looked up on every path walk through them and nearly always say
+// what they said before, so the new copy is the one freed. A changed text
+// leaves the old one behind: a readlink on another CPU may be copying it.
+fn set_link_text(mut link VFSNode, text string) {
+	if link.symlink_target == text {
+		unsafe { text.free() }
+		return
+	}
+	link.symlink_target = text
 }
 
 fn is_procfs_resource(res &resource.Resource) bool {
@@ -1030,12 +1043,14 @@ fn refresh_fd_directory(mut descriptors VFSNode, pid int) {
 	for index, fdnum in live {
 		name := '${fdnum}'
 		target := nodes[index]
-		text := if target == unsafe { nil } { texts[index] } else { descriptor_link_text(target) }
+		// A copy of the kind-and-inode text: freeing `texts` frees the strings
+		// in it, and the link keeps this one.
+		text := if target == unsafe { nil } { texts[index].clone() } else { descriptor_link_text(target) }
 		if name in descriptors.children {
 			mut existing := unsafe { descriptors.children[name] }
 			existing.redir = unsafe { nil }
 			existing.magic_target = target
-			existing.symlink_target = text
+			set_link_text(mut existing, text)
 			continue
 		}
 		// A magic link rather than a stored pathname: following it leads to
