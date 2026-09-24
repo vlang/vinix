@@ -101,6 +101,9 @@ pub mut:
 	// Set on the way out of a syscall that is being rewound to run again, for
 	// the signal dispatched next to take back if its handler wants EINTR.
 	restarting_syscall bool
+	// Set by a sibling's exit_group() or execve(): leave at the next return to
+	// userspace, once the syscall in progress has unwound.
+	must_exit bool
 }
 
 pub fn (t &Thread) current_syscall() (i64, u64) {

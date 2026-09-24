@@ -19,6 +19,7 @@ import posixtimer
 import proc
 import sched
 import term
+import time
 import usercopy
 
 // clone(2) flags. Only the ones that change what we build are listed.
@@ -513,11 +514,76 @@ fn encode_fatal_signal(signal u8) int {
 	return int(signal) & 0x7f
 }
 
-// Stop every other thread of the process for good. They are never resumed, so
-// they must not keep a run queue slot or be reachable by tid. Their kernel
-// stacks are deliberately left allocated: one of them may still be parked
-// mid-syscall on its own stack, and there is no safe moment to free it here.
+// How long exit_group() and execve() give the other threads to leave on their
+// own before stopping whatever is still running.
+const sibling_exit_grace_ns = u64(500000000)
+
+// A thread told to go by a sibling's exit_group() or execve() leaves here, on
+// its way back to userspace, after the syscall it was in has unwound and given
+// back what it held.
+pub fn exit_if_told_to() {
+	t := proc.current_thread()
+	if t == unsafe { nil } || !katomic.load(&t.must_exit) {
+		return
+	}
+	thread_exit(0, false)
+}
+
+fn has_other_threads(mut process proc.Process, current_thread &proc.Thread) bool {
+	process.threads_lock.acquire()
+	defer {
+		process.threads_lock.release()
+	}
+	for t in process.threads {
+		if voidptr(t) != voidptr(current_thread) {
+			return true
+		}
+	}
+	return false
+}
+
+// Get every other thread of the process out, for good. Each is told to exit and
+// woken if it is waiting, so that one blocked in the kernel unwinds its
+// syscall -- giving back the descriptors, references and memory that syscall
+// holds -- and leaves by itself on the way back to userspace. Stopping them where they
+// stood leaked all of that: a Go program exits with a thread parked in
+// epoll_pwait, and each one left references on the sockets and pipes it was
+// watching, which then never closed, plus the thread's own kernel stack.
+//
+// A thread that does not leave within the grace period -- one busy in
+// userspace, which holds nothing of the kernel's -- is stopped where it is.
+// Its kernel stack is deliberately left allocated: it may still be parked
+// mid-syscall on it, and there is no safe moment to free it here.
 fn kill_sibling_threads(mut current_process proc.Process, current_thread &proc.Thread) {
+	current_process.threads_lock.acquire()
+	mut others := []&proc.Thread{}
+	for t in current_process.threads {
+		if voidptr(t) != voidptr(current_thread) {
+			others << t
+		}
+	}
+	current_process.threads_lock.release()
+	for mut other in others {
+		katomic.store(mut &other.must_exit, true)
+		sched.enqueue_thread(other, true)
+	}
+	unsafe { others.free() }
+
+	deadline := time.monotonic_ns() + sibling_exit_grace_ns
+	for has_other_threads(mut current_process, current_thread) && time.monotonic_ns() < deadline {
+		mut timer := time.new_timer(time.TimeSpec{
+			tv_sec:  0
+			tv_nsec: 1000000
+		})
+		mut timer_events := [&timer.event]
+		event.await(mut timer_events, true) or {}
+		timer.disarm()
+		unsafe {
+			timer_events.free()
+			free(timer)
+		}
+	}
+
 	current_process.threads_lock.acquire()
 	mut victims := []&proc.Thread{}
 	for t in current_process.threads {
@@ -533,6 +599,14 @@ fn kill_sibling_threads(mut current_process proc.Process, current_thread &proc.T
 		katomic.store(mut &victim.is_dead, true)
 		sched.intercept_thread(victim) or {}
 		sched.dequeue_thread(victim)
+		// It may still be on another CPU finishing what it was doing; the
+		// descriptors and address space it could reach are torn down next.
+		for n := 0; n < 1000000 && katomic.load(&victim.running_on) != u64(-1); n++ {
+			asm volatile aarch64 {
+				yield
+				; ; ; memory
+			}
+		}
 		sched.set_itimer_real(victim, 0, 0)
 		// A thread that split off its own root and mount namespace -- runc
 		// keeps one in the container's namespace for opening mount sources --

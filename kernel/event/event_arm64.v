@@ -126,7 +126,9 @@ fn await_internal(mut events []&eventstruct.Event, block bool, watch_generation 
 		return watched_index
 	}
 
-	if block == false {
+	// A thread its process has told to exit must not go to sleep again: the
+	// sibling tearing the process down is waiting for it to unwind and leave.
+	if block == false || katomic.load(&t.must_exit) {
 		unlock_events(mut events)
 		return none
 	}
@@ -169,7 +171,7 @@ fn await_internal(mut events []&eventstruct.Event, block bool, watch_generation 
 	}
 	// Child exit raises an event and SIGCHLD together. If both wake this wait,
 	// retain the consumed event; otherwise waitpid loses the zombie forever.
-	if interrupted_by_signal && t.which_event == u64(-1) {
+	if (interrupted_by_signal || katomic.load(&t.must_exit)) && t.which_event == u64(-1) {
 		return none
 	}
 

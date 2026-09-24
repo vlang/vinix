@@ -969,6 +969,14 @@ pub fn start_program_node(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, p
 		mut curr_process := t.process
 		gpu_exec_trace(trace_gpu, 'beginning process image replacement')
 
+		// Every other thread has to be gone before the address space they are
+		// running in is replaced -- and before the close-on-exec descriptors
+		// go, as on Linux: a sibling unwinding a syscall still reaches the
+		// descriptor it was called on.
+		gpu_exec_trace(trace_gpu, 'stopping sibling threads')
+		kill_sibling_threads(mut curr_process, t)
+		gpu_exec_trace(trace_gpu, 'sibling threads stopped')
+
 		// Close O_CLOEXEC file descriptors before exec.
 		// This is critical for pipe EOF detection: popen creates pipes
 		// with O_CLOEXEC, and leaked FDs prevent pipe refcount from
@@ -984,12 +992,6 @@ pub fn start_program_node(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, p
 			}
 		}
 		gpu_exec_trace(trace_gpu, 'closed close-on-exec descriptors')
-
-		// Every other thread has to be off the CPUs before the address space
-		// they are running in is replaced.
-		gpu_exec_trace(trace_gpu, 'stopping sibling threads')
-		kill_sibling_threads(mut curr_process, t)
-		gpu_exec_trace(trace_gpu, 'sibling threads stopped')
 		gpu_exec_trace(trace_gpu, 'removing process timers')
 		posixtimer.remove_process_timers(curr_process)
 		gpu_exec_trace(trace_gpu, 'process timers removed')
