@@ -48,6 +48,21 @@ jobs:
       - name: Boot it
         run: sudo --preserve-env=PATH ./test-iso.sh --no-qemu --virtualbox --timeout=600 --out=test iso/vinix-amd64.iso
 
+      # The test runs as root and leaves root-only files, which the upload
+      # below cannot read; the first release's screenshots were lost that way.
+      # Print the end of the serial log as well, so a failure shows up in the
+      # job log even without downloading anything.
+      - name: Collect the results
+        if: always()
+        run: |
+          sudo chown -R "$(id -u):$(id -g)" test || true
+          chmod -R a+rX test || true
+          for log in test/*/serial.log; do
+            [ -f "$log" ] || continue
+            echo "==> $log"
+            tail -n 60 "$log" | tr -cd '\11\12\15\40-\176'
+          done
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
