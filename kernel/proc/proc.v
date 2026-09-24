@@ -328,6 +328,8 @@ __global (
 	processes      [max_pid]&Process
 	threads_by_tid [max_pid]&Thread
 	pid_lock       klock.Lock
+	// Where the search for the next free id starts. Called with pid_lock held.
+	next_id_cursor = int(1)
 )
 
 // A process group or a session outlives the process that named it: the leader
@@ -349,14 +351,24 @@ fn id_is_a_live_group(id int) bool {
 	return false
 }
 
+// Ids are handed out in increasing order and wrap at max_pid, as on Linux, so
+// one is not reused until the others have had their turn. Taking the lowest
+// free id instead gave a process that had just died's pid to the next one
+// started, within moments. Whatever still watches the old pid then acts on the
+// new process: busybox timeout's watcher polls kill(parent, 0) to see whether
+// the command it guards has finished, kept seeing the recycled pid alive, and
+// at the deadline sent its SIGTERM to an unrelated process -- a container
+// shim, runc, the docker client.
 fn find_free_id() ?int {
-	for i := int(1); i < max_pid; i++ {
+	for n := 0; n < max_pid - 1; n++ {
+		i := (next_id_cursor - 1 + n) % (max_pid - 1) + 1
 		if processes[i] != unsafe { nil } || threads_by_tid[i] != unsafe { nil } {
 			continue
 		}
 		if id_is_a_live_group(i) {
 			continue
 		}
+		next_id_cursor = if i + 1 >= max_pid { 1 } else { i + 1 }
 		return i
 	}
 	return none
