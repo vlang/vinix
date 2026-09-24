@@ -419,7 +419,14 @@ pub fn syscall_epoll_pwait(_ voidptr, epfd int, events_buf u64, maxevents int, t
 			return 0, 0
 		}
 		// A wake with nothing ready: the set changed, or a watched resource
-		// did in a way that is not being waited for. Look again.
+		// did in a way that is not being waited for. Look again -- unless a
+		// signal is waiting to be taken, which only the way out delivers, as
+		// Linux's ep_poll() looks before every pass. An event that kept firing
+		// with nothing ready kept postgres's processes looping here with a
+		// SIGTERM pending for good, and a shutdown never finished.
+		if t.pending_signals & ~t.masked_signals != 0 {
+			return errno.err, errno.eintr
+		}
 	}
 
 	return 0, 0

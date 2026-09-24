@@ -177,6 +177,15 @@ fn await_internal(mut events []&eventstruct.Event, block bool, watch_generation 
 		unlock_events(mut events)
 		return none
 	}
+	// Nor go to sleep with a signal it does not block already pending: the wait
+	// ends as interrupted, as Linux's signal_pending() check ends it. A signal
+	// sent while the thread was not asleep had nothing to wake, and the next
+	// wait slept through it for as long as its timeout, or for good: none of
+	// postgres's processes saw the SIGTERM of a shutdown.
+	if t.pending_signals & ~t.masked_signals != 0 {
+		unlock_events(mut events)
+		return none
+	}
 
 	katomic.inc(mut &waiting_event_count)
 	t.which_event = u64(-1)
