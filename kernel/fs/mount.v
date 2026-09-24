@@ -433,7 +433,7 @@ fn new_mount(parent &VFSNode, source string, target string, fstype string, flags
 
 	mut source_node := &VFSNode(unsafe { nil })
 	if source.len != 0 && kind !in pseudo_filesystems {
-		_, source_node, _ = path2node(parent, source)
+		_, source_node, _ = walk_path(parent, source, 0, true)
 		if voidptr(source_node) == unsafe { nil } {
 			errno.set(errno.enoent)
 			return none
@@ -528,7 +528,7 @@ fn mount_devpts(parent &VFSNode, target string, flags u64, options string) ? {
 	} else {
 		pts = internal_create(devtmpfs_root, 'pts', stat.ifdir | 0o755)?
 	}
-	_, mut target_node, _ := path2node(parent, target)
+	_, mut target_node, _ := walk_path(parent, target, 0, true)
 	if target_node == unsafe { nil } {
 		errno.set(errno.enoent)
 		return none
@@ -554,7 +554,7 @@ fn mount_devpts(parent &VFSNode, target string, flags u64, options string) ? {
 // recursive one.
 fn bind_mount(parent &VFSNode, source string, target string, flags u64) ? {
 	source_node := get_node(parent, source, true)?
-	_, mut target_node, _ := path2node(parent, target)
+	_, mut target_node, _ := walk_path(parent, target, 0, true)
 	if target_node == unsafe { nil } {
 		errno.set(errno.enoent)
 		return none
@@ -627,7 +627,7 @@ fn move_mount(parent &VFSNode, source string, target string) ? {
 		errno.set(errno.einval)
 		return none
 	}
-	_, mut target_node, _ := path2node(parent, target)
+	_, mut target_node, _ := walk_path(parent, target, 0, true)
 	if target_node == unsafe { nil } {
 		errno.set(errno.enoent)
 		return none

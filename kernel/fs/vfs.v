@@ -123,7 +123,7 @@ fn reduce_node_bounded(node &VFSNode, follow_symlinks bool, depth int, effective
 			errno.set(errno.enoent)
 			return 0
 		}
-		_, next_node, _ := path2node_bounded(node.parent, target, depth + 1, effective)
+		_, next_node, _ := walk_path(node.parent, target, depth + 1, effective)
 		if unsafe { next_node == 0 } {
 			return 0
 		}
@@ -131,7 +131,7 @@ fn reduce_node_bounded(node &VFSNode, follow_symlinks bool, depth int, effective
 	}
 	if node.symlink_target.len != 0 && follow_symlinks == true {
 		target := node.symlink_target
-		_, next_node, _ := path2node_bounded(node.parent, target, depth + 1,
+		_, next_node, _ := walk_path(node.parent, target, depth + 1,
 			effective)
 		if unsafe { next_node == 0 } {
 			return 0
@@ -141,11 +141,17 @@ fn reduce_node_bounded(node &VFSNode, follow_symlinks bool, depth int, effective
 	return unsafe { node }
 }
 
+// Resolve `path`, returning the directory it ends in, the node it names (nil
+// when that does not exist yet) and its final component. The component is the
+// caller's to keep -- it names the node a create makes -- so it is a copy.
 fn path2node(parent &VFSNode, path string) (&VFSNode, &VFSNode, string) {
-	return path2node_bounded(parent, path, 0, true)
+	parent_of, node, basename := walk_path(parent, path, 0, true)
+	return parent_of, node, basename.clone()
 }
 
-fn path2node_bounded(parent &VFSNode, path string, depth int, effective bool) (&VFSNode, &VFSNode, string) {
+// path2node for callers that only want the nodes. The final component it
+// returns points into `path`.
+fn walk_path(parent &VFSNode, path string, depth int, effective bool) (&VFSNode, &VFSNode, string) {
 	if depth > 64 { errno.set(errno.eloop); return 0, 0, '' }
 	if path.len > 4096 { errno.set(errno.einval); return 0, 0, '' }
 	if path.len == 0 {
@@ -166,25 +172,20 @@ fn path2node_bounded(parent &VFSNode, path string, depth int, effective bool) (&
 	}
 
 	for {
-		mut elem := []u8{}
-		defer {
-			unsafe { elem.free() }
-		}
-
+		start := index
 		for index < path.len && path[index] != `/` {
-			elem << path[index]
 			index++
 		}
-
-		elem << 0
+		// A view into `path`, not a copy: looking a name up needs none, and
+		// the copies made here for every component of every path were never
+		// freed.
+		elem_str := unsafe { tos(path.str + start, int(index - start)) }
 
 		for index < path.len && path[index] == `/` {
 			index++
 		}
 
 		last := index == u64(path.len)
-
-		elem_str := unsafe { cstring_to_vstring(&elem[0]) }
 
 		current_node = reduce_node_bounded(current_node, false, depth + 1, effective)
 
@@ -254,13 +255,18 @@ fn get_parent_dir(dirfd int, path string) ?&VFSNode {
 		if dirfd == at_fdcwd {
 			parent = unsafe { &VFSNode(proc.current_directory_of(current_process)) }
 		} else {
-			dir_fd := file.fd_from_fdnum(current_process, dirfd) or { return none }
+			// The lookup's reference is given back once the directory's node
+			// is known; nodes outlive the descriptors that name them. Keeping
+			// it held every directory any *at() call had named open for good.
+			mut dir_fd := file.fd_from_fdnum(current_process, dirfd) or { return none }
 			dir_handle := dir_fd.handle
 			if stat.isdir(dir_handle.resource.stat.mode) == false {
+				dir_fd.unref()
 				errno.set(errno.enotdir)
 				return none
 			}
 			parent = unsafe { &VFSNode(dir_handle.node) }
+			dir_fd.unref()
 		}
 	}
 
@@ -273,7 +279,7 @@ pub fn get_node(parent &VFSNode, path string, follow_links bool) ?&VFSNode {
 
 fn get_node_with_credentials(parent &VFSNode, path string, follow_links bool,
 	effective bool) ?&VFSNode {
-	_, node, _ := path2node_bounded(parent, path, 0, effective)
+	_, node, _ := walk_path(parent, path, 0, effective)
 	if voidptr(node) == unsafe { nil } {
 		return none
 	}
@@ -373,7 +379,7 @@ pub fn link(parent &VFSNode, dest string, target string) ?&VFSNode {
 		return none
 	}
 
-	_, mut dest_node, _ := path2node(calling_root(), dest)
+	_, mut dest_node, _ := walk_path(calling_root(), dest, 0, true)
 	if dest_node == unsafe { nil } { return none }
 	if dest_node.read_only { errno.set(errno.erofs); return none }
 
@@ -530,6 +536,9 @@ pub fn syscall_unlinkat(_ voidptr, dirfd int, _path charptr, flags int) (u64, u6
 	}
 
 	path := user_path(_path) or { return errno.err, errno.get() }
+	defer {
+		unsafe { path.free() }
+	}
 
 	if path.len == 0 {
 		return errno.err, errno.enoent
@@ -554,6 +563,9 @@ pub fn syscall_rmdirat(_ voidptr, dirfd int, _path charptr) (u64, u64) {
 	}
 
 	path := user_path(_path) or { return errno.err, errno.get() }
+	defer {
+		unsafe { path.free() }
+	}
 
 	if path.len == 0 {
 		return errno.err, errno.enoent
@@ -576,6 +588,9 @@ pub fn syscall_mkdirat(_ voidptr, dirfd int, _path charptr, mode u32) (u64, u64)
 	}
 
 	path := user_path(_path) or { return errno.err, errno.get() }
+	defer {
+		unsafe { path.free() }
+	}
 
 	if path.len == 0 {
 		return errno.err, errno.enoent
@@ -639,6 +654,9 @@ pub fn syscall_readlinkat(_ voidptr, dirfd int, _path charptr, buf voidptr, limi
 	}
 
 	path := user_path(_path) or { return errno.err, errno.get() }
+	defer {
+		unsafe { path.free() }
+	}
 
 	if path.len == 0 {
 		return errno.err, errno.enoent
@@ -690,6 +708,10 @@ pub fn syscall_openat(_ voidptr, dirfd int, _path charptr, flags int, mode u32) 
 	}
 
 	path := user_path(_path) or { return errno.err, errno.get() }
+	// Nothing keeps the path: a node created from it takes a copy of its name.
+	defer {
+		unsafe { path.free() }
+	}
 
 	if path.len == 0 {
 		return errno.err, errno.enoent
@@ -930,6 +952,9 @@ pub fn syscall_faccessat(_ voidptr, dirfd int, _path charptr, mode u32, flags in
 	}
 
 	path := user_path(_path) or { return errno.err, errno.get() }
+	defer {
+		unsafe { path.free() }
+	}
 	if mode & ~u32(7) != 0 || flags & ~(at_eaccess | at_symlink_nofollow) != 0 {
 		return errno.err, errno.einval
 	}
@@ -964,6 +989,9 @@ pub fn syscall_fstatat(_ voidptr, dirfd int, _path charptr, statbuf &stat.Stat, 
 	current_process := proc.current_thread().process
 
 	path := user_path(_path) or { return errno.err, errno.get() }
+	defer {
+		unsafe { path.free() }
+	}
 
 	mut statsrc := &stat.Stat(unsafe { nil })
 
@@ -976,8 +1004,15 @@ pub fn syscall_fstatat(_ voidptr, dirfd int, _path charptr, statbuf &stat.Stat, 
 			node := unsafe { &VFSNode(proc.current_directory_of(current_process)) }
 			statsrc = &node.resource.stat
 		} else {
-			fd := file.fd_from_fdnum(current_process, dirfd) or { return errno.err, errno.get() }
-			statsrc = &fd.handle.resource.stat
+			// The lookup holds the descriptor, which has to be given back.
+			mut fd := file.fd_from_fdnum(current_process, dirfd) or {
+				return errno.err, errno.get()
+			}
+			unsafe {
+				*statbuf = fd.handle.resource.stat
+			}
+			fd.unref()
+			return 0, 0
 		}
 	} else {
 		parent := get_parent_dir(dirfd, path) or { return errno.err, errno.get() }
@@ -1035,7 +1070,7 @@ pub fn syscall_linkat(_ voidptr, olddirfd int, _oldpath charptr, newdirfd int, _
 
 	oldbase := get_parent_dir(olddirfd, oldpath) or { return errno.err, errno.get() }
 	newbase := get_parent_dir(newdirfd, newpath) or { return errno.err, errno.get() }
-	oldparent, found_old_node, _ := path2node(oldbase, oldpath)
+	oldparent, found_old_node, _ := walk_path(oldbase, oldpath, 0, true)
 	mut newparent, found_new_node, basename := path2node(newbase, newpath)
 	if unsafe { oldparent == nil } || unsafe { found_old_node == nil } {
 		return errno.err, errno.enoent
@@ -1112,6 +1147,9 @@ pub fn syscall_fchmod(_ voidptr, fdnum int, mode u32) (u64, u64) {
 
 pub fn syscall_fchmodat(_ voidptr, dirfd int, _path charptr, mode u32) (u64, u64) {
 	path := user_path(_path) or { return errno.err, errno.get() }
+	defer {
+		unsafe { path.free() }
+	}
 	if path.len == 0 {
 		return errno.err, errno.enoent
 	}
@@ -1148,6 +1186,9 @@ pub fn syscall_chdir(_ voidptr, _path charptr) (u64, u64) {
 	}
 
 	path := user_path(_path) or { return errno.err, errno.get() }
+	defer {
+		unsafe { path.free() }
+	}
 
 	if path.len == 0 {
 		return errno.err, errno.enoent
@@ -1607,6 +1648,9 @@ pub fn syscall_truncate(_ voidptr, _path charptr, length i64) (u64, u64) {
 	}
 
 	path := user_path(_path) or { return errno.err, errno.get() }
+	defer {
+		unsafe { path.free() }
+	}
 	if path.len == 0 {
 		return errno.err, errno.enoent
 	}
@@ -1661,6 +1705,9 @@ fn change_owner(mut res resource.Resource, uid u32, gid u32) ? {
 
 pub fn syscall_fchownat(_ voidptr, dirfd int, _path charptr, uid u32, gid u32, flags int) (u64, u64) {
 	path := user_path(_path) or { return errno.err, errno.get() }
+	defer {
+		unsafe { path.free() }
+	}
 
 	mut process := proc.current_thread().process
 
@@ -1729,6 +1776,9 @@ pub fn syscall_fchown(_ voidptr, fdnum int, uid u32, gid u32) (u64, u64) {
 // one filesystem this kernel has anything to say about.
 pub fn syscall_statfs(_ voidptr, _path charptr, buf u64) (u64, u64) {
 	path := user_path(_path) or { return errno.err, errno.get() }
+	defer {
+		unsafe { path.free() }
+	}
 	if path.len == 0 {
 		return errno.err, errno.enoent
 	}
@@ -1788,6 +1838,9 @@ pub fn syscall_utimensat(_ voidptr, dirfd int, _path charptr, times u64, flags i
 		return errno.err, errno.einval
 	}
 	path := user_path(_path) or { return errno.err, errno.get() }
+	defer {
+		unsafe { path.free() }
+	}
 	mut node := &VFSNode(unsafe { nil })
 	if path.len == 0 {
 		if flags & at_empty_path == 0 { return errno.err, errno.enoent }
