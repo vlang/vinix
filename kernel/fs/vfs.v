@@ -56,6 +56,8 @@ pub mut:
 	mount_root bool
 	// Set when the directory is removed; see unlink().
 	removed bool
+	// What an overlay node is made of; see overlay.v.
+	overlay &OverlayEntry = unsafe { nil }
 }
 
 __global (
@@ -208,6 +210,7 @@ fn walk_path(parent &VFSNode, path string, depth int, effective bool) (&VFSNode,
 				effective)
 		} else {
 			procfs_lookup_refresh(current_node, elem_str)
+			overlay_lookup_refresh(current_node)
 			if elem_str !in current_node.children {
 				errno.set(errno.enoent)
 				if last == true {
@@ -450,6 +453,14 @@ pub fn unlink(parent &VFSNode, name string, remove_dir bool) ? {
 			cgroup_may_remove(node)?
 		}
 		if node.children.len > 2 { errno.set(errno.enotempty); return none }
+	}
+	if parent_of_tgt.overlay != unsafe { nil } {
+		overlay_unlink(mut parent_of_tgt, mut node, basename)?
+		dir_flag := if stat.isdir(node.resource.stat.mode) { in_isdir } else { u32(0) }
+		inotify_emit(parent_of_tgt, basename, in_delete | dir_flag, 0)
+		inotify_emit(node, '', in_delete_self, 0)
+		inotify_forget(node)
+		return
 	}
 	// A read-only or failing backend must leave the namespace intact.
 	node.resource.unlink(voidptr(node))?
@@ -831,6 +842,12 @@ pub fn syscall_openat(_ voidptr, dirfd int, _path charptr, flags int, mode u32) 
 	if read_only(node) && ((flags & 3) != 0 || flags & resource.o_trunc != 0) {
 		return errno.err, errno.erofs
 	}
+	// A file on an overlay opened to be written is copied up first, so the
+	// writes land in the upper layer.
+	if node.overlay != unsafe { nil } && stat.isreg(node.resource.stat.mode)
+		&& flags & resource.o_path == 0 && ((flags & 3) != 0 || flags & resource.o_trunc != 0) {
+		overlay_copy_up(node) or { return errno.err, errno.get() }
+	}
 	if flags & resource.o_trunc != 0 && stat.isreg(node.resource.stat.mode) {
 		mut res := node.resource
 		res.grow(unsafe { nil }, 0) or { return errno.err, errno.get() }
@@ -1183,7 +1200,9 @@ pub fn syscall_fchmod(_ voidptr, fdnum int, mode u32) (u64, u64) {
 		return errno.err, errno.eperm
 	}
 	// Preserve file type bits (upper 4 bits), only change permission bits.
-	mut res := fd.handle.resource
+	mut res := handle_resource_to_change(fd.handle.node, fd.handle.resource) or {
+		return errno.err, errno.get()
+	}
 	old_mode := res.stat.mode
 	res.stat.mode = (res.stat.mode & stat.ifmt) | (mode & 0o7777)
 	resource.persist_metadata(mut res) or {
@@ -1216,7 +1235,7 @@ pub fn syscall_fchmodat(_ voidptr, dirfd int, _path charptr, mode u32) (u64, u64
 
 	// Preserve the object type and update only permission/special bits, just as
 	// fchmod does. Archive extractors use fchmodat after creating each file.
-	mut node_resource := node.resource
+	mut node_resource := resource_to_change(node) or { return errno.err, errno.get() }
 	old_mode := node_resource.stat.mode
 	node_resource.stat.mode = (node_resource.stat.mode & stat.ifmt) | (mode & 0o7777)
 	resource.persist_metadata(mut node_resource) or {
@@ -1288,6 +1307,7 @@ pub fn syscall_readdir(_ voidptr, fdnum int, mut buf stat.Dirent) (u64, u64) {
 
 	if dir_handle.dirlist_valid == false {
 		procfs_refresh(dir_node)
+		overlay_lookup_refresh(dir_node)
 		// Sized for the whole directory up front: growing it would leave each
 		// outgrown buffer behind, and every entry takes a full Dirent.
 		unsafe { dir_handle.dirlist.free() }
@@ -1505,6 +1525,11 @@ pub fn rename(oldparent &VFSNode, oldpath string, newparent &VFSNode, newpath st
 			errno.set(errno.einval)
 			return none
 		}
+		// An overlay cannot swap two names in one step.
+		if old_parent_of.overlay != unsafe { nil } {
+			errno.set(errno.exdev)
+			return none
+		}
 		old_parent_of.filesystem.rename(old_parent_of, old_basename, new_parent_of,
 			new_basename, flags)?
 
@@ -1563,6 +1588,17 @@ pub fn rename(oldparent &VFSNode, oldpath string, newparent &VFSNode, newpath st
 			errno.set(errno.enotempty)
 			return none
 		}
+	}
+
+	if old_parent_of.overlay != unsafe { nil } {
+		overlay_rename(mut old_parent_of, old_basename, mut old_node, mut new_parent_of,
+			new_basename, new_node)?
+		cookie := inotify_next_cookie()
+		dir_flag := if stat.isdir(old_node.resource.stat.mode) { in_isdir } else { u32(0) }
+		inotify_emit(old_parent_of, old_basename, in_moved_from | dir_flag, cookie)
+		inotify_emit(new_parent_of, new_basename, in_moved_to | dir_flag, cookie)
+		inotify_emit(old_node, '', in_move_self, 0)
+		return
 	}
 
 	// Give an on-disk filesystem the complete validated operation before the
@@ -1720,6 +1756,7 @@ pub fn syscall_truncate(_ voidptr, _path charptr, length i64) (u64, u64) {
 	if !check_access(node, access_write, true) {
 		return errno.err, errno.eacces
 	}
+	res = resource_to_change(node) or { return errno.err, errno.get() }
 
 	res.grow(unsafe { nil }, u64(length)) or { return errno.err, errno.get() }
 
@@ -1779,6 +1816,7 @@ pub fn syscall_fchownat(_ voidptr, dirfd int, _path charptr, uid u32, gid u32, f
 		if !may_chown(res.stat.uid, uid, gid) {
 			return errno.err, errno.eperm
 		}
+		res = handle_resource_to_change(fd.handle.node, res) or { return errno.err, errno.get() }
 		change_owner(mut res, uid, gid) or { return errno.err, errno.get() }
 		if fd.handle.node != unsafe { nil } {
 			inotify_emit(unsafe { &VFSNode(fd.handle.node) }, '', in_attrib, 0)
@@ -1795,6 +1833,7 @@ pub fn syscall_fchownat(_ voidptr, dirfd int, _path charptr, uid u32, gid u32, f
 	if !may_chown(res.stat.uid, uid, gid) {
 		return errno.err, errno.eperm
 	}
+	res = resource_to_change(node) or { return errno.err, errno.get() }
 
 	change_owner(mut res, uid, gid) or { return errno.err, errno.get() }
 	inotify_emit(node, '', in_attrib, 0)
@@ -1816,6 +1855,7 @@ pub fn syscall_fchown(_ voidptr, fdnum int, uid u32, gid u32) (u64, u64) {
 	if !may_chown(res.stat.uid, uid, gid) {
 		return errno.err, errno.eperm
 	}
+	res = handle_resource_to_change(fd.handle.node, res) or { return errno.err, errno.get() }
 	change_owner(mut res, uid, gid) or { return errno.err, errno.get() }
 	if fd.handle.node != unsafe { nil } {
 		inotify_emit(unsafe { &VFSNode(fd.handle.node) }, '', in_attrib, 0)
@@ -1942,7 +1982,7 @@ pub fn syscall_utimensat(_ voidptr, dirfd int, _path charptr, times u64, flags i
 		return 0, 0
 	}
 
-	mut res := node.resource
+	mut res := resource_to_change(node) or { return errno.err, errno.get() }
 	old_atim := res.stat.atim
 	old_mtim := res.stat.mtim
 	old_ctim := res.stat.ctim

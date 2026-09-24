@@ -418,14 +418,14 @@ fn display_fstype(fstype string) string {
 	}
 }
 
-const pseudo_filesystems = ['tmpfs', 'procfs', 'sysfs', 'devtmpfs', 'cgroup2']
+const pseudo_filesystems = ['tmpfs', 'procfs', 'sysfs', 'devtmpfs', 'cgroup2', 'overlay']
 
 fn new_mount(parent &VFSNode, source string, target string, fstype string, flags u64, options string) ? {
 	kind := filesystem_kind(fstype)
 	if kind == 'devpts' {
 		return mount_devpts(parent, target, flags, options)
 	}
-	if kind !in filesystems {
+	if kind !in filesystems && kind != 'overlay' {
 		errno.set(errno.enodev)
 		return none
 	}
@@ -463,8 +463,15 @@ fn new_mount(parent &VFSNode, source string, target string, fstype string, flags
 	}
 
 	mut mount_node := &VFSNode(unsafe { nil })
+	mut mount_flags := flags
 	if kind == 'cgroup2' {
 		mount_node = cgroup_mount_root(parent_of_tgt_node, basename)?
+	} else if kind == 'overlay' {
+		mount_node = overlay_mount(parent, parent_of_tgt_node, basename, options)?
+		// With no upper layer there is nowhere for a change to go.
+		if mount_node.read_only {
+			mount_flags |= ms_rdonly
+		}
 	} else {
 		mut f_sys := unsafe { filesystems[kind].instantiate() }
 		mount_node = f_sys.mount(parent_of_tgt_node, basename, source_node)?
@@ -480,7 +487,7 @@ fn new_mount(parent &VFSNode, source string, target string, fstype string, flags
 	attach_mount(mut table, mut target_node, mount_node)
 	shown := if fstype == kind { display_fstype(kind) } else { fstype }
 	record_mount(mut table, target_node, mount_node, if source.len > 0 { source } else { shown },
-		shown, flags, options)
+		shown, mount_flags, options)
 
 	if source.len > 0 {
 		print('vfs: Mounted `${source}` to `${target}` with filesystem `${fstype}`\n')

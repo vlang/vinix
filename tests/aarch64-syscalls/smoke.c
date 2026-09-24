@@ -27,6 +27,7 @@
 #include <sys/wait.h>
 #include <sys/xattr.h>
 #include <sys/membarrier.h>
+#include <sys/mount.h>
 #include <sys/mman.h>
 #include <time.h>
 #include <unistd.h>
@@ -230,6 +231,83 @@ static int special_node_numbers(void) {
     unlink(fifo);
     unlink(device);
     rmdir(dir);
+    return valid;
+}
+
+static int write_text(const char *path, const char *text) {
+    int fd = open(path, O_CREAT | O_WRONLY | O_TRUNC, 0644);
+    if (fd < 0)
+        return 0;
+    ssize_t length = (ssize_t)strlen(text);
+    int valid = write(fd, text, (size_t)length) == length;
+    close(fd);
+    return valid;
+}
+
+static int has_text(const char *path, const char *text) {
+    char buffer[64] = {0};
+    int fd = open(path, O_RDONLY);
+    if (fd < 0)
+        return 0;
+    ssize_t length = read(fd, buffer, sizeof(buffer) - 1);
+    close(fd);
+    return length == (ssize_t)strlen(text) && !memcmp(buffer, text, (size_t)length);
+}
+
+// An overlay of one directory tree on another, as Docker's overlay2 driver
+// mounts every container.
+static int overlay_semantics(void) {
+    const char *merged = "/tmp/aarch64-syscall-ovl/merged";
+    struct stat whiteout_stat;
+    mkdir("/tmp/aarch64-syscall-ovl", 0755);
+    mkdir("/tmp/aarch64-syscall-ovl/lower", 0755);
+    mkdir("/tmp/aarch64-syscall-ovl/lower/d", 0755);
+    mkdir("/tmp/aarch64-syscall-ovl/lower2", 0755);
+    mkdir("/tmp/aarch64-syscall-ovl/upper", 0755);
+    mkdir("/tmp/aarch64-syscall-ovl/work", 0755);
+    mkdir(merged, 0755);
+    if (!write_text("/tmp/aarch64-syscall-ovl/lower/a", "lower") ||
+        !write_text("/tmp/aarch64-syscall-ovl/lower/keep", "keep") ||
+        !write_text("/tmp/aarch64-syscall-ovl/lower/d/f", "f") ||
+        !write_text("/tmp/aarch64-syscall-ovl/lower/hidden", "hidden") ||
+        mknod("/tmp/aarch64-syscall-ovl/lower2/hidden", S_IFCHR, 0) != 0)
+        return 0;
+    const char *options = "lowerdir=/tmp/aarch64-syscall-ovl/lower2:/tmp/aarch64-syscall-ovl/lower,"
+                          "upperdir=/tmp/aarch64-syscall-ovl/upper,workdir=/tmp/aarch64-syscall-ovl/work";
+    if (mount("overlay", merged, "overlay", 0, options) != 0) {
+        printf("overlay mount: errno=%d\n", errno);
+        return 0;
+    }
+    int valid = has_text("/tmp/aarch64-syscall-ovl/merged/a", "lower") &&
+                failed_with_errno(access("/tmp/aarch64-syscall-ovl/merged/hidden", F_OK), ENOENT,
+                                  "whiteout in a lower layer") &&
+                write_text("/tmp/aarch64-syscall-ovl/merged/a", "upper") &&
+                has_text("/tmp/aarch64-syscall-ovl/merged/a", "upper") &&
+                has_text("/tmp/aarch64-syscall-ovl/upper/a", "upper") &&
+                has_text("/tmp/aarch64-syscall-ovl/lower/a", "lower") &&
+                unlink("/tmp/aarch64-syscall-ovl/merged/keep") == 0 &&
+                failed_with_errno(access("/tmp/aarch64-syscall-ovl/merged/keep", F_OK), ENOENT,
+                                  "removed lower file") &&
+                lstat("/tmp/aarch64-syscall-ovl/upper/keep", &whiteout_stat) == 0 &&
+                S_ISCHR(whiteout_stat.st_mode) && whiteout_stat.st_rdev == 0 &&
+                has_text("/tmp/aarch64-syscall-ovl/lower/keep", "keep") &&
+                failed_with_errno(rename("/tmp/aarch64-syscall-ovl/merged/d",
+                                         "/tmp/aarch64-syscall-ovl/merged/e"),
+                                  EXDEV, "rename of a lower directory") &&
+                failed_with_errno(rmdir("/tmp/aarch64-syscall-ovl/merged/d"), ENOTEMPTY,
+                                  "rmdir of a merged directory") &&
+                mkdir("/tmp/aarch64-syscall-ovl/merged/n", 0755) == 0 &&
+                write_text("/tmp/aarch64-syscall-ovl/merged/n/x", "x") &&
+                has_text("/tmp/aarch64-syscall-ovl/upper/n/x", "x");
+    valid = umount("/tmp/aarch64-syscall-ovl/merged") == 0 && valid;
+
+    if (mount("overlay", merged, "overlay", 0,
+              "lowerdir=/tmp/aarch64-syscall-ovl/upper:/tmp/aarch64-syscall-ovl/lower") != 0)
+        return 0;
+    valid = valid && has_text("/tmp/aarch64-syscall-ovl/merged/a", "upper") &&
+            failed_with_errno(open("/tmp/aarch64-syscall-ovl/merged/new", O_CREAT | O_WRONLY, 0644),
+                              EROFS, "create in a read-only overlay");
+    valid = umount("/tmp/aarch64-syscall-ovl/merged") == 0 && valid;
     return valid;
 }
 
@@ -536,6 +614,7 @@ int main(void) {
     check(removed_ok, "removed working directory stays usable");
     check(xattr_operations(), "extended attributes on tmpfs");
     check(special_node_numbers(), "mknod nodes have inode numbers");
+    check(overlay_semantics(), "overlay mount");
     if (chdir(previous_cwd) != 0)
         chdir("/");
 

@@ -89,20 +89,54 @@ fn xattr_name(_name charptr) ?string {
 	return name
 }
 
-fn xattr_store(target XAttrTarget) ?&TmpFSResource {
-	mut res := target.res
-	if res != unsafe { nil } {
-		if mut res is TmpFSResource {
-			return res
+// The tmpfs file behind a resource, or nil: the only kind that keeps
+// attributes.
+fn tmpfs_resource_of(res &resource.Resource) &TmpFSResource {
+	mut r := unsafe { res }
+	if r != unsafe { nil } {
+		if mut r is TmpFSResource {
+			return r
 		}
 	}
-	errno.set(errno.enotsup)
-	return none
+	return unsafe { nil }
 }
 
-// trusted.* is for the administrator alone, to read as well as to write.
-fn xattr_visible(name string) bool {
+fn xattr_store(target XAttrTarget) ?&TmpFSResource {
+	res := tmpfs_resource_of(target.res)
+	if res == unsafe { nil } {
+		errno.set(errno.enotsup)
+		return none
+	}
+	return res
+}
+
+// trusted.* is for the administrator alone, to read as well as to write. An
+// overlay keeps its own trusted.overlay.* in its layers and shows none of it.
+fn xattr_visible(target XAttrTarget, name string) bool {
+	if xattr_on_overlay(target) && name.starts_with('trusted.overlay.') {
+		return false
+	}
 	return !name.starts_with('trusted.') || proc.current_has_capability(proc.cap_sys_admin)
+}
+
+fn xattr_on_overlay(target XAttrTarget) bool {
+	return target.node != unsafe { nil } && target.node.overlay != unsafe { nil }
+}
+
+// A change through an overlay goes to the upper copy, made first.
+fn xattr_target_to_change(target XAttrTarget, name string) ?XAttrTarget {
+	if !xattr_on_overlay(target) {
+		return target
+	}
+	if name.starts_with('trusted.overlay.') {
+		errno.set(errno.eperm)
+		return none
+	}
+	overlay_copy_up(target.node)?
+	return XAttrTarget{
+		node: target.node
+		res:  target.node.resource
+	}
 }
 
 // What setting or removing `name` on `target` needs, as on Linux.
@@ -152,15 +186,22 @@ fn xattr_find(set &XAttrSet, name string) int {
 	return -1
 }
 
-fn xattr_set(target XAttrTarget, _name charptr, value voidptr, size u64, flags int) (u64, u64) {
+fn xattr_set(given XAttrTarget, _name charptr, value voidptr, size u64, flags int) (u64, u64) {
 	if flags & ~(xattr_create | xattr_replace) != 0 {
 		return errno.err, errno.einval
 	}
 	if size > xattr_size_max {
 		return errno.err, errno.e2big
 	}
-	mut res := xattr_store(target) or { return errno.err, errno.get() }
 	name := xattr_name(_name) or { return errno.err, errno.get() }
+	target := xattr_target_to_change(given, name) or {
+		unsafe { name.free() }
+		return errno.err, errno.get()
+	}
+	mut res := xattr_store(target) or {
+		unsafe { name.free() }
+		return errno.err, errno.get()
+	}
 	xattr_may_change(target, res, name) or {
 		unsafe { name.free() }
 		return errno.err, errno.get()
@@ -223,7 +264,7 @@ fn xattr_get(target XAttrTarget, _name charptr, value voidptr, size u64) (u64, u
 	defer {
 		unsafe { name.free() }
 	}
-	if !xattr_visible(name) {
+	if !xattr_visible(target, name) {
 		return errno.err, errno.enodata
 	}
 	// Copied out under the lock and to the caller after it: the caller's
@@ -270,7 +311,7 @@ fn xattr_list(target XAttrTarget, list voidptr, size u64) (u64, u64) {
 	res.l.acquire()
 	if res.xattrs != unsafe { nil } {
 		for entry in res.xattrs.entries {
-			if !xattr_visible(entry.name) {
+			if !xattr_visible(target, entry.name) {
 				continue
 			}
 			for c in entry.name {
@@ -293,12 +334,13 @@ fn xattr_list(target XAttrTarget, list voidptr, size u64) (u64, u64) {
 	return length, 0
 }
 
-fn xattr_remove(target XAttrTarget, _name charptr) (u64, u64) {
-	mut res := xattr_store(target) or { return errno.err, errno.get() }
+fn xattr_remove(given XAttrTarget, _name charptr) (u64, u64) {
 	name := xattr_name(_name) or { return errno.err, errno.get() }
 	defer {
 		unsafe { name.free() }
 	}
+	target := xattr_target_to_change(given, name) or { return errno.err, errno.get() }
+	mut res := xattr_store(target) or { return errno.err, errno.get() }
 	xattr_may_change(target, res, name) or { return errno.err, errno.get() }
 	res.l.acquire()
 	index := xattr_find(res.xattrs, name)
@@ -317,6 +359,91 @@ fn xattr_remove(target XAttrTarget, _name charptr) (u64, u64) {
 		inotify_emit(target.node, '', in_attrib, 0)
 	}
 	return 0, 0
+}
+
+// Whether a tmpfs file has the attribute `name` set to `expected`.
+fn xattr_equals(res &resource.Resource, name string, expected string) bool {
+	mut file := tmpfs_resource_of(res)
+	if file == unsafe { nil } {
+		return false
+	}
+	file.l.acquire()
+	defer {
+		file.l.release()
+	}
+	index := xattr_find(file.xattrs, name)
+	if index < 0 {
+		return false
+	}
+	value := file.xattrs.entries[index].value
+	if value.len != expected.len {
+		return false
+	}
+	for i in 0 .. value.len {
+		if value[i] != expected[i] {
+			return false
+		}
+	}
+	return true
+}
+
+fn xattr_put_bytes(mut file TmpFSResource, name string, value []u8) {
+	if file.xattrs == unsafe { nil } {
+		file.xattrs = &XAttrSet{
+			entries: []XAttr{}
+		}
+	}
+	index := xattr_find(file.xattrs, name)
+	if index >= 0 {
+		unsafe { file.xattrs.entries[index].value.free() }
+		file.xattrs.entries[index].value = value
+		return
+	}
+	file.xattrs.entries << XAttr{
+		name:  name.clone()
+		value: value
+	}
+}
+
+// Set an attribute from inside the kernel, as overlay marks a directory
+// opaque. Files that keep none are left alone.
+fn xattr_put(res &resource.Resource, name string, value string) {
+	mut file := tmpfs_resource_of(res)
+	if file == unsafe { nil } {
+		return
+	}
+	file.l.acquire()
+	defer {
+		file.l.release()
+	}
+	xattr_put_bytes(mut file, name, value.bytes())
+}
+
+// Give `to` the attributes `from` has, but for those whose names start with
+// `skip`.
+fn copy_xattrs(from &resource.Resource, to &resource.Resource, skip string) {
+	mut source := tmpfs_resource_of(from)
+	mut dest := tmpfs_resource_of(to)
+	if source == unsafe { nil } || dest == unsafe { nil } || source.xattrs == unsafe { nil } {
+		return
+	}
+	mut copied := []XAttr{}
+	source.l.acquire()
+	for entry in source.xattrs.entries {
+		if !entry.name.starts_with(skip) {
+			copied << XAttr{
+				name:  entry.name
+				value: entry.value.clone()
+			}
+		}
+	}
+	source.l.release()
+	dest.l.acquire()
+	for entry in copied {
+		xattr_put_bytes(mut dest, entry.name, entry.value)
+	}
+	dest.l.release()
+	unsafe { copied.free() }
 }
 
 // Called when a tmpfs file goes.

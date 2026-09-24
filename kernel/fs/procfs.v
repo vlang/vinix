@@ -492,7 +492,7 @@ fn (this &ProcFSResource) contents() string {
 		.filesystems {
 			// The `nodev` column matters: a container runtime skips those when
 			// choosing what to mount for a rootfs.
-			return 'nodev\ttmpfs\nnodev\tproc\nnodev\tsysfs\nnodev\tdevtmpfs\nnodev\tcgroup2\nnodev\tdevpts\n\text2\n'
+			return 'nodev\ttmpfs\nnodev\tproc\nnodev\tsysfs\nnodev\tdevtmpfs\nnodev\tcgroup2\nnodev\tdevpts\nnodev\toverlay\n\text2\n'
 		}
 		.self_mounts, .mounts {
 			pid := if this.kind == .self_mounts { proc.current_thread().process.pid } else { this.pid }

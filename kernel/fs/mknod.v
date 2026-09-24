@@ -157,7 +157,8 @@ fn find_device_number(directory &VFSNode, kind u32, rdev u64, depth int) &resour
 // which the runtime took from the host's node.
 fn make_device_node(mut parent VFSNode, name string, mode u32, rdev u64) ?&VFSNode {
 	mut backing := device_by_name(name)
-	if backing == unsafe { nil } {
+	// 0/0 is no device: it is what an overlay whiteout is made as.
+	if backing == unsafe { nil } && rdev != 0 {
 		backing = device_by_number(mode & stat.ifmt, rdev)
 	}
 	if backing == unsafe { nil } {
@@ -249,6 +250,15 @@ pub fn syscall_mknodat(_ voidptr, dirfd int, _path charptr, mode u32, dev u64) (
 	vfs_lock.acquire()
 	defer {
 		vfs_lock.release()
+	}
+	// A FIFO or a device node in an overlay directory is made in its upper
+	// layer.
+	if dir.overlay != unsafe { nil } && (kind == stat.ififo || kind == stat.ifchr
+		|| kind == stat.ifblk) {
+		overlay_mknod(mut dir, basename, kind | final_mode, dev) or {
+			return errno.err, errno.get()
+		}
+		return 0, 0
 	}
 	match kind {
 		0, stat.ifreg {
