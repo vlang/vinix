@@ -618,35 +618,102 @@ pub fn map_page_in_range(_g &MmapRangeGlobal, virt_addr u64, phys_addr u64, _pro
 // pagemap decides: the first page installed there backs the address, and a
 // loser gives its own page back and maps the winner's.
 //
+// The page is mapped only for the process that owns `local`. Another process
+// sharing the range picks it up from the shadow when it touches it itself.
+// Mapping it into every sharer's page tables from here meant walking the
+// range's list of locals, which a fork appends to and an exec removes from --
+// freeing the page map the local named -- under locks this side does not
+// hold, and a fault in containerd racing its fork of a shim mapped pages
+// through a freed page map.
+//
+// The caller looked `local` up and let the page map's lock go while it
+// acquired the page. Another thread may have unmapped the range since, freeing
+// it, so it is looked up again under the lock before anything of it is used;
+// an address no longer mapped fails as the fault it now is.
+//
 // Nothing is left for the caller to release: a page that loses is released
 // here, and one that wins belongs to the range.
-pub fn install_range_page(_g &MmapRangeGlobal, virt u64, file_page u64, page voidptr, flags int) ? {
-	mut g := unsafe { _g }
+pub fn install_range_page(mut pagemap memory.Pagemap, local &MmapRangeLocal, virt u64, file_page u64, page voidptr, flags int) ? {
+	pagemap.l.acquire()
+	current, _, _ := addr2range(pagemap, virt) or {
+		pagemap.l.release()
+		drop_unmapped_page(page, flags)
+		return none
+	}
+	// Split since, by an mprotect(): the address is still mapped, so the access
+	// is only retried, and faults again against the range as it is now.
+	if voidptr(current) != voidptr(local) {
+		pagemap.l.release()
+		drop_unmapped_page(page, flags)
+		return
+	}
+	mut g := local.global
+	// What giving `page` back takes, read while the range is sure to be there.
+	// The giving back itself waits until the lock is let go: a shared file page
+	// goes back through its filesystem, which may write it out.
+	release := PageRelease{
+		resource: g.resource
+		handle:   g.handle
+		direct:   flags & map_anonymous != 0
+			|| (g.segmented_file && !range_page_has_file_data(g, virt))
+	}
 	shadow_flags := memory.pte_present | memory.pte_writable | memory.pte_noexec
 	mut phys := u64(page)
+	mut surplus := false
 	g.shadow_pagemap.l.acquire()
 	if existing := g.shadow_pagemap.virt2phys(virt) {
-		g.shadow_pagemap.l.release()
-		release_range_page(g, virt, file_page, page, flags)
+		// Another thread got the page in first; ours goes back.
 		phys = existing
+		surplus = true
 	} else {
 		g.shadow_pagemap.map_page_unlocked(virt, phys, shadow_flags) or {
 			g.shadow_pagemap.l.release()
-			release_range_page(g, virt, file_page, page, flags)
+			pagemap.l.release()
+			release.give_back(file_page, page, flags)
 			return none
 		}
-		g.shadow_pagemap.l.release()
 	}
-	for i := u64(0); i < g.locals.len; i++ {
-		mut l := g.locals[i]
-		if virt < l.base || virt >= l.base + l.length {
-			continue
-		}
-		// A private page that a fork child still shares stays read-only, so
-		// that the first write copies it instead of changing both processes.
-		writable := !(l.cow && memory.pmm_refcount(voidptr(phys)) > 1)
-		pt_flags := page_table_flags(l.prot, g.pte_extra, writable)
-		l.pagemap.map_page(virt, phys, pt_flags) or { return none }
+	g.shadow_pagemap.l.release()
+	// A private page that a fork child still shares stays read-only, so that
+	// the first write copies it instead of changing both processes.
+	writable := !(local.cow && memory.pmm_refcount(voidptr(phys)) > 1)
+	pt_flags := page_table_flags(local.prot, g.pte_extra, writable)
+	mut mapped := true
+	pagemap.map_page_unlocked(virt, phys, pt_flags) or { mapped = false }
+	pagemap.l.release()
+	if surplus {
+		release.give_back(file_page, page, flags)
+	}
+	if !mapped {
+		return none
+	}
+}
+
+// How to give back a page a range acquired: straight to the allocator, or to
+// the file it came from. See release_range_page.
+struct PageRelease {
+	resource &resource.Resource = unsafe { nil }
+	handle   voidptr
+	direct   bool
+}
+
+fn (release PageRelease) give_back(file_page u64, physical voidptr, flags int) {
+	if release.direct {
+		memory.pmm_free(physical, 1)
+		return
+	}
+	mut res := release.resource
+	resource.release_mapping(mut res, release.handle, file_page, physical, flags)
+}
+
+// A page acquired for a range that changed before it could be installed.
+// Anonymous memory is ours to free. A file's page is a reference on a page
+// cache entry, released through a range that may be gone; it is left rather
+// than risk the freed range, which only a fault racing its own process'
+// munmap or mprotect can cause.
+fn drop_unmapped_page(page voidptr, flags int) {
+	if flags & map_anonymous != 0 {
+		memory.pmm_free(page, 1)
 	}
 }
 
@@ -1061,7 +1128,7 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
 			if page != unsafe { nil } {
 				// The range is already visible to the process' other threads,
 				// which may fault on this very page while it is pre-faulted.
-				install_range_page(range_global, base + i, file_page, page, flags) or {
+				install_range_page(mut pagemap, range_local, base + i, file_page, page, flags) or {
 					munmap(mut pagemap, voidptr(base), length) or {}
 					errno.set(errno.enomem)
 					return none
@@ -1201,7 +1268,7 @@ fn populate_missing_pages(mut pagemap memory.Pagemap, address u64, _length u64, 
 			errno.set(errno.enomem)
 			return none
 		}
-		install_range_page(global_range, virt, file_page, page, flags) or {
+		install_range_page(mut pagemap, local_range, virt, file_page, page, flags) or {
 			errno.set(errno.enomem)
 			return none
 		}

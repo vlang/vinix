@@ -49,12 +49,13 @@ pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
 		return none
 	}
 
+	flags := range_local.flags
 	pagemap.l.release()
 
 	virt := memory_page * page_size
 	page := acquire_range_page(range_local, virt, file_page) or { return none }
 
-	install_range_page(range_local.global, virt, file_page, page, range_local.flags)?
+	install_range_page(mut pagemap, range_local, virt, file_page, page, flags)?
 }
 
 // usercopy pages in untouched pages through this on aarch64; amd64 keeps
