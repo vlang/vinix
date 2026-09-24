@@ -1,5 +1,8 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
 // An activity monitor, built into the desktop.
 //
 // Like the file browser this is Vinix's own rather than a ui2 example, and it
@@ -401,8 +404,8 @@ fn activity_name_of(record &ActivitySample) string {
 	display := match name {
 		'vinix-files' { 'Files' }
 		'vinix-calculator' { 'Calculator' }
-		'vinix-cocoa-calculator' { 'Cocoa Calculator' }
 		'vinix-minecraft' { 'Minecraft' }
+		'vinix-doom' { 'Chocolate Doom' }
 		'vinix-blender' { 'Blender' }
 		'vinix-gimp' { 'GIMP' }
 		'vinix-chromium' { 'Chromium' }

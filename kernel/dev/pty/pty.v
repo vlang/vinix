@@ -154,6 +154,8 @@ __global (
 	ptmx_res    = &Ptmx(unsafe { nil })
 	pty_id_lock klock.Lock
 	pty_ids     [pty_max_pairs]bool
+	// The live pairs by id, for finding the terminal a session controls.
+	pty_pairs [pty_max_pairs]&PtyPair
 )
 
 fn allocate_id() ?int {
@@ -213,6 +215,10 @@ pub fn initialise() {
 	initialise_stat(mut ptmx_res.stat, 0o666)
 	ptmx_res.status = file.pollout
 	fs.devtmpfs_add_device(ptmx_res, 'ptmx')
+	// A devpts filesystem carries its own ptmx, as on Linux. A container's
+	// /dev/ptmx is a symlink to pts/ptmx inside the devpts runc mounts for it,
+	// and `docker run -t` failed with "open /dev/ptmx: no such file".
+	fs.devtmpfs_add_device(ptmx_res, 'pts/ptmx')
 }
 
 // refresh_status_locked derives readiness from the two queues and endpoint
@@ -273,8 +279,38 @@ fn (mut this Ptmx) open(_flags int) ?&resource.Resource {
 	pair.slave = slave
 	pair.refresh_status_locked()
 
+	pty_id_lock.acquire()
+	pty_pairs[id] = pair
+	pty_id_lock.release()
+
 	fs.devtmpfs_add_device(slave, pair.path)
-	return &resource.Resource(*master)
+	// Keep the master endpoint's event, status and refcount shared with the
+	// pair. Converting *master would box a copy of the resource instead.
+	return &resource.Resource(unsafe { master })
+}
+
+// Open the slave of the terminal that `session` controls, as open(2) of its
+// /dev/pts path would. This is what /dev/tty stands for. The id table's lock
+// is held throughout, so the pair cannot be destroyed underneath the open.
+pub fn open_session_terminal(session int, flags int) ?&resource.Resource {
+	if session == 0 {
+		errno.set(errno.enxio)
+		return none
+	}
+	pty_id_lock.acquire()
+	defer {
+		pty_id_lock.release()
+	}
+	for i := 0; i < pty_max_pairs; i++ {
+		mut pair := pty_pairs[i]
+		if pair == unsafe { nil } || pair.session != session || !pair.master_open {
+			continue
+		}
+		mut slave := pair.slave
+		return slave.open(flags | resource.o_noctty)
+	}
+	errno.set(errno.enxio)
+	return none
 }
 
 fn (mut this PtySlave) open(flags int) ?&resource.Resource {
@@ -300,7 +336,8 @@ fn (mut this PtySlave) open(flags int) ?&resource.Resource {
 	pair.refresh_status_locked()
 	pair.l.release()
 	wake_pair(mut pair)
-	return &resource.Resource(*this)
+	// The opened handle must wait on the same event that wake_pair signals.
+	return &resource.Resource(unsafe { this })
 }
 
 fn (pair &PtyPair) input_room_locked() u64 {
@@ -457,14 +494,10 @@ fn signal_group(pgid int, signal u8) {
 		if target == unsafe { nil } || target.pgid != pgid {
 			continue
 		}
-		target.threads_lock.acquire()
-		mut target_thread := &proc.Thread(unsafe { nil })
-		if target.threads.len != 0 {
-			target_thread = target.threads[0]
-		}
-		target.threads_lock.release()
+		target_thread := proc.get_main_thread(target)
 		if target_thread != unsafe { nil } {
 			userland.sendsig(target_thread, signal)
+			proc.unpin_thread(target_thread)
 		}
 	}
 }
@@ -665,12 +698,12 @@ fn (mut this PtySlave) write(handle voidptr, buf voidptr, _loc u64, count u64) ?
 
 fn copy_termios_to_user(pair &PtyPair, argp voidptr) bool {
 	settings := pair.termios
-	return usercopy.copy_to_user(u64(argp), voidptr(&settings), sizeof(termios.Termios))
+	return usercopy.copy_to_user(u64(argp), voidptr(&settings), termios.user_size())
 }
 
 fn set_termios_from_user(mut pair PtyPair, request u64, argp voidptr) bool {
-	mut settings := termios.Termios{}
-	if !usercopy.copy_from_user(voidptr(&settings), u64(argp), sizeof(termios.Termios)) {
+	mut settings := pair.termios
+	if !usercopy.copy_from_user(voidptr(&settings), u64(argp), termios.user_size()) {
 		return false
 	}
 	was_canonical := pair.termios.c_lflag & termios.icanon != 0
@@ -724,8 +757,10 @@ fn terminal_ioctl(mut pair PtyPair, slave_side bool, request u64, argp voidptr) 
 			}
 			return 0
 		}
+		// Groups and sessions are numbered as the caller's pid namespace
+		// numbers them.
 		ioctl.tiocgpgrp {
-			value := i32(pair.foreground_pgid)
+			value := i32(proc.group_in(proc.current_pid_namespace(), pair.foreground_pgid))
 			if !usercopy.copy_to_user(u64(argp), voidptr(&value), sizeof(i32)) {
 				errno.set(errno.efault)
 				return none
@@ -742,7 +777,16 @@ fn terminal_ioctl(mut pair PtyPair, slave_side bool, request u64, argp voidptr) 
 				errno.set(errno.einval)
 				return none
 			}
-			pair.foreground_pgid = int(value)
+			viewer := proc.current_pid_namespace()
+			mut group := proc.group_from(viewer, int(value))
+			if group == 0 {
+				group = proc.pid_from(viewer, int(value))
+			}
+			if group == 0 {
+				errno.set(errno.esrch)
+				return none
+			}
+			pair.foreground_pgid = group
 			return 0
 		}
 		ioctl.tiocgsid {
@@ -750,7 +794,7 @@ fn terminal_ioctl(mut pair PtyPair, slave_side bool, request u64, argp voidptr) 
 				errno.set(errno.enotty)
 				return none
 			}
-			value := i32(pair.session)
+			value := i32(proc.group_in(proc.current_pid_namespace(), pair.session))
 			if !usercopy.copy_to_user(u64(argp), voidptr(&value), sizeof(i32)) {
 				errno.set(errno.efault)
 				return none
@@ -876,6 +920,11 @@ fn (mut this PtySlave) ioctl(_handle voidptr, request u64, argp voidptr) ?int {
 }
 
 fn destroy_pair(pair &PtyPair) {
+	pty_id_lock.acquire()
+	if pair.id >= 0 && pair.id < pty_max_pairs {
+		pty_pairs[pair.id] = unsafe { nil }
+	}
+	pty_id_lock.release()
 	release_id(pair.id)
 	unsafe {
 		pair.path.free()

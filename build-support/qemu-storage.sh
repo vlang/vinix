@@ -73,15 +73,18 @@ vinix_storage_find_mke2fs() {
 # $4, when given, turns the result into a *system* volume rather than a home
 # one: the kernel's mount points are created, the image identity is recorded so
 # a later run can tell a rebuilt image from the one already installed, and $5,
-# when given, replaces the archive's /root with a home carried over from the
-# volume being replaced.
+# when given, merges in a home carried over from the volume being replaced.
+# $6 may name a package overlay to merge into a system image on the host. That
+# keeps the archive off the boot disk and out of guest RAM. Carried files win
+# conflicts while newly packaged home files are retained.
 vinix_storage_create_ext2() {
     local target="$1"
     local size_mb="$2"
     local seed_archive="${3:-}"
     local image_id="${4:-}"
     local carried_home="${5:-}"
-    local target_dir temp_disk seed_dir mke2fs persist_bytes
+    local package_overlay="${6:-}"
+    local target_dir temp_disk seed_dir mke2fs persist_bytes root_owner_tool
     local -a seed_args
 
     target_dir="$(dirname "$target")"
@@ -123,9 +126,29 @@ vinix_storage_create_ext2() {
             return 1
         fi
         chmod 1777 "$seed_dir/tmp" 2>/dev/null || true
+        if [ -n "$package_overlay" ]; then
+            if [ ! -f "$package_overlay" ] || \
+               ! tar -xf "$package_overlay" -C "$seed_dir"; then
+                echo "ERROR: package overlay is not a readable tar archive: $package_overlay" >&2
+                rm -rf "$seed_dir"
+                rm -f "$temp_disk"
+                return 1
+            fi
+        fi
         if [ -n "$carried_home" ]; then
-            rm -rf "${seed_dir:?}/root"
-            if ! cp -a "$carried_home" "$seed_dir/root"; then
+            # An old home from before source generations were recorded must
+            # not inherit the new seed's marker. Its desktop sources still win
+            # the merge below, so retaining that marker would falsely describe
+            # a mixed, stale tree as current.
+            if { [ -d "$carried_home/desktop" ] || \
+                 [ -d "$carried_home/vmodules" ]; } && \
+               [ ! -f "$carried_home/.vinix-desktop-dev-version" ]; then
+                rm -f "$seed_dir/root/.vinix-desktop-dev-version"
+            fi
+            # Replacing this directory wholesale drops files introduced by an
+            # image update, such as /root/vmodules. Merge the old home over the
+            # packaged seed so user edits win without hiding new seed content.
+            if ! cp -a "$carried_home/." "$seed_dir/root/"; then
                 echo "ERROR: could not carry the existing home into the new volume" >&2
                 rm -rf "$seed_dir"
                 rm -f "$temp_disk"
@@ -179,8 +202,8 @@ vinix_storage_create_ext2() {
     # and enforces Unix permissions; Firefox, for one, refuses to start when it
     # finds that $HOME belongs to somebody else.
     if [ -n "$seed_dir" ]; then
-        if ! python3 "$(dirname "${BASH_SOURCE[0]}")/ext2-set-root-owner.py" \
-            "$temp_disk"; then
+        root_owner_tool="${VINIX_EXT2_ROOT_OWNER_TOOL:-$(dirname "${BASH_SOURCE[0]}")/ext2-set-root-owner.py}"
+        if ! "$root_owner_tool" "$temp_disk"; then
             echo "ERROR: could not give the new volume to root" >&2
             rm -rf "$seed_dir"
             rm -f "$temp_disk"

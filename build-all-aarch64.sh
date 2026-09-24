@@ -151,6 +151,7 @@ for image_path in \
     usr/bin/v \
     usr/bin/vinix-desktop-build \
     usr/bin/vinix-desktop-reload \
+    usr/bin/vinix-host-sync \
     usr/bin/Xorg \
     usr/bin/run-firefox \
     usr/bin/Hyprland \

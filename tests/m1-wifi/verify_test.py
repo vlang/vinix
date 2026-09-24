@@ -55,15 +55,15 @@ class BuildVerifierTests(unittest.TestCase):
 
     def test_missing_init(self):
         with self.assertRaisesRegex(ValueError, 'initialization'):
-            verify_hooks(source.replace('apple__wifi__initialise();', ''))
+            verify_hooks(source.replace('wifi__initialise();', ''))
 
     def test_missing_poll(self):
         with self.assertRaisesRegex(ValueError, 'polling'):
-            verify_hooks(source.replace('apple__wifi__poll();', ''))
+            verify_hooks(source.replace('wifi__poll();', ''))
 
     def test_duplicate_poll(self):
         with self.assertRaisesRegex(ValueError, 'polling'):
-            verify_hooks(source.replace('apple__wifi__poll();', 'apple__wifi__poll(); apple__wifi__poll();'))
+            verify_hooks(source.replace('wifi__poll();', 'wifi__poll(); wifi__poll();'))
 
 
 if __name__ == '__main__':

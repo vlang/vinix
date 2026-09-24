@@ -5,6 +5,7 @@ import klock
 import katomic
 import memory
 import event.eventstruct
+import time
 
 // Match the conventional Linux soft RLIMIT_NOFILE. Large compatibility
 // processes such as Wine's server keep a descriptor for every translated
@@ -184,13 +185,29 @@ pub mut:
 	ppid                     int
 	pgid                     int
 	sid                      int
+	// In a pid namespace other than the initial one, the process's pid, group
+	// and session as that namespace numbers them (0 for a group or session
+	// whose leader is outside it), and the namespace itself. Kept until the
+	// process is reaped: its parent still asks for it by number.
+	ns_pid                   int
+	ns_pgid                  int
+	ns_sid                   int
+	numbered_in              &Namespace = unsafe { nil }
+	// Field 22 of /proc/<pid>/stat: start time in clock ticks. Linux runtimes
+	// (runc) use (pid, start_time) as a process's identity; a constant zero
+	// makes a just-created process indistinguishable from the zero value a
+	// caller compares against, which breaks runc's hasInit() check.
+	start_time_ticks         u64
 	pagemap                  &memory.Pagemap = unsafe { nil }
 	thread_stack_top         u64
 	threads                  []&Thread
 	threads_lock             klock.Lock
 	fds_lock                 klock.Lock
 	rlimits_lock             klock.Lock
-	fds                      [max_fds]voidptr
+	// The descriptor table, max_fds entries allocated with the process and
+	// freed when it is reaped. Held inline it made every process 10 KiB, which
+	// the allocator rounds up to four pages.
+	fds                      []voidptr
 	children                 []&Process
 	children_lock            klock.Lock
 	mmap_anon_non_fixed_base u64
@@ -212,6 +229,9 @@ pub mut:
 	// Linux convention used by unmodified Alpine binaries. exec sets this from
 	// the ELF interpreter; fork inherits it with the rest of the process ABI.
 	linux_abi bool
+	// Some compatibility runtimes require an RWX probe even when their generated
+	// code runs interpreted. Exec replaces this opt-in; fork preserves it.
+	allow_wx bool
 
 	// Credentials: the real, effective and saved sets POSIX names, plus the
 	// supplementary groups. Everything starts as root and is inherited across
@@ -250,6 +270,21 @@ pub mut:
 	// Where MPOL_INTERLEAVE is up to. It lives on the process so that its
 	// threads interleave together instead of each starting from node zero.
 	mempolicy_interleave u64
+
+	// Container state; see container.v. The directory absolute paths start
+	// from (nil means the system root), the namespaces this process is in,
+	// its capability sets and its cgroup.
+	root_directory  voidptr
+	ns              NamespaceSet
+	caps            Capabilities
+	no_new_privs    bool
+	child_subreaper bool
+	pdeathsig       int
+	cgroup          voidptr
+	oom_score_adj   int
+	// The file the process is running. /proc/<pid>/exe leads here when
+	// followed, which is what makes an exec from a memfd resolvable.
+	exe_node voidptr
 }
 
 // Read-mostly limits are naturally aligned u64s.  Writers serialize complete
@@ -304,6 +339,8 @@ __global (
 	processes      [max_pid]&Process
 	threads_by_tid [max_pid]&Thread
 	pid_lock       klock.Lock
+	// Where the search for the next free id starts. Called with pid_lock held.
+	next_id_cursor = int(1)
 )
 
 // A process group or a session outlives the process that named it: the leader
@@ -325,14 +362,24 @@ fn id_is_a_live_group(id int) bool {
 	return false
 }
 
+// Ids are handed out in increasing order and wrap at max_pid, as on Linux, so
+// one is not reused until the others have had their turn. Taking the lowest
+// free id instead gave a process that had just died's pid to the next one
+// started, within moments. Whatever still watches the old pid then acts on the
+// new process: busybox timeout's watcher polls kill(parent, 0) to see whether
+// the command it guards has finished, kept seeing the recycled pid alive, and
+// at the deadline sent its SIGTERM to an unrelated process -- a container
+// shim, runc, the docker client.
 fn find_free_id() ?int {
-	for i := int(1); i < max_pid; i++ {
+	for n := 0; n < max_pid - 1; n++ {
+		i := (next_id_cursor - 1 + n) % (max_pid - 1) + 1
 		if processes[i] != unsafe { nil } || threads_by_tid[i] != unsafe { nil } {
 			continue
 		}
 		if id_is_a_live_group(i) {
 			continue
 		}
+		next_id_cursor = if i + 1 >= max_pid { 1 } else { i + 1 }
 		return i
 	}
 	return none
@@ -346,6 +393,17 @@ pub fn allocate_pid(process &Process) ?int {
 
 	i := find_free_id()?
 	processes[i] = unsafe { process }
+	mut p := unsafe { process }
+	if p.start_time_ticks == 0 {
+		// USER_HZ is 100 on aarch64 Linux, so a tick is 10 ms. The value only
+		// has to be non-zero and stable per process; tick-granularity
+		// collisions between processes are what Linux has too.
+		mut ticks := time.monotonic_ns() / 10000000
+		if ticks == 0 {
+			ticks = 1
+		}
+		p.start_time_ticks = ticks
+	}
 	return i
 }
 
@@ -359,7 +417,15 @@ pub fn free_pid(pid int) {
 		pid_lock.release()
 	}
 
+	mut reaped := processes[pid]
+	release_process_number(reaped)
 	processes[pid] = unsafe { nil }
+	// Nothing can find the process now, and every descriptor it had was closed
+	// when it exited.
+	if reaped != unsafe { nil } && reaped.fds.len != 0 {
+		unsafe { reaped.fds.free() }
+		reaped.fds = []voidptr{}
+	}
 	// The main thread's tid aliases the pid, so it is released together.
 	release_thread_slot(pid)
 }
@@ -370,6 +436,7 @@ fn release_thread_slot(tid int) {
 	t := threads_by_tid[tid]
 	if t != unsafe { nil } {
 		adjust_policy_count(t.sched.is_special(), false)
+		release_thread_number(t)
 	}
 	threads_by_tid[tid] = unsafe { nil }
 }
@@ -529,19 +596,6 @@ pub fn free_tid(tid int) {
 	}
 
 	release_thread_slot(tid)
-}
-
-pub fn thread_by_tid(tid int) &Thread {
-	if tid <= 0 || tid >= max_pid {
-		return unsafe { nil }
-	}
-
-	pid_lock.acquire()
-	defer {
-		pid_lock.release()
-	}
-
-	return threads_by_tid[tid]
 }
 
 pub fn thread_affinity(tid int) ?u64 {
@@ -723,9 +777,72 @@ pub fn thread_ids(pid int) []int {
 	return ids
 }
 
+// Whether some process or thread stands in `directory`: has it as its working
+// directory or its root. Neither holds a reference on it, so removing the
+// directory has to ask. A process whose thread list is busy counts as one.
+pub fn directory_in_use(directory voidptr) bool {
+	lock_table()
+	defer { unlock_table() }
+	for pid := 1; pid < max_pid; pid++ {
+		process := process_at(pid)
+		if process == unsafe { nil } {
+			continue
+		}
+		if process.current_directory == directory || process.root_directory == directory {
+			return true
+		}
+		mut owner := unsafe { process }
+		if !owner.threads_lock.test_and_acquire() {
+			return true
+		}
+		mut inside := false
+		for t in process.threads {
+			if t.fs != unsafe { nil } && (t.fs.current_directory == directory
+				|| t.fs.root_directory == directory) {
+				inside = true
+				break
+			}
+		}
+		owner.threads_lock.release()
+		if inside {
+			return true
+		}
+	}
+	return false
+}
+
+// sysrq 't': every thread on the console, with the syscall it is in and that
+// call's first argument, which is how a hang in userspace is told apart from
+// one in the kernel and pinned to the call that never returned.
+pub fn dump_tasks() {
+	lock_table()
+	defer { unlock_table() }
+	for pid := 1; pid < max_pid; pid++ {
+		process := process_at(pid)
+		if process == unsafe { nil } {
+			continue
+		}
+		state := if process.exiting { 'Z' } else { 'R' }
+		// The list is only safe to walk under its lock: a thread leaving takes
+		// itself out and can be freed right after. Taken without blocking, for
+		// the same reason as in the tid listing above.
+		mut owner := unsafe { process }
+		if !owner.threads_lock.test_and_acquire() {
+			print('sysrq: pid=${pid} ppid=${process.ppid} ${state} ${command_name(process.name)} (thread list busy)\n')
+			continue
+		}
+		for t in process.threads {
+			nr, arg0 := t.current_syscall()
+			print('sysrq: pid=${pid} ppid=${process.ppid} tid=${t.tid} ${state} ${command_name(process.name)} syscall=${nr} arg0=0x${arg0:x} ${t.syscall_args_text()}\n')
+		}
+		owner.threads_lock.release()
+	}
+}
+
 // The first fields of /proc/<pid>/stat. Everything Vinix does not account for
 // is reported as zero rather than invented; readers take the fields they know.
-pub fn process_stat_line(pid int) string {
+// Ids are shown as `viewer` numbers them.
+pub fn process_stat_line(pid int, viewer &Namespace) string {
 	lock_table()
 	defer { unlock_table() }
 	process := process_at(pid)
@@ -746,7 +863,12 @@ pub fn process_stat_line(pid int) string {
 
 	// Fields 21 to 39, which nothing here keeps, and then rt_priority and
 	// policy in 40 and 41.
-	return '${pid} (${comm}) R ${process.ppid} ${process.pgid} ${process.sid} 0 -1 0 0 0 0 0 0 0 0 0 ${priority} ${process.nice} ${threads} 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 ${params.priority} ${params.policy}\n'
+	state := if process.exiting { 'Z' } else { 'R' }
+	shown_pid := pid_in(process, viewer)
+	shown_ppid := pid_in(process_at(process.ppid), viewer)
+	shown_pgid := pgid_in(process, viewer)
+	shown_sid := sid_in(process, viewer)
+	return '${shown_pid} (${comm}) ${state} ${shown_ppid} ${shown_pgid} ${shown_sid} 0 -1 0 0 0 0 0 0 0 0 0 ${priority} ${process.nice} ${threads} 0 ${process.start_time_ticks} 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 ${params.priority} ${params.policy}\n'
 }
 
 // The scheduling parameters of a thread that may not be there. Called with the
@@ -758,7 +880,7 @@ fn (t &Thread) sched_or_default() SchedParams {
 	return t.sched
 }
 
-pub fn process_status_text(pid int) string {
+pub fn process_status_text(pid int, viewer &Namespace) string {
 	lock_table()
 	defer { unlock_table() }
 	process := process_at(pid)
@@ -767,5 +889,20 @@ pub fn process_status_text(pid int) string {
 	}
 	comm := command_name(process.name)
 	threads := if process.threads.len > 0 { process.threads.len } else { 1 }
-	return 'Name:\t${comm}\nUmask:\t0${process.umask:o}\nState:\tR (running)\nTgid:\t${pid}\nNgid:\t0\nPid:\t${pid}\nPPid:\t${process.ppid}\nTracerPid:\t0\nUid:\t${process.uid}\t${process.euid}\t${process.suid}\t${process.euid}\nGid:\t${process.gid}\t${process.egid}\t${process.sgid}\t${process.egid}\nThreads:\t${threads}\n'
+	caps := process.caps
+	no_new_privs := if process.no_new_privs { 1 } else { 0 }
+	// Seccomp is reported as absent altogether: without the field a runtime
+	// knows the kernel has no seccomp, which is the truth here.
+	state := if process.exiting { 'Z (zombie)' } else { 'R (running)' }
+	shown_pid := pid_in(process, viewer)
+	shown_ppid := pid_in(process_at(process.ppid), viewer)
+	// NSpid lists the process's number in every namespace from the reader's
+	// down to its own.
+	nspid := if !numbers_own(viewer) && numbers_own(process.numbered_in) {
+		'${pid}\t${process.ns_pid}'
+	} else {
+		'${shown_pid}'
+	}
+	return 'Name:\t${comm}\nUmask:\t0${process.umask:o}\nState:\t${state}\nTgid:\t${shown_pid}\nNgid:\t0\nPid:\t${shown_pid}\nPPid:\t${shown_ppid}\nTracerPid:\t0\nUid:\t${process.uid}\t${process.euid}\t${process.suid}\t${process.euid}\nGid:\t${process.gid}\t${process.egid}\t${process.sgid}\t${process.egid}\nNSpid:\t${nspid}\nThreads:\t${threads}\nCapInh:\t${caps.inheritable:016x}\nCapPrm:\t${caps.permitted:016x}\nCapEff:\t${caps.effective:016x}\nCapBnd:\t${caps.bounding:016x}\nCapAmb:\t${caps.ambient:016x}\nNoNewPrivs:\t${no_new_privs}\n'
 }
+

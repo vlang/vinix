@@ -1,5 +1,8 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
 // Text rendering. The faces in font_data.v are 8-bit coverage atlases, so a
 // glyph is drawn by blending its coverage with the run's color — the same
 // antialiasing a desktop toolkit would give, without a rasteriser on the

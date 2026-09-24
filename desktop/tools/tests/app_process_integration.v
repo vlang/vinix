@@ -1,5 +1,8 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
 // Standalone host integration test for the compositor/application process
 // boundary. The parent execs this same binary in app mode, exactly as the
 // installed per-app symlinks do on Vinix.
@@ -14,6 +17,18 @@ fn tree_has_id(element ui2.Element, id string) bool {
 	}
 	for child in element.children {
 		if tree_has_id(child, id) {
+			return true
+		}
+	}
+	return false
+}
+
+fn tree_has_native_button(element ui2.Element, id string, checked bool) bool {
+	if element.id == id {
+		return element.kind == .button && element.native_style && element.checked == checked
+	}
+	for child in element.children {
+		if tree_has_native_button(child, id, checked) {
 			return true
 		}
 	}
@@ -43,7 +58,31 @@ fn main() {
 		run_app_process(options)
 		return
 	}
+	// Standalone applications receive their pipe descriptors through the
+	// environment, leaving argv empty for applications that open argv[1].
+	if os.getenv('VINIX_RESPONSE_FD') != '' {
+		assert arguments().len == 1
+		assert os.getenv('VINIX_REQUEST_FD').int() >= 3
+		os.fd_write(os.getenv('VINIX_RESPONSE_FD').int(), 'S')
+		return
+	}
 	desktop_ignore_broken_pipe()
+	standalone := desktop_spawn_app(arguments()[0], 'voffice-calc', 0, true) or {
+		panic('could not start standalone app fixture')
+	}
+	mut standalone_marker := [1]u8{}
+	mut standalone_replied := false
+	for _ in 0 .. 100 {
+		if desktop_read(standalone.from_child, &standalone_marker[0], 1) == 1 {
+			standalone_replied = true
+			break
+		}
+		desktop_sleep_ms(10)
+	}
+	assert standalone_replied && standalone_marker[0] == `S`
+	desktop_close(standalone.to_child)
+	desktop_close(standalone.from_child)
+	assert desktop_wait_child(standalone.pid) == 0
 
 	// A silent application process must not be able to hold the system session
 	// before its first framebuffer present (or during a later Settings action).
@@ -58,6 +97,31 @@ fn main() {
 	assert response_timed_out
 	desktop_close(int(silent_pipe[0]))
 	desktop_close(int(silent_pipe[1]))
+	// The timeout must also cover a client that sends a valid response header
+	// and only part of its advertised tree, while keeping the pipe open.
+	mut partial_pipe := [2]i32{}
+	assert C.pipe(&partial_pipe[0]) == 0
+	assert desktop_set_nonblocking(int(partial_pipe[0]), true)
+	mut partial_header := []u8{cap: app_response_header_size}
+	wire_put_u32(mut partial_header, app_protocol_magic)
+	wire_put_u8(mut partial_header, app_protocol_version)
+	wire_put_u8(mut partial_header, 0)
+	wire_put_u8(mut partial_header, 0)
+	wire_put_u8(mut partial_header, 0)
+	wire_put_state(mut partial_header, AppWireState{})
+	wire_put_u32(mut partial_header, 4)
+	assert partial_header.len == app_response_header_size
+	assert desktop_write_all(int(partial_pipe[1]), partial_header.data, u64(partial_header.len))
+	assert desktop_write_all(int(partial_pipe[1]), c'x', 1)
+	mut partial_timed_out := false
+	receive_app_response_with_timeout(int(partial_pipe[0]), 20) or {
+		assert err.msg() == 'application response payload timed out or pipe closed'
+		partial_timed_out = true
+	}
+	assert partial_timed_out
+	unsafe { partial_header.free() }
+	desktop_close(int(partial_pipe[0]))
+	desktop_close(int(partial_pipe[1]))
 	// A cold persistent home can make Files' initial directory scan slower
 	// than a normal interaction. Boot-started apps get that larger budget;
 	// requests after startup still fail promptly through the timeout above.
@@ -69,7 +133,7 @@ fn main() {
 	assert available_apps[3].poll_interval_ms == 100
 	assert available_apps[5].poll_interval_ms == 1000
 	assert available_apps[8].poll_interval_ms == 100
-	assert available_apps[10].poll_interval_ms == 0
+	assert available_apps[9].poll_interval_ms == 0
 	assert remote_app_poll_due(50, false, 0, 1_000)
 	assert !remote_app_poll_due(50, true, 1_000, 1_049)
 	assert remote_app_poll_due(50, true, 1_000, 1_050)
@@ -90,11 +154,16 @@ fn main() {
 	assert cadence_desktop.idle_wait_interval(1000, 16) == 16
 
 	mut desktop := Desktop{}
-	mut files := start_remote_app_at(arguments()[0], available_apps[0], mut desktop) or {
+	mut files := start_remote_app_at_with_timeout(arguments()[0], available_apps[0], mut desktop,
+		app_response_timeout_ms) or {
 		panic(err)
 	}
 	if mut files is RemoteApp {
 		assert files.pid > 0
+		// Large response frames must not depend on a blocking pipe hand-off:
+		// Vinix's compositor and app otherwise can both sleep while transferring
+		// one tree during session startup.
+		assert C.fcntl(files.response_fd, C.F_GETFL) & C.O_NONBLOCK != 0
 	}
 	files_tree := files.build(ui2.rect(0, 0, 460, 326)) or { panic(err) }
 	assert files_tree.kind == .screen
@@ -106,7 +175,8 @@ fn main() {
 	// A native application may abort for reasons outside the protocol. Its
 	// process must be the only casualty: the compositor side closes the broken
 	// transport and remains able to launch and render another application.
-	mut crashing_files := start_remote_app_at(arguments()[0], available_apps[0], mut desktop) or {
+	mut crashing_files := start_remote_app_at_with_timeout(arguments()[0], available_apps[0], mut desktop,
+		app_response_timeout_ms) or {
 		panic(err)
 	}
 	mut crashed_pid := -1
@@ -124,7 +194,8 @@ fn main() {
 		assert crashing_files.closed
 	}
 
-	mut settings := start_remote_app_at(arguments()[0], available_apps[4], mut desktop) or {
+	mut settings := start_remote_app_at_with_timeout(arguments()[0], available_apps[4], mut desktop,
+		app_response_timeout_ms) or {
 		panic(err)
 	}
 	settings.handle('${settings_action_category}1') or { panic(err) }
@@ -136,10 +207,13 @@ fn main() {
 	settings_tree := settings.build(ui2.rect(0, 0, 620, 386)) or { panic(err) }
 	assert settings_tree.kind == .screen
 	assert tree_has_id(settings_tree, settings_scale_100_action)
+	assert tree_has_native_button(settings_tree, settings_scale_100_action, false)
+	assert tree_has_native_button(settings_tree, settings_scale_200_action, true)
 	free_tree(settings_tree)
 	close_remote(mut settings)
 
-	mut capture := start_remote_app_at(arguments()[0], available_apps[15], mut desktop) or {
+	mut capture := start_remote_app_at_with_timeout(arguments()[0], available_apps[14], mut desktop,
+		app_response_timeout_ms) or {
 		panic(err)
 	}
 	capture_tree := capture.build(ui2.rect(0, 0, 560, 396)) or { panic(err) }
@@ -158,7 +232,8 @@ fn main() {
 	// new size. The terminal rebuilds its grid there, and releasing the old
 	// row cache twice used to abort the application process, leaving the
 	// window able to report only that its application had stopped drawing.
-	mut terminal := start_remote_app_at(arguments()[0], available_apps[3], mut desktop) or {
+	mut terminal := start_remote_app_at_with_timeout(arguments()[0], available_apps[3], mut desktop,
+		app_response_timeout_ms) or {
 		panic(err)
 	}
 	terminal_tree := terminal.build(ui2.rect(0, 0, 560, 316)) or { panic(err) }

@@ -2,8 +2,21 @@
 module proc
 
 import klock
+import katomic
 import x86.cpu.local as cpulocal
 import event.eventstruct
+
+pub fn (t &Thread) current_syscall() (i64, u64) {
+	return -1, 0
+}
+
+pub fn (t &Thread) syscall_args_text() string {
+	return ''
+}
+
+// What a wait a signal interrupted reports. The x86-64 syscall exit has no
+// restart, so the caller sees EINTR.
+pub const interrupted_errno = 4
 
 pub struct Thread {
 pub mut:
@@ -16,6 +29,7 @@ pub mut:
 	syscall_num  u64
 	// Movable members
 	tid                int
+	ns_tid             int
 	is_in_queue        bool
 	l                  klock.Lock
 	process            &Process = unsafe { nil }
@@ -68,6 +82,16 @@ pub mut:
 	// it up, which is what claims it: the scheduler then prefers to keep it
 	// there, next to the pages it faulted in. -1 means no CPU has run it yet.
 	numa_node int = -1
+	// Root, working directory and mount namespace of this thread's own, once
+	// unshare(2) has split them off from its process'. See ThreadFS.
+	fs &ThreadFS = unsafe { nil }
+	// References held by code that found this thread under a lock and went on
+	// using it after letting go. See pin_thread().
+	pins int
+	// A mask sigsuspend(2) installed temporarily. The next handler frame has to
+	// carry the mask from before the call, so that sigreturn restores it.
+	saved_mask       u64
+	saved_mask_valid bool
 }
 
 pub fn current_thread() &Thread {
@@ -79,4 +103,61 @@ pub fn current_thread() &Thread {
 	}
 
 	return ret
+}
+
+// Code that keeps using a thread past the lock it found it under pins it first
+// and unpins it when done. The arm64 reaper holds a pinned corpse back; see the
+// longer note in proc_arm64.v. Shared callers use the same calls on both.
+
+// Pin a thread found under pid_lock or its process' threads_lock, before
+// letting go of that lock.
+pub fn pin_thread(t &Thread) {
+	mut thread := unsafe { t }
+	katomic.inc(mut &thread.pins)
+}
+
+// Give back a pin. The thread may be freed as soon as this returns, so this is
+// the last thing the caller does with it.
+pub fn unpin_thread(t &Thread) {
+	mut thread := unsafe { t }
+	katomic.dec(mut &thread.pins)
+}
+
+pub fn thread_is_pinned(t &Thread) bool {
+	return katomic.load(&t.pins) != 0
+}
+
+// The thread with id `tid`, pinned; the caller unpins it. Nil if there is none.
+pub fn get_thread(tid int) &Thread {
+	if tid <= 0 || tid >= max_pid {
+		return unsafe { nil }
+	}
+
+	pid_lock.acquire()
+	defer {
+		pid_lock.release()
+	}
+
+	t := threads_by_tid[tid]
+	if t != unsafe { nil } {
+		pin_thread(t)
+	}
+	return t
+}
+
+// The first thread of `process`, which is the one signals aimed at the process
+// as a whole wait on, pinned; the caller unpins it. Nil if it has none left.
+pub fn get_main_thread(process &Process) &Thread {
+	mut target := unsafe { process }
+	target.threads_lock.acquire()
+	defer {
+		target.threads_lock.release()
+	}
+
+	if target.threads.len == 0 {
+		return unsafe { nil }
+	}
+	t := target.threads[0]
+	pin_thread(t)
+	return t
 }

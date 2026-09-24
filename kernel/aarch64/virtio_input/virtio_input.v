@@ -157,19 +157,22 @@ __global (
 	// coordinates spanning 0..max, which is what an absolute device reports;
 	// a relative device is integrated into the same span so both kinds reach
 	// userland as one position.
-	vi_ptr_present  = false
-	vi_ptr_absolute = false
-	vi_ptr_x        = int(0)
-	vi_ptr_y        = int(0)
-	vi_ptr_max_x    = int(0)
-	vi_ptr_max_y    = int(0)
-	vi_ptr_buttons  = u32(0)
+	vi_ptr_present   = false
+	vi_ptr_absolute  = false
+	vi_ptr_x         = int(0)
+	vi_ptr_y         = int(0)
+	vi_ptr_max_x     = int(0)
+	vi_ptr_max_y     = int(0)
+	vi_ptr_buttons   = u32(0)
 	// Edges latched between two reads, so a click shorter than the reader's
 	// frame interval is still seen.
-	vi_ptr_pressed  = u32(0)
-	vi_ptr_released = u32(0)
-	vi_ptr_scroll   = int(0)
-	vi_ptr_callback = voidptr(0)
+	vi_ptr_pressed   = u32(0)
+	vi_ptr_released  = u32(0)
+	vi_ptr_scroll    = int(0)
+	vi_ptr_callback  = voidptr(0)
+	// Another input driver polled alongside these devices; see
+	// set_extra_poller().
+	vi_extra_poller  = voidptr(0)
 )
 
 // /dev/pointer owns readiness and registers this after publishing its resource.
@@ -177,6 +180,65 @@ __global (
 // and the VirtIO state it snapshots.
 pub fn set_pointer_event_callback(callback voidptr) {
 	vi_ptr_callback = callback
+}
+
+// A USB keyboard or pointer (aarch64.xhci) reports through the same state as
+// the virtio devices, so the console and /dev/pointer see one keyboard and one
+// pointer whichever bus they sit on. `callback` runs inside poll(), after the
+// virtio queues, and hands its events to the report_* functions below.
+pub fn set_extra_poller(callback voidptr) {
+	vi_extra_poller = callback
+}
+
+// A key went down (1), came up (0) or repeats (2). `code` is a Linux keycode.
+pub fn report_key(code u16, value u32) {
+	process_key(code, value)
+}
+
+// Announce a pointer before its first report, so /dev/pointer has a range to
+// scale by from the start. An absolute device reports 0..max on each axis; a
+// relative one is integrated over a span picked here, as for virtio.
+pub fn declare_pointer(absolute bool, max_x int, max_y int) {
+	if vi_ptr_present && vi_ptr_absolute && !absolute {
+		return
+	}
+	vi_ptr_present = true
+	vi_ptr_absolute = absolute
+	vi_ptr_max_x = if absolute { max_x } else { 32767 }
+	vi_ptr_max_y = if absolute { max_y } else { 32767 }
+	vi_ptr_x = vi_ptr_max_x / 2
+	vi_ptr_y = vi_ptr_max_y / 2
+}
+
+pub fn report_absolute(x int, y int) {
+	vi_ptr_x = clamp_axis(x, vi_ptr_max_x)
+	vi_ptr_y = clamp_axis(y, vi_ptr_max_y)
+	notify_pointer_event()
+}
+
+pub fn report_relative(dx int, dy int) {
+	if dx != 0 {
+		process_rel(rel_x, u32(dx))
+	}
+	if dy != 0 {
+		process_rel(rel_y, u32(dy))
+	}
+}
+
+pub fn report_scroll(delta int) {
+	if delta != 0 {
+		process_rel(rel_wheel, u32(delta))
+	}
+}
+
+// The whole button state, bit 0 the left button; only changes are reported on.
+pub fn report_buttons(buttons u32) {
+	changed := buttons ^ vi_ptr_buttons
+	for bit := u32(0); bit <= u32(btn_last - btn_left); bit++ {
+		if changed & (u32(1) << bit) != 0 {
+			process_button(btn_left + u16(bit), (buttons >> bit) & 1)
+		}
+	}
 }
 
 fn notify_pointer_event() {
@@ -228,6 +290,27 @@ fn vi_emit_arrow(final u8) {
 	vi_put(0x1b)
 	vi_put(u8(`[`))
 	vi_put(final)
+}
+
+fn vi_emit_arrow_key(final u8) {
+	if !vi_meta_active {
+		vi_emit_arrow(final)
+		return
+	}
+	mut modifiers := u32(8)
+	if vi_shift_active {
+		modifiers |= 1
+	}
+	if vi_alt_active {
+		modifiers |= 2
+	}
+	if vi_ctrl_active {
+		modifiers |= 4
+	}
+	vi_puts(c'\e[1;')
+	vi_put_uint(1 + modifiers)
+	vi_put(final)
+	vi_meta_chorded = true
 }
 
 fn vi_emit_tilde(num u8) {
@@ -347,19 +430,19 @@ fn process_key(code u16, value u32) {
 	// Extended keys (outside conversion table range)
 	match code {
 		key_up {
-			vi_emit_arrow(u8(`A`))
+			vi_emit_arrow_key(u8(`A`))
 			return
 		}
 		key_down {
-			vi_emit_arrow(u8(`B`))
+			vi_emit_arrow_key(u8(`B`))
 			return
 		}
 		key_right {
-			vi_emit_arrow(u8(`C`))
+			vi_emit_arrow_key(u8(`C`))
 			return
 		}
 		key_left {
-			vi_emit_arrow(u8(`D`))
+			vi_emit_arrow_key(u8(`D`))
 			return
 		}
 		key_home {
@@ -629,5 +712,8 @@ pub fn poll() {
 
 	for i := 0; i < vi_dev_count; i++ {
 		poll_device(i)
+	}
+	if vi_extra_poller != voidptr(0) {
+		C.vinix_call_void_fn(vi_extra_poller)
 	}
 }

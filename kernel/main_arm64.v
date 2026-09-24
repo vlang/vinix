@@ -7,6 +7,7 @@ import lib.stubs
 import aarch64.cpu
 import aarch64.cpu.local as cpulocal
 import aarch64.exception
+import aarch64.firmware
 import aarch64.aic
 import aarch64.gic
 import aarch64.timer
@@ -18,10 +19,13 @@ import aarch64.virtio_input
 import aarch64.virtio_gpu
 import aarch64.virtio_blk
 import aarch64.virtio_net
+import aarch64.virtio_snd
+import aarch64.xhci
 import apple.smc
 import apple.ans
 import apple.typec
 import devicetree
+import pci
 import initramfs
 import numa
 import fs
@@ -46,6 +50,7 @@ import dev.fbdev.simple
 import dev.pointerdev
 import dev.procdev
 import dev.pty
+import dev.tty
 import dev.random
 import dev.streams
 import time
@@ -146,9 +151,16 @@ fn parse_aic_guest_virtual_timer_irq() ?u32 {
 // hardware IRQ event, so it must be serviced from the FIQ dispatch path and
 // gated on the timer's own ISTATUS rather than on an AIC IRQ number.
 fn aic_fiq_handler(gpr_state voidptr) {
-	if timer.is_pending() {
+	sched.gpu_exec_fiq_trace(0, 0)
+	ctl := cpu.read_cntv_ctl_el0()
+	sched.gpu_exec_fiq_trace(1, ctl)
+	if ctl & 4 != 0 {
+		sched.gpu_exec_fiq_trace(2, ctl)
 		timer_handler := sched.get_timer_handler()
 		timer_handler(gpr_state)
+		sched.gpu_exec_fiq_trace(3, cpu.read_cntv_ctl_el0())
+	} else {
+		sched.gpu_exec_fiq_trace(4, ctl)
 	}
 }
 
@@ -164,7 +176,7 @@ fn bootstrap_cpu0() {
 	print('CPU 0 bootstrap done\n')
 }
 
-fn kmain_thread(qemu_platform bool) {
+fn kmain_thread(qemu_platform bool, acpi_platform bool) {
 	boot_stage(11)
 	print('kmain_thread: started\n')
 
@@ -262,6 +274,9 @@ fn kmain_thread(qemu_platform bool) {
 
 	table.init_syscall_table()
 	table.init_storage_syscalls()
+	table.init_container_syscalls()
+	// cgroup.kill sends a signal, which lives above fs; hand it the entry point.
+	fs.set_cgroup_signal_hook(voidptr(userland.cgroup_kill_process))
 	print('kmain_thread: syscall table done\n')
 
 	// Register segfault handler so user-space crashes kill the process
@@ -273,6 +288,9 @@ fn kmain_thread(qemu_platform bool) {
 	random.initialise()
 	print('kmain_thread: random done\n')
 	if qemu_platform {
+		virtio_snd.initialise(memory.get_hhdm_offset())
+	}
+	if qemu_platform {
 		virtio_gpu.initialise(memory.get_hhdm_offset())
 	}
 
@@ -280,6 +298,11 @@ fn kmain_thread(qemu_platform bool) {
 	fbdev.register_driver(simple.get_driver())
 	print('kmain_thread: fbdev done\n')
 
+	// A USB keyboard and pointer, before /dev/pointer takes the pointer's
+	// range. They are all a VirtualBox VM has to type and point with.
+	if qemu_platform || acpi_platform {
+		start_usb()
+	}
 	pointerdev.initialise()
 	print('kmain_thread: pointer done\n')
 
@@ -289,6 +312,7 @@ fn kmain_thread(qemu_platform bool) {
 	print('kmain_thread: pty done\n')
 
 	console.initialise()
+	tty.initialise()
 	print('kmain_thread: console done\n')
 
 	// ANS is independent of the GPU, and disabled unless explicitly requested.
@@ -326,6 +350,21 @@ const writeback_interval_seconds = i64(5)
 // all. Linux answers this with a writeback timer; so does this thread. sync(2)
 // and reboot(2) are still the exact guarantees, and this only bounds the window
 // for everything that never calls them, including a VM window simply closed.
+// Map PCIe configuration space from the MCFG, scan it, and start any xHCI
+// controller found there.
+fn start_usb() {
+	ecam := firmware.pcie_ecam() or {
+		print('pci: no MCFG; skipping PCIe\n')
+		return
+	}
+	buses := u64(ecam.end_bus) + 1
+	pci.set_ecam(memory.map_mmio(ecam.base, buses << 20))
+	pci.initialise()
+	if !xhci.initialise() {
+		print('xhci: no USB controller\n')
+	}
+}
+
 fn writeback_thread() {
 	for {
 		mut events := []&eventstruct.Event{}
@@ -650,6 +689,16 @@ fn kmain() {
 
 	configure_apple_bringup_from_cmdline()
 
+	// QEMU's virt machine names itself in its ACPI tables, so an image booted
+	// in QEMU without vinix.qemu_platform=1 -- a release ISO, say -- still gets
+	// its keyboard, tablet and interrupt controller. Apple hardware has no ACPI.
+	// vinix.platform=acpi skips this, so the path other UEFI machines take can
+	// be exercised in QEMU.
+	if !force_qemu_platform && firmware.is_qemu()
+		&& !early_cmdline_contains('vinix.platform=acpi') {
+		force_qemu_platform = true
+	}
+
 	// Optional QEMU virt MMIO path (PL011/GIC/Virtio-input). Keep this opt-in
 	// so missing DTB on real hardware does not trigger invalid MMIO accesses.
 	if force_qemu_platform {
@@ -750,6 +799,19 @@ fn kmain() {
 	}
 	boot_stage(8)
 
+	// A UEFI machine other than QEMU -- VirtualBox's, say -- describes its
+	// console UART and interrupt controller in ACPI instead of putting them at
+	// QEMU's addresses. Apple hardware has no ACPI and took the path above.
+	acpi_platform := !use_aic && !force_qemu_platform && firmware.has_acpi()
+	if acpi_platform {
+		// VirtualBox has no SPCR; its UART is only in the DSDT.
+		uart_phys := firmware.console_uart() or { firmware.dsdt_pl011() or { u64(0) } }
+		if uart_phys != 0 {
+			uart.initialise(memory.map_mmio(uart_phys, 0x1000))
+			uart.puts(c'\n=== Vinix aarch64 booting (ACPI) ===\n')
+		}
+	}
+
 	// Virtio-input keyboard probe/GIC setup is for the QEMU virt machine.
 	if !use_aic && force_qemu_platform {
 		print('init virtio-input...\n')
@@ -772,6 +834,14 @@ fn kmain() {
 		print('init gic (QEMU virt)...\n')
 		gic.initialise(memory.get_hhdm_offset())
 		print('gic done\n')
+	} else if acpi_platform {
+		if g := firmware.gic() {
+			print('init gic (ACPI: GICD 0x${g.dist:x}, GICR 0x${g.redist:x})...\n')
+			gic.initialise_at(g.dist, g.redist, g.redist_len)
+			print('gic done\n')
+		} else {
+			print('no GIC in the MADT\n')
+		}
 	}
 
 	// ARM64 PCI ECAM setup is not wired yet; skip to avoid unsafe probing.
@@ -818,7 +888,7 @@ fn kmain() {
 	print('init sched...\n')
 	sched.initialise()
 	// Wire scheduler timer callback for the active interrupt controller.
-	if !use_aic && force_qemu_platform {
+	if !use_aic && gic.is_initialised() {
 		gic.set_timer_handler(sched.get_timer_handler())
 	}
 	print('sched done\n')
@@ -827,7 +897,7 @@ fn kmain() {
 	print('spawning kmain_thread via scheduler...\n')
 	// Capture the early platform decision before the scheduler handoff. Limine's
 	// response storage is bootloader-owned and must not be re-read later.
-	spawn kmain_thread(force_qemu_platform)
+	spawn kmain_thread(force_qemu_platform, acpi_platform)
 	print('spawn done, calling await...\n')
 
 	sched.await()

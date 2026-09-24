@@ -19,7 +19,21 @@ import krandom
 
 fn C.sched_switch_context(gpr_state voidptr, kernel_stack u64)
 
-fn C.vinix_enter_idle(stack_top u64, entry voidptr)
+fn C.vinix_enter_idle(stack_top u64, entry voidptr, thread voidptr)
+
+// The outgoing thread's lock protects its kernel stack. Release it only after
+// the CPU has switched to its private idle stack; another CPU may otherwise
+// resume that thread and overwrite the scheduler's still-active return frames.
+@[noreturn]
+fn finish_eviction(_thread voidptr) {
+	mut thread := unsafe { &proc.Thread(_thread) }
+	thread.l.release()
+	// A replacement was often already runnable. Dispatch it now instead of
+	// adding an idle-timer tick to every ordinary context switch.
+	scheduler_timer_handler(unsafe { nil })
+	await()
+	for {}
+}
 
 // Go idle on this CPU's own stack instead of returning.
 //
@@ -30,14 +44,14 @@ fn C.vinix_enter_idle(stack_top u64, entry voidptr)
 // CPU is free to resume it, so returning would put two CPUs on one stack. Leave
 // for a stack nobody else can be using.
 @[noreturn]
-fn evict_to_idle(cpu_number u64) {
+fn evict_to_idle(cpu_number u64, thread &proc.Thread) {
 	mut index := cpu_number
 	if index >= max_idle_stacks {
 		index = max_idle_stacks - 1
 	}
 	mut top := u64(voidptr(&idle_stacks[index][0])) + u64(idle_stack_size)
 	top &= ~u64(0xf)
-	C.vinix_enter_idle(top, voidptr(await))
+	C.vinix_enter_idle(top, voidptr(finish_eviction), voidptr(thread))
 	for {}
 }
 
@@ -46,6 +60,8 @@ fn C.vinix_call_void_fn(f voidptr)
 fn C.yield_dispatch(handler voidptr)
 
 const max_reap_slots = 256
+
+const max_deferred_reaps = 64
 
 // The same count as the per-CPU exception stacks. A CPU past the end shares the
 // last stack, which is only reached when that CPU is idling anyway.
@@ -56,6 +72,9 @@ const idle_stack_size = 32768
 __global (
 	// Per-CPU parking slot for the thread that most recently died there.
 	reap_slots [max_reap_slots]&proc.Thread
+	// Corpses still pinned when their turn to be freed came. See defer_reap().
+	reap_deferred_slots [max_deferred_reaps]&proc.Thread
+	reap_deferred_lock  klock.Lock
 	// One idle stack per CPU, for the case where a CPU has to leave a thread's
 	// stack behind rather than return onto it: see evict_to_idle(). 32 KiB is
 	// what await() and one pass of the scheduler need.
@@ -66,11 +85,169 @@ __global (
 	// loop, a blocking yield and a timeslice can be on three different CPUs.
 	input_poll_lock            klock.Lock
 	last_syscall_input_poll_ns u64
+	// The first context switch into vinix-desktop-gpu is the boundary which
+	// differs between QEMU and the M1. Point at that thread's saved register
+	// state so the assembly restore can emit checkpoints without flooding every
+	// ordinary context switch on the machine.
+	gpu_exec_switch_state u64
+	gpu_exec_switch_cpu   = u64(-1)
+	// Interrupt-side continuation of the same one-shot trace. The first
+	// lower-EL IRQ/FIQ transfers ownership here so the context-switch marker
+	// does not recursively trace later switches while the interrupt dispatcher
+	// can still identify exactly where that first exception stops.
+	gpu_exec_interrupt_active = u64(0)
+	gpu_exec_interrupt_cpu    = u64(-1)
+	gpu_exec_interrupt_kind   u64
+	gpu_exec_interrupt_state  u64
+	// Printing to the framebuffer is slow enough to consume a short scheduler
+	// slice. Hold the first GPU desktop slice here and arm it only after the
+	// final traced checkpoint immediately before eret.
+	gpu_exec_deferred_timeslice u64
 )
 
+fn gpu_exec_interrupt_trace_active(cpu_number u64) bool {
+	return katomic.load(&gpu_exec_interrupt_active) != 0
+		&& katomic.load(&gpu_exec_interrupt_cpu) == cpu_number
+}
+
+fn clear_gpu_exec_interrupt_trace() {
+	katomic.store(mut &gpu_exec_interrupt_active, u64(0))
+	katomic.store(mut &gpu_exec_interrupt_cpu, u64(-1))
+	katomic.store(mut &gpu_exec_interrupt_kind, u64(0))
+	katomic.store(mut &gpu_exec_interrupt_state, u64(0))
+}
+
+@[export: 'scheduler_gpu_context_trace']
+fn scheduler_gpu_context_trace(gpr_state voidptr, phase u64) {
+	if katomic.load(&gpu_exec_switch_state) != u64(gpr_state) {
+		return
+	}
+	state := unsafe { &cpulocal.GPRState(gpr_state) }
+
+	match phase {
+		0 { println('exec[gpu]/switch: entered sched_switch_context assembly') }
+		1 { println('exec[gpu]/switch: ELR and SPSR programmed') }
+		2 {
+			println('exec[gpu]/switch: eret readback ELR=0x${cpu.read_elr_el1():x} SPSR=0x${cpu.read_spsr_el1():x} CurrentEL=0x${cpu.read_currentel():x}')
+			println('exec[gpu]/switch: saved target pc=0x${state.pc:x} sp=0x${state.sp:x} pstate=0x${state.pstate:x} tls=0x${state.tpidr_el0:x}')
+			deferred_slice := katomic.load(&gpu_exec_deferred_timeslice)
+			println('exec[gpu]/switch: target stack and TPIDR ready; arming deferred ${deferred_slice} us timeslice')
+			// Nothing may print after this arm: on the M1 each production log also
+			// redraws the framebuffer, and the old diagnostic path could expire the
+			// new thread's entire slice before assembly reached eret.
+			katomic.store(mut &gpu_exec_deferred_timeslice, u64(0))
+			if deferred_slice != 0 {
+				timer.oneshot(deferred_slice)
+			}
+			// Keep the trace armed across eret. The first lower-EL exception
+			// vector clears it after saving the exception frame, which lets the
+			// M1 distinguish an eret which never completes from an immediate
+			// instruction abort, interrupt, FIQ, or SError.
+		}
+		else { println('exec[gpu]/switch: unknown assembly phase ${phase}') }
+	}
+}
+
+// Record the very first exception after the initial context switch into the
+// GPU desktop. This hook is called directly by the lower-EL vector stubs after
+// SAVE_REGS has made the interrupted user register state safe. It intentionally
+// runs before the ordinary syscall, page-fault, and IRQ dispatchers: if one of
+// those paths stalls, the last visible line still identifies the exception
+// which successfully crossed eret.
+@[export: 'scheduler_gpu_lower_exception_trace']
+fn scheduler_gpu_lower_exception_trace(esr u64, far u64, raw_state voidptr, kind u64) {
+	if katomic.load(&gpu_exec_switch_state) == 0 {
+		return
+	}
+	cpu_number := cpu.read_tpidr_el1()
+	if katomic.load(&gpu_exec_switch_cpu) != cpu_number {
+		return
+	}
+
+	// IRQ and FIQ dispatch have several important stages after vector entry.
+	// Transfer those two kinds to a separate one-shot state before disarming
+	// the context-switch trace. Synchronous faults and SError already have
+	// dedicated dispatch diagnostics and end the handoff trace here.
+	if kind == 1 || kind == 2 {
+		katomic.store(mut &gpu_exec_interrupt_cpu, cpu_number)
+		katomic.store(mut &gpu_exec_interrupt_kind, kind)
+		katomic.store(mut &gpu_exec_interrupt_state, u64(raw_state))
+		katomic.store(mut &gpu_exec_interrupt_active, u64(1))
+	}
+	katomic.store(mut &gpu_exec_switch_state, u64(0))
+	katomic.store(mut &gpu_exec_switch_cpu, u64(-1))
+	state := unsafe { &cpulocal.GPRState(raw_state) }
+	name := match kind {
+		0 { 'synchronous' }
+		1 { 'IRQ' }
+		2 { 'FIQ' }
+		3 { 'SError' }
+		else { 'unknown' }
+	}
+	println('exec[gpu]/eret: crossed into EL0; first lower-EL ${name} vector entered on CPU ${cpu_number}')
+	println('exec[gpu]/eret: ESR=0x${esr:x} EC=0x${esr >> 26:x} FAR=0x${far:x}')
+	println('exec[gpu]/eret: exception frame pc=0x${state.pc:x} sp=0x${state.sp:x} pstate=0x${state.pstate:x} x0=0x${state.x0:x} x8=0x${state.x8:x}')
+}
+
+// Mark the boundaries around the common IRQ dispatcher from the lower-EL
+// vector. Phase 2 is the final operation before restoring the saved EL0 frame;
+// if the scheduler retained this thread, arm its deferred fresh timeslice only
+// after every slow diagnostic print is finished.
+@[export: 'scheduler_gpu_interrupt_trace']
+pub fn scheduler_gpu_interrupt_trace(raw_state voidptr, phase u64) {
+	cpu_number := cpu.read_tpidr_el1()
+	if !gpu_exec_interrupt_trace_active(cpu_number)
+		|| katomic.load(&gpu_exec_interrupt_state) != u64(raw_state) {
+		return
+	}
+
+	kind := if katomic.load(&gpu_exec_interrupt_kind) == 2 { 'FIQ' } else { 'IRQ' }
+	match phase {
+		0 { println('exec[gpu]/${kind}: entering common interrupt dispatcher') }
+		1 { println('exec[gpu]/${kind}: common interrupt dispatcher returned; running exit barrier') }
+		2 {
+			deferred_slice := katomic.load(&gpu_exec_deferred_timeslice)
+			if deferred_slice != 0 {
+				println('exec[gpu]/${kind}: exit barrier complete; arming deferred ${deferred_slice} us timeslice and restoring EL0')
+			} else {
+				println('exec[gpu]/${kind}: exit barrier complete; restoring saved EL0 frame')
+			}
+			clear_gpu_exec_interrupt_trace()
+			katomic.store(mut &gpu_exec_deferred_timeslice, u64(0))
+			if deferred_slice != 0 {
+				timer.oneshot(deferred_slice)
+			}
+		}
+		else { println('exec[gpu]/${kind}: unknown vector phase ${phase}') }
+	}
+}
+
+// The Apple architectural timer arrives through the FIQ callback ahead of the
+// AIC event drain. These markers distinguish a timer-status read, scheduler
+// stall, and AIC_EVENT stall without tracing every interrupt after startup.
+pub fn gpu_exec_fiq_trace(phase u64, cntv_ctl u64) {
+	cpu_number := cpu.read_tpidr_el1()
+	if !gpu_exec_interrupt_trace_active(cpu_number) {
+		return
+	}
+	match phase {
+		0 { println('exec[gpu]/FIQ: platform FIQ callback entered') }
+		1 { println('exec[gpu]/FIQ: CNTV_CTL=0x${cntv_ctl:x} pending=${cntv_ctl & 4 != 0}') }
+		2 { println('exec[gpu]/FIQ: virtual timer pending; entering scheduler timer handler') }
+		3 { println('exec[gpu]/FIQ: scheduler timer handler returned; CNTV_CTL=0x${cntv_ctl:x}') }
+		4 { println('exec[gpu]/FIQ: virtual timer not pending; continuing with AIC event drain') }
+		else { println('exec[gpu]/FIQ: unknown callback phase ${phase}') }
+	}
+}
+
 pub fn initialise() {
+	// The kernel acts with every capability: file permissions are lifted by
+	// capabilities, not by a uid of zero, and kernel threads create files
+	// wherever the initramfs puts them.
 	kernel_process = &proc.Process{
 		pagemap: &kernel_pagemap
+		caps:    proc.full_capabilities()
+		fds:     []voidptr{len: proc.max_fds}
 	}
 
 	// Release the secondary CPUs into the scheduler.
@@ -348,10 +525,17 @@ fn realtime_work_pending(cpu_number u64) bool {
 	if realtime_throttled(cpu_number, now_ns) {
 		return false
 	}
+	scheduler_queue_lock.acquire()
+	defer {
+		scheduler_queue_lock.release()
+	}
 
 	for i := 0; i < max_running_threads; i++ {
 		mut t := scheduler_running_queue[i]
 		if unsafe { t == nil } {
+			continue
+		}
+		if katomic.load(&t.is_dead) {
 			continue
 		}
 		if !t.sched.is_realtime() || t.l.is_held() {
@@ -375,6 +559,10 @@ fn realtime_work_pending(cpu_number u64) bool {
 // the memory it faulted in, while a node with nothing to do still takes work
 // from a busy one rather than idling.
 fn get_next_thread() &proc.Thread {
+	scheduler_queue_lock.acquire()
+	defer {
+		scheduler_queue_lock.release()
+	}
 	mut cpu_local := cpulocal.current()
 
 	if numa_multinode {
@@ -418,6 +606,9 @@ fn scan_run_queue_in_turn(mut cpu_local cpulocal.Local, want_node int) &proc.Thr
 
 		mut t := scheduler_running_queue[index]
 		if unsafe { t == nil } {
+			continue
+		}
+		if katomic.load(&t.is_dead) {
 			continue
 		}
 		if !may_run_here(t, cpu_local.cpu_number) {
@@ -466,6 +657,9 @@ fn scan_run_queue_ranked(mut cpu_local cpulocal.Local, want_node int) &proc.Thre
 
 			mut t := scheduler_running_queue[index]
 			if unsafe { t == nil } {
+				continue
+			}
+			if katomic.load(&t.is_dead) {
 				continue
 			}
 			if !may_run_here(t, cpu_local.cpu_number) {
@@ -549,6 +743,14 @@ fn effective_timeslice(t &proc.Thread) u64 {
 }
 
 fn scheduler_timer_handler(_gpr_state voidptr) {
+	dispatch_cpu := cpu.read_tpidr_el1()
+	trace_gpu_switch := katomic.load(&gpu_exec_switch_state) != 0
+		&& katomic.load(&gpu_exec_switch_cpu) == dispatch_cpu
+	trace_gpu_interrupt := gpu_exec_interrupt_trace_active(dispatch_cpu)
+	trace_gpu_dispatch := trace_gpu_switch || trace_gpu_interrupt
+	if trace_gpu_dispatch {
+		println('exec[gpu]/sched: immediate scheduler handler entered on CPU ${dispatch_cpu}')
+	}
 	// The timer interrupt delivers this handler with interrupts already off,
 	// but yield()'s polling loop also calls it directly through
 	// C.yield_dispatch(), and that loop can have been resumed by
@@ -573,6 +775,9 @@ fn scheduler_timer_handler(_gpr_state voidptr) {
 
 	gpr_state := unsafe { &cpulocal.GPRState(_gpr_state) }
 	timer.stop()
+	if trace_gpu_dispatch {
+		println('exec[gpu]/sched: scheduler interrupts disabled and timer stopped')
+	}
 
 	// Tick the monotonic/realtime clocks. The interval is measured from the
 	// generic timer's counter rather than assumed, because this handler fires
@@ -582,9 +787,15 @@ fn scheduler_timer_handler(_gpr_state voidptr) {
 	// so a switch neither loses time between the two nor counts it twice.
 	now_ns := timer.get_ns()
 	time.advance_to_ns(now_ns)
+	if trace_gpu_dispatch {
+		println('exec[gpu]/sched: scheduler clock advanced to ${now_ns} ns')
+	}
 
 	// Tick per-process interval timers (SIGALRM)
 	tick_itimers()
+	if trace_gpu_dispatch {
+		println('exec[gpu]/sched: interval timers ticked; reading CPU-local state')
+	}
 
 	mut cpu_local := cpulocal.current()
 	// The idle loop normally polls UART, VirtIO input and networking. A busy
@@ -593,9 +804,18 @@ fn scheduler_timer_handler(_gpr_state voidptr) {
 	// queues. Poll once per CPU-0 timeslice as well; using one CPU preserves the
 	// drivers' single-poller assumption while keeping the desktop interactive.
 	if cpu_local.cpu_number == 0 {
+		if trace_gpu_dispatch {
+			println('exec[gpu]/sched: polling platform input before run-queue selection')
+		}
 		poll_platform_input()
+		if trace_gpu_dispatch {
+			println('exec[gpu]/sched: platform input poll complete')
+		}
 	}
 	katomic.store(mut &cpu_local.is_idle, false)
+	if trace_gpu_dispatch {
+		println('exec[gpu]/sched: CPU marked non-idle; reading current thread')
+	}
 
 	mut current_thread := proc.current_thread()
 
@@ -605,8 +825,25 @@ fn scheduler_timer_handler(_gpr_state voidptr) {
 	// below, so a thread that has just run out of budget is passed over on the
 	// scan it has run out on rather than on the next.
 	account_realtime_time(cpu_local.cpu_number, current_thread, now_ns)
+	if trace_gpu_dispatch {
+		println('exec[gpu]/sched: realtime accounting complete; selecting run-queue thread')
+	}
 
 	mut next_thread := get_next_thread()
+	if trace_gpu_dispatch {
+		println('exec[gpu]/sched: run-queue selection returned')
+	}
+	// Only the replacement thread whose first handoff was explicitly armed is
+	// interesting here. Matching the executable path alone keeps tracing every
+	// later desktop timeslice and quickly buries the one-shot eret diagnostic.
+	trace_gpu_next := unsafe { next_thread != nil }
+		&& katomic.load(&gpu_exec_switch_state) == u64(&next_thread.gpr_state)
+	if trace_gpu_next {
+		println('exec[gpu]/sched: CPU ${cpu_local.cpu_number} selected replacement thread from run queue')
+		println('exec[gpu]/sched: target pc=0x${next_thread.gpr_state.pc:x} sp=0x${next_thread.gpr_state.sp:x} ttbr0=0x${next_thread.ttbr0:x}')
+		next_thread.affinity_mask = u64(-1)
+		println('exec[gpu]/sched: first-handoff CPU pin removed')
+	}
 	// Set once this CPU has let go of the thread it was running, which decides
 	// whether the idle path below may return to its caller.
 	mut released_current := false
@@ -614,7 +851,7 @@ fn scheduler_timer_handler(_gpr_state voidptr) {
 	if unsafe { current_thread != 0 } {
 		current_thread.yield_await.release()
 
-		entitled := current_thread.is_in_queue
+		entitled := katomic.load(&current_thread.is_in_queue)
 			&& may_run_here(current_thread, cpu_local.cpu_number)
 		mut keeps_cpu := unsafe { next_thread == nil } && entitled
 		if unsafe { next_thread != nil } && entitled {
@@ -639,7 +876,13 @@ fn scheduler_timer_handler(_gpr_state voidptr) {
 			// whose affinity no longer allows this CPU, which has to be put down
 			// even with nothing to replace it.
 			current_thread.yield_requested = false
-			timer.oneshot(effective_timeslice(current_thread))
+			next_slice := effective_timeslice(current_thread)
+			if trace_gpu_interrupt {
+				println('exec[gpu]/sched: current thread keeps CPU; deferring ${next_slice} us timer rearm until vector exit')
+				katomic.store(mut &gpu_exec_deferred_timeslice, next_slice)
+			} else {
+				timer.oneshot(next_slice)
+			}
 			return
 		}
 		current_thread.yield_requested = false
@@ -665,33 +908,55 @@ fn scheduler_timer_handler(_gpr_state voidptr) {
 		current_thread.ttbr0 = cpu.read_ttbr0_el1()
 		fpu_save(current_thread.fpu_storage)
 		katomic.store(mut &current_thread.running_on, u64(-1))
-		current_thread.l.release()
 		released_current = true
 	}
 
+	if released_current {
+		// The run-queue candidate is still eligible for the idle loop's next
+		// scan. Drop its lock before parking, but retain the outgoing thread's
+		// lock until the assembly handoff has changed stacks.
+		if unsafe { next_thread != nil } {
+			next_thread.l.release()
+		}
+		if trace_gpu_interrupt {
+			clear_gpu_exec_interrupt_trace()
+		}
+		cpu.write_tpidr_el1(cpu_local.cpu_number)
+		proc.set_current_thread(cpu_local.cpu_number, unsafe { nil })
+		katomic.store(mut &cpu_local.is_idle, true)
+		kernel_pagemap.switch_to()
+		evict_to_idle(cpu_local.cpu_number, current_thread)
+	}
+
 	if unsafe { next_thread == nil } {
+		if trace_gpu_interrupt {
+			println('exec[gpu]/sched: no runnable target after first GPU interrupt; ending interrupt trace before idle')
+			clear_gpu_exec_interrupt_trace()
+		}
 		// Called from the idle loop (await): no current thread, no next
 		// thread. Go idle and return to await()'s polling loop.
 		cpu.write_tpidr_el1(cpu_local.cpu_number)
 		proc.set_current_thread(cpu_local.cpu_number, unsafe { nil })
 		katomic.store(mut &cpu_local.is_idle, true)
 		kernel_pagemap.switch_to()
-		if released_current {
-			// The call below this one is standing on the stack of the thread
-			// just released, and that thread is now resumable by any CPU that
-			// takes it off the queue. Returning would leave this CPU executing
-			// on a stack another CPU may already be using. Idle on our own
-			// instead; whoever picks the thread up restores its context in full.
-			evict_to_idle(cpu_local.cpu_number)
-		}
 		// Nothing was running here: this is await()'s own poll asking for work
 		// and finding none, so returning to its loop is exactly right.
 		return
 	}
 
 	current_thread = next_thread
+	trace_gpu_restore := trace_gpu_next || trace_gpu_interrupt
+	if trace_gpu_restore {
+		println('exec[gpu]/sched: publishing replacement as CPU current thread')
+	}
 	proc.set_current_thread(cpu_local.cpu_number, current_thread)
+	if trace_gpu_restore {
+		println('exec[gpu]/sched: replacement published; starting CPU-time accounting')
+	}
 	proc.begin_cpu_time(mut current_thread, now_ns)
+	if trace_gpu_restore {
+		println('exec[gpu]/sched: CPU-time accounting started')
+	}
 
 	// The first CPU to run a thread claims it for its node, so that the pages
 	// the thread goes on to fault in and the CPU it keeps returning to are on
@@ -699,36 +964,95 @@ fn scheduler_timer_handler(_gpr_state voidptr) {
 	if current_thread.numa_node < 0 {
 		current_thread.numa_node = int(cpu_local.numa_node)
 	}
-
-	cpu.write_tpidr_el0(current_thread.tpidr_el0)
-
-	if cpu.read_ttbr0_el1() != current_thread.ttbr0 {
-		cpu.write_ttbr0_el1(current_thread.ttbr0)
-		cpu.isb()
-		cpu.tlbi_vmalle1()
+	if trace_gpu_restore {
+		println('exec[gpu]/sched: NUMA home selected; restoring TPIDR_EL0')
 	}
 
+	cpu.write_tpidr_el0(current_thread.tpidr_el0)
+	if trace_gpu_restore {
+		println('exec[gpu]/sched: TPIDR_EL0 restored; reading current TTBR0')
+	}
+
+	old_ttbr0 := cpu.read_ttbr0_el1()
+	if trace_gpu_restore {
+		println('exec[gpu]/sched: current TTBR0=0x${old_ttbr0:x}')
+	}
+	if old_ttbr0 != current_thread.ttbr0 {
+		if trace_gpu_restore {
+			println('exec[gpu]/sched: writing replacement TTBR0')
+		}
+		cpu.write_ttbr0_el1(current_thread.ttbr0)
+		if trace_gpu_restore {
+			println('exec[gpu]/sched: replacement TTBR0 written; executing ISB')
+		}
+		cpu.isb()
+		if trace_gpu_restore {
+			println('exec[gpu]/sched: ISB complete; invalidating local TLB')
+		}
+		cpu.tlbi_vmalle1()
+		if trace_gpu_restore {
+			println('exec[gpu]/sched: local TLB invalidation complete')
+		}
+	} else if trace_gpu_restore {
+		println('exec[gpu]/sched: replacement TTBR0 already active')
+	}
+
+	if trace_gpu_restore {
+		println('exec[gpu]/sched: restoring FPU state')
+	}
 	fpu_restore(current_thread.fpu_storage)
+	if trace_gpu_restore {
+		println('exec[gpu]/sched: FPU state restored; publishing running CPU')
+	}
 	katomic.store(mut &current_thread.running_on, cpu_local.cpu_number)
+	if trace_gpu_restore {
+		println('exec[gpu]/sched: running CPU published; preparing timeslice')
+	}
 
 	// Debug: check if x30 is corrupted when restoring state for pid 3
 	if current_thread.process.pid == 3 && current_thread.gpr_state.x30 == u64(0x220000) {
 		print('\nSCHED RESTORE: pid=3 x30=0x220000! pc=0x${current_thread.gpr_state.pc:x} sp=0x${current_thread.gpr_state.sp:x} pstate=0x${current_thread.gpr_state.pstate:x}\n')
 	}
 
-	timer.oneshot(effective_timeslice(current_thread))
+	next_slice := effective_timeslice(current_thread)
+	if trace_gpu_next {
+		katomic.store(mut &gpu_exec_deferred_timeslice, next_slice)
+		println('exec[gpu]/sched: deferring ${next_slice} us timeslice until final low-level checkpoint')
+	} else {
+		timer.oneshot(next_slice)
+		if trace_gpu_restore {
+			println('exec[gpu]/sched: timeslice armed; entering low-level context restore')
+		}
+	}
+
+	if trace_gpu_interrupt {
+		println('exec[gpu]/sched: selected another thread; first GPU interrupt frame saved, ending interrupt trace')
+		clear_gpu_exec_interrupt_trace()
+	}
 
 	// Restore ARM64 GPR state and return via eret (does not return).
 	C.sched_switch_context(voidptr(&current_thread.gpr_state), current_thread.kernel_stack)
 }
 
 pub fn enqueue_thread(_thread &proc.Thread, by_signal bool) bool {
-	mut t := unsafe { _thread }
+	return enqueue_thread_impl(_thread, by_signal, false)
+}
 
-	// A torn-down thread may still be referenced by event listener slots it
-	// never got to detach; never let it back onto the run queue.
-	if t.is_dead == true {
-		return false
+pub fn enqueue_thread_traced(_thread &proc.Thread, by_signal bool) bool {
+	return enqueue_thread_impl(_thread, by_signal, true)
+}
+
+fn enqueue_thread_impl(_thread &proc.Thread, by_signal bool, trace bool) bool {
+	mut t := unsafe { _thread }
+	if trace {
+		println('exec[gpu]/sched: entered enqueue_thread')
+		first_cpu := cpu.read_tpidr_el1()
+		if first_cpu < 64 {
+			t.affinity_mask = u64(1) << first_cpu
+		}
+		katomic.store(mut &gpu_exec_switch_cpu, first_cpu)
+		katomic.store(mut &gpu_exec_switch_state, u64(&t.gpr_state))
+		println('exec[gpu]/sched: armed first-context-switch tracing on CPU ${first_cpu}')
 	}
 
 	// A signal can arrive while the target is running immediately before it
@@ -738,44 +1062,82 @@ pub fn enqueue_thread(_thread &proc.Thread, by_signal bool) bool {
 		katomic.store(mut &t.enqueued_by_signal, true)
 	}
 
+	if trace {
+		println('exec[gpu]/sched: acquiring run-queue lock')
+	}
+	scheduler_queue_lock.acquire()
+
+	// A torn-down thread may still be referenced by event listener slots it
+	// never got to detach; never let it back onto the run queue.
+	if katomic.load(&t.is_dead) == true {
+		scheduler_queue_lock.release()
+		if trace {
+			println('exec[gpu]/sched: run-queue lock acquired; ERROR replacement thread already dead')
+		}
+		return false
+	}
+
 	if t.is_in_queue == true {
+		scheduler_queue_lock.release()
+		if trace {
+			println('exec[gpu]/sched: run-queue lock acquired; replacement thread was already queued')
+		}
 		return true
 	}
 
 	for i := u64(0); i < max_running_threads; i++ {
 		if katomic.cas[&proc.Thread](mut &scheduler_running_queue[i], unsafe { nil }, t) {
-			t.is_in_queue = true
+			katomic.store(mut &t.is_in_queue, true)
 
-			// Wake any idle CPUs via SEV
-			for cpu_entry in cpu_locals {
-				if katomic.load(&cpu_entry.is_idle) == true {
-					cpu.sev()
-					break
+			// Wake an idle CPU for ordinary work. The traced exec handoff stays
+			// pinned to its current CPU until that CPU has acquired the new
+			// thread, avoiding a cross-CPU race while diagnosing the M1 path.
+			if !trace {
+				for cpu_entry in cpu_locals {
+					if katomic.load(&cpu_entry.is_idle) == true {
+						cpu.sev()
+						break
+					}
 				}
 			}
 
+			scheduler_queue_lock.release()
+			if trace {
+				println('exec[gpu]/sched: run-queue lock acquired; installed thread in slot ${i}')
+				println('exec[gpu]/sched: deferred wakeup for same-CPU exec handoff')
+				println('exec[gpu]/sched: enqueue complete; run-queue lock released')
+			}
 			return true
 		}
 	}
 
+	scheduler_queue_lock.release()
+	if trace {
+		println('exec[gpu]/sched: run-queue lock acquired; ERROR no free slot; lock released')
+	}
 	return false
 }
 
 pub fn dequeue_thread(_thread &proc.Thread) bool {
 	mut t := unsafe { _thread }
-
-	if t.is_in_queue == false {
-		return true
+	scheduler_queue_lock.acquire()
+	defer {
+		scheduler_queue_lock.release()
 	}
 
+	was_enqueued := t.is_in_queue
+	mut removed := false
 	for i := u64(0); i < max_running_threads; i++ {
 		if katomic.cas[&proc.Thread](mut &scheduler_running_queue[i], t, unsafe { nil }) {
-			t.is_in_queue = false
-			return true
+			// Remove every occurrence. This also repairs a queue corrupted by an
+			// older kernel's concurrent-wakeup race instead of leaving a stale
+			// pointer behind when the Thread is freed.
+			removed = true
 		}
 	}
+	katomic.store(mut &t.is_in_queue, false)
 
-	return false
+	return removed || !was_enqueued
 }
 
 pub fn intercept_thread(_thread &proc.Thread) ? {
@@ -800,18 +1162,37 @@ pub fn intercept_thread(_thread &proc.Thread) ? {
 	t.l.release()
 }
 
+@[noreturn]
+fn idle_after_dying_thread(trace bool) {
+	cpu.interrupt_toggle(false)
+	if trace {
+		println('exec[gpu]/sched: idle handoff disabled interrupts')
+	}
+	timer.stop()
+	if trace {
+		println('exec[gpu]/sched: idle handoff stopped old timeslice; arming immediate timer')
+	}
+	timer.oneshot(1)
+	if trace {
+		println('exec[gpu]/sched: immediate timer armed; enabling interrupts')
+	}
+	cpu.interrupt_toggle(true)
+	if trace {
+		println('exec[gpu]/sched: interrupts enabled; entering traced idle loop')
+	}
+	await_impl(trace)
+	for {}
+}
+
 pub fn yield(save_ctx bool) {
+	if save_ctx == false {
+		// Dying thread path (dequeue_and_die). Enter idle scheduler loop.
+		idle_after_dying_thread(false)
+	}
+
 	cpu.interrupt_toggle(false)
 	timer.stop()
 	mut current_thread := proc.current_thread()
-
-	if save_ctx == false {
-		// Dying thread path (dequeue_and_die). Enter idle scheduler loop.
-		timer.oneshot(1)
-		cpu.interrupt_toggle(true)
-		await()
-		return
-	}
 
 	// Blocking yield: HVF workaround.
 	// IRQ delivery to guest is broken, so we can't rely on preemptive context
@@ -872,7 +1253,7 @@ pub fn yield(save_ctx bool) {
 		poll_platform_input()
 
 		// Check if we've been re-enqueued by an event trigger
-		if current_thread.is_in_queue {
+		if katomic.load(&current_thread.is_in_queue) {
 			break
 		}
 
@@ -926,28 +1307,94 @@ pub fn dequeue_and_yield() {
 
 @[noreturn]
 pub fn dequeue_and_die() {
+	dequeue_and_die_impl(false)
+}
+
+@[noreturn]
+pub fn dequeue_and_die_traced() {
+	dequeue_and_die_impl(true)
+}
+
+@[noreturn]
+fn dequeue_and_die_impl(trace bool) {
+	if trace {
+		println('exec[gpu]/sched: entered dequeue_and_die')
+	}
 	cpu.interrupt_toggle(false)
+	if trace {
+		println('exec[gpu]/sched: old execve thread disabled interrupts')
+	}
 	mut t := proc.current_thread()
+	// Publish death before removing the queue entry. A concurrent event wakeup
+	// will then either lose the queue lock and be removed below, or observe the
+	// dead flag and refuse to resurrect this Thread.
+	katomic.store(mut &t.is_dead, true)
+	if trace {
+		println('exec[gpu]/sched: old execve thread marked dead; dequeuing')
+	}
 	dequeue_thread(t)
-	t.is_dead = true
+	if trace {
+		println('exec[gpu]/sched: old execve thread dequeued; charging CPU time')
+	}
 	// This thread leaves the CPU here rather than through the switch in
 	// scheduler_timer_handler, so its last turn is charged here or not at all.
 	// A process that runs briefly and exits would otherwise report no CPU time
 	// at all, which is exactly the process worth noticing.
 	proc.charge_cpu_time(mut t, timer.get_ns())
+	if trace {
+		println('exec[gpu]/sched: CPU time charged; disarming interval timer')
+	}
 	// tick_itimers() keeps a raw pointer to every armed thread, so the entry
 	// has to go before the Thread struct can be recycled.
 	set_itimer_real(t, 0, 0)
+	if trace {
+		println('exec[gpu]/sched: interval timer disarmed; releasing thread lock')
+	}
 	// A running thread holds its own lock, taken by get_next_thread(). Nothing
 	// will ever deschedule us to release it, and intercept_thread() would spin
 	// on it forever, so hand it back here.
 	katomic.store(mut &t.running_on, u64(-1))
 	t.l.release()
+	if trace {
+		println('exec[gpu]/sched: old thread lock released; clearing CPU current thread')
+	}
 	// Clear current thread so the scheduler timer handler knows
 	// there is no running thread to save state from.
 	mut cpu_local := cpulocal.current()
 	proc.set_current_thread(cpu_local.cpu_number, unsafe { nil })
+	if trace {
+		println('exec[gpu]/sched: CPU current thread cleared; handing old thread to reaper')
+	}
 	hand_over_to_reaper(cpu_local.cpu_number, t)
+	if trace {
+		println('exec[gpu]/sched: old thread handed to reaper; dispatching scheduler immediately')
+		// The replacement is already runnable. Select it synchronously instead
+		// of depending on the first post-AGX CNTV timer status becoming visible.
+		scheduler_timer_handler(unsafe { nil })
+		println('exec[gpu]/sched: immediate dispatch returned without a target; entering scheduler idle loop')
+		idle_after_dying_thread(true)
+	}
+	yield(false)
+	for {
+	}
+}
+
+// Leave the CPU for good without going to the reaper. For a thread whose exit a
+// sibling tearing the process down has already taken charge of (see
+// proc.claim_thread_exit): that sibling is waiting for this thread to be off
+// the CPU, and releases what it holds once it is. Its memory stays allocated,
+// as for every thread a sibling has to stop.
+@[noreturn]
+pub fn park_stopped_thread() {
+	cpu.interrupt_toggle(false)
+	mut t := proc.current_thread()
+	katomic.store(mut &t.is_dead, true)
+	dequeue_thread(t)
+	proc.charge_cpu_time(mut t, timer.get_ns())
+	katomic.store(mut &t.running_on, u64(-1))
+	t.l.release()
+	mut cpu_local := cpulocal.current()
+	proc.set_current_thread(cpu_local.cpu_number, unsafe { nil })
 	yield(false)
 	for {
 	}
@@ -967,17 +1414,66 @@ fn hand_over_to_reaper(cpu_number u64, t &proc.Thread) {
 	mut previous := reap_slots[cpu_number]
 	reap_slots[cpu_number] = unsafe { t }
 
-	if unsafe { previous == nil } {
+	if unsafe { previous != nil } {
+		// Something that found the thread before it died -- a signal on its way
+		// to it, a sibling stopping it -- may still be using it. Hold on to the
+		// corpse until the last of them has let go.
+		if proc.thread_is_pinned(previous) {
+			defer_reap(previous)
+		} else {
+			free_thread_memory(previous)
+		}
+	}
+	reap_deferred()
+}
+
+fn free_thread_memory(t &proc.Thread) {
+	if t.kstack_phys != 0 {
+		memory.pmm_free(voidptr(t.kstack_phys), kernel_stack_size / page_size)
+	}
+	if t.fpu_storage_phys != 0 {
+		memory.pmm_free(voidptr(t.fpu_storage_phys), lib.div_roundup(fpu_storage_size, page_size))
+	}
+	unsafe { free(voidptr(t)) }
+}
+
+// A pinned corpse waits here. Pins last only as long as a signal delivery or a
+// sibling's teardown, so the list stays short; one that does not fit is kept
+// for good rather than freed under somebody's feet.
+fn defer_reap(t &proc.Thread) {
+	reap_deferred_lock.acquire()
+	defer {
+		reap_deferred_lock.release()
+	}
+	for i := 0; i < max_deferred_reaps; i++ {
+		if unsafe { reap_deferred_slots[i] == nil } {
+			reap_deferred_slots[i] = unsafe { t }
+			return
+		}
+	}
+}
+
+// Free every waiting corpse whose last pin has gone. Nothing can pin a corpse
+// again: it left the tid table and its process' thread list before it died.
+fn reap_deferred() {
+	if !reap_deferred_lock.test_and_acquire() {
 		return
 	}
-
-	if previous.kstack_phys != 0 {
-		memory.pmm_free(voidptr(previous.kstack_phys), kernel_stack_size / page_size)
+	mut ready := [max_deferred_reaps]&proc.Thread{}
+	mut count := 0
+	for i := 0; i < max_deferred_reaps; i++ {
+		t := reap_deferred_slots[i]
+		if unsafe { t == nil } || proc.thread_is_pinned(t) {
+			continue
+		}
+		reap_deferred_slots[i] = unsafe { nil }
+		ready[count] = t
+		count++
 	}
-	if previous.fpu_storage_phys != 0 {
-		memory.pmm_free(voidptr(previous.fpu_storage_phys), lib.div_roundup(fpu_storage_size, page_size))
+	reap_deferred_lock.release()
+	for i := 0; i < count; i++ {
+		free_thread_memory(ready[i])
 	}
-	unsafe { free(voidptr(previous)) }
 }
 
 // Give up the rest of this thread's timeslice without leaving the run queue.
@@ -1069,19 +1565,60 @@ pub fn syscall_new_thread(_ voidptr, pc voidptr, stack u64) (u64, u64) {
 	return u64(new_thread.tid), 0
 }
 
+// The new address space is not necessarily active during exec. Write its
+// initial stack through the direct map, one physical page at a time.
+fn write_initial_stack(pagemap &memory.Pagemap, addr u64, src voidptr, length u64) bool {
+	mut done := u64(0)
+	for done < length {
+		virt := addr + done
+		phys := pagemap.virt2phys(virt) or { return false }
+		offset := virt & (page_size - 1)
+		chunk := if length - done < page_size - offset { length - done } else { page_size - offset }
+		unsafe {
+			C.memcpy(voidptr(phys + higher_half + offset), voidptr(u64(src) + done), chunk)
+		}
+		done += chunk
+	}
+	return true
+}
+
+fn push_initial_bytes(pagemap &memory.Pagemap, bottom u64, mut cursor u64, src voidptr, length u64) bool {
+	if cursor < bottom || length > cursor - bottom {
+		return false
+	}
+	cursor -= length
+	return write_initial_stack(pagemap, cursor, src, length)
+}
+
+fn push_initial_word(pagemap &memory.Pagemap, bottom u64, mut cursor u64, value u64) bool {
+	return push_initial_bytes(pagemap, bottom, mut cursor, voidptr(&value), sizeof(u64))
+}
+
+fn push_initial_pair(pagemap &memory.Pagemap, bottom u64, mut cursor u64, key u64, value u64) bool {
+	return push_initial_word(pagemap, bottom, mut cursor, value)
+		&& push_initial_word(pagemap, bottom, mut cursor, key)
+}
+
 pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg voidptr, _stack u64, argv []string, envp []string, auxval &elf.Auxval, autoenqueue bool) ?&proc.Thread {
 	mut process := unsafe { _process }
+	trace_gpu_exec := process.executable_path == '/usr/bin/vinix-desktop-gpu'
+	if trace_gpu_exec {
+		println('exec[gpu]/thread: entered new_user_thread')
+	}
 
 	mut stacks := []voidptr{}
 	defer {
 		unsafe { stacks.free() }
 	}
 
-	mut stack := unsafe { &u64(0) }
 	mut stack_vma := u64(0)
+	mut stack_bottom_vma := u64(0)
 
 	if _stack == 0 {
-		mut user_stack_size := stack_size
+		if trace_gpu_exec {
+			println('exec[gpu]/thread: calculating user stack size')
+		}
+		mut user_stack_size := default_user_stack_size
 		stack_limit := proc.soft_limit(process, proc.rlimit_stack)
 		if stack_limit != proc.rlim_infinity && stack_limit < user_stack_size {
 			user_stack_size = lib.align_down(stack_limit, page_size)
@@ -1090,25 +1627,49 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 			errno.set(errno.enomem)
 			return none
 		}
-		stack_phys := memory.pmm_alloc(user_stack_size / page_size)
-		stack = unsafe { &u64(u64(stack_phys) + user_stack_size + higher_half) }
+		if trace_gpu_exec {
+			println('exec[gpu]/thread: allocating ${user_stack_size / page_size} physical stack pages')
+		}
+		mut stack_pages := []u64{cap: int(user_stack_size / page_size)}
+		for _ in 0 .. int(user_stack_size / page_size) {
+			stack_pages << u64(memory.pmm_alloc(1))
+		}
 
 		stack_vma = process.thread_stack_top
 		process.thread_stack_top -= user_stack_size
-		stack_bottom_vma := process.thread_stack_top
+		stack_bottom_vma = process.thread_stack_top
 		process.thread_stack_top -= page_size
 
-		mmap.map_range(mut process.pagemap, stack_bottom_vma, u64(stack_phys), user_stack_size, mmap.prot_read | mmap.prot_write, mmap.map_anonymous) or { return none }
+		if trace_gpu_exec {
+			println('exec[gpu]/thread: mapping user stack at 0x${stack_bottom_vma:x} len=0x${user_stack_size:x}')
+		}
+		mmap.map_pages(mut process.pagemap, stack_bottom_vma, stack_pages, mmap.prot_read | mmap.prot_write, mmap.map_anonymous) or {
+			unsafe { stack_pages.free() }
+			return none
+		}
+		unsafe { stack_pages.free() }
+		if trace_gpu_exec {
+			println('exec[gpu]/thread: user stack mapped')
+		}
 	} else {
-		stack = &u64(voidptr(_stack))
 		stack_vma = _stack
 	}
 
+	if trace_gpu_exec {
+		println('exec[gpu]/thread: allocating kernel stack')
+	}
 	kernel_stack_phys := memory.pmm_alloc(kernel_stack_size / page_size)
 	stacks << kernel_stack_phys
 	kernel_stack := u64(kernel_stack_phys) + kernel_stack_size + higher_half
+	if trace_gpu_exec {
+		println('exec[gpu]/thread: kernel stack allocated at 0x${u64(kernel_stack_phys):x}')
+		println('exec[gpu]/thread: allocating FPU storage')
+	}
 
 	fpu_storage_phys := memory.pmm_alloc(lib.div_roundup(fpu_storage_size, page_size))
+	if trace_gpu_exec {
+		println('exec[gpu]/thread: FPU storage allocated at 0x${u64(fpu_storage_phys):x}')
+	}
 
 	gpr_state := cpulocal.GPRState{
 		pc: u64(pc)
@@ -1129,6 +1690,9 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 		fpu_storage: voidptr(u64(fpu_storage_phys) + higher_half)
 		fpu_storage_phys: u64(fpu_storage_phys)
 	}
+	if trace_gpu_exec {
+		println('exec[gpu]/thread: thread object initialized pc=0x${t.gpr_state.pc:x} sp=0x${t.gpr_state.sp:x}')
+	}
 
 	t.self = voidptr(t)
 	t.tpidr_el0 = u64(0)
@@ -1139,6 +1703,9 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 	}
 
 	if want_elf == true {
+		if trace_gpu_exec {
+			println('exec[gpu]/thread: building initial ELF stack')
+		}
 		if auxval != unsafe { nil } {
 			uart.puts(c'ELF auxval: base=')
 			uart.put_hex(auxval.at_base)
@@ -1148,115 +1715,119 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 			uart.put_hex(auxval.at_entry)
 			uart.putc(`\n`)
 		}
-		unsafe {
-			stack_top := stack
-			mut orig_stack_vma := stack_vma
-
-			for elem in envp {
-				stack = &u64(u64(stack) - u64(elem.len + 1))
-				C.memcpy(voidptr(stack), elem.str, elem.len + 1)
+		mut cursor := stack_vma
+		mut string_pointer := stack_vma
+		for elem in envp {
+			if !push_initial_bytes(process.pagemap, stack_bottom_vma, mut cursor,
+				voidptr(elem.str), u64(elem.len) + 1) {
+				errno.set(errno.e2big)
+				return none
 			}
-			for elem in argv {
-				stack = &u64(u64(stack) - u64(elem.len + 1))
-				C.memcpy(voidptr(stack), elem.str, elem.len + 1)
+		}
+		for elem in argv {
+			if !push_initial_bytes(process.pagemap, stack_bottom_vma, mut cursor,
+				voidptr(elem.str), u64(elem.len) + 1) {
+				errno.set(errno.e2big)
+				return none
 			}
+		}
+		cursor &= ~u64(0xf)
+		if (argv.len + envp.len + 1) & 1 != 0 {
+			cursor -= sizeof(u64)
+		}
+		mut random_bytes := [16]u8{}
+		if !krandom.fill(voidptr(&random_bytes[0]), 16, true) {
+			unsafe { C.memset(voidptr(&random_bytes[0]), 0, 16) }
+		}
+		if !push_initial_bytes(process.pagemap, stack_bottom_vma, mut cursor,
+			voidptr(&random_bytes[0]), 16) {
+			errno.set(errno.e2big)
+			return none
+		}
+		random_vma := cursor
 
-			stack = &u64(u64(stack) - (u64(stack) & 0x0f))
-
-			if (argv.len + envp.len + 1) & 1 != 0 {
-				stack = &stack[-1]
+		// Auxiliary vector (NULL-terminated). ARM64 advertises the mandatory
+		// FP/ASIMD baseline and no optional extensions yet.
+		if !push_initial_pair(process.pagemap, stack_bottom_vma, mut cursor, 0, 0)
+			|| !push_initial_pair(process.pagemap, stack_bottom_vma, mut cursor, elf.at_secure, 0)
+			|| !push_initial_pair(process.pagemap, stack_bottom_vma, mut cursor, elf.at_hwcap2, 0)
+			|| !push_initial_pair(process.pagemap, stack_bottom_vma, mut cursor, elf.at_hwcap, 0x3)
+			|| !push_initial_pair(process.pagemap, stack_bottom_vma, mut cursor, elf.at_random, random_vma)
+			|| !push_initial_pair(process.pagemap, stack_bottom_vma, mut cursor, elf.at_pagesz, page_size)
+			|| !push_initial_pair(process.pagemap, stack_bottom_vma, mut cursor, elf.at_uid, u64(process.uid))
+			|| !push_initial_pair(process.pagemap, stack_bottom_vma, mut cursor, elf.at_euid, u64(process.euid))
+			|| !push_initial_pair(process.pagemap, stack_bottom_vma, mut cursor, elf.at_gid, u64(process.gid))
+			|| !push_initial_pair(process.pagemap, stack_bottom_vma, mut cursor, elf.at_egid, u64(process.egid))
+			|| !push_initial_pair(process.pagemap, stack_bottom_vma, mut cursor, elf.at_entry, auxval.at_entry)
+			|| !push_initial_pair(process.pagemap, stack_bottom_vma, mut cursor, elf.at_phdr, auxval.at_phdr)
+			|| !push_initial_pair(process.pagemap, stack_bottom_vma, mut cursor, elf.at_phent, auxval.at_phent)
+			|| !push_initial_pair(process.pagemap, stack_bottom_vma, mut cursor, elf.at_phnum, auxval.at_phnum)
+			|| !push_initial_pair(process.pagemap, stack_bottom_vma, mut cursor, elf.at_base, auxval.at_base)
+			|| !push_initial_word(process.pagemap, stack_bottom_vma, mut cursor, 0) {
+			errno.set(errno.e2big)
+			return none
+		}
+		if cursor < stack_bottom_vma || u64(envp.len) * sizeof(u64) > cursor - stack_bottom_vma {
+			errno.set(errno.e2big)
+			return none
+		}
+		cursor -= u64(envp.len) * sizeof(u64)
+		for i, elem in envp {
+			string_pointer -= u64(elem.len) + 1
+			pointer := string_pointer
+			if !write_initial_stack(process.pagemap, cursor + u64(i) * sizeof(u64),
+				voidptr(&pointer), sizeof(u64)) {
+				return none
 			}
-
-			// AT_RANDOM is shared by libc stack canaries and userspace ASLR.
-			stack = &u64(u64(stack) - 16)
-			random_kernel_addr := u64(stack)
-			if !krandom.fill(voidptr(random_kernel_addr), 16, true) {
-				C.memset(voidptr(random_kernel_addr), 0, 16)
+		}
+		if !push_initial_word(process.pagemap, stack_bottom_vma, mut cursor, 0) {
+			errno.set(errno.e2big)
+			return none
+		}
+		if cursor < stack_bottom_vma || u64(argv.len) * sizeof(u64) > cursor - stack_bottom_vma {
+			errno.set(errno.e2big)
+			return none
+		}
+		cursor -= u64(argv.len) * sizeof(u64)
+		for i, elem in argv {
+			string_pointer -= u64(elem.len) + 1
+			pointer := string_pointer
+			if !write_initial_stack(process.pagemap, cursor + u64(i) * sizeof(u64),
+				voidptr(&pointer), sizeof(u64)) {
+				return none
 			}
-			random_vma := stack_vma - (u64(stack_top) - random_kernel_addr)
-
-			// Auxiliary vector (NULL-terminated)
-			stack[-1] = 0
-			stack = &stack[-1]
-			stack[-1] = 0
-			stack = &stack[-1]
-
-			stack = &stack[-2]
-			stack[0] = elf.at_secure
-			stack[1] = 0
-			// Linux always publishes the ARM capability words. Their absence
-			// makes crypto libraries fall back to executing optional instructions
-			// under SIGILL probes. Advertise the mandatory FP/ASIMD baseline and
-			// no optional extensions until Vinix enumerates ID registers itself.
-			stack = &stack[-2]
-			stack[0] = elf.at_hwcap2
-			stack[1] = 0
-			stack = &stack[-2]
-			stack[0] = elf.at_hwcap
-			stack[1] = 0x3
-			stack = &stack[-2]
-			stack[0] = elf.at_random
-			stack[1] = random_vma
-			stack = &stack[-2]
-			stack[0] = elf.at_pagesz
-			stack[1] = page_size
-			stack = &stack[-2]
-			stack[0] = elf.at_uid
-			stack[1] = u64(process.uid)
-			stack = &stack[-2]
-			stack[0] = elf.at_euid
-			stack[1] = u64(process.euid)
-			stack = &stack[-2]
-			stack[0] = elf.at_gid
-			stack[1] = u64(process.gid)
-			stack = &stack[-2]
-			stack[0] = elf.at_egid
-			stack[1] = u64(process.egid)
-			stack = &stack[-2]
-			stack[0] = elf.at_entry
-			stack[1] = auxval.at_entry
-			stack = &stack[-2]
-			stack[0] = elf.at_phdr
-			stack[1] = auxval.at_phdr
-			stack = &stack[-2]
-			stack[0] = elf.at_phent
-			stack[1] = auxval.at_phent
-			stack = &stack[-2]
-			stack[0] = elf.at_phnum
-			stack[1] = auxval.at_phnum
-			stack = &stack[-2]
-			stack[0] = elf.at_base
-			stack[1] = auxval.at_base
-
-			stack[-1] = 0
-			stack = &stack[-1]
-			stack = &stack[-envp.len]
-			for i := u64(0); i < envp.len; i++ {
-				orig_stack_vma -= u64(envp[i].len) + 1
-				stack[i] = orig_stack_vma
-			}
-
-			stack[-1] = 0
-			stack = &stack[-1]
-			stack = &stack[-argv.len]
-			for i := u64(0); i < argv.len; i++ {
-				orig_stack_vma -= u64(argv[i].len) + 1
-				stack[i] = orig_stack_vma
-			}
-
-			stack[-1] = u64(argv.len)
-			stack = &stack[-1]
-
-			t.gpr_state.sp -= u64(stack_top) - u64(stack)
+		}
+		if !push_initial_word(process.pagemap, stack_bottom_vma, mut cursor, u64(argv.len)) {
+			errno.set(errno.e2big)
+			return none
+		}
+		t.gpr_state.sp = cursor
+		if trace_gpu_exec {
+			println('exec[gpu]/thread: initial ELF stack complete sp=0x${t.gpr_state.sp:x}')
 		}
 	}
 
+	if trace_gpu_exec {
+		println('exec[gpu]/thread: attaching replacement thread to process')
+	}
 	attach_thread(mut process, mut t)?
-
-	if autoenqueue == true {
-		enqueue_thread(t, false)
+	if trace_gpu_exec {
+		println('exec[gpu]/thread: replacement thread attached tid=${t.tid}')
 	}
 
+	if autoenqueue == true {
+		if trace_gpu_exec {
+			println('exec[gpu]/thread: auto-enqueueing replacement thread')
+		}
+		enqueue_thread(t, false)
+		if trace_gpu_exec {
+			println('exec[gpu]/thread: auto-enqueue complete')
+		}
+	}
+
+	if trace_gpu_exec {
+		println('exec[gpu]/thread: leaving new_user_thread')
+	}
 	return t
 }
 
@@ -1272,8 +1843,10 @@ fn attach_thread(mut process proc.Process, mut t proc.Thread) ?int {
 	if process.threads.len == 0 && process.pid != 0 {
 		t.tid = process.pid
 		proc.bind_tid(t.tid, t)
+		proc.number_thread(mut t, true)
 	} else {
 		t.tid = proc.allocate_tid(t)?
+		proc.number_thread(mut t, false)
 	}
 
 	process.threads << t
@@ -1346,6 +1919,7 @@ pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) ?&proc.Pr
 	}
 	mut new_proc := &proc.Process{
 		pagemap: unsafe { nil }
+		fds:     []voidptr{len: proc.max_fds}
 	}
 
 	new_proc.pid = proc.allocate_pid(new_proc) or { return none }
@@ -1354,6 +1928,8 @@ pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) ?&proc.Pr
 		new_proc.ppid = old_process.pid
 		new_proc.pgid = old_process.pgid
 		new_proc.sid = old_process.sid
+		// A child is in its parent's session, so the same terminal controls it.
+		new_proc.tty_session = old_process.tty_session
 		new_proc.uid = old_process.uid
 		new_proc.euid = old_process.euid
 		new_proc.suid = old_process.suid
@@ -1365,6 +1941,7 @@ pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) ?&proc.Pr
 		new_proc.nice = old_process.nice
 		new_proc.executable_path = old_process.executable_path.clone()
 		new_proc.rlimits = old_process.rlimits
+		new_proc.allow_wx = old_process.allow_wx
 		// A NUMA memory policy is process state, like nice and the rlimits, so
 		// a fork keeps the placement its parent asked for.
 		new_proc.mempolicy_mode = old_process.mempolicy_mode
@@ -1372,7 +1949,8 @@ pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) ?&proc.Pr
 		new_proc.pagemap = mmap.fork_pagemap(old_process.pagemap) or { return none }
 		new_proc.thread_stack_top = old_process.thread_stack_top
 		new_proc.mmap_anon_non_fixed_base = old_process.mmap_anon_non_fixed_base
-		new_proc.current_directory = old_process.current_directory
+		new_proc.current_directory = proc.current_directory_of(old_process)
+		proc.inherit_container_state(mut new_proc, old_process)
 	} else {
 		new_proc.ppid = 0
 		new_proc.pgid = new_proc.pid
@@ -1382,6 +1960,7 @@ pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) ?&proc.Pr
 		new_proc.mmap_anon_non_fixed_base = elf.initial_mmap_base()
 		new_proc.current_directory = voidptr(vfs_root)
 		new_proc.rlimits = proc.default_rlimits()
+		proc.inherit_container_state(mut new_proc, unsafe { nil })
 	}
 
 	return new_proc
@@ -1396,6 +1975,13 @@ pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) ?&proc.Pr
 const idle_tick_hz = u64(1000)
 
 pub fn await() {
+	await_impl(false)
+}
+
+fn await_impl(trace_gpu_handoff bool) {
+	if trace_gpu_handoff {
+		println('exec[gpu]/sched: traced idle loop entered; reading timer frequency')
+	}
 	freq := cpu.read_cntfrq_el0()
 	mut ticks := freq / idle_tick_hz
 	if ticks == 0 {
@@ -1403,19 +1989,36 @@ pub fn await() {
 	}
 	cpu.write_cntv_tval_el0(ticks)
 	cpu.write_cntv_ctl_el0(1)
+	if trace_gpu_handoff {
+		println('exec[gpu]/sched: idle timer programmed for ${ticks} ticks; disabling interrupts')
+	}
 
 	// Polling idle loop used on both QEMU/HVF and early Apple bring-up.
 	// Keep interrupts disabled, poll CNTV_CTL ISTATUS, and dispatch the
 	// scheduler timer handler directly when the timer fires.
 	cpu.interrupt_toggle(false)
+	if trace_gpu_handoff {
+		println('exec[gpu]/sched: idle interrupts disabled; polling timer')
+	}
 
 	mut last_realtime_poll_ns := u64(0)
+	mut first_poll := true
 
 	for {
 		vctl := cpu.read_cntv_ctl_el0()
+		if trace_gpu_handoff && first_poll {
+			println('exec[gpu]/sched: first idle timer status=0x${vctl:x}')
+			first_poll = false
+		}
 		if vctl & 0x4 != 0 {
+			if trace_gpu_handoff {
+				println('exec[gpu]/sched: idle timer fired; dispatching scheduler')
+			}
 			// Timer fired. Dispatch scheduler in polling mode.
 			scheduler_timer_handler(unsafe { nil })
+			if trace_gpu_handoff {
+				println('exec[gpu]/sched: idle scheduler dispatch returned without a target; rearming timer')
+			}
 
 			// Re-arm timer for next tick
 			cpu.write_cntv_tval_el0(ticks)

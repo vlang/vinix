@@ -10,6 +10,7 @@ import proc
 import errno
 import aarch64.cpu
 import memory.mmap
+import security
 
 // kernel/memory/mmap uses this bit only for the reserved brk arena. It is not a
 // Linux mmap flag implemented by Vinix and must never reach VM accounting from
@@ -73,16 +74,14 @@ fn storage_syncfs(_ voidptr, fdnum int) (u64, u64) {
 }
 
 fn storage_reboot(_ voidptr, magic1 u32, magic2 u32, command u32, _arg voidptr) (u64, u64) {
+	if !security.permitted(security.system_reboot) { return errno.err, errno.eperm }
 	if magic1 != 0xfee1dead || (magic2 != 0x28121969 && magic2 != 0x05121996
 		&& magic2 != 0x16041998 && magic2 != 0x20112000) { return errno.err, errno.einval }
 	if command != 0x01234567 && command != 0xcdef0123 && command != 0x4321fedc {
 		return errno.err, errno.einval
 	}
-	// Linux gates this on CAP_SYS_BOOT. Vinix has no credential model, so every
-	// process already holds the privilege such a check would look for, and
-	// demanding PID 1 instead only made reboot(2) unreachable: on the desktop
-	// image init execs the compositor, so nothing a terminal runs is ever pid 1.
-	// The magic numbers above remain the guard against a stray call.
+	// The caller must hold the named reboot permission, and Linux's magic
+	// numbers still guard against an accidental call by a privileged process.
 	//
 	// Nothing restarts a machine with unwritten data. A reset that dropped the
 	// page cache is exactly the reboot that loses the file just created, so a

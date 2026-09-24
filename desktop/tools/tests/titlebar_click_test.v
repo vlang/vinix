@@ -1,3 +1,7 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 // SPDX-License-Identifier: GPL-2.0-or-later
 module main
 
@@ -112,7 +116,9 @@ fn test_titlebar_drag_can_move_partly_offscreen() {
 	assert desktop.windows[left_index].x < 0
 	assert desktop.windows[left_index].x + desktop.windows[left_index].width >= 60
 	desktop.buttons = 0
-	desktop.on_pointer_up(0, title_y)
+	// Release one pixel inside the edge so this test can keep exercising free
+	// off-screen movement; exact-edge release is covered by the snap tests.
+	desktop.on_pointer_up(1, title_y)
 
 	// The right edge behaves the same way.
 	set_titlebar_test_target(mut desktop, id)
@@ -123,7 +129,7 @@ fn test_titlebar_drag_can_move_partly_offscreen() {
 	assert desktop.windows[right_index].x + desktop.windows[right_index].width > 800
 	assert desktop.windows[right_index].x <= 800 - 60
 	desktop.buttons = 0
-	desktop.on_pointer_up(799, title_y)
+	desktop.on_pointer_up(798, title_y)
 
 	// Downward movement can hide the body too. The title bar remains above the
 	// taskbar, so the window can still be dragged back onto the desktop.
@@ -136,4 +142,235 @@ fn test_titlebar_drag_can_move_partly_offscreen() {
 	down_index := desktop.window_index(id) or { panic('missing dragged window') }
 	assert desktop.windows[down_index].y == 600 - taskbar_height - desktop.theme().title_height
 	assert desktop.windows[down_index].y + desktop.windows[down_index].height > 600
+}
+
+fn drag_window_to(mut desktop Desktop, id int, x int, y int) {
+	set_titlebar_test_target(mut desktop, id)
+	index := desktop.window_index(id) or { panic('missing dragged window') }
+	press_x := desktop.windows[index].x + desktop.windows[index].width / 2
+	press_y := desktop.windows[index].y + desktop.theme().title_height / 2
+	desktop.on_pointer_down(press_x, press_y)
+	desktop.buttons = button_left
+	desktop.on_pointer_move(x, y)
+	desktop.buttons = 0
+	desktop.on_pointer_up(x, y)
+}
+
+fn test_titlebar_drag_snaps_to_screen_edges_and_restores_when_pulled_away() {
+	mut desktop := Desktop{
+		canvas: Canvas{
+			width:  801
+			height: 600
+		}
+	}
+	id := desktop.spawn('Welcome', .welcome, 120, 80, 400, 260)
+
+	drag_window_to(mut desktop, id, 0, 300)
+	mut index := desktop.window_index(id) or { panic('missing left-snapped window') }
+	assert desktop.windows[index].snap == .left
+	assert !desktop.windows[index].maximized
+	assert desktop.windows[index].x == 0
+	assert desktop.windows[index].y == 0
+	assert desktop.windows[index].width == 400
+	assert desktop.windows[index].height == 600 - taskbar_height
+	assert desktop.windows[index].restore_width == 400
+	assert desktop.windows[index].restore_height == 260
+
+	// Pulling a half-screen window away restores its normal dimensions while
+	// keeping the pointer at the same proportional place on the title bar.
+	set_titlebar_test_target(mut desktop, id)
+	desktop.on_pointer_down(200, desktop.theme().title_height / 2)
+	desktop.buttons = button_left
+	desktop.on_pointer_move(500, 100)
+	index = desktop.window_index(id) or { panic('missing restored window') }
+	assert desktop.windows[index].snap == .none_
+	assert desktop.windows[index].width == 400
+	assert desktop.windows[index].height == 260
+	assert desktop.windows[index].x == 300
+	desktop.buttons = 0
+	desktop.on_pointer_up(500, 100)
+
+	drag_window_to(mut desktop, id, 800, 300)
+	index = desktop.window_index(id) or { panic('missing right-snapped window') }
+	assert desktop.windows[index].snap == .right
+	assert !desktop.windows[index].maximized
+	assert desktop.windows[index].x == 400
+	assert desktop.windows[index].y == 0
+	assert desktop.windows[index].width == 401
+	assert desktop.windows[index].height == 600 - taskbar_height
+
+	// Maximizing a snapped window and restoring it must return to the normal
+	// frame, not treat the half-screen frame as its new restore geometry.
+	desktop.toggle_maximize(id)
+	index = desktop.window_index(id) or { panic('missing maximized snapped window') }
+	assert desktop.windows[index].maximized
+	desktop.toggle_maximize(id)
+	index = desktop.window_index(id) or { panic('missing restored snapped window') }
+	assert !desktop.windows[index].maximized
+	assert desktop.windows[index].snap == .none_
+	assert desktop.windows[index].width == 400
+	assert desktop.windows[index].height == 260
+}
+
+fn test_titlebar_drag_to_top_maximizes_on_release() {
+	mut desktop := Desktop{
+		canvas: Canvas{
+			width:  800
+			height: 600
+		}
+	}
+	id := desktop.spawn('Welcome', .welcome, 120, 80, 400, 260)
+	set_titlebar_test_target(mut desktop, id)
+	desktop.on_pointer_down(320, 80 + desktop.theme().title_height / 2)
+	desktop.buttons = button_left
+	desktop.on_pointer_move(400, 0)
+	mut index := desktop.window_index(id) or { panic('missing dragged window') }
+	assert !desktop.windows[index].maximized
+
+	// The real pointer pump observes the released button level during its move
+	// pass before dispatching the release edge, so exercise that path directly.
+	desktop.buttons = 0
+	desktop.on_pointer_move(400, 0)
+	index = desktop.window_index(id) or { panic('missing maximized window') }
+	assert desktop.windows[index].maximized
+	assert desktop.windows[index].snap == .none_
+	assert desktop.windows[index].x == 0
+	assert desktop.windows[index].y == 0
+	assert desktop.windows[index].width == 800
+	assert desktop.windows[index].height == 600 - taskbar_height
+	assert desktop.drag.kind == .none_
+}
+
+fn test_edge_snap_uses_last_position_seen_while_button_was_held() {
+	mut desktop := Desktop{
+		canvas: Canvas{
+			width:  800
+			height: 600
+		}
+	}
+	id := desktop.spawn('Welcome', .welcome, 120, 80, 400, 260)
+	title_y := 80 + desktop.theme().title_height / 2
+	set_titlebar_test_target(mut desktop, id)
+	desktop.on_pointer_down(320, title_y)
+	desktop.buttons = button_left
+	desktop.on_pointer_move(0, title_y)
+
+	// A wrapped button-up coordinate on the opposite edge must not turn a
+	// left snap into a right snap.
+	desktop.buttons = 0
+	desktop.on_pointer_move(799, title_y)
+	mut index := desktop.window_index(id) or { panic('missing left-snapped window') }
+	assert desktop.windows[index].snap == .left
+	assert desktop.windows[index].x == 0
+	assert desktop.windows[index].width == 400
+
+	// Likewise, wrapping from the top to the bottom while releasing must keep
+	// the maximize gesture captured at the top edge.
+	set_titlebar_test_target(mut desktop, id)
+	desktop.on_pointer_down(200, desktop.theme().title_height / 2)
+	desktop.buttons = button_left
+	desktop.on_pointer_move(400, 0)
+	desktop.buttons = 0
+	desktop.on_pointer_move(400, 599)
+	index = desktop.window_index(id) or { panic('missing maximized window') }
+	assert desktop.windows[index].maximized
+	assert desktop.windows[index].x == 0
+	assert desktop.windows[index].y == 0
+	assert desktop.windows[index].width == 800
+	assert desktop.windows[index].height == 600 - taskbar_height
+}
+
+fn test_clicking_an_edge_touching_titlebar_does_not_snap_without_a_drag() {
+	mut desktop := Desktop{
+		canvas: Canvas{
+			width:  800
+			height: 600
+		}
+	}
+	id := desktop.spawn('Welcome', .welcome, 120, 0, 400, 260)
+	set_titlebar_test_target(mut desktop, id)
+	x := 320
+	y := 0
+	desktop.on_pointer_move(x, y)
+	desktop.on_pointer_down(x, y)
+	desktop.on_pointer_up(x, y)
+	index := desktop.window_index(id) or { panic('missing clicked window') }
+	assert !desktop.windows[index].maximized
+	assert desktop.windows[index].snap == .none_
+	assert desktop.windows[index].x == 120
+	assert desktop.windows[index].y == 0
+}
+
+fn set_resize_test_target(mut desktop Desktop, id int) {
+	index := desktop.window_index(id) or { panic('missing test window') }
+	window := desktop.windows[index]
+	target := HitTarget{
+		action_id: window.id_resize
+		x:         window.x + window.width - window_resize_grip_size
+		y:         window.y + window.height - window_resize_grip_size
+		width:     window_resize_grip_size
+		height:    window_resize_grip_size
+	}
+	if desktop.targets.len == 0 {
+		desktop.targets << target
+	} else {
+		desktop.targets[0] = target
+	}
+}
+
+fn test_lower_right_corner_resizes_window_and_updates_restore_frame() {
+	mut desktop := Desktop{
+		canvas: Canvas{
+			width:  800
+			height: 600
+		}
+	}
+	id := desktop.spawn('Welcome', .welcome, 120, 80, 400, 260)
+	set_resize_test_target(mut desktop, id)
+	desktop.on_pointer_down(519, 339)
+	assert desktop.drag.kind == .resize
+	desktop.buttons = button_left
+	desktop.on_pointer_move(619, 399)
+	index := desktop.window_index(id) or { panic('missing resized window') }
+	assert desktop.windows[index].x == 120
+	assert desktop.windows[index].y == 80
+	assert desktop.windows[index].width == 500
+	assert desktop.windows[index].height == 320
+	desktop.buttons = 0
+	desktop.on_pointer_up(619, 399)
+	assert desktop.drag.kind == .none_
+	assert desktop.windows[index].restore_x == 120
+	assert desktop.windows[index].restore_y == 80
+	assert desktop.windows[index].restore_width == 500
+	assert desktop.windows[index].restore_height == 320
+}
+
+fn test_corner_resize_respects_minimum_size_and_usable_desktop() {
+	mut desktop := Desktop{
+		canvas: Canvas{
+			width:  800
+			height: 600
+		}
+	}
+	id := desktop.spawn('Welcome', .welcome, 120, 80, 400, 260)
+	set_resize_test_target(mut desktop, id)
+	desktop.on_pointer_down(519, 339)
+	desktop.buttons = button_left
+	desktop.on_pointer_move(0, 0)
+	mut index := desktop.window_index(id) or { panic('missing minimum-sized window') }
+	assert desktop.windows[index].width == window_min_width
+	assert desktop.windows[index].height == desktop.theme().title_height + window_min_body_height
+	desktop.buttons = 0
+	desktop.on_pointer_up(0, 0)
+
+	set_resize_test_target(mut desktop, id)
+	index = desktop.window_index(id) or { panic('missing window before growth') }
+	press_x := desktop.windows[index].x + desktop.windows[index].width - 1
+	press_y := desktop.windows[index].y + desktop.windows[index].height - 1
+	desktop.on_pointer_down(press_x, press_y)
+	desktop.buttons = button_left
+	desktop.on_pointer_move(799, 599)
+	index = desktop.window_index(id) or { panic('missing maximum-sized window') }
+	assert desktop.windows[index].x + desktop.windows[index].width == 800
+	assert desktop.windows[index].y + desktop.windows[index].height == 600 - taskbar_height
 }

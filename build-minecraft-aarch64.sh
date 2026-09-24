@@ -94,6 +94,11 @@ python3 "$SCRIPT_DIR/build-support/minecraft/fetch-minecraft.py" \
     --staging "$GAME_CACHE" \
     --game-root "$GAME_ROOT" \
     ${FETCH_ARGS[@]+"${FETCH_ARGS[@]}"}
+# LWJGL's bundled libffi contains one fortified glibc call that gcompat cannot
+# bind. Rewrite that call to its equivalent musl-supported form while the
+# native is still inside its downloaded JAR.
+python3 "$SCRIPT_DIR/build-support/minecraft/patch-lwjgl-aarch64.py" \
+    "$GAME_CACHE$GAME_ROOT"
 mkdir -p "$STAGING$(dirname "$GAME_ROOT")"
 cp -a "$GAME_CACHE$GAME_ROOT" "$STAGING$(dirname "$GAME_ROOT")/"
 

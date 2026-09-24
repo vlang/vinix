@@ -89,6 +89,17 @@ pub const sigpoll = sigio
 
 pub const sigpwr = 30
 
+const gpu_desktop_executable = '/usr/bin/vinix-desktop-gpu'
+
+// V's print path reaches both the UART and framebuffer console in production
+// kernels. C.printf is intentionally compiled to a no-op in PROD, so it must
+// not be used for boot diagnostics that need to be visible on the M1 panel.
+fn gpu_exec_trace(enabled bool, stage string) {
+	if enabled {
+		println('exec[gpu]: ${stage}')
+	}
+}
+
 pub const sigsys = 31
 
 pub const sigrtmin = 32
@@ -145,13 +156,22 @@ pub mut:
 pub fn syscall_getpid(_ voidptr) (u64, u64) {
 	mut t := unsafe { proc.current_thread() }
 
-	return u64(t.process.pid), 0
+	return u64(proc.own_pid(t.process)), 0
 }
 
+// A parent outside the caller's pid namespace is 0 to it, as a container's
+// init sees the runtime that started it.
 pub fn syscall_getppid(_ voidptr) (u64, u64) {
 	mut t := unsafe { proc.current_thread() }
-
-	return u64(t.process.ppid), 0
+	process := t.process
+	if !proc.numbers_own(process.numbered_in) {
+		return u64(process.ppid), 0
+	}
+	proc.lock_table()
+	defer {
+		proc.unlock_table()
+	}
+	return u64(proc.pid_in(proc.process_at(process.ppid), process.numbered_in)), 0
 }
 
 pub fn syscall_sigentry(_ voidptr, sigentry u64) (u64, u64) {
@@ -261,20 +281,46 @@ pub fn dispatch_a_signal(context &cpulocal.GPRState) {
 	dispatch_a_signal_with_fault(context, false, 0, 0)
 }
 
+const linux_sa_restart = 0x10000000
+
+// A syscall that a signal interrupted before it had done anything returns
+// ERESTARTSYS. Rewind to the SVC so that it runs again once the signal has
+// been dealt with, as Linux does: Go programs rely on SA_RESTART for calls
+// they do not retry themselves, such as runc's blocking open of its exec FIFO,
+// while the runtime preempts goroutines with SIGURG. The signal dispatched
+// next takes the rewind back if its handler was installed without SA_RESTART.
+pub fn prepare_syscall_restart(context &cpulocal.GPRState) {
+	mut ctx := unsafe { context }
+	if ctx.x0 != u64(-i64(proc.interrupted_errno)) {
+		return
+	}
+	mut t := proc.current_thread()
+	ctx.x0 = t.syscall_x0
+	ctx.pc -= 4
+	t.restarting_syscall = true
+}
+
 // Linux SA_SIGINFO handlers need the fault address and a usable ucontext. QEMU
 // user mode depends on both: translated memory accesses deliberately fault in
 // the host and its SIGSEGV handler turns that host context into a guest fault.
 fn dispatch_a_signal_with_fault(context &cpulocal.GPRState, synchronous bool, fault_address u64, fault_esr u64) {
 	mut t := unsafe { proc.current_thread() }
+	restarting := t.restarting_syscall
+	t.restarting_syscall = false
 
 	mut which := -1
 
 	for i := u8(0); i < 64; i++ {
-		if t.masked_signals & (u64(1) << i) != 0 {
+		signum := int(i) + 1
+		// SIGKILL and SIGSTOP can never be blocked, whatever the mask says. A
+		// wait syscall that installed a full temporary mask must not be able to
+		// keep the process alive against kill -9.
+		unblockable := signum == sigkill || signum == sigstop
+		if !unblockable && t.masked_signals & (u64(1) << i) != 0 {
 			continue
 		}
 		if katomic.btr(mut &t.pending_signals, i) == true {
-			which = int(i) + 1
+			which = signum
 			break
 		}
 	}
@@ -302,6 +348,14 @@ fn dispatch_a_signal_with_fault(context &cpulocal.GPRState, synchronous bool, fa
 			exit_with_fatal_signal(u8(which))
 		}
 		return
+	}
+
+	// A handler that did not ask for SA_RESTART sees the syscall fail with
+	// EINTR instead of running again behind its back.
+	if restarting && sigaction.sa_flags & sa_restart == 0 && sigaction.sa_flags & linux_sa_restart == 0 {
+		mut ctx := unsafe { context }
+		ctx.pc += 4
+		ctx.x0 = u64(-i64(4))
 	}
 
 	// A sigsuspend(2) that installed a temporary mask wants the frame to carry
@@ -335,26 +389,30 @@ fn dispatch_a_signal_with_fault(context &cpulocal.GPRState, synchronous bool, fa
 
 		signal_sp -= sizeof(cpulocal.GPRState)
 		signal_sp = lib.align_down(signal_sp, 16)
-		mut return_context := unsafe { &cpulocal.GPRState(signal_sp) }
+		return_context_addr := signal_sp
 
-		unsafe {
-			*return_context = *context
-		}
-		t.gpr_state = *context
-		t.gpr_state.sp = signal_sp
+		mut siginfo_sp := signal_sp - sizeof(SigInfo)
+		siginfo_sp = lib.align_down(siginfo_sp, 16)
 
-		t.gpr_state.sp -= sizeof(SigInfo)
-		t.gpr_state.sp = lib.align_down(t.gpr_state.sp, 16)
-		mut siginfo := unsafe { &SigInfo(t.gpr_state.sp) }
-
-		unsafe { C.memset(voidptr(siginfo), 0, sizeof(SigInfo)) }
+		mut siginfo := SigInfo{}
 		siginfo.si_signo = i32(which)
 
+		// The stack may be unmapped or too small for the frame, for instance a
+		// preemption signal that arrives with the SP deep in a small stack.
+		// Write it through the pagemap so that turns into a killed process, as
+		// on Linux, rather than a kernel-mode fault that takes the machine down.
+		if !usercopy.copy_to_user(return_context_addr, voidptr(context), sizeof(cpulocal.GPRState))
+			|| !usercopy.copy_to_user(siginfo_sp, voidptr(&siginfo), sizeof(SigInfo)) {
+			exit_with_fatal_signal(u8(sigsegv))
+		}
+
+		t.gpr_state = *context
+		t.gpr_state.sp = siginfo_sp
 		t.gpr_state.pc = t.sigentry
 		t.gpr_state.x0 = u64(which)
-		t.gpr_state.x1 = u64(siginfo)
+		t.gpr_state.x1 = siginfo_sp
 		t.gpr_state.x2 = u64(handler)
-		t.gpr_state.x3 = u64(return_context)
+		t.gpr_state.x3 = return_context_addr
 		t.gpr_state.x4 = previous_mask
 
 		enter_handler(mut t, context)
@@ -377,28 +435,31 @@ fn dispatch_a_signal_with_fault(context &cpulocal.GPRState, synchronous bool, fa
 			context_offset + sizeof(cpulocal.GPRState)
 		}
 		mut signal_sp := lib.align_down(stack_top - frame_size, 16)
+		uc_address := signal_sp + ucontext_offset
 
-		// Store original context into frame on user stack
+		// Build the whole frame in kernel memory, then push it to the user
+		// stack with a single checked copy. A preemption signal can arrive
+		// with the SP deep in a small goroutine stack, so the frame may not
+		// fit; the checked copy turns that into a killed process (Linux
+		// force_sigsegv) instead of a kernel-mode fault that kills the machine.
+		mut frame := []u8{len: int(frame_size)}
+		base := u64(frame.data)
 		unsafe {
-			*&u64(signal_sp) = previous_mask
-			*&u64(signal_sp + 8) = 0
-			C.memcpy(voidptr(signal_sp + context_offset), context, sizeof(cpulocal.GPRState))
+			*&u64(base) = previous_mask
+			// The private header points rt_sigreturn at the public context so
+			// changes made by a three-argument handler are not discarded.
+			*&u64(base + 8) = if wants_siginfo { uc_address } else { u64(0) }
+			C.memcpy(voidptr(base + context_offset), context, sizeof(cpulocal.GPRState))
 		}
 
 		if wants_siginfo {
-			info_address := signal_sp + info_offset
-			uc_address := signal_sp + ucontext_offset
+			info_base := base + info_offset
+			uc_base := base + ucontext_offset
 			unsafe {
-				// The private header points rt_sigreturn at the public context so
-				// changes made by a three-argument handler are not discarded.
-				*&u64(signal_sp + 8) = uc_address
-				C.memset(voidptr(info_address), 0, 128)
-				C.memset(voidptr(uc_address), 0, ucontext_size)
-
 				// siginfo_t: signo, errno, positive si_code, then si_addr. Linux
 				// distinguishes an unmapped page from a permission-protected one.
-				*&i32(info_address) = i32(which)
-				*&i32(info_address + 8) = if timer_info.found {
+				*&i32(info_base) = i32(which)
+				*&i32(info_base + 8) = if timer_info.found {
 					i32(timer_info.code)
 				} else if synchronous && (fault_esr & 0x3f) >= 0x0c {
 					2 // SEGV_ACCERR
@@ -407,31 +468,37 @@ fn dispatch_a_signal_with_fault(context &cpulocal.GPRState, synchronous bool, fa
 				} else {
 					0
 				}
-				*&u64(info_address + 16) = fault_address
+				*&u64(info_base + 16) = fault_address
 				if timer_info.found {
-					*&i32(info_address + 20) = i32(timer_info.overrun)
-					*&u64(info_address + 24) = timer_info.value
+					*&i32(info_base + 20) = i32(timer_info.overrun)
+					*&u64(info_base + 24) = timer_info.value
 				}
 
 				// musl AArch64 ucontext_t offsets. The signal mask begins at 40;
 				// its 128 bytes are followed by eight bytes of alignment before
 				// mcontext at 176. The reserved extension records are 16-byte
 				// aligned after pstate.
-				*&u64(uc_address + 40) = previous_mask
-				*&u64(uc_address + 176) = fault_address
-				C.memcpy(voidptr(uc_address + 184), context, 31 * sizeof(u64))
-				*&u64(uc_address + 432) = context.sp
-				*&u64(uc_address + 440) = context.pc
-				*&u64(uc_address + 448) = context.pstate
+				*&u64(uc_base + 40) = previous_mask
+				*&u64(uc_base + 176) = fault_address
+				C.memcpy(voidptr(uc_base + 184), context, 31 * sizeof(u64))
+				*&u64(uc_base + 432) = context.sp
+				*&u64(uc_base + 440) = context.pc
+				*&u64(uc_base + 448) = context.pstate
 
 				// esr_context lets QEMU distinguish reads from writes without
 				// decoding the faulting AArch64 instruction.
-				*&u32(uc_address + 464) = 0x45535201
-				*&u32(uc_address + 468) = 16
-				*&u64(uc_address + 472) = fault_esr
+				*&u32(uc_base + 464) = 0x45535201
+				*&u32(uc_base + 468) = 16
+				*&u64(uc_base + 472) = fault_esr
 				// A zero header terminates the extension-record chain.
-				*&u64(uc_address + 480) = 0
+				*&u64(uc_base + 480) = 0
 			}
+		}
+
+		pushed := usercopy.copy_to_user(signal_sp, frame.data, frame_size)
+		unsafe { frame.free() }
+		if !pushed {
+			exit_with_fatal_signal(u8(sigsegv))
 		}
 
 		// Set up handler invocation
@@ -530,38 +597,89 @@ pub fn sendsig(_thread &proc.Thread, signal u8) {
 	sched.enqueue_thread(t, true)
 }
 
-// Deliver to a process' main thread. Signal state is per-thread here, so there
-// is no process-wide pending mask to raise instead.
+// Deliver a signal aimed at a whole process. Signal state is per-thread here,
+// so there is no process-wide pending mask to raise; the signal goes to the
+// first thread that does not block it, as Linux picks one, and only when every
+// thread blocks it does it wait on the main thread. Always choosing the main
+// thread lost signals for good in Go programs, whose main thread commonly sits
+// with them blocked while other threads are the ones meant to take them.
 fn signal_process(mut target proc.Process, signal int) bool {
+	bit := u64(1) << (signal - 1)
+	unblockable := signal == sigkill || signal == sigstop
 	target.threads_lock.acquire()
-	mut main_thread := &proc.Thread(unsafe { nil })
-	if target.threads.len > 0 {
-		main_thread = target.threads[0]
+	mut chosen := &proc.Thread(unsafe { nil })
+	for t in target.threads {
+		if katomic.load(&t.is_dead) {
+			continue
+		}
+		if chosen == unsafe { nil } {
+			chosen = t
+		}
+		if unblockable || t.masked_signals & bit == 0 {
+			chosen = t
+			break
+		}
+	}
+	if chosen != unsafe { nil } {
+		proc.pin_thread(chosen)
 	}
 	target.threads_lock.release()
 
-	if main_thread == unsafe { nil } {
+	if chosen == unsafe { nil } {
 		return false
 	}
 
-	sendsig(main_thread, u8(signal))
+	sendsig(chosen, u8(signal))
+	proc.unpin_thread(chosen)
 	return true
+}
+
+// Send `signal` to process `pid` from inside the kernel: cgroup.kill, the death
+// of a pid namespace's init, and PR_SET_PDEATHSIG all end up here.
+pub fn signal_pid(pid int, signal int) {
+	if pid <= 0 || pid >= proc.max_pid || signal <= 0 || signal > 64 {
+		return
+	}
+	mut target := processes[pid]
+	if target == unsafe { nil } || target.exiting {
+		return
+	}
+	signal_process(mut target, signal)
 }
 
 // kill(2). Signal 0 raises nothing: it is the "does this pid exist?" probe that
 // shells and daemons use, so it must never fail loudly.
+// cgroup.kill: fs asks the signal layer to kill a member of a cgroup. Kept
+// here because fs cannot reach the signal code, which sits above it.
+pub fn cgroup_kill_process(pid int, signal int) {
+	if pid <= 0 || pid >= proc.max_pid {
+		return
+	}
+	mut target := processes[pid]
+	if target == unsafe { nil } {
+		return
+	}
+	signal_process(mut target, signal)
+}
+
 pub fn syscall_kill(_ voidptr, pid int, signal int) (u64, u64) {
 	if signal < 0 || signal > 64 {
 		return errno.err, errno.einval
 	}
 
 	mut current_process := proc.current_thread().process
+	// Pids and groups are the caller's namespace's numbers.
+	viewer := current_process.numbered_in
 
 	if pid > 0 {
 		if pid >= proc.max_pid {
 			return errno.err, errno.esrch
 		}
-		mut target := processes[pid]
+		global := proc.pid_from(viewer, pid)
+		if global <= 0 {
+			return errno.err, errno.esrch
+		}
+		mut target := processes[global]
 		if target == unsafe { nil } {
 			return errno.err, errno.esrch
 		}
@@ -581,8 +699,13 @@ pub fn syscall_kill(_ voidptr, pid int, signal int) (u64, u64) {
 	if pid == 0 {
 		pgid = current_process.pgid
 	} else if pid < -1 {
-		pgid = -pid
+		pgid = proc.group_from(viewer, -pid)
+		if pgid == 0 {
+			return errno.err, errno.esrch
+		}
 	}
+	// A namespace's -1 reaches its own members only, and spares its init.
+	init_pid := if proc.numbers_own(viewer) { viewer.init_pid } else { 1 }
 
 	mut found := false
 	for i := 1; i < proc.max_pid; i++ {
@@ -593,7 +716,10 @@ pub fn syscall_kill(_ voidptr, pid int, signal int) (u64, u64) {
 		if pgid != 0 && target.pgid != pgid {
 			continue
 		}
-		if pid == -1 && (target.pid == 1 || target.pid == current_process.pid) {
+		if proc.numbers_own(viewer) && voidptr(target.numbered_in) != voidptr(viewer) {
+			continue
+		}
+		if pid == -1 && (target.pid == init_pid || target.pid == current_process.pid) {
 			continue
 		}
 
@@ -627,11 +753,21 @@ fn signal_thread(tgid int, tid int, signal int) (u64, u64) {
 		return errno.err, errno.einval
 	}
 
-	mut target := proc.thread_by_tid(tid)
-	if target == unsafe { nil } || target.is_dead {
+	// Go preempts its threads with tgkill(SIGURG) from every CPU, and those
+	// threads come and go all the time; the pin keeps a target that exits in the
+	// meantime from being freed and reused before the signal is on it.
+	viewer := proc.current_pid_namespace()
+	mut target := proc.thread_in(viewer, tid)
+	if target == unsafe { nil } {
 		return errno.err, errno.esrch
 	}
-	if tgid > 0 && target.process.pid != tgid {
+	defer {
+		proc.unpin_thread(target)
+	}
+	if katomic.load(&target.is_dead) {
+		return errno.err, errno.esrch
+	}
+	if tgid > 0 && proc.pid_in(target.process, viewer) != tgid {
 		return errno.err, errno.esrch
 	}
 	if signal == 0 {
@@ -644,8 +780,18 @@ fn signal_thread(tgid int, tid int, signal int) (u64, u64) {
 }
 
 pub fn syscall_execve(_ voidptr, _path charptr, _argv &charptr, _envp &charptr) (u64, u64) {
-	path := fs.user_path(_path) or { return errno.err, errno.get() }
+	// This first marker intentionally precedes the user-pointer copy. The
+	// launcher has already named the program in its own last message, and this
+	// distinguishes a syscall-entry failure from a later ELF-loader failure.
+	println('exec: syscall handler entered; copying user path')
+	path := fs.user_path(_path) or {
+		println('exec: ERROR copying user path')
+		return errno.err, errno.get()
+	}
+	trace_gpu := path == gpu_desktop_executable
+	gpu_exec_trace(trace_gpu, 'user path copied')
 	mut argv := []string{}
+	gpu_exec_trace(trace_gpu, 'copying argument vector')
 	for i := 0; true; i++ {
 		unsafe {
 			if _argv[i] == nil {
@@ -654,7 +800,9 @@ pub fn syscall_execve(_ voidptr, _path charptr, _argv &charptr, _envp &charptr) 
 			argv << cstring_to_vstring(_argv[i])
 		}
 	}
+	gpu_exec_trace(trace_gpu, 'argument vector copied')
 	mut envp := []string{}
+	gpu_exec_trace(trace_gpu, 'copying environment')
 	for i := 0; true; i++ {
 		unsafe {
 			if _envp[i] == nil {
@@ -663,8 +811,9 @@ pub fn syscall_execve(_ voidptr, _path charptr, _argv &charptr, _envp &charptr) 
 			envp << cstring_to_vstring(_envp[i])
 		}
 	}
+	gpu_exec_trace(trace_gpu, 'environment copied; entering ELF loader')
 
-	start_program(true, proc.current_thread().process.current_directory, path, argv, envp,
+	start_program(true, proc.current_directory_of(proc.current_thread().process), path, argv, envp,
 		'', '', '') or { return errno.err, errno.get() }
 
 	return errno.err, errno.get()
@@ -677,16 +826,33 @@ pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, 
 	// child's own /proc/self/exe point back at itself forever.
 	path := fs.resolve_self_reference(_path)
 	prog_node := fs.get_node(dir, path, true)?
+	return start_program_node(execve, dir, prog_node, path, argv, envp, stdin_path,
+		stdout_path, stderr_path)
+}
+
+// The part of exec that follows finding the program. execveat(2) on a
+// descriptor comes here directly: a memfd has no name to be found by.
+pub fn start_program_node(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, path string, argv []string, envp []string, stdin_path string, stdout_path string, stderr_path string) ?&proc.Process {
+	trace_gpu := execve && path == gpu_desktop_executable
+	gpu_exec_trace(trace_gpu, 'resolved executable path')
+	gpu_exec_trace(trace_gpu, 'opened executable node')
+	// A program's interpreter is found from the root of the process that runs
+	// it -- a container's, after pivot_root.
+	caller := proc.current_thread().process
+	root := fs.process_root(caller)
+	program_path := fs.program_path(prog_node, path)
 	if !stat.isreg(prog_node.resource.stat.mode)
 		|| !fs.check_access(prog_node, fs.access_exec, true) {
 		errno.set(errno.eacces)
 		return none
 	}
+	gpu_exec_trace(trace_gpu, 'validated executable permissions')
 	mut prog := prog_node.resource
 
 	// Check for shebang before proceeding as if it was an ELF.
 	mut shebang := [2]char{}
 	prog.read(0, &shebang[0], 0, 2)?
+	gpu_exec_trace(trace_gpu, 'read executable signature')
 	if shebang[0] == char(`#`) && shebang[1] == char(`!`) {
 		real_path, arg := parse_shebang(mut prog)?
 		mut final_argv := [real_path]
@@ -705,6 +871,7 @@ pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, 
 	// the kernel exec path also catches helper programs that Wine starts itself,
 	// rather than only binaries launched through the shell wrapper.
 	architecture := elf.architecture(prog) or { return none }
+	gpu_exec_trace(trace_gpu, 'validated ELF architecture')
 	if architecture == elf.arch_x86_64 {
 		translator := '/usr/bin/qemu-x86_64'
 		guest_root := '/usr/libexec/vinix-x86_64/root'
@@ -726,19 +893,32 @@ pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, 
 			translated_envp << 'LD_LIBRARY_PATH=${guest_root}/lib:${guest_root}/usr/lib'
 		}
 
-		return start_program(execve, vfs_root, translator, translated_argv,
-			translated_envp, stdin_path, stdout_path, stderr_path)
+		return start_program(execve, root, translator, translated_argv, translated_envp,
+			stdin_path, stdout_path, stderr_path)
 	}
 
+	gpu_exec_trace(trace_gpu, 'allocating replacement page map')
 	mut new_pagemap := memory.new_pagemap()
-	mut auxval, ld_path := elf.load(new_pagemap, prog, 0) or { return none }
+	gpu_exec_trace(trace_gpu, 'allocated replacement page map')
+	gpu_exec_trace(trace_gpu, 'loading program ELF segments')
+	mut auxval := elf.Auxval{}
+	mut ld_path := ''
+	if trace_gpu {
+		auxval, ld_path = elf.load_traced(new_pagemap, prog, 0, 'program') or { return none }
+	} else {
+		auxval, ld_path = elf.load(new_pagemap, prog, 0) or { return none }
+	}
+	gpu_exec_trace(trace_gpu, 'program ELF segments loaded')
+	allow_wx := envp.contains('VINIX_ALLOW_WX=1')
 
 	mut entry_point := unsafe { nil }
 
 	if ld_path == '' {
 		entry_point = voidptr(auxval.at_entry)
+		gpu_exec_trace(trace_gpu, 'using program entry point (no interpreter)')
 	} else {
-		ld_node := fs.get_node(vfs_root, ld_path, true)?
+		gpu_exec_trace(trace_gpu, 'opening ELF interpreter')
+		ld_node := fs.get_node(root, ld_path, true)?
 		if !stat.isreg(ld_node.resource.stat.mode)
 			|| !fs.check_access(ld_node, fs.access_exec, true) {
 			errno.set(errno.eacces)
@@ -746,9 +926,20 @@ pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, 
 		}
 		ld := ld_node.resource
 
-		ld_auxval, interp := elf.load(new_pagemap, ld, elf.interpreter_load_base()) or {
-			return none
+		gpu_exec_trace(trace_gpu, 'choosing ELF interpreter load base')
+		interpreter_base := elf.interpreter_load_base()
+		gpu_exec_trace(trace_gpu, 'loading ELF interpreter segments')
+		mut ld_auxval := elf.Auxval{}
+		mut interp := ''
+		if trace_gpu {
+			ld_auxval, interp = elf.load_traced(new_pagemap, ld, interpreter_base,
+				'interpreter') or {
+				return none
+			}
+		} else {
+			ld_auxval, interp = elf.load(new_pagemap, ld, interpreter_base) or { return none }
 		}
+		gpu_exec_trace(trace_gpu, 'ELF interpreter segments loaded')
 
 		if interp != '' {
 			unsafe { interp.free() }
@@ -756,6 +947,9 @@ pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, 
 
 		entry_point = voidptr(ld_auxval.at_entry)
 		auxval.at_base = ld_auxval.at_base
+		if trace_gpu {
+			println('exec[gpu]: interpreter entry=0x${u64(entry_point):x} program entry=0x${auxval.at_entry:x}')
+		}
 
 		unsafe { ld_path.free() }
 	}
@@ -764,7 +958,9 @@ pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, 
 		mut new_process := sched.new_process(unsafe { nil }, new_pagemap)?
 
 		new_process.name = '${path}[${new_process.pid}]'
-		new_process.executable_path = path.clone()
+		new_process.executable_path = program_path
+		new_process.exe_node = voidptr(prog_node)
+		new_process.allow_wx = allow_wx
 
 		stdin_node := fs.get_node(vfs_root, stdin_path, true)?
 		stdin_handle := &file.Handle{
@@ -808,11 +1004,21 @@ pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, 
 	} else {
 		mut t := proc.current_thread()
 		mut curr_process := t.process
+		gpu_exec_trace(trace_gpu, 'beginning process image replacement')
+
+		// Every other thread has to be gone before the address space they are
+		// running in is replaced -- and before the close-on-exec descriptors
+		// go, as on Linux: a sibling unwinding a syscall still reaches the
+		// descriptor it was called on.
+		gpu_exec_trace(trace_gpu, 'stopping sibling threads')
+		kill_sibling_threads(mut curr_process, t)
+		gpu_exec_trace(trace_gpu, 'sibling threads stopped')
 
 		// Close O_CLOEXEC file descriptors before exec.
 		// This is critical for pipe EOF detection: popen creates pipes
 		// with O_CLOEXEC, and leaked FDs prevent pipe refcount from
 		// reaching 1, blocking EOF on reads.
+		gpu_exec_trace(trace_gpu, 'scanning close-on-exec descriptors')
 		for i := 0; i < proc.max_fds; i++ {
 			fd_ptr := unsafe { &file.FD(curr_process.fds[i]) }
 			if fd_ptr == unsafe { nil } {
@@ -822,23 +1028,38 @@ pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, 
 				file.fdnum_close(curr_process, i, true) or {}
 			}
 		}
-
-		// Every other thread has to be off the CPUs before the address space
-		// they are running in is replaced.
-		kill_sibling_threads(mut curr_process, t)
+		gpu_exec_trace(trace_gpu, 'closed close-on-exec descriptors')
+		gpu_exec_trace(trace_gpu, 'removing process timers')
 		posixtimer.remove_process_timers(curr_process)
+		gpu_exec_trace(trace_gpu, 'process timers removed')
 
 		mut old_pagemap := curr_process.pagemap
 
 		curr_process.pagemap = new_pagemap
 
 		curr_process.name = '${path}[${curr_process.pid}]'
-		curr_process.executable_path = path.clone()
+		curr_process.executable_path = program_path
+		curr_process.exe_node = voidptr(prog_node)
+		curr_process.allow_wx = allow_wx
+		// execve recomputes the capability sets from the new credentials and
+		// the bounding set, which is how a container's root ends up with only
+		// the capabilities its runtime left it.
+		proc.capabilities_after_exec(mut curr_process)
+		gpu_exec_trace(trace_gpu, 'installed replacement process metadata')
 
+		gpu_exec_trace(trace_gpu, 'switching CPU to kernel page map')
 		kernel_pagemap.switch_to()
+		gpu_exec_trace(trace_gpu, 'switched CPU to kernel page map')
 		t.process = kernel_process
+		gpu_exec_trace(trace_gpu, 'detached execve thread from old process')
 
-		mmap.delete_pagemap(mut old_pagemap)?
+		gpu_exec_trace(trace_gpu, 'deleting old process page map')
+		if trace_gpu {
+			mmap.delete_pagemap_traced(mut old_pagemap)?
+		} else {
+			mmap.delete_pagemap(mut old_pagemap)?
+		}
+		gpu_exec_trace(trace_gpu, 'old process page map deleted')
 
 		curr_process.thread_stack_top = elf.initial_stack_top()
 		curr_process.mmap_anon_non_fixed_base = elf.initial_mmap_base()
@@ -846,6 +1067,7 @@ pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, 
 		curr_process.threads_lock.acquire()
 		curr_process.threads = []&proc.Thread{}
 		curr_process.threads_lock.release()
+		gpu_exec_trace(trace_gpu, 'reset process thread metadata')
 
 		// The program that comes out of exec has one thread and it is the group
 		// leader, so it takes over the pid as its tid. Anything else this
@@ -860,14 +1082,37 @@ pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, 
 		// before the thread is enqueued, so it is never picked up as an
 		// ordinary thread first.
 		inherited_sched := t.sched
+		gpu_exec_trace(trace_gpu, 'building replacement user thread and stack')
 		mut new_thread := sched.new_user_thread(curr_process, true, entry_point, unsafe { nil },
 			0, argv, envp, auxval, false)?
+		if trace_gpu {
+			println('exec[gpu]: replacement thread built pc=0x${new_thread.gpr_state.pc:x} sp=0x${new_thread.gpr_state.sp:x} tid=${new_thread.tid}')
+		}
 		proc.set_thread_sched_params(new_thread.tid, inherited_sched)
-		sched.enqueue_thread(new_thread, false)
+		gpu_exec_trace(trace_gpu, 'inherited scheduler parameters')
+		if trace_gpu {
+			gpu_exec_trace(trace_gpu, 'disabling interrupts for atomic same-CPU handoff')
+			cpu.interrupt_toggle(false)
+			gpu_exec_trace(trace_gpu, 'handoff interrupts disabled')
+		}
+		enqueued := if trace_gpu {
+			sched.enqueue_thread_traced(new_thread, false)
+		} else {
+			sched.enqueue_thread(new_thread, false)
+		}
+		if enqueued {
+			gpu_exec_trace(trace_gpu, 'replacement thread enqueued')
+		} else {
+			gpu_exec_trace(trace_gpu, 'ERROR: replacement thread enqueue failed')
+		}
 
 		unsafe {
 			argv.free()
 			envp.free()
+		}
+		gpu_exec_trace(trace_gpu, 'retiring original execve thread')
+		if trace_gpu {
+			sched.dequeue_and_die_traced()
 		}
 		sched.dequeue_and_die()
 	}
@@ -930,21 +1175,26 @@ pub fn syscall_execveat(_ voidptr, dirfd int, _path charptr, _argv &charptr, _en
 	mut directory := &fs.VFSNode(unsafe { nil })
 	mut target := path
 
+	mut direct_node := &fs.VFSNode(unsafe { nil })
 	if path.len == 0 {
 		if flags & fs.at_empty_path == 0 {
 			return errno.err, errno.enoent
 		}
-		// Run whatever the descriptor is open on. Its own name and parent are
-		// what a relative interpreter path then resolves against.
+		// Run whatever the descriptor is open on. Its parent, when it has one,
+		// is what a relative interpreter path then resolves against.
 		mut fd := file.fd_from_fdnum(process, dirfd) or { return errno.err, errno.ebadf }
 		node := unsafe { &fs.VFSNode(fd.handle.node) }
-		if node == unsafe { nil } || node.parent == unsafe { nil } {
-			fd.unref()
+		fd.unref()
+		if node == unsafe { nil } {
 			return errno.err, errno.eacces
 		}
-		directory = node.parent
-		target = node.name
-		fd.unref()
+		direct_node = node
+		directory = if node.parent != unsafe { nil } {
+			node.parent
+		} else {
+			unsafe { &fs.VFSNode(proc.current_directory_of(process)) }
+		}
+		target = '/proc/self/fd/${dirfd}'
 	} else {
 		directory = fs.parent_dir_for(dirfd, path) or { return errno.err, errno.get() }
 	}
@@ -968,6 +1218,12 @@ pub fn syscall_execveat(_ voidptr, dirfd int, _path charptr, _argv &charptr, _en
 		}
 	}
 
+	if direct_node != unsafe { nil } {
+		start_program_node(true, directory, direct_node, target, argv, envp, '', '', '') or {
+			return errno.err, errno.get()
+		}
+		return errno.err, errno.get()
+	}
 	start_program(true, directory, target, argv, envp, '', '', '') or {
 		return errno.err, errno.get()
 	}

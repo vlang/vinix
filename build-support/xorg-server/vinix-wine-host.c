@@ -1,5 +1,8 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
 //
 // Host one Wine application on an off-screen Xvfb display. vinix-desktop maps
 // Xvfb's XWD framebuffer into a normal compositor window and sends compact
@@ -49,6 +52,16 @@ _Static_assert(sizeof(struct wine_host_event) == 20,
                "Wine host event ABI changed");
 
 static volatile sig_atomic_t running = 1;
+static int hold_game_keys = 0;
+#define GAME_KEY_HOLD_MS 500
+#define MAX_HELD_GAME_KEYS 16
+
+struct held_game_key {
+    KeyCode code;
+    uint64_t release_at_ms;
+};
+
+static struct held_game_key held_game_keys[MAX_HELD_GAME_KEYS];
 
 static void stop_running(int signal_number) {
     (void)signal_number;
@@ -64,6 +77,13 @@ static int ignore_x_error(Display *display, XErrorEvent *event) {
 static void sleep_10ms(void) {
     const struct timespec delay = { 0, 10000000 };
     nanosleep(&delay, NULL);
+}
+
+static uint64_t monotonic_millis(void) {
+    struct timespec now;
+    if (clock_gettime(CLOCK_MONOTONIC, &now) != 0)
+        return 0;
+    return (uint64_t)now.tv_sec * 1000 + (uint64_t)now.tv_nsec / 1000000;
 }
 
 /* The desktop names each hosted display after the process that asked for it,
@@ -105,6 +125,19 @@ static void remove_display_files(int number) {
     unlink(path);
     snprintf(path, sizeof(path), "/tmp/.X%d-lock", number);
     unlink(path);
+}
+
+/* The framebuffer and damage counter are temporary files. Without removing
+ * them, a closed application leaves its private tmpfs directory behind and
+ * repeated game launches retain one framebuffer per run. */
+static void remove_surface_files(const char *directory) {
+    char path[PATH_MAX];
+    const char *names[] = { "Xvfb_screen0", "damage" };
+    for (size_t index = 0; index < sizeof(names) / sizeof(names[0]); ++index) {
+        if (snprintf(path, sizeof(path), "%s/%s", directory, names[index]) <
+            (int)sizeof(path))
+            unlink(path);
+    }
 }
 
 /* True when nothing answers on this display. A lock file whose server is gone
@@ -153,7 +186,7 @@ static const char *claim_display(const char *requested, char *storage,
 }
 
 static pid_t spawn_xvfb(const char *display_name, const char *directory,
-                        const char *geometry) {
+                        const char *geometry, int game_input) {
     pid_t pid = fork();
     const char *xvfb;
     if (pid != 0)
@@ -163,15 +196,21 @@ static pid_t spawn_xvfb(const char *display_name, const char *directory,
     setenv("LIBGL_ALWAYS_SOFTWARE", "1", 1);
     setenv("LIBGL_DRIVERS_PATH", "/usr/lib/xorg/modules/dri", 1);
     setenv("GALLIUM_DRIVER", "softpipe", 1);
-    xvfb = access("/usr/bin/Xvfb-glx", X_OK) == 0
+    xvfb = !game_input && access("/usr/bin/Xvfb-glx", X_OK) == 0
                ? "/usr/bin/Xvfb-glx" : "/usr/bin/Xvfb";
     /* Vinix does not provide SysV shared memory. Do not advertise MIT-SHM to
      * clients only to make every attachment fail with ENOSYS; ordinary X11
      * image transport is reliable for this private local display. */
-    execl(xvfb, "Xvfb", display_name, "-screen", "0", geometry,
-          "-fbdir", directory, "-nolisten", "tcp", "-noreset", "-ac",
-          "-extension", "MIT-SHM", "+extension", "GLX", "+iglx",
-          (char *)NULL);
+    if (game_input) {
+        execl(xvfb, "Xvfb", display_name, "-screen", "0", geometry,
+              "-fbdir", directory, "-nolisten", "tcp", "-noreset", "-ac",
+              "-extension", "MIT-SHM", (char *)NULL);
+    } else {
+        execl(xvfb, "Xvfb", display_name, "-screen", "0", geometry,
+              "-fbdir", directory, "-nolisten", "tcp", "-noreset", "-ac",
+              "-extension", "MIT-SHM", "+extension", "GLX", "+iglx",
+              (char *)NULL);
+    }
     _exit(127);
 }
 
@@ -210,7 +249,53 @@ static void fake_key(Display *display, KeySym symbol, Bool pressed) {
         XTestFakeKeyEvent(display, code, pressed, CurrentTime);
 }
 
+static void hold_game_key(Display *display, KeySym symbol) {
+    KeyCode code = XKeysymToKeycode(display, symbol);
+    int index;
+    int free_slot = -1;
+    uint64_t deadline = monotonic_millis() + GAME_KEY_HOLD_MS;
+
+    if (code == 0)
+        return;
+    for (index = 0; index < MAX_HELD_GAME_KEYS; ++index) {
+        if (held_game_keys[index].code == code) {
+            held_game_keys[index].release_at_ms = deadline;
+            return;
+        }
+        if (free_slot < 0 && held_game_keys[index].code == 0)
+            free_slot = index;
+    }
+    if (free_slot < 0)
+        return;
+    held_game_keys[free_slot].code = code;
+    held_game_keys[free_slot].release_at_ms = deadline;
+    XTestFakeKeyEvent(display, code, True, CurrentTime);
+    XFlush(display);
+}
+
+static void release_expired_game_keys(Display *display) {
+    uint64_t now = monotonic_millis();
+    int index;
+    int released = 0;
+
+    for (index = 0; index < MAX_HELD_GAME_KEYS; ++index) {
+        if (held_game_keys[index].code == 0 ||
+            now < held_game_keys[index].release_at_ms)
+            continue;
+        XTestFakeKeyEvent(display, held_game_keys[index].code, False,
+                          CurrentTime);
+        held_game_keys[index].code = 0;
+        released = 1;
+    }
+    if (released)
+        XFlush(display);
+}
+
 static void tap_key(Display *display, KeySym symbol, int shift, int control) {
+    if (hold_game_keys && !shift && !control) {
+        hold_game_key(display, symbol);
+        return;
+    }
     if (control)
         fake_key(display, XK_Control_L, True);
     if (shift)
@@ -359,9 +444,37 @@ static void focus_top_window(Display *display) {
      * must not receive focus. Descend through substantial input/output
      * children until the real application control or modal dialog is reached.
      */
-    target = topmost_input_window(display, root);
+    /* SDL's game window is the direct root child. Descending into its
+     * helper children sends synthetic keys away from the game event loop. */
+    target = hold_game_keys ? topmost_substantial_child(display, root)
+                            : topmost_input_window(display, root);
     if (target != None)
         XSetInputFocus(display, target, RevertToPointerRoot, CurrentTime);
+}
+
+/* Xvfb deliberately has no window manager. Most hosted applications request
+ * the root dimensions themselves, but a stale Minecraft launch description
+ * can make GLFW fall back to 854x480 and leave the rest of the captured root
+ * visible as a white border. For applications explicitly hosted with
+ * --fill, take over the one window-manager job they need and keep their
+ * top-level window fitted to the complete private display. */
+static void fill_top_window(Display *display) {
+    Window root = DefaultRootWindow(display);
+    Window target = topmost_substantial_child(display, root);
+    XWindowAttributes attributes;
+    int width = DisplayWidth(display, DefaultScreen(display));
+    int height = DisplayHeight(display, DefaultScreen(display));
+
+    if (target == None ||
+        !XGetWindowAttributes(display, target, &attributes))
+        return;
+    if (attributes.x == 0 && attributes.y == 0 &&
+        attributes.width == width && attributes.height == height)
+        return;
+    XMoveResizeWindow(display, target, 0, 0, (unsigned int)width,
+                      (unsigned int)height);
+    XRaiseWindow(display, target);
+    XFlush(display);
 }
 
 static int process_event(Display *display, const struct wine_host_event *event,
@@ -478,15 +591,30 @@ int main(int argc, char **argv) {
     volatile uint32_t *damage_counter = NULL;
     uint32_t damage_sequence = 0;
     Damage damage;
+    int fill_surface = 0;
+    int game_input = 0;
+    unsigned int fill_tick = 0;
 
-    if (argc != 5) {
-        fprintf(stderr, "usage: %s DISPLAY FBDIR GEOMETRY COMMAND\n", argv[0]);
+    if (argc != 5 && argc != 6) {
+        fprintf(stderr, "usage: %s DISPLAY FBDIR GEOMETRY COMMAND [--fill|--game-input]\n",
+                argv[0]);
         return 2;
+    }
+    if (argc == 6) {
+        if (strcmp(argv[5], "--fill") == 0) {
+            fill_surface = 1;
+        } else if (strcmp(argv[5], "--game-input") == 0) {
+            game_input = 1;
+        } else {
+            fprintf(stderr, "vinix-wine-host: unknown option: %s\n", argv[5]);
+            return 2;
+        }
     }
     display_name = argv[1];
     directory = argv[2];
     geometry = argv[3];
     command = argv[4];
+    hold_game_keys = game_input;
 
     memset(&action, 0, sizeof(action));
     action.sa_handler = stop_running;
@@ -506,7 +634,7 @@ int main(int argc, char **argv) {
         rmdir(directory);
         return 1;
     }
-    xvfb_pid = spawn_xvfb(display_name, directory, geometry);
+    xvfb_pid = spawn_xvfb(display_name, directory, geometry, game_input);
     if (xvfb_pid < 0) {
         perror("vinix-wine-host: fork Xvfb");
         rmdir(directory);
@@ -516,6 +644,7 @@ int main(int argc, char **argv) {
     if (display == NULL) {
         fprintf(stderr, "vinix-wine-host: Xvfb did not become ready\n");
         stop_child(xvfb_pid);
+        remove_surface_files(directory);
         rmdir(directory);
         return 1;
     }
@@ -525,6 +654,7 @@ int main(int argc, char **argv) {
         fprintf(stderr, "vinix-wine-host: XTEST extension is unavailable\n");
         XCloseDisplay(display);
         stop_child(xvfb_pid);
+        remove_surface_files(directory);
         rmdir(directory);
         return 1;
     }
@@ -586,6 +716,12 @@ int main(int argc, char **argv) {
         if (used == sizeof(input))
             running = 0;
 
+        /* Check at 10 Hz rather than on every bridge iteration. This catches
+         * both the first GLFW mapping and any later client-requested reset,
+         * while the no-op steady state is just one small XQueryTree. */
+        if (fill_surface && fill_tick++ % 10 == 0)
+            fill_top_window(display);
+
         if (damage != None) {
             int drawn = 0;
             /* XDamageReportNonEmpty stays quiet until the region is taken
@@ -608,6 +744,8 @@ int main(int argc, char **argv) {
             wine_pid = -1;
             running = 0;
         }
+        if (hold_game_keys)
+            release_expired_game_keys(display);
         sleep_10ms();
     }
 
@@ -619,6 +757,7 @@ int main(int argc, char **argv) {
     /* Xvfb removes these when it is asked to stop, but not when it has to be
      * killed. Leave nothing behind for the next server on this number. */
     remove_display_files(display_number(display_name));
+    remove_surface_files(directory);
     rmdir(directory);
     return 0;
 }

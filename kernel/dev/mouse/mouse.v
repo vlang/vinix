@@ -326,6 +326,14 @@ fn handler() {
 }
 
 pub fn initialise() {
+	// mouse_res is a global, which V3 zero-fills without applying the struct's
+	// field defaults. A pointer range of 0x0 pinned every report at the corner,
+	// so the desktop had nothing to place its cursor with.
+	mouse_res.pointer_x = 511
+	mouse_res.pointer_y = 383
+	mouse_res.pointer_max_x = 1023
+	mouse_res.pointer_max_y = 767
+
 	write(0xf6)
 	read()
 

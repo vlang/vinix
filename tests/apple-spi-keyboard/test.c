@@ -1,3 +1,7 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 #include <assert.h>
 #include <stdio.h>
@@ -164,6 +168,12 @@ static void test_command_chords(void)
         (const uint8_t *)"\033[13;9u", 7); /* Cmd-Return */
     expect_bytes(encode_key(20, 0x0f, 0, 0, 0),
         (const uint8_t *)"\033[81;16u", 8); /* Shift-Ctrl-Alt-Cmd-Q */
+    expect_bytes(encode_key(80, 0x08, 0, 0, 0),
+        (const uint8_t *)"\033[1;9D", 6); /* Cmd-Left */
+    expect_bytes(encode_key(82, 0x0a, 0, 0, 0),
+        (const uint8_t *)"\033[1;10A", 7); /* Shift-Cmd-Up */
+    expect_bytes(encode_key(31, 0x0a, 0, 0, 0),
+        (const uint8_t *)"\033[64;10u", 8); /* Shift-Cmd-2 */
 
     assert(single(&d, 100, 0x08, 0, 20, out) == 8
         && !memcmp(out, "\033[113;9u", 8));

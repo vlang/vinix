@@ -1,5 +1,8 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
 // Windows and what they show. Native windows contain a built-in page or a
 // ui2 tree received from an application process. External display-owning programs are launched by
 // the window manager and only use a native window to report a startup error.
@@ -18,6 +21,16 @@ enum Page {
 	app
 }
 
+enum WindowSnap {
+	none_
+	left
+	right
+	top_left
+	top_right
+	bottom_left
+	bottom_right
+}
+
 struct Window {
 mut:
 	id     int
@@ -27,6 +40,7 @@ mut:
 	y      int
 	width  int
 	height int
+	hide_body_cursor bool
 	// The glyph that stands for the window in the switcher. An application
 	// lends its own; a built-in page has none of its own to lend.
 	icon string = 'builtin:window'
@@ -41,6 +55,7 @@ mut:
 	id_minimize string
 	id_divider  string
 	id_body     string
+	id_resize   string
 	id_task     string
 	// Geometry to come back to when a maximised window is restored.
 	restore_x      int
@@ -48,7 +63,12 @@ mut:
 	restore_width  int
 	restore_height int
 	maximized      bool
+	snap           WindowSnap
 	minimized      bool
+	// Workspaces are zero-based internally and numbered from one in the UI.
+	// A window belongs to exactly one workspace; its application keeps running
+	// while another workspace is shown.
+	workspace int
 	// Index into Desktop.apps for a `.app` window, or -1 for a built-in page.
 	app_index int = -1
 }
@@ -80,7 +100,7 @@ fn external_error_page(width int, desktop &Desktop) []ui2.Element {
 	inner := width - 2 * pad
 	mut children := frame_elements(5)
 	children << ui2.view('', ui2.rect(f64(pad), 18, f64(inner), 4), ui2.BoxStyle{
-		bg: app_accent
+		bg:     app_accent
 		radius: 2
 	}, [])
 	children << heading(desktop.external_error_title, pad, 34, inner)
@@ -93,15 +113,15 @@ fn external_error_page(width int, desktop &Desktop) []ui2.Element {
 fn heading(text string, x int, y int, width int) ui2.Element {
 	return ui2.label('', text, ui2.rect(f64(x), f64(y), f64(width), 20), ui2.TextStyle{
 		color: body_heading
-		size: 17
-		bold: true
+		size:  17
+		bold:  true
 	})
 }
 
 fn body_line(text string, x int, y int, width int) ui2.Element {
 	return ui2.label('', text, ui2.rect(f64(x), f64(y), f64(width), 18), ui2.TextStyle{
 		color: body_text
-		size: 13
+		size:  13
 	})
 }
 
@@ -110,14 +130,14 @@ fn body_line(text string, x int, y int, width int) ui2.Element {
 fn owned_body_line(text string, x int, y int, width int) ui2.Element {
 	return ui2.label(frame_owned_text_id, text, ui2.rect(f64(x), f64(y), f64(width), 18), ui2.TextStyle{
 		color: body_text
-		size: 13
+		size:  13
 	})
 }
 
 fn muted_line(text string, x int, y int, width int) ui2.Element {
 	return ui2.label('', text, ui2.rect(f64(x), f64(y), f64(width), 16), ui2.TextStyle{
 		color: body_muted
-		size: 11
+		size:  11
 	})
 }
 
@@ -126,7 +146,7 @@ fn welcome_page(width int, _height int) []ui2.Element {
 	inner := width - 2 * pad
 	mut children := frame_elements(7)
 	children << ui2.view('', ui2.rect(f64(pad), 18, f64(inner), 4), ui2.BoxStyle{
-		bg: app_accent
+		bg:     app_accent
 		radius: 2
 	}, [])
 	children << heading('Welcome to Vinix', pad, 32, inner)
@@ -170,11 +190,12 @@ fn system_page(width int, height int, desktop &Desktop) []ui2.Element {
 	panel_children << owned_body_line(frames, 12, 72, inner - 24)
 	panel_children << owned_body_line(battery, 12, 92, inner - 24)
 	panel_children << owned_body_line(backlight, 12, 112, inner - 24)
-	panel_children << muted_line('Ctrl-P opens Start, Ctrl-Q leaves the desktop.', 12, 136, inner - 24)
+	panel_children << muted_line('Super+Arrows tiles; Super+1..4 changes workspace.', 12,
+		136, inner - 24)
 	mut children := frame_elements(2)
 	children << heading('System', pad, 18, inner)
 	children << ui2.view('', ui2.rect(f64(pad), 46, f64(inner), f64(height - 46 - pad)), ui2.BoxStyle{
-		bg: body_panel
+		bg:     body_panel
 		radius: 6
 	}, panel_children)
 	return children
@@ -217,7 +238,7 @@ fn palette_page(width int, height int) []ui2.Element {
 		column := i % columns
 		row := i / columns
 		children << ui2.view('', ui2.rect(f64(pad + column * (cell + gap)), f64(top + row * (cell + gap)), f64(cell), f64(cell)), ui2.BoxStyle{
-			bg: color
+			bg:     color
 			radius: 6
 		}, [])
 	}

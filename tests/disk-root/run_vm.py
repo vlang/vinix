@@ -164,6 +164,10 @@ def main() -> int:
     if WROTE_MARKER not in text:
         print("ERROR: the guest never wrote the marker", file=sys.stderr)
         return 1
+    if b"Loading saved package overlay" in text:
+        print("ERROR: the package overlay was loaded as a boot module",
+              file=sys.stderr)
+        return 1
     if PASS_MARKER not in text:
         print("ERROR: the file written outside /root did not survive the restart",
               file=sys.stderr)

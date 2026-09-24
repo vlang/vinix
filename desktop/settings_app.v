@@ -1,5 +1,8 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
 // The Settings application: categories down the left, the chosen category's
 // settings on the right.
 //
@@ -204,17 +207,30 @@ fn settings_note(text string, y int, width int) ui2.Element {
 	})
 }
 
-// choice draws one option as a radio-style pill: filled when it is the current
-// setting, outlined when it is not.
+// A choice carries radio state but asks for a native button bezel. The Vinix
+// renderer therefore keeps the existing flat control in the default theme and
+// uses a compact Catalina push-button face in the macOS theme.
 fn settings_choice(id string, label string, x int, y int, width int, selected bool) ui2.Element {
-	return ui2.button(id, label, ui2.rect(f64(x), f64(y), f64(width), 28), ui2.BoxStyle{
-		bg: if selected { app_accent } else { settings_choice_bg }
-		radius: 6
-	}, ui2.TextStyle{
-		color: if selected { app_on_accent } else { body_text }
-		size: 12
-		align: .center
-	})
+	return ui2.Element{
+		kind:                .button
+		id:                  id
+		text:                label
+		frame:               ui2.rect(f64(x), f64(y), f64(width), 28)
+		box:                 ui2.BoxStyle{
+			bg:     if selected { app_accent } else { settings_choice_bg }
+			radius: 6
+		}
+		text_style:          ui2.TextStyle{
+			color: if selected { app_on_accent } else { body_text }
+			size:  12
+			align: .center
+		}
+		native_style:        true
+		checked:             selected
+		accessibility_role:  'radio'
+		accessibility_label: label
+		accessibility_value: if selected { 'selected' } else { 'not selected' }
+	}
 }
 
 fn (a &SettingsApp) appearance_pane(width int) []ui2.Element {

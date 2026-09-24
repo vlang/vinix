@@ -31,6 +31,16 @@ fn C.vinix_cas64(addr voidptr, expected u64, desired u64) u64
 fn C.vinix_casa32(addr voidptr, expected u32, desired u32) u32
 fn C.vinix_casa64(addr voidptr, expected u64, desired u64) u64
 
+// Full-system publication barrier for memory shared with devices or firmware.
+// Acquire/release atomics order CPU accesses, while an AP/ASC ring handoff
+// requires the stronger device-observation point provided by DSB SY.
+pub fn sync() {
+	asm volatile aarch64 {
+		dsb 15
+		; ; ; memory
+	}
+}
+
 pub fn bts[T](mut var T, bit u8) bool {
 	mask := unsafe { T(1) << bit }
 	$if T is u32 || T is i32 || T is int {

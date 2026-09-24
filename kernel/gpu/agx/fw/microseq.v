@@ -212,6 +212,101 @@ pub mut:
 	header u32
 }
 
+@[packed]
+pub struct G13MicroseqTimestampV135 {
+pub mut:
+	bytes [0x3c]u8
+}
+@[packed]
+pub struct G13MicroseqStartVertexV135 {
+pub mut:
+	bytes [0x18c]u8
+}
+@[packed]
+pub struct G13MicroseqFinalizeVertexV135 {
+pub mut:
+	bytes [0x84]u8
+}
+@[packed]
+pub struct G13MicroseqStartFragmentV135 {
+pub mut:
+	bytes [0x1ac]u8
+}
+@[packed]
+pub struct G13MicroseqFinalizeFragmentV135 {
+pub mut:
+	bytes [0xb4]u8
+}
+@[packed]
+pub struct G13MicroseqStartComputeV135 {
+pub mut:
+	bytes [0x16c]u8
+}
+@[packed]
+pub struct G13MicroseqFinalizeComputeV135 {
+pub mut:
+	bytes [0x7c]u8
+}
+
+pub fn g13_microseq_timestamp_v13_5(legacy &G13MicroseqTimestamp,
+	unknown_timestamp_address u64) G13MicroseqTimestampV135 {
+	mut out := G13MicroseqTimestampV135{}
+	g13_copy_bytes(voidptr(&out), 0, voidptr(legacy), 0, 0x2c)
+	g13_put_u64(voidptr(&out), 0x2c, unknown_timestamp_address)
+	g13_copy_bytes(voidptr(&out), 0x34, voidptr(legacy), 0x2c, 8)
+	return out
+}
+
+pub fn g13_microseq_start_vertex_v13_5(legacy &G13MicroseqStartVertex,
+	counter u64, event_control_buffer u64) G13MicroseqStartVertexV135 {
+	mut out := G13MicroseqStartVertexV135{}
+	g13_copy_bytes(voidptr(&out), 0, voidptr(legacy), 0, 0x178)
+	g13_put_u64(voidptr(&out), 0x178, counter)
+	g13_put_u64(voidptr(&out), 0x180, event_control_buffer)
+	g13_copy_bytes(voidptr(&out), 0x188, voidptr(legacy), 0x178, 4)
+	return out
+}
+
+pub fn g13_microseq_finalize_vertex_v13_5(legacy &G13MicroseqFinalizeVertex) G13MicroseqFinalizeVertexV135 {
+	mut out := G13MicroseqFinalizeVertexV135{}
+	g13_copy_bytes(voidptr(&out), 0, voidptr(legacy), 0, 0x74)
+	return out
+}
+
+pub fn g13_microseq_start_fragment_v13_5(legacy &G13MicroseqStartFragment,
+	counter u64, event_control_buffer u64) G13MicroseqStartFragmentV135 {
+	mut out := G13MicroseqStartFragmentV135{}
+	g13_copy_bytes(voidptr(&out), 0, voidptr(legacy), 0, 0x7c)
+	g13_copy_bytes(voidptr(&out), 0x84, voidptr(legacy), 0x7c, 0x118)
+	g13_put_u64(voidptr(&out), 0x19c, counter)
+	g13_put_u64(voidptr(&out), 0x1a4, event_control_buffer)
+	return out
+}
+
+pub fn g13_microseq_finalize_fragment_v13_5(legacy &G13MicroseqFinalizeFragment) G13MicroseqFinalizeFragmentV135 {
+	mut out := G13MicroseqFinalizeFragmentV135{}
+	g13_copy_bytes(voidptr(&out), 0, voidptr(legacy), 0, 0x6c)
+	g13_copy_bytes(voidptr(&out), 0x74, voidptr(legacy), 0x6c, 0x30)
+	return out
+}
+
+pub fn g13_microseq_start_compute_v13_5(legacy &G13MicroseqStartCompute,
+	flag_address u64, counter u64, event_control_buffer u64) G13MicroseqStartComputeV135 {
+	mut out := G13MicroseqStartComputeV135{}
+	g13_copy_bytes(voidptr(&out), 0, voidptr(legacy), 0, 0x154)
+	g13_put_u64(voidptr(&out), 0x154, flag_address)
+	g13_put_u64(voidptr(&out), 0x15c, counter)
+	g13_put_u64(voidptr(&out), 0x164, event_control_buffer)
+	return out
+}
+
+pub fn g13_microseq_finalize_compute_v13_5(legacy &G13MicroseqFinalizeCompute) G13MicroseqFinalizeComputeV135 {
+	mut out := G13MicroseqFinalizeComputeV135{}
+	g13_copy_bytes(voidptr(&out), 0, voidptr(legacy), 0, 0x18)
+	g13_copy_bytes(voidptr(&out), 0x18, voidptr(legacy), 0x1c, 0x48)
+	return out
+}
+
 pub fn g13_wait_for_idle_header(pipe u32) ?u32 {
 	if pipe != g13_useq_pipe_vertex && pipe != g13_useq_pipe_fragment
 		&& pipe != g13_useq_pipe_compute {
@@ -230,5 +325,12 @@ pub fn validate_g13_microsequence_layouts() bool {
 		&& sizeof(G13MicroseqFinalizeFragment) == 0x9c
 		&& sizeof(G13MicroseqStartCompute) == 0x154
 		&& sizeof(G13MicroseqFinalizeCompute) == 0x64
+		&& sizeof(G13MicroseqTimestampV135) == 0x3c
+		&& sizeof(G13MicroseqStartVertexV135) == 0x18c
+		&& sizeof(G13MicroseqFinalizeVertexV135) == 0x84
+		&& sizeof(G13MicroseqStartFragmentV135) == 0x1ac
+		&& sizeof(G13MicroseqFinalizeFragmentV135) == 0xb4
+		&& sizeof(G13MicroseqStartComputeV135) == 0x16c
+		&& sizeof(G13MicroseqFinalizeComputeV135) == 0x7c
 		&& sizeof(G13MicroseqSimpleOp) == 4
 }

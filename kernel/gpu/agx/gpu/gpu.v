@@ -155,6 +155,7 @@ pub fn new_gpu_manager(res &regs.GpuResources, cfg &hw.HwConfig, rtk &rtkit.RTKi
 	}
 	if cfg.gpu_gen == .g13 {
 		mgr.rtk.set_shmem_allocator(voidptr(mgr), allocate_rtkit_shmem)
+		mgr.rtk.set_shmem_resolver(resolve_rtkit_shmem)
 	}
 
 	return mgr
@@ -226,11 +227,13 @@ fn (mut mgr GpuManager) stop_firmware_cpus(count u32) {
 
 struct SharedBuffer {
 mut:
-	va        u64
-	phys      u64
-	size      u64
-	allocator u32
-	mapped    bool
+	va                  u64
+	phys                u64
+	size                u64
+	protection          u64
+	allocator           u32
+	mapped              bool
+	cache_flush_pending bool
 }
 
 @[inline]
@@ -256,6 +259,31 @@ fn allocate_rtkit_shmem(context voidptr, size u64) u64 {
 	return iova
 }
 
+// RTKit crash logs live in firmware-requested UAT buffers. Resolve only an
+// interval wholly contained in one retained allocation; the crash parser must
+// never follow an arbitrary firmware-provided address through the HHDM.
+fn resolve_rtkit_shmem(context voidptr, iova u64, size u64) voidptr {
+	if context == unsafe { nil } || size == 0 {
+		return unsafe { nil }
+	}
+	mut mgr := unsafe { &GpuManager(context) }
+	mgr.rtkit_buffer_lock.acquire()
+	defer {
+		mgr.rtkit_buffer_lock.release()
+	}
+	for buffer in mgr.rtkit_buffers {
+		if iova < buffer.va || size > buffer.size {
+			continue
+		}
+		offset := iova - buffer.va
+		if offset > buffer.size - size {
+			continue
+		}
+		return voidptr(buffer.phys + higher_half + offset)
+	}
+	return unsafe { nil }
+}
+
 struct G13ChannelAllocations {
 mut:
 	states                     [g13_channel_allocation_count]SharedBuffer
@@ -266,7 +294,6 @@ mut:
 	runtime_pointers           SharedBuffer
 	globals                    SharedBuffer
 	fw_status                  SharedBuffer
-	fwlog_payload              SharedBuffer
 	hwdata_b                   SharedBuffer
 	hwdata_a                   SharedBuffer
 	stats_vertex               SharedBuffer
@@ -325,8 +352,10 @@ fn alloc_buffer_from_heap(mut heap alloc.HeapAllocator, size u64, protection u64
 		va: va
 		phys: phys
 		size: aligned_size
+		protection: protection
 		allocator: allocator_id
 		mapped: true
+		cache_flush_pending: pgtable.is_cached_noncoherent(protection)
 	}
 }
 
@@ -413,8 +442,10 @@ fn alloc_fixed_buffer(iova u64, size u64, protection u64) ?SharedBuffer {
 		va: iova
 		phys: phys
 		size: aligned_size
+		protection: protection
 		allocator: buffer_allocator_fixed
 		mapped: true
+		cache_flush_pending: pgtable.is_cached_noncoherent(protection)
 	}
 }
 
@@ -429,6 +460,56 @@ fn unmap_shared_buffer(mut buffer SharedBuffer) {
 		uat_mgr.unmap_kernel(buffer.va, buffer.size)
 	}
 	buffer.mapped = false
+}
+
+// Perform the cache-safe teardown sequence recovered by m1n1 and implemented
+// by Asahi's KernelMapping::drop. Cached firmware mappings must remain valid
+// while firmware discards their noncoherent cache lines; only then may their
+// PTEs be removed. The second invalidation retires the uncached translation.
+fn (mut mgr GpuManager) invalidate_g13_shared_buffer(mut buffer SharedBuffer) bool {
+	if buffer.va == 0 || buffer.size == 0 || uat_mgr == unsafe { nil } {
+		return false
+	}
+	// A previous attempt may have removed the PTE and then lost the final
+	// firmware acknowledgement. Keep retrying that final invalidation without
+	// ever remapping or releasing the backing.
+	if !buffer.mapped {
+		return mgr.flush_g13_uat_range(mmu.uat_kernel_flush_slot, buffer.va, buffer.size)
+	}
+	if buffer.cache_flush_pending {
+		if pgtable.is_cached_noncoherent(buffer.protection) {
+			uncached := pgtable.as_uncached(buffer.protection)
+			if !uat_mgr.reprotect_kernel(buffer.va, buffer.size, uncached) {
+				return false
+			}
+			buffer.protection = uncached
+		}
+		if !mgr.flush_g13_uat_range(mmu.uat_kernel_flush_slot, buffer.va, buffer.size) {
+			return false
+		}
+		buffer.cache_flush_pending = false
+	}
+	unmap_shared_buffer(mut buffer)
+	return mgr.flush_g13_uat_range(mmu.uat_kernel_flush_slot, buffer.va, buffer.size)
+}
+
+fn (mut mgr GpuManager) invalidate_g13_driver_buffer(mut context mmu.UatContext,
+	buffer &mmu.UatBuffer) bool {
+	if context == unsafe { nil } || buffer == unsafe { nil } || buffer.va == 0
+		|| buffer.size == 0 {
+		return false
+	}
+	if buffer.needs_cache_flush() {
+		if !context.reprotect_driver_buffer_uncached(buffer)
+			|| !mgr.flush_g13_uat_range(context.id, buffer.va, buffer.size)
+			|| !context.complete_driver_buffer_cache_flush(buffer) {
+			return false
+		}
+	}
+	if !context.unmap_driver_buffer(buffer) {
+		return false
+	}
+	return mgr.flush_g13_uat_range(context.id, buffer.va, buffer.size)
 }
 
 fn (mut mgr GpuManager) release_shared_buffer_backing(mut buffer SharedBuffer) {
@@ -508,7 +589,7 @@ fn (mut mgr GpuManager) map_g13_io_mappings(mut allocations G13ChannelAllocation
 	mut next_va := g13_mmio_va_start
 	mut mapped_count := u32(0)
 	unsafe {
-		mut data := &fw.G13HwDataB(allocations.hwdata_b.phys + higher_half)
+		mut data := &fw.G13HwDataBBlob(allocations.hwdata_b.phys + higher_half)
 		for index := 0; index < fw.g13_io_mapping_count; index++ {
 			mapping := mgr.hw_config.io_mappings[index]
 			if !mapping.is_present() {
@@ -546,12 +627,16 @@ fn (mut mgr GpuManager) map_g13_io_mappings(mut allocations G13ChannelAllocation
 			}
 			allocations.io_mapping_vas[index] = next_va
 			allocations.io_mapping_sizes[index] = map_size
-			data.io_mappings[index] = fw.G13IoMapping{
+			if !fw.set_g13_hwdata_b_io_mapping(mut data, mgr.hw_config.firmware_abi,
+				index, fw.G13IoMapping{
 				physical_address: mapping.phys
 				virtual_address: next_va + page_offset
 				total_size: u32(mapping.size)
 				element_size: u32(mapping.range_size)
 				readwrite: if mapping.writable { u64(1) } else { u64(0) }
+			}) {
+				unmap_g13_io_mappings(mut allocations)
+				return false
 			}
 			mapped_count++
 
@@ -584,7 +669,6 @@ fn (mut mgr GpuManager) free_g13_channel_allocations(mut allocations G13ChannelA
 	mgr.free_shared_buffer(mut allocations.stats_vertex)
 	mgr.free_shared_buffer(mut allocations.hwdata_a)
 	mgr.free_shared_buffer(mut allocations.hwdata_b)
-	mgr.free_shared_buffer(mut allocations.fwlog_payload)
 	mgr.free_shared_buffer(mut allocations.fw_status)
 	mgr.free_shared_buffer(mut allocations.globals)
 	mgr.free_shared_buffer(mut allocations.runtime_pointers)
@@ -637,7 +721,8 @@ fn (mut mgr GpuManager) allocate_g13_channels() ?&G13ChannelAllocations {
 	if !mgr.alloc_g13_channel_pair(mut allocations, g13_ktrace_index, sizeof(channel.RingHeader), u64(fw.ktrace_size) * sizeof(fw.FwKTraceMsg), pgtable.gpu_prot_fw_shared_rw) {
 		return none
 	}
-	if !mgr.alloc_g13_channel_pair(mut allocations, g13_stats_index, sizeof(channel.RingHeader), u64(fw.stats_size) * sizeof(fw.FwStatsMsg), pgtable.gpu_prot_fw_shared_rw) {
+	stats_entry_size := fw.g13_stats_entry_size(mgr.hw_config.firmware_abi) or { return none }
+	if !mgr.alloc_g13_channel_pair(mut allocations, g13_stats_index, sizeof(channel.RingHeader), u64(fw.stats_size) * u64(stats_entry_size), pgtable.gpu_prot_fw_shared_rw) {
 		return none
 	}
 	for pipe := u32(0); pipe < 12; pipe++ {
@@ -677,7 +762,8 @@ fn (mut mgr GpuManager) init_channels() bool {
 	mgr.channels.ktrace = channel.new_rx_channel('ktrace', ktrace_state.va, ktrace_state.phys, ktrace_ring.va, ktrace_ring.phys, fw.ktrace_size, u32(sizeof(fw.FwKTraceMsg)))
 	stats_state := &allocations.states[g13_stats_index]
 	stats_ring := &allocations.rings[g13_stats_index]
-	mgr.channels.stats = channel.new_rx_channel('stats', stats_state.va, stats_state.phys, stats_ring.va, stats_ring.phys, fw.stats_size, u32(sizeof(fw.FwStatsMsg)))
+	stats_entry_size := fw.g13_stats_entry_size(mgr.hw_config.firmware_abi) or { return false }
+	mgr.channels.stats = channel.new_rx_channel('stats', stats_state.va, stats_state.phys, stats_ring.va, stats_ring.phys, fw.stats_size, stats_entry_size)
 	for pipe := u32(0); pipe < 12; pipe++ {
 		state := &allocations.states[g13_pipe_base_index + pipe]
 		ring := &allocations.rings[g13_pipe_base_index + pipe]
@@ -779,8 +865,10 @@ pub fn (mut mgr GpuManager) init() bool {
 		return mgr.fail_g13_initialization()
 	}
 
-	// Step 5: Publish the v12.3 Initialize command before making InitData live.
-	initialize := fw.make_device_control_initialize()
+	// Step 5: Publish the selected ABI's Initialize command before InitData.
+	initialize := fw.make_device_control_initialize(mgr.hw_config.firmware_abi) or {
+		return mgr.fail_g13_initialization()
+	}
 	if !mgr.channels.device_ctrl.enqueue(voidptr(&initialize)) {
 		println('agx: Failed to queue device-control Initialize')
 		return mgr.fail_g13_initialization()
@@ -844,7 +932,9 @@ fn (mut mgr GpuManager) init_firmware_data() bool {
 		return false
 	}
 
-	graph.unknown_buffer = mgr.alloc_g13_buffer_with_protection(0x4000, pgtable.gpu_prot_fw_shared_ro) or {
+	// InitData RegionA is firmware-owned shared scratch. G13 writes its first
+	// state word at +0x10 while the desktop client is starting.
+	graph.unknown_buffer = mgr.alloc_g13_shared_buffer(0x4000) or {
 		return false
 	}
 	graph.runtime_pointers = mgr.alloc_g13_buffer_with_protection(fw.g13_runtime_pointers_size, pgtable.gpu_prot_fw_private_rw) or {
@@ -865,15 +955,14 @@ fn (mut mgr GpuManager) init_firmware_data() bool {
 	graph.fw_status = mgr.alloc_g13_shared_buffer(sizeof(fw.G13FwStatus)) or {
 		return false
 	}
-	graph.fwlog_payload = mgr.alloc_g13_shared_buffer(u64(fw.g13_fwlog_subchannels) * u64(fw.g13_fwlog_payload_count) * sizeof(fw.FwLogPayloadMsg)) or {
-		return false
-	}
-	graph.hwdata_b = mgr.alloc_g13_buffer_with_protection(fw.g13_hwdata_b_size, pgtable.gpu_prot_fw_private_rw) or {
+	hwdata_b_size := fw.g13_hwdata_b_active_size(mgr.hw_config.firmware_abi) or { return false }
+	graph.hwdata_b = mgr.alloc_g13_buffer_with_protection(hwdata_b_size, pgtable.gpu_prot_fw_private_rw) or {
 		return false
 	}
 	unsafe {
-		mut hwdata_b := &fw.G13HwDataB(graph.hwdata_b.phys + higher_half)
-		if !fw.populate_g13_hwdata_b(mut hwdata_b, &mgr.hw_config, uat_mgr.ttbs_base, mmu.uat_unknown_page) {
+		mut hwdata_b := &fw.G13HwDataBBlob(graph.hwdata_b.phys + higher_half)
+		if !fw.populate_g13_hwdata_b_blob(mut hwdata_b, &mgr.hw_config, uat_mgr.ttbs_base,
+			mmu.uat_unknown_page, alloc.g13_timestamp_start) {
 			return false
 		}
 	}
@@ -926,7 +1015,8 @@ fn (mut mgr GpuManager) init_firmware_data() bool {
 		return false
 	}
 	graph.buffer_manager_high_mapped = true
-	graph.initdata = mgr.alloc_g13_buffer_with_protection(fw.g13_initdata_size, pgtable.gpu_prot_fw_private_rw) or {
+	initdata_size := fw.g13_initdata_active_size(mgr.hw_config.firmware_abi) or { return false }
+	graph.initdata = mgr.alloc_g13_buffer_with_protection(initdata_size, pgtable.gpu_prot_fw_private_rw) or {
 		return false
 	}
 
@@ -951,7 +1041,8 @@ fn (mut mgr GpuManager) init_firmware_data() bool {
 		runtime.unkptr_198 = graph.unknown_198.va
 		runtime.hwdata_b = graph.hwdata_b.va
 		runtime.hwdata_b_2 = graph.hwdata_b.va
-		runtime.fwlog_buffer = graph.fwlog_payload.va
+		// RegionB repeats the FWLog channel ring at fwlog_ring2.
+		runtime.fwlog_buffer = mgr.channels.fw_log.ring_base
 		runtime.unkptr_1b8 = graph.unknown_1b8.va
 		runtime.unkptr_1c0 = graph.unknown_1c0.va
 		runtime.unkptr_1c8 = graph.unknown_1c8.va
@@ -964,9 +1055,14 @@ fn (mut mgr GpuManager) init_firmware_data() bool {
 		status.fwctl = fw.make_g13_ring_pointers(mgr.channels.fw_ctrl.state_base, mgr.channels.fw_ctrl.ring_base)
 	}
 
-	initdata := fw.build_g13_initdata(graph.unknown_buffer.va, graph.runtime_pointers.va, graph.globals.va, graph.fw_status.va, mgr.hw_config.uat_oas) or { return false }
+	mut initdata := fw.G13InitDataBlob{}
+	if !fw.build_g13_initdata_blob(mut initdata, mgr.hw_config.firmware_abi,
+		graph.unknown_buffer.va, graph.runtime_pointers.va, graph.globals.va, graph.fw_status.va,
+		mgr.hw_config.uat_oas) {
+		return false
+	}
 	unsafe {
-		C.memcpy(voidptr(graph.initdata.phys + higher_half), &initdata, sizeof(fw.G13InitData))
+		C.memcpy(voidptr(graph.initdata.phys + higher_half), &initdata, initdata_size)
 	}
 	mgr.initdata_va = graph.initdata.va
 	mgr.initdata_phys = graph.initdata.phys
@@ -1005,11 +1101,6 @@ pub fn (mut mgr GpuManager) flush_g13_uat_range(slot u32, addr u64, size u64) bo
 		|| size & pgtable.uat_pg_mask != 0 {
 		return false
 	}
-	pages := size / pgtable.uat_pgsz
-	if pages == 0 || pages >= 0x10000 {
-		return false
-	}
-
 	mgr.fwctl_lock.acquire()
 	defer {
 		mgr.fwctl_lock.release()
@@ -1017,12 +1108,7 @@ pub fn (mut mgr GpuManager) flush_g13_uat_range(slot u32, addr u64, size u64) bo
 	if !uat_mgr.begin_flush(slot, addr, size) {
 		return false
 	}
-	message := fw.FwFwCtlMsg{
-		addr: addr
-		slot: slot
-		page_count: u16(pages)
-		unk_12: 2
-	}
+	message := fw.make_g13_fwctl_invalidate(addr, slot)
 	token := mgr.channels.fw_ctrl.enqueue_with_token(voidptr(&message)) or {
 		uat_mgr.abort_unpublished_flush(slot)
 		return false

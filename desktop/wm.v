@@ -1,5 +1,8 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
 // The window manager. It keeps the window list, turns it into a ui2 element
 // tree once per frame, and routes pointer events back to the elements that
 // tree produced — so what is drawn and what is clickable can never drift
@@ -13,16 +16,16 @@ import ui2
 // its taskbar entry.
 // Wallpaper shortcuts carry the index of the application they open.
 const action_shortcut_prefix = 'shortcut.'
-// The desktop's own actions all begin with one of these. An action that does
-// not is an application's, and is routed to whichever window it was clicked
-// in — which is what lets a native application name its events whatever it
-// likes, ui2's `__qml_...` or the file browser's `files.row.3` alike.
+// These prefixes identify the desktop's own selectors only when the hit target
+// came from the desktop world. An application's selectors are opaque, even if
+// their spelling collides with one of these prefixes.
 const desktop_action_prefixes = ['taskbar.', 'task.', 'win.', 'shortcut.', 'start.',
-	action_switch_prefix]
+	action_switch_prefix, action_workspace_prefix]
 
 enum DragKind {
 	none_
 	move
+	resize
 }
 
 struct Drag {
@@ -33,6 +36,17 @@ mut:
 	// to have its corner under the cursor.
 	offset_x int
 	offset_y int
+	// A resize is measured from the frame at pointer-down, so grabbing anywhere
+	// in the corner does not make the edge jump under the pointer.
+	start_pointer_x int
+	start_pointer_y int
+	start_width     int
+	start_height    int
+	// Edge placement is a drag gesture, not a side effect of clicking an
+	// already edge-touching title bar without moving it.
+	moved               bool
+	snap_on_release     WindowSnap
+	maximize_on_release bool
 }
 
 // DamageRect describes the part of the composed canvas that differs from the
@@ -49,19 +63,43 @@ mut:
 
 struct Desktop {
 mut:
-	canvas  Canvas
-	fonts   []FontFace
-	windows []Window // painting order; the last entry is on top
-	next_id int = 1
-	focus   int
-	drag    Drag
-	hover   string // owned; update through set_hover
+	canvas Canvas
+	fonts  []FontFace
+	// Official 512px app artwork, loaded once by the compositor. Native app
+	// helper processes leave these empty because they never rasterize frames.
+	firefox_icon    AppIcon
+	chromium_icon   AppIcon
+	blender_icon    AppIcon
+	minecraft_icon  AppIcon
+	terminal_icon   AppIcon
+	settings_icon   AppIcon
+	activity_icon   AppIcon
+	calculator_icon AppIcon
+	vspace_icon     AppIcon
+	editor_icon     AppIcon
+	files_icon      AppIcon
+	clock_icon      AppIcon
+	calendar_icon   AppIcon
+	capture_icon    AppIcon
+	// PNG resources loaded lazily for installed native UI2 applications.
+	native_asset_icons map[string]&AppIcon
+	windows            []Window // painting order; the last entry is on top
+	next_id            int = 1
+	focus              int
+	current_workspace  int
+	drag               Drag
+	hover              string // owned; update through set_hover
 
 	pointer_x       int
 	pointer_y       int
 	buttons         u32
 	pointer_present bool
 	pointer_capture int
+	shortcut_order  []int
+	shortcut_press  ShortcutPress
+	// Window chrome owns the primary-button gesture through its release, even
+	// when the button-up packet ends the drag during the move pass first.
+	chrome_pointer_capture bool
 	// A Start-menu press is consumed through its release even when the press
 	// launches something and closes the menu before that release arrives.
 	start_menu_pointer bool
@@ -89,6 +127,8 @@ mut:
 
 	// Hit targets collected by the last render pass, in painting order.
 	targets []HitTarget
+	// Optional monitor for high-level pointer selectors from both UI worlds.
+	trace_selectors bool
 
 	// Application clients. Native apps live in separate processes; a window
 	// points to its compositor-side proxy by index.
@@ -132,26 +172,28 @@ fn (mut d Desktop) spawn(title string, page Page, x int, y int, width int, heigh
 	d.next_id++
 	prefix := 'win.${id}'
 	d.windows << Window{
-		id: id
-		title: title
-		page: page
-		x: x
-		y: y
-		width: width
-		height: height
-		restore_x: x
-		restore_y: y
-		restore_width: width
+		id:             id
+		title:          title
+		page:           page
+		x:              x
+		y:              y
+		width:          width
+		height:         height
+		restore_x:      x
+		restore_y:      y
+		restore_width:  width
 		restore_height: height
-		id_frame: prefix
-		id_titlebar: '${prefix}.titlebar'
-		id_title: '${prefix}.title'
-		id_close: '${prefix}.close'
-		id_maximize: '${prefix}.maximize'
-		id_minimize: '${prefix}.minimize'
-		id_divider: '${prefix}.divider'
-		id_body: '${prefix}.body'
-		id_task: 'task.${id}'
+		workspace:      d.current_workspace
+		id_frame:       prefix
+		id_titlebar:    '${prefix}.titlebar'
+		id_title:       '${prefix}.title'
+		id_close:       '${prefix}.close'
+		id_maximize:    '${prefix}.maximize'
+		id_minimize:    '${prefix}.minimize'
+		id_divider:     '${prefix}.divider'
+		id_body:        '${prefix}.body'
+		id_resize:      '${prefix}.resize'
+		id_task:        'task.${id}'
 	}
 	d.focus = id
 	d.dirty = true
@@ -170,7 +212,7 @@ fn (d &Desktop) window_index(id int) ?int {
 fn (d &Desktop) visible_window_count() int {
 	mut count := 0
 	for window in d.windows {
-		if !window.minimized {
+		if window.workspace == d.current_workspace && !window.minimized {
 			count++
 		}
 	}
@@ -185,7 +227,7 @@ fn (d &Desktop) visible_window_count() int {
 fn (d &Desktop) next_window_by_age(after_id int) ?int {
 	mut found := -1
 	for i, window in d.windows {
-		if window.id <= after_id {
+		if window.workspace != d.current_workspace || window.id <= after_id {
 			continue
 		}
 		if found < 0 || window.id < d.windows[found].id {
@@ -227,30 +269,69 @@ fn (mut d Desktop) close_window(id int) {
 		d.capture_close()
 	}
 	if d.focus == id {
-		d.focus = if d.windows.len > 0 { d.windows.last().id } else { 0 }
+		d.focus_top_window_in_current_workspace()
 	}
 	d.dirty = true
+}
+
+fn (mut d Desktop) remember_restore_frame(index int) {
+	d.windows[index].restore_x = d.windows[index].x
+	d.windows[index].restore_y = d.windows[index].y
+	d.windows[index].restore_width = d.windows[index].width
+	d.windows[index].restore_height = d.windows[index].height
+}
+
+fn (mut d Desktop) restore_window(id int) {
+	index := d.window_index(id) or { return }
+	d.windows[index].x = d.windows[index].restore_x
+	d.windows[index].y = d.windows[index].restore_y
+	d.windows[index].width = d.windows[index].restore_width
+	d.windows[index].height = d.windows[index].restore_height
+	d.windows[index].maximized = false
+	d.windows[index].snap = .none_
+	d.raise(id)
+}
+
+fn (mut d Desktop) maximize(id int) {
+	index := d.window_index(id) or { return }
+	if d.windows[index].maximized {
+		return
+	}
+	// A snapped window already remembers the normal frame it should return to.
+	if d.windows[index].snap == .none_ {
+		d.remember_restore_frame(index)
+	}
+	d.windows[index].x = 0
+	d.windows[index].y = 0
+	d.windows[index].width = d.canvas.width
+	d.windows[index].height = d.canvas.height - taskbar_height
+	d.windows[index].maximized = true
+	d.windows[index].snap = .none_
+	d.raise(id)
 }
 
 fn (mut d Desktop) toggle_maximize(id int) {
 	index := d.window_index(id) or { return }
 	if d.windows[index].maximized {
-		d.windows[index].x = d.windows[index].restore_x
-		d.windows[index].y = d.windows[index].restore_y
-		d.windows[index].width = d.windows[index].restore_width
-		d.windows[index].height = d.windows[index].restore_height
-		d.windows[index].maximized = false
+		d.restore_window(id)
 	} else {
-		d.windows[index].restore_x = d.windows[index].x
-		d.windows[index].restore_y = d.windows[index].y
-		d.windows[index].restore_width = d.windows[index].width
-		d.windows[index].restore_height = d.windows[index].height
-		d.windows[index].x = 0
-		d.windows[index].y = 0
-		d.windows[index].width = d.canvas.width
-		d.windows[index].height = d.canvas.height - taskbar_height
-		d.windows[index].maximized = true
+		d.maximize(id)
 	}
+}
+
+fn (mut d Desktop) snap_window(id int, snap WindowSnap) {
+	if snap == .none_ {
+		return
+	}
+	index := d.window_index(id) or { return }
+	// Moving between arranged states must not replace the original normal
+	// frame with a maximized or half-screen frame.
+	if !d.windows[index].maximized && d.windows[index].snap == .none_ {
+		d.remember_restore_frame(index)
+	}
+	d.apply_snap_geometry(index, snap, d.canvas.width, d.canvas.height)
+	d.windows[index].maximized = false
+	d.windows[index].snap = snap
 	d.raise(id)
 }
 
@@ -259,13 +340,7 @@ fn (mut d Desktop) minimize(id int) {
 	d.windows[index].minimized = true
 	d.dirty = true
 	if d.focus == id {
-		d.focus = 0
-		for i := d.windows.len - 1; i >= 0; i-- {
-			if !d.windows[i].minimized {
-				d.focus = d.windows[i].id
-				break
-			}
-		}
+		d.focus_top_window_in_current_workspace()
 	}
 }
 
@@ -273,7 +348,11 @@ fn (mut d Desktop) minimize(id int) {
 // that window on top. A taskbar button is a focus target; only the window's
 // explicit minimise control hides an already focused window.
 fn (mut d Desktop) activate(id int) {
-	index := d.window_index(id) or { return }
+	mut index := d.window_index(id) or { return }
+	if d.windows[index].workspace != d.current_workspace {
+		d.switch_workspace(d.windows[index].workspace)
+	}
+	index = d.window_index(id) or { return }
 	if d.windows[index].minimized {
 		d.windows[index].minimized = false
 	}
@@ -295,7 +374,8 @@ fn (mut d Desktop) build_tree() ui2.Element {
 	// only this temporary outer array is no longer needed.
 	unsafe { shortcuts.free() }
 	for window_index in 0 .. d.windows.len {
-		if d.windows[window_index].minimized {
+		if d.windows[window_index].workspace != d.current_workspace
+			|| d.windows[window_index].minimized {
 			continue
 		}
 		children << d.window_element(window_index)
@@ -398,8 +478,8 @@ fn (mut d Desktop) window_element(window_index int) ui2.Element {
 		text_inset_left
 	}), 0, f64(if theme.title_centered { window.width } else { title_limit }), f64(theme.title_height)), ui2.TextStyle{
 		color: title_text_color
-		size: theme.title_size
-		bold: theme.title_bold
+		size:  theme.title_size
+		bold:  theme.title_bold
 		align: if theme.title_centered { .center } else { .left }
 		lines: 1
 	})
@@ -424,12 +504,22 @@ fn (mut d Desktop) window_element(window_index int) ui2.Element {
 		bg: background
 	}, contents)
 
-	mut window_children := frame_elements(3)
+	mut window_children := frame_elements(4)
 	window_children << title_bar
 	window_children << divider
 	window_children << body
+	// Arranged windows already fill a desktop-defined region. A normal window
+	// retains an invisible lower-right target for pointer resizing, without
+	// adding chrome over the application's surface.
+	if !window.maximized && window.snap == .none_ {
+		grip_size := window_resize_grip_size
+		window_children << ui2.draggable_view_with_cursor(window.id_resize, ui2.rect(f64(window.width -
+			grip_size), f64(window.height - grip_size), f64(grip_size), f64(grip_size)), ui2.BoxStyle{
+			transparent: true
+		}, ui2.cursor_resize_nwse, frame_elements(0))
+	}
 	return ui2.view(window.id_frame, window.frame_rect(), ui2.BoxStyle{
-		bg: background
+		bg:     background
 		radius: theme.window_radius
 	}, window_children)
 }
@@ -471,22 +561,37 @@ fn (mut d Desktop) launch_with_timeout(factory AppFactory, timeout_ms int) {
 		d.dirty = true
 		return
 	}
-	if factory.open == unsafe { nil } || factory.process_name == '' {
+	if (factory.open == unsafe { nil } && !factory.standalone) || factory.process_name == '' {
 		eprintln('vinix-desktop: ${factory.title} has no launcher')
+		return
+	}
+	if factory.install_package != '' && !native_app_installed(factory) {
+		d.show_app_not_installed(factory)
 		return
 	}
 	app := start_remote_app_with_timeout(factory, mut d, timeout_ms) or {
 		eprintln('vinix-desktop: cannot start ${factory.title}: ${err}')
 		return
 	}
+	if factory.install_package != '' {
+		// The icon was looked up, and found missing, before pkg installed it.
+		if cached := d.native_asset_icons[factory.icon] {
+			if cached.width == 0 {
+				d.native_asset_icons.delete(factory.icon)
+			}
+		}
+	}
 	d.apps << app
-	// Cascade like any other new window, but at the size the application asked
-	// for rather than the desktop's default.
+	// Most windows cascade. Games that leave the centred wallpaper logo visible
+	// open against the right edge with the same small margin as the top edge.
 	step := ((d.next_id - 1) % 6) * 26
-	id := d.spawn(factory.title, .app, 120 + step, 60 + step, factory.width, factory.height)
+	x := if factory.launch_top_right { d.canvas.width - factory.width - 24 } else { 120 + step }
+	y := if factory.launch_top_right { 24 } else { 60 + step }
+	id := d.spawn(factory.title, .app, x, y, factory.width, factory.height)
 	index := d.window_index(id) or { return }
 	d.windows[index].app_index = d.apps.len - 1
 	d.windows[index].icon = factory.icon
+	d.windows[index].hide_body_cursor = factory.hide_body_cursor
 	d.clamp_to_screen(index)
 }
 
@@ -526,6 +631,25 @@ fn (mut d Desktop) external_finished(result ExternalProgramResult) {
 	d.clamp_to_screen(index)
 }
 
+fn native_app_installed(factory AppFactory) bool {
+	path := native_app_directory + factory.process_name
+	defer { unsafe { path.free() } }
+	return C.access(&char(path.str), C.X_OK) == 0
+}
+
+// show_app_not_installed answers a shortcut for an optional app with a window
+// naming its package, instead of a launch that fails without any feedback.
+fn (mut d Desktop) show_app_not_installed(factory AppFactory) {
+	d.external_error_title = '${factory.title} is not installed'
+	d.external_error = 'Run pkg install ${factory.install_package} in Terminal to install it.'
+	d.external_error_note = 'The Vinix image does not include this app.'
+	d.external_error_hint = 'Open it again from here once the install has finished.'
+	id := d.spawn(factory.title, .external_error, 180, 120, 560, 220)
+	index := d.window_index(id) or { return }
+	d.windows[index].icon = factory.icon
+	d.clamp_to_screen(index)
+}
+
 // launch_titled opens the application with this title, for a caller that knows
 // which one it wants rather than where it sits in the list.
 // invalidate_wallpaper throws away the scaled backdrop so the next frame
@@ -551,7 +675,7 @@ fn (mut d Desktop) poll_apps() {
 			// A minimised window still has to be polled — a shell pipe has to
 			// be drained whether or not anyone can see it — but recomposing
 			// the screen for a picture nobody is looking at is pure waste.
-			if app.poll() && !window.minimized {
+			if app.poll() && window.workspace == d.current_workspace && !window.minimized {
 				d.dirty = true
 			}
 		}
@@ -697,10 +821,20 @@ fn (mut d Desktop) launch_index(index int) {
 // application under the pointer. Hosted ids are ui2's own — it prefixes them
 // `__qml_` — so rather than parse them the window manager routes by where the
 // click landed, which is also what decides it between two open applications.
-fn (mut d Desktop) forward_to_app(x int, y int, action string) {
+fn (mut d Desktop) forward_to_app(x int, y int, action string, world ActionWorld) {
+	if world == .desktop && action.starts_with(ui2_example_action_prefix) {
+		name := action[ui2_example_action_prefix.len..]
+		factory := ui2_example_named(name) or {
+			eprintln('vinix-desktop: unknown ui2 example ${name}')
+			return
+		}
+		d.launch(factory)
+		return
+	}
 	for i := d.windows.len - 1; i >= 0; i-- {
 		window := d.windows[i]
-		if window.minimized || window.app_index < 0 || window.app_index >= d.apps.len {
+		if window.workspace != d.current_workspace || window.minimized || window.app_index < 0
+			|| window.app_index >= d.apps.len {
 			continue
 		}
 		if x < window.x || y < window.y || x >= window.x + window.width
@@ -714,7 +848,8 @@ fn (mut d Desktop) forward_to_app(x int, y int, action string) {
 		// Capture the desktop, not the Capture window. The compositor will wait
 		// until it has presented a frame with this window hidden before writing
 		// the first pixel. Its taskbar entry remains the way back to Stop.
-		if action == capture_action_take_screenshot || action == capture_action_start_video {
+		if window.title == capture_app_title
+			&& (action == capture_action_take_screenshot || action == capture_action_start_video) {
 			d.capture.owner_window_id = window.id
 			d.minimize(window.id)
 		}
@@ -734,7 +869,8 @@ fn (mut d Desktop) forward_pointer_to_app(x int, y int, phase AppPointerPhase, b
 		for i := d.windows.len - 1; i >= 0; i-- {
 			window := &d.windows[i]
 			body_top := window.y + d.theme().title_height
-			if !window.minimized && window.app_index >= 0 && x >= window.x
+			if window.workspace == d.current_workspace && !window.minimized
+				&& window.app_index >= 0 && x >= window.x
 				&& x < window.x + window.width && y >= body_top
 				&& y < window.y + window.height {
 				selected = i
@@ -797,13 +933,18 @@ fn (mut d Desktop) forward_pointer_to_app(x int, y int, phase AppPointerPhase, b
 fn (d &Desktop) shortcut_elements() []ui2.Element {
 	mut out := frame_elements(available_apps.len)
 	rows := shortcut_rows_for_height(d.canvas.height)
-	for index in 0 .. available_apps.len {
-		factory := &available_apps[index]
-		id := app_shortcut_actions[index]
+	for slot in 0 .. available_apps.len {
+		app_index := d.shortcut_app_at_slot(slot)
+		if app_index < 0 {
+			continue
+		}
+		factory := &available_apps[app_index]
+		id := app_shortcut_actions[app_index]
 		theme := d.theme()
 		hovered := d.hover == id
-		column := index / rows
-		row := index % rows
+		dragging := d.shortcut_press.dragging && d.shortcut_press.app_index == app_index
+		column := slot / rows
+		row := slot % rows
 		x := shortcut_left + column * (shortcut_width + shortcut_gap)
 		y := shortcut_top + row * (shortcut_height + shortcut_gap)
 		icon_x := (shortcut_width - shortcut_icon) / 2
@@ -811,18 +952,18 @@ fn (d &Desktop) shortcut_elements() []ui2.Element {
 		shortcut_children << ui2.button_with_image('', '', factory.icon, ui2.rect(f64(icon_x), 10, f64(shortcut_icon), f64(shortcut_icon)), ui2.BoxStyle{
 			transparent: true
 		}, ui2.TextStyle{
-			color: if hovered { theme.shortcut_hover } else { theme.shortcut_label }
+			color: if hovered || dragging { theme.shortcut_hover } else { theme.shortcut_label }
 		})
 		shortcut_children << ui2.label('', factory.title, ui2.rect(0, f64(shortcut_icon + 16), f64(shortcut_width), 18), ui2.TextStyle{
-			color: if hovered { theme.shortcut_hover } else { theme.shortcut_label }
+			color:  if hovered || dragging { theme.shortcut_hover } else { theme.shortcut_label }
 			shadow: true
-			size: 12
-			align: .center
+			size:   12
+			align:  .center
 		})
 		out << ui2.clickable_view(id, ui2.rect(f64(x), f64(y), f64(shortcut_width), f64(shortcut_height)), ui2.BoxStyle{
-			bg: theme.shortcut_panel
-			radius: 8
-			transparent: !hovered
+			bg:          theme.shortcut_panel
+			radius:      8
+			transparent: !hovered && !dragging
 		}, shortcut_children)
 	}
 	return out
@@ -841,8 +982,8 @@ fn shortcut_rows_for_height(height int) int {
 	return rows
 }
 
-// desktop_owns reports whether an action is the window manager's own. Anything
-// else is an application's, wherever it came from.
+// desktop_owns recognizes compositor selector names after origin has been
+// checked. A matching name supplied by an application remains its own action.
 fn desktop_owns(action string) bool {
 	for prefix in desktop_action_prefixes {
 		if action.starts_with(prefix) {
@@ -889,12 +1030,12 @@ fn (d &Desktop) title_button(id string, glyph string, x int, active bool, set_ho
 			theme.traffic_zoom_glyph
 		}
 		return ui2.button_with_image(id, '', if set_hovered { glyph } else { '' }, ui2.rect(f64(x), f64(y), f64(theme.button_size), f64(theme.button_size)), ui2.BoxStyle{
-			bg: fill
-			radius: theme.button_size / 2
-			border_color: edge
-			border_left: 1
-			border_top: 1
-			border_right: 1
+			bg:            fill
+			radius:        theme.button_size / 2
+			border_color:  edge
+			border_left:   1
+			border_top:    1
+			border_right:  1
 			border_bottom: 1
 		}, ui2.TextStyle{
 			color: glyph_color
@@ -909,8 +1050,8 @@ fn (d &Desktop) title_button(id string, glyph string, x int, active bool, set_ho
 		theme.button_hover
 	}
 	return ui2.button_with_image(id, '', glyph, ui2.rect(f64(x), f64(y), f64(theme.button_size), f64(theme.button_size)), ui2.BoxStyle{
-		bg: bg
-		radius: 5
+		bg:          bg
+		radius:      5
 		transparent: !hovered
 	}, ui2.TextStyle{
 		color: if hovered && is_close { theme.glyph_on_close } else { theme.glyph_color }
@@ -923,20 +1064,22 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 	// A dock is a panel wide enough for what is in it, centred and floating
 	// clear of the screen's edge. A taskbar is the whole width of the bottom.
 	dock := theme.dock
+	icon_only := theme.taskbar_icon_only
 	edge_padding := if dock { theme.dock_padding } else { taskbar_padding }
 
-	mut children := frame_elements(d.windows.len + 4)
-	item_y := (taskbar_height - taskbar_item_height) / 2
+	mut children := frame_elements(d.windows.len + workspace_count + 4)
+	item_height := if icon_only { taskbar_icon_item_height } else { taskbar_item_height }
+	item_y := (taskbar_height - item_height) / 2
 
 	// The Start orb is the taskbar's anchor. Its standalone V is the first
 	// letterform of the wallpaper wordmark, not a font-dependent character.
-	children << ui2.button_with_image(action_start_toggle, '', 'builtin:vinix', ui2.rect(f64(edge_padding), f64(item_y), f64(start_button_width), f64(taskbar_item_height)), ui2.BoxStyle{
-		bg: if d.start_menu_open || d.hover == action_start_toggle {
+	children << ui2.button_with_image(action_start_toggle, '', 'builtin:vinix', ui2.rect(f64(edge_padding), f64(item_y), f64(start_button_width), f64(item_height)), ui2.BoxStyle{
+		bg:     if d.start_menu_open || d.hover == action_start_toggle {
 			theme.accent
 		} else {
 			theme.accent_dim
 		}
-		radius: taskbar_item_height / 2
+		radius: item_height / 2
 	}, ui2.TextStyle{
 		color: theme.taskbar_text_active
 	})
@@ -953,19 +1096,29 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 	// at the physical lower-right corner after 2x M1 presentation as well as
 	// on an unscaled framebuffer.
 	clock_width := taskbar_clock_width
-	entry_right := width - edge_padding - clock_width - taskbar_item_gap
+	workspace_width := workspace_count * workspace_button_width +
+		(workspace_count - 1) * workspace_button_gap
+	workspace_x_fixed := width - edge_padding - clock_width - taskbar_item_gap - workspace_width
+	entry_right := if dock { width } else { workspace_x_fixed - taskbar_item_gap }
 
 	// Entries share whatever room is left rather than each taking a fixed
 	// slot: with a fixed one the last window opened simply had no entry, which
 	// is the opposite of what a list of open windows is for.
-	mut item_width := if dock { dock_item_width } else { taskbar_item_width }
+	mut item_width := if dock {
+		dock_item_width
+	} else if icon_only {
+		taskbar_icon_item_width
+	} else {
+		taskbar_item_width
+	}
+	item_min_width := if icon_only { taskbar_icon_item_min_width } else { taskbar_item_min_width }
 	if entries.len > 0 {
 		share := (entry_right - x + taskbar_item_gap) / entries.len - taskbar_item_gap
 		if share < item_width {
 			item_width = share
 		}
-		if item_width < taskbar_item_min_width {
-			item_width = taskbar_item_min_width
+		if item_width < item_min_width {
+			item_width = item_min_width
 		}
 	}
 
@@ -989,15 +1142,55 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 		} else {
 			theme.taskbar_text
 		}
-		children << ui2.button(entry.id, entry.label, ui2.rect(f64(x), f64(item_y), f64(item_width), f64(taskbar_item_height)), ui2.BoxStyle{
-			bg: bg
-			radius: 6
-		}, ui2.TextStyle{
-			color: text_color
-			size: 12
-			align: .left
-		})
+		button_frame := ui2.rect(f64(x), f64(item_y), f64(item_width), f64(item_height))
+		button_style := ui2.BoxStyle{
+			bg:     bg
+			radius: if icon_only { 4 } else { 6 }
+		}
+		if icon_only {
+			// An icon consumes the full button when it has no label, making an
+			// app identifiable at a glance without stealing room from the clock.
+			children << ui2.button_with_image(entry.id, '', entry.icon, button_frame, button_style, ui2.TextStyle{
+				color: text_color
+			})
+		} else {
+			children << ui2.button(entry.id, entry.label, button_frame, button_style, ui2.TextStyle{
+				color: text_color
+				size:  12
+				align: .left
+			})
+		}
 		x += item_width + taskbar_item_gap
+	}
+
+	// A compact pager makes workspaces discoverable without opening an
+	// overview. Numbered buttons match the Super+1..4 shortcuts and dim empty
+	// workspaces while keeping every destination clickable.
+	workspace_x := if dock { x } else { workspace_x_fixed }
+	for workspace in 0 .. workspace_count {
+		id := workspace_action_ids[workspace]
+		active := workspace == d.current_workspace
+		occupied := d.workspace_window_count(workspace) > 0
+		children << ui2.button(id, workspace_labels[workspace], ui2.rect(f64(workspace_x +
+			workspace * (workspace_button_width + workspace_button_gap)), f64(item_y),
+			f64(workspace_button_width), f64(item_height)), ui2.BoxStyle{
+			bg:     if active {
+				theme.accent
+			} else if d.hover == id {
+				theme.taskbar_item_hover
+			} else {
+				theme.taskbar_item_bg
+			}
+			radius: 5
+		}, ui2.TextStyle{
+			color: if active || occupied { theme.taskbar_text_active } else { theme.taskbar_muted }
+			size:  12
+			bold:  active
+			align: .center
+		})
+	}
+	if dock {
+		x = workspace_x + workspace_width + taskbar_item_gap
 	}
 
 	// A regular taskbar pins the status area to the lower-right corner. A dock
@@ -1006,13 +1199,13 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 	clock_x := if dock { x } else { width - edge_padding - clock_width }
 	children << ui2.label('clock.time', d.taskbar_clock_time, ui2.rect(f64(clock_x), 3, f64(clock_width), 21), ui2.TextStyle{
 		color: theme.taskbar_text_active
-		size: 17
-		bold: true
+		size:  17
+		bold:  true
 		align: .right
 	})
 	children << ui2.label('clock.date', d.taskbar_clock_date, ui2.rect(f64(clock_x), 25, f64(clock_width), 17), ui2.TextStyle{
 		color: theme.taskbar_muted
-		size: 11
+		size:  11
 		align: .right
 	})
 	if dock {
@@ -1034,7 +1227,7 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 		// Clear of the bottom edge, the way a dock sits.
 		panel_y := d.canvas.height - taskbar_height - dock_bottom_gap
 		return ui2.view('taskbar', ui2.rect(f64(panel_x), f64(panel_y), f64(panel_width), f64(taskbar_height)), ui2.BoxStyle{
-			bg: theme.dock_bg
+			bg:     theme.dock_bg
 			radius: theme.dock_radius
 		}, children)
 	}
@@ -1050,6 +1243,7 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 struct TaskbarEntry {
 	id        string
 	label     string
+	icon      string
 	active    bool
 	minimized bool
 }
@@ -1064,9 +1258,10 @@ fn (d &Desktop) taskbar_entries() []TaskbarEntry {
 			window := &d.windows[index]
 			last_id = window.id
 			out << TaskbarEntry{
-				id: window.id_task
-				label: window.title
-				active: window.id == d.focus && !window.minimized
+				id:        window.id_task
+				label:     window.title
+				icon:      window.icon
+				active:    window.id == d.focus && !window.minimized
 				minimized: window.minimized
 			}
 		}
@@ -1080,6 +1275,9 @@ fn (d &Desktop) taskbar_entries() []TaskbarEntry {
 	unsafe { seen.flags |= .noslices }
 	for window_index in 0 .. d.windows.len {
 		window := &d.windows[window_index]
+		if window.workspace != d.current_workspace {
+			continue
+		}
 		if window.title in seen {
 			continue
 		}
@@ -1089,7 +1287,7 @@ fn (d &Desktop) taskbar_entries() []TaskbarEntry {
 		mut active := false
 		mut all_minimized := true
 		for other in d.windows {
-			if other.title != window.title {
+			if other.workspace != d.current_workspace || other.title != window.title {
 				continue
 			}
 			count++
@@ -1102,15 +1300,17 @@ fn (d &Desktop) taskbar_entries() []TaskbarEntry {
 		}
 		// The last in painting order is the one on top.
 		for i := d.windows.len - 1; i >= 0; i-- {
-			if d.windows[i].title == window.title {
+			if d.windows[i].workspace == d.current_workspace
+				&& d.windows[i].title == window.title {
 				newest_index = i
 				break
 			}
 		}
 		out << TaskbarEntry{
-			id: d.windows[newest_index].id_task
-			label: if count > 1 { '${window.title}  (${count})' } else { window.title }
-			active: active
+			id:        d.windows[newest_index].id_task
+			label:     if count > 1 { '${window.title}  (${count})' } else { window.title }
+			icon:      d.windows[newest_index].icon
+			active:    active
 			minimized: all_minimized
 		}
 	}
@@ -1129,12 +1329,50 @@ fn (mut d Desktop) on_pointer_move(x int, y int) {
 	}
 	d.pointer_x = x
 	d.pointer_y = y
+	if d.drag.kind == .move && pointer_moved {
+		d.drag.moved = true
+	}
+	if d.drag.kind == .move && d.buttons & button_left != 0 {
+		// Keep the edge seen while the button is down. Some absolute-pointer
+		// backends report the button-up packet after wrapping a cursor that
+		// crossed the host's left or top edge to the opposite side.
+		d.drag.maximize_on_release = y <= 0
+		d.drag.snap_on_release = if y <= 0 {
+			.none_
+		} else if x <= 0 {
+			.left
+		} else if x >= d.canvas.width - 1 {
+			.right
+		} else {
+			.none_
+		}
+	}
+
+	if d.shortcut_press.app_index >= 0 && d.buttons & button_left != 0 {
+		d.update_shortcut_drag(x, y)
+		hover := d.hit_action(x, y)
+		if hover != d.hover {
+			d.set_hover(hover)
+			d.dirty = true
+		}
+		return
+	}
 
 	// The button level, not just the release edge, ends a drag. The driver
 	// reports the current state on every read, so a release that was missed
 	// between two frames cannot leave a window stuck to the cursor.
-	if d.drag.kind == .move && d.buttons & button_left == 0 {
+	if d.drag.kind != .none_ && d.buttons & button_left == 0 {
+		if d.drag.kind == .move {
+			d.finish_window_drag(x, y)
+		} else if d.drag.kind == .resize {
+			d.finish_window_resize()
+		}
 		d.drag = Drag{}
+	}
+
+	if d.drag.kind == .resize {
+		d.resize_window_to_pointer(x, y)
+		return
 	}
 
 	if d.drag.kind == .move {
@@ -1142,11 +1380,11 @@ fn (mut d Desktop) on_pointer_move(x int, y int) {
 			d.drag = Drag{}
 			return
 		}
-		// A maximised window that is dragged goes back to its own size, with
+		// An arranged window that is dragged goes back to its own size, with
 		// the grab kept proportionally along the title bar.
-		if d.windows[index].maximized {
+		if d.windows[index].maximized || d.windows[index].snap != .none_ {
 			ratio := f64(d.drag.offset_x) / f64(d.windows[index].width)
-			d.toggle_maximize(d.drag.window_id)
+			d.restore_window(d.drag.window_id)
 			new_index := d.window_index(d.drag.window_id) or { return }
 			d.drag.offset_x = int(ratio * f64(d.windows[new_index].width))
 			d.drag.offset_y = d.theme().title_height / 2
@@ -1181,6 +1419,46 @@ fn (mut d Desktop) on_pointer_move(x int, y int) {
 	}
 }
 
+// resize_window_to_pointer changes the lower and right edges while leaving the
+// window's origin fixed. The usable desktop bounds the growing edge; a window
+// already positioned too near an edge still retains the global minimum size.
+fn (mut d Desktop) resize_window_to_pointer(x int, y int) {
+	index := d.window_index(d.drag.window_id) or {
+		d.drag = Drag{}
+		return
+	}
+	mut width := d.drag.start_width + x - d.drag.start_pointer_x
+	mut height := d.drag.start_height + y - d.drag.start_pointer_y
+	min_height := d.theme().title_height + window_min_body_height
+	if width < window_min_width {
+		width = window_min_width
+	}
+	if height < min_height {
+		height = min_height
+	}
+	max_width := d.canvas.width - d.windows[index].x
+	max_height := d.canvas.height - taskbar_height - d.windows[index].y
+	if max_width >= window_min_width && width > max_width {
+		width = max_width
+	}
+	if max_height >= min_height && height > max_height {
+		height = max_height
+	}
+	if width != d.windows[index].width || height != d.windows[index].height {
+		d.windows[index].width = width
+		d.windows[index].height = height
+		d.dirty = true
+	}
+}
+
+fn (mut d Desktop) finish_window_resize() {
+	if d.drag.kind != .resize {
+		return
+	}
+	index := d.window_index(d.drag.window_id) or { return }
+	d.remember_restore_frame(index)
+}
+
 // add_drag_damage includes the outside edge of the shadow and both cursor
 // positions. Rendering clips it to the canvas, so edge coordinates may be
 // negative here.
@@ -1188,9 +1466,12 @@ fn (mut d Desktop) add_drag_damage(old_x int, old_y int, new_x int, new_y int,
 	old_pointer_x int, old_pointer_y int, pointer_x int, pointer_y int, width int, height int) {
 	d.add_damage_rect(old_x - 7, old_y - 5, width + 14, height + 14)
 	d.add_damage_rect(new_x - 7, new_y - 5, width + 14, height + 14)
-	// draw_cursor paints a one-pixel halo around a 12×19 mask.
-	d.add_damage_rect(old_pointer_x - 1, old_pointer_y - 1, 14, 21)
-	d.add_damage_rect(pointer_x - 1, pointer_y - 1, 14, 21)
+	// The Catalina pointer includes a soft shadow to the right and below; this
+	// rectangle also covers the default pointer's one-pixel halo.
+	d.add_damage_rect(old_pointer_x - 1, old_pointer_y - 1, catalina_cursor_width + 2,
+		catalina_cursor_height + 2)
+	d.add_damage_rect(pointer_x - 1, pointer_y - 1, catalina_cursor_width + 2,
+		catalina_cursor_height + 2)
 }
 
 fn (mut d Desktop) add_damage_rect(x int, y int, width int, height int) {
@@ -1291,21 +1572,25 @@ fn (mut d Desktop) clamp_drag_to_screen(index int) {
 }
 
 fn (mut d Desktop) on_pointer_down(x int, y int) {
-	action := d.hit_action(x, y)
+	// A fresh primary press supersedes any release that an earlier, incomplete
+	// device report failed to deliver.
+	d.chrome_pointer_capture = false
+	action, world := d.hit_action_world(x, y)
+	d.trace_selector(action, world)
 	d.set_hover(action)
 	d.dirty = true
 
 	if d.switcher.active {
 		// A click on a tile switches to that window; a click anywhere else
 		// dismisses the switcher and then means whatever it would have meant.
-		if action.starts_with(action_switch_prefix) {
+		if world == .desktop && action.starts_with(action_switch_prefix) {
 			d.switcher_select(action[action_switch_prefix.len..].int())
 			return
 		}
 		d.switcher_close()
 	}
 
-	if action == action_start_toggle {
+	if world == .desktop && action == action_start_toggle {
 		d.start_menu_pointer = true
 		d.toggle_start_menu()
 		return
@@ -1313,7 +1598,7 @@ fn (mut d Desktop) on_pointer_down(x int, y int) {
 
 	if d.start_menu_open {
 		d.start_menu_pointer = true
-		if action.starts_with('start.') {
+		if world == .desktop && action.starts_with('start.') {
 			d.handle_start_action(action)
 			return
 		}
@@ -1322,7 +1607,8 @@ fn (mut d Desktop) on_pointer_down(x int, y int) {
 		d.close_start_menu()
 	}
 
-	if d.forward_pointer_to_app(x, y, .down, .left, 0) {
+	resizing_window := world == .desktop && action.starts_with('win.') && action.ends_with('.resize')
+	if !resizing_window && d.forward_pointer_to_app(x, y, .down, .left, 0) && action == '' {
 		// Raw-surface clicks were already delivered and focused above. Falling
 		// through would interpret their deliberately action-less content as an
 		// empty-desktop click and immediately clear that focus again.
@@ -1337,13 +1623,26 @@ fn (mut d Desktop) on_pointer_down(x int, y int) {
 		return
 	}
 
+	// The app world's star selector forwards arbitrary action ids to the app
+	// under the pointer over its private RPC pipe. Their spelling never grants
+	// access to desktop actions, including Start, window chrome and shortcuts.
+	if world == .application {
+		d.forward_to_app(x, y, action, world)
+		return
+	}
+
 	if !desktop_owns(action) {
-		d.forward_to_app(x, y, action)
+		d.forward_to_app(x, y, action, world)
 		return
 	}
 
 	if action.starts_with(action_shortcut_prefix) {
-		d.launch_index(action[action_shortcut_prefix.len..].int())
+		d.begin_shortcut_press(action, x, y)
+		return
+	}
+
+	if action.starts_with(action_workspace_prefix) {
+		d.switch_workspace(action[action_workspace_prefix.len..].int())
 		return
 	}
 
@@ -1363,11 +1662,30 @@ fn (mut d Desktop) on_pointer_down(x int, y int) {
 				d.raise(id)
 				index := d.window_index(id) or { return }
 				d.drag = Drag{
-					kind: .move
+					kind:      .move
 					window_id: id
-					offset_x: x - d.windows[index].x
-					offset_y: y - d.windows[index].y
+					offset_x:  x - d.windows[index].x
+					offset_y:  y - d.windows[index].y
 				}
+				d.chrome_pointer_capture = true
+				d.drag_damage = DamageRect{}
+			}
+			'resize' {
+				index := d.window_index(id) or { return }
+				if d.windows[index].maximized || d.windows[index].snap != .none_ {
+					return
+				}
+				d.raise(id)
+				resized := d.window_index(id) or { return }
+				d.drag = Drag{
+					kind:            .resize
+					window_id:       id
+					start_pointer_x: x
+					start_pointer_y: y
+					start_width:     d.windows[resized].width
+					start_height:    d.windows[resized].height
+				}
+				d.chrome_pointer_capture = true
 				d.drag_damage = DamageRect{}
 			}
 			'close' {
@@ -1386,16 +1704,74 @@ fn (mut d Desktop) on_pointer_down(x int, y int) {
 	}
 }
 
+fn (d &Desktop) trace_selector(action string, world ActionWorld) {
+	if !d.trace_selectors || action.len == 0 {
+		return
+	}
+	// A remote app supplies its selector text. Keep control bytes and very long
+	// strings out of the compositor log, while retaining readable selectors.
+	mut printable := action.len <= 128
+	for ch in action {
+		if ch < 32 || ch > 126 {
+			printable = false
+			break
+		}
+	}
+	if printable {
+		eprintln('vinix-desktop: selector[${world}] ${action}')
+	} else {
+		eprintln('vinix-desktop: selector[${world}] <${action.len} bytes>')
+	}
+}
+
 fn (mut d Desktop) on_pointer_up(x int, y int) {
+	action, world := d.hit_action_world(x, y)
+	release_action := if world == .desktop { action } else { '' }
+	if d.shortcut_press.app_index >= 0 {
+		// Own the action before launch_index can replace application state that
+		// supplied the current frame's hit targets.
+		d.set_hover(release_action)
+		if app_index := d.finish_shortcut_press(release_action, x, y) {
+			d.launch_index(app_index)
+		}
+		d.drag = Drag{}
+		d.drag_damage = DamageRect{}
+		d.dirty = true
+		return
+	}
+	was_dragging := d.chrome_pointer_capture || d.drag.kind != .none_
+	d.chrome_pointer_capture = false
 	if d.start_menu_pointer {
 		d.start_menu_pointer = false
-	} else {
+	} else if !was_dragging {
 		d.forward_pointer_to_app(x, y, .up, .left, 0)
+	}
+	if d.drag.kind == .move {
+		d.finish_window_drag(x, y)
+	} else if d.drag.kind == .resize {
+		d.finish_window_resize()
 	}
 	d.drag = Drag{}
 	d.drag_damage = DamageRect{}
-	d.set_hover(d.hit_action(x, y))
+	d.set_hover(release_action)
 	d.dirty = true
+}
+
+// finish_window_drag applies Windows 7-style edge placement when the title
+// bar is released against a display edge. The top edge takes precedence at a
+// corner; the side edges fill their respective half of the usable desktop.
+fn (mut d Desktop) finish_window_drag(x int, y int) {
+	if d.drag.kind != .move || !d.drag.moved {
+		return
+	}
+	id := d.drag.window_id
+	if y <= 0 || (d.drag.maximize_on_release && y >= d.canvas.height - 1) {
+		d.maximize(id)
+	} else if x <= 0 {
+		d.snap_window(id, if d.drag.snap_on_release == .right { .right } else { .left })
+	} else if x >= d.canvas.width - 1 {
+		d.snap_window(id, if d.drag.snap_on_release == .left { .left } else { .right })
+	}
 }
 
 // Non-primary buttons and the wheel have no desktop chrome meaning yet, but a
@@ -1418,18 +1794,22 @@ fn (mut d Desktop) on_app_pointer_scroll(x int, y int, scroll int) {
 	}
 }
 
-// hit_action returns the action id of the topmost target under a point. The
-// targets come from the render pass in painting order, so walking backwards
-// finds what the user can actually see.
-fn (d &Desktop) hit_action(x int, y int) string {
+// The render pass records each target's world alongside its selector. Keep
+// that origin attached until dispatch; a string prefix cannot authenticate it.
+fn (d &Desktop) hit_action_world(x int, y int) (string, ActionWorld) {
 	for i := d.targets.len - 1; i >= 0; i-- {
 		target := d.targets[i]
 		if x >= target.x && y >= target.y && x < target.x + target.width
 			&& y < target.y + target.height {
-			return target.action_id
+			return target.action_id, target.world
 		}
 	}
-	return ''
+	return '', .desktop
+}
+
+fn (d &Desktop) hit_action(x int, y int) string {
+	action, _ := d.hit_action_world(x, y)
+	return action
 }
 
 // Hover outlives the frame that produced its hit target. Keep an owned copy:

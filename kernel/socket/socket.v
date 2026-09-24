@@ -7,6 +7,7 @@ import usercopy
 import socket.public as sock_pub
 import socket.unix as sock_unix
 import socket.inet as sock_inet
+import socket.netlink as sock_netlink
 import proc
 
 const cmsg_header_size = u64(16)
@@ -21,7 +22,6 @@ struct CMsgHdr {
 fn release_passed_fds(mut fds []&file.FD) {
 	for mut fd in fds {
 		fd.unref()
-		unsafe { free(voidptr(fd)) }
 	}
 	unsafe { fds.free() }
 }
@@ -77,11 +77,12 @@ fn collect_passed_fds(msg &sock_pub.MsgHdr) ?[]&file.FD {
 				return none
 			}
 			// fd_from_fdnum() acquired the Handle reference now owned by this
-			// queued descriptor. Do not unref the source on the success path.
+			// queued descriptor, so only the source descriptor is let go.
 			mut passed := &file.FD{
 				handle: source.handle
 				flags: 0
 			}
+			source.release_descriptor()
 			result << passed
 		}
 
@@ -120,6 +121,10 @@ fn socket_create(domain int, @type int, protocol int) ?&resource.Resource {
 		}
 		sock_pub.af_inet {
 			ret := sock_inet.create(@type, protocol)?
+			return ret
+		}
+		sock_pub.af_netlink {
+			ret := sock_netlink.create(@type, protocol)?
 			return ret
 		}
 		else {
@@ -218,6 +223,8 @@ pub fn syscall_accept(_ voidptr, fdnum int) (u64, u64) {
 		sock = res
 	} else if mut res is sock_inet.InetSocket {
 		sock = res
+	} else if mut res is sock_netlink.NetlinkSocket {
+		sock = res
 	} else {
 		return errno.err, errno.einval
 	}
@@ -253,6 +260,8 @@ pub fn syscall_bind(_ voidptr, fdnum int, _addr voidptr, addrlen u32) (u64, u64)
 		sock = res
 	} else if mut res is sock_inet.InetSocket {
 		sock = res
+	} else if mut res is sock_netlink.NetlinkSocket {
+		sock = res
 	} else {
 		return errno.err, errno.einval
 	}
@@ -283,6 +292,8 @@ pub fn syscall_listen(_ voidptr, fdnum int, backlog int) (u64, u64) {
 	if mut res is sock_unix.UnixSocket {
 		sock = res
 	} else if mut res is sock_inet.InetSocket {
+		sock = res
+	} else if mut res is sock_netlink.NetlinkSocket {
 		sock = res
 	} else {
 		return errno.err, errno.einval
@@ -315,6 +326,8 @@ pub fn syscall_recvmsg(_ voidptr, fdnum int, msg &sock_pub.MsgHdr, flags int) (u
 	if mut res is sock_unix.UnixSocket {
 		sock = res
 	} else if mut res is sock_inet.InetSocket {
+		sock = res
+	} else if mut res is sock_netlink.NetlinkSocket {
 		sock = res
 	} else {
 		return errno.err, errno.einval
@@ -369,11 +382,26 @@ pub fn syscall_sendto(_ voidptr, fdnum int, buf voidptr, len u64, flags int, des
 		ret := fd.handle.write(buf, len) or { return errno.err, errno.get() }
 		return u64(ret), 0
 	}
+	if mut res is sock_netlink.NetlinkSocket {
+		old_flags := fd.handle.flags
+		if flags & 0x40 != 0 {
+			fd.handle.flags |= resource.o_nonblock
+		}
+		defer {
+			fd.handle.flags = old_flags
+		}
+		ret := fd.handle.write(buf, len) or { return errno.err, errno.get() }
+		return u64(ret), 0
+	}
 	return errno.err, errno.enotsock
 }
 
 pub fn syscall_recvfrom(_ voidptr, fdnum int, buf voidptr, len u64, flags int, src_addr voidptr, addrlen &u32) (u64, u64) {
-	if flags & ~0x40 != 0 { // MSG_DONTWAIT
+	// MSG_PEEK, MSG_TRUNC, MSG_DONTWAIT, MSG_WAITALL and MSG_CMSG_CLOEXEC. A
+	// length-prefix protocol on a SOCK_SEQPACKET socket reads a record's size
+	// with recvfrom(0, MSG_PEEK|MSG_TRUNC); the unix seqpacket path honours it.
+	allowed := 0x2 | 0x20 | 0x40 | 0x100 | 0x40000000
+	if flags & ~allowed != 0 {
 		return errno.err, errno.eopnotsupp
 	}
 	mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.get() }
@@ -395,7 +423,34 @@ pub fn syscall_recvfrom(_ voidptr, fdnum int, buf voidptr, len u64, flags int, s
 		return u64(ret), 0
 	}
 	if mut res is sock_unix.UnixSocket {
+		old_flags := fd.handle.flags
+		if flags & 0x40 != 0 {
+			fd.handle.flags |= resource.o_nonblock
+		}
+		defer {
+			fd.handle.flags = old_flags
+		}
+		if res.is_seqpacket() {
+			ret := res.recv_seqpacket(voidptr(fd.handle), buf, len, flags) or {
+				return errno.err, errno.get()
+			}
+			return u64(ret), 0
+		}
 		ret := fd.handle.read(buf, len) or { return errno.err, errno.get() }
+		return u64(ret), 0
+	}
+	if mut res is sock_netlink.NetlinkSocket {
+		old_flags := fd.handle.flags
+		if flags & 0x40 != 0 {
+			fd.handle.flags |= resource.o_nonblock
+		}
+		defer {
+			fd.handle.flags = old_flags
+		}
+		ret := fd.handle.read(buf, len) or { return errno.err, errno.get() }
+		if src_addr != unsafe { nil } && addrlen != unsafe { nil } {
+			sock_netlink.write_kernel_source(src_addr, addrlen)
+		}
 		return u64(ret), 0
 	}
 	return errno.err, errno.enotsock
@@ -485,6 +540,8 @@ pub fn syscall_connect(_ voidptr, fdnum int, _addr voidptr, addrlen u32) (u64, u
 		sock = res
 	} else if mut res is sock_inet.InetSocket {
 		sock = res
+	} else if mut res is sock_netlink.NetlinkSocket {
+		sock = res
 	} else {
 		return errno.err, errno.einval
 	}
@@ -519,6 +576,9 @@ fn socket_from_fdnum(fdnum int) ?(&file.FD, &sock_pub.Socket) {
 		return fd, &sock_pub.Socket(res)
 	}
 	if mut res is sock_inet.InetSocket {
+		return fd, &sock_pub.Socket(res)
+	}
+	if mut res is sock_netlink.NetlinkSocket {
 		return fd, &sock_pub.Socket(res)
 	}
 

@@ -45,11 +45,13 @@ pub fn syscall_getegid(_ voidptr) (u64, u64) {
 // program drop privilege temporarily and take it back.
 pub fn syscall_setuid(_ voidptr, uid u32) (u64, u64) {
 	mut process := current_process()
+	old_ruid, old_euid, old_suid := process.uid, process.euid, process.suid
 
 	if is_privileged(process) {
 		process.uid = uid
 		process.euid = uid
 		process.suid = uid
+		proc.capabilities_after_setuid(mut process, old_ruid, old_euid, old_suid)
 		return 0, 0
 	}
 
@@ -58,6 +60,7 @@ pub fn syscall_setuid(_ voidptr, uid u32) (u64, u64) {
 	}
 
 	process.euid = uid
+	proc.capabilities_after_setuid(mut process, old_ruid, old_euid, old_suid)
 	return 0, 0
 }
 
@@ -86,6 +89,7 @@ fn unchanged(id u32) bool {
 
 pub fn syscall_setreuid(_ voidptr, ruid u32, euid u32) (u64, u64) {
 	mut process := current_process()
+	old_ruid, old_euid, old_suid := process.uid, process.euid, process.suid
 	privileged := is_privileged(process)
 
 	if !unchanged(ruid) {
@@ -113,6 +117,7 @@ pub fn syscall_setreuid(_ voidptr, ruid u32, euid u32) (u64, u64) {
 		process.suid = process.euid
 	}
 
+	proc.capabilities_after_setuid(mut process, old_ruid, old_euid, old_suid)
 	return 0, 0
 }
 
@@ -150,6 +155,7 @@ pub fn syscall_setregid(_ voidptr, rgid u32, egid u32) (u64, u64) {
 // three-argument call landing in a two-argument handler.
 pub fn syscall_setresuid(_ voidptr, ruid u32, euid u32, suid u32) (u64, u64) {
 	mut process := current_process()
+	old_ruid, old_euid, old_suid := process.uid, process.euid, process.suid
 
 	if !is_privileged(process) {
 		for wanted in [ruid, euid, suid] {
@@ -172,6 +178,7 @@ pub fn syscall_setresuid(_ voidptr, ruid u32, euid u32, suid u32) (u64, u64) {
 		process.suid = suid
 	}
 
+	proc.capabilities_after_setuid(mut process, old_ruid, old_euid, old_suid)
 	return 0, 0
 }
 
@@ -302,23 +309,26 @@ pub fn syscall_setsid(_ voidptr) (u64, u64) {
 	process.sid = process.pid
 	process.pgid = process.pid
 	process.tty_session = 0
+	proc.renumber_group(mut process)
 
-	return u64(process.pid), 0
+	return u64(proc.own_pid(process)), 0
 }
 
 // getsid(pid). Zero means the caller.
 pub fn syscall_getsid(_ voidptr, pid int) (u64, u64) {
 	mut target := current_process()
+	viewer := target.numbered_in
 
 	if pid != 0 {
 		if pid < 0 || pid >= proc.max_pid {
 			return errno.err, errno.esrch
 		}
-		target = processes[pid]
+		global := proc.pid_from(viewer, pid)
+		target = if global > 0 { processes[global] } else { unsafe { nil } }
 		if target == unsafe { nil } {
 			return errno.err, errno.esrch
 		}
 	}
 
-	return u64(target.sid), 0
+	return u64(proc.sid_in(target, viewer)), 0
 }

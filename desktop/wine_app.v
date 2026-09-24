@@ -1,5 +1,8 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
 // X11 applications embedded in native Vinix windows. Xvfb owns the upstream
 // application's display while the Vinix compositor maps its live XWD surface.
 module main
@@ -44,8 +47,16 @@ const wine_word2013_window_width = 680
 const wine_word2013_window_height = 510
 const minecraft_surface_width = 1280
 const minecraft_surface_height = 720
-const minecraft_window_width = 760
-const minecraft_window_height = 428
+// Keep Minecraft windowed, but give its 16:9 game surface enough desktop
+// space to be comfortably playable. This is 30% larger than the previous
+// 1520x856 frame and still fits the standard 2048x1536 QEMU desktop with its
+// title bar and the Vinix taskbar visible.
+const minecraft_window_width = 1976
+const minecraft_window_height = 1113
+const doom_surface_width = 720
+const doom_surface_height = 540
+const doom_window_width = 720
+const doom_window_height = 540
 const wine_host_event_magic = u32(0x56574831) // VWH1
 
 enum WineHostEventKind as u32 {
@@ -87,7 +98,7 @@ mut:
 }
 
 fn open_firefox(mut _ Desktop) !NativeApp {
-	return open_hosted_x11_app('firefox', '/usr/bin/run-firefox', firefox_surface_width, firefox_surface_height, 'builtin:browser', 'Starting Firefox…', 'Firefox is not installed in this desktop image.', 'Firefox exited.')
+	return open_hosted_x11_app('firefox', '/usr/bin/run-firefox', firefox_surface_width, firefox_surface_height, 'asset:firefox', 'Starting Firefox…', 'Firefox is not installed in this desktop image.', 'Firefox exited.')
 }
 
 // Chromium is not in the image: `pkg install chromium` fetches it from Alpine.
@@ -98,13 +109,13 @@ fn open_chromium(mut _ Desktop) !NativeApp {
 		return &HostedX11App{
 			surface_width: chromium_surface_width
 			surface_height: chromium_surface_height
-			icon: 'builtin:browser'
+			icon: 'asset:chromium'
 			failed: true
 			error_message: 'Chromium is not installed. Run pkg install chromium in Terminal.'
 		}
 	}
 	return open_hosted_x11_app('chromium', '/usr/bin/run-chromium', chromium_surface_width,
-		chromium_surface_height, 'builtin:browser', 'Starting Chromium…', 'Chromium is not installed. Run pkg install chromium in Terminal.',
+		chromium_surface_height, 'asset:chromium', 'Starting Chromium…', 'Chromium is not installed. Run pkg install chromium in Terminal.',
 		'Chromium exited.')
 }
 
@@ -174,7 +185,42 @@ fn open_wine_word2013(mut _ Desktop) !NativeApp {
 }
 
 fn open_minecraft(mut _ Desktop) !NativeApp {
-	return open_hosted_x11_app('minecraft', '/usr/bin/minecraft', minecraft_surface_width, minecraft_surface_height, 'builtin:block', 'Starting Minecraft…', 'Minecraft is not installed. Build its AArch64 runtime first.', 'Minecraft exited.')
+	if C.access(c'/usr/bin/minecraft', C.X_OK) != 0 {
+		return &HostedX11App{
+			surface_width:  minecraft_surface_width
+			surface_height: minecraft_surface_height
+			icon:           'asset:minecraft'
+			failed:         true
+			error_message:  'Minecraft is not installed. Run pkg install minecraft in Terminal.'
+		}
+	}
+	return open_hosted_x11_app('minecraft', '/usr/bin/minecraft', minecraft_surface_width,
+		minecraft_surface_height, 'asset:minecraft', 'Starting Minecraft…',
+		'Minecraft is not installed. Run pkg install minecraft in Terminal.', 'Minecraft exited.')
+}
+
+fn open_doom(mut _ Desktop) !NativeApp {
+	if C.access(c'/usr/bin/chocolate-doom', C.X_OK) != 0 {
+		return &HostedX11App{
+			surface_width: doom_surface_width
+			surface_height: doom_surface_height
+			icon: 'builtin:block'
+			failed: true
+			error_message: 'Chocolate Doom is not installed. Run build-doom-aarch64.sh.'
+		}
+	}
+	if C.access(c'/usr/share/games/doom/doom1.wad', C.R_OK) != 0 {
+		return &HostedX11App{
+			surface_width: doom_surface_width
+			surface_height: doom_surface_height
+			icon: 'builtin:block'
+			failed: true
+			error_message: 'Doom WAD is missing. Set VINIX_DOOM_WAD and rebuild the image.'
+		}
+	}
+	return open_hosted_x11_app('doom', '/usr/bin/run-doom', doom_surface_width,
+		doom_surface_height, 'builtin:block', 'Starting Chocolate Doom…',
+		'Chocolate Doom is not installed. Run build-doom-aarch64.sh.', 'Chocolate Doom exited.')
 }
 
 fn open_hosted_x11_app(name string, command string, surface_width int, surface_height int,
@@ -187,7 +233,18 @@ fn open_hosted_x11_app(name string, command string, surface_width int, surface_h
 		exited_text: exited_text
 	}
 	process_id := C.getpid()
-	app.directory = '/tmp/vinix-${name}-${process_id}'
+	// Xvfb writes its framebuffer through a shared mmap. Use the per-boot
+	// scratch mount when init provided it, keeping constant frame updates off
+	// the persistent root filesystem.
+	base := if C.access(c'/run/vinix-hosted-x11/.tmpfs-ready', C.R_OK) == 0 {
+		'/run/vinix-hosted-x11'
+	} else {
+		'/tmp'
+	}
+	// PIDs can be reused while the compositor still has the previous XWD file
+	// mapped. Give each launch a new path so its surface cannot resolve to a
+	// cached frame from an earlier X server.
+	app.directory = '${base}/vinix-${name}-${process_id}-${monotonic_millis()}'
 	app.xwd_path = '${app.directory}/Xvfb_screen0'
 	app.damage_path = '${app.directory}/damage'
 	app.image_path = '${xwd_image_prefix}${app.xwd_path}'
@@ -202,7 +259,12 @@ fn open_hosted_x11_app(name string, command string, surface_width int, surface_h
 		app.error_message = missing_text
 		return app
 	}
-	host := desktop_spawn_wine_host(app.directory, surface_width, surface_height, command) or {
+	// Minecraft's saved launch description can outlive the package that
+	// generated it. Ask the host to enforce the Xvfb dimensions as well as
+	// passing them to the launcher, so an old or ignored game-size option can
+	// never leave a smaller GLFW window floating in a white root surface.
+	host := desktop_spawn_wine_host(app.directory, surface_width, surface_height, command,
+		name == 'minecraft', name == 'doom') or {
 		app.failed = true
 		app.error_message = 'Vinix could not start the embedded X11 host.'
 		return app

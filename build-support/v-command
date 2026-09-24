@@ -1,4 +1,28 @@
 #!/bin/sh
 # Keep the executable beside vlib: V derives its installation root from the
 # real compiler path, while users get the conventional /usr/bin/v command.
+# Defaults precede caller-supplied VFLAGS and command-line arguments so an
+# explicit -os, -arch, -musl/-glibc, or -cc still wins. Alpine's native TCC is
+# the fast default for applications and tells V it can link the Vinix target.
+# Keep V's worker passes serial until their threading is qualified on Vinix.
+vinix_vflags='-os vinix -arch arm64 -musl -cc tcc -no-parallel -no-memory-limit'
+
+# Keep the self-built compiler on the hosted Linux/musl runtime, while the
+# resulting command continues to target Vinix by default. Self-host serially
+# with the same Alpine TCC so the replacement does not depend on Vinix worker
+# scheduling while compiler threading support is still being qualified.
+for vinix_arg in "$@"; do
+	if [ "$vinix_arg" = self ]; then
+		vinix_vflags='-os linux -arch arm64 -musl -cc tcc -no-parallel -no-memory-limit'
+		break
+	fi
+done
+VJOBS=1
+export VJOBS
+if [ -n "${VFLAGS:-}" ]; then
+	VFLAGS="$vinix_vflags $VFLAGS"
+else
+	VFLAGS=$vinix_vflags
+fi
+export VFLAGS
 exec /usr/lib/vlang/v "$@"

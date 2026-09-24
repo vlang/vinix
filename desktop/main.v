@@ -1,5 +1,8 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
 // vinix-desktop — a small desktop environment for Vinix.
 //
 // It maps /dev/fb0, reads the pointer from /dev/pointer and the keyboard from
@@ -36,13 +39,20 @@ const key_f2 = '\x1bOQ'
 // One step of the bar in Settings, so the two agree.
 const brightness_step = 5
 
+// The reload helper removes this before asking PID 1 to replace the session.
+// Recreate it only after the replacement has painted its first frame and
+// completed the startup application handshakes, so an out-of-group watchdog
+// can distinguish a responsive desktop from a process that merely exec'd.
+const desktop_session_ready_path = '/run/vinix-desktop-ready'
+
 struct Options {
-	framebuffer    string = '/dev/fb0'
-	pointer        string = '/dev/pointer'
-	tz_offset      i64
-	frame_interval i64 = default_frame_interval_ms
-	idle_interval  i64 = default_idle_interval_ms
-	stats          bool
+	framebuffer     string = '/dev/fb0'
+	pointer         string = '/dev/pointer'
+	tz_offset       i64
+	frame_interval  i64 = default_frame_interval_ms
+	idle_interval   i64 = default_idle_interval_ms
+	stats           bool
+	trace_selectors bool
 	// Applications to open at startup, by the title on their shortcut. The
 	// desktop is otherwise only reachable through the pointer, which leaves a
 	// scripted boot no way to ask for the one thing worth measuring: how long
@@ -51,8 +61,11 @@ struct Options {
 }
 
 fn parse_options(args []string) Options {
+	gpu_present_startup_stage(c'initializing command-line defaults')
 	mut options := Options{}
+	gpu_present_startup_stage(c'command-line defaults initialized')
 	for arg in args {
+		gpu_present_startup_stage(c'parsing command-line option')
 		if arg.starts_with('--fb=') {
 			options = Options{
 				...options
@@ -85,6 +98,11 @@ fn parse_options(args []string) Options {
 				...options
 				stats: true
 			}
+		} else if arg == '--trace-selectors' {
+			options = Options{
+				...options
+				trace_selectors: true
+			}
 		} else if arg.starts_with('--tz=') {
 			// Hours east of UTC. Vinix has no time zone database, so the
 			// offset the clock should show has to be told to it.
@@ -94,6 +112,7 @@ fn parse_options(args []string) Options {
 			}
 		}
 	}
+	gpu_present_startup_stage(c'command-line option scan complete')
 	return options
 }
 
@@ -101,40 +120,78 @@ fn sleep_ms(ms i64) {
 	desktop_sleep_ms(ms)
 }
 
-fn sleep_to_next_frame(frame_started i64, interval i64) {
-	elapsed := monotonic_millis() - frame_started
-	wait := desktop_frame_wait_ms(elapsed, interval)
-	if wait > 0 {
-		sleep_ms(wait)
+fn desktop_publish_session_ready() {
+	message := 'ready\n'
+	if !desktop_write_file(desktop_session_ready_path, message.str, u64(message.len)) {
+		eprintln('vinix-desktop: could not publish the session-ready marker')
+		return
+	}
+	if desktop_is_system_session() {
+		eprintln('vinix-desktop: ready')
 	}
 }
 
 fn main() {
-	if app_options := app_process_options(arguments()[1..]) {
+	gpu_present_startup_stage(c'entered main')
+	gpu_present_startup_stage(c'collecting process arguments')
+	all_args := arguments()
+	gpu_present_startup_stage(c'process arguments collected')
+	// Both parsers only recognise option prefixes, so argv[0] is harmless.
+	// Passing the captured array directly also avoids V's array-slice path,
+	// which is not returning on the native M1 boot.
+	gpu_present_startup_stage(c'using captured arguments without slicing')
+	gpu_present_startup_stage(c'checking application subprocess mode')
+	if app_options := app_process_options(all_args) {
+		gpu_present_startup_stage(c'dispatching application subprocess')
 		run_app_process(app_options)
 		return
 	}
+	gpu_present_startup_stage(c'application subprocess mode not requested')
+	gpu_present_startup_stage(c'desktop process selected')
 	desktop_ignore_broken_pipe()
+	gpu_present_startup_stage(c'SIGPIPE ignored')
 	desktop_install_power_signals()
-	options := parse_options(arguments()[1..])
+	gpu_present_startup_stage(c'power signal handlers installed')
+	gpu_present_startup_stage(c'entering command-line parser')
+	options := parse_options(all_args)
+	gpu_present_startup_stage(c'command line parsed')
 
+	gpu_present_startup_stage(c'opening framebuffer')
 	mut fb := open_framebuffer(options.framebuffer) or {
 		eprintln('vinix-desktop: ${err}')
 		exit(1)
 	}
+	gpu_present_startup_stage(c'framebuffer mapped')
 	defer {
 		fb.close()
 	}
 
+	gpu_present_startup_stage(c'loading preferences')
 	mut preferences := desktop_load_preferences(desktop_home)
+	gpu_present_startup_stage(c'preferences loaded')
 	scale := preferences.configure_scale(fb.width, fb.height)
+	gpu_present_startup_stage(c'display scale configured')
+	gpu_present_startup_stage(c'allocating canvas')
+	canvas := new_scaled_canvas(desktop_scaled_extent(fb.width, scale),
+		desktop_scaled_extent(fb.height, scale), fb.width, fb.height, scale)
+	gpu_present_startup_stage(c'canvas allocated')
+	gpu_present_startup_stage(c'loading fonts')
+	fonts := load_fonts()
+	gpu_present_startup_stage(c'fonts loaded')
 	mut desktop := Desktop{
 		settings:          preferences.settings
-		canvas:            new_scaled_canvas(desktop_scaled_extent(fb.width, scale), desktop_scaled_extent(fb.height, scale), fb.width, fb.height, scale)
-		fonts:             load_fonts()
+		canvas:            canvas
+		fonts:             fonts
+		shortcut_order:    load_shortcut_order(desktop_home)
 		tz_offset_seconds: options.tz_offset
+		trace_selectors:   options.trace_selectors
 	}
+	gpu_present_startup_stage(c'desktop state allocated')
+	gpu_present_startup_stage(c'loading application icons')
+	desktop.load_app_icons()
+	gpu_present_startup_stage(c'application icons loaded')
 
+	gpu_present_startup_stage(c'opening pointer device')
 	mut pointer := open_pointer(options.pointer)
 	defer {
 		pointer.close()
@@ -143,39 +200,66 @@ fn main() {
 	desktop.pointer_x = desktop.canvas.width / 2
 	desktop.pointer_y = desktop.canvas.height / 2
 	mut titlebar_click := TitlebarClick{}
+	gpu_present_startup_stage(c'pointer device ready')
 
+	gpu_present_startup_stage(c'opening keyboard device')
 	mut keyboard := open_keyboard()
 	defer {
 		keyboard.close()
 	}
+	gpu_present_startup_stage(c'keyboard device ready')
 
 	// First launch is an exclusive setup mode: ordinary windows, shortcuts and
 	// the taskbar do not exist until a persistent user profile has been created.
+	gpu_present_startup_stage(c'checking user profile')
 	desktop.ensure_registered_user(mut fb, mut pointer, mut keyboard, options.frame_interval,
 		options.idle_interval)
+	gpu_present_startup_stage(c'user profile ready')
+	if !desktop.running {
+		return
+	}
+	// A newly created user then chooses which optional apps to install. The
+	// install itself runs in a Terminal once the ordinary desktop is up.
+	gpu_present_startup_stage(c'checking first-run app choice')
+	launch_install_terminal := desktop.choose_first_run_apps(mut fb, mut pointer, mut keyboard,
+		options.frame_interval, options.idle_interval)
+	gpu_present_startup_stage(c'first-run app choice ready')
 	if !desktop.running {
 		return
 	}
 
 	// An opening arrangement, kept clear of the shortcut column down the left
-	// edge. The calculator is not opened: it remains available from its shortcut
-	// and the Start menu, and three windows is enough to show what the taskbar is for.
+	// edge. The calculator remains available from its shortcut and the Start
+	// menu; the Welcome page is available from Help but is not shown at launch.
 	mut launch_default_files := false
+	mut launch_development_terminal := false
 	if options.open.len == 0 {
-		desktop.spawn('Welcome', .welcome, 150, 60, 396, 244)
+		gpu_present_startup_stage(c'creating initial System window')
 		desktop.spawn('System', .system, 580, 60, 372, 232)
+		gpu_present_startup_stage(c'initial System window created')
 		// Files is a separate process. Paint the compositor-owned windows first,
 		// so a delayed application handshake cannot leave the firmware console
 		// looking like the desktop failed to start.
 		launch_default_files = true
+		// The install Terminal ends in an ordinary interactive shell, so it
+		// also serves as the development session's Terminal.
+		launch_development_terminal = desktop_is_development_session()
+			|| launch_install_terminal
 	} else {
 		for title in options.open {
 			desktop.launch_titled_at_startup(title)
 		}
+		if launch_install_terminal {
+			desktop.launch_titled_at_startup('Terminal')
+		}
+		desktop_publish_session_ready()
 	}
 
 	mut stats := FrameStats{}
 	for desktop.running {
+		if desktop.frames == 0 {
+			gpu_present_startup_stage(c'first compositor iteration')
+		}
 		// `reboot`, `poweroff` and `halt` signal PID 1 rather than powering the
 		// machine down themselves. The supervising init forwards those signals
 		// to this system-session compositor for an orderly teardown.
@@ -235,6 +319,9 @@ fn main() {
 		other_dirty := desktop.dirty
 		desktop.dirty = background_dirty || pointer_dirty || keyboard_dirty || capture_dirty
 			|| other_dirty
+		if desktop.frames == 0 {
+			gpu_present_startup_stage(c'first input and application poll complete')
+		}
 		after_input := monotonic_millis()
 
 		// Nothing has changed: the framebuffer already holds the right
@@ -251,8 +338,14 @@ fn main() {
 		}
 		desktop.dirty = false
 
+		if desktop.frames == 0 {
+			gpu_present_startup_stage(c'building first element tree')
+		}
 		desktop.frames++
 		tree := desktop.build_tree()
+		if desktop.frames == 1 {
+			gpu_present_startup_stage(c'first element tree built')
+		}
 		after_build := monotonic_millis()
 
 		partial_drag_frame := desktop.drag.kind == .move && desktop.drag_damage.valid
@@ -262,13 +355,22 @@ fn main() {
 		} else {
 			desktop.render(tree)
 		}
+		if desktop.frames == 1 {
+			gpu_present_startup_stage(c'first canvas render complete')
+		}
 		desktop.render_create_context_menu()
 		after_render := monotonic_millis()
 
+		if desktop.frames == 1 {
+			gpu_present_startup_stage(c'presenting first canvas')
+		}
 		if partial_drag_frame {
 			fb.present_damage(&desktop.canvas, desktop.drag_damage)
 		} else {
 			fb.present(&desktop.canvas, desktop_current_scale())
+		}
+		if desktop.frames == 1 {
+			gpu_present_startup_stage(c'first canvas presented')
 		}
 		desktop.capture_presented(&desktop.canvas)
 		after_present := monotonic_millis()
@@ -279,6 +381,11 @@ fn main() {
 		if launch_default_files {
 			launch_default_files = false
 			desktop.launch_titled_at_startup('Files')
+			if launch_development_terminal {
+				launch_development_terminal = false
+				desktop.launch_titled_at_startup('Terminal')
+			}
+			desktop_publish_session_ready()
 		}
 
 		sleep_to_next_frame(frame_started, options.frame_interval)
@@ -293,6 +400,20 @@ fn main() {
 	// that is no longer being redrawn.
 	desktop.close_apps()
 	desktop.capture_close()
+	if desktop.power == .reload_desktop {
+		// Close every inherited device before exec, but keep this process alive:
+		// graphics-mode ownership is PID based, so the last complete frame stays
+		// visible until the replacement compositor presents its first one.
+		keyboard.close()
+		pointer.close()
+		fb.close()
+		println('vinix-desktop: ${desktop.frames} frames; executing replacement')
+		desktop_exec_replacement()
+		// execve only returns on failure. Let PID 1's ordinary crash recovery
+		// start the installed binary instead of drawing through closed devices.
+		return
+	}
+	// Power actions hand the display back to the system console.
 	desktop.canvas.clip = Clip{
 		x: 0
 		y: 0

@@ -216,6 +216,15 @@ pub fn flanterm_callback(p voidptr, t u64, a u64, b u64, c u64) {
 	}
 }
 
+// The console, if `session` controls it: what /dev/tty stands for there.
+pub fn session_terminal(session int) ?&resource.Resource {
+	if console_res == unsafe { nil } || session == 0 || console_res.session != session {
+		errno.set(errno.enxio)
+		return none
+	}
+	return &resource.Resource(unsafe { console_res })
+}
+
 pub fn initialise() {
 	C.flanterm_set_callback(flanterm_ctx, voidptr(flanterm_callback))
 
@@ -443,7 +452,7 @@ fn (mut this Console) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 		}
 		ioctl.tcgets {
 			settings := this.termios
-			if !usercopy.copy_to_user(u64(argp), voidptr(&settings), sizeof(termios.Termios)) {
+			if !usercopy.copy_to_user(u64(argp), voidptr(&settings), termios.user_size()) {
 				errno.set(errno.efault)
 				return none
 			}
@@ -452,8 +461,8 @@ fn (mut this Console) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 		// The three differ only in when they take effect. Nothing here buffers
 		// output, so there is nothing to drain and they are the same.
 		ioctl.tcsets, ioctl.tcsetsw, ioctl.tcsetsf {
-			mut settings := termios.Termios{}
-			if !usercopy.copy_from_user(voidptr(&settings), u64(argp), sizeof(termios.Termios)) {
+			mut settings := this.termios
+			if !usercopy.copy_from_user(voidptr(&settings), u64(argp), termios.user_size()) {
 				errno.set(errno.efault)
 				return none
 			}
@@ -492,7 +501,7 @@ fn (mut this Console) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 				errno.set(errno.enotty)
 				return none
 			}
-			value := i32(this.session)
+			value := i32(proc.group_in(process.numbered_in, this.session))
 			if !usercopy.copy_to_user(u64(argp), voidptr(&value), sizeof(i32)) {
 				errno.set(errno.efault)
 				return none
@@ -502,10 +511,12 @@ fn (mut this Console) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 		ioctl.tiocgpgrp {
 			// Reporting no foreground group is what made every shell give up on
 			// job control at startup.
-			mut value := i32(this.foreground_pgid)
-			if value == 0 {
-				value = i32(process.pgid)
+			mut group := this.foreground_pgid
+			if group == 0 {
+				group = process.pgid
 			}
+			// As the caller's pid namespace numbers the group.
+			value := i32(proc.group_in(process.numbered_in, group))
 			if !usercopy.copy_to_user(u64(argp), voidptr(&value), sizeof(i32)) {
 				errno.set(errno.efault)
 				return none
@@ -522,7 +533,15 @@ fn (mut this Console) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 				errno.set(errno.einval)
 				return none
 			}
-			this.foreground_pgid = int(value)
+			mut group := proc.group_from(process.numbered_in, int(value))
+			if group == 0 {
+				group = proc.pid_from(process.numbered_in, int(value))
+			}
+			if group == 0 {
+				errno.set(errno.esrch)
+				return none
+			}
+			this.foreground_pgid = group
 			return 0
 		}
 		ioctl.fionread {
@@ -577,14 +596,10 @@ fn signal_foreground(pgid int, signal u8) {
 		if target == unsafe { nil } || target.pgid != pgid {
 			continue
 		}
-		target.threads_lock.acquire()
-		mut main_thread := &proc.Thread(unsafe { nil })
-		if target.threads.len > 0 {
-			main_thread = target.threads[0]
-		}
-		target.threads_lock.release()
+		main_thread := proc.get_main_thread(target)
 		if main_thread != unsafe { nil } {
 			userland.sendsig(main_thread, signal)
+			proc.unpin_thread(main_thread)
 		}
 	}
 }

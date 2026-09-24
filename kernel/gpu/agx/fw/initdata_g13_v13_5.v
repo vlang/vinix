@@ -142,7 +142,8 @@ pub fn g13_globals_write_v13_5_additions(mut data G13Globals, abi hw.FirmwareAbi
 	mut ok := true
 	ok = ok && g13_globals_put_raw_u32(mut data, abi, g13_v13_5_globals_unk_24_0_offset, 3000)
 	ok = ok && g13_globals_put_raw_u32(mut data, abi, g13_v13_5_globals_debug_offset, 0)
-	ok = ok && g13_globals_put_raw_u32(mut data, abi, g13_v13_5_globals_unk_2c_0_offset, 1)
+	// G13 leaves this generation-gated word clear; only G14X and newer set it.
+	ok = ok && g13_globals_put_raw_u32(mut data, abi, g13_v13_5_globals_unk_2c_0_offset, 0)
 	ok = ok && g13_globals_put_raw_u32(mut data, abi, g13_v13_5_globals_unk_89f4_8_offset, 1)
 	ok = ok && g13_globals_put_raw_u32(mut data, abi, g13_v13_5_globals_idle_off_standby_timer_offset, power.idle_off_standby_timer)
 	ok = ok && g13_globals_put_raw_u32(mut data, abi, g13_v13_5_globals_unk_9010_0_offset, 1)

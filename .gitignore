@@ -18,6 +18,7 @@ boot-image/
 /build-aarch64-userland/
 /build-aarch64-x11/
 /build-aarch64-chromium/
+/build-aarch64-doom/
 build-support/init-aarch64/init
 build-support/init-aarch64/initramfs.tar
 build-support/init-aarch64/initramfs-minimal.tar
@@ -49,6 +50,8 @@ kernel/tmp.v
 /build-aarch64-x86-translation/
 /build-aarch64-minecraft/
 /build-aarch64-blender-native/
+/build-aarch64-desktop-apps/
+/build-aarch64-voffice/
 /.claude/
 /deploy-to-m1.sh
 /build-office2019-probe/
@@ -57,3 +60,9 @@ kernel/tmp.v
 /build-word2013-prefix/
 /build-word55-probe/
 *repomix*
+/build-aarch64-docker/
+/build-aarch64-userland/
+
+# Screenshots stay out of git.
+/docker-vinix-terminal.png
+/build-release/

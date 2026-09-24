@@ -7,6 +7,7 @@ import klock
 import proc
 import file
 import errno
+import security
 import ioctl
 import time
 import usercopy
@@ -44,6 +45,19 @@ pub mut:
 	symlink_target string
 	// Enforced independently of mount flags for immutable on-disk trees.
 	read_only bool
+	// A procfs link that leads to a node rather than to a path: an open
+	// descriptor, a namespace or a running program.
+	magic_target &VFSNode = unsafe { nil }
+	// How many mount namespaces other than the initial one mount something
+	// on this node, or unmount what the initial one has there; see mount.v.
+	ns_mounts int
+	// Set once the node has been the root of a mount, which is when `..`
+	// has to consult the mount table instead of following the parent.
+	mount_root bool
+	// Set when the directory is removed; see unlink().
+	removed bool
+	// What an overlay node is made of; see overlay.v.
+	overlay &OverlayEntry = unsafe { nil }
 }
 
 __global (
@@ -84,6 +98,8 @@ pub fn initialise() {
 	filesystems['devtmpfs'] = &DevTmpFS{}
 	filesystems['procfs'] = &ProcFS{}
 	filesystems['sysfs'] = &SysFS{}
+	filesystems['cgroup2'] = &CGroupFS{}
+	init_mount_tables()
 }
 
 fn reduce_node(node &VFSNode, follow_symlinks bool) &VFSNode {
@@ -96,21 +112,30 @@ fn reduce_node_bounded(node &VFSNode, follow_symlinks bool, depth int, effective
 	if unsafe { node.redir != 0 } {
 		return reduce_node_bounded(node.redir, follow_symlinks, depth + 1, effective)
 	}
-	if unsafe { node.mountpoint != 0 } {
-		return reduce_node_bounded(node.mountpoint, follow_symlinks, depth + 1, effective)
+	mounted := mount_of(node)
+	if mounted != unsafe { nil } {
+		return reduce_node_bounded(mounted, follow_symlinks, depth + 1, effective)
+	}
+	if follow_symlinks && node.magic_target != unsafe { nil } {
+		return reduce_node_bounded(node.magic_target, follow_symlinks, depth + 1, effective)
+	}
+	if follow_symlinks && procfs_is_dynamic_link(node) {
+		// /proc/self and /proc/thread-self name the reading process, so their
+		// target cannot be a string stored on the node.
+		target := procfs_dynamic_link_target(node)
+		if target.len == 0 {
+			errno.set(errno.enoent)
+			return 0
+		}
+		_, next_node, _ := walk_path(node.parent, target, depth + 1, effective)
+		if unsafe { next_node == 0 } {
+			return 0
+		}
+		return reduce_node_bounded(next_node, follow_symlinks, depth + 1, effective)
 	}
 	if node.symlink_target.len != 0 && follow_symlinks == true {
-		// /proc/self names the reading process, so its target cannot be a
-		// string stored on the node.
-		mut target := node.symlink_target
-		if procfs_is_self_link(node) {
-			target = procfs_self_target()
-			if target.len == 0 {
-				errno.set(errno.enoent)
-				return 0
-			}
-		}
-		_, next_node, _ := path2node_bounded(node.parent, target, depth + 1,
+		target := node.symlink_target
+		_, next_node, _ := walk_path(node.parent, target, depth + 1,
 			effective)
 		if unsafe { next_node == 0 } {
 			return 0
@@ -120,30 +145,28 @@ fn reduce_node_bounded(node &VFSNode, follow_symlinks bool, depth int, effective
 	return unsafe { node }
 }
 
+// Resolve `path`, returning the directory it ends in, the node it names (nil
+// when that does not exist yet) and its final component. The component is the
+// caller's to keep -- it names the node a create makes -- so it is a copy.
 fn path2node(parent &VFSNode, path string) (&VFSNode, &VFSNode, string) {
-	return path2node_bounded(parent, path, 0, true)
+	parent_of, node, basename := walk_path(parent, path, 0, true)
+	return parent_of, node, basename.clone()
 }
 
-fn path2node_bounded(parent &VFSNode, path string, depth int, effective bool) (&VFSNode, &VFSNode, string) {
+// path2node for callers that only want the nodes. The final component it
+// returns points into `path`.
+fn walk_path(parent &VFSNode, path string, depth int, effective bool) (&VFSNode, &VFSNode, string) {
 	if depth > 64 { errno.set(errno.eloop); return 0, 0, '' }
 	if path.len > 4096 { errno.set(errno.einval); return 0, 0, '' }
 	if path.len == 0 {
 		errno.set(errno.enoent)
 		return 0, 0, ''
 	}
-	if path.starts_with(proc_self_prefix) {
-		// The substitute is a real pathname, so it never re-enters this branch.
-		resolved := resolve_self_reference(path)
-		if resolved != path {
-			return path2node_bounded(parent, resolved, depth + 1, effective)
-		}
-	}
-
 	mut index := u64(0)
 	mut current_node := reduce_node_bounded(parent, false, depth + 1, effective)
 
 	if path[index] == `/` {
-		current_node = reduce_node_bounded(vfs_root, false, depth + 1, effective)
+		current_node = reduce_node_bounded(calling_root(), false, depth + 1, effective)
 		for path[index] == `/` {
 			if index == u64(path.len) - 1 {
 				return current_node, current_node, ''
@@ -153,25 +176,20 @@ fn path2node_bounded(parent &VFSNode, path string, depth int, effective bool) (&
 	}
 
 	for {
-		mut elem := []u8{}
-		defer {
-			unsafe { elem.free() }
-		}
-
+		start := index
 		for index < path.len && path[index] != `/` {
-			elem << path[index]
 			index++
 		}
-
-		elem << 0
+		// A view into `path`, not a copy: looking a name up needs none, and
+		// the copies made here for every component of every path were never
+		// freed.
+		elem_str := unsafe { tos(path.str + start, int(index - start)) }
 
 		for index < path.len && path[index] == `/` {
 			index++
 		}
 
 		last := index == u64(path.len)
-
-		elem_str := unsafe { cstring_to_vstring(&elem[0]) }
 
 		current_node = reduce_node_bounded(current_node, false, depth + 1, effective)
 
@@ -184,19 +202,26 @@ fn path2node_bounded(parent &VFSNode, path string, depth int, effective bool) (&
 			errno.set(errno.eacces)
 			return 0, 0, ''
 		}
-		if elem_str !in current_node.children {
-			procfs_refresh(current_node)
-		}
-		if elem_str !in current_node.children {
-			errno.set(errno.enoent)
-			if last == true {
-				return current_node, 0, elem_str
+		mut new_node := &VFSNode(unsafe { nil })
+		if elem_str == '..' {
+			// The way out of a directory depends on how it was reached: see
+			// logical_parent().
+			new_node = reduce_node_bounded(logical_parent(current_node), false, depth + 1,
+				effective)
+		} else {
+			procfs_lookup_refresh(current_node, elem_str)
+			overlay_lookup_refresh(current_node)
+			if elem_str !in current_node.children {
+				errno.set(errno.enoent)
+				if last == true {
+					return current_node, 0, elem_str
+				}
+				return 0, 0, ''
 			}
-			return 0, 0, ''
-		}
 
-		mut new_node := reduce_node_bounded(unsafe { current_node.children[elem_str] }, false,
-			depth + 1, effective)
+			new_node = reduce_node_bounded(unsafe { current_node.children[elem_str] }, false,
+				depth + 1, effective)
+		}
 
 		if last == true {
 			return current_node, new_node, elem_str
@@ -230,22 +255,33 @@ fn get_parent_dir(dirfd int, path string) ?&VFSNode {
 	mut parent := &VFSNode(unsafe { nil })
 
 	if is_absolute == true {
-		parent = vfs_root
+		parent = calling_root()
 	} else {
 		if dirfd == at_fdcwd {
-			parent = unsafe { &VFSNode(current_process.current_directory) }
+			parent = unsafe { &VFSNode(proc.current_directory_of(current_process)) }
 		} else {
-			dir_fd := file.fd_from_fdnum(current_process, dirfd) or { return none }
+			// The lookup's reference is given back once the directory's node
+			// is known; nodes outlive the descriptors that name them. Keeping
+			// it held every directory any *at() call had named open for good.
+			mut dir_fd := file.fd_from_fdnum(current_process, dirfd) or { return none }
 			dir_handle := dir_fd.handle
 			if stat.isdir(dir_handle.resource.stat.mode) == false {
+				dir_fd.unref()
 				errno.set(errno.enotdir)
 				return none
 			}
 			parent = unsafe { &VFSNode(dir_handle.node) }
+			dir_fd.unref()
 		}
 	}
 
 	return parent
+}
+
+// Whether a change may not be made through `node`: its filesystem is
+// read-only, or the mount it is in has been made so.
+fn read_only(node &VFSNode) bool {
+	return node.read_only || in_read_only_mount(node)
 }
 
 pub fn get_node(parent &VFSNode, path string, follow_links bool) ?&VFSNode {
@@ -254,7 +290,7 @@ pub fn get_node(parent &VFSNode, path string, follow_links bool) ?&VFSNode {
 
 fn get_node_with_credentials(parent &VFSNode, path string, follow_links bool,
 	effective bool) ?&VFSNode {
-	_, node, _ := path2node_bounded(parent, path, 0, effective)
+	_, node, _ := walk_path(parent, path, 0, effective)
 	if voidptr(node) == unsafe { nil } {
 		return none
 	}
@@ -266,80 +302,6 @@ fn get_node_with_credentials(parent &VFSNode, path string, follow_links bool,
 		return ret
 	}
 	return node
-}
-
-pub fn syscall_mount(_ voidptr, src charptr, tgt charptr, fs_type charptr, mountflags u64, data voidptr) (u64, u64) {
-	mut current_thread := proc.current_thread()
-	mut process := current_thread.process
-
-	C.printf(c'\n\e[32m%s\e[m: mount(%s, %s, %s, 0x%x, %x)\n', process.name.str, src,
-		tgt, fs_type, mountflags, data)
-	defer {
-		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
-	}
-	if process.euid != 0 {
-		return errno.err, errno.eperm
-	}
-
-	source := unsafe { cstring_to_vstring(src) }
-	target := unsafe { cstring_to_vstring(tgt) }
-	fstype := unsafe { cstring_to_vstring(fs_type) }
-
-	// TODO: Not ignore mountflags and data once the current system supports it.
-	curr_dir := proc.current_thread().process.current_directory
-	mount(curr_dir, source, target, fstype) or { return errno.err, errno.get() }
-
-	return 0, 0
-}
-
-pub fn syscall_umount(_ voidptr, tgt charptr, flags u64) (u64, u64) {
-	mut current_thread := proc.current_thread()
-	mut process := current_thread.process
-
-	C.printf(c'\n\e[32m%s\e[m: umount(%s, 0x%x)\n', process.name.str, tgt, flags)
-	defer {
-		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
-	}
-
-	// TODO: Implement this once the FS supports it.
-	return errno.err, errno.enosys
-}
-
-pub fn mount(parent &VFSNode, source string, target string, filesystem string) ? {
-	if filesystem !in filesystems {
-		return none
-	}
-
-	mut source_node := &VFSNode(unsafe { nil })
-	if source.len != 0 {
-		_, source_node, _ = path2node(parent, source)
-		if voidptr(source_node) == unsafe { nil } || stat.isdir(source_node.resource.stat.mode) {
-			return none
-		}
-	}
-
-	parent_of_tgt_node, mut target_node, basename := path2node(parent, target)
-
-	mounting_root := voidptr(target_node) == voidptr(vfs_root)
-
-	if target_node == unsafe { nil }
-		|| (!mounting_root && !stat.isdir(target_node.resource.stat.mode)) {
-		return none
-	}
-
-	mut f_sys := unsafe { filesystems[filesystem].instantiate() }
-
-	mut mount_node := f_sys.mount(parent_of_tgt_node, basename, source_node)?
-
-	target_node.mountpoint = mount_node
-
-	mount_node.create_dotentries(parent_of_tgt_node)
-
-	if source.len > 0 {
-		print('vfs: Mounted `${source}` to `${target}` with filesystem `${filesystem}`\n')
-	} else {
-		print('vfs: Mounted ${filesystem} to `${target}`\n')
-	}
 }
 
 // Kernel subsystems that discover boot-time storage do not receive a process
@@ -361,19 +323,30 @@ pub fn (mut node VFSNode) create_dotentries(parent &VFSNode) {
 	}
 }
 
+// The path of a node as the calling process sees it: from its root, through
+// the mounts of its namespace. A node that cannot be reached from there is
+// named by its path from the system root instead.
 pub fn pathname(node &VFSNode) string {
-	mut components := []string{}
+	if node == unsafe { nil } {
+		return '/'
+	}
+	return path_from_root(node, calling_root()) or { global_pathname(node) }
+}
+
+fn global_pathname(node &VFSNode) string {
+	// Nodes rather than their names; see path_from_root().
+	mut components := []&VFSNode{cap: 32}
 	defer {
 		unsafe { components.free() }
 	}
 
 	mut current_node := unsafe { node }
 
-	for {
+	for current_node != unsafe { nil } {
 		if current_node.name == '' {
 			break
 		}
-		components << current_node.name
+		components << current_node
 		current_node = current_node.parent
 	}
 
@@ -381,12 +354,29 @@ pub fn pathname(node &VFSNode) string {
 		return '/'
 	}
 
-	mut ret := ''
-	for i := components.len - 1; i >= 0; i-- {
-		ret += '/${components[i]}'
-	}
+	return join_path(components)
+}
 
-	return ret
+// `/` and the names of `nodes` in reverse, the order a walk up from a node
+// collects them in. Built in one buffer: appending to a string makes a new one
+// for each component and nothing frees the ones before, which every /proc link
+// refreshed paid for.
+fn join_path(nodes []&VFSNode) string {
+	mut total := 0
+	for node in nodes {
+		total += node.name.len + 1
+	}
+	mut buffer := []u8{cap: total}
+	defer {
+		unsafe { buffer.free() }
+	}
+	for i := nodes.len - 1; i >= 0; i-- {
+		buffer << `/`
+		for c in nodes[i].name {
+			buffer << c
+		}
+	}
+	return buffer.bytestr()
 }
 
 pub fn symlink(parent &VFSNode, dest string, target string) ?&VFSNode {
@@ -397,8 +387,9 @@ pub fn symlink(parent &VFSNode, dest string, target string) ?&VFSNode {
 		return none
 	}
 
-	if parent_of_tgt_node.read_only { errno.set(errno.erofs); return none }
+	if read_only(parent_of_tgt_node) { errno.set(errno.erofs); return none }
 	require_access(parent_of_tgt_node, access_write | access_exec)?
+	require_linked(parent_of_tgt_node)?
 	target_node = parent_of_tgt_node.filesystem.symlink(parent_of_tgt_node, dest, basename)
 	if target_node == unsafe { nil } { return none }
 	apply_creation_identity(mut target_node, parent_of_tgt_node)?
@@ -418,12 +409,13 @@ pub fn link(parent &VFSNode, dest string, target string) ?&VFSNode {
 		return none
 	}
 
-	_, mut dest_node, _ := path2node(vfs_root, dest)
+	_, mut dest_node, _ := walk_path(calling_root(), dest, 0, true)
 	if dest_node == unsafe { nil } { return none }
-	if dest_node.read_only { errno.set(errno.erofs); return none }
+	if read_only(dest_node) { errno.set(errno.erofs); return none }
 
-	if parent_of_tgt_node.read_only { errno.set(errno.erofs); return none }
+	if read_only(parent_of_tgt_node) { errno.set(errno.erofs); return none }
 	require_access(parent_of_tgt_node, access_write | access_exec)?
+	require_linked(parent_of_tgt_node)?
 	target_node = parent_of_tgt_node.filesystem.link(parent_of_tgt_node, dest, mut dest_node) ?
 	if target_node == unsafe { nil } { return none }
 
@@ -438,16 +430,37 @@ pub fn link(parent &VFSNode, dest string, target string) ?&VFSNode {
 pub fn unlink(parent &VFSNode, name string, remove_dir bool) ? {
 	mut parent_of_tgt, mut node, basename := path2node(parent, name)
 	if node == unsafe { nil } || parent_of_tgt == unsafe { nil } { return none }
-	if node.read_only || parent_of_tgt.read_only { errno.set(errno.erofs); return none }
+	if read_only(node) || read_only(parent_of_tgt) { errno.set(errno.erofs); return none }
 	if !may_remove(parent_of_tgt, node) { errno.set(errno.eacces); return none }
 	if basename == '.' || basename == '..' || basename == '' { errno.set(errno.einval); return none }
+	// Something mounted here, in this or any other namespace, keeps the name.
+	if basename in parent_of_tgt.children {
+		covered := unsafe { parent_of_tgt.children[basename] }
+		if covered.mountpoint != unsafe { nil } || covered.ns_mounts > 0 {
+			errno.set(errno.ebusy)
+			return none
+		}
+	}
 	if remove_dir && !stat.isdir(node.resource.stat.mode) {
 		errno.set(errno.enotdir)
 		return none
 	}
 	if stat.isdir(node.resource.stat.mode) {
 		if !remove_dir { errno.set(errno.eisdir); return none }
+		// A cgroup directory is never empty: its interface files come and go
+		// with it, once no process and no child group is left inside.
+		if is_cgroup_resource(node.resource) {
+			cgroup_may_remove(node)?
+		}
 		if node.children.len > 2 { errno.set(errno.enotempty); return none }
+	}
+	if parent_of_tgt.overlay != unsafe { nil } {
+		overlay_unlink(mut parent_of_tgt, mut node, basename)?
+		dir_flag := if stat.isdir(node.resource.stat.mode) { in_isdir } else { u32(0) }
+		inotify_emit(parent_of_tgt, basename, in_delete | dir_flag, 0)
+		inotify_emit(node, '', in_delete_self, 0)
+		inotify_forget(node)
+		return
 	}
 	// A read-only or failing backend must leave the namespace intact.
 	node.resource.unlink(voidptr(node))?
@@ -455,17 +468,39 @@ pub fn unlink(parent &VFSNode, name string, remove_dir bool) ? {
 	inotify_emit(parent_of_tgt, basename, in_delete | dir_flag, 0)
 	inotify_emit(node, '', in_delete_self, 0)
 	inotify_forget(node)
+	// A removed directory can still be stood in or open: a shim runs in the
+	// bundle directory containerd deletes. Such a one keeps its node, its
+	// entries and its resource, and it is left with no links and nothing but
+	// `.` and `..` in it, into which nothing can be made. Freeing them had
+	// the next lookup from there read freed memory.
+	mut held := false
 	if stat.isdir(node.resource.stat.mode) {
-		unsafe {
-			free(node.children['.'].children)
-			free(node.children['.'])
-			free(node.children['..'].children)
-			free(node.children['..'])
-			free(node.children)
+		node.removed = true
+		node.resource.stat.nlink = 0
+		held = proc.directory_in_use(voidptr(node))
+		if !held && node.resource.refcount <= 1 {
+			unsafe {
+				free(node.children['.'].children)
+				free(node.children['.'])
+				free(node.children['..'].children)
+				free(node.children['..'])
+				free(node.children)
+				node.children = nil
+			}
 		}
 	}
 	parent_of_tgt.children.delete(basename)
-	node.resource.unref(unsafe { nil })?
+	if !held {
+		node.resource.unref(unsafe { nil })?
+	}
+}
+
+// Nothing is made in a directory that has been removed; Linux says ENOENT.
+fn require_linked(directory &VFSNode) ? {
+	if directory.removed {
+		errno.set(errno.enoent)
+		return none
+	}
 }
 
 pub fn create(parent &VFSNode, name string, mode u32) ?&VFSNode {
@@ -505,8 +540,9 @@ pub fn internal_create(parent &VFSNode, name string, mode u32) ?&VFSNode {
 		return none
 	}
 
-	if parent_of_tgt_node.read_only { errno.set(errno.erofs); return none }
+	if read_only(parent_of_tgt_node) { errno.set(errno.erofs); return none }
 	require_access(parent_of_tgt_node, access_write | access_exec)?
+	require_linked(parent_of_tgt_node)?
 	target_node = parent_of_tgt_node.filesystem.create(parent_of_tgt_node, basename, mode)
 	if target_node == unsafe { nil } { return none }
 	apply_creation_identity(mut target_node, parent_of_tgt_node)?
@@ -562,6 +598,9 @@ pub fn syscall_unlinkat(_ voidptr, dirfd int, _path charptr, flags int) (u64, u6
 	}
 
 	path := user_path(_path) or { return errno.err, errno.get() }
+	defer {
+		unsafe { path.free() }
+	}
 
 	if path.len == 0 {
 		return errno.err, errno.enoent
@@ -586,6 +625,9 @@ pub fn syscall_rmdirat(_ voidptr, dirfd int, _path charptr) (u64, u64) {
 	}
 
 	path := user_path(_path) or { return errno.err, errno.get() }
+	defer {
+		unsafe { path.free() }
+	}
 
 	if path.len == 0 {
 		return errno.err, errno.enoent
@@ -608,6 +650,9 @@ pub fn syscall_mkdirat(_ voidptr, dirfd int, _path charptr, mode u32) (u64, u64)
 	}
 
 	path := user_path(_path) or { return errno.err, errno.get() }
+	defer {
+		unsafe { path.free() }
+	}
 
 	if path.len == 0 {
 		return errno.err, errno.enoent
@@ -635,56 +680,29 @@ pub fn syscall_mkdirat(_ voidptr, dirfd int, _path charptr, mode u32) (u64, u64)
 
 pub const proc_self_prefix = '/proc/self/'
 
-// Substitute the two /proc/self entries the kernel can answer directly: the
-// program a process is running, and the pathname behind one of its descriptors.
-// procfs serves both as ordinary nodes, but resolving them to a real pathname
-// here is what lets exec() record where the program actually is — Chromium
-// starts each of its child processes by executing /proc/self/exe, and a child
-// that kept the literal path would resolve its own /proc/self/exe to itself
-// forever. musl's realpath(3) reopens /proc/self/fd/N, which is the same case.
-//
-// The original path comes back when it names anything else under /proc/self, so
-// a caller can tell the substitution apart from a path that simply is not there.
+// Chromium starts each of its child processes by executing /proc/self/exe, and
+// a child that kept that literal path would resolve its own /proc/self/exe to
+// itself forever. A path through /proc is therefore replaced by the path of
+// what it leads to, when the caller can reach that by name at all.
 pub fn resolve_self_reference(path string) string {
-	mut process := proc.current_thread().process
-	if unsafe { process == 0 } {
+	if !path.starts_with('/proc/') {
 		return path
 	}
+	node := get_node(calling_directory(), path, true) or { return path }
+	return path_from_root(node, calling_root()) or { path }
+}
 
-	if path == '/proc/self/exe' {
-		if process.executable_path.len == 0 {
-			return path
-		}
-		return process.executable_path
+// What /proc/<pid>/exe says a program is: the path it was run by, unless that
+// went through /proc, in which case the path of the file itself -- or, for a
+// file with no name at all, the "/memfd:... (deleted)" Linux shows.
+pub fn program_path(node &VFSNode, requested string) string {
+	if !requested.starts_with('/proc/') {
+		return requested.clone()
 	}
-
-	fd_prefix := '/proc/self/fd/'
-	if !path.starts_with(fd_prefix) {
-		return path
+	if node.parent == unsafe { nil } && node.name.len > 0 {
+		return '/${node.name} (deleted)'
 	}
-	fd_text := path[fd_prefix.len..]
-	if fd_text.len == 0 {
-		return path
-	}
-	mut fdnum := 0
-	for digit in fd_text {
-		if digit < `0` || digit > `9` {
-			return path
-		}
-		fdnum = fdnum * 10 + int(digit - `0`)
-		if fdnum >= proc.max_fds {
-			return path
-		}
-	}
-
-	mut fd := file.fd_from_fdnum(process, fdnum) or { return path }
-	defer {
-		fd.unref()
-	}
-	if fd.handle.node == unsafe { nil } {
-		return path
-	}
-	return pathname(unsafe { &VFSNode(fd.handle.node) })
+	return pathname(node)
 }
 
 pub fn syscall_readlinkat(_ voidptr, dirfd int, _path charptr, buf voidptr, limit u64) (u64, u64) {
@@ -698,25 +716,13 @@ pub fn syscall_readlinkat(_ voidptr, dirfd int, _path charptr, buf voidptr, limi
 	}
 
 	path := user_path(_path) or { return errno.err, errno.get() }
+	defer {
+		unsafe { path.free() }
+	}
 
 	if path.len == 0 {
 		return errno.err, errno.enoent
 	}
-	if path.starts_with(proc_self_prefix) {
-		target := resolve_self_reference(path)
-		if target == path {
-			return errno.err, errno.enoent
-		}
-		mut to_copy := u64(target.len)
-		if to_copy > limit {
-			to_copy = limit
-		}
-		if !usercopy.copy_to_user(u64(buf), target.str, to_copy) {
-			return errno.err, errno.efault
-		}
-		return to_copy, 0
-	}
-
 	parent := get_parent_dir(dirfd, path) or { return errno.err, errno.get() }
 
 	node := get_node(parent, path, false) or { return errno.err, errno.get() }
@@ -725,8 +731,8 @@ pub fn syscall_readlinkat(_ voidptr, dirfd int, _path charptr, buf voidptr, limi
 		return errno.err, errno.einval
 	}
 
-	if procfs_is_self_link(node) {
-		self_target := procfs_self_target()
+	if procfs_is_dynamic_link(node) {
+		self_target := procfs_dynamic_link_target(node)
 		if self_target.len == 0 {
 			return errno.err, errno.enoent
 		}
@@ -764,6 +770,10 @@ pub fn syscall_openat(_ voidptr, dirfd int, _path charptr, flags int, mode u32) 
 	}
 
 	path := user_path(_path) or { return errno.err, errno.get() }
+	// Nothing keeps the path: a node created from it takes a copy of its name.
+	defer {
+		unsafe { path.free() }
+	}
 
 	if path.len == 0 {
 		return errno.err, errno.enoent
@@ -829,8 +839,14 @@ pub fn syscall_openat(_ voidptr, dirfd int, _path charptr, flags int, mode u32) 
 		return errno.err, errno.eisdir
 	}
 
-	if node.read_only && ((flags & 3) != 0 || flags & resource.o_trunc != 0) {
+	if read_only(node) && ((flags & 3) != 0 || flags & resource.o_trunc != 0) {
 		return errno.err, errno.erofs
+	}
+	// A file on an overlay opened to be written is copied up first, so the
+	// writes land in the upper layer.
+	if node.overlay != unsafe { nil } && stat.isreg(node.resource.stat.mode)
+		&& flags & resource.o_path == 0 && ((flags & 3) != 0 || flags & resource.o_trunc != 0) {
+		overlay_copy_up(node) or { return errno.err, errno.get() }
 	}
 	if flags & resource.o_trunc != 0 && stat.isreg(node.resource.stat.mode) {
 		mut res := node.resource
@@ -977,7 +993,12 @@ pub fn syscall_ioctl(_ voidptr, fdnum int, request u64, argp voidptr) (u64, u64)
 }
 
 pub fn syscall_getcwd(_ voidptr, buf charptr, len u64) (u64, u64) {
-	cwd := pathname(proc.current_thread().process.current_directory)
+	directory := unsafe { &VFSNode(proc.current_directory_of(proc.current_thread().process)) }
+	// A directory outside the caller's root has no name it could use, which
+	// Linux reports by prefixing the path with "(unreachable)".
+	cwd := path_from_root(directory, calling_root()) or {
+		'(unreachable)' + global_pathname(directory)
+	}
 
 	bytes_needed := u64(cwd.len + 1) // include null terminator
 	if bytes_needed > len {
@@ -999,6 +1020,9 @@ pub fn syscall_faccessat(_ voidptr, dirfd int, _path charptr, mode u32, flags in
 	}
 
 	path := user_path(_path) or { return errno.err, errno.get() }
+	defer {
+		unsafe { path.free() }
+	}
 	if mode & ~u32(7) != 0 || flags & ~(at_eaccess | at_symlink_nofollow) != 0 {
 		return errno.err, errno.einval
 	}
@@ -1033,6 +1057,9 @@ pub fn syscall_fstatat(_ voidptr, dirfd int, _path charptr, statbuf &stat.Stat, 
 	current_process := proc.current_thread().process
 
 	path := user_path(_path) or { return errno.err, errno.get() }
+	defer {
+		unsafe { path.free() }
+	}
 
 	mut statsrc := &stat.Stat(unsafe { nil })
 
@@ -1042,11 +1069,18 @@ pub fn syscall_fstatat(_ voidptr, dirfd int, _path charptr, statbuf &stat.Stat, 
 		}
 
 		if dirfd == at_fdcwd {
-			node := unsafe { &VFSNode(current_process.current_directory) }
+			node := unsafe { &VFSNode(proc.current_directory_of(current_process)) }
 			statsrc = &node.resource.stat
 		} else {
-			fd := file.fd_from_fdnum(current_process, dirfd) or { return errno.err, errno.get() }
-			statsrc = &fd.handle.resource.stat
+			// The lookup holds the descriptor, which has to be given back.
+			mut fd := file.fd_from_fdnum(current_process, dirfd) or {
+				return errno.err, errno.get()
+			}
+			unsafe {
+				*statbuf = fd.handle.resource.stat
+			}
+			fd.unref()
+			return 0, 0
 		}
 	} else {
 		parent := get_parent_dir(dirfd, path) or { return errno.err, errno.get() }
@@ -1104,7 +1138,7 @@ pub fn syscall_linkat(_ voidptr, olddirfd int, _oldpath charptr, newdirfd int, _
 
 	oldbase := get_parent_dir(olddirfd, oldpath) or { return errno.err, errno.get() }
 	newbase := get_parent_dir(newdirfd, newpath) or { return errno.err, errno.get() }
-	oldparent, found_old_node, _ := path2node(oldbase, oldpath)
+	oldparent, found_old_node, _ := walk_path(oldbase, oldpath, 0, true)
 	mut newparent, found_new_node, basename := path2node(newbase, newpath)
 	if unsafe { oldparent == nil } || unsafe { found_old_node == nil } {
 		return errno.err, errno.enoent
@@ -1133,7 +1167,7 @@ pub fn syscall_linkat(_ voidptr, olddirfd int, _oldpath charptr, newdirfd int, _
 		return errno.err, errno.eacces
 	}
 
-	if newparent.read_only || old_node.read_only { return errno.err, errno.erofs }
+	if read_only(newparent) || read_only(old_node) { return errno.err, errno.erofs }
 	mut new_node := newparent.filesystem.link(newparent, basename, mut old_node) or {
 		return errno.err, errno.get()
 	}
@@ -1160,13 +1194,15 @@ pub fn syscall_fchmod(_ voidptr, fdnum int, mode u32) (u64, u64) {
 
 	if fd.handle.node != unsafe { nil } {
 		node := unsafe { &VFSNode(fd.handle.node) }
-		if node.read_only { return errno.err, errno.erofs }
+		if read_only(node) { return errno.err, errno.erofs }
 	}
 	if !owns_resource(fd.handle.resource.stat.uid) {
 		return errno.err, errno.eperm
 	}
 	// Preserve file type bits (upper 4 bits), only change permission bits.
-	mut res := fd.handle.resource
+	mut res := handle_resource_to_change(fd.handle.node, fd.handle.resource) or {
+		return errno.err, errno.get()
+	}
 	old_mode := res.stat.mode
 	res.stat.mode = (res.stat.mode & stat.ifmt) | (mode & 0o7777)
 	resource.persist_metadata(mut res) or {
@@ -1181,13 +1217,16 @@ pub fn syscall_fchmod(_ voidptr, fdnum int, mode u32) (u64, u64) {
 
 pub fn syscall_fchmodat(_ voidptr, dirfd int, _path charptr, mode u32) (u64, u64) {
 	path := user_path(_path) or { return errno.err, errno.get() }
+	defer {
+		unsafe { path.free() }
+	}
 	if path.len == 0 {
 		return errno.err, errno.enoent
 	}
 
 	parent := get_parent_dir(dirfd, path) or { return errno.err, errno.get() }
 	mut node := get_node(parent, path, true) or { return errno.err, errno.get() }
-	if node.read_only {
+	if read_only(node) {
 		return errno.err, errno.erofs
 	}
 	if !owns_resource(node.resource.stat.uid) {
@@ -1196,7 +1235,7 @@ pub fn syscall_fchmodat(_ voidptr, dirfd int, _path charptr, mode u32) (u64, u64
 
 	// Preserve the object type and update only permission/special bits, just as
 	// fchmod does. Archive extractors use fchmodat after creating each file.
-	mut node_resource := node.resource
+	mut node_resource := resource_to_change(node) or { return errno.err, errno.get() }
 	old_mode := node_resource.stat.mode
 	node_resource.stat.mode = (node_resource.stat.mode & stat.ifmt) | (mode & 0o7777)
 	resource.persist_metadata(mut node_resource) or {
@@ -1217,12 +1256,17 @@ pub fn syscall_chdir(_ voidptr, _path charptr) (u64, u64) {
 	}
 
 	path := user_path(_path) or { return errno.err, errno.get() }
+	defer {
+		unsafe { path.free() }
+	}
 
 	if path.len == 0 {
 		return errno.err, errno.enoent
 	}
 
-	mut node := get_node(process.current_directory, path, true) or { return errno.err, errno.get() }
+	mut node := get_node(proc.current_directory_of(process), path, true) or {
+		return errno.err, errno.get()
+	}
 
 	if !stat.isdir(node.resource.stat.mode) {
 		return errno.err, errno.enotdir
@@ -1231,7 +1275,7 @@ pub fn syscall_chdir(_ voidptr, _path charptr) (u64, u64) {
 		return errno.err, errno.eacces
 	}
 
-	process.current_directory = node
+	proc.set_current_directory(mut process, node)
 
 	return 0, 0
 }
@@ -1263,7 +1307,11 @@ pub fn syscall_readdir(_ voidptr, fdnum int, mut buf stat.Dirent) (u64, u64) {
 
 	if dir_handle.dirlist_valid == false {
 		procfs_refresh(dir_node)
-		dir_handle.dirlist.clear()
+		overlay_lookup_refresh(dir_node)
+		// Sized for the whole directory up front: growing it would leave each
+		// outgrown buffer behind, and every entry takes a full Dirent.
+		unsafe { dir_handle.dirlist.free() }
+		dir_handle.dirlist = []stat.Dirent{cap: dir_node.children.len}
 		mut i := u64(0)
 		for name, mut orig_node in dir_node.children {
 			node := reduce_node(unsafe { *orig_node }, false)
@@ -1444,8 +1492,8 @@ pub fn rename(oldparent &VFSNode, oldpath string, newparent &VFSNode, newpath st
 		return none
 	}
 
-	if old_parent_of.read_only || new_parent_of.read_only || old_node.read_only
-		|| (new_node != unsafe { nil } && new_node.read_only) {
+	if read_only(old_parent_of) || read_only(new_parent_of) || read_only(old_node)
+		|| (new_node != unsafe { nil } && read_only(new_node)) {
 		errno.set(errno.erofs)
 		return none
 	}
@@ -1466,6 +1514,7 @@ pub fn rename(oldparent &VFSNode, oldpath string, newparent &VFSNode, newpath st
 		errno.set(errno.exdev)
 		return none
 	}
+	require_linked(new_parent_of)?
 
 	if flags & rename_exchange != 0 {
 		if unsafe { new_node == 0 } {
@@ -1474,6 +1523,11 @@ pub fn rename(oldparent &VFSNode, oldpath string, newparent &VFSNode, newpath st
 		}
 		if is_ancestor(old_node, new_parent_of) || is_ancestor(new_node, old_parent_of) {
 			errno.set(errno.einval)
+			return none
+		}
+		// An overlay cannot swap two names in one step.
+		if old_parent_of.overlay != unsafe { nil } {
+			errno.set(errno.exdev)
 			return none
 		}
 		old_parent_of.filesystem.rename(old_parent_of, old_basename, new_parent_of,
@@ -1536,6 +1590,17 @@ pub fn rename(oldparent &VFSNode, oldpath string, newparent &VFSNode, newpath st
 		}
 	}
 
+	if old_parent_of.overlay != unsafe { nil } {
+		overlay_rename(mut old_parent_of, old_basename, mut old_node, mut new_parent_of,
+			new_basename, new_node)?
+		cookie := inotify_next_cookie()
+		dir_flag := if stat.isdir(old_node.resource.stat.mode) { in_isdir } else { u32(0) }
+		inotify_emit(old_parent_of, old_basename, in_moved_from | dir_flag, cookie)
+		inotify_emit(new_parent_of, new_basename, in_moved_to | dir_flag, cookie)
+		inotify_emit(old_node, '', in_move_self, 0)
+		return
+	}
+
 	// Give an on-disk filesystem the complete validated operation before the
 	// in-memory namespace changes. RAM filesystems use a no-op implementation.
 	old_parent_of.filesystem.rename(old_parent_of, old_basename, new_parent_of,
@@ -1575,10 +1640,13 @@ fn adopt(mut node VFSNode, mut parent VFSNode, name string) {
 	if unsafe { node.children == 0 } {
 		return
 	}
+	// ".." is a redirecting node the directory owns, not the parent itself:
+	// rmdir frees it along with its children map. Point it somewhere new
+	// rather than putting the parent in its place, or removing a renamed
+	// directory frees its parent too.
 	if '..' in node.children {
-		unsafe {
-			node.children['..'] = parent
-		}
+		mut dotdot := unsafe { node.children['..'] }
+		dotdot.redir = parent
 	}
 }
 
@@ -1656,7 +1724,7 @@ pub fn syscall_fchdir(_ voidptr, fdnum int) (u64, u64) {
 		return errno.err, errno.eacces
 	}
 
-	process.current_directory = voidptr(node)
+	proc.set_current_directory(mut process, voidptr(node))
 
 	return 0, 0
 }
@@ -1668,13 +1736,16 @@ pub fn syscall_truncate(_ voidptr, _path charptr, length i64) (u64, u64) {
 	}
 
 	path := user_path(_path) or { return errno.err, errno.get() }
+	defer {
+		unsafe { path.free() }
+	}
 	if path.len == 0 {
 		return errno.err, errno.enoent
 	}
 
 	mut process := proc.current_thread().process
 
-	mut node := get_node(process.current_directory, path, true) or {
+	mut node := get_node(proc.current_directory_of(process), path, true) or {
 		return errno.err, errno.get()
 	}
 	mut res := node.resource
@@ -1685,6 +1756,7 @@ pub fn syscall_truncate(_ voidptr, _path charptr, length i64) (u64, u64) {
 	if !check_access(node, access_write, true) {
 		return errno.err, errno.eacces
 	}
+	res = resource_to_change(node) or { return errno.err, errno.get() }
 
 	res.grow(unsafe { nil }, u64(length)) or { return errno.err, errno.get() }
 
@@ -1722,6 +1794,9 @@ fn change_owner(mut res resource.Resource, uid u32, gid u32) ? {
 
 pub fn syscall_fchownat(_ voidptr, dirfd int, _path charptr, uid u32, gid u32, flags int) (u64, u64) {
 	path := user_path(_path) or { return errno.err, errno.get() }
+	defer {
+		unsafe { path.free() }
+	}
 
 	mut process := proc.current_thread().process
 
@@ -1735,12 +1810,13 @@ pub fn syscall_fchownat(_ voidptr, dirfd int, _path charptr, uid u32, gid u32, f
 		}
 		mut res := fd.handle.resource
 		if fd.handle.node != unsafe { nil }
-			&& unsafe { &VFSNode(fd.handle.node) }.read_only {
+			&& read_only(unsafe { &VFSNode(fd.handle.node) }) {
 			return errno.err, errno.erofs
 		}
 		if !may_chown(res.stat.uid, uid, gid) {
 			return errno.err, errno.eperm
 		}
+		res = handle_resource_to_change(fd.handle.node, res) or { return errno.err, errno.get() }
 		change_owner(mut res, uid, gid) or { return errno.err, errno.get() }
 		if fd.handle.node != unsafe { nil } {
 			inotify_emit(unsafe { &VFSNode(fd.handle.node) }, '', in_attrib, 0)
@@ -1752,11 +1828,12 @@ pub fn syscall_fchownat(_ voidptr, dirfd int, _path charptr, uid u32, gid u32, f
 
 	follow_links := flags & at_symlink_nofollow == 0
 	mut node := get_node(parent, path, follow_links) or { return errno.err, errno.get() }
-	if node.read_only { return errno.err, errno.erofs }
+	if read_only(node) { return errno.err, errno.erofs }
 	mut res := node.resource
 	if !may_chown(res.stat.uid, uid, gid) {
 		return errno.err, errno.eperm
 	}
+	res = resource_to_change(node) or { return errno.err, errno.get() }
 
 	change_owner(mut res, uid, gid) or { return errno.err, errno.get() }
 	inotify_emit(node, '', in_attrib, 0)
@@ -1772,12 +1849,13 @@ pub fn syscall_fchown(_ voidptr, fdnum int, uid u32, gid u32) (u64, u64) {
 
 	mut res := fd.handle.resource
 	if fd.handle.node != unsafe { nil }
-		&& unsafe { &VFSNode(fd.handle.node) }.read_only {
+		&& read_only(unsafe { &VFSNode(fd.handle.node) }) {
 		return errno.err, errno.erofs
 	}
 	if !may_chown(res.stat.uid, uid, gid) {
 		return errno.err, errno.eperm
 	}
+	res = handle_resource_to_change(fd.handle.node, res) or { return errno.err, errno.get() }
 	change_owner(mut res, uid, gid) or { return errno.err, errno.get() }
 	if fd.handle.node != unsafe { nil } {
 		inotify_emit(unsafe { &VFSNode(fd.handle.node) }, '', in_attrib, 0)
@@ -1790,6 +1868,9 @@ pub fn syscall_fchown(_ voidptr, fdnum int, uid u32, gid u32) (u64, u64) {
 // one filesystem this kernel has anything to say about.
 pub fn syscall_statfs(_ voidptr, _path charptr, buf u64) (u64, u64) {
 	path := user_path(_path) or { return errno.err, errno.get() }
+	defer {
+		unsafe { path.free() }
+	}
 	if path.len == 0 {
 		return errno.err, errno.enoent
 	}
@@ -1799,7 +1880,9 @@ pub fn syscall_statfs(_ voidptr, _path charptr, buf u64) (u64, u64) {
 
 	mut process := proc.current_thread().process
 
-	node := get_node(process.current_directory, path, true) or { return errno.err, errno.get() }
+	node := get_node(proc.current_directory_of(process), path, true) or {
+		return errno.err, errno.get()
+	}
 
 	mut res := node.resource
 	if !fill_statfs_resource(mut res, buf) {
@@ -1847,11 +1930,14 @@ pub fn syscall_utimensat(_ voidptr, dirfd int, _path charptr, times u64, flags i
 		return errno.err, errno.einval
 	}
 	path := user_path(_path) or { return errno.err, errno.get() }
+	defer {
+		unsafe { path.free() }
+	}
 	mut node := &VFSNode(unsafe { nil })
 	if path.len == 0 {
 		if flags & at_empty_path == 0 { return errno.err, errno.enoent }
 		if dirfd == at_fdcwd {
-			node = proc.current_thread().process.current_directory
+			node = proc.current_directory_of(proc.current_thread().process)
 		} else {
 			mut fd := file.fd_from_fdnum(unsafe { nil }, dirfd) or {
 				return errno.err, errno.get()
@@ -1866,7 +1952,7 @@ pub fn syscall_utimensat(_ voidptr, dirfd int, _path charptr, times u64, flags i
 			return errno.err, errno.get()
 		}
 	}
-	if node.read_only { return errno.err, errno.erofs }
+	if read_only(node) { return errno.err, errno.erofs }
 
 	now := time.clock_now(time.clock_type_realtime) or { time.TimeSpec{} }
 	mut requested := [2]time.TimeSpec{init: now}
@@ -1896,7 +1982,7 @@ pub fn syscall_utimensat(_ voidptr, dirfd int, _path charptr, times u64, flags i
 		return 0, 0
 	}
 
-	mut res := node.resource
+	mut res := resource_to_change(node) or { return errno.err, errno.get() }
 	old_atim := res.stat.atim
 	old_mtim := res.stat.mtim
 	old_ctim := res.stat.ctim
@@ -1954,14 +2040,21 @@ pub fn syscall_memfd_create(_ voidptr, name u64, flags u32) (u64, u64) {
 		return errno.err, errno.efault
 	}
 
-	// The name is only for show — Linux surfaces it through /proc — but the
+	// The name is only for show -- Linux surfaces it through /proc -- but the
 	// pointer still has to be readable, so a caller passing a bad one is told.
 	mut first := u8(0)
 	if !usercopy.copy_from_user(voidptr(&first), name, 1) {
 		return errno.err, errno.efault
 	}
+	shown := optional_user_string(charptr(name), 249)
 
 	mut res := create_anonymous(0o600)
+	if mut res is TmpFSResource {
+		res.memfd = true
+		// Without MFD_ALLOW_SEALING the one seal a memfd starts with is the
+		// one that forbids adding any other.
+		res.seals = if flags & u32(mfd_allow_sealing) != 0 { u32(0) } else { f_seal_seal }
+	}
 
 	// memfd_create hands back a descriptor open for reading and writing. Saying
 	// so matters: without an access mode the handle looks read-only, and
@@ -1972,8 +2065,25 @@ pub fn syscall_memfd_create(_ voidptr, name u64, flags u32) (u64, u64) {
 	}
 
 	fdnum := file.fdnum_create_from_resource(unsafe { nil }, mut res, open_flags, 0, false) or {
-		return errno.err, errno.get()
+		saved := errno.get()
+		res.unref(unsafe { nil }) or {}
+		return errno.err, saved
 	}
+	// A node that is in no directory. It is what /proc/self/fd/N leads to, and
+	// it is what lets execveat(2) -- or an exec of that /proc path -- run the
+	// file, which is how runc starts its init from a sealed copy of itself.
+	mut node := create_node(unsafe { filesystems['tmpfs'] }, unsafe { nil }, 'memfd:${shown}',
+		false)
+	node.resource = res
+	// Drop the reference create_anonymous() handed us once the descriptor holds
+	// its own. Keeping both left every memfd alive after its last descriptor and
+	// mapping were gone: runc's 10 MiB copy of itself, for every container.
+	defer {
+		res.unref(unsafe { nil }) or {}
+	}
+	mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or { return u64(fdnum), 0 }
+	fd.handle.node = voidptr(node)
+	fd.unref()
 
 	return u64(fdnum), 0
 }

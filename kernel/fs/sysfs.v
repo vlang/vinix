@@ -85,6 +85,13 @@ fn (mut this SysFS) mount(parent &VFSNode, name string, _source &VFSNode) ?&VFSN
 	build_cpu_tree(mut system)
 	build_node_tree(mut system)
 
+	// Where the cgroup v2 hierarchy is mounted.
+	mut fs_dir := add_sysfs_directory(mut root, 'fs')
+	add_sysfs_directory(mut fs_dir, 'cgroup')
+	mut kernel_dir := add_sysfs_directory(mut root, 'kernel')
+	add_sysfs_directory(mut kernel_dir, 'security')
+	add_sysfs_directory(mut root, 'module')
+
 	return root
 }
 

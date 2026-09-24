@@ -50,5 +50,6 @@ pub fn install_ssd_root(mut root VFSNode) bool {
 		dotdot.redir = root
 	}
 	committed = true
+	record_root_switch(root, 'ext2')
 	return true
 }

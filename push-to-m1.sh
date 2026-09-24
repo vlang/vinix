@@ -65,6 +65,9 @@ echo "==> Comparing files; changed files show a live percentage..."
 # M1 starts through its existing m1n1/U-Boot chain and deploy-m1-efi.sh only
 # needs the separately copied Limine EFI below.  Sending either artifact can
 # fill the Mac's data volume before the actual desktop initramfs is reached.
+# Image builders publish an ext2 volume by renaming an adjacent `*.tmp.*`
+# file. Exclude that transient name explicitly as well: otherwise rsync can
+# enumerate it and then fail when the atomic rename removes it mid-transfer.
 # The amd64 build trees and application-probe disk images are QEMU-only too;
 # in particular, partially transferring a multi-GB probe disk can strand an
 # M1 with no room for the deployment inputs that it actually needs.  The .ext2
@@ -78,6 +81,7 @@ if ! rsync -a --partial --progress --stats \
     --exclude 'vinix.iso' \
     --exclude 'boot-image/boot*.img' \
     --exclude 'boot-image/*.ext2' \
+    --exclude 'boot-image/*.ext2.tmp.*' \
     --exclude 'boot-image/edk2-aarch64-code-*.fd' \
     --exclude 'build-*-probe/*.img' \
     --exclude 'build-amd64-*/' \
