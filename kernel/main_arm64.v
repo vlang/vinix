@@ -174,7 +174,7 @@ fn bootstrap_cpu0() {
 	print('CPU 0 bootstrap done\n')
 }
 
-fn kmain_thread(qemu_platform bool) {
+fn kmain_thread(qemu_platform bool, acpi_platform bool) {
 	boot_stage(11)
 	print('kmain_thread: started\n')
 
@@ -670,7 +670,10 @@ fn kmain() {
 	// QEMU's virt machine names itself in its ACPI tables, so an image booted
 	// in QEMU without vinix.qemu_platform=1 -- a release ISO, say -- still gets
 	// its keyboard, tablet and interrupt controller. Apple hardware has no ACPI.
-	if !force_qemu_platform && firmware.is_qemu() {
+	// vinix.platform=acpi skips this, so the path other UEFI machines take can
+	// be exercised in QEMU.
+	if !force_qemu_platform && firmware.is_qemu()
+		&& !early_cmdline_contains('vinix.platform=acpi') {
 		force_qemu_platform = true
 	}
 
@@ -774,6 +777,17 @@ fn kmain() {
 	}
 	boot_stage(8)
 
+	// A UEFI machine other than QEMU -- VirtualBox's, say -- describes its
+	// console UART and interrupt controller in ACPI instead of putting them at
+	// QEMU's addresses. Apple hardware has no ACPI and took the path above.
+	acpi_platform := !use_aic && !force_qemu_platform && firmware.has_acpi()
+	if acpi_platform {
+		if uart_phys := firmware.console_uart() {
+			uart.initialise(memory.map_mmio(uart_phys, 0x1000))
+			uart.puts(c'\n=== Vinix aarch64 booting (ACPI) ===\n')
+		}
+	}
+
 	// Virtio-input keyboard probe/GIC setup is for the QEMU virt machine.
 	if !use_aic && force_qemu_platform {
 		print('init virtio-input...\n')
@@ -796,6 +810,14 @@ fn kmain() {
 		print('init gic (QEMU virt)...\n')
 		gic.initialise(memory.get_hhdm_offset())
 		print('gic done\n')
+	} else if acpi_platform {
+		if g := firmware.gic() {
+			print('init gic (ACPI: GICD 0x${g.dist:x}, GICR 0x${g.redist:x})...\n')
+			gic.initialise_at(g.dist, g.redist, g.redist_len)
+			print('gic done\n')
+		} else {
+			print('no GIC in the MADT\n')
+		}
 	}
 
 	// ARM64 PCI ECAM setup is not wired yet; skip to avoid unsafe probing.
@@ -842,7 +864,7 @@ fn kmain() {
 	print('init sched...\n')
 	sched.initialise()
 	// Wire scheduler timer callback for the active interrupt controller.
-	if !use_aic && force_qemu_platform {
+	if !use_aic && gic.is_initialised() {
 		gic.set_timer_handler(sched.get_timer_handler())
 	}
 	print('sched done\n')
@@ -851,7 +873,7 @@ fn kmain() {
 	print('spawning kmain_thread via scheduler...\n')
 	// Capture the early platform decision before the scheduler handoff. Limine's
 	// response storage is bootloader-owned and must not be re-read later.
-	spawn kmain_thread(force_qemu_platform)
+	spawn kmain_thread(force_qemu_platform, acpi_platform)
 	print('spawn done, calling await...\n')
 
 	sched.await()

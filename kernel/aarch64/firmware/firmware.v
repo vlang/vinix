@@ -38,10 +38,11 @@ const spcr_sbsa = u8(0xe)
 pub struct Gic {
 pub:
 	// Physical addresses. `redist` is the start of the redistributor frames,
-	// one after another in CPU order.
-	dist   u64
-	redist u64
-	its    u64
+	// one after another in CPU order, and `redist_len` how far they reach.
+	dist       u64
+	redist     u64
+	redist_len u64
+	its        u64
 	// 3 or 4; 0 when the MADT does not say.
 	version u8
 }
@@ -176,6 +177,8 @@ pub fn gic() ?Gic {
 	length := u64(read_u32(madt, 4))
 	mut dist := u64(0)
 	mut redist := u64(0)
+	mut redist_len := u64(0)
+	mut gicc_count := u64(0)
 	mut its := u64(0)
 	mut version := u8(0)
 	mut offset := u64(44)
@@ -193,14 +196,16 @@ pub fn gic() ?Gic {
 				}
 			}
 			madt_gicr {
-				if size >= 16 && redist == 0 {
+				if size >= 16 && redist_len == 0 {
 					redist = read_u64(madt, offset + 4)
+					redist_len = u64(read_u32(madt, offset + 12))
 				}
 			}
 			madt_gicc {
 				// Firmware that lists no GICR range gives each CPU's frame here
 				// instead. The first CPU's is the start of the run.
-				if size >= 76 && redist == 0 {
+				gicc_count++
+				if size >= 68 && redist == 0 {
 					redist = read_u64(madt, offset + 60)
 				}
 			}
@@ -213,14 +218,19 @@ pub fn gic() ?Gic {
 		}
 		offset += size
 	}
-	if dist == 0 {
+	if dist == 0 || redist == 0 {
 		return none
 	}
+	if redist_len == 0 {
+		// Two 64 KiB frames, RD and SGI, per CPU.
+		redist_len = gicc_count * 0x20000
+	}
 	return Gic{
-		dist:    dist
-		redist:  redist
-		its:     its
-		version: version
+		dist:       dist
+		redist:     redist
+		redist_len: redist_len
+		its:        its
+		version:    version
 	}
 }
 
