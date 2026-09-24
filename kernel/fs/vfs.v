@@ -1196,7 +1196,10 @@ pub fn syscall_readdir(_ voidptr, fdnum int, mut buf stat.Dirent) (u64, u64) {
 
 	if dir_handle.dirlist_valid == false {
 		procfs_refresh(dir_node)
-		dir_handle.dirlist.clear()
+		// Sized for the whole directory up front: growing it would leave each
+		// outgrown buffer behind, and every entry takes a full Dirent.
+		unsafe { dir_handle.dirlist.free() }
+		dir_handle.dirlist = []stat.Dirent{cap: dir_node.children.len}
 		mut i := u64(0)
 		for name, mut orig_node in dir_node.children {
 			node := reduce_node(unsafe { *orig_node }, false)

@@ -73,7 +73,10 @@ fn (mut this Handle) unref() {
 	release_flock(this)
 	mut res := this.resource
 	res.unref(voidptr(this)) or {}
-	unsafe { free(voidptr(this)) }
+	unsafe {
+		this.dirlist.free()
+		free(voidptr(this))
+	}
 }
 
 fn retain_mmap_handle(handle voidptr) {
