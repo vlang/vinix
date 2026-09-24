@@ -559,21 +559,36 @@ pub fn sendsig(_thread &proc.Thread, signal u8) {
 	sched.enqueue_thread(t, true)
 }
 
-// Deliver to a process' main thread. Signal state is per-thread here, so there
-// is no process-wide pending mask to raise instead.
+// Deliver a signal aimed at a whole process. Signal state is per-thread here,
+// so there is no process-wide pending mask to raise; the signal goes to the
+// first thread that does not block it, as Linux picks one, and only when every
+// thread blocks it does it wait on the main thread. Always choosing the main
+// thread lost signals for good in Go programs, whose main thread commonly sits
+// with them blocked while other threads are the ones meant to take them.
 fn signal_process(mut target proc.Process, signal int) bool {
+	bit := u64(1) << (signal - 1)
+	unblockable := signal == sigkill || signal == sigstop
 	target.threads_lock.acquire()
-	mut main_thread := &proc.Thread(unsafe { nil })
-	if target.threads.len > 0 {
-		main_thread = target.threads[0]
+	mut chosen := &proc.Thread(unsafe { nil })
+	for t in target.threads {
+		if katomic.load(&t.is_dead) {
+			continue
+		}
+		if chosen == unsafe { nil } {
+			chosen = t
+		}
+		if unblockable || t.masked_signals & bit == 0 {
+			chosen = t
+			break
+		}
 	}
 	target.threads_lock.release()
 
-	if main_thread == unsafe { nil } {
+	if chosen == unsafe { nil } {
 		return false
 	}
 
-	sendsig(main_thread, u8(signal))
+	sendsig(chosen, u8(signal))
 	return true
 }
 
