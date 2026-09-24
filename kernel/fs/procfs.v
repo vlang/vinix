@@ -62,6 +62,7 @@ enum ProcFSKind {
 	process_cgroup
 	environ
 	sysctl
+	sysrq_trigger
 }
 
 @[heap]
@@ -130,6 +131,8 @@ fn (mut this ProcFS) mount(parent &VFSNode, name string, _source &VFSNode) ?&VFS
 	add_procfs_file(mut root, 'meminfo', .meminfo)
 	add_procfs_file(mut root, 'uptime', .uptime)
 	add_procfs_file(mut root, 'version', .version)
+	mut sysrq := add_procfs_file(mut root, 'sysrq-trigger', .sysrq_trigger)
+	sysrq.resource.stat.mode = stat.ifreg | 0o200
 
 	mut sys := add_procfs_directory(mut root, 'sys')
 	mut sys_fs := add_procfs_directory(mut sys, 'fs')
@@ -502,6 +505,13 @@ fn (mut this ProcFSResource) write(_handle voidptr, buf voidptr, _loc u64, count
 		.uid_map, .gid_map, .setgroups, .loginuid {
 			return i64(count)
 		}
+		.sysrq_trigger {
+			// Of the magic SysRq commands only 't', the task dump, is here.
+			if count > 0 && unsafe { *&u8(buf) } == `t` {
+				proc.dump_tasks()
+			}
+			return i64(count)
+		}
 		.sysctl {
 			mut text := []u8{len: int(count)}
 			unsafe { C.memcpy(&text[0], buf, count) }
@@ -524,9 +534,26 @@ fn (mut this ProcFSResource) mmap(_handle voidptr, _page u64, _flags int) voidpt
 	return unsafe { nil }
 }
 
-fn (mut this ProcFSResource) grow(_handle voidptr, _new_size u64) ? {
-	errno.set(errno.eperm)
-	return none
+fn (mut this ProcFSResource) grow(_handle voidptr, new_size u64) ? {
+	// Opening a writable knob with O_TRUNC -- `echo 0 > file`, or a container
+	// runtime setting a sysctl -- truncates it first. That is not a request to
+	// resize anything; the write that follows replaces the value.
+	match this.kind {
+		.sysctl {
+			if new_size == 0 {
+				this.text = ''
+				this.stat.size = 0
+			}
+			return
+		}
+		.oom_score_adj, .uid_map, .gid_map, .setgroups, .loginuid, .sysrq_trigger {
+			return
+		}
+		else {
+			errno.set(errno.eperm)
+			return none
+		}
+	}
 }
 
 fn (mut this ProcFSResource) unref(_handle voidptr) ? {
@@ -820,14 +847,22 @@ fn refresh_fd_directory(mut descriptors VFSNode, pid int) {
 		}
 	}
 
-	proc.lock_table()
-	mut process := proc.process_at(pid)
-	if process != unsafe { nil } {
-		// Taken without blocking: this already holds the process table, and a
-		// process in the middle of opening a file holds its descriptor table
-		// while it goes on to take filesystem locks. A process that is busy
-		// changing its descriptors lists none for this one lookup.
+	// Taken without blocking: this holds the process table and procfs, and a
+	// process in the middle of opening a file holds its descriptor table while
+	// it goes on to take filesystem locks. A busy table is retried a bounded
+	// number of times; if it stays busy the listing is left exactly as it was,
+	// since pruning against an empty scan would make every descriptor of a
+	// busy multithreaded process vanish from /proc/<pid>/fd for that lookup.
+	mut scanned := false
+	for attempt := 0; attempt < 4096 && !scanned; attempt++ {
+		proc.lock_table()
+		mut process := proc.process_at(pid)
+		if process == unsafe { nil } {
+			proc.unlock_table()
+			break
+		}
 		if process.fds_lock.test_and_acquire() {
+			scanned = true
 			for fdnum := 0; fdnum < proc.max_fds; fdnum++ {
 				if process.fds[fdnum] == unsafe { nil } {
 					continue
@@ -851,8 +886,11 @@ fn refresh_fd_directory(mut descriptors VFSNode, pid int) {
 			}
 			process.fds_lock.release()
 		}
+		proc.unlock_table()
 	}
-	proc.unlock_table()
+	if !scanned {
+		return
+	}
 
 	for index, fdnum in live {
 		name := '${fdnum}'

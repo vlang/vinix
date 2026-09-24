@@ -35,6 +35,12 @@ pub mut:
 	readers   int
 	writers   int
 	event     eventstruct.Event
+	// Named FIFOs, from mknod(2), count the ends as they are opened rather
+	// than starting with one of each, and remember how many times each end has
+	// been opened so that a blocking open can wait for the other side.
+	fifo         bool
+	reader_opens u64
+	writer_opens u64
 }
 
 pub fn initialise() {}
@@ -56,6 +62,114 @@ pub fn create() ?&Pipe {
 	p.status |= file.pollout
 
 	return p
+}
+
+// A named FIFO. Nothing has it open yet, and the node that names it holds the
+// one reference that keeps it alive between opens.
+pub fn create_fifo(mode u32) ?&Pipe {
+	mut p := &Pipe{
+		data:     unsafe { malloc(pipe_capacity) }
+		capacity: pipe_capacity
+		refcount: 1
+		fifo:     true
+	}
+	p.stat.mode = (mode & 0o7777) | stat.ififo
+	p.stat.nlink = 1
+	return p
+}
+
+// open(2) on a FIFO. A reader blocks until a writer has opened the other end
+// and a writer until a reader has, which is the rendezvous a container
+// runtime builds its create/start handshake on: runc's init opens exec.fifo
+// for writing and must not run the container's program until `runc start`
+// opens it for reading. O_NONBLOCK readers return at once; O_NONBLOCK writers
+// with no reader get ENXIO. O_RDWR never waits.
+fn (mut this Pipe) open(flags int) ?&resource.Resource {
+	// An O_PATH descriptor opens neither end, and runc's is only reopened
+	// later through /proc/self/fd/N, which comes back here with real flags.
+	if !this.fifo || flags & resource.o_path != 0 {
+		return &resource.Resource(this)
+	}
+	nonblock := flags & resource.o_nonblock != 0
+	this.l.acquire()
+	match flags & resource.o_accmode {
+		resource.o_rdonly {
+			this.readers++
+			this.reader_opens++
+			this.status &= ~file.pollerr
+			if this.used < this.capacity {
+				this.status |= file.pollout
+			}
+			event.trigger(mut this.event, false)
+			if !nonblock && this.writers == 0 {
+				opened := this.writer_opens
+				for this.writer_opens == opened {
+					generation := event.generation(mut this.event)
+					this.l.release()
+					mut events := [&this.event]
+					event.await_from_generation(mut events, true, 0, generation) or {
+						unsafe { events.free() }
+						this.l.acquire()
+						this.readers--
+						if this.readers == 0 {
+							this.status &= ~file.pollout
+							this.status |= file.pollerr
+						}
+						this.l.release()
+						errno.set(proc.interrupted_errno)
+						return none
+					}
+					unsafe { events.free() }
+					this.l.acquire()
+				}
+			}
+		}
+		resource.o_wronly {
+			if nonblock && this.readers == 0 {
+				this.l.release()
+				errno.set(errno.enxio)
+				return none
+			}
+			this.writers++
+			this.writer_opens++
+			this.status &= ~file.pollhup
+			event.trigger(mut this.event, false)
+			if this.readers == 0 {
+				opened := this.reader_opens
+				for this.reader_opens == opened {
+					generation := event.generation(mut this.event)
+					this.l.release()
+					mut events := [&this.event]
+					event.await_from_generation(mut events, true, 0, generation) or {
+						unsafe { events.free() }
+						this.l.acquire()
+						this.writers--
+						if this.writers == 0 {
+							this.status |= file.pollhup
+						}
+						this.l.release()
+						errno.set(proc.interrupted_errno)
+						return none
+					}
+					unsafe { events.free() }
+					this.l.acquire()
+				}
+			}
+		}
+		else {
+			this.readers++
+			this.writers++
+			this.reader_opens++
+			this.writer_opens++
+			this.status &= ~(file.pollhup | file.pollerr)
+			if this.used < this.capacity {
+				this.status |= file.pollout
+			}
+			event.trigger(mut this.event, false)
+		}
+	}
+	this.l.release()
+	return &resource.Resource(this)
 }
 
 pub fn syscall_pipe(_ voidptr, pipefds &i32, flags int) (u64, u64) {
@@ -323,6 +437,13 @@ fn (mut this Pipe) unref(handle voidptr) ? {
 			}
 		}
 		else {}
+	}
+	// Whatever is left in a FIFO once the last end closes is gone; the next
+	// reader to open it must not see a previous writer's bytes.
+	if this.fifo && accmode != -1 && this.readers == 0 && this.writers == 0 {
+		this.used = 0
+		this.read_ptr = 0
+		this.write_ptr = 0
 	}
 	still_referenced := katomic.dec(mut &this.refcount)
 	this.l.release()

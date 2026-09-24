@@ -89,7 +89,31 @@ pub mut:
 	// Root, working directory and mount namespace of this thread's own, once
 	// unshare(2) has split them off from its process'. See ThreadFS.
 	fs &ThreadFS = unsafe { nil }
+	// The first argument of the syscall in progress, which the result
+	// overwrites in the saved registers. A restarted syscall needs it back.
+	syscall_x0 u64
+	// The syscall this thread is in, or -1 when it is in userspace. What
+	// sysrq 't' reports for a thread that is stuck.
+	syscall_nr i64 = -1
+	syscall_x1 u64
+	syscall_x2 u64
+	syscall_x3 u64
+	// Set on the way out of a syscall that is being rewound to run again, for
+	// the signal dispatched next to take back if its handler wants EINTR.
+	restarting_syscall bool
 }
+
+pub fn (t &Thread) current_syscall() (i64, u64) {
+	return t.syscall_nr, t.syscall_x0
+}
+
+pub fn (t &Thread) syscall_args_text() string {
+	return 'x1=0x${t.syscall_x1:x} x2=0x${t.syscall_x2:x} x3=0x${t.syscall_x3:x} blocked=0x${t.masked_signals:x} pending=0x${t.pending_signals:x}'
+}
+
+// What a wait a signal interrupted reports: a restart once the signal is
+// handled, which the AArch64 syscall exit knows how to do.
+pub const interrupted_errno = 512
 
 pub fn current_thread() &Thread {
 	cpu_num := cpu.read_tpidr_el1()

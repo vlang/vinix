@@ -124,13 +124,12 @@ fn install_device_node(mut parent VFSNode, name string, mode u32, rdev u64, back
 }
 
 fn make_fifo_node(mut parent VFSNode, name string, mode u32) ?&VFSNode {
-	mut new_pipe := pipe.create() or {
+	// A named pipe has no ends open until something opens one, and blocks
+	// an opener until the other side arrives; see pipe.create_fifo.
+	mut new_pipe := pipe.create_fifo(mode) or {
 		errno.set(errno.enomem)
 		return none
 	}
-	// A named pipe reports itself as a FIFO, not the anonymous pipe create()
-	// makes, so stat and open see the file the caller asked for.
-	new_pipe.stat.mode = (mode & 0o7777) | stat.ififo
 	mut node := create_node(parent.filesystem, parent, name, false)
 	node.resource = new_pipe
 	apply_creation_identity(mut node, parent)?

@@ -5,6 +5,18 @@ import klock
 import x86.cpu.local as cpulocal
 import event.eventstruct
 
+pub fn (t &Thread) current_syscall() (i64, u64) {
+	return -1, 0
+}
+
+pub fn (t &Thread) syscall_args_text() string {
+	return ''
+}
+
+// What a wait a signal interrupted reports. The x86-64 syscall exit has no
+// restart, so the caller sees EINTR.
+pub const interrupted_errno = 4
+
 pub struct Thread {
 pub mut:
 	// Fixed members, DO NOT MOVE

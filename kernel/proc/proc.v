@@ -758,6 +758,25 @@ pub fn thread_ids(pid int) []int {
 	return ids
 }
 
+// sysrq 't': every thread on the console, with the syscall it is in and that
+// call's first argument, which is how a hang in userspace is told apart from
+// one in the kernel and pinned to the call that never returned.
+pub fn dump_tasks() {
+	lock_table()
+	defer { unlock_table() }
+	for pid := 1; pid < max_pid; pid++ {
+		process := process_at(pid)
+		if process == unsafe { nil } {
+			continue
+		}
+		state := if process.exiting { 'Z' } else { 'R' }
+		for t in process.threads {
+			nr, arg0 := t.current_syscall()
+			print('sysrq: pid=${pid} ppid=${process.ppid} tid=${t.tid} ${state} ${command_name(process.name)} syscall=${nr} arg0=0x${arg0:x} ${t.syscall_args_text()}\n')
+		}
+	}
+}
+
 // The first fields of /proc/<pid>/stat. Everything Vinix does not account for
 // is reported as zero rather than invented; readers take the fields they know.
 pub fn process_stat_line(pid int) string {
@@ -781,7 +800,8 @@ pub fn process_stat_line(pid int) string {
 
 	// Fields 21 to 39, which nothing here keeps, and then rt_priority and
 	// policy in 40 and 41.
-	return '${pid} (${comm}) R ${process.ppid} ${process.pgid} ${process.sid} 0 -1 0 0 0 0 0 0 0 0 0 ${priority} ${process.nice} ${threads} 0 ${process.start_time_ticks} 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 ${params.priority} ${params.policy}\n'
+	state := if process.exiting { 'Z' } else { 'R' }
+	return '${pid} (${comm}) ${state} ${process.ppid} ${process.pgid} ${process.sid} 0 -1 0 0 0 0 0 0 0 0 0 ${priority} ${process.nice} ${threads} 0 ${process.start_time_ticks} 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 ${params.priority} ${params.policy}\n'
 }
 
 // The scheduling parameters of a thread that may not be there. Called with the
@@ -806,6 +826,7 @@ pub fn process_status_text(pid int) string {
 	no_new_privs := if process.no_new_privs { 1 } else { 0 }
 	// Seccomp is reported as absent altogether: without the field a runtime
 	// knows the kernel has no seccomp, which is the truth here.
-	return 'Name:\t${comm}\nUmask:\t0${process.umask:o}\nState:\tR (running)\nTgid:\t${pid}\nNgid:\t0\nPid:\t${pid}\nPPid:\t${process.ppid}\nTracerPid:\t0\nUid:\t${process.uid}\t${process.euid}\t${process.suid}\t${process.euid}\nGid:\t${process.gid}\t${process.egid}\t${process.sgid}\t${process.egid}\nNSpid:\t${pid}\nThreads:\t${threads}\nCapInh:\t${caps.inheritable:016x}\nCapPrm:\t${caps.permitted:016x}\nCapEff:\t${caps.effective:016x}\nCapBnd:\t${caps.bounding:016x}\nCapAmb:\t${caps.ambient:016x}\nNoNewPrivs:\t${no_new_privs}\n'
+	state := if process.exiting { 'Z (zombie)' } else { 'R (running)' }
+	return 'Name:\t${comm}\nUmask:\t0${process.umask:o}\nState:\t${state}\nTgid:\t${pid}\nNgid:\t0\nPid:\t${pid}\nPPid:\t${process.ppid}\nTracerPid:\t0\nUid:\t${process.uid}\t${process.euid}\t${process.suid}\t${process.euid}\nGid:\t${process.gid}\t${process.egid}\t${process.sgid}\t${process.egid}\nNSpid:\t${pid}\nThreads:\t${threads}\nCapInh:\t${caps.inheritable:016x}\nCapPrm:\t${caps.permitted:016x}\nCapEff:\t${caps.effective:016x}\nCapBnd:\t${caps.bounding:016x}\nCapAmb:\t${caps.ambient:016x}\nNoNewPrivs:\t${no_new_privs}\n'
 }
 

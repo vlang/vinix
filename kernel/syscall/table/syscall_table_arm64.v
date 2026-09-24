@@ -82,6 +82,11 @@ pub fn syscall_trace(gpr_state voidptr) {
 	// responsive while translated applications occupy every virtual CPU.
 	sched.poll_syscall_input()
 	mut current_thread := proc.current_thread()
+	current_thread.syscall_x0 = gpr.x0
+	current_thread.syscall_nr = i64(nr)
+	current_thread.syscall_x1 = gpr.x1
+	current_thread.syscall_x2 = gpr.x2
+	current_thread.syscall_x3 = gpr.x3
 	pid := u64(current_thread.process.pid)
 	// Debug: detect x30=0x220000 corruption at syscall entry
 	if pid == 3 && gpr.x30 == u64(0x220000) {
@@ -113,6 +118,8 @@ pub fn syscall_trace(gpr_state voidptr) {
 
 @[export: 'syscall_trace_ret']
 pub fn syscall_trace_ret(ret u64, err u64) {
+	mut current_thread := proc.current_thread()
+	current_thread.syscall_nr = -1
 	if !sc_trace_active {
 		return
 	}

@@ -272,11 +272,32 @@ pub fn dispatch_a_signal(context &cpulocal.GPRState) {
 	dispatch_a_signal_with_fault(context, false, 0, 0)
 }
 
+const linux_sa_restart = 0x10000000
+
+// A syscall that a signal interrupted before it had done anything returns
+// ERESTARTSYS. Rewind to the SVC so that it runs again once the signal has
+// been dealt with, as Linux does: Go programs rely on SA_RESTART for calls
+// they do not retry themselves, such as runc's blocking open of its exec FIFO,
+// while the runtime preempts goroutines with SIGURG. The signal dispatched
+// next takes the rewind back if its handler was installed without SA_RESTART.
+pub fn prepare_syscall_restart(context &cpulocal.GPRState) {
+	mut ctx := unsafe { context }
+	if ctx.x0 != u64(-i64(proc.interrupted_errno)) {
+		return
+	}
+	mut t := proc.current_thread()
+	ctx.x0 = t.syscall_x0
+	ctx.pc -= 4
+	t.restarting_syscall = true
+}
+
 // Linux SA_SIGINFO handlers need the fault address and a usable ucontext. QEMU
 // user mode depends on both: translated memory accesses deliberately fault in
 // the host and its SIGSEGV handler turns that host context into a guest fault.
 fn dispatch_a_signal_with_fault(context &cpulocal.GPRState, synchronous bool, fault_address u64, fault_esr u64) {
 	mut t := unsafe { proc.current_thread() }
+	restarting := t.restarting_syscall
+	t.restarting_syscall = false
 
 	mut which := -1
 
@@ -318,6 +339,14 @@ fn dispatch_a_signal_with_fault(context &cpulocal.GPRState, synchronous bool, fa
 			exit_with_fatal_signal(u8(which))
 		}
 		return
+	}
+
+	// A handler that did not ask for SA_RESTART sees the syscall fail with
+	// EINTR instead of running again behind its back.
+	if restarting && sigaction.sa_flags & sa_restart == 0 && sigaction.sa_flags & linux_sa_restart == 0 {
+		mut ctx := unsafe { context }
+		ctx.pc += 4
+		ctx.x0 = u64(-i64(4))
 	}
 
 	// A sigsuspend(2) that installed a temporary mask wants the frame to carry
