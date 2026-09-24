@@ -310,6 +310,36 @@ fn cgroup_members(group &CGroup, recursive bool) []int {
 	return members
 }
 
+fn append_decimal(mut text []u8, value int) {
+	mut digits := [12]u8{}
+	mut n := 0
+	mut rest := value
+	for {
+		digits[n] = u8(`0` + rest % 10)
+		n++
+		rest /= 10
+		if rest == 0 || n == digits.len {
+			break
+		}
+	}
+	for n > 0 {
+		n--
+		text << digits[n]
+	}
+}
+
+fn cgroup_memory_bytes(group &CGroup) u64 {
+	members := cgroup_members(group, true)
+	defer {
+		unsafe { members.free() }
+	}
+	mut total := u64(0)
+	for pid in members {
+		total += resident_bytes(pid)
+	}
+	return total
+}
+
 fn cgroup_has_children(group &CGroup) bool {
 	for name in group.node.children.keys() {
 		if is_dot_name(name) {
@@ -327,14 +357,21 @@ fn (mut this CGroupResource) contents() string {
 	mut group := this.group
 	match this.name {
 		'cgroup.procs', 'cgroup.threads' {
-			mut text := ''
-			for pid in cgroup_members(group, false) {
-				text += '${pid}\n'
+			members := cgroup_members(group, false)
+			defer {
+				unsafe { members.free() }
 			}
-			return text
+			mut text := []u8{cap: members.len * 8}
+			for pid in members {
+				append_decimal(mut text, pid)
+				text << `\n`
+			}
+			return text.bytestr()
 		}
 		'cgroup.events' {
-			populated := if cgroup_members(group, true).len > 0 { 1 } else { 0 }
+			members := cgroup_members(group, true)
+			populated := if members.len > 0 { 1 } else { 0 }
+			unsafe { members.free() }
 			frozen := if group.node != unsafe { nil } && 'cgroup.freeze' in group.node.children {
 				freeze_res := unsafe { &CGroupResource(group.node.children['cgroup.freeze'].resource) }
 				freeze_res.text.trim_space()
@@ -357,7 +394,19 @@ fn (mut this CGroupResource) contents() string {
 			return group.subtree.join(' ') + '\n'
 		}
 		'pids.current' {
-			return '${cgroup_members(group, true).len}\n'
+			members := cgroup_members(group, true)
+			defer {
+				unsafe { members.free() }
+			}
+			return '${members.len}\n'
+		}
+		// What the group's processes have mapped, which is what they use: mmap
+		// makes every accessible page resident. docker stats reads this.
+		'memory.current' {
+			return '${cgroup_memory_bytes(group)}\n'
+		}
+		'memory.stat' {
+			return 'anon ${cgroup_memory_bytes(group)}\nfile 0\nkernel 0\nshmem 0\n'
 		}
 		'cgroup.stat' {
 			mut descendants := 0
@@ -383,7 +432,11 @@ fn (mut this CGroupResource) read(_handle voidptr, buf voidptr, loc u64, count u
 		errno.set(errno.eisdir)
 		return none
 	}
+	// Every read makes the text afresh, and it is only needed until copied.
 	text := this.contents()
+	defer {
+		unsafe { text.free() }
+	}
 	if loc >= u64(text.len) {
 		return i64(0)
 	}
