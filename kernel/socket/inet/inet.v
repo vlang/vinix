@@ -19,6 +19,7 @@ struct C.vinix_socket {}
 fn C.vinix_net_init()
 fn C.vinix_net_poll(now_ms u32)
 fn C.vinix_net_attach(mac &u8, driver int) int
+fn C.vinix_net_link(mac &u8, mtu &u32) int
 fn C.vinix_net_detach()
 fn C.vinix_net_input(frame voidptr, length u64) int
 fn C.vinix_net_config(address &u32, netmask &u32, gateway &u32, dns &u32) int
@@ -255,6 +256,15 @@ pub fn receive(frame voidptr, length u64) bool {
 pub fn configuration(address &u32, netmask &u32, gateway &u32, dns &[3]u32) bool {
 	net_lock.acquire()
 	ret := unsafe { C.vinix_net_config(address, netmask, gateway, &dns[0]) }
+	net_lock.release()
+	return ret != 0
+}
+
+// The hardware address and MTU of the network interface, once a driver has
+// attached one.
+pub fn link_info(mut mac [6]u8, mut mtu u32) bool {
+	net_lock.acquire()
+	ret := C.vinix_net_link(&mac[0], &mtu)
 	net_lock.release()
 	return ret != 0
 }
@@ -719,6 +729,9 @@ fn (mut this InetSocket) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 		net_lock.release()
 		unsafe { *&i32(argp) = i32(value) }
 		return 0
+	}
+	if is_interface_ioctl(request) {
+		return interface_ioctl(request, argp)
 	}
 	return resource.default_ioctl(handle, request, argp)
 }

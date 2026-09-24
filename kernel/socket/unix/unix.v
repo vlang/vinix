@@ -6,6 +6,7 @@ import event.eventstruct
 import errno
 import proc
 import fs
+import socket.inet
 import socket.public as sock_pub
 import event
 import file
@@ -484,6 +485,10 @@ pub fn (mut this UnixSocket) write_with_fds(_handle voidptr, buf voidptr, _count
 }
 
 fn (mut this UnixSocket) ioctl(handle voidptr, request u64, argp voidptr) ?int {
+	// musl's if_nametoindex and if_indextoname ask on an AF_UNIX socket.
+	if inet.is_interface_ioctl(request) {
+		return inet.interface_ioctl(request, argp)
+	}
 	match request {
 		ioctl.fionread {
 			if this.listening {

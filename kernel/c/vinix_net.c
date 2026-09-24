@@ -457,6 +457,15 @@ int vinix_net_config(uint32_t *address, uint32_t *netmask, uint32_t *gateway,
     return 1;
 }
 
+int vinix_net_link(uint8_t mac[6], uint32_t *mtu) {
+    if (!link_attached) {
+        return 0;
+    }
+    memcpy(mac, physical_netif.hwaddr, 6);
+    *mtu = physical_netif.mtu;
+    return 1;
+}
+
 struct vinix_socket *vinix_socket_new(int type, int protocol) {
     struct vinix_socket *socket;
     if (!stack_initialised) {
