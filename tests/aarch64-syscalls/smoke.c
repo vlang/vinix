@@ -391,6 +391,32 @@ static int seccomp_filters(void) {
     return valid && security_child_succeeded(unprivileged);
 }
 
+// A handler installed without SA_RESTORER, as glibc installs every one on
+// AArch64, with whatever its stack held left in sa_restorer: it returns
+// through the kernel's rt_sigreturn trampoline.
+static volatile sig_atomic_t saw_plain_handler;
+
+static void plain_handler(int signal_number) {
+    (void)signal_number;
+    saw_plain_handler = 1;
+}
+
+static int handler_without_restorer(void) {
+    struct {
+        void (*handler)(int);
+        unsigned long flags;
+        void *restorer;
+        unsigned long mask;
+    } action = {plain_handler, 0, (void *)(uintptr_t)0x1234, 0};
+    if (syscall(SYS_rt_sigaction, SIGUSR2, &action, NULL, 8) != 0)
+        return 0;
+    saw_plain_handler = 0;
+    raise(SIGUSR2);
+    int valid = saw_plain_handler == 1;
+    signal(SIGUSR2, SIG_DFL);
+    return valid;
+}
+
 static void *eventfd_writer(void *argument) {
     int fd = *(int *)argument;
     struct timespec delay = {.tv_nsec = 10000000};
@@ -696,6 +722,7 @@ int main(void) {
     check(special_node_numbers(), "mknod nodes have inode numbers");
     check(overlay_semantics(), "overlay mount");
     check(seccomp_filters(), "seccomp filters");
+    check(handler_without_restorer(), "signal handler without SA_RESTORER");
     if (chdir(previous_cwd) != 0)
         chdir("/");
 

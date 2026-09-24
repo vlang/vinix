@@ -277,6 +277,45 @@ pub fn syscall_sigreturn(gpr_state_ptr voidptr, context_arg voidptr, old_mask_ar
 
 // Dispatch a signal to _self_, called from the scheduler at the
 // end of syscalls, or from exception handlers.
+// Linux gives an AArch64 signal handler whose sigaction sets no SA_RESTORER a
+// return into the vDSO's __kernel_rt_sigreturn. glibc relies on that and
+// leaves sa_restorer unset -- it is whatever its stack held -- so every
+// handler of a glibc program returned into garbage: bash and dash died of
+// the SIGCHLD of their first child. There is no vDSO here; every program gets
+// a page holding just that: mov x8, #139 (rt_sigreturn); svc #0. It sits
+// just above the highest place the stack can start.
+const sigreturn_page_address = u64(0x70000000000)
+const linux_sa_restorer = 0x04000000
+
+fn install_sigreturn_page(mut pagemap memory.Pagemap) ?u64 {
+	page := memory.pmm_alloc(1)
+	if page == unsafe { nil } {
+		errno.set(errno.enomem)
+		return none
+	}
+	code := unsafe { &u32(u64(page) + higher_half) }
+	unsafe {
+		code[0] = u32(0xd2801168)
+		code[1] = u32(0xd4000001)
+	}
+	cpu.sync_instruction_cache(u64(page) + higher_half, page_size)
+	mmap.map_range(mut pagemap, sigreturn_page_address, u64(page), page_size, mmap.prot_read | mmap.prot_exec,
+		mmap.map_private) or {
+		memory.pmm_free(page, 1)
+		return none
+	}
+	return sigreturn_page_address
+}
+
+// Where a Linux handler returns: its own restorer if it asked for one with
+// SA_RESTORER, as musl does, or the process's rt_sigreturn page.
+fn signal_restorer(process &proc.Process, sigaction &proc.SigAction) u64 {
+	if sigaction.sa_flags & linux_sa_restorer != 0 && sigaction.sa_restorer != unsafe { nil } {
+		return u64(sigaction.sa_restorer)
+	}
+	return process.sigreturn_page
+}
+
 pub fn dispatch_a_signal(context &cpulocal.GPRState) {
 	dispatch_a_signal_with_fault(context, false, 0, 0)
 }
@@ -446,8 +485,8 @@ fn dispatch_a_signal_with_fault(context &cpulocal.GPRState, synchronous bool, fa
 		t.gpr_state.x4 = previous_mask
 
 		enter_handler(mut t, context)
-	} else if sigaction.sa_restorer != unsafe { nil } {
-		// ── Linux/musl mode: set up signal frame on user stack ──
+	} else if signal_restorer(t.process, &sigaction) != 0 {
+		// ── Linux mode: set up signal frame on user stack ──
 		// Frame layout: [prev_mask(8)] [pad(8)] [GPRState(sizeof)]
 		// A three-argument SA_SIGINFO handler appends siginfo_t and an AArch64
 		// ucontext_t. Synchronous faults always require those objects as well.
@@ -535,7 +574,7 @@ fn dispatch_a_signal_with_fault(context &cpulocal.GPRState, synchronous bool, fa
 		t.gpr_state = *context
 		t.gpr_state.sp = signal_sp
 		t.gpr_state.pc = u64(handler)
-		t.gpr_state.x30 = u64(sigaction.sa_restorer) // LR = __restore_rt
+		t.gpr_state.x30 = signal_restorer(t.process, &sigaction)
 		t.gpr_state.x0 = u64(which)
 		if wants_siginfo {
 			t.gpr_state.x1 = signal_sp + info_offset
@@ -983,6 +1022,7 @@ pub fn start_program_node(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, p
 
 		unsafe { ld_path.free() }
 	}
+	sigreturn_page := install_sigreturn_page(mut new_pagemap) or { return none }
 
 	if execve == false {
 		mut new_process := sched.new_process(unsafe { nil }, new_pagemap)?
@@ -991,6 +1031,7 @@ pub fn start_program_node(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, p
 		new_process.executable_path = program_path
 		new_process.exe_node = voidptr(prog_node)
 		new_process.allow_wx = allow_wx
+		new_process.sigreturn_page = sigreturn_page
 
 		stdin_node := fs.get_node(vfs_root, stdin_path, true)?
 		stdin_handle := &file.Handle{
@@ -1075,6 +1116,7 @@ pub fn start_program_node(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, p
 		curr_process.executable_path = program_path
 		curr_process.exe_node = voidptr(prog_node)
 		curr_process.allow_wx = allow_wx
+		curr_process.sigreturn_page = sigreturn_page
 		// execve recomputes the capability sets from the new credentials and
 		// the bounding set, which is how a container's root ends up with only
 		// the capabilities its runtime left it.

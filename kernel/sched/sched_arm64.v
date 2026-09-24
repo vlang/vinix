@@ -2038,6 +2038,7 @@ pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) ?&proc.Pr
 		new_proc.executable_path = old_process.executable_path.clone()
 		new_proc.rlimits = old_process.rlimits
 		new_proc.allow_wx = old_process.allow_wx
+		new_proc.sigreturn_page = old_process.sigreturn_page
 		// A NUMA memory policy is process state, like nice and the rlimits, so
 		// a fork keeps the placement its parent asked for.
 		new_proc.mempolicy_mode = old_process.mempolicy_mode

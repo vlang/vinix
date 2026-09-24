@@ -233,6 +233,9 @@ pub mut:
 	// Some compatibility runtimes require an RWX probe even when their generated
 	// code runs interpreted. Exec replaces this opt-in; fork preserves it.
 	allow_wx bool
+	// Where a signal handler returns to when it names no SA_RESTORER of its
+	// own; see install_sigreturn_page() in userland.
+	sigreturn_page u64
 
 	// Credentials: the real, effective and saved sets POSIX names, plus the
 	// supplementary groups. Everything starts as root and is inherited across
