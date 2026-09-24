@@ -1,31 +1,55 @@
 #!/bin/bash
-# Cross-build the current pinned V compiler for Vinix/AArch64 and stage the
-# matching vlib tree. The resulting layer is merged into every desktop image,
+# Cross-build the current pinned V compiler for Vinix/AArch64 (or amd64, with
+# VINIX_ARCH=x86_64 as build-v-amd64.sh sets it) and stage the matching vlib
+# tree. The resulting layer is merged into every desktop image,
 # so V programs and vinix-desktop itself can be built natively inside Vinix.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 . "$SCRIPT_DIR/build-support/find-v.sh"
 
-BUILD_DIR="${VINIX_V_BUILD_DIR:-$SCRIPT_DIR/build-aarch64-v}"
+VINIX_ARCH="${VINIX_ARCH:-aarch64}"
+TCC_ALPINE_VERSION=0.9.27_git20250619-r1
+case "$VINIX_ARCH" in
+    aarch64)
+        ARCH_DIR=aarch64
+        V_ARCH=arm64
+        FILE_ARCH='ARM aarch64'
+        USERLAND_DIR="${VINIX_AARCH64_USERLAND_BUILD_DIR:-$SCRIPT_DIR/build-aarch64-userland}"
+        SYSROOT="${VINIX_AARCH64_SYSROOT:-$USERLAND_DIR/staging}"
+        TCC_PACKAGE_SHA256=5329d1702d2a7ff39efdab46b915308d1479a37595619a9002ec4b3e35eba209
+        TCC_DEV_PACKAGE_SHA256=c68f967def600a0e877ca8941354b987a67ad17695e6b962f64847dd8069fe37
+        TCC_LIBS_PACKAGE_SHA256=b46e95d8dc6e643b836ea3809d964f9c0628adc621602c29d94207d99a9e1e7c
+        TCC_STATIC_PACKAGE_SHA256=50e4866cb072e898643e178d78b974fc6e04e88f45f18ebfdc3bb2f11ca86c2a
+        ;;
+    x86_64)
+        ARCH_DIR=amd64
+        V_ARCH=amd64
+        FILE_ARCH='x86-64'
+        USERLAND_DIR="${VINIX_AMD64_USERLAND_BUILD_DIR:-$SCRIPT_DIR/build-amd64-userland}"
+        SYSROOT="${VINIX_AMD64_SYSROOT:-$USERLAND_DIR/staging}"
+        TCC_PACKAGE_SHA256=91be3c8254290b61c0deaf49c48e43c180a6bb9e4c88aac6bcde5e42c10c9bc5
+        TCC_DEV_PACKAGE_SHA256=ac024039585653b6a3a903a60029e067ac5bba4f86472f3c0dc2360c72dfb349
+        TCC_LIBS_PACKAGE_SHA256=ac5642a8707efbd721173a18b216eff5519ef766ad58b12a67777c6bb507c230
+        TCC_STATIC_PACKAGE_SHA256=45db2c2096bcff86be76d61f3dcb5ae84f118a880e81cb2a3b44011980feade7
+        ;;
+    *)
+        echo "ERROR: unsupported VINIX_ARCH: $VINIX_ARCH" >&2
+        exit 1
+        ;;
+esac
+BUILD_DIR="${VINIX_V_BUILD_DIR:-$SCRIPT_DIR/build-$ARCH_DIR-v}"
 STAGING="$BUILD_DIR/staging"
 DOWNLOADS="$BUILD_DIR/downloads"
-USERLAND_DIR="${VINIX_AARCH64_USERLAND_BUILD_DIR:-$SCRIPT_DIR/build-aarch64-userland}"
-SYSROOT="${VINIX_AARCH64_SYSROOT:-$USERLAND_DIR/staging}"
 LLVM_BIN="${LLVM_BIN:-/opt/homebrew/opt/llvm/bin}"
 V_COMMIT="${VINIX_V_COMMIT:-${V_COMMIT:-9bfa1dc3f3455d5733d5c226662b6aaba8544f2c}}"
 V_SOURCE="${VINIX_V_SOURCE:-}"
 CC_SHIM="$SCRIPT_DIR/build-support/aarch64-cc-shim"
-TCC_ALPINE_REPOSITORY="${VINIX_TCC_ALPINE_REPOSITORY:-https://dl-cdn.alpinelinux.org/alpine/v3.24/community/aarch64}"
-TCC_ALPINE_VERSION=0.9.27_git20250619-r1
+TCC_ALPINE_REPOSITORY="${VINIX_TCC_ALPINE_REPOSITORY:-https://dl-cdn.alpinelinux.org/alpine/v3.24/community/$VINIX_ARCH}"
 TCC_PACKAGE="tcc-$TCC_ALPINE_VERSION.apk"
 TCC_DEV_PACKAGE="tcc-dev-$TCC_ALPINE_VERSION.apk"
 TCC_LIBS_PACKAGE="tcc-libs-$TCC_ALPINE_VERSION.apk"
 TCC_STATIC_PACKAGE="tcc-libs-static-$TCC_ALPINE_VERSION.apk"
-TCC_PACKAGE_SHA256=5329d1702d2a7ff39efdab46b915308d1479a37595619a9002ec4b3e35eba209
-TCC_DEV_PACKAGE_SHA256=c68f967def600a0e877ca8941354b987a67ad17695e6b962f64847dd8069fe37
-TCC_LIBS_PACKAGE_SHA256=b46e95d8dc6e643b836ea3809d964f9c0628adc621602c29d94207d99a9e1e7c
-TCC_STATIC_PACKAGE_SHA256=50e4866cb072e898643e178d78b974fc6e04e88f45f18ebfdc3bb2f11ca86c2a
 
 sha256_file() {
     if command -v sha256sum >/dev/null 2>&1; then
@@ -69,10 +93,10 @@ if [ ! -x "$LLVM_BIN/clang" ] || [ ! -x "$LLVM_BIN/llvm-strip" ]; then
 fi
 if [ ! -f "$SYSROOT/usr/lib/libc.a" ] || [ ! -d "$SYSROOT/usr/include" ]; then
     echo "ERROR: Alpine development sysroot is incomplete: $SYSROOT" >&2
-    echo "Run ./build-userland-aarch64.sh first." >&2
+    echo "Run ./build-userland-$ARCH_DIR.sh first." >&2
     exit 1
 fi
-GCCLIB="$(find "$SYSROOT/usr/lib/gcc/aarch64-alpine-linux-musl" \
+GCCLIB="$(find "$SYSROOT/usr/lib/gcc/$VINIX_ARCH-alpine-linux-musl" \
     -mindepth 1 -maxdepth 1 -type d 2>/dev/null | LC_ALL=C sort | tail -n1)"
 if [ -z "$GCCLIB" ] || [ ! -f "$GCCLIB/libgcc.a" ]; then
     echo "ERROR: Alpine GCC runtime not found below $SYSROOT/usr/lib/gcc" >&2
@@ -127,12 +151,12 @@ patch -d "$PREPARED_SOURCE" -p0 < "$SCRIPT_DIR/build-support/v-no-parallel-nativ
 patch -d "$PREPARED_SOURCE" -p0 < "$SCRIPT_DIR/build-support/v-serial-driver.patch"
 SOURCE_DIR="$PREPARED_SOURCE"
 
-echo "==> Translating V $V_COMMIT for aarch64-linux-musl..."
+echo "==> Translating V $V_COMMIT for $VINIX_ARCH-linux-musl..."
 # The compiler itself uses the mature hosted Linux/musl runtime. The installed
 # `v` command supplies Vinix as the default output target, so programs use the
 # Vinix-specific runtime paths while this large self-hosted compiler retains the
 # process and allocator behavior already exercised by the desktop build.
-"$V" -new-compiler -no-memory-limit -cross -os linux -arch arm64 -musl \
+"$V" -new-compiler -no-memory-limit -cross -os linux -arch "$V_ARCH" -musl \
     -gc none -no-parallel -o "$BUILD_DIR/v.c" "$SOURCE_DIR/cmd/v"
 
 # V3 records @VMODROOT and @VEXEROOT as C string constants. A compiler copied
@@ -173,7 +197,7 @@ if ! grep -Fq 'bool native_inputs_overlap = !current_no_parallel && driver__shou
 fi
 
 echo "==> Linking the native V compiler..."
-"$LLVM_BIN/clang" --target=aarch64-linux-musl -static -nostdinc -nostdlib \
+"$LLVM_BIN/clang" --target="$VINIX_ARCH-linux-musl" -static -nostdinc -nostdlib \
     -isystem "$CC_SHIM" \
     -isystem "$GCCLIB/include" -isystem "$SYSROOT/usr/include" \
     -I "$SOURCE_DIR/thirdparty/stdatomic/nix" \
@@ -196,10 +220,10 @@ install -m644 "$SOURCE_DIR/GNUmakefile" "$STAGING/usr/lib/vlang/GNUmakefile"
 install -m644 "$SOURCE_DIR/v.mod" "$STAGING/usr/lib/vlang/v.mod"
 # `make` populates a V checkout with a bundled TCC for the build host. When a
 # macOS checkout is supplied through VINIX_V_SOURCE that executable is Mach-O,
-# not an AArch64 Linux/musl program. V probes an executable bundled TCC before
+# not a Linux/musl program for the guest. V probes an executable bundled TCC before
 # falling back to a system compiler; on Vinix the incompatible probe can enter
 # the Mach-O compatibility path and never return. Replace those host-generated
-# artifacts with Alpine's native AArch64 TCC packages below.
+# artifacts with Alpine's native TCC packages below.
 rm -rf "$STAGING/usr/lib/vlang/thirdparty/tcc"
 for package in "$TCC_PACKAGE" "$TCC_DEV_PACKAGE" "$TCC_LIBS_PACKAGE" "$TCC_STATIC_PACKAGE"; do
     tar xzf "$DOWNLOADS/$package" -C "$STAGING"
@@ -216,8 +240,8 @@ install -m755 "$SCRIPT_DIR/build-support/v-command" "$STAGING/usr/bin/v"
 install -m644 "$SCRIPT_DIR/tests/vlang/hello.v" "$STAGING/root/v-smoke.v"
 install -m755 "$SCRIPT_DIR/tests/vlang/smoke.sh" "$STAGING/root/v-smoke.sh"
 
-if ! file "$STAGING/usr/lib/vlang/v" | grep -q 'ARM aarch64'; then
-    echo "ERROR: staged V compiler is not an AArch64 executable" >&2
+if ! file "$STAGING/usr/lib/vlang/v" | grep -q "$FILE_ARCH"; then
+    echo "ERROR: staged V compiler is not a $VINIX_ARCH executable" >&2
     file "$STAGING/usr/lib/vlang/v" >&2
     exit 1
 fi
@@ -225,8 +249,8 @@ if [ -e "$STAGING/usr/lib/vlang/thirdparty/tcc/tcc.exe" ]; then
     echo "ERROR: host TCC leaked into the Vinix V layer" >&2
     exit 1
 fi
-if ! file "$STAGING/usr/bin/tcc" | grep -q 'ARM aarch64'; then
-    echo "ERROR: staged Alpine TCC is not an AArch64 executable" >&2
+if ! file "$STAGING/usr/bin/tcc" | grep -q "$FILE_ARCH"; then
+    echo "ERROR: staged Alpine TCC is not a $VINIX_ARCH executable" >&2
     file "$STAGING/usr/bin/tcc" >&2
     exit 1
 fi

@@ -1,14 +1,22 @@
 #!/bin/bash
-# Stage network-facing developer tools for the Vinix aarch64 userland.
+# Stage network-facing developer tools for the Vinix aarch64 (or amd64) userland.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-BUILD_DIR="${VINIX_NETWORK_TOOLS_BUILD_DIR:-$SCRIPT_DIR/build-aarch64-network-tools}"
+# VINIX_ARCH=x86_64 stages the same layer for amd64; build-network-tools-amd64.sh
+# does that.
+VINIX_ARCH="${VINIX_ARCH:-aarch64}"
+case "$VINIX_ARCH" in
+    aarch64) ARCH_DIR=aarch64 ;;
+    x86_64) ARCH_DIR=amd64 ;;
+    *) echo "ERROR: unsupported VINIX_ARCH: $VINIX_ARCH" >&2; exit 1 ;;
+esac
+BUILD_DIR="${VINIX_NETWORK_TOOLS_BUILD_DIR:-$SCRIPT_DIR/build-$ARCH_DIR-network-tools}"
 DOWNLOADS="$BUILD_DIR/downloads"
 STAGING="$BUILD_DIR/staging"
 
 ALPINE_MIRROR="${ALPINE_MIRROR:-https://dl-cdn.alpinelinux.org/alpine/v3.21}"
-ALPINE_ARCH=aarch64
+ALPINE_ARCH="$VINIX_ARCH"
 
 for tool in clang curl ld.lld python3 tar; do
     if ! command -v "$tool" >/dev/null 2>&1; then
@@ -81,8 +89,12 @@ printf '%s\n' "$ALPINE_ARCH" > "$STAGING/etc/apk/arch"
 # apk's database loader expects an empty tar archive even before any package
 # scripts have been installed. Two 512-byte zero records are an empty tar.
 dd if=/dev/zero of="$STAGING/lib/apk/db/scripts.tar" bs=1024 count=1 2>/dev/null
-printf '%s\n' \
-    'repository=https://repo-default.voidlinux.org/current/aarch64' \
+# Void publishes x86_64 musl packages under current/musl.
+case "$VINIX_ARCH" in
+    aarch64) void_repository=https://repo-default.voidlinux.org/current/aarch64 ;;
+    x86_64) void_repository=https://repo-default.voidlinux.org/current/musl ;;
+esac
+printf 'repository=%s\n' "$void_repository" \
     > "$STAGING/etc/xbps.d/00-repository-main.conf"
 
 # pkg registers this already-extracted bootstrap set during its first package
@@ -149,7 +161,7 @@ install -m644 "$SCRIPT_DIR/build-support/gimp/vinix-gimprc" \
     "$STAGING/etc/gimp/2.0/vinix-gimprc"
 install -m644 "$SCRIPT_DIR/build-support/gimp/vinix-sessionrc" \
     "$STAGING/etc/gimp/2.0/vinix-sessionrc"
-clang -target aarch64-linux-musl -fPIC -ffreestanding -fno-stack-protector \
+clang -target "$VINIX_ARCH-linux-musl" -fPIC -ffreestanding -fno-stack-protector \
     -nostdlib -c "$SCRIPT_DIR/tests/packages/gtk-smoke-auto-close.c" \
     -o "$BUILD_DIR/gtk-smoke-auto-close.o"
 ld.lld -shared -soname libgtk-smoke-auto-close.so \

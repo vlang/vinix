@@ -1,19 +1,27 @@
 #!/bin/bash
-# Stage a CPython 3 for the Vinix aarch64 userland.
+# Stage a CPython 3 for the Vinix aarch64 (or amd64) userland.
 #
-# Nothing is compiled here: Alpine already ships a musl aarch64 python3, which
+# Nothing is compiled here: Alpine already ships a musl python3, which
 # is the same libc and architecture the Vinix userland uses, so its packages
 # drop straight into the initramfs. Building CPython from source in the guest
 # would take hours and prove nothing extra.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-BUILD_DIR="${VINIX_PYTHON_BUILD_DIR:-$SCRIPT_DIR/build-aarch64-python}"
+# VINIX_ARCH=x86_64 stages the same layer for amd64; build-python-amd64.sh
+# does that.
+VINIX_ARCH="${VINIX_ARCH:-aarch64}"
+case "$VINIX_ARCH" in
+    aarch64) ARCH_DIR=aarch64 ;;
+    x86_64) ARCH_DIR=amd64 ;;
+    *) echo "ERROR: unsupported VINIX_ARCH: $VINIX_ARCH" >&2; exit 1 ;;
+esac
+BUILD_DIR="${VINIX_PYTHON_BUILD_DIR:-$SCRIPT_DIR/build-$ARCH_DIR-python}"
 DOWNLOADS="$BUILD_DIR/downloads"
 STAGING="$BUILD_DIR/staging"
 
 ALPINE_MIRROR="${ALPINE_MIRROR:-https://dl-cdn.alpinelinux.org/alpine/v3.21}"
-ALPINE_ARCH=aarch64
+ALPINE_ARCH="$VINIX_ARCH"
 
 mkdir -p "$DOWNLOADS" "$STAGING"
 
@@ -47,7 +55,9 @@ download_apk() {
     fi
 
     echo "  extracting ${filename}"
-    tar -ixzf "$local_file" -C "$STAGING" 2>/dev/null || true
+    # An apk is concatenated tar streams; take the payload after the
+    # signature and metadata. BSD tar's -i does not, so spell it out.
+    tar --ignore-zeros -xzf "$local_file" -C "$STAGING" 2>/dev/null || true
     rm -f "$STAGING/.PKGINFO" "$STAGING/.SIGN"* "$STAGING/.trigger"*
 }
 

@@ -29,6 +29,11 @@ build-support/init-aarch64/initramfs-minimal.tar
 /build-amd64-kernel/
 /build-amd64-qemu/
 /build-amd64-userland/
+/build-amd64-x11/
+/build-amd64-firefox/
+/build-amd64-network-tools/
+/build-amd64-python/
+/build-amd64-v/
 /third_party/
 build-support/init-aarch64/initramfs-desktop.tar
 build-support/init-aarch64/initramfs-desktop.tar.gz

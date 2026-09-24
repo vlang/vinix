@@ -1,5 +1,5 @@
 #!/bin/bash
-# Stage Firefox ESR and its Linux/aarch64 runtime for Vinix.
+# Stage Firefox ESR and its Linux/aarch64 (or x86_64) runtime for Vinix.
 #
 # Firefox's widgets are Gecko/XUL, but its Linux window-system glue is GTK 3.
 # We use Alpine's musl build and package GTK as an ordinary userspace library;
@@ -8,7 +8,15 @@ set -euo pipefail
 set -f
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-BUILD_DIR="${VINIX_FIREFOX_BUILD_DIR:-$SCRIPT_DIR/build-aarch64-firefox}"
+# VINIX_ARCH=x86_64 stages the same layer for amd64; build-firefox-amd64.sh
+# does that.
+VINIX_ARCH="${VINIX_ARCH:-aarch64}"
+case "$VINIX_ARCH" in
+    aarch64) ARCH_DIR=aarch64 ;;
+    x86_64) ARCH_DIR=amd64 ;;
+    *) echo "ERROR: unsupported VINIX_ARCH: $VINIX_ARCH" >&2; exit 1 ;;
+esac
+BUILD_DIR="${VINIX_FIREFOX_BUILD_DIR:-$SCRIPT_DIR/build-$ARCH_DIR-firefox}"
 DOWNLOADS="$BUILD_DIR/downloads"
 STAGING="$BUILD_DIR/staging"
 CACHE_STATE="$BUILD_DIR/.staging-cache-key"
@@ -18,7 +26,7 @@ ALPINE_MIRROR="${ALPINE_MIRROR:-https://dl-cdn.alpinelinux.org/alpine}"
 # implemented by Vinix yet. 3.22 carries the same Firefox 140 ESR generation
 # with the normal musl allocator, so keep the compatibility bundle on it.
 ALPINE_BRANCH="${ALPINE_BRANCH:-v3.22}"
-ALPINE_ARCH=aarch64
+ALPINE_ARCH="$VINIX_ARCH"
 FIREFOX_PACKAGE="${VINIX_FIREFOX_PACKAGE:-firefox-esr}"
 
 BRANCH_KEY="$(printf '%s' "$ALPINE_BRANCH" | tr '/:' '__')"

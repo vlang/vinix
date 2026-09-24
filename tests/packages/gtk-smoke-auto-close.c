@@ -16,12 +16,19 @@ extern void *gtk_widget_get_window(void *widget);
 extern int XSync(void *display, int discard);
 
 __attribute__((noreturn)) static void exit_success(void) {
+#if defined(__x86_64__)
+    asm volatile("syscall"
+                 :
+                 : "a"(231L) /* Linux x86-64 exit_group */, "D"(0L)
+                 : "rcx", "r11", "memory");
+#else
     register long status asm("x0") = 0;
     register long syscall_number asm("x8") = 94; /* Linux aarch64 exit_group */
     asm volatile("svc #0"
                  : "+r"(status)
                  : "r"(syscall_number)
                  : "memory");
+#endif
     __builtin_unreachable();
 }
 
