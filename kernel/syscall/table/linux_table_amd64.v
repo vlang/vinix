@@ -446,6 +446,7 @@ pub fn init_linux_syscall_table() {
 	linux_syscall_table[4] = voidptr(syscall_linux_stat)
 	linux_syscall_table[5] = voidptr(fs.syscall_fstat)
 	linux_syscall_table[6] = voidptr(syscall_linux_lstat)
+	linux_syscall_table[7] = voidptr(file.syscall_poll)
 	linux_syscall_table[8] = voidptr(fs.syscall_seek)
 	linux_syscall_table[9] = voidptr(syscall_linux_mmap)
 	linux_syscall_table[10] = voidptr(mmap.syscall_mprotect)
@@ -530,6 +531,8 @@ pub fn init_linux_syscall_table() {
 	linux_syscall_table[257] = voidptr(fs.syscall_openat)
 	linux_syscall_table[262] = voidptr(fs.syscall_fstatat)
 	linux_syscall_table[269] = voidptr(syscall_linux_faccessat)
+	// The fifth argument, the signal set's size, is always 8 from musl.
+	linux_syscall_table[271] = voidptr(file.syscall_ppoll)
 	linux_syscall_table[273] = voidptr(syscall_linux_set_robust_list)
 	linux_syscall_table[280] = voidptr(fs.syscall_utimensat)
 	linux_syscall_table[293] = voidptr(pipe.syscall_pipe)

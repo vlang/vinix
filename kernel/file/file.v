@@ -8,6 +8,7 @@ import errno
 import stat
 import event
 import event.eventstruct
+import memory
 import memory.mmap
 import time
 import usercopy
@@ -315,7 +316,43 @@ pub fn syscall_ppoll(_ voidptr, user_fds u64, nfds u64, user_timeout u64, user_s
 		}
 		sigmask_ptr = &sigmask
 	}
+	return poll_user_fds(pagemap, user_fds, mut pollfds, nfds, timeout_ptr, sigmask_ptr)
+}
 
+// poll(2), which x86-64 Linux programs call rather than ppoll: musl's DNS
+// resolver among them. The timeout is in milliseconds, and negative for none.
+pub fn syscall_poll(_ voidptr, user_fds u64, nfds u64, timeout_ms u64) (u64, u64) {
+	if nfds > 4096 {
+		return errno.err, errno.einval
+	}
+	pagemap := proc.current_thread().process.pagemap
+
+	mut pollfds := []PollFD{len: int(nfds)}
+	defer {
+		unsafe { pollfds.free() }
+	}
+	if nfds != 0
+		&& !usercopy.copy_from_user(unsafe { voidptr(&pollfds[0]) }, user_fds, nfds * sizeof(PollFD)) {
+		return errno.err, errno.efault
+	}
+
+	// The C int arrives in a 64-bit register; only its low half is defined.
+	milliseconds := i64(i32(u32(timeout_ms)))
+	timeout := time.TimeSpec{
+		tv_sec:  milliseconds / 1000
+		tv_nsec: (milliseconds % 1000) * 1000000
+	}
+	mut timeout_ptr := &time.TimeSpec(unsafe { nil })
+	if milliseconds >= 0 {
+		// In unsafe, so that timeout stays on the stack: see getdents64.
+		timeout_ptr = unsafe { &timeout }
+	}
+	return poll_user_fds(pagemap, user_fds, mut pollfds, nfds, timeout_ptr, unsafe { nil })
+}
+
+// Wait on a poll array already copied in from `pagemap`, then copy the
+// results back out.
+fn poll_user_fds(pagemap &memory.Pagemap, user_fds u64, mut pollfds []PollFD, nfds u64, timeout_ptr &time.TimeSpec, sigmask_ptr &u64) (u64, u64) {
 	mut fds_ptr := &PollFD(unsafe { nil })
 	if nfds != 0 {
 		fds_ptr = unsafe { &pollfds[0] }
