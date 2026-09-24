@@ -428,9 +428,10 @@ fn (mut this TmpFSResource) filesystem_stat() resource.FileSystemStat {
 }
 
 fn (mut this TmpFSResource) unref(_handle voidptr) ? {
-	katomic.dec(mut &this.refcount)
-
-	if this.refcount != 0 {
+	// The count the decrement left, not one read after it: two last
+	// references dropped at once could both read zero and free the file
+	// twice.
+	if katomic.dec(mut &this.refcount) {
 		return
 	}
 
