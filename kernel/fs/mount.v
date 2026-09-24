@@ -414,6 +414,14 @@ fn new_mount(parent &VFSNode, source string, target string, fstype string, flags
 		errno.set(errno.enoent)
 		return none
 	}
+	// The mount point is reached through normal path resolution, so a final
+	// symlink is followed too. runc mounts onto /proc/self/fd/<n>, a magic link
+	// to the real directory it opened, to avoid a TOCTOU on the path.
+	target_node = reduce_node(target_node, true)
+	if target_node == unsafe { nil } {
+		errno.set(errno.enoent)
+		return none
+	}
 	mounting_root := voidptr(target_node) == voidptr(vfs_root)
 	if !mounting_root && !stat.isdir(target_node.resource.stat.mode) {
 		errno.set(errno.enotdir)
@@ -486,6 +494,11 @@ fn mount_devpts(parent &VFSNode, target string, flags u64, options string) ? {
 		pts = internal_create(devtmpfs_root, 'pts', stat.ifdir | 0o755)?
 	}
 	_, mut target_node, _ := path2node(parent, target)
+	if target_node == unsafe { nil } {
+		errno.set(errno.enoent)
+		return none
+	}
+	target_node = reduce_node(target_node, true)
 	if target_node == unsafe { nil } {
 		errno.set(errno.enoent)
 		return none
