@@ -752,6 +752,11 @@ pub fn procfs_self_target() string {
 // Bring a procfs directory up to date with the process table. Called from path
 // resolution and from readdir, and a no-op for every other filesystem.
 pub fn procfs_refresh(node &VFSNode) {
+	procfs_refresh_named(node, '')
+}
+
+// The same for a lookup of `name` in it; '' is a listing.
+fn procfs_refresh_named(node &VFSNode, name string) {
 	if unsafe { procfs_root == 0 } || node == unsafe { nil } {
 		return
 	}
@@ -773,6 +778,10 @@ pub fn procfs_refresh(node &VFSNode) {
 	}
 
 	if directory.lazy && !directory.populated {
+		if name.len > 0 {
+			add_process_entry(mut target, directory.pid, name, directory.tid == 0)
+			return
+		}
 		directory.populated = true
 		if directory.tid == 0 {
 			populate_process_directory(mut target, directory.pid)
@@ -810,10 +819,10 @@ pub fn procfs_lookup_refresh(node &VFSNode, name string) {
 		procfs_refresh(node)
 		return
 	}
-	// A process directory is filled in on first use; do that before looking
+	// A process directory is filled in as it is used; do that before looking
 	// at what it holds.
 	if name !in node.children {
-		procfs_refresh(node)
+		procfs_refresh_named(node, name)
 	}
 	if directory.pid != 0 && name in ['exe', 'cwd', 'root'] && name in node.children {
 		mut link := unsafe { node.children[name] }
@@ -908,77 +917,112 @@ fn add_process_directory(mut root VFSNode, pid int, name string, view voidptr) {
 	}
 }
 
-// What a /proc/<pid> directory holds, made the first time it is looked in.
+// What a /proc/<pid> directory holds. A listing makes all of it; a lookup
+// makes only the entry it names (see add_process_entry()).
 fn populate_process_directory(mut node VFSNode, pid int) {
 	add_process_entries(mut node, pid)
-
-	mut task := add_procfs_directory(mut node, 'task')
-	mut task_resource := unsafe { &ProcFSResource(task.resource) }
-	task_resource.pid = pid
-	task_resource.view = unsafe { &ProcFSResource(node.resource) }.view
-	refresh_thread_directories(mut task, pid)
+	add_process_entry(mut node, pid, 'task', true)
 }
 
 // What /proc/<pid> and /proc/<pid>/task/<tid> both hold. A thread's
 // descriptors, namespaces and mounts are its process', since Vinix threads
 // share all three.
+const process_entry_names = ['cmdline', 'comm', 'stat', 'statm', 'status', 'cgroup', 'environ',
+	'mountinfo', 'mounts', 'mountstats', 'loginuid', 'oom_score_adj', 'uid_map', 'gid_map',
+	'setgroups', 'root', 'cwd', 'exe', 'fd', 'ns', 'attr']
+
 fn add_process_entries(mut node VFSNode, pid int) {
-	add_process_file(mut node, 'cmdline', .cmdline, pid)
-	add_process_file(mut node, 'comm', .comm, pid)
-	add_process_file(mut node, 'stat', .process_stat, pid)
-	add_process_file(mut node, 'statm', .statm, pid)
-	add_process_file(mut node, 'status', .status, pid)
-	add_process_file(mut node, 'cgroup', .process_cgroup, pid)
-	add_process_file(mut node, 'environ', .environ, pid)
-	add_process_file(mut node, 'mountinfo', .mountinfo, pid)
-	add_process_file(mut node, 'mounts', .mounts, pid)
-	add_process_file(mut node, 'mountstats', .mountstats, pid)
-	add_process_file(mut node, 'loginuid', .loginuid, pid)
-	add_process_writable(mut node, 'oom_score_adj', .oom_score_adj, pid)
-	add_process_writable(mut node, 'uid_map', .uid_map, pid)
-	add_process_writable(mut node, 'gid_map', .gid_map, pid)
-	add_process_writable(mut node, 'setgroups', .setgroups, pid)
-
-	mut root_link := create_node(node.filesystem, node, 'root', false)
-	root_link.resource = new_procfs_resource(.symlink, stat.iflnk | 0o777, pid, 0)
-	root_link.magic_target = process_root_node(pid)
-	if root_link.magic_target != unsafe { nil } {
-		root_link.symlink_target = pathname(root_link.magic_target)
+	for name in process_entry_names {
+		add_process_entry(mut node, pid, name, false)
 	}
+}
+
+// Make the entry `name` of a process or thread directory unless it is there
+// already, and answer whether such a directory has one. A lookup makes only
+// the entry it names. Making them all on the first look gave every process
+// anything looked in about thirty nodes of a kilobyte and more each, and
+// each of its threads as many again, none of them ever freed: some 400 KB
+// for every container a runtime started. `name` is only compared; the nodes
+// are named by the literals here.
+fn add_process_entry(mut node VFSNode, pid int, name string, is_process bool) bool {
+	if name in node.children {
+		return true
+	}
+	match name {
+		'cmdline' { add_process_file(mut node, 'cmdline', .cmdline, pid) }
+		'comm' { add_process_file(mut node, 'comm', .comm, pid) }
+		'stat' { add_process_file(mut node, 'stat', .process_stat, pid) }
+		'statm' { add_process_file(mut node, 'statm', .statm, pid) }
+		'status' { add_process_file(mut node, 'status', .status, pid) }
+		'cgroup' { add_process_file(mut node, 'cgroup', .process_cgroup, pid) }
+		'environ' { add_process_file(mut node, 'environ', .environ, pid) }
+		'mountinfo' { add_process_file(mut node, 'mountinfo', .mountinfo, pid) }
+		'mounts' { add_process_file(mut node, 'mounts', .mounts, pid) }
+		'mountstats' { add_process_file(mut node, 'mountstats', .mountstats, pid) }
+		'loginuid' { add_process_file(mut node, 'loginuid', .loginuid, pid) }
+		'oom_score_adj' { add_process_writable(mut node, 'oom_score_adj', .oom_score_adj, pid) }
+		'uid_map' { add_process_writable(mut node, 'uid_map', .uid_map, pid) }
+		'gid_map' { add_process_writable(mut node, 'gid_map', .gid_map, pid) }
+		'setgroups' { add_process_writable(mut node, 'setgroups', .setgroups, pid) }
+		'root' {
+			mut root_link := add_process_link(mut node, 'root', pid)
+			root_link.magic_target = process_root_node(pid)
+			if root_link.magic_target != unsafe { nil } {
+				root_link.symlink_target = pathname(root_link.magic_target)
+			}
+		}
+		'cwd' {
+			mut cwd_link := add_process_link(mut node, 'cwd', pid)
+			cwd_link.magic_target = process_cwd_node(pid)
+			if cwd_link.magic_target != unsafe { nil } {
+				cwd_link.symlink_target = pathname(cwd_link.magic_target)
+			}
+		}
+		'exe' {
+			mut exe := add_process_link(mut node, 'exe', pid)
+			exe.symlink_target = proc.process_program(pid)
+			exe.magic_target = process_exe_node(pid)
+		}
+		'fd' {
+			mut descriptors := add_procfs_directory(mut node, 'fd')
+			mut fd_resource := unsafe { &ProcFSResource(descriptors.resource) }
+			fd_resource.pid = pid
+			refresh_fd_directory(mut descriptors, pid)
+		}
+		'ns' {
+			mut namespaces := add_procfs_directory(mut node, 'ns')
+			mut ns_resource := unsafe { &ProcFSResource(namespaces.resource) }
+			ns_resource.pid = pid
+			refresh_ns_directory(mut namespaces, pid)
+		}
+		'attr' {
+			mut attr := add_procfs_directory(mut node, 'attr')
+			add_process_file(mut attr, 'current', .environ, pid)
+		}
+		'task' {
+			if !is_process {
+				return false
+			}
+			mut task := add_procfs_directory(mut node, 'task')
+			mut task_resource := unsafe { &ProcFSResource(task.resource) }
+			task_resource.pid = pid
+			task_resource.view = unsafe { &ProcFSResource(node.resource) }.view
+			refresh_thread_directories(mut task, pid)
+		}
+		else {
+			return false
+		}
+	}
+	return true
+}
+
+fn add_process_link(mut node VFSNode, name string, pid int) &VFSNode {
+	mut link := create_node(node.filesystem, node, name, false)
+	link.resource = new_procfs_resource(.symlink, stat.iflnk | 0o777, pid, 0)
 	unsafe {
-		node.children['root'] = root_link
+		node.children[name] = link
 	}
-
-	mut cwd_link := create_node(node.filesystem, node, 'cwd', false)
-	cwd_link.resource = new_procfs_resource(.symlink, stat.iflnk | 0o777, pid, 0)
-	cwd_link.magic_target = process_cwd_node(pid)
-	if cwd_link.magic_target != unsafe { nil } {
-		cwd_link.symlink_target = pathname(cwd_link.magic_target)
-	}
-	unsafe {
-		node.children['cwd'] = cwd_link
-	}
-
-	mut exe := create_node(node.filesystem, node, 'exe', false)
-	exe.resource = new_procfs_resource(.symlink, stat.iflnk | 0o777, pid, 0)
-	exe.symlink_target = proc.process_program(pid)
-	exe.magic_target = process_exe_node(pid)
-	unsafe {
-		node.children['exe'] = exe
-	}
-
-	mut descriptors := add_procfs_directory(mut node, 'fd')
-	mut fd_resource := unsafe { &ProcFSResource(descriptors.resource) }
-	fd_resource.pid = pid
-	refresh_fd_directory(mut descriptors, pid)
-
-	mut namespaces := add_procfs_directory(mut node, 'ns')
-	mut ns_resource := unsafe { &ProcFSResource(namespaces.resource) }
-	ns_resource.pid = pid
-	refresh_ns_directory(mut namespaces, pid)
-
-	mut attr := add_procfs_directory(mut node, 'attr')
-	add_process_file(mut attr, 'current', .environ, pid)
+	return link
 }
 
 // One symlink per open descriptor, named by its number. Chromium's sandbox
