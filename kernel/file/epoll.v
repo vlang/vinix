@@ -237,6 +237,11 @@ pub fn syscall_epoll_ctl(_ voidptr, epfd int, op int, fd int, event_ptr u64) (u6
 		}
 	}
 
+	// A thread already blocked in epoll_pwait on this set has to look at the
+	// descriptor just added or rearmed.
+	if op == epoll_ctl_add || op == epoll_ctl_mod {
+		event.trigger(mut epoll_res.event, false)
+	}
 	return 0, 0
 }
 
@@ -336,47 +341,11 @@ pub fn syscall_epoll_pwait(_ voidptr, epfd int, events_buf u64, maxevents int, t
 		return ret, 0
 	}
 
-	// Nothing ready yet. Snapshot the events to wait on while the set is
-	// locked, taking a reference on every watched open file so a concurrent
-	// EPOLL_CTL_DEL on another thread cannot free a resource this is about to
-	// sleep on. The references are dropped once the wait is over.
-	mut watched_handles := epoll_res.snapshot_watched()
-	mut ev_list := []&eventstruct.Event{}
-	defer {
-		for mut watched_handle in watched_handles {
-			watched_handle.unref()
-		}
-		unsafe {
-			ev_list.free()
-			watched_handles.free()
-		}
-	}
-	for mut watched_handle in watched_handles {
-		mut watched := watched_handle.resource
-		ev_list << &watched.event
-	}
-
-	if ev_list.len == 0 {
-		// No valid fds to wait on
-		if timeout == 0 {
-			return 0, 0
-		}
-		// With timeout, just sleep
-		if timeout > 0 {
-			ts := time.TimeSpec{
-				tv_sec:  i64(timeout / 1000)
-				tv_nsec: i64((timeout % 1000) * 1000000)
-			}
-			mut timer := time.new_timer(ts)
-			mut timer_events := [&timer.event]
-			event.await(mut timer_events, true) or {}
-			timer.disarm()
-			unsafe { free(timer) }
-		}
+	if timeout == 0 {
+		// Non-blocking, and nothing is ready.
 		return 0, 0
 	}
 
-	// Add a timer if timeout > 0
 	mut timer := &time.Timer(unsafe { nil })
 	if timeout > 0 {
 		ts := time.TimeSpec{
@@ -384,13 +353,8 @@ pub fn syscall_epoll_pwait(_ voidptr, epfd int, events_buf u64, maxevents int, t
 			tv_nsec: i64((timeout % 1000) * 1000000)
 		}
 		timer = time.new_timer(ts)
-		ev_list << &timer.event
-	} else if timeout == 0 {
-		// Non-blocking — we already checked, nothing ready
-		return 0, 0
 	}
 	// timeout < 0 means block indefinitely
-
 	defer {
 		if voidptr(timer) != unsafe { nil } {
 			timer.disarm()
@@ -398,20 +362,41 @@ pub fn syscall_epoll_pwait(_ voidptr, epfd int, events_buf u64, maxevents int, t
 		}
 	}
 
-	// Wait for any event
 	for {
-		which := event.await(mut ev_list, true) or {
-			return errno.err, errno.eintr
+		// Sleep on the events of what the set watches right now, and on the
+		// set's own event, which epoll_ctl raises when the set changes: Go adds
+		// descriptors to its poller while a thread is already blocked here.
+		// The wait pins the watched resources so their events outlive it, but
+		// not the open files. A file watched here must still go away when its
+		// last descriptor is closed -- a pipe reader is waiting for exactly
+		// that to see end of file -- and Linux never keeps one open either.
+		// Holding the file instead left runc's log pipe with a writer for as
+		// long as its poller slept, so runc waited forever for the EOF.
+		mut watched := epoll_res.snapshot_watched()
+		mut ev_list := []&eventstruct.Event{}
+		ev_list << &epoll_res.event
+		for i in 0 .. watched.len {
+			mut watched_res := watched[i]
+			ev_list << &watched_res.event
+		}
+		timer_index := u64(ev_list.len)
+		if voidptr(timer) != unsafe { nil } {
+			ev_list << &timer.event
 		}
 
-		// Check if timer expired
-		if voidptr(timer) != unsafe { nil } && which == u64(ev_list.len) - 1 {
-			return 0, 0
+		result := event.await(mut ev_list, true)
+		for i in 0 .. watched.len {
+			mut watched_res := watched[i]
+			resource.release_resource(mut watched_res)
 		}
+		unsafe {
+			watched.free()
+			ev_list.free()
+		}
+		which := result or { return errno.err, errno.eintr }
 
-		// Re-check every entry under the lock. A wake means one of the watched
-		// resources changed; the entries themselves may have moved in the
-		// meantime, so readiness is read from the set as it is now.
+		// Readiness is read from the set as it is now; the entries may have
+		// moved while this slept.
 		if events := epoll_res.collect_ready(maxevents) {
 			ret = 0
 			for out_event in events {
@@ -425,8 +410,11 @@ pub fn syscall_epoll_pwait(_ voidptr, epfd int, events_buf u64, maxevents int, t
 				return ret, 0
 			}
 		}
-
-		// Spurious wakeup, try again
+		if voidptr(timer) != unsafe { nil } && which == timer_index {
+			return 0, 0
+		}
+		// A wake with nothing ready: the set changed, or a watched resource
+		// did in a way that is not being waited for. Look again.
 	}
 
 	return 0, 0
@@ -463,23 +451,23 @@ fn (mut this EpollResource) collect_ready(maxevents int) ?[]EpollEvent {
 	return events
 }
 
-// A reference-holding copy of the handles currently watched, so a blocking
-// wait can sleep on their events without the entries being freed underneath it.
-fn (mut this EpollResource) snapshot_watched() []&Handle {
+// The resources currently watched, each retained so that a blocking wait can
+// sleep on its event without the resource being freed underneath it.
+fn (mut this EpollResource) snapshot_watched() []&resource.Resource {
 	this.l.acquire()
 	defer {
 		this.l.release()
 	}
-	mut handles := []&Handle{}
+	mut resources := []&resource.Resource{}
 	for entry in this.entries {
 		if entry.handle == unsafe { nil } {
 			continue
 		}
-		mut watched_handle := entry.handle
-		katomic.inc(mut &watched_handle.refcount)
-		handles << watched_handle
+		mut watched := entry.handle.resource
+		resource.retain_resource(mut watched)
+		resources << watched
 	}
-	return handles
+	return resources
 }
 
 // epoll_pwait2 is epoll_pwait with a nanosecond timespec instead of a
