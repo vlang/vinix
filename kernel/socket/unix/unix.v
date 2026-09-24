@@ -285,9 +285,16 @@ pub fn (mut this UnixSocket) recv_seqpacket(_handle voidptr, buf voidptr, count 
 			errno.set(errno.ewouldblock)
 			return none
 		}
+		// Sample the event's generation while the socket lock still protects the
+		// empty state. A writer that fills the socket after this check and
+		// before the wait attaches raises the generation, so the generation-aware
+		// wait returns at once instead of sleeping on a notification another
+		// reader has already consumed. runc's synchronous sync channel deadlocked
+		// on exactly that lost wakeup.
+		generation := event.generation(mut this.event)
 		this.l.release()
 		mut events := [&this.event]
-		event.await(mut events, true) or {
+		event.await_from_generation(mut events, true, 0, generation) or {
 			unsafe { events.free() }
 			errno.set(errno.eintr)
 			return none
