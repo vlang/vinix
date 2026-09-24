@@ -9,6 +9,7 @@ import event
 import errno
 import resource
 import file
+import katomic
 import socket.inet
 import socket.public as sock_pub
 
@@ -299,13 +300,8 @@ fn requested_link(list []inet.Interface, request voidptr, length u64) ?inet.Inte
 }
 
 // An NLMSG_ERROR carrying `code` (0 is a plain ACK), echoing the request header.
-fn build_ack(seq u32, pid u32, code i32, request voidptr, request_len u64) []u8 {
-	mut m := []u8{}
-	put_u32(mut m, 0) // length, filled below
-	put_u16(mut m, nlmsg_error)
-	put_u16(mut m, 0)
-	put_u32(mut m, seq)
-	put_u32(mut m, pid)
+fn put_ack(mut m []u8, seq u32, pid u32, code i32, request voidptr, request_len u64) {
+	start := start_message(mut m, nlmsg_error, 0, seq, pid)
 	put_u32(mut m, u32(code)) // errno (negative on real errors; 0 = ACK)
 	// The original request header (first 16 bytes) follows.
 	copy_len := if request_len < 16 { request_len } else { u64(16) }
@@ -313,26 +309,16 @@ fn build_ack(seq u32, pid u32, code i32, request voidptr, request_len u64) []u8 
 	for i := u64(0); i < copy_len; i++ {
 		m << unsafe { rp[i] }
 	}
-	for m.len < 36 {
+	for m.len - start < 36 {
 		m << u8(0)
 	}
-	total := u32(m.len)
-	m[0] = u8(total)
-	m[1] = u8(total >> 8)
-	m[2] = u8(total >> 16)
-	m[3] = u8(total >> 24)
-	return m
+	finish_message(mut m, start)
 }
 
-fn build_done(seq u32, pid u32) []u8 {
-	mut m := []u8{}
-	put_u32(mut m, 20)
-	put_u16(mut m, nlmsg_done)
-	put_u16(mut m, nlm_f_multi)
-	put_u32(mut m, seq)
-	put_u32(mut m, pid)
+fn put_done(mut m []u8, seq u32, pid u32) {
+	start := start_message(mut m, nlmsg_done, nlm_f_multi, seq, pid)
 	put_u32(mut m, 0) // NLMSG_DONE payload: error = 0
-	return m
+	finish_message(mut m, start)
 }
 
 // Turn one request datagram into its reply datagram and queue it.
@@ -362,13 +348,13 @@ fn (mut this NetlinkSocket) handle_request(buf voidptr, count u64) {
 				put_link(mut reply, iface, seq, pid, true)
 			}
 			unsafe { list.free() }
-			reply << build_done(seq, pid)
+			put_done(mut reply, seq, pid)
 		} else if msg_type == rtm_getlink {
 			list := inet.interfaces()
 			if iface := requested_link(list, req, u64(msg_len)) {
 				put_link(mut reply, iface, seq, pid, false)
 			} else {
-				reply << build_ack(seq, pid, -enodev, req, u64(msg_len))
+				put_ack(mut reply, seq, pid, -enodev, req, u64(msg_len))
 			}
 			unsafe { list.free() }
 		} else if msg_type == rtm_getaddr && is_dump {
@@ -379,7 +365,7 @@ fn (mut this NetlinkSocket) handle_request(buf voidptr, count u64) {
 				}
 			}
 			unsafe { list.free() }
-			reply << build_done(seq, pid)
+			put_done(mut reply, seq, pid)
 		} else if msg_type == rtm_getroute && is_dump {
 			list := inet.interfaces()
 			for iface in list {
@@ -392,27 +378,29 @@ fn (mut this NetlinkSocket) handle_request(buf voidptr, count u64) {
 				put_route(mut reply, iface, seq, pid, false)
 			}
 			unsafe { list.free() }
-			reply << build_done(seq, pid)
+			put_done(mut reply, seq, pid)
 		} else if is_get && is_dump {
 			// Neighbours, rules, qdiscs and the rest: there are none to list.
-			reply << build_done(seq, pid)
+			put_done(mut reply, seq, pid)
 		} else if is_get {
 			// A lookup that is not answered would leave its caller waiting.
-			reply << build_ack(seq, pid, -eopnotsupp, req, u64(msg_len))
+			put_ack(mut reply, seq, pid, -eopnotsupp, req, u64(msg_len))
 		} else {
 			// RTM_NEWLINK/RTM_SETLINK/RTM_NEWADDR and the rest: acknowledge when
 			// asked, which is what LinkSetUp waits for.
 			if (msg_flags & nlm_f_ack) != 0 {
-				reply << build_ack(seq, pid, 0, req, u64(msg_len))
+				put_ack(mut reply, seq, pid, 0, req, u64(msg_len))
 			}
 		}
 		off += u64((msg_len + 3) & u32(0xfffffffc))
 	}
-	if reply.len != 0 {
-		this.rx << reply
-		this.status |= file.pollin
-		event.trigger(mut this.event, false)
+	if reply.len == 0 {
+		unsafe { reply.free() }
+		return
 	}
+	this.rx << reply
+	this.status |= file.pollin
+	event.trigger(mut this.event, false)
 }
 
 // ── resource methods ─────────────────────────────────────────────────────────
@@ -611,11 +599,18 @@ fn (mut this NetlinkSocket) ioctl(handle voidptr, request u64, argp voidptr) ?in
 }
 
 fn (mut this NetlinkSocket) unref(_handle voidptr) ? {
-	this.l.acquire()
-	defer {
-		this.l.release()
+	if katomic.dec(mut &this.refcount) {
+		return
 	}
-	this.refcount--
+	// The last descriptor is gone, and with it anything that could still be
+	// waiting for a reply. runc opens one of these for every container.
+	for i in 0 .. this.rx.len {
+		unsafe { this.rx[i].free() }
+	}
+	unsafe {
+		this.rx.free()
+		free(this)
+	}
 }
 
 fn (mut this NetlinkSocket) grow(_handle voidptr, _new_size u64) ? {}
