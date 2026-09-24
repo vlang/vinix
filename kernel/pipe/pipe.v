@@ -471,10 +471,14 @@ fn (mut this Pipe) unref(handle voidptr) ? {
 		unsafe { free(this.data) }
 		this.data = unsafe { nil }
 	}
-	still_referenced := katomic.dec(mut &this.refcount)
 	this.l.release()
+	// Waiters are woken while this reference still holds the pipe. The other
+	// end closing on another CPU can free it as soon as the reference goes,
+	// and a wakeup after that took the lock of freed memory: it spun on the
+	// poison, which reads as held, until the memory was reused, and then took
+	// a "lock" inside whatever lived there by then.
 	event.trigger(mut this.event, false)
-	if !still_referenced {
+	if !katomic.dec(mut &this.refcount) {
 		unsafe {
 			free(this.data)
 			free(this)
