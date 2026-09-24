@@ -736,7 +736,6 @@ fn create_prime_fd(dev &DrmDevice, obj &gem.GemObject, flags u32) ?int {
 	}
 	fdnum := file.fdnum_create_from_fd(unsafe { nil }, fd, 0, false) or {
 		fd.unref()
-		unsafe { free(voidptr(fd)) }
 		return none
 	}
 	return fdnum
@@ -815,7 +814,6 @@ fn create_sync_file_fd(fence &syncobj.DmaFence) ?int {
 	}
 	fdnum := file.fdnum_create_from_fd(unsafe { nil }, fd, 0, false) or {
 		fd.unref()
-		unsafe { free(voidptr(fd)) }
 		return none
 	}
 	return fdnum

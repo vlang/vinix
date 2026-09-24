@@ -192,6 +192,7 @@ pub fn syscall_epoll_ctl(_ voidptr, epfd int, op int, fd int, event_ptr u64) (u6
 				data:   requested.data
 				handle: watched_fd.handle
 			}
+			watched_fd.release_descriptor()
 		}
 		epoll_ctl_del {
 			watched_fd.unref()

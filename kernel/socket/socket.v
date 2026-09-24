@@ -22,7 +22,6 @@ struct CMsgHdr {
 fn release_passed_fds(mut fds []&file.FD) {
 	for mut fd in fds {
 		fd.unref()
-		unsafe { free(voidptr(fd)) }
 	}
 	unsafe { fds.free() }
 }
@@ -78,11 +77,12 @@ fn collect_passed_fds(msg &sock_pub.MsgHdr) ?[]&file.FD {
 				return none
 			}
 			// fd_from_fdnum() acquired the Handle reference now owned by this
-			// queued descriptor. Do not unref the source on the success path.
+			// queued descriptor, so only the source descriptor is let go.
 			mut passed := &file.FD{
 				handle: source.handle
 				flags: 0
 			}
+			source.release_descriptor()
 			result << passed
 		}
 

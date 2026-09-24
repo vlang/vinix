@@ -334,11 +334,28 @@ pub struct FD {
 pub mut:
 	handle &Handle = unsafe { nil }
 	flags  int
+	// The descriptor table's reference, plus one for every syscall that has
+	// the descriptor from fd_from_fdnum(). close() drops the table's, so a
+	// syscall still running on a descriptor another thread closed keeps what
+	// it is using until it lets go.
+	refcount int = 1
 }
 
+// Give back the reference fd_from_fdnum() took, on the descriptor and on the
+// open file behind it. The descriptor goes once nothing holds it.
 pub fn (mut this FD) unref() {
 	mut handle := this.handle
 	handle.unref()
+	this.release_descriptor()
+}
+
+// Drop only the reference on the descriptor object, for a caller that keeps
+// the open-file reference fd_from_fdnum() took -- a descriptor being passed
+// over a socket.
+pub fn (mut this FD) release_descriptor() {
+	if !katomic.dec(mut &this.refcount) {
+		unsafe { free(voidptr(this)) }
+	}
 }
 
 pub fn fdnum_close(_process &proc.Process, fdnum int, do_lock bool) ? {
@@ -374,8 +391,8 @@ pub fn fdnum_close(_process &proc.Process, fdnum int, do_lock bool) ? {
 	// POSIX record locks are process-owned and closing any descriptor for the
 	// inode releases that process' locks, even when another dup remains open.
 	release_posix_locks(handle.resource, process.pid)
-	unsafe { free(voidptr(fd)) }
 	handle.unref()
+	fd.release_descriptor()
 }
 
 pub fn fdnum_create_from_fd(_process &proc.Process, fd &FD, oldfd int, specific bool) ?int {
@@ -470,6 +487,7 @@ pub fn fd_from_fdnum(_process &proc.Process, fdnum int) ?&FD {
 	}
 
 	katomic.inc(mut &ret.handle.refcount)
+	katomic.inc(mut &ret.refcount)
 
 	return ret
 }
@@ -501,6 +519,7 @@ pub fn fdnum_dup(_old_process &proc.Process, oldfdnum int, _new_process &proc.Pr
 
 	mut new_fd := unsafe { &FD(malloc(sizeof(FD))) }
 	unsafe { C.memcpy(new_fd, oldfd, sizeof(FD)) }
+	new_fd.refcount = 1
 	katomic.inc(mut &oldfd.handle.refcount)
 
 	new_fdnum := fdnum_create_from_fd(new_process, new_fd, newfdnum, specific) or {

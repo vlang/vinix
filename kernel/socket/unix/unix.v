@@ -237,7 +237,6 @@ fn (mut this UnixSocket) read(_handle voidptr, buf voidptr, _loc u64, _count u64
 		mut pending_fds := unsafe { this.pending_fd_groups[0].fds }
 		for mut dropped in pending_fds {
 			dropped.unref()
-			unsafe { free(voidptr(dropped)) }
 		}
 		unsafe { pending_fds.free() }
 		this.pending_fd_groups.delete(0)
@@ -335,7 +334,6 @@ pub fn (mut this UnixSocket) recv_seqpacket(_handle voidptr, buf voidptr, count 
 			mut pending_fds := unsafe { this.pending_fd_groups[0].fds }
 			for mut dropped in pending_fds {
 				dropped.unref()
-				unsafe { free(voidptr(dropped)) }
 			}
 			unsafe { pending_fds.free() }
 			this.pending_fd_groups.delete(0)
@@ -565,7 +563,6 @@ fn (mut this UnixSocket) close_endpoint() {
 		mut descriptors := unsafe { group.fds }
 		for mut descriptor in descriptors {
 			descriptor.unref()
-			unsafe { free(voidptr(descriptor)) }
 		}
 		unsafe { descriptors.free() }
 	}
@@ -1168,7 +1165,6 @@ fn (mut this UnixSocket) recvmsg(_handle voidptr, msg &sock_pub.MsgHdr, flags in
 		for i in int(deliver) .. pending_fds.len {
 			mut dropped := pending_fds[i]
 			dropped.unref()
-			unsafe { free(voidptr(dropped)) }
 		}
 		unsafe { pending_fds.free() }
 		this.pending_fd_groups.delete(0)
@@ -1186,7 +1182,6 @@ fn (mut this UnixSocket) recvmsg(_handle voidptr, msg &sock_pub.MsgHdr, flags in
 				mut pending_fds := unsafe { this.pending_fd_groups[0].fds }
 				for mut dropped in pending_fds {
 					dropped.unref()
-					unsafe { free(voidptr(dropped)) }
 				}
 				unsafe { pending_fds.free() }
 				this.pending_fd_groups.delete(0)
