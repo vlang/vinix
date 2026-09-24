@@ -559,6 +559,13 @@ fn (mut this ProcFSResource) read(_handle voidptr, buf voidptr, loc u64, count u
 	}
 
 	text := this.contents()
+	// Every kind but the stored ones makes its text afresh for each read, and
+	// it is only needed until copied out.
+	defer {
+		if this.kind != .text && this.kind != .sysctl {
+			unsafe { text.free() }
+		}
+	}
 	if loc >= u64(text.len) {
 		return i64(0)
 	}
@@ -1165,3 +1172,4 @@ fn prune_directories(mut parent VFSNode, live []int) {
 		}
 	}
 }
+
