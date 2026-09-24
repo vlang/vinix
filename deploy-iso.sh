@@ -198,10 +198,30 @@ IMAGES=()
 
 # ── amd64 ──────────────────────────────────────────────────────────────────
 
+# The desktops are assembled from package layers built by their own scripts.
+# They hold Alpine's and upstream binaries rather than Vinix source, so this
+# checkout's copies are used as they are.
+layer_missing=0
+check_layer() {
+    if [ ! -e "$1" ]; then
+        echo "  missing: $1 (build it with $2)" >&2
+        layer_missing=1
+    fi
+}
+
 if [ "$BUILD_AMD64" -eq 1 ]; then
     step "Building the amd64 image"
+    for layer in x11 firefox network-tools python v; do
+        check_layer "$SCRIPT_DIR/build-amd64-$layer/staging" "./build-$layer-amd64.sh"
+    done
+    [ "$layer_missing" -eq 0 ] || die "build the missing layers in $SCRIPT_DIR first"
     rm -f "$OUT/vinix-amd64.iso"
     VINIX_UI2_SOURCE="$UI2_SOURCE" \
+    VINIX_AMD64_X11_STAGING="$SCRIPT_DIR/build-amd64-x11/staging" \
+    VINIX_AMD64_FIREFOX_STAGING="$SCRIPT_DIR/build-amd64-firefox/staging" \
+    VINIX_AMD64_NETWORK_TOOLS_STAGING="$SCRIPT_DIR/build-amd64-network-tools/staging" \
+    VINIX_AMD64_PYTHON_STAGING="$SCRIPT_DIR/build-amd64-python/staging" \
+    VINIX_AMD64_VLANG_STAGING="$SCRIPT_DIR/build-amd64-v/staging" \
     VINIX_AMD64_DESKTOP_BUILD_DIR="$WORK/amd64-desktop" \
     VINIX_AMD64_USERLAND_BUILD_DIR="$CACHE/amd64-userland" \
     VINIX_AMD64_BUILD_DIR="$WORK/amd64-kernel" \
@@ -215,16 +235,6 @@ fi
 
 if [ "$BUILD_ARM64" -eq 1 ]; then
     step "Building the arm64 image"
-    # The desktop is assembled from package layers built by their own
-    # scripts. They hold Alpine's and upstream binaries rather than Vinix
-    # source, so this checkout's copies are used as they are.
-    layer_missing=0
-    check_layer() {
-        if [ ! -e "$1" ]; then
-            echo "  missing: $1 (build it with $2)" >&2
-            layer_missing=1
-        fi
-    }
     check_layer "$SCRIPT_DIR/build-support/init-aarch64/initramfs.tar" ./build-aarch64.sh
     check_layer "$SCRIPT_DIR/build-aarch64-userland/staging" ./build-aarch64.sh
     check_layer "$SCRIPT_DIR/build-aarch64-x11/staging" ./build-x11-aarch64.sh
@@ -329,15 +339,21 @@ describe_boot() {
     echo
     echo '```sh'
     echo '# amd64 (use -accel kvm -cpu host on Linux, -accel hvf on an Intel Mac)'
-    echo 'qemu-system-x86_64 -machine q35 -m 4096 -smp 2 -cdrom vinix-amd64.iso'
+    echo 'qemu-system-x86_64 -machine q35 -m 4096 -smp 2 -cdrom vinix-amd64.iso \'
+    echo '    -nic user,model=e1000'
     echo
     echo '# arm64 (use -accel kvm on an arm64 Linux host)'
     echo 'qemu-system-aarch64 -machine virt -accel hvf -cpu host -m 4096 -smp 4 \'
     echo '    -bios "$(brew --prefix qemu)/share/qemu/edk2-aarch64-code.fd" \'
     echo '    -device virtio-scsi-pci -device scsi-cd,drive=cd \'
     echo '    -drive if=none,id=cd,media=cdrom,file=vinix-arm64.iso \'
-    echo '    -device ramfb -device qemu-xhci -device usb-kbd -device usb-tablet'
+    echo '    -device ramfb -device qemu-xhci -device usb-kbd -device usb-tablet \'
+    echo '    -netdev user,id=net0 -device virtio-net-device,netdev=net0'
     echo '```'
+    echo
+    echo "Firefox, Chromium and the other optional apps are not on the image: the first"
+    echo "launch offers them and \`pkg install\` downloads them, so give the VM a network"
+    echo "card (the commands above do). Vinix drives VirtIO and Intel e1000 cards."
     echo
     echo "### VirtualBox"
     echo
@@ -346,7 +362,8 @@ describe_boot() {
     echo
     echo "Create a VM of type **Other/Unknown (64-bit)** or **Other/Unknown (ARM 64-bit)**,"
     echo "give it **4096 MB** of memory and two CPUs, skip the hard disk, and attach the ISO"
-    echo "to its optical drive. Everything else can stay as VirtualBox sets it; the amd64"
+    echo "to its optical drive. For the network, set the adapter type to **Intel PRO/1000"
+    echo "MT Desktop (82540EM)**. Everything else can stay as VirtualBox sets it; the amd64"
     echo "image boots with EFI switched on or off. From a checkout of this repository,"
     echo "\`./run-iso-virtualbox.sh vinix-arm64.iso\` creates and starts such a VM."
     if [ -n "$TEST_SUMMARY" ]; then

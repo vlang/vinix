@@ -138,6 +138,7 @@ if [ "$ARCH" = amd64 ]; then
         --firmware "$FIRMWARE" \
         --graphicscontroller vmsvga --vram 64 \
         --keyboard ps2 --mouse ps2 \
+        --nic1 nat --nictype1 82540EM \
         --boot1 dvd --boot2 none --boot3 none --boot4 none
     controller="$(vbox showvminfo "$NAME" --machinereadable |
         sed -n 's/^storagecontrollername0="\(.*\)"$/\1/p')"
@@ -149,6 +150,7 @@ else
         --memory "$MEMORY" --cpus "$CPUS" \
         --graphicscontroller vmsvga --vram 64 \
         --usb-xhci on --keyboard usb --mouse usbtablet \
+        --nic1 nat --nictype1 82540EM \
         --boot1 dvd --boot2 none --boot3 none --boot4 none
     controller="$(vbox showvminfo "$NAME" --machinereadable |
         sed -n 's/^storagecontrollername0="\(.*\)"$/\1/p')"
