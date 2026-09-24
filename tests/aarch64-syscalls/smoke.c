@@ -417,13 +417,16 @@ int main(void) {
             _exit(1);
         if (sethostname("syscall-smoke", 13) != 0 ||
             syscall(SYS_setdomainname, "vinix.test", 10) != 0 ||
-            !failed_with_errno(syscall(SYS_umount2, "/tmp", 0), ENOSYS, "root umount2") ||
+            (mount_ready && syscall(SYS_umount2, mount_dir, 0) != 0) ||
             !failed_with_errno(syscall(SYS_reboot, 0, 0, 0, NULL), EINVAL, "root reboot invalid magic"))
             _exit(2);
         _exit(0);
     }
     check(security_child_succeeded(root_effective_child),
           "non-root real uid with root euid is allowed");
+    if (mount_ready)
+        check(access("/tmp/aarch64-syscall-mount/probe", F_OK) != 0,
+              "root umount2 detaches the mount");
 
     close(fd);
     unlink(path);

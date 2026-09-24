@@ -342,9 +342,21 @@ pub fn syscall_mount(_ voidptr, src charptr, tgt charptr, fs_type charptr, mount
 	if !security.permitted(security.filesystem_mount) {
 		return errno.err, errno.eperm
 	}
-	target := user_path(tgt) or { return errno.err, errno.get() }
-	source := optional_user_string(src, 4096)
-	fstype := optional_user_string(fs_type, 256)
+	// Copy the names before resolving anything: the caller may change or unmap
+	// its buffers afterwards, and a bad pointer must be an EFAULT rather than a
+	// kernel dereference. The source is required, as the smoke test expects. The
+	// type may be NULL, as it is for a remount, bind, move or propagation change.
+	// The mount table keeps the source and type for /proc/mounts, so they are
+	// not freed here.
+	source := usercopy.copy_cstring_from_user(u64(src), 4096) or { return errno.err, errno.get() }
+	target := usercopy.copy_cstring_from_user(u64(tgt), 4096) or { return errno.err, errno.get() }
+	defer { unsafe { target.free() } }
+	mut fstype := ''
+	if fs_type != unsafe { nil } {
+		fstype = usercopy.copy_cstring_from_user(u64(fs_type), 4096) or {
+			return errno.err, errno.get()
+		}
+	}
 	options := optional_user_string(charptr(data), 4096)
 	mut flags := mountflags
 	// Old programs still put MS_MGC_VAL in the top half of the flags.
@@ -648,7 +660,8 @@ pub fn syscall_umount(_ voidptr, tgt charptr, flags u64) (u64, u64) {
 	if !security.permitted(security.filesystem_unmount) {
 		return errno.err, errno.eperm
 	}
-	target := user_path(tgt) or { return errno.err, errno.get() }
+	target := usercopy.copy_cstring_from_user(u64(tgt), 4096) or { return errno.err, errno.get() }
+	defer { unsafe { target.free() } }
 	if flags & ~u64(0xf) != 0 {
 		return errno.err, errno.einval
 	}
