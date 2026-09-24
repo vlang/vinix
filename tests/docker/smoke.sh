@@ -36,4 +36,11 @@ output=$(docker run --rm "$image" echo hello-from-a-container) ||
 [ "$output" = hello-from-a-container ] || fail "unexpected output: $output"
 pass "container ran and printed its output"
 
+# -t gives the container a pty. The shell sees a terminal on stdin and can
+# reopen it as /dev/tty; the pty turns the newline into CRLF on the way out.
+output=$(docker run --rm -t "$image" sh -c '[ -t 0 ] && [ -t 1 ] && : < /dev/tty && echo tty-ok') ||
+	fail "docker run -t"
+[ "$output" = "$(printf 'tty-ok\r')" ] || fail "unexpected -t output: $output"
+pass "container ran with a terminal"
+
 echo "DOCKER SMOKE: PASS"

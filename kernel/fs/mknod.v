@@ -33,6 +33,16 @@ pub mut:
 	backing &resource.Resource = unsafe { nil }
 }
 
+// A device that decides what an open returns, as /dev/tty and /dev/ptmx do,
+// must decide it for the container's node too.
+fn (mut this MknodDeviceResource) open(flags int) ?&resource.Resource {
+	mut backing := this.backing
+	if mut backing is resource.OpenableResource {
+		return backing.open(flags)
+	}
+	return &resource.Resource(this)
+}
+
 fn (mut this MknodDeviceResource) read(handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
 	mut backing := this.backing
 	return backing.read(handle, buf, loc, count)
