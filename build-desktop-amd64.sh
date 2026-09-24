@@ -4,6 +4,11 @@
 # The desktop is linked against the same official Alpine/musl packages as the
 # base image. No Vinix-specific GCC, libc, or userspace build is required.
 #
+# The image carries the same package layers as the arm64 desktop; build them
+# first with ./build-x11-amd64.sh, ./build-firefox-amd64.sh,
+# ./build-network-tools-amd64.sh, ./build-python-amd64.sh and
+# ./build-v-amd64.sh.
+#
 # Usage: ./build-desktop-amd64.sh [--no-iso]
 set -euo pipefail
 
@@ -41,6 +46,23 @@ elif [ -f "$SCRIPT_DIR/../ui2/v.mod" ]; then
 else
     UI2_SOURCE="$SCRIPT_DIR/third_party/ui2"
 fi
+
+# X.org with Mesa and LLVM; GTK with its fonts and media codecs, which come
+# from the Firefox layer without Firefox itself (the first-run app page offers
+# the browser through pkg); pkg with apk, curl and git; Python; V with TCC.
+X11_STAGING="${VINIX_AMD64_X11_STAGING:-$SCRIPT_DIR/build-amd64-x11/staging}"
+FIREFOX_STAGING="${VINIX_AMD64_FIREFOX_STAGING:-$SCRIPT_DIR/build-amd64-firefox/staging}"
+NETWORK_TOOLS_STAGING="${VINIX_AMD64_NETWORK_TOOLS_STAGING:-$SCRIPT_DIR/build-amd64-network-tools/staging}"
+PYTHON_STAGING="${VINIX_AMD64_PYTHON_STAGING:-$SCRIPT_DIR/build-amd64-python/staging}"
+VLANG_STAGING="${VINIX_AMD64_VLANG_STAGING:-$SCRIPT_DIR/build-amd64-v/staging}"
+for layer in "$X11_STAGING:build-x11-amd64.sh" "$FIREFOX_STAGING:build-firefox-amd64.sh" \
+    "$NETWORK_TOOLS_STAGING:build-network-tools-amd64.sh" \
+    "$PYTHON_STAGING:build-python-amd64.sh" "$VLANG_STAGING:build-v-amd64.sh"; do
+    if [ ! -d "${layer%%:*}/usr" ]; then
+        echo "ERROR: missing package layer ${layer%%:*}; run ./${layer##*:} first" >&2
+        exit 1
+    fi
+done
 
 case "$BUILD_DIR" in
     ''|/|"$SCRIPT_DIR")
@@ -127,6 +149,32 @@ STAGING="$BUILD_DIR/initramfs-root"
 rm -rf "$STAGING"
 mkdir -p "$STAGING"
 cp -a "$SYSROOT/." "$STAGING/"
+
+# macOS cp follows an existing destination symlink and cannot replace a
+# read-only file in place, so unlink what a layer is about to replace.
+merge_staging_tree() {
+    local overlay="$1" source relative destination
+    while IFS= read -r -d '' source; do
+        relative="${source#"$overlay/"}"
+        destination="$STAGING/$relative"
+        if [ ! -d "$source" ] && { [ -e "$destination" ] || [ -L "$destination" ]; }; then
+            rm -f "$destination"
+        fi
+    done < <(find "$overlay" -mindepth 1 -print0)
+    cp -a "$overlay/." "$STAGING/"
+}
+for layer in "$X11_STAGING" "$FIREFOX_STAGING" "$NETWORK_TOOLS_STAGING" \
+    "$PYTHON_STAGING" "$VLANG_STAGING"; do
+    echo "    merging $layer"
+    merge_staging_tree "$layer"
+done
+rm -rf "$STAGING/usr/lib/firefox-esr" "$STAGING/usr/lib/firefox" \
+    "$STAGING/usr/bin/firefox-esr" "$STAGING/usr/bin/firefox" \
+    "$STAGING"/usr/share/applications/firefox*.desktop \
+    "$STAGING"/usr/share/icons/hicolor/*/apps/firefox* \
+    "$STAGING"/usr/share/metainfo/*firefox*
+rm -f "$STAGING/.PKGINFO" "$STAGING/.INSTALL" "$STAGING"/.SIGN.* \
+    "$STAGING"/.pre-* "$STAGING"/.post-* "$STAGING"/.trigger*
 mkdir -p "$STAGING/usr/bin" "$STAGING/usr/share/vinix/wallpapers" \
     "$STAGING/usr/share/vinix/icons" "$STAGING/root/desktop" "$STAGING/run"
 install -m755 "$BUILD_DIR/vinix-desktop" "$STAGING/usr/bin/vinix-desktop"
@@ -145,18 +193,61 @@ for app_icon in terminal settings activity calculator vspace editor files clock 
 done
 install -m755 "$SCRIPT_DIR/build-support/vinix-desktop-reload" \
     "$STAGING/usr/bin/vinix-desktop-reload"
+# The launchers and settings the desktop's X11 apps and pkg expect, as on arm64.
+install -m755 "$SCRIPT_DIR/build-support/vinix-pkg" "$STAGING/usr/bin/pkg"
+install -m755 "$SCRIPT_DIR/build-support/xorg-server/startx" "$STAGING/usr/bin/startx"
+install -m755 "$SCRIPT_DIR/build-support/firefox/run-firefox" "$STAGING/usr/bin/run-firefox"
+install -m755 "$SCRIPT_DIR/build-support/chromium/run-chromium" "$STAGING/usr/bin/run-chromium"
+install -m755 "$SCRIPT_DIR/build-support/gimp/run-gimp" "$STAGING/usr/bin/run-gimp"
+install -m755 "$SCRIPT_DIR/build-support/libreoffice/run-libreoffice" \
+    "$STAGING/usr/bin/run-libreoffice"
+mkdir -p "$STAGING/etc/firefox/policies" "$STAGING/usr/share/vinix/firefox" \
+    "$STAGING/etc/chromium/policies/managed" "$STAGING/etc/gimp/2.0" \
+    "$STAGING/etc/libreoffice"
+install -m644 "$SCRIPT_DIR/build-support/firefox/policies.json" \
+    "$STAGING/etc/firefox/policies/policies.json"
+install -m644 "$SCRIPT_DIR/build-support/firefox/vinix.js" \
+    "$STAGING/usr/share/vinix/firefox/vinix.js"
+install -m644 "$SCRIPT_DIR/build-support/chromium/policies.json" \
+    "$STAGING/etc/chromium/policies/managed/vinix.json"
+install -m644 "$SCRIPT_DIR/build-support/gimp/vinix-gimprc" \
+    "$STAGING/etc/gimp/2.0/vinix-gimprc"
+install -m644 "$SCRIPT_DIR/build-support/gimp/vinix-sessionrc" \
+    "$STAGING/etc/gimp/2.0/vinix-sessionrc"
+install -m644 "$SCRIPT_DIR/build-support/libreoffice/vinix-registrymodifications.xcu" \
+    "$STAGING/etc/libreoffice/vinix-registrymodifications.xcu"
+install -m644 "$SCRIPT_DIR/build-support/libreoffice/welcome.fodt" \
+    "$STAGING/usr/share/vinix/libreoffice-welcome.fodt"
+install -m644 "$SCRIPT_DIR/tests/browsers/firefox-smoke.html" \
+    "$STAGING/usr/share/vinix/firefox-smoke.html"
+install -m644 "$SCRIPT_DIR/tests/browsers/chromium-smoke.html" \
+    "$STAGING/usr/share/vinix/chromium-smoke.html"
+install -m755 "$SCRIPT_DIR/tests/packages/x-window-check.py" \
+    "$STAGING/usr/share/vinix/x-window-check.py"
 rm -f "$STAGING/sbin/init"
 install -m755 "$SCRIPT_DIR/build-support/init-amd64/desktop-init" "$STAGING/sbin/init"
-if [ ! -x "$STAGING/bin/zsh" ]; then
-    echo "ERROR: desktop image has no executable /bin/zsh" >&2
-    exit 1
-fi
+for command_path in bin/zsh usr/bin/python3 usr/bin/v usr/bin/tcc usr/bin/pkg sbin/apk \
+    usr/bin/curl usr/bin/git usr/bin/Xorg usr/bin/Xvfb usr/bin/Xvfb-glx \
+    usr/bin/vinix-wine-host usr/bin/vinix-xinput usr/bin/run-firefox; do
+    if [ ! -x "$STAGING/$command_path" ]; then
+        echo "ERROR: desktop image has no executable /$command_path" >&2
+        exit 1
+    fi
+done
+for runtime_path in usr/lib/libgtk-3.so.0 usr/lib/libavcodec.so.60 \
+    usr/lib/xorg/modules/dri/swrast_dri.so usr/share/fonts; do
+    if [ ! -e "$STAGING/$runtime_path" ]; then
+        echo "ERROR: desktop image is missing /$runtime_path" >&2
+        exit 1
+    fi
+done
 
 # One immutable multicall image, with the same per-application process names as
 # the aarch64 desktop image.
 for app_name in vinix-files vinix-calculator vinix-terminal vinix-settings \
     vinix-activity vinix-editor vinix-calendar vinix-clock \
     vinix-vspace \
+    vinix-firefox vinix-chromium vinix-gimp vinix-libreoffice \
     vinix-minecraft vinix-wine-calculator vinix-wine-notepad vinix-wine-word2010 \
     vinix-capture; do
     ln -sf vinix-desktop "$STAGING/usr/bin/$app_name"

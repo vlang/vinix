@@ -113,7 +113,9 @@ else
 fi
 
 echo "==> Staging Zsh, Vim, and Oh My Zsh..."
-stage_alpine_packages zsh vim
+# libuuid is libSM's, which the X11 layer's clients link against; the arm64
+# userland gets it from its fuller package set.
+stage_alpine_packages zsh vim libuuid
 "$SCRIPT_DIR/build-support/stage-oh-my-zsh.sh" "$STAGING" "$DOWNLOADS"
 
 # Vinix starts /sbin/init itself. Use Alpine's unmodified /bin/busybox through
