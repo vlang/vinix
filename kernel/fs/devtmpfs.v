@@ -128,7 +128,7 @@ fn (mut this DevTmpFSResource) unref(_handle voidptr) ? {
 		memory.free(this.storage)
 	}
 
-	unsafe { free(this) }
+	unsafe { free(&this) }
 }
 
 fn (mut this DevTmpFSResource) link(_handle voidptr) ? {
@@ -208,7 +208,8 @@ fn (mut this DevTmpFS) create(parent &VFSNode, name string, mode u32) &VFSNode {
 	new_resource.stat.blocks = 0
 	new_resource.stat.blksize = 512
 	new_resource.stat.dev = devtmpfs_dev_id
-	new_resource.stat.ino = devtmpfs_inode_counter++
+	new_resource.stat.ino = devtmpfs_inode_counter
+	devtmpfs_inode_counter++
 	new_resource.stat.mode = mode
 	new_resource.stat.nlink = 1
 
@@ -248,7 +249,8 @@ fn (mut this DevTmpFS) symlink(parent &VFSNode, dest string, target string) &VFS
 	new_resource.stat.blocks = 0
 	new_resource.stat.blksize = 512
 	new_resource.stat.dev = devtmpfs_dev_id
-	new_resource.stat.ino = devtmpfs_inode_counter++
+	new_resource.stat.ino = devtmpfs_inode_counter
+	devtmpfs_inode_counter++
 	new_resource.stat.mode = stat.iflnk | 0o777
 	new_resource.stat.nlink = 1
 
@@ -264,7 +266,7 @@ fn (mut this DevTmpFS) symlink(parent &VFSNode, dest string, target string) &VFS
 }
 
 fn ensure_devtmpfs_dir(parent &VFSNode, name string) &VFSNode {
-	if name in parent.children {
+	if unsafe { name in *parent.children } {
 		return unsafe { parent.children[name] or { panic('devtmpfs: missing child ${name}') } }
 	}
 
@@ -278,7 +280,8 @@ fn ensure_devtmpfs_dir(parent &VFSNode, name string) &VFSNode {
 	new_resource.stat.blocks = 0
 	new_resource.stat.blksize = 512
 	new_resource.stat.dev = devtmpfs_dev_id
-	new_resource.stat.ino = devtmpfs_inode_counter++
+	new_resource.stat.ino = devtmpfs_inode_counter
+	devtmpfs_inode_counter++
 	new_resource.stat.mode = stat.ifdir | 0o755
 	new_resource.stat.nlink = 1
 	new_resource.stat.atim = realtime_clock
@@ -332,7 +335,8 @@ pub fn devtmpfs_add_device(device &resource.Resource, name string) {
 
 	new_node.resource = unsafe { device }
 	new_node.resource.stat.dev = devtmpfs_dev_id
-	new_node.resource.stat.ino = devtmpfs_inode_counter++
+	new_node.resource.stat.ino = devtmpfs_inode_counter
+	devtmpfs_inode_counter++
 	new_node.resource.stat.nlink = 1
 	new_node.resource.stat.atim = realtime_clock
 	new_node.resource.stat.ctim = realtime_clock
@@ -374,14 +378,14 @@ pub fn devtmpfs_remove_device(name string) bool {
 				leaf = part
 				break
 			}
-			if parent.children == unsafe { nil } || part !in parent.children {
+			if parent.children == unsafe { nil } || unsafe { part !in *parent.children } {
 				return false
 			}
 			parent = unsafe { parent.children[part] }
 		}
 	}
 
-	if parent == unsafe { nil } || parent.children == unsafe { nil } || leaf !in parent.children {
+	if parent == unsafe { nil } || parent.children == unsafe { nil } || unsafe { leaf !in *parent.children } {
 		return false
 	}
 	mut node := unsafe { parent.children[leaf] }

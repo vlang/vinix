@@ -52,7 +52,7 @@ fn (mut this FramebufferNode) read(_handle voidptr, buf voidptr, loc u64, count 
 		return i64(0)
 	}
 
-	vmem := &u8(this.info.base)
+	vmem := unsafe { &u8(this.info.base) }
 	mut actual_count := count
 
 	if loc + count > this.info.size {
@@ -69,7 +69,7 @@ fn (mut this FramebufferNode) write(_handle voidptr, buf voidptr, loc u64, count
 		return i64(0)
 	}
 
-	vmem := &u8(this.info.base)
+	vmem := unsafe { &u8(this.info.base) }
 	mut actual_count := count
 
 	if loc + count > this.info.size {
@@ -179,7 +179,8 @@ pub fn register_device(info api.FramebufferInfo) ? {
 
 	println('fbdev: registered new framebuffer device (using driver ${info.driver.name} and mode ${info.variable.xres}x${info.variable.yres}x${info.variable.bits_per_pixel})')
 
-	return create_device_node(index)
+	create_device_node(index)?
+	return
 }
 
 pub fn register_driver(driver &api.FramebufferDriver) {

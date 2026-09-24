@@ -252,6 +252,7 @@ pub fn pthread_exit(ret voidptr) {
 	trigger(mut current_thread.exited, false)
 
 	sched.yield(false)
+	for {}
 }
 
 pub fn pthread_wait(t &proc.Thread) voidptr {

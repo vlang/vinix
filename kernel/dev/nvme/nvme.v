@@ -566,7 +566,7 @@ pub fn (mut pair NVMEQueuePair) send_cmd_and_wait(mut submission NVMECommand, ci
 		return 0xffff
 	}
 
-	mut events := [&int_events[pair.vector]]
+	mut events := [unsafe { &int_events[pair.vector] }]
 	event.await(mut events, true) or {}
 
 	mut completion_entry := unsafe { pair.completion_queue[pair.cq_head] }
@@ -596,6 +596,7 @@ pub fn (mut pair NVMEQueuePair) send_cmd_and_wait(mut submission NVMECommand, ci
 
 pub fn (mut ns NVMENamespace) rw_lba(buffer voidptr, start u64, cnt u64, rw bool) int {
 	mut new_command := NVMECommand{}
+	mut rw_command := unsafe { &NVMECommandRW(&new_command.private) }
 
 	mut queue_pair_index := ns.parent_controller.io_queue_bitmap.alloc() or { 0 }
 	mut queue_pair := ns.parent_controller.queue_list[queue_pair_index]
@@ -634,11 +635,11 @@ pub fn (mut ns NVMENamespace) rw_lba(buffer voidptr, start u64, cnt u64, rw bool
 			}
 
 			unsafe {
-				new_command.private.rw.prp2 = u64(&prp_list[cid * ns.max_prps]) - higher_half
+				rw_command.prp2 = u64(&prp_list[cid * ns.max_prps]) - higher_half
 			}
 		} else {
 			unsafe {
-				new_command.private.rw.prp2 = u64(buffer) + page_size - higher_half
+				rw_command.prp2 = u64(buffer) + page_size - higher_half
 			}
 		}
 	}
@@ -652,10 +653,10 @@ pub fn (mut ns NVMENamespace) rw_lba(buffer voidptr, start u64, cnt u64, rw bool
 	new_command.cid = u16(cid)
 
 	unsafe {
-		new_command.private.rw.nsid = u32(ns.nsid)
-		new_command.private.rw.slba = start
-		new_command.private.rw.length = u16(cnt - 1)
-		new_command.private.rw.prp1 = u64(buffer) - higher_half
+		rw_command.nsid = u32(ns.nsid)
+		rw_command.slba = start
+		rw_command.length = u16(cnt - 1)
+		rw_command.prp1 = u64(buffer) - higher_half
 	}
 	queue_pair.l.release()
 	ns.parent_controller.io_queue_bitmap.free_entry(queue_pair_index)

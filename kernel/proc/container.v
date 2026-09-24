@@ -146,7 +146,7 @@ pub fn get_namespace(mut ns Namespace) &Namespace {
 
 // Drop a reference, reporting whether it was the last one.
 pub fn put_namespace(mut ns Namespace) bool {
-	if unsafe { ns == nil } || is_initial_namespace(ns) {
+	if is_initial_namespace(ns) {
 		return false
 	}
 	return !katomic.dec(mut &ns.refcount)

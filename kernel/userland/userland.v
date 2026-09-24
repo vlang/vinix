@@ -439,7 +439,7 @@ pub fn sendsig(_thread &proc.Thread, signal u8) {
 // process.threads mid-exec -- a bare process.threads[0] can land in
 // either window. Returns false, rather than indexing an empty array,
 // when there is currently no thread to signal.
-fn signal_process(_process &proc.Process, signal u8) bool {
+pub fn signal_process(_process &proc.Process, signal u8) bool {
 	mut process := unsafe { _process }
 	process.threads_lock.acquire()
 	defer {

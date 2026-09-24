@@ -85,11 +85,11 @@ fn init_mount_tables() {
 }
 
 fn calling_process() &proc.Process {
-	thread := proc.current_thread()
-	if thread == unsafe { nil } {
+	current := proc.current_thread()
+	if current == unsafe { nil } {
 		return unsafe { nil }
 	}
-	return thread.process
+	return current.process
 }
 
 fn table_of(process &proc.Process) &MountTable {
@@ -357,7 +357,7 @@ pub fn syscall_mount(_ voidptr, src charptr, tgt charptr, fs_type charptr, mount
 			return errno.err, errno.get()
 		}
 	}
-	options := optional_user_string(charptr(data), 4096)
+	options := optional_user_string(unsafe { charptr(data) }, 4096)
 	mut flags := mountflags
 	// Old programs still put MS_MGC_VAL in the top half of the flags.
 	if flags & 0xffff0000 == 0xc0ed0000 {
@@ -380,7 +380,8 @@ fn calling_directory() &VFSNode {
 
 fn mount_request(parent &VFSNode, source string, target string, fstype string, flags u64, options string) ? {
 	if flags & ms_remount != 0 {
-		return remount(parent, target, flags, options)
+		remount(parent, target, flags, options)?
+		return
 	}
 	if flags & ms_propagation != 0 {
 		// Propagation types are accepted but not modelled: see the top of this
@@ -389,17 +390,21 @@ fn mount_request(parent &VFSNode, source string, target string, fstype string, f
 		return
 	}
 	if flags & ms_bind != 0 {
-		return bind_mount(parent, source, target, flags)
+		bind_mount(parent, source, target, flags)?
+		return
 	}
 	if flags & ms_move != 0 {
-		return move_mount(parent, source, target)
+		move_mount(parent, source, target)?
+		return
 	}
-	return new_mount(parent, source, target, fstype, flags, options)
+	new_mount(parent, source, target, fstype, flags, options)?
+	return
 }
 
 // Kernel callers: mount a new filesystem instance with default options.
 pub fn mount(parent &VFSNode, source string, target string, filesystem string) ? {
-	return new_mount(parent, source, target, filesystem, 0, '')
+	new_mount(parent, source, target, filesystem, 0, '')?
+	return
 }
 
 // The registered filesystem behind a Linux filesystem type name.
@@ -424,7 +429,8 @@ const pseudo_filesystems = ['tmpfs', 'procfs', 'sysfs', 'devtmpfs', 'cgroup2']
 fn new_mount(parent &VFSNode, source string, target string, fstype string, flags u64, options string) ? {
 	kind := filesystem_kind(fstype)
 	if kind == 'devpts' {
-		return mount_devpts(parent, target, flags, options)
+		mount_devpts(parent, target, flags, options)?
+		return
 	}
 	if kind !in filesystems {
 		errno.set(errno.enodev)
@@ -470,7 +476,7 @@ fn new_mount(parent &VFSNode, source string, target string, fstype string, flags
 		mut f_sys := unsafe { filesystems[kind].instantiate() }
 		mount_node = f_sys.mount(parent_of_tgt_node, basename, source_node)?
 	}
-	if mount_node.children != unsafe { nil } && '.' !in mount_node.children {
+	if mount_node.children != unsafe { nil } && unsafe { '.' !in *mount_node.children } {
 		mount_node.create_dotentries(parent_of_tgt_node)
 	}
 	if kind == 'tmpfs' {
@@ -523,7 +529,7 @@ fn mount_devpts(parent &VFSNode, target string, flags u64, options string) ? {
 		return none
 	}
 	mut pts := &VFSNode(unsafe { nil })
-	if 'pts' in devtmpfs_root.children {
+	if unsafe { 'pts' in *devtmpfs_root.children } {
 		pts = unsafe { devtmpfs_root.children['pts'] }
 	} else {
 		pts = internal_create(devtmpfs_root, 'pts', stat.ifdir | 0o755)?

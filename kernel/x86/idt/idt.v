@@ -33,7 +33,8 @@ pub fn allocate_vector() u8 {
 	if idt_free_vector == 0xf0 {
 		panic('IDT exhausted')
 	}
-	ret := idt_free_vector++
+	ret := idt_free_vector
+	idt_free_vector++
 	idt_lock.release()
 	return ret
 }
@@ -49,7 +50,7 @@ pub fn initialise() {
 pub fn reload() {
 	idt_pointer = IDTPointer{
 		size:    u16((sizeof(IDTEntry) * 256) - 1)
-		address: &idt_entries
+		address: unsafe { &idt_entries }
 	}
 
 	asm volatile amd64 {

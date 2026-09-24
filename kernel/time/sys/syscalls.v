@@ -144,7 +144,7 @@ pub fn syscall_getrusage(_ voidptr, who int, usage u64) (u64, u64) {
 	mut result := [18]i64{}
 	result[0] = i64(ns / 1000000000)
 	result[1] = i64((ns % 1000000000) / 1000)
-	if !usercopy.copy_to_user(usage, voidptr(&result[0]), sizeof(i64) * 18) {
+	if !usercopy.copy_to_user(usage, unsafe { voidptr(&result[0]) }, sizeof(i64) * 18) {
 		return errno.err, errno.efault
 	}
 	return 0, 0
@@ -163,7 +163,7 @@ pub fn syscall_sysinfo(_ voidptr, info u64) (u64, u64) {
 		*&u16(u64(&result[0]) + 80) = proc.process_count()
 		*&u32(u64(&result[0]) + 104) = 1
 	}
-	if !usercopy.copy_to_user(info, voidptr(&result[0]), sizeof(u64) * 14) {
+	if !usercopy.copy_to_user(info, unsafe { voidptr(&result[0]) }, sizeof(u64) * 14) {
 		return errno.err, errno.efault
 	}
 	return 0, 0

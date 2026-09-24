@@ -7,7 +7,7 @@ import klock
 import proc
 import file
 import errno
-import security
+import security as _
 import ioctl
 import time
 import usercopy
@@ -205,7 +205,7 @@ fn path2node_bounded(parent &VFSNode, path string, depth int, effective bool) (&
 				effective)
 		} else {
 			procfs_lookup_refresh(current_node, elem_str)
-			if elem_str !in current_node.children {
+			if unsafe { elem_str !in *current_node.children } {
 				errno.set(errno.enoent)
 				if last == true {
 					return current_node, 0, elem_str
@@ -291,7 +291,8 @@ fn get_node_with_credentials(parent &VFSNode, path string, follow_links bool,
 // working directory. Keep the root pointer private and expose only the scoped
 // mount operation they need.
 pub fn mount_at_root(source string, target string, filesystem string) ? {
-	return mount(vfs_root, source, target, filesystem)
+	mount(vfs_root, source, target, filesystem)?
+	return
 }
 
 pub fn (mut node VFSNode) create_dotentries(parent &VFSNode) {
@@ -397,7 +398,7 @@ pub fn unlink(parent &VFSNode, name string, remove_dir bool) ? {
 	if !may_remove(parent_of_tgt, node) { errno.set(errno.eacces); return none }
 	if basename == '.' || basename == '..' || basename == '' { errno.set(errno.einval); return none }
 	// Something mounted here, in this or any other namespace, keeps the name.
-	if basename in parent_of_tgt.children {
+	if unsafe { basename in *parent_of_tgt.children } {
 		covered := unsafe { parent_of_tgt.children[basename] }
 		if covered.mountpoint != unsafe { nil } || covered.ns_mounts > 0 {
 			errno.set(errno.ebusy)
@@ -1231,11 +1232,12 @@ pub fn syscall_readdir(_ voidptr, fdnum int, mut buf stat.Dirent) (u64, u64) {
 			}
 			mut new_dirent := stat.Dirent{
 				ino:    node.resource.stat.ino
-				off:    i++
+					off:    i
 				reclen: u16(sizeof(stat.Dirent))
 				@type:  u8(t)
 			}
-			C.strcpy(&new_dirent.name[0], name.str)
+				C.strcpy(&new_dirent.name[0], name.str)
+				i++
 			dir_handle.dirlist << new_dirent
 		}
 		dir_handle.dirlist_valid = true
@@ -1515,7 +1517,7 @@ fn adopt(mut node VFSNode, mut parent VFSNode, name string) {
 	// rmdir frees it along with its children map. Point it somewhere new
 	// rather than putting the parent in its place, or removing a renamed
 	// directory frees its parent too.
-	if '..' in node.children {
+	if unsafe { '..' in *node.children } {
 		mut dotdot := unsafe { node.children['..'] }
 		dotdot.redir = parent
 	}
@@ -1775,7 +1777,7 @@ fn fill_statfs_resource(mut res resource.Resource, buf u64) bool {
 	raw[9] = info.frsize
 	raw[10] = info.flags
 
-	return usercopy.copy_to_user(buf, voidptr(&raw[0]), sizeof(u64) * 15)
+	return usercopy.copy_to_user(buf, unsafe { voidptr(&raw[0]) }, sizeof(u64) * 15)
 }
 
 const utime_now = i64(0x3fffffff)
@@ -1813,7 +1815,7 @@ pub fn syscall_utimensat(_ voidptr, dirfd int, _path charptr, times u64, flags i
 	mut requested := [2]time.TimeSpec{init: now}
 	mut explicit := false
 	if times != 0 {
-		if !usercopy.copy_from_user(voidptr(&requested[0]), times,
+		if !usercopy.copy_from_user(unsafe { voidptr(&requested[0]) }, times,
 			sizeof(time.TimeSpec) * 2) {
 			return errno.err, errno.efault
 		}

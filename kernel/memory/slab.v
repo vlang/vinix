@@ -3,7 +3,7 @@ module memory
 
 import klock
 import lib
-import xnualloc
+import xnualloc as _
 
 // The default bitmap path remains the independent Vinix implementation.
 // -d xnu_bitmap selects the APSL-preserving translation in xnualloc.
@@ -62,9 +62,9 @@ fn (mut this Slab) add_partial(mut hdr SlabHeader) {
 	hdr.next = this.partial
 	if this.partial != 0 {
 		mut next := unsafe { &SlabHeader(this.partial) }
-		next.prev = u64(hdr)
+		next.prev = u64(&hdr)
 	}
-	this.partial = u64(hdr)
+	this.partial = u64(&hdr)
 }
 
 fn (mut this Slab) remove_partial(mut hdr SlabHeader) {

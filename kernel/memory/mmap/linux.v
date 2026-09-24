@@ -214,7 +214,7 @@ pub fn syscall_mincore(_ voidptr, address u64, length u64, vec u64) (u64, u64) {
 		}
 		pagemap.l.release()
 
-		if !usercopy.copy_to_user(vec + done, voidptr(&chunk[0]), count) {
+		if !usercopy.copy_to_user(vec + done, unsafe { voidptr(&chunk[0]) }, count) {
 			return errno.err, errno.efault
 		}
 		done += count

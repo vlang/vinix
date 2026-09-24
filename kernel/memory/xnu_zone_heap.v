@@ -99,7 +99,7 @@ __global (
 
 fn xnu_heap_init() {
 	for i := 0; i < 14; i++ {
-		mut h := &xnu_heap_classes[i]
+		mut h := unsafe { &xnu_heap_classes[i] }
 		ok := h.zone.zone_init(slabs[i].ent_size, 2)
 		if !ok {
 			lib.kpanic(unsafe { nil }, c'XNU zone initialization failed')
@@ -208,7 +208,7 @@ fn xnu_heap_alloc(size u64) voidptr {
 	if index == 14 {
 		return big_alloc(size)
 	}
-	mut h := &xnu_heap_classes[index]
+	mut h := unsafe { &xnu_heap_classes[index] }
 	h.@lock.acquire()
 	c := h.cache_locked(true)
 	mut addr := h.zone.zalloc_ext(c)
@@ -238,7 +238,7 @@ fn xnu_heap_free(ptr voidptr) {
 		lib.kpanic(unsafe { nil }, c'XNU zone invalid free header')
 		return
 	}
-	mut h := &xnu_heap_classes[int(hdr.class)]
+	mut h := unsafe { &xnu_heap_classes[int(hdr.class)] }
 	h.@lock.acquire()
 	if !h.zone.zone_mark_invalid(u64(ptr)) {
 		h.@lock.release()
@@ -277,7 +277,7 @@ fn xnu_heap_realloc(ptr voidptr, size u64) voidptr {
 	if size <= old_size {
 		return ptr
 	}
-	new_ptr := malloc(size)
+	new_ptr := unsafe { malloc(size) }
 	if new_ptr == unsafe { nil } {
 		return unsafe { nil }
 	}
@@ -289,7 +289,7 @@ fn xnu_heap_realloc(ptr voidptr, size u64) voidptr {
 fn xnu_heap_trim() u64 {
 	mut bytes := u64(0)
 	for i := 0; i < 14; i++ {
-		mut h := &xnu_heap_classes[i]
+		mut h := unsafe { &xnu_heap_classes[i] }
 		h.@lock.acquire()
 		h.drain_locked()
 		// Detach a private list under the lock, then release outside it.

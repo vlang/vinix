@@ -345,7 +345,7 @@ fn delete_pagemap_impl(mut pagemap memory.Pagemap, trace bool) ? {
 	if trace {
 		println('exec[gpu]/vm: old top-level table freed; freeing page-map object')
 	}
-	unsafe { free(pagemap) }
+	unsafe { free(&pagemap) }
 	if trace {
 		println('exec[gpu]/vm: old page-map object freed')
 	}
@@ -422,7 +422,7 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap) ?&memory.Pagemap {
 						top_level: unsafe { &u64(0) }
 					}
 				}
-				new_global_range.shadow_pagemap.top_level = &u64(memory.pmm_alloc(1))
+				new_global_range.shadow_pagemap.top_level = unsafe { &u64(memory.pmm_alloc(1)) }
 				if new_global_range.handle != unsafe { nil }
 					&& new_global_range.handle_ref != unsafe { nil } {
 					new_global_range.handle_ref(new_global_range.handle)
@@ -681,7 +681,7 @@ pub fn map_range(mut pagemap memory.Pagemap, _virt_addr u64, phys_addr u64, _len
 	range_local.global = range_global
 
 	range_global.locals << range_local
-	range_global.shadow_pagemap.top_level = &u64(memory.pmm_alloc(1))
+	range_global.shadow_pagemap.top_level = unsafe { &u64(memory.pmm_alloc(1)) }
 
 	pagemap.l.acquire()
 	pagemap.mmap_ranges << voidptr(range_local)
@@ -723,7 +723,7 @@ pub fn map_pages(mut pagemap memory.Pagemap, virt_addr u64, phys_pages []u64, pr
 
 	range_local.global = range_global
 	range_global.locals << range_local
-	range_global.shadow_pagemap.top_level = &u64(memory.pmm_alloc(1))
+	range_global.shadow_pagemap.top_level = unsafe { &u64(memory.pmm_alloc(1)) }
 
 	pagemap.l.acquire()
 	pagemap.mmap_ranges << voidptr(range_local)
@@ -857,7 +857,7 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
 	range_local.global = range_global
 
 	range_global.locals << range_local
-	range_global.shadow_pagemap.top_level = &u64(memory.pmm_alloc(1))
+	range_global.shadow_pagemap.top_level = unsafe { &u64(memory.pmm_alloc(1)) }
 
 	// Choose and claim the virtual span as one locked operation. Wine first
 	// probes preferred PE addresses with MAP_FIXED_NOREPLACE, while POSIX mmap

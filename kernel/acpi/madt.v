@@ -37,7 +37,7 @@ pub:
 }
 
 @[packed]
-struct MADTIoApic {
+pub struct MADTIoApic {
 pub:
 	header   MADTHeader
 	apic_id  u8
@@ -47,7 +47,7 @@ pub:
 }
 
 @[packed]
-struct MADTISO {
+pub struct MADTISO {
 pub:
 	header     MADTHeader
 	bus_source u8

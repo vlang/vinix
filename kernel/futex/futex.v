@@ -117,7 +117,7 @@ fn put(mut f Futex) {
 		head.next = f.next
 	}
 	futex_lock.release()
-	unsafe { free(f) }
+	unsafe { free(&f) }
 }
 
 // Block until woken, unless the word no longer holds the expected value.

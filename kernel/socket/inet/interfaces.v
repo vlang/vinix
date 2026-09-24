@@ -46,12 +46,14 @@ pub fn interfaces() []Interface {
 	}
 	mut mac := [6]u8{}
 	mut mtu := u32(0)
-	if link_info(mut mac, mut mtu) {
+	if link_info(mut mac, &mtu) {
 		mut address := u32(0)
 		mut netmask := u32(0)
 		mut gateway := u32(0)
 		dns := [3]u32{}
-		configuration(&address, &netmask, &gateway, &dns)
+		net_lock.acquire()
+		unsafe { C.vinix_net_config(&address, &netmask, &gateway, &dns[0]) }
+		net_lock.release()
 		list << Interface{
 			index:   2
 			name:    'eth0'

@@ -470,20 +470,13 @@ pub fn (mut this NetlinkSocket) bind(_handle voidptr, _addr voidptr, addrlen u32
 	this.bound = true
 }
 
-pub fn (mut this NetlinkSocket) sockname(_handle voidptr, _addr voidptr, addrlen &u32) ? {
+pub fn (mut this NetlinkSocket) sockname(_handle voidptr, _addr voidptr, addrlen voidptr) ? {
 	mut out := SockaddrNl{
 		nl_family: u16(sock_pub.af_netlink)
 		nl_pid:    this.nl_pid
 		nl_groups: this.groups
 	}
-	mut want := unsafe { *addrlen }
-	if want > u32(sizeof(SockaddrNl)) {
-		want = u32(sizeof(SockaddrNl))
-	}
-	unsafe { C.memcpy(_addr, voidptr(&out), want) }
-	unsafe {
-		*addrlen = u32(sizeof(SockaddrNl))
-	}
+	sock_pub.copy_out_sockaddr(_addr, addrlen, &out, sizeof(SockaddrNl))
 }
 
 pub fn (mut this NetlinkSocket) recvmsg(_handle voidptr, msg &sock_pub.MsgHdr, flags int) ?u64 {
@@ -548,18 +541,11 @@ pub fn (mut this NetlinkSocket) connect(_handle voidptr, _addr voidptr, addrlen 
 	// Netlink "connects" to the kernel; nothing to establish.
 }
 
-pub fn (mut this NetlinkSocket) peername(_handle voidptr, _addr voidptr, addrlen &u32) ? {
+pub fn (mut this NetlinkSocket) peername(_handle voidptr, _addr voidptr, addrlen voidptr) ? {
 	mut out := SockaddrNl{
 		nl_family: u16(sock_pub.af_netlink)
 	}
-	mut want := unsafe { *addrlen }
-	if want > u32(sizeof(SockaddrNl)) {
-		want = u32(sizeof(SockaddrNl))
-	}
-	unsafe { C.memcpy(_addr, voidptr(&out), want) }
-	unsafe {
-		*addrlen = u32(sizeof(SockaddrNl))
-	}
+	sock_pub.copy_out_sockaddr(_addr, addrlen, &out, sizeof(SockaddrNl))
 }
 
 pub fn (mut this NetlinkSocket) shutdown(_handle voidptr, how int) ? {}

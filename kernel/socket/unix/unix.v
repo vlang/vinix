@@ -624,7 +624,7 @@ fn (mut this UnixSocket) grow(_handle voidptr, _new_size u64) ? {
 	return none
 }
 
-fn (mut this UnixSocket) peername(_handle voidptr, _addr voidptr, addrlen &u32) ? {
+fn (mut this UnixSocket) peername(_handle voidptr, _addr voidptr, addrlen voidptr) ? {
 	if this.connected == false {
 		errno.set(errno.enotconn)
 		return none
@@ -635,7 +635,7 @@ fn (mut this UnixSocket) peername(_handle voidptr, _addr voidptr, addrlen &u32) 
 	sock_pub.copy_out_sockaddr(_addr, addrlen, voidptr(&this.peer.name), sizeof(SockaddrUn))
 }
 
-fn (mut this UnixSocket) sockname(_handle voidptr, _addr voidptr, addrlen &u32) ? {
+fn (mut this UnixSocket) sockname(_handle voidptr, _addr voidptr, addrlen voidptr) ? {
 	// An unbound socket has no path, and getsockname(2) reports just the family.
 	mut full := u32(sizeof(SockaddrUn))
 	if this.name.sun_path[0] == 0 {

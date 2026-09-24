@@ -468,7 +468,7 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 
 		mmap.map_range(mut process.pagemap, stack_bottom_vma, u64(stack_phys), user_stack_size, mmap.prot_read | mmap.prot_write, mmap.map_anonymous) or { return none }
 	} else {
-		stack = &u64(voidptr(_stack))
+		stack = unsafe { &u64(voidptr(_stack)) }
 		stack_vma = _stack
 	}
 
@@ -555,7 +555,7 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 
 			// Ensure final stack pointer is 16 byte aligned
 			if (argv.len + envp.len + 1) & 1 != 0 {
-				stack = &stack[-1]
+				stack = &u64(u64(stack) - sizeof(u64))
 			}
 
 			// Linux libcs use AT_RANDOM for their stack canary. It is also harmless
@@ -568,72 +568,72 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 			random_vma := stack_vma - (u64(stack_top) - random_kernel_addr)
 
 			// Zero auxiliary vector entry
-			stack[-1] = 0
-			stack = &stack[-1]
-			stack[-1] = 0
-			stack = &stack[-1]
+			stack = &u64(u64(stack) - sizeof(u64))
+			stack[0] = 0
+			stack = &u64(u64(stack) - sizeof(u64))
+			stack[0] = 0
 
-			stack = &stack[-2]
+			stack = &u64(u64(stack) - 2 * sizeof(u64))
 			stack[0] = elf.at_secure
 			stack[1] = 0
-			stack = &stack[-2]
+			stack = &u64(u64(stack) - 2 * sizeof(u64))
 			stack[0] = elf.at_hwcap2
 			stack[1] = 0
-			stack = &stack[-2]
+			stack = &u64(u64(stack) - 2 * sizeof(u64))
 			stack[0] = elf.at_hwcap
 			stack[1] = 0
-			stack = &stack[-2]
+			stack = &u64(u64(stack) - 2 * sizeof(u64))
 			stack[0] = elf.at_random
 			stack[1] = random_vma
-			stack = &stack[-2]
+			stack = &u64(u64(stack) - 2 * sizeof(u64))
 			stack[0] = elf.at_pagesz
 			stack[1] = page_size
-			stack = &stack[-2]
+			stack = &u64(u64(stack) - 2 * sizeof(u64))
 			stack[0] = elf.at_uid
 			stack[1] = u64(process.uid)
-			stack = &stack[-2]
+			stack = &u64(u64(stack) - 2 * sizeof(u64))
 			stack[0] = elf.at_euid
 			stack[1] = u64(process.euid)
-			stack = &stack[-2]
+			stack = &u64(u64(stack) - 2 * sizeof(u64))
 			stack[0] = elf.at_gid
 			stack[1] = u64(process.gid)
-			stack = &stack[-2]
+			stack = &u64(u64(stack) - 2 * sizeof(u64))
 			stack[0] = elf.at_egid
 			stack[1] = u64(process.egid)
-			stack = &stack[-2]
+			stack = &u64(u64(stack) - 2 * sizeof(u64))
 			stack[0] = elf.at_entry
 			stack[1] = auxval.at_entry
-			stack = &stack[-2]
+			stack = &u64(u64(stack) - 2 * sizeof(u64))
 			stack[0] = elf.at_phdr
 			stack[1] = auxval.at_phdr
-			stack = &stack[-2]
+			stack = &u64(u64(stack) - 2 * sizeof(u64))
 			stack[0] = elf.at_phent
 			stack[1] = auxval.at_phent
-			stack = &stack[-2]
+			stack = &u64(u64(stack) - 2 * sizeof(u64))
 			stack[0] = elf.at_phnum
 			stack[1] = auxval.at_phnum
-			stack = &stack[-2]
+			stack = &u64(u64(stack) - 2 * sizeof(u64))
 			stack[0] = elf.at_base
 			stack[1] = auxval.at_base
 
-			stack[-1] = 0
-			stack = &stack[-1]
-			stack = &stack[-envp.len]
+			stack = &u64(u64(stack) - sizeof(u64))
+			stack[0] = 0
+			stack = &u64(u64(stack) - u64(envp.len) * sizeof(u64))
 			for i := u64(0); i < envp.len; i++ {
 				orig_stack_vma -= u64(envp[i].len) + 1
 				stack[i] = orig_stack_vma
 			}
 
-			stack[-1] = 0
-			stack = &stack[-1]
-			stack = &stack[-argv.len]
+			stack = &u64(u64(stack) - sizeof(u64))
+			stack[0] = 0
+			stack = &u64(u64(stack) - u64(argv.len) * sizeof(u64))
 			for i := u64(0); i < argv.len; i++ {
 				orig_stack_vma -= u64(argv[i].len) + 1
 				stack[i] = orig_stack_vma
 			}
 
-			stack[-1] = u64(argv.len)
-			stack = &stack[-1]
+			stack = &u64(u64(stack) - sizeof(u64))
+			stack[0] = u64(argv.len)
 
 			t.gpr_state.rsp -= u64(stack_top) - u64(stack)
 		}

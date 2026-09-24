@@ -51,7 +51,7 @@ pub fn write(fd int, buf voidptr, count u64) i64 {
 		lib.kpanic(unsafe { nil }, c'write to fd != 1 && fd != 2 is a stub')
 	}
 
-	kprint.kwrite(charptr(buf), count)
+	kprint.kwrite(unsafe { charptr(buf) }, count)
 
 	return i64(count)
 }

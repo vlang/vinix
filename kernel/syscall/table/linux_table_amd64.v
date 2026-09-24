@@ -195,7 +195,7 @@ fn syscall_linux_rt_sigaction(gpr_state voidptr, signum int, act_ptr u64, oldact
 	mut old := proc.SigAction{}
 	mut raw := [4]u64{}
 	if act_ptr != 0 {
-		if !usercopy.copy_from_user(voidptr(&raw[0]), act_ptr, 32) {
+		if !usercopy.copy_from_user(unsafe { voidptr(&raw[0]) }, act_ptr, 32) {
 			return errno.err, errno.efault
 		}
 		incoming = proc.SigAction{
@@ -222,7 +222,7 @@ fn syscall_linux_rt_sigaction(gpr_state voidptr, signum int, act_ptr u64, oldact
 		raw[1] = u64(u32(old.sa_flags))
 		raw[2] = u64(old.sa_restorer)
 		raw[3] = old.sa_mask
-		if !usercopy.copy_to_user(oldact_ptr, voidptr(&raw[0]), 32) {
+		if !usercopy.copy_to_user(oldact_ptr, unsafe { voidptr(&raw[0]) }, 32) {
 			return errno.err, errno.efault
 		}
 	}
@@ -260,9 +260,9 @@ fn syscall_linux_uname(_ voidptr, buf u64) (u64, u64) {
 		C.strcpy(charptr(&uts[195]), c'Vinix 0.1.0 amd64')
 		C.strcpy(charptr(&uts[260]), c'x86_64')
 	}
-	net.copy_hostname(u64(&uts[65]))
-	net.copy_domainname(u64(&uts[325]))
-	if !usercopy.copy_to_user(buf, voidptr(&uts[0]), u64(uts.len)) {
+	net.copy_hostname(unsafe { u64(&uts[65]) })
+	net.copy_domainname(unsafe { u64(&uts[325]) })
+	if !usercopy.copy_to_user(buf, unsafe { voidptr(&uts[0]) }, u64(uts.len)) {
 		return errno.err, errno.efault
 	}
 	return 0, 0
@@ -351,7 +351,7 @@ fn syscall_linux_getrandom(_ voidptr, buf u64, count u64, flags u32) (u64, u64) 
 		if !krandom.fill(&bounce[0], amount, allow_insecure) {
 			return errno.err, errno.eagain
 		}
-		if !usercopy.copy_to_user(buf + written, voidptr(&bounce[0]), amount) {
+		if !usercopy.copy_to_user(buf + written, unsafe { voidptr(&bounce[0]) }, amount) {
 			if written != 0 {
 				return written, 0
 			}

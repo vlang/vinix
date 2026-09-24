@@ -220,7 +220,10 @@ fn unpack(initramfs_begin voidptr, initramfs_size u64, module_index u64) {
 						// Keep the generic path for a regular file supplied by some
 						// other root filesystem implementation.
 						new_resource.grow(unsafe { nil }, size) or {}
-						new_resource.write(0, buf, 0, size) or {
+						written := new_resource.write(0, buf, 0, size) or {
+							panic('initramfs: failed to write file ${full_name}')
+						}
+						if written != i64(size) {
 							panic('initramfs: failed to write file ${full_name}')
 						}
 					}

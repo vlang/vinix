@@ -124,7 +124,8 @@ fn new_sysfs_resource(kind SysFSKind, mode u32, node int) &SysFSResource {
 	new_resource.stat.blocks = 0
 	new_resource.stat.blksize = 512
 	new_resource.stat.dev = sysfs_dev_id
-	new_resource.stat.ino = sysfs_inode_counter++
+	new_resource.stat.ino = sysfs_inode_counter
+	sysfs_inode_counter++
 	new_resource.stat.mode = mode
 	new_resource.stat.nlink = if stat.isdir(mode) { u64(2) } else { u64(1) }
 	new_resource.stat.atim = realtime_clock

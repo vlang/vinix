@@ -2,7 +2,6 @@
 module simple
 
 import dev.fbdev.api
-import drm.simple as simpledrm
 
 pub struct SimpleFBConfig {
 pub mut:
@@ -39,7 +38,6 @@ fn simple_init() {
 
 	simplefb_initialized = true
 	simplefb_pending_cnt = 0
-	simpledrm.register()
 
 	println('simplefb: initialized')
 }

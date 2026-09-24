@@ -33,7 +33,7 @@ fn heap_selftest() {
 		heap_test_require(count <= 512)
 		mut objects := unsafe { [512]voidptr{} }
 		for i := u64(0); i < count; i++ {
-			ptr := malloc(slab.ent_size)
+			ptr := unsafe { malloc(slab.ent_size) }
 			heap_test_require(ptr != unsafe { nil } && u64(ptr) % slab_alignment == 0)
 			for j := u64(0); j < i; j++ {
 				heap_test_require(objects[int(j)] != ptr)
@@ -59,18 +59,18 @@ fn heap_selftest() {
 	for mut slab in slabs {
 		for delta := u64(0); delta < 3; delta++ {
 			size := slab.ent_size - 1 + delta
-			ptr := malloc(size)
+			ptr := unsafe { malloc(size) }
 			heap_test_require(ptr != unsafe { nil } && u64(ptr) % slab_alignment == 0)
 			heap_test_bytes(ptr, size, 0)
 			free(ptr)
 		}
 	}
-	zero := malloc(0)
+	zero := unsafe { malloc(0) }
 	heap_test_require(zero != unsafe { nil })
 	free(zero)
 	free(unsafe { nil })
 
-	old := malloc(17)
+	old := unsafe { malloc(17) }
 	unsafe { C.memset(old, 0x5a, 17) }
 	grown := realloc(old, 65)
 	heap_test_require(grown != unsafe { nil })
@@ -79,7 +79,7 @@ fn heap_selftest() {
 	heap_test_bytes(grown, 17, 0x5a)
 	free(grown)
 
-	big := malloc(page_size + 1)
+	big := unsafe { malloc(page_size + 1) }
 	unsafe { C.memset(big, 0x6b, page_size + 1) }
 	bigger := realloc(big, 2 * page_size + 1)
 	heap_test_require(bigger != unsafe { nil })
@@ -93,7 +93,7 @@ fn heap_selftest() {
 	heap_test_bytes(cleared, 91, 0)
 	free(cleared)
 	heap_test_require(calloc(u64(1) << 63, 2) == unsafe { nil })
-	heap_test_require(malloc(u64(-1)) == unsafe { nil })
+	heap_test_require(unsafe { malloc(u64(-1)) } == unsafe { nil })
 	heap_trim()
 	heap_test_require(free_bytes() == baseline)
 	C.printf(c'heap: self-test passed\n')

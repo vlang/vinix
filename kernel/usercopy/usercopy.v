@@ -124,7 +124,7 @@ pub fn copy_cstring_from_user(address u64, max_bytes int) ?string {
 		} else {
 			max_bytes - copied
 		}
-		if !copy_from_user(voidptr(&bytes[copied]), current, u64(chunk)) {
+		if !copy_from_user(unsafe { voidptr(&bytes[copied]) }, current, u64(chunk)) {
 			errno.set(errno.efault)
 			return none
 		}

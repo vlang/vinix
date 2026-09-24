@@ -28,9 +28,10 @@ pub fn pthread_detach(t &C.__thread_data) int {
 }
 
 @[export: 'pthread_join']
-pub fn pthread_join(t &C.__thread_data, mut retval voidptr) int {
-	unsafe {
-		*retval = event.pthread_wait(&proc.Thread(t))
+pub fn pthread_join(t &C.__thread_data, retval voidptr) int {
+	result := event.pthread_wait(unsafe { &proc.Thread(t) })
+	if retval != unsafe { nil } {
+		unsafe { *(&voidptr(retval)) = result }
 	}
 	return 0
 }

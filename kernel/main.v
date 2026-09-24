@@ -4,7 +4,7 @@ module main
 // Kernel entry point - shared definitions.
 // Arch-specific kmain() and kmain_thread() are in main_amd64.v / main_arm64.v.
 
-import lib.stubs
+import lib.stubs as _
 import limine
 
 #include <symbols.h>
