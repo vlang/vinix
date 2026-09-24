@@ -61,10 +61,38 @@ pub fn mimmutable(mut pagemap memory.Pagemap, address u64, _length u64) ? {
 
 	pagemap.l.acquire()
 	defer { pagemap.l.release() }
-	mimmutable_unlocked(mut pagemap, base, length)?
+	mimmutable_filtered_unlocked(mut pagemap, base, length, false)?
 }
 
-fn mimmutable_unlocked(mut pagemap memory.Pagemap, base u64, length u64) ? {
+// Kernel ELF loading can safely freeze final executable text while leaving
+// data/RELRO policy to the dynamic linker. Only ranges whose final protection
+// is executable and non-writable are affected; page-rounded PT_LOAD overlap
+// that was replaced by a later writable segment is deliberately skipped.
+pub fn mimmutable_executable(mut pagemap memory.Pagemap, address u64, _length u64) ? {
+	if _length == 0 {
+		return
+	}
+	base := lib.align_down(address, page_size)
+	prefix := address - base
+	if _length > u64(-1) - prefix {
+		errno.set(errno.einval)
+		return none
+	}
+	requested := _length + prefix
+	length := lib.align_up(requested, page_size)
+	if length < requested || base >= memory.user_address_limit()
+		|| length > memory.user_address_limit() - base {
+		errno.set(errno.einval)
+		return none
+	}
+
+	pagemap.l.acquire()
+	defer { pagemap.l.release() }
+	mimmutable_filtered_unlocked(mut pagemap, base, length, true)?
+}
+
+fn mimmutable_filtered_unlocked(mut pagemap memory.Pagemap, base u64, length u64,
+	executable_only bool) ? {
 	end := base + length
 	mut current := base
 	for current < end {
@@ -77,6 +105,11 @@ fn mimmutable_unlocked(mut pagemap memory.Pagemap, base u64, length u64) ? {
 		local_end := local_range.base + local_range.length
 		snip_begin := current
 		snip_end := if local_end < end { local_end } else { end }
+		if executable_only
+			&& (local_range.prot & prot_exec == 0 || local_range.prot & prot_write != 0) {
+			current = snip_end
+			continue
+		}
 		if local_range.immutable {
 			current = snip_end
 			continue
