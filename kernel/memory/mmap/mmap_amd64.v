@@ -54,8 +54,5 @@ pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
 	virt := memory_page * page_size
 	page := acquire_range_page(range_local, virt, file_page) or { return none }
 
-	map_page_in_range(range_local.global, virt, u64(page), range_local.prot) or {
-		release_range_page(range_local.global, virt, file_page, page, range_local.flags)
-		return none
-	}
+	install_range_page(range_local.global, virt, file_page, page, range_local.flags)?
 }

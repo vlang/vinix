@@ -63,6 +63,18 @@ pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
 		return none
 	}
 
+	// A translation fault on a page that is mapped by now raced with a
+	// break-before-make update of its descriptor: fork write-protecting it, or
+	// a copy-on-write fault resolved on another CPU. Retrying the access is all
+	// it needs. Paging the range's page in again would map a page still shared
+	// with a fork child writable, behind copy-on-write's back.
+	if dfsc >= 0x04 && dfsc <= 0x07 {
+		if _ := pagemap.virt2phys(memory_page * page_size) {
+			pagemap.l.release()
+			return
+		}
+	}
+
 	pagemap.l.release()
 
 	virt := memory_page * page_size
@@ -73,8 +85,5 @@ pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
 		cpu.sync_instruction_cache(u64(page) + higher_half, page_size)
 	}
 
-	map_page_in_range(range_local.global, virt, u64(page), range_local.prot) or {
-		release_range_page(range_local.global, virt, file_page, page, range_local.flags)
-		return none
-	}
+	install_range_page(range_local.global, virt, file_page, page, range_local.flags)?
 }

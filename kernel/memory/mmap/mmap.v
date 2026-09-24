@@ -560,6 +560,47 @@ pub fn map_page_in_range(_g &MmapRangeGlobal, virt_addr u64, phys_addr u64, _pro
 	}
 }
 
+// Install a page just obtained for `virt` unless another thread got there
+// first. Faults, pre-faults and mprotect commits all drop the address-space
+// lock before allocating, so two threads touching the same absent page can
+// each come back with a fresh one; mapping both would let the second silently
+// replace a page the first has already written to -- a Go program's heap
+// metadata or a futex word vanishing into a zeroed page. The range's shadow
+// pagemap decides: the first page installed there backs the address, and a
+// loser gives its own page back and maps the winner's.
+//
+// Nothing is left for the caller to release: a page that loses is released
+// here, and one that wins belongs to the range.
+pub fn install_range_page(_g &MmapRangeGlobal, virt u64, file_page u64, page voidptr, flags int) ? {
+	mut g := unsafe { _g }
+	shadow_flags := memory.pte_present | memory.pte_writable | memory.pte_noexec
+	mut phys := u64(page)
+	g.shadow_pagemap.l.acquire()
+	if existing := g.shadow_pagemap.virt2phys(virt) {
+		g.shadow_pagemap.l.release()
+		release_range_page(g, virt, file_page, page, flags)
+		phys = existing
+	} else {
+		g.shadow_pagemap.map_page_unlocked(virt, phys, shadow_flags) or {
+			g.shadow_pagemap.l.release()
+			release_range_page(g, virt, file_page, page, flags)
+			return none
+		}
+		g.shadow_pagemap.l.release()
+	}
+	for i := u64(0); i < g.locals.len; i++ {
+		mut l := g.locals[i]
+		if virt < l.base || virt >= l.base + l.length {
+			continue
+		}
+		// A private page that a fork child still shares stays read-only, so
+		// that the first write copies it instead of changing both processes.
+		writable := !(l.cow && memory.pmm_refcount(voidptr(phys)) > 1)
+		pt_flags := page_table_flags(l.prot, g.pte_extra, writable)
+		l.pagemap.map_page(virt, phys, pt_flags) or { return none }
+	}
+}
+
 // Resolve a write to a private page shared by fork().  A range retains its
 // requested PROT_WRITE bit while its PTE is read-only, so no software-only PTE
 // bit is needed and both architectures use exactly the same state machine.
@@ -575,6 +616,12 @@ pub fn resolve_cow_fault(_pagemap &memory.Pagemap, address u64) bool {
 		return false
 	}
 	old_phys := pagemap.virt2phys(virt) or { return false }
+	// Another thread resolved this page while we waited for the lock, and its
+	// writes already go to the page mapped now. Copying that page again would
+	// lose whatever they change before the new mapping reaches every CPU.
+	if _ := pagemap.user_page_phys(virt, true) {
+		return true
+	}
 	flags := page_table_flags(local_range.prot, local_range.global.pte_extra, true)
 	if memory.pmm_refcount(voidptr(old_phys)) <= 1 {
 		pagemap.flag_page(virt, flags) or { return false }
@@ -953,8 +1000,9 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
 				continue
 			}
 			if page != unsafe { nil } {
-				map_page_in_range(range_global, base + i, u64(page), prot) or {
-					release_range_page(range_global, base + i, file_page, page, flags)
+				// The range is already visible to the process' other threads,
+				// which may fault on this very page while it is pre-faulted.
+				install_range_page(range_global, base + i, file_page, page, flags) or {
 					munmap(mut pagemap, voidptr(base), length) or {}
 					errno.set(errno.enomem)
 					return none
@@ -1093,8 +1141,7 @@ fn populate_missing_pages(mut pagemap memory.Pagemap, address u64, _length u64, 
 			errno.set(errno.enomem)
 			return none
 		}
-		map_page_in_range(global_range, virt, u64(page), prot) or {
-			release_range_page(global_range, virt, file_page, page, flags)
+		install_range_page(global_range, virt, file_page, page, flags) or {
 			errno.set(errno.enomem)
 			return none
 		}
