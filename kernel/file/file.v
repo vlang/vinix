@@ -841,7 +841,7 @@ pub fn syscall_fcntl(_ voidptr, fdnum int, cmd int, arg u64) (u64, u64) {
 			fd.unref()
 		}
 		f_getpipe_sz {
-			if handle.resource.stat.mode & stat.ifmt != stat.ifpipe {
+			if !stat.isifo(handle.resource.stat.mode) {
 				fd.unref()
 				return errno.err, errno.einval
 			}
@@ -853,7 +853,7 @@ pub fn syscall_fcntl(_ voidptr, fdnum int, cmd int, arg u64) (u64, u64) {
 			fd.unref()
 		}
 		f_setpipe_sz {
-			if handle.resource.stat.mode & stat.ifmt != stat.ifpipe {
+			if !stat.isifo(handle.resource.stat.mode) {
 				fd.unref()
 				return errno.err, errno.einval
 			}
