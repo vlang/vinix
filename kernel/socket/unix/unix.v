@@ -722,7 +722,7 @@ pub fn (this &UnixSocket) peer_credentials() ?sock_pub.UCred {
 		return none
 	}
 	return sock_pub.UCred{
-		pid: this.peer_pid
+		pid: proc.pid_seen_by_caller(this.peer_pid)
 		uid: this.peer_uid
 		gid: this.peer_gid
 	}
@@ -1090,7 +1090,7 @@ fn (mut this UnixSocket) recvmsg(_handle voidptr, msg &sock_pub.MsgHdr, flags in
 			// captured when the connection was established are the sending
 			// process's own.
 			credentials := sock_pub.UCred{
-				pid: i32(this.peer_pid)
+				pid: i32(proc.pid_seen_by_caller(this.peer_pid))
 				uid: this.peer_uid
 				gid: this.peer_gid
 			}

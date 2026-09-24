@@ -260,7 +260,7 @@ pub fn syscall_timer_create(_ voidptr, clock_id int, event_ptr u64, timer_id_ptr
 		event.value = raw[0]
 		event.signum = int(u32(raw[1]))
 		event.notify = int(u32(raw[1] >> 32))
-		event.tid = int(u32(raw[2]))
+		event.tid = proc.kernel_id(int(u32(raw[2])))
 	}
 	if event.notify != sigev_none && event.notify != sigev_signal
 		&& event.notify != sigev_thread_id {

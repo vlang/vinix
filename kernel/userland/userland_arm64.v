@@ -156,13 +156,22 @@ pub mut:
 pub fn syscall_getpid(_ voidptr) (u64, u64) {
 	mut t := unsafe { proc.current_thread() }
 
-	return u64(t.process.pid), 0
+	return u64(proc.own_pid(t.process)), 0
 }
 
+// A parent outside the caller's pid namespace is 0 to it, as a container's
+// init sees the runtime that started it.
 pub fn syscall_getppid(_ voidptr) (u64, u64) {
 	mut t := unsafe { proc.current_thread() }
-
-	return u64(t.process.ppid), 0
+	process := t.process
+	if !proc.numbers_own(process.numbered_in) {
+		return u64(process.ppid), 0
+	}
+	proc.lock_table()
+	defer {
+		proc.unlock_table()
+	}
+	return u64(proc.pid_in(proc.process_at(process.ppid), process.numbered_in)), 0
 }
 
 pub fn syscall_sigentry(_ voidptr, sigentry u64) (u64, u64) {
@@ -659,12 +668,18 @@ pub fn syscall_kill(_ voidptr, pid int, signal int) (u64, u64) {
 	}
 
 	mut current_process := proc.current_thread().process
+	// Pids and groups are the caller's namespace's numbers.
+	viewer := current_process.numbered_in
 
 	if pid > 0 {
 		if pid >= proc.max_pid {
 			return errno.err, errno.esrch
 		}
-		mut target := processes[pid]
+		global := proc.pid_from(viewer, pid)
+		if global <= 0 {
+			return errno.err, errno.esrch
+		}
+		mut target := processes[global]
 		if target == unsafe { nil } {
 			return errno.err, errno.esrch
 		}
@@ -684,8 +699,13 @@ pub fn syscall_kill(_ voidptr, pid int, signal int) (u64, u64) {
 	if pid == 0 {
 		pgid = current_process.pgid
 	} else if pid < -1 {
-		pgid = -pid
+		pgid = proc.group_from(viewer, -pid)
+		if pgid == 0 {
+			return errno.err, errno.esrch
+		}
 	}
+	// A namespace's -1 reaches its own members only, and spares its init.
+	init_pid := if proc.numbers_own(viewer) { viewer.init_pid } else { 1 }
 
 	mut found := false
 	for i := 1; i < proc.max_pid; i++ {
@@ -696,7 +716,10 @@ pub fn syscall_kill(_ voidptr, pid int, signal int) (u64, u64) {
 		if pgid != 0 && target.pgid != pgid {
 			continue
 		}
-		if pid == -1 && (target.pid == 1 || target.pid == current_process.pid) {
+		if proc.numbers_own(viewer) && voidptr(target.numbered_in) != voidptr(viewer) {
+			continue
+		}
+		if pid == -1 && (target.pid == init_pid || target.pid == current_process.pid) {
 			continue
 		}
 
@@ -733,7 +756,8 @@ fn signal_thread(tgid int, tid int, signal int) (u64, u64) {
 	// Go preempts its threads with tgkill(SIGURG) from every CPU, and those
 	// threads come and go all the time; the pin keeps a target that exits in the
 	// meantime from being freed and reused before the signal is on it.
-	mut target := proc.get_thread(tid)
+	viewer := proc.current_pid_namespace()
+	mut target := proc.thread_in(viewer, tid)
 	if target == unsafe { nil } {
 		return errno.err, errno.esrch
 	}
@@ -743,7 +767,7 @@ fn signal_thread(tgid int, tid int, signal int) (u64, u64) {
 	if katomic.load(&target.is_dead) {
 		return errno.err, errno.esrch
 	}
-	if tgid > 0 && target.process.pid != tgid {
+	if tgid > 0 && proc.pid_in(target.process, viewer) != tgid {
 		return errno.err, errno.esrch
 	}
 	if signal == 0 {

@@ -43,4 +43,11 @@ output=$(docker run --rm -t "$image" sh -c '[ -t 0 ] && [ -t 1 ] && : < /dev/tty
 [ "$output" = "$(printf 'tty-ok\r')" ] || fail "unexpected -t output: $output"
 pass "container ran with a terminal"
 
+# A container is its own pid namespace: its first process is 1 and its /proc
+# lists nothing from outside, dockerd included.
+output=$(docker run --rm "$image" sh -c 'echo $$; cat /proc/[0-9]*/comm | grep -c dockerd; true') ||
+	fail "docker run pid namespace"
+[ "$output" = "$(printf '1\n0')" ] || fail "unexpected pid namespace view: $output"
+pass "container has its own pid namespace"
+
 echo "DOCKER SMOKE: PASS"

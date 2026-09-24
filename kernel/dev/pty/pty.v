@@ -757,8 +757,10 @@ fn terminal_ioctl(mut pair PtyPair, slave_side bool, request u64, argp voidptr) 
 			}
 			return 0
 		}
+		// Groups and sessions are numbered as the caller's pid namespace
+		// numbers them.
 		ioctl.tiocgpgrp {
-			value := i32(pair.foreground_pgid)
+			value := i32(proc.group_in(proc.current_pid_namespace(), pair.foreground_pgid))
 			if !usercopy.copy_to_user(u64(argp), voidptr(&value), sizeof(i32)) {
 				errno.set(errno.efault)
 				return none
@@ -775,7 +777,16 @@ fn terminal_ioctl(mut pair PtyPair, slave_side bool, request u64, argp voidptr) 
 				errno.set(errno.einval)
 				return none
 			}
-			pair.foreground_pgid = int(value)
+			viewer := proc.current_pid_namespace()
+			mut group := proc.group_from(viewer, int(value))
+			if group == 0 {
+				group = proc.pid_from(viewer, int(value))
+			}
+			if group == 0 {
+				errno.set(errno.esrch)
+				return none
+			}
+			pair.foreground_pgid = group
 			return 0
 		}
 		ioctl.tiocgsid {
@@ -783,7 +794,7 @@ fn terminal_ioctl(mut pair PtyPair, slave_side bool, request u64, argp voidptr) 
 				errno.set(errno.enotty)
 				return none
 			}
-			value := i32(pair.session)
+			value := i32(proc.group_in(proc.current_pid_namespace(), pair.session))
 			if !usercopy.copy_to_user(u64(argp), voidptr(&value), sizeof(i32)) {
 				errno.set(errno.efault)
 				return none

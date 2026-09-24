@@ -185,6 +185,14 @@ pub mut:
 	ppid                     int
 	pgid                     int
 	sid                      int
+	// In a pid namespace other than the initial one, the process's pid, group
+	// and session as that namespace numbers them (0 for a group or session
+	// whose leader is outside it), and the namespace itself. Kept until the
+	// process is reaped: its parent still asks for it by number.
+	ns_pid                   int
+	ns_pgid                  int
+	ns_sid                   int
+	numbered_in              &Namespace = unsafe { nil }
 	// Field 22 of /proc/<pid>/stat: start time in clock ticks. Linux runtimes
 	// (runc) use (pid, start_time) as a process's identity; a constant zero
 	// makes a just-created process indistinguishable from the zero value a
@@ -406,6 +414,7 @@ pub fn free_pid(pid int) {
 		pid_lock.release()
 	}
 
+	release_process_number(processes[pid])
 	processes[pid] = unsafe { nil }
 	// The main thread's tid aliases the pid, so it is released together.
 	release_thread_slot(pid)
@@ -417,6 +426,7 @@ fn release_thread_slot(tid int) {
 	t := threads_by_tid[tid]
 	if t != unsafe { nil } {
 		adjust_policy_count(t.sched.is_special(), false)
+		release_thread_number(t)
 	}
 	threads_by_tid[tid] = unsafe { nil }
 }
@@ -787,7 +797,8 @@ pub fn dump_tasks() {
 
 // The first fields of /proc/<pid>/stat. Everything Vinix does not account for
 // is reported as zero rather than invented; readers take the fields they know.
-pub fn process_stat_line(pid int) string {
+// Ids are shown as `viewer` numbers them.
+pub fn process_stat_line(pid int, viewer &Namespace) string {
 	lock_table()
 	defer { unlock_table() }
 	process := process_at(pid)
@@ -809,7 +820,11 @@ pub fn process_stat_line(pid int) string {
 	// Fields 21 to 39, which nothing here keeps, and then rt_priority and
 	// policy in 40 and 41.
 	state := if process.exiting { 'Z' } else { 'R' }
-	return '${pid} (${comm}) ${state} ${process.ppid} ${process.pgid} ${process.sid} 0 -1 0 0 0 0 0 0 0 0 0 ${priority} ${process.nice} ${threads} 0 ${process.start_time_ticks} 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 ${params.priority} ${params.policy}\n'
+	shown_pid := pid_in(process, viewer)
+	shown_ppid := pid_in(process_at(process.ppid), viewer)
+	shown_pgid := pgid_in(process, viewer)
+	shown_sid := sid_in(process, viewer)
+	return '${shown_pid} (${comm}) ${state} ${shown_ppid} ${shown_pgid} ${shown_sid} 0 -1 0 0 0 0 0 0 0 0 0 ${priority} ${process.nice} ${threads} 0 ${process.start_time_ticks} 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 ${params.priority} ${params.policy}\n'
 }
 
 // The scheduling parameters of a thread that may not be there. Called with the
@@ -821,7 +836,7 @@ fn (t &Thread) sched_or_default() SchedParams {
 	return t.sched
 }
 
-pub fn process_status_text(pid int) string {
+pub fn process_status_text(pid int, viewer &Namespace) string {
 	lock_table()
 	defer { unlock_table() }
 	process := process_at(pid)
@@ -835,6 +850,15 @@ pub fn process_status_text(pid int) string {
 	// Seccomp is reported as absent altogether: without the field a runtime
 	// knows the kernel has no seccomp, which is the truth here.
 	state := if process.exiting { 'Z (zombie)' } else { 'R (running)' }
-	return 'Name:\t${comm}\nUmask:\t0${process.umask:o}\nState:\t${state}\nTgid:\t${pid}\nNgid:\t0\nPid:\t${pid}\nPPid:\t${process.ppid}\nTracerPid:\t0\nUid:\t${process.uid}\t${process.euid}\t${process.suid}\t${process.euid}\nGid:\t${process.gid}\t${process.egid}\t${process.sgid}\t${process.egid}\nNSpid:\t${pid}\nThreads:\t${threads}\nCapInh:\t${caps.inheritable:016x}\nCapPrm:\t${caps.permitted:016x}\nCapEff:\t${caps.effective:016x}\nCapBnd:\t${caps.bounding:016x}\nCapAmb:\t${caps.ambient:016x}\nNoNewPrivs:\t${no_new_privs}\n'
+	shown_pid := pid_in(process, viewer)
+	shown_ppid := pid_in(process_at(process.ppid), viewer)
+	// NSpid lists the process's number in every namespace from the reader's
+	// down to its own.
+	nspid := if !numbers_own(viewer) && numbers_own(process.numbered_in) {
+		'${pid}\t${process.ns_pid}'
+	} else {
+		'${shown_pid}'
+	}
+	return 'Name:\t${comm}\nUmask:\t0${process.umask:o}\nState:\t${state}\nTgid:\t${shown_pid}\nNgid:\t0\nPid:\t${shown_pid}\nPPid:\t${shown_ppid}\nTracerPid:\t0\nUid:\t${process.uid}\t${process.euid}\t${process.suid}\t${process.euid}\nGid:\t${process.gid}\t${process.egid}\t${process.sgid}\t${process.egid}\nNSpid:\t${nspid}\nThreads:\t${threads}\nCapInh:\t${caps.inheritable:016x}\nCapPrm:\t${caps.permitted:016x}\nCapEff:\t${caps.effective:016x}\nCapBnd:\t${caps.bounding:016x}\nCapAmb:\t${caps.ambient:016x}\nNoNewPrivs:\t${no_new_privs}\n'
 }
 

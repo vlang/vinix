@@ -501,7 +501,7 @@ fn (mut this Console) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 				errno.set(errno.enotty)
 				return none
 			}
-			value := i32(this.session)
+			value := i32(proc.group_in(process.numbered_in, this.session))
 			if !usercopy.copy_to_user(u64(argp), voidptr(&value), sizeof(i32)) {
 				errno.set(errno.efault)
 				return none
@@ -511,10 +511,12 @@ fn (mut this Console) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 		ioctl.tiocgpgrp {
 			// Reporting no foreground group is what made every shell give up on
 			// job control at startup.
-			mut value := i32(this.foreground_pgid)
-			if value == 0 {
-				value = i32(process.pgid)
+			mut group := this.foreground_pgid
+			if group == 0 {
+				group = process.pgid
 			}
+			// As the caller's pid namespace numbers the group.
+			value := i32(proc.group_in(process.numbered_in, group))
 			if !usercopy.copy_to_user(u64(argp), voidptr(&value), sizeof(i32)) {
 				errno.set(errno.efault)
 				return none
@@ -531,7 +533,15 @@ fn (mut this Console) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 				errno.set(errno.einval)
 				return none
 			}
-			this.foreground_pgid = int(value)
+			mut group := proc.group_from(process.numbered_in, int(value))
+			if group == 0 {
+				group = proc.pid_from(process.numbered_in, int(value))
+			}
+			if group == 0 {
+				errno.set(errno.esrch)
+				return none
+			}
+			this.foreground_pgid = group
 			return 0
 		}
 		ioctl.fionread {

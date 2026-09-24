@@ -38,6 +38,8 @@ const uname_release = '0.1.0'
 enum ProcFSKind {
 	directory
 	symlink
+	self_link
+	thread_self_link
 	cmdline
 	comm
 	process_stat
@@ -88,9 +90,20 @@ pub mut:
 	// concurrent path walk may still be standing on.
 	lazy      bool
 	populated bool
+	// On a /proc root and the process and thread directories under it, the
+	// pid namespace whose numbers name them; nil for the initial one.
+	view voidptr
 }
 
 struct ProcFS {}
+
+// A /proc mounted from inside a pid namespace lists that namespace's members,
+// by the numbers it gives them. Each namespace gets its own tree, made the
+// first time it mounts one.
+struct ProcFSView {
+	ns   voidptr
+	root &VFSNode = unsafe { nil }
+}
 
 __global (
 	procfs_dev_id        u64
@@ -100,6 +113,7 @@ __global (
 	// path resolution asks this module rather than reading a stored string.
 	procfs_self_node        &VFSNode
 	procfs_thread_self_node &VFSNode
+	procfs_views            []ProcFSView
 	// procfs owns only its own subtree. Keeping it off vfs_lock means a refresh
 	// can run from the middle of path resolution, which does not hold that lock
 	// and must not start to.
@@ -116,19 +130,76 @@ fn (mut this ProcFS) mount(parent &VFSNode, name string, _source &VFSNode) ?&VFS
 	if procfs_dev_id == 0 {
 		procfs_dev_id = resource.create_dev_id()
 	}
-	if unsafe { procfs_root != 0 } {
-		return procfs_root
-	}
-
 	// Linux numbers the procfs root inode PROC_ROOT_INO (1), and container
 	// runtimes reject a /proc whose root is not inode 1 as a spoofed procfs
-	// (CVE-2019-16884). Start the counter there so the root, made first, is 1.
+	// (CVE-2019-16884). Start the counter there so the root, made first, is 1;
+	// a namespace's root is given inode 1 too.
 	if procfs_inode_counter == 0 {
 		procfs_inode_counter = 1
 	}
-	mut root := create_node(this, parent, name, true)
-	root.resource = new_procfs_resource(.directory, stat.ifdir | 0o555, 0, 0)
+	view := proc.current_pid_namespace()
+	if proc.numbers_own(view) {
+		procfs_lock.acquire()
+		defer {
+			procfs_lock.release()
+		}
+		for existing in procfs_views {
+			if existing.ns == voidptr(view) {
+				return existing.root
+			}
+		}
+		// A namespace nothing is left in has no more use for its tree, and a
+		// container's comes and goes with every run.
+		for i in 0 .. procfs_views.len {
+			if !proc.namespace_has_members(unsafe { &proc.Namespace(procfs_views[i].ns) }) {
+				procfs_views[i].ns = voidptr(view)
+				mut reused := procfs_views[i].root
+				retarget_view(mut reused, voidptr(view))
+				return reused
+			}
+		}
+		mut root := this.build_root(parent, name, voidptr(view))
+		procfs_views << ProcFSView{
+			ns:   voidptr(view)
+			root: root
+		}
+		return root
+	}
+	if unsafe { procfs_root != 0 } {
+		return procfs_root
+	}
+	mut root := this.build_root(parent, name, unsafe { nil })
 	procfs_root = root
+	procfs_self_node = unsafe { root.children['self'] }
+	procfs_thread_self_node = unsafe { root.children['thread-self'] }
+	return root
+}
+
+// Hand a tree to another pid namespace. The directories of the old one's
+// processes go: its numbers start again at 1 in the new one.
+fn retarget_view(mut root VFSNode, view voidptr) {
+	mut root_resource := unsafe { &ProcFSResource(root.resource) }
+	root_resource.view = view
+	for link_name in ['self', 'thread-self'] {
+		if link_name in root.children {
+			link := unsafe { root.children[link_name] }
+			mut link_resource := unsafe { &ProcFSResource(link.resource) }
+			link_resource.view = view
+		}
+	}
+	prune_directories(mut root, []int{})
+}
+
+// A /proc tree: the machine-wide files, and the process directories of the pid
+// namespace `view` (nil for the initial one), filled in on first look.
+fn (mut this ProcFS) build_root(parent &VFSNode, name string, view voidptr) &VFSNode {
+	mut root := create_node(this, parent, name, true)
+	mut root_resource := new_procfs_resource(.directory, stat.ifdir | 0o555, 0, 0)
+	root_resource.view = view
+	if view != unsafe { nil } {
+		root_resource.stat.ino = 1
+	}
+	root.resource = root_resource
 
 	// The machine-wide files never come and go, so they are made once.
 	// Only what the kernel can answer truthfully. Per-CPU accounting is not
@@ -163,20 +234,23 @@ fn (mut this ProcFS) mount(parent &VFSNode, name string, _source &VFSNode) ?&VFS
 	// stored target is only what a listing shows; resolution goes through
 	// procfs_self_target().
 	mut self_node := create_node(this, root, 'self', false)
-	self_node.resource = new_procfs_resource(.symlink, stat.iflnk | 0o777, 0, 0)
+	mut self_resource := new_procfs_resource(.self_link, stat.iflnk | 0o777, 0, 0)
+	self_resource.view = view
+	self_node.resource = self_resource
 	self_node.symlink_target = 'self'
 	unsafe {
 		root.children['self'] = self_node
 	}
-	procfs_self_node = self_node
 
 	mut thread_self := create_node(this, root, 'thread-self', false)
-	thread_self.resource = new_procfs_resource(.symlink, stat.iflnk | 0o777, 0, 0)
+	mut thread_self_resource := new_procfs_resource(.thread_self_link, stat.iflnk | 0o777,
+		0, 0)
+	thread_self_resource.view = view
+	thread_self.resource = thread_self_resource
 	thread_self.symlink_target = 'thread-self'
 	unsafe {
 		root.children['thread-self'] = thread_self
 	}
-	procfs_thread_self_node = thread_self
 
 	// Machine-wide files a container runtime reads at startup.
 	add_procfs_file(mut root, 'cpuinfo', .cpuinfo)
@@ -400,14 +474,14 @@ fn (this &ProcFSResource) contents() string {
 			return '${proc.process_command(this.pid)}\n'
 		}
 		.process_stat {
-			return proc.process_stat_line(this.pid)
+			return proc.process_stat_line(this.pid, unsafe { &proc.Namespace(this.view) })
 		}
 		.statm {
 			pages := resident_bytes(this.pid) / page_size
 			return '${pages} ${pages} 0 0 0 0 0\n'
 		}
 		.status {
-			return proc.process_status_text(this.pid)
+			return proc.process_status_text(this.pid, unsafe { &proc.Namespace(this.view) })
 		}
 		.cpuinfo {
 			return cpuinfo_text()
@@ -629,9 +703,11 @@ fn resident_bytes(pid int) u64 {
 // True when the node resolves per reading thread: /proc/self and
 // /proc/thread-self.
 pub fn procfs_is_dynamic_link(node &VFSNode) bool {
-	return (unsafe { procfs_self_node != 0 } && voidptr(node) == voidptr(procfs_self_node))
-		|| (unsafe { procfs_thread_self_node != 0 }
-		&& voidptr(node) == voidptr(procfs_thread_self_node))
+	if node == unsafe { nil } || node.resource == unsafe { nil } || !is_procfs_resource(node.resource) {
+		return false
+	}
+	link := unsafe { &ProcFSResource(node.resource) }
+	return link.kind == .self_link || link.kind == .thread_self_link
 }
 
 // Where /proc/self or /proc/thread-self leads for the thread reading it.
@@ -640,9 +716,18 @@ pub fn procfs_dynamic_link_target(node &VFSNode) string {
 	if current == unsafe { nil } || unsafe { current.process == nil } {
 		return ''
 	}
-	pid := current.process.pid
-	if unsafe { procfs_thread_self_node != 0 } && voidptr(node) == voidptr(procfs_thread_self_node) {
-		return '/proc/${pid}/task/${current.tid}'
+	// The reader as the tree the link is in numbers it. A runtime inside a new
+	// pid namespace still reads the /proc it started with until it mounts the
+	// namespace's own, and there it is known by its kernel pid. A reader that
+	// tree cannot see has no self in it.
+	link := unsafe { &ProcFSResource(node.resource) }
+	view := unsafe { &proc.Namespace(link.view) }
+	pid := proc.pid_in(current.process, view)
+	if pid <= 0 {
+		return ''
+	}
+	if link.kind == .thread_self_link {
+		return '/proc/${pid}/task/${proc.tid_in(current, view)}'
 	}
 	return '/proc/${pid}'
 }
@@ -653,7 +738,7 @@ pub fn procfs_self_target() string {
 	if current == unsafe { nil } || unsafe { current.process == nil } {
 		return ''
 	}
-	return '/proc/${current.process.pid}'
+	return '/proc/${proc.own_pid(current.process)}'
 }
 
 // Bring a procfs directory up to date with the process table. Called from path
@@ -689,8 +774,9 @@ pub fn procfs_refresh(node &VFSNode) {
 		return
 	}
 
-	if voidptr(target) == voidptr(procfs_root) {
-		refresh_process_directories(mut target)
+	if voidptr(target) == voidptr(procfs_root) || (directory.view != unsafe { nil }
+		&& directory.pid == 0) {
+		refresh_process_directories(mut target, directory.view)
 	} else if directory.tid == 0 && directory.pid != 0 {
 		if target.name == 'task' {
 			refresh_thread_directories(mut target, directory.pid)
@@ -745,22 +831,34 @@ fn is_procfs_resource(res &resource.Resource) bool {
 	return res.stat.dev == procfs_dev_id && procfs_dev_id != 0
 }
 
-// One directory per live process, named by pid.
-fn refresh_process_directories(mut root VFSNode) {
+// One directory per live process `view` can see, named by the number it
+// gives the process.
+fn refresh_process_directories(mut root VFSNode, view voidptr) {
 	mut live := []int{}
+	mut numbers := []int{}
 	defer {
-		unsafe { live.free() }
+		unsafe {
+			live.free()
+			numbers.free()
+		}
 	}
+	viewer := unsafe { &proc.Namespace(view) }
 	proc.lock_table()
 	for pid := 1; pid < proc.max_pid; pid++ {
-		if unsafe { proc.process_at(pid) != 0 } {
+		process := proc.process_at(pid)
+		if process == unsafe { nil } {
+			continue
+		}
+		number := proc.pid_in(process, viewer)
+		if number > 0 {
 			live << pid
+			numbers << number
 		}
 	}
 	proc.unlock_table()
 
-	for pid in live {
-		name := '${pid}'
+	for i, pid in live {
+		name := '${numbers[i]}'
 		if name in root.children {
 			// exec() replaces the program without replacing the process, so
 			// the link has to be taken again rather than only created once.
@@ -772,16 +870,16 @@ fn refresh_process_directories(mut root VFSNode) {
 			}
 			continue
 		}
-		add_process_directory(mut root, pid)
+		add_process_directory(mut root, pid, name, view)
 	}
-	prune_directories(mut root, live)
+	prune_directories(mut root, numbers)
 }
 
-fn add_process_directory(mut root VFSNode, pid int) {
-	name := '${pid}'
+fn add_process_directory(mut root VFSNode, pid int, name string, view voidptr) {
 	mut node := create_node(root.filesystem, root, name, true)
 	mut directory := new_procfs_resource(.directory, stat.ifdir | 0o555, pid, 0)
 	directory.lazy = true
+	directory.view = view
 	node.resource = directory
 	node.create_dotentries(root)
 	unsafe {
@@ -797,6 +895,7 @@ fn populate_process_directory(mut node VFSNode, pid int) {
 	mut task := add_procfs_directory(mut node, 'task')
 	mut task_resource := unsafe { &ProcFSResource(task.resource) }
 	task_resource.pid = pid
+	task_resource.view = unsafe { &ProcFSResource(node.resource) }.view
 	refresh_thread_directories(mut task, pid)
 }
 
@@ -966,9 +1065,12 @@ fn anonymous_descriptor_text(res &resource.Resource) string {
 	return 'anon_inode:[${res.stat.ino}]'
 }
 
+// A process's file shows ids as the tree it is in numbers them.
 fn add_process_file(mut parent VFSNode, name string, kind ProcFSKind, pid int) {
 	mut node := create_node(parent.filesystem, parent, name, false)
-	node.resource = new_procfs_resource(kind, stat.ifreg | 0o444, pid, 0)
+	mut file := new_procfs_resource(kind, stat.ifreg | 0o444, pid, 0)
+	file.view = unsafe { &ProcFSResource(parent.resource) }.view
+	node.resource = file
 	unsafe {
 		parent.children[name] = node
 	}
@@ -978,18 +1080,27 @@ fn add_process_file(mut parent VFSNode, name string, kind ProcFSKind, pid int) {
 // caller how many threads the process has.
 fn refresh_thread_directories(mut task VFSNode, pid int) {
 	mut live := proc.thread_ids(pid)
+	view := unsafe { &ProcFSResource(task.resource) }.view
+	mut numbers := proc.thread_numbers(live, unsafe { &proc.Namespace(view) })
 	defer {
-		unsafe { live.free() }
+		unsafe {
+			live.free()
+			numbers.free()
+		}
 	}
 
-	for tid in live {
-		name := '${tid}'
+	for i, tid in live {
+		if numbers[i] <= 0 {
+			continue
+		}
+		name := '${numbers[i]}'
 		if name in task.children {
 			continue
 		}
 		mut node := create_node(task.filesystem, task, name, true)
 		mut directory := new_procfs_resource(.directory, stat.ifdir | 0o555, pid, tid)
 		directory.lazy = true
+		directory.view = view
 		node.resource = directory
 		node.create_dotentries(task)
 		unsafe {
@@ -997,7 +1108,7 @@ fn refresh_thread_directories(mut task VFSNode, pid int) {
 			task.resource.stat.nlink++
 		}
 	}
-	prune_directories(mut task, live)
+	prune_directories(mut task, numbers)
 }
 
 // Drop the directories whose process or thread has gone. A node is only freed

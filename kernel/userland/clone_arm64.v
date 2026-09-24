@@ -233,7 +233,7 @@ fn clone_thread_of_current(state &cpulocal.GPRState, flags u64, child_stack u64,
 		new_thread.clear_child_tid = child_tid
 	}
 
-	tid := u32(new_thread.tid)
+	tid := u32(proc.own_tid(new_thread))
 
 	// Both tid words live in the address space we share with the new thread, so
 	// they can be written here, before it is allowed to run. As on Linux, a
@@ -247,7 +247,7 @@ fn clone_thread_of_current(state &cpulocal.GPRState, flags u64, child_stack u64,
 
 	sched.enqueue_thread(new_thread, false)
 
-	return u64(new_thread.tid), 0
+	return u64(tid), 0
 }
 
 // Everything else: a new process with a copy of our address space and
@@ -293,6 +293,10 @@ fn clone_new_process(state &cpulocal.GPRState, flags u64, child_stack u64, paren
 		child_sp = child_stack
 	}
 
+	// Numbered once its pid namespace is settled, and before its first thread
+	// is, which takes the process's number.
+	proc.number_process(mut new_process, old_process)
+
 	mut new_thread := sched.new_cloned_thread(new_process, old_thread, state, child_sp,
 		tls, flags & clone_settls != 0) or {
 		mmap.delete_pagemap(mut new_process.pagemap) or {}
@@ -304,7 +308,11 @@ fn clone_new_process(state &cpulocal.GPRState, flags u64, child_stack u64, paren
 		new_thread.clear_child_tid = child_tid
 	}
 
-	tid := u32(new_thread.tid)
+	// The parent's word gets the child's tid as the parent sees it, the child's
+	// as the child does: in a new pid namespace the child is 1.
+	viewer := old_process.numbered_in
+	tid := u32(proc.tid_in(new_thread, viewer))
+	child_view_tid := u32(proc.own_tid(new_thread))
 
 	if flags & clone_parent_settid != 0 && parent_tid != 0 {
 		usercopy.copy_to_user(parent_tid, voidptr(&tid), sizeof(u32))
@@ -312,7 +320,8 @@ fn clone_new_process(state &cpulocal.GPRState, flags u64, child_stack u64, paren
 	// The child's pages were copied eagerly, so its tid word has to be written
 	// through its own pagemap rather than ours.
 	if flags & clone_child_settid != 0 && child_tid != 0 {
-		usercopy.copy_to_pagemap(new_process.pagemap, child_tid, voidptr(&tid), sizeof(u32))
+		usercopy.copy_to_pagemap(new_process.pagemap, child_tid, voidptr(&child_view_tid),
+			sizeof(u32))
 	}
 
 	parent_process.children_lock.acquire()
@@ -321,7 +330,7 @@ fn clone_new_process(state &cpulocal.GPRState, flags u64, child_stack u64, paren
 
 	sched.enqueue_thread(new_thread, false)
 
-	return u64(new_process.pid), 0
+	return u64(proc.pid_in(new_process, viewer)), 0
 }
 
 // ── exit ─────────────────────────────────────────────────────────────────────
@@ -681,7 +690,8 @@ fn wait_for_thread_to_leave(mut process proc.Process, t &proc.Thread) {
 }
 
 // Who adopts the children of `process`: its closest living ancestor that set
-// PR_SET_CHILD_SUBREAPER, or PID 1.
+// PR_SET_CHILD_SUBREAPER, or the init of its pid namespace -- a container's,
+// which is what lets tini reap the zombies inside it -- or PID 1.
 fn find_reaper(process &proc.Process) &proc.Process {
 	mut ppid := process.ppid
 	for _ in 0 .. proc.max_pid {
@@ -696,6 +706,14 @@ fn find_reaper(process &proc.Process) &proc.Process {
 			return ancestor
 		}
 		ppid = ancestor.ppid
+	}
+	pid_ns := process.numbered_in
+	if proc.numbers_own(pid_ns) && pid_ns.init_pid != process.pid && pid_ns.init_pid > 0
+		&& pid_ns.init_pid < proc.max_pid {
+		namespace_init := processes[pid_ns.init_pid]
+		if namespace_init != unsafe { nil } && !namespace_init.exiting {
+			return namespace_init
+		}
 	}
 	if process.pid == 1 {
 		return unsafe { nil }
@@ -751,7 +769,7 @@ pub fn syscall_set_tid_address(_ voidptr, tidptr u64) (u64, u64) {
 
 	current_thread.clear_child_tid = tidptr
 
-	return u64(current_thread.tid), 0
+	return u64(proc.own_tid(current_thread)), 0
 }
 
 pub fn syscall_set_robust_list(_ voidptr, head u64, len u64) (u64, u64) {
@@ -768,7 +786,7 @@ pub fn syscall_set_robust_list(_ voidptr, head u64, len u64) (u64, u64) {
 pub fn syscall_get_robust_list(_ voidptr, tid int, head_ptr u64, len_ptr u64) (u64, u64) {
 	mut head := proc.current_thread().robust_list_head
 	if tid != 0 {
-		target := proc.get_thread(tid)
+		target := proc.thread_in(proc.current_pid_namespace(), tid)
 		if target == unsafe { nil } {
 			return errno.err, errno.esrch
 		}
@@ -840,7 +858,7 @@ fn release_robust_list(mut t proc.Thread) {
 			break
 		}
 		if entry != pending {
-			abandon_robust_futex(t.tid, u64(i64(entry) + offset))
+			abandon_robust_futex(proc.own_tid(t), u64(i64(entry) + offset))
 		}
 		entry = next
 	}
@@ -848,10 +866,12 @@ fn release_robust_list(mut t proc.Thread) {
 	// list_op_pending covers the lock the thread was in the middle of taking
 	// or releasing when it died.
 	if pending != 0 {
-		abandon_robust_futex(t.tid, u64(i64(pending) + offset))
+		abandon_robust_futex(proc.own_tid(t), u64(i64(pending) + offset))
 	}
 }
 
+// `tid` is the thread's own number, which is what userspace stored as the
+// owner.
 fn abandon_robust_futex(tid int, address u64) {
 	mut value := u32(0)
 	if !usercopy.copy_from_user(voidptr(&value), address, sizeof(u32)) {
@@ -875,17 +895,19 @@ fn abandon_robust_futex(tid int, address u64) {
 
 // Selector semantics shared by wait4() and waitid(): >0 one pid, 0 the caller's
 // process group, -1 any child, < -1 the process group -pid.
+// `pid` is as the caller's pid namespace numbers processes and groups.
 fn child_matches(current_process &proc.Process, child &proc.Process, pid int) bool {
 	if pid == -1 {
 		return true
 	}
+	viewer := current_process.numbered_in
 	if pid > 0 {
-		return child.pid == pid
+		return proc.pid_in(child, viewer) == pid
 	}
 	if pid == 0 {
 		return child.pgid == current_process.pgid
 	}
-	return child.pgid == -pid
+	return proc.pgid_in(child, viewer) == -pid
 }
 
 // Look for a child selected by `pid` that has already exited. A nil child with
@@ -988,7 +1010,7 @@ pub fn syscall_wait4(_ voidptr, pid int, status_ptr u64, options int, rusage_ptr
 	}
 
 	status := i32(child.status)
-	reaped := child.pid
+	reaped := proc.pid_in(child, current_process.numbered_in)
 
 	if status_ptr != 0 && !usercopy.copy_to_user(status_ptr, voidptr(&status), sizeof(i32)) {
 		return errno.err, put_back(mut child)
@@ -1053,7 +1075,7 @@ pub fn syscall_waitid(_ voidptr, idtype int, id u64, infop u64, options int, rus
 	mut info := SigInfoChld{
 		si_signo:  i32(sigchld)
 		si_code:   i32(cld_exited)
-		si_pid:    i32(child.pid)
+		si_pid:    i32(proc.pid_in(child, current_process.numbered_in))
 		si_status: i32((status >> 8) & 0xff)
 	}
 	if status & 0x7f != 0 {

@@ -29,10 +29,11 @@ import usercopy
 
 // Which thread a scheduling call is about, or none if it names one that is not
 // there.
-fn sched_target_tid(pid int) ?int {
-	if pid < 0 {
+fn sched_target_tid(local_pid int) ?int {
+	if local_pid < 0 {
 		return none
 	}
+	pid := proc.kernel_id(local_pid)
 	if pid == 0 {
 		return proc.current_thread().tid
 	}
@@ -385,7 +386,8 @@ fn syscall_linux_sched_getattr(_ voidptr, pid int, attr_ptr u64, size u32, flags
 // sched_getaffinity(pid, size, mask). This is how a libc counts the processors
 // for sysconf(_SC_NPROCESSORS_ONLN), so the answer decides how many threads a
 // program starts.
-fn syscall_linux_sched_getaffinity(_ voidptr, pid int, size u64, mask u64) (u64, u64) {
+fn syscall_linux_sched_getaffinity(_ voidptr, local_pid int, size u64, mask u64) (u64, u64) {
+	pid := proc.kernel_id(local_pid)
 	if pid < 0 {
 		return errno.err, errno.einval
 	}
@@ -429,7 +431,8 @@ fn syscall_linux_sched_getaffinity(_ voidptr, pid int, size u64, mask u64) (u64,
 	return written, 0
 }
 
-fn syscall_linux_sched_setaffinity(_ voidptr, pid int, size u64, mask u64) (u64, u64) {
+fn syscall_linux_sched_setaffinity(_ voidptr, local_pid int, size u64, mask u64) (u64, u64) {
+	pid := proc.kernel_id(local_pid)
 	if pid < 0 || size < sizeof(u64) {
 		return errno.err, errno.einval
 	}

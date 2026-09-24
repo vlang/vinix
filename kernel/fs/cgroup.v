@@ -362,8 +362,17 @@ fn (mut this CGroupResource) contents() string {
 				unsafe { members.free() }
 			}
 			mut text := []u8{cap: members.len * 8}
+			defer {
+				unsafe { text.free() }
+			}
+			// As the reader's pid namespace numbers them; a container sees its
+			// own.
 			for pid in members {
-				append_decimal(mut text, pid)
+				number := proc.pid_seen_by_caller(pid)
+				if number <= 0 {
+					continue
+				}
+				append_decimal(mut text, number)
 				text << `\n`
 			}
 			return text.bytestr()
@@ -468,7 +477,7 @@ fn (mut this CGroupResource) write(_handle voidptr, buf voidptr, _loc u64, count
 				errno.set(errno.einval)
 				return none
 			}
-			target := if pid == 0 { calling_process().pid } else { pid }
+			target := if pid == 0 { calling_process().pid } else { proc.kernel_id(pid) }
 			if !move_to_cgroup(mut group, target) {
 				errno.set(errno.esrch)
 				return none

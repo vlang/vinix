@@ -31,10 +31,11 @@ mut:
 	inheritable u32
 }
 
-fn cap_target(pid int) &proc.Process {
-	if pid == 0 {
+fn cap_target(local_pid int) &proc.Process {
+	if local_pid == 0 {
 		return proc.current_thread().process
 	}
+	pid := proc.kernel_id(local_pid)
 	proc.lock_table()
 	mut target := proc.process_at(pid)
 	proc.unlock_table()

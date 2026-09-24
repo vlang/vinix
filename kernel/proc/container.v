@@ -42,7 +42,12 @@ pub mut:
 	data voidptr
 	// Pid namespaces: the process that is their init, once there is one.
 	init_pid int
-	lock     klock.Lock
+	// A pid namespace other than the initial one numbers its members itself:
+	// `ids` maps each number it has handed out to the kernel's id for that
+	// process or thread. Changed with pid_lock held.
+	ids     map[int]int
+	next_id int = 1
+	lock    klock.Lock
 	// The nsfs file /proc/<pid>/ns/<kind> leads to. One per namespace, so that
 	// comparing two of them by inode tells whether they are the same one.
 	node voidptr

@@ -466,7 +466,8 @@ fn syscall_linux_prctl(_ voidptr, option int, arg2 u64, _arg3 u64, _arg4 u64, _a
 	}
 }
 
-fn syscall_linux_prlimit64(_ voidptr, pid int, res int, new_rlim u64, old_rlim u64) (u64, u64) {
+fn syscall_linux_prlimit64(_ voidptr, local_pid int, res int, new_rlim u64, old_rlim u64) (u64, u64) {
+	pid := proc.kernel_id(local_pid)
 	if res < 0 || res >= proc.rlimit_nlimits {
 		return errno.err, errno.einval
 	}
@@ -526,7 +527,7 @@ fn syscall_linux_prlimit64(_ voidptr, pid int, res int, new_rlim u64, old_rlim u
 
 fn syscall_linux_gettid(_ voidptr) (u64, u64) {
 	current := proc.current_thread()
-	return u64(current.tid), 0
+	return u64(proc.own_tid(current)), 0
 }
 
 // ── X11 / dynamic-linking syscall stubs ──
@@ -704,34 +705,55 @@ fn syscall_linux_setpgid(_ voidptr, pid int, pgid int) (u64, u64) {
 	}
 
 	mut target := proc.current_thread().process
+	// Both numbers are the caller's pid namespace's.
+	viewer := target.numbered_in
 	if pid != 0 {
 		if pid >= proc.max_pid {
 			return errno.err, errno.esrch
 		}
-		target = processes[pid]
+		global := proc.pid_from(viewer, pid)
+		target = if global > 0 { processes[global] } else { unsafe { nil } }
 		if target == unsafe { nil } {
 			return errno.err, errno.esrch
 		}
 	}
 
-	target.pgid = if pgid == 0 { target.pid } else { pgid }
+	local := if pgid == 0 { proc.pid_in(target, viewer) } else { pgid }
+	mut group := if pgid == 0 || local == proc.pid_in(target, viewer) {
+		target.pid
+	} else {
+		proc.group_from(viewer, local)
+	}
+	if group == 0 {
+		// A group whose leader is alive but has nobody in it yet.
+		group = proc.pid_from(viewer, local)
+	}
+	if group == 0 {
+		return errno.err, errno.eperm
+	}
+	target.pgid = group
+	if proc.numbers_own(target.numbered_in) {
+		target.ns_pgid = local
+	}
 
 	return 0, 0
 }
 
 fn syscall_linux_getpgid(_ voidptr, pid int) (u64, u64) {
 	mut target := proc.current_thread().process
+	viewer := target.numbered_in
 	if pid != 0 {
 		if pid < 0 || pid >= proc.max_pid {
 			return errno.err, errno.esrch
 		}
-		target = processes[pid]
+		global := proc.pid_from(viewer, pid)
+		target = if global > 0 { processes[global] } else { unsafe { nil } }
 		if target == unsafe { nil } {
 			return errno.err, errno.esrch
 		}
 	}
 
-	return u64(target.pgid), 0
+	return u64(proc.pgid_in(target, viewer)), 0
 }
 
 // sendmsg is implemented by the socket layer so AF_INET datagrams retain their
@@ -949,7 +971,8 @@ fn syscall_linux_getrandom(_ voidptr, buf u64, count u64, flags u32) (u64, u64) 
 
 const prio_process = 0
 
-fn syscall_linux_setpriority(_ voidptr, which int, who int, prio int) (u64, u64) {
+fn syscall_linux_setpriority(_ voidptr, which int, local_who int, prio int) (u64, u64) {
+	who := proc.kernel_id(local_who)
 	if which != prio_process || who < 0 {
 		return errno.err, errno.einval
 	}
@@ -979,7 +1002,8 @@ fn syscall_linux_setpriority(_ voidptr, which int, who int, prio int) (u64, u64)
 	return 0, 0
 }
 
-fn syscall_linux_getpriority(_ voidptr, which int, who int) (u64, u64) {
+fn syscall_linux_getpriority(_ voidptr, which int, local_who int) (u64, u64) {
+	who := proc.kernel_id(local_who)
 	if which != prio_process || who < 0 {
 		return errno.err, errno.einval
 	}

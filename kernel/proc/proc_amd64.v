@@ -28,6 +28,7 @@ pub mut:
 	syscall_num  u64
 	// Movable members
 	tid                int
+	ns_tid             int
 	is_in_queue        bool
 	l                  klock.Lock
 	process            &Process = unsafe { nil }

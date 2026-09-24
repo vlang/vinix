@@ -23,6 +23,8 @@ pub mut:
 	syscall_num  u64
 	// Movable members
 	tid                int
+	// The tid as the thread's pid namespace numbers it; see Process.ns_pid.
+	ns_tid             int
 	is_in_queue        bool
 	l                  klock.Lock
 	process            &Process = unsafe { nil }

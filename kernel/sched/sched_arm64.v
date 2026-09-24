@@ -1842,8 +1842,10 @@ fn attach_thread(mut process proc.Process, mut t proc.Thread) ?int {
 	if process.threads.len == 0 && process.pid != 0 {
 		t.tid = process.pid
 		proc.bind_tid(t.tid, t)
+		proc.number_thread(mut t, true)
 	} else {
 		t.tid = proc.allocate_tid(t)?
+		proc.number_thread(mut t, false)
 	}
 
 	process.threads << t
