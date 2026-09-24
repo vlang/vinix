@@ -777,6 +777,40 @@ pub fn thread_ids(pid int) []int {
 	return ids
 }
 
+// Whether some process or thread stands in `directory`: has it as its working
+// directory or its root. Neither holds a reference on it, so removing the
+// directory has to ask. A process whose thread list is busy counts as one.
+pub fn directory_in_use(directory voidptr) bool {
+	lock_table()
+	defer { unlock_table() }
+	for pid := 1; pid < max_pid; pid++ {
+		process := process_at(pid)
+		if process == unsafe { nil } {
+			continue
+		}
+		if process.current_directory == directory || process.root_directory == directory {
+			return true
+		}
+		mut owner := unsafe { process }
+		if !owner.threads_lock.test_and_acquire() {
+			return true
+		}
+		mut inside := false
+		for t in process.threads {
+			if t.fs != unsafe { nil } && (t.fs.current_directory == directory
+				|| t.fs.root_directory == directory) {
+				inside = true
+				break
+			}
+		}
+		owner.threads_lock.release()
+		if inside {
+			return true
+		}
+	}
+	return false
+}
+
 // sysrq 't': every thread on the console, with the syscall it is in and that
 // call's first argument, which is how a hang in userspace is told apart from
 // one in the kernel and pinned to the call that never returned.

@@ -428,6 +428,25 @@ int main(void) {
         check(access("/tmp/aarch64-syscall-mount/probe", F_OK) != 0,
               "root umount2 detaches the mount");
 
+    // A directory removed while it is the working directory is still there
+    // to stand in: it has no links and nothing can be made in it.
+    const char *removed_dir = "/tmp/aarch64-syscall-removed";
+    char previous_cwd[256];
+    struct stat removed_stat;
+    int removed_ok = getcwd(previous_cwd, sizeof(previous_cwd)) != NULL &&
+                     mkdir(removed_dir, 0755) == 0 && chdir(removed_dir) == 0 &&
+                     rmdir(removed_dir) == 0;
+    removed_ok = removed_ok && stat(".", &removed_stat) == 0 &&
+                 removed_stat.st_nlink == 0;
+    removed_ok = removed_ok &&
+                 failed_with_errno(open("file", O_CREAT | O_WRONLY, 0644), ENOENT,
+                                   "create in removed directory") &&
+                 failed_with_errno(mkdir("dir", 0755), ENOENT,
+                                   "mkdir in removed directory");
+    check(removed_ok, "removed working directory stays usable");
+    if (chdir(previous_cwd) != 0)
+        chdir("/");
+
     close(fd);
     unlink(path);
     unlink(copy_path);

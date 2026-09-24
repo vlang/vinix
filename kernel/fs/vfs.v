@@ -54,6 +54,8 @@ pub mut:
 	// Set once the node has been the root of a mount, which is when `..`
 	// has to consult the mount table instead of following the parent.
 	mount_root bool
+	// Set when the directory is removed; see unlink().
+	removed bool
 }
 
 __global (
@@ -384,6 +386,7 @@ pub fn symlink(parent &VFSNode, dest string, target string) ?&VFSNode {
 
 	if read_only(parent_of_tgt_node) { errno.set(errno.erofs); return none }
 	require_access(parent_of_tgt_node, access_write | access_exec)?
+	require_linked(parent_of_tgt_node)?
 	target_node = parent_of_tgt_node.filesystem.symlink(parent_of_tgt_node, dest, basename)
 	if target_node == unsafe { nil } { return none }
 	apply_creation_identity(mut target_node, parent_of_tgt_node)?
@@ -409,6 +412,7 @@ pub fn link(parent &VFSNode, dest string, target string) ?&VFSNode {
 
 	if read_only(parent_of_tgt_node) { errno.set(errno.erofs); return none }
 	require_access(parent_of_tgt_node, access_write | access_exec)?
+	require_linked(parent_of_tgt_node)?
 	target_node = parent_of_tgt_node.filesystem.link(parent_of_tgt_node, dest, mut dest_node) ?
 	if target_node == unsafe { nil } { return none }
 
@@ -453,17 +457,39 @@ pub fn unlink(parent &VFSNode, name string, remove_dir bool) ? {
 	inotify_emit(parent_of_tgt, basename, in_delete | dir_flag, 0)
 	inotify_emit(node, '', in_delete_self, 0)
 	inotify_forget(node)
+	// A removed directory can still be stood in or open: a shim runs in the
+	// bundle directory containerd deletes. Such a one keeps its node, its
+	// entries and its resource, and it is left with no links and nothing but
+	// `.` and `..` in it, into which nothing can be made. Freeing them had
+	// the next lookup from there read freed memory.
+	mut held := false
 	if stat.isdir(node.resource.stat.mode) {
-		unsafe {
-			free(node.children['.'].children)
-			free(node.children['.'])
-			free(node.children['..'].children)
-			free(node.children['..'])
-			free(node.children)
+		node.removed = true
+		node.resource.stat.nlink = 0
+		held = proc.directory_in_use(voidptr(node))
+		if !held && node.resource.refcount <= 1 {
+			unsafe {
+				free(node.children['.'].children)
+				free(node.children['.'])
+				free(node.children['..'].children)
+				free(node.children['..'])
+				free(node.children)
+				node.children = nil
+			}
 		}
 	}
 	parent_of_tgt.children.delete(basename)
-	node.resource.unref(unsafe { nil })?
+	if !held {
+		node.resource.unref(unsafe { nil })?
+	}
+}
+
+// Nothing is made in a directory that has been removed; Linux says ENOENT.
+fn require_linked(directory &VFSNode) ? {
+	if directory.removed {
+		errno.set(errno.enoent)
+		return none
+	}
 }
 
 pub fn create(parent &VFSNode, name string, mode u32) ?&VFSNode {
@@ -505,6 +531,7 @@ pub fn internal_create(parent &VFSNode, name string, mode u32) ?&VFSNode {
 
 	if read_only(parent_of_tgt_node) { errno.set(errno.erofs); return none }
 	require_access(parent_of_tgt_node, access_write | access_exec)?
+	require_linked(parent_of_tgt_node)?
 	target_node = parent_of_tgt_node.filesystem.create(parent_of_tgt_node, basename, mode)
 	if target_node == unsafe { nil } { return none }
 	apply_creation_identity(mut target_node, parent_of_tgt_node)?
@@ -1467,6 +1494,7 @@ pub fn rename(oldparent &VFSNode, oldpath string, newparent &VFSNode, newpath st
 		errno.set(errno.exdev)
 		return none
 	}
+	require_linked(new_parent_of)?
 
 	if flags & rename_exchange != 0 {
 		if unsafe { new_node == 0 } {
