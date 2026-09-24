@@ -333,10 +333,12 @@ pub fn syscall_epoll_pwait(_ voidptr, epfd int, events_buf u64, maxevents int, t
 		for out_event in events {
 			if !usercopy.copy_to_user(events_buf + ret * sizeof(EpollEvent),
 				voidptr(&out_event), sizeof(EpollEvent)) {
+				unsafe { events.free() }
 				return errno.err, errno.efault
 			}
 			ret++
 		}
+		unsafe { events.free() }
 	}
 	if ret > 0 {
 		return ret, 0
@@ -374,7 +376,7 @@ pub fn syscall_epoll_pwait(_ voidptr, epfd int, events_buf u64, maxevents int, t
 		// Holding the file instead left runc's log pipe with a writer for as
 		// long as its poller slept, so runc waited forever for the EOF.
 		mut watched := epoll_res.snapshot_watched()
-		mut ev_list := []&eventstruct.Event{}
+		mut ev_list := []&eventstruct.Event{cap: watched.len + 2}
 		ev_list << &epoll_res.event
 		for i in 0 .. watched.len {
 			mut watched_res := watched[i]
@@ -403,10 +405,12 @@ pub fn syscall_epoll_pwait(_ voidptr, epfd int, events_buf u64, maxevents int, t
 			for out_event in events {
 				if !usercopy.copy_to_user(events_buf + ret * sizeof(EpollEvent),
 					voidptr(&out_event), sizeof(EpollEvent)) {
+					unsafe { events.free() }
 					return errno.err, errno.efault
 				}
 				ret++
 			}
+			unsafe { events.free() }
 			if ret > 0 {
 				return ret, 0
 			}
@@ -428,7 +432,10 @@ fn (mut this EpollResource) collect_ready(maxevents int) ?[]EpollEvent {
 	defer {
 		this.l.release()
 	}
-	mut events := []EpollEvent{}
+	// Sized up front: an array that grows leaves its old buffer behind in
+	// this kernel, and a Go runtime polls several times a millisecond.
+	limit := if maxevents < this.entries.len { maxevents } else { this.entries.len }
+	mut events := []EpollEvent{cap: limit}
 	for mut entry in this.entries {
 		if events.len >= maxevents {
 			break
@@ -459,7 +466,7 @@ fn (mut this EpollResource) snapshot_watched() []&resource.Resource {
 	defer {
 		this.l.release()
 	}
-	mut resources := []&resource.Resource{}
+	mut resources := []&resource.Resource{cap: this.entries.len}
 	for entry in this.entries {
 		if entry.handle == unsafe { nil } {
 			continue
