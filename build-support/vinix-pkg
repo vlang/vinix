@@ -335,6 +335,9 @@ install_packages() {
 				# the same release line and give it the same Vinix defaults.
 				apk_install adwaita-icon-theme font-dejavu firefox-esr
 				finalize_firefox
+				# Without the loader cache GTK cannot load a single image, and the
+				# browser spins on pixbuf assertions instead of drawing.
+				finalize_desktop
 				;;
 			gtk)
 				apk_install \
