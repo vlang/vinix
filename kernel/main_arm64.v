@@ -7,6 +7,7 @@ import lib.stubs
 import aarch64.cpu
 import aarch64.cpu.local as cpulocal
 import aarch64.exception
+import aarch64.firmware
 import aarch64.aic
 import aarch64.gic
 import aarch64.timer
@@ -665,6 +666,13 @@ fn kmain() {
 	}
 
 	configure_apple_bringup_from_cmdline()
+
+	// QEMU's virt machine names itself in its ACPI tables, so an image booted
+	// in QEMU without vinix.qemu_platform=1 -- a release ISO, say -- still gets
+	// its keyboard, tablet and interrupt controller. Apple hardware has no ACPI.
+	if !force_qemu_platform && firmware.is_qemu() {
+		force_qemu_platform = true
+	}
 
 	// Optional QEMU virt MMIO path (PL011/GIC/Virtio-input). Keep this opt-in
 	// so missing DTB on real hardware does not trigger invalid MMIO accesses.
