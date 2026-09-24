@@ -366,6 +366,37 @@ pub fn dequeue_and_die() {
 	}
 }
 
+// Give up the CPU, leaving the current thread to resume from the context in
+// its gpr_state, which the caller has just rewritten: a signal handler's entry,
+// or what a sigreturn restores. The registers of the syscall in progress are
+// not the thread's to keep, which is the difference from a timer switch --
+// but everything else a switch saves has to be saved here, and the thread's
+// lock let go, or no CPU can ever pick it up again: yield(false) alone leaves
+// scheduler_isr no current thread to do that for.
+pub fn resume_saved_context() {
+	asm volatile amd64 {
+		cli
+	}
+	mut t := proc.current_thread()
+	cpu_local := cpulocal.current()
+	// In a syscall the user's GS base is the one swapgs put aside.
+	t.gs_base = cpu.get_kernel_gs_base()
+	t.fs_base = cpu.get_fs_base()
+	t.cr3 = cpu.read_cr3()
+	fpu_save(t.fpu_storage)
+	proc.charge_cpu_time(mut t, time.monotonic_ns())
+	// GS points at the thread, whose first field is the CPU it runs on and is
+	// what cpulocal.current() reads. Point it at this CPU's own block before
+	// the thread stops claiming one.
+	cpu.set_gs_base(u64(&cpu_local.cpu_number))
+	cpu.set_kernel_gs_base(u64(&cpu_local.cpu_number))
+	katomic.store(mut &t.running_on, u64(-1))
+	t.l.release()
+	yield(false)
+	for {
+	}
+}
+
 // Give up the rest of this thread's timeslice without leaving the run queue.
 // This mirrors the ARM scheduler helper used by shared kernel wait loops.
 pub fn reschedule() {

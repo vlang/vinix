@@ -242,7 +242,7 @@ fn resume_sigreturn(context cpulocal.GPRState, old_mask u64) {
 	// Vinix's amd64 signal bitmap uses the signal number as its bit index.
 	t.masked_signals = old_mask & ~((u64(1) << sigkill) | (u64(1) << sigstop))
 
-	sched.yield(false)
+	sched.resume_saved_context()
 
 	for {}
 }
@@ -407,7 +407,7 @@ fn dispatch_signal(context &cpulocal.GPRState, info_signum int, info_code int, i
 	t.gpr_state.rcx = u64(return_context)
 	t.gpr_state.r8 = previous_mask
 
-	sched.yield(false)
+	sched.resume_saved_context()
 }
 
 // Dispatch a signal to _self_, this is called from the scheduler or at the
