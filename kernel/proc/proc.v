@@ -204,7 +204,10 @@ pub mut:
 	threads_lock             klock.Lock
 	fds_lock                 klock.Lock
 	rlimits_lock             klock.Lock
-	fds                      [max_fds]voidptr
+	// The descriptor table, max_fds entries allocated with the process and
+	// freed when it is reaped. Held inline it made every process 10 KiB, which
+	// the allocator rounds up to four pages.
+	fds                      []voidptr
 	children                 []&Process
 	children_lock            klock.Lock
 	mmap_anon_non_fixed_base u64
@@ -414,8 +417,15 @@ pub fn free_pid(pid int) {
 		pid_lock.release()
 	}
 
-	release_process_number(processes[pid])
+	mut reaped := processes[pid]
+	release_process_number(reaped)
 	processes[pid] = unsafe { nil }
+	// Nothing can find the process now, and every descriptor it had was closed
+	// when it exited.
+	if reaped != unsafe { nil } && reaped.fds.len != 0 {
+		unsafe { reaped.fds.free() }
+		reaped.fds = []voidptr{}
+	}
 	// The main thread's tid aliases the pid, so it is released together.
 	release_thread_slot(pid)
 }
