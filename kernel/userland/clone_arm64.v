@@ -534,6 +534,11 @@ fn kill_sibling_threads(mut current_process proc.Process, current_thread &proc.T
 		sched.intercept_thread(victim) or {}
 		sched.dequeue_thread(victim)
 		sched.set_itimer_real(victim, 0, 0)
+		// A thread that split off its own root and mount namespace -- runc
+		// keeps one in the container's namespace for opening mount sources --
+		// holds a reference that would otherwise keep the namespace, and every
+		// directory it has something mounted on, alive for good.
+		fs.release_thread_fs(mut victim)
 		proc.free_tid(victim.tid)
 	}
 

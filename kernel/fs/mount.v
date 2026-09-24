@@ -146,6 +146,29 @@ fn attach_mount(mut table MountTable, mut covered VFSNode, root &VFSNode) {
 	table.lock.release()
 }
 
+// Take away what `table` has mounted on `covered`. Outside the initial
+// namespace the override itself goes, so that the directory can be removed
+// again once nothing is mounted on it, unless it has to stay to hide a mount
+// the initial namespace has there.
+fn detach_mount(mut table MountTable, mut covered VFSNode) {
+	if table.initial {
+		covered.mountpoint = unsafe { nil }
+		return
+	}
+	key := u64(voidptr(covered))
+	table.lock.acquire()
+	if covered.mountpoint != unsafe { nil } {
+		if key !in table.overrides {
+			katomic.inc(mut &covered.ns_mounts)
+		}
+		table.overrides[key] = unsafe { nil }
+	} else if key in table.overrides {
+		table.overrides.delete(key)
+		katomic.dec(mut &covered.ns_mounts)
+	}
+	table.lock.release()
+}
+
 fn record_mount(mut table MountTable, covered &VFSNode, root &VFSNode, source string,
 	fstype string, flags u64, options string) &Mount {
 	entry := &Mount{
@@ -599,7 +622,7 @@ fn move_mount(parent &VFSNode, source string, target string) ? {
 	}
 	mut old_covered := entry.covered
 	if voidptr(old_covered) != voidptr(entry.root) {
-		attach_mount(mut table, mut old_covered, unsafe { nil })
+		detach_mount(mut table, mut old_covered)
 	}
 	attach_mount(mut table, mut target_node, entry.root)
 	entry.covered = target_node
@@ -643,7 +666,7 @@ fn unmount(parent &VFSNode, target string, flags u64) ? {
 	}
 	if voidptr(entry.covered) != voidptr(entry.root) {
 		mut covered := entry.covered
-		attach_mount(mut table, mut covered, unsafe { nil })
+		detach_mount(mut table, mut covered)
 	}
 	table.lock.acquire()
 	index := table.mounts.index(entry)
@@ -675,6 +698,10 @@ fn unmount(parent &VFSNode, target string, flags u64) ? {
 				table.mounts.delete(i)
 			}
 			table.lock.release()
+			if voidptr(candidate.covered) != voidptr(candidate.root) {
+				mut covered := candidate.covered
+				detach_mount(mut table, mut covered)
+			}
 		}
 		unsafe { stale.free() }
 	}
