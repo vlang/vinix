@@ -111,7 +111,8 @@ pub fn (t &Thread) current_syscall() (i64, u64) {
 }
 
 pub fn (t &Thread) syscall_args_text() string {
-	return 'x1=0x${t.syscall_x1:x} x2=0x${t.syscall_x2:x} x3=0x${t.syscall_x3:x} blocked=0x${t.masked_signals:x} pending=0x${t.pending_signals:x}'
+	cpu := if t.running_on == u64(-1) { '-' } else { t.running_on.str() }
+	return 'x1=0x${t.syscall_x1:x} x2=0x${t.syscall_x2:x} x3=0x${t.syscall_x3:x} blocked=0x${t.masked_signals:x} pending=0x${t.pending_signals:x} cpu=${cpu} queued=${t.is_in_queue}'
 }
 
 // What a wait a signal interrupted reports: a restart once the signal is
