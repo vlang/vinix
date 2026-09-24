@@ -24,7 +24,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 DEFAULT_DRIVER = SCRIPT_DIR / "build/kext/g17c/AGXG17X.macho"
 DEFAULT_DEVICE_TREE = SCRIPT_DIR / "build/live_macos.json"
 DEFAULT_OUTPUT = (
-    SCRIPT_DIR.parent.parent / "kernel/modules/gpu/agx/fw/g17_power_tables.v"
+    SCRIPT_DIR.parent.parent / "kernel/gpu/agx/fw/g17_power_tables.v"
 )
 Q_BITS = 40
 TEMPERATURE_C = 110.0

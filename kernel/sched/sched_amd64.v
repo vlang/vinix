@@ -22,8 +22,13 @@ pub fn initialise() {
 	interrupt_table[scheduler_vector] = voidptr(scheduler_isr)
 	idt.set_ist(scheduler_vector, 1)
 
+	// The kernel acts with every capability: file permissions are lifted by
+	// capabilities, not by a uid of zero, and kernel threads create files
+	// wherever the initramfs puts them.
 	kernel_process = &proc.Process{
 		pagemap: &kernel_pagemap
+		caps:    proc.full_capabilities()
+		fds:     []voidptr{len: proc.max_fds}
 	}
 }
 
@@ -46,6 +51,10 @@ fn may_run_here(t &proc.Thread, cpu_number u64) bool {
 // the memory it faulted in, while a node with nothing to do still takes work
 // from a busy one rather than idling.
 fn get_next_thread() &proc.Thread {
+	scheduler_queue_lock.acquire()
+	defer {
+		scheduler_queue_lock.release()
+	}
 	mut cpu_local := cpulocal.current()
 
 	if numa_multinode {
@@ -120,7 +129,7 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 	if unsafe { current_thread != 0 } {
 		current_thread.yield_await.release()
 
-		if unsafe { next_thread == nil } && current_thread.is_in_queue
+		if unsafe { next_thread == nil } && katomic.load(&current_thread.is_in_queue)
 			&& may_run_here(current_thread, cpu_local.cpu_number) {
 			apic.lapic_eoi()
 			apic.lapic_timer_oneshot(mut cpu_local, scheduler_vector, effective_timeslice(current_thread))
@@ -227,13 +236,18 @@ pub fn enqueue_thread(_thread &proc.Thread, by_signal bool) bool {
 		katomic.store(mut &t.enqueued_by_signal, true)
 	}
 
+	scheduler_queue_lock.acquire()
+	defer {
+		scheduler_queue_lock.release()
+	}
+
 	if t.is_in_queue == true {
 		return true
 	}
 
 	for i := u64(0); i < max_running_threads; i++ {
 		if katomic.cas[&proc.Thread](mut &scheduler_running_queue[i], unsafe { nil }, t) {
-			t.is_in_queue = true
+			katomic.store(mut &t.is_in_queue, true)
 
 			// Check if any CPU is idle and wake it up
 			for cpu_entry in cpu_locals {
@@ -252,19 +266,21 @@ pub fn enqueue_thread(_thread &proc.Thread, by_signal bool) bool {
 
 pub fn dequeue_thread(_thread &proc.Thread) bool {
 	mut t := unsafe { _thread }
-
-	if t.is_in_queue == false {
-		return true
+	scheduler_queue_lock.acquire()
+	defer {
+		scheduler_queue_lock.release()
 	}
 
+	was_enqueued := t.is_in_queue
+	mut removed := false
 	for i := u64(0); i < max_running_threads; i++ {
 		if katomic.cas[&proc.Thread](mut &scheduler_running_queue[i], t, unsafe { nil }) {
-			t.is_in_queue = false
-			return true
+			removed = true
 		}
 	}
+	katomic.store(mut &t.is_in_queue, false)
 
-	return false
+	return removed || !was_enqueued
 }
 
 // Like dequeue_thread(), but it stops it immediately
@@ -345,6 +361,37 @@ pub fn dequeue_and_die() {
 	proc.charge_cpu_time(mut t, time.monotonic_ns())
 	unsafe {
 	}
+	yield(false)
+	for {
+	}
+}
+
+// Give up the CPU, leaving the current thread to resume from the context in
+// its gpr_state, which the caller has just rewritten: a signal handler's entry,
+// or what a sigreturn restores. The registers of the syscall in progress are
+// not the thread's to keep, which is the difference from a timer switch --
+// but everything else a switch saves has to be saved here, and the thread's
+// lock let go, or no CPU can ever pick it up again: yield(false) alone leaves
+// scheduler_isr no current thread to do that for.
+pub fn resume_saved_context() {
+	asm volatile amd64 {
+		cli
+	}
+	mut t := proc.current_thread()
+	cpu_local := cpulocal.current()
+	// In a syscall the user's GS base is the one swapgs put aside.
+	t.gs_base = cpu.get_kernel_gs_base()
+	t.fs_base = cpu.get_fs_base()
+	t.cr3 = cpu.read_cr3()
+	fpu_save(t.fpu_storage)
+	proc.charge_cpu_time(mut t, time.monotonic_ns())
+	// GS points at the thread, whose first field is the CPU it runs on and is
+	// what cpulocal.current() reads. Point it at this CPU's own block before
+	// the thread stops claiming one.
+	cpu.set_gs_base(u64(&cpu_local.cpu_number))
+	cpu.set_kernel_gs_base(u64(&cpu_local.cpu_number))
+	katomic.store(mut &t.running_on, u64(-1))
+	t.l.release()
 	yield(false)
 	for {
 	}
@@ -438,7 +485,7 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 	mut stack_vma := u64(0)
 
 	if _stack == 0 {
-		mut user_stack_size := stack_size
+		mut user_stack_size := default_user_stack_size
 		stack_limit := proc.soft_limit(process, proc.rlimit_stack)
 		if stack_limit != proc.rlim_infinity && stack_limit < user_stack_size {
 			user_stack_size = lib.align_down(stack_limit, page_size)
@@ -632,8 +679,16 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 		enqueue_thread(t, false)
 	}
 
+	// Published processes (proc.allocate_pid()/new_process()) can be visible
+	// to another CPU -- e.g. syscall_kill's kill(-1, sig) broadcast, which
+	// reads process.threads directly -- before their first thread lands
+	// here, and start_program()'s exec path replaces this same slice under
+	// the identical lock. Hold it across the read-then-append so neither
+	// side can observe or index an array mid-mutation.
+	process.threads_lock.acquire()
 	t.tid = process.threads.len
 	process.threads << t
+	process.threads_lock.release()
 
 	return t
 }
@@ -645,6 +700,7 @@ pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) ?&proc.Pr
 	}
 	mut new_proc := &proc.Process{
 		pagemap: unsafe { nil }
+		fds:     []voidptr{len: proc.max_fds}
 	}
 
 	new_proc.pid = proc.allocate_pid(new_proc) or { return none }
@@ -658,7 +714,9 @@ pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) ?&proc.Pr
 		new_proc.thread_stack_top = old_process.thread_stack_top
 		new_proc.mmap_anon_non_fixed_base = old_process.mmap_anon_non_fixed_base
 		new_proc.current_directory = old_process.current_directory
+		proc.inherit_container_state(mut new_proc, old_process)
 		new_proc.linux_abi = old_process.linux_abi
+		new_proc.allow_wx = old_process.allow_wx
 		new_proc.uid = old_process.uid
 		new_proc.euid = old_process.euid
 		new_proc.suid = old_process.suid
@@ -682,6 +740,7 @@ pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) ?&proc.Pr
 		new_proc.mmap_anon_non_fixed_base = elf.initial_mmap_base()
 		new_proc.current_directory = voidptr(vfs_root)
 		new_proc.rlimits = proc.default_rlimits()
+		proc.inherit_container_state(mut new_proc, unsafe { nil })
 	}
 
 	return new_proc

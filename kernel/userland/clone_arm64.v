@@ -10,6 +10,7 @@ import errno
 import event
 import event.eventstruct
 import file
+import fs
 import futex
 import katomic
 import lib
@@ -18,6 +19,7 @@ import posixtimer
 import proc
 import sched
 import term
+import time
 import usercopy
 
 // clone(2) flags. Only the ones that change what we build are listed.
@@ -30,6 +32,14 @@ pub const clone_parent_settid = u64(0x00100000)
 pub const clone_child_cleartid = u64(0x00200000)
 
 pub const clone_child_settid = u64(0x01000000)
+
+// The child's parent is the caller's parent, as for a sibling.
+pub const clone_parent = u64(0x00008000)
+
+pub const clone_pidfd = u64(0x00001000)
+
+// clone3 only: start the child in the cgroup the args' directory fd names.
+pub const clone_into_cgroup = u64(0x200000000)
 
 // wait4(2)/waitid(2) options. `wnohang` lives in userland_arm64.v.
 const wstopped = 2
@@ -159,10 +169,40 @@ pub fn syscall_clone3(_gpr_state voidptr, uargs u64, size u64) (u64, u64) {
 		return errno.err, errno.einval
 	}
 
-	return do_clone(state, args.flags, child_sp, args.parent_tid, args.tls, args.child_tid)
+	mut cgroup := voidptr(unsafe { nil })
+	if args.flags & clone_into_cgroup != 0 {
+		if size < sizeof(CloneArgs) {
+			return errno.err, errno.einval
+		}
+		mut cgroup_fd := file.fd_from_fdnum(unsafe { nil }, int(args.cgroup)) or {
+			return errno.err, errno.ebadf
+		}
+		node := unsafe { &fs.VFSNode(cgroup_fd.handle.node) }
+		cgroup_fd.unref()
+		cgroup = fs.cgroup_from_node(node) or { return errno.err, errno.ebadf }
+	}
+
+	return do_clone_into(state, args.flags, child_sp, args.parent_tid, args.tls, args.child_tid,
+		args.flags & clone_into_cgroup != 0, cgroup)
 }
 
 fn do_clone(state &cpulocal.GPRState, flags u64, child_stack u64, parent_tid u64, tls u64, child_tid u64) (u64, u64) {
+	return do_clone_into(state, flags & 0xffffffff, child_stack, parent_tid, tls, child_tid,
+		false, unsafe { nil })
+}
+
+fn do_clone_into(state &cpulocal.GPRState, flags u64, child_stack u64, parent_tid u64, tls u64, child_tid u64, into_cgroup bool, cgroup voidptr) (u64, u64) {
+	// A new namespace other than a user namespace takes CAP_SYS_ADMIN, and none
+	// can be made for a thread, which shares its process' namespaces.
+	if flags & proc.clone_namespace_flags != 0 {
+		if flags & clone_thread != 0 {
+			return errno.err, errno.einval
+		}
+		if flags & proc.clone_namespace_flags & ~proc.clone_newuser != 0
+			&& !proc.current_has_capability(proc.cap_sys_admin) {
+			return errno.err, errno.eperm
+		}
+	}
 	// CLONE_THREAD, not CLONE_VM, decides between a thread and a process:
 	// posix_spawn and vfork ask for CLONE_VM but still expect a child that can
 	// execve without replacing us, which our separate address spaces give them.
@@ -171,7 +211,8 @@ fn do_clone(state &cpulocal.GPRState, flags u64, child_stack u64, parent_tid u64
 			child_tid)
 	}
 
-	return clone_new_process(state, flags, child_stack, parent_tid, tls, child_tid)
+	return clone_new_process(state, flags, child_stack, parent_tid, tls, child_tid, into_cgroup,
+		cgroup)
 }
 
 // CLONE_THREAD: another thread inside the calling process, sharing its address
@@ -192,7 +233,7 @@ fn clone_thread_of_current(state &cpulocal.GPRState, flags u64, child_stack u64,
 		new_thread.clear_child_tid = child_tid
 	}
 
-	tid := u32(new_thread.tid)
+	tid := u32(proc.own_tid(new_thread))
 
 	// Both tid words live in the address space we share with the new thread, so
 	// they can be written here, before it is allowed to run. As on Linux, a
@@ -206,12 +247,12 @@ fn clone_thread_of_current(state &cpulocal.GPRState, flags u64, child_stack u64,
 
 	sched.enqueue_thread(new_thread, false)
 
-	return u64(new_thread.tid), 0
+	return u64(tid), 0
 }
 
 // Everything else: a new process with a copy of our address space and
 // descriptor table, running a single thread that resumes where we did.
-fn clone_new_process(state &cpulocal.GPRState, flags u64, child_stack u64, parent_tid u64, tls u64, child_tid u64) (u64, u64) {
+fn clone_new_process(state &cpulocal.GPRState, flags u64, child_stack u64, parent_tid u64, tls u64, child_tid u64, into_cgroup bool, cgroup voidptr) (u64, u64) {
 	mut old_thread := proc.current_thread()
 	mut old_process := old_thread.process
 
@@ -220,6 +261,21 @@ fn clone_new_process(state &cpulocal.GPRState, flags u64, child_stack u64, paren
 	}
 
 	new_process.name = '${old_process.name}[${new_process.pid}]'
+	fs.fork_namespaces(mut new_process, flags)
+	if into_cgroup {
+		new_process.cgroup = cgroup
+	}
+
+	// CLONE_PARENT makes the child its creator's sibling: runc's init stages
+	// are all children of the runtime that started the first of them.
+	mut parent_process := old_process
+	if flags & clone_parent != 0 && old_process.ppid > 0 {
+		mut grandparent := processes[old_process.ppid]
+		if grandparent != unsafe { nil } {
+			parent_process = grandparent
+			new_process.ppid = grandparent.pid
+		}
+	}
 
 	// Duplicate the descriptor table, preserving each fd's O_CLOEXEC flag.
 	for i := 0; i < proc.max_fds; i++ {
@@ -237,6 +293,10 @@ fn clone_new_process(state &cpulocal.GPRState, flags u64, child_stack u64, paren
 		child_sp = child_stack
 	}
 
+	// Numbered once its pid namespace is settled, and before its first thread
+	// is, which takes the process's number.
+	proc.number_process(mut new_process, old_process)
+
 	mut new_thread := sched.new_cloned_thread(new_process, old_thread, state, child_sp,
 		tls, flags & clone_settls != 0) or {
 		mmap.delete_pagemap(mut new_process.pagemap) or {}
@@ -248,7 +308,11 @@ fn clone_new_process(state &cpulocal.GPRState, flags u64, child_stack u64, paren
 		new_thread.clear_child_tid = child_tid
 	}
 
-	tid := u32(new_thread.tid)
+	// The parent's word gets the child's tid as the parent sees it, the child's
+	// as the child does: in a new pid namespace the child is 1.
+	viewer := old_process.numbered_in
+	tid := u32(proc.tid_in(new_thread, viewer))
+	child_view_tid := u32(proc.own_tid(new_thread))
 
 	if flags & clone_parent_settid != 0 && parent_tid != 0 {
 		usercopy.copy_to_user(parent_tid, voidptr(&tid), sizeof(u32))
@@ -256,16 +320,17 @@ fn clone_new_process(state &cpulocal.GPRState, flags u64, child_stack u64, paren
 	// The child's pages were copied eagerly, so its tid word has to be written
 	// through its own pagemap rather than ours.
 	if flags & clone_child_settid != 0 && child_tid != 0 {
-		usercopy.copy_to_pagemap(new_process.pagemap, child_tid, voidptr(&tid), sizeof(u32))
+		usercopy.copy_to_pagemap(new_process.pagemap, child_tid, voidptr(&child_view_tid),
+			sizeof(u32))
 	}
 
-	old_process.children_lock.acquire()
-	old_process.children << new_process
-	old_process.children_lock.release()
+	parent_process.children_lock.acquire()
+	parent_process.children << new_process
+	parent_process.children_lock.release()
 
 	sched.enqueue_thread(new_thread, false)
 
-	return u64(new_process.pid), 0
+	return u64(proc.pid_in(new_process, viewer)), 0
 }
 
 // ── exit ─────────────────────────────────────────────────────────────────────
@@ -288,10 +353,18 @@ fn thread_exit(status int, group bool) {
 	mut current_thread := proc.current_thread()
 	mut current_process := current_thread.process
 
+	// A sibling tearing the process down may already have given up waiting and
+	// taken charge of this thread. Then it is the one releasing what this
+	// thread holds, and this thread only has to get out of its way.
+	if !proc.claim_thread_exit(current_thread) {
+		sched.park_stopped_thread()
+	}
+
 	// Hand back whatever this thread still owns while its address space is
 	// mapped: robust futexes it holds, and the tid word pthread_join waits on.
 	release_robust_list(mut current_thread)
 	clear_child_tid(mut current_thread)
+	fs.release_thread_fs(mut current_thread)
 
 	if !group && !leave_process(mut current_process, current_thread) {
 		proc.free_tid(current_thread.tid)
@@ -311,8 +384,13 @@ pub fn exit_with_fatal_signal(signal u8) {
 	mut current_thread := proc.current_thread()
 	mut current_process := current_thread.process
 
+	if !proc.claim_thread_exit(current_thread) {
+		sched.park_stopped_thread()
+	}
+
 	release_robust_list(mut current_thread)
 	clear_child_tid(mut current_thread)
+	fs.release_thread_fs(mut current_thread)
 
 	exit_process(mut current_process, mut current_thread, encode_fatal_signal(signal))
 }
@@ -382,23 +460,49 @@ fn exit_process(mut current_process proc.Process, mut current_thread proc.Thread
 		file.fdnum_close(current_process, i, true) or {}
 	}
 
-	// PID 1 adopts whatever children we leave behind. Taken off our own list
-	// first so that the two children locks are never held at the same time.
+	// The nearest ancestor that asked to be a child subreaper, or else PID 1,
+	// adopts whatever children we leave behind. Taken off our own list first
+	// so that the two children locks are never held at the same time.
 	current_process.children_lock.acquire()
 	mut orphans := unsafe { current_process.children }
 	current_process.children = []&proc.Process{}
 	current_process.children_lock.release()
 
-	mut init_process := processes[1]
-	if current_process.pid != 1 && init_process != unsafe { nil } {
-		init_process.children_lock.acquire()
-		for mut child_proc in orphans {
-			child_proc.ppid = 1
-			init_process.children << child_proc
+	// The init of a pid namespace takes every other member with it.
+	mut pid_ns := current_process.ns.pid
+	if pid_ns != unsafe { nil } && !proc.is_initial_namespace(pid_ns)
+		&& pid_ns.init_pid == current_process.pid {
+		for member in proc.pid_namespace_members(pid_ns) {
+			signal_pid(member, 9)
 		}
-		init_process.children_lock.release()
+	}
+
+	mut adopter := find_reaper(current_process)
+	if adopter != unsafe { nil } && voidptr(adopter) != voidptr(current_process) {
+		mut adopted_zombie := false
+		adopter.children_lock.acquire()
+		for mut child_proc in orphans {
+			child_proc.ppid = adopter.pid
+			adopter.children << child_proc
+			if child_proc.exiting {
+				adopted_zombie = true
+			}
+		}
+		adopter.children_lock.release()
+		// A child that had already died is the adopter's to reap now; tell it,
+		// as the dead child's own SIGCHLD went to a parent that is gone.
+		if adopted_zombie {
+			notify_process(adopter)
+		}
+	}
+	for mut child_proc in orphans {
+		if child_proc.pdeathsig > 0 && !child_proc.exiting {
+			signal_pid(child_proc.pid, child_proc.pdeathsig)
+		}
 	}
 	unsafe { orphans.free() }
+
+	fs.release_process_namespaces(mut current_process)
 
 	mmap.delete_pagemap(mut old_pagemap) or {}
 
@@ -430,31 +534,206 @@ fn encode_fatal_signal(signal u8) int {
 	return int(signal) & 0x7f
 }
 
-// Stop every other thread of the process for good. They are never resumed, so
-// they must not keep a run queue slot or be reachable by tid. Their kernel
-// stacks are deliberately left allocated: one of them may still be parked
-// mid-syscall on its own stack, and there is no safe moment to free it here.
+// How long exit_group() and execve() give the other threads to leave on their
+// own before stopping whatever is still running.
+const sibling_exit_grace_ns = u64(500000000)
+
+// A thread told to go by a sibling's exit_group() or execve() leaves here, on
+// its way back to userspace, after the syscall it was in has unwound and given
+// back what it held.
+pub fn exit_if_told_to() {
+	t := proc.current_thread()
+	if t == unsafe { nil } || !katomic.load(&t.must_exit) {
+		return
+	}
+	thread_exit(0, false)
+}
+
+fn has_other_threads(mut process proc.Process, current_thread &proc.Thread) bool {
+	process.threads_lock.acquire()
+	defer {
+		process.threads_lock.release()
+	}
+	for t in process.threads {
+		if voidptr(t) != voidptr(current_thread) {
+			return true
+		}
+	}
+	return false
+}
+
+// Get every other thread of the process out, for good. Each is told to exit and
+// woken if it is waiting, so that one blocked in the kernel unwinds its
+// syscall -- giving back the descriptors, references and memory that syscall
+// holds -- and leaves by itself on the way back to userspace. Stopping them where they
+// stood leaked all of that: a Go program exits with a thread parked in
+// epoll_pwait, and each one left references on the sockets and pipes it was
+// watching, which then never closed, plus the thread's own kernel stack.
+//
+// A thread that does not leave within the grace period -- one busy in
+// userspace, which holds nothing of the kernel's -- is stopped where it is.
+// Its kernel stack is deliberately left allocated: it may still be parked
+// mid-syscall on it, and there is no safe moment to free it here.
 fn kill_sibling_threads(mut current_process proc.Process, current_thread &proc.Thread) {
+	// Pinned while still on the list: any of them may leave and die by itself
+	// the moment the lock is let go, and its memory must not be handed to a new
+	// thread while this is still telling it to exit.
 	current_process.threads_lock.acquire()
-	mut victims := []&proc.Thread{}
+	mut others := []&proc.Thread{cap: current_process.threads.len}
 	for t in current_process.threads {
 		if voidptr(t) != voidptr(current_thread) {
+			proc.pin_thread(t)
+			others << t
+		}
+	}
+	current_process.threads_lock.release()
+	for mut other in others {
+		katomic.store(mut &other.must_exit, true)
+		sched.enqueue_thread(other, true)
+		proc.unpin_thread(other)
+	}
+	unsafe { others.free() }
+
+	deadline := time.monotonic_ns() + sibling_exit_grace_ns
+	for has_other_threads(mut current_process, current_thread) && time.monotonic_ns() < deadline {
+		mut timer := time.new_timer(time.TimeSpec{
+			tv_sec:  0
+			tv_nsec: 1000000
+		})
+		mut timer_events := [&timer.event]
+		event.await(mut timer_events, true) or {}
+		timer.disarm()
+		unsafe {
+			timer_events.free()
+			free(timer)
+		}
+	}
+
+	current_process.threads_lock.acquire()
+	mut victims := []&proc.Thread{cap: current_process.threads.len}
+	for t in current_process.threads {
+		if voidptr(t) != voidptr(current_thread) {
+			proc.pin_thread(t)
 			victims << t
 		}
 	}
 	current_process.threads_lock.release()
 
 	for mut victim in victims {
+		// One that has started leaving by itself -- it may have been just about
+		// to when the grace period ran out -- gives back its own tid and root.
+		// Doing that here as well freed them twice, and could stop and free the
+		// tid of whatever new thread had taken its place. Wait for it to be off
+		// the list instead, and leave it alone.
+		if !proc.claim_thread_exit(victim) {
+			wait_for_thread_to_leave(mut current_process, victim)
+			proc.unpin_thread(victim)
+			continue
+		}
 		// Marked first so that an event trigger racing with us cannot put the
 		// thread back on the run queue behind our back.
-		victim.is_dead = true
+		katomic.store(mut &victim.is_dead, true)
 		sched.intercept_thread(victim) or {}
 		sched.dequeue_thread(victim)
+		// It may still be on another CPU finishing what it was doing; the
+		// descriptors and address space it could reach are torn down next.
+		for n := 0; n < 1000000 && katomic.load(&victim.running_on) != u64(-1); n++ {
+			asm volatile aarch64 {
+				yield
+				; ; ; memory
+			}
+		}
 		sched.set_itimer_real(victim, 0, 0)
+		// A thread that split off its own root and mount namespace -- runc
+		// keeps one in the container's namespace for opening mount sources --
+		// holds a reference that would otherwise keep the namespace, and every
+		// directory it has something mounted on, alive for good.
+		fs.release_thread_fs(mut victim)
 		proc.free_tid(victim.tid)
+		proc.unpin_thread(victim)
 	}
 
 	unsafe { victims.free() }
+}
+
+fn thread_listed(mut process proc.Process, t &proc.Thread) bool {
+	process.threads_lock.acquire()
+	defer {
+		process.threads_lock.release()
+	}
+	for listed in process.threads {
+		if voidptr(listed) == voidptr(t) {
+			return true
+		}
+	}
+	return false
+}
+
+// A thread that has claimed its own exit has nothing left to block on, so it
+// is off the list within moments. The bound is only there so that a teardown
+// can never hang on one.
+fn wait_for_thread_to_leave(mut process proc.Process, t &proc.Thread) {
+	deadline := time.monotonic_ns() + sibling_exit_grace_ns
+	for thread_listed(mut process, t) && time.monotonic_ns() < deadline {
+		mut timer := time.new_timer(time.TimeSpec{
+			tv_sec:  0
+			tv_nsec: 1000000
+		})
+		mut timer_events := [&timer.event]
+		event.await(mut timer_events, true) or {}
+		timer.disarm()
+		unsafe {
+			timer_events.free()
+			free(timer)
+		}
+	}
+}
+
+// Who adopts the children of `process`: its closest living ancestor that set
+// PR_SET_CHILD_SUBREAPER, or the init of its pid namespace -- a container's,
+// which is what lets tini reap the zombies inside it -- or PID 1.
+fn find_reaper(process &proc.Process) &proc.Process {
+	mut ppid := process.ppid
+	for _ in 0 .. proc.max_pid {
+		if ppid <= 1 || ppid >= proc.max_pid {
+			break
+		}
+		ancestor := processes[ppid]
+		if ancestor == unsafe { nil } {
+			break
+		}
+		if ancestor.child_subreaper && !ancestor.exiting {
+			return ancestor
+		}
+		ppid = ancestor.ppid
+	}
+	pid_ns := process.numbered_in
+	if proc.numbers_own(pid_ns) && pid_ns.init_pid != process.pid && pid_ns.init_pid > 0
+		&& pid_ns.init_pid < proc.max_pid {
+		namespace_init := processes[pid_ns.init_pid]
+		if namespace_init != unsafe { nil } && !namespace_init.exiting {
+			return namespace_init
+		}
+	}
+	if process.pid == 1 {
+		return unsafe { nil }
+	}
+	return processes[1]
+}
+
+fn notify_process(parent &proc.Process) {
+	mut target := proc.get_main_thread(parent)
+	if target == unsafe { nil } {
+		return
+	}
+	defer {
+		proc.unpin_thread(target)
+	}
+	handler := target.sigactions[sigchld].sa_sigaction
+	if handler == sig_dfl || handler == sig_ign {
+		return
+	}
+	sendsig(target, u8(sigchld))
 }
 
 // Raise SIGCHLD in the parent. Only worth doing when it installed a handler:
@@ -466,15 +745,12 @@ fn notify_parent(current_process &proc.Process) {
 		return
 	}
 
-	parent.threads_lock.acquire()
-	mut target := &proc.Thread(unsafe { nil })
-	if parent.threads.len > 0 {
-		target = parent.threads[0]
-	}
-	parent.threads_lock.release()
-
+	mut target := proc.get_main_thread(parent)
 	if target == unsafe { nil } {
 		return
+	}
+	defer {
+		proc.unpin_thread(target)
 	}
 
 	handler := target.sigactions[sigchld].sa_sigaction
@@ -493,7 +769,7 @@ pub fn syscall_set_tid_address(_ voidptr, tidptr u64) (u64, u64) {
 
 	current_thread.clear_child_tid = tidptr
 
-	return u64(current_thread.tid), 0
+	return u64(proc.own_tid(current_thread)), 0
 }
 
 pub fn syscall_set_robust_list(_ voidptr, head u64, len u64) (u64, u64) {
@@ -508,19 +784,20 @@ pub fn syscall_set_robust_list(_ voidptr, head u64, len u64) (u64, u64) {
 }
 
 pub fn syscall_get_robust_list(_ voidptr, tid int, head_ptr u64, len_ptr u64) (u64, u64) {
-	mut target := proc.current_thread()
+	mut head := proc.current_thread().robust_list_head
 	if tid != 0 {
-		target = proc.thread_by_tid(tid)
+		target := proc.thread_in(proc.current_pid_namespace(), tid)
 		if target == unsafe { nil } {
 			return errno.err, errno.esrch
 		}
+		head = target.robust_list_head
+		proc.unpin_thread(target)
 	}
 
 	if head_ptr == 0 || len_ptr == 0 {
 		return errno.err, errno.efault
 	}
 
-	head := target.robust_list_head
 	len := robust_list_head_size
 
 	if !usercopy.copy_to_user(head_ptr, voidptr(&head), sizeof(u64)) {
@@ -581,7 +858,7 @@ fn release_robust_list(mut t proc.Thread) {
 			break
 		}
 		if entry != pending {
-			abandon_robust_futex(t.tid, u64(i64(entry) + offset))
+			abandon_robust_futex(proc.own_tid(t), u64(i64(entry) + offset))
 		}
 		entry = next
 	}
@@ -589,10 +866,12 @@ fn release_robust_list(mut t proc.Thread) {
 	// list_op_pending covers the lock the thread was in the middle of taking
 	// or releasing when it died.
 	if pending != 0 {
-		abandon_robust_futex(t.tid, u64(i64(pending) + offset))
+		abandon_robust_futex(proc.own_tid(t), u64(i64(pending) + offset))
 	}
 }
 
+// `tid` is the thread's own number, which is what userspace stored as the
+// owner.
 fn abandon_robust_futex(tid int, address u64) {
 	mut value := u32(0)
 	if !usercopy.copy_from_user(voidptr(&value), address, sizeof(u32)) {
@@ -616,17 +895,19 @@ fn abandon_robust_futex(tid int, address u64) {
 
 // Selector semantics shared by wait4() and waitid(): >0 one pid, 0 the caller's
 // process group, -1 any child, < -1 the process group -pid.
+// `pid` is as the caller's pid namespace numbers processes and groups.
 fn child_matches(current_process &proc.Process, child &proc.Process, pid int) bool {
 	if pid == -1 {
 		return true
 	}
+	viewer := current_process.numbered_in
 	if pid > 0 {
-		return child.pid == pid
+		return proc.pid_in(child, viewer) == pid
 	}
 	if pid == 0 {
 		return child.pgid == current_process.pgid
 	}
-	return child.pgid == -pid
+	return proc.pgid_in(child, viewer) == -pid
 }
 
 // Look for a child selected by `pid` that has already exited. A nil child with
@@ -729,7 +1010,7 @@ pub fn syscall_wait4(_ voidptr, pid int, status_ptr u64, options int, rusage_ptr
 	}
 
 	status := i32(child.status)
-	reaped := child.pid
+	reaped := proc.pid_in(child, current_process.numbered_in)
 
 	if status_ptr != 0 && !usercopy.copy_to_user(status_ptr, voidptr(&status), sizeof(i32)) {
 		return errno.err, put_back(mut child)
@@ -794,7 +1075,7 @@ pub fn syscall_waitid(_ voidptr, idtype int, id u64, infop u64, options int, rus
 	mut info := SigInfoChld{
 		si_signo:  i32(sigchld)
 		si_code:   i32(cld_exited)
-		si_pid:    i32(child.pid)
+		si_pid:    i32(proc.pid_in(child, current_process.numbered_in))
 		si_status: i32((status >> 8) & 0xff)
 	}
 	if status & 0x7f != 0 {

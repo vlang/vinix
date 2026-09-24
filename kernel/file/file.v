@@ -14,6 +14,7 @@ import usercopy
 
 pub const f_dupfd = 0
 pub const f_dupfd_cloexec = 1030
+pub const f_setpipe_sz = 1031
 pub const f_getpipe_sz = 1032
 pub const f_getfd = 1
 pub const f_setfd = 2
@@ -22,6 +23,11 @@ pub const f_setfl = 4
 
 // close_range(2) flags.
 pub const close_range_cloexec = u32(1) << 2
+pub const f_add_seals = 1033
+pub const f_get_seals = 1034
+pub const f_ofd_getlk = 36
+pub const f_ofd_setlk = 37
+pub const f_ofd_setlkw = 38
 pub const f_getlk = 5
 pub const f_setlk = 6
 pub const f_setlkw = 7
@@ -67,7 +73,10 @@ fn (mut this Handle) unref() {
 	release_flock(this)
 	mut res := this.resource
 	res.unref(voidptr(this)) or {}
-	unsafe { free(voidptr(this)) }
+	unsafe {
+		this.dirlist.free()
+		free(voidptr(this))
+	}
 }
 
 fn retain_mmap_handle(handle voidptr) {
@@ -121,7 +130,8 @@ fn ppoll(fds &PollFD, nfds u64, tmo_p &time.TimeSpec, sigmask &u64) (u64, u64) {
 
 	oldmask := t.masked_signals
 	if voidptr(sigmask) != unsafe { nil } {
-		t.masked_signals = *sigmask
+		// SIGKILL and SIGSTOP can never be blocked, not even for the wait.
+		t.masked_signals = *sigmask & ~((u64(1) << 8) | (u64(1) << 18))
 	}
 	defer {
 		t.masked_signals = oldmask
@@ -246,7 +256,8 @@ pub fn syscall_ppoll(_ voidptr, user_fds u64, nfds u64, user_timeout u64, user_s
 		if !usercopy.copy_from_user(voidptr(&timeout), user_timeout, sizeof(time.TimeSpec)) {
 			return errno.err, errno.efault
 		}
-		timeout_ptr = &timeout
+		// In unsafe, so that timeout stays on the stack: see getdents64.
+		timeout_ptr = unsafe { &timeout }
 	}
 
 	mut sigmask := u64(0)
@@ -327,11 +338,28 @@ pub struct FD {
 pub mut:
 	handle &Handle = unsafe { nil }
 	flags  int
+	// The descriptor table's reference, plus one for every syscall that has
+	// the descriptor from fd_from_fdnum(). close() drops the table's, so a
+	// syscall still running on a descriptor another thread closed keeps what
+	// it is using until it lets go.
+	refcount int = 1
 }
 
+// Give back the reference fd_from_fdnum() took, on the descriptor and on the
+// open file behind it. The descriptor goes once nothing holds it.
 pub fn (mut this FD) unref() {
 	mut handle := this.handle
 	handle.unref()
+	this.release_descriptor()
+}
+
+// Drop only the reference on the descriptor object, for a caller that keeps
+// the open-file reference fd_from_fdnum() took -- a descriptor being passed
+// over a socket.
+pub fn (mut this FD) release_descriptor() {
+	if !katomic.dec(mut &this.refcount) {
+		unsafe { free(voidptr(this)) }
+	}
 }
 
 pub fn fdnum_close(_process &proc.Process, fdnum int, do_lock bool) ? {
@@ -367,8 +395,8 @@ pub fn fdnum_close(_process &proc.Process, fdnum int, do_lock bool) ? {
 	// POSIX record locks are process-owned and closing any descriptor for the
 	// inode releases that process' locks, even when another dup remains open.
 	release_posix_locks(handle.resource, process.pid)
-	unsafe { free(voidptr(fd)) }
 	handle.unref()
+	fd.release_descriptor()
 }
 
 pub fn fdnum_create_from_fd(_process &proc.Process, fd &FD, oldfd int, specific bool) ?int {
@@ -463,6 +491,7 @@ pub fn fd_from_fdnum(_process &proc.Process, fdnum int) ?&FD {
 	}
 
 	katomic.inc(mut &ret.handle.refcount)
+	katomic.inc(mut &ret.refcount)
 
 	return ret
 }
@@ -494,6 +523,7 @@ pub fn fdnum_dup(_old_process &proc.Process, oldfdnum int, _new_process &proc.Pr
 
 	mut new_fd := unsafe { &FD(malloc(sizeof(FD))) }
 	unsafe { C.memcpy(new_fd, oldfd, sizeof(FD)) }
+	new_fd.refcount = 1
 	katomic.inc(mut &oldfd.handle.refcount)
 
 	new_fdnum := fdnum_create_from_fd(new_process, new_fd, newfdnum, specific) or {
@@ -811,8 +841,24 @@ pub fn syscall_fcntl(_ voidptr, fdnum int, cmd int, arg u64) (u64, u64) {
 				fd.unref()
 				return errno.err, errno.einval
 			}
-			// Pipes currently have one fixed page-sized circular buffer.
-			ret = 4096
+			mut res := handle.resource
+			ret = resource.pipe_capacity(mut res) or {
+				fd.unref()
+				return errno.err, errno.einval
+			}
+			fd.unref()
+		}
+		f_setpipe_sz {
+			if handle.resource.stat.mode & stat.ifmt != stat.ifpipe {
+				fd.unref()
+				return errno.err, errno.einval
+			}
+			mut res := handle.resource
+			ret = resource.set_pipe_capacity(mut res, arg) or {
+				saved_errno := errno.get()
+				fd.unref()
+				return errno.err, saved_errno
+			}
 			fd.unref()
 		}
 		f_getfd {
@@ -833,6 +879,39 @@ pub fn syscall_fcntl(_ voidptr, fdnum int, cmd int, arg u64) (u64, u64) {
 			// writable handle looking read-only.
 			handle.flags = (handle.flags & ~resource.file_settable_flags_mask) | (int(arg) & resource.file_settable_flags_mask)
 			fd.unref()
+		}
+		f_add_seals {
+			mut res := handle.resource
+			resource.add_seals(mut res, u32(arg)) or {
+				saved := errno.get()
+				fd.unref()
+				return errno.err, if saved == 0 { errno.einval } else { saved }
+			}
+			fd.unref()
+		}
+		f_get_seals {
+			mut res := handle.resource
+			ret = u64(resource.get_seals(mut res) or {
+				fd.unref()
+				return errno.err, errno.einval
+			})
+			fd.unref()
+		}
+		f_ofd_getlk, f_ofd_setlk, f_ofd_setlkw {
+			// Open-file-description locks are served by the per-process record
+			// locks: every lock a process holds is on one of its descriptions,
+			// and Vinix threads never contend for one against each other.
+			posix_cmd := match cmd {
+				f_ofd_getlk { f_getlk }
+				f_ofd_setlk { f_setlk }
+				else { f_setlkw }
+			}
+			lock_ret, lock_errno := fcntl_lock(mut handle, posix_cmd, arg)
+			fd.unref()
+			if lock_errno != 0 {
+				return lock_ret, lock_errno
+			}
+			ret = lock_ret
 		}
 		f_getlk, f_setlk, f_setlkw {
 			lock_ret, lock_errno := fcntl_lock(mut handle, cmd, arg)

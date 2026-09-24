@@ -59,33 +59,39 @@ pub fn syscall_clock_get(_ voidptr, clock_type int, ret &time.TimeSpec) (u64, u6
 	return 0, 0
 }
 
-pub fn syscall_nanosleep(_ voidptr, req &time.TimeSpec, mut rem time.TimeSpec) (u64, u64) {
+pub fn syscall_nanosleep(_ voidptr, request u64, remain u64) (u64, u64) {
 	mut current_thread := proc.current_thread()
 	mut process := current_thread.process
 
-	C.printf(c'\n\e[32m%s\e[m: nanosleep(0x%llx, 0x%llx)\n', process.name.str, voidptr(req),
-		voidptr(rem))
+	C.printf(c'\n\e[32m%s\e[m: nanosleep(0x%llx, 0x%llx)\n', process.name.str, request,
+		remain)
 
 	defer {
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
-	if req.tv_sec == 0 && req.tv_nsec == 0 {
+	mut duration := time.TimeSpec{}
+	if request == 0
+		|| !usercopy.copy_from_user(voidptr(&duration), request, sizeof(time.TimeSpec)) {
+		return errno.err, errno.efault
+	}
+
+	if duration.tv_sec == 0 && duration.tv_nsec == 0 {
 		return 0, 0
 	}
 
-	if req.tv_sec < 0 || req.tv_nsec < 0 || req.tv_nsec >= 1000000000 {
+	if duration.tv_sec < 0 || duration.tv_nsec < 0 || duration.tv_nsec >= 1000000000 {
 		return errno.err, errno.einval
 	}
+
+	started := monotonic_clock
 
 	mut events := []&eventstruct.Event{}
 	defer {
 		unsafe { events.free() }
 	}
 
-	mut target_time := *req
-
-	mut timer := time.new_timer(target_time)
+	mut timer := time.new_timer(duration)
 	events << &timer.event
 
 	defer {
@@ -94,18 +100,20 @@ pub fn syscall_nanosleep(_ voidptr, req &time.TimeSpec, mut rem time.TimeSpec) (
 	}
 
 	event.await(mut events, true) or {
-		if rem != unsafe { nil } {
-			rem.tv_sec = monotonic_clock.tv_sec - target_time.tv_sec
-			rem.tv_nsec = monotonic_clock.tv_nsec - target_time.tv_nsec
+		if remain != 0 {
+			// nanosleep takes a relative duration. Report that duration minus
+			// the time actually spent asleep, not the absolute monotonic clock.
+			// Returning the latter makes libc's ordinary EINTR retry sleep until
+			// approximately the Unix epoch measured from now.
+			mut elapsed := monotonic_clock
+			elapsed.sub(started)
 
-			if rem.tv_nsec < 0 {
-				rem.tv_nsec += 1000000000
-				rem.tv_sec--
+			mut left := duration
+			if left.sub(elapsed) {
+				left = time.TimeSpec{}
 			}
-
-			if rem.tv_sec < 0 {
-				rem.tv_sec = 0
-				rem.tv_nsec = 0
+			if !usercopy.copy_to_user(remain, voidptr(&left), sizeof(time.TimeSpec)) {
+				return errno.err, errno.efault
 			}
 		}
 

@@ -43,14 +43,6 @@ fn syscall_vacant(gpr_state voidptr) (u64, u64) {
 	return u64(-1), errno.enosys
 }
 
-// Vinix filesystems do not expose extended attributes yet. Linux software
-// probes every xattr entry point during prefix and cache setup; ENOTSUP is the
-// defined filesystem answer and avoids treating each harmless probe as an
-// unknown syscall.
-fn syscall_linux_xattr_unsupported(_ voidptr) (u64, u64) {
-	return errno.err, errno.enotsup
-}
-
 // Ring buffer for last N syscalls before a crash
 // Ring buffer for last N syscalls before crash
 struct SyscallTraceEntry {
@@ -75,13 +67,18 @@ __global (
 
 @[export: 'syscall_trace']
 pub fn syscall_trace(gpr_state voidptr) {
+	gpr := unsafe { &cpulocal.GPRState(gpr_state) }
+	nr := gpr.x8
 	// A busy userspace workload can keep the HVF scheduler out of its normal
 	// idle polling loop. This throttled, input-only call keeps the desktop
 	// responsive while translated applications occupy every virtual CPU.
 	sched.poll_syscall_input()
-	gpr := unsafe { &cpulocal.GPRState(gpr_state) }
-	nr := gpr.x8
 	mut current_thread := proc.current_thread()
+	current_thread.syscall_x0 = gpr.x0
+	current_thread.syscall_nr = i64(nr)
+	current_thread.syscall_x1 = gpr.x1
+	current_thread.syscall_x2 = gpr.x2
+	current_thread.syscall_x3 = gpr.x3
 	pid := u64(current_thread.process.pid)
 	// Debug: detect x30=0x220000 corruption at syscall entry
 	if pid == 3 && gpr.x30 == u64(0x220000) {
@@ -113,6 +110,8 @@ pub fn syscall_trace(gpr_state voidptr) {
 
 @[export: 'syscall_trace_ret']
 pub fn syscall_trace_ret(ret u64, err u64) {
+	mut current_thread := proc.current_thread()
+	current_thread.syscall_nr = -1
 	if !sc_trace_active {
 		return
 	}
@@ -308,8 +307,11 @@ fn syscall_linux_writev(gpr_state voidptr, fdnum int, iov_ptr u64, iovcnt int) (
 fn syscall_linux_getdents64(gpr_state voidptr, fdnum int, dirp u64, count u64) (u64, u64) {
 	mut offset := u64(0)
 	for offset + 19 < count { // minimum dirent64 size: 19 bytes + 1 name char
+		// Passed as `mut`, not `mut &`: V heap-allocates a local whose address
+		// is taken for a call with multiple results, and nothing frees it.
+		// That was a kilobyte for every entry read.
 		mut dirent := stat.Dirent{}
-		ret, err := fs.syscall_readdir(gpr_state, fdnum, mut &dirent)
+		ret, err := fs.syscall_readdir(gpr_state, fdnum, mut dirent)
 		if err != 0 {
 			if offset > 0 {
 				return offset, 0
@@ -383,6 +385,10 @@ const pr_set_no_new_privs = 38
 
 const pr_get_no_new_privs = 39
 
+const pr_set_timerslack = 29
+
+const pr_get_timerslack = 30
+
 const task_comm_len = 16
 
 fn syscall_linux_prctl(_ voidptr, option int, arg2 u64, _arg3 u64, _arg4 u64, _arg5 u64) (u64, u64) {
@@ -414,17 +420,37 @@ fn syscall_linux_prctl(_ voidptr, option int, arg2 u64, _arg3 u64, _arg4 u64, _a
 		pr_get_dumpable {
 			return 1, 0
 		}
-		pr_set_dumpable, pr_set_pdeathsig, pr_set_no_new_privs {
+		pr_set_dumpable, pr_set_timerslack {
 			// Accepted and remembered nowhere: there is no core dump to
-			// suppress, no parent death to notice and no privilege to gain.
+			// suppress and no timer slack to apply.
 			return 0, 0
 		}
-		pr_get_pdeathsig, pr_get_no_new_privs {
-			value := i32(0)
+		pr_get_timerslack {
+			return 50000, 0
+		}
+		pr_set_pdeathsig {
+			if arg2 > 64 {
+				return errno.err, errno.einval
+			}
+			process.pdeathsig = int(arg2)
+			return 0, 0
+		}
+		pr_get_pdeathsig {
+			value := i32(process.pdeathsig)
 			if !usercopy.copy_to_user(arg2, voidptr(&value), sizeof(i32)) {
 				return errno.err, errno.efault
 			}
 			return 0, 0
+		}
+		pr_set_no_new_privs {
+			if arg2 != 1 {
+				return errno.err, errno.einval
+			}
+			process.no_new_privs = true
+			return 0, 0
+		}
+		pr_get_no_new_privs {
+			return if process.no_new_privs { u64(1) } else { u64(0) }, 0
 		}
 		else {
 			return errno.err, errno.einval
@@ -432,13 +458,31 @@ fn syscall_linux_prctl(_ voidptr, option int, arg2 u64, _arg3 u64, _arg4 u64, _a
 	}
 }
 
-fn syscall_linux_prlimit64(_ voidptr, pid int, res int, new_rlim u64, old_rlim u64) (u64, u64) {
+fn syscall_linux_prlimit64(_ voidptr, local_pid int, res int, new_rlim u64, old_rlim u64) (u64, u64) {
+	pid := proc.kernel_id(local_pid)
 	if res < 0 || res >= proc.rlimit_nlimits {
 		return errno.err, errno.einval
 	}
-	mut process := proc.current_thread().process
-	if pid != 0 && pid != process.pid {
-		return errno.err, errno.esrch
+	mut caller := proc.current_thread().process
+	mut process := caller
+	if pid != 0 && pid != caller.pid {
+		// A container runtime sets its init's limits from the parent, so
+		// prlimit has to reach another process, not only the caller.
+		if pid < 0 || pid >= proc.max_pid {
+			return errno.err, errno.esrch
+		}
+		proc.lock_table()
+		target := proc.process_at(pid)
+		proc.unlock_table()
+		if target == unsafe { nil } {
+			return errno.err, errno.esrch
+		}
+		// Linux allows this with CAP_SYS_RESOURCE or a matching real/effective
+		// user; root, which every container runtime runs as here, has both.
+		if caller.euid != 0 && caller.euid != target.euid {
+			return errno.err, errno.eperm
+		}
+		process = target
 	}
 
 	process.rlimits_lock.acquire()
@@ -475,7 +519,7 @@ fn syscall_linux_prlimit64(_ voidptr, pid int, res int, new_rlim u64, old_rlim u
 
 fn syscall_linux_gettid(_ voidptr) (u64, u64) {
 	current := proc.current_thread()
-	return u64(current.tid), 0
+	return u64(proc.own_tid(current)), 0
 }
 
 // ── X11 / dynamic-linking syscall stubs ──
@@ -653,34 +697,55 @@ fn syscall_linux_setpgid(_ voidptr, pid int, pgid int) (u64, u64) {
 	}
 
 	mut target := proc.current_thread().process
+	// Both numbers are the caller's pid namespace's.
+	viewer := target.numbered_in
 	if pid != 0 {
 		if pid >= proc.max_pid {
 			return errno.err, errno.esrch
 		}
-		target = processes[pid]
+		global := proc.pid_from(viewer, pid)
+		target = if global > 0 { processes[global] } else { unsafe { nil } }
 		if target == unsafe { nil } {
 			return errno.err, errno.esrch
 		}
 	}
 
-	target.pgid = if pgid == 0 { target.pid } else { pgid }
+	local := if pgid == 0 { proc.pid_in(target, viewer) } else { pgid }
+	mut group := if pgid == 0 || local == proc.pid_in(target, viewer) {
+		target.pid
+	} else {
+		proc.group_from(viewer, local)
+	}
+	if group == 0 {
+		// A group whose leader is alive but has nobody in it yet.
+		group = proc.pid_from(viewer, local)
+	}
+	if group == 0 {
+		return errno.err, errno.eperm
+	}
+	target.pgid = group
+	if proc.numbers_own(target.numbered_in) {
+		target.ns_pgid = local
+	}
 
 	return 0, 0
 }
 
 fn syscall_linux_getpgid(_ voidptr, pid int) (u64, u64) {
 	mut target := proc.current_thread().process
+	viewer := target.numbered_in
 	if pid != 0 {
 		if pid < 0 || pid >= proc.max_pid {
 			return errno.err, errno.esrch
 		}
-		target = processes[pid]
+		global := proc.pid_from(viewer, pid)
+		target = if global > 0 { processes[global] } else { unsafe { nil } }
 		if target == unsafe { nil } {
 			return errno.err, errno.esrch
 		}
 	}
 
-	return u64(target.pgid), 0
+	return u64(proc.pgid_in(target, viewer)), 0
 }
 
 // sendmsg is implemented by the socket layer so AF_INET datagrams retain their
@@ -760,7 +825,7 @@ fn syscall_linux_statx(gpr_state voidptr, dirfd int, path charptr, flags int, _m
 	}
 
 	mut vinix_stat := stat.Stat{}
-	ret, err := fs.syscall_fstatat(gpr_state, dirfd, path, &vinix_stat, flags)
+	ret, err := fs.syscall_fstatat(gpr_state, dirfd, path, unsafe { &vinix_stat }, flags)
 	if err != 0 {
 		return ret, err
 	}
@@ -797,7 +862,7 @@ fn convert_stat_to_linux(src &stat.Stat, dst u64) {
 // fstatat wrapper: call Vinix fstatat with a local buffer, then convert to Linux layout.
 fn syscall_linux_fstatat(gpr_state voidptr, dirfd int, path charptr, linux_buf u64, flags int) (u64, u64) {
 	mut vinix_stat := stat.Stat{}
-	ret, err := fs.syscall_fstatat(gpr_state, dirfd, path, &vinix_stat, flags)
+	ret, err := fs.syscall_fstatat(gpr_state, dirfd, path, unsafe { &vinix_stat }, flags)
 	if err != 0 {
 		return ret, err
 	}
@@ -808,7 +873,7 @@ fn syscall_linux_fstatat(gpr_state voidptr, dirfd int, path charptr, linux_buf u
 // fstat wrapper: call Vinix fstat with a local buffer, then convert to Linux layout.
 fn syscall_linux_fstat(gpr_state voidptr, fdnum int, linux_buf u64) (u64, u64) {
 	mut vinix_stat := stat.Stat{}
-	ret, err := fs.syscall_fstat(gpr_state, fdnum, &vinix_stat)
+	ret, err := fs.syscall_fstat(gpr_state, fdnum, unsafe { &vinix_stat })
 	if err != 0 {
 		return ret, err
 	}
@@ -898,7 +963,8 @@ fn syscall_linux_getrandom(_ voidptr, buf u64, count u64, flags u32) (u64, u64) 
 
 const prio_process = 0
 
-fn syscall_linux_setpriority(_ voidptr, which int, who int, prio int) (u64, u64) {
+fn syscall_linux_setpriority(_ voidptr, which int, local_who int, prio int) (u64, u64) {
+	who := proc.kernel_id(local_who)
 	if which != prio_process || who < 0 {
 		return errno.err, errno.einval
 	}
@@ -928,7 +994,8 @@ fn syscall_linux_setpriority(_ voidptr, which int, who int, prio int) (u64, u64)
 	return 0, 0
 }
 
-fn syscall_linux_getpriority(_ voidptr, which int, who int) (u64, u64) {
+fn syscall_linux_getpriority(_ voidptr, which int, local_who int) (u64, u64) {
+	who := proc.kernel_id(local_who)
 	if which != prio_process || who < 0 {
 		return errno.err, errno.einval
 	}
@@ -955,9 +1022,18 @@ pub fn init_syscall_table() {
 	// Reference: include/uapi/asm-generic/unistd.h
 
 	// File I/O
-	for i := 5; i <= 16; i++ {
-		syscall_table[i] = voidptr(syscall_linux_xattr_unsupported)
-	}
+	syscall_table[5] = voidptr(fs.syscall_setxattr) // __NR_setxattr
+	syscall_table[6] = voidptr(fs.syscall_lsetxattr) // __NR_lsetxattr
+	syscall_table[7] = voidptr(fs.syscall_fsetxattr) // __NR_fsetxattr
+	syscall_table[8] = voidptr(fs.syscall_getxattr) // __NR_getxattr
+	syscall_table[9] = voidptr(fs.syscall_lgetxattr) // __NR_lgetxattr
+	syscall_table[10] = voidptr(fs.syscall_fgetxattr) // __NR_fgetxattr
+	syscall_table[11] = voidptr(fs.syscall_listxattr) // __NR_listxattr
+	syscall_table[12] = voidptr(fs.syscall_llistxattr) // __NR_llistxattr
+	syscall_table[13] = voidptr(fs.syscall_flistxattr) // __NR_flistxattr
+	syscall_table[14] = voidptr(fs.syscall_removexattr) // __NR_removexattr
+	syscall_table[15] = voidptr(fs.syscall_lremovexattr) // __NR_lremovexattr
+	syscall_table[16] = voidptr(fs.syscall_fremovexattr) // __NR_fremovexattr
 	syscall_table[17] = voidptr(fs.syscall_getcwd) // __NR_getcwd
 	syscall_table[19] = voidptr(file.syscall_eventfd2) // __NR_eventfd2
 	syscall_table[23] = voidptr(syscall_linux_dup) // __NR_dup
@@ -1012,6 +1088,7 @@ pub fn init_syscall_table() {
 	syscall_table[87] = voidptr(file.syscall_timerfd_gettime) // __NR_timerfd_gettime
 	syscall_table[267] = voidptr(fs.syscall_syncfs) // __NR_syncfs
 	syscall_table[279] = voidptr(fs.syscall_memfd_create) // __NR_memfd_create
+	syscall_table[280] = voidptr(syscall_linux_bpf) // __NR_bpf
 	syscall_table[281] = voidptr(userland.syscall_execveat) // __NR_execveat
 	syscall_table[283] = voidptr(syscall_linux_membarrier) // __NR_membarrier
 	syscall_table[285] = voidptr(pipe.syscall_copy_file_range) // __NR_copy_file_range

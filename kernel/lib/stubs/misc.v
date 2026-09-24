@@ -15,5 +15,6 @@ pub fn ctype_toupper_loc() &&i32 {
 @[export: 'exit']
 @[noreturn]
 pub fn kexit(code int) {
+	lib.print_backtrace()
 	lib.kpanic(unsafe { nil }, c'Kernel has called exit()')
 }

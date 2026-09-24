@@ -59,14 +59,23 @@ echo "startx: launching Xorg on $display"
 /usr/bin/Xorg "$display" +iglx -noreset -dumbSched \
     </dev/null >/var/log/Xorg.startx.log 2>&1 &
 SERVER_PID=$!
-echo "startx: Xorg PID=$SERVER_PID (sleeping 1s for init)"
-sleep 1
-if ! kill -0 "$SERVER_PID" 2>/dev/null; then
-    wait "$SERVER_PID" 2>/dev/null || true
-    SERVER_PID=
-    echo "startx: Xorg exited during startup" >&2
-    exit 1
-fi
+echo "startx: Xorg PID=$SERVER_PID (waiting for display readiness)"
+attempt=0
+until /usr/bin/xset q >/dev/null 2>&1; do
+    if ! kill -0 "$SERVER_PID" 2>/dev/null; then
+        wait "$SERVER_PID" 2>/dev/null || true
+        SERVER_PID=
+        echo "startx: Xorg exited during startup" >&2
+        exit 1
+    fi
+    attempt=$((attempt + 1))
+    if [ "$attempt" -ge 60 ]; then
+        echo "startx: Xorg did not become ready within 60 seconds" >&2
+        exit 1
+    fi
+    sleep 1
+done
+echo "startx: Xorg is ready"
 
 if [ ! -x /usr/bin/vinix-xinput ]; then
     echo "startx: /usr/bin/vinix-xinput is required" >&2

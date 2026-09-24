@@ -11,6 +11,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 BUILD_DIR="${VINIX_FIREFOX_BUILD_DIR:-$SCRIPT_DIR/build-aarch64-firefox}"
 DOWNLOADS="$BUILD_DIR/downloads"
 STAGING="$BUILD_DIR/staging"
+CACHE_STATE="$BUILD_DIR/.staging-cache-key"
 
 ALPINE_MIRROR="${ALPINE_MIRROR:-https://dl-cdn.alpinelinux.org/alpine}"
 # Alpine 3.24 links Firefox against Scudo, whose allocator VM contract is not
@@ -24,6 +25,24 @@ BRANCH_KEY="$(printf '%s' "$ALPINE_BRANCH" | tr '/:' '__')"
 RESOLVED="$BUILD_DIR/resolved-packages.txt"
 
 mkdir -p "$BUILD_DIR" "$DOWNLOADS"
+CACHE_ARGS=(
+    --state "$CACHE_STATE" --staging "$STAGING"
+    --value "$ALPINE_BRANCH" --value "$ALPINE_MIRROR"
+    --value "$ALPINE_ARCH" --value "$FIREFOX_PACKAGE"
+    --metadata "$DOWNLOADS"
+    --source "$SCRIPT_DIR/build-firefox-aarch64.sh"
+    --source "$SCRIPT_DIR/build-support/staging-cache.py"
+    --source "$SCRIPT_DIR/build-support/alpine-resolve.py"
+    --source "$SCRIPT_DIR/build-support/firefox"
+    --source "$SCRIPT_DIR/tests/browsers/firefox-smoke.html"
+    --executable usr/bin/run-firefox
+    --executable-any usr/bin/firefox-esr --executable-any usr/bin/firefox
+)
+if python3 "$SCRIPT_DIR/build-support/staging-cache.py" check "${CACHE_ARGS[@]}"; then
+    echo "==> Reusing cached Firefox staging"
+    exit 0
+fi
+rm -f "$CACHE_STATE"
 rm -rf "$STAGING"
 mkdir -p "$STAGING"
 : > "$RESOLVED"
@@ -41,77 +60,8 @@ fetch_index() {
     fi
 }
 
-# Print repo, package, version and dependencies as tab-separated fields.
-# APK dependencies may name a package directly or one of its `so:`/`cmd:`
-# provides. Prefer an exact package name before consulting provides.
-lookup_in_index() {
-    local repo="$1" wanted="$2" mode="$3"
-    local index_file="$DOWNLOADS/${BRANCH_KEY}_${repo}_APKINDEX"
-
-    awk -v repo="$repo" -v wanted="$wanted" -v mode="$mode" '
-        BEGIN { RS=""; FS="\n" }
-        {
-            package=version=dependencies=provides=""
-            for (i=1; i<=NF; i++) {
-                if ($i ~ /^P:/) package=substr($i, 3)
-                else if ($i ~ /^V:/) version=substr($i, 3)
-                else if ($i ~ /^D:/) dependencies=substr($i, 3)
-                else if ($i ~ /^p:/) provides=substr($i, 3)
-            }
-
-            matched=(mode == "exact" && package == wanted)
-            if (mode == "provide") {
-                count=split(provides, values, " ")
-                for (j=1; j<=count; j++) {
-                    value=values[j]
-                    sub(/[<>=~].*$/, "", value)
-                    if (value == wanted) matched=1
-                }
-            }
-
-            if (matched) {
-                printf "%s\t%s\t%s\t%s\n", repo, package, version, dependencies
-                exit
-            }
-        }
-    ' "$index_file"
-}
-
-find_package() {
-    local request="$1" alternative normalized repo result
-    local old_ifs="$IFS"
-    IFS='|'
-    set -- $request
-    IFS="$old_ifs"
-
-    for alternative in "$@"; do
-        case "$alternative" in
-            ''|'!'*|/*) continue ;;
-        esac
-        normalized="${alternative%%[\<\>\=\~]*}"
-
-        for repo in main community; do
-            result="$(lookup_in_index "$repo" "$normalized" exact)"
-            if [ -n "$result" ]; then
-                printf '%s\n' "$result"
-                return 0
-            fi
-        done
-        for repo in main community; do
-            result="$(lookup_in_index "$repo" "$normalized" provide)"
-            if [ -n "$result" ]; then
-                printf '%s\n' "$result"
-                return 0
-            fi
-        done
-    done
-
-    return 1
-}
-
 extract_package() {
-    local repo="$1" package="$2" version="$3"
-    local filename="$package-$version.apk"
+    local repo="$1" filename="$2"
     local local_file="$DOWNLOADS/$filename"
 
     if [ ! -s "$local_file" ]; then
@@ -122,7 +72,7 @@ extract_package() {
         echo "  using cached $filename"
     fi
 
-    tar -ixzf "$local_file" -C "$STAGING" 2>/dev/null || true
+    tar xzf "$local_file" -C "$STAGING" 2>/dev/null || true
     rm -f "$STAGING/.PKGINFO" "$STAGING/.INSTALL" "$STAGING/.trigger"* \
         "$STAGING/.SIGN"*
 }
@@ -134,37 +84,14 @@ fetch_index community
 # Firefox itself does not depend on a font package or the system TLS bundle,
 # although a useful browser needs both. The resolver follows the full runtime
 # closure, including GTK/X11, media codecs and their shared-library providers.
-queue=("$FIREFOX_PACKAGE" ca-certificates font-dejavu)
-queue_index=0
-while [ "$queue_index" -lt "${#queue[@]}" ]; do
-    dependency="${queue[$queue_index]}"
-    queue_index=$((queue_index + 1))
-
-    case "$dependency" in
-        ''|'!'*|/*) continue ;;
-    esac
-
-    package_record="$(find_package "$dependency")" || {
-        echo "ERROR: cannot resolve Alpine dependency: $dependency" >&2
-        exit 1
-    }
-    IFS=$'\t' read -r repo package version dependencies <<< "$package_record"
-    package_key="$repo/$package-$version"
-    if grep -Fqx "$package_key" "$RESOLVED"; then
-        continue
-    fi
-
-    printf '%s\n' "$package_key" >> "$RESOLVED"
-    extract_package "$repo" "$package" "$version"
-
-    if [ -n "$dependencies" ]; then
-        # Dependency records are deliberately shell words. Globbing is off,
-        # and each word is resolved through the two package indexes above.
-        for child in $dependencies; do
-            queue+=("$child")
-        done
-    fi
-done
+python3 "$SCRIPT_DIR/build-support/alpine-resolve.py" \
+    --index main "$DOWNLOADS/${BRANCH_KEY}_main_APKINDEX" \
+    --index community "$DOWNLOADS/${BRANCH_KEY}_community_APKINDEX" \
+    "$FIREFOX_PACKAGE" ca-certificates font-dejavu > "$RESOLVED"
+while IFS=$'\t' read -r repo filename; do
+    [ -n "$filename" ] || continue
+    extract_package "$repo" "$filename"
+done < "$RESOLVED"
 
 # Absolute library links from an APK would otherwise point into the build host.
 # Materialise file links as hard links. This avoids O_NOFOLLOW limitations in
@@ -221,3 +148,4 @@ echo "staged packages: $(wc -l < "$RESOLVED" | tr -d ' ')"
 echo "staged size: $(du -sh "$STAGING" | cut -f1)"
 echo "manifest: $RESOLVED"
 echo "launcher: /usr/bin/run-firefox"
+python3 "$SCRIPT_DIR/build-support/staging-cache.py" record "${CACHE_ARGS[@]}"

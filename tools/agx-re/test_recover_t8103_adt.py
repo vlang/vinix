@@ -352,7 +352,7 @@ class KernelLoaderAgreementTests(unittest.TestCase):
     """
 
     DRIVER = pathlib.Path(__file__).resolve().parents[2] / (
-        "kernel/modules/gpu/agx/driver/driver.v"
+        "kernel/gpu/agx/driver/driver.v"
     )
 
     def kernel_reads(self) -> dict[str, bool]:

@@ -181,6 +181,65 @@ fn add_to_buf(ptr &u8, count u64, echo bool) {
 	event.trigger(mut console_event, false)
 }
 
+// Modified navigation keys use xterm's CSI 1;<modifier><final> encoding.
+// Keeping Super in this stream lets the framebuffer desktop offer the same
+// global tiling keys on PS/2 machines as it does on Apple and virtio keyboards.
+fn console_add_modified_arrow(final u8) {
+	modifier := 9 + if console_shift_active { 1 } else { 0 } +
+		if console_alt_active { 2 } else { 0 } + if console_ctrl_active { 4 } else { 0 }
+	mut sequence := [8]u8{}
+	sequence[0] = 0x1b
+	sequence[1] = `[`
+	sequence[2] = `1`
+	sequence[3] = `;`
+	mut length := 0
+	if modifier >= 10 {
+		sequence[4] = u8(`0`) + u8(modifier / 10)
+		sequence[5] = u8(`0`) + u8(modifier % 10)
+		sequence[6] = final
+		length = 7
+	} else {
+		sequence[4] = u8(`0`) + u8(modifier)
+		sequence[5] = final
+		length = 6
+	}
+	add_to_buf(&sequence[0], u64(length), true)
+	console_meta_chorded = true
+}
+
+// Printable Super chords use CSI-u. Desktop workspaces use the number row and
+// window actions use letters, so preserve the entire translated ASCII range.
+fn console_add_csi_u(codepoint u8) {
+	modifier := 9 + if console_shift_active { 1 } else { 0 } +
+		if console_alt_active { 2 } else { 0 } + if console_ctrl_active { 4 } else { 0 }
+	mut sequence := [16]u8{}
+	sequence[0] = 0x1b
+	sequence[1] = `[`
+	mut length := 2
+	if codepoint >= 100 {
+		sequence[length] = u8(`0`) + codepoint / 100
+		length++
+	}
+	if codepoint >= 10 {
+		sequence[length] = u8(`0`) + (codepoint / 10) % 10
+		length++
+	}
+	sequence[length] = u8(`0`) + codepoint % 10
+	length++
+	sequence[length] = `;`
+	length++
+	if modifier >= 10 {
+		sequence[length] = u8(`0`) + u8(modifier / 10)
+		length++
+	}
+	sequence[length] = u8(`0`) + u8(modifier % 10)
+	length++
+	sequence[length] = `u`
+	length++
+	add_to_buf(&sequence[0], u64(length), true)
+	console_meta_chorded = true
+}
+
 fn keyboard_handler() {
 	vect := idt.allocate_vector()
 
@@ -285,7 +344,9 @@ fn keyboard_handler() {
 				}
 				0x48 {
 					// Up arrow
-					if console_decckm == false {
+					if console_meta_active {
+						console_add_modified_arrow(`A`)
+					} else if console_decckm == false {
 						add_to_buf(c'\e[A', 3, true)
 					} else {
 						add_to_buf(c'\eOA', 3, true)
@@ -294,7 +355,9 @@ fn keyboard_handler() {
 				}
 				0x4b {
 					// Left arrow
-					if console_decckm == false {
+					if console_meta_active {
+						console_add_modified_arrow(`D`)
+					} else if console_decckm == false {
 						add_to_buf(c'\e[D', 3, true)
 					} else {
 						add_to_buf(c'\eOD', 3, true)
@@ -303,7 +366,9 @@ fn keyboard_handler() {
 				}
 				0x50 {
 					// Down arrow
-					if console_decckm == false {
+					if console_meta_active {
+						console_add_modified_arrow(`B`)
+					} else if console_decckm == false {
 						add_to_buf(c'\e[B', 3, true)
 					} else {
 						add_to_buf(c'\eOB', 3, true)
@@ -312,7 +377,9 @@ fn keyboard_handler() {
 				}
 				0x4d {
 					// Right arrow
-					if console_decckm == false {
+					if console_meta_active {
+						console_add_modified_arrow(`C`)
+					} else if console_decckm == false {
 						add_to_buf(c'\e[C', 3, true)
 					} else {
 						add_to_buf(c'\eOC', 3, true)
@@ -410,6 +477,19 @@ fn keyboard_handler() {
 
 		mut c := u8(0)
 
+		if console_meta_active {
+			base := if input_byte in console_convtab_numpad_numlock {
+				console_convtab_numpad_numlock[input_byte]
+			} else {
+				keyboard.translate(input_byte, console_shift_active, console_capslock_active,
+					false)
+			}
+			if base != 0 {
+				console_add_csi_u(base)
+				continue
+			}
+		}
+
 		if input_byte in console_convtab_numpad_numlock {
 			c = console_convtab_numpad_numlock[input_byte]
 		} else {
@@ -424,12 +504,14 @@ fn keyboard_handler() {
 }
 
 fn read_ps2() u8 {
-	for kio.port_in[u8](0x64) & 1 == 0 {}
+	for kio.port_in[u8](0x64) & 1 == 0 {
+	}
 	return kio.port_in[u8](0x60)
 }
 
 fn write_ps2(port u16, value u8) {
-	for kio.port_in[u8](0x64) & 2 != 0 {}
+	for kio.port_in[u8](0x64) & 2 != 0 {
+	}
 	kio.port_out[u8](port, value)
 }
 
@@ -630,18 +712,12 @@ fn (mut this Console) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 			return 0
 		}
 		ioctl.tcgets {
-			mut t := unsafe { &termios.Termios(argp) }
-			unsafe {
-				*t = this.termios
-			}
+			unsafe { C.memcpy(argp, &this.termios, termios.user_size()) }
 			return 0
 		}
 		// TODO: handle these differently
 		ioctl.tcsets, ioctl.tcsetsw, ioctl.tcsetsf {
-			mut t := unsafe { &termios.Termios(argp) }
-			unsafe {
-				this.termios = *t
-			}
+			unsafe { C.memcpy(&this.termios, argp, termios.user_size()) }
 			return 0
 		}
 		else {

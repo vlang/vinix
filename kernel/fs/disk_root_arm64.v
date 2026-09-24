@@ -5,11 +5,12 @@ module fs
 import stat
 
 // Points the kernel overlays on a disk root. /dev and /proc were mounted while
-// the RAM root was still in place -- the block device the volume is read
+// the bootstrap root was still in place -- the block device the volume is read
 // through is one of them -- so they move rather than being remounted. /tmp and
-// /run are runtime scratch and stay in RAM.
+// /run remain the volume's own directories: a persistent root must not quietly
+// retain a second, growing filesystem in RAM.
 const disk_root_carried = ['dev', 'proc']
-const disk_root_scratch = ['tmp', 'run']
+const disk_root_required_directories = ['tmp', 'run']
 
 // Replace the bootstrap RAM root with a writable on-disk one, so that the whole
 // filesystem survives a restart rather than just a home directory mounted into
@@ -45,15 +46,15 @@ pub fn install_disk_root(mut root VFSNode) bool {
 	if 'dev' !in carried_names {
 		return false
 	}
-	// Every overlay point must be a plain directory the volume itself
-	// provides. A symlink or a file there would quietly redirect /dev or /tmp
-	// somewhere on disk, and an on-disk image is not trusted to that extent.
+	// Every required point must be a plain directory the volume itself
+	// provides. A symlink or a file there would quietly redirect /dev or /tmp,
+	// and an on-disk image is not trusted to that extent.
 	for name in carried_names {
 		if !plain_directory_child(root, name) {
 			return false
 		}
 	}
-	for name in disk_root_scratch {
+	for name in disk_root_required_directories {
 		if !plain_directory_child(root, name) {
 			return false
 		}
@@ -67,19 +68,6 @@ pub fn install_disk_root(mut root VFSNode) bool {
 		}
 	}
 
-	for name in disk_root_scratch {
-		mut scratch := &TmpFS{}
-		mut instance := scratch.instantiate()
-		mut mounted := instance.mount(root, name, unsafe { nil }) or { return false }
-		mounted.create_dotentries(root)
-		mounted.resource.stat.mode = (if name == 'tmp' {
-			u32(0o1777)
-		} else {
-			u32(0o755)
-		}) | stat.ifdir
-		mut target := unsafe { root.children[name] }
-		target.mountpoint = mounted
-	}
 	for index, name in carried_names {
 		mut target := unsafe { root.children[name] }
 		target.mountpoint = carried[index]
@@ -105,6 +93,7 @@ pub fn install_disk_root(mut root VFSNode) bool {
 		}
 	}
 	committed = true
+	record_root_switch(root, 'ext2')
 	return true
 }
 

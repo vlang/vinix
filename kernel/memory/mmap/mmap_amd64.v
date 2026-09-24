@@ -54,8 +54,9 @@ pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
 	virt := memory_page * page_size
 	page := acquire_range_page(range_local, virt, file_page) or { return none }
 
-	map_page_in_range(range_local.global, virt, u64(page), range_local.prot) or {
-		release_range_page(range_local.global, virt, file_page, page, range_local.flags)
-		return none
-	}
+	install_range_page(range_local.global, virt, file_page, page, range_local.flags)?
 }
+
+// usercopy pages in untouched pages through this on aarch64; amd64 keeps
+// failing such copies as it always has.
+fn register_page_in_resolver() {}

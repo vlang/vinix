@@ -366,6 +366,32 @@ pub fn declare_framebuffer(phys u64, len u64) {
 	vmm_framebuffer_len = len
 }
 
+// Is the page at `page` inside a memory map entry that describes memory, as
+// opposed to a hole or a reserved range? `first` is the first entry that does
+// not end at or below the page.
+fn low_page_is_memory(entries &&limine.LimineMemmapEntry, first u64, count u64, page u64) bool {
+	for k := first; k < count; k++ {
+		entry := unsafe { entries[k] }
+		if lib.align_down(entry.base, page_size) > page {
+			return false
+		}
+		if lib.align_up(entry.base + entry.length, page_size) <= page {
+			continue
+		}
+		return match entry.@type {
+			limine.limine_memmap_usable, limine.limine_memmap_acpi_reclaimable,
+			limine.limine_memmap_acpi_nvs, limine.limine_memmap_bootloader_reclaimable,
+			limine.limine_memmap_kernel_and_modules, limine.limine_memmap_framebuffer {
+				true
+			}
+			else {
+				false
+			}
+		}
+	}
+	return false
+}
+
 pub fn vmm_init() {
 	kernel_pagemap.top_level = pmm_alloc(1)
 	if kernel_pagemap.top_level == 0 {
@@ -403,26 +429,40 @@ pub fn vmm_init() {
 	data_len := u64(voidptr(C.data_end)) - data_virt
 	map_kernel_span(data_virt, data_phys, data_len, pte_present | pte_noexec | pte_writable)
 
-	// Map first 4GB of physical memory into HHDM.
-	// QEMU virt device MMIO range (0x00000000-0x3FFFFFFF) uses Device memory type.
-	// Everything else uses Normal cacheable.
+	memmap := memmap_req.response
+	entries := memmap.entries
+
+	// Map the first 4 GiB of physical memory into the HHDM. Where RAM and the
+	// device apertures sit inside it depends on the machine: QEMU's virt puts
+	// RAM at 1 GiB and its devices below that, VirtualBox puts RAM at 128 MiB
+	// and its devices just under 4 GiB. Map what the memory map calls memory as
+	// Normal cacheable and everything else -- holes, and reserved ranges, which
+	// is how UEFI reports runtime MMIO -- as Device. RAM mapped as Device takes
+	// an alignment fault on the first unaligned access and makes exclusive
+	// accesses unpredictable; registers mapped Normal can be merged or cached.
+	mut next_entry := u64(0)
+	mut low_device_pages := u64(0)
 	for i := u64(0); i < 0x100000000; i += page_size {
+		// The memory map is sorted by base and its entries do not overlap.
+		for next_entry < memmap.entry_count
+			&& unsafe { lib.align_up(entries[next_entry].base + entries[next_entry].length, page_size) } <= i {
+			next_entry++
+		}
 		mut flags := pte_present | pte_noexec | pte_writable
-		if i < u64(0x40000000) {
+		if !low_page_is_memory(entries, next_entry, memmap.entry_count, i) {
 			flags |= pte_device
+			low_device_pages++
 		}
 		kernel_pagemap.map_page(i + higher_half, i, flags) or {
 			panic('vmm init failure')
 		}
 	}
-	print('vmm: HHDM 0-4GiB mapped\n')
+	print('vmm: HHDM 0-4GiB mapped (${low_device_pages} device pages)\n')
 
 	// Map remaining physical memory. On Apple Silicon this is the whole of RAM,
 	// which sits above 4 GiB, so this loop (barely exercised by QEMU, whose RAM
 	// is below 4 GiB) does the real work. Print how much it covered: a runaway
 	// count would explain a stall here rather than at the page-table switch.
-	memmap := memmap_req.response
-	entries := memmap.entries
 	mut high_pages := u64(0)
 	for i := 0; i < memmap.entry_count; i++ {
 		base := unsafe { lib.align_down(entries[i].base, page_size) }

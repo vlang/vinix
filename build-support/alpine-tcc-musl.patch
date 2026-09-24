@@ -1,0 +1,10 @@
+--- usr/lib/tcc/include/stddef.h
++++ usr/lib/tcc/include/stddef.h
+@@ -4,6 +4,7 @@
+ typedef __SIZE_TYPE__ size_t;
+ typedef __PTRDIFF_TYPE__ ssize_t;
+ typedef __WCHAR_TYPE__ wchar_t;
++#define __DEFINED_wchar_t
+ typedef __PTRDIFF_TYPE__ ptrdiff_t;
+ typedef __PTRDIFF_TYPE__ intptr_t;
+ typedef __SIZE_TYPE__ uintptr_t;

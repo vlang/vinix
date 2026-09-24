@@ -181,7 +181,11 @@ pub fn display_hotplug(connected bool) {
 // Refusing to draw keeps that case quiet and survivable instead of fatal.
 fn fb_address_usable(fb &limine.LimineFramebuffer) bool {
 	base := u64(fb.address)
-	if base < 0xffff_0000_0000_0000 {
+	// Where the higher half starts depends on the paging mode: 0xffff000000000000
+	// on arm64, 0xffff800000000000 on amd64 with four levels, and
+	// 0xff00000000000000 with five, which Limine picks on any CPU that has it.
+	// This runs before pmm_init() on arm64, so ask Limine directly.
+	if base < memory.bootloader_hhdm_offset() {
 		return false
 	}
 	span := u64(fb.pitch) * u64(fb.height)

@@ -233,6 +233,7 @@ override VFILES := $(shell find -L * -type f -name '*.v' \
     | LC_ALL=C sort)
 override ASFILES := $(shell cd asm && find -L * -type f -name '*.S' \
     ! -name 'int_thunks_asm.S' \
+    ! -path 'x86_64/*' \
     | LC_ALL=C sort)
 else
 override VFILES := $(shell find -L * -type f -name '*.v' \

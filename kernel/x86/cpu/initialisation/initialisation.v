@@ -11,12 +11,16 @@ import katomic
 import sched
 import memory
 import x86.hypervisor
+// The syscall module supplies the C symbols syscall_entry calls into, and
+// pin_syscall_entry_callees() (called below) is what actually keeps them
+// linked in.
 import syscall
 
-// Hand-written in kernel/asm/syscall_entry.S rather than V -- it has to be
-// genuinely prologue-free (the CPU hands control here with the live user
-// stack pointer still active), which @[_naked] does not actually guarantee
-// for V 0.5.2's C backend. See that file's own comment for the full story.
+// Hand-written in kernel/asm/x86_64/syscall_entry.S rather than V -- it has
+// to be genuinely prologue-free (the CPU hands control here with the live
+// user stack pointer still active), which @[_naked] does not actually
+// guarantee for V 0.5.2's C backend. See that file's own comment for the
+// full story.
 fn C.syscall_entry()
 
 const cpuid7_ebx_smep = u32(1) << 7

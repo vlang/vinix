@@ -1,0 +1,55 @@
+#!/bin/sh
+# Start the Docker daemon on Vinix: mount the cgroup v2 hierarchy it manages
+# containers in, then run dockerd in the background with its log in
+# /var/log/dockerd.log. `vinix-dockerd stop` ends it again.
+
+log=/var/log/dockerd.log
+pidfile=/run/docker.pid
+
+start() {
+	if [ -s "$pidfile" ] && kill -0 "$(cat "$pidfile")" 2>/dev/null; then
+		echo "dockerd is already running"
+		return 0
+	fi
+	mkdir -p /sys/fs/cgroup /var/lib/docker /run /var/log
+	if ! grep -q ' /sys/fs/cgroup ' /proc/mounts 2>/dev/null; then
+		mount -t cgroup2 cgroup2 /sys/fs/cgroup 2>/dev/null || true
+	fi
+
+	dockerd >"$log" 2>&1 &
+	dpid=$!
+
+	i=0
+	while [ "$i" -lt 120 ]; do
+		if timeout 10 docker version >/dev/null 2>&1; then
+			echo "dockerd is running (log: $log)"
+			return 0
+		fi
+		if ! kill -0 "$dpid" 2>/dev/null; then
+			echo "dockerd exited during startup:" >&2
+			tail -n 40 "$log" >&2
+			return 1
+		fi
+		i=$((i + 1))
+		sleep 1
+	done
+	echo "dockerd did not answer within its startup window:" >&2
+	tail -n 40 "$log" >&2
+	return 1
+}
+
+case "${1:-start}" in
+start)
+	start
+	exit $?
+	;;
+stop)
+	if [ -s "$pidfile" ]; then
+		kill "$(cat "$pidfile")" 2>/dev/null || true
+	fi
+	;;
+*)
+	echo "usage: vinix-dockerd [start|stop]" >&2
+	exit 2
+	;;
+esac

@@ -12,8 +12,9 @@ entry point is removed with it. The model and its methods remain unmodified, so
 a hosted view can bind that model without copying its business logic.
 
 Both are `module main`, so they can share a directory. The desktop's own files
-are symlinked rather than copied, so editing one is picked up by the next
-build.
+are normally symlinked rather than copied, so editing one is picked up by the
+next build. A source with the redundant legacy license preamble is materialized
+without that preamble for compatibility with the native V3 compiler.
 
     stage_app.py <staging-dir> <desktop-dir> <example-dir>...
 """
@@ -32,6 +33,23 @@ EMBEDDED_VIEW_PATTERN = re.compile(
     r"\$embed_file\([^\n]+\)\.to_string\(\)\n",
     re.MULTILINE,
 )
+LEGACY_LICENSE_PREAMBLE = re.compile(
+    r"\A// Copyright \(c\) [^\n]+\. All rights reserved\.\n"
+    r"// Use of this source code is governed by a GPL v2 license\n"
+    r"// that can be found in the LICENSE file\.\n\n"
+    r"(?=// SPDX-License-Identifier:)",
+)
+
+
+def native_v3_source(text):
+    """Remove a redundant pre-SPDX comment that corrupts V3 source offsets.
+
+    The native V 0.5.2 `$vml` lowering currently misattributes tokens later in
+    a file when this exact multi-line preamble precedes the existing SPDX
+    header. The SPDX header and its copyright remain in the staged source, so
+    this compile-only normalization changes no code or licensing information.
+    """
+    return LEGACY_LICENSE_PREAMBLE.sub("", text, count=1)
 
 
 def stage_desktop(staging, desktop_dir):
@@ -41,10 +59,18 @@ def stage_desktop(staging, desktop_dir):
             continue
         if not (name.endswith(".v") or name.endswith(".h") or name.endswith(".vml")):
             continue
-        link = os.path.join(staging, name)
-        if os.path.lexists(link):
-            os.remove(link)
-        os.symlink(os.path.abspath(source), link)
+        destination = os.path.join(staging, name)
+        if os.path.lexists(destination):
+            os.remove(destination)
+        if name.endswith(".v"):
+            with open(source) as handle:
+                text = handle.read()
+            compatible = native_v3_source(text)
+            if compatible != text:
+                with open(destination, "w") as handle:
+                    handle.write(compatible)
+                continue
+        os.symlink(os.path.abspath(source), destination)
 
 
 def strip_main(text, origin):

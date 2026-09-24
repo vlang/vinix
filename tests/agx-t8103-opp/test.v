@@ -1,5 +1,8 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
 module main
 
 // Regression fixture for the stock t8103 GPU operating-point table.
@@ -102,13 +105,15 @@ fn check_loaded_table() {
 fn check_firmware_table() {
 	cfg := loaded_config()
 	mut hwdata := fw.G13HwDataB{}
-	assert fw.populate_g13_hwdata_b(mut hwdata, &cfg, test_uat_ttb_base, test_unknown_page)
+	assert fw.populate_g13_hwdata_b(mut hwdata, &cfg, test_uat_ttb_base, test_unknown_page,
+		0xffff_ffae_1000_0000)
 
 	assert hwdata.num_pstates == 7
 	assert hwdata.max_pstate == 6
 	assert hwdata.min_sram_voltage_mv == 790
 	assert hwdata.uat_ttb_base == test_uat_ttb_base
 	assert hwdata.unknown_page == test_unknown_page
+	assert hwdata.unkptr_038 == 0xffff_ffae_1000_0000
 
 	expected_mhz := [u32(0), 396, 528, 720, 924, 1128, 1278]
 	expected_rel_power := [u32(0), 21, 28, 40, 58, 79, 100]
@@ -203,19 +208,19 @@ fn check_rejected_firmware_tables() {
 	base_on_off.perf_state_base = 0
 	mut scratch := fw.G13HwDataB{}
 	assert !fw.populate_g13_hwdata_b(mut scratch, &base_on_off, test_uat_ttb_base,
-		test_unknown_page)
+		test_unknown_page, 0xffff_ffae_1000_0000)
 
 	mut off_with_power := loaded_config()
 	off_with_power.perf_state_powers[0] = 5
 	scratch = fw.G13HwDataB{}
 	assert !fw.populate_g13_hwdata_b(mut scratch, &off_with_power, test_uat_ttb_base,
-		test_unknown_page)
+		test_unknown_page, 0xffff_ffae_1000_0000)
 
 	mut active_without_power := loaded_config()
 	active_without_power.perf_state_powers[3] = 0
 	scratch = fw.G13HwDataB{}
 	assert !fw.populate_g13_hwdata_b(mut scratch, &active_without_power, test_uat_ttb_base,
-		test_unknown_page)
+		test_unknown_page, 0xffff_ffae_1000_0000)
 }
 
 fn check_table_without_off_state() {
@@ -230,7 +235,8 @@ fn check_table_without_off_state() {
 	assert cfg.perf_state_frequencies[0] == 396_000_000
 
 	mut hwdata := fw.G13HwDataB{}
-	assert fw.populate_g13_hwdata_b(mut hwdata, &cfg, test_uat_ttb_base, test_unknown_page)
+	assert fw.populate_g13_hwdata_b(mut hwdata, &cfg, test_uat_ttb_base, test_unknown_page,
+		0xffff_ffae_1000_0000)
 	assert hwdata.num_pstates == 6
 	assert hwdata.max_pstate == 5
 	assert hwdata.frequencies_mhz[0] == 396

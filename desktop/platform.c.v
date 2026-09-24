@@ -1,5 +1,8 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
 // V implementation of the desktop's POSIX boundary. Only declarations and
 // constants come from libc headers; there are no custom C function bodies.
 // Import vlib's declarations rather than inventing incompatible duplicates.
@@ -81,6 +84,8 @@ fn C.reboot(command u32) int
 fn C.sync()
 
 fn desktop_open_rw(path string) int {
+	// Keep `os` imported for its canonical POSIX C declarations.
+	_ = platform_os.path_separator
 	return C.open(&char(path.str), C.O_RDWR)
 }
 
@@ -220,6 +225,8 @@ fn desktop_frame_wait_ms(elapsed i64, interval i64) i64 {
 }
 
 fn desktop_sleep_ms(milliseconds i64) {
+	// Keep `time` imported for its canonical POSIX C declarations.
+	_ = platform_time.nanosecond
 	if milliseconds <= 0 {
 		return
 	}
@@ -395,8 +402,9 @@ fn desktop_run_external(path string) ExternalProgramResult {
 // control instead of requiring a private prompt protocol over pipes.
 //
 // The master comes back non-blocking, so polling it once per compositor frame
-// never stalls.
-fn desktop_spawn_shell(path string, rows int, columns int, width int, height int) ?SpawnedShell {
+// never stalls. A non-empty `command` runs through /bin/sh on the same PTY
+// instead; it is expected to exec the interactive shell when it is done.
+fn desktop_spawn_shell(path string, command string, rows int, columns int, width int, height int) ?SpawnedShell {
 	master := C.posix_openpt(C.O_RDWR | C.O_NOCTTY | C.O_CLOEXEC)
 	if master < 0 {
 		return none
@@ -426,7 +434,12 @@ fn desktop_spawn_shell(path string, rows int, columns int, width int, height int
 
 	// Built before the fork. Between fork and execve the child may call only
 	// async-signal-safe functions, which allocating is not.
-	argv := [&char(path.str), c'-i', &char(unsafe { nil })]
+	program := if command.len > 0 { '/bin/sh' } else { path }
+	argv := if command.len > 0 {
+		[c'/bin/sh', c'-c', &char(command.str), &char(unsafe { nil })]
+	} else {
+		[&char(path.str), c'-i', &char(unsafe { nil })]
+	}
 	path_entry := 'PATH=${desktop_command_path}'
 	home_entry := 'HOME=${desktop_home}'
 	// A valid terminal type is required by terminal applications such as tmux.
@@ -460,7 +473,7 @@ fn desktop_spawn_shell(path string, rows int, columns int, width int, height int
 		// not a login shell, so nothing else moves it there. A failure is not
 		// fatal: a shell in the wrong directory still beats no shell.
 		C.chdir(&char(desktop_home.str))
-		C.execve(&char(path.str), argv.data, envp.data)
+		C.execve(&char(program.str), argv.data, envp.data)
 		C._exit(127)
 	}
 
@@ -516,6 +529,45 @@ fn desktop_read_all(fd int, buffer voidptr, count u64) bool {
 		if got < 0 && C.errno == C.EINTR {
 			continue
 		}
+		// Native-app responses use nonblocking pipes. A response can be larger
+		// than the pipe, so let its writer run and continue draining instead of
+		// entering the kernel's contended reader/writer sleep path.
+		if got < 0 && (C.errno == C.EAGAIN || C.errno == C.EWOULDBLOCK) {
+			desktop_sleep_ms(1)
+			continue
+		}
+		return false
+	}
+	return true
+}
+
+// A response may start with a valid header and then stop midway through its
+// payload. Keep the transaction deadline while draining it so a broken client
+// cannot park the compositor forever after the initial poll succeeded.
+fn desktop_read_all_with_timeout(fd int, buffer voidptr, count u64, timeout_ms int) bool {
+	start := desktop_monotonic_ms()
+	if start == ~u64(0) || timeout_ms < 0 || u64(timeout_ms) > ~u64(0) - start {
+		return false
+	}
+	deadline := start + u64(timeout_ms)
+	mut done := u64(0)
+	for done < count {
+		got := desktop_read(fd, unsafe { voidptr(&u8(buffer) + done) }, count - done)
+		if got > 0 {
+			done += u64(got)
+			continue
+		}
+		if got < 0 && C.errno == C.EINTR {
+			continue
+		}
+		if got < 0 && (C.errno == C.EAGAIN || C.errno == C.EWOULDBLOCK) {
+			now := desktop_monotonic_ms()
+			if now == ~u64(0) || now >= deadline {
+				return false
+			}
+			desktop_sleep_ms(1)
+			continue
+		}
 		return false
 	}
 	return true
@@ -532,9 +584,22 @@ fn desktop_write_all(fd int, buffer voidptr, count u64) bool {
 		if wrote < 0 && C.errno == C.EINTR {
 			continue
 		}
+		if wrote < 0 && (C.errno == C.EAGAIN || C.errno == C.EWOULDBLOCK) {
+			desktop_sleep_ms(1)
+			continue
+		}
 		return false
 	}
 	return true
+}
+
+fn desktop_set_nonblocking(fd int, enabled bool) bool {
+	flags := C.fcntl(fd, C.F_GETFL)
+	if flags < 0 {
+		return false
+	}
+	next := if enabled { flags | C.O_NONBLOCK } else { flags & ~C.O_NONBLOCK }
+	return C.fcntl(fd, C.F_SETFL, next) == 0
 }
 
 fn desktop_set_cloexec(fd int, enabled bool) bool {
@@ -616,6 +681,32 @@ fn desktop_is_system_session() bool {
 	return C.getpid() == 1 || C.getenv(c'VINIX_SYSTEM_SESSION') != unsafe { nil }
 }
 
+// A self-hosted build marks the rest of this boot as a development session
+// before asking PID 1 to replace the compositor. The Terminal that issued the
+// command belongs to the old compositor, so the replacement uses this marker
+// to restore a useful development window automatically.
+fn desktop_is_development_session() bool {
+	return C.access(c'/run/vinix-desktop-development', 0) == 0
+}
+
+// Replace the supervised compositor without changing its PID. Vinix ties
+// framebuffer graphics mode to the owning process rather than to an open file
+// descriptor, so exec-in-place keeps the kernel console from repainting its
+// boot log between the old and new program images. The caller has already
+// stopped every application and closed its devices before entering here.
+fn desktop_exec_replacement() {
+	argv := [c'/usr/bin/vinix-desktop', &char(unsafe { nil })]
+	envp := [c'PATH=/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin', c'HOME=/root',
+		c'TERM=linux', c'PS1=vinix# ', c'USER=root', c'LOGNAME=root', c'SHELL=/bin/zsh',
+		c'LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules',
+		c'LIBGL_DRIVERS_PATH=/usr/lib/xorg/modules/dri:/usr/lib/dri',
+		c'XDG_RUNTIME_DIR=/run/user/0', c'XDG_CONFIG_HOME=/root/.config',
+		c'XDG_CACHE_HOME=/root/.cache', c'SSL_CA_CERT_FILE=/etc/ssl/certs/ca-certificates.crt',
+		c'VINIX_SYSTEM_SESSION=1', &char(unsafe { nil })]
+	C.execve(argv[0], argv.data, envp.data)
+	eprintln('vinix-desktop: could not execute the replacement desktop')
+}
+
 // Hand the machine to the kernel. reboot(2) only returns when it refuses, so
 // everything the session wanted to finish must already be done.
 fn desktop_power_apply(action PowerAction) {
@@ -642,7 +733,7 @@ struct SpawnedAppProcess {
 	from_child int
 }
 
-fn desktop_spawn_app(path string, app_name string, tz_offset i64) ?SpawnedAppProcess {
+fn desktop_spawn_app(path string, app_name string, tz_offset i64, standalone bool) ?SpawnedAppProcess {
 	if C.access(&char(path.str), C.X_OK) != 0 {
 		return none
 	}
@@ -661,19 +752,43 @@ fn desktop_spawn_app(path string, app_name string, tz_offset i64) ?SpawnedAppPro
 	desktop_set_cloexec(request[1], true)
 	desktop_set_cloexec(response[0], true)
 	desktop_set_cloexec(response[1], true)
+	// Application trees can exceed the pipe capacity. Keep the response ends
+	// nonblocking so desktop_read_all/desktop_write_all alternate cooperatively
+	// without relying on two simultaneous kernel pipe sleepers to hand off.
+	if !desktop_set_nonblocking(response[0], true)
+		|| !desktop_set_nonblocking(response[1], true) {
+		C.close(request[0])
+		C.close(request[1])
+		C.close(response[0])
+		C.close(response[1])
+		return none
+	}
 
 	mode_arg := '--vinix-app=${app_name}'
 	request_arg := '--request-fd=${request[0]}'
 	response_arg := '--response-fd=${response[1]}'
 	tz_arg := '--app-tz=${tz_offset}'
-	argv := [&char(path.str), &char(mode_arg.str), &char(request_arg.str), &char(response_arg.str),
-		&char(tz_arg.str), &char(unsafe { nil })]
+	// Multicall desktop clients need the app selector and pipe options. Office
+	// clients treat argv[1] as a document path, so pass their pipes in envp.
+	argv := if standalone {
+		[&char(path.str), &char(unsafe { nil })]
+	} else {
+		[&char(path.str), &char(mode_arg.str), &char(request_arg.str), &char(response_arg.str),
+			&char(tz_arg.str), &char(unsafe { nil })]
+	}
 	path_entry := 'PATH=${desktop_command_path}'
 	home_entry := 'HOME=${desktop_home}'
-	envp := [&char(path_entry.str), &char(home_entry.str), c'TERM=dumb', c'USER=root', c'LOGNAME=root',
-		c'SHELL=/bin/zsh', c'LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules',
+	request_env := 'VINIX_REQUEST_FD=${request[0]}'
+	response_env := 'VINIX_RESPONSE_FD=${response[1]}'
+	mut envp := [&char(path_entry.str), &char(home_entry.str), c'TERM=dumb', c'USER=root',
+		c'LOGNAME=root', c'SHELL=/bin/zsh', c'LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules',
 		c'LIBGL_DRIVERS_PATH=/usr/lib/xorg/modules/dri:/usr/lib/dri',
-		c'SSL_CA_CERT_FILE=/etc/ssl/certs/ca-certificates.crt', &char(unsafe { nil })]
+		c'SSL_CA_CERT_FILE=/etc/ssl/certs/ca-certificates.crt']
+	if standalone {
+		envp << &char(request_env.str)
+		envp << &char(response_env.str)
+	}
+	envp << &char(unsafe { nil })
 
 	pid := C.fork()
 	if pid < 0 {
@@ -687,6 +802,8 @@ fn desktop_spawn_app(path string, app_name string, tz_offset i64) ?SpawnedAppPro
 			response_arg.free()
 			tz_arg.free()
 			path_entry.free()
+			request_env.free()
+			response_env.free()
 			argv.free()
 			envp.free()
 		}
@@ -715,6 +832,8 @@ fn desktop_spawn_app(path string, app_name string, tz_offset i64) ?SpawnedAppPro
 		response_arg.free()
 		tz_arg.free()
 		path_entry.free()
+		request_env.free()
+		response_env.free()
 		argv.free()
 		envp.free()
 	}
@@ -883,7 +1002,7 @@ fn desktop_spawn_native_surface(path string, first_argument string, second_argum
 // Start the native Xvfb/Wine bridge with a private input pipe. The application
 // process retains only the write end; the host receives it as stdin and owns
 // every X11 and translated Wine child for the lifetime of the Vinix window.
-fn desktop_spawn_wine_host(directory string, width int, height int, command string) ?SpawnedWineHost {
+fn desktop_spawn_wine_host(directory string, width int, height int, command string, fill_surface bool, game_input bool) ?SpawnedWineHost {
 	host := '/usr/bin/vinix-wine-host'
 	if C.access(&char(host.str), C.X_OK) != 0 || C.access(&char(command.str), C.X_OK) != 0 {
 		return none
@@ -900,8 +1019,14 @@ fn desktop_spawn_wine_host(directory string, width int, height int, command stri
 	// Beside the surface directory rather than inside it: the host makes that
 	// directory itself, after this log has to be open.
 	log_path := '${directory}.log'
-	argv := [&char(host.str), &char(display_name.str), &char(directory.str), &char(geometry.str),
-		&char(command.str), &char(unsafe { nil })]
+	mut argv := [&char(host.str), &char(display_name.str), &char(directory.str), &char(geometry.str),
+		&char(command.str)]
+	if fill_surface {
+		argv << c'--fill'
+	} else if game_input {
+		argv << c'--game-input'
+	}
+	argv << &char(unsafe { nil })
 	path_entry := 'PATH=${desktop_command_path}'
 	home_entry := 'HOME=${desktop_home}'
 	envp := [&char(path_entry.str), &char(home_entry.str), c'TERM=dumb', c'USER=root', c'LOGNAME=root',

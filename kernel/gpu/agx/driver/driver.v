@@ -88,7 +88,8 @@ fn find_native_asc_node(role u32) ?&devicetree.DTNode {
 	return none
 }
 
-fn validate_g13_firmware_compat(gpu_node &devicetree.DTNode, native_adt bool) bool {
+fn validate_g13_firmware_compat(gpu_node &devicetree.DTNode, native_adt bool,
+	mut cfg hw.HwConfig) bool {
 	// The tuple arrives as standard big-endian FDT cells. An M1 Air booted
 	// through m1n1 supplies apple,firmware-compat and no apple,firmware-abi at
 	// all, so the fallback below is the spelling that actually turns up on
@@ -115,11 +116,16 @@ fn validate_g13_firmware_compat(gpu_node &devicetree.DTNode, native_adt bool) bo
 		return false
 	}
 	println('agx: t8103 ${property_name} ${compat[0]}.${compat[1]}.${compat[2]}')
-	if compat[0] != 12 || compat[1] != 3 || compat[2] != 0 {
-		println('agx: only the G13 12.3.0 firmware ABI is being implemented')
-		return false
+	if compat[0] == 12 && compat[1] == 3 && compat[2] == 0 {
+		cfg.firmware_abi = .v12_3
+		return true
 	}
-	return true
+	if compat[0] == 13 && compat[1] == 5 && compat[2] == 0 {
+		cfg.firmware_abi = .v13_5_partial
+		return true
+	}
+	println('agx: supported G13 firmware ABIs are 12.3.0 and 13.5.0')
+	return false
 }
 
 fn load_fdt_firmware_version(gpu_node &devicetree.DTNode, native_adt bool,
@@ -960,7 +966,7 @@ pub fn initialise() {
 	cfg.gpu_mmio_base = platform.sgx_base
 	cfg.gpu_mmio_size = platform.sgx_size
 	agx_driver_inst.detected = true
-	if chip_id == 0x8103 && !validate_g13_firmware_compat(gpu_node, native_adt) {
+	if chip_id == 0x8103 && !validate_g13_firmware_compat(gpu_node, native_adt, mut cfg) {
 		return
 	}
 	if platform.ttbs_size < 64 * 16 {

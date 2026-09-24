@@ -310,7 +310,7 @@ pub fn syscall_inotify_add_watch(_ voidptr, fdnum int, _path charptr, mask u32) 
 		return errno.err, errno.enoent
 	}
 	follow := mask & in_dont_follow == 0
-	node := get_node(proc.current_thread().process.current_directory, path, follow) or {
+	node := get_node(proc.current_directory_of(proc.current_thread().process), path, follow) or {
 		return errno.err, errno.get()
 	}
 	if mask & in_onlydir != 0 && !stat.isdir(node.resource.stat.mode) {

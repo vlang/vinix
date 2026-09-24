@@ -47,13 +47,12 @@ fn attach_listeners(mut events []&eventstruct.Event, mut t proc.Thread) bool {
 		}
 		mut e := events[i]
 
-		if e.listeners_i == eventstruct.max_listeners
-			|| t.attached_events_i == proc.max_events {
+		if t.attached_events_i == proc.max_events || !e.reserve() {
 			detach_listeners(mut t)
 			return false
 		}
 
-		mut listener := &e.listeners[e.listeners_i]
+		mut listener := e.slot(e.listeners_i)
 
 		listener.thrd = voidptr(t)
 		listener.which = i
@@ -72,14 +71,17 @@ fn detach_listeners(mut t proc.Thread) {
 		mut e := t.attached_events[i]
 
 		for j := u64(0); j < e.listeners_i; j++ {
-			mut listener := &e.listeners[j]
+			mut listener := e.slot(j)
 
 			if listener.thrd != voidptr(t) {
 				continue
 			}
 
-			e.listeners[j] = e.listeners[e.listeners_i - 1]
+			unsafe {
+				*listener = *e.slot(e.listeners_i - 1)
+			}
 			e.listeners_i--
+			e.shrink()
 
 			break
 		}
@@ -88,20 +90,63 @@ fn detach_listeners(mut t proc.Thread) {
 	t.attached_events_i = 0
 }
 
+// Every waiter takes the locks of the events it waits on in one order, by
+// address, and gives them back in the reverse. Taken in the order they were
+// listed, two threads waiting on the same two events -- one listing them
+// [a, b], the other [b, a] -- could each hold one and spin for the other with
+// interrupts off, and every CPU that then touched either event stopped too:
+// the machine froze without a word, at the busiest moments of container
+// starts and exits. An event listed twice is locked once.
 fn lock_events(mut events []&eventstruct.Event) {
-	for i := u64(0); i < events.len; i++ {
-		if !duplicate_event_before(events, i) {
-			events[i].@lock.acquire()
+	mut last := u64(0)
+	for {
+		index := next_event_above(events, last)
+		if index < 0 {
+			return
 		}
+		events[index].@lock.acquire()
+		last = u64(voidptr(events[index]))
 	}
 }
 
 fn unlock_events(mut events []&eventstruct.Event) {
-	for i := u64(0); i < events.len; i++ {
-		if !duplicate_event_before(events, i) {
-			events[i].@lock.release()
+	mut last := u64(-1)
+	for {
+		index := next_event_below(events, last)
+		if index < 0 {
+			return
+		}
+		events[index].@lock.release()
+		last = u64(voidptr(events[index]))
+	}
+}
+
+// The event with the lowest address above `bound`, or -1.
+fn next_event_above(events []&eventstruct.Event, bound u64) int {
+	mut chosen := -1
+	mut lowest := u64(-1)
+	for i := 0; i < events.len; i++ {
+		address := u64(voidptr(events[i]))
+		if address > bound && address <= lowest {
+			lowest = address
+			chosen = i
 		}
 	}
+	return chosen
+}
+
+// The event with the highest address below `bound`, or -1.
+fn next_event_below(events []&eventstruct.Event, bound u64) int {
+	mut chosen := -1
+	mut highest := u64(0)
+	for i := 0; i < events.len; i++ {
+		address := u64(voidptr(events[i]))
+		if address < bound && address >= highest {
+			highest = address
+			chosen = i
+		}
+	}
+	return chosen
 }
 
 fn await_internal(mut events []&eventstruct.Event, block bool, watch_generation bool,
@@ -126,7 +171,9 @@ fn await_internal(mut events []&eventstruct.Event, block bool, watch_generation 
 		return watched_index
 	}
 
-	if block == false {
+	// A thread its process has told to exit must not go to sleep again: the
+	// sibling tearing the process down is waiting for it to unwind and leave.
+	if block == false || katomic.load(&t.must_exit) {
 		unlock_events(mut events)
 		return none
 	}
@@ -169,20 +216,36 @@ fn await_internal(mut events []&eventstruct.Event, block bool, watch_generation 
 	}
 	// Child exit raises an event and SIGCHLD together. If both wake this wait,
 	// retain the consumed event; otherwise waitpid loses the zombie forever.
-	if interrupted_by_signal && t.which_event == u64(-1) {
+	if (interrupted_by_signal || katomic.load(&t.must_exit)) && t.which_event == u64(-1) {
 		return none
 	}
 
 	return t.which_event
 }
 
+// One wait, repeated while it only ends in a spurious wake: woken without one
+// of these events having fired for it, or told of an index that is not into
+// this wait's list. Handing such an index back had callers index their own
+// lists out of range, which panicked the kernel.
+fn await_valid(mut events []&eventstruct.Event, block bool, watch_generation bool,
+	watched_index u64, generation u64) ?u64 {
+	for {
+		which := await_internal(mut events, block, watch_generation, watched_index,
+			generation)?
+		if which < u64(events.len) {
+			return which
+		}
+	}
+	return none
+}
+
 pub fn await(mut events []&eventstruct.Event, block bool) ?u64 {
-	return await_internal(mut events, block, false, 0, 0)
+	return await_valid(mut events, block, false, 0, 0)
 }
 
 pub fn await_from_generation(mut events []&eventstruct.Event, block bool, watched_index u64,
 	generation u64) ?u64 {
-	return await_internal(mut events, block, true, watched_index, generation)
+	return await_valid(mut events, block, true, watched_index, generation)
 }
 
 pub fn generation(mut e eventstruct.Event) u64 {
@@ -222,15 +285,16 @@ pub fn trigger(mut e eventstruct.Event, drop bool) u64 {
 
 	mut preserve_pending := false
 	for i := u64(0); i < e.listeners_i; i++ {
-		mut t := unsafe { &proc.Thread(e.listeners[i].thrd) }
+		listener := e.slot(i)
+		mut t := unsafe { &proc.Thread(listener.thrd) }
 
 		// A thread may listen to several events. Once one has made it runnable,
 		// do not overwrite that selection; retain this event for its next await.
-		if t.is_in_queue {
+		if katomic.load(&t.is_in_queue) {
 			preserve_pending = true
 			continue
 		}
-		t.which_event = e.listeners[i].which
+		t.which_event = listener.which
 
 		if !sched.enqueue_thread(t, false) {
 			preserve_pending = true
@@ -243,6 +307,7 @@ pub fn trigger(mut e eventstruct.Event, drop bool) u64 {
 	ret := e.listeners_i
 
 	e.listeners_i = 0
+	e.shrink()
 
 	return ret
 }

@@ -1,3 +1,7 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 // SPDX-License-Identifier: GPL-2.0-or-later
 module main
 
@@ -19,6 +23,7 @@ struct TitlebarClick {
 	window_width  int
 	window_height int
 	maximized     bool
+	snap          WindowSnap
 	at_ms         u64
 }
 
@@ -59,7 +64,11 @@ fn titlebar_click_matches(previous TitlebarClick, id int, x int, y int, now_ms u
 // between the two clicks, so a double click on a maximised title bar restores
 // rather than immediately maximising again.
 fn (mut d Desktop) titlebar_pointer_down_at(previous TitlebarClick, x int, y int, now_ms u64) TitlebarClick {
-	action := d.hit_action(x, y)
+	action, world := d.hit_action_world(x, y)
+	if world == .application {
+		d.on_pointer_down(x, y)
+		return TitlebarClick{}
+	}
 	id := titlebar_action_window_id(action) or {
 		d.on_pointer_down(x, y)
 		return TitlebarClick{}
@@ -80,6 +89,7 @@ fn (mut d Desktop) titlebar_pointer_down_at(previous TitlebarClick, x int, y int
 		d.windows[index].width = previous.window_width
 		d.windows[index].height = previous.window_height
 		d.windows[index].maximized = previous.maximized
+		d.windows[index].snap = previous.snap
 		d.set_hover(action)
 		d.dirty = true
 		d.toggle_maximize(id)
@@ -95,6 +105,7 @@ fn (mut d Desktop) titlebar_pointer_down_at(previous TitlebarClick, x int, y int
 		window_width: d.windows[index].width
 		window_height: d.windows[index].height
 		maximized: d.windows[index].maximized
+		snap: d.windows[index].snap
 		at_ms: now_ms
 	}
 	d.on_pointer_down(x, y)

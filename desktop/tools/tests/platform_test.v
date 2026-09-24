@@ -1,5 +1,8 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
 module main
 
 import os
@@ -171,4 +174,17 @@ fn test_frame_wait_always_yields_after_an_overrun() {
 	// --frame-ms=0 deliberately remains the unpaced benchmarking mode.
 	assert desktop_frame_wait_ms(0, 0) == 0
 	assert desktop_frame_wait_ms(200, -1) == 0
+}
+
+fn test_platform_nonblocking_flag_helper() {
+	mut pair := [2]i32{}
+	assert C.pipe(&pair[0]) == 0
+	defer {
+		desktop_close(int(pair[0]))
+		desktop_close(int(pair[1]))
+	}
+	assert desktop_set_nonblocking(int(pair[0]), true)
+	assert C.fcntl(pair[0], C.F_GETFL) & C.O_NONBLOCK != 0
+	assert desktop_set_nonblocking(int(pair[0]), false)
+	assert C.fcntl(pair[0], C.F_GETFL) & C.O_NONBLOCK == 0
 }

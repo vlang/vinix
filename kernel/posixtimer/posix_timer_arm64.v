@@ -143,26 +143,25 @@ fn remaining(timer &PosixTimer, now_ns u64) u64 {
 	return timer.deadline_ns - now_ns
 }
 
+// The thread a timer's signal goes to, pinned; the caller unpins it.
 fn timer_target(timer &PosixTimer) &proc.Thread {
 	if timer.notify == sigev_thread_id {
-		target := proc.thread_by_tid(timer.tid)
-		if target == unsafe { nil } || target.is_dead || target.process != timer.owner {
+		target := proc.get_thread(timer.tid)
+		if target == unsafe { nil } {
+			return unsafe { nil }
+		}
+		if katomic.load(&target.is_dead) || target.process != timer.owner {
+			proc.unpin_thread(target)
 			return unsafe { nil }
 		}
 		return target
 	}
 
-	mut owner := timer.owner
+	owner := timer.owner
 	if owner == unsafe { nil } {
 		return unsafe { nil }
 	}
-	owner.threads_lock.acquire()
-	mut target := &proc.Thread(unsafe { nil })
-	if owner.threads.len > 0 {
-		target = owner.threads[0]
-	}
-	owner.threads_lock.release()
-	return target
+	return proc.get_main_thread(owner)
 }
 
 fn add_overrun(current int, amount u64) int {
@@ -209,6 +208,7 @@ pub fn tick_posix_timers() {
 			// expirations occurred while the first notification was pending.
 			timer.overrun = add_overrun(timer.overrun, expirations)
 			target.pending_signal_overruns[timer.signum - 1] = timer.overrun
+			proc.unpin_thread(target)
 			continue
 		}
 
@@ -220,6 +220,7 @@ pub fn tick_posix_timers() {
 		target.pending_signal_overruns[timer.signum - 1] = timer.overrun
 		katomic.bts(mut &target.pending_signals, u8(timer.signum - 1))
 		sched.enqueue_thread(target, true)
+		proc.unpin_thread(target)
 	}
 
 	posix_timers_lock.release()
@@ -259,7 +260,7 @@ pub fn syscall_timer_create(_ voidptr, clock_id int, event_ptr u64, timer_id_ptr
 		event.value = raw[0]
 		event.signum = int(u32(raw[1]))
 		event.notify = int(u32(raw[1] >> 32))
-		event.tid = int(u32(raw[2]))
+		event.tid = proc.kernel_id(int(u32(raw[2])))
 	}
 	if event.notify != sigev_none && event.notify != sigev_signal
 		&& event.notify != sigev_thread_id {
@@ -271,8 +272,13 @@ pub fn syscall_timer_create(_ voidptr, clock_id int, event_ptr u64, timer_id_ptr
 
 	owner := proc.current_thread().process
 	if event.notify == sigev_thread_id {
-		target := proc.thread_by_tid(event.tid)
-		if target == unsafe { nil } || target.is_dead || target.process != owner {
+		target := proc.get_thread(event.tid)
+		if target == unsafe { nil } {
+			return errno.err, errno.einval
+		}
+		valid := !katomic.load(&target.is_dead) && target.process == owner
+		proc.unpin_thread(target)
+		if !valid {
 			return errno.err, errno.einval
 		}
 	}

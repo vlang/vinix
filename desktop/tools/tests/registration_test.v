@@ -1,3 +1,7 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 module main
 
 import os
@@ -145,10 +149,13 @@ fn test_registration_persists_verifier_and_user_home() {
 	defer { state.close() }
 
 	assert !desktop_user_registered(home)
+	assert !desktop_app_selection_pending(home)
 	state.key_input('Alice Example\tcorrect horse battery staple\tcorrect horse battery staple\r',
 		home)
 	assert state.complete
 	assert desktop_user_registered(home)
+	// Creating the user is what schedules the first-run app choice.
+	assert desktop_app_selection_pending(home)
 	name := desktop_load_user_name(home) or { panic('saved user did not reload') }
 	assert name == 'Alice Example'
 	unsafe { name.free() }

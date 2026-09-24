@@ -81,6 +81,15 @@ pub fn get_hhdm_offset() u64 {
 	return higher_half
 }
 
+// The HHDM offset straight from Limine's response, for code that runs before
+// pmm_init() has copied it into higher_half. 0 if Limine gave none.
+pub fn bootloader_hhdm_offset() u64 {
+	if hhdm_req.response == unsafe { nil } {
+		return 0
+	}
+	return hhdm_req.response.offset
+}
+
 // total_bytes and free_bytes report the machine's usable RAM and how much of
 // it is unallocated. Both are page counts scaled to bytes, which is what a
 // reader outside this module wants to say to a person.

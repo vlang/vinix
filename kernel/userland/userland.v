@@ -242,7 +242,7 @@ fn resume_sigreturn(context cpulocal.GPRState, old_mask u64) {
 	// Vinix's amd64 signal bitmap uses the signal number as its bit index.
 	t.masked_signals = old_mask & ~((u64(1) << sigkill) | (u64(1) << sigstop))
 
-	sched.yield(false)
+	sched.resume_saved_context()
 
 	for {}
 }
@@ -337,8 +337,9 @@ pub fn syscall_sigprocmask(_ voidptr, how int, set &u64, oldset &u64) (u64, u64)
 
 fn dispatch_signal(context &cpulocal.GPRState, info_signum int, info_code int, info_addr u64) {
 	mut t := unsafe { proc.current_thread() }
+	linux := t.process.linux_abi
 
-	if t.sigentry == 0 {
+	if t.sigentry == 0 && !linux {
 		return
 	}
 
@@ -355,6 +356,11 @@ fn dispatch_signal(context &cpulocal.GPRState, info_signum int, info_code int, i
 	}
 
 	if which == -1 {
+		return
+	}
+
+	if linux {
+		dispatch_linux_signal(context, which, info_signum, info_code, info_addr)
 		return
 	}
 
@@ -407,7 +413,7 @@ fn dispatch_signal(context &cpulocal.GPRState, info_signum int, info_code int, i
 	t.gpr_state.rcx = u64(return_context)
 	t.gpr_state.r8 = previous_mask
 
-	sched.yield(false)
+	sched.resume_saved_context()
 }
 
 // Dispatch a signal to _self_, this is called from the scheduler or at the
@@ -431,6 +437,27 @@ pub fn sendsig(_thread &proc.Thread, signal u8) {
 	sched.enqueue_thread(t, true)
 }
 
+// signal_process safely delivers a signal to a process's first thread,
+// synchronized against thread creation/replacement via the same lock
+// new_user_thread's append and start_program()'s exec-time reset both
+// hold. proc.allocate_pid()/new_process() can publish a process before
+// its first thread is appended, and start_program() briefly empties
+// process.threads mid-exec -- a bare process.threads[0] can land in
+// either window. Returns false, rather than indexing an empty array,
+// when there is currently no thread to signal.
+fn signal_process(_process &proc.Process, signal u8) bool {
+	mut process := unsafe { _process }
+	process.threads_lock.acquire()
+	defer {
+		process.threads_lock.release()
+	}
+	if process.threads.len == 0 {
+		return false
+	}
+	sendsig(process.threads[0], signal)
+	return true
+}
+
 pub fn syscall_kill(_ voidptr, pid int, signal int) (u64, u64) {
 	mut current_thread := proc.current_thread()
 	mut process := current_thread.process
@@ -440,10 +467,45 @@ pub fn syscall_kill(_ voidptr, pid int, signal int) (u64, u64) {
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
+	if signal < 0 {
+		return errno.err, errno.einval
+	}
+
+	if pid == -1 {
+		if signal == 0 {
+			// The same existence/permission probe as kill(pid, 0), just
+			// against "does any eligible target exist" instead of one
+			// specific pid. Signal 0 is never actually sent, so it doesn't
+			// need root's real system-wide broadcast (out of scope here) to
+			// be implemented first -- the calling process itself is always
+			// an eligible target, so this always succeeds.
+			return 0, 0
+		}
+		// Broadcast. Root's true system-wide broadcast (including pid 1) is
+		// out of scope here; a non-root caller gets the real POSIX/Linux
+		// behavior, every process at its own uid, itself included.
+		if process.euid != 0 {
+			for i := 1; i < proc.max_pid; i++ {
+				candidate := processes[i]
+				if candidate != unsafe { nil } && candidate.uid == process.uid {
+					signal_process(candidate, u8(signal))
+				}
+			}
+			return 0, 0
+		}
+		return errno.err, errno.eperm
+	}
+
+	if pid < 0 || pid >= proc.max_pid || processes[pid] == unsafe { nil } {
+		return errno.err, errno.esrch
+	}
+
+	// signal == 0 is the standard POSIX existence/permission probe: no signal
+	// sent, the lookup above already did the check.
 	if signal > 0 {
-		sendsig(processes[pid].threads[0], u8(signal))
-	} else {
-		panic('sendsig: Values of signal <= 0 not supported')
+		if !signal_process(processes[pid], u8(signal)) {
+			return errno.err, errno.esrch
+		}
 	}
 
 	return 0, 0
@@ -524,7 +586,15 @@ pub fn syscall_waitpid(_ voidptr, pid int, _status &i32, options int) (u64, u64)
 	}
 
 	block := options & wnohang == 0
-	which := event.await(mut events, block) or { return errno.err, errno.eintr }
+	which := event.await(mut events, block) or {
+		// Under WNOHANG this means no child has exited yet, which Linux
+		// reports as 0. EINTR sent libcs that retry interrupted calls -- musl,
+		// and BusyBox's `wait` -- round a loop that never slept.
+		if !block {
+			return 0, 0
+		}
+		return errno.err, errno.eintr
+	}
 
 	if child == unsafe { nil } {
 		child = current_process.children[which]
@@ -545,10 +615,23 @@ pub fn syscall_waitpid(_ voidptr, pid int, _status &i32, options int) (u64, u64)
 
 @[noreturn]
 pub fn syscall_exit(_ voidptr, status int) {
+	exit_process(u32(status) << 8)
+}
+
+// End the calling process as one killed by `signal`, which is what wait()
+// then reports instead of an exit status.
+@[noreturn]
+pub fn exit_by_signal(signal int) {
+	exit_process(u32(signal) & 0x7f)
+}
+
+// `wait_status` is what wait() will report, encoded the way Linux does.
+@[noreturn]
+fn exit_process(wait_status u32) {
 	mut current_thread := proc.current_thread()
 	mut current_process := current_thread.process
 
-	C.printf(c'\n\e[32m%s\e[m: exit(%d)\n', current_process.name.str, status)
+	C.printf(c'\n\e[32m%s\e[m: exit(0x%x)\n', current_process.name.str, wait_status)
 	defer {
 		C.printf(c'\e[32m%s\e[m: returning\n', current_process.name.str)
 	}
@@ -580,8 +663,17 @@ pub fn syscall_exit(_ voidptr, status int) {
 
 	mmap.delete_pagemap(mut old_pagemap) or {}
 
-	katomic.store(mut &current_process.status, int(u32(status) << 8))
+	katomic.store(mut &current_process.status, int(wait_status))
 	event.trigger(mut &current_process.event, false)
+
+	// The parent hears of it through SIGCHLD as well as wait(): a shell such as
+	// zsh reaps from its SIGCHLD handler, and sleeps in sigsuspend() until then.
+	if current_process.ppid > 0 && current_process.ppid < proc.max_pid {
+		parent := processes[current_process.ppid]
+		if parent != unsafe { nil } {
+			signal_process(parent, sigchld)
+		}
+	}
 
 	sched.dequeue_and_die()
 }
@@ -697,6 +789,7 @@ pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, 
 	// the amd64 ELF loader follows the Linux syscall ABI; this includes Alpine's
 	// /lib/ld-musl-x86_64.so.1 and static Linux executables.
 	linux_abi := ld_path != '/usr/lib/ld.so'
+	allow_wx := envp.contains('VINIX_ALLOW_WX=1')
 
 	mut entry_point := unsafe { nil }
 
@@ -731,6 +824,7 @@ pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, 
 		new_process.name = '${path}[${new_process.pid}]'
 		new_process.executable_path = path.clone()
 		new_process.linux_abi = linux_abi
+		new_process.allow_wx = allow_wx
 
 		stdin_node := fs.get_node(vfs_root, stdin_path, true)?
 		stdin_handle := &file.Handle{
@@ -782,6 +876,7 @@ pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, 
 		process.name = '${path}[${process.pid}]'
 		process.executable_path = path.clone()
 		process.linux_abi = linux_abi
+		process.allow_wx = allow_wx
 
 		kernel_pagemap.switch_to()
 		t.process = kernel_process
@@ -793,7 +888,12 @@ pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, 
 
 		// TODO: Kill old threads
 		// old_threads := process.threads
+		// Same lock new_user_thread's append holds: without it, a concurrent
+		// reader of process.threads (syscall_kill's broadcast path) could
+		// observe this array mid-replacement.
+		process.threads_lock.acquire()
 		process.threads = []&proc.Thread{}
+		process.threads_lock.release()
 
 		sched.new_user_thread(process, true, entry_point, unsafe { nil }, 0, argv, envp,
 			auxval, true)?

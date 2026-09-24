@@ -2,12 +2,29 @@ from __future__ import annotations
 
 import textwrap
 import unittest
+from pathlib import Path
 
 import generate_g13_initdata_layout as layout
 
 
 G13_12_3 = {"G": "G13", "V": "V12_3"}
 G13_13_5 = {"G": "G13", "V": "V13_5"}
+
+
+class DefaultPathTests(unittest.TestCase):
+    def test_default_input_uses_the_configurable_m1n1_checkout(self) -> None:
+        self.assertEqual(
+            layout.DEFAULT_RAW_RS,
+            layout.DEFAULT_M1N1 / "rust/src/gpu/raw.rs",
+        )
+
+    def test_generated_output_is_relative_to_the_script_not_the_cwd(self) -> None:
+        expected = (
+            Path(layout.__file__).resolve().parents[2]
+            / "kernel/gpu/agx/fw/g13_initdata_layout.v"
+        )
+        self.assertTrue(layout.DEFAULT_OUTPUT.is_absolute())
+        self.assertEqual(layout.DEFAULT_OUTPUT, expected)
 
 
 class GateExtractionTests(unittest.TestCase):

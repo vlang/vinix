@@ -14,6 +14,10 @@ fail() {
 
 echo
 echo "VINIX V SELF-HOST TEST: START"
+echo "==> Rebuilding V from its installed source tree"
+v self || fail "compiler self rebuild"
+[ -x /usr/lib/vlang/v_old ] || fail "self rebuild did not retain the old compiler"
+echo "VINIX V SELF REBUILD TEST: PASS"
 /root/v-smoke.sh || fail "native compiler smoke test"
 vinix-desktop-build --no-reload || fail "desktop build"
 [ -x /root/vinix-desktop ] || fail "desktop output is missing"
@@ -58,6 +62,21 @@ echo "VINIX V SELF-HOST BUILD TEST: PASS"
 		echo "VINIX DESKTOP RELOAD TEST: FAIL replacement desktop did not start"
 		/sbin/poweroff -f 2>/dev/null || exit 1
 	fi
+	# A malformed native binary can survive exec long enough for pidof to see
+	# it and then wedge the guest during its first few frames. Keep observing
+	# the same compositor rather than declaring success at process creation.
+	attempt=0
+	while [ "$attempt" -lt 10 ]; do
+		sleep 1
+		case " $(/bin/busybox pidof vinix-desktop 2>/dev/null || true) " in
+			*" $new_pid "*) ;;
+			*)
+				echo "VINIX DESKTOP RELOAD TEST: FAIL replacement desktop did not stay running"
+				/sbin/poweroff -f 2>/dev/null || exit 1
+				;;
+		esac
+		attempt=$((attempt + 1))
+	done
 	if [ ! -e /run/vinix-desktop-development ] \
 		|| ! /bin/busybox cmp -s /root/vinix-desktop /usr/bin/vinix-desktop; then
 		echo "VINIX DESKTOP RELOAD TEST: FAIL replacement was not installed"

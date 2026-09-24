@@ -660,11 +660,19 @@ fn (mut inode EXT2Inode) write(mut filesystem EXT2Filesystem, buf voidptr, inode
 }
 
 fn (mut inode EXT2Inode) free_entry(mut filesystem EXT2Filesystem, inode_index u32) ?int {
-	for i := u64(0); i < lib.div_roundup(u64(inode.size32l), filesystem.block_size); i++ {
-		block_index := inode.get_block(mut filesystem, u32(i)) or { return none }
-		if block_index != 0 {
-			filesystem.free_block(block_index) or { return none }
-			inode.set_block(mut filesystem, inode_index, u32(i), 0) or { return none }
+	// A short symlink stores its target directly in the fifteen block-pointer
+	// fields. Interpreting those bytes as block numbers while unlinking or
+	// replacing the symlink corrupts the allocation bitmap (and made apk fail
+	// as soon as it replaced one of Alpine's compatibility links).
+	is_fast_symlink := stat.islnk(u32(inode.permissions)) && inode.sector_cnt == 0
+		&& inode.size32l != 0 && inode.size32l <= u32(sizeof(inode.blocks))
+	if !is_fast_symlink {
+		for i := u64(0); i < lib.div_roundup(u64(inode.size32l), filesystem.block_size); i++ {
+			block_index := inode.get_block(mut filesystem, u32(i)) or { return none }
+			if block_index != 0 {
+				filesystem.free_block(block_index) or { return none }
+				inode.set_block(mut filesystem, inode_index, u32(i), 0) or { return none }
+			}
 		}
 	}
 	inode.size32l = 0

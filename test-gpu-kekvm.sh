@@ -1,5 +1,6 @@
 #!/bin/sh
 # Run Vinix's paravirtual GPU stack against KekVM's host Metal backend.
+# Pass --desktop-startup to exercise the complete GPU compositor startup.
 set -eu
 
 repo=$(CDPATH= cd -- "$(dirname "$0")" && pwd)

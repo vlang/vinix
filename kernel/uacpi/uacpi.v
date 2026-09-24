@@ -9,7 +9,9 @@ import memory
 import lib
 import kprint
 import lib.stubs
-import x86.hpet
+// Aliased: the hpet module also has a global named `hpet`, and V3 resolves
+// `hpet.nanoseconds()` against the variable in a -prod build.
+import x86.hpet as hpet_clock
 import pci
 
 pub enum UACPIStatus {
@@ -241,7 +243,7 @@ pub fn uacpi_kernel_unmap(addr voidptr, len u64) {
 
 @[export: 'uacpi_kernel_get_nanoseconds_since_boot']
 pub fn uacpi_kernel_get_nanoseconds_since_boot() u64 {
-	return hpet.read_counter() * (1000000000 / hpet_frequency)
+	return hpet_clock.nanoseconds()
 }
 
 @[export: 'uacpi_kernel_io_map']
