@@ -279,6 +279,10 @@ pub mut:
 	ns              NamespaceSet
 	caps            Capabilities
 	no_new_privs    bool
+	// The seccomp programs a process has installed, newest first, and
+	// whether it is in strict mode instead; see seccomp.v.
+	seccomp_mode    int
+	seccomp         &SeccompFilter = unsafe { nil }
 	child_subreaper bool
 	pdeathsig       int
 	cgroup          voidptr
@@ -953,8 +957,6 @@ pub fn process_status_text(pid int, viewer &Namespace) string {
 	threads := if process.threads.len > 0 { process.threads.len } else { 1 }
 	caps := process.caps
 	no_new_privs := if process.no_new_privs { 1 } else { 0 }
-	// Seccomp is reported as absent altogether: without the field a runtime
-	// knows the kernel has no seccomp, which is the truth here.
 	state := if process.exiting { 'Z (zombie)' } else { 'R (running)' }
 	shown_pid := pid_in(process, viewer)
 	shown_ppid := pid_in(process_at(process.ppid), viewer)
@@ -999,6 +1001,10 @@ pub fn process_status_text(pid int, viewer &Namespace) string {
 	text.add_radix(caps.ambient, 16, 16)
 	text.add('\nNoNewPrivs:\t')
 	text.add_decimal(no_new_privs)
+	text.add('\nSeccomp:\t')
+	text.add_decimal(process.seccomp_mode)
+	text.add('\nSeccomp_filters:\t')
+	text.add_decimal(seccomp_filter_count(process))
 	text.add_byte(`\n`)
 	return text.str()
 }

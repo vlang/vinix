@@ -283,6 +283,8 @@ pub fn inherit_container_state(mut child Process, parent &Process) {
 	child.root_directory = root_directory_of(parent)
 	child.caps = parent.caps
 	child.no_new_privs = parent.no_new_privs
+	child.seccomp_mode = parent.seccomp_mode
+	child.seccomp = parent.seccomp
 	child.cgroup = parent.cgroup
 	child.cgroup_account = parent.cgroup_account
 	child.oom_score_adj = parent.oom_score_adj

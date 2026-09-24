@@ -10,6 +10,7 @@
 #include <poll.h>
 #include <sched.h>
 #include <signal.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -28,6 +29,10 @@
 #include <sys/xattr.h>
 #include <sys/membarrier.h>
 #include <sys/mount.h>
+#include <linux/audit.h>
+#include <linux/filter.h>
+#include <linux/seccomp.h>
+#include <sys/prctl.h>
 #include <sys/mman.h>
 #include <time.h>
 #include <unistd.h>
@@ -309,6 +314,81 @@ static int overlay_semantics(void) {
                               EROFS, "create in a read-only overlay");
     valid = umount("/tmp/aarch64-syscall-ovl/merged") == 0 && valid;
     return valid;
+}
+
+// seccomp filters, as a container runtime installs Docker's default profile.
+static int install_filter(struct sock_filter *program, unsigned short length) {
+    struct sock_fprog prog = {.len = length, .filter = program};
+    return (int)syscall(SYS_seccomp, SECCOMP_SET_MODE_FILTER, 0, &prog);
+}
+
+static int seccomp_child(void) {
+    struct sock_filter program[] = {
+        BPF_STMT(BPF_LD | BPF_W | BPF_ABS, offsetof(struct seccomp_data, arch)),
+        BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, AUDIT_ARCH_AARCH64, 1, 0),
+        BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_KILL_PROCESS),
+        BPF_STMT(BPF_LD | BPF_W | BPF_ABS, offsetof(struct seccomp_data, nr)),
+        BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, SYS_getppid, 0, 1),
+        BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_ERRNO | 77),
+        BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, SYS_getuid, 0, 1),
+        BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_KILL_PROCESS),
+        BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_ALLOW),
+    };
+    if (prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) != 0 ||
+        install_filter(program, sizeof(program) / sizeof(program[0])) != 0)
+        return 1;
+    if (syscall(SYS_getppid) != -1 || errno != 77 || getpid() <= 0 ||
+        prctl(PR_GET_SECCOMP, 0, 0, 0, 0) != 2)
+        return 2;
+    char status[2048] = {0};
+    int fd = open("/proc/self/status", O_RDONLY);
+    if (fd < 0 || read(fd, status, sizeof(status) - 1) <= 0 ||
+        !strstr(status, "Seccomp:\t2\nSeccomp_filters:\t1\n"))
+        return 3;
+    close(fd);
+    pid_t grandchild = fork();
+    if (grandchild == 0)
+        _exit(syscall(SYS_getppid) == -1 && errno == 77 ? 0 : 1);
+    int status_code = 0;
+    if (waitpid(grandchild, &status_code, 0) != grandchild || !WIFEXITED(status_code) ||
+        WEXITSTATUS(status_code) != 0)
+        return 4;
+    syscall(SYS_getuid);
+    return 5;
+}
+
+static int seccomp_filters(void) {
+    struct sock_filter bad_jump[] = {
+        BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, 0, 5, 0),
+        BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_ALLOW),
+    };
+    struct sock_filter no_return[] = {
+        BPF_STMT(BPF_LD | BPF_W | BPF_ABS, 0),
+    };
+    unsigned int log_action = SECCOMP_RET_LOG;
+    int valid = failed_with_errno(install_filter(bad_jump, 2), EINVAL, "seccomp jump out of range") &&
+                failed_with_errno(install_filter(no_return, 1), EINVAL, "seccomp without return") &&
+                syscall(SYS_seccomp, SECCOMP_GET_ACTION_AVAIL, 0, &log_action) == 0 &&
+                prctl(PR_GET_SECCOMP, 0, 0, 0, 0) == 0;
+
+    pid_t child = fork();
+    if (child == 0)
+        _exit(seccomp_child());
+    int status = 0;
+    valid = valid && waitpid(child, &status, 0) == child && WIFSIGNALED(status) &&
+            WTERMSIG(status) == SIGSYS;
+    if (!valid)
+        printf("seccomp child status=0x%x\n", status);
+
+    pid_t unprivileged = fork();
+    if (unprivileged == 0) {
+        struct sock_filter allow[] = {BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_ALLOW)};
+        if (setresuid(1000, 1000, 1000) != 0)
+            _exit(1);
+        _exit(failed_with_errno(install_filter(allow, 1), EACCES,
+                                "seccomp without no_new_privs") ? 0 : 2);
+    }
+    return valid && security_child_succeeded(unprivileged);
 }
 
 static void *eventfd_writer(void *argument) {
@@ -615,6 +695,7 @@ int main(void) {
     check(xattr_operations(), "extended attributes on tmpfs");
     check(special_node_numbers(), "mknod nodes have inode numbers");
     check(overlay_semantics(), "overlay mount");
+    check(seccomp_filters(), "seccomp filters");
     if (chdir(previous_cwd) != 0)
         chdir("/");
 

@@ -151,29 +151,98 @@ fn syscall_linux_capset(_ voidptr, header_ptr u64, data_ptr u64) (u64, u64) {
 	return 0, 0
 }
 
-// seccomp(operation, flags, args). Vinix does not filter syscalls, so a filter
-// is accepted and does nothing; a runtime that sets one still runs, it is just
-// not confined by it. SECCOMP_GET_ACTION_AVAIL answers that an action is known.
-fn syscall_linux_seccomp(_ voidptr, operation u32, flags u32, _args u64) (u64, u64) {
+const seccomp_set_mode_strict = u32(0)
+const seccomp_set_mode_filter = u32(1)
+const seccomp_get_action_avail = u32(2)
+const seccomp_filter_flag_tsync = u32(1)
+const seccomp_filter_flag_log = u32(2)
+const seccomp_filter_flag_spec_allow = u32(4)
+const seccomp_filter_flag_tsync_esrch = u32(16)
+
+// seccomp(operation, flags, args); see proc/seccomp.v. Programs are the
+// process's, so TSYNC holds already. There are no listeners to hand user
+// notifications to, so SECCOMP_FILTER_FLAG_NEW_LISTENER, like every flag
+// Linux does not know, is refused: libseccomp probes each flag this way and
+// leaves out what the kernel refuses.
+fn syscall_linux_seccomp(_ voidptr, operation u32, flags u32, args u64) (u64, u64) {
 	match operation {
-		0, 1 {
-			// SECCOMP_SET_MODE_STRICT and SECCOMP_SET_MODE_FILTER. A new-listener
-			// filter expects a descriptor back, which we cannot supply.
-			if flags & 0x8 != 0 { // SECCOMP_FILTER_FLAG_NEW_LISTENER
-				return errno.err, errno.enosys
+		seccomp_set_mode_strict {
+			if flags != 0 || args != 0 {
+				return errno.err, errno.einval
 			}
-			mut process := proc.current_thread().process
-			process.no_new_privs = true
-			return 0, 0
+			return seccomp_set_strict()
 		}
-		2 {
-			// SECCOMP_GET_ACTION_AVAIL: the action is in *args; report it known.
-			return 0, 0
+		seccomp_set_mode_filter {
+			known := seccomp_filter_flag_tsync | seccomp_filter_flag_log | seccomp_filter_flag_spec_allow | seccomp_filter_flag_tsync_esrch
+			if flags & ~known != 0 {
+				return errno.err, errno.einval
+			}
+			return seccomp_install(args)
+		}
+		seccomp_get_action_avail {
+			mut action := u32(0)
+			if !usercopy.copy_from_user(voidptr(&action), args, sizeof(u32)) {
+				return errno.err, errno.efault
+			}
+			match action {
+				proc.seccomp_ret_kill_process, proc.seccomp_ret_kill_thread, proc.seccomp_ret_trap,
+				proc.seccomp_ret_errno, proc.seccomp_ret_trace, proc.seccomp_ret_log,
+				proc.seccomp_ret_allow {
+					return 0, 0
+				}
+				else {
+					return errno.err, errno.eopnotsupp
+				}
+			}
 		}
 		else {
 			return errno.err, errno.einval
 		}
 	}
+}
+
+fn seccomp_set_strict() (u64, u64) {
+	mut process := proc.current_thread().process
+	if process.seccomp_mode != proc.seccomp_mode_disabled {
+		return errno.err, errno.einval
+	}
+	process.seccomp_mode = proc.seccomp_mode_strict
+	return 0, 0
+}
+
+// Install the program struct sock_fprog at `prog` describes. Only a process
+// that cannot gain privileges by exec, or one that holds CAP_SYS_ADMIN, may.
+fn seccomp_install(prog u64) (u64, u64) {
+	mut process := proc.current_thread().process
+	if process.seccomp_mode == proc.seccomp_mode_strict {
+		return errno.err, errno.einval
+	}
+	if !process.no_new_privs && !proc.current_has_capability(proc.cap_sys_admin) {
+		return errno.err, errno.eacces
+	}
+	// struct sock_fprog: an unsigned short length, then the pointer.
+	mut header := [2]u64{}
+	if !usercopy.copy_from_user(voidptr(&header[0]), prog, 16) {
+		return errno.err, errno.efault
+	}
+	length := int(header[0] & 0xffff)
+	if length == 0 || length > proc.bpf_max_instructions {
+		return errno.err, errno.einval
+	}
+	mut instructions := []proc.SockFilter{len: length}
+	if !usercopy.copy_from_user(voidptr(&instructions[0]), header[1], u64(length) * sizeof(proc.SockFilter)) {
+		unsafe { instructions.free() }
+		return errno.err, errno.efault
+	}
+	if !proc.seccomp_check(instructions) {
+		unsafe { instructions.free() }
+		return errno.err, errno.einval
+	}
+	if !proc.seccomp_attach(mut process, instructions) {
+		unsafe { instructions.free() }
+		return errno.err, errno.enomem
+	}
+	return 0, 0
 }
 
 // The extra prctl operations a container runtime uses. Anything else falls
@@ -187,10 +256,28 @@ const pr_get_keepcaps = 7
 const pr_cap_ambient = 47
 const pr_set_child_subreaper = 36
 const pr_get_child_subreaper = 37
+const pr_get_seccomp = 21
+const pr_set_seccomp = 22
 
 fn syscall_container_prctl(gpr_state voidptr, option int, arg2 u64, arg3 u64, arg4 u64, arg5 u64) (u64, u64) {
 	mut process := proc.current_thread().process
 	match option {
+		pr_get_seccomp {
+			return u64(process.seccomp_mode), 0
+		}
+		pr_set_seccomp {
+			match int(arg2) {
+				proc.seccomp_mode_strict {
+					return seccomp_set_strict()
+				}
+				proc.seccomp_mode_filter {
+					return seccomp_install(arg3)
+				}
+				else {
+					return errno.err, errno.einval
+				}
+			}
+		}
 		pr_capbset_read {
 			if arg2 > u64(proc.cap_last_cap) {
 				return errno.err, errno.einval

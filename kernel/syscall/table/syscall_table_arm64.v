@@ -65,8 +65,65 @@ __global (
 	sc_trace_gpr_state = u64(0)
 )
 
+// The table slot of the stand-in for a call a seccomp filter turned away.
+const seccomp_verdict_nr = u64(511)
+
+// Returns what the call a seccomp filter turned away returns.
+fn syscall_seccomp_verdict(_ voidptr) (u64, u64) {
+	e := proc.current_thread().seccomp_errno
+	if e == 0 {
+		return 0, 0
+	}
+	return errno.err, e
+}
+
+// What a call runs as once the process's seccomp filters have seen it: the
+// call itself, or the stand-in returning their verdict. A call is killed
+// here with SIGSYS when that is the verdict.
+fn seccomp_entry(mut t proc.Thread, gpr &cpulocal.GPRState, nr u64) u64 {
+	process := t.process
+	if process.seccomp_mode == proc.seccomp_mode_strict {
+		// read, write, exit and rt_sigreturn are all strict mode allows.
+		if nr == 63 || nr == 64 || nr == 93 || nr == 139 {
+			return nr
+		}
+		userland.exit_with_fatal_signal(u8(9))
+		return seccomp_verdict_nr
+	}
+	verdict := proc.seccomp_verdict(process.seccomp, nr, gpr.pc, [gpr.x0, gpr.x1, gpr.x2, gpr.x3,
+		gpr.x4, gpr.x5]!)
+	match verdict & proc.seccomp_ret_action_full {
+		proc.seccomp_ret_allow, proc.seccomp_ret_log {
+			return nr
+		}
+		proc.seccomp_ret_errno {
+			mut e := u64(verdict & proc.seccomp_ret_data)
+			if e > 4095 {
+				e = 4095
+			}
+			t.seccomp_errno = e
+			return seccomp_verdict_nr
+		}
+		proc.seccomp_ret_trap {
+			userland.sendsig(t, u8(31))
+			t.seccomp_errno = errno.enosys
+			return seccomp_verdict_nr
+		}
+		proc.seccomp_ret_trace, proc.seccomp_ret_user_notif {
+			// No tracer and no listener: Linux fails the call with ENOSYS.
+			t.seccomp_errno = errno.enosys
+			return seccomp_verdict_nr
+		}
+		else {
+			userland.exit_with_fatal_signal(u8(31))
+			return seccomp_verdict_nr
+		}
+	}
+}
+
+// Called on every syscall's way in. Answers the table slot to run.
 @[export: 'syscall_trace']
-pub fn syscall_trace(gpr_state voidptr) {
+pub fn syscall_trace(gpr_state voidptr) u64 {
 	gpr := unsafe { &cpulocal.GPRState(gpr_state) }
 	nr := gpr.x8
 	// A busy userspace workload can keep the HVF scheduler out of its normal
@@ -106,6 +163,10 @@ pub fn syscall_trace(gpr_state voidptr) {
 	sc_ring[idx].pid = pid
 	sc_trace_gpr_state = u64(gpr_state)
 	sc_trace_active = true
+	if current_thread.process.seccomp_mode != proc.seccomp_mode_disabled {
+		return seccomp_entry(mut current_thread, gpr, nr)
+	}
+	return nr
 }
 
 @[export: 'syscall_trace_ret']
@@ -1035,6 +1096,7 @@ pub fn init_syscall_table() {
 	syscall_table[15] = voidptr(fs.syscall_lremovexattr) // __NR_lremovexattr
 	syscall_table[16] = voidptr(fs.syscall_fremovexattr) // __NR_fremovexattr
 	syscall_table[17] = voidptr(fs.syscall_getcwd) // __NR_getcwd
+	syscall_table[seccomp_verdict_nr] = voidptr(syscall_seccomp_verdict)
 	syscall_table[19] = voidptr(file.syscall_eventfd2) // __NR_eventfd2
 	syscall_table[23] = voidptr(syscall_linux_dup) // __NR_dup
 	syscall_table[24] = voidptr(file.syscall_dup3) // __NR_dup3

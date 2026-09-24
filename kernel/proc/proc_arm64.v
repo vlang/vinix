@@ -107,6 +107,8 @@ pub mut:
 	syscall_x1 u64
 	syscall_x2 u64
 	syscall_x3 u64
+	// What the syscall a seccomp filter turned away returns: an errno, or 0.
+	seccomp_errno u64
 	// Set on the way out of a syscall that is being rewound to run again, for
 	// the signal dispatched next to take back if its handler wants EINTR.
 	restarting_syscall bool

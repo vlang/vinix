@@ -280,10 +280,12 @@ handle_svc:
     ldp x5, x6, [sp, #32]     // original x4 -> x5, original x5 -> x6
     mov x0, sp                 // first C arg = GPRState pointer
 
-    // Trace syscall entry
+    // Trace syscall entry. It answers the table slot to dispatch: the call
+    // itself, or the one a seccomp filter turned it into.
     stp x9, x30, [sp, #-16]!
     bl syscall_trace
     ldp x9, x30, [sp], #16
+    mov x9, x0
 
     // Reload args (trace clobbered them)
     ldp x1, x2, [sp, #0]
