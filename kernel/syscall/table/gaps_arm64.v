@@ -509,6 +509,13 @@ fn syscall_linux_times(_ voidptr, buf u64) (u64, u64) {
 
 // ── sockets ──────────────────────────────────────────────────────────────────
 
+// accept(2) is accept4(2) without flags. It reported no peer at all, so a
+// caller's address buffer kept whatever it held: postgres, through musl's
+// accept(), took that for the address of every connection.
+fn syscall_linux_accept(gpr_state voidptr, fdnum int, addr u64, addrlen u64) (u64, u64) {
+	return syscall_linux_accept4(gpr_state, fdnum, addr, addrlen, 0)
+}
+
 // accept4(fd, addr, addrlen, flags). accept()'s twin, and the one a server
 // reaches for when it wants the new connection non-blocking without a second
 // syscall to set it.

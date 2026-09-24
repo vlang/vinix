@@ -1266,7 +1266,7 @@ pub fn init_syscall_table() {
 	syscall_table[199] = voidptr(socket.syscall_socketpair) // __NR_socketpair
 	syscall_table[200] = voidptr(socket.syscall_bind) // __NR_bind
 	syscall_table[201] = voidptr(socket.syscall_listen) // __NR_listen
-	syscall_table[202] = voidptr(socket.syscall_accept) // __NR_accept
+	syscall_table[202] = voidptr(syscall_linux_accept) // __NR_accept
 	syscall_table[203] = voidptr(socket.syscall_connect) // __NR_connect
 	syscall_table[204] = voidptr(socket.syscall_getsockname) // __NR_getsockname
 	syscall_table[205] = voidptr(socket.syscall_getpeername) // __NR_getpeername
