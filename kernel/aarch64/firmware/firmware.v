@@ -167,8 +167,9 @@ pub fn is_qemu() bool {
 	return oem_starts_with('BOCHS')
 }
 
+// VirtualBox's tables are "ORCLVB".
 pub fn is_virtualbox() bool {
-	return oem_starts_with('VBOX')
+	return oem_starts_with('ORCLVB')
 }
 
 // The GIC as the MADT lays it out.
@@ -253,6 +254,58 @@ pub fn console_uart() ?u64 {
 		return none
 	}
 	return address
+}
+
+// The DSDT, through the FADT.
+fn dsdt() ?u64 {
+	fadt := find_table('FACP')?
+	length := u64(read_u32(fadt, 4))
+	mut address := u64(0)
+	if length >= 148 {
+		address = read_u64(fadt, 140)
+	}
+	if address == 0 {
+		address = u64(read_u32(fadt, 40))
+	}
+	if address == 0 {
+		return none
+	}
+	return table_virt(address)
+}
+
+// A PL011 the DSDT describes, for machines without an SPCR -- VirtualBox's.
+// Rather than run AML, look for the device's _HID string, ARMH0011, and take
+// the Memory32Fixed descriptor its _CRS starts with. QEMU and VirtualBox both
+// describe the UART that way; anything else is left alone.
+pub fn dsdt_pl011() ?u64 {
+	table := dsdt()?
+	length := u64(read_u32(table, 4))
+	hid := 'ARMH0011'
+	for offset := u64(36); offset + u64(hid.len) < length; offset++ {
+		mut matched := true
+		for i := 0; i < hid.len; i++ {
+			if read_u8(table, offset + u64(i)) != hid[i] {
+				matched = false
+				break
+			}
+		}
+		if !matched {
+			continue
+		}
+		// Memory32Fixed: tag 0x86, length 9, then the read/write flag, the
+		// base and the size.
+		end := if offset + 256 < length { offset + 256 } else { length }
+		for pos := offset + u64(hid.len); pos + 12 <= end; pos++ {
+			if read_u8(table, pos) == 0x86 && read_u8(table, pos + 1) == 0x09
+				&& read_u8(table, pos + 2) == 0 {
+				base := u64(read_u32(table, pos + 4))
+				if base != 0 {
+					return base
+				}
+			}
+		}
+	}
+	return none
 }
 
 // Segment 0's PCIe configuration space from the MCFG.

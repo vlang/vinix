@@ -804,7 +804,9 @@ fn kmain() {
 	// QEMU's addresses. Apple hardware has no ACPI and took the path above.
 	acpi_platform := !use_aic && !force_qemu_platform && firmware.has_acpi()
 	if acpi_platform {
-		if uart_phys := firmware.console_uart() {
+		// VirtualBox has no SPCR; its UART is only in the DSDT.
+		uart_phys := firmware.console_uart() or { firmware.dsdt_pl011() or { u64(0) } }
+		if uart_phys != 0 {
 			uart.initialise(memory.map_mmio(uart_phys, 0x1000))
 			uart.puts(c'\n=== Vinix aarch64 booting (ACPI) ===\n')
 		}
