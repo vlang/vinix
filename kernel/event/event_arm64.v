@@ -180,13 +180,29 @@ fn await_internal(mut events []&eventstruct.Event, block bool, watch_generation 
 	return t.which_event
 }
 
+// One wait, repeated while it only ends in a spurious wake: woken without one
+// of these events having fired for it, or told of an index that is not into
+// this wait's list. Handing such an index back had callers index their own
+// lists out of range, which panicked the kernel.
+fn await_valid(mut events []&eventstruct.Event, block bool, watch_generation bool,
+	watched_index u64, generation u64) ?u64 {
+	for {
+		which := await_internal(mut events, block, watch_generation, watched_index,
+			generation)?
+		if which < u64(events.len) {
+			return which
+		}
+	}
+	return none
+}
+
 pub fn await(mut events []&eventstruct.Event, block bool) ?u64 {
-	return await_internal(mut events, block, false, 0, 0)
+	return await_valid(mut events, block, false, 0, 0)
 }
 
 pub fn await_from_generation(mut events []&eventstruct.Event, block bool, watched_index u64,
 	generation u64) ?u64 {
-	return await_internal(mut events, block, true, watched_index, generation)
+	return await_valid(mut events, block, true, watched_index, generation)
 }
 
 pub fn generation(mut e eventstruct.Event) u64 {
