@@ -20,10 +20,12 @@ import aarch64.virtio_gpu
 import aarch64.virtio_blk
 import aarch64.virtio_net
 import aarch64.virtio_snd
+import aarch64.xhci
 import apple.smc
 import apple.ans
 import apple.typec
 import devicetree
+import pci
 import initramfs
 import numa
 import fs
@@ -296,6 +298,11 @@ fn kmain_thread(qemu_platform bool, acpi_platform bool) {
 	fbdev.register_driver(simple.get_driver())
 	print('kmain_thread: fbdev done\n')
 
+	// A USB keyboard and pointer, before /dev/pointer takes the pointer's
+	// range. They are all a VirtualBox VM has to type and point with.
+	if qemu_platform || acpi_platform {
+		start_usb()
+	}
 	pointerdev.initialise()
 	print('kmain_thread: pointer done\n')
 
@@ -343,6 +350,21 @@ const writeback_interval_seconds = i64(5)
 // all. Linux answers this with a writeback timer; so does this thread. sync(2)
 // and reboot(2) are still the exact guarantees, and this only bounds the window
 // for everything that never calls them, including a VM window simply closed.
+// Map PCIe configuration space from the MCFG, scan it, and start any xHCI
+// controller found there.
+fn start_usb() {
+	ecam := firmware.pcie_ecam() or {
+		print('pci: no MCFG; skipping PCIe\n')
+		return
+	}
+	buses := u64(ecam.end_bus) + 1
+	pci.set_ecam(memory.map_mmio(ecam.base, buses << 20))
+	pci.initialise()
+	if !xhci.initialise() {
+		print('xhci: no USB controller\n')
+	}
+}
+
 fn writeback_thread() {
 	for {
 		mut events := []&eventstruct.Event{}
