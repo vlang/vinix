@@ -282,6 +282,11 @@ pub mut:
 	child_subreaper bool
 	pdeathsig       int
 	cgroup          voidptr
+	// The controller state of that cgroup, nil for the root. See
+	// cgroup_account.v.
+	cgroup_account &CGroupAccount = unsafe { nil }
+	// Pages faulted in since memory.max was last checked for this process.
+	faults_since_memory_check u32
 	oom_score_adj   int
 	// The file the process is running. /proc/<pid>/exe leads here when
 	// followed, which is what makes an exec from a memfd resolvable.
@@ -453,6 +458,7 @@ fn release_thread_slot(tid int) {
 // begin_cpu_time marks a thread as having started a turn on a CPU.
 pub fn begin_cpu_time(mut t Thread, now_ns u64) {
 	t.scheduled_at_ns = now_ns
+	t.cgroup_charged_ns = now_ns
 }
 
 // charge_cpu_time bills the turn that has just ended to the thread's process
@@ -467,6 +473,8 @@ pub fn begin_cpu_time(mut t Thread, now_ns u64) {
 // multi-threaded processes worth measuring. Taking the process' lock instead
 // would put it underneath the scheduler, which is not somewhere it can go.
 pub fn charge_cpu_time(mut t Thread, now_ns u64) {
+	charge_cgroup_cpu(mut t, now_ns)
+	t.cgroup_charged_ns = 0
 	started := t.scheduled_at_ns
 	t.scheduled_at_ns = 0
 	if started == 0 || now_ns <= started {

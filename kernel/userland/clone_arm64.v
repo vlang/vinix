@@ -203,6 +203,15 @@ fn do_clone_into(state &cpulocal.GPRState, flags u64, child_stack u64, parent_ti
 			return errno.err, errno.eperm
 		}
 	}
+	// pids.max counts threads and processes alike. A group at its limit refuses
+	// one more, and the clone fails with EAGAIN, as on Linux.
+	if into_cgroup {
+		if !proc.cgroup_account_may_add_task(fs.cgroup_account_of(cgroup)) {
+			return errno.err, errno.eagain
+		}
+	} else if !proc.cgroup_may_add_task(proc.current_thread().process) {
+		return errno.err, errno.eagain
+	}
 	// CLONE_THREAD, not CLONE_VM, decides between a thread and a process:
 	// posix_spawn and vfork ask for CLONE_VM but still expect a child that can
 	// execve without replacing us, which our separate address spaces give them.
@@ -264,6 +273,7 @@ fn clone_new_process(state &cpulocal.GPRState, flags u64, child_stack u64, paren
 	fs.fork_namespaces(mut new_process, flags)
 	if into_cgroup {
 		new_process.cgroup = cgroup
+		new_process.cgroup_account = fs.cgroup_account_of(cgroup)
 	}
 
 	// CLONE_PARENT makes the child its creator's sibling: runc's init stages

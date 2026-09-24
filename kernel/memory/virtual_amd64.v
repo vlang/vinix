@@ -371,3 +371,16 @@ pub fn vmm_init() {
 
 	vmm_initialised = true
 }
+
+// The bytes of [start, end) that are resident, each page counted as its share.
+// The caller holds the pagemap lock.
+pub fn (pagemap &Pagemap) resident_share(start u64, end u64) u64 {
+	mut total := u64(0)
+	for virt := start & ~u64(0xfff); virt < end; virt += page_size {
+		if phys := pagemap.virt2phys(virt) {
+			refs := pmm_refcount_unlocked(voidptr(phys))
+			total += if refs > 1 { page_size / refs } else { page_size }
+		}
+	}
+	return total
+}

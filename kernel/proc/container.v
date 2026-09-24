@@ -284,6 +284,7 @@ pub fn inherit_container_state(mut child Process, parent &Process) {
 	child.caps = parent.caps
 	child.no_new_privs = parent.no_new_privs
 	child.cgroup = parent.cgroup
+	child.cgroup_account = parent.cgroup_account
 	child.oom_score_adj = parent.oom_score_adj
 	child.exe_node = parent.exe_node
 }

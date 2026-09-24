@@ -75,6 +75,12 @@ pub mut:
 	// twice and never counts one that has not finished.
 	scheduled_at_ns u64
 	cpu_time_ns     u64
+	// When this thread's CPU time was last charged to its cgroup, or 0 when it
+	// is off the CPU. See charge_cgroup_cpu().
+	cgroup_charged_ns u64
+	// Set while the thread waits on its way back to userspace for its frozen or
+	// throttled cgroup, so the scheduler treats it as stopped in userspace.
+	at_user_boundary bool
 	affinity_mask   u64 = u64(-1)
 	// Scheduling policy, priority and, under SCHED_DEADLINE, the budget left
 	// in this period. Inherited by fork and by every thread a process clones,

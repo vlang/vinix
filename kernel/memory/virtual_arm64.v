@@ -115,6 +115,59 @@ pub fn (pagemap &Pagemap) user_page_phys(virt u64, write bool) ?u64 {
 	return pte & pte_flags_mask
 }
 
+// The bytes of [start, end) that are resident, each page counted as its share:
+// a page that fork left shared by three processes counts a third to each, so
+// the processes of a group together count it once. What memory.max holds a
+// cgroup to. A missing table skips everything it would have covered, so a
+// large, mostly untouched range -- a runtime's heap reservation -- costs little
+// to count. The caller holds the pagemap lock.
+pub fn (pagemap &Pagemap) resident_share(start u64, end u64) u64 {
+	mut total := u64(0)
+	mut virt := start & ~u64(0xfff)
+	for virt < end {
+		l0 := unsafe { &u64(u64(pagemap.top_level) + higher_half) }
+		e0 := unsafe { l0[(virt >> 39) & 0x1ff] }
+		if e0 & 1 == 0 {
+			virt = next_table_boundary(virt, 39) or { break }
+			continue
+		}
+		l1 := unsafe { &u64((e0 & pte_flags_mask) + higher_half) }
+		e1 := unsafe { l1[(virt >> 30) & 0x1ff] }
+		if e1 & 1 == 0 {
+			virt = next_table_boundary(virt, 30) or { break }
+			continue
+		}
+		l2 := unsafe { &u64((e1 & pte_flags_mask) + higher_half) }
+		e2 := unsafe { l2[(virt >> 21) & 0x1ff] }
+		if e2 & 1 == 0 {
+			virt = next_table_boundary(virt, 21) or { break }
+			continue
+		}
+		l3 := unsafe { &u64((e2 & pte_flags_mask) + higher_half) }
+		table_end := next_table_boundary(virt, 21) or { u64(-1) }
+		stop := if end < table_end { end } else { table_end }
+		for virt < stop {
+			pte := unsafe { l3[(virt >> 12) & 0x1ff] }
+			if pte & 1 != 0 {
+				refs := pmm_refcount_unlocked(voidptr(pte & pte_flags_mask))
+				total += if refs > 1 { page_size / refs } else { page_size }
+			}
+			virt += page_size
+		}
+	}
+	return total
+}
+
+// The first address past the table level that maps `virt`, or none at the top
+// of the address space.
+fn next_table_boundary(virt u64, shift u64) ?u64 {
+	next := (virt | ((u64(1) << shift) - 1)) + 1
+	if next <= virt {
+		return none
+	}
+	return next
+}
+
 pub fn (mut pagemap Pagemap) switch_to() {
 	top_level := u64(pagemap.top_level)
 	cpu.write_ttbr0_el1(top_level)

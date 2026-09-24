@@ -486,6 +486,16 @@ pub fn pmm_retain(ptr voidptr, count u64) bool {
 	return true
 }
 
+// The same without the lock, for accounting that can live with a count that
+// is a moment out of date.
+pub fn pmm_refcount_unlocked(ptr voidptr) u32 {
+	page := u64(ptr) / page_size
+	if page >= pmm_avl_page_count {
+		return 0
+	}
+	return katomic.load(unsafe { &(&u32(pmm_refcounts))[page] })
+}
+
 pub fn pmm_refcount(ptr voidptr) u32 {
 	page := u64(ptr) / page_size
 	if page >= pmm_avl_page_count {

@@ -142,6 +142,54 @@ fn addr2range(pagemap &memory.Pagemap, addr u64) ?(&MmapRangeLocal, u64, u64) {
 	return none
 }
 
+// Whether `pagemap` is the calling process' own and the process is in a
+// cgroup that accounts its memory, so that its private anonymous memory is
+// filled in on demand.
+fn memory_accounted(process &proc.Process, pagemap &memory.Pagemap) bool {
+	return unsafe { process != nil } && voidptr(process.pagemap) == voidptr(pagemap)
+		&& proc.cgroup_accounts_memory(process)
+}
+
+// The anonymous memory a process actually has: the pages present in its
+// anonymous mappings, private or shared. It is what cgroup memory accounting
+// charges; file-backed pages are page cache, which Linux charges to whoever
+// first read them, and counting them here would count every mapped binary.
+// Large anonymous reservations are filled in on demand, so their length says
+// little and only the pages really there are counted. A page shared with
+// other processes -- after fork, until one of them writes it -- counts only
+// its share, so a group of processes forked from one another counts it once,
+// as Linux charges a page once.
+pub fn anonymous_resident_bytes(_pagemap &memory.Pagemap) u64 {
+	mut pagemap := unsafe { _pagemap }
+	if pagemap == unsafe { nil } {
+		return 0
+	}
+	// Not waiting for good on a pagemap another CPU is busy with: this runs for
+	// every process of a group, and a count a moment late is fine.
+	mut acquired := false
+	for _ in 0 .. 100000 {
+		if pagemap.l.test_and_acquire() {
+			acquired = true
+			break
+		}
+	}
+	if !acquired {
+		return 0
+	}
+	defer {
+		pagemap.l.release()
+	}
+	mut bytes := u64(0)
+	for i := 0; i < pagemap.mmap_ranges.len; i++ {
+		range := unsafe { &MmapRangeLocal(pagemap.mmap_ranges[i]) }
+		if unsafe { range == nil } || range.prot == prot_none || range.flags & map_anonymous == 0 {
+			continue
+		}
+		bytes += pagemap.resident_share(range.base, range.base + range.length)
+	}
+	return bytes
+}
+
 // Whether `addr` lies in a MAP_SHARED mapping, whose pages are the same
 // physical memory in every address space that maps them.
 pub fn is_shared_address(_pagemap &memory.Pagemap, addr u64) bool {
@@ -960,7 +1008,13 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
 	// Pre-fault smaller and file-backed mappings to avoid demand-paging faults.
 	// On QEMU+HVF, LDP/STP instructions on unmapped pages cause data aborts
 	// without ISV bit set, which crashes HVF.
-	lazy_anonymous := flags & map_anonymous != 0 && length >= lazy_anonymous_threshold
+	//
+	// A process in a cgroup gets all its private anonymous memory on demand,
+	// so the group is charged for the pages it touches and not for ones a
+	// runtime set aside and never used (see page_in). Large mappings show
+	// that faulting such pages in is safe on HVF.
+	lazy_anonymous := flags & map_anonymous != 0 && (length >= lazy_anonymous_threshold
+		|| (flags & map_shared == 0 && memory_accounted(process, pagemap)))
 	if prot != prot_none && !lazy_anonymous && !options.lazy_file {
 		// A shared file mapping reserves its whole extent up front: the loop
 		// below faults pages in ascending order, and a resource that grows a
@@ -1111,8 +1165,9 @@ pub fn mprotect(mut pagemap memory.Pagemap, addr voidptr, len u64, prot int) ? {
 	// mmap() deliberately leaves PROT_NONE reservations without physical pages.
 	// ARM64 HVF cannot reliably resume every paired load/store page fault, so
 	// populate pages here, before an application can touch a newly accessible
-	// part of the reservation.
-	if prot != prot_none {
+	// part of the reservation. A process in a cgroup is left to fault them in
+	// instead, as mmap() leaves it to (see there).
+	if prot != prot_none && !memory_accounted(proc.current_thread().process, &pagemap) {
 		populate_missing_pages(mut pagemap, u64(addr), len, prot)?
 	}
 

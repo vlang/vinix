@@ -94,6 +94,29 @@ fn page_in(mut pagemap memory.Pagemap, addr u64, present_is_done bool) ? {
 	}
 
 	install_range_page(range_local.global, virt, file_page, page, range_local.flags)?
+	note_anonymous_fault(pagemap, range_local.flags)
+}
+
+// Anonymous memory that is filled in on demand -- a large mapping, or any
+// private one of a process in a cgroup -- is committed a page at a time as it
+// faults in, so memory.max is checked here, once every 256 pages (1 MiB):
+// often enough to catch a runaway allocation early, rarely enough that
+// counting the group's memory stays off the fault path's cost.
+fn note_anonymous_fault(pagemap &memory.Pagemap, flags int) {
+	if flags & map_anonymous == 0 {
+		return
+	}
+	mut process := proc.current_thread().process
+	if unsafe { process == nil } || process.cgroup_account == unsafe { nil }
+		|| voidptr(process.pagemap) != voidptr(pagemap) {
+		return
+	}
+	process.faults_since_memory_check++
+	if process.faults_since_memory_check < 256 {
+		return
+	}
+	process.faults_since_memory_check = 0
+	proc.cgroup_charge_memory(process, 256 * page_size)
 }
 
 // Nothing is in the page tables for a page of a mapping that has not been

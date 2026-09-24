@@ -553,6 +553,57 @@ fn realtime_work_pending(cpu_number u64) bool {
 	return false
 }
 
+// A thread whose cgroup is frozen, or has used up its CPU quota for the period,
+// stays off the CPU -- but only once it is in userspace. One stopped inside a
+// syscall runs on until it returns, so nothing it holds stays held for a whole
+// period, or for as long as the group stays frozen. A thread with SIGKILL
+// pending, or told to exit, always gets through, so killing a paused or
+// throttled container works. `state` is where the thread would resume.
+fn cgroup_parks(t &proc.Thread, state &cpulocal.GPRState) bool {
+	if unsafe { t.process == nil } || t.process.cgroup_account == unsafe { nil } {
+		return false
+	}
+	if state.pstate & 0xf != 0 && !katomic.load(&t.at_user_boundary) {
+		return false
+	}
+	if katomic.load(&t.must_exit) || katomic.load(&t.pending_signals) & (u64(1) << 8) != 0 {
+		return false
+	}
+	return proc.cgroup_holds_back(t.process, timer.get_ns())
+}
+
+// Called on the way back to userspace from every syscall. A thread whose cgroup
+// is frozen, or out of CPU quota, gives the CPU up here and waits until the
+// group may run again. The timer alone would rarely stop a thread that spends
+// its time in syscalls -- a shell loop of echo and sleep is in userspace for
+// microseconds at a time -- so this is where docker pause catches it, and it is
+// also the point where a thread holds nothing of the kernel's.
+pub fn park_for_cgroup() {
+	mut t := proc.current_thread()
+	if unsafe { t == nil } || unsafe { t.process == nil }
+		|| t.process.cgroup_account == unsafe { nil } {
+		return
+	}
+	mut parked := false
+	for {
+		if katomic.load(&t.must_exit) || katomic.load(&t.pending_signals) & (u64(1) << 8) != 0 {
+			break
+		}
+		if !proc.cgroup_holds_back(t.process, timer.get_ns()) {
+			break
+		}
+		katomic.store(mut &t.at_user_boundary, true)
+		parked = true
+		reschedule()
+		katomic.store(mut &t.at_user_boundary, false)
+	}
+	if parked {
+		// reschedule() comes back with interrupts on; the syscall exit expects
+		// them off.
+		cpu.interrupt_toggle(false)
+	}
+}
+
 __global (
 	user_signal_hook voidptr
 )
@@ -647,6 +698,9 @@ fn scan_run_queue_in_turn(mut cpu_local cpulocal.Local, want_node int) &proc.Thr
 		if want_node >= 0 && t.numa_node >= 0 && t.numa_node != want_node {
 			continue
 		}
+		if cgroup_parks(t, &t.gpr_state) {
+			continue
+		}
 		if t.l.test_and_acquire() == true {
 			cpu_local.last_run_queue_index = index
 			return t
@@ -699,6 +753,9 @@ fn scan_run_queue_ranked(mut cpu_local cpulocal.Local, want_node int) &proc.Thre
 				continue
 			}
 			if t.l.is_held() {
+				continue
+			}
+			if cgroup_parks(t, &t.gpr_state) {
 				continue
 			}
 			rank := runnable_rank(mut t, now_ns, throttled)
@@ -855,8 +912,13 @@ fn scheduler_timer_handler(_gpr_state voidptr) {
 	// below, so a thread that has just run out of budget is passed over on the
 	// scan it has run out on rather than on the next.
 	account_realtime_time(cpu_local.cpu_number, current_thread, now_ns)
-	if unsafe { current_thread != 0 } && unsafe { _gpr_state != nil } {
-		deliver_signal_on_tick(current_thread, gpr_state)
+	// And the cgroup's cpu.max: a thread that keeps the CPU is charged as it
+	// goes, not only when it gives the CPU up.
+	if unsafe { current_thread != 0 } {
+		proc.charge_cgroup_cpu(mut current_thread, now_ns)
+		if unsafe { _gpr_state != nil } {
+			deliver_signal_on_tick(current_thread, gpr_state)
+		}
 	}
 	if trace_gpu_dispatch {
 		println('exec[gpu]/sched: realtime accounting complete; selecting run-queue thread')
@@ -886,6 +948,7 @@ fn scheduler_timer_handler(_gpr_state voidptr) {
 
 		entitled := katomic.load(&current_thread.is_in_queue)
 			&& may_run_here(current_thread, cpu_local.cpu_number)
+			&& !(unsafe { _gpr_state != nil } && cgroup_parks(current_thread, gpr_state))
 		mut keeps_cpu := unsafe { next_thread == nil } && entitled
 		if unsafe { next_thread != nil } && entitled {
 			// Something else is runnable, but whether it takes the CPU is the

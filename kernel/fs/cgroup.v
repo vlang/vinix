@@ -9,9 +9,19 @@
 // controller files. Vinix keeps the tree and the membership faithfully -- a
 // process belongs to exactly one group, its children are born into it, and
 // cgroup.procs and cgroup.events report who is there -- and cgroup.kill kills a
-// group's processes, which is how a runtime tears a container down. Controller
-// limits are stored as the text last written to them and read back, but are
-// not enforced: the accounting a controller would need is not collected.
+// group's processes, which is how a runtime tears a container down.
+//
+// Four controls are enforced, through the group's proc.CGroupAccount (see
+// proc/cgroup_account.v), since the code that acts on them cannot import fs:
+// - cpu.max: the scheduler charges each group the CPU its threads use and
+//   stops running them once the period's quota is spent.
+// - cgroup.freeze: the scheduler stops running the group's threads, which is
+//   what docker pause does.
+// - pids.max: clone fails with EAGAIN once the group has that many tasks.
+// - memory.max: the anonymous memory the group has resident is counted as it
+//   faults in, and going over the limit kills the group's largest process, or
+//   all of them with memory.oom.group, as Linux's OOM killer does.
+// The other controller files are stored as written and read back.
 @[has_globals]
 module fs
 
@@ -23,6 +33,8 @@ import proc
 import resource
 import event.eventstruct
 import numa
+import memory.mmap
+import time
 
 const cgroup_controllers = ['cpuset', 'cpu', 'io', 'memory', 'pids']
 
@@ -54,6 +66,7 @@ const cgroup_default_files = {
 	'memory.oom.group':       '0'
 	'pids.max':               'max'
 	'pids.current':           ''
+	'pids.events':            'max 0'
 	'pids.peak':              '0'
 	'cpu.max':                'max 100000'
 	'cpu.max.burst':          '0'
@@ -94,6 +107,9 @@ pub mut:
 	node    &VFSNode = unsafe { nil }
 	parent  &CGroup  = unsafe { nil }
 	subtree []string
+	// What its limits are and what it has used; nil for the root, which has
+	// no limits.
+	account &proc.CGroupAccount = unsafe { nil }
 }
 
 struct CGroupFS {}
@@ -178,6 +194,7 @@ pub fn cgroup_mount_root(parent &VFSNode, name string) ?&VFSNode {
 		// The root delegates every controller, as a systemd-less Linux
 		// system configured for containers does.
 		cgroup_root.subtree = cgroup_controllers.clone()
+		proc.set_cgroup_memory_hook(voidptr(cgroup_memory_check))
 	}
 	ns_root := cgroup_namespace_root(calling_process())
 	if ns_root != unsafe { nil } && ns_root.node != unsafe { nil } {
@@ -193,6 +210,9 @@ fn create_cgroup_directory(parent &VFSNode, name string, parent_group &CGroup) &
 		node:   node
 		parent: unsafe { parent_group }
 	}
+	if parent_group != unsafe { nil } {
+		group.account = proc.new_cgroup_account(parent_group.account)
+	}
 	mut dir_res := unsafe { &CGroupResource(node.resource) }
 	dir_res.group = group
 	for file_name, default in cgroup_default_files {
@@ -205,7 +225,8 @@ fn create_cgroup_directory(parent &VFSNode, name string, parent_group &CGroup) &
 		}
 		mut child := create_node(node.filesystem, node, file_name, false)
 		mut res := new_cgroup_resource(if file_name in ['cgroup.controllers', 'cgroup.events',
-			'cgroup.stat', 'memory.current', 'memory.stat', 'memory.events', 'pids.current',
+			'cgroup.stat', 'memory.current', 'memory.stat', 'memory.events', 'memory.peak',
+			'pids.current', 'pids.events',
 			'cpu.stat', 'io.stat', 'cpuset.cpus.effective', 'cpuset.mems.effective'] {
 			stat.ifreg | 0o444
 		} else if file_name == 'cgroup.kill' {
@@ -330,6 +351,20 @@ fn append_decimal(mut text []u8, value int) {
 	}
 }
 
+// The anonymous memory process `pid` has resident; see
+// mmap.anonymous_resident_bytes.
+fn anonymous_bytes_of(pid int) u64 {
+	proc.lock_table()
+	defer {
+		proc.unlock_table()
+	}
+	process := proc.process_at(pid)
+	if process == unsafe { nil } || process.exiting || unsafe { process.pagemap == nil } {
+		return 0
+	}
+	return mmap.anonymous_resident_bytes(process.pagemap)
+}
+
 fn cgroup_memory_bytes(group &CGroup) u64 {
 	members := cgroup_members(group, true)
 	defer {
@@ -337,7 +372,13 @@ fn cgroup_memory_bytes(group &CGroup) u64 {
 	}
 	mut total := u64(0)
 	for pid in members {
-		total += resident_bytes(pid)
+		total += anonymous_bytes_of(pid)
+	}
+	if group.account != unsafe { nil } {
+		mut account := group.account
+		if total > account.memory_peak {
+			account.memory_peak = total
+		}
 	}
 	return total
 }
@@ -357,6 +398,139 @@ fn cgroup_cpuset_effective(group &CGroup, file_name string, everything string) s
 		current = current.parent
 	}
 	return everything + '\n'
+}
+
+// The processes in `account` and the groups below it.
+fn account_members(account &proc.CGroupAccount) []int {
+	mut members := []int{}
+	proc.lock_table()
+	defer {
+		proc.unlock_table()
+	}
+	for pid := 1; pid < proc.max_pid; pid++ {
+		process := proc.process_at(pid)
+		if process == unsafe { nil } || process.exiting || unsafe { process.pagemap == nil } {
+			continue
+		}
+		if proc.process_in_account(process, account) {
+			members << pid
+		}
+	}
+	return members
+}
+
+fn process_alive(pid int) bool {
+	proc.lock_table()
+	defer {
+		proc.unlock_table()
+	}
+	process := proc.process_at(pid)
+	return process != unsafe { nil } && !process.exiting
+}
+
+// How long a counted usage stays good enough for an allocation that fits under
+// the limit with room to spare, and how long a process killed for going over is
+// given to exit before another is chosen.
+const memory_count_valid_ns = u64(50000000)
+
+const oom_victim_grace_ns = u64(500000000)
+
+// proc.cgroup_charge_memory calls this as `process` commits about `bytes` more.
+// Each group above it with a memory.max is checked; false means the caller
+// was the one killed.
+fn cgroup_memory_check(process &proc.Process, bytes u64) bool {
+	now := time.monotonic_ns()
+	mut current := process.cgroup_account
+	for current != unsafe { nil } {
+		limit := katomic.load(&current.memory_max)
+		if limit != 0 && !enforce_memory_max(mut current, bytes, limit, now, process.pid) {
+			return false
+		}
+		current = current.parent
+	}
+	return true
+}
+
+// Keep `account` within `limit` now that process `caller` has committed about
+// `bytes` more (0 for none, when the limit itself was just lowered). Returns
+// false only when the caller was killed.
+//
+// Counting a group means walking its processes' page tables, so growth that
+// keeps under the limit on a recent count is added to that count instead. Once
+// the count is stale or says the group is over, it is counted afresh, and a
+// group still over has its largest process killed, as Linux's OOM killer
+// would, or every process with memory.oom.group.
+fn enforce_memory_max(mut account proc.CGroupAccount, bytes u64, limit u64, now u64, caller int) bool {
+	account.lock.acquire()
+	fresh := account.memory_counted_ns != 0 && now - account.memory_counted_ns < memory_count_valid_ns
+	if fresh && account.memory_counted_bytes + bytes <= limit {
+		account.memory_counted_bytes += bytes
+		if account.memory_counted_bytes > account.memory_peak {
+			account.memory_peak = account.memory_counted_bytes
+		}
+		account.lock.release()
+		return true
+	}
+	account.lock.release()
+
+	members := account_members(account)
+	defer {
+		unsafe { members.free() }
+	}
+	mut usage := u64(0)
+	mut largest_pid := 0
+	mut largest := u64(0)
+	for pid in members {
+		used := anonymous_bytes_of(pid)
+		usage += used
+		if used > largest || largest_pid == 0 {
+			largest = used
+			largest_pid = pid
+		}
+	}
+
+	account.lock.acquire()
+	account.memory_counted_bytes = usage + bytes
+	account.memory_counted_ns = now
+	if usage + bytes > account.memory_peak {
+		account.memory_peak = usage + bytes
+	}
+	if usage + bytes <= limit {
+		account.lock.release()
+		return true
+	}
+	account.memory_events_max++
+	// The last victim may still be on its way out, and what it frees has not
+	// come back yet. Killing another now would take two for one excess.
+	if account.oom_victim_pid != 0 && now - account.oom_victim_ns < oom_victim_grace_ns
+		&& process_alive(account.oom_victim_pid) {
+		victim := account.oom_victim_pid
+		account.lock.release()
+		return caller != victim
+	}
+	if largest_pid == 0 {
+		account.lock.release()
+		return true
+	}
+	account.memory_events_oom++
+	whole_group := account.memory_oom_group
+	account.oom_victim_pid = largest_pid
+	account.oom_victim_ns = now
+	account.memory_events_oom_kill += if whole_group { u64(members.len) } else { u64(1) }
+	account.lock.release()
+
+	if cgroup_signal_hook == unsafe { nil } {
+		return true
+	}
+	hook := unsafe { CGroupSignalHook(cgroup_signal_hook) }
+	if whole_group {
+		for pid in members {
+			hook(pid, 9)
+		}
+		return caller == 0 || caller !in members
+	}
+	hook(largest_pid, 9)
+	return caller != largest_pid
 }
 
 fn cgroup_has_children(group &CGroup) bool {
@@ -400,12 +574,9 @@ fn (mut this CGroupResource) contents() string {
 			members := cgroup_members(group, true)
 			populated := if members.len > 0 { 1 } else { 0 }
 			unsafe { members.free() }
-			frozen := if group.node != unsafe { nil } && 'cgroup.freeze' in group.node.children {
-				freeze_res := unsafe { &CGroupResource(group.node.children['cgroup.freeze'].resource) }
-				freeze_res.text.trim_space()
-			} else {
-				'0'
-			}
+			// Frozen by its own cgroup.freeze or an ancestor's. runc pause polls
+			// for this once it has written cgroup.freeze.
+			frozen := if group.account != unsafe { nil } && group.account.is_frozen() { 1 } else { 0 }
 			return 'populated ${populated}\nfrozen ${frozen}\n'
 		}
 		'cgroup.controllers' {
@@ -421,15 +592,39 @@ fn (mut this CGroupResource) contents() string {
 			defer { group.lock.release() }
 			return group.subtree.join(' ') + '\n'
 		}
+		// Tasks, which is to say threads, as Linux counts them.
 		'pids.current' {
-			members := cgroup_members(group, true)
-			defer {
-				unsafe { members.free() }
-			}
-			return '${members.len}\n'
+			return '${cgroup_task_count(group)}\n'
 		}
-		// What the group's processes have mapped, which is what they use: mmap
-		// makes every accessible page resident. docker stats reads this.
+		'pids.events' {
+			if group.account == unsafe { nil } {
+				return 'max 0\n'
+			}
+			return 'max ${katomic.load(&group.account.pids_max_events)}\n'
+		}
+		'cpu.stat' {
+			if group.account == unsafe { nil } {
+				return this.text + '\n'
+			}
+			mut account := group.account
+			return account.cpu_stat_text()
+		}
+		'memory.events' {
+			if group.account == unsafe { nil } {
+				return this.text + '\n'
+			}
+			account := group.account
+			return 'low 0\nhigh 0\nmax ${account.memory_events_max}\noom ${account.memory_events_oom}\noom_kill ${account.memory_events_oom_kill}\noom_group_kill 0\n'
+		}
+		'memory.peak' {
+			cgroup_memory_bytes(group)
+			if group.account == unsafe { nil } {
+				return '0\n'
+			}
+			return '${group.account.memory_peak}\n'
+		}
+		// The anonymous memory the group's processes have resident, the same
+		// figure memory.max is held to. docker stats reads this.
 		'memory.current' {
 			return '${cgroup_memory_bytes(group)}\n'
 		}
@@ -551,10 +746,65 @@ fn (mut this CGroupResource) write(_handle voidptr, buf voidptr, _loc u64, count
 			return i64(count)
 		}
 		'cgroup.freeze' {
-			if value != '0' && value != '1' {
+			if value != '0' && value != '1' || group.account == unsafe { nil } {
 				errno.set(errno.einval)
 				return none
 			}
+			mut account := group.account
+			katomic.store(mut &account.freeze, if value == '1' { u32(1) } else { u32(0) })
+			this.text = value
+			return i64(count)
+		}
+		'cpu.max' {
+			quota_us, period_us := parse_cpu_max(value, group.account) or {
+				errno.set(errno.einval)
+				return none
+			}
+			mut account := group.account
+			account.set_cpu_max(quota_us * 1000, period_us * 1000)
+			this.text = if quota_us == 0 { 'max ${period_us}' } else { '${quota_us} ${period_us}' }
+			return i64(count)
+		}
+		'pids.max' {
+			limit := parse_pids_max(value) or {
+				errno.set(errno.einval)
+				return none
+			}
+			if group.account == unsafe { nil } {
+				errno.set(errno.einval)
+				return none
+			}
+			mut account := group.account
+			katomic.store(mut &account.pids_max, limit)
+			this.text = if limit < 0 { 'max' } else { '${limit}' }
+			return i64(count)
+		}
+		'memory.max' {
+			limit := parse_memory_amount(value) or {
+				errno.set(errno.einval)
+				return none
+			}
+			if group.account == unsafe { nil } {
+				errno.set(errno.einval)
+				return none
+			}
+			mut account := group.account
+			katomic.store(mut &account.memory_max, limit)
+			this.text = if limit == 0 { 'max' } else { '${limit}' }
+			// A limit lowered below what the group already uses is enforced
+			// straight away, as Linux does after it fails to reclaim.
+			if limit != 0 {
+				enforce_memory_max(mut account, 0, limit, time.monotonic_ns(), 0)
+			}
+			return i64(count)
+		}
+		'memory.oom.group' {
+			if value != '0' && value != '1' || group.account == unsafe { nil } {
+				errno.set(errno.einval)
+				return none
+			}
+			mut account := group.account
+			account.memory_oom_group = value == '1'
 			this.text = value
 			return i64(count)
 		}
@@ -577,7 +827,120 @@ fn move_to_cgroup(mut group CGroup, pid int) bool {
 		return false
 	}
 	process.cgroup = if voidptr(group) == voidptr(cgroup_root) { unsafe { nil } } else { voidptr(group) }
+	process.cgroup_account = group.account
 	return true
+}
+
+// The controller state of the group a CLONE_INTO_CGROUP descriptor named; nil
+// for the root.
+pub fn cgroup_account_of(group voidptr) &proc.CGroupAccount {
+	if group == unsafe { nil } {
+		return unsafe { nil }
+	}
+	return unsafe { &CGroup(group) }.account
+}
+
+// Threads in `group` and the groups below it.
+fn cgroup_task_count(group &CGroup) int {
+	if group.account != unsafe { nil } {
+		return proc.cgroup_task_count(group.account)
+	}
+	mut count := 0
+	proc.lock_table()
+	defer {
+		proc.unlock_table()
+	}
+	for pid := 1; pid < proc.max_pid; pid++ {
+		process := proc.process_at(pid)
+		if process != unsafe { nil } && !process.exiting {
+			count += process.threads.len
+		}
+	}
+	return count
+}
+
+fn all_digits(text string) bool {
+	if text.len == 0 {
+		return false
+	}
+	for c in text {
+		if c < `0` || c > `9` {
+			return false
+		}
+	}
+	return true
+}
+
+// cpu.max: "<quota|max> [period]", both in microseconds, as Linux takes them.
+// The period is kept when only the quota is given. A quota of 0 is returned for
+// max.
+fn parse_cpu_max(value string, account &proc.CGroupAccount) ?(u64, u64) {
+	if account == unsafe { nil } {
+		return none
+	}
+	fields := value.fields()
+	if fields.len == 0 || fields.len > 2 {
+		return none
+	}
+	mut period := account.cpu_period_ns / 1000
+	if fields.len == 2 {
+		if !all_digits(fields[1]) {
+			return none
+		}
+		period = fields[1].u64()
+	}
+	if period < 1000 || period > 1000000 {
+		return none
+	}
+	if fields[0] == 'max' {
+		return u64(0), period
+	}
+	if !all_digits(fields[0]) {
+		return none
+	}
+	quota := fields[0].u64()
+	if quota < 1000 {
+		return none
+	}
+	return quota, period
+}
+
+// pids.max: "max" (-1) or a count.
+fn parse_pids_max(value string) ?i64 {
+	if value == 'max' {
+		return -1
+	}
+	if !all_digits(value) {
+		return none
+	}
+	return i64(value.u64())
+}
+
+// memory.max: "max" (0, no limit) or bytes, with an optional K, M, G or T
+// suffix as Linux accepts. A limit of 0 bytes is kept as 1, since 0 means none.
+fn parse_memory_amount(value string) ?u64 {
+	if value == 'max' {
+		return u64(0)
+	}
+	mut number := value
+	mut scale := u64(1)
+	if number.len > 1 {
+		match number[number.len - 1] {
+			`k`, `K` { scale = u64(1) << 10 }
+			`m`, `M` { scale = u64(1) << 20 }
+			`g`, `G` { scale = u64(1) << 30 }
+			`t`, `T` { scale = u64(1) << 40 }
+			else {}
+		}
+		if scale != 1 {
+			number = number[..number.len - 1]
+		}
+	}
+	if !all_digits(number) {
+		return none
+	}
+	amount := number.u64() * scale
+	return if amount == 0 { u64(1) } else { amount }
 }
 
 // CLONE_INTO_CGROUP: the group a directory descriptor names, or none.
