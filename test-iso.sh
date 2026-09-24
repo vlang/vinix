@@ -20,10 +20,10 @@
 #          QEMU, UEFI, virt, USB keyboard and tablet on xHCI
 #          VirtualBox, EFI                           (arm64 hosts)
 #
-# A boot passes when the serial port says "Vinix: starting the desktop", a
-# screenshot taken after that shows the desktop rather than a console, and
-# typing and (outside VirtualBox, which cannot script its pointer) moving the
-# pointer both change what is on the screen.
+# A boot passes when the serial port says "Vinix: starting the desktop" (or,
+# failing that, the screen does), a screenshot shows the desktop rather than a
+# console, and typing and (outside VirtualBox, which cannot script its pointer)
+# moving the pointer both change what is on the screen.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -168,31 +168,43 @@ vm_point() {
 check_boot() {
     local name="$1" serial="$2" pid="$3"
     local started=$SECONDS shot="$OUT/$name" verdict=''
-    local deadline=$((started + TIMEOUT))
+    local deadline=$((started + TIMEOUT)) next_shot=$((started + 30)) drawn=0
+    # The serial marker says the desktop was started. A VM whose serial port is
+    # not logged anywhere never prints it, so a screenshot of the desktop counts
+    # as well.
     while [ "$SECONDS" -lt "$deadline" ]; do
         if [ "$pid" != 0 ] && ! kill -0 "$pid" 2>/dev/null; then
             echo "    $name: the VM exited" >&2
             return 1
         fi
         grep -Eaq "$MARKER" "$serial" 2>/dev/null && break
+        if [ "$SECONDS" -ge "$next_shot" ]; then
+            next_shot=$((SECONDS + 10))
+            if vm_shoot "$shot" >/dev/null 2>&1 &&
+                verdict="$(python3 "$CHECK" "$(vm_image "$shot")")"; then
+                drawn=1
+                echo "    $name: no marker on serial, but the screen shows the desktop"
+                break
+            fi
+        fi
         sleep 2
     done
-    if ! grep -Eaq "$MARKER" "$serial" 2>/dev/null; then
-        echo "    $name: no desktop marker on serial within ${TIMEOUT}s" >&2
-        vm_shoot "$shot-timeout" >/dev/null 2>&1 || true
-        return 1
-    fi
-    echo "    $name: desktop started after $((SECONDS - started))s"
-
-    local drawn=0
-    while [ "$SECONDS" -lt "$deadline" ]; do
-        sleep 10
-        vm_shoot "$shot" >/dev/null 2>&1 || continue
-        if verdict="$(python3 "$CHECK" "$(vm_image "$shot")")"; then
-            drawn=1
-            break
+    if [ "$drawn" -eq 0 ]; then
+        if ! grep -Eaq "$MARKER" "$serial" 2>/dev/null; then
+            echo "    $name: no desktop within ${TIMEOUT}s (${verdict:-no screenshot})" >&2
+            vm_shoot "$shot-timeout" >/dev/null 2>&1 || true
+            return 1
         fi
-    done
+        echo "    $name: desktop started after $((SECONDS - started))s"
+        while [ "$SECONDS" -lt "$deadline" ]; do
+            sleep 10
+            vm_shoot "$shot" >/dev/null 2>&1 || continue
+            if verdict="$(python3 "$CHECK" "$(vm_image "$shot")")"; then
+                drawn=1
+                break
+            fi
+        done
+    fi
     if [ "$drawn" -eq 0 ]; then
         echo "    $name: the screen never showed the desktop (${verdict:-no screenshot})" >&2
         return 1
