@@ -1,5 +1,6 @@
 module mmap
 
+import klock
 import memory
 import numa
 import resource
@@ -49,6 +50,16 @@ const map_brk_reservation = 0x20000000
 // commit only a small fraction of them. Keep large reservations sparse and let
 // the existing page-fault path allocate the pages that are actually touched.
 const lazy_anonymous_threshold = u64(64 * 1024 * 1024)
+
+__global (
+	// Guards every global range's list of locals. A MAP_SHARED range is shared
+	// by every process that fork left mapping it, and each changes the list
+	// under nothing but its own page map's lock: a fork appends its child, and
+	// an exec or exit in any of them removes one. Unguarded, a fork racing an
+	// exec reallocated the list under the delete and corrupted the heap. Taken
+	// inside a page map's lock, and only for the change itself.
+	range_locals_lock klock.Lock
+)
 
 // Resources that need uncached page table mappings (e.g., framebuffers).
 // On ARM64, device memory must be Non-Cacheable so writes reach hardware.
@@ -432,7 +443,9 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap) ?&memory.Pagemap {
 		new_local_range.pagemap = new_pagemap
 
 		if local_range.flags & map_shared != 0 {
+			range_locals_lock.acquire()
 			global_range.locals << new_local_range
+			range_locals_lock.release()
 			for i := local_range.base; i < local_range.base + local_range.length; i += page_size {
 				old_pte := old_pagemap.virt2pte(i, false) or { continue }
 				new_pte := new_pagemap.virt2pte(i, true) or { return none }
@@ -1330,7 +1343,9 @@ pub fn mprotect_unlocked(mut pagemap memory.Pagemap, addr voidptr, _length u64, 
 				immutable: local_range.immutable
 				global: local_range.global
 			}
+			range_locals_lock.acquire()
 			global_range.locals << postsplit_range
+			range_locals_lock.release()
 			pagemap.mmap_ranges << postsplit_range
 			local_range.length -= postsplit_range.length
 		}
@@ -1367,7 +1382,9 @@ pub fn mprotect_unlocked(mut pagemap memory.Pagemap, addr voidptr, _length u64, 
 				immutable: local_range.immutable
 				global: local_range.global
 			}
+			range_locals_lock.acquire()
 			global_range.locals << new_range
+			range_locals_lock.release()
 			pagemap.mmap_ranges << new_range
 		}
 	}
@@ -1436,7 +1453,9 @@ fn munmap_unlocked_impl(mut pagemap memory.Pagemap, addr voidptr, _length u64,
 				immutable: local_range.immutable
 				global: local_range.global
 			}
+			range_locals_lock.acquire()
 			global_range.locals << postsplit_range
+			range_locals_lock.release()
 			pagemap.mmap_ranges << postsplit_range
 			local_range.length -= postsplit_range.length
 		}
@@ -1446,7 +1465,16 @@ fn munmap_unlocked_impl(mut pagemap memory.Pagemap, addr voidptr, _length u64,
 		}
 
 		if snip_size == local_range.length {
-			if global_range.locals.len == 1 {
+			// Decided under the lock: once this is the last local, no other
+			// process maps the range, so none can fork another onto it, and it
+			// can be torn down after the lock is let go.
+			range_locals_lock.acquire()
+			last := global_range.locals.len == 1
+			if !last {
+				global_range.locals.delete(global_range.locals.index(local_range))
+			}
+			range_locals_lock.release()
+			if last {
 				for j := global_range.base; j < global_range.base + global_range.length; j += page_size {
 					phys := global_range.shadow_pagemap.virt2phys(j) or { continue }
 					global_range.shadow_pagemap.unmap_page(j) or {
@@ -1468,8 +1496,6 @@ fn munmap_unlocked_impl(mut pagemap memory.Pagemap, addr voidptr, _length u64,
 					global_range.locals.free()
 					free(global_range)
 				}
-			} else {
-				global_range.locals.delete(global_range.locals.index(local_range))
 			}
 			pagemap.mmap_ranges.delete(pagemap.mmap_ranges.index(local_range))
 			unsafe { free(local_range) }
