@@ -95,10 +95,10 @@ pub mut:
 	// QEMU's standard VGA desktop starts at 1024x768.  These are coordinate
 	// ranges rather than framebuffer dimensions; userspace scales them to the
 	// mode it actually received from Limine.
-	pointer_x        int = 511
-	pointer_y        int = 383
-	pointer_max_x    int = 1023
-	pointer_max_y    int = 767
+	pointer_x        int
+	pointer_y        int
+	pointer_max_x    int
+	pointer_max_y    int
 	pointer_buttons  u32
 	pointer_pressed  u32
 	pointer_released u32
@@ -326,6 +326,11 @@ fn handler() {
 }
 
 pub fn initialise() {
+	// Explicitly initialize the global; older V compilers omit struct defaults here.
+	mouse_res.pointer_x = 511
+	mouse_res.pointer_y = 383
+	mouse_res.pointer_max_x = 1023
+	mouse_res.pointer_max_y = 767
 	write(0xf6)
 	read()
 

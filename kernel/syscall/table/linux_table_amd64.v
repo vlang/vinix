@@ -367,6 +367,14 @@ fn syscall_linux_mkdir(gpr_state voidptr, path charptr, mode u32) (u64, u64) {
 	return fs.syscall_mkdirat(gpr_state, fs.at_fdcwd, path, mode)
 }
 
+fn syscall_linux_rename(gpr_state voidptr, oldpath charptr, newpath charptr) (u64, u64) {
+	return fs.syscall_renameat(gpr_state, fs.at_fdcwd, oldpath, fs.at_fdcwd, newpath)
+}
+
+fn syscall_linux_chmod(gpr_state voidptr, path charptr, mode u32) (u64, u64) {
+	return fs.syscall_fchmodat(gpr_state, fs.at_fdcwd, path, mode)
+}
+
 fn syscall_linux_rmdir(gpr_state voidptr, path charptr) (u64, u64) {
 	return fs.syscall_unlinkat(gpr_state, fs.at_fdcwd, path, fs.at_removedir)
 }
@@ -484,10 +492,12 @@ pub fn init_linux_syscall_table() {
 	linux_syscall_table[79] = voidptr(fs.syscall_getcwd)
 	linux_syscall_table[80] = voidptr(fs.syscall_chdir)
 	linux_syscall_table[81] = voidptr(fs.syscall_fchdir)
+	linux_syscall_table[82] = voidptr(syscall_linux_rename)
 	linux_syscall_table[83] = voidptr(syscall_linux_mkdir)
 	linux_syscall_table[84] = voidptr(syscall_linux_rmdir)
 	linux_syscall_table[87] = voidptr(syscall_linux_unlink)
 	linux_syscall_table[89] = voidptr(syscall_linux_readlink)
+	linux_syscall_table[90] = voidptr(syscall_linux_chmod)
 	linux_syscall_table[91] = voidptr(fs.syscall_fchmod)
 	linux_syscall_table[95] = voidptr(fs.syscall_umask)
 	linux_syscall_table[96] = voidptr(sys.syscall_gettimeofday)
@@ -513,7 +523,10 @@ pub fn init_linux_syscall_table() {
 	linux_syscall_table[254] = voidptr(fs.syscall_inotify_add_watch)
 	linux_syscall_table[255] = voidptr(fs.syscall_inotify_rm_watch)
 	linux_syscall_table[257] = voidptr(fs.syscall_openat)
+	linux_syscall_table[258] = voidptr(fs.syscall_mkdirat)
 	linux_syscall_table[262] = voidptr(fs.syscall_fstatat)
+	linux_syscall_table[264] = voidptr(fs.syscall_renameat)
+	linux_syscall_table[268] = voidptr(fs.syscall_fchmodat)
 	linux_syscall_table[269] = voidptr(syscall_linux_faccessat)
 	linux_syscall_table[273] = voidptr(syscall_linux_set_robust_list)
 	linux_syscall_table[280] = voidptr(fs.syscall_utimensat)
@@ -524,6 +537,7 @@ pub fn init_linux_syscall_table() {
 	linux_syscall_table[238] = voidptr(numa.syscall_set_mempolicy)
 	linux_syscall_table[239] = voidptr(numa.syscall_get_mempolicy)
 	linux_syscall_table[309] = voidptr(numa.syscall_getcpu)
+	linux_syscall_table[316] = voidptr(fs.syscall_renameat2)
 	linux_syscall_table[318] = voidptr(syscall_linux_getrandom)
 	linux_syscall_table[334] = voidptr(syscall_linux_rseq)
 	linux_syscall_table[439] = voidptr(fs.syscall_faccessat)
