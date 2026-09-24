@@ -94,8 +94,47 @@ fn device_by_name(name string) &resource.Resource {
 	return node.resource
 }
 
+// The device the kernel published with the number `rdev`, of the kind
+// (character or block) `kind` is, or nil. Looked for in /dev and one level
+// of directories below it, where /dev/dri/card0 is.
+fn device_by_number(kind u32, rdev u64) &resource.Resource {
+	if unsafe { devtmpfs_root == 0 } {
+		return unsafe { nil }
+	}
+	return find_device_number(devtmpfs_root, kind, rdev, 1)
+}
+
+fn find_device_number(directory &VFSNode, kind u32, rdev u64, depth int) &resource.Resource {
+	if directory.children == unsafe { nil } {
+		return unsafe { nil }
+	}
+	for _, node in directory.children {
+		if node == unsafe { nil } || node.resource == unsafe { nil } || is_dot_name(node.name) {
+			continue
+		}
+		node_kind := node.resource.stat.mode & stat.ifmt
+		if node_kind == kind && node.resource.stat.rdev == rdev {
+			return node.resource
+		}
+		if node_kind == stat.ifdir && depth > 0 {
+			found := find_device_number(node, kind, rdev, depth - 1)
+			if found != unsafe { nil } {
+				return found
+			}
+		}
+	}
+	return unsafe { nil }
+}
+
+// A node leads to the device of its name, as the ones a runtime makes in
+// every container do. A name Vinix has no device by -- `docker run --device
+// /dev/zero:/dev/myzero` -- leads to the device with its number instead,
+// which the runtime took from the host's node.
 fn make_device_node(mut parent VFSNode, name string, mode u32, rdev u64) ?&VFSNode {
-	backing := device_by_name(name)
+	mut backing := device_by_name(name)
+	if backing == unsafe { nil } {
+		backing = device_by_number(mode & stat.ifmt, rdev)
+	}
 	if backing == unsafe { nil } {
 		// A device Vinix does not have. /dev/null stands in: writes are
 		// discarded and reads give EOF, which is what an unbacked device node
