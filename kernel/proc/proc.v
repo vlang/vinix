@@ -5,6 +5,7 @@ import klock
 import katomic
 import memory
 import event.eventstruct
+import time
 
 // Match the conventional Linux soft RLIMIT_NOFILE. Large compatibility
 // processes such as Wine's server keep a descriptor for every translated
@@ -184,6 +185,11 @@ pub mut:
 	ppid                     int
 	pgid                     int
 	sid                      int
+	// Field 22 of /proc/<pid>/stat: start time in clock ticks. Linux runtimes
+	// (runc) use (pid, start_time) as a process's identity; a constant zero
+	// makes a just-created process indistinguishable from the zero value a
+	// caller compares against, which breaks runc's hasInit() check.
+	start_time_ticks         u64
 	pagemap                  &memory.Pagemap = unsafe { nil }
 	thread_stack_top         u64
 	threads                  []&Thread
@@ -364,6 +370,17 @@ pub fn allocate_pid(process &Process) ?int {
 
 	i := find_free_id()?
 	processes[i] = unsafe { process }
+	mut p := unsafe { process }
+	if p.start_time_ticks == 0 {
+		// USER_HZ is 100 on aarch64 Linux, so a tick is 10 ms. The value only
+		// has to be non-zero and stable per process; tick-granularity
+		// collisions between processes are what Linux has too.
+		mut ticks := time.monotonic_ns() / 10000000
+		if ticks == 0 {
+			ticks = 1
+		}
+		p.start_time_ticks = ticks
+	}
 	return i
 }
 
@@ -764,7 +781,7 @@ pub fn process_stat_line(pid int) string {
 
 	// Fields 21 to 39, which nothing here keeps, and then rt_priority and
 	// policy in 40 and 41.
-	return '${pid} (${comm}) R ${process.ppid} ${process.pgid} ${process.sid} 0 -1 0 0 0 0 0 0 0 0 0 ${priority} ${process.nice} ${threads} 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 ${params.priority} ${params.policy}\n'
+	return '${pid} (${comm}) R ${process.ppid} ${process.pgid} ${process.sid} 0 -1 0 0 0 0 0 0 0 0 0 ${priority} ${process.nice} ${threads} 0 ${process.start_time_ticks} 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 ${params.priority} ${params.policy}\n'
 }
 
 // The scheduling parameters of a thread that may not be there. Called with the
@@ -791,3 +808,4 @@ pub fn process_status_text(pid int) string {
 	// knows the kernel has no seccomp, which is the truth here.
 	return 'Name:\t${comm}\nUmask:\t0${process.umask:o}\nState:\tR (running)\nTgid:\t${pid}\nNgid:\t0\nPid:\t${pid}\nPPid:\t${process.ppid}\nTracerPid:\t0\nUid:\t${process.uid}\t${process.euid}\t${process.suid}\t${process.euid}\nGid:\t${process.gid}\t${process.egid}\t${process.sgid}\t${process.egid}\nNSpid:\t${pid}\nThreads:\t${threads}\nCapInh:\t${caps.inheritable:016x}\nCapPrm:\t${caps.permitted:016x}\nCapEff:\t${caps.effective:016x}\nCapBnd:\t${caps.bounding:016x}\nCapAmb:\t${caps.ambient:016x}\nNoNewPrivs:\t${no_new_privs}\n'
 }
+

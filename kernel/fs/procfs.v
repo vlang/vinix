@@ -112,6 +112,12 @@ fn (mut this ProcFS) mount(parent &VFSNode, name string, _source &VFSNode) ?&VFS
 		return procfs_root
 	}
 
+	// Linux numbers the procfs root inode PROC_ROOT_INO (1), and container
+	// runtimes reject a /proc whose root is not inode 1 as a spoofed procfs
+	// (CVE-2019-16884). Start the counter there so the root, made first, is 1.
+	if procfs_inode_counter == 0 {
+		procfs_inode_counter = 1
+	}
 	mut root := create_node(this, parent, name, true)
 	root.resource = new_procfs_resource(.directory, stat.ifdir | 0o555, 0, 0)
 	procfs_root = root
