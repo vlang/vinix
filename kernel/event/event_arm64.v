@@ -90,20 +90,63 @@ fn detach_listeners(mut t proc.Thread) {
 	t.attached_events_i = 0
 }
 
+// Every waiter takes the locks of the events it waits on in one order, by
+// address, and gives them back in the reverse. Taken in the order they were
+// listed, two threads waiting on the same two events -- one listing them
+// [a, b], the other [b, a] -- could each hold one and spin for the other with
+// interrupts off, and every CPU that then touched either event stopped too:
+// the machine froze without a word, at the busiest moments of container
+// starts and exits. An event listed twice is locked once.
 fn lock_events(mut events []&eventstruct.Event) {
-	for i := u64(0); i < events.len; i++ {
-		if !duplicate_event_before(events, i) {
-			events[i].@lock.acquire()
+	mut last := u64(0)
+	for {
+		index := next_event_above(events, last)
+		if index < 0 {
+			return
 		}
+		events[index].@lock.acquire()
+		last = u64(voidptr(events[index]))
 	}
 }
 
 fn unlock_events(mut events []&eventstruct.Event) {
-	for i := u64(0); i < events.len; i++ {
-		if !duplicate_event_before(events, i) {
-			events[i].@lock.release()
+	mut last := u64(-1)
+	for {
+		index := next_event_below(events, last)
+		if index < 0 {
+			return
+		}
+		events[index].@lock.release()
+		last = u64(voidptr(events[index]))
+	}
+}
+
+// The event with the lowest address above `bound`, or -1.
+fn next_event_above(events []&eventstruct.Event, bound u64) int {
+	mut chosen := -1
+	mut lowest := u64(-1)
+	for i := 0; i < events.len; i++ {
+		address := u64(voidptr(events[i]))
+		if address > bound && address <= lowest {
+			lowest = address
+			chosen = i
 		}
 	}
+	return chosen
+}
+
+// The event with the highest address below `bound`, or -1.
+fn next_event_below(events []&eventstruct.Event, bound u64) int {
+	mut chosen := -1
+	mut highest := u64(0)
+	for i := 0; i < events.len; i++ {
+		address := u64(voidptr(events[i]))
+		if address < bound && address >= highest {
+			highest = address
+			chosen = i
+		}
+	}
+	return chosen
 }
 
 fn await_internal(mut events []&eventstruct.Event, block bool, watch_generation bool,
