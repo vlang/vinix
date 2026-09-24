@@ -272,8 +272,12 @@ fn new_with_handle(handle &C.vinix_socket, socktype int, protocol int) ?&InetSoc
 		errno.set(errno.enomem)
 		return none
 	}
+	// The descriptor made from it holds the only reference, so closing the
+	// last one frees the pcb. A creator's reference that nothing dropped kept
+	// every closed socket's pcb, and the 65th UDP socket, one DNS query in a
+	// docker pull, failed with ENOMEM.
 	mut socket := &InetSocket{
-		refcount: 1
+		refcount: 0
 		handle: unsafe { handle }
 		socktype: socktype
 		protocol: protocol
@@ -538,8 +542,10 @@ fn (mut this InetSocket) accept(handle voidptr) ?&resource.Resource {
 		this.refresh_status()
 		net_lock.release()
 		if child_handle != unsafe { nil } {
-			mut child := new_with_handle(child_handle, sock_pub.sock_stream, ipproto_tcp)?
-			return &resource.Resource(*child)
+			// Hand out the registered socket itself. Converting *child copied
+			// it, and the copy's status never saw the traffic that arrived.
+			child := new_with_handle(child_handle, sock_pub.sock_stream, ipproto_tcp)?
+			return child
 		}
 		if open_handle.flags & resource.o_nonblock != 0 {
 			errno.set(errno.ewouldblock)
@@ -725,6 +731,7 @@ fn (mut this InetSocket) unref(_handle voidptr) ? {
 	net_lock.acquire()
 	C.vinix_socket_free(this.handle)
 	net_lock.release()
+	unsafe { free(this) }
 }
 
 fn (mut this InetSocket) grow(_handle voidptr, _new_size u64) ? {}

@@ -95,8 +95,37 @@ static int linux_error(err_t error) {
     }
 }
 
+#ifdef __AARCH64__
+void aarch64__uart__putc(uint8_t);
+
+static void assert_serial(const char *text) {
+    while (*text) {
+        aarch64__uart__putc((uint8_t)*text++);
+    }
+}
+#endif
+
+// A failed assertion stops this CPU for good, so say which one it was where it
+// can be read: ordinary printf is compiled out of PROD kernels, and the stack
+// was all that was left to find it by.
 void vinix_lwip_assert(const char *message, const char *file, int line) {
-    printf("lwip: assertion '%s' at %s:%d\n", message, file, line);
+    printf_panic("lwip: assertion '%s' at %s:%d\n", message, file, line);
+#ifdef __AARCH64__
+    char number[12];
+    int at = sizeof number - 1;
+    number[at] = 0;
+    do {
+        number[--at] = (char)('0' + line % 10);
+        line /= 10;
+    } while (line > 0 && at > 0);
+    assert_serial("lwip: assertion '");
+    assert_serial(message);
+    assert_serial("' at ");
+    assert_serial(file);
+    assert_serial(":");
+    assert_serial(&number[at]);
+    assert_serial("\n");
+#endif
     for (;;) { }
 }
 
@@ -475,7 +504,15 @@ void vinix_socket_free(struct vinix_socket *socket) {
         child->accept_next = NULL;
         vinix_socket_free(child);
     }
-    if (socket->tcp) {
+    if (socket->tcp && socket->tcp->state == LISTEN) {
+        // A listening pcb is lwIP's smaller tcp_pcb_listen. It has no data
+        // callbacks, and lwIP asserts if asked to clear them. Closing one
+        // cannot fail.
+        tcp_arg(socket->tcp, NULL);
+        tcp_accept(socket->tcp, NULL);
+        tcp_close(socket->tcp);
+        socket->tcp = NULL;
+    } else if (socket->tcp) {
         tcp_arg(socket->tcp, NULL);
         tcp_recv(socket->tcp, NULL);
         tcp_sent(socket->tcp, NULL);
