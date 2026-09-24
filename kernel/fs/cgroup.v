@@ -22,6 +22,7 @@ import errno
 import proc
 import resource
 import event.eventstruct
+import numa
 
 const cgroup_controllers = ['cpuset', 'cpu', 'io', 'memory', 'pids']
 
@@ -198,7 +199,8 @@ fn create_cgroup_directory(parent &VFSNode, name string, parent_group &CGroup) &
 		// The root has no limits of its own, so it has no controller files.
 		if parent_group == unsafe { nil } && file_name.contains('.')
 			&& !file_name.starts_with('cgroup.') && !file_name.ends_with('.stat')
-			&& !file_name.ends_with('.current') && !file_name.ends_with('.pressure') {
+			&& !file_name.ends_with('.current') && !file_name.ends_with('.pressure')
+			&& !file_name.ends_with('.effective') {
 			continue
 		}
 		mut child := create_node(node.filesystem, node, file_name, false)
@@ -340,6 +342,23 @@ fn cgroup_memory_bytes(group &CGroup) u64 {
 	return total
 }
 
+// The CPUs or memory nodes a group may use: the ones its cpuset names, or
+// failing that its parent's, and at the root `everything`. Vinix does not
+// confine a group to them.
+fn cgroup_cpuset_effective(group &CGroup, file_name string, everything string) string {
+	mut current := unsafe { group }
+	for current != unsafe { nil } {
+		if current.node != unsafe { nil } && file_name in current.node.children {
+			res := unsafe { &CGroupResource(current.node.children[file_name].resource) }
+			if res.text.len > 0 {
+				return res.text + '\n'
+			}
+		}
+		current = current.parent
+	}
+	return everything + '\n'
+}
+
 fn cgroup_has_children(group &CGroup) bool {
 	for name in group.node.children.keys() {
 		if is_dot_name(name) {
@@ -416,6 +435,18 @@ fn (mut this CGroupResource) contents() string {
 		}
 		'memory.stat' {
 			return 'anon ${cgroup_memory_bytes(group)}\nfile 0\nkernel 0\nshmem 0\n'
+		}
+		// Docker checks --cpuset-cpus against the root's before it makes a
+		// container.
+		'cpuset.cpus.effective' {
+			return cgroup_cpuset_effective(group, 'cpuset.cpus', if numa.cpu_count() > 1 {
+				'0-${numa.cpu_count() - 1}'
+			} else {
+				'0'
+			})
+		}
+		'cpuset.mems.effective' {
+			return cgroup_cpuset_effective(group, 'cpuset.mems', '0')
 		}
 		'cgroup.stat' {
 			mut descendants := 0
