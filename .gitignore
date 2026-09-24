@@ -65,3 +65,4 @@ kernel/tmp.v
 
 # Screenshots stay out of git.
 /docker-vinix-terminal.png
+/build-release/
