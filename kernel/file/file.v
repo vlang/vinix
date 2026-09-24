@@ -33,6 +33,14 @@ pub const f_setlk = 6
 pub const f_setlkw = 7
 pub const f_getown = 8
 pub const f_setown = 9
+pub const f_setsig = 10
+pub const f_getsig = 11
+pub const f_setown_ex = 15
+pub const f_getown_ex = 16
+
+const f_owner_tid = 0
+const f_owner_pid = 1
+const f_owner_pgrp = 2
 
 const f_rdlck = i16(0)
 const f_wrlck = i16(1)
@@ -60,6 +68,12 @@ pub mut:
 	dirlist_valid bool
 	dirlist       []stat.Dirent
 	dirlist_index u64
+	// Who F_SETOWN made the file's owner, a F_OWNER_* kind and an id, and the
+	// signal F_SETSIG chose. They are recorded, so that a program reads back
+	// what it set; I/O readiness raises no SIGIO here.
+	owner_type int
+	owner_id   int
+	signal     int
 }
 
 // A Handle is the open-file description shared by dup() and fork(). Its
@@ -916,6 +930,58 @@ pub fn syscall_fcntl(_ voidptr, fdnum int, cmd int, arg u64) (u64, u64) {
 				return lock_ret, lock_errno
 			}
 			ret = lock_ret
+		}
+		// nginx gives its master's channel to each worker this way.
+		f_setown {
+			// A negative id names a process group.
+			id := int(i32(u32(arg)))
+			handle.owner_type = if id < 0 { f_owner_pgrp } else { f_owner_pid }
+			handle.owner_id = if id < 0 { -id } else { id }
+			fd.unref()
+		}
+		f_getown {
+			ret = if handle.owner_type == f_owner_pgrp {
+				u64(-i64(handle.owner_id))
+			} else {
+				u64(handle.owner_id)
+			}
+			fd.unref()
+		}
+		f_setown_ex, f_getown_ex {
+			// struct f_owner_ex: an int kind, then a pid_t.
+			mut owner := [2]i32{}
+			if cmd == f_setown_ex {
+				if !usercopy.copy_from_user(voidptr(&owner[0]), arg, 8) {
+					fd.unref()
+					return errno.err, errno.efault
+				}
+				if owner[0] < f_owner_tid || owner[0] > f_owner_pgrp {
+					fd.unref()
+					return errno.err, errno.einval
+				}
+				handle.owner_type = int(owner[0])
+				handle.owner_id = int(owner[1])
+			} else {
+				owner[0] = i32(handle.owner_type)
+				owner[1] = i32(handle.owner_id)
+				if !usercopy.copy_to_user(arg, voidptr(&owner[0]), 8) {
+					fd.unref()
+					return errno.err, errno.efault
+				}
+			}
+			fd.unref()
+		}
+		f_setsig {
+			if arg > 64 {
+				fd.unref()
+				return errno.err, errno.einval
+			}
+			handle.signal = int(arg)
+			fd.unref()
+		}
+		f_getsig {
+			ret = u64(handle.signal)
+			fd.unref()
 		}
 		f_getlk, f_setlk, f_setlkw {
 			lock_ret, lock_errno := fcntl_lock(mut handle, cmd, arg)
