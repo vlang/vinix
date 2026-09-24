@@ -1037,8 +1037,13 @@ if [ "$GPU_DESKTOP_BUILT" -eq 1 ] && [ "$WITH_ASAHI_GPU" -eq 1 ]; then
         "$STAGING/usr/share/examples/gl-triangle/egl_triangle.c"
 fi
 mkdir -p "$STAGING/sbin" "$STAGING/usr/bin" "$STAGING/usr/share/vinix" \
-    "$STAGING/root" "$STAGING/dev" "$STAGING/proc" "$STAGING/sys" "$STAGING/tmp"
+    "$STAGING/root" "$STAGING/dev" "$STAGING/proc" "$STAGING/sys" "$STAGING/tmp" \
+    "$STAGING/run"
 mkdir -p "$STAGING/root/.config/GIMP/2.10" "$STAGING/root/.cache"
+# Package layers unpacked from .apk files can leave the package's own control
+# files at the root of the image.
+rm -f "$STAGING/.PKGINFO" "$STAGING/.INSTALL" "$STAGING"/.SIGN.* \
+    "$STAGING"/.pre-* "$STAGING"/.post-* "$STAGING"/.trigger*
 chmod 1777 "$STAGING/tmp"
 
 # The compositor loads its own app artwork rather than depending on whichever
