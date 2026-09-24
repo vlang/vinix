@@ -665,6 +665,14 @@ its applications use the same input path on both architectures. Pass
 `--no-build` to boot an existing image. Clang cross-compiles the same image on
 Apple Silicon, where QEMU runs it with TCG.
 
+The amd64 init supervisor keeps the compositor's standard input attached to
+`/dev/console` even while it runs in the background; registration and desktop
+keyboard shortcuts need that terminal in raw mode. The PS/2 driver's pointer
+range is initialized at startup before the compositor reads `/dev/pointer`.
+
+The Linux-compatible amd64 syscall table covers account setup's chmod and
+rename calls; tmpfs commits that metadata in memory for the disposable image.
+
 An existing `build-aarch64-hyprland/staging` layer remains available without
 changing the ordinary desktop session. Produce that layer with
 `build-hyprland-aarch64.sh` on an ARM64 host, then use

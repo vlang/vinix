@@ -79,6 +79,12 @@ fn (mut this TmpFSResource) add_seals(seals u32) ? {
 	this.seals |= seals
 }
 
+// Tmpfs metadata and file contents already live in the resource's in-memory
+// backing store; neither operation has a separate device to flush.
+fn (mut this TmpFSResource) persist_metadata() ? {}
+
+fn (mut this TmpFSResource) sync(_handle voidptr) ? {}
+
 // materialize_locked gives a borrowed (or as-yet empty) file writable tmpfs
 // storage.  The caller holds this.l.  Keep the minimum allocation at one page:
 // tmpfs.mmap returns physical pages and therefore needs a page-aligned big

@@ -77,7 +77,7 @@ while :; do
 	if [ ! -e /run/vinix-desktop-development ] && [ -x /usr/bin/vinix-desktop-gpu ]; then
 		desktop=/usr/bin/vinix-desktop-gpu
 	fi
-	"$desktop" &
+	"$desktop" </dev/console &
 	desktop_pid=$!
 	exited_pid=$desktop_pid
 	wait "$desktop_pid"
