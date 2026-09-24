@@ -1,5 +1,5 @@
 {
-  "storage-driver": "vfs",
+  "storage-driver": "overlay2",
   "iptables": false,
   "ip6tables": false,
   "bridge": "none",
