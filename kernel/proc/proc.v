@@ -2,6 +2,7 @@
 module proc
 
 import klock
+import lib
 import katomic
 import memory
 import event.eventstruct
@@ -703,6 +704,15 @@ pub fn deadline_bandwidth_ppm(except_tid int) u64 {
 // A Vinix process is named for the path it was executed from with its pid
 // appended; the part that corresponds to comm is the basename without that.
 fn command_name(name string) string {
+	start, end := command_name_bounds(name)
+	if start >= end {
+		return name
+	}
+	return name[start..end]
+}
+
+// Where the command name is in a process name.
+fn command_name_bounds(name string) (int, int) {
 	mut end := name.len
 	if end > 0 && name[end - 1] == `]` {
 		mut open := end - 1
@@ -720,9 +730,28 @@ fn command_name(name string) string {
 		}
 	}
 	if start >= end {
-		return name
+		return 0, name.len
 	}
-	return name[start..end]
+	return start, end
+}
+
+// The real, effective, saved and filesystem ids of a status Uid: or Gid: line;
+// the filesystem id is the effective one here.
+fn add_id_fields(mut text lib.Text, real u32, effective u32, saved u32) {
+	text.add_unsigned(u64(real))
+	text.add_byte(`\t`)
+	text.add_unsigned(u64(effective))
+	text.add_byte(`\t`)
+	text.add_unsigned(u64(saved))
+	text.add_byte(`\t`)
+	text.add_unsigned(u64(effective))
+}
+
+fn add_command_name(mut text lib.Text, name string) {
+	start, end := command_name_bounds(name)
+	for i in start .. end {
+		text.add_byte(name[i])
+	}
 }
 
 // The program a process is running, as an absolute path. Empty when the kernel
@@ -744,7 +773,9 @@ pub fn process_command(pid int) string {
 	if process == unsafe { nil } {
 		return ''
 	}
-	return command_name(process.name)
+	mut text := lib.new_text(32)
+	add_command_name(mut text, process.name)
+	return text.str()
 }
 
 // The thread ids of a process, in the order the process holds them.
@@ -849,7 +880,6 @@ pub fn process_stat_line(pid int, viewer &Namespace) string {
 	if process == unsafe { nil } {
 		return ''
 	}
-	comm := command_name(process.name)
 	threads := if process.threads.len > 0 { process.threads.len } else { 1 }
 
 	// The main thread's policy is what `ps -c` and `top` report for the
@@ -868,7 +898,32 @@ pub fn process_stat_line(pid int, viewer &Namespace) string {
 	shown_ppid := pid_in(process_at(process.ppid), viewer)
 	shown_pgid := pgid_in(process, viewer)
 	shown_sid := sid_in(process, viewer)
-	return '${shown_pid} (${comm}) ${state} ${shown_ppid} ${shown_pgid} ${shown_sid} 0 -1 0 0 0 0 0 0 0 0 0 ${priority} ${process.nice} ${threads} 0 ${process.start_time_ticks} 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 ${params.priority} ${params.policy}\n'
+	mut text := lib.new_text(256)
+	text.add_decimal(shown_pid)
+	text.add(' (')
+	add_command_name(mut text, process.name)
+	text.add(') ')
+	text.add(state)
+	text.add_byte(` `)
+	text.add_decimal(shown_ppid)
+	text.add_byte(` `)
+	text.add_decimal(shown_pgid)
+	text.add_byte(` `)
+	text.add_decimal(shown_sid)
+	text.add(' 0 -1 0 0 0 0 0 0 0 0 0 ')
+	text.add_decimal(priority)
+	text.add_byte(` `)
+	text.add_decimal(process.nice)
+	text.add_byte(` `)
+	text.add_decimal(threads)
+	text.add(' 0 ')
+	text.add_unsigned(process.start_time_ticks)
+	text.add(' 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 ')
+	text.add_decimal(params.priority)
+	text.add_byte(` `)
+	text.add_decimal(params.policy)
+	text.add_byte(`\n`)
+	return text.str()
 }
 
 // The scheduling parameters of a thread that may not be there. Called with the
@@ -887,7 +942,6 @@ pub fn process_status_text(pid int, viewer &Namespace) string {
 	if process == unsafe { nil } {
 		return ''
 	}
-	comm := command_name(process.name)
 	threads := if process.threads.len > 0 { process.threads.len } else { 1 }
 	caps := process.caps
 	no_new_privs := if process.no_new_privs { 1 } else { 0 }
@@ -896,13 +950,48 @@ pub fn process_status_text(pid int, viewer &Namespace) string {
 	state := if process.exiting { 'Z (zombie)' } else { 'R (running)' }
 	shown_pid := pid_in(process, viewer)
 	shown_ppid := pid_in(process_at(process.ppid), viewer)
+	mut text := lib.new_text(512)
+	text.add('Name:\t')
+	add_command_name(mut text, process.name)
+	text.add('\nUmask:\t0')
+	text.add_radix(u64(process.umask), 8, 0)
+	text.add('\nState:\t')
+	text.add(state)
+	text.add('\nTgid:\t')
+	text.add_decimal(shown_pid)
+	text.add('\nNgid:\t0\nPid:\t')
+	text.add_decimal(shown_pid)
+	text.add('\nPPid:\t')
+	text.add_decimal(shown_ppid)
+	text.add('\nTracerPid:\t0\nUid:\t')
+	add_id_fields(mut text, process.uid, process.euid, process.suid)
+	text.add('\nGid:\t')
+	add_id_fields(mut text, process.gid, process.egid, process.sgid)
 	// NSpid lists the process's number in every namespace from the reader's
 	// down to its own.
-	nspid := if !numbers_own(viewer) && numbers_own(process.numbered_in) {
-		'${pid}\t${process.ns_pid}'
+	text.add('\nNSpid:\t')
+	if !numbers_own(viewer) && numbers_own(process.numbered_in) {
+		text.add_decimal(pid)
+		text.add_byte(`\t`)
+		text.add_decimal(process.ns_pid)
 	} else {
-		'${shown_pid}'
+		text.add_decimal(shown_pid)
 	}
-	return 'Name:\t${comm}\nUmask:\t0${process.umask:o}\nState:\t${state}\nTgid:\t${shown_pid}\nNgid:\t0\nPid:\t${shown_pid}\nPPid:\t${shown_ppid}\nTracerPid:\t0\nUid:\t${process.uid}\t${process.euid}\t${process.suid}\t${process.euid}\nGid:\t${process.gid}\t${process.egid}\t${process.sgid}\t${process.egid}\nNSpid:\t${nspid}\nThreads:\t${threads}\nCapInh:\t${caps.inheritable:016x}\nCapPrm:\t${caps.permitted:016x}\nCapEff:\t${caps.effective:016x}\nCapBnd:\t${caps.bounding:016x}\nCapAmb:\t${caps.ambient:016x}\nNoNewPrivs:\t${no_new_privs}\n'
+	text.add('\nThreads:\t')
+	text.add_decimal(threads)
+	text.add('\nCapInh:\t')
+	text.add_radix(caps.inheritable, 16, 16)
+	text.add('\nCapPrm:\t')
+	text.add_radix(caps.permitted, 16, 16)
+	text.add('\nCapEff:\t')
+	text.add_radix(caps.effective, 16, 16)
+	text.add('\nCapBnd:\t')
+	text.add_radix(caps.bounding, 16, 16)
+	text.add('\nCapAmb:\t')
+	text.add_radix(caps.ambient, 16, 16)
+	text.add('\nNoNewPrivs:\t')
+	text.add_decimal(no_new_privs)
+	text.add_byte(`\n`)
+	return text.str()
 }
 

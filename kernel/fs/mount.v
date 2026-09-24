@@ -21,6 +21,7 @@ module fs
 import errno
 import katomic
 import klock
+import lib
 import proc
 import security
 import stat
@@ -855,41 +856,35 @@ pub fn syscall_pivot_root(_ voidptr, _new_root charptr, _put_old charptr) (u64, 
 
 // ── /proc/<pid>/mountinfo and /proc/<pid>/mounts ─────────────────────────────
 
-fn mount_option_text(flags u64) string {
-	mut text := if flags & ms_rdonly != 0 { 'ro' } else { 'rw' }
+fn add_mount_options(mut text lib.Text, flags u64) {
+	text.add(if flags & ms_rdonly != 0 { 'ro' } else { 'rw' })
 	if flags & ms_nosuid != 0 {
-		text += ',nosuid'
+		text.add(',nosuid')
 	}
 	if flags & ms_nodev != 0 {
-		text += ',nodev'
+		text.add(',nodev')
 	}
 	if flags & ms_noexec != 0 {
-		text += ',noexec'
+		text.add(',noexec')
 	}
 	if flags & ms_noatime != 0 {
-		text += ',noatime'
+		text.add(',noatime')
 	} else {
-		text += ',relatime'
+		text.add(',relatime')
 	}
-	return text
 }
 
 // Linux escapes whitespace and backslashes in these fields as octal.
-fn escape_mount_field(text string) string {
-	if !text.contains_any(' \t\n\\') {
-		return text
-	}
-	mut out := ''
-	for c in text {
+fn add_mount_field(mut text lib.Text, field string) {
+	for c in field {
 		match c {
-			` ` { out += '\\040' }
-			`\t` { out += '\\011' }
-			`\n` { out += '\\012' }
-			`\\` { out += '\\134' }
-			else { out += c.ascii_str() }
+			` ` { text.add('\\040') }
+			`\t` { text.add('\\011') }
+			`\n` { text.add('\\012') }
+			`\\` { text.add('\\134') }
+			else { text.add_byte(c) }
 		}
 	}
-	return out
 }
 
 struct VisibleMount {
@@ -898,18 +893,18 @@ struct VisibleMount {
 }
 
 fn visible_mounts(pid int) []VisibleMount {
-	mut visible := []VisibleMount{}
 	proc.lock_table()
 	process := proc.process_at(pid)
 	proc.unlock_table()
 	if process == unsafe { nil } {
-		return visible
+		return []VisibleMount{}
 	}
 	root := process_root(process)
 	mut table := table_of(process)
 	table.lock.acquire()
 	entries := table.mounts.clone()
 	table.lock.release()
+	mut visible := []VisibleMount{cap: entries.len}
 	for entry in entries {
 		path := path_from_root(entry.covered, root) or { continue }
 		visible << VisibleMount{
@@ -917,12 +912,33 @@ fn visible_mounts(pid int) []VisibleMount {
 			path:  path
 		}
 	}
+	unsafe { entries.free() }
 	return visible
 }
 
+fn free_visible_mounts(mut visible []VisibleMount) {
+	for item in visible {
+		unsafe { item.path.free() }
+	}
+	unsafe { visible.free() }
+}
+
+// Whether a mount point is below another, `path` below `above`.
+fn mount_path_under(path string, above string) bool {
+	if above == '/' {
+		return path.starts_with('/')
+	}
+	return path.len > above.len && path.starts_with(above) && path[above.len] == `/`
+}
+
+// Both are made afresh for every read, which runc does several times for
+// every container it starts; they are built in one buffer, see lib.Text.
 pub fn mountinfo_text(pid int) string {
-	visible := visible_mounts(pid)
-	mut text := ''
+	mut visible := visible_mounts(pid)
+	defer {
+		free_visible_mounts(mut visible)
+	}
+	mut text := lib.new_text(visible.len * 128 + 16)
 	for item in visible {
 		entry := item.entry
 		// The parent is the mount this one sits in: the closest one whose
@@ -933,9 +949,7 @@ pub fn mountinfo_text(pid int) string {
 			if other.entry.id == entry.id {
 				continue
 			}
-			prefix := if other.path == '/' { '/' } else { other.path + '/' }
-			if (item.path.starts_with(prefix) || (other.path == '/' && item.path != '/'))
-				&& other.path.len > best {
+			if mount_path_under(item.path, other.path) && other.path.len > best {
 				best = other.path.len
 				parent_id = other.entry.id
 			}
@@ -945,25 +959,49 @@ pub fn mountinfo_text(pid int) string {
 		} else {
 			u64(0)
 		}
-		root_field := if entry.options == 'bind' { entry.source } else { '/' }
-		super_options := if entry.options.len > 0 && entry.options != 'bind' {
-			'rw,' + entry.options
-		} else {
-			'rw'
+		text.add_decimal(entry.id)
+		text.add_byte(` `)
+		text.add_decimal(parent_id)
+		text.add(' 0:')
+		text.add_unsigned(dev)
+		text.add_byte(` `)
+		add_mount_field(mut text, if entry.options == 'bind' { entry.source } else { '/' })
+		text.add_byte(` `)
+		add_mount_field(mut text, item.path)
+		text.add_byte(` `)
+		add_mount_options(mut text, entry.flags)
+		text.add(' - ')
+		text.add(entry.fstype)
+		text.add_byte(` `)
+		add_mount_field(mut text, entry.source)
+		text.add(' rw')
+		if entry.options.len > 0 && entry.options != 'bind' {
+			text.add_byte(`,`)
+			text.add(entry.options)
 		}
-		text += '${entry.id} ${parent_id} 0:${dev} ${escape_mount_field(root_field)} ${escape_mount_field(item.path)} ${mount_option_text(entry.flags)} - ${entry.fstype} ${escape_mount_field(entry.source)} ${super_options}\n'
+		text.add_byte(`\n`)
 	}
-	return text
+	return text.str()
 }
 
 pub fn mounts_text(pid int) string {
-	visible := visible_mounts(pid)
-	mut text := ''
+	mut visible := visible_mounts(pid)
+	defer {
+		free_visible_mounts(mut visible)
+	}
+	mut text := lib.new_text(visible.len * 96 + 16)
 	for item in visible {
 		entry := item.entry
-		text += '${escape_mount_field(entry.source)} ${escape_mount_field(item.path)} ${entry.fstype} ${mount_option_text(entry.flags)} 0 0\n'
+		add_mount_field(mut text, entry.source)
+		text.add_byte(` `)
+		add_mount_field(mut text, item.path)
+		text.add_byte(` `)
+		text.add(entry.fstype)
+		text.add_byte(` `)
+		add_mount_options(mut text, entry.flags)
+		text.add(' 0 0\n')
 	}
-	return text
+	return text.str()
 }
 
 // The boot code swaps the system root for an on-disk one, carrying /dev and

@@ -19,6 +19,7 @@ module fs
 
 import stat
 import klock
+import lib
 import memory
 import katomic
 import errno
@@ -468,17 +469,22 @@ fn (this &ProcFSResource) contents() string {
 			// Vinix does not retain the argument vector after exec, so the one
 			// thing the kernel does know goes here: the program that is running.
 			// Linux NUL-terminates each argument, and readers split on that.
-			return '${proc.process_program(this.pid)}\x00'
+			return text_with_ending(proc.process_program(this.pid), 0)
 		}
 		.comm {
-			return '${proc.process_command(this.pid)}\n'
+			return text_with_ending(proc.process_command(this.pid), `\n`)
 		}
 		.process_stat {
 			return proc.process_stat_line(this.pid, unsafe { &proc.Namespace(this.view) })
 		}
 		.statm {
 			pages := resident_bytes(this.pid) / page_size
-			return '${pages} ${pages} 0 0 0 0 0\n'
+			mut text := lib.new_text(64)
+			text.add_unsigned(pages)
+			text.add_byte(` `)
+			text.add_unsigned(pages)
+			text.add(' 0 0 0 0 0\n')
+			return text.str()
 		}
 		.status {
 			return proc.process_status_text(this.pid, unsafe { &proc.Namespace(this.view) })
@@ -505,7 +511,10 @@ fn (this &ProcFSResource) contents() string {
 			return ''
 		}
 		.oom_score_adj {
-			return '${proc.process_oom_score_adj(this.pid)}\n'
+			mut text := lib.new_text(16)
+			text.add_decimal(proc.process_oom_score_adj(this.pid))
+			text.add_byte(`\n`)
+			return text.str()
 		}
 		.setgroups {
 			return 'allow\n'
@@ -529,6 +538,15 @@ fn (this &ProcFSResource) contents() string {
 			return ''
 		}
 	}
+}
+
+// `owned` with one byte after it, as a new string; `owned` is freed.
+fn text_with_ending(owned string, ending u8) string {
+	mut text := lib.new_text(owned.len + 1)
+	text.add(owned)
+	text.add_byte(ending)
+	unsafe { owned.free() }
+	return text.str()
 }
 
 fn cpuinfo_text() string {
@@ -887,7 +905,7 @@ fn refresh_process_directories(mut root VFSNode, view voidptr) {
 	proc.unlock_table()
 
 	for i, pid in live {
-		name := '${numbers[i]}'
+		name := numbers[i].str()
 		if name in root.children {
 			// exec() replaces the program without replacing the process, so
 			// the link has to be taken again rather than only created once.
@@ -895,8 +913,9 @@ fn refresh_process_directories(mut root VFSNode, view voidptr) {
 			if existing != unsafe { nil } && existing.children != unsafe { nil }
 				&& 'exe' in existing.children {
 				mut exe := unsafe { existing.children['exe'] }
-				exe.symlink_target = proc.process_program(pid)
+				set_link_text(mut exe, proc.process_program(pid))
 			}
+			unsafe { name.free() }
 			continue
 		}
 		add_process_directory(mut root, pid, name, view)
@@ -1055,6 +1074,22 @@ fn refresh_fd_directory(mut descriptors VFSNode, pid int) {
 		}
 		if process.fds_lock.test_and_acquire() {
 			scanned = true
+			// Sized first: an array that outgrows its buffer leaves the old one
+			// behind, and this runs on every lookup in the directory.
+			mut open_count := 0
+			for fdnum := 0; fdnum < proc.max_fds; fdnum++ {
+				if process.fds[fdnum] != unsafe { nil } {
+					open_count++
+				}
+			}
+			unsafe {
+				live.free()
+				nodes.free()
+				texts.free()
+			}
+			live = []int{cap: open_count}
+			nodes = []&VFSNode{cap: open_count}
+			texts = []string{cap: open_count}
 			for fdnum := 0; fdnum < proc.max_fds; fdnum++ {
 				if process.fds[fdnum] == unsafe { nil } {
 					continue
@@ -1085,7 +1120,7 @@ fn refresh_fd_directory(mut descriptors VFSNode, pid int) {
 	}
 
 	for index, fdnum in live {
-		name := '${fdnum}'
+		name := fdnum.str()
 		target := nodes[index]
 		// A copy of the kind-and-inode text: freeing `texts` frees the strings
 		// in it, and the link keeps this one.
@@ -1095,6 +1130,7 @@ fn refresh_fd_directory(mut descriptors VFSNode, pid int) {
 			existing.redir = unsafe { nil }
 			existing.magic_target = target
 			set_link_text(mut existing, text)
+			unsafe { name.free() }
 			continue
 		}
 		// A magic link rather than a stored pathname: following it leads to
@@ -1159,8 +1195,9 @@ fn refresh_thread_directories(mut task VFSNode, pid int) {
 		if numbers[i] <= 0 {
 			continue
 		}
-		name := '${numbers[i]}'
+		name := numbers[i].str()
 		if name in task.children {
+			unsafe { name.free() }
 			continue
 		}
 		mut node := create_node(task.filesystem, task, name, true)
