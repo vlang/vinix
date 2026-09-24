@@ -946,10 +946,8 @@ fn (mut this UnixSocket) bind(_handle voidptr, _addr voidptr, addrlen u32) ? {
 		return none
 	}
 
-	mut replaced := node.resource
 	this.stat = node.resource.stat
-	node.resource = unsafe { this }
-	replaced.unref(unsafe { nil }) or {}
+	fs.replace_resource(mut node, this)
 
 	this.name = *addr
 }

@@ -24,6 +24,7 @@
 #include <sys/stat.h>
 #include <sys/syscall.h>
 #include <sys/uio.h>
+#include <sys/un.h>
 #include <sys/utsname.h>
 #include <sys/wait.h>
 #include <sys/xattr.h>
@@ -259,6 +260,29 @@ static int has_text(const char *path, const char *text) {
     return length == (ssize_t)strlen(text) && !memcmp(buffer, text, (size_t)length);
 }
 
+// A socket bound in an overlay directory is a socket in the upper layer too,
+// and files made after it survive its unlink, as postgres's data directory
+// has to when it removes its socket on the way out.
+static int overlay_bound_socket(const char *dir, const char *upper) {
+    struct sockaddr_un address = {.sun_family = AF_UNIX};
+    char upper_path[sizeof(address.sun_path)], later_path[sizeof(address.sun_path)];
+    struct stat merged_stat, upper_stat;
+    snprintf(address.sun_path, sizeof(address.sun_path), "%s/sock", dir);
+    snprintf(upper_path, sizeof(upper_path), "%s/sock", upper);
+    snprintf(later_path, sizeof(later_path), "%s/later", dir);
+    int fd = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (fd < 0)
+        return 0;
+    int valid = bind(fd, (struct sockaddr *)&address, sizeof(address)) == 0 &&
+                lstat(address.sun_path, &merged_stat) == 0 && S_ISSOCK(merged_stat.st_mode) &&
+                lstat(upper_path, &upper_stat) == 0 && S_ISSOCK(upper_stat.st_mode);
+    close(fd);
+    valid = valid && write_text(later_path, "later") && unlink(address.sun_path) == 0 &&
+            has_text(later_path, "later");
+    unlink(later_path);
+    return valid;
+}
+
 // An overlay of one directory tree on another, as Docker's overlay2 driver
 // mounts every container.
 static int overlay_semantics(void) {
@@ -303,7 +327,9 @@ static int overlay_semantics(void) {
                                   "rmdir of a merged directory") &&
                 mkdir("/tmp/aarch64-syscall-ovl/merged/n", 0755) == 0 &&
                 write_text("/tmp/aarch64-syscall-ovl/merged/n/x", "x") &&
-                has_text("/tmp/aarch64-syscall-ovl/upper/n/x", "x");
+                has_text("/tmp/aarch64-syscall-ovl/upper/n/x", "x") &&
+                overlay_bound_socket("/tmp/aarch64-syscall-ovl/merged",
+                                     "/tmp/aarch64-syscall-ovl/upper");
     valid = umount("/tmp/aarch64-syscall-ovl/merged") == 0 && valid;
 
     if (mount("overlay", merged, "overlay", 0,

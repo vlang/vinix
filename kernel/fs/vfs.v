@@ -515,6 +515,23 @@ pub fn create(parent &VFSNode, name string, mode u32) ?&VFSNode {
 	return internal_create(parent, name, mode)
 }
 
+// Have a node create() just made lead to `res` instead of the file it was
+// made with, as bind(2) has the name of a socket lead to the socket. A name
+// made in an overlay is a node in the upper layer too, which has to lead
+// there as well: unlinking the name releases what that node holds. It kept
+// the file, which was freed here, and postgres, unlinking its socket on the
+// way out, released whatever had been made in that memory since -- its
+// postmaster.opts, which the next start was then denied.
+pub fn replace_resource(mut node VFSNode, res &resource.Resource) {
+	mut replaced := node.resource
+	node.resource = unsafe { res }
+	if node.overlay != unsafe { nil } && node.overlay.upper != unsafe { nil } {
+		mut real := node.overlay.upper
+		real.resource = unsafe { res }
+	}
+	replaced.unref(unsafe { nil }) or {}
+}
+
 // Replace a small regular file from a kernel service.  DHCP uses this after
 // the initramfs is mounted to publish its resolver list to libc; keeping the
 // VFS mechanics here avoids exposing vfs_root outside the fs module.
