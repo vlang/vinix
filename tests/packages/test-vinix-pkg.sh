@@ -529,8 +529,11 @@ fi
 grep -q 'VOffice archive checksum mismatch' "$work/voffice-mismatch.log"
 test ! -e "$root/usr/bin/voffice-writer"
 
+apk_calls_before=$(wc -l <"$log")
 VINIX_VOFFICE_URL="file://$voffice_archive" \
 	run_pkg install voffice >"$work/voffice-install.log"
+# VOffice alone needs no Alpine index refresh or base-package transaction.
+test "$(wc -l <"$log")" -eq "$apk_calls_before"
 grep -qx 'pkg: VOffice 0.0.3 Writer and Calc installed' "$work/voffice-install.log"
 test -x "$root/usr/bin/voffice-writer"
 test -x "$root/usr/bin/voffice-calc"

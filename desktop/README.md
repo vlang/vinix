@@ -686,6 +686,21 @@ keyboard:
 `input.py` speaks QMP to the virtio tablet, which takes absolute coordinates,
 so a click lands where it is aimed regardless of where the cursor was.
 
+First-run setup has its own boot. It types a new user into the registration
+screen through the compositor's standard input, chooses apps in the picker that
+follows, and checks that the Terminal the desktop then opens runs `pkg install`
+for exactly those apps. A recorder stands in for `pkg`, so the boot needs no
+network. Guest-init boots need the compact image, which fits the FAT32 boot
+disk:
+
+    VINIX_DESKTOP_INITRAMFS=$PWD/build/first-run.tar \
+        ./build-desktop-aarch64.sh --compact-initramfs
+    python3 tests/browsers/run_vm.py --first-run --initramfs build/first-run.tar
+
+Setting `VOFFICE_BUNDLE_URL` at the top of `tests/desktop/first-run-apps-init.sh`
+installs a real VOffice bundle instead, for example one served from the host at
+`http://10.0.2.2:PORT/`, and then opens VOffice Writer from Quick Launch.
+
 ## What it needs from the kernel
 
 `/dev/fb0` at 32bpp, and `/dev/pointer` — a character device added for this,

@@ -1140,8 +1140,16 @@ case "$command_name" in
 	install|add)
 		[ "$#" -gt 0 ] || { echo "pkg: install needs a package name" >&2; exit 1; }
 		require_root
-		ensure_repository_indexes
-		bootstrap_database
+		# VOffice is a release download that never touches apk, so installing it
+		# alone must not wait on the Alpine mirror or register the base packages.
+		needs_apk=false
+		for requested in "$@"; do
+			[ "$requested" = voffice ] || needs_apk=true
+		done
+		if [ "$needs_apk" = true ]; then
+			ensure_repository_indexes
+			bootstrap_database
+		fi
 		install_packages "$@"
 		;;
 	remove|delete|del)
