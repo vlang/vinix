@@ -1917,7 +1917,9 @@ pub fn syscall_memfd_create(_ voidptr, name u64, flags u32) (u64, u64) {
 	}
 
 	fdnum := file.fdnum_create_from_resource(unsafe { nil }, mut res, open_flags, 0, false) or {
-		return errno.err, errno.get()
+		saved := errno.get()
+		res.unref(unsafe { nil }) or {}
+		return errno.err, saved
 	}
 	// A node that is in no directory. It is what /proc/self/fd/N leads to, and
 	// it is what lets execveat(2) -- or an exec of that /proc path -- run the
@@ -1925,6 +1927,12 @@ pub fn syscall_memfd_create(_ voidptr, name u64, flags u32) (u64, u64) {
 	mut node := create_node(unsafe { filesystems['tmpfs'] }, unsafe { nil }, 'memfd:${shown}',
 		false)
 	node.resource = res
+	// Drop the reference create_anonymous() handed us once the descriptor holds
+	// its own. Keeping both left every memfd alive after its last descriptor and
+	// mapping were gone: runc's 10 MiB copy of itself, for every container.
+	defer {
+		res.unref(unsafe { nil }) or {}
+	}
 	mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or { return u64(fdnum), 0 }
 	fd.handle.node = voidptr(node)
 	fd.unref()

@@ -304,8 +304,13 @@ fn syscall_linux_bpf(_ voidptr, cmd int, attr u64, size u32) (u64, u64) {
 		mut res := fs.create_anonymous(0o600)
 		fdnum := file.fdnum_create_from_resource(unsafe { nil }, mut res, resource.o_rdwr,
 			0, false) or {
-			return errno.err, errno.get()
+			saved := errno.get()
+			res.unref(unsafe { nil }) or {}
+			return errno.err, saved
 		}
+		// The descriptor took its own reference; the one create_anonymous()
+		// returned would otherwise keep the file alive after it is closed.
+		res.unref(unsafe { nil }) or {}
 		return u64(fdnum), 0
 	}
 	if cmd == 8 || cmd == 9 {
