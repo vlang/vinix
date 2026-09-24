@@ -28,13 +28,34 @@ virtual machines.
 ![Screenshot 0](/screenshot0.png?raw=true "Screenshot 0")
 ![Screenshot 1](/screenshot1.png?raw=true "Screenshot 1")
 
-## Download latest nightly image
+## Download an image
 
-You can grab a pre-built nightly Vinix image at https://github.com/vlang/vinix/releases
+The latest release has a bootable desktop image for each architecture:
 
-Make sure to boot the ISO with enough memory (8+GiB) as, for now, Vinix loads its
-entire root filesystem in a ramdisk in order to be able to more easily boot
-on real hardware.
+- [vinix-amd64.iso](https://github.com/vlang/vinix/releases/latest/download/vinix-amd64.iso):
+  x86-64 PCs and VMs, BIOS or UEFI
+- [vinix-arm64.iso](https://github.com/vlang/vinix/releases/latest/download/vinix-arm64.iso):
+  arm64 VMs, UEFI (QEMU, VirtualBox on Apple Silicon Macs)
+
+Older and nightly images are at https://github.com/vlang/vinix/releases.
+
+Give the VM at least 4 GiB of memory: for now Vinix loads its entire root
+filesystem into a ramdisk, which makes it easier to boot on real hardware.
+
+```sh
+qemu-system-x86_64 -machine q35 -accel kvm -cpu host -m 4096 -smp 2 -cdrom vinix-amd64.iso
+
+qemu-system-aarch64 -machine virt -accel hvf -cpu host -m 4096 -smp 4 \
+    -bios "$(brew --prefix qemu)/share/qemu/edk2-aarch64-code.fd" \
+    -device virtio-scsi-pci -device scsi-cd,drive=cd \
+    -drive if=none,id=cd,media=cdrom,file=vinix-arm64.iso \
+    -device ramfb -device qemu-xhci -device usb-kbd -device usb-tablet
+```
+
+In VirtualBox, create a VM of type *Other/Unknown (64-bit)* or *Other/Unknown
+(ARM 64-bit)* with 4096 MB of memory and no hard disk, and attach the ISO; or
+let `./run-iso-virtualbox.sh vinix-arm64.iso` create one. VirtualBox only runs
+guests of its host's architecture.
 
 ## Roadmap
 
@@ -983,6 +1004,25 @@ lacks native ATC/external-DCP modesetting. The Studio Display's
 audio/camera/USB devices are not included. See
 [docs/apple-studio-display.md](docs/apple-studio-display.md) for the boot
 procedure, expected log lines, and failure diagnosis.
+
+### Release images
+
+`./deploy-iso.sh` builds both desktop ISOs from a clean checkout of a commit,
+boots each of them to the desktop in QEMU (and in VirtualBox, when it can run
+that architecture here), and publishes them with checksums as a GitHub release:
+
+```sh
+./deploy-iso.sh                # release HEAD, which must already be pushed
+./deploy-iso.sh --no-publish   # build and test only; see build-release/<tag>/
+./deploy-iso.sh --draft --tag=iso-2026-10-01
+```
+
+`./test-iso.sh vinix-amd64.iso vinix-arm64.iso` runs the same boot tests on any
+image: amd64 through BIOS with VirtualBox's defaults and through UEFI, arm64 with
+virtio and with USB input. A boot passes when the desktop is on screen and
+answers the keyboard and the pointer. The arm64 desktop is assembled from the
+package layers the aarch64 build scripts leave in this checkout, so build those
+first (see *Default software image on aarch64*).
 
 ### To test
 
