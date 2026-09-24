@@ -36,6 +36,20 @@ select_v() {
     return 1
 }
 
+# Follow a chain of symlinks to the file at the end of it. `readlink -f` is
+# not available everywhere this runs.
+resolve_symlinks() {
+    local path="$1" target
+    while [ -L "$path" ]; do
+        target="$(readlink "$path")"
+        case "$target" in
+            /*) path="$target" ;;
+            *) path="$(dirname "$path")/$target" ;;
+        esac
+    done
+    printf '%s\n' "$path"
+}
+
 find_v() {
     if [ -n "${V:-}" ]; then
         select_v "$V"
@@ -49,7 +63,9 @@ find_v() {
 
     if command -v v >/dev/null 2>&1; then
         candidate="$(command -v v)"
-        candidate_dir="$(CDPATH= cd -- "$(dirname -- "$candidate")" && pwd)"
+        # ~/.local/bin/v is often a symlink into a checkout; look beside the
+        # compiler it points at, not beside the link.
+        candidate_dir="$(CDPATH= cd -- "$(dirname -- "$(resolve_symlinks "$candidate")")" && pwd)"
         # A source checkout keeps `v` as its bootstrap compiler and writes a
         # freshly built development compiler to `vnew`. Automatic discovery
         # should use that development compiler; setting V to the exact `v`
@@ -63,10 +79,13 @@ find_v() {
     fi
 
     # The usual checkout layout. `vnew` is the freshly built compiler a V
-    # developer runs from a source tree; `v` is the released one.
+    # developer runs from a source tree; `v` is the released one. A
+    # development checkout is sometimes half rebuilt -- a vnew whose embedded
+    # sources have moved panics before doing anything -- so take the first
+    # one that can at least report its version.
     for candidate in "$HOME/code/v7/vnew" "$HOME/code/v7/v" \
         "$HOME/code/v/vnew" "$HOME/code/v/v" "$HOME/v/v"; do
-        if [ -x "$candidate" ]; then
+        if [ -x "$candidate" ] && "$candidate" version >/dev/null 2>&1; then
             V="$candidate"
             return 0
         fi
