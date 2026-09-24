@@ -133,6 +133,10 @@ fn reduce_node_bounded(node &VFSNode, follow_symlinks bool, depth int, effective
 		}
 		return reduce_node_bounded(next_node, follow_symlinks, depth + 1, effective)
 	}
+	// A descriptor that no name leads to is reached through the link itself.
+	if follow_symlinks && is_anonymous_descriptor_link(node) {
+		return unsafe { node }
+	}
 	if node.symlink_target.len != 0 && follow_symlinks == true {
 		target := node.symlink_target
 		_, next_node, _ := walk_path(node.parent, target, depth + 1,
@@ -818,6 +822,9 @@ pub fn syscall_openat(_ voidptr, dirfd int, _path charptr, flags int, mode u32) 
 	if unsafe { node == 0 } {
 		return errno.err, errno.enoent
 	}
+	if descriptor := procfs_anonymous_descriptor(node) {
+		return open_anonymous_descriptor(descriptor, flags)
+	}
 
 	if !stat.isdir(node.resource.stat.mode) && flags & resource.o_directory != 0 {
 		return errno.err, errno.enotdir
@@ -856,6 +863,75 @@ pub fn syscall_openat(_ voidptr, dirfd int, _path charptr, flags int, mode u32) 
 	inotify_emit(node, '', in_open, 0)
 
 	return u64(fdnum), 0
+}
+
+fn is_anonymous_descriptor_link(node &VFSNode) bool {
+	if _ := procfs_anonymous_descriptor(node) {
+		return true
+	}
+	return false
+}
+
+// The descriptor an anonymous /proc/<pid>/fd/<n> link names, held, if the
+// caller may reach into that process: its own, or one of its user's, or any
+// with CAP_SYS_PTRACE.
+fn anonymous_descriptor_fd(descriptor AnonymousDescriptor) ?&file.FD {
+	current := proc.current_thread().process
+	proc.lock_table()
+	owner := proc.process_at(descriptor.pid)
+	proc.unlock_table()
+	if owner == unsafe { nil } {
+		errno.set(errno.enoent)
+		return none
+	}
+	if voidptr(owner) != voidptr(current) && owner.euid != current.euid
+		&& !proc.current_has_capability(proc.cap_sys_ptrace) {
+		errno.set(errno.eacces)
+		return none
+	}
+	return file.fd_from_fdnum(owner, descriptor.fdnum) or {
+		errno.set(errno.enoent)
+		return none
+	}
+}
+
+// open(2) of a /proc/<pid>/fd/<n> that leads to a pipe: a new open file on
+// the same pipe, for reading or writing as asked, as on Linux. Images point
+// their logs at /dev/stdout and /dev/stderr, which lead here, to the pipes a
+// container runtime gives the container; nginx could not start without it.
+// A socket or anything else no name leads to cannot be opened this way,
+// which Linux says with ENXIO.
+fn open_anonymous_descriptor(descriptor AnonymousDescriptor, flags int) (u64, u64) {
+	mut fd := anonymous_descriptor_fd(descriptor) or { return errno.err, errno.get() }
+	defer {
+		fd.unref()
+	}
+	mut res := fd.handle.resource
+	if !stat.isifo(res.stat.mode) {
+		return errno.err, errno.enxio
+	}
+	mut opened := res
+	if mut res is resource.OpenableResource {
+		opened = res.open(flags) or { return errno.err, errno.get() }
+	}
+	mut new_fd := file.fd_create_from_resource(mut opened, flags) or {
+		return errno.err, errno.get()
+	}
+	fdnum := file.fdnum_create_from_fd(unsafe { nil }, new_fd, 0, false) or {
+		new_fd.unref()
+		return errno.err, errno.get()
+	}
+	return u64(fdnum), 0
+}
+
+// stat(2) of the same: what the descriptor is open on.
+fn stat_anonymous_descriptor(descriptor AnonymousDescriptor, statbuf &stat.Stat) (u64, u64) {
+	mut fd := anonymous_descriptor_fd(descriptor) or { return errno.err, errno.get() }
+	unsafe {
+		*statbuf = fd.handle.resource.stat
+	}
+	fd.unref()
+	return 0, 0
 }
 
 pub fn syscall_read(_ voidptr, fdnum int, buf voidptr, count u64) (u64, u64) {
@@ -1088,6 +1164,11 @@ pub fn syscall_fstatat(_ voidptr, dirfd int, _path charptr, statbuf &stat.Stat, 
 		follow_links := flags & at_symlink_nofollow == 0
 
 		node := get_node(parent, path, follow_links) or { return errno.err, errno.get() }
+		if follow_links {
+			if descriptor := procfs_anonymous_descriptor(node) {
+				return stat_anonymous_descriptor(descriptor, statbuf)
+			}
+		}
 
 		statsrc = &node.resource.stat
 	}

@@ -391,6 +391,39 @@ static int seccomp_filters(void) {
     return valid && security_child_succeeded(unprivileged);
 }
 
+// A pipe is a FIFO to stat(2), and can be opened again through
+// /proc/self/fd, which is where /dev/stdout and /dev/stderr lead.
+static int pipe_reopen(void) {
+    int ends[2];
+    int sockets[2];
+    char path[64];
+    char link[64] = {0};
+    char byte = 0;
+    struct stat info;
+    if (pipe(ends) != 0 || socketpair(AF_UNIX, SOCK_STREAM, 0, sockets) != 0)
+        return 0;
+    int valid = fstat(ends[0], &info) == 0 && S_ISFIFO(info.st_mode);
+    snprintf(path, sizeof(path), "/proc/self/fd/%d", ends[0]);
+    valid = valid && stat(path, &info) == 0 && S_ISFIFO(info.st_mode) &&
+            readlink(path, link, sizeof(link) - 1) > 0 && !strncmp(link, "pipe:[", 6);
+    snprintf(path, sizeof(path), "/proc/self/fd/%d", ends[1]);
+    int writer = open(path, O_WRONLY);
+    valid = valid && writer >= 0 && write(writer, "x", 1) == 1 &&
+            read(ends[0], &byte, 1) == 1 && byte == 'x';
+    // Both write ends count: EOF only once the reopened one closes as well.
+    close(ends[1]);
+    valid = valid && write(writer, "y", 1) == 1 && read(ends[0], &byte, 1) == 1 && byte == 'y';
+    if (writer >= 0)
+        close(writer);
+    valid = valid && read(ends[0], &byte, 1) == 0;
+    snprintf(path, sizeof(path), "/proc/self/fd/%d", sockets[0]);
+    valid = valid && failed_with_errno(open(path, O_RDWR), ENXIO, "reopen a socket");
+    close(ends[0]);
+    close(sockets[0]);
+    close(sockets[1]);
+    return valid;
+}
+
 // A handler installed without SA_RESTORER, as glibc installs every one on
 // AArch64, with whatever its stack held left in sa_restorer: it returns
 // through the kernel's rt_sigreturn trampoline.
@@ -722,6 +755,7 @@ int main(void) {
     check(special_node_numbers(), "mknod nodes have inode numbers");
     check(overlay_semantics(), "overlay mount");
     check(seccomp_filters(), "seccomp filters");
+    check(pipe_reopen(), "pipe reopened through /proc/self/fd");
     check(handler_without_restorer(), "signal handler without SA_RESTORER");
     if (chdir(previous_cwd) != 0)
         chdir("/");

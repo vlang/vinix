@@ -98,7 +98,23 @@ pub fn create_fifo(mode u32) ?&Pipe {
 fn (mut this Pipe) open(flags int) ?&resource.Resource {
 	// An O_PATH descriptor opens neither end, and runc's is only reopened
 	// later through /proc/self/fd/N, which comes back here with real flags.
-	if !this.fifo || flags & resource.o_path != 0 {
+	if flags & resource.o_path != 0 {
+		return &resource.Resource(this)
+	}
+	// An anonymous pipe opened again through /proc/<pid>/fd/<n> gets one more
+	// end of the kind asked for, which closing it gives back.
+	if !this.fifo {
+		this.l.acquire()
+		access := flags & resource.o_accmode
+		if access == resource.o_rdonly || access == resource.o_rdwr {
+			this.readers++
+			this.status &= ~file.pollerr
+		}
+		if access == resource.o_wronly || access == resource.o_rdwr {
+			this.writers++
+			this.status &= ~file.pollhup
+		}
+		this.l.release()
 		return &resource.Resource(this)
 	}
 	nonblock := flags & resource.o_nonblock != 0

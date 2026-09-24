@@ -1156,6 +1156,38 @@ fn descriptor_link_text(node &VFSNode) string {
 	return pathname(node)
 }
 
+// A /proc/<pid>/fd/<n> link to a descriptor that no name leads to: a pipe,
+// a socket, an eventfd. Its text only says what that is, so following it
+// takes the descriptor from the process instead; see
+// open_anonymous_descriptor().
+pub struct AnonymousDescriptor {
+pub:
+	pid   int
+	fdnum int
+}
+
+pub fn procfs_anonymous_descriptor(node &VFSNode) ?AnonymousDescriptor {
+	if node == unsafe { nil } || node.resource == unsafe { nil } || node.magic_target != unsafe { nil }
+		|| node.parent == unsafe { nil } || node.name.len == 0 || !is_procfs_resource(node.resource) {
+		return none
+	}
+	link := unsafe { &ProcFSResource(node.resource) }
+	if link.kind != .symlink || link.pid == 0 || node.parent.name != 'fd' {
+		return none
+	}
+	mut fdnum := 0
+	for c in node.name {
+		if c < `0` || c > `9` {
+			return none
+		}
+		fdnum = fdnum * 10 + int(c - `0`)
+	}
+	return AnonymousDescriptor{
+		pid:   link.pid
+		fdnum: fdnum
+	}
+}
+
 fn anonymous_descriptor_text(res &resource.Resource) string {
 	mode := res.stat.mode & stat.ifmt
 	if mode == stat.ifpipe || mode == stat.ififo {
