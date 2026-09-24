@@ -43,19 +43,28 @@ Give the VM at least 4 GiB of memory: for now Vinix loads its entire root
 filesystem into a ramdisk, which makes it easier to boot on real hardware.
 
 ```sh
-qemu-system-x86_64 -machine q35 -accel kvm -cpu host -m 4096 -smp 2 -cdrom vinix-amd64.iso
+qemu-system-x86_64 -machine q35 -accel kvm -cpu host -m 4096 -smp 2 -cdrom vinix-amd64.iso \
+    -nic user,model=e1000
 
 qemu-system-aarch64 -machine virt -accel hvf -cpu host -m 4096 -smp 4 \
     -bios "$(brew --prefix qemu)/share/qemu/edk2-aarch64-code.fd" \
     -device virtio-scsi-pci -device scsi-cd,drive=cd \
     -drive if=none,id=cd,media=cdrom,file=vinix-arm64.iso \
-    -device ramfb -device qemu-xhci -device usb-kbd -device usb-tablet
+    -device ramfb -device qemu-xhci -device usb-kbd -device usb-tablet \
+    -netdev user,id=net0 -device virtio-net-device,netdev=net0
 ```
 
 In VirtualBox, create a VM of type *Other/Unknown (64-bit)* or *Other/Unknown
-(ARM 64-bit)* with 4096 MB of memory and no hard disk, and attach the ISO; or
-let `./run-iso-virtualbox.sh vinix-arm64.iso` create one. VirtualBox only runs
+(ARM 64-bit)* with 4096 MB of memory and no hard disk, attach the ISO, and set
+the network adapter type to *Intel PRO/1000 MT Desktop (82540EM)*; or let
+`./run-iso-virtualbox.sh vinix-arm64.iso` create one. VirtualBox only runs
 guests of its host's architecture.
+
+Both images carry the same software: X.org with Mesa, GTK, Python, V, GCC,
+git, curl and `pkg`. Firefox, Chromium and the other larger apps are not on the
+image; the first launch offers them and `pkg install` downloads them, which is
+why the commands above give the VM a network card. Vinix drives VirtIO and
+Intel e1000 network cards.
 
 ## Roadmap
 

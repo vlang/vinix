@@ -277,15 +277,17 @@ qemu_amd64() {
     else
         accel=(-accel tcg -cpu max)
     fi
+    # Each boot has a network card, so the drivers pkg relies on come up too.
     run_qemu_boot qemu-amd64-bios "$qemu_bin" "${accel[@]}" \
-        -machine pc,hpet=off -m 4096 -smp 1 -vga std -cdrom "$iso"
+        -machine pc,hpet=off -m 4096 -smp 1 -vga std -cdrom "$iso" \
+        -nic user,model=e1000
     if ovmf="$(qemu_firmware "$qemu_bin" edk2-x86_64-code.fd \
         /usr/share/OVMF/OVMF_CODE.fd /usr/share/edk2/x64/OVMF_CODE.fd \
         /usr/share/qemu/OVMF.fd)"; then
         run_qemu_boot qemu-amd64-uefi "$qemu_bin" "${accel[@]}" \
             -machine q35 -m 4096 -smp 2 -vga std \
             -drive "if=pflash,format=raw,unit=0,readonly=on,file=$ovmf" \
-            -cdrom "$iso"
+            -cdrom "$iso" -nic user,model=e1000
     else
         FAILED+=("qemu-amd64-uefi (no x86_64 UEFI firmware found)")
     fi
@@ -320,10 +322,13 @@ qemu_arm64() {
         else
             dd if=/dev/zero of="$vars" bs=1048576 count=64 2>/dev/null
         fi
-        local devices=(-device virtio-keyboard-device -device virtio-tablet-device)
+        # The USB boot stands in for VirtualBox: xHCI input and an e1000.
+        local devices=(-device virtio-keyboard-device -device virtio-tablet-device
+            -netdev user,id=net0 -device virtio-net-device,netdev=net0)
         if [ "$input" = usb ]; then
             devices=(-device qemu-xhci,id=xhci -device usb-kbd,bus=xhci.0
-                -device usb-tablet,bus=xhci.0)
+                -device usb-tablet,bus=xhci.0
+                -netdev user,id=net0 -device e1000,netdev=net0)
         fi
         run_qemu_boot "$name" "$qemu_bin" "${accel[@]}" \
             -machine virt -m 4096 -smp 4 \
