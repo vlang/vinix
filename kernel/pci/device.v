@@ -69,7 +69,9 @@ pub fn (dev &PCIDevice) get_bar(bar u8) PCIBar {
 	is_64_bits := is_mmio && ((bar_low >> 1) & 0b11) == 0b10
 	bar_high := if is_64_bits { dev.read[u32](reg_index + 4) } else { 0 }
 
-	base := ((u64(bar_high) << 32) | bar_low) & ~u32(if is_mmio { 0b1111 } else { 0b11 })
+	// The mask has to be 64 bits wide: ~u32 zero-extends and would drop the
+	// upper half of a BAR above 4 GiB.
+	base := ((u64(bar_high) << 32) | bar_low) & ~u64(if is_mmio { 0b1111 } else { 0b11 })
 
 	dev.write[u32](reg_index, 0xFFFFFFFF)
 	bar_size_low = dev.read[u32](reg_index)
