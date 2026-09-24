@@ -1,6 +1,7 @@
 module krandom
 
 import aarch64.cpu
+import aarch64.firmware
 import devicetree
 import crypto.sha256
 import limine
@@ -46,6 +47,10 @@ fn read_counter() u64 {
 	return counter
 }
 
+fn cycle_counter() u64 {
+	return read_counter()
+}
+
 fn next_seed_word() u64 {
 	arm64_random_state += 0x9e3779b97f4a7c15
 	mut word := arm64_random_state ^ read_counter()
@@ -54,7 +59,12 @@ fn next_seed_word() u64 {
 	return word ^ (word >> 31)
 }
 
+// Probing QEMU virt's VirtIO slots is only safe on QEMU virt: asked for on
+// the command line, or recognised from its ACPI tables.
 fn qemu_entropy_requested() bool {
+	if firmware.is_qemu() {
+		return true
+	}
 	kernel_file := limine.kernel_file()
 	if kernel_file == unsafe { nil } || kernel_file.cmdline == unsafe { nil } {
 		return false
@@ -169,10 +179,12 @@ fn architecture_seed(mut output [64]u8) bool {
 	}
 
 	chosen := devicetree.find_node('/chosen') or {
-		return qemu_entropy_requested() && virtio_entropy_seed(mut output)
+		return (qemu_entropy_requested() && virtio_entropy_seed(mut output))
+			|| jitter_entropy_seed(mut output)
 	}
 	seed := devicetree.get_property(chosen, 'rng-seed') or {
-		return qemu_entropy_requested() && virtio_entropy_seed(mut output)
+		return (qemu_entropy_requested() && virtio_entropy_seed(mut output))
+			|| jitter_entropy_seed(mut output)
 	}
 	if seed.len < 32 || seed.len > 4096 {
 		return false

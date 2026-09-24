@@ -1,6 +1,7 @@
 @[has_globals]
 module krandom
 
+import crypto.sha256
 import klock
 
 struct Generator {
@@ -135,4 +136,84 @@ pub fn fill(buf voidptr, count u64, allow_insecure bool) bool {
 	generator.fill_locked(buf, count)
 	generator.lock.release()
 	return true
+}
+
+// Timing jitter, the entropy source of last resort. Apple Silicon has no
+// FEAT_RNG, QEMU's default x86 CPU has no RDRAND, VirtualBox offers no VirtIO
+// RNG and QEMU has one only when it is asked for, so a release image booted in
+// any of them had no seed at all: getrandom() and /dev/urandom refused every
+// caller, which is creating the first user and every TLS connection pkg makes. How long a data-dependent
+// walk through memory takes varies with cache, TLB and host scheduling state.
+// Sample that variation many times and fold the samples through SHA-256, as
+// Linux's jitterentropy does. Refuse the result when the timings are too
+// predictable: if the commonest timing turns up in 15 of every 16 samples,
+// 16384 samples still carry over a thousand bits of min-entropy.
+const jitter_samples = 16384
+const jitter_walk = 256
+
+__global (
+	jitter_pool [65536]u8
+)
+
+fn jitter_entropy_seed(mut output [64]u8) bool {
+	mut state := u64(0x2545f4914f6cdd1d) ^ cycle_counter()
+	mut samples := []u8{len: jitter_samples * 2}
+	mut counts := [256]u32{}
+	for i := 0; i <= jitter_samples; i++ {
+		start := cycle_counter()
+		for _ in 0 .. jitter_walk {
+			state ^= state << 13
+			state ^= state >> 7
+			state ^= state << 17
+			index := state % u64(jitter_pool.len)
+			jitter_pool[index] += u8(state >> 32)
+		}
+		delta := cycle_counter() - start
+		// The first walk warms the caches; its timing says little.
+		if i > 0 {
+			counts[delta & 0xff]++
+			samples[(i - 1) * 2] = u8(delta)
+			samples[(i - 1) * 2 + 1] = u8(delta >> 8)
+		}
+	}
+	mut distinct := 0
+	mut commonest := u32(0)
+	for count in counts {
+		if count != 0 {
+			distinct++
+		}
+		if count > commonest {
+			commonest = count
+		}
+	}
+	healthy := distinct >= 4 && u64(commonest) * 16 < u64(jitter_samples) * 15
+	if healthy {
+		domain := 'Vinix kernel CSPRNG jitter v1'
+		mut input := []u8{len: domain.len + samples.len + 1}
+		unsafe {
+			C.memcpy(input.data, domain.str, domain.len)
+			C.memcpy(&input[domain.len], samples.data, samples.len)
+		}
+		for i in 0 .. 2 {
+			input[input.len - 1] = u8(i)
+			digest := sha256.sum(input)
+			unsafe {
+				C.memcpy(&output[i * 32], digest.data, 32)
+				C.memset(digest.data, 0, digest.len)
+				digest.free()
+			}
+		}
+		unsafe {
+			C.memset(input.data, 0, input.len)
+			input.free()
+		}
+	}
+	outcome := if healthy { 'seeded the generator' } else { 'failed its health check' }
+	share := u64(commonest) * 100 / u64(jitter_samples)
+	println('random: CPU timing jitter ${outcome} (${distinct} distinct timings, commonest ${share}%)')
+	unsafe {
+		C.memset(samples.data, 0, samples.len)
+		samples.free()
+	}
+	return healthy
 }
