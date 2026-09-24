@@ -251,7 +251,7 @@ if [ "$BUILD_ARM64" -eq 1 ]; then
     VINIX_FIREFOX_STAGING="$SCRIPT_DIR/build-aarch64-firefox/staging" \
     VINIX_GPU_SYSROOT="$SCRIPT_DIR/build-aarch64-x11/sysroot" \
     VINIX_DESKTOP_INITRAMFS="$WORK/arm64-initramfs-desktop.tar" \
-        "$SRC/build-desktop-aarch64.sh" --compact-initramfs
+        "$SRC/build-desktop-aarch64.sh" --compact-initramfs --without-firefox
 
     rm -f "$OUT/vinix-arm64.iso"
     VINIX_AARCH64_KERNEL="$WORK/arm64-kernel/bin/vinix" \

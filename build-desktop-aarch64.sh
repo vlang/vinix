@@ -3,7 +3,7 @@
 # initramfs that boots straight into it.
 #
 # Usage: ./build-desktop-aarch64.sh [--no-initramfs] [--compact-initramfs]
-#        [--with-libreoffice] [--with-minecraft] [--with-asahi-gpu] [--with-x86-translation] [--wifi-bundle=DIR]
+#        [--without-firefox] [--with-libreoffice] [--with-minecraft] [--with-asahi-gpu] [--with-x86-translation] [--wifi-bundle=DIR]
 # Set V or VINIX_V_COMPILER to a V executable or checkout directory to select
 # a compiler explicitly (for example VINIX_V_COMPILER=~/code/v7).
 #
@@ -107,8 +107,9 @@ write_staging_cache_manifest() {
 
     # Change this when the immutable-layer assembly logic changes. Desktop
     # source and launcher edits are refreshed below without restaging 6+ GiB.
-    printf 'version=2\n'
+    printf 'version=3\n'
     printf 'compact=%s\n' "$COMPACT_INITRAMFS"
+    printf 'without_firefox=%s\n' "$WITHOUT_FIREFOX"
     printf 'chromium=%s\n' "$WITH_CHROMIUM"
     printf 'libreoffice=%s\n' "$WITH_LIBREOFFICE"
     printf 'minecraft=%s\n' "$WITH_MINECRAFT"
@@ -157,6 +158,7 @@ WITH_QEMU_SYSTEM=0
 WITH_CHROMIUM=0
 WITH_LIBREOFFICE=0
 WITH_MINECRAFT=0
+WITHOUT_FIREFOX=0
 REFRESH_STAGING="${VINIX_REFRESH_DESKTOP_STAGING:-0}"
 # The Apple GPU userspace is only correct on Apple hardware; see the overlay
 # below for why its mere presence on disk must not select it.
@@ -172,11 +174,14 @@ for arg in "$@"; do
         --with-chromium) WITH_CHROMIUM=1 ;;
         --with-libreoffice) WITH_LIBREOFFICE=1 ;;
         --with-minecraft) WITH_MINECRAFT=1 ;;
+        --without-firefox) WITHOUT_FIREFOX=1 ;;
         --with-asahi-gpu) WITH_ASAHI_GPU=1 ;;
         --wifi-bundle=*) WIFI_BUNDLE="${arg#*=}" ;;
         --help|-h)
-            echo "usage: $0 [--no-initramfs] [--compact-initramfs] [--with-chromium] [--with-libreoffice] [--with-minecraft] [--with-asahi-gpu] [--with-x86-translation] [--with-steam] [--with-qemu-system] [--wifi-bundle=DIR]"
+            echo "usage: $0 [--no-initramfs] [--compact-initramfs] [--without-firefox] [--with-chromium] [--with-libreoffice] [--with-minecraft] [--with-asahi-gpu] [--with-x86-translation] [--with-steam] [--with-qemu-system] [--wifi-bundle=DIR]"
             echo "  --compact-initramfs stages the desktop, core developer tools and Firefox"
+            echo "  --without-firefox leaves the browser out of a compact image, keeping its"
+            echo "      GTK/media runtime; the first-run app page offers it through pkg"
             echo "  --with-chromium adds a previously staged Chromium; otherwise it is a pkg install"
             echo "  --with-libreoffice adds a previously staged LibreOffice; otherwise it is a pkg install"
             echo "  --with-minecraft adds a previously staged Minecraft; otherwise it is a pkg install"
@@ -195,6 +200,11 @@ for arg in "$@"; do
             ;;
     esac
 done
+
+if [ "$WITHOUT_FIREFOX" -eq 1 ] && [ "$COMPACT_INITRAMFS" -ne 1 ]; then
+    echo "ERROR: --without-firefox applies to --compact-initramfs images" >&2
+    exit 1
+fi
 
 case "$REFRESH_STAGING" in
     0|1) ;;
@@ -748,6 +758,18 @@ if [ "$REUSE_STAGING" -eq 0 ]; then
         done
         merge_staging_tree "$X11_STAGING"
         merge_staging_tree "$FIREFOX_STAGING"
+        if [ "$WITHOUT_FIREFOX" -eq 1 ]; then
+            # The browser's own files: 220 MiB of a release ISO. Its runtime --
+            # GTK, the media codecs, fonts and the TLS bundle -- stays for the
+            # other GTK applications, and the first-run app page offers the
+            # browser itself through pkg.
+            echo "    leaving Firefox itself out (--without-firefox)"
+            rm -rf "$STAGING/usr/lib/firefox-esr" "$STAGING/usr/lib/firefox" \
+                "$STAGING/usr/bin/firefox-esr" "$STAGING/usr/bin/firefox" \
+                "$STAGING"/usr/share/applications/firefox*.desktop \
+                "$STAGING"/usr/share/icons/hicolor/*/apps/firefox* \
+                "$STAGING"/usr/share/metainfo/*firefox*
+        fi
         merge_staging_tree "$NETWORK_TOOLS_STAGING"
         merge_staging_tree "$PYTHON_STAGING"
 
@@ -1190,12 +1212,18 @@ if [ ! -f "$STAGING/usr/lib/vinix-obs-compat.so" ]; then
     echo "ERROR: OBS compatibility library is missing" >&2
     exit 1
 fi
-if [ "$firefox_app_found" -ne 1 ]; then
+if [ "$WITHOUT_FIREFOX" -eq 1 ]; then
+    if [ "$firefox_app_found" -ne 0 ]; then
+        echo "ERROR: --without-firefox image still has a Firefox application directory" >&2
+        exit 1
+    fi
+elif [ "$firefox_app_found" -ne 1 ]; then
     echo "ERROR: desktop image has no Firefox application directory" >&2
     echo "Run ./build-firefox-aarch64.sh and ./build-userland-aarch64.sh first." >&2
     exit 1
 fi
-if ! { [ -x "$STAGING/usr/lib/firefox-esr/firefox-esr" ] &&
+if [ "$WITHOUT_FIREFOX" -eq 0 ] &&
+   ! { [ -x "$STAGING/usr/lib/firefox-esr/firefox-esr" ] &&
        [ -x "$STAGING/usr/bin/firefox-esr" ]; } &&
    ! { [ -x "$STAGING/usr/lib/firefox/firefox" ] &&
        [ -x "$STAGING/usr/bin/firefox" ]; }; then
