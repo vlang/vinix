@@ -38,6 +38,8 @@ pub mut:
 	// pages from then on.
 	paged bool
 	pages []u64
+	// Extended attributes, nil until one is set; see xattr.v.
+	xattrs &XAttrSet = unsafe { nil }
 }
 
 // A file larger than this lives in individual pages rather than in one buffer.
@@ -440,6 +442,7 @@ fn (mut this TmpFSResource) unref(_handle voidptr) ? {
 	} else if stat.isreg(this.stat.mode) && this.storage_owned {
 		memory.free(this.storage)
 	}
+	free_xattrs(this.xattrs)
 
 	unsafe { free(this) }
 }

@@ -43,14 +43,6 @@ fn syscall_vacant(gpr_state voidptr) (u64, u64) {
 	return u64(-1), errno.enosys
 }
 
-// Vinix filesystems do not expose extended attributes yet. Linux software
-// probes every xattr entry point during prefix and cache setup; ENOTSUP is the
-// defined filesystem answer and avoids treating each harmless probe as an
-// unknown syscall.
-fn syscall_linux_xattr_unsupported(_ voidptr) (u64, u64) {
-	return errno.err, errno.enotsup
-}
-
 // Ring buffer for last N syscalls before a crash
 // Ring buffer for last N syscalls before crash
 struct SyscallTraceEntry {
@@ -1030,9 +1022,18 @@ pub fn init_syscall_table() {
 	// Reference: include/uapi/asm-generic/unistd.h
 
 	// File I/O
-	for i := 5; i <= 16; i++ {
-		syscall_table[i] = voidptr(syscall_linux_xattr_unsupported)
-	}
+	syscall_table[5] = voidptr(fs.syscall_setxattr) // __NR_setxattr
+	syscall_table[6] = voidptr(fs.syscall_lsetxattr) // __NR_lsetxattr
+	syscall_table[7] = voidptr(fs.syscall_fsetxattr) // __NR_fsetxattr
+	syscall_table[8] = voidptr(fs.syscall_getxattr) // __NR_getxattr
+	syscall_table[9] = voidptr(fs.syscall_lgetxattr) // __NR_lgetxattr
+	syscall_table[10] = voidptr(fs.syscall_fgetxattr) // __NR_fgetxattr
+	syscall_table[11] = voidptr(fs.syscall_listxattr) // __NR_listxattr
+	syscall_table[12] = voidptr(fs.syscall_llistxattr) // __NR_llistxattr
+	syscall_table[13] = voidptr(fs.syscall_flistxattr) // __NR_flistxattr
+	syscall_table[14] = voidptr(fs.syscall_removexattr) // __NR_removexattr
+	syscall_table[15] = voidptr(fs.syscall_lremovexattr) // __NR_lremovexattr
+	syscall_table[16] = voidptr(fs.syscall_fremovexattr) // __NR_fremovexattr
 	syscall_table[17] = voidptr(fs.syscall_getcwd) // __NR_getcwd
 	syscall_table[19] = voidptr(file.syscall_eventfd2) // __NR_eventfd2
 	syscall_table[23] = voidptr(syscall_linux_dup) // __NR_dup

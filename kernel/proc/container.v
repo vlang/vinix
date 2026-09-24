@@ -100,6 +100,7 @@ pub const cap_sys_admin = 21
 pub const cap_sys_boot = 22
 pub const cap_sys_resource = 24
 pub const cap_mknod = 27
+pub const cap_setfcap = 31
 
 __global (
 	namespace_id_counter = u64(4026532000)

@@ -25,6 +25,7 @@
 #include <sys/uio.h>
 #include <sys/utsname.h>
 #include <sys/wait.h>
+#include <sys/xattr.h>
 #include <sys/membarrier.h>
 #include <sys/mman.h>
 #include <time.h>
@@ -141,6 +142,74 @@ static int security_child_succeeded(pid_t child) {
            (int)child, (int)waited, status, errno);
     fflush(stdout);
     return 0;
+}
+
+// Extended attributes on tmpfs, as Docker's overlay2 driver and archive
+// extractors use them.
+static int xattr_operations(void) {
+    const char *xattr_file = "/tmp/aarch64-syscall-xattr";
+    const char *xattr_dir = "/tmp/aarch64-syscall-xattr-dir";
+    const char *xattr_link = "/tmp/aarch64-syscall-xattr-link";
+    char value[16] = {0};
+    char names[128] = {0};
+    unlink(xattr_file);
+    unlink(xattr_link);
+    rmdir(xattr_dir);
+    int xattr_fd = open(xattr_file, O_CREAT | O_RDWR, 0644);
+    if (xattr_fd < 0 || mkdir(xattr_dir, 0755) != 0 || symlink(xattr_file, xattr_link) != 0)
+        return 0;
+    int valid = setxattr(xattr_file, "user.test", "hello", 5, 0) == 0 &&
+                getxattr(xattr_file, "user.test", NULL, 0) == 5 &&
+                getxattr(xattr_file, "user.test", value, sizeof(value)) == 5 &&
+                !memcmp(value, "hello", 5) &&
+                failed_with_errno(getxattr(xattr_file, "user.test", value, 2), ERANGE,
+                                  "getxattr small buffer") &&
+                failed_with_errno(setxattr(xattr_file, "user.test", "x", 1, XATTR_CREATE),
+                                  EEXIST, "setxattr XATTR_CREATE") &&
+                failed_with_errno(setxattr(xattr_file, "user.none", "x", 1, XATTR_REPLACE),
+                                  ENODATA, "setxattr XATTR_REPLACE") &&
+                setxattr(xattr_file, "user.test", "hi", 2, XATTR_REPLACE) == 0 &&
+                fgetxattr(xattr_fd, "user.test", value, sizeof(value)) == 2 &&
+                !memcmp(value, "hi", 2) &&
+                fsetxattr(xattr_fd, "user.second", "", 0, 0) == 0 &&
+                listxattr(xattr_file, NULL, 0) == 22 &&
+                listxattr(xattr_file, names, sizeof(names)) == 22 &&
+                !memcmp(names, "user.test\0user.second\0", 22) &&
+                removexattr(xattr_file, "user.test") == 0 &&
+                failed_with_errno(getxattr(xattr_file, "user.test", value, sizeof(value)),
+                                  ENODATA, "getxattr removed") &&
+                fremovexattr(xattr_fd, "user.second") == 0 &&
+                listxattr(xattr_file, names, sizeof(names)) == 0 &&
+                setxattr(xattr_dir, "trusted.overlay.opaque", "y", 1, 0) == 0 &&
+                getxattr(xattr_dir, "trusted.overlay.opaque", value, sizeof(value)) == 1 &&
+                value[0] == 'y' &&
+                failed_with_errno(setxattr(xattr_file, "system.posix_acl_access", "x", 1, 0),
+                                  EOPNOTSUPP, "setxattr system namespace") &&
+                failed_with_errno(lsetxattr(xattr_link, "user.test", "x", 1, 0), EPERM,
+                                  "lsetxattr user namespace on symlink") &&
+                failed_with_errno(setxattr("/proc/self/status", "user.test", "x", 1, 0),
+                                  EOPNOTSUPP, "setxattr on procfs");
+
+    pid_t unprivileged = fork();
+    if (unprivileged == 0) {
+        if (setresuid(1000, 1000, 1000) != 0)
+            _exit(1);
+        char seen[16];
+        if (!failed_with_errno(getxattr(xattr_dir, "trusted.overlay.opaque", seen, sizeof(seen)),
+                               ENODATA, "unprivileged getxattr trusted") ||
+            listxattr(xattr_dir, seen, sizeof(seen)) != 0 ||
+            !failed_with_errno(setxattr(xattr_dir, "trusted.other", "x", 1, 0), EPERM,
+                               "unprivileged setxattr trusted"))
+            _exit(2);
+        _exit(0);
+    }
+    valid = valid && security_child_succeeded(unprivileged);
+
+    close(xattr_fd);
+    unlink(xattr_file);
+    unlink(xattr_link);
+    rmdir(xattr_dir);
+    return valid;
 }
 
 static void *eventfd_writer(void *argument) {
@@ -444,6 +513,7 @@ int main(void) {
                  failed_with_errno(mkdir("dir", 0755), ENOENT,
                                    "mkdir in removed directory");
     check(removed_ok, "removed working directory stays usable");
+    check(xattr_operations(), "extended attributes on tmpfs");
     if (chdir(previous_cwd) != 0)
         chdir("/");
 
