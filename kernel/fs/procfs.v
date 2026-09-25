@@ -1317,7 +1317,7 @@ fn refresh_fd_directory(mut descriptors VFSNode, pid int) {
 			// Sized first: an array that outgrows its buffer leaves the old one
 			// behind, and this runs on every lookup in the directory.
 			mut open_count := 0
-			for fdnum := 0; fdnum < proc.max_fds; fdnum++ {
+			for fdnum := 0; fdnum < process.fds.len; fdnum++ {
 				if process.fds[fdnum] != unsafe { nil } {
 					open_count++
 				}
@@ -1330,7 +1330,7 @@ fn refresh_fd_directory(mut descriptors VFSNode, pid int) {
 			live = []int{cap: open_count}
 			nodes = []&VFSNode{cap: open_count}
 			texts = []string{cap: open_count}
-			for fdnum := 0; fdnum < proc.max_fds; fdnum++ {
+			for fdnum := 0; fdnum < process.fds.len; fdnum++ {
 				if process.fds[fdnum] == unsafe { nil } {
 					continue
 				}

@@ -16,6 +16,12 @@ start() {
 		mount -t cgroup2 cgroup2 /sys/fs/cgroup 2>/dev/null || true
 	fi
 
+	# The descriptor limit containerd gives every container on Linux, where
+	# its service sets LimitNOFILE=infinity. Servers raise their own soft
+	# limit up to it; held at 1024, redis cut its client count and MariaDB its
+	# table cache.
+	ulimit -n 1048576 2>/dev/null || true
+
 	dockerd >"$log" 2>&1 &
 	dpid=$!
 

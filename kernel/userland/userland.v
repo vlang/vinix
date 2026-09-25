@@ -652,7 +652,7 @@ fn exit_process(wait_status u32) {
 	proc.unlock_table()
 
 	// Close all FDs
-	for i := 0; i < proc.max_fds; i++ {
+	for i := 0; i < current_process.fds.len; i++ {
 		if current_process.fds[i] == unsafe { nil } {
 			continue
 		}
@@ -703,7 +703,7 @@ pub fn syscall_fork(gpr_state &cpulocal.GPRState) (u64, u64) {
 	new_process.name = '${old_process.name}[${new_process.pid}]'
 
 	// Dup all FDs
-	for i := 0; i < proc.max_fds; i++ {
+	for i := 0; i < old_process.fds.len; i++ {
 		if old_process.fds[i] == unsafe { nil } {
 			continue
 		}

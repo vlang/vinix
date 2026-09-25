@@ -392,7 +392,7 @@ pub fn fdnum_close(_process &proc.Process, fdnum int, do_lock bool) ? {
 	if do_lock {
 		process.fds_lock.acquire()
 	}
-	mut fd := unsafe { &FD(process.fds[fdnum]) }
+	mut fd := if fdnum < process.fds.len { unsafe { &FD(process.fds[fdnum]) } } else { unsafe { nil } }
 	if fd == unsafe { nil } {
 		if do_lock {
 			process.fds_lock.release()
@@ -440,23 +440,84 @@ pub fn fdnum_create_from_fd(_process &proc.Process, fd &FD, oldfd int, specific 
 		return none
 	}
 	if specific == false {
-		for i := oldfd; i < limit; i++ {
+		// The lowest free number from oldfd up: in the table, or the first
+		// one past its end, which the table grows to hold.
+		mut i := oldfd
+		for ; i < limit && i < process.fds.len; i++ {
 			if process.fds[i] == unsafe { nil } {
 				process.fds[i] = voidptr(fd)
 				return i
 			}
 		}
-		errno.set(errno.emfile)
-		return none
+		if i >= limit || !grow_fd_table(mut process, i) {
+			errno.set(errno.emfile)
+			return none
+		}
+		process.fds[i] = voidptr(fd)
+		return i
 	} else {
 		if oldfd >= limit {
 			errno.set(errno.ebadf)
+			return none
+		}
+		if oldfd >= process.fds.len && !grow_fd_table(mut process, oldfd) {
+			errno.set(errno.emfile)
 			return none
 		}
 		fdnum_close(process, oldfd, false) or {}
 		process.fds[oldfd] = voidptr(fd)
 		return oldfd
 	}
+}
+
+// Make room in a descriptor table for `fdnum`, doubling it until there is. The
+// caller holds fds_lock, which everything that reads the table while another
+// thread may make descriptors holds too.
+fn grow_fd_table(mut process proc.Process, fdnum int) bool {
+	if fdnum >= proc.max_fds {
+		return false
+	}
+	mut length := if process.fds.len > 0 { process.fds.len } else { proc.initial_fds }
+	for length <= fdnum {
+		length *= 2
+	}
+	if length > proc.max_fds {
+		length = proc.max_fds
+	}
+	mut bigger := []voidptr{len: length}
+	if bigger.len != length {
+		return false
+	}
+	for i in 0 .. process.fds.len {
+		bigger[i] = process.fds[i]
+	}
+	mut old := process.fds
+	process.fds = bigger
+	unsafe { old.free() }
+	return true
+}
+
+// The descriptors a process has open, and their flags, read in one go under
+// the table's lock: what fork copies into the child.
+pub fn open_fdnums(process &proc.Process) []int {
+	mut target := unsafe { process }
+	target.fds_lock.acquire()
+	defer {
+		target.fds_lock.release()
+	}
+	mut count := 0
+	for slot in target.fds {
+		if slot != unsafe { nil } {
+			count++
+		}
+	}
+	mut open := []int{cap: count}
+	for i, slot in target.fds {
+		if slot != unsafe { nil } {
+			open << i
+		}
+	}
+	return open
 }
 
 pub fn fd_create_from_resource(mut res resource.Resource, flags int) ?&FD {
@@ -502,6 +563,10 @@ pub fn fd_from_fdnum(_process &proc.Process, fdnum int) ?&FD {
 		process.fds_lock.release()
 	}
 
+	if fdnum >= process.fds.len {
+		errno.set(errno.ebadf)
+		return none
+	}
 	mut ret := unsafe { &FD(process.fds[fdnum]) }
 	if voidptr(ret) == unsafe { nil } {
 		errno.set(errno.ebadf)
@@ -588,9 +653,14 @@ pub fn syscall_close_range(_ voidptr, first u32, last u32, flags u32) (u64, u64)
 
 	mut process := proc.current_thread().process
 
+	// No further than the table reaches; it only grows, and a descriptor
+	// made past its end while this runs is not one it was asked to close.
+	if process.fds.len == 0 {
+		return 0, 0
+	}
 	mut top := u64(last)
-	if top >= u64(proc.max_fds) {
-		top = u64(proc.max_fds) - 1
+	if top >= u64(process.fds.len) {
+		top = u64(process.fds.len) - 1
 	}
 
 	for i := u64(first); i <= top; i++ {

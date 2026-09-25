@@ -28,7 +28,7 @@ pub fn initialise() {
 	kernel_process = &proc.Process{
 		pagemap: &kernel_pagemap
 		caps:    proc.full_capabilities()
-		fds:     []voidptr{len: proc.max_fds}
+		fds:     []voidptr{len: proc.initial_fds}
 	}
 }
 
@@ -700,7 +700,7 @@ pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) ?&proc.Pr
 	}
 	mut new_proc := &proc.Process{
 		pagemap: unsafe { nil }
-		fds:     []voidptr{len: proc.max_fds}
+		fds:     []voidptr{len: proc.initial_fds}
 	}
 
 	new_proc.pid = proc.allocate_pid(new_proc) or { return none }

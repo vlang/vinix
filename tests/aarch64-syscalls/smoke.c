@@ -817,6 +817,47 @@ static int blocked_ignored_signals(void) {
     return valid;
 }
 
+// A process may raise its descriptor limit past 1024 and use what it asked
+// for, as servers do: the table grows, fork copies it, and /proc/self/fd and
+// close_range(2) reach the new descriptors.
+static int many_descriptors(void) {
+    struct rlimit old, raised;
+    if (getrlimit(RLIMIT_NOFILE, &old) != 0 || old.rlim_max < 4096)
+        return 0;
+    raised = old;
+    raised.rlim_cur = 4096;
+    if (setrlimit(RLIMIT_NOFILE, &raised) != 0)
+        return 0;
+    static int opened[1100];
+    int count = 0;
+    int valid = 1;
+    int last = -1;
+    for (int i = 0; i < 1100 && valid; i++) {
+        last = dup(0);
+        valid = last >= 0;
+        if (valid)
+            opened[count++] = last;
+    }
+    valid = valid && last >= 1024 && dup2(0, 3000) == 3000 && fcntl(3000, F_GETFD) >= 0 &&
+            access("/proc/self/fd/3000", F_OK) == 0;
+    fflush(stdout);
+    pid_t child = valid ? fork() : -1;
+    if (child == 0)
+        _exit(fcntl(3000, F_GETFD) >= 0 && fcntl(last, F_GETFD) >= 0 ? 0 : 1);
+    valid = valid && security_child_succeeded(child);
+    if (!valid)
+        printf("many descriptors: last=%d errno=%d\n", last, errno);
+    for (int i = 0; i < count; i++) {
+        if (opened[i] < 1024)
+            close(opened[i]);
+    }
+    syscall(SYS_close_range, 1024, ~0U, 0);
+    valid = valid && failed_with_errno(fcntl(3000, F_GETFD), EBADF, "descriptor closed by close_range") &&
+            failed_with_errno(fcntl(last, F_GETFD), EBADF, "descriptor closed by close_range");
+    setrlimit(RLIMIT_NOFILE, &old);
+    return valid;
+}
+
 static int handler_without_restorer(void) {
     struct {
         void (*handler)(int);
@@ -1148,6 +1189,7 @@ int main(int argc, char **argv, char **envp) {
     check(unix_datagrams(), "unix datagram sockets");
     check(initial_strings(argc, argv, envp), "argument and environment strings in order");
     check(blocked_ignored_signals(), "blocked signals kept whatever their disposition");
+    check(many_descriptors(), "descriptors past 1024");
     int no_family[2];
     check(failed_with_errno(socket(AF_INET6, SOCK_STREAM, 0), EAFNOSUPPORT, "IPv6 socket") &&
               failed_with_errno(socketpair(AF_INET, SOCK_STREAM, 0, no_family), EOPNOTSUPP,

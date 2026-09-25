@@ -1131,7 +1131,7 @@ pub fn start_program_node(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, p
 		// with O_CLOEXEC, and leaked FDs prevent pipe refcount from
 		// reaching 1, blocking EOF on reads.
 		gpu_exec_trace(trace_gpu, 'scanning close-on-exec descriptors')
-		for i := 0; i < proc.max_fds; i++ {
+		for i := 0; i < curr_process.fds.len; i++ {
 			fd_ptr := unsafe { &file.FD(curr_process.fds[i]) }
 			if fd_ptr == unsafe { nil } {
 				continue

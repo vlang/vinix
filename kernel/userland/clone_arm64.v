@@ -287,16 +287,19 @@ fn clone_new_process(state &cpulocal.GPRState, flags u64, child_stack u64, paren
 		}
 	}
 
-	// Duplicate the descriptor table, preserving each fd's O_CLOEXEC flag.
-	for i := 0; i < proc.max_fds; i++ {
-		if old_process.fds[i] == unsafe { nil } {
-			continue
-		}
-		old_fd := unsafe { &file.FD(old_process.fds[i]) }
-		file.fdnum_dup(old_process, i, new_process, i, old_fd.flags, true, false) or {
+	// Duplicate the descriptor table, preserving each fd's O_CLOEXEC flag. The
+	// open numbers are read under the table's lock: another thread of the
+	// parent may make a descriptor meanwhile, and grow the table as it does.
+	mut open := file.open_fdnums(old_process)
+	for i in open {
+		mut old_fd := file.fd_from_fdnum(old_process, i) or { continue }
+		flags := old_fd.flags
+		old_fd.unref()
+		file.fdnum_dup(old_process, i, new_process, i, flags, true, false) or {
 			continue
 		}
 	}
+	unsafe { open.free() }
 
 	mut child_sp := state.sp
 	if child_stack != 0 {
@@ -474,7 +477,7 @@ fn exit_process(mut current_process proc.Process, mut current_thread proc.Thread
 	current_process.pagemap = unsafe { nil }
 	proc.unlock_table()
 
-	for i := 0; i < proc.max_fds; i++ {
+	for i := 0; i < current_process.fds.len; i++ {
 		if current_process.fds[i] == unsafe { nil } {
 			continue
 		}

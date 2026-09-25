@@ -8,11 +8,20 @@ import memory
 import event.eventstruct
 import time
 
-// Match the conventional Linux soft RLIMIT_NOFILE. Large compatibility
-// processes such as Wine's server keep a descriptor for every translated
-// process, message queue, and X11 connection; 256 slots can be exhausted while
-// a complex application is still creating its UI threads.
-pub const max_fds = 1024
+// The most descriptors a process may have: Linux's nr_open, and the hard
+// RLIMIT_NOFILE a process starts with. Its table starts with initial_fds
+// slots and grows as descriptors past them are made (file.grow_fd_table), so
+// a process holding few costs no more than it did when every table was the
+// fixed size. Servers raise their soft limit into the thousands: redis wants
+// 10032, MariaDB and Elasticsearch more, and all of them were held to 1024.
+pub const max_fds = 1048576
+
+// The conventional soft RLIMIT_NOFILE, and how many slots a table has to begin
+// with. Large compatibility processes such as Wine's server keep a descriptor
+// for every translated process, message queue, and X11 connection; 256 slots
+// can be exhausted while a complex application is still creating its UI
+// threads.
+pub const initial_fds = 1024
 
 pub const max_events = 32
 
@@ -166,7 +175,7 @@ pub fn default_rlimits() [rlimit_nlimits]RLimit {
 		}
 	}
 	limits[rlimit_nofile] = RLimit{
-		cur: u64(max_fds)
+		cur: u64(initial_fds)
 		max: u64(max_fds)
 	}
 	limits[rlimit_stack] = RLimit{
@@ -208,9 +217,9 @@ pub mut:
 	threads_lock             klock.Lock
 	fds_lock                 klock.Lock
 	rlimits_lock             klock.Lock
-	// The descriptor table, max_fds entries allocated with the process and
-	// freed when it is reaped. Held inline it made every process 10 KiB, which
-	// the allocator rounds up to four pages.
+	// The descriptor table, initial_fds entries allocated with the process,
+	// grown under fds_lock, and freed when it is reaped. Held inline it made
+	// every process 10 KiB, which the allocator rounds up to four pages.
 	fds                      []voidptr
 	children                 []&Process
 	children_lock            klock.Lock
