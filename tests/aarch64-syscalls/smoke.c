@@ -858,6 +858,37 @@ static int many_descriptors(void) {
     return valid;
 }
 
+// A huge reservation with little in it costs what it holds, not its size:
+// fork, mprotect and munmap of 1 TiB of PROT_NONE with one page in use, as
+// MariaDB keeps 8 TiB of it. Walked a page at a time this took minutes.
+static int huge_reservation(void) {
+    size_t size = (size_t)1 << 40;
+    struct timespec start, end;
+    clock_gettime(CLOCK_MONOTONIC, &start);
+    char *reserved = mmap(NULL, size, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE, -1, 0);
+    if (reserved == MAP_FAILED) {
+        printf("huge reservation: mmap errno=%d\n", errno);
+        return 0;
+    }
+    char *middle = reserved + size / 2;
+    int valid = mprotect(middle, 4096, PROT_READ | PROT_WRITE) == 0;
+    if (valid)
+        middle[0] = 7;
+    for (int i = 0; i < 3 && valid; i++) {
+        fflush(stdout);
+        pid_t child = fork();
+        if (child == 0)
+            _exit(middle[0] == 7 ? 0 : 1);
+        valid = security_child_succeeded(child);
+    }
+    valid = valid && mprotect(reserved, size, PROT_NONE) == 0 && munmap(reserved, size) == 0;
+    clock_gettime(CLOCK_MONOTONIC, &end);
+    double seconds = (end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec) / 1e9;
+    if (!valid || seconds > 2.0)
+        printf("huge reservation: valid=%d %.2fs\n", valid, seconds);
+    return valid && seconds <= 2.0;
+}
+
 static int handler_without_restorer(void) {
     struct {
         void (*handler)(int);
@@ -1190,6 +1221,7 @@ int main(int argc, char **argv, char **envp) {
     check(initial_strings(argc, argv, envp), "argument and environment strings in order");
     check(blocked_ignored_signals(), "blocked signals kept whatever their disposition");
     check(many_descriptors(), "descriptors past 1024");
+    check(huge_reservation(), "a 1 TiB reservation costs what it holds");
     int no_family[2];
     check(failed_with_errno(socket(AF_INET6, SOCK_STREAM, 0), EAFNOSUPPORT, "IPv6 socket") &&
               failed_with_errno(socketpair(AF_INET, SOCK_STREAM, 0, no_family), EOPNOTSUPP,

@@ -446,12 +446,16 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap) ?&memory.Pagemap {
 			range_locals_lock.acquire()
 			global_range.locals << new_local_range
 			range_locals_lock.release()
-			for i := local_range.base; i < local_range.base + local_range.length; i += page_size {
-				old_pte := old_pagemap.virt2pte(i, false) or { continue }
+			// Only the pages there are: a large reservation holds few.
+			range_end := local_range.base + local_range.length
+			mut i := old_pagemap.next_present(local_range.base, range_end)
+			for i < range_end {
+				old_pte := old_pagemap.virt2pte(i, false) or { return none }
 				new_pte := new_pagemap.virt2pte(i, true) or { return none }
 				unsafe {
 					*new_pte = *old_pte
 				}
+				i = old_pagemap.next_present(i + page_size, range_end)
 			}
 		} else {
 			// Private resident pages start shared and read-only in both address
@@ -497,7 +501,12 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap) ?&memory.Pagemap {
 			new_local_range.global = new_global_range
 			new_global_range.locals << new_local_range
 
-			for i := local_range.base; i < local_range.base + local_range.length; i += page_size {
+			// Only the pages there are: a large reservation holds few.
+			range_end := local_range.base + local_range.length
+			mut next := old_pagemap.next_present(local_range.base, range_end)
+			for next < range_end {
+				i := next
+				next = old_pagemap.next_present(i + page_size, range_end)
 				old_pte := old_pagemap.virt2pte(i, false) or { continue }
 				if unsafe { *old_pte } & 1 == 0 {
 					continue
@@ -1288,6 +1297,29 @@ fn populate_missing_pages(mut pagemap memory.Pagemap, address u64, _length u64, 
 	}
 }
 
+// Where the piece of `local_range` from `begin` ends: the range's end or the
+// request's, whichever is first. Worked out rather than stepped to a page at
+// a time, which a range of terabytes made a matter of seconds.
+fn snip_end_of(local_range &MmapRangeLocal, request_end u64, begin u64) u64 {
+	range_end := local_range.base + local_range.length
+	end := if range_end < request_end { range_end } else { request_end }
+	return if end > begin { end } else { begin + page_size }
+}
+
+// The start of the first range after `from` and before `end`, or `end`: how
+// far a walk over a hole between mappings can skip. The caller holds the
+// pagemap lock.
+fn next_mapped_start(pagemap &memory.Pagemap, from u64, end u64) u64 {
+	mut next := end
+	for ptr in pagemap.mmap_ranges {
+		local_range := unsafe { &MmapRangeLocal(ptr) }
+		if local_range.base > from && local_range.base < next {
+			next = local_range.base
+		}
+	}
+	return next
+}
+
 pub fn mprotect_unlocked(mut pagemap memory.Pagemap, addr voidptr, _length u64, prot int) ? {
 	validate_protection(prot)?
 	if _length == 0 {
@@ -1309,24 +1341,20 @@ pub fn mprotect_unlocked(mut pagemap memory.Pagemap, addr voidptr, _length u64, 
 	mut i := u64(addr)
 	for i < u64(addr) + length {
 		mut local_range, _, _ := addr2range(pagemap, i) or {
-			i += page_size
+			i = next_mapped_start(pagemap, i, u64(addr) + length)
 			continue
 		}
 
 		mut global_range := local_range.global
 
+		// A range that has the protection already is passed over whole.
 		if local_range.prot == prot {
-			i += page_size
+			i = snip_end_of(local_range, u64(addr) + length, i)
 			continue
 		}
 
 		snip_begin := i
-		for {
-			i += page_size
-			if i >= local_range.base + local_range.length || i >= u64(addr) + length {
-				break
-			}
-		}
+		i = snip_end_of(local_range, u64(addr) + length, snip_begin)
 		snip_end := i
 		snip_size := snip_end - snip_begin
 
@@ -1350,7 +1378,11 @@ pub fn mprotect_unlocked(mut pagemap memory.Pagemap, addr voidptr, _length u64, 
 			local_range.length -= postsplit_range.length
 		}
 
-		for j := snip_begin; j < snip_end; j += page_size {
+		// Only a page that is there has a protection to change.
+		mut next_page := pagemap.next_present(snip_begin, snip_end)
+		for next_page < snip_end {
+			j := next_page
+			next_page = pagemap.next_present(j + page_size, snip_end)
 			mut writable := true
 			if local_range.cow && prot & prot_write != 0 {
 				phys := pagemap.virt2phys(j) or { u64(0) }
@@ -1424,19 +1456,14 @@ fn munmap_unlocked_impl(mut pagemap memory.Pagemap, addr voidptr, _length u64,
 	mut i := u64(addr)
 	for i < u64(addr) + length {
 		mut local_range, _, _ := addr2range(pagemap, i) or {
-			i += page_size
+			i = next_mapped_start(pagemap, i, u64(addr) + length)
 			continue
 		}
 
 		mut global_range := local_range.global
 
 		snip_begin := i
-		for {
-			i += page_size
-			if i >= local_range.base + local_range.length || i >= u64(addr) + length {
-				break
-			}
-		}
+		i = snip_end_of(local_range, u64(addr) + length, snip_begin)
 		snip_end := i
 		snip_size := snip_end - snip_begin
 
@@ -1460,8 +1487,13 @@ fn munmap_unlocked_impl(mut pagemap memory.Pagemap, addr voidptr, _length u64,
 			local_range.length -= postsplit_range.length
 		}
 
-		for j := snip_begin; j < snip_end; j += page_size {
-			pagemap.unmap_page_unlocked(j) or {}
+		// Only the pages there are: MariaDB's 8 TiB reservation took ten
+		// seconds a page at a time, and a killed container stayed a zombie
+		// for as long.
+		mut present := pagemap.next_present(snip_begin, snip_end)
+		for present < snip_end {
+			pagemap.unmap_page_unlocked(present) or {}
+			present = pagemap.next_present(present + page_size, snip_end)
 		}
 
 		if snip_size == local_range.length {
@@ -1475,7 +1507,12 @@ fn munmap_unlocked_impl(mut pagemap memory.Pagemap, addr voidptr, _length u64,
 			}
 			range_locals_lock.release()
 			if last {
-				for j := global_range.base; j < global_range.base + global_range.length; j += page_size {
+				global_end := global_range.base + global_range.length
+				mut next_shadow := global_range.shadow_pagemap.next_present(global_range.base,
+					global_end)
+				for next_shadow < global_end {
+					j := next_shadow
+					next_shadow = global_range.shadow_pagemap.next_present(j + page_size, global_end)
 					phys := global_range.shadow_pagemap.virt2phys(j) or { continue }
 					global_range.shadow_pagemap.unmap_page(j) or {
 						errno.set(errno.einval)

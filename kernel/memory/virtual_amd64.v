@@ -403,3 +403,14 @@ pub fn (pagemap &Pagemap) residency(start u64, end u64) Residency {
 	}
 	return counted
 }
+
+// The first page at or after `start`, and before `end`, that is mapped, or
+// `end` when none is. The caller holds the pagemap lock.
+pub fn (pagemap &Pagemap) next_present(start u64, end u64) u64 {
+	for virt := start & ~u64(0xfff); virt < end; virt += page_size {
+		if _ := pagemap.virt2phys(virt) {
+			return virt
+		}
+	}
+	return end
+}
