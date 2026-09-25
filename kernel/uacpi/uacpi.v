@@ -54,6 +54,37 @@ fn C.uacpi_namespace_initialize() UACPIStatus
 fn C.uacpi_set_interrupt_model(InterruptModel) UACPIStatus
 @[c_extern]
 fn C.uacpi_status_to_string(UACPIStatus) charptr
+@[c_extern]
+fn C.uacpi_prepare_for_sleep_state(state int) UACPIStatus
+@[c_extern]
+fn C.uacpi_enter_sleep_state(state int) UACPIStatus
+@[c_extern]
+fn C.uacpi_reboot() UACPIStatus
+
+// UACPI_SLEEP_STATE_S5, soft off.
+const sleep_state_s5 = 5
+
+// Turn the machine off through ACPI's S5 state. Returns only if that failed.
+pub fn power_off() {
+	if C.uacpi_prepare_for_sleep_state(sleep_state_s5) != .ok {
+		return
+	}
+	asm volatile amd64 {
+		cli
+	}
+	C.uacpi_enter_sleep_state(sleep_state_s5)
+	asm volatile amd64 {
+		sti
+	}
+}
+
+// Reset the machine through the FADT reset register, then through the
+// keyboard controller, which every PC and every PC emulator has. Returns only
+// if neither did anything.
+pub fn reboot() {
+	C.uacpi_reboot()
+	kio.port_out[u8](0x64, 0xfe)
+}
 
 @[export: 'uacpi_kernel_log']
 pub fn uacpi_kernel_log(level int, str charptr) {

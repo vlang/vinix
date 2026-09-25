@@ -395,6 +395,7 @@ pub fn init_linux_syscall_table() {
 	linux_syscall_table[137] = voidptr(fs.syscall_statfs) // statfs
 	linux_syscall_table[138] = voidptr(fs.syscall_fstatfs) // fstatfs
 	linux_syscall_table[162] = voidptr(fs.syscall_sync) // sync
+	linux_syscall_table[169] = voidptr(syscall_linux_reboot) // reboot
 	linux_syscall_table[188] = voidptr(fs.syscall_setxattr) // setxattr
 	linux_syscall_table[189] = voidptr(fs.syscall_lsetxattr) // lsetxattr
 	linux_syscall_table[190] = voidptr(fs.syscall_fsetxattr) // fsetxattr
