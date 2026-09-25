@@ -253,9 +253,13 @@ fn (mut this SignalFD) unref(_handle voidptr) ? {
 	if katomic.dec(mut &this.refcount) {
 		return
 	}
+	// Found by address. `==` on the two references compared the structs
+	// field by field, a copy of each on the stack; with that, the image
+	// tests froze or crashed the kernel right after postgres, the first
+	// program here to read its signals this way, had exited.
 	signalfds_lock.acquire()
 	for i := 0; i < signalfds.len; i++ {
-		if signalfds[i] == unsafe { this } {
+		if voidptr(signalfds[i]) == voidptr(this) {
 			signalfds.delete(i)
 			katomic.dec(mut &signalfds_count)
 			break
