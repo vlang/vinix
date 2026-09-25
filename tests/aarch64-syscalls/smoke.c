@@ -31,6 +31,7 @@
 #include <sys/membarrier.h>
 #include <sys/mount.h>
 #include <linux/audit.h>
+#include <linux/capability.h>
 #include <linux/filter.h>
 #include <linux/seccomp.h>
 #include <sys/prctl.h>
@@ -460,6 +461,40 @@ static void plain_handler(int signal_number) {
     saw_plain_handler = 1;
 }
 
+// Giving up root while keeping capabilities, then setting the group ids
+// with CAP_SETGID raised again, as setpriv --reuid --regid --clear-groups
+// does. Without the capability the group ids stay put.
+static int kept_capability_child(void) {
+    struct __user_cap_header_struct header = {.version = _LINUX_CAPABILITY_VERSION_3};
+    struct __user_cap_data_struct data[2];
+    if (prctl(PR_SET_KEEPCAPS, 1, 0, 0, 0) != 0 || setresuid(1000, 1000, 1000) != 0 ||
+        geteuid() != 1000)
+        return 1;
+    if (!failed_with_errno(setresgid(1000, 1000, 1000), EPERM, "setresgid without CAP_SETGID"))
+        return 2;
+    if (syscall(SYS_capget, &header, data) != 0 ||
+        !(data[0].permitted & (1u << CAP_SETGID)))
+        return 3;
+    data[0].effective |= 1u << CAP_SETGID;
+    if (syscall(SYS_capset, &header, data) != 0)
+        return 4;
+    gid_t none = 0;
+    if (setresgid(1000, 1000, 1000) != 0 || getgid() != 1000 || getegid() != 1000 ||
+        setgroups(0, &none) != 0 || getgroups(0, NULL) != 0)
+        return 5;
+    if (!failed_with_errno(setresuid(0, 0, 0), EPERM, "setresuid without CAP_SETUID"))
+        return 6;
+    return 0;
+}
+
+static int ids_with_kept_capabilities(void) {
+    fflush(stdout);
+    pid_t child = fork();
+    if (child == 0)
+        _exit(kept_capability_child());
+    return security_child_succeeded(child);
+}
+
 // The line of /proc/self/maps or smaps whose mapping holds `address`, and
 // with `field` the value of that field of it in smaps; -1 when not found.
 static long mapping_line(const char *file, unsigned long address, char *line, size_t size,
@@ -862,6 +897,7 @@ int main(void) {
     check(seccomp_filters(), "seccomp filters");
     check(pipe_reopen(), "pipe reopened through /proc/self/fd");
     check(handler_without_restorer(), "signal handler without SA_RESTORER");
+    check(ids_with_kept_capabilities(), "group ids set with CAP_SETGID after setuid");
     check(process_maps(), "/proc/self/maps and smaps");
     if (chdir(previous_cwd) != 0)
         chdir("/");

@@ -19,9 +19,17 @@ fn current_process() &proc.Process {
 	return proc.current_thread().process
 }
 
-// Whether the caller may hand itself arbitrary credentials.
-fn is_privileged(process &proc.Process) bool {
-	return process.euid == 0
+// Whether the caller may hand itself arbitrary user ids, or group ids and
+// supplementary groups: CAP_SETUID and CAP_SETGID, as on Linux, not an
+// effective uid of 0. setpriv, which starts redis and others in their
+// images, keeps its capabilities across giving up root and sets the groups
+// after the uid; with root the test, that setresgid() was refused.
+fn may_set_uids(process &proc.Process) bool {
+	return proc.has_capability(process, proc.cap_setuid)
+}
+
+fn may_set_gids(process &proc.Process) bool {
+	return proc.has_capability(process, proc.cap_setgid)
 }
 
 pub fn syscall_getuid(_ voidptr) (u64, u64) {
@@ -47,7 +55,7 @@ pub fn syscall_setuid(_ voidptr, uid u32) (u64, u64) {
 	mut process := current_process()
 	old_ruid, old_euid, old_suid := process.uid, process.euid, process.suid
 
-	if is_privileged(process) {
+	if may_set_uids(process) {
 		process.uid = uid
 		process.euid = uid
 		process.suid = uid
@@ -67,7 +75,7 @@ pub fn syscall_setuid(_ voidptr, uid u32) (u64, u64) {
 pub fn syscall_setgid(_ voidptr, gid u32) (u64, u64) {
 	mut process := current_process()
 
-	if is_privileged(process) {
+	if may_set_gids(process) {
 		process.gid = gid
 		process.egid = gid
 		process.sgid = gid
@@ -90,7 +98,7 @@ fn unchanged(id u32) bool {
 pub fn syscall_setreuid(_ voidptr, ruid u32, euid u32) (u64, u64) {
 	mut process := current_process()
 	old_ruid, old_euid, old_suid := process.uid, process.euid, process.suid
-	privileged := is_privileged(process)
+	privileged := may_set_uids(process)
 
 	if !unchanged(ruid) {
 		if !privileged && ruid != process.uid && ruid != process.euid {
@@ -123,7 +131,7 @@ pub fn syscall_setreuid(_ voidptr, ruid u32, euid u32) (u64, u64) {
 
 pub fn syscall_setregid(_ voidptr, rgid u32, egid u32) (u64, u64) {
 	mut process := current_process()
-	privileged := is_privileged(process)
+	privileged := may_set_gids(process)
 
 	if !unchanged(rgid) {
 		if !privileged && rgid != process.gid && rgid != process.egid {
@@ -157,7 +165,7 @@ pub fn syscall_setresuid(_ voidptr, ruid u32, euid u32, suid u32) (u64, u64) {
 	mut process := current_process()
 	old_ruid, old_euid, old_suid := process.uid, process.euid, process.suid
 
-	if !is_privileged(process) {
+	if !may_set_uids(process) {
 		for wanted in [ruid, euid, suid] {
 			if unchanged(wanted) {
 				continue
@@ -185,7 +193,7 @@ pub fn syscall_setresuid(_ voidptr, ruid u32, euid u32, suid u32) (u64, u64) {
 pub fn syscall_setresgid(_ voidptr, rgid u32, egid u32, sgid u32) (u64, u64) {
 	mut process := current_process()
 
-	if !is_privileged(process) {
+	if !may_set_gids(process) {
 		for wanted in [rgid, egid, sgid] {
 			if unchanged(wanted) {
 				continue
@@ -271,7 +279,7 @@ pub fn syscall_setgroups(_ voidptr, size int, list u64) (u64, u64) {
 	if size < 0 || size > max_groups {
 		return errno.err, errno.einval
 	}
-	if !is_privileged(process) {
+	if !may_set_gids(process) {
 		return errno.err, errno.eperm
 	}
 
