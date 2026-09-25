@@ -4,8 +4,6 @@ import x86.gdt
 import x86.idt
 import x86.cpu
 import x86.msr
-// The syscall module supplies the C symbols syscall_entry calls into.
-import syscall as _
 import x86.cpu.local as cpulocal
 import limine
 import x86.apic
@@ -13,8 +11,16 @@ import katomic
 import sched
 import memory
 import x86.hypervisor
+// The syscall module supplies the C symbols syscall_entry calls into, and
+// pin_syscall_entry_callees() (called below) is what actually keeps them
+// linked in.
+import syscall
 
-// asm/x86_64/syscall_entry.S
+// Hand-written in kernel/asm/x86_64/syscall_entry.S rather than V -- it has
+// to be genuinely prologue-free (the CPU hands control here with the live
+// user stack pointer still active), which @[_naked] does not actually
+// guarantee for V 0.5.2's C backend. See that file's own comment for the
+// full story.
 fn C.syscall_entry()
 
 const cpuid7_ebx_smep = u32(1) << 7
@@ -63,6 +69,10 @@ pub fn initialise(smp_info &limine.LimineSMPInfo) {
 	msr.wrmsr(0xc0000081, 0x0033002800000000)
 
 	// Entry address
+	// Real statement, not a global initializer expression: see
+	// pin_syscall_entry_callees's own comment for why that distinction
+	// mattered here.
+	syscall.pin_syscall_entry_callees()
 	msr.wrmsr(0xc0000082, u64(voidptr(C.syscall_entry)))
 
 	// Flags mask
