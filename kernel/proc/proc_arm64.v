@@ -53,6 +53,10 @@ pub mut:
 	stacks             []voidptr
 	signalfds_lock     klock.Lock
 	signalfds          []voidptr
+	// The name PR_SET_NAME gave the thread, which a new thread takes from the
+	// one that made it; empty for one never named, which goes by its
+	// process's.
+	comm string
 	attached_events    [max_events]&eventstruct.Event
 	attached_events_i  u64
 	// Linux thread bookkeeping

@@ -52,6 +52,8 @@ pub mut:
 	stacks             []voidptr
 	signalfds_lock     klock.Lock
 	signalfds          []voidptr
+	// The name PR_SET_NAME gave the thread; empty for one never named.
+	comm string
 	attached_events    [max_events]&eventstruct.Event
 	attached_events_i  u64
 	// Monotonic reading taken when this thread was last put on a CPU, or 0

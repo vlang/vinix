@@ -472,22 +472,36 @@ fn syscall_linux_prctl(_ voidptr, option int, arg2 u64, _arg3 u64, _arg4 u64, _a
 
 	match option {
 		pr_set_name {
-			// The name is the thread's, up to 16 bytes including the null.
+			// The name is the thread's, up to 16 bytes including the null. It
+			// was made the whole process's: node's threads name themselves, and
+			// its process went by the last of them -- ps showed DelayedTaskSche,
+			// and pgrep node found nothing. The process goes by its first
+			// thread's name, as on Linux.
 			mut raw := [task_comm_len]u8{}
 			if !usercopy.copy_from_user(voidptr(&raw[0]), arg2, task_comm_len) {
 				return errno.err, errno.efault
 			}
 			raw[task_comm_len - 1] = 0
-			process.name = unsafe { cstring_to_vstring(&raw[0]) }
+			mut current := proc.current_thread()
+			old_comm := current.comm
+			current.comm = unsafe { cstring_to_vstring(&raw[0]) }
+			if old_comm.len > 0 {
+				unsafe { old_comm.free() }
+			}
+			if current.tid == process.pid {
+				process.name = current.comm.clone()
+			}
 			return 0, 0
 		}
 		pr_get_name {
 			mut raw := [task_comm_len]u8{}
-			mut length := u64(process.name.len)
+			current := proc.current_thread()
+			own := if current.comm.len > 0 { current.comm } else { process.name }
+			mut length := u64(own.len)
 			if length > task_comm_len - 1 {
 				length = task_comm_len - 1
 			}
-			unsafe { C.memcpy(&raw[0], process.name.str, length) }
+			unsafe { C.memcpy(&raw[0], own.str, length) }
 			if !usercopy.copy_to_user(arg2, voidptr(&raw[0]), task_comm_len) {
 				return errno.err, errno.efault
 			}

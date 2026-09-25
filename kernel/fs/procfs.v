@@ -483,6 +483,9 @@ fn (this &ProcFSResource) contents() string {
 			return text_with_ending(proc.process_program(this.pid), 0)
 		}
 		.comm {
+			if this.tid != 0 {
+				return text_with_ending(proc.thread_command(this.pid, this.tid), `\n`)
+			}
 			return text_with_ending(proc.process_command(this.pid), `\n`)
 		}
 		.process_stat {
@@ -1456,7 +1459,9 @@ fn anonymous_descriptor_text(res &resource.Resource) string {
 // A process's file shows ids as the tree it is in numbers them.
 fn add_process_file(mut parent VFSNode, name string, kind ProcFSKind, pid int) {
 	mut node := create_node(parent.filesystem, parent, name, false)
-	mut file := new_procfs_resource(kind, stat.ifreg | 0o444, pid, 0)
+	// A file in /proc/<pid>/task/<tid> knows its thread.
+	mut file := new_procfs_resource(kind, stat.ifreg | 0o444, pid,
+		unsafe { &ProcFSResource(parent.resource) }.tid)
 	file.view = unsafe { &ProcFSResource(parent.resource) }.view
 	node.resource = file
 	unsafe {

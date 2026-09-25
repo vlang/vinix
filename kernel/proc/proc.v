@@ -808,6 +808,29 @@ pub fn process_command(pid int) string {
 	return text.str()
 }
 
+// A thread's name, as /proc/<pid>/task/<tid>/comm shows it: the one it gave
+// itself, or its process's.
+pub fn thread_command(pid int, tid int) string {
+	lock_table()
+	defer { unlock_table() }
+	mut process := process_at(pid)
+	if process == unsafe { nil } {
+		return ''
+	}
+	process.threads_lock.acquire()
+	for t in process.threads {
+		if t.tid == tid && t.comm.len > 0 {
+			name := t.comm.clone()
+			process.threads_lock.release()
+			return name
+		}
+	}
+	process.threads_lock.release()
+	mut text := lib.new_text(32)
+	add_command_name(mut text, process.name)
+	return text.str()
+}
+
 // The auxiliary vector a process was started with, as bytes of its own.
 pub fn process_auxv(pid int) []u8 {
 	lock_table()

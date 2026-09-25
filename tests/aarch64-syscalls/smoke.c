@@ -954,6 +954,42 @@ static int cpu_features(void) {
     return valid;
 }
 
+static void *naming_thread(void *result) {
+    char path[64], name[32] = {0};
+    prctl(PR_SET_NAME, "named-thread", 0, 0, 0);
+    snprintf(path, sizeof(path), "/proc/self/task/%ld/comm", (long)syscall(SYS_gettid));
+    int fd = open(path, O_RDONLY);
+    if (fd >= 0) {
+        read(fd, name, sizeof(name) - 1);
+        close(fd);
+    }
+    *(int *)result = !strcmp(name, "named-thread\n");
+    return NULL;
+}
+
+// A thread that names itself names itself, not its process: node's threads
+// do, and its process went by the last one's name.
+static int thread_names(void) {
+    char before[32] = {0}, after[32] = {0};
+    int fd = open("/proc/self/comm", O_RDONLY);
+    if (fd < 0 || read(fd, before, sizeof(before) - 1) <= 0)
+        return 0;
+    close(fd);
+    int thread_saw = 0;
+    pthread_t thread;
+    if (pthread_create(&thread, NULL, naming_thread, &thread_saw) != 0)
+        return 0;
+    pthread_join(thread, NULL);
+    fd = open("/proc/self/comm", O_RDONLY);
+    if (fd < 0 || read(fd, after, sizeof(after) - 1) <= 0)
+        return 0;
+    close(fd);
+    int valid = thread_saw && !strcmp(before, after);
+    if (!valid)
+        printf("thread names: thread=%d before=%s after=%s", thread_saw, before, after);
+    return valid;
+}
+
 static int handler_without_restorer(void) {
     struct {
         void (*handler)(int);
@@ -1289,6 +1325,7 @@ int main(int argc, char **argv, char **envp) {
     check(huge_reservation(), "a 1 TiB reservation costs what it holds");
     check(program_break(), "brk moves the break, and fork keeps it");
     check(cpu_features(), "AT_HWCAP, /proc/self/auxv and MRS of ID registers agree");
+    check(thread_names(), "a thread's name is its own");
     int no_family[2];
     check(failed_with_errno(socket(AF_INET6, SOCK_STREAM, 0), EAFNOSUPPORT, "IPv6 socket") &&
               failed_with_errno(socketpair(AF_INET, SOCK_STREAM, 0, no_family), EOPNOTSUPP,

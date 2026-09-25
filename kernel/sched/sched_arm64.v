@@ -2031,6 +2031,7 @@ pub fn new_cloned_thread(_process &proc.Process, _source &proc.Thread, state &cp
 		sigentry: source.sigentry
 		sigactions: source.sigactions
 		masked_signals: source.masked_signals
+		comm: source.comm.clone()
 		affinity_mask: source.affinity_mask
 		sched: inherited_sched_params(source)
 	}
