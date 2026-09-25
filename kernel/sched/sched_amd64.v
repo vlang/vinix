@@ -171,7 +171,15 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 	mut next_thread := get_next_thread()
 
 	if unsafe { current_thread != 0 } {
-		current_thread.yield_await.release()
+		// Let a yield() waiting on this lock go on, with a plain store rather
+		// than release(): release() puts back the interrupt flag of whoever
+		// took the lock last, and that was yield() itself, with interrupts on
+		// -- or, when the thread was not yielding at all, an earlier yield().
+		// Interrupts turned on here, on the scheduler's IST stack, let the next
+		// scheduler interrupt land on the same stack and write its frame over
+		// this one: the thread interrupted here was later resumed with another
+		// context's registers, or the CPU kept returning to its own iretq.
+		katomic.store(mut &current_thread.yield_await.l, false)
 
 		if unsafe { next_thread == nil } && katomic.load(&current_thread.is_in_queue)
 			&& may_run_here(current_thread, cpu_local.cpu_number) {
