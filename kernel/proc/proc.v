@@ -542,8 +542,44 @@ pub fn process_cpu_time(process &Process, now_ns u64) u64 {
 	return total
 }
 
+// The CPU time of the thread `id`, which has to be one of the caller's
+// process, or of the process `id`, for the clocks pthread_getcpuclockid(3)
+// and clock_getcpuclockid(3) name; 0 is the caller's. None when `id` names
+// no such thread or process.
+pub fn cpu_clock_ns(id int, per_thread bool, now_ns u64) ?u64 {
+	current := current_thread()
+	if per_thread {
+		if id == 0 || id == current.tid {
+			return thread_cpu_time(current, now_ns)
+		}
+		t := get_thread(id)
+		if t == unsafe { nil } {
+			return none
+		}
+		same := voidptr(t.process) == voidptr(current.process)
+		ns := thread_cpu_time(t, now_ns)
+		unpin_thread(t)
+		if !same {
+			return none
+		}
+		return ns
+	}
+	if id == 0 || id == current.tid {
+		return process_cpu_time(current.process, now_ns)
+	}
+	lock_table()
+	defer { unlock_table() }
+	p := process_at(id)
+	if p == unsafe { nil } {
+		return none
+	}
+	return process_cpu_time(p, now_ns)
+}
+
+// A reaped child's time, and that of the children it reaped in turn, is its
+// parent's children's time: `time make` counts the compilers make ran.
 pub fn account_reaped_child(mut parent Process, child &Process) {
-	child_time := katomic.load(&child.cpu_time_ns)
+	child_time := katomic.load(&child.cpu_time_ns) + katomic.load(&child.children_cpu_time_ns)
 	for {
 		total := katomic.load(&parent.children_cpu_time_ns)
 		if katomic.cas(mut &parent.children_cpu_time_ns, total, total + child_time) {
@@ -974,7 +1010,12 @@ pub fn process_stat_line(pid int, viewer &Namespace) string {
 	text.add_decimal(shown_pgid)
 	text.add_byte(` `)
 	text.add_decimal(shown_sid)
-	text.add(' 0 -1 0 0 0 0 0 0 0 0 0 ')
+	// utime and cutime, in clock ticks; all CPU time is charged as user time.
+	text.add(' 0 -1 0 0 0 0 0 ')
+	text.add_unsigned(katomic.load(&process.cpu_time_ns) / 10000000)
+	text.add(' 0 ')
+	text.add_unsigned(katomic.load(&process.children_cpu_time_ns) / 10000000)
+	text.add(' 0 ')
 	text.add_decimal(priority)
 	text.add_byte(` `)
 	text.add_decimal(process.nice)

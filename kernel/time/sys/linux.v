@@ -7,6 +7,7 @@ module sys
 import errno
 import event
 import event.eventstruct
+import proc
 import time
 import usercopy
 
@@ -36,11 +37,54 @@ fn read_clock(clock_id int) ?time.TimeSpec {
 		6 {
 			return monotonic_clock
 		}
+		// The CPU time of the calling process and thread.
+		clock_process_cputime_id {
+			return cpu_time_spec(proc.process_cpu_time(proc.current_thread().process,
+				time.monotonic_ns()))
+		}
+		clock_thread_cputime_id {
+			return cpu_time_spec(proc.thread_cpu_time(proc.current_thread(), time.monotonic_ns()))
+		}
 		else {
+			// A negative id is the CPU clock of a process or thread, as
+			// Linux encodes one: the pid, inverted, above three bits that say
+			// whether it is a thread's and which clock. The JVM reads other
+			// threads' CPU time this way. Every one of the three clocks is
+			// the same time here, charged as user time.
+			if clock_id < 0 && clock_id & cpuclock_which_mask != cpuclock_which_mask {
+				local := ~(clock_id >> 3)
+				per_thread := clock_id & cpuclock_perthread != 0
+				ns := proc.cpu_clock_ns(proc.kernel_id(local), per_thread, time.monotonic_ns()) or {
+					errno.set(errno.einval)
+					return none
+				}
+				return cpu_time_spec(ns)
+			}
 			errno.set(errno.einval)
 			return none
 		}
 	}
+}
+
+const clock_process_cputime_id = 2
+
+const clock_thread_cputime_id = 3
+
+const cpuclock_perthread = 4
+
+const cpuclock_which_mask = 3
+
+fn cpu_time_spec(ns u64) time.TimeSpec {
+	return time.TimeSpec{
+		tv_sec:  i64(ns / 1000000000)
+		tv_nsec: i64(ns % 1000000000)
+	}
+}
+
+// Whether `clock_id` measures CPU time rather than time passing.
+fn is_cpu_clock(clock_id int) bool {
+	return clock_id < 0 || clock_id == clock_process_cputime_id
+		|| clock_id == clock_thread_cputime_id
 }
 
 // Linux clock_gettime accepts the raw, boot-time and coarse clock ids used by
@@ -102,6 +146,11 @@ pub fn syscall_clock_getres(_ voidptr, clock_id int, res u64) (u64, u64) {
 // request is a point in time on `clock_id`, so it has to be turned into a
 // duration first — and a deadline already past is not an error, it just returns.
 pub fn syscall_clock_nanosleep(_ voidptr, clock_id int, flags int, request u64, remain u64) (u64, u64) {
+	// A sleep here is measured in time passing; one until a CPU clock reaches
+	// a value is not something it can wait for.
+	if is_cpu_clock(clock_id) {
+		return errno.err, errno.einval
+	}
 	now := read_clock(clock_id) or { return errno.err, errno.get() }
 
 	mut wanted := time.TimeSpec{}

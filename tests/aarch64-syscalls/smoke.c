@@ -29,6 +29,7 @@
 #include <ucontext.h>
 #include <sys/auxv.h>
 #include <sys/signalfd.h>
+#include <sys/times.h>
 #include <sys/un.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -1118,6 +1119,47 @@ static int signal_descriptor(void) {
     return valid;
 }
 
+static long elapsed_ns(struct timespec from, struct timespec to) {
+    return (to.tv_sec - from.tv_sec) * 1000000000L + (to.tv_nsec - from.tv_nsec);
+}
+
+// CPU time moves while the process computes, on every clock that reads it:
+// CLOCK_PROCESS_CPUTIME_ID and CLOCK_THREAD_CPUTIME_ID, the thread's clock
+// pthread_getcpuclockid() names, and times(). One of a thread outside the
+// process is refused.
+static int cpu_clocks(void) {
+    struct timespec process0 = {0}, thread0 = {0}, process1 = {0}, thread1 = {0}, named = {0};
+    struct timespec start, now;
+    struct tms before, after;
+    clockid_t own;
+    int valid = pthread_getcpuclockid(pthread_self(), &own) == 0 &&
+                clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &process0) == 0 &&
+                clock_gettime(CLOCK_THREAD_CPUTIME_ID, &thread0) == 0;
+    times(&before);
+    volatile double sum = 0;
+    clock_gettime(CLOCK_MONOTONIC, &start);
+    do {
+        for (int i = 0; i < 100000; i++)
+            sum += i;
+        clock_gettime(CLOCK_MONOTONIC, &now);
+    } while (elapsed_ns(start, now) < 150000000L);
+    valid = valid && clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &process1) == 0 &&
+            clock_gettime(CLOCK_THREAD_CPUTIME_ID, &thread1) == 0 &&
+            clock_gettime(own, &named) == 0;
+    times(&after);
+    long process_ns = elapsed_ns(process0, process1);
+    long thread_ns = elapsed_ns(thread0, thread1);
+    long ticks = (long)(after.tms_utime - before.tms_utime);
+    struct timespec refused;
+    int foreign = clock_gettime((clockid_t)((~1u << 3) | 6), &refused) == -1 && errno == EINVAL;
+    valid = valid && process_ns >= 50000000L && thread_ns >= 50000000L &&
+            elapsed_ns(thread1, named) >= 0 && ticks >= 5 && clock() > 0 && foreign;
+    if (!valid)
+        printf("cpu clocks: process=%ld thread=%ld ticks=%ld clock=%ld foreign=%d\n", process_ns,
+               thread_ns, ticks, (long)clock(), foreign);
+    return valid;
+}
+
 static int handler_without_restorer(void) {
     struct {
         void (*handler)(int);
@@ -1463,6 +1505,7 @@ int main(int argc, char **argv, char **envp) {
     close(queued_pipe[0]);
     close(queued_pipe[1]);
     check(signal_descriptor(), "signalfd with poll, epoll and a blocking read");
+    check(cpu_clocks(), "CPU time clocks and times()");
     int no_family[2];
     check(failed_with_errno(socket(AF_INET6, SOCK_STREAM, 0), EAFNOSUPPORT, "IPv6 socket") &&
               failed_with_errno(socketpair(AF_INET, SOCK_STREAM, 0, no_family), EOPNOTSUPP,
