@@ -1160,6 +1160,46 @@ static int cpu_clocks(void) {
     return valid;
 }
 
+// A file whose last descriptor is closed leaves the epoll sets that watch it,
+// without EPOLL_CTL_DEL: nginx closes a socket it tested EPOLLRDHUP with that
+// way, and could not add a connection that got the same number. One with a
+// descriptor left stays, and a pipe's write end watched there still gives its
+// reader end of file once closed.
+static int epoll_closed_files(void) {
+    int ep = epoll_create1(EPOLL_CLOEXEC);
+    int first[2], second[2], pipe_ends[2];
+    struct epoll_event watch = {.events = EPOLLIN, .data.u64 = 7}, out = {0};
+    if (ep < 0 || socketpair(AF_UNIX, SOCK_STREAM, 0, first) != 0 ||
+        socketpair(AF_UNIX, SOCK_STREAM, 0, second) != 0 || pipe(pipe_ends) != 0)
+        return 0;
+    int added = epoll_ctl(ep, EPOLL_CTL_ADD, first[0], &watch) == 0;
+    int number = first[0];
+    close(first[0]);
+    int moved = dup2(second[0], number) == number;
+    close(second[0]);
+    int readded = epoll_ctl(ep, EPOLL_CTL_ADD, number, &watch) == 0;
+    int copy = dup(number);
+    close(number);
+    int ready = write(second[1], "x", 1) == 1 && epoll_wait(ep, &out, 1, 1000) == 1 &&
+                out.data.u64 == 7;
+    struct epoll_event writable = {.events = EPOLLOUT};
+    epoll_ctl(ep, EPOLL_CTL_ADD, pipe_ends[1], &writable);
+    close(pipe_ends[1]);
+    fcntl(pipe_ends[0], F_SETFL, O_NONBLOCK);
+    char byte;
+    int eof = read(pipe_ends[0], &byte, 1) == 0;
+    close(pipe_ends[0]);
+    close(copy);
+    close(second[1]);
+    close(first[1]);
+    close(ep);
+    int valid = added && moved && readded && ready && eof;
+    if (!valid)
+        printf("epoll closed files: added=%d moved=%d readded=%d ready=%d eof=%d\n", added, moved,
+               readded, ready, eof);
+    return valid;
+}
+
 static int handler_without_restorer(void) {
     struct {
         void (*handler)(int);
@@ -1506,6 +1546,7 @@ int main(int argc, char **argv, char **envp) {
     close(queued_pipe[1]);
     check(signal_descriptor(), "signalfd with poll, epoll and a blocking read");
     check(cpu_clocks(), "CPU time clocks and times()");
+    check(epoll_closed_files(), "a closed file leaves its epoll sets");
     int no_family[2];
     check(failed_with_errno(socket(AF_INET6, SOCK_STREAM, 0), EAFNOSUPPORT, "IPv6 socket") &&
               failed_with_errno(socketpair(AF_INET, SOCK_STREAM, 0, no_family), EOPNOTSUPP,

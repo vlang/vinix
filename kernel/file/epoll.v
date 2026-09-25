@@ -1,3 +1,4 @@
+@[has_globals]
 module file
 
 import resource
@@ -26,11 +27,15 @@ mut:
 	events u32
 	data   u64
 	ready  u32
-	// A retained reference to the open-file description being watched. Holding
-	// it keeps the resource alive for as long as it is in the set, so a close
-	// of the last descriptor cannot free a resource this still points at --
-	// which is also how Linux behaves: an epoll registration is against the
-	// open file, not the descriptor number.
+	// A retained reference to the open-file description being watched, which
+	// keeps the resource alive for as long as it is in the set. It is counted
+	// in the file's epoll_refs, and when those are all that is left the file
+	// leaves the set (epoll_forget): an epoll registration is against the open
+	// file, and goes with it, as on Linux. Kept for good, it stayed after its
+	// last descriptor was closed, and a descriptor that later got the same
+	// number could not be added: nginx adds one end of a socketpair to test
+	// EPOLLRDHUP and closes it without deleting it, and a connection accepted
+	// as the same number failed with EEXIST and was never answered.
 	handle     &Handle = unsafe { nil }
 	generation u64
 	disabled   bool
@@ -50,6 +55,44 @@ pub const epollhup = 0x010
 pub const epollrdhup = 0x2000
 pub const epollet = u32(0x80000000)
 pub const epolloneshot = u32(0x40000000)
+
+// Every epoll set, for epoll_forget() to find the ones watching a file.
+__global (
+	epoll_sets      []&EpollResource
+	epoll_sets_lock klock.Lock
+)
+
+// Take `handle`, whose last descriptor has been closed, out of every set that
+// watches it, and give back their references. Called with no set's lock
+// held: the set's is taken here, after epoll_sets_lock.
+fn epoll_forget(handle &Handle) {
+	mut dropped := 0
+	epoll_sets_lock.acquire()
+	for mut set in epoll_sets {
+		set.l.acquire()
+		mut i := 0
+		for i < set.entries.len {
+			if voidptr(set.entries[i].handle) == voidptr(handle) {
+				set.entries.delete(i)
+				dropped++
+				continue
+			}
+			i++
+		}
+		set.l.release()
+	}
+	epoll_sets_lock.release()
+	if dropped == 0 {
+		return
+	}
+	mut watched := unsafe { handle }
+	for _ in 0 .. dropped {
+		katomic.dec(mut &watched.epoll_refs)
+	}
+	for _ in 0 .. dropped {
+		watched.unref()
+	}
+}
 
 @[heap]
 struct EpollResource {
@@ -83,10 +126,19 @@ fn (mut this EpollResource) unref(_handle voidptr) ? {
 	if katomic.dec(mut &this.refcount) {
 		return
 	}
+	epoll_sets_lock.acquire()
+	for i := 0; i < epoll_sets.len; i++ {
+		if voidptr(epoll_sets[i]) == voidptr(this) {
+			epoll_sets.delete(i)
+			break
+		}
+	}
+	epoll_sets_lock.release()
 	// Give back the reference every entry held on its watched open file.
 	for entry in this.entries {
 		if entry.handle != unsafe { nil } {
 			mut watched_handle := entry.handle
+			katomic.dec(mut &watched_handle.epoll_refs)
 			watched_handle.unref()
 		}
 	}
@@ -126,6 +178,10 @@ pub fn syscall_epoll_create1(_ voidptr, flags int) (u64, u64) {
 	open_flags := resource.o_rdwr |
 		if flags & epoll_cloexec != 0 { resource.o_cloexec } else { 0 }
 
+	epoll_sets_lock.acquire()
+	epoll_sets << res
+	epoll_sets_lock.release()
+	// A set that gets no descriptor is closed, which takes it off the list.
 	fdnum := fdnum_create_from_resource(unsafe { nil }, mut r, open_flags, 0, false) or {
 		return errno.err, errno.get()
 	}
@@ -169,52 +225,47 @@ pub fn syscall_epoll_ctl(_ voidptr, epfd int, op int, fd int, event_ptr u64) (u6
 	}
 
 	// The set's own lock, held only for the list mutation, keeps a concurrent
-	// epoll_pwait on another thread from scanning entries as they move.
+	// epoll_pwait on another thread from scanning entries as they move. No
+	// reference is given back while it is held: the last one on a file takes
+	// the file out of every set, this one's too, with their locks.
+	mut failure := u64(0)
+	mut keep_lookup := false
+	mut removed := &Handle(unsafe { nil })
 	epoll_res.l.acquire()
-	defer {
-		epoll_res.l.release()
-	}
-
 	match op {
 		epoll_ctl_add {
-			// Check if fd already exists
 			for entry in epoll_res.entries {
 				if entry.fd == fd {
-					watched_fd.unref()
-					return errno.err, errno.eexist
-				}
-			}
-			// The lookup reference is handed to the entry, which holds it until
-			// the fd is removed or the epoll set is destroyed.
-			epoll_res.entries << EpollEntry{
-				fd:     fd
-				events: requested.events
-				data:   requested.data
-				handle: watched_fd.handle
-			}
-			watched_fd.release_descriptor()
-		}
-		epoll_ctl_del {
-			watched_fd.unref()
-			mut found := false
-			for i, entry in epoll_res.entries {
-				if entry.fd == fd {
-					mut watched_handle := epoll_res.entries[i].handle
-					epoll_res.entries.delete(i)
-					if watched_handle != unsafe { nil } {
-						watched_handle.unref()
-					}
-					found = true
+					failure = errno.eexist
 					break
 				}
 			}
-			if !found {
-				return errno.err, errno.enoent
+			if failure == 0 {
+				// The lookup reference is handed to the entry, which holds it
+				// until the fd is removed, its file closed, or the set destroyed.
+				epoll_res.entries << EpollEntry{
+					fd:     fd
+					events: requested.events
+					data:   requested.data
+					handle: watched_fd.handle
+				}
+				katomic.inc(mut &watched_fd.handle.epoll_refs)
+				keep_lookup = true
+			}
+		}
+		epoll_ctl_del {
+			failure = errno.enoent
+			for i, entry in epoll_res.entries {
+				if entry.fd == fd {
+					removed = epoll_res.entries[i].handle
+					epoll_res.entries.delete(i)
+					failure = 0
+					break
+				}
 			}
 		}
 		epoll_ctl_mod {
-			watched_fd.unref()
-			mut found := false
+			failure = errno.enoent
 			for mut entry in epoll_res.entries {
 				if entry.fd == fd {
 					entry.events = requested.events
@@ -224,18 +275,28 @@ pub fn syscall_epoll_ctl(_ voidptr, epfd int, op int, fd int, event_ptr u64) (u6
 					entry.ready = 0
 					entry.generation = 0
 					entry.disabled = false
-					found = true
+					failure = 0
 					break
 				}
 			}
-			if !found {
-				return errno.err, errno.enoent
-			}
 		}
 		else {
-			watched_fd.unref()
-			return errno.err, errno.einval
+			failure = errno.einval
 		}
+	}
+	epoll_res.l.release()
+
+	if keep_lookup {
+		watched_fd.release_descriptor()
+	} else {
+		watched_fd.unref()
+	}
+	if removed != unsafe { nil } {
+		katomic.dec(mut &removed.epoll_refs)
+		removed.unref()
+	}
+	if failure != 0 {
+		return errno.err, failure
 	}
 
 	// A thread already blocked in epoll_pwait on this set has to look at the

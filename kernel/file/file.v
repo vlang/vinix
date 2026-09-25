@@ -74,6 +74,8 @@ pub mut:
 	owner_type int
 	owner_id   int
 	signal     int
+	// How many of `refcount` are epoll sets' registrations of it.
+	epoll_refs int
 }
 
 // A Handle is the open-file description shared by dup() and fork(). Its
@@ -81,6 +83,12 @@ pub mut:
 // final descriptor and every in-flight lookup have dropped their references.
 fn (mut this Handle) unref() {
 	if katomic.dec(mut &this.refcount) {
+		// Only epoll sets hold it now: its last descriptor is closed, and, as
+		// on Linux, it leaves every set that watches it.
+		watches := katomic.load(&this.epoll_refs)
+		if watches != 0 && katomic.load(&this.refcount) == watches {
+			epoll_forget(this)
+		}
 		return
 	}
 
