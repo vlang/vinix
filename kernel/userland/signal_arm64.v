@@ -210,6 +210,12 @@ pub fn syscall_rt_sigsuspend(_ voidptr, mask_ptr u64, sigsetsize u64) (u64, u64)
 	current_thread.masked_signals = temporary
 
 	for !deliverable_signal(current_thread, temporary) {
+		// A thread its process is taking down leaves; the wait would only
+		// come straight back, over and over, and the process never finish.
+		if katomic.load(&current_thread.must_exit) {
+			current_thread.masked_signals = original
+			return errno.err, errno.eintr
+		}
 		sleep_for_signal(unsafe { nil })
 	}
 
@@ -293,6 +299,13 @@ pub fn syscall_rt_sigtimedwait(_ voidptr, set_ptr u64, info_ptr u64, timeout_ptr
 
 		// Anything outside the requested set is a real interruption.
 		if deliverable_signal(current_thread, current_thread.masked_signals | wanted) {
+			return errno.err, errno.eintr
+		}
+		// So is the process being taken down. A wait on a thread that has to
+		// exit comes straight back, and this spun in the kernel for good: a
+		// killed MariaDB kept its signal thread, which waits here, and stayed
+		// a zombie nothing could reap or kill.
+		if katomic.load(&current_thread.must_exit) {
 			return errno.err, errno.eintr
 		}
 
