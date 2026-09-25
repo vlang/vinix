@@ -179,6 +179,15 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 	cpu.set_fs_base(current_thread.fs_base)
 
 	cpu_local.tss.ist3 = current_thread.pf_stack
+	// Interrupts and exceptions from user mode enter on this thread's own
+	// kernel stack, the one its syscalls use, rather than one shared by every
+	// thread on this CPU. Their handlers can then enable interrupts, be
+	// preempted and block, as syscalls do, without a thread switched in
+	// meanwhile starting its own entry on top of their live frames. Kernel
+	// threads have no kernel_stack and never enter from user mode.
+	if current_thread.kernel_stack != 0 {
+		cpu_local.tss.rsp0 = current_thread.kernel_stack
+	}
 
 	if cpu.read_cr3() != current_thread.cr3 {
 		cpu.write_cr3(current_thread.cr3)
