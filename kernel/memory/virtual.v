@@ -26,6 +26,16 @@ pub const pte_device = u64(1) << 3 // ARM64: use Device-nGnRnE memory type for M
 pub const pte_uncached = u64(1) << 4 // ARM64: use Normal Non-Cacheable for framebuffers
 pub const pte_noexec = u64(1) << 63
 
+// What of a range of an address space is resident, in bytes: all of it, the
+// part fork left shared with another process until one of them writes it,
+// and every page counted as its share, as resident_share() counts it.
+pub struct Residency {
+pub mut:
+	resident u64
+	shared   u64
+	share    u64
+}
+
 __global (
 	page_size        = u64(0x1000)
 	kernel_pagemap   Pagemap

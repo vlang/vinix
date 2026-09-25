@@ -1732,6 +1732,9 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 		}
 
 		stack_vma = process.thread_stack_top
+		if want_elf {
+			process.stack_end = stack_vma
+		}
 		process.thread_stack_top -= user_stack_size
 		stack_bottom_vma = process.thread_stack_top
 		process.thread_stack_top -= page_size
@@ -2045,6 +2048,7 @@ pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) ?&proc.Pr
 		new_proc.mempolicy_nodemask = old_process.mempolicy_nodemask
 		new_proc.pagemap = mmap.fork_pagemap(old_process.pagemap) or { return none }
 		new_proc.thread_stack_top = old_process.thread_stack_top
+		new_proc.stack_end = old_process.stack_end
 		new_proc.mmap_anon_non_fixed_base = old_process.mmap_anon_non_fixed_base
 		new_proc.current_directory = proc.current_directory_of(old_process)
 		proc.inherit_container_state(mut new_proc, old_process)

@@ -384,3 +384,22 @@ pub fn (pagemap &Pagemap) resident_share(start u64, end u64) u64 {
 	}
 	return total
 }
+
+// resident_share() with the shared pages told apart, for /proc/<pid>/smaps.
+// The caller holds the pagemap lock.
+pub fn (pagemap &Pagemap) residency(start u64, end u64) Residency {
+	mut counted := Residency{}
+	for virt := start & ~u64(0xfff); virt < end; virt += page_size {
+		if phys := pagemap.virt2phys(virt) {
+			refs := pmm_refcount_unlocked(voidptr(phys))
+			counted.resident += page_size
+			if refs > 1 {
+				counted.shared += page_size
+				counted.share += page_size / refs
+			} else {
+				counted.share += page_size
+			}
+		}
+	}
+	return counted
+}

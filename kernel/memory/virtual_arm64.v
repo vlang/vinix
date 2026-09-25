@@ -158,6 +158,51 @@ pub fn (pagemap &Pagemap) resident_share(start u64, end u64) u64 {
 	return total
 }
 
+// resident_share() with the shared pages told apart, for /proc/<pid>/smaps.
+// The caller holds the pagemap lock.
+pub fn (pagemap &Pagemap) residency(start u64, end u64) Residency {
+	mut counted := Residency{}
+	mut virt := start & ~u64(0xfff)
+	for virt < end {
+		l0 := unsafe { &u64(u64(pagemap.top_level) + higher_half) }
+		e0 := unsafe { l0[(virt >> 39) & 0x1ff] }
+		if e0 & 1 == 0 {
+			virt = next_table_boundary(virt, 39) or { break }
+			continue
+		}
+		l1 := unsafe { &u64((e0 & pte_flags_mask) + higher_half) }
+		e1 := unsafe { l1[(virt >> 30) & 0x1ff] }
+		if e1 & 1 == 0 {
+			virt = next_table_boundary(virt, 30) or { break }
+			continue
+		}
+		l2 := unsafe { &u64((e1 & pte_flags_mask) + higher_half) }
+		e2 := unsafe { l2[(virt >> 21) & 0x1ff] }
+		if e2 & 1 == 0 {
+			virt = next_table_boundary(virt, 21) or { break }
+			continue
+		}
+		l3 := unsafe { &u64((e2 & pte_flags_mask) + higher_half) }
+		table_end := next_table_boundary(virt, 21) or { u64(-1) }
+		stop := if end < table_end { end } else { table_end }
+		for virt < stop {
+			pte := unsafe { l3[(virt >> 12) & 0x1ff] }
+			if pte & 1 != 0 {
+				refs := pmm_refcount_unlocked(voidptr(pte & pte_flags_mask))
+				counted.resident += page_size
+				if refs > 1 {
+					counted.shared += page_size
+					counted.share += page_size / refs
+				} else {
+					counted.share += page_size
+				}
+			}
+			virt += page_size
+		}
+	}
+	return counted
+}
+
 // The first address past the table level that maps `virt`, or none at the top
 // of the address space.
 fn next_table_boundary(virt u64, shift u64) ?u64 {

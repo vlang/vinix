@@ -57,6 +57,8 @@ enum ProcFSKind {
 	mountinfo
 	mounts
 	mountstats
+	maps
+	smaps
 	oom_score_adj
 	setgroups
 	uid_map
@@ -94,6 +96,14 @@ pub mut:
 	// On a /proc root and the process and thread directories under it, the
 	// pid namespace whose numbers name them; nil for the initial one.
 	view voidptr
+	// The text each open file of maps or smaps is reading; see snapshot_read().
+	snapshots []ProcFSSnapshot
+}
+
+struct ProcFSSnapshot {
+mut:
+	handle voidptr
+	text   string
 }
 
 struct ProcFS {}
@@ -510,6 +520,12 @@ fn (this &ProcFSResource) contents() string {
 		.mountstats {
 			return ''
 		}
+		.maps {
+			return maps_text(this.pid, false)
+		}
+		.smaps {
+			return maps_text(this.pid, true)
+		}
 		.oom_score_adj {
 			mut text := lib.new_text(16)
 			text.add_decimal(proc.process_oom_score_adj(this.pid))
@@ -574,6 +590,9 @@ fn (mut this ProcFSResource) read(_handle voidptr, buf voidptr, loc u64, count u
 	if stat.isdir(this.stat.mode) {
 		errno.set(errno.eisdir)
 		return none
+	}
+	if (this.kind == .maps || this.kind == .smaps) && _handle != unsafe { nil } {
+		return this.snapshot_read(_handle, buf, loc, count)
 	}
 
 	text := this.contents()
@@ -663,7 +682,66 @@ fn (mut this ProcFSResource) grow(_handle voidptr, new_size u64) ? {
 	}
 }
 
+// A list of mappings is read in pieces, and made afresh for every piece it
+// changed under the reader: a piece could begin in other lines than the last
+// one ended in, and a reader going through smaps a kilobyte at a time, as
+// musl's stdio does, found the numbers of another mapping under the one it
+// looked for. Each open file reads one text, made when it starts at the
+// beginning, as Linux's seq_file does.
+fn (mut this ProcFSResource) snapshot_read(handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
+	this.l.acquire()
+	mut index := this.snapshot_index(handle)
+	if index < 0 || loc == 0 {
+		this.l.release()
+		fresh := this.contents()
+		this.l.acquire()
+		index = this.snapshot_index(handle)
+		if index < 0 {
+			this.snapshots << ProcFSSnapshot{
+				handle: handle
+				text:   fresh
+			}
+			index = this.snapshots.len - 1
+		} else {
+			unsafe { this.snapshots[index].text.free() }
+			this.snapshots[index].text = fresh
+		}
+	}
+	defer {
+		this.l.release()
+	}
+	text := this.snapshots[index].text
+	if loc >= u64(text.len) {
+		return i64(0)
+	}
+	mut actual_count := count
+	if loc + actual_count > u64(text.len) {
+		actual_count = u64(text.len) - loc
+	}
+	unsafe { C.memcpy(buf, &u8(text.str) + loc, actual_count) }
+	return i64(actual_count)
+}
+
+fn (this &ProcFSResource) snapshot_index(handle voidptr) int {
+	for i, snapshot in this.snapshots {
+		if snapshot.handle == handle {
+			return i
+		}
+	}
+	return -1
+}
+
 fn (mut this ProcFSResource) unref(_handle voidptr) ? {
+	// A closed file's text goes with it.
+	if _handle != unsafe { nil } && this.snapshots.len > 0 {
+		this.l.acquire()
+		index := this.snapshot_index(_handle)
+		if index >= 0 {
+			unsafe { this.snapshots[index].text.free() }
+			this.snapshots.delete(index)
+		}
+		this.l.release()
+	}
 	katomic.dec(mut &this.refcount)
 }
 
@@ -722,6 +800,166 @@ fn resident_bytes(pid int) u64 {
 	}
 	pagemap.l.release()
 	return total
+}
+
+// /proc/<pid>/maps, and with `detailed` smaps: every mapping of the process
+// as Linux lists it. glibc finds the main thread's stack in maps for
+// pthread_getattr_np(), and redis will not start without smaps: it checks
+// there that a page its child shares after fork counts as shared and dirty.
+fn maps_text(pid int, detailed bool) string {
+	mut list := []mmap.MappingInfo{}
+	mut brk_base := u64(0)
+	mut brk_current := u64(0)
+	mut stack_end := u64(0)
+	mut exe_node := &VFSNode(unsafe { nil })
+	// The page map is only waited for a little at a time, with the process
+	// table let go of in between.
+	for _ in 0 .. 50 {
+		proc.lock_table()
+		process := proc.process_at(pid)
+		if process == unsafe { nil } {
+			proc.unlock_table()
+			return ''
+		}
+		brk_base = process.brk_base
+		brk_current = process.brk_current
+		stack_end = process.stack_end
+		exe_node = unsafe { &VFSNode(process.exe_node) }
+		got := mmap.mappings(process.pagemap, detailed) or {
+			proc.unlock_table()
+			continue
+		}
+		proc.unlock_table()
+		list = got
+		break
+	}
+	defer {
+		mmap.release_mappings(mut list)
+	}
+
+	mut exe_dev := u64(0)
+	mut exe_ino := u64(0)
+	if exe_node != unsafe { nil } && exe_node.resource != unsafe { nil } {
+		exe_dev = exe_node.resource.stat.dev
+		exe_ino = exe_node.resource.stat.ino
+	}
+	mut text := lib.new_text(list.len * if detailed { 900 } else { 100 })
+	for info in list {
+		line_start := text.len()
+		text.add_radix(info.base, 16, 8)
+		text.add_byte(`-`)
+		text.add_radix(info.end, 16, 8)
+		text.add_byte(` `)
+		text.add_byte(if info.prot & mmap.prot_read != 0 { `r` } else { `-` })
+		text.add_byte(if info.prot & mmap.prot_write != 0 { `w` } else { `-` })
+		text.add_byte(if info.prot & mmap.prot_exec != 0 { `x` } else { `-` })
+		text.add_byte(if info.shared { `s` } else { `p` })
+		text.add_byte(` `)
+		text.add_radix(info.offset, 16, 8)
+		text.add_byte(` `)
+		// st_dev split as glibc's major() and minor() split it.
+		text.add_radix(((info.dev >> 8) & 0xfff) | ((info.dev >> 32) & ~u64(0xfff)), 16, 2)
+		text.add_byte(`:`)
+		text.add_radix((info.dev & 0xff) | ((info.dev >> 12) & ~u64(0xff)), 16, 2)
+		text.add_byte(` `)
+		text.add_unsigned(info.ino)
+		text.add_byte(` `)
+		name := mapping_name(info, exe_node, exe_dev, exe_ino, brk_base, brk_current, stack_end)
+		if name.len > 0 {
+			// The name starts in the column Linux pads it out to.
+			for text.len() < line_start + 72 {
+				text.add_byte(` `)
+			}
+			text.add_byte(` `)
+			text.add(name)
+			unsafe { name.free() }
+		}
+		text.add_byte(`\n`)
+		if detailed {
+			add_smaps_details(mut text, info)
+		}
+	}
+	return text.str()
+}
+
+// What names a mapping, as a string of its own: the file it maps, or what
+// Linux calls the program's break and its first thread's stack. Empty for
+// anonymous memory.
+fn mapping_name(info mmap.MappingInfo, exe_node &VFSNode, exe_dev u64, exe_ino u64, brk_base u64, brk_current u64, stack_end u64) string {
+	if info.handle != unsafe { nil } {
+		handle := unsafe { &file.Handle(info.handle) }
+		if handle.node != unsafe { nil } {
+			return pathname(unsafe { &VFSNode(handle.node) })
+		}
+	}
+	// The program and its interpreter are mapped by exec, with no open file
+	// to name them; the program is known by its inode.
+	if info.file && exe_node != unsafe { nil } && info.dev == exe_dev && info.ino == exe_ino {
+		return pathname(exe_node)
+	}
+	if info.brk && brk_current > brk_base && info.base < brk_current {
+		return '[heap]'.clone()
+	}
+	if stack_end != 0 && info.end == stack_end {
+		return '[stack]'.clone()
+	}
+	return ''
+}
+
+fn add_smaps_details(mut text lib.Text, info mmap.MappingInfo) {
+	resident := info.resident / 1024
+	shared := info.shared_resident / 1024
+	private := resident - shared
+	// Anonymous memory is dirty once it is there; what a file mapping holds is
+	// counted as the file's, and clean.
+	anonymous := !info.file
+	add_smaps_line(mut text, 'Size:', (info.end - info.base) / 1024)
+	add_smaps_line(mut text, 'KernelPageSize:', page_size / 1024)
+	add_smaps_line(mut text, 'MMUPageSize:', page_size / 1024)
+	add_smaps_line(mut text, 'Rss:', resident)
+	add_smaps_line(mut text, 'Pss:', info.share / 1024)
+	add_smaps_line(mut text, 'Pss_Dirty:', if anonymous { info.share / 1024 } else { u64(0) })
+	add_smaps_line(mut text, 'Shared_Clean:', if anonymous { u64(0) } else { shared })
+	add_smaps_line(mut text, 'Shared_Dirty:', if anonymous { shared } else { u64(0) })
+	add_smaps_line(mut text, 'Private_Clean:', if anonymous { u64(0) } else { private })
+	add_smaps_line(mut text, 'Private_Dirty:', if anonymous { private } else { u64(0) })
+	add_smaps_line(mut text, 'Referenced:', resident)
+	add_smaps_line(mut text, 'Anonymous:', if anonymous { resident } else { u64(0) })
+	for name in ['KSM:', 'LazyFree:', 'AnonHugePages:', 'ShmemPmdMapped:', 'FilePmdMapped:',
+		'Shared_Hugetlb:', 'Private_Hugetlb:', 'Swap:', 'SwapPss:', 'Locked:'] {
+		add_smaps_line(mut text, name, 0)
+	}
+	text.add('THPeligible:    0\nVmFlags:')
+	if info.prot & mmap.prot_read != 0 {
+		text.add(' rd')
+	}
+	if info.prot & mmap.prot_write != 0 {
+		text.add(' wr')
+	}
+	if info.prot & mmap.prot_exec != 0 {
+		text.add(' ex')
+	}
+	if info.shared {
+		text.add(' sh')
+	}
+	text.add(' mr mw me\n')
+}
+
+// `name` padded to sixteen columns and `kb` right-aligned in eight after it,
+// as Linux lays out a line of smaps.
+fn add_smaps_line(mut text lib.Text, name string, kb u64) {
+	text.add(name)
+	mut width := name.len
+	mut digits := 1
+	for rest := kb / 10; rest > 0; rest /= 10 {
+		digits++
+	}
+	for width < 16 + 8 - digits {
+		text.add_byte(` `)
+		width++
+	}
+	text.add_unsigned(kb)
+	text.add(' kB\n')
 }
 
 // ── Rebuilding the tree ──────────────────────────────────────────────────────
@@ -947,8 +1185,8 @@ fn populate_process_directory(mut node VFSNode, pid int) {
 // descriptors, namespaces and mounts are its process', since Vinix threads
 // share all three.
 const process_entry_names = ['cmdline', 'comm', 'stat', 'statm', 'status', 'cgroup', 'environ',
-	'mountinfo', 'mounts', 'mountstats', 'loginuid', 'oom_score_adj', 'uid_map', 'gid_map',
-	'setgroups', 'root', 'cwd', 'exe', 'fd', 'ns', 'attr']
+	'mountinfo', 'mounts', 'mountstats', 'maps', 'smaps', 'loginuid', 'oom_score_adj', 'uid_map',
+	'gid_map', 'setgroups', 'root', 'cwd', 'exe', 'fd', 'ns', 'attr']
 
 fn add_process_entries(mut node VFSNode, pid int) {
 	for name in process_entry_names {
@@ -978,6 +1216,8 @@ fn add_process_entry(mut node VFSNode, pid int, name string, is_process bool) bo
 		'mountinfo' { add_process_file(mut node, 'mountinfo', .mountinfo, pid) }
 		'mounts' { add_process_file(mut node, 'mounts', .mounts, pid) }
 		'mountstats' { add_process_file(mut node, 'mountstats', .mountstats, pid) }
+		'maps' { add_process_file(mut node, 'maps', .maps, pid) }
+		'smaps' { add_process_file(mut node, 'smaps', .smaps, pid) }
 		'loginuid' { add_process_file(mut node, 'loginuid', .loginuid, pid) }
 		'oom_score_adj' { add_process_writable(mut node, 'oom_score_adj', .oom_score_adj, pid) }
 		'uid_map' { add_process_writable(mut node, 'uid_map', .uid_map, pid) }

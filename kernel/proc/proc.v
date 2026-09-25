@@ -201,6 +201,9 @@ pub mut:
 	start_time_ticks         u64
 	pagemap                  &memory.Pagemap = unsafe { nil }
 	thread_stack_top         u64
+	// The top of the stack exec gave the program's first thread, which
+	// /proc/<pid>/maps names [stack].
+	stack_end u64
 	threads                  []&Thread
 	threads_lock             klock.Lock
 	fds_lock                 klock.Lock

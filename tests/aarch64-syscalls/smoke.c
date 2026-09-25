@@ -460,6 +460,85 @@ static void plain_handler(int signal_number) {
     saw_plain_handler = 1;
 }
 
+// The line of /proc/self/maps or smaps whose mapping holds `address`, and
+// with `field` the value of that field of it in smaps; -1 when not found.
+static long mapping_line(const char *file, unsigned long address, char *line, size_t size,
+                         const char *field) {
+    FILE *maps = fopen(file, "r");
+    if (!maps)
+        return -1;
+    int inside = 0;
+    long value = -1;
+    char buffer[512];
+    while (fgets(buffer, sizeof(buffer), maps)) {
+        unsigned long from, to;
+        if (sscanf(buffer, "%lx-%lx", &from, &to) == 2) {
+            if (inside && !field)
+                break;
+            inside = from <= address && address < to;
+            if (inside && line)
+                snprintf(line, size, "%s", buffer);
+            if (inside && !field) {
+                value = 0;
+                break;
+            }
+        } else if (inside && field && !strncmp(buffer, field, strlen(field))) {
+            sscanf(buffer + strlen(field), "%ld", &value);
+            break;
+        }
+    }
+    fclose(maps);
+    return value;
+}
+
+// The page redis looks at before it starts: written, then shared with a
+// child by fork, it has to count as shared and dirty in the child's smaps.
+static int smaps_shared_dirty_child(char *page) {
+    long shared = mapping_line("/proc/self/smaps", (unsigned long)page, NULL, 0, "Shared_Dirty:");
+    long rss = mapping_line("/proc/self/smaps", (unsigned long)page, NULL, 0, "Rss:");
+    if (shared != 4 || rss != 4) {
+        printf("child smaps: Shared_Dirty=%ld Rss=%ld\n", shared, rss);
+        fflush(stdout);
+        return 1;
+    }
+    return 0;
+}
+
+static int process_maps(void) {
+    long page = sysconf(_SC_PAGESIZE);
+    char line[512];
+    char *pages = mmap(NULL, 3 * page, PROT_READ, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (pages == MAP_FAILED || mprotect(pages + page, page, PROT_READ | PROT_WRITE) != 0)
+        return 0;
+    int stack_variable = 0;
+    int valid = mapping_line("/proc/self/maps", (unsigned long)pages, line, sizeof(line), NULL) == 0 &&
+                strstr(line, " r--p 00000000 00:00 0 ") != NULL;
+    valid = valid &&
+            mapping_line("/proc/self/maps", (unsigned long)(pages + page), line, sizeof(line), NULL) == 0 &&
+            strstr(line, " rw-p ") != NULL;
+    valid = valid &&
+            mapping_line("/proc/self/maps", (unsigned long)&stack_variable, line, sizeof(line), NULL) == 0 &&
+            strstr(line, "[stack]") != NULL;
+    valid = valid &&
+            mapping_line("/proc/self/maps", (unsigned long)process_maps, line, sizeof(line), NULL) == 0 &&
+            strstr(line, "r-xp") != NULL && strstr(line, "syscall-smoke") != NULL;
+    if (!valid)
+        printf("maps line: %s", line);
+
+    pages[page] = 1;
+    long own = mapping_line("/proc/self/smaps", (unsigned long)(pages + page), NULL, 0, "Private_Dirty:");
+    if (own != 4)
+        printf("own smaps: Private_Dirty=%ld\n", own);
+    valid = valid && own == 4;
+    fflush(stdout);
+    pid_t child = fork();
+    if (child == 0)
+        _exit(smaps_shared_dirty_child(pages + page));
+    valid = security_child_succeeded(child) && valid;
+    munmap(pages, 3 * page);
+    return valid;
+}
+
 static int handler_without_restorer(void) {
     struct {
         void (*handler)(int);
@@ -783,6 +862,7 @@ int main(void) {
     check(seccomp_filters(), "seccomp filters");
     check(pipe_reopen(), "pipe reopened through /proc/self/fd");
     check(handler_without_restorer(), "signal handler without SA_RESTORER");
+    check(process_maps(), "/proc/self/maps and smaps");
     if (chdir(previous_cwd) != 0)
         chdir("/");
 

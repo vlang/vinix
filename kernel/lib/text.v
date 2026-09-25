@@ -33,6 +33,11 @@ fn (mut t Text) reserve(extra int) {
 	t.bytes = bigger
 }
 
+// How many bytes the text holds so far.
+pub fn (t &Text) len() int {
+	return t.bytes.len
+}
+
 pub fn (mut t Text) add(s string) {
 	t.reserve(s.len)
 	for i in 0 .. s.len {
