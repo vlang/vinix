@@ -37,17 +37,32 @@ def available_port() -> str:
         return str(listener.getsockname()[1])
 
 
-def reaped(pid: int, seconds: float) -> bool:
+def gone(pid: int, master: int, seconds: float) -> bool:
+    # pty.fork made run-aarch64.sh the leader of a process group of its own,
+    # and QEMU is in it. The script exiting is not enough: a QEMU it leaves
+    # behind still runs the guest and holds the disk images. The terminal is
+    # read meanwhile, as nothing can finish exiting with output to it unread.
     deadline = time.monotonic() + seconds
-    while time.monotonic() < deadline:
+    while True:
         try:
-            waited, _ = os.waitpid(pid, os.WNOHANG)
+            os.waitpid(pid, os.WNOHANG)
         except ChildProcessError:
+            pass
+        try:
+            os.killpg(pid, 0)
+        except ProcessLookupError:
             return True
-        if waited == pid:
-            return True
-        time.sleep(0.05)
-    return False
+        except PermissionError:
+            # What is left of the group is exiting.
+            pass
+        if time.monotonic() >= deadline:
+            return False
+        readable, _, _ = select.select([master], [], [], 0.05)
+        if readable:
+            try:
+                os.read(master, 65536)
+            except OSError:
+                time.sleep(0.05)
 
 
 def stop_child(pid: int, master: int) -> None:
@@ -57,16 +72,16 @@ def stop_child(pid: int, master: int) -> None:
         os.write(master, b"\x01x")
     except OSError:
         pass
-    if reaped(pid, 5):
+    if gone(pid, master, 5):
         return
     for signal_number in (signal.SIGTERM, signal.SIGKILL):
-        # The child is run-aarch64.sh, not a process-group leader, so signal
-        # the process itself: killpg would need a group this never created.
         try:
-            os.kill(pid, signal_number)
+            os.killpg(pid, signal_number)
         except ProcessLookupError:
             return
-        if reaped(pid, 2):
+        except PermissionError:
+            pass
+        if gone(pid, master, 2):
             return
 
 
