@@ -181,8 +181,11 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 		// context's registers, or the CPU kept returning to its own iretq.
 		katomic.store(mut &current_thread.yield_await.l, false)
 
+		// A thread whose context resume_saved_context() preset is not resumed
+		// where it was interrupted, but from that context.
+		preset := current_thread.context_preset
 		if unsafe { next_thread == nil } && katomic.load(&current_thread.is_in_queue)
-			&& may_run_here(current_thread, cpu_local.cpu_number) {
+			&& may_run_here(current_thread, cpu_local.cpu_number) && !preset {
 			apic.lapic_eoi()
 			apic.lapic_timer_oneshot(mut cpu_local, scheduler_vector, effective_timeslice(current_thread))
 			return
@@ -192,8 +195,12 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 		// monotonic clock is the tick source here rather than a counter read,
 		// which puts the resolution at one timer tick.
 		proc.charge_cpu_time(mut current_thread, time.monotonic_ns())
-		unsafe {
-			current_thread.gpr_state = *gpr_state
+		if preset {
+			current_thread.context_preset = false
+		} else {
+			unsafe {
+				current_thread.gpr_state = *gpr_state
+			}
 		}
 		current_thread.gs_base = cpu.get_kernel_gs_base()
 		current_thread.fs_base = cpu.get_fs_base()
@@ -421,30 +428,21 @@ pub fn dequeue_and_die() {
 // Give up the CPU, leaving the current thread to resume from the context in
 // its gpr_state, which the caller has just rewritten: a signal handler's entry,
 // or what a sigreturn restores. The registers of the syscall in progress are
-// not the thread's to keep, which is the difference from a timer switch --
-// but everything else a switch saves has to be saved here, and the thread's
-// lock let go, or no CPU can ever pick it up again: yield(false) alone leaves
-// scheduler_isr no current thread to do that for.
+// not the thread's to keep, which is the difference from a timer switch;
+// scheduler_isr saves everything else a switch saves and leaves the registers
+// alone. It is also what lets go of the thread's lock, once this CPU is on the
+// scheduler's own stack. Letting go here, while still running on the thread's
+// kernel stack, let another CPU pick the thread up, run its handler and take
+// its next syscall on that same stack underneath this CPU, whose interrupts
+// then landed in the middle of the other's frames.
 pub fn resume_saved_context() {
 	asm volatile amd64 {
 		cli
 	}
 	mut t := proc.current_thread()
-	cpu_local := cpulocal.current()
-	// In a syscall the user's GS base is the one swapgs put aside.
-	t.gs_base = cpu.get_kernel_gs_base()
-	t.fs_base = cpu.get_fs_base()
-	t.cr3 = cpu.read_cr3()
-	fpu_save(t.fpu_storage)
-	proc.charge_cpu_time(mut t, time.monotonic_ns())
-	// GS points at the thread, whose first field is the CPU it runs on and is
-	// what cpulocal.current() reads. Point it at this CPU's own block before
-	// the thread stops claiming one.
-	cpu.set_gs_base(u64(&cpu_local.cpu_number))
-	cpu.set_kernel_gs_base(u64(&cpu_local.cpu_number))
-	katomic.store(mut &t.running_on, u64(-1))
-	t.l.release()
-	yield(false)
+	t.context_preset = true
+	yield(true)
+	// scheduler_isr never comes back to a thread whose context was preset.
 	for {
 	}
 }

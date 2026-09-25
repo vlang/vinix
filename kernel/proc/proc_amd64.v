@@ -99,6 +99,9 @@ pub mut:
 	// number, for the report. See proc/pledge.v.
 	pledge_violation u64
 	pledge_syscall   i64
+	// Set by sched.resume_saved_context(): the thread resumes from the context
+	// already in gpr_state, not from where the scheduler interrupted it.
+	context_preset bool
 }
 
 pub fn current_thread() &Thread {
