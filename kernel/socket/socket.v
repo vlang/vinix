@@ -676,8 +676,14 @@ pub fn syscall_getsockopt(_ voidptr, fdnum int, level int, optname int, optval u
 	if level == sock_pub.sol_socket && optname in [sock_pub.so_rcvtimeo, sock_pub.so_sndtimeo,
 		sock_pub.so_linger] {
 		mut res := fd.handle.resource
+		send := optname == sock_pub.so_sndtimeo
 		if mut res is sock_inet.InetSocket {
-			return struct_option(res, optname, optval, optlen, capacity)
+			on, seconds := res.linger()
+			return struct_option(optname, on, seconds, res.timeout(send), optval, optlen, capacity)
+		}
+		if mut res is sock_unix.UnixSocket {
+			on, seconds := res.linger()
+			return struct_option(optname, on, seconds, res.timeout(send), optval, optlen, capacity)
 		}
 	}
 	if capacity < sizeof(i32) {
@@ -699,19 +705,17 @@ pub fn syscall_getsockopt(_ voidptr, fdnum int, level int, optname int, optval u
 }
 
 // SO_RCVTIMEO and SO_SNDTIMEO, a struct timeval, and SO_LINGER, a struct
-// linger, of an inet socket: the options whose values are not an int.
-fn struct_option(socket &sock_inet.InetSocket, optname int, optval u64, optlen u64, capacity u32) (u64, u64) {
+// linger: the socket options whose values are not an int.
+fn struct_option(optname int, on int, seconds int, ns u64, optval u64, optlen u64, capacity u32) (u64, u64) {
 	mut words := [2]i64{}
 	mut size := u32(16)
 	if optname == sock_pub.so_linger {
-		on, seconds := socket.linger()
 		unsafe {
 			*&i32(&words[0]) = i32(on)
 			*&i32(u64(&words[0]) + 4) = i32(seconds)
 		}
 		size = 8
 	} else {
-		ns := socket.timeout(optname == sock_pub.so_sndtimeo)
 		words[0] = i64(ns / 1000000000)
 		words[1] = i64((ns % 1000000000) / 1000)
 	}
@@ -725,6 +729,47 @@ fn struct_option(socket &sock_inet.InetSocket, optname int, optval u64, optlen u
 	return 0, 0
 }
 
+// The value setsockopt(2) was given for SO_LINGER, as on and seconds, or for
+// SO_RCVTIMEO or SO_SNDTIMEO, in nanoseconds; errno set for one that is not
+// one. A negative time is no timeout, as on Linux.
+fn read_struct_option(optname int, optval u64, optlen u32) ?(int, int, u64) {
+	if optval == 0 {
+		errno.set(errno.efault)
+		return none
+	}
+	if optname == sock_pub.so_linger {
+		if optlen < 8 {
+			errno.set(errno.einval)
+			return none
+		}
+		mut linger := [2]i32{}
+		if !usercopy.copy_from_user(voidptr(&linger[0]), optval, 8) {
+			errno.set(errno.efault)
+			return none
+		}
+		return int(linger[0]), int(linger[1]), u64(0)
+	}
+	if optlen < 16 {
+		errno.set(errno.einval)
+		return none
+	}
+	mut timeval := [2]i64{}
+	if !usercopy.copy_from_user(voidptr(&timeval[0]), optval, 16) {
+		errno.set(errno.efault)
+		return none
+	}
+	if timeval[1] < 0 || timeval[1] >= 1000000 {
+		errno.set(errno.edom)
+		return none
+	}
+	mut ns := u64(0)
+	if timeval[0] > 0 || (timeval[0] == 0 && timeval[1] > 0) {
+		seconds := if timeval[0] > 1000000000 { i64(1000000000) } else { timeval[0] }
+		ns = u64(seconds) * 1000000000 + u64(timeval[1]) * 1000
+	}
+	return 0, 0, ns
+}
+
 // setsockopt(2).
 pub fn syscall_setsockopt(_ voidptr, fdnum int, level int, optname int, optval u64, optlen u32) (u64, u64) {
 	mut fd, mut sock := socket_from_fdnum(fdnum) or { return errno.err, errno.get() }
@@ -732,44 +777,33 @@ pub fn syscall_setsockopt(_ voidptr, fdnum int, level int, optname int, optval u
 		fd.unref()
 	}
 
-	// The timeouts and SO_LINGER of an inet socket, read as the structs they
-	// are. Varnish sets them on its listening socket and stopped when they
-	// failed with ENOPROTOOPT.
+	// The timeouts and SO_LINGER of an inet or unix socket, read as the
+	// structs they are. Varnish sets them on its listening socket and stopped
+	// when they failed with ENOPROTOOPT.
 	if level == sock_pub.sol_socket && optname in [sock_pub.so_rcvtimeo, sock_pub.so_sndtimeo,
 		sock_pub.so_linger] {
 		mut res := fd.handle.resource
+		send := optname == sock_pub.so_sndtimeo
 		if mut res is sock_inet.InetSocket {
-			if optval == 0 {
-				return errno.err, errno.efault
+			on, seconds, ns := read_struct_option(optname, optval, optlen) or {
+				return errno.err, errno.get()
 			}
 			if optname == sock_pub.so_linger {
-				if optlen < 8 {
-					return errno.err, errno.einval
-				}
-				mut linger := [2]i32{}
-				if !usercopy.copy_from_user(voidptr(&linger[0]), optval, 8) {
-					return errno.err, errno.efault
-				}
-				res.set_linger(int(linger[0]), int(linger[1]))
-				return 0, 0
+				res.set_linger(on, seconds)
+			} else {
+				res.set_timeout(send, ns)
 			}
-			if optlen < 16 {
-				return errno.err, errno.einval
+			return 0, 0
+		}
+		if mut res is sock_unix.UnixSocket {
+			on, seconds, ns := read_struct_option(optname, optval, optlen) or {
+				return errno.err, errno.get()
 			}
-			mut timeval := [2]i64{}
-			if !usercopy.copy_from_user(voidptr(&timeval[0]), optval, 16) {
-				return errno.err, errno.efault
+			if optname == sock_pub.so_linger {
+				res.set_linger(on, seconds)
+			} else {
+				res.set_timeout(send, ns)
 			}
-			if timeval[1] < 0 || timeval[1] >= 1000000 {
-				return errno.err, errno.edom
-			}
-			// A negative time is no timeout, as on Linux.
-			mut ns := u64(0)
-			if timeval[0] > 0 || (timeval[0] == 0 && timeval[1] > 0) {
-				seconds := if timeval[0] > 1000000000 { i64(1000000000) } else { timeval[0] }
-				ns = u64(seconds) * 1000000000 + u64(timeval[1]) * 1000
-			}
-			res.set_timeout(optname == sock_pub.so_sndtimeo, ns)
 			return 0, 0
 		}
 	}

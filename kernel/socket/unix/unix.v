@@ -13,6 +13,7 @@ import file
 import resource
 import katomic
 import ioctl
+import time
 
 pub const sock_buf = 0x100000
 
@@ -97,6 +98,12 @@ pub mut:
 	reuseaddr int
 	keepalive int
 	broadcast int
+	// SO_RCVTIMEO and SO_SNDTIMEO, in nanoseconds; 0 waits for good.
+	recv_timeout_ns u64
+	send_timeout_ns u64
+	// SO_LINGER as set; a close does not wait for the peer here.
+	linger_on      int
+	linger_seconds int
 	// SO_PASSCRED: every recvmsg on this socket is given the peer's identity as
 	// an SCM_CREDENTIALS record. Crashpad, D-Bus and systemd-style services use
 	// it to find out who is on the other end of a connection they accepted.
@@ -188,6 +195,87 @@ fn (mut this UnixSocket) mmap(_handle voidptr, _page u64, _flags int) voidptr {
 	return 0
 }
 
+// When a call that may wait `timeout_ns` gives up, or 0 for never.
+fn deadline_after(timeout_ns u64) u64 {
+	return if timeout_ns == 0 { u64(0) } else { time.monotonic_ns() + timeout_ns }
+}
+
+// Wait for `e` to fire -- from `generation` of it when `watch` is set -- until
+// `deadline` if it is not 0. False, with errno set, when the wait ends any
+// other way: EAGAIN once the deadline SO_RCVTIMEO or SO_SNDTIMEO set has
+// passed, the interrupted errno for a signal.
+fn wait_on(e &eventstruct.Event, deadline u64, watch bool, generation u64) bool {
+	mut timer := &time.Timer(unsafe { nil })
+	if deadline != 0 {
+		now := time.monotonic_ns()
+		if now >= deadline {
+			errno.set(errno.eagain)
+			return false
+		}
+		left := deadline - now
+		timer = time.new_timer(time.TimeSpec{
+			tv_sec:  i64(left / 1000000000)
+			tv_nsec: i64(left % 1000000000)
+		})
+	}
+	mut events := []&eventstruct.Event{cap: 2}
+	mut watched := unsafe { e }
+	events << watched
+	if timer != unsafe { nil } {
+		events << &timer.event
+	}
+	mut woken := true
+	mut which := u64(0)
+	if watch {
+		which = event.await_from_generation(mut events, true, 0, generation) or {
+			woken = false
+			0
+		}
+	} else {
+		which = event.await(mut events, true) or {
+			woken = false
+			0
+		}
+	}
+	unsafe { events.free() }
+	if timer != unsafe { nil } {
+		timer.disarm()
+		unsafe { free(timer) }
+	}
+	if !woken {
+		errno.set(proc.interrupted_errno)
+		return false
+	}
+	if which == 1 {
+		errno.set(errno.eagain)
+		return false
+	}
+	return true
+}
+
+// SO_RCVTIMEO or SO_SNDTIMEO, for setsockopt(2) and getsockopt(2).
+pub fn (mut this UnixSocket) set_timeout(send bool, timeout_ns u64) {
+	if send {
+		this.send_timeout_ns = timeout_ns
+	} else {
+		this.recv_timeout_ns = timeout_ns
+	}
+}
+
+pub fn (this &UnixSocket) timeout(send bool) u64 {
+	return if send { this.send_timeout_ns } else { this.recv_timeout_ns }
+}
+
+// SO_LINGER, for setsockopt(2) and getsockopt(2).
+pub fn (mut this UnixSocket) set_linger(on int, seconds int) {
+	this.linger_on = if on != 0 { 1 } else { 0 }
+	this.linger_seconds = seconds
+}
+
+pub fn (this &UnixSocket) linger() (int, int) {
+	return this.linger_on, this.linger_seconds
+}
+
 fn (mut this UnixSocket) read(_handle voidptr, buf voidptr, _loc u64, _count u64) ?i64 {
 	// A SOCK_SEQPACKET or SOCK_DGRAM read still returns exactly one record;
 	// the framed path owns the boundary bookkeeping.
@@ -209,6 +297,7 @@ fn (mut this UnixSocket) read(_handle voidptr, buf voidptr, _loc u64, _count u64
 		return 0
 	}
 
+	deadline := deadline_after(this.recv_timeout_ns)
 	// If pipe is empty, block or return if nonblock
 	for katomic.load(&this.used) == 0 {
 		// The peer shut its write half: drain first, then end of file. Without
@@ -225,13 +314,10 @@ fn (mut this UnixSocket) read(_handle voidptr, buf voidptr, _loc u64, _count u64
 			return none
 		}
 		this.l.release()
-		mut events := [&this.event]
-		event.await(mut events, true) or {
-			unsafe { events.free() }
-			errno.set(proc.interrupted_errno)
+		if !wait_on(&this.event, deadline, false, 0) {
+			this.l.acquire()
 			return none
 		}
-		unsafe { events.free() }
 		this.l.acquire()
 	}
 
@@ -321,6 +407,7 @@ pub fn (mut this UnixSocket) recv_seqpacket(_handle voidptr, buf voidptr, count 
 		return 0
 	}
 
+	deadline := deadline_after(this.recv_timeout_ns)
 	for this.nothing_queued() {
 		if this.peer_finished {
 			return 0
@@ -337,16 +424,13 @@ pub fn (mut this UnixSocket) recv_seqpacket(_handle voidptr, buf voidptr, count 
 		// on exactly that lost wakeup.
 		generation := event.generation(mut this.event)
 		this.l.release()
-		mut events := [&this.event]
-		event.await_from_generation(mut events, true, 0, generation) or {
-			unsafe { events.free() }
-			// Nothing was received: SA_RESTART runs the call again, as on
-			// Linux. runc's init reads its sync socket with a bare recvfrom()
-			// while Go preempts it with SIGURG, and failed with EINTR.
-			errno.set(proc.interrupted_errno)
+		// Nothing was received: SA_RESTART runs the call again, as on Linux.
+		// runc's init reads its sync socket with a bare recvfrom() while Go
+		// preempts it with SIGURG, and failed with EINTR.
+		if !wait_on(&this.event, deadline, true, generation) {
+			this.l.acquire()
 			return none
 		}
-		unsafe { events.free() }
 		this.l.acquire()
 	}
 
@@ -474,6 +558,7 @@ pub fn (mut this UnixSocket) write_with_fds(_handle voidptr, buf voidptr, _count
 	// short request as fatal.  Large writes can still make partial progress once
 	// any room is available, matching the existing stream behaviour.
 	requested_room := if count <= peer.capacity { count } else { u64(1) }
+	deadline := deadline_after(this.send_timeout_ns)
 	for peer.capacity - katomic.load(&peer.used) < requested_room {
 		if handle.flags & resource.o_nonblock != 0 {
 			if peer.used == peer.capacity {
@@ -484,13 +569,10 @@ pub fn (mut this UnixSocket) write_with_fds(_handle voidptr, buf voidptr, _count
 		}
 
 		peer.l.release()
-		mut events := [&peer.event]
-		event.await(mut events, true) or {
-			unsafe { events.free() }
-			errno.set(proc.interrupted_errno)
+		if !wait_on(&peer.event, deadline, false, 0) {
+			peer.l.acquire()
 			return none
 		}
-		unsafe { events.free() }
 		peer.l.acquire()
 		if peer.read_closed {
 			errno.set(errno.epipe)
@@ -582,6 +664,7 @@ pub fn (mut this UnixSocket) send_datagram(mut target UnixSocket, _handle voidpt
 	defer {
 		target.l.release()
 	}
+	deadline := deadline_after(this.send_timeout_ns)
 	for {
 		if target.closed || target.read_closed {
 			errno.set(errno.econnrefused)
@@ -596,14 +679,10 @@ pub fn (mut this UnixSocket) send_datagram(mut target UnixSocket, _handle voidpt
 		}
 		generation := event.generation(mut target.event)
 		target.l.release()
-		mut events := [&target.event]
-		event.await_from_generation(mut events, true, 0, generation) or {
-			unsafe { events.free() }
-			errno.set(proc.interrupted_errno)
+		if !wait_on(&target.event, deadline, true, generation) {
 			target.l.acquire()
 			return none
 		}
-		unsafe { events.free() }
 		target.l.acquire()
 	}
 
@@ -983,6 +1062,7 @@ fn (mut this UnixSocket) accept(_handle voidptr) ?&resource.Resource {
 
 	handle := unsafe { &file.Handle(_handle) }
 
+	deadline := deadline_after(this.recv_timeout_ns)
 	for this.backlog.len == 0 {
 		this.status &= ~file.pollin
 		if handle.flags & resource.o_nonblock != 0 {
@@ -991,13 +1071,10 @@ fn (mut this UnixSocket) accept(_handle voidptr) ?&resource.Resource {
 		}
 		print('unix accept: waiting for connection\n')
 		this.l.release()
-		mut events := [&this.event]
-		event.await(mut events, true) or {
-			unsafe { events.free() }
-			errno.set(proc.interrupted_errno)
+		if !wait_on(&this.event, deadline, false, 0) {
+			this.l.acquire()
 			return none
 		}
-		unsafe { events.free() }
 		this.l.acquire()
 	}
 
@@ -1167,6 +1244,7 @@ fn (mut this UnixSocket) recvmsg(_handle voidptr, msg &sock_pub.MsgHdr, flags in
 
 	C.printf(c'%d iovecs, %llu bytes\n', msg.msg_iovlen, count)
 
+	deadline := deadline_after(this.recv_timeout_ns)
 	// If pipe is empty, block or return if nonblock
 	for this.nothing_queued() {
 		// Return EOF if the pipe was closed
@@ -1182,13 +1260,10 @@ fn (mut this UnixSocket) recvmsg(_handle voidptr, msg &sock_pub.MsgHdr, flags in
 			return none
 		}
 		this.l.release()
-		mut events := [&this.event]
-		event.await(mut events, true) or {
-			unsafe { events.free() }
-			errno.set(proc.interrupted_errno)
+		if !wait_on(&this.event, deadline, false, 0) {
+			this.l.acquire()
 			return none
 		}
-		unsafe { events.free() }
 		this.l.acquire()
 	}
 

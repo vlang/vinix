@@ -1389,6 +1389,66 @@ static int exit_past_busy_thread(void) {
     return reaped && ms < 400;
 }
 
+// How long `call` took to fail with EAGAIN, or -1 if it did not.
+#define TIMED_EAGAIN(call)                                                                 \
+    ({                                                                                     \
+        struct timespec from_, to_;                                                        \
+        clock_gettime(CLOCK_MONOTONIC, &from_);                                            \
+        long result_ = (long)(call);                                                       \
+        int errno_ = errno;                                                                \
+        clock_gettime(CLOCK_MONOTONIC, &to_);                                              \
+        result_ == -1 && errno_ == EAGAIN ? elapsed_ns(from_, to_) / 1000000 : -1L;        \
+    })
+
+// SO_RCVTIMEO and SO_SNDTIMEO on unix sockets: a recv on a stream or datagram
+// pair, a send into a full stream socket and an accept each give up with
+// EAGAIN once their timeout has run out.
+static int unix_socket_timeouts(void) {
+    struct timeval wait = {0, 200000}, got = {0};
+    socklen_t got_length = sizeof(got);
+    int stream[2], dgram[2];
+    if (socketpair(AF_UNIX, SOCK_STREAM, 0, stream) != 0 ||
+        socketpair(AF_UNIX, SOCK_DGRAM, 0, dgram) != 0)
+        return 0;
+    char byte, block[4096] = {0};
+    setsockopt(stream[0], SOL_SOCKET, SO_RCVTIMEO, &wait, sizeof(wait));
+    setsockopt(dgram[0], SOL_SOCKET, SO_RCVTIMEO, &wait, sizeof(wait));
+    int read_back = getsockopt(stream[0], SOL_SOCKET, SO_RCVTIMEO, &got, &got_length) == 0 &&
+                    got.tv_usec == 200000;
+    long stream_ms = TIMED_EAGAIN(recv(stream[0], &byte, 1, 0));
+    long dgram_ms = TIMED_EAGAIN(recv(dgram[0], &byte, 1, 0));
+    // Fill the stream socket without blocking, then wait on a full one.
+    fcntl(stream[1], F_SETFL, O_NONBLOCK);
+    while (write(stream[1], block, sizeof(block)) > 0)
+        ;
+    fcntl(stream[1], F_SETFL, 0);
+    setsockopt(stream[1], SOL_SOCKET, SO_SNDTIMEO, &wait, sizeof(wait));
+    long send_ms = TIMED_EAGAIN(write(stream[1], block, sizeof(block)));
+    int listener = socket(AF_UNIX, SOCK_STREAM, 0);
+    struct sockaddr_un address = {.sun_family = AF_UNIX};
+    snprintf(address.sun_path, sizeof(address.sun_path), "/tmp/smoke-timeout-%d.sock", getpid());
+    unlink(address.sun_path);
+    long accept_ms = -1;
+    if (listener >= 0 && bind(listener, (struct sockaddr *)&address, sizeof(address)) == 0 &&
+        listen(listener, 1) == 0) {
+        setsockopt(listener, SOL_SOCKET, SO_RCVTIMEO, &wait, sizeof(wait));
+        accept_ms = TIMED_EAGAIN(accept(listener, NULL, NULL));
+    }
+    close(listener);
+    unlink(address.sun_path);
+    close(stream[0]);
+    close(stream[1]);
+    close(dgram[0]);
+    close(dgram[1]);
+    int valid = read_back && stream_ms >= 150 && stream_ms < 3000 && dgram_ms >= 150 &&
+                dgram_ms < 3000 && send_ms >= 150 && send_ms < 3000 && accept_ms >= 150 &&
+                accept_ms < 3000;
+    if (!valid)
+        printf("unix socket timeouts: read_back=%d recv=%ld dgram=%ld send=%ld accept=%ld ms\n",
+               read_back, stream_ms, dgram_ms, send_ms, accept_ms);
+    return valid;
+}
+
 static int handler_without_restorer(void) {
     struct {
         void (*handler)(int);
@@ -1742,6 +1802,7 @@ int main(int argc, char **argv, char **envp) {
     check(socket_timeouts(), "SO_RCVTIMEO, SO_LINGER and TCP keepalive options");
     check(growing_stack(), "a 32 MiB deep recursion after raising RLIMIT_STACK");
     check(exit_past_busy_thread(), "exit_group does not wait for a thread that only computes");
+    check(unix_socket_timeouts(), "SO_RCVTIMEO and SO_SNDTIMEO on unix sockets");
     int no_family[2];
     check(failed_with_errno(socket(AF_INET6, SOCK_STREAM, 0), EAFNOSUPPORT, "IPv6 socket") &&
               failed_with_errno(socketpair(AF_INET, SOCK_STREAM, 0, no_family), EOPNOTSUPP,
