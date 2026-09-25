@@ -40,8 +40,8 @@ __global (
 	hpet           &HPET
 	hpet_frequency u64
 	// A machine without an HPET -- VirtualBox by default -- counts time with
-	// the TSC instead, calibrated against the PIT. hpet_frequency is then the
-	// TSC's.
+	// the TSC instead, calibrated against the ACPI PM timer or the PIT.
+	// hpet_frequency is then the TSC's.
 	hpet_uses_tsc bool
 	hpet_tsc_base u64
 )
@@ -70,9 +70,57 @@ fn pit_count() u64 {
 	return (u64(hi) << 8) | u64(lo)
 }
 
-// Count TSC ticks across ~27 ms of the PIT. Channel 0 is reprogrammed later
-// by time.pit_initialise(), so it is free to borrow here.
-fn calibrate_tsc() {
+const pm_timer_frequency = u64(3579545)
+
+// The ACPI PM timer's I/O port, from the FADT, or 0 when there is none.
+fn pm_timer_port() u16 {
+	fadt := acpi.find_sdt('FACP', 0) or { return 0 }
+	length := unsafe { *&u32(u64(fadt) + 4) }
+	if length < 92 {
+		return 0
+	}
+	port := unsafe { *&u32(u64(fadt) + 76) }
+	width := unsafe { *&u8(u64(fadt) + 91) }
+	if port == 0 || port > 0xffff || width != 4 {
+		return 0
+	}
+	return u16(port)
+}
+
+// TSC ticks per second across 50 ms of the PM timer. It is 24 bits wide at
+// the least and wraps only every 4.7 s, so a virtual CPU that the host sets
+// aside for a while still measures the time that really passed. 0 when the
+// timer does not move: a tick is 280 ns, far shorter than a million port
+// reads, so a timer the FADT names but that does not count is given up on
+// instead of hanging the boot.
+fn tsc_rate_from_pm_timer(port u16) u64 {
+	mask := u64(0xffffff)
+	start := u64(kio.port_in[u32](port)) & mask
+	tsc_start := cpu.rdtsc()
+	mut elapsed := u64(0)
+	mut unchanged := 0
+	for elapsed < pm_timer_frequency / 20 {
+		now := (u64(kio.port_in[u32](port)) - start) & mask
+		if now == elapsed {
+			unchanged++
+			if unchanged > 1000000 {
+				return 0
+			}
+		} else {
+			unchanged = 0
+		}
+		elapsed = now
+	}
+	tsc_end := cpu.rdtsc()
+	return (tsc_end - tsc_start) * pm_timer_frequency / elapsed
+}
+
+// TSC ticks per second across ~27 ms of the PIT, or 0 when the count is seen
+// to go up: a whole 55 ms period passed between two reads, as it does when
+// the host sets a virtual CPU aside, and how much time that was cannot be
+// known. Channel 0 is reprogrammed later by time.pit_initialise(), so it is
+// free to borrow here.
+fn tsc_rate_from_pit() u64 {
 	// Rate generator counting down from 0xffff, a 55 ms period.
 	kio.port_out[u8](0x43, 0x34)
 	kio.port_out[u8](0x40, 0xff)
@@ -81,19 +129,62 @@ fn calibrate_tsc() {
 	// return whatever channel 0 held before.
 	for pit_count() < 0xf000 {}
 
-	pit_start := pit_count()
+	mut previous := pit_count()
 	tsc_start := cpu.rdtsc()
-	mut pit_now := pit_start
-	for pit_now <= pit_start && pit_start - pit_now < 0x8000 {
-		pit_now = pit_count()
+	mut elapsed := u64(0)
+	for elapsed < 0x8000 {
+		now := pit_count()
+		if now > previous {
+			return 0
+		}
+		elapsed += previous - now
+		previous = now
 	}
-	tsc_end := cpu.rdtsc()
-	pit_ticks := if pit_now <= pit_start { pit_start - pit_now } else { u64(0x8000) }
+	return (cpu.rdtsc() - tsc_start) * pit_frequency / elapsed
+}
 
-	hpet_frequency = (tsc_end - tsc_start) * pit_frequency / pit_ticks
+fn median_of_three(a u64, b u64, c u64) u64 {
+	if (a <= b && b <= c) || (c <= b && b <= a) {
+		return b
+	}
+	if (b <= a && a <= c) || (c <= a && a <= b) {
+		return a
+	}
+	return c
+}
+
+// Calibrate the TSC for a machine without an HPET. Every x86-64 TSC runs at
+// hundreds of MHz at least, so a rate below 50 MHz is a measurement the host
+// disturbed, and is taken again. The median of three keeps one disturbed
+// measurement from counting.
+fn calibrate_tsc() {
+	mut port := pm_timer_port()
+	mut rates := [3]u64{}
+	mut taken := 0
+	for attempt := 0; attempt < 12 && taken < 3; attempt++ {
+		rate := if port != 0 { tsc_rate_from_pm_timer(port) } else { tsc_rate_from_pit() }
+		if rate == 0 && port != 0 {
+			// The PM timer is stuck; the PIT is all there is.
+			port = 0
+			continue
+		}
+		if rate >= 50000000 {
+			rates[taken] = rate
+			taken++
+		}
+	}
+	hpet_frequency = match taken {
+		// Nothing plausible: keep the machine's time moving at a guess rather
+		// than dividing by nothing.
+		0 { u64(1000000000) }
+		1 { rates[0] }
+		2 { (rates[0] + rates[1]) / 2 }
+		else { median_of_three(rates[0], rates[1], rates[2]) }
+	}
 	hpet_tsc_base = cpu.rdtsc()
 	hpet_uses_tsc = true
-	println('hpet: No HPET; using the TSC at ${hpet_frequency} Hz')
+	source := if port != 0 { 'ACPI PM timer' } else { 'PIT' }
+	println('hpet: No HPET; using the TSC at ${hpet_frequency} Hz (calibrated against the ${source})')
 }
 
 pub fn initialise() {
