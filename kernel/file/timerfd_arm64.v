@@ -10,6 +10,7 @@ module file
 import errno
 import event
 import event.eventstruct
+import katomic
 import klock
 import resource
 import stat
@@ -34,7 +35,7 @@ const max_timerfds = 32
 struct TimerFD {
 mut:
 	stat     stat.Stat
-	refcount int = 1
+	refcount int
 	l        klock.Lock
 	event    eventstruct.Event
 	status   int
@@ -169,21 +170,27 @@ fn (mut this TimerFD) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 	return resource.default_ioctl(handle, request, argp)
 }
 
+// A timer counts its open descriptions, and goes when the last one is closed.
+// It started at one before its first, so it never got there: a closed timer
+// stayed in the table the tick walks, and once 32 had been made, every
+// timerfd_create failed with EMFILE. The comparison that finds it there is of
+// addresses; `==` on the two references compared the structs field by field,
+// empty slots included.
 fn (mut this TimerFD) unref(_handle voidptr) ? {
-	this.refcount--
-	if this.refcount > 0 {
+	if katomic.dec(mut &this.refcount) {
 		return
 	}
 
 	// The tick walks this table, so a closed timer has to leave it.
 	timerfd_lock.acquire()
 	for i := 0; i < max_timerfds; i++ {
-		if timerfd_entries[i] == unsafe { this } {
+		if voidptr(timerfd_entries[i]) == voidptr(this) {
 			timerfd_entries[i] = unsafe { nil }
 			break
 		}
 	}
 	timerfd_lock.release()
+	unsafe { free(voidptr(this)) }
 }
 
 fn (mut this TimerFD) link(_handle voidptr) ? {

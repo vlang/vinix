@@ -30,6 +30,7 @@
 #include <sys/auxv.h>
 #include <sys/signalfd.h>
 #include <sys/times.h>
+#include <sys/timerfd.h>
 #include <sys/un.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -1256,6 +1257,22 @@ static int terminal_after_session(void) {
     return first && second;
 }
 
+// A closed timerfd is gone: the tick's table of timers has room for 32, and
+// closed ones stayed in it until timerfd_create failed for good.
+static int timerfd_churn(void) {
+    for (int i = 0; i < 80; i++) {
+        int fd = timerfd_create(CLOCK_MONOTONIC, TFD_CLOEXEC);
+        if (fd < 0) {
+            printf("timerfd churn: create %d failed, errno %d\n", i, errno);
+            return 0;
+        }
+        struct itimerspec soon = {.it_value = {0, 1000000}};
+        timerfd_settime(fd, 0, &soon, NULL);
+        close(fd);
+    }
+    return 1;
+}
+
 static int handler_without_restorer(void) {
     struct {
         void (*handler)(int);
@@ -1605,6 +1622,7 @@ int main(int argc, char **argv, char **envp) {
     check(epoll_closed_files(), "a closed file leaves its epoll sets");
     check(limits_file(), "/proc/self/limits");
     check(terminal_after_session(), "a new session claims a pty after the last one ends");
+    check(timerfd_churn(), "80 timerfds made and closed in turn");
     int no_family[2];
     check(failed_with_errno(socket(AF_INET6, SOCK_STREAM, 0), EAFNOSUPPORT, "IPv6 socket") &&
               failed_with_errno(socketpair(AF_INET, SOCK_STREAM, 0, no_family), EOPNOTSUPP,
