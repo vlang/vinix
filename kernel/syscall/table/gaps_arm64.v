@@ -392,7 +392,12 @@ fn syscall_linux_sched_getaffinity(_ voidptr, local_pid int, size u64, mask u64)
 	if pid < 0 {
 		return errno.err, errno.einval
 	}
-	if pid != 0 && (pid >= proc.max_pid || processes[pid] == unsafe { nil }) {
+	// The id is a thread's, which thread_affinity() below looks up. It was
+	// looked for among processes, where only a first thread is: glibc's
+	// pthread_getattr_np() asks this of the calling thread, and the JVM,
+	// which asks that of every thread it runs on, stopped with ESRCH in
+	// Elasticsearch's Ubuntu-based image.
+	if pid >= proc.max_pid {
 		return errno.err, errno.esrch
 	}
 	if mask == 0 {

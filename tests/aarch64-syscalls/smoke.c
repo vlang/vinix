@@ -1041,6 +1041,25 @@ static int async_signals(void) {
     return async_ticks >= 50 && exact && saw_fpsimd_record;
 }
 
+static void *affinity_thread(void *result) {
+    unsigned long mask = 0;
+    long tid = syscall(SYS_gettid);
+    *(int *)result = syscall(SYS_sched_getaffinity, tid, sizeof(mask), &mask) == sizeof(mask) &&
+                     mask != 0;
+    return NULL;
+}
+
+// sched_getaffinity(2) of a thread that is not the first: glibc's
+// pthread_getattr_np() asks it of the calling thread.
+static int thread_affinity(void) {
+    int valid = 0;
+    pthread_t thread;
+    if (pthread_create(&thread, NULL, affinity_thread, &valid) != 0)
+        return 0;
+    pthread_join(thread, NULL);
+    return valid;
+}
+
 static int handler_without_restorer(void) {
     struct {
         void (*handler)(int);
@@ -1378,6 +1397,7 @@ int main(int argc, char **argv, char **envp) {
     check(cpu_features(), "AT_HWCAP, /proc/self/auxv and MRS of ID registers agree");
     check(thread_names(), "a thread's name is its own");
     check(async_signals(), "signals reach a computing thread and keep its FP state");
+    check(thread_affinity(), "sched_getaffinity of a thread");
     int no_family[2];
     check(failed_with_errno(socket(AF_INET6, SOCK_STREAM, 0), EAFNOSUPPORT, "IPv6 socket") &&
               failed_with_errno(socketpair(AF_INET, SOCK_STREAM, 0, no_family), EOPNOTSUPP,
