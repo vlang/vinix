@@ -15,3 +15,21 @@ fn leave(context &cpulocal.GPRState) {
 	sched.park_for_cgroup()
 	userland.dispatch_a_signal(context)
 }
+
+// On the way back to userspace from an interrupt. A thread that only computes
+// makes no syscall, and took no signal but a fatal one: a SIGALRM that
+// openssl speed times each run with, or the SIGURG Go preempts a busy
+// goroutine with, waited for good. It is delivered here as at a syscall's
+// end, its handler run on a frame that keeps the FP/SIMD registers the loop
+// had live.
+@[export: 'interrupt__leave']
+fn interrupt_leave(context &cpulocal.GPRState) {
+	if context.pstate & 0xf != 0 {
+		return
+	}
+	if !userland.async_signal_deliverable() {
+		return
+	}
+	cpu.interrupt_toggle(false)
+	userland.dispatch_a_signal(context)
+}

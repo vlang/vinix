@@ -24,6 +24,8 @@
 #include <sys/stat.h>
 #include <sys/syscall.h>
 #include <sys/uio.h>
+#include <sys/time.h>
+#include <ucontext.h>
 #include <sys/auxv.h>
 #include <sys/un.h>
 #include <netinet/in.h>
@@ -990,6 +992,55 @@ static int thread_names(void) {
     return valid;
 }
 
+static volatile sig_atomic_t async_ticks;
+static volatile int saw_fpsimd_record;
+
+// A handler that uses the FP/SIMD registers itself, as any may.
+static void clobbering_handler(int signal, siginfo_t *info, void *context) {
+    (void)signal;
+    (void)info;
+    volatile double noise = 0;
+    for (int i = 0; i < 64; i++)
+        noise += i * 1.5;
+    ucontext_t *uc = context;
+    unsigned int *record = (unsigned int *)uc->uc_mcontext.__reserved;
+    if (record[0] == 0x46508001 && record[1] == 528)
+        saw_fpsimd_record = 1;
+    async_ticks++;
+}
+
+// A signal taken while a thread only computes -- no syscalls -- is delivered,
+// and its handler leaves the FP/SIMD values the loop had live as they were.
+static int async_signals(void) {
+    struct sigaction action = {.sa_sigaction = clobbering_handler, .sa_flags = SA_SIGINFO};
+    struct sigaction previous;
+    sigemptyset(&action.sa_mask);
+    sigaction(SIGALRM, &action, &previous);
+    struct itimerval every = {.it_interval = {0, 1000}, .it_value = {0, 1000}};
+    async_ticks = 0;
+    saw_fpsimd_record = 0;
+    setitimer(ITIMER_REAL, &every, NULL);
+    typedef double v2 __attribute__((vector_size(16)));
+    v2 a = {0, 0}, step = {0.5, 0.25};
+    double sum = 0;
+    long iterations = 0;
+    while (async_ticks < 50 && iterations < 4000000000L) {
+        for (int i = 0; i < 1000; i++) {
+            a += step;
+            sum += 1.0;
+        }
+        iterations += 1000;
+    }
+    struct itimerval off = {0};
+    setitimer(ITIMER_REAL, &off, NULL);
+    sigaction(SIGALRM, &previous, NULL);
+    int exact = sum == (double)iterations && a[0] == iterations * 0.5 && a[1] == iterations * 0.25;
+    if (async_ticks < 50 || !exact || !saw_fpsimd_record)
+        printf("async signals: ticks=%d exact=%d record=%d sum=%.1f a=%.2f,%.2f iterations=%ld\n",
+               (int)async_ticks, exact, (int)saw_fpsimd_record, sum, a[0], a[1], iterations);
+    return async_ticks >= 50 && exact && saw_fpsimd_record;
+}
+
 static int handler_without_restorer(void) {
     struct {
         void (*handler)(int);
@@ -1326,6 +1377,7 @@ int main(int argc, char **argv, char **envp) {
     check(program_break(), "brk moves the break, and fork keeps it");
     check(cpu_features(), "AT_HWCAP, /proc/self/auxv and MRS of ID registers agree");
     check(thread_names(), "a thread's name is its own");
+    check(async_signals(), "signals reach a computing thread and keep its FP state");
     int no_family[2];
     check(failed_with_errno(socket(AF_INET6, SOCK_STREAM, 0), EAFNOSUPPORT, "IPv6 socket") &&
               failed_with_errno(socketpair(AF_INET, SOCK_STREAM, 0, no_family), EOPNOTSUPP,

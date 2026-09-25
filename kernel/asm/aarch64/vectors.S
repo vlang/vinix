@@ -342,6 +342,9 @@ handle_lower64_irq:
     bl scheduler_gpu_interrupt_trace
     mov x0, sp
     bl exception__irq_handler
+    // A signal that came while the thread computed is taken now.
+    mov x0, sp
+    bl interrupt__leave
     mov x0, sp
     mov x1, #1
     bl scheduler_gpu_interrupt_trace
@@ -365,6 +368,8 @@ handle_lower64_fiq:
     bl scheduler_gpu_interrupt_trace
     mov x0, sp
     bl exception__irq_handler
+    mov x0, sp
+    bl interrupt__leave
     mov x0, sp
     mov x1, #1
     bl scheduler_gpu_interrupt_trace

@@ -254,6 +254,9 @@ pub fn syscall_sigreturn(gpr_state_ptr voidptr, context_arg voidptr, old_mask_ar
 			if !usercopy.copy_from_user(voidptr(&prev_mask), public_context + 40, sizeof(u64)) {
 				return errno.err, errno.efault
 			}
+			if !restore_fpsimd(public_context + 464) {
+				return errno.err, errno.efault
+			}
 		}
 		restored_mask = prev_mask
 	}
@@ -273,6 +276,52 @@ pub fn syscall_sigreturn(gpr_state_ptr voidptr, context_arg voidptr, old_mask_ar
 	}
 
 	return t.gpr_state.x0, 0
+}
+
+fn C.vinix_aarch64_fpu_save(state voidptr)
+
+fn C.vinix_aarch64_fpu_restore(state voidptr)
+
+// Linux's struct fpsimd_context: a record header, FPSR, FPCR and the 32
+// vector registers. The kernel's own save area is the registers, then FPSR
+// and FPCR, 520 bytes.
+const fpsimd_magic = u32(0x46508001)
+const fpsimd_context_size = u32(528)
+const fpsimd_state_size = 520
+
+// Find the fpsimd_context among the extension records of a signal frame's
+// ucontext, at `records`, and load the FP/SIMD registers from it. A frame
+// without one leaves them as they are. False when the frame is not there to
+// read.
+fn restore_fpsimd(records u64) bool {
+	mut offset := u64(0)
+	for offset + 8 <= 4096 {
+		mut header := [2]u32{}
+		if !usercopy.copy_from_user(voidptr(&header[0]), records + offset, 8) {
+			return false
+		}
+		magic := header[0]
+		size := u64(header[1])
+		if magic == 0 || size < 8 || offset + size > 4096 {
+			return true
+		}
+		if magic == fpsimd_magic && size == u64(fpsimd_context_size) {
+			mut record := [528]u8{}
+			if !usercopy.copy_from_user(voidptr(&record[0]), records + offset, 528) {
+				return false
+			}
+			mut state := [fpsimd_state_size]u8{}
+			unsafe {
+				C.memcpy(&state[0], &record[16], 512)
+				*&u32(&state[512]) = *&u32(&record[8])
+				*&u32(&state[516]) = *&u32(&record[12])
+			}
+			C.vinix_aarch64_fpu_restore(voidptr(&state[0]))
+			return true
+		}
+		offset += size
+	}
+	return true
 }
 
 // Dispatch a signal to _self_, called from the scheduler at the
@@ -314,6 +363,17 @@ fn signal_restorer(process &proc.Process, sigaction &proc.SigAction) u64 {
 		return u64(sigaction.sa_restorer)
 	}
 	return process.sigreturn_page
+}
+
+// Whether a signal the current thread does not block waits for it, one that
+// may be delivered at any instruction. Only a Linux frame keeps the FP/SIMD
+// registers; a native program's is delivered at its next syscall, as before.
+pub fn async_signal_deliverable() bool {
+	t := proc.current_thread()
+	if unsafe { t == nil } || t.sigentry != 0 {
+		return false
+	}
+	return katomic.load(&t.pending_signals) & ~t.masked_signals != 0
 }
 
 pub fn dispatch_a_signal(context &cpulocal.GPRState) {
@@ -492,17 +552,18 @@ fn dispatch_a_signal_with_fault(context &cpulocal.GPRState, synchronous bool, fa
 		// ucontext_t. Synchronous faults always require those objects as well.
 		// rt_sigreturn still consumes the compact private header at the front;
 		// the appended ABI objects are for three-argument handlers.
+		//
+		// Every frame carries the ucontext, and in it the FP/SIMD registers,
+		// as Linux's do: a signal may now arrive at any instruction a thread
+		// runs in userspace, not only at a syscall, where the code it cuts
+		// into has live values in all of them. rt_sigreturn puts them back.
 		wants_siginfo := synchronous || sigaction.sa_flags & sa_siginfo != 0
 			|| sigaction.sa_flags & 4 != 0 // Linux SA_SIGINFO
 		context_offset := u64(16)
 		info_offset := lib.align_up(context_offset + sizeof(cpulocal.GPRState), 16)
 		ucontext_offset := info_offset + 128
 		ucontext_size := u64(4560)
-		frame_size := if wants_siginfo {
-			ucontext_offset + ucontext_size
-		} else {
-			context_offset + sizeof(cpulocal.GPRState)
-		}
+		frame_size := ucontext_offset + ucontext_size
 		mut signal_sp := lib.align_down(stack_top - frame_size, 16)
 		uc_address := signal_sp + ucontext_offset
 
@@ -517,51 +578,58 @@ fn dispatch_a_signal_with_fault(context &cpulocal.GPRState, synchronous bool, fa
 			*&u64(base) = previous_mask
 			// The private header points rt_sigreturn at the public context so
 			// changes made by a three-argument handler are not discarded.
-			*&u64(base + 8) = if wants_siginfo { uc_address } else { u64(0) }
+			*&u64(base + 8) = uc_address
 			C.memcpy(voidptr(base + context_offset), context, sizeof(cpulocal.GPRState))
 		}
 
-		if wants_siginfo {
-			info_base := base + info_offset
-			uc_base := base + ucontext_offset
-			unsafe {
-				// siginfo_t: signo, errno, positive si_code, then si_addr. Linux
-				// distinguishes an unmapped page from a permission-protected one.
-				*&i32(info_base) = i32(which)
-				*&i32(info_base + 8) = if timer_info.found {
-					i32(timer_info.code)
-				} else if synchronous && (fault_esr & 0x3f) >= 0x0c {
-					2 // SEGV_ACCERR
-				} else if synchronous {
-					1 // SEGV_MAPERR (also the first positive code for other faults)
-				} else {
-					0
-				}
-				*&u64(info_base + 16) = fault_address
-				if timer_info.found {
-					*&i32(info_base + 20) = i32(timer_info.overrun)
-					*&u64(info_base + 24) = timer_info.value
-				}
-
-				// musl AArch64 ucontext_t offsets. The signal mask begins at 40;
-				// its 128 bytes are followed by eight bytes of alignment before
-				// mcontext at 176. The reserved extension records are 16-byte
-				// aligned after pstate.
-				*&u64(uc_base + 40) = previous_mask
-				*&u64(uc_base + 176) = fault_address
-				C.memcpy(voidptr(uc_base + 184), context, 31 * sizeof(u64))
-				*&u64(uc_base + 432) = context.sp
-				*&u64(uc_base + 440) = context.pc
-				*&u64(uc_base + 448) = context.pstate
-
-				// esr_context lets QEMU distinguish reads from writes without
-				// decoding the faulting AArch64 instruction.
-				*&u32(uc_base + 464) = 0x45535201
-				*&u32(uc_base + 468) = 16
-				*&u64(uc_base + 472) = fault_esr
-				// A zero header terminates the extension-record chain.
-				*&u64(uc_base + 480) = 0
+		info_base := base + info_offset
+		uc_base := base + ucontext_offset
+		mut fpsimd := [fpsimd_state_size]u8{}
+		C.vinix_aarch64_fpu_save(voidptr(&fpsimd[0]))
+		unsafe {
+			// siginfo_t: signo, errno, positive si_code, then si_addr. Linux
+			// distinguishes an unmapped page from a permission-protected one.
+			*&i32(info_base) = i32(which)
+			*&i32(info_base + 8) = if timer_info.found {
+				i32(timer_info.code)
+			} else if synchronous && (fault_esr & 0x3f) >= 0x0c {
+				2 // SEGV_ACCERR
+			} else if synchronous {
+				1 // SEGV_MAPERR (also the first positive code for other faults)
+			} else {
+				0
 			}
+			*&u64(info_base + 16) = fault_address
+			if timer_info.found {
+				*&i32(info_base + 20) = i32(timer_info.overrun)
+				*&u64(info_base + 24) = timer_info.value
+			}
+
+			// musl AArch64 ucontext_t offsets. The signal mask begins at 40;
+			// its 128 bytes are followed by eight bytes of alignment before
+			// mcontext at 176. The reserved extension records are 16-byte
+			// aligned after pstate.
+			*&u64(uc_base + 40) = previous_mask
+			*&u64(uc_base + 176) = fault_address
+			C.memcpy(voidptr(uc_base + 184), context, 31 * sizeof(u64))
+			*&u64(uc_base + 432) = context.sp
+			*&u64(uc_base + 440) = context.pc
+			*&u64(uc_base + 448) = context.pstate
+
+			// fpsimd_context first, as Linux lays the records out: the
+			// FPSR and FPCR, then the 32 vector registers.
+			*&u32(uc_base + 464) = fpsimd_magic
+			*&u32(uc_base + 468) = fpsimd_context_size
+			*&u32(uc_base + 472) = *&u32(&fpsimd[512])
+			*&u32(uc_base + 476) = *&u32(&fpsimd[516])
+			C.memcpy(voidptr(uc_base + 480), &fpsimd[0], 512)
+			// esr_context lets QEMU distinguish reads from writes without
+			// decoding the faulting AArch64 instruction.
+			*&u32(uc_base + 992) = 0x45535201
+			*&u32(uc_base + 996) = 16
+			*&u64(uc_base + 1000) = fault_esr
+			// A zero header terminates the extension-record chain.
+			*&u64(uc_base + 1008) = 0
 		}
 
 		pushed := usercopy.copy_to_user(signal_sp, frame.data, frame_size)
