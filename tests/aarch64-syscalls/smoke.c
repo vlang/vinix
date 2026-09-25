@@ -621,6 +621,29 @@ static int multiple_messages(void) {
     return valid;
 }
 
+// futimens(2) is utimensat(2) with a null path, and a descriptor argument
+// is an int whose register may hold anything above its low 32 bits: GNU tar
+// relies on both when it extracts.
+static int descriptor_arguments(void) {
+    const char *dir = "/tmp/aarch64-syscall-fdcwd";
+    const char *file = "/tmp/aarch64-syscall-futimens";
+    rmdir(dir);
+    long zero_extended = (long)(unsigned int)AT_FDCWD;
+    int valid = syscall(SYS_mkdirat, zero_extended, dir, 0755) == 0 && access(dir, F_OK) == 0;
+    rmdir(dir);
+    int fd = open(file, O_CREAT | O_WRONLY | O_TRUNC, 0644);
+    struct timespec times[2] = {{.tv_sec = 1000000000}, {.tv_sec = 1234567890}};
+    struct stat st;
+    valid = valid && fd >= 0 && futimens(fd, times) == 0 && fstat(fd, &st) == 0 &&
+            st.st_mtim.tv_sec == 1234567890 && st.st_atim.tv_sec == 1000000000;
+    if (!valid)
+        printf("descriptor arguments: errno=%d\n", errno);
+    if (fd >= 0)
+        close(fd);
+    unlink(file);
+    return valid;
+}
+
 // mremap(2) moving an anonymous mapping into one that is filled in only as
 // it is touched, and out of one with pages it never had, as apt grows its
 // package cache. Mappings this large are not filled in up front.
@@ -971,6 +994,7 @@ int main(void) {
     check(ids_with_kept_capabilities(), "group ids set with CAP_SETGID after setuid");
     check(process_maps(), "/proc/self/maps and smaps");
     check(multiple_messages(), "sendmmsg and recvmmsg");
+    check(descriptor_arguments(), "futimens and a zero-extended AT_FDCWD");
     check(mremap_sparse(), "mremap with pages not filled in");
     int no_family[2];
     check(failed_with_errno(socket(AF_INET6, SOCK_STREAM, 0), EAFNOSUPPORT, "IPv6 socket") &&

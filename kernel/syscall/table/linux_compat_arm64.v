@@ -158,7 +158,7 @@ fn syscall_linux_faccessat2(gpr_state voidptr, dirfd int, path charptr, mode u32
 		if flags & fs.at_empty_path == 0 {
 			return errno.err, errno.enoent
 		}
-		if dirfd == fs.at_fdcwd {
+		if fs.is_fdcwd(dirfd) {
 			return 0, 0
 		}
 		mut checked_fd := file.fd_from_fdnum(unsafe { nil }, dirfd) or {

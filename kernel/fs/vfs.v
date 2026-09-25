@@ -251,6 +251,15 @@ fn walk_path(parent &VFSNode, path string, depth int, effective bool) (&VFSNode,
 	return 0, 0, ''
 }
 
+// Whether a directory descriptor argument is AT_FDCWD. A descriptor is a C
+// int, and only its low 32 bits are the caller's: the AArch64 procedure call
+// standard leaves the rest of the register to whatever was there, and Linux
+// reads the int alone. GNU tar's mkdirat(AT_FDCWD, ...) came in as
+// 0xffffff9c, was taken for descriptor 4294967196, and failed with EBADF.
+pub fn is_fdcwd(dirfd int) bool {
+	return i32(dirfd) == i32(at_fdcwd)
+}
+
 fn get_parent_dir(dirfd int, path string) ?&VFSNode {
 	is_absolute := path[0] == `/`
 
@@ -261,13 +270,13 @@ fn get_parent_dir(dirfd int, path string) ?&VFSNode {
 	if is_absolute == true {
 		parent = calling_root()
 	} else {
-		if dirfd == at_fdcwd {
+		if is_fdcwd(dirfd) {
 			parent = unsafe { &VFSNode(proc.current_directory_of(current_process)) }
 		} else {
 			// The lookup's reference is given back once the directory's node
 			// is known; nodes outlive the descriptors that name them. Keeping
 			// it held every directory any *at() call had named open for good.
-			mut dir_fd := file.fd_from_fdnum(current_process, dirfd) or { return none }
+			mut dir_fd := file.fd_from_fdnum(current_process, int(i32(dirfd))) or { return none }
 			dir_handle := dir_fd.handle
 			if stat.isdir(dir_handle.resource.stat.mode) == false {
 				dir_fd.unref()
@@ -1161,7 +1170,7 @@ pub fn syscall_fstatat(_ voidptr, dirfd int, _path charptr, statbuf &stat.Stat, 
 			return errno.err, errno.enoent
 		}
 
-		if dirfd == at_fdcwd {
+		if is_fdcwd(dirfd) {
 			node := unsafe { &VFSNode(proc.current_directory_of(current_process)) }
 			statsrc = &node.resource.stat
 		} else {
@@ -2027,30 +2036,45 @@ pub fn syscall_utimensat(_ voidptr, dirfd int, _path charptr, times u64, flags i
 	if flags & ~(at_symlink_nofollow | at_empty_path) != 0 {
 		return errno.err, errno.einval
 	}
-	path := user_path(_path) or { return errno.err, errno.get() }
+	// A null path is the file dirfd is open on, as Linux has it: glibc's
+	// futimens(2) is this call, and GNU tar sets every time it extracts with
+	// it. It was taken for a bad pointer, and tar, under dpkg, failed every
+	// package apt installed.
+	on_descriptor := _path == unsafe { nil } && !is_fdcwd(dirfd)
+	if on_descriptor && flags & at_symlink_nofollow != 0 {
+		return errno.err, errno.einval
+	}
+	path := if on_descriptor { '' } else { user_path(_path) or { return errno.err, errno.get() } }
 	defer {
-		unsafe { path.free() }
+		if !on_descriptor {
+			unsafe { path.free() }
+		}
 	}
 	mut node := &VFSNode(unsafe { nil })
+	mut res := &resource.Resource(unsafe { nil })
 	if path.len == 0 {
-		if flags & at_empty_path == 0 { return errno.err, errno.enoent }
-		if dirfd == at_fdcwd {
+		if !on_descriptor && flags & at_empty_path == 0 { return errno.err, errno.enoent }
+		if is_fdcwd(dirfd) {
 			node = proc.current_directory_of(proc.current_thread().process)
+			res = node.resource
 		} else {
+			// The descriptor may name something without a name, a pipe
+			// among them; its own file is what changes.
 			mut fd := file.fd_from_fdnum(unsafe { nil }, dirfd) or {
 				return errno.err, errno.get()
 			}
 			node = unsafe { &VFSNode(fd.handle.node) }
+			res = fd.handle.resource
 			fd.unref()
-			if unsafe { node == nil } { return errno.err, errno.einval }
 		}
 	} else {
 		parent := get_parent_dir(dirfd, path) or { return errno.err, errno.get() }
 		node = get_node(parent, path, flags & at_symlink_nofollow == 0) or {
 			return errno.err, errno.get()
 		}
+		res = node.resource
 	}
-	if read_only(node) { return errno.err, errno.erofs }
+	if node != unsafe { nil } && read_only(node) { return errno.err, errno.erofs }
 
 	now := time.clock_now(time.clock_type_realtime) or { time.TimeSpec{} }
 	mut requested := [2]time.TimeSpec{init: now}
@@ -2071,16 +2095,16 @@ pub fn syscall_utimensat(_ voidptr, dirfd int, _path charptr, times u64, flags i
 		}
 	}
 	if explicit {
-		if !owns_resource(node.resource.stat.uid) { return errno.err, errno.eperm }
-	} else if !owns_resource(node.resource.stat.uid)
-		&& !check_access(node, access_write, true) {
+		if !owns_resource(res.stat.uid) { return errno.err, errno.eperm }
+	} else if !owns_resource(res.stat.uid)
+		&& (node == unsafe { nil } || !check_access(node, access_write, true)) {
 		return errno.err, errno.eacces
 	}
 	if requested[0].tv_nsec == utime_omit && requested[1].tv_nsec == utime_omit {
 		return 0, 0
 	}
 
-	mut res := resource_to_change(node) or { return errno.err, errno.get() }
+	res = handle_resource_to_change(voidptr(node), res) or { return errno.err, errno.get() }
 	old_atim := res.stat.atim
 	old_mtim := res.stat.mtim
 	old_ctim := res.stat.ctim
@@ -2097,7 +2121,9 @@ pub fn syscall_utimensat(_ voidptr, dirfd int, _path charptr, times u64, flags i
 		res.stat.ctim = old_ctim
 		return errno.err, errno.get()
 	}
-	inotify_emit(node, '', in_attrib, 0)
+	if node != unsafe { nil } {
+		inotify_emit(node, '', in_attrib, 0)
+	}
 	return 0, 0
 }
 
