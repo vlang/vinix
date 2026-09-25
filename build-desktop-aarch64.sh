@@ -26,13 +26,9 @@ else
 fi
 
 BUILD_DIR="$SCRIPT_DIR/build"
-# The compositor and UI2 examples are independent, expensive application builds.
-# Keep their completed binaries outside the disposable compositor workspace so
-# cleaning build/ (or replacing its initramfs staging tree) cannot turn the
-# next deployment into an 85-application rebuild.  Their builders retain
-# content fingerprints and only replace an artifact when its real inputs
-# change.  Override this for CI or isolated builds without moving the normal
-# host cache.
+# Keep the completed compositor outside the disposable build/ workspace.
+# Its builder retains content fingerprints and only replaces the artifact when
+# its inputs change. Override this for CI or isolated builds.
 APP_CACHE_DIR="${VINIX_AARCH64_APP_CACHE:-$SCRIPT_DIR/build-aarch64-desktop-apps}"
 USERLAND_BUILD_DIR="${VINIX_AARCH64_USERLAND_BUILD_DIR:-$SCRIPT_DIR/build-aarch64-userland}"
 SYSROOT="${VINIX_AARCH64_SYSROOT:-$USERLAND_BUILD_DIR/staging}"
@@ -179,7 +175,7 @@ for arg in "$@"; do
             echo "  --with-x86-translation adds a previously built x86/Wine runtime"
             echo "  --wifi-bundle stages a package.py output and loads it before the desktop"
             echo "  VINIX_REFRESH_DESKTOP_STAGING=1 discards the cached assembled layers"
-            echo "  VINIX_AARCH64_APP_CACHE changes the persistent desktop/ui2 binary cache"
+            echo "  VINIX_AARCH64_APP_CACHE changes the persistent desktop binary cache"
             exit 0
             ;;
         *)
@@ -246,22 +242,6 @@ release_desktop_build_lock() {
 
 mkdir -p "$BUILD_DIR"
 
-migrate_legacy_app_cache() {
-    local legacy="$1"
-    local destination="$2"
-    local state="$3"
-
-    [ "$legacy" != "$destination" ] || return 0
-    [ ! -e "$destination" ] || return 0
-    [ -f "$legacy/$state" ] || return 0
-    mkdir -p "$(dirname "$destination")"
-    mv "$legacy" "$destination"
-    echo "==> Preserved application cache at $destination"
-}
-
-# Builds predating the persistent cache kept these outputs below build/. Move
-# a complete cache once so upgrading this checkout does not compile everything
-# again merely to establish the new location.
 build_lock_wait_reported=0
 while ! ln -s "$$" "$DESKTOP_BUILD_LOCK" 2>/dev/null; do
     build_lock_owner="$(desktop_build_lock_owner)"
@@ -284,9 +264,6 @@ while ! ln -s "$$" "$DESKTOP_BUILD_LOCK" 2>/dev/null; do
     sleep 1
 done
 trap release_desktop_build_lock EXIT
-
-migrate_legacy_app_cache "$BUILD_DIR/ui2-examples" \
-    "$APP_CACHE_DIR/ui2-examples" ".vinix-ui2-build-state.json"
 
 archive_has_member() {
     local archive="$1"
@@ -534,15 +511,6 @@ if [ "$DESKTOP_CACHE_HIT" -eq 0 ]; then
     fi
     python3 "$SCRIPT_DIR/build-support/staging-cache.py" record "${DESKTOP_CACHE_ARGS[@]}"
 fi
-
-echo "==> Preparing cached ui2 example applications for aarch64..."
-UI2_EXAMPLES_DIR="$APP_CACHE_DIR/ui2-examples"
-python3 "$SCRIPT_DIR/desktop/tools/build_ui2_examples.py" \
-    --repo "$SCRIPT_DIR" --ui2-source "$UI2_SOURCE" \
-    --output "$UI2_EXAMPLES_DIR" --work "$BUILD_DIR/ui2-examples-work" \
-    --v "$V" --arch arm64 --clang "$LLVM_BIN/clang" --strip "$LLVM_BIN/llvm-strip" \
-    --target aarch64-linux-musl --sysroot "$SYSROOT" --gcclib "$GCCLIB" \
-    --cc-shim "$CC_SHIM" --llvm-bin "$LLVM_BIN"
 
 if [ "$MAKE_INITRAMFS" -eq 0 ]; then
     exit 0
@@ -1206,7 +1174,7 @@ mkdir -p "$STAGING/usr/libexec"
 cp "$BUILD_DIR/desktop-init" "$STAGING/sbin/init"
 install -m755 "$BUILD_DIR/desktop-init" \
     "$STAGING/usr/libexec/vinix-desktop-init"
-install -m755 "$UI2_EXAMPLES_DIR"/vinix-ui2-* "$STAGING/usr/bin/"
+rm -f "$STAGING/usr/bin"/vinix-ui2-*
 cp "$BUILD_DIR/vinix-desktop" "$STAGING/usr/bin/vinix-desktop"
 # Guest hot reloads replace /usr/bin/vinix-desktop so every multicall native
 # application changes generation with the compositor. Keep one unreachable
@@ -1233,7 +1201,7 @@ chmod +x "$STAGING/sbin/init" "$STAGING/usr/bin/vinix-desktop" \
 # Vinix records the path passed to execve, so these relative symlinks produce
 # distinct names and truthful per-app accounting without storing a copy of the
 # same static executable for every native application in the initramfs.
-for app_name in vinix-files vinix-calculator vinix-terminal vinix-settings vinix-ui2-examples \
+for app_name in vinix-files vinix-calculator vinix-terminal vinix-settings \
     vinix-activity vinix-editor vinix-calendar vinix-clock \
     vinix-vspace \
     vinix-firefox vinix-chromium vinix-gimp vinix-libreoffice vinix-minecraft vinix-doom vinix-wine-calculator vinix-wine-notepad \
@@ -1342,7 +1310,6 @@ CONTENT_KEY_INPUTS=(
     "$GPU_CONTENT_KEY_INPUT"
     "$BUILD_DIR/wifi-ctl"
     "$BUILD_DIR/wallpapers"
-    "$UI2_EXAMPLES_DIR"
     "$SCRIPT_DIR/desktop"
     "$SCRIPT_DIR/build-support/vinix-pkg"
     "$SCRIPT_DIR/build-support/vinix-desktop-build"

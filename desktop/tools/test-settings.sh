@@ -29,8 +29,8 @@ python3 "$root/desktop/tools/stage_ui2.py" \
     "$root/desktop/tools/ui2_headless_bounds.v"
 # Settings is a category of the whole desktop application now, so the UI tests
 # build against the real thing rather than a hand-picked subset.
-# Staged exactly as the real build stages it, ui2 example and all, so the
-# tests build against the desktop that ships. main.v is then dropped: its
+# Staged exactly as the real build stages it, including Calculator's ui2 model,
+# so the tests build against the desktop that ships. main.v is then dropped: its
 # fn main() would collide with the test runner's.
 mkdir "$work/ui"
 python3 "$root/desktop/tools/stage_app.py" "$work/ui" "$root/desktop" \

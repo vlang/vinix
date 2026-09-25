@@ -673,16 +673,10 @@ fn test_available_utility_applications_and_shortcut_layouts() {
 	assert available_apps[20].height == chromium_window_height + default_title_height
 	assert available_apps[20].keyboard && available_apps[20].pointer
 	assert available_apps[20].polling && available_apps[20].poll_interval_ms == 50
-	assert available_apps[21].title == 'ui2 Examples'
-	assert available_apps[21].process_name == 'vinix-ui2-examples'
-	assert available_apps[21].open != unsafe { nil }
-	assert available_apps[22].title == 'Chocolate Doom'
-	assert available_apps[22].process_name == 'vinix-doom'
-	assert available_apps[22].keyboard && available_apps[22].pointer
-	assert ui2_example_names.len == 85
-	example := ui2_example_named('toggle_button') or { panic('missing ui2 example') }
-	assert example.process_name == 'vinix-ui2-toggle_button'
-	assert example.standalone && example.keyboard && example.pointer && example.polling
+	assert available_apps[21].title == 'Chocolate Doom'
+	assert available_apps[21].process_name == 'vinix-doom'
+	assert available_apps[21].keyboard && available_apps[21].pointer
+	assert available_apps.len == 22
 	assert app_start_actions.len == available_apps.len
 	assert app_shortcut_actions.len == available_apps.len
 	assert shortcut_rows_for_height(720) == 8

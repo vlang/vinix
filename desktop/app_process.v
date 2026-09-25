@@ -279,10 +279,9 @@ fn wire_take_state(mut reader WireReader) !AppWireState {
 	}
 }
 
-// Keep every portable control field on the wire. ui2 examples deliberately
-// exercise more than push buttons: slider values, switch state, dropdown
-// choices and text-input metadata all have to survive the process boundary for
-// the framebuffer backend to behave like the native backends.
+// Keep every portable control field on the wire: slider values, switch state,
+// dropdown choices and text-input metadata all have to survive the process
+// boundary for the framebuffer backend to behave like the native backends.
 fn encode_app_element(element ui2.Element, mut out []u8) ! {
 	if out.len > app_protocol_max_payload {
 		return error('application tree is too large')

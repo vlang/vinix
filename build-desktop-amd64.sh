@@ -122,14 +122,6 @@ echo "==> Compiling for x86_64-linux-musl..."
     -fuse-ld=lld -o "$BUILD_DIR/vinix-desktop"
 "$LLVM_STRIP" "$BUILD_DIR/vinix-desktop"
 
-echo "==> Building all ui2 example applications for amd64..."
-UI2_EXAMPLES_DIR="$BUILD_DIR/ui2-examples"
-python3 "$SCRIPT_DIR/desktop/tools/build_ui2_examples.py" \
-    --repo "$SCRIPT_DIR" --ui2-source "$UI2_SOURCE" \
-    --output "$UI2_EXAMPLES_DIR" --work "$BUILD_DIR/ui2-examples-work" \
-    --v "$V" --arch x64 --clang "$CLANG" --strip "$LLVM_STRIP" \
-    --target x86_64-linux-musl --sysroot "$SYSROOT" --gcclib "$GCCLIB"
-
 echo "==> Staging the amd64 desktop initramfs..."
 STAGING="$BUILD_DIR/initramfs-root"
 rm -rf "$STAGING"
@@ -138,7 +130,7 @@ cp -a "$SYSROOT/." "$STAGING/"
 mkdir -p "$STAGING/usr/bin" "$STAGING/usr/share/vinix/wallpapers" \
     "$STAGING/usr/share/vinix/icons" "$STAGING/root/desktop" "$STAGING/run"
 install -m755 "$BUILD_DIR/vinix-desktop" "$STAGING/usr/bin/vinix-desktop"
-install -m755 "$UI2_EXAMPLES_DIR"/vinix-ui2-* "$STAGING/usr/bin/"
+rm -f "$STAGING/usr/bin"/vinix-ui2-*
 install -m644 "$SCRIPT_DIR/desktop/assets/chromium.qoi" \
     "$STAGING/usr/share/vinix/icons/chromium.qoi"
 install -m644 "$SCRIPT_DIR/desktop/assets/firefox.qoi" \
@@ -162,7 +154,7 @@ fi
 
 # One immutable multicall image, with the same per-application process names as
 # the aarch64 desktop image.
-for app_name in vinix-files vinix-calculator vinix-terminal vinix-settings vinix-ui2-examples \
+for app_name in vinix-files vinix-calculator vinix-terminal vinix-settings \
     vinix-activity vinix-editor vinix-calendar vinix-clock \
     vinix-vspace \
     vinix-minecraft vinix-wine-calculator vinix-wine-notepad vinix-wine-word2010 \

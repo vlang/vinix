@@ -148,8 +148,7 @@ git clone https://github.com/vlang/ui2 third_party/ui2
 ```
 
 For local development, a sibling `../ui2` checkout (for example
-`~/code/ui2` beside `~/code/vinix`) is selected automatically and all of its
-examples are installed in the desktop's **ui2 Examples** launcher. Set
+`~/code/ui2` beside `~/code/vinix`) is selected automatically. Set
 `VINIX_UI2_SOURCE` to choose another checkout explicitly.
 
 This stages Alpine's prebuilt musl development packages, compiles
@@ -733,7 +732,7 @@ Chromium regression test boots:
 
 Chromium, Firefox and LibreOffice staging builders reuse their extracted
 package trees when their package archives and build inputs are unchanged.
-Repeated desktop builds also reuse compiled ui2 examples and the compositor.
+Repeated desktop builds reuse the compiled compositor.
 Use `./build-all-aarch64.sh --reuse-layers` to assemble a new
 image from the existing language and desktop layers.
 

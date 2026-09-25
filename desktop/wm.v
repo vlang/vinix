@@ -821,16 +821,7 @@ fn (mut d Desktop) launch_index(index int) {
 // application under the pointer. Hosted ids are ui2's own — it prefixes them
 // `__qml_` — so rather than parse them the window manager routes by where the
 // click landed, which is also what decides it between two open applications.
-fn (mut d Desktop) forward_to_app(x int, y int, action string, world ActionWorld) {
-	if world == .desktop && action.starts_with(ui2_example_action_prefix) {
-		name := action[ui2_example_action_prefix.len..]
-		factory := ui2_example_named(name) or {
-			eprintln('vinix-desktop: unknown ui2 example ${name}')
-			return
-		}
-		d.launch(factory)
-		return
-	}
+fn (mut d Desktop) forward_to_app(x int, y int, action string) {
 	for i := d.windows.len - 1; i >= 0; i-- {
 		window := d.windows[i]
 		if window.workspace != d.current_workspace || window.minimized || window.app_index < 0
@@ -1627,12 +1618,12 @@ fn (mut d Desktop) on_pointer_down(x int, y int) {
 	// under the pointer over its private RPC pipe. Their spelling never grants
 	// access to desktop actions, including Start, window chrome and shortcuts.
 	if world == .application {
-		d.forward_to_app(x, y, action, world)
+		d.forward_to_app(x, y, action)
 		return
 	}
 
 	if !desktop_owns(action) {
-		d.forward_to_app(x, y, action, world)
+		d.forward_to_app(x, y, action)
 		return
 	}
 

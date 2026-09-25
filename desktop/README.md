@@ -44,9 +44,6 @@ What it does:
   wallpaper, display, battery and experimental M1 Wi-Fi controls
 - **native ui2 applications**: every Files, Calculator, Terminal, Settings and
   utility window is backed by its own OS process, PID and memory accounting
-- a paged **ui2 Examples** launcher containing all 85 applications from the
-  sibling `~/code/ui2/examples` checkout, including native input, slider,
-  switch, toggle, menu, file-dialog and custom-window demonstrations
 - a **first-run app picker** shown right after the user is created, offering
   Firefox, Chromium, VOffice and Minecraft; the chosen apps install in a
   Terminal window through `pkg`
@@ -152,25 +149,17 @@ response, allowing theme, wallpaper and scale changes to cross the boundary
 immediately.
 
 Vinix's own app names are relative symlinks to one static multicall executable.
-The upstream examples are separate static executables because each is an
-independent `module main` program and several intentionally reuse model and
-callback names. Both forms create independent address spaces, and Vinix records
-the per-app exec path as its process name. Consequently `/dev/processes`
-reports truthful CPU and mapped-memory values for every app.
-
-`tools/build_ui2_examples.py` inventories the checkout against
-`ui2_examples.txt`, then compiles every example without modifying its source.
-The disposable ui2 overlay adds `tools/ui2_vinix_backend.v`, whose `run_window`
-implements the same versioned pipe protocol as `app_process.v`. The build uses
-`VINIX_UI2_SOURCE` when set, otherwise a sibling `../ui2` checkout when present,
-and finally `third_party/ui2`. This makes the local `~/code/ui2` tree the normal
-development source while retaining a self-contained CI/package fallback.
+Each native app has its own address space, and Vinix records the per-app exec
+path as its process name. Consequently `/dev/processes` reports truthful CPU
+and mapped-memory values for every app. The build uses `VINIX_UI2_SOURCE` when
+set, otherwise a sibling `../ui2` checkout when present, and finally
+`third_party/ui2`.
 
 VOffice is not built with the image. `../build-voffice-aarch64.sh` uses
-`tools/build_voffice.py` and that same backend to cross-compile Writer and Calc
-as static musl applications from `VINIX_OFFICE_SOURCE`, a sibling `../office`,
-or `third_party/office`. It packages both executables with VOffice's
-translations and ribbon PNGs as `VOffice-vinix-aarch64.tar.gz` plus a `.sha256`,
+`tools/build_voffice.py` and `tools/ui2_vinix_backend.v` to cross-compile
+Writer and Calc as static musl applications from `VINIX_OFFICE_SOURCE`, a
+sibling `../office`, or `third_party/office`. It packages both executables with
+VOffice's translations and ribbon PNGs as `VOffice-vinix-aarch64.tar.gz` plus a `.sha256`,
 and `--publish` uploads them to the latest `vlang/office` release. `--ref=REF`
 builds from a clean export of a commit rather than the working tree.
 `pkg install voffice` downloads that asset, verifies its checksum and installs
@@ -181,17 +170,14 @@ The compositor passes standalone apps their protocol pipes as
 `VINIX_REQUEST_FD` and `VINIX_RESPONSE_FD` environment variables, leaving
 their command line free for document paths.
 
-The compositor and the ui2 example builder keep content-keyed binaries in the
-persistent `build-aarch64-desktop-apps/` cache, outside the disposable
-compositor and initramfs workspace in `build/`. An unchanged deployment reuses
-the compositor and every ui2 example without invoking their compilers, even after
-`build/` has been cleaned. Changing one application's source rebuilds only
-that application, while shared ui2, compiler or sysroot changes invalidate all
-affected binaries. Outputs are replaced only after a successful compile and
-link, so an interrupted rebuild does not destroy the last complete cache
-entry. Set `VINIX_AARCH64_APP_CACHE` when CI or an isolated build needs a
-different cache root. The ui2 example builder uses up to four workers by
-default; `VINIX_UI2_JOBS` overrides that count.
+The compositor keeps a content-keyed binary in the persistent
+`build-aarch64-desktop-apps/` cache, outside the disposable compositor and
+initramfs workspace in `build/`. An unchanged deployment reuses it without
+invoking the compiler, even after `build/` has been cleaned. Changes to the
+desktop source, ui2, compiler or sysroot invalidate the binary. It is replaced
+only after a successful compile and link, so an interrupted rebuild does not
+destroy the last complete cache entry. Set `VINIX_AARCH64_APP_CACHE` when CI or
+an isolated build needs a different cache root.
 
 The Calculator model comes from ui2's own example and is not copied into this
 repository. `tools/stage_app.py` takes it straight from the ui2 checkout at
@@ -218,10 +204,7 @@ Run `vinix-desktop --trace-selectors` to log the world and selector of each
 high-level pointer action; non-printable and long app ids are redacted.
 
 Add a built-in application by adding an `AppFactory` to `available_apps` in
-`app.v`; it then has a wallpaper shortcut and a Start-menu entry. A new ui2
-example only needs its directory name added to `ui2_examples.txt` and the
-parallel constant in `ui2_examples.v`; the inventory check fails rather than
-silently omitting an upstream example.
+`app.v`; it then has a wallpaper shortcut and a Start-menu entry.
 
 Firefox is an upstream GTK/X11 application rather than a native ui2 client. It
 runs on a private Xvfb display whose live XWD framebuffer is composited into a
@@ -286,7 +269,7 @@ runtime libraries.
 
 ## The file browser
 
-`files.v` is not a ui2 example but Vinix's own, and it reads a real
+`files.v` is Vinix's own application, and it reads a real
 filesystem — the listing comes from the kernel's `getdents64` through musl's
 `readdir`, and each entry is `stat`ed for its size. It satisfies the same
 `NativeApp` interface in its client process, so the window manager's protocol
@@ -344,8 +327,8 @@ space and shrink only as far as a useful title.
 of RAM it is using. Native apps such as Calculator and Text Editor appear as
 ordinary kernel records with their own PID and measured CPU and RAM. It maps
 their stable executable names (`vinix-calculator`, `vinix-editor`, and so on)
-to the labels shown elsewhere in the desktop. Like the file browser it is
-Vinix's own rather than a ui2 example, and like it, it reads the real system.
+to the labels shown elsewhere in the desktop. Like the file browser it reads
+the real system.
 
 Vinix has no procfs, so this needed a kernel interface. `/dev/processes`
 answers a read with one snapshot of the whole table — a short header, then a

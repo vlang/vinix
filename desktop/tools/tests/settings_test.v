@@ -670,13 +670,6 @@ fn test_catalina_directional_button_captions_are_visible_without_font_glyphs() {
 	assert pressed_ink >= 12
 }
 
-fn test_2048_example_window_has_room_for_its_footer() {
-	game := ui2_example_named('gg2048') or { panic('missing 2048 example') }
-	ordinary := ui2_example_named('counter') or { panic('missing counter example') }
-	assert game.height == ui2_2048_window_height
-	assert game.height > ordinary.height
-}
-
 fn test_catalina_chrome_renders_measured_rows() {
 	mut desktop := Desktop{
 		canvas: new_scaled_canvas(640, 480, 640, 480, 1)

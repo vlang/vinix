@@ -5,9 +5,9 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // An activity monitor, built into the desktop.
 //
-// Like the file browser this is Vinix's own rather than a ui2 example, and it
-// reads the real system: /dev/processes answers with one snapshot of every
-// process, and two snapshots a second apart are what a percentage is made of.
+// Like the file browser this reads the real system: /dev/processes answers
+// with one snapshot of every process, and two snapshots a second apart are
+// what a percentage is made of.
 //
 // The kernel deliberately reports totals rather than rates — a running count of
 // nanoseconds on a CPU, and a count of mapped bytes — because it has no idea
