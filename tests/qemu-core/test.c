@@ -476,6 +476,44 @@ static int test_ext2_mapping_and_namespace(void)
 	return 0;
 }
 
+static unsigned long free_ram(void)
+{
+	struct sysinfo info;
+	if (sysinfo(&info) != 0)
+		return 0;
+	return info.freeram * (info.mem_unit ? info.mem_unit : 1);
+}
+
+/* musl maps a library's whole span and then maps its segments over it; an
+ * allocator maps more than it needs and trims the result to an alignment.
+ * Either leaves part of a private mapping unmapped while the rest lives on,
+ * and those pages stayed allocated until the whole mapping was gone. */
+static int test_partial_munmap_returns_pages(void)
+{
+	const size_t page = 4096;
+	const size_t length = 32UL * 1024 * 1024;
+	const unsigned long slack = 8UL * 1024 * 1024;
+	unsigned char *region = mmap(NULL, length, PROT_READ | PROT_WRITE,
+	    MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+	CHECK(region != MAP_FAILED);
+	memset(region, 0x5a, length);
+
+	/* The middle, then the head: both leave the mapping alive around them. */
+	unsigned long before = free_ram();
+	CHECK(munmap(region + length / 4, length / 2) == 0);
+	CHECK(free_ram() + slack >= before + length / 2);
+	before = free_ram();
+	CHECK(munmap(region, length / 4 - page) == 0);
+	CHECK(free_ram() + slack >= before + length / 4 - page);
+
+	CHECK(region[length / 4 - page] == 0x5a);
+	CHECK(region[length - 1] == 0x5a);
+	CHECK(munmap(region + length / 4 - page, page) == 0);
+	CHECK(munmap(region + 3 * length / 4, length / 4) == 0);
+	puts("QEMU CORE PASS: a partial munmap gives its pages back");
+	return 0;
+}
+
 /* A hosted X11 surface is exactly this: a file sized with ftruncate, never
  * written through its descriptor, and filled by the X server through a shared
  * mapping it never synchronises. The compositor maps it to display it, and
@@ -1308,6 +1346,7 @@ static int run_tests(void)
 	CHECK(test_default_terminating_signals() == 0);
 	CHECK(prepare_directory() == 0);
 	CHECK(test_ext2_mapping_and_namespace() == 0);
+	CHECK(test_partial_munmap_returns_pages() == 0);
 	CHECK(test_shared_mapping_visible_to_readers() == 0);
 	CHECK(test_released_pid_is_not_reused_while_its_group_lives() == 0);
 	CHECK(test_locks() == 0);
