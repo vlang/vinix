@@ -5,6 +5,7 @@
 module pagecache
 
 import errno
+import time
 
 struct Device {
 mut:
@@ -15,6 +16,13 @@ mut:
 	fail_write  bool
 	short_read  bool
 	short_write bool
+	// Set to watch what the cache allows while a page is being written.
+	cache          &Cache = unsafe { nil }
+	unlocked       int
+	during_write   fn (mut d Device) = unsafe { nil }
+	entered        chan bool
+	proceed        chan bool
+	hold_next      bool
 }
 
 fn device(size int) &Device {
@@ -36,6 +44,23 @@ fn load(context voidptr, buf voidptr, loc u64, count u64) ?i64 {
 fn store(context voidptr, buf voidptr, loc u64, count u64) ?i64 {
 	mut d := unsafe { &Device(context) }
 	d.writes++
+	if d.cache != unsafe { nil } {
+		mut cache := unsafe { d.cache }
+		if cache.l.test_and_acquire() {
+			cache.l.release()
+			d.unlocked++
+			if d.during_write != unsafe { nil } {
+				hook := d.during_write
+				d.during_write = unsafe { nil }
+				hook(mut d)
+			}
+		}
+	}
+	if d.hold_next {
+		d.hold_next = false
+		d.entered <- true
+		_ := <-d.proceed
+	}
 	if d.fail_write { errno.set(errno.eio); return none }
 	assert loc <= u64(d.bytes.len) && count <= u64(d.bytes.len) - loc
 	amount := if d.short_write { count / 2 } else { count }
@@ -75,6 +100,21 @@ fn resident_pages(cache &Cache) []&Page {
 	return ordered
 }
 
+// The dirty list must hold exactly the resident pages that are dirty.
+fn dirty_list_matches(cache &Cache) bool {
+	mut listed := 0
+	mut page := cache.dirty_first
+	for page != unsafe { nil } {
+		if !page.dirty {
+			return false
+		}
+		listed++
+		page = page.dirty_next
+	}
+	return listed == cache.dirty_pages
+		&& listed == resident_pages(cache).filter(it.dirty).len
+}
+
 fn test_hits_cross_page_writes_and_writeback() {
 	mut d := device(3 * 4096)
 	mut cache := Cache{capacity: 3}
@@ -94,9 +134,10 @@ fn test_hits_cross_page_writes_and_writeback() {
 	assert d.bytes[4090..4123] == payload
 	assert d.bytes[..4090] == before[..4090]
 	assert d.bytes[4123..] == before[4123..]
-	assert d.writes == 2
+	// Both pages are dirty and consecutive, so they go out as one request.
+	assert d.writes == 1
 	cache.sync(voidptr(d), store) or { panic('clean sync failed') }
-	assert d.writes == 2
+	assert d.writes == 1
 }
 
 fn test_full_replacement_and_device_tail_need_no_read() {
@@ -150,24 +191,26 @@ fn test_failed_eviction_retains_dirty_victim_and_retry() {
 }
 
 fn test_failed_and_short_sync_are_retryable() {
-	mut d := device(4096)
+	mut d := device(2 * 4096)
 	mut cache := Cache{}
 	defer { cache.release(voidptr(d), store) or { panic('release failed') } }
-	payload := []u8{len: 4096, init: 0x82}
+	payload := []u8{len: 2 * 4096, init: 0x82}
 	write_bytes(mut cache, d, 0, payload)
 	for short in [false, true] {
 		d.fail_write = !short
 		d.short_write = short
 		mut failed := false
 		cache.sync(voidptr(d), store) or { failed = true }
-		assert failed && resident_pages(cache)[0].dirty
-		assert read_bytes(mut cache, d, 0, 4096) == payload
+		// The pages went as one run, and all of it stays dirty.
+		assert failed && resident_pages(cache).all(it.dirty && !it.writeback)
+		assert dirty_list_matches(cache)
+		assert read_bytes(mut cache, d, 0, 2 * 4096) == payload
 	}
 	d.fail_write = false
 	d.short_write = false
 	cache.sync(voidptr(d), store) or { panic('retry failed') }
 	assert d.bytes == payload
-	assert !resident_pages(cache)[0].dirty
+	assert resident_pages(cache).all(!it.dirty)
 }
 
 fn test_discard_preserves_dirty_and_partial_pages() {
@@ -271,7 +314,179 @@ fn test_randomized_transfers_match_byte_model_under_pressure() {
 		if step % 23 == 0 { cache.sync(voidptr(d), store) or { panic('sync failed') } }
 		if step % 27 == 0 { cache.discard(0, u64(expected.len)) }
 		assert cache.resident <= 3
+		assert dirty_list_matches(cache)
 	}
 	cache.release(voidptr(d), store) or { panic('release failed') }
 	assert d.bytes == expected
+}
+
+// Writeback is a device round trip, and the cache lock is the one every read
+// of the disk waits for. sync writes each page with it free, so a system disk
+// with a full cache of dirty pages does not stop everything that reads it.
+fn test_sync_writes_with_the_lock_free() {
+	pages := int(max_run_pages) + 8
+	mut d := device(pages * 4096)
+	mut cache := Cache{capacity: pages}
+	d.cache = &cache
+	for page in 0 .. pages {
+		if page != pages - 2 {
+			write_bytes(mut cache, d, page * 4096, []u8{len: 4096, init: u8(page + 1)})
+		}
+	}
+	cache.sync(voidptr(d), store) or { panic('sync failed') }
+	// Consecutive dirty pages go out together, as many as a request takes; a
+	// page that is not dirty ends a run.
+	assert d.writes == 3
+	assert d.unlocked == 3
+	for page in 0 .. pages {
+		expected := if page == pages - 2 { u8((page * 4096) % 251) } else { u8(page + 1) }
+		assert d.bytes[page * 4096] == expected
+		assert d.bytes[page * 4096 + 4095] == if page == pages - 2 {
+			u8((page * 4096 + 4095) % 251)
+		} else {
+			u8(page + 1)
+		}
+	}
+	assert resident_pages(cache).all(!it.dirty && !it.writeback)
+	d.cache = unsafe { nil }
+	cache.release(voidptr(d), store) or { panic('release failed') }
+}
+
+fn rewrite_first_page(mut d Device) {
+	mut cache := unsafe { d.cache }
+	write_bytes(mut cache, d, 0, []u8{len: 4096, init: 0x22})
+}
+
+// The copy on its way to the device predates a write made meanwhile, so the
+// page stays dirty and the next sync carries the newer bytes.
+fn test_write_during_writeback_leaves_the_page_dirty() {
+	mut d := device(4096)
+	mut cache := Cache{capacity: 2}
+	d.cache = &cache
+	write_bytes(mut cache, d, 0, []u8{len: 4096, init: 0x11})
+	d.during_write = rewrite_first_page
+	cache.sync(voidptr(d), store) or { panic('sync failed') }
+	assert d.bytes == []u8{len: 4096, init: 0x11}
+	assert resident_pages(cache)[0].dirty && !resident_pages(cache)[0].writeback
+	cache.sync(voidptr(d), store) or { panic('second sync failed') }
+	assert d.bytes == []u8{len: 4096, init: 0x22}
+	assert !resident_pages(cache)[0].dirty
+	d.cache = unsafe { nil }
+	cache.release(voidptr(d), store) or { panic('release failed') }
+}
+
+fn crowd_the_cache(mut d Device) {
+	mut cache := unsafe { d.cache }
+	// A miss with the only resident page in flight goes over capacity rather
+	// than replacing it; neither advice nor memory pressure may drop it.
+	assert read_bytes(mut cache, d, 4096, 1) == d.bytes[4096..4097]
+	assert cache.resident == 2
+	cache.discard(0, u64(d.bytes.len))
+	assert cache.resident == 1 && resident_pages(cache)[0].index == 0
+	assert read_bytes(mut cache, d, 4096, 1) == d.bytes[4096..4097]
+	assert cache.reclaim_clean(8) == 1
+	assert cache.resident == 1 && resident_pages(cache)[0].index == 0
+	assert resident_pages(cache)[0].writeback
+	mut failed := false
+	cache.release(voidptr(d), store) or { failed = true }
+	assert failed && cache.resident == 1
+}
+
+fn test_a_page_in_flight_stays_resident() {
+	mut d := device(2 * 4096)
+	mut cache := Cache{capacity: 1}
+	d.cache = &cache
+	write_bytes(mut cache, d, 0, []u8{len: 4096, init: 0x33})
+	d.during_write = crowd_the_cache
+	cache.sync(voidptr(d), store) or { panic('sync failed') }
+	assert d.bytes[..4096] == []u8{len: 4096, init: 0x33}
+	assert cache.resident == 1 && !resident_pages(cache)[0].writeback
+	// Once it has landed the page is an ordinary clean one again.
+	assert read_bytes(mut cache, d, 4096, 1) == d.bytes[4096..4097]
+	assert cache.resident == 1 && resident_pages(cache)[0].index == 1
+	d.cache = unsafe { nil }
+	cache.release(voidptr(d), store) or { panic('release failed') }
+}
+
+struct Finished {
+mut:
+	syncs [2]bool
+}
+
+fn sync_in_thread(cache_address voidptr, d &Device, mut finished Finished, which int) {
+	mut cache := unsafe { &Cache(cache_address) }
+	cache.sync(voidptr(d), store) or { panic('background sync failed') }
+	finished.syncs[which] = true
+}
+
+// fsync must not return while the page it covers is still on its way to the
+// device, even though another sync took the page and it looks clean; and a
+// newer copy must not be written until the older one has landed.
+fn test_sync_waits_for_a_page_another_sync_is_writing() {
+	for redirty in [false, true] {
+		mut d := device(4096)
+		d.entered = chan bool{}
+		d.proceed = chan bool{}
+		mut cache := Cache{capacity: 2}
+		write_bytes(mut cache, d, 0, []u8{len: 4096, init: 0x44})
+		d.hold_next = true
+		mut finished := &Finished{}
+		first := spawn sync_in_thread(voidptr(&cache), d, mut finished, 0)
+		_ := <-d.entered
+		assert resident_pages(cache)[0].writeback
+		if redirty {
+			write_bytes(mut cache, d, 0, []u8{len: 4096, init: 0x55})
+		}
+		second := spawn sync_in_thread(voidptr(&cache), d, mut finished, 1)
+		time.sleep(50 * time.millisecond)
+		assert !finished.syncs[1]
+		assert d.writes == 1
+		d.proceed <- true
+		first.wait()
+		second.wait()
+		assert finished.syncs[0] && finished.syncs[1]
+		if redirty {
+			assert d.writes == 2
+			assert d.bytes == []u8{len: 4096, init: 0x55}
+		} else {
+			assert d.writes == 1
+			assert d.bytes == []u8{len: 4096, init: 0x44}
+		}
+		assert !resident_pages(cache)[0].dirty && !resident_pages(cache)[0].writeback
+		cache.release(voidptr(d), store) or { panic('release failed') }
+	}
+}
+
+// Past the dirty limit a write puts the oldest dirty pages on the device
+// itself, so a flush -- which EXT2 does holding its lock -- never has more
+// than the limit to write.
+fn test_writes_past_the_dirty_limit_write_the_oldest_back() {
+	pages := dirty_limit + 8
+	run := int(max_run_pages)
+	mut d := device(pages * 4096)
+	mut cache := Cache{capacity: pages}
+	for page in 0 .. pages {
+		write_bytes(mut cache, d, page * 4096, []u8{len: 4096, init: u8(page % 200 + 1)})
+	}
+	// Crossing the limit sent the oldest run in one request.
+	assert d.writes == 1
+	assert cache.dirty_pages == pages - run
+	assert dirty_list_matches(cache)
+	for page in 0 .. run {
+		assert d.bytes[page * 4096..(page + 1) * 4096] == []u8{len: 4096, init: u8(page % 200 + 1)}
+	}
+	assert d.bytes[run * 4096] == u8((run * 4096) % 251)
+	assert !resident_pages(cache)[run - 1].dirty && resident_pages(cache)[run].dirty
+	// Rewriting an old page puts it at the back of the line.
+	write_bytes(mut cache, d, 0, []u8{len: 4096, init: 0xee})
+	assert d.writes == 1
+	assert cache.dirty_last.index == 0
+	cache.sync(voidptr(d), store) or { panic('sync failed') }
+	assert cache.dirty_pages == 0 && dirty_list_matches(cache)
+	assert d.writes == 1 + (pages - run + run - 1) / run + 1
+	assert d.bytes[..4096] == []u8{len: 4096, init: 0xee}
+	for page in 1 .. pages {
+		assert d.bytes[page * 4096] == u8(page % 200 + 1)
+	}
+	cache.release(voidptr(d), store) or { panic('release failed') }
 }

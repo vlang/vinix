@@ -14,8 +14,12 @@ LRU replacement. Pages are allocated on demand. Full-page overwrites skip reads;
 partial writes preserve the rest of the page. Bounds are checked by subtraction,
 and a sector-aligned device tail may be shorter than a page.
 
-Dirty pages are written on eviction, explicit synchronization, and final resource
-close. Failed or short writeback leaves the page dirty, resident and retryable.
+Dirty pages are written on eviction, explicit synchronization, final resource
+close, and by a write that takes more than `dirty_limit` (1024) pages ahead of
+the device, which then writes the oldest back before it returns. Consecutive
+dirty pages go out together, up to `max_run_pages` (32) to a request, so store
+callbacks must accept up to 128 KiB. Failed or short writeback leaves the page
+dirty, resident and retryable.
 Failed/short fills are not published. Teardown does not free dirty pages if
 writeback fails. Callers must keep the backing resource alive until teardown
 succeeds. Cache callbacks must bypass the cache and must not re-enter it.
@@ -44,12 +48,19 @@ discarded by that path.
 Do not enable EXT2 mmap merely because this cache exists: these are physical
 backing pages and can contain bytes from different inodes and metadata.
 
-The cache uses the existing kernel lock across backing I/O. Its current ATA
-consumer polls completion. Cache misses and writeback retain the old EXT2
+Fills, eviction and write-behind hold the cache lock across backing I/O; sync
+does not. It copies each run with the lock held, marks its pages in flight, and
+writes the copy under a second lock that only serializes writeback. The cache
+lock is the one every EXT2 read and write waits for with interrupts off, and
+holding it across a system disk's whole cache stopped the machine for minutes.
+Pages in flight are never evicted, discarded, reclaimed or written by anyone
+else, and a sync that finds one waits for it to land before returning. The
+second lock still turns interrupts off, so a writer cannot be preempted with a
+page in flight while the CPUs that could resume it spin on EXT2's lock. Current
+backends poll completion. Cache misses and writeback retain the old EXT2
 adapter's physically contiguous, page-aligned PMM bounce buffers, releasing them
-on both success and failure. Before using interrupt-dependent backends, verify
-that completion does not require interrupts disabled by that lock; an interrupt-dependent backend needs a
-sleepable lock/explicit in-flight page state. Direct raw-device access outside
+on both success and failure. An interrupt-dependent backend still needs a
+sleepable lock. Direct raw-device access outside
 EXT2 is not coherent with this cache, and must not modify a mounted filesystem.
 The existing EXT2 allocator, resize/truncate and concurrent metadata-update
 limitations are not repaired by caching. Crash consistency and on-disk ordering
@@ -67,8 +78,11 @@ The harness substitutes only the kernel lock and errno modules. The actual cache
 source is copied unchanged and exercised with an instrumented byte-array backing
 store. Tests cover hits, partial/cross-page writes, tail pages, LRU and bounded
 prefetch, clean-only discard, invalid/overflowing ranges, backing identity,
-failed/short fills, failed/short writeback, dirty eviction, teardown retry, and
-400 deterministic randomized operations under a three-page capacity limit.
+failed/short fills, failed/short writeback, dirty eviction, teardown retry,
+writeback with the lock free and a write landing mid-flight, pages in flight
+staying resident, a second sync waiting for the first, write-behind past the
+dirty limit, and 400 deterministic randomized operations under a three-page
+capacity limit.
 The host tests do not validate kernel locks, syscalls, DMA, or EXT2 disk images.
 The pagecache workflow runs these tests; the existing kernel workflow provides
 separate build coverage. Kernel boot, remount persistence, allocation/truncation,

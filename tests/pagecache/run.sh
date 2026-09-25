@@ -29,6 +29,7 @@ cat > "$tmp/modules/errno/errno.v" <<'VEOF'
 module errno
 pub const eio = 5
 pub const enomem = 12
+pub const ebusy = 16
 pub const einval = 22
 __global (last_error int)
 pub fn set(value int) { last_error = value }

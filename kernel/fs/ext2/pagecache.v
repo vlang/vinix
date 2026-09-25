@@ -14,21 +14,23 @@ import stat
 // Preserve the old raw-I/O adapter's physically contiguous, page-aligned
 // buffers. Cached bytes themselves live in heap allocations and must not be
 // handed straight to a DMA backend. Only misses/writeback allocate a bounce.
+// A write-back sends a run of consecutive pages in one transfer.
 fn device_transfer(context voidptr, buf voidptr, loc u64, count u64, writing bool) ?i64 {
 	if count == 0 {
 		return 0
 	}
-	if count > pagecache.page_bytes {
+	if count > pagecache.max_run_pages * pagecache.page_bytes {
 		errno.set(errno.einval)
 		return none
 	}
-	physical := memory.pmm_alloc(1)
+	pages := (count + pagecache.page_bytes - 1) / pagecache.page_bytes
+	physical := memory.pmm_alloc(pages)
 	if physical == unsafe { nil } {
 		errno.set(errno.enomem)
 		return none
 	}
 	bounce := voidptr(u64(physical) + higher_half)
-	defer { memory.pmm_free(physical, 1) }
+	defer { memory.pmm_free(physical, pages) }
 	// Keep the VFS node as the opaque callback context. A V interface is two
 	// words (the object pointer and its method table); converting the interface
 	// itself to voidptr loses the method table and makes the indirect read/write
