@@ -105,9 +105,15 @@ fn socketpair_create(domain int, @type int, _protocol int) ?(&resource.Resource,
 			socket0, socket1 := sock_unix.create_pair(@type)?
 			return &resource.Resource(socket0), &resource.Resource(socket1)
 		}
+		// Linux's IPv4 has no socketpair(2); a family there is none of has
+		// no sockets at all.
+		sock_pub.af_inet {
+			errno.set(errno.eopnotsupp)
+			return none
+		}
 		else {
 			C.printf(c'socket: Unknown domain: %d\n', domain)
-			errno.set(errno.einval)
+			errno.set(errno.eafnosupport)
 			return none
 		}
 	}
@@ -128,8 +134,11 @@ fn socket_create(domain int, @type int, protocol int) ?&resource.Resource {
 			return ret
 		}
 		else {
+			// A family there are no sockets of, IPv6 among them, as Linux built
+			// without it says. Servers that listen on both families look for
+			// this answer to go on with IPv4 alone, as redis and postgres do.
 			C.printf(c'socket: Unknown domain: %d\n', domain)
-			errno.set(errno.einval)
+			errno.set(errno.eafnosupport)
 			return none
 		}
 	}

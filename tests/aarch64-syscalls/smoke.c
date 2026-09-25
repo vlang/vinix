@@ -899,6 +899,11 @@ int main(void) {
     check(handler_without_restorer(), "signal handler without SA_RESTORER");
     check(ids_with_kept_capabilities(), "group ids set with CAP_SETGID after setuid");
     check(process_maps(), "/proc/self/maps and smaps");
+    int no_family[2];
+    check(failed_with_errno(socket(AF_INET6, SOCK_STREAM, 0), EAFNOSUPPORT, "IPv6 socket") &&
+              failed_with_errno(socketpair(AF_INET, SOCK_STREAM, 0, no_family), EOPNOTSUPP,
+                                "IPv4 socketpair"),
+          "socket families without sockets");
     if (chdir(previous_cwd) != 0)
         chdir("/");
 
