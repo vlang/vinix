@@ -384,14 +384,56 @@ pub fn vmm_init() {
 	vmm_initialised = true
 }
 
+// The last-level table that maps `virt`, as a kernel pointer, or nil and the
+// first address past what the missing table above it would have covered -- 0
+// when that is past the top of the address space. What lets a walk over a
+// large reservation with little in it skip the holes: the program break is
+// a 960 GiB reservation, and page by page, every fork of a program that had
+// used brk() walked a quarter of a billion page table entries.
+fn (pagemap &Pagemap) leaf_table(virt u64) (&u64, u64) {
+	mut table := unsafe { &u64(u64(pagemap.top_level) + higher_half) }
+	mut shift := if la57 { u64(48) } else { u64(39) }
+	for shift > 12 {
+		entry := unsafe { table[(virt >> shift) & 0x1ff] }
+		if entry & 1 == 0 {
+			return unsafe { nil }, (virt | ((u64(1) << shift) - 1)) + 1
+		}
+		table = unsafe { &u64((entry & pte_flags_mask) + higher_half) }
+		shift -= 9
+	}
+	return table, 0
+}
+
+// Where the last-level table `virt` is in ends, or the top of the address
+// space.
+fn leaf_table_end(virt u64) u64 {
+	next := (virt | 0x1fffff) + 1
+	return if next > virt { next } else { u64(-1) }
+}
+
 // The bytes of [start, end) that are resident, each page counted as its share.
 // The caller holds the pagemap lock.
 pub fn (pagemap &Pagemap) resident_share(start u64, end u64) u64 {
 	mut total := u64(0)
-	for virt := start & ~u64(0xfff); virt < end; virt += page_size {
-		if phys := pagemap.virt2phys(virt) {
-			refs := pmm_refcount_unlocked(voidptr(phys))
-			total += if refs > 1 { page_size / refs } else { page_size }
+	mut virt := start & ~u64(0xfff)
+	for virt < end {
+		table, skip := pagemap.leaf_table(virt)
+		if table == unsafe { nil } {
+			if skip <= virt {
+				break
+			}
+			virt = skip
+			continue
+		}
+		table_end := leaf_table_end(virt)
+		stop := if end < table_end { end } else { table_end }
+		for virt < stop {
+			pte := unsafe { table[(virt >> 12) & 0x1ff] }
+			if pte & 1 != 0 {
+				refs := pmm_refcount_unlocked(voidptr(pte & pte_flags_mask))
+				total += if refs > 1 { page_size / refs } else { page_size }
+			}
+			virt += page_size
 		}
 	}
 	return total
@@ -401,27 +443,58 @@ pub fn (pagemap &Pagemap) resident_share(start u64, end u64) u64 {
 // The caller holds the pagemap lock.
 pub fn (pagemap &Pagemap) residency(start u64, end u64) Residency {
 	mut counted := Residency{}
-	for virt := start & ~u64(0xfff); virt < end; virt += page_size {
-		if phys := pagemap.virt2phys(virt) {
-			refs := pmm_refcount_unlocked(voidptr(phys))
-			counted.resident += page_size
-			if refs > 1 {
-				counted.shared += page_size
-				counted.share += page_size / refs
-			} else {
-				counted.share += page_size
+	mut virt := start & ~u64(0xfff)
+	for virt < end {
+		table, skip := pagemap.leaf_table(virt)
+		if table == unsafe { nil } {
+			if skip <= virt {
+				break
 			}
+			virt = skip
+			continue
+		}
+		table_end := leaf_table_end(virt)
+		stop := if end < table_end { end } else { table_end }
+		for virt < stop {
+			pte := unsafe { table[(virt >> 12) & 0x1ff] }
+			if pte & 1 != 0 {
+				refs := pmm_refcount_unlocked(voidptr(pte & pte_flags_mask))
+				counted.resident += page_size
+				if refs > 1 {
+					counted.shared += page_size
+					counted.share += page_size / refs
+				} else {
+					counted.share += page_size
+				}
+			}
+			virt += page_size
 		}
 	}
 	return counted
 }
 
 // The first page at or after `start`, and before `end`, that is mapped, or
-// `end` when none is. The caller holds the pagemap lock.
+// `end` when none is. A missing table is skipped with all it would have
+// covered, so walking a large reservation with little in it costs what it
+// holds rather than its size. The caller holds the pagemap lock.
 pub fn (pagemap &Pagemap) next_present(start u64, end u64) u64 {
-	for virt := start & ~u64(0xfff); virt < end; virt += page_size {
-		if _ := pagemap.virt2phys(virt) {
-			return virt
+	mut virt := start & ~u64(0xfff)
+	for virt < end {
+		table, skip := pagemap.leaf_table(virt)
+		if table == unsafe { nil } {
+			if skip <= virt {
+				return end
+			}
+			virt = skip
+			continue
+		}
+		table_end := leaf_table_end(virt)
+		stop := if end < table_end { end } else { table_end }
+		for virt < stop {
+			if unsafe { table[(virt >> 12) & 0x1ff] } & 1 != 0 {
+				return virt
+			}
+			virt += page_size
 		}
 	}
 	return end
