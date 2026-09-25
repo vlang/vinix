@@ -211,6 +211,12 @@ pub fn (mut pagemap Pagemap) unmap_page_unlocked(virt u64) ? {
 			pml4_p[pml4_entry] = 0
 		}
 		if la57 {
+			// From the start of the table, as for the levels below. Carrying on
+			// from where the PML3 scan stopped found the PML4 empty whenever its
+			// live entries sat below that index, and freed it with them: every
+			// munmap of more than a page on a 5-level machine lost the rest of
+			// its pages, and every exec leaked the 8 MiB stack.
+			i = 0
 			for ; i < 512; i++ {
 				if pml4_p[i] != 0 {
 					break
