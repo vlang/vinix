@@ -34,10 +34,18 @@ fn stat_seconds(value time.TimeSpec) u32 {
 	return u32(value.tv_sec)
 }
 
-fn (mut filesystem EXT2Filesystem) flush() ? {
-	mut device := filesystem.backing_device.resource
-	filesystem.cache.sync(voidptr(filesystem.backing_device), device_write)?
-	resource_mod.sync_resource(mut device, unsafe { nil })?
+// A change to the namespace is on the device before the program that made it
+// sees it made, but it is not flushed here. The callers hold EXT2's lock, and
+// creating, linking and renaming hold the VFS's too; every other access to
+// the filesystem waits for those with interrupts off, and flushing the cache
+// with them held stopped the machine for seconds while a download filled it.
+// The thread flushes on its way back to userspace instead, holding nothing. A
+// kernel thread's change goes out with the next writeback pass.
+fn flush_on_return() {
+	mut thread := proc.current_thread()
+	if thread != unsafe { nil } {
+		thread.owes_sync = true
+	}
 }
 
 fn (mut this EXT2Resource) persist_metadata() ? {
@@ -49,7 +57,6 @@ fn (mut this EXT2Resource) persist_metadata() ? {
 	defer { this.filesystem.l.release() }
 	mut inode := EXT2Inode{}
 	inode.read_entry(mut this.filesystem, u32(this.stat.ino))?
-	old := inode
 	inode.permissions = u16(this.stat.mode)
 	inode.user_id = u16(this.stat.uid)
 	inode.group_id = u16(this.stat.gid)
@@ -57,12 +64,7 @@ fn (mut this EXT2Resource) persist_metadata() ? {
 	inode.creation_time = stat_seconds(this.stat.ctim)
 	inode.mod_time = stat_seconds(this.stat.mtim)
 	inode.write_entry(mut this.filesystem, u32(this.stat.ino))?
-	this.filesystem.flush() or {
-		mut restore := old
-		restore.write_entry(mut this.filesystem, u32(this.stat.ino)) or {}
-		this.filesystem.flush() or {}
-		return none
-	}
+	flush_on_return()
 }
 
 fn (mut this EXT2Resource) filesystem_stat() resource_mod.FileSystemStat {
@@ -327,10 +329,7 @@ fn (mut filesystem EXT2Filesystem) create_persistent(parent &vfs.VFSNode,
 		inode.free_entry(mut filesystem, inode_index) or {}
 		return unsafe { nil }
 	}
-	filesystem.flush() or {
-		errno.set(errno.eio)
-		return unsafe { nil }
-	}
+	flush_on_return()
 
 	mut node := vfs.create_node(filesystem, parent, name, stat.isdir(mode))
 	node.resource = resource_from_inode(filesystem, inode_index, inode)
@@ -354,7 +353,7 @@ fn (mut this EXT2Resource) link(_handle voidptr) ? {
 	inode.hard_link_cnt++
 	inode.creation_time = ext2_now()
 	inode.write_entry(mut this.filesystem, u32(this.stat.ino))?
-	this.filesystem.flush()?
+	flush_on_return()
 	this.stat.nlink++
 }
 
@@ -380,7 +379,7 @@ fn (mut this EXT2Resource) unlink(handle voidptr) ? {
 		parent_inode.hard_link_cnt--
 		parent_inode.write_entry(mut this.filesystem, parent_index)?
 	}
-	this.filesystem.flush()?
+	flush_on_return()
 	this.stat.nlink = inode.hard_link_cnt
 	if stat.isdir(this.stat.mode) && node.parent.resource.stat.nlink > 0 {
 		node.parent.resource.stat.nlink--
@@ -409,9 +408,7 @@ fn (mut this EXT2Filesystem) link_persistent(parent &vfs.VFSNode, name string,
 		inode.write_entry(mut this, inode_index) or {}
 		return none
 	}
-	this.flush() or {
-		return none
-	}
+	flush_on_return()
 	mut node := vfs.create_node(this, parent, name, false)
 	katomic.inc(mut &old_node.resource.refcount)
 	old_node.resource.stat.nlink = inode.hard_link_cnt
@@ -475,7 +472,7 @@ fn (mut filesystem EXT2Filesystem) rename_persistent(old_parent &vfs.VFSNode,
 			old_dir.write_entry(mut filesystem, old_parent_index)?
 			new_dir.write_entry(mut filesystem, new_parent_index)?
 		}
-		filesystem.flush()?
+		flush_on_return()
 		return
 	}
 
@@ -501,5 +498,5 @@ fn (mut filesystem EXT2Filesystem) rename_persistent(old_parent &vfs.VFSNode,
 		old_dir.write_entry(mut filesystem, old_parent_index)?
 		new_dir.write_entry(mut filesystem, new_parent_index)?
 	}
-	filesystem.flush()?
+	flush_on_return()
 }

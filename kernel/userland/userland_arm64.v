@@ -1211,6 +1211,9 @@ pub fn start_program_node(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, p
 				file.fdnum_close(curr_process, i, true) or {}
 			}
 		}
+		// This thread never returns to userspace to pay for what those closes
+		// changed; the new program's thread starts there.
+		flush_owed_sync()
 		gpu_exec_trace(trace_gpu, 'closed close-on-exec descriptors')
 		gpu_exec_trace(trace_gpu, 'removing process timers')
 		posixtimer.remove_process_timers(curr_process)

@@ -14,13 +14,15 @@ pub const default_capacity = 128
 // Growth stays bounded because the reclaimer hands clean pages back under
 // memory pressure.
 pub const max_capacity = u64(65536)
-// How far writers may run ahead of the device. Every change to an EXT2
-// directory flushes the whole cache before it returns, holding the lock every
-// other access to the filesystem waits for with interrupts off; with a
-// download's 256 MiB of dirty pages in the cache, creating a file stopped the
-// machine for minutes. Past this many, a write puts the oldest dirty pages on
-// the device before it returns, so no flush has more than this to do.
+// How far writers may run ahead of the device. Past this many dirty pages,
+// EXT2 has the writing thread flush on its way back to userspace, holding no
+// lock. Every change to a directory is flushed the same way before the call
+// that made it returns, and this bounds what that flush has to write.
 pub const dirty_limit = 1024
+// Past this many, a write puts the oldest dirty pages on the device itself,
+// holding the lock: a write too large to wait for its call's end, or one made
+// by a kernel thread, which has no end to wait for.
+pub const dirty_ceiling = 4 * dirty_limit
 // Consecutive dirty pages go to the device together, up to this many to a
 // request, and a store callback must take that much. A request is a
 // synchronous round trip, which under QEMU costs milliseconds almost whatever
@@ -384,10 +386,16 @@ pub fn (mut this Cache) write(context voidptr, load IO, store IO, buf voidptr, l
 	return i64(done)
 }
 
+// Whether writers have run far enough ahead that one should flush. A hint:
+// read without the lock.
+pub fn (this &Cache) over_dirty_limit() bool {
+	return this.dirty_pages > dirty_limit
+}
+
 // Called with l held. A page that will not go stays dirty for sync to report;
 // one in flight is skipped, as nothing may write it until it lands.
 fn (mut this Cache) write_behind(context voidptr, store IO) {
-	for this.dirty_pages > dirty_limit {
+	for this.dirty_pages > dirty_ceiling {
 		mut oldest := this.dirty_first
 		for oldest != unsafe { nil } && oldest.writeback {
 			oldest = oldest.dirty_next

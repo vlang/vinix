@@ -218,6 +218,11 @@ fn (mut this EXT2Resource) write(_handle voidptr, buf voidptr, loc u64, count u6
 
 	current_inode.read_entry(mut this.filesystem, u32(this.stat.ino)) or { return none }
 	written := current_inode.write(mut this.filesystem, buf, u32(this.stat.ino), loc, count)?
+	// A writer far enough ahead of the device catches up before its call
+	// returns, but not here, with EXT2's lock held.
+	if this.filesystem.cache.over_dirty_limit() {
+		flush_on_return()
+	}
 	mut done := u64(0)
 	for done < u64(written) {
 		offset := loc + done
@@ -268,11 +273,7 @@ fn (mut this EXT2Resource) unref(handle voidptr) ? {
 			this.filesystem.l.release()
 			return none
 		}
-		this.filesystem.flush() or {
-			this.refcount = 1
-			this.filesystem.l.release()
-			return none
-		}
+		flush_on_return()
 		this.filesystem.l.release()
 	}
 	for mapped in this.mapped_pages {

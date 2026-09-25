@@ -31,6 +31,11 @@ pub mut:
 	tid                int
 	ns_tid             int
 	is_in_queue        bool
+	// A filesystem change this thread made during its syscall that is not on
+	// the device yet. It is flushed on the way back to userspace, or once an
+	// exiting process' descriptors are closed, where no lock is held; see
+	// flush_on_return in fs/ext2.
+	owes_sync          bool
 	l                  klock.Lock
 	process            &Process = unsafe { nil }
 	gpr_state          cpulocal.GPRState

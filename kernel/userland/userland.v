@@ -659,6 +659,10 @@ fn exit_process(wait_status u32) {
 
 		file.fdnum_close(current_process, i, true) or {}
 	}
+	// What closing them changed -- the inode of an unlinked file, freed with
+	// its last descriptor -- goes out before the parent can wait for the exit,
+	// as it would on the way back from close(2).
+	flush_owed_sync()
 
 	// PID 1 inherits children
 	if current_process.pid != 1 {

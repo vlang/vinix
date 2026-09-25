@@ -17,6 +17,7 @@ fn syscall_is_linux() u64 {
 // userspace, with the saved GPR frame.
 @[export: 'syscall_leave']
 fn leave(context &cpulocal.GPRState) {
+	userland.flush_owed_sync()
 	asm volatile amd64 {
 		cli
 	}

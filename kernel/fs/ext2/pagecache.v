@@ -84,7 +84,7 @@ fn (mut filesystem EXT2Filesystem) raw_device_write(buf voidptr, loc u64, count 
 fn (mut this EXT2Resource) sync(_handle voidptr) ? {
 	// Shared mmap pages sit above the common backing-device cache. Fold them
 	// into the inode first, then flush metadata and data through the same cache.
-	this.sync_mapping(_handle, 0, u64(-1))?
+	this.write_mapped_pages(0, u64(-1))?
 	mut device := this.filesystem.backing_device.resource
 	this.filesystem.cache.sync(voidptr(this.filesystem.backing_device), device_write) or { return none }
 	// Drivers may additionally implement a hardware cache/barrier operation.

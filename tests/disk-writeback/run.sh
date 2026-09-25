@@ -1,7 +1,8 @@
 #!/bin/sh
 # Stream a file far larger than the block cache onto a disk root while other
-# threads read, create files and sleep, and fail if any of them is kept waiting
-# for more than ten seconds. Each prints its worst and mean wait.
+# threads read, create files and sleep, and fail if any of them waits too long
+# on average, or ten seconds at once. Each prints its worst and mean wait, with
+# nothing being written and while the stream runs.
 #
 #   ./build-userland-aarch64.sh        # once, for the musl test sysroot
 #   tests/disk-writeback/run.sh

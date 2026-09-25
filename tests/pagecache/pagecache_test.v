@@ -457,18 +457,36 @@ fn test_sync_waits_for_a_page_another_sync_is_writing() {
 	}
 }
 
-// Past the dirty limit a write puts the oldest dirty pages on the device
-// itself, so a flush -- which EXT2 does holding its lock -- never has more
-// than the limit to write.
-fn test_writes_past_the_dirty_limit_write_the_oldest_back() {
+// Past the dirty limit a writer is told to flush, which EXT2 does on its way
+// back to userspace with nothing held; the cache itself writes nothing yet.
+fn test_the_dirty_limit_asks_for_a_flush() {
 	pages := dirty_limit + 8
+	mut d := device(pages * 4096)
+	mut cache := Cache{capacity: pages}
+	for page in 0 .. dirty_limit {
+		write_bytes(mut cache, d, page * 4096, []u8{len: 4096, init: 1})
+	}
+	assert !cache.over_dirty_limit()
+	write_bytes(mut cache, d, dirty_limit * 4096, []u8{len: 4096, init: 1})
+	assert cache.over_dirty_limit()
+	assert d.writes == 0
+	cache.sync(voidptr(d), store) or { panic('sync failed') }
+	assert !cache.over_dirty_limit() && cache.dirty_pages == 0
+	assert d.writes == (dirty_limit + 1 + int(max_run_pages) - 1) / int(max_run_pages)
+	cache.release(voidptr(d), store) or { panic('release failed') }
+}
+
+// Past the ceiling a write puts the oldest dirty pages on the device itself,
+// holding the lock: nothing else bounds a single enormous write.
+fn test_writes_past_the_dirty_ceiling_write_the_oldest_back() {
+	pages := dirty_ceiling + 8
 	run := int(max_run_pages)
 	mut d := device(pages * 4096)
 	mut cache := Cache{capacity: pages}
 	for page in 0 .. pages {
 		write_bytes(mut cache, d, page * 4096, []u8{len: 4096, init: u8(page % 200 + 1)})
 	}
-	// Crossing the limit sent the oldest run in one request.
+	// Crossing the ceiling sent the oldest run in one request.
 	assert d.writes == 1
 	assert cache.dirty_pages == pages - run
 	assert dirty_list_matches(cache)

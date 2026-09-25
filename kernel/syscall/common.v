@@ -7,6 +7,7 @@ import userland
 
 @[markused]
 fn leave(context &cpulocal.GPRState) {
+	userland.flush_owed_sync()
 	cpu.interrupt_toggle(false)
 	userland.exit_if_told_to()
 	userland.prepare_syscall_restart(context)

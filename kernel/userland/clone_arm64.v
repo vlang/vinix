@@ -484,6 +484,10 @@ fn exit_process(mut current_process proc.Process, mut current_thread proc.Thread
 
 		file.fdnum_close(current_process, i, true) or {}
 	}
+	// What closing them changed -- the inode of an unlinked file, freed with
+	// its last descriptor -- goes out before the parent can wait for the exit,
+	// as it would on the way back from close(2).
+	flush_owed_sync()
 
 	// The nearest ancestor that asked to be a child subreaper, or else PID 1,
 	// adopts whatever children we leave behind. Taken off our own list first

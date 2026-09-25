@@ -14,9 +14,16 @@
  *
  * One thread streams a file far larger than the cache while others do what
  * the rest of a desktop does meanwhile -- read a file already in the cache,
- * create and remove small files, sleep for a tick -- and each records the
- * longest it had to wait. The writeback thread's passes over the dirty cache
- * are what the waits are measured against.
+ * create and remove small files, sleep for a tick -- and each records how long
+ * it had to wait. They run for a while with nothing being written first: that
+ * is how long the host, not the guest, keeps them waiting, and on a loaded
+ * Mac a vCPU can go unscheduled for a second or two.
+ *
+ * The means are what is judged, since a host's hiccups hardly move them, with
+ * a bound on the worst wait for a machine that stops outright. Before, with
+ * the lock held for a whole writeback pass, a cached read took 230 ms on
+ * average on a quiet host and 1.9 s on a busy one, and the worst waits were
+ * 25 s and 108 s.
  */
 #include <errno.h>
 #include <fcntl.h>
@@ -37,26 +44,36 @@ static const char *probe_path = "/tmp/vinix-writeback-probe";
 static const char *stream_path = "/tmp/vinix-writeback-stream";
 
 static unsigned long stream_mib = 768;
-/* Longest any one of the others may be kept waiting. A writeback pass that
- * held the disk for the whole of its flush kept them waiting 25 s on a quiet
- * host and over 100 s on a busy one. Waits of a few seconds remain on a busy
- * host: every change to a directory still flushes what is dirty, up to the
- * cache's dirty limit, with the filesystem's lock held. */
-static unsigned long limit_ms = 10000;
+static long quiet_ms = 8000;
+/* Longest any one of the others may be kept waiting while the stream runs. */
+static unsigned long worst_limit_ms = 10000;
 
 static atomic_int stopping;
+/* 0 while nothing is written, 1 while the stream runs. */
+static atomic_int phase;
 
-struct watch {
-	const char *name;
+struct stats {
 	unsigned long long worst_ns;
 	unsigned long long total_ns;
 	unsigned long count;
+};
+
+struct watch {
+	const char *name;
+	/* Longest the mean wait may be while the stream runs. */
+	unsigned long long mean_limit_us;
+	struct stats phases[2];
 	int failed;
 };
 
-static struct watch readers[READERS];
-static struct watch creator = { .name = "create+unlink" };
-static struct watch ticker = { .name = "2 ms sleep" };
+static struct watch readers[READERS] = {
+	{ .name = "cached read 1", .mean_limit_us = 50000 },
+	{ .name = "cached read 2", .mean_limit_us = 50000 },
+};
+/* Each round is flushed before its calls return, the stream's dirty pages
+ * with it, so it takes as long as writing out the cache's dirty limit. */
+static struct watch creator = { .name = "create+unlink", .mean_limit_us = 3000000 };
+static struct watch ticker = { .name = "2 ms sleep", .mean_limit_us = 100000 };
 
 static unsigned long long now_ns(void)
 {
@@ -67,10 +84,11 @@ static unsigned long long now_ns(void)
 
 static void note(struct watch *w, unsigned long long took)
 {
-	if (took > w->worst_ns)
-		w->worst_ns = took;
-	w->total_ns += took;
-	w->count++;
+	struct stats *s = &w->phases[atomic_load(&phase)];
+	if (took > s->worst_ns)
+		s->worst_ns = took;
+	s->total_ns += took;
+	s->count++;
 }
 
 static void pause_ms(long ms)
@@ -206,27 +224,40 @@ static int stream(unsigned long long *took)
 	return 0;
 }
 
+static unsigned long long mean_us(const struct stats *s)
+{
+	return s->count ? s->total_ns / s->count / 1000ull : 0;
+}
+
 static void show(const struct watch *w)
 {
-	unsigned long long mean_us = w->count ? w->total_ns / w->count / 1000ull : 0;
-	printf("VINIX WRITEBACK: %-14s worst %llu ms, mean %llu us over %lu\n", w->name,
-	       w->worst_ns / 1000000ull, mean_us, w->count);
+	const struct stats *quiet = &w->phases[0], *busy = &w->phases[1];
+	printf("VINIX WRITEBACK: %-14s quiet: worst %llu ms, mean %llu us over %lu; "
+	       "writing: worst %llu ms, mean %llu us over %lu\n",
+	       w->name, quiet->worst_ns / 1000000ull, mean_us(quiet), quiet->count,
+	       busy->worst_ns / 1000000ull, mean_us(busy), busy->count);
 }
 
 static int judge(const struct watch *w)
 {
-	unsigned long long worst_ms = w->worst_ns / 1000000ull;
+	const struct stats *busy = &w->phases[1];
+	unsigned long long worst_ms = busy->worst_ns / 1000000ull;
 	if (w->failed) {
 		printf("VINIX WRITEBACK: FAIL %s stopped with errno %d\n", w->name, w->failed);
 		return 1;
 	}
-	if (w->count == 0) {
+	if (w->phases[0].count == 0 || busy->count == 0) {
 		printf("VINIX WRITEBACK: FAIL %s never ran\n", w->name);
 		return 1;
 	}
-	if (worst_ms > limit_ms) {
-		printf("VINIX WRITEBACK: FAIL %s waited %llu ms, limit %lu ms\n", w->name, worst_ms,
-		       limit_ms);
+	if (mean_us(busy) > w->mean_limit_us) {
+		printf("VINIX WRITEBACK: FAIL %s waited %llu us on average, limit %llu us\n",
+		       w->name, mean_us(busy), w->mean_limit_us);
+		return 1;
+	}
+	if (worst_ms > worst_limit_ms) {
+		printf("VINIX WRITEBACK: FAIL %s waited %llu ms, limit %lu ms\n", w->name,
+		       worst_ms, worst_limit_ms);
 		return 1;
 	}
 	return 0;
@@ -242,13 +273,13 @@ int main(void)
 	}
 
 	pthread_t threads[READERS + 2];
-	for (int i = 0; i < READERS; i++) {
-		readers[i].name = i == 0 ? "cached read 1" : "cached read 2";
+	for (int i = 0; i < READERS; i++)
 		pthread_create(&threads[i], NULL, read_probe, &readers[i]);
-	}
 	pthread_create(&threads[READERS], NULL, create_files, &creator);
 	pthread_create(&threads[READERS + 1], NULL, tick, &ticker);
 
+	pause_ms(quiet_ms);
+	atomic_store(&phase, 1);
 	unsigned long long took = 0;
 	int streamed = stream(&took);
 	int saved = errno;

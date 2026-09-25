@@ -82,6 +82,17 @@ fn (mut this EXT2Resource) sync_mapping(_handle voidptr, offset u64, length u64)
 	if length == 0 {
 		return
 	}
+	this.write_mapped_pages(offset, length)?
+	// msync(MS_SYNC) must reach the backing resource, not merely the block
+	// cache. It does before the call returns, but msync holds the address
+	// space's lock here, so the flush waits until the thread holds nothing.
+	// Failed or short device writeback remains dirty there for retry.
+	flush_on_return()
+}
+
+// Put the shared pages mapped over [offset, offset + length) into the block
+// cache, where a flush finds them.
+fn (mut this EXT2Resource) write_mapped_pages(offset u64, length u64) ? {
 	end := if length > u64(-1) - offset { u64(-1) } else { offset + length }
 	this.l.acquire()
 	defer { this.l.release() }
@@ -116,7 +127,4 @@ fn (mut this EXT2Resource) sync_mapping(_handle voidptr, offset u64, length u64)
 	this.stat.mtim.tv_nsec = 0
 	this.stat.ctim.tv_sec = inode.creation_time
 	this.stat.ctim.tv_nsec = 0
-	// msync(MS_SYNC) must reach the backing resource, not merely the block
-	// cache. Failed or short device writeback remains dirty there for retry.
-	this.filesystem.flush()?
 }
