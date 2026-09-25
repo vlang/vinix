@@ -736,6 +736,9 @@ pub fn sendsig(_thread &proc.Thread, signal u8) {
 
 	posixtimer.clear_signal_info(mut t, int(signal))
 	katomic.bts(mut &t.pending_signals, signal - 1)
+	if t.process != unsafe { nil } {
+		notify_signalfds(t.process.pid, int(signal))
+	}
 
 	// Wake the thread when it can take the signal now, or waits for it in
 	// sigtimedwait(). A signal it blocks otherwise just stays pending: waking

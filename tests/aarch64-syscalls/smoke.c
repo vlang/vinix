@@ -28,6 +28,7 @@
 #include <sys/time.h>
 #include <ucontext.h>
 #include <sys/auxv.h>
+#include <sys/signalfd.h>
 #include <sys/un.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -1061,6 +1062,62 @@ static int thread_affinity(void) {
     return valid;
 }
 
+static void *late_signal(void *unused) {
+    (void)unused;
+    usleep(50000);
+    kill(getpid(), SIGUSR2);
+    return NULL;
+}
+
+// signalfd(2): blocked signals read from a descriptor, which poll and epoll
+// find ready while one is pending, and a read that blocks until one sent to
+// the process from another thread comes.
+static int signal_descriptor(void) {
+    sigset_t both, only_usr1, previous;
+    sigemptyset(&both);
+    sigaddset(&both, SIGUSR1);
+    sigaddset(&both, SIGUSR2);
+    sigemptyset(&only_usr1);
+    sigaddset(&only_usr1, SIGUSR1);
+    sigprocmask(SIG_BLOCK, &both, &previous);
+    struct signalfd_siginfo info;
+    int fd = signalfd(-1, &only_usr1, SFD_NONBLOCK | SFD_CLOEXEC);
+    struct pollfd p = {.fd = fd, .events = POLLIN};
+    int empty = fd >= 0 && read(fd, &info, sizeof(info)) == -1 && errno == EAGAIN &&
+                poll(&p, 1, 0) == 0;
+    kill(getpid(), SIGUSR1);
+    int ready = poll(&p, 1, 0) == 1 && (p.revents & POLLIN);
+    int got = read(fd, &info, sizeof(info)) == sizeof(info) && info.ssi_signo == SIGUSR1;
+    int drained = read(fd, &info, sizeof(info)) == -1 && errno == EAGAIN && poll(&p, 1, 0) == 0;
+    int updated = signalfd(fd, &both, 0) == fd;
+    int ep = epoll_create1(EPOLL_CLOEXEC);
+    struct epoll_event watch = {.events = EPOLLIN, .data.fd = fd}, out = {0};
+    epoll_ctl(ep, EPOLL_CTL_ADD, fd, &watch);
+    pthread_t thread;
+    pthread_create(&thread, NULL, late_signal, NULL);
+    int woke = epoll_wait(ep, &out, 1, 2000) == 1 && out.data.fd == fd;
+    pthread_join(thread, NULL);
+    int late = read(fd, &info, sizeof(info)) == sizeof(info) && info.ssi_signo == SIGUSR2;
+    int blocking = signalfd(-1, &both, SFD_CLOEXEC);
+    pthread_create(&thread, NULL, late_signal, NULL);
+    int waited = read(blocking, &info, sizeof(info)) == sizeof(info) && info.ssi_signo == SIGUSR2;
+    pthread_join(thread, NULL);
+    close(blocking);
+    close(ep);
+    close(fd);
+    // Leave nothing pending to kill the test once unblocked.
+    struct timespec none = {0, 0};
+    while (sigtimedwait(&both, NULL, &none) > 0)
+        ;
+    sigprocmask(SIG_SETMASK, &previous, NULL);
+    int valid = empty && ready && got && drained && updated && woke && late && waited;
+    if (!valid)
+        printf("signalfd: empty=%d ready=%d got=%d drained=%d updated=%d woke=%d late=%d "
+               "waited=%d\n",
+               empty, ready, got, drained, updated, woke, late, waited);
+    return valid;
+}
+
 static int handler_without_restorer(void) {
     struct {
         void (*handler)(int);
@@ -1405,6 +1462,7 @@ int main(int argc, char **argv, char **envp) {
           "FIONREAD on a pipe");
     close(queued_pipe[0]);
     close(queued_pipe[1]);
+    check(signal_descriptor(), "signalfd with poll, epoll and a blocking read");
     int no_family[2];
     check(failed_with_errno(socket(AF_INET6, SOCK_STREAM, 0), EAFNOSUPPORT, "IPv6 socket") &&
               failed_with_errno(socketpair(AF_INET, SOCK_STREAM, 0, no_family), EOPNOTSUPP,

@@ -1163,7 +1163,7 @@ pub fn init_syscall_table() {
 	syscall_table[70] = voidptr(syscall_linux_pwritev) // __NR_pwritev
 	syscall_table[72] = voidptr(file.syscall_pselect6) // __NR_pselect6
 	syscall_table[73] = voidptr(file.syscall_ppoll) // __NR_ppoll
-	syscall_table[74] = voidptr(userland.syscall_signalfd) // __NR_signalfd4
+	syscall_table[74] = voidptr(userland.syscall_signalfd4) // __NR_signalfd4
 	syscall_table[78] = voidptr(fs.syscall_readlinkat) // __NR_readlinkat
 	syscall_table[79] = voidptr(syscall_linux_fstatat) // __NR_fstatat / newfstatat
 	syscall_table[80] = voidptr(syscall_linux_fstat) // __NR_fstat

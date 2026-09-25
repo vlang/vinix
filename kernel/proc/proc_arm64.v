@@ -51,8 +51,6 @@ pub mut:
 	pending_signal_values   [64]u64
 	pending_signal_overruns [64]int
 	stacks             []voidptr
-	signalfds_lock     klock.Lock
-	signalfds          []voidptr
 	// The name PR_SET_NAME gave the thread, which a new thread takes from the
 	// one that made it; empty for one never named, which goes by its
 	// process's.
