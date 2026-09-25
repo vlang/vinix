@@ -53,6 +53,8 @@ struct vinix_socket {
     int reuseaddr;
     int broadcast;
     int keepalive;
+    /* TCP_NODELAY on a listening socket, for the connections it accepts. */
+    int nodelay;
     struct tcp_pcb *tcp;
     struct udp_pcb *udp;
     struct packet *rx_head;
@@ -276,6 +278,10 @@ static err_t accept_callback(void *argument, struct tcp_pcb *pcb, err_t error) {
     child->tcp = pcb;
     child->reuseaddr = ip_get_option(pcb, SOF_REUSEADDR) != 0;
     child->keepalive = ip_get_option(pcb, SOF_KEEPALIVE) != 0;
+    /* A connection takes TCP_NODELAY from the socket it was accepted on. */
+    if (listener->nodelay) {
+        tcp_nagle_disable(pcb);
+    }
     install_tcp_callbacks(child);
 
     if (listener->accept_tail) {
@@ -919,6 +925,15 @@ int vinix_socket_set_option(struct vinix_socket *socket, int level, int option,
         switch (option) {
         case 1: /* TCP_NODELAY */
             if (!socket->tcp) return 92;
+            /* A listening pcb is lwIP's smaller tcp_pcb_listen, which has no
+             * flags: its accept callback lies where they would be, and
+             * setting TF_NODELAY there turned the callback into a pointer
+             * to nowhere, which the next connection to finish its handshake
+             * called. Varnish sets it on its listening socket. */
+            if (socket->tcp->state == LISTEN) {
+                socket->nodelay = value != 0;
+                return 0;
+            }
             if (value) tcp_nagle_disable(socket->tcp);
             else tcp_nagle_enable(socket->tcp);
             return 0;
@@ -956,6 +971,10 @@ int vinix_socket_get_option(struct vinix_socket *socket, int level, int option,
         switch (option) {
         case 1:
             if (!socket->tcp) return 92;
+            if (socket->tcp->state == LISTEN) {
+                *value = socket->nodelay;
+                return 0;
+            }
             *value = tcp_nagle_disabled(socket->tcp) ? 1 : 0;
             return 0;
         default: return 92;
