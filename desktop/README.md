@@ -568,6 +568,10 @@ installed, one command builds the aarch64 image and boots into the desktop:
 
     ./run-desktop-aarch64.sh
 
+The host runner builds the kernel and packaged desktop with `-prod` and uses
+Clang for cross compilation. A warm run reuses cached build outputs. For quick
+desktop edits inside the running VM, use `vinix-desktop-build` below.
+
 To build a single desktop image with the default portable software set
 (Python, Ruby, Go, V, developer tools, X11, Firefox, Hyprland, x86 translation,
 and the CLI tools), use the aggregate builder and then boot its result. Java,
@@ -591,6 +595,9 @@ asks PID 1 to reload the graphical session. The replacement session reopens
 Files and Terminal, because the Terminal that ran the build belongs to the old
 session and closes during its orderly teardown. `--no-reload` leaves the
 current session running.
+
+The in-guest build uses V3 and native TCC without `-prod`. Compilation stops if
+V or TCC fails, without trying the V1 compiler or another C compiler.
 
 The runner caches a gzip-compressed version of the immutable QEMU module to
 keep the boot payload small and comfortably below the FAT32 single-file limit;

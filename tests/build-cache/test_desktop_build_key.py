@@ -67,6 +67,16 @@ class DesktopBuildKeyTests(unittest.TestCase):
             write(root / "desktop/main.v", "module main\nconst changed = true\n")
             self.assertNotEqual(first, MODULE.compute_key(root, v, env))
 
+    def test_v_launcher_change_invalidates(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            v, env = self.fixture(root)
+            launcher = root / "build-support/v-command"
+            write(launcher, "old launcher\n")
+            first = MODULE.compute_key(root, v, env)
+            write(launcher, "new launcher\n")
+            self.assertNotEqual(first, MODULE.compute_key(root, v, env))
+
     def test_m1_triangle_source_change_invalidates(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

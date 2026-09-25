@@ -25,6 +25,7 @@ if [ "${1:-}" = version ]; then
 fi
 echo 'test compiler stdout should stay out of an interactive terminal'
 echo 'test compiler stderr should stay out of an interactive terminal' >&2
+printf '%s\n' "${VINIX_DESKTOP_TEST_CC_LINE:-  > tcc -o out src.c}"
 printf '%s\n' "$*" > "$VINIX_DESKTOP_TEST_V_ARGS"
 output=
 last=
@@ -128,7 +129,9 @@ VINIX_DESKTOP_TEST_STAGED_SOURCE="$work/staged-main.v" \
 test -f "$work/synced"
 grep -F "$host|$host/third_party" "$work/v-args" >/dev/null
 grep -F -- '-cc tcc' "$work/v-args" >/dev/null
+grep -F -- '-new-compiler' "$work/v-args" >/dev/null
 grep -F -- '-no-retry-compilation' "$work/v-args" >/dev/null
+grep -F -- '-showcc' "$work/v-args" >/dev/null
 grep -F -- '-cflags -I/usr/include' "$work/v-args" >/dev/null
 grep -F -- '-ldflags -static' "$work/v-args" >/dev/null
 grep -F '/desktop' "$work/v-args" >/dev/null
@@ -136,10 +139,29 @@ if grep -Fq -- '-d glibc' "$work/v-args"; then
 	echo "desktop build selected glibc for its musl/TCC output" >&2
 	exit 1
 fi
+if grep -Fq -- '-prod' "$work/v-args"; then
+	echo "desktop build unexpectedly selected production compilation" >&2
+	exit 1
+fi
 grep -Fqx '// SPDX-License-Identifier: GPL-2.0-or-later' "$work/staged-main.v"
 if grep -Fq 'All rights reserved.' "$work/staged-main.v"; then
 	echo "desktop build retained the V3-incompatible redundant preamble" >&2
 	exit 1
 fi
+
+# A successful V exit is insufficient if its C driver silently chose another
+# compiler. The helper must keep the current binary when that happens.
+printf 'existing desktop\n' > "$work/vinix-desktop"
+if PATH="$work/bin:/usr/bin:/bin" \
+	VINIX_DESKTOP_HOME_DEV="$work/home" \
+	VINIX_DESKTOP_SYSTEM_DEV="$work/system" \
+	VINIX_DESKTOP_OUTPUT="$work/vinix-desktop" \
+	VINIX_DESKTOP_TEST_V_ARGS="$work/v-args" \
+	VINIX_DESKTOP_TEST_CC_LINE='  > cc -o out src.c' \
+	"$repo/build-support/vinix-desktop-build" --no-reload >/dev/null 2>&1; then
+	echo "desktop helper accepted a build without TCC" >&2
+	exit 1
+fi
+grep -Fqx 'existing desktop' "$work/vinix-desktop"
 
 echo "PASS desktop build helper source selection and host staging"

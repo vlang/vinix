@@ -54,6 +54,10 @@ def staged_source(name, source_path):
 def symlink_entries(source, destination):
     os.makedirs(destination, exist_ok=True)
     for name in sorted(os.listdir(source)):
+        # Scratch V files in a sibling ui2 checkout should not become part of
+        # the module compiled into Vinix. V excludes *_test.v itself.
+        if name.endswith("_tmp.v"):
+            continue
         source_path = os.path.abspath(os.path.join(source, name))
         staged = staged_source(name, source_path)
         destination_path = os.path.join(destination, name)

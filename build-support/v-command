@@ -5,7 +5,8 @@
 # explicit -os, -arch, -musl/-glibc, or -cc still wins. Alpine's native TCC is
 # the fast default for applications and tells V it can link the Vinix target.
 # Keep V's worker passes serial until their threading is qualified on Vinix.
-vinix_vflags='-os vinix -arch arm64 -musl -cc tcc -no-parallel -no-memory-limit'
+# Require V3 and TCC for native builds; compiler failures must stay visible.
+vinix_vflags='-new-compiler -no-retry-compilation -os vinix -arch arm64 -musl -cc tcc -no-parallel -no-memory-limit'
 
 # Keep the self-built compiler on the hosted Linux/musl runtime, while the
 # resulting command continues to target Vinix by default. Self-host serially
@@ -13,7 +14,7 @@ vinix_vflags='-os vinix -arch arm64 -musl -cc tcc -no-parallel -no-memory-limit'
 # scheduling while compiler threading support is still being qualified.
 for vinix_arg in "$@"; do
 	if [ "$vinix_arg" = self ]; then
-		vinix_vflags='-os linux -arch arm64 -musl -cc tcc -no-parallel -no-memory-limit'
+		vinix_vflags='-new-compiler -no-retry-compilation -os linux -arch arm64 -musl -cc tcc -no-parallel -no-memory-limit'
 		break
 	fi
 done

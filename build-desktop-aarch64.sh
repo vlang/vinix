@@ -1049,6 +1049,8 @@ mkdir -p "$STAGING/usr/share/vinix/firefox"
 install -m644 "$SCRIPT_DIR/build-support/firefox/vinix.js" \
     "$STAGING/usr/share/vinix/firefox/vinix.js"
 install -m755 "$SCRIPT_DIR/build-support/chromium/run-chromium" "$STAGING/usr/bin/run-chromium"
+# Keep the small launcher current even when the cached native V layer is reused.
+install -m755 "$SCRIPT_DIR/build-support/v-command" "$STAGING/usr/bin/v"
 install -m755 "$SCRIPT_DIR/build-support/vinix-desktop-build" \
     "$STAGING/usr/bin/vinix-desktop-build"
 install -m755 "$SCRIPT_DIR/build-support/vinix-desktop-reload" \
@@ -1312,6 +1314,7 @@ CONTENT_KEY_INPUTS=(
     "$BUILD_DIR/wallpapers"
     "$SCRIPT_DIR/desktop"
     "$SCRIPT_DIR/build-support/vinix-pkg"
+    "$SCRIPT_DIR/build-support/v-command"
     "$SCRIPT_DIR/build-support/vinix-desktop-build"
     "$SCRIPT_DIR/build-support/vinix-desktop-reload"
     "$SCRIPT_DIR/build-support/vinix-host-sync"

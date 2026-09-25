@@ -21,6 +21,7 @@ cp "$repo/desktop/tools/ui2_headless_bounds.v" \
 	"$source_root/desktop/tools/ui2_headless_bounds.v"
 printf 'Module { name: "ui2", subdirs: ["ui"] }\n' > "$ui2_root/v.mod"
 printf 'module ui2\n' > "$ui2_root/ui/ui.v"
+printf 'module ui2\nimport os\n' > "$ui2_root/ui/scratch_tmp.v"
 printf 'module main\n\nstruct CalculatorModel {}\n\nfn main() {}\n' \
 	> "$ui2_root/examples/calculator/main.v"
 printf 'third_party/\n' > "$source_root/.gitignore"
@@ -51,6 +52,7 @@ VINIX_HOST_TAR=$(command -v tar) \
 grep -q 'host_revision = 1' "$work/mnt/vinix/desktop/main.v"
 test -f "$work/mnt/vinix/.vinix-build/desktop/app_calculator.v"
 test -f "$work/mnt/vinix/.vinix-build/vmodules/ui2/v.mod"
+test ! -e "$work/mnt/vinix/.vinix-build/vmodules/ui2/ui/scratch_tmp.v"
 test -L "$work/mnt/vinix"
 
 # The service snapshots at request time, not QEMU launch time.
