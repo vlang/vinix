@@ -414,3 +414,7 @@ pub fn (pagemap &Pagemap) next_present(start u64, end u64) u64 {
 	}
 	return end
 }
+
+// The flush that follows tearing down a page map no CPU runs any more. The
+// x86 unmap path still invalidates each page itself.
+pub fn flush_tlb_everywhere() {}

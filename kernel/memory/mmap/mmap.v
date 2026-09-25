@@ -359,6 +359,11 @@ fn delete_pagemap_impl(mut pagemap memory.Pagemap, trace bool) ? {
 
 	// Address-space destruction is a kernel-internal operation and must be able
 	// to reclaim immutable ranges after the process can no longer observe them.
+	// Every caller has taken the page map off every CPU first: exit and exec
+	// switch to the kernel's and have stopped the other threads, and a failed
+	// fork never ran it. So its pages come out without TLB maintenance each,
+	// and one flush follows.
+	pagemap.dying = true
 	mut range_index := u64(0)
 	for pagemap.mmap_ranges.len != 0 {
 		local_range := unsafe { &MmapRangeLocal(pagemap.mmap_ranges[0]) }
@@ -388,6 +393,7 @@ fn delete_pagemap_impl(mut pagemap memory.Pagemap, trace bool) ? {
 		range_index++
 	}
 
+	memory.flush_tlb_everywhere()
 	top_level := pagemap.top_level
 	pagemap.l.release()
 	if trace {

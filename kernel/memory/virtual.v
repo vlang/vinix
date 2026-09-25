@@ -75,6 +75,9 @@ pub mut:
 	l           klock.Lock
 	top_level   &u64 = unsafe { nil }
 	mmap_ranges []voidptr
+	// Being torn down: no CPU runs it any more, so pages come out of it with
+	// no TLB maintenance each, and one flush follows (flush_tlb_everywhere).
+	dying bool
 }
 
 fn C.get_kernel_end_addr() u64

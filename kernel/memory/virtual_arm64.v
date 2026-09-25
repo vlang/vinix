@@ -320,12 +320,18 @@ pub fn (mut pagemap Pagemap) unmap_page_unlocked(virt u64) ? {
 	l2_p := unsafe { &u64(u64(l2) + higher_half) }
 	l3_p := unsafe { &u64(u64(l3) + higher_half) }
 
-	// Clear the leaf entry and flush its translation first.
+	// Clear the leaf entry and flush its translation first -- unless no CPU
+	// runs the page map any more, when flush_tlb_everywhere() follows the
+	// whole teardown instead. Two broadcast invalidations for every page made
+	// an exit, and the old image's teardown in an exec, cost 10 ms.
 	unsafe {
 		l3_p[l3_entry] = 0
 	}
-	cpu.tlbi_vaae1(virt >> 12)
-	cpu.dsb_sy()
+	if !pagemap.dying {
+		cpu.tlbi_vaae1(virt >> 12)
+		cpu.dsb_sy()
+	}
+	mut freed_table := false
 
 	// Reclaim now-empty tables from the leaf upward. At every level the parent
 	// descriptor is unlinked (and the write made visible with a barrier) BEFORE
@@ -338,6 +344,7 @@ pub fn (mut pagemap Pagemap) unmap_page_unlocked(virt u64) ? {
 		}
 		cpu.dsb_sy()
 		pmm_free(l3, 1)
+		freed_table = true
 
 		if arm64_table_empty(l2_p) {
 			unsafe {
@@ -358,8 +365,18 @@ pub fn (mut pagemap Pagemap) unmap_page_unlocked(virt u64) ? {
 
 	// Drop any TLB caching of the intermediate walks we just tore down.
 	// Intermediate translation-table walk caches can exist on any CPU which
-	// ran this user pagemap. Broadcast before returning the reclaimed table
-	// pages to the PMM.
+	// ran this user pagemap. Only a table taken out needs it; the leaf's own
+	// translation went above.
+	if freed_table && !pagemap.dying {
+		cpu.tlbi_vmalle1is()
+		cpu.dsb_sy()
+		cpu.isb()
+	}
+}
+
+// Every CPU's translations, walk caches included, gone: the flush that
+// follows tearing down a page map no CPU runs any more.
+pub fn flush_tlb_everywhere() {
 	cpu.tlbi_vmalle1is()
 	cpu.dsb_sy()
 	cpu.isb()
