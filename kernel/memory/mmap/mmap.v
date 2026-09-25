@@ -1278,8 +1278,23 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
 	// so the group is charged for the pages it touches and not for ones a
 	// runtime set aside and never used (see page_in). Large mappings show
 	// that faulting such pages in is safe on HVF.
+	//
+	// A private file mapping is filled in on demand too, as the ELF loader's
+	// segments always were. Each of its pages is a copy of the file's, and
+	// copying every page up front cost a process the whole of every library
+	// it loaded: musl maps an object's whole span before placing its segments,
+	// so Firefox's 130 MB libxul was copied in full by every one of its
+	// processes, and a 4 GiB machine ran out of memory while it started.
+	//
+	// A private file mapping is filled in on demand too, as the ELF loader's
+	// segments always were. Each of its pages is a copy of the file's, and
+	// copying every page up front cost a process the whole of every library
+	// it loaded: musl maps an object's whole span before placing its segments,
+	// so Firefox's 130 MB libxul was copied in full by every one of its
+	// processes, and a 4 GiB machine ran out of memory while it started.
 	lazy_anonymous := flags & map_anonymous != 0 && (length >= lazy_anonymous_threshold
 		|| (flags & map_shared == 0 && memory_accounted(process, pagemap)))
+	lazy_private_file := flags & map_anonymous == 0 && flags & map_shared == 0
 	// Convert movable shared-file storage before any page can be handed out,
 	// including when the mapping itself will be populated on demand.
 	if flags & map_anonymous == 0 && flags & map_shared != 0
@@ -1296,7 +1311,7 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
 			return none
 		}
 	}
-	if prot != prot_none && !lazy_anonymous && !lazy_file {
+	if prot != prot_none && !lazy_anonymous && !lazy_private_file && !lazy_file {
 		for i := u64(0); i < length; i += page_size {
 			file_page := u64((offset + i64(i)) / i64(page_size))
 			// Past the end of the file there is nothing to pre-fault, and a

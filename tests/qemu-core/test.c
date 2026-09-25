@@ -476,6 +476,56 @@ static int test_ext2_mapping_and_namespace(void)
 	return 0;
 }
 
+/* A private file mapping is filled in as it is touched. Each page still has to
+ * hold the file's bytes when first read, a write has to stay in the mapping,
+ * and the rest of the last page past the end of the file reads as zeroes. */
+static int test_private_file_mapping(void)
+{
+	static const char *path = "/root/vinix-qemu-core/private";
+	const size_t page = 4096;
+	const size_t length = 5 * page + 123;
+	unsigned char *expected = malloc(length);
+	CHECK(expected != NULL);
+	for (size_t i = 0; i < length; ++i)
+		expected[i] = (unsigned char)(i / page * 29u + i * 7u + 3u);
+
+	int fd = open(path, O_CREAT | O_TRUNC | O_RDWR, 0600);
+	CHECK(fd >= 0);
+	CHECK(write(fd, expected, length) == (ssize_t)length);
+
+	unsigned char *mapped = mmap(NULL, 6 * page, PROT_READ | PROT_WRITE,
+	    MAP_PRIVATE, fd, 0);
+	CHECK(mapped != MAP_FAILED);
+	/* Out of order, so no page is read only because its neighbour was. */
+	for (size_t p = 5; p-- > 0;)
+		CHECK(memcmp(mapped + p * page, expected + p * page, page) == 0);
+	CHECK(memcmp(mapped + 5 * page, expected + 5 * page, 123) == 0);
+	for (size_t i = 123; i < page; ++i)
+		CHECK(mapped[5 * page + i] == 0);
+
+	mapped[2 * page + 5] ^= 0xff;
+	pid_t child = fork();
+	if (child == 0) {
+		/* The child inherits the private write and makes its own. */
+		if (mapped[2 * page + 5] != (unsigned char)(expected[2 * page + 5] ^ 0xff))
+			_exit(1);
+		mapped[3 * page + 9] ^= 0xff;
+		_exit(0);
+	}
+	CHECK(reap_ok(child) == 0);
+	CHECK(mapped[3 * page + 9] == expected[3 * page + 9]);
+
+	unsigned char observed[4096];
+	CHECK(pread(fd, observed, page, 2 * page) == (ssize_t)page);
+	CHECK(memcmp(observed, expected + 2 * page, page) == 0);
+	CHECK(munmap(mapped, 6 * page) == 0);
+	CHECK(close(fd) == 0);
+	CHECK(unlink(path) == 0);
+	free(expected);
+	puts("QEMU CORE PASS: private file mappings read the file and keep their writes");
+	return 0;
+}
+
 static unsigned long free_ram(void)
 {
 	struct sysinfo info;
@@ -1346,6 +1396,7 @@ static int run_tests(void)
 	CHECK(test_default_terminating_signals() == 0);
 	CHECK(prepare_directory() == 0);
 	CHECK(test_ext2_mapping_and_namespace() == 0);
+	CHECK(test_private_file_mapping() == 0);
 	CHECK(test_partial_munmap_returns_pages() == 0);
 	CHECK(test_shared_mapping_visible_to_readers() == 0);
 	CHECK(test_released_pid_is_not_reused_while_its_group_lives() == 0);
