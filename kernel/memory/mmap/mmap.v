@@ -1268,6 +1268,13 @@ pub fn mprotect(mut pagemap memory.Pagemap, addr voidptr, len u64, prot int) ? {
 	mprotect_unlocked(mut pagemap, addr, len, prot)?
 }
 
+// Fill in the pages of [address, address + length) a range has no page for
+// yet, in an address space that need not be the active one: exec writes a
+// program's first stack through it.
+pub fn populate(mut pagemap memory.Pagemap, address u64, length u64) ? {
+	populate_missing_pages(mut pagemap, address, length, prot_read | prot_write)?
+}
+
 fn populate_missing_pages(mut pagemap memory.Pagemap, address u64, _length u64, prot int) ? {
 	length := lib.align_up(_length, page_size)
 	for virt := address; virt < address + length; virt += page_size {

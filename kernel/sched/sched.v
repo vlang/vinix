@@ -11,6 +11,12 @@ const stack_size = u64(0x200000)
 // translating a full application.
 const default_user_stack_size = u64(0x800000)
 
+// How much address space a program's first thread gets for its stack, unless
+// RLIMIT_STACK says more, up to the most it is given.
+const main_stack_reservation = u64(256) << 20
+
+const max_main_stack_reservation = u64(4) << 30
+
 // ARM64 kernel stacks do not need the larger userspace reservation. Keeping
 // them small also avoids requiring a large
 // physically-contiguous run for every pthread a native runtime creates.

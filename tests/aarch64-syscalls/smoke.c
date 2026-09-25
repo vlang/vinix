@@ -1332,6 +1332,32 @@ static int socket_timeouts(void) {
     return valid;
 }
 
+static int __attribute__((noinline)) recurse(int depth) {
+    volatile char frame[1024];
+    frame[0] = (char)depth;
+    if (depth == 0)
+        return frame[0];
+    return recurse(depth - 1) + frame[0];
+}
+
+// The first thread's stack grows past 8 MiB once RLIMIT_STACK allows it, as
+// gcc raises it to 64 MiB and recurses deep into a large function.
+static int growing_stack(void) {
+    pid_t child = fork();
+    if (child == 0) {
+        struct rlimit wider = {64UL << 20, RLIM_INFINITY};
+        setrlimit(RLIMIT_STACK, &wider);
+        recurse(32 * 1024);
+        _exit(0);
+    }
+    int status = 0;
+    int valid = child > 0 && waitpid(child, &status, 0) == child && WIFEXITED(status) &&
+                WEXITSTATUS(status) == 0;
+    if (!valid)
+        printf("growing stack: status=0x%x\n", status);
+    return valid;
+}
+
 static int handler_without_restorer(void) {
     struct {
         void (*handler)(int);
@@ -1683,6 +1709,7 @@ int main(int argc, char **argv, char **envp) {
     check(terminal_after_session(), "a new session claims a pty after the last one ends");
     check(timerfd_churn(), "80 timerfds made and closed in turn");
     check(socket_timeouts(), "SO_RCVTIMEO, SO_LINGER and TCP keepalive options");
+    check(growing_stack(), "a 32 MiB deep recursion after raising RLIMIT_STACK");
     int no_family[2];
     check(failed_with_errno(socket(AF_INET6, SOCK_STREAM, 0), EAFNOSUPPORT, "IPv6 socket") &&
               failed_with_errno(socketpair(AF_INET, SOCK_STREAM, 0, no_family), EOPNOTSUPP,

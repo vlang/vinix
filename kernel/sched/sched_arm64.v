@@ -1684,7 +1684,13 @@ fn write_initial_stack(pagemap &memory.Pagemap, addr u64, src voidptr, length u6
 	mut done := u64(0)
 	for done < length {
 		virt := addr + done
-		phys := pagemap.virt2phys(virt) or { return false }
+		// The stack is filled in as it is used; a page not there yet is
+		// filled in now.
+		phys := pagemap.virt2phys(virt) or {
+			mut writable := unsafe { pagemap }
+			mmap.populate(mut writable, virt & ~(page_size - 1), page_size) or { return false }
+			pagemap.virt2phys(virt) or { return false }
+		}
 		offset := virt & (page_size - 1)
 		chunk := if length - done < page_size - offset { length - done } else { page_size - offset }
 		unsafe {
@@ -1731,21 +1737,25 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 		if trace_gpu_exec {
 			println('exec[gpu]/thread: calculating user stack size')
 		}
-		mut user_stack_size := default_user_stack_size
+		// The first thread's stack is reserved for as far as it may grow. It was
+		// 8 MiB of pages allocated at exec and could grow no further, whatever
+		// a program raised RLIMIT_STACK to while it ran -- gcc raises it to
+		// 64 MiB as it starts -- where Linux lets the stack grow to the new
+		// limit. A limit set below the 8 MiB default is kept to.
+		mut user_stack_size := main_stack_reservation
 		stack_limit := proc.soft_limit(process, proc.rlimit_stack)
-		if stack_limit != proc.rlim_infinity && stack_limit < user_stack_size {
+		if stack_limit != proc.rlim_infinity && stack_limit < default_user_stack_size {
 			user_stack_size = lib.align_down(stack_limit, page_size)
+		} else if stack_limit != proc.rlim_infinity && stack_limit > user_stack_size {
+			user_stack_size = lib.align_down(if stack_limit < max_main_stack_reservation {
+				stack_limit
+			} else {
+				max_main_stack_reservation
+			}, page_size)
 		}
 		if user_stack_size < page_size {
 			errno.set(errno.enomem)
 			return none
-		}
-		if trace_gpu_exec {
-			println('exec[gpu]/thread: allocating ${user_stack_size / page_size} physical stack pages')
-		}
-		mut stack_pages := []u64{cap: int(user_stack_size / page_size)}
-		for _ in 0 .. int(user_stack_size / page_size) {
-			stack_pages << u64(memory.pmm_alloc(1))
 		}
 
 		stack_vma = process.thread_stack_top
@@ -1759,11 +1769,21 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 		if trace_gpu_exec {
 			println('exec[gpu]/thread: mapping user stack at 0x${stack_bottom_vma:x} len=0x${user_stack_size:x}')
 		}
-		mmap.map_pages(mut process.pagemap, stack_bottom_vma, stack_pages, mmap.prot_read | mmap.prot_write, mmap.map_anonymous) or {
-			unsafe { stack_pages.free() }
-			return none
+		mmap.mmap(process.pagemap, voidptr(stack_bottom_vma), user_stack_size,
+			mmap.prot_read | mmap.prot_write, mmap.map_private | mmap.map_anonymous | mmap.map_fixed,
+			unsafe { nil }, 0, unsafe { nil }, unsafe { nil }, unsafe { nil }) or { return none }
+		// The 8 MiB a stack had are there from the start, as before; only what
+		// lies past them is filled in as it is touched. HVF does not always
+		// resume a fault taken on an STP or LDP, which is mostly what a stack
+		// is touched with, and with the whole stack filled in lazily the
+		// syscall smoke test failed a different, unrelated check in each of
+		// two runs.
+		eager := if user_stack_size < default_user_stack_size {
+			user_stack_size
+		} else {
+			default_user_stack_size
 		}
-		unsafe { stack_pages.free() }
+		mmap.populate(mut process.pagemap, stack_vma - eager, eager) or { return none }
 		if trace_gpu_exec {
 			println('exec[gpu]/thread: user stack mapped')
 		}
