@@ -57,7 +57,9 @@ const exception_names = [
 ]
 
 fn pf_handler(num u32, mut gpr_state cpulocal.GPRState) {
-	mmap.pf_handler(gpr_state) or { exception_handler(num, mut gpr_state) }
+	// Read while interrupts are still off: see mmap.pf_handler().
+	fault_addr := cpu.read_cr2()
+	mmap.pf_handler(gpr_state) or { exception_handler_at(num, mut gpr_state, fault_addr) }
 }
 
 fn abort_handler(_num u32, _gpr_state &cpulocal.GPRState) {
@@ -71,6 +73,11 @@ fn abort_handler(_num u32, _gpr_state &cpulocal.GPRState) {
 }
 
 fn exception_handler(num u32, mut gpr_state cpulocal.GPRState) {
+	exception_handler_at(num, mut gpr_state, if num == 14 { cpu.read_cr2() } else { u64(0) })
+}
+
+// `cr2` is the faulting address of a page fault, read on entry.
+fn exception_handler_at(num u32, mut gpr_state cpulocal.GPRState, cr2 u64) {
 	if gpr_state.cs == user_code_seg {
 		mut signal := u8(0)
 
@@ -99,7 +106,7 @@ fn exception_handler(num u32, mut gpr_state cpulocal.GPRState) {
 		// Hardware error codes occupy the low bits; mlibc exposes the vector in
 		// the high half as uc_mcontext.gregs[REG_TRAPNO].
 		gpr_state.err = (gpr_state.err & u64(0xffffffff)) | (u64(num) << 32)
-		fault_addr := if num == 14 { cpu.read_cr2() } else { u64(0) }
+		fault_addr := if num == 14 { cr2 } else { u64(0) }
 		fault_code := match num {
 			0 { 1 } // FPE_INTDIV
 			1 { 2 } // TRAP_TRACE

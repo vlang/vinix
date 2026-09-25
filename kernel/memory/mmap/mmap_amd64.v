@@ -5,6 +5,12 @@ import x86.cpu.local as cpulocal
 import proc
 
 pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
+	// CR2 is read before interrupts go back on. Once they are, the scheduler
+	// can switch this thread out, and another one's page fault on this CPU
+	// overwrites CR2: the handler then looked up the other thread's address in
+	// this thread's page map, found nothing there, and killed it with SIGSEGV
+	// for a page that was perfectly mappable.
+	addr := cpu.read_cr2()
 	if gpr_state.err & 1 != 0 {
 		// A write-protection fault on a fork-shared private page is the normal
 		// COW path, not a process fault.
@@ -14,7 +20,7 @@ pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
 				sti
 			}
 			resolved := current != unsafe { nil }
-				&& resolve_cow_fault(current.process.pagemap, cpu.read_cr2())
+				&& resolve_cow_fault(current.process.pagemap, addr)
 			asm volatile amd64 {
 				cli
 			}
@@ -39,8 +45,6 @@ pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
 
 	mut process := current_thread.process
 	mut pagemap := process.pagemap
-
-	addr := cpu.read_cr2()
 
 	pagemap.l.acquire()
 
