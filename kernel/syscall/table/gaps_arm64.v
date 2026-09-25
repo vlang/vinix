@@ -14,6 +14,7 @@ import file
 import katomic
 import proc
 import socket
+import socket.public as sock_pub
 import time
 import usercopy
 
@@ -508,6 +509,84 @@ fn syscall_linux_times(_ voidptr, buf u64) (u64, u64) {
 }
 
 // ── sockets ──────────────────────────────────────────────────────────────────
+
+// struct mmsghdr: a msghdr and the byte count the call leaves in it.
+struct LinuxMMsgHdr {
+mut:
+	hdr sock_pub.MsgHdr
+	len u32
+	pad u32
+}
+
+const linux_msg_dontwait = 0x40
+const linux_msg_waitforone = 0x10000
+const linux_uio_maxiov = 1024
+
+// sendmmsg(2): sendmsg(2) for each message in turn, as many as go, with the
+// bytes of each left in its msg_len. glibc's resolver sends a lookup's A and
+// AAAA queries together this way when a host has addresses of both kinds.
+fn syscall_linux_sendmmsg(gpr_state voidptr, fdnum int, vec u64, vlen u32, flags int) (u64, u64) {
+	count := if vlen > linux_uio_maxiov { u32(linux_uio_maxiov) } else { vlen }
+	mut sent := u32(0)
+	for sent < count {
+		address := vec + u64(sent) * sizeof(LinuxMMsgHdr)
+		mut message := LinuxMMsgHdr{}
+		if !usercopy.copy_from_user(voidptr(&message), address, sizeof(LinuxMMsgHdr)) {
+			if sent == 0 {
+				return errno.err, errno.efault
+			}
+			break
+		}
+		ret, err := socket.syscall_sendmsg(gpr_state, fdnum, unsafe { &message.hdr }, flags)
+		if err != 0 {
+			if sent == 0 {
+				return errno.err, err
+			}
+			break
+		}
+		length := u32(ret)
+		if !usercopy.copy_to_user(address + u64(__offsetof(LinuxMMsgHdr, len)), voidptr(&length), sizeof(u32)) {
+			return errno.err, errno.efault
+		}
+		sent++
+	}
+	return u64(sent), 0
+}
+
+// recvmmsg(2): recvmsg(2) into each message in turn. MSG_WAITFORONE waits
+// only for the first; the timeout is not kept, so without it the call waits
+// for every message as a blocking socket would.
+fn syscall_linux_recvmmsg(gpr_state voidptr, fdnum int, vec u64, vlen u32, flags int, _timeout u64) (u64, u64) {
+	count := if vlen > linux_uio_maxiov { u32(linux_uio_maxiov) } else { vlen }
+	mut received := u32(0)
+	for received < count {
+		address := vec + u64(received) * sizeof(LinuxMMsgHdr)
+		mut message := LinuxMMsgHdr{}
+		if !usercopy.copy_from_user(voidptr(&message), address, sizeof(LinuxMMsgHdr)) {
+			if received == 0 {
+				return errno.err, errno.efault
+			}
+			break
+		}
+		mut these_flags := flags & ~linux_msg_waitforone
+		if received > 0 && flags & linux_msg_waitforone != 0 {
+			these_flags |= linux_msg_dontwait
+		}
+		ret, err := socket.syscall_recvmsg(gpr_state, fdnum, unsafe { &message.hdr }, these_flags)
+		if err != 0 {
+			if received == 0 {
+				return errno.err, err
+			}
+			break
+		}
+		message.len = u32(ret)
+		if !usercopy.copy_to_user(address, voidptr(&message), sizeof(LinuxMMsgHdr)) {
+			return errno.err, errno.efault
+		}
+		received++
+	}
+	return u64(received), 0
+}
 
 // accept(2) is accept4(2) without flags. It reported no peer at all, so a
 // caller's address buffer kept whatever it held: postgres, through musl's

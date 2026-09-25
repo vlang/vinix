@@ -1149,6 +1149,7 @@ pub fn init_syscall_table() {
 	syscall_table[86] = voidptr(file.syscall_timerfd_settime) // __NR_timerfd_settime
 	syscall_table[87] = voidptr(file.syscall_timerfd_gettime) // __NR_timerfd_gettime
 	syscall_table[267] = voidptr(fs.syscall_syncfs) // __NR_syncfs
+	syscall_table[269] = voidptr(syscall_linux_sendmmsg) // __NR_sendmmsg
 	syscall_table[279] = voidptr(fs.syscall_memfd_create) // __NR_memfd_create
 	syscall_table[280] = voidptr(syscall_linux_bpf) // __NR_bpf
 	syscall_table[281] = voidptr(userland.syscall_execveat) // __NR_execveat
@@ -1278,6 +1279,7 @@ pub fn init_syscall_table() {
 	syscall_table[211] = voidptr(syscall_linux_sendmsg) // __NR_sendmsg
 	syscall_table[212] = voidptr(socket.syscall_recvmsg) // __NR_recvmsg
 	syscall_table[242] = voidptr(syscall_linux_accept4) // __NR_accept4
+	syscall_table[243] = voidptr(syscall_linux_recvmmsg) // __NR_recvmmsg
 
 	// Memory
 	syscall_table[194] = voidptr(sysvshm.syscall_shmget) // __NR_shmget

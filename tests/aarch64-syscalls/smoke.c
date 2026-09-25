@@ -25,6 +25,8 @@
 #include <sys/syscall.h>
 #include <sys/uio.h>
 #include <sys/un.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 #include <sys/utsname.h>
 #include <sys/wait.h>
 #include <sys/xattr.h>
@@ -574,6 +576,51 @@ static int process_maps(void) {
     return valid;
 }
 
+// Two datagrams sent with one sendmmsg(2) and taken with one recvmmsg(2),
+// as glibc's resolver can send its A and AAAA queries.
+static int multiple_messages(void) {
+    int pair[2] = {socket(AF_INET, SOCK_DGRAM, 0), socket(AF_INET, SOCK_DGRAM, 0)};
+    struct sockaddr_in address = {.sin_family = AF_INET, .sin_addr.s_addr = htonl(INADDR_LOOPBACK)};
+    socklen_t length = sizeof(address);
+    if (pair[0] < 0 || pair[1] < 0 ||
+        bind(pair[1], (struct sockaddr *)&address, sizeof(address)) != 0 ||
+        getsockname(pair[1], (struct sockaddr *)&address, &length) != 0 ||
+        connect(pair[0], (struct sockaddr *)&address, sizeof(address)) != 0) {
+        printf("mmsg: udp setup errno=%d\n", errno);
+        return 0;
+    }
+    char first[] = "first", second[] = "second-one";
+    struct iovec out[2] = {{first, sizeof(first)}, {second, sizeof(second)}};
+    struct mmsghdr sent[2];
+    memset(sent, 0, sizeof(sent));
+    sent[0].msg_hdr.msg_iov = &out[0];
+    sent[0].msg_hdr.msg_iovlen = 1;
+    sent[1].msg_hdr.msg_iov = &out[1];
+    sent[1].msg_hdr.msg_iovlen = 1;
+    int valid = sendmmsg(pair[0], sent, 2, 0) == 2 && sent[0].msg_len == sizeof(first) &&
+                sent[1].msg_len == sizeof(second);
+    char in_first[32] = {0}, in_second[32] = {0};
+    struct iovec in[2] = {{in_first, sizeof(in_first)}, {in_second, sizeof(in_second)}};
+    struct mmsghdr got[3];
+    memset(got, 0, sizeof(got));
+    got[0].msg_hdr.msg_iov = &in[0];
+    got[0].msg_hdr.msg_iovlen = 1;
+    got[1].msg_hdr.msg_iov = &in[1];
+    got[1].msg_hdr.msg_iovlen = 1;
+    got[2].msg_hdr.msg_iov = &in[1];
+    got[2].msg_hdr.msg_iovlen = 1;
+    int received = valid ? recvmmsg(pair[1], got, 3, MSG_WAITFORONE, NULL) : -1;
+    valid = valid && received == 2 && got[0].msg_len == sizeof(first) &&
+            got[1].msg_len == sizeof(second) && !strcmp(in_first, first) &&
+            !strcmp(in_second, second);
+    if (!valid)
+        printf("mmsg: received=%d errno=%d lens=%u,%u\n", received, errno, got[0].msg_len,
+               got[1].msg_len);
+    close(pair[0]);
+    close(pair[1]);
+    return valid;
+}
+
 static int handler_without_restorer(void) {
     struct {
         void (*handler)(int);
@@ -899,6 +946,7 @@ int main(void) {
     check(handler_without_restorer(), "signal handler without SA_RESTORER");
     check(ids_with_kept_capabilities(), "group ids set with CAP_SETGID after setuid");
     check(process_maps(), "/proc/self/maps and smaps");
+    check(multiple_messages(), "sendmmsg and recvmmsg");
     int no_family[2];
     check(failed_with_errno(socket(AF_INET6, SOCK_STREAM, 0), EAFNOSUPPORT, "IPv6 socket") &&
               failed_with_errno(socketpair(AF_INET, SOCK_STREAM, 0, no_family), EOPNOTSUPP,
