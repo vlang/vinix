@@ -2068,6 +2068,11 @@ pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) ?&proc.Pr
 		new_proc.pagemap = mmap.fork_pagemap(old_process.pagemap) or { return none }
 		new_proc.thread_stack_top = old_process.thread_stack_top
 		new_proc.stack_end = old_process.stack_end
+		// The child has the parent's heap, so it has its break too. Starting
+		// from none, its first brk() tried to reserve the arena the copy of the
+		// address space already held there, failed, and reported a break of 0.
+		new_proc.brk_base = old_process.brk_base
+		new_proc.brk_current = old_process.brk_current
 		new_proc.mmap_anon_non_fixed_base = old_process.mmap_anon_non_fixed_base
 		new_proc.current_directory = proc.current_directory_of(old_process)
 		proc.inherit_container_state(mut new_proc, old_process)

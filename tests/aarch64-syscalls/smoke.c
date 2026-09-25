@@ -889,6 +889,37 @@ static int huge_reservation(void) {
     return valid && seconds <= 2.0;
 }
 
+// brk(2) moves the break, and a forked child has its parent's break and can
+// move it further.
+static int brk_child(unsigned long parent_break) {
+    unsigned long now = (unsigned long)syscall(SYS_brk, 0);
+    if (now != parent_break) {
+        printf("child break 0x%lx, parent's 0x%lx\n", now, parent_break);
+        fflush(stdout);
+        return 1;
+    }
+    unsigned long grown = (unsigned long)syscall(SYS_brk, now + 8192);
+    if (grown != now + 8192)
+        return 2;
+    ((volatile char *)now)[8191] = 1;
+    return 0;
+}
+
+static int program_break(void) {
+    unsigned long start = (unsigned long)syscall(SYS_brk, 0);
+    unsigned long moved = (unsigned long)syscall(SYS_brk, start + 4096);
+    if (start == 0 || moved != start + 4096) {
+        printf("brk: start=0x%lx moved=0x%lx\n", start, moved);
+        return 0;
+    }
+    ((volatile char *)start)[4095] = 1;
+    fflush(stdout);
+    pid_t child = fork();
+    if (child == 0)
+        _exit(brk_child(moved));
+    return security_child_succeeded(child);
+}
+
 static int handler_without_restorer(void) {
     struct {
         void (*handler)(int);
@@ -1222,6 +1253,7 @@ int main(int argc, char **argv, char **envp) {
     check(blocked_ignored_signals(), "blocked signals kept whatever their disposition");
     check(many_descriptors(), "descriptors past 1024");
     check(huge_reservation(), "a 1 TiB reservation costs what it holds");
+    check(program_break(), "brk moves the break, and fork keeps it");
     int no_family[2];
     check(failed_with_errno(socket(AF_INET6, SOCK_STREAM, 0), EAFNOSUPPORT, "IPv6 socket") &&
               failed_with_errno(socketpair(AF_INET, SOCK_STREAM, 0, no_family), EOPNOTSUPP,

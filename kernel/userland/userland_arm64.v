@@ -1180,6 +1180,10 @@ pub fn start_program_node(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, p
 
 		curr_process.thread_stack_top = elf.initial_stack_top()
 		curr_process.mmap_anon_non_fixed_base = elf.initial_mmap_base()
+		// The new program has no break yet; its first brk() reserves the arena
+		// in the address space it now has.
+		curr_process.brk_base = 0
+		curr_process.brk_current = 0
 
 		curr_process.threads_lock.acquire()
 		curr_process.threads = []&proc.Thread{}

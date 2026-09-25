@@ -28,7 +28,13 @@ const mincore_chunk = 512
 
 const brk_arena_base = u64(0x60000000000)
 
-const brk_arena_size = u64(0x10000000000)
+// 960 GiB, which ends the arena 64 GiB short of the stack region. A whole TiB
+// reached 0x70000000000 itself, with the stack of every program's first
+// thread already mapped at its top: reserving the arena failed for every
+// process, brk() reported a break of 0, and allocators went to mmap instead.
+// Walking the reservation costs only what is mapped in it (see
+// Pagemap.next_present), so fork and exit do not pay for its size.
+const brk_arena_size = u64(0xf000000000)
 
 // ── mremap ───────────────────────────────────────────────────────────────────
 
