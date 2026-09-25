@@ -493,7 +493,13 @@ pub fn pmm_refcount_unlocked(ptr voidptr) u32 {
 	if page >= pmm_avl_page_count {
 		return 0
 	}
-	return katomic.load(unsafe { &(&u32(pmm_refcounts))[page] })
+	// The count's address is worked out by hand. Taking the address of the
+	// indexed element had the compiler copy the element into a temporary and
+	// load from where that temporary had been, once it was gone: the counts
+	// read were whatever the stack held there, 0x80000000 or 0xffff0000 for a
+	// page two processes shared after fork.
+	count := unsafe { &u32(u64(pmm_refcounts) + page * sizeof(u32)) }
+	return katomic.load(count)
 }
 
 pub fn pmm_refcount(ptr voidptr) u32 {
