@@ -730,6 +730,28 @@ static int unix_datagrams(void) {
     return valid;
 }
 
+// The argument and environment strings lie as Linux lays them out: from
+// argv[0] up, each right after the one before, the environment after the
+// arguments. libuv sizes node's process title from this.
+static int initial_strings(int argc, char **argv, char **envp) {
+    char *expected = argv[0];
+    for (int i = 0; i < argc; i++) {
+        if (argv[i] != expected) {
+            printf("argv[%d] at %p, expected %p\n", i, (void *)argv[i], (void *)expected);
+            return 0;
+        }
+        expected += strlen(argv[i]) + 1;
+    }
+    for (int i = 0; envp[i]; i++) {
+        if (envp[i] != expected) {
+            printf("envp[%d] at %p, expected %p\n", i, (void *)envp[i], (void *)expected);
+            return 0;
+        }
+        expected += strlen(envp[i]) + 1;
+    }
+    return 1;
+}
+
 static int handler_without_restorer(void) {
     struct {
         void (*handler)(int);
@@ -754,7 +776,7 @@ static void *eventfd_writer(void *argument) {
     return NULL;
 }
 
-int main(void) {
+int main(int argc, char **argv, char **envp) {
     const char *path = "/tmp/aarch64-syscall-smoke";
     const char *copy_path = "/tmp/aarch64-syscall-copy";
     mkdir("/tmp", 0777);
@@ -1059,6 +1081,7 @@ int main(void) {
     check(descriptor_arguments(), "futimens and a zero-extended AT_FDCWD");
     check(mremap_sparse(), "mremap with pages not filled in");
     check(unix_datagrams(), "unix datagram sockets");
+    check(initial_strings(argc, argv, envp), "argument and environment strings in order");
     int no_family[2];
     check(failed_with_errno(socket(AF_INET6, SOCK_STREAM, 0), EAFNOSUPPORT, "IPv6 socket") &&
               failed_with_errno(socketpair(AF_INET, SOCK_STREAM, 0, no_family), EOPNOTSUPP,

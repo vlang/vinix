@@ -1814,21 +1814,38 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 			uart.put_hex(auxval.at_entry)
 			uart.putc(`\n`)
 		}
+		// The strings go in as Linux lays them out: argv[0] lowest, each one
+		// after the last, the environment above the arguments. Programs count
+		// on it. libuv, in every node process, takes the room for a process
+		// title to run from argv[0] to the end of the last argument; pushed in
+		// the other order that came out negative, a huge size unsigned, and
+		// setting process.title cleared memory up past the top of the stack.
 		mut cursor := stack_vma
-		mut string_pointer := stack_vma
-		for elem in envp {
+		mut env_strings := []u64{len: envp.len}
+		mut arg_strings := []u64{len: argv.len}
+		for i := envp.len - 1; i >= 0; i-- {
 			if !push_initial_bytes(process.pagemap, stack_bottom_vma, mut cursor,
-				voidptr(elem.str), u64(elem.len) + 1) {
+				voidptr(envp[i].str), u64(envp[i].len) + 1) {
+				unsafe {
+					env_strings.free()
+					arg_strings.free()
+				}
 				errno.set(errno.e2big)
 				return none
 			}
+			env_strings[i] = cursor
 		}
-		for elem in argv {
+		for i := argv.len - 1; i >= 0; i-- {
 			if !push_initial_bytes(process.pagemap, stack_bottom_vma, mut cursor,
-				voidptr(elem.str), u64(elem.len) + 1) {
+				voidptr(argv[i].str), u64(argv[i].len) + 1) {
+				unsafe {
+					env_strings.free()
+					arg_strings.free()
+				}
 				errno.set(errno.e2big)
 				return none
 			}
+			arg_strings[i] = cursor
 		}
 		cursor &= ~u64(0xf)
 		if (argv.len + envp.len + 1) & 1 != 0 {
@@ -1871,9 +1888,8 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 			return none
 		}
 		cursor -= u64(envp.len) * sizeof(u64)
-		for i, elem in envp {
-			string_pointer -= u64(elem.len) + 1
-			pointer := string_pointer
+		for i in 0 .. envp.len {
+			pointer := env_strings[i]
 			if !write_initial_stack(process.pagemap, cursor + u64(i) * sizeof(u64),
 				voidptr(&pointer), sizeof(u64)) {
 				return none
@@ -1888,13 +1904,16 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 			return none
 		}
 		cursor -= u64(argv.len) * sizeof(u64)
-		for i, elem in argv {
-			string_pointer -= u64(elem.len) + 1
-			pointer := string_pointer
+		for i in 0 .. argv.len {
+			pointer := arg_strings[i]
 			if !write_initial_stack(process.pagemap, cursor + u64(i) * sizeof(u64),
 				voidptr(&pointer), sizeof(u64)) {
 				return none
 			}
+		}
+		unsafe {
+			env_strings.free()
+			arg_strings.free()
 		}
 		if !push_initial_word(process.pagemap, stack_bottom_vma, mut cursor, u64(argv.len)) {
 			errno.set(errno.e2big)
