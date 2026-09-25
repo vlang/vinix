@@ -621,6 +621,30 @@ static int multiple_messages(void) {
     return valid;
 }
 
+// mremap(2) moving an anonymous mapping into one that is filled in only as
+// it is touched, and out of one with pages it never had, as apt grows its
+// package cache. Mappings this large are not filled in up front.
+static int mremap_sparse(void) {
+    size_t small = 4096, large = 64 << 20;
+    char *page = mmap(NULL, small, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (page == MAP_FAILED)
+        return 0;
+    page[0] = 42;
+    char *grown = mremap(page, small, large, MREMAP_MAYMOVE);
+    int valid = grown != MAP_FAILED && grown[0] == 42 && grown[large - 1] == 0;
+    if (!valid) {
+        printf("mremap into a sparse mapping: errno=%d\n", errno);
+        return 0;
+    }
+    grown[large / 2] = 7;
+    char *again = mremap(grown, large, large + small, MREMAP_MAYMOVE);
+    valid = again != MAP_FAILED && again[0] == 42 && again[large / 2] == 7 && again[4096] == 0;
+    if (!valid)
+        printf("mremap out of a sparse mapping: errno=%d\n", errno);
+    munmap(again != MAP_FAILED ? again : grown, again != MAP_FAILED ? large + small : large);
+    return valid;
+}
+
 static int handler_without_restorer(void) {
     struct {
         void (*handler)(int);
@@ -947,6 +971,7 @@ int main(void) {
     check(ids_with_kept_capabilities(), "group ids set with CAP_SETGID after setuid");
     check(process_maps(), "/proc/self/maps and smaps");
     check(multiple_messages(), "sendmmsg and recvmmsg");
+    check(mremap_sparse(), "mremap with pages not filled in");
     int no_family[2];
     check(failed_with_errno(socket(AF_INET6, SOCK_STREAM, 0), EAFNOSUPPORT, "IPv6 socket") &&
               failed_with_errno(socketpair(AF_INET, SOCK_STREAM, 0, no_family), EOPNOTSUPP,

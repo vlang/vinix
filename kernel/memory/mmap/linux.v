@@ -140,7 +140,7 @@ pub fn syscall_mremap(_ voidptr, old_address u64, old_size u64, new_size u64, fl
 	// themselves.
 	if anonymous {
 		carried := if old_length < new_length { old_length } else { new_length }
-		if !copy_between_mappings(pagemap, u64(destination), old_address, carried) {
+		if !copy_between_mappings(mut pagemap, u64(destination), old_address, carried, prot) {
 			munmap(mut pagemap, destination, new_length) or {}
 			return errno.err, errno.efault
 		}
@@ -152,11 +152,22 @@ pub fn syscall_mremap(_ voidptr, old_address u64, old_size u64, new_size u64, fl
 }
 
 // Move page contents through the direct map, so neither address has to be
-// touched with the user's own mapping active.
-fn copy_between_mappings(pagemap &memory.Pagemap, destination u64, source u64, length u64) bool {
+// touched with the user's own mapping active. A page the old mapping never
+// had is zero, as the new one's is. A page the new mapping does not have yet
+// is made first: a mapping in a cgroup, or a large one, is filled in only as
+// it is touched, and every such page failed the move. apt grows its package
+// cache this way, and "Dynamic MMap ran out of room" in every Ubuntu
+// container.
+fn copy_between_mappings(mut pagemap memory.Pagemap, destination u64, source u64, length u64, prot int) bool {
 	for offset := u64(0); offset < length; offset += page_size {
-		source_phys := pagemap.virt2phys(source + offset) or { return false }
-		destination_phys := pagemap.virt2phys(destination + offset) or { return false }
+		source_phys := pagemap.virt2phys(source + offset) or { continue }
+		mut destination_phys := pagemap.virt2phys(destination + offset) or { u64(0) }
+		if destination_phys == 0 {
+			populate_missing_pages(mut pagemap, destination + offset, page_size, prot) or {
+				return false
+			}
+			destination_phys = pagemap.virt2phys(destination + offset) or { return false }
+		}
 		unsafe {
 			C.memcpy(voidptr(destination_phys + higher_half), voidptr(source_phys + higher_half), page_size)
 		}
