@@ -67,6 +67,14 @@ pub fn initial_mmap_base() u64 {
 }
 
 pub const abi_sysv = 0x00
+// ELFOSABI_GNU, which is also ELFOSABI_LINUX. glibc marks a static program
+// that uses GNU indirect functions with it -- Ubuntu's ldconfig.real -- and
+// Linux runs it as it runs any other.
+pub const abi_gnu = 0x03
+
+fn supported_osabi(osabi u8) bool {
+	return osabi == abi_sysv || osabi == abi_gnu
+}
 pub const arch_x86_64 = 0x3e
 pub const arch_aarch64 = 0xb7
 pub const bits_le = 0x01
@@ -184,7 +192,7 @@ pub fn architecture(_res &resource.Resource) !u16 {
 		return error('elf: Invalid magic')
 	}
 	if header.ident[ei_class] != 0x02 || header.ident[ei_data] != bits_le
-		|| header.ident[ei_osabi] != abi_sysv {
+		|| !supported_osabi(header.ident[ei_osabi]) {
 		return error('elf: Unsupported ELF file')
 	}
 
@@ -224,7 +232,7 @@ fn load_impl(_pagemap &memory.Pagemap, _res &resource.Resource, _base u64, trace
 	}
 
 	if header.ident[ei_class] != 0x02 || header.ident[ei_data] != bits_le
-		|| header.ident[ei_osabi] != abi_sysv
+		|| !supported_osabi(header.ident[ei_osabi])
 		|| (header.machine != arch_x86_64 && header.machine != arch_aarch64)
 		|| (header.@type != et_exec && header.@type != et_dyn)
 		|| header.phdr_size != sizeof(ProgramHdr) {

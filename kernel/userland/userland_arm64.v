@@ -899,6 +899,18 @@ pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, 
 		stdout_path, stderr_path)
 }
 
+// An image the loader turned down is not an executable, as Linux answers:
+// ENOEXEC. The loader's errors carry no errno, and exec reported whatever
+// an earlier call had left -- ENOENT once, EPERM after -- for a program it
+// could not read. Only a segment that could not be mapped keeps the errno
+// the mapping set.
+fn exec_format_error(err IError) ?&proc.Process {
+	if !err.msg().starts_with('elf: unable to map') {
+		errno.set(errno.enoexec)
+	}
+	return none
+}
+
 // The part of exec that follows finding the program. execveat(2) on a
 // descriptor comes here directly: a memfd has no name to be found by.
 pub fn start_program_node(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, path string, argv []string, envp []string, stdin_path string, stdout_path string, stderr_path string) ?&proc.Process {
@@ -939,7 +951,7 @@ pub fn start_program_node(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, p
 	// QEMU user-mode translator and its private x86-64 musl root. Doing this in
 	// the kernel exec path also catches helper programs that Wine starts itself,
 	// rather than only binaries launched through the shell wrapper.
-	architecture := elf.architecture(prog) or { return none }
+	architecture := elf.architecture(prog) or { return exec_format_error(err) }
 	gpu_exec_trace(trace_gpu, 'validated ELF architecture')
 	if architecture == elf.arch_x86_64 {
 		translator := '/usr/bin/qemu-x86_64'
@@ -973,9 +985,11 @@ pub fn start_program_node(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, p
 	mut auxval := elf.Auxval{}
 	mut ld_path := ''
 	if trace_gpu {
-		auxval, ld_path = elf.load_traced(new_pagemap, prog, 0, 'program') or { return none }
+		auxval, ld_path = elf.load_traced(new_pagemap, prog, 0, 'program') or {
+			return exec_format_error(err)
+		}
 	} else {
-		auxval, ld_path = elf.load(new_pagemap, prog, 0) or { return none }
+		auxval, ld_path = elf.load(new_pagemap, prog, 0) or { return exec_format_error(err) }
 	}
 	gpu_exec_trace(trace_gpu, 'program ELF segments loaded')
 	allow_wx := envp.contains('VINIX_ALLOW_WX=1')
@@ -1003,10 +1017,12 @@ pub fn start_program_node(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, p
 		if trace_gpu {
 			ld_auxval, interp = elf.load_traced(new_pagemap, ld, interpreter_base,
 				'interpreter') or {
-				return none
+				return exec_format_error(err)
 			}
 		} else {
-			ld_auxval, interp = elf.load(new_pagemap, ld, interpreter_base) or { return none }
+			ld_auxval, interp = elf.load(new_pagemap, ld, interpreter_base) or {
+				return exec_format_error(err)
+			}
 		}
 		gpu_exec_trace(trace_gpu, 'ELF interpreter segments loaded')
 
