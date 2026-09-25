@@ -417,11 +417,20 @@ fn syscall_linux_uname(_ voidptr, buf u64) (u64, u64) {
 	// uname(2) which system they are on get the same answer. Erlang takes its
 	// os:type() from it, and RabbitMQ's disk monitor refused to start on
 	// {unix,vinix}. Outside a container the kernel is Vinix.
-	sysname := if net.in_own_uts_namespace() { c'Linux' } else { c'Vinix' }
+	//
+	// Its release is a Linux one too. glibc before 2.36 refuses to start on a
+	// kernel older than the one it was built for -- 3.7 on arm64 -- and every
+	// program in MongoDB 7's and Elasticsearch 8's images, built on Ubuntu
+	// 22.04 and 20.04, died with "FATAL: kernel too old" on 0.1.0. 5.15 is a
+	// long-term release programs are made to run on; what a newer kernel adds
+	// they look for when they want it, and ENOSYS tells them.
+	in_container := net.in_own_uts_namespace()
+	sysname := if in_container { c'Linux' } else { c'Vinix' }
+	release := if in_container { c'5.15.0-vinix' } else { c'0.1.0' }
 	unsafe {
 		C.strcpy(charptr(&uts[0]), sysname)
 		C.strcpy(charptr(&uts[65]), c'vinix')
-		C.strcpy(charptr(&uts[130]), c'0.1.0')
+		C.strcpy(charptr(&uts[130]), release)
 		C.strcpy(charptr(&uts[195]), c'Vinix 0.1.0 aarch64')
 		C.strcpy(charptr(&uts[260]), c'aarch64')
 	}
