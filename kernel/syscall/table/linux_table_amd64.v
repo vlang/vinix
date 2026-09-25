@@ -233,6 +233,20 @@ fn syscall_linux_rt_sigprocmask(gpr_state voidptr, how int, set_ptr u64, oldset_
 	if sigsetsize != 8 {
 		return errno.err, errno.einval
 	}
+	// Linux spells SIG_BLOCK, SIG_UNBLOCK and SIG_SETMASK 0, 1 and 2; the
+	// native handler takes mlibc's 1, 2 and 3. Passed through unchanged, a
+	// Linux SIG_BLOCK did nothing, SIG_UNBLOCK blocked and SIG_SETMASK
+	// unblocked: pthread_sigmask() and sigprocmask() never blocked anything,
+	// and a signal a program meant to take with sigwait() killed it instead.
+	native_how := match how {
+		0 { userland.sig_block }
+		1 { userland.sig_unblock }
+		2 { userland.sig_setmask }
+		else { -1 }
+	}
+	if set_ptr != 0 && native_how < 0 {
+		return errno.err, errno.einval
+	}
 	// Linux numbers signal n as bit n-1; the kernel's masks use bit n.
 	mut set := u64(0)
 	mut oldset := u64(0)
@@ -241,10 +255,11 @@ fn syscall_linux_rt_sigprocmask(gpr_state voidptr, how int, set_ptr u64, oldset_
 		if !usercopy.copy_from_user(voidptr(&set), set_ptr, 8) {
 			return errno.err, errno.efault
 		}
-		set = userland.linux_mask_to_vinix(set)
+		// SIGKILL and SIGSTOP cannot be blocked; Linux drops them silently.
+		set = userland.linux_mask_to_vinix(set) & ~((u64(1) << 9) | (u64(1) << 19))
 		set_arg = &set
 	}
-	ret, err := userland.syscall_sigprocmask(gpr_state, how, set_arg, &oldset)
+	ret, err := userland.syscall_sigprocmask(gpr_state, native_how, set_arg, &oldset)
 	if err != 0 {
 		return ret, err
 	}
