@@ -749,7 +749,7 @@ pub fn syscall_fork(gpr_state &cpulocal.GPRState) (u64, u64) {
 		masked_signals: old_thread.masked_signals
 		affinity_mask:  old_thread.affinity_mask
 		stacks:         stacks
-		fpu_storage:    unsafe { malloc(fpu_storage_size) }
+		fpu_storage:    voidptr(u64(memory.pmm_alloc(lib.div_roundup(fpu_storage_size, page_size))) + higher_half)
 	}
 
 	unsafe { stacks.free() }

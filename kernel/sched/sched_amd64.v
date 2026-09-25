@@ -216,6 +216,8 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 		cpu.set_kernel_gs_base(u64(&cpu_local.cpu_number))
 		katomic.store(mut &cpu_local.is_idle, true)
 		kernel_pagemap.switch_to()
+		cpu_local.tss.ist3 = cpu_local.idle_pf_stack
+		reap_dead_threads(mut cpu_local)
 		await()
 	}
 
@@ -238,6 +240,7 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 	cpu.set_fs_base(current_thread.fs_base)
 
 	cpu_local.tss.ist3 = current_thread.pf_stack
+	reap_dead_threads(mut cpu_local)
 
 	if cpu.read_cr3() != current_thread.cr3 {
 		cpu.write_cr3(current_thread.cr3)
@@ -418,8 +421,10 @@ pub fn dequeue_and_die() {
 	// This thread leaves the CPU here rather than through the switch in
 	// scheduler_isr, so its last turn is charged here or not at all.
 	proc.charge_cpu_time(mut t, time.monotonic_ns())
-	unsafe {
-	}
+	// Its stacks are still in use until the switch; the scheduler gives them
+	// back once it is past it.
+	mut cpu_local := cpulocal.current()
+	cpu_local.dying_thread = voidptr(t)
 	yield(false)
 	for {
 	}
@@ -818,4 +823,42 @@ pub fn await() {
 		jmp b1
 		; ; ; memory
 	}
+}
+
+// ── giving back the stacks of dead threads ──────────────────────────────────
+
+// Every thread has a 2 MiB kernel stack, a 2 MiB page fault stack and its FPU
+// area. They used to be kept forever, so every process a program started cost
+// 4 MiB for the rest of the machine's life.
+
+// The stacks are found from their tops, which the thread keeps; its `stacks`
+// array cannot be used for this, as the functions that make threads free it
+// once they have copied it in.
+fn free_thread_stacks(mut t proc.Thread) {
+	if t.kernel_stack != 0 {
+		memory.pmm_free(voidptr(t.kernel_stack - stack_size - higher_half), stack_size / page_size)
+		t.kernel_stack = 0
+	}
+	if t.pf_stack != 0 {
+		memory.pmm_free(voidptr(t.pf_stack - stack_size - higher_half), stack_size / page_size)
+		t.pf_stack = 0
+	}
+	if t.fpu_storage != unsafe { nil } {
+		memory.pmm_free(voidptr(u64(t.fpu_storage) - higher_half), lib.div_roundup(fpu_storage_size,
+			page_size))
+		t.fpu_storage = unsafe { nil }
+	}
+}
+
+// Called by scheduler_isr once this CPU is on its own stacks and its IST3
+// points at the thread it is about to run, or at its idle stack: the thread
+// that died on this CPU is off its stacks by then. The Thread itself stays,
+// as events and the tid table may still point at it.
+fn reap_dead_threads(mut cpu_local cpulocal.Local) {
+	if cpu_local.dying_thread == unsafe { nil } {
+		return
+	}
+	mut dead := unsafe { &proc.Thread(cpu_local.dying_thread) }
+	cpu_local.dying_thread = unsafe { nil }
+	free_thread_stacks(mut dead)
 }

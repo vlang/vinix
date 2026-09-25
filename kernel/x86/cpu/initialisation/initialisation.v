@@ -55,6 +55,12 @@ pub fn initialise(smp_info &limine.LimineSMPInfo) {
 		sched_stack_phys := memory.pmm_alloc(stack_size / page_size)
 		mut sched_stack := &u64(u64(sched_stack_phys) + stack_size + higher_half)
 		cpu_local.tss.ist1 = u64(sched_stack)
+
+		// Every thread brings its own page fault stack; this one is for the
+		// CPU between threads.
+		idle_pf_stack_phys := memory.pmm_alloc(stack_size / page_size)
+		cpu_local.idle_pf_stack = u64(idle_pf_stack_phys) + stack_size + higher_half
+		cpu_local.tss.ist3 = cpu_local.idle_pf_stack
 	}
 	// Enable syscall
 	mut efer := msr.rdmsr(0xc0000080)
