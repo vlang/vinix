@@ -114,6 +114,8 @@ pub mut:
 	// sigaltstack(2): where SA_ONSTACK handlers run.
 	sigaltstack_sp   u64
 	sigaltstack_size u64
+	// What the syscall a seccomp filter turned away returns: an errno, or 0.
+	seccomp_errno u64
 	// Set by sched.resume_saved_context(): the thread resumes from the context
 	// already in gpr_state, not from where the scheduler interrupted it.
 	context_preset bool
@@ -207,6 +209,9 @@ pub fn sigset_to_user(mask u64) u64 {
 	}
 	return mask
 }
+
+// What a seccomp program sees as seccomp_data.arch.
+pub const seccomp_audit_arch = audit_arch_x86_64
 
 // The bit of a pending or masked set signal `signum` takes: signal n in bit n,
 // which leaves no room for signal 64.

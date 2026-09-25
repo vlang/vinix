@@ -32,6 +32,7 @@ pub const seccomp_ret_action_full = u32(0xffff0000)
 pub const seccomp_ret_data = u32(0x0000ffff)
 
 pub const audit_arch_aarch64 = u32(0xc00000b7)
+pub const audit_arch_x86_64 = u32(0xc000003e)
 
 pub const bpf_max_instructions = 4096
 // Linux's bound on every program a call runs through, each counted with four
@@ -199,7 +200,7 @@ fn seccomp_run(instructions []SockFilter, data &[16]u32) u32 {
 pub fn seccomp_verdict(filter &SeccompFilter, nr u64, ip u64, args [6]u64) u32 {
 	mut data := [16]u32{}
 	data[0] = u32(nr)
-	data[1] = audit_arch_aarch64
+	data[1] = seccomp_audit_arch
 	data[2] = u32(ip)
 	data[3] = u32(ip >> 32)
 	for i in 0 .. 6 {

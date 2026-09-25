@@ -614,4 +614,6 @@ pub fn init_linux_syscall_table() {
 	linux_syscall_table[272] = voidptr(fs.syscall_unshare) // unshare
 	linux_syscall_table[308] = voidptr(fs.syscall_setns) // setns
 	linux_syscall_table[321] = voidptr(syscall_linux_bpf) // bpf
+	linux_syscall_table[317] = voidptr(syscall_linux_seccomp) // seccomp
+	linux_syscall_table[seccomp_verdict_nr] = voidptr(syscall_seccomp_verdict)
 }

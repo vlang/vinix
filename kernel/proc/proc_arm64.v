@@ -251,6 +251,9 @@ pub fn sigset_to_user(mask u64) u64 {
 	return mask
 }
 
+// What a seccomp program sees as seccomp_data.arch.
+pub const seccomp_audit_arch = audit_arch_aarch64
+
 // The bit of a pending or masked set signal `signum` takes: the Linux layout,
 // signal n in bit n-1. 64 is the last signal there is.
 pub fn pending_bit(signum int) u8 {

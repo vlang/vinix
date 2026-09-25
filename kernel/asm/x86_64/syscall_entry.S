@@ -79,7 +79,11 @@ syscall_entry:
     // C stack.
 1:
     mov $1, %r12
-    mov 16(%rsp), %r13
+    // linux_syscall_slot() answers the table slot to run: the call's number,
+    // or the stand-in for one the process's seccomp filters turned away.
+    mov %rsp, %rdi
+    call linux_syscall_slot
+    mov %rax, %r13
     cmp $512, %r13
     jae 3f
     mov %rsp, %rax
