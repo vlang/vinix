@@ -9,7 +9,7 @@ fi
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT HUP INT TERM
 mkdir -p "$tmp/modules/pagecache" "$tmp/modules/errno" "$tmp/modules/klock"
-cp "$root/kernel/modules/pagecache/pagecache.v" "$tmp/modules/pagecache/"
+cp "$root/kernel/pagecache/pagecache.v" "$tmp/modules/pagecache/"
 cp "$root/tests/pagecache/pagecache_test.v" "$tmp/modules/pagecache/"
 cat > "$tmp/v.mod" <<'MOD'
 Module { name: 'pagecache_host_tests' }
