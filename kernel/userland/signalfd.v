@@ -6,6 +6,12 @@ module userland
 // signalfd(2): signals a program blocks, read from a descriptor instead of
 // taken by a handler, so an event loop waits for them with everything else.
 // systemd's sd-event takes every signal it handles this way.
+//
+// The same on arm64 and amd64. What differs is how each keeps its signal
+// sets -- signal n in bit n-1 on arm64, in bit n on amd64 -- and each
+// architecture's signal code supplies take_pending(), signal_bit(),
+// unblockable_mask() and sigset_size in its own layout; masks are kept in it
+// too, converted from the caller's sigset on the way in.
 
 import errno
 import event
@@ -213,7 +219,7 @@ fn (mut this SignalFD) read(_handle voidptr, buf voidptr, _loc u64, count u64) ?
 		if signum != 0 {
 			if !usercopy.copy_to_user(u64(buf) + done, voidptr(&info[0]), signalfd_siginfo_size) {
 				// Hand the signal back rather than losing it.
-				katomic.bts(mut &current.pending_signals, u8(signum - 1))
+				katomic.bts(mut &current.pending_signals, proc.pending_bit(signum))
 				if done != 0 {
 					break
 				}
@@ -294,7 +300,12 @@ pub fn syscall_signalfd4(_ voidptr, fdnum int, mask_ptr u64, sizemask u64, flags
 	if !usercopy.copy_from_user(voidptr(&mask), mask_ptr, sigset_size) {
 		return errno.err, errno.efault
 	}
-	mask &= ~unblockable_mask()
+	return signalfd_set(fdnum, proc.sigset_from_user(mask) & ~unblockable_mask(), flags)
+}
+
+// Make a signalfd for `mask`, given in this kernel's layout, or give the one
+// `fdnum` is that mask.
+fn signalfd_set(fdnum int, mask u64, flags int) (u64, u64) {
 	pid := proc.current_thread().process.pid
 
 	if fdnum != -1 {

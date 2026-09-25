@@ -303,6 +303,15 @@ pub fn enqueue_thread(_thread &proc.Thread, by_signal bool) bool {
 		scheduler_queue_lock.release()
 	}
 
+	// A thread that has died -- by its own exit, or torn down by a sibling's
+	// exit_group() or execve() -- is still reachable through the events it
+	// was listening on and the timers it had armed. It has no context left to
+	// resume, so it must never be picked again. Checked under the queue lock,
+	// which dequeue_and_die() takes after marking the thread.
+	if t.is_dead {
+		return false
+	}
+
 	if t.is_in_queue == true {
 		return true
 	}
@@ -343,6 +352,52 @@ pub fn dequeue_thread(_thread &proc.Thread) bool {
 	katomic.store(mut &t.is_in_queue, false)
 
 	return removed || !was_enqueued
+}
+
+// Who gives back a dead thread's stacks: the thread itself, from its own CPU
+// once it is off them, or the sibling that stopped it for good.
+const reap_claim_self = 1
+const reap_claim_stopped = 2
+
+// Take a thread of another CPU for good, for exit_group() or execve() in one
+// of its siblings: it is off every CPU when this returns, and never runs
+// again. The caller has marked it dead, so no wakeup can put it back. A thread
+// that is already on its way out through dequeue_and_die() is left to go by
+// itself -- it never lets go of its lock, so waiting for that would be waiting
+// forever -- and its stacks are then its own CPU's to give back. Otherwise
+// they are buried here.
+pub fn stop_thread_for_good(_thread &proc.Thread) {
+	mut t := unsafe { _thread }
+	if voidptr(t) == voidptr(proc.current_thread()) {
+		return
+	}
+	mut kicked_cpu := u64(-1)
+	for {
+		if katomic.load(&t.reap_claim) == u32(reap_claim_self) {
+			return
+		}
+		dequeue_thread(t)
+		on := katomic.load(&t.running_on)
+		if on == u64(-1) {
+			// Off every CPU, unless one is just picking it up: it takes the
+			// lock before it says where the thread runs.
+			if !t.l.is_held() {
+				break
+			}
+		} else if on != kicked_cpu {
+			// Send that CPU to the scheduler, once per CPU it is found on.
+			apic.lapic_send_ipi(u8(cpu_locals[on].lapic_id), scheduler_vector)
+			kicked_cpu = on
+		}
+		asm volatile amd64 {
+			pause
+			; ; ; memory
+		}
+	}
+	set_itimer_real(t, 0, 0)
+	if katomic.cas(mut &t.reap_claim, u32(0), u32(reap_claim_stopped)) {
+		bury_thread(t)
+	}
 }
 
 // Like dequeue_thread(), but it stops it immediately
@@ -417,14 +472,22 @@ pub fn dequeue_and_die() {
 		cli
 	}
 	mut t := proc.current_thread()
+	t.is_dead = true
+	// A sibling's exit_group() may be stopping this thread at the same time.
+	// Whichever of the two claims it gives back its stacks.
+	claimed := katomic.cas(mut &t.reap_claim, u32(0), u32(reap_claim_self))
 	dequeue_thread(t)
+	// ITIMER_REAL keeps a pointer to the thread that armed it.
+	set_itimer_real(t, 0, 0)
 	// This thread leaves the CPU here rather than through the switch in
 	// scheduler_isr, so its last turn is charged here or not at all.
 	proc.charge_cpu_time(mut t, time.monotonic_ns())
 	// Its stacks are still in use until the switch; the scheduler gives them
 	// back once it is past it.
-	mut cpu_local := cpulocal.current()
-	cpu_local.dying_thread = voidptr(t)
+	if claimed {
+		mut cpu_local := cpulocal.current()
+		cpu_local.dying_thread = voidptr(t)
+	}
 	yield(false)
 	for {
 	}
@@ -730,20 +793,99 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 		}
 	}
 
-	if autoenqueue == true {
-		enqueue_thread(t, false)
-	}
-
 	// Published processes (proc.allocate_pid()/new_process()) can be visible
 	// to another CPU -- e.g. syscall_kill's kill(-1, sig) broadcast, which
 	// reads process.threads directly -- before their first thread lands
 	// here, and start_program()'s exec path replaces this same slice under
-	// the identical lock. Hold it across the read-then-append so neither
-	// side can observe or index an array mid-mutation.
+	// the identical lock; attach_thread() holds it across the append. The
+	// thread is numbered before it can run, so gettid() never sees it bare.
+	attach_thread(mut process, mut t) or {
+		errno.set(errno.eagain)
+		return none
+	}
+
+	if autoenqueue == true {
+		enqueue_thread(t, false)
+	}
+
+	return t
+}
+
+// Number a thread and add it to its process. Threads are numbered from the
+// pid space, as on Linux and on arm64: the first thread of a process takes the
+// pid as its tid, every other one an id no process can have while it lives.
+// gettid(), tgkill() and the scheduling calls find a thread by that number.
+fn attach_thread(mut process proc.Process, mut t proc.Thread) ?int {
 	process.threads_lock.acquire()
-	t.tid = process.threads.len
+	defer {
+		process.threads_lock.release()
+	}
+
+	if process.threads.len == 0 && process.pid != 0 {
+		t.tid = process.pid
+		proc.bind_tid(t.tid, t)
+		proc.number_thread(mut t, true)
+	} else {
+		t.tid = proc.allocate_tid(t)?
+		proc.number_thread(mut t, false)
+	}
+
 	process.threads << t
-	process.threads_lock.release()
+	return t.tid
+}
+
+// A thread for clone(CLONE_THREAD), or the one thread of a process
+// clone()/fork() makes: it resumes where `source` made the syscall, from the
+// registers in `state`, with 0 as the syscall's result and `child_sp` as its
+// stack pointer. `tls`, when `set_tls` asks for it, is its FS base -- where
+// musl keeps the thread pointer. The caller enqueues it.
+pub fn new_cloned_thread(_process &proc.Process, _source &proc.Thread, state &cpulocal.GPRState, child_sp u64, tls u64, set_tls bool) ?&proc.Thread {
+	mut process := unsafe { _process }
+	mut source := unsafe { _source }
+
+	kernel_stack_phys := memory.pmm_alloc(stack_size / page_size)
+	pf_stack_phys := memory.pmm_alloc(stack_size / page_size)
+	fpu_phys := memory.pmm_alloc(lib.div_roundup(fpu_storage_size, page_size))
+	if kernel_stack_phys == unsafe { nil } || pf_stack_phys == unsafe { nil }
+		|| fpu_phys == unsafe { nil } {
+		errno.set(errno.eagain)
+		return none
+	}
+
+	mut t := &proc.Thread{
+		process:        process
+		cr3:            u64(process.pagemap.top_level)
+		gpr_state:      *state
+		timeslice:      source.timeslice
+		running_on:     u64(-1)
+		kernel_stack:   u64(kernel_stack_phys) + stack_size + higher_half
+		pf_stack:       u64(pf_stack_phys) + stack_size + higher_half
+		fpu_storage:    voidptr(u64(fpu_phys) + higher_half)
+		sigentry:       source.sigentry
+		sigactions:     source.sigactions
+		masked_signals: source.masked_signals
+		affinity_mask:  source.affinity_mask
+		sched:          source.sched
+		comm:           source.comm.clone()
+	}
+
+	t.self = voidptr(t)
+	// In a syscall the user's GS base is the one swapgs put aside.
+	t.gs_base = cpu.get_kernel_gs_base()
+	t.fs_base = if set_tls { tls } else { cpu.get_fs_base() }
+
+	// The saved copy is from the last switch; the child has to start with
+	// the FPU state the caller has at this syscall.
+	fpu_save(source.fpu_storage)
+	unsafe { C.memcpy(t.fpu_storage, source.fpu_storage, fpu_storage_size) }
+
+	t.gpr_state.rax = 0
+	t.gpr_state.rsp = child_sp
+
+	attach_thread(mut process, mut t) or {
+		errno.set(errno.eagain)
+		return none
+	}
 
 	return t
 }
@@ -825,11 +967,157 @@ pub fn await() {
 	}
 }
 
+// ── ITIMER_REAL ──────────────────────────────────────────────────────────────
+
+// setitimer(ITIMER_REAL) and alarm(): SIGALRM once the time is up, and again
+// every interval after that. The same bookkeeping as arm64's, counted down
+// from the clock tick instead of from the generic timer's counter.
+const max_itimer_real = 32
+
+struct ItimerRealEntry {
+mut:
+	thrd        &proc.Thread = unsafe { nil }
+	value_us    i64
+	interval_us i64
+	active      bool
+}
+
+__global (
+	itimer_real_entries [max_itimer_real]ItimerRealEntry
+	itimer_real_lock    klock.Lock
+	itimer_last_ns      u64
+	// Set once by whichever set_itimer_real() gets to register the tick hook.
+	// A word, as katomic.cas needs 4 or 8 bytes.
+	itimer_hook_claimed u32
+)
+
+// Called by the clock tick. A tick that finds the table busy leaves the time
+// to the next one, which counts it: the elapsed time is measured, not assumed.
+fn tick_itimers() {
+	if !itimer_real_lock.test_and_acquire() {
+		return
+	}
+	defer {
+		itimer_real_lock.release()
+	}
+
+	now := time.monotonic_ns()
+	if itimer_last_ns == 0 || now <= itimer_last_ns {
+		itimer_last_ns = now
+		return
+	}
+	elapsed_us := i64((now - itimer_last_ns) / 1000)
+	if elapsed_us <= 0 {
+		return
+	}
+	itimer_last_ns += u64(elapsed_us) * 1000
+
+	for i := 0; i < max_itimer_real; i++ {
+		mut e := unsafe { &itimer_real_entries[i] }
+		if !e.active || e.value_us <= 0 {
+			continue
+		}
+		e.value_us -= elapsed_us
+		if e.value_us <= 0 {
+			// SIGALRM.
+			katomic.bts(mut &e.thrd.pending_signals, proc.pending_bit(14))
+			enqueue_thread(e.thrd, true)
+			if e.interval_us > 0 {
+				e.value_us = e.interval_us
+			} else {
+				e.active = false
+			}
+		}
+	}
+}
+
+// set_itimer_real arms or disarms `thrd`'s ITIMER_REAL timer and returns the
+// previous (value_us, interval_us).
+pub fn set_itimer_real(thrd &proc.Thread, value_us i64, interval_us i64) (i64, i64) {
+	arming := value_us > 0 || interval_us > 0
+	if arming && katomic.cas(mut &itimer_hook_claimed, u32(0), u32(1)) {
+		if !time.register_tick_hook(tick_itimers) {
+			katomic.store(mut &itimer_hook_claimed, u32(0))
+		}
+	}
+
+	itimer_real_lock.acquire()
+	defer {
+		itimer_real_lock.release()
+	}
+
+	for i := 0; i < max_itimer_real; i++ {
+		mut e := unsafe { &itimer_real_entries[i] }
+		if e.active && e.thrd == thrd {
+			old_value := e.value_us
+			old_interval := e.interval_us
+			if !arming {
+				e.active = false
+			} else {
+				e.value_us = value_us
+				e.interval_us = interval_us
+			}
+			return old_value, old_interval
+		}
+	}
+
+	if arming {
+		if itimer_last_ns == 0 {
+			itimer_last_ns = time.monotonic_ns()
+		}
+		for i := 0; i < max_itimer_real; i++ {
+			mut e := unsafe { &itimer_real_entries[i] }
+			if !e.active {
+				e.thrd = unsafe { thrd }
+				e.value_us = value_us
+				e.interval_us = interval_us
+				e.active = true
+				break
+			}
+		}
+	}
+
+	return 0, 0
+}
+
+// get_itimer_real returns the current (value_us, interval_us) for a thread.
+pub fn get_itimer_real(thrd &proc.Thread) (i64, i64) {
+	itimer_real_lock.acquire()
+	defer {
+		itimer_real_lock.release()
+	}
+
+	for i := 0; i < max_itimer_real; i++ {
+		e := itimer_real_entries[i]
+		if e.active && e.thrd == thrd {
+			return e.value_us, e.interval_us
+		}
+	}
+
+	return 0, 0
+}
+
 // ── giving back the stacks of dead threads ──────────────────────────────────
 
 // Every thread has a 2 MiB kernel stack, a 2 MiB page fault stack and its FPU
-// area. They used to be kept forever, so every process a program started cost
-// 4 MiB for the rest of the machine's life.
+// area. They used to be kept forever, so every process and thread a program
+// started cost 4 MiB for the rest of the machine's life: a session of shell
+// prompts, compiles and git clones ran a 4 GiB machine out of memory.
+
+__global (
+	// Threads a sibling's exit_group() or execve() stopped. Their stacks go
+	// when that sibling's own do.
+	graveyard      []&proc.Thread
+	graveyard_lock klock.Lock
+)
+
+// Hand over a thread that will never run again: one exit_group() or execve()
+// took off the CPU for good.
+pub fn bury_thread(t &proc.Thread) {
+	graveyard_lock.acquire()
+	graveyard << unsafe { t }
+	graveyard_lock.release()
+}
 
 // The stacks are found from their tops, which the thread keeps; its `stacks`
 // array cannot be used for this, as the functions that make threads free it
@@ -861,4 +1149,21 @@ fn reap_dead_threads(mut cpu_local cpulocal.Local) {
 	mut dead := unsafe { &proc.Thread(cpu_local.dying_thread) }
 	cpu_local.dying_thread = unsafe { nil }
 	free_thread_stacks(mut dead)
+
+	// The threads it stopped on its way out were taken off their CPUs before
+	// it went on to die itself, so by now nothing can be on their stacks.
+	if !graveyard_lock.test_and_acquire() {
+		return
+	}
+	mut i := 0
+	for i < graveyard.len {
+		mut buried := graveyard[i]
+		if katomic.load(&buried.running_on) == u64(-1) && !buried.l.is_held() {
+			free_thread_stacks(mut buried)
+			graveyard.delete(i)
+		} else {
+			i++
+		}
+	}
+	graveyard_lock.release()
 }

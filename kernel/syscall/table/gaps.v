@@ -8,7 +8,6 @@ module table
 // that have nothing to do here but must not fail, and a handful of calls whose
 // by-descriptor or by-name twin already existed.
 
-import aarch64.cpu.local as cpulocal
 import errno
 import file
 import katomic
@@ -484,7 +483,7 @@ fn syscall_linux_rt_sigpending(_ voidptr, set u64, sigsetsize u64) (u64, u64) {
 	}
 
 	current_thread := proc.current_thread()
-	pending := katomic.load(&current_thread.pending_signals) & current_thread.masked_signals
+	pending := proc.sigset_to_user(katomic.load(&current_thread.pending_signals) & current_thread.masked_signals)
 
 	if !usercopy.copy_to_user(set, voidptr(&pending), sizeof(u64)) {
 		return errno.err, errno.efault

@@ -54,9 +54,13 @@ pub mut:
 	pending_signals    u64
 	masked_signals     u64
 	enqueued_by_signal bool
+	// Per-signal origin data for Linux siginfo_t, indexed by signal - 1.
+	// Ordinary signals keep these zero; POSIX timers populate them until
+	// delivery consumes the pending bit.
+	pending_signal_codes    [64]int
+	pending_signal_values   [64]u64
+	pending_signal_overruns [64]int
 	stacks             []voidptr
-	signalfds_lock     klock.Lock
-	signalfds          []voidptr
 	// The name PR_SET_NAME gave the thread; empty for one never named.
 	comm string
 	attached_events    [max_events]&eventstruct.Event
@@ -99,9 +103,23 @@ pub mut:
 	// number, for the report. See proc/pledge.v.
 	pledge_violation u64
 	pledge_syscall   i64
+	// Linux thread bookkeeping, as on arm64: the futex word set_tid_address()
+	// or CLONE_CHILD_CLEARTID names, and the set_robust_list() head, both
+	// handed back when the thread exits.
+	clear_child_tid  u64
+	robust_list_head u64
+	// Torn down by exit_group() or execve() in a sibling; it must never be
+	// enqueued again.
+	is_dead bool
+	// sigaltstack(2): where SA_ONSTACK handlers run.
+	sigaltstack_sp   u64
+	sigaltstack_size u64
 	// Set by sched.resume_saved_context(): the thread resumes from the context
 	// already in gpr_state, not from where the scheduler interrupted it.
 	context_preset bool
+	// Who gives back the stacks of the dead thread; see
+	// sched.stop_thread_for_good(). A word, as katomic.cas needs 4 or 8 bytes.
+	reap_claim u32
 }
 
 pub fn current_thread() &Thread {
@@ -171,3 +189,29 @@ pub fn get_main_thread(process &Process) &Thread {
 	pin_thread(t)
 	return t
 }
+
+// A Linux sigset keeps signal n in bit n-1; this kernel's amd64 masks and
+// pending sets, and the native Vinix ABI's sigsets, keep it in bit n. Shared
+// code that takes a sigset from the calling program, or hands one back,
+// converts through these.
+pub fn sigset_from_user(set u64) u64 {
+	if current_thread().process.linux_abi {
+		return set << 1
+	}
+	return set
+}
+
+pub fn sigset_to_user(mask u64) u64 {
+	if current_thread().process.linux_abi {
+		return mask >> 1
+	}
+	return mask
+}
+
+// The bit of a pending or masked set signal `signum` takes: signal n in bit n,
+// which leaves no room for signal 64.
+pub fn pending_bit(signum int) u8 {
+	return u8(signum)
+}
+
+pub const max_pending_signal = 63

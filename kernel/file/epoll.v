@@ -12,8 +12,9 @@ import event.eventstruct
 import time
 import usercopy
 
-// epoll_event struct — on aarch64, NOT packed (unlike x86)
-// Layout: events (u32) + padding (u32) + data (u64) = 16 bytes
+// epoll_event as the kernel keeps it. Userspace lays it out differently per
+// architecture -- padded to 16 bytes on aarch64, packed into 12 on x86-64 --
+// so it is copied in and out through read_epoll_event()/write_epoll_event().
 struct EpollEvent {
 mut:
 	events u32
@@ -192,9 +193,7 @@ pub fn syscall_epoll_create1(_ voidptr, flags int) (u64, u64) {
 pub fn syscall_epoll_ctl(_ voidptr, epfd int, op int, fd int, event_ptr u64) (u64, u64) {
 	mut requested := EpollEvent{}
 	if op == epoll_ctl_add || op == epoll_ctl_mod {
-		if !usercopy.copy_from_user(voidptr(&requested), event_ptr, sizeof(EpollEvent)) {
-			return errno.err, errno.efault
-		}
+		requested = read_epoll_event(event_ptr) or { return errno.err, errno.efault }
 	}
 
 	// Get the epoll fd
@@ -382,7 +381,7 @@ pub fn syscall_epoll_pwait(_ voidptr, epfd int, events_buf u64, maxevents int, t
 			return errno.err, errno.efault
 		}
 		// SIGKILL and SIGSTOP can never be blocked, not even for the wait.
-		t.masked_signals = incoming_mask & ~((u64(1) << 8) | (u64(1) << 18))
+		t.masked_signals = proc.sigset_from_user(incoming_mask & ~((u64(1) << 8) | (u64(1) << 18)))
 	}
 	defer {
 		t.masked_signals = oldmask
@@ -392,8 +391,7 @@ pub fn syscall_epoll_pwait(_ voidptr, epfd int, events_buf u64, maxevents int, t
 	mut ret := u64(0)
 	if events := epoll_res.collect_ready(maxevents) {
 		for out_event in events {
-			if !usercopy.copy_to_user(events_buf + ret * sizeof(EpollEvent),
-				voidptr(&out_event), sizeof(EpollEvent)) {
+			if !write_epoll_event(events_buf + ret * epoll_event_size, out_event) {
 				unsafe { events.free() }
 				return errno.err, errno.efault
 			}
@@ -464,8 +462,7 @@ pub fn syscall_epoll_pwait(_ voidptr, epfd int, events_buf u64, maxevents int, t
 		if events := epoll_res.collect_ready(maxevents) {
 			ret = 0
 			for out_event in events {
-				if !usercopy.copy_to_user(events_buf + ret * sizeof(EpollEvent),
-					voidptr(&out_event), sizeof(EpollEvent)) {
+				if !write_epoll_event(events_buf + ret * epoll_event_size, out_event) {
 					unsafe { events.free() }
 					return errno.err, errno.efault
 				}

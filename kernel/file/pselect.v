@@ -2,9 +2,9 @@
 // Copyright (c) 2026 Alexander Medvednikov
 module file
 
-// pselect6(2), and through it select(2), which musl implements on top of it.
-// aarch64 has no select or poll syscall of its own: both are built from
-// pselect6 and ppoll.
+// pselect6(2), and through it select(2), which musl implements on top of it on
+// aarch64, where there is no select or poll syscall of its own. x86-64 has
+// select(2) as well; its table builds it from this too.
 
 import errno
 import event
@@ -51,18 +51,9 @@ fn set_bit(mut set [fd_set_words]u64, fd int) {
 // there is one readiness path rather than two. Unlike select(2), the timeout is
 // not written back: pselect6 leaves it alone, and musl's select() copies it.
 pub fn syscall_pselect6(_ voidptr, nfds int, readfds u64, writefds u64, exceptfds u64, timeout u64, sigmask u64) (u64, u64) {
-	mut current_thread := proc.current_thread()
-
 	if nfds < 0 || nfds > fd_set_bits {
 		return errno.err, errno.einval
 	}
-
-	words := u64((nfds + 63) / 64)
-
-	mut want_read := read_fd_set(readfds, words) or { return errno.err, errno.get() }
-	mut want_write := read_fd_set(writefds, words) or { return errno.err, errno.get() }
-	mut want_except := read_fd_set(exceptfds, words) or { return errno.err, errno.get() }
-
 	mut deadline := time.TimeSpec{}
 	mut timed := false
 	if timeout != 0 {
@@ -74,6 +65,45 @@ pub fn syscall_pselect6(_ voidptr, nfds int, readfds u64, writefds u64, exceptfd
 		}
 		timed = true
 	}
+	return do_select(nfds, readfds, writefds, exceptfds, timed, deadline, sigmask)
+}
+
+// select(nfds, readfds, writefds, exceptfds, timeout), the x86-64 call: the
+// same as pselect6 with a struct timeval for the timeout and no signal mask.
+// The time left is not written back; musl hands the kernel a copy anyway.
+pub fn syscall_select(_ voidptr, nfds int, readfds u64, writefds u64, exceptfds u64, timeout u64) (u64, u64) {
+	if nfds < 0 || nfds > fd_set_bits {
+		return errno.err, errno.einval
+	}
+	mut deadline := time.TimeSpec{}
+	mut timed := false
+	if timeout != 0 {
+		// struct timeval: seconds and microseconds.
+		mut tv := [2]i64{}
+		if !usercopy.copy_from_user(voidptr(&tv[0]), timeout, 16) {
+			return errno.err, errno.efault
+		}
+		if tv[0] < 0 || tv[1] < 0 || tv[1] >= 1000000 {
+			return errno.err, errno.einval
+		}
+		deadline = time.TimeSpec{tv[0], tv[1] * 1000}
+		timed = true
+	}
+	return do_select(nfds, readfds, writefds, exceptfds, timed, deadline, 0)
+}
+
+fn do_select(nfds int, readfds u64, writefds u64, exceptfds u64, timed bool, deadline time.TimeSpec, sigmask u64) (u64, u64) {
+	mut current_thread := proc.current_thread()
+
+	if nfds < 0 || nfds > fd_set_bits {
+		return errno.err, errno.einval
+	}
+
+	words := u64((nfds + 63) / 64)
+
+	mut want_read := read_fd_set(readfds, words) or { return errno.err, errno.get() }
+	mut want_write := read_fd_set(writefds, words) or { return errno.err, errno.get() }
+	mut want_except := read_fd_set(exceptfds, words) or { return errno.err, errno.get() }
 
 	// pselect6 swaps in a signal mask for the duration of the wait, the same
 	// way ppoll does.
@@ -94,7 +124,7 @@ pub fn syscall_pselect6(_ voidptr, nfds int, readfds u64, writefds u64, exceptfd
 			}
 			// SIGKILL and SIGSTOP can never be blocked, not even for the
 			// duration of the wait.
-			current_thread.masked_signals = wanted & ~((u64(1) << 8) | (u64(1) << 18))
+			current_thread.masked_signals = proc.sigset_from_user(wanted & ~((u64(1) << 8) | (u64(1) << 18)))
 			masked = true
 		}
 	}
@@ -155,10 +185,11 @@ pub fn syscall_pselect6(_ voidptr, nfds int, readfds u64, writefds u64, exceptfd
 		return 0, 0
 	}
 
+	mut remaining := deadline
 	mut timeout_ptr := &time.TimeSpec(unsafe { nil })
 	if timed {
-		// In unsafe, so that deadline stays on the stack: see getdents64.
-		timeout_ptr = unsafe { &deadline }
+		// In unsafe, so that the copy stays on the stack: see getdents64.
+		timeout_ptr = unsafe { &remaining }
 	}
 
 	ready, err := ppoll(unsafe { &polls[0] }, u64(polls.len), timeout_ptr, unsafe { nil })

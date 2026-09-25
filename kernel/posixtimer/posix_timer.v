@@ -202,7 +202,7 @@ pub fn tick_posix_timers() {
 			continue
 		}
 
-		bit := u64(1) << u64(timer.signum - 1)
+		bit := u64(1) << u64(proc.pending_bit(timer.signum))
 		if katomic.load(&target.pending_signals) & bit != 0 {
 			// Standard signals coalesce. Preserve how many additional timer
 			// expirations occurred while the first notification was pending.
@@ -218,7 +218,7 @@ pub fn tick_posix_timers() {
 		target.pending_signal_codes[timer.signum - 1] = si_timer
 		target.pending_signal_values[timer.signum - 1] = timer.value
 		target.pending_signal_overruns[timer.signum - 1] = timer.overrun
-		katomic.bts(mut &target.pending_signals, u8(timer.signum - 1))
+		katomic.bts(mut &target.pending_signals, proc.pending_bit(timer.signum))
 		sched.enqueue_thread(target, true)
 		proc.unpin_thread(target)
 	}
@@ -266,7 +266,7 @@ pub fn syscall_timer_create(_ voidptr, clock_id int, event_ptr u64, timer_id_ptr
 		&& event.notify != sigev_thread_id {
 		return errno.err, errno.einval
 	}
-	if event.notify != sigev_none && (event.signum <= 0 || event.signum > 64) {
+	if event.notify != sigev_none && (event.signum <= 0 || event.signum > proc.max_pending_signal) {
 		return errno.err, errno.einval
 	}
 

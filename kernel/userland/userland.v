@@ -6,6 +6,7 @@ import memory.mmap
 import elf
 import sched
 import file
+import posixtimer
 import proc
 import x86.cpu.local as cpulocal
 import x86.cpu
@@ -172,32 +173,6 @@ pub fn syscall_getppid(_ voidptr) (u64, u64) {
 	mut t := unsafe { proc.current_thread() }
 
 	return u64(t.process.ppid), 0
-}
-
-pub fn syscall_getgroups(_ voidptr, size int, list &u32) (u64, u64) {
-	mut current_thread := proc.current_thread()
-	mut process := current_thread.process
-
-	C.printf(c'\n\e[32m%s\e[m: getgroups(%d, 0x%llx)\n', process.name.str, size, voidptr(list))
-	defer {
-		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
-	}
-
-	return 0, 0
-}
-
-// Become the leader of a new session and process group. The desktop terminal
-// uses this before claiming its PTY slave as the controlling terminal.
-pub fn syscall_setsid(_ voidptr) (u64, u64) {
-	mut process := proc.current_thread().process
-	if process.pgid == process.pid {
-		return errno.err, errno.eperm
-	}
-
-	process.sid = process.pid
-	process.pgid = process.pid
-	process.tty_session = 0
-	return u64(process.pid), 0
 }
 
 pub fn syscall_sigentry(_ voidptr, sigentry u64) (u64, u64) {
@@ -432,9 +407,22 @@ pub fn sendsig(_thread &proc.Thread, signal u8) {
 	mut t := unsafe { _thread }
 
 	katomic.bts(mut &t.pending_signals, signal)
+	// A signalfd of the process that reads this signal is readable now.
+	if t.process != unsafe { nil } {
+		notify_signalfds(t.process.pid, int(signal))
+	}
 
 	// Try to stop an event_await()
 	sched.enqueue_thread(t, true)
+}
+
+// signalfd for the native Vinix ABI, which passes the mask itself, in this
+// kernel's layout, rather than a pointer to a Linux sigset.
+pub fn syscall_signalfd(_ voidptr, fdnum int, mask u64, flags int) (u64, u64) {
+	if flags & ~(sfd_nonblock | sfd_cloexec) != 0 {
+		return errno.err, errno.einval
+	}
+	return signalfd_set(fdnum, mask & ~unblockable_mask(), flags)
 }
 
 // signal_process safely delivers a signal to a process's first thread,
@@ -540,8 +528,8 @@ pub fn syscall_execve(_ voidptr, _path charptr, _argv &charptr, _envp &charptr) 
 		}
 	}
 
-	start_program(true, proc.current_thread().process.current_directory, path, argv, envp,
-		'', '', '') or { return errno.err, errno.get() }
+	start_program(true, proc.current_directory_of(proc.current_thread().process), path, argv,
+		envp, '', '', '') or { return errno.err, errno.get() }
 
 	return errno.err, errno.get()
 }
@@ -638,9 +626,24 @@ fn exit_process(wait_status u32) {
 	mut current_thread := proc.current_thread()
 	mut current_process := current_thread.process
 
-	C.printf(c'\n\e[32m%s\e[m: exit(0x%x)\n', current_process.name.str, wait_status)
-	defer {
-		C.printf(c'\e[32m%s\e[m: returning\n', current_process.name.str)
+	// One thread tears a process down. Another that gets here meanwhile -- a
+	// sibling in exit_group() at the same moment, or one whose own exit raced
+	// the teardown -- just goes.
+	current_process.threads_lock.acquire()
+	if current_process.exiting {
+		current_process.threads_lock.release()
+		kernel_pagemap.switch_to()
+		sched.dequeue_and_die()
+	}
+	current_process.exiting = true
+	current_process.threads_lock.release()
+
+	// Every other thread is stopped before the address space and descriptors
+	// they are using go away, and so are the POSIX timers aimed at them.
+	kill_sibling_threads(mut current_process, current_thread)
+	posixtimer.remove_process_timers(current_process)
+	if current_thread.tid != current_process.pid {
+		proc.free_tid(current_thread.tid)
 	}
 
 	// A framebuffer owner can exit without issuing a console ioctl. Restore
@@ -695,80 +698,6 @@ fn exit_process(wait_status u32) {
 	sched.dequeue_and_die()
 }
 
-pub fn syscall_fork(gpr_state &cpulocal.GPRState) (u64, u64) {
-	mut current_thread := proc.current_thread()
-	mut process := current_thread.process
-
-	C.printf(c'\n\e[32m%s\e[m: fork()\n', process.name.str)
-	defer {
-		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
-	}
-
-	old_thread := proc.current_thread()
-	mut old_process := old_thread.process
-
-	mut new_process := sched.new_process(old_process, unsafe { nil }) or {
-		return errno.err, errno.get()
-	}
-
-	new_process.name = proc.process_name(old_process.name, new_process.pid)
-
-	// Dup all FDs
-	for i := 0; i < old_process.fds.len; i++ {
-		if old_process.fds[i] == unsafe { nil } {
-			continue
-		}
-
-		file.fdnum_dup(old_process, i, new_process, i, 0, true, false) or { panic('') }
-	}
-
-	stack_size := u64(0x200000)
-
-	mut stacks := []voidptr{}
-
-	kernel_stack_phys := memory.pmm_alloc(stack_size / page_size)
-	stacks << kernel_stack_phys
-	kernel_stack := u64(kernel_stack_phys) + stack_size + higher_half
-
-	pf_stack_phys := memory.pmm_alloc(stack_size / page_size)
-	stacks << pf_stack_phys
-	pf_stack := u64(pf_stack_phys) + stack_size + higher_half
-
-	mut new_thread := &proc.Thread{
-		gpr_state:      gpr_state
-		process:        new_process
-		timeslice:      old_thread.timeslice
-		gs_base:        cpu.get_kernel_gs_base()
-		fs_base:        cpu.get_fs_base()
-		kernel_stack:   kernel_stack
-		pf_stack:       pf_stack
-		running_on:     u64(-1)
-		cr3:            u64(new_process.pagemap.top_level)
-		sigentry:       old_thread.sigentry
-		sigactions:     old_thread.sigactions
-		masked_signals: old_thread.masked_signals
-		affinity_mask:  old_thread.affinity_mask
-		stacks:         stacks
-		fpu_storage:    voidptr(u64(memory.pmm_alloc(lib.div_roundup(fpu_storage_size, page_size))) + higher_half)
-	}
-
-	unsafe { stacks.free() }
-
-	new_thread.self = voidptr(new_thread)
-
-	unsafe { C.memcpy(new_thread.fpu_storage, old_thread.fpu_storage, fpu_storage_size) }
-
-	new_thread.gpr_state.rax = u64(0)
-	new_thread.gpr_state.rdx = u64(0)
-
-	old_process.children << new_process
-	new_process.threads << new_thread
-
-	sched.enqueue_thread(new_thread, false)
-
-	return u64(new_process.pid), u64(0)
-}
-
 pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, envp []string, stdin_path string, stdout_path string, stderr_path string) ?&proc.Process {
 	// Chromium starts every child process by executing /proc/self/exe. The VFS
 	// resolves that to this process's program, but the new process must record
@@ -776,6 +705,13 @@ pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, 
 	// child's own /proc/self/exe point back at itself forever.
 	path := fs.resolve_self_reference(_path)
 	prog_node := fs.get_node(dir, path, true)?
+	return start_program_node(execve, dir, prog_node, path, argv, envp, stdin_path,
+		stdout_path, stderr_path)
+}
+
+// The part of exec that follows finding the program. execveat(2) on a
+// descriptor comes here directly: a memfd has no name to be found by.
+pub fn start_program_node(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, path string, argv []string, envp []string, stdin_path string, stdout_path string, stderr_path string) ?&proc.Process {
 	// The program, or a script's interpreter, is subject to pledge(2) and
 	// unveil(2); the ELF interpreter the kernel loads for it is not.
 	if execve && !fs.policy_check(prog_node, proc.policy_exec) {
@@ -892,6 +828,11 @@ pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, 
 		mut t := proc.current_thread()
 		mut process := t.process
 
+		// Every other thread has to be gone before the address space it runs
+		// in is replaced. POSIX timers do not survive an exec either.
+		kill_sibling_threads(mut process, t)
+		posixtimer.remove_process_timers(process)
+
 		// Swapped under the process table lock, which cgroup memory accounting
 		// and /proc hold while they walk a process' page map: the old one is
 		// freed below.
@@ -900,6 +841,7 @@ pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, 
 		process.pagemap = new_pagemap
 		proc.unlock_table()
 
+		was_linux := process.linux_abi
 		// The copies fork made are replaced, not kept alongside.
 		unsafe {
 			process.name.free()
@@ -926,8 +868,6 @@ pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, 
 		process.brk_base = 0
 		process.brk_current = 0
 
-		// TODO: Kill old threads
-		// old_threads := process.threads
 		// Same lock new_user_thread's append holds: without it, a concurrent
 		// reader of process.threads (syscall_kill's broadcast path) could
 		// observe this array mid-replacement.
@@ -935,8 +875,27 @@ pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, 
 		process.threads = []&proc.Thread{}
 		process.threads_lock.release()
 
-		sched.new_user_thread(process, true, entry_point, unsafe { nil }, 0, argv, envp,
-			auxval, true)?
+		// The program that comes out of exec has one thread, the group leader,
+		// which takes the pid as its tid. A thread other than the leader that
+		// called execve gives its own number back.
+		if t.tid != process.pid {
+			proc.free_tid(t.tid)
+		}
+
+		mut new_thread := sched.new_user_thread(process, true, entry_point, unsafe { nil },
+			0, argv, envp, auxval, false)?
+
+		// execve keeps the signal mask and what was ignored; only handlers,
+		// which pointed into the old program, go back to the default.
+		new_thread.masked_signals = t.masked_signals
+		if linux_abi && was_linux {
+			for i := 0; i < t.sigactions.len; i++ {
+				if u64(t.sigactions[i].sa_sigaction) == linux_sig_ign {
+					new_thread.sigactions[i].sa_sigaction = voidptr(linux_sig_ign)
+				}
+			}
+		}
+		sched.enqueue_thread(new_thread, false)
 
 		unsafe {
 			argv.free()
@@ -990,4 +949,71 @@ pub fn parse_shebang(mut res resource.Resource) ?(string, string) {
 		build_arg.free()
 	}
 	return final_path, final_arg
+}
+
+// execveat(dirfd, path, argv, envp, flags): execve relative to a directory
+// descriptor. AT_EMPTY_PATH with an empty path runs the descriptor itself,
+// which is what fexecve(3) is built from.
+pub fn syscall_execveat(_ voidptr, dirfd int, _path charptr, _argv &charptr, _envp &charptr, flags int) (u64, u64) {
+	mut process := proc.current_thread().process
+
+	path := fs.user_path(_path) or { return errno.err, errno.get() }
+
+	mut directory := &fs.VFSNode(unsafe { nil })
+	mut target := path
+
+	mut direct_node := &fs.VFSNode(unsafe { nil })
+	if path.len == 0 {
+		if flags & fs.at_empty_path == 0 {
+			return errno.err, errno.enoent
+		}
+		// Run whatever the descriptor is open on. Its parent, when it has one,
+		// is what a relative interpreter path then resolves against.
+		mut fd := file.fd_from_fdnum(process, dirfd) or { return errno.err, errno.ebadf }
+		node := unsafe { &fs.VFSNode(fd.handle.node) }
+		fd.unref()
+		if node == unsafe { nil } {
+			return errno.err, errno.eacces
+		}
+		direct_node = node
+		directory = if node.parent != unsafe { nil } {
+			node.parent
+		} else {
+			unsafe { &fs.VFSNode(proc.current_directory_of(process)) }
+		}
+		target = '/proc/self/fd/${dirfd}'
+	} else {
+		directory = fs.parent_dir_for(dirfd, path) or { return errno.err, errno.get() }
+	}
+
+	mut argv := []string{}
+	for i := 0; true; i++ {
+		unsafe {
+			if _argv[i] == nil {
+				break
+			}
+			argv << cstring_to_vstring(_argv[i])
+		}
+	}
+	mut envp := []string{}
+	for i := 0; true; i++ {
+		unsafe {
+			if _envp[i] == nil {
+				break
+			}
+			envp << cstring_to_vstring(_envp[i])
+		}
+	}
+
+	if direct_node != unsafe { nil } {
+		start_program_node(true, directory, direct_node, target, argv, envp, '', '', '') or {
+			return errno.err, errno.get()
+		}
+		return errno.err, errno.get()
+	}
+	start_program(true, directory, target, argv, envp, '', '', '') or {
+		return errno.err, errno.get()
+	}
+
+	return errno.err, errno.get()
 }

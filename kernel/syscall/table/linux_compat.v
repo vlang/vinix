@@ -2,10 +2,11 @@
 // Copyright (c) 2026 Alexander Medvednikov
 module table
 
-// Linux AArch64 compatibility calls which do not map one-for-one onto an
-// existing Vinix syscall.  musl exposes these directly (notably the vectored
+// Linux compatibility calls which do not map one-for-one onto an existing
+// Vinix syscall. musl exposes these directly (notably the vectored
 // positioned-I/O family), so their argument layout must follow the kernel ABI
-// rather than the C library function prototype.
+// rather than the C library function prototype. The layout is the same on
+// arm64 and x86-64.
 
 import errno
 import file
@@ -128,8 +129,9 @@ fn syscall_linux_pwritev2(gpr_state voidptr, fdnum int, iov_ptr u64, iovcnt int,
 	return total, 0
 }
 
-// faccessat has no flags argument at syscall 48.  Calling the five-argument
-// VFS handler directly let an arbitrary live x3 register become flags.
+// faccessat has no flags argument (syscall 48 on arm64, 269 on x86-64).
+// Calling the five-argument VFS handler directly let an arbitrary live x3
+// register become flags.
 fn syscall_linux_faccessat(gpr_state voidptr, dirfd int, path charptr, mode u32) (u64, u64) {
 	if mode & ~u32(0x7) != 0 {
 		return errno.err, errno.einval
