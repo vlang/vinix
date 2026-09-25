@@ -24,6 +24,7 @@
 #include <sys/stat.h>
 #include <sys/syscall.h>
 #include <sys/uio.h>
+#include <sys/auxv.h>
 #include <sys/un.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -920,6 +921,39 @@ static int program_break(void) {
     return security_child_succeeded(child);
 }
 
+// What a program learns of the CPU: AT_HWCAP from the ID registers, the same
+// vector again from /proc/self/auxv, and an MRS of an ID register from EL0
+// answered as Linux answers it, with fields that agree with AT_HWCAP.
+static int cpu_features(void) {
+    unsigned long hwcap = getauxval(AT_HWCAP);
+    int valid = (hwcap & 3) == 3;
+    int fd = open("/proc/self/auxv", O_RDONLY);
+    unsigned long pairs[128] = {0};
+    ssize_t length = fd >= 0 ? read(fd, pairs, sizeof(pairs)) : -1;
+    if (fd >= 0)
+        close(fd);
+    int saw_hwcap = 0, saw_pagesz = 0;
+    for (ssize_t i = 0; i + 1 < length / 8; i += 2) {
+        if (pairs[i] == AT_HWCAP)
+            saw_hwcap = pairs[i + 1] == hwcap;
+        if (pairs[i] == AT_PAGESZ)
+            saw_pagesz = pairs[i + 1] == 4096;
+    }
+    valid = valid && saw_hwcap && saw_pagesz;
+    unsigned long isar0 = 0, midr = 0;
+    __asm__ volatile("mrs %0, ID_AA64ISAR0_EL1" : "=r"(isar0));
+    __asm__ volatile("mrs %0, MIDR_EL1" : "=r"(midr));
+    int aes_register = ((isar0 >> 4) & 0xf) >= 1;
+    int aes_hwcap = (hwcap & (1UL << 3)) != 0;
+    int atomics_register = ((isar0 >> 20) & 0xf) >= 2;
+    int atomics_hwcap = (hwcap & (1UL << 8)) != 0;
+    valid = valid && aes_register == aes_hwcap && atomics_register == atomics_hwcap && midr != 0;
+    if (!valid)
+        printf("cpu features: hwcap=0x%lx auxv=%zd/%d/%d isar0=0x%lx midr=0x%lx\n", hwcap,
+               length, saw_hwcap, saw_pagesz, isar0, midr);
+    return valid;
+}
+
 static int handler_without_restorer(void) {
     struct {
         void (*handler)(int);
@@ -1254,6 +1288,7 @@ int main(int argc, char **argv, char **envp) {
     check(many_descriptors(), "descriptors past 1024");
     check(huge_reservation(), "a 1 TiB reservation costs what it holds");
     check(program_break(), "brk moves the break, and fork keeps it");
+    check(cpu_features(), "AT_HWCAP, /proc/self/auxv and MRS of ID registers agree");
     int no_family[2];
     check(failed_with_errno(socket(AF_INET6, SOCK_STREAM, 0), EAFNOSUPPORT, "IPv6 socket") &&
               failed_with_errno(socketpair(AF_INET, SOCK_STREAM, 0, no_family), EOPNOTSUPP,

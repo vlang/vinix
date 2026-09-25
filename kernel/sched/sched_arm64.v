@@ -1661,6 +1661,23 @@ pub fn syscall_new_thread(_ voidptr, pc voidptr, stack u64) (u64, u64) {
 	return u64(new_thread.tid), 0
 }
 
+// Read back what was written to a new stack, through the direct map.
+fn read_initial_stack(pagemap &memory.Pagemap, addr u64, length u64) []u8 {
+	mut bytes := []u8{len: int(length)}
+	mut done := u64(0)
+	for done < length {
+		virt := addr + done
+		phys := pagemap.virt2phys(virt) or { break }
+		offset := virt & (page_size - 1)
+		chunk := if length - done < page_size - offset { length - done } else { page_size - offset }
+		unsafe {
+			C.memcpy(&bytes[int(done)], voidptr(phys + higher_half + offset), chunk)
+		}
+		done += chunk
+	}
+	return bytes
+}
+
 // The new address space is not necessarily active during exec. Write its
 // initial stack through the direct map, one physical page at a time.
 fn write_initial_stack(pagemap &memory.Pagemap, addr u64, src voidptr, length u64) bool {
@@ -1861,13 +1878,15 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 			return none
 		}
 		random_vma := cursor
+		hwcap, hwcap2 := cpu.user_hwcaps()
 
-		// Auxiliary vector (NULL-terminated). ARM64 advertises the mandatory
-		// FP/ASIMD baseline and no optional extensions yet.
+		// Auxiliary vector (NULL-terminated), with the CPU features the ID
+		// registers show userspace can use; see cpu.user_hwcaps().
+		auxv_top := cursor
 		if !push_initial_pair(process.pagemap, stack_bottom_vma, mut cursor, 0, 0)
 			|| !push_initial_pair(process.pagemap, stack_bottom_vma, mut cursor, elf.at_secure, 0)
-			|| !push_initial_pair(process.pagemap, stack_bottom_vma, mut cursor, elf.at_hwcap2, 0)
-			|| !push_initial_pair(process.pagemap, stack_bottom_vma, mut cursor, elf.at_hwcap, 0x3)
+			|| !push_initial_pair(process.pagemap, stack_bottom_vma, mut cursor, elf.at_hwcap2, hwcap2)
+			|| !push_initial_pair(process.pagemap, stack_bottom_vma, mut cursor, elf.at_hwcap, hwcap)
 			|| !push_initial_pair(process.pagemap, stack_bottom_vma, mut cursor, elf.at_random, random_vma)
 			|| !push_initial_pair(process.pagemap, stack_bottom_vma, mut cursor, elf.at_pagesz, page_size)
 			|| !push_initial_pair(process.pagemap, stack_bottom_vma, mut cursor, elf.at_uid, u64(process.uid))
@@ -1882,6 +1901,14 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 			|| !push_initial_word(process.pagemap, stack_bottom_vma, mut cursor, 0) {
 			errno.set(errno.e2big)
 			return none
+		}
+		// Kept for /proc/<pid>/auxv, which is where Go's x/sys/cpu looks for
+		// the CPU's features before it tries reading them from the CPU.
+		if want_elf {
+			auxv_start := cursor + sizeof(u64)
+			unsafe { process.saved_auxv.free() }
+			process.saved_auxv = read_initial_stack(process.pagemap, auxv_start,
+				auxv_top - auxv_start)
 		}
 		if cursor < stack_bottom_vma || u64(envp.len) * sizeof(u64) > cursor - stack_bottom_vma {
 			errno.set(errno.e2big)
@@ -2068,6 +2095,7 @@ pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) ?&proc.Pr
 		new_proc.pagemap = mmap.fork_pagemap(old_process.pagemap) or { return none }
 		new_proc.thread_stack_top = old_process.thread_stack_top
 		new_proc.stack_end = old_process.stack_end
+		new_proc.saved_auxv = old_process.saved_auxv.clone()
 		// The child has the parent's heap, so it has its break too. Starting
 		// from none, its first brk() tried to reserve the arena the copy of the
 		// address space already held there, failed, and reported a break of 0.

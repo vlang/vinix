@@ -205,6 +205,20 @@ pub fn sync_handler(esr u64, far u64, gpr_state &cpulocal.GPRState) {
 			}
 			fault_handler(ec, esr, far, gpr_state)
 		}
+		0x18 { // Trapped MSR, MRS or system instruction
+			// A read of an ID register from userspace is answered, as Linux 4.11
+			// and later answer it; anything else is an illegal instruction.
+			if from_userspace(gpr_state) {
+				if emulate_id_register_read(esr, gpr_state) {
+					return
+				}
+				if userland.dispatch_sync_signal(gpr_state, u8(userland.sigill)) {
+					return
+				}
+				terminate_faulting_process(ec, esr, far, gpr_state, u8(userland.sigill))
+			}
+			fault_handler(ec, esr, far, gpr_state)
+		}
 		0x20, 0x24 { // Instruction or Data Abort from a lower EL: userspace
 			mmap.pf_handler(gpr_state) or {
 				if userland.dispatch_sync_fault(gpr_state, far, esr) {
@@ -233,6 +247,31 @@ pub fn sync_handler(esr u64, far u64, gpr_state &cpulocal.GPRState) {
 			fault_handler(ec, esr, far, gpr_state)
 		}
 	}
+}
+
+// An MRS of a register in the ID space (op0 3, op1 0, CRn 0) from EL0: put
+// what Linux would answer in its destination and step past it.
+fn emulate_id_register_read(esr u64, gpr_state &cpulocal.GPRState) bool {
+	iss := esr & 0x1ffffff
+	is_read := iss & 1 != 0
+	crm := (iss >> 1) & 0xf
+	rt := (iss >> 5) & 0x1f
+	crn := (iss >> 10) & 0xf
+	op1 := (iss >> 14) & 0x7
+	op2 := (iss >> 17) & 0x7
+	op0 := (iss >> 20) & 0x3
+	if !is_read || op0 != 3 || op1 != 0 || crn != 0 {
+		return false
+	}
+	value := cpu.emulated_id_register(crm, op2)
+	mut state := unsafe { &cpulocal.GPRState(gpr_state) }
+	if rt != 31 {
+		unsafe {
+			*(&u64(u64(voidptr(state)) + rt * 8)) = value
+		}
+	}
+	state.pc += 4
+	return true
 }
 
 // A fault raised by a userspace instruction that no handler took over ends that

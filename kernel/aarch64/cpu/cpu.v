@@ -713,3 +713,273 @@ fn C.vinix_install_early_fault_vectors()
 pub fn install_early_fault_reset() {
 	C.vinix_install_early_fault_vectors()
 }
+fn read_id_aa64isar0_el1() u64 {
+	mut ret := u64(0)
+	asm volatile aarch64 {
+		mrs ret, id_aa64isar0_el1
+		; =r (ret)
+		; ; memory
+	}
+	return ret
+}
+
+fn read_id_aa64isar1_el1() u64 {
+	mut ret := u64(0)
+	asm volatile aarch64 {
+		mrs ret, id_aa64isar1_el1
+		; =r (ret)
+		; ; memory
+	}
+	return ret
+}
+
+fn read_id_aa64pfr0_el1() u64 {
+	mut ret := u64(0)
+	asm volatile aarch64 {
+		mrs ret, id_aa64pfr0_el1
+		; =r (ret)
+		; ; memory
+	}
+	return ret
+}
+
+fn read_id_aa64mmfr2_el1() u64 {
+	mut ret := u64(0)
+	asm volatile aarch64 {
+		mrs ret, id_aa64mmfr2_el1
+		; =r (ret)
+		; ; memory
+	}
+	return ret
+}
+
+fn id_field(register u64, shift u64) u64 {
+	return (register >> shift) & 0xf
+}
+
+// What the CPU offers userspace, as Linux's AT_HWCAP and AT_HWCAP2 bits, read
+// from its ID registers. Programs look here before using an instruction:
+// OpenSSL for AES and SHA, glibc, Go and Java for the LSE atomics and CRC32,
+// MongoDB to know it is on ARMv8.2. Only what EL0 can use with nothing set up
+// by the kernel is offered: no SVE or SME, which are not enabled here, no
+// pointer authentication or BTI, which need keys and page attributes, and no
+// event stream, which Vinix does not run. HWCAP_CPUID is not set either: an
+// EL0 read of an ID register is answered (see emulated_id_register()), but
+// all it shows is what these bits already say.
+pub fn user_hwcaps() (u64, u64) {
+	isar0 := read_id_aa64isar0_el1()
+	isar1 := read_id_aa64isar1_el1()
+	pfr0 := read_id_aa64pfr0_el1()
+	mmfr2 := read_id_aa64mmfr2_el1()
+	mut hwcap := u64(0)
+	mut hwcap2 := u64(0)
+
+	fp := id_field(pfr0, 16)
+	simd := id_field(pfr0, 20)
+	if fp != 0xf {
+		hwcap |= 1 << 0 // FP
+		if fp >= 1 {
+			hwcap |= 1 << 9 // FPHP
+		}
+	}
+	if simd != 0xf {
+		hwcap |= 1 << 1 // ASIMD
+		if simd >= 1 {
+			hwcap |= 1 << 10 // ASIMDHP
+		}
+	}
+	aes := id_field(isar0, 4)
+	if aes >= 1 {
+		hwcap |= 1 << 3 // AES
+	}
+	if aes >= 2 {
+		hwcap |= 1 << 4 // PMULL
+	}
+	if id_field(isar0, 8) >= 1 {
+		hwcap |= 1 << 5 // SHA1
+	}
+	sha2 := id_field(isar0, 12)
+	if sha2 >= 1 {
+		hwcap |= 1 << 6 // SHA2
+	}
+	if sha2 >= 2 {
+		hwcap |= 1 << 21 // SHA512
+	}
+	if id_field(isar0, 16) >= 1 {
+		hwcap |= 1 << 7 // CRC32
+	}
+	if id_field(isar0, 20) >= 2 {
+		hwcap |= 1 << 8 // ATOMICS
+	}
+	if id_field(isar0, 28) >= 1 {
+		hwcap |= 1 << 12 // ASIMDRDM
+	}
+	if id_field(isar0, 32) >= 1 {
+		hwcap |= 1 << 17 // SHA3
+	}
+	if id_field(isar0, 36) >= 1 {
+		hwcap |= 1 << 18 // SM3
+	}
+	if id_field(isar0, 40) >= 1 {
+		hwcap |= 1 << 19 // SM4
+	}
+	if id_field(isar0, 44) >= 1 {
+		hwcap |= 1 << 20 // ASIMDDP
+	}
+	if id_field(isar0, 48) >= 1 {
+		hwcap |= 1 << 23 // ASIMDFHM
+	}
+	flagm := id_field(isar0, 52)
+	if flagm >= 1 {
+		hwcap |= 1 << 27 // FLAGM
+	}
+	if flagm >= 2 {
+		hwcap2 |= 1 << 7 // FLAGM2
+	}
+
+	dpb := id_field(isar1, 0)
+	if dpb >= 1 {
+		hwcap |= 1 << 16 // DCPOP
+	}
+	if dpb >= 2 {
+		hwcap2 |= 1 << 0 // DCPODP
+	}
+	if id_field(isar1, 12) >= 1 {
+		hwcap |= 1 << 13 // JSCVT
+	}
+	if id_field(isar1, 16) >= 1 {
+		hwcap |= 1 << 14 // FCMA
+	}
+	lrcpc := id_field(isar1, 20)
+	if lrcpc >= 1 {
+		hwcap |= 1 << 15 // LRCPC
+	}
+	if lrcpc >= 2 {
+		hwcap |= 1 << 26 // ILRCPC
+	}
+	if id_field(isar1, 32) >= 1 {
+		hwcap2 |= 1 << 8 // FRINT
+	}
+	if id_field(isar1, 36) >= 1 {
+		hwcap |= 1 << 29 // SB
+	}
+	if id_field(isar1, 44) >= 1 {
+		hwcap2 |= 1 << 14 // BF16
+	}
+	if id_field(isar1, 48) >= 1 {
+		hwcap2 |= 1 << 15 // DGH
+	}
+	if id_field(isar1, 52) >= 1 {
+		hwcap2 |= 1 << 13 // I8MM
+	}
+
+	if id_field(pfr0, 48) >= 1 {
+		hwcap |= 1 << 24 // DIT
+	}
+	if id_field(mmfr2, 32) >= 1 {
+		hwcap |= 1 << 25 // USCAT
+	}
+	return hwcap, hwcap2
+}
+
+// The names /proc/cpuinfo lists for the bits user_hwcaps() sets, in Linux's
+// order.
+const hwcap_names = ['fp', 'asimd', 'evtstrm', 'aes', 'pmull', 'sha1', 'sha2', 'crc32', 'atomics',
+	'fphp', 'asimdhp', 'cpuid', 'asimdrdm', 'jscvt', 'fcma', 'lrcpc', 'dcpop', 'sha3', 'sm3', 'sm4',
+	'asimddp', 'sha512', 'sve', 'asimdfhm', 'dit', 'uscat', 'ilrcpc', 'flagm', 'ssbs', 'sb', 'paca',
+	'pacg']
+const hwcap2_names = ['dcpodp', 'sve2', 'sveaes', 'svepmull', 'svebitperm', 'svesha3', 'svesm4',
+	'flagm2', 'frint', 'svei8mm', 'svef32mm', 'svef64mm', 'svebf16', 'i8mm', 'bf16', 'dgh']
+
+// The Features line of /proc/cpuinfo, as a string of its own. Built in one
+// buffer: the names are literals, and an array of them could not be freed
+// without freeing them too.
+pub fn user_feature_names() string {
+	hwcap, hwcap2 := user_hwcaps()
+	mut text := []u8{cap: 512}
+	for i, name in hwcap_names {
+		if hwcap & (u64(1) << i) != 0 {
+			append_feature(mut text, name)
+		}
+	}
+	for i, name in hwcap2_names {
+		if hwcap2 & (u64(1) << i) != 0 {
+			append_feature(mut text, name)
+		}
+	}
+	result := text.bytestr()
+	unsafe { text.free() }
+	return result
+}
+
+fn append_feature(mut text []u8, name string) {
+	if text.len > 0 {
+		text << ` `
+	}
+	for i in 0 .. name.len {
+		text << name[i]
+	}
+}
+
+fn read_midr_el1() u64 {
+	mut ret := u64(0)
+	asm volatile aarch64 {
+		mrs ret, midr_el1
+		; =r (ret)
+		; ; memory
+	}
+	return ret
+}
+
+// The fields of each ID register an EL0 read is shown; the rest read as zero.
+const pfr0_user_fields = u64(0xf000000ff0000) // FP, AdvSIMD, DIT
+const isar0_user_fields = u64(0xfffffff0fffff0) // AES .. TS, not RNDR or TME
+const isar1_user_fields = u64(0xfff0ff00fff00f) // DPB, JSCVT, FCMA, LRCPC, FRINTTS, SB, BF16, DGH, I8MM
+const mmfr2_user_fields = u64(0xf00000000) // AT: USCAT
+
+// The value an EL0 read of an ID register gets, as Linux answers the MRS it
+// traps: the fields user_hwcaps() offers, and nothing a program could be
+// misled by -- no SVE, SME, BTI, MTE, pointer authentication or RNDR. Any
+// other register in the ID space reads as zero. `crm` and `op2` name the
+// register within op0 3, op1 0, CRn 0. Go's x/sys/cpu reads ISAR0, ISAR1 and
+// PFR0 this way on a kernel that is 4.11 or later, which a container is told
+// it runs on.
+pub fn emulated_id_register(crm u64, op2 u64) u64 {
+	match crm {
+		0 {
+			return match op2 {
+				0 { read_midr_el1() }
+				5 { u64(0x80000000) } // MPIDR_EL1: what Linux shows every CPU
+				else { u64(0) }
+			}
+		}
+		4 {
+			if op2 == 0 {
+				// FP, AdvSIMD, DIT, and EL0 as AArch64 only.
+				return (read_id_aa64pfr0_el1() & pfr0_user_fields) | 1
+			}
+			return 0
+		}
+		6 {
+			if op2 == 0 {
+				// AES, SHA1, SHA2, CRC32, atomics, RDM, SHA3, SM3, SM4, DP,
+				// FHM, TS.
+				return read_id_aa64isar0_el1() & isar0_user_fields
+			}
+			if op2 == 1 {
+				// DPB, JSCVT, FCMA, LRCPC, FRINTTS, SB, BF16, DGH, I8MM.
+				return read_id_aa64isar1_el1() & isar1_user_fields
+			}
+			return 0
+		}
+		7 {
+			if op2 == 2 {
+				return read_id_aa64mmfr2_el1() & mmfr2_user_fields
+			}
+			return 0
+		}
+		else {
+			return 0
+		}
+	}
+}

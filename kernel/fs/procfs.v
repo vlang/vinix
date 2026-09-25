@@ -59,6 +59,7 @@ enum ProcFSKind {
 	mountstats
 	maps
 	smaps
+	auxv
 	oom_score_adj
 	setgroups
 	uid_map
@@ -523,6 +524,12 @@ fn (this &ProcFSResource) contents() string {
 		.maps {
 			return maps_text(this.pid, false)
 		}
+		.auxv {
+			mut bytes := proc.process_auxv(this.pid)
+			text := bytes.bytestr()
+			unsafe { bytes.free() }
+			return text
+		}
 		.smaps {
 			return maps_text(this.pid, true)
 		}
@@ -566,12 +573,18 @@ fn text_with_ending(owned string, ending u8) string {
 }
 
 fn cpuinfo_text() string {
-	mut text := ''
+	features := cpu_feature_names()
 	count := numa.cpu_count()
+	mut text := lib.new_text(count * (180 + features.len))
 	for i := 0; i < count; i++ {
-		text += 'processor\t: ${i}\nBogoMIPS\t: 100.00\nFeatures\t: fp asimd\nCPU implementer\t: 0x61\nCPU architecture: 8\nCPU variant\t: 0x0\nCPU part\t: 0x000\nCPU revision\t: 0\n\n'
+		text.add('processor\t: ')
+		text.add_unsigned(u64(i))
+		text.add('\nBogoMIPS\t: 100.00\nFeatures\t: ')
+		text.add(features)
+		text.add('\nCPU implementer\t: 0x61\nCPU architecture: 8\nCPU variant\t: 0x0\nCPU part\t: 0x000\nCPU revision\t: 0\n\n')
 	}
-	return text
+	unsafe { features.free() }
+	return text.str()
 }
 
 fn machine_stat_text() string {
@@ -1185,8 +1198,8 @@ fn populate_process_directory(mut node VFSNode, pid int) {
 // descriptors, namespaces and mounts are its process', since Vinix threads
 // share all three.
 const process_entry_names = ['cmdline', 'comm', 'stat', 'statm', 'status', 'cgroup', 'environ',
-	'mountinfo', 'mounts', 'mountstats', 'maps', 'smaps', 'loginuid', 'oom_score_adj', 'uid_map',
-	'gid_map', 'setgroups', 'root', 'cwd', 'exe', 'fd', 'ns', 'attr']
+	'mountinfo', 'mounts', 'mountstats', 'maps', 'smaps', 'auxv', 'loginuid', 'oom_score_adj',
+	'uid_map', 'gid_map', 'setgroups', 'root', 'cwd', 'exe', 'fd', 'ns', 'attr']
 
 fn add_process_entries(mut node VFSNode, pid int) {
 	for name in process_entry_names {
@@ -1218,6 +1231,7 @@ fn add_process_entry(mut node VFSNode, pid int, name string, is_process bool) bo
 		'mountstats' { add_process_file(mut node, 'mountstats', .mountstats, pid) }
 		'maps' { add_process_file(mut node, 'maps', .maps, pid) }
 		'smaps' { add_process_file(mut node, 'smaps', .smaps, pid) }
+		'auxv' { add_process_file(mut node, 'auxv', .auxv, pid) }
 		'loginuid' { add_process_file(mut node, 'loginuid', .loginuid, pid) }
 		'oom_score_adj' { add_process_writable(mut node, 'oom_score_adj', .oom_score_adj, pid) }
 		'uid_map' { add_process_writable(mut node, 'uid_map', .uid_map, pid) }

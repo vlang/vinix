@@ -213,6 +213,9 @@ pub mut:
 	// The top of the stack exec gave the program's first thread, which
 	// /proc/<pid>/maps names [stack].
 	stack_end u64
+	// The auxiliary vector exec gave the program, as /proc/<pid>/auxv hands
+	// it back.
+	saved_auxv []u8
 	threads                  []&Thread
 	threads_lock             klock.Lock
 	fds_lock                 klock.Lock
@@ -803,6 +806,17 @@ pub fn process_command(pid int) string {
 	mut text := lib.new_text(32)
 	add_command_name(mut text, process.name)
 	return text.str()
+}
+
+// The auxiliary vector a process was started with, as bytes of its own.
+pub fn process_auxv(pid int) []u8 {
+	lock_table()
+	defer { unlock_table() }
+	process := process_at(pid)
+	if process == unsafe { nil } {
+		return []u8{}
+	}
+	return process.saved_auxv.clone()
 }
 
 // The thread ids of a process, in the order the process holds them.
