@@ -31,11 +31,21 @@ mkdir -p /run
 # A compositor process can exist while blocked in its first application
 # handshake. The replacement recreates this marker only once it has painted
 # and finished those handshakes, giving diagnostics a real readiness signal.
-rm -f /run/vinix-desktop-ready
+# It is only that signal: on a disk-root machine /run is persistent, and a
+# marker the kernel failed to unlink at boot can refuse removal with ENOENT.
+rm -f /run/vinix-desktop-ready 2>/dev/null || \
+	echo "vinix-desktop-reload: could not clear /run/vinix-desktop-ready; reloading anyway" >&2
 trap - EXIT HUP INT TERM
 
 echo "vinix-desktop-reload: installed $destination; reloading the desktop"
-desktop_pids=$(/bin/busybox pidof vinix-desktop 2>/dev/null || true)
+# Every multicall application runs this same executable, and pidof also
+# matches /proc/<pid>/exe, so it reports Files and Terminal too. The
+# compositor is the one whose own name is vinix-desktop.
+desktop_pids=
+for pid in $(/bin/busybox pidof vinix-desktop 2>/dev/null || true); do
+	[ "$(cat "/proc/$pid/comm" 2>/dev/null)" = vinix-desktop ] || continue
+	desktop_pids="$desktop_pids $pid"
+done
 set -- $desktop_pids
 if [ "$#" -ne 1 ]; then
 	echo "vinix-desktop-reload: expected one running desktop, found $#: ${desktop_pids:-none}" >&2

@@ -46,12 +46,20 @@ mkdir -p /run
 : > /run/vinix-desktop-development
 : > /run/vinix-desktop-ready
 
+# Files and Terminal run the same multicall executable, so pidof, which also
+# matches /proc/<pid>/exe, reports them as vinix-desktop too.
+desktop_pid() {
+	for pid in $(/bin/busybox pidof vinix-desktop 2>/dev/null || true); do
+		[ "$(cat "/proc/$pid/comm" 2>/dev/null)" = vinix-desktop ] && echo "$pid"
+	done
+}
+
 wait_for_ready_session() {
 	round=$1
 	attempt=0
 	while [ "$attempt" -lt 45 ]; do
 		if [ -s /run/vinix-desktop-ready ] \
-			&& /bin/busybox pidof vinix-desktop >/dev/null 2>&1 \
+			&& [ -n "$(desktop_pid)" ] \
 			&& /bin/busybox pidof vinix-files >/dev/null 2>&1 \
 			&& /bin/busybox pidof vinix-terminal >/dev/null 2>&1; then
 			return 0
@@ -84,7 +92,7 @@ wait_for_ready_session() {
 	old_pid=''
 	attempt=0
 	while [ "$attempt" -lt 30 ]; do
-		old_pid=$(/bin/busybox pidof vinix-desktop 2>/dev/null || true)
+		old_pid=$(desktop_pid)
 		[ -n "$old_pid" ] && break
 		sleep 1
 		attempt=$((attempt + 1))
@@ -96,7 +104,7 @@ wait_for_ready_session() {
 	vinix-desktop-build || fail "desktop build and reload"
 	[ -x /root/vinix-desktop ] || fail "desktop output is missing"
 	wait_for_ready_session 1
-	first_pid=$(/bin/busybox pidof vinix-desktop)
+	first_pid=$(desktop_pid)
 	first_ready_inode=$(/bin/busybox stat -c '%i' /run/vinix-desktop-ready)
 
 	# Reload the TCC-built session once more. This is the key liveness check:
@@ -104,7 +112,7 @@ wait_for_ready_session() {
 	# therefore cannot recreate the marker removed by the helper.
 	vinix-desktop-reload /root/vinix-desktop || fail "second reload helper"
 	wait_for_ready_session 2
-	second_pid=$(/bin/busybox pidof vinix-desktop)
+	second_pid=$(desktop_pid)
 	second_ready_inode=$(/bin/busybox stat -c '%i' /run/vinix-desktop-ready)
 	[ "$second_ready_inode" != "$first_ready_inode" ] \
 		|| fail "second reload did not recreate the readiness marker"
