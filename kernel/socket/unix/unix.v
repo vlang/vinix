@@ -125,6 +125,25 @@ pub mut:
 	// relies on it: it reads a record's length with
 	// recvfrom(0, MSG_PEEK|MSG_TRUNC) and then reads the record itself.
 	packet_lengths []u64
+
+	// The length of the address bind(2) gave this socket, as getsockname(2)
+	// and a datagram's receiver are told it.
+	name_len u32
+	// SOCK_DGRAM: where a send with no address goes, which connect(2) sets
+	// without a listener to join, and the sender of every datagram queued
+	// here, oldest first beside packet_lengths.
+	dgram_target &UnixSocket = unsafe { nil }
+	datagrams    []DatagramSender
+}
+
+// Who sent a datagram: what recvfrom(2) reports as its source, and the
+// identity SO_PASSCRED hands over with it.
+struct DatagramSender {
+	name     SockaddrUn
+	name_len u32
+	pid      int
+	uid      u32
+	gid      u32
 }
 
 // Whether this endpoint keeps message boundaries (SOCK_SEQPACKET).
@@ -132,13 +151,37 @@ pub fn (this &UnixSocket) is_seqpacket() bool {
 	return this.socktype & sock_pub.sock_type_mask == sock_pub.sock_seqpacket
 }
 
+pub fn (this &UnixSocket) is_datagram() bool {
+	return this.socktype & sock_pub.sock_type_mask == sock_pub.sock_dgram
+}
+
+// Whether each send is one record that a receive returns whole: a datagram
+// or a SOCK_SEQPACKET record, never a stream's bytes.
+pub fn (this &UnixSocket) keeps_boundaries() bool {
+	return this.is_seqpacket() || this.is_datagram()
+}
+
+// Whether nothing waits to be received. A record may be empty, so a socket
+// that keeps boundaries counts records rather than bytes.
+fn (this &UnixSocket) nothing_queued() bool {
+	if this.keeps_boundaries() {
+		return this.packet_lengths.len == 0
+	}
+	return katomic.load(&this.used) == 0
+}
+
 // The byte length of the next record to be received, or all buffered bytes for
 // a stream socket that keeps no boundaries.
 fn (this &UnixSocket) next_message_length() u64 {
-	if this.is_seqpacket() && this.packet_lengths.len > 0 {
+	if this.keeps_boundaries() && this.packet_lengths.len > 0 {
 		return this.packet_lengths[0]
 	}
 	return this.used
+}
+
+// How long this socket's address is: the family alone when it is unbound.
+fn (this &UnixSocket) address_length() u32 {
+	return if this.name_len != 0 { this.name_len } else { u32(sizeof(u16)) }
 }
 
 fn (mut this UnixSocket) mmap(_handle voidptr, _page u64, _flags int) voidptr {
@@ -146,10 +189,10 @@ fn (mut this UnixSocket) mmap(_handle voidptr, _page u64, _flags int) voidptr {
 }
 
 fn (mut this UnixSocket) read(_handle voidptr, buf voidptr, _loc u64, _count u64) ?i64 {
-	// A SOCK_SEQPACKET read still returns exactly one record; the framed path
-	// owns the boundary bookkeeping.
-	if this.is_seqpacket() {
-		return this.recv_seqpacket(_handle, buf, _count, 0)
+	// A SOCK_SEQPACKET or SOCK_DGRAM read still returns exactly one record;
+	// the framed path owns the boundary bookkeeping.
+	if this.keeps_boundaries() {
+		return this.recv_seqpacket(_handle, buf, _count, 0, unsafe { nil }, unsafe { nil })
 	}
 
 	mut count := _count
@@ -261,8 +304,9 @@ fn (mut this UnixSocket) read(_handle voidptr, buf voidptr, _loc u64, _count u64
 // its true length even when the buffer is shorter, and the two together with a
 // zero-length buffer answer "how long is the next record" without consuming it.
 // runc's sync channel drives exactly this. Any descriptors a peeked-past record
-// carried are dropped, as a plain recvfrom does.
-pub fn (mut this UnixSocket) recv_seqpacket(_handle voidptr, buf voidptr, count u64, flags int) ?i64 {
+// carried are dropped, as a plain recvfrom does. A datagram's sender is
+// reported through `src_addr` when one is asked for.
+pub fn (mut this UnixSocket) recv_seqpacket(_handle voidptr, buf voidptr, count u64, flags int, src_addr voidptr, addrlen &u32) ?i64 {
 	peek := flags & msg_peek != 0
 	trunc := flags & msg_trunc != 0
 
@@ -277,7 +321,7 @@ pub fn (mut this UnixSocket) recv_seqpacket(_handle voidptr, buf voidptr, count 
 		return 0
 	}
 
-	for katomic.load(&this.used) == 0 {
+	for this.nothing_queued() {
 		if this.peer_finished {
 			return 0
 		}
@@ -326,12 +370,22 @@ pub fn (mut this UnixSocket) recv_seqpacket(_handle voidptr, buf voidptr, count 
 	// was handed back.
 	ret := if trunc { message_length } else { to_copy }
 
+	if this.is_datagram() && this.datagrams.len > 0 && addrlen != unsafe { nil } {
+		sender := this.datagrams[0]
+		sock_pub.copy_out_sockaddr(src_addr, addrlen, voidptr(&sender.name), sender.name_len)
+	}
+
 	if !peek {
 		// The whole record leaves the queue even when it did not all fit.
-		this.read_ptr = (this.read_ptr + message_length) % this.capacity
+		if message_length != 0 {
+			this.read_ptr = (this.read_ptr + message_length) % this.capacity
+		}
 		this.used -= message_length
 		if this.packet_lengths.len > 0 {
 			this.packet_lengths.delete(0)
+		}
+		if this.datagrams.len > 0 {
+			this.datagrams.delete(0)
 		}
 		// A plain recvfrom past a descriptor-bearing record drops its rights.
 		if this.pending_fd_groups.len != 0 && this.pending_fd_groups[0].offset < message_length {
@@ -345,9 +399,16 @@ pub fn (mut this UnixSocket) recv_seqpacket(_handle voidptr, buf voidptr, count 
 		for i in 0 .. this.pending_fd_groups.len {
 			this.pending_fd_groups[i].offset -= message_length
 		}
-		this.peer.status |= file.pollout
-		event.trigger(mut this.peer.event, false)
-		if this.used == 0 {
+		// A datagram socket that was only bound has no peer: its senders wait
+		// for room on its own event.
+		if this.peer != unsafe { nil } {
+			this.peer.status |= file.pollout
+			event.trigger(mut this.peer.event, false)
+		}
+		if this.is_datagram() {
+			event.trigger(mut this.event, false)
+		}
+		if this.nothing_queued() {
 			this.status &= ~file.pollin
 		}
 	}
@@ -368,6 +429,17 @@ pub fn (mut this UnixSocket) write_with_fds(_handle voidptr, buf voidptr, _count
 	if this.write_closed {
 		errno.set(errno.epipe)
 		return none
+	}
+
+	// A datagram goes to the socket connect(2) named, or to the other end of
+	// a socketpair(2).
+	if this.is_datagram() {
+		mut target := if this.dgram_target != unsafe { nil } { this.dgram_target } else { this.peer }
+		if target == unsafe { nil } {
+			errno.set(errno.enotconn)
+			return none
+		}
+		return this.send_datagram(mut target, _handle, buf, count, fds)
 	}
 
 	mut peer := this.peer
@@ -484,6 +556,145 @@ pub fn (mut this UnixSocket) write_with_fds(_handle voidptr, buf voidptr, _count
 	return i64(count)
 }
 
+// Queue one datagram on `target`, a SOCK_DGRAM socket: all of it or none,
+// with who sent it. A receiver whose queue is full makes a blocking sender
+// wait, as Linux's does; one that is gone refuses it.
+pub fn (mut this UnixSocket) send_datagram(mut target UnixSocket, _handle voidptr, buf voidptr, count u64, fds []&file.FD) ?i64 {
+	if !target.is_datagram() {
+		errno.set(errno.eprototype)
+		return none
+	}
+	if count > sock_buf {
+		errno.set(errno.emsgsize)
+		return none
+	}
+	process := proc.current_thread().process
+	sender := DatagramSender{
+		name:     this.name
+		name_len: this.address_length()
+		pid:      process.pid
+		uid:      process.euid
+		gid:      process.egid
+	}
+	handle := unsafe { &file.Handle(_handle) }
+
+	target.l.acquire()
+	defer {
+		target.l.release()
+	}
+	for {
+		if target.closed || target.read_closed {
+			errno.set(errno.econnrefused)
+			return none
+		}
+		if target.capacity - target.used >= count {
+			break
+		}
+		if handle.flags & resource.o_nonblock != 0 {
+			errno.set(errno.eagain)
+			return none
+		}
+		generation := event.generation(mut target.event)
+		target.l.release()
+		mut events := [&target.event]
+		event.await_from_generation(mut events, true, 0, generation) or {
+			unsafe { events.free() }
+			errno.set(proc.interrupted_errno)
+			target.l.acquire()
+			return none
+		}
+		unsafe { events.free() }
+		target.l.acquire()
+	}
+
+	if fds.len != 0 {
+		mut group := PendingFdGroup{
+			offset: target.used
+			span:   count
+			fds:    []&file.FD{}
+		}
+		group.fds << fds
+		target.pending_fd_groups << group
+	}
+	if count != 0 {
+		mut before_wrap := count
+		mut after_wrap := u64(0)
+		if target.write_ptr + count > target.capacity {
+			before_wrap = target.capacity - target.write_ptr
+			after_wrap = count - before_wrap
+		}
+		unsafe { C.memcpy(&target.data[target.write_ptr], buf, before_wrap) }
+		if after_wrap != 0 {
+			unsafe { C.memcpy(target.data, voidptr(u64(buf) + before_wrap), after_wrap) }
+		}
+		target.write_ptr = (target.write_ptr + count) % target.capacity
+		target.used += count
+	}
+	target.packet_lengths << count
+	target.datagrams << sender
+
+	target.status |= file.pollin
+	event.trigger(mut target.event, false)
+	return i64(count)
+}
+
+// sendto(2) with an address, which only a datagram socket takes: the
+// datagram goes to whatever socket is bound there, a syslog daemon's
+// /dev/log or a service manager's notify socket.
+pub fn (mut this UnixSocket) send_datagram_to(_handle voidptr, buf voidptr, count u64, addr voidptr, addrlen u32) ?i64 {
+	if this.write_closed {
+		errno.set(errno.epipe)
+		return none
+	}
+	mut target := lookup_bound(addr, addrlen)?
+	return this.send_datagram(mut target, _handle, buf, count, []&file.FD{})
+}
+
+// The socket bound at a sockaddr_un: a name in the abstract namespace, or a
+// path.
+fn lookup_bound(_addr voidptr, addrlen u32) ?&UnixSocket {
+	if addrlen < sizeof(u16) {
+		errno.set(errno.einval)
+		return none
+	}
+	addr := unsafe { &SockaddrUn(_addr) }
+	if addr.sun_family != sock_pub.af_unix {
+		errno.set(errno.einval)
+		return none
+	}
+
+	// Abstract socket: sun_path[0] == '\0'
+	if addrlen > 2 && addr.sun_path[0] == 0 {
+		name_len := addrlen - 2
+		abstract_sockets_lock.acquire()
+		defer {
+			abstract_sockets_lock.release()
+		}
+		for i in 0 .. 64 {
+			if abstract_sockets[i].in_use && abstract_sockets[i].name_len == name_len {
+				if unsafe { C.memcmp(&abstract_sockets[i].name[0], &addr.sun_path[0], name_len) } == 0 {
+					return abstract_sockets[i].socket
+				}
+			}
+		}
+		errno.set(errno.econnrefused)
+		return none
+	}
+
+	t := proc.current_thread()
+	path := unsafe { cstring_to_vstring(&addr.sun_path[0]) }
+	defer {
+		unsafe { path.free() }
+	}
+	target := fs.get_node(proc.current_directory_of(t.process), path, true) or { return none }
+	mut target_res := target.resource
+	if mut target_res is UnixSocket {
+		return target_res
+	}
+	errno.set(errno.econnrefused)
+	return none
+}
+
 fn (mut this UnixSocket) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 	// musl's if_nametoindex and if_indextoname ask on an AF_UNIX socket.
 	if inet.is_interface_ioctl(request) {
@@ -557,6 +768,8 @@ fn (mut this UnixSocket) close_endpoint() {
 	this.pending_fd_groups = []PendingFdGroup{}
 	unsafe { this.packet_lengths.free() }
 	this.packet_lengths = []u64{}
+	unsafe { this.datagrams.free() }
+	this.datagrams = []DatagramSender{}
 	data := this.data
 	this.data = unsafe { nil }
 	this.capacity = 0
@@ -625,6 +838,11 @@ fn (mut this UnixSocket) grow(_handle voidptr, _new_size u64) ? {
 }
 
 fn (mut this UnixSocket) peername(_handle voidptr, _addr voidptr, addrlen &u32) ? {
+	if this.dgram_target != unsafe { nil } {
+		mut target := this.dgram_target
+		sock_pub.copy_out_sockaddr(_addr, addrlen, voidptr(&target.name), target.address_length())
+		return
+	}
 	if this.connected == false {
 		errno.set(errno.enotconn)
 		return none
@@ -637,12 +855,7 @@ fn (mut this UnixSocket) peername(_handle voidptr, _addr voidptr, addrlen &u32) 
 
 fn (mut this UnixSocket) sockname(_handle voidptr, _addr voidptr, addrlen &u32) ? {
 	// An unbound socket has no path, and getsockname(2) reports just the family.
-	mut full := u32(sizeof(SockaddrUn))
-	if this.name.sun_path[0] == 0 {
-		full = u32(sizeof(u16))
-	}
-
-	sock_pub.copy_out_sockaddr(_addr, addrlen, voidptr(&this.name), full)
+	sock_pub.copy_out_sockaddr(_addr, addrlen, voidptr(&this.name), this.address_length())
 }
 
 // shutdown(2). Closing the write half is how a peer is told that nothing more
@@ -808,48 +1021,22 @@ fn (mut this UnixSocket) accept(_handle voidptr) ?&resource.Resource {
 }
 
 fn (mut this UnixSocket) connect(_handle voidptr, _addr voidptr, addrlen u32) ? {
-	addr := unsafe { &SockaddrUn(_addr) }
+	mut socket := lookup_bound(_addr, addrlen)?
 
-	if addr.sun_family != sock_pub.af_unix {
-		errno.set(errno.einval)
-		return none
-	}
-
-	mut socket := &UnixSocket(unsafe { nil })
-
-	// Abstract socket: sun_path[0] == '\0'
-	if addrlen > 2 && addr.sun_path[0] == 0 {
-		name_len := addrlen - 2
-		abstract_sockets_lock.acquire()
-		for i in 0 .. 64 {
-			if abstract_sockets[i].in_use && abstract_sockets[i].name_len == name_len {
-				if unsafe { C.memcmp(&abstract_sockets[i].name[0], &addr.sun_path[0], name_len) } == 0 {
-					socket = abstract_sockets[i].socket
-					break
-				}
-			}
+	// A datagram socket joins no listener: connect(2) only names where its
+	// sends go, as syslog(3) does with /dev/log.
+	if this.is_datagram() {
+		if !socket.is_datagram() {
+			errno.set(errno.eprototype)
+			return none
 		}
-		abstract_sockets_lock.release()
-		if socket == unsafe { nil } {
+		if socket.closed {
 			errno.set(errno.econnrefused)
 			return none
 		}
-	} else {
-		mut t := proc.current_thread()
-		path := unsafe { cstring_to_vstring(&addr.sun_path[0]) }
-
-		mut target := fs.get_node(proc.current_directory_of(t.process), path, true) or {
-			return none
-		}
-
-		mut target_res := target.resource
-
-		if mut target_res is UnixSocket {
-			socket = target_res
-		} else {
-			errno.set(errno.econnrefused)
-			return none
-		}
+		this.dgram_target = socket
+		this.status |= file.pollout
+		return
 	}
 
 	socket.l.acquire()
@@ -872,6 +1059,7 @@ fn (mut this UnixSocket) connect(_handle voidptr, _addr voidptr, addrlen u32) ? 
 		peer:      this
 		connected: true
 		name:      socket.name
+		name_len:  socket.name_len
 		data:      unsafe { malloc(sock_buf) }
 		capacity:  sock_buf
 		status:    file.pollout
@@ -930,6 +1118,7 @@ fn (mut this UnixSocket) bind(_handle voidptr, _addr voidptr, addrlen u32) ? {
 				unsafe { C.memcpy(&abstract_sockets[i].name[0], &addr.sun_path[0], name_len) }
 				abstract_sockets[i].socket = unsafe { this }
 				this.name = *addr
+				this.name_len = addrlen
 				return
 			}
 		}
@@ -950,6 +1139,7 @@ fn (mut this UnixSocket) bind(_handle voidptr, _addr voidptr, addrlen u32) ? {
 	fs.replace_resource(mut node, this)
 
 	this.name = *addr
+	this.name_len = u32(sizeof(u16)) + u32(path.len) + 1
 }
 
 fn (mut this UnixSocket) listen(_handle voidptr, backlog int) ? {
@@ -978,13 +1168,15 @@ fn (mut this UnixSocket) recvmsg(_handle voidptr, msg &sock_pub.MsgHdr, flags in
 	C.printf(c'%d iovecs, %llu bytes\n', msg.msg_iovlen, count)
 
 	// If pipe is empty, block or return if nonblock
-	for katomic.load(&this.used) == 0 {
+	for this.nothing_queued() {
 		// Return EOF if the pipe was closed
 		//		if this.refcount <= 1 {
 		//			return 0
 		//		}
-		this.peer.status |= file.pollout
-		event.trigger(mut this.peer.event, false)
+		if this.peer != unsafe { nil } {
+			this.peer.status |= file.pollout
+			event.trigger(mut this.peer.event, false)
+		}
 		if handle.flags & resource.o_nonblock != 0 {
 			errno.set(errno.ewouldblock)
 			return none
@@ -1004,10 +1196,10 @@ fn (mut this UnixSocket) recvmsg(_handle voidptr, msg &sock_pub.MsgHdr, flags in
 		count = this.used
 	}
 
-	// A SOCK_SEQPACKET recvmsg returns at most one record; never read across
-	// its boundary.
+	// A SOCK_SEQPACKET or SOCK_DGRAM recvmsg returns at most one record;
+	// never read across its boundary.
 	mut seq_msg_len := u64(0)
-	if this.is_seqpacket() {
+	if this.keeps_boundaries() {
 		seq_msg_len = this.next_message_length()
 		if count > seq_msg_len {
 			count = seq_msg_len
@@ -1086,11 +1278,19 @@ fn (mut this UnixSocket) recvmsg(_handle voidptr, msg &sock_pub.MsgHdr, flags in
 		if cmsg_space <= control_capacity {
 			// A connected stream never changes identity, so the credentials
 			// captured when the connection was established are the sending
-			// process's own.
-			credentials := sock_pub.UCred{
+			// process's own. A datagram carries its sender's.
+			mut credentials := sock_pub.UCred{
 				pid: i32(proc.pid_seen_by_caller(this.peer_pid))
 				uid: this.peer_uid
 				gid: this.peer_gid
+			}
+			if this.is_datagram() && this.datagrams.len > 0 {
+				sender := this.datagrams[0]
+				credentials = sock_pub.UCred{
+					pid: i32(proc.pid_seen_by_caller(sender.pid))
+					uid: sender.uid
+					gid: sender.gid
+				}
 			}
 			control := unsafe { &u8(msg.msg_control) }
 			unsafe {
@@ -1180,9 +1380,19 @@ fn (mut this UnixSocket) recvmsg(_handle voidptr, msg &sock_pub.MsgHdr, flags in
 		this.pending_fd_groups[i].offset -= transferred
 	}
 
+	// A datagram's source, taken before its record is retired. The name is
+	// only as long as the sender's address, and no more of it than the
+	// caller has room for is written.
+	if this.is_datagram() && this.datagrams.len > 0 && msg.msg_name != unsafe { nil } {
+		sender := this.datagrams[0]
+		sock_pub.copy_out_sockaddr(msg.msg_name, unsafe { &msg.msg_namelen }, voidptr(&sender.name),
+			sender.name_len)
+	}
+
 	// One SOCK_SEQPACKET recvmsg consumes exactly one record: drop whatever of
-	// it did not fit, and its descriptors, then retire its boundary.
-	if this.is_seqpacket() && seq_msg_len > 0 {
+	// it did not fit, and its descriptors, then retire its boundary. An empty
+	// record is retired too.
+	if this.keeps_boundaries() && this.packet_lengths.len > 0 {
 		remainder := seq_msg_len - transferred
 		if remainder > 0 {
 			for this.pending_fd_groups.len > 0 && this.pending_fd_groups[0].offset < remainder {
@@ -1200,29 +1410,34 @@ fn (mut this UnixSocket) recvmsg(_handle voidptr, msg &sock_pub.MsgHdr, flags in
 			}
 			unsafe { msg.msg_flags |= msg_trunc }
 		}
-		if this.packet_lengths.len > 0 {
-			this.packet_lengths.delete(0)
+		this.packet_lengths.delete(0)
+		if this.datagrams.len > 0 {
+			this.datagrams.delete(0)
 		}
 	}
 
-	this.peer.status |= file.pollout
-	event.trigger(mut this.peer.event, false)
+	if this.peer != unsafe { nil } {
+		this.peer.status |= file.pollout
+		event.trigger(mut this.peer.event, false)
+	}
+	if this.is_datagram() {
+		event.trigger(mut this.event, false)
+	}
 
-	if msg.msg_name != unsafe { nil } && this.connected {
-		mut actual_size := msg.msg_namelen
-		if actual_size < sizeof(SockaddrUn) {
-			actual_size = sizeof(SockaddrUn)
-		}
-
-		unsafe { C.memcpy(msg.msg_name, voidptr(&this.peer.name), actual_size) }
-		unsafe {
-			msg.msg_namelen = actual_size
-		}
+	// The peer's address, no longer than it is and no more of it than the
+	// caller has room for. The whole structure was copied whatever room
+	// msg_namelen gave, past a smaller buffer, and a larger one had kernel
+	// memory beyond the address copied into it.
+	if msg.msg_name != unsafe { nil } && this.connected && !this.is_datagram()
+		&& this.peer != unsafe { nil } {
+		mut peer := this.peer
+		sock_pub.copy_out_sockaddr(msg.msg_name, unsafe { &msg.msg_namelen }, voidptr(&peer.name),
+			peer.address_length())
 	}
 
 	C.printf(c'Successfully received %llu bytes\n', transferred)
 
-	if this.used == 0 {
+	if this.nothing_queued() {
 		this.status &= ~file.pollin
 	}
 

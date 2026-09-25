@@ -668,6 +668,68 @@ static int mremap_sparse(void) {
     return valid;
 }
 
+// SOCK_DGRAM sockets keep each datagram whole and send by address alone, as
+// a syslog client does to /dev/log: a socketpair, a bound receiver an
+// unbound sender reaches with sendto(2), and a sender connect(2) aims at it.
+static int unix_datagrams(void) {
+    const char *receiver_path = "/tmp/aarch64-syscall-dgram-receiver";
+    const char *sender_path = "/tmp/aarch64-syscall-dgram-sender";
+    char buffer[64];
+    int pair[2];
+    unlink(receiver_path);
+    unlink(sender_path);
+    if (socketpair(AF_UNIX, SOCK_DGRAM, 0, pair) != 0)
+        return 0;
+    int valid = send(pair[0], "a", 1, 0) == 1 && send(pair[0], "bb", 2, 0) == 2 &&
+                recv(pair[1], buffer, sizeof(buffer), 0) == 1 && buffer[0] == 'a' &&
+                recv(pair[1], buffer, sizeof(buffer), 0) == 2 && !memcmp(buffer, "bb", 2) &&
+                send(pair[0], "", 0, 0) == 0 &&
+                recv(pair[1], buffer, sizeof(buffer), MSG_DONTWAIT) == 0 &&
+                failed_with_errno(recv(pair[1], buffer, sizeof(buffer), MSG_DONTWAIT), EAGAIN,
+                                  "empty datagram queue");
+    close(pair[0]);
+    close(pair[1]);
+
+    struct sockaddr_un receiver_address = {.sun_family = AF_UNIX};
+    struct sockaddr_un sender_address = {.sun_family = AF_UNIX};
+    snprintf(receiver_address.sun_path, sizeof(receiver_address.sun_path), "%s", receiver_path);
+    snprintf(sender_address.sun_path, sizeof(sender_address.sun_path), "%s", sender_path);
+    int receiver = socket(AF_UNIX, SOCK_DGRAM, 0);
+    int anonymous = socket(AF_UNIX, SOCK_DGRAM, 0);
+    int named = socket(AF_UNIX, SOCK_DGRAM, 0);
+    struct sockaddr_un from;
+    socklen_t from_length = sizeof(from);
+    valid = valid && receiver >= 0 && anonymous >= 0 && named >= 0 &&
+            bind(receiver, (struct sockaddr *)&receiver_address, sizeof(receiver_address)) == 0 &&
+            sendto(anonymous, "hello", 5, 0, (struct sockaddr *)&receiver_address,
+                   sizeof(receiver_address)) == 5 &&
+            recvfrom(receiver, buffer, sizeof(buffer), 0, (struct sockaddr *)&from, &from_length) == 5 &&
+            !memcmp(buffer, "hello", 5) && from_length == sizeof(sa_family_t);
+    from_length = sizeof(from);
+    struct sockaddr_un peer;
+    socklen_t peer_length = sizeof(peer);
+    valid = valid &&
+            bind(named, (struct sockaddr *)&sender_address, sizeof(sender_address)) == 0 &&
+            connect(named, (struct sockaddr *)&receiver_address, sizeof(receiver_address)) == 0 &&
+            getpeername(named, (struct sockaddr *)&peer, &peer_length) == 0 &&
+            !strcmp(peer.sun_path, receiver_path) && send(named, "x", 1, 0) == 1 &&
+            recvfrom(receiver, buffer, sizeof(buffer), 0, (struct sockaddr *)&from, &from_length) == 1 &&
+            !strcmp(from.sun_path, sender_path);
+    if (receiver >= 0)
+        close(receiver);
+    valid = valid && failed_with_errno(send(named, "y", 1, 0), ECONNREFUSED,
+                                       "datagram to a closed socket");
+    if (!valid)
+        printf("unix datagrams: errno=%d\n", errno);
+    if (anonymous >= 0)
+        close(anonymous);
+    if (named >= 0)
+        close(named);
+    unlink(receiver_path);
+    unlink(sender_path);
+    return valid;
+}
+
 static int handler_without_restorer(void) {
     struct {
         void (*handler)(int);
@@ -996,6 +1058,7 @@ int main(void) {
     check(multiple_messages(), "sendmmsg and recvmmsg");
     check(descriptor_arguments(), "futimens and a zero-extended AT_FDCWD");
     check(mremap_sparse(), "mremap with pages not filled in");
+    check(unix_datagrams(), "unix datagram sockets");
     int no_family[2];
     check(failed_with_errno(socket(AF_INET6, SOCK_STREAM, 0), EAFNOSUPPORT, "IPv6 socket") &&
               failed_with_errno(socketpair(AF_INET, SOCK_STREAM, 0, no_family), EOPNOTSUPP,

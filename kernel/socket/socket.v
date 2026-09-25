@@ -385,8 +385,22 @@ pub fn syscall_sendto(_ voidptr, fdnum int, buf voidptr, len u64, flags int, des
 		return u64(ret), 0
 	}
 	if mut res is sock_unix.UnixSocket {
+		old_flags := fd.handle.flags
+		if flags & 0x40 != 0 {
+			fd.handle.flags |= resource.o_nonblock
+		}
+		defer {
+			fd.handle.flags = old_flags
+		}
 		if dest_addr != unsafe { nil } {
-			return errno.err, errno.eopnotsupp
+			// Only a datagram has somewhere to go by address alone.
+			if !res.is_datagram() {
+				return errno.err, errno.eopnotsupp
+			}
+			ret := res.send_datagram_to(voidptr(fd.handle), buf, len, dest_addr, addrlen) or {
+				return errno.err, errno.get()
+			}
+			return u64(ret), 0
 		}
 		ret := fd.handle.write(buf, len) or { return errno.err, errno.get() }
 		return u64(ret), 0
@@ -439,8 +453,8 @@ pub fn syscall_recvfrom(_ voidptr, fdnum int, buf voidptr, len u64, flags int, s
 		defer {
 			fd.handle.flags = old_flags
 		}
-		if res.is_seqpacket() {
-			ret := res.recv_seqpacket(voidptr(fd.handle), buf, len, flags) or {
+		if res.keeps_boundaries() {
+			ret := res.recv_seqpacket(voidptr(fd.handle), buf, len, flags, src_addr, addrlen) or {
 				return errno.err, errno.get()
 			}
 			return u64(ret), 0
