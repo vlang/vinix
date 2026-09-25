@@ -436,6 +436,16 @@ fn (mut this Pipe) write(handle voidptr, buf voidptr, _loc u64, _count u64) ?i64
 }
 
 fn (mut this Pipe) ioctl(handle voidptr, request u64, argp voidptr) ?int {
+	// FIONREAD: how many bytes a read would get now. The JDK asks it of a
+	// pipe before it reads one, and falls back to lseek(), which a pipe
+	// refuses: Elasticsearch, reading a child's output, stopped with
+	// "Illegal seek".
+	if request == fionread {
+		this.l.acquire()
+		queued := this.used
+		this.l.release()
+		return copy_fionread(argp, queued)
+	}
 	return resource.default_ioctl(handle, request, argp)
 }
 

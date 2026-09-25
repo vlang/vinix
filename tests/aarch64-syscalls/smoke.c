@@ -24,6 +24,7 @@
 #include <sys/stat.h>
 #include <sys/syscall.h>
 #include <sys/uio.h>
+#include <sys/ioctl.h>
 #include <sys/time.h>
 #include <ucontext.h>
 #include <sys/auxv.h>
@@ -1398,6 +1399,12 @@ int main(int argc, char **argv, char **envp) {
     check(thread_names(), "a thread's name is its own");
     check(async_signals(), "signals reach a computing thread and keep its FP state");
     check(thread_affinity(), "sched_getaffinity of a thread");
+    int queued_pipe[2], queued = -1;
+    check(pipe(queued_pipe) == 0 && write(queued_pipe[1], "hello", 5) == 5 &&
+              ioctl(queued_pipe[0], FIONREAD, &queued) == 0 && queued == 5,
+          "FIONREAD on a pipe");
+    close(queued_pipe[0]);
+    close(queued_pipe[1]);
     int no_family[2];
     check(failed_with_errno(socket(AF_INET6, SOCK_STREAM, 0), EAFNOSUPPORT, "IPv6 socket") &&
               failed_with_errno(socketpair(AF_INET, SOCK_STREAM, 0, no_family), EOPNOTSUPP,
