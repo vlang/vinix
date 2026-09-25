@@ -42,6 +42,9 @@ pub mut:
 	pending_signals    u64
 	masked_signals     u64
 	enqueued_by_signal bool
+	// The signals rt_sigtimedwait(2) is waiting for on this thread, and zero
+	// the rest of the time.
+	sigwait_set u64
 	// Per-signal origin data for Linux siginfo_t. Ordinary signals keep these
 	// zero; POSIX timers populate them until delivery consumes the pending bit.
 	pending_signal_codes    [64]int

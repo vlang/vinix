@@ -744,43 +744,22 @@ fn find_reaper(process &proc.Process) &proc.Process {
 }
 
 fn notify_process(parent &proc.Process) {
-	mut target := proc.get_main_thread(parent)
-	if target == unsafe { nil } {
-		return
-	}
-	defer {
-		proc.unpin_thread(target)
-	}
-	handler := target.sigactions[sigchld].sa_sigaction
-	if handler == sig_dfl || handler == sig_ign {
-		return
-	}
-	sendsig(target, u8(sigchld))
+	mut target := unsafe { parent }
+	signal_process(mut target, sigchld)
 }
 
-// Raise SIGCHLD in the parent. Only worth doing when it installed a handler:
-// the default disposition is to ignore SIGCHLD, and waking a parent that is
-// blocked in an unrelated syscall would hand it a needless EINTR.
+// Raise SIGCHLD in the parent, as a signal to the whole process. sendsig()
+// drops it where the parent neither handles nor blocks it -- its default
+// disposition is to be ignored -- and wakes no thread for it that only
+// blocks it, so a parent in an unrelated syscall gets no needless EINTR. A
+// parent that blocks it keeps it pending for sigwait(2); it was dropped
+// unless a handler had been installed.
 fn notify_parent(current_process &proc.Process) {
 	mut parent := processes[current_process.ppid]
 	if parent == unsafe { nil } || parent.pid == current_process.pid {
 		return
 	}
-
-	mut target := proc.get_main_thread(parent)
-	if target == unsafe { nil } {
-		return
-	}
-	defer {
-		proc.unpin_thread(target)
-	}
-
-	handler := target.sigactions[sigchld].sa_sigaction
-	if handler == sig_dfl || handler == sig_ign {
-		return
-	}
-
-	sendsig(target, u8(sigchld))
+	signal_process(mut parent, sigchld)
 }
 
 // ── tid address and robust futex lists ───────────────────────────────────────

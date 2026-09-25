@@ -752,6 +752,71 @@ static int initial_strings(int argc, char **argv, char **envp) {
     return 1;
 }
 
+static void *sigterm_waiter(void *result) {
+    sigset_t set;
+    sigemptyset(&set);
+    sigaddset(&set, SIGTERM);
+    int signal = 0;
+    *(int *)result = sigwait(&set, &signal) == 0 ? signal : -1;
+    return NULL;
+}
+
+// A blocked signal stays pending whatever its disposition, for sigwait(2)
+// or signalfd(2) to take: SIGCHLD, ignored by default, and SIGUSR1 set to
+// SIG_IGN. And one sent to the whole process reaches the thread that waits
+// for it, as MariaDB stops its signal thread with kill(getpid(), SIGTERM)
+// while every thread blocks SIGTERM.
+static int blocked_ignored_signals(void) {
+    sigset_t set, old;
+    sigemptyset(&set);
+    sigaddset(&set, SIGCHLD);
+    sigaddset(&set, SIGUSR1);
+    struct sigaction ignore = {.sa_handler = SIG_IGN}, previous_usr1, previous_chld;
+    struct sigaction deflt = {.sa_handler = SIG_DFL};
+    sigemptyset(&ignore.sa_mask);
+    sigemptyset(&deflt.sa_mask);
+    sigaction(SIGUSR1, &ignore, &previous_usr1);
+    sigaction(SIGCHLD, &deflt, &previous_chld);
+    sigprocmask(SIG_BLOCK, &set, &old);
+    struct timespec wait = {.tv_sec = 5};
+    raise(SIGUSR1);
+    int valid = sigtimedwait(&set, NULL, &wait) == SIGUSR1;
+    pid_t child = fork();
+    if (child == 0)
+        _exit(0);
+    valid = valid && child > 0 && sigtimedwait(&set, NULL, &wait) == SIGCHLD;
+    if (child > 0)
+        waitpid(child, NULL, 0);
+
+    sigset_t term;
+    sigemptyset(&term);
+    sigaddset(&term, SIGTERM);
+    sigprocmask(SIG_BLOCK, &term, NULL);
+    int received = 0;
+    pthread_t waiter;
+    if (valid && pthread_create(&waiter, NULL, sigterm_waiter, &received) == 0) {
+        for (int i = 0; i < 50 && received == 0; i++) {
+            kill(getpid(), SIGTERM);
+            usleep(20000);
+        }
+        pthread_join(waiter, NULL);
+        valid = received == SIGTERM;
+        // A SIGTERM sent after the waiter took one is still pending here,
+        // and would end the test once unblocked.
+        struct timespec none = {0};
+        while (sigtimedwait(&term, NULL, &none) == SIGTERM) {
+        }
+    } else {
+        valid = 0;
+    }
+    if (!valid)
+        printf("blocked ignored signals: errno=%d\n", errno);
+    sigprocmask(SIG_SETMASK, &old, NULL);
+    sigaction(SIGUSR1, &previous_usr1, NULL);
+    sigaction(SIGCHLD, &previous_chld, NULL);
+    return valid;
+}
+
 static int handler_without_restorer(void) {
     struct {
         void (*handler)(int);
@@ -1082,6 +1147,7 @@ int main(int argc, char **argv, char **envp) {
     check(mremap_sparse(), "mremap with pages not filled in");
     check(unix_datagrams(), "unix datagram sockets");
     check(initial_strings(argc, argv, envp), "argument and environment strings in order");
+    check(blocked_ignored_signals(), "blocked signals kept whatever their disposition");
     int no_family[2];
     check(failed_with_errno(socket(AF_INET6, SOCK_STREAM, 0), EAFNOSUPPORT, "IPv6 socket") &&
               failed_with_errno(socketpair(AF_INET, SOCK_STREAM, 0, no_family), EOPNOTSUPP,

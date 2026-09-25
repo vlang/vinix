@@ -654,16 +654,27 @@ pub fn sendsig(_thread &proc.Thread, signal u8) {
 		return
 	}
 
+	// An ignored signal is dropped, unless the thread blocks it: as on Linux,
+	// a blocked signal is kept pending whatever its disposition, for
+	// sigwait(2) and signalfd(2) to take. MariaDB's signal thread waits in
+	// sigwait() for the one its shutdown sends it, and the bootstrap server
+	// that creates its data directory never finished stopping.
 	handler := t.sigactions[signal].sa_sigaction
-	if handler == sig_ign || (handler == sig_dfl && has_default_ignore_action(int(signal))) {
+	blocked := katomic.load(&t.masked_signals) & (u64(1) << (signal - 1)) != 0
+	if !blocked && (handler == sig_ign
+		|| (handler == sig_dfl && has_default_ignore_action(int(signal)))) {
 		return
 	}
 
 	posixtimer.clear_signal_info(mut t, int(signal))
 	katomic.bts(mut &t.pending_signals, signal - 1)
 
-	// Try to stop an event_await()
-	sched.enqueue_thread(t, true)
+	// Wake the thread when it can take the signal now, or waits for it in
+	// sigtimedwait(). A signal it blocks otherwise just stays pending: waking
+	// it for one ended whatever it was waiting in with EINTR for nothing.
+	if !blocked || katomic.load(&t.sigwait_set) & (u64(1) << (signal - 1)) != 0 {
+		sched.enqueue_thread(t, true)
+	}
 }
 
 // Deliver a signal aimed at a whole process. Signal state is per-thread here,
@@ -672,11 +683,18 @@ pub fn sendsig(_thread &proc.Thread, signal u8) {
 // thread blocks it does it wait on the main thread. Always choosing the main
 // thread lost signals for good in Go programs, whose main thread commonly sits
 // with them blocked while other threads are the ones meant to take them.
+//
+// Linux keeps such a signal pending on the process, where any thread waiting
+// for it in sigwait(2) takes it. The nearest here is to give it to a thread
+// that waits for it now: MariaDB blocks SIGTERM in every thread, sends it to
+// its own pid to stop the thread that sigwait()s for it, and that thread
+// never saw it on the main thread, so the server never stopped.
 fn signal_process(mut target proc.Process, signal int) bool {
 	bit := u64(1) << (signal - 1)
 	unblockable := signal == sigkill || signal == sigstop
 	target.threads_lock.acquire()
 	mut chosen := &proc.Thread(unsafe { nil })
+	mut waiting := &proc.Thread(unsafe { nil })
 	for t in target.threads {
 		if katomic.load(&t.is_dead) {
 			continue
@@ -686,8 +704,15 @@ fn signal_process(mut target proc.Process, signal int) bool {
 		}
 		if unblockable || t.masked_signals & bit == 0 {
 			chosen = t
+			waiting = unsafe { nil }
 			break
 		}
+		if waiting == unsafe { nil } && katomic.load(&t.sigwait_set) & bit != 0 {
+			waiting = t
+		}
+	}
+	if waiting != unsafe { nil } {
+		chosen = waiting
 	}
 	if chosen != unsafe { nil } {
 		proc.pin_thread(chosen)

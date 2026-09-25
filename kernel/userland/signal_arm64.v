@@ -269,6 +269,13 @@ pub fn syscall_rt_sigtimedwait(_ voidptr, set_ptr u64, info_ptr u64, timeout_ptr
 		timed = true
 	}
 
+	// Named before the first look, so that a signal sent in between wakes
+	// the sleep below rather than being left for it to miss.
+	katomic.store(mut &current_thread.sigwait_set, wanted)
+	defer {
+		katomic.store(mut &current_thread.sigwait_set, u64(0))
+	}
+
 	for {
 		if which := take_pending(mut current_thread, wanted) {
 			if info_ptr != 0 && !write_signal_info(info_ptr, current_thread, which) {
