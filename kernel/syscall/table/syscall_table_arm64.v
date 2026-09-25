@@ -412,8 +412,14 @@ fn syscall_linux_getdents64(gpr_state voidptr, fdnum int, dirp u64, count u64) (
 // Linux uname(buf) — fill utsname (6 x 65-byte fields).
 fn syscall_linux_uname(_ voidptr, buf u64) (u64, u64) {
 	mut uts := [390]u8{}
+	// A container is a Linux system to what runs in it, and /proc there says
+	// Linux already: /proc/sys/kernel/ostype, /proc/version. Programs that ask
+	// uname(2) which system they are on get the same answer. Erlang takes its
+	// os:type() from it, and RabbitMQ's disk monitor refused to start on
+	// {unix,vinix}. Outside a container the kernel is Vinix.
+	sysname := if net.in_own_uts_namespace() { c'Linux' } else { c'Vinix' }
 	unsafe {
-		C.strcpy(charptr(&uts[0]), c'Vinix')
+		C.strcpy(charptr(&uts[0]), sysname)
 		C.strcpy(charptr(&uts[65]), c'vinix')
 		C.strcpy(charptr(&uts[130]), c'0.1.0')
 		C.strcpy(charptr(&uts[195]), c'Vinix 0.1.0 aarch64')

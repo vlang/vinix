@@ -27,6 +27,12 @@ fn uts_namespace() &proc.Namespace {
 	return ns
 }
 
+// Whether the caller has a UTS namespace of its own, as every container a
+// runtime starts does.
+pub fn in_own_uts_namespace() bool {
+	return uts_namespace() != unsafe { nil }
+}
+
 // The caller's hostname, as uname(2) reports it.
 pub fn hostname_text() string {
 	ns := uts_namespace()
