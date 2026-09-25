@@ -1223,6 +1223,39 @@ static int limits_file(void) {
     return valid;
 }
 
+// A child in a session of its own claims the terminal `name`, as apt's dpkg
+// child does: setsid, an open without O_NOCTTY, TIOCSCTTY.
+static int claim_terminal(const char *name) {
+    pid_t child = fork();
+    if (child == 0) {
+        setsid();
+        int fd = open(name, O_RDWR);
+        _exit(fd >= 0 && ioctl(fd, TIOCSCTTY, 0) == 0 ? 0 : 1);
+    }
+    int status = 0;
+    return child > 0 && waitpid(child, &status, 0) == child && WIFEXITED(status) &&
+           WEXITSTATUS(status) == 0;
+}
+
+// A terminal is free again once the leader of its session has exited: apt
+// runs dpkg in a new session on one pty each time.
+static int terminal_after_session(void) {
+    int master = posix_openpt(O_RDWR | O_NOCTTY);
+    if (master < 0 || grantpt(master) != 0 || unlockpt(master) != 0)
+        return 0;
+    char name[64];
+    if (ptsname_r(master, name, sizeof(name)) != 0)
+        return 0;
+    int kept = open(name, O_RDWR | O_NOCTTY);
+    int first = claim_terminal(name);
+    int second = claim_terminal(name);
+    close(kept);
+    close(master);
+    if (!first || !second)
+        printf("terminal after session: first=%d second=%d\n", first, second);
+    return first && second;
+}
+
 static int handler_without_restorer(void) {
     struct {
         void (*handler)(int);
@@ -1571,6 +1604,7 @@ int main(int argc, char **argv, char **envp) {
     check(cpu_clocks(), "CPU time clocks and times()");
     check(epoll_closed_files(), "a closed file leaves its epoll sets");
     check(limits_file(), "/proc/self/limits");
+    check(terminal_after_session(), "a new session claims a pty after the last one ends");
     int no_family[2];
     check(failed_with_errno(socket(AF_INET6, SOCK_STREAM, 0), EAFNOSUPPORT, "IPv6 socket") &&
               failed_with_errno(socketpair(AF_INET, SOCK_STREAM, 0, no_family), EOPNOTSUPP,

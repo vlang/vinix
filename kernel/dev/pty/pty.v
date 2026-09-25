@@ -313,6 +313,17 @@ pub fn open_session_terminal(session int, flags int) ?&resource.Resource {
 	return none
 }
 
+// Let go of a terminal whose session's leader has exited, as Linux does when
+// the leader exits. It stayed that session's for good: apt runs dpkg in a
+// new session on one pty each time, and every run after the first failed to
+// claim it with TIOCSCTTY. Called with the pair locked.
+fn (mut pair PtyPair) release_ended_session() {
+	if pair.session != 0 && !proc.session_leader_alive(pair.session) {
+		pair.session = 0
+		pair.foreground_pgid = 0
+	}
+}
+
 fn (mut this PtySlave) open(flags int) ?&resource.Resource {
 	mut pair := this.pair
 	pair.l.acquire()
@@ -327,6 +338,9 @@ fn (mut this PtySlave) open(flags int) ?&resource.Resource {
 	// Opening a terminal without O_NOCTTY lets an eligible session leader
 	// acquire it. openpty users pass O_NOCTTY and claim it explicitly later.
 	mut process := proc.current_thread().process
+	if flags & resource.o_noctty == 0 {
+		pair.release_ended_session()
+	}
 	if flags & resource.o_noctty == 0 && process.sid == process.pid && process.tty_session == 0
 		&& pair.session == 0 {
 		pair.session = process.sid
@@ -807,6 +821,7 @@ fn terminal_ioctl(mut pair PtyPair, slave_side bool, request u64, argp voidptr) 
 				return none
 			}
 			mut process := proc.current_thread().process
+			pair.release_ended_session()
 			if process.sid != process.pid || (pair.session != 0 && pair.session != process.sid) {
 				errno.set(errno.eperm)
 				return none

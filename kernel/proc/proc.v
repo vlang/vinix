@@ -927,6 +927,15 @@ fn add_limit_value(mut text lib.Text, value u64) {
 	}
 }
 
+// Whether the process that leads session `sid` is still running. A
+// terminal is its session's only for that long.
+pub fn session_leader_alive(sid int) bool {
+	lock_table()
+	defer { unlock_table() }
+	p := process_at(sid)
+	return p != unsafe { nil } && !p.exiting && p.sid == sid
+}
+
 // The auxiliary vector a process was started with, as bytes of its own.
 pub fn process_auxv(pid int) []u8 {
 	lock_table()
