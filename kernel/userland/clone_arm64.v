@@ -566,6 +566,12 @@ const sibling_exit_grace_ns = u64(500000000)
 // A thread told to go by a sibling's exit_group() or execve() leaves here, on
 // its way back to userspace, after the syscall it was in has unwound and given
 // back what it held.
+// Whether the current thread's process has told it to exit.
+pub fn told_to_exit() bool {
+	t := proc.current_thread()
+	return t != unsafe { nil } && katomic.load(&t.must_exit)
+}
+
 pub fn exit_if_told_to() {
 	t := proc.current_thread()
 	if t == unsafe { nil } || !katomic.load(&t.must_exit) {

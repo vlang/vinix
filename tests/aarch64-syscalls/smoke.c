@@ -1358,6 +1358,37 @@ static int growing_stack(void) {
     return valid;
 }
 
+static void *spinning_thread(void *unused) {
+    (void)unused;
+    volatile unsigned long n = 0;
+    for (;;)
+        n++;
+    return NULL;
+}
+
+// A process whose other thread only computes exits at once: that thread
+// leaves at its next interrupt, as it would at its next syscall, rather than
+// being waited for and stopped.
+static int exit_past_busy_thread(void) {
+    struct timespec start, end;
+    clock_gettime(CLOCK_MONOTONIC, &start);
+    pid_t child = fork();
+    if (child == 0) {
+        pthread_t thread;
+        pthread_create(&thread, NULL, spinning_thread, NULL);
+        usleep(20000);
+        _exit(7);
+    }
+    int status = 0;
+    int reaped = child > 0 && waitpid(child, &status, 0) == child && WIFEXITED(status) &&
+                 WEXITSTATUS(status) == 7;
+    clock_gettime(CLOCK_MONOTONIC, &end);
+    long ms = elapsed_ns(start, end) / 1000000;
+    if (!reaped || ms >= 400)
+        printf("exit past busy thread: reaped=%d status=0x%x %ldms\n", reaped, status, ms);
+    return reaped && ms < 400;
+}
+
 static int handler_without_restorer(void) {
     struct {
         void (*handler)(int);
@@ -1710,6 +1741,7 @@ int main(int argc, char **argv, char **envp) {
     check(timerfd_churn(), "80 timerfds made and closed in turn");
     check(socket_timeouts(), "SO_RCVTIMEO, SO_LINGER and TCP keepalive options");
     check(growing_stack(), "a 32 MiB deep recursion after raising RLIMIT_STACK");
+    check(exit_past_busy_thread(), "exit_group does not wait for a thread that only computes");
     int no_family[2];
     check(failed_with_errno(socket(AF_INET6, SOCK_STREAM, 0), EAFNOSUPPORT, "IPv6 socket") &&
               failed_with_errno(socketpair(AF_INET, SOCK_STREAM, 0, no_family), EOPNOTSUPP,

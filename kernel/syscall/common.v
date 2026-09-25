@@ -22,14 +22,23 @@ fn leave(context &cpulocal.GPRState) {
 // goroutine with, waited for good. It is delivered here as at a syscall's
 // end, its handler run on a frame that keeps the FP/SIMD registers the loop
 // had live.
+//
+// A thread its process has told to exit leaves here too, as it does at a
+// syscall's end. One that only computed made no syscall to leave at: the
+// sibling tearing the process down waited half a second for it, then
+// stopped it where it was and left its kernel stack allocated for good.
 @[export: 'interrupt__leave']
 fn interrupt_leave(context &cpulocal.GPRState) {
 	if context.pstate & 0xf != 0 {
 		return
 	}
-	if !userland.async_signal_deliverable() {
+	told_to_exit := userland.told_to_exit()
+	if !told_to_exit && !userland.async_signal_deliverable() {
 		return
 	}
 	cpu.interrupt_toggle(false)
+	if told_to_exit {
+		userland.exit_if_told_to()
+	}
 	userland.dispatch_a_signal(context)
 }
