@@ -37,7 +37,7 @@ pub mut:
 }
 
 __global (
-	hpet           &HPET
+	hpet_device    &HPET
 	hpet_frequency u64
 	// A machine without an HPET -- VirtualBox by default -- counts time with
 	// the TSC instead, calibrated against the PIT. hpet_frequency is then the
@@ -52,7 +52,7 @@ pub fn read_counter() u64 {
 	if hpet_uses_tsc {
 		return cpu.rdtsc() - hpet_tsc_base
 	}
-	return kio.mmin(&hpet.main_counter_value)
+	return kio.mmin(&hpet_device.main_counter_value)
 }
 
 // Time since initialise(), in nanoseconds.
@@ -104,19 +104,19 @@ pub fn initialise() {
 		})
 	}
 
-	hpet = unsafe { &HPET(hpet_table.address + higher_half) }
+	hpet_device = unsafe { &HPET(hpet_table.address + higher_half) }
 
-	mut tmp := kio.mmin(&hpet.general_capabilities)
+	mut tmp := kio.mmin(&hpet_device.general_capabilities)
 
 	counter_clk_period := tmp >> 32
 	hpet_frequency = u64(1000000000000000) / counter_clk_period
 
 	println('hpet: Detected frequency of ${hpet_frequency} Hz')
 
-	kio.mmout(&hpet.main_counter_value, 0)
+	kio.mmout(&hpet_device.main_counter_value, 0)
 
 	println('hpet: Enabling')
-	tmp = kio.mmin(&hpet.general_configuration)
+	tmp = kio.mmin(&hpet_device.general_configuration)
 	tmp |= 0b01
-	kio.mmout(&hpet.general_configuration, tmp)
+	kio.mmout(&hpet_device.general_configuration, tmp)
 }
