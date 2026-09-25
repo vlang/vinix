@@ -661,10 +661,20 @@ STAGING_CACHE="$BUILD_DIR/initramfs-root.layers"
 CONTENT_KEY="$BUILD_DIR/initramfs-root.content-key"
 STAGING_CACHE_EXPECTED="$(mktemp "$BUILD_DIR/.initramfs-root.layers.XXXXXX")"
 CONTENT_KEY_EXPECTED=""
+# An interrupted archive step would otherwise leave a multi-gigabyte partial
+# tar in the checkout, where the QEMU host source share picks it up.
+DESKTOP_INITRAMFS_TMP=""
+DESKTOP_INITRAMFS_GZ_TMP=""
 cleanup_desktop_cache_temps() {
     rm -f "$STAGING_CACHE_EXPECTED"
     if [ -n "$CONTENT_KEY_EXPECTED" ]; then
         rm -f "$CONTENT_KEY_EXPECTED"
+    fi
+    if [ -n "$DESKTOP_INITRAMFS_TMP" ]; then
+        rm -f "$DESKTOP_INITRAMFS_TMP"
+    fi
+    if [ -n "$DESKTOP_INITRAMFS_GZ_TMP" ]; then
+        rm -f "$DESKTOP_INITRAMFS_GZ_TMP"
     fi
     release_desktop_build_lock
 }

@@ -19,6 +19,12 @@ import tarfile
 import tempfile
 
 
+# The guest downloads the whole shared checkout on every build. A stray build
+# artifact (an abandoned multi-gigabyte initramfs tar, a disk image) would make
+# that download outlast curl's timeout and stall the build indefinitely.
+MAX_SHARED_FILE_BYTES = 64 * 1024 * 1024
+
+
 class OverlayError(Exception):
     pass
 
@@ -282,6 +288,14 @@ def build_source_snapshot(
                     source = root / relative
                     try:
                         if not (source.is_file() or source.is_symlink()):
+                            continue
+                        size = source.lstat().st_size
+                        if size > MAX_SHARED_FILE_BYTES:
+                            print(
+                                f"qemu-package-store: not sharing {relative} "
+                                f"({size} bytes)",
+                                flush=True,
+                            )
                             continue
                         archive.add(source, arcname=relative.as_posix(), recursive=False)
                     except FileNotFoundError:

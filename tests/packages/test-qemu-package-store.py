@@ -186,6 +186,15 @@ class PackageStoreTests(unittest.TestCase):
                 snapshot.extractfile("desktop/main.v").read(),
             )
 
+    def test_source_snapshot_skips_oversized_files(self) -> None:
+        # A sparse file costs nothing on disk but would add 65 MiB to every
+        # guest sync, as an interrupted desktop build's partial tar once did.
+        with open(self.source / ".initramfs-desktop.tar.abc123", "wb") as leftover:
+            leftover.truncate(65 * 1024 * 1024)
+        with self.source_snapshot() as snapshot:
+            self.assertNotIn(".initramfs-desktop.tar.abc123", snapshot.getnames())
+            self.assertIn("desktop/local.v", snapshot.getnames())
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
