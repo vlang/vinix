@@ -82,6 +82,21 @@ fn (mut this TmpFSResource) add_seals(seals u32) ? {
 	this.seals |= seals
 }
 
+// Tmpfs metadata and file contents already live in the resource's in-memory
+// backing store, and a shared mapping maps that store itself: there is no
+// device to flush, nothing to write back and nothing to prefetch. Spelled out
+// all the same, because the amd64 kernel has no other file system implementing
+// these optional hooks, and V3 compiles `res is MetadataResource` for an
+// interface nothing implements as a non-nil check whose call then panics --
+// chmod, fsync, msync and fadvise all brought the amd64 kernel down that way.
+fn (mut this TmpFSResource) persist_metadata() ? {}
+
+fn (mut this TmpFSResource) sync(_handle voidptr) ? {}
+
+fn (mut this TmpFSResource) sync_mapping(_handle voidptr, _offset u64, _length u64) ? {}
+
+fn (mut this TmpFSResource) advise(_handle voidptr, _offset u64, _length u64, _advice int) ? {}
+
 // materialize_locked gives a borrowed (or as-yet empty) file writable tmpfs
 // storage.  The caller holds this.l.  Keep the minimum allocation at one page:
 // tmpfs.mmap returns physical pages and therefore needs a page-aligned big
