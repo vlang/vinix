@@ -75,6 +75,10 @@ pub const so_reuseport = 15
 
 pub const so_passcred = 16
 
+pub const so_rcvtimeo = 20
+
+pub const so_sndtimeo = 21
+
 pub const so_peercred = 17
 
 pub const so_acceptconn = 30

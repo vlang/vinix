@@ -31,6 +31,7 @@
 #include <sys/signalfd.h>
 #include <sys/times.h>
 #include <sys/timerfd.h>
+#include <netinet/tcp.h>
 #include <sys/un.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -1273,6 +1274,64 @@ static int timerfd_churn(void) {
     return 1;
 }
 
+// SO_RCVTIMEO ends a blocking recv and accept with EAGAIN, and it, SO_LINGER
+// and the TCP keepalive timing read back as set: Varnish sets them all on its
+// listening socket and stops if one fails.
+static int socket_timeouts(void) {
+    struct sockaddr_in address = {.sin_family = AF_INET, .sin_addr.s_addr = htonl(INADDR_LOOPBACK)};
+    socklen_t length = sizeof(address);
+    int listener = socket(AF_INET, SOCK_STREAM, 0);
+    struct timeval wait = {0, 200000}, bad = {0, 1000000}, got = {0};
+    struct linger linger = {1, 5}, got_linger = {0};
+    socklen_t got_length = sizeof(got), linger_length = sizeof(got_linger);
+    int idle = 30, count = 0, got_idle = 0;
+    socklen_t idle_length = sizeof(got_idle);
+    if (listener < 0 || bind(listener, (struct sockaddr *)&address, sizeof(address)) != 0 ||
+        getsockname(listener, (struct sockaddr *)&address, &length) != 0 || listen(listener, 4) != 0)
+        return 0;
+    int options = setsockopt(listener, SOL_SOCKET, SO_RCVTIMEO, &wait, sizeof(wait)) == 0 &&
+                  getsockopt(listener, SOL_SOCKET, SO_RCVTIMEO, &got, &got_length) == 0 &&
+                  got.tv_sec == 0 && got.tv_usec == 200000 && got_length == sizeof(got) &&
+                  setsockopt(listener, SOL_SOCKET, SO_LINGER, &linger, sizeof(linger)) == 0 &&
+                  getsockopt(listener, SOL_SOCKET, SO_LINGER, &got_linger, &linger_length) == 0 &&
+                  got_linger.l_onoff == 1 && got_linger.l_linger == 5 &&
+                  setsockopt(listener, IPPROTO_TCP, TCP_KEEPIDLE, &idle, sizeof(idle)) == 0 &&
+                  getsockopt(listener, IPPROTO_TCP, TCP_KEEPIDLE, &got_idle, &idle_length) == 0 &&
+                  got_idle == 30;
+    int refused = setsockopt(listener, SOL_SOCKET, SO_SNDTIMEO, &bad, sizeof(bad)) == -1 &&
+                  errno == EDOM &&
+                  setsockopt(listener, IPPROTO_TCP, TCP_KEEPCNT, &count, sizeof(count)) == -1 &&
+                  errno == EINVAL;
+    struct timespec start, end;
+    clock_gettime(CLOCK_MONOTONIC, &start);
+    int accepted = accept(listener, NULL, NULL);
+    int accept_errno = errno;
+    int accept_timed_out = accepted == -1 && accept_errno == EAGAIN;
+    clock_gettime(CLOCK_MONOTONIC, &end);
+    long accept_ms = elapsed_ns(start, end) / 1000000;
+    int client = socket(AF_INET, SOCK_STREAM, 0);
+    int connected = client >= 0 && connect(client, (struct sockaddr *)&address, sizeof(address)) == 0;
+    int server = connected ? accept(listener, NULL, NULL) : -1;
+    setsockopt(client, SOL_SOCKET, SO_RCVTIMEO, &wait, sizeof(wait));
+    char byte;
+    clock_gettime(CLOCK_MONOTONIC, &start);
+    int recv_timed_out = recv(client, &byte, 1, 0) == -1 && errno == EAGAIN;
+    clock_gettime(CLOCK_MONOTONIC, &end);
+    long recv_ms = elapsed_ns(start, end) / 1000000;
+    int still_works = server >= 0 && write(server, "x", 1) == 1 && recv(client, &byte, 1, 0) == 1;
+    close(server);
+    close(client);
+    close(listener);
+    int valid = options && refused && accept_timed_out && accept_ms >= 150 && accept_ms < 3000 &&
+                connected && recv_timed_out && recv_ms >= 150 && recv_ms < 3000 && still_works;
+    if (!valid)
+        printf("socket timeouts: options=%d refused=%d accept=%d/%ldms (%d, errno %d) connected=%d "
+               "recv=%d/%ldms works=%d\n",
+               options, refused, accept_timed_out, accept_ms, accepted, accept_errno, connected,
+               recv_timed_out, recv_ms, still_works);
+    return valid;
+}
+
 static int handler_without_restorer(void) {
     struct {
         void (*handler)(int);
@@ -1623,6 +1682,7 @@ int main(int argc, char **argv, char **envp) {
     check(limits_file(), "/proc/self/limits");
     check(terminal_after_session(), "a new session claims a pty after the last one ends");
     check(timerfd_churn(), "80 timerfds made and closed in turn");
+    check(socket_timeouts(), "SO_RCVTIMEO, SO_LINGER and TCP keepalive options");
     int no_family[2];
     check(failed_with_errno(socket(AF_INET6, SOCK_STREAM, 0), EAFNOSUPPORT, "IPv6 socket") &&
               failed_with_errno(socketpair(AF_INET, SOCK_STREAM, 0, no_family), EOPNOTSUPP,

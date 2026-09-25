@@ -48,6 +48,12 @@ const ready_hangup = 8
 const ipproto_tcp = 6
 const ipproto_ip = 0
 const tcp_nodelay = 1
+
+// The keepalive timing a program may set, in seconds and probes. They are
+// kept and read back; lwIP here keeps its own timing.
+const tcp_keepidle = 4
+const tcp_keepintvl = 5
+const tcp_keepcnt = 6
 const ip_tos = 1
 const ip_ttl = 2
 const ip_recverr = 11
@@ -83,6 +89,16 @@ pub mut:
 	// are not reported to a socket at all.
 	recverr int
 	keepalive  int
+	// SO_RCVTIMEO and SO_SNDTIMEO, in nanoseconds; 0 waits for good.
+	recv_timeout_ns u64
+	send_timeout_ns u64
+	// SO_LINGER as set; a close does not wait for unsent data here.
+	linger_on      int
+	linger_seconds int
+	// TCP_KEEPIDLE, TCP_KEEPINTVL and TCP_KEEPCNT; 0 is Linux's default.
+	keep_idle     int
+	keep_interval int
+	keep_count    int
 }
 
 __global (
@@ -349,18 +365,71 @@ fn address(_addr voidptr, addrlen u32) ?&SockaddrIn {
 	return addr
 }
 
-fn wait_for_event(mut this InetSocket) bool {
+// When a call that may wait `timeout_ns` gives up, or 0 for never.
+fn deadline_after(timeout_ns u64) u64 {
+	return if timeout_ns == 0 { u64(0) } else { time.monotonic_ns() + timeout_ns }
+}
+
+// Wait for the socket to change, until `deadline` if it is not 0. A wait that
+// runs out ends as EAGAIN, as a timeout SO_RCVTIMEO or SO_SNDTIMEO set does.
+fn wait_for_event(mut this InetSocket, deadline u64) bool {
+	mut timer := &time.Timer(unsafe { nil })
+	if deadline != 0 {
+		now := time.monotonic_ns()
+		if now >= deadline {
+			errno.set(errno.eagain)
+			return false
+		}
+		left := deadline - now
+		timer = time.new_timer(time.TimeSpec{
+			tv_sec:  i64(left / 1000000000)
+			tv_nsec: i64(left % 1000000000)
+		})
+	}
 	this.l.release()
 	mut events := [&this.event]
-	event.await(mut events, true) or {
-		unsafe { events.free() }
-		this.l.acquire()
+	if timer != unsafe { nil } {
+		events << &timer.event
+	}
+	result := event.await(mut events, true)
+	unsafe { events.free() }
+	if timer != unsafe { nil } {
+		timer.disarm()
+		unsafe { free(timer) }
+	}
+	this.l.acquire()
+	which := result or {
 		errno.set(errno.eintr)
 		return false
 	}
-	unsafe { events.free() }
-	this.l.acquire()
+	if which == 1 {
+		errno.set(errno.eagain)
+		return false
+	}
 	return true
+}
+
+// SO_RCVTIMEO or SO_SNDTIMEO, for setsockopt(2) and getsockopt(2).
+pub fn (mut this InetSocket) set_timeout(send bool, timeout_ns u64) {
+	if send {
+		this.send_timeout_ns = timeout_ns
+	} else {
+		this.recv_timeout_ns = timeout_ns
+	}
+}
+
+pub fn (this &InetSocket) timeout(send bool) u64 {
+	return if send { this.send_timeout_ns } else { this.recv_timeout_ns }
+}
+
+// SO_LINGER, for setsockopt(2) and getsockopt(2).
+pub fn (mut this InetSocket) set_linger(on int, seconds int) {
+	this.linger_on = if on != 0 { 1 } else { 0 }
+	this.linger_seconds = seconds
+}
+
+pub fn (this &InetSocket) linger() (int, int) {
+	return this.linger_on, this.linger_seconds
 }
 
 fn (mut this InetSocket) read(handle voidptr, buf voidptr, _loc u64, count u64) ?i64 {
@@ -369,6 +438,7 @@ fn (mut this InetSocket) read(handle voidptr, buf voidptr, _loc u64, count u64) 
 	defer {
 		this.l.release()
 	}
+	deadline := deadline_after(this.recv_timeout_ns)
 	for {
 		net_lock.acquire()
 		ret := C.vinix_socket_recv(this.handle, buf, count, unsafe { nil }, unsafe { nil })
@@ -381,7 +451,7 @@ fn (mut this InetSocket) read(handle voidptr, buf voidptr, _loc u64, count u64) 
 			set_error(ret)
 			return none
 		}
-		if !wait_for_event(mut this) {
+		if !wait_for_event(mut this, deadline) {
 			return none
 		}
 	}
@@ -394,6 +464,7 @@ fn (mut this InetSocket) write(handle voidptr, buf voidptr, _loc u64, count u64)
 	defer {
 		this.l.release()
 	}
+	deadline := deadline_after(this.send_timeout_ns)
 	for {
 		net_lock.acquire()
 		ret := C.vinix_socket_send(this.handle, buf, count, 0, 0, 0)
@@ -406,7 +477,7 @@ fn (mut this InetSocket) write(handle voidptr, buf voidptr, _loc u64, count u64)
 			set_error(ret)
 			return none
 		}
-		if !wait_for_event(mut this) {
+		if !wait_for_event(mut this, deadline) {
 			return none
 		}
 	}
@@ -425,6 +496,7 @@ pub fn (mut this InetSocket) sendto(handle voidptr, buf voidptr, count u64, _add
 	defer {
 		this.l.release()
 	}
+	deadline := deadline_after(this.send_timeout_ns)
 	for {
 		net_lock.acquire()
 		ret := C.vinix_socket_send(this.handle, buf, count,
@@ -439,7 +511,7 @@ pub fn (mut this InetSocket) sendto(handle voidptr, buf voidptr, count u64, _add
 			set_error(ret)
 			return none
 		}
-		if !wait_for_event(mut this) {
+		if !wait_for_event(mut this, deadline) {
 			return none
 		}
 	}
@@ -452,6 +524,7 @@ pub fn (mut this InetSocket) recvfrom(handle voidptr, buf voidptr, count u64, _a
 	defer {
 		this.l.release()
 	}
+	deadline := deadline_after(this.recv_timeout_ns)
 	for {
 		mut source := SockaddrIn{sin_family: sock_pub.af_inet}
 		net_lock.acquire()
@@ -468,7 +541,7 @@ pub fn (mut this InetSocket) recvfrom(handle voidptr, buf voidptr, count u64, _a
 			set_error(ret)
 			return none
 		}
-		if !wait_for_event(mut this) {
+		if !wait_for_event(mut this, deadline) {
 			return none
 		}
 	}
@@ -509,8 +582,14 @@ fn (mut this InetSocket) connect(handle voidptr, _addr voidptr, addrlen u32) ? {
 		errno.set(errno.einprogress)
 		return none
 	}
+	// Linux gives up a blocking connect after SO_SNDTIMEO with EINPROGRESS;
+	// the connection goes on being made.
+	deadline := deadline_after(this.send_timeout_ns)
 	for {
-		if !wait_for_event(mut this) {
+		if !wait_for_event(mut this, deadline) {
+			if errno.get() == errno.eagain {
+				errno.set(errno.einprogress)
+			}
 			return none
 		}
 		net_lock.acquire()
@@ -550,6 +629,7 @@ fn (mut this InetSocket) accept(handle voidptr) ?&resource.Resource {
 	defer {
 		this.l.release()
 	}
+	deadline := deadline_after(this.recv_timeout_ns)
 	for {
 		net_lock.acquire()
 		child_handle := C.vinix_socket_accept(this.handle)
@@ -565,7 +645,7 @@ fn (mut this InetSocket) accept(handle voidptr) ?&resource.Resource {
 			errno.set(errno.ewouldblock)
 			return none
 		}
-		if !wait_for_event(mut this) {
+		if !wait_for_event(mut this, deadline) {
 			return none
 		}
 	}
@@ -672,6 +752,13 @@ fn (mut this InetSocket) getsockopt(_handle voidptr, level int, optname int) ?in
 		if ret == 0 {
 			return int(value)
 		}
+	} else if level == ipproto_tcp && this.socktype == sock_pub.sock_stream
+		&& optname in [tcp_keepidle, tcp_keepintvl, tcp_keepcnt] {
+		return match optname {
+			tcp_keepidle { if this.keep_idle != 0 { this.keep_idle } else { 7200 } }
+			tcp_keepintvl { if this.keep_interval != 0 { this.keep_interval } else { 75 } }
+			else { if this.keep_count != 0 { this.keep_count } else { 9 } }
+		}
 	} else if level == ipproto_tcp && optname == tcp_nodelay && this.socktype == sock_pub.sock_stream {
 		mut value := i32(0)
 		net_lock.acquire()
@@ -716,6 +803,21 @@ fn (mut this InetSocket) setsockopt(_handle voidptr, level int, optname int, val
 		supported = true
 	} else if level == ipproto_tcp && optname == tcp_nodelay && this.socktype == sock_pub.sock_stream {
 		supported = true
+	} else if level == ipproto_tcp && this.socktype == sock_pub.sock_stream
+		&& optname in [tcp_keepidle, tcp_keepintvl, tcp_keepcnt] {
+		// Varnish sets all three on its listening socket and stops if any
+		// fails. Linux's ranges.
+		limit := if optname == tcp_keepcnt { 127 } else { 32767 }
+		if value < 1 || value > limit {
+			errno.set(errno.einval)
+			return none
+		}
+		match optname {
+			tcp_keepidle { this.keep_idle = value }
+			tcp_keepintvl { this.keep_interval = value }
+			else { this.keep_count = value }
+		}
+		return
 	}
 	if !supported {
 		errno.set(errno.enoprotoopt)
