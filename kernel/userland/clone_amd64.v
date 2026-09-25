@@ -157,6 +157,8 @@ fn clone_new_process(state &cpulocal.GPRState, flags u64, child_stack u64, paren
 	}
 
 	new_process.name = proc.process_name(old_process.name, new_process.pid)
+	new_process.executable_path = old_process.executable_path.clone()
+	new_process.exe_node = old_process.exe_node
 	fs.fork_namespaces(mut new_process, flags)
 	if into_cgroup {
 		new_process.cgroup = cgroup

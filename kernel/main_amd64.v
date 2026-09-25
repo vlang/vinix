@@ -89,6 +89,11 @@ fn kmain_thread() {
 	fs.mount(vfs_root, '', '/', 'tmpfs') or {}
 	fs.create(vfs_root, '/dev', 0o644 | stat.ifdir) or {}
 	fs.mount(vfs_root, '', '/dev', 'devtmpfs') or {}
+	// /proc, as arm64 has it: /proc/self/exe, /proc/meminfo and the process
+	// directories are where Linux programs look for themselves and for the
+	// machine, and nothing in the amd64 image mounts it.
+	fs.create(vfs_root, '/proc', 0o555 | stat.ifdir) or {}
+	fs.mount(vfs_root, '', '/proc', 'procfs') or {}
 	hypervisor.initialise()
 
 	initramfs.initialise()

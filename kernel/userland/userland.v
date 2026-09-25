@@ -780,7 +780,8 @@ pub fn start_program_node(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, p
 		mut new_process := sched.new_process(unsafe { nil }, new_pagemap)?
 
 		new_process.name = proc.process_name(path, new_process.pid)
-		new_process.executable_path = path.clone()
+		new_process.executable_path = fs.program_path(prog_node, path)
+		new_process.exe_node = voidptr(prog_node)
 		new_process.linux_abi = linux_abi
 		new_process.allow_wx = allow_wx
 		new_process.sigcookie = proc.new_sigcookie()
@@ -864,7 +865,11 @@ pub fn start_program_node(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, p
 			process.executable_path.free()
 		}
 		process.name = proc.process_name(path, process.pid)
-		process.executable_path = path.clone()
+		// /proc/self/exe leads to the program's node, as on arm64, so that it
+		// names the file wherever the exec found it -- by a relative path, or
+		// through a descriptor.
+		process.executable_path = fs.program_path(prog_node, path)
+		process.exe_node = voidptr(prog_node)
 		process.linux_abi = linux_abi
 		process.allow_wx = allow_wx
 		// The new program runs under the execpromises, or unpledged.
