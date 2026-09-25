@@ -50,6 +50,7 @@ const ipproto_ip = 0
 const tcp_nodelay = 1
 const ip_tos = 1
 const ip_ttl = 2
+const ip_recverr = 11
 
 // Driver identifiers shared with vinix_net.c.
 pub const driver_virtio = 1
@@ -78,6 +79,9 @@ pub mut:
 	listening  bool
 	reuseaddr  int
 	broadcast  int
+	// IP_RECVERR, kept for getsockopt(). No error queue is kept: ICMP errors
+	// are not reported to a socket at all.
+	recverr int
 	keepalive  int
 }
 
@@ -658,6 +662,8 @@ fn (mut this InetSocket) getsockopt(_handle voidptr, level int, optname int) ?in
 			sock_pub.so_broadcast { return this.broadcast }
 			else {}
 		}
+	} else if level == ipproto_ip && optname == ip_recverr {
+		return this.recverr
 	} else if level == ipproto_ip && optname in [ip_tos, ip_ttl] {
 		mut value := i32(0)
 		net_lock.acquire()
@@ -700,6 +706,12 @@ fn (mut this InetSocket) setsockopt(_handle voidptr, level int, optname int, val
 			}
 			else {}
 		}
+	} else if level == ipproto_ip && optname == ip_recverr {
+		// glibc's resolver turns this on for every socket it asks a name
+		// server with, and gives up on the name server when it cannot: no
+		// name resolved in an Ubuntu or Debian container.
+		this.recverr = value
+		return
 	} else if level == ipproto_ip && optname in [ip_tos, ip_ttl] {
 		supported = true
 	} else if level == ipproto_tcp && optname == tcp_nodelay && this.socktype == sock_pub.sock_stream {
