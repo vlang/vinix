@@ -173,12 +173,19 @@ fn clone_new_process(state &cpulocal.GPRState, flags u64, child_stack u64, paren
 		}
 	}
 
-	// Duplicate the descriptor table. The open numbers are read under the
-	// table's lock: another thread of the parent may make a descriptor
-	// meanwhile, and grow the table as it does.
+	// Duplicate the descriptor table, keeping each descriptor's flags: a
+	// close-on-exec pipe end that lost its flag here would outlive the
+	// child's execve and keep the reader from ever seeing end of file. The
+	// open numbers are read under the table's lock: another thread of the
+	// parent may make a descriptor meanwhile, and grow the table as it does.
 	mut open := file.open_fdnums(old_process)
 	for i in open {
-		file.fdnum_dup(old_process, i, new_process, i, 0, true, false) or { continue }
+		mut old_fd := file.fd_from_fdnum(old_process, i) or { continue }
+		flags := old_fd.flags
+		old_fd.unref()
+		file.fdnum_dup(old_process, i, new_process, i, flags, true, false) or {
+			continue
+		}
 	}
 	unsafe { open.free() }
 

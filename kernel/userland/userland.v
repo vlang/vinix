@@ -829,9 +829,25 @@ pub fn start_program_node(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, p
 		mut process := t.process
 
 		// Every other thread has to be gone before the address space it runs
-		// in is replaced. POSIX timers do not survive an exec either.
+		// in is replaced, and before the close-on-exec descriptors go. POSIX
+		// timers do not survive an exec either.
 		kill_sibling_threads(mut process, t)
 		posixtimer.remove_process_timers(process)
+
+		// Close the O_CLOEXEC descriptors, as execve(2) promises. A pipe end
+		// that survived the exec would keep its reader from ever seeing end
+		// of file: posix_spawn() and Python's subprocess learn that the
+		// child's exec worked from exactly that end of file. The table stops
+		// growing with the other threads gone.
+		for i := 0; i < process.fds.len; i++ {
+			fd_ptr := unsafe { &file.FD(process.fds[i]) }
+			if fd_ptr == unsafe { nil } {
+				continue
+			}
+			if fd_ptr.flags & resource.o_cloexec != 0 {
+				file.fdnum_close(process, i, true) or {}
+			}
+		}
 
 		// Swapped under the process table lock, which cgroup memory accounting
 		// and /proc hold while they walk a process' page map: the old one is
