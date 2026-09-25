@@ -1200,6 +1200,29 @@ static int epoll_closed_files(void) {
     return valid;
 }
 
+// /proc/self/limits shows what getrlimit(2) gives, in the columns Linux uses.
+static int limits_file(void) {
+    struct rlimit files;
+    char text[4096] = {0}, header[128];
+    getrlimit(RLIMIT_NOFILE, &files);
+    snprintf(header, sizeof(header), "%-25s %-20s %-20s %-10s\n", "Limit", "Soft Limit",
+             "Hard Limit", "Units");
+    int fd = open("/proc/self/limits", O_RDONLY);
+    ssize_t length = fd >= 0 ? read(fd, text, sizeof(text) - 1) : -1;
+    if (fd >= 0)
+        close(fd);
+    char *row = length > 0 ? strstr(text, "\nMax open files ") : NULL;
+    unsigned long soft = 0, hard = 0;
+    int parsed = row && sscanf(row + 1 + 26, "%lu %lu", &soft, &hard) == 2;
+    int valid = length > 0 && !strncmp(text, header, strlen(header)) && parsed &&
+                soft == files.rlim_cur && hard == files.rlim_max &&
+                strstr(text, "\nMax stack size ") != NULL;
+    if (!valid)
+        printf("limits: length=%zd parsed=%d soft=%lu hard=%lu\n%.300s", length, parsed, soft,
+               hard, text);
+    return valid;
+}
+
 static int handler_without_restorer(void) {
     struct {
         void (*handler)(int);
@@ -1547,6 +1570,7 @@ int main(int argc, char **argv, char **envp) {
     check(signal_descriptor(), "signalfd with poll, epoll and a blocking read");
     check(cpu_clocks(), "CPU time clocks and times()");
     check(epoll_closed_files(), "a closed file leaves its epoll sets");
+    check(limits_file(), "/proc/self/limits");
     int no_family[2];
     check(failed_with_errno(socket(AF_INET6, SOCK_STREAM, 0), EAFNOSUPPORT, "IPv6 socket") &&
               failed_with_errno(socketpair(AF_INET, SOCK_STREAM, 0, no_family), EOPNOTSUPP,

@@ -867,6 +867,66 @@ pub fn thread_command(pid int, tid int) string {
 	return text.str()
 }
 
+// The names and units /proc/<pid>/limits gives the limits, in resource order.
+const limit_names = ['Max cpu time', 'Max file size', 'Max data size', 'Max stack size',
+	'Max core file size', 'Max resident set', 'Max processes', 'Max open files',
+	'Max locked memory', 'Max address space', 'Max file locks', 'Max pending signals',
+	'Max msgqueue size', 'Max nice priority', 'Max realtime priority', 'Max realtime timeout']
+
+const limit_units = ['seconds', 'bytes', 'bytes', 'bytes', 'bytes', 'bytes', 'processes', 'files',
+	'bytes', 'bytes', 'locks', 'signals', 'bytes', '', '', 'us']
+
+// /proc/<pid>/limits: every limit's soft and hard value, in the columns
+// Linux prints them in, which readers cut the file up by.
+pub fn process_limits_text(pid int) string {
+	lock_table()
+	process := process_at(pid)
+	if process == unsafe { nil } {
+		unlock_table()
+		return ''
+	}
+	limits := process.rlimits
+	unlock_table()
+
+	mut text := lib.new_text(1500)
+	add_column(mut text, 'Limit', 26)
+	add_column(mut text, 'Soft Limit', 21)
+	add_column(mut text, 'Hard Limit', 21)
+	add_column(mut text, 'Units', 10)
+	text.add_byte(`\n`)
+	for i in 0 .. rlimit_nlimits {
+		add_column(mut text, limit_names[i], 26)
+		add_limit_value(mut text, limits[i].cur)
+		add_limit_value(mut text, limits[i].max)
+		if limit_units[i].len > 0 {
+			add_column(mut text, limit_units[i], 10)
+		}
+		text.add_byte(`\n`)
+	}
+	return text.str()
+}
+
+// `s`, then spaces out to `width`.
+fn add_column(mut text lib.Text, s string, width int) {
+	start := text.len()
+	text.add(s)
+	for text.len() < start + width {
+		text.add_byte(` `)
+	}
+}
+
+fn add_limit_value(mut text lib.Text, value u64) {
+	start := text.len()
+	if value == rlim_infinity {
+		text.add('unlimited')
+	} else {
+		text.add_unsigned(value)
+	}
+	for text.len() < start + 21 {
+		text.add_byte(` `)
+	}
+}
+
 // The auxiliary vector a process was started with, as bytes of its own.
 pub fn process_auxv(pid int) []u8 {
 	lock_table()

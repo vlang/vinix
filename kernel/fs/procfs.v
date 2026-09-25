@@ -60,6 +60,7 @@ enum ProcFSKind {
 	maps
 	smaps
 	auxv
+	limits
 	oom_score_adj
 	setgroups
 	uid_map
@@ -526,6 +527,9 @@ fn (this &ProcFSResource) contents() string {
 		}
 		.maps {
 			return maps_text(this.pid, false)
+		}
+		.limits {
+			return proc.process_limits_text(this.pid)
 		}
 		.auxv {
 			mut bytes := proc.process_auxv(this.pid)
@@ -1201,8 +1205,8 @@ fn populate_process_directory(mut node VFSNode, pid int) {
 // descriptors, namespaces and mounts are its process', since Vinix threads
 // share all three.
 const process_entry_names = ['cmdline', 'comm', 'stat', 'statm', 'status', 'cgroup', 'environ',
-	'mountinfo', 'mounts', 'mountstats', 'maps', 'smaps', 'auxv', 'loginuid', 'oom_score_adj',
-	'uid_map', 'gid_map', 'setgroups', 'root', 'cwd', 'exe', 'fd', 'ns', 'attr']
+	'mountinfo', 'mounts', 'mountstats', 'maps', 'smaps', 'auxv', 'limits', 'loginuid',
+	'oom_score_adj', 'uid_map', 'gid_map', 'setgroups', 'root', 'cwd', 'exe', 'fd', 'ns', 'attr']
 
 fn add_process_entries(mut node VFSNode, pid int) {
 	for name in process_entry_names {
@@ -1235,6 +1239,7 @@ fn add_process_entry(mut node VFSNode, pid int, name string, is_process bool) bo
 		'maps' { add_process_file(mut node, 'maps', .maps, pid) }
 		'smaps' { add_process_file(mut node, 'smaps', .smaps, pid) }
 		'auxv' { add_process_file(mut node, 'auxv', .auxv, pid) }
+		'limits' { add_process_file(mut node, 'limits', .limits, pid) }
 		'loginuid' { add_process_file(mut node, 'loginuid', .loginuid, pid) }
 		'oom_score_adj' { add_process_writable(mut node, 'oom_score_adj', .oom_score_adj, pid) }
 		'uid_map' { add_process_writable(mut node, 'uid_map', .uid_map, pid) }
