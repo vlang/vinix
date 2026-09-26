@@ -54,8 +54,14 @@ done
 build_started_uptime=
 if [ "$reload" -eq 1 ]; then
 	uptime_file=${VINIX_DESKTOP_UPTIME_FILE:-/proc/uptime}
-	read -r build_started_uptime _ < "$uptime_file" || {
+	# Vinix procfs regenerates /proc/uptime on each read. The shell read builtin
+	# can wait indefinitely on this file; awk takes the first record and exits.
+	build_started_uptime=$(awk 'NR == 1 { print $1; exit }' "$uptime_file") || {
 		echo "vinix-desktop-build: cannot read $uptime_file" >&2
+		exit 1
+	}
+	[ -n "$build_started_uptime" ] || {
+		echo "vinix-desktop-build: $uptime_file is empty" >&2
 		exit 1
 	}
 fi

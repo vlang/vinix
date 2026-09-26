@@ -102,6 +102,7 @@ wait_for_ready_session() {
 
 	old_pid=''
 	attempt=0
+	echo "VINIX HOST DESKTOP BUILD TEST: finding initial desktop"
 	while [ "$attempt" -lt 30 ]; do
 		old_pid=$(desktop_pid)
 		[ -n "$old_pid" ] && break
@@ -109,6 +110,7 @@ wait_for_ready_session() {
 		attempt=$((attempt + 1))
 	done
 	[ -n "$old_pid" ] || fail "initial desktop did not start"
+	echo "VINIX HOST DESKTOP BUILD TEST: initial desktop $old_pid"
 	if [ -e /dev/dri/renderD128 ] && [ -x /usr/bin/vinix-desktop-gpu ]; then
 		case "$(cat "/proc/$old_pid/comm" 2>/dev/null)" in
 			vinix-desktop-g*) ;;
@@ -122,6 +124,7 @@ wait_for_ready_session() {
 		vinix-host-sync || fail "first host source sync"
 		vinix-host-sync || fail "second host source sync"
 	fi
+	echo "VINIX HOST DESKTOP BUILD TEST: invoking vinix-desktop-build"
 	vinix-desktop-build || fail "desktop build and reload"
 	[ -x /root/vinix-desktop ] || fail "desktop output is missing"
 	wait_for_ready_session 1
