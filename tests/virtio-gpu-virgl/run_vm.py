@@ -18,8 +18,8 @@ import tempfile
 import time
 
 
-SMOKE_PASS_LINE = re.compile(rb"(?:^|\r*\n)VINIX_VIRGL_VM_PASS\r*(?:\n|$)")
-SMOKE_FAIL_LINE = re.compile(rb"(?:^|\r*\n)VINIX_VIRGL_VM_FAIL:[0-9]+\r*(?:\n|$)")
+SMOKE_PASS_LINE = re.compile(rb"(?:^|\r*\n)VINIX_VIRGL_VM_PASS")
+SMOKE_FAIL_LINE = re.compile(rb"(?:^|\r*\n)VINIX_VIRGL_VM_FAIL:[0-9]+")
 DESKTOP_PASS_LINE = re.compile(
     rb"(?:^|\r*\n)VINIX_GPU_DESKTOP_VM_PASS\r*(?:\n|$)"
 )
@@ -42,6 +42,7 @@ DESKTOP_REQUIRED_STAGES = (
 DESKTOP_READY = b"vinix-desktop: ready"
 PIXELS = b"gl-triangle-agx: hardware frame rendered successfully"
 VIRGL_PASS = b"VINIX VIRGL RENDER TEST: PASS"
+NETWORK_PASS = b"VINIX_VIRGL_NETWORK_PASS"
 M1_HARDWARE_PASS = b"VINIX M1 AGX RENDER TEST: PASS"
 FOUR_CPUS_ONLINE = b"smp: 4 CPUs online"
 
@@ -225,8 +226,8 @@ def run_vm(root: Path, timeout: int, desktop_startup: bool) -> int:
                 sys.stdout.buffer.flush()
 
                 recent = bytes(transcript[-131072:])
-                pass_seen = pass_line.search(recent) is not None
-                fail_seen = fail_line.search(recent) is not None
+                pass_seen |= pass_line.search(recent) is not None
+                fail_seen |= fail_line.search(recent) is not None
                 if (pass_seen or fail_seen) and not shutdown_sent:
                     os.write(master, b"\x01x")
                     shutdown_sent = True
@@ -256,6 +257,8 @@ def run_vm(root: Path, timeout: int, desktop_startup: bool) -> int:
             if DESKTOP_READY not in output:
                 missing.append("desktop ready marker")
         else:
+            if output.count(NETWORK_PASS) != 1:
+                missing.append("DHCP and package server connectivity")
             if not RENDERER.search(output):
                 missing.append("VirGL renderer backed by an Apple host GPU")
             if output.count(PIXELS) != 1:

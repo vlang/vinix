@@ -842,9 +842,9 @@ macOS display backend is `cocoa,gl=core`. Override the QEMU path with
 `VINIX_VIRGL_QEMU` or select a display backend with `QEMU_DISPLAY_BACKEND`.
 The simpler `--virtio-gpu` option exposes the unaccelerated MMIO device and is
 useful for transport probing, but it does not create a render node. KekVM's
-compact QEMU currently omits libslirp, so this launch mode is offline. Firefox
-can exercise its bundled local smoke page. Browsing needs a VirGL QEMU build
-with a network backend.
+compact QEMU omits libslirp, so the VirGL runner uses stock `qemu-system-aarch64`
+as a local network bridge. This gives the guest DHCP, DNS, package downloads,
+and the host source share. Set `VINIX_NETWORK_QEMU` if stock QEMU is elsewhere.
 
 The VirGL desktop uses a RAM system with its own persistent `/root` volume so
 the Mesa overlay reaches applications. This volume is separate from the usual

@@ -105,6 +105,8 @@ RECOVERY_DIR=""
 RESET_DISK=0
 PACKAGE_RUNTIME_DIR=""
 PACKAGE_SERVER_PID=""
+NETWORK_BRIDGE_PID=""
+NETWORK_BRIDGE_DIR=""
 EPHEMERAL_RUNTIME_DIR=""
 CLEANUP_BOOT_DISK=0
 KEEP_TEMP_BOOT_DISK="${VINIX_KEEP_TEMP_BOOT_DISK:-0}"
@@ -118,6 +120,15 @@ cleanup_runtime() {
         kill "$PACKAGE_SERVER_PID" 2>/dev/null || true
         wait "$PACKAGE_SERVER_PID" 2>/dev/null || true
         PACKAGE_SERVER_PID=""
+    fi
+    if [ -n "$NETWORK_BRIDGE_PID" ]; then
+        kill "$NETWORK_BRIDGE_PID" 2>/dev/null || true
+        wait "$NETWORK_BRIDGE_PID" 2>/dev/null || true
+        NETWORK_BRIDGE_PID=""
+    fi
+    if [ -n "$NETWORK_BRIDGE_DIR" ]; then
+        rm -rf "$NETWORK_BRIDGE_DIR"
+        NETWORK_BRIDGE_DIR=""
     fi
     if [ -n "$PACKAGE_RUNTIME_DIR" ]; then
         rm -rf "$PACKAGE_RUNTIME_DIR"
@@ -978,7 +989,7 @@ printf '%s\n' \
 LC_ALL=C sort -u -o "$PACKAGE_RUNTIME_ROOT/etc/vinix-pkg/base-files" \
     "$PACKAGE_RUNTIME_ROOT/etc/vinix-pkg/base-files"
 : > "$PACKAGE_RUNTIME_ROOT/etc/vinix/qemu-host-source-url"
-if [ "$HOST_SOURCE_ENABLED" -eq 1 ] && [ "$VIRTIO_GPU" -ne 2 ]; then
+if [ "$HOST_SOURCE_ENABLED" -eq 1 ]; then
     printf 'http://10.0.2.2:%s\n' "$PACKAGE_STORE_PORT" \
         > "$PACKAGE_RUNTIME_ROOT/etc/vinix/qemu-host-source-url"
 fi
@@ -1014,49 +1025,85 @@ echo "==> Copying kernel to boot disk..."
 mcopy -o -i "$BOOT_DISK" "$KERNEL_DIR/bin/vinix" ::/boot/vinix
 
 # ── Launch QEMU ──
+QEMU_BIN="${VINIX_QEMU_BIN:-qemu-system-aarch64}"
 if [ "$VIRTIO_GPU" -eq 2 ]; then
-    # KekVM's compact VirGL build omits libslirp. Keep this mode offline rather
-    # than failing QEMU startup on the normal user-network backend.
-    NETWORK_FLAGS="-nic none"
-    echo "==> VirGL VM is offline (KekVM QEMU has no libslirp backend)"
-else
-    if ! command -v python3 >/dev/null 2>&1; then
-        echo "ERROR: python3 is required for QEMU package persistence" >&2
+    QEMU_BIN="${VINIX_VIRGL_QEMU:-$SCRIPT_DIR/../kekvm/.tools/qemu-virgl/bin/kekvm-qemu-system-aarch64}"
+    if [ ! -x "$QEMU_BIN" ]; then
+        echo "ERROR: KekVM's VirGL QEMU was not found at $QEMU_BIN" >&2
+        echo "       Run 'make setup-gpu' in ../kekvm or set VINIX_VIRGL_QEMU." >&2
         exit 1
     fi
-    SOURCE_SERVER_ARGS=()
-    if [ "$HOST_SOURCE_ENABLED" -eq 1 ]; then
-        SOURCE_SERVER_ARGS=(--source-root "$HOST_SOURCE_ROOT" \
-            --ui2-source "$HOST_UI2_SOURCE")
+fi
+
+if ! command -v python3 >/dev/null 2>&1; then
+    echo "ERROR: python3 is required for QEMU package persistence" >&2
+    exit 1
+fi
+SOURCE_SERVER_ARGS=()
+if [ "$HOST_SOURCE_ENABLED" -eq 1 ]; then
+    SOURCE_SERVER_ARGS=(--source-root "$HOST_SOURCE_ROOT" \
+        --ui2-source "$HOST_UI2_SOURCE")
+fi
+python3 "$SCRIPT_DIR/tools/qemu-package-store.py" \
+    --store "$PACKAGE_STORE" --port "$PACKAGE_STORE_PORT" \
+    --ready-file "$PACKAGE_SERVER_READY" "${SOURCE_SERVER_ARGS[@]}" \
+    >"$PACKAGE_SERVER_LOG" 2>&1 &
+PACKAGE_SERVER_PID=$!
+for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+    [ -s "$PACKAGE_SERVER_READY" ] && break
+    if ! kill -0 "$PACKAGE_SERVER_PID" 2>/dev/null; then
+        break
     fi
-    python3 "$SCRIPT_DIR/tools/qemu-package-store.py" \
-        --store "$PACKAGE_STORE" --port "$PACKAGE_STORE_PORT" \
-        --ready-file "$PACKAGE_SERVER_READY" "${SOURCE_SERVER_ARGS[@]}" \
-        >"$PACKAGE_SERVER_LOG" 2>&1 &
-    PACKAGE_SERVER_PID=$!
+    sleep 0.05
+done
+if [ ! -s "$PACKAGE_SERVER_READY" ]; then
+    cat "$PACKAGE_SERVER_LOG" >&2
+    echo "ERROR: QEMU package store could not start on port $PACKAGE_STORE_PORT" >&2
+    exit 1
+fi
+
+# QEMU user networking advertises 10.0.2.2 as the host and provides DHCP and
+# DNS. KekVM's VirGL build lacks libslirp, so a stock QEMU can provide the user
+# backend and forward Ethernet frames to the VirGL VM over a local stream.
+NETWORK_BACKEND="${VINIX_NETWORK_QEMU:-qemu-system-aarch64}"
+NETWORK_FLAGS=(-netdev user,id=net0 -device virtio-net-device,netdev=net0,mac=52:54:00:12:34:56)
+if [ "$VIRTIO_GPU" -eq 2 ] && ! "$QEMU_BIN" -machine virt -netdev help 2>/dev/null | grep -qx user; then
+    if ! command -v "$NETWORK_BACKEND" >/dev/null 2>&1 ||
+       ! "$NETWORK_BACKEND" -machine virt -netdev help 2>/dev/null | grep -qx user; then
+        echo "ERROR: VirGL networking needs a QEMU with the user network backend; set VINIX_NETWORK_QEMU" >&2
+        exit 1
+    fi
+    # macOS Unix socket paths have a short limit; TMPDIR can be deeply nested.
+    NETWORK_BRIDGE_DIR="$(mktemp -d /tmp/vinix-net.XXXXXX)"
+    BRIDGE_SOCKET="$NETWORK_BRIDGE_DIR/net.sock"
+    BRIDGE_LOG="$PACKAGE_RUNTIME_DIR/network-bridge.log"
+    "$NETWORK_BACKEND" -machine none -nodefaults -display none -monitor none \
+        -netdev user,id=slirp \
+        -netdev "stream,id=link,server=on,addr.type=unix,addr.path=$BRIDGE_SOCKET" \
+        -netdev hubport,id=slirp_hub,hubid=0,netdev=slirp \
+        -netdev hubport,id=link_hub,hubid=0,netdev=link \
+        >"$BRIDGE_LOG" 2>&1 &
+    NETWORK_BRIDGE_PID=$!
     for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
-        [ -s "$PACKAGE_SERVER_READY" ] && break
-        if ! kill -0 "$PACKAGE_SERVER_PID" 2>/dev/null; then
+        [ -S "$BRIDGE_SOCKET" ] && break
+        if ! kill -0 "$NETWORK_BRIDGE_PID" 2>/dev/null; then
             break
         fi
         sleep 0.05
     done
-    if [ ! -s "$PACKAGE_SERVER_READY" ]; then
-        cat "$PACKAGE_SERVER_LOG" >&2
-        echo "ERROR: QEMU package store could not start on port $PACKAGE_STORE_PORT" >&2
+    if [ ! -S "$BRIDGE_SOCKET" ]; then
+        cat "$BRIDGE_LOG" >&2
+        echo "ERROR: QEMU network bridge did not start" >&2
         exit 1
     fi
-    # QEMU's user network maps 10.0.2.2 to the host. The service itself stays
-    # bound to 127.0.0.1, so it is reachable by the guest without being
-    # exposed to the host's physical network. Unlike a guestfwd character
-    # backend, the host gateway supports every independent HTTP connection a
-    # long-lived VM makes.
-    NETWORK_FLAGS="-netdev user,id=net0 -device virtio-net-device,netdev=net0,mac=52:54:00:12:34:56"
-    echo "==> Package installs persist in: $PACKAGE_STORE"
-    if [ "$HOST_SOURCE_ENABLED" -eq 1 ]; then
-        echo "==> Host sources: $HOST_SOURCE_ROOT -> /mnt/host/vinix"
-        echo "==> Desktop ui2 sources: $HOST_UI2_SOURCE"
-    fi
+    NETWORK_FLAGS=(-netdev "stream,id=net0,server=off,addr.type=unix,addr.path=$BRIDGE_SOCKET" \
+        -device virtio-net-device,netdev=net0,mac=52:54:00:12:34:56)
+    echo "==> VirGL networking via $NETWORK_BACKEND"
+fi
+echo "==> Package installs persist in: $PACKAGE_STORE"
+if [ "$HOST_SOURCE_ENABLED" -eq 1 ]; then
+    echo "==> Host sources: $HOST_SOURCE_ROOT -> /mnt/host/vinix"
+    echo "==> Desktop ui2 sources: $HOST_UI2_SOURCE"
 fi
 echo "==> Starting QEMU (Ctrl-A X to quit)..."
 
@@ -1128,16 +1175,6 @@ fi
 # VINIX_QEMU_EXTRA appends raw flags, e.g. a monitor socket to drive
 # screendump from a script. Keep the runner alive to own the loopback package
 # store for the lifetime of the VM.
-QEMU_BIN="${VINIX_QEMU_BIN:-qemu-system-aarch64}"
-if [ "$VIRTIO_GPU" -eq 2 ]; then
-    QEMU_BIN="${VINIX_VIRGL_QEMU:-$SCRIPT_DIR/../kekvm/.tools/qemu-virgl/bin/kekvm-qemu-system-aarch64}"
-    if [ ! -x "$QEMU_BIN" ]; then
-        echo "ERROR: KekVM's VirGL QEMU was not found at $QEMU_BIN" >&2
-        echo "       Run 'make setup-gpu' in ../kekvm or set VINIX_VIRGL_QEMU." >&2
-        exit 1
-    fi
-fi
-
 set +e
 "$QEMU_BIN" \
     ${VINIX_QEMU_EXTRA} \
@@ -1154,7 +1191,7 @@ set +e
     -device virtio-keyboard-device \
     -device virtio-tablet-device \
     "${AUDIO_FLAGS[@]}" \
-    $NETWORK_FLAGS \
+    "${NETWORK_FLAGS[@]}" \
     $DISPLAY_FLAGS
 qemu_status=$?
 set -e
