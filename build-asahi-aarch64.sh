@@ -225,7 +225,6 @@ TARGET_MESON_OPTIONS=(
     # Gallium drivers as EGL so DRI3 can reach Asahi or VirGL directly.
     -Dglx=dri
     -Dglvnd=disabled
-    -Ddri3=enabled
     -Degl=enabled
     -Dgbm=enabled
     -Dopengl=true
