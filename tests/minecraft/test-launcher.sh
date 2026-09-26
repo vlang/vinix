@@ -36,11 +36,19 @@ fi
 printf 'display=%s\n' "${DISPLAY:-}"
 printf 'software=%s\n' "${LIBGL_ALWAYS_SOFTWARE:-}"
 printf 'gallium=%s\n' "${GALLIUM_DRIVER:-}"
+printf 'driver_override=%s\n' "${MESA_LOADER_DRIVER_OVERRIDE:-}"
 printf 'indirect=%s\n' "${LIBGL_ALWAYS_INDIRECT:-}"
 printf 'allow_wx=%s\n' "${VINIX_ALLOW_WX:-}"
 printf 'args=%s\n' "$*"
 EOF
 chmod +x "$work/bin/java"
+cat > "$work/bin/glxinfo" <<'EOF'
+#!/bin/sh
+printf 'OpenGL renderer string: %s\n' "${VINIX_TEST_GLX_RENDERER:-virgl (Apple M5 Max)}"
+EOF
+chmod +x "$work/bin/glxinfo"
+PATH="$work/bin:$PATH"
+export PATH
 
 launcher="$root/build-support/minecraft/run-minecraft"
 common_env="VINIX_MINECRAFT_ROOT=$work/game VINIX_MINECRAFT_JAVA=$work/bin/java VINIX_MINECRAFT_USER_DIR=$work/user"
@@ -73,6 +81,22 @@ printf '%s\n' "$output" | grep -q '^indirect=$'
 # GALLIUM_DRIVER=llvmpipe names gallium-pipe/pipe_llvmpipe.so, which is not
 # staged; asking for it fails EGL outright. It has to stay unset.
 printf '%s\n' "$output" | grep -q '^gallium=$'
+# A hardware request must clear every inherited software/indirect override.
+hardware_output=$(env $common_env DISPLAY=:7 VINIX_MINECRAFT_HARDWARE_GL=1 \
+    LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe \
+    MESA_LOADER_DRIVER_OVERRIDE=swrast LIBGL_ALWAYS_INDIRECT=1 "$launcher")
+printf '%s\n' "$hardware_output" | grep -q 'hardware OpenGL renderer: virgl (Apple M5 Max)'
+printf '%s\n' "$hardware_output" | grep -q '^software=$'
+printf '%s\n' "$hardware_output" | grep -q '^gallium=$'
+printf '%s\n' "$hardware_output" | grep -q '^driver_override=$'
+printf '%s\n' "$hardware_output" | grep -q '^indirect=$'
+if env $common_env DISPLAY=:7 VINIX_MINECRAFT_HARDWARE_GL=1 \
+    VINIX_TEST_GLX_RENDERER='llvmpipe (LLVM 19)' "$launcher" \
+    >"$work/software-fallback.log" 2>&1; then
+    echo 'hardware launch accepted a software GLX renderer' >&2
+    exit 1
+fi
+grep -q 'expected hardware OpenGL, got llvmpipe' "$work/software-fallback.log"
 printf '%s' "$output" | grep -q 'net.minecraft.client.main.Main'
 printf '%s' "$output" | grep -q 'natives-linux-arm64'
 printf '%s' "$output" | grep -q -- '--width 1280 --height 720'

@@ -579,8 +579,8 @@ no dropouts, and writes that block at the playback rate.
 
 ### Minecraft: Java Edition on aarch64
 
-Vinix runs Mojang's own Minecraft client on AArch64 through its X11 and
-software-OpenGL stack. The game is not part of this repository. From the
+Vinix runs Mojang's own Minecraft client on AArch64 through X11 and Mesa.
+The game is not part of this repository. From the
 default Vinix desktop image, install it on demand:
 
 ```sh
@@ -635,9 +635,16 @@ Two things make the stock Linux build work on Vinix. Mojang ships no AArch64
 Linux natives, so the LWJGL natives come from the same LWJGL release on Maven
 Central; and those are glibc objects, so they load through `gcompat`, with
 Alpine's native OpenAL and jemalloc substituted for the bundled copies that do
-not survive that translation. Rendering uses Mesa's llvmpipe, the only software
-rasteriser here that reaches the OpenGL 3.2 core profile the client requires.
-Set `VINIX_MINECRAFT_HARDWARE_GL=1` to experiment with hardware GL.
+not survive that translation. The generic VM uses Mesa's llvmpipe. A GPU VM
+with the GLX-enabled Asahi/VirGL Mesa runtime uses hardware OpenGL when the
+game starts through direct Xorg. Build that runtime with `./build-asahi-aarch64.sh`
+in the ARM64 build VM, copy its staging tree back, then boot with
+`./run-desktop-aarch64.sh gpuvm --no-build`. Run `minecraft` from a guest console
+without an existing `DISPLAY` so `startx` creates the DRI3 display. The
+launcher checks the GLX renderer and stops if it falls back to software.
+Minecraft opened from the desktop icon uses a private Xvfb display and remains
+on software rendering. Set `VINIX_MINECRAFT_HARDWARE_GL=0` to force software
+or `VINIX_MINECRAFT_HARDWARE_GL=1` to require hardware on an existing display.
 
 GTK and Gnumeric are deliberately not included in the base or network-tools
 package layer. GTK is downloaded only when it or an application that needs it

@@ -3,7 +3,7 @@
 #
 # The build host has already resolved the version manifest into launch.env, so
 # this script only has to expand Mojang's argument templates, apply the musl
-# and software-OpenGL settings Vinix needs, and exec the JVM.
+# and OpenGL settings Vinix needs, and exec the JVM.
 #
 # Mojang publishes no musl natives. LWJGL's own AArch64 natives are glibc
 # builds that load through gcompat, but not all of them survive that: OpenAL
@@ -123,10 +123,41 @@ if [ "$mode" = auto ]; then
 	if [ "$signed_in" = yes ]; then mode=play; else mode=demo; fi
 fi
 
-# Rendering happens in the game's own process: Mesa's software rasteriser
-# presents through Xorg without GPU support, while indirect GLX would run the
-# renderer inside the X server, which Vinix does not support.
-if [ "${VINIX_MINECRAFT_HARDWARE_GL:-0}" != 1 ]; then
+# The direct Xorg launcher marks a GPU-backed DRI3 display. Its Mesa runtime
+# must also include a matching DRI GLX client, since GLFW uses GLX rather than
+# EGL. A desktop-hosted Xvfb session remains on its software path.
+hardware_gl=0
+if [ "${VINIX_MINECRAFT_HARDWARE_GL:-0}" = 1 ]; then
+	hardware_gl=1
+elif [ "${VINIX_MINECRAFT_HARDWARE_GL:-auto}" = auto ] &&
+     [ "${VINIX_XORG_ACCELERATED:-0}" = 1 ] &&
+     [ "${VINIX_FORCE_SOFTWARE_GL:-0}" != 1 ] &&
+     [ "${LIBGL_ALWAYS_SOFTWARE:-0}" != 1 ] &&
+     [ -e /dev/dri/renderD128 ] &&
+     { grep -q 'glx=dri' /usr/share/vinix/mesa-x11-egl 2>/dev/null ||
+       grep -q 'glx=dri' /usr/share/vinix/asahi-x11-egl 2>/dev/null; }; then
+	hardware_gl=1
+fi
+unset LIBGL_ALWAYS_INDIRECT
+if [ "$hardware_gl" = 1 ]; then
+	unset LIBGL_ALWAYS_SOFTWARE GALLIUM_DRIVER MESA_LOADER_DRIVER_OVERRIDE
+	# Mesa may silently select llvmpipe when DRI3 or the matching driver is
+	# unavailable. Reject that before starting a very slow JVM/game session.
+	if [ -n "${DISPLAY:-}" ]; then
+		if ! glx_output=$(glxinfo -B 2>&1); then
+			echo "minecraft: hardware GLX is unavailable: $glx_output" >&2
+			exit 1
+		fi
+		renderer=$(printf '%s\n' "$glx_output" | sed -n 's/^OpenGL renderer string: //p' | head -n 1)
+		case "$renderer" in
+			*virgl*|*VirGL*|*Asahi*|*AGX*|*Apple*)
+				echo "minecraft: hardware OpenGL renderer: $renderer" ;;
+			*)
+				echo "minecraft: expected hardware OpenGL, got ${renderer:-no GLX renderer}" >&2
+				exit 1 ;;
+		esac
+	fi
+else
 	export LIBGL_ALWAYS_SOFTWARE=1
 	# Mesa's on-disk shader cache never completes here: with it enabled
 	# eglCreateContext does not return, and the process sits at full CPU
@@ -138,7 +169,6 @@ if [ "${VINIX_MINECRAFT_HARDWARE_GL:-0}" != 1 ]; then
 	# loader turns into gallium-pipe/pipe_llvmpipe.so, and the only pipe driver
 	# staged is pipe_swrast.so, so asking for it fails EGL outright. Leaving it
 	# unset lets Mesa pick the software renderer it actually has.
-	unset LIBGL_ALWAYS_INDIRECT
 fi
 
 if [ -z "${DISPLAY:-}" ]; then

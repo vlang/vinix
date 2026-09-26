@@ -68,6 +68,7 @@ fi
 
 for MESA_PATCH in \
     "$SCRIPT_DIR/patches/mesa/jinx-working-patch.patch" \
+    "$SCRIPT_DIR/patches/mesa/vinix-virgl-render-node.patch" \
     "$SCRIPT_DIR/patches/mesa/vinix-fake-g17-renderer.patch" \
     "$SCRIPT_DIR/patches/mesa/vinix-libagx-link-names.patch"; do
     if patch --dry-run -p1 -d "$MESA_SRC" < "$MESA_PATCH" >/dev/null 2>&1; then
@@ -164,7 +165,7 @@ for package in \
     xorgproto xcb-proto libxau libxau-dev libxdmcp libxdmcp-dev \
     libxcb libxcb-dev libx11 libx11-dev libxext libxext-dev \
     libxfixes libxfixes-dev libxrender libxrender-dev \
-    libxrandr libxrandr-dev \
+    libxrandr libxrandr-dev libxxf86vm libxxf86vm-dev \
     libxshmfence libxshmfence-dev; do
     extract_apk main "$package"
 done
@@ -220,7 +221,11 @@ TARGET_MESON_OPTIONS=(
     --buildtype=release
     -Dstrip=true
     -Dplatforms=x11
-    -Dglx=disabled
+    # Minecraft/GLFW creates GLX contexts. Build libGL against the same
+    # Gallium drivers as EGL so DRI3 can reach Asahi or VirGL directly.
+    -Dglx=dri
+    -Dglvnd=disabled
+    -Ddri3=enabled
     -Degl=enabled
     -Dgbm=enabled
     -Dopengl=true
@@ -251,6 +256,10 @@ fi
 ninja -C "$TARGET_BUILD" -j"$NPROC"
 rm -rf "$STAGING"
 DESTDIR="$STAGING" ninja -C "$TARGET_BUILD" install
+if [ ! -f "$STAGING/usr/lib/libGL.so.1" ]; then
+    echo "Mesa's DRI GLX library was not installed" >&2
+    exit 1
+fi
 
 echo "==> Installing Mesa hardware runtime and triangle test"
 mkdir -p "$STAGING/lib" "$STAGING/etc" "$STAGING/usr/lib" \
@@ -267,7 +276,8 @@ for pattern in \
     'libatomic.so*' 'libz.so*' 'libzstd.so*' 'libexpat.so*' \
     'libX11.so*' 'libX11-xcb.so*' 'libXau.so*' 'libXdmcp.so*' \
     'libxcb.so*' 'libxcb-*.so*' 'libXext.so*' 'libXfixes.so*' \
-    'libXrender.so*' 'libXrandr.so*' 'libxshmfence.so*'; do
+    'libXrender.so*' 'libXrandr.so*' 'libXxf86vm.so*' \
+    'libxshmfence.so*'; do
     for library in "$SYSROOT/usr/lib"/$pattern; do
         [ -e "$library" ] || continue
         cp -a "$library" "$STAGING/usr/lib/"
@@ -291,7 +301,7 @@ install -m755 "$SCRIPT_DIR/gl-triangle/run-gl-triangle-agx" "$STAGING/usr/bin/"
 install -m755 "$SCRIPT_DIR/gl-triangle/run-gl-triangle" "$STAGING/usr/bin/"
 install -m755 "$SCRIPT_DIR/gl-triangle/run-m1-agx-smoke" "$STAGING/usr/bin/"
 install -m755 "$SCRIPT_DIR/gl-triangle/run-virgl-smoke" "$STAGING/usr/bin/"
-printf '%s\n' "mesa=$MESA_VERSION drivers=asahi,virgl,softpipe platforms=x11,surfaceless gbm=enabled" \
+printf '%s\n' "mesa=$MESA_VERSION drivers=asahi,virgl,softpipe platforms=x11,surfaceless gbm=enabled glx=dri" \
     > "$STAGING/usr/share/vinix/mesa-x11-egl"
 # Keep the old marker for deployment scripts and images built before the
 # virtual GPU path was added.

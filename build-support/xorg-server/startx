@@ -15,9 +15,11 @@ if [ "${VINIX_FORCE_SOFTWARE_GL:-0}" != 1 ] &&
    { [ -f /usr/share/vinix/mesa-x11-egl ] ||
      [ -f /usr/share/vinix/asahi-x11-egl ]; }; then
     unset LIBGL_ALWAYS_SOFTWARE
+    export VINIX_XORG_ACCELERATED=1
     echo "startx: enabling Mesa glamor/DRI3 acceleration"
 else
     export VINIX_FORCE_SOFTWARE_GL=1
+    unset VINIX_XORG_ACCELERATED
 fi
 
 d=0
