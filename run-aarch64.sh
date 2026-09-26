@@ -71,7 +71,8 @@ QEMU_RESOLUTION="${VINIX_QEMU_RESOLUTION:-}"
 # Package state and persistent /root have stable defaults independent of an
 # ephemeral boot image. Desktop runs select their own fixed profile paths.
 PACKAGE_STORE="${VINIX_QEMU_PACKAGE_STORE:-$BOOT_DIR/boot.img.packages.tar}"
-PACKAGE_STORE_PORT="${VINIX_QEMU_PACKAGE_STORE_PORT:-18081}"
+# Let the server atomically choose a free port unless the caller requests one.
+PACKAGE_STORE_PORT="${VINIX_QEMU_PACKAGE_STORE_PORT:-0}"
 # The host checkout is served over the same loopback-only guest forward as the
 # package overlay. A fresh archive is made for every request, so a running VM
 # sees host edits without a QEMU restart. Set this to 0 to disable the share or
@@ -201,13 +202,6 @@ if [ "$EPHEMERAL_BOOT" -eq 1 ]; then
     if [ "$PERSIST_ENABLED" -eq 1 ] && [ -z "${VINIX_QEMU_PERSIST_DISK:-}" ]; then
         PERSIST_DISK="$EPHEMERAL_RUNTIME_DIR/root.ext2"
     fi
-    if [ -z "${VINIX_QEMU_PACKAGE_STORE_PORT:-}" ]; then
-        if ! command -v python3 >/dev/null 2>&1; then
-            echo "ERROR: --ephemeral needs python3 to allocate an isolated package-store port" >&2
-            exit 1
-        fi
-        PACKAGE_STORE_PORT="$(python3 -c 'import socket; s = socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1]); s.close()')"
-    fi
 fi
 
 if [ ! -e "$BOOT_DISK" ] && [ "$KEEP_TEMP_BOOT_DISK" -eq 0 ] &&
@@ -319,15 +313,17 @@ case "$PERSIST_SIZE_MB" in
         exit 1
         ;;
 esac
-case "$PACKAGE_STORE_PORT" in
-    ''|*[!0-9]*|0)
+if [ -n "${VINIX_QEMU_PACKAGE_STORE_PORT:-}" ]; then
+    case "$PACKAGE_STORE_PORT" in
+        *[!0-9]*)
+            echo "ERROR: VINIX_QEMU_PACKAGE_STORE_PORT must be between 1 and 65535" >&2
+            exit 1
+            ;;
+    esac
+    if [ "$PACKAGE_STORE_PORT" -eq 0 ] || [ "$PACKAGE_STORE_PORT" -gt 65535 ]; then
         echo "ERROR: VINIX_QEMU_PACKAGE_STORE_PORT must be between 1 and 65535" >&2
         exit 1
-        ;;
-esac
-if [ "$PACKAGE_STORE_PORT" -gt 65535 ]; then
-    echo "ERROR: VINIX_QEMU_PACKAGE_STORE_PORT must be between 1 and 65535" >&2
-    exit 1
+    fi
 fi
 
 # ── Build init program (fallback if no busybox userland) ──
@@ -836,6 +832,35 @@ mkdir -p "$PACKAGE_RUNTIME_ROOT/etc/vinix-pkg" "$PACKAGE_RUNTIME_ROOT/root" \
     "$PACKAGE_RUNTIME_ROOT/etc/vinix" "$PACKAGE_RUNTIME_ROOT/usr/bin" \
     "$PACKAGE_RUNTIME_ROOT/usr/libexec"
 
+if ! command -v python3 >/dev/null 2>&1; then
+    echo "ERROR: python3 is required for QEMU package persistence" >&2
+    exit 1
+fi
+SOURCE_SERVER_ARGS=()
+if [ "$HOST_SOURCE_ENABLED" -eq 1 ]; then
+    SOURCE_SERVER_ARGS=(--source-root "$HOST_SOURCE_ROOT" \
+        --ui2-source "$HOST_UI2_SOURCE")
+fi
+python3 "$SCRIPT_DIR/tools/qemu-package-store.py" \
+    --store "$PACKAGE_STORE" --port "$PACKAGE_STORE_PORT" \
+    --ready-file "$PACKAGE_SERVER_READY" "${SOURCE_SERVER_ARGS[@]}" \
+    >"$PACKAGE_SERVER_LOG" 2>&1 &
+PACKAGE_SERVER_PID=$!
+for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+    [ -s "$PACKAGE_SERVER_READY" ] && break
+    if ! kill -0 "$PACKAGE_SERVER_PID" 2>/dev/null; then
+        break
+    fi
+    sleep 0.05
+done
+if [ ! -s "$PACKAGE_SERVER_READY" ]; then
+    cat "$PACKAGE_SERVER_LOG" >&2
+    echo "ERROR: QEMU package store could not start on port $PACKAGE_STORE_PORT" >&2
+    exit 1
+fi
+# Both guest URLs must name the port that is still held by this server.
+PACKAGE_STORE_PORT="$(cat "$PACKAGE_SERVER_READY")"
+
 # Tests may replace PID 1 without copying and rewriting a multi-gigabyte base
 # image. Limine loads this per-run module last, so the override exists only in
 # the guest's RAM-backed root for this boot.
@@ -1033,33 +1058,6 @@ if [ "$VIRTIO_GPU" -eq 2 ]; then
         echo "       Run 'make setup-gpu' in ../kekvm or set VINIX_VIRGL_QEMU." >&2
         exit 1
     fi
-fi
-
-if ! command -v python3 >/dev/null 2>&1; then
-    echo "ERROR: python3 is required for QEMU package persistence" >&2
-    exit 1
-fi
-SOURCE_SERVER_ARGS=()
-if [ "$HOST_SOURCE_ENABLED" -eq 1 ]; then
-    SOURCE_SERVER_ARGS=(--source-root "$HOST_SOURCE_ROOT" \
-        --ui2-source "$HOST_UI2_SOURCE")
-fi
-python3 "$SCRIPT_DIR/tools/qemu-package-store.py" \
-    --store "$PACKAGE_STORE" --port "$PACKAGE_STORE_PORT" \
-    --ready-file "$PACKAGE_SERVER_READY" "${SOURCE_SERVER_ARGS[@]}" \
-    >"$PACKAGE_SERVER_LOG" 2>&1 &
-PACKAGE_SERVER_PID=$!
-for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
-    [ -s "$PACKAGE_SERVER_READY" ] && break
-    if ! kill -0 "$PACKAGE_SERVER_PID" 2>/dev/null; then
-        break
-    fi
-    sleep 0.05
-done
-if [ ! -s "$PACKAGE_SERVER_READY" ]; then
-    cat "$PACKAGE_SERVER_LOG" >&2
-    echo "ERROR: QEMU package store could not start on port $PACKAGE_STORE_PORT" >&2
-    exit 1
 fi
 
 # QEMU user networking advertises 10.0.2.2 as the host and provides DHCP and
