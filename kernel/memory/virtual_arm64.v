@@ -433,11 +433,9 @@ fn install_arm64_pte(mut entry &u64, virt u64, new_pte u64, active bool) {
 		*entry = new_pte
 	}
 	cpu.dsb_ishst()
-	if old_pte & 1 == 0 {
-		// Invalidate a cached translation fault for a newly mapped page.
-		cpu.tlbi_vaae1(virt >> 12)
-		cpu.dsb_ish()
-	}
+	// A translation fault cannot be cached in an Arm TLB, so making an
+	// invalid descriptor valid needs no invalidation. The old valid mapping
+	// was invalidated above before this descriptor was installed.
 	cpu.isb()
 }
 
