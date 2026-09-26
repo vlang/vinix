@@ -12,6 +12,7 @@
 #   --reset-disk    reinstall the system volume from scratch, losing its data
 #   --no-persist    use the full RAM-backed desktop instead of persistent /root
 #   --ephemeral     isolate and automatically delete this run's boot image
+#   --virgl         use KekVM's GPU backend with a RAM system and persistent /root
 #   --mem=MB        guest RAM (default: 8192 MiB for the desktop image)
 #   --v=PATH        V compiler executable or checkout (for example ~/code/v7)
 #   --help
@@ -64,6 +65,8 @@ WITH_MONITOR=0
 PERSIST_DESKTOP="${VINIX_QEMU_PERSIST:-1}"
 DISK_ROOT_DESKTOP="${VINIX_QEMU_ROOT_DISK:-1}"
 EPHEMERAL_DESKTOP=0
+ROOT_LAYOUT_EXPLICIT=0
+VIRGL_DESKTOP=0
 PASSTHROUGH=()
 
 while [ "$#" -gt 0 ]; do
@@ -75,8 +78,9 @@ while [ "$#" -gt 0 ]; do
         --monitor)    WITH_MONITOR=1 ;;
         --persist|--persist=*) PERSIST_DESKTOP=1; PASSTHROUGH+=("$arg") ;;
         --no-persist) PERSIST_DESKTOP=0; DISK_ROOT_DESKTOP=0; PASSTHROUGH+=("$arg") ;;
-        --disk-root)    DISK_ROOT_DESKTOP=1 ;;
-        --no-disk-root) DISK_ROOT_DESKTOP=0 ;;
+        --disk-root)    DISK_ROOT_DESKTOP=1; ROOT_LAYOUT_EXPLICIT=1 ;;
+        --no-disk-root) DISK_ROOT_DESKTOP=0; ROOT_LAYOUT_EXPLICIT=1 ;;
+        --virgl)        VIRGL_DESKTOP=1; PASSTHROUGH+=("$arg") ;;
         --ephemeral)  EPHEMERAL_DESKTOP=1; PASSTHROUGH+=("$arg") ;;
         --v=*)        VINIX_V_COMPILER="${arg#*=}" ;;
         --v)
@@ -92,6 +96,15 @@ while [ "$#" -gt 0 ]; do
     esac
     shift
 done
+
+if [ "$VIRGL_DESKTOP" -eq 1 ] && [ "$DISK_ROOT_DESKTOP" -eq 1 ]; then
+    if [ "$ROOT_LAYOUT_EXPLICIT" -eq 1 ]; then
+        echo "ERROR: --virgl needs --no-disk-root so its Mesa runtime overlays the guest image" >&2
+        exit 1
+    fi
+    echo "==> VirGL uses a RAM system with a separate persistent /root volume"
+    DISK_ROOT_DESKTOP=0
+fi
 
 case "$PERSIST_DESKTOP" in
     0|1) ;;
@@ -241,6 +254,7 @@ if [ "$DISK_ROOT_DESKTOP" -eq 1 ]; then
     # Only Limine, the kernel and a recovery shell live here now.
     export VINIX_BOOT_DISK_SIZE_MB="${VINIX_BOOT_DISK_SIZE_MB:-512}"
 elif [ "$PERSIST_DESKTOP" -eq 1 ]; then
+    export VINIX_QEMU_ROOT_DISK=0
     python3 "$SCRIPT_DIR/tools/split-desktop-initramfs.py" \
         "$DESKTOP_INITRAMFS" "$QEMU_DESKTOP_INITRAMFS" \
         "$DESKTOP_ROOT_SEED" "$DESKTOP_STORAGE_MANIFEST"
@@ -271,6 +285,7 @@ elif [ "$PERSIST_DESKTOP" -eq 1 ]; then
     fi
     export VINIX_BOOT_DISK_SIZE_MB="${VINIX_BOOT_DISK_SIZE_MB:-3072}"
 else
+    export VINIX_QEMU_ROOT_DISK=0
     export VINIX_INITRAMFS="$DESKTOP_INITRAMFS"
     export VINIX_QEMU_PERSIST=0
     if [ "$EPHEMERAL_DESKTOP" -eq 0 ]; then

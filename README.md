@@ -831,14 +831,20 @@ run-virgl-smoke
 run-firefox
 ```
 
-`--virgl` selects KekVM's `.tools/qemu-virgl` binary and requests a GL-enabled
-display. Override its location with `VINIX_VIRGL_QEMU` or select a QEMU display
-backend with `QEMU_DISPLAY_BACKEND`. The simpler
+`--virgl` selects KekVM's `kekvm-qemu-system-aarch64` copy, linked to its patched
+virglrenderer, and supplies the staged VirGL Mesa runtime for that boot. It also
+requests a GL-enabled display. Override its location with `VINIX_VIRGL_QEMU`
+or select a QEMU display backend with `QEMU_DISPLAY_BACKEND`. The simpler
 `--virtio-gpu` option exposes the unaccelerated MMIO device and is useful for
 transport probing, but it does not create a render node. KekVM's compact QEMU
 currently omits libslirp, so this launch mode is offline; Firefox can exercise
 its bundled local smoke page, while browsing needs a VirGL QEMU build with a
 network backend.
+
+The VirGL desktop uses a RAM system with its own persistent `/root` volume so
+the Mesa overlay reaches applications. This volume is separate from the usual
+persistent system disk; other system changes from a VirGL session do not
+persist.
 
 ### Hyprland on aarch64
 

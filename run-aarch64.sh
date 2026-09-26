@@ -278,6 +278,11 @@ if [ "$DISK_ROOT" -eq 1 ] && [ "$PERSIST_ENABLED" -eq 0 ]; then
     echo "ERROR: --disk-root is the persistent volume; it cannot be combined with --no-persist" >&2
     exit 1
 fi
+if [ "$VIRTIO_GPU" -eq 2 ] && [ "$DISK_ROOT" -eq 1 ]; then
+    echo "ERROR: --virgl needs a RAM root so its Mesa runtime overlays the guest image" >&2
+    echo "       Use --no-disk-root with run-desktop-aarch64.sh." >&2
+    exit 1
+fi
 case "$DISK_ROOT_FALLBACK" in
     recovery|image) ;;
     *)
@@ -829,6 +834,33 @@ if [ -n "$GUEST_INIT" ]; then
     echo "==> Injecting test init: $GUEST_INIT"
 fi
 
+if [ "$VIRTIO_GPU" -eq 2 ]; then
+    # The normal QEMU desktop image keeps the generic Mesa software renderer.
+    # Supply the VirGL-capable Mesa build only for this boot, after the base
+    # module, so selecting --virgl gives applications the matching driver
+    # without changing the persistent image or other QEMU modes.
+    VIRGL_RUNTIME="$SCRIPT_DIR/build-aarch64-asahi/staging/usr"
+    if [ ! -x "$VIRGL_RUNTIME/bin/run-virgl-smoke" ] || \
+       [ ! -f "$VIRGL_RUNTIME/lib/libgallium-25.0.5.so" ] || \
+       [ ! -f "$VIRGL_RUNTIME/share/vinix/mesa-x11-egl" ]; then
+        echo "ERROR: Vinix's staged VirGL Mesa runtime is missing." >&2
+        echo "       Build it with ./build-asahi-aarch64.sh in the ARM64 build VM first." >&2
+        exit 1
+    fi
+    echo "==> Injecting VirGL Mesa runtime for this boot"
+    for directory in bin lib share; do
+        mkdir -p "$PACKAGE_RUNTIME_ROOT/usr/$directory"
+        # A later initramfs module can replace an existing regular file, but
+        # its symlink entries cannot replace the base image's regular EGL/GBM
+        # files. Dereference the staged links so the intended Mesa wins.
+        cp -RL "$VIRGL_RUNTIME/$directory/." "$PACKAGE_RUNTIME_ROOT/usr/$directory/"
+    done
+    # The full desktop can carry a newer C++ runtime for Hyprland and other
+    # programs. Mesa's older copy would otherwise replace it for this boot.
+    rm -f "$PACKAGE_RUNTIME_ROOT/usr/lib"/libstdc++.so* \
+        "$PACKAGE_RUNTIME_ROOT/usr/lib"/libgcc_s.so*
+fi
+
 # Hyprland is an explicit alternate desktop session. Keep the selection in
 # this per-run module rather than the image itself: a staged Hyprland runtime
 # must not turn the ordinary desktop launcher into its full-screen terminal.
@@ -1093,7 +1125,7 @@ fi
 # store for the lifetime of the VM.
 QEMU_BIN="${VINIX_QEMU_BIN:-qemu-system-aarch64}"
 if [ "$VIRTIO_GPU" -eq 2 ]; then
-    QEMU_BIN="${VINIX_VIRGL_QEMU:-$SCRIPT_DIR/../kekvm/.tools/qemu-virgl/bin/qemu-system-aarch64}"
+    QEMU_BIN="${VINIX_VIRGL_QEMU:-$SCRIPT_DIR/../kekvm/.tools/qemu-virgl/bin/kekvm-qemu-system-aarch64}"
     if [ ! -x "$QEMU_BIN" ]; then
         echo "ERROR: KekVM's VirGL QEMU was not found at $QEMU_BIN" >&2
         echo "       Run 'make setup-gpu' in ../kekvm or set VINIX_VIRGL_QEMU." >&2

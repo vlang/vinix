@@ -67,31 +67,37 @@ def stop_child(pid: int, master: int) -> None:
             return
         time.sleep(0.05)
 
-    try:
-        os.killpg(pid, signal.SIGTERM)
-    except ProcessLookupError:
-        return
+    signal_child(pid, signal.SIGTERM)
     deadline = time.monotonic() + 2
     while time.monotonic() < deadline:
         waited, _status = os.waitpid(pid, os.WNOHANG)
         if waited == pid:
             return
         time.sleep(0.05)
-    try:
-        os.killpg(pid, signal.SIGKILL)
-    except ProcessLookupError:
-        pass
+    signal_child(pid, signal.SIGKILL)
     try:
         os.waitpid(pid, 0)
     except ChildProcessError:
         pass
 
 
+def signal_child(pid: int, sig: signal.Signals) -> None:
+    try:
+        os.killpg(pid, sig)
+    except (ProcessLookupError, PermissionError):
+        # The Cocoa QEMU process may exit between waitpid and killpg. macOS
+        # reports EPERM for the vanished PTY process group in that race.
+        try:
+            os.kill(pid, sig)
+        except ProcessLookupError:
+            pass
+
+
 def qemu_path(root: Path) -> Path:
     override = os.environ.get("VINIX_VIRGL_QEMU")
     if override:
         return Path(override).expanduser().resolve()
-    return root.parent / "kekvm/.tools/qemu-virgl/bin/qemu-system-aarch64"
+    return root.parent / "kekvm/.tools/qemu-virgl/bin/kekvm-qemu-system-aarch64"
 
 
 def check_host(root: Path) -> tuple[Path, str | None]:
@@ -121,45 +127,23 @@ def run_vm(root: Path, timeout: int, desktop_startup: bool) -> int:
         return 2
 
     kernel = root / "kernel/bin/vinix"
-    source_image = root / "build-support/init-aarch64/initramfs-desktop.tar"
-    image = root / "build/initramfs-desktop-qemu.tar"
-    root_seed = root / "build/desktop-root-seed.tar.gz"
-    storage_manifest = root / "build/desktop-qemu-storage.json"
-    splitter = root / "tools/split-desktop-initramfs.py"
     if desktop_startup:
+        source_image = root / "build-support/init-aarch64/initramfs-desktop.tar"
         guest_init = root / "tests/virtio-gpu-virgl/desktop-guest-init.sh"
         pass_line = DESKTOP_PASS_LINE
         fail_line = DESKTOP_FAIL_LINE
     else:
+        source_image = root / "build-support/init-aarch64/initramfs.tar"
         guest_init = root / "tests/virtio-gpu-virgl/guest-init.sh"
         pass_line = SMOKE_PASS_LINE
         fail_line = SMOKE_FAIL_LINE
-    for label, path in (("kernel", kernel), ("desktop initramfs", source_image)):
+    for label, path in (("kernel", kernel), ("initramfs", source_image)):
         if not path.is_file():
             print(f"ERROR: Vinix {label} is missing: {path}", file=sys.stderr)
             return 2
 
-    split = subprocess.run(
-        [
-            sys.executable,
-            str(splitter),
-            str(source_image),
-            str(image),
-            str(root_seed),
-            str(storage_manifest),
-        ],
-        check=False,
-    )
-    if split.returncode != 0:
-        print("ERROR: could not prepare the split QEMU desktop image", file=sys.stderr)
-        return 2
-
-    # Leave 256 MiB for the kernel, loader, configuration and FAT metadata.
-    image_mb = (image.stat().st_size + 1024 * 1024 - 1) // (1024 * 1024)
-    disk_mb = max(2048, image_mb + 256)
-
     print(f"Host transport: {qemu}")
-    print("Path: Vinix VirtIO-GPU -> VirGL -> virglrenderer -> ANGLE/Metal")
+    print("Path: Vinix VirtIO-GPU -> VirGL -> virglrenderer -> host Apple GPU")
     print("Boundary: this does not emulate native AGX RTKit/UAT/firmware")
     if desktop_startup:
         print("Workload: full vinix-desktop-gpu startup through its first frame")
@@ -168,11 +152,6 @@ def run_vm(root: Path, timeout: int, desktop_startup: bool) -> int:
         environment = os.environ.copy()
         environment["VINIX_VIRGL_QEMU"] = str(qemu)
         environment["TMPDIR"] = scratch
-        environment["VINIX_INITRAMFS"] = str(image)
-        environment["VINIX_BOOT_DISK"] = str(Path(scratch) / "boot.img")
-        environment["VINIX_BOOT_DISK_SIZE_MB"] = str(disk_mb)
-        environment["VINIX_EFIVARS"] = str(Path(scratch) / "efivars.fd")
-        environment["VINIX_QEMU_PACKAGE_STORE"] = str(Path(scratch) / "packages.tar")
         # KekVM's patched Cocoa backend needs an explicit core profile.  QEMU's
         # generic default creates a legacy context on macOS, then fails its own
         # GLSL 1.40 scanout shaders before the guest can boot.
@@ -180,16 +159,33 @@ def run_vm(root: Path, timeout: int, desktop_startup: bool) -> int:
         environment.pop("VINIX_QEMU_PERSIST", None)
         environment.pop("VINIX_QEMU_PERSIST_DISK", None)
         environment.pop("VINIX_QEMU_PERSIST_SEED", None)
+        environment.pop("VINIX_QEMU_PERSIST_SIZE_MB", None)
+        environment.pop("VINIX_QEMU_ROOT_DISK", None)
+        environment.pop("VINIX_QEMU_ROOT_IMAGE", None)
+        environment.pop("VINIX_BOOT_DISK", None)
+        environment.pop("VINIX_EFIVARS", None)
+        environment.pop("VINIX_QEMU_PACKAGE_STORE", None)
         environment.setdefault("VINIX_QEMU_MEM", "8192")
 
-        command = [
-            str(root / "run-aarch64.sh"),
-            "--no-build",
-            "--virgl",
-            "--no-persist",
-            f"--guest-init={guest_init}",
-            f"--disk={disk_mb}",
-        ]
+        if desktop_startup:
+            command = [
+                str(root / "run-desktop-aarch64.sh"),
+                "--no-build",
+                "--no-disk-root",
+                "--ephemeral",
+                "--virgl",
+                f"--guest-init={guest_init}",
+            ]
+        else:
+            environment["VINIX_INITRAMFS"] = str(source_image)
+            command = [
+                str(root / "run-aarch64.sh"),
+                "--no-build",
+                "--no-persist",
+                "--ephemeral",
+                "--virgl",
+                f"--guest-init={guest_init}",
+            ]
         pid, master = pty.fork()
         if pid == 0:
             os.chdir(root)
@@ -293,8 +289,8 @@ def main() -> int:
     parser.add_argument(
         "--timeout",
         type=int,
-        default=int(os.environ.get("VINIX_VIRGL_VM_TIMEOUT", "240")),
-        help="maximum setup, boot and render time in seconds (default: 240)",
+        default=int(os.environ.get("VINIX_VIRGL_VM_TIMEOUT", "900")),
+        help="maximum setup, boot and render time in seconds (default: 900)",
     )
     parser.add_argument(
         "--desktop-startup",
