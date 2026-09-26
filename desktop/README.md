@@ -14,8 +14,8 @@ exists, with an automatic fallback to the static software binary.
 
 What it does:
 
-- a wallpaper, and a taskbar with Start, open windows and a clock in its
-  bottom-right status area
+- a wallpaper, and a taskbar with Start, open windows, the desktop build date
+  and time, and a clock in its bottom-right status area
 - windows with a title bar, a close, a maximise/restore and a minimise button
 - dragging a window by its title bar, including Windows 7-style top-edge
   maximize and left/right half-screen snapping

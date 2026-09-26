@@ -13,6 +13,7 @@ module main
 const weekday_names = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const month_names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov',
 	'Dec']
+const desktop_build_timestamp = @BUILD_TIMESTAMP
 
 struct CivilTime {
 	year    int
@@ -128,6 +129,29 @@ fn (d &Desktop) taskbar_clock_strings_at(seconds i64) (string, string) {
 	return time_text, date_text
 }
 
+// The compiler embeds an epoch so a cached or copied binary keeps the date
+// and time of the build that actually produced it. Display it in the same
+// configured time zone as the live clock.
+fn (d &Desktop) taskbar_build_strings_at(seconds i64) (string, string) {
+	if seconds <= 0 {
+		return 'Built --:--'.clone(), 'Date unavailable'.clone()
+	}
+	civil := civil_from_epoch(seconds + d.tz_offset_seconds)
+	hour := pad2(civil.hour)
+	minute := pad2(civil.minute)
+	day := pad2(civil.day)
+	year := civil.year.str()
+	time_text := 'Built ${hour}:${minute}'
+	date_text := '${day} ${month_names[civil.month - 1]} ${year}'
+	unsafe {
+		hour.free()
+		minute.free()
+		day.free()
+		year.free()
+	}
+	return time_text, date_text
+}
+
 // update_taskbar_clock is sampled on every compositor pass, but only formats
 // and invalidates a frame when the displayed second changes. That preserves
 // the idle renderer while keeping the status area alive after boot.
@@ -139,6 +163,11 @@ fn (mut d Desktop) update_taskbar_clock() {
 // update_taskbar_clock_at keeps the time source separate from updating the
 // retained labels, which also makes the layout test deterministic.
 fn (mut d Desktop) update_taskbar_clock_at(seconds i64) {
+	if d.taskbar_build_time.len == 0 {
+		build_time, build_date := d.taskbar_build_strings_at(desktop_build_timestamp.i64())
+		d.taskbar_build_time = build_time
+		d.taskbar_build_date = build_date
+	}
 	if d.taskbar_clock_sampled && d.taskbar_clock_seconds == seconds {
 		return
 	}

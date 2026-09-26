@@ -55,6 +55,19 @@ fn test_taskbar_clock_formats_24_and_12_hour_time() {
 	assert no_date_line == ''
 }
 
+fn test_taskbar_build_date_uses_the_clock_time_zone() {
+	mut desktop := Desktop{}
+	// 1970-01-01 13:05:09 UTC.
+	build_time, build_date := desktop.taskbar_build_strings_at(47_109)
+	assert build_time == 'Built 13:05'
+	assert build_date == '01 Jan 1970'
+
+	desktop.tz_offset_seconds = 3 * 3600
+	local_time, local_date := desktop.taskbar_build_strings_at(47_109)
+	assert local_time == 'Built 16:05'
+	assert local_date == '01 Jan 1970'
+}
+
 fn test_date_time_settings_controls_update_desktop_preferences() {
 	mut desktop := Desktop{}
 	mut app := SettingsApp{

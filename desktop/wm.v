@@ -122,6 +122,8 @@ mut:
 	// scales together with every other desktop coordinate.
 	taskbar_clock_time    string
 	taskbar_clock_date    string
+	taskbar_build_time    string
+	taskbar_build_date    string
 	taskbar_clock_sampled bool
 	taskbar_clock_seconds i64
 
@@ -1058,7 +1060,7 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 	icon_only := theme.taskbar_icon_only
 	edge_padding := if dock { theme.dock_padding } else { taskbar_padding }
 
-	mut children := frame_elements(d.windows.len + workspace_count + 4)
+	mut children := frame_elements(d.windows.len + workspace_count + 6)
 	item_height := if icon_only { taskbar_icon_item_height } else { taskbar_item_height }
 	item_y := (taskbar_height - item_height) / 2
 
@@ -1087,9 +1089,11 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 	// at the physical lower-right corner after 2x M1 presentation as well as
 	// on an unscaled framebuffer.
 	clock_width := taskbar_clock_width
+	build_width := taskbar_build_width
+	status_width := build_width + taskbar_item_gap + clock_width
 	workspace_width := workspace_count * workspace_button_width +
 		(workspace_count - 1) * workspace_button_gap
-	workspace_x_fixed := width - edge_padding - clock_width - taskbar_item_gap - workspace_width
+	workspace_x_fixed := width - edge_padding - status_width - taskbar_item_gap - workspace_width
 	entry_right := if dock { width } else { workspace_x_fixed - taskbar_item_gap }
 
 	// Entries share whatever room is left rather than each taking a fixed
@@ -1184,10 +1188,21 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 		x = workspace_x + workspace_width + taskbar_item_gap
 	}
 
-	// A regular taskbar pins the status area to the lower-right corner. A dock
-	// keeps the same clock immediately after its task buttons so it remains
-	// inside the floating panel instead of being stranded at the screen edge.
-	clock_x := if dock { x } else { width - edge_padding - clock_width }
+	// Keep the build date immediately left of the live clock. On a regular
+	// taskbar the live clock stays flush with the lower-right screen edge.
+	build_x := if dock { x } else { width - edge_padding - status_width }
+	clock_x := build_x + build_width + taskbar_item_gap
+	children << ui2.label('build.time', d.taskbar_build_time, ui2.rect(f64(build_x), 3, f64(build_width), 21), ui2.TextStyle{
+		color: theme.taskbar_text_active
+		size:  15
+		bold:  true
+		align: .right
+	})
+	children << ui2.label('build.date', d.taskbar_build_date, ui2.rect(f64(build_x), 25, f64(build_width), 17), ui2.TextStyle{
+		color: theme.taskbar_muted
+		size:  11
+		align: .right
+	})
 	children << ui2.label('clock.time', d.taskbar_clock_time, ui2.rect(f64(clock_x), 3, f64(clock_width), 21), ui2.TextStyle{
 		color: theme.taskbar_text_active
 		size:  17

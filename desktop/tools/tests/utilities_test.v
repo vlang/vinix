@@ -861,12 +861,17 @@ fn test_taskbar_keeps_a_bottom_right_clock_and_open_windows() {
 
 	root := desktop.build_tree()
 	taskbar := utility_element_named(root, 'taskbar') or { panic('missing taskbar') }
-	assert taskbar.children.len == 6 + workspace_count
+	assert taskbar.children.len == 8 + workspace_count
 	assert utility_element_named(taskbar, action_start_toggle) != none
 	assert utility_element_named(taskbar, 'task.1') != none
 	assert utility_element_named(taskbar, 'task.2') != none
 	clock_time := utility_element_named(taskbar, 'clock.time') or { panic('missing taskbar clock') }
 	clock_date := utility_element_named(taskbar, 'clock.date') or { panic('missing taskbar date') }
+	build_time := utility_element_named(taskbar, 'build.time') or { panic('missing desktop build time') }
+	build_date := utility_element_named(taskbar, 'build.date') or { panic('missing desktop build date') }
+	assert build_time.text.starts_with('Built ')
+	assert build_date.text.len > 0
+	assert int(build_time.frame.x + build_time.frame.width + taskbar_item_gap) == int(clock_time.frame.x)
 	assert clock_time.text == '00:00:00'
 	assert clock_date.text == 'Thu 1 Jan'
 	assert int(clock_time.frame.x + clock_time.frame.width) == 1280 - taskbar_padding
@@ -876,7 +881,7 @@ fn test_taskbar_keeps_a_bottom_right_clock_and_open_windows() {
 	desktop.close_window(1)
 	empty := desktop.build_tree()
 	empty_taskbar := utility_element_named(empty, 'taskbar') or { panic('missing empty taskbar') }
-	assert empty_taskbar.children.len == 4 + workspace_count
+	assert empty_taskbar.children.len == 6 + workspace_count
 	assert utility_element_named(empty_taskbar, action_start_toggle) != none
 	assert utility_element_named(empty_taskbar, 'clock.time') != none
 	free_tree(empty)
