@@ -427,8 +427,8 @@ fn enable_power_domains(node &devicetree.DTNode, depth u32) bool {
 
 fn alloc_uncached(size u64) ?(u64, u64) {
 	span := lib.align_up(size, real_dart_page_size)
-	pages := lib.div_roundup(span, u64(4096))
-	raw := u64(memory.pmm_alloc_aligned_fallible(pages, real_dart_page_size / 4096))
+	pages := lib.div_roundup(span, memory.page_size)
+	raw := u64(memory.pmm_alloc_aligned_fallible(pages, real_dart_page_size / memory.page_size))
 	if raw == 0 {
 		return none
 	}

@@ -97,7 +97,7 @@ override LDFLAGS_DIRECT += \
     --build-id=none \
     --nostdlib \
     --static \
-    -z max-page-size=0x1000 \
+    -z max-page-size=0x4000 \
     --gc-sections \
     -T linker-aarch64.ld
 

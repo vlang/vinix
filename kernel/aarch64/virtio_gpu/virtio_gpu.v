@@ -1007,7 +1007,7 @@ pub fn initialise(hhdm u64) bool {
 			return false
 		}
 		mmio_w32(base + reg_guest_features, virtio_gpu_f_virgl)
-		mmio_w32(base + reg_guest_page_size, 4096)
+		mmio_w32(base + reg_guest_page_size, u32(page_size))
 
 		mmio_w32(base + reg_queue_sel, 0)
 		maximum := mmio_r32(base + reg_queue_num_max)

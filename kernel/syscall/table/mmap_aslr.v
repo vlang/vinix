@@ -13,7 +13,6 @@ import proc
 // spacing window. Vinix uses the same entropy scale while leaving its existing
 // hole finder in charge of collision resolution.
 const mmap_aslr_span = u64(4 * 1024 * 1024 * 1024)
-const mmap_aslr_page = u64(4096)
 
 fn randomized_mmap_hint(length u64) voidptr {
 	process := proc.current_thread().process
@@ -30,7 +29,7 @@ fn randomized_mmap_hint(length u64) voidptr {
 	if max_offset > mmap_aslr_span {
 		max_offset = mmap_aslr_span
 	}
-	slots := max_offset / mmap_aslr_page
+	slots := max_offset / memory.page_size
 	if slots == 0 {
 		return unsafe { nil }
 	}
@@ -39,6 +38,6 @@ fn randomized_mmap_hint(length u64) voidptr {
 	if !krandom.fill(voidptr(&random), sizeof(random), false) {
 		return unsafe { nil }
 	}
-	offset := (random % (slots + 1)) * mmap_aslr_page
+	offset := (random % (slots + 1)) * memory.page_size
 	return voidptr(anchor + offset)
 }

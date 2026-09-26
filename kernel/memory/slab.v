@@ -15,6 +15,8 @@ import xnualloc
 // or XNU's virtual-address/type sequestering.
 const slab_magic = u64(0x56494e4958534c42)
 const slab_alignment = u64(16)
+const slab_bitmap_words = 16
+const slab_max_capacity = u64(slab_bitmap_words * 64)
 
 pub struct Slab {
 mut:
@@ -35,7 +37,7 @@ mut:
 	capacity u64
 	in_use   u64
 	// Default: 1 = allocated/tail. With xnu_bitmap: 1 = free, 0 = used/tail.
-	used     [4]u64
+	used     [slab_bitmap_words]u64
 }
 
 fn slab_data_offset() u64 {
@@ -51,7 +53,7 @@ pub fn (mut this Slab) init(ent_size u64) {
 	}
 	this.ent_size = lib.align_up(ent_size, slab_alignment)
 	capacity := (page_size - slab_data_offset()) / this.ent_size
-	if capacity == 0 || capacity > 256 {
+	if capacity == 0 || capacity > slab_max_capacity {
 		lib.kpanic(unsafe { nil }, c'Slab: unsupported page geometry')
 	}
 }
@@ -122,9 +124,9 @@ fn (mut this Slab) grow() {
 	hdr.magic = slab_magic
 	hdr.capacity = (page_size - slab_data_offset()) / this.ent_size
 	$if xnu_bitmap ? {
-		xnualloc.zone_bits_init_ref(unsafe { &hdr.used[0] }, 4, u32(hdr.capacity))
+		xnualloc.zone_bits_init_ref(unsafe { &hdr.used[0] }, slab_bitmap_words, u32(hdr.capacity))
 	} $else {
-		for i := 0; i < 4; i++ {
+		for i := 0; i < slab_bitmap_words; i++ {
 			hdr.used[i] = u64(-1)
 		}
 		for i := u64(0); i < hdr.capacity; i++ {
@@ -152,14 +154,14 @@ pub fn (mut this Slab) alloc() voidptr {
 		}
 	}
 	mut hdr := unsafe { &SlabHeader(this.partial) }
-	mut slot := u64(256)
+	mut slot := slab_max_capacity
 	$if xnu_bitmap ? {
-		slot = xnualloc.zba_scan_bitmap_ref(unsafe { &hdr.used[0] }, 4, u64(this.alloc_rr) + 1)
+		slot = xnualloc.zba_scan_bitmap_ref(unsafe { &hdr.used[0] }, slab_bitmap_words, u64(this.alloc_rr) + 1)
 		if slot != xnualloc.no_element {
 			this.alloc_rr = u16(slot)
 		}
 	} $else {
-		for i := 0; i < 4; i++ {
+		for i := 0; i < slab_bitmap_words; i++ {
 			if hdr.used[i] != u64(-1) {
 				bit := slab_first_zero(hdr.used[i])
 				hdr.used[i] |= u64(1) << bit
@@ -210,7 +212,7 @@ pub fn (mut this Slab) sfree(ptr voidptr) {
 	bit := u64(1) << (slot % 64)
 	mut is_free := false
 	$if xnu_bitmap ? {
-		is_free = xnualloc.zone_bits_is_free_ref(unsafe { &hdr.used[0] }, 4, slot)
+		is_free = xnualloc.zone_bits_is_free_ref(unsafe { &hdr.used[0] }, slab_bitmap_words, slot)
 	} $else {
 		is_free = hdr.used[word] & bit == 0
 	}
@@ -224,7 +226,7 @@ pub fn (mut this Slab) sfree(ptr voidptr) {
 	unsafe { C.memset(ptr, 0xaa, this.ent_size) }
 	$if xnu_bitmap ? {
 		// The class lock and preceding check guarantee success.
-		if !xnualloc.zone_bits_mark_free_ref(unsafe { &hdr.used[0] }, 4, slot) {
+		if !xnualloc.zone_bits_mark_free_ref(unsafe { &hdr.used[0] }, slab_bitmap_words, slot) {
 			this.@lock.release()
 			lib.kpanic(unsafe { nil }, c'Slab: corrupt XNU bitmap state')
 			return

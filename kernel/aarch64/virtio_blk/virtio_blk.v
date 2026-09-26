@@ -126,7 +126,7 @@ fn setup_queue(mut device VirtioBlockDevice) bool {
 	avail_offset := u64(device.queue_size) * 16
 	used_offset := align_up(avail_offset + 4 + 2 * u64(device.queue_size) + 2, queue_align)
 	queue_bytes := used_offset + 4 + 8 * u64(device.queue_size) + 2
-	queue_pages := (queue_bytes + 4095) / 4096
+	queue_pages := (queue_bytes + memory.page_size - 1) / memory.page_size
 	queue_phys := u64(memory.pmm_alloc(queue_pages))
 	if queue_phys == 0 {
 		return false
@@ -134,10 +134,10 @@ fn setup_queue(mut device VirtioBlockDevice) bool {
 	device.desc = queue_phys + device.hhdm
 	device.avail = device.desc + avail_offset
 	device.used = device.desc + used_offset
-	unsafe { C.memset(voidptr(device.desc), 0, queue_pages * 4096) }
+	unsafe { C.memset(voidptr(device.desc), 0, queue_pages * memory.page_size) }
 
 	request_phys := u64(memory.pmm_alloc(1))
-	data_phys := u64(memory.pmm_alloc(max_transfer / 4096))
+	data_phys := u64(memory.pmm_alloc(max_transfer / memory.page_size))
 	if request_phys == 0 || data_phys == 0 {
 		return false
 	}
@@ -150,7 +150,7 @@ fn setup_queue(mut device VirtioBlockDevice) bool {
 		C.memset(voidptr(device.data_virt), 0, max_transfer)
 	}
 	cpu.dmb_ish()
-	mmio_w32(device.base + reg_queue_pfn, u32(queue_phys / 4096))
+	mmio_w32(device.base + reg_queue_pfn, u32(queue_phys / memory.page_size))
 	return true
 }
 
@@ -314,7 +314,7 @@ pub fn initialise(hhdm u64) {
 		// No block features are required for the synchronous request path.
 		_ = mmio_r32(base + reg_host_features)
 		mmio_w32(base + reg_guest_features, 0)
-		mmio_w32(base + reg_guest_page_size, 4096)
+		mmio_w32(base + reg_guest_page_size, u32(memory.page_size))
 		if !setup_queue(mut device) {
 			mmio_w32(base + reg_status, status_acknowledge | status_driver | status_failed)
 			uart.puts(c'virtio-blk: queue unavailable\n')

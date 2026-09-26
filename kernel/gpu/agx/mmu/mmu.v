@@ -416,7 +416,7 @@ pub fn (mut ctx UatContext) alloc_driver_buffer_aligned(size u64, private bool,
 		return none
 	}
 	aligned_size := (size + alignment - 1) & ~(alignment - 1)
-	pages := aligned_size / u64(4096)
+	pages := aligned_size / memory.page_size
 
 	ctx.lock.acquire()
 	defer {
@@ -426,7 +426,7 @@ pub fn (mut ctx UatContext) alloc_driver_buffer_aligned(size u64, private bool,
 		return none
 	}
 
-	phys := u64(memory.pmm_alloc_aligned_fallible(pages, 4))
+	phys := u64(memory.pmm_alloc_aligned_fallible(pages, pgtable.uat_pgsz / memory.page_size))
 	if phys == 0 {
 		return none
 	}
@@ -558,7 +558,7 @@ fn (mut ctx UatContext) release_driver_buffer_locked(buffer &UatBuffer) {
 		owned.mapped = false
 	}
 	if owned.phys != 0 && owned.size != 0 {
-		memory.pmm_free(voidptr(owned.phys), owned.size / u64(4096))
+		memory.pmm_free(voidptr(owned.phys), owned.size / memory.page_size)
 	}
 	if owned.private {
 		ctx.driver_private.release(owned.va)

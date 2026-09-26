@@ -5,11 +5,20 @@ import lib
 import limine
 import aarch64.cpu
 
-// ARM64 output address mask: bits [47:12]
-pub const pte_flags_mask = u64(0x0000_FFFF_FFFF_F000)
+fn C.vinix_arm64_switch_granule(mair u64, root u64, tcr u64)
+
+// ARM64 output address mask for a 16 KiB granule: bits [47:14].
+pub const pte_flags_mask = u64(0x0000_FFFF_FFFF_C000)
+const kernel_pte_address_mask = u64(0x0000_FFFF_FFFF_F000)
+
+// Limine enters with 4 KiB translation tables. Set the kernel's allocation
+// granule before the PMM or any page-based subsystem is initialized.
+pub fn configure_page_size() {
+	page_size = u64(0x4000)
+}
 
 pub fn user_address_limit() u64 {
-	return u64(1) << 48
+	return u64(1) << 47
 }
 
 // ARM64-internal PTE bits
@@ -26,7 +35,7 @@ const arm64_pte_attr_uncached = u64(2) << 2 // MAIR index 2 (Normal Non-Cacheabl
 const arm64_pte_table = u64(0b11)
 
 // Translate portable flags into an ARM64 L3 page descriptor.
-fn portable_to_arm64_pte(phys u64, flags u64) u64 {
+fn portable_to_arm64_pte(phys u64, flags u64, address_mask u64) u64 {
 	mut attr := arm64_pte_attr_normal
 	mut sh := arm64_pte_sh_inner
 	if flags & pte_device != 0 {
@@ -37,7 +46,7 @@ fn portable_to_arm64_pte(phys u64, flags u64) u64 {
 		// Non-cacheable memory uses outer shareable for framebuffers
 		sh = u64(2) << 8 // Outer Shareable
 	}
-	mut pte := (phys & pte_flags_mask) | arm64_pte_valid | arm64_pte_af | sh | attr
+	mut pte := (phys & address_mask) | arm64_pte_valid | arm64_pte_af | sh | attr
 
 	// OpenBSD marks every userspace mapping privileged-XN: EL0 executable pages
 	// may still execute at EL0, but EL1 must never fetch instructions from them.
@@ -75,18 +84,29 @@ pub fn new_pagemap() &Pagemap {
 }
 
 pub fn (pagemap &Pagemap) virt2pte(virt u64, allocate bool) ?&u64 {
-	// ARM64 4-level with 4KB granule: L0[47:39] L1[38:30] L2[29:21] L3[20:12]
-	l0_entry := (virt & (u64(0x1ff) << 39)) >> 39
-	l1_entry := (virt & (u64(0x1ff) << 30)) >> 30
-	l2_entry := (virt & (u64(0x1ff) << 21)) >> 21
-	l3_entry := (virt & (u64(0x1ff) << 12)) >> 12
+	if virt >= user_address_limit() {
+		return pagemap.kernel_virt2pte(virt, allocate)
+	}
+	// 16 KiB granule, 47-bit VA: L1[46:36] L2[35:25] L3[24:14].
+	l1_entry := (virt >> 36) & 0x7ff
+	l2_entry := (virt >> 25) & 0x7ff
+	l3_entry := (virt >> 14) & 0x7ff
 
-	l0 := pagemap.top_level
-	l1 := get_next_level(l0, l0_entry, allocate) or { return none }
+	l1 := pagemap.top_level
 	l2 := get_next_level(l1, l1_entry, allocate) or { return none }
 	l3 := get_next_level(l2, l2_entry, allocate) or { return none }
 
 	return unsafe { &u64(u64(&l3[l3_entry]) + higher_half) }
+}
+
+// TTBR1 keeps Limine's 4 KiB, 48-bit kernel geometry. TTBR0 uses the
+// independent 16 KiB, 47-bit user geometry above.
+fn (pagemap &Pagemap) kernel_virt2pte(virt u64, allocate bool) ?&u64 {
+	l0 := pagemap.top_level
+	l1 := get_next_level(l0, (virt >> 39) & 0x1ff, allocate) or { return none }
+	l2 := get_next_level(l1, (virt >> 30) & 0x1ff, allocate) or { return none }
+	l3 := get_next_level(l2, (virt >> 21) & 0x1ff, allocate) or { return none }
+	return unsafe { &u64(u64(&l3[(virt >> 12) & 0x1ff]) + higher_half) }
 }
 
 pub fn (pagemap &Pagemap) virt2phys(virt u64) ?u64 {
@@ -94,14 +114,15 @@ pub fn (pagemap &Pagemap) virt2phys(virt u64) ?u64 {
 	if unsafe { *pte_p } & 1 == 0 {
 		return none
 	}
-	return unsafe { *pte_p } & pte_flags_mask
+	mask := if virt >= user_address_limit() { kernel_pte_address_mask } else { pte_flags_mask }
+	return unsafe { *pte_p } & mask
 }
 
 // Resolve one userspace page for a checked kernel copy. Callers must hold the
 // pagemap lock while using the returned physical address so munmap/mprotect
 // cannot invalidate the access between validation and memcpy.
 pub fn (pagemap &Pagemap) user_page_phys(virt u64, write bool) ?u64 {
-	if virt >= u64(1) << 48 {
+	if virt >= user_address_limit() {
 		return none
 	}
 	pte_p := pagemap.virt2pte(virt, false) or { return none }
@@ -123,31 +144,25 @@ pub fn (pagemap &Pagemap) user_page_phys(virt u64, write bool) ?u64 {
 // to count. The caller holds the pagemap lock.
 pub fn (pagemap &Pagemap) resident_share(start u64, end u64) u64 {
 	mut total := u64(0)
-	mut virt := start & ~u64(0xfff)
+	mut virt := start & ~(page_size - 1)
 	for virt < end {
-		l0 := unsafe { &u64(u64(pagemap.top_level) + higher_half) }
-		e0 := unsafe { l0[(virt >> 39) & 0x1ff] }
-		if e0 & 1 == 0 {
-			virt = next_table_boundary(virt, 39) or { break }
-			continue
-		}
-		l1 := unsafe { &u64((e0 & pte_flags_mask) + higher_half) }
-		e1 := unsafe { l1[(virt >> 30) & 0x1ff] }
+		l1 := unsafe { &u64(u64(pagemap.top_level) + higher_half) }
+		e1 := unsafe { l1[(virt >> 36) & 0x7ff] }
 		if e1 & 1 == 0 {
-			virt = next_table_boundary(virt, 30) or { break }
+			virt = next_table_boundary(virt, 36) or { break }
 			continue
 		}
 		l2 := unsafe { &u64((e1 & pte_flags_mask) + higher_half) }
-		e2 := unsafe { l2[(virt >> 21) & 0x1ff] }
+		e2 := unsafe { l2[(virt >> 25) & 0x7ff] }
 		if e2 & 1 == 0 {
-			virt = next_table_boundary(virt, 21) or { break }
+			virt = next_table_boundary(virt, 25) or { break }
 			continue
 		}
 		l3 := unsafe { &u64((e2 & pte_flags_mask) + higher_half) }
-		table_end := next_table_boundary(virt, 21) or { u64(-1) }
+		table_end := next_table_boundary(virt, 25) or { u64(-1) }
 		stop := if end < table_end { end } else { table_end }
 		for virt < stop {
-			pte := unsafe { l3[(virt >> 12) & 0x1ff] }
+			pte := unsafe { l3[(virt >> 14) & 0x7ff] }
 			if pte & 1 != 0 {
 				refs := pmm_refcount_unlocked(voidptr(pte & pte_flags_mask))
 				total += if refs > 1 { page_size / refs } else { page_size }
@@ -164,31 +179,25 @@ pub fn (pagemap &Pagemap) resident_share(start u64, end u64) u64 {
 // 8 TiB of PROT_NONE -- costs what it holds rather than its size. The caller
 // holds the pagemap lock.
 pub fn (pagemap &Pagemap) next_present(start u64, end u64) u64 {
-	mut virt := start & ~u64(0xfff)
+	mut virt := start & ~(page_size - 1)
 	for virt < end {
-		l0 := unsafe { &u64(u64(pagemap.top_level) + higher_half) }
-		e0 := unsafe { l0[(virt >> 39) & 0x1ff] }
-		if e0 & 1 == 0 {
-			virt = next_table_boundary(virt, 39) or { return end }
-			continue
-		}
-		l1 := unsafe { &u64((e0 & pte_flags_mask) + higher_half) }
-		e1 := unsafe { l1[(virt >> 30) & 0x1ff] }
+		l1 := unsafe { &u64(u64(pagemap.top_level) + higher_half) }
+		e1 := unsafe { l1[(virt >> 36) & 0x7ff] }
 		if e1 & 1 == 0 {
-			virt = next_table_boundary(virt, 30) or { return end }
+			virt = next_table_boundary(virt, 36) or { return end }
 			continue
 		}
 		l2 := unsafe { &u64((e1 & pte_flags_mask) + higher_half) }
-		e2 := unsafe { l2[(virt >> 21) & 0x1ff] }
+		e2 := unsafe { l2[(virt >> 25) & 0x7ff] }
 		if e2 & 1 == 0 {
-			virt = next_table_boundary(virt, 21) or { return end }
+			virt = next_table_boundary(virt, 25) or { return end }
 			continue
 		}
 		l3 := unsafe { &u64((e2 & pte_flags_mask) + higher_half) }
-		table_end := next_table_boundary(virt, 21) or { u64(-1) }
+		table_end := next_table_boundary(virt, 25) or { u64(-1) }
 		stop := if end < table_end { end } else { table_end }
 		for virt < stop {
-			if unsafe { l3[(virt >> 12) & 0x1ff] } & 1 != 0 {
+			if unsafe { l3[(virt >> 14) & 0x7ff] } & 1 != 0 {
 				return virt
 			}
 			virt += page_size
@@ -201,31 +210,25 @@ pub fn (pagemap &Pagemap) next_present(start u64, end u64) u64 {
 // The caller holds the pagemap lock.
 pub fn (pagemap &Pagemap) residency(start u64, end u64) Residency {
 	mut counted := Residency{}
-	mut virt := start & ~u64(0xfff)
+	mut virt := start & ~(page_size - 1)
 	for virt < end {
-		l0 := unsafe { &u64(u64(pagemap.top_level) + higher_half) }
-		e0 := unsafe { l0[(virt >> 39) & 0x1ff] }
-		if e0 & 1 == 0 {
-			virt = next_table_boundary(virt, 39) or { break }
-			continue
-		}
-		l1 := unsafe { &u64((e0 & pte_flags_mask) + higher_half) }
-		e1 := unsafe { l1[(virt >> 30) & 0x1ff] }
+		l1 := unsafe { &u64(u64(pagemap.top_level) + higher_half) }
+		e1 := unsafe { l1[(virt >> 36) & 0x7ff] }
 		if e1 & 1 == 0 {
-			virt = next_table_boundary(virt, 30) or { break }
+			virt = next_table_boundary(virt, 36) or { break }
 			continue
 		}
 		l2 := unsafe { &u64((e1 & pte_flags_mask) + higher_half) }
-		e2 := unsafe { l2[(virt >> 21) & 0x1ff] }
+		e2 := unsafe { l2[(virt >> 25) & 0x7ff] }
 		if e2 & 1 == 0 {
-			virt = next_table_boundary(virt, 21) or { break }
+			virt = next_table_boundary(virt, 25) or { break }
 			continue
 		}
 		l3 := unsafe { &u64((e2 & pte_flags_mask) + higher_half) }
-		table_end := next_table_boundary(virt, 21) or { u64(-1) }
+		table_end := next_table_boundary(virt, 25) or { u64(-1) }
 		stop := if end < table_end { end } else { table_end }
 		for virt < stop {
-			pte := unsafe { l3[(virt >> 12) & 0x1ff] }
+			pte := unsafe { l3[(virt >> 14) & 0x7ff] }
 			if pte & 1 != 0 {
 				refs := pmm_refcount_unlocked(voidptr(pte & pte_flags_mask))
 				counted.resident += page_size
@@ -280,10 +283,10 @@ fn get_next_level(current_level &u64, index u64, allocate bool) ?&u64 {
 	return ret
 }
 
-// Returns true if every one of the 512 descriptors in a page-table page
+// Returns true if every one of the 2048 descriptors in a page-table page
 // (addressed through its higher-half virtual pointer) is empty.
 fn arm64_table_empty(table_p &u64) bool {
-	for i := u64(0); i < 512; i++ {
+	for i := u64(0); i < page_size / 8; i++ {
 		if unsafe { table_p[i] } != 0 {
 			return false
 		}
@@ -303,19 +306,16 @@ pub fn (mut pagemap Pagemap) unmap_page(virt u64) ? {
 // avoids recursively acquiring the non-recursive pagemap lock from munmap(),
 // which serializes a complete range before tearing it down.
 pub fn (mut pagemap Pagemap) unmap_page_unlocked(virt u64) ? {
-	l0_entry := (virt & (u64(0x1ff) << 39)) >> 39
-	l1_entry := (virt & (u64(0x1ff) << 30)) >> 30
-	l2_entry := (virt & (u64(0x1ff) << 21)) >> 21
-	l3_entry := (virt & (u64(0x1ff) << 12)) >> 12
+	l1_entry := (virt >> 36) & 0x7ff
+	l2_entry := (virt >> 25) & 0x7ff
+	l3_entry := (virt >> 14) & 0x7ff
 
-	// l0..l3 are physical table addresses; l0_p..l3_p are the higher-half
+	// l1..l3 are physical table addresses; l1_p..l3_p are the higher-half
 	// virtual pointers used to read/write descriptors.
-	l0 := pagemap.top_level
-	l1 := get_next_level(l0, l0_entry, false) or { return none }
+	l1 := pagemap.top_level
 	l2 := get_next_level(l1, l1_entry, false) or { return none }
 	l3 := get_next_level(l2, l2_entry, false) or { return none }
 
-	l0_p := unsafe { &u64(u64(l0) + higher_half) }
 	l1_p := unsafe { &u64(u64(l1) + higher_half) }
 	l2_p := unsafe { &u64(u64(l2) + higher_half) }
 	l3_p := unsafe { &u64(u64(l3) + higher_half) }
@@ -336,8 +336,7 @@ pub fn (mut pagemap Pagemap) unmap_page_unlocked(virt u64) ? {
 	// Reclaim now-empty tables from the leaf upward. At every level the parent
 	// descriptor is unlinked (and the write made visible with a barrier) BEFORE
 	// the child table's memory is returned to the PMM, so no live descriptor can
-	// ever point at freed/reused memory. The L0 root table is never freed, but
-	// its entry into the empty L1 MUST be cleared.
+	// ever point at freed/reused memory. The L1 root table is never freed.
 	if arm64_table_empty(l3_p) {
 		unsafe {
 			l2_p[l2_entry] = 0
@@ -352,14 +351,6 @@ pub fn (mut pagemap Pagemap) unmap_page_unlocked(virt u64) ? {
 			}
 			cpu.dsb_sy()
 			pmm_free(l2, 1)
-
-			if arm64_table_empty(l1_p) {
-				unsafe {
-					l0_p[l0_entry] = 0
-				}
-				cpu.dsb_sy()
-				pmm_free(l1, 1)
-			}
 		}
 	}
 
@@ -392,7 +383,7 @@ pub fn (mut pagemap Pagemap) flag_page(virt u64, flags u64) ? {
 		return none
 	}
 	phys := unsafe { *pte_p } & pte_flags_mask
-	new_pte := portable_to_arm64_pte(phys, flags)
+	new_pte := portable_to_arm64_pte(phys, flags, pte_flags_mask)
 	active := cpu.read_ttbr0_el1() & pte_flags_mask == u64(pagemap.top_level) & pte_flags_mask
 	install_arm64_pte(mut pte_p, virt, new_pte, active)
 }
@@ -448,30 +439,35 @@ pub fn (mut pagemap Pagemap) map_page(virt u64, phys u64, flags u64) ? {
 }
 
 pub fn (mut pagemap Pagemap) map_page_unlocked(virt u64, phys u64, flags u64) ? {
-	l0_entry := (virt & (u64(0x1ff) << 39)) >> 39
-	l1_entry := (virt & (u64(0x1ff) << 30)) >> 30
-	l2_entry := (virt & (u64(0x1ff) << 21)) >> 21
-	l3_entry := (virt & (u64(0x1ff) << 12)) >> 12
+	if virt >= user_address_limit() {
+		mut entry := pagemap.kernel_virt2pte(virt, true) or { return none }
+		new_pte := portable_to_arm64_pte(phys, flags, kernel_pte_address_mask)
+		active := cpu.read_ttbr1_el1() & pte_flags_mask == u64(pagemap.top_level) & pte_flags_mask
+		install_arm64_pte(mut entry, virt, new_pte, active)
+		return
+	}
+	l1_entry := (virt >> 36) & 0x7ff
+	l2_entry := (virt >> 25) & 0x7ff
+	l3_entry := (virt >> 14) & 0x7ff
 
-	l0 := pagemap.top_level
-	l1 := get_next_level(l0, l0_entry, true) or { return none }
+	l1 := pagemap.top_level
 	l2 := get_next_level(l1, l1_entry, true) or { return none }
-	mut l3 := get_next_level(l2, l2_entry, true) or { return none }
+	l3 := get_next_level(l2, l2_entry, true) or { return none }
 
 	mut entry := unsafe { &u64(u64(l3) + higher_half + l3_entry * 8) }
 
-	new_pte := portable_to_arm64_pte(phys, flags)
+	new_pte := portable_to_arm64_pte(phys, flags, pte_flags_mask)
 	active := cpu.read_ttbr0_el1() & pte_flags_mask == u64(pagemap.top_level) & pte_flags_mask
 	install_arm64_pte(mut entry, virt, new_pte, active)
 }
 
 fn remap_hhdm_span(phys u64, len u64, flags u64, failure string) u64 {
-	if len == 0 || phys > u64(-1) - len || phys + len > u64(-1) - (page_size - 1) {
+	if len == 0 || phys > u64(-1) - len || phys + len > u64(-1) - (kernel_page_size - 1) {
 		panic('${failure}: invalid physical aperture')
 	}
-	page_base := lib.align_down(phys, page_size)
-	page_top := lib.align_up(phys + len, page_size)
-	for pg := page_base; pg < page_top; pg += page_size {
+	page_base := lib.align_down(phys, kernel_page_size)
+	page_top := lib.align_up(phys + len, kernel_page_size)
+	for pg := page_base; pg < page_top; pg += kernel_page_size {
 		kernel_pagemap.map_page(pg + higher_half, pg, pte_present | pte_noexec | pte_writable | flags) or { panic('${failure}: failed to map physical aperture') }
 	}
 	cpu.dsb_sy()
@@ -531,10 +527,10 @@ pub fn declare_framebuffer(phys u64, len u64) {
 fn low_page_is_memory(entries &&limine.LimineMemmapEntry, first u64, count u64, page u64) bool {
 	for k := first; k < count; k++ {
 		entry := unsafe { entries[k] }
-		if lib.align_down(entry.base, page_size) > page {
+		if lib.align_down(entry.base, kernel_page_size) > page {
 			return false
 		}
-		if lib.align_up(entry.base + entry.length, page_size) <= page {
+		if lib.align_up(entry.base + entry.length, kernel_page_size) <= page {
 			continue
 		}
 		return match entry.@type {
@@ -555,11 +551,6 @@ pub fn vmm_init() {
 	kernel_pagemap.top_level = pmm_alloc(1)
 	if kernel_pagemap.top_level == 0 {
 		panic('vmm_init() allocation failure')
-	}
-
-	// Pre-allocate L1 tables for the kernel half (indices 256..511)
-	for i := u64(256); i < 512; i++ {
-		get_next_level(kernel_pagemap.top_level, i, true) or { panic('vmm init failure') }
 	}
 
 	if kaddr_req.response == unsafe { nil } {
@@ -601,10 +592,10 @@ pub fn vmm_init() {
 	// accesses unpredictable; registers mapped Normal can be merged or cached.
 	mut next_entry := u64(0)
 	mut low_device_pages := u64(0)
-	for i := u64(0); i < 0x100000000; i += page_size {
+	for i := u64(0); i < 0x100000000; i += kernel_page_size {
 		// The memory map is sorted by base and its entries do not overlap.
 		for next_entry < memmap.entry_count
-			&& unsafe { lib.align_up(entries[next_entry].base + entries[next_entry].length, page_size) } <= i {
+			&& unsafe { lib.align_up(entries[next_entry].base + entries[next_entry].length, kernel_page_size) } <= i {
 			next_entry++
 		}
 		mut flags := pte_present | pte_noexec | pte_writable
@@ -624,12 +615,12 @@ pub fn vmm_init() {
 	// count would explain a stall here rather than at the page-table switch.
 	mut high_pages := u64(0)
 	for i := 0; i < memmap.entry_count; i++ {
-		base := unsafe { lib.align_down(entries[i].base, page_size) }
-		top := unsafe { lib.align_up(entries[i].base + entries[i].length, page_size) }
+		base := unsafe { lib.align_down(entries[i].base, kernel_page_size) }
+		top := unsafe { lib.align_up(entries[i].base + entries[i].length, kernel_page_size) }
 		if top <= u64(0x100000000) {
 			continue
 		}
-		for j := base; j < top; j += page_size {
+		for j := base; j < top; j += kernel_page_size {
 			if j < u64(0x100000000) {
 				continue
 			}
@@ -647,7 +638,7 @@ pub fn vmm_init() {
 	// pmm_init no longer carves it out, so the loop above already covered it;
 	// map it explicitly anyway, so that invariant does not depend on the PMM.
 	if pmm_bitmap_size != 0 {
-		for pg := pmm_bitmap_phys; pg < pmm_bitmap_phys + pmm_bitmap_size; pg += page_size {
+		for pg := pmm_bitmap_phys; pg < pmm_bitmap_phys + pmm_bitmap_size; pg += kernel_page_size {
 			kernel_pagemap.map_page(pg + higher_half, pg, pte_present | pte_noexec | pte_writable) or {
 				panic('vmm init failure: pmm bitmap')
 			}
@@ -663,9 +654,9 @@ pub fn vmm_init() {
 		entry := unsafe { entries[k] }
 		if entry.@type == limine.limine_memmap_framebuffer {
 			fb_entries++
-			fb_base := lib.align_down(entry.base, page_size)
-			fb_top := lib.align_up(entry.base + entry.length, page_size)
-			for pg := fb_base; pg < fb_top; pg += page_size {
+			fb_base := lib.align_down(entry.base, kernel_page_size)
+			fb_top := lib.align_up(entry.base + entry.length, kernel_page_size)
+			for pg := fb_base; pg < fb_top; pg += kernel_page_size {
 				kernel_pagemap.map_page(pg + higher_half, pg, pte_present | pte_noexec | pte_writable | pte_uncached) or {
 					panic('vmm init failure: framebuffer remap')
 				}
@@ -676,9 +667,9 @@ pub fn vmm_init() {
 	// The framebuffer the caller declared, mapped from its own span rather than
 	// from the memory map. Harmless when it duplicates an entry above.
 	if vmm_framebuffer_len != 0 {
-		fb_base := lib.align_down(vmm_framebuffer_base, page_size)
-		fb_top := lib.align_up(vmm_framebuffer_base + vmm_framebuffer_len, page_size)
-		for pg := fb_base; pg < fb_top; pg += page_size {
+		fb_base := lib.align_down(vmm_framebuffer_base, kernel_page_size)
+		fb_top := lib.align_up(vmm_framebuffer_base + vmm_framebuffer_len, kernel_page_size)
+		for pg := fb_base; pg < fb_top; pg += kernel_page_size {
 			kernel_pagemap.map_page(pg + higher_half, pg, pte_present | pte_noexec | pte_writable | pte_uncached) or {
 				panic('vmm init failure: declared framebuffer')
 			}
@@ -689,8 +680,8 @@ pub fn vmm_init() {
 	// Activate the kernel page tables. This is a live switch: the MMU is already
 	// on (Limine handed off with it enabled), so the running instruction stream,
 	// stack and framebuffer must stay mapped across it. The kernel's tables map
-	// all three, and its TCR matches Limine's geometry (both 4KB granule, 48-bit,
-	// T0SZ=T1SZ=16), so no fetch changes meaning mid-switch.
+	// all three. TTBR1 keeps Limine's 4 KiB geometry while TTBR0 changes to
+	// 16 KiB user pages in the same register update.
 	print('vmm: activating kernel page tables\n')
 	vmm_activate_on_cpu()
 
@@ -721,18 +712,22 @@ pub fn vmm_activate_on_cpu() {
 	// the new tables going live.
 	mair := u64(0xFF) | (u64(0x00) << 8) | (u64(0x44) << 16)
 
-	// TCR_EL1 for 4KB granule, 48-bit VA and a physical address size read from
+	// TCR_EL1 for 16 KiB user pages and 4 KiB kernel pages. Read physical
+	// address size from
 	// this CPU's ID_AA64MMFR0_EL1.PARange. PARange and TCR.IPS share an encoding.
 	mmfr0 := cpu.read_id_aa64mmfr0_el1()
+	if (mmfr0 >> 20) & 0xf == 0xf {
+		panic('ARM64 CPU does not support 16 KiB translation granules')
+	}
 	mut tcr_ips := (mmfr0 >> 0) & 0xf
 	if tcr_ips > 6 {
 		// Fallback to 48-bit PA if the encoding is unknown/reserved.
 		tcr_ips = 5
 	}
-	tcr := u64(16) | // T0SZ = 16 -> 48-bit user VA
+	tcr := u64(17) | // T0SZ = 17 -> 47-bit user VA
 	(u64(16) << 16) | // T1SZ = 16 -> 48-bit kernel VA
-	(u64(0b00) << 14) | // TG0 = 4KB granule (TTBR0)
-	(u64(0b10) << 30) | // TG1 = 4KB granule (TTBR1)
+	(u64(0b10) << 14) | // TG0 = 16 KiB granule (TTBR0)
+	(u64(0b10) << 30) | // TG1 = 4 KiB granule (TTBR1)
 	(tcr_ips << 32) | // IPS = physical address size
 	(u64(0b11) << 12) | // SH0 = inner shareable
 	(u64(0b11) << 28) | // SH1 = inner shareable
@@ -741,16 +736,8 @@ pub fn vmm_activate_on_cpu() {
 	(u64(0b01) << 8) | // IRGN0 = Write-Back
 	(u64(0b01) << 24) // IRGN1 = Write-Back
 
-	// Order matters and follows Limine's own hand-off: install the translation
-	// bases first, write TCR last. TCR is the register that re-interprets an
-	// in-flight table walk, so it is written only once the correct bases are
-	// already live. Each writer ends in an ISB.
-	cpu.write_mair_el1(mair)
-	cpu.write_ttbr0_el1(u64(kernel_pagemap.top_level))
-	cpu.write_ttbr1_el1(u64(kernel_pagemap.top_level))
-	cpu.write_tcr_el1(tcr)
-
-	cpu.tlbi_vmalle1()
-	cpu.dsb_sy()
-	cpu.isb()
+	// The individual register helpers issue ISB after each write, which would
+	// interpret one table under the other granule. Publish the complete regime
+	// before a single context-synchronization barrier.
+	C.vinix_arm64_switch_granule(mair, u64(kernel_pagemap.top_level), tcr)
 }

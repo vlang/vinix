@@ -50,7 +50,7 @@ const desc_write = u16(2)
 const mmio_base = u64(0x0a000000)
 const mmio_slot_size = u64(0x200)
 const mmio_slot_count = u64(32)
-const page_bytes = u64(4096)
+const page_bytes = u64(4096) // Audio period buffer, independent of the MMU granule.
 const queue_align = u64(4096)
 
 const control_queue_index = u16(0)
@@ -188,15 +188,15 @@ fn setup_queue(index u16, wanted u16) ?Queue {
 
 	avail_offset := u64(size) * 16
 	used_offset := align_up(avail_offset + 4 + 2 * u64(size) + 2, queue_align)
-	pages := (used_offset + 4 + 8 * u64(size) + 2 + page_bytes - 1) / page_bytes
+	pages := (used_offset + 4 + 8 * u64(size) + 2 + memory.page_size - 1) / memory.page_size
 	phys := u64(memory.pmm_alloc(pages))
 	if phys == 0 {
 		return none
 	}
 	virt := phys + snd_hhdm
-	unsafe { C.memset(voidptr(virt), 0, pages * page_bytes) }
+	unsafe { C.memset(voidptr(virt), 0, pages * memory.page_size) }
 	cpu.dmb_ish()
-	mmio_w32(snd_base + reg_queue_pfn, u32(phys / page_bytes))
+	mmio_w32(snd_base + reg_queue_pfn, u32(phys / memory.page_size))
 	return Queue{
 		size:  size
 		desc:  virt
@@ -878,7 +878,7 @@ pub fn initialise(hhdm u64) {
 	mmio_w32(snd_base + reg_status, status_acknowledge)
 	mmio_w32(snd_base + reg_status, status_acknowledge | status_driver)
 	mmio_w32(snd_base + reg_guest_features, 0)
-	mmio_w32(snd_base + reg_guest_page_size, u32(page_bytes))
+	mmio_w32(snd_base + reg_guest_page_size, u32(memory.page_size))
 
 	snd_control = setup_queue(control_queue_index, 16) or {
 		fail('control queue unavailable')

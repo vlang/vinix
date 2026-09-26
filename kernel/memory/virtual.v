@@ -25,6 +25,7 @@ pub const pte_user = u64(1) << 2
 pub const pte_device = u64(1) << 3 // ARM64: use Device-nGnRnE memory type for MMIO
 pub const pte_uncached = u64(1) << 4 // ARM64: use Normal Non-Cacheable for framebuffers
 pub const pte_noexec = u64(1) << 63
+pub const kernel_page_size = u64(0x1000)
 
 // What of a range of an address space is resident, in bytes: all of it, the
 // part fork left shared with another process until one of them writes it,
@@ -94,11 +95,11 @@ __global (
 )
 
 fn map_kernel_span(virt u64, phys u64, len u64, flags u64) {
-	aligned_len := lib.align_up(len, page_size)
+	aligned_len := lib.align_up(len, kernel_page_size)
 
 	print('vmm: Kernel: Mapping 0x${phys:x} to 0x${virt:x}, length: 0x${aligned_len:x}\n')
 
-	for i := u64(0); i < aligned_len; i += page_size {
+	for i := u64(0); i < aligned_len; i += kernel_page_size {
 		kernel_pagemap.map_page(virt + i, phys + i, flags) or { panic('vmm init failure') }
 	}
 }

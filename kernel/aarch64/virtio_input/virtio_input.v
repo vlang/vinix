@@ -567,7 +567,7 @@ pub fn initialise(hhdm u64) {
 		mmio_w32(base + reg_status, status_acknowledge)
 		mmio_w32(base + reg_status, status_acknowledge | status_driver)
 		mmio_w32(base + reg_guest_features, 0) // Accept no features
-		mmio_w32(base + reg_guest_page_size, 4096)
+		mmio_w32(base + reg_guest_page_size, u32(memory.page_size))
 
 		// Configure virtqueue 0
 		mmio_w32(base + reg_queue_sel, 0)
@@ -598,7 +598,7 @@ pub fn initialise(hhdm u64) {
 		vi_vq_used_virt[idx] = page_virt + used_off
 		vi_events_virt[idx] = page_virt + 0x300
 
-		mmio_w32(base + reg_queue_pfn, u32(page_phys / 4096))
+		mmio_w32(base + reg_queue_pfn, u32(page_phys / memory.page_size))
 
 		// Set up descriptors: each points to an 8-byte event buffer (device-writable)
 		for j := u64(0); j < qsz; j++ {

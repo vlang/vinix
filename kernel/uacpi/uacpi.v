@@ -226,9 +226,9 @@ pub fn uacpi_kernel_handle_firmware_request(req voidptr) UACPIStatus {
 
 @[export: 'uacpi_kernel_map']
 pub fn uacpi_kernel_map(phys u64, len u64) voidptr {
-	aligned_len := lib.align_up(len, page_size)
+	aligned_len := lib.align_up(len, memory.kernel_page_size)
 
-	for i := u64(0); i < aligned_len; i += page_size {
+	for i := u64(0); i < aligned_len; i += memory.kernel_page_size {
 		kernel_pagemap.map_page(higher_half + phys + i, phys + i, memory.pte_present | memory.pte_noexec | memory.pte_writable) or {
 			panic('uacpi_kernel_map() failure')
 		}

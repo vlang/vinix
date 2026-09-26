@@ -39,7 +39,7 @@ pub fn create(size u64) ?&GemObject {
 }
 
 // Create a GEM object with a physical and size alignment suitable for the
-// target device. AGX callers use 16 KiB; ordinary DRM users retain 4 KiB.
+// target device. AGX callers require 16 KiB alignment on either kernel granule.
 pub fn create_aligned(size u64, alignment u64) ?&GemObject {
 	if size == 0 {
 		return none

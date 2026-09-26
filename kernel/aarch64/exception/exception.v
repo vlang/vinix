@@ -382,7 +382,7 @@ fn fault_handler(ec u64, esr u64, far u64, gpr_state &cpulocal.GPRState) {
 	// this walks the faulting thread's pagemap.
 	if ec == 0x0 && from_userspace(gpr_state) && proc.current_thread() != unsafe { nil } {
 		mut current_thread := proc.current_thread()
-		pc_page := gpr_state.pc & ~u64(0xfff)
+		pc_page := gpr_state.pc & ~(page_size - 1)
 		phys := current_thread.process.pagemap.virt2phys(pc_page) or { u64(0) }
 		pte_p := current_thread.process.pagemap.virt2pte(pc_page, false) or { unsafe { &u64(0) } }
 		mut pte_val := u64(0)
@@ -399,7 +399,7 @@ fn fault_handler(ec u64, esr u64, far u64, gpr_state &cpulocal.GPRState) {
 
 		// Dump 32 bytes of instructions at PC (read via HHDM)
 		if phys != 0 {
-			pc_offset := gpr_state.pc & u64(0xfff)
+			pc_offset := gpr_state.pc & (page_size - 1)
 			kernel_addr := phys + higher_half + pc_offset
 			uart.puts(c'INSN AT PC (via HHDM):\n')
 			for ioff := u64(0); ioff < 32; ioff += 4 {
@@ -437,9 +437,9 @@ fn fault_handler(ec u64, esr u64, far u64, gpr_state &cpulocal.GPRState) {
 		uart_put_hex(sp_val)
 		uart.puts(c':\n')
 		for si := dump_start; si < sp_val + 128; si += 8 {
-			si_page := si & ~u64(0xfff)
+			si_page := si & ~(page_size - 1)
 			si_phys := current_thread.process.pagemap.virt2phys(si_page) or { continue }
-			si_offset := si & u64(0xfff)
+			si_offset := si & (page_size - 1)
 			if si_offset + 8 > page_size {
 				continue
 			}
@@ -469,7 +469,7 @@ fn fault_handler(ec u64, esr u64, far u64, gpr_state &cpulocal.GPRState) {
 	// Dump PTE info for instruction abort or user data abort
 	if ec == 0x20 || ec == 0x24 {
 		mut current_thread := proc.current_thread()
-		page_addr := far & ~u64(0xfff)
+		page_addr := far & ~(memory.page_size - 1)
 		phys := current_thread.process.pagemap.virt2phys(page_addr) or { u64(0) }
 		pte_p := current_thread.process.pagemap.virt2pte(page_addr, false) or { unsafe { &u64(0) } }
 		mut pte_val := u64(0)
@@ -522,7 +522,7 @@ fn fault_handler(ec u64, esr u64, far u64, gpr_state &cpulocal.GPRState) {
 			// Check for physical page aliasing: walk TTBR0 page table to find
 			// ALL virtual addresses mapped to the same physical page as chunk
 			mut current_thread := proc.current_thread()
-			chunk_phys := current_thread.process.pagemap.virt2phys(chunk & ~u64(0xfff)) or {
+			chunk_phys := current_thread.process.pagemap.virt2phys(chunk & ~(memory.page_size - 1)) or {
 				uart.puts(c'  Chunk page not mapped!\n')
 				u64(0)
 			}
@@ -533,37 +533,31 @@ fn fault_handler(ec u64, esr u64, far u64, gpr_state &cpulocal.GPRState) {
 				hh := higher_half
 				pt_top := current_thread.process.pagemap.top_level
 				mut alias_count := 0
-				for l0i := u64(0); l0i < 512; l0i++ {
-					l0e := unsafe { *&u64(u64(pt_top) + hh + l0i * 8) }
-					if l0e & 1 == 0 {
+				for l1i := u64(0); l1i < memory.page_size / 8; l1i++ {
+					l1e := unsafe { *&u64(u64(pt_top) + hh + l1i * 8) }
+					if l1e & 1 == 0 {
 						continue
 					}
-					l1_base := l0e & memory.pte_flags_mask
-					for l1i := u64(0); l1i < 512; l1i++ {
-						l1e := unsafe { *&u64(l1_base + hh + l1i * 8) }
-						if l1e & 1 == 0 {
+					l2_base := l1e & memory.pte_flags_mask
+					for l2i := u64(0); l2i < memory.page_size / 8; l2i++ {
+						l2e := unsafe { *&u64(l2_base + hh + l2i * 8) }
+						if l2e & 1 == 0 {
 							continue
 						}
-						l2_base := l1e & memory.pte_flags_mask
-						for l2i := u64(0); l2i < 512; l2i++ {
-							l2e := unsafe { *&u64(l2_base + hh + l2i * 8) }
-							if l2e & 1 == 0 {
-								continue
-							}
-							l3_base := l2e & memory.pte_flags_mask
-							for l3i := u64(0); l3i < 512; l3i++ {
+						l3_base := l2e & memory.pte_flags_mask
+						for l3i := u64(0); l3i < memory.page_size / 8; l3i++ {
 								l3e := unsafe { *&u64(l3_base + hh + l3i * 8) }
 								if l3e & 1 == 0 {
 									continue
 								}
 								phys := l3e & memory.pte_flags_mask
 								if phys == chunk_phys {
-									virt := (l0i << 39) | (l1i << 30) | (l2i << 21) | (l3i << 12)
+									virt := (l1i << 36) | (l2i << 25) | (l3i << 14)
 									uart.puts(c'  VIRT=0x')
 									uart_put_hex(virt)
 									uart.puts(c' PTE=0x')
 									uart_put_hex(l3e)
-									if virt == (chunk & ~u64(0xfff)) {
+									if virt == (chunk & ~(memory.page_size - 1)) {
 										uart.puts(c' (expected)')
 									} else {
 										uart.puts(c' *** ALIAS! ***')
@@ -574,7 +568,6 @@ fn fault_handler(ec u64, esr u64, far u64, gpr_state &cpulocal.GPRState) {
 							}
 						}
 					}
-				}
 				if alias_count <= 1 {
 					uart.puts(c'  No aliasing found (page mapped once)\n')
 				} else {

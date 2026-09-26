@@ -206,15 +206,16 @@ fn initialise_hardware() bool {
 	sart := memory.map_mmio(plan.sart.base, plan.sart.size)
 	reset := memory.map_mmio(plan.reset.region.base, plan.reset.region.size)
 	if nvme == 0 || asc == 0 || mailbox == 0 || sart == 0 || reset == 0 { return false }
-	// One bounded, fallible allocation. PMM pages are 4 KiB; DMA is 16-KiB aligned.
+	// One bounded, fallible allocation. DMA is 16 KiB aligned.
 	bytes := u64(0x460000)
-	physical := u64(memory.pmm_alloc_aligned_fallible(bytes / 4096, 4))
+	physical := u64(memory.pmm_alloc_aligned_fallible(bytes / memory.page_size,
+		u64(0x4000) / memory.page_size))
 	if physical == 0 { println('ans: DMA allocation failed'); return false }
 	// Never free this arena after hardware has been started, even on error.
 	// Its queues, TCBs and firmware system buffers may still be DMA targets.
 	for d in plan.power {
 		if !pmgr.enable_region(d.region.base, d.region.size, d.offset) {
-			memory.pmm_free(voidptr(physical), bytes / 4096)
+			memory.pmm_free(voidptr(physical), bytes / memory.page_size)
 			println('ans: power-domain enable failed')
 			return false
 		}

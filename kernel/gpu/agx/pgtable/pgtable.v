@@ -81,8 +81,8 @@ pub fn as_uncached(protection u64) u64 {
 	return (protection & ~uat_pte_memattr_mask) | uat_memattr_normal_uncached
 }
 
-// Number of 4KB kernel pages required for one 16KB GPU page table page
-const kernel_pages_per_uat_page = u64(4) // 4 * 4096 = 16384
+// Number of kernel pages required for one 16 KiB GPU page table page.
+const kernel_pages_per_uat_page = u64(1)
 
 // --- UAT page table structure ---
 
@@ -98,8 +98,7 @@ pub mut:
 }
 
 // Allocate a single 16KB-aligned page table page.
-// The kernel PMM uses 4KB pages, so we allocate 4 contiguous pages
-// and zero them out (pmm_alloc already zeroes memory).
+// pmm_alloc already zeroes the contiguous, aligned memory.
 pub fn alloc_table_page() ?&u64 {
 	ptr := memory.pmm_alloc_aligned(kernel_pages_per_uat_page, kernel_pages_per_uat_page)
 	if ptr == 0 {
@@ -108,7 +107,7 @@ pub fn alloc_table_page() ?&u64 {
 	return ptr
 }
 
-// Free a 16KB page table page (4 contiguous kernel pages).
+// Free a 16 KiB page table page.
 pub fn free_table_page(page &u64) {
 	if page == unsafe { nil } {
 		return

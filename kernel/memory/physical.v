@@ -175,8 +175,10 @@ pub fn pmm_init() {
 			if entries[i].@type != u32(limine.limine_memmap_usable) {
 				continue
 			}
-			if entries[i].length >= metadata_size {
-				pmm_bitmap_phys = entries[i].base
+			aligned_base := lib.align_up(entries[i].base, page_size)
+			if aligned_base < entries[i].base + entries[i].length
+				&& entries[i].base + entries[i].length - aligned_base >= metadata_size {
+				pmm_bitmap_phys = aligned_base
 				pmm_bitmap_size = bitmap_size
 				pmm_bitmap = voidptr(pmm_bitmap_phys + higher_half)
 				pmm_refcounts_phys = pmm_bitmap_phys + bitmap_size
@@ -200,9 +202,11 @@ pub fn pmm_init() {
 				continue
 			}
 
-			for j := u64(0); j < entries[i].length; j += page_size {
+			base := lib.align_up(entries[i].base, page_size)
+			top := lib.align_down(entries[i].base + entries[i].length, page_size)
+			for addr := base; addr < top; addr += page_size {
 				free_pages++
-				lib.bitreset(pmm_bitmap, (entries[i].base + j) / page_size)
+				lib.bitreset(pmm_bitmap, addr / page_size)
 			}
 		}
 
@@ -380,7 +384,7 @@ pub fn pmm_alloc_fallible(count u64) voidptr {
 }
 
 // Allocate `count` contiguous pages whose physical base is aligned to
-// `alignment_pages`. The PMM is 4 KiB-granular, so this over-allocates and
+// `alignment_pages`. The PMM is page-granular, so this over-allocates and
 // returns the unused prefix and suffix before exposing the aligned range.
 fn pmm_alloc_aligned_inner(count u64, alignment_pages u64, fallible bool) voidptr {
 	if count == 0 || alignment_pages == 0 || alignment_pages & (alignment_pages - 1) != 0

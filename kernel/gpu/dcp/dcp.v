@@ -72,7 +72,7 @@ pub fn (mut dcp AppleDCP) initialise() bool {
 	dcp.disp_dart.init()
 
 	// Step 2: Allocate shared memory and map it through DART
-	shmem_pages := dcp.shmem_size / u64(0x1000)
+	shmem_pages := dcp.shmem_size / memory.page_size
 	shmem_phys := u64(memory.pmm_alloc(shmem_pages))
 	if shmem_phys == 0 {
 		C.printf(c'dcp: Failed to allocate shared memory\n')

@@ -89,21 +89,21 @@ fn setup_queue(index u16, hhdm u64, receive bool) ?Queue {
 	avail_offset := u64(size) * 16
 	used_offset := align_up(avail_offset + 4 + 2 * u64(size) + 2, queue_align)
 	queue_bytes := used_offset + 4 + 8 * u64(size) + 2
-	queue_pages := (queue_bytes + 4095) / 4096
+	queue_pages := (queue_bytes + memory.page_size - 1) / memory.page_size
 	queue_phys := u64(memory.pmm_alloc(queue_pages))
 	if queue_phys == 0 {
 		return none
 	}
 	queue_virt := queue_phys + hhdm
-	unsafe { C.memset(voidptr(queue_virt), 0, queue_pages * 4096) }
+	unsafe { C.memset(voidptr(queue_virt), 0, queue_pages * memory.page_size) }
 
-	buffer_pages := (u64(size) * buffer_size + 4095) / 4096
+	buffer_pages := (u64(size) * buffer_size + memory.page_size - 1) / memory.page_size
 	buffer_phys := u64(memory.pmm_alloc(buffer_pages))
 	if buffer_phys == 0 {
 		return none
 	}
 	buffer_virt := buffer_phys + hhdm
-	unsafe { C.memset(voidptr(buffer_virt), 0, buffer_pages * 4096) }
+	unsafe { C.memset(voidptr(buffer_virt), 0, buffer_pages * memory.page_size) }
 
 	mut queue := Queue{
 		index: index
@@ -132,7 +132,7 @@ fn setup_queue(index u16, hhdm u64, receive bool) ?Queue {
 		unsafe { *&u16(queue.avail + 2) = size }
 	}
 	cpu.dmb_ish()
-	mmio_w32(device_base + reg_queue_pfn, u32(queue_phys / 4096))
+	mmio_w32(device_base + reg_queue_pfn, u32(queue_phys / memory.page_size))
 	return queue
 }
 
@@ -204,7 +204,7 @@ pub fn initialise(hhdm u64) {
 		offered := mmio_r32(base + reg_host_features)
 		accepted := offered & virtio_net_f_mac
 		mmio_w32(base + reg_guest_features, accepted)
-		mmio_w32(base + reg_guest_page_size, 4096)
+		mmio_w32(base + reg_guest_page_size, u32(memory.page_size))
 		if accepted & virtio_net_f_mac != 0 {
 			for i := u64(0); i < 6; i++ {
 				mac_address[i] = unsafe { *&u8(base + reg_config + i) }

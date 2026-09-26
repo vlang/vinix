@@ -31,9 +31,12 @@ This is hardware-accelerated rendering, but it is paravirtualized access—not
 direct GPU passthrough. macOS retains ownership of the physical GPU and the
 guest submits a portable VirGL command stream through a host API.
 
-Vinix currently uses 4 KiB pages (`kernel/memory/virtual.v`). KekVM's Venus
-backend requires a 16 KiB-page guest, so this launch uses VirGL for accelerated
-OpenGL and leaves Venus disabled.
+Vinix uses 16 KiB pages for AArch64 processes, which satisfies KekVM's guest
+page-size requirement for Venus. The kernel retains 4 KiB mappings for its
+Limine-compatible higher-half address space. This launch still uses VirGL for
+accelerated OpenGL: Vinix's VirtIO-GPU DRM driver does not yet implement the
+blob resources, context initialization, and modern VirtIO transport needed by
+Venus, so Vulkan acceleration remains disabled.
 
 Consequently, this test covers the Vinix VirtIO DRM implementation, GEM and
 fence lifecycle, Mesa/EGL/GLES integration, command transport, and real pixel

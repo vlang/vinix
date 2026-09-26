@@ -605,6 +605,7 @@ fn early_cmdline_has_token(token string) bool {
 }
 
 fn kmain() {
+	memory.configure_page_size()
 	// Read the cmdline before touching anything else. The framebuffer used to
 	// be written first, which made it impossible to tell a kernel that never
 	// ran from one that faulted on the very first pixel: both leave the black

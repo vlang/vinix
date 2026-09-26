@@ -69,7 +69,7 @@ fn (mut this AnsRootResource) mmap(_handle voidptr, page u64, flags int) voidptr
 	// File-backed private pages support the ELF loader and shared libraries.
 	// Never provide writable shared mappings of the immutable root image.
 	if !stat.isreg(this.stat.mode) || flags & mmap.map_shared != 0
-		|| page > ~u64(0) / 4096 || page * 4096 >= u64(this.stat.size) {
+		|| page > ~u64(0) / memory.page_size || page * memory.page_size >= u64(this.stat.size) {
 		return unsafe { nil }
 	}
 	this.l.acquire()
@@ -82,12 +82,12 @@ fn (mut this AnsRootResource) mmap(_handle voidptr, page u64, flags int) voidptr
 		if source == unsafe { nil } {
 			return unsafe { nil }
 		}
-		mut n := u64(this.stat.size) - page * 4096
-		if n > 4096 {
-			n = 4096
+		mut n := u64(this.stat.size) - page * memory.page_size
+		if n > memory.page_size {
+			n = memory.page_size
 		}
 		ans_lock.acquire()
-		result := C.vinix_ans_root_read(u32(this.stat.ino), voidptr(u64(source) + memory.get_hhdm_offset()), page * 4096, n)
+		result := C.vinix_ans_root_read(u32(this.stat.ino), voidptr(u64(source) + memory.get_hhdm_offset()), page * memory.page_size, n)
 		ans_lock.release()
 		if result != i64(n) {
 			memory.pmm_free(source, 1)
@@ -100,7 +100,7 @@ fn (mut this AnsRootResource) mmap(_handle voidptr, page u64, flags int) voidptr
 		return unsafe { nil }
 	}
 	unsafe {
-		C.memcpy(voidptr(u64(copy) + memory.get_hhdm_offset()), voidptr(u64(source) + memory.get_hhdm_offset()), 4096)
+		C.memcpy(voidptr(u64(copy) + memory.get_hhdm_offset()), voidptr(u64(source) + memory.get_hhdm_offset()), memory.page_size)
 	}
 	return copy
 }

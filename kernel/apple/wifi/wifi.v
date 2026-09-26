@@ -383,7 +383,7 @@ fn prepare_seed() bool {
 }
 
 fn alloc_aligned(bytes u64) u64 {
-	raw := memory.pmm_alloc(bytes / 4096 + 3)
+	raw := memory.pmm_alloc((bytes + memory.page_size - 1) / memory.page_size + 1)
 	if raw == unsafe { nil } {
 		return 0
 	}
