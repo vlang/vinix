@@ -23,8 +23,14 @@ cleanup() {
 }
 trap cleanup EXIT HUP INT TERM
 
-cp "$source_binary" "$temporary"
-chmod 755 "$temporary"
+# On disk-root boots the build and installed executable share ext2. Linking
+# the complete inode avoids a second copy of the large multicall binary;
+# no-disk-root boots still take the cross-filesystem copy path.
+rm -f "$temporary"
+if ! ln "$source_binary" "$temporary" 2>/dev/null; then
+	cp "$source_binary" "$temporary"
+	chmod 755 "$temporary"
+fi
 mv -f "$temporary" "$destination"
 mkdir -p /run
 : > /run/vinix-desktop-development

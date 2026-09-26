@@ -13,7 +13,6 @@ module main
 const weekday_names = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const month_names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov',
 	'Dec']
-const desktop_build_timestamp = @BUILD_TIMESTAMP
 
 struct CivilTime {
 	year    int
@@ -129,9 +128,8 @@ fn (d &Desktop) taskbar_clock_strings_at(seconds i64) (string, string) {
 	return time_text, date_text
 }
 
-// The compiler embeds an epoch so a cached or copied binary keeps the date
-// and time of the build that actually produced it. Display it in the same
-// configured time zone as the live clock.
+// The executable's modification time records when this binary was built, even
+// when a cached build is reused. Display it in the live clock's time zone.
 fn (d &Desktop) taskbar_build_strings_at(seconds i64) (string, string) {
 	if seconds <= 0 {
 		return 'Built --:--'.clone(), 'Date unavailable'.clone()
@@ -164,7 +162,7 @@ fn (mut d Desktop) update_taskbar_clock() {
 // retained labels, which also makes the layout test deterministic.
 fn (mut d Desktop) update_taskbar_clock_at(seconds i64) {
 	if d.taskbar_build_time.len == 0 {
-		build_time, build_date := d.taskbar_build_strings_at(desktop_build_timestamp.i64())
+		build_time, build_date := d.taskbar_build_strings_at(desktop_build_epoch())
 		d.taskbar_build_time = build_time
 		d.taskbar_build_date = build_date
 	}

@@ -200,6 +200,18 @@ fn desktop_realtime() (i64, i64) {
 	return stamp.tv_sec, stamp.tv_nsec
 }
 
+fn desktop_build_epoch() i64 {
+	executable := platform_os.executable()
+	defer {
+		unsafe { executable.free() }
+	}
+	mut info := C.stat{}
+	if executable.len == 0 || unsafe { C.stat(&char(executable.str), &info) } != 0 {
+		return 0
+	}
+	return i64(info.st_mtime)
+}
+
 // UINT64_MAX is an explicit failed-clock sentinel, shared by both clients.
 fn desktop_monotonic_ms() u64 {
 	mut stamp := C.timespec{}

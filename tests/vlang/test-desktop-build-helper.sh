@@ -25,8 +25,18 @@ if [ "${1:-}" = version ]; then
 fi
 echo 'test compiler stdout should stay out of an interactive terminal'
 echo 'test compiler stderr should stay out of an interactive terminal' >&2
-printf '%s\n' "${VINIX_DESKTOP_TEST_CC_LINE:-  > tcc -o out src.c}"
+printf '%s\n' "${VINIX_DESKTOP_TEST_CC_LINE:-  > cc -o out src.c}"
 printf '%s\n' "$*" > "$VINIX_DESKTOP_TEST_V_ARGS"
+if tcc -v >/dev/null 2>&1; then
+	echo 'desktop build left the implicit TCC probe enabled' >&2
+	exit 1
+fi
+printf '%s\n' "$V3CACHE" > "$VINIX_DESKTOP_TEST_CACHE_PATH"
+printf '%s\n' "$(command -v cc)" > "$VINIX_DESKTOP_TEST_CC_PATH"
+printf '%s\n' "${VFLAGS-unset}" > "$VINIX_DESKTOP_TEST_VFLAGS"
+cc "-B$VINIX_DESKTOP_VROOT/thirdparty/tcc/lib" \
+	"-I$VINIX_DESKTOP_VROOT/thirdparty/tcc/lib/include" \
+	"-L$VINIX_DESKTOP_VROOT/thirdparty/tcc/lib" -I/usr/include
 output=
 last=
 while [ "$#" -gt 0 ]; do
@@ -39,15 +49,20 @@ while [ "$#" -gt 0 ]; do
 	shift
 done
 [ -n "$output" ] || exit 1
-printf 'int main(void) { return 0; }\n' > "$output"
+printf 'int main(void) { return 0; }\n' > "$output.stage"
+mv -f "$output.stage" "$output"
 if [ -n "${VINIX_DESKTOP_TEST_STAGED_SOURCE:-}" ]; then
 	cp "$last/main.v" "$VINIX_DESKTOP_TEST_STAGED_SOURCE"
 fi
 EOF
 cat > "$work/bin/tcc" <<'EOF'
 #!/bin/sh
-echo 'test TCC must be driven through V' >&2
-exit 1
+printf '%s\n' "$*" > "$VINIX_DESKTOP_TEST_TCC_ARGS"
+if [ "${1:-}" = -c ]; then
+	shift
+	[ "$1" = -o ] || exit 1
+	printf 'test compatibility object\n' > "$2"
+fi
 EOF
 cat > "$work/bin/python3" <<'EOF'
 #!/bin/sh
@@ -66,6 +81,12 @@ output="$(
 	VINIX_DESKTOP_HOME_DEV="$work/home" \
 	VINIX_DESKTOP_SYSTEM_DEV="$work/system" \
 	VINIX_DESKTOP_OUTPUT="$work/vinix-desktop" \
+	VINIX_DESKTOP_V_COMPILER="$work/bin/v" \
+	VINIX_DESKTOP_V3CACHE="$work/v3" \
+	VINIX_DESKTOP_TEST_CACHE_PATH="$work/cache-path" \
+	VINIX_DESKTOP_TEST_CC_PATH="$work/cc-path" \
+	VINIX_DESKTOP_TEST_VFLAGS="$work/vflags" \
+	VINIX_DESKTOP_TEST_TCC_ARGS="$work/tcc-args" \
 	VINIX_DESKTOP_TEST_V_ARGS="$work/v-args" \
 		"$repo/build-support/vinix-desktop-build" --no-reload 2>&1
 )"
@@ -81,17 +102,37 @@ case "$output" in
 esac
 grep -F "$work/system/desktop" "$work/v-args" >/dev/null
 grep -F "$work/system/vmodules" "$work/v-args" >/dev/null
+grep -F -- "-o $work/home/.cache/vinix-desktop/build/vinix-desktop" "$work/v-args" >/dev/null
 [ -x "$work/vinix-desktop" ]
+[ "$work/vinix-desktop" -ef "$work/home/.cache/vinix-desktop/build/vinix-desktop" ]
+grep -Fqx "$work/v3" "$work/cache-path"
+grep -Fqx '' "$work/vflags"
+grep -Fqx "$work/home/.cache/vinix-desktop/bin/cc" "$work/cc-path"
+grep -Fqx -- '-I/usr/include' "$work/tcc-args"
+[ -f "$work/home/.cache/vinix-desktop/compat/time-autostr.o" ]
+grep -F -- "$work/home/.cache/vinix-desktop/compat/time-autostr.o" "$work/v-args" >/dev/null
+ln "$work/home/.cache/vinix-desktop/bin/cc" "$work/first-cc-shim"
+ln "$work/home/.cache/vinix-desktop/bin/tcc" "$work/first-tcc-shim"
+ln "$work/home/.cache/vinix-desktop/compat/time-autostr.o" "$work/first-compat-object"
 
 cp "$work/system/.source-version" "$work/home/.vinix-desktop-dev-version"
 PATH="$work/bin:/usr/bin:/bin" \
 VINIX_DESKTOP_HOME_DEV="$work/home" \
 VINIX_DESKTOP_SYSTEM_DEV="$work/system" \
 VINIX_DESKTOP_OUTPUT="$work/vinix-desktop" \
+VINIX_DESKTOP_V_COMPILER="$work/bin/v" \
+VINIX_DESKTOP_V3CACHE="$work/v3" \
+VINIX_DESKTOP_TEST_CACHE_PATH="$work/cache-path" \
+VINIX_DESKTOP_TEST_CC_PATH="$work/cc-path" \
+VINIX_DESKTOP_TEST_VFLAGS="$work/vflags" \
+VINIX_DESKTOP_TEST_TCC_ARGS="$work/tcc-args" \
 VINIX_DESKTOP_TEST_V_ARGS="$work/v-args" \
 	"$repo/build-support/vinix-desktop-build" --no-reload >/dev/null
 grep -F "$work/home/desktop" "$work/v-args" >/dev/null
 grep -F "$work/home/vmodules" "$work/v-args" >/dev/null
+[ "$work/first-cc-shim" -ef "$work/home/.cache/vinix-desktop/bin/cc" ]
+[ "$work/first-tcc-shim" -ef "$work/home/.cache/vinix-desktop/bin/tcc" ]
+[ "$work/first-compat-object" -ef "$work/home/.cache/vinix-desktop/compat/time-autostr.o" ]
 
 # A QEMU host share takes precedence over the image-seeded copies. Staging is
 # performed by the macOS source service, so the guest helper must consume the
@@ -122,16 +163,26 @@ VINIX_HOST_MOUNT="$host" \
 VINIX_DESKTOP_HOME_DEV="$work/home" \
 VINIX_DESKTOP_SYSTEM_DEV="$work/system" \
 VINIX_DESKTOP_OUTPUT="$work/vinix-desktop" \
+VINIX_DESKTOP_V_COMPILER="$work/bin/v" \
+VINIX_DESKTOP_V3CACHE="$work/v3" \
+VINIX_DESKTOP_TEST_CACHE_PATH="$work/cache-path" \
+VINIX_DESKTOP_TEST_CC_PATH="$work/cc-path" \
+VINIX_DESKTOP_TEST_VFLAGS="$work/vflags" \
+VINIX_DESKTOP_TEST_TCC_ARGS="$work/tcc-args" \
 VINIX_DESKTOP_TEST_SYNCED="$work/synced" \
 VINIX_DESKTOP_TEST_V_ARGS="$work/v-args" \
 VINIX_DESKTOP_TEST_STAGED_SOURCE="$work/staged-main.v" \
 	"$repo/build-support/vinix-desktop-build" --no-reload >/dev/null
 test -f "$work/synced"
 grep -F "$host|$host/third_party" "$work/v-args" >/dev/null
-grep -F -- '-cc tcc' "$work/v-args" >/dev/null
+if grep -Fq -- '-cc' "$work/v-args"; then
+	echo "desktop build disabled V3 module caching with an explicit C compiler" >&2
+	exit 1
+fi
 grep -F -- '-new-compiler' "$work/v-args" >/dev/null
 grep -F -- '-no-retry-compilation' "$work/v-args" >/dev/null
 grep -F -- '-showcc' "$work/v-args" >/dev/null
+grep -F -- "-exclude @vlib/time/timer*.c.v,@vlib/sync/waitgroup*.c.v" "$work/v-args" >/dev/null
 grep -F -- '-cflags -I/usr/include' "$work/v-args" >/dev/null
 grep -F -- '-ldflags -static' "$work/v-args" >/dev/null
 grep -F '/desktop' "$work/v-args" >/dev/null
@@ -156,8 +207,14 @@ if PATH="$work/bin:/usr/bin:/bin" \
 	VINIX_DESKTOP_HOME_DEV="$work/home" \
 	VINIX_DESKTOP_SYSTEM_DEV="$work/system" \
 	VINIX_DESKTOP_OUTPUT="$work/vinix-desktop" \
+	VINIX_DESKTOP_V_COMPILER="$work/bin/v" \
+	VINIX_DESKTOP_V3CACHE="$work/v3" \
+	VINIX_DESKTOP_TEST_CACHE_PATH="$work/cache-path" \
+	VINIX_DESKTOP_TEST_CC_PATH="$work/cc-path" \
+	VINIX_DESKTOP_TEST_VFLAGS="$work/vflags" \
+	VINIX_DESKTOP_TEST_TCC_ARGS="$work/tcc-args" \
 	VINIX_DESKTOP_TEST_V_ARGS="$work/v-args" \
-	VINIX_DESKTOP_TEST_CC_LINE='  > cc -o out src.c' \
+	VINIX_DESKTOP_TEST_CC_LINE='  > gcc -o out src.c' \
 	"$repo/build-support/vinix-desktop-build" --no-reload >/dev/null 2>&1; then
 	echo "desktop helper accepted a build without TCC" >&2
 	exit 1
