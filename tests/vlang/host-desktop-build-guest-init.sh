@@ -116,8 +116,12 @@ wait_for_ready_session() {
 		esac
 	fi
 
-	vinix-host-sync || fail "first host source sync"
-	vinix-host-sync || fail "second host source sync"
+	# The GPU case exercises the user command directly. The ordinary QEMU case
+	# also checks repeated manual syncs before invoking the build helper.
+	if [ ! -e /dev/dri/renderD128 ]; then
+		vinix-host-sync || fail "first host source sync"
+		vinix-host-sync || fail "second host source sync"
+	fi
 	vinix-desktop-build || fail "desktop build and reload"
 	[ -x /root/vinix-desktop ] || fail "desktop output is missing"
 	wait_for_ready_session 1
