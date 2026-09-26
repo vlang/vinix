@@ -47,10 +47,21 @@ mkdir -p /run
 : > /run/vinix-desktop-ready
 
 # Files and Terminal run the same multicall executable, so pidof, which also
-# matches /proc/<pid>/exe, reports them as vinix-desktop too.
+# matches /proc/<pid>/exe, reports them as vinix-desktop too. The GPU boot
+# starts its compositor from a different executable.
 desktop_pid() {
-	for pid in $(/bin/busybox pidof vinix-desktop 2>/dev/null || true); do
-		[ "$(cat "/proc/$pid/comm" 2>/dev/null)" = vinix-desktop ] && echo "$pid"
+	found=
+	for desktop_name in vinix-desktop vinix-desktop-gpu; do
+		for pid in $(/bin/busybox pidof "$desktop_name" 2>/dev/null || true); do
+			case "$(cat "/proc/$pid/comm" 2>/dev/null)" in
+				vinix-desktop|vinix-desktop-g*) ;;
+				*) continue ;;
+			esac
+			case " $found " in
+				*" $pid "*) ;;
+				*) found="$found $pid"; echo "$pid" ;;
+			esac
+		done
 	done
 }
 
@@ -98,6 +109,12 @@ wait_for_ready_session() {
 		attempt=$((attempt + 1))
 	done
 	[ -n "$old_pid" ] || fail "initial desktop did not start"
+	if [ -e /dev/dri/renderD128 ] && [ -x /usr/bin/vinix-desktop-gpu ]; then
+		case "$(cat "/proc/$old_pid/comm" 2>/dev/null)" in
+			vinix-desktop-g*) ;;
+			*) fail "GPU VM did not start the GPU desktop" ;;
+		esac
+	fi
 
 	vinix-host-sync || fail "first host source sync"
 	vinix-host-sync || fail "second host source sync"
@@ -105,6 +122,8 @@ wait_for_ready_session() {
 	[ -x /root/vinix-desktop ] || fail "desktop output is missing"
 	wait_for_ready_session 1
 	first_pid=$(desktop_pid)
+	[ "$(cat "/proc/$first_pid/comm" 2>/dev/null)" = vinix-desktop ] \
+		|| fail "first replacement did not start the built desktop"
 	first_ready_inode=$(/bin/busybox stat -c '%i' /run/vinix-desktop-ready)
 
 	# Reload the TCC-built session once more. This is the key liveness check:

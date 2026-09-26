@@ -44,13 +44,22 @@ rm -f /run/vinix-desktop-ready 2>/dev/null || \
 trap - EXIT HUP INT TERM
 
 echo "vinix-desktop-reload: installed $destination; reloading the desktop"
-# Every multicall application runs this same executable, and pidof also
-# matches /proc/<pid>/exe, so it reports Files and Terminal too. The
-# compositor is the one whose own name is vinix-desktop.
+# Every multicall application runs the ordinary desktop executable, and pidof
+# also matches /proc/<pid>/exe, so it reports Files and Terminal too. A GPU
+# boot runs vinix-desktop-gpu instead. Check comm to keep only the compositor;
+# Linux-style comm can truncate the GPU name to vinix-desktop-g.
 desktop_pids=
-for pid in $(/bin/busybox pidof vinix-desktop 2>/dev/null || true); do
-	[ "$(cat "/proc/$pid/comm" 2>/dev/null)" = vinix-desktop ] || continue
-	desktop_pids="$desktop_pids $pid"
+for desktop_name in vinix-desktop vinix-desktop-gpu; do
+	for pid in $(/bin/busybox pidof "$desktop_name" 2>/dev/null || true); do
+		case "$(cat "/proc/$pid/comm" 2>/dev/null)" in
+			vinix-desktop|vinix-desktop-g*) ;;
+			*) continue ;;
+		esac
+		case " $desktop_pids " in
+			*" $pid "*) ;;
+			*) desktop_pids="$desktop_pids $pid" ;;
+		esac
+	done
 done
 set -- $desktop_pids
 if [ "$#" -ne 1 ]; then
