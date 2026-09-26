@@ -12,8 +12,9 @@
 #   --reset-disk    reinstall the system volume from scratch, losing its data
 #   --no-persist    use the full RAM-backed desktop instead of persistent /root
 #   --ephemeral     isolate and automatically delete this run's boot image
+#   gpuvm           boot with KekVM's accelerated VirGL GPU
 #   --virgl         use KekVM's GPU backend with a RAM system and persistent /root
-#   --mem=MB        guest RAM (default: 8192 MiB for the desktop image)
+#   --mem=MB        guest RAM (default: 8192 MiB, or 12288 MiB for gpuvm)
 #   --v=PATH        V compiler executable or checkout (for example ~/code/v7)
 #   --help
 #
@@ -29,9 +30,9 @@
 # asks for the clean install and --no-disk-root returns to the old layout, in
 # which the system is loaded into RAM and only /root persists.
 #
-# The generic runner defaults to 2 GiB of guest RAM for small shell images,
-# whereas this image needs at least 8 GiB. An explicit environment setting or
-# --mem=MB still wins.
+# The generic runner defaults to 2 GiB for small shell images. The desktop
+# needs 8 GiB; its VirGL RAM image needs 12 GiB while Limine loads it. An
+# explicit environment setting or --mem=MB still wins.
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -45,7 +46,6 @@ QEMU_DESKTOP_INITRAMFS_GZ="$QEMU_DESKTOP_INITRAMFS.gz"
 DESKTOP_ROOT_SEED="$SCRIPT_DIR/build/desktop-root-seed.tar.gz"
 DESKTOP_STORAGE_MANIFEST="$SCRIPT_DIR/build/desktop-qemu-storage.json"
 DESKTOP_BUILD_KEY="$SCRIPT_DIR/build/run-desktop-aarch64.key"
-export VINIX_QEMU_MEM="${VINIX_QEMU_MEM:-8192}"
 # The desktop uses a 2x version of the normal QEMU framebuffer (1024x768),
 # giving it a native 2048x1536 framebuffer without changing the standard
 # shell runner.
@@ -80,7 +80,7 @@ while [ "$#" -gt 0 ]; do
         --no-persist) PERSIST_DESKTOP=0; DISK_ROOT_DESKTOP=0; PASSTHROUGH+=("$arg") ;;
         --disk-root)    DISK_ROOT_DESKTOP=1; ROOT_LAYOUT_EXPLICIT=1 ;;
         --no-disk-root) DISK_ROOT_DESKTOP=0; ROOT_LAYOUT_EXPLICIT=1 ;;
-        --virgl)        VIRGL_DESKTOP=1; PASSTHROUGH+=("$arg") ;;
+        gpuvm|--virgl) VIRGL_DESKTOP=1; PASSTHROUGH+=(--virgl) ;;
         --ephemeral)  EPHEMERAL_DESKTOP=1; PASSTHROUGH+=("$arg") ;;
         --v=*)        VINIX_V_COMPILER="${arg#*=}" ;;
         --v)
@@ -96,6 +96,12 @@ while [ "$#" -gt 0 ]; do
     esac
     shift
 done
+
+if [ "$VIRGL_DESKTOP" -eq 1 ]; then
+    export VINIX_QEMU_MEM="${VINIX_QEMU_MEM:-12288}"
+else
+    export VINIX_QEMU_MEM="${VINIX_QEMU_MEM:-8192}"
+fi
 
 if [ "$VIRGL_DESKTOP" -eq 1 ] && [ "$DISK_ROOT_DESKTOP" -eq 1 ]; then
     if [ "$ROOT_LAYOUT_EXPLICIT" -eq 1 ]; then

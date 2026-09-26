@@ -75,10 +75,15 @@ def stop_child(pid: int, master: int) -> None:
             return
         time.sleep(0.05)
     signal_child(pid, signal.SIGKILL)
-    try:
-        os.waitpid(pid, 0)
-    except ChildProcessError:
-        pass
+    deadline = time.monotonic() + 2
+    while time.monotonic() < deadline:
+        try:
+            waited, _status = os.waitpid(pid, os.WNOHANG)
+        except ChildProcessError:
+            return
+        if waited == pid:
+            return
+        time.sleep(0.05)
 
 
 def signal_child(pid: int, sig: signal.Signals) -> None:
@@ -152,10 +157,9 @@ def run_vm(root: Path, timeout: int, desktop_startup: bool) -> int:
         environment = os.environ.copy()
         environment["VINIX_VIRGL_QEMU"] = str(qemu)
         environment["TMPDIR"] = scratch
-        # KekVM's patched Cocoa backend needs an explicit core profile.  QEMU's
-        # generic default creates a legacy context on macOS, then fails its own
-        # GLSL 1.40 scanout shaders before the guest can boot.
-        environment.setdefault("QEMU_DISPLAY_BACKEND", "cocoa,gl=core")
+        # Exercise the runner's macOS core-profile default, independent of the
+        # caller's display setting.
+        environment.pop("QEMU_DISPLAY_BACKEND", None)
         environment.pop("VINIX_QEMU_PERSIST", None)
         environment.pop("VINIX_QEMU_PERSIST_DISK", None)
         environment.pop("VINIX_QEMU_PERSIST_SEED", None)
@@ -165,7 +169,7 @@ def run_vm(root: Path, timeout: int, desktop_startup: bool) -> int:
         environment.pop("VINIX_BOOT_DISK", None)
         environment.pop("VINIX_EFIVARS", None)
         environment.pop("VINIX_QEMU_PACKAGE_STORE", None)
-        environment.setdefault("VINIX_QEMU_MEM", "8192")
+        environment.setdefault("VINIX_QEMU_MEM", "12288" if desktop_startup else "8192")
 
         if desktop_startup:
             command = [
@@ -173,7 +177,7 @@ def run_vm(root: Path, timeout: int, desktop_startup: bool) -> int:
                 "--no-build",
                 "--no-disk-root",
                 "--ephemeral",
-                "--virgl",
+                "gpuvm",
                 f"--guest-init={guest_init}",
             ]
         else:

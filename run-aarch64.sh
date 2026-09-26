@@ -1065,8 +1065,13 @@ if [ "$VIRTIO_GPU" -eq 2 ] && [ "$SERIAL_ONLY" -eq 1 ]; then
     exit 1
 elif [ "$VIRTIO_GPU" -eq 2 ]; then
     # virglrenderer needs a GL-capable host display context to execute the
-    # guest's Gallium commands. Callers may select a specific QEMU backend.
-    DISPLAY_BACKEND_FLAGS="-display ${QEMU_DISPLAY_BACKEND:-default,gl=on}"
+    # guest's Gallium commands. KekVM's macOS backend also needs a core
+    # profile for its scanout shaders. Callers may override the backend.
+    if [ "$(uname -s)" = Darwin ]; then
+        DISPLAY_BACKEND_FLAGS="-display ${QEMU_DISPLAY_BACKEND:-cocoa,gl=core}"
+    else
+        DISPLAY_BACKEND_FLAGS="-display ${QEMU_DISPLAY_BACKEND:-default,gl=on}"
+    fi
 elif [ "$SERIAL_ONLY" -eq 1 ]; then
     # Use -display none (not -nographic) to keep ramfb for framebuffer/GOP
     # while hiding the QEMU window. -nographic removes display devices entirely.

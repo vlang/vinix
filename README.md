@@ -819,7 +819,7 @@ desktop through KekVM's Metal-enabled QEMU:
 ```sh
 ./build-asahi-aarch64.sh
 ./build-desktop-aarch64.sh
-./run-desktop-aarch64.sh --no-build --virgl
+./run-desktop-aarch64.sh gpuvm --no-build
 ```
 
 Inside Vinix, the hardware smoke test prints the selected renderer and rejects
@@ -831,15 +831,20 @@ run-virgl-smoke
 run-firefox
 ```
 
-`--virgl` selects KekVM's `kekvm-qemu-system-aarch64` copy, linked to its patched
-virglrenderer, and supplies the staged VirGL Mesa runtime for that boot. It also
-requests a GL-enabled display. Override its location with `VINIX_VIRGL_QEMU`
-or select a QEMU display backend with `QEMU_DISPLAY_BACKEND`. The simpler
-`--virtio-gpu` option exposes the unaccelerated MMIO device and is useful for
-transport probing, but it does not create a render node. KekVM's compact QEMU
-currently omits libslirp, so this launch mode is offline; Firefox can exercise
-its bundled local smoke page, while browsing needs a VirGL QEMU build with a
-network backend.
+`gpuvm` is the desktop shortcut for `--virgl`; run
+`./run-desktop-aarch64.sh gpuvm` to build and boot in one command once the
+staged Mesa runtime is available. It defaults to 12 GiB of guest RAM for the
+RAM-backed image; `--mem=MB` or `VINIX_QEMU_MEM` overrides that.
+
+The shortcut selects KekVM's `kekvm-qemu-system-aarch64` copy, linked to its
+patched virglrenderer, and supplies the staged VirGL Mesa runtime. The default
+macOS display backend is `cocoa,gl=core`. Override the QEMU path with
+`VINIX_VIRGL_QEMU` or select a display backend with `QEMU_DISPLAY_BACKEND`.
+The simpler `--virtio-gpu` option exposes the unaccelerated MMIO device and is
+useful for transport probing, but it does not create a render node. KekVM's
+compact QEMU currently omits libslirp, so this launch mode is offline. Firefox
+can exercise its bundled local smoke page. Browsing needs a VirGL QEMU build
+with a network backend.
 
 The VirGL desktop uses a RAM system with its own persistent `/root` volume so
 the Mesa overlay reaches applications. This volume is separate from the usual
