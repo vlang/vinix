@@ -130,7 +130,7 @@ fn (d &Desktop) taskbar_clock_strings_at(seconds i64) (string, string) {
 
 // The executable's modification time records when this binary was built, even
 // when a cached build is reused. Display it in the live clock's time zone.
-fn (d &Desktop) taskbar_build_strings_at(seconds i64) (string, string) {
+fn (d &Desktop) taskbar_build_strings_at(seconds i64, gpu_driver_enabled bool) (string, string) {
 	if seconds <= 0 {
 		return 'Built --:--'.clone(), 'Date unavailable'.clone()
 	}
@@ -138,14 +138,13 @@ fn (d &Desktop) taskbar_build_strings_at(seconds i64) (string, string) {
 	hour := pad2(civil.hour)
 	minute := pad2(civil.minute)
 	day := pad2(civil.day)
-	year := civil.year.str()
 	time_text := 'Built ${hour}:${minute}'
-	date_text := '${day} ${month_names[civil.month - 1]} ${year}'
+	gpu_suffix := if gpu_driver_enabled { ' gpu+' } else { '' }
+	date_text := '${day} ${month_names[civil.month - 1]}${gpu_suffix}'
 	unsafe {
 		hour.free()
 		minute.free()
 		day.free()
-		year.free()
 	}
 	return time_text, date_text
 }
@@ -162,7 +161,8 @@ fn (mut d Desktop) update_taskbar_clock() {
 // retained labels, which also makes the layout test deterministic.
 fn (mut d Desktop) update_taskbar_clock_at(seconds i64) {
 	if d.taskbar_build_time.len == 0 {
-		build_time, build_date := d.taskbar_build_strings_at(desktop_build_epoch())
+		build_time, build_date := d.taskbar_build_strings_at(desktop_build_epoch(),
+			desktop_gpu_driver_enabled())
 		d.taskbar_build_time = build_time
 		d.taskbar_build_date = build_date
 	}

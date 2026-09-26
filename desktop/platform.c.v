@@ -89,6 +89,17 @@ fn desktop_open_rw(path string) int {
 	return C.open(&char(path.str), C.O_RDWR)
 }
 
+// Match init's GPU desktop selection: an accessible render node means the
+// kernel has registered a GPU driver for this boot.
+fn desktop_gpu_driver_enabled() bool {
+	fd := desktop_open_rw('/dev/dri/renderD128')
+	if fd < 0 {
+		return false
+	}
+	desktop_close(fd)
+	return true
+}
+
 fn desktop_create_truncated(path string) int {
 	return C.open(&char(path.str), C.O_WRONLY | C.O_CREAT | C.O_TRUNC, 0o644)
 }
