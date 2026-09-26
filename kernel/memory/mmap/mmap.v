@@ -1333,6 +1333,57 @@ fn next_mapped_start(pagemap &memory.Pagemap, from u64, end u64) u64 {
 	return next
 }
 
+// Successive brk() calls commit the next slice of the same reserved arena.
+// Extend its existing writable local range instead of appending a new one
+// for every slice. Assemblers can grow the break thousands of times; leaving
+// each slice separate makes later limit and immutable-range checks scan an
+// ever-growing list. The caller holds the pagemap lock and has already
+// populated any pages needed by the newly accessible slice.
+fn extend_brk_range_unlocked(mut pagemap memory.Pagemap, base u64, length u64, prot int) bool {
+	if prot != (prot_read | prot_write) {
+		return false
+	}
+	mut committed := unsafe { &MmapRangeLocal(nil) }
+	mut reserve := unsafe { &MmapRangeLocal(nil) }
+	for ptr in pagemap.mmap_ranges {
+		mut local := unsafe { &MmapRangeLocal(ptr) }
+		if local.flags & map_brk_reservation == 0 {
+			continue
+		}
+		if local.base == base && local.length >= length && local.prot == prot_none {
+			reserve = local
+		} else if local.base + local.length == base && local.prot == prot {
+			committed = local
+		}
+	}
+	if committed == unsafe { nil } || reserve == unsafe { nil }
+		|| committed.global != reserve.global || committed.flags != reserve.flags
+		|| committed.cow != reserve.cow || committed.immutable != reserve.immutable
+		|| committed.offset + i64(committed.length) != reserve.offset {
+		return false
+	}
+
+	end := base + length
+	mut next_page := pagemap.next_present(base, end)
+	for next_page < end {
+		page := next_page
+		next_page = pagemap.next_present(page + page_size, end)
+		mut writable := true
+		if reserve.cow {
+			phys := pagemap.virt2phys(page) or { u64(0) }
+			writable = phys == 0 || memory.pmm_refcount(voidptr(phys)) <= 1
+		}
+		pt_flags := page_table_flags(prot, reserve.global.pte_extra, writable)
+		pagemap.flag_page(page, pt_flags) or {}
+	}
+
+	committed.length += length
+	reserve.base = end
+	reserve.length -= length
+	reserve.offset += i64(length)
+	return true
+}
+
 pub fn mprotect_unlocked(mut pagemap memory.Pagemap, addr voidptr, _length u64, prot int) ? {
 	validate_protection(prot)?
 	if _length == 0 {
@@ -1349,6 +1400,9 @@ pub fn mprotect_unlocked(mut pagemap memory.Pagemap, addr voidptr, _length u64, 
 	if immutable_overlap_unlocked(pagemap, u64(addr), length) {
 		errno.set(errno.eperm)
 		return none
+	}
+	if extend_brk_range_unlocked(mut pagemap, u64(addr), length, prot) {
+		return
 	}
 
 	mut i := u64(addr)
