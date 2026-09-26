@@ -221,4 +221,32 @@ if PATH="$work/bin:/usr/bin:/bin" \
 fi
 grep -Fqx 'existing desktop' "$work/vinix-desktop"
 
+# The old Terminal is torn down on reload. Pass its monotonic start time to
+# the reload helper so the replacement Terminal can report the full duration.
+cat > "$work/bin/vinix-desktop-reload" <<'EOF'
+#!/bin/sh
+printf '%s\n' "$VINIX_DESKTOP_REBUILD_STARTED" > "$VINIX_DESKTOP_TEST_STARTED"
+printf '%s\n' "$1" > "$VINIX_DESKTOP_TEST_RELOAD_OUTPUT"
+EOF
+chmod 755 "$work/bin/vinix-desktop-reload"
+printf '1000.00 1000.00\n' > "$work/uptime"
+PATH="$work/bin:/usr/bin:/bin" \
+VINIX_DESKTOP_UPTIME_FILE="$work/uptime" \
+VINIX_HOST_SOURCE_URL_FILE="$work/no-host-source" \
+VINIX_DESKTOP_HOME_DEV="$work/home" \
+VINIX_DESKTOP_SYSTEM_DEV="$work/system" \
+VINIX_DESKTOP_OUTPUT="$work/vinix-desktop" \
+VINIX_DESKTOP_V_COMPILER="$work/bin/v" \
+VINIX_DESKTOP_V3CACHE="$work/v3" \
+VINIX_DESKTOP_TEST_CACHE_PATH="$work/cache-path" \
+VINIX_DESKTOP_TEST_CC_PATH="$work/cc-path" \
+VINIX_DESKTOP_TEST_VFLAGS="$work/vflags" \
+VINIX_DESKTOP_TEST_TCC_ARGS="$work/tcc-args" \
+VINIX_DESKTOP_TEST_V_ARGS="$work/v-args" \
+VINIX_DESKTOP_TEST_STARTED="$work/rebuild-started" \
+VINIX_DESKTOP_TEST_RELOAD_OUTPUT="$work/reload-output" \
+	"$repo/build-support/vinix-desktop-build" >/dev/null
+grep -Fqx '1000.00' "$work/rebuild-started"
+grep -Fqx "$work/vinix-desktop" "$work/reload-output"
+
 echo "PASS desktop build helper source selection and host staging"

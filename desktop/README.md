@@ -594,7 +594,8 @@ The second command builds `/root/vinix-desktop`, atomically installs it, and
 asks PID 1 to reload the graphical session. The replacement session reopens
 Files and Terminal, because the Terminal that ran the build belongs to the old
 session and closes during its orderly teardown. `--no-reload` leaves the
-current session running.
+current session running. Once the replacement desktop is ready, its new
+Terminal reports the total build and relaunch time in seconds.
 
 The in-guest build uses V3 and native TCC without `-prod`. Compilation stops if
 V or TCC fails, without trying the V1 compiler or another C compiler.

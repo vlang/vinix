@@ -57,8 +57,23 @@ if [ "$#" -ne 1 ]; then
 	echo "vinix-desktop-reload: expected one running desktop, found $#: ${desktop_pids:-none}" >&2
 	exit 1
 fi
+rebuild_notice=/run/vinix-desktop-rebuild
+rebuild_notice_temp="$rebuild_notice.new.$$"
+rebuild_started=${VINIX_DESKTOP_REBUILD_STARTED:-}
+if [ -n "$rebuild_started" ]; then
+	# The fresh Terminal is a different process from the one running the build.
+	# Hand it the start time and this compositor's PID. The PID stops a later
+	# session from reporting a stale result left by a failed restart.
+	printf '%s %s\n' "$1" "$rebuild_started" > "$rebuild_notice_temp"
+	mv -f "$rebuild_notice_temp" "$rebuild_notice"
+else
+	rm -f "$rebuild_notice" 2>/dev/null || true
+fi
 # Signal the compositor itself. It execs the newly installed inode in place,
 # preserving the framebuffer's graphics owner across the replacement. Sending
 # this through PID 1 made the old process exit first, which briefly restored
 # the full kernel boot console and looked like a machine crash/reboot.
-kill -HUP "$1"
+if ! kill -HUP "$1"; then
+	rm -f "$rebuild_notice" "$rebuild_notice_temp" 2>/dev/null || true
+	exit 1
+fi

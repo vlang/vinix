@@ -70,6 +70,8 @@ const terminal_action_scroll_down = 'term.scroll.down'
 const terminal_row_height = 16
 const terminal_column_width = 8
 const terminal_padding = 8
+const terminal_rebuild_notice_path = '/run/vinix-desktop-rebuild'
+const terminal_rebuild_notice_max_age_ms = u64(600_000)
 
 struct TerminalApp {
 mut:
@@ -132,6 +134,51 @@ fn open_terminal(mut _ Desktop) !NativeApp {
 	return &TerminalApp{
 		read_buf: []u8{len: terminal_read_chunk}
 	}
+}
+
+// The shell that ran vinix-desktop-build exits with the old session. Its
+// replacement Terminal consumes the result after the new compositor is ready.
+fn terminal_rebuild_uptime_ms(value string) ?u64 {
+	parts := value.split('.')
+	if parts.len != 2 || parts[0].len == 0 || parts[0].len > 10 || parts[1].len != 2 {
+		return none
+	}
+	for ch in value {
+		if ch != `.` && (ch < `0` || ch > `9`) {
+			return none
+		}
+	}
+	return parts[0].u64() * 1000 + parts[1].u64() * 10
+}
+
+fn terminal_rebuild_message(record string, compositor_pid int, now_ms u64) string {
+	fields := record.trim_space().split(' ')
+	if fields.len != 2 || fields[0].int() != compositor_pid || compositor_pid <= 0
+		|| now_ms == ~u64(0) {
+		return ''
+	}
+	started_ms := terminal_rebuild_uptime_ms(fields[1]) or { return '' }
+	if started_ms > now_ms || now_ms - started_ms > terminal_rebuild_notice_max_age_ms {
+		return ''
+	}
+	return 'vinix-desktop has been rebuilt in ${f64(now_ms - started_ms) / 1000.0:.2f} seconds\r\n'
+}
+
+fn terminal_take_rebuild_message() string {
+	if !desktop_is_development_session()
+		|| C.access(c'/run/vinix-desktop-ready', 0) != 0 {
+		return ''
+	}
+	mut data := []u8{len: 64}
+	got := desktop_read_file(terminal_rebuild_notice_path, data.data, u64(data.len))
+	if got < 0 {
+		return ''
+	}
+	desktop_unlink(terminal_rebuild_notice_path)
+	if got == 0 || got >= data.len {
+		return ''
+	}
+	return terminal_rebuild_message(data[..int(got)].bytestr(), C.getppid(), desktop_monotonic_ms())
 }
 
 fn terminal_clamp(value int, low int, high int) int {
@@ -387,6 +434,10 @@ fn (mut a TerminalApp) start_shell(rows int, columns int, width int, height int)
 	a.terminal = shell.terminal
 	a.terminal_rows = rows
 	a.terminal_columns = columns
+	message := terminal_take_rebuild_message()
+	if message.len > 0 {
+		a.ingest_output(message.bytes())
+	}
 }
 
 fn (mut a TerminalApp) poll() bool {

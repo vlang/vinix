@@ -8,6 +8,15 @@ module main
 import os
 import ui2
 
+fn test_terminal_rebuild_message_reports_elapsed_after_relaunch() {
+	assert terminal_rebuild_message('42 1000.00\n', 42, 1_001_890) ==
+		'vinix-desktop has been rebuilt in 1.89 seconds\r\n'
+	assert terminal_rebuild_message('42 1000.00\n', 43, 1_001_890) == ''
+	assert terminal_rebuild_message('42 1000.00\n', 42, 999_990) == ''
+	assert terminal_rebuild_message('42 1000.00\n', 42, 1_600_010) == ''
+	assert terminal_rebuild_message('42 invalid\n', 42, 1_001_890) == ''
+}
+
 fn utility_tree_has_text(element ui2.Element, text string) bool {
 	if element.text == text {
 		return true
