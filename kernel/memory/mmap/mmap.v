@@ -103,6 +103,10 @@ pub mut:
 	flags     int
 	cow       bool
 	immutable bool
+	tree_left &MmapRangeLocal = unsafe { nil }
+	tree_right &MmapRangeLocal = unsafe { nil }
+	tree_priority u64
+	list_index int
 }
 
 pub struct MmapRangeGlobal {
@@ -142,15 +146,140 @@ pub fn list_ranges(pagemap &memory.Pagemap) {
 }
 
 fn addr2range(pagemap &memory.Pagemap, addr u64) ?(&MmapRangeLocal, u64, u64) {
-	for i := u64(0); i < pagemap.mmap_ranges.len; i++ {
-		r := unsafe { &MmapRangeLocal(pagemap.mmap_ranges[i]) }
-		if addr >= r.base && addr < r.base + r.length {
-			memory_page := addr / page_size
-			file_page := u64(r.offset) / page_size + (memory_page - r.base / page_size)
-			return r, memory_page, file_page
-		}
+	r := range_floor(pagemap, addr)
+	if r == unsafe { nil } {
+		return none
+	}
+	if addr >= r.base && addr < r.base + r.length {
+		memory_page := addr / page_size
+		file_page := u64(r.offset) / page_size + (memory_page - r.base / page_size)
+		return r, memory_page, file_page
 	}
 	return none
+}
+
+// The address index is a treap. The separate list allows O(1) removal even
+// when an allocator frees tens of thousands of ranges in creation order.
+fn range_priority(base u64) u64 {
+	mut x := base >> 14
+	x = (x ^ (x >> 30)) * u64(0xbf58476d1ce4e5b9)
+	x = (x ^ (x >> 27)) * u64(0x94d049bb133111eb)
+	return x ^ (x >> 31)
+}
+
+fn rotate_range_left(mut root MmapRangeLocal) &MmapRangeLocal {
+	mut next := root.tree_right
+	root.tree_right = next.tree_left
+	next.tree_left = root
+	return next
+}
+
+fn rotate_range_right(mut root MmapRangeLocal) &MmapRangeLocal {
+	mut next := root.tree_left
+	root.tree_left = next.tree_right
+	next.tree_right = root
+	return next
+}
+
+fn range_tree_insert(_root &MmapRangeLocal, node &MmapRangeLocal) &MmapRangeLocal {
+	mut root := unsafe { _root }
+	if root == unsafe { nil } {
+		return node
+	}
+	if node.base < root.base {
+		root.tree_left = range_tree_insert(root.tree_left, node)
+		if root.tree_left.tree_priority < root.tree_priority {
+			root = rotate_range_right(mut root)
+		}
+	} else {
+		root.tree_right = range_tree_insert(root.tree_right, node)
+		if root.tree_right.tree_priority < root.tree_priority {
+			root = rotate_range_left(mut root)
+		}
+	}
+	return root
+}
+
+fn range_tree_merge(_left &MmapRangeLocal, _right &MmapRangeLocal) &MmapRangeLocal {
+	mut left := unsafe { _left }
+	mut right := unsafe { _right }
+	if left == unsafe { nil } {
+		return right
+	}
+	if right == unsafe { nil } {
+		return left
+	}
+	if left.tree_priority < right.tree_priority {
+		left.tree_right = range_tree_merge(left.tree_right, right)
+		return left
+	}
+	right.tree_left = range_tree_merge(left, right.tree_left)
+	return right
+}
+
+fn range_tree_remove(_root &MmapRangeLocal, node &MmapRangeLocal) &MmapRangeLocal {
+	mut root := unsafe { _root }
+	if root == unsafe { nil } {
+		return root
+	}
+	if node.base < root.base {
+		root.tree_left = range_tree_remove(root.tree_left, node)
+	} else if node.base > root.base || voidptr(node) != voidptr(root) {
+		root.tree_right = range_tree_remove(root.tree_right, node)
+	} else {
+		return range_tree_merge(root.tree_left, root.tree_right)
+	}
+	return root
+}
+
+fn range_floor(pagemap &memory.Pagemap, base u64) &MmapRangeLocal {
+	mut node := unsafe { &MmapRangeLocal(pagemap.mmap_root) }
+	mut found := unsafe { &MmapRangeLocal(nil) }
+	for node != unsafe { nil } {
+		if node.base <= base {
+			found = node
+			node = node.tree_right
+		} else {
+			node = node.tree_left
+		}
+	}
+	return found
+}
+
+fn range_lower_bound(pagemap &memory.Pagemap, base u64) &MmapRangeLocal {
+	mut node := unsafe { &MmapRangeLocal(pagemap.mmap_root) }
+	mut found := unsafe { &MmapRangeLocal(nil) }
+	for node != unsafe { nil } {
+		if node.base >= base {
+			found = node
+			node = node.tree_left
+		} else {
+			node = node.tree_right
+		}
+	}
+	return found
+}
+
+fn insert_range_unlocked(mut pagemap memory.Pagemap, _local &MmapRangeLocal) {
+	mut local := unsafe { _local }
+	local.tree_left = unsafe { nil }
+	local.tree_right = unsafe { nil }
+	local.tree_priority = range_priority(local.base)
+	local.list_index = pagemap.mmap_ranges.len
+	pagemap.mmap_ranges << voidptr(local)
+	pagemap.mmap_root = range_tree_insert(unsafe { &MmapRangeLocal(pagemap.mmap_root) }, local)
+}
+
+fn remove_range_unlocked(mut pagemap memory.Pagemap, local &MmapRangeLocal) {
+	pagemap.mmap_root = range_tree_remove(unsafe { &MmapRangeLocal(pagemap.mmap_root) }, local)
+	index := local.list_index
+	last := pagemap.mmap_ranges.len - 1
+	if index != last {
+		moved := unsafe { &MmapRangeLocal(pagemap.mmap_ranges[last]) }
+		pagemap.mmap_ranges[index] = voidptr(moved)
+		moved.list_index = index
+	}
+	pagemap.mmap_ranges.delete(last)
 }
 
 // Whether `pagemap` is the calling process' own and the process is in a
@@ -221,12 +350,13 @@ fn range_is_free_unlocked(pagemap &memory.Pagemap, base u64, length u64) bool {
 	if end < base {
 		return false
 	}
-	for ptr in pagemap.mmap_ranges {
-		range_local := unsafe { &MmapRangeLocal(ptr) }
-		range_end := range_local.base + range_local.length
-		if base < range_end && end > range_local.base {
-			return false
-		}
+	previous := range_floor(pagemap, base)
+	if previous != unsafe { nil } && base < previous.base + previous.length {
+		return false
+	}
+	next := range_lower_bound(pagemap, base)
+	if next != unsafe { nil } && end > next.base {
+		return false
 	}
 	return true
 }
@@ -324,18 +454,24 @@ fn find_free_base_unlocked(pagemap &memory.Pagemap, start u64, length u64) ?u64 
 			errno.set(errno.enomem)
 			return none
 		}
-		mut next := u64(0)
-		for ptr in pagemap.mmap_ranges {
-			range_local := unsafe { &MmapRangeLocal(ptr) }
-			range_end := range_local.base + range_local.length
-			if base < range_end && base + length > range_local.base && range_end > next {
-				next = range_end
-			}
+		mut collision := unsafe { &MmapRangeLocal(nil) }
+		previous := range_floor(pagemap, base)
+		if previous != unsafe { nil } && base < previous.base + previous.length {
+			collision = previous
 		}
-		if next == 0 {
+		next := range_lower_bound(pagemap, base)
+		if collision == unsafe { nil } && next != unsafe { nil }
+			&& base + length > next.base {
+			collision = next
+		}
+		if collision == unsafe { nil } {
 			return base
 		}
-		base = lib.align_up(next + page_size, page_size)
+		if collision.base + collision.length > u64(-1) - page_size {
+			errno.set(errno.enomem)
+			return none
+		}
+		base = lib.align_up(collision.base + collision.length + page_size, page_size)
 	}
 	return none
 }
@@ -533,7 +669,7 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap) ?&memory.Pagemap {
 			}
 		}
 
-		new_pagemap.mmap_ranges << voidptr(new_local_range)
+		insert_range_unlocked(mut new_pagemap, new_local_range)
 	}
 
 	return new_pagemap
@@ -827,7 +963,7 @@ pub fn map_range(mut pagemap memory.Pagemap, _virt_addr u64, phys_addr u64, _len
 	range_global.shadow_pagemap.top_level = &u64(memory.pmm_alloc(1))
 
 	pagemap.l.acquire()
-	pagemap.mmap_ranges << voidptr(range_local)
+	insert_range_unlocked(mut pagemap, range_local)
 	pagemap.l.release()
 
 	for i := u64(0); i < length; i += page_size {
@@ -869,7 +1005,7 @@ pub fn map_pages(mut pagemap memory.Pagemap, virt_addr u64, phys_pages []u64, pr
 	range_global.shadow_pagemap.top_level = &u64(memory.pmm_alloc(1))
 
 	pagemap.l.acquire()
-	pagemap.mmap_ranges << voidptr(range_local)
+	insert_range_unlocked(mut pagemap, range_local)
 	pagemap.l.release()
 
 	for i, phys in phys_pages {
@@ -1085,7 +1221,7 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
 	}
 	range_local.base = base
 	range_global.base = base
-	pagemap.mmap_ranges << voidptr(range_local)
+	insert_range_unlocked(mut pagemap, range_local)
 	pagemap.l.release()
 
 	if range_handle != unsafe { nil } && handle_ref != unsafe { nil } {
@@ -1323,14 +1459,14 @@ fn snip_end_of(local_range &MmapRangeLocal, request_end u64, begin u64) u64 {
 // far a walk over a hole between mappings can skip. The caller holds the
 // pagemap lock.
 fn next_mapped_start(pagemap &memory.Pagemap, from u64, end u64) u64 {
-	mut next := end
-	for ptr in pagemap.mmap_ranges {
-		local_range := unsafe { &MmapRangeLocal(ptr) }
-		if local_range.base > from && local_range.base < next {
-			next = local_range.base
-		}
+	if from == u64(-1) {
+		return end
 	}
-	return next
+	next := range_lower_bound(pagemap, from + 1)
+	if next != unsafe { nil } && next.base < end {
+		return next.base
+	}
+	return end
 }
 
 // Successive brk() calls commit the next slice of the same reserved arena.
@@ -1441,7 +1577,7 @@ pub fn mprotect_unlocked(mut pagemap memory.Pagemap, addr voidptr, _length u64, 
 			range_locals_lock.acquire()
 			global_range.locals << postsplit_range
 			range_locals_lock.release()
-			pagemap.mmap_ranges << postsplit_range
+			insert_range_unlocked(mut pagemap, postsplit_range)
 			local_range.length -= postsplit_range.length
 		}
 
@@ -1484,7 +1620,7 @@ pub fn mprotect_unlocked(mut pagemap memory.Pagemap, addr voidptr, _length u64, 
 			range_locals_lock.acquire()
 			global_range.locals << new_range
 			range_locals_lock.release()
-			pagemap.mmap_ranges << new_range
+			insert_range_unlocked(mut pagemap, new_range)
 		}
 	}
 }
@@ -1550,7 +1686,7 @@ fn munmap_unlocked_impl(mut pagemap memory.Pagemap, addr voidptr, _length u64,
 			range_locals_lock.acquire()
 			global_range.locals << postsplit_range
 			range_locals_lock.release()
-			pagemap.mmap_ranges << postsplit_range
+			insert_range_unlocked(mut pagemap, postsplit_range)
 			local_range.length -= postsplit_range.length
 		}
 
@@ -1601,7 +1737,7 @@ fn munmap_unlocked_impl(mut pagemap memory.Pagemap, addr voidptr, _length u64,
 					free(global_range)
 				}
 			}
-			pagemap.mmap_ranges.delete(pagemap.mmap_ranges.index(local_range))
+			remove_range_unlocked(mut pagemap, local_range)
 			unsafe { free(local_range) }
 		} else {
 			if snip_begin == local_range.base {

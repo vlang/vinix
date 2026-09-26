@@ -17,28 +17,35 @@ fn immutable_overlap_unlocked(pagemap &memory.Pagemap, base u64, length u64) boo
 		return false
 	}
 	end := base + length
-	for ptr in pagemap.mmap_ranges {
-		range_local := unsafe { &MmapRangeLocal(ptr) }
-		if !range_local.immutable {
-			continue
+	mut range_local := range_floor(pagemap, base)
+	if range_local == unsafe { nil } {
+		range_local = range_lower_bound(pagemap, base)
+	}
+	for range_local != unsafe { nil } {
+		if range_local.base >= end {
+			break
 		}
 		range_end := range_local.base + range_local.length
-		if base < range_end && end > range_local.base {
+		if range_local.immutable && base < range_end && end > range_local.base {
 			return true
 		}
+		if range_local.base == u64(-1) {
+			break
+		}
+		range_local = range_lower_bound(pagemap, range_local.base + 1)
 	}
 	return false
 }
 
 fn next_mapped_base_unlocked(pagemap &memory.Pagemap, address u64, end u64) u64 {
-	mut next := end
-	for ptr in pagemap.mmap_ranges {
-		range_local := unsafe { &MmapRangeLocal(ptr) }
-		if range_local.base > address && range_local.base < next {
-			next = range_local.base
-		}
+	if address == u64(-1) {
+		return end
 	}
-	return next
+	next := range_lower_bound(pagemap, address + 1)
+	if next != unsafe { nil } && next.base < end {
+		return next.base
+	}
+	return end
 }
 
 pub fn mimmutable(mut pagemap memory.Pagemap, address u64, _length u64) ? {
@@ -100,7 +107,7 @@ fn mimmutable_unlocked(mut pagemap memory.Pagemap, base u64, length u64) ? {
 			range_locals_lock.acquire()
 			global_range.locals << postsplit_range
 			range_locals_lock.release()
-			pagemap.mmap_ranges << postsplit_range
+			insert_range_unlocked(mut pagemap, postsplit_range)
 			local_range.length -= postsplit_range.length
 		}
 
@@ -128,7 +135,7 @@ fn mimmutable_unlocked(mut pagemap memory.Pagemap, base u64, length u64) ? {
 			range_locals_lock.acquire()
 			global_range.locals << immutable_range
 			range_locals_lock.release()
-			pagemap.mmap_ranges << immutable_range
+			insert_range_unlocked(mut pagemap, immutable_range)
 		}
 		current = snip_end
 	}
