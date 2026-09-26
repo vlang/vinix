@@ -31,8 +31,8 @@
 # which the system is loaded into RAM and only /root persists.
 #
 # The generic runner defaults to 2 GiB for small shell images. The desktop
-# needs 8 GiB; its VirGL RAM image needs 12 GiB while Limine loads it. An
-# explicit environment setting or --mem=MB still wins.
+# needs 8 GiB; its VirGL and full RAM images need 12 GiB while Limine loads
+# them. An explicit environment setting or --mem=MB still wins.
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -42,7 +42,8 @@ KERNEL_DIR="$SCRIPT_DIR/kernel"
 # build-desktop-aarch64.sh writes for the deployment scripts.
 DESKTOP_INITRAMFS="${VINIX_DESKTOP_INITRAMFS:-$SCRIPT_DIR/build-support/init-aarch64/initramfs-desktop.tar}"
 QEMU_DESKTOP_INITRAMFS="$SCRIPT_DIR/build/initramfs-desktop-qemu.tar"
-QEMU_DESKTOP_INITRAMFS_GZ="$QEMU_DESKTOP_INITRAMFS.gz"
+QEMU_DESKTOP_PARTS="$SCRIPT_DIR/build/initramfs-desktop-qemu-parts"
+QEMU_DESKTOP_FULL_PARTS="$SCRIPT_DIR/build/initramfs-desktop-full-parts"
 DESKTOP_ROOT_SEED="$SCRIPT_DIR/build/desktop-root-seed.tar.gz"
 DESKTOP_STORAGE_MANIFEST="$SCRIPT_DIR/build/desktop-qemu-storage.json"
 DESKTOP_BUILD_KEY="$SCRIPT_DIR/build/run-desktop-aarch64.key"
@@ -97,7 +98,7 @@ while [ "$#" -gt 0 ]; do
     shift
 done
 
-if [ "$VIRGL_DESKTOP" -eq 1 ]; then
+if [ "$VIRGL_DESKTOP" -eq 1 ] || [ "$PERSIST_DESKTOP" -eq 0 ]; then
     export VINIX_QEMU_MEM="${VINIX_QEMU_MEM:-12288}"
 else
     export VINIX_QEMU_MEM="${VINIX_QEMU_MEM:-8192}"
@@ -191,6 +192,30 @@ write_desktop_build_key() {
     mv -f "$temp" "$DESKTOP_BUILD_KEY"
 }
 
+prepare_qemu_initramfs_parts() {
+    local source="$1"
+    local directory="$2"
+    local output part
+    local -a parts=()
+
+    output="$(python3 "$SCRIPT_DIR/tools/split-qemu-initramfs.py" "$source" "$directory")"
+    while IFS= read -r part; do
+        [ -z "$part" ] || parts+=("$part")
+    done <<< "$output"
+    if [ "${#parts[@]}" -eq 0 ]; then
+        echo "ERROR: no QEMU desktop modules were produced" >&2
+        return 1
+    fi
+    export VINIX_INITRAMFS="${parts[0]}"
+    export VINIX_INITRAMFS_COMPRESSED=0
+    export VINIX_QEMU_BASE_ARCHIVE="$source"
+    export VINIX_QEMU_MODULE_MANIFEST="$directory/manifest.json"
+    export VINIX_QEMU_EXTRA_MODULES=""
+    if [ "${#parts[@]}" -gt 1 ]; then
+        export VINIX_QEMU_EXTRA_MODULES="$(printf '%s\n' "${parts[@]:1}")"
+    fi
+}
+
 if [ "$BUILD_DESKTOP" -eq 1 ]; then
     DESKTOP_INPUT_KEY=""
     if [ "${VINIX_REFRESH_DESKTOP_STAGING:-0}" != 1 ] &&
@@ -235,8 +260,7 @@ fi
 # The whole system goes on one ext2 volume and the machine boots from it, so a
 # write anywhere survives a restart. The hardware initramfs is unchanged and
 # stays self-contained; what the boot payload carries here shrinks to a
-# recovery shell, which is also what removes the compressed gigabyte Limine
-# otherwise decompresses on every boot.
+# recovery shell, avoiding a large Limine module on every boot.
 if [ "$DISK_ROOT_DESKTOP" -eq 1 ]; then
     export VINIX_QEMU_ROOT_DISK=1
     export VINIX_QEMU_ROOT_IMAGE="$DESKTOP_INITRAMFS"
@@ -264,22 +288,7 @@ elif [ "$PERSIST_DESKTOP" -eq 1 ]; then
     python3 "$SCRIPT_DIR/tools/split-desktop-initramfs.py" \
         "$DESKTOP_INITRAMFS" "$QEMU_DESKTOP_INITRAMFS" \
         "$DESKTOP_ROOT_SEED" "$DESKTOP_STORAGE_MANIFEST"
-    if [ ! -s "$QEMU_DESKTOP_INITRAMFS_GZ" ] || \
-       [ "$QEMU_DESKTOP_INITRAMFS" -nt "$QEMU_DESKTOP_INITRAMFS_GZ" ]; then
-        echo "==> Compressing the QEMU desktop module for FAT32..."
-        QEMU_DESKTOP_INITRAMFS_GZ_TMP="$(mktemp "$SCRIPT_DIR/build/.initramfs-desktop-qemu.tar.gz.XXXXXX")"
-        if ! gzip -n -1 -c "$QEMU_DESKTOP_INITRAMFS" > "$QEMU_DESKTOP_INITRAMFS_GZ_TMP"; then
-            rm -f "$QEMU_DESKTOP_INITRAMFS_GZ_TMP"
-            exit 1
-        fi
-        mv -f "$QEMU_DESKTOP_INITRAMFS_GZ_TMP" "$QEMU_DESKTOP_INITRAMFS_GZ"
-    fi
-    if ! gzip -t "$QEMU_DESKTOP_INITRAMFS_GZ"; then
-        echo "ERROR: compressed QEMU desktop module is corrupt" >&2
-        exit 1
-    fi
-    export VINIX_INITRAMFS="$QEMU_DESKTOP_INITRAMFS_GZ"
-    export VINIX_INITRAMFS_COMPRESSED=1
+    prepare_qemu_initramfs_parts "$QEMU_DESKTOP_INITRAMFS" "$QEMU_DESKTOP_PARTS"
     export VINIX_QEMU_PERSIST=1
     if [ "$EPHEMERAL_DESKTOP" -eq 0 ]; then
         export VINIX_QEMU_PERSIST_DISK="${VINIX_QEMU_PERSIST_DISK:-$SCRIPT_DIR/boot-image/desktop-root.ext2}"
@@ -287,17 +296,17 @@ elif [ "$PERSIST_DESKTOP" -eq 1 ]; then
     export VINIX_QEMU_PERSIST_SIZE_MB="${VINIX_QEMU_PERSIST_SIZE_MB:-3072}"
     export VINIX_QEMU_PERSIST_SEED="${VINIX_QEMU_PERSIST_SEED:-$DESKTOP_ROOT_SEED}"
     if [ "$EPHEMERAL_DESKTOP" -eq 0 ]; then
-        export VINIX_BOOT_DISK="${VINIX_BOOT_DISK:-$SCRIPT_DIR/boot-image/boot-desktop-qemu.img}"
+        export VINIX_BOOT_DISK="${VINIX_BOOT_DISK:-$SCRIPT_DIR/boot-image/boot-desktop-qemu-uncompressed.img}"
     fi
-    export VINIX_BOOT_DISK_SIZE_MB="${VINIX_BOOT_DISK_SIZE_MB:-3072}"
+    export VINIX_BOOT_DISK_SIZE_MB="${VINIX_BOOT_DISK_SIZE_MB:-6144}"
 else
     export VINIX_QEMU_ROOT_DISK=0
-    export VINIX_INITRAMFS="$DESKTOP_INITRAMFS"
+    prepare_qemu_initramfs_parts "$DESKTOP_INITRAMFS" "$QEMU_DESKTOP_FULL_PARTS"
     export VINIX_QEMU_PERSIST=0
     if [ "$EPHEMERAL_DESKTOP" -eq 0 ]; then
-        export VINIX_BOOT_DISK="${VINIX_BOOT_DISK:-$SCRIPT_DIR/boot-image/boot-desktop-full.img}"
+        export VINIX_BOOT_DISK="${VINIX_BOOT_DISK:-$SCRIPT_DIR/boot-image/boot-desktop-full-uncompressed.img}"
     fi
-    export VINIX_BOOT_DISK_SIZE_MB="${VINIX_BOOT_DISK_SIZE_MB:-4096}"
+    export VINIX_BOOT_DISK_SIZE_MB="${VINIX_BOOT_DISK_SIZE_MB:-8192}"
 fi
 if [ "$EPHEMERAL_DESKTOP" -eq 0 ]; then
     export VINIX_QEMU_PACKAGE_STORE="${VINIX_QEMU_PACKAGE_STORE:-$SCRIPT_DIR/boot-image/boot-desktop-4096.img.packages.tar}"

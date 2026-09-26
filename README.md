@@ -189,10 +189,10 @@ The M1 deployment scripts pass the flag; a QEMU image should not. Wi-Fi
 firmware and proprietary Office media remain explicit inputs and are never
 downloaded by the aggregate build.
 
-The desktop runner splits the writable `/root` seed from the immutable image
-and caches a compressed QEMU module. This keeps the boot payload small, leaves
-headroom below FAT32's single-file limit, and lets Limine decompress the module
-during boot.
+The desktop runner splits the writable `/root` seed from the immutable image.
+For the RAM-system layouts, it caches the QEMU image as uncompressed tar
+modules, each below FAT32's 4 GiB single-file limit. Limine loads them in
+order from the UEFI boot disk, so no decompression step is needed during boot.
 
 The individual layer builders described below remain available for iterating
 on one component, but are not required for a normal default-image build.

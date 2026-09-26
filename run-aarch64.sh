@@ -330,6 +330,14 @@ fi
 # VINIX_INITRAMFS selects a different image, e.g. the one
 # ./build-desktop-aarch64.sh stages to boot straight into the desktop.
 INITRAMFS="${VINIX_INITRAMFS:-$INIT_DIR/initramfs.tar}"
+BASE_ARCHIVE="${VINIX_QEMU_BASE_ARCHIVE:-}"
+MODULE_MANIFEST="${VINIX_QEMU_MODULE_MANIFEST:-}"
+EXTRA_MODULES=()
+if [ -n "${VINIX_QEMU_EXTRA_MODULES:-}" ]; then
+    while IFS= read -r module; do
+        [ -z "$module" ] || EXTRA_MODULES+=("$module")
+    done <<< "$VINIX_QEMU_EXTRA_MODULES"
+fi
 INITRAMFS_COMPRESSED="${VINIX_INITRAMFS_COMPRESSED:-}"
 if [ -z "$INITRAMFS_COMPRESSED" ]; then
     case "$INITRAMFS" in
@@ -344,6 +352,24 @@ case "$INITRAMFS_COMPRESSED" in
         exit 1
         ;;
 esac
+if [ "${#EXTRA_MODULES[@]}" -gt 0 ] && [ "$INITRAMFS_COMPRESSED" -eq 1 ]; then
+    echo "ERROR: additional QEMU initramfs modules require uncompressed tar files" >&2
+    exit 1
+fi
+if [ -n "$BASE_ARCHIVE" ] && [ ! -f "$BASE_ARCHIVE" ]; then
+    echo "ERROR: QEMU base archive is missing: $BASE_ARCHIVE" >&2
+    exit 1
+fi
+if [ -n "$MODULE_MANIFEST" ] && [ ! -f "$MODULE_MANIFEST" ]; then
+    echo "ERROR: QEMU module manifest is missing: $MODULE_MANIFEST" >&2
+    exit 1
+fi
+for module in "${EXTRA_MODULES[@]}"; do
+    if [ ! -f "$module" ]; then
+        echo "ERROR: QEMU initramfs module is missing: $module" >&2
+        exit 1
+    fi
+done
 if [ "$NO_BUILD" -eq 0 ] && [ ! -f "$INITRAMFS" ]; then
     echo "==> Building minimal init program..."
     echo "    (Run ./build-userland-aarch64.sh for full busybox userland)"
@@ -608,10 +634,17 @@ if [ -n "$QEMU_RESOLUTION" ]; then
     fi
 fi
 
-# Limine supplies modules in configuration order. A RAM root needs its saved
-# package overlay here. A disk root received the same overlay while its ext2
-# image was installed, so putting it in the boot payload would only make
-# firmware load another potentially multi-gigabyte copy into guest RAM.
+# Limine supplies modules in configuration order. Each uncompressed tar part
+# is unpacked before the saved package overlay and per-run runtime module.
+module_number=2
+for module in "${EXTRA_MODULES[@]}"; do
+    printf '    module_path: boot():/boot/initramfs-part%s.tar\n' "$module_number" >> "$LIMINE_CONF_QEMU"
+    module_number=$((module_number + 1))
+done
+
+# A RAM root needs its saved package overlay here. A disk root received the
+# same overlay while its ext2 image was installed. Putting it in the boot
+# payload would make firmware load another copy into guest RAM.
 if [ "$DISK_ROOT" -ne 1 ] && [ -s "$PACKAGE_STORE" ]; then
     printf '%s\n' '    module_path: boot():/boot/packages.tar' >> "$LIMINE_CONF_QEMU"
 fi
@@ -725,6 +758,15 @@ if [ -f "$INITRAMFS" ]; then
         echo "       Use a split initramfs and persistent volume, as run-desktop-aarch64.sh does." >&2
         exit 1
     fi
+    extra_module_bytes=0
+    for module in "${EXTRA_MODULES[@]}"; do
+        module_bytes="$(vinix_storage_file_size "$module")"
+        if [ "$module_bytes" -gt 4294967295 ]; then
+            echo "ERROR: $module exceeds FAT32's 4 GiB single-file limit." >&2
+            exit 1
+        fi
+        extra_module_bytes=$((extra_module_bytes + module_bytes))
+    done
     package_overlay_bytes=0
     if [ "$DISK_ROOT" -ne 1 ] && [ -s "$PACKAGE_STORE" ]; then
         if stat -f%z "$PACKAGE_STORE" >/dev/null 2>&1; then
@@ -737,7 +779,7 @@ if [ -f "$INITRAMFS" ]; then
             exit 1
         fi
     fi
-    required_bytes=$((initramfs_bytes + package_overlay_bytes + 128 * 1024 * 1024))
+    required_bytes=$((initramfs_bytes + extra_module_bytes + package_overlay_bytes + 128 * 1024 * 1024))
     required_mb=$(((required_bytes + 1024 * 1024 - 1) / (1024 * 1024)))
 
     if [ -f "$BOOT_DISK" ]; then
@@ -800,8 +842,37 @@ if [ -f "$INITRAMFS" ]; then
     # build-userland-aarch64.sh. Naming it matters: booting the desktop image
     # and booting the shell one look identical up to this line.
     echo "==> Using initramfs: $(basename "$INITRAMFS")"
-    mcopy -o -i "$BOOT_DISK" "$INITRAMFS" ::/boot/initramfs.tar
-    ACTIVE_INITRAMFS="$INITRAMFS"
+    COPY_BASE_MODULES=1
+    if [ -n "$MODULE_MANIFEST" ] &&
+       mtype -i "$BOOT_DISK" ::/boot/initramfs-parts.json 2>/dev/null | cmp -s - "$MODULE_MANIFEST"; then
+        COPY_BASE_MODULES=0
+        mdir -i "$BOOT_DISK" ::/boot/initramfs.tar >/dev/null 2>&1 || COPY_BASE_MODULES=1
+        module_number=2
+        for module in "${EXTRA_MODULES[@]}"; do
+            mdir -i "$BOOT_DISK" "::/boot/initramfs-part${module_number}.tar" >/dev/null 2>&1 || COPY_BASE_MODULES=1
+            module_number=$((module_number + 1))
+        done
+    fi
+    if [ "$COPY_BASE_MODULES" -eq 0 ]; then
+        echo "==> Reusing uncompressed initramfs modules on boot disk"
+    fi
+    if [ "$COPY_BASE_MODULES" -eq 1 ]; then
+        if [ "${#EXTRA_MODULES[@]}" -gt 0 ] || [ -n "$MODULE_MANIFEST" ]; then
+            mdel -i "$BOOT_DISK" ::/boot/initramfs.tar 2>/dev/null || true
+            mdel -i "$BOOT_DISK" '::/boot/initramfs-part*.tar' 2>/dev/null || true
+        fi
+        mcopy -o -i "$BOOT_DISK" "$INITRAMFS" ::/boot/initramfs.tar
+        module_number=2
+        for module in "${EXTRA_MODULES[@]}"; do
+            echo "==> Copying initramfs part ${module_number}..."
+            mcopy -i "$BOOT_DISK" "$module" "::/boot/initramfs-part${module_number}.tar"
+            module_number=$((module_number + 1))
+        done
+        if [ -n "$MODULE_MANIFEST" ]; then
+            mcopy -o -i "$BOOT_DISK" "$MODULE_MANIFEST" ::/boot/initramfs-parts.json
+        fi
+    fi
+    ACTIVE_INITRAMFS="${BASE_ARCHIVE:-$INITRAMFS}"
 elif [ -f "$INIT_DIR/init" ]; then
     # Fallback: minimal init only
     echo "==> Creating minimal initramfs with /sbin/init..."

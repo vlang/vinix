@@ -600,13 +600,14 @@ Terminal reports the total build and relaunch time in seconds.
 The in-guest build uses V3 and native TCC without `-prod`. Compilation stops if
 V or TCC fails, without trying the V1 compiler or another C compiler.
 
-The runner caches a gzip-compressed version of the immutable QEMU module to
-keep the boot payload small and comfortably below the FAT32 single-file limit;
-Limine expands it before handing it to the kernel. `/root` remains the separate
-persistent EXT2 volume.
+For the RAM-system layouts, the runner caches the immutable QEMU image as
+uncompressed tar modules below FAT32's single-file limit. Limine loads them in
+order from the UEFI boot disk. `/root` remains on a separate persistent ext2
+volume.
 
 It builds the kernel, builds the desktop, and starts QEMU on the result. The
-launcher reuses `boot-image/boot-desktop-qemu.img` for the immutable system and
+launcher reuses `boot-image/boot-desktop-qemu-uncompressed.img` for EFI, the
+kernel and the immutable system modules, and
 mounts `boot-image/desktop-root.ext2` at `/root`. On the first run it derives a
 smaller QEMU initramfs from the self-contained hardware image and seeds the
 persistent volume with the desktop files and other per-user state. Later runs
