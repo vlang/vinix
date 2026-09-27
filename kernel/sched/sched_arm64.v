@@ -164,6 +164,20 @@ fn scheduler_gpu_lower_exception_trace(esr u64, far u64, raw_state voidptr, kind
 		return
 	}
 
+	// The first synchronous exception is normally the instruction translation
+	// fault which demand-pages the new executable's entry point. Do not print
+	// from that exception: on the M1 every console line redraws the framebuffer,
+	// so the three diagnostics below can consume the freshly armed 5 ms slice.
+	// pf_handler() then enables interrupts with the timer already pending and
+	// gets preempted before it can install the first PTE. We already proved that
+	// eret reaches EL0; disarm the one-shot trace and let the expected fault take
+	// the ordinary, uninstrumented path.
+	if kind == 0 {
+		katomic.store(mut &gpu_exec_switch_state, u64(0))
+		katomic.store(mut &gpu_exec_switch_cpu, u64(-1))
+		return
+	}
+
 	// IRQ and FIQ dispatch have several important stages after vector entry.
 	// Transfer those two kinds to a separate one-shot state before disarming
 	// the context-switch trace. Synchronous faults and SError already have
