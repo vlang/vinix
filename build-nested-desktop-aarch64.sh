@@ -21,6 +21,10 @@ mkdir -p "$work/root"
 tar -xzf "$minirootfs" -C "$work/root"
 install -m755 "$repo/build/vinix-desktop" "$work/root/usr/bin/vinix-desktop"
 install -m755 "$repo/build/desktop-init" "$work/root/sbin/init"
+# The compositor loads QOI app artwork from this directory at startup.
+mkdir -p "$work/root/usr/share/vinix/icons"
+install -m644 "$repo"/desktop/assets/*.qoi \
+    "$work/root/usr/share/vinix/icons/"
 for app in vinix-files vinix-calculator vinix-terminal vinix-settings \
     vinix-activity vinix-editor vinix-calendar vinix-clock; do
     ln -sf vinix-desktop "$work/root/usr/bin/$app"
