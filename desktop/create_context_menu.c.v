@@ -297,7 +297,12 @@ fn open_files_with_context_menu(mut _ Desktop) !NativeApp {
 	if app.files.browser.error != '' {
 		return error(app.files.browser.error)
 	}
+	app.restore_files_view_mode(desktop_home)
 	return app
+}
+
+fn (mut a FilesContextApp) restore_files_view_mode(home string) {
+	a.files.set_view_mode(load_files_view_mode(home))
 }
 
 fn (mut a FilesContextApp) set_context_path(path string) {
@@ -771,7 +776,14 @@ fn (mut a FilesContextApp) handle(event_id string) ! {
 			&& !event_id.starts_with(files_action_tag_row)) {
 		a.clear_context_path()
 	}
+	a.handle_browser_action(event_id, desktop_home)!
+}
+
+fn (mut a FilesContextApp) handle_browser_action(event_id string, home string) ! {
 	a.files.handle(event_id)!
+	if event_id == files_action_view_list || event_id == files_action_view_columns {
+		save_files_view_mode(home, a.files.view_mode)
+	}
 }
 
 fn (mut a FilesContextApp) pointer_input_enabled() bool {

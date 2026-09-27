@@ -6,6 +6,7 @@ module main
 import encoding.hex
 
 const files_settings_filename = '.vinix-files-settings'
+const files_view_mode_filename = '.vinix-files-view-mode'
 const files_settings_limit = 1024 * 1024
 const files_tag_limit = 32
 
@@ -47,6 +48,34 @@ fn default_files_settings() FilesSettings {
 
 fn files_settings_path(home string) string {
 	return '${home}/${files_settings_filename}'
+}
+
+fn files_view_mode_path(home string) string {
+	return '${home}/${files_view_mode_filename}'
+}
+
+fn load_files_view_mode(home string) FilesViewMode {
+	path := files_view_mode_path(home)
+	defer { unsafe { path.free() } }
+	info := desktop_stat(path) or { return .list }
+	if info.is_dir || info.size == 0 || info.size > 16 {
+		return .list
+	}
+	mut buffer := [16]u8{}
+	got := desktop_read_file(path, &buffer[0], info.size)
+	if got != i64(info.size) {
+		return .list
+	}
+	value := buffer[..int(got)].bytestr()
+	defer { unsafe { value.free() } }
+	return if value == 'columns' { .columns } else { .list }
+}
+
+fn save_files_view_mode(home string, mode FilesViewMode) bool {
+	path := files_view_mode_path(home)
+	defer { unsafe { path.free() } }
+	value := if mode == .columns { 'columns' } else { 'list' }
+	return desktop_write_file(path, value.str, u64(value.len))
 }
 
 fn files_settings_bool(value string) bool {

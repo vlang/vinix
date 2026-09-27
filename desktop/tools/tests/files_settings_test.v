@@ -63,6 +63,47 @@ fn test_files_settings_shortcut_and_hidden_factory() {
 	assert app_factory_named(files_settings_process_name) != none
 }
 
+fn test_files_view_mode_reopens_with_last_selected_mode() {
+	root := os.join_path(os.temp_dir(), 'vinix-files-view-mode-test')
+	child := os.join_path(root, 'child')
+	os.rmdir_all(root) or {}
+	os.mkdir_all(child) or { panic(err) }
+	defer { os.rmdir_all(root) or {} }
+	assert load_files_view_mode(root) == .list
+
+	mut app := FilesContextApp{}
+	app.files.settings = default_files_settings()
+	app.files.browser.read(child.clone())
+	app.handle_browser_action(files_action_view_columns, root) or { panic(err) }
+	assert app.files.view_mode == .columns
+	assert load_files_view_mode(root) == .columns
+
+	mut reopened := FilesContextApp{}
+	reopened.files.browser.read(child.clone())
+	reopened.restore_files_view_mode(root)
+	assert reopened.files.view_mode == .columns
+	assert reopened.files.current_path() == child
+
+	// Tag results use a temporary list view, without changing the preference.
+	app.files.handle('${files_action_tag_prefix}0') or { panic(err) }
+	assert app.files.view_mode == .list
+	assert load_files_view_mode(root) == .columns
+
+	mut settings := default_files_settings()
+	settings.show_hidden = true
+	assert settings.save(root)
+	assert load_files_view_mode(root) == .columns
+	app.handle_browser_action(files_action_view_list, root) or { panic(err) }
+	assert load_files_view_mode(root) == .list
+	reopened.restore_files_view_mode(root)
+	assert reopened.files.view_mode == .list
+	assert reopened.files.current_path() == child
+	path := files_view_mode_path(root)
+	defer { unsafe { path.free() } }
+	os.write_file(path, 'unknown') or { panic(err) }
+	assert load_files_view_mode(root) == .list
+}
+
 fn test_files_settings_gear_and_shortcut_focus_one_window() {
 	mut desktop := Desktop{}
 	desktop.apps << &FilesContextApp{}
