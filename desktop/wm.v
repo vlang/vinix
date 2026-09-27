@@ -924,7 +924,7 @@ fn (mut d Desktop) forward_pointer_to_app(x int, y int, phase AppPointerPhase, b
 			// focus for shortcuts and typing.
 			d.raise(window_id)
 		} else if phase == .up
-			&& d.buttons & (button_left | button_right | button_middle) == 0 {
+			&& d.buttons & (button_left | button_right | button_middle | button_back) == 0 {
 			d.pointer_capture = 0
 		}
 		return true

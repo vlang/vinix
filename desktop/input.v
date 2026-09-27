@@ -31,6 +31,7 @@ mut:
 const button_left = u32(1)
 const button_right = u32(2)
 const button_middle = u32(4)
+const button_back = u32(0x48) // BTN_SIDE (HID button 4) or BTN_BACK
 
 struct PointerDevice {
 mut:

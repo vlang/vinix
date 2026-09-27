@@ -958,7 +958,7 @@ fn run_app_process(options AppProcessOptions) {
 				if pointer.kind < int(AppPointerPhase.move)
 					|| pointer.kind > int(AppPointerPhase.scroll)
 					|| pointer.button < int(AppPointerButton.no_button)
-					|| pointer.button > int(AppPointerButton.right) || pointer.width <= 0
+					|| pointer.button > int(AppPointerButton.back) || pointer.width <= 0
 					|| pointer.height <= 0 {
 					send_app_error(options.response_fd, app_current_state(desktop), 'invalid pointer geometry')
 					free_app_payload(payload)

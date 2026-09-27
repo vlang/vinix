@@ -42,6 +42,7 @@ enum AppPointerButton {
 	left
 	middle
 	right
+	back
 }
 
 interface PointerApp {

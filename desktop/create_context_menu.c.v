@@ -800,6 +800,13 @@ fn (mut a FilesContextApp) pointer_event(phase AppPointerPhase, button AppPointe
 		}
 		return
 	}
+	if button == .back {
+		if phase == .down {
+			a.clear_context_path()
+			a.files.handle(files_action_up) or {}
+		}
+		return
+	}
 	a.files.pointer_event(phase, button, scroll, x, y, width, height)
 }
 

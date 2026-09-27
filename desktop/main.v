@@ -453,7 +453,7 @@ fn (mut d Desktop) pump_pointer(mut pointer PointerDevice, width int, height int
 
 	mut click := titlebar_click
 	// A different pointer gesture breaks a pending double-click sequence.
-	if packet.pressed & (button_middle | button_right) != 0 || packet.scroll != 0 {
+	if packet.pressed & (button_middle | button_right | button_back) != 0 || packet.scroll != 0 {
 		click = TitlebarClick{}
 	}
 	if packet.pressed & button_left != 0 {
@@ -485,6 +485,12 @@ fn (mut d Desktop) pump_pointer(mut pointer PointerDevice, width int, height int
 		if !take_create_context_right_release() {
 			d.on_app_pointer_button(pointer_x, pointer_y, .up, .right)
 		}
+	}
+	if packet.pressed & button_back != 0 {
+		d.on_app_pointer_button(pointer_x, pointer_y, .down, .back)
+	}
+	if packet.released & button_back != 0 {
+		d.on_app_pointer_button(pointer_x, pointer_y, .up, .back)
 	}
 	if packet.scroll != 0 {
 		d.on_app_pointer_scroll(pointer_x, pointer_y, int(packet.scroll))
