@@ -3,10 +3,12 @@
 
 import ctypes
 import sys
+import time
 
 
 Display = ctypes.c_void_p
 Window = ctypes.c_ulong
+XErrorHandler = ctypes.CFUNCTYPE(ctypes.c_int, Display, ctypes.c_void_p)
 
 
 class XWindowAttributes(ctypes.Structure):
@@ -38,6 +40,8 @@ class XWindowAttributes(ctypes.Structure):
 
 
 def configure_xlib(xlib):
+    xlib.XSetErrorHandler.argtypes = [XErrorHandler]
+    xlib.XSetErrorHandler.restype = ctypes.c_void_p
     xlib.XOpenDisplay.argtypes = [ctypes.c_char_p]
     xlib.XOpenDisplay.restype = Display
     xlib.XDefaultRootWindow.argtypes = [Display]
@@ -152,26 +156,41 @@ def find_window(xlib, display, window, expected, depth=0):
 
 
 def main():
-    if len(sys.argv) != 3:
-        print(f"usage: {sys.argv[0]} DISPLAY TITLE", file=sys.stderr)
+    if len(sys.argv) not in (3, 4):
+        print(f"usage: {sys.argv[0]} DISPLAY TITLE [WAIT_SECONDS]", file=sys.stderr)
         return 2
+    try:
+        wait_seconds = float(sys.argv[3]) if len(sys.argv) == 4 else 0.0
+    except ValueError:
+        return 2
+    if wait_seconds < 0:
+        return 2
+    deadline = time.monotonic() + wait_seconds
 
     xlib = ctypes.CDLL("libX11.so.6")
     configure_xlib(xlib)
-    display = xlib.XOpenDisplay(sys.argv[1].encode("ascii"))
-    if not display:
-        return 1
-    try:
-        title = find_window(
-            xlib,
-            display,
-            xlib.XDefaultRootWindow(display),
-            sys.argv[2],
-        )
-        if not title:
+    # A child can disappear between XQueryTree and XGetWindowAttributes.
+    # Xlib otherwise exits this watcher on the asynchronous BadWindow reply.
+    ignore_window_races = XErrorHandler(lambda _display, _error: 0)
+    xlib.XSetErrorHandler(ignore_window_races)
+    display = None
+    while not display:
+        display = xlib.XOpenDisplay(sys.argv[1].encode("ascii"))
+        if display:
+            break
+        if time.monotonic() >= deadline:
             return 1
-        print(f"WINDOW={title}")
-        return 0
+        time.sleep(1)
+    try:
+        root = xlib.XDefaultRootWindow(display)
+        while True:
+            title = find_window(xlib, display, root, sys.argv[2])
+            if title:
+                print(f"WINDOW={title}")
+                return 0
+            if time.monotonic() >= deadline:
+                return 1
+            time.sleep(1)
     finally:
         xlib.XCloseDisplay(display)
 
