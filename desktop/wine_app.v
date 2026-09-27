@@ -53,6 +53,10 @@ const minecraft_surface_height = 720
 // title bar and the Vinix taskbar visible.
 const minecraft_window_width = 1976
 const minecraft_window_height = 1113
+const qemu_surface_width = 1024
+const qemu_surface_height = 768
+const qemu_window_width = 1024
+const qemu_window_height = 768
 const doom_surface_width = 720
 const doom_surface_height = 540
 const doom_window_width = 720
@@ -184,6 +188,12 @@ fn open_wine_word2013(mut _ Desktop) !NativeApp {
 	}
 }
 
+fn open_qemu_desktop(mut _ Desktop) !NativeApp {
+	return open_hosted_x11_app('qemu', '/usr/bin/vinix-qemu-desktop', qemu_surface_width,
+		qemu_surface_height, 'asset:terminal', 'Starting Vinix in QEMU…',
+		'QEMU is not installed. Build the desktop with --with-qemu-system.', 'QEMU exited.')
+}
+
 fn open_minecraft(mut _ Desktop) !NativeApp {
 	if C.access(c'/usr/bin/minecraft', C.X_OK) != 0 {
 		return &HostedX11App{
@@ -264,7 +274,7 @@ fn open_hosted_x11_app(name string, command string, surface_width int, surface_h
 	// passing them to the launcher, so an old or ignored game-size option can
 	// never leave a smaller GLFW window floating in a white root surface.
 	host := desktop_spawn_wine_host(app.directory, surface_width, surface_height, command,
-		name == 'minecraft', name == 'doom') or {
+		name == 'minecraft', name == 'doom' || name == 'qemu') or {
 		app.failed = true
 		app.error_message = 'Vinix could not start the embedded X11 host.'
 		return app

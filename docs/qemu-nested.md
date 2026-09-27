@@ -7,7 +7,7 @@ On the build host, stage QEMU and build a desktop image containing it:
 
 ```sh
 ./build-qemu-system-aarch64.sh
-./build-desktop-aarch64.sh --with-qemu-system
+./build-desktop-aarch64.sh --compact-initramfs --with-qemu-system
 ./run-desktop-aarch64.sh --no-build
 ```
 
@@ -47,7 +47,34 @@ vinix-qemu /root/vinix-guest.img
 boots the raw image with a serial console. Set `VINIX_QEMU_GUEST_MEM` (MiB)
 or `VINIX_QEMU_GUEST_SMP` to change the inner VM's memory or CPU count. The
 default is 2048 MiB and one CPU. The inner image is writable and keeps its
-changes across runs.
+changes across runs. QEMU leaves the inner VM's network disabled by default;
+pass explicit QEMU network options after the image path if it is needed.
+
+To open a second Vinix desktop in a window, build the small inner desktop disk,
+copy it to `/root/vinix-inner-desktop.img` in the outer desktop, and open
+**Vinix in QEMU** from the Start menu. The launcher shows QEMU's VNC display in
+a fixed 1024×768 Vinix window and gives the inner VM 1024 MiB by default. The
+viewer accepts inner resolutions up to 1024×768. On the build host:
+
+```sh
+./build-nested-desktop-aarch64.sh
+python3 -m http.server 8765 --bind 127.0.0.1 --directory build-aarch64-qemu-system
+```
+
+Then, in the outer Vinix Terminal:
+
+```sh
+curl -fLo /root/vinix-inner-desktop.img http://10.0.2.2:8765/vinix-inner-desktop.img
+```
+
+The small image includes the native desktop and core applications. Create its
+user profile in the inner desktop when it first starts.
+
+For another image path, set `VINIX_QEMU_DESKTOP_IMAGE` before launching
+`vinix-qemu-desktop` from a hosted X11 session. The plain `vinix-qemu` command
+remains suitable for serial and automated boot checks. The desktop launcher
+uses `VINIX_QEMU_DISPLAY=vnc=127.0.0.1:1` and writes the serial log to
+`/tmp/vinix-qemu-desktop-serial.log`.
 
 For a two level boot check with a tiny inner initramfs, run
 `./tests/qemu-nested/run.sh` on the build host. It reports

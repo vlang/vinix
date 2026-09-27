@@ -25,10 +25,15 @@ fi
 
 # QEMU's TCG emits writable executable code. Vinix enables that per process.
 export VINIX_ALLOW_WX=1
+# Do not add QEMU's default NIC: its UEFI network driver requires a trusted
+# entropy source, which a nested Vinix boot may not have yet.
 exec qemu-system-aarch64 \
     -machine virt,gic-version=3 -cpu max -accel tcg \
     -m "${VINIX_QEMU_GUEST_MEM:-2048}" -smp "${VINIX_QEMU_GUEST_SMP:-1}" \
-    -display none -device ramfb -monitor none -serial stdio -no-reboot \
+    -display "${VINIX_QEMU_DISPLAY:-none}" -device ramfb -monitor none \
+    -serial "${VINIX_QEMU_SERIAL:-stdio}" -no-reboot \
+    -nic none \
+    -device virtio-keyboard-device -device virtio-tablet-device \
     -drive "if=pflash,format=raw,unit=0,readonly=on,file=$firmware" \
     -drive "if=pflash,format=raw,unit=1,file=$vars" \
     -drive "if=none,id=boot,format=raw,file=$image" \
