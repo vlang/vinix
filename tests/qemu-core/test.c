@@ -153,6 +153,51 @@ static int test_cow(void)
 	return 0;
 }
 
+static int test_sparse_tmpfs_shared_mapping(void)
+{
+	const char *path = "/dev/shm/vinix-qemu-core-sparse";
+	const size_t size = 64UL * 1024 * 1024;
+	struct sysinfo before, sized, mapped;
+	CHECK(sysinfo(&before) == 0);
+	int fd = open(path, O_CREAT | O_EXCL | O_RDWR, 0600);
+	CHECK(fd >= 0);
+	CHECK(ftruncate(fd, (off_t)size) == 0);
+	CHECK(sysinfo(&sized) == 0);
+	CHECK(sized.freeram + 8UL * 1024 * 1024 >= before.freeram);
+	unsigned char *area = mmap(NULL, size, PROT_READ | PROT_WRITE,
+	    MAP_SHARED, fd, 0);
+	CHECK(area != MAP_FAILED);
+	CHECK(sysinfo(&mapped) == 0);
+	CHECK(mapped.freeram + 8UL * 1024 * 1024 >= sized.freeram);
+	CHECK(area[0] == 0 && area[size - 1] == 0);
+	area[0] = 0x42;
+	area[size - 1] = 0x73;
+	CHECK(mprotect(area, size, PROT_READ) == 0);
+	CHECK(sysinfo(&mapped) == 0);
+	CHECK(mapped.freeram + 8UL * 1024 * 1024 >= sized.freeram);
+	pid_t child = fork();
+	CHECK(child >= 0);
+	if (child == 0) {
+		int reader = open(path, O_RDWR);
+		if (reader < 0)
+			_exit(1);
+		unsigned char *other = mmap(NULL, size, PROT_READ | PROT_WRITE,
+		    MAP_SHARED, reader, 0);
+		if (other == MAP_FAILED || other[0] != 0x42 ||
+		    other[size - 1] != 0x73 || other[size / 2] != 0)
+			_exit(1);
+		other[size / 2] = 0x5a;
+		_exit(0);
+	}
+	CHECK(reap_ok(child) == 0);
+	CHECK(area[size / 2] == 0x5a);
+	CHECK(munmap(area, size) == 0);
+	CHECK(close(fd) == 0);
+	CHECK(unlink(path) == 0);
+	puts("QEMU CORE PASS: sparse tmpfs shared mappings allocate on touch");
+	return 0;
+}
+
 static int test_partial_munmap_reclaims_pages(void)
 {
 	const size_t size = 32UL * 1024 * 1024;
@@ -1196,6 +1241,7 @@ static int run_tests(void)
 	 * cases so a failure there cannot prevent this foundational hand-off from
 	 * being exercised. */
 	CHECK(test_large_pipe_progress() == 0);
+	CHECK(test_sparse_tmpfs_shared_mapping() == 0);
 	CHECK(test_cow() == 0);
 	CHECK(test_partial_munmap_reclaims_pages() == 0);
 	CHECK(test_madvise_reclaims_anonymous_pages() == 0);

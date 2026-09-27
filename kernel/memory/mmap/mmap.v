@@ -1125,6 +1125,9 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
 	if flags & map_anonymous == 0 {
 		range_handle = handle
 	}
+	lazy_file := options.lazy_file || (flags & map_anonymous == 0
+		&& flags & map_shared != 0 && voidptr(resource_) != unsafe { nil }
+		&& resource.lazy_shared_mapping(mut resource_))
 
 	mut range_global := &MmapRangeGlobal{
 		locals: []&MmapRangeLocal{}
@@ -1136,7 +1139,7 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
 		handle_unref: handle_unref
 		offset: offset
 		pte_extra: extra_pte
-		lazy_file: options.lazy_file
+		lazy_file: lazy_file
 		segmented_file: options.segmented_file
 		file_data_start: options.file_data_start
 		file_data_length: options.file_data_length
@@ -1258,24 +1261,23 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
 	// that faulting such pages in is safe on HVF.
 	lazy_anonymous := flags & map_anonymous != 0 && (length >= lazy_anonymous_threshold
 		|| (flags & map_shared == 0 && memory_accounted(process, pagemap)))
-	if prot != prot_none && !lazy_anonymous && !options.lazy_file {
-		// A shared file mapping reserves its whole extent up front: the loop
-		// below faults pages in ascending order, and a resource that grows a
-		// movable buffer mid-loop would relocate the pages already mapped.
-		if flags & map_anonymous == 0 && flags & map_shared != 0
-			&& voidptr(resource_) != unsafe { nil } {
-			reserve_length := if u64(offset) < u64(resource_.stat.size) {
-				min_u64(length, u64(resource_.stat.size) - u64(offset))
-			} else {
-				u64(0)
-			}
-			if reserve_length > 0
-				&& !resource.reserve_shared_mapping(mut resource_, u64(offset), reserve_length) {
-				munmap(mut pagemap, voidptr(base), length) or {}
-				errno.set(errno.enomem)
-				return none
-			}
+	// Convert movable shared-file storage before any page can be handed out,
+	// including when the mapping itself will be populated on demand.
+	if flags & map_anonymous == 0 && flags & map_shared != 0
+		&& voidptr(resource_) != unsafe { nil } {
+		reserve_length := if u64(offset) < u64(resource_.stat.size) {
+			min_u64(length, u64(resource_.stat.size) - u64(offset))
+		} else {
+			u64(0)
 		}
+		if reserve_length > 0
+			&& !resource.reserve_shared_mapping(mut resource_, u64(offset), reserve_length) {
+			munmap(mut pagemap, voidptr(base), length) or {}
+			errno.set(errno.enomem)
+			return none
+		}
+	}
+	if prot != prot_none && !lazy_anonymous && !lazy_file {
 		for i := u64(0); i < length; i += page_size {
 			file_page := u64((offset + i64(i)) / i64(page_size))
 			// Past the end of the file there is nothing to pre-fault, and a
@@ -1411,7 +1413,7 @@ pub fn mprotect(mut pagemap memory.Pagemap, addr voidptr, len u64, prot int) ? {
 	// part of the reservation. A process in a cgroup is left to fault them in
 	// instead, as mmap() leaves it to (see there).
 	if prot != prot_none && !memory_accounted(proc.current_thread().process, &pagemap) {
-		populate_missing_pages(mut pagemap, u64(addr), len, prot)?
+		populate_missing_pages(mut pagemap, u64(addr), len, prot, true)?
 	}
 
 	pagemap.l.acquire()
@@ -1426,10 +1428,11 @@ pub fn mprotect(mut pagemap memory.Pagemap, addr voidptr, len u64, prot int) ? {
 // yet, in an address space that need not be the active one: exec writes a
 // program's first stack through it.
 pub fn populate(mut pagemap memory.Pagemap, address u64, length u64) ? {
-	populate_missing_pages(mut pagemap, address, length, prot_read | prot_write)?
+	populate_missing_pages(mut pagemap, address, length, prot_read | prot_write, false)?
 }
 
-fn populate_missing_pages(mut pagemap memory.Pagemap, address u64, _length u64, prot int) ? {
+fn populate_missing_pages(mut pagemap memory.Pagemap, address u64, _length u64, prot int,
+	skip_lazy_shared bool) ? {
 	length := lib.align_up(_length, page_size)
 	for virt := address; virt < address + length; virt += page_size {
 		pagemap.l.acquire()
@@ -1446,6 +1449,9 @@ fn populate_missing_pages(mut pagemap memory.Pagemap, address u64, _length u64, 
 		flags := local_range.flags
 		global_range := local_range.global
 		pagemap.l.release()
+		if skip_lazy_shared && flags & map_shared != 0 && global_range.lazy_file {
+			continue
+		}
 
 		page := acquire_range_page(local_range, virt, file_page) or {
 			errno.set(errno.enomem)

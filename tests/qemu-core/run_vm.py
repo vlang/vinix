@@ -26,6 +26,7 @@ FAIL_MARKERS = (
 )
 FEATURE_MARKERS = (
     b"QEMU CORE PASS: secure getrandom",
+    b"QEMU CORE PASS: sparse tmpfs shared mappings allocate on touch",
     b"QEMU CORE PASS: copy-on-write fork",
     b"QEMU CORE PASS: partial unmap reclaims pages and retains forked shares",
     b"QEMU CORE PASS: madvise returns anonymous pages to the allocator",

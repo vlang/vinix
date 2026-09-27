@@ -33,11 +33,12 @@ pub mut:
 	seals u32
 	// A file that is mapped MAP_SHARED can no longer live in one movable
 	// buffer: growing it would relocate the pages a mapping already points at.
-	// It switches to a list of individually allocated physical pages, which
-	// stay put for the life of the file, and every access goes through those
-	// pages from then on.
+	// It switches to a sparse list of physical pages, which stay put once
+	// allocated. ftruncate and mmap reserve slots without backing untouched
+	// pages; Chromium creates many large shared-memory files this way.
 	paged bool
 	pages []u64
+	allocated_pages u64
 	// Extended attributes, nil until one is set; see xattr.v.
 	xattrs &XAttrSet = unsafe { nil }
 }
@@ -150,9 +151,8 @@ pub fn tmpfs_borrow_storage(mut res resource.Resource, storage voidptr, size u64
 	return false
 }
 
-// Back the in-file part of a shared mapping with immovable pages before any of
-// them is returned. Only up to the file's end: a page past it must stay absent
-// so touching it faults.
+// Reserve stable page slots for the in-file part of a shared mapping. Physical
+// pages are allocated on first touch; a page past EOF must remain absent.
 fn (mut this TmpFSResource) reserve_shared_mapping(offset u64, length u64) bool {
 	if offset > u64(-1) - length {
 		return false
@@ -171,6 +171,10 @@ fn (mut this TmpFSResource) reserve_shared_mapping(offset u64, length u64) bool 
 	return this.grow_pages_locked(lib.div_roundup(end, page_size))
 }
 
+fn (mut this TmpFSResource) lazy_shared_mapping() bool {
+	return true
+}
+
 // Give the file discrete, immovable physical pages. Called before it is first
 // shared-mapped. The contiguous buffer, borrowed or owned, is copied across
 // page by page and then let go.
@@ -182,7 +186,7 @@ fn (mut this TmpFSResource) ensure_paged_locked() bool {
 	mut pages := []u64{cap: int(page_count)}
 	size := u64(this.stat.size)
 	for i := u64(0); i < page_count; i++ {
-		phys := memory.pmm_alloc(1)
+		phys := memory.pmm_alloc_fallible(1)
 		if phys == unsafe { nil } {
 			for allocated in pages {
 				memory.pmm_free(voidptr(allocated), 1)
@@ -205,10 +209,12 @@ fn (mut this TmpFSResource) ensure_paged_locked() bool {
 	this.storage_owned = false
 	this.pages = pages
 	this.paged = true
+	this.allocated_pages = page_count
+	this.stat.blocks = page_count * page_size / u64(this.stat.blksize)
 	return true
 }
 
-// Add zero-filled pages so the file has at least `page_count` of them.
+// Reserve slots without allocating pages for the file's untouched holes.
 fn (mut this TmpFSResource) grow_pages_locked(page_count u64) bool {
 	// Room is made here, doubling, rather than by pushing: an array grown by
 	// << leaves its old buffer behind in this kernel, one for every step of a
@@ -224,12 +230,22 @@ fn (mut this TmpFSResource) grow_pages_locked(page_count u64) bool {
 		this.pages = larger
 	}
 	for u64(this.pages.len) < page_count {
-		phys := memory.pmm_alloc(1)
-		if phys == unsafe { nil } {
-			return false
-		}
-		this.pages << u64(phys)
+		this.pages << u64(0)
 	}
+	return true
+}
+
+fn (mut this TmpFSResource) materialize_page_locked(index int) bool {
+	if this.pages[index] != 0 {
+		return true
+	}
+	phys := memory.pmm_alloc_fallible(1)
+	if phys == unsafe { nil } {
+		return false
+	}
+	this.pages[index] = u64(phys)
+	this.allocated_pages++
+	this.stat.blocks = this.allocated_pages * page_size / u64(this.stat.blksize)
 	return true
 }
 
@@ -246,7 +262,10 @@ fn (mut this TmpFSResource) zero_pages_locked(from u64, to u64) {
 		if chunk > end - at {
 			chunk = end - at
 		}
-		unsafe { C.memset(voidptr(this.pages[int(at / page_size)] + higher_half + in_page), 0, chunk) }
+		phys := this.pages[int(at / page_size)]
+		if phys != 0 {
+			unsafe { C.memset(voidptr(phys + higher_half + in_page), 0, chunk) }
+		}
 		at += chunk
 	}
 }
@@ -272,7 +291,7 @@ fn (mut this TmpFSResource) mmap(_handle voidptr, page u64, flags int) voidptr {
 		if !this.ensure_paged_locked() {
 			return unsafe { nil }
 		}
-		if page >= u64(this.pages.len) {
+		if !this.grow_pages_locked(page + 1) || !this.materialize_page_locked(int(page)) {
 			return unsafe { nil }
 		}
 		return voidptr(this.pages[int(page)])
@@ -283,7 +302,7 @@ fn (mut this TmpFSResource) mmap(_handle voidptr, page u64, flags int) voidptr {
 	if offset < file_size {
 		copy_size := if page_size < file_size - offset { page_size } else { file_size - offset }
 		if this.paged {
-			if page < u64(this.pages.len) {
+			if page < u64(this.pages.len) && this.pages[int(page)] != 0 {
 				unsafe {
 					C.memcpy(voidptr(u64(copy_page) + higher_half),
 						voidptr(this.pages[int(page)] + higher_half), copy_size)
@@ -339,7 +358,7 @@ fn (mut this TmpFSResource) paged_copy(buf voidptr, loc u64, count u64, to_file 
 		if chunk > count - done {
 			chunk = count - done
 		}
-		if index < this.pages.len {
+		if index < this.pages.len && this.pages[index] != 0 {
 			page_addr := this.pages[index] + higher_half + in_page
 			src_or_dst := u64(buf) + done
 			if to_file {
@@ -384,7 +403,14 @@ fn (mut this TmpFSResource) write(_handle voidptr, buf voidptr, loc u64, count u
 			this.zero_pages_locked(u64(this.stat.size), loc)
 		}
 		if !this.grow_pages_locked(lib.div_roundup(write_end, page_size)) {
+			errno.set(errno.enospc)
 			return none
+		}
+		for index := int(loc / page_size); index <= int((write_end - 1) / page_size); index++ {
+			if !this.materialize_page_locked(index) {
+				errno.set(errno.enospc)
+				return none
+			}
 		}
 		this.paged_copy(buf, loc, count, true)
 	} else {
@@ -403,7 +429,9 @@ fn (mut this TmpFSResource) write(_handle voidptr, buf voidptr, loc u64, count u
 
 	if write_end > this.stat.size {
 		this.stat.size = write_end
-		this.stat.blocks = lib.div_roundup(this.stat.size, this.stat.blksize)
+		if !this.paged {
+			this.stat.blocks = lib.div_roundup(this.stat.size, this.stat.blksize)
+		}
 	}
 
 	return i64(count)
@@ -437,7 +465,9 @@ fn (mut this TmpFSResource) unref(_handle voidptr) ? {
 
 	if this.paged {
 		for phys in this.pages {
-			memory.pmm_free(voidptr(phys), 1)
+			if phys != 0 {
+				memory.pmm_free(voidptr(phys), 1)
+			}
 		}
 		unsafe { this.pages.free() }
 	} else if stat.isreg(this.stat.mode) && this.storage_owned {
@@ -474,7 +504,9 @@ fn (mut this TmpFSResource) grow(_handle voidptr, new_size u64) ? {
 		// fresh one. An ordinary file's borrowed storage can stay borrowed and
 		// re-materialise its still-visible prefix on the next grow.
 		this.stat.size = new_size
-		this.stat.blocks = lib.div_roundup(new_size, u64(this.stat.blksize))
+		if !this.paged {
+			this.stat.blocks = lib.div_roundup(new_size, u64(this.stat.blksize))
+		}
 		return
 	}
 
@@ -501,7 +533,9 @@ fn (mut this TmpFSResource) grow(_handle voidptr, new_size u64) ? {
 	}
 
 	this.stat.size = new_size
-	this.stat.blocks = lib.div_roundup(new_size, u64(this.stat.blksize))
+	if !this.paged {
+		this.stat.blocks = lib.div_roundup(new_size, u64(this.stat.blksize))
+	}
 }
 
 struct TmpFS {

@@ -133,6 +133,21 @@ pub fn reserve_shared_mapping(mut res Resource, offset u64, length u64) bool {
 	return true
 }
 
+// Resources with stable, independently allocated pages can leave a shared
+// mapping unpopulated until a process touches each page. tmpfs uses this for
+// sparse shared-memory files; disk resources still pre-fault their mappings.
+pub interface LazySharedMapping {
+mut:
+	lazy_shared_mapping() bool
+}
+
+pub fn lazy_shared_mapping(mut res Resource) bool {
+	if mut res is LazySharedMapping {
+		return res.lazy_shared_mapping()
+	}
+	return false
+}
+
 // memfd seals, from fcntl(F_ADD_SEALS/F_GET_SEALS). Only a memfd is sealable;
 // every other resource answers EINVAL.
 pub interface SealableResource {
