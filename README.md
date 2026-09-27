@@ -576,10 +576,12 @@ everything the guest plays, or to `off` to leave the card out:
 VINIX_QEMU_AUDIO=wav:/tmp/vinix.wav ./run-desktop-aarch64.sh --no-build
 ```
 
-Only playback is supported, and only in QEMU; Apple hardware has no sound
-driver yet. `tests/sound/run.sh` boots a test program that drives `/dev/dsp`
-the way SDL does and checks the recording: the pitch and length of each tone,
-no dropouts, and writes that block at the playback rate.
+Only playback is supported. On the base M1 MacBook Air, `/dev/dsp` is the
+built-in speakers instead, with a speaker protection model; see
+[docs/m1-speakers.md](docs/m1-speakers.md). `tests/sound/run.sh` boots a
+test program that drives `/dev/dsp` the way SDL does and checks the
+recording: the pitch and length of each tone, no dropouts, and writes that
+block at the playback rate.
 
 ### Minecraft: Java Edition on aarch64
 

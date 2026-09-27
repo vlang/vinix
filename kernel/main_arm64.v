@@ -24,6 +24,7 @@ import aarch64.xhci
 import apple.smc
 import apple.ans
 import apple.typec
+import apple.speakers
 import devicetree
 import pci
 import initramfs
@@ -290,6 +291,9 @@ fn kmain_thread(qemu_platform bool, acpi_platform bool) {
 	print('kmain_thread: random done\n')
 	if qemu_platform {
 		virtio_snd.initialise(memory.get_hhdm_offset())
+	} else if devicetree.is_available() && !early_cmdline_contains('vinix.apple_speakers=0') {
+		// The MacBook Air's built-in speakers, with their protection model.
+		speakers.initialise()
 	}
 	if qemu_platform {
 		virtio_gpu.initialise(memory.get_hhdm_offset())
