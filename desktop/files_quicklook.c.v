@@ -91,6 +91,10 @@ fn files_quicklook_put_u32(mut bytes []u8, at int, value u32) {
 }
 
 fn (mut p FilesQuickLook) load_image() bool {
+	node := desktop_lstat(p.path) or { return false }
+	if !node.is_file {
+		return false
+	}
 	info := desktop_stat(p.path) or { return false }
 	if info.is_dir || info.size == 0 || info.size > files_quicklook_max_source {
 		return false
@@ -166,6 +170,10 @@ fn (mut p FilesQuickLook) load_image() bool {
 }
 
 fn (mut p FilesQuickLook) load_text() bool {
+	node := desktop_lstat(p.path) or { return false }
+	if !node.is_file {
+		return false
+	}
 	info := desktop_stat(p.path) or { return false }
 	if info.is_dir {
 		return false

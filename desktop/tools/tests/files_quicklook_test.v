@@ -120,4 +120,11 @@ fn test_files_quicklook_only_opens_supported_regular_files() {
 	preview.show('/tmp/does-not-exist.txt')
 	assert preview.open && preview.message != ''
 	preview.close()
+	root := os.join_path(os.temp_dir(), 'vinix-files-quicklook-folder.txt')
+	os.rmdir_all(root) or {}
+	os.mkdir_all(root) or { panic(err) }
+	defer { os.rmdir_all(root) or {} }
+	preview.show(root)
+	assert preview.open && preview.message != ''
+	preview.close()
 }
