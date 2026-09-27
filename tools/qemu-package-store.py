@@ -70,10 +70,29 @@ class OverlayHandler(http.server.BaseHTTPRequestHandler):
             self.send_response(204)
             self.end_headers()
             return
+        if self.path in ("/vinix-files/version", "/vinix-files/binary") and self.server.source_root is not None:
+            self.send_files_build()
+            return
         if self.path == "/vinix-source.tar" and self.server.source_root is not None:
             self.send_source_snapshot()
             return
         self.send_error(404)
+
+    def send_files_build(self) -> None:
+        files_root = self.server.source_root / "build-aarch64-desktop-apps/files-live"
+        name = "version" if self.path.endswith("/version") else "vinix-files"
+        path = files_root / name
+        try:
+            with path.open("rb") as source:
+                size = path.stat().st_size
+                self.send_response(200)
+                self.send_header("Content-Type", "application/octet-stream")
+                self.send_header("Content-Length", str(size))
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                shutil.copyfileobj(source, self.wfile)
+        except FileNotFoundError:
+            self.send_error(404)
 
     def send_source_snapshot(self) -> None:
         try:

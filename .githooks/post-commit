@@ -1,0 +1,22 @@
+#!/bin/sh
+# Publish committed Files changes to any running desktop QEMU guest.
+set -eu
+
+[ "${VINIX_FILES_SYNC:-1}" != 0 ] || exit 0
+root=$(git rev-parse --show-toplevel)
+subject=$(git log -1 --format=%s)
+paths=$(git diff-tree --root --no-commit-id --name-only -r HEAD)
+
+case "$subject" in
+    Files:*|files:*) files_commit=1 ;;
+    *) files_commit=0 ;;
+esac
+if [ "$files_commit" -eq 0 ]; then
+    printf '%s\n' "$paths" | grep -Eq '^desktop/(files\.v|file_context_ops\.c\.v|create_context_menu\.c\.v)$' || exit 0
+fi
+
+echo "==> Files commit detected; cross-compiling for the running VM"
+if ! "$root/cross-compile-files.sh"; then
+    echo "ERROR: Files cross-build or publication failed; run ./cross-compile-files.sh to retry" >&2
+    exit 1
+fi

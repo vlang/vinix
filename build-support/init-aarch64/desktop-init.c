@@ -247,6 +247,24 @@ static i64 spawn_program(char **arguments, char **fallback, int own_group,
 	return child;
 }
 
+static int executable_available(const char *path);
+
+static void start_files_sync(char **environment) {
+	char *arguments[] = { "/usr/bin/vinix-files-sync", (char *)0 };
+	i64 child;
+	if (!executable_available(arguments[0]))
+		return;
+	child = syscall5(220 /* clone */, 17 /* SIGCHLD */, 0, 0, 0, 0);
+	if (child == 0) {
+		/* The helper must survive a compositor restart and its process-group
+		 * cleanup. It exits immediately outside a QEMU host-source boot. */
+		syscall2(154 /* setpgid */, 0, 0);
+		syscall3(221 /* execve */, (u64)arguments[0], (u64)arguments,
+		         (u64)environment);
+		syscall1(93 /* exit */, 127);
+	}
+}
+
 static void reap_exited_children(void) {
 	int status;
 	while (syscall4(260 /* wait4 */, (u64)(i64)-1, (u64)&status,
@@ -319,12 +337,25 @@ static void prepare_desktop_boot(void) {
 	static const char temporary_desktop[] =
 		"/usr/bin/.vinix-desktop.system";
 	static const char desktop[] = "/usr/bin/vinix-desktop";
+	static const char files[] = "/usr/bin/vinix-files";
+	static const char temporary_files[] = "/usr/bin/.vinix-files.system";
 	const u64 at_fdcwd = (u64)(i64)-100;
 
 	syscall3(35 /* unlinkat */, at_fdcwd,
 	         (u64)"/run/vinix-desktop-development", 0);
 	syscall3(35 /* unlinkat */, at_fdcwd,
 	         (u64)"/run/vinix-desktop-ready", 0);
+	syscall3(35 /* unlinkat */, at_fdcwd,
+	         (u64)"/run/vinix-files-version", 0);
+	/* A Files-only cross-build replaces this symlink during a QEMU session.
+	 * Restore the packaged multicall link before starting the next session. */
+	syscall3(35 /* unlinkat */, at_fdcwd, (u64)temporary_files, 0);
+	if (syscall3(36 /* symlinkat */, (u64)"vinix-desktop", at_fdcwd,
+	             (u64)temporary_files) >= 0) {
+		if (syscall4(38 /* renameat */, at_fdcwd, (u64)temporary_files,
+		             at_fdcwd, (u64)files) < 0)
+			syscall3(35 /* unlinkat */, at_fdcwd, (u64)temporary_files, 0);
+	}
 
 	/* Older images have no immutable copy. Leave their existing desktop alone
 	 * rather than removing the only executable they can start. */
@@ -411,6 +442,7 @@ void _start(void) {
 	prepare_desktop_boot();
 	prepare_hosted_x11_storage();
 	install_power_signals();
+	start_files_sync(environment);
 
 #ifdef VINIX_WIFI_BUNDLE
 	char *wifi[] = {

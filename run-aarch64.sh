@@ -1076,11 +1076,14 @@ install -m755 "$SCRIPT_DIR/build-support/vinix-desktop-build" \
 # checkout rather than the reload helper lagging behind in the image.
 install -m755 "$SCRIPT_DIR/build-support/vinix-desktop-reload" \
     "$PACKAGE_RUNTIME_ROOT/usr/bin/vinix-desktop-reload"
+install -m755 "$SCRIPT_DIR/build-support/vinix-files-sync" \
+    "$PACKAGE_RUNTIME_ROOT/usr/bin/vinix-files-sync"
 printf '%s\n' \
     etc/vinix/qemu-host-source-url \
     usr/bin/vinix-host-sync \
     usr/bin/vinix-desktop-build \
     usr/bin/vinix-desktop-reload \
+    usr/bin/vinix-files-sync \
     >> "$PACKAGE_RUNTIME_ROOT/etc/vinix-pkg/base-files"
 LC_ALL=C sort -u -o "$PACKAGE_RUNTIME_ROOT/etc/vinix-pkg/base-files" \
     "$PACKAGE_RUNTIME_ROOT/etc/vinix-pkg/base-files"

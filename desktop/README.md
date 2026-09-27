@@ -572,6 +572,19 @@ The host runner builds the kernel and packaged desktop with `-prod` and uses
 Clang for cross compilation. A warm run reuses cached build outputs. For quick
 desktop edits inside the running VM, use `vinix-desktop-build` below.
 
+For Files changes, `./cross-compile-files.sh` builds the committed desktop
+sources for AArch64 and publishes the binary through the QEMU host source
+server. The guest checks for it every two seconds and atomically replaces
+`/usr/bin/vinix-files`. Close and reopen Files to run the new version; the
+desktop and OS keep running. The guest helper is started by the desktop image,
+so a VM booted before this helper was added needs one initial restart.
+
+This checkout also provides `.githooks/post-commit`, which runs the script
+after commits that change Files sources or have a `Files:` subject. Enable it
+in this checkout with `git config core.hooksPath .githooks`. Set
+`VINIX_FILES_SYNC=0` for a commit when you need to skip the build, then run
+`./cross-compile-files.sh` later.
+
 To build a single desktop image with the default portable software set
 (Python, Ruby, Go, V, developer tools, X11, Firefox, Hyprland, x86 translation,
 and the CLI tools), use the aggregate builder and then boot its result. Java,
