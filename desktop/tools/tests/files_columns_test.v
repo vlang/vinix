@@ -31,6 +31,18 @@ fn files_columns_tree_has_view_button(element ui2.Element, action string, icon s
 	return false
 }
 
+fn files_columns_tree_path_view(element ui2.Element, path string) ?ui2.Element {
+	if element.tooltip == path && element.kind == .view {
+		return element
+	}
+	for child in element.children {
+		if found := files_columns_tree_path_view(child, path) {
+			return found
+		}
+	}
+	return none
+}
+
 fn files_columns_entry_index(column &MillerColumn, name string) int {
 	for index, entry in column.browser.entries {
 		if entry.name == name {
@@ -78,10 +90,14 @@ fn test_file_browser_miller_columns_follow_directory_selection() {
 	assert app.columns.len == base_columns + 2
 	assert app.columns.last().browser.path == os.join_path(root, 'alpha', 'nested')
 
-	// The full selected path stays visible above the columns. The scrollbar
-	// begins at the right edge, showing the two newest of four columns.
+	// The full path stays in the toolbar, and the columns begin below it.
 	tree := app.build(ui2.rect(0, 0, 460, 330))!
-	assert files_columns_tree_has_text(tree, os.join_path(root, 'alpha', 'nested'))
+	selected_path := os.join_path(root, 'alpha', 'nested')
+	assert files_columns_tree_has_text(tree, selected_path)
+	path_view := files_columns_tree_path_view(tree, selected_path) or { panic('missing path') }
+	assert int(path_view.frame.x) == files_path_left
+	assert int(path_view.frame.y) == files_path_top
+	assert app.rows_top == files_header_height
 	assert app.column_offset == app.max_column_offset()
 	assert app.max_column_offset() > 0
 	assert files_columns_tree_has_view_button(tree, files_action_view_list, 'builtin:list_view',
@@ -94,10 +110,11 @@ fn test_file_browser_miller_columns_follow_directory_selection() {
 	content_left := files_content_left(460)
 	assert app.path_offset == app.max_path_offset()
 	assert app.path_offset > 0
-	path_x := content_left + files_padding + 20
-	app.pointer_event(.down, .left, 0, path_x, files_header_height + 10, 460, 330)
-	app.pointer_event(.move, .no_button, 0, path_x + 200, files_header_height + 10, 460, 330)
-	app.pointer_event(.up, .left, 0, path_x + 200, files_header_height + 10, 460, 330)
+	path_x := files_path_left + 20
+	path_y := files_path_top + 10
+	app.pointer_event(.down, .left, 0, path_x, path_y, 460, 330)
+	app.pointer_event(.move, .no_button, 0, path_x + 200, path_y, 460, 330)
+	app.pointer_event(.up, .left, 0, path_x + 200, path_y, 460, 330)
 	assert app.path_offset < app.max_path_offset()
 	app.column_offset = files_clamp((app.columns.len - 2) * app.column_width,
 		app.max_column_offset())

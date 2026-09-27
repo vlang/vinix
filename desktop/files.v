@@ -243,9 +243,11 @@ const files_action_scrollbar = 'files.scrollbar'
 const files_row_height = 24
 const files_header_height = 38
 const files_padding = 10
-const files_column_path_height = 26
 const files_column_min_width = 200
 const files_view_button_width = 28
+const files_path_left = 60
+const files_path_top = 8
+const files_path_height = 22
 const files_horizontal_bar_height = 20
 const files_scrollbar_width = 8
 const files_scrollbar_min_thumb = 20
@@ -272,6 +274,11 @@ const files_locations = [
 
 fn files_content_left(width int) int {
 	return if width >= files_sidebar_min_window_width { files_sidebar_width } else { 0 }
+}
+
+fn files_path_width(width int) int {
+	right := width - files_padding - 2 * files_view_button_width - 2 - 8
+	return if right > files_path_left { right - files_path_left } else { 1 }
 }
 
 enum FilesViewMode {
@@ -320,6 +327,7 @@ mut:
 	vertical_drag_scroll int
 	path_offset int
 	path_content_width int
+	path_viewport_width int
 	path_drag bool
 	path_drag_x int
 	path_drag_offset int
@@ -632,8 +640,14 @@ fn (a &FileBrowserApp) max_column_offset() int {
 }
 
 fn (a &FileBrowserApp) max_path_offset() int {
-	visible := a.viewport_width - 2 * files_padding
-	return if a.path_content_width > visible { a.path_content_width - visible } else { 0 }
+	return if a.path_content_width > a.path_viewport_width {
+		a.path_content_width - a.path_viewport_width
+	} else { 0 }
+}
+
+fn (a &FileBrowserApp) pointer_over_path(x int, y int) bool {
+	return x >= files_path_left && x < files_path_left + a.path_viewport_width
+		&& y >= files_path_top && y < files_path_top + files_path_height
 }
 
 fn (mut a FileBrowserApp) build(size ui2.Rect) !ui2.Element {
@@ -652,11 +666,12 @@ fn (mut a FileBrowserApp) build(size ui2.Rect) !ui2.Element {
 	}
 	a.viewport_width = content_width
 	a.column_width = content_width / slot_count
+	a.path_viewport_width = files_path_width(width)
 	if a.view_mode == .columns {
 		// The path is drawn untruncated inside a clipped strip. Give it a
 		// conservative glyph width so even wide names fit its virtual label.
 		path_pixels := a.current_path().len * 12
-		visible_path := content_width - 2 * files_padding
+		visible_path := a.path_viewport_width
 		a.path_content_width = if path_pixels > visible_path { path_pixels } else { visible_path }
 		if a.reveal_path_end {
 			a.path_offset = a.max_path_offset()
@@ -672,7 +687,7 @@ fn (mut a FileBrowserApp) build(size ui2.Rect) !ui2.Element {
 	} else {
 		a.column_offset = files_clamp(a.column_offset, column_max)
 	}
-	a.rows_top = files_header_height + if a.view_mode == .columns { files_column_path_height } else { 0 }
+	a.rows_top = files_header_height
 	bar_height := if a.view_mode == .columns && column_max > 0 { files_horizontal_bar_height } else { 0 }
 	a.rows_height = height - a.rows_top - bar_height - files_padding
 	if a.rows_height < files_row_height {
@@ -688,10 +703,9 @@ fn (mut a FileBrowserApp) build(size ui2.Rect) !ui2.Element {
 	mut children := frame_elements(a.visible_rows * (slot_count + 2) + 18)
 
 	// Header: where we are, the way back out, and the two view choices.
-	up_width := 40
 	view_button_gap := 2
 	view_x := width - files_padding - 2 * files_view_button_width - view_button_gap
-	children << ui2.button(files_action_up, 'Up', ui2.rect(f64(files_padding), 8, f64(up_width), 22), ui2.BoxStyle{
+	children << ui2.button(files_action_up, 'Up', ui2.rect(f64(files_padding), files_path_top, 40, files_path_height), ui2.BoxStyle{
 		bg: if a.current_path() == '/' { files_up_disabled } else { files_up }
 		radius: 5
 	}, ui2.TextStyle{
@@ -704,26 +718,25 @@ fn (mut a FileBrowserApp) build(size ui2.Rect) !ui2.Element {
 	children << files_view_button(files_action_view_columns, 'Column view', 'builtin:column_view',
 		view_x + files_view_button_width + view_button_gap, a.view_mode == .columns)
 	if a.view_mode == .list {
-		path_left := files_padding + up_width + 10
-		path_right := view_x - 8
-		children << ui2.label('', a.current_path(), ui2.rect(f64(path_left), 8, f64(path_right - path_left), 22), ui2.TextStyle{
+		children << ui2.label('', a.current_path(), ui2.rect(files_path_left, files_path_top,
+			f64(a.path_viewport_width), files_path_height), ui2.TextStyle{
 			color: body_heading
 			size: 13
 			bold: true
 		})
 	} else {
-		// This clipped strip holds the entire path. Navigation reveals its end;
-		// dragging or wheeling over it reaches earlier segments.
+		// The path shares the toolbar with Up and the view buttons. Navigation
+		// reveals its end; dragging or wheeling reaches earlier segments.
 		mut path_children := frame_elements(1)
 		path_children << ui2.label('', a.current_path(), ui2.rect(f64(-a.path_offset), 0,
-			f64(a.path_content_width), f64(files_column_path_height - 2)), ui2.TextStyle{
+			f64(a.path_content_width), files_path_height), ui2.TextStyle{
 			color: body_heading
-			size: 12
+			size: 13
 			bold: true
 		})
 		children << ui2.Element{
-			...ui2.view('', ui2.rect(f64(content_left + files_padding), files_header_height + 1,
-				f64(inner), f64(files_column_path_height - 2)), ui2.BoxStyle{
+			...ui2.view('', ui2.rect(files_path_left, files_path_top,
+				f64(a.path_viewport_width), files_path_height), ui2.BoxStyle{
 				transparent: true
 			}, path_children)
 			tooltip: a.current_path()
@@ -919,11 +932,14 @@ fn (mut a FileBrowserApp) clamp_scroll() {
 
 fn (mut a FileBrowserApp) scroll_at(x int, y int, steps int, width int) {
 	content_left := width - a.viewport_width
-	if steps == 0 || x < content_left {
+	if steps == 0 {
 		return
 	}
-	if a.view_mode == .columns && y >= files_header_height && y < a.rows_top {
+	if a.view_mode == .columns && a.pointer_over_path(x, y) {
 		a.path_offset = files_clamp(a.path_offset - steps * 48, a.max_path_offset())
+		return
+	}
+	if x < content_left {
 		return
 	}
 	if a.view_mode == .columns && y >= a.rows_top + a.rows_height {
@@ -1040,14 +1056,13 @@ fn (mut a FileBrowserApp) pointer_event(phase AppPointerPhase, button AppPointer
 	if phase != .down || button != .left {
 		return
 	}
-	if x < content_left {
-		return
-	}
-	if a.view_mode == .columns && y >= files_header_height && y < a.rows_top
-		&& x >= content_left + files_padding && x < width - files_padding {
+	if a.view_mode == .columns && a.pointer_over_path(x, y) {
 		a.path_drag = true
 		a.path_drag_x = x
 		a.path_drag_offset = a.path_offset
+		return
+	}
+	if x < content_left {
 		return
 	}
 	if a.view_mode == .columns && a.max_column_offset() > 0
