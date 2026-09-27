@@ -5,8 +5,7 @@ module main
 
 import ui2
 
-#flag -DSTB_IMAGE_IMPLEMENTATION -DSTBI_ONLY_JPEG -DSTBI_ONLY_PNG -DSTBI_ONLY_BMP -DSTBI_ONLY_GIF -DSTBI_NO_STDIO -DSTBI_NO_SIMD
-#include "stb_image.h"
+#include "quicklook_stb.h"
 
 fn C.stbi_info_from_memory(buffer &u8, length int, width &int, height &int, channels &int) int
 fn C.stbi_load_from_memory(buffer &u8, length int, width &int, height &int, channels &int, desired_channels int) &u8
