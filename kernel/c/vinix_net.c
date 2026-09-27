@@ -57,6 +57,9 @@ struct vinix_socket {
     int nodelay;
     struct tcp_pcb *tcp;
     struct udp_pcb *udp;
+    /* tcp_err releases the PCB before user space can query this socket. */
+    uint32_t last_local_address;
+    uint16_t last_local_port;
     struct packet *rx_head;
     struct packet *rx_tail;
     struct vinix_socket *accept_head;
@@ -559,7 +562,8 @@ int vinix_socket_bind(struct vinix_socket *socket, uint32_t address, uint16_t po
         return 88;
     }
     ip = ipv4(address);
-    if (socket->tcp) {
+    if (socket->type == VINIX_NET_STREAM) {
+        if (!socket->tcp) return socket->error ? socket->error : 107;
         error = tcp_bind(socket->tcp, &ip, lwip_ntohs(port));
     } else {
         error = udp_bind(socket->udp, &ip, lwip_ntohs(port));
@@ -574,7 +578,8 @@ int vinix_socket_connect(struct vinix_socket *socket, uint32_t address, uint16_t
         return 88;
     }
     ip = ipv4(address);
-    if (socket->tcp) {
+    if (socket->type == VINIX_NET_STREAM) {
+        if (!socket->tcp) return socket->error ? socket->error : 107;
         if (socket->connected) {
             return 106;
         }
@@ -587,6 +592,8 @@ int vinix_socket_connect(struct vinix_socket *socket, uint32_t address, uint16_t
             socket->connecting = 0;
             return linux_error(error);
         }
+        socket->last_local_address = ip_2_ip4(&socket->tcp->local_ip)->addr;
+        socket->last_local_port = lwip_htons(socket->tcp->local_port);
         /* NO_SYS loopback queues packets until netif_poll_all().  A busy
          * nonblocking client may never let the scheduler reach its idle
          * poller, so complete the in-kernel handshake synchronously. */
@@ -653,8 +660,9 @@ int vinix_socket_send(struct vinix_socket *socket, const void *data, size_t leng
     if (socket->write_shutdown) {
         return -32;
     }
-    if (socket->tcp) {
+    if (socket->type == VINIX_NET_STREAM) {
         uint16_t amount;
+        if (!socket->tcp) return -(socket->error ? socket->error : 107);
         if (!socket->connected) {
             return -107;
         }
@@ -727,11 +735,11 @@ int vinix_socket_recv(struct vinix_socket *socket, void *data, size_t length,
     }
     packet = socket->rx_head;
     if (!packet) {
-        if (socket->tcp && socket->peer_closed) {
+        if (socket->type == VINIX_NET_STREAM && socket->peer_closed && !socket->error) {
             return 0;
         }
-        if (socket->tcp && !socket->connected) {
-            return -107;
+        if (socket->type == VINIX_NET_STREAM && !socket->connected) {
+            return -(socket->error ? socket->error : 107);
         }
         return -11;
     }
@@ -779,7 +787,8 @@ int vinix_socket_shutdown(struct vinix_socket *socket, int how) {
     if (how == 1 || how == 2) {
         socket->write_shutdown = 1;
     }
-    if (socket->tcp) {
+    if (socket->type == VINIX_NET_STREAM) {
+        if (!socket->tcp) return 107;
         error = tcp_shutdown(socket->tcp, how == 0 || how == 2,
                              how == 1 || how == 2);
         return linux_error(error);
@@ -795,9 +804,11 @@ int vinix_socket_local(struct vinix_socket *socket, uint32_t *address, uint16_t 
     if (!socket) {
         return 88;
     }
-    if (socket->tcp) {
-        if (address) *address = ip_2_ip4(&socket->tcp->local_ip)->addr;
-        if (port) *port = lwip_htons(socket->tcp->local_port);
+    if (socket->type == VINIX_NET_STREAM) {
+        if (address) *address = socket->tcp ?
+            ip_2_ip4(&socket->tcp->local_ip)->addr : socket->last_local_address;
+        if (port) *port = socket->tcp ?
+            lwip_htons(socket->tcp->local_port) : socket->last_local_port;
     } else {
         if (address) *address = ip_2_ip4(&socket->udp->local_ip)->addr;
         if (port) *port = lwip_htons(socket->udp->local_port);
@@ -888,24 +899,31 @@ int vinix_socket_set_option(struct vinix_socket *socket, int level, int option,
         case 2:  /* SO_REUSEADDR */
         case 15: /* SO_REUSEPORT: lwIP shares address-reuse semantics. */
             socket->reuseaddr = value;
-            if (value) ip_set_option(pcb, SOF_REUSEADDR);
-            else ip_reset_option(pcb, SOF_REUSEADDR);
+            if (pcb) {
+                if (value) ip_set_option(pcb, SOF_REUSEADDR);
+                else ip_reset_option(pcb, SOF_REUSEADDR);
+            }
             return 0;
         case 6: /* SO_BROADCAST */
             socket->broadcast = value;
-            if (value) ip_set_option(pcb, SOF_BROADCAST);
-            else ip_reset_option(pcb, SOF_BROADCAST);
+            if (pcb) {
+                if (value) ip_set_option(pcb, SOF_BROADCAST);
+                else ip_reset_option(pcb, SOF_BROADCAST);
+            }
             return 0;
         case 9: /* SO_KEEPALIVE */
             socket->keepalive = value;
-            if (value) ip_set_option(pcb, SOF_KEEPALIVE);
-            else ip_reset_option(pcb, SOF_KEEPALIVE);
+            if (pcb) {
+                if (value) ip_set_option(pcb, SOF_KEEPALIVE);
+                else ip_reset_option(pcb, SOF_KEEPALIVE);
+            }
             return 0;
         default:
             return 92;
         }
     }
     if (level == 0) { /* IPPROTO_IP */
+        if (!pcb) return 107;
         if (value < 0 || value > 255) {
             return 22;
         }
@@ -961,6 +979,7 @@ int vinix_socket_get_option(struct vinix_socket *socket, int level, int option,
         }
     }
     if (level == 0) { /* IPPROTO_IP */
+        if (!pcb) return 107;
         switch (option) {
         case 1: *value = pcb->tos; return 0;
         case 2: *value = pcb->ttl; return 0;

@@ -132,6 +132,26 @@ fail:
     return 0;
 }
 
+static int refused_loopback_tcp(void) {
+    struct sockaddr_in remote = {2, network_short(32125), 0x0100007f, {0}};
+    struct sockaddr_in local = {0};
+    u32 local_length = sizeof(local);
+    int keepalive = 1;
+    int client = (int)call3(198, 2, 1, 0);
+    if (client < 0) return 0;
+    /* A refused connection destroys lwIP's TCP PCB. The still-open file
+     * descriptor must remain safe to inspect, configure and close. */
+    int refused = call3(203, client, (u64)&remote, sizeof(remote)) < 0;
+    int safe = refused &&
+        call3(204, client, (u64)&local, (u64)&local_length) == 0 &&
+        local.family == 2 &&
+        call5(208, client, 1, 9, (u64)&keepalive, sizeof(keepalive)) == 0 &&
+        call6(206, client, (u64)"x", 1, 0, 0, 0) < 0 &&
+        call2(210, client, 2) < 0;
+    close_fd(client);
+    return safe;
+}
+
 static int loopback_udp(void) {
     struct sockaddr_in destination = {2, network_short(32124), 0x0100007f, {0}};
     struct sockaddr_in source = {0};
@@ -213,6 +233,8 @@ void _start(void) {
     print("NET TEST START\n");
     if (loopback_tcp()) print("PASS tcp loopback\n");
     else { print("FAIL tcp loopback\n"); failures++; }
+    if (refused_loopback_tcp()) print("PASS refused tcp socket remains safe\n");
+    else { print("FAIL refused tcp socket remains safe\n"); failures++; }
     if (loopback_udp()) print("PASS udp loopback\n");
     else { print("FAIL udp loopback\n"); failures++; }
     if (socket_options()) print("PASS IPv4 socket options\n");
