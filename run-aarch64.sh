@@ -1132,6 +1132,13 @@ if [ "$VIRTIO_GPU" -eq 2 ]; then
         echo "       Run 'make setup-gpu' in ../kekvm or set VINIX_VIRGL_QEMU." >&2
         exit 1
     fi
+    if [ "$(uname -s)" = Darwin ]; then
+        # Apple's OpenGL driver can crash when a texture buffer remains bound
+        # during another buffer update. Load the Vinix-local renderer fix only
+        # in this QEMU process.
+        "$SCRIPT_DIR/build-support/virglrenderer/build-host.sh" || exit 1
+        host_virgl_lib="$SCRIPT_DIR/build/virglrenderer-host/lib"
+    fi
 fi
 
 # QEMU user networking advertises 10.0.2.2 as the host and provides DHCP and
@@ -1247,6 +1254,9 @@ fi
 # VINIX_QEMU_EXTRA appends raw flags, e.g. a monitor socket to drive
 # screendump from a script. Keep the runner alive to own the loopback package
 # store for the lifetime of the VM.
+if [ -n "${host_virgl_lib:-}" ]; then
+    export DYLD_LIBRARY_PATH="$host_virgl_lib${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"
+fi
 set +e
 "$QEMU_BIN" \
     ${VINIX_QEMU_EXTRA} \

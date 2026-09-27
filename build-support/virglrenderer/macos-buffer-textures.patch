@@ -1,0 +1,170 @@
+diff --git a/src/vrend/vrend_renderer.c b/src/vrend/vrend_renderer.c
+--- a/src/vrend/vrend_renderer.c
++++ b/src/vrend/vrend_renderer.c
+@@ -8436,7 +8436,67 @@
+       }
+    }
+    return 0;
++}
++
++#ifdef __APPLE__
++/* Apple's GL engine can dereference a null buffer-stamp pointer when any
++ * texture buffer is bound while another buffer is changed. Save and unbind
++ * texture-buffer bindings around buffer storage operations, then restore the
++ * bindings before rendering resumes. See Magnum's
++ * apple-buffer-texture-unbind-on-buffer-modify workaround:
++ * https://magnum.graphics/doc/magnum/opengl-workarounds.html
++ */
++struct vrend_apple_buffer_textures {
++   GLint active_texture;
++   GLint count;
++   GLuint *bound;
++   GLuint inline_bound[128];
++};
++
++static void vrend_apple_suspend_buffer_textures(struct vrend_apple_buffer_textures *state)
++{
++   memset(state, 0, sizeof(*state));
++   if (vrend_state.use_gles)
++      return;
++   glGetIntegerv(GL_ACTIVE_TEXTURE, &state->active_texture);
++   glGetIntegerv(GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS, &state->count);
++   if (state->count <= 0)
++      return;
++
++   state->bound = state->count <= ARRAY_SIZE(state->inline_bound) ?
++                  state->inline_bound : calloc(state->count, sizeof(GLuint));
++   if (!state->bound) {
++      virgl_error("Cannot save Apple texture-buffer bindings\n");
++      state->count = 0;
++      return;
++   }
++
++   for (GLint i = 0; i < state->count; i++) {
++      GLint texture = 0;
++      glActiveTexture(GL_TEXTURE0 + i);
++      glGetIntegerv(GL_TEXTURE_BINDING_BUFFER, &texture);
++      state->bound[i] = texture;
++      if (texture)
++         glBindTexture(GL_TEXTURE_BUFFER, 0);
++   }
++   glActiveTexture(state->active_texture);
++}
++
++static void vrend_apple_restore_buffer_textures(struct vrend_apple_buffer_textures *state)
++{
++   if (!state->bound)
++      return;
++   for (GLint i = 0; i < state->count; i++) {
++      if (state->bound[i]) {
++         glActiveTexture(GL_TEXTURE0 + i);
++         glBindTexture(GL_TEXTURE_BUFFER, state->bound[i]);
++      }
++   }
++   glActiveTexture(state->active_texture);
++   if (state->bound != state->inline_bound)
++      free(state->bound);
+ }
++#endif
+ 
+ static void vrend_create_buffer(struct vrend_resource *gr, uint32_t width, uint32_t flags)
+ {
+@@ -8457,6 +8517,10 @@
+ 
+    gr->storage_bits |= VREND_STORAGE_GL_BUFFER;
+    glGenBuffersARB(1, &gr->gl_id);
++#ifdef __APPLE__
++   struct vrend_apple_buffer_textures apple_textures;
++   vrend_apple_suspend_buffer_textures(&apple_textures);
++#endif
+    glBindBufferARB(gr->target, gr->gl_id);
+ 
+    if (buffer_storage_flags) {
+@@ -8475,12 +8539,18 @@
+                                            GBM_FORMAT_R8, GBM_BO_USE_LINEAR);
+          if (!bo) {
+             virgl_error("Failed to allocate emulated GL buffer backing storage");
++#ifdef __APPLE__
++            vrend_apple_restore_buffer_textures(&apple_textures);
++#endif
+             return;
+          }
+ 
+          ret = virgl_gbm_export_fd(gbm->device, gbm_bo_get_handle(bo).u32, &fd);
+          if (ret || fd < 0) {
+             virgl_error("Failed to get file descriptor\n");
++#ifdef __APPLE__
++            vrend_apple_restore_buffer_textures(&apple_textures);
++#endif
+             return;
+          }
+ 
+@@ -8495,6 +8565,9 @@
+ #endif
+       else {
+          virgl_error("Missing buffer storage and interop extensions\n");
++#ifdef __APPLE__
++         vrend_apple_restore_buffer_textures(&apple_textures);
++#endif
+          return;
+       }
+ 
+@@ -8505,6 +8578,9 @@
+       glBufferData(gr->target, width, NULL, GL_STREAM_DRAW);
+ 
+    glBindBufferARB(gr->target, 0);
++#ifdef __APPLE__
++   vrend_apple_restore_buffer_textures(&apple_textures);
++#endif
+ }
+ 
+ static int
+@@ -9510,12 +9586,18 @@
+    if (has_bit(res->storage_bits, VREND_STORAGE_GL_BUFFER)) {
+       GLuint map_flags = GL_MAP_INVALIDATE_RANGE_BIT | GL_MAP_WRITE_BIT;
+       struct virgl_sub_upload_data d;
++#ifdef __APPLE__
++      struct vrend_apple_buffer_textures apple_textures;
++#endif
+       d.box = info->box;
+       d.target = res->target;
+ 
+       if (!info->synchronized)
+          map_flags |= GL_MAP_UNSYNCHRONIZED_BIT;
+ 
++#ifdef __APPLE__
++      vrend_apple_suspend_buffer_textures(&apple_textures);
++#endif
+       glBindBufferARB(res->target, res->gl_id);
+       data = glMapBufferRange(res->target, info->box->x, info->box->width, map_flags);
+       if (data == NULL) {
+@@ -9526,6 +9608,9 @@
+          glUnmapBuffer(res->target);
+       }
+       glBindBufferARB(res->target, 0);
++#ifdef __APPLE__
++      vrend_apple_restore_buffer_textures(&apple_textures);
++#endif
+    } else {
+       GLenum glformat;
+       GLenum gltype;
+@@ -10762,12 +10847,19 @@
+                                        uint32_t dstx, uint32_t srcx,
+                                        uint32_t width)
+ {
++#ifdef __APPLE__
++   struct vrend_apple_buffer_textures apple_textures;
++   vrend_apple_suspend_buffer_textures(&apple_textures);
++#endif
+    glBindBuffer(GL_COPY_READ_BUFFER, src_res->gl_id);
+    glBindBuffer(GL_COPY_WRITE_BUFFER, dst_res->gl_id);
+ 
+    glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, srcx, dstx, width);
+    glBindBuffer(GL_COPY_READ_BUFFER, 0);
+    glBindBuffer(GL_COPY_WRITE_BUFFER, 0);
++#ifdef __APPLE__
++   vrend_apple_restore_buffer_textures(&apple_textures);
++#endif
+ }
+ 
+ static void vrend_resource_copy_fallback(struct vrend_resource *src_res,
