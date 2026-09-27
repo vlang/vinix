@@ -594,8 +594,9 @@ The second command builds `/root/vinix-desktop`, atomically installs it, and
 signals the compositor to reload the graphical session. The replacement
 session reopens Files and Terminal. The Terminal that ran the build belongs
 to the old session and closes during its orderly teardown. `--no-reload`
-leaves the current session running. Once the replacement desktop is ready,
-its new Terminal reports the total build and relaunch time in seconds.
+leaves the current session running. During that teardown its visible rows and
+scrollback are saved, so the replacement Terminal restores the command and
+build output before reporting the total build and relaunch time in seconds.
 
 On a `gpu+` QEMU boot, the same command reloads into the native TCC-built
 software presenter. The `gpu+` indicator returns on the next GPU boot, which

@@ -226,6 +226,7 @@ grep -Fqx 'existing desktop' "$work/vinix-desktop"
 cat > "$work/bin/vinix-desktop-reload" <<'EOF'
 #!/bin/sh
 printf '%s\n' "$VINIX_DESKTOP_REBUILD_STARTED" > "$VINIX_DESKTOP_TEST_STARTED"
+printf '%s\n' "$VINIX_DESKTOP_REBUILD_SHELL" > "$VINIX_DESKTOP_TEST_SHELL"
 printf '%s\n' "$1" > "$VINIX_DESKTOP_TEST_RELOAD_OUTPUT"
 EOF
 chmod 755 "$work/bin/vinix-desktop-reload"
@@ -244,9 +245,11 @@ VINIX_DESKTOP_TEST_VFLAGS="$work/vflags" \
 VINIX_DESKTOP_TEST_TCC_ARGS="$work/tcc-args" \
 VINIX_DESKTOP_TEST_V_ARGS="$work/v-args" \
 VINIX_DESKTOP_TEST_STARTED="$work/rebuild-started" \
+VINIX_DESKTOP_TEST_SHELL="$work/rebuild-shell" \
 VINIX_DESKTOP_TEST_RELOAD_OUTPUT="$work/reload-output" \
 	"$repo/build-support/vinix-desktop-build" >/dev/null
 grep -Fqx '1000.00' "$work/rebuild-started"
+grep -Eq '^[1-9][0-9]*$' "$work/rebuild-shell"
 grep -Fqx "$work/vinix-desktop" "$work/reload-output"
 
 echo "PASS desktop build helper source selection and host staging"

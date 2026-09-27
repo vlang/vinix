@@ -68,12 +68,18 @@ if [ "$#" -ne 1 ]; then
 fi
 rebuild_notice=/run/vinix-desktop-rebuild
 rebuild_notice_temp="$rebuild_notice.new.$$"
+rebuild_snapshot=/run/vinix-desktop-rebuild-terminal
 rebuild_started=${VINIX_DESKTOP_REBUILD_STARTED:-}
+rebuild_shell=${VINIX_DESKTOP_REBUILD_SHELL:-}
+# A matching Terminal writes a fresh snapshot during the orderly shutdown.
+# Clear any abandoned snapshot before publishing the marker that authorizes it.
+rm -f "$rebuild_snapshot" 2>/dev/null || true
 if [ -n "$rebuild_started" ]; then
 	# The fresh Terminal is a different process from the one running the build.
-	# Hand it the start time and this compositor's PID. The PID stops a later
-	# session from reporting a stale result left by a failed restart.
-	printf '%s %s\n' "$1" "$rebuild_started" > "$rebuild_notice_temp"
+	# Hand the old and new clients the compositor PID, start time, and initiating
+	# shell. The PIDs stop an unrelated Terminal or later session from consuming
+	# a stale result left by a failed restart.
+	printf '%s %s %s\n' "$1" "$rebuild_started" "$rebuild_shell" > "$rebuild_notice_temp"
 	mv -f "$rebuild_notice_temp" "$rebuild_notice"
 else
 	rm -f "$rebuild_notice" 2>/dev/null || true
@@ -83,6 +89,6 @@ fi
 # this through PID 1 made the old process exit first, which briefly restored
 # the full kernel boot console and looked like a machine crash/reboot.
 if ! kill -HUP "$1"; then
-	rm -f "$rebuild_notice" "$rebuild_notice_temp" 2>/dev/null || true
+	rm -f "$rebuild_notice" "$rebuild_notice_temp" "$rebuild_snapshot" 2>/dev/null || true
 	exit 1
 fi

@@ -71,7 +71,9 @@ const terminal_row_height = 16
 const terminal_column_width = 8
 const terminal_padding = 8
 const terminal_rebuild_notice_path = '/run/vinix-desktop-rebuild'
+const terminal_rebuild_snapshot_path = '/run/vinix-desktop-rebuild-terminal'
 const terminal_rebuild_notice_max_age_ms = u64(600_000)
+const terminal_rebuild_snapshot_max_bytes = u64(1024 * 1024)
 
 struct TerminalApp {
 mut:
@@ -138,6 +140,11 @@ fn open_terminal(mut _ Desktop) !NativeApp {
 
 // The shell that ran vinix-desktop-build exits with the old session. Its
 // replacement Terminal consumes the result after the new compositor is ready.
+struct TerminalRebuildRecord {
+	started_ms u64
+	shell_pid  int = -1
+}
+
 fn terminal_rebuild_uptime_ms(value string) ?u64 {
 	parts := value.split('.')
 	if parts.len != 2 || parts[0].len == 0 || parts[0].len > 10 || parts[1].len != 2 {
@@ -151,17 +158,51 @@ fn terminal_rebuild_uptime_ms(value string) ?u64 {
 	return parts[0].u64() * 1000 + parts[1].u64() * 10
 }
 
-fn terminal_rebuild_message(record string, compositor_pid int, now_ms u64) string {
+fn terminal_rebuild_record(record string, compositor_pid int, now_ms u64) ?TerminalRebuildRecord {
 	fields := record.trim_space().split(' ')
-	if fields.len != 2 || fields[0].int() != compositor_pid || compositor_pid <= 0
+	if (fields.len != 2 && fields.len != 3) || fields[0].int() != compositor_pid
+		|| compositor_pid <= 0
 		|| now_ms == ~u64(0) {
-		return ''
+		return none
 	}
-	started_ms := terminal_rebuild_uptime_ms(fields[1]) or { return '' }
+	started_ms := terminal_rebuild_uptime_ms(fields[1]) or { return none }
 	if started_ms > now_ms || now_ms - started_ms > terminal_rebuild_notice_max_age_ms {
+		return none
+	}
+	shell_pid := if fields.len == 3 { fields[2].int() } else { -1 }
+	if fields.len == 3 && shell_pid <= 0 {
+		return none
+	}
+	return TerminalRebuildRecord{
+		started_ms: started_ms
+		shell_pid:  shell_pid
+	}
+}
+
+fn terminal_rebuild_result(record TerminalRebuildRecord, now_ms u64) string {
+	return 'vinix-desktop has been rebuilt in ${f64(now_ms - record.started_ms) / 1000.0:.2f} seconds\r\n'
+}
+
+fn terminal_rebuild_message(value string, compositor_pid int, now_ms u64) string {
+	record := terminal_rebuild_record(value, compositor_pid, now_ms) or { return '' }
+	return terminal_rebuild_result(record, now_ms)
+}
+
+fn terminal_take_rebuild_snapshot() string {
+	info := desktop_stat(terminal_rebuild_snapshot_path) or { return '' }
+	defer {
+		desktop_unlink(terminal_rebuild_snapshot_path)
+	}
+	if info.is_dir || info.size == 0 || info.size > terminal_rebuild_snapshot_max_bytes {
 		return ''
 	}
-	return 'vinix-desktop has been rebuilt in ${f64(now_ms - started_ms) / 1000.0:.2f} seconds\r\n'
+	mut data := []u8{len: int(info.size)}
+	got := desktop_read_file(terminal_rebuild_snapshot_path, data.data, info.size)
+	if got != i64(info.size) {
+		unsafe { data.free() }
+		return ''
+	}
+	return data.bytestr()
 }
 
 fn terminal_take_rebuild_message() string {
@@ -178,7 +219,87 @@ fn terminal_take_rebuild_message() string {
 	if got == 0 || got >= data.len {
 		return ''
 	}
-	return terminal_rebuild_message(data[..int(got)].bytestr(), C.getppid(), desktop_monotonic_ms())
+	now_ms := desktop_monotonic_ms()
+	record := terminal_rebuild_record(data[..int(got)].bytestr(), C.getppid(), now_ms) or {
+		return ''
+	}
+	snapshot := terminal_take_rebuild_snapshot()
+	result := terminal_rebuild_result(record, now_ms)
+	return snapshot + result
+}
+
+fn terminal_append_snapshot_line(mut output []u8, line string) bool {
+	if u64(output.len + line.len + 2) > terminal_rebuild_snapshot_max_bytes {
+		return false
+	}
+	for ch in line {
+		output << ch
+	}
+	output << `\r`
+	output << `\n`
+	return true
+}
+
+// Flatten the visible main screen and scrollback into ordinary terminal text.
+// The replacement gets a new PTY, so control state cannot safely be retained;
+// the displayed rows are the durable part users need after a self-hosted build.
+fn (a &TerminalApp) rebuild_snapshot() string {
+	if a.alternate_screen || a.rows <= 0 || a.columns <= 0 || a.screen.len == 0 {
+		return ''
+	}
+	mut output := []u8{cap: 16 * 1024}
+	for line in a.lines {
+		if !terminal_append_snapshot_line(mut output, line) {
+			unsafe { output.free() }
+			return ''
+		}
+	}
+	mut last_row := -1
+	for row in 0 .. a.rows {
+		start := row * a.columns
+		for column in 0 .. a.columns {
+			if a.screen[start + column] != ` ` {
+				last_row = row
+				break
+			}
+		}
+	}
+	for row in 0 .. last_row + 1 {
+		line := a.row_string(row)
+		if !terminal_append_snapshot_line(mut output, line) {
+			unsafe { line.free() }
+			unsafe { output.free() }
+			return ''
+		}
+		if line.len > 0 {
+			unsafe { line.free() }
+		}
+	}
+	return output.bytestr()
+}
+
+fn (mut a TerminalApp) preserve_rebuild_snapshot() {
+	if a.pid <= 0 {
+		return
+	}
+	mut data := []u8{len: 96}
+	got := desktop_read_file(terminal_rebuild_notice_path, data.data, u64(data.len))
+	if got <= 0 || got >= data.len {
+		return
+	}
+	record := terminal_rebuild_record(data[..int(got)].bytestr(), C.getppid(),
+		desktop_monotonic_ms()) or { return }
+	if record.shell_pid != a.pid {
+		return
+	}
+	// The reload signal can reach the compositor before its next regular app
+	// poll. Drain the final helper line before taking the screen snapshot.
+	a.poll()
+	snapshot := a.rebuild_snapshot()
+	if snapshot.len > 0 {
+		desktop_write_file(terminal_rebuild_snapshot_path, snapshot.str, u64(snapshot.len))
+		unsafe { snapshot.free() }
+	}
 }
 
 fn terminal_clamp(value int, low int, high int) int {
@@ -896,6 +1017,7 @@ fn (mut a TerminalApp) key_input(text string) {
 }
 
 fn (mut a TerminalApp) close_app() {
+	a.preserve_rebuild_snapshot()
 	if a.terminal >= 0 {
 		desktop_close(a.terminal)
 		a.terminal = -1
@@ -954,9 +1076,9 @@ fn (mut a TerminalApp) build(size ui2.Rect) !ui2.Element {
 			continue
 		}
 		children << ui2.label('', text, ui2.rect(f64(terminal_padding), f64(terminal_padding + row * terminal_row_height), f64(width - 2 * terminal_padding), f64(terminal_row_height)), ui2.TextStyle{
-			color: terminal_text
+			color:       terminal_text
 			font_family: 'mono'
-			size: 13
+			size:        13
 		})
 	}
 
@@ -964,19 +1086,19 @@ fn (mut a TerminalApp) build(size ui2.Rect) !ui2.Element {
 		button := 18
 		right := width - terminal_padding - button
 		children << ui2.button(terminal_action_scroll_up, '-', ui2.rect(f64(right - button - 4), f64(terminal_padding), f64(button), 18), ui2.BoxStyle{
-			bg: terminal_button
+			bg:     terminal_button
 			radius: 4
 		}, ui2.TextStyle{
 			color: terminal_text
-			size: 12
+			size:  12
 			align: .center
 		})
 		children << ui2.button(terminal_action_scroll_down, '+', ui2.rect(f64(right), f64(terminal_padding), f64(button), 18), ui2.BoxStyle{
-			bg: terminal_button
+			bg:     terminal_button
 			radius: 4
 		}, ui2.TextStyle{
 			color: terminal_text
-			size: 12
+			size:  12
 			align: .center
 		})
 	}

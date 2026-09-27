@@ -25,6 +25,14 @@ rm -f "$work/ui/main.v"
 cp "$root/desktop/tools/tests/utilities_test.v" "$work/ui/"
 printf "Module { name: 'utility_tests' }\n" > "$work/ui/v.mod"
 
+# Rebuild handoff owns a one-shot terminal snapshot as well as its elapsed-time
+# record. Keep its parser and row serialization cases isolated from the broad
+# utility suite so this test file does not overlap application catalog changes.
+cp "$root/desktop/tools/tests/terminal_rebuild_test.v" "$work/ui/"
+"$v" -new-compiler -nocache -gc none -manualfree -enable-globals -stats -d ui2_headless \
+    -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/terminal_rebuild_test.v"
+rm -f "$work/ui/terminal_rebuild_test.v"
+
 # The staged Calculator uses ui2's compile-time `$vml` lowering, which is
 # provided by V's current compiler. Keep test and production compilation on
 # the same frontend.

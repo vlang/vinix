@@ -52,6 +52,7 @@ done
 # time across the compositor exec so the replacement Terminal can include its
 # own startup in the reported duration.
 build_started_uptime=
+build_shell_pid=
 if [ "$reload" -eq 1 ]; then
 	uptime_file=${VINIX_DESKTOP_UPTIME_FILE:-/proc/uptime}
 	# Vinix procfs regenerates /proc/uptime on each read. The shell read builtin
@@ -64,6 +65,9 @@ if [ "$reload" -eq 1 ]; then
 		echo "vinix-desktop-build: $uptime_file is empty" >&2
 		exit 1
 	}
+	# The compositor can have several Terminal clients. Remember which shell
+	# launched this command so only its visible screen is restored after reload.
+	build_shell_pid=$PPID
 fi
 
 # The QEMU runner publishes the host checkout through a loopback-only service.
@@ -302,7 +306,9 @@ if [ "$reload" -eq 1 ]; then
 	publish_output
 	# A terminal launched by the old compositor disappears during the orderly
 	# session teardown, so leave the stable copy in place before sending SIGHUP.
-	VINIX_DESKTOP_REBUILD_STARTED=$build_started_uptime vinix-desktop-reload "$output"
+	VINIX_DESKTOP_REBUILD_STARTED=$build_started_uptime \
+		VINIX_DESKTOP_REBUILD_SHELL=$build_shell_pid \
+		vinix-desktop-reload "$output"
 else
 	publish_output
 	echo "vinix-desktop-build: wrote $output"
