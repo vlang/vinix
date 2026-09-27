@@ -9,6 +9,7 @@ ESP_MOUNT=""
 ENABLE_APPLE_GPU=0
 GPU_PROBE_ONLY=0
 USE_MINIMAL_INITRAMFS=0
+USE_SOUND_INITRAMFS=0
 USE_DESKTOP_INITRAMFS=0
 INITRAMFS_COMPRESSED=0
 USE_NATIVE_RESOLUTION=0
@@ -118,8 +119,11 @@ for argument in "$@"; do
             # problem is reading the large module, not the kernel.
             USE_MINIMAL_INITRAMFS=1
             ;;
+        --sound-initramfs)
+            USE_SOUND_INITRAMFS=1
+            ;;
         --help|-h)
-            echo "usage: $0 [--apple-studio-display|--external-display] [--apple-display-hotplug] [--apple-gpu] [--gpu-probe-only] [--apple-dcp] [--apple-battery] [--apple-wifi] [--apple-ans] [--ans-rw=UUID] [--ans-root=UUID] [--all-drivers] [--minimal-initramfs] [--desktop-initramfs] [--no-early-term] [--halt-at=N] [--native-resolution] [--force-fault] <mounted_esp_path>"
+            echo "usage: $0 [--apple-studio-display|--external-display] [--apple-display-hotplug] [--apple-gpu] [--gpu-probe-only] [--apple-dcp] [--apple-battery] [--apple-wifi] [--apple-ans] [--ans-rw=UUID] [--ans-root=UUID] [--all-drivers] [--minimal-initramfs] [--sound-initramfs] [--desktop-initramfs] [--no-early-term] [--halt-at=N] [--native-resolution] [--force-fault] <mounted_esp_path>"
             exit 0
             ;;
         --*)
@@ -145,6 +149,10 @@ if [ "$GPU_PROBE_ONLY" -eq 1 ] && [ "$ENABLE_APPLE_GPU" -ne 1 ]; then
     echo "error: --gpu-probe-only requires --apple-gpu or --all-drivers" >&2
     exit 1
 fi
+if [ "$USE_SOUND_INITRAMFS" -eq 1 ] && { [ "$USE_MINIMAL_INITRAMFS" -eq 1 ] || [ "$USE_DESKTOP_INITRAMFS" -eq 1 ]; }; then
+    echo "error: --sound-initramfs cannot be combined with another initramfs mode" >&2
+    exit 1
+fi
 
 if [ ! -d "$ESP_MOUNT" ]; then
     echo "error: ESP mount path does not exist: $ESP_MOUNT"
@@ -154,6 +162,7 @@ fi
 KERNEL="$SCRIPT_DIR/kernel/bin/vinix"
 INITRAMFS="$SCRIPT_DIR/build-support/init-aarch64/initramfs.tar"
 MINIMAL_INITRAMFS="$SCRIPT_DIR/build-support/init-aarch64/initramfs-minimal.tar"
+SOUND_INITRAMFS="$SCRIPT_DIR/build-support/init-aarch64/initramfs-sound.tar"
 DESKTOP_INITRAMFS="$SCRIPT_DIR/build-support/init-aarch64/initramfs-desktop.tar"
 DESKTOP_INITRAMFS_GZ="$DESKTOP_INITRAMFS.gz"
 LIMINE_VERSION="12.8.0"
@@ -182,6 +191,15 @@ if [ "$USE_MINIMAL_INITRAMFS" -eq 1 ]; then
     fi
     INITRAMFS="$MINIMAL_INITRAMFS"
     echo "using minimal initramfs ($(wc -c < "$INITRAMFS" | tr -d ' ') bytes)"
+fi
+if [ "$USE_SOUND_INITRAMFS" -eq 1 ]; then
+    if [ ! -f "$SOUND_INITRAMFS" ]; then
+        echo "error: sound test initramfs not built: $SOUND_INITRAMFS" >&2
+        echo "hint: run tests/apple-speakers/build-guest.sh" >&2
+        exit 1
+    fi
+    INITRAMFS="$SOUND_INITRAMFS"
+    echo "using sound test initramfs ($(wc -c < "$INITRAMFS" | tr -d ' ') bytes)"
 fi
 
 for f in "$KERNEL" "$INITRAMFS" "$LIMINE_EFI" "$LIMINE_CONF"; do
