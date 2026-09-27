@@ -577,6 +577,27 @@ fn (a &FileBrowserApp) screen_with_sidebar(width int, height int, mut children [
 	return ui2.screen(app_surface, children)
 }
 
+// Finder stripes continue below the last file and keep their parity when the
+// list scrolls. Paint them behind the interactive rows so hover still wins.
+fn files_zebra_background(mut children []ui2.Element, x int, top int, width int, height int, first_row int) {
+	if width <= 0 || height <= 0 {
+		return
+	}
+	children << ui2.view('', ui2.rect(f64(x), f64(top), f64(width), f64(height)), ui2.BoxStyle{
+		bg: files_row_base
+	}, [])
+	for slot := 0; slot * files_row_height < height; slot++ {
+		if (first_row + slot) % 2 == 0 {
+			continue
+		}
+		remaining := height - slot * files_row_height
+		stripe_height := if remaining < files_row_height { remaining } else { files_row_height }
+		children << ui2.view('', ui2.rect(f64(x), f64(top + slot * files_row_height), f64(width), f64(stripe_height)), ui2.BoxStyle{
+			bg: files_row_alt
+		}, [])
+	}
+}
+
 fn (mut a FileBrowserApp) go_up_miller() {
 	if a.columns.len == 0 {
 		a.reset_miller_columns(a.browser.path)
@@ -810,6 +831,8 @@ fn (mut a FileBrowserApp) build(size ui2.Rect) !ui2.Element {
 	if a.active_tag_id >= 0 {
 		return a.build_tag_results(width, height, mut children)
 	}
+	files_zebra_background(mut children, content_left, a.rows_top, content_width, height - a.rows_top,
+		a.browser.scroll)
 
 	if a.browser.error != '' {
 		children << ui2.label('', a.browser.error, ui2.rect(f64(content_left + files_padding), f64(a.rows_top + 8), f64(inner), 20), ui2.TextStyle{
@@ -940,6 +963,8 @@ fn (mut a FileBrowserApp) build_tag_results(width int, height int, mut children 
 	} else {
 		0
 	})
+	files_zebra_background(mut children, content_left, a.rows_top + 26, content_width,
+		height - a.rows_top - 26, a.browser.scroll)
 	for slot := 0; slot < visible; slot++ {
 		row := a.browser.scroll + slot
 		if row >= paths.len { break }
@@ -965,7 +990,7 @@ fn (mut a FileBrowserApp) build_tag_results(width int, height int, mut children 
 		})
 		item << ui2.view('', ui2.rect(f64(content_width - 25), 9, 7, 7), ui2.BoxStyle{ bg: tag.color, radius: 4 }, [])
 		children << ui2.clickable_view('${files_action_tag_row}${row}', ui2.rect(f64(content_left), f64(a.rows_top + 26 + slot * files_row_height), f64(content_width), files_row_height), ui2.BoxStyle{
-			bg: if slot % 2 == 0 { body_panel } else { app_surface }
+			transparent: true
 		}, item)
 	}
 	if paths.len > visible {

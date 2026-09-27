@@ -97,6 +97,8 @@ const battery_graph_rule = u32(0xdde3e9)
 // ── File browser ───────────────────────────────────────────────────
 const files_up = u32(0x4a6fa5)
 const files_up_disabled = u32(0xe7eaf0)
+const files_row_base = u32(0xffffff)
+const files_row_alt = u32(0xf4f5f5)
 const files_row_hover = u32(0xeaf1fb)
 const files_error = u32(0xc0392b)
 const files_folder_icon = u32(0x5b8def)
