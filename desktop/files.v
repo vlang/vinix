@@ -45,6 +45,7 @@ mut:
 	// Row the pointer is over, or -1. Kept here rather than in the desktop's
 	// hover state because rows are the application's, not the chrome's.
 	hover_row int = -1
+	selected_row int = -1
 }
 
 // join builds a child path without the doubled slash that string concatenation
@@ -148,6 +149,7 @@ fn (mut b FileBrowser) read(path string) {
 	b.scroll = 0
 	b.error = ''
 	b.hover_row = -1
+	b.selected_row = -1
 }
 
 fn prepare_file_rows(mut entries []FileEntry, action_prefix string) {
@@ -771,7 +773,7 @@ fn (mut a FileBrowserApp) build(size ui2.Rect) !ui2.Element {
 	for index := a.browser.scroll; index < a.browser.entries.len && row < a.visible_rows; index++ {
 		entry := &a.browser.entries[index]
 		y := a.rows_top + row * files_row_height
-		hovered := a.browser.hover_row == index
+		hovered := a.browser.hover_row == index || a.browser.selected_row == index
 		mut row_children := frame_elements(3)
 		row_children << ui2.button_with_image('', '', if entry.is_dir {
 			'builtin:folder'

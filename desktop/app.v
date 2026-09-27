@@ -79,6 +79,7 @@ const available_apps = [
 		width: 700
 		height: 400
 		process_name: 'vinix-files'
+		keyboard: true
 		pointer: true
 		open: open_files_with_context_menu
 	},

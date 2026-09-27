@@ -257,6 +257,7 @@ mut:
 	rename_path       string
 	rename_text       []u8
 	rename_select_all bool
+	preview          FilesQuickLook
 }
 
 fn open_files_with_context_menu(mut _ Desktop) !NativeApp {
@@ -375,6 +376,7 @@ fn (mut a FilesContextApp) select_action(action string) {
 	if action.starts_with(files_action_row) {
 		index := action[files_action_row.len..].int()
 		if index >= 0 && index < a.files.browser.entries.len {
+			a.files.browser.selected_row = index
 			path := create_item_path(a.files.browser.path, a.files.browser.entries[index].name)
 			a.set_context_path(path)
 			unsafe { path.free() }
@@ -382,8 +384,9 @@ fn (mut a FilesContextApp) select_action(action string) {
 		}
 	}
 	if row := parse_miller_row_action(action) {
-		for column in a.files.columns {
+		for column_index, column in a.files.columns {
 			if column.id == row.column_id && row.row >= 0 && row.row < column.browser.entries.len {
+				a.files.columns[column_index].selected_row = row.row
 				path := create_item_path(column.browser.path, column.browser.entries[row.row].name)
 				a.set_context_path(path)
 				unsafe { path.free() }
@@ -467,6 +470,15 @@ fn (a &FilesContextApp) rename_overlay(size ui2.Rect) ?ui2.Element {
 
 fn (mut a FilesContextApp) build(size ui2.Rect) !ui2.Element {
 	root := a.files.build(size)!
+	if a.preview.open {
+		mut children := frame_elements(root.children.len + 1)
+		children << root.children
+		children << a.preview.build(size)
+		return ui2.Element{
+			...root
+			children: children
+		}
+	}
 	if overlay := a.rename_overlay(size) {
 		mut children := frame_elements(root.children.len + 1)
 		children << root.children
@@ -586,6 +598,12 @@ fn (mut a FilesContextApp) rename_key_input(input string) ! {
 }
 
 fn (mut a FilesContextApp) handle(event_id string) ! {
+	if a.preview.open {
+		if event_id == files_quicklook_close {
+			a.preview.close()
+		}
+		return
+	}
 	if event_id.starts_with(files_context_select_prefix) {
 		a.select_action(event_id[files_context_select_prefix.len..])
 		return
@@ -629,6 +647,17 @@ fn (mut a FilesContextApp) handle(event_id string) ! {
 		}
 		else {}
 	}
+	if event_id.starts_with(files_action_row) {
+		index := event_id[files_action_row.len..].int()
+		if index >= 0 && index < a.files.browser.entries.len {
+			a.select_action(event_id)
+		}
+	} else if parse_miller_row_action(event_id) != none {
+		a.select_action(event_id)
+	} else if event_id == files_action_up || event_id == files_action_view_list
+		|| event_id == files_action_view_columns || event_id.starts_with('files.location.') {
+		a.clear_context_path()
+	}
 	a.files.handle(event_id)!
 }
 
@@ -638,7 +667,21 @@ fn (mut a FilesContextApp) pointer_input_enabled() bool {
 
 fn (mut a FilesContextApp) pointer_event(phase AppPointerPhase, button AppPointerButton,
 	scroll int, x int, y int, width int, height int) {
+	if a.preview.open {
+		if phase == .scroll {
+			a.preview.scroll_by(-scroll * 3, height)
+		}
+		return
+	}
 	a.files.pointer_event(phase, button, scroll, x, y, width, height)
+}
+
+fn (mut a FilesContextApp) key_input(input string) {
+	a.quicklook_key_input(input)
+}
+
+fn (mut a FilesContextApp) close_app() {
+	a.preview.close()
 }
 
 fn (mut d Desktop) clear_context_item_path() {
