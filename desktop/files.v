@@ -237,7 +237,8 @@ const files_action_up = 'files.up'
 const files_action_row = 'files.row.'
 const files_action_scroll_up = 'files.scroll.up'
 const files_action_scroll_down = 'files.scroll.down'
-const files_action_view_toggle = 'files.view.toggle'
+const files_action_view_list = 'files.view.list'
+const files_action_view_columns = 'files.view.columns'
 const files_action_column_row = 'files.column.row.'
 const files_action_column_scroll_up = 'files.column.scroll.up.'
 const files_action_column_scroll_down = 'files.column.scroll.down.'
@@ -247,6 +248,7 @@ const files_header_height = 38
 const files_padding = 10
 const files_column_header_height = 26
 const files_column_min_width = 200
+const files_view_button_width = 28
 
 enum FilesViewMode {
 	list
@@ -527,10 +529,10 @@ fn (mut a FileBrowserApp) build(size ui2.Rect) !ui2.Element {
 	}
 	mut children := frame_elements(a.visible_rows * rendered_columns + 16)
 
-	// Header: where we are, the way back out, and the optional column view.
+	// Header: where we are, the way back out, and the two view choices.
 	up_width := 40
-	view_width := 64
-	view_x := width - files_padding - view_width
+	view_button_gap := 2
+	view_x := width - files_padding - 2 * files_view_button_width - view_button_gap
 	children << ui2.button(files_action_up, 'Up', ui2.rect(f64(files_padding), 8, f64(up_width), 22), ui2.BoxStyle{
 		bg: if a.current_path() == '/' { files_up_disabled } else { files_up }
 		radius: 5
@@ -539,14 +541,10 @@ fn (mut a FileBrowserApp) build(size ui2.Rect) !ui2.Element {
 		size: 12
 		align: .center
 	})
-	children << ui2.button(files_action_view_toggle, if a.view_mode == .list { 'Columns' } else { 'List' }, ui2.rect(f64(view_x), 8, f64(view_width), 22), ui2.BoxStyle{
-		bg: files_up
-		radius: 5
-	}, ui2.TextStyle{
-		color: app_on_accent
-		size: 11
-		align: .center
-	})
+	children << files_view_button(files_action_view_list, 'List view', 'builtin:list_view',
+		view_x, a.view_mode == .list)
+	children << files_view_button(files_action_view_columns, 'Column view', 'builtin:column_view',
+		view_x + files_view_button_width + view_button_gap, a.view_mode == .columns)
 	path_left := files_padding + up_width + 10
 	path_right := view_x - 8
 	children << ui2.label('', a.current_path(), ui2.rect(f64(path_left), 8, f64(path_right - path_left), 22), ui2.TextStyle{
@@ -637,6 +635,21 @@ fn (mut a FileBrowserApp) build(size ui2.Rect) !ui2.Element {
 	}
 
 	return ui2.screen(app_surface, children)
+}
+
+fn files_view_button(action string, label string, icon string, x int, selected bool) ui2.Element {
+	return ui2.Element{
+		...ui2.button_with_image(action, '', icon, ui2.rect(f64(x), 8, files_view_button_width,
+			22), ui2.BoxStyle{
+			bg:     if selected { files_up } else { body_panel }
+			radius: 5
+		}, ui2.TextStyle{
+			color: if selected { app_on_accent } else { body_text }
+		})
+		tooltip:             label
+		accessibility_label: label
+		accessibility_value: if selected { 'selected' } else { '' }
+	}
 }
 
 fn (mut a FileBrowserApp) build_miller_columns(width int, height int, list_top int, slot_count int, mut children []ui2.Element) !ui2.Element {
@@ -759,8 +772,12 @@ fn (mut a FileBrowserApp) handle(event_id string) ! {
 			}
 			return
 		}
-		files_action_view_toggle {
-			a.set_view_mode(if a.view_mode == .list { .columns } else { .list })
+		files_action_view_list {
+			a.set_view_mode(.list)
+			return
+		}
+		files_action_view_columns {
+			a.set_view_mode(.columns)
 			return
 		}
 		files_action_scroll_up {

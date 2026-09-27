@@ -1109,6 +1109,20 @@ fn (mut d Desktop) draw_builtin_glyph(path string, x int, y int, w int, h int, c
 			d.canvas.draw_line(cx, cy + half, cx - head, cy + half - head, color, 1)
 			d.canvas.draw_line(cx, cy + half, cx + head, cy + half - head, color, 1)
 		}
+		'list_view' {
+			// Finder-style rows: a small item marker followed by its name line.
+			for row in 0 .. 3 {
+				top := cy - 6 + row * 4
+				d.canvas.fill_rect(cx - 7, top, 2, 2, color)
+				d.canvas.fill_rect(cx - 3, top, 10, 2, color)
+			}
+		}
+		'column_view' {
+			// Three adjacent panes read as the browser's Miller columns.
+			d.canvas.stroke_round_rect(cx - 7, cy - 6, 14, 12, 2, color, 255)
+			d.canvas.fill_rect(cx - 3, cy - 5, 1, 10, color)
+			d.canvas.fill_rect(cx + 2, cy - 5, 1, 10, color)
+		}
 
 		// Application and file icons. These are filled shapes rather than
 		// hairlines: they are read at a glance and at whatever size the

@@ -20,6 +20,17 @@ fn files_columns_tree_has_text(element ui2.Element, text string) bool {
 	return false
 }
 
+fn files_columns_tree_has_view_button(element ui2.Element, action string, icon string, selected bool) bool {
+	for child in element.children {
+		if child.id == action {
+			return child.image_path == icon && child.text == ''
+				&& child.accessibility_label != ''
+				&& (child.accessibility_value == 'selected') == selected
+		}
+	}
+	return false
+}
+
 fn files_columns_entry_index(column &MillerColumn, name string) int {
 	for index, entry in column.browser.entries {
 		if entry.name == name {
@@ -63,19 +74,32 @@ fn test_file_browser_miller_columns_follow_directory_selection() {
 	assert app.columns.last().browser.path == os.join_path(root, 'alpha', 'nested')
 
 	// The default 460-pixel Files window has room for two Miller columns. At
-	// the deepest point those are alpha and nested, with List offered as the
-	// way back to the ordinary single-directory view.
+	// the deepest point those are alpha and nested. Both view choices stay
+	// visible, with the active one marked selected.
 	tree := app.build(ui2.rect(0, 0, 460, 330))!
 	assert files_columns_tree_has_text(tree, 'alpha')
 	assert files_columns_tree_has_text(tree, 'nested')
-	assert files_columns_tree_has_text(tree, 'List')
+	assert files_columns_tree_has_view_button(tree, files_action_view_list, 'builtin:list_view',
+		false)
+	assert files_columns_tree_has_view_button(tree, files_action_view_columns, 'builtin:column_view',
+		true)
 	free_tree(tree)
 
-	app.handle(files_action_view_toggle)!
+	app.handle(files_action_view_columns)!
+	assert app.columns.len == 4
+	app.handle(files_action_view_list)!
 	assert app.view_mode == .list
 	assert app.columns.len == 0
 	assert app.browser.path == os.join_path(root, 'alpha', 'nested')
 	assert app.browser.entries.len == 0
+	list_tree := app.build(ui2.rect(0, 0, 460, 330))!
+	assert files_columns_tree_has_view_button(list_tree, files_action_view_list,
+		'builtin:list_view', true)
+	assert files_columns_tree_has_view_button(list_tree, files_action_view_columns,
+		'builtin:column_view', false)
+	free_tree(list_tree)
+	app.handle(files_action_view_list)!
+	assert app.view_mode == .list
 	app.browser.free_entries()
 }
 
