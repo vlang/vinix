@@ -197,6 +197,10 @@ order from the UEFI boot disk, so no decompression step is needed during boot.
 The individual layer builders described below remain available for iterating
 on one component, but are not required for a normal default-image build.
 
+Vinix can also boot another AArch64 Vinix instance through native QEMU system
+emulation. See [docs/qemu-nested.md](docs/qemu-nested.md) for the build, image,
+and launch commands.
+
 ### Develop Vinix desktop inside Vinix
 
 The AArch64 desktop image contains the native V compiler and its matching

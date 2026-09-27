@@ -64,6 +64,7 @@ ASAHI_STAGING="${VINIX_ASAHI_STAGING:-$SCRIPT_DIR/build-aarch64-asahi/staging}"
 HYPRLAND_STAGING="${VINIX_HYPRLAND_STAGING:-$SCRIPT_DIR/build-aarch64-hyprland/staging}"
 BLENDER_NATIVE_STAGING="${VINIX_BLENDER_NATIVE_STAGING:-$SCRIPT_DIR/build-aarch64-blender-native/staging}"
 X86_TRANSLATION_STAGING="${VINIX_X86_TRANSLATION_STAGING:-$SCRIPT_DIR/build-aarch64-x86-translation/staging}"
+QEMU_SYSTEM_STAGING="${VINIX_QEMU_SYSTEM_STAGING:-$SCRIPT_DIR/build-aarch64-qemu-system/staging}"
 GPU_SYSROOT="${VINIX_GPU_SYSROOT:-$SCRIPT_DIR/build-aarch64-x11/sysroot}"
 
 file_size() {
@@ -112,6 +113,7 @@ write_staging_cache_manifest() {
     printf 'minecraft=%s\n' "$WITH_MINECRAFT"
     printf 'asahi=%s\n' "$WITH_ASAHI_GPU"
     printf 'x86=%s\n' "$WITH_X86_TRANSLATION"
+    printf 'qemu_system=%s\n' "$WITH_QEMU_SYSTEM"
     for input in \
         "$BASE_INITRAMFS" "$DEVTOOLS_ARCHIVE" "$SYSROOT" \
         "$PYTHON_STAGING" "$NETWORK_TOOLS_STAGING" "$X11_STAGING" \
@@ -120,6 +122,7 @@ write_staging_cache_manifest() {
         "$MINECRAFT_STAGING" "$ASAHI_STAGING" "$HYPRLAND_STAGING" \
         "$DOOM_STAGING" \
         "$BLENDER_NATIVE_STAGING" "$X86_TRANSLATION_STAGING" \
+        "$QEMU_SYSTEM_STAGING" \
         "$GPU_SYSROOT"; do
         printf '%s=%s\n' "$input" "$(path_generation "$input")"
     done
@@ -147,6 +150,7 @@ merge_staging_tree() {
 MAKE_INITRAMFS=1
 COMPACT_INITRAMFS=0
 WITH_X86_TRANSLATION=0
+WITH_QEMU_SYSTEM=0
 WITH_CHROMIUM=0
 WITH_LIBREOFFICE=0
 WITH_MINECRAFT=0
@@ -160,19 +164,21 @@ for arg in "$@"; do
         --no-initramfs) MAKE_INITRAMFS=0 ;;
         --compact-initramfs) COMPACT_INITRAMFS=1 ;;
         --with-x86-translation) WITH_X86_TRANSLATION=1 ;;
+        --with-qemu-system) WITH_QEMU_SYSTEM=1 ;;
         --with-chromium) WITH_CHROMIUM=1 ;;
         --with-libreoffice) WITH_LIBREOFFICE=1 ;;
         --with-minecraft) WITH_MINECRAFT=1 ;;
         --with-asahi-gpu) WITH_ASAHI_GPU=1 ;;
         --wifi-bundle=*) WIFI_BUNDLE="${arg#*=}" ;;
         --help|-h)
-            echo "usage: $0 [--no-initramfs] [--compact-initramfs] [--with-chromium] [--with-libreoffice] [--with-minecraft] [--with-asahi-gpu] [--with-x86-translation] [--wifi-bundle=DIR]"
+            echo "usage: $0 [--no-initramfs] [--compact-initramfs] [--with-chromium] [--with-libreoffice] [--with-minecraft] [--with-asahi-gpu] [--with-x86-translation] [--with-qemu-system] [--wifi-bundle=DIR]"
             echo "  --compact-initramfs stages the desktop, core developer tools and Firefox"
             echo "  --with-chromium adds a previously staged Chromium; otherwise it is a pkg install"
             echo "  --with-libreoffice adds a previously staged LibreOffice; otherwise it is a pkg install"
             echo "  --with-minecraft adds a previously staged Minecraft; otherwise it is a pkg install"
             echo "  --with-asahi-gpu overlays the Apple GPU Mesa; only correct for an M1 image"
             echo "  --with-x86-translation adds a previously built x86/Wine runtime"
+            echo "  --with-qemu-system adds native QEMU and UEFI firmware for nested Vinix"
             echo "  --wifi-bundle stages a package.py output and loads it before the desktop"
             echo "  VINIX_REFRESH_DESKTOP_STAGING=1 discards the cached assembled layers"
             echo "  VINIX_AARCH64_APP_CACHE changes the persistent desktop binary cache"
@@ -194,8 +200,8 @@ case "$REFRESH_STAGING" in
 esac
 
 if [ "$MAKE_INITRAMFS" -eq 0 ] &&
-   { [ -n "$WIFI_BUNDLE" ] || [ "$WITH_X86_TRANSLATION" -eq 1 ]; }; then
-    echo "ERROR: --wifi-bundle and --with-x86-translation require initramfs generation" >&2
+   { [ -n "$WIFI_BUNDLE" ] || [ "$WITH_X86_TRANSLATION" -eq 1 ] || [ "$WITH_QEMU_SYSTEM" -eq 1 ]; }; then
+    echo "ERROR: --wifi-bundle, --with-x86-translation and --with-qemu-system require initramfs generation" >&2
     exit 1
 fi
 
@@ -590,6 +596,14 @@ if [ "$WITH_X86_TRANSLATION" -eq 1 ] &&
     echo "Run ./build-x86-translation-aarch64.sh first." >&2
     exit 1
 fi
+if [ "$WITH_QEMU_SYSTEM" -eq 1 ] &&
+   { [ ! -x "$QEMU_SYSTEM_STAGING/usr/bin/qemu-system-aarch64" ] ||
+     [ ! -x "$QEMU_SYSTEM_STAGING/usr/bin/vinix-qemu" ] ||
+     [ ! -f "$QEMU_SYSTEM_STAGING/usr/share/qemu/edk2-aarch64-code.fd" ]; }; then
+    echo "ERROR: --with-qemu-system needs $QEMU_SYSTEM_STAGING" >&2
+    echo "Run ./build-qemu-system-aarch64.sh first." >&2
+    exit 1
+fi
 
 # `package.py` produces the only supported bundle format. Its manifest binds
 # the opaque vendor files to identity captured from the target, and wifi-ctl
@@ -863,6 +877,11 @@ if [ "$REUSE_STAGING" -eq 0 ]; then
         if [ -f "$office_vsta_metadata" ]; then
             rm -f "$office_vsta_metadata"
         fi
+    fi
+
+    if [ "$WITH_QEMU_SYSTEM" -eq 1 ]; then
+        echo "==> Staging native QEMU system emulator"
+        merge_staging_tree "$QEMU_SYSTEM_STAGING"
     fi
 
     # Hyprland is an optional build layer because its patched Aquamarine library

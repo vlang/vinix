@@ -62,6 +62,7 @@ kernel/tmp.v
 /build-word55-probe/
 *repomix*
 /build-aarch64-docker/
+/build-aarch64-qemu-system/
 /build-aarch64-userland/
 
 # Screenshots stay out of git.
