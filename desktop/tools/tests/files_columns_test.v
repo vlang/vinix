@@ -56,7 +56,9 @@ fn test_file_browser_miller_columns_follow_directory_selection() {
 	assert app.browser.error == ''
 	app.set_view_mode(.columns)
 	assert app.view_mode == .columns
-	assert app.columns.len == 2
+	base_columns := app.columns.len
+	assert base_columns > 2
+	assert app.columns[0].browser.path == '/'
 	assert app.columns.last().browser.path == root
 
 	alpha_column := app.columns.len - 1
@@ -64,7 +66,7 @@ fn test_file_browser_miller_columns_follow_directory_selection() {
 	assert alpha >= 0
 	alpha_action := app.columns.last().browser.entries[alpha].row_action
 	app.handle(alpha_action)!
-	assert app.columns.len == 3
+	assert app.columns.len == base_columns + 1
 	assert app.columns[app.columns.len - 2].selected_row == alpha
 	assert app.columns.last().browser.path == os.join_path(root, 'alpha')
 
@@ -73,7 +75,7 @@ fn test_file_browser_miller_columns_follow_directory_selection() {
 	assert nested >= 0
 	nested_action := app.columns.last().browser.entries[nested].row_action
 	app.handle(nested_action)!
-	assert app.columns.len == 4
+	assert app.columns.len == base_columns + 2
 	assert app.columns.last().browser.path == os.join_path(root, 'alpha', 'nested')
 
 	// The full selected path stays visible above the columns. The scrollbar
@@ -122,7 +124,7 @@ fn test_file_browser_miller_columns_follow_directory_selection() {
 	assert app.column_offset == app.max_column_offset()
 
 	app.handle(files_action_view_columns)!
-	assert app.columns.len == 4
+	assert app.columns.len == base_columns + 2
 	app.handle(files_action_view_list)!
 	assert app.view_mode == .list
 	assert app.columns.len == 0

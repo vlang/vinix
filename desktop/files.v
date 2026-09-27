@@ -391,19 +391,25 @@ fn (mut a FileBrowserApp) reset_miller_columns(path string) {
 	a.column_offset = 0
 	a.reveal_last_column = true
 	a.reveal_path_end = true
-	if path == '/' {
-		a.columns << a.new_miller_column(path.clone())
-		return
+	mut paths := []string{}
+	mut ancestor := path.clone()
+	for {
+		paths << ancestor
+		if ancestor == '/' {
+			break
+		}
+		ancestor = parent_path(ancestor).clone()
 	}
-	parent := parent_path(path)
-	parent_owned := parent.clone()
-	a.columns << a.new_miller_column(parent_owned)
-	name := file_path_name(path)
-	selected := a.find_miller_entry(0, name)
-	if selected >= 0 {
-		a.columns[0].selected_row = selected
+	for index := paths.len - 1; index >= 0; index-- {
+		if a.columns.len > 0 {
+			parent_index := a.columns.len - 1
+			a.columns[parent_index].selected_row = a.find_miller_entry(parent_index,
+				file_path_name(paths[index]))
+		}
+		// []string.free() releases its elements; columns keep separate copies.
+		a.columns << a.new_miller_column(paths[index].clone())
 	}
-	a.columns << a.new_miller_column(path.clone())
+	unsafe { paths.free() }
 }
 
 fn (mut a FileBrowserApp) set_view_mode(mode FilesViewMode) {
