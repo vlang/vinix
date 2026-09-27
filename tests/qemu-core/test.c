@@ -153,6 +153,150 @@ static int test_cow(void)
 	return 0;
 }
 
+static int test_partial_munmap_reclaims_pages(void)
+{
+	const size_t size = 32UL * 1024 * 1024;
+	const size_t hole = 16UL * 1024 * 1024;
+	struct sysinfo before, populated, after_hole, after_all;
+	CHECK(sysinfo(&before) == 0);
+	unsigned char *area = mmap(NULL, size, PROT_READ | PROT_WRITE,
+	    MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+	CHECK(area != MAP_FAILED);
+	for (size_t offset = 0; offset < size; offset += 16384)
+		area[offset] = 0x5a;
+	CHECK(sysinfo(&populated) == 0);
+	CHECK(populated.freeram + 24UL * 1024 * 1024 <= before.freeram);
+	CHECK(munmap(area + 8UL * 1024 * 1024, hole) == 0);
+	CHECK(sysinfo(&after_hole) == 0);
+	CHECK(after_hole.freeram >= populated.freeram + 12UL * 1024 * 1024);
+	CHECK(area[0] == 0x5a && area[size - 16384] == 0x5a);
+	CHECK(munmap(area, 8UL * 1024 * 1024) == 0);
+	CHECK(munmap(area + 24UL * 1024 * 1024, 8UL * 1024 * 1024) == 0);
+	CHECK(sysinfo(&after_all) == 0);
+	CHECK(after_all.freeram + 8UL * 1024 * 1024 >= before.freeram);
+
+	/* A parent's partial unmap must retain pages still covered by a forked
+	 * shared local. The child reads them after the parent's range changed. */
+	int ready[2];
+	CHECK(pipe(ready) == 0);
+	unsigned char *shared = mmap(NULL, 4 * 16384, PROT_READ | PROT_WRITE,
+	    MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+	CHECK(shared != MAP_FAILED);
+	shared[0] = 0x31;
+	shared[3 * 16384] = 0x73;
+	pid_t child = fork();
+	CHECK(child >= 0);
+	if (child == 0) {
+		char signal;
+		close(ready[1]);
+		if (read(ready[0], &signal, 1) != 1)
+			_exit(1);
+		_exit(shared[0] == 0x31 && shared[3 * 16384] == 0x73 ? 0 : 1);
+	}
+	CHECK(close(ready[0]) == 0);
+	CHECK(munmap(shared, 16384) == 0);
+	CHECK(write(ready[1], "x", 1) == 1);
+	CHECK(close(ready[1]) == 0);
+	CHECK(reap_ok(child) == 0);
+	CHECK(shared[3 * 16384] == 0x73);
+	CHECK(munmap(shared + 16384, 3 * 16384) == 0);
+	puts("QEMU CORE PASS: partial unmap reclaims pages and retains forked shares");
+	return 0;
+}
+
+static int test_madvise_reclaims_anonymous_pages(void)
+{
+	const size_t size = 32UL * 1024 * 1024;
+	struct sysinfo populated, discarded;
+	volatile unsigned char *area = mmap(NULL, size, PROT_READ | PROT_WRITE,
+	    MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+	CHECK(area != MAP_FAILED);
+	for (size_t offset = 0; offset < size; offset += 16384)
+		area[offset] = 0x5a;
+	CHECK(sysinfo(&populated) == 0);
+	CHECK(madvise((void *)area, size, MADV_DONTNEED) == 0);
+	CHECK(sysinfo(&discarded) == 0);
+	CHECK(discarded.freeram >= populated.freeram + 24UL * 1024 * 1024);
+	CHECK(area[0] == 0 && area[size - 16384] == 0);
+	CHECK(munmap((void *)area, size) == 0);
+
+	/* Discarding a fork child's private page releases only its reference. */
+	area = mmap(NULL, 16384, PROT_READ | PROT_WRITE,
+	    MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+	CHECK(area != MAP_FAILED);
+	area[0] = 0x73;
+	pid_t child = fork();
+	CHECK(child >= 0);
+	if (child == 0) {
+		if (madvise((void *)area, 16384, MADV_DONTNEED) != 0)
+			_exit(1);
+		_exit(area[0] == 0 ? 0 : 1);
+	}
+	CHECK(reap_ok(child) == 0);
+	CHECK(area[0] == 0x73);
+	CHECK(munmap((void *)area, 16384) == 0);
+	puts("QEMU CORE PASS: madvise returns anonymous pages to the allocator");
+	return 0;
+}
+
+static int test_short_lived_process_memory_reclamation(void)
+{
+	struct sysinfo before, after;
+	CHECK(sysinfo(&before) == 0);
+	for (int attempt = 0; attempt < 16; ++attempt) {
+		pid_t child = fork();
+		CHECK(child >= 0);
+		if (child == 0) {
+			const size_t size = 32UL * 1024 * 1024;
+			volatile unsigned char *area = mmap(NULL, size,
+			    PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+			if (area == MAP_FAILED)
+				_exit(1);
+			for (size_t offset = 0; offset < size; offset += 16384)
+				area[offset] = 0x5a;
+			if (attempt & 1) {
+				char *const argv[] = {"/sbin/init", "--exec-memory-probe", NULL};
+				execv(argv[0], argv);
+				_exit(1);
+			}
+			_exit(0);
+		}
+		CHECK(reap_ok(child) == 0);
+	}
+	CHECK(sysinfo(&after) == 0);
+	CHECK(after.freeram + 32UL * 1024 * 1024 >= before.freeram);
+	puts("QEMU CORE PASS: exit and exec reclaim process mappings");
+	return 0;
+}
+
+static int test_forked_cow_memory_reclamation(void)
+{
+	const size_t size = 32UL * 1024 * 1024;
+	volatile unsigned char *area = mmap(NULL, size, PROT_READ | PROT_WRITE,
+	    MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+	CHECK(area != MAP_FAILED);
+	for (size_t offset = 0; offset < size; offset += 16384)
+		area[offset] = 0x31;
+	struct sysinfo before, after;
+	CHECK(sysinfo(&before) == 0);
+	for (int attempt = 0; attempt < 16; ++attempt) {
+		pid_t child = fork();
+		CHECK(child >= 0);
+		if (child == 0) {
+			for (size_t offset = 0; offset < size; offset += 16384)
+				area[offset] = 0x73;
+			_exit(0);
+		}
+		CHECK(reap_ok(child) == 0);
+	}
+	CHECK(sysinfo(&after) == 0);
+	CHECK(after.freeram + 32UL * 1024 * 1024 >= before.freeram);
+	CHECK(area[0] == 0x31 && area[size - 16384] == 0x31);
+	CHECK(munmap((void *)area, size) == 0);
+	puts("QEMU CORE PASS: forked copy-on-write pages are reclaimed");
+	return 0;
+}
+
 static int test_default_terminating_signals(void)
 {
 	pid_t child = fork();
@@ -1053,6 +1197,10 @@ static int run_tests(void)
 	 * being exercised. */
 	CHECK(test_large_pipe_progress() == 0);
 	CHECK(test_cow() == 0);
+	CHECK(test_partial_munmap_reclaims_pages() == 0);
+	CHECK(test_madvise_reclaims_anonymous_pages() == 0);
+	CHECK(test_short_lived_process_memory_reclamation() == 0);
+	CHECK(test_forked_cow_memory_reclamation() == 0);
 	CHECK(test_interrupted_nanosleep_remaining() == 0);
 	CHECK(test_anonymous_ipc_memory_reclamation() == 0);
 	CHECK(test_socket_interface_box_reclamation() == 0);
@@ -1096,8 +1244,10 @@ static int run_tests(void)
 	return 0;
 }
 
-int main(void)
+int main(int argc, char **argv)
 {
+	if (argc == 2 && strcmp(argv[1], "--exec-memory-probe") == 0)
+		return 0;
 	setbuf(stdout, NULL);
 	setbuf(stderr, NULL);
 	if (getpid() != 1)

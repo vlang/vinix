@@ -902,10 +902,21 @@ pub fn resolve_cow_fault(_pagemap &memory.Pagemap, address u64) bool {
 	if _ := pagemap.user_page_phys(virt, true) {
 		return true
 	}
+	if _ := unshare_private_page_unlocked(mut pagemap, local_range, virt, old_phys, true) {
+		return true
+	}
+	return false
+}
+
+// A kernel write to a private anonymous mapping must also break fork's
+// sharing. The caller holds the pagemap lock and supplies the mapped page.
+fn unshare_private_page_unlocked(mut pagemap memory.Pagemap, local_range &MmapRangeLocal, virt u64, old_phys u64, writable bool) ?u64 {
 	flags := page_table_flags(local_range.prot, local_range.global.pte_extra, true)
 	if memory.pmm_refcount(voidptr(old_phys)) <= 1 {
-		pagemap.flag_page(virt, flags) or { return false }
-		return true
+		if writable {
+			pagemap.flag_page(virt, flags) or { return none }
+		}
+		return old_phys
 	}
 
 	// A private copy is written by, and then read by, the thread taking this
@@ -913,7 +924,7 @@ pub fn resolve_cow_fault(_pagemap &memory.Pagemap, address u64) bool {
 	// page it was copied from.
 	new_page := numa.alloc_user_page_nozero()
 	if new_page == unsafe { nil } {
-		return false
+		return none
 	}
 	unsafe {
 		C.memcpy(voidptr(u64(new_page) + higher_half), voidptr(old_phys + higher_half), page_size)
@@ -921,14 +932,15 @@ pub fn resolve_cow_fault(_pagemap &memory.Pagemap, address u64) bool {
 	shadow_flags := memory.pte_present | memory.pte_writable | memory.pte_noexec
 	local_range.global.shadow_pagemap.map_page(virt, u64(new_page), shadow_flags) or {
 		memory.pmm_free(new_page, 1)
-		return false
+		return none
 	}
-	pagemap.map_page_unlocked(virt, u64(new_page), flags) or {
+	pagemap.map_page_unlocked(virt, u64(new_page), page_table_flags(local_range.prot,
+		local_range.global.pte_extra, writable)) or {
 		memory.pmm_free(new_page, 1)
-		return false
+		return none
 	}
 	memory.pmm_free(voidptr(old_phys), 1)
-	return true
+	return u64(new_page)
 }
 
 pub fn map_range(mut pagemap memory.Pagemap, _virt_addr u64, phys_addr u64, _length u64, prot int, _flags int) ? {
@@ -1638,6 +1650,47 @@ pub fn munmap_unlocked(mut pagemap memory.Pagemap, addr voidptr, _length u64) ? 
 	munmap_unlocked_impl(mut pagemap, addr, _length, true)?
 }
 
+// A split or a fork can keep a global range alive after one local stops
+// covering a page. Its shadow mapping must not keep that page alive on its
+// own. The caller holds range_locals_lock while changing the locals and
+// reclaiming their newly uncovered pages, so another process cannot remove
+// the last local (and destroy the global) in the middle of the walk.
+fn reclaim_uncovered_shadow_pages_locked(mut global_range MmapRangeGlobal, begin u64, end u64,
+	flags int) {
+	mut cursor := begin
+	for cursor < end {
+		global_range.shadow_pagemap.l.acquire()
+		page := global_range.shadow_pagemap.next_present(cursor, end)
+		if page == end {
+			global_range.shadow_pagemap.l.release()
+			break
+		}
+		cursor = page + page_size
+		mut covered := false
+		for local in global_range.locals {
+			if page >= local.base && page < local.base + local.length {
+				covered = true
+				break
+			}
+		}
+		if covered {
+			global_range.shadow_pagemap.l.release()
+			continue
+		}
+		phys := global_range.shadow_pagemap.virt2phys(page) or {
+			global_range.shadow_pagemap.l.release()
+			continue
+		}
+		global_range.shadow_pagemap.unmap_page_unlocked(page) or {
+			global_range.shadow_pagemap.l.release()
+			continue
+		}
+		global_range.shadow_pagemap.l.release()
+		file_page := u64(global_range.offset) / page_size + (page - global_range.base) / page_size
+		release_range_page(global_range, page, file_page, voidptr(phys), flags)
+	}
+}
+
 fn munmap_unlocked_impl(mut pagemap memory.Pagemap, addr voidptr, _length u64,
 	enforce_immutable bool) ? {
 	if _length == 0 {
@@ -1707,6 +1760,8 @@ fn munmap_unlocked_impl(mut pagemap memory.Pagemap, addr voidptr, _length u64,
 			last := global_range.locals.len == 1
 			if !last {
 				global_range.locals.delete(global_range.locals.index(local_range))
+				reclaim_uncovered_shadow_pages_locked(mut global_range, snip_begin, snip_end,
+					local_range.flags)
 			}
 			range_locals_lock.release()
 			if last {
@@ -1740,11 +1795,15 @@ fn munmap_unlocked_impl(mut pagemap memory.Pagemap, addr voidptr, _length u64,
 			remove_range_unlocked(mut pagemap, local_range)
 			unsafe { free(local_range) }
 		} else {
+			range_locals_lock.acquire()
 			if snip_begin == local_range.base {
 				local_range.offset += i64(snip_size)
 				local_range.base = snip_end
 			}
 			local_range.length -= snip_size
+			reclaim_uncovered_shadow_pages_locked(mut global_range, snip_begin, snip_end,
+				local_range.flags)
+			range_locals_lock.release()
 		}
 	}
 }

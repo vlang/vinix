@@ -27,6 +27,10 @@ FAIL_MARKERS = (
 FEATURE_MARKERS = (
     b"QEMU CORE PASS: secure getrandom",
     b"QEMU CORE PASS: copy-on-write fork",
+    b"QEMU CORE PASS: partial unmap reclaims pages and retains forked shares",
+    b"QEMU CORE PASS: madvise returns anonymous pages to the allocator",
+    b"QEMU CORE PASS: exit and exec reclaim process mappings",
+    b"QEMU CORE PASS: forked copy-on-write pages are reclaimed",
     b"QEMU CORE PASS: default signal dispositions",
     b"QEMU CORE PASS: interrupted nanosleep returns a relative remainder",
     b"QEMU CORE PASS: anonymous IPC buffers are reclaimed",

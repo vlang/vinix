@@ -245,25 +245,33 @@ pub fn syscall_mincore(_ voidptr, address u64, length u64, vec u64) (u64, u64) {
 // madvise(addr, length, advice).
 //
 // MADV_DONTNEED and MADV_FREE promise that the next read of an anonymous page
-// gives back zeroes. Resident pages are zeroed in place; sparse large mappings
-// stay absent and the fault path supplies a fresh zeroed page on first access.
+// gives back zeroes. Discard whole resident pages so a process can actually
+// return memory; a translated guest's partial 4 KiB discard clears only that
+// part of its 16 KiB host page. Sparse mappings stay absent.
 // Every other advice is a hint with nothing to do.
 pub fn syscall_madvise(_ voidptr, address u64, length u64, advice int) (u64, u64) {
-	if address % page_size != 0 {
+	mut process := proc.current_thread().process
+	mut pagemap := process.pagemap
+	// QEMU's x86 guests discard 4 KiB pages even though Vinix maps 16 KiB
+	// host pages. Accept that alignment for the translators and clear only
+	// the requested subpage so adjacent guest pages keep their contents.
+	guest_page_size := if process.executable_path == '/usr/bin/qemu-x86_64'
+		|| process.executable_path == '/usr/bin/qemu-i386' { u64(4096) } else { page_size }
+	if address % guest_page_size != 0 {
 		return errno.err, errno.einval
 	}
 	if advice != madv_dontneed && advice != madv_free {
 		return 0, 0
 	}
-
-	mut process := proc.current_thread().process
-	mut pagemap := process.pagemap
-
-	pages := lib.div_roundup(length, page_size)
-	aligned_length := pages * page_size
-	if pages != 0 && aligned_length / page_size != pages {
+	if length > u64(-1) - (guest_page_size - 1) {
 		return errno.err, errno.einval
 	}
+	aligned_length := lib.align_up(length, guest_page_size)
+	if address > u64(-1) - aligned_length {
+		return errno.err, errno.einval
+	}
+
+	end := address + aligned_length
 
 	pagemap.l.acquire()
 	defer {
@@ -273,16 +281,49 @@ pub fn syscall_madvise(_ voidptr, address u64, length u64, advice int) (u64, u64
 		return errno.err, errno.eperm
 	}
 
-	for i := u64(0); i < pages; i++ {
-		virt := address + i * page_size
-		local_range, _, _ := addr2range(pagemap, virt) or { continue }
-		if local_range.flags & map_anonymous == 0 || local_range.flags & map_shared != 0 {
+	mut virt := address
+	for virt < end {
+		in_page := virt % page_size
+		available := page_size - in_page
+		chunk := if end - virt < available { end - virt } else { available }
+		local_range, _, _ := addr2range(pagemap, virt) or {
+			virt += chunk
 			continue
 		}
-		phys := pagemap.virt2phys(virt) or { continue }
-		unsafe {
-			C.memset(voidptr(phys + higher_half), 0, page_size)
+		if local_range.flags & map_anonymous != 0 && local_range.flags & map_shared == 0 {
+			mut phys := pagemap.virt2phys(virt) or {
+				virt += chunk
+				continue
+			}
+			if in_page == 0 && chunk == page_size {
+				mut global_range := local_range.global
+				global_range.shadow_pagemap.l.acquire()
+				shadow_phys := global_range.shadow_pagemap.virt2phys(virt) or { u64(0) }
+				if shadow_phys == phys {
+					pagemap.unmap_page_unlocked(virt) or {
+						global_range.shadow_pagemap.l.release()
+						return errno.err, errno.einval
+					}
+					global_range.shadow_pagemap.unmap_page_unlocked(virt) or {
+						global_range.shadow_pagemap.l.release()
+						return errno.err, errno.einval
+					}
+					global_range.shadow_pagemap.l.release()
+					memory.pmm_free(voidptr(phys), 1)
+					virt += chunk
+					continue
+				}
+				global_range.shadow_pagemap.l.release()
+			}
+			if local_range.cow {
+				phys = unshare_private_page_unlocked(mut pagemap, local_range,
+					lib.align_down(virt, page_size), phys, false) or { return errno.err, errno.enomem }
+			}
+			unsafe {
+				C.memset(voidptr(phys + higher_half + in_page), 0, chunk)
+			}
 		}
+		virt += chunk
 	}
 
 	return 0, 0
