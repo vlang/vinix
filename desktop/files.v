@@ -766,7 +766,8 @@ fn (mut a FileBrowserApp) build(size ui2.Rect) !ui2.Element {
 	} else {
 		0
 	}
-	a.rows_height = height - a.rows_top - bar_height - files_padding
+	bottom_padding := if a.view_mode == .columns { files_padding } else { 0 }
+	a.rows_height = height - a.rows_top - bar_height - bottom_padding
 	if a.rows_height < files_row_height {
 		a.rows_height = files_row_height
 	}

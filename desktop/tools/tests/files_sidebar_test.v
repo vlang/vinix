@@ -64,3 +64,24 @@ fn test_files_sidebar_locations_and_navigation_in_both_views() {
 	app.browser.free_entries()
 	unsafe { app.browser.path.free() }
 }
+
+fn test_files_list_draws_last_row_that_fits_above_window_bottom() {
+	root := os.join_path(os.temp_dir(), 'vinix-files-last-row-test')
+	os.rmdir_all(root) or {}
+	os.mkdir_all(root) or { panic(err) }
+	defer { os.rmdir_all(root) or {} }
+	for index in 0 .. 14 {
+		os.write_file(os.join_path(root, 'file-${index}.txt'), 'x') or { panic(err) }
+	}
+
+	mut app := FileBrowserApp{}
+	app.browser.read(root.clone())
+	assert app.browser.entries.len == 14
+	tree := app.build(ui2.rect(0, 0, 700, 378))!
+	last := files_sidebar_find(tree, 'files.row.13') or { panic('last visible file row is missing') }
+	assert app.visible_rows == 14
+	assert int(last.frame.y + last.frame.height) <= 378
+	free_tree(tree)
+	app.browser.free_entries()
+	unsafe { app.browser.path.free() }
+}
