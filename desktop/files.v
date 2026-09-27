@@ -383,9 +383,8 @@ fn (mut a FileBrowserApp) find_miller_entry(column int, name string) int {
 	return -1
 }
 
-// Entering column view starts with the current directory and, when possible,
-// its parent. That gives the default two-column window useful context without
-// rereading every ancestor on a deep path.
+// Rebuild the chain from the filesystem root to the current directory so a
+// deep path has its full history available to the horizontal scrollbar.
 fn (mut a FileBrowserApp) reset_miller_columns(path string) {
 	a.free_miller_columns()
 	a.column_offset = 0
@@ -735,7 +734,7 @@ fn files_vertical_scrollbar(x int, y int, height int, visible int, total int, sc
 
 fn (mut a FileBrowserApp) build_miller_columns(width int, height int, mut children []ui2.Element) !ui2.Element {
 	column_width := a.column_width
-	content_left := 0
+	content_left := width - a.viewport_width
 	for column_index := 0; column_index < a.columns.len; column_index++ {
 		local_x := column_index * column_width - a.column_offset
 		if local_x + column_width <= 0 || local_x >= a.viewport_width {
@@ -829,7 +828,7 @@ fn (mut a FileBrowserApp) clamp_scroll() {
 }
 
 fn (mut a FileBrowserApp) scroll_at(x int, y int, steps int, width int) {
-	content_left := 0
+	content_left := width - a.viewport_width
 	if steps == 0 || x < content_left {
 		return
 	}
@@ -892,7 +891,7 @@ fn (mut a FileBrowserApp) begin_vertical_drag(id int, y int, total int, current 
 }
 
 fn (mut a FileBrowserApp) pointer_event(phase AppPointerPhase, button AppPointerButton, scroll int, x int, y int, width int, height int) {
-	content_left := 0
+	content_left := width - a.viewport_width
 	if phase == .scroll {
 		a.scroll_at(x, y, scroll, width)
 		return
