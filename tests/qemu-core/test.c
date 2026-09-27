@@ -776,6 +776,59 @@ static int test_anonymous_ipc_memory_reclamation(void)
 	return 0;
 }
 
+/* Idle sockets must not each reserve a 1 MiB receive buffer. A browser can
+ * keep hundreds of UNIX endpoints open while starting; allocating them all
+ * eagerly exhausted or fragmented the guest before Steam opened a window.
+ * Also exercise FIFO order when a wrapped, partly consumed buffer grows. */
+static int test_unix_socket_buffer_growth(void)
+{
+	struct sysinfo before, after;
+	int pairs[16][2];
+	CHECK(sysinfo(&before) == 0);
+	for (int i = 0; i < 16; ++i)
+		CHECK(socketpair(AF_UNIX, SOCK_STREAM, 0, pairs[i]) == 0);
+	CHECK(sysinfo(&after) == 0);
+	CHECK(after.freeram + 8UL * 1024 * 1024 >= before.freeram);
+	for (int i = 0; i < 16; ++i) {
+		CHECK(close(pairs[i][0]) == 0);
+		CHECK(close(pairs[i][1]) == 0);
+	}
+
+	int pair[2];
+	CHECK(socketpair(AF_UNIX, SOCK_STREAM, 0, pair) == 0);
+	int receive_limit = 0;
+	socklen_t limit_len = sizeof(receive_limit);
+	CHECK(getsockopt(pair[1], SOL_SOCKET, SO_RCVBUF, &receive_limit,
+	    &limit_len) == 0);
+	CHECK(receive_limit == 1024 * 1024);
+	char first[3000], second[6000], received[7000];
+	memset(first, 'A', sizeof(first));
+	memset(second, 'B', sizeof(second));
+	CHECK(write(pair[0], first, sizeof(first)) == (ssize_t)sizeof(first));
+	CHECK(read(pair[1], received, 2000) == 2000);
+	CHECK(memcmp(received, first, 2000) == 0);
+	CHECK(write(pair[0], second, sizeof(second)) == (ssize_t)sizeof(second));
+	CHECK(read(pair[1], received, sizeof(received)) ==
+	    (ssize_t)sizeof(received));
+	CHECK(memcmp(received, first + 2000, 1000) == 0);
+	CHECK(memcmp(received + 1000, second, sizeof(second)) == 0);
+	CHECK(close(pair[0]) == 0);
+	CHECK(close(pair[1]) == 0);
+
+	CHECK(socketpair(AF_UNIX, SOCK_DGRAM, 0, pair) == 0);
+	CHECK(send(pair[0], second, sizeof(second), 0) ==
+	    (ssize_t)sizeof(second));
+	CHECK(recv(pair[1], received, sizeof(received), 0) ==
+	    (ssize_t)sizeof(second));
+	CHECK(memcmp(received, second, sizeof(second)) == 0);
+	CHECK(send(pair[0], "", 0, 0) == 0);
+	CHECK(recv(pair[1], received, sizeof(received), 0) == 0);
+	CHECK(close(pair[0]) == 0);
+	CHECK(close(pair[1]) == 0);
+	puts("QEMU CORE PASS: UNIX receive buffers grow on demand");
+	return 0;
+}
+
 /* V3 makes the V `int` type pointer-width. Linux still defines pollfd.fd as a
  * 32-bit C int, so exercise the structure from a real libc caller: widening
  * the kernel field makes it combine fd/events into one invalid descriptor. */
@@ -977,6 +1030,7 @@ static int run_tests(void)
 	CHECK(test_cow() == 0);
 	CHECK(test_interrupted_nanosleep_remaining() == 0);
 	CHECK(test_anonymous_ipc_memory_reclamation() == 0);
+	CHECK(test_unix_socket_buffer_growth() == 0);
 	CHECK(test_default_terminating_signals() == 0);
 	CHECK(prepare_directory() == 0);
 	CHECK(test_ext2_mapping_and_namespace() == 0);

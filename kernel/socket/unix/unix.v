@@ -177,6 +177,38 @@ fn (this &UnixSocket) nothing_queued() bool {
 	return katomic.load(&this.used) == 0
 }
 
+// Most UNIX sockets carry only a few bytes, and many never carry any. Allocate
+// receive storage when data first arrives, then keep the queued bytes in order
+// when the circular buffer grows. The caller holds this socket's lock.
+fn (mut this UnixSocket) ensure_capacity(needed u64) {
+	if needed <= this.capacity {
+		return
+	}
+	mut new_capacity := if this.capacity == 0 { u64(4096) } else { this.capacity }
+	for new_capacity < needed {
+		new_capacity *= 2
+	}
+	mut new_data := unsafe { &u8(malloc(new_capacity)) }
+	if this.used != 0 {
+		first := if this.used < this.capacity - this.read_ptr {
+			this.used
+		} else {
+			this.capacity - this.read_ptr
+		}
+		unsafe { C.memcpy(new_data, &this.data[this.read_ptr], first) }
+		if this.used > first {
+			unsafe { C.memcpy(&new_data[first], this.data, this.used - first) }
+		}
+	}
+	if this.data != unsafe { nil } {
+		unsafe { free(this.data) }
+	}
+	this.data = new_data
+	this.capacity = new_capacity
+	this.read_ptr = 0
+	this.write_ptr = this.used
+}
+
 // The byte length of the next record to be received, or all buffered bytes for
 // a stream socket that keeps no boundaries.
 fn (this &UnixSocket) next_message_length() u64 {
@@ -535,7 +567,7 @@ pub fn (mut this UnixSocket) write_with_fds(_handle voidptr, buf voidptr, _count
 	// receive buffer can never be delivered whole and must be refused rather
 	// than truncated into a bogus boundary. A peer that has closed has no
 	// buffer left at all; that is EPIPE, below, not a message too long.
-	if peer.is_seqpacket() && _count > peer.capacity && !peer.closed {
+	if peer.is_seqpacket() && _count > sock_buf && !peer.closed {
 		errno.set(errno.emsgsize)
 		return none
 	}
@@ -557,11 +589,11 @@ pub fn (mut this UnixSocket) write_with_fds(_handle voidptr, buf voidptr, _count
 	// Wine relies on this for its writev()-based request protocol and treats a
 	// short request as fatal.  Large writes can still make partial progress once
 	// any room is available, matching the existing stream behaviour.
-	requested_room := if count <= peer.capacity { count } else { u64(1) }
+	requested_room := if count <= sock_buf { count } else { u64(1) }
 	deadline := deadline_after(this.send_timeout_ns)
-	for peer.capacity - katomic.load(&peer.used) < requested_room {
+	for sock_buf - katomic.load(&peer.used) < requested_room {
 		if handle.flags & resource.o_nonblock != 0 {
-			if peer.used == peer.capacity {
+			if peer.used == sock_buf {
 				errno.set(errno.ewouldblock)
 				return none
 			}
@@ -580,13 +612,17 @@ pub fn (mut this UnixSocket) write_with_fds(_handle voidptr, buf voidptr, _count
 		}
 	}
 
-	if peer.used + count > peer.capacity {
-		count = peer.capacity - peer.used
+	if peer.used + count > sock_buf {
+		count = sock_buf - peer.used
 	}
 	if count == 0 && fds.len != 0 {
 		errno.set(errno.eagain)
 		return none
 	}
+	if count == 0 && !peer.is_seqpacket() {
+		return 0
+	}
+	peer.ensure_capacity(if count == 0 { u64(1) } else { peer.used + count })
 
 	// Descriptor rights are attached to the first byte written by this
 	// sendmsg(), after any data already queued on the peer.
@@ -670,7 +706,7 @@ pub fn (mut this UnixSocket) send_datagram(mut target UnixSocket, _handle voidpt
 			errno.set(errno.econnrefused)
 			return none
 		}
-		if target.capacity - target.used >= count {
+		if sock_buf - target.used >= count {
 			break
 		}
 		if handle.flags & resource.o_nonblock != 0 {
@@ -685,6 +721,7 @@ pub fn (mut this UnixSocket) send_datagram(mut target UnixSocket, _handle voidpt
 		}
 		target.l.acquire()
 	}
+	target.ensure_capacity(if count == 0 { u64(1) } else { target.used + count })
 
 	if fds.len != 0 {
 		mut group := PendingFdGroup{
@@ -987,7 +1024,7 @@ fn (mut this UnixSocket) getsockopt(_handle voidptr, level int, optname int) ?in
 			return 0
 		}
 		sock_pub.so_sndbuf, sock_pub.so_rcvbuf {
-			return int(this.capacity)
+			return sock_buf
 		}
 		sock_pub.so_reuseaddr {
 			return this.reuseaddr
@@ -1137,8 +1174,6 @@ fn (mut this UnixSocket) connect(_handle voidptr, _addr voidptr, addrlen u32) ? 
 		connected: true
 		name:      socket.name
 		name_len:  socket.name_len
-		data:      unsafe { malloc(sock_buf) }
-		capacity:  sock_buf
 		status:    file.pollout
 		socktype:  this.socktype
 		owner_pid: socket.owner_pid
@@ -1524,8 +1559,6 @@ pub fn create(@type int) ?&UnixSocket {
 	mut ret := &UnixSocket{
 		refcount:  1
 		peer:      unsafe { nil }
-		data:      unsafe { malloc(sock_buf) }
-		capacity:  sock_buf
 		owner_pid: process.pid
 		owner_uid: process.euid
 		owner_gid: process.egid
@@ -1541,8 +1574,6 @@ pub fn create_pair(@type int) ?(&UnixSocket, &UnixSocket) {
 	mut a := &UnixSocket{
 		refcount:  1
 		peer:      unsafe { nil }
-		data:      unsafe { malloc(sock_buf) }
-		capacity:  sock_buf
 		owner_pid: process.pid
 		owner_uid: process.euid
 		owner_gid: process.egid
@@ -1553,8 +1584,6 @@ pub fn create_pair(@type int) ?(&UnixSocket, &UnixSocket) {
 	mut b := &UnixSocket{
 		refcount:  1
 		peer:      unsafe { nil }
-		data:      unsafe { malloc(sock_buf) }
-		capacity:  sock_buf
 		owner_pid: process.pid
 		owner_uid: process.euid
 		owner_gid: process.egid
