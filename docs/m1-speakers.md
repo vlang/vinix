@@ -19,8 +19,12 @@ Asahi Linux's drivers (`mca.c`, `apple-admac.c`, `clk-apple-nco.c`,
 Everything is taken from the device tree the Asahi boot chain passes on: the
 `Speakers` link of the `apple,j313-macaudio` sound node names the MCA ports
 and the amplifiers, and those lead to the clocks, DMA channels, buses, pins
-and power domains. A device tree without all of it leaves the speakers off,
-and no address is ever guessed.
+and power domains. Some J313 boot trees omit the codecs' shared
+`shutdown-gpios` property. In that case the driver accepts AP GPIO 181 from
+the [Asahi J313 board description](https://github.com/AsahiLinux/linux/blob/asahi/arch/arm64/boot/dts/apple/t8103-j313.dts)
+only after checking the exact codec models, I2C addresses and buses, and
+current and voltage sense slots. Other missing or conflicting wiring leaves
+the speakers off.
 
 - `kernel/apple/speakers/speakers.v`: device tree discovery, power, pins, the
   DART, `/dev/dsp`, and the service thread.

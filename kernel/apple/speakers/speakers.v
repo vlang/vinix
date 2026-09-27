@@ -9,9 +9,10 @@ module speakers
 // Everything is found in the device tree the Asahi boot chain passes on: the
 // "Speakers" link of the apple,j313-macaudio sound node names the MCA ports
 // and the two TAS5770L amplifiers, and those lead to the clocks, DMA
-// channels, I2C buses, pins and power domains. Nothing is guessed: a device
-// tree without all of it leaves the speakers off. The register work and the
-// speaker protection model are in c/apple_speakers.c.
+// channels, I2C buses, pins and power domains. On J313 only, an older boot
+// tree may omit the shared amplifier shutdown GPIO; the published J313 board
+// wiring supplies that one pin after the other codec details are checked.
+// The register work and protection model are in c/apple_speakers.c.
 import aarch64.kio
 import aarch64.pmgr
 import apple.dart
@@ -429,32 +430,59 @@ fn plan_amp(node &devicetree.DTNode, index int, mut plan Plan) string {
 	if reg.len != 1 || reg[0] > 0x7f || imon > 0x3f || vmon > 0x3f {
 		return 'speaker ${index} has no usable address or sense slots'
 	}
-	gpio := devicetree.get_u32_array(node, 'shutdown-gpios') or {
-		return 'speaker ${index} has no shutdown GPIO'
-	}
-	defer { unsafe { gpio.free() } }
-	if gpio.len != 3 || gpio[2] != 0 {
-		return 'speaker ${index} shutdown GPIO is not active-high'
-	}
-	provider := devicetree.find_phandle(gpio[0]) or { return 'speaker GPIO provider missing' }
-	region := gpio_region(provider, gpio[1]) or { return 'speaker GPIO is not an Apple pin' }
-	if index == 0 {
-		plan.gpio = region
-		plan.gpio_pin = gpio[1]
-		if !plan_power(provider, 0, mut plan) {
-			return 'GPIO power domains unusable'
-		}
-	} else if region.base != plan.gpio.base || gpio[1] != plan.gpio_pin {
-		// The two amplifiers share one shutdown line on the J313.
-		return 'the amplifiers do not share one shutdown line'
-	}
 	bus := node.parent
 	if bus == unsafe { nil } || !enabled(bus) || !compatible(bus, 'apple,t8103-i2c')
 		|| devicetree.get_u32(bus, '#address-cells') or { u32(0) } != 1
 		|| devicetree.get_u32(bus, '#size-cells') or { u32(1) } != 0 {
 		return 'speaker ${index} is not on an enabled t8103 I2C bus'
 	}
-	plan.i2c[index] = only_region(bus, 0x30) or { return 'I2C bus ${index} registers unusable' }
+	bus_region := only_region(bus, 0x30) or { return 'I2C bus ${index} registers unusable' }
+	mut provider := &devicetree.DTNode(unsafe { nil })
+	mut gpio_pin := u32(0)
+	if has_property(node, 'shutdown-gpios') {
+		gpio := devicetree.get_u32_array(node, 'shutdown-gpios') or {
+			return 'speaker ${index} shutdown GPIO property is malformed'
+		}
+		defer { unsafe { gpio.free() } }
+		if gpio.len != 3 || gpio[2] != 0 {
+			return 'speaker ${index} shutdown GPIO is not active-high'
+		}
+		provider = devicetree.find_phandle(gpio[0]) or { return 'speaker GPIO provider missing' }
+		gpio_pin = gpio[1]
+	} else {
+		// Some J313 boot trees describe the MCA and both TAS5770L codecs
+		// but omit their common shutdown line. The board DTS specifies AP
+		// GPIO 181. Accept that board wiring only when all the other codec
+		// details and its physical I2C bus match the J313 exactly.
+		expected_address := if index == 0 { u32(0x31) } else { u32(0x34) }
+		expected_bus := if index == 0 { u64(0x235014000) } else { u64(0x23501c000) }
+		expected_imon := if index == 0 { u32(0) } else { u32(4) }
+		expected_vmon := if index == 0 { u32(2) } else { u32(6) }
+		if reg[0] != expected_address || bus_region.base != expected_bus || imon != expected_imon
+			|| vmon != expected_vmon {
+			return 'speaker ${index} has no shutdown GPIO and is not the known J313 codec'
+		}
+		provider = devicetree.find_node('/soc/pinctrl@23c100000') or {
+			return 'J313 AP GPIO controller missing'
+		}
+		gpio_pin = 181
+		println('apple-speakers: speaker ${index} lacks shutdown-gpios; using J313 AP GPIO 181')
+	}
+	region := gpio_region(provider, gpio_pin) or { return 'speaker GPIO is not an Apple pin' }
+	if region.base != 0x23c100000 || gpio_pin != 181 {
+		return 'speaker shutdown GPIO is not J313 AP GPIO 181'
+	}
+	if index == 0 {
+		plan.gpio = region
+		plan.gpio_pin = gpio_pin
+		if !plan_power(provider, 0, mut plan) {
+			return 'GPIO power domains unusable'
+		}
+	} else if region.base != plan.gpio.base || gpio_pin != plan.gpio_pin {
+		// The two amplifiers share one shutdown line on the J313.
+		return 'the amplifiers do not share one shutdown line'
+	}
+	plan.i2c[index] = bus_region
 	clocks := devicetree.get_u32_array(bus, 'clocks') or { return 'I2C bus has no clock' }
 	defer { unsafe { clocks.free() } }
 	if clocks.len != 1 {
