@@ -249,6 +249,30 @@ const files_view_button_width = 28
 const files_horizontal_bar_height = 20
 const files_scrollbar_width = 8
 const files_scrollbar_min_thumb = 20
+const files_sidebar_width = 152
+const files_sidebar_min_window_width = 360
+const files_sidebar_row_height = 29
+
+struct FilesLocation {
+	title  string
+	path   string
+	icon   string
+	action string
+}
+
+const files_locations = [
+	FilesLocation{ title: 'Home', path: desktop_home, icon: 'builtin:home', action: 'files.location.home' },
+	FilesLocation{ title: 'Desktop', path: desktop_directory, icon: 'builtin:desktop', action: 'files.location.desktop' },
+	FilesLocation{ title: 'Documents', path: '${desktop_home}/Documents', icon: 'builtin:documents', action: 'files.location.documents' },
+	FilesLocation{ title: 'Downloads', path: '${desktop_home}/Downloads', icon: 'builtin:downloads', action: 'files.location.downloads' },
+	FilesLocation{ title: 'Pictures', path: '${desktop_home}/Pictures', icon: 'builtin:folder', action: 'files.location.pictures' },
+	FilesLocation{ title: 'Music', path: '${desktop_home}/Music', icon: 'builtin:folder', action: 'files.location.music' },
+	FilesLocation{ title: 'Computer', path: '/', icon: 'builtin:drive', action: 'files.location.computer' },
+]
+
+fn files_content_left(width int) int {
+	return if width >= files_sidebar_min_window_width { files_sidebar_width } else { 0 }
+}
 
 enum FilesViewMode {
 	list
@@ -435,6 +459,72 @@ fn (a &FileBrowserApp) current_path() string {
 	return a.browser.path
 }
 
+fn (mut a FileBrowserApp) navigate_to(path string) {
+	// read() takes ownership on success. Sidebar paths are shared constants.
+	owned := path.clone()
+	a.browser.read(owned)
+	if a.browser.error != '' {
+		unsafe { owned.free() }
+		return
+	}
+	if a.view_mode == .columns {
+		a.reset_miller_columns(path)
+	}
+}
+
+fn (a &FileBrowserApp) sidebar(height int) ui2.Element {
+	mut rows := frame_elements(files_locations.len + 3)
+	rows << ui2.label('', 'Favorites', ui2.rect(14, 10, files_sidebar_width - 28, 20), ui2.TextStyle{
+		color: body_muted
+		size: 11
+		bold: true
+	})
+	for index, location in files_locations {
+		if index == files_locations.len - 1 {
+			rows << ui2.label('', 'Locations', ui2.rect(14, 225, files_sidebar_width - 28, 20), ui2.TextStyle{
+				color: body_muted
+				size: 11
+				bold: true
+			})
+		}
+		y := if index == files_locations.len - 1 { 250 } else { 35 + index * files_sidebar_row_height }
+		if y + files_sidebar_row_height > height {
+			continue
+		}
+		selected := a.current_path() == location.path
+		mut contents := frame_elements(2)
+		contents << ui2.button_with_image('', '', location.icon, ui2.rect(10, 5, 18, 18), ui2.BoxStyle{
+			transparent: true
+		}, ui2.TextStyle{
+			color: files_sidebar_icon
+		})
+		contents << ui2.label('', location.title, ui2.rect(37, 0, files_sidebar_width - 48, files_sidebar_row_height), ui2.TextStyle{
+			color: body_text
+			size: 12
+		})
+		rows << ui2.clickable_view(location.action, ui2.rect(6, f64(y), files_sidebar_width - 12, files_sidebar_row_height), ui2.BoxStyle{
+			bg: files_sidebar_selected
+			radius: 6
+			transparent: !selected
+		}, contents)
+	}
+	return ui2.clickable_view('files.sidebar', ui2.rect(0, files_header_height, files_sidebar_width, f64(height)), ui2.BoxStyle{
+		bg: files_sidebar_bg
+	}, rows)
+}
+
+fn (a &FileBrowserApp) screen_with_sidebar(width int, height int, mut children []ui2.Element) ui2.Element {
+	content_left := files_content_left(width)
+	if content_left > 0 {
+		children << a.sidebar(height - files_header_height)
+		children << ui2.view('', ui2.rect(f64(content_left), files_header_height, 1,
+			f64(height - files_header_height)), ui2.BoxStyle{
+			bg: body_rule
+		}, [])
+	}
+	return ui2.screen(app_surface, children)
+}
+
 fn (mut a FileBrowserApp) go_up_miller() {
 	if a.columns.len == 0 {
 		a.reset_miller_columns(a.browser.path)
@@ -550,7 +640,7 @@ fn (mut a FileBrowserApp) build(size ui2.Rect) !ui2.Element {
 	prepare_file_rows(mut a.browser.entries, files_action_row)
 	width := int(size.width)
 	height := int(size.height)
-	content_left := 0
+	content_left := files_content_left(width)
 	content_width := width - content_left
 	inner := content_width - 2 * files_padding
 	if a.view_mode == .columns && a.columns.len == 0 {
@@ -652,7 +742,7 @@ fn (mut a FileBrowserApp) build(size ui2.Rect) !ui2.Element {
 			color: files_error
 			size: 13
 		})
-		return ui2.screen(app_surface, children)
+		return a.screen_with_sidebar(width, height, mut children)
 	}
 
 	if a.browser.entries.len == 0 {
@@ -660,7 +750,7 @@ fn (mut a FileBrowserApp) build(size ui2.Rect) !ui2.Element {
 			color: body_muted
 			size: 13
 		})
-		return ui2.screen(app_surface, children)
+		return a.screen_with_sidebar(width, height, mut children)
 	}
 
 	// Rows.
@@ -700,7 +790,7 @@ fn (mut a FileBrowserApp) build(size ui2.Rect) !ui2.Element {
 			a.rows_height, a.visible_rows, a.browser.entries.len, a.browser.scroll)
 	}
 
-	return ui2.screen(app_surface, children)
+	return a.screen_with_sidebar(width, height, mut children)
 }
 
 fn files_view_button(action string, label string, icon string, x int, selected bool) ui2.Element {
@@ -814,7 +904,7 @@ fn (mut a FileBrowserApp) build_miller_columns(width int, height int, mut childr
 			radius: 4
 		}, [])
 	}
-	return ui2.screen(app_surface, children)
+	return a.screen_with_sidebar(width, height, mut children)
 }
 
 fn (mut a FileBrowserApp) clamp_scroll() {
@@ -1000,6 +1090,12 @@ fn (mut a FileBrowserApp) pointer_event(phase AppPointerPhase, button AppPointer
 }
 
 fn (mut a FileBrowserApp) handle(event_id string) ! {
+	for location in files_locations {
+		if event_id == location.action {
+			a.navigate_to(location.path)
+			return
+		}
+	}
 	match event_id {
 		files_action_up {
 			if a.view_mode == .columns {

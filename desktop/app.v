@@ -76,8 +76,8 @@ const available_apps = [
 	AppFactory{
 		title: 'Files'
 		icon: 'asset:files'
-		width: 460
-		height: 360
+		width: 700
+		height: 400
 		process_name: 'vinix-files'
 		pointer: true
 		open: open_files_with_context_menu

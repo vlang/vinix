@@ -101,6 +101,9 @@ const files_row_hover = u32(0xeaf1fb)
 const files_error = u32(0xc0392b)
 const files_folder_icon = u32(0x5b8def)
 const files_file_icon = u32(0x9aa5b5)
+const files_sidebar_bg = u32(0xf3f5f9)
+const files_sidebar_selected = u32(0xdfe7f5)
+const files_sidebar_icon = u32(0x6d82a0)
 
 // ── Activity monitor ───────────────────────────────────────────────
 // A long list of small numbers, so the stripe is barely there and only the

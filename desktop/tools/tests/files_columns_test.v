@@ -91,7 +91,7 @@ fn test_file_browser_miller_columns_follow_directory_selection() {
 	assert !files_columns_tree_has_text(tree, '-')
 	assert !files_columns_tree_has_text(tree, '+')
 	free_tree(tree)
-	content_left := 0
+	content_left := files_content_left(460)
 	assert app.path_offset == app.max_path_offset()
 	assert app.path_offset > 0
 	path_x := content_left + files_padding + 20

@@ -261,6 +261,11 @@ mut:
 
 fn open_files_with_context_menu(mut _ Desktop) !NativeApp {
 	mut app := &FilesContextApp{}
+	for location in files_locations[..files_locations.len - 1] {
+		if location.path != desktop_home {
+			ensure_directory(location.path) or {}
+		}
+	}
 	app.files.browser.read(desktop_home)
 	if app.files.browser.error != '' {
 		unsafe { app.files.browser.error.free() }
@@ -396,7 +401,7 @@ fn (a &FilesContextApp) rename_overlay(size ui2.Rect) ?ui2.Element {
 	parent := parent_path(a.rename_path)
 	name := file_path_name(a.rename_path)
 	width := int(size.width)
-	content_left := 0
+	content_left := files_content_left(width)
 	if a.files.view_mode == .list {
 		if a.files.browser.path != parent {
 			return none
@@ -430,12 +435,21 @@ fn (a &FilesContextApp) rename_overlay(size ui2.Rect) ?ui2.Element {
 		if column.browser.path == parent {
 			index := files_context_entry_index(column.browser.entries, name)
 			if index >= column.browser.scroll && index < column.browser.scroll + a.files.visible_rows {
-				x := content_left + column_x + files_padding + 20
+				mut x := content_left + column_x + files_padding + 20
+				if x < content_left + files_padding {
+					x = content_left + files_padding
+				}
 				y := a.files.rows_top
 					+ (index - column.browser.scroll) * files_row_height
 				mut field_width := column_width - 2 * files_padding - 52
-				if field_width < 72 {
-					field_width = 72
+				visible_right := if column_x + column_width < a.files.viewport_width {
+					content_left + column_x + column_width
+				} else { width }
+				if field_width > visible_right - x - files_padding {
+					field_width = visible_right - x - files_padding
+				}
+				if field_width < 40 {
+					return none
 				}
 				return ui2.text_field('', '', rename_buffer_text(a.rename_text), ui2.rect(f64(x),
 					f64(y + 1), f64(field_width), f64(files_row_height - 2)), ui2.BoxStyle{
