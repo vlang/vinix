@@ -57,7 +57,7 @@ What it does:
   without hiding the desktop
 - embedded **Minecraft**: Mojang's Java Edition client renders into Xvfb and is
   composited as a movable, resizable Vinix window with forwarded input
-- **Chocolate Doom**: an aarch64 SDL2 build renders into a private Xvfb
+- **DOOM**: a Chocolate Doom aarch64 SDL2 build renders into a private Xvfb
   display and appears in a movable Vinix window with forwarded input
 - native **Blender**: a Vinix GHOST backend renders with surfaceless EGL and
   publishes directly into a compositor-owned Vinix window, with no Xorg or
@@ -244,7 +244,7 @@ window points to the on-demand package command.
 3.1.1 and stages its SDL2 and SDL2_mixer runtime. It reads the local WAD at
 `../3rd/doom/doom1.wad` by default; set `VINIX_DOOM_WAD` to select another
 file. The WAD stays in ignored build output and is never committed. Rebuild the
-desktop image with `./build-desktop-aarch64.sh`, then launch **Chocolate Doom**
+desktop image with `./build-desktop-aarch64.sh`, then launch **DOOM**
 from its desktop shortcut or Start menu. The launcher opens E1M1 in a 720×540
 window at the top right, leaving the wallpaper logo visible. The pointer is
 hidden over the game content and remains visible over the title bar and other

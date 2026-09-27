@@ -214,23 +214,23 @@ fn open_doom(mut _ Desktop) !NativeApp {
 		return &HostedX11App{
 			surface_width: doom_surface_width
 			surface_height: doom_surface_height
-			icon: 'builtin:block'
+			icon: 'asset:doom'
 			failed: true
-			error_message: 'Chocolate Doom is not installed. Run build-doom-aarch64.sh.'
+			error_message: 'DOOM is not installed. Run build-doom-aarch64.sh.'
 		}
 	}
 	if C.access(c'/usr/share/games/doom/doom1.wad', C.R_OK) != 0 {
 		return &HostedX11App{
 			surface_width: doom_surface_width
 			surface_height: doom_surface_height
-			icon: 'builtin:block'
+			icon: 'asset:doom'
 			failed: true
-			error_message: 'Doom WAD is missing. Set VINIX_DOOM_WAD and rebuild the image.'
+			error_message: 'DOOM WAD is missing. Set VINIX_DOOM_WAD and rebuild the image.'
 		}
 	}
 	return open_hosted_x11_app('doom', '/usr/bin/run-doom', doom_surface_width,
-		doom_surface_height, 'builtin:block', 'Starting Chocolate Doom…',
-		'Chocolate Doom is not installed. Run build-doom-aarch64.sh.', 'Chocolate Doom exited.')
+		doom_surface_height, 'asset:doom', 'Starting DOOM…',
+		'DOOM is not installed. Run build-doom-aarch64.sh.', 'DOOM exited.')
 }
 
 fn open_hosted_x11_app(name string, command string, surface_width int, surface_height int,

@@ -307,8 +307,8 @@ const available_apps = [
 		open:             open_chromium
 	},
 	AppFactory{
-		title: 'Chocolate Doom'
-		icon: 'builtin:block'
+		title: 'DOOM'
+		icon: 'asset:doom'
 		width: doom_window_width
 		height: doom_window_height + default_title_height
 		process_name: 'vinix-doom'

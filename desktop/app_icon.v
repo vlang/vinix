@@ -263,6 +263,7 @@ fn (mut d Desktop) load_app_icons() {
 	d.chromium_icon = load_app_icon('chromium')
 	d.blender_icon = load_app_icon('blender')
 	d.minecraft_icon = load_app_icon('minecraft')
+	d.doom_icon = load_app_icon('doom')
 	d.terminal_icon = load_app_icon('terminal')
 	d.settings_icon = load_app_icon('settings')
 	d.activity_icon = load_app_icon('activity')
@@ -281,6 +282,7 @@ fn (d &Desktop) bundled_app_icon(path string) &AppIcon {
 		'asset:chromium' { return &d.chromium_icon }
 		'asset:blender' { return &d.blender_icon }
 		'asset:minecraft' { return &d.minecraft_icon }
+		'asset:doom' { return &d.doom_icon }
 		'asset:terminal' { return &d.terminal_icon }
 		'asset:settings' { return &d.settings_icon }
 		'asset:activity' { return &d.activity_icon }

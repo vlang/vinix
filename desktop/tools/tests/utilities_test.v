@@ -682,10 +682,13 @@ fn test_available_utility_applications_and_shortcut_layouts() {
 	assert available_apps[20].height == chromium_window_height + default_title_height
 	assert available_apps[20].keyboard && available_apps[20].pointer
 	assert available_apps[20].polling && available_apps[20].poll_interval_ms == 50
-	assert available_apps[21].title == 'Chocolate Doom'
+	assert available_apps[21].title == 'DOOM'
 	assert available_apps[21].process_name == 'vinix-doom'
+	assert available_apps[21].icon == 'asset:doom'
 	assert available_apps[21].keyboard && available_apps[21].pointer
-	assert available_apps.len == 22
+	assert available_apps[22].title == 'Vinix in QEMU'
+	assert available_apps[22].process_name == 'vinix-qemu-window'
+	assert available_apps.len == 23
 	assert app_start_actions.len == available_apps.len
 	assert app_shortcut_actions.len == available_apps.len
 	assert shortcut_rows_for_height(720) == 8

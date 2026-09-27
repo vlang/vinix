@@ -1020,7 +1020,7 @@ install -m644 "$SCRIPT_DIR/desktop/assets/blender.qoi" \
 install -m644 "$SCRIPT_DIR/desktop/assets/minecraft.qoi" \
     "$STAGING/usr/share/vinix/icons/minecraft.qoi"
 
-for app_icon in terminal settings activity calculator vspace editor files clock calendar capture; do
+for app_icon in terminal settings activity calculator vspace editor files clock calendar capture doom; do
     install -m644 "$SCRIPT_DIR/desktop/assets/${app_icon}.qoi" \
         "$STAGING/usr/share/vinix/icons/${app_icon}.qoi"
 done
