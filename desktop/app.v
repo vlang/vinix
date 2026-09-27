@@ -334,6 +334,19 @@ const available_apps = [
 	},
 ]
 
+fn files_settings_factory() AppFactory {
+	return AppFactory{
+		title:           files_settings_window_title
+		icon:            'asset:files'
+		width:           540
+		height:          550
+		process_name:    files_settings_process_name
+		keyboard:        true
+		pointer:         true
+		open:            open_files_settings_window
+	}
+}
+
 fn open_calculator(mut _ Desktop) !NativeApp {
 	return open_native_calculator()
 }

@@ -663,6 +663,9 @@ fn app_process_options(args []string) ?AppProcessOptions {
 }
 
 fn app_factory_named(name string) ?AppFactory {
+	if name == files_settings_process_name {
+		return files_settings_factory()
+	}
 	for factory in available_apps {
 		if factory.process_name == name {
 			return factory
@@ -1012,7 +1015,12 @@ fn start_remote_app(factory AppFactory, mut desktop Desktop) !NativeApp {
 // their initial response has a distinct (and deliberately longer) deadline.
 // The returned app uses app_response_timeout_ms for every later transaction.
 fn start_remote_app_with_timeout(factory AppFactory, mut desktop Desktop, timeout_ms int) !NativeApp {
-	path := native_app_directory + factory.process_name
+	// Files Settings has its own app identity but shares Files' installed binary.
+	path := native_app_directory + if factory.process_name == files_settings_process_name {
+		'vinix-files'
+	} else {
+		factory.process_name
+	}
 	app := start_remote_app_at_with_timeout(path, factory, mut desktop, timeout_ms) or {
 		unsafe { path.free() }
 		return err

@@ -835,10 +835,22 @@ fn (mut d Desktop) forward_to_app(x int, y int, action string) {
 			|| y >= window.y + window.height {
 			continue
 		}
+		if window.title == 'Files' && action == files_action_settings {
+			d.open_files_settings_window()
+			return
+		}
+		if window.title == files_settings_window_title && action == files_settings_close {
+			d.close_window(window.id)
+			d.refresh_files_settings_clients(window.app_index)
+			return
+		}
 		d.apps[window.app_index].handle(action) or {
 			eprintln('vinix-desktop: ${window.title}: ${err}')
 		}
 		d.raise(window.id)
+		if window.title == files_settings_window_title || action.starts_with(files_picker_toggle_prefix) {
+			d.refresh_files_settings_clients(window.app_index)
+		}
 		// Capture the desktop, not the Capture window. The compositor will wait
 		// until it has presented a frame with this window hidden before writing
 		// the first pixel. Its taskbar entry remains the way back to Stop.

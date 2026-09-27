@@ -510,6 +510,10 @@ fn (mut d Desktop) pump_keyboard(mut keyboard Keyboard) {
 	if rest.len == 0 {
 		return
 	}
+	rest = d.take_files_settings_shortcut(rest)
+	if rest.len == 0 {
+		return
+	}
 
 	// Window-management chords are taken before a focused app gets text. Cmd-W
 	// must close a terminal or editor window rather than inserting an escape
@@ -530,7 +534,17 @@ fn (mut d Desktop) pump_keyboard(mut keyboard Keyboard) {
 	// the desktop's own shortcuts stand down: a terminal cannot have `q` close
 	// the desktop out from under whoever is typing.
 	if d.focused_app_takes_keys() {
+		mut settings_app_index := -1
+		for window in d.windows {
+			if window.id == d.focus && window.title == files_settings_window_title {
+				settings_app_index = window.app_index
+				break
+			}
+		}
 		d.send_keys_to_focused(rest)
+		if settings_app_index >= 0 {
+			d.refresh_files_settings_clients(settings_app_index)
+		}
 		return
 	}
 

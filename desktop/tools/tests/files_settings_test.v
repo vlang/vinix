@@ -19,7 +19,7 @@ fn files_settings_has_entry(entries []FileEntry, name string) bool {
 	return false
 }
 
-fn test_files_settings_hidden_files_in_both_views_and_shortcut() {
+fn test_files_settings_window_updates_files_in_both_views() {
 	root := os.join_path(os.temp_dir(), 'vinix-files-settings-hidden-test')
 	os.rmdir_all(root) or {}
 	os.mkdir_all(root) or { panic(err) }
@@ -30,20 +30,71 @@ fn test_files_settings_hidden_files_in_both_views_and_shortcut() {
 	app.files.settings = default_files_settings()
 	app.files.browser.read(root.clone())
 	assert !files_settings_has_entry(app.files.browser.entries, '.local')
-	app.key_input('\x1b[44;9u')
-	assert app.settings_open
-	tree := app.build(ui2.rect(0, 0, 700, 400)) or { panic(err) }
+	mut settings_app := FilesContextApp{
+		settings_only: true
+	}
+	settings_app.files.settings = default_files_settings()
+	tree := settings_app.build(ui2.rect(0, 0, 540, 520)) or { panic(err) }
 	assert files_settings_has_id(tree, files_settings_hidden)
+	assert !files_settings_has_id(tree, files_action_up)
 	free_tree(tree)
-	app.handle(files_settings_hidden) or { panic(err) }
+	settings_app.handle(files_settings_hidden) or { panic(err) }
+	assert settings_app.files.settings.save(root)
+	app.reload_files_settings(root)
 	assert app.files.settings.show_hidden
 	assert files_settings_has_entry(app.files.browser.entries, '.local')
-	app.handle(files_settings_close) or { panic(err) }
 	app.files.set_view_mode(.columns)
 	assert files_settings_has_entry(app.files.columns.last().browser.entries, '.local')
-	app.key_input('\x1b[44;9u')
-	app.handle(files_settings_hidden) or { panic(err) }
+	settings_app.handle(files_settings_hidden) or { panic(err) }
+	assert settings_app.files.settings.save(root)
+	app.reload_files_settings(root)
 	assert !files_settings_has_entry(app.files.columns.last().browser.entries, '.local')
+}
+
+fn test_files_settings_shortcut_and_hidden_factory() {
+	rest, found := files_settings_remove_shortcut('a${files_settings_command_comma}b')
+	assert found
+	assert rest == 'ab'
+	rest_plain, found_plain := files_settings_remove_shortcut('abc')
+	assert !found_plain
+	assert rest_plain == 'abc'
+	factory := files_settings_factory()
+	assert factory.process_name == files_settings_process_name
+	assert app_factory_named(files_settings_process_name) != none
+}
+
+fn test_files_settings_gear_and_shortcut_focus_one_window() {
+	mut desktop := Desktop{}
+	desktop.apps << &FilesContextApp{}
+	desktop.windows << Window{
+		id:        1
+		title:     'Files'
+		x:         0
+		y:         0
+		width:     700
+		height:    400
+		app_index: 0
+	}
+	desktop.windows << Window{
+		id:        2
+		title:     files_settings_window_title
+		x:         1000
+		y:         0
+		width:     540
+		height:    550
+		app_index: 0
+		minimized: true
+	}
+	desktop.focus = 1
+	desktop.forward_to_app(10, 10, files_action_settings)
+	assert desktop.focus == 2
+	assert !desktop.windows.last().minimized
+	assert desktop.windows.len == 2
+	desktop.focus = 1
+	rest := desktop.take_files_settings_shortcut(files_settings_command_comma)
+	assert rest == ''
+	assert desktop.focus == 2
+	assert desktop.windows.len == 2
 }
 
 fn test_files_tags_persist_and_follow_file_operations() {
@@ -108,13 +159,16 @@ fn test_files_tag_picker_and_custom_tag_editing() {
 	assert app.files.settings.first_color('/tmp/report.txt') == app.files.settings.tags[0].color
 	app.handle(files_picker_close) or { panic(err) }
 	assert !app.tag_picker
-	app.handle(files_action_settings) or { panic(err) }
-	app.handle(files_settings_tags) or { panic(err) }
-	app.handle(files_settings_add) or { panic(err) }
-	assert app.settings_editing
-	app.key_input('Project\n')
-	assert !app.settings_editing
-	assert app.files.settings.tags.last().name == 'Project'
-	app.handle(files_settings_remove) or { panic(err) }
-	assert app.files.settings.tags.len == 10
+	mut settings_app := FilesContextApp{
+		settings_only: true
+	}
+	settings_app.files.settings = default_files_settings()
+	settings_app.handle(files_settings_tags) or { panic(err) }
+	settings_app.handle(files_settings_add) or { panic(err) }
+	assert settings_app.settings_editing
+	settings_app.key_input('Project\n')
+	assert !settings_app.settings_editing
+	assert settings_app.files.settings.tags.last().name == 'Project'
+	settings_app.handle(files_settings_remove) or { panic(err) }
+	assert settings_app.files.settings.tags.len == 10
 }

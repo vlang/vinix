@@ -263,7 +263,7 @@ fn (mut d Desktop) desktop_directory_rename_key(input string) {
 struct FilesContextApp {
 mut:
 	files               FileBrowserApp
-	settings_open       bool
+	settings_only       bool
 	settings_tab        int
 	settings_selected   int
 	settings_scroll     int
@@ -530,15 +530,14 @@ fn (a &FilesContextApp) rename_overlay(size ui2.Rect) ?ui2.Element {
 }
 
 fn (mut a FilesContextApp) build(size ui2.Rect) !ui2.Element {
+	if a.settings_only {
+		return a.settings_window(size)
+	}
 	root := a.files.build(size)!
-	if a.settings_open || a.tag_picker {
+	if a.tag_picker {
 		mut children := frame_elements(root.children.len + 1)
 		children << root.children
-		children << if a.settings_open {
-			a.settings_overlay(size)
-		} else {
-			a.tag_picker_overlay(size)
-		}
+		children << a.tag_picker_overlay(size)
 		return ui2.Element{ ...root, children: children }
 	}
 	if a.preview.open {
@@ -684,14 +683,18 @@ fn (mut a FilesContextApp) rename_key_input(input string) ! {
 }
 
 fn (mut a FilesContextApp) handle(event_id string) ! {
+	if event_id == files_settings_refresh {
+		a.reload_files_settings(desktop_home)
+		return
+	}
+	if a.settings_only {
+		a.handle_settings(event_id)
+		return
+	}
 	if a.preview.open {
 		if event_id == files_quicklook_close {
 			a.preview.close()
 		}
-		return
-	}
-	if a.settings_open {
-		a.handle_settings(event_id)
 		return
 	}
 	if a.tag_picker {
@@ -702,10 +705,6 @@ fn (mut a FilesContextApp) handle(event_id string) ! {
 			a.files.settings.toggle_tag(a.context_path, id)
 			a.files.settings.save(desktop_home)
 		}
-		return
-	}
-	if event_id == files_action_settings {
-		a.settings_open = true
 		return
 	}
 	if event_id.starts_with(files_context_select_prefix) {
@@ -769,7 +768,7 @@ fn (mut a FilesContextApp) handle(event_id string) ! {
 	} else if event_id == files_action_up || event_id == files_action_view_list
 		|| event_id == files_action_view_columns || event_id.starts_with('files.location.')
 		|| (event_id.starts_with(files_action_tag_prefix)
-		&& !event_id.starts_with(files_action_tag_row)) {
+			&& !event_id.starts_with(files_action_tag_row)) {
 		a.clear_context_path()
 	}
 	a.files.handle(event_id)!
@@ -781,7 +780,7 @@ fn (mut a FilesContextApp) pointer_input_enabled() bool {
 
 fn (mut a FilesContextApp) pointer_event(phase AppPointerPhase, button AppPointerButton,
 	scroll int, x int, y int, width int, height int) {
-	if a.settings_open {
+	if a.settings_only {
 		if phase == .scroll && a.settings_tab == 1 {
 			a.settings_scroll = files_clamp(a.settings_scroll - scroll,
 				if a.files.settings.tags.len > 0 { a.files.settings.tags.len - 1 } else { 0 })
@@ -805,17 +804,12 @@ fn (mut a FilesContextApp) pointer_event(phase AppPointerPhase, button AppPointe
 }
 
 fn (mut a FilesContextApp) key_input(input string) {
+	if a.settings_only {
+		a.settings_key_input(input)
+		return
+	}
 	if a.preview.open {
 		a.quicklook_key_input(input)
-		return
-	}
-	if input.contains('\x1b[44;9u') {
-		a.settings_open = !a.settings_open
-		a.tag_picker = false
-		return
-	}
-	if a.settings_open {
-		a.settings_key_input(input)
 		return
 	}
 	if a.tag_picker {
@@ -1074,6 +1068,7 @@ fn (mut d Desktop) create_context_left_down(x int, y int) bool {
 				if handled && action in [create_context_new_folder, create_context_new_file,
 					file_context_paste, file_context_delete] {
 					d.refresh_desktop_directory()
+					d.refresh_files_settings_clients(app_index)
 				}
 			}
 		}
@@ -1124,6 +1119,7 @@ fn (mut d Desktop) file_context_rename_key_input(input string) bool {
 	if handled && rename_input_finishes(input) {
 		create_context_menu.rename_app_index = -1
 		d.refresh_desktop_directory()
+		d.refresh_files_settings_clients(index)
 	}
 	d.dirty = true
 	return true

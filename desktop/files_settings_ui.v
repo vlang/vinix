@@ -1,8 +1,20 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Files' preferences sheet and the tag picker for a selected item.
+// Files preferences window and the tag picker for a selected item.
 module main
 
 import ui2
+
+const files_settings_window_title = 'Files Settings'
+const files_settings_process_name = 'vinix-files-settings'
+const files_settings_refresh = 'files.settings.refresh'
+
+fn open_files_settings_window(mut _ Desktop) !NativeApp {
+	mut app := &FilesContextApp{
+		settings_only: true
+	}
+	app.files.settings = load_files_settings(desktop_home)
+	return app
+}
 
 const files_settings_close = 'files.settings.close'
 const files_settings_general = 'files.settings.general'
@@ -54,13 +66,11 @@ fn files_settings_checkbox(id string, title string, checked bool, x int, y int, 
 	}
 }
 
-fn (a &FilesContextApp) settings_overlay(size ui2.Rect) ui2.Element {
+fn (a &FilesContextApp) settings_window(size ui2.Rect) ui2.Element {
 	width := int(size.width)
 	height := int(size.height)
-	panel_width := if width > 500 { 480 } else { width - 20 }
-	panel_height := if height > 490 { 460 } else { height - 16 }
-	x := (width - panel_width) / 2
-	y := (height - panel_height) / 2
+	panel_width := width
+	panel_height := height
 	mut rows := frame_elements(24)
 	rows << ui2.label('', 'Files Settings', ui2.rect(18, 12, f64(panel_width - 70), 27), ui2.TextStyle{
 		color: body_heading
@@ -181,22 +191,7 @@ fn (a &FilesContextApp) settings_overlay(size ui2.Rect) ui2.Element {
 		rows << files_settings_checkbox(files_settings_tint, 'Tint folders based on tags', a.files.settings.tint_folders,
 			20, panel_height - 31, panel_width - 40)
 	}
-	mut outer := frame_elements(2)
-	outer << ui2.clickable_view(files_settings_close, ui2.rect(0, 0, f64(width), f64(height)), ui2.BoxStyle{
-		transparent: true
-	}, [])
-	outer << ui2.clickable_view('files.settings.panel', ui2.rect(f64(x), f64(y), f64(panel_width), f64(panel_height)), ui2.BoxStyle{
-		bg:            app_surface
-		radius:        9
-		border_color:  body_rule
-		border_left:   1
-		border_right:  1
-		border_top:    1
-		border_bottom: 1
-	}, rows)
-	return ui2.view('', ui2.rect(0, 0, f64(width), f64(height)), ui2.BoxStyle{
-		transparent: true
-	}, outer)
+	return ui2.screen(app_surface, rows)
 }
 
 fn (a &FilesContextApp) tag_picker_overlay(size ui2.Rect) ui2.Element {
@@ -258,7 +253,6 @@ fn (mut a FilesContextApp) start_settings_rename() {
 
 fn (mut a FilesContextApp) settings_key_input(input string) {
 	if !a.settings_editing {
-		if input == '\x1b' { a.settings_open = false }
 		return
 	}
 	result := apply_rename_input(mut a.settings_name, a.settings_select_all, input)
@@ -280,15 +274,11 @@ fn (mut a FilesContextApp) settings_key_input(input string) {
 
 fn (mut a FilesContextApp) handle_settings(action string) {
 	match action {
-		files_settings_close { a.settings_open = false }
+		files_settings_close {}
 		files_settings_general { a.settings_tab = 0 }
 		files_settings_tags { a.settings_tab = 1 }
 		files_settings_hidden {
 			a.files.settings.show_hidden = !a.files.settings.show_hidden
-			a.files.browser.show_hidden = a.files.settings.show_hidden
-			path := a.files.current_path().clone()
-			a.files.navigate_to(path)
-			unsafe { path.free() }
 			a.files.settings.save(desktop_home)
 		}
 		files_settings_tint {
@@ -364,5 +354,26 @@ fn (mut a FilesContextApp) handle_settings(action string) {
 				}
 			}
 		}
+	}
+}
+
+fn (mut a FilesContextApp) reload_files_settings(home string) {
+	updated := load_files_settings(home)
+	hidden_changed := updated.show_hidden != a.files.settings.show_hidden
+	a.files.settings = updated
+	if a.settings_only {
+		return
+	}
+	a.files.browser.show_hidden = updated.show_hidden
+	if hidden_changed {
+		path := a.files.current_path().clone()
+		tag_id := a.files.active_tag_id
+		a.files.navigate_to(path)
+		if a.files.settings.tag_index(tag_id) >= 0 {
+			a.files.active_tag_id = tag_id
+		}
+		unsafe { path.free() }
+	} else if a.files.settings.tag_index(a.files.active_tag_id) < 0 {
+		a.files.active_tag_id = -1
 	}
 }
