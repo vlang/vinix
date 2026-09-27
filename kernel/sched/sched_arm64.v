@@ -99,9 +99,17 @@ __global (
 	gpu_exec_interrupt_cpu    = u64(-1)
 	gpu_exec_interrupt_kind   u64
 	gpu_exec_interrupt_state  u64
+	// A synchronous exception is the normal first event after exec: the ELF
+	// entry point is demand-paged. Keep the initial quantum stopped until that
+	// exception has installed its PTE and is ready to return to EL0. This avoids
+	// racing a timer FIQ against the first page-in on physical Apple hardware,
+	// and gives the one-shot trace a post-page-in checkpoint.
+	gpu_exec_sync_active = u64(0)
+	gpu_exec_sync_cpu    = u64(-1)
+	gpu_exec_sync_state  u64
 	// Printing to the framebuffer is slow enough to consume a short scheduler
-	// slice. Hold the first GPU desktop slice here and arm it only after the
-	// final traced checkpoint immediately before eret.
+	// slice. Hold the first GPU desktop slice here and arm it only when the
+	// first lower-EL exception has completed.
 	gpu_exec_deferred_timeslice u64
 )
 
@@ -115,6 +123,12 @@ fn clear_gpu_exec_interrupt_trace() {
 	katomic.store(mut &gpu_exec_interrupt_cpu, u64(-1))
 	katomic.store(mut &gpu_exec_interrupt_kind, u64(0))
 	katomic.store(mut &gpu_exec_interrupt_state, u64(0))
+}
+
+fn clear_gpu_exec_sync_trace() {
+	katomic.store(mut &gpu_exec_sync_active, u64(0))
+	katomic.store(mut &gpu_exec_sync_cpu, u64(-1))
+	katomic.store(mut &gpu_exec_sync_state, u64(0))
 }
 
 @[export: 'scheduler_gpu_context_trace']
@@ -131,14 +145,10 @@ fn scheduler_gpu_context_trace(gpr_state voidptr, phase u64) {
 			println('exec[gpu]/switch: eret readback ELR=0x${cpu.read_elr_el1():x} SPSR=0x${cpu.read_spsr_el1():x} CurrentEL=0x${cpu.read_currentel():x}')
 			println('exec[gpu]/switch: saved target pc=0x${state.pc:x} sp=0x${state.sp:x} pstate=0x${state.pstate:x} tls=0x${state.tpidr_el0:x}')
 			deferred_slice := katomic.load(&gpu_exec_deferred_timeslice)
-			println('exec[gpu]/switch: target stack and TPIDR ready; arming deferred ${deferred_slice} us timeslice')
-			// Nothing may print after this arm: on the M1 each production log also
-			// redraws the framebuffer, and the old diagnostic path could expire the
-			// new thread's entire slice before assembly reached eret.
-			katomic.store(mut &gpu_exec_deferred_timeslice, u64(0))
-			if deferred_slice != 0 {
-				timer.oneshot(deferred_slice)
-			}
+			println('exec[gpu]/switch: target stack and TPIDR ready; deferring ${deferred_slice} us timeslice until first lower-EL return')
+			// The new ELF entry point is demand-paged. Enter EL0 with the timer
+			// stopped, resolve that first exception as one transaction, then arm a
+			// fresh slice from scheduler_gpu_sync_exit_trace().
 			// Keep the trace armed across eret. The first lower-EL exception
 			// vector clears it after saving the exception frame, which lets the
 			// M1 distinguish an eret which never completes from an immediate
@@ -165,14 +175,13 @@ fn scheduler_gpu_lower_exception_trace(esr u64, far u64, raw_state voidptr, kind
 	}
 
 	// The first synchronous exception is normally the instruction translation
-	// fault which demand-pages the new executable's entry point. Do not print
-	// from that exception: on the M1 every console line redraws the framebuffer,
-	// so the three diagnostics below can consume the freshly armed 5 ms slice.
-	// pf_handler() then enables interrupts with the timer already pending and
-	// gets preempted before it can install the first PTE. We already proved that
-	// eret reaches EL0; disarm the one-shot trace and let the expected fault take
-	// the ordinary, uninstrumented path.
+	// fault which demand-pages the new executable's entry point. Transfer the
+	// trace to its exit hook without printing on entry: the framebuffer console
+	// is slow, and the useful boundary is whether page-in actually completed.
 	if kind == 0 {
+		katomic.store(mut &gpu_exec_sync_cpu, cpu_number)
+		katomic.store(mut &gpu_exec_sync_state, u64(raw_state))
+		katomic.store(mut &gpu_exec_sync_active, u64(1))
 		katomic.store(mut &gpu_exec_switch_state, u64(0))
 		katomic.store(mut &gpu_exec_switch_cpu, u64(-1))
 		return
@@ -201,6 +210,28 @@ fn scheduler_gpu_lower_exception_trace(esr u64, far u64, raw_state voidptr, kind
 	println('exec[gpu]/eret: crossed into EL0; first lower-EL ${name} vector entered on CPU ${cpu_number}')
 	println('exec[gpu]/eret: ESR=0x${esr:x} EC=0x${esr >> 26:x} FAR=0x${far:x}')
 	println('exec[gpu]/eret: exception frame pc=0x${state.pc:x} sp=0x${state.sp:x} pstate=0x${state.pstate:x} x0=0x${state.x0:x} x8=0x${state.x8:x}')
+}
+
+// Finish the first synchronous exception after its handler and signal work
+// have completed, but before the saved EL0 frame is restored. A demand-fault
+// handler normally arms its own fresh slice; stop that timer while printing so
+// the checkpoint itself cannot consume the quantum, then arm the exec slice.
+@[export: 'scheduler_gpu_sync_exit_trace']
+fn scheduler_gpu_sync_exit_trace(raw_state voidptr) {
+	if katomic.load(&gpu_exec_sync_active) == 0
+		|| katomic.load(&gpu_exec_sync_cpu) != cpu.read_tpidr_el1()
+		|| katomic.load(&gpu_exec_sync_state) != u64(raw_state) {
+		return
+	}
+
+	deferred_slice := katomic.load(&gpu_exec_deferred_timeslice)
+	timer.stop()
+	println('exec[gpu]/eret: first lower-EL synchronous exception completed; arming deferred ${deferred_slice} us timeslice')
+	clear_gpu_exec_sync_trace()
+	katomic.store(mut &gpu_exec_deferred_timeslice, u64(0))
+	if deferred_slice != 0 {
+		timer.oneshot(deferred_slice)
+	}
 }
 
 // Mark the boundaries around the common IRQ dispatcher from the lower-EL

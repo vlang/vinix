@@ -268,6 +268,8 @@ handle_lower64_sync:
     mov x2, sp                 // arg2: GPRState pointer
     bl exception__sync_handler
     HVF_SYNC_BARRIER
+    mov x0, sp
+    bl scheduler_gpu_sync_exit_trace
     RESTORE_REGS_TO_EL0
 
 handle_svc:
@@ -320,12 +322,16 @@ handle_svc:
     mov x0, sp
     bl syscall__leave
     HVF_SYNC_BARRIER
+    mov x0, sp
+    bl scheduler_gpu_sync_exit_trace
     RESTORE_REGS_TO_EL0
 
 .svc_invalid:
     movn x0, #37               // x0 = -38 = -ENOSYS
     str x0, [sp, #0]
     HVF_SYNC_BARRIER
+    mov x0, sp
+    bl scheduler_gpu_sync_exit_trace
     RESTORE_REGS_TO_EL0
 
 handle_lower64_irq:
