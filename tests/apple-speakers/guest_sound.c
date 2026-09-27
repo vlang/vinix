@@ -91,23 +91,44 @@ int main(void)
         puts("VINIX M1 SOUND: FAIL - no /dev/dsp; see apple-speakers boot log");
         goto hold;
     }
+    puts("VINIX M1 SOUND: opening DSP");
+    int fd = open("/dev/dsp", O_WRONLY);
+    if (fd < 0 || configure(fd) != 0) {
+        printf("VINIX M1 SOUND: FAIL - OSS setup (%d)\n", errno);
+        if (fd >= 0)
+            close(fd);
+        goto hold;
+    }
     for (int pass = 1; pass <= 3; pass++) {
-        int fd = open("/dev/dsp", O_WRONLY);
-        if (fd < 0 || configure(fd) != 0) {
-            printf("VINIX M1 SOUND: FAIL - OSS setup on pass %d (%d)\n", pass, errno);
-            if (fd >= 0)
-                close(fd);
-            goto hold;
-        }
         printf("VINIX M1 SOUND: tone %d/3 (800 Hz, low level)\n", pass);
         if (tone(fd) != 0) {
             close(fd);
             goto hold;
         }
-        close(fd);
-        sleep(2);
+        if (pass < 3) {
+            puts("VINIX M1 SOUND: waiting 2 seconds");
+            sleep(2);
+            puts("VINIX M1 SOUND: wait finished");
+        }
     }
-    puts("VINIX M1 SOUND: PCM test passed; confirm the tone was audible");
+    puts("VINIX M1 SOUND: three streams drained; closing DSP");
+    if (close(fd) != 0) {
+        printf("VINIX M1 SOUND: FAIL - close (%d)\n", errno);
+        goto hold;
+    }
+    puts("VINIX M1 SOUND: DSP closed; checking reopen");
+    fd = open("/dev/dsp", O_WRONLY);
+    if (fd < 0 || configure(fd) != 0) {
+        printf("VINIX M1 SOUND: FAIL - reopen (%d)\n", errno);
+        if (fd >= 0)
+            close(fd);
+        goto hold;
+    }
+    if (close(fd) != 0) {
+        printf("VINIX M1 SOUND: FAIL - reclose (%d)\n", errno);
+        goto hold;
+    }
+    puts("VINIX M1 SOUND: PCM and reopen passed; confirm the tones were audible");
 
 hold:
     for (;;)
