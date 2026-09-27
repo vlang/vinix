@@ -10,13 +10,13 @@ module virtio_gpu
 // synchronous: this keeps GEM lifetime and CPU readback ordering exact while
 // still executing every Gallium command on virglrenderer and the host GPU.
 import aarch64.cpu
+import aarch64.timer
 import aarch64.uart
 import drm
 import drm.gem
 import drm.ioctl
 import klock
 import memory
-import time
 import usercopy
 
 const reg_magic = u64(0x000)
@@ -55,7 +55,7 @@ const queue_align = u64(4096)
 const wanted_queue_size = u16(8)
 const request_capacity = u64(1024 * 1024 + 4096)
 const response_capacity = u64(128 * 1024)
-const command_timeout_ns = u64(5_000_000_000)
+const command_timeout_ns = u64(120_000_000_000)
 
 const cmd_resource_unref = u32(0x0102)
 const cmd_resource_attach_backing = u32(0x0106)
@@ -292,6 +292,9 @@ fn submit(command voidptr, command_length u64, payload u64, payload_length u64,
 	defer {
 		virtgpu_transport.lock.release()
 	}
+	if !virtgpu_transport.ready {
+		return 0, 0
+	}
 
 	unsafe {
 		C.memcpy(voidptr(virtgpu_transport.request_virt), command, command_length)
@@ -336,17 +339,21 @@ fn submit(command voidptr, command_length u64, payload u64, payload_length u64,
 	}
 	mmio_w32(virtgpu_transport.base + reg_queue_notify, 0)
 
-	deadline := time.monotonic_ns() + command_timeout_ns
-	mut spins := u64(0)
+	// The transport lock masks local interrupts, so the scheduler's clock may
+	// stop advancing on a single-CPU guest. The hardware counter does not.
+	deadline := timer.get_ns() + command_timeout_ns
 	for {
 		cpu.dmb_ish()
 		used_index := unsafe { *&u16(virtgpu_transport.used + 2) }
 		if used_index != virtgpu_transport.last_used {
 			break
 		}
-		spins++
-		if spins > 100_000_000 || time.monotonic_ns() >= deadline {
-			C.printf(c'virtio-gpu: command 0x%x timed out\n', unsafe { *&u32(virtgpu_transport.request_virt) })
+		if timer.get_ns() >= deadline {
+			// The host can still complete this command later. Reusing its
+			// descriptors or DMA buffers would confuse that completion with the
+			// next command and corrupt the VirGL resource stream.
+			virtgpu_transport.ready = false
+			uart.puts(c'virtio-gpu: command timed out; disabling transport\n')
 			return 0, 0
 		}
 	}
@@ -438,7 +445,7 @@ fn ensure_context(mut file VirtioFile) bool {
 	for i in 0 .. name.len {
 		request.debug_name[i] = name[i]
 	}
-	if !nodata(voidptr(&request), sizeof(request), unsafe { nil }, 0, false) {
+	if !nodata(voidptr(&request), sizeof(request), unsafe { nil }, 0, true) {
 		return false
 	}
 	file.context_created = true
@@ -487,7 +494,8 @@ fn release_object(_object &VirtioObject) {
 			hdr: header(cmd_resource_unref, 0)
 			resource_id: object.resource_id
 		}
-		nodata(voidptr(&request), sizeof(request), unsafe { nil }, 0, false)
+		// The host must finish using the attached backing before GEM frees it.
+		nodata(voidptr(&request), sizeof(request), unsafe { nil }, 0, true)
 	}
 	gem.unref(object.gem_object)
 	if last {
@@ -500,7 +508,7 @@ fn context_resource(command_type u32, context_id u32, resource_id u32) bool {
 		hdr: header(command_type, context_id)
 		resource_id: resource_id
 	}
-	return nodata(voidptr(&request), sizeof(request), unsafe { nil }, 0, false)
+	return nodata(voidptr(&request), sizeof(request), unsafe { nil }, 0, true)
 }
 
 fn retain_object(_object &VirtioObject) {
@@ -619,12 +627,12 @@ fn resource_create_handler(_dev &drm.DrmDevice, handle voidptr, data voidptr) in
 		length: u32(object.size)
 	}
 	if object.size > u64(0xffff_ffff)
-		|| !nodata(voidptr(&attach), sizeof(attach), voidptr(&entry), sizeof(entry), false) {
+		|| !nodata(voidptr(&attach), sizeof(attach), voidptr(&entry), sizeof(entry), true) {
 		mut unref := ResourceCommand{
 			hdr: header(cmd_resource_unref, 0)
 			resource_id: resource_id
 		}
-		nodata(voidptr(&unref), sizeof(unref), unsafe { nil }, 0, false)
+		nodata(voidptr(&unref), sizeof(unref), unsafe { nil }, 0, true)
 		gem.unref(object)
 		return -5
 	}
@@ -633,7 +641,7 @@ fn resource_create_handler(_dev &drm.DrmDevice, handle voidptr, data voidptr) in
 			hdr: header(cmd_resource_unref, 0)
 			resource_id: resource_id
 		}
-		nodata(voidptr(&unref), sizeof(unref), unsafe { nil }, 0, false)
+		nodata(voidptr(&unref), sizeof(unref), unsafe { nil }, 0, true)
 		gem.unref(object)
 		return -5
 	}
@@ -689,8 +697,6 @@ fn transfer_handler(handle voidptr, data voidptr, to_host bool) int {
 		file.lock.release()
 		return -2
 	}
-	resource_id := object.resource_id
-	file.lock.release()
 	mut command := Transfer3d{
 		hdr: header(if to_host {
 			cmd_transfer_to_host_3d
@@ -699,12 +705,15 @@ fn transfer_handler(handle voidptr, data voidptr, to_host bool) int {
 		}, file.context_id)
 		box: request.box
 		offset: u64(request.offset)
-		resource_id: resource_id
+		resource_id: object.resource_id
 		level: request.level
 		stride: request.stride
 		layer_stride: request.layer_stride
 	}
-	return if nodata(voidptr(&command), sizeof(command), unsafe { nil }, 0, true) { 0 } else { -5 }
+	// Keep the file's resource alive until the fenced transfer completes.
+	completed := nodata(voidptr(&command), sizeof(command), unsafe { nil }, 0, true)
+	file.lock.release()
+	return if completed { 0 } else { -5 }
 }
 
 fn transfer_from_handler(_dev &drm.DrmDevice, handle voidptr, data voidptr) int {
@@ -741,12 +750,13 @@ fn execbuffer_handler(_dev &drm.DrmDevice, handle voidptr, data voidptr) int {
 			return -2
 		}
 	}
-	file.lock.release()
 	mut command := Submit3d{
 		hdr: header(cmd_submit_3d, file.context_id)
 		size: request.size
 	}
+	// A concurrent GEM close must not unref a buffer used by this submission.
 	response_type, _ := submit(voidptr(&command), sizeof(command), request.command, request.size, true, unsafe { nil }, 0, true)
+	file.lock.release()
 	request.fence_fd = -1
 	return if response_type == resp_ok_nodata { 0 } else { -5 }
 }
@@ -923,7 +933,7 @@ fn close_file(_dev &drm.DrmDevice, handle voidptr) {
 		mut request := ContextCommand{
 			hdr: header(cmd_ctx_destroy, context_id)
 		}
-		nodata(voidptr(&request), sizeof(request), unsafe { nil }, 0, false)
+		nodata(voidptr(&request), sizeof(request), unsafe { nil }, 0, true)
 	}
 	unsafe { free(voidptr(file)) }
 }
