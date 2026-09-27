@@ -46,6 +46,9 @@ fn test_file_browser_miller_columns_follow_directory_selection() {
 	os.mkdir_all(os.join_path(root, 'alpha', 'nested')) or { panic(err) }
 	os.mkdir_all(os.join_path(root, 'beta')) or { panic(err) }
 	os.write_file(os.join_path(root, 'alpha', 'readme.txt'), 'hello') or { panic(err) }
+	for index in 0 .. 20 {
+		os.write_file(os.join_path(root, 'alpha', 'item-${index}.txt'), 'hello') or { panic(err) }
+	}
 	defer { os.rmdir_all(root) or {} }
 
 	mut app := FileBrowserApp{}
@@ -73,17 +76,50 @@ fn test_file_browser_miller_columns_follow_directory_selection() {
 	assert app.columns.len == 4
 	assert app.columns.last().browser.path == os.join_path(root, 'alpha', 'nested')
 
-	// The default 460-pixel Files window has room for two Miller columns. At
-	// the deepest point those are alpha and nested. Both view choices stay
-	// visible, with the active one marked selected.
+	// The full selected path stays visible above the columns. The scrollbar
+	// begins at the right edge, showing the two newest of four columns.
 	tree := app.build(ui2.rect(0, 0, 460, 330))!
-	assert files_columns_tree_has_text(tree, 'alpha')
-	assert files_columns_tree_has_text(tree, 'nested')
+	assert files_columns_tree_has_text(tree, os.join_path(root, 'alpha', 'nested'))
+	assert app.column_offset == app.max_column_offset()
+	assert app.max_column_offset() > 0
 	assert files_columns_tree_has_view_button(tree, files_action_view_list, 'builtin:list_view',
 		false)
 	assert files_columns_tree_has_view_button(tree, files_action_view_columns, 'builtin:column_view',
 		true)
+	assert !files_columns_tree_has_text(tree, '-')
+	assert !files_columns_tree_has_text(tree, '+')
 	free_tree(tree)
+	content_left := 0
+	assert app.path_offset == app.max_path_offset()
+	assert app.path_offset > 0
+	path_x := content_left + files_padding + 20
+	app.pointer_event(.down, .left, 0, path_x, files_header_height + 10, 460, 330)
+	app.pointer_event(.move, .no_button, 0, path_x + 200, files_header_height + 10, 460, 330)
+	app.pointer_event(.up, .left, 0, path_x + 200, files_header_height + 10, 460, 330)
+	assert app.path_offset < app.max_path_offset()
+	app.column_offset = files_clamp((app.columns.len - 2) * app.column_width,
+		app.max_column_offset())
+	app.pointer_event(.scroll, .no_button, -1, content_left + 10, app.rows_top + 10, 460, 330)
+	assert app.columns[app.columns.len - 2].browser.scroll == 2
+	bar_x := content_left + app.column_width - files_scrollbar_width - 2
+	bar_position, _ := files_scroll_thumb(app.rows_height, app.visible_rows,
+		app.columns[app.columns.len - 2].browser.entries.len, 2)
+	app.pointer_event(.down, .left, 0, bar_x + 2, app.rows_top + bar_position + 1, 460, 330)
+	app.pointer_event(.move, .no_button, 0, bar_x + 2, app.rows_top + app.rows_height + 10, 460, 330)
+	app.pointer_event(.up, .left, 0, bar_x + 2, app.rows_top + app.rows_height + 10, 460, 330)
+	assert app.columns[app.columns.len - 2].browser.scroll == app.columns[app.columns.len - 2].browser.entries.len - app.visible_rows
+	app.column_offset = app.max_column_offset()
+	track := app.viewport_width - 2 * files_padding
+	thumb_x, _ := files_scroll_thumb(track, app.viewport_width, app.columns.len * app.column_width,
+		app.column_offset)
+	bar_y := 330 - files_horizontal_bar_height + 8
+	app.pointer_event(.down, .left, 0, content_left + files_padding + thumb_x + 1, bar_y, 460, 330)
+	app.pointer_event(.move, .no_button, 0, content_left + files_padding + 1, bar_y, 460, 330)
+	app.pointer_event(.up, .left, 0, content_left + files_padding + 1, bar_y, 460, 330)
+	assert app.column_offset == 0
+	app.pointer_event(.down, .left, 0, 460 - files_padding - 2, bar_y, 460, 330)
+	app.pointer_event(.up, .left, 0, 460 - files_padding - 2, bar_y, 460, 330)
+	assert app.column_offset == app.max_column_offset()
 
 	app.handle(files_action_view_columns)!
 	assert app.columns.len == 4

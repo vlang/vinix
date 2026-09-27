@@ -396,6 +396,7 @@ fn (a &FilesContextApp) rename_overlay(size ui2.Rect) ?ui2.Element {
 	parent := parent_path(a.rename_path)
 	name := file_path_name(a.rename_path)
 	width := int(size.width)
+	content_left := 0
 	if a.files.view_mode == .list {
 		if a.files.browser.path != parent {
 			return none
@@ -404,7 +405,7 @@ fn (a &FilesContextApp) rename_overlay(size ui2.Rect) ?ui2.Element {
 		if index < a.files.browser.scroll || index >= a.files.browser.scroll + a.files.visible_rows {
 			return none
 		}
-		x := files_padding + 20
+		x := content_left + files_padding + 20
 		y := files_header_height + (index - a.files.browser.scroll) * files_row_height
 		mut field_width := width - x - files_padding - 72
 		if field_width < 80 {
@@ -419,32 +420,20 @@ fn (a &FilesContextApp) rename_overlay(size ui2.Rect) ?ui2.Element {
 			size: 13
 		}, 0)
 	}
-	mut slots := 1
-	if width >= files_column_min_width {
-		slots = width / files_column_min_width
-		if slots < 1 {
-			slots = 1
+	column_width := a.files.column_width
+	for column_index := 0; column_index < a.files.columns.len; column_index++ {
+		column_x := column_index * column_width - a.files.column_offset
+		if column_x + column_width <= 0 || column_x >= a.files.viewport_width {
+			continue
 		}
-	}
-	column_width := width / slots
-	mut start := a.files.columns.len - slots
-	if start < 0 {
-		start = 0
-	}
-	mut slot := 0
-	for column_index := start; column_index < a.files.columns.len && slot < slots; column_index++ {
 		column := &a.files.columns[column_index]
 		if column.browser.path == parent {
 			index := files_context_entry_index(column.browser.entries, name)
 			if index >= column.browser.scroll && index < column.browser.scroll + a.files.visible_rows {
-				x := slot * column_width + files_padding + 20
-				y := files_header_height + files_column_header_height
+				x := content_left + column_x + files_padding + 20
+				y := a.files.rows_top
 					+ (index - column.browser.scroll) * files_row_height
-				mut this_width := column_width
-				if slot + 1 == slots {
-					this_width = width - slot * column_width
-				}
-				mut field_width := this_width - 2 * files_padding - 52
+				mut field_width := column_width - 2 * files_padding - 52
 				if field_width < 72 {
 					field_width = 72
 				}
@@ -458,7 +447,6 @@ fn (a &FilesContextApp) rename_overlay(size ui2.Rect) ?ui2.Element {
 				}, 0)
 			}
 		}
-		slot++
 	}
 	return none
 }
@@ -628,6 +616,15 @@ fn (mut a FilesContextApp) handle(event_id string) ! {
 		else {}
 	}
 	a.files.handle(event_id)!
+}
+
+fn (mut a FilesContextApp) pointer_input_enabled() bool {
+	return true
+}
+
+fn (mut a FilesContextApp) pointer_event(phase AppPointerPhase, button AppPointerButton,
+	scroll int, x int, y int, width int, height int) {
+	a.files.pointer_event(phase, button, scroll, x, y, width, height)
 }
 
 fn (mut d Desktop) clear_context_item_path() {
