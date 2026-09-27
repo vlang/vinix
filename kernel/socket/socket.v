@@ -237,6 +237,9 @@ pub fn syscall_accept(_ voidptr, fdnum int) (u64, u64) {
 	} else {
 		return errno.err, errno.einval
 	}
+	defer {
+		unsafe { free(sock) }
+	}
 
 	mut connection_socket := sock.accept(fd.handle) or { return errno.err, errno.get() }
 
@@ -274,6 +277,11 @@ pub fn syscall_bind(_ voidptr, fdnum int, _addr voidptr, addrlen u32) (u64, u64)
 	} else {
 		return errno.err, errno.einval
 	}
+	// V boxes a pointer to this interface on the heap. The socket resource
+	// remains owned by the descriptor; only the temporary box is ours.
+	defer {
+		unsafe { free(sock) }
+	}
 
 	sock.bind(fd.handle, _addr, addrlen) or { return errno.err, errno.get() }
 
@@ -306,6 +314,11 @@ pub fn syscall_listen(_ voidptr, fdnum int, backlog int) (u64, u64) {
 		sock = res
 	} else {
 		return errno.err, errno.einval
+	}
+	// V boxes a pointer to this interface on the heap. The socket resource
+	// remains owned by the descriptor; only the temporary box is ours.
+	defer {
+		unsafe { free(sock) }
 	}
 
 	sock.listen(fd.handle, backlog) or { return errno.err, errno.get() }
@@ -340,6 +353,9 @@ pub fn syscall_recvmsg(_ voidptr, fdnum int, msg &sock_pub.MsgHdr, flags int) (u
 		sock = res
 	} else {
 		return errno.err, errno.einval
+	}
+	defer {
+		unsafe { free(sock) }
 	}
 
 	// MSG_DONTWAIT is a per-call override, not a permanent descriptor flag.
@@ -568,6 +584,11 @@ pub fn syscall_connect(_ voidptr, fdnum int, _addr voidptr, addrlen u32) (u64, u
 	} else {
 		return errno.err, errno.einval
 	}
+	// V boxes a pointer to this interface on the heap. The socket resource
+	// remains owned by the descriptor; only the temporary box is ours.
+	defer {
+		unsafe { free(sock) }
+	}
 
 	sock.connect(fd.handle, _addr, addrlen) or { return errno.err, errno.get() }
 
@@ -578,6 +599,8 @@ pub fn syscall_getpeername(_ voidptr, fdnum int, _addr voidptr, addrlen &u32) (u
 	mut fd, mut sock := socket_from_fdnum(fdnum) or { return errno.err, errno.get() }
 	defer {
 		fd.unref()
+		// socket_from_fdnum returns a boxed interface, separate from the FD.
+		unsafe { free(sock) }
 	}
 
 	if addrlen == unsafe { nil } {
@@ -617,6 +640,8 @@ pub fn syscall_getsockname(_ voidptr, fdnum int, _addr voidptr, addrlen &u32) (u
 	mut fd, mut sock := socket_from_fdnum(fdnum) or { return errno.err, errno.get() }
 	defer {
 		fd.unref()
+		// socket_from_fdnum returns a boxed interface, separate from the FD.
+		unsafe { free(sock) }
 	}
 
 	if addrlen == unsafe { nil } {
@@ -634,6 +659,8 @@ pub fn syscall_shutdown(_ voidptr, fdnum int, how int) (u64, u64) {
 	mut fd, mut sock := socket_from_fdnum(fdnum) or { return errno.err, errno.get() }
 	defer {
 		fd.unref()
+		// socket_from_fdnum returns a boxed interface, separate from the FD.
+		unsafe { free(sock) }
 	}
 
 	sock.shutdown(fd.handle, how) or { return errno.err, errno.get() }
@@ -647,6 +674,8 @@ pub fn syscall_getsockopt(_ voidptr, fdnum int, level int, optname int, optval u
 	mut fd, mut sock := socket_from_fdnum(fdnum) or { return errno.err, errno.get() }
 	defer {
 		fd.unref()
+		// socket_from_fdnum returns a boxed interface, separate from the FD.
+		unsafe { free(sock) }
 	}
 
 	if optval == 0 || optlen == 0 {
@@ -775,6 +804,8 @@ pub fn syscall_setsockopt(_ voidptr, fdnum int, level int, optname int, optval u
 	mut fd, mut sock := socket_from_fdnum(fdnum) or { return errno.err, errno.get() }
 	defer {
 		fd.unref()
+		// socket_from_fdnum returns a boxed interface, separate from the FD.
+		unsafe { free(sock) }
 	}
 
 	// The timeouts and SO_LINGER of an inet or unix socket, read as the

@@ -776,6 +776,31 @@ static int test_anonymous_ipc_memory_reclamation(void)
 	return 0;
 }
 
+/* A socket syscall boxes the V Socket interface for dispatch. Repeated empty
+ * receives used to retain each box, consuming one 16 KiB slab page for every
+ * few dozen calls while a busy X11 client polled its sockets. */
+static int test_socket_interface_box_reclamation(void)
+{
+	int pair[2];
+	struct sysinfo before, after;
+	char byte;
+	struct iovec iov = {.iov_base = &byte, .iov_len = sizeof(byte)};
+	struct msghdr message = {.msg_iov = &iov, .msg_iovlen = 1};
+	CHECK(socketpair(AF_UNIX, SOCK_STREAM, 0, pair) == 0);
+	CHECK(sysinfo(&before) == 0);
+	for (int i = 0; i < 65536; ++i) {
+		errno = 0;
+		CHECK(recvmsg(pair[0], &message, MSG_DONTWAIT) == -1);
+		CHECK(errno == EAGAIN || errno == EWOULDBLOCK);
+	}
+	CHECK(sysinfo(&after) == 0);
+	CHECK(after.freeram + 6UL * 1024 * 1024 >= before.freeram);
+	CHECK(close(pair[0]) == 0);
+	CHECK(close(pair[1]) == 0);
+	puts("QEMU CORE PASS: socket interface boxes are reclaimed");
+	return 0;
+}
+
 /* Idle sockets must not each reserve a 1 MiB receive buffer. A browser can
  * keep hundreds of UNIX endpoints open while starting; allocating them all
  * eagerly exhausted or fragmented the guest before Steam opened a window.
@@ -1030,6 +1055,7 @@ static int run_tests(void)
 	CHECK(test_cow() == 0);
 	CHECK(test_interrupted_nanosleep_remaining() == 0);
 	CHECK(test_anonymous_ipc_memory_reclamation() == 0);
+	CHECK(test_socket_interface_box_reclamation() == 0);
 	CHECK(test_unix_socket_buffer_growth() == 0);
 	CHECK(test_default_terminating_signals() == 0);
 	CHECK(prepare_directory() == 0);
