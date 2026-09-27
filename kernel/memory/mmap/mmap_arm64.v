@@ -2,6 +2,7 @@ module mmap
 
 import aarch64.cpu
 import aarch64.cpu.local as cpulocal
+import aarch64.timer
 import memory
 import proc
 
@@ -50,12 +51,23 @@ pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
 		return none
 	}
 
+	// Resolve the fault as one exception transaction. In particular, do not
+	// enable the scheduler FIQ between finding the backing page and installing
+	// its PTE: a file-backed fault on the M1 can outlive a 5 ms quantum, and a
+	// context switch from this nested synchronous exception leaves the initial
+	// exec handoff unable to make forward progress. The earlier bounded startup
+	// trace happened to avoid that race by stopping the timer around each fault.
+	// Make that correctness property independent of diagnostics, and give the
+	// faulting instruction a fresh quantum in which to retry after the PTE and
+	// instruction-cache maintenance are complete.
+	fault_timeslice := if current_thread.timeslice != 0 { current_thread.timeslice } else { u64(1) }
+	timer.stop()
+	defer {
+		timer.oneshot(fault_timeslice)
+	}
+
 	mut process := current_thread.process
 	mut pagemap := process.pagemap
-	prev := cpu.interrupt_toggle(true)
-	defer {
-		cpu.interrupt_toggle(prev)
-	}
 
 	// A translation fault on a page that is mapped by now raced with a
 	// break-before-make update of its descriptor: fork write-protecting it, or
