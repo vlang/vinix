@@ -38,13 +38,14 @@ mut:
 // list has been scrolled.
 struct FileBrowser {
 mut:
-	path    string = '/'
-	entries []FileEntry
-	scroll  int
-	error   string
+	path        string = '/'
+	entries     []FileEntry
+	show_hidden bool
+	scroll      int
+	error       string
 	// Row the pointer is over, or -1. Kept here rather than in the desktop's
 	// hover state because rows are the application's, not the chrome's.
-	hover_row int = -1
+	hover_row    int = -1
 	selected_row int = -1
 }
 
@@ -81,6 +82,10 @@ fn file_path_name(path string) string {
 // prefix is part of the cached row ids, so every visible column can route a
 // click without allocating an action string on each compositor rebuild.
 fn read_file_entries(path string, action_prefix string) ?[]FileEntry {
+	return read_file_entries_filtered(path, action_prefix, false)
+}
+
+fn read_file_entries_filtered(path string, action_prefix string, show_hidden bool) ?[]FileEntry {
 	dir := desktop_opendir(path)
 	if dir == unsafe { nil } {
 		return none
@@ -96,7 +101,7 @@ fn read_file_entries(path string, action_prefix string) ?[]FileEntry {
 		}
 		name := unsafe { cstring_to_vstring(&char(&buffer[0])) }
 		// `.` says nothing, and `..` is the Up button's job.
-		if name == '.' || name == '..' {
+		if name == '.' || name == '..' || (!show_hidden && name.starts_with('.')) {
 			unsafe { name.free() }
 			continue
 		}
@@ -110,9 +115,9 @@ fn read_file_entries(path string, action_prefix string) ?[]FileEntry {
 		unsafe { full.free() }
 		// Unreadable entries remain visible, with unknown type and size.
 		entries << FileEntry{
-			name: name
+			name:   name
 			is_dir: is_dir
-			size: size
+			size:   size
 		}
 	}
 	desktop_closedir(dir)
@@ -133,7 +138,7 @@ fn read_file_entries(path string, action_prefix string) ?[]FileEntry {
 // open leaves the browser where it was and says so, rather than emptying the
 // window and looking like the directory is empty.
 fn (mut b FileBrowser) read(path string) {
-	entries := read_file_entries(path, files_action_row) or {
+	entries := read_file_entries_filtered(path, files_action_row, b.show_hidden) or {
 		unsafe { b.error.free() }
 		b.error = 'cannot open ${path}'
 		return
@@ -239,6 +244,9 @@ const files_action_up = 'files.up'
 const files_action_row = 'files.row.'
 const files_action_view_list = 'files.view.list'
 const files_action_view_columns = 'files.view.columns'
+const files_action_settings = 'files.settings.open'
+const files_action_tag_prefix = 'files.tag.'
+const files_action_tag_row = 'files.tag.row.'
 const files_action_column_row = 'files.column.row.'
 const files_action_scrollbar = 'files.scrollbar'
 
@@ -279,7 +287,7 @@ fn files_content_left(width int) int {
 }
 
 fn files_path_width(width int) int {
-	right := width - files_padding - 2 * files_view_button_width - 2 - 8
+	right := width - files_padding - 3 * files_view_button_width - 2 * 2 - 8
 	return if right > files_path_left { right - files_path_left } else { 1 }
 }
 
@@ -293,9 +301,9 @@ enum FilesViewMode {
 // columns to follow another branch never invalidates the remaining actions.
 struct MillerColumn {
 mut:
-	id                 int
-	browser            FileBrowser
-	selected_row       int = -1
+	id           int
+	browser      FileBrowser
+	selected_row int = -1
 }
 
 fn (mut c MillerColumn) release() {
@@ -308,32 +316,35 @@ fn (mut c MillerColumn) release() {
 
 struct FileBrowserApp {
 mut:
-	browser FileBrowser
+	browser        FileBrowser
+	settings       FilesSettings
+	active_tag_id  int = -1
+	sidebar_scroll int
 	// Rows the window last had space for, so scrolling can clamp against the
 	// window as it actually is rather than as it was when it opened.
-	visible_rows int = 1
-	view_mode FilesViewMode
-	columns []MillerColumn
-	next_column_id int = 1
-	column_offset int
-	column_width int
-	viewport_width int
-	rows_top int
-	rows_height int
-	reveal_last_column bool
-	horizontal_drag bool
-	horizontal_drag_x int
+	visible_rows           int = 1
+	view_mode              FilesViewMode
+	columns                []MillerColumn
+	next_column_id         int = 1
+	column_offset          int
+	column_width           int
+	viewport_width         int
+	rows_top               int
+	rows_height            int
+	reveal_last_column     bool
+	horizontal_drag        bool
+	horizontal_drag_x      int
 	horizontal_drag_offset int
-	vertical_drag_id int = -2 // -2: none, -1: list, otherwise a MillerColumn id
-	vertical_drag_y int
-	vertical_drag_scroll int
-	path_offset int
-	path_content_width int
-	path_viewport_width int
-	path_drag bool
-	path_drag_x int
-	path_drag_offset int
-	reveal_path_end bool
+	vertical_drag_id       int = -2 // -2: none, -1: list, otherwise a MillerColumn id
+	vertical_drag_y        int
+	vertical_drag_scroll   int
+	path_offset            int
+	path_content_width     int
+	path_viewport_width    int
+	path_drag              bool
+	path_drag_x            int
+	path_drag_offset       int
+	reveal_path_end        bool
 }
 
 fn open_files(mut _ Desktop) !NativeApp {
@@ -360,16 +371,16 @@ fn (mut a FileBrowserApp) new_miller_column(path string) MillerColumn {
 	a.next_column_id++
 	id_text := id.str()
 	row_prefix := '${files_action_column_row}${id_text}.'
-	entries := read_file_entries(path, row_prefix) or {
+	entries := read_file_entries_filtered(path, row_prefix, a.settings.show_hidden) or {
 		error_text := 'cannot open ${path}'
 		unsafe {
 			id_text.free()
 			row_prefix.free()
 		}
 		return MillerColumn{
-			id: id
+			id:      id
 			browser: FileBrowser{
-				path: path
+				path:  path
 				error: error_text
 			}
 		}
@@ -379,9 +390,9 @@ fn (mut a FileBrowserApp) new_miller_column(path string) MillerColumn {
 		row_prefix.free()
 	}
 	return MillerColumn{
-		id: id
+		id:      id
 		browser: FileBrowser{
-			path: path
+			path:    path
 			entries: entries
 		}
 	}
@@ -446,6 +457,7 @@ fn (mut a FileBrowserApp) reset_miller_columns(path string) {
 }
 
 fn (mut a FileBrowserApp) set_view_mode(mode FilesViewMode) {
+	a.active_tag_id = -1
 	if mode == a.view_mode {
 		return
 	}
@@ -470,6 +482,7 @@ fn (a &FileBrowserApp) current_path() string {
 }
 
 fn (mut a FileBrowserApp) navigate_to(path string) {
+	a.active_tag_id = -1
 	// read() takes ownership on success. Sidebar paths are shared constants.
 	owned := path.clone()
 	a.browser.read(owned)
@@ -483,22 +496,26 @@ fn (mut a FileBrowserApp) navigate_to(path string) {
 }
 
 fn (a &FileBrowserApp) sidebar(height int) ui2.Element {
-	mut rows := frame_elements(files_locations.len + 3)
-	rows << ui2.label('', 'Favorites', ui2.rect(14, 10, files_sidebar_width - 28, 20), ui2.TextStyle{
+	mut rows := frame_elements(files_locations.len + a.settings.tags.len + 4)
+	rows << ui2.label('', 'Favorites', ui2.rect(14, f64(10 - a.sidebar_scroll), files_sidebar_width - 28, 20), ui2.TextStyle{
 		color: body_muted
-		size: 11
-		bold: true
+		size:  11
+		bold:  true
 	})
 	for index, location in files_locations {
 		if index == files_locations.len - 1 {
-			rows << ui2.label('', 'Locations', ui2.rect(14, 225, files_sidebar_width - 28, 20), ui2.TextStyle{
+			rows << ui2.label('', 'Locations', ui2.rect(14, f64(225 - a.sidebar_scroll), files_sidebar_width - 28, 20), ui2.TextStyle{
 				color: body_muted
-				size: 11
-				bold: true
+				size:  11
+				bold:  true
 			})
 		}
-		y := if index == files_locations.len - 1 { 250 } else { 35 + index * files_sidebar_row_height }
-		if y + files_sidebar_row_height > height {
+		y := (if index == files_locations.len - 1 {
+			250
+		} else {
+			35 + index * files_sidebar_row_height
+		}) - a.sidebar_scroll
+		if y + files_sidebar_row_height > height || y < 0 {
 			continue
 		}
 		selected := a.current_path() == location.path
@@ -510,12 +527,37 @@ fn (a &FileBrowserApp) sidebar(height int) ui2.Element {
 		})
 		contents << ui2.label('', location.title, ui2.rect(37, 0, files_sidebar_width - 48, files_sidebar_row_height), ui2.TextStyle{
 			color: body_text
-			size: 12
+			size:  12
 		})
 		rows << ui2.clickable_view(location.action, ui2.rect(6, f64(y), files_sidebar_width - 12, files_sidebar_row_height), ui2.BoxStyle{
-			bg: files_sidebar_selected
-			radius: 6
+			bg:          files_sidebar_selected
+			radius:      6
 			transparent: !selected
+		}, contents)
+	}
+	mut tag_row := 0
+	for tag in a.settings.tags {
+		if !tag.sidebar { continue }
+		if tag_row == 0 {
+			rows << ui2.label('', 'Tags', ui2.rect(14, f64(290 - a.sidebar_scroll), files_sidebar_width - 28, 20), ui2.TextStyle{
+				color: body_muted
+				size:  11
+				bold:  true
+			})
+		}
+		y := 313 + tag_row * files_sidebar_row_height - a.sidebar_scroll
+		tag_row++
+		if y + files_sidebar_row_height > height || y < 0 { continue }
+		mut contents := frame_elements(2)
+		contents << ui2.view('', ui2.rect(14, 10, 9, 9), ui2.BoxStyle{ bg: tag.color, radius: 5 }, [])
+		contents << ui2.label('', tag.name, ui2.rect(36, 0, files_sidebar_width - 47, files_sidebar_row_height), ui2.TextStyle{
+			color: body_text
+			size:  12
+		})
+		rows << ui2.clickable_view('${files_action_tag_prefix}${tag.id}', ui2.rect(6, f64(y), files_sidebar_width - 12, files_sidebar_row_height), ui2.BoxStyle{
+			bg:          files_sidebar_selected
+			radius:      6
+			transparent: a.active_tag_id != tag.id
 		}, contents)
 	}
 	return ui2.clickable_view('files.sidebar', ui2.rect(0, files_header_height, files_sidebar_width, f64(height)), ui2.BoxStyle{
@@ -611,12 +653,18 @@ fn parse_miller_row_action(event_id string) ?MillerRowAction {
 	}
 	return MillerRowAction{
 		column_id: column_id
-		row: row
+		row:       row
 	}
 }
 
 fn files_clamp(value int, maximum int) int {
-	return if value < 0 { 0 } else if value > maximum { maximum } else { value }
+	return if value < 0 {
+		0
+	} else if value > maximum {
+		maximum
+	} else {
+		value
+	}
 }
 
 // Returns the thumb's position and length within a track. The same geometry
@@ -644,7 +692,9 @@ fn (a &FileBrowserApp) max_column_offset() int {
 fn (a &FileBrowserApp) max_path_offset() int {
 	return if a.path_content_width > a.path_viewport_width {
 		a.path_content_width - a.path_viewport_width
-	} else { 0 }
+	} else {
+		0
+	}
 }
 
 fn (a &FileBrowserApp) pointer_over_path(x int, y int) bool {
@@ -690,7 +740,11 @@ fn (mut a FileBrowserApp) build(size ui2.Rect) !ui2.Element {
 		a.column_offset = files_clamp(a.column_offset, column_max)
 	}
 	a.rows_top = files_header_height
-	bar_height := if a.view_mode == .columns && column_max > 0 { files_horizontal_bar_height } else { 0 }
+	bar_height := if a.view_mode == .columns && column_max > 0 {
+		files_horizontal_bar_height
+	} else {
+		0
+	}
 	a.rows_height = height - a.rows_top - bar_height - files_padding
 	if a.rows_height < files_row_height {
 		a.rows_height = files_row_height
@@ -706,25 +760,27 @@ fn (mut a FileBrowserApp) build(size ui2.Rect) !ui2.Element {
 
 	// Header: where we are, the way back out, and the two view choices.
 	view_button_gap := 2
-	view_x := width - files_padding - 2 * files_view_button_width - view_button_gap
+	view_x := width - files_padding - 3 * files_view_button_width - 2 * view_button_gap
 	children << ui2.button(files_action_up, 'Up', ui2.rect(f64(files_padding), files_path_top, 40, files_path_height), ui2.BoxStyle{
-		bg: if a.current_path() == '/' { files_up_disabled } else { files_up }
+		bg:     if a.current_path() == '/' { files_up_disabled } else { files_up }
 		radius: 5
 	}, ui2.TextStyle{
 		color: if a.current_path() == '/' { body_muted } else { app_on_accent }
-		size: 12
+		size:  12
 		align: .center
 	})
 	children << files_view_button(files_action_view_list, 'List view', 'builtin:list_view',
 		view_x, a.view_mode == .list)
 	children << files_view_button(files_action_view_columns, 'Column view', 'builtin:column_view',
 		view_x + files_view_button_width + view_button_gap, a.view_mode == .columns)
+	children << files_view_button(files_action_settings, 'Files Settings (Cmd+,)', 'builtin:settings',
+		view_x + 2 * (files_view_button_width + view_button_gap), false)
 	if a.view_mode == .list {
 		children << ui2.label('', a.current_path(), ui2.rect(files_path_left, files_path_top,
 			f64(a.path_viewport_width), files_path_height), ui2.TextStyle{
 			color: body_heading
-			size: 13
-			bold: true
+			size:  13
+			bold:  true
 		})
 	} else {
 		// The path shares the toolbar with Up and the view buttons. Navigation
@@ -733,8 +789,8 @@ fn (mut a FileBrowserApp) build(size ui2.Rect) !ui2.Element {
 		path_children << ui2.label('', a.current_path(), ui2.rect(f64(-a.path_offset), 0,
 			f64(a.path_content_width), files_path_height), ui2.TextStyle{
 			color: body_heading
-			size: 13
-			bold: true
+			size:  13
+			bold:  true
 		})
 		children << ui2.Element{
 			...ui2.view('', ui2.rect(files_path_left, files_path_top,
@@ -751,11 +807,14 @@ fn (mut a FileBrowserApp) build(size ui2.Rect) !ui2.Element {
 	if a.view_mode == .columns {
 		return a.build_miller_columns(width, height, mut children)
 	}
+	if a.active_tag_id >= 0 {
+		return a.build_tag_results(width, height, mut children)
+	}
 
 	if a.browser.error != '' {
 		children << ui2.label('', a.browser.error, ui2.rect(f64(content_left + files_padding), f64(a.rows_top + 8), f64(inner), 20), ui2.TextStyle{
 			color: files_error
-			size: 13
+			size:  13
 		})
 		return a.screen_with_sidebar(width, height, mut children)
 	}
@@ -763,7 +822,7 @@ fn (mut a FileBrowserApp) build(size ui2.Rect) !ui2.Element {
 	if a.browser.entries.len == 0 {
 		children << ui2.label('', 'This directory is empty.', ui2.rect(f64(content_left + files_padding), f64(a.rows_top + 8), f64(inner), 20), ui2.TextStyle{
 			color: body_muted
-			size: 13
+			size:  13
 		})
 		return a.screen_with_sidebar(width, height, mut children)
 	}
@@ -772,6 +831,8 @@ fn (mut a FileBrowserApp) build(size ui2.Rect) !ui2.Element {
 	mut row := 0
 	for index := a.browser.scroll; index < a.browser.entries.len && row < a.visible_rows; index++ {
 		entry := &a.browser.entries[index]
+		entry_path := join_path(a.browser.path, entry.name)
+		tag_color := a.settings.first_color(entry_path)
 		y := a.rows_top + row * files_row_height
 		hovered := a.browser.hover_row == index || a.browser.selected_row == index
 		mut row_children := frame_elements(3)
@@ -782,21 +843,34 @@ fn (mut a FileBrowserApp) build(size ui2.Rect) !ui2.Element {
 		}, ui2.rect(f64(files_padding), 4, 16, 16), ui2.BoxStyle{
 			transparent: true
 		}, ui2.TextStyle{
-			color: if entry.is_dir { files_folder_icon } else { files_file_icon }
+			color: if entry.is_dir && a.settings.tint_folders && tag_color != 0 {
+				tag_color
+			} else if entry.is_dir {
+				files_folder_icon
+			} else {
+				files_file_icon
+			}
 		})
 		row_children << ui2.label('', entry.name, ui2.rect(f64(files_padding + 24), 0, f64(inner - 24 - 72), f64(files_row_height)), ui2.TextStyle{
 			color: if entry.is_dir { body_heading } else { body_text }
-			size: 13
+			size:  13
 		})
 		row_children << ui2.label('', entry.size_text, ui2.rect(f64(content_width - files_padding - 70), 0, 70, f64(files_row_height)), ui2.TextStyle{
 			color: body_muted
-			size: 11
+			size:  11
 			align: .right
 		})
+		if tag_color != 0 {
+			row_children << ui2.view('', ui2.rect(f64(content_width - files_padding - 83), 9, 7, 7), ui2.BoxStyle{
+				bg:     tag_color
+				radius: 4
+			}, [])
+		}
 		children << ui2.clickable_view(entry.row_action, ui2.rect(f64(content_left), f64(y), f64(content_width), f64(files_row_height)), ui2.BoxStyle{
-			bg: files_row_hover
+			bg:          files_row_hover
 			transparent: !hovered
 		}, row_children)
+		unsafe { entry_path.free() }
 		row++
 	}
 
@@ -827,14 +901,78 @@ fn files_vertical_scrollbar(x int, y int, height int, visible int, total int, sc
 	position, thumb_height := files_scroll_thumb(height, visible, total, scroll)
 	mut bar_children := frame_elements(1)
 	bar_children << ui2.view('', ui2.rect(1, f64(position), 6, f64(thumb_height)), ui2.BoxStyle{
-		bg: body_muted
+		bg:     body_muted
 		radius: 3
 	}, [])
 	return ui2.clickable_view(files_action_scrollbar, ui2.rect(f64(x), f64(y), files_scrollbar_width,
 		f64(height)), ui2.BoxStyle{
-		bg: body_rule
+		bg:     body_rule
 		radius: 4
 	}, bar_children)
+}
+
+fn (mut a FileBrowserApp) build_tag_results(width int, height int, mut children []ui2.Element) ui2.Element {
+	content_left := files_content_left(width)
+	content_width := width - content_left
+	index := a.settings.tag_index(a.active_tag_id)
+	if index < 0 {
+		a.active_tag_id = -1
+		return a.screen_with_sidebar(width, height, mut children)
+	}
+	tag := a.settings.tags[index]
+	paths := a.settings.tagged_paths(tag.id)
+	defer { unsafe { paths.free() } }
+	children << ui2.label('', tag.name, ui2.rect(f64(content_left + 14), f64(a.rows_top + 6), f64(content_width - 28), 20), ui2.TextStyle{
+		color: body_heading
+		size:  14
+		bold:  true
+	})
+	if paths.len == 0 {
+		children << ui2.label('', 'No files have this tag.', ui2.rect(f64(content_left + 14), f64(a.rows_top + 34), f64(content_width - 28), 20), ui2.TextStyle{
+			color: body_muted
+			size:  12
+		})
+		return a.screen_with_sidebar(width, height, mut children)
+	}
+	visible := if a.visible_rows > 1 { a.visible_rows - 1 } else { 1 }
+	a.browser.scroll = files_clamp(a.browser.scroll, if paths.len > visible {
+		paths.len - visible
+	} else {
+		0
+	})
+	for slot := 0; slot < visible; slot++ {
+		row := a.browser.scroll + slot
+		if row >= paths.len { break }
+		path := paths[row]
+		info := desktop_lstat(path) or { continue }
+		mut item := frame_elements(3)
+		item << ui2.button_with_image('', '', if info.is_dir {
+			'builtin:folder'
+		} else {
+			'builtin:file'
+		}, ui2.rect(10, 4, 16, 16), ui2.BoxStyle{ transparent: true }, ui2.TextStyle{
+			color: if info.is_dir && a.settings.tint_folders {
+				tag.color
+			} else if info.is_dir {
+				files_folder_icon
+			} else {
+				files_file_icon
+			}
+		})
+		item << ui2.label('', file_path_name(path), ui2.rect(34, 0, f64(content_width - 80), files_row_height), ui2.TextStyle{
+			color: body_text
+			size:  12
+		})
+		item << ui2.view('', ui2.rect(f64(content_width - 25), 9, 7, 7), ui2.BoxStyle{ bg: tag.color, radius: 4 }, [])
+		children << ui2.clickable_view('${files_action_tag_row}${row}', ui2.rect(f64(content_left), f64(a.rows_top + 26 + slot * files_row_height), f64(content_width), files_row_height), ui2.BoxStyle{
+			bg: if slot % 2 == 0 { body_panel } else { app_surface }
+		}, item)
+	}
+	if paths.len > visible {
+		children << files_vertical_scrollbar(width - files_scrollbar_width - 2, a.rows_top + 26,
+			a.rows_height - 26, visible, paths.len, a.browser.scroll)
+	}
+	return a.screen_with_sidebar(width, height, mut children)
 }
 
 fn (mut a FileBrowserApp) build_miller_columns(width int, height int, mut children []ui2.Element) !ui2.Element {
@@ -852,18 +990,20 @@ fn (mut a FileBrowserApp) build_miller_columns(width int, height int, mut childr
 		if column.browser.error != '' {
 			children << ui2.label('', column.browser.error, ui2.rect(f64(x + files_padding), f64(rows_top + 8), f64(column_width - 2 * files_padding), 36), ui2.TextStyle{
 				color: files_error
-				size: 12
+				size:  12
 				lines: 2
 			})
 		} else if column.browser.entries.len == 0 {
 			children << ui2.label('', 'Empty', ui2.rect(f64(x + files_padding), f64(rows_top + 8), f64(column_width - 2 * files_padding), 20), ui2.TextStyle{
 				color: body_muted
-				size: 12
+				size:  12
 			})
 		} else {
 			mut row_slot := 0
 			for entry_index := column.browser.scroll; entry_index < column.browser.entries.len && row_slot < a.visible_rows; entry_index++ {
 				entry := &column.browser.entries[entry_index]
+				entry_path := join_path(column.browser.path, entry.name)
+				tag_color := a.settings.first_color(entry_path)
 				y := rows_top + row_slot * files_row_height
 				selected := column.selected_row == entry_index
 				mut row_children := frame_elements(3)
@@ -874,21 +1014,34 @@ fn (mut a FileBrowserApp) build_miller_columns(width int, height int, mut childr
 				}, ui2.rect(f64(files_padding), 4, 16, 16), ui2.BoxStyle{
 					transparent: true
 				}, ui2.TextStyle{
-					color: if entry.is_dir { files_folder_icon } else { files_file_icon }
+					color: if entry.is_dir && a.settings.tint_folders && tag_color != 0 {
+						tag_color
+					} else if entry.is_dir {
+						files_folder_icon
+					} else {
+						files_file_icon
+					}
 				})
 				row_children << ui2.label('', entry.name, ui2.rect(f64(files_padding + 24), 0, f64(column_width - 2 * files_padding - 24 - 34), f64(files_row_height)), ui2.TextStyle{
 					color: if entry.is_dir { body_heading } else { body_text }
-					size: 12
+					size:  12
 				})
 				row_children << ui2.label('', if entry.is_dir { '>' } else { entry.size_text }, ui2.rect(f64(column_width - files_padding - 30), 0, 30, f64(files_row_height)), ui2.TextStyle{
 					color: body_muted
-					size: 11
+					size:  11
 					align: .right
 				})
+				if tag_color != 0 {
+					row_children << ui2.view('', ui2.rect(f64(column_width - files_padding - 42), 9, 7, 7), ui2.BoxStyle{
+						bg:     tag_color
+						radius: 4
+					}, [])
+				}
 				children << ui2.clickable_view(entry.row_action, ui2.rect(f64(x), f64(y), f64(column_width), f64(files_row_height)), ui2.BoxStyle{
-					bg: files_row_hover
+					bg:          files_row_hover
 					transparent: !selected
 				}, row_children)
+				unsafe { entry_path.free() }
 				row_slot++
 			}
 		}
@@ -910,12 +1063,12 @@ fn (mut a FileBrowserApp) build_miller_columns(width int, height int, mut childr
 			a.columns.len * column_width, a.column_offset)
 		bar_y := height - files_horizontal_bar_height + 5
 		children << ui2.view('', ui2.rect(f64(content_left + files_padding), f64(bar_y), f64(track_width), 8), ui2.BoxStyle{
-			bg: body_rule
+			bg:     body_rule
 			radius: 4
 		}, [])
 		children << ui2.view('', ui2.rect(f64(content_left + files_padding + thumb_x), f64(bar_y),
 			f64(thumb_width), 8), ui2.BoxStyle{
-			bg: body_muted
+			bg:     body_muted
 			radius: 4
 		}, [])
 	}
@@ -937,6 +1090,17 @@ fn (mut a FileBrowserApp) scroll_at(x int, y int, steps int, width int) {
 	if steps == 0 {
 		return
 	}
+	if x < content_left && content_left > 0 {
+		mut count := 0
+		for tag in a.settings.tags { if tag.sidebar { count++ } }
+		maximum := if 313 + count * files_sidebar_row_height > a.rows_height {
+			313 + count * files_sidebar_row_height - a.rows_height
+		} else {
+			0
+		}
+		a.sidebar_scroll = files_clamp(a.sidebar_scroll - steps * files_sidebar_row_height, maximum)
+		return
+	}
 	if a.view_mode == .columns && a.pointer_over_path(x, y) {
 		a.path_offset = files_clamp(a.path_offset - steps * 48, a.max_path_offset())
 		return
@@ -953,9 +1117,19 @@ fn (mut a FileBrowserApp) scroll_at(x int, y int, steps int, width int) {
 		return
 	}
 	if a.view_mode == .list {
+		if a.active_tag_id >= 0 {
+			paths := a.settings.tagged_paths(a.active_tag_id)
+			visible := if a.visible_rows > 1 { a.visible_rows - 1 } else { 1 }
+			a.browser.scroll = files_clamp(a.browser.scroll - steps * 2,
+				if paths.len > visible { paths.len - visible } else { 0 })
+			unsafe { paths.free() }
+			return
+		}
 		maximum := if a.browser.entries.len > a.visible_rows {
 			a.browser.entries.len - a.visible_rows
-		} else { 0 }
+		} else {
+			0
+		}
 		a.browser.scroll = files_clamp(a.browser.scroll - steps * 2, maximum)
 		return
 	}
@@ -968,7 +1142,9 @@ fn (mut a FileBrowserApp) scroll_at(x int, y int, steps int, width int) {
 	}
 	maximum := if a.columns[index].browser.entries.len > a.visible_rows {
 		a.columns[index].browser.entries.len - a.visible_rows
-	} else { 0 }
+	} else {
+		0
+	}
 	a.columns[index].browser.scroll = files_clamp(a.columns[index].browser.scroll - steps * 2,
 		maximum)
 }
@@ -977,12 +1153,19 @@ fn (mut a FileBrowserApp) begin_vertical_drag(id int, y int, total int, current 
 	a.vertical_drag_id = id
 	a.vertical_drag_y = y
 	a.vertical_drag_scroll = current
-	position, thumb := files_scroll_thumb(a.rows_height, a.visible_rows, total, current)
-	if y < a.rows_top + position || y >= a.rows_top + position + thumb {
-		maximum := total - a.visible_rows
-		travel := a.rows_height - thumb
+	visible := if id == -1 && a.active_tag_id >= 0 && a.visible_rows > 1 {
+		a.visible_rows - 1
+	} else {
+		a.visible_rows
+	}
+	top := if id == -1 && a.active_tag_id >= 0 { a.rows_top + 26 } else { a.rows_top }
+	height := if id == -1 && a.active_tag_id >= 0 { a.rows_height - 26 } else { a.rows_height }
+	position, thumb := files_scroll_thumb(height, visible, total, current)
+	if y < top + position || y >= top + position + thumb {
+		maximum := total - visible
+		travel := height - thumb
 		if travel > 0 && maximum > 0 {
-			a.vertical_drag_scroll = files_clamp((y - a.rows_top - thumb / 2) * maximum / travel,
+			a.vertical_drag_scroll = files_clamp((y - top - thumb / 2) * maximum / travel,
 				maximum)
 			if id == -1 {
 				a.browser.scroll = a.vertical_drag_scroll
@@ -1026,6 +1209,15 @@ fn (mut a FileBrowserApp) pointer_event(phase AppPointerPhase, button AppPointer
 			}
 		} else if a.vertical_drag_id != -2 {
 			mut total := a.browser.entries.len
+			mut visible := a.visible_rows
+			mut track_height := a.rows_height
+			if a.vertical_drag_id == -1 && a.active_tag_id >= 0 {
+				paths := a.settings.tagged_paths(a.active_tag_id)
+				total = paths.len
+				unsafe { paths.free() }
+				visible = if a.visible_rows > 1 { a.visible_rows - 1 } else { 1 }
+				track_height -= 26
+			}
 			if a.vertical_drag_id >= 0 {
 				for column in a.columns {
 					if column.id == a.vertical_drag_id {
@@ -1034,10 +1226,10 @@ fn (mut a FileBrowserApp) pointer_event(phase AppPointerPhase, button AppPointer
 					}
 				}
 			}
-			_, thumb := files_scroll_thumb(a.rows_height, a.visible_rows, total,
+			_, thumb := files_scroll_thumb(track_height, visible, total,
 				a.vertical_drag_scroll)
-			travel := a.rows_height - thumb
-			maximum := total - a.visible_rows
+			travel := track_height - thumb
+			maximum := total - visible
 			if travel > 0 && maximum > 0 {
 				next := files_clamp(a.vertical_drag_scroll + (y - a.vertical_drag_y) * maximum / travel,
 					maximum)
@@ -1091,6 +1283,15 @@ fn (mut a FileBrowserApp) pointer_event(phase AppPointerPhase, button AppPointer
 		return
 	}
 	if a.view_mode == .list {
+		if a.active_tag_id >= 0 {
+			paths := a.settings.tagged_paths(a.active_tag_id)
+			visible := if a.visible_rows > 1 { a.visible_rows - 1 } else { 1 }
+			if paths.len > visible && x >= width - files_scrollbar_width - 4 {
+				a.begin_vertical_drag(-1, y, paths.len, a.browser.scroll)
+			}
+			unsafe { paths.free() }
+			return
+		}
 		if a.browser.entries.len > a.visible_rows && x >= width - files_scrollbar_width - 4 {
 			a.begin_vertical_drag(-1, y, a.browser.entries.len, a.browser.scroll)
 		}
@@ -1107,6 +1308,33 @@ fn (mut a FileBrowserApp) pointer_event(phase AppPointerPhase, button AppPointer
 }
 
 fn (mut a FileBrowserApp) handle(event_id string) ! {
+	if event_id.starts_with(files_action_tag_row) {
+		paths := a.settings.tagged_paths(a.active_tag_id)
+		index := event_id[files_action_tag_row.len..].int()
+		if index >= 0 && index < paths.len {
+			path := paths[index]
+			a.navigate_to(parent_path(path))
+			for row, entry in a.browser.entries {
+				if entry.name == file_path_name(path) {
+					a.browser.selected_row = row
+					break
+				}
+			}
+		}
+		return
+	}
+	if event_id.starts_with(files_action_tag_prefix) {
+		id := event_id[files_action_tag_prefix.len..].int()
+		if a.settings.tag_index(id) >= 0 {
+			a.active_tag_id = id
+			if a.view_mode == .columns {
+				a.set_view_mode(.list)
+				a.active_tag_id = id
+			}
+			a.browser.scroll = 0
+		}
+		return
+	}
 	for location in files_locations {
 		if event_id == location.action {
 			a.navigate_to(location.path)
@@ -1115,6 +1343,10 @@ fn (mut a FileBrowserApp) handle(event_id string) ! {
 	}
 	match event_id {
 		files_action_up {
+			if a.active_tag_id >= 0 {
+				a.active_tag_id = -1
+				return
+			}
 			if a.view_mode == .columns {
 				a.go_up_miller()
 			} else {

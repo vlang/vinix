@@ -15,6 +15,7 @@ const file_context_copy = 'files.context.copy'
 const file_context_cut = 'files.context.cut'
 const file_context_paste = 'files.context.paste'
 const file_context_delete = 'files.context.delete'
+const file_context_tags = 'files.context.tags'
 const files_context_select_prefix = 'files.context.select.'
 const files_context_clear = 'files.context.clear'
 const files_context_rename_key_prefix = 'files.context.rename.key.'
@@ -26,40 +27,49 @@ const create_context_row_height = 30
 
 const create_context_background_entries = [
 	ui2.MenuEntry{
-		id: create_context_new_folder
+		id:    create_context_new_folder
 		title: 'New Folder'
 	},
 	ui2.MenuEntry{
-		id: create_context_new_file
+		id:    create_context_new_file
 		title: 'New File'
 	},
 	ui2.MenuEntry{
-		id: file_context_paste
+		id:    file_context_paste
 		title: 'Paste'
 	},
 ]
 
 const create_context_item_entries = [
 	ui2.MenuEntry{
-		id: file_context_rename
+		id:    file_context_rename
 		title: 'Rename'
 	},
 	ui2.MenuEntry{
-		id: file_context_copy
+		id:    file_context_copy
 		title: 'Copy'
 	},
 	ui2.MenuEntry{
-		id: file_context_cut
+		id:    file_context_cut
 		title: 'Cut'
 	},
 	ui2.MenuEntry{
-		id: file_context_paste
+		id:    file_context_paste
 		title: 'Paste'
 	},
 	ui2.MenuEntry{
-		id: file_context_delete
+		id:    file_context_delete
 		title: 'Delete'
 	},
+]
+
+const create_context_files_item_entries = [
+	ui2.MenuEntry{ id: file_context_rename, title: 'Rename' },
+	ui2.MenuEntry{ id: file_context_copy, title: 'Copy' },
+	ui2.MenuEntry{ id: file_context_cut, title: 'Cut' },
+	ui2.MenuEntry{ id: file_context_paste, title: 'Paste' },
+	ui2.MenuEntry{ id: file_context_tags, title: 'Tags…' },
+	ui2.MenuEntry{ id: file_context_delete, title: 'Delete' },
 ]
 
 enum CreateContextTarget {
@@ -125,13 +135,13 @@ fn apply_rename_input(mut buffer []u8, select_all bool, input string) RenameInpu
 		match ch {
 			0x1b {
 				return RenameInputResult{
-					state: .cancel
+					state:      .cancel
 					select_all: selected
 				}
 			}
 			`\n`, `\r` {
 				return RenameInputResult{
-					state: .commit
+					state:      .commit
 					select_all: selected
 				}
 			}
@@ -157,7 +167,7 @@ fn apply_rename_input(mut buffer []u8, select_all bool, input string) RenameInpu
 		}
 	}
 	return RenameInputResult{
-		state: .editing
+		state:      .editing
 		select_all: selected
 	}
 }
@@ -252,16 +262,27 @@ fn (mut d Desktop) desktop_directory_rename_key(input string) {
 // filesystem actions and the inline rename field used by the shared menu.
 struct FilesContextApp {
 mut:
-	files             FileBrowserApp
-	context_path      string
-	rename_path       string
-	rename_text       []u8
-	rename_select_all bool
-	preview          FilesQuickLook
+	files               FileBrowserApp
+	settings_open       bool
+	settings_tab        int
+	settings_selected   int
+	settings_scroll     int
+	settings_editing    bool
+	settings_select_all bool
+	settings_name       []u8
+	tag_picker          bool
+	tag_picker_scroll   int
+	context_path        string
+	rename_path         string
+	rename_text         []u8
+	rename_select_all   bool
+	preview             FilesQuickLook
 }
 
 fn open_files_with_context_menu(mut _ Desktop) !NativeApp {
 	mut app := &FilesContextApp{}
+	app.files.settings = load_files_settings(desktop_home)
+	app.files.browser.show_hidden = app.files.settings.show_hidden
 	for location in files_locations[..files_locations.len - 1] {
 		if location.path != desktop_home {
 			ensure_directory(location.path) or {}
@@ -321,6 +342,19 @@ fn files_context_entry_index(entries []FileEntry, name string) int {
 }
 
 fn (mut a FilesContextApp) focus_path(path string) {
+	if a.files.active_tag_id >= 0 {
+		paths := a.files.settings.tagged_paths(a.files.active_tag_id)
+		visible := if a.files.visible_rows > 1 { a.files.visible_rows - 1 } else { 1 }
+		index := paths.index(path)
+		if index >= 0 {
+			if index < a.files.browser.scroll { a.files.browser.scroll = index }
+			if index >= a.files.browser.scroll + visible {
+				a.files.browser.scroll = index - visible + 1
+			}
+		}
+		unsafe { paths.free() }
+		return
+	}
 	parent := parent_path(path)
 	name := file_path_name(path)
 	if a.files.view_mode == .list {
@@ -373,6 +407,16 @@ fn (mut a FilesContextApp) refresh_to(path string) {
 }
 
 fn (mut a FilesContextApp) select_action(action string) {
+	if action.starts_with(files_action_tag_row) {
+		paths := a.files.settings.tagged_paths(a.files.active_tag_id)
+		index := action[files_action_tag_row.len..].int()
+		if index >= 0 && index < paths.len {
+			a.set_context_path(paths[index])
+			unsafe { paths.free() }
+			return
+		}
+		unsafe { paths.free() }
+	}
 	if action.starts_with(files_action_row) {
 		index := action[files_action_row.len..].int()
 		if index >= 0 && index < a.files.browser.entries.len {
@@ -405,6 +449,21 @@ fn (a &FilesContextApp) rename_overlay(size ui2.Rect) ?ui2.Element {
 	name := file_path_name(a.rename_path)
 	width := int(size.width)
 	content_left := files_content_left(width)
+	if a.files.active_tag_id >= 0 {
+		paths := a.files.settings.tagged_paths(a.files.active_tag_id)
+		index := paths.index(a.rename_path)
+		visible := if a.files.visible_rows > 1 { a.files.visible_rows - 1 } else { 1 }
+		unsafe { paths.free() }
+		if index < a.files.browser.scroll || index >= a.files.browser.scroll + visible {
+			return none
+		}
+		return ui2.text_field('', '', rename_buffer_text(a.rename_text), ui2.rect(f64(content_left + 36),
+			f64(files_header_height + 27 + (index - a.files.browser.scroll) * files_row_height),
+			f64(width - content_left - 62), f64(files_row_height - 2)), ui2.BoxStyle{
+			bg:     editor_path_focus
+			radius: 4
+		}, ui2.TextStyle{ color: body_text, size: 12 }, 0)
+	}
 	if a.files.view_mode == .list {
 		if a.files.browser.path != parent {
 			return none
@@ -421,11 +480,11 @@ fn (a &FilesContextApp) rename_overlay(size ui2.Rect) ?ui2.Element {
 		}
 		return ui2.text_field('', '', rename_buffer_text(a.rename_text), ui2.rect(f64(x),
 			f64(y + 1), f64(field_width), f64(files_row_height - 2)), ui2.BoxStyle{
-			bg: editor_path_focus
+			bg:     editor_path_focus
 			radius: 4
 		}, ui2.TextStyle{
 			color: body_text
-			size: 13
+			size:  13
 		}, 0)
 	}
 	column_width := a.files.column_width
@@ -442,12 +501,14 @@ fn (a &FilesContextApp) rename_overlay(size ui2.Rect) ?ui2.Element {
 				if x < content_left + files_padding {
 					x = content_left + files_padding
 				}
-				y := a.files.rows_top
-					+ (index - column.browser.scroll) * files_row_height
+				y := a.files.rows_top +
+					(index - column.browser.scroll) * files_row_height
 				mut field_width := column_width - 2 * files_padding - 52
 				visible_right := if column_x + column_width < a.files.viewport_width {
 					content_left + column_x + column_width
-				} else { width }
+				} else {
+					width
+				}
 				if field_width > visible_right - x - files_padding {
 					field_width = visible_right - x - files_padding
 				}
@@ -456,11 +517,11 @@ fn (a &FilesContextApp) rename_overlay(size ui2.Rect) ?ui2.Element {
 				}
 				return ui2.text_field('', '', rename_buffer_text(a.rename_text), ui2.rect(f64(x),
 					f64(y + 1), f64(field_width), f64(files_row_height - 2)), ui2.BoxStyle{
-					bg: editor_path_focus
+					bg:     editor_path_focus
 					radius: 4
 				}, ui2.TextStyle{
 					color: body_text
-					size: 12
+					size:  12
 				}, 0)
 			}
 		}
@@ -470,6 +531,16 @@ fn (a &FilesContextApp) rename_overlay(size ui2.Rect) ?ui2.Element {
 
 fn (mut a FilesContextApp) build(size ui2.Rect) !ui2.Element {
 	root := a.files.build(size)!
+	if a.settings_open || a.tag_picker {
+		mut children := frame_elements(root.children.len + 1)
+		children << root.children
+		children << if a.settings_open {
+			a.settings_overlay(size)
+		} else {
+			a.tag_picker_overlay(size)
+		}
+		return ui2.Element{ ...root, children: children }
+	}
 	if a.preview.open {
 		mut children := frame_elements(root.children.len + 1)
 		children << root.children
@@ -535,6 +606,8 @@ fn (mut a FilesContextApp) delete_selected() ! {
 		}
 		return err
 	}
+	a.files.settings.remove_path(selected)
+	a.files.settings.save(desktop_home)
 	a.clear_context_path()
 	if a.rename_path == selected {
 		a.clear_rename()
@@ -548,9 +621,20 @@ fn (mut a FilesContextApp) delete_selected() ! {
 
 fn (mut a FilesContextApp) paste() ! {
 	directory := a.files.current_path().clone()
+	clipboard := file_context_clipboard_load()
 	pasted := paste_file_clipboard(directory) or {
+		if source := clipboard { unsafe { source.path.free() } }
 		unsafe { directory.free() }
 		return err
+	}
+	if source := clipboard {
+		if source.mode == .cut {
+			a.files.settings.rebase_path(source.path, pasted)
+		} else {
+			a.files.settings.copy_path(source.path, pasted)
+		}
+		a.files.settings.save(desktop_home)
+		unsafe { source.path.free() }
 	}
 	a.refresh_to(directory)
 	a.set_context_path(pasted)
@@ -573,6 +657,8 @@ fn (mut a FilesContextApp) commit_rename() ! {
 		return err
 	}
 	next_current := file_context_rebased_path(current, old_path, new_path)
+	a.files.settings.rebase_path(old_path, new_path)
+	a.files.settings.save(desktop_home)
 	a.clear_rename()
 	a.set_context_path(new_path)
 	a.refresh_to(next_current)
@@ -602,6 +688,24 @@ fn (mut a FilesContextApp) handle(event_id string) ! {
 		if event_id == files_quicklook_close {
 			a.preview.close()
 		}
+		return
+	}
+	if a.settings_open {
+		a.handle_settings(event_id)
+		return
+	}
+	if a.tag_picker {
+		if event_id == files_picker_close {
+			a.tag_picker = false
+		} else if event_id.starts_with(files_picker_toggle_prefix) {
+			id := event_id[files_picker_toggle_prefix.len..].int()
+			a.files.settings.toggle_tag(a.context_path, id)
+			a.files.settings.save(desktop_home)
+		}
+		return
+	}
+	if event_id == files_action_settings {
+		a.settings_open = true
 		return
 	}
 	if event_id.starts_with(files_context_select_prefix) {
@@ -645,6 +749,13 @@ fn (mut a FilesContextApp) handle(event_id string) ! {
 			a.delete_selected()!
 			return
 		}
+		file_context_tags {
+			if a.context_path.len > 0 {
+				a.tag_picker = true
+				a.tag_picker_scroll = 0
+			}
+			return
+		}
 		else {}
 	}
 	if event_id.starts_with(files_action_row) {
@@ -652,10 +763,13 @@ fn (mut a FilesContextApp) handle(event_id string) ! {
 		if index >= 0 && index < a.files.browser.entries.len {
 			a.select_action(event_id)
 		}
-	} else if parse_miller_row_action(event_id) != none {
+	} else if event_id.starts_with(files_action_tag_row)
+		|| parse_miller_row_action(event_id) != none {
 		a.select_action(event_id)
 	} else if event_id == files_action_up || event_id == files_action_view_list
-		|| event_id == files_action_view_columns || event_id.starts_with('files.location.') {
+		|| event_id == files_action_view_columns || event_id.starts_with('files.location.')
+		|| (event_id.starts_with(files_action_tag_prefix)
+		&& !event_id.starts_with(files_action_tag_row)) {
 		a.clear_context_path()
 	}
 	a.files.handle(event_id)!
@@ -667,6 +781,20 @@ fn (mut a FilesContextApp) pointer_input_enabled() bool {
 
 fn (mut a FilesContextApp) pointer_event(phase AppPointerPhase, button AppPointerButton,
 	scroll int, x int, y int, width int, height int) {
+	if a.settings_open {
+		if phase == .scroll && a.settings_tab == 1 {
+			a.settings_scroll = files_clamp(a.settings_scroll - scroll,
+				if a.files.settings.tags.len > 0 { a.files.settings.tags.len - 1 } else { 0 })
+		}
+		return
+	}
+	if a.tag_picker {
+		if phase == .scroll {
+			a.tag_picker_scroll = files_clamp(a.tag_picker_scroll - scroll,
+				if a.files.settings.tags.len > 0 { a.files.settings.tags.len - 1 } else { 0 })
+		}
+		return
+	}
 	if a.preview.open {
 		if phase == .scroll {
 			a.preview.scroll_by(-scroll * 3, height)
@@ -677,6 +805,23 @@ fn (mut a FilesContextApp) pointer_event(phase AppPointerPhase, button AppPointe
 }
 
 fn (mut a FilesContextApp) key_input(input string) {
+	if a.preview.open {
+		a.quicklook_key_input(input)
+		return
+	}
+	if input.contains('\x1b[44;9u') {
+		a.settings_open = !a.settings_open
+		a.tag_picker = false
+		return
+	}
+	if a.settings_open {
+		a.settings_key_input(input)
+		return
+	}
+	if a.tag_picker {
+		if input == '\x1b' { a.tag_picker = false }
+		return
+	}
 	a.quicklook_key_input(input)
 }
 
@@ -691,8 +836,16 @@ fn (mut d Desktop) clear_context_item_path() {
 	create_context_menu.item_path = ''
 }
 
-fn context_menu_height(has_item bool) int {
-	count := if has_item { create_context_item_entries.len } else { create_context_background_entries.len }
+fn context_menu_height(target CreateContextTarget, has_item bool) int {
+	count := if has_item {
+		if target == .files {
+			create_context_files_item_entries.len
+		} else {
+			create_context_item_entries.len
+		}
+	} else {
+		create_context_background_entries.len
+	}
 	return count * create_context_row_height + 2 * create_context_padding
 }
 
@@ -700,7 +853,7 @@ fn (mut d Desktop) set_create_context_menu(target CreateContextTarget, app_index
 	item_path string, x int, y int) {
 	mut menu_x := x
 	mut menu_y := y
-	height := context_menu_height(has_item)
+	height := context_menu_height(target, has_item)
 	if menu_x + create_context_width > d.canvas.width {
 		menu_x = d.canvas.width - create_context_width
 	}
@@ -756,6 +909,7 @@ fn (mut d Desktop) cancel_file_context_rename() {
 
 fn files_context_row_action(action string) bool {
 	return action.starts_with(files_action_row) || action.starts_with(files_action_column_row)
+		|| action.starts_with(files_action_tag_row)
 }
 
 // Files gets the item under the pointer as a private selection event before
@@ -766,6 +920,11 @@ fn (mut d Desktop) open_create_context_menu(x int, y int) bool {
 	}
 	d.cancel_file_context_rename()
 	underlying, world := d.hit_action_world(x, y)
+	if world == .application && (underlying.starts_with('files.settings.')
+		|| underlying.starts_with('files.tags.')) {
+		d.close_create_context_menu()
+		return false
+	}
 	for i := d.windows.len - 1; i >= 0; i-- {
 		window := &d.windows[i]
 		if window.minimized || x < window.x || x >= window.x + window.width || y < window.y
@@ -814,7 +973,7 @@ fn (mut d Desktop) open_create_context_menu(x int, y int) bool {
 fn context_menu_action(action string) bool {
 	return action == create_context_new_folder || action == create_context_new_file
 		|| action == file_context_rename || action == file_context_copy || action == file_context_cut
-		|| action == file_context_paste || action == file_context_delete
+		|| action == file_context_paste || action == file_context_delete || action == file_context_tags
 }
 
 fn action_starts_rename(action string) bool {
@@ -826,7 +985,11 @@ fn (mut d Desktop) desktop_context_action(action string, item_path string) ! {
 	ensure_desktop_directory()!
 	match action {
 		create_context_new_folder, create_context_new_file {
-			kind := if action == create_context_new_folder { CreateItemKind.folder } else { CreateItemKind.file }
+			kind := if action == create_context_new_folder {
+				CreateItemKind.folder
+			} else {
+				CreateItemKind.file
+			}
 			created := create_unique_item(desktop_directory, kind)!
 			d.refresh_desktop_directory()
 			d.desktop_directory_begin_rename(created)
@@ -1022,26 +1185,26 @@ fn (mut d Desktop) render_desktop_file_icons() {
 		if renaming {
 			icon_children << ui2.text_field('', '', rename_buffer_text(desktop_directory_state.rename_text),
 				ui2.rect(2, f64(shortcut_icon + 13), f64(shortcut_width - 4), 22), ui2.BoxStyle{
-					bg: editor_path_focus
+					bg:     editor_path_focus
 					radius: 4
 				}, ui2.TextStyle{
 					color: body_text
-					size: 12
+					size:  12
 					align: .center
 				}, 0)
 		} else {
 			icon_children << ui2.label('', entry.name, ui2.rect(0, f64(shortcut_icon + 16),
 				f64(shortcut_width), 18), ui2.TextStyle{
-				color: if hovered { theme.shortcut_hover } else { theme.shortcut_label }
+				color:  if hovered { theme.shortcut_hover } else { theme.shortcut_label }
 				shadow: true
-				size: 12
-				align: .center
+				size:   12
+				align:  .center
 			})
 		}
 		icon := ui2.clickable_view(entry.row_action, ui2.rect(f64(x), f64(y), f64(shortcut_width),
 			f64(shortcut_height)), ui2.BoxStyle{
-			bg: theme.shortcut_panel
-			radius: 8
+			bg:          theme.shortcut_panel
+			radius:      8
 			transparent: !hovered && !renaming
 		}, icon_children)
 		d.render_element(icon, 0, 0, 1)
@@ -1057,22 +1220,22 @@ fn (mut d Desktop) render_context_entries(entries []ui2.MenuEntry) {
 		children << ui2.button(entry.id, entry.title, ui2.rect(f64(create_context_padding), f64(y),
 			f64(create_context_width - 2 * create_context_padding), f64(create_context_row_height)),
 			ui2.BoxStyle{
-				bg: if d.hover == entry.id { files_row_hover } else { app_surface }
+				bg:     if d.hover == entry.id { files_row_hover } else { app_surface }
 				radius: 5
 			}, ui2.TextStyle{
 				color: body_text
-				size: 13
+				size:  13
 				align: .left
 			})
 	}
 	panel := ui2.clickable_view(create_context_panel, ui2.rect(f64(create_context_menu.x),
 		f64(create_context_menu.y), f64(create_context_width), f64(height)), ui2.BoxStyle{
-		bg: app_surface
-		radius: 7
-		border_color: body_rule
-		border_left: 1
-		border_top: 1
-		border_right: 1
+		bg:            app_surface
+		radius:        7
+		border_color:  body_rule
+		border_left:   1
+		border_top:    1
+		border_right:  1
 		border_bottom: 1
 	}, children)
 	d.render_element(panel, 0, 0, 2)
@@ -1086,7 +1249,11 @@ fn (mut d Desktop) render_create_context_menu() {
 	d.render_desktop_file_icons()
 	if create_context_menu.visible {
 		if create_context_menu.has_item {
-			d.render_context_entries(create_context_item_entries)
+			if create_context_menu.target == .files {
+				d.render_context_entries(create_context_files_item_entries)
+			} else {
+				d.render_context_entries(create_context_item_entries)
+			}
 		} else {
 			d.render_context_entries(create_context_background_entries)
 		}
