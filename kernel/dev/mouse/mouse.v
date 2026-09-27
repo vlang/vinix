@@ -46,6 +46,23 @@ fn read() u8 {
 	return kio.port_in[u8](0x60)
 }
 
+fn set_sample_rate(rate u8) bool {
+	write(0xf3)
+	if read() != 0xfa {
+		return false
+	}
+	write(rate)
+	return read() == 0xfa
+}
+
+fn device_id() u8 {
+	write(0xf2)
+	if read() != 0xfa {
+		return 0
+	}
+	return read()
+}
+
 struct MousePacket {
 pub mut:
 	flags u8
@@ -102,6 +119,8 @@ pub mut:
 	pointer_buttons  u32
 	pointer_pressed  u32
 	pointer_released u32
+	packet_bytes     int
+	five_buttons     bool
 }
 
 fn (mut this Pointer) mmap(_handle voidptr, _page u64, _flags int) voidptr {
@@ -244,6 +263,7 @@ fn handler() {
 	mut handler_cycle := 0
 	mut current_packet := MousePacket{}
 	mut discard_packet := false
+	mut extra := u8(0)
 
 	for {
 		mut events := [&int_events[ps2_mouse_vector]]
@@ -276,14 +296,21 @@ fn handler() {
 			}
 			2 {
 				current_packet.y_mov = read()
-				handler_cycle = 0
-
-				if discard_packet {
-					discard_packet = false
+				if mouse_res.packet_bytes == 4 {
+					handler_cycle = 3
 					continue
 				}
+				handler_cycle = 0
+			}
+			3 {
+				extra = read()
+				handler_cycle = 0
 			}
 			else {}
+		}
+		if discard_packet {
+			discard_packet = false
+			continue
 		}
 
 		if current_packet.flags & (1 << 4) != 0 {
@@ -304,7 +331,11 @@ fn handler() {
 		delta_y := int(i32(current_packet.y_mov))
 		mouse_res.pointer_x = clamp_pointer_axis(mouse_res.pointer_x + delta_x, mouse_res.pointer_max_x)
 		mouse_res.pointer_y = clamp_pointer_axis(mouse_res.pointer_y - delta_y, mouse_res.pointer_max_y)
-		buttons := u32(current_packet.flags & 0x07)
+		mut buttons := u32(current_packet.flags & 0x07)
+		if mouse_res.five_buttons && extra & 0xc0 != 0x40 && extra & 0xc0 != 0x80 {
+			// Explorer packets put Back and Forward in bits 4 and 5 of byte 4.
+			buttons |= u32((extra >> 4) & 0x03) << 3
+		}
 		mouse_res.pointer_pressed |= buttons & ~mouse_res.pointer_buttons
 		mouse_res.pointer_released |= mouse_res.pointer_buttons & ~buttons
 		mouse_res.pointer_buttons = buttons
@@ -333,9 +364,28 @@ pub fn initialise() {
 	mouse_res.pointer_y = 383
 	mouse_res.pointer_max_x = 1023
 	mouse_res.pointer_max_y = 767
+	mouse_res.packet_bytes = 3
+	mouse_res.five_buttons = false
 
 	write(0xf6)
 	read()
+	// PS/2 Explorer mice expose side buttons only after switching to the
+	// four-byte IntelliMouse protocol. An ordinary three-button mouse keeps
+	// its original packet format.
+	if set_sample_rate(200) && set_sample_rate(100) && set_sample_rate(80) {
+		id := device_id()
+		if id == 3 || id == 4 {
+			mouse_res.packet_bytes = 4
+		}
+		if set_sample_rate(200) && set_sample_rate(200) && set_sample_rate(80) {
+			mouse_res.five_buttons = device_id() == 4
+		} else if id == 4 {
+			mouse_res.five_buttons = true
+		}
+		if mouse_res.five_buttons {
+			mouse_res.packet_bytes = 4
+		}
+	}
 
 	write(0xf4)
 	read()
