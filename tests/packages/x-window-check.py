@@ -8,7 +8,6 @@ import time
 
 Display = ctypes.c_void_p
 Window = ctypes.c_ulong
-XErrorHandler = ctypes.CFUNCTYPE(ctypes.c_int, Display, ctypes.c_void_p)
 
 
 class XWindowAttributes(ctypes.Structure):
@@ -40,8 +39,6 @@ class XWindowAttributes(ctypes.Structure):
 
 
 def configure_xlib(xlib):
-    xlib.XSetErrorHandler.argtypes = [XErrorHandler]
-    xlib.XSetErrorHandler.restype = ctypes.c_void_p
     xlib.XOpenDisplay.argtypes = [ctypes.c_char_p]
     xlib.XOpenDisplay.restype = Display
     xlib.XDefaultRootWindow.argtypes = [Display]
@@ -169,10 +166,6 @@ def main():
 
     xlib = ctypes.CDLL("libX11.so.6")
     configure_xlib(xlib)
-    # A child can disappear between XQueryTree and XGetWindowAttributes.
-    # Xlib otherwise exits this watcher on the asynchronous BadWindow reply.
-    ignore_window_races = XErrorHandler(lambda _display, _error: 0)
-    xlib.XSetErrorHandler(ignore_window_races)
     display = None
     while not display:
         display = xlib.XOpenDisplay(sys.argv[1].encode("ascii"))
