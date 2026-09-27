@@ -859,8 +859,14 @@ static void admac_run(struct speakers *s, uint32_t ch, int run)
 {
     uint32_t bit = 1u << (ch / 2);
     if (run) {
+        /* Asahi's apple-admac driver unmasks this output only because its
+         * IRQ handler drains the report ring and acknowledges every level
+         * interrupt.  Vinix deliberately polls the rings from the speaker
+         * service thread, so an unmasked descriptor-done interrupt would
+         * remain asserted between polls and trap a CPU in an IRQ storm as
+         * soon as the first period completed. */
         wr(s, chan(s, ch) + CHAN_INTSTATUS(ADMAC_IRQ_INDEX), STATUS_DESC_DONE | STATUS_ERR);
-        wr(s, chan(s, ch) + CHAN_INTMASK(ADMAC_IRQ_INDEX), STATUS_DESC_DONE | STATUS_ERR);
+        wr(s, chan(s, ch) + CHAN_INTMASK(ADMAC_IRQ_INDEX), 0);
         wr(s, s->cfg.admac + ((ch & 1) ? ADMAC_RX_START : ADMAC_TX_START), bit);
     } else {
         wr(s, s->cfg.admac + ((ch & 1) ? ADMAC_RX_STOP : ADMAC_TX_STOP), bit);

@@ -713,6 +713,12 @@ static void test_stream_registers(void)
     assert(reg_get(FAKE_NCO + NCO_STRIDE + NCO_CTRL) & NCO_ENABLE);
     assert(chans[TX_CH].running && chans[SENSE_CH].running);
     assert(chans[TX_CH].count >= 3 && chans[SENSE_CH].count == 4);
+    /* This driver polls report rings.  Unlike Asahi's IRQ-driven driver it
+     * must not unmask IRQ output 1: the first completed descriptor would
+     * otherwise leave a level interrupt asserted with no registered
+     * handler. */
+    assert(reg_get(FAKE_ADMAC + CHAN_BASE(TX_CH) + CHAN_INTMASK(ADMAC_IRQ_INDEX)) == 0);
+    assert(reg_get(FAKE_ADMAC + CHAN_BASE(SENSE_CH) + CHAN_INTMASK(ADMAC_IRQ_INDEX)) == 0);
     assert(amps[0].regs[TAS_PWR_CTRL] == PWR_ACTIVE && amps[1].regs[TAS_PWR_CTRL] == PWR_ACTIVE);
     assert(amps[0].regs[TAS_PLAY_CFG2] == ATT_SAFE);
     assert(amps[0].regs[TAS_TDM0] == 0x06);
