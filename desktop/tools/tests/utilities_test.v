@@ -931,6 +931,62 @@ fn test_macos_taskbar_uses_large_icon_only_buttons_at_screen_edges() {
 	free_tree(root)
 }
 
+fn test_open_calendar_task_button_shows_local_today() {
+	mut desktop := Desktop{
+		canvas:   Canvas{
+			width:  1280
+			height: 720
+		}
+		settings: Settings{
+			theme: .macos
+		}
+	}
+	id := desktop.spawn('Calendar', .welcome, 0, 0, 300, 200)
+	desktop.windows[0].icon = 'asset:calendar'
+	desktop.update_taskbar_clock_at(0)
+	root := desktop.build_tree()
+	entry := utility_element_named(root, 'task.${id}') or { panic('missing Calendar task button') }
+	assert entry.image_path == 'builtin:calendar_today'
+	free_tree(root)
+
+	mut icon_desktop := Desktop{
+		canvas:            new_scaled_canvas(48, 40, 48, 40, 1)
+		fonts:             load_fonts()
+		tz_offset_seconds: 3 * 3600
+	}
+	defer {
+		unsafe { free(icon_desktop.canvas.pixels) }
+	}
+	// 21:00 UTC is midnight in the desktop's +03:00 local time. The
+	// weekday and the number both need to change without reopening Calendar.
+	icon_desktop.update_taskbar_clock_at(0)
+	icon_desktop.canvas.clear(0x5d84ab)
+	icon_desktop.draw_calendar_today_icon(0, 0, 48, 40)
+	mut before := []u32{len: 48 * 40}
+	for pixel in 0 .. before.len {
+		before[pixel] = unsafe { icon_desktop.canvas.pixels[pixel] }
+	}
+	icon_desktop.update_taskbar_clock_at(21 * 3600)
+	icon_desktop.canvas.clear(0x5d84ab)
+	icon_desktop.draw_calendar_today_icon(0, 0, 48, 40)
+	mut weekday_changed := false
+	mut day_changed := false
+	for y in 4 .. 35 {
+		for x in 8 .. 40 {
+			at := y * 48 + x
+			if before[at] != unsafe { icon_desktop.canvas.pixels[at] } {
+				if y < 15 {
+					weekday_changed = true
+				} else if y >= 19 {
+					day_changed = true
+				}
+			}
+		}
+	}
+	assert weekday_changed
+	assert day_changed
+}
+
 fn test_clicking_a_taskbar_window_button_focuses_without_minimizing() {
 	mut desktop := Desktop{
 		canvas: Canvas{

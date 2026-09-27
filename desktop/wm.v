@@ -1146,7 +1146,12 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 		if icon_only {
 			// An icon consumes the full button when it has no label, making an
 			// app identifiable at a glance without stealing room from the clock.
-			children << ui2.button_with_image(entry.id, '', entry.icon, button_frame, button_style, ui2.TextStyle{
+			icon := if entry.icon == 'asset:calendar' {
+				'builtin:calendar_today'
+			} else {
+				entry.icon
+			}
+			children << ui2.button_with_image(entry.id, '', icon, button_frame, button_style, ui2.TextStyle{
 				color: text_color
 			})
 		} else {

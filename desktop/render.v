@@ -1019,6 +1019,40 @@ fn (mut d Desktop) draw_button(el ui2.Element, x int, y int, w int, h int) {
 	}
 }
 
+// The calendar task button uses the same sampled local date as the clock. Its
+// white page, red weekday and large day follow the macOS Calendar icon.
+fn (mut d Desktop) draw_calendar_today_icon(x int, y int, w int, h int) {
+	if !d.taskbar_clock_sampled || d.taskbar_clock_seconds < 0 {
+		d.draw_builtin_glyph('builtin:calendar', x, y, w, h, 0xffffff)
+		return
+	}
+	mut size := if w < h { w } else { h }
+	size -= 4
+	if size <= 0 {
+		return
+	}
+	left := x + (w - size) / 2
+	top := y + (h - size) / 2
+	radius := size / 5
+	d.canvas.blend_round_rect(left, top + 1, size, size, radius, 0x283648, 70)
+	d.canvas.fill_round_rect(left, top, size, size, radius, 0xffffff)
+	d.canvas.stroke_round_rect(left, top, size, size, radius, 0xe6e6e6, 255)
+
+	civil := civil_from_epoch(d.taskbar_clock_seconds + d.tz_offset_seconds)
+	weekday := weekday_names[civil.weekday]
+	day := civil.day.str()
+	weekday_face := d.face_for(ui2.TextStyle{
+		size: 11
+		bold: true
+	})
+	day_face := d.face_for(ui2.TextStyle{
+		size: 18
+	})
+	d.canvas.draw_text_centered(weekday_face, left, top + 2, size, weekday, 0xf02f38)
+	d.canvas.draw_text_centered(day_face, left, top + 13, size, day, 0x222222)
+	unsafe { day.free() }
+}
+
 // draw_builtin_glyph draws the title bar symbols as strokes rather than as
 // characters: the baked faces are ASCII only, and a hairline drawn at the
 // pixel grid stays crisp at any of the sizes the chrome uses.
@@ -1043,6 +1077,9 @@ fn (mut d Desktop) draw_builtin_glyph(path string, x int, y int, w int, h int, c
 	half := if w < h { w / 5 } else { h / 5 }
 
 	match name {
+		'calendar_today' {
+			d.draw_calendar_today_icon(x, y, w, h)
+		}
 		'vinix' {
 			// The brand mark is the exact V polygon from vinix-logo.svg. In
 			// particular, its outer taper and narrow inner notch carry through
