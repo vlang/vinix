@@ -97,7 +97,9 @@ fn do_register(config &SimpleFBConfig) {
 	}
 
 	simplefb_driver.register_device(info) or {
-		print('simplefb: failed to register framebuffer device: ${err.msg()}')
+		msg := err.msg()
+		C.kprintf(c'simplefb: failed to register framebuffer device: %.*s', i32(msg.len),
+			msg.str)
 	}
 }
 

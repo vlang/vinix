@@ -42,6 +42,9 @@ pub mut:
 	fifo         bool
 	reader_opens u64
 	writer_opens u64
+	// The interface box every open of the pipe hands out, freed with it. A
+	// new box on every open was never freed.
+	box &resource.Resource = unsafe { nil }
 }
 
 pub fn initialise() {}
@@ -63,6 +66,7 @@ pub fn create() ?&Pipe {
 	// it freed space, so until something had been read a fresh pipe reported
 	// itself unwritable and anything waiting for room to write blocked for good.
 	p.status |= file.pollout
+	p.box = &resource.Resource(p) @[freed]
 
 	return p
 }
@@ -86,6 +90,7 @@ pub fn create_fifo(mode u32) ?&Pipe {
 	p.stat.atim = now
 	p.stat.mtim = now
 	p.stat.ctim = now
+	p.box = &resource.Resource(p) @[freed]
 	return p
 }
 
@@ -99,7 +104,7 @@ fn (mut this Pipe) open(flags int) ?&resource.Resource {
 	// An O_PATH descriptor opens neither end, and runc's is only reopened
 	// later through /proc/self/fd/N, which comes back here with real flags.
 	if flags & resource.o_path != 0 {
-		return &resource.Resource(this)
+		return this.box
 	}
 	// An anonymous pipe opened again through /proc/<pid>/fd/<n> gets one more
 	// end of the kind asked for, which closing it gives back.
@@ -115,7 +120,7 @@ fn (mut this Pipe) open(flags int) ?&resource.Resource {
 			this.status &= ~file.pollhup
 		}
 		this.l.release()
-		return &resource.Resource(this)
+		return this.box
 	}
 	nonblock := flags & resource.o_nonblock != 0
 	this.l.acquire()
@@ -141,9 +146,7 @@ fn (mut this Pipe) open(flags int) ?&resource.Resource {
 				for this.writer_opens == opened {
 					generation := event.generation(mut this.event)
 					this.l.release()
-					mut events := [&this.event]
-					event.await_from_generation(mut events, true, 0, generation) or {
-						unsafe { events.free() }
+					event.await_one_from_generation(mut this.event, true, generation) or {
 						this.l.acquire()
 						this.readers--
 						if this.readers == 0 {
@@ -154,7 +157,6 @@ fn (mut this Pipe) open(flags int) ?&resource.Resource {
 						errno.set(proc.interrupted_errno)
 						return none
 					}
-					unsafe { events.free() }
 					this.l.acquire()
 				}
 			}
@@ -174,9 +176,7 @@ fn (mut this Pipe) open(flags int) ?&resource.Resource {
 				for this.reader_opens == opened {
 					generation := event.generation(mut this.event)
 					this.l.release()
-					mut events := [&this.event]
-					event.await_from_generation(mut events, true, 0, generation) or {
-						unsafe { events.free() }
+					event.await_one_from_generation(mut this.event, true, generation) or {
 						this.l.acquire()
 						this.writers--
 						if this.writers == 0 {
@@ -186,7 +186,6 @@ fn (mut this Pipe) open(flags int) ?&resource.Resource {
 						errno.set(proc.interrupted_errno)
 						return none
 					}
-					unsafe { events.free() }
 					this.l.acquire()
 				}
 			}
@@ -204,7 +203,7 @@ fn (mut this Pipe) open(flags int) ?&resource.Resource {
 		}
 	}
 	this.l.release()
-	return &resource.Resource(this)
+	return this.box
 }
 
 pub fn syscall_pipe(_ voidptr, pipefds &i32, flags int) (u64, u64) {
@@ -217,12 +216,13 @@ pub fn syscall_pipe(_ voidptr, pipefds &i32, flags int) (u64, u64) {
 	}
 
 	mut new_pipe := create() or { return errno.err, errno.get() }
+	mut box := new_pipe.box
 
-	rd_fd := file.fdnum_create_from_resource(unsafe { nil }, mut new_pipe, flags | resource.o_rdonly, 0, false) or {
+	rd_fd := file.fdnum_create_from_resource(unsafe { nil }, mut box, flags | resource.o_rdonly, 0, false) or {
 		return errno.err, errno.get()
 	}
 
-	wr_fd := file.fdnum_create_from_resource(unsafe { nil }, mut new_pipe, flags | resource.o_wronly, 0, false) or {
+	wr_fd := file.fdnum_create_from_resource(unsafe { nil }, mut box, flags | resource.o_wronly, 0, false) or {
 		return errno.err, errno.get()
 	}
 
@@ -269,15 +269,12 @@ fn (mut this Pipe) read(_handle voidptr, buf voidptr, _loc u64, _count u64) ?i64
 		// attached. The generation change still makes await return in that case.
 		generation := event.generation(mut this.event)
 		this.l.release()
-		mut events := [&this.event]
-		event.await_from_generation(mut events, true, 0, generation) or {
-			unsafe { events.free() }
+		event.await_one_from_generation(mut this.event, true, generation) or {
 			// Nothing was read: a signal handler installed with SA_RESTART
 			// has the call run again, as on Linux, instead of failing it.
 			errno.set(proc.interrupted_errno)
 			return none
 		}
-		unsafe { events.free() }
 		this.l.acquire()
 	}
 
@@ -369,9 +366,7 @@ fn (mut this Pipe) write(handle voidptr, buf voidptr, _loc u64, _count u64) ?i64
 			// even when the event's pending count has already been consumed.
 			generation := event.generation(mut this.event)
 			this.l.release()
-			mut events := [&this.event]
-			event.await_from_generation(mut events, true, 0, generation) or {
-				unsafe { events.free() }
+			event.await_one_from_generation(mut this.event, true, generation) or {
 				this.l.acquire()
 				if written != 0 {
 					return i64(written)
@@ -379,7 +374,6 @@ fn (mut this Pipe) write(handle voidptr, buf voidptr, _loc u64, _count u64) ?i64
 				errno.set(proc.interrupted_errno)
 				return none
 			}
-			unsafe { events.free() }
 			this.l.acquire()
 		}
 
@@ -509,6 +503,7 @@ fn (mut this Pipe) unref(handle voidptr) ? {
 	if !katomic.dec(mut &this.refcount) {
 		unsafe {
 			free(this.data)
+			free(voidptr(this.box))
 			free(this)
 		}
 	}

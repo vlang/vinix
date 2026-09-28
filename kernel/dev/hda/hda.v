@@ -764,13 +764,13 @@ pub fn (mut c HDACodec) initialize() {
 
 		c.set_power_state(func_group_nid, power_state_d0)
 
-		print('hda: audio function group at ${c.cid:x}:${func_group_nid:x}\n')
+		C.kprintf(c'hda: audio function group at %llx:%llx\n', u64(c.cid), u64(func_group_nid))
 
 		num_widgets_resp := c.get_parameter(func_group_nid, param_node_count)
 		num_widgets := u8(num_widgets_resp & 0xFF)
 		widgets_start_nid := u8((num_widgets_resp >> 16) & 0xFF)
 
-		print('hda: found ${num_widgets} widgets\n')
+		C.kprintf(c'hda: found %llu widgets\n', u64(num_widgets))
 
 		for widget_nid := widgets_start_nid; widget_nid < widgets_start_nid + num_widgets; widget_nid++ {
 			audio_caps := c.get_parameter(widget_nid, param_audio_caps)
@@ -856,8 +856,10 @@ pub fn (mut c HDACodec) initialize() {
 	mut stream := c.get_output_stream()
 	stream.change_volume(50)
 
-	print('hda: found ${c.audio_outputs.len} audio outputs and ${c.pin_complexes.len} pin complexes\n')
-	print('hda: found ${c.output_paths.len} output paths (${c.non_overlapping_output_paths.len} non-overlapping)\n')
+	C.kprintf(c'hda: found %lld audio outputs and %lld pin complexes\n', i64(c.audio_outputs.len),
+		i64(c.pin_complexes.len))
+	C.kprintf(c'hda: found %lld output paths (%lld non-overlapping)\n', i64(c.output_paths.len),
+		i64(c.non_overlapping_output_paths.len))
 
 	oss.create_device(c)
 }
@@ -936,11 +938,10 @@ fn (mut c HDAController) wait_for_verb(index u8) HDAResponseDescriptor {
 }
 
 fn irq_handler(mut c HDAController) {
-	print('hda: using irq ${c.irq_vect:x}\n')
+	C.kprintf(c'hda: using irq %llx\n', u64(c.irq_vect))
 
 	for {
-		mut events := [&int_events[c.irq_vect]]
-		event.await(mut events, true) or {}
+		event.await_one(mut int_events[c.irq_vect], true) or {}
 
 		intsts := c.regs.intsts
 		if intsts & intsts_sie_mask == 0 {
@@ -1124,7 +1125,8 @@ pub fn (mut c HDAController) initialise(pci_device &pci.PCIDevice) int {
 		c.out_streams[i].initialize(i, true)
 	}
 
-	print('hda: ${c.in_stream_count} in streams and ${c.out_stream_count} out streams\n')
+	C.kprintf(c'hda: %llu in streams and %llu out streams\n', u64(c.in_stream_count),
+		u64(c.out_stream_count))
 
 	if pci_device.msi_support == true {
 		print('hda: device is msi capable\n')
@@ -1152,7 +1154,7 @@ pub fn (mut c HDAController) initialise(pci_device &pci.PCIDevice) int {
 	statests := c.regs.statests
 	for i := 0; i < 15; i++ {
 		if statests & (1 << i) != 0 {
-			print('hda: codec found at address ${i}\n')
+			C.kprintf(c'hda: codec found at address %lld\n', i64(i))
 
 			mut codec := unsafe {
 				&HDACodec{

@@ -201,9 +201,7 @@ fn (mut this Mouse) read(_handle voidptr, buf voidptr, _loc u64, count u64) ?i64
 			return none
 		}
 
-		mut events := [&mouse_res.event]
-		event.await(mut events, true) or {}
-		unsafe { events.free() }
+		event.await_one(mut mouse_res.event, true) or {}
 
 		mouse_res.l.acquire()
 	}
@@ -266,9 +264,7 @@ fn handler() {
 	mut extra := u8(0)
 
 	for {
-		mut events := [&int_events[ps2_mouse_vector]]
-		event.await(mut events, true) or {}
-		unsafe { events.free() }
+		event.await_one(mut int_events[ps2_mouse_vector], true) or {}
 
 		// we will get some spurious packets at the beginning and they will screw
 		// up the alignment of the handler cycle so just ignore everything in

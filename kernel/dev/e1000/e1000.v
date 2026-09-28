@@ -202,7 +202,8 @@ pub fn initialise() bool {
 	mut other_mac := [6]u8{}
 	mut other_mtu := u32(0)
 	if inet.link_info(mut other_mac, mut other_mtu) {
-		print('e1000: ${name} left alone: another network interface is attached\n')
+		C.kprintf(c'e1000: %.*s left alone: another network interface is attached\n',
+			i32(name.len), name.str)
 		return false
 	}
 
@@ -214,13 +215,13 @@ pub fn initialise() bool {
 	bar := dev.get_bar(0)
 	dev.write[u32](0x4, (command & ~u32(1)) | 0x6 | (u32(1) << 10))
 	if !bar.is_mmio || bar.base == 0 {
-		print('e1000: ${name} has no memory BAR\n')
+		C.kprintf(c'e1000: %.*s has no memory BAR\n', i32(name.len), name.str)
 		return false
 	}
 	span := if bar.size >= min_register_span { bar.size } else { min_register_span }
 	e1000_regs = map_registers(bar.base, span)
 	if e1000_regs == 0 {
-		print('e1000: could not map registers at 0x${bar.base:x}\n')
+		C.kprintf(c'e1000: could not map registers at 0x%llx\n', u64(bar.base))
 		return false
 	}
 	e1000_new_eerd = dev.device_id == id_82574l
@@ -233,7 +234,7 @@ pub fn initialise() bool {
 	reg_write(reg_tctl, 0)
 	reg_write(reg_ctrl, reg_read(reg_ctrl) | ctrl_rst)
 	if !wait_for_reset() {
-		print('e1000: ${name} did not come out of reset\n')
+		C.kprintf(c'e1000: %.*s did not come out of reset\n', i32(name.len), name.str)
 		return false
 	}
 	reg_write(reg_imc, 0xffffffff)
@@ -261,11 +262,10 @@ pub fn initialise() bool {
 	}
 
 	link := if reg_read(reg_status) & status_lu != 0 { 'up' } else { 'down' }
-	mut mac_text := '${e1000_mac[0]:02x}'
-	for i := 1; i < 6; i++ {
-		mac_text += ':${e1000_mac[i]:02x}'
-	}
-	print('e1000: ${name} at ${dev.bus:x}:${dev.slot:x}.${dev.function:x}, MAC ${mac_text}, link ${link}\n')
+	C.kprintf(c'e1000: %.*s at %llx:%llx.%llx, MAC %02llx:%02llx:%02llx:%02llx:%02llx:%02llx, link %.*s\n',
+		i32(name.len), name.str, u64(dev.bus), u64(dev.slot), u64(dev.function),
+		u64(e1000_mac[0]), u64(e1000_mac[1]), u64(e1000_mac[2]), u64(e1000_mac[3]),
+		u64(e1000_mac[4]), u64(e1000_mac[5]), i32(link.len), link.str)
 
 	// Transmit has to work before attaching: DHCP sends its discover from
 	// inside attach().

@@ -98,7 +98,7 @@ fn add_to_buf_char(_c u8, echo bool) {
 				console_buffer[console_buffer_i] = c
 				console_buffer_i++
 				if echo && console_termios.c_lflag & termios.echo != 0 {
-					print('${c:c}')
+					C.kprintf(c'%c', i32(c))
 				}
 				for i := u64(0); i < console_buffer_i; i++ {
 					if console_res.status & file.pollin == 0 {
@@ -155,9 +155,9 @@ fn add_to_buf_char(_c u8, echo bool) {
 
 	if echo && console_termios.c_lflag & termios.echo != 0 {
 		if is_printable(c) {
-			print('${c:c}')
+			C.kprintf(c'%c', i32(c))
 		} else if c >= 0x01 && c <= 0x1f {
-			print('^${c + 0x40:c}')
+			C.kprintf(c'^%c', i32(c + 0x40))
 		}
 	}
 }
@@ -243,7 +243,7 @@ fn console_add_csi_u(codepoint u8) {
 fn keyboard_handler() {
 	vect := idt.allocate_vector()
 
-	print('console: PS/2 keyboard vector is 0x${vect:x}\n')
+	C.kprintf(c'console: PS/2 keyboard vector is 0x%llx\n', u64(vect))
 
 	apic.io_apic_set_irq_redirect(cpu_locals[0].lapic_id, vect, 1, true)
 
@@ -294,9 +294,7 @@ fn keyboard_handler() {
 	}
 
 	for {
-		mut events := [&int_events[vect]]
-		event.await(mut events, true) or {}
-		unsafe { events.free() }
+		event.await_one(mut int_events[vect], true) or {}
 		input_byte := read_ps2()
 
 		if input_byte == 0xe0 {
@@ -655,13 +653,10 @@ fn (mut this Console) read(_handle voidptr, void_buf voidptr, _loc u64, count u6
 			errno.set(errno.ewouldblock)
 			return none
 		}
-		mut events := [&console_event]
-		event.await(mut events, true) or {
-			unsafe { events.free() }
+		event.await_one(mut console_event, true) or {
 			errno.set(errno.eintr)
 			return none
 		}
-		unsafe { events.free() }
 	}
 
 	mut wait := true
@@ -692,13 +687,10 @@ fn (mut this Console) read(_handle voidptr, void_buf voidptr, _loc u64, count u6
 				}
 				console_read_lock.release()
 				for {
-					mut events := [&console_event]
-					event.await(mut events, true) or {
-						unsafe { events.free() }
+					event.await_one(mut console_event, true) or {
 						errno.set(errno.eintr)
 						return none
 					}
-					unsafe { events.free() }
 					if console_read_lock.test_and_acquire() == true {
 						break
 					}

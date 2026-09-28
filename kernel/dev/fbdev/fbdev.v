@@ -10,6 +10,7 @@ import event.eventstruct
 import dev.fbdev.api
 import katomic
 import errno
+import lib
 import memory.mmap
 
 pub struct FramebufferNode {
@@ -149,8 +150,12 @@ fn create_device_node(index u64) ? {
 	node.node_created = true
 
 	mmap.register_uncached_resource(voidptr(node))
-	fs.devtmpfs_add_device(node, 'fb${index}')
-	println('fbdev: created device node /dev/fb${index}')
+	// The device node keeps the name.
+	mut name := lib.new_text(8)
+	name.add('fb')
+	name.add_unsigned(index)
+	fs.devtmpfs_add_device(node, name.str())
+	C.kprintf(c'fbdev: created device node /dev/fb%llu\n', u64(index))
 }
 
 pub fn register_device(info api.FramebufferInfo) ? {
@@ -177,7 +182,9 @@ pub fn register_device(info api.FramebufferInfo) ? {
 		return none
 	}
 
-	println('fbdev: registered new framebuffer device (using driver ${info.driver.name} and mode ${info.variable.xres}x${info.variable.yres}x${info.variable.bits_per_pixel})')
+	C.kprintf(c'fbdev: registered new framebuffer device (using driver %.*s and mode %llux%llux%llu)\n',
+		i32(info.driver.name.len), info.driver.name.str, u64(info.variable.xres),
+		u64(info.variable.yres), u64(info.variable.bits_per_pixel))
 
 	return create_device_node(index)
 }

@@ -102,6 +102,8 @@ pub mut:
 	keep_idle     int
 	keep_interval int
 	keep_count    int
+	// The interface box its descriptor is made with, freed with the socket.
+	box &resource.Resource = unsafe { nil }
 }
 
 __global (
@@ -268,24 +270,34 @@ pub fn poll() {
 	// a time for as long as the root had no /etc.
 	if has_configuration && (address != last_address
 		|| (!resolver_published && pending_resolver.len == 0)) {
-		// print(), not the C printf this used: that one is compiled out of a
+		// kprintf(), not the C printf this used: that one is compiled out of a
 		// PROD kernel, so the one line that says whether the machine has an
 		// address was invisible in exactly the builds anyone debugs.
 		if !network_ready {
-			print('net: DHCP lease ${address & 0xff}.${(address >> 8) & 0xff}.${(address >> 16) & 0xff}.${address >> 24}\n')
+			C.kprintf(c'net: DHCP lease %llu.%llu.%llu.%llu\n', u64(address & 0xff),
+				u64((address >> 8) & 0xff), u64((address >> 16) & 0xff), u64(address >> 24))
 		}
 		network_ready = true
-		mut contents := ''
+		mut contents := lib.new_text(128)
 		for server in dns {
 			if server != 0 {
-				contents += 'nameserver ${server & 0xff}.${(server >> 8) & 0xff}.${(server >> 16) & 0xff}.${(server >> 24) & 0xff}\n'
+				contents.add('nameserver ')
+				contents.add_unsigned(u64(server & 0xff))
+				contents.add_byte(`.`)
+				contents.add_unsigned(u64((server >> 8) & 0xff))
+				contents.add_byte(`.`)
+				contents.add_unsigned(u64((server >> 16) & 0xff))
+				contents.add_byte(`.`)
+				contents.add_unsigned(u64((server >> 24) & 0xff))
+				contents.add_byte(`\n`)
 			}
 		}
-		contents += 'options attempts:2 timeout:2\n'
+		contents.add('options attempts:2 timeout:2\n')
 		// This runs from the scheduler's poll callback, which is no place to
 		// walk the VFS and write to a disk-backed root. Leave the text for
-		// publish_resolver(), which a kernel thread calls.
-		pending_resolver = contents
+		// publish_resolver(), which a kernel thread calls. The text it replaces
+		// is not freed: publish_resolver() may be writing it out right now.
+		pending_resolver = contents.str()
 		last_address = address
 	}
 }
@@ -377,6 +389,7 @@ fn new_with_handle(handle &C.vinix_socket, socktype int, protocol int) ?&InetSoc
 		errno.set(errno.enfile)
 		return none
 	}
+	socket.box = &resource.Resource(socket) @[freed]
 	net_lock.acquire()
 	socket.refresh_status()
 	net_lock.release()
@@ -452,12 +465,14 @@ fn wait_for_event(mut this InetSocket, deadline u64) bool {
 		})
 	}
 	this.l.release()
-	mut events := [&this.event]
+	mut storage := [&this.event, &this.event]!
+	mut count := 1
 	if timer != unsafe { nil } {
-		events << &timer.event
+		storage[1] = &timer.event
+		count = 2
 	}
+	mut events := unsafe { event.stack_list(&storage[0], count) }
 	result := event.await(mut events, true)
-	unsafe { events.free() }
 	if timer != unsafe { nil } {
 		timer.disarm()
 		unsafe { free(timer) }
@@ -704,7 +719,7 @@ fn (mut this InetSocket) accept(handle voidptr) ?&resource.Resource {
 			// Hand out the registered socket itself. Converting *child copied
 			// it, and the copy's status never saw the traffic that arrived.
 			child := new_with_handle(child_handle, sock_pub.sock_stream, ipproto_tcp)?
-			return child
+			return child.box
 		}
 		if open_handle.flags & resource.o_nonblock != 0 {
 			errno.set(errno.ewouldblock)
@@ -816,7 +831,7 @@ fn (mut this InetSocket) getsockopt(_handle voidptr, level int, optname int) ?in
 		}
 	} else if level == ipproto_ip && optname == ip_recverr {
 		return this.recverr
-	} else if level == ipproto_ip && optname in [ip_tos, ip_ttl] {
+	} else if level == ipproto_ip && (optname == ip_tos || optname == ip_ttl) {
 		mut value := i32(0)
 		net_lock.acquire()
 		ret := C.vinix_socket_get_option(this.handle, level, optname, &value)
@@ -825,7 +840,7 @@ fn (mut this InetSocket) getsockopt(_handle voidptr, level int, optname int) ?in
 			return int(value)
 		}
 	} else if level == ipproto_tcp && this.socktype == sock_pub.sock_stream
-		&& optname in [tcp_keepidle, tcp_keepintvl, tcp_keepcnt] {
+		&& (optname == tcp_keepidle || optname == tcp_keepintvl || optname == tcp_keepcnt) {
 		return match optname {
 			tcp_keepidle { if this.keep_idle != 0 { this.keep_idle } else { 7200 } }
 			tcp_keepintvl { if this.keep_interval != 0 { this.keep_interval } else { 75 } }
@@ -871,12 +886,12 @@ fn (mut this InetSocket) setsockopt(_handle voidptr, level int, optname int, val
 		// name resolved in an Ubuntu or Debian container.
 		this.recverr = value
 		return
-	} else if level == ipproto_ip && optname in [ip_tos, ip_ttl] {
+	} else if level == ipproto_ip && (optname == ip_tos || optname == ip_ttl) {
 		supported = true
 	} else if level == ipproto_tcp && optname == tcp_nodelay && this.socktype == sock_pub.sock_stream {
 		supported = true
 	} else if level == ipproto_tcp && this.socktype == sock_pub.sock_stream
-		&& optname in [tcp_keepidle, tcp_keepintvl, tcp_keepcnt] {
+		&& (optname == tcp_keepidle || optname == tcp_keepintvl || optname == tcp_keepcnt) {
 		// Varnish sets all three on its listening socket and stops if any
 		// fails. Linux's ranges.
 		limit := if optname == tcp_keepcnt { 127 } else { 32767 }
@@ -930,7 +945,10 @@ fn (mut this InetSocket) unref(_handle voidptr) ? {
 	net_lock.acquire()
 	C.vinix_socket_free(this.handle)
 	net_lock.release()
-	unsafe { free(this) }
+	unsafe {
+		free(voidptr(this.box))
+		free(this)
+	}
 }
 
 fn (mut this InetSocket) grow(_handle voidptr, _new_size u64) ? {}

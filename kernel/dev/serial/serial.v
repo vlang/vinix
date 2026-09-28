@@ -8,6 +8,7 @@ import stat
 import event
 import event.eventstruct
 import katomic
+import lib
 import resource
 import file
 import x86.idt
@@ -17,7 +18,7 @@ import x86.apic
 // guaranteed tho, especially beyond the first 2, so we gotta check them all.
 const com1_port = 0x3f8
 
-const com_ports = [com1_port, 0x2f8, 0x3e8, 0x2e8]
+const com_ports = [com1_port, 0x2f8, 0x3e8, 0x2e8]!
 
 // Serial devices share IRQs in pairs, COM1/3 use IRQ 4, COM2/4 use IRQ3
 const com1_3_irq = 4
@@ -68,7 +69,11 @@ pub fn initialise() {
 			com_res.status |= file.pollout
 			com_res.port = port
 			com_res.port_vector = if i % 2 == 0 { com1_3_vector } else { com2_4_vector }
-			fs.devtmpfs_add_device(com_res, 'com${i + 1}')
+			// The device node keeps the name.
+			mut name := lib.new_text(8)
+			name.add('com')
+			name.add_decimal(i + 1)
+			fs.devtmpfs_add_device(com_res, name.str())
 		}
 	}
 }
@@ -153,10 +158,6 @@ fn (mut this COMPort) read(_handle voidptr, void_buf voidptr, _loc u64, count u6
 
 	// Wait on the event of the port's IRQ.
 	mut data := unsafe { &u8(void_buf) }
-	mut events := [&int_events[this.port_vector]]
-	defer {
-		unsafe { events.free() }
-	}
 	for i := u64(0); i < count; {
 		if is_data_received(this.port) {
 			val := kio.port_in[u8](this.port)
@@ -165,7 +166,7 @@ fn (mut this COMPort) read(_handle voidptr, void_buf voidptr, _loc u64, count u6
 			}
 			i++
 		} else {
-			event.await(mut events, true) or {}
+			event.await_one(mut int_events[this.port_vector], true) or {}
 		}
 	}
 

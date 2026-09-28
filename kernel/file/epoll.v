@@ -106,6 +106,8 @@ mut:
 	can_mmap bool
 
 	entries []EpollEntry
+	// The interface box the set's descriptors share, freed with the set.
+	box &resource.Resource = unsafe { nil }
 }
 
 fn (mut this EpollResource) read(_handle voidptr, _buf voidptr, _loc u64, _count u64) ?i64 {
@@ -145,6 +147,7 @@ fn (mut this EpollResource) unref(_handle voidptr) ? {
 	}
 	unsafe {
 		this.entries.free()
+		free(voidptr(this.box))
 		free(voidptr(this))
 	}
 }
@@ -174,12 +177,15 @@ pub fn syscall_epoll_create1(_ voidptr, flags int) (u64, u64) {
 	mut res := &EpollResource{}
 	res.stat.mode = 0o600
 
-	mut r := &resource.Resource(unsafe { res })
+	res.box = &resource.Resource(unsafe { res }) @[freed]
+	mut r := res.box
 
 	open_flags := resource.o_rdwr |
 		if flags & epoll_cloexec != 0 { resource.o_cloexec } else { 0 }
 
 	epoll_sets_lock.acquire()
+	// Nothing slices the list, so growing can free the old block.
+	epoll_sets.flags |= .noslices
 	epoll_sets << res
 	epoll_sets_lock.release()
 	// A set that gets no descriptor is closed, which takes it off the list.
@@ -242,6 +248,8 @@ pub fn syscall_epoll_ctl(_ voidptr, epfd int, op int, fd int, event_ptr u64) (u6
 			if failure == 0 {
 				// The lookup reference is handed to the entry, which holds it
 				// until the fd is removed, its file closed, or the set destroyed.
+				// Nothing slices the entries, so growing can free the old block.
+				epoll_res.entries.flags |= .noslices
 				epoll_res.entries << EpollEntry{
 					fd:     fd
 					events: requested.events
@@ -435,7 +443,7 @@ pub fn syscall_epoll_pwait(_ voidptr, epfd int, events_buf u64, maxevents int, t
 		// Holding the file instead left runc's log pipe with a writer for as
 		// long as its poller slept, so runc waited forever for the EOF.
 		mut watched := epoll_res.snapshot_watched()
-		mut ev_list := []&eventstruct.Event{cap: watched.len + 2}
+		mut ev_list := []&eventstruct.Event{cap: watched.len + 2} @[freed]
 		ev_list << &epoll_res.event
 		for i in 0 .. watched.len {
 			mut watched_res := watched[i]
@@ -500,7 +508,8 @@ fn (mut this EpollResource) collect_ready(maxevents int) ?[]EpollEvent {
 	// Sized up front: an array that grows leaves its old buffer behind in
 	// this kernel, and a Go runtime polls several times a millisecond.
 	limit := if maxevents < this.entries.len { maxevents } else { this.entries.len }
-	mut events := []EpollEvent{cap: limit}
+	// The caller frees it.
+	mut events := []EpollEvent{cap: limit} @[freed]
 	for mut entry in this.entries {
 		if events.len >= maxevents {
 			break
@@ -531,7 +540,8 @@ fn (mut this EpollResource) snapshot_watched() []&resource.Resource {
 	defer {
 		this.l.release()
 	}
-	mut resources := []&resource.Resource{cap: this.entries.len}
+	// The caller frees it.
+	mut resources := []&resource.Resource{cap: this.entries.len} @[freed]
 	for entry in this.entries {
 		if entry.handle == unsafe { nil } {
 			continue

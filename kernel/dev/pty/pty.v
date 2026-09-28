@@ -11,6 +11,7 @@ import fs
 import ioctl
 import katomic
 import klock
+import lib
 import proc
 import resource
 import stat
@@ -137,6 +138,8 @@ mut:
 	status   int
 	can_mmap bool
 	pair     &PtyPair = unsafe { nil }
+	// The interface box its descriptor is made with; destroy_pair() frees it.
+	box &resource.Resource = unsafe { nil }
 }
 
 struct PtySlave {
@@ -148,6 +151,9 @@ mut:
 	status   int
 	can_mmap bool
 	pair     &PtyPair = unsafe { nil }
+	// The interface box every open of it hands out; destroy_pair() frees it.
+	// A new box on every open was never freed.
+	box &resource.Resource = unsafe { nil }
 }
 
 __global (
@@ -256,9 +262,14 @@ fn wake_pair(mut pair PtyPair) {
 
 fn (mut this Ptmx) open(_flags int) ?&resource.Resource {
 	id := allocate_id()?
+	mut name := lib.new_text(8)
+	name.add('pts/')
+	name.add_decimal(id)
+	// destroy_pair() frees it.
+	path := name.str() @[freed]
 	mut pair := &PtyPair{
 		id: id
-		path: 'pts/${id}'
+		path: path
 		input: new_queue()
 		output: new_queue()
 	}
@@ -275,6 +286,11 @@ fn (mut this Ptmx) open(_flags int) ?&resource.Resource {
 	}
 	initialise_stat(mut master.stat, 0o666)
 	initialise_stat(mut slave.stat, 0o620)
+	// Boxes of the endpoints themselves, so that the handles share their
+	// event, status and refcount with the pair: boxing *master would box a
+	// copy. destroy_pair() frees them.
+	master.box = &resource.Resource(unsafe { master }) @[freed]
+	slave.box = &resource.Resource(unsafe { slave }) @[freed]
 	pair.master = master
 	pair.slave = slave
 	pair.refresh_status_locked()
@@ -283,10 +299,9 @@ fn (mut this Ptmx) open(_flags int) ?&resource.Resource {
 	pty_pairs[id] = pair
 	pty_id_lock.release()
 
-	fs.devtmpfs_add_device(slave, pair.path)
-	// Keep the master endpoint's event, status and refcount shared with the
-	// pair. Converting *master would box a copy of the resource instead.
-	return &resource.Resource(unsafe { master })
+	// Its own box: passing `slave` made another one, which nothing freed.
+	fs.devtmpfs_add_device(slave.box, pair.path)
+	return master.box
 }
 
 // Open the slave of the terminal that `session` controls, as open(2) of its
@@ -351,7 +366,7 @@ fn (mut this PtySlave) open(flags int) ?&resource.Resource {
 	pair.l.release()
 	wake_pair(mut pair)
 	// The opened handle must wait on the same event that wake_pair signals.
-	return &resource.Resource(unsafe { this })
+	return this.box
 }
 
 fn (pair &PtyPair) input_room_locked() u64 {
@@ -534,13 +549,10 @@ fn (mut this PtyMaster) read(handle voidptr, buf voidptr, _loc u64, count u64) ?
 			return none
 		}
 		pair.l.release()
-		mut events := [&this.event]
-		event.await(mut events, true) or {
-			unsafe { events.free() }
+		event.await_one(mut this.event, true) or {
 			errno.set(errno.eintr)
 			return none
 		}
-		unsafe { events.free() }
 		pair.l.acquire()
 	}
 	read := pair.output.read(buf, count)
@@ -579,13 +591,10 @@ fn (mut this PtyMaster) write(handle voidptr, buf voidptr, _loc u64, count u64) 
 				return none
 			}
 			pair.l.release()
-			mut events := [&this.event]
-			event.await(mut events, true) or {
-				unsafe { events.free() }
+			event.await_one(mut this.event, true) or {
 				errno.set(errno.eintr)
 				return none
 			}
-			unsafe { events.free() }
 			pair.l.acquire()
 		}
 		byte := unsafe { bytes[written] }
@@ -641,13 +650,10 @@ fn (mut this PtySlave) read(handle voidptr, buf voidptr, _loc u64, count u64) ?i
 			return none
 		}
 		pair.l.release()
-		mut events := [&this.event]
-		event.await(mut events, true) or {
-			unsafe { events.free() }
+		event.await_one(mut this.event, true) or {
 			errno.set(errno.eintr)
 			return none
 		}
-		unsafe { events.free() }
 		pair.l.acquire()
 	}
 	read := pair.input.read(buf, count)
@@ -692,13 +698,10 @@ fn (mut this PtySlave) write(handle voidptr, buf voidptr, _loc u64, count u64) ?
 				return none
 			}
 			pair.l.release()
-			mut events := [&this.event]
-			event.await(mut events, true) or {
-				unsafe { events.free() }
+			event.await_one(mut this.event, true) or {
 				errno.set(errno.eintr)
 				return none
 			}
-			unsafe { events.free() }
 			pair.l.acquire()
 		}
 		output_byte_locked(mut pair, byte)
@@ -945,6 +948,8 @@ fn destroy_pair(pair &PtyPair) {
 		pair.path.free()
 		free(pair.input.data)
 		free(pair.output.data)
+		free(voidptr(pair.master.box))
+		free(voidptr(pair.slave.box))
 		free(pair.master)
 		free(pair.slave)
 		free(pair)

@@ -18,7 +18,7 @@ const pci_subclass = 0x1
 
 const pci_progif = 0x80
 
-const ata_ports = [0x1f0, 0x1f0, 0x170, 0x170]
+const ata_ports = [0x1f0, 0x1f0, 0x170, 0x170]!
 
 const ata_bytes_per_sector = 512
 
@@ -73,9 +73,14 @@ pub fn initialise() {
 	mut index := 0
 	for i in 0 .. ata_ports.len {
 		drive := init_ata_drive(i, mut dev) or { continue }
-		name := 'ata${index}'
+		// The device node keeps the name.
+		mut text := lib.new_text(8)
+		text.add('ata')
+		text.add_decimal(index)
+		name := text.str()
 		fs.devtmpfs_add_device(drive, name)
-		print('ata: Port ${i} initialised as ${name} (${drive.stat.size} bytes)\n')
+		C.kprintf(c'ata: Port %lld initialised as %.*s (%lld bytes)\n', i64(i), i32(name.len),
+			name.str, i64(drive.stat.size))
 		index += 1
 	}
 }
@@ -121,13 +126,13 @@ fn init_ata_drive(port_index int, mut pci_device pci.PCIDevice) ?&ATADrive {
 	kio.port_out[u8](dev.cmd_port, 0xec)
 
 	if kio.port_in[u8](dev.cmd_port) == 0 {
-		print('ata: Port ${port_index} is not connected\n')
+		C.kprintf(c'ata: Port %lld is not connected\n', i64(port_index))
 		return none
 	} else {
 		mut timeout := 0
 		for kio.port_in[u8](dev.cmd_port) & 0b10000000 != 0 {
 			if timeout == 100000 {
-				print('ata: Port ${port_index} is not answering\n')
+				C.kprintf(c'ata: Port %lld is not answering\n', i64(port_index))
 				return none
 			}
 			timeout += 1
@@ -136,7 +141,7 @@ fn init_ata_drive(port_index int, mut pci_device pci.PCIDevice) ?&ATADrive {
 
 	// Check for non-standard ATAPI.
 	if kio.port_in[u8](dev.lba_mid_port) != 0 || kio.port_in[u8](dev.lba_hi_port) != 0 {
-		print('ata: Port ${port_index} is non-standard ATAPI\n')
+		C.kprintf(c'ata: Port %lld is non-standard ATAPI\n', i64(port_index))
 		return none
 	}
 
@@ -144,14 +149,14 @@ fn init_ata_drive(port_index int, mut pci_device pci.PCIDevice) ?&ATADrive {
 	for {
 		status := kio.port_in[u8](dev.cmd_port)
 		if status & 0b00000001 != 0 {
-			print('ata: Port ${port_index} errored out\n')
+			C.kprintf(c'ata: Port %lld errored out\n', i64(port_index))
 			return none
 		}
 		if status & 0b00001000 != 0 {
 			break
 		}
 		if timeout == 100000 {
-			print('ata: Port ${port_index} hanged\n')
+			C.kprintf(c'ata: Port %lld hanged\n', i64(port_index))
 			return none
 		}
 	}
@@ -239,7 +244,7 @@ fn (mut dev ATADrive) read(_handle voidptr, buffer voidptr, loc u64, count u64) 
 				break
 			}
 			if status & 0x01 != 0 {
-				print('ata: Error reading sector ${sector_loc} on drive')
+				C.kprintf(c'ata: Error reading sector %llu on drive', u64(sector_loc))
 				return none
 			}
 		}
@@ -306,7 +311,7 @@ fn (mut dev ATADrive) write(_handle voidptr, buffer voidptr, loc u64, count u64)
 				break
 			}
 			if status & 0x01 != 0 {
-				print('ata: Error reading sector ${sector_loc} on drive')
+				C.kprintf(c'ata: Error reading sector %llu on drive', u64(sector_loc))
 				return none
 			}
 		}
@@ -320,7 +325,7 @@ fn (mut dev ATADrive) write(_handle voidptr, buffer voidptr, loc u64, count u64)
 				break
 			}
 			if status & 0x01 != 0 {
-				print('ata: Error reading sector ${sector_loc} on drive')
+				C.kprintf(c'ata: Error reading sector %llu on drive', u64(sector_loc))
 				return none
 			}
 		}

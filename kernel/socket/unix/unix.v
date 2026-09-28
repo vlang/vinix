@@ -250,12 +250,14 @@ fn wait_on(e &eventstruct.Event, deadline u64, watch bool, generation u64) bool 
 			tv_nsec: i64(left % 1000000000)
 		})
 	}
-	mut events := []&eventstruct.Event{cap: 2}
 	mut watched := unsafe { e }
-	events << watched
+	mut storage := [watched, watched]!
+	mut count := 1
 	if timer != unsafe { nil } {
-		events << &timer.event
+		storage[1] = &timer.event
+		count = 2
 	}
+	mut events := unsafe { event.stack_list(&storage[0], count) }
 	mut woken := true
 	mut which := u64(0)
 	if watch {
@@ -269,7 +271,6 @@ fn wait_on(e &eventstruct.Event, deadline u64, watch bool, generation u64) bool 
 			0
 		}
 	}
-	unsafe { events.free() }
 	if timer != unsafe { nil } {
 		timer.disarm()
 		unsafe { free(timer) }
@@ -665,12 +666,15 @@ pub fn (mut this UnixSocket) write_with_fds(_handle voidptr, buf voidptr, _count
 			fds:    []&file.FD{}
 		}
 		group.fds << fds
+		// Nothing slices these queues, so growing can free the old block.
+		peer.pending_fd_groups.flags |= .noslices
 		peer.pending_fd_groups << group
 	}
 	// On a SOCK_SEQPACKET peer this send is one record. The write above did not
 	// split it -- a message larger than the buffer is refused, and the wait
 	// loop held out for room for the whole of it -- so its length is `count`.
 	if peer.is_seqpacket() {
+		peer.packet_lengths.flags |= .noslices
 		peer.packet_lengths << count
 	}
 
@@ -736,6 +740,8 @@ pub fn (mut this UnixSocket) send_datagram(mut target UnixSocket, _handle voidpt
 			fds:    []&file.FD{}
 		}
 		group.fds << fds
+		// Nothing slices these queues, so growing can free the old block.
+		target.pending_fd_groups.flags |= .noslices
 		target.pending_fd_groups << group
 	}
 	if count != 0 {
@@ -752,6 +758,8 @@ pub fn (mut this UnixSocket) send_datagram(mut target UnixSocket, _handle voidpt
 		target.write_ptr = (target.write_ptr + count) % target.capacity
 		target.used += count
 	}
+	target.packet_lengths.flags |= .noslices
+	target.datagrams.flags |= .noslices
 	target.packet_lengths << count
 	target.datagrams << sender
 
@@ -1266,7 +1274,10 @@ fn (mut this UnixSocket) bind(_handle voidptr, _addr voidptr, addrlen u32) ? {
 }
 
 fn (mut this UnixSocket) listen(_handle voidptr, backlog int) ? {
-	this.backlog = []&UnixSocket{cap: backlog}
+	// close_endpoint() frees it. Nothing slices it, so growing can free the
+	// old block.
+	this.backlog = []&UnixSocket{cap: backlog} @[freed]
+	this.backlog.flags |= .noslices
 	this.listening = true
 }
 

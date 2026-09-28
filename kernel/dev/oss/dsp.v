@@ -9,6 +9,7 @@ import resource
 import fs
 import file
 import errno
+import lib
 import usercopy
 
 const ctl_dsp_halt = u64(0x5000)
@@ -104,7 +105,11 @@ pub fn create_device(device &OssAudioDevice) {
 	oss_device.stat.rdev = resource.create_dev_id()
 	oss_device.stat.mode = 0o666 | stat.ifchr
 
-	name := 'dsp${oss_devices.len}'
+	// The device node keeps the name.
+	mut text := lib.new_text(16)
+	text.add('dsp')
+	text.add_decimal(oss_devices.len)
+	name := text.str()
 	fs.devtmpfs_add_device(oss_device, name)
 	if oss_devices.len == 0 {
 		root := fs.devtmpfs_get_root()
@@ -294,7 +299,7 @@ fn (mut dev OssDevice) ioctl(handle voidptr, _request u64, argp voidptr) ?int {
 			return 0
 		}
 		else {
-			print('oss: unhandled ioctl ${request:x}\n')
+			C.kprintf(c'oss: unhandled ioctl %llx\n', u64(request))
 			return resource.default_ioctl(handle, request, argp)
 		}
 	}

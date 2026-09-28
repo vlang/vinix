@@ -48,6 +48,8 @@ mut:
 	interval_ns u64
 	expirations u64
 	nonblocking bool
+	// The interface box its descriptors share, freed with the timer.
+	box &resource.Resource = unsafe { nil }
 }
 
 __global (
@@ -149,13 +151,10 @@ fn (mut this TimerFD) read(_handle voidptr, buf voidptr, _loc u64, count u64) ?i
 			return none
 		}
 
-		mut events := [&this.event]
-		event.await(mut events, true) or {
-			unsafe { events.free() }
+		event.await_one(mut this.event, true) or {
 			errno.set(errno.eintr)
 			return none
 		}
-		unsafe { events.free() }
 	}
 
 	return 0
@@ -190,7 +189,10 @@ fn (mut this TimerFD) unref(_handle voidptr) ? {
 		}
 	}
 	timerfd_lock.release()
-	unsafe { free(voidptr(this)) }
+	unsafe {
+		free(voidptr(this.box))
+		free(voidptr(this))
+	}
 }
 
 fn (mut this TimerFD) link(_handle voidptr) ? {
@@ -251,10 +253,12 @@ pub fn syscall_timerfd_create(_ voidptr, clock_id int, flags int) (u64, u64) {
 	timer.stat.blksize = 512
 
 	if !register_timerfd(mut timer) {
+		unsafe { free(timer) }
 		return errno.err, errno.emfile
 	}
 
-	mut res := &resource.Resource(unsafe { timer })
+	timer.box = &resource.Resource(unsafe { timer }) @[freed]
+	mut res := timer.box
 
 	mut open_flags := resource.o_rdwr
 	if flags & tfd_cloexec != 0 {

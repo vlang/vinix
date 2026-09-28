@@ -31,6 +31,8 @@ const console_bigbuf_size = 4096
 
 __global (
 	console_res       = &Console(unsafe { nil })
+	// The one interface box every open of the console is handed.
+	console_box       = &resource.Resource(unsafe { nil })
 	console_read_lock klock.Lock
 	console_event     eventstruct.Event
 	console_buffer    [console_buffer_size]u8
@@ -74,7 +76,7 @@ fn add_to_buf_char(_c u8, echo bool) {
 				console_buffer[console_buffer_i] = c
 				console_buffer_i++
 				if echo && console_termios.c_lflag & termios.echo != 0 {
-					print('${c:c}')
+					C.kprintf(c'%c', i32(c))
 				}
 				for i := u64(0); i < console_buffer_i; i++ {
 					if console_res.status & file.pollin == 0 {
@@ -131,9 +133,9 @@ fn add_to_buf_char(_c u8, echo bool) {
 
 	if echo && console_termios.c_lflag & termios.echo != 0 {
 		if is_printable(c) {
-			print('${c:c}')
+			C.kprintf(c'%c', i32(c))
 		} else if c >= 0x01 && c <= 0x1f {
-			print('^${c + 0x40:c}')
+			C.kprintf(c'^%c', i32(c + 0x40))
 		}
 	}
 }
@@ -224,13 +226,15 @@ pub fn session_terminal(session int) ?&resource.Resource {
 		errno.set(errno.enxio)
 		return none
 	}
-	return &resource.Resource(unsafe { console_res })
+	// A new box on every open of /dev/tty was never freed.
+	return console_box
 }
 
 pub fn initialise() {
 	C.flanterm_set_callback(flanterm_ctx, voidptr(flanterm_callback))
 
 	console_res = &Console{}
+	console_box = &resource.Resource(unsafe { console_res })
 	console_res.stat.size = 0
 	console_res.stat.blocks = 0
 	console_res.stat.blksize = 512
@@ -260,7 +264,7 @@ pub fn initialise() {
 
 	console_res.status |= file.pollout
 
-	fs.devtmpfs_add_device(console_res, 'console')
+	fs.devtmpfs_add_device(console_box, 'console')
 
 	// Initialize only after console/termios setup and before polling starts.
 	spi_keyboard.initialise()
@@ -308,13 +312,10 @@ fn (mut this Console) read(_handle voidptr, void_buf voidptr, _loc u64, count u6
 	mut buf := &u8(void_buf)
 
 	for console_read_lock.test_and_acquire() == false {
-		mut events := [&console_event]
-		event.await(mut events, true) or {
-			unsafe { events.free() }
+		event.await_one(mut console_event, true) or {
 			errno.set(errno.eintr)
 			return none
 		}
-		unsafe { events.free() }
 	}
 
 	mut wait := true
@@ -347,13 +348,10 @@ fn (mut this Console) read(_handle voidptr, void_buf voidptr, _loc u64, count u6
 				}
 				console_read_lock.release()
 				for {
-					mut events := [&console_event]
-					event.await(mut events, true) or {
-						unsafe { events.free() }
+					event.await_one(mut console_event, true) or {
 						errno.set(errno.eintr)
 						return none
 					}
-					unsafe { events.free() }
 					if console_read_lock.test_and_acquire() == true {
 						break
 					}

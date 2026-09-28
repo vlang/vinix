@@ -74,7 +74,7 @@ const convtab_nomod = [
 	`\0`,
 	`\0`,
 	` `,
-]
+]!
 
 const convtab_shift = [
 	`\0`,
@@ -135,7 +135,7 @@ const convtab_shift = [
 	`\0`,
 	`\0`,
 	` `,
-]
+]!
 
 const convtab_capslock = [
 	`\0`,
@@ -196,7 +196,7 @@ const convtab_capslock = [
 	`\0`,
 	`\0`,
 	` `,
-]
+]!
 
 const convtab_shift_capslock = [
 	`\0`,
@@ -257,7 +257,7 @@ const convtab_shift_capslock = [
 	`\0`,
 	`\0`,
 	` `,
-]
+]!
 
 pub fn translate(code u8, shift bool, capslock bool, ctrl bool) u8 {
 	if code > max_keycode {

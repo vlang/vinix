@@ -168,13 +168,13 @@ fn ppoll(fds &PollFD, nfds u64, tmo_p &time.TimeSpec, sigmask &u64) (u64, u64) {
 			return 0, 0
 		}
 		mut sleeper := eventstruct.Event{}
-		mut sleep_events := [&sleeper]
-		defer { unsafe { sleep_events.free() } }
+		mut sleep_storage := [unsafe { &sleeper }]!
 		mut timer := &time.Timer(unsafe { nil })
 		if voidptr(tmo_p) != unsafe { nil } {
 			timer = time.new_timer(*tmo_p)
-			sleep_events[0] = &timer.event
+			sleep_storage[0] = &timer.event
 		}
+		mut sleep_events := unsafe { event.stack_list(&sleep_storage[0], sleep_storage.len) }
 		defer {
 			if voidptr(timer) != unsafe { nil } {
 				timer.disarm()
@@ -185,9 +185,10 @@ fn ppoll(fds &PollFD, nfds u64, tmo_p &time.TimeSpec, sigmask &u64) (u64, u64) {
 		return 0, 0
 	}
 
-	mut fdlist := []&FD{}
-	mut fdnums := []u64{}
-	mut events := []&eventstruct.Event{}
+	// Sized up front: growing them would leave each outgrown block behind.
+	mut fdlist := []&FD{cap: int(nfds)} @[freed]
+	mut fdnums := []u64{cap: int(nfds)} @[freed]
+	mut events := []&eventstruct.Event{cap: int(nfds) + 1} @[freed]
 
 	defer {
 		for mut f in fdlist {
@@ -289,7 +290,7 @@ pub fn syscall_ppoll(_ voidptr, user_fds u64, nfds u64, user_timeout u64, user_s
 	}
 	pagemap := proc.current_thread().process.pagemap
 
-	mut pollfds := []PollFD{len: int(nfds)}
+	mut pollfds := []PollFD{len: int(nfds)} @[freed]
 	defer {
 		unsafe { pollfds.free() }
 	}
@@ -314,7 +315,8 @@ pub fn syscall_ppoll(_ voidptr, user_fds u64, nfds u64, user_timeout u64, user_s
 		if !usercopy.copy_from_user(voidptr(&sigmask), user_sigmask, sizeof(u64)) {
 			return errno.err, errno.efault
 		}
-		sigmask_ptr = &sigmask
+		// In unsafe, so that sigmask stays on the stack: see getdents64.
+		sigmask_ptr = unsafe { &sigmask }
 	}
 	return poll_user_fds(pagemap, user_fds, mut pollfds, nfds, timeout_ptr, sigmask_ptr)
 }
@@ -327,7 +329,7 @@ pub fn syscall_poll(_ voidptr, user_fds u64, nfds u64, timeout_ms u64) (u64, u64
 	}
 	pagemap := proc.current_thread().process.pagemap
 
-	mut pollfds := []PollFD{len: int(nfds)}
+	mut pollfds := []PollFD{len: int(nfds)} @[freed]
 	defer {
 		unsafe { pollfds.free() }
 	}
@@ -626,7 +628,7 @@ fn grow_fd_table(mut process proc.Process, fdnum int) bool {
 	if length > proc.max_fds {
 		length = proc.max_fds
 	}
-	mut bigger := []voidptr{len: length}
+	mut bigger := []voidptr{len: length} @[freed]
 	if bigger.len != length {
 		return false
 	}
@@ -653,7 +655,8 @@ pub fn open_fdnums(process &proc.Process) []int {
 			count++
 		}
 	}
-	mut open := []int{cap: count}
+	// The caller frees it.
+	mut open := []int{cap: count} @[freed]
 	for i, slot in target.fds {
 		if slot != unsafe { nil } {
 			open << i
@@ -1246,7 +1249,7 @@ pub fn syscall_fcntl(_ voidptr, fdnum int, cmd int, arg u64) (u64, u64) {
 			ret = lock_ret
 		}
 		else {
-			print('\nfcntl: Unhandled command: ${cmd}\n')
+			C.kprintf(c'\nfcntl: Unhandled command: %lld\n', i64(cmd))
 			fd.unref()
 			return errno.err, errno.einval
 		}

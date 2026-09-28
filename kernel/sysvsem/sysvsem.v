@@ -109,10 +109,14 @@ pub fn syscall_semget(_ voidptr, key i32, nsems int, flags int) (u64, u64) {
     }
     id := next_id
     next_id++
+    // destroy_unlocked() frees it with the set.
+    values := []int{len: nsems} @[freed]
+    // Nothing slices the list, so growing can free the old block.
+    sets.flags |= .noslices
     sets << &Set{
         id: id
         key: key
-        values: []int{len: nsems}
+        values: values
     }
     sets_lock.release()
     return u64(id), 0
@@ -175,12 +179,12 @@ fn operate(id int, user_operations u64, count u64, timeout_address u64) (u64, u6
     if user_operations == 0 || count == 0 || count > max_ops {
         return errno.err, errno.einval
     }
-    mut operations := []SemBuf{len: int(count)}
-    defer { unsafe { operations.free() } }
-    if !usercopy.copy_from_user(operations.data, user_operations, count * sizeof(SemBuf)) {
+    mut operations := [max_ops]SemBuf{}
+    if !usercopy.copy_from_user(unsafe { voidptr(&operations[0]) }, user_operations, count * sizeof(SemBuf)) {
         return errno.err, errno.efault
     }
-    for op in operations {
+    for i in 0 .. int(count) {
+        op := operations[i]
         if int(op.flags) & ~(ipc_nowait | sem_undo) != 0 {
             return errno.err, errno.einval
         }
@@ -214,7 +218,8 @@ fn operate(id int, user_operations u64, count u64, timeout_address u64) (u64, u6
         mut proposed := set.values.clone()
         mut blocked := false
         mut nowait := false
-        for op in operations {
+        for i in 0 .. int(count) {
+            op := operations[i]
             number := int(op.number)
             if number >= proposed.len {
                 unsafe { proposed.free() }
@@ -256,12 +261,14 @@ fn operate(id int, user_operations u64, count u64, timeout_address u64) (u64, u6
         mut wake := &set.wake
         sets_lock.release()
 
-        mut events := [wake]
+        mut storage := [wake, wake]!
+        mut waiting := 1
         if timer != unsafe { nil } {
-            events << &timer.event
+            storage[1] = &timer.event
+            waiting = 2
         }
+        mut events := unsafe { event.stack_list(&storage[0], waiting) }
         which := event.await_from_generation(mut events, true, 0, generation) or { u64(-1) }
-        unsafe { events.free() }
 
         sets_lock.acquire()
         set.waiters--

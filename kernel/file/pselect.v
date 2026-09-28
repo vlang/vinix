@@ -136,6 +136,9 @@ fn do_select(nfds int, readfds u64, writefds u64, exceptfds u64, timed bool, dea
 
 	mut polls := []PollFD{}
 	mut indexes := []int{}
+	// Nothing slices them, so growing can free each outgrown block.
+	polls.flags |= .noslices
+	indexes.flags |= .noslices
 	defer {
 		unsafe {
 			polls.free()
@@ -172,15 +175,11 @@ fn do_select(nfds int, readfds u64, writefds u64, exceptfds u64, timed bool, dea
 		}
 		if deadline.tv_sec != 0 || deadline.tv_nsec != 0 {
 			mut timer := time.new_timer(deadline)
-			mut sleep_events := [&timer.event]
 			defer {
 				timer.disarm()
-				unsafe {
-					free(timer)
-					sleep_events.free()
-				}
+				unsafe { free(timer) }
 			}
-			event.await(mut sleep_events, true) or { return errno.err, errno.eintr }
+			event.await_one(mut timer.event, true) or { return errno.err, errno.eintr }
 		}
 		return 0, 0
 	}

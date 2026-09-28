@@ -33,8 +33,9 @@ pub:
 	gateway u32
 }
 
+// The caller frees the list.
 pub fn interfaces() []Interface {
-	mut list := []Interface{cap: 2}
+	mut list := []Interface{cap: 2} @[freed]
 	list << Interface{
 		index:   1
 		name:    'lo'
@@ -111,9 +112,15 @@ mut:
 }
 
 pub fn is_interface_ioctl(request u64) bool {
-	return request in [siocgifname, siocgifconf, siocgifflags, siocgifaddr, siocgifbrdaddr,
-		siocgifnetmask, siocgifmetric, siocgifmtu, siocgifhwaddr, siocgifindex, siocgiftxqlen,
-		siocgifmap]
+	return match request {
+		siocgifname, siocgifconf, siocgifflags, siocgifaddr, siocgifbrdaddr, siocgifnetmask,
+		siocgifmetric, siocgifmtu, siocgifhwaddr, siocgifindex, siocgiftxqlen, siocgifmap {
+			true
+		}
+		else {
+			false
+		}
+	}
 }
 
 fn put_sockaddr_in(mut req IfReq, address u32) {

@@ -28,6 +28,8 @@ fn release_passed_fds(mut fds []&file.FD) {
 
 fn collect_passed_fds(msg &sock_pub.MsgHdr) ?[]&file.FD {
 	mut result := []&file.FD{}
+	// Nothing slices it, so growing can free each outgrown block.
+	result.flags |= .noslices
 	mut offset := u64(0)
 	for offset < msg.msg_controllen {
 		remaining := msg.msg_controllen - offset
@@ -156,11 +158,11 @@ fn socket_create(domain int, @type int, protocol int) ?&resource.Resource {
 		}
 		sock_pub.af_inet {
 			ret := sock_inet.create(@type, protocol)?
-			return ret
+			return ret.box
 		}
 		sock_pub.af_netlink {
 			ret := sock_netlink.create(@type, protocol)?
-			return ret
+			return ret.box
 		}
 		else {
 			// A family there are no sockets of, IPv6 among them, as Linux built
@@ -628,8 +630,6 @@ pub fn syscall_getpeername(_ voidptr, fdnum int, _addr voidptr, addrlen &u32) (u
 	mut fd, mut sock := socket_from_fdnum(fdnum) or { return errno.err, errno.get() }
 	defer {
 		fd.unref()
-		// socket_from_fdnum returns a boxed interface, separate from the FD.
-		unsafe { free(sock) }
 	}
 
 	if addrlen == unsafe { nil } {
@@ -642,19 +642,20 @@ pub fn syscall_getpeername(_ voidptr, fdnum int, _addr voidptr, addrlen &u32) (u
 }
 
 // Resolve a descriptor to the socket behind it, so that the socket syscalls
-// reject an ordinary file rather than answering for it.
-fn socket_from_fdnum(fdnum int) ?(&file.FD, &sock_pub.Socket) {
+// reject an ordinary file rather than answering for it. The socket is handed
+// back as an interface value, which needs no box on the heap.
+fn socket_from_fdnum(fdnum int) ?(&file.FD, sock_pub.Socket) {
 	mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum)?
 
 	mut res := fd.handle.resource
 	if mut res is sock_unix.UnixSocket {
-		return fd, &sock_pub.Socket(res)
+		return fd, sock_pub.Socket(res)
 	}
 	if mut res is sock_inet.InetSocket {
-		return fd, &sock_pub.Socket(res)
+		return fd, sock_pub.Socket(res)
 	}
 	if mut res is sock_netlink.NetlinkSocket {
-		return fd, &sock_pub.Socket(res)
+		return fd, sock_pub.Socket(res)
 	}
 
 	fd.unref()
@@ -669,8 +670,6 @@ pub fn syscall_getsockname(_ voidptr, fdnum int, _addr voidptr, addrlen &u32) (u
 	mut fd, mut sock := socket_from_fdnum(fdnum) or { return errno.err, errno.get() }
 	defer {
 		fd.unref()
-		// socket_from_fdnum returns a boxed interface, separate from the FD.
-		unsafe { free(sock) }
 	}
 
 	if addrlen == unsafe { nil } {
@@ -688,8 +687,6 @@ pub fn syscall_shutdown(_ voidptr, fdnum int, how int) (u64, u64) {
 	mut fd, mut sock := socket_from_fdnum(fdnum) or { return errno.err, errno.get() }
 	defer {
 		fd.unref()
-		// socket_from_fdnum returns a boxed interface, separate from the FD.
-		unsafe { free(sock) }
 	}
 
 	sock.shutdown(fd.handle, how) or { return errno.err, errno.get() }
@@ -703,8 +700,6 @@ pub fn syscall_getsockopt(_ voidptr, fdnum int, level int, optname int, optval u
 	mut fd, mut sock := socket_from_fdnum(fdnum) or { return errno.err, errno.get() }
 	defer {
 		fd.unref()
-		// socket_from_fdnum returns a boxed interface, separate from the FD.
-		unsafe { free(sock) }
 	}
 
 	if optval == 0 || optlen == 0 {
@@ -731,8 +726,8 @@ pub fn syscall_getsockopt(_ voidptr, fdnum int, level int, optname int, optval u
 		}
 		return errno.err, errno.enoprotoopt
 	}
-	if level == sock_pub.sol_socket && optname in [sock_pub.so_rcvtimeo, sock_pub.so_sndtimeo,
-		sock_pub.so_linger] {
+	if level == sock_pub.sol_socket && (optname == sock_pub.so_rcvtimeo
+		|| optname == sock_pub.so_sndtimeo || optname == sock_pub.so_linger) {
 		mut res := fd.handle.resource
 		send := optname == sock_pub.so_sndtimeo
 		if mut res is sock_inet.InetSocket {
@@ -833,15 +828,13 @@ pub fn syscall_setsockopt(_ voidptr, fdnum int, level int, optname int, optval u
 	mut fd, mut sock := socket_from_fdnum(fdnum) or { return errno.err, errno.get() }
 	defer {
 		fd.unref()
-		// socket_from_fdnum returns a boxed interface, separate from the FD.
-		unsafe { free(sock) }
 	}
 
 	// The timeouts and SO_LINGER of an inet or unix socket, read as the
 	// structs they are. Varnish sets them on its listening socket and stopped
 	// when they failed with ENOPROTOOPT.
-	if level == sock_pub.sol_socket && optname in [sock_pub.so_rcvtimeo, sock_pub.so_sndtimeo,
-		sock_pub.so_linger] {
+	if level == sock_pub.sol_socket && (optname == sock_pub.so_rcvtimeo
+		|| optname == sock_pub.so_sndtimeo || optname == sock_pub.so_linger) {
 		mut res := fd.handle.resource
 		send := optname == sock_pub.so_sndtimeo
 		if mut res is sock_inet.InetSocket {

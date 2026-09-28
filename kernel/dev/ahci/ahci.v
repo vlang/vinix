@@ -11,6 +11,7 @@ import errno
 import block.partition
 import fs
 import katomic
+import lib
 import time.sys
 
 const ahci_class = 0x1
@@ -416,11 +417,14 @@ fn (mut d AHCIDevice) initialise() ?int {
 			model_number[i + 1] = tmp
 		}
 
-		print('ahci: device: serial number: ${cstring_to_vstring(serial_number)}\n')
-		print('ahci: device: firmware revision: ${cstring_to_vstring(firmware_revision)}\n')
-		print('ahci: device: model number: ${cstring_to_vstring(model_number)}\n')
+		C.kprintf(c'ahci: device: serial number: %s\n', serial_number)
+		C.kprintf(c'ahci: device: firmware revision: %s\n', firmware_revision)
+		C.kprintf(c'ahci: device: model number: %s\n', model_number)
+		free(serial_number)
+		free(firmware_revision)
+		free(model_number)
 	}
-	print('ahci: device: sector count: ${sector_cnt}\n')
+	C.kprintf(c'ahci: device: sector count: %llu\n', u64(sector_cnt))
 
 	d.stat.blocks = sector_cnt
 	d.stat.blksize = sector_size
@@ -473,7 +477,8 @@ pub fn (mut c AHCIController) initialise(pci_device &pci.PCIDevice) int {
 	c.version_maj = (c.regs.vs >> 16) & 0xffff
 	c.version_min = c.regs.vs & 0xffff
 
-	print('ahci: controller detected version ${c.version_maj:x}:${c.version_min:x}\n')
+	C.kprintf(c'ahci: controller detected version %llx:%llx\n', u64(c.version_maj),
+		u64(c.version_min))
 
 	if c.regs.cap & (1 << 31) == 0 {
 		print('ahci: 64 bit addressing not supported\n')
@@ -497,7 +502,7 @@ pub fn (mut c AHCIController) initialise(pci_device &pci.PCIDevice) int {
 
 			match port.sig {
 				sata_ata {
-					print('ahci: sata drive found on port ${i}\n')
+					C.kprintf(c'ahci: sata drive found on port %llu\n', u64(i))
 
 					mut device := &AHCIDevice{
 						parent_controller: unsafe { c }
@@ -509,16 +514,27 @@ pub fn (mut c AHCIController) initialise(pci_device &pci.PCIDevice) int {
 						continue
 					}
 
-					fs.devtmpfs_add_device(device, 'sd${c.device_list.len}')
-					partition.scan_partitions(mut device, 'sd${c.device_list.len}-')
+					// The device node keeps the name; the partitions' names are
+					// made from the prefix, which goes afterwards.
+					mut name := lib.new_text(8)
+					name.add('sd')
+					name.add_decimal(c.device_list.len)
+					fs.devtmpfs_add_device(device, name.str())
+					mut prefix_text := lib.new_text(8)
+					prefix_text.add('sd')
+					prefix_text.add_decimal(c.device_list.len)
+					prefix_text.add_byte(`-`)
+					prefix := prefix_text.str()
+					partition.scan_partitions(mut device, prefix)
+					unsafe { prefix.free() }
 
 					c.device_list << device
 				}
 				sata_atapi {
-					print('ahci: enclosure management bridge found on port ${i}\n')
+					C.kprintf(c'ahci: enclosure management bridge found on port %llu\n', u64(i))
 				}
 				sata_pm {
-					print('ahci: port multipler found on port ${i}\n')
+					C.kprintf(c'ahci: port multipler found on port %llu\n', u64(i))
 				}
 				else {}
 			}

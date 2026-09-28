@@ -427,7 +427,7 @@ pub fn (mut namespace NVMENamespace) initialise(mut parent_controller NVMEContro
 		new_command.private.identify.prp1 = u64(namespace.identity) - higher_half
 	}
 	if parent_controller.admin_queue.send_cmd_and_wait(mut new_command, -1) == 0xffff {
-		print('nvme: nsid ${nsid:x} : unable to read namespace identity\n')
+		C.kprintf(c'nvme: nsid %llx : unable to read namespace identity\n', u64(nsid))
 		return -1
 	}
 
@@ -525,7 +525,7 @@ pub fn (mut pair NVMEQueuePair) initialise(mut parent_controller NVMEController,
 		return -1
 	}
 
-	print('nvme: created io queue pair with qid ${qid:x}\n')
+	C.kprintf(c'nvme: created io queue pair with qid %llx\n', u64(qid))
 
 	return 0
 }
@@ -535,7 +535,7 @@ pub fn (mut pair NVMEQueuePair) send_cmd(mut submission NVMECommand, cid int) in
 
 	if cid == -1 {
 		command_cid = int(pair.cid_bitmap.alloc() or {
-			print('nvme: no available cids on qid ${pair.qid:x}\n')
+			C.kprintf(c'nvme: no available cids on qid %llx\n', u64(pair.qid))
 			return -1
 		})
 	}
@@ -561,18 +561,17 @@ pub fn (mut pair NVMEQueuePair) send_cmd_and_wait(mut submission NVMECommand, ci
 	pair.l.acquire()
 
 	if pair.send_cmd(mut submission, cid) == -1 {
-		print('nvme: unable to send a command to qid ${pair.qid:x}\n')
+		C.kprintf(c'nvme: unable to send a command to qid %llx\n', u64(pair.qid))
 		pair.l.release()
 		return 0xffff
 	}
 
-	mut events := [&int_events[pair.vector]]
-	event.await(mut events, true) or {}
+	event.await_one(mut int_events[pair.vector], true) or {}
 
 	mut completion_entry := unsafe { pair.completion_queue[pair.cq_head] }
 
 	if (completion_entry.status >> 1) != 0 {
-		print('nvme: command error: status ${completion_entry.status:x}\n')
+		C.kprintf(c'nvme: command error: status %llx\n', u64(completion_entry.status))
 		pair.l.release()
 		return completion_entry.status
 	}
@@ -706,7 +705,8 @@ pub fn (mut c NVMEController) initialise(pci_device &pci.PCIDevice) int {
 	minor_version := (c.regs.vs >> 8) & 0xff
 	tertiary_version := c.regs.vs & 0xff
 
-	print('nvme: Version Detected [${major_version}:${minor_version}:${tertiary_version}]\n')
+	C.kprintf(c'nvme: Version Detected [%llu:%llu:%llu]\n', u64(major_version), u64(minor_version),
+		u64(tertiary_version))
 
 	if (u64(c.regs.cap) & (u64(1) << 37)) == 0 {
 		print('nvme: NVME command set not supported\n')
@@ -783,8 +783,8 @@ pub fn (mut c NVMEController) initialise(pci_device &pci.PCIDevice) int {
 		return -1
 	}
 
-	print('nvme: vendor ID: ${c.controller_id.vid:x}\n')
-	print('nvme: subsystem vendor ID: ${c.controller_id.ssvid}\n')
+	C.kprintf(c'nvme: vendor ID: %llx\n', u64(c.controller_id.vid))
+	C.kprintf(c'nvme: subsystem vendor ID: %llu\n', u64(c.controller_id.ssvid))
 
 	nsid_list := unsafe {
 		&u32(u64(memory.pmm_alloc(lib.div_roundup[u64](c.controller_id.nn * 4, page_size))) +
@@ -839,13 +839,28 @@ pub fn (mut c NVMEController) initialise(pci_device &pci.PCIDevice) int {
 				return -1
 			}
 
-			print('nvme: namespace id: ${new_namespace.nsid:x}\n')
-			print('nvme: lba cnt: ${new_namespace.stat.blocks:x}\n')
-			print('nvme: lba size: ${new_namespace.stat.blksize:x}\n')
-			print('nvme: max prps: ${new_namespace.max_prps:x}\n')
+			C.kprintf(c'nvme: namespace id: %llx\n', u64(new_namespace.nsid))
+			C.kprintf(c'nvme: lba cnt: %llx\n', u64(new_namespace.stat.blocks))
+			C.kprintf(c'nvme: lba size: %llx\n', u64(new_namespace.stat.blksize))
+			C.kprintf(c'nvme: max prps: %llx\n', u64(new_namespace.max_prps))
 
-			fs.devtmpfs_add_device(new_namespace, 'nvme${controller_list.len}n${i}')
-			partition.scan_partitions(mut new_namespace, 'nvme${controller_list.len}n${i}p')
+			// The device node keeps the name; the partitions' names are made
+			// from the prefix, which goes afterwards.
+			mut name := lib.new_text(16)
+			name.add('nvme')
+			name.add_decimal(controller_list.len)
+			name.add_byte(`n`)
+			name.add_unsigned(i)
+			fs.devtmpfs_add_device(new_namespace, name.str())
+			mut prefix_text := lib.new_text(16)
+			prefix_text.add('nvme')
+			prefix_text.add_decimal(controller_list.len)
+			prefix_text.add_byte(`n`)
+			prefix_text.add_unsigned(i)
+			prefix_text.add_byte(`p`)
+			prefix := prefix_text.str()
+			partition.scan_partitions(mut new_namespace, prefix)
+			unsafe { prefix.free() }
 
 			c.namespace_list << new_namespace
 		}

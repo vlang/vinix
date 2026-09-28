@@ -212,8 +212,7 @@ fn (mut s HDAStream) sync_write(buf voidptr, _loc u64, count u64) ?i64 {
 		s_remaining := katomic.load(&s.remaining_data)
 
 		if s.regs.ctl0 & sdctl0_run != 0 && s_remaining == total_buffer_size {
-			mut events := [&s.event]
-			event.await(mut events, true) or {}
+			event.await_one(mut s.event, true) or {}
 		}
 
 		to_copy := if i + (total_buffer_size - s_remaining) > count {
@@ -272,8 +271,7 @@ fn (mut s HDAStream) sync_write(buf voidptr, _loc u64, count u64) ?i64 {
 			if s_remaining <= chunk_size * 2 {
 				break
 			}
-			mut events := [&s.event]
-			event.await(mut events, true) or {}
+			event.await_one(mut s.event, true) or {}
 		}
 	}
 
@@ -316,8 +314,7 @@ fn (mut s HDAStream) wait_until_empty() {
 			}
 		}
 
-		mut events := [&s.event]
-		event.await(mut events, true) or {}
+		event.await_one(mut s.event, true) or {}
 	}
 }
 

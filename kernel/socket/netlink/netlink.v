@@ -95,6 +95,8 @@ pub mut:
 	bound    bool
 	// Reply datagrams waiting to be received, one per request sent.
 	rx [][]u8
+	// The interface box its descriptor is made with, freed with the socket.
+	box &resource.Resource = unsafe { nil }
 }
 
 // NETLINK_ROUTE is the only family there is. Any other -- kernel uevents,
@@ -114,6 +116,7 @@ pub fn create(@type int, protocol int) ?&NetlinkSocket {
 		status:   file.pollout
 	}
 	s.stat.mode = stat.ifsock | 0o777
+	s.box = &resource.Resource(s) @[freed]
 	return s
 }
 
@@ -334,7 +337,10 @@ fn put_done(mut m []u8, seq u32, pid u32) {
 
 // Turn one request datagram into its reply datagram and queue it.
 fn (mut this NetlinkSocket) handle_request(buf voidptr, count u64) {
-	mut reply := []u8{cap: 1024}
+	// Queued on rx, or freed here when empty; read() and recvmsg() free it.
+	// Nothing slices it, so growing can free each outgrown block.
+	mut reply := []u8{cap: 1024} @[freed]
+	reply.flags |= .noslices
 	mut off := u64(0)
 	for off + 16 <= count {
 		msg_len := read_u32(buf, off)
@@ -409,6 +415,7 @@ fn (mut this NetlinkSocket) handle_request(buf voidptr, count u64) {
 		unsafe { reply.free() }
 		return
 	}
+	this.rx.flags |= .noslices
 	this.rx << reply
 	this.status |= file.pollin
 	event.trigger(mut this.event, false)
@@ -437,13 +444,10 @@ fn (mut this NetlinkSocket) read(_handle voidptr, buf voidptr, _loc u64, count u
 			return none
 		}
 		this.l.release()
-		mut events := [&this.event]
-		event.await(mut events, true) or {
-			unsafe { events.free() }
+		event.await_one(mut this.event, true) or {
 			errno.set(errno.eintr)
 			return none
 		}
-		unsafe { events.free() }
 		this.l.acquire()
 	}
 	mut datagram := this.rx[0]
@@ -500,13 +504,10 @@ pub fn (mut this NetlinkSocket) recvmsg(_handle voidptr, msg &sock_pub.MsgHdr, f
 			return none
 		}
 		this.l.release()
-		mut events := [&this.event]
-		event.await(mut events, true) or {
-			unsafe { events.free() }
+		event.await_one(mut this.event, true) or {
 			errno.set(errno.eintr)
 			return none
 		}
-		unsafe { events.free() }
 		this.l.acquire()
 	}
 	mut datagram := this.rx[0]
@@ -620,6 +621,7 @@ fn (mut this NetlinkSocket) unref(_handle voidptr) ? {
 	}
 	unsafe {
 		this.rx.free()
+		free(voidptr(this.box))
 		free(this)
 	}
 }

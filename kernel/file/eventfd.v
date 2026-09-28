@@ -35,6 +35,8 @@ mut:
 
 	counter   u64
 	semaphore bool
+	// The interface box its descriptors share, freed with the counter.
+	box &resource.Resource = unsafe { nil }
 }
 
 fn (mut this EventFD) mmap(_handle voidptr, _page u64, _flags int) voidptr {
@@ -52,16 +54,13 @@ fn eventfd_wait(mut this EventFD, handle_ptr voidptr) bool {
 		handle.l.release()
 	}
 
-	mut events := [&this.event]
-	event.await(mut events, true) or {
-		unsafe { events.free() }
+	event.await_one(mut this.event, true) or {
 		if handle != unsafe { nil } {
 			handle.l.acquire()
 		}
 		this.l.acquire()
 		return false
 	}
-	unsafe { events.free() }
 
 	if handle != unsafe { nil } {
 		handle.l.acquire()
@@ -171,7 +170,10 @@ fn (mut this EventFD) unref(_handle voidptr) ? {
 	if katomic.dec(mut &this.refcount) {
 		return
 	}
-	unsafe { free(voidptr(this)) }
+	unsafe {
+		free(voidptr(this.box))
+		free(voidptr(this))
+	}
 }
 
 fn (mut this EventFD) link(_handle voidptr) ? {
@@ -216,7 +218,8 @@ pub fn syscall_eventfd2(_ voidptr, initial u32, flags int) (u64, u64) {
 		open_flags |= resource.o_cloexec
 	}
 
-	mut res := &resource.Resource(unsafe { counter })
+	counter.box = &resource.Resource(unsafe { counter }) @[freed]
+	mut res := counter.box
 	fdnum := fdnum_create_from_resource(unsafe { nil }, mut res, open_flags, 0, false) or {
 		return errno.err, errno.get()
 	}

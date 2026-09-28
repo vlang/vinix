@@ -8,6 +8,7 @@ import fs
 import katomic
 import resource
 import errno
+import lib
 
 const ctl_mix_read = u64(0xc0345805)
 const ctl_mix_write = u64(0xc0345806)
@@ -143,7 +144,11 @@ fn create_mixer(main_device &OssDevice, index int) {
 	oss_mixer.stat.rdev = resource.create_dev_id()
 	oss_mixer.stat.mode = 0o666 | stat.ifchr
 
-	name := 'mixer${index}'
+	// The device node keeps the name.
+	mut text := lib.new_text(16)
+	text.add('mixer')
+	text.add_decimal(index)
+	name := text.str()
 	fs.devtmpfs_add_device(oss_mixer, name)
 	if index == 0 {
 		root := fs.devtmpfs_get_root()
@@ -211,11 +216,15 @@ fn (mut dev OssMixerDevice) ioctl(handle voidptr, _request u64, argp voidptr) ?i
 					info.entry_type = mixt_devroot
 					root := unsafe { &OssMixExtRoot(&info.data) }
 
-					name := '${dev.main_device.device.name()}_main'
+					mut text := lib.new_text(32)
+					text.add(dev.main_device.device.name())
+					text.add('_main')
+					name := text.str()
 
 					unsafe {
 						C.memcpy(&root.id, name.str, name.len + 1)
 						C.memcpy(&root.name, name.str, name.len + 1)
+						name.free()
 					}
 					return 0
 				}
@@ -229,10 +238,14 @@ fn (mut dev OssMixerDevice) ioctl(handle voidptr, _request u64, argp voidptr) ?i
 					info.max_value = 100
 					info.flags = mixf_readable | mixf_writable | mixf_mainvol
 
-					name := '${dev.main_device.device.name()}_mainvolume'
+					mut text := lib.new_text(32)
+					text.add(dev.main_device.device.name())
+					text.add('_mainvolume')
+					name := text.str()
 
 					unsafe {
 						C.memcpy(&info.ext_name, name.str, name.len + 1)
+						name.free()
 					}
 					return 0
 				}
@@ -245,13 +258,21 @@ fn (mut dev OssMixerDevice) ioctl(handle voidptr, _request u64, argp voidptr) ?i
 		ctl_mixerinfo {
 			mut info := unsafe { &OssMixerInfo(argp) }
 
-			name := '${dev.main_device.device.name()} mixer'
-			dev_name := '/dev/mixer${dev.index}'
+			mut text := lib.new_text(32)
+			text.add(dev.main_device.device.name())
+			text.add(' mixer')
+			name := text.str()
+			mut node_text := lib.new_text(32)
+			node_text.add('/dev/mixer')
+			node_text.add_decimal(dev.index)
+			dev_name := node_text.str()
 
 			unsafe {
 				C.memcpy(&info.id, name.str, name.len + 1)
 				C.memcpy(&info.name, name.str, name.len + 1)
 				C.memcpy(&info.devnode, dev_name.str, dev_name.len + 1)
+				name.free()
+				dev_name.free()
 			}
 			info.modify_counter = i32(dev.modify_counter)
 			info.card_number = -1
@@ -264,7 +285,7 @@ fn (mut dev OssMixerDevice) ioctl(handle voidptr, _request u64, argp voidptr) ?i
 			return 0
 		}
 		else {
-			print('oss: unhandled mixer ioctl ${request:x}\n')
+			C.kprintf(c'oss: unhandled mixer ioctl %llx\n', u64(request))
 			return resource.default_ioctl(handle, request, argp)
 		}
 	}
