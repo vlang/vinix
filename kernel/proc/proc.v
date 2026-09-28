@@ -526,8 +526,82 @@ pub fn free_pid(pid int) {
 		unsafe { reaped.fds.free() }
 		reaped.fds = []voidptr{}
 	}
+	if reaped != unsafe { nil } {
+		quarantine_reaped(reaped)
+	}
 	// The main thread's tid aliases the pid, so it is released together.
 	release_thread_slot(pid)
+}
+
+// process_name is `name[pid]`, the way a process is named. Built from the
+// pid's own string, which interpolating the int left behind at every fork
+// and exec.
+pub fn process_name(name string, pid int) string {
+	pid_text := pid.str()
+	result := '${name}[${pid_text}]'
+	unsafe { pid_text.free() }
+	return result
+}
+
+// ── Freeing reaped processes ───────────────────────────────────────
+// A reaped process left the tables in free_pid() and was never freed: 3.5 KB
+// with what it owned, for every program ever run. A desktop whose Files sync
+// starts a few programs every two seconds grew by tens of megabytes an hour.
+//
+// It is not freed at once. A `&Process` is only good under pid_lock, but a few
+// paths look at one just past that -- signal_pid() reads `processes` without
+// it, and a signal on its way to a pinned thread reaches the thread's process
+// after the lock is dropped -- which was harmless only while nothing was ever
+// freed. A reaped process waits here until it has been out of every table for
+// reaped_grace_ns, far longer than any of those windows, and is freed then.
+const reaped_quarantine_len = 256
+const reaped_grace_ns = u64(2_000_000_000)
+
+__global (
+	reaped_quarantine [256]&Process
+	reaped_at_ns      [256]u64
+	reaped_next       int
+)
+
+// Called with pid_lock held.
+fn quarantine_reaped(p &Process) {
+	now := time.monotonic_ns()
+	for i := 0; i < reaped_quarantine_len; i++ {
+		waiting := reaped_quarantine[i]
+		if waiting != unsafe { nil } && now - reaped_at_ns[i] >= reaped_grace_ns {
+			reaped_quarantine[i] = unsafe { nil }
+			free_process_memory(waiting)
+		}
+	}
+	slot := reaped_next
+	reaped_next = (reaped_next + 1) % reaped_quarantine_len
+	// Only a whole quarantine's worth of processes reaped within the grace
+	// period pushes one out early, and then the oldest.
+	oldest := reaped_quarantine[slot]
+	if oldest != unsafe { nil } {
+		free_process_memory(oldest)
+	}
+	reaped_quarantine[slot] = unsafe { p }
+	reaped_at_ns[slot] = now
+}
+
+// free_process_memory frees a reaped process and what only it owned. Its
+// descriptors, address space, unveil set, namespaces and pid went at exit and
+// reap; its seccomp filters and cgroup are shared and stay.
+fn free_process_memory(p &Process) {
+	mut process := unsafe { p }
+	unsafe {
+		process.name.free()
+		process.executable_path.free()
+		process.saved_auxv.free()
+		process.groups.free()
+		process.threads.free()
+		process.children.free()
+		if process.event.overflow != nil {
+			free(process.event.overflow)
+		}
+		free(process)
+	}
 }
 
 // Drop a thread out of the tid table, taking its real-time entitlement with

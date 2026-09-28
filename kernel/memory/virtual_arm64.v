@@ -77,10 +77,16 @@ pub fn new_pagemap() &Pagemap {
 
 	// On ARM64, TTBR1 handles kernel space. User pagemaps (TTBR0) do
 	// not need higher-half entries copied.
-	return &Pagemap{
-		top_level: top_level
+	mut pagemap := &Pagemap{
+		top_level:   top_level
 		mmap_ranges: []voidptr{}
 	}
+	// Nothing keeps a copy of the list, so growing it can give back the
+	// storage it outgrew; V keeps that for arrays that might be sliced, and
+	// every fork and exec lost three blocks of it. `|=`, not flags.set():
+	// V 0.5.2 compiles set() on an array's flags to nothing.
+	pagemap.mmap_ranges.flags |= .noslices
+	return pagemap
 }
 
 pub fn (pagemap &Pagemap) virt2pte(virt u64, allocate bool) ?&u64 {

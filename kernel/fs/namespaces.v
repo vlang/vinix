@@ -257,8 +257,9 @@ pub fn release_process_namespaces(mut process proc.Process) {
 	}
 	set := process.ns
 	process.ns = proc.NamespaceSet{}
+	// A fixed array: a literal one was allocated, and lost, at every exit.
 	for ns_ptr in [set.mnt, set.uts, set.ipc, set.net, set.pid, set.pid_for_children,
-		set.cgroup, set.user, set.time] {
+		set.cgroup, set.user, set.time]! {
 		if ns_ptr != unsafe { nil } {
 			mut ns := unsafe { ns_ptr }
 			release_namespace(mut ns)

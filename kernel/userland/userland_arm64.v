@@ -1014,7 +1014,10 @@ pub fn syscall_execve(_ voidptr, _path charptr, _argv &charptr, _envp &charptr) 
 	}
 	trace_gpu := path == gpu_desktop_executable
 	gpu_exec_trace(trace_gpu, 'user path copied')
+	// Both vectors are only built here, so growing them can give back what
+	// they outgrow; V otherwise keeps it, and every exec lost it.
 	mut argv := []string{}
+	argv.flags |= .noslices
 	gpu_exec_trace(trace_gpu, 'copying argument vector')
 	for i := 0; true; i++ {
 		unsafe {
@@ -1026,6 +1029,7 @@ pub fn syscall_execve(_ voidptr, _path charptr, _argv &charptr, _envp &charptr) 
 	}
 	gpu_exec_trace(trace_gpu, 'argument vector copied')
 	mut envp := []string{}
+	envp.flags |= .noslices
 	gpu_exec_trace(trace_gpu, 'copying environment')
 	for i := 0; true; i++ {
 		unsafe {
@@ -1038,7 +1042,10 @@ pub fn syscall_execve(_ voidptr, _path charptr, _argv &charptr, _envp &charptr) 
 	gpu_exec_trace(trace_gpu, 'environment copied; entering ELF loader')
 
 	start_program(true, proc.current_directory_of(proc.current_thread().process), path, argv, envp,
-		'', '', '') or { return errno.err, errno.get() }
+		'', '', '') or {
+		unsafe { path.free() }
+		return errno.err, errno.get()
+	}
 
 	return errno.err, errno.get()
 }
@@ -1313,7 +1320,7 @@ fn load_program_node(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, path s
 	if execve == false {
 		mut new_process := sched.new_process(unsafe { nil }, new_pagemap)?
 
-		new_process.name = '${path}[${new_process.pid}]'
+		new_process.name = proc.process_name(path, new_process.pid)
 		new_process.executable_path = program_path
 		new_process.exe_node = voidptr(prog_node)
 		new_process.allow_wx = allow_wx
@@ -1405,7 +1412,12 @@ fn load_program_node(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, path s
 		curr_process.pagemap = new_pagemap
 		proc.unlock_table()
 
-		curr_process.name = '${path}[${curr_process.pid}]'
+		// The copies fork made are replaced, not kept alongside.
+		unsafe {
+			curr_process.name.free()
+			curr_process.executable_path.free()
+		}
+		curr_process.name = proc.process_name(path, curr_process.pid)
 		curr_process.executable_path = program_path
 		curr_process.exe_node = voidptr(prog_node)
 		curr_process.allow_wx = allow_wx
@@ -1442,7 +1454,7 @@ fn load_program_node(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, path s
 		curr_process.brk_current = 0
 
 		curr_process.threads_lock.acquire()
-		curr_process.threads = []&proc.Thread{}
+		curr_process.threads.clear()
 		curr_process.threads_lock.release()
 		gpu_exec_trace(trace_gpu, 'reset process thread metadata')
 
@@ -1483,7 +1495,14 @@ fn load_program_node(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, path s
 			gpu_exec_trace(trace_gpu, 'ERROR: replacement thread enqueue failed')
 		}
 
+		// execve copied the path from user memory and could not free it, as
+		// this never returns. A script's interpreter and the x86 translator
+		// put the path they were given into argv instead, freed with it.
+		path_in_argv := argv.any(it.str == path.str)
 		unsafe {
+			if !path_in_argv {
+				path.free()
+			}
 			argv.free()
 			envp.free()
 			if omit_foreign_preload {
@@ -1580,6 +1599,7 @@ pub fn syscall_execveat(_ voidptr, dirfd int, _path charptr, _argv &charptr, _en
 	}
 
 	mut argv := []string{}
+	argv.flags |= .noslices
 	for i := 0; true; i++ {
 		unsafe {
 			if _argv[i] == nil {
@@ -1589,6 +1609,7 @@ pub fn syscall_execveat(_ voidptr, dirfd int, _path charptr, _argv &charptr, _en
 		}
 	}
 	mut envp := []string{}
+	envp.flags |= .noslices
 	for i := 0; true; i++ {
 		unsafe {
 			if _envp[i] == nil {

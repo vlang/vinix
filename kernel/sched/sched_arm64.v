@@ -1590,7 +1590,10 @@ fn free_thread_memory(t &proc.Thread) {
 	if t.fpu_storage_phys != 0 {
 		memory.pmm_free(voidptr(t.fpu_storage_phys), lib.div_roundup(fpu_storage_size, page_size))
 	}
-	unsafe { free(voidptr(t)) }
+	unsafe {
+		t.comm.free()
+		free(voidptr(t))
+	}
 }
 
 // A pinned corpse waits here. Pins last only as long as a signal delivery or a

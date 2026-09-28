@@ -711,7 +711,7 @@ pub fn syscall_fork(gpr_state &cpulocal.GPRState) (u64, u64) {
 		return errno.err, errno.get()
 	}
 
-	new_process.name = '${old_process.name}[${new_process.pid}]'
+	new_process.name = proc.process_name(old_process.name, new_process.pid)
 
 	// Dup all FDs
 	for i := 0; i < old_process.fds.len; i++ {
@@ -843,7 +843,7 @@ pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, 
 	if execve == false {
 		mut new_process := sched.new_process(unsafe { nil }, new_pagemap)?
 
-		new_process.name = '${path}[${new_process.pid}]'
+		new_process.name = proc.process_name(path, new_process.pid)
 		new_process.executable_path = path.clone()
 		new_process.linux_abi = linux_abi
 		new_process.allow_wx = allow_wx
@@ -900,7 +900,12 @@ pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, 
 		process.pagemap = new_pagemap
 		proc.unlock_table()
 
-		process.name = '${path}[${process.pid}]'
+		// The copies fork made are replaced, not kept alongside.
+		unsafe {
+			process.name.free()
+			process.executable_path.free()
+		}
+		process.name = proc.process_name(path, process.pid)
 		process.executable_path = path.clone()
 		process.linux_abi = linux_abi
 		process.allow_wx = allow_wx

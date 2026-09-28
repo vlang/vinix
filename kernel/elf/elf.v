@@ -278,7 +278,7 @@ fn load_impl(_pagemap &memory.Pagemap, _res &resource.Resource, _base u64, trace
 	mut ld_path := ''
 	mut load_addr := u64(0)
 	mut load_addr_set := false
-	mut loaded_ranges := []LoadedRange{}
+	mut loaded_ranges := []LoadedRange{cap: int(header.ph_num)}
 	mut committed := false
 	defer {
 		if !committed {

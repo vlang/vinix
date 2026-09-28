@@ -530,6 +530,7 @@ fn syscall_linux_prctl(_ voidptr, option int, arg2 u64, _arg3 u64, _arg4 u64, _a
 				unsafe { old_comm.free() }
 			}
 			if current.tid == process.pid {
+				unsafe { process.name.free() }
 				process.name = current.comm.clone()
 			}
 			return 0, 0

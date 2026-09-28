@@ -269,7 +269,7 @@ fn clone_new_process(state &cpulocal.GPRState, flags u64, child_stack u64, paren
 		return errno.err, errno.get()
 	}
 
-	new_process.name = '${old_process.name}[${new_process.pid}]'
+	new_process.name = proc.process_name(old_process.name, new_process.pid)
 	fs.fork_namespaces(mut new_process, flags)
 	if into_cgroup {
 		new_process.cgroup = cgroup
@@ -545,7 +545,7 @@ fn exit_process(mut current_process proc.Process, mut current_thread proc.Thread
 	// The Thread structs are about to be recycled, so nothing may reach them
 	// through the zombie process that is left behind.
 	current_process.threads_lock.acquire()
-	current_process.threads = []&proc.Thread{}
+	current_process.threads.clear()
 	current_process.threads_lock.release()
 
 	proc.free_tid(current_thread.tid)

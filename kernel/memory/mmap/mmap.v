@@ -558,8 +558,10 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap) ?&memory.Pagemap {
 	register_page_in_resolver()
 	mut old_pagemap := unsafe { _old_pagemap }
 	mut new_pagemap := memory.new_pagemap()
-	mut old_private_globals := []voidptr{}
-	mut new_private_globals := []&MmapRangeGlobal{}
+	// Sized for every range up front: grown one push at a time, each array
+	// lost the blocks it outgrew.
+	mut old_private_globals := []voidptr{cap: old_pagemap.mmap_ranges.len}
+	mut new_private_globals := []&MmapRangeGlobal{cap: old_pagemap.mmap_ranges.len}
 	defer {
 		unsafe {
 			old_private_globals.free()
