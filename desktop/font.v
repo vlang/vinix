@@ -44,12 +44,16 @@ mut:
 const glyph_header_size = 5
 
 fn load_face(data FaceBlob) FontFace {
-	raw := base64.decode(data.parts.join(''))
+	encoded := data.parts.join('')
+	raw := base64.decode(encoded)
+	unsafe { encoded.free() }
 	count := font_last_char - font_first_char + 1 + font_extra_runes.len
 	header_bytes := count * glyph_header_size
 
 	mut glyphs := []Glyph{cap: count}
-	mut offset := 0
+	// Coverage is read where it was decoded, just past the metrics header,
+	// rather than from a copy that would leave the decoded blob behind.
+	mut offset := header_bytes
 	for i := 0; i < count; i++ {
 		base := i * glyph_header_size
 		width := int(raw[base])
@@ -74,7 +78,7 @@ fn load_face(data FaceBlob) FontFace {
 		descent:      data.descent
 		line_height:  data.ascent + data.descent
 		glyphs:       glyphs
-		pixels:       raw[header_bytes..].clone()
+		pixels:       raw
 	}
 }
 
@@ -84,6 +88,34 @@ fn load_fonts() []FontFace {
 		faces << load_face(blob)
 	}
 	return faces
+}
+
+// load_fonts_for_scale loads only the faces rasterised for one display scale,
+// which is all face_for picks from while that scale is in use. The 2x faces
+// are most of the atlas data and a 100% desktop never draws with them.
+fn load_fonts_for_scale(scale int) []FontFace {
+	mut faces := []FontFace{cap: font_blobs.len}
+	for blob in font_blobs {
+		if blob.raster_scale == scale {
+			faces << load_face(blob)
+		}
+	}
+	if faces.len == 0 {
+		unsafe { faces.free() }
+		return load_fonts()
+	}
+	return faces
+}
+
+fn free_fonts(mut faces []FontFace) {
+	for face in faces {
+		unsafe {
+			face.glyphs.free()
+			face.pixels.free()
+		}
+	}
+	unsafe { faces.free() }
+	faces = []FontFace{}
 }
 
 // next_rune decodes one UTF-8 sequence and reports how many bytes it took. A

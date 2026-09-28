@@ -297,35 +297,82 @@ fn (mut c Canvas) clear(color u32) {
 // grid. Wallpaper generation therefore stays cheap while the text drawn over
 // it can use the full native-resolution canvas.
 fn (mut c Canvas) copy_logical_pixels(source []u32) {
-	if source.len < c.width * c.height {
+	c.copy_logical_patch(source, 0, 0, c.width, c.height)
+}
+
+// copy_logical_patch copies a logical image of w x h pixels whose top-left
+// corner is at (x, y), within the clip.
+fn (mut c Canvas) copy_logical_patch(source []u32, x int, y int, w int, h int) {
+	if source.len < w * h {
 		return
 	}
-	x0 := if c.clip.x > 0 { c.clip.x } else { 0 }
-	y0 := if c.clip.y > 0 { c.clip.y } else { 0 }
-	x1 := if c.clip.x + c.clip.w < c.width { c.clip.x + c.clip.w } else { c.width }
-	y1 := if c.clip.y + c.clip.h < c.height { c.clip.y + c.clip.h } else { c.height }
+	mut x0 := if c.clip.x > x { c.clip.x } else { x }
+	mut y0 := if c.clip.y > y { c.clip.y } else { y }
+	x1 := if c.clip.x + c.clip.w < x + w { c.clip.x + c.clip.w } else { x + w }
+	y1 := if c.clip.y + c.clip.h < y + h { c.clip.y + c.clip.h } else { y + h }
+	if x0 < 0 {
+		x0 = 0
+	}
+	if y0 < 0 {
+		y0 = 0
+	}
 	if x1 <= x0 || y1 <= y0 {
 		return
 	}
-	if c.scale == 1 && c.width == c.physical_width && c.height == c.physical_height {
-		for y := y0; y < y1; y++ {
-			unsafe {
-				C.memcpy(&c.pixels[y * c.stride + x0], &source[y * c.width + x0], usize((x1 - x0) * 4))
-			}
-		}
+	scale := c.scale
+	physical_x0 := x0 * scale
+	physical_x1 := if x1 * scale < c.physical_width { x1 * scale } else { c.physical_width }
+	if physical_x1 <= physical_x0 {
 		return
 	}
-	for y := y0; y < y1; y++ {
-		for x := x0; x < x1; x++ {
-			color := source[y * c.width + x]
-			physical_x := x * c.scale
-			physical_y := y * c.scale
-			for offset_y := 0; offset_y < c.scale
-				&& physical_y + offset_y < c.physical_height; offset_y++ {
-				row := (physical_y + offset_y) * c.stride
-				for offset_x := 0; offset_x < c.scale
-					&& physical_x + offset_x < c.physical_width; offset_x++ {
-					unsafe { c.pixels[row + physical_x + offset_x] = color }
+	for ly := y0; ly < y1; ly++ {
+		physical_y := ly * scale
+		if physical_y >= c.physical_height {
+			break
+		}
+		first := physical_y * c.stride
+		if scale == 1 {
+			unsafe {
+				vmemcpy(&c.pixels[first + physical_x0], &source[(ly - y) * w + x0 - x], usize((physical_x1 - physical_x0) * 4))
+			}
+			continue
+		}
+		// Expand one row, then copy it down for the rest of the logical row.
+		for px := physical_x0; px < physical_x1; px++ {
+			unsafe {
+				c.pixels[first + px] = source[(ly - y) * w + px / scale - x]
+			}
+		}
+		for offset := 1; offset < scale && physical_y + offset < c.physical_height; offset++ {
+			unsafe {
+				vmemcpy(&c.pixels[first + offset * c.stride + physical_x0], &c.pixels[first + physical_x0], usize((physical_x1 - physical_x0) * 4))
+			}
+		}
+	}
+}
+
+// fill_logical_rows paints each logical row of the clip in its own colour,
+// which is all a gradient backdrop is.
+fn (mut c Canvas) fill_logical_rows(colors []u32) {
+	x0 := if c.clip.x > 0 { c.clip.x } else { 0 }
+	y0 := if c.clip.y > 0 { c.clip.y } else { 0 }
+	x1 := if c.clip.x + c.clip.w < c.width { c.clip.x + c.clip.w } else { c.width }
+	mut y1 := if c.clip.y + c.clip.h < c.height { c.clip.y + c.clip.h } else { c.height }
+	if y1 > colors.len {
+		y1 = colors.len
+	}
+	if x1 <= x0 || y1 <= y0 {
+		return
+	}
+	physical_x0 := x0 * c.scale
+	physical_x1 := if x1 * c.scale < c.physical_width { x1 * c.scale } else { c.physical_width }
+	for ly := y0; ly < y1; ly++ {
+		color := colors[ly]
+		for py := ly * c.scale; py < (ly + 1) * c.scale && py < c.physical_height; py++ {
+			row := py * c.stride
+			for px := physical_x0; px < physical_x1; px++ {
+				unsafe {
+					c.pixels[row + px] = color
 				}
 			}
 		}
@@ -507,6 +554,15 @@ fn (mut c Canvas) blend_round_rect(x int, y int, w int, h int, radius int, color
 	c.blend_rect(x + r, y, w - 2 * r, r, color, alpha) // top band
 	c.blend_rect(x + r, y + h - r, w - 2 * r, r, color, alpha) // bottom band
 
+	// Corners outside the clip are skipped whole: a partial frame walks every
+	// rounded shape on the screen, and most of them are nowhere near it.
+	left := c.clip_touches(x, y, r, h)
+	right := c.clip_touches(x + w - r, y, r, h)
+	top := c.clip_touches(x, y, w, r)
+	bottom := c.clip_touches(x, y + h - r, w, r)
+	if !(left || right) || !(top || bottom) {
+		return
+	}
 	rf := f64(r)
 	for cy := 0; cy < r; cy++ {
 		for cx := 0; cx < r; cx++ {
@@ -515,12 +571,27 @@ fn (mut c Canvas) blend_round_rect(x int, y int, w int, h int, radius int, color
 				continue
 			}
 			a := if alpha >= 255 { coverage } else { coverage * alpha / 255 }
-			c.blend_pixel(x + cx, y + cy, color, a)
-			c.blend_pixel(x + w - 1 - cx, y + cy, color, a)
-			c.blend_pixel(x + cx, y + h - 1 - cy, color, a)
-			c.blend_pixel(x + w - 1 - cx, y + h - 1 - cy, color, a)
+			if top && left {
+				c.blend_pixel(x + cx, y + cy, color, a)
+			}
+			if top && right {
+				c.blend_pixel(x + w - 1 - cx, y + cy, color, a)
+			}
+			if bottom && left {
+				c.blend_pixel(x + cx, y + h - 1 - cy, color, a)
+			}
+			if bottom && right {
+				c.blend_pixel(x + w - 1 - cx, y + h - 1 - cy, color, a)
+			}
 		}
 	}
+}
+
+// clip_touches reports whether any of the rectangle can be drawn.
+@[inline]
+fn (c &Canvas) clip_touches(x int, y int, w int, h int) bool {
+	return w > 0 && h > 0 && x < c.clip.x + c.clip.w && x + w > c.clip.x
+		&& y < c.clip.y + c.clip.h && y + h > c.clip.y
 }
 
 // stroke_round_rect outlines a shape with a one pixel edge, taking the ring
@@ -658,6 +729,42 @@ fn (mut c Canvas) drop_shadow(x int, y int, w int, h int, radius int, spread int
 		layer := alpha * u32(spread - i + 1) / u32(spread * 3)
 		c.blend_round_rect(x - i, y - i + 2, w + 2 * i, h + 2 * i, radius + i, 0x000000, layer)
 	}
+}
+
+// drop_shadow_behind is drop_shadow for a rounded shape the caller then fills
+// opaquely. Between its corners the shape covers its full width, so the seven
+// layers are only blended in the bands around that middle, the part of the
+// shadow that stays visible. Blending all of it, window interior included,
+// was the most expensive thing in a frame.
+fn (mut c Canvas) drop_shadow_behind(x int, y int, w int, h int, radius int, spread int, alpha u32) {
+	half := if w < h { w / 2 } else { h / 2 }
+	r := if radius > half { half } else if radius > 0 { radius } else { 0 }
+	top := y + r
+	bottom := y + h - r
+	if bottom <= top {
+		c.drop_shadow(x, y, w, h, radius, spread, alpha)
+		return
+	}
+	outer_x := x - spread
+	outer_w := w + 2 * spread
+	outer_top := y - spread + 2
+	outer_bottom := y + h + spread + 2
+	c.drop_shadow_band(outer_x, outer_top, outer_w, top - outer_top, x, y, w, h, radius,
+		spread, alpha)
+	c.drop_shadow_band(outer_x, bottom, outer_w, outer_bottom - bottom, x, y, w, h, radius,
+		spread, alpha)
+	c.drop_shadow_band(outer_x, top, spread, bottom - top, x, y, w, h, radius, spread, alpha)
+	c.drop_shadow_band(x + w, top, spread, bottom - top, x, y, w, h, radius, spread, alpha)
+}
+
+fn (mut c Canvas) drop_shadow_band(band_x int, band_y int, band_w int, band_h int, x int, y int,
+	w int, h int, radius int, spread int, alpha u32) {
+	if !c.clip_touches(band_x, band_y, band_w, band_h) {
+		return
+	}
+	saved := c.push_clip_rect(band_x, band_y, band_w, band_h)
+	c.drop_shadow(x, y, w, h, radius, spread, alpha)
+	c.restore_clip(saved)
 }
 
 fn (mut c Canvas) fill_circle(cx int, cy int, radius int, color u32) {

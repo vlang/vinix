@@ -170,6 +170,21 @@ fn (mut d Desktop) update_taskbar_clock_at(seconds i64) {
 		return
 	}
 	time_text, date_text := d.taskbar_clock_strings_at(seconds)
+	was_sampled := d.taskbar_clock_sampled
+	d.taskbar_clock_seconds = seconds
+	d.taskbar_clock_sampled = true
+	// Without seconds on show the text changes once a minute; the other 59
+	// ticks have nothing to draw.
+	if was_sampled && time_text == d.taskbar_clock_time && date_text == d.taskbar_clock_date {
+		unsafe {
+			time_text.free()
+			date_text.free()
+		}
+		return
+	}
+	// A new day can change what windows show too (Calendar marks today), so
+	// only the time ticking over is a taskbar-only change.
+	date_changed := date_text != d.taskbar_clock_date
 	if d.taskbar_clock_time.len > 0 {
 		unsafe { d.taskbar_clock_time.free() }
 	}
@@ -178,9 +193,28 @@ fn (mut d Desktop) update_taskbar_clock_at(seconds i64) {
 	}
 	d.taskbar_clock_time = time_text
 	d.taskbar_clock_date = date_text
-	d.taskbar_clock_seconds = seconds
-	d.taskbar_clock_sampled = true
-	d.dirty = true
+	if was_sampled && !date_changed {
+		d.damage_taskbar()
+	} else {
+		d.dirty = true
+	}
+}
+
+// taskbar_clock_idle_interval ends an idle wait just after the wall clock
+// next changes what the taskbar shows. The wait was a second from whenever
+// the last pass ran, so the time could turn over up to a second late. A few
+// milliseconds of margin keep the wake from landing just before the change,
+// since the caller also subtracts the time its own pass took.
+fn (d &Desktop) taskbar_clock_idle_interval(interval i64) i64 {
+	seconds, nanoseconds := desktop_realtime()
+	if seconds < 0 || nanoseconds < 0 || nanoseconds >= 1_000_000_000 {
+		return interval
+	}
+	mut wait := (1_000_000_000 - nanoseconds) / 1_000_000 + 5
+	if !d.settings.clock_show_seconds {
+		wait += (59 - seconds % 60) * 1000
+	}
+	return if wait < interval { wait } else { interval }
 }
 
 // monotonic_millis drives frame pacing.

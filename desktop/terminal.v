@@ -30,6 +30,14 @@ mut:
 	poll() bool
 }
 
+// PollPacedApp is a PollingApp that knows when its next poll can find
+// something new, and returns that in each poll reply. The compositor then
+// waits that long rather than its fixed cadence: a clock showing seconds has
+// nothing new for most of a second, and a quiet shell for longer still.
+interface PollPacedApp {
+	next_poll_ms() u64
+}
+
 enum AppPointerPhase {
 	move
 	down
@@ -78,8 +86,14 @@ const terminal_rebuild_snapshot_path = '/run/vinix-desktop-rebuild-terminal'
 const terminal_rebuild_notice_max_age_ms = u64(600_000)
 const terminal_rebuild_snapshot_max_bytes = u64(1024 * 1024)
 
+const terminal_active_poll_ms = u64(100)
+const terminal_quiet_poll_ms = u64(250)
+const terminal_idle_poll_ms = u64(500)
+
 struct TerminalApp {
 mut:
+	// When the shell last printed anything; see next_poll_ms.
+	last_output_ms u64
 	// The visible terminal is a fixed grid of code points, one per cell. Keeping
 	// it flat makes scrolling and erasing deterministic and avoids one
 	// allocation per cell.
@@ -652,6 +666,9 @@ fn (mut a TerminalApp) poll() bool {
 			break
 		}
 	}
+	if changed {
+		a.last_output_ms = desktop_monotonic_ms()
+	}
 
 	if !a.exited && a.pid >= 0 && desktop_child_exited(a.pid) {
 		a.ingest_output('\r\n[${terminal_shell} exited]'.bytes())
@@ -662,6 +679,24 @@ fn (mut a TerminalApp) poll() bool {
 		changed = true
 	}
 	return changed
+}
+
+// A shell that has just printed is polled at the Terminal's full cadence, so
+// a command's output streams. One that has been quiet for a while is only
+// waiting for its user, whose typing polls it at once; background output
+// then shows within a quarter or half of a second instead of a tenth.
+fn (a &TerminalApp) next_poll_ms() u64 {
+	now := desktop_monotonic_ms()
+	if a.terminal < 0 {
+		return 0
+	}
+	if now == ~u64(0) || now < a.last_output_ms || now - a.last_output_ms < 1000 {
+		return terminal_active_poll_ms
+	}
+	if now - a.last_output_ms < 10_000 {
+		return terminal_quiet_poll_ms
+	}
+	return terminal_idle_poll_ms
 }
 
 fn (mut a TerminalApp) ingest_output(output []u8) {

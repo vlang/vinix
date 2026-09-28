@@ -1514,6 +1514,15 @@ fn (mut d Desktop) render_context_entries(entries []ui2.MenuEntry) {
 }
 
 fn (mut d Desktop) render_create_context_menu() {
+	d.render_create_context_overlays()
+	// Both overlays are painted after render(), whose first cursor copy can be
+	// covered by an icon or menu.
+	d.draw_cursor()
+}
+
+// render_create_context_overlays paints what the desktop draws over its
+// element tree, in the canvas' current clip.
+fn (mut d Desktop) render_create_context_overlays() {
 	// User files are part of the desktop surface, so paint them after the main
 	// tree only where no window covers them. Their targets then participate in
 	// the same hit testing as app shortcuts and context-menu rows.
@@ -1542,7 +1551,4 @@ fn (mut d Desktop) render_create_context_menu() {
 			d.render_context_entries(create_context_background_entries)
 		}
 	}
-	// Both overlays are painted after render(), whose first cursor copy can be
-	// covered by an icon or menu.
-	d.draw_cursor()
 }

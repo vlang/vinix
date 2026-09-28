@@ -90,10 +90,22 @@ fn load_raw_image(path string) ?RawImage {
 	if int(got) < needed {
 		return none
 	}
+	pixels := buffer[vwp_header_size..needed].clone()
+	unsafe { buffer.free() }
 	return RawImage{
 		width: width
 		height: height
-		pixels: buffer[vwp_header_size..needed].clone()
+		pixels: pixels
+	}
+}
+
+fn free_wallpaper_list(images []WallpaperImage) {
+	unsafe {
+		for image in images {
+			image.name.free()
+			image.file.free()
+		}
+		images.free()
 	}
 }
 

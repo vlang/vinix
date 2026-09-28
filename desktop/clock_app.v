@@ -23,6 +23,8 @@ mut:
 	started_ms      u64
 	accumulated_ms  u64
 	last_refresh_ms u64
+	// The wall-clock second the time on show was read at.
+	shown_seconds i64 = -1
 }
 
 fn open_clock(mut desktop Desktop) !NativeApp {
@@ -93,6 +95,7 @@ fn (mut a ClockApp) refresh() {
 		a.time_text = clock_replace_text(a.time_text, next_time)
 		a.date_text = clock_replace_text(a.date_text, next_date)
 	}
+	a.shown_seconds = seconds
 	now := desktop_monotonic_ms()
 	a.stopwatch_text = clock_replace_text(a.stopwatch_text, clock_stopwatch_text(a.elapsed(now)))
 	a.last_refresh_ms = now
@@ -103,13 +106,36 @@ fn (mut a ClockApp) poll() bool {
 	if now == ~u64(0) {
 		return false
 	}
-	interval := if a.running { clock_running_poll_ms } else { clock_idle_poll_ms }
+	if !a.running {
+		// Only the seconds can have changed, so there is nothing to redraw
+		// until the wall clock reaches the next one.
+		seconds, _ := desktop_realtime()
+		if seconds == a.shown_seconds {
+			return false
+		}
+		a.refresh()
+		return true
+	}
 	if a.last_refresh_ms != ~u64(0) && now >= a.last_refresh_ms
-		&& now - a.last_refresh_ms < interval {
+		&& now - a.last_refresh_ms < clock_running_poll_ms {
 		return false
 	}
 	a.refresh()
 	return true
+}
+
+// next_poll_ms asks for the stopwatch's tenths while it runs, and otherwise
+// for the moment the next wall-clock second begins, so the time turns over
+// on the second rather than up to one poll interval after it.
+fn (a &ClockApp) next_poll_ms() u64 {
+	if a.running {
+		return clock_running_poll_ms
+	}
+	_, nanoseconds := desktop_realtime()
+	if nanoseconds < 0 || nanoseconds >= 1_000_000_000 {
+		return clock_idle_poll_ms
+	}
+	return u64(1_000_000_000 - nanoseconds) / 1_000_000 + 1
 }
 
 fn (mut a ClockApp) toggle_stopwatch() {

@@ -968,8 +968,17 @@ fn run_app_process(options AppProcessOptions) {
 			}
 			.poll {
 				changed := if mut app is PollingApp { app.poll() } else { false }
-				poll_payload := [u8(if changed { 1 } else { 0 })]
-				if !send_app_response(options.response_fd, true, app_current_state(desktop), poll_payload) {
+				mut poll_payload := [u8(if changed { 1 } else { 0 })]
+				// The reply's optional second field: how long until the next poll
+				// is worth making. A one-byte reply, which standalone applications
+				// send, keeps the application's fixed cadence.
+				if mut app is PollPacedApp {
+					wire_put_u32(mut poll_payload, u32(app.next_poll_ms()))
+				}
+				sent := send_app_response(options.response_fd, true, app_current_state(desktop),
+					poll_payload)
+				unsafe { poll_payload.free() }
+				if !sent {
 					free_app_payload(payload)
 					break
 				}
@@ -1024,6 +1033,9 @@ mut:
 	response_fd      int
 	polling          bool
 	poll_interval_ms u64
+	// The application's own estimate, from its last poll reply, of when the
+	// next poll can find something new. Zero means use poll_interval_ms.
+	poll_hint_ms     u64
 	poll_sampled     bool
 	last_poll_ms     u64
 	keyboard         bool
@@ -1032,7 +1044,31 @@ mut:
 	closed           bool
 	failure_reason   string
 	desktop          &Desktop = unsafe { nil }
+	// The last tree the application sent, still encoded. The compositor
+	// rebuilds its element tree on every frame, and asking each application
+	// for its tree again meant two pipe messages, a rebuild in the child and
+	// two scheduler hand-offs per window per frame -- the whole cost of
+	// moving the pointer over the wallpaper. It is reused until anything the
+	// application's picture depends on can have changed: an event delivered to
+	// it, a poll that reports a change, a new size or desktop state, or -- for
+	// a frame that repaints everything -- remote_tree_max_age_ms passing, which
+	// bounds how stale a battery reading or a directory listing an
+	// application takes while building can get.
+	tree        []u8
+	tree_width  int
+	tree_height int
+	tree_state  AppWireState
+	tree_ms     u64
+	tree_stale  bool = true
+	// Whether the frame being built repaints everything. A partial frame
+	// repaints parts of windows around a change elsewhere, and a newer tree
+	// there would leave the window showing two versions of itself; whatever
+	// changed in the application itself has already made its tree stale and
+	// its whole window damaged.
+	tree_age_limited bool = true
 }
+
+const remote_tree_max_age_ms = u64(1000)
 
 /*
 fn start_remote_app(factory AppFactory, mut desktop Desktop) !NativeApp {
@@ -1138,7 +1174,23 @@ fn (mut a RemoteApp) remember_transport_failure(reason string) {
 }
 
 fn (mut a RemoteApp) build(size ui2.Rect) !ui2.Element {
-	reply := a.transact(.build, int(size.width), int(size.height), '')!
+	width := int(size.width)
+	height := int(size.height)
+	state := if unsafe { a.desktop != nil } {
+		app_current_state(a.desktop)
+	} else {
+		AppWireState{}
+	}
+	now := desktop_monotonic_ms()
+	fresh := !a.tree_age_limited
+		|| (now != ~u64(0) && now >= a.tree_ms && now - a.tree_ms < remote_tree_max_age_ms)
+	a.tree_age_limited = true
+	if !a.tree_stale && a.tree.len > 0 && a.tree_width == width && a.tree_height == height
+		&& a.tree_state == state && fresh {
+		return decode_app_tree(a.tree)
+	}
+	a.drop_tree()
+	reply := a.transact(.build, width, height, '')!
 	if !reply.ok {
 		return app_reply_error(reply)
 	}
@@ -1148,13 +1200,46 @@ fn (mut a RemoteApp) build(size ui2.Rect) !ui2.Element {
 		}
 		return err
 	}
-	if reply.payload.cap > 0 {
-		unsafe { reply.payload.free() }
-	}
+	a.tree = reply.payload
+	a.tree_width = width
+	a.tree_height = height
+	a.tree_state = state
+	a.tree_ms = now
+	a.tree_stale = now == ~u64(0)
 	return tree
 }
 
+// drop_tree forgets the cached tree, so the next build asks the application.
+fn (mut a RemoteApp) drop_tree() {
+	if a.tree.cap > 0 {
+		unsafe { a.tree.free() }
+	}
+	a.tree = []u8{}
+	a.tree_stale = true
+}
+
+// next_poll_interval is the application's hint, kept between a quarter of its
+// cadence and two seconds so neither a confused client nor a stale estimate
+// can make it spin or go quiet. A zero cadence is a hosted surface that is
+// polled every frame, and stays so.
+fn (a &RemoteApp) next_poll_interval() u64 {
+	if a.poll_interval_ms == 0 || a.poll_hint_ms == 0 {
+		return a.poll_interval_ms
+	}
+	lowest := a.poll_interval_ms / 4
+	if a.poll_hint_ms < lowest {
+		return lowest
+	}
+	if a.poll_hint_ms > remote_poll_hint_max_ms {
+		return remote_poll_hint_max_ms
+	}
+	return a.poll_hint_ms
+}
+
+const remote_poll_hint_max_ms = u64(2000)
+
 fn (mut a RemoteApp) handle(event_id string) ! {
+	a.tree_stale = true
 	reply := a.transact(.handle, 0, 0, event_id)!
 	if !reply.ok {
 		return app_reply_error(reply)
@@ -1168,6 +1253,7 @@ fn (mut a RemoteApp) key_input(text string) {
 	if !a.keyboard {
 		return
 	}
+	a.tree_stale = true
 	reply := a.transact(.key_input, 0, 0, text) or { return }
 	if reply.payload.cap > 0 {
 		unsafe { reply.payload.free() }
@@ -1196,6 +1282,7 @@ fn (mut a RemoteApp) pointer_event(phase AppPointerPhase, button AppPointerButto
 		height: i32(height)
 	}
 	payload := unsafe { tos(&u8(&pointer), int(sizeof(AppPointerPayload))) }
+	a.tree_stale = true
 	reply := a.transact(.pointer, 0, 0, payload) or { return }
 	if reply.payload.cap > 0 {
 		unsafe { reply.payload.free() }
@@ -1207,10 +1294,13 @@ fn (mut a RemoteApp) poll() bool {
 		return false
 	}
 	now := desktop_monotonic_ms()
-	if !remote_app_poll_due(a.poll_interval_ms, a.poll_sampled, a.last_poll_ms, now) {
+	if !remote_app_poll_due(a.next_poll_interval(), a.poll_sampled, a.last_poll_ms, now) {
 		return false
 	}
-	reply := a.transact(.poll, 0, 0, '') or { return true }
+	reply := a.transact(.poll, 0, 0, '') or {
+		a.tree_stale = true
+		return true
+	}
 	// Measure the next interval from the completed response. Activity and Clock
 	// also pace their work inside the child; starting before the request could
 	// make their next check land a few milliseconds early and skip a whole
@@ -1224,9 +1314,18 @@ fn (mut a RemoteApp) poll() bool {
 		if reply.payload.cap > 0 {
 			unsafe { reply.payload.free() }
 		}
+		a.tree_stale = true
 		return true
 	}
-	changed := reply.payload.len == 1 && reply.payload[0] != 0
+	changed := reply.payload.len >= 1 && reply.payload[0] != 0
+	if changed {
+		a.tree_stale = true
+	}
+	a.poll_hint_ms = if reply.payload.len >= 5 {
+		u64(reply.payload[1]) | u64(reply.payload[2]) << 8 | u64(reply.payload[3]) << 16 | u64(reply.payload[4]) << 24
+	} else {
+		0
+	}
 	// A quiet interactive client can use a long interval without making command
 	// output crawl: typing already forces the first poll, and a changed reply
 	// keeps polling on subsequent rendered frames until the output is drained.
@@ -1240,6 +1339,7 @@ fn (mut a RemoteApp) poll() bool {
 }
 
 fn (mut a RemoteApp) close_transport() {
+	a.drop_tree()
 	if a.request_fd >= 0 {
 		desktop_close(a.request_fd)
 		a.request_fd = -1
@@ -1260,6 +1360,7 @@ fn (mut a RemoteApp) close_transport() {
 // opening an application, and waiting for that process would replace one
 // permanent compositor stall with another. Terminate it before reaping it.
 fn (mut a RemoteApp) abort_transport() {
+	a.drop_tree()
 	if a.request_fd >= 0 {
 		desktop_close(a.request_fd)
 		a.request_fd = -1

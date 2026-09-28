@@ -66,12 +66,19 @@ struct LogoCrossing {
 	winding int
 }
 
-// draw_logo paints the wordmark into the middle of a screen-sized buffer. It
-// goes into the cached wallpaper rather than onto the canvas: the mark never
-// moves, so it is rasterised with the backdrop and blitted with it after.
-fn draw_logo(mut pixels []u32, width int, height int, color u32) {
+// LogoBox is where the wordmark sits on a screen of a given size, and the
+// scale its view box is drawn at.
+struct LogoBox {
+	x     int
+	y     int
+	w     int
+	h     int
+	scale f64
+}
+
+fn logo_box(width int, height int) ?LogoBox {
 	if width <= 0 || height <= 0 {
-		return
+		return none
 	}
 	mut scale := f64(width) / logo_width_fraction / logo_view_width
 	fit_height := f64(height) / logo_height_fraction / logo_view_height
@@ -83,10 +90,28 @@ fn draw_logo(mut pixels []u32, width int, height int, color u32) {
 	box_w := int(logo_view_width * scale) + 2
 	box_h := int(logo_view_height * scale) + 2
 	if box_w < 8 || box_h < 8 || box_w > width || box_h > height {
+		return none
+	}
+	return LogoBox{
+		x:     (width - box_w) / 2
+		y:     (height - box_h) / 2
+		w:     box_w
+		h:     box_h
+		scale: scale
+	}
+}
+
+// draw_logo paints the wordmark over `pixels`, the box's own w x h pixels
+// holding the backdrop behind it. It goes into the cached wallpaper rather
+// than onto the canvas: the mark never moves, so it is rasterised with the
+// backdrop and blitted with it after.
+fn draw_logo(mut pixels []u32, logo LogoBox, color u32) {
+	box_w := logo.w
+	box_h := logo.h
+	scale := logo.scale
+	if pixels.len < box_w * box_h {
 		return
 	}
-	origin_x := (width - box_w) / 2
-	origin_y := (height - box_h) / 2
 
 	// The shapes are rasterised into a mask first, so a pixel two of them share
 	// an edge on is blended once and does not come out darker than the rest.
@@ -97,7 +122,7 @@ fn draw_logo(mut pixels []u32, width int, height int, color u32) {
 
 	for y in 0 .. box_h {
 		row := y * box_w
-		out_row := (origin_y + y) * width + origin_x
+		out_row := y * box_w
 		for x in 0 .. box_w {
 			cov := u32(coverage[row + x])
 			if cov == 0 {

@@ -258,52 +258,137 @@ fn load_app_icon(name string) AppIcon {
 	return decode_qoi(bytes) or { AppIcon{} }
 }
 
-fn (mut d Desktop) load_app_icons() {
-	d.firefox_icon = load_app_icon('firefox')
-	d.chromium_icon = load_app_icon('chromium')
-	d.blender_icon = load_app_icon('blender')
-	d.minecraft_icon = load_app_icon('minecraft')
-	d.doom_icon = load_app_icon('doom')
-	d.steam_icon = load_app_icon('steam')
-	d.terminal_icon = load_app_icon('terminal')
-	d.settings_icon = load_app_icon('settings')
-	d.activity_icon = load_app_icon('activity')
-	d.calculator_icon = load_app_icon('calculator')
-	d.vspace_icon = load_app_icon('vspace')
-	d.editor_icon = load_app_icon('editor')
-	d.files_icon = load_app_icon('files')
-	d.clock_icon = load_app_icon('clock')
-	d.calendar_icon = load_app_icon('calendar')
-	d.capture_icon = load_app_icon('capture')
+// The bundled icons, by the image path the desktop's elements name them with.
+// Their artwork is /usr/share/vinix/icons/<name>.qoi.
+const bundled_icon_paths = ['asset:firefox', 'asset:chromium', 'asset:blender', 'asset:minecraft',
+	'asset:doom', 'asset:steam', 'asset:terminal', 'asset:settings', 'asset:activity',
+	'asset:calculator', 'asset:vspace', 'asset:editor', 'asset:files', 'asset:clock',
+	'asset:calendar', 'asset:capture']
+
+// How many scaled icons are kept. The desktop draws each icon at a handful of
+// sizes; the limit only matters if something keeps asking for new ones.
+const sized_icon_limit = 128
+
+// SizedIcon is bundled artwork scaled to one size it is drawn at. The artwork
+// is 512px and the desktop never draws it larger than a few dozen, so each
+// size is made from it once, every source pixel counted, and kept; the
+// artwork itself is only held while a new size is being made. Keeping all
+// sixteen decoded at 512px cost 16 MiB.
+struct SizedIcon {
+	path    string
+	missing bool
+	icon    AppIcon
 }
 
-fn (d &Desktop) bundled_app_icon(path string) &AppIcon {
-	match path {
-		'asset:firefox' { return &d.firefox_icon }
-		'asset:chromium' { return &d.chromium_icon }
-		'asset:blender' { return &d.blender_icon }
-		'asset:minecraft' { return &d.minecraft_icon }
-		'asset:doom' { return &d.doom_icon }
-		'asset:steam' { return &d.steam_icon }
-		'asset:terminal' { return &d.terminal_icon }
-		'asset:settings' { return &d.settings_icon }
-		'asset:activity' { return &d.activity_icon }
-		'asset:calculator' { return &d.calculator_icon }
-		'asset:vspace' { return &d.vspace_icon }
-		'asset:editor' { return &d.editor_icon }
-		'asset:files' { return &d.files_icon }
-		'asset:clock' { return &d.clock_icon }
-		'asset:calendar' { return &d.calendar_icon }
-		'asset:capture' { return &d.capture_icon }
-		else { return unsafe { nil } }
+fn bundled_icon_path(path string) bool {
+	return path.starts_with('asset:') && path in bundled_icon_paths
+}
+
+// sized_bundled_icon returns the bundled icon at exactly width x height
+// physical pixels, or nil when the image has no artwork installed.
+fn (mut d Desktop) sized_bundled_icon(path string, width int, height int) &AppIcon {
+	for i in 0 .. d.sized_icons.len {
+		if d.sized_icons[i].icon.width == width && d.sized_icons[i].icon.height == height
+			&& d.sized_icons[i].path == path {
+			if d.sized_icons[i].missing {
+				return unsafe { nil }
+			}
+			return &d.sized_icons[i].icon
+		}
+	}
+	name := path['asset:'.len..]
+	source := load_app_icon(name)
+	unsafe { name.free() }
+	mut entry := SizedIcon{
+		path:    path.clone()
+		missing: source.width == 0 || source.height == 0
+		icon:    AppIcon{
+			width:  width
+			height: height
+		}
+	}
+	if !entry.missing {
+		entry = SizedIcon{
+			...entry
+			icon: scale_app_icon(source, width, height)
+		}
+		unsafe { source.pixels.free() }
+	}
+	if d.sized_icons.len >= sized_icon_limit {
+		d.free_sized_icon(0)
+		d.sized_icons.delete(0)
+	}
+	d.sized_icons << entry
+	if entry.missing {
+		return unsafe { nil }
+	}
+	return &d.sized_icons[d.sized_icons.len - 1].icon
+}
+
+fn (mut d Desktop) free_sized_icon(index int) {
+	unsafe {
+		d.sized_icons[index].path.free()
+		if d.sized_icons[index].icon.pixels.cap > 0 {
+			d.sized_icons[index].icon.pixels.free()
+		}
+	}
+}
+
+// drop_sized_icons forgets every scaled icon, for a new display scale.
+fn (mut d Desktop) drop_sized_icons() {
+	for i in 0 .. d.sized_icons.len {
+		d.free_sized_icon(i)
+	}
+	d.sized_icons.clear()
+}
+
+// scale_app_icon averages every source pixel under each output pixel, with
+// colour weighted by alpha so a transparent edge does not darken the art.
+// A larger output than the source repeats pixels instead.
+fn scale_app_icon(source AppIcon, width int, height int) AppIcon {
+	mut pixels := []u32{len: width * height}
+	for y in 0 .. height {
+		y0 := y * source.height / height
+		mut y1 := (y + 1) * source.height / height
+		if y1 <= y0 {
+			y1 = y0 + 1
+		}
+		for x in 0 .. width {
+			x0 := x * source.width / width
+			mut x1 := (x + 1) * source.width / width
+			if x1 <= x0 {
+				x1 = x0 + 1
+			}
+			mut alpha := u64(0)
+			mut red := u64(0)
+			mut green := u64(0)
+			mut blue := u64(0)
+			for sy in y0 .. y1 {
+				row := sy * source.width
+				for sx in x0 .. x1 {
+					pixel := source.pixels[row + sx]
+					weight := u64(pixel >> 24)
+					alpha += weight
+					red += u64((pixel >> 16) & 0xff) * weight
+					green += u64((pixel >> 8) & 0xff) * weight
+					blue += u64(pixel & 0xff) * weight
+				}
+			}
+			if alpha == 0 {
+				continue
+			}
+			count := u64((x1 - x0) * (y1 - y0))
+			pixels[y * width + x] = u32((alpha + count / 2) / count) << 24 | u32(red / alpha) << 16 | u32(green / alpha) << 8 | u32(blue / alpha)
+		}
+	}
+	return AppIcon{
+		width:  width
+		height: height
+		pixels: pixels
 	}
 }
 
 fn (mut d Desktop) app_icon(path string) &AppIcon {
-	bundled := d.bundled_app_icon(path)
-	if !isnil(bundled) {
-		return bundled
-	}
 	// Native UI2 apps may only ask the compositor to open installed, immutable
 	// application assets. Do not turn arbitrary document paths into reads by
 	// the privileged desktop process.
@@ -336,16 +421,34 @@ fn (mut d Desktop) app_icon(path string) &AppIcon {
 	return loaded
 }
 
-// draw_app_icon samples the original 512px artwork on the physical output
-// grid. The desktop therefore remains sharp on 2x panels instead of scaling a
-// 30px logical bitmap into soft blocks.
+// draw_app_icon draws on the physical output grid, so the desktop remains
+// sharp on 2x panels instead of scaling a 30px logical bitmap into soft
+// blocks. Bundled artwork comes already scaled to the physical size; an
+// installed application's own PNG is sampled from its full size.
 fn (mut d Desktop) draw_app_icon(path string, x int, y int, w int, h int) bool {
-	icon := d.app_icon(path)
-	if isnil(icon) || icon.width == 0 || icon.height == 0 || w <= 0 || h <= 0 {
+	if w <= 0 || h <= 0 {
 		return false
 	}
 	physical_w := w * d.canvas.scale
 	physical_h := h * d.canvas.scale
+	if bundled_icon_path(path) {
+		icon := d.sized_bundled_icon(path, physical_w, physical_h)
+		if isnil(icon) {
+			return false
+		}
+		for py in 0 .. physical_h {
+			for px in 0 .. physical_w {
+				pixel := icon.pixels[py * physical_w + px]
+				d.canvas.blend_physical_pixel(x * d.canvas.scale + px, y * d.canvas.scale + py,
+					pixel & 0x00ffffff, pixel >> 24)
+			}
+		}
+		return true
+	}
+	icon := d.app_icon(path)
+	if isnil(icon) || icon.width == 0 || icon.height == 0 {
+		return false
+	}
 	for py in 0 .. physical_h {
 		sy := py * icon.height / physical_h
 		for px in 0 .. physical_w {

@@ -193,7 +193,9 @@ fn files_list_separator(x int) ui2.Element {
 		files_list_header_height - 10), ui2.BoxStyle{ bg: body_rule }, [])
 }
 
-fn files_list_header_sort_target(mut children []ui2.Element, action string, title string,
+// `tooltip` is a literal: the tree is rebuilt for every frame the window is
+// drawn in, and nothing frees the strings it holds.
+fn files_list_header_sort_target(mut children []ui2.Element, action string, tooltip string,
 	x int, width int, selected bool, descending bool) {
 	if selected {
 		children << ui2.Element{
@@ -205,8 +207,8 @@ fn files_list_header_sort_target(mut children []ui2.Element, action string, titl
 	children << ui2.Element{
 		...ui2.clickable_view(action, ui2.rect(f64(x), files_header_height, f64(width),
 			files_list_header_height), ui2.BoxStyle{ transparent: true }, [])
-		tooltip:             'Sort by ${title}'
-		accessibility_label: 'Sort by ${title}'
+		tooltip:             tooltip
+		accessibility_label: tooltip
 		accessibility_value: if selected {
 			if descending { 'descending' } else { 'ascending' }
 		} else {
@@ -254,16 +256,16 @@ fn files_list_header(mut children []ui2.Element, x int, width int, layout FilesL
 	if layout.show_kind { children << files_list_separator(x + layout.kind_x) }
 	children << ui2.view('', ui2.rect(f64(x), y + files_list_header_height - 1,
 		f64(width), 1), ui2.BoxStyle{ bg: body_rule }, [])
-	files_list_header_sort_target(mut children, files_action_sort_name, 'Name', x,
+	files_list_header_sort_target(mut children, files_action_sort_name, 'Sort by Name', x,
 		layout.name_end, sort_column == .name, descending)
 	if layout.show_modified {
-		files_list_header_sort_target(mut children, files_action_sort_modified, 'Date Modified',
+		files_list_header_sort_target(mut children, files_action_sort_modified, 'Sort by Date Modified',
 			x + layout.modified_x, layout.modified_width, sort_column == .modified, descending)
 	}
-	files_list_header_sort_target(mut children, files_action_sort_size, 'Size',
+	files_list_header_sort_target(mut children, files_action_sort_size, 'Sort by Size',
 		x + layout.size_x, layout.size_width, sort_column == .size, descending)
 	if layout.show_kind {
-		files_list_header_sort_target(mut children, files_action_sort_kind, 'Kind',
+		files_list_header_sort_target(mut children, files_action_sort_kind, 'Sort by Kind',
 			x + layout.kind_x, layout.kind_width, sort_column == .kind, descending)
 	}
 }

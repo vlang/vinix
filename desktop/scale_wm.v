@@ -122,6 +122,14 @@ fn (mut d Desktop) apply_requested_scale() {
 	old_pixels := d.canvas.pixels
 	d.canvas = new_scaled_canvas(new_width, new_height, desktop_physical_width, desktop_physical_height, target)
 	unsafe { free(voidptr(old_pixels)) }
+	// The pointer's backing was in the old canvas' pixels, and the faces were
+	// rasterised for the old scale.
+	d.cursor_backing.box = DamageRect{}
+	d.drop_sized_icons()
+	if d.fonts.len > 0 {
+		free_fonts(mut d.fonts)
+		d.fonts = load_fonts_for_scale(target)
+	}
 
 	d.pointer_x = desktop_rescale_coordinate(d.pointer_x, old_width, new_width)
 	d.pointer_y = desktop_rescale_coordinate(d.pointer_y, old_height, new_height)

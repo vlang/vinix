@@ -69,24 +69,10 @@ mut:
 	canvas        Canvas
 	preview_cache VinixPreviewCache
 	fonts         []FontFace
-	// Official 512px app artwork, loaded once by the compositor. Native app
-	// helper processes leave these empty because they never rasterize frames.
-	firefox_icon    AppIcon
-	chromium_icon   AppIcon
-	blender_icon    AppIcon
-	minecraft_icon  AppIcon
-	doom_icon       AppIcon
-	steam_icon      AppIcon
-	terminal_icon   AppIcon
-	settings_icon   AppIcon
-	activity_icon   AppIcon
-	calculator_icon AppIcon
-	vspace_icon     AppIcon
-	editor_icon     AppIcon
-	files_icon      AppIcon
-	clock_icon      AppIcon
-	calendar_icon   AppIcon
-	capture_icon    AppIcon
+	// The bundled app artwork at each size it has been drawn at, made the
+	// first time. Native app helper processes never rasterize frames, so
+	// theirs stays empty. See sized_bundled_icon.
+	sized_icons []SizedIcon
 	// PNG resources loaded lazily for installed native UI2 applications.
 	native_asset_icons map[string]&AppIcon
 	windows            []Window // painting order; the last entry is on top
@@ -124,6 +110,20 @@ mut:
 	// A moving top-level window can reuse the last complete canvas. Motion
 	// accumulates its old and new bounds here until the next frame consumes it.
 	drag_damage DamageRect
+	// Changes confined to a known area (the taskbar clock ticking, one
+	// application redrawing its window) accumulate here instead of setting
+	// `dirty`, so the next frame recomposes only that area. See frame_damage.v.
+	frame_damage FrameDamage
+	// Whether the frame being built repaints everything. Only such a frame
+	// asks applications for a tree just because the one it has is old.
+	paint_full bool = true
+	// The pixels under the software pointer, so a pointer that only moved can
+	// be redrawn without recomposing anything else.
+	cursor_backing CursorBacking
+	// Set by the last pointer packet when it moved the pointer and everything
+	// else it changed was recorded in `frame_damage`: no button, no scroll, no
+	// drag and no hover change outside the two controls involved.
+	pointer_moved_only bool
 	// The taskbar clock owns its text so unchanged seconds do not allocate. It
 	// occupies a fixed logical status area, which the framebuffer presenter
 	// scales together with every other desktop coordinate.
@@ -189,11 +189,18 @@ mut:
 	next_status_token        int
 	taskbar_status_polled_ms i64
 	taskbar_marquee_ms       i64
-	// One screen's worth of wallpaper, scaled once and kept. It only changes
-	// when the setting does, and rescaling a photograph every frame to paint a
-	// backdrop that has not moved would cost more than the rest of a frame.
-	wallpaper       []u32
-	wallpaper_valid bool
+	// The backdrop, prepared once and kept. It only changes when the setting
+	// does, and rescaling a photograph every frame to paint a backdrop that has
+	// not moved would cost more than the rest of a frame. A photograph is one
+	// screen's worth of pixels in `wallpaper`; a colour is `wallpaper_rows`, one
+	// colour per row, and the wordmark's box. See build_wallpaper.
+	wallpaper             []u32
+	wallpaper_rows        []u32
+	wallpaper_logo        LogoBox
+	wallpaper_logo_pixels []u32
+	wallpaper_width       int
+	wallpaper_height      int
+	wallpaper_valid       bool
 
 	tz_offset_seconds i64
 }
@@ -592,7 +599,11 @@ fn (mut d Desktop) window_contents(window_index int, body_height int) (u32, []ui
 		return d.theme().window_body, window.content(window.width, body_height, d)
 	}
 	size := ui2.rect(0, 0, f64(window.width), f64(body_height))
-	root := d.apps[window.app_index].build(size) or {
+	mut app := d.apps[window.app_index]
+	if mut app is RemoteApp {
+		app.tree_age_limited = d.paint_full
+	}
+	root := app.build(size) or {
 		// An application that cannot lay itself out should say so in its own
 		// window rather than take the desktop down with it.
 		mut error_children := frame_elements(2)
@@ -738,17 +749,19 @@ fn (mut d Desktop) poll_apps() {
 	// stay stable after a window closes, but a closed terminal or clock should
 	// not keep doing background work forever. Minimized applications do keep
 	// polling: a shell pipe must still be drained while its window is hidden.
-	for window in d.windows {
-		if window.app_index < 0 || window.app_index >= d.apps.len {
+	for index in 0 .. d.windows.len {
+		app_index := d.windows[index].app_index
+		if app_index < 0 || app_index >= d.apps.len {
 			continue
 		}
-		mut app := d.apps[window.app_index]
+		mut app := d.apps[app_index]
 		if mut app is PollingApp {
 			// A minimised window still has to be polled — a shell pipe has to
 			// be drained whether or not anyone can see it — but recomposing
-			// the screen for a picture nobody is looking at is pure waste.
-			if app.poll() && window.workspace == d.current_workspace && !window.minimized {
-				d.dirty = true
+			// the screen for a picture nobody is looking at is pure waste. A
+			// visible one only needs its own window repainted.
+			if app.poll() {
+				d.damage_window(index)
 			}
 		}
 	}
@@ -774,7 +787,16 @@ fn (d &Desktop) idle_wait_interval(maximum i64, frame_interval i64) i64 {
 			if app.poll_interval_ms == 0 {
 				return frame_interval
 			}
-			candidate := i64(app.poll_interval_ms)
+			// The next poll is due an interval after the last one. The caller
+			// takes this pass's own time off the wait, so aim a few
+			// milliseconds past the due time: waking just before it would cost
+			// a pass that finds the poll not yet due.
+			mut candidate := i64(app.next_poll_interval())
+			now := desktop_monotonic_ms()
+			if now != ~u64(0) && now >= app.last_poll_ms {
+				since := i64(now - app.last_poll_ms)
+				candidate = if since < candidate { candidate - since + poll_wake_margin_ms } else { 1 }
+			}
 			if candidate < interval {
 				interval = candidate
 			}
@@ -782,6 +804,8 @@ fn (d &Desktop) idle_wait_interval(maximum i64, frame_interval i64) i64 {
 	}
 	return interval
 }
+
+const poll_wake_margin_ms = i64(4)
 
 // focused_app_takes_keys reports whether the window on top belongs to an
 // application that wants typed input.
@@ -938,6 +962,13 @@ fn (mut d Desktop) forward_to_app(x int, y int, action string) {
 // explicitly request it. A press captures the surface until release so a drag
 // does not get lost merely because it crossed the content edge.
 fn (mut d Desktop) forward_pointer_to_app(x int, y int, phase AppPointerPhase, button AppPointerButton, scroll int) bool {
+	return d.forward_pointer_to_window(x, y, phase, button, scroll) >= 0
+}
+
+// forward_pointer_to_window delivers a pointer event to the application under
+// it and returns the index of that application's window, or -1 when no
+// application took it.
+fn (mut d Desktop) forward_pointer_to_window(x int, y int, phase AppPointerPhase, button AppPointerButton, scroll int) int {
 	mut selected := -1
 	if d.pointer_capture != 0 {
 		selected = d.window_index(d.pointer_capture) or { -1 }
@@ -958,16 +989,16 @@ fn (mut d Desktop) forward_pointer_to_app(x int, y int, phase AppPointerPhase, b
 		if phase == .up {
 			d.pointer_capture = 0
 		}
-		return false
+		return -1
 	}
 	window := &d.windows[selected]
 	if window.app_index < 0 || window.app_index >= d.apps.len {
-		return false
+		return -1
 	}
 	mut app := d.apps[window.app_index]
 	if mut app is PointerApp {
 		if !app.pointer_input_enabled() {
-			return false
+			return -1
 		}
 		window_id := window.id
 		body_height := window.height - d.theme().title_height
@@ -997,9 +1028,9 @@ fn (mut d Desktop) forward_pointer_to_app(x int, y int, phase AppPointerPhase, b
 			&& d.buttons & (button_left | button_right | button_middle | button_back) == 0 {
 			d.pointer_capture = 0
 		}
-		return true
+		return selected
 	}
-	return false
+	return -1
 }
 
 // shortcut_elements lays the application shortcuts down the left edge of the
@@ -1651,9 +1682,11 @@ fn (d &Desktop) taskbar_entry_for_action(action string) ?TaskbarEntry {
 // ── Pointer handling ───────────────────────────────────────────────
 
 fn (mut d Desktop) on_pointer_move(x int, y int) {
+	d.pointer_moved_only = false
 	pointer_moved := x != d.pointer_x || y != d.pointer_y
 	old_pointer_x := d.pointer_x
 	old_pointer_y := d.pointer_y
+	was_dirty := d.dirty
 	if pointer_moved {
 		d.dirty = true
 	}
@@ -1742,15 +1775,31 @@ fn (mut d Desktop) on_pointer_move(x int, y int) {
 		}
 		return
 	}
-	if !d.start_menu_open && !d.start_menu_pointer {
-		d.forward_pointer_to_app(x, y, .move, .no_button, 0)
+	// The device reports its position on every read, moved or not. Only a
+	// real move is news to an application, and each one is a round trip.
+	mut delivered := -1
+	if pointer_moved && !d.start_menu_open && !d.start_menu_pointer {
+		delivered = d.forward_pointer_to_window(x, y, .move, .no_button, 0)
 	}
 
+	// What an ordinary move changes is local: the pointer's own picture, the
+	// window of the application it was delivered to, and the two controls
+	// the hover highlight left and reached. Those are repainted by themselves
+	// (see frame_damage.v); anything else takes the whole frame.
+	mut local := pointer_moved
 	hover := d.hit_action(x, y)
 	if hover != d.hover {
+		local = local && d.damage_hover_change(d.hover, hover)
 		d.set_hover(hover)
 		d.update_start_menu_hover()
 		d.dirty = true
+	}
+	if local {
+		if delivered >= 0 {
+			d.damage_window(delivered)
+		}
+		d.dirty = was_dirty
+		d.pointer_moved_only = true
 	}
 }
 
@@ -1810,37 +1859,13 @@ fn (mut d Desktop) add_drag_damage(old_x int, old_y int, new_x int, new_y int,
 }
 
 fn (mut d Desktop) add_damage_rect(x int, y int, width int, height int) {
-	if width <= 0 || height <= 0 {
-		return
-	}
-	if !d.drag_damage.valid {
-		d.drag_damage = DamageRect{
-			x:     x
-			y:     y
-			w:     width
-			h:     height
-			valid: true
-		}
-		return
-	}
-	right := if d.drag_damage.x + d.drag_damage.w > x + width {
-		d.drag_damage.x + d.drag_damage.w
-	} else {
-		x + width
-	}
-	bottom := if d.drag_damage.y + d.drag_damage.h > y + height {
-		d.drag_damage.y + d.drag_damage.h
-	} else {
-		y + height
-	}
-	if x < d.drag_damage.x {
-		d.drag_damage.x = x
-	}
-	if y < d.drag_damage.y {
-		d.drag_damage.y = y
-	}
-	d.drag_damage.w = right - d.drag_damage.x
-	d.drag_damage.h = bottom - d.drag_damage.y
+	d.drag_damage = damage_union(d.drag_damage, DamageRect{
+		x:     x
+		y:     y
+		w:     width
+		h:     height
+		valid: true
+	})
 }
 
 // clamp_to_screen keeps a window wholly visible when it fits. Oversized

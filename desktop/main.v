@@ -173,7 +173,7 @@ fn main() {
 		desktop_scaled_extent(fb.height, scale), fb.width, fb.height, scale)
 	gpu_present_startup_stage(c'canvas allocated')
 	gpu_present_startup_stage(c'loading fonts')
-	fonts := load_fonts()
+	fonts := load_fonts_for_scale(scale)
 	gpu_present_startup_stage(c'fonts loaded')
 	mut desktop := Desktop{
 		settings:          preferences.settings
@@ -187,9 +187,6 @@ fn main() {
 		trace_selectors:   options.trace_selectors
 	}
 	gpu_present_startup_stage(c'desktop state allocated')
-	gpu_present_startup_stage(c'loading application icons')
-	desktop.load_app_icons()
-	gpu_present_startup_stage(c'application icons loaded')
 
 	gpu_present_startup_stage(c'opening pointer device')
 	mut pointer := open_pointer(options.pointer)
@@ -260,6 +257,10 @@ fn main() {
 	}
 
 	mut stats := FrameStats{}
+	// Registration and the app picker drew into the same canvas; the desktop
+	// starts from a complete frame of its own, pointer backing included.
+	desktop.dirty = true
+	desktop.cursor_backing.box = DamageRect{}
 	for desktop.running {
 		if desktop.frames == 0 {
 			gpu_present_startup_stage(c'first compositor iteration')
@@ -327,28 +328,75 @@ fn main() {
 		desktop.poll_taskbar_status()
 		desktop.tick_taskbar_marquee()
 		other_dirty := desktop.dirty
+		// A pointer that moved, where everything else the move changed has been
+		// recorded as damage. See on_pointer_move.
+		pointer_only := desktop.pointer_moved_only && desktop.drag.kind == .none_
 		desktop.dirty = background_dirty || pointer_dirty || keyboard_dirty || capture_dirty
 			|| other_dirty
+		// Changes that know their area: the clock ticking, one application
+		// redrawing. See frame_damage.v.
+		mut damage := desktop.frame_damage
+		desktop.frame_damage = FrameDamage{}
+		if pointer_only && !desktop.cursor_backing.box.valid {
+			// Where the pointer was last drawn is not known, so it cannot be
+			// taken off the picture by itself.
+			desktop.dirty = true
+		}
+		if damage.valid() && desktop.taskbar_preview.open {
+			// Open previews are live pictures of every window, and are only
+			// captured from complete frames.
+			desktop.dirty = true
+		}
 		if desktop.frames == 0 {
 			gpu_present_startup_stage(c'first input and application poll complete')
 		}
 		after_input := monotonic_millis()
 
+		if !desktop.dirty && pointer_only && !damage.valid() {
+			old_cursor, new_cursor := desktop.move_cursor()
+			fb.present_damages(&desktop.canvas, old_cursor, new_cursor)
+			desktop.capture_presented(&desktop.canvas)
+			obs_capture_presented(&desktop.canvas)
+			sleep_to_next_frame(frame_started, options.frame_interval)
+			continue
+		}
+		if !desktop.dirty && pointer_only {
+			// The partial frame below takes the pointer off where it was and
+			// puts it where it is, in one rectangle so the new position is
+			// wholly repainted by one pass.
+			damage.add(damage_union(desktop.cursor_backing.box, desktop.cursor_box(desktop.pointer_x,
+				desktop.pointer_y)))
+		}
+
 		// Nothing has changed: the framebuffer already holds the right
 		// picture, so the frame is skipped entirely rather than recomposed into
 		// the same pixels. The wait is interruptible by either input descriptor;
 		// its timeout only drives application housekeeping.
-		if !desktop.dirty {
+		if !desktop.dirty && !damage.valid() {
 			elapsed := monotonic_millis() - frame_started
 			app_interval := desktop.idle_wait_interval(options.idle_interval, options.frame_interval)
 			capture_interval := desktop.capture_idle_interval(app_interval, options.frame_interval)
 			hover_interval := desktop.taskbar_hover_idle_interval(capture_interval)
-			interval := desktop.taskbar_status_idle_interval(hover_interval)
+			status_interval := desktop.taskbar_status_idle_interval(hover_interval)
+			interval := desktop.taskbar_clock_idle_interval(status_interval)
 			wait := desktop_frame_wait_ms(elapsed, interval)
 			desktop_wait_for_input(pointer.fd, keyboard.fd, wait)
 			continue
 		}
+
+		// A drag's pointer-only damage is kept apart from independent changes
+		// (keyboard input, a window opening, etc.), which need the whole frame.
+		partial_drag_frame := desktop.drag.kind == .move && desktop.drag_damage.valid
+			&& pointer_dirty && !background_dirty && !keyboard_dirty && !capture_dirty && !other_dirty
+		full_frame := desktop.dirty && !partial_drag_frame
 		desktop.dirty = false
+		if !full_frame {
+			if partial_drag_frame {
+				damage.add(desktop.drag_damage)
+			}
+			desktop.damage_frame_counters(mut damage)
+		}
+		desktop.paint_full = full_frame
 
 		if desktop.frames == 0 {
 			gpu_present_startup_stage(c'building first element tree')
@@ -360,26 +408,26 @@ fn main() {
 		}
 		after_build := monotonic_millis()
 
-		partial_drag_frame := desktop.drag.kind == .move && desktop.drag_damage.valid
-			&& pointer_dirty && !background_dirty && !keyboard_dirty && !capture_dirty && !other_dirty
-		if partial_drag_frame {
-			desktop.render_drag_damage(tree, desktop.drag_damage)
+		if full_frame {
+			desktop.render_desktop_frame(tree, desktop.canvas_damage())
 		} else {
-			desktop.render(tree)
+			for i in 0 .. damage.count {
+				desktop.render_desktop_frame(tree, damage.rects[i])
+			}
 		}
+		desktop.paint_full = true
 		if desktop.frames == 1 {
 			gpu_present_startup_stage(c'first canvas render complete')
 		}
-		desktop.render_create_context_menu()
 		after_render := monotonic_millis()
 
 		if desktop.frames == 1 {
 			gpu_present_startup_stage(c'presenting first canvas')
 		}
-		if partial_drag_frame {
-			fb.present_damage(&desktop.canvas, desktop.drag_damage)
-		} else {
+		if full_frame {
 			fb.present(&desktop.canvas, desktop_current_scale())
+		} else {
+			fb.present_frame_damage(&desktop.canvas, damage)
 		}
 		if desktop.frames == 1 {
 			gpu_present_startup_stage(c'first canvas presented')
@@ -446,6 +494,7 @@ fn main() {
 // pump_pointer maps the device's own coordinate space onto the screen and
 // turns the button mask into press and release events.
 fn (mut d Desktop) pump_pointer(mut pointer PointerDevice, width int, height int, titlebar_click TitlebarClick) TitlebarClick {
+	d.pointer_moved_only = false
 	packet := pointer.poll() or { return titlebar_click }
 
 	// The node exists even on a machine with no pointer hardware, and says so
@@ -463,6 +512,12 @@ fn (mut d Desktop) pump_pointer(mut pointer PointerDevice, width int, height int
 	// button is no longer held.
 	d.buttons = packet.buttons
 	d.on_pointer_move(pointer_x, pointer_y)
+	if packet.pressed != 0 || packet.released != 0 || packet.scroll != 0 {
+		// A click or a scroll recomposes everything, including the pointer
+		// the move above would otherwise have redrawn by itself.
+		d.pointer_moved_only = false
+		d.dirty = true
+	}
 
 	mut click := titlebar_click
 	// A different pointer gesture breaks a pending double-click sequence.

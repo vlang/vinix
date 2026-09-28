@@ -207,7 +207,20 @@ fn (mut fb Framebuffer) present(canvas &Canvas, _ int) {
 // owns a full-frame hardware path, so it remains preferable when active;
 // software fbdev output otherwise avoids copying untouched desktop pixels.
 fn (mut fb Framebuffer) present_damage(canvas &Canvas, damage DamageRect) {
-	if !damage.valid {
+	fb.present_damages(canvas, damage, DamageRect{})
+}
+
+// present_damages transfers two changed rectangles, such as where the pointer
+// was and where it is now, without copying everything between them.
+fn (mut fb Framebuffer) present_damages(canvas &Canvas, first DamageRect, second DamageRect) {
+	mut damage := FrameDamage{}
+	damage.add(first)
+	damage.add(second)
+	fb.present_frame_damage(canvas, damage)
+}
+
+fn (mut fb Framebuffer) present_frame_damage(canvas &Canvas, damage FrameDamage) {
+	if !damage.valid() {
 		return
 	}
 	if fb.direct && fb.gpu.present(canvas, fb.base, fb.width, fb.height, fb.stride) {
@@ -215,6 +228,15 @@ fn (mut fb Framebuffer) present_damage(canvas &Canvas, damage DamageRect) {
 		return
 	}
 	fb.claim_graphics()
+	for i in 0 .. damage.count {
+		fb.copy_damage(canvas, damage.rects[i])
+	}
+}
+
+fn (mut fb Framebuffer) copy_damage(canvas &Canvas, damage DamageRect) {
+	if !damage.valid {
+		return
+	}
 	x0 := if damage.x > 0 { damage.x } else { 0 }
 	y0 := if damage.y > 0 { damage.y } else { 0 }
 	x1 := if damage.x + damage.w < canvas.width { damage.x + damage.w } else { canvas.width }

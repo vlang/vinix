@@ -236,30 +236,17 @@ fn (mut d Desktop) render(root ui2.Element) {
 		y: 0
 		w: d.canvas.width
 		h: d.canvas.height
-	})
+	}, false)
 }
 
-// render_drag_damage refreshes only the pixels a moving top-level window can
-// have changed. The element walk still records every hit target, so click
-// routing is correct as soon as the drag ends.
-fn (mut d Desktop) render_drag_damage(root ui2.Element, damage DamageRect) {
-	left := if damage.x > 0 { damage.x } else { 0 }
-	top := if damage.y > 0 { damage.y } else { 0 }
-	right := if damage.x + damage.w < d.canvas.width { damage.x + damage.w } else { d.canvas.width }
-	bottom := if damage.y + damage.h < d.canvas.height {
-		damage.y + damage.h
-	} else {
-		d.canvas.height
-	}
-	d.render_clipped(root, Clip{
-		x: left
-		y: top
-		w: if right > left { right - left } else { 0 }
-		h: if bottom > top { bottom - top } else { 0 }
-	})
+// render_desktop_frame composes the ordinary desktop into `damage`: the tree,
+// then the icons and menus painted over it, then the pointer. A partial
+// damage leaves every other pixel as the previous frame left it.
+fn (mut d Desktop) render_desktop_frame(root ui2.Element, damage DamageRect) {
+	d.render_clipped(root, d.damage_clip(damage), true)
 }
 
-fn (mut d Desktop) render_clipped(root ui2.Element, clip Clip) {
+fn (mut d Desktop) render_clipped(root ui2.Element, clip Clip, desktop_overlays bool) {
 	// Keep the target array's buffer, but release action ids retained from the
 	// preceding remote tree before collecting this frame's targets.
 	d.clear_hit_targets()
@@ -270,6 +257,12 @@ fn (mut d Desktop) render_clipped(root ui2.Element, clip Clip) {
 	if clip.x == 0 && clip.y == 0 && clip.w == d.canvas.width && clip.h == d.canvas.height {
 		d.capture_window_thumbnails()
 	}
+	// Desktop file icons and context menus are painted after the tree, inside
+	// the same clip, so a partial frame does not blend them over themselves.
+	if desktop_overlays {
+		d.render_create_context_overlays()
+	}
+	d.save_cursor_backing(clip)
 	d.draw_cursor()
 	// A partial frame must not leak its clip into the next full one.
 	d.canvas.clip = Clip{
@@ -289,6 +282,16 @@ fn (mut d Desktop) render_element(el ui2.Element, off_x int, off_y int, depth in
 	y := off_y + int(el.frame.y)
 	w := int(el.frame.width)
 	h := int(el.frame.height)
+
+	// A view clips its children to itself, so one that is wholly outside the
+	// clip draws nothing, shadow included. A partial frame skips it and only
+	// collects the hit targets inside it.
+	if (el.kind == .view || el.kind == .scroll)
+		&& !d.canvas.clip_touches(x - view_paint_margin, y - view_paint_margin, w +
+		2 * view_paint_margin, h + 2 * view_paint_margin + 2) {
+		d.record_subtree_targets(el, x, y, w, h)
+		return
+	}
 
 	match el.kind {
 		.screen {
@@ -372,6 +375,22 @@ fn (mut d Desktop) draw_office2013_tab_labels(x int, y int, width int, height in
 	}
 }
 
+// How far outside its frame a view can paint: the window drop shadow.
+const view_paint_margin = 8
+
+// record_subtree_targets is render_element's hit-target collection alone, for
+// a subtree that has nothing to draw in this frame's clip.
+fn (mut d Desktop) record_subtree_targets(el ui2.Element, x int, y int, w int, h int) {
+	d.record_target(el, x, y, w, h)
+	for child in el.children {
+		if child.hidden {
+			continue
+		}
+		d.record_subtree_targets(child, x + int(child.frame.x), y + int(child.frame.y),
+			int(child.frame.width), int(child.frame.height))
+	}
+}
+
 fn (mut d Desktop) record_target(el ui2.Element, x int, y int, w int, h int) {
 	interactive := el.kind == .button || el.kind == .checkbox || el.kind == .dropdown
 		|| el.kind == .text_field || el.kind == .text_area || el.kind == .slider
@@ -437,8 +456,10 @@ fn (mut d Desktop) draw_surface(el ui2.Element, x int, y int, w int, h int, dept
 	// below it is keyed off the window manager's own id. Taskbar thumbnails sit
 	// on the same kind of dark glass.
 	translucent := el.id == switcher_panel_id || el.id == taskbar_preview_panel
-	if floating {
+	if floating && translucent {
 		d.canvas.drop_shadow(x, y, w, h, radius, 7, d.theme().shadow_alpha)
+	} else if floating {
+		d.canvas.drop_shadow_behind(x, y, w, h, radius, 7, d.theme().shadow_alpha)
 	}
 	if translucent {
 		d.canvas.blend_round_rect(x, y, w, h, radius, el.box.bg, if el.id == taskbar_preview_panel {
@@ -497,48 +518,85 @@ fn (mut d Desktop) draw_surface(el ui2.Element, x int, y int, w int, h int, dept
 }
 
 // paint_wallpaper blits the cached backdrop, building it first if the setting
-// changed. Both kinds end up in the same buffer, so the frame after is a
-// straight copy whichever was chosen.
+// changed.
 fn (mut d Desktop) paint_wallpaper() {
 	width := d.canvas.width
 	height := d.canvas.height
-	if !d.wallpaper_valid || d.wallpaper.len != width * height {
-		d.wallpaper = []u32{len: width * height}
-		mut done := false
-		if d.settings.wallpaper_image >= 0 {
-			images := list_wallpapers()
-			if d.settings.wallpaper_image < images.len {
-				if image := load_raw_image(images[d.settings.wallpaper_image].file) {
-					image.scale_into(mut d.wallpaper, width, height)
-					done = true
-				}
-			}
-		}
-		if !done {
-			// A colour, or the fallback when an image will not load.
-			index := if d.settings.wallpaper_color < wallpaper_colors.len {
-				d.settings.wallpaper_color
-			} else {
-				0
-			}
-			color := wallpaper_colors[index]
-			for y in 0 .. height {
-				shade := mix(color.top, color.bottom, u32(y * 255 / height))
-				row := y * width
-				for x in 0 .. width {
-					d.wallpaper[row + x] = shade
-				}
-			}
-			// White on all of them: no colour offered here is light enough to
-			// need a second answer. The mark is rasterised into the cache with
-			// the gradient, which is why a wallpaper the desktop draws
-			// thousands of times is still one memcpy per frame.
-			draw_logo(mut d.wallpaper, width, height, logo_color)
-		}
-		d.wallpaper_valid = true
+	if !d.wallpaper_valid || d.wallpaper_width != width || d.wallpaper_height != height {
+		d.build_wallpaper(width, height)
 	}
+	if d.wallpaper.len > 0 {
+		d.canvas.copy_logical_pixels(d.wallpaper)
+		return
+	}
+	d.canvas.fill_logical_rows(d.wallpaper_rows)
+	logo := d.wallpaper_logo
+	d.canvas.copy_logical_patch(d.wallpaper_logo_pixels, logo.x, logo.y, logo.w, logo.h)
+}
 
-	d.canvas.copy_logical_pixels(d.wallpaper)
+// build_wallpaper prepares the backdrop for a screen of this size. A
+// photograph is scaled into one screen's worth of pixels. A colour is a
+// gradient with the wordmark in the middle, which needs only a colour per row
+// and the pixels of the mark's box: 12 MB less than a screen of them.
+fn (mut d Desktop) build_wallpaper(width int, height int) {
+	d.free_wallpaper()
+	d.wallpaper_width = width
+	d.wallpaper_height = height
+	d.wallpaper_valid = true
+	if d.settings.wallpaper_image >= 0 {
+		images := list_wallpapers()
+		if d.settings.wallpaper_image < images.len {
+			if image := load_raw_image(images[d.settings.wallpaper_image].file) {
+				d.wallpaper = []u32{len: width * height}
+				image.scale_into(mut d.wallpaper, width, height)
+				unsafe { image.pixels.free() }
+			}
+		}
+		free_wallpaper_list(images)
+		if d.wallpaper.len > 0 {
+			return
+		}
+	}
+	// A colour, or the fallback when an image will not load.
+	index := if d.settings.wallpaper_color < wallpaper_colors.len {
+		d.settings.wallpaper_color
+	} else {
+		0
+	}
+	color := wallpaper_colors[index]
+	d.wallpaper_rows = []u32{len: height}
+	for y in 0 .. height {
+		d.wallpaper_rows[y] = mix(color.top, color.bottom, u32(y * 255 / height))
+	}
+	// White on all of them: no colour offered here is light enough to need a
+	// second answer.
+	logo := logo_box(width, height) or { return }
+	d.wallpaper_logo = logo
+	d.wallpaper_logo_pixels = []u32{len: logo.w * logo.h}
+	for y in 0 .. logo.h {
+		for x in 0 .. logo.w {
+			d.wallpaper_logo_pixels[y * logo.w + x] = d.wallpaper_rows[logo.y + y]
+		}
+	}
+	draw_logo(mut d.wallpaper_logo_pixels, logo, logo_color)
+}
+
+fn (mut d Desktop) free_wallpaper() {
+	unsafe {
+		if d.wallpaper.cap > 0 {
+			d.wallpaper.free()
+		}
+		if d.wallpaper_rows.cap > 0 {
+			d.wallpaper_rows.free()
+		}
+		if d.wallpaper_logo_pixels.cap > 0 {
+			d.wallpaper_logo_pixels.free()
+		}
+	}
+	d.wallpaper = []u32{}
+	d.wallpaper_rows = []u32{}
+	d.wallpaper_logo_pixels = []u32{}
+	d.wallpaper_logo = LogoBox{}
 }
 
 fn (mut d Desktop) draw_label(el ui2.Element, x int, y int, w int, h int) {
