@@ -206,6 +206,8 @@ fn free_desktop_directory_entries() {
 			desktop_directory_state.entries[index].name.free()
 			desktop_directory_state.entries[index].row_action.free()
 			desktop_directory_state.entries[index].size_text.free()
+			desktop_directory_state.entries[index].modified_text.free()
+			desktop_directory_state.entries[index].kind_text.free()
 		}
 	}
 	if desktop_directory_state.entries.cap > 0 {
@@ -298,8 +300,10 @@ mut:
 	preview             FilesQuickLook
 }
 
-fn open_files_with_context_menu(mut _ Desktop) !NativeApp {
+fn open_files_with_context_menu(mut desktop Desktop) !NativeApp {
 	mut app := &FilesContextApp{}
+	app.files.tz_offset_seconds = desktop.tz_offset_seconds
+	app.files.browser.tz_offset_seconds = desktop.tz_offset_seconds
 	app.files.settings = load_files_settings(desktop_home)
 	app.files.browser.show_hidden = app.files.settings.show_hidden
 	for location in files_locations[..files_locations.len - 1] {

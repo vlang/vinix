@@ -28,22 +28,25 @@ mut:
 	name   string
 	is_dir bool
 	size   u64
-	// Cached because these two strings are stable until a new directory is
+	// Cached because these strings are stable until a new directory is
 	// read, while the element tree is rebuilt whenever desktop state changes.
-	row_action string
-	size_text  string
+	row_action    string
+	size_text     string
+	modified_text string
+	kind_text     string
 }
 
 // FileBrowser is the model: where it is, what is there, and how far down the
 // list has been scrolled.
 struct FileBrowser {
 mut:
-	path          string = '/'
-	entries       []FileEntry
-	show_hidden   bool
-	action_prefix string
-	scroll        int
-	error         string
+	path              string = '/'
+	entries           []FileEntry
+	show_hidden       bool
+	action_prefix     string
+	tz_offset_seconds i64
+	scroll            int
+	error             string
 	// Row the pointer is over, or -1. Kept here rather than in the desktop's
 	// hover state because rows are the application's, not the chrome's.
 	hover_row    int = -1
@@ -83,10 +86,11 @@ fn file_path_name(path string) string {
 // prefix is part of the cached row ids, so every visible column can route a
 // click without allocating an action string on each compositor rebuild.
 fn read_file_entries(path string, action_prefix string) ?[]FileEntry {
-	return read_file_entries_filtered(path, action_prefix, false)
+	return read_file_entries_filtered(path, action_prefix, false, 0)
 }
 
-fn read_file_entries_filtered(path string, action_prefix string, show_hidden bool) ?[]FileEntry {
+fn read_file_entries_filtered(path string, action_prefix string, show_hidden bool,
+	tz_offset_seconds i64) ?[]FileEntry {
 	dir := desktop_opendir(path)
 	if dir == unsafe { nil } {
 		return none
@@ -108,17 +112,21 @@ fn read_file_entries_filtered(path string, action_prefix string, show_hidden boo
 		}
 		mut size := u64(0)
 		mut is_dir := false
+		mut modified := i64(-1)
 		full := join_path(path, name)
 		if info := desktop_stat(full) {
 			size = info.size
 			is_dir = info.is_dir
+			modified = info.modified
 		}
 		unsafe { full.free() }
 		// Unreadable entries remain visible, with unknown type and size.
 		entries << FileEntry{
-			name:   name
-			is_dir: is_dir
-			size:   size
+			name:          name
+			is_dir:        is_dir
+			size:          size
+			modified_text: files_list_modified_text(modified, tz_offset_seconds)
+			kind_text:     files_list_kind_text(name, is_dir)
 		}
 	}
 	desktop_closedir(dir)
@@ -140,7 +148,7 @@ fn read_file_entries_filtered(path string, action_prefix string, show_hidden boo
 // window and looking like the directory is empty.
 fn (mut b FileBrowser) read(path string) {
 	prefix := if b.action_prefix.len > 0 { b.action_prefix } else { files_action_row }
-	entries := read_file_entries_filtered(path, prefix, b.show_hidden) or {
+	entries := read_file_entries_filtered(path, prefix, b.show_hidden, b.tz_offset_seconds) or {
 		unsafe { b.error.free() }
 		b.error = 'cannot open ${path}'
 		return
@@ -178,6 +186,8 @@ fn (mut b FileBrowser) free_entries() {
 			b.entries[index].name.free()
 			b.entries[index].row_action.free()
 			b.entries[index].size_text.free()
+			b.entries[index].modified_text.free()
+			b.entries[index].kind_text.free()
 		}
 	}
 	if b.entries.cap > 0 {
@@ -259,6 +269,7 @@ const files_action_scrollbar = 'files.scrollbar'
 
 const files_row_height = 24
 const files_header_height = 38
+const files_list_header_height = 28
 const files_pane_header_height = 27
 const files_padding = 10
 const files_column_min_width = 200
@@ -333,6 +344,7 @@ mut:
 	// window as it actually is rather than as it was when it opened.
 	visible_rows           int = 1
 	view_mode              FilesViewMode
+	tz_offset_seconds      i64
 	dual_left              FileBrowser
 	dual_right             FileBrowser
 	dual_initialized       bool
@@ -384,7 +396,8 @@ fn (mut a FileBrowserApp) new_miller_column(path string) MillerColumn {
 	a.next_column_id++
 	id_text := id.str()
 	row_prefix := '${files_action_column_row}${id_text}.'
-	entries := read_file_entries_filtered(path, row_prefix, a.settings.show_hidden) or {
+	entries := read_file_entries_filtered(path, row_prefix, a.settings.show_hidden,
+		a.tz_offset_seconds) or {
 		error_text := 'cannot open ${path}'
 		unsafe {
 			id_text.free()
@@ -405,8 +418,9 @@ fn (mut a FileBrowserApp) new_miller_column(path string) MillerColumn {
 	return MillerColumn{
 		id:      id
 		browser: FileBrowser{
-			path:    path
-			entries: entries
+			path:              path
+			entries:           entries
+			tz_offset_seconds: a.tz_offset_seconds
 		}
 	}
 }
@@ -492,6 +506,8 @@ fn (mut a FileBrowserApp) set_view_mode(mode FilesViewMode) {
 			a.dual_right.action_prefix = files_action_pane_right_row
 			a.dual_left.show_hidden = a.settings.show_hidden
 			a.dual_right.show_hidden = a.settings.show_hidden
+			a.dual_left.tz_offset_seconds = a.tz_offset_seconds
+			a.dual_right.tz_offset_seconds = a.tz_offset_seconds
 			a.dual_left.read(a.browser.path.clone())
 			a.dual_right.read(a.browser.path.clone())
 			a.dual_initialized = true
@@ -814,6 +830,8 @@ fn (mut a FileBrowserApp) build(size ui2.Rect) !ui2.Element {
 	a.rows_top = files_header_height
 	if a.view_mode == .commander {
 		a.rows_top += files_pane_header_height
+	} else if a.view_mode == .list && a.active_tag_id < 0 {
+		a.rows_top += files_list_header_height
 	}
 	bar_height := if a.view_mode == .columns && column_max > 0 {
 		files_horizontal_bar_height
@@ -891,6 +909,8 @@ fn (mut a FileBrowserApp) build(size ui2.Rect) !ui2.Element {
 	if a.active_tag_id >= 0 {
 		return a.build_tag_results(width, height, mut children)
 	}
+	layout := files_list_layout(content_width)
+	files_list_header(mut children, content_left, content_width, layout)
 	files_zebra_background(mut children, content_left, a.rows_top, content_width, height - a.rows_top,
 		a.browser.scroll)
 
@@ -918,37 +938,7 @@ fn (mut a FileBrowserApp) build(size ui2.Rect) !ui2.Element {
 		tag_color := a.settings.first_color(entry_path)
 		y := a.rows_top + row * files_row_height
 		hovered := a.browser.hover_row == index || a.browser.selected_row == index
-		mut row_children := frame_elements(3)
-		row_children << ui2.button_with_image('', '', if entry.is_dir {
-			'builtin:folder'
-		} else {
-			'builtin:file'
-		}, ui2.rect(f64(files_padding), 4, 16, 16), ui2.BoxStyle{
-			transparent: true
-		}, ui2.TextStyle{
-			color: if entry.is_dir && a.settings.tint_folders && tag_color != 0 {
-				tag_color
-			} else if entry.is_dir {
-				files_folder_icon
-			} else {
-				files_file_icon
-			}
-		})
-		row_children << ui2.label('', entry.name, ui2.rect(f64(files_padding + 24), 0, f64(inner - 24 - 72), f64(files_row_height)), ui2.TextStyle{
-			color: if entry.is_dir { body_heading } else { body_text }
-			size:  13
-		})
-		row_children << ui2.label('', entry.size_text, ui2.rect(f64(content_width - files_padding - 70), 0, 70, f64(files_row_height)), ui2.TextStyle{
-			color: body_muted
-			size:  11
-			align: .right
-		})
-		if tag_color != 0 {
-			row_children << ui2.view('', ui2.rect(f64(content_width - files_padding - 83), 9, 7, 7), ui2.BoxStyle{
-				bg:     tag_color
-				radius: 4
-			}, [])
-		}
+		row_children := files_list_row_children(entry, &a.settings, tag_color, layout)
 		children << ui2.clickable_view(entry.row_action, ui2.rect(f64(content_left), f64(y), f64(content_width), f64(files_row_height)), ui2.BoxStyle{
 			bg:          files_row_hover
 			transparent: !hovered

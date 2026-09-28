@@ -89,6 +89,11 @@ cp "$root/desktop/tools/tests/files_columns_test.v" "$work/ui/"
     -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/files_columns_test.v"
 rm -f "$work/ui/files_columns_test.v"
 
+cp "$root/desktop/tools/tests/files_list_columns_test.v" "$work/ui/"
+"$v" -new-compiler -nocache -gc none -manualfree -enable-globals -stats -d ui2_headless \
+    -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/files_list_columns_test.v"
+rm -f "$work/ui/files_list_columns_test.v"
+
 cp "$root/desktop/tools/tests/files_sidebar_test.v" "$work/ui/"
 "$v" -new-compiler -nocache -gc none -manualfree -enable-globals -stats -d ui2_headless \
     -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/files_sidebar_test.v"

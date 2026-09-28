@@ -1165,8 +1165,9 @@ fn desktop_closedir(dir voidptr) {
 }
 
 struct DesktopFileInfo {
-	size   u64
-	is_dir bool
+	size     u64
+	is_dir   bool
+	modified i64
 }
 
 // What a disk inventory needs from one directory entry. The identity pair is
@@ -1188,8 +1189,9 @@ fn desktop_stat(path string) ?DesktopFileInfo {
 		return none
 	}
 	return DesktopFileInfo{
-		size: u64(info.st_size)
-		is_dir: (u32(info.st_mode) & u32(C.S_IFMT)) == u32(C.S_IFDIR)
+		size:     u64(info.st_size)
+		is_dir:   (u32(info.st_mode) & u32(C.S_IFMT)) == u32(C.S_IFDIR)
+		modified: i64(info.st_mtime)
 	}
 }
 

@@ -77,10 +77,11 @@ fn test_files_list_draws_last_row_that_fits_above_window_bottom() {
 	mut app := FileBrowserApp{}
 	app.browser.read(root.clone())
 	assert app.browser.entries.len == 14
-	tree := app.build(ui2.rect(0, 0, 700, 378))!
+	height := files_header_height + files_list_header_height + 14 * files_row_height
+	tree := app.build(ui2.rect(0, 0, 700, f64(height)))!
 	last := files_sidebar_find(tree, 'files.row.13') or { panic('last visible file row is missing') }
 	assert app.visible_rows == 14
-	assert int(last.frame.y + last.frame.height) <= 378
+	assert int(last.frame.y + last.frame.height) <= height
 	free_tree(tree)
 	app.browser.free_entries()
 	unsafe { app.browser.path.free() }
