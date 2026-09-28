@@ -652,6 +652,12 @@ pub fn (mut this UnixSocket) write_with_fds(_handle voidptr, buf voidptr, _count
 
 	peer.write_ptr = new_ptr_loc
 	peer.used += count
+	// A full receive buffer cannot accept another byte. Nonblocking X11
+	// clients use POLLOUT to resume a partially sent image request; keeping
+	// it set here makes them spin on EAGAIN until the server drains the socket.
+	if peer.used == sock_buf {
+		this.status &= ~file.pollout
+	}
 	if fds.len != 0 {
 		mut group := PendingFdGroup{
 			offset: fd_offset

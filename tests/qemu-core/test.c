@@ -1043,6 +1043,58 @@ static int test_unix_socket_buffer_growth(void)
 	return 0;
 }
 
+/* XCB flushes large images through a nonblocking Unix stream. Once its peer's
+ * receive buffer is full, POLLOUT must stay clear until the server reads data;
+ * otherwise the client spins on EAGAIN instead of waiting for space. */
+static int test_unix_socket_full_write_readiness(void)
+{
+	int pair[2];
+	CHECK(socketpair(AF_UNIX, SOCK_STREAM, 0, pair) == 0);
+	CHECK(fcntl(pair[0], F_SETFL, O_NONBLOCK) == 0);
+	char *image = malloc(1024 * 1024);
+	CHECK(image != NULL);
+	memset(image, 0x5a, 1024 * 1024);
+	CHECK(write(pair[0], image, 1024 * 1024) == 1024 * 1024);
+
+	struct pollfd writer = {.fd = pair[0], .events = POLLOUT};
+	CHECK(poll(&writer, 1, 0) == 0);
+	int epfd = epoll_create1(0);
+	CHECK(epfd >= 0);
+	struct epoll_event event = {.events = EPOLLOUT, .data.fd = pair[0]};
+	CHECK(epoll_ctl(epfd, EPOLL_CTL_ADD, pair[0], &event) == 0);
+	CHECK(epoll_wait(epfd, &event, 1, 0) == 0);
+
+	char byte;
+	CHECK(read(pair[1], &byte, 1) == 1 && byte == 0x5a);
+	CHECK(poll(&writer, 1, 0) == 1 && (writer.revents & POLLOUT));
+	CHECK(epoll_wait(epfd, &event, 1, 0) == 1 && (event.events & EPOLLOUT));
+	CHECK(close(epfd) == 0);
+	CHECK(close(pair[0]) == 0);
+	CHECK(close(pair[1]) == 0);
+	free(image);
+	puts("QEMU CORE PASS: full UNIX stream clears write readiness");
+	return 0;
+}
+
+/* Qt's raster painter uses FUTEX_WAKE_OP to notify a semaphore waiter. */
+static int test_futex_wake_op(void)
+{
+	uint32_t words[2] = {0, 7};
+	/* ADD 3; wake the second address only when its old value was 7. */
+	CHECK(syscall(SYS_futex, &words[0], 5 | 128, 1, 1, &words[1],
+	    0x10003007) == 0);
+	CHECK(words[1] == 10);
+	/* Qt's OR 0 / NE 0 form must preserve the word. */
+	CHECK(syscall(SYS_futex, &words[0], 5 | 128, 1, 1, &words[1],
+	    0x21000000) == 0);
+	CHECK(words[1] == 10);
+	errno = 0;
+	CHECK(syscall(SYS_futex, &words[0], 5 | 128, 1, 1, (void *)1,
+	    0x21000000) == -1 && errno == EFAULT);
+	puts("QEMU CORE PASS: futex wake-op updates and compares user words");
+	return 0;
+}
+
 /* V3 makes the V `int` type pointer-width. Linux still defines pollfd.fd as a
  * 32-bit C int, so exercise the structure from a real libc caller: widening
  * the kernel field makes it combine fd/events into one invalid descriptor. */
@@ -1251,6 +1303,8 @@ static int run_tests(void)
 	CHECK(test_anonymous_ipc_memory_reclamation() == 0);
 	CHECK(test_socket_interface_box_reclamation() == 0);
 	CHECK(test_unix_socket_buffer_growth() == 0);
+	CHECK(test_unix_socket_full_write_readiness() == 0);
+	CHECK(test_futex_wake_op() == 0);
 	CHECK(test_default_terminating_signals() == 0);
 	CHECK(prepare_directory() == 0);
 	CHECK(test_ext2_mapping_and_namespace() == 0);

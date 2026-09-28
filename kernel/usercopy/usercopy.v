@@ -156,3 +156,43 @@ pub fn read_u32(address u64) ?u32 {
 	}
 	return value
 }
+
+fn C.vinix_ldar32(addr voidptr) u32
+fn C.vinix_cas32(addr voidptr, expected u32, desired u32) u32
+
+// FUTEX_WAKE_OP must change a user word atomically with respect to userspace.
+// Resolve writable/COW pages first, then use the same physical word the
+// process sees. The pagemap lock keeps that mapping stable during the CAS.
+pub fn futex_atomic_op_u32(address u64, op u32, operand u32) ?u32 {
+	if address & 3 != 0 || !valid_user_range(address, 4) {
+		return none
+	}
+	mut pagemap := proc.current_thread().process.pagemap
+	for _ in 0 .. 4 {
+		pagemap.l.acquire()
+		physical := pagemap.user_page_phys(address, true) or {
+			pagemap.l.release()
+			if memory.resolve_cow(pagemap, address) || memory.resolve_missing_page(pagemap,
+				address) {
+				continue
+			}
+			return none
+		}
+		ptr := voidptr(physical + (address & (page_size - 1)) + memory.get_hhdm_offset())
+		for {
+			old := C.vinix_ldar32(ptr)
+			updated := match op {
+				0 { operand } // SET
+				1 { old + operand } // ADD
+				2 { old | operand } // OR
+				3 { old & ~operand } // ANDN
+				else { old ^ operand } // XOR
+			}
+			if C.vinix_cas32(ptr, old, updated) == old {
+				pagemap.l.release()
+				return old
+			}
+		}
+	}
+	return none
+}

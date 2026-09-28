@@ -130,4 +130,32 @@ finally:
     xlib.XCloseDisplay(display)
 PY
 
+# A mapped OBS window can still be stuck before Qt paints its controls. The
+# XWD screen is shared memory, so watch its pixels until the UI appears.
+/usr/bin/python3 - <<'PY' || fail "OBS window stayed blank"
+import mmap
+import struct
+import time
+
+with open('/tmp/vinix-obs-test/Xvfb_screen0', 'rb') as file:
+    screen = mmap.mmap(file.fileno(), 0, access=mmap.ACCESS_READ)
+    header = struct.unpack_from('>25I', screen)
+    width, height, stride = header[4], header[5], header[12]
+    offset = header[0] + header[19] * 12
+    if screen.size() < offset + height * stride:
+        raise SystemExit('incomplete XWD screen')
+    deadline = time.monotonic() + 45
+    while time.monotonic() < deadline:
+        colors = {screen[offset + y * stride + x * 4:
+                         offset + y * stride + x * 4 + 3]
+                  for y in range(0, height, 16)
+                  for x in range(0, width, 16)}
+        if len(colors) >= 16:
+            break
+        time.sleep(1)
+    else:
+        raise SystemExit('OBS controls did not paint')
+    screen.close()
+PY
+
 echo "VINIX OBS TEST: PASS"

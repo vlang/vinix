@@ -265,6 +265,40 @@ fn syscall_linux_futex(_ voidptr, uaddr u64, futex_op u64, val u64, timeout u64,
 		1, 10 { // FUTEX_WAKE, FUTEX_WAKE_BITSET
 			return futex.wake(uaddr), 0
 		}
+		5 { // FUTEX_WAKE_OP
+			// Decode FUTEX_OP(op, oparg, cmp, cmparg). In particular Qt's
+			// QSemaphore uses OR 0 / NE 0 to wake paint worker completions.
+			code := u32(val3)
+			operation := (code >> 28) & 0xf
+			comparison := (code >> 24) & 0xf
+			mut operand := i32(code << 8) >> 20
+			compare_arg := i32(code << 20) >> 20
+			if operation & 7 > 4 || comparison > 5 {
+				return errno.err, errno.einval
+			}
+			if operation & 8 != 0 {
+				if operand < 0 || operand >= 32 {
+					return errno.err, errno.einval
+				}
+				operand = i32(u32(1) << u32(operand))
+			}
+			old := usercopy.futex_atomic_op_u32(uaddr2, operation & 7, u32(operand)) or {
+				return errno.err, errno.efault
+			}
+			woken := futex.wake(uaddr)
+			matched := match comparison {
+				0 { i32(old) == compare_arg }
+				1 { i32(old) != compare_arg }
+				2 { i32(old) < compare_arg }
+				3 { i32(old) <= compare_arg }
+				4 { i32(old) > compare_arg }
+				else { i32(old) >= compare_arg }
+			}
+			if matched {
+				return woken + futex.wake(uaddr2), 0
+			}
+			return woken, 0
+		}
 		3, 4 { // FUTEX_REQUEUE, FUTEX_CMP_REQUEUE
 			// Moving waiters over to uaddr2 would need a real wait queue.
 			// Waking them instead is heavier but still correct: pthread_cond
