@@ -120,6 +120,30 @@ finally:
 PY
 echo "VINIX STEAM PASS: eventfd and lazy file buffer"
 
+# A closed Chromium IPC peer leaves EPOLLHUP ready. recvmsg must drain its
+# buffered bytes and then return EOF, or the browser loops on EAGAIN forever.
+/usr/bin/python3 - <<'PY' || fail "Unix recvmsg hangup failed"
+import select
+import socket
+
+reader, writer = socket.socketpair()
+poller = select.epoll()
+try:
+    reader.setblocking(False)
+    poller.register(reader.fileno(), select.EPOLLIN)
+    writer.sendall(b'abc')
+    writer.close()
+    assert poller.poll(1), 'closed peer did not wake epoll'
+    assert reader.recvmsg(2)[0] == b'ab'
+    assert reader.recvmsg(2)[0] == b'c'
+    assert reader.recvmsg(2)[0] == b'', 'closed peer did not return EOF'
+finally:
+    poller.close()
+    reader.close()
+    writer.close()
+PY
+echo "VINIX STEAM PASS: Unix recvmsg hangup"
+
 # A browser thread may use an empty ppoll as a timed sleep. Returning at once
 # makes its event loop spin and can starve the translated client.
 /bin/busybox timeout 5 /usr/bin/python3 - <<'PY' || fail "empty ppoll sleep failed"

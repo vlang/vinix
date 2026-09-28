@@ -1277,6 +1277,13 @@ fn (mut this UnixSocket) recvmsg(_handle voidptr, msg &sock_pub.MsgHdr, flags in
 	}
 
 	handle := unsafe { &file.Handle(_handle) }
+	if this.read_closed {
+		unsafe {
+			msg.msg_controllen = 0
+			msg.msg_flags = 0
+		}
+		return 0
+	}
 
 	mut count := u64(0)
 	for i := u64(0); i < msg.msg_iovlen; i++ {
@@ -1288,10 +1295,15 @@ fn (mut this UnixSocket) recvmsg(_handle voidptr, msg &sock_pub.MsgHdr, flags in
 	deadline := deadline_after(this.recv_timeout_ns)
 	// If pipe is empty, block or return if nonblock
 	for this.nothing_queued() {
-		// Return EOF if the pipe was closed
-		//		if this.refcount <= 1 {
-		//			return 0
-		//		}
+		// A hung-up stream stays readable in epoll until recvmsg reports EOF.
+		// Returning EAGAIN here makes a browser spin on the same HUP forever.
+		if this.peer_finished {
+			unsafe {
+				msg.msg_controllen = 0
+				msg.msg_flags = 0
+			}
+			return 0
+		}
 		if this.peer != unsafe { nil } {
 			this.peer.status |= file.pollout
 			event.trigger(mut this.peer.event, false)
