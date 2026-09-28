@@ -552,20 +552,62 @@ fn map_handler(_dev &drm.DrmDevice, handle voidptr, data voidptr) int {
 		file.lock.release()
 		return -2
 	}
-	mut present := false
-	for mapped in file.mmap_objects {
-		if mapped == object {
-			present = true
-			break
-		}
-	}
-	if !present {
-		retain_object(object)
-		file.mmap_objects << object
-	}
 	request.offset = gem.create_mmap_offset(object.gem_object)
 	file.lock.release()
 	return 0
+}
+
+fn mapping_covers(object &VirtioObject, offset u64, length u64) bool {
+	if object == unsafe { nil } || object.gem_object == unsafe { nil } || length == 0 {
+		return false
+	}
+	base := object.gem_object.mmap_offset
+	size := object.gem_object.size
+	return offset >= base && offset - base < size && length <= size - (offset - base)
+}
+
+fn mmap_retain(_dev &drm.DrmDevice, handle voidptr, offset u64, length u64) bool {
+	mut file := get_file(handle) or { return false }
+	file.lock.acquire()
+	mut found := &VirtioObject(unsafe { nil })
+	for object in file.objects {
+		if mapping_covers(object, offset, length) {
+			found = object
+			break
+		}
+	}
+	if found == unsafe { nil } {
+		// A fork can copy a mapping after its GEM handle was closed. The
+		// original mapping still owns the resource until its last VMA goes.
+		for object in file.mmap_objects {
+			if mapping_covers(object, offset, length) {
+				found = object
+				break
+			}
+		}
+	}
+	if found == unsafe { nil } {
+		file.lock.release()
+		return false
+	}
+	retain_object(found)
+	file.mmap_objects << found
+	file.lock.release()
+	return true
+}
+
+fn mmap_release(_dev &drm.DrmDevice, handle voidptr, offset u64, length u64) {
+	mut file := get_file(handle) or { return }
+	file.lock.acquire()
+	for index, object in file.mmap_objects {
+		if mapping_covers(object, offset, length) {
+			file.mmap_objects.delete(index)
+			file.lock.release()
+			release_object(object)
+			return
+		}
+	}
+	file.lock.release()
 }
 
 fn getparam_handler(_dev &drm.DrmDevice, _handle voidptr, data voidptr) int {
@@ -1145,6 +1187,8 @@ pub fn initialise(hhdm u64) bool {
 			gem_export_put: release_exported_object
 			gem_import: import_object
 			mmap: mmap_object
+			mmap_retain: mmap_retain
+			mmap_release: mmap_release
 		}
 		drm.register_driver(driver) or {
 			virtgpu_transport.ready = false

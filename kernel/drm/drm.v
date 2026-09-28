@@ -48,6 +48,8 @@ pub mut:
 	gem_export_put fn (&DrmDevice, &gem.GemObject) = unsafe { nil }
 	gem_import     fn (&DrmDevice, voidptr, &gem.GemObject) ?u32 = unsafe { nil }
 	mmap           fn (&DrmDevice, voidptr, u64, int) voidptr = unsafe { nil }
+	mmap_retain    fn (&DrmDevice, voidptr, u64, u64) bool = unsafe { nil }
+	mmap_release   fn (&DrmDevice, voidptr, u64, u64) = unsafe { nil }
 }
 
 pub struct DrmDevice {
@@ -467,6 +469,25 @@ fn (mut this DrmNode) mmap(handle voidptr, page u64, flags int) voidptr {
 		return unsafe { nil }
 	}
 	return this.dev.driver.mmap(this.dev, handle, page, flags)
+}
+
+fn (mut this DrmNode) retain_mapping_range(handle voidptr, offset u64, length u64) bool {
+	if handle == unsafe { nil } || this.dev == unsafe { nil }
+		|| this.dev.driver == unsafe { nil } {
+		return false
+	}
+	if this.dev.driver.mmap_retain == unsafe { nil } {
+		return true
+	}
+	return this.dev.driver.mmap_retain(this.dev, handle, offset, length)
+}
+
+fn (mut this DrmNode) release_mapping_range(handle voidptr, offset u64, length u64) {
+	if handle != unsafe { nil } && this.dev != unsafe { nil }
+		&& this.dev.driver != unsafe { nil }
+		&& this.dev.driver.mmap_release != unsafe { nil } {
+		this.dev.driver.mmap_release(this.dev, handle, offset, length)
+	}
 }
 
 fn (mut this DrmNode) read(_handle voidptr, _buf voidptr, _loc u64, _count u64) ?i64 {

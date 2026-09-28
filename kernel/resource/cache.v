@@ -43,6 +43,28 @@ mut:
 	release_mapping(handle voidptr, page u64, physical voidptr, flags int)
 }
 
+// Device mappings can own storage independently of the file descriptor and
+// its ioctl handle. Keep that storage until the last VMA for this mapping is
+// gone, including after GEM_CLOSE or a fork.
+pub interface MappingLifetimeResource {
+mut:
+	retain_mapping_range(handle voidptr, offset u64, length u64) bool
+	release_mapping_range(handle voidptr, offset u64, length u64)
+}
+
+pub fn retain_mapping_range(mut res Resource, handle voidptr, offset u64, length u64) bool {
+	if mut res is MappingLifetimeResource {
+		return res.retain_mapping_range(handle, offset, length)
+	}
+	return true
+}
+
+pub fn release_mapping_range(mut res Resource, handle voidptr, offset u64, length u64) {
+	if mut res is MappingLifetimeResource {
+		res.release_mapping_range(handle, offset, length)
+	}
+}
+
 pub struct FileSystemStat {
 pub mut:
 	@type   u64

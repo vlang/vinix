@@ -122,6 +122,7 @@ pub mut:
 	offset            i64
 	pte_extra         u64 // Extra PTE flags (e.g., pte_uncached for device memory)
 	owns_resource_ref bool
+	owns_mapping_ref  bool
 	lazy_file         bool
 	segmented_file    bool
 	file_data_start   u64
@@ -620,6 +621,7 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap) ?&memory.Pagemap {
 					offset: global_range.offset
 					pte_extra: global_range.pte_extra
 					owns_resource_ref: global_range.owns_resource_ref
+					owns_mapping_ref: global_range.owns_mapping_ref
 					lazy_file: global_range.lazy_file
 					segmented_file: global_range.segmented_file
 					file_data_start: global_range.file_data_start
@@ -636,6 +638,13 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap) ?&memory.Pagemap {
 				} else if new_global_range.owns_resource_ref {
 					mut retained := new_global_range.resource
 					resource.retain_resource(mut retained)
+				}
+				if new_global_range.owns_mapping_ref {
+					mut retained := new_global_range.resource
+					if !resource.retain_mapping_range(mut retained, new_global_range.handle,
+						u64(new_global_range.offset), new_global_range.length) {
+						return none
+					}
 				}
 				old_private_globals << voidptr(global_range)
 				new_private_globals << new_global_range
@@ -1245,6 +1254,14 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
 		resource.retain_resource(mut resource_)
 		range_global.owns_resource_ref = true
 	}
+	if flags & map_anonymous == 0 && voidptr(resource_) != unsafe { nil } {
+		if !resource.retain_mapping_range(mut resource_, range_handle, u64(offset), length) {
+			munmap(mut pagemap, voidptr(base), length) or {}
+			errno.set(errno.einval)
+			return none
+		}
+		range_global.owns_mapping_ref = true
+	}
 
 	// PROT_NONE and large anonymous mappings are address-space reservations, not
 	// committed memory. Large runtimes reserve far more virtual memory than they
@@ -1786,6 +1803,11 @@ fn munmap_unlocked_impl(mut pagemap memory.Pagemap, addr voidptr, _length u64,
 					release_range_page(global_range, j, file_page, voidptr(phys), local_range.flags)
 				}
 				memory.pmm_free(global_range.shadow_pagemap.top_level, 1)
+				if global_range.owns_mapping_ref {
+					mut retained := global_range.resource
+					resource.release_mapping_range(mut retained, global_range.handle,
+						u64(global_range.offset), global_range.length)
+				}
 				if global_range.handle != unsafe { nil }
 					&& global_range.handle_unref != unsafe { nil } {
 					global_range.handle_unref(global_range.handle)
