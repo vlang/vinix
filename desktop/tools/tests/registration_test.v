@@ -169,20 +169,111 @@ fn test_registration_persists_verifier_and_user_home() {
 	info := os.stat(path)!
 	assert info.mode & 0o777 == 0o600
 
-	user_home := desktop_user_home_path(home, 'Alice Example')
+	user_home := desktop_user_storage_path(home, 'Alice Example')
 	defer { unsafe { user_home.free() } }
-	assert user_home.ends_with('/alice-example')
+	assert user_home == os.join_path(home, 'home', 'alice-example')
 	assert os.is_dir(user_home)
 	home_info := os.stat(user_home)!
 	assert home_info.mode & 0o777 == registration_user_home_mode
+	// Creating the user creates the usual folders in its home.
+	for folder in desktop_user_folders {
+		assert os.is_dir(os.join_path(user_home, folder.name))
+	}
 
 	// Profiles written by the first registration implementation did not have a
 	// home directory. A later launch repairs that profile rather than asking the
 	// user to register again.
-	os.rmdir(user_home)!
+	os.rmdir_all(user_home)!
 	assert !os.exists(user_home)
 	assert desktop_user_registered(home)
 	assert os.is_dir(user_home)
 	repaired := os.stat(user_home)!
 	assert repaired.mode & 0o777 == registration_user_home_mode
+	assert os.is_dir(os.join_path(user_home, 'Downloads'))
+}
+
+fn registration_test_register(home string, name string) {
+	mut state := new_registration_state()
+	defer { state.close() }
+	state.key_input('${name}\tsecret\tsecret\r', home)
+	assert state.complete
+}
+
+fn test_registered_user_home_is_linked_from_home_directory() {
+	root := registration_test_home('link')
+	defer { os.rmdir_all(root) or {} }
+	home := os.join_path(root, 'root')
+	users := os.join_path(root, 'home')
+	os.mkdir(home)!
+	// Folders the desktop used to keep in /root itself.
+	os.mkdir(os.join_path(home, 'Desktop'))!
+	os.write_file(os.join_path(home, 'Desktop', 'note.txt'), 'kept')!
+	os.mkdir(os.join_path(home, 'Downloads'))!
+	registration_test_register(home, 'Alice Example')
+
+	storage := desktop_user_storage_path(home, 'Alice Example')
+	defer { unsafe { storage.free() } }
+	user_home := desktop_prepare_user_home(home, users)
+	defer { unsafe { user_home.free() } }
+	assert user_home == os.join_path(users, 'alice-example')
+	assert os.is_link(user_home)
+	assert os.readlink(user_home)! == storage
+	for folder in desktop_user_folders {
+		assert os.is_dir(os.join_path(user_home, folder.name))
+		assert !os.exists(os.join_path(home, folder.name))
+	}
+	assert os.read_file(os.join_path(user_home, 'Desktop', 'note.txt'))! == 'kept'
+
+	dirs := os.read_file(os.join_path(home, desktop_user_dirs_name))!
+	assert dirs.contains('XDG_DESKTOP_DIR="${user_home}/Desktop"\n')
+	assert dirs.contains('XDG_DOWNLOAD_DIR="${user_home}/Downloads"\n')
+	assert dirs.contains('XDG_DOCUMENTS_DIR="${user_home}/Documents"\n')
+
+	// /home may be in RAM: a later start makes the link again, replaces one
+	// that points elsewhere and keeps a user-dirs file that is already there.
+	os.write_file(os.join_path(home, desktop_user_dirs_name), 'mine\n')!
+	os.rm(user_home)!
+	os.symlink(home, user_home)!
+	again := desktop_prepare_user_home(home, users)
+	defer { unsafe { again.free() } }
+	assert again == user_home
+	assert os.readlink(user_home)! == storage
+	assert os.read_file(os.join_path(home, desktop_user_dirs_name))! == 'mine\n'
+
+	// Application processes find the same home without changing anything.
+	found := desktop_find_user_home(home, users)
+	defer { unsafe { found.free() } }
+	assert found == user_home
+	os.rm(user_home)!
+	stored := desktop_find_user_home(home, users)
+	defer { unsafe { stored.free() } }
+	assert stored == storage
+	assert !os.exists(user_home)
+
+	desktop_use_user_home(again.clone())
+	assert desktop_user_home == user_home
+	assert desktop_directory == os.join_path(user_home, 'Desktop')
+	assert files_locations[0].path == user_home
+	assert files_locations.any(it.path == os.join_path(user_home, 'Downloads'))
+}
+
+fn test_user_home_falls_back_to_its_storage_when_the_name_is_taken() {
+	root := registration_test_home('taken')
+	defer { os.rmdir_all(root) or {} }
+	home := os.join_path(root, 'root')
+	users := os.join_path(root, 'home')
+	os.mkdir(home)!
+	os.mkdir(users)!
+	os.mkdir(os.join_path(users, 'bob'))!
+	os.write_file(os.join_path(users, 'bob', 'theirs'), 'x')!
+	registration_test_register(home, 'Bob')
+
+	user_home := desktop_prepare_user_home(home, users)
+	defer { unsafe { user_home.free() } }
+	storage := desktop_user_storage_path(home, 'Bob')
+	defer { unsafe { storage.free() } }
+	assert user_home == storage
+	assert os.is_dir(os.join_path(user_home, 'Desktop'))
+	assert os.exists(os.join_path(users, 'bob', 'theirs'))
+	assert !os.is_link(os.join_path(users, 'bob'))
 }

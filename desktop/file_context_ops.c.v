@@ -12,7 +12,8 @@ fn C.mkdir(path &char, mode u32) i32
 fn C.rename(old_filename &char, new_filename &char) i32
 fn C.rmdir(path &char) i32
 
-const desktop_directory = '${desktop_home}/Desktop'
+// The user's Desktop folder, /home/<user>/Desktop: see desktop_use_user_home.
+__global desktop_directory = ''
 const file_context_clipboard_path = '/tmp/.vinix-file-clipboard'
 const file_context_copy_buffer_size = 64 * 1024
 const file_context_max_depth = 64

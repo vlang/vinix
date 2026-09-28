@@ -298,15 +298,21 @@ struct FilesLocation {
 	action string
 }
 
-const files_locations = [
-	FilesLocation{ title: 'Home', path: desktop_home, icon: 'builtin:home', action: 'files.location.home' },
-	FilesLocation{ title: 'Desktop', path: desktop_directory, icon: 'builtin:desktop', action: 'files.location.desktop' },
-	FilesLocation{ title: 'Documents', path: '${desktop_home}/Documents', icon: 'builtin:documents', action: 'files.location.documents' },
-	FilesLocation{ title: 'Downloads', path: '${desktop_home}/Downloads', icon: 'builtin:downloads', action: 'files.location.downloads' },
-	FilesLocation{ title: 'Pictures', path: '${desktop_home}/Pictures', icon: 'builtin:folder', action: 'files.location.pictures' },
-	FilesLocation{ title: 'Music', path: '${desktop_home}/Music', icon: 'builtin:folder', action: 'files.location.music' },
-	FilesLocation{ title: 'Computer', path: '/', icon: 'builtin:drive', action: 'files.location.computer' },
-]
+// The sidebar's folders are the user's, in /home/<user>: see
+// desktop_use_user_home.
+__global files_locations = []FilesLocation{}
+
+fn files_locations_in(home string) []FilesLocation {
+	return [
+		FilesLocation{ title: 'Home', path: home, icon: 'builtin:home', action: 'files.location.home' },
+		FilesLocation{ title: 'Desktop', path: '${home}/Desktop', icon: 'builtin:desktop', action: 'files.location.desktop' },
+		FilesLocation{ title: 'Documents', path: '${home}/Documents', icon: 'builtin:documents', action: 'files.location.documents' },
+		FilesLocation{ title: 'Downloads', path: '${home}/Downloads', icon: 'builtin:downloads', action: 'files.location.downloads' },
+		FilesLocation{ title: 'Pictures', path: '${home}/Pictures', icon: 'builtin:folder', action: 'files.location.pictures' },
+		FilesLocation{ title: 'Music', path: '${home}/Music', icon: 'builtin:folder', action: 'files.location.music' },
+		FilesLocation{ title: 'Computer', path: '/', icon: 'builtin:drive', action: 'files.location.computer' },
+	]
+}
 
 fn files_content_left(width int) int {
 	return if width >= files_sidebar_min_window_width { files_sidebar_width } else { 0 }

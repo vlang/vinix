@@ -26,6 +26,8 @@ fn test_files_sidebar_locations_and_navigation_in_both_views() {
 	os.mkdir_all(os.join_path(root, 'child')) or { panic(err) }
 	defer { os.rmdir_all(root) or {} }
 
+	desktop_use_user_home(root.clone())
+	assert files_locations.len == 7
 	mut app := FileBrowserApp{}
 	app.browser.read(root.clone())
 	assert app.browser.error == ''
@@ -48,6 +50,8 @@ fn test_files_sidebar_locations_and_navigation_in_both_views() {
 	assert int(column_row.frame.x) >= files_sidebar_width
 	free_tree(columns)
 
+	app.handle('files.location.home')!
+	assert app.current_path() == root
 	app.handle('files.location.computer')!
 	assert app.current_path() == '/'
 	assert app.columns.len == 1

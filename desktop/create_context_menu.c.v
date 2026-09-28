@@ -307,13 +307,18 @@ fn open_files_with_context_menu(mut desktop Desktop) !NativeApp {
 	app.files.settings = load_files_settings(desktop_home)
 	app.files.browser.show_hidden = app.files.settings.show_hidden
 	for location in files_locations[..files_locations.len - 1] {
-		if location.path != desktop_home {
+		if location.path != desktop_user_home {
 			ensure_directory(location.path) or {}
 		}
 	}
-	app.files.browser.read(desktop_home)
+	// read() takes ownership on success; the home is shared with the sidebar.
+	home := desktop_user_home.clone()
+	app.files.browser.read(home)
 	if app.files.browser.error != '' {
-		unsafe { app.files.browser.error.free() }
+		unsafe {
+			home.free()
+			app.files.browser.error.free()
+		}
 		app.files.browser.error = ''
 		app.files.browser.read('/')
 	}

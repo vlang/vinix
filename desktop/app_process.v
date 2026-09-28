@@ -879,6 +879,8 @@ fn free_app_payload(payload string) {
 fn run_app_process(options AppProcessOptions) {
 	desktop_set_cloexec(options.request_fd, true)
 	desktop_set_cloexec(options.response_fd, true)
+	// The user's folders are known in the desktop's process, not in this one.
+	desktop_use_user_home(desktop_find_user_home(desktop_home, desktop_users_directory))
 	mut desktop := Desktop{
 		tz_offset_seconds: options.tz_offset
 	}

@@ -291,6 +291,17 @@ entries than the window has room for.
 The image carries the desktop's own source at `/root/desktop`, so there is
 something real to browse and so the machine holds the code it is running.
 
+Creating the user on first launch gives it a home, `/home/<user>`, with
+`Desktop`, `Documents`, `Downloads`, `Music`, `Pictures` and `Videos` in it.
+The desktop surface shows `/home/<user>/Desktop`, and the sidebar's Home and
+folder entries open the same folders. Only `/root` is persistent in every
+storage layout, so the home is kept in `/root/home/<user>` and
+`/home/<user>` is a link to it, made again at every start in case `/home` is
+in RAM. Folders the desktop used to keep directly in `/root` move into the
+home the first time. Programs still run with `HOME=/root`, so the desktop also
+writes `/root/.config/user-dirs.dirs`, which is how Firefox and Chromium find
+the Downloads folder.
+
 ## Desktop utilities
 
 The text editor reads and writes real files. Click the path in its toolbar to

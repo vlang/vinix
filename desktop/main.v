@@ -219,6 +219,10 @@ fn main() {
 	if !desktop.running {
 		return
 	}
+	// The Desktop and Files show the user's /home/<user>/Desktop, Documents,
+	// Downloads and so on from here on.
+	desktop_use_user_home(desktop_prepare_user_home(desktop_home, desktop_users_directory))
+	gpu_present_startup_stage(c'user home ready')
 	// A newly created user then chooses which optional apps to install. The
 	// install itself runs in a Terminal once the ordinary desktop is up.
 	gpu_present_startup_stage(c'checking first-run app choice')
