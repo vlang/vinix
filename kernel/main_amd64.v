@@ -89,6 +89,8 @@ fn kmain_thread() {
 }
 
 fn kmain() {
+	// Before anything that returns: see c/stack_protector.c.
+	C.vinix_stack_guard_init()
 	// Ensure the base revision is supported.
 	if limine_base_revision.revision != 0 {
 		for {}

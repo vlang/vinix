@@ -8,6 +8,7 @@ import lib.stubs
 import limine
 
 #include <symbols.h>
+#include <stack_protector.h>
 
 @[_linker_section: '.requests']
 @[cinit]
@@ -18,6 +19,8 @@ __global (
 )
 
 fn C._vinit(argc int, argv voidptr)
+
+fn C.vinix_stack_guard_init()
 
 pub fn main() {
 	kmain()

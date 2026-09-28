@@ -77,7 +77,8 @@ override CFLAGS += \
     -nostdinc \
     -ffreestanding \
     -fno-omit-frame-pointer \
-    -fno-stack-protector \
+    -fstack-protector-strong \
+    -mstack-protector-guard=global \
     -fno-stack-check \
     -fno-lto \
     -fno-PIC \
@@ -120,7 +121,8 @@ override CFLAGS += \
     -nostdinc \
     -ffreestanding \
     -fno-omit-frame-pointer \
-    -fno-stack-protector \
+    -fstack-protector-strong \
+    -mstack-protector-guard=global \
     -fno-stack-check \
     -fno-lto \
     -fno-PIC \

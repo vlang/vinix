@@ -616,6 +616,8 @@ fn early_cmdline_has_token(token string) bool {
 }
 
 fn kmain() {
+	// Before anything that returns: see c/stack_protector.c.
+	C.vinix_stack_guard_init()
 	memory.configure_page_size()
 	// Read the cmdline before touching anything else. The framebuffer used to
 	// be written first, which made it impossible to tell a kernel that never

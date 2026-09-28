@@ -135,6 +135,40 @@ randomized PIE base, interpreter base, stack top and `mmap` placement Vinix
 already had. On amd64, exec now resets the break and fork copies it, which
 arm64 already did.
 
+## Kernel stack protector
+
+The kernel is built with `-fstack-protector-strong`, as OpenBSD has built
+its kernel with ProPolice since 2003. Every kernel function with a buffer or
+an address-taken local keeps a copy of a secret guard below its return
+address, and checks it before returning. If an overflow reached the return
+address, the check fails and the kernel panics instead of returning into
+whatever was written there. The guard is global (`-mstack-protector-guard=global`),
+because the x86-64 default reads it through `%fs`, which in the kernel
+belongs to userspace.
+
+`kmain()` calls `vinix_stack_guard_init()` (`kernel/c/stack_protector.c`)
+before anything that will return. It mixes RDRAND (amd64) or RNDR (arm64,
+where the CPU has FEAT_RNG) with the cycle counter and the boot stack's
+address. The M1 has no RNDR, so there the guard depends on the counter's
+jitter since reset. The guard's lowest byte is zero, as glibc makes it, so an
+overflow through a string function stops at the terminator it would have to
+write there.
+
+## Already in place
+
+These came before and are unchanged: W^X for user mappings, `mimmutable(2)`
+and immutable ELF text, randomized `mmap`, PIE, interpreter and stack
+placement, checked copies to and from userspace in a growing number of
+syscalls, SMEP, UMIP, NXE and `CR0.WP` on amd64, and PXN on every user page
+on arm64.
+
+Not yet: SMAP and PAN need the kernel's remaining direct dereferences of user
+pointers converted to checked copies first. `fstatat` still writes its
+`struct stat` straight to the user's buffer, for example. `MAP_STACK`
+checking and syscall-origin pinning (`pinsyscalls`) would break Go and
+statically linked Linux programs, which make syscalls from their own text
+and run on stacks that were never mapped with `MAP_STACK`.
+
 ## Calling them
 
 The syscall numbers sit next to `mimmutable(2)`, in ranges Linux leaves
