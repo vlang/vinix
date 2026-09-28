@@ -170,6 +170,22 @@ static void install_power_signals(void) {
 	install_power_signal(12 /* SIGUSR2: power off */);
 }
 
+/* A blocking wait4 only watches the children its caller had when it began, so
+ * an orphan handed to PID 1 later could die without waking it. SIGCHLD cuts
+ * that wait short, and wait_for_child() then waits again, this time with the
+ * orphan among the children. The kernel delivers SIGCHLD only to a process
+ * that handles it. */
+static void child_signal_handler(int signal) {
+	(void)signal;
+}
+
+static void install_child_signal(void) {
+	struct kernel_sigaction action = {
+		child_signal_handler, 0, signal_restorer, 0,
+	};
+	syscall4(134 /* rt_sigaction */, 17 /* SIGCHLD */, (u64)&action, 0, 8);
+}
+
 static void apply_power_request(void) {
 	int signal = requested_power_signal;
 	u64 command;
@@ -188,20 +204,34 @@ struct kernel_timespec {
 	i64 nanoseconds;
 };
 
+/* Every child that exits interrupts the sleep with SIGCHLD, which leaves what
+ * was left of it in `delay`; sleep that out too. A power or reload request
+ * still cuts it short. */
+static void pause_for(struct kernel_timespec delay) {
+	while (syscall4(115 /* clock_nanosleep */, 1 /* CLOCK_MONOTONIC */, 0,
+	                (u64)&delay, (u64)&delay) == -4 /* EINTR */
+	       && !requested_power_signal && !requested_desktop_reload) {
+	}
+}
+
 static void restart_pause(void) {
 	struct kernel_timespec delay = { 1, 0 };
-	syscall4(115 /* clock_nanosleep */, 1 /* CLOCK_MONOTONIC */, 0,
-	         (u64)&delay, 0);
+	pause_for(delay);
 }
 
 static void teardown_pause(void) {
 	struct kernel_timespec delay = { 0, 10000000 /* 10 ms */ };
-	syscall4(115 /* clock_nanosleep */, 1 /* CLOCK_MONOTONIC */, 0,
-	         (u64)&delay, 0);
+	pause_for(delay);
 }
 
 /* Wait for one supervised child. A power signal interrupts wait4; forward it
- * once, then let the compositor perform its normal clean shutdown. */
+ * once, then let the compositor perform its normal clean shutdown.
+ *
+ * Every process whose parent dies is handed to PID 1, and nothing else will
+ * ever reap it, so wait for any child rather than only this one. Waiting on
+ * the compositor alone left each orphan that exited -- an application whose
+ * launcher had gone, a daemon's double fork -- a zombie for the whole
+ * session. */
 static void wait_for_child(i64 child, int *status) {
 	int forwarded_signal = 0;
 	for (;;) {
@@ -212,8 +242,11 @@ static void wait_for_child(i64 child, int *status) {
 			syscall2(129 /* kill */, (u64)child, (u64)signal);
 			forwarded_signal = signal;
 		}
-		if (syscall4(260 /* wait4 */, (u64)child, (u64)status, 0, 0) == child)
+		int any_status = 0;
+		if (syscall4(260 /* wait4 */, (u64)(i64)-1, (u64)&any_status, 0, 0) == child) {
+			*status = any_status;
 			return;
+		}
 	}
 }
 
@@ -456,6 +489,7 @@ void _start(void) {
 	prepare_desktop_boot();
 	prepare_hosted_x11_storage();
 	install_power_signals();
+	install_child_signal();
 	start_files_sync(environment);
 
 #ifdef VINIX_WIFI_BUNDLE
