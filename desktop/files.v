@@ -25,9 +25,10 @@ const max_entries = 4096
 
 struct FileEntry {
 mut:
-	name   string
-	is_dir bool
-	size   u64
+	name     string
+	is_dir   bool
+	size     u64
+	modified i64
 	// Cached because these strings are stable until a new directory is
 	// read, while the element tree is rebuilt whenever desktop state changes.
 	row_action    string
@@ -45,6 +46,8 @@ mut:
 	show_hidden       bool
 	action_prefix     string
 	tz_offset_seconds i64
+	sort_column       FilesListSortColumn
+	sort_descending   bool
 	scroll            int
 	error             string
 	// Row the pointer is over, or -1. Kept here rather than in the desktop's
@@ -125,6 +128,7 @@ fn read_file_entries_filtered(path string, action_prefix string, show_hidden boo
 			name:          name
 			is_dir:        is_dir
 			size:          size
+			modified:      modified
 			modified_text: files_list_modified_text(modified, tz_offset_seconds)
 			kind_text:     files_list_kind_text(name, is_dir)
 		}
@@ -165,6 +169,9 @@ fn (mut b FileBrowser) read(path string) {
 	b.error = ''
 	b.hover_row = -1
 	b.selected_row = -1
+	if b.sort_column != .name || b.sort_descending {
+		b.apply_list_sort()
+	}
 }
 
 fn prepare_file_rows(mut entries []FileEntry, action_prefix string) {
@@ -910,7 +917,8 @@ fn (mut a FileBrowserApp) build(size ui2.Rect) !ui2.Element {
 		return a.build_tag_results(width, height, mut children)
 	}
 	layout := files_list_layout(content_width)
-	files_list_header(mut children, content_left, content_width, layout)
+	files_list_header(mut children, content_left, content_width, layout, a.browser.sort_column,
+		a.browser.sort_descending)
 	files_zebra_background(mut children, content_left, a.rows_top, content_width, height - a.rows_top,
 		a.browser.scroll)
 
@@ -1387,6 +1395,12 @@ fn (mut a FileBrowserApp) pointer_event(phase AppPointerPhase, button AppPointer
 }
 
 fn (mut a FileBrowserApp) handle(event_id string) ! {
+	if column := files_list_sort_column_for_action(event_id) {
+		if a.view_mode == .list && a.active_tag_id < 0 {
+			a.browser.set_list_sort(column)
+		}
+		return
+	}
 	if event_id.starts_with(files_action_tag_row) {
 		paths := a.settings.tagged_paths(a.active_tag_id)
 		index := event_id[files_action_tag_row.len..].int()
