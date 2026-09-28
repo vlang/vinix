@@ -512,7 +512,13 @@ fn (mut d Desktop) pump_pointer(mut pointer PointerDevice, width int, height int
 }
 
 fn (mut d Desktop) pump_keyboard(mut keyboard Keyboard) {
-	keys := keyboard.poll()
+	raw := keyboard.poll()
+	// The console types the US layout. Everything below reads what the chosen
+	// input source types instead; shortcuts arrive as they were.
+	keys := d.type_with_layout(raw, keyboard.fd)
+	if raw.len > 0 && keys.str != raw.str {
+		unsafe { raw.free() }
+	}
 
 	// Cmd-Tab is the window manager's whoever is typing, so it comes out of
 	// the stream first. An empty read goes through as well: a sequence the

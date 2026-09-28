@@ -10,10 +10,10 @@ import os
 import time
 
 const vinix_app_magic = u32(0x56415050)
-const vinix_app_version = u8(8)
-const vinix_request_header_size = 124
-const vinix_response_header_size = 116
-const vinix_state_size = 104
+const vinix_app_version = u8(9)
+const vinix_request_header_size = 132
+const vinix_response_header_size = 124
+const vinix_state_size = 112
 const vinix_max_payload = 16 * 1024 * 1024
 
 enum VinixCommand as u8 {
@@ -168,8 +168,11 @@ fn vinix_write_all(fd int, data []u8) {
 
 fn vinix_default_state() []u8 {
 	mut state := []u8{len: vinix_state_size}
-	// requested_scale follows nine i32 Settings fields and must be 1 or 2.
+	// Nine i32 Settings fields come first. The enabled keyboard layouts follow
+	// and must include the current one (0, English); then requested_scale,
+	// which must be 1 or 2.
 	state[36] = 1
+	state[44] = 1
 	return state
 }
 
@@ -839,7 +842,7 @@ fn vinix_serve(request_fd int, response_fd int) {
 		width := vinix_take_i32(header, 8)
 		height := vinix_take_i32(header, 12)
 		state = header[16..16 + vinix_state_size].clone()
-		payload_length := int(vinix_take_u32(header, 120))
+		payload_length := int(vinix_take_u32(header, 16 + vinix_state_size))
 		if payload_length < 0 || payload_length > vinix_max_payload {
 			break
 		}

@@ -41,6 +41,114 @@ mut:
 	wallpaper_color int
 	// Index into the wallpaper images, or -1 for the colour above.
 	wallpaper_image int = -1
+	// The input sources Ctrl-Space moves between, one KeyboardLayout.bit()
+	// each, and the one typing uses now. The current one is always enabled.
+	keyboard_layouts u32 = keyboard_layout_default_mask
+	keyboard_layout  KeyboardLayout
+}
+
+// ── Keyboard ───────────────────────────────────────────────────────
+
+// KeyboardLayout is an input source. keyboard_layout.v holds what each one
+// types; this is what Settings, the preference file and the protocol name.
+enum KeyboardLayout {
+	us
+	russian
+	spanish
+	french
+	german
+	portuguese
+}
+
+const keyboard_layouts = [KeyboardLayout.us, .russian, .spanish, .french, .german, .portuguese]
+// English (US) alone: typing is exactly what the console delivers.
+const keyboard_layout_default_mask = u32(1)
+const keyboard_layout_all_mask = u32((1 << 6) - 1)
+
+fn (l KeyboardLayout) title() string {
+	return match l {
+		.us { 'English (US)' }
+		.russian { 'Russian' }
+		.spanish { 'Spanish' }
+		.french { 'French' }
+		.german { 'German' }
+		.portuguese { 'Portuguese' }
+	}
+}
+
+// code names the layout in the preference file.
+fn (l KeyboardLayout) code() string {
+	return match l {
+		.us { 'us' }
+		.russian { 'ru' }
+		.spanish { 'es' }
+		.french { 'fr' }
+		.german { 'de' }
+		.portuguese { 'pt' }
+	}
+}
+
+// badge is the short name the input-source panel shows.
+fn (l KeyboardLayout) badge() string {
+	return match l {
+		.us { 'EN' }
+		.russian { 'RU' }
+		.spanish { 'ES' }
+		.french { 'FR' }
+		.german { 'DE' }
+		.portuguese { 'PT' }
+	}
+}
+
+fn (l KeyboardLayout) bit() u32 {
+	return u32(1) << int(l)
+}
+
+fn keyboard_layout_from_code(code string) ?KeyboardLayout {
+	for layout in keyboard_layouts {
+		if layout.code() == code {
+			return layout
+		}
+	}
+	return none
+}
+
+// keyboard_layout_count says how many input sources a mask enables.
+fn keyboard_layout_count(mask u32) int {
+	mut count := 0
+	for layout in keyboard_layouts {
+		if mask & layout.bit() != 0 {
+			count++
+		}
+	}
+	return count
+}
+
+// keyboard_next_layout is the input source after `current` among the enabled
+// ones, in the order Settings lists them.
+fn keyboard_next_layout(mask u32, current KeyboardLayout) KeyboardLayout {
+	for step in 1 .. keyboard_layouts.len + 1 {
+		candidate := keyboard_layouts[(int(current) + step) % keyboard_layouts.len]
+		if mask & candidate.bit() != 0 {
+			return candidate
+		}
+	}
+	return current
+}
+
+fn keyboard_first_layout(mask u32) KeyboardLayout {
+	for layout in keyboard_layouts {
+		if mask & layout.bit() != 0 {
+			return layout
+		}
+	}
+	return .us
+}
+
+fn keyboard_settings_valid(mask u32, current KeyboardLayout) bool {
+	return mask != 0 && mask & ~keyboard_layout_all_mask == 0
+		&& int(current) >= int(KeyboardLayout.us) && int(current) <= int(KeyboardLayout.portuguese)
+		&& mask & current.bit() != 0
 }
 
 // ── Wallpaper ──────────────────────────────────────────────────────

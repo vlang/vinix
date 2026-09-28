@@ -50,6 +50,9 @@ struct AppFactory {
 	// provides it. Launching it before that install explains how to get it.
 	install_package   string
 	exclusive_command string
+	// Typing reaches it as the US keys, whatever the input source: a game's
+	// controls and a virtual machine's own keyboard layout are positional.
+	us_keys bool
 	// Used only after exec, in the application process. Settings receives that
 	// process' synchronized desktop-state proxy; most apps ignore it.
 	open fn (mut desktop Desktop) !NativeApp = unsafe { nil }
@@ -333,6 +336,7 @@ const available_apps = [
 		pointer: true
 		launch_top_right: true
 		hide_body_cursor: true
+		us_keys: true
 		open: open_doom
 	},
 	AppFactory{
@@ -344,6 +348,7 @@ const available_apps = [
 		polling: true
 		keyboard: true
 		pointer: true
+		us_keys: true
 		open: open_qemu_desktop
 	},
 	AppFactory{

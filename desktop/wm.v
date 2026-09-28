@@ -155,6 +155,9 @@ mut:
 	external_error_hint    string
 
 	settings Settings
+	// What typing goes through first: the input source's dead keys and the
+	// Ctrl-Space panel.
+	keyboard KeyboardInput
 	// Screenshot and video requests originate in the native Capture app, but
 	// the compositor owns the pixels and the output stream.
 	capture CaptureService
@@ -441,6 +444,9 @@ fn (mut d Desktop) build_tree() ui2.Element {
 	// Last, so the switcher is over everything it is a picture of.
 	if d.switcher.shown {
 		children << d.switcher_element()
+	}
+	if hud := d.keyboard_hud_element() {
+		children << hud
 	}
 
 	return ui2.view('desktop', ui2.rect(0, 0, f64(d.canvas.width), f64(d.canvas.height)), ui2.BoxStyle{
@@ -753,7 +759,7 @@ fn (mut d Desktop) poll_apps() {
 // opening a stopwatch or a continuously hosted framebuffer lowers the timeout
 // to that application's requested cadence.
 fn (d &Desktop) idle_wait_interval(maximum i64, frame_interval i64) i64 {
-	mut interval := maximum
+	mut interval := d.keyboard_hud_wait(maximum)
 	for window in d.windows {
 		if window.app_index < 0 || window.app_index >= d.apps.len {
 			continue

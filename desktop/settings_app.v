@@ -23,10 +23,11 @@ enum SettingsCategory {
 	wifi
 	display
 	battery
+	keyboard
 }
 
 const settings_categories = [SettingsCategory.appearance, .date_time, .theme, .wallpaper, .wifi,
-	.display, .battery]
+	.display, .battery, .keyboard]
 
 fn (c SettingsCategory) title() string {
 	return match c {
@@ -37,6 +38,7 @@ fn (c SettingsCategory) title() string {
 		.wifi { 'Wi-Fi' }
 		.display { 'Display' }
 		.battery { 'Battery' }
+		.keyboard { 'Keyboard' }
 	}
 }
 
@@ -168,6 +170,7 @@ fn (a &SettingsApp) pane(width int, height int) []ui2.Element {
 		.date_time { a.date_time_pane(width) }
 		.theme { a.theme_pane(width) }
 		.wallpaper { a.wallpaper_pane(width) }
+		.keyboard { a.keyboard_pane(width) }
 		else { []ui2.Element{} }
 	}
 }
@@ -426,6 +429,9 @@ fn (mut a SettingsApp) handle(event_id string) ! {
 	}
 	// Everything below writes a preference, which needs a desktop to write to.
 	if a.desktop == unsafe { nil } {
+		return
+	}
+	if a.handle_keyboard(event_id) {
 		return
 	}
 	if event_id.starts_with(settings_action_side) {

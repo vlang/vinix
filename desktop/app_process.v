@@ -19,9 +19,9 @@ import math.bits
 import ui2
 
 const app_protocol_magic = u32(0x56415050) // VAPP
-const app_protocol_version = u8(8)
-const app_request_header_size = 124
-const app_response_header_size = 116
+const app_protocol_version = u8(9)
+const app_request_header_size = 132
+const app_response_header_size = 124
 const app_protocol_max_payload = 16 * 1024 * 1024
 const app_protocol_max_string = 64 * 1024
 const app_protocol_max_elements = 16 * 1024
@@ -189,6 +189,8 @@ fn wire_put_state(mut out []u8, state AppWireState) {
 	wire_put_i32(mut out, if state.settings.clock_show_weekday { 1 } else { 0 })
 	wire_put_i32(mut out, state.settings.wallpaper_color)
 	wire_put_i32(mut out, state.settings.wallpaper_image)
+	wire_put_u32(mut out, state.settings.keyboard_layouts)
+	wire_put_i32(mut out, int(state.settings.keyboard_layout))
 	wire_put_i32(mut out, state.requested_scale)
 	wire_put_u32(mut out, state.capture_request.sequence)
 	wire_put_i32(mut out, int(state.capture_request.command))
@@ -215,6 +217,8 @@ fn wire_take_state(mut reader WireReader) !AppWireState {
 	clock_show_weekday := reader.take_i32()!
 	wallpaper_color := reader.take_i32()!
 	wallpaper_image := reader.take_i32()!
+	keyboard_mask := reader.take_u32()!
+	keyboard_layout := reader.take_i32()!
 	requested_scale := reader.take_i32()!
 	capture_sequence := reader.take_u32()!
 	capture_command := reader.take_i32()!
@@ -236,6 +240,8 @@ fn wire_take_state(mut reader WireReader) !AppWireState {
 		|| clock_show_seconds < 0 || clock_show_seconds > 1
 		|| clock_show_date < 0 || clock_show_date > 1
 		|| clock_show_weekday < 0 || clock_show_weekday > 1
+		|| keyboard_layout < int(KeyboardLayout.us) || keyboard_layout > int(KeyboardLayout.portuguese)
+		|| !keyboard_settings_valid(keyboard_mask, unsafe { KeyboardLayout(keyboard_layout) })
 		|| !desktop_scale_valid(requested_scale)
 		|| capture_command < int(CaptureCommand.none_)
 		|| capture_command > int(CaptureCommand.stop) || capture_delay < 0
@@ -257,6 +263,8 @@ fn wire_take_state(mut reader WireReader) !AppWireState {
 			clock_show_weekday: clock_show_weekday == 1
 			wallpaper_color:    wallpaper_color
 			wallpaper_image:    wallpaper_image
+			keyboard_layouts:   keyboard_mask
+			keyboard_layout:    unsafe { KeyboardLayout(keyboard_layout) }
 		}
 		requested_scale: requested_scale
 		capture_request: CaptureRequest{
@@ -690,6 +698,10 @@ fn apply_app_state(mut desktop Desktop, state AppWireState) {
 		|| desktop.settings.clock_show_seconds != state.settings.clock_show_seconds
 		|| desktop.settings.clock_show_date != state.settings.clock_show_date
 		|| desktop.settings.clock_show_weekday != state.settings.clock_show_weekday
+	if desktop.settings.keyboard_layout != state.settings.keyboard_layout {
+		// An accent typed in the old input source does not carry over.
+		desktop.keyboard.dead = 0
+	}
 	desktop.settings = state.settings
 	desktop.accept_capture_request(state.capture_request)
 	if wallpaper_changed {
@@ -1016,6 +1028,7 @@ mut:
 	last_poll_ms     u64
 	keyboard         bool
 	pointer          bool
+	us_keys          bool
 	closed           bool
 	failure_reason   string
 	desktop          &Desktop = unsafe { nil }
@@ -1067,6 +1080,7 @@ fn start_remote_app_at_with_timeout(path string, factory AppFactory, mut desktop
 		poll_interval_ms: factory.poll_interval_ms
 		keyboard:         factory.keyboard
 		pointer:          factory.pointer
+		us_keys:          factory.us_keys
 		desktop:          desktop
 	}
 	reply := receive_app_response_with_timeout(remote.response_fd, timeout_ms) or {

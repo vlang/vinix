@@ -39,13 +39,14 @@ rm -f "$work/ui/main.v"
 cp "$root/desktop/tools/tests/settings_test.v" "$work/ui/"
 cp "$root/desktop/tools/tests/settings_persistence_test.v" "$work/ui/"
 cp "$root/desktop/tools/tests/clock_settings_test.v" "$work/ui/"
+cp "$root/desktop/tools/tests/keyboard_layout_test.v" "$work/ui/"
 cp "$root/desktop/tools/tests/switcher_test.v" "$work/ui/"
 cp "$root/desktop/tools/tests/memory_test.v" "$work/ui/"
 cp "$root/desktop/tools/tests/heap_tracker.h" "$work/ui/"
 # Both sets share fixture_app and element_named in one translation unit.
 sed '1,/^import ui2$/d' "$root/desktop/tools/tests/battery_test.v" >> "$work/ui/settings_test.v"
 printf "Module { name: 'settings_tests' }\n" > "$work/ui/v.mod"
-for name in settings switcher settings_persistence clock_settings; do
+for name in settings switcher settings_persistence clock_settings keyboard_layout; do
     "$v" -new-compiler -nocache -gc none -manualfree -enable-globals -stats -d ui2_headless \
         -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/${name}_test.v"
 done

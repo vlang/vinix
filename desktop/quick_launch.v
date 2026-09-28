@@ -173,6 +173,10 @@ fn (mut d Desktop) quick_launch_take_keys(input string) string {
 		match ch {
 			8, 127 {
 				if d.switcher.query.len > 0 {
+					// A letter from another input source is several bytes.
+					for d.switcher.query.len > 1 && d.switcher.query.last() & 0xc0 == 0x80 {
+						d.switcher.query.delete_last()
+					}
 					d.switcher.query.delete_last()
 					d.switcher.index = 0
 					d.dirty = true
@@ -186,7 +190,7 @@ fn (mut d Desktop) quick_launch_take_keys(input string) string {
 				d.quick_launch_move_selection(1)
 			}
 			else {
-				if ch >= 0x20 && ch < 0x7f && d.switcher.query.len < start_menu_max_query {
+				if ch >= 0x20 && ch != 0x7f && d.switcher.query.len < start_menu_max_query {
 					d.switcher.query << ch
 					d.switcher.index = 0
 					d.dirty = true
