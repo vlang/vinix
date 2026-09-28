@@ -13,12 +13,13 @@ for name in device_io.v platform.c.v backlight_client.v battery_client.v wifi_cl
 done
 cp "$root/desktop/libc_compat.h" "$work/clients/"
 cp "$root/desktop/tools/tests/device_io_mock.v" "$work/clients/"
+cp "$root/desktop/tools/tests/taskbar_status_mock.v" "$work/clients/"
 for name in backlight_client battery_client wifi_client platform preferences clock_preferences; do
     cp "$root/desktop/tools/tests/${name}_test.v" "$work/clients/"
     # Invoke the test file directly so older vtest runners cannot lose the
     # shell quoting around a module path containing '|'. V runs its tests.
     "$v" -new-compiler -nocache -gc none -enable-globals -stats \
-        -path "@vlib|@vmodules|$root/kernel/modules" "$work/clients/${name}_test.v"
+        -path "@vlib|@vmodules|$root/kernel" "$work/clients/${name}_test.v"
 done
 if [ "${CLIENTS_ONLY:-0}" = 1 ]; then exit 0; fi
 [ -f "$root/third_party/ui2/v.mod" ] || {
