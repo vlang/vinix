@@ -37,7 +37,11 @@ there first.
 
 `tools/tests/i18n_test.v` checks that every file defines exactly the English
 keys, that placeholders and plural forms match, that every key the sources use
-exists, and that the fonts can draw every letter.
+exists, and that the fonts can draw every letter. It also fails on literal
+words handed to the UI helpers (`ui2.label`, `ui2.button`, `settings_note`,
+`heading`, ...), naming the file and line, so new text cannot skip the
+translations; product names that read the same everywhere are listed in
+`i18n_untranslated_names`.
 
 ## Adding a language
 

@@ -106,6 +106,112 @@ fn test_every_key_the_sources_use_is_defined() {
 	}
 }
 
+// UI helpers whose first argument is the text they show, and those whose
+// second argument is, after an element id.
+const i18n_text_first = ['settings_heading', 'settings_note', 'settings_owned_note', 'heading',
+	'body_line', 'owned_body_line', 'muted_line', 'tray_flyout_heading']
+const i18n_text_second = ['ui2.label', 'ui2.button', 'ui2.button_with_image', 'settings_choice',
+	'settings_toggle', 'editor_toolbar_button']
+// Names that read the same in every language.
+const i18n_untranslated_names = ['Vinix', 'VSpace']
+
+// i18n_literal_after is the single-quoted literal starting at index, after
+// any spaces, or none.
+fn i18n_literal_after(text string, index int) ?string {
+	mut at := index
+	for at < text.len && text[at] in [` `, `\t`, `\n`] {
+		at++
+	}
+	if at >= text.len || text[at] != `'` {
+		return none
+	}
+	end := text.index_after("'", at + 1) or { return none }
+	return text[at + 1..end]
+}
+
+// i18n_second_argument is where the argument after the first top-level comma
+// of the call whose `(` is at open begins.
+fn i18n_second_argument(text string, open int) ?int {
+	mut depth := 0
+	mut at := open + 1
+	for at < text.len {
+		c := text[at]
+		if c == `'` {
+			at = (text.index_after("'", at + 1) or { return none }) + 1
+			continue
+		}
+		if c in [`(`, `[`, `{`] {
+			depth++
+		} else if c in [`)`, `]`, `}`] {
+			if depth == 0 {
+				return none
+			}
+			depth--
+		} else if c == `,` && depth == 0 {
+			return at + 1
+		}
+		at++
+	}
+	return none
+}
+
+// i18n_shows_words is whether a literal has letters of its own once its
+// ${...} interpolations are taken out. Symbols such as ↑, − and × are not
+// words and read the same in every language.
+fn i18n_shows_words(literal string) bool {
+	mut at := 0
+	for at < literal.len {
+		if literal[at] == `$` && at + 1 < literal.len && literal[at + 1] == `{` {
+			at = (literal.index_after('}', at) or { return false }) + 1
+			continue
+		}
+		r, size := next_rune(literal, at)
+		if (r >= `a` && r <= `z`) || (r >= `A` && r <= `Z`)
+			|| (r >= 0xc0 && r <= 0x24f && r != 0xd7 && r != 0xf7) || (r >= 0x400 && r <= 0x4ff) {
+			return true
+		}
+		at += size
+	}
+	return false
+}
+
+// Every word the desktop shows goes through a translation key. This finds
+// literal text handed to the UI helpers, which a translation would miss.
+fn test_ui_helpers_are_not_given_literal_words() {
+	root := @VMODROOT
+	mut found := []string{}
+	for name in os.ls(root) or { panic(err) } {
+		if !name.ends_with('.v') || name.ends_with('_test.v') || name.starts_with('app_') {
+			continue
+		}
+		text := os.read_file(os.join_path(root, name)) or { panic(err) }
+		for index, helpers in [i18n_text_first, i18n_text_second] {
+			for helper in helpers {
+				mut at := 0
+				for {
+					call := text.index_after(helper + '(', at) or { break }
+					at = call + helper.len + 1
+					if call > 0 && (text[call - 1].is_letter() || text[call - 1].is_digit()
+						|| text[call - 1] == `_` || (text[call - 1] == `.` && !helper.contains('.'))) {
+						continue
+					}
+					start := if index == 0 {
+						call + helper.len + 1
+					} else {
+						i18n_second_argument(text, call + helper.len) or { continue }
+					}
+					literal := i18n_literal_after(text, start) or { continue }
+					if i18n_shows_words(literal) && literal !in i18n_untranslated_names {
+						line := text[..call].count('\n') + 1
+						found << '${name}:${line}: ${helper} shows \'${literal}\''
+					}
+				}
+			}
+		}
+	}
+	assert found.len == 0, 'use tr() for text the desktop shows:\n' + found.join('\n')
+}
+
 // Text the fonts cannot draw comes out as gaps. Every rune any translation
 // uses must have a glyph of its own, in every face.
 fn test_fonts_draw_every_translated_rune() {
