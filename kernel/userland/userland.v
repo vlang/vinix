@@ -916,6 +916,10 @@ pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, 
 
 		process.thread_stack_top = elf.initial_stack_top()
 		process.mmap_anon_non_fixed_base = elf.initial_mmap_base()
+		// The old program's break went with its page map; the new one
+		// reserves its own arena on its first brk().
+		process.brk_base = 0
+		process.brk_current = 0
 
 		// TODO: Kill old threads
 		// old_threads := process.threads

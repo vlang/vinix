@@ -6,6 +6,7 @@ module mmap
 // mremap, mincore, madvise and brk.
 
 import errno
+import krandom
 import lib
 import memory
 import proc
@@ -35,6 +36,19 @@ const brk_arena_base = u64(0x60000000000)
 // Walking the reservation costs only what is mapped in it (see
 // Pagemap.next_present), so fork and exit do not pay for its size.
 const brk_arena_size = u64(0xf000000000)
+
+// The break starts at a random page in the first 256 MiB of the arena, a
+// different one for each program, as OpenBSD starts it: a heap at the same
+// address in every process is one an exploit needs no leak to find.
+const brk_aslr_span = u64(0x10000000)
+
+fn random_brk_start() u64 {
+	mut random := u64(0)
+	if !krandom.fill(voidptr(&random), sizeof(random), true) {
+		return brk_arena_base
+	}
+	return brk_arena_base + (random % (brk_aslr_span / page_size)) * page_size
+}
 
 // ── mremap ───────────────────────────────────────────────────────────────────
 
@@ -346,14 +360,15 @@ pub fn syscall_brk(_ voidptr, address u64) (u64, u64) {
 		mmap(pagemap, voidptr(brk_arena_base), brk_arena_size, prot_none, map_anonymous | map_private | map_fixed_noreplace | map_brk_reservation, unsafe { nil }, 0, unsafe { nil }, unsafe { nil }, unsafe { nil }) or {
 			return 0, 0
 		}
-		process.brk_base = brk_arena_base
-		process.brk_current = brk_arena_base
+		start := random_brk_start()
+		process.brk_base = start
+		process.brk_current = start
 	}
 
 	if address == 0 || address == process.brk_current {
 		return process.brk_current, 0
 	}
-	if address < process.brk_base || address > process.brk_base + brk_arena_size {
+	if address < process.brk_base || address > brk_arena_base + brk_arena_size {
 		return process.brk_current, 0
 	}
 	requested_data := address - process.brk_base

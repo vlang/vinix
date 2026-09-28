@@ -4,8 +4,8 @@
 
 /* SPDX-License-Identifier: BSD-2-Clause
  * In-guest regression coverage for Vinix's OpenBSD security features:
- * pledge(2), unveil(2), signed signal frames and random process ids.
- * Built statically for either architecture and run
+ * pledge(2), unveil(2), signed signal frames, random process ids and a
+ * random program break. Built statically for either architecture and run
  * as PID 1; every case runs in a child, so a pledge violation that kills the
  * child is an outcome the parent can check. */
 #define _GNU_SOURCE
@@ -589,10 +589,34 @@ static int run_signal_tests(void)
 	return 0;
 }
 
-/* ── random process ids ───────────────────────────────────────── */
+/* ── random process ids and break ───────────────────────────────────────── */
 
 static int exit_at_once(void)
 {
+	return 0;
+}
+
+/* The break a freshly executed copy of this program starts with. */
+static int exec_break(uintptr_t *out)
+{
+	int channel[2];
+	CHECK(pipe(channel) == 0);
+	fflush(stdout);
+	pid_t child = fork();
+	CHECK(child >= 0);
+	if (child == 0) {
+		dup2(channel[1], STDOUT_FILENO);
+		char *argv[] = { self_path, "--print-break", NULL };
+		execv(self_path, argv);
+		_exit(1);
+	}
+	close(channel[1]);
+	char text[32] = { 0 };
+	ssize_t length = read(channel[0], text, sizeof(text) - 1);
+	close(channel[0]);
+	CHECK(exited_ok(reap(child)));
+	CHECK(length > 0);
+	*out = (uintptr_t)strtoull(text, NULL, 16);
 	return 0;
 }
 
@@ -617,10 +641,37 @@ static int run_pid_tests(void)
 	return 0;
 }
 
+static int run_break_tests(void)
+{
+	uintptr_t first = 0, second = 0;
+	CHECK(exec_break(&first) == 0);
+	CHECK(exec_break(&second) == 0);
+	CHECK(first != 0 && second != 0 && first != second);
+	/* A forked child has its parent's heap, and so its break. */
+	uintptr_t parent_break = (uintptr_t)sbrk(0);
+	int channel[2];
+	CHECK(pipe(channel) == 0);
+	fflush(stdout);
+	pid_t child = fork();
+	CHECK(child >= 0);
+	if (child == 0) {
+		uintptr_t child_break = (uintptr_t)sbrk(0);
+		_exit(write(channel[1], &child_break, sizeof(child_break)) == sizeof(child_break) ? 0 : 1);
+	}
+	uintptr_t child_break = 0;
+	CHECK(read(channel[0], &child_break, sizeof(child_break)) == sizeof(child_break));
+	CHECK(exited_ok(reap(child)));
+	CHECK(child_break == parent_break);
+	close(channel[0]);
+	close(channel[1]);
+	puts("OPENBSD SECURITY PASS: the program break is random");
+	return 0;
+}
+
 static int run_tests(void)
 {
 	if (run_pledge_tests() != 0 || run_unveil_tests() != 0 || run_signal_tests() != 0
-	    || run_pid_tests() != 0)
+	    || run_pid_tests() != 0 || run_break_tests() != 0)
 		return 1;
 	puts("VINIX OPENBSD SECURITY: PASS");
 	return 0;
@@ -632,6 +683,10 @@ int main(int argc, char **argv)
 		return pledged_child_opens();
 	if (argc == 2 && strcmp(argv[1], "--read-secret") == 0)
 		return read_secret();
+	if (argc == 2 && strcmp(argv[1], "--print-break") == 0) {
+		printf("%lx\n", (unsigned long)(uintptr_t)sbrk(0));
+		return 0;
+	}
 	setbuf(stdout, NULL);
 	setbuf(stderr, NULL);
 	if (getpid() != 1)

@@ -126,6 +126,15 @@ taken IDs in a nearly full table, allocation falls back to the old
 sequential scan. PID namespaces number their processes on their own, so
 container init is still pid 1 inside the container.
 
+## Random program break
+
+The heap `brk(2)` grows used to start at `0x60000000000` in every process.
+Now each program's break starts at a random page in the first 256 MiB of its
+arena, as OpenBSD randomizes the start of the data segment. This joins the
+randomized PIE base, interpreter base, stack top and `mmap` placement Vinix
+already had. On amd64, exec now resets the break and fork copies it, which
+arm64 already did.
+
 ## Calling them
 
 The syscall numbers sit next to `mimmutable(2)`, in ranges Linux leaves
