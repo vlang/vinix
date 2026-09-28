@@ -97,7 +97,7 @@ const gpu_desktop_executable = '/usr/bin/vinix-desktop-gpu'
 // not be used for boot diagnostics that need to be visible on the M1 panel.
 fn gpu_exec_trace(enabled bool, stage string) {
 	if enabled {
-		println('exec[gpu]: ${stage}')
+		C.kprintf(c'exec[gpu]: %.*s\n', i32(stage.len), stage.str)
 	}
 }
 
@@ -630,7 +630,7 @@ fn dispatch_a_signal_with_fault(context &cpulocal.GPRState, synchronous bool, fa
 		// with the SP deep in a small goroutine stack, so the frame may not
 		// fit; the checked copy turns that into a killed process (Linux
 		// force_sigsegv) instead of a kernel-mode fault that kills the machine.
-		mut frame := []u8{len: int(frame_size)}
+		mut frame := []u8{len: int(frame_size)} @[freed]
 		base := u64(frame.data)
 		unsafe {
 			*&u64(base) = previous_mask
@@ -1041,24 +1041,60 @@ pub fn syscall_execve(_ voidptr, _path charptr, _argv &charptr, _envp &charptr) 
 	}
 	gpu_exec_trace(trace_gpu, 'environment copied; entering ELF loader')
 
+	// The path and both vectors are the exec's now, freed whether it works or
+	// not. A failed exec is common: execvp() tries every directory in PATH.
 	start_program(true, proc.current_directory_of(proc.current_thread().process), path, argv, envp,
-		'', '', '') or {
-		unsafe { path.free() }
-		return errno.err, errno.get()
-	}
+		'', '', '') or { return errno.err, errno.get() }
 
 	return errno.err, errno.get()
 }
 
+// With `execve` set, the exec owns `_path`, `argv` and `envp` and frees them
+// whether it works or not; one that works never returns. The boot path that
+// starts init passes `execve` unset and keeps them.
 pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, envp []string, stdin_path string, stdout_path string, stderr_path string) ?&proc.Process {
 	// Chromium starts every child process by executing /proc/self/exe. The VFS
 	// resolves that to this process's program, but the new process must record
 	// where the program really is: keeping the literal path would make the
 	// child's own /proc/self/exe point back at itself forever.
 	path := fs.resolve_self_reference(_path)
-	prog_node := fs.get_node(dir, path, true)?
+	if execve && path.str != _path.str && !argv.any(it.str == _path.str) {
+		unsafe { _path.free() }
+	}
+	prog_node := fs.get_node(dir, path, true) or {
+		if execve {
+			free_exec_arguments(path, argv, envp)
+		}
+		return none
+	}
 	return start_program_node(execve, dir, prog_node, path, argv, envp, stdin_path,
 		stdout_path, stderr_path)
+}
+
+// Frees what an exec was handed, once it has failed or is about to leave for
+// good. `path` can be one of the arguments too: a script's interpreter and the
+// x86 translator are put into argv as well.
+fn free_exec_arguments(path string, argv []string, envp []string) {
+	path_in_argv := argv.any(it.str == path.str)
+	unsafe {
+		if !path_in_argv {
+			path.free()
+		}
+		argv.free()
+		envp.free()
+	}
+}
+
+// What follows the first `prefix` bytes of an environment entry, as a view
+// into it: nothing to free, and good only for as long as the entry is.
+fn env_value(entry string, prefix int) string {
+	return unsafe { tos(entry.str + prefix, entry.len - prefix) }
+}
+
+// Whether `entry` is `name` followed by `value`, without building that.
+fn env_entry_is(entry string, name string, value string) bool {
+	return entry.len == name.len + value.len && entry.starts_with(name)
+		&& entry.ends_with(value)
 }
 
 // An image the loader turned down is not an executable, as Linux answers:
@@ -1081,13 +1117,28 @@ pub fn start_program_node(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, p
 	// interpreter, the x86 translator -- is not, as OpenBSD does not judge
 	// ld.so.
 	if execve && !fs.policy_check(prog_node, proc.policy_exec) {
+		free_exec_arguments(path, argv, envp)
 		return none
 	}
 	return load_program_node(execve, dir, prog_node, path, argv, envp, stdin_path, stdout_path,
 		stderr_path)
 }
 
+// Frees what an exec was handed when it fails, unless load_program_image()
+// has handed that on to an interpreter or translator's exec, which frees it.
 fn load_program_node(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, path string, argv []string, envp []string, stdin_path string, stdout_path string, stderr_path string) ?&proc.Process {
+	mut handed_on := false
+	process := load_program_image(execve, dir, prog_node, path, argv, envp, stdin_path,
+		stdout_path, stderr_path, mut handed_on) or {
+		if execve && !handed_on {
+			free_exec_arguments(path, argv, envp)
+		}
+		return none
+	}
+	return process
+}
+
+fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, path string, argv []string, envp []string, stdin_path string, stdout_path string, stderr_path string, mut handed_on bool) ?&proc.Process {
 	trace_gpu := execve && path == gpu_desktop_executable
 	gpu_exec_trace(trace_gpu, 'resolved executable path')
 	gpu_exec_trace(trace_gpu, 'opened executable node')
@@ -1095,7 +1146,6 @@ fn load_program_node(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, path s
 	// it -- a container's, after pivot_root.
 	caller := proc.current_thread().process
 	root := fs.process_root(caller)
-	program_path := fs.program_path(prog_node, path)
 	if !stat.isreg(prog_node.resource.stat.mode)
 		|| !fs.check_access(prog_node, fs.access_exec, true) {
 		errno.set(errno.eacces)
@@ -1110,15 +1160,44 @@ fn load_program_node(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, path s
 	gpu_exec_trace(trace_gpu, 'read executable signature')
 	if shebang[0] == char(`#`) && shebang[1] == char(`!`) {
 		real_path, arg := parse_shebang(mut prog)?
-		mut final_argv := [real_path]
+		// Room for the interpreter, its argument and the script. `<<` copies
+		// a string, so the list owns all of its strings.
+		mut final_argv := []string{cap: argv.len + 2} @[freed]
+		final_argv << real_path
 		if arg != '' {
 			final_argv << arg
 		}
 		final_argv << path
-		final_argv << argv[1..]
+		for i := 1; i < argv.len; i++ {
+			final_argv << argv[i]
+		}
+		unsafe {
+			real_path.free()
+			arg.free()
+		}
 
-		return start_program(execve, dir, real_path, final_argv, envp, stdin_path, stdout_path,
-			stderr_path)
+		if execve {
+			// The interpreter's exec frees final_argv and envp; the rest of
+			// what this exec was handed goes now.
+			handed_on = true
+			path_in_argv := argv.any(it.str == path.str)
+			unsafe {
+				if !path_in_argv {
+					path.free()
+				}
+				argv.free()
+			}
+			return start_program(true, dir, final_argv[0], final_argv, envp, stdin_path,
+				stdout_path, stderr_path)
+		}
+		// Starting init, which keeps what it gave.
+		process := start_program(false, dir, final_argv[0], final_argv, envp, stdin_path,
+			stdout_path, stderr_path) or {
+			unsafe { final_argv.free() }
+			return none
+		}
+		unsafe { final_argv.free() }
+		return process
 	}
 
 	// ARM64 cannot enter an x86 ELF directly. Re-exec it through the native
@@ -1137,10 +1216,13 @@ fn load_program_node(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, path s
 			guest_root = '/usr/libexec/vinix-i386/root'
 			root_variable = 'VINIX_I386_ROOT='
 		}
+		// Looked up first: past it nothing can fail, and what this exec was
+		// handed is handed on or freed below.
+		translator_node := fs.get_node(root, translator, true)?
 		// The environment can name another root, the way the shell launchers
 		// let it: Steam runs in a glibc tree whose loader knows where its
 		// libraries are. The default musl roots are told through
-		// LD_LIBRARY_PATH.
+		// LD_LIBRARY_PATH. The values are views into envp's strings.
 		mut own_root := false
 		mut has_library_path := false
 		mut library_path := ''
@@ -1149,21 +1231,25 @@ fn load_program_node(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, path s
 		for environment_entry in envp {
 			if environment_entry.starts_with(root_variable)
 				&& environment_entry.len > root_variable.len {
-				guest_root = environment_entry[root_variable.len..]
+				guest_root = env_value(environment_entry, root_variable.len)
 				own_root = true
 			} else if environment_entry.starts_with('LD_LIBRARY_PATH=') {
 				has_library_path = true
-				library_path = environment_entry['LD_LIBRARY_PATH='.len..]
+				library_path = env_value(environment_entry, 'LD_LIBRARY_PATH='.len)
 			} else if environment_entry.starts_with('VINIX_I386_PRELOAD=') {
-				i386_preload = environment_entry['VINIX_I386_PRELOAD='.len..]
+				i386_preload = env_value(environment_entry, 'VINIX_I386_PRELOAD='.len)
 			} else if environment_entry.starts_with('VINIX_X86_64_PRELOAD=') {
-				x86_64_preload = environment_entry['VINIX_X86_64_PRELOAD='.len..]
+				x86_64_preload = env_value(environment_entry, 'VINIX_X86_64_PRELOAD='.len)
 			}
 		}
 		multiarch_root := own_root && envp.contains('VINIX_X86_MULTIARCH=1')
 		guest_preload := if architecture == elf.arch_i386 { i386_preload } else { x86_64_preload }
 
-		mut translated_argv := [translator]
+		// Room for every option below, then the program's arguments. `<<`
+		// copies a string, and the rest are literals or made here, so both
+		// lists own all of their strings.
+		mut translated_argv := []string{cap: argv.len + 14} @[freed]
+		translated_argv << translator
 		if architecture == elf.arch_x86_64 {
 			translated_argv << '-B'
 			translated_argv << '0x100000000'
@@ -1179,22 +1265,40 @@ fn load_program_node(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, path s
 			if architecture == elf.arch_i386 {
 				multiarch = 'i386-linux-gnu'
 			}
-			mut guest_library_path := '${guest_root}/usr/lib/${multiarch}:${guest_root}/lib/${multiarch}'
+			mut library_text := lib.new_text(256)
+			library_text.add('LD_LIBRARY_PATH=')
+			library_text.add(guest_root)
+			library_text.add('/usr/lib/')
+			library_text.add(multiarch)
+			library_text.add_byte(`:`)
+			library_text.add(guest_root)
+			library_text.add('/lib/')
+			library_text.add(multiarch)
 			if library_path != '' {
-				guest_library_path += ':${library_path}'
+				library_text.add_byte(`:`)
+				library_text.add(library_path)
 			}
 			translated_argv << '-E'
-			translated_argv << 'LD_LIBRARY_PATH=${guest_library_path}'
+			translated_argv << library_text.str()
 			// Mesa opens DRI drivers itself rather than through the ELF loader.
 			// Give the guest the driver directory of its own word size, or an
 			// inherited native path can make it dlopen an AArch64 driver.
+			mut drivers_text := lib.new_text(128)
+			drivers_text.add('LIBGL_DRIVERS_PATH=')
+			drivers_text.add(guest_root)
+			drivers_text.add('/usr/lib/')
+			drivers_text.add(multiarch)
+			drivers_text.add('/dri')
 			translated_argv << '-E'
-			translated_argv << 'LIBGL_DRIVERS_PATH=${guest_root}/usr/lib/${multiarch}/dri'
+			translated_argv << drivers_text.str()
 			if guest_preload != '' {
 				// Each guest preload must match its word size and must never
 				// reach the native translator.
+				mut preload_text := lib.new_text(guest_preload.len + 16)
+				preload_text.add('LD_PRELOAD=')
+				preload_text.add(guest_preload)
 				translated_argv << '-E'
-				translated_argv << 'LD_PRELOAD=${guest_preload}'
+				translated_argv << preload_text.str()
 			}
 		}
 		// argv[0] is the caller's to choose, as it is for a native program:
@@ -1204,11 +1308,11 @@ fn load_program_node(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, path s
 			translated_argv << argv[0]
 		}
 		translated_argv << path
-		if argv.len > 1 {
-			translated_argv << argv[1..]
+		for i := 1; i < argv.len; i++ {
+			translated_argv << argv[i]
 		}
 
-		mut translated_envp := []string{}
+		mut translated_envp := []string{cap: envp.len + 1} @[freed]
 		for environment_entry in envp {
 			if multiarch_root && (environment_entry.starts_with('LD_LIBRARY_PATH=')
 				|| (guest_preload != '' && environment_entry.starts_with('LD_PRELOAD='))) {
@@ -1217,12 +1321,37 @@ fn load_program_node(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, path s
 			translated_envp << environment_entry
 		}
 		if !own_root && !has_library_path {
-			translated_envp << 'LD_LIBRARY_PATH=${guest_root}/lib:${guest_root}/usr/lib'
+			mut library_text := lib.new_text(2 * guest_root.len + 32)
+			library_text.add('LD_LIBRARY_PATH=')
+			library_text.add(guest_root)
+			library_text.add('/lib:')
+			library_text.add(guest_root)
+			library_text.add('/usr/lib')
+			translated_envp << library_text.str()
 		}
 
-		translator_node := fs.get_node(root, translator, true)?
-		return load_program_node(execve, root, translator_node, translator, translated_argv,
-			translated_envp, stdin_path, stdout_path, stderr_path)
+		if execve {
+			// The translator's exec frees both lists. What this exec was
+			// handed goes now, and with envp the views into it.
+			handed_on = true
+			free_exec_arguments(path, argv, envp)
+			return load_program_node(true, root, translator_node, translator, translated_argv,
+				translated_envp, stdin_path, stdout_path, stderr_path)
+		}
+		// Starting init, which keeps what it gave.
+		process := load_program_node(false, root, translator_node, translator, translated_argv,
+			translated_envp, stdin_path, stdout_path, stderr_path) or {
+			unsafe {
+				translated_argv.free()
+				translated_envp.free()
+			}
+			return none
+		}
+		unsafe {
+			translated_argv.free()
+			translated_envp.free()
+		}
+		return process
 	}
 	// QEMU's -E preload belongs to the emulated x86 process. Its children may
 	// exec a native helper (for example Steam's /bin/sh uname wrapper), passing
@@ -1232,26 +1361,32 @@ fn load_program_node(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, path s
 	mut foreign_preload := ''
 	for entry in envp {
 		if entry.starts_with('LD_PRELOAD=') {
-			foreign_preload = entry['LD_PRELOAD='.len..]
+			foreign_preload = env_value(entry, 'LD_PRELOAD='.len)
 			break
 		}
 	}
 	mut omit_foreign_preload := false
 	if foreign_preload != '' {
 		for entry in envp {
-			if entry == 'VINIX_I386_PRELOAD=${foreign_preload}'
-				|| entry == 'VINIX_X86_64_PRELOAD=${foreign_preload}' {
+			if env_entry_is(entry, 'VINIX_I386_PRELOAD=', foreign_preload)
+				|| env_entry_is(entry, 'VINIX_X86_64_PRELOAD=', foreign_preload) {
 				omit_foreign_preload = true
 				break
 			}
 		}
 	}
 	if omit_foreign_preload {
-		program_envp = []string{cap: envp.len}
+		// `<<` copies the strings; this frees them with the list.
+		program_envp = []string{cap: envp.len} @[freed]
 		for entry in envp {
 			if !entry.starts_with('LD_PRELOAD=') {
 				program_envp << entry
 			}
+		}
+	}
+	defer {
+		if omit_foreign_preload {
+			unsafe { program_envp.free() }
 		}
 	}
 
@@ -1310,7 +1445,8 @@ fn load_program_node(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, path s
 		entry_point = voidptr(ld_auxval.at_entry)
 		auxval.at_base = ld_auxval.at_base
 		if trace_gpu {
-			println('exec[gpu]: interpreter entry=0x${u64(entry_point):x} program entry=0x${auxval.at_entry:x}')
+			C.kprintf(c'exec[gpu]: interpreter entry=0x%llx program entry=0x%llx\n', u64(entry_point),
+				u64(auxval.at_entry))
 		}
 
 		unsafe { ld_path.free() }
@@ -1321,7 +1457,7 @@ fn load_program_node(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, path s
 		mut new_process := sched.new_process(unsafe { nil }, new_pagemap)?
 
 		new_process.name = proc.process_name(path, new_process.pid)
-		new_process.executable_path = program_path
+		new_process.executable_path = fs.program_path(prog_node, path)
 		new_process.exe_node = voidptr(prog_node)
 		new_process.allow_wx = allow_wx
 		new_process.sigreturn_page = sigreturn_page
@@ -1364,15 +1500,14 @@ fn load_program_node(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, path s
 
 		sched.new_user_thread(new_process, true, entry_point, unsafe { nil }, 0, argv,
 			program_envp, auxval, true)?
-		if omit_foreign_preload {
-			unsafe { program_envp.free() }
-		}
 
 		return new_process
 	} else {
 		mut t := proc.current_thread()
 		mut curr_process := t.process
 		gpu_exec_trace(trace_gpu, 'beginning process image replacement')
+		// Named before the close-on-exec descriptors go: fexecve() runs one.
+		program_path := fs.program_path(prog_node, path)
 
 		// Every other thread has to be gone before the address space they are
 		// running in is replaced -- and before the close-on-exec descriptors
@@ -1475,7 +1610,8 @@ fn load_program_node(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, path s
 		mut new_thread := sched.new_user_thread(curr_process, true, entry_point, unsafe { nil },
 			0, argv, program_envp, auxval, false)?
 		if trace_gpu {
-			println('exec[gpu]: replacement thread built pc=0x${new_thread.gpr_state.pc:x} sp=0x${new_thread.gpr_state.sp:x} tid=${new_thread.tid}')
+			C.kprintf(c'exec[gpu]: replacement thread built pc=0x%llx sp=0x%llx tid=%lld\n',
+				u64(new_thread.gpr_state.pc), u64(new_thread.gpr_state.sp), i64(new_thread.tid))
 		}
 		proc.set_thread_sched_params(new_thread.tid, inherited_sched)
 		gpu_exec_trace(trace_gpu, 'inherited scheduler parameters')
@@ -1495,20 +1631,12 @@ fn load_program_node(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, path s
 			gpu_exec_trace(trace_gpu, 'ERROR: replacement thread enqueue failed')
 		}
 
-		// execve copied the path from user memory and could not free it, as
-		// this never returns. A script's interpreter and the x86 translator
-		// put the path they were given into argv instead, freed with it.
-		path_in_argv := argv.any(it.str == path.str)
-		unsafe {
-			if !path_in_argv {
-				path.free()
-			}
-			argv.free()
-			envp.free()
-			if omit_foreign_preload {
-				program_envp.free()
-			}
+		// This never returns, so neither the caller nor the defer above frees
+		// what the exec was handed.
+		if omit_foreign_preload {
+			unsafe { program_envp.free() }
 		}
+		free_exec_arguments(path, argv, envp)
 		gpu_exec_trace(trace_gpu, 'retiring original execve thread')
 		if trace_gpu {
 			sched.dequeue_and_die_traced()
@@ -1576,6 +1704,8 @@ pub fn syscall_execveat(_ voidptr, dirfd int, _path charptr, _argv &charptr, _en
 
 	mut direct_node := &fs.VFSNode(unsafe { nil })
 	if path.len == 0 {
+		// The descriptor's name below takes the empty path's place.
+		unsafe { path.free() }
 		if flags & fs.at_empty_path == 0 {
 			return errno.err, errno.enoent
 		}
@@ -1593,9 +1723,15 @@ pub fn syscall_execveat(_ voidptr, dirfd int, _path charptr, _argv &charptr, _en
 		} else {
 			unsafe { &fs.VFSNode(proc.current_directory_of(process)) }
 		}
-		target = '/proc/self/fd/${dirfd}'
+		mut name := lib.new_text(32)
+		name.add('/proc/self/fd/')
+		name.add_decimal(i64(dirfd))
+		target = name.str()
 	} else {
-		directory = fs.parent_dir_for(dirfd, path) or { return errno.err, errno.get() }
+		directory = fs.parent_dir_for(dirfd, path) or {
+			unsafe { path.free() }
+			return errno.err, errno.get()
+		}
 	}
 
 	mut argv := []string{}
@@ -1619,6 +1755,8 @@ pub fn syscall_execveat(_ voidptr, dirfd int, _path charptr, _argv &charptr, _en
 		}
 	}
 
+	// The path and both vectors are the exec's now, freed whether it works or
+	// not.
 	if direct_node != unsafe { nil } {
 		start_program_node(true, directory, direct_node, target, argv, envp, '', '', '') or {
 			return errno.err, errno.get()

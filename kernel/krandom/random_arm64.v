@@ -190,7 +190,7 @@ fn architecture_seed(mut output [64]u8) bool {
 		return false
 	}
 	domain := 'Vinix kernel CSPRNG v1'
-	mut input := []u8{len: domain.len + int(seed.len) + 1}
+	mut input := []u8{len: domain.len + int(seed.len) + 1} @[freed]
 	unsafe {
 		C.memcpy(input.data, domain.str, domain.len)
 		C.memcpy(&input[domain.len], seed.data, seed.len)

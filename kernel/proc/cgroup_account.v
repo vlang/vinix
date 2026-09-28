@@ -15,6 +15,7 @@ module proc
 
 import klock
 import katomic
+import lib
 
 pub const cgroup_default_cpu_period_ns = u64(100000000)
 
@@ -172,7 +173,19 @@ pub fn (mut account CGroupAccount) cpu_stat_text() string {
 	throttled := account.nr_throttled
 	throttled_us := account.throttled_ns / 1000
 	account.lock.release()
-	return 'usage_usec ${usage}\nuser_usec ${usage}\nsystem_usec 0\nnr_periods ${periods}\nnr_throttled ${throttled}\nthrottled_usec ${throttled_us}\n'
+	mut text := lib.new_text(160)
+	text.add('usage_usec ')
+	text.add_unsigned(u64(usage))
+	text.add('\nuser_usec ')
+	text.add_unsigned(u64(usage))
+	text.add('\nsystem_usec 0\nnr_periods ')
+	text.add_unsigned(u64(periods))
+	text.add('\nnr_throttled ')
+	text.add_unsigned(u64(throttled))
+	text.add('\nthrottled_usec ')
+	text.add_unsigned(u64(throttled_us))
+	text.add_byte(`\n`)
+	return text.str()
 }
 
 // Is `process` in `account`, directly or through a group below it?

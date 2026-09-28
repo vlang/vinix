@@ -276,19 +276,19 @@ fn child_matches(current_process &proc.Process, child &proc.Process, pid int) bo
 // Look for a child selected by `pid` that has already exited. A nil child with
 // errno 0 means "nothing ready yet", which only happens under WNOHANG.
 fn take_exited_child(mut current_process proc.Process, pid int, block bool) (&proc.Process, u64) {
-	mut candidates := []&proc.Process{}
-	mut events := []&eventstruct.Event{}
+	// Snapshot the selection: event.await() below can block, which no spinlock
+	// may be held across. Process structs outlive their pid, so the events
+	// stay valid even if another thread reaps one of them meanwhile. Sized
+	// for every child, as a list that grew would lose the buffers it outgrew.
+	current_process.children_lock.acquire()
+	mut candidates := []&proc.Process{cap: current_process.children.len} @[freed]
+	mut events := []&eventstruct.Event{cap: current_process.children.len} @[freed]
 	defer {
 		unsafe {
 			candidates.free()
 			events.free()
 		}
 	}
-
-	// Snapshot the selection: event.await() below can block, which no spinlock
-	// may be held across. Process structs outlive their pid, so the events
-	// stay valid even if another thread reaps one of them meanwhile.
-	current_process.children_lock.acquire()
 	for c in current_process.children {
 		if child_matches(current_process, c, pid) {
 			candidates << c

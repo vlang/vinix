@@ -166,7 +166,7 @@ pub fn syscall_setresuid(_ voidptr, ruid u32, euid u32, suid u32) (u64, u64) {
 	old_ruid, old_euid, old_suid := process.uid, process.euid, process.suid
 
 	if !may_set_uids(process) {
-		for wanted in [ruid, euid, suid] {
+		for wanted in [ruid, euid, suid]! {
 			if unchanged(wanted) {
 				continue
 			}
@@ -194,7 +194,7 @@ pub fn syscall_setresgid(_ voidptr, rgid u32, egid u32, sgid u32) (u64, u64) {
 	mut process := current_process()
 
 	if !may_set_gids(process) {
-		for wanted in [rgid, egid, sgid] {
+		for wanted in [rgid, egid, sgid]! {
 			if unchanged(wanted) {
 				continue
 			}
@@ -283,7 +283,9 @@ pub fn syscall_setgroups(_ voidptr, size int, list u64) (u64, u64) {
 		return errno.err, errno.eperm
 	}
 
-	mut incoming := []u32{len: size}
+	// The process' groups from here, freed when they are replaced and when it
+	// is reaped (proc.free_process_memory).
+	mut incoming := []u32{len: size} @[freed]
 	if size > 0 {
 		if list == 0 {
 			unsafe { incoming.free() }

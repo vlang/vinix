@@ -36,7 +36,7 @@ pub fn pit_initialise() {
 
 	vect := idt.allocate_vector()
 
-	print('timer: PIT vector is 0x${vect:x}\n')
+	C.kprintf(c'timer: PIT vector is 0x%llx\n', u64(vect))
 
 	interrupt_table[vect] = voidptr(pit_handler)
 

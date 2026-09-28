@@ -53,7 +53,8 @@ pub fn mappings(_pagemap &memory.Pagemap, count_pages bool) ?[]MappingInfo {
 		pagemap.l.release()
 	}
 
-	mut list := []MappingInfo{cap: pagemap.mmap_ranges.len}
+	// The caller frees it with release_mappings().
+	mut list := []MappingInfo{cap: pagemap.mmap_ranges.len} @[freed]
 	for ptr in pagemap.mmap_ranges {
 		local_range := unsafe { &MmapRangeLocal(ptr) }
 		if unsafe { local_range == nil } {

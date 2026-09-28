@@ -63,9 +63,13 @@ pub fn unveil_parse(text string) ?u8 {
 	return perms
 }
 
+// A set's entries are freed with it, in unveil_release(). Nothing slices them,
+// so an entries array that grows gives its old buffer back.
 fn new_unveil_set() &UnveilSet {
+	mut entries := []UnveilEntry{cap: 8} @[freed]
+	entries.flags |= .noslices
 	return &UnveilSet{
-		entries: []UnveilEntry{cap: 8}
+		entries: entries
 	}
 }
 
@@ -242,8 +246,10 @@ pub fn unveil_copy(set &UnveilSet) &UnveilSet {
 	defer {
 		source.l.release()
 	}
+	mut entries := []UnveilEntry{cap: source.entries.len} @[freed]
+	entries.flags |= .noslices
 	mut copy := &UnveilSet{
-		entries: []UnveilEntry{cap: source.entries.len}
+		entries: entries
 		locked:  source.locked
 	}
 	for entry in source.entries {

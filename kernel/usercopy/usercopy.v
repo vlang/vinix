@@ -107,7 +107,7 @@ pub fn copy_cstring_from_user(address u64, max_bytes int) ?string {
 		errno.set(errno.efault)
 		return none
 	}
-	mut bytes := []u8{len: max_bytes}
+	mut bytes := []u8{len: max_bytes} @[freed]
 	defer {
 		unsafe { bytes.free() }
 	}

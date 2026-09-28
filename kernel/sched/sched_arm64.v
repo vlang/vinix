@@ -142,10 +142,13 @@ fn scheduler_gpu_context_trace(gpr_state voidptr, phase u64) {
 		0 { println('exec[gpu]/switch: entered sched_switch_context assembly') }
 		1 { println('exec[gpu]/switch: ELR and SPSR programmed') }
 		2 {
-			println('exec[gpu]/switch: eret readback ELR=0x${cpu.read_elr_el1():x} SPSR=0x${cpu.read_spsr_el1():x} CurrentEL=0x${cpu.read_currentel():x}')
-			println('exec[gpu]/switch: saved target pc=0x${state.pc:x} sp=0x${state.sp:x} pstate=0x${state.pstate:x} tls=0x${state.tpidr_el0:x}')
+			C.kprintf(c'exec[gpu]/switch: eret readback ELR=0x%llx SPSR=0x%llx CurrentEL=0x%llx\n',
+				u64(cpu.read_elr_el1()), u64(cpu.read_spsr_el1()), u64(cpu.read_currentel()))
+			C.kprintf(c'exec[gpu]/switch: saved target pc=0x%llx sp=0x%llx pstate=0x%llx tls=0x%llx\n',
+				u64(state.pc), u64(state.sp), u64(state.pstate), u64(state.tpidr_el0))
 			deferred_slice := katomic.load(&gpu_exec_deferred_timeslice)
-			println('exec[gpu]/switch: target stack and TPIDR ready; deferring ${deferred_slice} us timeslice until first lower-EL return')
+			C.kprintf(c'exec[gpu]/switch: target stack and TPIDR ready; deferring %llu us timeslice until first lower-EL return\n',
+				u64(deferred_slice))
 			// The new ELF entry point is demand-paged. Enter EL0 with the timer
 			// stopped, resolve that first exception as one transaction, then arm a
 			// fresh slice from scheduler_gpu_sync_exit_trace().
@@ -154,7 +157,7 @@ fn scheduler_gpu_context_trace(gpr_state voidptr, phase u64) {
 			// M1 distinguish an eret which never completes from an immediate
 			// instruction abort, interrupt, FIQ, or SError.
 		}
-		else { println('exec[gpu]/switch: unknown assembly phase ${phase}') }
+		else { C.kprintf(c'exec[gpu]/switch: unknown assembly phase %llu\n', u64(phase)) }
 	}
 }
 
@@ -207,9 +210,12 @@ fn scheduler_gpu_lower_exception_trace(esr u64, far u64, raw_state voidptr, kind
 		3 { 'SError' }
 		else { 'unknown' }
 	}
-	println('exec[gpu]/eret: crossed into EL0; first lower-EL ${name} vector entered on CPU ${cpu_number}')
-	println('exec[gpu]/eret: ESR=0x${esr:x} EC=0x${esr >> 26:x} FAR=0x${far:x}')
-	println('exec[gpu]/eret: exception frame pc=0x${state.pc:x} sp=0x${state.sp:x} pstate=0x${state.pstate:x} x0=0x${state.x0:x} x8=0x${state.x8:x}')
+	C.kprintf(c'exec[gpu]/eret: crossed into EL0; first lower-EL %.*s vector entered on CPU %llu\n',
+		i32(name.len), name.str, u64(cpu_number))
+	C.kprintf(c'exec[gpu]/eret: ESR=0x%llx EC=0x%llx FAR=0x%llx\n', u64(esr), u64(esr >> 26),
+		u64(far))
+	C.kprintf(c'exec[gpu]/eret: exception frame pc=0x%llx sp=0x%llx pstate=0x%llx x0=0x%llx x8=0x%llx\n',
+		u64(state.pc), u64(state.sp), u64(state.pstate), u64(state.x0), u64(state.x8))
 }
 
 // Finish the first synchronous exception after its handler and signal work
@@ -226,7 +232,8 @@ fn scheduler_gpu_sync_exit_trace(raw_state voidptr) {
 
 	deferred_slice := katomic.load(&gpu_exec_deferred_timeslice)
 	timer.stop()
-	println('exec[gpu]/eret: first lower-EL synchronous exception completed; arming deferred ${deferred_slice} us timeslice')
+	C.kprintf(c'exec[gpu]/eret: first lower-EL synchronous exception completed; arming deferred %llu us timeslice\n',
+		u64(deferred_slice))
 	clear_gpu_exec_sync_trace()
 	katomic.store(mut &gpu_exec_deferred_timeslice, u64(0))
 	if deferred_slice != 0 {
@@ -248,14 +255,22 @@ pub fn scheduler_gpu_interrupt_trace(raw_state voidptr, phase u64) {
 
 	kind := if katomic.load(&gpu_exec_interrupt_kind) == 2 { 'FIQ' } else { 'IRQ' }
 	match phase {
-		0 { println('exec[gpu]/${kind}: entering common interrupt dispatcher') }
-		1 { println('exec[gpu]/${kind}: common interrupt dispatcher returned; running exit barrier') }
+		0 {
+			C.kprintf(c'exec[gpu]/%.*s: entering common interrupt dispatcher\n', i32(kind.len),
+				kind.str)
+		}
+		1 {
+			C.kprintf(c'exec[gpu]/%.*s: common interrupt dispatcher returned; running exit barrier\n',
+				i32(kind.len), kind.str)
+		}
 		2 {
 			deferred_slice := katomic.load(&gpu_exec_deferred_timeslice)
 			if deferred_slice != 0 {
-				println('exec[gpu]/${kind}: exit barrier complete; arming deferred ${deferred_slice} us timeslice and restoring EL0')
+				C.kprintf(c'exec[gpu]/%.*s: exit barrier complete; arming deferred %llu us timeslice and restoring EL0\n',
+					i32(kind.len), kind.str, u64(deferred_slice))
 			} else {
-				println('exec[gpu]/${kind}: exit barrier complete; restoring saved EL0 frame')
+				C.kprintf(c'exec[gpu]/%.*s: exit barrier complete; restoring saved EL0 frame\n',
+					i32(kind.len), kind.str)
 			}
 			clear_gpu_exec_interrupt_trace()
 			katomic.store(mut &gpu_exec_deferred_timeslice, u64(0))
@@ -263,7 +278,10 @@ pub fn scheduler_gpu_interrupt_trace(raw_state voidptr, phase u64) {
 				timer.oneshot(deferred_slice)
 			}
 		}
-		else { println('exec[gpu]/${kind}: unknown vector phase ${phase}') }
+		else {
+			C.kprintf(c'exec[gpu]/%.*s: unknown vector phase %llu\n', i32(kind.len), kind.str,
+				u64(phase))
+		}
 	}
 }
 
@@ -277,11 +295,17 @@ pub fn gpu_exec_fiq_trace(phase u64, cntv_ctl u64) {
 	}
 	match phase {
 		0 { println('exec[gpu]/FIQ: platform FIQ callback entered') }
-		1 { println('exec[gpu]/FIQ: CNTV_CTL=0x${cntv_ctl:x} pending=${cntv_ctl & 4 != 0}') }
+		1 {
+			pending := if cntv_ctl & 4 != 0 { c'true' } else { c'false' }
+			C.kprintf(c'exec[gpu]/FIQ: CNTV_CTL=0x%llx pending=%s\n', u64(cntv_ctl), pending)
+		}
 		2 { println('exec[gpu]/FIQ: virtual timer pending; entering scheduler timer handler') }
-		3 { println('exec[gpu]/FIQ: scheduler timer handler returned; CNTV_CTL=0x${cntv_ctl:x}') }
+		3 {
+			C.kprintf(c'exec[gpu]/FIQ: scheduler timer handler returned; CNTV_CTL=0x%llx\n',
+				u64(cntv_ctl))
+		}
 		4 { println('exec[gpu]/FIQ: virtual timer not pending; continuing with AIC event drain') }
-		else { println('exec[gpu]/FIQ: unknown callback phase ${phase}') }
+		else { C.kprintf(c'exec[gpu]/FIQ: unknown callback phase %llu\n', u64(phase)) }
 	}
 }
 
@@ -881,7 +905,8 @@ fn scheduler_timer_handler(_gpr_state voidptr) {
 	trace_gpu_interrupt := gpu_exec_interrupt_trace_active(dispatch_cpu)
 	trace_gpu_dispatch := trace_gpu_switch || trace_gpu_interrupt
 	if trace_gpu_dispatch {
-		println('exec[gpu]/sched: immediate scheduler handler entered on CPU ${dispatch_cpu}')
+		C.kprintf(c'exec[gpu]/sched: immediate scheduler handler entered on CPU %llu\n',
+			u64(dispatch_cpu))
 	}
 	// The timer interrupt delivers this handler with interrupts already off,
 	// but yield()'s polling loop also calls it directly through
@@ -920,7 +945,7 @@ fn scheduler_timer_handler(_gpr_state voidptr) {
 	now_ns := timer.get_ns()
 	time.advance_to_ns(now_ns)
 	if trace_gpu_dispatch {
-		println('exec[gpu]/sched: scheduler clock advanced to ${now_ns} ns')
+		C.kprintf(c'exec[gpu]/sched: scheduler clock advanced to %llu ns\n', u64(now_ns))
 	}
 
 	// Tick per-process interval timers (SIGALRM)
@@ -979,8 +1004,10 @@ fn scheduler_timer_handler(_gpr_state voidptr) {
 	trace_gpu_next := unsafe { next_thread != nil }
 		&& katomic.load(&gpu_exec_switch_state) == u64(&next_thread.gpr_state)
 	if trace_gpu_next {
-		println('exec[gpu]/sched: CPU ${cpu_local.cpu_number} selected replacement thread from run queue')
-		println('exec[gpu]/sched: target pc=0x${next_thread.gpr_state.pc:x} sp=0x${next_thread.gpr_state.sp:x} ttbr0=0x${next_thread.ttbr0:x}')
+		C.kprintf(c'exec[gpu]/sched: CPU %llu selected replacement thread from run queue\n',
+			u64(cpu_local.cpu_number))
+		C.kprintf(c'exec[gpu]/sched: target pc=0x%llx sp=0x%llx ttbr0=0x%llx\n', u64(next_thread.gpr_state.pc),
+			u64(next_thread.gpr_state.sp), u64(next_thread.ttbr0))
 		next_thread.affinity_mask = u64(-1)
 		println('exec[gpu]/sched: first-handoff CPU pin removed')
 	}
@@ -1019,7 +1046,8 @@ fn scheduler_timer_handler(_gpr_state voidptr) {
 			current_thread.yield_requested = false
 			next_slice := effective_timeslice(current_thread)
 			if trace_gpu_interrupt {
-				println('exec[gpu]/sched: current thread keeps CPU; deferring ${next_slice} us timer rearm until vector exit')
+				C.kprintf(c'exec[gpu]/sched: current thread keeps CPU; deferring %llu us timer rearm until vector exit\n',
+					u64(next_slice))
 				katomic.store(mut &gpu_exec_deferred_timeslice, next_slice)
 			} else {
 				timer.oneshot(next_slice)
@@ -1037,12 +1065,15 @@ fn scheduler_timer_handler(_gpr_state voidptr) {
 			}
 			// Debug: check if x30 is corrupted when saving state for pid 3
 			if current_thread.process.pid == 3 && current_thread.gpr_state.x30 == u64(0x220000) {
-				print('\nSCHED SAVE: pid=3 x30=0x220000! pc=0x${current_thread.gpr_state.pc:x} sp=0x${current_thread.gpr_state.sp:x} pstate=0x${current_thread.gpr_state.pstate:x}\n')
+				C.kprintf(c'\nSCHED SAVE: pid=3 x30=0x220000! pc=0x%llx sp=0x%llx pstate=0x%llx\n',
+					u64(current_thread.gpr_state.pc), u64(current_thread.gpr_state.sp),
+					u64(current_thread.gpr_state.pstate))
 			}
 		} else {
 			// gpr_state is nil: check if existing gpr_state has corruption
 			if current_thread.process.pid == 3 && current_thread.gpr_state.x30 == u64(0x220000) {
-				print('\nSCHED NIL-SAVE: pid=3 x30=0x220000! pc=0x${current_thread.gpr_state.pc:x} sp=0x${current_thread.gpr_state.sp:x}\n')
+				C.kprintf(c'\nSCHED NIL-SAVE: pid=3 x30=0x220000! pc=0x%llx sp=0x%llx\n',
+					u64(current_thread.gpr_state.pc), u64(current_thread.gpr_state.sp))
 			}
 		}
 		current_thread.tpidr_el0 = cpu.read_tpidr_el0()
@@ -1116,7 +1147,7 @@ fn scheduler_timer_handler(_gpr_state voidptr) {
 
 	old_ttbr0 := cpu.read_ttbr0_el1()
 	if trace_gpu_restore {
-		println('exec[gpu]/sched: current TTBR0=0x${old_ttbr0:x}')
+		C.kprintf(c'exec[gpu]/sched: current TTBR0=0x%llx\n', u64(old_ttbr0))
 	}
 	if old_ttbr0 != current_thread.ttbr0 {
 		if trace_gpu_restore {
@@ -1152,13 +1183,15 @@ fn scheduler_timer_handler(_gpr_state voidptr) {
 
 	// Debug: check if x30 is corrupted when restoring state for pid 3
 	if current_thread.process.pid == 3 && current_thread.gpr_state.x30 == u64(0x220000) {
-		print('\nSCHED RESTORE: pid=3 x30=0x220000! pc=0x${current_thread.gpr_state.pc:x} sp=0x${current_thread.gpr_state.sp:x} pstate=0x${current_thread.gpr_state.pstate:x}\n')
+		C.kprintf(c'\nSCHED RESTORE: pid=3 x30=0x220000! pc=0x%llx sp=0x%llx pstate=0x%llx\n',
+			u64(current_thread.gpr_state.pc), u64(current_thread.gpr_state.sp), u64(current_thread.gpr_state.pstate))
 	}
 
 	next_slice := effective_timeslice(current_thread)
 	if trace_gpu_next {
 		katomic.store(mut &gpu_exec_deferred_timeslice, next_slice)
-		println('exec[gpu]/sched: deferring ${next_slice} us timeslice until final low-level checkpoint')
+		C.kprintf(c'exec[gpu]/sched: deferring %llu us timeslice until final low-level checkpoint\n',
+			u64(next_slice))
 	} else {
 		timer.oneshot(next_slice)
 		if trace_gpu_restore {
@@ -1193,7 +1226,7 @@ fn enqueue_thread_impl(_thread &proc.Thread, by_signal bool, trace bool) bool {
 		}
 		katomic.store(mut &gpu_exec_switch_cpu, first_cpu)
 		katomic.store(mut &gpu_exec_switch_state, u64(&t.gpr_state))
-		println('exec[gpu]/sched: armed first-context-switch tracing on CPU ${first_cpu}')
+		C.kprintf(c'exec[gpu]/sched: armed first-context-switch tracing on CPU %llu\n', u64(first_cpu))
 	}
 
 	// A signal can arrive while the target is running immediately before it
@@ -1244,7 +1277,8 @@ fn enqueue_thread_impl(_thread &proc.Thread, by_signal bool, trace bool) bool {
 
 			scheduler_queue_lock.release()
 			if trace {
-				println('exec[gpu]/sched: run-queue lock acquired; installed thread in slot ${i}')
+				C.kprintf(c'exec[gpu]/sched: run-queue lock acquired; installed thread in slot %lld\n',
+					i64(i))
 				println('exec[gpu]/sched: deferred wakeup for same-CPU exec handoff')
 				println('exec[gpu]/sched: enqueue complete; run-queue lock released')
 			}
@@ -1724,9 +1758,11 @@ pub fn syscall_new_thread(_ voidptr, pc voidptr, stack u64) (u64, u64) {
 	return u64(new_thread.tid), 0
 }
 
-// Read back what was written to a new stack, through the direct map.
+// Read back what was written to a new stack, through the direct map. Kept as
+// the process' saved_auxv, which is freed when it is replaced and when the
+// process is (proc.free_process_memory).
 fn read_initial_stack(pagemap &memory.Pagemap, addr u64, length u64) []u8 {
-	mut bytes := []u8{len: int(length)}
+	mut bytes := []u8{len: int(length)} @[freed]
 	mut done := u64(0)
 	for done < length {
 		virt := addr + done
@@ -1830,7 +1866,8 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 		process.thread_stack_top -= page_size
 
 		if trace_gpu_exec {
-			println('exec[gpu]/thread: mapping user stack at 0x${stack_bottom_vma:x} len=0x${user_stack_size:x}')
+			C.kprintf(c'exec[gpu]/thread: mapping user stack at 0x%llx len=0x%llx\n', u64(stack_bottom_vma),
+				u64(user_stack_size))
 		}
 		mmap.mmap(process.pagemap, voidptr(stack_bottom_vma), user_stack_size,
 			mmap.prot_read | mmap.prot_write, mmap.map_private | mmap.map_anonymous | mmap.map_fixed,
@@ -1861,13 +1898,13 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 	stacks << kernel_stack_phys
 	kernel_stack := u64(kernel_stack_phys) + kernel_stack_size + higher_half
 	if trace_gpu_exec {
-		println('exec[gpu]/thread: kernel stack allocated at 0x${u64(kernel_stack_phys):x}')
+		C.kprintf(c'exec[gpu]/thread: kernel stack allocated at 0x%llx\n', u64(kernel_stack_phys))
 		println('exec[gpu]/thread: allocating FPU storage')
 	}
 
 	fpu_storage_phys := memory.pmm_alloc(lib.div_roundup(fpu_storage_size, page_size))
 	if trace_gpu_exec {
-		println('exec[gpu]/thread: FPU storage allocated at 0x${u64(fpu_storage_phys):x}')
+		C.kprintf(c'exec[gpu]/thread: FPU storage allocated at 0x%llx\n', u64(fpu_storage_phys))
 	}
 
 	gpr_state := cpulocal.GPRState{
@@ -1890,7 +1927,8 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 		fpu_storage_phys: u64(fpu_storage_phys)
 	}
 	if trace_gpu_exec {
-		println('exec[gpu]/thread: thread object initialized pc=0x${t.gpr_state.pc:x} sp=0x${t.gpr_state.sp:x}')
+		C.kprintf(c'exec[gpu]/thread: thread object initialized pc=0x%llx sp=0x%llx\n', u64(t.gpr_state.pc),
+			u64(t.gpr_state.sp))
 	}
 
 	t.self = voidptr(t)
@@ -1921,15 +1959,17 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 		// the other order that came out negative, a huge size unsigned, and
 		// setting process.title cleared memory up past the top of the stack.
 		mut cursor := stack_vma
-		mut env_strings := []u64{len: envp.len}
-		mut arg_strings := []u64{len: argv.len}
+		mut env_strings := []u64{len: envp.len} @[freed]
+		mut arg_strings := []u64{len: argv.len} @[freed]
+		defer {
+			unsafe {
+				env_strings.free()
+				arg_strings.free()
+			}
+		}
 		for i := envp.len - 1; i >= 0; i-- {
 			if !push_initial_bytes(process.pagemap, stack_bottom_vma, mut cursor,
 				voidptr(envp[i].str), u64(envp[i].len) + 1) {
-				unsafe {
-					env_strings.free()
-					arg_strings.free()
-				}
 				errno.set(errno.e2big)
 				return none
 			}
@@ -1938,10 +1978,6 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 		for i := argv.len - 1; i >= 0; i-- {
 			if !push_initial_bytes(process.pagemap, stack_bottom_vma, mut cursor,
 				voidptr(argv[i].str), u64(argv[i].len) + 1) {
-				unsafe {
-					env_strings.free()
-					arg_strings.free()
-				}
 				errno.set(errno.e2big)
 				return none
 			}
@@ -2021,17 +2057,13 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 				return none
 			}
 		}
-		unsafe {
-			env_strings.free()
-			arg_strings.free()
-		}
 		if !push_initial_word(process.pagemap, stack_bottom_vma, mut cursor, u64(argv.len)) {
 			errno.set(errno.e2big)
 			return none
 		}
 		t.gpr_state.sp = cursor
 		if trace_gpu_exec {
-			println('exec[gpu]/thread: initial ELF stack complete sp=0x${t.gpr_state.sp:x}')
+			C.kprintf(c'exec[gpu]/thread: initial ELF stack complete sp=0x%llx\n', u64(t.gpr_state.sp))
 		}
 	}
 
@@ -2040,7 +2072,7 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 	}
 	attach_thread(mut process, mut t)?
 	if trace_gpu_exec {
-		println('exec[gpu]/thread: replacement thread attached tid=${t.tid}')
+		C.kprintf(c'exec[gpu]/thread: replacement thread attached tid=%lld\n', i64(t.tid))
 	}
 
 	if autoenqueue == true {
@@ -2153,12 +2185,20 @@ pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) ?&proc.Pr
 		errno.set(errno.eagain)
 		return none
 	}
+	// Freed when the process is reaped, in proc.free_pid().
+	fds := []voidptr{len: proc.initial_fds} @[freed]
 	mut new_proc := &proc.Process{
 		pagemap: unsafe { nil }
-		fds:     []voidptr{len: proc.initial_fds}
+		fds:     fds
 	}
 
-	new_proc.pid = proc.allocate_pid(new_proc) or { return none }
+	new_proc.pid = proc.allocate_pid(new_proc) or {
+		unsafe {
+			new_proc.fds.free()
+			free(new_proc)
+		}
+		return none
+	}
 
 	if unsafe { old_process != 0 } {
 		new_proc.ppid = old_process.pid
@@ -2234,7 +2274,8 @@ fn await_impl(trace_gpu_handoff bool) {
 	cpu.write_cntv_tval_el0(ticks)
 	cpu.write_cntv_ctl_el0(1)
 	if trace_gpu_handoff {
-		println('exec[gpu]/sched: idle timer programmed for ${ticks} ticks; disabling interrupts')
+		C.kprintf(c'exec[gpu]/sched: idle timer programmed for %llu ticks; disabling interrupts\n',
+			u64(ticks))
 	}
 
 	// Polling idle loop used on both QEMU/HVF and early Apple bring-up.
@@ -2251,7 +2292,7 @@ fn await_impl(trace_gpu_handoff bool) {
 	for {
 		vctl := cpu.read_cntv_ctl_el0()
 		if trace_gpu_handoff && first_poll {
-			println('exec[gpu]/sched: first idle timer status=0x${vctl:x}')
+			C.kprintf(c'exec[gpu]/sched: first idle timer status=0x%llx\n', u64(vctl))
 			first_poll = false
 		}
 		if vctl & 0x4 != 0 {

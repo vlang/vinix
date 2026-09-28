@@ -136,11 +136,7 @@ pub fn wait(virt u64, expected int) (u64, u64) {
 		return errno.err, errno.eagain
 	}
 
-	mut events := [e]
-	defer {
-		unsafe { events.free() }
-	}
-	event.await_from_generation(mut events, true, 0, generation) or {
+	event.await_one_from_generation(mut e, true, generation) or {
 		return errno.err, errno.eintr
 	}
 
@@ -175,10 +171,8 @@ pub fn wait_timeout(virt u64, expected int, duration time.TimeSpec) (u64, u64) {
 		unsafe { free(timer) }
 	}
 
-	mut events := [e, &timer.event]
-	defer {
-		unsafe { events.free() }
-	}
+	mut storage := [e, &timer.event]!
+	mut events := unsafe { event.stack_list(&storage[0], storage.len) }
 	which := event.await_from_generation(mut events, true, 0, generation) or {
 		return errno.err, errno.eintr
 	}

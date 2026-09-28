@@ -57,7 +57,7 @@ fn poll_devices() {
 
 pub fn initialise() {
 	scheduler_vector = idt.allocate_vector()
-	println('sched: Scheduler interrupt vector is 0x${scheduler_vector:x}')
+	C.kprintf(c'sched: Scheduler interrupt vector is 0x%llx\n', u64(scheduler_vector))
 
 	interrupt_table[scheduler_vector] = voidptr(scheduler_isr)
 	idt.set_ist(scheduler_vector, 1)
@@ -902,12 +902,20 @@ pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) ?&proc.Pr
 		errno.set(errno.eagain)
 		return none
 	}
+	// Freed when the process is reaped, in proc.free_pid().
+	fds := []voidptr{len: proc.initial_fds} @[freed]
 	mut new_proc := &proc.Process{
 		pagemap: unsafe { nil }
-		fds:     []voidptr{len: proc.initial_fds}
+		fds:     fds
 	}
 
-	new_proc.pid = proc.allocate_pid(new_proc) or { return none }
+	new_proc.pid = proc.allocate_pid(new_proc) or {
+		unsafe {
+			new_proc.fds.free()
+			free(new_proc)
+		}
+		return none
+	}
 
 	if unsafe { old_process != 0 } {
 		new_proc.ppid = old_process.pid

@@ -49,6 +49,8 @@ mut:
 	// Raised each time a signal makes it readable, so that a look at what is
 	// pending that raced with one does not clear what it set.
 	notifications u64
+	// The interface box its descriptor holds, freed with it.
+	box &resource.Resource = unsafe { nil }
 }
 
 __global (
@@ -187,10 +189,8 @@ fn (mut this SignalFD) wait(_handle voidptr) bool {
 	if handle != unsafe { nil } {
 		handle.l.release()
 	}
-	mut events := [&this.event]
 	mut woken := true
-	event.await(mut events, true) or { woken = false }
-	unsafe { events.free() }
+	event.await_one(mut this.event, true) or { woken = false }
 	if handle != unsafe { nil } {
 		handle.l.acquire()
 	}
@@ -272,7 +272,10 @@ fn (mut this SignalFD) unref(_handle voidptr) ? {
 		}
 	}
 	signalfds_lock.release()
-	unsafe { free(voidptr(this)) }
+	unsafe {
+		free(voidptr(this.box))
+		free(voidptr(this))
+	}
 }
 
 fn (mut this SignalFD) link(_handle voidptr) ? {
@@ -340,7 +343,8 @@ fn signalfd_set(fdnum int, mask u64, flags int) (u64, u64) {
 	signalfds << sfd
 	katomic.inc(mut &signalfds_count)
 	signalfds_lock.release()
-	mut res := &resource.Resource(unsafe { sfd })
+	sfd.box = &resource.Resource(unsafe { sfd }) @[freed]
+	mut res := sfd.box
 	newfd := file.fdnum_create_from_resource(unsafe { nil }, mut res, flags | resource.o_rdwr,
 		0, false) or { return errno.err, errno.get() }
 	// Signals it reads may be pending already.

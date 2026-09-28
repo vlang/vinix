@@ -562,8 +562,8 @@ pub fn vmm_init() {
 	if kaddr_req.response == unsafe { nil } {
 		panic('Kernel address bootloader response missing')
 	}
-	print('vmm: Kernel physical base: 0x${kaddr_req.response.physical_base:x}\n')
-	print('vmm: Kernel virtual base: 0x${kaddr_req.response.virtual_base:x}\n')
+	C.kprintf(c'vmm: Kernel physical base: 0x%llx\n', u64(kaddr_req.response.physical_base))
+	C.kprintf(c'vmm: Kernel virtual base: 0x%llx\n', u64(kaddr_req.response.virtual_base))
 	virtual_base := kaddr_req.response.virtual_base
 	physical_base := kaddr_req.response.physical_base
 
@@ -613,7 +613,7 @@ pub fn vmm_init() {
 			panic('vmm init failure')
 		}
 	}
-	print('vmm: HHDM 0-4GiB mapped (${low_device_pages} device pages)\n')
+	C.kprintf(c'vmm: HHDM 0-4GiB mapped (%llu device pages)\n', u64(low_device_pages))
 
 	// Map remaining physical memory. On Apple Silicon this is the whole of RAM,
 	// which sits above 4 GiB, so this loop (barely exercised by QEMU, whose RAM
@@ -636,7 +636,7 @@ pub fn vmm_init() {
 			high_pages++
 		}
 	}
-	print('vmm: high RAM mapped (${high_pages} pages above 4GiB)\n')
+	C.kprintf(c'vmm: high RAM mapped (%llu pages above 4GiB)\n', u64(high_pages))
 
 	// Every page the PMM has consumed or may hand out must be reachable
 	// through the higher half once these tables are live, or the first
@@ -650,7 +650,7 @@ pub fn vmm_init() {
 			}
 		}
 	}
-	print('vmm: pmm bitmap 0x${pmm_bitmap_phys:x} +0x${pmm_bitmap_size:x} mapped\n')
+	C.kprintf(c'vmm: pmm bitmap 0x%llx +0x%llx mapped\n', u64(pmm_bitmap_phys), u64(pmm_bitmap_size))
 
 	// Remap framebuffer regions as Non-Cacheable.
 	// Normal Write-Back Cacheable (the default) causes writes to stay in CPU cache,
@@ -681,7 +681,8 @@ pub fn vmm_init() {
 			}
 		}
 	}
-	print('vmm: framebuffer 0x${vmm_framebuffer_base:x} +0x${vmm_framebuffer_len:x} mapped (memmap FB entries: ${fb_entries}, HHDM 0x${higher_half:x})\n')
+	C.kprintf(c'vmm: framebuffer 0x%llx +0x%llx mapped (memmap FB entries: %llu, HHDM 0x%llx)\n',
+		u64(vmm_framebuffer_base), u64(vmm_framebuffer_len), u64(fb_entries), u64(higher_half))
 
 	// Activate the kernel page tables. This is a live switch: the MMU is already
 	// on (Limine handed off with it enabled), so the running instruction stream,

@@ -181,9 +181,11 @@ fn syscall_linux_rt_sigprocmask(gpr_state voidptr, how int, set_ptr u64, oldset_
 		}
 		// SIGKILL and SIGSTOP cannot be blocked; Linux drops them silently.
 		set = userland.linux_mask_to_vinix(set) & ~((u64(1) << 9) | (u64(1) << 19))
-		set_arg = &set
+		set_arg = unsafe { &set }
 	}
-	ret, err := userland.syscall_sigprocmask(gpr_state, native_how, set_arg, &oldset)
+	// unsafe: a plain `&set` or `&oldset` made V copy the local to the heap at
+	// every call, and nothing freed it.
+	ret, err := userland.syscall_sigprocmask(gpr_state, native_how, set_arg, unsafe { &oldset })
 	if err != 0 {
 		return ret, err
 	}
@@ -237,7 +239,7 @@ fn syscall_linux_getdents64(gpr_state voidptr, fdnum int, dirp u64, count u64) (
 			fs.readdir_unread(fdnum)
 			break
 		}
-		mut record := []u8{len: int(reclen)}
+		mut record := []u8{len: int(reclen)} @[freed]
 		unsafe {
 			*&u64(&record[0]) = dirent.ino
 			*&u64(&record[8]) = dirent.off

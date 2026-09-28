@@ -331,7 +331,8 @@ pub fn pid_seen_by_caller(global int) int {
 // The numbers `viewer` gives the threads with kernel ids `tids`, 0 for any it
 // cannot see or that has gone.
 pub fn thread_numbers(tids []int, viewer &Namespace) []int {
-	mut numbers := []int{len: tids.len}
+	// The caller frees it.
+	mut numbers := []int{len: tids.len} @[freed]
 	pid_lock.acquire()
 	defer {
 		pid_lock.release()

@@ -538,7 +538,9 @@ pub fn free_pid(pid int) {
 // and exec.
 pub fn process_name(name string, pid int) string {
 	pid_text := pid.str()
-	result := '${name}[${pid_text}]'
+	// Owned by the process it names, and freed when that is renamed by an
+	// exec or freed itself (free_process_memory).
+	result := '${name}[${pid_text}]' @[freed]
 	unsafe { pid_text.free() }
 	return result
 }
@@ -1169,18 +1171,25 @@ pub fn dump_tasks() {
 		if process == unsafe { nil } {
 			continue
 		}
-		state := if process.exiting { 'Z' } else { 'R' }
+		state := if process.exiting { c'Z' } else { c'R' }
+		start, end := command_name_bounds(process.name)
+		command := unsafe { process.name.str + start }
 		// The list is only safe to walk under its lock: a thread leaving takes
 		// itself out and can be freed right after. Taken without blocking, for
 		// the same reason as in the tid listing above.
 		mut owner := unsafe { process }
 		if !owner.threads_lock.test_and_acquire() {
-			print('sysrq: pid=${pid} ppid=${process.ppid} ${state} ${command_name(process.name)} (thread list busy)\n')
+			C.kprintf(c'sysrq: pid=%lld ppid=%lld %s %.*s (thread list busy)\n', i64(pid),
+				i64(process.ppid), state, i32(end - start), command)
 			continue
 		}
 		for t in process.threads {
 			nr, arg0 := t.current_syscall()
-			print('sysrq: pid=${pid} ppid=${process.ppid} tid=${t.tid} ${state} ${command_name(process.name)} syscall=${nr} arg0=0x${arg0:x} ${t.syscall_args_text()}\n')
+			args := t.syscall_args_text()
+			C.kprintf(c'sysrq: pid=%lld ppid=%lld tid=%lld %s %.*s syscall=%lld arg0=0x%llx %.*s\n',
+				i64(pid), i64(process.ppid), i64(t.tid), state, i32(end - start), command,
+				i64(nr), u64(arg0), i32(args.len), args.str)
+			unsafe { args.free() }
 		}
 		owner.threads_lock.release()
 	}

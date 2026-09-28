@@ -491,7 +491,7 @@ fn delete_pagemap_impl(mut pagemap memory.Pagemap, trace bool) ? {
 	}
 	pagemap.l.acquire()
 	if trace {
-		println('exec[gpu]/vm: old page-map lock acquired; ranges=${pagemap.mmap_ranges.len}')
+		C.kprintf(c'exec[gpu]/vm: old page-map lock acquired; ranges=%lld\n', i64(pagemap.mmap_ranges.len))
 	}
 
 	// Address-space destruction is a kernel-internal operation and must be able
@@ -506,26 +506,28 @@ fn delete_pagemap_impl(mut pagemap memory.Pagemap, trace bool) ? {
 		local_range := unsafe { &MmapRangeLocal(pagemap.mmap_ranges[0]) }
 		old_len := pagemap.mmap_ranges.len
 		if trace {
-			println('exec[gpu]/vm: unmapping range ${range_index} base=0x${local_range.base:x} len=0x${local_range.length:x} remaining=${old_len}')
+			C.kprintf(c'exec[gpu]/vm: unmapping range %llu base=0x%llx len=0x%llx remaining=%lld\n',
+				u64(range_index), u64(local_range.base), u64(local_range.length), i64(old_len))
 		}
 		munmap_unlocked_impl(mut pagemap, voidptr(local_range.base), local_range.length,
 			false) or {
 			if trace {
-				println('exec[gpu]/vm: ERROR unmapping old range ${range_index}')
+				C.kprintf(c'exec[gpu]/vm: ERROR unmapping old range %llu\n', u64(range_index))
 			}
 			pagemap.l.release()
 			return none
 		}
 		if pagemap.mmap_ranges.len >= old_len {
 			if trace {
-				println('exec[gpu]/vm: ERROR old range list did not shrink at ${range_index}')
+				C.kprintf(c'exec[gpu]/vm: ERROR old range list did not shrink at %llu\n',
+					u64(range_index))
 			}
 			pagemap.l.release()
 			errno.set(errno.einval)
 			return none
 		}
 		if trace {
-			println('exec[gpu]/vm: unmapped range ${range_index}')
+			C.kprintf(c'exec[gpu]/vm: unmapped range %llu\n', u64(range_index))
 		}
 		range_index++
 	}
@@ -560,8 +562,8 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap) ?&memory.Pagemap {
 	mut new_pagemap := memory.new_pagemap()
 	// Sized for every range up front: grown one push at a time, each array
 	// lost the blocks it outgrew.
-	mut old_private_globals := []voidptr{cap: old_pagemap.mmap_ranges.len}
-	mut new_private_globals := []&MmapRangeGlobal{cap: old_pagemap.mmap_ranges.len}
+	mut old_private_globals := []voidptr{cap: old_pagemap.mmap_ranges.len} @[freed]
+	mut new_private_globals := []&MmapRangeGlobal{cap: old_pagemap.mmap_ranges.len} @[freed]
 	defer {
 		unsafe {
 			old_private_globals.free()
@@ -589,7 +591,7 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap) ?&memory.Pagemap {
 
 		if local_range.flags & map_shared != 0 {
 			range_locals_lock.acquire()
-			global_range.locals << new_local_range
+			global_range.add_local(new_local_range)
 			range_locals_lock.release()
 			// Only the pages there are: a large reservation holds few.
 			range_end := local_range.base + local_range.length
@@ -652,7 +654,7 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap) ?&memory.Pagemap {
 				new_private_globals << new_global_range
 			}
 			new_local_range.global = new_global_range
-			new_global_range.locals << new_local_range
+			new_global_range.add_local(new_local_range)
 
 			// Only the pages there are: a large reservation holds few.
 			range_end := local_range.base + local_range.length
@@ -763,6 +765,14 @@ fn release_range_page(global &MmapRangeGlobal, virt u64, file_page u64,
 	}
 	mut res := global.resource
 	resource.release_mapping(mut res, global.handle, file_page, physical, flags)
+}
+
+// add_local records one more local range on a global one. Nothing slices the
+// list, so one that grows frees the buffer it outgrew: a split of a range
+// that already had two locals lost the old buffer.
+fn (mut g MmapRangeGlobal) add_local(local &MmapRangeLocal) {
+	g.locals.flags |= .noslices
+	g.locals << unsafe { local }
 }
 
 pub fn map_page_in_range(_g &MmapRangeGlobal, virt_addr u64, phys_addr u64, _prot int) ? {
@@ -982,7 +992,7 @@ pub fn map_range(mut pagemap memory.Pagemap, _virt_addr u64, phys_addr u64, _len
 
 	range_local.global = range_global
 
-	range_global.locals << range_local
+	range_global.add_local(range_local)
 	range_global.shadow_pagemap.top_level = &u64(memory.pmm_alloc(1))
 
 	pagemap.l.acquire()
@@ -1024,7 +1034,7 @@ pub fn map_pages(mut pagemap memory.Pagemap, virt_addr u64, phys_pages []u64, pr
 	}
 
 	range_local.global = range_global
-	range_global.locals << range_local
+	range_global.add_local(range_local)
 	range_global.shadow_pagemap.top_level = &u64(memory.pmm_alloc(1))
 
 	pagemap.l.acquire()
@@ -1161,7 +1171,7 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
 
 	range_local.global = range_global
 
-	range_global.locals << range_local
+	range_global.add_local(range_local)
 	range_global.shadow_pagemap.top_level = &u64(memory.pmm_alloc(1))
 
 	// Choose and claim the virtual span as one locked operation. Wine first
@@ -1627,7 +1637,7 @@ pub fn mprotect_unlocked(mut pagemap memory.Pagemap, addr voidptr, _length u64, 
 				global: local_range.global
 			}
 			range_locals_lock.acquire()
-			global_range.locals << postsplit_range
+			global_range.add_local(postsplit_range)
 			range_locals_lock.release()
 			insert_range_unlocked(mut pagemap, postsplit_range)
 			local_range.length -= postsplit_range.length
@@ -1670,7 +1680,7 @@ pub fn mprotect_unlocked(mut pagemap memory.Pagemap, addr voidptr, _length u64, 
 				global: local_range.global
 			}
 			range_locals_lock.acquire()
-			global_range.locals << new_range
+			global_range.add_local(new_range)
 			range_locals_lock.release()
 			insert_range_unlocked(mut pagemap, new_range)
 		}
@@ -1777,7 +1787,7 @@ fn munmap_unlocked_impl(mut pagemap memory.Pagemap, addr voidptr, _length u64,
 				global: local_range.global
 			}
 			range_locals_lock.acquire()
-			global_range.locals << postsplit_range
+			global_range.add_local(postsplit_range)
 			range_locals_lock.release()
 			insert_range_unlocked(mut pagemap, postsplit_range)
 			local_range.length -= postsplit_range.length

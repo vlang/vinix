@@ -274,7 +274,8 @@ pub:
 
 // heap_classes reads every class's counts, each under its own lock.
 pub fn heap_classes() []HeapClass {
-	mut out := []HeapClass{cap: slabs.len}
+	// The caller frees it.
+	mut out := []HeapClass{cap: slabs.len} @[freed]
 	for mut slab in slabs {
 		if slab.ent_size == 0 {
 			continue

@@ -436,7 +436,7 @@ fn configure_apple_bringup_from_cmdline() {
 	// different parameter containing this name. Last explicit option wins.
 	mut option_start := 0
 	for index := 0; index <= cmdline.len; index++ {
-		if index != cmdline.len && cmdline[index] !in [` `, `\t`, `\r`, `\n`] {
+		if index != cmdline.len && !is_cmdline_space(cmdline[index]) {
 			continue
 		}
 		// Compare in place: command-line parsing does not allocate.
@@ -584,6 +584,12 @@ fn early_cmdline_contains(needle string) bool {
 	return false
 }
 
+// What separates command-line options. Compared one by one: `!in` a list
+// literal built the list on the heap.
+fn is_cmdline_space(c u8) bool {
+	return c == ` ` || c == `\t` || c == `\r` || c == `\n`
+}
+
 // Allocation-free exact token lookup for decisions made before _vinit. Unlike
 // a substring search, `vinix.display=external-test` must not change scanout.
 fn early_cmdline_has_token(token string) bool {
@@ -595,7 +601,7 @@ fn early_cmdline_has_token(token string) bool {
 	mut start := 0
 	for index := 0; true; index++ {
 		value := unsafe { text[index] }
-		if value != 0 && value !in [` `, `\t`, `\r`, `\n`] {
+		if value != 0 && !is_cmdline_space(value) {
 			continue
 		}
 		length := index - start
@@ -772,7 +778,8 @@ fn kmain() {
 			// the CPU state, so "nothing after init aic" can be pinned to the
 			// call itself, to the callee, or to the text path.
 			term.early_stage_mark(40)
-			print('aic.0 calling initialise, CurrentEL=${cpu.read_currentel()} DAIF=0x${cpu.read_daif():x}\n')
+			C.kprintf(c'aic.0 calling initialise, CurrentEL=%llu DAIF=0x%llx\n', u64(cpu.read_currentel()),
+				u64(cpu.read_daif()))
 			if aic.initialise(aic_phys) {
 				if timer_irq := parse_aic_guest_virtual_timer_irq() {
 					aic_timer_irq = timer_irq
@@ -781,7 +788,7 @@ fn kmain() {
 				// dispatch path instead of unmasking it as an AIC hardware IRQ.
 				aic.register_fiq_handler(aic_fiq_handler)
 				use_aic = true
-				print('aic: timer via FIQ (dt irq hint ${aic_timer_irq})\n')
+				C.kprintf(c'aic: timer via FIQ (dt irq hint %llu)\n', u64(aic_timer_irq))
 				print('aic done\n')
 			} else {
 				// Keep going on CPU 0 without an interrupt controller: the rest of
@@ -855,7 +862,7 @@ fn kmain() {
 		print('gic done\n')
 	} else if acpi_platform {
 		if g := firmware.gic() {
-			print('init gic (ACPI: GICD 0x${g.dist:x}, GICR 0x${g.redist:x})...\n')
+			C.kprintf(c'init gic (ACPI: GICD 0x%llx, GICR 0x%llx)...\n', u64(g.dist), u64(g.redist))
 			gic.initialise_at(g.dist, g.redist, g.redist_len)
 			print('gic done\n')
 		} else {

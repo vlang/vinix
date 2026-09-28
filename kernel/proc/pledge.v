@@ -16,6 +16,8 @@
 // narrowing, inheritance and what a violation does.
 module proc
 
+import lib
+
 pub const pledge_stdio = u64(1) << 0
 pub const pledge_rpath = u64(1) << 1
 pub const pledge_wpath = u64(1) << 2
@@ -202,23 +204,18 @@ pub fn pledge_parse(text string) ?u64 {
 
 // The names of the promises in `promises`, as pledge(2) spells them.
 pub fn pledge_names_text(promises u64) string {
-	mut text := []u8{cap: 64}
-	defer {
-		unsafe { text.free() }
-	}
+	mut text := lib.new_text(64)
 	for i := 0; i <= pledge_last_bit; i++ {
 		bit := u64(1) << i
 		if promises & bit == 0 {
 			continue
 		}
-		if text.len != 0 {
-			text << ` `
+		if text.len() != 0 {
+			text.add_byte(` `)
 		}
-		for c in pledge_name_at(i) {
-			text << c
-		}
+		text.add(pledge_name_at(i))
 	}
-	return text.bytestr()
+	return text.str()
 }
 
 @[inline]
@@ -291,7 +288,8 @@ pub fn pledge_fail(needed u64) u64 {
 		// The first broken promise is the one worth reporting; a call that
 		// goes on to break more is dead already.
 		names := pledge_names_text(needed & ~pledge_set)
-		print('${process.name}: pledge "${names}", syscall ${t.pledge_syscall}\n')
+		C.kprintf(c'%.*s: pledge "%.*s", syscall %lld\n', i32(process.name.len), process.name.str,
+			i32(names.len), names.str, i64(t.pledge_syscall))
 		unsafe { names.free() }
 	}
 	t.pledge_violation = needed | pledge_set

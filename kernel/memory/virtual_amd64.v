@@ -331,8 +331,8 @@ pub fn vmm_init() {
 	if kaddr_req.response == unsafe { nil } {
 		panic('Kernel address bootloader response missing')
 	}
-	print('vmm: Kernel physical base: 0x${kaddr_req.response.physical_base:x}\n')
-	print('vmm: Kernel virtual base: 0x${kaddr_req.response.virtual_base:x}\n')
+	C.kprintf(c'vmm: Kernel physical base: 0x%llx\n', u64(kaddr_req.response.physical_base))
+	C.kprintf(c'vmm: Kernel virtual base: 0x%llx\n', u64(kaddr_req.response.virtual_base))
 	virtual_base := kaddr_req.response.virtual_base
 	physical_base := kaddr_req.response.physical_base
 

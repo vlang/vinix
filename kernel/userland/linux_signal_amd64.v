@@ -154,10 +154,10 @@ fn dispatch_linux_signal(context &cpulocal.GPRState, which int, info_signum int,
 	sp = lib.align_down(sp - frame_size, 16) - 8
 	frame := sp
 
-	mut buf := []u8{len: int(frame_size)}
-	defer {
-		unsafe { buf.free() }
-	}
+	// Freed once pushed, not by a defer: this ends in resume_saved_context()
+	// or exit_by_signal(), neither of which returns, and a signal delivered
+	// through here lost it every time.
+	mut buf := []u8{len: int(frame_size)} @[freed]
 	put_u64(mut buf, 0, u64(sigaction.sa_restorer))
 	// uc_flags and uc_link stay 0. uc_stack describes the alternate stack as
 	// it was when the signal arrived.
@@ -167,11 +167,10 @@ fn dispatch_linux_signal(context &cpulocal.GPRState, which int, info_signum int,
 	mc := frame_mcontext
 	registers := [context.r8, context.r9, context.r10, context.r11, context.r12, context.r13,
 		context.r14, context.r15, context.rdi, context.rsi, context.rbp, context.rbx, context.rdx,
-		context.rax, context.rcx, context.rsp, context.rip, context.rflags]
+		context.rax, context.rcx, context.rsp, context.rip, context.rflags]!
 	for i, value in registers {
 		put_u64(mut buf, mc + u64(i) * 8, value)
 	}
-	unsafe { registers.free() }
 	put_u64(mut buf, mc + mc_cs, context.cs | (context.ss << 48))
 	put_u64(mut buf, mc + mc_err, context.err & 0xffffffff)
 	put_u64(mut buf, mc + mc_trapno, context.err >> 32)
@@ -197,8 +196,10 @@ fn dispatch_linux_signal(context &cpulocal.GPRState, which int, info_signum int,
 
 	// The registers still hold the program's FPU state; the kernel uses none.
 	fpu_save(t.fpu_storage)
-	if !usercopy.copy_to_user(frame, voidptr(&buf[0]), frame_size)
-		|| !usercopy.copy_to_user(fpstate, t.fpu_storage, fpu_storage_size) {
+	pushed := usercopy.copy_to_user(frame, voidptr(&buf[0]), frame_size)
+		&& usercopy.copy_to_user(fpstate, t.fpu_storage, fpu_storage_size)
+	unsafe { buf.free() }
+	if !pushed {
 		// No stack to put the frame on: Linux kills the process with SIGSEGV.
 		exit_by_signal(sigsegv)
 	}
@@ -232,7 +233,7 @@ pub fn syscall_linux_rt_sigreturn(gpr_state voidptr) (u64, u64) {
 	syscall_frame := unsafe { &cpulocal.GPRState(gpr_state) }
 	frame := syscall_frame.rsp - 8
 
-	mut buf := []u8{len: int(frame_size)}
+	mut buf := []u8{len: int(frame_size)} @[freed]
 	if !usercopy.copy_from_user(voidptr(&buf[0]), frame, frame_size) {
 		unsafe { buf.free() }
 		exit_by_signal(sigsegv)

@@ -512,7 +512,7 @@ fn kill_sibling_threads(mut current_process proc.Process, current_thread &proc.T
 	// the moment the lock is let go, and its memory must not be handed to a new
 	// thread while this is still telling it to exit.
 	current_process.threads_lock.acquire()
-	mut others := []&proc.Thread{cap: current_process.threads.len}
+	mut others := []&proc.Thread{cap: current_process.threads.len} @[freed]
 	for t in current_process.threads {
 		if voidptr(t) != voidptr(current_thread) {
 			proc.pin_thread(t)
@@ -533,17 +533,13 @@ fn kill_sibling_threads(mut current_process proc.Process, current_thread &proc.T
 			tv_sec:  0
 			tv_nsec: 1000000
 		})
-		mut timer_events := [&timer.event]
-		event.await(mut timer_events, true) or {}
+		event.await_one(mut timer.event, true) or {}
 		timer.disarm()
-		unsafe {
-			timer_events.free()
-			free(timer)
-		}
+		unsafe { free(timer) }
 	}
 
 	current_process.threads_lock.acquire()
-	mut victims := []&proc.Thread{cap: current_process.threads.len}
+	mut victims := []&proc.Thread{cap: current_process.threads.len} @[freed]
 	for t in current_process.threads {
 		if voidptr(t) != voidptr(current_thread) {
 			proc.pin_thread(t)
@@ -633,13 +629,9 @@ fn wait_for_thread_to_leave(mut process proc.Process, t &proc.Thread) {
 			tv_sec:  0
 			tv_nsec: 1000000
 		})
-		mut timer_events := [&timer.event]
-		event.await(mut timer_events, true) or {}
+		event.await_one(mut timer.event, true) or {}
 		timer.disarm()
-		unsafe {
-			timer_events.free()
-			free(timer)
-		}
+		unsafe { free(timer) }
 	}
 }
 

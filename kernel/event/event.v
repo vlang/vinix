@@ -260,12 +260,10 @@ pub fn pthread_exit(ret voidptr) {
 }
 
 pub fn pthread_wait(t &proc.Thread) voidptr {
-	mut events := [&t.exited]
+	mut storage := [&t.exited]!
+	mut events := unsafe { stack_list(&storage[0], storage.len) }
 	await(mut events, true) or {}
 	exit_value := t.exit_value
-	unsafe {
-		free(t)
-		events.free()
-	}
+	unsafe { free(t) }
 	return exit_value
 }

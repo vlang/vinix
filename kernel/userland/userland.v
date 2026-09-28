@@ -509,7 +509,10 @@ pub fn syscall_execve(_ voidptr, _path charptr, _argv &charptr, _envp &charptr) 
 	}
 
 	path := unsafe { cstring_to_vstring(_path) }
+	// Both vectors are only built here, so growing them can give back what
+	// they outgrow.
 	mut argv := []string{}
+	argv.flags |= .noslices
 	for i := 0; true; i++ {
 		unsafe {
 			if _argv[i] == nil {
@@ -519,6 +522,7 @@ pub fn syscall_execve(_ voidptr, _path charptr, _argv &charptr, _envp &charptr) 
 		}
 	}
 	mut envp := []string{}
+	envp.flags |= .noslices
 	for i := 0; true; i++ {
 		unsafe {
 			if _envp[i] == nil {
@@ -528,6 +532,8 @@ pub fn syscall_execve(_ voidptr, _path charptr, _argv &charptr, _envp &charptr) 
 		}
 	}
 
+	// The path and both vectors are the exec's now, freed whether it works or
+	// not. A failed exec is common: execvp() tries every directory in PATH.
 	start_program(true, proc.current_directory_of(proc.current_thread().process), path, argv,
 		envp, '', '', '') or { return errno.err, errno.get() }
 
@@ -698,20 +704,59 @@ fn exit_process(wait_status u32) {
 	sched.dequeue_and_die()
 }
 
+// With `execve` set, the exec owns `_path`, `argv` and `envp` and frees them
+// whether it works or not; one that works never returns. The boot path that
+// starts init passes `execve` unset and keeps them.
 pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, envp []string, stdin_path string, stdout_path string, stderr_path string) ?&proc.Process {
 	// Chromium starts every child process by executing /proc/self/exe. The VFS
 	// resolves that to this process's program, but the new process must record
 	// where the program really is: keeping the literal path would make the
 	// child's own /proc/self/exe point back at itself forever.
 	path := fs.resolve_self_reference(_path)
-	prog_node := fs.get_node(dir, path, true)?
+	if execve && path.str != _path.str && !argv.any(it.str == _path.str) {
+		unsafe { _path.free() }
+	}
+	prog_node := fs.get_node(dir, path, true) or {
+		if execve {
+			free_exec_arguments(path, argv, envp)
+		}
+		return none
+	}
 	return start_program_node(execve, dir, prog_node, path, argv, envp, stdin_path,
 		stdout_path, stderr_path)
 }
 
+// Frees what an exec was handed, once it has failed or is about to leave for
+// good. `path` can be one of the arguments too: a script's interpreter is put
+// into argv as well.
+fn free_exec_arguments(path string, argv []string, envp []string) {
+	path_in_argv := argv.any(it.str == path.str)
+	unsafe {
+		if !path_in_argv {
+			path.free()
+		}
+		argv.free()
+		envp.free()
+	}
+}
+
 // The part of exec that follows finding the program. execveat(2) on a
-// descriptor comes here directly: a memfd has no name to be found by.
+// descriptor comes here directly: a memfd has no name to be found by. What an
+// exec was handed is freed here when it fails, unless load_program_image()
+// has handed it on to a script interpreter's exec, which frees it.
 pub fn start_program_node(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, path string, argv []string, envp []string, stdin_path string, stdout_path string, stderr_path string) ?&proc.Process {
+	mut handed_on := false
+	process := load_program_image(execve, dir, prog_node, path, argv, envp, stdin_path,
+		stdout_path, stderr_path, mut handed_on) or {
+		if execve && !handed_on {
+			free_exec_arguments(path, argv, envp)
+		}
+		return none
+	}
+	return process
+}
+
+fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, path string, argv []string, envp []string, stdin_path string, stdout_path string, stderr_path string, mut handed_on bool) ?&proc.Process {
 	// The program, or a script's interpreter, is subject to pledge(2) and
 	// unveil(2); the ELF interpreter the kernel loads for it is not.
 	if execve && !fs.policy_check(prog_node, proc.policy_exec) {
@@ -724,23 +769,53 @@ pub fn start_program_node(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, p
 	}
 	mut prog := prog_node.resource
 
-	mut new_pagemap := memory.new_pagemap()
-
 	// Check for shebang before proceeding as if it was an ELF.
 	mut shebang := [2]char{}
 	prog.read(0, &shebang[0], 0, 2)?
 	if shebang[0] == char(`#`) && shebang[1] == char(`!`) {
 		real_path, arg := parse_shebang(mut prog)?
-		mut final_argv := [real_path]
+		// Room for the interpreter, its argument and the script. `<<` copies
+		// a string, so the list owns all of its strings.
+		mut final_argv := []string{cap: argv.len + 2} @[freed]
+		final_argv << real_path
 		if arg != '' {
 			final_argv << arg
 		}
 		final_argv << path
-		final_argv << argv[1..]
+		for i := 1; i < argv.len; i++ {
+			final_argv << argv[i]
+		}
+		unsafe {
+			real_path.free()
+			arg.free()
+		}
 
-		return start_program(execve, dir, real_path, final_argv, envp, stdin_path, stdout_path,
-			stderr_path)
+		if execve {
+			// The interpreter's exec frees final_argv and envp; the rest of
+			// what this exec was handed goes now.
+			handed_on = true
+			path_in_argv := argv.any(it.str == path.str)
+			unsafe {
+				if !path_in_argv {
+					path.free()
+				}
+				argv.free()
+			}
+			return start_program(true, dir, final_argv[0], final_argv, envp, stdin_path,
+				stdout_path, stderr_path)
+		}
+		// Starting init, which keeps what it gave.
+		process := start_program(false, dir, final_argv[0], final_argv, envp, stdin_path,
+			stdout_path, stderr_path) or {
+			unsafe { final_argv.free() }
+			return none
+		}
+		unsafe { final_argv.free() }
+		return process
 	}
+
+	// Made after the shebang check: a script never used it, and lost it.
+	mut new_pagemap := memory.new_pagemap()
 
 	mut auxval, ld_path := elf.load(new_pagemap, prog, 0) or { return none }
 	// Vinix's mlibc toolchain uses /usr/lib/ld.so. Everything else accepted by
@@ -892,8 +967,9 @@ pub fn start_program_node(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, p
 		// Same lock new_user_thread's append holds: without it, a concurrent
 		// reader of process.threads (syscall_kill's broadcast path) could
 		// observe this array mid-replacement.
+		// Emptied, not replaced: a new empty list lost the old one's buffer.
 		process.threads_lock.acquire()
-		process.threads = []&proc.Thread{}
+		process.threads.clear()
 		process.threads_lock.release()
 
 		// The program that comes out of exec has one thread, the group leader,
@@ -918,10 +994,9 @@ pub fn start_program_node(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, p
 		}
 		sched.enqueue_thread(new_thread, false)
 
-		unsafe {
-			argv.free()
-			envp.free()
-		}
+		// This never returns, so the caller cannot free what the exec was
+		// handed; the path was lost with every exec.
+		free_exec_arguments(path, argv, envp)
 		sched.dequeue_and_die()
 	}
 }
@@ -985,6 +1060,8 @@ pub fn syscall_execveat(_ voidptr, dirfd int, _path charptr, _argv &charptr, _en
 
 	mut direct_node := &fs.VFSNode(unsafe { nil })
 	if path.len == 0 {
+		// The descriptor's name below takes the empty path's place.
+		unsafe { path.free() }
 		if flags & fs.at_empty_path == 0 {
 			return errno.err, errno.enoent
 		}
@@ -1002,12 +1079,19 @@ pub fn syscall_execveat(_ voidptr, dirfd int, _path charptr, _argv &charptr, _en
 		} else {
 			unsafe { &fs.VFSNode(proc.current_directory_of(process)) }
 		}
-		target = '/proc/self/fd/${dirfd}'
+		mut name := lib.new_text(32)
+		name.add('/proc/self/fd/')
+		name.add_decimal(i64(dirfd))
+		target = name.str()
 	} else {
-		directory = fs.parent_dir_for(dirfd, path) or { return errno.err, errno.get() }
+		directory = fs.parent_dir_for(dirfd, path) or {
+			unsafe { path.free() }
+			return errno.err, errno.get()
+		}
 	}
 
 	mut argv := []string{}
+	argv.flags |= .noslices
 	for i := 0; true; i++ {
 		unsafe {
 			if _argv[i] == nil {
@@ -1017,6 +1101,7 @@ pub fn syscall_execveat(_ voidptr, dirfd int, _path charptr, _argv &charptr, _en
 		}
 	}
 	mut envp := []string{}
+	envp.flags |= .noslices
 	for i := 0; true; i++ {
 		unsafe {
 			if _envp[i] == nil {
@@ -1026,6 +1111,8 @@ pub fn syscall_execveat(_ voidptr, dirfd int, _path charptr, _argv &charptr, _en
 		}
 	}
 
+	// The path and both vectors are the exec's now, freed whether it works or
+	// not.
 	if direct_node != unsafe { nil } {
 		start_program_node(true, directory, direct_node, target, argv, envp, '', '', '') or {
 			return errno.err, errno.get()

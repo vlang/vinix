@@ -105,7 +105,7 @@ fn mimmutable_unlocked(mut pagemap memory.Pagemap, base u64, length u64) ? {
 				global: local_range.global
 			}
 			range_locals_lock.acquire()
-			global_range.locals << postsplit_range
+			global_range.add_local(postsplit_range)
 			range_locals_lock.release()
 			insert_range_unlocked(mut pagemap, postsplit_range)
 			local_range.length -= postsplit_range.length
@@ -133,7 +133,7 @@ fn mimmutable_unlocked(mut pagemap memory.Pagemap, base u64, length u64) ? {
 				global: local_range.global
 			}
 			range_locals_lock.acquire()
-			global_range.locals << immutable_range
+			global_range.add_local(immutable_range)
 			range_locals_lock.release()
 			insert_range_unlocked(mut pagemap, immutable_range)
 		}

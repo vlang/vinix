@@ -3,6 +3,7 @@ module proc
 
 import klock
 import katomic
+import lib
 import aarch64.cpu
 import aarch64.cpu.local as cpulocal
 import event.eventstruct
@@ -145,9 +146,27 @@ pub fn (t &Thread) current_syscall() (i64, u64) {
 	return t.syscall_nr, t.syscall_x0
 }
 
+// The caller frees the text.
 pub fn (t &Thread) syscall_args_text() string {
-	cpu := if t.running_on == u64(-1) { '-' } else { t.running_on.str() }
-	return 'x1=0x${t.syscall_x1:x} x2=0x${t.syscall_x2:x} x3=0x${t.syscall_x3:x} blocked=0x${t.masked_signals:x} pending=0x${t.pending_signals:x} cpu=${cpu} queued=${t.is_in_queue}'
+	mut text := lib.new_text(160)
+	text.add('x1=0x')
+	text.add_radix(t.syscall_x1, 16, 0)
+	text.add(' x2=0x')
+	text.add_radix(t.syscall_x2, 16, 0)
+	text.add(' x3=0x')
+	text.add_radix(t.syscall_x3, 16, 0)
+	text.add(' blocked=0x')
+	text.add_radix(t.masked_signals, 16, 0)
+	text.add(' pending=0x')
+	text.add_radix(t.pending_signals, 16, 0)
+	text.add(' cpu=')
+	if t.running_on == u64(-1) {
+		text.add('-')
+	} else {
+		text.add_unsigned(t.running_on)
+	}
+	text.add(if t.is_in_queue { ' queued=true' } else { ' queued=false' })
+	return text.str()
 }
 
 // What a wait a signal interrupted reports: a restart once the signal is

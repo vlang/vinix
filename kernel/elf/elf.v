@@ -205,7 +205,8 @@ pub fn architecture(_res &resource.Resource) !u16 {
 
 fn exec_trace(enabled bool, image string, stage string) {
 	if enabled {
-		println('exec[gpu]/elf ${image}: ${stage}')
+		C.kprintf(c'exec[gpu]/elf %.*s: %.*s\n', i32(image.len), image.str, i32(stage.len),
+			stage.str)
 	}
 }
 
@@ -243,7 +244,8 @@ fn load_impl(_pagemap &memory.Pagemap, _res &resource.Resource, _base u64, trace
 		return error('elf: Unsupported ELF file')
 	}
 	if trace {
-		println('exec[gpu]/elf ${image}: header valid type=${header.@type} phnum=${header.ph_num} entry=0x${header.entry:x}')
+		C.kprintf(c'exec[gpu]/elf %.*s: header valid type=%llu phnum=%llu entry=0x%llx\n',
+			i32(image.len), image.str, u64(header.@type), u64(header.ph_num), u64(header.entry))
 	}
 	program_header_bytes := u64(header.ph_num) * sizeof(ProgramHdr)
 	if header.phoff > u64(res.stat.size)
@@ -261,7 +263,8 @@ fn load_impl(_pagemap &memory.Pagemap, _res &resource.Resource, _base u64, trace
 		base = pie_base + random_offset(pie_span(extent), image_alignment)
 	}
 	if trace {
-		println('exec[gpu]/elf ${image}: effective load base=0x${base:x}')
+		C.kprintf(c'exec[gpu]/elf %.*s: effective load base=0x%llx\n', i32(image.len), image.str,
+			u64(base))
 	}
 	if header.entry > u64(-1) - base {
 		return error('elf: entry address overflow')
@@ -278,7 +281,7 @@ fn load_impl(_pagemap &memory.Pagemap, _res &resource.Resource, _base u64, trace
 	mut ld_path := ''
 	mut load_addr := u64(0)
 	mut load_addr_set := false
-	mut loaded_ranges := []LoadedRange{cap: int(header.ph_num)}
+	mut loaded_ranges := []LoadedRange{cap: int(header.ph_num)} @[freed]
 	mut committed := false
 	defer {
 		if !committed {
@@ -298,12 +301,14 @@ fn load_impl(_pagemap &memory.Pagemap, _res &resource.Resource, _base u64, trace
 		mut phdr := ProgramHdr{}
 
 		if trace {
-			println('exec[gpu]/elf ${image}: reading program header ${i + 1}/${header.ph_num}')
+			C.kprintf(c'exec[gpu]/elf %.*s: reading program header %llu/%llu\n', i32(image.len),
+				image.str, u64(i + 1), u64(header.ph_num))
 		}
 		read_exact(mut res, unsafe { &phdr }, header.phoff + (sizeof(ProgramHdr) * i),
 			sizeof(ProgramHdr))!
 		if trace {
-			println('exec[gpu]/elf ${image}: program header ${i + 1} type=${phdr.p_type} flags=0x${phdr.p_flags:x}')
+			C.kprintf(c'exec[gpu]/elf %.*s: program header %llu type=%llu flags=0x%llx\n',
+				i32(image.len), image.str, u64(i + 1), u64(phdr.p_type), u64(phdr.p_flags))
 		}
 
 		match phdr.p_type {
@@ -393,11 +398,14 @@ fn load_impl(_pagemap &memory.Pagemap, _res &resource.Resource, _base u64, trace
 		file_offset := i64(lib.align_down(phdr.p_offset, page_size))
 		file_backed_length := misalign + phdr.p_filesz
 		if trace {
-			println('exec[gpu]/elf ${image}: mapping LOAD ${i + 1} va=0x${virt:x} len=0x${mapping_length:x} file=0x${file_offset:x} prot=${pf}')
+			C.kprintf(c'exec[gpu]/elf %.*s: mapping LOAD %llu va=0x%llx len=0x%llx file=0x%llx prot=%lld\n',
+				i32(image.len), image.str, u64(i + 1), u64(virt), u64(mapping_length), u64(file_offset),
+				i64(pf))
 		}
 		mmap.mmap_file_segment(pagemap, virt, mapping_length, pf, res, file_offset, 0, file_backed_length) or { return error('elf: unable to map LOAD segment') }
 		if trace {
-			println('exec[gpu]/elf ${image}: mapped LOAD ${i + 1}')
+			C.kprintf(c'exec[gpu]/elf %.*s: mapped LOAD %llu\n', i32(image.len), image.str,
+				u64(i + 1))
 		}
 		loaded_ranges << LoadedRange{
 			base: virt
@@ -421,7 +429,8 @@ fn load_impl(_pagemap &memory.Pagemap, _res &resource.Resource, _base u64, trace
 
 	committed = true
 	if trace {
-		println('exec[gpu]/elf ${image}: committed entry=0x${auxval.at_entry:x} phdr=0x${auxval.at_phdr:x}')
+		C.kprintf(c'exec[gpu]/elf %.*s: committed entry=0x%llx phdr=0x%llx\n', i32(image.len),
+			image.str, u64(auxval.at_entry), u64(auxval.at_phdr))
 	}
 	return auxval, ld_path
 }

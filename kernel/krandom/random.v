@@ -157,7 +157,7 @@ __global (
 
 fn jitter_entropy_seed(mut output [64]u8) bool {
 	mut state := u64(0x2545f4914f6cdd1d) ^ cycle_counter()
-	mut samples := []u8{len: jitter_samples * 2}
+	mut samples := []u8{len: jitter_samples * 2} @[freed]
 	mut counts := [256]u32{}
 	for i := 0; i <= jitter_samples; i++ {
 		start := cycle_counter()
@@ -189,7 +189,7 @@ fn jitter_entropy_seed(mut output [64]u8) bool {
 	healthy := distinct >= 4 && u64(commonest) * 16 < u64(jitter_samples) * 15
 	if healthy {
 		domain := 'Vinix kernel CSPRNG jitter v1'
-		mut input := []u8{len: domain.len + samples.len + 1}
+		mut input := []u8{len: domain.len + samples.len + 1} @[freed]
 		unsafe {
 			C.memcpy(input.data, domain.str, domain.len)
 			C.memcpy(&input[domain.len], samples.data, samples.len)
@@ -208,9 +208,10 @@ fn jitter_entropy_seed(mut output [64]u8) bool {
 			input.free()
 		}
 	}
-	outcome := if healthy { 'seeded the generator' } else { 'failed its health check' }
+	outcome := if healthy { c'seeded the generator' } else { c'failed its health check' }
 	share := u64(commonest) * 100 / u64(jitter_samples)
-	println('random: CPU timing jitter ${outcome} (${distinct} distinct timings, commonest ${share}%)')
+	C.kprintf(c'random: CPU timing jitter %s (%lld distinct timings, commonest %llu%%)\n',
+		outcome, i64(distinct), u64(share))
 	unsafe {
 		C.memset(samples.data, 0, samples.len)
 		samples.free()

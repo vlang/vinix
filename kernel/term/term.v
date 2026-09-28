@@ -112,8 +112,9 @@ pub fn report_framebuffer_selection() {
 	} else {
 		fb_req.response.framebuffer_count
 	}
-	mode := if framebuffer_external { 'external handoff' } else { 'firmware default' }
-	println('framebuffer: selected GOP ${framebuffer_index + 1}/${count}, ${fb.width}x${fb.height}x${fb.bpp} (${mode})')
+	mode := if framebuffer_external { c'external handoff' } else { c'firmware default' }
+	C.kprintf(c'framebuffer: selected GOP %llu/%llu, %llux%llux%llu (%s)\n', u64(framebuffer_index + 1),
+		u64(count), u64(fb.width), u64(fb.height), u64(fb.bpp), mode)
 }
 
 // Dimensions of the one framebuffer chosen during the Limine handoff.  The
