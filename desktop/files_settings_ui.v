@@ -372,7 +372,18 @@ fn (mut a FilesContextApp) reload_files_settings(home string) {
 		return
 	}
 	a.files.browser.show_hidden = updated.show_hidden
+	if a.files.dual_initialized {
+		a.files.dual_left.show_hidden = updated.show_hidden
+		a.files.dual_right.show_hidden = updated.show_hidden
+		if hidden_changed {
+			a.files.dual_left.read(a.files.dual_left.path.clone())
+			a.files.dual_right.read(a.files.dual_right.path.clone())
+		}
+	}
 	if hidden_changed {
+		if a.files.view_mode == .commander {
+			return
+		}
 		path := a.files.current_path().clone()
 		tag_id := a.files.active_tag_id
 		a.files.navigate_to(path)

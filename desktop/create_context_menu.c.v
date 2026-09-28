@@ -362,6 +362,14 @@ fn (mut a FilesContextApp) focus_path(path string) {
 	}
 	parent := parent_path(path)
 	name := file_path_name(path)
+	if a.files.view_mode == .commander {
+		if a.files.active_pane == 0 {
+			files_commander_focus_path(mut a.files.dual_left, parent, name, a.files.visible_rows)
+		} else {
+			files_commander_focus_path(mut a.files.dual_right, parent, name, a.files.visible_rows)
+		}
+		return
+	}
 	if a.files.view_mode == .list {
 		if a.files.browser.path != parent {
 			return
@@ -408,6 +416,16 @@ fn (mut a FilesContextApp) refresh_to(path string) {
 		unsafe { path.free() }
 		return
 	}
+	if a.files.view_mode == .commander {
+		if a.files.active_pane == 0 {
+			a.files.dual_right.read(a.files.dual_right.path.clone())
+			a.files.dual_left.read(path)
+		} else {
+			a.files.dual_left.read(a.files.dual_left.path.clone())
+			a.files.dual_right.read(path)
+		}
+		return
+	}
 	a.files.browser.read(path)
 }
 
@@ -421,6 +439,28 @@ fn (mut a FilesContextApp) select_action(action string) {
 			return
 		}
 		unsafe { paths.free() }
+	}
+	if action.starts_with(files_action_pane_left_row) {
+		a.files.active_pane = 0
+		index := action[files_action_pane_left_row.len..].int()
+		if index >= 0 && index < a.files.dual_left.entries.len {
+			a.files.dual_left.selected_row = index
+			path := create_item_path(a.files.dual_left.path, a.files.dual_left.entries[index].name)
+			a.set_context_path(path)
+			unsafe { path.free() }
+			return
+		}
+	}
+	if action.starts_with(files_action_pane_right_row) {
+		a.files.active_pane = 1
+		index := action[files_action_pane_right_row.len..].int()
+		if index >= 0 && index < a.files.dual_right.entries.len {
+			a.files.dual_right.selected_row = index
+			path := create_item_path(a.files.dual_right.path, a.files.dual_right.entries[index].name)
+			a.set_context_path(path)
+			unsafe { path.free() }
+			return
+		}
 	}
 	if action.starts_with(files_action_row) {
 		index := action[files_action_row.len..].int()
@@ -465,6 +505,25 @@ fn (a &FilesContextApp) rename_overlay(size ui2.Rect) ?ui2.Element {
 		return ui2.text_field('', '', rename_buffer_text(a.rename_text), ui2.rect(f64(content_left + 36),
 			f64(files_header_height + 27 + (index - a.files.browser.scroll) * files_row_height),
 			f64(width - content_left - 62), f64(files_row_height - 2)), ui2.BoxStyle{
+			bg:     editor_path_focus
+			radius: 4
+		}, ui2.TextStyle{ color: body_text, size: 12 }, 0)
+	}
+	if a.files.view_mode == .commander {
+		pane := a.files.active_pane
+		browser := if pane == 0 { &a.files.dual_left } else { &a.files.dual_right }
+		if browser.path != parent {
+			return none
+		}
+		index := files_context_entry_index(browser.entries, name)
+		if index < browser.scroll || index >= browser.scroll + a.files.visible_rows {
+			return none
+		}
+		pane_x := files_commander_pane_x(width, pane)
+		pane_width := files_commander_pane_width(width, pane)
+		return ui2.text_field('', '', rename_buffer_text(a.rename_text), ui2.rect(f64(pane_x + files_padding + 22),
+			f64(a.files.rows_top + (index - browser.scroll) * files_row_height + 1),
+			f64(pane_width - 2 * files_padding - 28), f64(files_row_height - 2)), ui2.BoxStyle{
 			bg:     editor_path_focus
 			radius: 4
 		}, ui2.TextStyle{ color: body_text, size: 12 }, 0)
@@ -767,11 +826,15 @@ fn (mut a FilesContextApp) handle(event_id string) ! {
 		if index >= 0 && index < a.files.browser.entries.len {
 			a.select_action(event_id)
 		}
-	} else if event_id.starts_with(files_action_tag_row)
+	} else if event_id.starts_with(files_action_pane_left_row)
+		|| event_id.starts_with(files_action_pane_right_row)
+		|| event_id.starts_with(files_action_tag_row)
 		|| parse_miller_row_action(event_id) != none {
 		a.select_action(event_id)
 	} else if event_id == files_action_up || event_id == files_action_view_list
-		|| event_id == files_action_view_columns || event_id.starts_with('files.location.')
+		|| event_id == files_action_view_columns || event_id == files_action_view_commander
+		|| event_id == files_action_pane_left || event_id == files_action_pane_right
+		|| event_id.starts_with('files.location.')
 		|| (event_id.starts_with(files_action_tag_prefix)
 			&& !event_id.starts_with(files_action_tag_row)) {
 		a.clear_context_path()
@@ -781,7 +844,8 @@ fn (mut a FilesContextApp) handle(event_id string) ! {
 
 fn (mut a FilesContextApp) handle_browser_action(event_id string, home string) ! {
 	a.files.handle(event_id)!
-	if event_id == files_action_view_list || event_id == files_action_view_columns {
+	if event_id == files_action_view_list || event_id == files_action_view_columns
+		|| event_id == files_action_view_commander {
 		save_files_view_mode(home, a.files.view_mode)
 	}
 }
@@ -833,6 +897,11 @@ fn (mut a FilesContextApp) key_input(input string) {
 	}
 	if a.tag_picker {
 		if input == '\x1b' { a.tag_picker = false }
+		return
+	}
+	if a.files.view_mode == .commander && input == '\t' {
+		a.files.active_pane = 1 - a.files.active_pane
+		a.clear_context_path()
 		return
 	}
 	a.quicklook_key_input(input)
@@ -923,6 +992,8 @@ fn (mut d Desktop) cancel_file_context_rename() {
 fn files_context_row_action(action string) bool {
 	return action.starts_with(files_action_row) || action.starts_with(files_action_column_row)
 		|| action.starts_with(files_action_tag_row)
+		|| action.starts_with(files_action_pane_left_row)
+		|| action.starts_with(files_action_pane_right_row)
 }
 
 // Files gets the item under the pointer as a private selection event before
@@ -957,6 +1028,9 @@ fn (mut d Desktop) open_create_context_menu(x int, y int) bool {
 				}
 				unsafe { payload.free() }
 			} else {
+				if underlying == files_action_pane_left || underlying == files_action_pane_right {
+					d.apps[app_index].handle(underlying) or {}
+				}
 				d.apps[app_index].handle(files_context_clear) or {}
 			}
 			d.raise(window_id)

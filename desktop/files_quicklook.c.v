@@ -318,6 +318,20 @@ fn (p &FilesQuickLook) build(size ui2.Rect) ui2.Element {
 }
 
 fn (mut a FilesContextApp) quicklook_move_selection(delta int) {
+	if a.files.view_mode == .commander {
+		mut path := ''
+		if a.files.active_pane == 0 {
+			path = files_commander_next_selection(mut a.files.dual_left, delta)
+		} else {
+			path = files_commander_next_selection(mut a.files.dual_right, delta)
+		}
+		if path.len > 0 {
+			a.set_context_path(path)
+			unsafe { path.free() }
+			a.focus_path(a.context_path)
+		}
+		return
+	}
 	if a.files.view_mode == .list {
 		count := a.files.browser.entries.len
 		if count == 0 { return }

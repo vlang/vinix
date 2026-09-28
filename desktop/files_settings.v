@@ -68,13 +68,21 @@ fn load_files_view_mode(home string) FilesViewMode {
 	}
 	value := buffer[..int(got)].bytestr()
 	defer { unsafe { value.free() } }
-	return if value == 'columns' { .columns } else { .list }
+	return match value {
+		'columns' { .columns }
+		'commander' { .commander }
+		else { .list }
+	}
 }
 
 fn save_files_view_mode(home string, mode FilesViewMode) bool {
 	path := files_view_mode_path(home)
 	defer { unsafe { path.free() } }
-	value := if mode == .columns { 'columns' } else { 'list' }
+	value := match mode {
+		.columns { 'columns' }
+		.commander { 'commander' }
+		else { 'list' }
+	}
 	return desktop_write_file(path, value.str, u64(value.len))
 }
 

@@ -38,11 +38,12 @@ mut:
 // list has been scrolled.
 struct FileBrowser {
 mut:
-	path        string = '/'
-	entries     []FileEntry
-	show_hidden bool
-	scroll      int
-	error       string
+	path          string = '/'
+	entries       []FileEntry
+	show_hidden   bool
+	action_prefix string
+	scroll        int
+	error         string
 	// Row the pointer is over, or -1. Kept here rather than in the desktop's
 	// hover state because rows are the application's, not the chrome's.
 	hover_row    int = -1
@@ -138,7 +139,8 @@ fn read_file_entries_filtered(path string, action_prefix string, show_hidden boo
 // open leaves the browser where it was and says so, rather than emptying the
 // window and looking like the directory is empty.
 fn (mut b FileBrowser) read(path string) {
-	entries := read_file_entries_filtered(path, files_action_row, b.show_hidden) or {
+	prefix := if b.action_prefix.len > 0 { b.action_prefix } else { files_action_row }
+	entries := read_file_entries_filtered(path, prefix, b.show_hidden) or {
 		unsafe { b.error.free() }
 		b.error = 'cannot open ${path}'
 		return
@@ -244,6 +246,11 @@ const files_action_up = 'files.up'
 const files_action_row = 'files.row.'
 const files_action_view_list = 'files.view.list'
 const files_action_view_columns = 'files.view.columns'
+const files_action_view_commander = 'files.view.commander'
+const files_action_pane_left = 'files.pane.left'
+const files_action_pane_right = 'files.pane.right'
+const files_action_pane_left_row = 'files.pane.left.row.'
+const files_action_pane_right_row = 'files.pane.right.row.'
 const files_action_settings = 'files.settings.open'
 const files_action_tag_prefix = 'files.tag.'
 const files_action_tag_row = 'files.tag.row.'
@@ -252,6 +259,7 @@ const files_action_scrollbar = 'files.scrollbar'
 
 const files_row_height = 24
 const files_header_height = 38
+const files_pane_header_height = 27
 const files_padding = 10
 const files_column_min_width = 200
 const files_view_button_width = 28
@@ -287,13 +295,14 @@ fn files_content_left(width int) int {
 }
 
 fn files_path_width(width int) int {
-	right := width - files_padding - 3 * files_view_button_width - 2 * 2 - 8
+	right := width - files_padding - 4 * files_view_button_width - 3 * 2 - 8
 	return if right > files_path_left { right - files_path_left } else { 1 }
 }
 
 enum FilesViewMode {
 	list
 	columns
+	commander
 }
 
 // One retained directory listing in Miller-column mode. A stable id, rather
@@ -324,6 +333,10 @@ mut:
 	// window as it actually is rather than as it was when it opened.
 	visible_rows           int = 1
 	view_mode              FilesViewMode
+	dual_left              FileBrowser
+	dual_right             FileBrowser
+	dual_initialized       bool
+	active_pane            int
 	columns                []MillerColumn
 	next_column_id         int = 1
 	column_offset          int
@@ -461,20 +474,43 @@ fn (mut a FileBrowserApp) set_view_mode(mode FilesViewMode) {
 	if mode == a.view_mode {
 		return
 	}
+	if a.view_mode == .commander {
+		a.browser.read(a.current_path().clone())
+	}
+	if a.view_mode == .columns && a.columns.len > 0 {
+		a.browser.read(a.columns.last().browser.path.clone())
+	}
+	a.free_miller_columns()
 	if mode == .columns {
 		a.reset_miller_columns(a.browser.path)
 		a.view_mode = .columns
 		return
 	}
-	if a.columns.len > 0 {
-		path := a.columns.last().browser.path.clone()
-		a.browser.read(path)
+	if mode == .commander {
+		if !a.dual_initialized {
+			a.dual_left.action_prefix = files_action_pane_left_row
+			a.dual_right.action_prefix = files_action_pane_right_row
+			a.dual_left.show_hidden = a.settings.show_hidden
+			a.dual_right.show_hidden = a.settings.show_hidden
+			a.dual_left.read(a.browser.path.clone())
+			a.dual_right.read(a.browser.path.clone())
+			a.dual_initialized = true
+		} else if (a.active_pane == 0 && a.dual_left.path != a.browser.path)
+			|| (a.active_pane == 1 && a.dual_right.path != a.browser.path) {
+			// A single-pane view may have navigated since commander was last shown.
+			// Follow that location in the active pane and retain the other pane.
+			a.navigate_commander_active_to(a.browser.path)
+		}
+		a.view_mode = .commander
+		return
 	}
-	a.free_miller_columns()
 	a.view_mode = .list
 }
 
 fn (a &FileBrowserApp) current_path() string {
+	if a.view_mode == .commander && a.dual_initialized {
+		return if a.active_pane == 0 { a.dual_left.path } else { a.dual_right.path }
+	}
 	if a.view_mode == .columns && a.columns.len > 0 {
 		return a.columns.last().browser.path
 	}
@@ -483,6 +519,10 @@ fn (a &FileBrowserApp) current_path() string {
 
 fn (mut a FileBrowserApp) navigate_to(path string) {
 	a.active_tag_id = -1
+	if a.view_mode == .commander {
+		a.navigate_commander_active_to(path)
+		return
+	}
 	// read() takes ownership on success. Sidebar paths are shared constants.
 	owned := path.clone()
 	a.browser.read(owned)
@@ -492,6 +532,17 @@ fn (mut a FileBrowserApp) navigate_to(path string) {
 	}
 	if a.view_mode == .columns {
 		a.reset_miller_columns(path)
+	}
+}
+
+fn (mut a FileBrowserApp) navigate_commander_active_to(path string) {
+	owned := path.clone()
+	if a.active_pane == 0 {
+		a.dual_left.read(owned)
+		if a.dual_left.error != '' { unsafe { owned.free() } }
+	} else {
+		a.dual_right.read(owned)
+		if a.dual_right.error != '' { unsafe { owned.free() } }
 	}
 }
 
@@ -761,6 +812,9 @@ fn (mut a FileBrowserApp) build(size ui2.Rect) !ui2.Element {
 		a.column_offset = files_clamp(a.column_offset, column_max)
 	}
 	a.rows_top = files_header_height
+	if a.view_mode == .commander {
+		a.rows_top += files_pane_header_height
+	}
 	bar_height := if a.view_mode == .columns && column_max > 0 {
 		files_horizontal_bar_height
 	} else {
@@ -780,9 +834,9 @@ fn (mut a FileBrowserApp) build(size ui2.Rect) !ui2.Element {
 	}
 	mut children := frame_elements(a.visible_rows * (slot_count + 2) + 18)
 
-	// Header: where we are, the way back out, and the two view choices.
+	// Header: where we are, the way back out, and the view choices.
 	view_button_gap := 2
-	view_x := width - files_padding - 3 * files_view_button_width - 2 * view_button_gap
+	view_x := width - files_padding - 4 * files_view_button_width - 3 * view_button_gap
 	children << ui2.button(files_action_up, 'Up', ui2.rect(f64(files_padding), files_path_top, 40, files_path_height), ui2.BoxStyle{
 		bg:     if a.current_path() == '/' { files_up_disabled } else { files_up }
 		radius: 5
@@ -791,13 +845,15 @@ fn (mut a FileBrowserApp) build(size ui2.Rect) !ui2.Element {
 		size:  12
 		align: .center
 	})
+	children << files_view_button(files_action_view_commander, 'Two pane view',
+		'builtin:dual_pane', view_x, a.view_mode == .commander)
 	children << files_view_button(files_action_view_list, 'List view', 'builtin:list_view',
-		view_x, a.view_mode == .list)
+		view_x + files_view_button_width + view_button_gap, a.view_mode == .list)
 	children << files_view_button(files_action_view_columns, 'Column view', 'builtin:column_view',
-		view_x + files_view_button_width + view_button_gap, a.view_mode == .columns)
+		view_x + 2 * (files_view_button_width + view_button_gap), a.view_mode == .columns)
 	children << files_view_button(files_action_settings, 'Files Settings (Cmd+,)', 'builtin:settings',
-		view_x + 2 * (files_view_button_width + view_button_gap), false)
-	if a.view_mode == .list {
+		view_x + 3 * (files_view_button_width + view_button_gap), false)
+	if a.view_mode != .columns {
 		children << ui2.label('', a.current_path(), ui2.rect(files_path_left, files_path_top,
 			f64(a.path_viewport_width), files_path_height), ui2.TextStyle{
 			color: body_heading
@@ -828,6 +884,9 @@ fn (mut a FileBrowserApp) build(size ui2.Rect) !ui2.Element {
 
 	if a.view_mode == .columns {
 		return a.build_miller_columns(width, height, mut children)
+	}
+	if a.view_mode == .commander {
+		return a.build_commander(width, height, mut children)
 	}
 	if a.active_tag_id >= 0 {
 		return a.build_tag_results(width, height, mut children)
@@ -1208,6 +1267,10 @@ fn (mut a FileBrowserApp) begin_vertical_drag(id int, y int, total int, current 
 }
 
 fn (mut a FileBrowserApp) pointer_event(phase AppPointerPhase, button AppPointerButton, scroll int, x int, y int, width int, height int) {
+	if a.view_mode == .commander {
+		a.commander_pointer_event(phase, button, scroll, x, y, width)
+		return
+	}
 	content_left := width - a.viewport_width
 	if phase == .scroll {
 		a.scroll_at(x, y, scroll, width)
@@ -1353,7 +1416,7 @@ fn (mut a FileBrowserApp) handle(event_id string) ! {
 		id := event_id[files_action_tag_prefix.len..].int()
 		if a.settings.tag_index(id) >= 0 {
 			a.active_tag_id = id
-			if a.view_mode == .columns {
+			if a.view_mode != .list {
 				a.set_view_mode(.list)
 				a.active_tag_id = id
 			}
@@ -1375,6 +1438,12 @@ fn (mut a FileBrowserApp) handle(event_id string) ! {
 			}
 			if a.view_mode == .columns {
 				a.go_up_miller()
+			} else if a.view_mode == .commander {
+				if a.active_pane == 0 {
+					a.dual_left.go_up()
+				} else {
+					a.dual_right.go_up()
+				}
 			} else {
 				a.browser.go_up()
 			}
@@ -1388,7 +1457,29 @@ fn (mut a FileBrowserApp) handle(event_id string) ! {
 			a.set_view_mode(.columns)
 			return
 		}
+		files_action_view_commander {
+			a.set_view_mode(.commander)
+			return
+		}
+		files_action_pane_left {
+			a.active_pane = 0
+			return
+		}
+		files_action_pane_right {
+			a.active_pane = 1
+			return
+		}
 		else {}
+	}
+	if event_id.starts_with(files_action_pane_left_row) {
+		a.active_pane = 0
+		a.dual_left.enter(event_id[files_action_pane_left_row.len..].int())
+		return
+	}
+	if event_id.starts_with(files_action_pane_right_row) {
+		a.active_pane = 1
+		a.dual_right.enter(event_id[files_action_pane_right_row.len..].int())
+		return
 	}
 	if row := parse_miller_row_action(event_id) {
 		a.select_miller_row(row.column_id, row.row)

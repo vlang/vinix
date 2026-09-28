@@ -1192,6 +1192,15 @@ fn (mut d Desktop) draw_builtin_glyph(path string, x int, y int, w int, h int, c
 			d.canvas.fill_rect(cx - 3, cy - 5, 1, 10, color)
 			d.canvas.fill_rect(cx + 2, cy - 5, 1, 10, color)
 		}
+		'dual_pane' {
+			d.canvas.stroke_round_rect(cx - 8, cy - 6, 16, 12, 2, color, 255)
+			d.canvas.fill_rect(cx, cy - 5, 1, 10, color)
+			for row in 0 .. 3 {
+				row_y := cy - 4 + row * 4
+				d.canvas.fill_rect(cx - 6, row_y, 4, 1, color)
+				d.canvas.fill_rect(cx + 2, row_y, 4, 1, color)
+			}
+		}
 
 		// Application and file icons. These are filled shapes rather than
 		// hairlines: they are read at a glance and at whatever size the
