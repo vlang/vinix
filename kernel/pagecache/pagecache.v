@@ -196,7 +196,8 @@ fn (mut this Cache) open_buckets() {
 	for count < this.capacity {
 		count *= 2
 	}
-	this.buckets = []&Page{len: count, init: unsafe { nil }}
+	// Freed by release().
+	this.buckets = []&Page{len: count, init: unsafe { nil }} @[freed]
 	this.bucket_mask = u64(count - 1)
 }
 
@@ -473,7 +474,7 @@ pub fn (mut this Cache) sync(context voidptr, store IO) ? {
 	}
 	// Pages dirtied after this point are the next sync's to write, so a
 	// steady writer cannot keep this one going indefinitely.
-	mut dirty := []u64{cap: this.dirty_pages}
+	mut dirty := []u64{cap: this.dirty_pages} @[freed]
 	mut page := this.dirty_first
 	for page != unsafe { nil } {
 		dirty << page.index

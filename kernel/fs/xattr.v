@@ -34,6 +34,15 @@ mut:
 	entries []XAttr
 }
 
+// Nothing slices the entries, so one that grows frees the buffer it outgrew.
+fn new_xattr_set() &XAttrSet {
+	mut set := &XAttrSet{
+		entries: []XAttr{}
+	}
+	set.entries.flags |= .noslices
+	return set
+}
+
 // The file a call acts on and, when it came by a name or a descriptor that
 // has one, the node that names it.
 struct XAttrTarget {
@@ -210,7 +219,9 @@ fn xattr_set(given XAttrTarget, _name charptr, value voidptr, size u64, flags in
 		unsafe { name.free() }
 		return errno.err, errno.get()
 	}
-	mut data := []u8{len: int(size)}
+	// Freed on every failure below, and otherwise kept as the value, which
+	// free_xattrs() frees with the file.
+	mut data := []u8{len: int(size)} @[freed]
 	if size > 0 && !usercopy.copy_from_user(&data[0], u64(value), size) {
 		unsafe {
 			name.free()
@@ -238,9 +249,7 @@ fn xattr_set(given XAttrTarget, _name charptr, value voidptr, size u64, flags in
 		return errno.err, errno.enodata
 	}
 	if res.xattrs == unsafe { nil } {
-		res.xattrs = &XAttrSet{
-			entries: []XAttr{}
-		}
+		res.xattrs = new_xattr_set()
 	}
 	if index >= 0 {
 		unsafe {
@@ -307,6 +316,9 @@ fn xattr_list(target XAttrTarget, list voidptr, size u64) (u64, u64) {
 		return errno.err, errno.get()
 	}
 	mut names := []u8{}
+	// Nothing slices it, so growing frees each outgrown buffer; they were
+	// left behind by every listxattr(2).
+	names.flags |= .noslices
 	defer {
 		unsafe { names.free() }
 	}
@@ -393,9 +405,7 @@ fn xattr_equals(res &resource.Resource, name string, expected string) bool {
 
 fn xattr_put_bytes(mut file TmpFSResource, name string, value []u8) {
 	if file.xattrs == unsafe { nil } {
-		file.xattrs = &XAttrSet{
-			entries: []XAttr{}
-		}
+		file.xattrs = new_xattr_set()
 	}
 	index := xattr_find(file.xattrs, name)
 	if index >= 0 {

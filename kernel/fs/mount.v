@@ -170,16 +170,19 @@ fn detach_mount(mut table MountTable, mut covered VFSNode) {
 	table.lock.release()
 }
 
+// The table keeps copies of the strings, which callers are free to let go of.
+// An entry and its strings are never freed: the copies other namespaces take
+// of a table share them, and /proc/<pid>/mountinfo reads them unlocked.
 fn record_mount(mut table MountTable, covered &VFSNode, root &VFSNode, source string,
 	fstype string, flags u64, options string) &Mount {
 	entry := &Mount{
 		id:      katomic.inc(mut &mount_id_counter) + 1
 		covered: unsafe { covered }
 		root:    unsafe { root }
-		source:  source
-		fstype:  fstype
+		source:  source.clone()
+		fstype:  fstype.clone()
 		flags:   flags & ms_per_mount
-		options: options
+		options: options.clone()
 	}
 	if voidptr(covered) != voidptr(root) {
 		mut root_node := unsafe { root }
@@ -288,7 +291,10 @@ pub fn path_from_root(node &VFSNode, root &VFSNode) ?string {
 	// The nodes, not their names: freeing a []string frees every string in
 	// it, and these are the nodes' own names. Sized so that pushing does not
 	// grow it, since a grown array leaves its old buffer behind here.
-	mut components := []&VFSNode{cap: 32}
+	mut components := []&VFSNode{cap: 32} @[freed]
+	// A path deeper than that grows it; nothing slices it, so the outgrown
+	// buffer is freed.
+	components.flags |= .noslices
 	defer {
 		unsafe { components.free() }
 	}
@@ -324,7 +330,11 @@ fn optional_user_string(pointer charptr, limit int) string {
 	if pointer == unsafe { nil } {
 		return ''
 	}
-	mut bytes := []u8{}
+	// Sized up front: a buffer that grows leaves each outgrown one behind.
+	mut bytes := []u8{cap: limit} @[freed]
+	defer {
+		unsafe { bytes.free() }
+	}
 	for i := 0; i < limit; i++ {
 		mut c := u8(0)
 		if !usercopy.copy_from_user(voidptr(&c), u64(pointer) + u64(i), 1) {
@@ -350,9 +360,9 @@ pub fn syscall_mount(_ voidptr, src charptr, tgt charptr, fs_type charptr, mount
 	// its buffers afterwards, and a bad pointer must be an EFAULT rather than a
 	// kernel dereference. The source is required, as the smoke test expects. The
 	// type may be NULL, as it is for a remount, bind, move or propagation change.
-	// The mount table keeps the source and type for /proc/mounts, so they are
-	// not freed here.
+	// The mount table keeps copies of what it shows in /proc/mounts.
 	source := usercopy.copy_cstring_from_user(u64(src), 4096) or { return errno.err, errno.get() }
+	defer { unsafe { source.free() } }
 	target := usercopy.copy_cstring_from_user(u64(tgt), 4096) or { return errno.err, errno.get() }
 	defer { unsafe { target.free() } }
 	mut fstype := ''
@@ -361,7 +371,9 @@ pub fn syscall_mount(_ voidptr, src charptr, tgt charptr, fs_type charptr, mount
 			return errno.err, errno.get()
 		}
 	}
+	defer { unsafe { fstype.free() } }
 	options := optional_user_string(charptr(data), 4096)
+	defer { unsafe { options.free() } }
 	mut flags := mountflags
 	// Old programs still put MS_MGC_VAL in the top half of the flags.
 	if flags & 0xffff0000 == 0xc0ed0000 {
@@ -448,7 +460,7 @@ fn new_mount(parent &VFSNode, source string, target string, fstype string, flags
 		}
 	}
 
-	parent_of_tgt_node, mut target_node, basename := path2node(parent, target)
+	parent_of_tgt_node, mut target_node, final_component := walk_path(parent, target, 0, true)
 	if target_node == unsafe { nil } {
 		errno.set(errno.enoent)
 		return none
@@ -467,19 +479,34 @@ fn new_mount(parent &VFSNode, source string, target string, fstype string, flags
 		return none
 	}
 
+	// A filesystem that makes a new root names it with this copy; one that
+	// hands back a root it already has keeps nothing of it.
+	basename := final_component.clone()
 	mut mount_node := &VFSNode(unsafe { nil })
 	mut mount_flags := flags
 	if kind == 'cgroup2' {
-		mount_node = cgroup_mount_root(parent_of_tgt_node, basename)?
+		mount_node = cgroup_mount_root(parent_of_tgt_node, basename) or {
+			unsafe { basename.free() }
+			return none
+		}
 	} else if kind == 'overlay' {
-		mount_node = overlay_mount(parent, parent_of_tgt_node, basename, options)?
+		mount_node = overlay_mount(parent, parent_of_tgt_node, basename, options) or {
+			unsafe { basename.free() }
+			return none
+		}
 		// With no upper layer there is nowhere for a change to go.
 		if mount_node.read_only {
 			mount_flags |= ms_rdonly
 		}
 	} else {
 		mut f_sys := unsafe { filesystems[kind].instantiate() }
-		mount_node = f_sys.mount(parent_of_tgt_node, basename, source_node)?
+		mount_node = f_sys.mount(parent_of_tgt_node, basename, source_node) or {
+			unsafe { basename.free() }
+			return none
+		}
+	}
+	if mount_node.name.str != basename.str {
+		unsafe { basename.free() }
 	}
 	if mount_node.children != unsafe { nil } && '.' !in mount_node.children {
 		mount_node.create_dotentries(parent_of_tgt_node)
@@ -495,9 +522,11 @@ fn new_mount(parent &VFSNode, source string, target string, fstype string, flags
 		shown, mount_flags, options)
 
 	if source.len > 0 {
-		print('vfs: Mounted `${source}` to `${target}` with filesystem `${fstype}`\n')
+		C.kprintf(c'vfs: Mounted `%.*s` to `%.*s` with filesystem `%.*s`\n', i32(source.len),
+			source.str, i32(target.len), target.str, i32(fstype.len), fstype.str)
 	} else {
-		print('vfs: Mounted ${fstype} to `${target}`\n')
+		C.kprintf(c'vfs: Mounted %.*s to `%.*s`\n', i32(fstype.len), fstype.str, i32(target.len),
+			target.str)
 	}
 }
 
@@ -508,10 +537,20 @@ fn apply_tmpfs_options(mut root VFSNode, options string) {
 		return
 	}
 	mut res := root.resource
-	for option in options.split(',') {
+	// Each option and value is a view into `options`: split() and slicing
+	// copy, and nothing freed the copies.
+	mut start := 0
+	for start <= options.len {
+		mut end := start
+		for end < options.len && options[end] != `,` {
+			end++
+		}
+		option := unsafe { tos(options.str + start, end - start) }
+		start = end + 1
 		if option.starts_with('mode=') {
 			mut mode := u32(0)
-			for digit in option[5..] {
+			for i in 5 .. option.len {
+				digit := option[i]
 				if digit < `0` || digit > `7` {
 					break
 				}
@@ -519,9 +558,11 @@ fn apply_tmpfs_options(mut root VFSNode, options string) {
 			}
 			res.stat.mode = (res.stat.mode & stat.ifmt) | (mode & 0o7777)
 		} else if option.starts_with('uid=') {
-			res.stat.uid = u32(option[4..].int())
+			value := unsafe { tos(option.str + 4, option.len - 4) }
+			res.stat.uid = u32(value.int())
 		} else if option.starts_with('gid=') {
-			res.stat.gid = u32(option[4..].int())
+			value := unsafe { tos(option.str + 4, option.len - 4) }
+			res.stat.gid = u32(value.int())
 		}
 	}
 }
@@ -601,6 +642,7 @@ fn bind_mount(parent &VFSNode, source string, target string, flags u64) ? {
 	}
 	table.lock.release()
 	record_mount(mut table, target_node, source_node, origin, fstype, flags, 'bind')
+	unsafe { origin.free() }
 }
 
 fn is_beneath(node &VFSNode, ancestor &VFSNode) bool {
@@ -690,7 +732,8 @@ fn remount(parent &VFSNode, target string, flags u64, options string) ? {
 	}
 	entry.flags = flags & ms_per_mount
 	if flags & ms_bind == 0 && options.len > 0 {
-		entry.options = options
+		// The old options may be another namespace's too, so they stay.
+		entry.options = options.clone()
 	}
 }
 
@@ -746,7 +789,8 @@ fn unmount(parent &VFSNode, target string, flags u64) ? {
 		}
 		table.lock.release()
 		for candidate in stale {
-			if _ := path_from_root(candidate.covered, root) {
+			if still_reachable := path_from_root(candidate.covered, root) {
+				unsafe { still_reachable.free() }
 				continue
 			}
 			table.lock.acquire()
@@ -771,6 +815,9 @@ pub fn syscall_chroot(_ voidptr, _path charptr) (u64, u64) {
 		return errno.err, errno.eperm
 	}
 	path := user_path(_path) or { return errno.err, errno.get() }
+	defer {
+		unsafe { path.free() }
+	}
 	if path.len == 0 {
 		return errno.err, errno.enoent
 	}
@@ -795,7 +842,13 @@ pub fn syscall_pivot_root(_ voidptr, _new_root charptr, _put_old charptr) (u64, 
 		return errno.err, errno.get()
 	}
 	new_path := user_path(_new_root) or { return errno.err, errno.get() }
+	defer {
+		unsafe { new_path.free() }
+	}
 	old_path := user_path(_put_old) or { return errno.err, errno.get() }
+	defer {
+		unsafe { old_path.free() }
+	}
 	directory := calling_directory()
 	mut new_root := get_node(directory, new_path, true) or { return errno.err, errno.get() }
 	mut put_old := get_node(directory, old_path, true) or { return errno.err, errno.get() }
@@ -916,7 +969,8 @@ fn visible_mounts(pid int) []VisibleMount {
 	table.lock.acquire()
 	entries := table.mounts.clone()
 	table.lock.release()
-	mut visible := []VisibleMount{cap: entries.len}
+	// Freed, with the paths in it, by free_visible_mounts().
+	mut visible := []VisibleMount{cap: entries.len} @[freed]
 	for entry in entries {
 		path := path_from_root(entry.covered, root) or { continue }
 		visible << VisibleMount{
@@ -1026,7 +1080,14 @@ pub fn record_root_switch(root &VFSNode, fstype string) {
 	table.mounts.clear()
 	table.lock.release()
 	record_mount(mut table, root, root, '/dev/root', fstype, 0, '')
-	for name in root.children.keys() {
+	mut names := root.children.keys()
+	defer {
+		unsafe {
+			names.free()
+			old.free()
+		}
+	}
+	for name in names {
 		if is_dot_name(name) {
 			continue
 		}

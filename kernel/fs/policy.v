@@ -15,6 +15,7 @@
 module fs
 
 import errno
+import lib
 import proc
 import resource
 import stat
@@ -28,11 +29,16 @@ fn policy_path(node &VFSNode) string {
 	return path_from_root(node, vfs_root) or { global_pathname(node) }
 }
 
+// Built in one buffer: `directory + '/' + name` made a string for the first
+// `+` that nothing freed. Callers free the result.
 fn join_policy_path(directory string, name string) string {
-	if directory == '/' {
-		return '/' + name
+	mut text := lib.new_text(directory.len + name.len + 1)
+	if directory != '/' {
+		text.add(directory)
 	}
-	return directory + '/' + name
+	text.add_byte(`/`)
+	text.add(name)
+	return text.str()
 }
 
 @[inline]

@@ -37,7 +37,12 @@ pub fn install_disk_root(mut root VFSNode) bool {
 		}
 	}
 	for name in disk_root_carried {
-		existing := get_node(old_root, '/${name}', true) or { continue }
+		path := '/${name}' @[freed]
+		existing := get_node(old_root, path, true) or {
+			unsafe { path.free() }
+			continue
+		}
+		unsafe { path.free() }
 		carried << existing
 		carried_names << name
 	}

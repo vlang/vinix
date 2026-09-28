@@ -26,6 +26,7 @@ import numa
 import memory
 import resource
 import event.eventstruct
+import lib
 
 // Vinix's scheduler carries 64-bit affinity masks, so this is the largest CPU
 // number any of these files can name.
@@ -167,28 +168,55 @@ fn add_sysfs_generated(mut parent VFSNode, name string, kind SysFSKind, node_id 
 
 // ── The trees ───────────────────────────────────────────────────────────────
 
+// The tree is made once and kept, so its texts and names are too. They are
+// built in lib.Text all the same, which leaves nothing else behind.
+
+// `prefix` then `value` in decimal: a name such as cpu0.
+fn sysfs_numbered(prefix string, value int) string {
+	mut text := lib.new_text(prefix.len + 20)
+	text.add(prefix)
+	text.add_decimal(i64(value))
+	return text.str()
+}
+
+// `value` in decimal and a newline.
+fn sysfs_decimal_line(value i64) string {
+	mut text := lib.new_text(24)
+	text.add_decimal(value)
+	text.add_byte(`\n`)
+	return text.str()
+}
+
+// A cpulist and a newline.
+fn sysfs_list_line(mask u64) string {
+	mut text := lib.new_text(64)
+	add_cpu_list(mut text, mask)
+	text.add_byte(`\n`)
+	return text.str()
+}
+
 fn build_cpu_tree(mut system VFSNode) {
 	mut cpus := add_sysfs_directory(mut system, 'cpu')
 	count := numa.cpu_count()
-	present := if count > 0 { cpu_list(all_cpus_mask(count)) } else { '' }
+	present := if count > 0 { all_cpus_mask(count) } else { u64(0) }
 	// glibc reads `online` for sysconf(_SC_NPROCESSORS_ONLN), and every CPU
 	// Vinix starts stays started, so the three lists are the same list.
-	add_sysfs_text(mut cpus, 'possible', '${present}\n')
-	add_sysfs_text(mut cpus, 'present', '${present}\n')
-	add_sysfs_text(mut cpus, 'online', '${present}\n')
+	add_sysfs_text(mut cpus, 'possible', sysfs_list_line(present))
+	add_sysfs_text(mut cpus, 'present', sysfs_list_line(present))
+	add_sysfs_text(mut cpus, 'online', sysfs_list_line(present))
 	add_sysfs_text(mut cpus, 'offline', '\n')
-	add_sysfs_text(mut cpus, 'kernel_max', '${sysfs_max_cpus - 1}\n')
+	add_sysfs_text(mut cpus, 'kernel_max', sysfs_decimal_line(sysfs_max_cpus - 1))
 
 	for i := 0; i < count && i < sysfs_max_cpus; i++ {
-		mut entry := add_sysfs_directory(mut cpus, 'cpu${i}')
+		mut entry := add_sysfs_directory(mut cpus, sysfs_numbered('cpu', i))
 		mut topology := add_sysfs_directory(mut entry, 'topology')
 		// A logical CPU is its own core and its own package here: Vinix does not
 		// read the sibling maps that would say otherwise, and inventing them
 		// would mislead a program that schedules by them.
-		add_sysfs_text(mut topology, 'core_id', '${i}\n')
-		add_sysfs_text(mut topology, 'physical_package_id', '${numa.node_of_cpu(i)}\n')
-		add_sysfs_text(mut topology, 'core_siblings_list', '${i}\n')
-		add_sysfs_text(mut topology, 'thread_siblings_list', '${i}\n')
+		add_sysfs_text(mut topology, 'core_id', sysfs_decimal_line(i64(i)))
+		add_sysfs_text(mut topology, 'physical_package_id', sysfs_decimal_line(i64(numa.node_of_cpu(i))))
+		add_sysfs_text(mut topology, 'core_siblings_list', sysfs_decimal_line(i64(i)))
+		add_sysfs_text(mut topology, 'thread_siblings_list', sysfs_decimal_line(i64(i)))
 	}
 }
 
@@ -208,25 +236,29 @@ fn build_node_tree(mut system VFSNode) {
 			with_memory |= u64(1) << u64(id)
 		}
 	}
-	add_sysfs_text(mut nodes, 'possible', '${cpu_list(declared)}\n')
-	add_sysfs_text(mut nodes, 'online', '${cpu_list(declared)}\n')
-	add_sysfs_text(mut nodes, 'has_cpu', '${cpu_list(with_cpus)}\n')
-	add_sysfs_text(mut nodes, 'has_memory', '${cpu_list(with_memory)}\n')
-	add_sysfs_text(mut nodes, 'has_normal_memory', '${cpu_list(with_memory)}\n')
+	add_sysfs_text(mut nodes, 'possible', sysfs_list_line(declared))
+	add_sysfs_text(mut nodes, 'online', sysfs_list_line(declared))
+	add_sysfs_text(mut nodes, 'has_cpu', sysfs_list_line(with_cpus))
+	add_sysfs_text(mut nodes, 'has_memory', sysfs_list_line(with_memory))
+	add_sysfs_text(mut nodes, 'has_normal_memory', sysfs_list_line(with_memory))
 
 	for id := 0; id < count && id < 64; id++ {
-		mut entry := add_sysfs_directory(mut nodes, 'node${id}')
+		mut entry := add_sysfs_directory(mut nodes, sysfs_numbered('node', id))
 		mask := numa.node_cpu_mask(id)
-		add_sysfs_text(mut entry, 'cpumap', '${cpu_map(mask)}\n')
-		add_sysfs_text(mut entry, 'cpulist', '${cpu_list(mask)}\n')
-		mut distances := ''
+		mut cpumap := lib.new_text(24)
+		add_cpu_map(mut cpumap, mask)
+		cpumap.add_byte(`\n`)
+		add_sysfs_text(mut entry, 'cpumap', cpumap.str())
+		add_sysfs_text(mut entry, 'cpulist', sysfs_list_line(mask))
+		mut distances := lib.new_text(count * 4 + 1)
 		for other := 0; other < count; other++ {
 			if other != 0 {
-				distances += ' '
+				distances.add_byte(` `)
 			}
-			distances += '${numa.distance(id, other)}'
+			distances.add_decimal(i64(numa.distance(id, other)))
 		}
-		add_sysfs_text(mut entry, 'distance', '${distances}\n')
+		distances.add_byte(`\n`)
+		add_sysfs_text(mut entry, 'distance', distances.str())
 		add_sysfs_generated(mut entry, 'meminfo', .node_meminfo, id)
 		add_sysfs_generated(mut entry, 'numastat', .node_numastat, id)
 	}
@@ -240,10 +272,10 @@ fn all_cpus_mask(count int) u64 {
 	return mask
 }
 
-// The comma-separated ranges Linux calls a "cpulist": "0-1", "0,2-3", or the
-// empty string for nothing at all.
-fn cpu_list(mask u64) string {
-	mut out := ''
+// The comma-separated ranges Linux calls a "cpulist": "0-1", "0,2-3", or
+// nothing at all for no CPUs.
+fn add_cpu_list(mut text lib.Text, mask u64) {
+	start := text.len()
 	mut i := 0
 	for i < sysfs_max_cpus {
 		if mask & (u64(1) << u64(i)) == 0 {
@@ -254,25 +286,29 @@ fn cpu_list(mask u64) string {
 		for last + 1 < sysfs_max_cpus && mask & (u64(1) << u64(last + 1)) != 0 {
 			last++
 		}
-		if out.len != 0 {
-			out += ','
+		if text.len() != start {
+			text.add_byte(`,`)
 		}
-		out += if last == i { '${i}' } else { '${i}-${last}' }
+		text.add_decimal(i64(i))
+		if last != i {
+			text.add_byte(`-`)
+			text.add_decimal(i64(last))
+		}
 		i = last + 1
 	}
-	return out
 }
 
 // The "cpumap" spelling of the same set: 32-bit hex groups, most significant
 // first, comma separated. Trailing empty groups are not printed, so a machine
 // with four CPUs reports one group.
-fn cpu_map(mask u64) string {
+fn add_cpu_map(mut text lib.Text, mask u64) {
 	high := u32(mask >> 32)
 	low := u32(mask)
 	if high != 0 {
-		return '${high:08x},${low:08x}'
+		text.add_radix(u64(high), 16, 8)
+		text.add_byte(`,`)
 	}
-	return '${low:08x}'
+	text.add_radix(u64(low), 16, 8)
 }
 
 // ── Generated file contents ─────────────────────────────────────────────────
@@ -286,7 +322,11 @@ fn (this &SysFSResource) contents() string {
 			total_kb := memory.pmm_node_total_pages(this.node) * page_size / 1024
 			free_kb := memory.pmm_node_free_pages(this.node) * page_size / 1024
 			used_kb := if total_kb > free_kb { total_kb - free_kb } else { u64(0) }
-			return 'Node ${this.node} MemTotal:       ${total_kb} kB\nNode ${this.node} MemFree:        ${free_kb} kB\nNode ${this.node} MemUsed:        ${used_kb} kB\n'
+			mut text := lib.new_text(160)
+			add_node_meminfo_line(mut text, this.node, ' MemTotal:       ', total_kb)
+			add_node_meminfo_line(mut text, this.node, ' MemFree:        ', free_kb)
+			add_node_meminfo_line(mut text, this.node, ' MemUsed:        ', used_kb)
+			return text.str()
 		}
 		.node_numastat {
 			// Vinix does not count the faults that missed their preferred node,
@@ -300,6 +340,14 @@ fn (this &SysFSResource) contents() string {
 	}
 }
 
+fn add_node_meminfo_line(mut text lib.Text, node int, label string, kb u64) {
+	text.add('Node ')
+	text.add_decimal(i64(node))
+	text.add(label)
+	text.add_unsigned(kb)
+	text.add(' kB\n')
+}
+
 fn (mut this SysFSResource) read(_handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
 	if stat.isdir(this.stat.mode) {
 		errno.set(errno.eisdir)
@@ -307,6 +355,12 @@ fn (mut this SysFSResource) read(_handle voidptr, buf voidptr, loc u64, count u6
 	}
 
 	text := this.contents()
+	// The generated kinds make their text afresh for every read.
+	defer {
+		if this.kind != .text {
+			unsafe { text.free() }
+		}
+	}
 	if loc >= u64(text.len) {
 		return i64(0)
 	}

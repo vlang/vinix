@@ -258,7 +258,9 @@ fn (mut this DevTmpFS) symlink(parent &VFSNode, dest string, target string) &VFS
 
 	new_node.resource = new_resource
 
-	new_node.symlink_target = dest
+	// A copy of its own, as every filesystem keeps: symlinkat(2) frees the
+	// text it was given.
+	new_node.symlink_target = dest.clone()
 
 	return new_node
 }
@@ -268,7 +270,8 @@ fn ensure_devtmpfs_dir(parent &VFSNode, name string) &VFSNode {
 		return unsafe { parent.children[name] or { panic('devtmpfs: missing child ${name}') } }
 	}
 
-	mut new_node := create_node(unsafe { filesystems['devtmpfs'] }, parent, name, true)
+	// `name` may point into a longer path; the node keeps a copy.
+	mut new_node := create_node(unsafe { filesystems['devtmpfs'] }, parent, name.clone(), true)
 	mut new_resource := &DevTmpFSResource{
 		storage: unsafe { nil }
 		refcount: 1
@@ -304,24 +307,27 @@ pub fn devtmpfs_add_device(device &resource.Resource, name string) {
 	mut leaf := name
 
 	if name.contains('/') {
-		parts := name.split('/')
-		mut path_parts := []string{}
-		for part in parts {
-			if part.len > 0 {
-				path_parts << part
+		// Every pty's pts/N comes and goes through here. The components are
+		// views into `name`, where split() made copies nothing freed, and the
+		// node is given a copy of its own name.
+		mut last := ''
+		mut start := 0
+		for end := 0; end <= name.len; end++ {
+			if end < name.len && name[end] != `/` {
+				continue
 			}
+			if end > start {
+				if last.len > 0 {
+					parent = ensure_devtmpfs_dir(parent, last)
+				}
+				last = unsafe { tos(name.str + start, end - start) }
+			}
+			start = end + 1
 		}
-		if path_parts.len == 0 {
+		if last.len == 0 {
 			return
 		}
-
-		for i, part in path_parts {
-			if i == path_parts.len - 1 {
-				leaf = part
-				break
-			}
-			parent = ensure_devtmpfs_dir(parent, part)
-		}
+		leaf = last.clone()
 	}
 
 	if leaf.len == 0 {
@@ -355,30 +361,28 @@ pub fn devtmpfs_remove_device(name string) bool {
 	mut parent := devtmpfs_root
 	mut leaf := name
 	if name.contains('/') {
-		parts := name.split('/')
-		mut path_parts := []string{}
-		defer {
-			unsafe { path_parts.free() }
-		}
-		for part in parts {
-			if part.len > 0 {
-				path_parts << part
+		// Views into `name`, as in devtmpfs_add_device().
+		mut last := ''
+		mut start := 0
+		for end := 0; end <= name.len; end++ {
+			if end < name.len && name[end] != `/` {
+				continue
 			}
+			if end > start {
+				if last.len > 0 {
+					if parent.children == unsafe { nil } || last !in parent.children {
+						return false
+					}
+					parent = unsafe { parent.children[last] }
+				}
+				last = unsafe { tos(name.str + start, end - start) }
+			}
+			start = end + 1
 		}
-		if path_parts.len == 0 {
+		if last.len == 0 {
 			return false
 		}
-
-		for i, part in path_parts {
-			if i == path_parts.len - 1 {
-				leaf = part
-				break
-			}
-			if parent.children == unsafe { nil } || part !in parent.children {
-				return false
-			}
-			parent = unsafe { parent.children[part] }
-		}
+		leaf = last
 	}
 
 	if parent == unsafe { nil } || parent.children == unsafe { nil } || leaf !in parent.children {

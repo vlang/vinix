@@ -113,9 +113,9 @@ fn check_ustar(hdr &USTARHeader) bool {
 
 @[manualfree]
 fn unpack(initramfs_begin voidptr, initramfs_size u64, module_index u64) {
-	println('initramfs: Module:  ${module_index + 1}')
-	println('initramfs: Address: 0x${voidptr(initramfs_begin):x}')
-	println('initramfs: Size:    ${u32(initramfs_size):u}')
+	C.kprintf(c'initramfs: Module:  %llu\n', u64(module_index + 1))
+	C.kprintf(c'initramfs: Address: 0x%llx\n', u64(initramfs_begin))
+	C.kprintf(c'initramfs: Size:    %llu\n', u64(u32(initramfs_size)))
 
 	uart_puts('initramfs: Unpacking...\n')
 
@@ -155,9 +155,12 @@ fn unpack(initramfs_begin voidptr, initramfs_size u64, module_index u64) {
 
 		// Prefix support for USTAR (paths >100 chars split into prefix + name)
 		mut full_name := name
+		mut joined := false
 		prefix := ustar_field_string(&current_header.prefix[0], current_header.prefix.len)
 		if prefix.len > 0 && name_override == '' {
-			full_name = '${prefix}/${name}'
+			// Freed after the entry: the filesystem copies what it keeps.
+			full_name = '${prefix}/${name}' @[freed]
+			joined = true
 		}
 
 		link_name := ustar_field_string(&current_header.link_name[0], current_header.link_name.len)
@@ -238,6 +241,9 @@ fn unpack(initramfs_begin voidptr, initramfs_size u64, module_index u64) {
 		uart_putc(`!`)
 
 		next:
+		if joined {
+			unsafe { full_name.free() }
+		}
 		current_header = unsafe {
 			&USTARHeader(usize(current_header) + usize(512) + usize(lib.align_up(size, 512)))
 		}

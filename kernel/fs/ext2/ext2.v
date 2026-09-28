@@ -258,9 +258,13 @@ fn (mut this EXT2Resource) unref(handle voidptr) ? {
 		// description closed. A read-only close has written no data and must
 		// not flush the entire filesystem cache: package installers close many
 		// large input archives while other files still have dirty pages.
-		if this.refcount == 1 && handle != unsafe { nil }
-			&& (unsafe { &file.Handle(handle) }.flags & resource_mod.o_accmode) in [resource_mod.o_wronly, resource_mod.o_rdwr] {
-			this.sync(handle)?
+		// Compared one by one: `in` an array literal made the array on every
+		// close.
+		if this.refcount == 1 && handle != unsafe { nil } {
+			access := unsafe { &file.Handle(handle) }.flags & resource_mod.o_accmode
+			if access == resource_mod.o_wronly || access == resource_mod.o_rdwr {
+				this.sync(handle)?
+			}
 		}
 		return
 	}
@@ -455,13 +459,15 @@ fn (mut bro EXT2Filesystem) instantiate() &vfs.FileSystem {
 	this.frag_size = 1024 << this.superblock.frag_size
 	this.bgd_cnt = lib.div_roundup(this.superblock.block_cnt, this.superblock.blocks_per_group)
 
-	print('ext2: filesystem detected on device ${vfs.pathname(this.backing_device)}\n')
-	print('ext2: inode count: ${this.superblock.inode_cnt}\n')
-	print('ext2: inodes per group: ${this.superblock.inodes_per_group:x}\n')
-	print('ext2: block count: ${this.superblock.block_cnt:x}\n')
-	print('ext2: blocks per group: ${this.superblock.blocks_per_group:x}\n')
-	print('ext2: block size: ${this.block_size:x}\n')
-	print('ext2: bgd count: ${this.bgd_cnt:x}\n')
+	device := vfs.pathname(this.backing_device)
+	C.kprintf(c'ext2: filesystem detected on device %.*s\n', i32(device.len), device.str)
+	unsafe { device.free() }
+	C.kprintf(c'ext2: inode count: %llu\n', u64(this.superblock.inode_cnt))
+	C.kprintf(c'ext2: inodes per group: %llx\n', u64(this.superblock.inodes_per_group))
+	C.kprintf(c'ext2: block count: %llx\n', u64(this.superblock.block_cnt))
+	C.kprintf(c'ext2: blocks per group: %llx\n', u64(this.superblock.blocks_per_group))
+	C.kprintf(c'ext2: block size: %llx\n', u64(this.block_size))
+	C.kprintf(c'ext2: bgd count: %llx\n', u64(this.bgd_cnt))
 
 	this.root_inode.read_entry(mut this, 2) or {
 		print('ext2: unable to read root inode\n')

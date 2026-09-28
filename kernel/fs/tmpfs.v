@@ -198,7 +198,8 @@ fn (mut this TmpFSResource) ensure_paged_locked() bool {
 		return true
 	}
 	page_count := lib.div_roundup(u64(this.stat.size), page_size)
-	mut pages := []u64{cap: int(page_count)}
+	// Kept as this.pages, which unref() frees.
+	mut pages := []u64{cap: int(page_count)} @[freed]
 	size := u64(this.stat.size)
 	for i := u64(0); i < page_count; i++ {
 		phys := memory.pmm_alloc_fallible(1)
@@ -239,7 +240,8 @@ fn (mut this TmpFSResource) grow_pages_locked(page_count u64) bool {
 		if u64(wanted) < page_count {
 			wanted = int(page_count)
 		}
-		mut larger := []u64{cap: wanted}
+		// Kept as this.pages, which unref() frees.
+		mut larger := []u64{cap: wanted} @[freed]
 		larger << this.pages
 		unsafe { this.pages.free() }
 		this.pages = larger
@@ -638,7 +640,9 @@ fn (mut this TmpFS) symlink(parent &VFSNode, dest string, target string) &VFSNod
 
 	new_node.resource = new_resource
 
-	new_node.symlink_target = dest
+	// A copy of its own, as every filesystem keeps: symlinkat(2) frees the
+	// text it was given.
+	new_node.symlink_target = dest.clone()
 
 	return new_node
 }

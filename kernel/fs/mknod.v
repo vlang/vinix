@@ -31,6 +31,9 @@ pub mut:
 	can_mmap bool
 
 	backing &resource.Resource = unsafe { nil }
+	// The node's own interface value for this, handed to every open that the
+	// backing device does not decide. Making one per open left it behind.
+	boxed &resource.Resource = unsafe { nil }
 }
 
 // A device that decides what an open returns, as /dev/tty and /dev/ptmx do,
@@ -40,7 +43,7 @@ fn (mut this MknodDeviceResource) open(flags int) ?&resource.Resource {
 	if mut backing is resource.OpenableResource {
 		return backing.open(flags)
 	}
-	return &resource.Resource(this)
+	return this.boxed
 }
 
 fn (mut this MknodDeviceResource) read(handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
@@ -183,14 +186,18 @@ fn install_device_node(mut parent VFSNode, name string, mode u32, rdev u64, back
 	}
 	res.stat.mode = mode
 	res.stat.rdev = rdev
-	number_special_node(mut res, parent)
 	res.stat.nlink = 1
 	res.stat.blksize = 512
 	res.can_mmap = backing.can_mmap
 	res.stat.atim = realtime_clock
 	res.stat.ctim = realtime_clock
 	res.stat.mtim = realtime_clock
-	node.resource = res
+	// One interface value, kept for the life of the node: passing `res` where
+	// a resource.Resource is taken makes a new one each time.
+	mut boxed := &resource.Resource(res)
+	res.boxed = boxed
+	number_special_node(mut boxed, parent)
+	node.resource = boxed
 	apply_creation_identity(mut node, parent)?
 	unsafe {
 		parent.children[name] = node
@@ -205,9 +212,11 @@ fn make_fifo_node(mut parent VFSNode, name string, mode u32) ?&VFSNode {
 		errno.set(errno.enomem)
 		return none
 	}
-	number_special_node(mut new_pipe, parent)
+	// One interface value for the node, rather than one more for the call.
+	mut boxed := &resource.Resource(new_pipe)
+	number_special_node(mut boxed, parent)
 	mut node := create_node(parent.filesystem, parent, name, false)
-	node.resource = new_pipe
+	node.resource = boxed
 	apply_creation_identity(mut node, parent)?
 	unsafe {
 		parent.children[name] = node
@@ -217,6 +226,9 @@ fn make_fifo_node(mut parent VFSNode, name string, mode u32) ?&VFSNode {
 
 pub fn syscall_mknodat(_ voidptr, dirfd int, _path charptr, mode u32, dev u64) (u64, u64) {
 	path := user_path(_path) or { return errno.err, errno.get() }
+	defer {
+		unsafe { path.free() }
+	}
 	if path.len == 0 {
 		return errno.err, errno.enoent
 	}
@@ -229,7 +241,8 @@ pub fn syscall_mknodat(_ voidptr, dirfd int, _path charptr, mode u32, dev u64) (
 	}
 
 	parent := get_parent_dir(dirfd, path) or { return errno.err, errno.get() }
-	parent_of_tgt_node, target_node, basename := path2node(parent, path)
+	// A view into `path`: the node made below is given a copy of its own.
+	parent_of_tgt_node, target_node, basename := walk_path(parent, path, 0, true)
 	if unsafe { parent_of_tgt_node == 0 } {
 		return errno.err, errno.enoent
 	}
@@ -264,7 +277,7 @@ pub fn syscall_mknodat(_ voidptr, dirfd int, _path charptr, mode u32, dev u64) (
 	// layer.
 	if dir.overlay != unsafe { nil } && (kind == stat.ififo || kind == stat.ifchr
 		|| kind == stat.ifblk) {
-		overlay_mknod(mut dir, basename, kind | final_mode, dev) or {
+		overlay_mknod(mut dir, basename.clone(), kind | final_mode, dev) or {
 			return errno.err, errno.get()
 		}
 		return 0, 0
@@ -276,10 +289,12 @@ pub fn syscall_mknodat(_ voidptr, dirfd int, _path charptr, mode u32, dev u64) (
 			}
 		}
 		stat.ififo {
-			make_fifo_node(mut dir, basename, final_mode) or { return errno.err, errno.get() }
+			make_fifo_node(mut dir, basename.clone(), final_mode) or {
+				return errno.err, errno.get()
+			}
 		}
 		stat.ifchr, stat.ifblk {
-			make_device_node(mut dir, basename, kind | final_mode, dev) or {
+			make_device_node(mut dir, basename.clone(), kind | final_mode, dev) or {
 				return errno.err, errno.get()
 			}
 		}

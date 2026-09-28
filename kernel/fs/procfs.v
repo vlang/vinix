@@ -37,6 +37,8 @@ pub type NetTcpSnapshot = fn () string
 // with itself.
 const uname_release = '0.1.0'
 
+const uname_release_line = uname_release + '\n'
+
 // What a node under /proc describes. Directories are rebuilt on access; the
 // files generate their contents when they are read.
 enum ProcFSKind {
@@ -203,7 +205,7 @@ fn (mut this ProcFS) mount(parent &VFSNode, name string, _source &VFSNode) ?&VFS
 fn retarget_view(mut root VFSNode, view voidptr) {
 	mut root_resource := unsafe { &ProcFSResource(root.resource) }
 	root_resource.view = view
-	for link_name in ['self', 'thread-self'] {
+	for link_name in ['self', 'thread-self']! {
 		if link_name in root.children {
 			link := unsafe { root.children[link_name] }
 			mut link_resource := unsafe { &ProcFSResource(link.resource) }
@@ -238,16 +240,16 @@ fn (mut this ProcFS) build_root(parent &VFSNode, name string, view voidptr) &VFS
 
 	mut sys := add_procfs_directory(mut root, 'sys')
 	mut sys_fs := add_procfs_directory(mut sys, 'fs')
-	add_procfs_text(mut sys_fs, 'nr_open', '${proc.max_fds}\n')
+	add_procfs_text(mut sys_fs, 'nr_open', decimal_line(proc.max_fds))
 	mut inotify := add_procfs_directory(mut sys_fs, 'inotify')
 	add_procfs_text(mut inotify, 'max_user_watches', '8192\n')
 	add_procfs_text(mut inotify, 'max_user_instances', '128\n')
 	add_procfs_text(mut inotify, 'max_queued_events', '16384\n')
 	mut sys_kernel := add_procfs_directory(mut sys, 'kernel')
 	add_procfs_text(mut sys_kernel, 'ostype', 'Linux\n')
-	add_procfs_text(mut sys_kernel, 'osrelease', '${uname_release}\n')
-	add_procfs_text(mut sys_kernel, 'pid_max', '${proc.max_pid}\n')
-	add_procfs_text(mut sys_kernel, 'threads-max', '${proc.max_pid}\n')
+	add_procfs_text(mut sys_kernel, 'osrelease', uname_release_line)
+	add_procfs_text(mut sys_kernel, 'pid_max', decimal_line(proc.max_pid))
+	add_procfs_text(mut sys_kernel, 'threads-max', decimal_line(proc.max_pid))
 	mut sys_kernel_keys := add_procfs_directory(mut sys_kernel, 'keys')
 	add_procfs_text(mut sys_kernel_keys, 'root_maxkeys', '1000000\n')
 	add_procfs_text(mut sys_kernel_keys, 'root_maxbytes', '25000000\n')
@@ -281,7 +283,7 @@ fn (mut this ProcFS) build_root(parent &VFSNode, name string, view voidptr) &VFS
 	add_procfs_file(mut root, 'stat', .machine_stat)
 	add_procfs_file(mut root, 'filesystems', .filesystems)
 	add_procfs_file(mut root, 'mounts', .self_mounts)
-	add_procfs_text(mut sys_kernel, 'cap_last_cap', '${proc.cap_last_cap}\n')
+	add_procfs_text(mut sys_kernel, 'cap_last_cap', decimal_line(proc.cap_last_cap))
 	add_procfs_text(mut sys_kernel, 'hostname', 'vinix\n')
 	mut sys_vm := add_procfs_directory(mut sys, 'vm')
 	add_procfs_text(mut sys_vm, 'overcommit_memory', '0\n')
@@ -376,7 +378,7 @@ fn build_net_sysctls(mut sys_net VFSNode) {
 	add_procfs_sysctl(mut ipv4, 'ip_local_port_range', '32768\t60999\n')
 	add_procfs_sysctl(mut ipv4, 'ip_unprivileged_port_start', '1024\n')
 	mut ipv4_conf := add_procfs_directory(mut ipv4, 'conf')
-	for scope in ['all', 'default'] {
+	for scope in ['all', 'default']! {
 		mut dir := add_procfs_directory(mut ipv4_conf, scope)
 		add_procfs_sysctl(mut dir, 'forwarding', '1\n')
 		add_procfs_sysctl(mut dir, 'route_localnet', '0\n')
@@ -392,7 +394,7 @@ fn build_net_sysctls(mut sys_net VFSNode) {
 	mut ipv6 := add_procfs_directory(mut sys_net, 'ipv6')
 	add_procfs_sysctl(mut ipv6, 'ip_nonlocal_bind', '0\n')
 	mut ipv6_conf := add_procfs_directory(mut ipv6, 'conf')
-	for scope in ['all', 'default'] {
+	for scope in ['all', 'default']! {
 		mut dir := add_procfs_directory(mut ipv6_conf, scope)
 		add_procfs_sysctl(mut dir, 'forwarding', '0\n')
 		add_procfs_sysctl(mut dir, 'disable_ipv6', '0\n')
@@ -405,7 +407,7 @@ fn build_net_sysctls(mut sys_net VFSNode) {
 
 	mut bridge := add_procfs_directory(mut sys_net, 'bridge')
 	for knob in ['bridge-nf-call-iptables', 'bridge-nf-call-ip6tables',
-		'bridge-nf-call-arptables'] {
+		'bridge-nf-call-arptables']! {
 		add_procfs_sysctl(mut bridge, knob, '0\n')
 	}
 }
@@ -462,6 +464,15 @@ fn process_exe_node(pid int) &VFSNode {
 	return unsafe { &VFSNode(process.exe_node) }
 }
 
+// `value` and a newline, as a /proc/sys file reads, without the string an
+// interpolated number leaves behind.
+fn decimal_line(value i64) string {
+	mut text := lib.new_text(24)
+	text.add_decimal(value)
+	text.add_byte(`\n`)
+	return text.str()
+}
+
 fn add_procfs_text(mut parent VFSNode, name string, text string) &VFSNode {
 	mut node := add_procfs_file(mut parent, name, .text)
 	mut file_resource := unsafe { &ProcFSResource(node.resource) }
@@ -484,7 +495,19 @@ fn (this &ProcFSResource) contents() string {
 			// the kernel heap has, the page caches' own storage included.
 			cached_kb := pagecache.resident_bytes() / 1024
 			slab_kb := heap_pages() * page_size / 1024
-			return 'MemTotal:       ${total_kb} kB\nMemFree:        ${free_kb} kB\nMemAvailable:   ${free_kb} kB\nBuffers:               0 kB\nCached:         ${cached_kb} kB\nSwapTotal:             0 kB\nSwapFree:              0 kB\nSlab:           ${slab_kb} kB\n'
+			mut text := lib.new_text(256)
+			text.add('MemTotal:       ')
+			text.add_unsigned(total_kb)
+			text.add(' kB\nMemFree:        ')
+			text.add_unsigned(free_kb)
+			text.add(' kB\nMemAvailable:   ')
+			text.add_unsigned(free_kb)
+			text.add(' kB\nBuffers:               0 kB\nCached:         ')
+			text.add_unsigned(cached_kb)
+			text.add(' kB\nSwapTotal:             0 kB\nSwapFree:              0 kB\nSlab:           ')
+			text.add_unsigned(slab_kb)
+			text.add(' kB\n')
+			return text.str()
 		}
 		.slabinfo {
 			return slabinfo_text()
@@ -492,10 +515,22 @@ fn (this &ProcFSResource) contents() string {
 		.uptime {
 			seconds := time.monotonic_ns() / 1000000000
 			hundredths := (time.monotonic_ns() / 10000000) % 100
-			return '${seconds}.${hundredths:02} ${seconds}.${hundredths:02}\n'
+			mut text := lib.new_text(48)
+			for i in 0 .. 2 {
+				if i > 0 {
+					text.add_byte(` `)
+				}
+				text.add_unsigned(seconds)
+				text.add_byte(`.`)
+				text.add_radix(hundredths, 10, 2)
+			}
+			text.add_byte(`\n`)
+			return text.str()
 		}
 		.version {
-			return 'Linux version ${uname_release} (vinix) #1 SMP\n'
+			// Freed by read(), as every generated text is.
+			text := 'Linux version ${uname_release} (vinix) #1 SMP\n' @[freed]
+			return text
 		}
 		.cmdline {
 			// Vinix does not retain the argument vector after exec, so the one
@@ -624,14 +659,21 @@ fn cpuinfo_text() string {
 
 fn machine_stat_text() string {
 	count := numa.cpu_count()
-	mut text := 'cpu  0 0 0 0 0 0 0 0 0 0\n'
+	mut text := lib.new_text(count * 32 + 160)
+	text.add('cpu  0 0 0 0 0 0 0 0 0 0\n')
 	for i := 0; i < count; i++ {
-		text += 'cpu${i} 0 0 0 0 0 0 0 0 0 0\n'
+		text.add('cpu')
+		text.add_unsigned(u64(i))
+		text.add(' 0 0 0 0 0 0 0 0 0 0\n')
 	}
 	seconds := time.monotonic_ns() / 1000000000
 	boot := (realtime_clock.tv_sec - i64(seconds))
-	text += 'intr 0\nctxt 0\nbtime ${boot}\nprocesses ${proc.process_count()}\nprocs_running 1\nprocs_blocked 0\n'
-	return text
+	text.add('intr 0\nctxt 0\nbtime ')
+	text.add_decimal(boot)
+	text.add('\nprocesses ')
+	text.add_decimal(i64(proc.process_count()))
+	text.add('\nprocs_running 1\nprocs_blocked 0\n')
+	return text.str()
 }
 
 fn (mut this ProcFSResource) read(_handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
@@ -670,9 +712,15 @@ fn (mut this ProcFSResource) write(_handle voidptr, buf voidptr, _loc u64, count
 	// it so that a runtime configuring a container is not stopped by an EPERM.
 	match this.kind {
 		.oom_score_adj {
-			mut text := []u8{len: int(count)}
-			unsafe { C.memcpy(&text[0], buf, count) }
-			value := text.bytestr().trim_space().int()
+			// Read in place: copying the bytes out, into a string and a
+			// trimmed string left all three behind on every write.
+			if count == 0 {
+				return i64(0)
+			}
+			written := unsafe { tos(&u8(buf), int(count)) }
+			trimmed := written.trim_space()
+			value := trimmed.int()
+			unsafe { trimmed.free() }
 			proc.set_process_oom_score_adj(this.pid, value)
 			return i64(count)
 		}
@@ -688,9 +736,12 @@ fn (mut this ProcFSResource) write(_handle voidptr, buf voidptr, _loc u64, count
 			return i64(count)
 		}
 		.sysctl {
-			mut text := []u8{len: int(count)}
-			unsafe { C.memcpy(&text[0], buf, count) }
-			this.text = text.bytestr()
+			// The text it replaces stays: read() copies from it unlocked.
+			if count == 0 {
+				return i64(0)
+			}
+			written := unsafe { tos(&u8(buf), int(count)) }
+			this.text = written.clone()
 			this.stat.size = u64(this.text.len)
 			return i64(count)
 		}
@@ -993,7 +1044,7 @@ fn add_smaps_details(mut text lib.Text, info mmap.MappingInfo) {
 	add_smaps_line(mut text, 'Referenced:', resident)
 	add_smaps_line(mut text, 'Anonymous:', if anonymous { resident } else { u64(0) })
 	for name in ['KSM:', 'LazyFree:', 'AnonHugePages:', 'ShmemPmdMapped:', 'FilePmdMapped:',
-		'Shared_Hugetlb:', 'Private_Hugetlb:', 'Swap:', 'SwapPss:', 'Locked:'] {
+		'Shared_Hugetlb:', 'Private_Hugetlb:', 'Swap:', 'SwapPss:', 'Locked:']! {
 		add_smaps_line(mut text, name, 0)
 	}
 	text.add('THPeligible:    0\nVmFlags:')
@@ -1057,10 +1108,16 @@ pub fn procfs_dynamic_link_target(node &VFSNode) string {
 	if pid <= 0 {
 		return ''
 	}
+	// Made on every walk through the link, so without the string an
+	// interpolated number leaves behind; the caller frees it.
+	mut text := lib.new_text(40)
+	text.add('/proc/')
+	text.add_decimal(i64(pid))
 	if link.kind == .thread_self_link {
-		return '/proc/${pid}/task/${proc.tid_in(current, view)}'
+		text.add('/task/')
+		text.add_decimal(i64(proc.tid_in(current, view)))
 	}
-	return '/proc/${pid}'
+	return text.str()
 }
 
 // Kept for callers that only need /proc/self.
@@ -1069,7 +1126,10 @@ pub fn procfs_self_target() string {
 	if current == unsafe { nil } || unsafe { current.process == nil } {
 		return ''
 	}
-	return '/proc/${proc.own_pid(current.process)}'
+	mut text := lib.new_text(24)
+	text.add('/proc/')
+	text.add_decimal(i64(proc.own_pid(current.process)))
+	return text.str()
 }
 
 // Bring a procfs directory up to date with the process table. Called from path
@@ -1147,24 +1207,40 @@ pub fn procfs_lookup_refresh(node &VFSNode, name string) {
 	if name !in node.children {
 		procfs_refresh_named(node, name)
 	}
-	if directory.pid != 0 && name in ['exe', 'cwd', 'root'] && name in node.children {
+	if directory.pid != 0 && (name == 'exe' || name == 'cwd' || name == 'root')
+		&& name in node.children {
 		mut link := unsafe { node.children[name] }
 		match name {
 			'exe' {
-				set_link_text(mut link, proc.process_program(directory.pid))
 				link.magic_target = process_exe_node(directory.pid)
+				set_link_text(mut link, exe_link_text(directory.pid, link.magic_target))
 			}
 			'cwd' {
 				link.magic_target = process_cwd_node(directory.pid)
+				if link.magic_target != unsafe { nil } {
+					set_link_text(mut link, pathname(link.magic_target))
+				}
 			}
 			else {
 				link.magic_target = process_root_node(directory.pid)
+				if link.magic_target != unsafe { nil } {
+					set_link_text(mut link, pathname(link.magic_target))
+				}
 			}
 		}
-		if link.magic_target != unsafe { nil } {
-			set_link_text(mut link, pathname(link.magic_target))
-		}
 	}
+}
+
+// What a process' exe link says: the path, as the reader sees it, of the file
+// the process runs, or the path it was run by when there is no such file.
+// Made in one go: setting the one and then the other, as this was, left one
+// of them behind on every lookup of a program run by another name, such as
+// through a symlink.
+fn exe_link_text(pid int, exe &VFSNode) string {
+	if exe != unsafe { nil } {
+		return pathname(exe)
+	}
+	return proc.process_program(pid)
 }
 
 // Give a link freshly made text, keeping what it has if that is the same.
@@ -1186,8 +1262,12 @@ fn is_procfs_resource(res &resource.Resource) bool {
 // One directory per live process `view` can see, named by the number it
 // gives the process.
 fn refresh_process_directories(mut root VFSNode, view voidptr) {
+	// Nothing slices these, so growing them frees each outgrown buffer; they
+	// were left behind on every lookup in /proc.
 	mut live := []int{}
 	mut numbers := []int{}
+	live.flags |= .noslices
+	numbers.flags |= .noslices
 	defer {
 		unsafe {
 			live.free()
@@ -1218,7 +1298,7 @@ fn refresh_process_directories(mut root VFSNode, view voidptr) {
 			if existing != unsafe { nil } && existing.children != unsafe { nil }
 				&& 'exe' in existing.children {
 				mut exe := unsafe { existing.children['exe'] }
-				set_link_text(mut exe, proc.process_program(pid))
+				set_link_text(mut exe, exe_link_text(pid, process_exe_node(pid)))
 			}
 			unsafe { name.free() }
 			continue
@@ -1308,8 +1388,8 @@ fn add_process_entry(mut node VFSNode, pid int, name string, is_process bool) bo
 		}
 		'exe' {
 			mut exe := add_process_link(mut node, 'exe', pid)
-			exe.symlink_target = proc.process_program(pid)
 			exe.magic_target = process_exe_node(pid)
+			exe.symlink_target = exe_link_text(pid, exe.magic_target)
 		}
 		'fd' {
 			mut descriptors := add_procfs_directory(mut node, 'fd')
@@ -1396,9 +1476,9 @@ fn refresh_fd_directory(mut descriptors VFSNode, pid int) {
 				nodes.free()
 				texts.free()
 			}
-			live = []int{cap: open_count}
-			nodes = []&VFSNode{cap: open_count}
-			texts = []string{cap: open_count}
+			live = []int{cap: open_count} @[freed]
+			nodes = []&VFSNode{cap: open_count} @[freed]
+			texts = []string{cap: open_count} @[freed]
 			for fdnum := 0; fdnum < process.fds.len; fdnum++ {
 				if process.fds[fdnum] == unsafe { nil } {
 					continue
@@ -1457,10 +1537,13 @@ fn refresh_fd_directory(mut descriptors VFSNode, pid int) {
 	prune_directories(mut descriptors, live)
 }
 
+// The link takes the text, or set_link_text() frees it when it says what the
+// link says already, as it nearly always does.
 fn descriptor_link_text(node &VFSNode) string {
 	if node.parent == unsafe { nil } && node.name.len > 0 {
 		// A memfd or another file that was never in a directory.
-		return '/${node.name} (deleted)'
+		text := '/${node.name} (deleted)' @[freed]
+		return text
 	}
 	return pathname(node)
 }
@@ -1497,15 +1580,21 @@ pub fn procfs_anonymous_descriptor(node &VFSNode) ?AnonymousDescriptor {
 	}
 }
 
+// Made for every such descriptor on every lookup in /proc/<pid>/fd, so
+// without the string an interpolated number leaves behind.
 fn anonymous_descriptor_text(res &resource.Resource) string {
 	mode := res.stat.mode & stat.ifmt
+	mut text := lib.new_text(32)
 	if mode == stat.ifpipe || mode == stat.ififo {
-		return 'pipe:[${res.stat.ino}]'
+		text.add('pipe:[')
+	} else if mode == stat.ifsock {
+		text.add('socket:[')
+	} else {
+		text.add('anon_inode:[')
 	}
-	if mode == stat.ifsock {
-		return 'socket:[${res.stat.ino}]'
-	}
-	return 'anon_inode:[${res.stat.ino}]'
+	text.add_unsigned(res.stat.ino)
+	text.add_byte(`]`)
+	return text.str()
 }
 
 // A process's file shows ids as the tree it is in numbers them.
@@ -1560,12 +1649,20 @@ fn refresh_thread_directories(mut task VFSNode, pid int) {
 // Drop the directories whose process or thread has gone. A node is only freed
 // when procfs holds the last reference to its resource; one that a descriptor
 // is still open on is unlinked from the tree and left to that descriptor.
+//
+// The nodes are gone through by value and known by their own names, which in
+// procfs are their keys: a loop over the keys copies every one, and nothing
+// freed the copies.
 fn prune_directories(mut parent VFSNode, live []int) {
-	mut stale := []string{}
+	mut stale := []&VFSNode{}
 	defer {
 		unsafe { stale.free() }
 	}
-	for name, _ in parent.children {
+	for _, child in parent.children {
+		if child == unsafe { nil } {
+			continue
+		}
+		name := child.name
 		if name.len == 0 || name[0] < `0` || name[0] > `9` {
 			continue
 		}
@@ -1589,20 +1686,17 @@ fn prune_directories(mut parent VFSNode, live []int) {
 			}
 		}
 		if !found {
-			stale << name
+			stale << child
 		}
 	}
 
-	for name in stale {
-		mut node := unsafe { parent.children[name] }
-		parent.children.delete(name)
+	for stale_node in stale {
+		mut node := unsafe { stale_node }
+		parent.children.delete(node.name)
 		unsafe {
 			if parent.resource.stat.nlink > 2 {
 				parent.resource.stat.nlink--
 			}
-		}
-		if node == unsafe { nil } {
-			continue
 		}
 		mut node_resource := node.resource
 		if node_resource != unsafe { nil } {

@@ -102,6 +102,15 @@ fn (mut this Partition) mmap(handle voidptr, page u64, flags int) voidptr {
 	return this.parent_device.mmap(handle, page, flags)
 }
 
+// The device name of partition `index`: the device's own and the number. The
+// device node keeps it as its name.
+fn partition_name(prefix string, index int) string {
+	mut text := lib.new_text(prefix.len + 20)
+	text.add(prefix)
+	text.add_decimal(i64(index))
+	return text.str()
+}
+
 pub fn scan_partitions(mut parent_device resource.Resource, prefix string) int {
 	lba_buffer := memory.malloc(u64(parent_device.stat.blksize))
 
@@ -152,9 +161,10 @@ pub fn scan_partitions(mut parent_device resource.Resource, prefix string) int {
 			partition.stat.rdev = resource.create_dev_id()
 			partition.stat.mode = 0o644 | stat.ifblk
 
-			print('gpt: partition detected [start: ${partition.device_offset:x} sector cnt: ${partition.sector_cnt}]\n')
+			C.kprintf(c'gpt: partition detected [start: %llx sector cnt: %llu]\n',
+				u64(partition.device_offset), u64(partition.sector_cnt))
 
-			fs.devtmpfs_add_device(partition, '${prefix}${i}')
+			fs.devtmpfs_add_device(partition, partition_name(prefix, i))
 		}
 
 		return 0
@@ -190,9 +200,10 @@ pub fn scan_partitions(mut parent_device resource.Resource, prefix string) int {
 			partition.stat.rdev = resource.create_dev_id()
 			partition.stat.mode = 0o644 | stat.ifblk
 
-			print('mbr: partition detected [start: ${partition.device_offset:x} sector cnt: ${partition.sector_cnt}]\n')
+			C.kprintf(c'mbr: partition detected [start: %llx sector cnt: %llu]\n',
+				u64(partition.device_offset), u64(partition.sector_cnt))
 
-			fs.devtmpfs_add_device(partition, '${prefix}${i}')
+			fs.devtmpfs_add_device(partition, partition_name(prefix, i))
 		}
 
 		return 0

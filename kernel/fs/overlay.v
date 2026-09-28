@@ -246,7 +246,7 @@ fn overlay_populate_locked(mut dir VFSNode) {
 	}
 	entry.populated = true
 
-	mut layers := []&VFSNode{cap: entry.lowers.len + 1}
+	mut layers := []&VFSNode{cap: entry.lowers.len + 1} @[freed]
 	defer {
 		unsafe { layers.free() }
 	}
@@ -421,7 +421,8 @@ fn overlay_copy_up_locked(mut node VFSNode) ? {
 			}
 		}
 		stat.iflnk {
-			real = overlay_real_symlink(mut upper_dir, lower.symlink_target.clone(), name)?
+			// The upper filesystem keeps a copy of its own.
+			real = overlay_real_symlink(mut upper_dir, lower.symlink_target, name)?
 		}
 		stat.ififo {
 			real = make_fifo_node(mut upper_dir, name, mode & 0o7777)?
@@ -687,12 +688,24 @@ fn overlay_mount(parent &VFSNode, mount_parent &VFSNode, name string, options st
 	mut lower_spec := ''
 	mut upper_path := ''
 	mut work_path := ''
-	for option in options.split(',') {
+	// Docker mounts one of these for every container. split() and the halves
+	// of each option were copies nothing freed; the list is freed here and
+	// the halves are views into it.
+	option_list := options.split(',')
+	defer {
+		unsafe { option_list.free() }
+	}
+	for option in option_list {
 		if option.len == 0 {
 			continue
 		}
-		key := option.all_before('=')
-		value := option.all_after('=')
+		equals := option.index_u8(`=`)
+		key := if equals < 0 { option } else { unsafe { tos(option.str, equals) } }
+		value := if equals < 0 {
+			option
+		} else {
+			unsafe { tos(option.str + equals + 1, option.len - equals - 1) }
+		}
 		match key {
 			'lowerdir' { lower_spec = value }
 			'upperdir' { upper_path = value }
@@ -713,7 +726,11 @@ fn overlay_mount(parent &VFSNode, mount_parent &VFSNode, name string, options st
 		return none
 	}
 	mut lowers := []&VFSNode{}
-	for path in lower_spec.split(':') {
+	lower_paths := lower_spec.split(':')
+	defer {
+		unsafe { lower_paths.free() }
+	}
+	for path in lower_paths {
 		if path.len == 0 {
 			errno.set(errno.einval)
 			return none

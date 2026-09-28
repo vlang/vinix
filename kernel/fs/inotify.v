@@ -60,6 +60,8 @@ mut:
 	queue      []u8
 	next_wd    int = 1
 	overflowed bool
+	// The interface box its descriptors share, freed with the instance.
+	box &resource.Resource = unsafe { nil }
 }
 
 __global (
@@ -86,11 +88,15 @@ fn append_u32(mut bytes []u8, value u32) {
 	bytes << u8(value >> 24)
 }
 
-fn queued_record_size(bytes []u8) u64 {
-	if bytes.len < 16 {
+// The size of the record at `offset` in the queue. An offset rather than a
+// slice: slicing marks the queue's buffer as shared, and every later
+// delete_many() then copied the queue to a new buffer and left the old one.
+fn queued_record_size(bytes []u8, offset int) u64 {
+	if bytes.len - offset < 16 {
 		return 0
 	}
-	name_len := u32(bytes[12]) | (u32(bytes[13]) << 8) | (u32(bytes[14]) << 16) | (u32(bytes[15]) << 24)
+	at := offset + 12
+	name_len := u32(bytes[at]) | (u32(bytes[at + 1]) << 8) | (u32(bytes[at + 2]) << 16) | (u32(bytes[at + 3]) << 24)
 	return 16 + u64(name_len)
 }
 
@@ -177,14 +183,11 @@ fn inotify_wait(mut this INotify, handle_ptr voidptr) bool {
 	mut handle := unsafe { &file.Handle(handle_ptr) }
 	this.l.release()
 	if handle != unsafe { nil } { handle.l.release() }
-	mut events := [&this.event]
-	event.await(mut events, true) or {
-		unsafe { events.free() }
+	event.await_one(mut this.event, true) or {
 		if handle != unsafe { nil } { handle.l.acquire() }
 		this.l.acquire()
 		return false
 	}
-	unsafe { events.free() }
 	if handle != unsafe { nil } { handle.l.acquire() }
 	this.l.acquire()
 	return true
@@ -208,7 +211,7 @@ fn (mut this INotify) read(handle_ptr voidptr, buf voidptr, _loc u64, count u64)
 			return none
 		}
 	}
-	first := queued_record_size(this.queue)
+	first := queued_record_size(this.queue, 0)
 	if first == 0 {
 		errno.set(errno.eio)
 		return none
@@ -219,7 +222,7 @@ fn (mut this INotify) read(handle_ptr voidptr, buf voidptr, _loc u64, count u64)
 	}
 	mut amount := u64(0)
 	for amount < u64(this.queue.len) {
-		record := queued_record_size(this.queue[int(amount)..])
+		record := queued_record_size(this.queue, int(amount))
 		if record == 0 || amount + record > count {
 			break
 		}
@@ -261,6 +264,7 @@ fn (mut this INotify) unref(_handle voidptr) ? {
 	unsafe {
 		this.watches.free()
 		this.queue.free()
+		free(voidptr(this.box))
 		free(voidptr(this))
 	}
 }
@@ -290,10 +294,14 @@ pub fn syscall_inotify_init(_ voidptr, flags int) (u64, u64) {
 	mut inotify := &INotify{}
 	inotify.stat.mode = stat.ifchr | 0o600
 	inotify.stat.blksize = 1
+	// Nothing slices these, so a grown one frees the buffer it outgrew.
+	inotify.queue.flags |= .noslices
+	inotify.watches.flags |= .noslices
 	inotify_lock.acquire()
 	inotify_instances << inotify
 	inotify_lock.release()
-	mut res := &resource.Resource(unsafe { inotify })
+	inotify.box = &resource.Resource(unsafe { inotify }) @[freed]
+	mut res := inotify.box
 	fdnum := file.fdnum_create_from_resource(unsafe { nil }, mut res, flags, 0, false) or {
 		return errno.err, errno.get()
 	}
@@ -306,6 +314,9 @@ pub fn syscall_inotify_add_watch(_ voidptr, fdnum int, _path charptr, mask u32) 
 		return errno.err, errno.einval
 	}
 	path := user_path(_path) or { return errno.err, errno.get() }
+	defer {
+		unsafe { path.free() }
+	}
 	if path.len == 0 {
 		return errno.err, errno.enoent
 	}

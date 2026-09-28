@@ -128,6 +128,9 @@ fn reduce_node_bounded(node &VFSNode, follow_symlinks bool, depth int, effective
 			return 0
 		}
 		_, next_node, _ := walk_path(node.parent, target, depth + 1, effective)
+		// Made afresh for every walk through the link, and nothing the walk
+		// returned points into it.
+		unsafe { target.free() }
 		if unsafe { next_node == 0 } {
 			return 0
 		}
@@ -150,15 +153,9 @@ fn reduce_node_bounded(node &VFSNode, follow_symlinks bool, depth int, effective
 }
 
 // Resolve `path`, returning the directory it ends in, the node it names (nil
-// when that does not exist yet) and its final component. The component is the
-// caller's to keep -- it names the node a create makes -- so it is a copy.
-fn path2node(parent &VFSNode, path string) (&VFSNode, &VFSNode, string) {
-	parent_of, node, basename := walk_path(parent, path, 0, true)
-	return parent_of, node, basename.clone()
-}
-
-// path2node for callers that only want the nodes. The final component it
-// returns points into `path`.
+// when that does not exist yet) and its final component. The component points
+// into `path`: a caller that makes a node with it gives the node a copy, and
+// copying it for every lookup left the copies behind on every other path.
 fn walk_path(parent &VFSNode, path string, depth int, effective bool) (&VFSNode, &VFSNode, string) {
 	if depth > 64 { errno.set(errno.eloop); return 0, 0, '' }
 	if path.len > 4096 { errno.set(errno.einval); return 0, 0, '' }
@@ -348,7 +345,8 @@ pub fn pathname(node &VFSNode) string {
 
 fn global_pathname(node &VFSNode) string {
 	// Nodes rather than their names; see path_from_root().
-	mut components := []&VFSNode{cap: 32}
+	mut components := []&VFSNode{cap: 32} @[freed]
+	components.flags |= .noslices
 	defer {
 		unsafe { components.free() }
 	}
@@ -379,7 +377,7 @@ fn join_path(nodes []&VFSNode) string {
 	for node in nodes {
 		total += node.name.len + 1
 	}
-	mut buffer := []u8{cap: total}
+	mut buffer := []u8{cap: total} @[freed]
 	defer {
 		unsafe { buffer.free() }
 	}
@@ -393,7 +391,7 @@ fn join_path(nodes []&VFSNode) string {
 }
 
 pub fn symlink(parent &VFSNode, dest string, target string) ?&VFSNode {
-	mut parent_of_tgt_node, mut target_node, basename := path2node(parent, target)
+	mut parent_of_tgt_node, mut target_node, basename := walk_path(parent, target, 0, true)
 
 	if parent_of_tgt_node != unsafe { nil }
 		&& !policy_check_name(parent_of_tgt_node, basename, proc.policy_create) {
@@ -407,8 +405,13 @@ pub fn symlink(parent &VFSNode, dest string, target string) ?&VFSNode {
 	if read_only(parent_of_tgt_node) { errno.set(errno.erofs); return none }
 	require_access(parent_of_tgt_node, access_write | access_exec)?
 	require_linked(parent_of_tgt_node)?
-	target_node = parent_of_tgt_node.filesystem.symlink(parent_of_tgt_node, dest, basename)
-	if target_node == unsafe { nil } { return none }
+	// The node keeps its name; `basename` points into `target`.
+	name := basename.clone()
+	target_node = parent_of_tgt_node.filesystem.symlink(parent_of_tgt_node, dest, name)
+	if target_node == unsafe { nil } {
+		unsafe { name.free() }
+		return none
+	}
 	apply_creation_identity(mut target_node, parent_of_tgt_node)?
 
 	unsafe {
@@ -419,7 +422,9 @@ pub fn symlink(parent &VFSNode, dest string, target string) ?&VFSNode {
 }
 
 pub fn link(parent &VFSNode, dest string, target string) ?&VFSNode {
-	mut parent_of_tgt_node, mut target_node, basename := path2node(parent, target)
+	// The new node is named by `dest`, so the final component is only
+	// looked at.
+	mut parent_of_tgt_node, mut target_node, basename := walk_path(parent, target, 0, true)
 
 	if unsafe { target_node != 0 } || unsafe { parent_of_tgt_node == 0 } {
 		errno.set(errno.eexist)
@@ -445,7 +450,8 @@ pub fn link(parent &VFSNode, dest string, target string) ?&VFSNode {
 }
 
 pub fn unlink(parent &VFSNode, name string, remove_dir bool) ? {
-	mut parent_of_tgt, mut node, basename := path2node(parent, name)
+	// Nothing here keeps the final component, so it stays a view into `name`.
+	mut parent_of_tgt, mut node, basename := walk_path(parent, name, 0, true)
 	if node == unsafe { nil } || parent_of_tgt == unsafe { nil } { return none }
 	if !policy_check_name(parent_of_tgt, basename, proc.policy_create) { return none }
 	if read_only(node) || read_only(parent_of_tgt) { errno.set(errno.erofs); return none }
@@ -577,7 +583,7 @@ pub fn internal_create(parent &VFSNode, name string, mode u32) ?&VFSNode {
 // new name; see policy.v. The name is judged in the directory the walk found,
 // before anything is said about whether it exists.
 fn internal_create_checked(parent &VFSNode, name string, mode u32, access u32) ?&VFSNode {
-	mut parent_of_tgt_node, mut target_node, basename := path2node(parent, name)
+	mut parent_of_tgt_node, mut target_node, basename := walk_path(parent, name, 0, true)
 
 	if access != 0 && parent_of_tgt_node != unsafe { nil }
 		&& !policy_check_name(parent_of_tgt_node, basename, access) {
@@ -596,8 +602,13 @@ fn internal_create_checked(parent &VFSNode, name string, mode u32, access u32) ?
 	if read_only(parent_of_tgt_node) { errno.set(errno.erofs); return none }
 	require_access(parent_of_tgt_node, access_write | access_exec)?
 	require_linked(parent_of_tgt_node)?
-	target_node = parent_of_tgt_node.filesystem.create(parent_of_tgt_node, basename, mode)
-	if target_node == unsafe { nil } { return none }
+	// The node keeps its name; `basename` points into `name`.
+	node_name := basename.clone()
+	target_node = parent_of_tgt_node.filesystem.create(parent_of_tgt_node, node_name, mode)
+	if target_node == unsafe { nil } {
+		unsafe { node_name.free() }
+		return none
+	}
 	apply_creation_identity(mut target_node, parent_of_tgt_node)?
 
 	unsafe {
@@ -713,7 +724,8 @@ pub fn syscall_mkdirat(_ voidptr, dirfd int, _path charptr, mode u32) (u64, u64)
 
 	parent := get_parent_dir(dirfd, path) or { return errno.err, errno.get() }
 
-	mut parent_of_tgt_node, mut target_node, basename := path2node(parent, path)
+	// internal_create() below makes its own copy of the name for the node.
+	mut parent_of_tgt_node, mut target_node, basename := walk_path(parent, path, 0, true)
 
 	if unsafe { parent_of_tgt_node == 0 } {
 		return errno.err, errno.enoent
@@ -756,7 +768,10 @@ pub fn program_path(node &VFSNode, requested string) string {
 		return requested.clone()
 	}
 	if node.parent == unsafe { nil } && node.name.len > 0 {
-		return '/${node.name} (deleted)'
+		// The process keeps this as its executable_path, which is freed when
+		// that is replaced or the process goes.
+		deleted := '/${node.name} (deleted)' @[freed]
+		return deleted
 	}
 	return pathname(node)
 }
@@ -792,6 +807,9 @@ pub fn syscall_readlinkat(_ voidptr, dirfd int, _path charptr, buf voidptr, limi
 
 	if procfs_is_dynamic_link(node) {
 		self_target := procfs_dynamic_link_target(node)
+		defer {
+			unsafe { self_target.free() }
+		}
 		if self_target.len == 0 {
 			return errno.err, errno.enoent
 		}
@@ -1142,7 +1160,13 @@ pub fn syscall_getcwd(_ voidptr, buf charptr, len u64) (u64, u64) {
 	// A directory outside the caller's root has no name it could use, which
 	// Linux reports by prefixing the path with "(unreachable)".
 	cwd := path_from_root(directory, calling_root()) or {
-		'(unreachable)' + global_pathname(directory)
+		global := global_pathname(directory)
+		unreachable := '(unreachable)' + global @[freed]
+		unsafe { global.free() }
+		unreachable
+	}
+	defer {
+		unsafe { cwd.free() }
 	}
 
 	bytes_needed := u64(cwd.len + 1) // include null terminator
@@ -1296,17 +1320,24 @@ pub fn syscall_linkat(_ voidptr, olddirfd int, _oldpath charptr, newdirfd int, _
 	}
 
 	oldpath := user_path(_oldpath) or { return errno.err, errno.get() }
+	defer {
+		unsafe { oldpath.free() }
+	}
 	// TODO handle AT_ENPTY_PATH?
 	if oldpath.len == 0 {
 		return errno.err, errno.enoent
 	}
 
 	newpath := user_path(_newpath) or { return errno.err, errno.get() }
+	defer {
+		unsafe { newpath.free() }
+	}
 
 	oldbase := get_parent_dir(olddirfd, oldpath) or { return errno.err, errno.get() }
 	newbase := get_parent_dir(newdirfd, newpath) or { return errno.err, errno.get() }
 	oldparent, found_old_node, _ := walk_path(oldbase, oldpath, 0, true)
-	mut newparent, found_new_node, basename := path2node(newbase, newpath)
+	// A view into `newpath`, copied below for the node that keeps it.
+	mut newparent, found_new_node, basename := walk_path(newbase, newpath, 0, true)
 	if unsafe { oldparent == nil } || unsafe { found_old_node == nil } {
 		return errno.err, errno.enoent
 	}
@@ -1338,7 +1369,9 @@ pub fn syscall_linkat(_ voidptr, olddirfd int, _oldpath charptr, newdirfd int, _
 	}
 
 	if read_only(newparent) || read_only(old_node) { return errno.err, errno.erofs }
-	mut new_node := newparent.filesystem.link(newparent, basename, mut old_node) or {
+	name := basename.clone()
+	mut new_node := newparent.filesystem.link(newparent, name, mut old_node) or {
+		unsafe { name.free() }
 		return errno.err, errno.get()
 	}
 
@@ -1487,10 +1520,17 @@ pub fn syscall_readdir(_ voidptr, fdnum int, mut buf stat.Dirent) (u64, u64) {
 		// Sized for the whole directory up front: growing it would leave each
 		// outgrown buffer behind, and every entry takes a full Dirent.
 		unsafe { dir_handle.dirlist.free() }
-		dir_handle.dirlist = []stat.Dirent{cap: dir_node.children.len}
+		// Freed when the handle goes, or when the listing is made again.
+		dir_handle.dirlist = []stat.Dirent{cap: dir_node.children.len} @[freed]
+		// A loop over the map itself hands out a copy of every key, and
+		// nothing would free those; these copies are freed below.
+		mut names := dir_node.children.keys()
+		defer {
+			unsafe { names.free() }
+		}
 		mut i := u64(0)
-		for name, mut orig_node in dir_node.children {
-			node := reduce_node(unsafe { *orig_node }, false)
+		for name in names {
+			node := reduce_node(unsafe { dir_node.children[name] }, false)
 			t := match node.resource.stat.mode & stat.ifmt {
 				stat.ifchr {
 					stat.dt_chr
@@ -1617,8 +1657,15 @@ pub fn syscall_seek(_ voidptr, fdnum int, offset i64, whence int) (u64, u64) {
 // The target is never resolved here, so a symlink may name something that does
 // not exist yet.
 pub fn syscall_symlinkat(_ voidptr, _target charptr, newdirfd int, _linkpath charptr) (u64, u64) {
+	// Every filesystem keeps its own copy of the target.
 	target := user_path(_target) or { return errno.err, errno.get() }
+	defer {
+		unsafe { target.free() }
+	}
 	linkpath := user_path(_linkpath) or { return errno.err, errno.get() }
+	defer {
+		unsafe { linkpath.free() }
+	}
 
 	if target.len == 0 || linkpath.len == 0 {
 		return errno.err, errno.enoent
@@ -1656,13 +1703,15 @@ pub fn rename(oldparent &VFSNode, oldpath string, newparent &VFSNode, newpath st
 		vfs_lock.release()
 	}
 
-	mut old_parent_of, mut old_node, old_basename := path2node(oldparent, oldpath)
+	// Both names are views into the paths. A node that takes a name is given
+	// a copy of its own.
+	mut old_parent_of, mut old_node, old_basename := walk_path(oldparent, oldpath, 0, true)
 	if unsafe { old_node == 0 } || unsafe { old_parent_of == 0 } {
 		errno.set(errno.enoent)
 		return none
 	}
 
-	mut new_parent_of, mut new_node, new_basename := path2node(newparent, newpath)
+	mut new_parent_of, mut new_node, new_basename := walk_path(newparent, newpath, 0, true)
 	if unsafe { new_parent_of == 0 } {
 		errno.set(errno.enoent)
 		return none
@@ -1717,8 +1766,8 @@ pub fn rename(oldparent &VFSNode, oldpath string, newparent &VFSNode, newpath st
 			old_parent_of.children[old_basename] = new_node
 			new_parent_of.children[new_basename] = old_node
 		}
-		adopt(mut old_node, mut new_parent_of, new_basename)
-		adopt(mut new_node, mut old_parent_of, old_basename)
+		adopt(mut old_node, mut new_parent_of, new_basename.clone())
+		adopt(mut new_node, mut old_parent_of, old_basename.clone())
 		first_cookie := inotify_next_cookie()
 		old_dir_flag := if stat.isdir(old_node.resource.stat.mode) { in_isdir } else { u32(0) }
 		new_dir_flag := if stat.isdir(new_node.resource.stat.mode) { in_isdir } else { u32(0) }
@@ -1771,8 +1820,9 @@ pub fn rename(oldparent &VFSNode, oldpath string, newparent &VFSNode, newpath st
 	}
 
 	if old_parent_of.overlay != unsafe { nil } {
+		// The moved node and its upper-layer node both keep the new name.
 		overlay_rename(mut old_parent_of, old_basename, mut old_node, mut new_parent_of,
-			new_basename, new_node)?
+			new_basename.clone(), new_node)?
 		cookie := inotify_next_cookie()
 		dir_flag := if stat.isdir(old_node.resource.stat.mode) { in_isdir } else { u32(0) }
 		inotify_emit(old_parent_of, old_basename, in_moved_from | dir_flag, cookie)
@@ -1800,7 +1850,7 @@ pub fn rename(oldparent &VFSNode, oldpath string, newparent &VFSNode, newpath st
 	unsafe {
 		new_parent_of.children[new_basename] = old_node
 	}
-	adopt(mut old_node, mut new_parent_of, new_basename)
+	adopt(mut old_node, mut new_parent_of, new_basename.clone())
 	cookie := inotify_next_cookie()
 	dir_flag := if stat.isdir(old_node.resource.stat.mode) { in_isdir } else { u32(0) }
 	inotify_emit(old_parent_of, old_basename, in_moved_from | dir_flag, cookie)
@@ -1862,8 +1912,15 @@ fn is_ancestor(ancestor &VFSNode, node &VFSNode) bool {
 
 // renameat2(olddirfd, oldpath, newdirfd, newpath, flags).
 pub fn syscall_renameat2(_ voidptr, olddirfd int, _oldpath charptr, newdirfd int, _newpath charptr, flags int) (u64, u64) {
+	// rename() copies what it keeps of either.
 	oldpath := user_path(_oldpath) or { return errno.err, errno.get() }
+	defer {
+		unsafe { oldpath.free() }
+	}
 	newpath := user_path(_newpath) or { return errno.err, errno.get() }
+	defer {
+		unsafe { newpath.free() }
+	}
 
 	if oldpath.len == 0 || newpath.len == 0 {
 		return errno.err, errno.enoent
@@ -2276,13 +2333,17 @@ pub fn syscall_memfd_create(_ voidptr, name u64, flags u32) (u64, u64) {
 	fdnum := file.fdnum_create_from_resource(unsafe { nil }, mut res, open_flags, 0, false) or {
 		saved := errno.get()
 		res.unref(unsafe { nil }) or {}
+		unsafe { shown.free() }
 		return errno.err, saved
 	}
 	// A node that is in no directory. It is what /proc/self/fd/N leads to, and
 	// it is what lets execveat(2) -- or an exec of that /proc path -- run the
 	// file, which is how runc starts its init from a sealed copy of itself.
-	mut node := create_node(unsafe { filesystems['tmpfs'] }, unsafe { nil }, 'memfd:${shown}',
-		false)
+	// The node keeps its name. Neither goes away: /proc/<pid>/fd and exec
+	// may still reach the node after the file is closed.
+	node_name := 'memfd:${shown}'
+	unsafe { shown.free() }
+	mut node := create_node(unsafe { filesystems['tmpfs'] }, unsafe { nil }, node_name, false)
 	node.resource = res
 	// Drop the reference create_anonymous() handed us once the descriptor holds
 	// its own. Keeping both left every memfd alive after its last descriptor and

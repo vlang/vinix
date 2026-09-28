@@ -29,6 +29,7 @@ import stat
 import klock
 import katomic
 import errno
+import lib
 import proc
 import resource
 import event.eventstruct
@@ -224,10 +225,7 @@ fn create_cgroup_directory(parent &VFSNode, name string, parent_group &CGroup) &
 			continue
 		}
 		mut child := create_node(node.filesystem, node, file_name, false)
-		mut res := new_cgroup_resource(if file_name in ['cgroup.controllers', 'cgroup.events',
-			'cgroup.stat', 'memory.current', 'memory.stat', 'memory.events', 'memory.peak',
-			'pids.current', 'pids.events',
-			'cpu.stat', 'io.stat', 'cpuset.cpus.effective', 'cpuset.mems.effective'] {
+		mut res := new_cgroup_resource(if cgroup_read_only_file(file_name) {
 			stat.ifreg | 0o444
 		} else if file_name == 'cgroup.kill' {
 			stat.ifreg | 0o200
@@ -243,6 +241,21 @@ fn create_cgroup_directory(parent &VFSNode, name string, parent_group &CGroup) &
 		}
 	}
 	return node
+}
+
+// The interface files that only report. A match rather than `in` an array
+// literal, which was made for every file of every group.
+fn cgroup_read_only_file(name string) bool {
+	return match name {
+		'cgroup.controllers', 'cgroup.events', 'cgroup.stat', 'memory.current', 'memory.stat',
+		'memory.events', 'memory.peak', 'pids.current', 'pids.events', 'cpu.stat', 'io.stat',
+		'cpuset.cpus.effective', 'cpuset.mems.effective' {
+			true
+		}
+		else {
+			false
+		}
+	}
 }
 
 fn cgroup_of_process(process &proc.Process) &CGroup {
@@ -281,25 +294,35 @@ fn (group &CGroup) is_within(ancestor &CGroup) bool {
 	return ancestor == unsafe { nil }
 }
 
-// The path of a group from `root`, as /proc/<pid>/cgroup shows it.
-fn cgroup_path(group &CGroup, root &CGroup) string {
-	mut names := []string{}
+// The path of a group from `root`, as /proc/<pid>/cgroup shows it, added to
+// `text`. The groups are collected rather than their names, which pushing
+// would have copied, and the path is made in the one buffer.
+fn add_cgroup_path(mut text lib.Text, group &CGroup, root &CGroup) {
+	mut groups := []&CGroup{cap: 16} @[freed]
+	groups.flags |= .noslices
+	defer {
+		unsafe { groups.free() }
+	}
 	mut current := unsafe { group }
 	for current != unsafe { nil } && current.parent != unsafe { nil }
 		&& voidptr(current) != voidptr(root) {
-		names << current.node.name
+		groups << current
 		current = current.parent
 	}
 	if voidptr(current) != voidptr(root) && root != unsafe { nil } && root != cgroup_root {
 		// Outside the reader's namespace: Linux shows the path relative to the
 		// namespace root with leading `..` components; the plain path will do.
-		return cgroup_path(group, cgroup_root)
+		add_cgroup_path(mut text, group, cgroup_root)
+		return
 	}
-	mut path := ''
-	for i := names.len - 1; i >= 0; i-- {
-		path += '/' + names[i]
+	if groups.len == 0 {
+		text.add_byte(`/`)
+		return
 	}
-	return if path.len == 0 { '/' } else { path }
+	for i := groups.len - 1; i >= 0; i-- {
+		text.add_byte(`/`)
+		text.add(groups[i].node.name)
+	}
 }
 
 // /proc/<pid>/cgroup.
@@ -312,7 +335,11 @@ pub fn process_cgroup_text(pid int) string {
 	}
 	group := cgroup_of_process(process)
 	root := cgroup_namespace_root(calling_process())
-	return '0::${cgroup_path(group, root)}\n'
+	mut text := lib.new_text(64)
+	text.add('0::')
+	add_cgroup_path(mut text, group, root)
+	text.add_byte(`\n`)
+	return text.str()
 }
 
 // The pids whose group is `group`, or any group below it with `recursive`.
@@ -384,20 +411,57 @@ fn cgroup_memory_bytes(group &CGroup) u64 {
 }
 
 // The CPUs or memory nodes a group may use: the ones its cpuset names, or
-// failing that its parent's, and at the root `everything`. Vinix does not
-// confine a group to them.
-fn cgroup_cpuset_effective(group &CGroup, file_name string, everything string) string {
+// failing that its parent's, and at the root every one there is: `last` and
+// all below it. Vinix does not confine a group to them.
+fn cgroup_cpuset_effective(group &CGroup, file_name string, last int) string {
 	mut current := unsafe { group }
 	for current != unsafe { nil } {
 		if current.node != unsafe { nil } && file_name in current.node.children {
 			res := unsafe { &CGroupResource(current.node.children[file_name].resource) }
 			if res.text.len > 0 {
-				return res.text + '\n'
+				return text_line(res.text)
 			}
 		}
 		current = current.parent
 	}
-	return everything + '\n'
+	mut text := lib.new_text(24)
+	text.add_byte(`0`)
+	if last > 0 {
+		text.add_byte(`-`)
+		text.add_decimal(i64(last))
+	}
+	text.add_byte(`\n`)
+	return text.str()
+}
+
+// `line` and a newline, as a new string.
+fn text_line(line string) string {
+	mut text := lib.new_text(line.len + 1)
+	text.add(line)
+	text.add_byte(`\n`)
+	return text.str()
+}
+
+// `value` in decimal after `label`, and a newline, as a new string.
+fn labelled_decimal(label string, value u64) string {
+	mut text := lib.new_text(label.len + 24)
+	text.add(label)
+	text.add_unsigned(value)
+	text.add_byte(`\n`)
+	return text.str()
+}
+
+// The names in `names`, space separated, and a newline.
+fn joined_line(names []string) string {
+	mut text := lib.new_text(names.len * 8 + 1)
+	for i, name in names {
+		if i > 0 {
+			text.add_byte(` `)
+		}
+		text.add(name)
+	}
+	text.add_byte(`\n`)
+	return text.str()
 }
 
 // The processes in `account` and the groups below it.
@@ -533,12 +597,12 @@ fn enforce_memory_max(mut account proc.CGroupAccount, bytes u64, limit u64, now 
 	return caller != largest_pid
 }
 
+// Gone through by value: keys() copied every name, and nothing freed them.
 fn cgroup_has_children(group &CGroup) bool {
-	for name in group.node.children.keys() {
-		if is_dot_name(name) {
+	for _, child in group.node.children {
+		if child == unsafe { nil } || is_dot_name(child.name) {
 			continue
 		}
-		child := unsafe { group.node.children[name] }
 		if child.resource != unsafe { nil } && stat.isdir(child.resource.stat.mode) {
 			return true
 		}
@@ -554,7 +618,7 @@ fn (mut this CGroupResource) contents() string {
 			defer {
 				unsafe { members.free() }
 			}
-			mut text := []u8{cap: members.len * 8}
+			mut text := []u8{cap: members.len * 8} @[freed]
 			defer {
 				unsafe { text.free() }
 			}
@@ -577,89 +641,110 @@ fn (mut this CGroupResource) contents() string {
 			// Frozen by its own cgroup.freeze or an ancestor's. runc pause polls
 			// for this once it has written cgroup.freeze.
 			frozen := if group.account != unsafe { nil } && group.account.is_frozen() { 1 } else { 0 }
-			return 'populated ${populated}\nfrozen ${frozen}\n'
+			mut text := lib.new_text(32)
+			text.add('populated ')
+			text.add_decimal(i64(populated))
+			text.add('\nfrozen ')
+			text.add_decimal(i64(frozen))
+			text.add_byte(`\n`)
+			return text.str()
 		}
+		// These are made for every read and freed by it, so each is built
+		// without the strings an interpolated number or a join leaves behind.
 		'cgroup.controllers' {
 			available := if group.parent == unsafe { nil } {
 				cgroup_controllers
 			} else {
 				group.parent.subtree
 			}
-			return available.join(' ') + '\n'
+			return joined_line(available)
 		}
 		'cgroup.subtree_control' {
 			group.lock.acquire()
 			defer { group.lock.release() }
-			return group.subtree.join(' ') + '\n'
+			return joined_line(group.subtree)
 		}
 		// Tasks, which is to say threads, as Linux counts them.
 		'pids.current' {
-			return '${cgroup_task_count(group)}\n'
+			return labelled_decimal('', u64(cgroup_task_count(group)))
 		}
 		'pids.events' {
 			if group.account == unsafe { nil } {
 				return 'max 0\n'
 			}
-			return 'max ${katomic.load(&group.account.pids_max_events)}\n'
+			return labelled_decimal('max ', katomic.load(&group.account.pids_max_events))
 		}
 		'cpu.stat' {
 			if group.account == unsafe { nil } {
-				return this.text + '\n'
+				return text_line(this.text)
 			}
 			mut account := group.account
 			return account.cpu_stat_text()
 		}
 		'memory.events' {
 			if group.account == unsafe { nil } {
-				return this.text + '\n'
+				return text_line(this.text)
 			}
 			account := group.account
-			return 'low 0\nhigh 0\nmax ${account.memory_events_max}\noom ${account.memory_events_oom}\noom_kill ${account.memory_events_oom_kill}\noom_group_kill 0\n'
+			mut text := lib.new_text(96)
+			text.add('low 0\nhigh 0\nmax ')
+			text.add_unsigned(account.memory_events_max)
+			text.add('\noom ')
+			text.add_unsigned(account.memory_events_oom)
+			text.add('\noom_kill ')
+			text.add_unsigned(account.memory_events_oom_kill)
+			text.add('\noom_group_kill 0\n')
+			return text.str()
 		}
 		'memory.peak' {
 			cgroup_memory_bytes(group)
 			if group.account == unsafe { nil } {
 				return '0\n'
 			}
-			return '${group.account.memory_peak}\n'
+			return labelled_decimal('', group.account.memory_peak)
 		}
 		// The anonymous memory the group's processes have resident, the same
 		// figure memory.max is held to. docker stats reads this.
 		'memory.current' {
-			return '${cgroup_memory_bytes(group)}\n'
+			return labelled_decimal('', cgroup_memory_bytes(group))
 		}
 		'memory.stat' {
-			return 'anon ${cgroup_memory_bytes(group)}\nfile 0\nkernel 0\nshmem 0\n'
+			mut text := lib.new_text(64)
+			text.add('anon ')
+			text.add_unsigned(cgroup_memory_bytes(group))
+			text.add('\nfile 0\nkernel 0\nshmem 0\n')
+			return text.str()
 		}
 		// Docker checks --cpuset-cpus against the root's before it makes a
 		// container.
 		'cpuset.cpus.effective' {
-			return cgroup_cpuset_effective(group, 'cpuset.cpus', if numa.cpu_count() > 1 {
-				'0-${numa.cpu_count() - 1}'
-			} else {
-				'0'
-			})
+			return cgroup_cpuset_effective(group, 'cpuset.cpus', numa.cpu_count() - 1)
 		}
 		'cpuset.mems.effective' {
-			return cgroup_cpuset_effective(group, 'cpuset.mems', '0')
+			return cgroup_cpuset_effective(group, 'cpuset.mems', 0)
 		}
 		'cgroup.stat' {
 			mut descendants := 0
-			for name in group.node.children.keys() {
-				if is_dot_name(name) { continue }
-				child := unsafe { group.node.children[name] }
+			for _, child in group.node.children {
+				if child == unsafe { nil } || is_dot_name(child.name) {
+					continue
+				}
 				if child.resource != unsafe { nil } && stat.isdir(child.resource.stat.mode) {
 					descendants++
 				}
 			}
-			return 'nr_descendants ${descendants}\nnr_dying_descendants 0\n'
+			mut text := lib.new_text(48)
+			text.add('nr_descendants ')
+			text.add_decimal(i64(descendants))
+			text.add('\nnr_dying_descendants 0\n')
+			return text.str()
 		}
 		else {}
 	}
 	if this.text.len == 0 {
 		return ''
 	}
-	return this.text + '\n'
+	return text_line(this.text)
 }
 
 fn (mut this CGroupResource) read(_handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
@@ -691,9 +776,17 @@ fn (mut this CGroupResource) write(_handle voidptr, buf voidptr, _loc u64, count
 	if count == 0 {
 		return 0
 	}
-	mut incoming := []u8{len: int(count)}
-	unsafe { C.memcpy(&incoming[0], buf, count) }
-	value := incoming.bytestr().trim_space()
+	// Trimmed straight from the buffer: a copy of the bytes and a string of
+	// them were left behind by every write. The trimmed value is freed on the
+	// way out unless the file keeps it as its text.
+	written := unsafe { tos(&u8(buf), int(count)) }
+	value := written.trim_space()
+	mut kept := false
+	defer {
+		if !kept {
+			unsafe { value.free() }
+		}
+	}
 	mut group := this.group
 
 	match this.name {
@@ -718,19 +811,24 @@ fn (mut this CGroupResource) write(_handle voidptr, buf voidptr, _loc u64, count
 			}
 			group.lock.acquire()
 			defer { group.lock.release() }
-			for token in value.fields() {
+			tokens := value.fields()
+			defer {
+				unsafe { tokens.free() }
+			}
+			for token in tokens {
 				if token.len < 2 || (token[0] != `+` && token[0] != `-`) {
 					errno.set(errno.einval)
 					return none
 				}
-				name := token[1..]
+				// A view into the token; the list keeps a copy of a name added.
+				name := unsafe { tos(token.str + 1, token.len - 1) }
 				if name !in available {
 					errno.set(errno.enoent)
 					return none
 				}
 				index := group.subtree.index(name)
 				if token[0] == `+` && index < 0 {
-					group.subtree << name
+					group.subtree << name.clone()
 				} else if token[0] == `-` && index >= 0 {
 					group.subtree.delete(index)
 				}
@@ -752,7 +850,9 @@ fn (mut this CGroupResource) write(_handle voidptr, buf voidptr, _loc u64, count
 			}
 			mut account := group.account
 			katomic.store(mut &account.freeze, if value == '1' { u32(1) } else { u32(0) })
+			// The text replaced stays: a read may be copying it.
 			this.text = value
+			kept = true
 			return i64(count)
 		}
 		'cpu.max' {
@@ -762,7 +862,15 @@ fn (mut this CGroupResource) write(_handle voidptr, buf voidptr, _loc u64, count
 			}
 			mut account := group.account
 			account.set_cpu_max(quota_us * 1000, period_us * 1000)
-			this.text = if quota_us == 0 { 'max ${period_us}' } else { '${quota_us} ${period_us}' }
+			mut text := lib.new_text(48)
+			if quota_us == 0 {
+				text.add('max')
+			} else {
+				text.add_unsigned(quota_us)
+			}
+			text.add_byte(` `)
+			text.add_unsigned(period_us)
+			this.text = text.str()
 			return i64(count)
 		}
 		'pids.max' {
@@ -776,7 +884,7 @@ fn (mut this CGroupResource) write(_handle voidptr, buf voidptr, _loc u64, count
 			}
 			mut account := group.account
 			katomic.store(mut &account.pids_max, limit)
-			this.text = if limit < 0 { 'max' } else { '${limit}' }
+			this.text = if limit < 0 { 'max' } else { decimal_text(u64(limit)) }
 			return i64(count)
 		}
 		'memory.max' {
@@ -790,7 +898,7 @@ fn (mut this CGroupResource) write(_handle voidptr, buf voidptr, _loc u64, count
 			}
 			mut account := group.account
 			katomic.store(mut &account.memory_max, limit)
-			this.text = if limit == 0 { 'max' } else { '${limit}' }
+			this.text = if limit == 0 { 'max' } else { decimal_text(limit) }
 			// A limit lowered below what the group already uses is enforced
 			// straight away, as Linux does after it fails to reclaim.
 			if limit != 0 {
@@ -806,6 +914,7 @@ fn (mut this CGroupResource) write(_handle voidptr, buf voidptr, _loc u64, count
 			mut account := group.account
 			account.memory_oom_group = value == '1'
 			this.text = value
+			kept = true
 			return i64(count)
 		}
 		else {}
@@ -816,7 +925,15 @@ fn (mut this CGroupResource) write(_handle voidptr, buf voidptr, _loc u64, count
 	}
 	// Limits are recorded so a runtime reads back what it set.
 	this.text = value
+	kept = true
 	return i64(count)
+}
+
+// `value` in decimal, as a new string.
+fn decimal_text(value u64) string {
+	mut text := lib.new_text(24)
+	text.add_unsigned(value)
+	return text.str()
 }
 
 fn move_to_cgroup(mut group CGroup, pid int) bool {
@@ -879,6 +996,9 @@ fn parse_cpu_max(value string, account &proc.CGroupAccount) ?(u64, u64) {
 		return none
 	}
 	fields := value.fields()
+	defer {
+		unsafe { fields.free() }
+	}
 	if fields.len == 0 || fields.len > 2 {
 		return none
 	}
@@ -933,7 +1053,8 @@ fn parse_memory_amount(value string) ?u64 {
 			else {}
 		}
 		if scale != 1 {
-			number = number[..number.len - 1]
+			// A view: slicing a string copies it.
+			number = unsafe { tos(number.str, number.len - 1) }
 		}
 	}
 	if !all_digits(number) {
@@ -961,7 +1082,11 @@ fn kill_cgroup(group &CGroup) {
 		return
 	}
 	hook := unsafe { CGroupSignalHook(cgroup_signal_hook) }
-	for pid in cgroup_members(group, true) {
+	members := cgroup_members(group, true)
+	defer {
+		unsafe { members.free() }
+	}
+	for pid in members {
 		hook(pid, 9)
 	}
 }
@@ -979,19 +1104,26 @@ pub fn cgroup_may_remove(node &VFSNode) ?bool {
 		errno.set(errno.ebusy)
 		return none
 	}
-	if cgroup_has_children(group) || cgroup_members(group, true).len > 0 {
+	if cgroup_has_children(group) {
+		errno.set(errno.ebusy)
+		return none
+	}
+	members := cgroup_members(group, true)
+	populated := members.len > 0
+	unsafe { members.free() }
+	if populated {
 		errno.set(errno.ebusy)
 		return none
 	}
 	mut dir := unsafe { node }
-	mut names := []string{}
-	for name in dir.children.keys() {
-		if !is_dot_name(name) {
-			names << name
-		}
+	mut names := dir.children.keys()
+	defer {
+		unsafe { names.free() }
 	}
 	for name in names {
-		dir.children.delete(name)
+		if !is_dot_name(name) {
+			dir.children.delete(name)
+		}
 	}
 	return true
 }

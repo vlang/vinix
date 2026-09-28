@@ -12,6 +12,7 @@ import event.eventstruct
 import file
 import katomic
 import klock
+import lib
 import net
 import proc
 import resource
@@ -48,6 +49,18 @@ fn namespace_kind_name(kind u64) string {
 	}
 }
 
+// "<kind>:[<id>]", what a /proc/<pid>/ns link says and its node is named.
+// Built without the string an interpolated number leaves behind: the links
+// are made again on every lookup in the directory.
+fn namespace_link_text(ns &proc.Namespace) string {
+	mut text := lib.new_text(32)
+	text.add(namespace_kind_name(ns.kind))
+	text.add(':[')
+	text.add_unsigned(u64(ns.id))
+	text.add_byte(`]`)
+	return text.str()
+}
+
 // The one nsfs node that stands for a namespace.
 fn namespace_node(mut ns proc.Namespace) &VFSNode {
 	ns.lock.acquire()
@@ -72,8 +85,8 @@ fn namespace_node(mut ns proc.Namespace) &VFSNode {
 	res.stat.atim = realtime_clock
 	res.stat.ctim = realtime_clock
 	res.stat.mtim = realtime_clock
-	mut node := create_node(unsafe { filesystems['tmpfs'] }, unsafe { nil },
-		'${namespace_kind_name(ns.kind)}:[${ns.id}]', false)
+	mut node := create_node(unsafe { filesystems['tmpfs'] }, unsafe { nil }, namespace_link_text(ns),
+		false)
 	node.resource = res
 	ns.node = voidptr(node)
 	return node
@@ -135,29 +148,24 @@ fn refresh_ns_directory(mut dir VFSNode, pid int) {
 	set := process.ns
 	proc.unlock_table()
 
-	entries := {
-		'cgroup':            set.cgroup
-		'ipc':               set.ipc
-		'mnt':               set.mnt
-		'net':               set.net
-		'pid':               set.pid
-		'pid_for_children':  set.pid_for_children
-		'time':              set.time
-		'time_for_children': set.time
-		'user':              set.user
-		'uts':               set.uts
-	}
-	for name, ns_ptr in entries {
+	// Fixed arrays: a map literal here was made, and lost, on every lookup,
+	// with a copy of each of its keys.
+	names := ['cgroup', 'ipc', 'mnt', 'net', 'pid', 'pid_for_children', 'time',
+		'time_for_children', 'user', 'uts']!
+	pointers := [set.cgroup, set.ipc, set.mnt, set.net, set.pid, set.pid_for_children, set.time,
+		set.time, set.user, set.uts]!
+	for i, ns_ptr in pointers {
 		if ns_ptr == unsafe { nil } {
 			continue
 		}
+		name := names[i]
 		mut ns := unsafe { ns_ptr }
 		target := namespace_node(mut ns)
-		text := '${namespace_kind_name(ns.kind)}:[${ns.id}]'
+		text := namespace_link_text(ns)
 		if name in dir.children {
 			mut existing := unsafe { dir.children[name] }
 			existing.magic_target = target
-			existing.symlink_target = text
+			set_link_text(mut existing, text)
 			continue
 		}
 		mut link := create_node(dir.filesystem, dir, name, false)
@@ -322,8 +330,9 @@ pub fn syscall_setns(_ voidptr, fdnum int, nstype int) (u64, u64) {
 		// A pidfd names every namespace of a process at once; Vinix has none.
 		return errno.err, errno.einval
 	}
-	ns_res := res as NsFSResource
-	mut ns := ns_res.ns
+	// Read through the smart cast: `res as NsFSResource` copied the resource
+	// onto the heap at every call.
+	mut ns := res.ns
 	if nstype != 0 && u64(nstype) != ns.kind {
 		return errno.err, errno.einval
 	}

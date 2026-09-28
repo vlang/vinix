@@ -16,7 +16,7 @@ pub fn install_ssd_root(mut root VFSNode) bool {
 	mut dev_dir := get_node(old_root, '/dev', true) or { return false }
 	// Reject symlink or missing mountpoint directories; never overlay an
 	// unexpected path supplied by an on-disk image.
-	for name in ['dev', 'tmp', 'run'] {
+	for name in ['dev', 'tmp', 'run']! {
 		if name !in root.children { return false }
 		child := unsafe { root.children[name] }
 		if !stat.isdir(child.resource.stat.mode) || child.symlink_target.len != 0 { return false }
@@ -25,7 +25,7 @@ pub fn install_ssd_root(mut root VFSNode) bool {
 	mut committed := false
 	defer { if !committed { vfs_root = old_root } }
 	// Runtime scratch is RAM-backed, not silently writable SSD-root data.
-	for name in ['tmp', 'run'] {
+	for name in ['tmp', 'run']! {
 		mut tmp := &TmpFS{}
 		mut instance := tmp.instantiate()
 		mut mounted := instance.mount(root, name, unsafe { nil }) or { return false }
