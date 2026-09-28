@@ -37,6 +37,14 @@ const files_picker_toggle_prefix = 'files.tags.toggle.'
 
 fn files_settings_checkbox(id string, title string, checked bool, x int, y int, width int) ui2.Element {
 	mut contents := frame_elements(2)
+	mut mark := frame_elements(1)
+	if checked {
+		check := ui2.image('', 'builtin:check', ui2.rect(1, 0, 15, 16))
+		mark << ui2.Element{
+			...check
+			text_style: ui2.TextStyle{ color: app_on_accent }
+		}
+	}
 	contents << ui2.view('', ui2.rect(0, 4, 17, 17), ui2.BoxStyle{
 		bg:            if checked { app_accent } else { app_surface }
 		radius:        4
@@ -45,11 +53,7 @@ fn files_settings_checkbox(id string, title string, checked bool, x int, y int, 
 		border_right:  1
 		border_top:    1
 		border_bottom: 1
-	}, frame_child(ui2.label('', if checked { '✓' } else { '' }, ui2.rect(1, 0, 15, 16), ui2.TextStyle{
-		color: app_on_accent
-		size:  12
-		align: .center
-	})))
+	}, mark)
 	if width > 27 {
 		contents << ui2.label('', title, ui2.rect(27, 0, f64(width - 27), 26), ui2.TextStyle{
 			color: body_text
@@ -223,11 +227,14 @@ fn (a &FilesContextApp) tag_picker_overlay(size ui2.Rect) ui2.Element {
 			color: body_text
 			size:  12
 		})
-		item << ui2.label('', if assigned.contains(tag.id) { '✓' } else { '' }, ui2.rect(f64(panel_width - 54), 0, 24, 25), ui2.TextStyle{
-			color: app_accent
-			size:  14
-			align: .center
-		})
+		if assigned.contains(tag.id) {
+			check := ui2.image('', 'builtin:check', ui2.rect(f64(panel_width - 50), 4,
+				16, 16))
+			item << ui2.Element{
+				...check
+				text_style: ui2.TextStyle{ color: app_accent }
+			}
+		}
 		rows << ui2.clickable_view('${files_picker_toggle_prefix}${tag.id}', ui2.rect(12, f64(row_y), f64(panel_width - 24), 25), ui2.BoxStyle{
 			bg: if index % 2 == 0 { body_panel } else { app_surface }
 		}, item)
