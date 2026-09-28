@@ -2,7 +2,7 @@
 
 Vinix borrows a number of OpenBSD's mitigations. They are on for every
 process on both architectures, unless noted otherwise. `tests/openbsd-security/run.sh [aarch64|amd64]`
-boots a kernel with a test program as PID 1 and checks them.
+boots a kernel with a test program as PID 1 and checks the ones below.
 
 ## pledge(2)
 
@@ -91,6 +91,29 @@ can be inspected with `stat(2)`, `access(2)` with `F_OK`, `readlink(2)` and
 `chdir(2)`. glibc's `realpath()` and `getcwd()` fallbacks stat every
 component. OpenBSD has a `__realpath` syscall so that its libc never needs to.
 Inspecting a covered path needs any permission other than `""`.
+
+## Signed signal frames
+
+`rt_sigreturn(2)` loads every register from memory the program controls,
+which makes it a useful gadget for an exploit. Sigreturn-oriented
+programming forges a signal frame on the stack and calls it. As on OpenBSD,
+every frame the kernel builds carries a cookie: a per-process secret XORed
+with the frame's address. `rt_sigreturn` checks the cookie before it trusts
+anything else in the frame, then clears it so that the frame cannot be
+returned through twice. A frame that fails the check kills the process with
+`SIGSEGV`. exec picks a new secret, and fork keeps it, because the child
+returns through frames that were built for its parent's handlers.
+
+On amd64 the cookie is in the first word of `sigcontext.reserved1`, which
+Linux leaves zero and libc never reads. On arm64 it is in the kernel-private
+header at the start of the frame, and `rt_sigreturn` also refuses a
+ucontext pointer other than the one the kernel wrote. The native Vinix
+signal ABI on arm64 is covered too; the legacy native ABI on amd64 is not.
+
+A glibc program on arm64 returns from its handlers through a page the kernel
+maps, because glibc leaves `sa_restorer` unset. That page used to be at a
+fixed address. It now sits at a random page in the gigabyte above the stack,
+chosen for each program, much as OpenBSD places its signal trampoline.
 
 ## Calling them
 

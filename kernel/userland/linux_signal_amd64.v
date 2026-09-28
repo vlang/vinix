@@ -41,6 +41,11 @@ const frame_sigmask = u64(304)
 const frame_siginfo = u64(312)
 const frame_size = u64(440)
 
+// The first word of sigcontext's reserved1[8], which Linux leaves zero and
+// libc never reads, holds the cookie that signs the frame; see
+// proc/sigcookie.v.
+const mc_cookie = u64(192)
+
 // struct sigcontext, from the start of uc_mcontext.
 const mc_r8 = u64(0)
 const mc_rdi = u64(64)
@@ -155,6 +160,7 @@ fn dispatch_linux_signal(context &cpulocal.GPRState, which int, info_signum int,
 	put_u64(mut buf, mc + mc_cr2, info_addr)
 	put_u64(mut buf, mc + mc_fpstate, fpstate)
 	put_u64(mut buf, frame_sigmask, vinix_mask_to_linux(previous_mask))
+	put_u64(mut buf, mc + mc_cookie, proc.sigframe_cookie(t.process, frame))
 	put_u32(mut buf, frame_siginfo, u32(which))
 	if info_signum == which {
 		put_u32(mut buf, frame_siginfo + 8, u32(info_code))
@@ -204,6 +210,15 @@ pub fn syscall_linux_rt_sigreturn(gpr_state voidptr) (u64, u64) {
 		exit_by_signal(sigsegv)
 	}
 	mc := frame_mcontext
+	// Nothing in the frame is believed until its cookie is, and the cookie is
+	// spent, so that the frame cannot be returned through twice. A forged
+	// frame is an attack, not a mistake.
+	spent := u64(0)
+	if get_u64(buf, mc + mc_cookie) != proc.sigframe_cookie(proc.current_thread().process, frame)
+		|| !usercopy.copy_to_user(frame + mc + mc_cookie, voidptr(&spent), sizeof(u64)) {
+		unsafe { buf.free() }
+		exit_by_signal(sigsegv)
+	}
 	mut context := cpulocal.GPRState{
 		r8:     get_u64(buf, mc + mc_r8)
 		r9:     get_u64(buf, mc + mc_r8 + 8)

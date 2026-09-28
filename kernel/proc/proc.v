@@ -319,6 +319,8 @@ pub mut:
 	pledge     u64
 	execpledge u64
 	unveil     &UnveilSet = unsafe { nil }
+	// The secret every signal frame is signed with; see sigcookie.v.
+	sigcookie u64
 }
 
 // Read-mostly limits are naturally aligned u64s.  Writers serialize complete

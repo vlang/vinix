@@ -290,6 +290,7 @@ pub fn inherit_container_state(mut child Process, parent &Process) {
 	child.oom_score_adj = parent.oom_score_adj
 	child.exe_node = parent.exe_node
 	pledge_inherit(mut child, parent)
+	child.sigcookie = parent.sigcookie
 }
 
 pub fn full_capabilities() Capabilities {

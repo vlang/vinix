@@ -10,6 +10,7 @@ import proc
 import aarch64.cpu.local as cpulocal
 import aarch64.cpu
 import katomic
+import krandom
 import posixtimer
 import errno
 import lib
@@ -182,6 +183,36 @@ pub fn syscall_sigentry(_ voidptr, sigentry u64) (u64, u64) {
 	return 0, 0
 }
 
+// A Linux signal frame begins with a header of Vinix's own that only
+// rt_sigreturn reads: the mask to restore, the address of the public
+// ucontext, the registers, and the cookie that signs the frame (see
+// proc/sigcookie.v). siginfo_t and the ucontext follow.
+fn linux_frame_cookie_offset() u64 {
+	return 16 + sizeof(cpulocal.GPRState)
+}
+
+fn linux_frame_info_offset() u64 {
+	return lib.align_up(linux_frame_cookie_offset() + sizeof(u64), 16)
+}
+
+fn linux_frame_ucontext_offset() u64 {
+	return linux_frame_info_offset() + 128
+}
+
+// Whether the frame at `frame` was one the kernel built for this process, and
+// if so spend its cookie, so that the frame cannot be returned through twice.
+fn take_sigframe_cookie(frame u64, cookie_address u64) bool {
+	mut cookie := u64(0)
+	if !usercopy.copy_from_user(voidptr(&cookie), cookie_address, sizeof(u64)) {
+		return false
+	}
+	if cookie != proc.sigframe_cookie(proc.current_thread().process, frame) {
+		return false
+	}
+	spent := u64(0)
+	return usercopy.copy_to_user(cookie_address, voidptr(&spent), sizeof(u64))
+}
+
 // rt_sigreturn(2). The handler's stack frame holds the context to go back to,
 // so this writes it straight into the exception frame the syscall path is about
 // to restore. x0 is returned as the syscall result because handle_svc stores it
@@ -212,6 +243,11 @@ pub fn syscall_sigreturn(gpr_state_ptr voidptr, context_arg voidptr, old_mask_ar
 		if u64(context_arg) & 0xf != 0 {
 			return errno.err, errno.einval
 		}
+		// The cookie follows the registers; a context the kernel did not
+		// build is an attack, not a mistake.
+		if !take_sigframe_cookie(u64(context_arg), u64(context_arg) + sizeof(cpulocal.GPRState)) {
+			exit_with_fatal_signal(u8(sigsegv))
+		}
 		if !usercopy.copy_from_user(voidptr(&restored), u64(context_arg), sizeof(cpulocal.GPRState)) {
 			return errno.err, errno.efault
 		}
@@ -224,6 +260,11 @@ pub fn syscall_sigreturn(gpr_state_ptr voidptr, context_arg voidptr, old_mask_ar
 		user_sp := frame.sp
 		if user_sp & 0xf != 0 {
 			return errno.err, errno.einval
+		}
+		// Nothing in the frame is believed until its cookie is: a forged
+		// frame is an attack, not a mistake.
+		if !take_sigframe_cookie(user_sp, user_sp + linux_frame_cookie_offset()) {
+			exit_with_fatal_signal(u8(sigsegv))
 		}
 
 		mut prev_mask := u64(0)
@@ -242,8 +283,11 @@ pub fn syscall_sigreturn(gpr_state_ptr voidptr, context_arg voidptr, old_mask_ar
 		// PC to its stack-overflow continuation. Restore those edits instead of
 		// blindly resuming the private snapshot and faulting forever.
 		if public_context != 0 {
-			if public_context & 0xf != 0 {
-				return errno.err, errno.einval
+			// The kernel put the ucontext right after the header; a pointer
+			// anywhere else would bring back registers the cookie never
+			// covered.
+			if public_context != user_sp + linux_frame_ucontext_offset() {
+				exit_with_fatal_signal(u8(sigsegv))
 			}
 			if !usercopy.copy_from_user(voidptr(&restored.x0), public_context + 184, 31 * sizeof(u64)) {
 				return errno.err, errno.efault
@@ -332,9 +376,18 @@ fn restore_fpsimd(records u64) bool {
 // handler of a glibc program returned into garbage: bash and dash died of
 // the SIGCHLD of their first child. There is no vDSO here; every program gets
 // a page holding just that: mov x8, #139 (rt_sigreturn); svc #0. It sits
-// just above the highest place the stack can start.
-const sigreturn_page_address = u64(0x70000000000)
+// somewhere in the gigabyte above the highest place the stack can start, a
+// different page for every program, as OpenBSD places its signal trampoline:
+// a gadget at a fixed address is one an exploit needs no leak to find.
+const sigreturn_page_base = u64(0x70000000000)
+const sigreturn_page_span = u64(0x40000000)
 const linux_sa_restorer = 0x04000000
+
+fn sigreturn_page_address() u64 {
+	mut random := u64(0)
+	krandom.fill(voidptr(&random), sizeof(random), true)
+	return sigreturn_page_base + (random % (sigreturn_page_span / page_size)) * page_size
+}
 
 fn install_sigreturn_page(mut pagemap memory.Pagemap) ?u64 {
 	page := memory.pmm_alloc(1)
@@ -348,12 +401,13 @@ fn install_sigreturn_page(mut pagemap memory.Pagemap) ?u64 {
 		code[1] = u32(0xd4000001)
 	}
 	cpu.sync_instruction_cache(u64(page) + higher_half, page_size)
-	mmap.map_range(mut pagemap, sigreturn_page_address, u64(page), page_size, mmap.prot_read | mmap.prot_exec,
+	address := sigreturn_page_address()
+	mmap.map_range(mut pagemap, address, u64(page), page_size, mmap.prot_read | mmap.prot_exec,
 		mmap.map_private) or {
 		memory.pmm_free(page, 1)
 		return none
 	}
-	return sigreturn_page_address
+	return address
 }
 
 // Where a Linux handler returns: its own restorer if it asked for one with
@@ -516,9 +570,11 @@ fn dispatch_a_signal_with_fault(context &cpulocal.GPRState, synchronous bool, fa
 		// from the last timer preemption.
 		mut signal_sp := lib.align_down(stack_top, 16)
 
-		signal_sp -= sizeof(cpulocal.GPRState)
+		// The registers, then the cookie that signs them.
+		signal_sp -= sizeof(cpulocal.GPRState) + sizeof(u64)
 		signal_sp = lib.align_down(signal_sp, 16)
 		return_context_addr := signal_sp
+		cookie := proc.sigframe_cookie(t.process, return_context_addr)
 
 		mut siginfo_sp := signal_sp - sizeof(SigInfo)
 		siginfo_sp = lib.align_down(siginfo_sp, 16)
@@ -531,6 +587,8 @@ fn dispatch_a_signal_with_fault(context &cpulocal.GPRState, synchronous bool, fa
 		// Write it through the pagemap so that turns into a killed process, as
 		// on Linux, rather than a kernel-mode fault that takes the machine down.
 		if !usercopy.copy_to_user(return_context_addr, voidptr(context), sizeof(cpulocal.GPRState))
+			|| !usercopy.copy_to_user(return_context_addr + sizeof(cpulocal.GPRState), voidptr(&cookie),
+			sizeof(u64))
 			|| !usercopy.copy_to_user(siginfo_sp, voidptr(&siginfo), sizeof(SigInfo)) {
 			exit_with_fatal_signal(u8(sigsegv))
 		}
@@ -560,8 +618,8 @@ fn dispatch_a_signal_with_fault(context &cpulocal.GPRState, synchronous bool, fa
 		wants_siginfo := synchronous || sigaction.sa_flags & sa_siginfo != 0
 			|| sigaction.sa_flags & 4 != 0 // Linux SA_SIGINFO
 		context_offset := u64(16)
-		info_offset := lib.align_up(context_offset + sizeof(cpulocal.GPRState), 16)
-		ucontext_offset := info_offset + 128
+		info_offset := linux_frame_info_offset()
+		ucontext_offset := linux_frame_ucontext_offset()
 		ucontext_size := u64(4560)
 		frame_size := ucontext_offset + ucontext_size
 		mut signal_sp := lib.align_down(stack_top - frame_size, 16)
@@ -580,6 +638,7 @@ fn dispatch_a_signal_with_fault(context &cpulocal.GPRState, synchronous bool, fa
 			// changes made by a three-argument handler are not discarded.
 			*&u64(base + 8) = uc_address
 			C.memcpy(voidptr(base + context_offset), context, sizeof(cpulocal.GPRState))
+			*&u64(base + linux_frame_cookie_offset()) = proc.sigframe_cookie(t.process, signal_sp)
 		}
 
 		info_base := base + info_offset
@@ -1259,6 +1318,7 @@ fn load_program_node(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, path s
 		new_process.exe_node = voidptr(prog_node)
 		new_process.allow_wx = allow_wx
 		new_process.sigreturn_page = sigreturn_page
+		new_process.sigcookie = proc.new_sigcookie()
 
 		stdin_node := fs.get_node(vfs_root, stdin_path, true)?
 		stdin_handle := &file.Handle{
@@ -1350,6 +1410,8 @@ fn load_program_node(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, path s
 		curr_process.exe_node = voidptr(prog_node)
 		curr_process.allow_wx = allow_wx
 		curr_process.sigreturn_page = sigreturn_page
+		// Frames the old program was given must not return into the new one.
+		curr_process.sigcookie = proc.new_sigcookie()
 		// execve recomputes the capability sets from the new credentials and
 		// the bounding set, which is how a container's root ends up with only
 		// the capabilities its runtime left it.

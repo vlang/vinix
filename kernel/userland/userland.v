@@ -847,6 +847,7 @@ pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, 
 		new_process.executable_path = path.clone()
 		new_process.linux_abi = linux_abi
 		new_process.allow_wx = allow_wx
+		new_process.sigcookie = proc.new_sigcookie()
 
 		stdin_node := fs.get_node(vfs_root, stdin_path, true)?
 		stdin_handle := &file.Handle{
@@ -905,6 +906,8 @@ pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, 
 		process.allow_wx = allow_wx
 		// The new program runs under the execpromises, or unpledged.
 		proc.pledge_after_exec(mut process)
+		// Frames the old program was given must not return into the new one.
+		process.sigcookie = proc.new_sigcookie()
 
 		kernel_pagemap.switch_to()
 		t.process = kernel_process

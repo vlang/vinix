@@ -4,7 +4,7 @@
 
 /* SPDX-License-Identifier: BSD-2-Clause
  * In-guest regression coverage for Vinix's OpenBSD security features:
- * pledge(2) and unveil(2). Built statically for either architecture and run
+ * pledge(2), unveil(2) and signed signal frames. Built statically for either architecture and run
  * as PID 1; every case runs in a child, so a pledge violation that kills the
  * child is an outcome the parent can check. */
 #define _GNU_SOURCE
@@ -510,9 +510,87 @@ static int run_unveil_tests(void)
 	return 0;
 }
 
+/* ── signed signal frames ───────────────────────────────────────────────── */
+
+static volatile sig_atomic_t handled;
+
+static void count_signal(int signal)
+{
+	(void)signal;
+	handled++;
+}
+
+static void nest_signal(int signal)
+{
+	(void)signal;
+	handled++;
+	kill(getpid(), SIGUSR2);
+}
+
+/* kill() rather than raise(): musl's raise() is tkill(2), which the amd64
+ * Linux ABI does not have yet. */
+static int handlers_return(void)
+{
+	struct sigaction action = { .sa_handler = count_signal };
+	CHECK(sigaction(SIGUSR1, &action, NULL) == 0);
+	CHECK(sigaction(SIGUSR2, &action, NULL) == 0);
+	for (int i = 0; i < 64; i++)
+		CHECK(kill(getpid(), SIGUSR1) == 0);
+	CHECK(handled == 64);
+	/* A frame pushed while another is live returns through both. */
+	action.sa_handler = nest_signal;
+	CHECK(sigaction(SIGUSR1, &action, NULL) == 0);
+	CHECK(kill(getpid(), SIGUSR1) == 0);
+	CHECK(handled == 66);
+	return 0;
+}
+
+static void forged_target(void)
+{
+	/* Reached only if rt_sigreturn believed the forged frame. */
+	_exit(42);
+}
+
+static uint64_t forged_stack[512] __attribute__((aligned(16)));
+static uint64_t forged_frame[1024] __attribute__((aligned(16)));
+
+/* Sigreturn-oriented programming: a frame on the stack that no signal put
+ * there, naming a program counter of the attacker's choosing. Every check
+ * but the cookie passes, so without it the process would exit with 42. */
+static int forged_frame_dies(void)
+{
+	uint64_t stack_top = (uint64_t)&forged_stack[500];
+#if defined(__aarch64__)
+	/* The mask, the ucontext address (none: the registers alone), then the
+	 * registers x0..x30, sp, pc, pstate and tpidr_el0. */
+	forged_frame[2 + 31] = stack_top;
+	forged_frame[2 + 32] = (uint64_t)forged_target;
+	__asm__ volatile("mov sp, %0\n\tmov x8, #139\n\tsvc #0"
+	    : : "r"(forged_frame) : "x8", "memory");
+#elif defined(__x86_64__)
+	/* rt_sigframe: the return address, then a ucontext whose mcontext holds
+	 * rsp at 120 and rip at 128, as Linux lays it out. */
+	unsigned char *frame = (unsigned char *)forged_frame;
+	*(uint64_t *)(frame + 48 + 120) = stack_top - 8;
+	*(uint64_t *)(frame + 48 + 128) = (uint64_t)forged_target;
+	*(uint64_t *)(frame + 48 + 136) = 0x202;
+	__asm__ volatile("lea 8(%0), %%rsp\n\tmov $15, %%eax\n\tsyscall"
+	    : : "r"(frame) : "rax", "rcx", "r11", "memory");
+#endif
+	return 1;
+}
+
+static int run_signal_tests(void)
+{
+	CHECK(exited_ok(in_child(handlers_return)));
+	CHECK(killed_by(in_child(forged_frame_dies), SIGSEGV));
+	puts("OPENBSD SECURITY PASS: signal frames are signed");
+	return 0;
+}
+
 static int run_tests(void)
 {
-	if (run_pledge_tests() != 0 || run_unveil_tests() != 0)
+	if (run_pledge_tests() != 0 || run_unveil_tests() != 0 || run_signal_tests() != 0)
 		return 1;
 	puts("VINIX OPENBSD SECURITY: PASS");
 	return 0;
