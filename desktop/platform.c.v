@@ -468,10 +468,17 @@ fn desktop_spawn_shell(path string, command string, rows int, columns int, width
 	// A valid terminal type is required by terminal applications such as tmux.
 	// `linux` is available in ncurses-terminfo-base, including when tmux is
 	// installed through pkg, and the terminal parser accepts its ANSI output.
-	envp := [&char(path_entry.str), &char(home_entry.str), c'TERM=linux', c'USER=root', c'LOGNAME=root',
-		c'SHELL=/bin/zsh', c'LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules',
+	mut envp := [&char(path_entry.str), &char(home_entry.str), c'TERM=linux', c'USER=root',
+		c'LOGNAME=root', c'SHELL=/bin/zsh', c'LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules',
 		c'LIBGL_DRIVERS_PATH=/usr/lib/xorg/modules/dri:/usr/lib/dri',
-		c'SSL_CA_CERT_FILE=/etc/ssl/certs/ca-certificates.crt', &char(unsafe { nil })]
+		c'SSL_CA_CERT_FILE=/etc/ssl/certs/ca-certificates.crt']
+	// Commands in the shell can drive this window's taskbar button directly.
+	taskbar_status_writer.resolve()
+	status_entry := '${taskbar_status_env}=${taskbar_status_writer.path}'
+	if taskbar_status_writer.path.len > 0 {
+		envp << &char(status_entry.str)
+	}
+	envp << &char(unsafe { nil })
 
 	pid := C.fork()
 	if pid < 0 {
@@ -771,7 +778,7 @@ struct SpawnedAppProcess {
 	from_child int
 }
 
-fn desktop_spawn_app(path string, app_name string, tz_offset i64, standalone bool) ?SpawnedAppProcess {
+fn desktop_spawn_app(path string, app_name string, tz_offset i64, standalone bool, status_path string) ?SpawnedAppProcess {
 	if C.access(&char(path.str), C.X_OK) != 0 {
 		return none
 	}
@@ -826,6 +833,11 @@ fn desktop_spawn_app(path string, app_name string, tz_offset i64, standalone boo
 		envp << &char(request_env.str)
 		envp << &char(response_env.str)
 	}
+	// Taskbar progress and badges; inherited by anything the app starts.
+	status_env := '${taskbar_status_env}=${status_path}'
+	if status_path.len > 0 {
+		envp << &char(status_env.str)
+	}
 	envp << &char(unsafe { nil })
 
 	pid := C.fork()
@@ -842,6 +854,7 @@ fn desktop_spawn_app(path string, app_name string, tz_offset i64, standalone boo
 			path_entry.free()
 			request_env.free()
 			response_env.free()
+			status_env.free()
 			argv.free()
 			envp.free()
 		}
@@ -872,6 +885,7 @@ fn desktop_spawn_app(path string, app_name string, tz_offset i64, standalone boo
 		path_entry.free()
 		request_env.free()
 		response_env.free()
+		status_env.free()
 		argv.free()
 		envp.free()
 	}

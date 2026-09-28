@@ -45,6 +45,14 @@ cp "$root/desktop/tools/tests/taskbar_pinning_test.v" "$work/ui/"
     -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/taskbar_pinning_test.v"
 rm -f "$work/ui/taskbar_pinning_test.v"
 
+# Reordering, previews and Aero Peek, Show Desktop, Jump Lists, Start menu
+# history, the notification area and taskbar progress share hover timers and
+# persistent lists, so they run in their own entry point.
+cp "$root/desktop/tools/tests/taskbar_features_test.v" "$work/ui/"
+"$v" -new-compiler -nocache -gc none -manualfree -enable-globals -stats -d ui2_headless \
+    -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/taskbar_features_test.v"
+rm -f "$work/ui/taskbar_features_test.v"
+
 # Quick Launch shares the switcher's global keyboard path. Keep its Cmd-Space,
 # query filtering and modal overlay cases isolated from the broader utility
 # suite so sequence state cannot leak between tests.

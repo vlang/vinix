@@ -119,6 +119,13 @@ mut:
 	csi_count               int
 	csi_private             u8
 	csi_has_digits          bool
+	// The start of an OSC string, enough to recognise the taskbar progress
+	// sequence OSC 9;4. Anything longer is skipped, as before.
+	osc_bytes [terminal_osc_limit]u8
+	osc_len   int
+	// Taskbar state published for this window: progress from OSC 9;4 and a
+	// new attention serial for each bell.
+	taskbar TaskStatus
 
 	read_buf []u8
 
@@ -132,6 +139,8 @@ mut:
 	terminal_columns int
 	visible_rows     int = 1
 }
+
+const terminal_osc_limit = 32
 
 fn open_terminal(mut _ Desktop) !NativeApp {
 	return &TerminalApp{
@@ -608,7 +617,13 @@ fn (mut a TerminalApp) ingest_output(output []u8) {
 
 fn (mut a TerminalApp) ingest_terminal_byte(ch u8) {
 	match ch {
-		0, 0x07 {}
+		0 {}
+		0x07 {
+			// A bell asks for attention. The taskbar flags the button until
+			// the window is next brought up, and not at all if it is focused.
+			a.taskbar.attention_serial++
+			publish_taskbar_status(a.taskbar)
+		}
 		`\n`, 0x0b, 0x0c { a.line_feed() }
 		`\r` { a.move_cursor(a.cursor_row, 0) }
 		`\t` {
@@ -734,6 +749,30 @@ fn (mut a TerminalApp) ingest_escape_byte(ch u8) {
 			} else if ch == 0x1b {
 				a.escape_state = 4
 			} else {
+				a.osc_bytes[0] = ch
+				a.osc_len = 1
+				a.escape_state = 8
+			}
+		}
+		8 {
+			// Collecting a short OSC string until BEL or ST ends it.
+			if ch == 0x07 {
+				a.finish_osc()
+				a.escape_state = 0
+			} else if ch == 0x1b {
+				a.escape_state = 9
+			} else if a.osc_len < terminal_osc_limit {
+				a.osc_bytes[a.osc_len] = ch
+				a.osc_len++
+			} else {
+				a.escape_state = 3
+			}
+		}
+		9 {
+			if ch == `\\` {
+				a.finish_osc()
+				a.escape_state = 0
+			} else {
 				a.escape_state = 3
 			}
 		}
@@ -747,6 +786,45 @@ fn (mut a TerminalApp) ingest_escape_byte(ch u8) {
 			a.escape_state = 0
 		}
 	}
+}
+
+// finish_osc acts on OSC 9;4;<state>;<percent>, the progress report that
+// Windows Terminal and ConEmu put on the taskbar: 0 clears it, 1 is ordinary
+// progress, 2 an error, 3 indeterminate and 4 paused. An error or pause with
+// no percentage keeps the last one. Every other OSC is ignored, as before.
+fn (mut a TerminalApp) finish_osc() {
+	if a.osc_len < 3 || a.osc_bytes[0] != `9` || a.osc_bytes[1] != `;` || a.osc_bytes[2] != `4` {
+		return
+	}
+	mut values := [2]int{}
+	mut present := [2]bool{}
+	mut field := -1
+	for index in 3 .. a.osc_len {
+		ch := a.osc_bytes[index]
+		if ch == `;` {
+			field++
+			continue
+		}
+		if field < 0 || field > 1 || ch < `0` || ch > `9` {
+			continue
+		}
+		if values[field] < 1000 {
+			values[field] = values[field] * 10 + int(ch - `0`)
+		}
+		present[field] = true
+	}
+	state := match values[0] {
+		1 { TaskProgress.normal }
+		2 { TaskProgress.error }
+		3 { TaskProgress.indeterminate }
+		4 { TaskProgress.paused }
+		else { TaskProgress.none_ }
+	}
+	a.taskbar.progress_state = state
+	if present[1] || state == .normal || state == .none_ {
+		a.taskbar.progress = if values[1] > 100 { 100 } else { values[1] }
+	}
+	publish_taskbar_status(a.taskbar)
 }
 
 fn (a &TerminalApp) csi_value(index int, default_value int) int {

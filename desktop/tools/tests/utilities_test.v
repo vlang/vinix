@@ -906,7 +906,12 @@ fn test_taskbar_keeps_a_bottom_right_clock_and_open_windows() {
 
 	root := desktop.build_tree()
 	taskbar := utility_element_named(root, 'taskbar') or { panic('missing taskbar') }
-	assert taskbar.children.len == 8 + workspace_count
+	// Start, two windows, the pager, the tray's overflow chevron and network
+	// icon, build date and clock, the top edge and Show Desktop.
+	assert taskbar.children.len == 11 + workspace_count
+	assert utility_element_named(taskbar, action_show_desktop) != none
+	assert utility_element_named(taskbar, 'tray.icon.network') != none
+	assert utility_element_named(taskbar, action_tray_overflow) != none
 	assert utility_element_named(taskbar, action_start_toggle) != none
 	assert utility_element_named(taskbar, 'task.1') != none
 	assert utility_element_named(taskbar, 'task.2') != none
@@ -919,14 +924,14 @@ fn test_taskbar_keeps_a_bottom_right_clock_and_open_windows() {
 	assert int(build_time.frame.x + build_time.frame.width + taskbar_item_gap) == int(clock_time.frame.x)
 	assert clock_time.text == '00:00:00'
 	assert clock_date.text == 'Thu 1 Jan'
-	assert int(clock_time.frame.x + clock_time.frame.width) == 1280 - taskbar_padding
+	assert int(clock_time.frame.x + clock_time.frame.width) == 1280 - taskbar_show_desktop_width - taskbar_item_gap
 	free_tree(root)
 
 	desktop.close_window(2)
 	desktop.close_window(1)
 	empty := desktop.build_tree()
 	empty_taskbar := utility_element_named(empty, 'taskbar') or { panic('missing empty taskbar') }
-	assert empty_taskbar.children.len == 6 + workspace_count
+	assert empty_taskbar.children.len == 9 + workspace_count
 	assert utility_element_named(empty_taskbar, action_start_toggle) != none
 	assert utility_element_named(empty_taskbar, 'clock.time') != none
 	free_tree(empty)
@@ -960,7 +965,7 @@ fn test_macos_taskbar_uses_large_icon_only_buttons_at_screen_edges() {
 	assert entry.image_path == 'builtin:folder'
 	assert int(entry.frame.width) == taskbar_icon_item_width
 	assert int(entry.frame.height) == taskbar_icon_item_height
-	assert int(clock.frame.x + clock.frame.width) == 1280 - taskbar_padding
+	assert int(clock.frame.x + clock.frame.width) == 1280 - taskbar_show_desktop_width - taskbar_item_gap
 	free_tree(root)
 }
 
@@ -1206,8 +1211,9 @@ fn test_taskbar_clock_stays_visible_at_m1_200_percent_scale() {
 	root := desktop.build_tree()
 	taskbar := utility_element_named(root, 'taskbar') or { panic('missing taskbar') }
 	clock := utility_element_named(taskbar, 'clock.time') or { panic('missing taskbar clock') }
-	assert int(clock.frame.x + clock.frame.width) == desktop.canvas.width - taskbar_padding
-	assert int(clock.frame.x + clock.frame.width) * desktop_scale_200 == 3024 - 2 * taskbar_padding
+	clock_inset := taskbar_show_desktop_width + taskbar_item_gap
+	assert int(clock.frame.x + clock.frame.width) == desktop.canvas.width - clock_inset
+	assert int(clock.frame.x + clock.frame.width) * desktop_scale_200 == 3024 - 2 * clock_inset
 	assert int(taskbar.frame.y) * desktop_scale_200 == 1964 - 2 * taskbar_height
 	free_tree(root)
 }

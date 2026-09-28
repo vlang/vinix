@@ -16,6 +16,12 @@ What it does:
 
 - a wallpaper, and a taskbar with Start, open windows, the desktop build date
   and time, and a clock in its bottom-right status area
+- a **Windows 7-style taskbar**: pinned and running buttons that can be
+  dragged into a new order, hover thumbnails with a window picker for grouped
+  buttons, Aero Peek, a Show Desktop corner (also Super+D), Jump Lists with
+  recent folders and documents and per-program tasks, a notification area with
+  network, battery, display and Capture icons and an overflow panel, and
+  progress bars, badges and attention flashes on buttons
 - windows with a title bar, a close, a maximise/restore and a minimise button
 - dragging a window by its title bar, including Windows 7-style top-edge
   maximize and left/right half-screen snapping
@@ -24,8 +30,9 @@ What it does:
 - Linux-style Super+Arrow keyboard tiling into halves and quarters, with
   Super+Up/Down maximizing and restoring floating windows
 - resizing a normal window by dragging its lower-right corner
-- a **V Start button** and Windows 7-style two-column Start menu, with recent
-  programs, All Programs, type-to-search, system links and a session button
+- a **V Start button** and Windows 7-style two-column Start menu, with pinned
+  and recently used programs, their recent items, Recent Items, All Programs,
+  type-to-search, system links and a session button
 - **shortcuts down the left edge of the wallpaper**, and matching Start-menu
   entries, for every application the desktop can open
 - a **file browser** over the real filesystem: directories first, sizes, and a
@@ -94,6 +101,12 @@ typing any word with a q in it drop the user back to the console.
     clock_app.v    the large clock and stopwatch application
     capture.v      the ui2 capture app, PNG encoder and AVI recorder
     switcher.v     Cmd-Tab: the session it opens and the panel it shows
+    taskbar_pin.v / taskbar_drag.v  taskbar pins and dragging buttons into order
+    taskbar_preview.v  thumbnails, the window picker, Aero Peek, Show Desktop
+    taskbar_status.v   progress, badges and attention reported by applications
+    jump_list.v    the taskbar's right-click Jump Lists
+    recent_items.v recent documents, folders and programs, and Start menu pins
+    notification_area.c.v  the tray: network, battery, display and Capture
     settings.v     preferences shared by the desktop and Settings application
     settings_app.v the settings application
     settings_wifi.v the Wi-Fi pane: radio control, scan and network list
@@ -505,6 +518,51 @@ interiors normally keep their declared styles, but controls marked
 `native_style` use Catalina's measured 21-pixel AppKit bezel under the macOS
 theme, including hover, pressed, selected and disabled states. Other controls
 continue to use their declared `app_*` colours.
+
+## The taskbar
+
+The taskbar follows Windows 7. Buttons are dragged into a new order with the
+left button: pins keep theirs in `/root/.vinix-taskbar-pins`, and buttons for
+running windows swap per-window ranks. A pinned program that is not running
+starts on release, so a press that turns into a drag starts nothing.
+
+Resting on a button for 0.4 s opens a panel of thumbnails of its windows;
+clicking a button that stands for several windows opens it at once, as a
+picker. Thumbnails are sampled from the composed frame, box-filtered, whenever
+a window is fully in view, so a covered or minimized window shows the last
+picture taken of it (or its icon until there is one). Resting on a thumbnail
+peeks at that window, turning all others into glass outlines, and the strip in
+the lower-right corner does the same for the desktop. Clicking it, or Super+D,
+minimizes the workspace's windows and a second use puts back exactly those.
+
+A right-click opens the program's Jump List: its recent folders (Files) or
+documents (Text Editor), its tasks, such as Files' Documents and Downloads or
+Settings' panes, then the program itself, pinning and closing. The programs
+record what they open in `/root/.vinix-recent-items`; opening an entry starts a
+new window and hands it the path over the ordinary action pipe. The Start menu
+shows programs pinned to it (right-click a program), then the most recently
+launched ones from `/root/.vinix-recent-programs`, with an arrow beside Files and
+Text Editor that shows their recent items in the right column.
+
+The notification area shows the network (the `eth0` address from SIOCGIFADDR,
+and the Wi-Fi radio), the battery when there is one, the display's brightness
+and Capture, each with a flyout. Right-clicking an icon moves it to or from the
+overflow panel behind the chevron; the choice is kept in `/root/.vinix-tray`.
+
+Each application process is started with `VINIX_TASKBAR_STATUS` naming a file
+under `/run/vinix-taskbar`. Anything running in that process, including a
+shell in Terminal, can write to it:
+
+    progress 42      percent complete
+    state paused     normal, paused, error, indeterminate or none
+    badge 3          up to three characters
+    attention 7      a new serial flashes the button until it is brought up
+
+The compositor reads it once a second and tints the button with the progress,
+draws the badge in its corner and turns it orange for attention. Terminal
+translates the OSC 9;4 progress sequence and the bell into this file, VSpace
+reports its walk as indeterminate progress, and a recording Capture window
+carries a REC badge.
 
 ## Desktop shortcuts
 

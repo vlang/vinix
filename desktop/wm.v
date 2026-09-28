@@ -20,7 +20,8 @@ const action_shortcut_prefix = 'shortcut.'
 // came from the desktop world. An application's selectors are opaque, even if
 // their spelling collides with one of these prefixes.
 const desktop_action_prefixes = ['taskbar.', 'task.', 'win.', 'shortcut.', 'start.',
-	action_switch_prefix, action_workspace_prefix, taskbar_pin_action_prefix]
+	action_switch_prefix, action_workspace_prefix, taskbar_pin_action_prefix,
+	taskbar_preview_prefix, 'tray.']
 
 enum DragKind {
 	none_
@@ -63,6 +64,8 @@ mut:
 
 struct Desktop {
 mut:
+	// Where the compositor keeps its own lists (pins, history, preferences).
+	home          string = desktop_home
 	canvas        Canvas
 	preview_cache VinixPreviewCache
 	fonts         []FontFace
@@ -142,6 +145,8 @@ mut:
 	// An exclusive application is started by the main loop after it has
 	// released the framebuffer, pointer and raw console keyboard.
 	pending_external       string
+	// The taskbar status file for the application process being started.
+	pending_status_path    string
 	pending_external_title string
 	pending_external_icon  string
 	external_error         string
@@ -162,6 +167,25 @@ mut:
 	start_menu_all_apps  bool
 	start_menu_searching bool
 	start_menu_query     []u8
+	// Programs pinned to the Start menu and the most recently launched ones,
+	// both catalog indices persisted by process name.
+	start_pins      []int
+	recent_programs []int
+	// The program whose recent items fill the right column, start_recent_all
+	// for Recent Items, or start_recent_none for the system links.
+	start_menu_recent_app    int = start_recent_none
+	start_menu_recent_items  []RecentItem
+	start_menu_recent_titles []string
+	start_menu_recent_dirs   []bool
+	// Taskbar interaction beyond plain clicks: dragging buttons, thumbnails and
+	// peeking, Show Desktop and the notification area.
+	taskbar_press            TaskbarPress
+	taskbar_preview          TaskbarPreview
+	show_desktop             ShowDesktop
+	tray                     TrayState
+	next_status_token        int
+	taskbar_status_polled_ms i64
+	taskbar_marquee_ms       i64
 	// One screen's worth of wallpaper, scaled once and kept. It only changes
 	// when the setting does, and rescaling a photograph every frame to paint a
 	// backdrop that has not moved would cost more than the rest of a frame.
@@ -200,6 +224,10 @@ fn (mut d Desktop) spawn(title string, page Page, x int, y int, width int, heigh
 		id_body:        '${prefix}.body'
 		id_resize:      '${prefix}.resize'
 		id_task:        'task.${id}'
+		task_rank:      id
+		id_preview:       '${taskbar_preview_prefix}${id}'
+		id_preview_close: '${taskbar_preview_prefix}${id}.close'
+		id_thumbnail:     '${window_thumbnail_image_prefix}${id}'
 	}
 	d.focus = id
 	d.dirty = true
@@ -225,27 +253,6 @@ fn (d &Desktop) visible_window_count() int {
 	return count
 }
 
-// next_window_by_age finds the window opened just after `after_id`. The window
-// list is kept in painting order, which changes whenever one is raised, while
-// the taskbar wants the order they were opened in. Ids only ever increase, so
-// repeatedly taking the smallest id above the last one walks that order
-// without building a sorted copy every frame.
-fn (d &Desktop) next_window_by_age(after_id int) ?int {
-	mut found := -1
-	for i, window in d.windows {
-		if window.workspace != d.current_workspace || window.id <= after_id {
-			continue
-		}
-		if found < 0 || window.id < d.windows[found].id {
-			found = i
-		}
-	}
-	if found < 0 {
-		return none
-	}
-	return found
-}
-
 fn (d &Desktop) pointer_description() string {
 	return if d.pointer_present { '/dev/pointer' } else { 'not available' }
 }
@@ -257,6 +264,7 @@ fn (mut d Desktop) raise(id int) {
 	d.windows.delete(index)
 	d.windows << window
 	d.focus = id
+	d.acknowledge_attention(id)
 	d.dirty = true
 }
 
@@ -269,6 +277,17 @@ fn (mut d Desktop) close_window(id int) {
 		if mut app is RemoteApp {
 			app.close()
 		}
+	}
+	d.release_window_thumbnail(index)
+	d.release_taskbar_status(index)
+	for slot, hidden in d.show_desktop.hidden {
+		if hidden == id {
+			d.show_desktop.hidden.delete(slot)
+			break
+		}
+	}
+	if d.taskbar_preview.peek_window == id {
+		d.end_peek()
 	}
 	d.windows.delete(index)
 	if closing_capture {
@@ -362,6 +381,13 @@ fn (mut d Desktop) activate(id int) {
 	if d.windows[index].minimized {
 		d.windows[index].minimized = false
 	}
+	// Bringing a window back by hand ends the Show Desktop session for it.
+	for slot, hidden in d.show_desktop.hidden {
+		if hidden == id {
+			d.show_desktop.hidden.delete(slot)
+			break
+		}
+	}
 	d.raise(id)
 }
 
@@ -372,21 +398,41 @@ fn (mut d Desktop) activate(id int) {
 // is rendered, and ui2 has no gradient to declare.
 fn (mut d Desktop) build_tree() ui2.Element {
 	begin_frame_elements()
-	mut children := frame_elements(available_apps.len + d.windows.len + 3)
+	mut children := frame_elements(available_apps.len + d.windows.len + 6)
 	// Shortcuts first, so every window paints over them.
 	shortcuts := d.shortcut_elements()
 	children << shortcuts
 	// The elements (and their nested child arrays) were copied into children;
 	// only this temporary outer array is no longer needed.
 	unsafe { shortcuts.free() }
+	// Aero Peek keeps one window solid, or none for the desktop, and draws the
+	// rest as glass. A peeked window shows even if it is minimized, or on
+	// another workspace, since a pinned button covers all of its windows.
+	peek := d.peek_target()
 	for window_index in 0 .. d.windows.len {
-		if d.windows[window_index].workspace != d.current_workspace
-			|| d.windows[window_index].minimized {
+		window_id := d.windows[window_index].id
+		if window_id != peek && (d.windows[window_index].workspace != d.current_workspace
+			|| d.windows[window_index].minimized) {
+			continue
+		}
+		if peek != 0 && window_id != peek {
+			children << d.peek_ghost_element(window_index)
 			continue
 		}
 		children << d.window_element(window_index)
 	}
 	children << d.taskbar_element()
+	// Taskbar popups rise from the bar, over the windows but under the Start
+	// menu, which closes them when it opens anyway.
+	if preview := d.taskbar_preview_element() {
+		children << preview
+	}
+	if flyout := d.tray_flyout_element() {
+		children << flyout
+	}
+	if tooltip := d.taskbar_tooltip_element() {
+		children << tooltip
+	}
 	// The Start menu paints over windows and the taskbar, and its panel consumes
 	// clicks in otherwise empty areas so they do not reach the window below.
 	if d.start_menu_open {
@@ -560,10 +606,12 @@ fn (mut d Desktop) launch(factory AppFactory) {
 // launch_with_timeout keeps normal interactive launches responsive while
 // allowing the boot path to tolerate cold persistent storage.
 fn (mut d Desktop) launch_with_timeout(factory AppFactory, timeout_ms int) {
+	factory_index := shortcut_app_index_named(factory.process_name)
 	if factory.exclusive_command != '' {
 		d.pending_external = factory.exclusive_command
 		d.pending_external_title = factory.title
 		d.pending_external_icon = factory.icon
+		d.record_recent_program_in(d.home, factory_index)
 		d.dirty = true
 		return
 	}
@@ -575,10 +623,20 @@ fn (mut d Desktop) launch_with_timeout(factory AppFactory, timeout_ms int) {
 		d.show_app_not_installed(factory)
 		return
 	}
+	// The process and everything it starts can report taskbar progress
+	// through this file; see taskbar_status.v.
+	status_path := d.next_taskbar_status_path()
+	d.pending_status_path = status_path
 	app := start_remote_app_with_timeout(factory, mut d, timeout_ms) or {
+		d.pending_status_path = ''
+		if status_path.len > 0 {
+			unsafe { status_path.free() }
+		}
 		eprintln('vinix-desktop: cannot start ${factory.title}: ${err}')
 		return
 	}
+	d.pending_status_path = ''
+	d.record_recent_program_in(d.home, factory_index)
 	if factory.install_package != '' {
 		// The icon was looked up, and found missing, before pkg installed it.
 		if cached := d.native_asset_icons[factory.icon] {
@@ -596,7 +654,8 @@ fn (mut d Desktop) launch_with_timeout(factory AppFactory, timeout_ms int) {
 	id := d.spawn(factory.title, .app, x, y, factory.width, factory.height)
 	index := d.window_index(id) or { return }
 	d.windows[index].app_index = d.apps.len - 1
-	d.windows[index].factory_index = shortcut_app_index_named(factory.process_name)
+	d.windows[index].factory_index = factory_index
+	d.windows[index].status_path = status_path
 	d.windows[index].icon = factory.icon
 	d.windows[index].hide_body_cursor = factory.hide_body_cursor
 	d.clamp_to_screen(index)
@@ -1078,7 +1137,13 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 	icon_only := theme.taskbar_icon_only
 	edge_padding := if dock { theme.dock_padding } else { taskbar_padding }
 
-	mut children := frame_elements(d.windows.len + d.pinned_apps.len + workspace_count + 6)
+	// Pinned apps stay here after closing. Other apps appear while open:
+	// `standard` gives every window an entry, while `combined` groups them.
+	entries := d.taskbar_entries()
+	defer {
+		unsafe { entries.free() }
+	}
+	mut children := frame_elements(3 * entries.len + workspace_count + tray_item_count + 10)
 	item_height := if icon_only { taskbar_icon_item_height } else { taskbar_item_height }
 	item_y := (taskbar_height - item_height) / 2
 
@@ -1095,89 +1160,45 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 		color: theme.taskbar_text_active
 	})
 
-	// Pinned apps stay here after closing. Other apps appear while open:
-	// `standard` gives every window an entry, while `combined` groups them.
-	entries := d.taskbar_entries()
-	defer {
-		unsafe { entries.free() }
-	}
-	mut x := edge_padding + start_button_width + 8
-	// Reserve this space before sizing entries. The clock is therefore visible
-	// at the physical lower-right corner after 2x M1 presentation as well as
-	// on an unscaled framebuffer.
+	layout := d.taskbar_layout(entries.len)
+	entries_left := layout.entries_left
+	entry_right := layout.entries_right
+	item_width := layout.item_width
+	workspace_x_fixed := layout.workspace_x
+	status_right := layout.status_right
+	status_width := layout.status_width
+	tray_span := layout.tray_span
+	workspace_width := layout.workspace_width
 	clock_width := taskbar_clock_width
 	build_width := taskbar_build_width
-	status_width := build_width + taskbar_item_gap + clock_width
-	workspace_width := workspace_count * workspace_button_width +
-		(workspace_count - 1) * workspace_button_gap
-	workspace_x_fixed := width - edge_padding - status_width - taskbar_item_gap - workspace_width
-	entry_right := if dock { width } else { workspace_x_fixed - taskbar_item_gap }
+	show_desktop_width := if dock { 0 } else { taskbar_show_desktop_width }
+	mut x := entries_left
 
-	// Entries share whatever room is left rather than each taking a fixed
-	// slot: with a fixed one the last window opened simply had no entry, which
-	// is the opposite of what a list of open windows is for.
-	mut item_width := if dock {
-		dock_item_width
-	} else if icon_only {
-		taskbar_icon_item_width
-	} else {
-		taskbar_item_width
-	}
-	item_min_width := if icon_only { taskbar_icon_item_min_width } else { taskbar_item_min_width }
-	if entries.len > 0 {
-		share := (entry_right - x + taskbar_item_gap) / entries.len - taskbar_item_gap
-		if share < item_width {
-			item_width = share
-		}
-		if item_width < item_min_width {
-			item_width = item_min_width
-		}
-	}
-
-	for entry in entries {
+	// A dragged button follows the pointer. Its slot stays reserved, so the
+	// other buttons only move when the drag actually crosses one of them.
+	mut dragged := -1
+	for index, entry in entries {
 		if x + item_width > entry_right {
 			break
 		}
-		bg := if entry.active {
-			theme.taskbar_item_active
-		} else if d.hover == entry.id {
-			theme.taskbar_item_hover
+		if d.taskbar_press.dragging && entry.key == d.taskbar_press.key {
+			dragged = index
 		} else {
-			theme.taskbar_item_bg
-		}
-		// A minimised window is dimmed rather than marked with a character:
-		// the baked faces are ASCII, so a nice bullet would come out blank.
-		text_color := if entry.active {
-			theme.taskbar_text_active
-		} else if entry.minimized {
-			theme.taskbar_muted
-		} else {
-			theme.taskbar_text
-		}
-		button_frame := ui2.rect(f64(x), f64(item_y), f64(item_width), f64(item_height))
-		button_style := ui2.BoxStyle{
-			bg:     bg
-			radius: if icon_only { 4 } else { 6 }
-		}
-		if icon_only {
-			// An icon consumes the full button when it has no label, making an
-			// app identifiable at a glance without stealing room from the clock.
-			icon := if entry.icon == 'asset:calendar' {
-				'builtin:calendar_today'
-			} else {
-				entry.icon
-			}
-			children << ui2.button_with_image(entry.id, '', icon, button_frame, button_style, ui2.TextStyle{
-				color: text_color
-			})
-		} else {
-			children << ui2.button(entry.id, entry.label, button_frame, button_style, ui2.TextStyle{
-				color: text_color
-				size:  12
-				align: .left
-			})
+			d.taskbar_entry_elements(mut children, entry, x, item_y, item_width, item_height,
+				icon_only, false)
 		}
 		x += item_width + taskbar_item_gap
+	}
+	if dragged >= 0 {
+		mut drag_x := d.pointer_x - d.taskbar_press.grab_offset
+		if drag_x > x - taskbar_item_gap - item_width {
+			drag_x = x - taskbar_item_gap - item_width
+		}
+		if drag_x < entries_left {
+			drag_x = entries_left
+		}
+		d.taskbar_entry_elements(mut children, entries[dragged], drag_x, item_y, item_width,
+			item_height, icon_only, true)
 	}
 
 	// A compact pager makes workspaces discoverable without opening an
@@ -1210,9 +1231,11 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 		x = workspace_x + workspace_width + taskbar_item_gap
 	}
 
-	// Keep the build date immediately left of the live clock. On a regular
-	// taskbar the live clock stays flush with the lower-right screen edge.
-	build_x := if dock { x } else { width - edge_padding - status_width }
+	// The notification area sits left of the build date, then the build date
+	// immediately left of the live clock, as the Windows 7 tray did.
+	tray_x := if dock { x } else { status_right - status_width }
+	d.tray_elements(mut children, tray_x, item_y, item_height)
+	build_x := tray_x + tray_span
 	clock_x := build_x + build_width + taskbar_item_gap
 	children << ui2.label('build.time', d.taskbar_build_time, ui2.rect(f64(build_x), 3, f64(build_width), 21), ui2.TextStyle{
 		color: theme.taskbar_text_active
@@ -1247,6 +1270,16 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 		children << ui2.view('taskbar.edge', ui2.rect(0, 0, f64(width), 1), ui2.BoxStyle{
 			bg: theme.taskbar_edge
 		}, [])
+		// Show Desktop fills the lower-right corner, where a pointer pushed
+		// against both edges always lands on it.
+		children << ui2.button(action_show_desktop, '', ui2.rect(f64(width - show_desktop_width), 1,
+			f64(show_desktop_width), f64(taskbar_height - 1)), ui2.BoxStyle{
+			bg: if d.hover == action_show_desktop || d.show_desktop.active {
+				theme.taskbar_item_hover
+			} else {
+				theme.taskbar_item_bg
+			}
+		}, ui2.TextStyle{})
 	}
 
 	if dock {
@@ -1265,6 +1298,131 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 	}, children)
 }
 
+// TaskbarLayout is where the bar's parts go, in the taskbar's coordinates.
+// Drawing and dragging share it, so a dragged button lands in the slot that is
+// actually drawn under the pointer.
+struct TaskbarLayout {
+	entries_left    int
+	entries_right   int
+	item_width      int
+	workspace_x     int
+	workspace_width int
+	status_right    int
+	status_width    int
+	tray_span       int
+}
+
+fn (d &Desktop) taskbar_layout(entry_count int) TaskbarLayout {
+	theme := d.theme()
+	dock := theme.dock
+	edge_padding := if dock { theme.dock_padding } else { taskbar_padding }
+	entries_left := edge_padding + start_button_width + 8
+	// Reserve the status area before sizing entries. The clock therefore stays
+	// in the physical lower-right corner, just inside Show Desktop, after 2x M1
+	// presentation as well as on an unscaled framebuffer.
+	tray_width := d.tray_width()
+	tray_span := if tray_width > 0 { tray_width + taskbar_item_gap } else { 0 }
+	status_width := tray_span + taskbar_build_width + taskbar_item_gap + taskbar_clock_width
+	status_right := if dock {
+		0
+	} else {
+		d.canvas.width - taskbar_show_desktop_width - taskbar_item_gap
+	}
+	workspace_width := workspace_count * workspace_button_width +
+		(workspace_count - 1) * workspace_button_gap
+	workspace_x := status_right - status_width - taskbar_item_gap - workspace_width
+	entries_right := if dock { d.canvas.width } else { workspace_x - taskbar_item_gap }
+	// Entries share whatever room is left rather than each taking a fixed
+	// slot: with a fixed one the last window opened simply had no entry, which
+	// is the opposite of what a list of open windows is for.
+	return TaskbarLayout{
+		entries_left:    entries_left
+		entries_right:   entries_right
+		item_width:      d.taskbar_item_width(entry_count, entries_left, entries_right)
+		workspace_x:     workspace_x
+		workspace_width: workspace_width
+		status_right:    status_right
+		status_width:    status_width
+		tray_span:       tray_span
+	}
+}
+
+fn (d &Desktop) taskbar_item_width(count int, left int, right int) int {
+	theme := d.theme()
+	mut item_width := if theme.dock {
+		dock_item_width
+	} else if theme.taskbar_icon_only {
+		taskbar_icon_item_width
+	} else {
+		taskbar_item_width
+	}
+	item_min_width := if theme.taskbar_icon_only {
+		taskbar_icon_item_min_width
+	} else {
+		taskbar_item_min_width
+	}
+	if count > 0 {
+		share := (right - left + taskbar_item_gap) / count - taskbar_item_gap
+		if share < item_width {
+			item_width = share
+		}
+		if item_width < item_min_width {
+			item_width = item_min_width
+		}
+	}
+	return item_width
+}
+
+// taskbar_entry_elements appends one button, then its progress and badge
+// overlays, which paint over the button and are not themselves clickable.
+fn (d &Desktop) taskbar_entry_elements(mut children []ui2.Element, entry TaskbarEntry, x int, y int,
+	width int, height int, icon_only bool, dragging bool) {
+	theme := d.theme()
+	bg := if entry.status.attention && !entry.active {
+		taskbar_attention_bg
+	} else if entry.active {
+		theme.taskbar_item_active
+	} else if dragging || d.hover == entry.id {
+		theme.taskbar_item_hover
+	} else {
+		theme.taskbar_item_bg
+	}
+	// A minimised window is dimmed rather than marked with a character:
+	// the baked faces are ASCII, so a nice bullet would come out blank.
+	text_color := if entry.active || entry.status.attention {
+		theme.taskbar_text_active
+	} else if entry.minimized {
+		theme.taskbar_muted
+	} else {
+		theme.taskbar_text
+	}
+	radius := if icon_only { 4 } else { 6 }
+	button_frame := ui2.rect(f64(x), f64(y), f64(width), f64(height))
+	button_style := ui2.BoxStyle{
+		bg:     bg
+		radius: radius
+	}
+	if icon_only {
+		// An icon consumes the full button when it has no label, making an
+		// app identifiable at a glance without stealing room from the clock.
+		icon := if entry.icon == 'asset:calendar' {
+			'builtin:calendar_today'
+		} else {
+			entry.icon
+		}
+		children << ui2.button_with_image(entry.id, '', icon, button_frame, button_style, ui2.TextStyle{
+			color: text_color
+		})
+	} else {
+		children << ui2.button(entry.id, entry.label, button_frame, button_style, ui2.TextStyle{
+			color: text_color
+			size:  12
+			align: .left
+		})
+	}
+	d.taskbar_status_elements(mut children, entry.status, x, y, width, height, radius)
+}
+
 // TaskbarEntry is one button in the middle of the bar. A pinned app keeps its
 // own action id when closed; an open window uses its task action id.
 struct TaskbarEntry {
@@ -1275,6 +1433,14 @@ struct TaskbarEntry {
 	minimized bool
 	app_index int = -1
 	window_id int
+	// What the button stands for, independently of which of its windows is on
+	// top: the pin's action, a window's task id, or a combined group's title.
+	// Hover previews and drags follow the key while the action id changes.
+	key          string
+	pinned       bool
+	window_count int
+	// The most significant progress, badge and attention of its windows.
+	status TaskStatus
 }
 
 fn (d &Desktop) taskbar_entries() []TaskbarEntry {
@@ -1287,56 +1453,74 @@ fn (d &Desktop) taskbar_entries() []TaskbarEntry {
 		window_id := d.taskbar_window_for_app(index)
 		mut active := false
 		mut minimized := false
+		mut count := 0
+		mut status := TaskStatus{}
+		for window in d.windows {
+			if window.factory_index != index {
+				continue
+			}
+			count++
+			status = merge_task_status(status, window.status, window.id == d.focus)
+			if window.id == d.focus && !window.minimized {
+				active = true
+			}
+		}
 		if window_id != 0 {
 			window_index := d.window_index(window_id) or { -1 }
 			if window_index >= 0 {
-				window := &d.windows[window_index]
-				active = window.id == d.focus && !window.minimized
-				minimized = window.minimized
+				minimized = d.windows[window_index].minimized
 			}
 		}
 		out << TaskbarEntry{
-			id:        taskbar_pin_actions[index]
-			label:     available_apps[index].title
-			icon:      available_apps[index].icon
-			active:    active
-			minimized: minimized
-			app_index: index
-			window_id: window_id
+			id:           taskbar_pin_actions[index]
+			label:        available_apps[index].title
+			icon:         available_apps[index].icon
+			active:       active
+			minimized:    minimized
+			app_index:    index
+			window_id:    window_id
+			key:          taskbar_pin_actions[index]
+			pinned:       true
+			window_count: count
+			status:       status
 		}
 	}
 	if d.settings.taskbar_mode == .standard {
-		mut last_id := 0
+		mut last_rank := min_i32_rank
 		for {
-			index := d.next_window_by_age(last_id) or { break }
+			index := d.next_window_by_task_rank(last_rank) or { break }
 			window := &d.windows[index]
-			last_id = window.id
+			last_rank = window.task_rank
 			if d.taskbar_is_pinned(window.factory_index) {
 				continue
 			}
 			out << TaskbarEntry{
-				id:        window.id_task
-				label:     window.title
-				icon:      window.icon
-				active:    window.id == d.focus && !window.minimized
-				minimized: window.minimized
-				app_index: window.factory_index
-				window_id: window.id
+				id:           window.id_task
+				label:        window.title
+				icon:         window.icon
+				active:       window.id == d.focus && !window.minimized
+				minimized:    window.minimized
+				app_index:    window.factory_index
+				window_id:    window.id
+				key:          window.id_task
+				window_count: 1
+				status:       merge_task_status(TaskStatus{}, window.status, window.id == d.focus)
 			}
 		}
 		return out
 	}
 
-	// Combined: one entry per title, labelled with how many windows share it.
-	// Clicking it activates the most recently raised of them, which is what
-	// makes a second click minimise the one you just brought up.
+	// Combined: one entry per title, labelled with how many windows share it,
+	// in the order of each group's first button. Clicking it activates the most
+	// recently raised of them, which is what makes a second click minimise the
+	// one you just brought up.
 	mut seen := []string{cap: d.windows.len}
 	unsafe { seen.flags |= .noslices }
-	for window_index in 0 .. d.windows.len {
+	mut last_rank := min_i32_rank
+	for {
+		window_index := d.next_window_by_task_rank(last_rank) or { break }
 		window := &d.windows[window_index]
-		if window.workspace != d.current_workspace {
-			continue
-		}
+		last_rank = window.task_rank
 		if d.taskbar_is_pinned(window.factory_index) {
 			continue
 		}
@@ -1348,12 +1532,14 @@ fn (d &Desktop) taskbar_entries() []TaskbarEntry {
 		mut newest_index := window_index
 		mut active := false
 		mut all_minimized := true
+		mut status := TaskStatus{}
 		for other in d.windows {
 			if other.workspace != d.current_workspace || other.title != window.title
 				|| d.taskbar_is_pinned(other.factory_index) {
 				continue
 			}
 			count++
+			status = merge_task_status(status, other.status, other.id == d.focus)
 			if other.id == d.focus && !other.minimized {
 				active = true
 			}
@@ -1371,17 +1557,72 @@ fn (d &Desktop) taskbar_entries() []TaskbarEntry {
 			}
 		}
 		out << TaskbarEntry{
-			id:        d.windows[newest_index].id_task
-			label:     if count > 1 { '${window.title}  (${count})' } else { window.title }
-			icon:      d.windows[newest_index].icon
-			active:    active
-			minimized: all_minimized
-			app_index: d.windows[newest_index].factory_index
-			window_id: d.windows[newest_index].id
+			id:           d.windows[newest_index].id_task
+			label:        if count > 1 {
+				d.taskbar_group_label(window.title, count)
+			} else {
+				window.title
+			}
+			icon:         d.windows[newest_index].icon
+			active:       active
+			minimized:    all_minimized
+			app_index:    d.windows[newest_index].factory_index
+			window_id:    d.windows[newest_index].id
+			key:          window.title
+			window_count: count
+			status:       status
 		}
 	}
 	unsafe { seen.free() }
 	return out
+}
+
+// Combined labels such as `Terminal  (2)` are built once per title and count,
+// rather than on every rebuild, because nothing collects them here.
+fn (d &Desktop) taskbar_group_label(title string, count int) string {
+	for label in taskbar_group_labels {
+		if label.count == count && label.title == title {
+			return label.text
+		}
+	}
+	text := '${title}  (${count})'
+	taskbar_group_labels << TaskbarGroupLabel{
+		title: title.clone()
+		count: count
+		text:  text
+	}
+	return text
+}
+
+struct TaskbarGroupLabel {
+	title string
+	count int
+	text  string
+}
+
+__global taskbar_group_labels = []TaskbarGroupLabel{}
+
+const min_i32_rank = -2147483647
+
+// next_window_by_task_rank walks the current workspace's windows in taskbar
+// order. The window list is kept in painting order, which changes whenever one
+// is raised; ranks only change when a button is dragged, so repeatedly taking
+// the smallest rank above the last one gives a stable order without building a
+// sorted copy every frame.
+fn (d &Desktop) next_window_by_task_rank(after_rank int) ?int {
+	mut found := -1
+	for i, window in d.windows {
+		if window.workspace != d.current_workspace || window.task_rank <= after_rank {
+			continue
+		}
+		if found < 0 || window.task_rank < d.windows[found].task_rank {
+			found = i
+		}
+	}
+	if found < 0 {
+		return none
+	}
+	return found
 }
 
 fn (d &Desktop) taskbar_entry_for_action(action string) ?TaskbarEntry {
@@ -1432,6 +1673,10 @@ fn (mut d Desktop) on_pointer_move(x int, y int) {
 			d.set_hover(hover)
 			d.dirty = true
 		}
+		return
+	}
+	if d.taskbar_press.active && d.buttons & button_left != 0 {
+		d.update_taskbar_drag(x, y)
 		return
 	}
 
@@ -1492,6 +1737,7 @@ fn (mut d Desktop) on_pointer_move(x int, y int) {
 	hover := d.hit_action(x, y)
 	if hover != d.hover {
 		d.set_hover(hover)
+		d.update_start_menu_hover()
 		d.dirty = true
 	}
 }
@@ -1652,6 +1898,7 @@ fn (mut d Desktop) on_pointer_down(x int, y int) {
 	// A fresh primary press supersedes any release that an earlier, incomplete
 	// device report failed to deliver.
 	d.chrome_pointer_capture = false
+	d.clear_taskbar_press()
 	action, world := d.hit_action_world(x, y)
 	d.trace_selector(action, world)
 	d.set_hover(action)
@@ -1665,6 +1912,16 @@ fn (mut d Desktop) on_pointer_down(x int, y int) {
 			return
 		}
 		d.switcher_close()
+	}
+
+	// A flyout closes when anything outside it is pressed, and the press then
+	// means what it would have meant.
+	if d.tray.flyout != .none_ && !(world == .desktop && action.starts_with('tray.')) {
+		d.close_tray_flyout()
+	}
+	if d.taskbar_preview.open && !(world == .desktop && (taskbar_entry_action(action)
+		|| action == taskbar_preview_panel || action.starts_with(taskbar_preview_prefix))) {
+		d.close_taskbar_preview()
 	}
 
 	if world == .desktop && action == action_start_toggle {
@@ -1723,22 +1980,27 @@ fn (mut d Desktop) on_pointer_down(x int, y int) {
 		return
 	}
 
-	if action.starts_with('task.') {
-		id := action[5..].int()
-		d.activate(id)
+	if taskbar_entry_action(action) {
+		d.taskbar_entry_click(action, x, y)
 		return
 	}
 
-	if action.starts_with(taskbar_pin_action_prefix) {
-		index := action[taskbar_pin_action_prefix.len..].int()
-		if d.taskbar_is_pinned(index) {
-			window_id := d.taskbar_window_for_app(index)
-			if window_id != 0 {
-				d.activate(window_id)
-			} else {
-				d.launch_index(index)
-			}
-		}
+	if action == taskbar_preview_panel {
+		return
+	}
+
+	if action.starts_with(taskbar_preview_prefix) {
+		d.handle_preview_action(action)
+		return
+	}
+
+	if action == action_show_desktop {
+		d.toggle_show_desktop()
+		return
+	}
+
+	if action.starts_with('tray.') {
+		d.handle_tray_action(action)
 		return
 	}
 
@@ -1822,6 +2084,16 @@ fn (mut d Desktop) on_pointer_up(x int, y int) {
 		// supplied the current frame's hit targets.
 		d.set_hover(release_action)
 		if app_index := d.finish_shortcut_press(release_action, x, y) {
+			d.launch_index(app_index)
+		}
+		d.drag = Drag{}
+		d.drag_damage = DamageRect{}
+		d.dirty = true
+		return
+	}
+	if d.taskbar_press.active {
+		d.set_hover(release_action)
+		if app_index := d.finish_taskbar_press_in(d.home, release_action, x, y) {
 			d.launch_index(app_index)
 		}
 		d.drag = Drag{}

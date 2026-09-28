@@ -101,6 +101,12 @@ fn (mut d Desktop) take_window_shortcuts(keys string) string {
 			i += matched
 			continue
 		}
+		matched = match_at(keys, i, key_super_d)
+		if matched > seq_none {
+			d.toggle_show_desktop()
+			i += matched
+			continue
+		}
 		matched = match_at(keys, i, key_super_left)
 		if matched > seq_none {
 			d.tile_focused(.left)

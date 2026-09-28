@@ -36,9 +36,6 @@ const key_ctrl_q = u8(0x11)
 const key_f1 = '\x1bOP'
 const key_f2 = '\x1bOQ'
 
-// One step of the bar in Settings, so the two agree.
-const brightness_step = 5
-
 // The reload helper removes this before asking PID 1 to replace the session.
 // Recreate it only after the replacement has painted its first frame and
 // completed the startup application handshakes, so an out-of-group watchdog
@@ -184,6 +181,8 @@ fn main() {
 		fonts:             fonts
 		shortcut_order:    load_shortcut_order(desktop_home)
 		pinned_apps:       load_taskbar_pins(desktop_home)
+		start_pins:        load_start_pins(desktop_home)
+		recent_programs:   load_recent_programs(desktop_home)
 		tz_offset_seconds: options.tz_offset
 		trace_selectors:   options.trace_selectors
 	}
@@ -321,6 +320,12 @@ fn main() {
 			eprintln('vinix-desktop: could not save desktop settings; changes may reset on restart')
 		}
 		desktop.update_switcher()
+		// Hover delays, device status and reported progress are all sampled
+		// against the clock, so an idle pass costs only these comparisons.
+		desktop.update_taskbar_hover()
+		desktop.update_tray()
+		desktop.poll_taskbar_status()
+		desktop.tick_taskbar_marquee()
 		other_dirty := desktop.dirty
 		desktop.dirty = background_dirty || pointer_dirty || keyboard_dirty || capture_dirty
 			|| other_dirty
@@ -336,7 +341,9 @@ fn main() {
 		if !desktop.dirty {
 			elapsed := monotonic_millis() - frame_started
 			app_interval := desktop.idle_wait_interval(options.idle_interval, options.frame_interval)
-			interval := desktop.capture_idle_interval(app_interval, options.frame_interval)
+			capture_interval := desktop.capture_idle_interval(app_interval, options.frame_interval)
+			hover_interval := desktop.taskbar_hover_idle_interval(capture_interval)
+			interval := desktop.taskbar_status_idle_interval(hover_interval)
 			wait := desktop_frame_wait_ms(elapsed, interval)
 			desktop_wait_for_input(pointer.fd, keyboard.fd, wait)
 			continue
@@ -619,29 +626,6 @@ fn (mut d Desktop) take_brightness_keys(keys string) string {
 		return keys
 	}
 	return kept.bytestr()
-}
-
-// adjust_brightness moves the panel by one step, reading first so that a
-// change made in Settings, or by the other key, is where it starts from.
-fn adjust_brightness(delta int) {
-	mut state := BacklightState{}
-	if read_backlight(mut state) != .ok || !state.online || !state.writable {
-		return
-	}
-	current := backlight_percent(&state)
-	if current < 0 {
-		return
-	}
-	mut target := current + delta
-	if target < 0 {
-		target = 0
-	}
-	if target > 100 {
-		target = 100
-	}
-	if target != current {
-		set_backlight_percent(target)
-	}
 }
 
 // FrameStats accumulates where a frame's milliseconds went. It is only kept

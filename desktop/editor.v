@@ -143,6 +143,7 @@ fn (mut a TextEditorApp) open_document() {
 	a.modified = false
 	a.focus = .document
 	a.set_file_status('Opened')
+	record_recent_item('vinix-editor', path)
 }
 
 fn (mut a TextEditorApp) save_document() {
@@ -161,6 +162,7 @@ fn (mut a TextEditorApp) save_document() {
 	}
 	a.modified = false
 	a.set_file_status('Saved')
+	record_recent_item('vinix-editor', path)
 }
 
 fn (a &TextEditorApp) line_start(position int) int {
@@ -464,6 +466,14 @@ fn (mut a TextEditorApp) build(size ui2.Rect) !ui2.Element {
 }
 
 fn (mut a TextEditorApp) handle(event_id string) ! {
+	// A Jump List or Recent Items entry opens its document in a new window.
+	if event_id.starts_with(jump_open_prefix) {
+		path := event_id[jump_open_prefix.len..]
+		a.set_path(path)
+		unsafe { path.free() }
+		a.open_document()
+		return
+	}
 	match event_id {
 		editor_action_new { a.new_document() }
 		editor_action_open { a.open_document() }

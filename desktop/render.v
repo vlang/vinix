@@ -54,6 +54,14 @@ const button_icon_size = 16
 // constructing heap-backed array literals for every icon on every redraw.
 const gear_tooth_x = [1, 0, -1, 0]
 const gear_tooth_y = [0, 1, 0, -1]
+// Doubled unit directions for the brightness sun's eight rays; diagonals are
+// shortened so every ray has about the same length.
+const brightness_ray_x = [2, 1, 0, -1, -2, -1, 0, 1]
+const brightness_ray_y = [0, 1, 2, 1, 0, -1, -2, -1]
+const network_offline_mark = u32(0xd24a3c)
+const record_mark = u32(0xe0443a)
+const battery_low_mark = u32(0xe0443a)
+const battery_charge_mark = u32(0xf5c542)
 const activity_bar_shares = [2, 3, 5]
 
 // Word 2013's unselected tabs are the only text drawn into its missing
@@ -258,6 +266,10 @@ fn (mut d Desktop) render_clipped(root ui2.Element, clip Clip) {
 	d.canvas.clip = clip
 	d.paint_wallpaper()
 	d.render_element(root, 0, 0, 0)
+	// Only a complete frame shows every window as it is now.
+	if clip.x == 0 && clip.y == 0 && clip.w == d.canvas.width && clip.h == d.canvas.height {
+		d.capture_window_thumbnails()
+	}
 	d.draw_cursor()
 	// A partial frame must not leak its clip into the next full one.
 	d.canvas.clip = Clip{
@@ -293,7 +305,10 @@ fn (mut d Desktop) render_element(el ui2.Element, off_x int, off_y int, depth in
 			d.draw_button(el, x, y, w, h)
 		}
 		.image {
-			if el.image_path.starts_with(vinix_preview_image_prefix) {
+			if el.image_path.starts_with(window_thumbnail_image_prefix) {
+				d.draw_window_thumbnail(el.image_path[window_thumbnail_image_prefix.len..].int(),
+					x, y, w, h)
+			} else if el.image_path.starts_with(vinix_preview_image_prefix) {
 				d.preview_cache.draw(mut d.canvas, el.image_path[vinix_preview_image_prefix.len..], x, y, w, h)
 			} else if el.image_path.starts_with(vinix_surface_image_prefix) {
 				d.canvas.draw_vinix_surface(el.image_path[vinix_surface_image_prefix.len..], x, y, w, h)
@@ -402,28 +417,49 @@ fn (mut d Desktop) draw_surface(el ui2.Element, x int, y int, w int, h int, dept
 		return
 	}
 	radius := int(el.box.radius)
+	// Aero Peek's glass: a faint pane and a brighter rim where a window was.
+	if el.id == peek_ghost_id {
+		d.canvas.blend_round_rect(x, y, w, h, radius, el.box.bg, peek_ghost_alpha)
+		d.canvas.stroke_round_rect(x, y, w, h, radius, el.box.bg, peek_ghost_edge_alpha)
+		return
+	}
+	// Taskbar progress tints the part of its button that is done.
+	if el.id == taskbar_progress_overlay_id {
+		d.canvas.blend_round_rect(x, y, w, h, radius, el.box.bg, taskbar_progress_alpha)
+		return
+	}
 	floating := depth == 1 && (el.id.starts_with('win.') || el.id == switcher_panel_id
-		|| el.id == action_start_panel)
+		|| el.id == action_start_panel || el.id == taskbar_preview_panel
+		|| el.id == action_tray_flyout || el.id == taskbar_tooltip_id)
 	// The switcher is drawn through: it covers the middle of the screen for as
 	// long as a key is held, and what it covers should stay legible behind it.
 	// Alpha is not something a ui2 box style can declare, so like the shadow
-	// below it is keyed off the window manager's own id.
-	translucent := el.id == switcher_panel_id
+	// below it is keyed off the window manager's own id. Taskbar thumbnails sit
+	// on the same kind of dark glass.
+	translucent := el.id == switcher_panel_id || el.id == taskbar_preview_panel
 	if floating {
 		d.canvas.drop_shadow(x, y, w, h, radius, 7, d.theme().shadow_alpha)
 	}
 	if translucent {
-		d.canvas.blend_round_rect(x, y, w, h, radius, el.box.bg, switcher_alpha)
+		d.canvas.blend_round_rect(x, y, w, h, radius, el.box.bg, if el.id == taskbar_preview_panel {
+			taskbar_preview_alpha
+		} else {
+			switcher_alpha
+		})
 	} else if radius > 0 {
 		d.canvas.fill_round_rect(x, y, w, h, radius, el.box.bg)
 	} else {
 		d.canvas.fill_rect(x, y, w, h, el.box.bg)
 	}
 	if floating {
-		edge := if translucent {
+		edge := if el.id == taskbar_preview_panel {
+			taskbar_preview_edge
+		} else if translucent {
 			switcher_edge
 		} else if el.id == action_start_panel {
 			u32(0x9db3cc)
+		} else if el.id == action_tray_flyout || el.id == taskbar_tooltip_id {
+			body_rule
 		} else {
 			d.theme().window_edge
 		}
@@ -1387,6 +1423,64 @@ fn (mut d Desktop) draw_builtin_glyph(path string, x int, y int, w int, h int, c
 			d.canvas.fill_rect(cx + 1, cy - radius - 1, radius + 2, radius + 1, behind)
 			d.canvas.fill_circle(cx, cy, radius / 4, behind)
 		}
+		'network_wired', 'network_pending', 'network_offline' {
+			// A monitor with a cable, the Windows 7 wired-network mark. Pending
+			// adds an ellipsis and offline a cross, both in the lower corner.
+			size := if w < h { w * 5 / 8 } else { h * 5 / 8 }
+			left := cx - size / 2
+			top := cy - size / 2
+			d.canvas.stroke_round_rect(left, top, size, size * 3 / 4, 2, color, 255)
+			d.canvas.fill_rect(cx - 1, top + size * 3 / 4, 2, size / 5, color)
+			d.canvas.fill_rect(cx - size / 4, top + size * 3 / 4 + size / 5, size / 2, 2, color)
+			if name == 'network_offline' {
+				bx := left + size - 2
+				by := top + size - 3
+				d.canvas.fill_circle(bx, by, 4, network_offline_mark)
+				d.canvas.draw_line(bx - 2, by - 2, bx + 2, by + 2, 0xffffff, 1)
+				d.canvas.draw_line(bx + 2, by - 2, bx - 2, by + 2, 0xffffff, 1)
+			} else if name == 'network_pending' {
+				for dot in 0 .. 3 {
+					d.canvas.fill_rect(left + size / 4 + dot * 3, top + size / 3, 2, 2, color)
+				}
+			}
+		}
+		'network_wifi' {
+			// Three arcs over a dot. The arcs are drawn as nested discs punched
+			// back out, which keeps them smooth at 200%.
+			radius := if w < h { w * 7 / 16 } else { h * 7 / 16 }
+			base_y := cy + radius / 2
+			behind := d.surface_under(x, y)
+			for ring in 0 .. 3 {
+				outer := radius - ring * radius / 3
+				d.canvas.fill_circle(cx, base_y, outer, color)
+				d.canvas.fill_circle(cx, base_y, outer - 2, behind)
+			}
+			d.canvas.fill_rect(cx - radius - 1, base_y, 2 * radius + 2, radius + 1, behind)
+			d.canvas.fill_rect(cx - radius - 1, cy - radius - 1, radius / 3, radius * 2, behind)
+			d.canvas.fill_rect(cx + radius - radius / 3 + 2, cy - radius - 1, radius / 3, radius * 2, behind)
+			d.canvas.fill_circle(cx, base_y - 1, 2, color)
+		}
+		'brightness' {
+			// A sun: a disc and eight short rays.
+			radius := if w < h { w / 7 } else { h / 7 }
+			reach := radius * 2 + 1
+			d.canvas.fill_circle(cx, cy, radius, color)
+			for ray in 0 .. 8 {
+				dx := brightness_ray_x[ray]
+				dy := brightness_ray_y[ray]
+				d.canvas.draw_line(cx + dx * (radius + 2) / 2, cy + dy * (radius + 2) / 2,
+					cx + dx * reach / 2, cy + dy * reach / 2, color, 1)
+			}
+		}
+		'record' {
+			radius := if w < h { w / 4 } else { h / 4 }
+			d.canvas.fill_circle(cx, cy, radius, record_mark)
+		}
+		'chevron_up' {
+			arm := if w < h { w / 4 } else { h / 4 }
+			d.canvas.draw_line(cx - arm, cy + arm / 2, cx, cy - arm / 2, color, 1)
+			d.canvas.draw_line(cx, cy - arm / 2, cx + arm, cy + arm / 2, color, 1)
+		}
 		'search' {
 			radius := if w < h { w / 4 } else { h / 4 }
 			d.canvas.fill_circle(cx - 2, cy - 2, radius, color)
@@ -1395,7 +1489,44 @@ fn (mut d Desktop) draw_builtin_glyph(path string, x int, y int, w int, h int, c
 			}
 			d.canvas.draw_line(cx + radius / 2, cy + radius / 2, cx + radius, cy + radius, color, 2)
 		}
-		else {}
+		else {
+			if name.starts_with('battery_') {
+				d.draw_battery_glyph(name, cx, cy, w, h, color)
+			}
+		}
+	}
+}
+
+// draw_battery_glyph draws `battery_<percent>` or `battery_charging_<percent>`:
+// an outline with a terminal nub, filled to the charge, red when nearly empty.
+fn (mut d Desktop) draw_battery_glyph(name string, cx int, cy int, w int, h int, color u32) {
+	charging := name.starts_with('battery_charging_')
+	digits := if charging { name['battery_charging_'.len..] } else { name['battery_'.len..] }
+	percent := digits.int()
+	unsafe { digits.free() }
+	body_width := if w < h { w * 5 / 8 } else { h * 5 / 8 }
+	body_height := body_width / 2 + 1
+	left := cx - body_width / 2 - 1
+	top := cy - body_height / 2
+	d.canvas.stroke_round_rect(left, top, body_width, body_height, 2, color, 255)
+	d.canvas.fill_rect(left + body_width, top + body_height / 3, 2, body_height / 3 + 1, color)
+	fill := (body_width - 4) * percent / 100
+	if fill > 0 {
+		d.canvas.fill_rect(left + 2, top + 2, fill, body_height - 4, if percent <= 10 && !charging {
+			battery_low_mark
+		} else {
+			color
+		})
+	}
+	if charging {
+		// A bolt across the body, drawn in the taskbar's own colour behind it.
+		behind := d.surface_under(left - 2, top - 2)
+		d.canvas.draw_line(cx + 1, top - 1, cx - 2, cy + 1, behind, 3)
+		d.canvas.draw_line(cx - 2, cy + 1, cx + 2, cy - 1, behind, 3)
+		d.canvas.draw_line(cx + 2, cy - 1, cx - 1, top + body_height + 1, behind, 3)
+		d.canvas.draw_line(cx + 1, top, cx - 2, cy + 1, battery_charge_mark, 1)
+		d.canvas.draw_line(cx - 2, cy + 1, cx + 2, cy - 1, battery_charge_mark, 1)
+		d.canvas.draw_line(cx + 2, cy - 1, cx - 1, top + body_height, battery_charge_mark, 1)
 	}
 }
 

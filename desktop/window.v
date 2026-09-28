@@ -73,6 +73,24 @@ mut:
 	app_index int = -1
 	// Stable catalog identity for taskbar pinning; separate from the client slot.
 	factory_index int = -1
+	// Position among unpinned taskbar buttons. It starts as the window id, so
+	// buttons appear in opening order, and dragging a button swaps ranks.
+	task_rank int
+	// Hover-preview identities, built once like the chrome ids above.
+	id_preview       string
+	id_preview_close string
+	id_thumbnail     string
+	// The last unobstructed picture of the window, sampled from the composed
+	// canvas at the backing store's density. Minimized and covered windows
+	// keep showing the last picture that was taken of them.
+	thumbnail        []u32
+	thumbnail_width  int
+	thumbnail_height int
+	thumbnail_scale  int
+	// Taskbar progress, badge and attention reported by the window's process.
+	status_path    string
+	status         TaskStatus
+	attention_seen int
 }
 
 fn (w &Window) frame_rect() ui2.Rect {

@@ -76,17 +76,19 @@ const create_context_files_item_entries = [
 	ui2.MenuEntry{ id: file_context_delete, title: 'Delete' },
 ]
 
-const taskbar_context_running_entries = [
-	ui2.MenuEntry{ id: taskbar_context_pin, title: 'Pin to taskbar' },
-	ui2.MenuEntry{ id: taskbar_context_close, title: 'Close window' },
+const start_context_open = 'start.context.open'
+const start_context_pin_start = 'start.context.pin.start'
+const start_context_unpin_start = 'start.context.unpin.start'
+const start_context_pin_taskbar = 'start.context.pin.taskbar'
+const start_context_unpin_taskbar = 'start.context.unpin.taskbar'
+const start_context_forget = 'start.context.forget'
+const tray_context_hide = 'tray.context.hide'
+const tray_context_show = 'tray.context.show'
+const tray_context_hide_entries = [
+	ui2.MenuEntry{ id: tray_context_hide, title: 'Hide in overflow' },
 ]
-const taskbar_context_pinned_running_entries = [
-	ui2.MenuEntry{ id: taskbar_context_unpin, title: 'Unpin from taskbar' },
-	ui2.MenuEntry{ id: taskbar_context_close, title: 'Close window' },
-]
-const taskbar_context_pinned_closed_entries = [
-	ui2.MenuEntry{ id: taskbar_context_open, title: 'Open' },
-	ui2.MenuEntry{ id: taskbar_context_unpin, title: 'Unpin from taskbar' },
+const tray_context_show_entries = [
+	ui2.MenuEntry{ id: tray_context_show, title: 'Show on taskbar' },
 ]
 
 enum CreateContextTarget {
@@ -94,6 +96,8 @@ enum CreateContextTarget {
 	desktop
 	files
 	taskbar
+	start_menu
+	tray
 }
 
 enum RenameInputState {
@@ -117,6 +121,8 @@ mut:
 	y                     int
 	app_index             int = -1
 	taskbar_window_id     int
+	// Rows in a Start menu program's menu, which depend on its pins.
+	start_rows            int
 	rename_app_index      int = -1
 	swallow_left_release  bool
 	swallow_right_release bool
@@ -779,6 +785,12 @@ fn (mut a FilesContextApp) handle(event_id string) ! {
 		a.reload_files_settings(desktop_home)
 		return
 	}
+	if event_id.starts_with(jump_open_prefix) && !a.settings_only {
+		path := event_id[jump_open_prefix.len..]
+		a.open_jump_path(path, desktop_home)
+		unsafe { path.free() }
+		return
+	}
 	if a.settings_only {
 		a.handle_settings(event_id)
 		return
@@ -871,10 +883,38 @@ fn (mut a FilesContextApp) handle(event_id string) ! {
 }
 
 fn (mut a FilesContextApp) handle_browser_action(event_id string, home string) ! {
+	before := a.files.current_path().clone()
+	defer { unsafe { before.free() } }
 	a.files.handle(event_id)!
 	if event_id == files_action_view_list || event_id == files_action_view_columns
 		|| event_id == files_action_view_commander {
 		save_files_view_mode(home, a.files.view_mode)
+	}
+	// Every folder the user goes into is a recent item for Files' Jump List.
+	if a.files.current_path() != before {
+		record_recent_item_in(home, 'vinix-files', a.files.current_path())
+	}
+}
+
+// open_jump_path shows a folder, or the folder holding a file with that file
+// selected, when the compositor opens this window from a Jump List.
+fn (mut a FilesContextApp) open_jump_path(path string, home string) {
+	info := desktop_stat(path) or { return }
+	a.clear_context_path()
+	if info.is_dir {
+		a.files.navigate_to(path)
+		record_recent_item_in(home, 'vinix-files', a.files.current_path())
+		return
+	}
+	a.files.navigate_to(parent_path(path))
+	a.set_context_path(path)
+	a.focus_path(path)
+	name := file_path_name(path)
+	for row, entry in a.files.browser.entries {
+		if entry.name == name {
+			a.files.browser.selected_row = row
+			break
+		}
 	}
 }
 
@@ -947,8 +987,15 @@ fn (mut d Desktop) clear_context_item_path() {
 }
 
 fn context_menu_height(target CreateContextTarget, has_item bool) int {
+	if target == .taskbar && taskbar_jump_list.height > 0 {
+		return taskbar_jump_list.height
+	}
 	count := if target == .taskbar {
 		2
+	} else if target == .start_menu {
+		create_context_menu.start_rows
+	} else if target == .tray {
+		1
 	} else if has_item {
 		if target == .files {
 			create_context_files_item_entries.len
@@ -1002,6 +1049,8 @@ fn (mut d Desktop) close_create_context_menu() {
 	create_context_menu.has_item = false
 	create_context_menu.app_index = -1
 	create_context_menu.taskbar_window_id = 0
+	create_context_menu.start_rows = 0
+	free_jump_list()
 	d.clear_context_item_path()
 	d.set_hover('')
 	d.dirty = true
@@ -1031,17 +1080,43 @@ fn files_context_row_action(action string) bool {
 // Files gets the item under the pointer as a private selection event before
 // the compositor shows the menu. Empty Files space instead clears that target.
 fn (mut d Desktop) open_create_context_menu(x int, y int) bool {
-	if d.switcher.active || d.start_menu_open {
+	if d.switcher.active {
+		return false
+	}
+	underlying, world := d.hit_action_world(x, y)
+	if d.start_menu_open {
+		// A program in the Start menu offers its pins; nothing else in the
+		// menu has one.
+		if world == .desktop && underlying.starts_with(action_start_launch_prefix) {
+			index := underlying[action_start_launch_prefix.len..].int()
+			if index >= 0 && index < available_apps.len {
+				d.close_create_context_menu()
+				create_context_menu.start_rows = d.start_context_entries(index).len
+				d.set_create_context_menu(.start_menu, index, true, '', x, y)
+				return true
+			}
+		}
 		return false
 	}
 	d.cancel_file_context_rename()
-	underlying, world := d.hit_action_world(x, y)
+	if world == .desktop && (underlying.starts_with('tray.icon.')
+		|| underlying.starts_with('tray.overflow.icon.')) {
+		if item := tray_item_for_action(underlying) {
+			d.close_tray_flyout()
+			d.set_create_context_menu(.tray, int(item), true, '', x, y)
+			return true
+		}
+	}
 	if world == .desktop && (underlying.starts_with('task.')
 		|| underlying.starts_with(taskbar_pin_action_prefix)) {
 		if entry := d.taskbar_entry_for_action(underlying) {
 			if entry.app_index >= 0 {
+				d.close_taskbar_preview()
+				d.close_tray_flyout()
+				d.build_jump_list(entry)
 				d.set_create_context_menu(.taskbar, entry.app_index, true, '', x, y)
 				create_context_menu.taskbar_window_id = entry.window_id
+				d.place_jump_list(x)
 				return true
 			}
 		}
@@ -1105,6 +1180,9 @@ fn context_menu_action(action string) bool {
 		|| action == file_context_paste || action == file_context_delete || action == file_context_tags
 		|| action == taskbar_context_pin || action == taskbar_context_unpin
 		|| action == taskbar_context_open || action == taskbar_context_close
+		|| action == taskbar_context_close_all || action.starts_with(jump_list_prefix)
+		|| action.starts_with('start.context.') || action == tray_context_hide
+		|| action == tray_context_show
 }
 
 fn action_starts_rename(action string) bool {
@@ -1186,6 +1264,17 @@ fn (mut d Desktop) create_context_left_down(x int, y int) bool {
 		''
 	}
 	create_context_menu.swallow_left_release = true
+	// A Jump List entry is released with the menu, so take what it says first.
+	mut jump := JumpEntry{}
+	mut jump_path := ''
+	mut jump_windows := []int{}
+	if target == .taskbar {
+		if entry := jump_list_entry_for(action) {
+			jump = entry
+			jump_path = entry.path.clone()
+		}
+		jump_windows = taskbar_jump_list.windows.clone()
+	}
 	d.close_create_context_menu()
 	match target {
 		.desktop {
@@ -1211,26 +1300,39 @@ fn (mut d Desktop) create_context_left_down(x int, y int) bool {
 			}
 		}
 		.taskbar {
-			match action {
-				taskbar_context_pin {
-					if !d.pin_taskbar_app_in(desktop_home, app_index) {
-						eprintln('vinix-desktop: could not pin taskbar app')
-					}
-				}
-				taskbar_context_unpin {
-					if !d.unpin_taskbar_app_in(desktop_home, app_index) {
-						eprintln('vinix-desktop: could not unpin taskbar app')
-					}
-				}
-				taskbar_context_open { d.launch_index(app_index) }
-				taskbar_context_close { d.close_window(taskbar_window_id) }
-				else {}
+			command := match action {
+				taskbar_context_pin { JumpCommand.pin }
+				taskbar_context_unpin { JumpCommand.unpin }
+				taskbar_context_open { JumpCommand.launch }
+				taskbar_context_close { JumpCommand.close_window }
+				taskbar_context_close_all { JumpCommand.close_all }
+				else { jump.command }
+			}
+			if command == .close_window && action == taskbar_context_close {
+				d.close_window(taskbar_window_id)
+			} else {
+				d.run_jump_command(command, app_index, jump_path, jump.arg, jump_windows)
+			}
+		}
+		.start_menu {
+			d.start_context_action(action, app_index)
+		}
+		.tray {
+			if app_index >= 0 && app_index < tray_item_count {
+				d.set_tray_item_hidden_in(d.home, tray_item_from_index(app_index),
+					action == tray_context_hide)
 			}
 		}
 		.none_ {}
 	}
 	if item_path.len > 0 {
 		unsafe { item_path.free() }
+	}
+	if jump_path.len > 0 {
+		unsafe { jump_path.free() }
+	}
+	if jump_windows.cap > 0 {
+		unsafe { jump_windows.free() }
 	}
 	d.dirty = true
 	return true
@@ -1281,8 +1383,26 @@ fn (mut d Desktop) file_context_rename_key_input(input string) bool {
 }
 
 fn desktop_file_icon_occluded(d &Desktop, x int, y int, width int, height int) bool {
+	// Taskbar popups are drawn in the main tree, before the icons.
+	p := &d.taskbar_preview
+	if p.panel_width > 0 && rects_overlap(x, y, width, height, p.panel_x, p.panel_y,
+		p.panel_width, p.panel_height) {
+		return true
+	}
+	if p.tooltip_shown && rects_overlap(x, y, width, height, p.tooltip_x, p.tooltip_y,
+		p.tooltip_width, p.tooltip_height) {
+		return true
+	}
+	if d.tray.flyout != .none_ && rects_overlap(x, y, width, height, d.tray.flyout_x,
+		d.tray.flyout_y, d.tray.flyout_width, d.tray.flyout_height) {
+		return true
+	}
+	// Peeking at the desktop turns every window to glass over the icons.
+	if d.peek_target() == -1 {
+		return false
+	}
 	for window in d.windows {
-		if window.minimized {
+		if window.minimized || window.workspace != d.current_workspace {
 			continue
 		}
 		if x < window.x + window.width && x + width > window.x && y < window.y + window.height
@@ -1400,13 +1520,18 @@ fn (mut d Desktop) render_create_context_menu() {
 	d.render_desktop_file_icons()
 	if create_context_menu.visible {
 		if create_context_menu.target == .taskbar {
-			if create_context_menu.taskbar_window_id == 0 {
-				d.render_context_entries(taskbar_context_pinned_closed_entries)
-			} else if d.taskbar_is_pinned(create_context_menu.app_index) {
-				d.render_context_entries(taskbar_context_pinned_running_entries)
+			d.render_jump_list()
+		} else if create_context_menu.target == .start_menu {
+			entries := d.start_context_entries(create_context_menu.app_index)
+			d.render_context_entries(entries)
+			unsafe { entries.free() }
+		} else if create_context_menu.target == .tray {
+			item := tray_item_from_index(create_context_menu.app_index)
+			d.render_context_entries(if d.tray.hidden(item) {
+				tray_context_show_entries
 			} else {
-				d.render_context_entries(taskbar_context_running_entries)
-			}
+				tray_context_hide_entries
+			})
 		} else if create_context_menu.has_item {
 			if create_context_menu.target == .files {
 				d.render_context_entries(create_context_files_item_entries)

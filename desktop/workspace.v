@@ -49,6 +49,10 @@ fn (mut d Desktop) switch_workspace(workspace int) {
 	if d.start_menu_open {
 		d.close_start_menu()
 	}
+	d.close_taskbar_preview()
+	d.end_peek()
+	d.close_tray_flyout()
+	d.clear_taskbar_press()
 	d.drag = Drag{}
 	d.drag_damage = DamageRect{}
 	d.pointer_capture = 0

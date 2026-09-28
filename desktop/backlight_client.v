@@ -249,3 +249,29 @@ fn set_backlight_percent(percent int) BacklightResult {
 	mut io := PosixDeviceIO{}
 	return set_backlight_percent_with(mut io, percent)
 }
+
+// One step of the bar in Settings, so the two agree.
+const brightness_step = 5
+
+// adjust_brightness moves the panel by one step, reading first so that a
+// change made in Settings, or by the other key, is where it starts from.
+fn adjust_brightness(delta int) {
+	mut state := BacklightState{}
+	if read_backlight(mut state) != .ok || !state.online || !state.writable {
+		return
+	}
+	current := backlight_percent(&state)
+	if current < 0 {
+		return
+	}
+	mut target := current + delta
+	if target < 0 {
+		target = 0
+	}
+	if target > 100 {
+		target = 100
+	}
+	if target != current {
+		set_backlight_percent(target)
+	}
+}

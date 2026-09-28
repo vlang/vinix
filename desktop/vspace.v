@@ -603,7 +603,18 @@ fn open_vspace(mut _ Desktop) !NativeApp {
 }
 
 fn (mut a VSpaceApp) poll() bool {
-	return a.scanner.step()
+	changed := a.scanner.step()
+	// A walk has no known end, so its button shows indeterminate progress,
+	// and an error bar if the walk failed.
+	publish_taskbar_status(TaskStatus{
+		progress_state: match a.scanner.phase {
+			.scanning { TaskProgress.indeterminate }
+			.failed { TaskProgress.error }
+			else { TaskProgress.none_ }
+		}
+		progress:       if a.scanner.phase == .failed { 100 } else { 0 }
+	})
+	return changed
 }
 
 fn (mut a VSpaceApp) close_app() {
