@@ -262,7 +262,11 @@ pub fn poll() {
 	refresh_registered_sockets()
 	net_lock.release()
 
-	if has_configuration && (!resolver_published || address != last_address) {
+	// Built once per address and kept until publish_resolver() writes it.
+	// Rebuilt at every poll until then, each copy was lost: a millisecond at
+	// a time for as long as the root had no /etc.
+	if has_configuration && (address != last_address
+		|| (!resolver_published && pending_resolver.len == 0)) {
 		// print(), not the C printf this used: that one is compiled out of a
 		// PROD kernel, so the one line that says whether the machine has an
 		// address was invisible in exactly the builds anyone debugs.
