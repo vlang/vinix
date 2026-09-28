@@ -34,7 +34,8 @@
 #
 # --guest-init=PATH overlays /sbin/init for this boot only. It is intended for
 # automated VM tests: neither the selected initramfs nor a persistent volume is
-# modified.
+# modified. VINIX_QEMU_OVERLAY=DIR adds that directory's files to the same
+# per-boot module, so a test can also bring binaries or data along with it.
 #
 # --mem=MB (or VINIX_QEMU_MEM) sizes guest RAM. The virt machine places RAM
 # from 1 GiB upwards, so anything past --mem=3072 lands above 4 GiB, which is
@@ -258,6 +259,11 @@ if [ -n "$GUEST_INIT" ]; then
         exit 1
     fi
 fi
+QEMU_OVERLAY="${VINIX_QEMU_OVERLAY:-}"
+if [ -n "$QEMU_OVERLAY" ] && [ ! -d "$QEMU_OVERLAY" ]; then
+    echo "ERROR: VINIX_QEMU_OVERLAY must name a directory: $QEMU_OVERLAY" >&2
+    exit 1
+fi
 
 case "$BOOT_DISK_SIZE_MB" in
     ''|*[!0-9]*|0)
@@ -298,6 +304,10 @@ esac
 if [ "$DISK_ROOT" -eq 1 ] && [ -n "$GUEST_INIT" ]; then
     # --guest-init overlays the initramfs, which a disk root does not boot.
     echo "ERROR: --guest-init overlays the initramfs, which --disk-root does not boot from" >&2
+    exit 1
+fi
+if [ "$DISK_ROOT" -eq 1 ] && [ -n "$QEMU_OVERLAY" ]; then
+    echo "ERROR: VINIX_QEMU_OVERLAY overlays the initramfs, which --disk-root does not boot from" >&2
     exit 1
 fi
 case "$PERSIST_ENABLED" in
@@ -997,6 +1007,10 @@ if [ -n "$GUEST_INIT" ]; then
     mkdir -p "$PACKAGE_RUNTIME_ROOT/sbin"
     install -m755 "$GUEST_INIT" "$PACKAGE_RUNTIME_ROOT/sbin/init"
     echo "==> Injecting test init: $GUEST_INIT"
+fi
+if [ -n "$QEMU_OVERLAY" ]; then
+    cp -R "$QEMU_OVERLAY/." "$PACKAGE_RUNTIME_ROOT/"
+    echo "==> Injecting test overlay: $QEMU_OVERLAY"
 fi
 
 if [ "$VIRTIO_GPU" -eq 2 ]; then
