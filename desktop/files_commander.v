@@ -61,7 +61,7 @@ fn files_commander_pane(mut children []ui2.Element, browser &FileBrowser, settin
 		return
 	}
 	if browser.entries.len == 0 {
-		children << ui2.label('', 'This directory is empty.', ui2.rect(f64(x + files_padding),
+		children << ui2.label('', tr('files.empty_directory'), ui2.rect(f64(x + files_padding),
 			f64(rows_top + 8), f64(width - 2 * files_padding), 20), ui2.TextStyle{
 			color: body_muted
 			size:  12

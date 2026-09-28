@@ -10,9 +10,100 @@
 // independent of what the target's time zone database does or does not have.
 module main
 
+// English abbreviations, for code that has not yet moved to the translated
+// names below. Text the user reads comes from date_weekday_short and friends.
 const weekday_names = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const month_names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov',
 	'Dec']
+
+// The names a date is written with, in the desktop's language. Weekdays count
+// from Sunday as CivilTime does, months from one. The table owns every name:
+// none of them may be freed.
+//
+// Each context has names of its own because languages differ in more than
+// spelling. Russian writes a month in the genitive after a day (28 сентября)
+// and in the nominative on its own (Сентябрь 2026, in calendar.v), and spells
+// out the long date that English abbreviates.
+
+// date_weekday_short is the abbreviation the taskbar and the calendar's
+// column headings use.
+fn date_weekday_short(weekday int) string {
+	return match weekday {
+		0 { tr('date.weekday.short.sun') }
+		1 { tr('date.weekday.short.mon') }
+		2 { tr('date.weekday.short.tue') }
+		3 { tr('date.weekday.short.wed') }
+		4 { tr('date.weekday.short.thu') }
+		5 { tr('date.weekday.short.fri') }
+		else { tr('date.weekday.short.sat') }
+	}
+}
+
+// date_month_short is the abbreviation written after a day number.
+fn date_month_short(month int) string {
+	return match month {
+		1 { tr('date.month.short.jan') }
+		2 { tr('date.month.short.feb') }
+		3 { tr('date.month.short.mar') }
+		4 { tr('date.month.short.apr') }
+		5 { tr('date.month.short.may') }
+		6 { tr('date.month.short.jun') }
+		7 { tr('date.month.short.jul') }
+		8 { tr('date.month.short.aug') }
+		9 { tr('date.month.short.sep') }
+		10 { tr('date.month.short.oct') }
+		11 { tr('date.month.short.nov') }
+		else { tr('date.month.short.dec') }
+	}
+}
+
+// date_long_weekday and date_long_month are the names in the long date the
+// Clock and Calendar show. English keeps the abbreviations it has always
+// used there.
+fn date_long_weekday(weekday int) string {
+	return match weekday {
+		0 { tr('date.long.weekday.sun') }
+		1 { tr('date.long.weekday.mon') }
+		2 { tr('date.long.weekday.tue') }
+		3 { tr('date.long.weekday.wed') }
+		4 { tr('date.long.weekday.thu') }
+		5 { tr('date.long.weekday.fri') }
+		else { tr('date.long.weekday.sat') }
+	}
+}
+
+fn date_long_month(month int) string {
+	return match month {
+		1 { tr('date.long.month.jan') }
+		2 { tr('date.long.month.feb') }
+		3 { tr('date.long.month.mar') }
+		4 { tr('date.long.month.apr') }
+		5 { tr('date.long.month.may') }
+		6 { tr('date.long.month.jun') }
+		7 { tr('date.long.month.jul') }
+		8 { tr('date.long.month.aug') }
+		9 { tr('date.long.month.sep') }
+		10 { tr('date.long.month.oct') }
+		11 { tr('date.long.month.nov') }
+		else { tr('date.long.month.dec') }
+	}
+}
+
+// date_long_text writes out a date with its weekday: "Mon, Sep 28, 2026",
+// "понедельник, 28 сентября 2026 г.", "lunes, 28 de septiembre de 2026". The
+// result belongs to the caller.
+fn date_long_text(year int, month int, day int, weekday int) string {
+	day_text := day.str()
+	year_text := year.str()
+	date := tr_fill3('date.long.day_month_year', day_text, date_long_month(month), year_text)
+	text := tr_fill2('date.long', date_long_weekday(weekday), date)
+	unsafe {
+		day_text.free()
+		year_text.free()
+		date.free()
+	}
+	return text
+}
 
 struct CivilTime {
 	year    int
@@ -77,7 +168,7 @@ fn pad2(value int) string {
 fn (d &Desktop) taskbar_clock_strings_at(seconds i64) (string, string) {
 	if seconds < 0 {
 		return if d.settings.clock_show_seconds { '--:--:--'.clone() } else { '--:--'.clone() },
-			'Clock unavailable'.clone()
+			tr('clock.unavailable').clone()
 	}
 	civil := civil_from_epoch(seconds + d.tz_offset_seconds)
 	minute := pad2(civil.minute)
@@ -91,39 +182,41 @@ fn (d &Desktop) taskbar_clock_strings_at(seconds i64) (string, string) {
 		}
 		hour = display_hour.str()
 	}
-	suffix := if civil.hour < 12 { 'AM' } else { 'PM' }
 	mut time_text := ''
 	if d.settings.clock_show_seconds {
 		second := pad2(civil.second)
-		time_text = if d.settings.clock_24_hour {
-			'${hour}:${minute}:${second}'
-		} else {
-			'${hour}:${minute}:${second} ${suffix}'
-		}
+		time_text = '${hour}:${minute}:${second}'
 		unsafe { second.free() }
 	} else {
-		time_text = if d.settings.clock_24_hour {
-			'${hour}:${minute}'
-		} else {
-			'${hour}:${minute} ${suffix}'
-		}
+		time_text = '${hour}:${minute}'
 	}
 	unsafe {
 		hour.free()
 		minute.free()
 	}
+	if !d.settings.clock_24_hour {
+		// Each language places its own AM and PM around the time.
+		clock := time_text
+		time_text = if civil.hour < 12 {
+			tr_fill('date.time_am', clock)
+		} else {
+			tr_fill('date.time_pm', clock)
+		}
+		unsafe { clock.free() }
+	}
 
 	mut date_text := ''
 	if d.settings.clock_show_date {
 		day := civil.day.str()
+		month := date_month_short(civil.month)
 		date_text = if d.settings.clock_show_weekday {
-			'${weekday_names[civil.weekday]} ${day} ${month_names[civil.month - 1]}'
+			tr_fill3('date.weekday_day_month', date_weekday_short(civil.weekday), day, month)
 		} else {
-			'${day} ${month_names[civil.month - 1]}'
+			tr_fill2('date.day_month', day, month)
 		}
 		unsafe { day.free() }
 	} else if d.settings.clock_show_weekday {
-		date_text = weekday_names[civil.weekday].clone()
+		date_text = date_weekday_short(civil.weekday).clone()
 	}
 	return time_text, date_text
 }
@@ -132,19 +225,26 @@ fn (d &Desktop) taskbar_clock_strings_at(seconds i64) (string, string) {
 // when a cached build is reused. Display it in the live clock's time zone.
 fn (d &Desktop) taskbar_build_strings_at(seconds i64, gpu_driver_enabled bool) (string, string) {
 	if seconds <= 0 {
-		return 'Built --:--'.clone(), 'Date unavailable'.clone()
+		return tr_fill('clock.built', '--:--'), tr('clock.date_unavailable').clone()
 	}
 	civil := civil_from_epoch(seconds + d.tz_offset_seconds)
 	hour := pad2(civil.hour)
 	minute := pad2(civil.minute)
 	day := pad2(civil.day)
-	time_text := 'Built ${hour}:${minute}'
-	gpu_suffix := if gpu_driver_enabled { ' gpu+' } else { '' }
-	date_text := '${day} ${month_names[civil.month - 1]}${gpu_suffix}'
+	clock := '${hour}:${minute}'
+	time_text := tr_fill('clock.built', clock)
+	mut date_text := tr_fill2('date.day_month', day, date_month_short(civil.month))
+	if gpu_driver_enabled {
+		// A developer's marker rather than a word, the same in every language.
+		plain := date_text
+		date_text = '${plain} gpu+'
+		unsafe { plain.free() }
+	}
 	unsafe {
 		hour.free()
 		minute.free()
 		day.free()
+		clock.free()
 	}
 	return time_text, date_text
 }
@@ -160,9 +260,18 @@ fn (mut d Desktop) update_taskbar_clock() {
 // update_taskbar_clock_at keeps the time source separate from updating the
 // retained labels, which also makes the layout test deterministic.
 fn (mut d Desktop) update_taskbar_clock_at(seconds i64) {
-	if d.taskbar_build_time.len == 0 {
+	// The build stamp is formatted once, and again whenever something that
+	// shapes the taskbar's text changes — the language among them — which is
+	// what clears taskbar_clock_sampled.
+	if d.taskbar_build_time.len == 0 || !d.taskbar_clock_sampled {
 		build_time, build_date := d.taskbar_build_strings_at(desktop_build_epoch(),
 			desktop_gpu_driver_enabled())
+		if d.taskbar_build_time.len > 0 {
+			unsafe { d.taskbar_build_time.free() }
+		}
+		if d.taskbar_build_date.len > 0 {
+			unsafe { d.taskbar_build_date.free() }
+		}
 		d.taskbar_build_time = build_time
 		d.taskbar_build_date = build_date
 	}

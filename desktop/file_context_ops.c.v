@@ -50,10 +50,11 @@ fn ensure_desktop_directory() ! {
 	ensure_directory(desktop_directory)!
 }
 
+// A new item is named in the desktop's language, as it would be typed.
 fn create_item_base_name(kind CreateItemKind) string {
 	return match kind {
-		.file { 'New File' }
-		.folder { 'New Folder' }
+		.file { tr('files.new_file') }
+		.folder { tr('files.new_folder') }
 	}
 }
 
@@ -367,9 +368,12 @@ fn file_context_unique_copy_destination(directory string, source string) !string
 		name := if attempt == 0 {
 			base
 		} else if attempt == 1 {
-			'${base} copy'
+			tr_fill('files.copy_name', base)
 		} else {
-			'${base} copy (${attempt})'
+			number := attempt.str()
+			numbered := tr_fill2('files.copy_name_numbered', base, number)
+			unsafe { number.free() }
+			numbered
 		}
 		path := create_item_path(directory, name)
 		if desktop_lstat(path) == none {

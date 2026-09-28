@@ -106,19 +106,110 @@ mut:
 	surface_width   int
 	surface_height  int
 	icon            string
-	starting_text   string
-	exited_text     string
+	starting        HostedText
+	exited          HostedText
 	ready           bool
 	damage_counter  &u32 = unsafe { nil }
 	damage_attempts int
 	damage_sequence u32
 	last_blit_ms    i64
 	failed          bool
-	error_message   string
+	failure         HostedText
+}
+
+// HostedText is what a hosted window says in place of its surface. The window
+// keeps which message it is showing rather than the words, so a message still
+// on screen when the language changes is shown in the new one.
+enum HostedText {
+	none_
+	firefox_starting
+	firefox_missing
+	firefox_exited
+	chromium_starting
+	chromium_missing
+	chromium_exited
+	gimp_starting
+	gimp_missing
+	gimp_exited
+	obs_starting
+	obs_missing
+	obs_exited
+	libreoffice_starting
+	libreoffice_missing
+	libreoffice_exited
+	windows_starting
+	wine_missing
+	windows_exited
+	word_starting
+	win64_wine_missing
+	word_exited
+	word_setup_starting
+	word_setup_closed
+	word_media_missing
+	steam_installing
+	steam_missing
+	steam_exited
+	qemu_starting
+	qemu_missing
+	qemu_exited
+	minecraft_starting
+	minecraft_missing
+	minecraft_exited
+	doom_starting
+	doom_missing
+	doom_wad_missing
+	doom_exited
+	xvfb_missing
+	host_failed
+}
+
+fn (t HostedText) text() string {
+	return match t {
+		.none_ { '' }
+		.firefox_starting { tr('wine.firefox.starting') }
+		.firefox_missing { tr('wine.firefox.missing') }
+		.firefox_exited { tr('wine.firefox.exited') }
+		.chromium_starting { tr('wine.chromium.starting') }
+		.chromium_missing { tr('wine.chromium.missing') }
+		.chromium_exited { tr('wine.chromium.exited') }
+		.gimp_starting { tr('wine.gimp.starting') }
+		.gimp_missing { tr('wine.gimp.missing') }
+		.gimp_exited { tr('wine.gimp.exited') }
+		.obs_starting { tr('wine.obs.starting') }
+		.obs_missing { tr('wine.obs.missing') }
+		.obs_exited { tr('wine.obs.exited') }
+		.libreoffice_starting { tr('wine.libreoffice.starting') }
+		.libreoffice_missing { tr('wine.libreoffice.missing') }
+		.libreoffice_exited { tr('wine.libreoffice.exited') }
+		.windows_starting { tr('wine.windows.starting') }
+		.wine_missing { tr('wine.windows.missing') }
+		.windows_exited { tr('wine.windows.exited') }
+		.word_starting { tr('wine.word.starting') }
+		.win64_wine_missing { tr('wine.word.missing') }
+		.word_exited { tr('wine.word.exited') }
+		.word_setup_starting { tr('wine.word.setup_starting') }
+		.word_setup_closed { tr('wine.word.setup_closed') }
+		.word_media_missing { tr('wine.word.media_missing') }
+		.steam_installing { tr('wine.steam.installing') }
+		.steam_missing { tr('wine.steam.missing') }
+		.steam_exited { tr('wine.steam.exited') }
+		.qemu_starting { tr('wine.qemu.starting') }
+		.qemu_missing { tr('wine.qemu.missing') }
+		.qemu_exited { tr('wine.qemu.exited') }
+		.minecraft_starting { tr('wine.minecraft.starting') }
+		.minecraft_missing { tr('wine.minecraft.missing') }
+		.minecraft_exited { tr('wine.minecraft.exited') }
+		.doom_starting { tr('wine.doom.starting') }
+		.doom_missing { tr('wine.doom.missing') }
+		.doom_wad_missing { tr('wine.doom.wad_missing') }
+		.doom_exited { tr('wine.doom.exited') }
+		.xvfb_missing { tr('wine.xvfb_missing') }
+		.host_failed { tr('wine.host_failed') }
+	}
 }
 
 fn open_firefox(mut _ Desktop) !NativeApp {
-	return open_hosted_x11_app('firefox', '/usr/bin/run-firefox', firefox_surface_width, firefox_surface_height, 'asset:firefox', 'Starting Firefox…', 'Firefox is not installed in this desktop image.', 'Firefox exited.')
+	return open_hosted_x11_app('firefox', '/usr/bin/run-firefox', firefox_surface_width, firefox_surface_height, 'asset:firefox', .firefox_starting, .firefox_missing, .firefox_exited)
 }
 
 // Chromium is not in the image: `pkg install chromium` fetches it from Alpine.
@@ -131,12 +222,12 @@ fn open_chromium(mut _ Desktop) !NativeApp {
 			surface_height: chromium_surface_height
 			icon: 'asset:chromium'
 			failed: true
-			error_message: 'Chromium is not installed. Run pkg install chromium in Terminal.'
+			failure: .chromium_missing
 		}
 	}
 	return open_hosted_x11_app('chromium', '/usr/bin/run-chromium', chromium_surface_width,
-		chromium_surface_height, 'asset:chromium', 'Starting Chromium…', 'Chromium is not installed. Run pkg install chromium in Terminal.',
-		'Chromium exited.')
+		chromium_surface_height, 'asset:chromium', .chromium_starting, .chromium_missing,
+		.chromium_exited)
 }
 
 fn open_gimp(mut _ Desktop) !NativeApp {
@@ -146,10 +237,10 @@ fn open_gimp(mut _ Desktop) !NativeApp {
 			surface_height: gimp_surface_height
 			icon: 'builtin:editor'
 			failed: true
-			error_message: 'GIMP is not installed. Run pkg install gimp in Terminal.'
+			failure: .gimp_missing
 		}
 	}
-	return open_hosted_x11_app('gimp', '/usr/bin/run-gimp', gimp_surface_width, gimp_surface_height, 'builtin:editor', 'Starting GIMP…', 'GIMP is not installed. Run pkg install gimp in Terminal.', 'GIMP exited.')
+	return open_hosted_x11_app('gimp', '/usr/bin/run-gimp', gimp_surface_width, gimp_surface_height, 'builtin:editor', .gimp_starting, .gimp_missing, .gimp_exited)
 }
 
 fn open_obs(mut _ Desktop) !NativeApp {
@@ -159,12 +250,11 @@ fn open_obs(mut _ Desktop) !NativeApp {
 			surface_height: obs_surface_height
 			icon: 'asset:capture'
 			failed: true
-			error_message: 'OBS Studio is not installed. Run pkg install obs-studio in Terminal.'
+			failure: .obs_missing
 		}
 	}
 	return open_hosted_x11_app('obs', '/usr/bin/run-obs', obs_surface_width,
-		obs_surface_height, 'asset:capture', 'Starting OBS Studio…',
-		'OBS Studio is not installed. Run pkg install obs-studio in Terminal.', 'OBS Studio exited.')
+		obs_surface_height, 'asset:capture', .obs_starting, .obs_missing, .obs_exited)
 }
 
 // LibreOffice is a 900 MiB closure that an image can reasonably be built
@@ -177,20 +267,20 @@ fn open_libreoffice(mut _ Desktop) !NativeApp {
 			surface_height: libreoffice_surface_height
 			icon: 'builtin:editor'
 			failed: true
-			error_message: 'LibreOffice is not installed. Run pkg install libreoffice-writer in Terminal.'
+			failure: .libreoffice_missing
 		}
 	}
 	return open_hosted_x11_app('libreoffice', '/usr/bin/run-libreoffice', libreoffice_surface_width,
-		libreoffice_surface_height, 'builtin:editor', 'Starting LibreOffice…', 'LibreOffice is not installed. Run pkg install libreoffice-writer in Terminal.',
-		'LibreOffice exited.')
+		libreoffice_surface_height, 'builtin:editor', .libreoffice_starting, .libreoffice_missing,
+		.libreoffice_exited)
 }
 
 fn open_wine_calculator(mut _ Desktop) !NativeApp {
-	return open_hosted_x11_app('wine', '/usr/bin/calculator', wine_surface_width, wine_surface_height, 'builtin:calculator', 'Starting Windows application…', 'The translated Wine runtime is not installed.', 'The Windows application exited.')
+	return open_hosted_x11_app('wine', '/usr/bin/calculator', wine_surface_width, wine_surface_height, 'builtin:calculator', .windows_starting, .wine_missing, .windows_exited)
 }
 
 fn open_wine_notepad(mut _ Desktop) !NativeApp {
-	return open_hosted_x11_app('wine-notepad', '/usr/bin/notepad', wine_notepad_surface_width, wine_notepad_surface_height, 'builtin:editor', 'Starting Windows application…', 'The translated Wine runtime is not installed.', 'The Windows application exited.')
+	return open_hosted_x11_app('wine-notepad', '/usr/bin/notepad', wine_notepad_surface_width, wine_notepad_surface_height, 'builtin:editor', .windows_starting, .wine_missing, .windows_exited)
 }
 
 fn open_wine_word2013(mut _ Desktop) !NativeApp {
@@ -199,7 +289,7 @@ fn open_wine_word2013(mut _ Desktop) !NativeApp {
 		'/root/.wine-word2013-x86_64/drive_c/Program Files/Microsoft Office/Office15/WINWORD.EXE',
 	] {
 		if C.access(&char(word.str), 0) == 0 {
-			mut app := open_hosted_x11_app('wine-word2013', '/usr/bin/word2013', wine_word2013_surface_width, wine_word2013_surface_height, 'builtin:editor', 'Starting Microsoft Word 2013…', 'The translated Win64 Wine runtime is not installed.', 'Microsoft Word 2013 exited.')
+			mut app := open_hosted_x11_app('wine-word2013', '/usr/bin/word2013', wine_word2013_surface_width, wine_word2013_surface_height, 'builtin:editor', .word_starting, .win64_wine_missing, .word_exited)
 			app.image_path = '${office_xwd_image_prefix}${app.xwd_path}'
 			return app
 		}
@@ -207,7 +297,7 @@ fn open_wine_word2013(mut _ Desktop) !NativeApp {
 	for setup in ['/root/word2013-media/office/setup64.exe', '/root/word2013-media/office/SETUP64.EXE',
 		'/root/word2013-media/setup.exe', '/root/word2013-media/SETUP.EXE'] {
 		if C.access(&char(setup.str), 0) == 0 {
-			return open_hosted_x11_app('wine-word2013-setup', '/usr/bin/word2013-setup', wine_word2013_surface_width, wine_word2013_surface_height, 'builtin:editor', 'Starting 64-bit Word 2013 setup…', 'The translated Win64 Wine runtime is not installed.', 'Word 2013 setup closed. Launch Word again after installation.')
+			return open_hosted_x11_app('wine-word2013-setup', '/usr/bin/word2013-setup', wine_word2013_surface_width, wine_word2013_surface_height, 'builtin:editor', .word_setup_starting, .win64_wine_missing, .word_setup_closed)
 		}
 	}
 	return &HostedX11App{
@@ -215,7 +305,7 @@ fn open_wine_word2013(mut _ Desktop) !NativeApp {
 		surface_height: wine_word2013_surface_height
 		icon: 'builtin:editor'
 		failed: true
-		error_message: 'Stage licensed Word 2013 x64 media, then launch Word again.'
+		failure: .word_media_missing
 	}
 }
 
@@ -228,18 +318,16 @@ fn open_steam(mut _ Desktop) !NativeApp {
 			surface_height: steam_surface_height
 			icon: 'asset:steam'
 			failed: true
-			error_message: 'Steam is not installed in this desktop image.'
+			failure: .steam_missing
 		}
 	}
 	return open_hosted_x11_app('steam', '/usr/bin/steam-hosted', steam_surface_width,
-		steam_surface_height, 'asset:steam', 'Installing Steam client…',
-		'Steam is not installed in this desktop image.', 'Steam exited.')
+		steam_surface_height, 'asset:steam', .steam_installing, .steam_missing, .steam_exited)
 }
 
 fn open_qemu_desktop(mut _ Desktop) !NativeApp {
 	return open_hosted_x11_app('qemu', '/usr/bin/vinix-qemu-desktop', qemu_surface_width,
-		qemu_surface_height, 'asset:terminal', 'Starting Vinix in QEMU…',
-		'QEMU is not installed. Build the desktop with --with-qemu-system.', 'QEMU exited.')
+		qemu_surface_height, 'asset:terminal', .qemu_starting, .qemu_missing, .qemu_exited)
 }
 
 fn open_minecraft(mut _ Desktop) !NativeApp {
@@ -249,12 +337,12 @@ fn open_minecraft(mut _ Desktop) !NativeApp {
 			surface_height: minecraft_surface_height
 			icon:           'asset:minecraft'
 			failed:         true
-			error_message:  'Minecraft is not installed. Run pkg install minecraft in Terminal.'
+			failure:        .minecraft_missing
 		}
 	}
 	return open_hosted_x11_app('minecraft', '/usr/bin/minecraft', minecraft_surface_width,
-		minecraft_surface_height, 'asset:minecraft', 'Starting Minecraft…',
-		'Minecraft is not installed. Run pkg install minecraft in Terminal.', 'Minecraft exited.')
+		minecraft_surface_height, 'asset:minecraft', .minecraft_starting, .minecraft_missing,
+		.minecraft_exited)
 }
 
 fn open_doom(mut _ Desktop) !NativeApp {
@@ -264,7 +352,7 @@ fn open_doom(mut _ Desktop) !NativeApp {
 			surface_height: doom_surface_height
 			icon: 'asset:doom'
 			failed: true
-			error_message: 'DOOM is not installed. Run build-doom-aarch64.sh.'
+			failure: .doom_missing
 		}
 	}
 	if C.access(c'/usr/share/games/doom/doom1.wad', C.R_OK) != 0 {
@@ -273,22 +361,21 @@ fn open_doom(mut _ Desktop) !NativeApp {
 			surface_height: doom_surface_height
 			icon: 'asset:doom'
 			failed: true
-			error_message: 'DOOM WAD is missing. Set VINIX_DOOM_WAD and rebuild the image.'
+			failure: .doom_wad_missing
 		}
 	}
 	return open_hosted_x11_app('doom', '/usr/bin/run-doom', doom_surface_width,
-		doom_surface_height, 'asset:doom', 'Starting DOOM…',
-		'DOOM is not installed. Run build-doom-aarch64.sh.', 'DOOM exited.')
+		doom_surface_height, 'asset:doom', .doom_starting, .doom_missing, .doom_exited)
 }
 
 fn open_hosted_x11_app(name string, command string, surface_width int, surface_height int,
-	icon string, starting_text string, missing_text string, exited_text string) &HostedX11App {
+	icon string, starting HostedText, missing HostedText, exited HostedText) &HostedX11App {
 	mut app := &HostedX11App{
 		surface_width: surface_width
 		surface_height: surface_height
 		icon: icon
-		starting_text: starting_text
-		exited_text: exited_text
+		starting: starting
+		exited: exited
 	}
 	process_id := C.getpid()
 	// Xvfb writes its framebuffer through a shared mmap. Use the per-boot
@@ -309,12 +396,12 @@ fn open_hosted_x11_app(name string, command string, surface_width int, surface_h
 
 	if C.access(c'/usr/bin/Xvfb', C.X_OK) != 0 {
 		app.failed = true
-		app.error_message = 'Xvfb is not installed. Rebuild the Vinix X11 layer.'
+		app.failure = .xvfb_missing
 		return app
 	}
 	if C.access(&char(command.str), C.X_OK) != 0 {
 		app.failed = true
-		app.error_message = missing_text
+		app.failure = missing
 		return app
 	}
 	// Minecraft's saved launch description can outlive the package that
@@ -324,7 +411,7 @@ fn open_hosted_x11_app(name string, command string, surface_width int, surface_h
 	host := desktop_spawn_wine_host(app.directory, surface_width, surface_height, command,
 		name == 'minecraft', name == 'doom' || name == 'qemu', name == 'obs') or {
 		app.failed = true
-		app.error_message = 'Vinix could not start the embedded X11 host.'
+		app.failure = .host_failed
 		return app
 	}
 	app.host_pid = host.pid
@@ -339,7 +426,7 @@ fn (mut app HostedX11App) build(size ui2.Rect) !ui2.Element {
 	if app.ready {
 		children << ui2.image('', app.image_path, ui2.rect(0, 0, f64(width), f64(height)))
 	} else {
-		message := if app.failed { app.error_message } else { app.starting_text }
+		message := if app.failed { app.failure.text() } else { app.starting.text() }
 		children << ui2.button_with_image('', '', app.icon, ui2.rect(f64((width - 48) / 2), f64((height - 82) / 2), 48, 48), ui2.BoxStyle{ transparent: true }, ui2.TextStyle{ color: app_accent })
 		children << ui2.label('', message, ui2.rect(16, f64((height - 82) / 2 + 58), f64(width - 32), 20), ui2.TextStyle{
 			color: if app.failed { u32(0xb42318) } else { body_muted }
@@ -361,7 +448,7 @@ fn (mut app HostedX11App) poll() bool {
 		}
 		app.ready = false
 		app.failed = true
-		app.error_message = app.exited_text
+		app.failure = app.exited
 		return true
 	}
 	if !app.ready {

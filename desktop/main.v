@@ -165,6 +165,7 @@ fn main() {
 
 	gpu_present_startup_stage(c'loading preferences')
 	mut preferences := desktop_load_preferences(desktop_home)
+	set_desktop_language(preferences.settings.language)
 	gpu_present_startup_stage(c'preferences loaded')
 	scale := preferences.configure_scale(fb.width, fb.height)
 	gpu_present_startup_stage(c'display scale configured')

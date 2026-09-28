@@ -114,8 +114,24 @@ fn settings_scale_button(id string, text string, x int, selected bool) ui2.Eleme
 		checked:             selected
 		accessibility_role:  'radio'
 		accessibility_label: text
-		accessibility_value: if selected { 'selected' } else { 'not selected' }
+		accessibility_value: if selected { tr('settings.choice.selected') } else { tr('settings.choice.not_selected') }
 	}
+}
+
+// settings_fill_numbers is tr_fill3 for whole numbers: it puts a, b and c in
+// the `{0}`, `{1}` and `{2}` of text, which tr looked up. Only the result stays
+// allocated, and it belongs to the caller.
+fn settings_fill_numbers(text string, a int, b int, c int) string {
+	first := a.str()
+	second := b.str()
+	third := c.str()
+	filled := tr_substitute(text, first, second, third)
+	unsafe {
+		first.free()
+		second.free()
+		third.free()
+	}
+	return filled
 }
 
 fn settings_same_state(a &BacklightState, b &BacklightState) bool {
@@ -128,9 +144,16 @@ fn (mut a SettingsApp) refresh() {
 	mut next := BacklightState{}
 	result := a.read_state(mut next)
 	a.last_poll_ms = desktop_monotonic_ms()
-	if a.initialized && result == a.read_result && settings_same_state(&a.state, &next) {
+	if a.initialized && result == a.read_result && settings_same_state(&a.state, &next)
+		&& a.labels_language == desktop_language {
 		return
 	}
+	a.replace_display_labels(result, next)
+}
+
+// replace_display_labels takes a readback and remakes the cached labels from
+// it in the desktop's language, releasing the ones they replace.
+fn (mut a SettingsApp) replace_display_labels(result BacklightResult, next BacklightState) {
 	if a.initialized {
 		unsafe {
 			a.level_text.free()
@@ -140,28 +163,48 @@ fn (mut a SettingsApp) refresh() {
 		}
 	}
 	a.initialized = true
+	a.labels_language = desktop_language
 	a.state = next
 	a.read_result = result
 	if result != .ok {
-		a.level_text = 'Unavailable'.clone()
-		a.requested_text = 'Requested: unknown'.clone()
-		a.actual_text = 'Actual: unknown'.clone()
-		a.range_text = 'Panel brightness range is unavailable.'.clone()
+		a.level_text = tr('settings.display.unavailable').clone()
+		a.requested_text = tr('settings.display.requested_unknown').clone()
+		a.actual_text = tr('settings.display.actual_unknown').clone()
+		a.range_text = tr('settings.display.range_unavailable').clone()
 		return
 	}
 	percent := backlight_percent(&a.state)
-	a.level_text = if percent >= 0 { '${percent}%' } else { 'Unknown'.clone() }
-	a.requested_text = if next.requested_nits >= 0 {
-		'Requested: ${next.requested_nits} nits'
+	a.level_text = if percent >= 0 {
+		'${percent}%'
 	} else {
-		'Requested: unchanged since boot'.clone()
+		tr('settings.display.unknown').clone()
+	}
+	a.requested_text = if next.requested_nits >= 0 {
+		settings_fill_numbers(tr('settings.display.requested_nits'), next.requested_nits,
+			0, 0)
+	} else {
+		tr('settings.display.requested_unchanged').clone()
 	}
 	a.actual_text = if next.actual_nits >= 0 {
-		'Actual: ${next.actual_nits} nits (driver report)'
+		settings_fill_numbers(tr('settings.display.actual_nits'), next.actual_nits, 0, 0)
 	} else {
-		'Actual: waiting for a driver report'.clone()
+		tr('settings.display.actual_waiting').clone()
 	}
-	a.range_text = '${next.min_nits} - ${next.max_nits} nits; 0% keeps the display on.'
+	a.range_text = settings_fill_numbers(tr('settings.display.range'), next.min_nits, next.max_nits,
+		0)
+}
+
+// follow_display_language remakes the cached labels when the language has
+// changed since they were made. The pane draws through an immutable receiver,
+// and build polls the panel only once a second, so without this a language
+// chosen elsewhere would leave these labels in the old one until the next
+// readback. It changes nothing but this application's own label cache.
+fn (a &SettingsApp) follow_display_language() {
+	if !a.initialized || a.labels_language == desktop_language {
+		return
+	}
+	mut app := unsafe { &SettingsApp(a) }
+	app.replace_display_labels(a.read_result, a.state)
 }
 
 fn (a &SettingsApp) can_change() bool {
@@ -170,11 +213,11 @@ fn (a &SettingsApp) can_change() bool {
 
 fn settings_error_text(result BacklightResult) string {
 	return match result {
-		.unavailable { 'Brightness driver not available.' }
-		.permission { 'Permission denied. Brightness control requires write access.' }
-		.offline { 'Display brightness device is offline.' }
-		.invalid { 'Invalid brightness response.' }
-		else { 'Brightness I/O failed. Refresh to try again.' }
+		.unavailable { tr('settings.display.error.unavailable') }
+		.permission { tr('settings.display.error.permission') }
+		.offline { tr('settings.display.error.offline') }
+		.invalid { tr('settings.display.error.invalid') }
+		else { tr('settings.display.error.io') }
 	}
 }
 
@@ -189,12 +232,12 @@ fn (a &SettingsApp) status_text() string {
 		return settings_error_text(BacklightResult.offline)
 	}
 	if !a.state.writable {
-		return 'Read-only access; brightness controls are disabled.'
+		return tr('settings.display.read_only')
 	}
 	if a.state.pending {
-		return 'Brightness request pending in the display driver.'
+		return tr('settings.display.pending')
 	}
-	return 'Brightness read from /dev/apple-panel-bl.'
+	return tr('settings.display.read_from')
 }
 
 fn (a &SettingsApp) display_pane(width int) []ui2.Element {
@@ -202,7 +245,7 @@ fn (a &SettingsApp) display_pane(width int) []ui2.Element {
 	inner := width - 2 * settings_padding
 	if inner < 300 {
 		mut narrow := frame_elements(1)
-		narrow << settings_label('Enlarge Settings to show its controls.', x, settings_padding, if inner > 0 {
+		narrow << settings_label(tr('settings.display.enlarge'), x, settings_padding, if inner > 0 {
 			inner
 		} else {
 			1
@@ -210,22 +253,24 @@ fn (a &SettingsApp) display_pane(width int) []ui2.Element {
 		return narrow
 	}
 
+	a.follow_display_language()
 	active := a.can_change()
 	percent := if a.read_result == .ok { backlight_percent(&a.state) } else { -1 }
 	mut out := frame_elements(settings_brightness_actions.len + 16)
-	out << ui2.label('', 'Display', ui2.rect(f64(x), 16, f64(inner), 28), ui2.TextStyle{
+	out << ui2.label('', tr('settings.category.display'), ui2.rect(f64(x), 16, f64(inner), 28), ui2.TextStyle{
 		color: body_heading
 		size: 20
 		bold: true
 	})
-	out << settings_label('Scale', x, 46, 42, body_muted)
-	out << settings_scale_button(settings_scale_100_action, '100%', x + 50, desktop_requested_scale() == desktop_scale_100)
-	out << settings_scale_button(settings_scale_200_action, '200%', x + 116, desktop_requested_scale() == desktop_scale_200)
-	out << settings_label('Built-in display', x + 190, 46, inner - 190, body_muted)
+	// The caption is wide enough for «Масштаб», the longest translation.
+	out << settings_label(tr('settings.display.scale'), x, 46, 58, body_muted)
+	out << settings_scale_button(settings_scale_100_action, '100%', x + 66, desktop_requested_scale() == desktop_scale_100)
+	out << settings_scale_button(settings_scale_200_action, '200%', x + 132, desktop_requested_scale() == desktop_scale_200)
+	out << settings_label(tr('settings.display.built_in'), x + 206, 46, inner - 206, body_muted)
 	out << ui2.view('', ui2.rect(f64(x), 76, f64(inner), 1), ui2.BoxStyle{
 		bg: body_rule
 	}, [])
-	out << settings_label('Brightness', x, 90, inner - 100, body_heading)
+	out << settings_label(tr('settings.display.brightness'), x, 90, inner - 100, body_heading)
 	out << settings_label(a.level_text, x + inner - 100, 90, 100, body_heading)
 	// A click-to-set stepped bar, not a pretend draggable slider: NativeApp
 	// receives action ids, not pointer coordinates. Every step is 5%.
@@ -254,7 +299,7 @@ fn (a &SettingsApp) display_pane(width int) []ui2.Element {
 	out << settings_button('settings.decrease', '- 5%', ui2.rect(f64(x), 192, 62, 30), active
 		&& percent > 0)
 	out << settings_button('settings.increase', '+ 5%', ui2.rect(f64(x + 70), 192, 62, 30), active && percent >= 0 && percent < 100)
-	out << settings_button('settings.refresh', 'Refresh', ui2.rect(f64(x + inner - 80), 192, 80, 30), true)
+	out << settings_button('settings.refresh', tr('settings.display.refresh'), ui2.rect(f64(x + inner - 80), 192, 80, 30), true)
 	out << settings_label(a.requested_text, x, 236, inner, body_text)
 	out << settings_label(a.actual_text, x, 258, inner, body_text)
 	out << settings_label(a.status_text(), x, 290, inner, if a.read_result != .ok
@@ -264,9 +309,9 @@ fn (a &SettingsApp) display_pane(width int) []ui2.Element {
 		body_muted
 	})
 	if a.read_result == .unavailable {
-		out << settings_label('DCP backend integration is still required.', x, 312, inner, body_muted)
+		out << settings_label(tr('settings.display.dcp_required'), x, 312, inner, body_muted)
 	} else {
-		out << settings_label('Click the bar to set brightness in 5% steps.', x, 312, inner, body_muted)
+		out << settings_label(tr('settings.display.bar_hint'), x, 312, inner, body_muted)
 	}
 	return out
 }
@@ -276,7 +321,7 @@ fn (a &SettingsApp) battery_pane(width int, height int) []ui2.Element {
 	// Nothing offscreen is built, so nothing offscreen can become a hit target.
 	if inner < 300 || height < 360 {
 		mut narrow := frame_elements(1)
-		narrow << settings_label('Enlarge Settings to show its controls.', settings_padding, settings_padding, if inner > 0 {
+		narrow << settings_label(tr('settings.battery.enlarge'), settings_padding, settings_padding, if inner > 0 {
 			inner
 		} else {
 			1

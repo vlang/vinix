@@ -153,6 +153,12 @@ mut:
 	external_error_title   string
 	external_error_note    string
 	external_error_hint    string
+	// What the external-error window reports, kept so that its text can be
+	// composed again when the language changes.
+	external_error_app     string
+	external_error_package string
+	external_error_result  ExternalProgramResult
+	external_error_missing bool
 
 	settings Settings
 	// What typing goes through first: the input source's dead keys and the
@@ -264,7 +270,7 @@ fn (d &Desktop) visible_window_count() int {
 }
 
 fn (d &Desktop) pointer_description() string {
-	return if d.pointer_present { '/dev/pointer' } else { 'not available' }
+	return if d.pointer_present { '/dev/pointer' } else { tr('window.system.no_pointer') }
 }
 
 // raise moves a window to the top of the painting order and focuses it.
@@ -537,7 +543,7 @@ fn (mut d Desktop) window_element(window_index int) ui2.Element {
 	// whole bar and simply accept a shorter run.
 	text_inset_left := if buttons_left { theme.button_inset + span + 10 } else { 14 }
 	title_limit := window.width - span - theme.button_inset - text_inset_left - 10
-	title := ui2.label(window.id_title, window.title, ui2.rect(f64(if theme.title_centered {
+	title := ui2.label(window.id_title, app_title_text(window.title), ui2.rect(f64(if theme.title_centered {
 		0
 	} else {
 		text_inset_left
@@ -607,7 +613,7 @@ fn (mut d Desktop) window_contents(window_index int, body_height int) (u32, []ui
 		// An application that cannot lay itself out should say so in its own
 		// window rather than take the desktop down with it.
 		mut error_children := frame_elements(2)
-		error_children << body_line('This application failed to draw:', 18, 18, window.width - 36)
+		error_children << body_line(tr('wm.app_failed'), 18, 18, window.width - 36)
 		error_children << muted_line(err.msg(), 18, 40, window.width - 36)
 		return d.theme().window_body, error_children
 	}
@@ -688,7 +694,7 @@ fn (mut d Desktop) external_finished(result ExternalProgramResult) {
 	d.wallpaper_valid = false
 	d.dirty = true
 	title := if d.pending_external_title == '' {
-		'External application'
+		external_app_title
 	} else {
 		d.pending_external_title
 	}
@@ -698,20 +704,40 @@ fn (mut d Desktop) external_finished(result ExternalProgramResult) {
 	if result == .success {
 		return
 	}
-	d.external_error = match result {
-		.unavailable { '${title} is not installed in this desktop image.' }
-		.spawn_failed { 'Vinix could not create the ${title} launcher process.' }
-		.wait_failed { 'Vinix lost track of the ${title} launcher process.' }
-		.failed { '${title} or Xorg exited with an error.' }
-		.success { '' }
-	}
-	d.external_error_title = '${title} could not start'
-	d.external_error_note = '${title} runs in an exclusive X11 session; the native desktop resumes when it exits.'
-	d.external_error_hint = 'Build Firefox/Xorg, then rebuild the userland and desktop image.'
+	d.external_error_app = title
+	d.external_error_result = result
+	d.external_error_missing = false
+	d.compose_external_error()
 	id := d.spawn(title, .external_error, 180, 120, 560, 220)
 	index := d.window_index(id) or { return }
 	d.windows[index].icon = icon
 	d.clamp_to_screen(index)
+}
+
+// The title of an external-error window when the program had none.
+const external_app_title = 'External application'
+
+// compose_external_error writes the external-error window's text in the
+// desktop's language, from what it reports.
+fn (mut d Desktop) compose_external_error() {
+	title := app_title_text(d.external_error_app)
+	if d.external_error_missing {
+		d.external_error_title = tr_fill('wm.not_installed.title', title)
+		d.external_error = tr_fill('wm.not_installed.command', d.external_error_package)
+		d.external_error_note = tr('wm.not_installed.note')
+		d.external_error_hint = tr('wm.not_installed.hint')
+		return
+	}
+	d.external_error = match d.external_error_result {
+		.unavailable { tr_fill('wm.external.unavailable', title) }
+		.spawn_failed { tr_fill('wm.external.spawn_failed', title) }
+		.wait_failed { tr_fill('wm.external.wait_failed', title) }
+		.failed { tr_fill('wm.external.failed', title) }
+		.success { '' }
+	}
+	d.external_error_title = tr_fill('wm.external.title', title)
+	d.external_error_note = tr_fill('wm.external.note', title)
+	d.external_error_hint = tr('wm.external.hint')
 }
 
 fn native_app_installed(factory AppFactory) bool {
@@ -723,10 +749,10 @@ fn native_app_installed(factory AppFactory) bool {
 // show_app_not_installed answers a shortcut for an optional app with a window
 // naming its package, instead of a launch that fails without any feedback.
 fn (mut d Desktop) show_app_not_installed(factory AppFactory) {
-	d.external_error_title = '${factory.title} is not installed'
-	d.external_error = 'Run pkg install ${factory.install_package} in Terminal to install it.'
-	d.external_error_note = 'The Vinix image does not include this app.'
-	d.external_error_hint = 'Open it again from here once the install has finished.'
+	d.external_error_app = factory.title
+	d.external_error_package = factory.install_package
+	d.external_error_missing = true
+	d.compose_external_error()
 	id := d.spawn(factory.title, .external_error, 180, 120, 560, 220)
 	index := d.window_index(id) or { return }
 	d.windows[index].icon = factory.icon
@@ -1075,7 +1101,7 @@ fn (d &Desktop) shortcut_elements() []ui2.Element {
 		}, ui2.TextStyle{
 			color: if hovered || dragging { theme.shortcut_hover } else { theme.shortcut_label }
 		})
-		shortcut_children << ui2.label('', factory.title, ui2.rect(0, f64(shortcut_icon + 16), f64(shortcut_width), 18), ui2.TextStyle{
+		shortcut_children << ui2.label('', app_title_text(factory.title), ui2.rect(0, f64(shortcut_icon + 16), f64(shortcut_width), 18), ui2.TextStyle{
 			color:  if hovered || dragging { theme.shortcut_hover } else { theme.shortcut_label }
 			shadow: true
 			size:   12
@@ -1530,7 +1556,7 @@ fn (d &Desktop) taskbar_entries() []TaskbarEntry {
 		}
 		out << TaskbarEntry{
 			id:           taskbar_pin_actions[index]
-			label:        available_apps[index].title
+			label:        app_title_text(available_apps[index].title)
 			icon:         available_apps[index].icon
 			active:       active
 			minimized:    minimized
@@ -1553,7 +1579,7 @@ fn (d &Desktop) taskbar_entries() []TaskbarEntry {
 			}
 			out << TaskbarEntry{
 				id:           window.id_task
-				label:        window.title
+				label:        app_title_text(window.title)
 				icon:         window.icon
 				active:       window.id == d.focus && !window.minimized
 				minimized:    window.minimized
@@ -1618,7 +1644,7 @@ fn (d &Desktop) taskbar_entries() []TaskbarEntry {
 			label:        if count > 1 {
 				d.taskbar_group_label(window.title, count)
 			} else {
-				window.title
+				app_title_text(window.title)
 			}
 			icon:         d.windows[newest_index].icon
 			active:       active
@@ -1634,27 +1660,31 @@ fn (d &Desktop) taskbar_entries() []TaskbarEntry {
 	return out
 }
 
-// Combined labels such as `Terminal  (2)` are built once per title and count,
-// rather than on every rebuild, because nothing collects them here.
+// Combined labels such as `Terminal  (2)` are built once per title, count and
+// language, rather than on every rebuild, because nothing collects them here.
 fn (d &Desktop) taskbar_group_label(title string, count int) string {
 	for label in taskbar_group_labels {
-		if label.count == count && label.title == title {
+		if label.count == count && label.language == desktop_language && label.title == title {
 			return label.text
 		}
 	}
-	text := '${title}  (${count})'
+	number := count.str()
+	text := tr_fill2('wm.taskbar.group', app_title_text(title), number)
+	unsafe { number.free() }
 	taskbar_group_labels << TaskbarGroupLabel{
-		title: title.clone()
-		count: count
-		text:  text
+		title:    title.clone()
+		count:    count
+		language: desktop_language
+		text:     text
 	}
 	return text
 }
 
 struct TaskbarGroupLabel {
-	title string
-	count int
-	text  string
+	title    string
+	count    int
+	language DesktopLanguage
+	text     string
 }
 
 __global taskbar_group_labels = []TaskbarGroupLabel{}

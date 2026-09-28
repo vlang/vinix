@@ -476,11 +476,12 @@ fn test_keyboard_settings_pane_enables_and_selects_input_sources() {
 	for layout in keyboard_layouts {
 		desktop.settings.keyboard_layouts = keyboard_layout_all_mask
 		desktop.settings.keyboard_layout = layout
-		app.build(ui2.rect(0, 0, 620, 376)) or { panic(err) }
+		pane := app.build(ui2.rect(0, 0, 620, 376)) or { panic(err) }
 		preview := keyboard_previews[int(layout)]
-		assert preview.letters.starts_with('Types: ')
+		assert preview.letters.len > 0
+		assert keyboard_test_has_text(pane, 'Types: ${preview.letters}')
 	}
-	assert keyboard_previews[int(KeyboardLayout.russian)].letters == 'Types: й ц у к е н г ш щ з х ъ'
+	assert keyboard_previews[int(KeyboardLayout.russian)].letters == 'й ц у к е н г ш щ з х ъ'
 	assert keyboard_previews[int(KeyboardLayout.german)].option.contains('@')
 	assert keyboard_previews[int(KeyboardLayout.french)].accents.contains('^')
 	assert keyboard_previews[int(KeyboardLayout.russian)].accents == ''
@@ -526,4 +527,16 @@ fn test_keyboard_settings_cross_the_application_protocol() {
 	apply_app_state(mut desktop, state)
 	assert desktop.settings.keyboard_layout == .portuguese
 	assert desktop.keyboard.dead == 0
+}
+
+fn keyboard_test_has_text(el ui2.Element, text string) bool {
+	if el.text == text {
+		return true
+	}
+	for child in el.children {
+		if keyboard_test_has_text(child, text) {
+			return true
+		}
+	}
+	return false
 }

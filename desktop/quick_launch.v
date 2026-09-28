@@ -79,7 +79,7 @@ fn (d &Desktop) quick_launch_match_count() int {
 	query := d.quick_launch_query_text()
 	mut count := 0
 	for factory in available_apps {
-		if start_menu_matches(factory.title, query) {
+		if app_matches(factory.title, query) {
 			count++
 		}
 	}
@@ -114,7 +114,7 @@ fn (d &Desktop) quick_launch_app_index(result_index int) ?int {
 	query := d.quick_launch_query_text()
 	mut result := 0
 	for app_index, factory in available_apps {
-		if !start_menu_matches(factory.title, query) {
+		if !app_matches(factory.title, query) {
 			continue
 		}
 		if result == result_index {
@@ -287,7 +287,7 @@ fn (d &Desktop) quick_launch_element() ui2.Element {
 
 	mut panel_children := frame_elements(result_count + 3)
 	query := d.quick_launch_query_text()
-	search_text := if query.len > 0 { query } else { 'Search applications' }
+	search_text := if query.len > 0 { query } else { tr('quick_launch.search') }
 	panel_children << ui2.button_with_image('', search_text, 'builtin:search', ui2.rect(f64(quick_launch_panel_padding), f64(quick_launch_panel_padding), f64(width - 2 * quick_launch_panel_padding), f64(quick_launch_search_height)), ui2.BoxStyle{
 		bg: quick_launch_field_bg
 		radius: 10
@@ -299,7 +299,7 @@ fn (d &Desktop) quick_launch_element() ui2.Element {
 
 	row_y := quick_launch_panel_padding + quick_launch_search_height + 8
 	if result_count == 0 {
-		panel_children << ui2.label('quick-launch.empty', 'No applications found', ui2.rect(24, f64(row_y + 9), f64(width - 48), 30), ui2.TextStyle{
+		panel_children << ui2.label('quick-launch.empty', tr('quick_launch.empty'), ui2.rect(24, f64(row_y + 9), f64(width - 48), 30), ui2.TextStyle{
 			color: quick_launch_muted
 			size: 13
 			align: .left
@@ -307,7 +307,7 @@ fn (d &Desktop) quick_launch_element() ui2.Element {
 	} else {
 		mut result := 0
 		for factory in available_apps {
-			if !start_menu_matches(factory.title, query) {
+			if !app_matches(factory.title, query) {
 				continue
 			}
 			if result >= result_count {
@@ -316,7 +316,7 @@ fn (d &Desktop) quick_launch_element() ui2.Element {
 			id := d.switcher.ids[result]
 			selected := result == d.switcher.index
 			hovered := d.hover == id
-			panel_children << ui2.button_with_image(id, factory.title, factory.icon, ui2.rect(f64(quick_launch_panel_padding), f64(row_y + result * quick_launch_row_height), f64(width - 2 * quick_launch_panel_padding), f64(quick_launch_row_height)), ui2.BoxStyle{
+			panel_children << ui2.button_with_image(id, app_title_text(factory.title), factory.icon, ui2.rect(f64(quick_launch_panel_padding), f64(row_y + result * quick_launch_row_height), f64(width - 2 * quick_launch_panel_padding), f64(quick_launch_row_height)), ui2.BoxStyle{
 				bg: if selected { d.theme().accent } else if hovered { quick_launch_hover } else { quick_launch_bg }
 				radius: 7
 			}, ui2.TextStyle{

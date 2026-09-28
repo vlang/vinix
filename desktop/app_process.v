@@ -19,9 +19,9 @@ import math.bits
 import ui2
 
 const app_protocol_magic = u32(0x56415050) // VAPP
-const app_protocol_version = u8(9)
-const app_request_header_size = 132
-const app_response_header_size = 124
+const app_protocol_version = u8(10)
+const app_request_header_size = 136
+const app_response_header_size = 128
 const app_protocol_max_payload = 16 * 1024 * 1024
 const app_protocol_max_string = 64 * 1024
 const app_protocol_max_elements = 16 * 1024
@@ -74,6 +74,7 @@ struct AppProcessOptions {
 	request_fd  int
 	response_fd int
 	tz_offset   i64
+	language    DesktopLanguage
 }
 
 struct AppWireState {
@@ -191,6 +192,7 @@ fn wire_put_state(mut out []u8, state AppWireState) {
 	wire_put_i32(mut out, state.settings.wallpaper_image)
 	wire_put_u32(mut out, state.settings.keyboard_layouts)
 	wire_put_i32(mut out, int(state.settings.keyboard_layout))
+	wire_put_i32(mut out, int(state.settings.language))
 	wire_put_i32(mut out, state.requested_scale)
 	wire_put_u32(mut out, state.capture_request.sequence)
 	wire_put_i32(mut out, int(state.capture_request.command))
@@ -219,6 +221,7 @@ fn wire_take_state(mut reader WireReader) !AppWireState {
 	wallpaper_image := reader.take_i32()!
 	keyboard_mask := reader.take_u32()!
 	keyboard_layout := reader.take_i32()!
+	language := reader.take_i32()!
 	requested_scale := reader.take_i32()!
 	capture_sequence := reader.take_u32()!
 	capture_command := reader.take_i32()!
@@ -242,6 +245,7 @@ fn wire_take_state(mut reader WireReader) !AppWireState {
 		|| clock_show_weekday < 0 || clock_show_weekday > 1
 		|| keyboard_layout < int(KeyboardLayout.us) || keyboard_layout > int(KeyboardLayout.portuguese)
 		|| !keyboard_settings_valid(keyboard_mask, unsafe { KeyboardLayout(keyboard_layout) })
+		|| language < 0 || language >= desktop_languages.len
 		|| !desktop_scale_valid(requested_scale)
 		|| capture_command < int(CaptureCommand.none_)
 		|| capture_command > int(CaptureCommand.stop) || capture_delay < 0
@@ -257,6 +261,7 @@ fn wire_take_state(mut reader WireReader) !AppWireState {
 			button_side:        unsafe { ButtonSide(button_side) }
 			taskbar_mode:       unsafe { TaskbarMode(taskbar_mode) }
 			theme:              unsafe { ThemeKind(theme) }
+			language:           unsafe { DesktopLanguage(language) }
 			clock_24_hour:      clock_24_hour == 1
 			clock_show_seconds: clock_show_seconds == 1
 			clock_show_date:    clock_show_date == 1
@@ -645,6 +650,7 @@ fn app_process_options(args []string) ?AppProcessOptions {
 	mut request_fd := -1
 	mut response_fd := -1
 	mut tz_offset := i64(0)
+	mut language := DesktopLanguage.en
 	for arg in args {
 		if arg.starts_with('--vinix-app=') {
 			name = arg['--vinix-app='.len..]
@@ -654,6 +660,8 @@ fn app_process_options(args []string) ?AppProcessOptions {
 			response_fd = arg['--response-fd='.len..].int()
 		} else if arg.starts_with('--app-tz=') {
 			tz_offset = arg['--app-tz='.len..].i64()
+		} else if arg.starts_with('--app-lang=') {
+			language = desktop_language_from_code(arg['--app-lang='.len..]) or { DesktopLanguage.en }
 		}
 	}
 	if name == '' {
@@ -667,6 +675,7 @@ fn app_process_options(args []string) ?AppProcessOptions {
 		request_fd:  request_fd
 		response_fd: response_fd
 		tz_offset:   tz_offset
+		language:    language
 	}
 }
 
@@ -702,6 +711,7 @@ fn apply_app_state(mut desktop Desktop, state AppWireState) {
 		// An accent typed in the old input source does not carry over.
 		desktop.keyboard.dead = 0
 	}
+	language_changed := desktop.settings.language != state.settings.language
 	desktop.settings = state.settings
 	desktop.accept_capture_request(state.capture_request)
 	if wallpaper_changed {
@@ -710,6 +720,9 @@ fn apply_app_state(mut desktop Desktop, state AppWireState) {
 	if clock_changed {
 		desktop.taskbar_clock_sampled = false
 		desktop.dirty = true
+	}
+	if language_changed {
+		desktop.language_changed()
 	}
 	if desktop_requested_scale() != state.requested_scale {
 		desktop_request_scale(state.requested_scale)
@@ -895,7 +908,13 @@ fn run_app_process(options AppProcessOptions) {
 	desktop_use_user_home(desktop_find_user_home(desktop_home, desktop_users_directory))
 	mut desktop := Desktop{
 		tz_offset_seconds: options.tz_offset
+		settings:          Settings{
+			language: options.language
+		}
 	}
+	// What an app composes as it opens is in the desktop's language too, not
+	// only what it draws once the first request brings the settings.
+	set_desktop_language(options.language)
 	factory := app_factory_named(options.name) or {
 		send_app_error(options.response_fd, app_current_state(desktop), 'unknown application ${options.name}')
 		return
@@ -918,6 +937,7 @@ fn run_app_process(options AppProcessOptions) {
 			break
 		}
 		desktop.settings = state.settings
+		set_desktop_language(state.settings.language)
 		desktop.capture.request = state.capture_request
 		desktop.capture.report = state.capture_report
 		desktop_request_scale(state.requested_scale)
@@ -1119,6 +1139,7 @@ fn start_remote_app_at(path string, factory AppFactory, mut desktop Desktop) !Na
 
 fn start_remote_app_at_with_timeout(path string, factory AppFactory, mut desktop Desktop, timeout_ms int) !NativeApp {
 	process := desktop_spawn_app(path, factory.process_name, desktop.tz_offset_seconds,
+		desktop.settings.language.code(),
 		factory.standalone, desktop.pending_status_path) or {
 		return error('cannot execute ${path}')
 	}

@@ -113,57 +113,16 @@ const battery_percentage_labels = [
 	'100%',
 ]
 
-const battery_remaining_labels = [
-	'Less than 1 hour',
-	'About 1 hour',
-	'About 2 hours',
-	'About 3 hours',
-	'About 4 hours',
-	'About 5 hours',
-	'About 6 hours',
-	'About 7 hours',
-	'About 8 hours',
-	'About 9 hours',
-	'About 10 hours',
-	'About 11 hours',
-	'About 12 hours',
-	'About 13 hours',
-	'About 14 hours',
-	'About 15 hours',
-	'About 16 hours',
-	'About 17 hours',
-	'About 18 hours',
-	'About 19 hours',
-	'About 20 hours',
-	'About 21 hours',
-	'About 22 hours',
-	'About 23 hours',
-	'About 24 hours',
-	'About 25 hours',
-	'About 26 hours',
-	'About 27 hours',
-	'About 28 hours',
-	'About 29 hours',
-	'About 30 hours',
-	'About 31 hours',
-	'About 32 hours',
-	'About 33 hours',
-	'About 34 hours',
-	'About 35 hours',
-	'About 36 hours',
-	'About 37 hours',
-	'About 38 hours',
-	'About 39 hours',
-	'About 40 hours',
-	'About 41 hours',
-	'About 42 hours',
-	'About 43 hours',
-	'About 44 hours',
-	'About 45 hours',
-	'About 46 hours',
-	'About 47 hours',
-	'About 48 hours',
-]
+// The "About N hours" estimates, made once per language for each hour shown:
+// the pane is rebuilt every frame, and its estimate is text the renderer does
+// not free. Hour 0 is "Less than 1 hour", which needs no filling.
+struct BatteryHourLabels {
+mut:
+	language DesktopLanguage
+	labels   [battery_estimate_maximum_hours + 1]string
+}
+
+__global battery_hour_labels = BatteryHourLabels{}
 
 fn read_battery(force bool) int {
 	return battery_get(force)
@@ -178,30 +137,50 @@ fn battery_percentage_text(percent int) string {
 
 fn battery_status_text(percent int) string {
 	if percent >= 0 && percent <= 100 {
-		return 'Percentage reported by the battery driver.'
+		return tr('battery.status.reported')
 	}
 	return match percent {
-		battery_unavailable { 'Battery driver not available.' }
-		battery_permission { 'Permission denied reading the battery.' }
-		battery_invalid { 'Invalid battery response.' }
-		else { 'Battery read failed or the sample is stale.' }
+		battery_unavailable { tr('battery.status.unavailable') }
+		battery_permission { tr('battery.status.permission') }
+		battery_invalid { tr('battery.status.invalid') }
+		else { tr('battery.status.failed') }
 	}
 }
 
 fn battery_remaining_text(estimate int) string {
 	return match estimate {
-		battery_estimate_unavailable { 'Unavailable' }
-		battery_estimate_calculating { 'Calculating…' }
-		battery_estimate_charging { 'Charging' }
-		battery_estimate_full { 'Fully charged' }
+		battery_estimate_unavailable { tr('battery.remaining.unavailable') }
+		battery_estimate_calculating { tr('battery.remaining.calculating') }
+		battery_estimate_charging { tr('battery.remaining.charging') }
+		battery_estimate_full { tr('battery.remaining.full') }
 		else {
-			if estimate >= 0 && estimate < battery_remaining_labels.len {
-				battery_remaining_labels[estimate]
+			if estimate == 0 {
+				tr('battery.remaining.less_than_hour')
+			} else if estimate > 0 && estimate < battery_hour_labels.labels.len {
+				battery_hours_text(estimate)
 			} else {
-				'Calculating…'
+				tr('battery.remaining.calculating')
 			}
 		}
 	}
+}
+
+// battery_hours_text is the estimate for hours, from the labels made in the
+// desktop's language. A change of language releases those made in the last.
+fn battery_hours_text(hours int) string {
+	if battery_hour_labels.language != desktop_language {
+		for i in 0 .. battery_hour_labels.labels.len {
+			if battery_hour_labels.labels[i].len > 0 {
+				unsafe { battery_hour_labels.labels[i].free() }
+				battery_hour_labels.labels[i] = ''
+			}
+		}
+		battery_hour_labels.language = desktop_language
+	}
+	if battery_hour_labels.labels[hours].len == 0 {
+		battery_hour_labels.labels[hours] = tr_count('battery.remaining.about_hours', hours)
+	}
+	return battery_hour_labels.labels[hours]
 }
 
 fn battery_graph_y(percent int, height int) int {
@@ -305,22 +284,22 @@ fn battery_settings_elements(percent int, history &BatteryHistory, x int, inner 
 	estimate := history.remaining_hours(percent)
 	stat_width := (inner - 16) / 2
 	mut children := frame_elements(16)
-	children << ui2.label('settings.battery.title', 'Battery', ui2.rect(f64(x), 16, f64(inner), 28), ui2.TextStyle{ color: body_heading, size: 20, bold: true })
-	children << settings_label('Built-in battery', x, 46, inner, body_muted)
+	children << ui2.label('settings.battery.title', tr('settings.category.battery'), ui2.rect(f64(x), 16, f64(inner), 28), ui2.TextStyle{ color: body_heading, size: 20, bold: true })
+	children << settings_label(tr('settings.battery.built_in'), x, 46, inner, body_muted)
 	children << ui2.view('', ui2.rect(f64(x), 76, f64(inner), 1), ui2.BoxStyle{
 		bg: body_rule
 	}, [])
-	children << settings_label('Current charge', x, 88, stat_width, body_heading)
+	children << settings_label(tr('settings.battery.current_charge'), x, 88, stat_width, body_heading)
 	children << ui2.label('settings.battery.percent', if available {
 		battery_percentage_text(percent)
 	} else {
-		'Unavailable'
+		tr('settings.battery.unavailable')
 	}, ui2.rect(f64(x), 108, f64(stat_width), 34), ui2.TextStyle{
 		color: if available { body_heading } else { body_muted }
 		size: 28
 		bold: true
 	})
-	children << settings_label('Estimated remaining', x + stat_width + 16, 88, stat_width, body_heading)
+	children << settings_label(tr('settings.battery.estimated_remaining'), x + stat_width + 16, 88, stat_width, body_heading)
 	children << ui2.label('settings.battery.estimate', battery_remaining_text(estimate), ui2.rect(f64(x + stat_width + 16), 110, f64(stat_width), 30), ui2.TextStyle{
 		color: if estimate == battery_estimate_unavailable { body_muted } else { body_heading }
 		size: 19
@@ -332,18 +311,18 @@ fn battery_settings_elements(percent int, history &BatteryHistory, x int, inner 
 	} else {
 		files_error
 	})
-	children << settings_label('Battery level — last 24 hours', x, 190, inner, body_heading)
+	children << settings_label(tr('settings.battery.history'), x, 190, inner, body_heading)
 	children << battery_graph(history, x, 214, inner, 76)
-	children << settings_label('24 hours ago', x, 294, inner / 2, body_muted)
-	children << ui2.label('', 'Now', ui2.rect(f64(x + inner / 2), 294, f64(inner / 2), 16), ui2.TextStyle{ color: body_muted, size: 11, align: .right })
-	children << settings_button('settings.refresh', 'Refresh', ui2.rect(f64(x), 326, 80, 30), true)
+	children << settings_label(tr('settings.battery.day_ago'), x, 294, inner / 2, body_muted)
+	children << ui2.label('', tr('settings.battery.now'), ui2.rect(f64(x + inner / 2), 294, f64(inner / 2), 16), ui2.TextStyle{ color: body_muted, size: 11, align: .right })
+	children << settings_button('settings.refresh', tr('settings.battery.refresh'), ui2.rect(f64(x), 326, 80, 30), true)
 	if available && percent > 0 {
 		children << ui2.view('settings.battery.fill', ui2.rect(f64(x), 148, f64(inner * percent / 100), 10), ui2.BoxStyle{ bg: battery_level, radius: 4 }, [])
 	}
 	if percent == battery_unavailable {
-		children << settings_label('Check apple-smc boot diagnostics.', x + 96, 333, inner - 96, body_muted)
+		children << settings_label(tr('settings.battery.check_smc'), x + 96, 333, inner - 96, body_muted)
 	} else {
-		children << settings_label('Read-only · /dev/battery · updates every 5 seconds.', x + 96, 333, inner - 96, body_muted)
+		children << settings_label(tr('settings.battery.footer'), x + 96, 333, inner - 96, body_muted)
 	}
 	return children
 }

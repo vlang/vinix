@@ -44,6 +44,10 @@ class PackageStoreTests(unittest.TestCase):
             encoding="utf-8",
         )
         (self.source / "desktop/local.v").write_text("module main\n", encoding="utf-8")
+        (self.source / "desktop/translations").mkdir()
+        (self.source / "desktop/translations/en.tr").write_text(
+            "app.files\nFiles\n", encoding="utf-8"
+        )
         (self.source / "desktop/tools").mkdir()
         for name in ("stage_app.py", "stage_ui2.py", "ui2_headless_bounds.v"):
             shutil.copyfile(
@@ -148,6 +152,7 @@ class PackageStoreTests(unittest.TestCase):
             )
             self.assertIn("desktop/local.v", snapshot.getnames())
             self.assertIn(".vinix-build/desktop/app_calculator.v", snapshot.getnames())
+            self.assertIn(".vinix-build/desktop/translations_data.v", snapshot.getnames())
             self.assertIn(".vinix-build/vmodules/ui2/v.mod", snapshot.getnames())
             self.assertIn(
                 ".vinix-build/vmodules/ui2/ui/vinix_headless_backend.v",

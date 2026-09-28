@@ -1135,7 +1135,7 @@ fn (mut d Desktop) draw_calendar_today_icon(x int, y int, w int, h int) {
 	d.canvas.stroke_round_rect(left, top, size, size, radius, 0xe6e6e6, 255)
 
 	civil := civil_from_epoch(d.taskbar_clock_seconds + d.tz_offset_seconds)
-	weekday := weekday_names[civil.weekday]
+	weekday := date_weekday_short(civil.weekday)
 	day := civil.day.str()
 	weekday_face := d.face_for(ui2.TextStyle{
 		size: 11

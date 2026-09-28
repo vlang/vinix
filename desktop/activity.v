@@ -112,6 +112,9 @@ mut:
 	process_total u32
 	used_memory   u64
 	total_memory  u64
+	// The language the kept text is in. build rewrites it after a change,
+	// rather than leaving the old words up until the next sample.
+	language DesktopLanguage
 	// The buffer a read lands in, allocated once. A snapshot is a few tens of
 	// kilobytes and reading it into a fresh allocation every second would be a
 	// steady leak.
@@ -129,19 +132,31 @@ fn activity_buffer_size() int {
 fn (mut m ActivityMonitor) sample() bool {
 	fd := desktop_open_ro_nonblock(activity_device)
 	if fd < 0 {
-		return m.fail('${activity_device} is not there.\nThis kernel does not report processes.')
+		// Two sentences, one to a line, as the error label shows them.
+		missing := tr_fill('activity.error.missing', activity_device)
+		note := tr('activity.error.missing_note')
+		message := '${missing}\n${note}'
+		unsafe { missing.free() }
+		return m.fail(message)
 	}
 	got := desktop_read(fd, m.buffer.data, u64(m.buffer.len))
 	desktop_close(fd)
 
 	if got < i64(sizeof(ActivityTable)) {
-		return m.fail('Could not read ${activity_device}.')
+		return m.fail(tr_fill('activity.error.read', activity_device))
 	}
 
 	header := unsafe { &ActivityTable(m.buffer.data) }
 	if header.version != activity_table_version
 		|| header.record_size != u32(sizeof(ActivitySample)) {
-		return m.fail('${activity_device} speaks version ${header.version}, not ${activity_table_version}.')
+		found := header.version.str()
+		wanted := activity_table_version.str()
+		message := tr_fill3('activity.error.version', activity_device, found, wanted)
+		unsafe {
+			found.free()
+			wanted.free()
+		}
+		return m.fail(message)
 	}
 
 	// Trust the byte count that actually arrived over the header's own claim:
@@ -220,6 +235,7 @@ fn (mut m ActivityMonitor) apply_snapshot(header &ActivityTable, records &Activi
 	m.total_memory = header.total_memory
 	m.update_summary()
 	m.set_error('')
+	m.language = desktop_language
 }
 
 fn (m &ActivityMonitor) process_row_index(pid int) int {
@@ -241,19 +257,43 @@ fn replace_activity_text(current string, next string) string {
 }
 
 fn (mut m ActivityMonitor) update_summary() {
-	process_noun := if m.process_total == 1 { 'process' } else { 'processes' }
 	// The values are named rather than interpolated in place so every owned
 	// string can be released explicitly on the manual-free desktop target.
 	process_count := m.process_total.str()
 	used_text := human_size(m.used_memory)
 	total_text := human_size(m.total_memory)
 	unsafe { m.summary.free() }
-	m.summary = '${process_count} ${process_noun}   ${used_text} of ${total_text} used'
+	// Each plural form is a whole sentence, so every language orders the
+	// count and the two sizes its own way.
+	m.summary = tr_substitute(tr_plural_form('activity.summary', i64(m.process_total)),
+		process_count, used_text, total_text)
 	unsafe {
 		process_count.free()
 		used_text.free()
 		total_text.free()
 	}
+}
+
+// relocalize rewrites the kept text in the desktop's language from the numbers
+// it was made from. An error is read afresh instead: it says what the device
+// answered, and asking again is how to say it in the new language.
+fn (mut m ActivityMonitor) relocalize() {
+	m.language = desktop_language
+	if m.error != '' {
+		if m.buffer.len > 0 {
+			m.sample()
+		}
+		return
+	}
+	for index in 0 .. m.rows.len {
+		m.rows[index].cpu_text = replace_activity_text(m.rows[index].cpu_text, percent_text(m.rows[index].cpu_percent))
+		m.rows[index].mem_text = replace_activity_text(m.rows[index].mem_text, memory_mb_text(m.rows[index].memory_bytes))
+	}
+	// Names sort as they read, and they read differently now.
+	if m.sort == .name {
+		m.sort_rows()
+	}
+	m.update_summary()
 }
 
 // set_error replaces the reason the window is empty, releasing the one before
@@ -313,6 +353,7 @@ fn (mut m ActivityMonitor) fail(message string) bool {
 	m.previous.clear()
 	m.sampled_ns = 0
 	m.set_error(message)
+	m.language = desktop_language
 	return changed
 }
 
@@ -395,6 +436,8 @@ fn activity_name_of(record &ActivitySample) string {
 		}
 	}
 	if length <= start {
+		// Kept in English like every other name; activity_display_name
+		// translates it on screen.
 		return '(unnamed)'
 	}
 	name := unsafe { tos(&u8(&record.name[start]), length - start).clone() }
@@ -428,6 +471,16 @@ fn activity_name_of(record &ActivitySample) string {
 	return display.clone()
 }
 
+// activity_display_name is how a process' name reads in the window. A row
+// keeps the name it was given, the English title for a native application;
+// the table's translation is shown, and the table owns it.
+fn activity_display_name(name string) string {
+	if name == '(unnamed)' {
+		return tr('activity.unnamed')
+	}
+	return app_title_text(name)
+}
+
 // percent_text renders a share to one decimal place, which is as fine as a
 // figure sampled once a second deserves. Anything at or over 100 loses the
 // decimal: a process pinning several CPUs is interesting for the fact, not for
@@ -445,7 +498,7 @@ fn percent_text(value f64) string {
 	tenths := int(value * 10.0 + 0.5)
 	whole := (tenths / 10).str()
 	fraction := (tenths % 10).str()
-	text := '${whole}.${fraction}'
+	text := tr_fill2('activity.cpu.decimal', whole, fraction)
 	unsafe {
 		whole.free()
 		fraction.free()
@@ -463,7 +516,7 @@ fn memory_mb_text(bytes u64) string {
 	if whole < 10 && tenths > 0 {
 		whole_text := whole.str()
 		tenths_text := tenths.str()
-		text := '${whole_text}.${tenths_text} MB'
+		text := tr_fill2('activity.memory.mb_decimal', whole_text, tenths_text)
 		unsafe {
 			whole_text.free()
 			tenths_text.free()
@@ -471,7 +524,7 @@ fn memory_mb_text(bytes u64) string {
 		return text
 	}
 	whole_text := whole.str()
-	text := '${whole_text} MB'
+	text := tr_fill('activity.memory.mb', whole_text)
 	unsafe { whole_text.free() }
 	return text
 }
@@ -501,7 +554,9 @@ fn (mut m ActivityMonitor) sort_rows() {
 		}
 		.name {
 			m.rows.sort_with_compare(fn (a &ActivityRow, b &ActivityRow) int {
-				order := compare_strings(a.name, b.name)
+				left := activity_display_name(a.name)
+				right := activity_display_name(b.name)
+				order := compare_strings(left, right)
 				return if order != 0 { order } else { a.pid - b.pid }
 			})
 		}
@@ -580,6 +635,9 @@ fn (mut a ActivityApp) build(size ui2.Rect) !ui2.Element {
 		1
 	}
 	a.monitor.clamp_scroll()
+	if a.monitor.language != desktop_language {
+		a.monitor.relocalize()
+	}
 
 	mut children := frame_elements(a.monitor.visible_rows + 11)
 
@@ -676,14 +734,14 @@ fn activity_action_of(sort ActivitySort) string {
 
 fn activity_sort_title(sort ActivitySort) string {
 	return match sort {
-		.cpu { 'CPU' }
-		.memory { 'RAM' }
-		.name { 'Name' }
+		.cpu { tr('activity.sort_title.cpu') }
+		.memory { tr('activity.sort_title.memory') }
+		.name { tr('activity.sort_title.name') }
 	}
 }
 
-// activity_headings labels the columns. The strings are constants, so building
-// these each frame allocates nothing.
+// activity_headings labels the columns. The strings belong to the translation
+// table, so building these each frame allocates nothing.
 fn activity_headings(width int) []ui2.Element {
 	y := f64(activity_header_height - 19)
 	right := ui2.TextStyle{
@@ -694,9 +752,9 @@ fn activity_headings(width int) []ui2.Element {
 	}
 	name_width := width - activity_padding * 2 - activity_pid_column - activity_cpu_column - activity_mem_column
 	mut headings := frame_elements(3)
-	headings << ui2.label('', 'PID', ui2.rect(f64(activity_padding + name_width), y, f64(activity_pid_column), 14), right)
-	headings << ui2.label('', '% CPU', ui2.rect(f64(activity_padding + name_width + activity_pid_column), y, f64(activity_cpu_column), 14), right)
-	headings << ui2.label('', 'MB', ui2.rect(f64(activity_padding + name_width + activity_pid_column + activity_cpu_column), y, f64(activity_mem_column), 14), right)
+	headings << ui2.label('', tr('activity.column.pid'), ui2.rect(f64(activity_padding + name_width), y, f64(activity_pid_column), 14), right)
+	headings << ui2.label('', tr('activity.column.cpu'), ui2.rect(f64(activity_padding + name_width + activity_pid_column), y, f64(activity_cpu_column), 14), right)
+	headings << ui2.label('', tr('activity.column.memory'), ui2.rect(f64(activity_padding + name_width + activity_pid_column + activity_cpu_column), y, f64(activity_mem_column), 14), right)
 	return headings
 }
 
@@ -713,7 +771,7 @@ fn activity_row_cells(entry ActivityRow, width int) []ui2.Element {
 	// real share of a CPU is marked rather than left to be found by reading.
 	busy := entry.cpu_percent >= activity_busy_percent
 	mut cells := frame_elements(4)
-	cells << ui2.label('', entry.name, ui2.rect(f64(activity_padding), 0, f64(name_width), f64(activity_row_height)), ui2.TextStyle{
+	cells << ui2.label('', activity_display_name(entry.name), ui2.rect(f64(activity_padding), 0, f64(name_width), f64(activity_row_height)), ui2.TextStyle{
 		color: body_heading
 		size: 11
 		bold: busy

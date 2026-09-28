@@ -235,7 +235,8 @@ fn (mut p FilesQuickLook) show(path string) {
 		.none_ { false }
 	}
 	if !ok {
-		p.message = 'Unable to preview this file.'
+		// close() frees the message, so it is the preview's own copy.
+		p.message = tr('files.quicklook.cannot_preview').clone()
 	}
 }
 
@@ -276,7 +277,9 @@ fn (p &FilesQuickLook) build(size ui2.Rect) ui2.Element {
 		})
 	body << ui2.view('', ui2.rect(0, 42, f64(width), 1), ui2.BoxStyle{ bg: body_rule }, [])
 	if p.message != '' {
-		body << ui2.label('', p.message, ui2.rect(18, 62, f64(width - 36), 24), ui2.TextStyle{
+		// The only message is this one. It is looked up as it is drawn, so a
+		// preview left open follows a change of language.
+		body << ui2.label('', tr('files.quicklook.cannot_preview'), ui2.rect(18, 62, f64(width - 36), 24), ui2.TextStyle{
 			color: files_error
 			size:  13
 		})
@@ -303,7 +306,7 @@ fn (p &FilesQuickLook) build(size ui2.Rect) ui2.Element {
 		body << ui2.view('', ui2.rect(20, 52, f64(width - 40), f64(height - 72)),
 			ui2.BoxStyle{ transparent: true }, text_children)
 		if p.truncated {
-			body << ui2.label('', 'Showing the beginning of the file', ui2.rect(20, f64(height - 20),
+			body << ui2.label('', tr('files.quicklook.truncated'), ui2.rect(20, f64(height - 20),
 				f64(width - 40), 16), ui2.TextStyle{ color: body_muted, size: 11 })
 		}
 	}

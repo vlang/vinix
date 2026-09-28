@@ -50,6 +50,12 @@ mut:
 	sort_descending   bool
 	scroll            int
 	error             string
+	// The directory error names, kept so the message can be made again in
+	// another language. Owned; empty when there is no error to remake.
+	error_path string
+	// The language the entries' date, kind and size text and the error were
+	// made in. follow_language remakes them when the desktop's differs.
+	language DesktopLanguage = desktop_language
 	// Row the pointer is over, or -1. Kept here rather than in the desktop's
 	// hover state because rows are the application's, not the chrome's.
 	hover_row    int = -1
@@ -153,8 +159,12 @@ fn read_file_entries_filtered(path string, action_prefix string, show_hidden boo
 fn (mut b FileBrowser) read(path string) {
 	prefix := if b.action_prefix.len > 0 { b.action_prefix } else { files_action_row }
 	entries := read_file_entries_filtered(path, prefix, b.show_hidden, b.tz_offset_seconds) or {
-		unsafe { b.error.free() }
-		b.error = 'cannot open ${path}'
+		unsafe {
+			b.error.free()
+			b.error_path.free()
+		}
+		b.error = tr_fill('files.cannot_open', path)
+		b.error_path = path.clone()
 		return
 	}
 
@@ -162,11 +172,16 @@ fn (mut b FileBrowser) read(path string) {
 	unsafe {
 		b.path.free()
 		b.error.free()
+		b.error_path.free()
 	}
 	b.path = path
 	b.entries = entries
 	b.scroll = 0
 	b.error = ''
+	b.error_path = ''
+	// Freshly read entries are in the current language, and so is any
+	// entry text relabel_entries would otherwise remake.
+	b.language = desktop_language
 	b.hover_row = -1
 	b.selected_row = -1
 	if b.sort_column != .name || b.sort_descending {
@@ -225,16 +240,17 @@ fn (mut b FileBrowser) go_up() {
 
 // human_size keeps a listing's last column narrow. Sizes are shown to three
 // significant figures at most, which is as much as anyone reads at a glance.
+// The units and the decimal separator are the desktop language's (1,5 МБ).
 fn human_size(size u64) string {
 	if size < 1024 {
 		bytes := size.str()
-		text := '${bytes} B'
+		text := tr_fill('files.size.bytes', bytes)
 		unsafe { bytes.free() }
 		return text
 	}
 	mut value := f64(size) / 1024.0
 	mut unit := 0
-	for value >= 1024.0 && unit + 1 < file_size_units.len {
+	for value >= 1024.0 && unit + 1 < file_size_unit_count {
 		value /= 1024.0
 		unit++
 	}
@@ -242,7 +258,7 @@ fn human_size(size u64) string {
 		tenths := int(value * 10.0 + 0.5)
 		whole := (tenths / 10).str()
 		fraction := (tenths % 10).str()
-		text := '${whole}.${fraction} ${file_size_units[unit]}'
+		text := tr_fill3('files.size.decimal', whole, fraction, file_size_unit(unit))
 		unsafe {
 			whole.free()
 			fraction.free()
@@ -250,12 +266,22 @@ fn human_size(size u64) string {
 		return text
 	}
 	whole := int(value).str()
-	text := '${whole} ${file_size_units[unit]}'
+	text := tr_fill2('files.size.whole', whole, file_size_unit(unit))
 	unsafe { whole.free() }
 	return text
 }
 
-const file_size_units = ['KB', 'MB', 'GB', 'TB']
+// KB, MB, GB and TB, in that order.
+const file_size_unit_count = 4
+
+fn file_size_unit(unit int) string {
+	return match unit {
+		0 { tr('files.unit.kb') }
+		1 { tr('files.unit.mb') }
+		2 { tr('files.unit.gb') }
+		else { tr('files.unit.tb') }
+	}
+}
 
 // ── The native application ────────────────────────────────────────
 
@@ -292,6 +318,7 @@ const files_sidebar_min_window_width = 360
 const files_sidebar_row_height = 29
 
 struct FilesLocation {
+	// English, like the folder's name; the sidebar shows display_title().
 	title  string
 	path   string
 	icon   string
@@ -312,6 +339,21 @@ fn files_locations_in(home string) []FilesLocation {
 		FilesLocation{ title: 'Music', path: '${home}/Music', icon: 'builtin:folder', action: 'files.location.music' },
 		FilesLocation{ title: 'Computer', path: '/', icon: 'builtin:drive', action: 'files.location.computer' },
 	]
+}
+
+// display_title is the location's name in the desktop's language. The folders
+// themselves keep their English names on disk; only the label is translated.
+fn (l &FilesLocation) display_title() string {
+	return match l.action {
+		'files.location.home' { tr('files.location.home') }
+		'files.location.desktop' { tr('files.location.desktop') }
+		'files.location.documents' { tr('files.location.documents') }
+		'files.location.downloads' { tr('files.location.downloads') }
+		'files.location.pictures' { tr('files.location.pictures') }
+		'files.location.music' { tr('files.location.music') }
+		'files.location.computer' { tr('files.location.computer') }
+		else { l.title }
+	}
 }
 
 fn files_content_left(width int) int {
@@ -344,6 +386,7 @@ fn (mut c MillerColumn) release() {
 	unsafe {
 		c.browser.path.free()
 		c.browser.error.free()
+		c.browser.error_path.free()
 	}
 }
 
@@ -411,7 +454,7 @@ fn (mut a FileBrowserApp) new_miller_column(path string) MillerColumn {
 	row_prefix := '${files_action_column_row}${id_text}.'
 	entries := read_file_entries_filtered(path, row_prefix, a.settings.show_hidden,
 		a.tz_offset_seconds) or {
-		error_text := 'cannot open ${path}'
+		error_text := tr_fill('files.cannot_open', path)
 		unsafe {
 			id_text.free()
 			row_prefix.free()
@@ -419,8 +462,9 @@ fn (mut a FileBrowserApp) new_miller_column(path string) MillerColumn {
 		return MillerColumn{
 			id:      id
 			browser: FileBrowser{
-				path:  path
-				error: error_text
+				path:       path
+				error:      error_text
+				error_path: path.clone()
 			}
 		}
 	}
@@ -577,14 +621,14 @@ fn (mut a FileBrowserApp) navigate_commander_active_to(path string) {
 
 fn (a &FileBrowserApp) sidebar(height int) ui2.Element {
 	mut rows := frame_elements(files_locations.len + a.settings.tags.len + 4)
-	rows << ui2.label('', 'Favorites', ui2.rect(14, f64(10 - a.sidebar_scroll), files_sidebar_width - 28, 20), ui2.TextStyle{
+	rows << ui2.label('', tr('files.sidebar.favorites'), ui2.rect(14, f64(10 - a.sidebar_scroll), files_sidebar_width - 28, 20), ui2.TextStyle{
 		color: body_muted
 		size:  11
 		bold:  true
 	})
 	for index, location in files_locations {
 		if index == files_locations.len - 1 {
-			rows << ui2.label('', 'Locations', ui2.rect(14, f64(225 - a.sidebar_scroll), files_sidebar_width - 28, 20), ui2.TextStyle{
+			rows << ui2.label('', tr('files.sidebar.locations'), ui2.rect(14, f64(225 - a.sidebar_scroll), files_sidebar_width - 28, 20), ui2.TextStyle{
 				color: body_muted
 				size:  11
 				bold:  true
@@ -605,7 +649,7 @@ fn (a &FileBrowserApp) sidebar(height int) ui2.Element {
 		}, ui2.TextStyle{
 			color: files_sidebar_icon
 		})
-		contents << ui2.label('', location.title, ui2.rect(37, 0, files_sidebar_width - 48, files_sidebar_row_height), ui2.TextStyle{
+		contents << ui2.label('', location.display_title(), ui2.rect(37, 0, files_sidebar_width - 48, files_sidebar_row_height), ui2.TextStyle{
 			color: body_text
 			size:  12
 		})
@@ -619,7 +663,7 @@ fn (a &FileBrowserApp) sidebar(height int) ui2.Element {
 	for tag in a.settings.tags {
 		if !tag.sidebar { continue }
 		if tag_row == 0 {
-			rows << ui2.label('', 'Tags', ui2.rect(14, f64(290 - a.sidebar_scroll), files_sidebar_width - 28, 20), ui2.TextStyle{
+			rows << ui2.label('', tr('files.settings.tags'), ui2.rect(14, f64(290 - a.sidebar_scroll), files_sidebar_width - 28, 20), ui2.TextStyle{
 				color: body_muted
 				size:  11
 				bold:  true
@@ -630,7 +674,7 @@ fn (a &FileBrowserApp) sidebar(height int) ui2.Element {
 		if y + files_sidebar_row_height > height || y < 0 { continue }
 		mut contents := frame_elements(2)
 		contents << ui2.view('', ui2.rect(14, 10, 9, 9), ui2.BoxStyle{ bg: tag.color, radius: 5 }, [])
-		contents << ui2.label('', tag.name, ui2.rect(36, 0, files_sidebar_width - 47, files_sidebar_row_height), ui2.TextStyle{
+		contents << ui2.label('', tag.display_name(), ui2.rect(36, 0, files_sidebar_width - 47, files_sidebar_row_height), ui2.TextStyle{
 			color: body_text
 			size:  12
 		})
@@ -804,6 +848,7 @@ fn (a &FileBrowserApp) pointer_over_path(x int, y int) bool {
 }
 
 fn (mut a FileBrowserApp) build(size ui2.Rect) !ui2.Element {
+	a.follow_language()
 	prepare_file_rows(mut a.browser.entries, files_action_row)
 	width := int(size.width)
 	height := int(size.height)
@@ -868,7 +913,7 @@ fn (mut a FileBrowserApp) build(size ui2.Rect) !ui2.Element {
 	// Header: where we are, the way back out, and the view choices.
 	view_button_gap := 2
 	view_x := width - files_padding - 4 * files_view_button_width - 3 * view_button_gap
-	children << ui2.button(files_action_up, 'Up', ui2.rect(f64(files_padding), files_path_top, 40, files_path_height), ui2.BoxStyle{
+	children << ui2.button(files_action_up, tr('files.toolbar.up'), ui2.rect(f64(files_padding), files_path_top, 40, files_path_height), ui2.BoxStyle{
 		bg:     if a.current_path() == '/' { files_up_disabled } else { files_up }
 		radius: 5
 	}, ui2.TextStyle{
@@ -876,13 +921,13 @@ fn (mut a FileBrowserApp) build(size ui2.Rect) !ui2.Element {
 		size:  12
 		align: .center
 	})
-	children << files_view_button(files_action_view_commander, 'Two pane view',
+	children << files_view_button(files_action_view_commander, tr('files.toolbar.commander'),
 		'builtin:dual_pane', view_x, a.view_mode == .commander)
-	children << files_view_button(files_action_view_list, 'List view', 'builtin:list_view',
+	children << files_view_button(files_action_view_list, tr('files.toolbar.list'), 'builtin:list_view',
 		view_x + files_view_button_width + view_button_gap, a.view_mode == .list)
-	children << files_view_button(files_action_view_columns, 'Column view', 'builtin:column_view',
+	children << files_view_button(files_action_view_columns, tr('files.toolbar.columns'), 'builtin:column_view',
 		view_x + 2 * (files_view_button_width + view_button_gap), a.view_mode == .columns)
-	children << files_view_button(files_action_settings, 'Files Settings (Cmd+,)', 'builtin:settings',
+	children << files_view_button(files_action_settings, tr('files.toolbar.settings'), 'builtin:settings',
 		view_x + 3 * (files_view_button_width + view_button_gap), false)
 	if a.view_mode != .columns {
 		children << ui2.label('', a.current_path(), ui2.rect(files_path_left, files_path_top,
@@ -937,7 +982,7 @@ fn (mut a FileBrowserApp) build(size ui2.Rect) !ui2.Element {
 	}
 
 	if a.browser.entries.len == 0 {
-		children << ui2.label('', 'This directory is empty.', ui2.rect(f64(content_left + files_padding), f64(a.rows_top + 8), f64(inner), 20), ui2.TextStyle{
+		children << ui2.label('', tr('files.empty_directory'), ui2.rect(f64(content_left + files_padding), f64(a.rows_top + 8), f64(inner), 20), ui2.TextStyle{
 			color: body_muted
 			size:  13
 		})
@@ -980,7 +1025,7 @@ fn files_view_button(action string, label string, icon string, x int, selected b
 		})
 		tooltip:             label
 		accessibility_label: label
-		accessibility_value: if selected { 'selected' } else { '' }
+		accessibility_value: if selected { tr('settings.choice.selected') } else { '' }
 	}
 }
 
@@ -1009,13 +1054,13 @@ fn (mut a FileBrowserApp) build_tag_results(width int, height int, mut children 
 	tag := a.settings.tags[index]
 	paths := a.settings.tagged_paths(tag.id)
 	defer { unsafe { paths.free() } }
-	children << ui2.label('', tag.name, ui2.rect(f64(content_left + 14), f64(a.rows_top + 6), f64(content_width - 28), 20), ui2.TextStyle{
+	children << ui2.label('', tag.display_name(), ui2.rect(f64(content_left + 14), f64(a.rows_top + 6), f64(content_width - 28), 20), ui2.TextStyle{
 		color: body_heading
 		size:  14
 		bold:  true
 	})
 	if paths.len == 0 {
-		children << ui2.label('', 'No files have this tag.', ui2.rect(f64(content_left + 14), f64(a.rows_top + 34), f64(content_width - 28), 20), ui2.TextStyle{
+		children << ui2.label('', tr('files.tag_results.empty'), ui2.rect(f64(content_left + 14), f64(a.rows_top + 34), f64(content_width - 28), 20), ui2.TextStyle{
 			color: body_muted
 			size:  12
 		})
@@ -1083,7 +1128,7 @@ fn (mut a FileBrowserApp) build_miller_columns(width int, height int, mut childr
 				lines: 2
 			})
 		} else if column.browser.entries.len == 0 {
-			children << ui2.label('', 'Empty', ui2.rect(f64(x + files_padding), f64(rows_top + 8), f64(column_width - 2 * files_padding), 20), ui2.TextStyle{
+			children << ui2.label('', tr('files.column.empty'), ui2.rect(f64(x + files_padding), f64(rows_top + 8), f64(column_width - 2 * files_padding), 20), ui2.TextStyle{
 				color: body_muted
 				size:  12
 			})

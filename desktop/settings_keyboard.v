@@ -12,8 +12,9 @@ import ui2
 const settings_action_keyboard_enable = 'settings.keyboard.enable.'
 const settings_action_keyboard_current = 'settings.keyboard.current.'
 
-// KeyboardPreview is what the pane says about one layout. Its strings are made
-// once: the renderer frees a frame's element arrays, not the strings in them.
+// KeyboardPreview is what one layout types, as lists of keycaps. They are made
+// once; the sentences around them are the desktop's language's, and are made
+// for each frame into labels that own them.
 struct KeyboardPreview {
 	letters string
 	option  string
@@ -34,7 +35,7 @@ fn keyboard_build_previews() []KeyboardPreview {
 	for layout in keyboard_layouts {
 		keymap := keymap_for(layout) or {
 			previews << KeyboardPreview{
-				letters: 'Types: q w e r t y u i o p [ ]'
+				letters: 'q w e r t y u i o p [ ]'
 			}
 			continue
 		}
@@ -61,13 +62,9 @@ fn keyboard_build_previews() []KeyboardPreview {
 			}
 		}
 		previews << KeyboardPreview{
-			letters: 'Types: ${letters.join(' ')}'
-			option:  if option.len > 0 { 'Option (Alt) types: ${option.join(' ')}' } else { '' }
-			accents: if accents.len > 0 {
-				'Accent keys ${accents.join(' ')} wait for the letter they go on.'
-			} else {
-				''
-			}
+			letters: letters.join(' ')
+			option:  option.join(' ')
+			accents: accents.join(' ')
 		}
 	}
 	return previews
@@ -93,8 +90,30 @@ fn settings_toggle(id string, label string, x int, y int, width int, on bool) ui
 		checked:             on
 		accessibility_role:  'checkbox'
 		accessibility_label: label
-		accessibility_value: if on { 'on' } else { 'off' }
+		accessibility_value: if on { tr('settings.keyboard.on') } else { tr('settings.keyboard.off') }
 	}
+}
+
+// keyboard_layout_text is how a layout is named on screen. KeyboardLayout's
+// own title stays English, beside the model it describes.
+fn keyboard_layout_text(layout KeyboardLayout) string {
+	return match layout {
+		.us { tr('settings.keyboard.layout.us') }
+		.russian { tr('settings.keyboard.layout.russian') }
+		.spanish { tr('settings.keyboard.layout.spanish') }
+		.french { tr('settings.keyboard.layout.french') }
+		.german { tr('settings.keyboard.layout.german') }
+		.portuguese { tr('settings.keyboard.layout.portuguese') }
+	}
+}
+
+// settings_owned_note is a note whose text was made for this frame; the
+// renderer frees it with the frame.
+fn settings_owned_note(text string, y int, width int) ui2.Element {
+	return ui2.label(frame_owned_text_id, text, ui2.rect(f64(settings_padding), f64(y), f64(width - 2 * settings_padding), 16), ui2.TextStyle{
+		color: body_muted
+		size:  11
+	})
 }
 
 fn (a &SettingsApp) keyboard_pane(width int) []ui2.Element {
@@ -106,22 +125,21 @@ fn (a &SettingsApp) keyboard_pane(width int) []ui2.Element {
 	mut out := frame_elements(2 * keyboard_layouts.len + 10)
 	mut y := settings_padding
 
-	out << settings_heading('Input sources', y, width)
+	out << settings_heading(tr('settings.keyboard.sources'), y, width)
 	y += 22
-	out << settings_note('Ctrl-Space moves between the layouts turned on here.', y, width)
+	out << settings_note(tr('settings.keyboard.sources_note'), y, width)
 	y += 22
 	for index, layout in keyboard_layouts {
 		x := settings_padding + (index % columns) * (cell + settings_row_gap)
 		row_y := y + (index / columns) * (28 + settings_row_gap)
-		out << settings_toggle('${settings_action_keyboard_enable}${index}', layout.title(),
+		out << settings_toggle('${settings_action_keyboard_enable}${index}', keyboard_layout_text(layout),
 			x, row_y, cell, settings.keyboard_layouts & layout.bit() != 0)
 	}
 	y += ((keyboard_layouts.len + columns - 1) / columns) * (28 + settings_row_gap) + 14
 
-	out << settings_heading('Typing with', y, width)
+	out << settings_heading(tr('settings.keyboard.typing'), y, width)
 	y += 22
-	out << settings_note('Shortcuts such as Ctrl-C and Cmd-W keep their keys in every layout.',
-		y, width)
+	out << settings_note(tr('settings.keyboard.typing_note'), y, width)
 	y += 22
 	mut shown := 0
 	for index, layout in keyboard_layouts {
@@ -130,18 +148,24 @@ fn (a &SettingsApp) keyboard_pane(width int) []ui2.Element {
 		}
 		x := settings_padding + (shown % columns) * (cell + settings_row_gap)
 		row_y := y + (shown / columns) * (28 + settings_row_gap)
-		out << settings_choice('${settings_action_keyboard_current}${index}', layout.title(),
+		out << settings_choice('${settings_action_keyboard_current}${index}', keyboard_layout_text(layout),
 			x, row_y, cell, settings.keyboard_layout == layout)
 		shown++
 	}
 	y += ((shown + columns - 1) / columns) * (28 + settings_row_gap) + 6
 
 	preview := keyboard_previews[int(settings.keyboard_layout)]
-	for line in [preview.letters, preview.option, preview.accents] {
-		if line.len > 0 {
-			out << settings_note(line, y, width)
-			y += 18
-		}
+	out << settings_owned_note(tr_fill('settings.keyboard.types', preview.letters), y, width)
+	y += 18
+	if preview.option.len > 0 {
+		out << settings_owned_note(tr_fill('settings.keyboard.option_types', preview.option), y,
+			width)
+		y += 18
+	}
+	if preview.accents.len > 0 {
+		out << settings_owned_note(tr_fill('settings.keyboard.accents', preview.accents), y,
+			width)
+		y += 18
 	}
 	return out
 }

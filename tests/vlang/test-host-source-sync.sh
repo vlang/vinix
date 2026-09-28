@@ -15,6 +15,8 @@ ui2_root=$work/ui2-source
 mkdir -p "$source_root/desktop/tools" "$ui2_root/ui" \
 	"$ui2_root/examples/calculator"
 printf 'module main\nconst host_revision = 1\n' > "$source_root/desktop/main.v"
+mkdir -p "$source_root/desktop/translations"
+printf 'app.files\nFiles\n' > "$source_root/desktop/translations/en.tr"
 cp "$repo/desktop/tools/stage_app.py" "$source_root/desktop/tools/stage_app.py"
 cp "$repo/desktop/tools/stage_ui2.py" "$source_root/desktop/tools/stage_ui2.py"
 cp "$repo/desktop/tools/ui2_headless_bounds.v" \
@@ -51,6 +53,7 @@ VINIX_HOST_TAR=$(command -v tar) \
 	"$repo/build-support/vinix-host-sync" >/dev/null
 grep -q 'host_revision = 1' "$work/mnt/vinix/desktop/main.v"
 test -f "$work/mnt/vinix/.vinix-build/desktop/app_calculator.v"
+grep -q "'Files'," "$work/mnt/vinix/.vinix-build/desktop/translations_data.v"
 test -f "$work/mnt/vinix/.vinix-build/vmodules/ui2/v.mod"
 test ! -e "$work/mnt/vinix/.vinix-build/vmodules/ui2/ui/scratch_tmp.v"
 test -L "$work/mnt/vinix"

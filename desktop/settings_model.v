@@ -27,11 +27,51 @@ enum ThemeKind {
 	macos
 }
 
+// The language the desktop and its own applications speak. Each has a
+// translations/<code>.tr file; translations.v looks text up in it.
+enum DesktopLanguage {
+	en
+	ru
+	es
+}
+
+const desktop_languages = [DesktopLanguage.en, .ru, .es]
+
+// code names the language in the preferences file and its translation file.
+fn (l DesktopLanguage) code() string {
+	return match l {
+		.en { 'en' }
+		.ru { 'ru' }
+		.es { 'es' }
+	}
+}
+
+// native_name is what a language calls itself. A language picker lists it
+// that way, so someone who cannot read the current language still finds
+// their own.
+fn (l DesktopLanguage) native_name() string {
+	return match l {
+		.en { 'English' }
+		.ru { 'Русский' }
+		.es { 'Español' }
+	}
+}
+
+fn desktop_language_from_code(code string) ?DesktopLanguage {
+	for language in desktop_languages {
+		if language.code() == code {
+			return language
+		}
+	}
+	return none
+}
+
 struct Settings {
 mut:
 	button_side  ButtonSide
 	taskbar_mode TaskbarMode
 	theme        ThemeKind
+	language     DesktopLanguage
 	// Clock defaults preserve the desktop's existing taskbar presentation.
 	clock_24_hour      bool = true
 	clock_show_seconds bool = true

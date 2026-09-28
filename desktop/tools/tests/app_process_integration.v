@@ -67,7 +67,7 @@ fn main() {
 		return
 	}
 	desktop_ignore_broken_pipe()
-	standalone := desktop_spawn_app(arguments()[0], 'voffice-calc', 0, true, '') or {
+	standalone := desktop_spawn_app(arguments()[0], 'voffice-calc', 0, 'en', true, '') or {
 		panic('could not start standalone app fixture')
 	}
 	mut standalone_marker := [1]u8{}

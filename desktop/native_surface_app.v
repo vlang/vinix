@@ -43,11 +43,33 @@ mut:
 	surface_width  int
 	surface_height int
 	icon           string
-	starting_text  string
-	exited_text    string
+	starting       SurfaceText
+	exited         SurfaceText
 	ready          bool
 	failed         bool
-	error_message  string
+	failure        SurfaceText
+}
+
+// SurfaceText is what a native-surface window says in place of its surface,
+// kept as which message it is so that it follows a change of language.
+enum SurfaceText {
+	none_
+	blender_starting
+	blender_exited
+	blender_not_staged
+	blender_data_missing
+	blender_client_failed
+}
+
+fn (t SurfaceText) text() string {
+	return match t {
+		.none_ { '' }
+		.blender_starting { tr('surface.blender.starting') }
+		.blender_exited { tr('surface.blender.exited') }
+		.blender_not_staged { tr('surface.blender.not_staged') }
+		.blender_data_missing { tr('surface.blender.data_missing') }
+		.blender_client_failed { tr('surface.blender.client_failed') }
+	}
 }
 
 fn open_blender(mut _ Desktop) !NativeApp {
@@ -55,24 +77,24 @@ fn open_blender(mut _ Desktop) !NativeApp {
 		surface_width: blender_surface_width
 		surface_height: blender_surface_height
 		icon: 'builtin:block'
-		starting_text: 'Starting native Blender…'
-		exited_text: 'Blender exited.'
+		starting: .blender_starting
+		exited: .blender_exited
 	}
 	if C.access(&char(blender_native_executable.str), C.X_OK) != 0 {
 		app.failed = true
-		app.error_message = 'Native Blender is not staged. Run build-blender-native-aarch64.sh.'
+		app.failure = .blender_not_staged
 		return app
 	}
 	if C.access(&char(blender_data_directory.str), C.R_OK) != 0 {
 		app.failed = true
-		app.error_message = 'Blender data is not installed. Run pkg install blender in Terminal.'
+		app.failure = .blender_data_missing
 		return app
 	}
 	app.surface_path = '/tmp/vinix-blender-${C.getpid()}.surface'
 	desktop_unlink(app.surface_path)
 	client := desktop_spawn_native_surface(blender_native_executable, '--debug-gpu-force-workarounds', '-noaudio', app.surface_path, blender_surface_width, blender_surface_height) or {
 		app.failed = true
-		app.error_message = 'Vinix could not start the native Blender client.'
+		app.failure = .blender_client_failed
 		return app
 	}
 	app.client_pid = client.pid
@@ -87,7 +109,7 @@ fn (mut app NativeSurfaceApp) build(size ui2.Rect) !ui2.Element {
 	if app.ready {
 		children << ui2.image('', '${vinix_surface_image_prefix}${app.surface_path}', ui2.rect(0, 0, f64(width), f64(height)))
 	} else {
-		message := if app.failed { app.error_message } else { app.starting_text }
+		message := if app.failed { app.failure.text() } else { app.starting.text() }
 		children << ui2.button_with_image('', '', app.icon, ui2.rect(f64((width - 48) / 2), f64((height - 82) / 2), 48, 48), ui2.BoxStyle{ transparent: true }, ui2.TextStyle{ color: app_accent })
 		children << ui2.label('', message, ui2.rect(16, f64((height - 82) / 2 + 58), f64(width - 32), 20), ui2.TextStyle{
 			color: if app.failed { u32(0xb42318) } else { body_muted }
@@ -109,7 +131,7 @@ fn (mut app NativeSurfaceApp) poll() bool {
 		}
 		app.ready = false
 		app.failed = true
-		app.error_message = app.exited_text
+		app.failure = app.exited
 		desktop_unlink(app.surface_path)
 		return true
 	}

@@ -778,7 +778,9 @@ struct SpawnedAppProcess {
 	from_child int
 }
 
-fn desktop_spawn_app(path string, app_name string, tz_offset i64, standalone bool, status_path string) ?SpawnedAppProcess {
+// language is the DesktopLanguage code the app starts in; each request then
+// brings the current one with the rest of the desktop's settings.
+fn desktop_spawn_app(path string, app_name string, tz_offset i64, language string, standalone bool, status_path string) ?SpawnedAppProcess {
 	if C.access(&char(path.str), C.X_OK) != 0 {
 		return none
 	}
@@ -813,13 +815,14 @@ fn desktop_spawn_app(path string, app_name string, tz_offset i64, standalone boo
 	request_arg := '--request-fd=${request[0]}'
 	response_arg := '--response-fd=${response[1]}'
 	tz_arg := '--app-tz=${tz_offset}'
+	language_arg := '--app-lang=${language}'
 	// Multicall desktop clients need the app selector and pipe options. Office
 	// clients treat argv[1] as a document path, so pass their pipes in envp.
 	argv := if standalone {
 		[&char(path.str), &char(unsafe { nil })]
 	} else {
 		[&char(path.str), &char(mode_arg.str), &char(request_arg.str), &char(response_arg.str),
-			&char(tz_arg.str), &char(unsafe { nil })]
+			&char(tz_arg.str), &char(language_arg.str), &char(unsafe { nil })]
 	}
 	path_entry := 'PATH=${desktop_command_path}'
 	home_entry := 'HOME=${desktop_home}'
@@ -851,6 +854,7 @@ fn desktop_spawn_app(path string, app_name string, tz_offset i64, standalone boo
 			request_arg.free()
 			response_arg.free()
 			tz_arg.free()
+			language_arg.free()
 			path_entry.free()
 			request_env.free()
 			response_env.free()
@@ -882,6 +886,7 @@ fn desktop_spawn_app(path string, app_name string, tz_offset i64, standalone boo
 		request_arg.free()
 		response_arg.free()
 		tz_arg.free()
+		language_arg.free()
 		path_entry.free()
 		request_env.free()
 		response_env.free()

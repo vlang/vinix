@@ -1,0 +1,1775 @@
+activity.column.cpu
+% ЦП
+-----
+activity.column.memory
+МБ
+-----
+activity.column.pid
+PID
+-----
+activity.cpu.decimal
+{0},{1}
+-----
+activity.error.missing
+{0} отсутствует.
+-----
+activity.error.missing_note
+Это ядро не сообщает о процессах.
+-----
+activity.error.read
+Не удалось прочитать {0}.
+-----
+activity.error.version
+{0} использует версию {1}, а не {2}.
+-----
+activity.memory.mb
+{0} МБ
+-----
+activity.memory.mb_decimal
+{0},{1} МБ
+-----
+activity.sort_title.cpu
+ЦП
+-----
+activity.sort_title.memory
+Память
+-----
+activity.sort_title.name
+Имя
+-----
+activity.summary
+{0} процесс   занято {1} из {2}|{0} процесса   занято {1} из {2}|{0} процессов   занято {1} из {2}
+-----
+activity.unnamed
+(без имени)
+-----
+app.activity_monitor
+Мониторинг системы
+-----
+app.calculator
+Калькулятор
+-----
+app.calendar
+Календарь
+-----
+app.capture
+Захват экрана
+-----
+app.clock
+Часы
+-----
+app.files
+Файлы
+-----
+app.files_settings
+Настройки Файлов
+-----
+app.qemu
+Vinix в QEMU
+-----
+app.settings
+Настройки
+-----
+app.terminal
+Терминал
+-----
+app.text_editor
+Текстовый редактор
+-----
+app.wine_calculator
+Калькулятор Wine
+-----
+app.wine_notepad
+Блокнот Wine
+-----
+app_selection.chromium.detail
+Открытая версия браузера Chrome
+-----
+app_selection.continue
+Продолжить
+-----
+app_selection.firefox.detail
+Веб-браузер Mozilla
+-----
+app_selection.heading
+Выберите приложения
+-----
+app_selection.install.done
+Выбранные приложения установлены. Открывайте их с рабочего стола или из меню «Пуск».
+-----
+app_selection.install.failed
+Не установлены:{0}. Чтобы повторить попытку, выполните pkg install{0}.
+-----
+app_selection.install.started
+Установка приложений, выбранных при настройке: {0}
+-----
+app_selection.install_1
+Установить 1 приложение
+-----
+app_selection.install_2
+Установить 2 приложения
+-----
+app_selection.install_3
+Установить 3 приложения
+-----
+app_selection.install_4
+Установить 4 приложения
+-----
+app_selection.installed
+Установлено
+-----
+app_selection.intro
+Отметьте те, которые нужно скачать и установить сейчас.
+-----
+app_selection.minecraft.detail
+Java Edition, с учётной записью Microsoft
+-----
+app_selection.note
+Другие приложения можно установить позже командой pkg install в Терминале.
+-----
+app_selection.voffice.detail
+Документы Writer и таблицы Calc
+-----
+battery.remaining.about_hours
+Около {0} часа|Около {0} часов|Около {0} часов
+-----
+battery.remaining.calculating
+Вычисление…
+-----
+battery.remaining.charging
+Заряжается
+-----
+battery.remaining.full
+Полностью заряжен
+-----
+battery.remaining.less_than_hour
+Меньше часа
+-----
+battery.remaining.unavailable
+Недоступно
+-----
+battery.status.failed
+Ошибка чтения аккумулятора или данные устарели.
+-----
+battery.status.invalid
+Недопустимый ответ аккумулятора.
+-----
+battery.status.permission
+Нет прав на чтение данных аккумулятора.
+-----
+battery.status.reported
+Процент заряда по данным драйвера аккумулятора.
+-----
+battery.status.unavailable
+Драйвер аккумулятора недоступен.
+-----
+calendar.heading
+{0} {1}
+-----
+calendar.heading.month.apr
+Апрель
+-----
+calendar.heading.month.aug
+Август
+-----
+calendar.heading.month.dec
+Декабрь
+-----
+calendar.heading.month.feb
+Февраль
+-----
+calendar.heading.month.jan
+Январь
+-----
+calendar.heading.month.jul
+Июль
+-----
+calendar.heading.month.jun
+Июнь
+-----
+calendar.heading.month.mar
+Март
+-----
+calendar.heading.month.may
+Май
+-----
+calendar.heading.month.nov
+Ноябрь
+-----
+calendar.heading.month.oct
+Октябрь
+-----
+calendar.heading.month.sep
+Сентябрь
+-----
+calendar.today
+Сегодня
+-----
+capture.cancel
+Отмена
+-----
+capture.delay.five_seconds
+5 секунд
+-----
+capture.delay.none
+Без задержки
+-----
+capture.delay.three_seconds
+3 секунды
+-----
+capture.eyebrow
+ЗАХВАТ ЭКРАНА
+-----
+capture.heading
+Снимки и запись экрана
+-----
+capture.page.screenshot
+Снимок экрана
+-----
+capture.page.video
+Видео
+-----
+capture.screenshot.delay
+Задержка
+-----
+capture.screenshot.facts
+PNG{0}весь рабочий стол{0}с указателем
+-----
+capture.screenshot.heading
+Снимок всего рабочего стола
+-----
+capture.screenshot.take
+Сделать снимок
+-----
+capture.status.cancel_hint
+Чтобы отменить, разверните это окно.
+-----
+capture.status.cancelled
+Захват отменён
+-----
+capture.status.cancelled_detail
+Ничего не сохранено.
+-----
+capture.status.failed
+Не удалось выполнить захват
+-----
+capture.status.failed_detail
+Не удалось записать файл в /root.
+-----
+capture.status.fps
+{0} к/с
+-----
+capture.status.frames
+{0} кадр|{0} кадра|{0} кадров
+-----
+capture.status.ready
+Готово к захвату
+-----
+capture.status.ready_detail
+Файлы сохраняются в /root.
+-----
+capture.status.recording
+Запись  {0}
+-----
+capture.status.recording_in
+Запись через {0} секунду|Запись через {0} секунды|Запись через {0} секунд
+-----
+capture.status.recording_saved
+Запись сохранена  {0}
+-----
+capture.status.screenshot_in
+Снимок через {0} секунду|Снимок через {0} секунды|Снимок через {0} секунд
+-----
+capture.status.screenshot_saved
+Снимок сохранён  {0}
+-----
+capture.stop_recording
+Остановить запись
+-----
+capture.video.compact
+Компактно  5 к/с
+-----
+capture.video.facts
+Видео AVI{0}до 640 x 480{0}с указателем{0}без звука
+-----
+capture.video.frame_rate
+Частота кадров
+-----
+capture.video.heading
+Запись рабочего стола
+-----
+capture.video.smooth
+Плавно  10 к/с
+-----
+capture.video.start
+Начать запись
+-----
+clock.built
+Сборка {0}
+-----
+clock.date_unavailable
+Дата недоступна
+-----
+clock.reset
+Сброс
+-----
+clock.start
+Старт
+-----
+clock.stop
+Стоп
+-----
+clock.stopwatch
+СЕКУНДОМЕР
+-----
+clock.unavailable
+Часы недоступны
+-----
+date.day_month
+{0} {1}
+-----
+date.long
+{0}, {1}
+-----
+date.long.day_month_year
+{0} {1} {2} г.
+-----
+date.long.month.apr
+апреля
+-----
+date.long.month.aug
+августа
+-----
+date.long.month.dec
+декабря
+-----
+date.long.month.feb
+февраля
+-----
+date.long.month.jan
+января
+-----
+date.long.month.jul
+июля
+-----
+date.long.month.jun
+июня
+-----
+date.long.month.mar
+марта
+-----
+date.long.month.may
+мая
+-----
+date.long.month.nov
+ноября
+-----
+date.long.month.oct
+октября
+-----
+date.long.month.sep
+сентября
+-----
+date.long.weekday.fri
+пятница
+-----
+date.long.weekday.mon
+понедельник
+-----
+date.long.weekday.sat
+суббота
+-----
+date.long.weekday.sun
+воскресенье
+-----
+date.long.weekday.thu
+четверг
+-----
+date.long.weekday.tue
+вторник
+-----
+date.long.weekday.wed
+среда
+-----
+date.month.short.apr
+апр.
+-----
+date.month.short.aug
+авг.
+-----
+date.month.short.dec
+дек.
+-----
+date.month.short.feb
+февр.
+-----
+date.month.short.jan
+янв.
+-----
+date.month.short.jul
+июл.
+-----
+date.month.short.jun
+июн.
+-----
+date.month.short.mar
+мар.
+-----
+date.month.short.may
+мая
+-----
+date.month.short.nov
+нояб.
+-----
+date.month.short.oct
+окт.
+-----
+date.month.short.sep
+сент.
+-----
+date.time_am
+{0} AM
+-----
+date.time_pm
+{0} PM
+-----
+date.weekday.short.fri
+пт
+-----
+date.weekday.short.mon
+пн
+-----
+date.weekday.short.sat
+сб
+-----
+date.weekday.short.sun
+вс
+-----
+date.weekday.short.thu
+чт
+-----
+date.weekday.short.tue
+вт
+-----
+date.weekday.short.wed
+ср
+-----
+date.weekday_day_month
+{0} {1} {2}
+-----
+desktop_menu.copy
+Копировать
+-----
+desktop_menu.cut
+Вырезать
+-----
+desktop_menu.delete
+Удалить
+-----
+desktop_menu.new_file
+Новый файл
+-----
+desktop_menu.new_folder
+Новая папка
+-----
+desktop_menu.paste
+Вставить
+-----
+desktop_menu.rename
+Переименовать
+-----
+desktop_menu.tags
+Теги…
+-----
+editor.new
+Новый
+-----
+editor.open
+Открыть
+-----
+editor.save
+Сохранить
+-----
+editor.status.cannot_open
+Не удаётся открыть
+-----
+editor.status.cannot_read
+Не удаётся прочитать
+-----
+editor.status.cannot_save
+Не удаётся сохранить
+-----
+editor.status.enter_path
+Сначала введите путь
+-----
+editor.status.is_directory
+Путь указывает на папку:
+-----
+editor.status.limit
+Документ не может быть больше 64 КБ
+-----
+editor.status.new_document
+Новый документ
+-----
+editor.status.opened
+Открыт
+-----
+editor.status.saved
+Сохранено
+-----
+editor.status.too_large
+Файл больше 64 КБ
+-----
+editor.status.unsaved
+Есть несохранённые изменения
+-----
+files.cannot_open
+Не удаётся открыть {0}
+-----
+files.column.empty
+Пусто
+-----
+files.copy_name
+{0} копия
+-----
+files.copy_name_numbered
+{0} копия ({1})
+-----
+files.empty_directory
+Эта папка пуста.
+-----
+files.kind.bmp
+Рисунок BMP
+-----
+files.kind.c_header
+Заголовок C
+-----
+files.kind.c_source
+Код на C
+-----
+files.kind.document
+Документ
+-----
+files.kind.extension_file
+Файл {0}
+-----
+files.kind.folder
+Папка
+-----
+files.kind.gif
+Рисунок GIF
+-----
+files.kind.jpeg
+Рисунок JPEG
+-----
+files.kind.json
+Документ JSON
+-----
+files.kind.log
+Файл журнала
+-----
+files.kind.plain_text
+Простой текст
+-----
+files.kind.png
+Рисунок PNG
+-----
+files.kind.python
+Скрипт Python
+-----
+files.kind.tar
+Архив tar
+-----
+files.kind.v_source
+Код на V
+-----
+files.list.ascending
+по возрастанию
+-----
+files.list.descending
+по убыванию
+-----
+files.list.kind
+Тип
+-----
+files.list.modified
+Дата изменения
+-----
+files.list.name
+Имя
+-----
+files.list.size
+Размер
+-----
+files.list.sort_by_kind
+Сортировать по типу
+-----
+files.list.sort_by_modified
+Сортировать по дате изменения
+-----
+files.list.sort_by_name
+Сортировать по имени
+-----
+files.list.sort_by_size
+Сортировать по размеру
+-----
+files.location.computer
+Компьютер
+-----
+files.location.desktop
+Рабочий стол
+-----
+files.location.documents
+Документы
+-----
+files.location.downloads
+Загрузки
+-----
+files.location.home
+Домашняя папка
+-----
+files.location.music
+Музыка
+-----
+files.location.pictures
+Изображения
+-----
+files.new_file
+Новый файл
+-----
+files.new_folder
+Новая папка
+-----
+files.quicklook.cannot_preview
+Не удалось просмотреть этот файл.
+-----
+files.quicklook.truncated
+Показано начало файла
+-----
+files.settings.done
+Готово
+-----
+files.settings.favorite_tags
+Избранные теги (нажмите для переключения):
+-----
+files.settings.file_visibility
+Видимость файлов
+-----
+files.settings.general
+Основные
+-----
+files.settings.new_tag
+Новый тег
+-----
+files.settings.rename
+Изменить
+-----
+files.settings.show_hidden
+Показывать скрытые файлы и папки
+-----
+files.settings.show_hidden_note
+Включая имена, начинающиеся с точки, например .local.
+-----
+files.settings.show_tag_in_sidebar
+Показывать «{0}» в боковой панели
+-----
+files.settings.sidebar_tags
+Показывать эти теги в боковой панели:
+-----
+files.settings.tags
+Теги
+-----
+files.settings.tint_folders
+Окрашивать папки в цвет тегов
+-----
+files.sidebar.favorites
+Избранное
+-----
+files.sidebar.locations
+Места
+-----
+files.size.bytes
+{0} Б
+-----
+files.size.decimal
+{0},{1} {2}
+-----
+files.size.whole
+{0} {1}
+-----
+files.tag.blue
+Синий
+-----
+files.tag.gray
+Серый
+-----
+files.tag.green
+Зелёный
+-----
+files.tag.home
+Дом
+-----
+files.tag.important
+Важное
+-----
+files.tag.orange
+Оранжевый
+-----
+files.tag.purple
+Фиолетовый
+-----
+files.tag.red
+Красный
+-----
+files.tag.work
+Работа
+-----
+files.tag.yellow
+Жёлтый
+-----
+files.tag_results.empty
+Нет файлов с этим тегом.
+-----
+files.toolbar.columns
+Просмотр в виде колонок
+-----
+files.toolbar.commander
+Просмотр в две панели
+-----
+files.toolbar.list
+Просмотр в виде списка
+-----
+files.toolbar.settings
+Настройки Файлов (Cmd+,)
+-----
+files.toolbar.up
+Вверх
+-----
+files.unit.gb
+ГБ
+-----
+files.unit.kb
+КБ
+-----
+files.unit.mb
+МБ
+-----
+files.unit.tb
+ТБ
+-----
+jump.close_all
+Закрыть все окна
+-----
+jump.close_window
+Закрыть окно
+-----
+jump.computer
+Компьютер
+-----
+jump.documents
+Документы
+-----
+jump.downloads
+Загрузки
+-----
+jump.home
+Домашняя папка
+-----
+jump.new_document
+Новый документ
+-----
+jump.new_window
+Новое окно
+-----
+jump.pin
+Закрепить на панели задач
+-----
+jump.recent
+Недавние
+-----
+jump.take_screenshot
+Сделать снимок экрана
+-----
+jump.tasks
+Задачи
+-----
+jump.unpin
+Открепить от панели задач
+-----
+quick_launch.empty
+Приложения не найдены
+-----
+quick_launch.search
+Поиск приложений
+-----
+registration.button.create
+Создать пользователя
+-----
+registration.error.mismatch
+Пароли не совпадают.
+-----
+registration.error.no_name
+Введите имя.
+-----
+registration.error.no_password
+Введите пароль.
+-----
+registration.error.save_failed
+Не удалось сохранить пользователя. Попробуйте ещё раз.
+-----
+registration.field.confirm
+Подтверждение пароля
+-----
+registration.field.name
+Имя
+-----
+registration.field.password
+Пароль
+-----
+registration.heading
+Создайте пользователя
+-----
+registration.intro
+Завершите настройку, чтобы начать работу с Vinix.
+-----
+registration.placeholder.confirm
+Повторите пароль
+-----
+registration.placeholder.name
+Введите имя
+-----
+registration.placeholder.password
+Введите пароль
+-----
+settings.appearance.buttons
+Кнопки окна
+-----
+settings.appearance.buttons_note
+С какой стороны заголовка стоят кнопки закрытия и масштаба.
+-----
+settings.appearance.combined
+Сгруппированная
+-----
+settings.appearance.combined_note
+Как в Windows 7: одна кнопка на приложение.
+-----
+settings.appearance.left
+Слева (macOS)
+-----
+settings.appearance.right
+Справа
+-----
+settings.appearance.standard
+Обычная
+-----
+settings.appearance.standard_note
+Как в Windows XP: одна кнопка на окно.
+-----
+settings.appearance.taskbar
+Панель задач
+-----
+settings.appearance.taskbar_note
+Одна кнопка на каждое окно или на каждое приложение.
+-----
+settings.battery.built_in
+Встроенный аккумулятор
+-----
+settings.battery.check_smc
+Проверьте диагностику загрузки apple-smc.
+-----
+settings.battery.current_charge
+Текущий заряд
+-----
+settings.battery.day_ago
+24 часа назад
+-----
+settings.battery.enlarge
+Увеличьте окно, чтобы увидеть настройки.
+-----
+settings.battery.estimated_remaining
+Оставшееся время
+-----
+settings.battery.footer
+Только чтение · /dev/battery · обновление каждые 5 с.
+-----
+settings.battery.history
+Уровень заряда — последние 24 часа
+-----
+settings.battery.now
+Сейчас
+-----
+settings.battery.refresh
+Обновить
+-----
+settings.battery.unavailable
+Недоступно
+-----
+settings.category.appearance
+Оформление
+-----
+settings.category.battery
+Аккумулятор
+-----
+settings.category.date_time
+Дата и время
+-----
+settings.category.display
+Дисплей
+-----
+settings.category.keyboard
+Клавиатура
+-----
+settings.category.language
+Язык
+-----
+settings.category.theme
+Тема
+-----
+settings.category.wallpaper
+Обои
+-----
+settings.category.wifi
+Wi-Fi
+-----
+settings.choice.not_selected
+не выбрано
+-----
+settings.choice.selected
+выбрано
+-----
+settings.date_time.12_hour
+12 часов
+-----
+settings.date_time.24_hour
+24 часа
+-----
+settings.date_time.date_line
+Строка даты
+-----
+settings.date_time.date_line_note
+Что показывать под временем на панели задач.
+-----
+settings.date_time.format
+Формат времени
+-----
+settings.date_time.format_note
+24-часовой формат или 12-часовой с AM/PM.
+-----
+settings.date_time.hide
+Скрывать
+-----
+settings.date_time.hide_date
+Скрывать дату
+-----
+settings.date_time.hide_weekday
+Скрывать день недели
+-----
+settings.date_time.seconds
+Секунды
+-----
+settings.date_time.seconds_note
+Показывать секунды в часах на панели задач.
+-----
+settings.date_time.show
+Показывать
+-----
+settings.date_time.show_date
+Показывать дату
+-----
+settings.date_time.show_weekday
+Показывать день недели
+-----
+settings.display.actual_nits
+Фактически: {0} нит (по данным драйвера)
+-----
+settings.display.actual_unknown
+Фактически: неизвестно
+-----
+settings.display.actual_waiting
+Фактически: ожидание данных драйвера
+-----
+settings.display.bar_hint
+Нажмите на шкалу, чтобы задать яркость с шагом 5%.
+-----
+settings.display.brightness
+Яркость
+-----
+settings.display.built_in
+Встроенный дисплей
+-----
+settings.display.dcp_required
+Ещё требуется интеграция с бэкендом DCP.
+-----
+settings.display.enlarge
+Увеличьте окно, чтобы увидеть настройки.
+-----
+settings.display.error.invalid
+Недопустимый ответ устройства яркости.
+-----
+settings.display.error.io
+Ошибка ввода-вывода яркости. Нажмите «Обновить».
+-----
+settings.display.error.offline
+Устройство яркости дисплея отключено.
+-----
+settings.display.error.permission
+Доступ запрещён. Для управления яркостью нужны права на запись.
+-----
+settings.display.error.unavailable
+Драйвер яркости недоступен.
+-----
+settings.display.pending
+Запрос яркости ожидает обработки драйвером дисплея.
+-----
+settings.display.range
+{0}–{1} нит; при 0% дисплей не выключается.
+-----
+settings.display.range_unavailable
+Диапазон яркости панели недоступен.
+-----
+settings.display.read_from
+Яркость считана из /dev/apple-panel-bl.
+-----
+settings.display.read_only
+Доступ только для чтения; управление яркостью отключено.
+-----
+settings.display.refresh
+Обновить
+-----
+settings.display.requested_nits
+Запрошено: {0} нит
+-----
+settings.display.requested_unchanged
+Запрошено: без изменений с загрузки
+-----
+settings.display.requested_unknown
+Запрошено: неизвестно
+-----
+settings.display.scale
+Масштаб
+-----
+settings.display.unavailable
+Недоступно
+-----
+settings.display.unknown
+Неизвестно
+-----
+settings.keyboard.accents
+Клавиши акцентов {0} ждут буквы, к которой относятся.
+-----
+settings.keyboard.layout.french
+Французская
+-----
+settings.keyboard.layout.german
+Немецкая
+-----
+settings.keyboard.layout.portuguese
+Португальская
+-----
+settings.keyboard.layout.russian
+Русская
+-----
+settings.keyboard.layout.spanish
+Испанская
+-----
+settings.keyboard.layout.us
+Английская (США)
+-----
+settings.keyboard.menu_hint
+Ctrl-пробел: другая раскладка
+-----
+settings.keyboard.menu_settings
+Настройки клавиатуры
+-----
+settings.keyboard.off
+выключено
+-----
+settings.keyboard.on
+включено
+-----
+settings.keyboard.option_types
+С Option (Alt): {0}
+-----
+settings.keyboard.sources
+Источники ввода
+-----
+settings.keyboard.sources_note
+Ctrl-пробел переключает раскладки, включённые здесь.
+-----
+settings.keyboard.types
+Печатает: {0}
+-----
+settings.keyboard.typing
+Текущая раскладка
+-----
+settings.keyboard.typing_note
+Сочетания вроде Ctrl-C и Cmd-W работают одинаково в любой раскладке.
+-----
+settings.language.apps_note
+Другие приложения выбирают язык сами.
+-----
+settings.language.heading
+Язык системы
+-----
+settings.language.note
+Язык меню, окон и приложений Vinix.
+-----
+settings.theme.default
+Стандартная
+-----
+settings.theme.default_note_1
+Скруглённые окна с тенями и однотонным цветом
+-----
+settings.theme.default_note_2
+и панель задач вдоль нижнего края.
+-----
+settings.theme.heading
+Тема
+-----
+settings.theme.macos
+macOS
+-----
+settings.theme.macos_note_1
+Светло-серые окна с заголовком по центру, три
+-----
+settings.theme.macos_note_2
+цветных кружка у переднего края и док.
+-----
+settings.theme.note
+Как выглядят окна и панель задач.
+-----
+settings.wallpaper.colour
+Цвет
+-----
+settings.wallpaper.no_photos_1
+В этом образе нет фотографий. Сборка скачивает
+-----
+settings.wallpaper.no_photos_2
+их, но у неё не было ни сети, ни кэша.
+-----
+settings.wallpaper.photo
+Фото
+-----
+settings.wifi.available
+Доступные сети
+-----
+settings.wifi.channel
+кан. {0}
+-----
+settings.wifi.enlarge
+Увеличьте окно, чтобы увидеть настройки.
+-----
+settings.wifi.error.disabled
+Включите Wi-Fi перед поиском сетей.
+-----
+settings.wifi.error.invalid
+Недопустимый ответ драйвера Wi-Fi.
+-----
+settings.wifi.error.io
+Ошибка ввода-вывода Wi-Fi. Нажмите «Обновить».
+-----
+settings.wifi.error.not_ready
+Перед включением Wi-Fi загрузите подходящую прошивку BCM4378.
+-----
+settings.wifi.error.permission
+Доступ запрещён. Для управления Wi-Fi нужны права на запись.
+-----
+settings.wifi.error.unavailable
+Устройство Wi-Fi недоступно. Загрузите систему с vinix.apple_wifi=1.
+-----
+settings.wifi.hidden_network
+<Скрытая сеть>
+-----
+settings.wifi.list.driver_error
+Wi-Fi остановлен из-за ошибки драйвера; перезагрузите систему.
+-----
+settings.wifi.list.no_device
+Поиск сетей недоступен, пока не появится устройство Wi-Fi.
+-----
+settings.wifi.list.no_firmware
+Загрузите подходящую прошивку Wi-Fi, чтобы искать сети.
+-----
+settings.wifi.list.none_found
+Беспроводные сети не найдены. Нажмите «Искать».
+-----
+settings.wifi.list.searching
+Поиск беспроводных сетей...
+-----
+settings.wifi.list.turn_on
+Включите Wi-Fi, чтобы искать сети.
+-----
+settings.wifi.next_button
+Далее
+-----
+settings.wifi.open
+Открытая
+-----
+settings.wifi.page
+{0}–{1} из {2}
+-----
+settings.wifi.previous_button
+Назад
+-----
+settings.wifi.radio
+Wi-Fi
+-----
+settings.wifi.read_only
+Доступ только для чтения; управление Wi-Fi отключено.
+-----
+settings.wifi.refresh_button
+Обновить
+-----
+settings.wifi.scan_button
+Искать
+-----
+settings.wifi.scan_failed
+Последний поиск сетей завершился ошибкой ({0}).
+-----
+settings.wifi.scanning_button
+Поиск...
+-----
+settings.wifi.secured
+Защищённая
+-----
+settings.wifi.signal
+{0} дБм
+-----
+settings.wifi.state.authenticated
+Соединение Wi-Fi аутентифицировано.
+-----
+settings.wifi.state.connecting
+Подключение к сети Wi-Fi...
+-----
+settings.wifi.state.detected
+Обнаружен BCM4378; загрузите его прошивку через wifi-ctl.
+-----
+settings.wifi.state.driver_error
+Wi-Fi остановлен из-за ошибки драйвера ({0}).
+-----
+settings.wifi.state.hardware_off
+Адаптер Wi-Fi выключен.
+-----
+settings.wifi.state.off
+Wi-Fi выключен.
+-----
+settings.wifi.state.on
+Wi-Fi включён.
+-----
+settings.wifi.state.starting
+Прошивка Wi-Fi запускается.
+-----
+settings.wifi.subtitle
+Беспроводной адаптер Broadcom BCM4378
+-----
+settings.wifi.turn_off
+Выключить
+-----
+settings.wifi.turn_on
+Включить
+-----
+start.all_programs
+Все программы  >
+-----
+start.back
+<  Назад
+-----
+start.context.forget
+Удалить из этого списка
+-----
+start.context.open
+Открыть
+-----
+start.context.pin_start
+Закрепить в меню «Пуск»
+-----
+start.context.pin_taskbar
+Закрепить на панели задач
+-----
+start.context.unpin_start
+Открепить от меню «Пуск»
+-----
+start.context.unpin_taskbar
+Открепить от панели задач
+-----
+start.documents
+Документы
+-----
+start.help
+Справка
+-----
+start.no_results
+Программы не найдены
+-----
+start.recent_empty
+Пока ничего не открывалось
+-----
+start.recent_items
+Недавние документы
+-----
+start.search
+Найти программы и файлы
+-----
+start.shut_down
+Завершение работы
+-----
+surface.blender.client_failed
+Не удалось запустить нативный клиент Blender.
+-----
+surface.blender.data_missing
+Данные Blender не установлены. Выполните pkg install blender в Терминале.
+-----
+surface.blender.exited
+Blender завершил работу.
+-----
+surface.blender.not_staged
+Нативный Blender не подготовлен. Запустите build-blender-native-aarch64.sh.
+-----
+surface.blender.starting
+Запуск нативного Blender…
+-----
+terminal.cannot_start
+не удаётся запустить {0}
+-----
+tray.battery.charging
+Заряжается
+-----
+tray.battery.heading
+Аккумулятор
+-----
+tray.battery.settings
+Настройки электропитания
+-----
+tray.battery.tip_charging
+Аккумулятор: {0}, заряжается
+-----
+tray.battery.tip_remaining
+Аккумулятор: осталось {0}
+-----
+tray.capture.note
+Снимки и записи экрана
+-----
+tray.capture.open
+Открыть «Захват экрана»
+-----
+tray.capture.recording
+Идёт запись экрана
+-----
+tray.capture.screenshot
+Сделать снимок экрана
+-----
+tray.capture.tip_recording
+Захват экрана: запись
+-----
+tray.display.brighter
+Ярче
+-----
+tray.display.brightness
+Яркость {0}%
+-----
+tray.display.dimmer
+Темнее
+-----
+tray.display.heading
+Дисплей
+-----
+tray.display.no_backlight
+Подсветка дисплея не регулируется.
+-----
+tray.display.settings
+Настройки дисплея
+-----
+tray.display.tip_brightness
+Яркость: {0}%
+-----
+tray.ethernet.acquiring
+Ethernet: получение адреса
+-----
+tray.ethernet.checking
+Ethernet: проверка
+-----
+tray.ethernet.connected
+Ethernet: подключено
+-----
+tray.ethernet.no_adapter
+Ethernet: нет адаптера
+-----
+tray.menu.hide
+Скрыть значок
+-----
+tray.menu.show
+Показать значок
+-----
+tray.network.ethernet_address
+Ethernet: {0}
+-----
+tray.network.heading
+Сеть
+-----
+tray.network.ipv4_address
+IPv4-адрес {0}
+-----
+tray.network.no_ipv4
+Нет IPv4-адреса
+-----
+tray.network.not_connected
+Нет подключения
+-----
+tray.network.settings
+Настройки сети
+-----
+tray.overflow.hint
+Правый щелчок — перенос
+-----
+tray.show_desktop
+Показать рабочий стол
+-----
+tray.show_hidden_icons
+Показать скрытые значки
+-----
+tray.wifi.networks_nearby
+Wi-Fi: включён, рядом {0} сеть|Wi-Fi: включён, рядом {0} сети|Wi-Fi: включён, рядом {0} сетей
+-----
+tray.wifi.no_adapter
+Wi-Fi: нет адаптера
+-----
+tray.wifi.not_connected
+Wi-Fi: нет подключения
+-----
+tray.wifi.off
+Wi-Fi: выключен
+-----
+vspace.button.rescan
+Обновить
+-----
+vspace.button.stop
+Стоп
+-----
+vspace.button.up
+Вверх
+-----
+vspace.duration.milliseconds
+{0} мс
+-----
+vspace.duration.minutes
+{0} мин {1} с
+-----
+vspace.duration.seconds
+{0},{1} с
+-----
+vspace.error.cannot_open
+Не удалось открыть {0}
+-----
+vspace.metric.files
+ФАЙЛЫ
+-----
+vspace.metric.folders
+ПАПКИ
+-----
+vspace.metric.size
+ОБЩИЙ РАЗМЕР
+-----
+vspace.metric.skipped
+ПРОПУЩЕНО
+-----
+vspace.panel.empty
+Результаты появятся здесь по мере обхода диска.
+-----
+vspace.panel.files
+Самые большие файлы
+-----
+vspace.panel.folders
+Самые большие папки
+-----
+vspace.panel.nothing_yet
+пока пусто
+-----
+vspace.panel.ranked
+{0} позиция|{0} позиции|{0} позиций
+-----
+vspace.phase.complete
+ГОТОВО
+-----
+vspace.phase.scanning
+АНАЛИЗ
+-----
+vspace.phase.stopped
+ПРЕРВАНО
+-----
+vspace.phase.unreadable
+НЕДОСТУПНО
+-----
+vspace.scope.home
+Домашняя
+-----
+vspace.scope.system
+Система
+-----
+vspace.scope.whole_disk
+Весь диск
+-----
+vspace.size.bytes
+{0} Б
+-----
+vspace.size.decimal
+{0},{1} {2}
+-----
+vspace.size.whole
+{0} {1}
+-----
+vspace.status.scanned
+Папка {0} просканирована за {1}.
+-----
+vspace.status.scanned_skipped
+Папка {1} просканирована за {2}. Пропущен {0} защищённый или недоступный объект.|Папка {1} просканирована за {2}. Пропущено {0} защищённых или недоступных объекта.|Папка {1} просканирована за {2}. Пропущено {0} защищённых или недоступных объектов.
+-----
+vspace.status.stopped
+Остановлено. В списках ниже — то, что успели подсчитать.
+-----
+vspace.status.walking
+Обход: {0}
+-----
+vspace.subtitle
+Анализ диска
+-----
+vspace.unit.gb
+ГБ
+-----
+vspace.unit.kb
+КБ
+-----
+vspace.unit.mb
+МБ
+-----
+vspace.unit.pb
+ПБ
+-----
+vspace.unit.tb
+ТБ
+-----
+window.external_app
+Внешнее приложение
+-----
+window.notes
+Заметки
+-----
+window.notes.line_1
+Композитор отвечает за каждый пиксель:
+-----
+window.notes.line_2
+обои, рамки окон, текст и курсор.
+-----
+window.notes.line_3
+Раскладка и попадания курсора берутся
+-----
+window.notes.line_4
+из дерева ui2, которое строится каждый кадр.
+-----
+window.palette
+Палитра
+-----
+window.system
+Система
+-----
+window.system.backlight_absent
+Подсветка   нет (драйвер не зарегистрировал)
+-----
+window.system.backlight_present
+Подсветка   есть: {0}
+-----
+window.system.battery_absent
+Аккумулятор   нет (драйвер не зарегистрировал)
+-----
+window.system.battery_present
+Аккумулятор   есть: {0}
+-----
+window.system.display
+Дисплей   {0} x {1}
+-----
+window.system.frames
+Кадры   {0}
+-----
+window.system.no_pointer
+недоступен
+-----
+window.system.pointer
+Указатель   {0}
+-----
+window.system.shortcuts
+Super+стрелки — окна; Super+1..4 — рабочие столы.
+-----
+window.system.windows
+Окна   открыто: {0}, на экране: {1}
+-----
+window.welcome
+Добро пожаловать
+-----
+window.welcome.heading
+Добро пожаловать в Vinix
+-----
+window.welcome.hint_1
+Перетащите заголовок, чтобы переместить окно.
+-----
+window.welcome.hint_2
+На панели задач видно всё, что открыто.
+-----
+window.welcome.line_1
+Рабочий стол, написанный с нуля на V,
+-----
+window.welcome.line_2
+который рисует прямо в кадровый буфер.
+-----
+wine.chromium.exited
+Chromium завершил работу.
+-----
+wine.chromium.missing
+Chromium не установлен. Выполните pkg install chromium в Терминале.
+-----
+wine.chromium.starting
+Запуск Chromium…
+-----
+wine.doom.exited
+DOOM завершил работу.
+-----
+wine.doom.missing
+DOOM не установлен. Запустите build-doom-aarch64.sh.
+-----
+wine.doom.starting
+Запуск DOOM…
+-----
+wine.doom.wad_missing
+Нет WAD-файла DOOM. Задайте VINIX_DOOM_WAD и пересоберите образ.
+-----
+wine.firefox.exited
+Firefox завершил работу.
+-----
+wine.firefox.missing
+Firefox не установлен в этом образе рабочего стола.
+-----
+wine.firefox.starting
+Запуск Firefox…
+-----
+wine.gimp.exited
+GIMP завершил работу.
+-----
+wine.gimp.missing
+GIMP не установлен. Выполните pkg install gimp в Терминале.
+-----
+wine.gimp.starting
+Запуск GIMP…
+-----
+wine.host_failed
+Не удалось запустить встроенный хост X11.
+-----
+wine.libreoffice.exited
+LibreOffice завершил работу.
+-----
+wine.libreoffice.missing
+LibreOffice не установлен. Выполните pkg install libreoffice-writer в Терминале.
+-----
+wine.libreoffice.starting
+Запуск LibreOffice…
+-----
+wine.minecraft.exited
+Minecraft завершил работу.
+-----
+wine.minecraft.missing
+Minecraft не установлен. Выполните pkg install minecraft в Терминале.
+-----
+wine.minecraft.starting
+Запуск Minecraft…
+-----
+wine.obs.exited
+OBS Studio завершил работу.
+-----
+wine.obs.missing
+OBS Studio не установлен. Выполните pkg install obs-studio в Терминале.
+-----
+wine.obs.starting
+Запуск OBS Studio…
+-----
+wine.qemu.exited
+QEMU завершил работу.
+-----
+wine.qemu.missing
+QEMU не установлен. Соберите рабочий стол с параметром --with-qemu-system.
+-----
+wine.qemu.starting
+Запуск Vinix в QEMU…
+-----
+wine.steam.exited
+Steam завершил работу.
+-----
+wine.steam.installing
+Установка клиента Steam…
+-----
+wine.steam.missing
+Steam не установлен в этом образе рабочего стола.
+-----
+wine.windows.exited
+Приложение Windows завершило работу.
+-----
+wine.windows.missing
+Транслируемая среда Wine не установлена.
+-----
+wine.windows.starting
+Запуск приложения Windows…
+-----
+wine.word.exited
+Microsoft Word 2013 завершил работу.
+-----
+wine.word.media_missing
+Подготовьте лицензионный дистрибутив Word 2013 x64 и снова запустите Word.
+-----
+wine.word.missing
+Транслируемая среда Wine для Win64 не установлена.
+-----
+wine.word.setup_closed
+Установка Word 2013 закрыта. Когда она завершится, снова запустите Word.
+-----
+wine.word.setup_starting
+Запуск 64-разрядной установки Word 2013…
+-----
+wine.word.starting
+Запуск Microsoft Word 2013…
+-----
+wine.xvfb_missing
+Xvfb не установлен. Пересоберите слой X11.
+-----
+wm.app_failed
+Приложению не удалось отрисовать окно:
+-----
+wm.external.failed
+«{0}» или Xorg завершились с ошибкой.
+-----
+wm.external.hint
+Соберите Firefox/Xorg, затем пересоберите userland и образ рабочего стола.
+-----
+wm.external.note
+«{0}» работает в отдельном сеансе X11; рабочий стол вернётся, когда он завершится.
+-----
+wm.external.spawn_failed
+Vinix не удалось создать процесс запуска «{0}».
+-----
+wm.external.title
+Не удалось запустить «{0}»
+-----
+wm.external.unavailable
+Приложение «{0}» не установлено в этом образе.
+-----
+wm.external.wait_failed
+Vinix потерял процесс запуска «{0}».
+-----
+wm.not_installed.command
+Чтобы установить его, выполните pkg install {0} в Терминале.
+-----
+wm.not_installed.hint
+Когда установка завершится, откройте его отсюда снова.
+-----
+wm.not_installed.note
+Это приложение не входит в образ Vinix.
+-----
+wm.not_installed.title
+Приложение «{0}» не установлено
+-----
+wm.taskbar.group
+{0}  ({1})

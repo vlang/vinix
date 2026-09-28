@@ -824,37 +824,53 @@ fn capture_duration(milliseconds u64) string {
 	return result
 }
 
+// The facts lines and the recording detail are lists, not sentences: their
+// `  |  ` separators stay out of the translations, where `|` marks a plural.
+const capture_fact_separator = '  |  '
+
 fn capture_status_text(report CaptureReport) (string, string) {
 	match report.phase {
 		.idle {
-			return 'Ready to capture'.clone(), 'Files are saved in /root.'.clone()
+			return tr('capture.status.ready').clone(), tr('capture.status.ready_detail').clone()
 		}
 		.screenshot_countdown {
-			seconds := (report.elapsed_ms + 999) / 1000
-			return 'Screenshot in ${seconds}'.clone(), 'Restore this window to cancel.'.clone()
+			seconds := i64((report.elapsed_ms + 999) / 1000)
+			return tr_count('capture.status.screenshot_in', seconds), tr('capture.status.cancel_hint').clone()
 		}
 		.video_countdown {
-			seconds := (report.elapsed_ms + 999) / 1000
-			return 'Recording in ${seconds}'.clone(), 'Restore this window to cancel.'.clone()
+			seconds := i64((report.elapsed_ms + 999) / 1000)
+			return tr_count('capture.status.recording_in', seconds), tr('capture.status.cancel_hint').clone()
 		}
 		.recording {
 			duration := capture_duration(report.elapsed_ms)
-			title := 'Recording  ${duration}'
-			detail := '${report.frames} frames  |  ${report.width} x ${report.height}  |  ${report.fps} fps'
-			unsafe { duration.free() }
+			title := tr_fill('capture.status.recording', duration)
+			frames := tr_count('capture.status.frames', report.frames)
+			size := '${report.width} x ${report.height}'
+			fps := tr_count('capture.status.fps', report.fps)
+			detail := '${frames}${capture_fact_separator}${size}${capture_fact_separator}${fps}'
+			unsafe {
+				duration.free()
+				frames.free()
+				size.free()
+				fps.free()
+			}
 			return title, detail
 		}
 		.screenshot_saved {
 			path := capture_file_path(.screenshot, report.file_id)
-			title := 'Screenshot saved  ${report.width} x ${report.height}'
+			size := '${report.width} x ${report.height}'
+			title := tr_fill('capture.status.screenshot_saved', size)
 			detail := path.clone()
-			unsafe { path.free() }
+			unsafe {
+				path.free()
+				size.free()
+			}
 			return title, detail
 		}
 		.video_saved {
 			path := capture_file_path(.video, report.file_id)
 			duration := capture_duration(report.elapsed_ms)
-			title := 'Recording saved  ${duration}'
+			title := tr_fill('capture.status.recording_saved', duration)
 			detail := path.clone()
 			unsafe {
 				path.free()
@@ -863,10 +879,10 @@ fn capture_status_text(report CaptureReport) (string, string) {
 			return title, detail
 		}
 		.failed {
-			return 'Capture failed'.clone(), 'Could not write the file in /root.'.clone()
+			return tr('capture.status.failed').clone(), tr('capture.status.failed_detail').clone()
 		}
 		.cancelled {
-			return 'Capture cancelled'.clone(), 'Nothing was saved.'.clone()
+			return tr('capture.status.cancelled').clone(), tr('capture.status.cancelled_detail').clone()
 		}
 	}
 }
@@ -913,20 +929,20 @@ fn (mut app CaptureApp) build(size ui2.Rect) !ui2.Element {
 	}, ui2.TextStyle{
 		color: app_accent
 	})
-	children << ui2.label('', 'CAPTURE', ui2.rect(64, 14, f64(width - 84), 17), ui2.TextStyle{
+	children << ui2.label('', tr('capture.eyebrow'), ui2.rect(64, 14, f64(width - 84), 17), ui2.TextStyle{
 		color: body_muted
 		size:  11
 		bold:  true
 	})
-	children << ui2.label('', 'Screenshots and screen recordings', ui2.rect(64, 29, f64(width - 84), 24), ui2.TextStyle{
+	children << ui2.label('', tr('capture.heading'), ui2.rect(64, 29, f64(width - 84), 24), ui2.TextStyle{
 		color: body_heading
 		size:  17
 		bold:  true
 	})
 
 	tab_width := (width - 40) / 2
-	children << capture_choice(capture_action_screenshot_tab, 'Screenshot', 20, 64, tab_width, app.page == .screenshot)
-	children << capture_choice(capture_action_video_tab, 'Video', 20 + tab_width, 64, tab_width, app.page == .video)
+	children << capture_choice(capture_action_screenshot_tab, tr('capture.page.screenshot'), 20, 64, tab_width, app.page == .screenshot)
+	children << capture_choice(capture_action_video_tab, tr('capture.page.video'), 20 + tab_width, 64, tab_width, app.page == .video)
 	children << ui2.view('', ui2.rect(20, 102, f64(width - 40), 1), ui2.BoxStyle{
 		bg: body_rule
 	}, [])
@@ -939,28 +955,32 @@ fn (mut app CaptureApp) build(size ui2.Rect) !ui2.Element {
 	active := report.phase == .recording || report.phase == .screenshot_countdown
 		|| report.phase == .video_countdown
 	if app.page == .screenshot {
-		children << ui2.label('', 'Full desktop screenshot', ui2.rect(20, 119, f64(width - 40), 22), ui2.TextStyle{
+		children << ui2.label('', tr('capture.screenshot.heading'), ui2.rect(20, 119, f64(width - 40), 22), ui2.TextStyle{
 			color: body_heading
 			size:  14
 			bold:  true
 		})
-		children << ui2.label('', 'Delay', ui2.rect(20, 153, 100, 18), ui2.TextStyle{
+		children << ui2.label('', tr('capture.screenshot.delay'), ui2.rect(20, 153, 100, 18), ui2.TextStyle{
 			color: body_muted
 			size:  11
 			bold:  true
 		})
 		choice_width := (width - 56) / 3
-		children << capture_choice(capture_action_delay_0, 'No delay', 20, 175, choice_width, app.delay == 0)
-		children << capture_choice(capture_action_delay_3, '3 seconds', 28 + choice_width, 175, choice_width, app.delay == 3)
-		children << capture_choice(capture_action_delay_5, '5 seconds', 36 + 2 * choice_width, 175, choice_width, app.delay == 5)
-		children << ui2.label('', 'PNG  |  full desktop  |  includes the pointer', ui2.rect(20, 218, f64(width - 40), 18), ui2.TextStyle{
+		children << capture_choice(capture_action_delay_0, tr('capture.delay.none'), 20, 175, choice_width, app.delay == 0)
+		children << capture_choice(capture_action_delay_3, tr('capture.delay.three_seconds'), 28 + choice_width, 175, choice_width, app.delay == 3)
+		children << capture_choice(capture_action_delay_5, tr('capture.delay.five_seconds'), 36 + 2 * choice_width, 175, choice_width, app.delay == 5)
+		children << capture_owned_label(tr_fill('capture.screenshot.facts', capture_fact_separator), ui2.rect(20, 218, f64(width - 40), 18), ui2.TextStyle{
 			color: body_muted
 			size:  11
 		})
 		button_text := if active {
-			if report.phase == .recording { 'Stop recording' } else { 'Cancel' }
+			if report.phase == .recording {
+				tr('capture.stop_recording')
+			} else {
+				tr('capture.cancel')
+			}
 		} else {
-			'Take screenshot'
+			tr('capture.screenshot.take')
 		}
 		button_action := if active { capture_action_stop } else { capture_action_take_screenshot }
 		children << ui2.button(button_action, button_text, ui2.rect(20, 250, f64(width - 40), 38), ui2.BoxStyle{
@@ -973,27 +993,31 @@ fn (mut app CaptureApp) build(size ui2.Rect) !ui2.Element {
 			align: .center
 		})
 	} else {
-		children << ui2.label('', 'Record the desktop', ui2.rect(20, 119, f64(width - 40), 22), ui2.TextStyle{
+		children << ui2.label('', tr('capture.video.heading'), ui2.rect(20, 119, f64(width - 40), 22), ui2.TextStyle{
 			color: body_heading
 			size:  14
 			bold:  true
 		})
-		children << ui2.label('', 'Frame rate', ui2.rect(20, 153, 100, 18), ui2.TextStyle{
+		children << ui2.label('', tr('capture.video.frame_rate'), ui2.rect(20, 153, 100, 18), ui2.TextStyle{
 			color: body_muted
 			size:  11
 			bold:  true
 		})
 		choice_width := (width - 48) / 2
-		children << capture_choice(capture_action_fps_5, 'Compact  5 fps', 20, 175, choice_width, app.fps == 5)
-		children << capture_choice(capture_action_fps_10, 'Smooth  10 fps', 28 + choice_width, 175, choice_width, app.fps == 10)
-		children << ui2.label('', 'AVI video  |  up to 640 x 480  |  pointer included  |  no audio', ui2.rect(20, 218, f64(width - 40), 18), ui2.TextStyle{
+		children << capture_choice(capture_action_fps_5, tr('capture.video.compact'), 20, 175, choice_width, app.fps == 5)
+		children << capture_choice(capture_action_fps_10, tr('capture.video.smooth'), 28 + choice_width, 175, choice_width, app.fps == 10)
+		children << capture_owned_label(tr_fill('capture.video.facts', capture_fact_separator), ui2.rect(20, 218, f64(width - 40), 18), ui2.TextStyle{
 			color: body_muted
 			size:  11
 		})
 		button_text := if active {
-			if report.phase == .recording { 'Stop recording' } else { 'Cancel' }
+			if report.phase == .recording {
+				tr('capture.stop_recording')
+			} else {
+				tr('capture.cancel')
+			}
 		} else {
-			'Start recording'
+			tr('capture.video.start')
 		}
 		button_action := if active { capture_action_stop } else { capture_action_start_video }
 		children << ui2.button(button_action, button_text, ui2.rect(20, 250, f64(width - 40), 38), ui2.BoxStyle{

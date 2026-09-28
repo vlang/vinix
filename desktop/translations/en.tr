@@ -1,0 +1,1775 @@
+activity.column.cpu
+% CPU
+-----
+activity.column.memory
+MB
+-----
+activity.column.pid
+PID
+-----
+activity.cpu.decimal
+{0}.{1}
+-----
+activity.error.missing
+{0} is not there.
+-----
+activity.error.missing_note
+This kernel does not report processes.
+-----
+activity.error.read
+Could not read {0}.
+-----
+activity.error.version
+{0} speaks version {1}, not {2}.
+-----
+activity.memory.mb
+{0} MB
+-----
+activity.memory.mb_decimal
+{0}.{1} MB
+-----
+activity.sort_title.cpu
+CPU
+-----
+activity.sort_title.memory
+RAM
+-----
+activity.sort_title.name
+Name
+-----
+activity.summary
+{0} process   {1} of {2} used|{0} processes   {1} of {2} used
+-----
+activity.unnamed
+(unnamed)
+-----
+app.activity_monitor
+Activity Monitor
+-----
+app.calculator
+Calculator
+-----
+app.calendar
+Calendar
+-----
+app.capture
+Capture
+-----
+app.clock
+Clock
+-----
+app.files
+Files
+-----
+app.files_settings
+Files Settings
+-----
+app.qemu
+Vinix in QEMU
+-----
+app.settings
+Settings
+-----
+app.terminal
+Terminal
+-----
+app.text_editor
+Text Editor
+-----
+app.wine_calculator
+Wine Calculator
+-----
+app.wine_notepad
+Wine Notepad
+-----
+app_selection.chromium.detail
+The open-source Chrome web browser
+-----
+app_selection.continue
+Continue
+-----
+app_selection.firefox.detail
+Mozilla web browser
+-----
+app_selection.heading
+Choose your apps
+-----
+app_selection.install.done
+The selected apps are installed. Open them from the desktop or the Start menu.
+-----
+app_selection.install.failed
+Not installed:{0}. Run pkg install{0} to try again.
+-----
+app_selection.install.started
+Installing the apps chosen during setup: {0}
+-----
+app_selection.install_1
+Install 1 app
+-----
+app_selection.install_2
+Install 2 apps
+-----
+app_selection.install_3
+Install 3 apps
+-----
+app_selection.install_4
+Install 4 apps
+-----
+app_selection.installed
+Installed
+-----
+app_selection.intro
+Pick the apps to download and install now.
+-----
+app_selection.minecraft.detail
+Java Edition, with a Microsoft account
+-----
+app_selection.note
+You can install more later with pkg install in Terminal.
+-----
+app_selection.voffice.detail
+Writer documents and Calc spreadsheets
+-----
+battery.remaining.about_hours
+About {0} hour|About {0} hours
+-----
+battery.remaining.calculating
+Calculating…
+-----
+battery.remaining.charging
+Charging
+-----
+battery.remaining.full
+Fully charged
+-----
+battery.remaining.less_than_hour
+Less than 1 hour
+-----
+battery.remaining.unavailable
+Unavailable
+-----
+battery.status.failed
+Battery read failed or the sample is stale.
+-----
+battery.status.invalid
+Invalid battery response.
+-----
+battery.status.permission
+Permission denied reading the battery.
+-----
+battery.status.reported
+Percentage reported by the battery driver.
+-----
+battery.status.unavailable
+Battery driver not available.
+-----
+calendar.heading
+{0} {1}
+-----
+calendar.heading.month.apr
+Apr
+-----
+calendar.heading.month.aug
+Aug
+-----
+calendar.heading.month.dec
+Dec
+-----
+calendar.heading.month.feb
+Feb
+-----
+calendar.heading.month.jan
+Jan
+-----
+calendar.heading.month.jul
+Jul
+-----
+calendar.heading.month.jun
+Jun
+-----
+calendar.heading.month.mar
+Mar
+-----
+calendar.heading.month.may
+May
+-----
+calendar.heading.month.nov
+Nov
+-----
+calendar.heading.month.oct
+Oct
+-----
+calendar.heading.month.sep
+Sep
+-----
+calendar.today
+Today
+-----
+capture.cancel
+Cancel
+-----
+capture.delay.five_seconds
+5 seconds
+-----
+capture.delay.none
+No delay
+-----
+capture.delay.three_seconds
+3 seconds
+-----
+capture.eyebrow
+CAPTURE
+-----
+capture.heading
+Screenshots and screen recordings
+-----
+capture.page.screenshot
+Screenshot
+-----
+capture.page.video
+Video
+-----
+capture.screenshot.delay
+Delay
+-----
+capture.screenshot.facts
+PNG{0}full desktop{0}includes the pointer
+-----
+capture.screenshot.heading
+Full desktop screenshot
+-----
+capture.screenshot.take
+Take screenshot
+-----
+capture.status.cancel_hint
+Restore this window to cancel.
+-----
+capture.status.cancelled
+Capture cancelled
+-----
+capture.status.cancelled_detail
+Nothing was saved.
+-----
+capture.status.failed
+Capture failed
+-----
+capture.status.failed_detail
+Could not write the file in /root.
+-----
+capture.status.fps
+{0} fps
+-----
+capture.status.frames
+{0} frame|{0} frames
+-----
+capture.status.ready
+Ready to capture
+-----
+capture.status.ready_detail
+Files are saved in /root.
+-----
+capture.status.recording
+Recording  {0}
+-----
+capture.status.recording_in
+Recording in {0}|Recording in {0}
+-----
+capture.status.recording_saved
+Recording saved  {0}
+-----
+capture.status.screenshot_in
+Screenshot in {0}|Screenshot in {0}
+-----
+capture.status.screenshot_saved
+Screenshot saved  {0}
+-----
+capture.stop_recording
+Stop recording
+-----
+capture.video.compact
+Compact  5 fps
+-----
+capture.video.facts
+AVI video{0}up to 640 x 480{0}pointer included{0}no audio
+-----
+capture.video.frame_rate
+Frame rate
+-----
+capture.video.heading
+Record the desktop
+-----
+capture.video.smooth
+Smooth  10 fps
+-----
+capture.video.start
+Start recording
+-----
+clock.built
+Built {0}
+-----
+clock.date_unavailable
+Date unavailable
+-----
+clock.reset
+Reset
+-----
+clock.start
+Start
+-----
+clock.stop
+Stop
+-----
+clock.stopwatch
+STOPWATCH
+-----
+clock.unavailable
+Clock unavailable
+-----
+date.day_month
+{0} {1}
+-----
+date.long
+{0}, {1}
+-----
+date.long.day_month_year
+{1} {0}, {2}
+-----
+date.long.month.apr
+Apr
+-----
+date.long.month.aug
+Aug
+-----
+date.long.month.dec
+Dec
+-----
+date.long.month.feb
+Feb
+-----
+date.long.month.jan
+Jan
+-----
+date.long.month.jul
+Jul
+-----
+date.long.month.jun
+Jun
+-----
+date.long.month.mar
+Mar
+-----
+date.long.month.may
+May
+-----
+date.long.month.nov
+Nov
+-----
+date.long.month.oct
+Oct
+-----
+date.long.month.sep
+Sep
+-----
+date.long.weekday.fri
+Fri
+-----
+date.long.weekday.mon
+Mon
+-----
+date.long.weekday.sat
+Sat
+-----
+date.long.weekday.sun
+Sun
+-----
+date.long.weekday.thu
+Thu
+-----
+date.long.weekday.tue
+Tue
+-----
+date.long.weekday.wed
+Wed
+-----
+date.month.short.apr
+Apr
+-----
+date.month.short.aug
+Aug
+-----
+date.month.short.dec
+Dec
+-----
+date.month.short.feb
+Feb
+-----
+date.month.short.jan
+Jan
+-----
+date.month.short.jul
+Jul
+-----
+date.month.short.jun
+Jun
+-----
+date.month.short.mar
+Mar
+-----
+date.month.short.may
+May
+-----
+date.month.short.nov
+Nov
+-----
+date.month.short.oct
+Oct
+-----
+date.month.short.sep
+Sep
+-----
+date.time_am
+{0} AM
+-----
+date.time_pm
+{0} PM
+-----
+date.weekday.short.fri
+Fri
+-----
+date.weekday.short.mon
+Mon
+-----
+date.weekday.short.sat
+Sat
+-----
+date.weekday.short.sun
+Sun
+-----
+date.weekday.short.thu
+Thu
+-----
+date.weekday.short.tue
+Tue
+-----
+date.weekday.short.wed
+Wed
+-----
+date.weekday_day_month
+{0} {1} {2}
+-----
+desktop_menu.copy
+Copy
+-----
+desktop_menu.cut
+Cut
+-----
+desktop_menu.delete
+Delete
+-----
+desktop_menu.new_file
+New File
+-----
+desktop_menu.new_folder
+New Folder
+-----
+desktop_menu.paste
+Paste
+-----
+desktop_menu.rename
+Rename
+-----
+desktop_menu.tags
+Tags…
+-----
+editor.new
+New
+-----
+editor.open
+Open
+-----
+editor.save
+Save
+-----
+editor.status.cannot_open
+Cannot open
+-----
+editor.status.cannot_read
+Cannot read
+-----
+editor.status.cannot_save
+Cannot save
+-----
+editor.status.enter_path
+Enter a path first
+-----
+editor.status.is_directory
+Path is a directory:
+-----
+editor.status.limit
+Document limit is 64 KB
+-----
+editor.status.new_document
+New document
+-----
+editor.status.opened
+Opened
+-----
+editor.status.saved
+Saved
+-----
+editor.status.too_large
+File is larger than 64 KB
+-----
+editor.status.unsaved
+Unsaved changes
+-----
+files.cannot_open
+cannot open {0}
+-----
+files.column.empty
+Empty
+-----
+files.copy_name
+{0} copy
+-----
+files.copy_name_numbered
+{0} copy ({1})
+-----
+files.empty_directory
+This directory is empty.
+-----
+files.kind.bmp
+BMP image
+-----
+files.kind.c_header
+C header
+-----
+files.kind.c_source
+C source
+-----
+files.kind.document
+Document
+-----
+files.kind.extension_file
+{0} file
+-----
+files.kind.folder
+Folder
+-----
+files.kind.gif
+GIF image
+-----
+files.kind.jpeg
+JPEG image
+-----
+files.kind.json
+JSON document
+-----
+files.kind.log
+Log File
+-----
+files.kind.plain_text
+Plain text
+-----
+files.kind.png
+PNG image
+-----
+files.kind.python
+Python script
+-----
+files.kind.tar
+tar archive
+-----
+files.kind.v_source
+V source
+-----
+files.list.ascending
+ascending
+-----
+files.list.descending
+descending
+-----
+files.list.kind
+Kind
+-----
+files.list.modified
+Date Modified
+-----
+files.list.name
+Name
+-----
+files.list.size
+Size
+-----
+files.list.sort_by_kind
+Sort by Kind
+-----
+files.list.sort_by_modified
+Sort by Date Modified
+-----
+files.list.sort_by_name
+Sort by Name
+-----
+files.list.sort_by_size
+Sort by Size
+-----
+files.location.computer
+Computer
+-----
+files.location.desktop
+Desktop
+-----
+files.location.documents
+Documents
+-----
+files.location.downloads
+Downloads
+-----
+files.location.home
+Home
+-----
+files.location.music
+Music
+-----
+files.location.pictures
+Pictures
+-----
+files.new_file
+New File
+-----
+files.new_folder
+New Folder
+-----
+files.quicklook.cannot_preview
+Unable to preview this file.
+-----
+files.quicklook.truncated
+Showing the beginning of the file
+-----
+files.settings.done
+Done
+-----
+files.settings.favorite_tags
+Favorite tags (click to toggle):
+-----
+files.settings.file_visibility
+File visibility
+-----
+files.settings.general
+General
+-----
+files.settings.new_tag
+New Tag
+-----
+files.settings.rename
+Rename
+-----
+files.settings.show_hidden
+Show hidden files and folders
+-----
+files.settings.show_hidden_note
+Includes names beginning with a dot, such as .local.
+-----
+files.settings.show_tag_in_sidebar
+Show {0} in sidebar
+-----
+files.settings.sidebar_tags
+Show these tags in the sidebar:
+-----
+files.settings.tags
+Tags
+-----
+files.settings.tint_folders
+Tint folders based on tags
+-----
+files.sidebar.favorites
+Favorites
+-----
+files.sidebar.locations
+Locations
+-----
+files.size.bytes
+{0} B
+-----
+files.size.decimal
+{0}.{1} {2}
+-----
+files.size.whole
+{0} {1}
+-----
+files.tag.blue
+Blue
+-----
+files.tag.gray
+Gray
+-----
+files.tag.green
+Green
+-----
+files.tag.home
+Home
+-----
+files.tag.important
+Important
+-----
+files.tag.orange
+Orange
+-----
+files.tag.purple
+Purple
+-----
+files.tag.red
+Red
+-----
+files.tag.work
+Work
+-----
+files.tag.yellow
+Yellow
+-----
+files.tag_results.empty
+No files have this tag.
+-----
+files.toolbar.columns
+Column view
+-----
+files.toolbar.commander
+Two pane view
+-----
+files.toolbar.list
+List view
+-----
+files.toolbar.settings
+Files Settings (Cmd+,)
+-----
+files.toolbar.up
+Up
+-----
+files.unit.gb
+GB
+-----
+files.unit.kb
+KB
+-----
+files.unit.mb
+MB
+-----
+files.unit.tb
+TB
+-----
+jump.close_all
+Close all windows
+-----
+jump.close_window
+Close window
+-----
+jump.computer
+Computer
+-----
+jump.documents
+Documents
+-----
+jump.downloads
+Downloads
+-----
+jump.home
+Home
+-----
+jump.new_document
+New document
+-----
+jump.new_window
+New window
+-----
+jump.pin
+Pin this program to taskbar
+-----
+jump.recent
+Recent
+-----
+jump.take_screenshot
+Take screenshot
+-----
+jump.tasks
+Tasks
+-----
+jump.unpin
+Unpin this program from taskbar
+-----
+quick_launch.empty
+No applications found
+-----
+quick_launch.search
+Search applications
+-----
+registration.button.create
+Create user
+-----
+registration.error.mismatch
+Passwords do not match.
+-----
+registration.error.no_name
+Enter a name.
+-----
+registration.error.no_password
+Enter a password.
+-----
+registration.error.save_failed
+Could not save the user. Try again.
+-----
+registration.field.confirm
+Confirm password
+-----
+registration.field.name
+Name
+-----
+registration.field.password
+Password
+-----
+registration.heading
+Create your user
+-----
+registration.intro
+Finish setup to use Vinix.
+-----
+registration.placeholder.confirm
+Repeat the password
+-----
+registration.placeholder.name
+Enter your name
+-----
+registration.placeholder.password
+Enter a password
+-----
+settings.appearance.buttons
+Window buttons
+-----
+settings.appearance.buttons_note
+Which end of the title bar close and zoom sit at.
+-----
+settings.appearance.combined
+Combined
+-----
+settings.appearance.combined_note
+Windows 7 style: one button per application.
+-----
+settings.appearance.left
+Left (macOS)
+-----
+settings.appearance.right
+Right
+-----
+settings.appearance.standard
+Standard
+-----
+settings.appearance.standard_note
+Windows XP style: one button per window.
+-----
+settings.appearance.taskbar
+Taskbar
+-----
+settings.appearance.taskbar_note
+One entry per window, or one per application.
+-----
+settings.battery.built_in
+Built-in battery
+-----
+settings.battery.check_smc
+Check apple-smc boot diagnostics.
+-----
+settings.battery.current_charge
+Current charge
+-----
+settings.battery.day_ago
+24 hours ago
+-----
+settings.battery.enlarge
+Enlarge Settings to show its controls.
+-----
+settings.battery.estimated_remaining
+Estimated remaining
+-----
+settings.battery.footer
+Read-only · /dev/battery · updates every 5 seconds.
+-----
+settings.battery.history
+Battery level — last 24 hours
+-----
+settings.battery.now
+Now
+-----
+settings.battery.refresh
+Refresh
+-----
+settings.battery.unavailable
+Unavailable
+-----
+settings.category.appearance
+Appearance
+-----
+settings.category.battery
+Battery
+-----
+settings.category.date_time
+Date & Time
+-----
+settings.category.display
+Display
+-----
+settings.category.keyboard
+Keyboard
+-----
+settings.category.language
+Language
+-----
+settings.category.theme
+Theme
+-----
+settings.category.wallpaper
+Wallpaper
+-----
+settings.category.wifi
+Wi-Fi
+-----
+settings.choice.not_selected
+not selected
+-----
+settings.choice.selected
+selected
+-----
+settings.date_time.12_hour
+12-hour
+-----
+settings.date_time.24_hour
+24-hour
+-----
+settings.date_time.date_line
+Date line
+-----
+settings.date_time.date_line_note
+Choose what appears underneath the taskbar time.
+-----
+settings.date_time.format
+Time format
+-----
+settings.date_time.format_note
+Choose 24-hour time or a 12-hour clock with AM/PM.
+-----
+settings.date_time.hide
+Hide
+-----
+settings.date_time.hide_date
+Hide date
+-----
+settings.date_time.hide_weekday
+Hide weekday
+-----
+settings.date_time.seconds
+Seconds
+-----
+settings.date_time.seconds_note
+Show seconds in the taskbar clock.
+-----
+settings.date_time.show
+Show
+-----
+settings.date_time.show_date
+Show date
+-----
+settings.date_time.show_weekday
+Show weekday
+-----
+settings.display.actual_nits
+Actual: {0} nits (driver report)
+-----
+settings.display.actual_unknown
+Actual: unknown
+-----
+settings.display.actual_waiting
+Actual: waiting for a driver report
+-----
+settings.display.bar_hint
+Click the bar to set brightness in 5% steps.
+-----
+settings.display.brightness
+Brightness
+-----
+settings.display.built_in
+Built-in display
+-----
+settings.display.dcp_required
+DCP backend integration is still required.
+-----
+settings.display.enlarge
+Enlarge Settings to show its controls.
+-----
+settings.display.error.invalid
+Invalid brightness response.
+-----
+settings.display.error.io
+Brightness I/O failed. Refresh to try again.
+-----
+settings.display.error.offline
+Display brightness device is offline.
+-----
+settings.display.error.permission
+Permission denied. Brightness control requires write access.
+-----
+settings.display.error.unavailable
+Brightness driver not available.
+-----
+settings.display.pending
+Brightness request pending in the display driver.
+-----
+settings.display.range
+{0} - {1} nits; 0% keeps the display on.
+-----
+settings.display.range_unavailable
+Panel brightness range is unavailable.
+-----
+settings.display.read_from
+Brightness read from /dev/apple-panel-bl.
+-----
+settings.display.read_only
+Read-only access; brightness controls are disabled.
+-----
+settings.display.refresh
+Refresh
+-----
+settings.display.requested_nits
+Requested: {0} nits
+-----
+settings.display.requested_unchanged
+Requested: unchanged since boot
+-----
+settings.display.requested_unknown
+Requested: unknown
+-----
+settings.display.scale
+Scale
+-----
+settings.display.unavailable
+Unavailable
+-----
+settings.display.unknown
+Unknown
+-----
+settings.keyboard.accents
+Accent keys {0} wait for the letter they go on.
+-----
+settings.keyboard.layout.french
+French
+-----
+settings.keyboard.layout.german
+German
+-----
+settings.keyboard.layout.portuguese
+Portuguese
+-----
+settings.keyboard.layout.russian
+Russian
+-----
+settings.keyboard.layout.spanish
+Spanish
+-----
+settings.keyboard.layout.us
+English (US)
+-----
+settings.keyboard.menu_hint
+Ctrl-Space: next input source
+-----
+settings.keyboard.menu_settings
+Keyboard settings
+-----
+settings.keyboard.off
+off
+-----
+settings.keyboard.on
+on
+-----
+settings.keyboard.option_types
+Option (Alt) types: {0}
+-----
+settings.keyboard.sources
+Input sources
+-----
+settings.keyboard.sources_note
+Ctrl-Space moves between the layouts turned on here.
+-----
+settings.keyboard.types
+Types: {0}
+-----
+settings.keyboard.typing
+Typing with
+-----
+settings.keyboard.typing_note
+Shortcuts such as Ctrl-C and Cmd-W keep their keys in every layout.
+-----
+settings.language.apps_note
+Other applications choose their language themselves.
+-----
+settings.language.heading
+System language
+-----
+settings.language.note
+The language of menus, windows and Vinix applications.
+-----
+settings.theme.default
+Default
+-----
+settings.theme.default_note_1
+Rounded windows with shadows and flat colour,
+-----
+settings.theme.default_note_2
+and a taskbar across the bottom.
+-----
+settings.theme.heading
+Theme
+-----
+settings.theme.macos
+macOS
+-----
+settings.theme.macos_note_1
+Light grey windows with the title centred, three
+-----
+settings.theme.macos_note_2
+coloured discs at the leading edge, and a dock.
+-----
+settings.theme.note
+How windows and the taskbar are drawn.
+-----
+settings.wallpaper.colour
+Colour
+-----
+settings.wallpaper.no_photos_1
+No photographs on this image. The build downloads
+-----
+settings.wallpaper.no_photos_2
+them; it had neither network nor cache.
+-----
+settings.wallpaper.photo
+Photo
+-----
+settings.wifi.available
+Available networks
+-----
+settings.wifi.channel
+ch {0}
+-----
+settings.wifi.enlarge
+Enlarge Settings to show its controls.
+-----
+settings.wifi.error.disabled
+Turn Wi-Fi on before scanning.
+-----
+settings.wifi.error.invalid
+Invalid Wi-Fi driver response.
+-----
+settings.wifi.error.io
+Wi-Fi I/O failed. Refresh to try again.
+-----
+settings.wifi.error.not_ready
+Load the matching BCM4378 firmware before turning Wi-Fi on.
+-----
+settings.wifi.error.permission
+Permission denied. Wi-Fi controls require write access.
+-----
+settings.wifi.error.unavailable
+Wi-Fi device not available. Boot with vinix.apple_wifi=1.
+-----
+settings.wifi.hidden_network
+<Hidden network>
+-----
+settings.wifi.list.driver_error
+Wi-Fi stopped after a driver error; reboot to retry.
+-----
+settings.wifi.list.no_device
+Network scanning is unavailable until the Wi-Fi device is present.
+-----
+settings.wifi.list.no_firmware
+Load the matching Wi-Fi firmware to scan for networks.
+-----
+settings.wifi.list.none_found
+No wireless networks found. Select Scan to search.
+-----
+settings.wifi.list.searching
+Searching for wireless networks...
+-----
+settings.wifi.list.turn_on
+Turn Wi-Fi on to scan for networks.
+-----
+settings.wifi.next_button
+Next
+-----
+settings.wifi.open
+Open
+-----
+settings.wifi.page
+{0}-{1} of {2}
+-----
+settings.wifi.previous_button
+Previous
+-----
+settings.wifi.radio
+Wi-Fi
+-----
+settings.wifi.read_only
+Read-only access; Wi-Fi controls are disabled.
+-----
+settings.wifi.refresh_button
+Refresh
+-----
+settings.wifi.scan_button
+Scan
+-----
+settings.wifi.scan_failed
+The last network scan failed ({0}).
+-----
+settings.wifi.scanning_button
+Scanning...
+-----
+settings.wifi.secured
+Secured
+-----
+settings.wifi.signal
+{0} dBm
+-----
+settings.wifi.state.authenticated
+Wi-Fi link authenticated.
+-----
+settings.wifi.state.connecting
+Connecting to a Wi-Fi network...
+-----
+settings.wifi.state.detected
+BCM4378 detected; load its matching firmware with wifi-ctl.
+-----
+settings.wifi.state.driver_error
+Wi-Fi stopped after a driver error ({0}).
+-----
+settings.wifi.state.hardware_off
+Wi-Fi hardware is off.
+-----
+settings.wifi.state.off
+Wi-Fi is off.
+-----
+settings.wifi.state.on
+Wi-Fi is on.
+-----
+settings.wifi.state.starting
+Wi-Fi firmware is starting.
+-----
+settings.wifi.subtitle
+Broadcom BCM4378 wireless
+-----
+settings.wifi.turn_off
+Turn off
+-----
+settings.wifi.turn_on
+Turn on
+-----
+start.all_programs
+All Programs  >
+-----
+start.back
+<  Back
+-----
+start.context.forget
+Remove from this list
+-----
+start.context.open
+Open
+-----
+start.context.pin_start
+Pin to Start menu
+-----
+start.context.pin_taskbar
+Pin to taskbar
+-----
+start.context.unpin_start
+Unpin from Start menu
+-----
+start.context.unpin_taskbar
+Unpin from taskbar
+-----
+start.documents
+Documents
+-----
+start.help
+Help
+-----
+start.no_results
+No programs found
+-----
+start.recent_empty
+Nothing opened yet
+-----
+start.recent_items
+Recent Items
+-----
+start.search
+Search programs and files
+-----
+start.shut_down
+Shut down
+-----
+surface.blender.client_failed
+Vinix could not start the native Blender client.
+-----
+surface.blender.data_missing
+Blender data is not installed. Run pkg install blender in Terminal.
+-----
+surface.blender.exited
+Blender exited.
+-----
+surface.blender.not_staged
+Native Blender is not staged. Run build-blender-native-aarch64.sh.
+-----
+surface.blender.starting
+Starting native Blender…
+-----
+terminal.cannot_start
+cannot start {0}
+-----
+tray.battery.charging
+Charging
+-----
+tray.battery.heading
+Battery
+-----
+tray.battery.settings
+Power settings
+-----
+tray.battery.tip_charging
+Battery: {0}, charging
+-----
+tray.battery.tip_remaining
+Battery: {0} remaining
+-----
+tray.capture.note
+Screenshots and screen recordings
+-----
+tray.capture.open
+Open Capture
+-----
+tray.capture.recording
+Recording the screen
+-----
+tray.capture.screenshot
+Take screenshot
+-----
+tray.capture.tip_recording
+Capture: recording
+-----
+tray.display.brighter
+Brighter
+-----
+tray.display.brightness
+Brightness {0}%
+-----
+tray.display.dimmer
+Dimmer
+-----
+tray.display.heading
+Display
+-----
+tray.display.no_backlight
+This display has no adjustable backlight.
+-----
+tray.display.settings
+Display settings
+-----
+tray.display.tip_brightness
+Brightness: {0}%
+-----
+tray.ethernet.acquiring
+Ethernet: acquiring an address
+-----
+tray.ethernet.checking
+Ethernet: checking
+-----
+tray.ethernet.connected
+Ethernet: connected
+-----
+tray.ethernet.no_adapter
+Ethernet: no adapter
+-----
+tray.menu.hide
+Hide in overflow
+-----
+tray.menu.show
+Show on taskbar
+-----
+tray.network.ethernet_address
+Ethernet: {0}
+-----
+tray.network.heading
+Network
+-----
+tray.network.ipv4_address
+IPv4 address {0}
+-----
+tray.network.no_ipv4
+No IPv4 address
+-----
+tray.network.not_connected
+Not connected
+-----
+tray.network.settings
+Network settings
+-----
+tray.overflow.hint
+Right-click to move
+-----
+tray.show_desktop
+Show desktop
+-----
+tray.show_hidden_icons
+Show hidden icons
+-----
+tray.wifi.networks_nearby
+Wi-Fi: on, {0} network nearby|Wi-Fi: on, {0} networks nearby
+-----
+tray.wifi.no_adapter
+Wi-Fi: no adapter
+-----
+tray.wifi.not_connected
+Wi-Fi: not connected
+-----
+tray.wifi.off
+Wi-Fi: off
+-----
+vspace.button.rescan
+Rescan
+-----
+vspace.button.stop
+Stop
+-----
+vspace.button.up
+Up
+-----
+vspace.duration.milliseconds
+{0} ms
+-----
+vspace.duration.minutes
+{0} min {1} sec
+-----
+vspace.duration.seconds
+{0}.{1} sec
+-----
+vspace.error.cannot_open
+cannot open {0}
+-----
+vspace.metric.files
+FILES
+-----
+vspace.metric.folders
+FOLDERS
+-----
+vspace.metric.size
+INDEXED SIZE
+-----
+vspace.metric.skipped
+SKIPPED
+-----
+vspace.panel.empty
+Results appear here while the disk is walked.
+-----
+vspace.panel.files
+Largest files
+-----
+vspace.panel.folders
+Largest folders
+-----
+vspace.panel.nothing_yet
+nothing yet
+-----
+vspace.panel.ranked
+{0} ranked|{0} ranked
+-----
+vspace.phase.complete
+COMPLETE
+-----
+vspace.phase.scanning
+SCANNING
+-----
+vspace.phase.stopped
+STOPPED
+-----
+vspace.phase.unreadable
+UNREADABLE
+-----
+vspace.scope.home
+Home
+-----
+vspace.scope.system
+System
+-----
+vspace.scope.whole_disk
+Whole disk
+-----
+vspace.size.bytes
+{0} B
+-----
+vspace.size.decimal
+{0}.{1} {2}
+-----
+vspace.size.whole
+{0} {1}
+-----
+vspace.status.scanned
+Scanned {0} in {1}.
+-----
+vspace.status.scanned_skipped
+Scanned {1} in {2}. {0} protected or unreadable item was skipped.|Scanned {1} in {2}. {0} protected or unreadable items were skipped.
+-----
+vspace.status.stopped
+Stopped. The rankings below hold what had been counted.
+-----
+vspace.status.walking
+Walking {0}
+-----
+vspace.subtitle
+Disk inventory
+-----
+vspace.unit.gb
+GB
+-----
+vspace.unit.kb
+KB
+-----
+vspace.unit.mb
+MB
+-----
+vspace.unit.pb
+PB
+-----
+vspace.unit.tb
+TB
+-----
+window.external_app
+External application
+-----
+window.notes
+Notes
+-----
+window.notes.line_1
+The compositor owns every pixel:
+-----
+window.notes.line_2
+wallpaper, frames, text and cursor.
+-----
+window.notes.line_3
+Layout and hit testing come from a
+-----
+window.notes.line_4
+ui2 element tree, rebuilt each frame.
+-----
+window.palette
+Palette
+-----
+window.system
+System
+-----
+window.system.backlight_absent
+Backlight absent (driver did not register it)
+-----
+window.system.backlight_present
+Backlight present at {0}
+-----
+window.system.battery_absent
+Battery   absent (driver did not register it)
+-----
+window.system.battery_present
+Battery   present at {0}
+-----
+window.system.display
+Display   {0} x {1}
+-----
+window.system.frames
+Frames    {0}
+-----
+window.system.no_pointer
+not available
+-----
+window.system.pointer
+Pointer   {0}
+-----
+window.system.shortcuts
+Super+Arrows tiles; Super+1..4 changes workspace.
+-----
+window.system.windows
+Windows   {0} open, {1} on screen
+-----
+window.welcome
+Welcome
+-----
+window.welcome.heading
+Welcome to Vinix
+-----
+window.welcome.hint_1
+Drag a title bar to move a window.
+-----
+window.welcome.hint_2
+The taskbar lists everything that is open.
+-----
+window.welcome.line_1
+A desktop written from scratch in V,
+-----
+window.welcome.line_2
+drawing straight into the framebuffer.
+-----
+wine.chromium.exited
+Chromium exited.
+-----
+wine.chromium.missing
+Chromium is not installed. Run pkg install chromium in Terminal.
+-----
+wine.chromium.starting
+Starting Chromium…
+-----
+wine.doom.exited
+DOOM exited.
+-----
+wine.doom.missing
+DOOM is not installed. Run build-doom-aarch64.sh.
+-----
+wine.doom.starting
+Starting DOOM…
+-----
+wine.doom.wad_missing
+DOOM WAD is missing. Set VINIX_DOOM_WAD and rebuild the image.
+-----
+wine.firefox.exited
+Firefox exited.
+-----
+wine.firefox.missing
+Firefox is not installed in this desktop image.
+-----
+wine.firefox.starting
+Starting Firefox…
+-----
+wine.gimp.exited
+GIMP exited.
+-----
+wine.gimp.missing
+GIMP is not installed. Run pkg install gimp in Terminal.
+-----
+wine.gimp.starting
+Starting GIMP…
+-----
+wine.host_failed
+Vinix could not start the embedded X11 host.
+-----
+wine.libreoffice.exited
+LibreOffice exited.
+-----
+wine.libreoffice.missing
+LibreOffice is not installed. Run pkg install libreoffice-writer in Terminal.
+-----
+wine.libreoffice.starting
+Starting LibreOffice…
+-----
+wine.minecraft.exited
+Minecraft exited.
+-----
+wine.minecraft.missing
+Minecraft is not installed. Run pkg install minecraft in Terminal.
+-----
+wine.minecraft.starting
+Starting Minecraft…
+-----
+wine.obs.exited
+OBS Studio exited.
+-----
+wine.obs.missing
+OBS Studio is not installed. Run pkg install obs-studio in Terminal.
+-----
+wine.obs.starting
+Starting OBS Studio…
+-----
+wine.qemu.exited
+QEMU exited.
+-----
+wine.qemu.missing
+QEMU is not installed. Build the desktop with --with-qemu-system.
+-----
+wine.qemu.starting
+Starting Vinix in QEMU…
+-----
+wine.steam.exited
+Steam exited.
+-----
+wine.steam.installing
+Installing Steam client…
+-----
+wine.steam.missing
+Steam is not installed in this desktop image.
+-----
+wine.windows.exited
+The Windows application exited.
+-----
+wine.windows.missing
+The translated Wine runtime is not installed.
+-----
+wine.windows.starting
+Starting Windows application…
+-----
+wine.word.exited
+Microsoft Word 2013 exited.
+-----
+wine.word.media_missing
+Stage licensed Word 2013 x64 media, then launch Word again.
+-----
+wine.word.missing
+The translated Win64 Wine runtime is not installed.
+-----
+wine.word.setup_closed
+Word 2013 setup closed. Launch Word again after installation.
+-----
+wine.word.setup_starting
+Starting 64-bit Word 2013 setup…
+-----
+wine.word.starting
+Starting Microsoft Word 2013…
+-----
+wine.xvfb_missing
+Xvfb is not installed. Rebuild the Vinix X11 layer.
+-----
+wm.app_failed
+This application failed to draw:
+-----
+wm.external.failed
+{0} or Xorg exited with an error.
+-----
+wm.external.hint
+Build Firefox/Xorg, then rebuild the userland and desktop image.
+-----
+wm.external.note
+{0} runs in an exclusive X11 session; the native desktop resumes when it exits.
+-----
+wm.external.spawn_failed
+Vinix could not create the {0} launcher process.
+-----
+wm.external.title
+{0} could not start
+-----
+wm.external.unavailable
+{0} is not installed in this desktop image.
+-----
+wm.external.wait_failed
+Vinix lost track of the {0} launcher process.
+-----
+wm.not_installed.command
+Run pkg install {0} in Terminal to install it.
+-----
+wm.not_installed.hint
+Open it again from here once the install has finished.
+-----
+wm.not_installed.note
+The Vinix image does not include this app.
+-----
+wm.not_installed.title
+{0} is not installed
+-----
+wm.taskbar.group
+{0}  ({1})

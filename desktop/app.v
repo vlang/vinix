@@ -384,3 +384,32 @@ fn open_calculator(mut _ Desktop) !NativeApp {
 fn open_settings_app(mut desktop Desktop) !NativeApp {
 	return desktop.open_settings()!
 }
+
+// app_title_text is how an application's or a window's title is shown. The
+// titles themselves stay English, because the window manager recognises
+// windows by them and `--open` names applications by them. Product names read
+// the same in every language and are shown as they are.
+fn app_title_text(title string) string {
+	key := match title {
+		'Files' { 'app.files' }
+		'Calculator' { 'app.calculator' }
+		'Terminal' { 'app.terminal' }
+		'Settings' { 'app.settings' }
+		'Activity Monitor' { 'app.activity_monitor' }
+		'Text Editor' { 'app.text_editor' }
+		'Calendar' { 'app.calendar' }
+		'Clock' { 'app.clock' }
+		'Wine Calculator' { 'app.wine_calculator' }
+		'Wine Notepad' { 'app.wine_notepad' }
+		'Vinix in QEMU' { 'app.qemu' }
+		capture_app_title { 'app.capture' }
+		files_settings_window_title { 'app.files_settings' }
+		external_app_title { 'window.external_app' }
+		'Welcome' { 'window.welcome' }
+		'System' { 'window.system' }
+		'Palette' { 'window.palette' }
+		'Notes' { 'window.notes' }
+		else { '' }
+	}
+	return if key.len > 0 { tr(key) } else { title }
+}

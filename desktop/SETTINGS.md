@@ -4,8 +4,8 @@
 
 All desktop preferences use **one file**, `/root/.vinix-desktop-settings`:
 window-button side, taskbar grouping, taskbar clock format, seconds, date and
-weekday, theme, wallpaper colour and image, keyboard layouts, and scale. It is
-a versioned, human-readable snapshot, for example:
+weekday, theme, system language, wallpaper colour and image, keyboard layouts,
+and scale. It is a versioned, human-readable snapshot, for example:
 
 ```ini
 version=1
@@ -13,6 +13,7 @@ scale=2
 button_side=left
 taskbar_mode=combined
 theme=macos
+language=ru
 clock_24_hour=false
 clock_show_seconds=false
 clock_show_date=false
@@ -24,7 +25,8 @@ keyboard_layout=ru
 ```
 
 `scale` is `auto`, `1` (100%) or `2` (200%). The other choices are `right`/`left`,
-`standard`/`combined` and `default`/`macos`. Clock choices are `true`/`false`;
+`standard`/`combined` and `default`/`macos`. `language` is `en` (the default),
+`ru` or `es`; see [the system language](#system-language) below. Clock choices are `true`/`false`;
 all four default to `true`, preserving the historical 24-hour clock with
 seconds, date and weekday when an older version-1 snapshot omits the new keys.
 Wallpaper values are the same zero-based catalogue indices used by Settings;
@@ -328,3 +330,23 @@ compositor scale application before saving and restoring the complete snapshot.
 
 Desktop scaling is independent of the DCP backlight transport and never changes
 the status of physical brightness adjustment.
+
+## System language
+
+Settings → Language chooses the language of the desktop and of the Vinix
+applications it runs: English, Russian (Русский) or Spanish (Español). Each is
+listed in its own name. The choice takes effect on the next frame everywhere,
+including windows that are already open, and is saved as `language=` above.
+Applications that are not part of Vinix (Firefox, LibreOffice, Wine...) choose
+their language themselves.
+
+Every string the desktop shows is looked up by key with `tr()`
+([translations.v](translations.v)) from `translations/<code>.tr`, in the
+format of V's `i18n` module. See [translations/README.md](translations/README.md)
+for the format and for adding a language. Window and application titles stay
+English internally, since the window manager identifies windows by them, and
+are translated only where they are shown.
+
+The native applications run as separate processes, so the language is part of
+the settings every application request carries (`app_process.v`), the same way
+the clock and theme preferences are.

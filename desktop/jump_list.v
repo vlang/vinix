@@ -48,7 +48,8 @@ enum JumpCommand {
 }
 
 // A task's path is absolute, or a folder in the user's home -- which is only
-// known at run time -- when it does not start with a slash.
+// known at run time -- when it does not start with a slash. A settings page's
+// arg is its SettingsCategory. The title stays English; jump_task_text shows it.
 struct JumpTask {
 	title   string
 	icon    string
@@ -120,25 +121,25 @@ const settings_jump_tasks = [
 		title:   'Wallpaper'
 		icon:    'builtin:desktop'
 		command: .settings_page
-		arg:     3
+		arg:     int(SettingsCategory.wallpaper)
 	},
 	JumpTask{
 		title:   'Display'
 		icon:    'builtin:brightness'
 		command: .settings_page
-		arg:     5
+		arg:     int(SettingsCategory.display)
 	},
 	JumpTask{
 		title:   'Wi-Fi'
 		icon:    'builtin:network_wifi'
 		command: .settings_page
-		arg:     4
+		arg:     int(SettingsCategory.wifi)
 	},
 	JumpTask{
 		title:   'Battery'
 		icon:    'builtin:battery_70'
 		command: .settings_page
-		arg:     6
+		arg:     int(SettingsCategory.battery)
 	},
 ]
 const capture_jump_tasks = [
@@ -165,6 +166,24 @@ fn jump_list_tasks(process_name string) []JumpTask {
 		'vinix-capture' { capture_jump_tasks }
 		'vinix-terminal' { terminal_jump_tasks }
 		else { no_jump_tasks }
+	}
+}
+
+// jump_task_text is how a task's title is shown.
+fn jump_task_text(title string) string {
+	return match title {
+		'Home' { tr('jump.home') }
+		'Documents' { tr('jump.documents') }
+		'Downloads' { tr('jump.downloads') }
+		'Computer' { tr('jump.computer') }
+		'New document' { tr('jump.new_document') }
+		'Wallpaper' { tr('settings.category.wallpaper') }
+		'Display' { tr('settings.category.display') }
+		'Wi-Fi' { tr('settings.category.wifi') }
+		'Battery' { tr('settings.category.battery') }
+		'Take screenshot' { tr('jump.take_screenshot') }
+		'New window' { tr('jump.new_window') }
+		else { title }
 	}
 }
 
@@ -264,7 +283,7 @@ fn (d &Desktop) build_jump_list(entry TaskbarEntry) {
 	if jump_list_has_recent(factory.process_name) {
 		items := recent_items_for(d.home, factory.process_name, recent_items_per_app)
 		if items.len > 0 {
-			jump_list_push(.header, 'Recent', '', .none_, '', 0, false, false)
+			jump_list_push(.header, tr('jump.recent'), '', .none_, '', 0, false, false)
 		}
 		for item in items {
 			is_dir := if info := desktop_stat(item.path) { info.is_dir } else { false }
@@ -281,33 +300,35 @@ fn (d &Desktop) build_jump_list(entry TaskbarEntry) {
 	}
 	tasks := jump_list_tasks(factory.process_name)
 	if tasks.len > 0 {
-		jump_list_push(.header, 'Tasks', '', .none_, '', 0, false, false)
+		jump_list_push(.header, tr('jump.tasks'), '', .none_, '', 0, false, false)
 		for task in tasks {
 			if task.command == .open_path {
-				// The title is a literal, which freeing leaves alone.
-				jump_list_push(.item, task.title, task.icon, task.command, user_folder_path(task.path),
-					task.arg, true, false)
+				// An owned entry frees its title, so it gets its own copy of the
+				// translation, which belongs to the translation table.
+				jump_list_push(.item, jump_task_text(task.title).clone(), task.icon, task.command,
+					user_folder_path(task.path), task.arg, true, false)
 			} else {
-				jump_list_push(.item, task.title, task.icon, task.command, task.path, task.arg,
-					false, false)
+				jump_list_push(.item, jump_task_text(task.title), task.icon, task.command,
+					task.path, task.arg, false, false)
 			}
 		}
 	}
 	if taskbar_jump_list.entries.len > 0 {
 		jump_list_push(.separator, '', '', .none_, '', 0, false, true)
 	}
-	jump_list_push(.item, factory.title, factory.icon, .launch, '', 0, false, true)
+	jump_list_push(.item, app_title_text(factory.title), factory.icon, .launch, '', 0, false,
+		true)
 	if d.taskbar_is_pinned(entry.app_index) {
-		jump_list_push(.item, 'Unpin this program from taskbar', 'builtin:arrow_down', .unpin,
-			'', 0, false, true)
+		jump_list_push(.item, tr('jump.unpin'), 'builtin:arrow_down', .unpin, '', 0, false,
+			true)
 	} else {
-		jump_list_push(.item, 'Pin this program to taskbar', 'builtin:arrow_up', .pin, '', 0,
-			false, true)
+		jump_list_push(.item, tr('jump.pin'), 'builtin:arrow_up', .pin, '', 0, false, true)
 	}
 	if taskbar_jump_list.windows.len == 1 {
-		jump_list_push(.item, 'Close window', 'builtin:close', .close_window, '', 0, false, true)
+		jump_list_push(.item, tr('jump.close_window'), 'builtin:close', .close_window, '', 0,
+			false, true)
 	} else if taskbar_jump_list.windows.len > 1 {
-		jump_list_push(.item, 'Close all windows', 'builtin:close', .close_all, '', 0, false,
+		jump_list_push(.item, tr('jump.close_all'), 'builtin:close', .close_all, '', 0, false,
 			true)
 	}
 }
@@ -463,8 +484,10 @@ fn (mut d Desktop) run_jump_command(command JumpCommand, app_index int, path str
 			d.launch_index(app_index)
 		}
 		.settings_page {
-			if arg >= 0 && arg < settings_categories.len {
-				d.open_settings_category(settings_categories[arg])
+			for category in settings_categories {
+				if int(category) == arg {
+					d.open_settings_category(category)
+				}
 			}
 		}
 		.capture_screenshot {

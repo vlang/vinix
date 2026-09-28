@@ -650,7 +650,7 @@ fn (d &Desktop) preview_tile(index int, x int, y int, width int, height int) ui2
 	}, ui2.TextStyle{
 		color: taskbar_preview_text
 	})
-	children << ui2.label('', window.title, ui2.rect(f64(pad + 22), 3, f64(width - 2 * pad - 46),
+	children << ui2.label('', app_title_text(window.title), ui2.rect(f64(pad + 22), 3, f64(width - 2 * pad - 46),
 		20), ui2.TextStyle{
 		color: taskbar_preview_text
 		size:  12
@@ -695,7 +695,7 @@ fn (d &Desktop) preview_list_row(index int, x int, y int, width int) ui2.Element
 	}, ui2.TextStyle{
 		color: taskbar_preview_text
 	})
-	children << ui2.label('', window.title, ui2.rect(32, 5, f64(width - 64), 20), ui2.TextStyle{
+	children << ui2.label('', app_title_text(window.title), ui2.rect(32, 5, f64(width - 64), 20), ui2.TextStyle{
 		color: taskbar_preview_text
 		size:  12
 		bold:  window.id == d.focus

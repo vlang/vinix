@@ -10,10 +10,10 @@ import os
 import time
 
 const vinix_app_magic = u32(0x56415050)
-const vinix_app_version = u8(9)
-const vinix_request_header_size = 132
-const vinix_response_header_size = 124
-const vinix_state_size = 112
+const vinix_app_version = u8(10)
+const vinix_request_header_size = 136
+const vinix_response_header_size = 128
+const vinix_state_size = 116
 const vinix_max_payload = 16 * 1024 * 1024
 
 enum VinixCommand as u8 {
@@ -169,10 +169,10 @@ fn vinix_write_all(fd int, data []u8) {
 fn vinix_default_state() []u8 {
 	mut state := []u8{len: vinix_state_size}
 	// Nine i32 Settings fields come first. The enabled keyboard layouts follow
-	// and must include the current one (0, English); then requested_scale,
-	// which must be 1 or 2.
+	// and must include the current one (0, English), then the language (0,
+	// English); then requested_scale, which must be 1 or 2.
 	state[36] = 1
-	state[44] = 1
+	state[48] = 1
 	return state
 }
 

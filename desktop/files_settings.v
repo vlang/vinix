@@ -28,21 +28,47 @@ mut:
 	next_tag_id  int = 10
 }
 
+// The built-in tags' names, by id. They are stored in English; display_name
+// shows them in the desktop's language until the user renames one.
+const files_default_tag_names = ['Red', 'Orange', 'Yellow', 'Green', 'Blue', 'Purple', 'Gray',
+	'Work', 'Home', 'Important']
+
 fn default_files_settings() FilesSettings {
 	return FilesSettings{
 		tags:        [
-			FilesTag{ id: 0, name: 'Red', color: 0xff595e, favorite: true },
-			FilesTag{ id: 1, name: 'Orange', color: 0xffa044, favorite: true },
-			FilesTag{ id: 2, name: 'Yellow', color: 0xffd84a, favorite: true },
-			FilesTag{ id: 3, name: 'Green', color: 0x59cc74, favorite: true },
-			FilesTag{ id: 4, name: 'Blue', color: 0x4896f2, favorite: true },
-			FilesTag{ id: 5, name: 'Purple', color: 0xc864dc, favorite: true },
-			FilesTag{ id: 6, name: 'Gray', color: 0xa0a1a6, favorite: true },
-			FilesTag{ id: 7, name: 'Work', color: 0x4896f2 },
-			FilesTag{ id: 8, name: 'Home', color: 0x59cc74 },
-			FilesTag{ id: 9, name: 'Important', color: 0xff595e },
+			FilesTag{ id: 0, name: files_default_tag_names[0], color: 0xff595e, favorite: true },
+			FilesTag{ id: 1, name: files_default_tag_names[1], color: 0xffa044, favorite: true },
+			FilesTag{ id: 2, name: files_default_tag_names[2], color: 0xffd84a, favorite: true },
+			FilesTag{ id: 3, name: files_default_tag_names[3], color: 0x59cc74, favorite: true },
+			FilesTag{ id: 4, name: files_default_tag_names[4], color: 0x4896f2, favorite: true },
+			FilesTag{ id: 5, name: files_default_tag_names[5], color: 0xc864dc, favorite: true },
+			FilesTag{ id: 6, name: files_default_tag_names[6], color: 0xa0a1a6, favorite: true },
+			FilesTag{ id: 7, name: files_default_tag_names[7], color: 0x4896f2 },
+			FilesTag{ id: 8, name: files_default_tag_names[8], color: 0x59cc74 },
+			FilesTag{ id: 9, name: files_default_tag_names[9], color: 0xff595e },
 		]
 		assignments: map[string][]int{}
+	}
+}
+
+// display_name is the tag's name as the user sees it: a built-in tag still
+// under its English name is shown translated, any other name as it is. The
+// result belongs to the tag or to the translation table; never free it.
+fn (t &FilesTag) display_name() string {
+	if t.id < 0 || t.id >= files_default_tag_names.len || t.name != files_default_tag_names[t.id] {
+		return t.name
+	}
+	return match t.id {
+		0 { tr('files.tag.red') }
+		1 { tr('files.tag.orange') }
+		2 { tr('files.tag.yellow') }
+		3 { tr('files.tag.green') }
+		4 { tr('files.tag.blue') }
+		5 { tr('files.tag.purple') }
+		6 { tr('files.tag.gray') }
+		7 { tr('files.tag.work') }
+		8 { tr('files.tag.home') }
+		else { tr('files.tag.important') }
 	}
 }
 

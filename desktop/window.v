@@ -169,14 +169,14 @@ fn welcome_page(width int, _height int) []ui2.Element {
 		bg:     app_accent
 		radius: 2
 	}, [])
-	children << heading('Welcome to Vinix', pad, 32, inner)
-	children << body_line('A desktop written from scratch in V,', pad, 60, inner)
-	children << body_line('drawing straight into the framebuffer.', pad, 78, inner)
+	children << heading(tr('window.welcome.heading'), pad, 32, inner)
+	children << body_line(tr('window.welcome.line_1'), pad, 60, inner)
+	children << body_line(tr('window.welcome.line_2'), pad, 78, inner)
 	children << ui2.view('', ui2.rect(f64(pad), 104, f64(inner), 1), ui2.BoxStyle{
 		bg: body_rule
 	}, [])
-	children << muted_line('Drag a title bar to move a window.', pad, 116, inner)
-	children << muted_line('The taskbar lists everything that is open.', pad, 134, inner)
+	children << muted_line(tr('window.welcome.hint_1'), pad, 116, inner)
+	children << muted_line(tr('window.welcome.hint_2'), pad, 134, inner)
 	return children
 }
 
@@ -185,24 +185,26 @@ fn system_page(width int, height int, desktop &Desktop) []ui2.Element {
 	inner := width - 2 * pad
 	display_width := desktop.canvas.width.str()
 	display_height := desktop.canvas.height.str()
-	display := 'Display   ${display_width} x ${display_height}'
+	display := tr_fill2('window.system.display', display_width, display_height)
 	unsafe {
 		display_width.free()
 		display_height.free()
 	}
-	pointer := 'Pointer   ${desktop.pointer_description()}'
+	pointer := tr_fill('window.system.pointer', desktop.pointer_description())
 	open_windows := desktop.windows.len.str()
 	visible_windows := desktop.visible_window_count().str()
-	windows := 'Windows   ${open_windows} open, ${visible_windows} on screen'
+	windows := tr_fill2('window.system.windows', open_windows, visible_windows)
 	unsafe {
 		open_windows.free()
 		visible_windows.free()
 	}
 	frame_count := desktop.frames.str()
-	frames := 'Frames    ${frame_count}'
+	frames := tr_fill('window.system.frames', frame_count)
 	unsafe { frame_count.free() }
-	battery := device_line('Battery   ', '/dev/battery')
-	backlight := device_line('Backlight ', '/dev/apple-panel-bl')
+	battery := device_line('/dev/battery', tr('window.system.battery_absent'),
+		tr('window.system.battery_present'))
+	backlight := device_line('/dev/apple-panel-bl', tr('window.system.backlight_absent'),
+		tr('window.system.backlight_present'))
 	mut panel_children := frame_elements(7)
 	panel_children << owned_body_line(display, 12, 12, inner - 24)
 	panel_children << owned_body_line(pointer, 12, 32, inner - 24)
@@ -210,10 +212,9 @@ fn system_page(width int, height int, desktop &Desktop) []ui2.Element {
 	panel_children << owned_body_line(frames, 12, 72, inner - 24)
 	panel_children << owned_body_line(battery, 12, 92, inner - 24)
 	panel_children << owned_body_line(backlight, 12, 112, inner - 24)
-	panel_children << muted_line('Super+Arrows tiles; Super+1..4 changes workspace.', 12,
-		136, inner - 24)
+	panel_children << muted_line(tr('window.system.shortcuts'), 12, 136, inner - 24)
 	mut children := frame_elements(2)
-	children << heading('System', pad, 18, inner)
+	children << heading(tr('window.system'), pad, 18, inner)
 	children << ui2.view('', ui2.rect(f64(pad), 46, f64(inner), f64(height - 46 - pad)), ui2.BoxStyle{
 		bg:     body_panel
 		radius: 6
@@ -226,9 +227,11 @@ fn system_page(width int, height int, desktop &Desktop) []ui2.Element {
 // port paints the boot log over with this desktop, so "the battery reads --%"
 // and "F1 changes no brightness" otherwise look like desktop bugs when both
 // are really the kernel never having registered the device.
-fn device_line(label string, path string) string {
-	desktop_stat(path) or { return '${label}absent (driver did not register it)' }
-	return '${label}present at ${path}'
+// Both texts are translations; present has a `{0}` for the path. The line
+// returned is newly allocated either way, for an owned label.
+fn device_line(path string, absent string, present string) string {
+	desktop_stat(path) or { return absent.clone() }
+	return tr_substitute(present, path, '', '')
 }
 
 fn palette_page(width int, height int) []ui2.Element {
@@ -253,7 +256,7 @@ fn palette_page(width int, height int) []ui2.Element {
 	cell := if cell_width < cell_height { cell_width } else { cell_height }
 
 	mut children := frame_elements(swatches.len + 1)
-	children << heading('Palette', pad, 18, inner)
+	children << heading(tr('window.palette'), pad, 18, inner)
 	for i, color in swatches {
 		column := i % columns
 		row := i / columns
@@ -269,14 +272,14 @@ fn notes_page(width int, _height int) []ui2.Element {
 	pad := 18
 	inner := width - 2 * pad
 	lines := [
-		'The compositor owns every pixel:',
-		'wallpaper, frames, text and cursor.',
+		tr('window.notes.line_1'),
+		tr('window.notes.line_2'),
 		'',
-		'Layout and hit testing come from a',
-		'ui2 element tree, rebuilt each frame.',
+		tr('window.notes.line_3'),
+		tr('window.notes.line_4'),
 	]
 	mut children := frame_elements(lines.len + 1)
-	children << heading('Notes', pad, 18, inner)
+	children << heading(tr('window.notes'), pad, 18, inner)
 	for i, line in lines {
 		children << body_line(line, pad, 50 + i * 19, inner)
 	}

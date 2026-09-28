@@ -45,6 +45,11 @@ mut:
 	text         []u8
 	path         []u8
 	status       []u8
+	// The status line's translation key, whether the path follows it, and the
+	// language it was written in, so that it follows a change of language.
+	status_key      string
+	status_path     bool
+	status_language DesktopLanguage
 	cursor       int
 	focus        EditorFocus = .document
 	scroll       int
@@ -59,7 +64,7 @@ mut:
 fn open_editor(mut _ Desktop) !NativeApp {
 	mut app := &TextEditorApp{}
 	app.set_path(editor_default_path)
-	app.set_status('New document')
+	app.set_status('editor.status.new_document')
 	return app
 }
 
@@ -186,17 +191,37 @@ fn (mut a TextEditorApp) set_path(path string) {
 	editor_append(mut a.path, path)
 }
 
-fn (mut a TextEditorApp) set_status(status string) {
+// set_status shows the translation of key on the status line.
+fn (mut a TextEditorApp) set_status(key string) {
+	a.status_key = key
+	a.status_path = false
+	a.status_language = desktop_language
 	a.status.clear()
-	editor_append(mut a.status, status)
+	editor_append(mut a.status, tr(key))
 }
 
-fn (mut a TextEditorApp) set_file_status(prefix string) {
+// set_file_status shows the translation of key followed by the path.
+fn (mut a TextEditorApp) set_file_status(key string) {
+	a.status_key = key
+	a.status_path = true
+	a.status_language = desktop_language
 	a.status.clear()
-	editor_append(mut a.status, prefix)
+	editor_append(mut a.status, tr(key))
 	if a.path.len > 0 {
 		a.status << ` `
 		a.status << a.path
+	}
+}
+
+// follow_language writes the status line again after a change of language.
+fn (mut a TextEditorApp) follow_language() {
+	if a.status_key.len == 0 || a.status_language == desktop_language {
+		return
+	}
+	if a.status_path {
+		a.set_file_status(a.status_key)
+	} else {
+		a.set_status(a.status_key)
 	}
 }
 
@@ -207,25 +232,25 @@ fn (mut a TextEditorApp) new_document() {
 	a.modified = false
 	a.focus = .document
 	a.set_path(editor_default_path)
-	a.set_status('New document')
+	a.set_status('editor.status.new_document')
 }
 
 fn (mut a TextEditorApp) open_document() {
 	if a.path.len == 0 {
-		a.set_status('Enter a path first')
+		a.set_status('editor.status.enter_path')
 		return
 	}
 	path := editor_bytes_text(a.path)
 	info := desktop_stat(path) or {
-		a.set_file_status('Cannot open')
+		a.set_file_status('editor.status.cannot_open')
 		return
 	}
 	if info.is_dir {
-		a.set_file_status('Path is a directory:')
+		a.set_file_status('editor.status.is_directory')
 		return
 	}
 	if info.size > editor_max_file_size {
-		a.set_status('File is larger than 64 KB')
+		a.set_status('editor.status.too_large')
 		return
 	}
 
@@ -233,7 +258,7 @@ fn (mut a TextEditorApp) open_document() {
 	got := if next.len == 0 { i64(0) } else { desktop_read_file(path, next.data, info.size) }
 	if got < 0 {
 		unsafe { next.free() }
-		a.set_file_status('Cannot read')
+		a.set_file_status('editor.status.cannot_read')
 		return
 	}
 	if got < i64(next.len) {
@@ -245,13 +270,13 @@ fn (mut a TextEditorApp) open_document() {
 	a.scroll = 0
 	a.modified = false
 	a.focus = .document
-	a.set_file_status('Opened')
+	a.set_file_status('editor.status.opened')
 	record_recent_item('vinix-editor', path)
 }
 
 fn (mut a TextEditorApp) save_document() {
 	if a.path.len == 0 {
-		a.set_status('Enter a path first')
+		a.set_status('editor.status.enter_path')
 		return
 	}
 	path := editor_bytes_text(a.path)
@@ -260,11 +285,11 @@ fn (mut a TextEditorApp) save_document() {
 		data = voidptr(a.text.data)
 	}
 	if !desktop_write_file(path, data, u64(a.text.len)) {
-		a.set_file_status('Cannot save')
+		a.set_file_status('editor.status.cannot_save')
 		return
 	}
 	a.modified = false
-	a.set_file_status('Saved')
+	a.set_file_status('editor.status.saved')
 	record_recent_item('vinix-editor', path)
 }
 
@@ -356,7 +381,7 @@ fn (mut a TextEditorApp) delete_char(start int, length int) {
 	a.cursor = start
 	a.settle_cursor()
 	a.modified = true
-	a.set_status('Unsaved changes')
+	a.set_status('editor.status.unsaved')
 }
 
 // insert_byte places one byte at the cursor. Every byte of a character goes in
@@ -372,12 +397,12 @@ fn (mut a TextEditorApp) insert_byte(ch u8) {
 
 fn (mut a TextEditorApp) insert(ch u8) {
 	if a.text.len >= editor_max_file_size {
-		a.set_status('Document limit is 64 KB')
+		a.set_status('editor.status.limit')
 		return
 	}
 	a.insert_byte(ch)
 	a.modified = true
-	a.set_status('Unsaved changes')
+	a.set_status('editor.status.unsaved')
 }
 
 // type_pending gives the multibyte character gathered in `pending` to
@@ -394,14 +419,14 @@ fn (mut a TextEditorApp) type_pending() {
 		return
 	}
 	if a.text.len + length > editor_max_file_size {
-		a.set_status('Document limit is 64 KB')
+		a.set_status('editor.status.limit')
 		return
 	}
 	for k := 0; k < length; k++ {
 		a.insert_byte(a.pending[k])
 	}
 	a.modified = true
-	a.set_status('Unsaved changes')
+	a.set_status('editor.status.unsaved')
 }
 
 fn (mut a TextEditorApp) edit_path(ch u8) {
@@ -567,14 +592,16 @@ fn editor_toolbar_button(id string, text string, x int, width int) ui2.Element {
 }
 
 fn (mut a TextEditorApp) build(size ui2.Rect) !ui2.Element {
+	a.follow_language()
 	width := int(size.width)
 	height := int(size.height)
 	mut children := frame_elements(8)
 
-	button_width := 54
-	children << editor_toolbar_button(editor_action_new, 'New', editor_padding, button_width)
-	children << editor_toolbar_button(editor_action_open, 'Open', editor_padding + button_width + 6, button_width)
-	children << editor_toolbar_button(editor_action_save, 'Save', editor_padding + 2 * (button_width + 6), button_width)
+	// Wide enough for the longest translation, Russian «Сохранить».
+	button_width := 68
+	children << editor_toolbar_button(editor_action_new, tr('editor.new'), editor_padding, button_width)
+	children << editor_toolbar_button(editor_action_open, tr('editor.open'), editor_padding + button_width + 6, button_width)
+	children << editor_toolbar_button(editor_action_save, tr('editor.save'), editor_padding + 2 * (button_width + 6), button_width)
 
 	path_x := editor_padding + 3 * (button_width + 6) + 4
 	path_width := if width - path_x - editor_padding > 40 {

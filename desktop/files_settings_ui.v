@@ -76,12 +76,12 @@ fn (a &FilesContextApp) settings_window(size ui2.Rect) ui2.Element {
 	panel_width := width
 	panel_height := height
 	mut rows := frame_elements(24)
-	rows << ui2.label('', 'Files Settings', ui2.rect(18, 12, f64(panel_width - 70), 27), ui2.TextStyle{
+	rows << ui2.label('', tr('app.files_settings'), ui2.rect(18, 12, f64(panel_width - 70), 27), ui2.TextStyle{
 		color: body_heading
 		size:  16
 		bold:  true
 	})
-	rows << ui2.button(files_settings_close, 'Done', ui2.rect(f64(panel_width - 68), 12, 54, 25), ui2.BoxStyle{
+	rows << ui2.button(files_settings_close, tr('files.settings.done'), ui2.rect(f64(panel_width - 68), 12, 54, 25), ui2.BoxStyle{
 		bg:     body_panel
 		radius: 5
 	}, ui2.TextStyle{
@@ -89,27 +89,27 @@ fn (a &FilesContextApp) settings_window(size ui2.Rect) ui2.Element {
 		size:  12
 		align: .center
 	})
-	rows << settings_choice(files_settings_general, 'General', 15, 48, 100, a.settings_tab == 0)
-	rows << settings_choice(files_settings_tags, 'Tags', 120, 48, 100, a.settings_tab == 1)
+	rows << settings_choice(files_settings_general, tr('files.settings.general'), 15, 48, 100, a.settings_tab == 0)
+	rows << settings_choice(files_settings_tags, tr('files.settings.tags'), 120, 48, 100, a.settings_tab == 1)
 	rows << ui2.view('', ui2.rect(0, 84, f64(panel_width), 1), ui2.BoxStyle{
 		bg: body_rule
 	}, [])
 	if a.settings_tab == 0 {
-		rows << ui2.label('', 'File visibility', ui2.rect(20, 105, f64(panel_width - 40), 22), ui2.TextStyle{
+		rows << ui2.label('', tr('files.settings.file_visibility'), ui2.rect(20, 105, f64(panel_width - 40), 22), ui2.TextStyle{
 			color: body_heading
 			size:  14
 			bold:  true
 		})
-		rows << files_settings_checkbox(files_settings_hidden, 'Show hidden files and folders', a.files.settings.show_hidden,
+		rows << files_settings_checkbox(files_settings_hidden, tr('files.settings.show_hidden'), a.files.settings.show_hidden,
 			22, 139, panel_width - 44)
-		rows << ui2.label('', 'Includes names beginning with a dot, such as .local.',
+		rows << ui2.label('', tr('files.settings.show_hidden_note'),
 			ui2.rect(49, 169, f64(panel_width - 65), 38), ui2.TextStyle{
 				color: body_muted
 				size:  11
 				lines: 2
 			})
 	} else {
-		rows << ui2.label('', 'Show these tags in the sidebar:', ui2.rect(20, 91, f64(panel_width - 40), 20), ui2.TextStyle{
+		rows << ui2.label('', tr('files.settings.sidebar_tags'), ui2.rect(20, 91, f64(panel_width - 40), 20), ui2.TextStyle{
 			color: body_heading
 			size:  13
 		})
@@ -127,7 +127,7 @@ fn (a &FilesContextApp) settings_window(size ui2.Rect) ui2.Element {
 				bg:     tag.color
 				radius: 8
 			}, [])
-			row << ui2.label('', tag.name, ui2.rect(34, 0, f64(panel_width - 110), 25), ui2.TextStyle{
+			row << ui2.label('', tag.display_name(), ui2.rect(34, 0, f64(panel_width - 110), 25), ui2.TextStyle{
 				color: if selected { app_on_accent } else { body_text }
 				size:  13
 			})
@@ -143,7 +143,7 @@ fn (a &FilesContextApp) settings_window(size ui2.Rect) ui2.Element {
 			rows << ui2.Element{
 				...files_settings_checkbox('${files_settings_sidebar_prefix}${index}', '', tag.sidebar,
 					panel_width - 55, row_y, 26)
-				accessibility_label: 'Show ${tag.name} in sidebar'
+				accessibility_label: tr_fill('files.settings.show_tag_in_sidebar', tag.display_name())
 			}
 		}
 		rows << ui2.button(files_settings_scroll_up, '↑', ui2.rect(f64(panel_width - 53), 90, 19, 21), ui2.BoxStyle{
@@ -163,7 +163,7 @@ fn (a &FilesContextApp) settings_window(size ui2.Rect) ui2.Element {
 			bg:     body_panel
 			radius: 5
 		}, ui2.TextStyle{ color: body_text, size: 18, align: .center })
-		rows << ui2.button(files_settings_rename, 'Rename', ui2.rect(84, f64(buttons_y), 66, 25), ui2.BoxStyle{
+		rows << ui2.button(files_settings_rename, tr('files.settings.rename'), ui2.rect(84, f64(buttons_y), 66, 25), ui2.BoxStyle{
 			bg:     body_panel
 			radius: 5
 		}, ui2.TextStyle{ color: body_text, size: 11, align: .center })
@@ -180,7 +180,7 @@ fn (a &FilesContextApp) settings_window(size ui2.Rect) ui2.Element {
 				}, [])
 			}
 		}
-		rows << ui2.label('', 'Favorite tags (click to toggle):', ui2.rect(20, f64(panel_height - 78), f64(panel_width - 40), 18), ui2.TextStyle{
+		rows << ui2.label('', tr('files.settings.favorite_tags'), ui2.rect(20, f64(panel_height - 78), f64(panel_width - 40), 18), ui2.TextStyle{
 			color: body_muted
 			size:  11
 		})
@@ -192,7 +192,7 @@ fn (a &FilesContextApp) settings_window(size ui2.Rect) ui2.Element {
 				radius: 10
 			}, [])
 		}
-		rows << files_settings_checkbox(files_settings_tint, 'Tint folders based on tags', a.files.settings.tint_folders,
+		rows << files_settings_checkbox(files_settings_tint, tr('files.settings.tint_folders'), a.files.settings.tint_folders,
 			20, panel_height - 31, panel_width - 40)
 	}
 	return ui2.screen(app_surface, rows)
@@ -207,12 +207,12 @@ fn (a &FilesContextApp) tag_picker_overlay(size ui2.Rect) ui2.Element {
 	x := (width - panel_width) / 2
 	y := (height - panel_height) / 2
 	mut rows := frame_elements(a.files.settings.tags.len + 3)
-	rows << ui2.label('', 'Tags', ui2.rect(14, 12, f64(panel_width - 80), 24), ui2.TextStyle{
+	rows << ui2.label('', tr('files.settings.tags'), ui2.rect(14, 12, f64(panel_width - 80), 24), ui2.TextStyle{
 		color: body_heading
 		size:  15
 		bold:  true
 	})
-	rows << ui2.button(files_picker_close, 'Done', ui2.rect(f64(panel_width - 68), 11, 55, 25), ui2.BoxStyle{
+	rows << ui2.button(files_picker_close, tr('files.settings.done'), ui2.rect(f64(panel_width - 68), 11, 55, 25), ui2.BoxStyle{
 		bg:     body_panel
 		radius: 5
 	}, ui2.TextStyle{ color: body_text, size: 12, align: .center })
@@ -223,7 +223,7 @@ fn (a &FilesContextApp) tag_picker_overlay(size ui2.Rect) ui2.Element {
 		if row_y + 25 > panel_height - 10 { break }
 		mut item := frame_elements(3)
 		item << ui2.view('', ui2.rect(10, 5, 15, 15), ui2.BoxStyle{ bg: tag.color, radius: 8 }, [])
-		item << ui2.label('', tag.name, ui2.rect(34, 0, f64(panel_width - 78), 25), ui2.TextStyle{
+		item << ui2.label('', tag.display_name(), ui2.rect(34, 0, f64(panel_width - 78), 25), ui2.TextStyle{
 			color: body_text
 			size:  12
 		})
@@ -253,7 +253,8 @@ fn (mut a FilesContextApp) start_settings_rename() {
 		return
 	}
 	a.settings_name.clear()
-	rename_buffer_set(mut a.settings_name, a.files.settings.tags[a.settings_selected].name)
+	// The user edits the name they see, translated or not.
+	rename_buffer_set(mut a.settings_name, a.files.settings.tags[a.settings_selected].display_name())
 	a.settings_editing = true
 	a.settings_select_all = true
 }
@@ -269,8 +270,11 @@ fn (mut a FilesContextApp) settings_key_input(input string) {
 		.cancel { a.settings_editing = false }
 		.commit {
 			name := rename_buffer_text(a.settings_name).trim_space()
+			// A built-in tag left as it was keeps its English name, so it
+			// still follows the language.
 			if name.len > 0 && name.len <= 64 && a.settings_selected >= 0
-				&& a.settings_selected < a.files.settings.tags.len {
+				&& a.settings_selected < a.files.settings.tags.len
+				&& name != a.files.settings.tags[a.settings_selected].display_name() {
 				a.files.settings.tags[a.settings_selected].name = name.clone()
 				a.files.settings.save(desktop_home)
 			}
@@ -298,7 +302,7 @@ fn (mut a FilesContextApp) handle_settings(action string) {
 				a.files.settings.next_tag_id++
 				a.files.settings.tags << FilesTag{
 					id:    id
-					name:  'New Tag'
+					name:  tr('files.settings.new_tag')
 					color: 0x989aa0
 				}
 				a.settings_selected = a.files.settings.tags.len - 1

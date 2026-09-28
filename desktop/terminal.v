@@ -642,7 +642,7 @@ fn (mut a TerminalApp) start_shell(rows int, columns int, width int, height int)
 		}
 	}
 	shell := desktop_spawn_shell(terminal_shell, command, rows, columns, width, height) or {
-		a.error = 'cannot start ${terminal_shell}'
+		a.error = tr_fill('terminal.cannot_start', terminal_shell)
 		a.ingest_output(a.error.bytes())
 		a.exited = true
 		return

@@ -575,7 +575,7 @@ fn (d &Desktop) keyboard_hud_element() ?ui2.Element {
 		lines: 1
 	})))
 	text_x := inset * 2 + keyboard_hud_badge
-	children << ui2.label('', layout.title(), ui2.rect(f64(text_x), 0, f64(keyboard_hud_width - text_x - inset), f64(keyboard_hud_height)), ui2.TextStyle{
+	children << ui2.label('', keyboard_layout_text(layout), ui2.rect(f64(text_x), 0, f64(keyboard_hud_width - text_x - inset), f64(keyboard_hud_height)), ui2.TextStyle{
 		color: switcher_text
 		size:  15
 		bold:  true
@@ -699,7 +699,7 @@ fn (d &Desktop) input_menu_children(mut children []ui2.Element) int {
 		}
 		row << input_badge(layout.badge(), badge_x, (tray_input_row_height - tray_input_badge_height) / 2,
 			tray_flyout_text, 0xffffff)
-		row << ui2.label('', layout.title(), ui2.rect(f64(text_x), 0, f64(row_width - text_x - 8),
+		row << ui2.label('', keyboard_layout_text(layout), ui2.rect(f64(text_x), 0, f64(row_width - text_x - 8),
 			f64(tray_input_row_height)), ui2.TextStyle{
 			color: tray_flyout_text
 			size:  13
@@ -714,14 +714,14 @@ fn (d &Desktop) input_menu_children(mut children []ui2.Element) int {
 	}, [])
 	y += 6
 	children << d.input_menu_row(action_tray_keyboard_settings, pad, y, row_width, frame_child(ui2.label('',
-		'Keyboard settings', ui2.rect(f64(badge_x), 0, f64(row_width - badge_x - 8), f64(tray_input_row_height)),
+		tr('settings.keyboard.menu_settings'), ui2.rect(f64(badge_x), 0, f64(row_width - badge_x - 8), f64(tray_input_row_height)),
 		ui2.TextStyle{
 		color: tray_flyout_text
 		size:  13
 		lines: 1
 	})))
 	y += tray_input_row_height
-	children << ui2.label('', 'Ctrl-Space: next input source', ui2.rect(f64(pad + badge_x),
+	children << ui2.label('', tr('settings.keyboard.menu_hint'), ui2.rect(f64(pad + badge_x),
 		f64(y + 2), f64(row_width - badge_x - 8), 18), ui2.TextStyle{
 		color: tray_flyout_muted
 		size:  11

@@ -6,8 +6,8 @@
 //
 // Devices are sampled on a slow cadence from the compositor loop and only a
 // change invalidates the frame. Every string the icons and flyouts show is
-// formatted when a sample changes and retained, so an idle rebuild allocates
-// nothing.
+// formatted when a sample or the desktop's language changes and retained, so
+// an idle rebuild allocates nothing.
 module main
 
 import ui2
@@ -113,7 +113,8 @@ mut:
 	flyout_y      int
 	flyout_width  int
 	flyout_height int
-	// Formatted from the last sample; all owned.
+	// Formatted from the last sample; all owned, and worded in `language`.
+	language       DesktopLanguage
 	network_tip    string
 	ethernet_line  string
 	address_line   string
@@ -269,6 +270,11 @@ fn (mut d Desktop) update_tray_at(now i64, force bool) {
 	if !d.tray.preferences_loaded {
 		d.load_tray_preferences(d.home)
 	}
+	// Text worded in another language is rewritten from the sample it
+	// describes; the devices need not be read again for that.
+	if d.tray.sampled && d.tray.language != desktop_language {
+		d.format_tray_text()
+	}
 	if !force && d.tray.sampled && now >= d.tray.sampled_ms
 		&& now - d.tray.sampled_ms < tray_sample_ms {
 		return
@@ -311,7 +317,8 @@ fn (mut d Desktop) update_tray_at(now i64, force bool) {
 }
 
 // set_owned_text stores a formatted string, or a literal, which V's free
-// leaves alone, and releases the one it replaces.
+// leaves alone, and releases the one it replaces. Text from tr() belongs to
+// the translation table, so it is cloned before it is stored here.
 fn set_owned_text(slot string, text string) string {
 	if slot.len > 0 {
 		unsafe { slot.free() }
@@ -320,64 +327,75 @@ fn set_owned_text(slot string, text string) string {
 }
 
 // apply_tray_sample reformats the retained strings only when what the icons
-// report has changed. It is separate from sampling so tests can supply one.
+// report, or the language they report it in, has changed. It is separate from
+// sampling so tests can supply one.
 fn (mut d Desktop) apply_tray_sample(sample TraySample) {
-	if d.tray.sampled && d.tray.sample.same(sample) {
+	if d.tray.sampled && d.tray.sample.same(sample) && d.tray.language == desktop_language {
 		return
 	}
 	d.tray.sampled = true
 	d.tray.sample = sample
+	d.format_tray_text()
+}
+
+// format_tray_text words the retained strings for the current sample in the
+// desktop's language.
+fn (mut d Desktop) format_tray_text() {
+	sample := d.tray.sample
+	d.tray.language = desktop_language
 	address := if sample.ethernet == .connected { ipv4_text(sample.address) } else { '' }
 	d.tray.ethernet_line = set_owned_text(d.tray.ethernet_line, match sample.ethernet {
-		.connected { 'Ethernet: connected' }
-		.pending { 'Ethernet: acquiring an address' }
-		.absent { 'Ethernet: no adapter' }
-		.unknown { 'Ethernet: checking' }
+		.connected { tr('tray.ethernet.connected').clone() }
+		.pending { tr('tray.ethernet.acquiring').clone() }
+		.absent { tr('tray.ethernet.no_adapter').clone() }
+		.unknown { tr('tray.ethernet.checking').clone() }
 	})
 	d.tray.wifi_line = set_owned_text(d.tray.wifi_line, if !sample.wifi_present {
-		'Wi-Fi: no adapter'
+		tr('tray.wifi.no_adapter').clone()
 	} else if !sample.wifi_radio {
-		'Wi-Fi: off'
-	} else if sample.wifi_networks == 1 {
-		'Wi-Fi: on, 1 network nearby'
+		tr('tray.wifi.off').clone()
 	} else {
-		'Wi-Fi: on, ${sample.wifi_networks} networks nearby'
+		tr_count('tray.wifi.networks_nearby', sample.wifi_networks)
 	})
 	d.tray.address_line = set_owned_text(d.tray.address_line, if address.len > 0 {
-		'IPv4 address ${address}'
+		tr_fill('tray.network.ipv4_address', address)
 	} else {
 		''
 	})
 	d.tray.network_tip = set_owned_text(d.tray.network_tip, if sample.ethernet == .connected {
-		'Ethernet: ${address}'
+		tr_fill('tray.network.ethernet_address', address)
 	} else if sample.ethernet == .pending {
-		'Ethernet: acquiring an address'
+		tr('tray.ethernet.acquiring').clone()
 	} else if sample.wifi_present && sample.wifi_radio {
-		'Wi-Fi: not connected'
+		tr('tray.wifi.not_connected').clone()
 	} else {
-		'Not connected'
+		tr('tray.network.not_connected').clone()
 	})
 	if address.len > 0 {
 		unsafe { address.free() }
 	}
 	percent := battery_percentage_text(sample.battery)
 	d.tray.battery_tip = set_owned_text(d.tray.battery_tip, if sample.charging {
-		'Battery: ${percent}, charging'
+		tr_fill('tray.battery.tip_charging', percent)
 	} else {
-		'Battery: ${percent} remaining'
+		tr_fill('tray.battery.tip_remaining', percent)
 	})
 	estimate := desktop_battery_cache.history.remaining_hours(sample.battery)
 	d.tray.battery_line = set_owned_text(d.tray.battery_line, battery_remaining_text(estimate).clone())
+	brightness := if sample.backlight_present { sample.backlight_percent.str() } else { '' }
 	d.tray.display_tip = set_owned_text(d.tray.display_tip, if sample.backlight_present {
-		'Brightness: ${sample.backlight_percent}%'
+		tr_fill('tray.display.tip_brightness', brightness)
 	} else {
-		'Display'
+		tr('tray.display.heading').clone()
 	})
 	d.tray.display_line = set_owned_text(d.tray.display_line, if sample.backlight_present {
-		'Brightness ${sample.backlight_percent}%'
+		tr_fill('tray.display.brightness', brightness)
 	} else {
-		'This display has no adjustable backlight.'
+		tr('tray.display.no_backlight').clone()
 	})
+	if brightness.len > 0 {
+		unsafe { brightness.free() }
+	}
 	d.dirty = true
 }
 
@@ -490,14 +508,18 @@ fn (d &Desktop) tray_elements(mut children []ui2.Element, x int, y int, height i
 
 fn (d &Desktop) tooltip_text(action string) string {
 	return match action {
-		action_show_desktop { 'Show desktop' }
-		action_tray_overflow { 'Show hidden icons' }
-		action_tray_input { d.settings.keyboard_layout.title() }
+		action_show_desktop { tr('tray.show_desktop') }
+		action_tray_overflow { tr('tray.show_hidden_icons') }
+		action_tray_input { keyboard_layout_text(d.settings.keyboard_layout) }
 		'tray.icon.network', 'tray.overflow.icon.network' { d.tray.network_tip }
 		'tray.icon.battery', 'tray.overflow.icon.battery' { d.tray.battery_tip }
 		'tray.icon.display', 'tray.overflow.icon.display' { d.tray.display_tip }
 		'tray.icon.capture', 'tray.overflow.icon.capture' {
-			if d.capture.report.phase == .recording { 'Capture: recording' } else { 'Capture' }
+			if d.capture.report.phase == .recording {
+				tr('tray.capture.tip_recording')
+			} else {
+				tr('app.capture')
+			}
 		}
 		else { '' }
 	}
@@ -705,7 +727,7 @@ fn (mut d Desktop) tray_flyout_element() ?ui2.Element {
 	mut width := tray_flyout_width
 	match d.tray.flyout {
 		.network {
-			children << tray_flyout_heading('Network', pad, 12, inner)
+			children << tray_flyout_heading(tr('tray.network.heading'), pad, 12, inner)
 			children << ui2.button_with_image('', '', d.tray_glyph(.network), ui2.rect(f64(pad), 40,
 				28, 28), ui2.BoxStyle{
 				transparent: true
@@ -716,15 +738,15 @@ fn (mut d Desktop) tray_flyout_element() ?ui2.Element {
 			children << tray_flyout_line(if d.tray.address_line.len > 0 {
 				d.tray.address_line
 			} else {
-				'No IPv4 address'
+				tr('tray.network.no_ipv4')
 			}, pad + 38, 56, inner - 38, true)
 			children << tray_flyout_line(d.tray.wifi_line, pad + 38, 80, inner - 38, false)
-			children << d.tray_flyout_button(action_tray_network_settings, 'Network settings',
+			children << d.tray_flyout_button(action_tray_network_settings, tr('tray.network.settings'),
 				pad, 110, inner)
 			height = 152
 		}
 		.battery {
-			children << tray_flyout_heading('Battery', pad, 12, inner)
+			children << tray_flyout_heading(tr('tray.battery.heading'), pad, 12, inner)
 			children << ui2.label('', battery_percentage_text(d.tray.sample.battery), ui2.rect(f64(pad),
 				36, f64(inner), 34), ui2.TextStyle{
 				color: tray_flyout_text
@@ -732,40 +754,41 @@ fn (mut d Desktop) tray_flyout_element() ?ui2.Element {
 				bold:  true
 			})
 			children << tray_flyout_line(if d.tray.sample.charging {
-				'Charging'
+				tr('tray.battery.charging')
 			} else {
 				d.tray.battery_line
 			}, pad, 74, inner, true)
-			children << d.tray_flyout_button(action_tray_power_settings, 'Power settings', pad,
-				102, inner)
+			children << d.tray_flyout_button(action_tray_power_settings, tr('tray.battery.settings'),
+				pad, 102, inner)
 			height = 144
 		}
 		.display {
-			children << tray_flyout_heading('Display', pad, 12, inner)
+			children << tray_flyout_heading(tr('tray.display.heading'), pad, 12, inner)
 			children << tray_flyout_line(d.tray.display_line, pad, 40, inner, !d.tray.sample.backlight_present)
 			mut y := 66
 			if d.tray.sample.backlight_present {
 				half := (inner - 8) / 2
-				children << d.tray_flyout_button(action_tray_brightness_down, 'Dimmer', pad, y, half)
-				children << d.tray_flyout_button(action_tray_brightness_up, 'Brighter', pad + half +
-					8, y, half)
+				children << d.tray_flyout_button(action_tray_brightness_down, tr('tray.display.dimmer'),
+					pad, y, half)
+				children << d.tray_flyout_button(action_tray_brightness_up, tr('tray.display.brighter'),
+					pad + half + 8, y, half)
 				y += 36
 			}
-			children << d.tray_flyout_button(action_tray_display_settings, 'Display settings',
+			children << d.tray_flyout_button(action_tray_display_settings, tr('tray.display.settings'),
 				pad, y, inner)
 			height = y + 42
 		}
 		.capture {
-			children << tray_flyout_heading('Capture', pad, 12, inner)
+			children << tray_flyout_heading(tr('app.capture'), pad, 12, inner)
 			children << tray_flyout_line(if d.capture.report.phase == .recording {
-				'Recording the screen'
+				tr('tray.capture.recording')
 			} else {
-				'Screenshots and screen recordings'
+				tr('tray.capture.note')
 			}, pad, 40, inner, true)
-			children << d.tray_flyout_button(action_tray_capture_screenshot, 'Take screenshot',
+			children << d.tray_flyout_button(action_tray_capture_screenshot, tr('tray.capture.screenshot'),
 				pad, 66, inner)
-			children << d.tray_flyout_button(action_tray_capture_open, 'Open Capture', pad, 102,
-				inner)
+			children << d.tray_flyout_button(action_tray_capture_open, tr('tray.capture.open'),
+				pad, 102, inner)
 			height = 144
 		}
 		.overflow {
@@ -779,15 +802,24 @@ fn (mut d Desktop) tray_flyout_element() ?ui2.Element {
 					d.tray_glyph(item), 8 + count * (tray_icon_width + 6), 8)
 				count++
 			}
-			width = 16 + count * (tray_icon_width + 6)
-			if width < 132 {
-				width = 132
-			}
-			children << ui2.label('', 'Right-click to move', ui2.rect(10, 44, f64(width - 20), 16),
-				ui2.TextStyle{
+			hint := tr('tray.overflow.hint')
+			hint_style := ui2.TextStyle{
 				color: tray_flyout_muted
 				size:  11
-			})
+			}
+			// Wide enough for the hint under the icons, in whichever language.
+			mut least := 132
+			if d.fonts.len > 0 {
+				hint_width := d.face_for(hint_style).text_width(hint) + 20
+				if hint_width > least {
+					least = hint_width
+				}
+			}
+			width = 16 + count * (tray_icon_width + 6)
+			if width < least {
+				width = least
+			}
+			children << ui2.label('', hint, ui2.rect(10, 44, f64(width - 20), 16), hint_style)
 			height = 68
 		}
 		.input {

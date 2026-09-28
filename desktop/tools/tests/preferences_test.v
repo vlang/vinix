@@ -24,6 +24,7 @@ fn preference_test_custom() DesktopPreferences {
 			button_side: .left
 			taskbar_mode: .combined
 			theme: .macos
+			language: .ru
 			clock_24_hour: false
 			clock_show_seconds: false
 			clock_show_date: false
@@ -66,7 +67,7 @@ fn test_preferences_round_trip_every_field_and_both_scale_overrides() {
 	}
 	assert os.ls(home)! == [desktop_preferences_name]
 	record := os.read_file(desktop_preferences_path(home))!
-	assert record == 'version=1\nscale=2\nbutton_side=left\ntaskbar_mode=combined\ntheme=macos\nclock_24_hour=false\nclock_show_seconds=false\nclock_show_date=false\nclock_show_weekday=false\nwallpaper_color=4\nwallpaper_image=2\nkeyboard_layouts=us,ru,de\nkeyboard_layout=de\n'
+	assert record == 'version=1\nscale=2\nbutton_side=left\ntaskbar_mode=combined\ntheme=macos\nlanguage=ru\nclock_24_hour=false\nclock_show_seconds=false\nclock_show_date=false\nclock_show_weekday=false\nwallpaper_color=4\nwallpaper_image=2\nkeyboard_layouts=us,ru,de\nkeyboard_layout=de\n'
 }
 
 fn test_preferences_each_change_preserves_the_rest_of_the_snapshot() {
@@ -75,7 +76,7 @@ fn test_preferences_each_change_preserves_the_rest_of_the_snapshot() {
 	mut p := desktop_load_preferences(home)
 	p.configure_scale(1920, 1080)
 	mut settings := Settings{}
-	for field in 0 .. 11 {
+	for field in 0 .. 12 {
 		match field {
 			0 { settings.button_side = .left }
 			1 { settings.taskbar_mode = .combined }
@@ -87,7 +88,8 @@ fn test_preferences_each_change_preserves_the_rest_of_the_snapshot() {
 			7 { settings.clock_show_date = false }
 			8 { settings.clock_show_weekday = false }
 			9 { settings.keyboard_layouts = preference_test_custom().settings.keyboard_layouts }
-			else { settings.keyboard_layout = .german }
+			10 { settings.keyboard_layout = .german }
+			else { settings.language = .ru }
 		}
 		assert p.save_changes(settings, desktop_current_scale(), home)
 		loaded := desktop_load_preferences(home)
@@ -115,6 +117,7 @@ fn test_preferences_optional_keys_comments_and_unknown_keys() {
 	assert p.settings.clock_show_date
 	assert p.settings.clock_show_weekday
 	assert p.settings.wallpaper_image == -1
+	assert p.settings.language == .en
 	assert p.scale == 0
 	assert p.settings.keyboard_layouts == keyboard_layout_default_mask
 	assert p.settings.keyboard_layout == .us
@@ -129,6 +132,15 @@ fn test_preferences_optional_keys_comments_and_unknown_keys() {
 	assert every.settings.keyboard_layouts == keyboard_layout_all_mask
 	assert every.settings.keyboard_layout == .spanish
 	assert desktop_encode_keyboard_layouts(keyboard_layout_all_mask) == 'us,ru,es,fr,de,pt'
+	for language in desktop_languages {
+		chosen := desktop_parse_preferences('version=1\nlanguage=${language.code()}\n')?
+		assert chosen.settings.language == language
+		assert chosen == DesktopPreferences{
+			settings: Settings{
+				language: language
+			}
+		}
+	}
 	assert desktop_preference_index('2147483647')? == 2147483647
 	assert desktop_preference_index('-1')? == -1
 }
@@ -141,6 +153,8 @@ fn test_preferences_reject_invalid_versions_fields_duplicates_and_overflow() {
 		'version=1\nscale=0', 'version=1\nscale=200', 'version=1\nscale=2junk',
 		'version=1\nscale=1\nscale=2', 'version=1\nbutton_side=up',
 		'version=1\ntaskbar_mode=9', 'version=1\ntheme=other',
+		'version=1\nlanguage=fr', 'version=1\nlanguage=RU', 'version=1\nlanguage=',
+		'version=1\nlanguage=en\nlanguage=es',
 		'version=1\nwallpaper_color=-1', 'version=1\nwallpaper_color=${wallpaper_colors.len}',
 		'version=1\nwallpaper_image=-2', 'version=1\nwallpaper_image=1junk',
 		'version=1\nwallpaper_image=2147483648', 'version=1\nwallpaper_image=999999999999',

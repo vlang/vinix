@@ -25,6 +25,9 @@ mut:
 	last_refresh_ms u64
 	// The wall-clock second the time on show was read at.
 	shown_seconds i64 = -1
+	// The language date_text was written in. build rewrites it after a
+	// change rather than waiting for the next second.
+	language DesktopLanguage
 }
 
 fn open_clock(mut desktop Desktop) !NativeApp {
@@ -73,7 +76,7 @@ fn (mut a ClockApp) refresh() {
 	seconds, _ := desktop_realtime()
 	if seconds < 0 {
 		a.time_text = clock_replace_text(a.time_text, '--:--:--'.clone())
-		a.date_text = clock_replace_text(a.date_text, 'Clock unavailable'.clone())
+		a.date_text = clock_replace_text(a.date_text, tr('clock.unavailable').clone())
 	} else {
 		civil := civil_from_epoch(seconds + a.tz_offset)
 		hour := pad2(civil.hour)
@@ -85,17 +88,12 @@ fn (mut a ClockApp) refresh() {
 			minute.free()
 			second.free()
 		}
-		day := civil.day.str()
-		year := civil.year.str()
-		next_date := '${weekday_names[civil.weekday]}, ${month_names[civil.month - 1]} ${day}, ${year}'
-		unsafe {
-			day.free()
-			year.free()
-		}
+		next_date := date_long_text(civil.year, civil.month, civil.day, civil.weekday)
 		a.time_text = clock_replace_text(a.time_text, next_time)
 		a.date_text = clock_replace_text(a.date_text, next_date)
 	}
 	a.shown_seconds = seconds
+	a.language = desktop_language
 	now := desktop_monotonic_ms()
 	a.stopwatch_text = clock_replace_text(a.stopwatch_text, clock_stopwatch_text(a.elapsed(now)))
 	a.last_refresh_ms = now
@@ -167,6 +165,9 @@ fn (mut a ClockApp) reset_stopwatch() {
 }
 
 fn (mut a ClockApp) build(size ui2.Rect) !ui2.Element {
+	if a.language != desktop_language {
+		a.refresh()
+	}
 	width := int(size.width)
 	height := int(size.height)
 	pad := 24
@@ -189,7 +190,7 @@ fn (mut a ClockApp) build(size ui2.Rect) !ui2.Element {
 	}, [])
 
 	stopwatch_top := 154
-	children << ui2.label('', 'STOPWATCH', ui2.rect(f64(pad), f64(stopwatch_top), f64(inner), 20), ui2.TextStyle{
+	children << ui2.label('', tr('clock.stopwatch'), ui2.rect(f64(pad), f64(stopwatch_top), f64(inner), 20), ui2.TextStyle{
 		color: body_muted
 		size: 11
 		bold: true
@@ -208,7 +209,7 @@ fn (mut a ClockApp) build(size ui2.Rect) !ui2.Element {
 	buttons_width := 2 * button_width + button_gap
 	button_x := (width - buttons_width) / 2
 	button_y := if height - 54 > stopwatch_top + 78 { height - 54 } else { stopwatch_top + 82 }
-	children << ui2.button(clock_action_toggle, if a.running { 'Stop' } else { 'Start' }, ui2.rect(f64(button_x), f64(button_y), f64(button_width), 32), ui2.BoxStyle{
+	children << ui2.button(clock_action_toggle, if a.running { tr('clock.stop') } else { tr('clock.start') }, ui2.rect(f64(button_x), f64(button_y), f64(button_width), 32), ui2.BoxStyle{
 		bg: if a.running { clock_stop } else { app_accent }
 		radius: 7
 	}, ui2.TextStyle{
@@ -217,7 +218,7 @@ fn (mut a ClockApp) build(size ui2.Rect) !ui2.Element {
 		bold: true
 		align: .center
 	})
-	children << ui2.button(clock_action_reset, 'Reset', ui2.rect(f64(button_x + button_width + button_gap), f64(button_y), f64(button_width), 32), ui2.BoxStyle{
+	children << ui2.button(clock_action_reset, tr('clock.reset'), ui2.rect(f64(button_x + button_width + button_gap), f64(button_y), f64(button_width), 32), ui2.BoxStyle{
 		bg: clock_button
 		radius: 7
 	}, ui2.TextStyle{

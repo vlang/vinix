@@ -29,16 +29,36 @@ const app_selection_row_top = 104
 const app_selection_selected_bg = u32(0xeef4fd)
 const app_selection_installed_bg = u32(0xf5f6f8)
 
-// Literal labels: the tree is rebuilt on every input and nothing collects the
+// One install-button label per count of chosen apps, each a whole
+// translation: the tree is rebuilt on every input and nothing collects the
 // strings a formatted count would allocate.
-const app_selection_install_labels = ['Continue', 'Install 1 app', 'Install 2 apps',
-	'Install 3 apps', 'Install 4 apps']
+enum AppSelectionInstallLabel {
+	continue_
+	install_1
+	install_2
+	install_3
+	install_4
+}
+
+const app_selection_install_labels = [AppSelectionInstallLabel.continue_, .install_1, .install_2,
+	.install_3, .install_4]
+
+fn (l AppSelectionInstallLabel) text() string {
+	return match l {
+		.continue_ { tr('app_selection.continue') }
+		.install_1 { tr('app_selection.install_1') }
+		.install_2 { tr('app_selection.install_2') }
+		.install_3 { tr('app_selection.install_3') }
+		.install_4 { tr('app_selection.install_4') }
+	}
+}
 
 // FirstRunApp is one optional application offered during setup. Any one of
-// `installed_paths` being executable means the image already carries it.
+// `installed_paths` being executable means the image already carries it. The
+// title is a product name; detail_text says what it is in the desktop's
+// language.
 struct FirstRunApp {
 	title           string
-	detail          string
 	icon            string
 	package_name    string
 	action          string
@@ -48,7 +68,6 @@ struct FirstRunApp {
 const first_run_apps = [
 	FirstRunApp{
 		title:           'Firefox'
-		detail:          'Mozilla web browser'
 		icon:            'asset:firefox'
 		package_name:    'firefox'
 		action:          'apps.toggle.firefox'
@@ -56,7 +75,6 @@ const first_run_apps = [
 	},
 	FirstRunApp{
 		title:           'Chromium'
-		detail:          'The open-source Chrome web browser'
 		icon:            'asset:chromium'
 		package_name:    'chromium'
 		action:          'apps.toggle.chromium'
@@ -64,7 +82,6 @@ const first_run_apps = [
 	},
 	FirstRunApp{
 		title:           'VOffice'
-		detail:          'Writer documents and Calc spreadsheets'
 		icon:            'builtin:editor'
 		package_name:    'voffice'
 		action:          'apps.toggle.voffice'
@@ -72,13 +89,22 @@ const first_run_apps = [
 	},
 	FirstRunApp{
 		title:           'Minecraft'
-		detail:          'Java Edition, with a Microsoft account'
 		icon:            'asset:minecraft'
 		package_name:    'minecraft'
 		action:          'apps.toggle.minecraft'
 		installed_paths: ['/usr/bin/minecraft']
 	},
 ]
+
+fn (app FirstRunApp) detail_text() string {
+	return match app.package_name {
+		'firefox' { tr('app_selection.firefox.detail') }
+		'chromium' { tr('app_selection.chromium.detail') }
+		'voffice' { tr('app_selection.voffice.detail') }
+		'minecraft' { tr('app_selection.minecraft.detail') }
+		else { '' }
+	}
+}
 
 fn first_run_app_installed(app FirstRunApp) bool {
 	for path in app.installed_paths {
@@ -273,13 +299,13 @@ fn app_selection_row(app FirstRunApp, installed bool, selected bool, hovered boo
 		size:  14
 		bold:  true
 	})
-	children << ui2.label('', app.detail, ui2.rect(63, 33, f64(width - 64 - 112), 18),
+	children << ui2.label('', app.detail_text(), ui2.rect(63, 33, f64(width - 64 - 112), 18),
 		ui2.TextStyle{
 		color: body_muted
 		size:  11
 	})
 	if installed {
-		children << ui2.label('', 'Installed', ui2.rect(f64(width - 111), 21, 94, 20),
+		children << ui2.label('', tr('app_selection.installed'), ui2.rect(f64(width - 111), 21, 94, 20),
 			ui2.TextStyle{
 			color: body_muted
 			size:  11
@@ -337,13 +363,13 @@ fn (s &AppSelectionState) element(d &Desktop) ui2.Element {
 	inner := card_width - 64
 
 	mut card_children := frame_elements(9)
-	card_children << ui2.label('apps.title', 'Choose your apps', ui2.rect(32, 28, f64(inner),
+	card_children << ui2.label('apps.title', tr('app_selection.heading'), ui2.rect(32, 28, f64(inner),
 		34), ui2.TextStyle{
 		color: body_heading
 		size:  24
 		bold:  true
 	})
-	card_children << ui2.label('apps.subtitle', 'Pick the apps to download and install now.',
+	card_children << ui2.label('apps.subtitle', tr('app_selection.intro'),
 		ui2.rect(32, 67, f64(inner), 24), ui2.TextStyle{
 		color: body_muted
 		size:  12
@@ -361,7 +387,7 @@ fn (s &AppSelectionState) element(d &Desktop) ui2.Element {
 		card_children << app_selection_row(app, s.installed[i], s.selected[i],
 			d.hover == app.action, y, inner)
 	}
-	card_children << ui2.label('apps.note', 'You can install more later with pkg install in Terminal.',
+	card_children << ui2.label('apps.note', tr('app_selection.note'),
 		ui2.rect(32, 402, f64(inner), 20), ui2.TextStyle{
 		color: body_muted
 		size:  11
@@ -370,7 +396,7 @@ fn (s &AppSelectionState) element(d &Desktop) ui2.Element {
 	if count >= app_selection_install_labels.len {
 		count = app_selection_install_labels.len - 1
 	}
-	label := app_selection_install_labels[count]
+	label := app_selection_install_labels[count].text()
 	card_children << ui2.button(action_apps_install, label, ui2.rect(32, 432, f64(inner), 40),
 		ui2.BoxStyle{
 		bg:     if d.hover == action_apps_install { u32(0x4a8ee7) } else { app_accent }
@@ -461,11 +487,22 @@ fn first_run_install_command(request string) string {
 			packages.free()
 		}
 	}
-	return "echo 'Installing the apps chosen during setup: ${names}'; echo; " +
+	// The messages sit inside the shell's quotes: `$failed` is the shell's list
+	// of what failed, and no translation contains a quote, `$`, `\` or a
+	// backtick (tools/tests/i18n_apps_test.v).
+	started := tr_fill('app_selection.install.started', names)
+	not_installed := tr_fill('app_selection.install.failed', '\$failed')
+	done := tr('app_selection.install.done')
+	defer {
+		unsafe {
+			started.free()
+			not_installed.free()
+		}
+	}
+	return "echo '${started}'; echo; " +
 		"failed=; for app in ${names}; do pkg install \"\$app\" || failed=\"\$failed \$app\"; done; echo; " +
-		"if [ -n \"\$failed\" ]; then echo \"Not installed:\$failed. Run pkg install\$failed to try again.\"; " +
-		"else echo 'The selected apps are installed. Open them from the desktop or the Start menu.'; fi; " +
-		'exec /bin/zsh -i'
+		"if [ -n \"\$failed\" ]; then echo \"${not_installed}\"; " +
+		"else echo '${done}'; fi; " + 'exec /bin/zsh -i'
 }
 
 // The picker runs between registration and the first ordinary desktop frame,

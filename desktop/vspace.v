@@ -244,7 +244,9 @@ mut:
 	started_ms  u64
 	elapsed_ms  u64
 	error       string
-	name_buffer [vspace_name_max]u8
+	// The language the error is worded in.
+	error_language DesktopLanguage
+	name_buffer    [vspace_name_max]u8
 }
 
 // begin restarts the walk at `path`. The new root is copied before anything is
@@ -261,7 +263,7 @@ fn (mut s VSpaceScanner) begin(path string) {
 	dir := desktop_opendir(s.root)
 	if dir == unsafe { nil } {
 		s.phase = .failed
-		s.set_error('cannot open ${s.root}')
+		s.word_error()
 		return
 	}
 	if info := desktop_lstat(s.root) {
@@ -442,6 +444,13 @@ fn (mut s VSpaceScanner) set_error(message string) {
 	s.error = message
 }
 
+// word_error says, in the desktop's language, why the root could not be
+// scanned. The window asks again when the language has changed since.
+fn (mut s VSpaceScanner) word_error() {
+	s.error_language = desktop_language
+	s.set_error(tr_fill('vspace.error.cannot_open', s.root))
+}
+
 // current_path is what the walk is inside of right now. The string belongs to
 // the frame that owns the open directory, and the element tree is encoded and
 // thrown away before that frame can be popped.
@@ -461,22 +470,35 @@ fn vspace_elapsed(from u64, to u64) u64 {
 
 // ── Formatting ────────────────────────────────────────────────────
 
-const vspace_size_units = ['KB', 'MB', 'GB', 'TB', 'PB']
+// KB, MB, GB, TB and PB.
+const vspace_size_unit_count = 5
+
+// vspace_size_unit is a unit's symbol in the desktop's language.
+fn vspace_size_unit(unit int) string {
+	return match unit {
+		0 { tr('vspace.unit.kb') }
+		1 { tr('vspace.unit.mb') }
+		2 { tr('vspace.unit.gb') }
+		3 { tr('vspace.unit.tb') }
+		else { tr('vspace.unit.pb') }
+	}
+}
 
 // vspace_size_text is the standalone program's byte formatter: a compact
 // binary unit carrying three significant figures. The arithmetic is integer
 // because V's floating-point formatter keeps scratch storage alive under
-// -manualfree, and this runs for every row of both panels every frame.
+// -manualfree, and this runs for every row of both panels every frame. The
+// decimal point and the units are the language's own.
 fn vspace_size_text(bytes u64) string {
 	if bytes < 1024 {
 		count := bytes.str()
-		text := '${count} B'
+		text := tr_fill('vspace.size.bytes', count)
 		unsafe { count.free() }
 		return text
 	}
 	mut value := bytes
 	mut unit := 0
-	for value >= 1024 * 1024 && unit + 1 < vspace_size_units.len {
+	for value >= 1024 * 1024 && unit + 1 < vspace_size_unit_count {
 		value /= 1024
 		unit++
 	}
@@ -485,7 +507,7 @@ fn vspace_size_text(bytes u64) string {
 	hundredths := (value * 100 + 512) / 1024
 	if hundredths >= 10000 {
 		whole := ((hundredths + 50) / 100).str()
-		text := '${whole} ${vspace_size_units[unit]}'
+		text := tr_fill2('vspace.size.whole', whole, vspace_size_unit(unit))
 		unsafe { whole.free() }
 		return text
 	}
@@ -493,7 +515,7 @@ fn vspace_size_text(bytes u64) string {
 		tenths := (hundredths + 5) / 10
 		whole := (tenths / 10).str()
 		fraction := (tenths % 10).str()
-		text := '${whole}.${fraction} ${vspace_size_units[unit]}'
+		text := tr_fill3('vspace.size.decimal', whole, fraction, vspace_size_unit(unit))
 		unsafe {
 			whole.free()
 			fraction.free()
@@ -502,7 +524,7 @@ fn vspace_size_text(bytes u64) string {
 	}
 	whole := (hundredths / 100).str()
 	fraction := pad2(int(hundredths % 100))
-	text := '${whole}.${fraction} ${vspace_size_units[unit]}'
+	text := tr_fill3('vspace.size.decimal', whole, fraction, vspace_size_unit(unit))
 	unsafe {
 		whole.free()
 		fraction.free()
@@ -510,14 +532,25 @@ fn vspace_size_text(bytes u64) string {
 	return text
 }
 
+// vspace_group_separator is what a language writes between groups of three
+// digits: Russian and Spanish write a comma as their decimal point.
+fn vspace_group_separator() u8 {
+	return match desktop_language {
+		.en { `,` }
+		.ru { ` ` }
+		.es { `.` }
+	}
+}
+
 // vspace_count_text groups an integer into thousands. Six hundred thousand
 // files is unreadable as a run of digits and obvious with two commas in it.
 fn vspace_count_text(value u64) string {
 	digits := value.str()
+	separator := vspace_group_separator()
 	mut out := []u8{cap: digits.len + digits.len / 3}
 	for index in 0 .. digits.len {
 		if index > 0 && (digits.len - index) % 3 == 0 {
-			out << `,`
+			out << separator
 		}
 		out << digits[index]
 	}
@@ -532,7 +565,7 @@ fn vspace_count_text(value u64) string {
 fn vspace_duration_text(milliseconds u64) string {
 	if milliseconds < 1000 {
 		count := milliseconds.str()
-		text := '${count} ms'
+		text := tr_fill('vspace.duration.milliseconds', count)
 		unsafe { count.free() }
 		return text
 	}
@@ -540,7 +573,7 @@ fn vspace_duration_text(milliseconds u64) string {
 	if seconds < 60 {
 		whole := seconds.str()
 		tenth := (milliseconds % 1000 / 100).str()
-		text := '${whole}.${tenth} sec'
+		text := tr_fill2('vspace.duration.seconds', whole, tenth)
 		unsafe {
 			whole.free()
 			tenth.free()
@@ -549,7 +582,7 @@ fn vspace_duration_text(milliseconds u64) string {
 	}
 	minutes := (seconds / 60).str()
 	remaining := (seconds % 60).str()
-	text := '${minutes} min ${remaining} sec'
+	text := tr_fill2('vspace.duration.minutes', minutes, remaining)
 	unsafe {
 		minutes.free()
 		remaining.free()
@@ -569,9 +602,17 @@ const vspace_action_files_next = 'vspace.files.next'
 
 // The scopes the standalone program's Whole disk and Home buttons stand for,
 // plus the one directory on a Vinix image that is worth a button of its own.
-const vspace_scope_titles = ['Whole disk', 'Home', 'System']
+const vspace_scope_count = 3
 const vspace_scope_paths = ['/', '/root', '/usr']
 const vspace_scope_actions = ['vspace.scope.0', 'vspace.scope.1', 'vspace.scope.2']
+
+fn vspace_scope_title(index int) string {
+	return match index {
+		0 { tr('vspace.scope.whole_disk') }
+		1 { tr('vspace.scope.home') }
+		else { tr('vspace.scope.system') }
+	}
+}
 
 // Row actions are literals because the tree is rebuilt on every frame and this
 // target has no garbage collector. They name a row of the window, not an entry
@@ -702,10 +743,10 @@ fn (a &VSpaceApp) phase_color() u32 {
 
 fn (a &VSpaceApp) phase_title() string {
 	return match a.scanner.phase {
-		.scanning { 'SCANNING' }
-		.complete { 'COMPLETE' }
-		.cancelled { 'STOPPED' }
-		.failed { 'UNREADABLE' }
+		.scanning { tr('vspace.phase.scanning') }
+		.complete { tr('vspace.phase.complete') }
+		.cancelled { tr('vspace.phase.stopped') }
+		.failed { tr('vspace.phase.unreadable') }
 	}
 }
 
@@ -715,23 +756,27 @@ fn (a &VSpaceApp) phase_title() string {
 fn (a &VSpaceApp) status_text() string {
 	match a.scanner.phase {
 		.scanning {
-			return 'Walking ${a.scanner.current_path()}'
+			return tr_fill('vspace.status.walking', a.scanner.current_path())
 		}
 		.failed {
 			return a.scanner.error.clone()
 		}
 		.cancelled {
-			return 'Stopped. The rankings below hold what had been counted.'
+			// The label owns and frees its text; the table's is not its to free.
+			return tr('vspace.status.stopped').clone()
 		}
 		.complete {
 			duration := vspace_duration_text(a.scanner.elapsed_ms)
 			if a.scanner.unreadable == 0 {
-				text := 'Scanned ${a.scanner.root} in ${duration}.'
+				text := tr_fill2('vspace.status.scanned', a.scanner.root, duration)
 				unsafe { duration.free() }
 				return text
 			}
+			// The count is grouped into thousands, so the form is chosen for
+			// it and then filled rather than left to tr_count.
 			skipped := vspace_count_text(a.scanner.unreadable)
-			text := 'Scanned ${a.scanner.root} in ${duration}. ${skipped} protected or unreadable items were skipped.'
+			text := tr_substitute(tr_plural_form('vspace.status.scanned_skipped', i64(a.scanner.unreadable)),
+				skipped, a.scanner.root, duration)
 			unsafe {
 				duration.free()
 				skipped.free()
@@ -855,11 +900,11 @@ fn (a &VSpaceApp) panel(title string, ranking &VSpaceRanking, page int, rows int
 		align: .right
 	}
 	if ranking.entries.len == 0 {
-		children << ui2.label('', 'nothing yet', summary_frame, summary_style)
+		children << ui2.label('', tr('vspace.panel.nothing_yet'), summary_frame, summary_style)
 	} else {
-		count := vspace_count_text(u64(ranking.entries.len))
-		children << vspace_owned_label('${count} ranked', summary_frame, summary_style)
-		unsafe { count.free() }
+		// A ranking holds at most vspace_rank_limit entries, too few to group.
+		children << vspace_owned_label(tr_count('vspace.panel.ranked', ranking.entries.len),
+			summary_frame, summary_style)
 	}
 	children << ui2.view('', ui2.rect(0, f64(vspace_panel_header - 1), f64(width), 1), ui2.BoxStyle{
 		bg: body_rule
@@ -885,7 +930,7 @@ fn (a &VSpaceApp) panel(title string, ranking &VSpaceRanking, page int, rows int
 	}
 
 	if ranking.entries.len == 0 {
-		children << ui2.label('', 'Results appear here while the disk is walked.', ui2.rect(14,
+		children << ui2.label('', tr('vspace.panel.empty'), ui2.rect(14,
 			f64(vspace_panel_header + 10), f64(width - 28), 18), ui2.TextStyle{
 			color: body_muted
 			size: 11
@@ -914,6 +959,9 @@ fn (a &VSpaceApp) panel(title string, ranking &VSpaceRanking, page int, rows int
 }
 
 fn (mut a VSpaceApp) build(size ui2.Rect) !ui2.Element {
+	if a.scanner.phase == .failed && a.scanner.error_language != desktop_language {
+		a.scanner.word_error()
+	}
 	width := int(size.width)
 	height := int(size.height)
 	inner := width - vspace_pad * 2
@@ -938,7 +986,7 @@ fn (mut a VSpaceApp) build(size ui2.Rect) !ui2.Element {
 		size: 18
 		bold: true
 	})
-	children << ui2.label('', 'Disk inventory', ui2.rect(f64(vspace_pad + 78), 12, 160, 16),
+	children << ui2.label('', tr('vspace.subtitle'), ui2.rect(f64(vspace_pad + 78), 12, 160, 16),
 		ui2.TextStyle{
 		color: body_muted
 		size: 11
@@ -964,17 +1012,18 @@ fn (mut a VSpaceApp) build(size ui2.Rect) !ui2.Element {
 	// Scope: the presets, the way back out of a folder that was descended
 	// into, and the two controls that start and stop a walk.
 	mut scope_x := vspace_pad
-	for index, title in vspace_scope_titles {
+	for index in 0 .. vspace_scope_count {
 		button_width := if index == 0 { 92 } else { 72 }
-		children << vspace_button(vspace_scope_actions[index], title, scope_x, 40, button_width,
-			true)
+		children << vspace_button(vspace_scope_actions[index], vspace_scope_title(index), scope_x,
+			40, button_width, true)
 		scope_x += button_width + 6
 	}
-	children << vspace_button(vspace_action_up, 'Up', scope_x, 40, 48, a.scanner.root != '/')
-	children << vspace_button(vspace_action_stop, 'Stop', width - vspace_pad - 68, 40, 68,
-		scanning)
-	children << vspace_button(vspace_action_rescan, 'Rescan', width - vspace_pad - 144, 40,
-		72, !scanning)
+	children << vspace_button(vspace_action_up, tr('vspace.button.up'), scope_x, 40, 48,
+		a.scanner.root != '/')
+	children << vspace_button(vspace_action_stop, tr('vspace.button.stop'), width - vspace_pad - 68,
+		40, 68, scanning)
+	children << vspace_button(vspace_action_rescan, tr('vspace.button.rescan'), width - vspace_pad -
+		144, 40, 72, !scanning)
 
 	children << ui2.label('', a.scanner.root, ui2.rect(f64(vspace_pad), 72, f64(inner), 16),
 		ui2.TextStyle{
@@ -1006,22 +1055,22 @@ fn (mut a VSpaceApp) build(size ui2.Rect) !ui2.Element {
 
 	gap := 10
 	metric_width := (inner - gap * 3) / 4
-	children << vspace_metric('INDEXED SIZE', vspace_size_text(a.scanner.total_bytes), vspace_pad,
-		106, metric_width, app_accent)
-	children << vspace_metric('FILES', vspace_count_text(a.scanner.files), vspace_pad + metric_width +
-		gap, 106, metric_width, vspace_files_accent)
-	children << vspace_metric('FOLDERS', vspace_count_text(a.scanner.directories), vspace_pad +
-		(metric_width + gap) * 2, 106, metric_width, vspace_folders_accent)
-	children << vspace_metric('SKIPPED', vspace_count_text(a.scanner.unreadable), vspace_pad +
-		(metric_width + gap) * 3, 106, metric_width, files_error)
+	children << vspace_metric(tr('vspace.metric.size'), vspace_size_text(a.scanner.total_bytes),
+		vspace_pad, 106, metric_width, app_accent)
+	children << vspace_metric(tr('vspace.metric.files'), vspace_count_text(a.scanner.files),
+		vspace_pad + metric_width + gap, 106, metric_width, vspace_files_accent)
+	children << vspace_metric(tr('vspace.metric.folders'), vspace_count_text(a.scanner.directories),
+		vspace_pad + (metric_width + gap) * 2, 106, metric_width, vspace_folders_accent)
+	children << vspace_metric(tr('vspace.metric.skipped'), vspace_count_text(a.scanner.unreadable),
+		vspace_pad + (metric_width + gap) * 3, 106, metric_width, files_error)
 
 	panel_width := (inner - gap) / 2
-	children << a.panel('Largest folders', &a.scanner.dirs_rank, a.dir_page, rows, vspace_dir_actions,
-		vspace_action_dirs_back, vspace_action_dirs_next, vspace_pad, panel_y, panel_width,
-		panel_height, vspace_folders_accent, !scanning)
-	children << a.panel('Largest files', &a.scanner.files_rank, a.file_page, rows, vspace_dir_actions,
-		vspace_action_files_back, vspace_action_files_next, vspace_pad + panel_width + gap,
-		panel_y, panel_width, panel_height, vspace_files_accent, false)
+	children << a.panel(tr('vspace.panel.folders'), &a.scanner.dirs_rank, a.dir_page, rows,
+		vspace_dir_actions, vspace_action_dirs_back, vspace_action_dirs_next, vspace_pad, panel_y,
+		panel_width, panel_height, vspace_folders_accent, !scanning)
+	children << a.panel(tr('vspace.panel.files'), &a.scanner.files_rank, a.file_page, rows,
+		vspace_dir_actions, vspace_action_files_back, vspace_action_files_next, vspace_pad +
+		panel_width + gap, panel_y, panel_width, panel_height, vspace_files_accent, false)
 
 	mut status := frame_elements(1)
 	status << vspace_owned_label(a.status_text(), ui2.rect(10, 5, f64(inner - 20), 14), ui2.TextStyle{

@@ -393,7 +393,7 @@ fn (d &Desktop) switcher_element() ui2.Element {
 		})))
 	}
 
-	children << ui2.label('switcher.title', d.switcher_title(), ui2.rect(0, f64(panel_height - switcher_label_height - switcher_padding / 2), f64(panel_width), f64(switcher_label_height)), ui2.TextStyle{
+	children << ui2.label('switcher.title', app_title_text(d.switcher_title()), ui2.rect(0, f64(panel_height - switcher_label_height - switcher_padding / 2), f64(panel_width), f64(switcher_label_height)), ui2.TextStyle{
 		color: switcher_text
 		size:  15
 		bold:  true
@@ -407,6 +407,8 @@ fn (d &Desktop) switcher_element() ui2.Element {
 	}, children)
 }
 
+// switcher_title is the selected window's title as the window manager knows
+// it, which is English; the panel shows it through app_title_text.
 fn (d &Desktop) switcher_title() string {
 	if d.switcher.index < 0 || d.switcher.index >= d.switcher.order.len {
 		return ''

@@ -91,6 +91,25 @@ const tray_context_show_entries = [
 	ui2.MenuEntry{ id: tray_context_show, title: 'Show on taskbar' },
 ]
 
+// context_entry_title is the text a menu row shows. The menus above are
+// constants, so their rows are worded in the desktop's language when drawn;
+// rows built elsewhere, such as a Start menu program's, carry their own.
+fn context_entry_title(entry ui2.MenuEntry) string {
+	return match entry.id {
+		create_context_new_folder { tr('desktop_menu.new_folder') }
+		create_context_new_file { tr('desktop_menu.new_file') }
+		file_context_rename { tr('desktop_menu.rename') }
+		file_context_copy { tr('desktop_menu.copy') }
+		file_context_cut { tr('desktop_menu.cut') }
+		file_context_paste { tr('desktop_menu.paste') }
+		file_context_tags { tr('desktop_menu.tags') }
+		file_context_delete { tr('desktop_menu.delete') }
+		tray_context_hide { tr('tray.menu.hide') }
+		tray_context_show { tr('tray.menu.show') }
+		else { entry.title }
+	}
+}
+
 enum CreateContextTarget {
 	none_
 	desktop
@@ -1496,8 +1515,8 @@ fn (mut d Desktop) render_context_entries(entries []ui2.MenuEntry) {
 	mut children := frame_elements(entries.len)
 	for index, entry in entries {
 		y := create_context_padding + index * create_context_row_height
-		children << ui2.button(entry.id, entry.title, ui2.rect(f64(create_context_padding), f64(y),
-			f64(create_context_width - 2 * create_context_padding), f64(create_context_row_height)),
+		children << ui2.button(entry.id, context_entry_title(entry), ui2.rect(f64(create_context_padding),
+			f64(y), f64(create_context_width - 2 * create_context_padding), f64(create_context_row_height)),
 			ui2.BoxStyle{
 				bg:     if d.hover == entry.id { files_row_hover } else { app_surface }
 				radius: 5
