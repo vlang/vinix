@@ -21,6 +21,7 @@ run-desktop-aarch64.sh boots, at the desktop's default scale for it (100%).
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
 import os
@@ -271,7 +272,10 @@ def main() -> int:
     # to Limine on a cached ISO9660 disk, the way run-desktop-aarch64.sh
     # --no-persist boots it. The cache is keyed by the image's identity.
     initramfs = arguments.initramfs.resolve()
-    module_iso = ROOT / "build/desktop-perf/initramfs.iso"
+    # One cache per image, so measuring a second image never rewrites the
+    # disk a running measurement is reading.
+    tag = hashlib.sha256(str(initramfs).encode()).hexdigest()[:12]
+    module_iso = ROOT / f"build/desktop-perf/{initramfs.stem}-{tag}.iso"
     subprocess.run([sys.executable, str(ROOT / "tools/build-qemu-module-iso.py"),
                     str(initramfs), str(module_iso)], check=True)
 
