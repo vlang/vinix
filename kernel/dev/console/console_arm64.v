@@ -412,6 +412,17 @@ fn (mut this Console) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 			}
 			return 0
 		}
+		// Caps Lock is kept by whichever keyboard toggled it: VirtIO and USB
+		// share one state, the built-in Apple keyboard has its own.
+		ioctl.kdgetled {
+			caps := vi_caps_active || spi_keyboard.caps_lock()
+			leds := u8(if caps { ioctl.led_cap } else { 0 })
+			if !usercopy.copy_to_user(u64(argp), voidptr(&leds), 1) {
+				errno.set(errno.efault)
+				return none
+			}
+			return 0
+		}
 		ioctl.tiocgwinsz {
 			mut size := ioctl.WinSize{}
 			if this.winsize_explicit {

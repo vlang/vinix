@@ -468,6 +468,17 @@ fn process_key(code u16, value u32) {
 		else {}
 	}
 
+	// The ISO key has no US character; see keyboard.iso_key.
+	if code == u16(keyboard.key_102nd) {
+		if !vi_meta_active {
+			if vi_alt_active {
+				vi_put(0x1b)
+			}
+			vi_puts(keyboard.iso_key(vi_shift_active))
+		}
+		return
+	}
+
 	// Regular keys — use shared conversion tables. GUI chords are encoded
 	// before Ctrl turns letters into control bytes.
 	base := keyboard.translate(u8(code), vi_shift_active, vi_caps_active, false)
@@ -486,9 +497,24 @@ fn process_key(code u16, value u32) {
 		vi_meta_chorded = true
 		return
 	}
+	// Ctrl-Space is NUL, as on any terminal; the table cannot say it. The
+	// desktop moves to the next keyboard layout on it.
+	if vi_ctrl_active && code == u16(keyboard.key_space) {
+		if vi_alt_active {
+			vi_put(0x1b)
+		}
+		vi_put(0)
+		return
+	}
 	c := keyboard.translate(u8(code), vi_shift_active, vi_caps_active, vi_ctrl_active)
 	if c == 0 {
 		return
+	}
+	// Option (Alt) goes in front as an escape, the way a terminal's Meta key
+	// does and the Apple SPI keyboard already sends it. The desktop's keyboard
+	// layouts type their AltGr characters from it.
+	if vi_alt_active {
+		vi_put(0x1b)
 	}
 	vi_put(c)
 }

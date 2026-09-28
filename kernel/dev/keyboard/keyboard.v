@@ -2,6 +2,19 @@ module keyboard
 
 const max_keycode = 57
 
+// Keys the drivers treat on their own, as Linux keycodes (which PS/2 set 1
+// scancodes match for these).
+pub const key_space = u8(57)
+pub const key_102nd = u8(86)
+
+// iso_key is what the ISO key between left Shift and Z types. The US layout
+// has no character for it, so it types the § and ± Apple's US layout prints
+// there: that names the key uniquely, and the desktop's keyboard layouts put
+// their own characters (< > | for most of Europe) on it.
+pub fn iso_key(shift bool) &char {
+	return if shift { c'\xc2\xb1' } else { c'\xc2\xa7' }
+}
+
 const convtab_nomod = [
 	`\0`,
 	`\e`,

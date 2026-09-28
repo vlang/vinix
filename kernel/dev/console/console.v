@@ -475,6 +475,28 @@ fn keyboard_handler() {
 			continue
 		}
 
+		// The ISO key has no US character; see keyboard.iso_key.
+		if input_byte == keyboard.key_102nd {
+			if !console_meta_active {
+				if console_alt_active {
+					add_to_buf(c'\e', 1, true)
+				}
+				add_to_buf(keyboard.iso_key(console_shift_active), 2, true)
+			}
+			continue
+		}
+
+		// Ctrl-Space is NUL, as on any terminal; the table cannot say it. The
+		// desktop moves to the next keyboard layout on it.
+		if console_ctrl_active && !console_meta_active && input_byte == space {
+			nul := u8(0)
+			if console_alt_active {
+				add_to_buf(c'\e', 1, true)
+			}
+			add_to_buf(&nul, 1, true)
+			continue
+		}
+
 		mut c := u8(0)
 
 		if console_meta_active {
@@ -499,6 +521,11 @@ fn keyboard_handler() {
 			}
 		}
 
+		// Option (Alt) goes in front as an escape, the way a terminal's Meta
+		// key does. The desktop's keyboard layouts type AltGr characters from it.
+		if console_alt_active {
+			add_to_buf(c'\e', 1, true)
+		}
 		add_to_buf(&c, 1, true)
 	}
 }
@@ -713,6 +740,12 @@ fn (mut this Console) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 		}
 		ioctl.tcgets {
 			unsafe { C.memcpy(argp, &this.termios, termios.user_size()) }
+			return 0
+		}
+		ioctl.kdgetled {
+			unsafe {
+				*&u8(argp) = u8(if console_capslock_active { ioctl.led_cap } else { 0 })
+			}
 			return 0
 		}
 		// TODO: handle these differently

@@ -245,7 +245,15 @@ static struct key_bytes encode_key(uint8_t key, uint8_t modifiers,
         case 46: c = shift ? '+' : '='; printable = 1; break;
         case 47: c = shift ? '{' : '['; printable = 1; break;
         case 48: c = shift ? '}' : ']'; printable = 1; break;
-        case 49: case 100: c = shift ? '|' : '\\'; printable = 1; break;
+        case 49: c = shift ? '|' : '\\'; printable = 1; break;
+        /* The ISO key has no US character. It types the § and ± Apple's US
+         * layout prints on it, which name it uniquely for the desktop's
+         * keyboard layouts to put their own characters on. */
+        case 100:
+            if (gui)
+                return out;
+            s = shift ? "\xc2\xb1" : "\xc2\xa7";
+            break;
         case 50: c = shift ? '~' : '#'; printable = 1; break;
         case 51: c = shift ? ':' : ';'; printable = 1; break;
         case 52: c = shift ? '"' : '\''; printable = 1; break;
@@ -743,6 +751,11 @@ int vinix_apple_spi_keyboard_poll(uint8_t *out, size_t capacity, int app)
 uint64_t vinix_apple_spi_keyboard_reports(void)
 {
     return keyboard.decoder.reports;
+}
+
+int vinix_apple_spi_keyboard_caps_lock(void)
+{
+    return keyboard.decoder.caps;
 }
 
 uint64_t vinix_apple_spi_touchpad_reports(void)

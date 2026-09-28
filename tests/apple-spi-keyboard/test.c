@@ -113,6 +113,12 @@ static void test_ascii_controls(void)
         b = encode_key((uint8_t)(30 + i), 2, 1, 0, 0);
         assert(b.len == 1 && b.data[0] == (uint8_t)"!@#$%^&*()"[i]);
     }
+    /* The ISO key is § and ±, after Option's escape; Cmd drops it. */
+    expect_bytes(encode_key(100, 0, 0, 0, 0), (const uint8_t *)"\xc2\xa7", 2);
+    expect_bytes(encode_key(100, 2, 1, 0, 0), (const uint8_t *)"\xc2\xb1", 2);
+    expect_bytes(encode_key(100, 0x40, 0, 0, 0), (const uint8_t *)"\033\xc2\xa7", 3);
+    assert(encode_key(100, 0x08, 0, 0, 0).len == 0);
+    expect_bytes(encode_key(49, 0, 0, 0, 0), (const uint8_t *)"\\", 1);
 }
 static void test_navigation_fn_and_function_keys(void)
 {
