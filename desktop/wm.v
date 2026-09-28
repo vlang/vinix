@@ -1238,11 +1238,16 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 	}
 
 	// The notification area sits left of the build date, then the build date
-	// immediately left of the live clock, as the Windows 7 tray did.
+	// immediately left of the live clock, as the Windows 7 tray did. The input
+	// source goes right up against the time, in the room its box leaves free.
 	tray_x := if dock { x } else { status_right - status_width }
 	d.tray_elements(mut children, tray_x, item_y, item_height)
 	build_x := tray_x + tray_span
-	clock_x := build_x + build_width + taskbar_item_gap
+	clock_x := build_x + build_width + taskbar_item_gap + d.input_menu_span()
+	if d.input_menu_shown() {
+		children << d.input_menu_button(clock_x + clock_width - d.clock_text_width() -
+			taskbar_item_gap - tray_input_width, item_y, item_height)
+	}
 	children << ui2.label('build.time', d.taskbar_build_time, ui2.rect(f64(build_x), 3, f64(build_width), 21), ui2.TextStyle{
 		color: theme.taskbar_text_active
 		size:  15
@@ -1256,13 +1261,13 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 	})
 	children << ui2.label('clock.time', d.taskbar_clock_time, ui2.rect(f64(clock_x), 3, f64(clock_width), 21), ui2.TextStyle{
 		color: theme.taskbar_text_active
-		size:  17
+		size:  taskbar_clock_time_size
 		bold:  true
 		align: .right
 	})
 	children << ui2.label('clock.date', d.taskbar_clock_date, ui2.rect(f64(clock_x), 25, f64(clock_width), 17), ui2.TextStyle{
 		color: theme.taskbar_muted
-		size:  11
+		size:  taskbar_clock_date_size
 		align: .right
 	})
 	if dock {
@@ -1328,7 +1333,8 @@ fn (d &Desktop) taskbar_layout(entry_count int) TaskbarLayout {
 	// presentation as well as on an unscaled framebuffer.
 	tray_width := d.tray_width()
 	tray_span := if tray_width > 0 { tray_width + taskbar_item_gap } else { 0 }
-	status_width := tray_span + taskbar_build_width + taskbar_item_gap + taskbar_clock_width
+	status_width := tray_span + taskbar_build_width + taskbar_item_gap + d.input_menu_span() +
+		taskbar_clock_width
 	status_right := if dock {
 		0
 	} else {

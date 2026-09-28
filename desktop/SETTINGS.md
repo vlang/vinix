@@ -122,6 +122,14 @@ briefly shows its name in the middle of the screen; with a single source, it
 reaches applications as NUL (Ctrl-@) as before. The current source is saved
 like every other preference, so a switch survives a restart.
 
+While more than one input source is on, the taskbar shows the current one's
+short name (`EN`, `RU`, ...) just left of the clock, as Windows' language bar
+and the Mac input menu do. Clicking it lists the sources that are on, with a
+tick beside the current one; picking one switches to it. **Keyboard settings**
+at the bottom opens this pane. The badge sits against the clock's text in the
+room its box leaves free, so the window buttons lose width only for a clock
+wide enough to fill it, such as a 12-hour clock with seconds.
+
 The layouts are the standard PC ones (xkb `ru`, `es`, `fr`, `de`, `pt`):
 ЙЦУКЕН, QWERTZ, AZERTY and the Spanish and Portuguese QWERTY layouts, with
 their dead accent keys. An accent key waits for the next letter (`´` then `e`
@@ -259,9 +267,10 @@ positive short write is an error and its suffix is never retried as a command.
 
 ## Implementation and tests
 
-`keyboard_layout.v` owns the layout tables, dead keys and the typing
-translation, and `settings_keyboard.v` the Keyboard pane; the input-source
-names and preference codes are in `settings_model.v`.
+`keyboard_layout.v` owns the layout tables, dead keys, the typing
+translation and the taskbar's input menu, and `settings_keyboard.v` the
+Keyboard pane; the input-source names and preference codes are in
+`settings_model.v`.
 `settings_app.v` implements `NativeApp`; its categories and controls are ui2
 elements (`ui2.view`, `ui2.label`, `ui2.button` and friends). `app.v` registers
 the launcher, and `settings_model.v` holds the shared preference data while

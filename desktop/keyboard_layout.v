@@ -586,3 +586,162 @@ fn (d &Desktop) keyboard_hud_element() ?ui2.Element {
 		radius: switcher_radius
 	}, children)
 }
+
+// ── The input menu ─────────────────────────────────────────────────
+
+// The taskbar names the current input source just left of the clock whenever
+// there is more than one to choose from, as Windows' language bar and the Mac
+// input menu do. Clicking it lists the enabled ones.
+const action_tray_input = 'tray.input'
+const tray_input_layout_prefix = 'tray.input.layout.'
+// One per entry of keyboard_layouts, so a rebuild formats nothing.
+const tray_input_layout_actions = ['tray.input.layout.0', 'tray.input.layout.1',
+	'tray.input.layout.2', 'tray.input.layout.3', 'tray.input.layout.4', 'tray.input.layout.5']
+const action_tray_keyboard_settings = 'tray.action.keyboard'
+const tray_input_width = 34
+const tray_input_badge_width = 26
+const tray_input_badge_height = 18
+const tray_input_menu_width = 232
+const tray_input_row_height = 28
+
+fn (d &Desktop) input_menu_shown() bool {
+	return keyboard_layout_count(d.settings.keyboard_layouts) > 1
+}
+
+// clock_text_width is how much of its box the clock's right-aligned text
+// covers. Its digits are all one width, so this holds still as the seconds
+// tick and changes only with the date or the clock's format.
+fn (d &Desktop) clock_text_width() int {
+	if d.fonts.len == 0 {
+		return taskbar_clock_width
+	}
+	time := d.face_for(ui2.TextStyle{
+		size: taskbar_clock_time_size
+		bold: true
+	}).text_width(d.taskbar_clock_time)
+	date := d.face_for(ui2.TextStyle{
+		size: taskbar_clock_date_size
+	}).text_width(d.taskbar_clock_date)
+	widest := if time > date { time } else { date }
+	return if widest < taskbar_clock_width { widest } else { taskbar_clock_width }
+}
+
+// input_menu_span is the room the button needs beyond what the clock's box
+// leaves free left of its text. A 24-hour clock leaves enough, so the taskbar
+// usually gives up nothing for it.
+fn (d &Desktop) input_menu_span() int {
+	if !d.input_menu_shown() {
+		return 0
+	}
+	need := tray_input_width + taskbar_item_gap - (taskbar_clock_width - d.clock_text_width())
+	return if need > 0 { need } else { 0 }
+}
+
+fn input_badge(text string, x int, y int, bg u32, color u32) ui2.Element {
+	return ui2.view('', ui2.rect(f64(x), f64(y), f64(tray_input_badge_width), f64(tray_input_badge_height)),
+		ui2.BoxStyle{
+		bg:     bg
+		radius: 4
+	}, frame_child(ui2.label('', text, ui2.rect(0, 0, f64(tray_input_badge_width), f64(tray_input_badge_height)),
+		ui2.TextStyle{
+		color: color
+		size:  11
+		bold:  true
+		align: .center
+		lines: 1
+	})))
+}
+
+// input_menu_button is the badge on the taskbar, cut out of a solid tag the
+// way the Mac draws it, so it reads as a label and not as another status icon.
+fn (d &Desktop) input_menu_button(x int, y int, height int) ui2.Element {
+	theme := d.theme()
+	open := d.tray.flyout == .input
+	return ui2.clickable_view(action_tray_input, ui2.rect(f64(x), f64(y), f64(tray_input_width),
+		f64(height)), ui2.BoxStyle{
+		bg:          if open { theme.taskbar_item_active } else { theme.taskbar_item_hover }
+		radius:      4
+		transparent: d.hover != action_tray_input && !open
+	}, frame_child(input_badge(d.settings.keyboard_layout.badge(), (tray_input_width - tray_input_badge_width) / 2,
+		(height - tray_input_badge_height) / 2, theme.taskbar_text_active, theme.taskbar_bg)))
+}
+
+fn (d &Desktop) input_menu_row(id string, x int, y int, width int, children []ui2.Element) ui2.Element {
+	return ui2.clickable_view(id, ui2.rect(f64(x), f64(y), f64(width), f64(tray_input_row_height)),
+		ui2.BoxStyle{
+		bg:          tray_flyout_button_hover
+		radius:      5
+		transparent: d.hover != id
+	}, children)
+}
+
+// input_menu_children lays out the menu: the enabled input sources with a
+// tick on the current one, then Keyboard settings. It answers the height.
+fn (d &Desktop) input_menu_children(mut children []ui2.Element) int {
+	pad := 6
+	row_width := tray_input_menu_width - 2 * pad
+	badge_x := 30
+	text_x := badge_x + tray_input_badge_width + 10
+	mut y := pad
+	for index, layout in keyboard_layouts {
+		if d.settings.keyboard_layouts & layout.bit() == 0 {
+			continue
+		}
+		mut row := frame_elements(3)
+		if layout == d.settings.keyboard_layout {
+			check := ui2.image('', 'builtin:check', ui2.rect(8, 6, 16, 16))
+			row << ui2.Element{
+				...check
+				text_style: ui2.TextStyle{
+					color: tray_flyout_text
+				}
+			}
+		}
+		row << input_badge(layout.badge(), badge_x, (tray_input_row_height - tray_input_badge_height) / 2,
+			tray_flyout_text, 0xffffff)
+		row << ui2.label('', layout.title(), ui2.rect(f64(text_x), 0, f64(row_width - text_x - 8),
+			f64(tray_input_row_height)), ui2.TextStyle{
+			color: tray_flyout_text
+			size:  13
+			lines: 1
+		})
+		children << d.input_menu_row(tray_input_layout_actions[index], pad, y, row_width, row)
+		y += tray_input_row_height
+	}
+	y += 5
+	children << ui2.view('', ui2.rect(f64(pad + 8), f64(y), f64(row_width - 16), 1), ui2.BoxStyle{
+		bg: body_rule
+	}, [])
+	y += 6
+	children << d.input_menu_row(action_tray_keyboard_settings, pad, y, row_width, frame_child(ui2.label('',
+		'Keyboard settings', ui2.rect(f64(badge_x), 0, f64(row_width - badge_x - 8), f64(tray_input_row_height)),
+		ui2.TextStyle{
+		color: tray_flyout_text
+		size:  13
+		lines: 1
+	})))
+	y += tray_input_row_height
+	children << ui2.label('', 'Ctrl-Space: next input source', ui2.rect(f64(pad + badge_x),
+		f64(y + 2), f64(row_width - badge_x - 8), 18), ui2.TextStyle{
+		color: tray_flyout_muted
+		size:  11
+		lines: 1
+	})
+	return y + 2 + 18 + pad
+}
+
+// choose_input_source is a pick from the menu. Like Ctrl-Space it drops an
+// accent typed in the old source, and the preference file follows on its own.
+fn (mut d Desktop) choose_input_source(index int) {
+	d.close_tray_flyout()
+	if index < 0 || index >= keyboard_layouts.len {
+		return
+	}
+	layout := keyboard_layouts[index]
+	if d.settings.keyboard_layouts & layout.bit() == 0 || d.settings.keyboard_layout == layout {
+		return
+	}
+	d.settings.keyboard_layout = layout
+	d.keyboard.dead = 0
+	d.dirty = true
+}

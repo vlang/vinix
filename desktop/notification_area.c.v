@@ -64,6 +64,8 @@ enum TrayFlyout {
 	display
 	capture
 	overflow
+	// The input menu; keyboard_layout.v draws it.
+	input
 }
 
 enum NetworkLink {
@@ -490,6 +492,7 @@ fn (d &Desktop) tooltip_text(action string) string {
 	return match action {
 		action_show_desktop { 'Show desktop' }
 		action_tray_overflow { 'Show hidden icons' }
+		action_tray_input { d.settings.keyboard_layout.title() }
 		'tray.icon.network', 'tray.overflow.icon.network' { d.tray.network_tip }
 		'tray.icon.battery', 'tray.overflow.icon.battery' { d.tray.battery_tip }
 		'tray.icon.display', 'tray.overflow.icon.display' { d.tray.display_tip }
@@ -517,7 +520,7 @@ fn (mut d Desktop) open_tray_flyout(flyout TrayFlyout, anchor string) {
 	d.hide_tooltip()
 	d.tray.flyout = flyout
 	d.tray.flyout_anchor = replace_owned(d.tray.flyout_anchor, anchor)
-	if flyout != .overflow && flyout != .capture {
+	if flyout != .overflow && flyout != .capture && flyout != .input {
 		// Read the device again rather than show a five-second-old sample.
 		d.update_tray_at(monotonic_millis(), true)
 	}
@@ -547,6 +550,18 @@ fn (mut d Desktop) handle_tray_action(action string) {
 		}
 		return
 	}
+	if action == action_tray_input {
+		if d.tray.flyout == .input {
+			d.close_tray_flyout()
+		} else {
+			d.open_tray_flyout(.input, action_tray_input)
+		}
+		return
+	}
+	if action.starts_with(tray_input_layout_prefix) {
+		d.choose_input_source(action[tray_input_layout_prefix.len..].int())
+		return
+	}
 	if item := tray_item_for_action(action) {
 		flyout := tray_flyout_for(item)
 		if d.tray.flyout == flyout {
@@ -571,6 +586,10 @@ fn (mut d Desktop) handle_tray_action(action string) {
 		action_tray_display_settings {
 			d.close_tray_flyout()
 			d.open_settings_category(.display)
+		}
+		action_tray_keyboard_settings {
+			d.close_tray_flyout()
+			d.open_settings_category(.keyboard)
 		}
 		action_tray_brightness_down, action_tray_brightness_up {
 			adjust_brightness(if action == action_tray_brightness_up {
@@ -770,6 +789,15 @@ fn (mut d Desktop) tray_flyout_element() ?ui2.Element {
 				size:  11
 			})
 			height = 68
+		}
+		.input {
+			if !d.input_menu_shown() {
+				// Settings turned the other input sources off under it.
+				d.close_tray_flyout()
+				return none
+			}
+			width = tray_input_menu_width
+			height = d.input_menu_children(mut children)
 		}
 		.none_ {}
 	}

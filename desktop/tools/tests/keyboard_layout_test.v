@@ -328,6 +328,103 @@ fn test_keyboard_desktop_shows_and_retires_the_input_source_panel() {
 	}
 }
 
+// keyboard_test_frame builds and renders the desktop, so its hit targets are
+// the ones a click would meet, and answers the taskbar's input badge.
+fn keyboard_test_frame(mut d Desktop) string {
+	tree := d.build_tree()
+	d.render(tree)
+	mut badge := ''
+	if button := keyboard_test_element(tree, action_tray_input) {
+		badge = button.children[0].children[0].text.clone()
+	}
+	free_tree(tree)
+	return badge
+}
+
+fn test_keyboard_taskbar_menu_lists_and_chooses_input_sources() {
+	mut d := Desktop{
+		canvas: new_scaled_canvas(1280, 720, 1280, 720, 1)
+		fonts:  load_fonts()
+	}
+	defer { unsafe { free(d.canvas.pixels) } }
+	d.tray.preferences_loaded = true
+	d.update_taskbar_clock_at(1_790_000_000)
+	// One input source has nothing to switch between, so no button.
+	assert keyboard_test_frame(mut d) == ''
+	if _ := d.hit_target_named(action_tray_input) {
+		assert false, 'input menu with a single input source'
+	}
+	clock_alone := d.taskbar_layout(0)
+
+	d.settings.keyboard_layouts = KeyboardLayout.us.bit() | KeyboardLayout.russian.bit() | KeyboardLayout.german.bit()
+	assert keyboard_test_frame(mut d) == 'EN'
+	button := d.hit_target_named(action_tray_input) or { panic('missing input menu button') }
+	assert d.tooltip_text(action_tray_input) == 'English (US)'
+	// It sits right against the time, in the room the clock's box leaves
+	// free, so a 24-hour clock costs the window buttons nothing.
+	layout := d.taskbar_layout(0)
+	assert layout == clock_alone
+	clock_text := d.clock_text_width()
+	assert clock_text > 0 && clock_text < taskbar_clock_width
+	assert button.x + button.width + taskbar_item_gap == layout.status_right - clock_text
+	// A 12-hour clock with seconds is wider; the taskbar then makes up only
+	// the difference, and the button still clears the build stamp.
+	d.settings.clock_24_hour = false
+	d.taskbar_clock_sampled = false
+	// 22:13:20 UTC, drawn as 10:13:20 PM.
+	d.update_taskbar_clock_at(1_790_000_000 + 8 * 3600)
+	assert d.taskbar_clock_time == '10:13:20 PM'
+	keyboard_test_frame(mut d)
+	wide := d.hit_target_named(action_tray_input) or { panic('missing input menu button') }
+	wide_layout := d.taskbar_layout(0)
+	assert d.input_menu_span() > 0
+	assert wide_layout.status_width == clock_alone.status_width + d.input_menu_span()
+	assert wide.x + wide.width + taskbar_item_gap == wide_layout.status_right - d.clock_text_width()
+	build_end := wide_layout.status_right - wide_layout.status_width + wide_layout.tray_span +
+		taskbar_build_width
+	assert wide.x >= build_end + taskbar_item_gap
+	d.settings.clock_24_hour = true
+
+	d.handle_tray_action(action_tray_input)
+	assert d.tray.flyout == .input
+	keyboard_test_frame(mut d)
+	russian_index := keyboard_layouts.index(KeyboardLayout.russian)
+	russian := d.hit_target_named(tray_input_layout_actions[russian_index]) or {
+		panic('missing Russian row')
+	}
+	d.hit_target_named(tray_input_layout_actions[keyboard_layouts.index(KeyboardLayout.german)]) or {
+		panic('missing German row')
+	}
+	d.hit_target_named(action_tray_keyboard_settings) or { panic('missing Keyboard settings') }
+	if _ := d.hit_target_named(tray_input_layout_actions[keyboard_layouts.index(KeyboardLayout.spanish)]) {
+		assert false, 'an input source that is off in the menu'
+	}
+	assert russian.y + russian.height <= d.canvas.height - taskbar_height
+
+	// Picking one switches typing to it, drops a waiting accent and closes
+	// the menu.
+	d.keyboard.dead = dead_acute
+	d.on_pointer_down(russian.x + 4, russian.y + 4)
+	assert d.settings.keyboard_layout == .russian
+	assert d.keyboard.dead == 0
+	assert d.tray.flyout == .none_
+	assert keyboard_test_frame(mut d) == 'RU'
+	assert d.tooltip_text(action_tray_input) == 'Russian'
+	assert d.type_with_layout('q', -1) == 'й'
+
+	// Only enabled input sources can be chosen.
+	d.handle_tray_action(tray_input_layout_actions[keyboard_layouts.index(KeyboardLayout.spanish)])
+	d.handle_tray_action('${tray_input_layout_prefix}99')
+	assert d.settings.keyboard_layout == .russian
+
+	// Settings turning the others off takes the button and its menu away.
+	d.handle_tray_action(action_tray_input)
+	assert d.tray.flyout == .input
+	d.settings.keyboard_layouts = KeyboardLayout.russian.bit()
+	assert keyboard_test_frame(mut d) == ''
+	assert d.tray.flyout == .none_
+}
+
 fn test_keyboard_settings_pane_enables_and_selects_input_sources() {
 	mut desktop := Desktop{}
 	mut app := SettingsApp{
