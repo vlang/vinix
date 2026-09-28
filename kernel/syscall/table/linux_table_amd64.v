@@ -26,6 +26,7 @@ import resource
 import sched
 import socket
 import stat
+import sysvsem
 import sysvshm
 import time
 import time.sys
@@ -478,6 +479,10 @@ pub fn init_linux_syscall_table() {
 	linux_syscall_table[30] = voidptr(sysvshm.syscall_shmat) // shmat
 	linux_syscall_table[31] = voidptr(sysvshm.syscall_shmctl) // shmctl
 	linux_syscall_table[67] = voidptr(sysvshm.syscall_shmdt) // shmdt
+	linux_syscall_table[64] = voidptr(sysvsem.syscall_semget) // semget
+	linux_syscall_table[65] = voidptr(sysvsem.syscall_semop) // semop
+	linux_syscall_table[66] = voidptr(sysvsem.syscall_semctl) // semctl
+	linux_syscall_table[220] = voidptr(sysvsem.syscall_semtimedop) // semtimedop
 	linux_syscall_table[149] = voidptr(syscall_linux_mlock) // mlock
 	linux_syscall_table[150] = voidptr(syscall_linux_mlock) // munlock
 	linux_syscall_table[151] = voidptr(syscall_linux_mlockall) // mlockall
