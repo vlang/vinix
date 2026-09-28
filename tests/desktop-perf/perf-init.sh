@@ -73,6 +73,60 @@ run_case() {
 		"$perf/measure" wakeups 16 "$MEASURE" "$label"
 		return
 	fi
+	# No desktop either: what the page cache costs. 32 MiB goes through the
+	# persistent ext2 /root and is read back, filling the cache to capacity.
+	if [ "$scenario" = cache ]; then
+		sync
+		sleep 2
+		before=$("$perf/measure" used)
+		dd if=/dev/zero of=/root/perf-cache bs=65536 count=512 2>/dev/null
+		sync
+		cat /root/perf-cache >/dev/null
+		sleep 3
+		sync
+		after=$("$perf/measure" used)
+		cached=$(/bin/busybox awk '/^Cached:/ { print $2 }' /proc/meminfo)
+		slab=$(/bin/busybox awk '/^Slab:/ { print $2 }' /proc/meminfo)
+		echo "PERF-CACHE $label written_mb=32 used_mb=$(((after - before) / 1048576)) cached_kb=${cached:-unknown} slab_kb=${slab:-unknown}"
+		sed "s/^/PERF-MEMINFO $label /" /proc/meminfo /proc/slabinfo 2>/dev/null
+		rm -f /root/perf-cache
+		sync
+		return
+	fi
+	# No desktop either: what running short programs leaves behind. Each is
+	# run first to warm any cache it fills, then counted.
+	if [ "$scenario" = churn ]; then
+		for program in /bin/true "/bin/sleep 0" "/usr/bin/curl --version" \
+			"/bin/busybox awk BEGIN{}"; do
+			$program >/dev/null 2>&1
+			$program >/dev/null 2>&1
+			sync
+			sleep 2
+			before=$("$perf/measure" used)
+			cat /proc/slabinfo >/tmp/slabinfo.before 2>/dev/null
+			i=0
+			while [ "$i" -lt 300 ]; do
+				$program >/dev/null 2>&1
+				i=$((i + 1))
+			done
+			sync
+			# Reaped processes are freed once they have been gone two seconds,
+			# when the next one is reaped: `sync` is that one.
+			sleep 3
+			sync
+			after=$("$perf/measure" used)
+			echo "PERF-CHURN $label program=\"$program\" runs=300 retained_kb=$(((after - before) / 1024)) per_run_bytes=$(((after - before) / 300))"
+			# Which heap classes kept what, where the kernel says.
+			if [ -s /tmp/slabinfo.before ]; then
+				cat /proc/slabinfo | /bin/busybox awk -v label="$label" -v program="$program" '
+					NR == FNR { if ($1 != "#") { objects[$1] = $3; pages[$1] = $4 }; next }
+					$1 != "#" && ($3 - objects[$1] != 0 || $4 - pages[$1] != 0) {
+						printf "PERF-SLAB %s program=\"%s\" class=%s objects=%+d pages=%+d\n", label, program, $1, $3 - objects[$1], $4 - pages[$1]
+					}' /tmp/slabinfo.before -
+			fi
+		done
+		return
+	fi
 
 	install -m755 "$perf/vinix-desktop-$variant" /usr/bin/vinix-desktop
 	rm -f /run/vinix-desktop-ready /tmp/perf-quit

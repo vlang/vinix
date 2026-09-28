@@ -15,6 +15,10 @@ Scenarios:
     drag     the default session while the System window is dragged around
     wakeups  no desktop: a process sleeping 16 ms at a time, the frame pacing
              alone, reported as PERF-WAKEUPS lines (optional)
+    churn    no desktop: the memory 300 runs each of a few short programs leave
+             behind, reported as PERF-CHURN lines (optional)
+    cache    no desktop: the memory 32 MiB through the ext2 page cache takes,
+             reported as a PERF-CACHE line (optional)
 
 The display is QEMU's 2048x1536 desktop resolution, the one
 run-desktop-aarch64.sh boots, at the desktop's default scale for it (100%).
@@ -43,7 +47,7 @@ import time
 
 ROOT = Path(__file__).resolve().parents[2]
 ABS_MAX = 32767
-SCENARIOS = ("idle", "apps", "pointer", "drag", "wakeups")
+SCENARIOS = ("idle", "apps", "pointer", "drag", "wakeups", "churn", "cache")
 RESULT = re.compile(rb"PERF-RESULT variant=(\S+) scenario=(\S+) round=(\d+) (.*)")
 SHOT = re.compile(rb"PERF-SHOT variant=(\S+) scenario=(\S+) round=(\d+)")
 DRIVE = re.compile(rb"PERF-DRIVE (\S+) (\d+)")
@@ -319,7 +323,7 @@ def main() -> int:
 
     pointer = Pointer(qmp)
     results: list[dict] = []
-    wakeups: list[str] = []
+    reports: list[str] = []
     pid, master = pty.fork()
     if pid == 0:
         os.chdir(ROOT)
@@ -343,8 +347,10 @@ def main() -> int:
                 arguments.shots.mkdir(parents=True, exist_ok=True)
                 name = "-".join(part.decode() for part in shot.groups())
                 pointer.screendump(arguments.shots.resolve() / f"{name}.ppm")
-            if b"PERF-WAKEUPS" in line:
-                wakeups.append(line[line.index(b"PERF-WAKEUPS"):].decode(errors="replace"))
+            for marker in (b"PERF-WAKEUPS", b"PERF-CHURN", b"PERF-SLAB", b"PERF-CACHE",
+                           b"PERF-MEMINFO"):
+                if marker in line:
+                    reports.append(line[line.index(marker):].decode(errors="replace"))
             result = RESULT.search(line)
             if result:
                 row = {"variant": result.group(1).decode(),
@@ -366,14 +372,15 @@ def main() -> int:
 
     if arguments.json:
         arguments.json.write_text(json.dumps(results, indent=2) + "\n")
-    if not results and not wakeups:
+    if not results and not reports:
         print("ERROR: no measurements were reported", file=sys.stderr)
         return 1
     if results:
         print(summarize(results))
-    for line in wakeups:
+    for line in reports:
         print(line)
-    expected = len(builds) * len([name for name in scenarios if name != "wakeups"]) * arguments.rounds
+    expected = len(builds) * len([name for name in scenarios
+                                  if name not in ("wakeups", "churn", "cache")]) * arguments.rounds
     if len(results) != expected:
         print(f"ERROR: {len(results)} of {expected} measurements were reported", file=sys.stderr)
         return 1
