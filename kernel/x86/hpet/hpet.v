@@ -183,8 +183,9 @@ fn calibrate_tsc() {
 	}
 	hpet_tsc_base = cpu.rdtsc()
 	hpet_uses_tsc = true
-	source := if port != 0 { 'ACPI PM timer' } else { 'PIT' }
-	println('hpet: No HPET; using the TSC at ${hpet_frequency} Hz (calibrated against the ${source})')
+	source := if port != 0 { c'ACPI PM timer' } else { c'PIT' }
+	C.kprintf(c'hpet: No HPET; using the TSC at %llu Hz (calibrated against the %s)\n',
+		u64(hpet_frequency), source)
 }
 
 pub fn initialise() {
@@ -202,7 +203,7 @@ pub fn initialise() {
 	counter_clk_period := tmp >> 32
 	hpet_frequency = u64(1000000000000000) / counter_clk_period
 
-	println('hpet: Detected frequency of ${hpet_frequency} Hz')
+	C.kprintf(c'hpet: Detected frequency of %llu Hz\n', u64(hpet_frequency))
 
 	kio.mmout(&hpet.main_counter_value, 0)
 

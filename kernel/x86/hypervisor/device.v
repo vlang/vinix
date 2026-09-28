@@ -63,6 +63,8 @@ mut:
 	status   int
 	can_mmap bool
 	vm       &Vm = unsafe { nil }
+	// The interface box its descriptors share, freed with the session.
+	box &resource.Resource = unsafe { nil }
 }
 
 __global (
@@ -87,7 +89,10 @@ fn (mut device HypervisorDevice) open(_flags int) ?&resource.Resource {
 	// though the factory node itself is a character device.
 	session.stat.mode = stat.ifblk | 0o600
 	session.stat.blksize = int(page_size)
-	return &resource.Resource(*session)
+	// Box the session itself, not a copy of it, which left this allocation
+	// behind. unref() frees both.
+	session.box = &resource.Resource(unsafe { session }) @[freed]
+	return session.box
 }
 
 fn (mut device HypervisorDevice) read(handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
@@ -315,7 +320,10 @@ fn (mut session HypervisorSession) unref(_handle voidptr) ? {
 }
 
 fn destroy_session(session &HypervisorSession) {
-	unsafe { free(session) }
+	unsafe {
+		free(voidptr(session.box))
+		free(session)
+	}
 }
 
 fn (mut session HypervisorSession) link(_handle voidptr) ? {
@@ -333,7 +341,7 @@ fn smoke_test() bool {
 		unsafe { free(vm) }
 	}
 	// mov dx, 0xe9; mov al, 'V'; out dx, al; hlt
-	code := [u8(0xba), 0xe9, 0x00, 0xb0, 0x56, 0xee, 0xf4]
+	code := [u8(0xba), 0xe9, 0x00, 0xb0, 0x56, 0xee, 0xf4]!
 	if !vm.copy_to_guest(0x1000, unsafe { &code[0] }, u64(code.len))
 		|| !vm.set_entry(0x1000, 0x8000, 2) {
 		return false

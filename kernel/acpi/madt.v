@@ -88,25 +88,26 @@ fn madt_init() {
 
 		match header.id {
 			0 {
-				println('acpi/madt: Found local APIC #${madt_local_apics.len}')
+				C.kprintf(c'acpi/madt: Found local APIC #%lld\n', i64(madt_local_apics.len))
 				madt_local_apics << unsafe { &MADTLocalApic(header) }
 			}
 			9 {
 				if x2apic_mode {
-					println('acpi/madt: Found local x2APIC #${madt_local_x2apics.len}')
+					C.kprintf(c'acpi/madt: Found local x2APIC #%lld\n',
+						i64(madt_local_x2apics.len))
 					madt_local_x2apics << unsafe { &MADTLocalX2Apic(header) }
 				}
 			}
 			1 {
-				println('acpi/madt: Found IO APIC #${madt_io_apics.len}')
+				C.kprintf(c'acpi/madt: Found IO APIC #%lld\n', i64(madt_io_apics.len))
 				madt_io_apics << unsafe { &MADTIoApic(header) }
 			}
 			2 {
-				println('acpi/madt: Found ISO #${madt_isos.len}')
+				C.kprintf(c'acpi/madt: Found ISO #%lld\n', i64(madt_isos.len))
 				madt_isos << unsafe { &MADTISO(header) }
 			}
 			4 {
-				println('acpi/madt: Found NMI #${madt_nmis.len}')
+				C.kprintf(c'acpi/madt: Found NMI #%lld\n', i64(madt_nmis.len))
 				madt_nmis << unsafe { &MADTNMI(header) }
 			}
 			else {}

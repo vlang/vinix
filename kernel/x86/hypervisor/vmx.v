@@ -476,22 +476,22 @@ fn (mut vm Vm) configure_vmcs() bool {
 
 	for field in [vmcs_guest_es_selector, vmcs_guest_cs_selector, vmcs_guest_ss_selector,
 		vmcs_guest_ds_selector, vmcs_guest_fs_selector, vmcs_guest_gs_selector,
-		vmcs_guest_ldtr_selector, vmcs_guest_tr_selector] {
+		vmcs_guest_ldtr_selector, vmcs_guest_tr_selector]! {
 		ok = ok && vmwrite(field, 0)
 	}
 	for field in [vmcs_guest_es_base, vmcs_guest_cs_base, vmcs_guest_ss_base, vmcs_guest_ds_base,
 		vmcs_guest_fs_base, vmcs_guest_gs_base, vmcs_guest_ldtr_base, vmcs_guest_tr_base,
-		vmcs_guest_gdtr_base, vmcs_guest_idtr_base] {
+		vmcs_guest_gdtr_base, vmcs_guest_idtr_base]! {
 		ok = ok && vmwrite(field, 0)
 	}
 	for field in [vmcs_guest_es_limit, vmcs_guest_cs_limit, vmcs_guest_ss_limit, vmcs_guest_ds_limit,
 		vmcs_guest_fs_limit, vmcs_guest_gs_limit, vmcs_guest_ldtr_limit, vmcs_guest_tr_limit,
-		vmcs_guest_gdtr_limit, vmcs_guest_idtr_limit] {
+		vmcs_guest_gdtr_limit, vmcs_guest_idtr_limit]! {
 		ok = ok && vmwrite(field, 0xffff)
 	}
 	ok = ok && vmwrite(vmcs_guest_cs_access, 0x9b)
 	for field in [vmcs_guest_es_access, vmcs_guest_ss_access, vmcs_guest_ds_access,
-		vmcs_guest_fs_access, vmcs_guest_gs_access] {
+		vmcs_guest_fs_access, vmcs_guest_gs_access]! {
 		ok = ok && vmwrite(field, 0x93)
 	}
 	ok = ok && vmwrite(vmcs_guest_ldtr_access, 0x10000)

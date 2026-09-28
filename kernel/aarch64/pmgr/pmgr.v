@@ -37,7 +37,7 @@ pub fn initialise(base u64) {
 	// should come from the device-tree reg entry; map a conservative window
 	// until that is plumbed through.
 	pmgr_base = memory.map_mmio(base, 0x10000)
-	println('pmgr: Apple Power Manager at 0x${base:x}')
+	C.kprintf(c'pmgr: Apple Power Manager at 0x%llx\n', u64(base))
 }
 
 fn enable_mapped(base u64, offset u32) bool {

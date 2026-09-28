@@ -28,9 +28,9 @@ pub struct T8110DartContract {
 pub:
 	die             u32
 	registers       [2]devicetree.DTReg
-	active_sids     []u32
-	bypassed_sids   []u32
-	translated_sids []u32
+	active_sids     [8]u32
+	bypassed_sids   [6]u32
+	translated_sids [2]u32
 	mapper_index    u32
 	mapper_handle   u32
 	vm_base         u64
@@ -52,6 +52,7 @@ fn t8110_empty_boolean_property(node &devicetree.DTNode, name string) i32 {
 fn t8110_string_property_contains(node &devicetree.DTNode, property string,
 	expected string) bool {
 	values := devicetree.get_string_list(node, property) or { return false }
+	defer { unsafe { values.free() } }
 	for value in values {
 		if value == expected {
 			return true
@@ -60,7 +61,7 @@ fn t8110_string_property_contains(node &devicetree.DTNode, property string,
 	return false
 }
 
-fn t8110_u32_array_equals(actual []u32, expected []u32) bool {
+fn t8110_u32_array_equals(actual []u32, expected [8]u32) bool {
 	if actual.len != expected.len {
 		return false
 	}
@@ -197,6 +198,7 @@ pub fn get_t6050_pmp_dart_contract(die u32,
 		return none
 	}
 	regions := devicetree.get_translated_reg_ranges(dart_node) or { return none }
+	defer { unsafe { regions.free() } }
 	if regions.len != 2 {
 		return none
 	}
@@ -206,9 +208,21 @@ pub fn get_t6050_pmp_dart_contract(die u32,
 		return none
 	}
 	sids := devicetree.get_le_u32_array(dart_node, 'sid') or { return none }
-	expected_bypassed_sids := [u32(2), 5, 6, 7, 8, 9]
+	defer { unsafe { sids.free() } }
+	expected_sids := [u32(0), 1, 2, 5, 6, 7, 8, 9]!
+	expected_bypassed_sids := [u32(2), 5, 6, 7, 8, 9]!
 	for sid := u32(0); sid < 16; sid++ {
-		state := t8110_empty_boolean_property(dart_node, 'bypass-${sid}')
+		// "bypass-${sid}", spelled on the stack: the lookup only compares it.
+		mut name := [u8(`b`), `y`, `p`, `a`, `s`, `s`, `-`, `0`, `0`]!
+		mut length := 8
+		if sid < 10 {
+			name[7] = u8(`0` + sid)
+		} else {
+			name[7] = u8(`0` + sid / 10)
+			name[8] = u8(`0` + sid % 10)
+			length = 9
+		}
+		state := t8110_empty_boolean_property(dart_node, unsafe { tos(&name[0], length) })
 		mut expected := false
 		for bypassed_sid in expected_bypassed_sids {
 			if sid == bypassed_sid {
@@ -220,7 +234,7 @@ pub fn get_t6050_pmp_dart_contract(die u32,
 			return none
 		}
 	}
-	if !t8110_u32_array_equals(sids, [u32(0), 1, 2, 5, 6, 7, 8, 9])
+	if !t8110_u32_array_equals(sids, expected_sids)
 		|| devicetree.get_le_u32(dart_node, 'page-size') or { return none } != u32(t8110_page_size)
 		|| devicetree.get_le_u32(dart_node, 'sid-count') or { return none } != 16
 		|| devicetree.get_le_u32(dart_node, 'dart-options') or { return none } != 0x65
@@ -239,9 +253,9 @@ pub fn get_t6050_pmp_dart_contract(die u32,
 	return T8110DartContract{
 		die: die
 		registers: [regions[0], regions[1]]!
-		active_sids: sids
+		active_sids: expected_sids
 		bypassed_sids: expected_bypassed_sids
-		translated_sids: [u32(0), 1]
+		translated_sids: [u32(0), 1]!
 		mapper_index: mapper_index
 		mapper_handle: mapper_handle
 		vm_base: t8110_pmp_vm_base

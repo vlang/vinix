@@ -150,7 +150,8 @@ fn crashlog_string(data voidptr, offset u32, available u32) string {
 }
 
 fn (rtk &RTKit) print_crashlog_entry_kind(kind u32) {
-	println('rtkit[${rtk.name}]: crash entry ${u8(kind >> 24):c}${u8(kind >> 16):c}${u8(kind >> 8):c}${u8(kind):c}')
+	C.kprintf(c'rtkit[%.*s]: crash entry %c%c%c%c\n', i32(rtk.name.len), rtk.name.str,
+		i32(u8(kind >> 24)), i32(u8(kind >> 16)), i32(u8(kind >> 8)), i32(u8(kind)))
 }
 
 fn (rtk &RTKit) dump_crashlog() {
@@ -158,28 +159,31 @@ fn (rtk &RTKit) dump_crashlog() {
 	allocated := rtk.system_sizes[ep_crashlog]
 	if iova == 0 || allocated < crashlog_header_size || allocated > max_system_buffer_size
 		|| rtk.shmem_resolve == unsafe { nil } {
-		println('rtkit[${rtk.name}]: crash log buffer is unavailable')
+		C.kprintf(c'rtkit[%.*s]: crash log buffer is unavailable\n', i32(rtk.name.len), rtk.name.str)
 		return
 	}
 	data := rtk.shmem_resolve(rtk.shmem_context, iova, allocated)
 	if data == unsafe { nil } {
-		println('rtkit[${rtk.name}]: cannot resolve crash log at 0x${iova:x}')
+		C.kprintf(c'rtkit[%.*s]: cannot resolve crash log at 0x%llx\n', i32(rtk.name.len),
+			rtk.name.str, u64(iova))
 		return
 	}
 	// The mailbox notification is firmware's publication event for this shared
 	// memory. Order subsequent CPU loads after observing it.
 	cpu.dmb_ishld()
 	if crashlog_u32(data, 0) != crashlog_type_header {
-		println('rtkit[${rtk.name}]: invalid crash log header 0x${crashlog_u32(data,
-			0):x}')
+		C.kprintf(c'rtkit[%.*s]: invalid crash log header 0x%llx\n', i32(rtk.name.len),
+			rtk.name.str, u64(crashlog_u32(data, 0)))
 		return
 	}
 	total := crashlog_u32(data, 8)
 	if total < crashlog_header_size || u64(total) > allocated {
-		println('rtkit[${rtk.name}]: invalid crash log size 0x${total:x} (buffer 0x${allocated:x})')
+		C.kprintf(c'rtkit[%.*s]: invalid crash log size 0x%llx (buffer 0x%llx)\n',
+			i32(rtk.name.len), rtk.name.str, u64(total), u64(allocated))
 		return
 	}
-	println('rtkit[${rtk.name}]: crash log version=${crashlog_u32(data, 4)} size=0x${total:x}')
+	C.kprintf(c'rtkit[%.*s]: crash log version=%llu size=0x%llx\n', i32(rtk.name.len),
+		rtk.name.str, u64(crashlog_u32(data, 4)), u64(total))
 	mut offset := crashlog_header_size
 	mut entries := u32(0)
 	for offset <= total - crashlog_entry_header_size && entries < crashlog_max_entries {
@@ -189,7 +193,8 @@ fn (rtk &RTKit) dump_crashlog() {
 		}
 		length := crashlog_u32(data, offset + 0xc)
 		if length < crashlog_entry_header_size || length > total - offset {
-			println('rtkit[${rtk.name}]: invalid crash entry length 0x${length:x} at 0x${offset:x}')
+			C.kprintf(c'rtkit[%.*s]: invalid crash entry length 0x%llx at 0x%llx\n',
+				i32(rtk.name.len), rtk.name.str, u64(length), u64(offset))
 			return
 		}
 		match kind {
@@ -197,7 +202,8 @@ fn (rtk &RTKit) dump_crashlog() {
 				if length >= 0x15 {
 					id := crashlog_u32(data, offset + 0x10)
 					message := crashlog_string(data, offset + 0x14, length - 0x14)
-					println('rtkit[${rtk.name}]: crash message ${id}: ${message}')
+					C.kprintf(c'rtkit[%.*s]: crash message %llu: %.*s\n', i32(rtk.name.len),
+						rtk.name.str, u64(id), i32(message.len), message.str)
 				} else {
 					rtk.print_crashlog_entry_kind(kind)
 				}
@@ -205,7 +211,8 @@ fn (rtk &RTKit) dump_crashlog() {
 			crashlog_type_version {
 				if length >= 0x21 {
 					version := crashlog_string(data, offset + 0x20, length - 0x20)
-					println('rtkit[${rtk.name}]: crash firmware: ${version}')
+					C.kprintf(c'rtkit[%.*s]: crash firmware: %.*s\n', i32(rtk.name.len),
+						rtk.name.str, i32(version.len), version.str)
 				} else {
 					rtk.print_crashlog_entry_kind(kind)
 				}
@@ -218,15 +225,17 @@ fn (rtk &RTKit) dump_crashlog() {
 					psr := crashlog_u64(data, offset + 0x120)
 					far := crashlog_u64(data, offset + 0x340)
 					esr := crashlog_u64(data, offset + 0x350)
-					println('rtkit[${rtk.name}]: exception pc=0x${pc:x} sp=0x${sp:x} psr=0x${psr:x} far=0x${far:x} esr=0x${esr:x}')
+					C.kprintf(c'rtkit[%.*s]: exception pc=0x%llx sp=0x%llx psr=0x%llx far=0x%llx esr=0x%llx\n',
+						i32(rtk.name.len), rtk.name.str, u64(pc), u64(sp), u64(psr), u64(far),
+						u64(esr))
 				} else {
 					rtk.print_crashlog_entry_kind(kind)
 				}
 			}
 			crashlog_type_stack {
 				if length >= 0x18 {
-					println('rtkit[${rtk.name}]: crashed task ${crashlog_u32(data,
-						offset + 0x10)}')
+					C.kprintf(c'rtkit[%.*s]: crashed task %llu\n', i32(rtk.name.len),
+						rtk.name.str, u64(crashlog_u32(data, offset + 0x10)))
 				} else {
 					rtk.print_crashlog_entry_kind(kind)
 				}
@@ -239,9 +248,11 @@ fn (rtk &RTKit) dump_crashlog() {
 		entries++
 	}
 	if entries == crashlog_max_entries {
-		println('rtkit[${rtk.name}]: crash log entry limit reached')
+		C.kprintf(c'rtkit[%.*s]: crash log entry limit reached\n', i32(rtk.name.len),
+			rtk.name.str)
 	} else {
-		println('rtkit[${rtk.name}]: crash log has no terminator')
+		C.kprintf(c'rtkit[%.*s]: crash log has no terminator\n', i32(rtk.name.len),
+			rtk.name.str)
 	}
 }
 
@@ -268,7 +279,7 @@ fn (mut rtk RTKit) send_start_endpoint(ep u8) bool {
 }
 
 fn (mut rtk RTKit) fail(message &char) bool {
-	println('rtkit[${rtk.name}]: ${message}')
+	C.kprintf(c'rtkit[%.*s]: %s\n', i32(rtk.name.len), rtk.name.str, message)
 	rtk.state = .error
 	return false
 }
@@ -288,7 +299,7 @@ pub fn (mut rtk RTKit) boot() bool {
 	rtk.state = .hello_wait
 	rtk.iop_power_state = 0
 	rtk.ap_power_state = 0
-	println('rtkit[${rtk.name}]: Starting boot handshake')
+	C.kprintf(c'rtkit[%.*s]: Starting boot handshake\n', i32(rtk.name.len), rtk.name.str)
 
 	// Wake the IOP. Its acknowledgment may arrive before or after HELLO/EPMAP.
 	if !rtk.send_management(msg_set_iop_power, u64(power_state_init)) {
@@ -316,7 +327,8 @@ pub fn (mut rtk RTKit) boot() bool {
 				min_version := u16(msg.data0 & 0xffff)
 				max_version := u16((msg.data0 >> 16) & 0xffff)
 				if min_version > max_supported_version || max_version < min_supported_version {
-					println('rtkit[${rtk.name}]: unsupported protocol range ${min_version}-${max_version}')
+					C.kprintf(c'rtkit[%.*s]: unsupported protocol range %llu-%llu\n',
+						i32(rtk.name.len), rtk.name.str, u64(min_version), u64(max_version))
 					rtk.state = .error
 					return false
 				}
@@ -331,7 +343,8 @@ pub fn (mut rtk RTKit) boot() bool {
 					return rtk.fail(c'failed to acknowledge HELLO')
 				}
 				rtk.state = .epmap_wait
-				println('rtkit[${rtk.name}]: negotiated protocol version ${version}')
+				C.kprintf(c'rtkit[%.*s]: negotiated protocol version %llu\n', i32(rtk.name.len),
+					rtk.name.str, u64(version))
 			}
 			msg_epmap {
 				bitmap := u32(msg.data0 & 0xffff_ffff)
@@ -341,7 +354,8 @@ pub fn (mut rtk RTKit) boot() bool {
 					// Never observed. If it ever fires, the upper group bits
 					// carry something this decoder does not model.
 					rtk.epmap_group_warned = true
-					println('rtkit[${rtk.name}]: endpoint-map group ${group} exceeds the addressable range')
+					C.kprintf(c'rtkit[%.*s]: endpoint-map group %llu exceeds the addressable range\n',
+						i32(rtk.name.len), rtk.name.str, u64(group))
 				}
 				last := msg.data0 & epmap_last != 0
 				base := block * epmap_group_endpoints
@@ -385,7 +399,8 @@ pub fn (mut rtk RTKit) boot() bool {
 				rtk.ap_power_state = u16(msg.data0 & 0xffff)
 			}
 			else {
-				println('rtkit[${rtk.name}]: ignoring management message type 0x${kind:x}')
+				C.kprintf(c'rtkit[%.*s]: ignoring management message type 0x%llx\n',
+					i32(rtk.name.len), rtk.name.str, u64(kind))
 			}
 		}
 
@@ -402,7 +417,7 @@ pub fn (mut rtk RTKit) boot() bool {
 		if endpoint_map_done && (rtk.iop_power_state & 0xff) == power_state_on
 			&& (rtk.ap_power_state & 0xff) == power_state_on {
 			rtk.state = .running
-			println('rtkit[${rtk.name}]: Boot handshake complete')
+			C.kprintf(c'rtkit[%.*s]: Boot handshake complete\n', i32(rtk.name.len), rtk.name.str)
 			return true
 		}
 	}
@@ -415,7 +430,8 @@ fn (mut rtk RTKit) allocate_system_buffer(ep u8, msg u64) bool {
 		return false
 	}
 	if rtk.system_iovas[ep] != 0 {
-		println('rtkit[${rtk.name}]: duplicate buffer request on endpoint ${ep}')
+		C.kprintf(c'rtkit[%.*s]: duplicate buffer request on endpoint %llu\n',
+			i32(rtk.name.len), rtk.name.str, u64(ep))
 		return false
 	}
 
@@ -432,13 +448,15 @@ fn (mut rtk RTKit) allocate_system_buffer(ep u8, msg u64) bool {
 	// chosen by firmware. Current Apple GPU firmware requests allocation with
 	// IOVA zero, matching the Asahi RTKit client contract.
 	if size == 0 || size > max_system_buffer_size || requested_iova != 0 {
-		println('rtkit[${rtk.name}]: invalid buffer request ep=${ep} size=0x${size:x} iova=0x${requested_iova:x}')
+		C.kprintf(c'rtkit[%.*s]: invalid buffer request ep=%llu size=0x%llx iova=0x%llx\n',
+			i32(rtk.name.len), rtk.name.str, u64(ep), u64(size), u64(requested_iova))
 		return false
 	}
 
 	iova := rtk.shmem_alloc(rtk.shmem_context, size)
 	if iova == 0 {
-		println('rtkit[${rtk.name}]: failed to allocate 0x${size:x}-byte buffer for ep=${ep}')
+		C.kprintf(c'rtkit[%.*s]: failed to allocate 0x%llx-byte buffer for ep=%llu\n',
+			i32(rtk.name.len), rtk.name.str, u64(size), u64(ep))
 		return false
 	}
 	rtk.system_iovas[ep] = iova
@@ -471,7 +489,8 @@ pub fn (mut rtk RTKit) handle_system_message(msg mailbox.MboxMsg) bool {
 					rtk.ap_power_state = u16(msg.data0 & 0xffff)
 				}
 				else {
-					println('rtkit[${rtk.name}]: ignoring runtime management message 0x${kind:x}')
+					C.kprintf(c'rtkit[%.*s]: ignoring runtime management message 0x%llx\n',
+						i32(rtk.name.len), rtk.name.str, u64(kind))
 				}
 			}
 		}
@@ -479,7 +498,8 @@ pub fn (mut rtk RTKit) handle_system_message(msg mailbox.MboxMsg) bool {
 			if management_type(msg.data0) == buffer_request && rtk.system_iovas[ep] == 0 {
 				return rtk.allocate_system_buffer(ep, msg.data0)
 			}
-			println('rtkit[${rtk.name}]: coprocessor crash notification')
+			C.kprintf(c'rtkit[%.*s]: coprocessor crash notification\n', i32(rtk.name.len),
+				rtk.name.str)
 			rtk.dump_crashlog()
 			rtk.state = .error
 			return false
@@ -521,7 +541,7 @@ pub fn (mut rtk RTKit) handle_system_message(msg mailbox.MboxMsg) bool {
 }
 
 fn start_system_endpoints(mut rtk RTKit) bool {
-	system_eps := [ep_crashlog, ep_syslog, ep_debug, ep_ioreport, ep_oslog]
+	system_eps := [ep_crashlog, ep_syslog, ep_debug, ep_ioreport, ep_oslog]!
 	for ep in system_eps {
 		if rtk.endpoints[ep] && !rtk.send_start_endpoint(ep) {
 			return false
@@ -533,11 +553,13 @@ fn start_system_endpoints(mut rtk RTKit) bool {
 // Start an application endpoint after RTKit has reached the ON state.
 pub fn (mut rtk RTKit) start_endpoint(ep u8) bool {
 	if !rtk.endpoints[ep] {
-		println('rtkit[${rtk.name}]: Endpoint ${ep} not available')
+		C.kprintf(c'rtkit[%.*s]: Endpoint %llu not available\n', i32(rtk.name.len),
+			rtk.name.str, u64(ep))
 		return false
 	}
 	if ep >= app_endpoint_start && rtk.state != .running {
-		println('rtkit[${rtk.name}]: Endpoint ${ep} requested before RTKit is running')
+		C.kprintf(c'rtkit[%.*s]: Endpoint %llu requested before RTKit is running\n',
+			i32(rtk.name.len), rtk.name.str, u64(ep))
 		return false
 	}
 	return rtk.send_start_endpoint(ep)

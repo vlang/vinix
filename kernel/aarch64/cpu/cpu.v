@@ -887,16 +887,16 @@ pub fn user_hwcaps() (u64, u64) {
 const hwcap_names = ['fp', 'asimd', 'evtstrm', 'aes', 'pmull', 'sha1', 'sha2', 'crc32', 'atomics',
 	'fphp', 'asimdhp', 'cpuid', 'asimdrdm', 'jscvt', 'fcma', 'lrcpc', 'dcpop', 'sha3', 'sm3', 'sm4',
 	'asimddp', 'sha512', 'sve', 'asimdfhm', 'dit', 'uscat', 'ilrcpc', 'flagm', 'ssbs', 'sb', 'paca',
-	'pacg']
+	'pacg']!
 const hwcap2_names = ['dcpodp', 'sve2', 'sveaes', 'svepmull', 'svebitperm', 'svesha3', 'svesm4',
-	'flagm2', 'frint', 'svei8mm', 'svef32mm', 'svef64mm', 'svebf16', 'i8mm', 'bf16', 'dgh']
+	'flagm2', 'frint', 'svei8mm', 'svef32mm', 'svef64mm', 'svebf16', 'i8mm', 'bf16', 'dgh']!
 
 // The Features line of /proc/cpuinfo, as a string of its own. Built in one
 // buffer: the names are literals, and an array of them could not be freed
 // without freeing them too.
 pub fn user_feature_names() string {
 	hwcap, hwcap2 := user_hwcaps()
-	mut text := []u8{cap: 512}
+	mut text := []u8{cap: 512} @[freed]
 	for i, name in hwcap_names {
 		if hwcap & (u64(1) << i) != 0 {
 			append_feature(mut text, name)

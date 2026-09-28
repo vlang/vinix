@@ -51,7 +51,7 @@ pub fn initialise(smp_info &limine.LimineSMPInfo) {
 	// architectural thread state and must be switched on every CPU.
 	cpu.init_fpu_globals()
 
-	print('smp: CPU ${cpu_local.cpu_number} online!\n')
+	C.kprintf(c'smp: CPU %llu online!\n', u64(cpu_local.cpu_number))
 
 	katomic.inc(mut &cpu_local.online)
 

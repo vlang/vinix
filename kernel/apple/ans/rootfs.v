@@ -197,7 +197,7 @@ fn (mut this AnsRootFS) make_node(parent &fs.VFSNode, name string, ino u32) ?&fs
 	node.resource = res
 	node.read_only = true
 	if stat.islnk(mode) {
-		mut text := []u8{len: int(fields[0]) + 1}
+		mut text := []u8{len: int(fields[0]) + 1} @[freed]
 		ans_lock.acquire()
 		n := C.vinix_ans_root_read(ino, text.data, 0, fields[0])
 		ans_lock.release()

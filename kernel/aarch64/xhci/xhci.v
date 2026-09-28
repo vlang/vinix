@@ -288,14 +288,15 @@ fn command(d0 u32, d1 u32, d2 u32, d3 u32) ?Event {
 		ev := next_event() or { continue }
 		if event_type(ev) == trb_command_completion && ev.param == trb {
 			if event_code(ev) != cc_success {
-				println('xhci: command ${(d3 >> 10) & 0x3f} failed with code ${event_code(ev)}')
+				C.kprintf(c'xhci: command %llu failed with code %llu\n', u64((d3 >> 10) & 0x3f),
+					u64(event_code(ev)))
 				return none
 			}
 			return ev
 		}
 		handle_event(ev)
 	}
-	println('xhci: command ${(d3 >> 10) & 0x3f} timed out')
+	C.kprintf(c'xhci: command %llu timed out\n', u64((d3 >> 10) & 0x3f))
 	return none
 }
 
@@ -434,7 +435,7 @@ fn reset_port(port u32) bool {
 // a pointer.
 fn attach(port u32) {
 	if !reset_port(port) {
-		println('xhci: port ${port} did not enable')
+		C.kprintf(c'xhci: port %llu did not enable\n', u64(port))
 		return
 	}
 	speed := (rd(port_register(port)) >> 10) & 0xf
@@ -460,7 +461,7 @@ fn attach(port u32) {
 		return
 	}
 	if !control(mut dev, 0x80, 6, 0x0100, 0, 8) {
-		println('xhci: port ${port}: no device descriptor')
+		C.kprintf(c'xhci: port %llu: no device descriptor\n', u64(port))
 		return
 	}
 	if speed < 3 && u32(buf_u8(&dev, 7)) != max_packet && buf_u8(&dev, 7) >= 8 {
@@ -510,7 +511,8 @@ pub fn initialise() bool {
 	if xhci_slots > max_slots {
 		xhci_slots = max_slots
 	}
-	println('xhci: controller at 0x${bar.base:x}, ${xhci_ports} ports, ${xhci_slots} slots')
+	C.kprintf(c'xhci: controller at 0x%llx, %llu ports, %llu slots\n', u64(bar.base),
+		u64(xhci_ports), u64(xhci_slots))
 
 	take_ownership((hcc1 >> 16) << 2)
 
@@ -576,7 +578,7 @@ pub fn initialise() bool {
 	cpu.dmb_ish()
 	xhci_ready = true
 	virtio_input.set_extra_poller(voidptr(poll))
-	println('xhci: ${xhci_function_cnt} input device(s)')
+	C.kprintf(c'xhci: %lld input device(s)\n', i64(xhci_function_cnt))
 	return true
 }
 

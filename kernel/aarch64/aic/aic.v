@@ -70,17 +70,17 @@ fn aic_write(offset u32, value u32) {
 pub fn initialise(base u64) bool {
 	term.early_stage_mark(41) // green: entered initialise
 	print('aic.1 entered initialise\n')
-	println('aic.2 base 0x${base:x}, mapping MMIO aperture...')
+	C.kprintf(c'aic.2 base 0x%llx, mapping MMIO aperture...\n', u64(base))
 
 	// Map the AIC register aperture as Device memory (it lives far above the
 	// 4 GiB HHDM window, so plain `base + higher_half` is not valid).
 	aic_base = memory.map_mmio(base, 0x8000)
 	term.early_stage_mark(42) // blue: map_mmio returned
-	println('aic.3 MMIO mapped at 0x${aic_base:x}, reading AIC_INFO...')
+	C.kprintf(c'aic.3 MMIO mapped at 0x%llx, reading AIC_INFO...\n', u64(aic_base))
 
 	info := aic_read(aic_info)
 	term.early_stage_mark(43) // yellow: first MMIO read returned
-	println('aic.4 AIC_INFO=0x${info:x}')
+	C.kprintf(c'aic.4 AIC_INFO=0x%llx\n', u64(info))
 	aic_nr_irqs = info & 0xffff
 
 	// AICv1 parts carry a few hundred to ~1k IRQs (t8103: 896). 0 means the
@@ -90,12 +90,12 @@ pub fn initialise(base u64) bool {
 		return false
 	}
 
-	println('aic: Apple Interrupt Controller at 0x${base:x}')
-	println('aic: ${aic_nr_irqs} hardware IRQs')
+	C.kprintf(c'aic: Apple Interrupt Controller at 0x%llx\n', u64(base))
+	C.kprintf(c'aic: %llu hardware IRQs\n', u64(aic_nr_irqs))
 
 	// Mask all IRQs initially
 	nr_regs := (aic_nr_irqs + 31) / 32
-	print('aic.5 masking ${nr_regs} mask registers\n')
+	C.kprintf(c'aic.5 masking %llu mask registers\n', u64(nr_regs))
 	for i := u32(0); i < nr_regs; i++ {
 		aic_write(aic_mask_set + i * 4, 0xffffffff)
 	}

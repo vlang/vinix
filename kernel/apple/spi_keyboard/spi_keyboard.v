@@ -355,7 +355,7 @@ fn initialise_hardware() {
 		}
 		ready_reg = base + u64(plan.ready.pin) * 4
 	}
-	mut pin_registers := []u64{cap: plan.pins.len}
+	mut pin_registers := []u64{cap: plan.pins.len} @[freed]
 	defer { unsafe { pin_registers.free() } }
 	for pin in plan.pins {
 		base := memory.map_mmio(pin.region.base, pin.region.size)

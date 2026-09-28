@@ -213,7 +213,7 @@ pub fn io_apic_set_irq_redirect(lapic_id u32, vector u8, irq u8, status bool) {
 	for i := 0; i < madt_isos.len; i++ {
 		if madt_isos[i].irq_source == irq {
 			if status {
-				print('apic: IRQ ${irq} using override\n')
+				C.kprintf(c'apic: IRQ %llu using override\n', u64(irq))
 			}
 			io_apic_set_gsi_redirect(lapic_id, vector, madt_isos[i].gsi, madt_isos[i].flags,
 				status)

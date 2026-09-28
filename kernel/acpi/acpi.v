@@ -67,9 +67,9 @@ pub fn initialise() {
 		rsdt = unsafe { &RSDT(byteptr(usize(rsdp.rsdt_addr)) + higher_half) }
 	}
 
-	println('acpi: Revision:  ${rsdp.revision}')
-	println('acpi: Use XSDT:  ${use_xsdt()}')
-	println('acpi: R/XSDT at: 0x${voidptr(rsdt):x}')
+	C.kprintf(c'acpi: Revision:  %llu\n', u64(rsdp.revision))
+	C.kprintf(c'acpi: Use XSDT:  %s\n', if use_xsdt() { c'true' } else { c'false' })
+	C.kprintf(c'acpi: R/XSDT at: 0x%llx\n', u64(voidptr(rsdt)))
 
 	// We won't support HW reduced ACPI systems
 	if fadt := find_sdt('FACP', 0) {
@@ -84,7 +84,8 @@ pub fn initialise() {
 	madt_init()
 }
 
-pub fn find_sdt(signature string, index int) !voidptr {
+// No caller reads why a table is missing, and an error() would be allocated.
+pub fn find_sdt(signature string, index int) ?voidptr {
 	mut count := 0
 
 	entry_count := (rsdt.header.length - sizeof(SDT)) / u32(if use_xsdt() { 8 } else { 4 })
@@ -100,10 +101,11 @@ pub fn find_sdt(signature string, index int) !voidptr {
 				count++
 				continue
 			}
-			println('acpi: Found "${signature}" at 0x${voidptr(ptr):x}')
+			C.kprintf(c'acpi: Found "%.*s" at 0x%llx\n', i32(signature.len), signature.str,
+				u64(voidptr(ptr)))
 			return voidptr(ptr)
 		}
 	}
 
-	return error('acpi: "${signature}" not found')
+	return none
 }

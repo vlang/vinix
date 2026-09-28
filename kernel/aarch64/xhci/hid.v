@@ -140,7 +140,7 @@ fn take_hid_functions(mut dev Device, total u64) {
 		return
 	}
 	if !control(mut dev, 0x00, 9, u16(config_value), 0, 0) {
-		println('xhci: slot ${dev.slot}: SET_CONFIGURATION failed')
+		C.kprintf(c'xhci: slot %llu: SET_CONFIGURATION failed\n', u64(dev.slot))
 		return
 	}
 
@@ -177,13 +177,14 @@ fn take_hid_functions(mut dev Device, total u64) {
 		}
 		xhci_functions[xhci_function_cnt] = f
 		xhci_function_cnt++
-		println('xhci: slot ${dev.slot} interface ${c.iface}: ${if f.kind == kind_keyboard {
-			'keyboard'
+		role := if f.kind == kind_keyboard {
+			c'keyboard'
 		} else if f.x.relative {
-			'mouse'
+			c'mouse'
 		} else {
-			'tablet'
-		}}')
+			c'tablet'
+		}
+		C.kprintf(c'xhci: slot %llu interface %llu: %s\n', u64(dev.slot), u64(c.iface), role)
 	}
 	if xhci_function_cnt > first {
 		configure_endpoints(mut dev, first, candidates, count)
@@ -240,7 +241,7 @@ fn configure_endpoints(mut dev Device, first int, candidates [4]Candidate, count
 	mem_wr(ctx(dev.input_virt, 0) + 4, add)
 	write_slot(dev, last_dci)
 	command(u32(dev.input_phys), u32(dev.input_phys >> 32), 0, (trb_configure_endpoint << 10) | (dev.slot << 24)) or {
-		println('xhci: slot ${dev.slot}: endpoints not configured')
+		C.kprintf(c'xhci: slot %llu: endpoints not configured\n', u64(dev.slot))
 		// Keep nothing that would wait on an endpoint that does not exist.
 		xhci_function_cnt = first
 	}

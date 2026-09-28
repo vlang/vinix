@@ -40,7 +40,8 @@ pub fn (dev &PCIDevice) set_msi(vector u8) {
 
 pub fn (dev &PCIDevice) set_msix(vector u8) bool {
 	msix_vector := dev.msix_table_bitmap.alloc() or {
-		print('pci: [${dev.bus:x}:${dev.slot:x}:${dev.function:x}:${dev.parent:x}] msix no free vectors\n')
+		C.kprintf(c'pci: [%llx:%llx:%llx:%lld] msix no free vectors\n', u64(dev.bus), u64(dev.slot),
+			u64(dev.function), i64(dev.parent))
 		return false
 	}
 
@@ -51,7 +52,8 @@ pub fn (dev &PCIDevice) set_msix(vector u8) bool {
 	bar_offset := (table_ptr >> 3) << 3
 
 	if dev.is_bar_present(u8(bar_index)) == false {
-		print('pci: [${dev.bus:x}:${dev.slot:x}:${dev.function:x}:${dev.parent:x}] msix table bar not present\n')
+		C.kprintf(c'pci: [%llx:%llx:%llx:%lld] msix table bar not present\n', u64(dev.bus),
+			u64(dev.slot), u64(dev.function), i64(dev.parent))
 		return false
 	}
 

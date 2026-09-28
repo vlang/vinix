@@ -441,10 +441,9 @@ fn (mut controller Controller) sample() int {
 fn service() {
 	mut controller := monitor
 	mut poll_timer := time.new_timer(time.TimeSpec{ tv_nsec: poll_interval_ns })
-	mut events := [&poll_timer.event]
 	mut failures := 0
 	for {
-		event.await(mut events, true) or {}
+		event.await_one(mut poll_timer.event, true) or {}
 		poll_timer.disarm()
 		result := controller.sample()
 		if result < 0 {
@@ -478,10 +477,7 @@ fn service() {
 		}
 		poll_timer.arm()
 	}
-	unsafe {
-		events.free()
-		free(poll_timer)
-	}
+	unsafe { free(poll_timer) }
 	sched.dequeue_and_die()
 }
 

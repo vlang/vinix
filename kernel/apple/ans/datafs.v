@@ -202,7 +202,7 @@ fn (mut this AnsDataFS) make_node(parent &fs.VFSNode, name string, ino u32) ?&fs
 	mut node := fs.create_node(this, parent, name, stat.isdir(res.stat.mode))
 	node.resource = res
 	if stat.islnk(res.stat.mode) {
-		mut target := []u8{len: int(res.stat.size) + 1}
+		mut target := []u8{len: int(res.stat.size) + 1} @[freed]
 		ans_lock.acquire()
 		result := C.vinix_ans_data_read(ino, target.data, 0, u64(res.stat.size))
 		ans_lock.release()

@@ -27,9 +27,9 @@ pub fn initialise() {
 	}
 	smp_tag := smp_req.response
 
-	println('smp: BSP LAPIC ID:    ${smp_tag.bsp_lapic_id:x}')
-	println('smp: Total CPU count: ${smp_tag.cpu_count}')
-	println('smp: Using x2APIC:    ${x2apic_mode}')
+	C.kprintf(c'smp: BSP LAPIC ID:    %llx\n', u64(smp_tag.bsp_lapic_id))
+	C.kprintf(c'smp: Total CPU count: %llu\n', u64(smp_tag.cpu_count))
+	C.kprintf(c'smp: Using x2APIC:    %s\n', if x2apic_mode { c'true' } else { c'false' })
 
 	smp_info_array := smp_tag.cpus
 

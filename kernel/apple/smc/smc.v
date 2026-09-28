@@ -127,6 +127,7 @@ pub fn initialise() {
 		println('apple-smc: SMC node has no mboxes property')
 		return
 	}
+	defer { unsafe { channels.free() } }
 	if channels.len != 1 {
 		println('apple-smc: expected one zero-argument mailbox')
 		return
@@ -147,6 +148,7 @@ pub fn initialise() {
 		println('apple-smc: mailbox provider has no compatible property')
 		return
 	}
+	defer { unsafe { compatible.free() } }
 	if cells != 0 || 'apple,asc-mailbox-v4' !in compatible {
 		println('apple-smc: unsupported mailbox provider')
 		return
@@ -155,6 +157,7 @@ pub fn initialise() {
 		println('apple-smc: mailbox registers do not translate to an address')
 		return
 	}
+	defer { unsafe { regs.free() } }
 	if regs.len != 1 || regs[0].base == 0 || regs[0].size < 0x1000
 		|| regs[0].base > ~u64(0) - 0xfff {
 		println('apple-smc: invalid mailbox register range')
@@ -207,12 +210,11 @@ pub fn initialise() {
 
 fn service() {
 	mut dev := battery_device
-	// Reuse both the timer and its listener array rather than allocating ten
-	// times per second. event.await consumes a pending timer event before sleep.
+	// Reuse the timer rather than allocating one ten times per second.
+	// event.await consumes a pending timer event before sleep.
 	mut timer := time.new_timer(time.TimeSpec{tv_nsec: 100_000_000})
-	mut events := [&timer.event]
 	for {
-		event.await(mut events, true) or {}
+		event.await_one(mut timer.event, true) or {}
 		timer.disarm()
 		// No Resource spinlock during firmware waits: Vinix spinlocks mask
 		// interrupts. This worker alone owns the mutable protocol state.
@@ -230,10 +232,7 @@ fn service() {
 		timer.when = time.TimeSpec{tv_nsec: 100_000_000}
 		timer.arm()
 	}
-	unsafe {
-		events.free()
-		free(timer)
-	}
+	unsafe { free(timer) }
 	sched.dequeue_and_die()
 }
 

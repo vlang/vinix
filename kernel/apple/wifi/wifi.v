@@ -210,11 +210,20 @@ fn named_or_index(node &devicetree.DTNode, name string, index int, minimum u64) 
 	return ranges[index]
 }
 
-fn exact_cells(node &devicetree.DTNode, name string, expected []u32) bool {
+// `expected` is `count` cells, usually a fixed array on the caller's stack.
+fn exact_cells(node &devicetree.DTNode, name string, expected &u32, count int) bool {
 	cells := devicetree.get_u32_array(node, name) or { return false }
 	defer { unsafe { cells.free() }
 	 }
-	return cells == expected
+	if cells.len != count {
+		return false
+	}
+	for i in 0 .. count {
+		if cells[i] != unsafe { expected[i] } {
+			return false
+		}
+	}
+	return true
 }
 
 fn discover(mut p Plan) bool {
@@ -223,13 +232,16 @@ fn discover(mut p Plan) bool {
 		return false
 	}
 	wifi := devicetree.find_compatible('pci14e4,4425') or { return false }
-	if !enabled(wifi) || !exact_cells(wifi, 'reg', [u32(0x10000), 0, 0, 0, 0])
+	wifi_reg := [u32(0x10000), 0, 0, 0, 0]!
+	if !enabled(wifi) || !exact_cells(wifi, 'reg', &wifi_reg[0], wifi_reg.len)
 		|| (devicetree.get_string_prop(wifi, 'brcm,board-type') or { '' }) != 'apple,shikoku' {
 		return false
 	}
 	port := wifi.parent
-	if port == unsafe { nil } || !exact_cells(port, 'reg', [u32(0), 0, 0, 0, 0])
-		|| !exact_cells(port, 'bus-range', [u32(1), 1]) {
+	port_reg := [u32(0), 0, 0, 0, 0]!
+	bus_range := [u32(1), 1]!
+	if port == unsafe { nil } || !exact_cells(port, 'reg', &port_reg[0], port_reg.len)
+		|| !exact_cells(port, 'bus-range', &bus_range[0], bus_range.len) {
 		return false
 	}
 	host := port.parent
@@ -359,7 +371,7 @@ fn prepare_seed() bool {
 	// Domain-separated SHA-256 expansion of bootloader entropy. M1n1's SEP
 	// path supplies 128 bytes. No timer-based or deterministic fallback.
 	domain := 'Vinix BCM4378 firmware seed v1'
-	mut input := []u8{len: domain.len + int(seed.len) + 1}
+	mut input := []u8{len: domain.len + int(seed.len) + 1} @[freed]
 	defer {
 		unsafe {
 			C.memset(input.data, 0, input.len)

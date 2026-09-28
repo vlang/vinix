@@ -400,11 +400,7 @@ fn nap(ns i64) Nap {
 		timer.disarm()
 		unsafe { free(timer) }
 	}
-	mut events := [&timer.event]
-	defer {
-		unsafe { events.free() }
-	}
-	event.await(mut events, true) or { return pending_signal() }
+	event.await_one(mut timer.event, true) or { return pending_signal() }
 	return .slept
 }
 
@@ -457,7 +453,8 @@ fn (mut s SoundStream) setup_params(fmt u32, rate u32, channels u8) {
 		}
 	}
 	if bytes == 0 || rate_index < 0 || channels == 0 {
-		print('virtio-snd: unsupported parameters: format ${fmt:x}, ${rate} Hz, ${channels} channels\n')
+		C.kprintf(c'virtio-snd: unsupported parameters: format %llx, %llu Hz, %llu channels\n',
+			u64(fmt), u64(rate), u64(channels))
 		return
 	}
 
@@ -494,12 +491,12 @@ fn (mut s SoundStream) setup_params(fmt u32, rate u32, channels u8) {
 	}
 	code := control(24, 4)
 	if code != s_ok {
-		print('virtio-snd: SET_PARAMS failed (${code:x})\n')
+		C.kprintf(c'virtio-snd: SET_PARAMS failed (%llx)\n', u64(code))
 		return
 	}
 	prepare := stream_request(r_pcm_prepare, s.id)
 	if prepare != s_ok {
-		print('virtio-snd: PREPARE failed (${prepare:x})\n')
+		C.kprintf(c'virtio-snd: PREPARE failed (%llx)\n', u64(prepare))
 		return
 	}
 	s.format = format
@@ -661,7 +658,7 @@ fn (mut s SoundStream) start_locked() {
 	if s.prepared && !s.started {
 		code := stream_request(r_pcm_start, s.id)
 		if code != s_ok {
-			print('virtio-snd: START failed (${code:x})\n')
+			C.kprintf(c'virtio-snd: START failed (%llx)\n', u64(code))
 			return
 		}
 		s.started = true
@@ -821,7 +818,7 @@ fn find_output_stream(streams u32) bool {
 	wr32(page + 12, u32(pcm_info_size))
 	code := control(16, u32(4 + u64(count) * pcm_info_size))
 	if code != s_ok {
-		print('virtio-snd: PCM_INFO failed (${code:x})\n')
+		C.kprintf(c'virtio-snd: PCM_INFO failed (%llx)\n', u64(code))
 		return false
 	}
 	for i := u32(0); i < count; i++ {
@@ -848,7 +845,7 @@ fn find_output_stream(streams u32) bool {
 }
 
 fn fail(message string) {
-	print('virtio-snd: ${message}\n')
+	C.kprintf(c'virtio-snd: %.*s\n', i32(message.len), message.str)
 	mmio_w32(snd_base + reg_status, status_failed)
 }
 

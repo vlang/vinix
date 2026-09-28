@@ -13,6 +13,7 @@ import event.eventstruct
 import fs
 import fs.ext2
 import klock
+import lib
 import limine
 import memory
 import resource
@@ -306,10 +307,13 @@ pub fn initialise(hhdm u64) {
 		if mmio_r32(base + reg_magic) != virtio_magic || mmio_r32(base + reg_device_id) != virtio_id_block {
 			continue
 		}
+		mut name := lib.new_text(3)
+		name.add('vd')
+		name.add_byte(u8(`a` + index))
 		mut device := &VirtioBlockDevice{
 			base: base
 			hhdm: hhdm
-			name: 'vd' + rune(`a` + index).str()
+			name: name.str()
 		}
 		mmio_w32(base + reg_status, 0)
 		mmio_w32(base + reg_status, status_acknowledge)
@@ -378,23 +382,31 @@ pub fn mount_persistent_root() bool {
 		return false
 	}
 	for device in devices {
-		node := fs.get_node(vfs_root, '/dev/${device.name}', true) or { continue }
+		path := '/dev/${device.name}' @[freed]
+		node := fs.get_node(vfs_root, path, true) or {
+			unsafe { path.free() }
+			continue
+		}
+		unsafe { path.free() }
+		name_len, name := i32(device.name.len), device.name.str
 		mut filesystem, ok := ext2.ext2_init(node)
 		if !ok {
-			println('virtio-blk: /dev/${device.name} is not a readable ext2 volume')
+			C.kprintf(c'virtio-blk: /dev/%.*s is not a readable ext2 volume\n', name_len, name)
 			continue
 		}
 		// Not attached anywhere: install_disk_root is what publishes it, and
 		// only once it has checked that the volume really carries a system.
 		mut root := ext2.ext2_root(mut filesystem) or {
-			println('virtio-blk: ext2 volume /dev/${device.name} has no readable root')
+			C.kprintf(c'virtio-blk: ext2 volume /dev/%.*s has no readable root\n', name_len,
+				name)
 			continue
 		}
 		if !fs.install_disk_root(mut root) {
-			println('virtio-blk: /dev/${device.name} does not carry a bootable system')
+			C.kprintf(c'virtio-blk: /dev/%.*s does not carry a bootable system\n', name_len,
+				name)
 			continue
 		}
-		println('virtio-blk: persistent ext2 root mounted from /dev/${device.name}')
+		C.kprintf(c'virtio-blk: persistent ext2 root mounted from /dev/%.*s\n', name_len, name)
 		return true
 	}
 	println('virtio-blk: no ext2 volume carried a system; using the initramfs root')
@@ -409,18 +421,29 @@ pub fn mount_persistent_home() bool {
 		return true
 	}
 	for device in devices {
-		node := fs.get_node(vfs_root, '/dev/${device.name}', true) or { continue }
+		// The mount table keeps a copy of its own.
+		path := '/dev/${device.name}' @[freed]
+		node := fs.get_node(vfs_root, path, true) or {
+			unsafe { path.free() }
+			continue
+		}
+		name_len, name := i32(device.name.len), device.name.str
 		filesystem, ok := ext2.ext2_init(node)
 		if !ok {
-			println('virtio-blk: /dev/${device.name} is not a readable ext2 volume')
+			C.kprintf(c'virtio-blk: /dev/%.*s is not a readable ext2 volume\n', name_len, name)
+			unsafe { path.free() }
 			continue
 		}
 		fs.add_filesystem(filesystem, 'qemu-persist')
-		fs.mount_at_root('/dev/${device.name}', '/root', 'qemu-persist') or {
-			println('virtio-blk: ext2 volume /dev/${device.name} could not mount at /root')
+		fs.mount_at_root(path, '/root', 'qemu-persist') or {
+			C.kprintf(c'virtio-blk: ext2 volume /dev/%.*s could not mount at /root\n', name_len,
+				name)
+			unsafe { path.free() }
 			return false
 		}
-		println('virtio-blk: persistent ext2 mounted at /root from /dev/${device.name}')
+		unsafe { path.free() }
+		C.kprintf(c'virtio-blk: persistent ext2 mounted at /root from /dev/%.*s\n', name_len,
+			name)
 		return true
 	}
 	println('virtio-blk: requested persistent ext2 volume was not found')

@@ -181,11 +181,14 @@ pub fn uacpi_kernel_wait_for_event(handle voidptr, timeout u16) bool {
 			free(timer)
 		}
 	}
-	mut events := if timeout == 0xffff {
-		[unsafe { &eventstruct.Event(handle) }]
-	} else {
-		[unsafe { &eventstruct.Event(handle) }, &timer.event]
+	// uACPI waits here on every AML Wait; a list literal leaked on each one.
+	mut e := unsafe { &eventstruct.Event(handle) }
+	if timeout == 0xffff {
+		event.await_one(mut e, true) or { return false }
+		return true
 	}
+	mut storage := [e, &timer.event]!
+	mut events := unsafe { event.stack_list(&storage[0], storage.len) }
 	event.await(mut events, true) or { return false }
 	return true
 }
@@ -215,8 +218,7 @@ pub fn uacpi_kernel_sleep(msec u64) {
 			free(timer)
 		}
 	}
-	mut events := [&timer.event]
-	event.await(mut events, true) or {}
+	event.await_one(mut timer.event, true) or {}
 }
 
 @[export: 'uacpi_kernel_alloc']

@@ -8,6 +8,7 @@ import fs
 import stat
 import file
 import klock
+import lib
 import katomic
 import errno
 import event.eventstruct
@@ -173,8 +174,9 @@ fn publish(index u32, partition int, start u64, blocks u64, name string) {
 	res.stat.mode = (if writable { u32(0o600) } else { u32(0o440) }) | stat.ifblk
 	res.status = file.pollin | (if writable { file.pollout } else { 0 })
 	fs.devtmpfs_add_device(res, name)
-	access := if writable { 'writable (FUA + flush)' } else { 'read-only' }
-	println('ans: /dev/${name}: ${res.stat.size} bytes, ${sector}-byte sectors, ${access}')
+	access := if writable { c'writable (FUA + flush)' } else { c'read-only' }
+	C.kprintf(c'ans: /dev/%.*s: %lld bytes, %llu-byte sectors, %s\n', i32(name.len), name.str,
+		i64(res.stat.size), u64(sector), access)
 	if partition >= 0 {
 		mut uuid := [37]u8{}
 		if C.vinix_ans_partition_uuid(index, u32(partition), unsafe { &char(&uuid[0]) }, 37) == 0 {
@@ -208,16 +210,25 @@ pub fn initialise(cmdline string) {
 		ans_ready = true
 		for i in 0 .. C.vinix_ans_namespace_count() {
 			index := u32(i)
-			name := 'ans0n${C.vinix_ans_namespace_id(index)}'
+			// The device nodes keep these names.
+			mut namespace := lib.new_text(16)
+			namespace.add('ans0n')
+			namespace.add_unsigned(u64(C.vinix_ans_namespace_id(index)))
+			name := namespace.str()
 			publish(index, -1, 0, C.vinix_ans_sector_count(index), name)
 			parts := C.vinix_ans_partition_count(index)
 			for j in 0 .. parts {
 				p := u32(j)
+				mut partition := lib.new_text(name.len + 4)
+				partition.add(name)
+				partition.add_byte(`p`)
+				partition.add_unsigned(u64(C.vinix_ans_partition_number(index, p)))
 				publish(index, int(p), C.vinix_ans_partition_start(index, p),
-					C.vinix_ans_partition_blocks(index, p),
-					'${name}p${C.vinix_ans_partition_number(index, p)}')
+					C.vinix_ans_partition_blocks(index, p), partition.str())
 			}
-			if parts == 0 { println('ans: ${name}: no validated GPT partitions') }
+			if parts == 0 {
+				C.kprintf(c'ans: %.*s: no validated GPT partitions\n', i32(name.len), name.str)
+			}
 		}
 	}
 }

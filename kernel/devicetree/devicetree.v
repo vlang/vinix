@@ -126,7 +126,7 @@ pub fn parse(dtb_addr voidptr) bool {
 	version := be32(voidptr(&header.version))
 	totalsize := be32(voidptr(&header.totalsize))
 
-	println('devicetree: FDT version ${version}, size ${totalsize} bytes')
+	C.kprintf(c'devicetree: FDT version %llu, size %llu bytes\n', u64(version), u64(totalsize))
 
 	dt_strings = unsafe { voidptr(u64(dtb_addr) + be32(voidptr(&header.off_dt_strings))) }
 	dt_struct = unsafe { voidptr(u64(dtb_addr) + be32(voidptr(&header.off_dt_struct))) }
@@ -420,6 +420,7 @@ pub fn find_phandle(phandle u32) ?&DTNode {
 // memory-region and mailbox providers with zero argument cells.
 pub fn get_phandle_node(node &DTNode, property string, index u32) ?&DTNode {
 	values := get_u32_array(node, property) or { return none }
+	defer { unsafe { values.free() } }
 	if index >= u32(values.len) {
 		return none
 	}
@@ -428,6 +429,7 @@ pub fn get_phandle_node(node &DTNode, property string, index u32) ?&DTNode {
 
 pub fn get_named_phandle_node(node &DTNode, property string, names_property string, name string) ?&DTNode {
 	names := get_string_list(node, names_property) or { return none }
+	defer { unsafe { names.free() } }
 	for index, candidate in names {
 		if candidate == name {
 			return get_phandle_node(node, property, u32(index))

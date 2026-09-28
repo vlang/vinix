@@ -54,7 +54,7 @@ const exception_names = [
 	c'???',
 	c'???',
 	c'Security',
-]
+]!
 
 fn pf_handler(num u32, mut gpr_state cpulocal.GPRState) {
 	// Read while interrupts are still off: see mmap.pf_handler().

@@ -21,6 +21,7 @@ import devicetree
 import errno
 import event
 import katomic
+import lib
 import memory
 import proc
 import time
@@ -418,34 +419,56 @@ fn dma_channel(mca &devicetree.DTNode, name string, admac_handle u32) ?u32 {
 	return none
 }
 
+// Discovery reasons that name a part. The caller frees every reason once it
+// has printed it; interpolating the number would leave its string behind.
+fn numbered(prefix string, index int, suffix string) string {
+	mut text := lib.new_text(prefix.len + suffix.len + 4)
+	text.add(prefix)
+	text.add_decimal(index)
+	text.add(suffix)
+	return text.str()
+}
+
+fn named(prefix string, name string, suffix string) string {
+	mut text := lib.new_text(prefix.len + name.len + suffix.len)
+	text.add(prefix)
+	text.add(name)
+	text.add(suffix)
+	return text.str()
+}
+
 fn plan_amp(node &devicetree.DTNode, index int, mut plan Plan) string {
 	if !enabled(node) || !compatible(node, 'ti,tas2770')
 		|| devicetree.get_u32(node, '#sound-dai-cells') or { u32(1) } != 0 {
-		return 'speaker ${index} is not an enabled TAS2770-family amplifier'
+		return numbered('speaker ', index, ' is not an enabled TAS2770-family amplifier')
 	}
-	reg := devicetree.get_u32_array(node, 'reg') or { return 'speaker ${index} has no address' }
+	reg := devicetree.get_u32_array(node, 'reg') or {
+		return numbered('speaker ', index, ' has no address')
+	}
 	defer { unsafe { reg.free() } }
 	imon := devicetree.get_u32(node, 'ti,imon-slot-no') or { u32(0xff) }
 	vmon := devicetree.get_u32(node, 'ti,vmon-slot-no') or { u32(0xff) }
 	if reg.len != 1 || reg[0] > 0x7f || imon > 0x3f || vmon > 0x3f {
-		return 'speaker ${index} has no usable address or sense slots'
+		return numbered('speaker ', index, ' has no usable address or sense slots')
 	}
 	bus := node.parent
 	if bus == unsafe { nil } || !enabled(bus) || !compatible(bus, 'apple,t8103-i2c')
 		|| devicetree.get_u32(bus, '#address-cells') or { u32(0) } != 1
 		|| devicetree.get_u32(bus, '#size-cells') or { u32(1) } != 0 {
-		return 'speaker ${index} is not on an enabled t8103 I2C bus'
+		return numbered('speaker ', index, ' is not on an enabled t8103 I2C bus')
 	}
-	bus_region := only_region(bus, 0x30) or { return 'I2C bus ${index} registers unusable' }
+	bus_region := only_region(bus, 0x30) or {
+		return numbered('I2C bus ', index, ' registers unusable')
+	}
 	mut provider := &devicetree.DTNode(unsafe { nil })
 	mut gpio_pin := u32(0)
 	if has_property(node, 'shutdown-gpios') {
 		gpio := devicetree.get_u32_array(node, 'shutdown-gpios') or {
-			return 'speaker ${index} shutdown GPIO property is malformed'
+			return numbered('speaker ', index, ' shutdown GPIO property is malformed')
 		}
 		defer { unsafe { gpio.free() } }
 		if gpio.len != 3 || gpio[2] != 0 {
-			return 'speaker ${index} shutdown GPIO is not active-high'
+			return numbered('speaker ', index, ' shutdown GPIO is not active-high')
 		}
 		provider = devicetree.find_phandle(gpio[0]) or { return 'speaker GPIO provider missing' }
 		gpio_pin = gpio[1]
@@ -460,13 +483,14 @@ fn plan_amp(node &devicetree.DTNode, index int, mut plan Plan) string {
 		expected_vmon := if index == 0 { u32(2) } else { u32(6) }
 		if reg[0] != expected_address || bus_region.base != expected_bus || imon != expected_imon
 			|| vmon != expected_vmon {
-			return 'speaker ${index} has no shutdown GPIO and is not the known J313 codec'
+			return numbered('speaker ', index, ' has no shutdown GPIO and is not the known J313 codec')
 		}
 		provider = devicetree.find_node('/soc/pinctrl@23c100000') or {
 			return 'J313 AP GPIO controller missing'
 		}
 		gpio_pin = 181
-		println('apple-speakers: speaker ${index} lacks shutdown-gpios; using J313 AP GPIO 181')
+		C.kprintf(c'apple-speakers: speaker %lld lacks shutdown-gpios; using J313 AP GPIO 181\n',
+			i64(index))
 	}
 	region := gpio_region(provider, gpio_pin) or { return 'speaker GPIO is not an Apple pin' }
 	if region.base != 0x23c100000 || gpio_pin != 181 {
@@ -582,9 +606,11 @@ fn discover(root &devicetree.DTNode, mut plan Plan) string {
 		return 'MCA has no DMA'
 	}
 	admac_handle := dmas[0]
-	plan.tx_dma = dma_channel(mca, tx_dma_name, admac_handle) or { return 'no ${tx_dma_name} DMA' }
+	plan.tx_dma = dma_channel(mca, tx_dma_name, admac_handle) or {
+		return named('no ', tx_dma_name, ' DMA')
+	}
 	plan.sense_dma = dma_channel(mca, sense_dma_name, admac_handle) or {
-		return 'no ${sense_dma_name} DMA'
+		return named('no ', sense_dma_name, ' DMA')
 	}
 	admac := devicetree.find_phandle(admac_handle) or { return 'ADMAC missing' }
 	if !enabled(admac) || !compatible(admac, 'apple,t8103-admac')
@@ -621,7 +647,7 @@ fn discover(root &devicetree.DTNode, mut plan Plan) string {
 		|| !plan_power(dart_node, 0, mut plan) {
 		return 'audio power domains unusable'
 	}
-	for i, cluster in [tx_cluster, sense_cluster] {
+	for i, cluster in [tx_cluster, sense_cluster]! {
 		handle := domains[cluster + 1]
 		node := devicetree.find_phandle(handle) or { return 'cluster power domain missing' }
 		if !has_property(node, 'apple,externally-clocked') || !plan_power(node, 0, mut plan) {
@@ -640,7 +666,9 @@ fn discover(root &devicetree.DTNode, mut plan Plan) string {
 	plan.reset = pwrstate(mca_reset[0]) or { return 'audio reset unusable' }
 
 	for index in 0 .. 2 {
-		amp := devicetree.find_phandle(codec_dai[index]) or { return 'amplifier ${index} missing' }
+		amp := devicetree.find_phandle(codec_dai[index]) or {
+			return numbered('amplifier ', index, ' missing')
+		}
 		reason := plan_amp(amp, index, mut plan)
 		if reason != '' {
 			return reason
@@ -668,8 +696,9 @@ fn initialise_hardware() {
 	mut plan := Plan{}
 	reason := discover(root, mut plan)
 	if reason != '' {
-		println('apple-speakers: ${reason}; speakers off')
+		C.kprintf(c'apple-speakers: %.*s; speakers off\n', i32(reason.len), reason.str)
 		unsafe {
+			reason.free()
 			plan.pins.free()
 			plan.power.free()
 		}
@@ -679,7 +708,8 @@ fn initialise_hardware() {
 
 	for d in plan.power {
 		if !pmgr.enable_region(d.region.base, d.region.size, d.offset) {
-			println('apple-speakers: power domain 0x${d.offset:x} did not come up; speakers off')
+			C.kprintf(c'apple-speakers: power domain 0x%llx did not come up; speakers off\n',
+				u64(d.offset))
 			return
 		}
 	}
@@ -702,7 +732,8 @@ fn initialise_hardware() {
 	mut iommu := dart.new_dart(plan.dart.base, u8(plan.dart_stream))
 	if !iommu.init_preserving() || !iommu.map(tx_iova, tx_phys, tx_ring_bytes)
 		|| !iommu.map(sense_iova, sense_phys, sense_ring_bytes) {
-		println('apple-speakers: SIO DART stream ${plan.dart_stream} unusable; speakers off')
+		C.kprintf(c'apple-speakers: SIO DART stream %llu unusable; speakers off\n',
+			u64(plan.dart_stream))
 		return
 	}
 
@@ -747,7 +778,8 @@ fn initialise_hardware() {
 	// Globals start zeroed, whatever the struct's defaults say.
 	speaker_stream.rate = 48000
 	speaker_stream.level = 100
-	println('apple-speakers: MacBook Air J313 speakers on MCA ports 0x${plan.port_mask:x}, amplifiers 0x${plan.address[0]:x} and 0x${plan.address[1]:x}; output held at -20 dB until the sense data checks out')
+	C.kprintf(c'apple-speakers: MacBook Air J313 speakers on MCA ports 0x%llx, amplifiers 0x%llx and 0x%llx; output held at -20 dB until the sense data checks out\n',
+		u64(plan.port_mask), u64(plan.address[0]), u64(plan.address[1]))
 	oss.create_device(&speaker_card)
 	spawn service_thread()
 }
@@ -778,32 +810,39 @@ fn print_events() {
 	mut e := [3]i32{}
 	for take_event(mut e) {
 		code := int(e[0])
-		side := if e[1] == 0 { 'left' } else { 'right' }
+		side := if e[1] == 0 { c'left' } else { c'right' }
 		if code == ev_amp {
-			println('apple-speakers: ${side} amplifier ready (revision 0x${e[2]:x})')
+			C.kprintf(c'apple-speakers: %s amplifier ready (revision 0x%llx)\n', side,
+				u64(u32(e[2])))
 		} else if code == ev_verified {
 			println('apple-speakers: sense data tracks the output; protection model in control')
 		} else if code == ev_stale {
-			println('apple-speakers: no sense data for ${e[1]} ms; output held at -20 dB')
+			C.kprintf(c'apple-speakers: no sense data for %lld ms; output held at -20 dB\n',
+				i64(e[1]))
 		} else if code == ev_dead {
-			println('apple-speakers: ${side} speaker measured no voltage while playing; output held at -20 dB')
+			C.kprintf(c'apple-speakers: %s speaker measured no voltage while playing; output held at -20 dB\n',
+				side)
 		} else if code == ev_gain {
 			if e[1] == 0 {
 				println('apple-speakers: speakers cool; full volume available')
 			} else {
 				tenths := -e[1] / 100
-				println('apple-speakers: speakers warm; limited to -${tenths / 10}.${tenths % 10} dB')
+				C.kprintf(c'apple-speakers: speakers warm; limited to -%lld.%lld dB\n',
+					i64(tenths / 10), i64(tenths % 10))
 			}
 		} else if code == ev_fault_temp {
-			println('apple-speakers: ${side} speaker model reached ${e[2] / 1000} C; amplifiers shut down until reboot')
+			C.kprintf(c'apple-speakers: %s speaker model reached %lld C; amplifiers shut down until reboot\n',
+				side, i64(e[2] / 1000))
 		} else if code == ev_fault_power {
-			println('apple-speakers: ${side} speaker sense implies ${e[2]} mW; amplifiers shut down until reboot')
+			C.kprintf(c'apple-speakers: %s speaker sense implies %lld mW; amplifiers shut down until reboot\n',
+				side, i64(e[2]))
 		} else if code == ev_fault_i2c {
-			println('apple-speakers: ${side} amplifier I2C error ${e[2]}')
+			C.kprintf(c'apple-speakers: %s amplifier I2C error %lld\n', side, i64(e[2]))
 		} else if code == ev_dma_error {
-			println('apple-speakers: ADMAC channel ${e[1]} ring error')
+			C.kprintf(c'apple-speakers: ADMAC channel %lld ring error\n', i64(e[1]))
 		} else if code == ev_serdes {
-			println('apple-speakers: MCA cluster ${e[1]} serializer did not leave reset')
+			C.kprintf(c'apple-speakers: MCA cluster %lld serializer did not leave reset\n',
+				i64(e[1]))
 		}
 	}
 }
@@ -831,13 +870,14 @@ fn start_locked() {
 		C.vinix_apple_speakers_fail()
 		return
 	}
-	for i, cluster in [tx_cluster, sense_cluster] {
+	for i, cluster in [tx_cluster, sense_cluster]! {
 		if mask & (u32(1) << cluster) == 0 {
 			continue
 		}
 		d := speaker_plan.cluster_power[i]
 		if !pmgr.enable_region_externally_clocked(d.region.base, d.region.size, d.offset) {
-			println('apple-speakers: MCA cluster ${cluster} did not power up; speakers off')
+			C.kprintf(c'apple-speakers: MCA cluster %llu did not power up; speakers off\n',
+				u64(cluster))
 			C.vinix_apple_speakers_stop()
 			C.vinix_apple_speakers_fail()
 			return
@@ -869,7 +909,8 @@ fn service_thread() {
 			faulted = true
 			mut st := C.vinix_apple_speakers_status{}
 			C.vinix_apple_speakers_get_status(&st)
-			println('apple-speakers: stopped; modelled coil ${st.coil_mc[0] / 1000}/${st.coil_mc[1] / 1000} C')
+			C.kprintf(c'apple-speakers: stopped; modelled coil %lld/%lld C\n',
+				i64(st.coil_mc[0] / 1000), i64(st.coil_mc[1] / 1000))
 		}
 		sys.nsleep(if flags & service_running != 0 { running_period_ns } else { idle_period_ns })
 	}
@@ -918,11 +959,7 @@ fn nap(ns i64) Nap {
 		timer.disarm()
 		unsafe { free(timer) }
 	}
-	mut events := [&timer.event]
-	defer {
-		unsafe { events.free() }
-	}
-	event.await(mut events, true) or { return pending_signal() }
+	event.await_one(mut timer.event, true) or { return pending_signal() }
 	return .slept
 }
 
@@ -953,7 +990,7 @@ fn (mut s SpeakerStream) setup_params(fmt u32, rate u32, channels u8) {
 	}
 	s.rate = speaker_card.refine_rate(rate)
 	if C.vinix_apple_speakers_configure(s.rate) == 0 && C.vinix_apple_speakers_faulted() == 0 {
-		println('apple-speakers: cannot play ${rate} Hz')
+		C.kprintf(c'apple-speakers: cannot play %llu Hz\n', u64(rate))
 	}
 }
 

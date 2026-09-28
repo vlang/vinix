@@ -92,7 +92,8 @@ fn check_function(bus u8, slot u8, function u8, parent i64) {
 			}
 		}
 
-		print('pci: Found [${device.bus:x}:${device.slot:x}:${device.function:x}:${device.parent:x}]\n')
+		C.kprintf(c'pci: Found [%llx:%llx:%llx:%lld]\n', u64(device.bus), u64(device.slot),
+			u64(device.function), i64(device.parent))
 	}
 }
 
