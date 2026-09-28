@@ -271,7 +271,10 @@ fn test_activity_monitor_follows_the_language() {
 	// The names stay English underneath and read in Russian on screen.
 	assert app.monitor.rows[0].name == 'Activity Monitor'
 	assert 'Мониторинг системы' in texts && 'Файлы' in texts && '(без имени)' in texts
-	assert 'ЦП' in texts && 'Память' in texts && 'Имя' in texts
+	assert 'Имя' in texts
+	cpu_heading := i18n_time_element(russian, activity_action_cpu) or { panic('missing CPU heading') }
+	assert cpu_heading.tooltip == 'Сортировать по загрузке ЦП'
+	assert cpu_heading.accessibility_value == 'по убыванию'
 	assert '% ЦП' in texts && 'МБ' in texts && 'PID' in texts
 	assert '12,5' in texts && '1,5 МБ' in texts && '12 МБ' in texts
 	assert app.monitor.summary.starts_with('3 процесса   занято ')
@@ -298,7 +301,11 @@ fn test_activity_monitor_follows_the_language() {
 	spanish := app.build(ui2.rect(0, 0, 520, 400))!
 	texts.clear()
 	i18n_time_texts(spanish, mut texts)
-	assert 'Nombre' in texts && 'Memoria' in texts && '(sin nombre)' in texts
+	assert 'Nombre' in texts && '(sin nombre)' in texts
+	memory_heading := i18n_time_element(spanish, activity_action_memory) or {
+		panic('missing memory heading')
+	}
+	assert memory_heading.tooltip == 'Ordenar por memoria'
 	assert '1,5 MB' in texts
 	assert app.monitor.summary.starts_with('22 procesos   ')
 	assert app.monitor.summary.contains(' en uso')

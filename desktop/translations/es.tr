@@ -4,6 +4,9 @@ activity.column.cpu
 activity.column.memory
 MB
 -----
+activity.column.name
+Nombre
+-----
 activity.column.pid
 PID
 -----
@@ -28,14 +31,17 @@ activity.memory.mb
 activity.memory.mb_decimal
 {0},{1} MB
 -----
-activity.sort_title.cpu
-CPU
+activity.sort_by.cpu
+Ordenar por CPU
 -----
-activity.sort_title.memory
-Memoria
+activity.sort_by.memory
+Ordenar por memoria
 -----
-activity.sort_title.name
-Nombre
+activity.sort_by.name
+Ordenar por nombre
+-----
+activity.sort_by.pid
+Ordenar por PID
 -----
 activity.summary
 {0} proceso   {1} de {2} en uso|{0} procesos   {1} de {2} en uso

@@ -92,6 +92,7 @@ enum ActivitySort {
 	cpu
 	memory
 	name
+	pid
 }
 
 struct ActivityMonitor {
@@ -104,6 +105,9 @@ mut:
 	sampled_ns   u64
 	last_poll_ms i64
 	sort         ActivitySort = .cpu
+	// Whether the list runs from the largest down. Each column starts the way
+	// it is most often read, and clicking its heading again turns it round.
+	descending   bool = true
 	scroll       int
 	visible_rows int = 1
 	// Summary text, rebuilt with the rows for the same reason.
@@ -529,6 +533,11 @@ fn memory_mb_text(bytes u64) string {
 	return text
 }
 
+// sort_rows orders the list by the chosen column, smallest first, and turns
+// it round for a descending sort. Every comparison ends on the pid, so the
+// order is total and a second click on a heading reverses exactly what the
+// first one showed. The comparisons capture nothing: a closure would be made
+// again with every sample, and this target never frees one.
 fn (mut m ActivityMonitor) sort_rows() {
 	match m.sort {
 		.cpu {
@@ -536,10 +545,10 @@ fn (mut m ActivityMonitor) sort_rows() {
 				// Ties on CPU are common — most processes sit at zero — so
 				// memory breaks them and the list stops shuffling every second.
 				if a.cpu_percent != b.cpu_percent {
-					return if a.cpu_percent > b.cpu_percent { -1 } else { 1 }
+					return if a.cpu_percent < b.cpu_percent { -1 } else { 1 }
 				}
 				if a.memory_bytes != b.memory_bytes {
-					return if a.memory_bytes > b.memory_bytes { -1 } else { 1 }
+					return if a.memory_bytes < b.memory_bytes { -1 } else { 1 }
 				}
 				return a.pid - b.pid
 			})
@@ -547,7 +556,7 @@ fn (mut m ActivityMonitor) sort_rows() {
 		.memory {
 			m.rows.sort_with_compare(fn (a &ActivityRow, b &ActivityRow) int {
 				if a.memory_bytes != b.memory_bytes {
-					return if a.memory_bytes > b.memory_bytes { -1 } else { 1 }
+					return if a.memory_bytes < b.memory_bytes { -1 } else { 1 }
 				}
 				return a.pid - b.pid
 			})
@@ -560,6 +569,14 @@ fn (mut m ActivityMonitor) sort_rows() {
 				return if order != 0 { order } else { a.pid - b.pid }
 			})
 		}
+		.pid {
+			m.rows.sort_with_compare(fn (a &ActivityRow, b &ActivityRow) int {
+				return a.pid - b.pid
+			})
+		}
+	}
+	if m.descending {
+		m.rows.reverse_in_place()
 	}
 }
 
@@ -578,11 +595,12 @@ fn (mut m ActivityMonitor) clamp_scroll() {
 const activity_action_cpu = 'activity.sort.cpu'
 const activity_action_memory = 'activity.sort.memory'
 const activity_action_name = 'activity.sort.name'
+const activity_action_pid = 'activity.sort.pid'
 const activity_action_scroll_up = 'activity.scroll.up'
 const activity_action_scroll_down = 'activity.scroll.down'
 
 const activity_row_height = 22
-const activity_header_height = 46
+const activity_header_height = 26
 const activity_footer_height = 26
 const activity_padding = 10
 
@@ -639,30 +657,10 @@ fn (mut a ActivityApp) build(size ui2.Rect) !ui2.Element {
 		a.monitor.relocalize()
 	}
 
-	mut children := frame_elements(a.monitor.visible_rows + 11)
-
-	// What the list is ordered by. Three buttons rather than clickable column
-	// headings: a heading that is also a button has to look like one, and at
-	// eleven point there is no room to show that it does.
-	mut sort_x := activity_padding
-	for option in activity_sort_options {
-		children << ui2.button(activity_action_of(option), activity_sort_title(option), ui2.rect(f64(sort_x), 5, f64(activity_sort_width), 20), ui2.BoxStyle{
-			bg: if a.monitor.sort == option { app_accent } else { activity_sort_idle }
-			radius: 5
-		}, ui2.TextStyle{
-			color: if a.monitor.sort == option { app_on_accent } else { body_text }
-			size: 11
-			align: .center
-		})
-		sort_x += activity_sort_width + 4
-	}
+	mut children := frame_elements(a.monitor.visible_rows + 18)
 
 	// Column headings, then the rule the list hangs from.
-	headings := activity_headings(width)
-	for heading in headings {
-		children << heading
-	}
-	unsafe { headings.free() }
+	activity_header(mut children, width, a.monitor.sort, a.monitor.descending)
 	children << ui2.view('', ui2.rect(0, f64(list_top - 1), f64(width), 1), ui2.BoxStyle{
 		bg: body_rule
 	}, [])
@@ -688,10 +686,18 @@ fn (mut a ActivityApp) build(size ui2.Rect) !ui2.Element {
 		row++
 	}
 
+	// The footer: what the machine as a whole is doing, and the buttons that
+	// page through a list longer than the window.
+	footer_y := height - activity_footer_height
+	children << ui2.view('', ui2.rect(0, f64(footer_y), f64(width), 1), ui2.BoxStyle{
+		bg: body_rule
+	}, [])
+	mut summary_width := inner
 	if a.monitor.rows.len > a.monitor.visible_rows {
 		button_size := 18
 		right := width - activity_padding - button_size
-		children << ui2.button(activity_action_scroll_up, '-', ui2.rect(f64(right - button_size - 4), 6, f64(button_size), 18), ui2.BoxStyle{
+		button_y := footer_y + (activity_footer_height - button_size) / 2
+		children << ui2.button(activity_action_scroll_up, '-', ui2.rect(f64(right - button_size - 4), f64(button_y), f64(button_size), f64(button_size)), ui2.BoxStyle{
 			bg: files_up
 			radius: 4
 		}, ui2.TextStyle{
@@ -699,7 +705,7 @@ fn (mut a ActivityApp) build(size ui2.Rect) !ui2.Element {
 			size: 11
 			align: .center
 		})
-		children << ui2.button(activity_action_scroll_down, '+', ui2.rect(f64(right), 6, f64(button_size), 18), ui2.BoxStyle{
+		children << ui2.button(activity_action_scroll_down, '+', ui2.rect(f64(right), f64(button_y), f64(button_size), f64(button_size)), ui2.BoxStyle{
 			bg: files_up
 			radius: 4
 		}, ui2.TextStyle{
@@ -707,13 +713,9 @@ fn (mut a ActivityApp) build(size ui2.Rect) !ui2.Element {
 			size: 11
 			align: .center
 		})
+		summary_width -= 2 * button_size + 12
 	}
-
-	// The footer: what the machine as a whole is doing.
-	children << ui2.view('', ui2.rect(0, f64(height - activity_footer_height), f64(width), 1), ui2.BoxStyle{
-		bg: body_rule
-	}, [])
-	children << ui2.label('', a.monitor.summary, ui2.rect(f64(activity_padding), f64(height - activity_footer_height + 5), f64(inner), 16), ui2.TextStyle{
+	children << ui2.label('', a.monitor.summary, ui2.rect(f64(activity_padding), f64(footer_y + 5), f64(summary_width), 16), ui2.TextStyle{
 		color: body_muted
 		size: 11
 	})
@@ -721,41 +723,120 @@ fn (mut a ActivityApp) build(size ui2.Rect) !ui2.Element {
 	return ui2.screen(app_surface, children)
 }
 
-const activity_sort_width = 52
-const activity_sort_options = [ActivitySort.cpu, .memory, .name]
+// The slot the sort arrow takes at the right of its heading, and the gap
+// between it and the heading's text. The glyph is drawn in a larger box
+// around the slot: a builtin arrow is a fifth of the box it is given.
+const activity_sort_arrow = 10
+const activity_sort_arrow_box = 20
+const activity_sort_arrow_gap = 4
+// How far past a column's last figure the rule after it stands. The numbers
+// run right up to the next column, so a rule on the boundary would touch them.
+const activity_rule_gap = 6
+
+// activity_header lays the column headings along the top, as Files' list view
+// does: clicking a heading sorts the list by that column, the one in use is
+// darker and has an arrow for its direction, and a rule between headings
+// shows where one target ends and the next begins.
+fn activity_header(mut children []ui2.Element, width int, sort ActivitySort, descending bool) {
+	name_width := width - activity_padding * 2 - activity_pid_column - activity_cpu_column - activity_mem_column
+	pid_x := activity_padding + name_width
+	cpu_x := pid_x + activity_pid_column
+	mem_x := cpu_x + activity_cpu_column
+	children << ui2.view('', ui2.rect(0, 0, f64(width), f64(activity_header_height)), ui2.BoxStyle{
+		bg: body_panel
+	}, [])
+	// Each target reaches to the next rule, and the outer two to the window's
+	// edges, so no part of the heading row is a click that does nothing.
+	activity_heading(mut children, .name, activity_padding, name_width, 0, pid_x + activity_rule_gap, sort, descending)
+	activity_heading(mut children, .pid, pid_x, activity_pid_column, pid_x + activity_rule_gap, cpu_x + activity_rule_gap, sort, descending)
+	activity_heading(mut children, .cpu, cpu_x, activity_cpu_column, cpu_x + activity_rule_gap, mem_x + activity_rule_gap, sort, descending)
+	activity_heading(mut children, .memory, mem_x, activity_mem_column, mem_x + activity_rule_gap, width, sort, descending)
+}
+
+// activity_heading draws one column's heading over the span its cells use,
+// and the target that sorts by it from `target_x` to `target_end`, with a rule
+// at the target's left edge. The name reads from the left like the names
+// beneath it, and a number's heading ends where the numbers do; the arrow
+// takes the right of the span and pushes the text over rather than covering
+// it. The strings belong to the translation table, so building these each
+// frame allocates nothing.
+fn activity_heading(mut children []ui2.Element, column ActivitySort, x int, width int,
+	target_x int, target_end int, sort ActivitySort, descending bool) {
+	selected := column == sort
+	if column != .name {
+		children << ui2.view('', ui2.rect(f64(target_x), 5, 1, f64(activity_header_height - 10)), ui2.BoxStyle{
+			bg: body_rule
+		}, [])
+	}
+	arrow_x := x + width - activity_sort_arrow
+	text_width := if selected { arrow_x - activity_sort_arrow_gap - x } else { width }
+	// Every heading is bold, the sorted one only darker: the atlas has no bold
+	// face this small, and a heading that grew when clicked would jog the row.
+	children << ui2.label('', activity_column_title(column), ui2.rect(f64(x), 0, f64(text_width), f64(activity_header_height)), ui2.TextStyle{
+		color: if selected { body_heading } else { body_muted }
+		size: 11
+		bold: true
+		align: if column == .name { ui2.Align.left } else { ui2.Align.right }
+	})
+	if selected {
+		children << ui2.Element{
+			...ui2.image('', if descending { 'builtin:arrow_down' } else { 'builtin:arrow_up' },
+				ui2.rect(f64(arrow_x + (activity_sort_arrow - activity_sort_arrow_box) / 2), f64((activity_header_height - activity_sort_arrow_box) / 2), f64(activity_sort_arrow_box), f64(activity_sort_arrow_box)))
+			text_style: ui2.TextStyle{
+				color: body_heading
+			}
+		}
+	}
+	label := activity_sort_label(column)
+	children << ui2.Element{
+		...ui2.clickable_view(activity_action_of(column), ui2.rect(f64(target_x), 0, f64(target_end - target_x), f64(activity_header_height)), ui2.BoxStyle{
+			transparent: true
+		}, [])
+		tooltip: label
+		accessibility_label: label
+		accessibility_value: if selected {
+			if descending { tr('files.list.descending') } else { tr('files.list.ascending') }
+		} else {
+			''
+		}
+	}
+}
 
 fn activity_action_of(sort ActivitySort) string {
 	return match sort {
 		.cpu { activity_action_cpu }
 		.memory { activity_action_memory }
 		.name { activity_action_name }
+		.pid { activity_action_pid }
 	}
 }
 
-fn activity_sort_title(sort ActivitySort) string {
+fn activity_column_title(sort ActivitySort) string {
 	return match sort {
-		.cpu { tr('activity.sort_title.cpu') }
-		.memory { tr('activity.sort_title.memory') }
-		.name { tr('activity.sort_title.name') }
+		.cpu { tr('activity.column.cpu') }
+		.memory { tr('activity.column.memory') }
+		.name { tr('activity.column.name') }
+		.pid { tr('activity.column.pid') }
 	}
 }
 
-// activity_headings labels the columns. The strings belong to the translation
-// table, so building these each frame allocates nothing.
-fn activity_headings(width int) []ui2.Element {
-	y := f64(activity_header_height - 19)
-	right := ui2.TextStyle{
-		color: body_muted
-		size: 10
-		bold: true
-		align: .right
+// activity_sort_label says what clicking a heading does ("Sort by PID"). Each
+// column has its own key because languages decline the column's name after
+// "by".
+fn activity_sort_label(sort ActivitySort) string {
+	return match sort {
+		.cpu { tr('activity.sort_by.cpu') }
+		.memory { tr('activity.sort_by.memory') }
+		.name { tr('activity.sort_by.name') }
+		.pid { tr('activity.sort_by.pid') }
 	}
-	name_width := width - activity_padding * 2 - activity_pid_column - activity_cpu_column - activity_mem_column
-	mut headings := frame_elements(3)
-	headings << ui2.label('', tr('activity.column.pid'), ui2.rect(f64(activity_padding + name_width), y, f64(activity_pid_column), 14), right)
-	headings << ui2.label('', tr('activity.column.cpu'), ui2.rect(f64(activity_padding + name_width + activity_pid_column), y, f64(activity_cpu_column), 14), right)
-	headings << ui2.label('', tr('activity.column.memory'), ui2.rect(f64(activity_padding + name_width + activity_pid_column + activity_cpu_column), y, f64(activity_mem_column), 14), right)
-	return headings
+}
+
+// activity_sort_starts_descending is the way a column is first sorted: the
+// figures that measure load put the heaviest process on top, and names and
+// pids read from the start.
+fn activity_sort_starts_descending(sort ActivitySort) bool {
+	return sort == .cpu || sort == .memory
 }
 
 // activity_row_cells lays one process across the same four columns the
@@ -802,6 +883,9 @@ fn (mut a ActivityApp) handle(event_id string) ! {
 		activity_action_name {
 			a.set_sort(.name)
 		}
+		activity_action_pid {
+			a.set_sort(.pid)
+		}
 		activity_action_scroll_up {
 			a.monitor.scroll -= a.monitor.visible_rows
 			a.monitor.clamp_scroll()
@@ -814,13 +898,17 @@ fn (mut a ActivityApp) handle(event_id string) ! {
 	}
 }
 
-// set_sort reorders the list at once rather than at the next sample: a second
-// is a long time to wait to find out whether the button did anything.
+// set_sort answers a click on a column heading as Files' list does: a new
+// column sorts the way it is usually read, and the one already in use turns
+// round. The list reorders at once rather than at the next sample: a second
+// is a long time to wait to find out whether the click did anything.
 fn (mut a ActivityApp) set_sort(sort ActivitySort) {
 	if a.monitor.sort == sort {
-		return
+		a.monitor.descending = !a.monitor.descending
+	} else {
+		a.monitor.sort = sort
+		a.monitor.descending = activity_sort_starts_descending(sort)
 	}
-	a.monitor.sort = sort
 	a.monitor.scroll = 0
 	a.monitor.sort_rows()
 }

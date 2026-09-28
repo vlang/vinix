@@ -111,7 +111,6 @@ const files_sidebar_icon = u32(0x6d82a0)
 // A long list of small numbers, so the stripe is barely there and only the
 // figures worth acting on are given a colour.
 const activity_row_alt = u32(0xf5f7fa)
-const activity_sort_idle = u32(0xe9edf4)
 const activity_busy = u32(0xc0632b)
 // The share of one CPU at which a process is worth pointing at. Below this
 // everything on an idle machine would be marked and the mark would say

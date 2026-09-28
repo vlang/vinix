@@ -4,6 +4,9 @@ activity.column.cpu
 activity.column.memory
 МБ
 -----
+activity.column.name
+Имя
+-----
 activity.column.pid
 PID
 -----
@@ -28,14 +31,17 @@ activity.memory.mb
 activity.memory.mb_decimal
 {0},{1} МБ
 -----
-activity.sort_title.cpu
-ЦП
+activity.sort_by.cpu
+Сортировать по загрузке ЦП
 -----
-activity.sort_title.memory
-Память
+activity.sort_by.memory
+Сортировать по памяти
 -----
-activity.sort_title.name
-Имя
+activity.sort_by.name
+Сортировать по имени
+-----
+activity.sort_by.pid
+Сортировать по PID
 -----
 activity.summary
 {0} процесс   занято {1} из {2}|{0} процесса   занято {1} из {2}|{0} процессов   занято {1} из {2}

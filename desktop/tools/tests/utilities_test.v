@@ -1303,6 +1303,88 @@ fn test_activity_monitor_uses_only_real_process_rows() {
 	app.monitor.free_rows()
 }
 
+fn utility_activity_record(pid int, name string, memory u64, cpu_ns u64) ActivitySample {
+	mut record := ActivitySample{
+		pid:          i32(pid)
+		memory_bytes: memory
+		cpu_time_ns:  cpu_ns
+	}
+	for index := 0; index < name.len && index < activity_name_len - 1; index++ {
+		record.name[index] = name[index]
+	}
+	return record
+}
+
+fn utility_activity_pids(app &ActivityApp) []int {
+	mut pids := []int{}
+	for row in app.monitor.rows {
+		pids << row.pid
+	}
+	return pids
+}
+
+fn test_activity_monitor_sorts_by_the_clicked_heading() {
+	mut app := ActivityApp{}
+	mut header := ActivityTable{
+		total:        3
+		total_memory: 256 * 1024 * 1024
+		free_memory:  192 * 1024 * 1024
+		sample_ns:    1_000_000_000
+	}
+	mut records := [
+		utility_activity_record(3, '/usr/bin/vinix-desktop[3]', 30_000_000, 0),
+		utility_activity_record(7, '/usr/bin/vinix-files[7]', 13_000_000, 0),
+		utility_activity_record(2, '/bin/sh[2]', 9_000_000, 0),
+	]
+	app.monitor.apply_snapshot(&header, unsafe { &records[0] }, records.len)
+	header.sample_ns += 1_000_000_000
+	records[0].cpu_time_ns += 100_000_000
+	records[2].cpu_time_ns += 500_000_000
+	app.monitor.apply_snapshot(&header, unsafe { &records[0] }, records.len)
+
+	// The busiest process first, until a heading says otherwise.
+	assert utility_activity_pids(&app) == [2, 3, 7]
+	tree := app.build(ui2.rect(0, 0, 520, 360))!
+	// The headings are the controls; the buttons that used to sort are gone.
+	assert !utility_tree_has_text(tree, 'CPU') && !utility_tree_has_text(tree, 'RAM')
+	for text in ['Name', 'PID', '% CPU', 'MB'] {
+		assert utility_tree_has_text(tree, text), text
+	}
+	cpu := utility_element_named(tree, activity_action_cpu) or { panic('missing CPU heading') }
+	assert cpu.tooltip == 'Sort by CPU'
+	assert cpu.accessibility_value == 'descending'
+	pid := utility_element_named(tree, activity_action_pid) or { panic('missing PID heading') }
+	assert pid.tooltip == 'Sort by PID'
+	assert pid.accessibility_value == ''
+	free_tree(tree)
+
+	// A second click on the heading in use turns the list round.
+	app.handle(activity_action_cpu)!
+	assert utility_activity_pids(&app) == [7, 3, 2]
+	// A new column sorts the way it is read: pids and names from the start,
+	// memory from the largest.
+	app.handle(activity_action_pid)!
+	assert utility_activity_pids(&app) == [2, 3, 7]
+	app.handle(activity_action_pid)!
+	assert utility_activity_pids(&app) == [7, 3, 2]
+	app.handle(activity_action_memory)!
+	assert utility_activity_pids(&app) == [3, 7, 2]
+	app.handle(activity_action_name)!
+	assert utility_activity_pids(&app) == [7, 2, 3]
+	app.handle(activity_action_name)!
+	assert utility_activity_pids(&app) == [3, 2, 7]
+	reversed := app.build(ui2.rect(0, 0, 520, 360))!
+	name := utility_element_named(reversed, activity_action_name) or { panic('missing Name heading') }
+	assert name.accessibility_value == 'descending'
+	free_tree(reversed)
+
+	// The next sample keeps the order that was chosen.
+	header.sample_ns += 1_000_000_000
+	app.monitor.apply_snapshot(&header, unsafe { &records[0] }, records.len)
+	assert utility_activity_pids(&app) == [3, 2, 7]
+	app.monitor.free_rows()
+}
+
 fn test_native_process_names_are_presented_as_app_names() {
 	mut sample := ActivitySample{}
 	name := '/usr/bin/vinix-activity[42]'
