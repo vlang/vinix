@@ -235,8 +235,9 @@ fn desktop_save_user(home string, name string, password []u8) bool {
 		unsafe { temporary.free() }
 	}
 	os.chmod(temporary, 0o600) or { return false }
-	file.set_unbuffered()
-	file.write_string(record) or { return false }
+	if !desktop_write_all(file.fd, record.str, u64(record.len)) {
+		return false
+	}
 	if !desktop_preferences_fsync(file.fd) {
 		return false
 	}

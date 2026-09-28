@@ -141,10 +141,11 @@ fn desktop_save_preferences(home string, p DesktopPreferences) bool {
 		}
 		unsafe { temporary.free() }
 	}
-	// Unbuffered writes report their errors here, not in File.close(), whose
-	// API has no result. write_string handles short/interrupted writes in vlib.
-	file.set_unbuffered()
-	file.write_string(data) or { return false }
+	// Write through the descriptor so errors are reported before publication.
+	// The temporary file helper's stream can be opened read-only on some hosts.
+	if !desktop_write_all(file.fd, data.str, u64(data.len)) {
+		return false
+	}
 	if !desktop_preferences_fsync(file.fd) {
 		return false
 	}
