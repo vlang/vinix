@@ -255,7 +255,7 @@ fn test_200_percent_traffic_lights_use_native_resolution_circles() {
 	}
 	desktop.canvas.clear(0xffffff)
 	close := desktop.title_button('window.close', 'builtin:traffic_close', theme_macos.button_inset, true, false)
-	desktop.draw_button(close, int(close.frame.x), int(close.frame.y), int(close.frame.width), int(close.frame.height))
+	desktop.draw_button(&close, int(close.frame.x), int(close.frame.y), int(close.frame.width), int(close.frame.height))
 
 	// A logical-pixel circle would make every aligned 2x2 physical block the
 	// same colour. The native-rasterised arc has independent coverage within
@@ -292,8 +292,8 @@ fn test_catalina_checkbox_uses_native_hidpi_curves_and_tick() {
 		checked: true
 		enabled: true
 	}
-	desktop.draw_button(checkbox, 4, 1, 32, 22)
-	desktop.draw_button(ui2.Element{
+	desktop.draw_button(&checkbox, 4, 1, 32, 22)
+	desktop.draw_button(&ui2.Element{
 		...checkbox
 		id:      'empty'
 		checked: false
@@ -464,7 +464,7 @@ fn test_catalina_native_button_uses_measured_normal_default_and_pressed_renditio
 		frame:        ui2.rect(10, 10, 100, 28)
 		native_style: true
 	}
-	desktop.draw_button(normal, 10, 10, 100, 28)
+	desktop.draw_button(&normal, 10, 10, 100, 28)
 	// The 21-pixel bezel is centred in the 28-pixel hit target. Its top and
 	// bottom rows are the two independently measured Catalina edge colours.
 	unsafe {
@@ -481,7 +481,7 @@ fn test_catalina_native_button_uses_measured_normal_default_and_pressed_renditio
 		native_style: true
 		checked:      true
 	}
-	desktop.draw_button(selected, 126, 10, 100, 28)
+	desktop.draw_button(&selected, 126, 10, 100, 28)
 	unsafe {
 		assert desktop.canvas.pixels[13 * desktop.canvas.stride + 146] == catalina_button_default_outer[0]
 		assert desktop.canvas.pixels[14 * desktop.canvas.stride + 146] == catalina_button_default_inner[0]
@@ -497,7 +497,7 @@ fn test_catalina_native_button_uses_measured_normal_default_and_pressed_renditio
 	}
 	desktop.hover = 'pressed'
 	desktop.buttons = button_left
-	desktop.draw_button(pressed, 242, 10, 100, 28)
+	desktop.draw_button(&pressed, 242, 10, 100, 28)
 	unsafe {
 		assert desktop.canvas.pixels[13 * desktop.canvas.stride + 262] == catalina_button_pressed_outer[0]
 		assert desktop.canvas.pixels[14 * desktop.canvas.stride + 262] == catalina_button_pressed_inner[0]
@@ -514,7 +514,7 @@ fn test_catalina_native_button_uses_measured_normal_default_and_pressed_renditio
 		native_style: true
 		checked:      true
 	}
-	desktop.draw_button(suppressed_default, 126, 42, 100, 28)
+	desktop.draw_button(&suppressed_default, 126, 42, 100, 28)
 	unsafe {
 		assert desktop.canvas.pixels[45 * desktop.canvas.stride + 146] == catalina_button_normal_outer[0]
 		assert desktop.canvas.pixels[46 * desktop.canvas.stride + 146] == catalina_button_face
@@ -548,7 +548,7 @@ fn test_catalina_text_field_uses_measured_focus_ring_inset_and_caret() {
 			caret:  1
 		}
 	}
-	desktop.draw_button(field, 10, 10, 120, 42)
+	desktop.draw_button(&field, 10, 10, 120, 42)
 	// The 22-pixel bezel is vertically centred at y=20. Its four straight
 	// rows are sampled directly from Catalina's native NSTextField.
 	unsafe {
@@ -606,7 +606,7 @@ fn test_catalina_native_button_rasterizes_curves_and_gradients_at_hidpi_scale() 
 		native_style: true
 		checked:      true
 	}
-	desktop.draw_button(button, 10, 6, 100, 28)
+	desktop.draw_button(&button, 10, 6, 100, 28)
 
 	// The two physical rows making up the first logical scanline are sampled
 	// independently. A scaled 1x rounded rectangle would repeat the same row.
@@ -639,7 +639,7 @@ fn test_catalina_directional_button_captions_are_visible_without_font_glyphs() {
 			frame:        ui2.rect(f64(x), 8, 48, 28)
 			native_style: true
 		}
-		desktop.draw_button(button, x, 8, 48, 28)
+		desktop.draw_button(&button, x, 8, 48, 28)
 		mut ink := 0
 		for y := 8; y < 36; y++ {
 			for sample_x := x; sample_x < x + 48; sample_x++ {
@@ -658,7 +658,7 @@ fn test_catalina_directional_button_captions_are_visible_without_font_glyphs() {
 		text:         '↑'
 		native_style: true
 	}
-	desktop.draw_button(pressed, 4, 8, 48, 28)
+	desktop.draw_button(&pressed, 4, 8, 48, 28)
 	mut pressed_ink := 0
 	for y := 8; y < 36; y++ {
 		for x := 4; x < 52; x++ {

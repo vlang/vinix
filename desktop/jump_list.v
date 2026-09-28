@@ -424,7 +424,7 @@ fn (mut d Desktop) render_jump_list() {
 		border_right:  1
 		border_bottom: 1
 	}, children)
-	d.render_element(panel, 0, 0, 2)
+	d.render_element(&panel, 0, 0, 2)
 	free_tree(panel)
 }
 

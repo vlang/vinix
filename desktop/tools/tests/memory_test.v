@@ -207,13 +207,13 @@ fn test_remote_application_trees_release_copied_strings_and_arrays() {
 	// The hit-target array is a persistent compositor buffer. Warm its capacity
 	// before measuring the per-frame remote action copies.
 	warm := decode_app_tree(encoded)!
-	desktop.record_target(warm.children[0], 0, 0, 320, 200)
+	desktop.record_target(&warm.children[0], 0, 0, 320, 200)
 	free_tree(warm)
 	desktop.clear_hit_targets()
 	C.vinix_heap_begin()
 	for _ in 0 .. 100 {
 		decoded := decode_app_tree(encoded)!
-		desktop.record_target(decoded.children[0], 0, 0, 320, 200)
+		desktop.record_target(&decoded.children[0], 0, 0, 320, 200)
 		free_tree(decoded)
 		assert desktop.hit_action(10, 10) == 'panel'
 		desktop.clear_hit_targets()

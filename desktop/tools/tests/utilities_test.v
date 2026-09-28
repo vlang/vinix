@@ -1082,7 +1082,7 @@ fn test_hit_target_owns_remote_action_past_tree_lifetime() {
 		enabled:   true
 	}
 
-	desktop.record_target(element, 10, 20, 100, 80)
+	desktop.record_target(&element, 10, 20, 100, 80)
 	assert desktop.targets.len == 1
 	assert desktop.targets[0].owns_action
 	assert desktop.targets[0].world == .application
@@ -1113,7 +1113,7 @@ fn test_remote_selectors_cannot_become_desktop_commands() {
 			key:       remote_owned_element_key
 			enabled:   true
 		}
-		desktop.record_target(element, 130, 130, 100, 40)
+		desktop.record_target(&element, 130, 130, 100, 40)
 		free_tree(element)
 		action, world := desktop.hit_action_world(150, 150)
 		assert action == spoofed
@@ -1136,7 +1136,7 @@ fn test_remote_selectors_cannot_become_desktop_commands() {
 		key:       remote_owned_element_key
 		enabled:   true
 	}
-	desktop.record_target(titlebar, 130, 130, 100, 40)
+	desktop.record_target(&titlebar, 130, 130, 100, 40)
 	free_tree(titlebar)
 	click := desktop.titlebar_pointer_down_at(TitlebarClick{}, 150, 150, 1_000)
 	assert click.window_id == 0
@@ -1163,7 +1163,7 @@ fn test_capture_selector_bridge_belongs_to_capture_window() {
 		key:       remote_owned_element_key
 		enabled:   true
 	}
-	desktop.record_target(element, 130, 130, 100, 40)
+	desktop.record_target(&element, 130, 130, 100, 40)
 	free_tree(element)
 	desktop.on_pointer_down(150, 150)
 	assert app.last_action == capture_action_take_screenshot
@@ -1188,7 +1188,7 @@ fn test_app_selector_cannot_execute_compositor_context_menu_action() {
 			key:       remote_owned_element_key
 			enabled:   true
 		}
-		desktop.record_target(element, 130, 130, 100, 40)
+		desktop.record_target(&element, 130, 130, 100, 40)
 		free_tree(element)
 		assert !desktop.create_context_left_down(150, 150)
 		assert !create_context_menu.visible

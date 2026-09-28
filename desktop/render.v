@@ -252,7 +252,7 @@ fn (mut d Desktop) render_clipped(root ui2.Element, clip Clip, desktop_overlays 
 	d.clear_hit_targets()
 	d.canvas.clip = clip
 	d.paint_wallpaper()
-	d.render_element(root, 0, 0, 0)
+	d.render_element(&root, 0, 0, 0)
 	// Only a complete frame shows every window as it is now.
 	if clip.x == 0 && clip.y == 0 && clip.w == d.canvas.width && clip.h == d.canvas.height {
 		d.capture_window_thumbnails()
@@ -273,7 +273,7 @@ fn (mut d Desktop) render_clipped(root ui2.Element, clip Clip, desktop_overlays 
 	}
 }
 
-fn (mut d Desktop) render_element(el ui2.Element, off_x int, off_y int, depth int) {
+fn (mut d Desktop) render_element(el &ui2.Element, off_x int, off_y int, depth int) {
 	if el.hidden {
 		return
 	}
@@ -349,8 +349,10 @@ fn (mut d Desktop) render_element(el ui2.Element, off_x int, off_y int, depth in
 		}
 	}
 
-	for child in el.children {
-		d.render_element(child, x, y, depth + 1)
+	// By reference: an Element is several hundred bytes, and copying each one
+	// into every call on every pass was a large part of a frame.
+	for i in 0 .. el.children.len {
+		d.render_element(unsafe { &el.children[i] }, x, y, depth + 1)
 	}
 
 	if pushed {
@@ -375,14 +377,47 @@ fn (mut d Desktop) draw_office2013_tab_labels(x int, y int, width int, height in
 	}
 }
 
+// children_cover reports whether a view's children paint every pixel of its
+// w x h frame opaquely: full-width, square, opaque views whose rows together
+// span it, as a window's title bar and body do.
+fn children_cover(el &ui2.Element, w int, h int) bool {
+	mut covered := 0
+	for covered < h {
+		mut reached := covered
+		for i in 0 .. el.children.len {
+			child := unsafe { &el.children[i] }
+			if child.hidden || child.box.transparent || child.box.radius != 0
+				|| (child.kind != .view && child.kind != .scroll) || child.id == peek_ghost_id
+				|| child.id == taskbar_progress_overlay_id {
+				continue
+			}
+			left := int(child.frame.x)
+			top := int(child.frame.y)
+			if left > 0 || left + int(child.frame.width) < w || top > covered {
+				continue
+			}
+			bottom := top + int(child.frame.height)
+			if bottom > reached {
+				reached = bottom
+			}
+		}
+		if reached <= covered {
+			return false
+		}
+		covered = reached
+	}
+	return h > 0
+}
+
 // How far outside its frame a view can paint: the window drop shadow.
 const view_paint_margin = 8
 
 // record_subtree_targets is render_element's hit-target collection alone, for
 // a subtree that has nothing to draw in this frame's clip.
-fn (mut d Desktop) record_subtree_targets(el ui2.Element, x int, y int, w int, h int) {
+fn (mut d Desktop) record_subtree_targets(el &ui2.Element, x int, y int, w int, h int) {
 	d.record_target(el, x, y, w, h)
-	for child in el.children {
+	for i in 0 .. el.children.len {
+		child := unsafe { &el.children[i] }
 		if child.hidden {
 			continue
 		}
@@ -391,7 +426,7 @@ fn (mut d Desktop) record_subtree_targets(el ui2.Element, x int, y int, w int, h
 	}
 }
 
-fn (mut d Desktop) record_target(el ui2.Element, x int, y int, w int, h int) {
+fn (mut d Desktop) record_target(el &ui2.Element, x int, y int, w int, h int) {
 	interactive := el.kind == .button || el.kind == .checkbox || el.kind == .dropdown
 		|| el.kind == .text_field || el.kind == .text_area || el.kind == .slider
 		|| el.kind == .switch_control || el.kind == .toggle_button || el.draggable
@@ -431,7 +466,7 @@ fn (mut d Desktop) clear_hit_targets() {
 // draw_surface paints a view's background. A rounded view at the top level of
 // the tree is treated as floating and gets a shadow and a hairline edge, which
 // is what makes a window read as a window rather than as a flat panel.
-fn (mut d Desktop) draw_surface(el ui2.Element, x int, y int, w int, h int, depth int) {
+fn (mut d Desktop) draw_surface(el &ui2.Element, x int, y int, w int, h int, depth int) {
 	if el.box.transparent {
 		return
 	}
@@ -467,6 +502,13 @@ fn (mut d Desktop) draw_surface(el ui2.Element, x int, y int, w int, h int, dept
 		} else {
 			switcher_alpha
 		})
+	} else if children_cover(el, w, h) {
+		// Its children paint over all of it -- a window's title bar and body
+		// do -- so its own fill only shows where they are cut by its rounded
+		// corners, and is only painted there.
+		if radius > 0 {
+			d.canvas.fill_round_rect_corners(x, y, w, h, radius, el.box.bg)
+		}
 	} else if radius > 0 {
 		d.canvas.fill_round_rect(x, y, w, h, radius, el.box.bg)
 	} else {
@@ -599,7 +641,7 @@ fn (mut d Desktop) free_wallpaper() {
 	d.wallpaper_logo = LogoBox{}
 }
 
-fn (mut d Desktop) draw_label(el ui2.Element, x int, y int, w int, h int) {
+fn (mut d Desktop) draw_label(el &ui2.Element, x int, y int, w int, h int) {
 	if el.text.len == 0 {
 		return
 	}
@@ -647,7 +689,7 @@ fn shadow_for(color u32) u32 {
 // draw_catalina_button paints the native AppKit push-button renditions measured
 // in docs/catalina-reference/push-buttons-*.png. The element's frame remains the
 // hit target; a taller frame centres the native 21-pixel bezel vertically.
-fn (mut d Desktop) draw_catalina_button(el ui2.Element, x int, y int, w int, h int) u32 {
+fn (mut d Desktop) draw_catalina_button(el &ui2.Element, x int, y int, w int, h int) u32 {
 	if w <= 0 || h <= 0 {
 		return catalina_button_text
 	}
@@ -708,7 +750,7 @@ fn (mut d Desktop) draw_catalina_button(el ui2.Element, x int, y int, w int, h i
 	return text_color
 }
 
-fn (mut d Desktop) draw_catalina_control_text(el ui2.Element, text string, x int, y int,
+fn (mut d Desktop) draw_catalina_control_text(el &ui2.Element, text string, x int, y int,
 	w int, h int, inset int, color u32) {
 	if text.len == 0 || w <= inset {
 		return
@@ -721,7 +763,7 @@ fn (mut d Desktop) draw_catalina_control_text(el ui2.Element, text string, x int
 	}
 }
 
-fn (mut d Desktop) draw_catalina_checkbox(el ui2.Element, x int, y int, w int, h int) {
+fn (mut d Desktop) draw_catalina_checkbox(el &ui2.Element, x int, y int, w int, h int) {
 	size := if h < catalina_checkbox_size { h } else { catalina_checkbox_size }
 	control_y := y + (h - size) / 2
 	action := if el.action_id.len > 0 { el.action_id } else { el.id }
@@ -762,7 +804,7 @@ fn (mut d Desktop) draw_catalina_checkbox(el ui2.Element, x int, y int, w int, h
 	d.draw_catalina_control_text(el, el.text, x + size, y, w - size, h, 6, text_color)
 }
 
-fn (mut d Desktop) draw_catalina_dropdown(el ui2.Element, x int, y int, w int, h int) {
+fn (mut d Desktop) draw_catalina_dropdown(el &ui2.Element, x int, y int, w int, h int) {
 	bezel_height := if h < catalina_popup_height { h } else { catalina_popup_height }
 	bezel_y := y + (h - bezel_height) / 2
 	radius := if bezel_height < 8 { bezel_height / 2 } else { 4 }
@@ -795,7 +837,7 @@ fn (mut d Desktop) draw_catalina_dropdown(el ui2.Element, x int, y int, w int, h
 		if el.enabled { catalina_control_text } else { catalina_control_disabled_text })
 }
 
-fn (mut d Desktop) draw_catalina_text_input(el ui2.Element, x int, y int, w int, h int) {
+fn (mut d Desktop) draw_catalina_text_input(el &ui2.Element, x int, y int, w int, h int) {
 	bezel_height := if el.kind == .text_area || h < catalina_text_input_height {
 		h
 	} else {
@@ -902,7 +944,7 @@ fn (mut d Desktop) draw_catalina_text_input(el ui2.Element, x int, y int, w int,
 	unsafe { runes.free() }
 }
 
-fn (mut d Desktop) draw_catalina_slider(el ui2.Element, x int, y int, w int, h int) {
+fn (mut d Desktop) draw_catalina_slider(el &ui2.Element, x int, y int, w int, h int) {
 	if w <= 0 || h <= 0 {
 		return
 	}
@@ -955,7 +997,7 @@ fn (mut d Desktop) draw_catalina_slider(el ui2.Element, x int, y int, w int, h i
 	}
 }
 
-fn (mut d Desktop) draw_catalina_switch(el ui2.Element, x int, y int, w int, h int) {
+fn (mut d Desktop) draw_catalina_switch(el &ui2.Element, x int, y int, w int, h int) {
 	if w <= 0 || h <= 0 {
 		return
 	}
@@ -984,7 +1026,7 @@ fn (mut d Desktop) draw_catalina_switch(el ui2.Element, x int, y int, w int, h i
 		if el.enabled { catalina_control_face } else { u32(0xf3f3f3) })
 }
 
-fn (mut d Desktop) draw_button(el ui2.Element, x int, y int, w int, h int) {
+fn (mut d Desktop) draw_button(el &ui2.Element, x int, y int, w int, h int) {
 	if d.settings.theme == .macos {
 		match el.kind {
 			.checkbox {

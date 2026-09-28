@@ -400,41 +400,79 @@ fn (mut c Canvas) blend_rect(x int, y int, w int, h int, color u32, alpha u32) {
 	if x1 <= x0 || y1 <= y0 {
 		return
 	}
-
-	if c.clip_is_plain(x0, y0, x1 - x0, y1 - y0) {
-		physical_x0 := x0 * c.scale
-		physical_y0 := y0 * c.scale
-		physical_x1 := if x1 * c.scale < c.physical_width { x1 * c.scale } else { c.physical_width }
-		physical_y1 := if y1 * c.scale < c.physical_height {
-			y1 * c.scale
-		} else {
-			c.physical_height
-		}
-		if alpha >= 255 {
-			for py := physical_y0; py < physical_y1; py++ {
-				row := py * c.stride
-				for px := physical_x0; px < physical_x1; px++ {
-					unsafe {
-						c.pixels[row + px] = color
-					}
-				}
-			}
-		} else {
-			for py := physical_y0; py < physical_y1; py++ {
-				row := py * c.stride
-				for px := physical_x0; px < physical_x1; px++ {
-					unsafe {
-						c.pixels[row + px] = blend(c.pixels[row + px], color, alpha)
-					}
-				}
-			}
-		}
+	r := c.clip.mask_radius
+	if r == 0 || c.clip_is_plain(x0, y0, x1 - x0, y1 - y0) {
+		c.fill_area(x0, y0, x1, y1, color, alpha)
 		return
 	}
 
+	// A rounded clip differs from its rectangle only in the four corner
+	// squares. Everything else is filled as plain spans, so a window's title
+	// bar or body -- which reach its corners -- is not blended a pixel at a
+	// time through the corner test.
+	top := c.clip.mask_y + r
+	bottom := c.clip.mask_y + c.clip.mask_h - r
+	left := c.clip.mask_x + r
+	right := c.clip.mask_x + c.clip.mask_w - r
+	middle_y0 := if y0 > top { y0 } else { top }
+	middle_y1 := if y1 < bottom { y1 } else { bottom }
+	if middle_y1 > middle_y0 {
+		c.fill_area(x0, middle_y0, x1, middle_y1, color, alpha)
+	}
+	span_x0 := if x0 > left { x0 } else { left }
+	span_x1 := if x1 < right { x1 } else { right }
 	for py := y0; py < y1; py++ {
-		for px := x0; px < x1; px++ {
+		if py >= top && py < bottom {
+			continue
+		}
+		if span_x1 > span_x0 {
+			c.fill_area(span_x0, py, span_x1, py + 1, color, alpha)
+		}
+		corner_x1 := if x1 < left { x1 } else { left }
+		for px := x0; px < corner_x1; px++ {
 			c.blend_pixel(px, py, color, alpha)
+		}
+		// A radius over half the width leaves no middle: the corners meet.
+		mut corner_x0 := if x0 > right { x0 } else { right }
+		if corner_x0 < corner_x1 {
+			corner_x0 = corner_x1
+		}
+		for px := corner_x0; px < x1; px++ {
+			c.blend_pixel(px, py, color, alpha)
+		}
+	}
+}
+
+// fill_area blends a logical rectangle already known to lie inside the clip
+// and clear of any rounded mask, on the physical pixel grid.
+fn (mut c Canvas) fill_area(x0 int, y0 int, x1 int, y1 int, color u32, alpha u32) {
+	physical_x0 := x0 * c.scale
+	physical_y0 := y0 * c.scale
+	physical_x1 := if x1 * c.scale < c.physical_width { x1 * c.scale } else { c.physical_width }
+	physical_y1 := if y1 * c.scale < c.physical_height { y1 * c.scale } else { c.physical_height }
+	if physical_x1 <= physical_x0 {
+		return
+	}
+	// Through a local pointer: stored through `c.pixels`, each pixel could
+	// have changed the field it is stored through, and the loop could not be
+	// vectorised.
+	pixels := c.pixels
+	stride := c.stride
+	span := physical_x1 - physical_x0
+	for py := physical_y0; py < physical_y1; py++ {
+		row := unsafe { &pixels[py * stride + physical_x0] }
+		if alpha >= 255 {
+			for i := 0; i < span; i++ {
+				unsafe {
+					row[i] = color
+				}
+			}
+		} else {
+			for i := 0; i < span; i++ {
+				unsafe {
+					row[i] = blend(row[i], color, alpha)
+				}
+			}
 		}
 	}
 }
@@ -534,6 +572,26 @@ fn (mut c Canvas) fill_native_vertical_palette_round_rect(x int, y int, w int, h
 // inside the four corner squares.
 fn (mut c Canvas) fill_round_rect(x int, y int, w int, h int, radius int, color u32) {
 	c.blend_round_rect(x, y, w, h, radius, color, 255)
+}
+
+// fill_round_rect_corners paints only the four corner squares of a rounded
+// rectangle, for a shape whose middle something else covers.
+fn (mut c Canvas) fill_round_rect_corners(x int, y int, w int, h int, radius int, color u32) {
+	half := if w < h { w / 2 } else { h / 2 }
+	r := if radius > half { half } else { radius }
+	if r <= 0 {
+		return
+	}
+	for corner in 0 .. 4 {
+		corner_x := if corner & 1 == 0 { x } else { x + w - r }
+		corner_y := if corner & 2 == 0 { y } else { y + h - r }
+		if !c.clip_touches(corner_x, corner_y, r, r) {
+			continue
+		}
+		saved := c.push_clip_rect(corner_x, corner_y, r, r)
+		c.fill_round_rect(x, y, w, h, radius, color)
+		c.restore_clip(saved)
+	}
 }
 
 fn (mut c Canvas) blend_round_rect(x int, y int, w int, h int, radius int, color u32, alpha u32) {
@@ -731,12 +789,78 @@ fn (mut c Canvas) drop_shadow(x int, y int, w int, h int, radius int, spread int
 	}
 }
 
+// The widest shadow drop_shadow_behind blends in one pass.
+const shadow_max_spread = 15
+
 // drop_shadow_behind is drop_shadow for a rounded shape the caller then fills
-// opaquely. Between its corners the shape covers its full width, so the seven
-// layers are only blended in the bands around that middle, the part of the
-// shadow that stays visible. Blending all of it, window interior included,
-// was the most expensive thing in a frame.
+// opaquely, drawn only where it shows and, along the straight edges, one
+// blend per pixel. There a pixel's layers depend only on its distance from
+// the shape, so what they stack up to is worked out once per distance. The
+// corners, where the layers curve, are drawn layer by layer as before. The
+// seven layers blended over the whole window were the most expensive thing in
+// a frame.
 fn (mut c Canvas) drop_shadow_behind(x int, y int, w int, h int, radius int, spread int, alpha u32) {
+	half := if w < h { w / 2 } else { h / 2 }
+	r := if radius > half { half } else if radius > 0 { radius } else { 0 }
+	if spread < 3 || spread > shadow_max_spread || c.clip.mask_radius != 0 || w - 2 * r <= 0
+		|| h + 2 - 2 * r <= 2 {
+		c.drop_shadow_banded(x, y, w, h, radius, spread, alpha)
+		return
+	}
+	// Layer i reaches i pixels out from the shape, 2 lower, with a radius of
+	// r + i, so a pixel d out along an edge is under layers d..spread.
+	mut combined := [shadow_max_spread + 1]u32{}
+	mut transmitted := 1.0
+	for d := spread; d >= 1; d-- {
+		layer := alpha * u32(spread - d + 1) / u32(spread * 3)
+		transmitted *= f64(255 - layer) / 255.0
+		combined[d] = u32(255.0 - transmitted * 255.0 + 0.5)
+	}
+	top := y - spread + 2
+	bottom := y + h + spread + 2
+	// Above and below, between the corners. The two rows straight under the
+	// shape are under every layer.
+	for py := top; py < y; py++ {
+		c.darken_rect(x + r, py, x + w - r, py + 1, combined[y + 2 - py])
+	}
+	for py := y + h; py < bottom; py++ {
+		d := py - y - h - 1
+		c.darken_rect(x + r, py, x + w - r, py + 1, combined[if d < 1 { 1 } else { d }])
+	}
+	// Left and right, between the corners.
+	side_top := y + 2 + r
+	side_bottom := y + h + 2 - r
+	for d := 1; d <= spread; d++ {
+		c.darken_rect(x - d, side_top, x - d + 1, side_bottom, combined[d])
+		c.darken_rect(x + w + d - 1, side_top, x + w + d, side_bottom, combined[d])
+	}
+	c.drop_shadow_band(x - spread, top, spread + r, side_top - top, x, y, w, h, radius,
+		spread, alpha)
+	c.drop_shadow_band(x + w - r, top, spread + r, side_top - top, x, y, w, h, radius,
+		spread, alpha)
+	c.drop_shadow_band(x - spread, side_bottom, spread + r, bottom - side_bottom, x, y, w,
+		h, radius, spread, alpha)
+	c.drop_shadow_band(x + w - r, side_bottom, spread + r, bottom - side_bottom, x, y, w,
+		h, radius, spread, alpha)
+}
+
+// darken_rect blends black at `alpha` over a logical rectangle, within the
+// clip.
+fn (mut c Canvas) darken_rect(x0 int, y0 int, x1 int, y1 int, alpha u32) {
+	left := if x0 > c.clip.x { x0 } else { c.clip.x }
+	top := if y0 > c.clip.y { y0 } else { c.clip.y }
+	right := if x1 < c.clip.x + c.clip.w { x1 } else { c.clip.x + c.clip.w }
+	bottom := if y1 < c.clip.y + c.clip.h { y1 } else { c.clip.y + c.clip.h }
+	if right <= left || bottom <= top || alpha == 0 {
+		return
+	}
+	c.fill_area(left, top, right, bottom, 0x000000, alpha)
+}
+
+// drop_shadow_banded is drop_shadow_behind for any shape: the layers are
+// blended in the bands around the shape's opaque middle, which the caller's
+// fill covers.
+fn (mut c Canvas) drop_shadow_banded(x int, y int, w int, h int, radius int, spread int, alpha u32) {
 	half := if w < h { w / 2 } else { h / 2 }
 	r := if radius > half { half } else if radius > 0 { radius } else { 0 }
 	top := y + r

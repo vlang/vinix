@@ -1505,7 +1505,7 @@ fn (mut d Desktop) render_desktop_file_icons() {
 			radius:      8
 			transparent: !hovered && !renaming
 		}, icon_children)
-		d.render_element(icon, 0, 0, 1)
+		d.render_element(&icon, 0, 0, 1)
 		free_tree(icon)
 	}
 }
@@ -1536,7 +1536,7 @@ fn (mut d Desktop) render_context_entries(entries []ui2.MenuEntry) {
 		border_right:  1
 		border_bottom: 1
 	}, children)
-	d.render_element(panel, 0, 0, 2)
+	d.render_element(&panel, 0, 0, 2)
 	free_tree(panel)
 }
 
