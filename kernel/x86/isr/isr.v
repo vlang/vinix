@@ -107,6 +107,27 @@ fn exception_handler(num u32, mut gpr_state cpulocal.GPRState) {
 			14 { if gpr_state.err & 1 != 0 { 2 } else { 1 } } // SEGV_ACCERR / SEGV_MAPERR
 			else { 128 } // SI_KERNEL
 		}
+		// A CPU exception arrives with interrupts off, and everything past this
+		// point -- sendsig's scheduler enqueue, syscall_exit's own printf,
+		// dequeue_and_die's cross-CPU work -- can spin on a klock.Lock.
+		// test_and_acquire() restores whatever the ambient interrupt state
+		// already was on a failed attempt (see klock_amd64.v), so a lock held by
+		// another CPU right now spins this one forever with interrupts
+		// permanently off: it can never take the IPI that would let the holder
+		// make progress and release it. mmap_amd64.v's own pf_handler already
+		// re-enables interrupts before this kind of work for the demand-paging
+		// and COW fault paths; this was missing the same `sti` for the same
+		// class of user-mode fault.
+		//
+		// Being preempted or blocking from here on is safe because this
+		// handler is running on the faulting thread's own stack: its
+		// kernel_stack through tss.rsp0 (set per thread by scheduler_isr), or
+		// its pf_stack through ist3 when reached from pf_handler. The
+		// syscall_exit path below can block in yield(true), for example on
+		// writeback while closing files, exactly as a syscall would.
+		asm volatile amd64 {
+			sti
+		}
 		userland.sendsig(proc.current_thread(), signal)
 		userland.dispatch_a_signal_info(gpr_state, int(signal), fault_code, fault_addr)
 		// dispatch_a_signal() switches away when it delivered the exception. If
