@@ -25,6 +25,7 @@ SCENARIOS=idle
 ROUNDS=1
 SETTLE=15
 MEASURE=45
+DESKTOP_ARGS=
 . "$perf/config"
 
 echo
@@ -67,6 +68,11 @@ run_case() {
 	scenario=$2
 	round=$3
 	label="variant=$variant scenario=$scenario round=$round"
+	# No desktop at all: what sleeping a frame at a time costs by itself.
+	if [ "$scenario" = wakeups ]; then
+		"$perf/measure" wakeups 16 "$MEASURE" "$label"
+		return
+	fi
 
 	install -m755 "$perf/vinix-desktop-$variant" /usr/bin/vinix-desktop
 	rm -f /run/vinix-desktop-ready /tmp/perf-quit
@@ -77,12 +83,12 @@ run_case() {
 	case "$scenario" in
 		apps)
 			{ while [ ! -e /tmp/perf-quit ]; do sleep 1; done; printf '\021'; sleep 20; } |
-				/usr/bin/vinix-desktop --open=Files --open=Terminal --open=Clock \
+				/usr/bin/vinix-desktop $DESKTOP_ARGS --open=Files --open=Terminal --open=Clock \
 					'--open=Activity Monitor' --open=Calculator >"$log" 2>&1 &
 			;;
 		*)
 			{ while [ ! -e /tmp/perf-quit ]; do sleep 1; done; printf '\021'; sleep 20; } |
-				/usr/bin/vinix-desktop >"$log" 2>&1 &
+				/usr/bin/vinix-desktop $DESKTOP_ARGS >"$log" 2>&1 &
 			;;
 	esac
 	pid=$!
@@ -115,6 +121,8 @@ run_case() {
 	stop_desktop "$pid"
 	frames=$(grep -o '[0-9]* frames' "$log" | tail -1)
 	echo "PERF-LOG $label ${frames:-no frame count}"
+	# What --stats measured, if it was asked for.
+	grep '^frames=' "$log" | sed "s/^/PERF-STATS $label /"
 }
 
 round=1

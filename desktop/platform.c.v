@@ -234,6 +234,16 @@ fn desktop_monotonic_ms() u64 {
 	return u64(stamp.tv_sec) * 1000 + u64(stamp.tv_nsec) / 1_000_000
 }
 
+// desktop_monotonic_us is the monotonic clock in microseconds, for --stats: a
+// partial frame takes less than a millisecond to compose.
+fn desktop_monotonic_us() i64 {
+	mut stamp := C.timespec{}
+	if C.clock_gettime(C.CLOCK_MONOTONIC, &stamp) != 0 || stamp.tv_sec < 0 {
+		return 0
+	}
+	return i64(stamp.tv_sec) * 1_000_000 + i64(stamp.tv_nsec) / 1000
+}
+
 // A positive frame interval must always produce a real sleep, even when the
 // render already consumed the budget. On Vinix/ARM64 the blocking scheduler
 // path also pumps polled console devices, including the shared Apple

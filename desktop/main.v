@@ -274,6 +274,7 @@ fn main() {
 			break
 		}
 		frame_started := monotonic_millis()
+		stats_started := if options.stats { desktop_monotonic_us() } else { i64(0) }
 
 		desktop.update_taskbar_clock()
 		desktop.poll_apps()
@@ -351,7 +352,7 @@ fn main() {
 		if desktop.frames == 0 {
 			gpu_present_startup_stage(c'first input and application poll complete')
 		}
-		after_input := monotonic_millis()
+		after_input := if options.stats { desktop_monotonic_us() } else { i64(0) }
 
 		if !desktop.dirty && pointer_only && !damage.valid() {
 			old_cursor, new_cursor := desktop.move_cursor()
@@ -407,7 +408,7 @@ fn main() {
 		if desktop.frames == 1 {
 			gpu_present_startup_stage(c'first element tree built')
 		}
-		after_build := monotonic_millis()
+		after_build := if options.stats { desktop_monotonic_us() } else { i64(0) }
 
 		if full_frame {
 			desktop.render_desktop_frame(tree, desktop.canvas_damage())
@@ -420,7 +421,7 @@ fn main() {
 		if desktop.frames == 1 {
 			gpu_present_startup_stage(c'first canvas render complete')
 		}
-		after_render := monotonic_millis()
+		after_render := if options.stats { desktop_monotonic_us() } else { i64(0) }
 
 		if desktop.frames == 1 {
 			gpu_present_startup_stage(c'presenting first canvas')
@@ -435,7 +436,7 @@ fn main() {
 		}
 		desktop.capture_presented(&desktop.canvas)
 		obs_capture_presented(&desktop.canvas)
-		after_present := monotonic_millis()
+		after_present := if options.stats { desktop_monotonic_us() } else { i64(0) }
 		desktop.drag_damage = DamageRect{}
 
 		free_tree(tree)
@@ -453,8 +454,10 @@ fn main() {
 		sleep_to_next_frame(frame_started, options.frame_interval)
 
 		if options.stats {
-			stats.add(after_input - frame_started, after_build - after_input, after_render - after_build, after_present - after_render, monotonic_millis() - after_present)
-			stats.report_every(200, monotonic_millis())
+			now := desktop_monotonic_us()
+			stats.add(after_input - stats_started, after_build - after_input, after_render - after_build,
+				after_present - after_render, now - after_present)
+			stats.report_every(200, now)
 		}
 	}
 
@@ -713,7 +716,7 @@ fn (mut s FrameStats) add(input i64, build i64, render i64, present i64, sleep i
 	s.sleep += sleep
 }
 
-// report_every writes one line per batch. Printing to the console is itself
+// Times are in microseconds. report_every writes one line per batch. Printing to the console is itself
 // expensive here — it goes through the kernel's terminal, which draws into the
 // very framebuffer being measured — so the batch is large and the line carries
 // the wall clock the batch took, which is the only honest way to read a rate
@@ -727,7 +730,7 @@ fn (mut s FrameStats) report_every(frames int, now i64) {
 	}
 	n := i64(s.count)
 	span := now - s.started
-	eprintln('frames=${s.count} in ${span}ms; avg ms input=${s.input / n} build=${s.build / n} render=${s.render / n} present=${s.present / n} sleep=${s.sleep / n}')
+	eprintln('frames=${s.count} in ${span / 1000}ms; avg us input=${s.input / n} build=${s.build / n} render=${s.render / n} present=${s.present / n} sleep=${s.sleep / n}')
 	s = FrameStats{
 		started: now
 	}

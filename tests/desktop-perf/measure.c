@@ -24,8 +24,14 @@
  *                                                 lines; USED is `measure used`
  *                                                 from before the desktop started
  *     measure tree PID                            print the pids below PID, deepest first
+ *     measure wakeups MS SECONDS LABEL...         sleep MS at a time, first with
+ *                                                 nanosleep and then with poll, and
+ *                                                 print the CPU time each cost: the
+ *                                                 kernel's share of the compositor's
+ *                                                 frame pacing, with nothing drawn
  */
 #include <fcntl.h>
+#include <poll.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -216,8 +222,46 @@ static int sample(int root, int seconds, uint64_t base_used, const char *label) 
 	return 0;
 }
 
+static double seconds_of(clockid_t clock) {
+	struct timespec now;
+	clock_gettime(clock, &now);
+	return (double)now.tv_sec + (double)now.tv_nsec / 1e9;
+}
+
+static void wakeups(int ms, int seconds, const char *label) {
+	for (int use_poll = 0; use_poll < 2; use_poll++) {
+		double wall = seconds_of(CLOCK_MONOTONIC);
+		double cpu = seconds_of(CLOCK_PROCESS_CPUTIME_ID);
+		long count = 0;
+		while (seconds_of(CLOCK_MONOTONIC) - wall < seconds) {
+			if (use_poll) {
+				poll(NULL, 0, ms);
+			} else {
+				struct timespec interval = {ms / 1000, (long)(ms % 1000) * 1000000};
+				nanosleep(&interval, NULL);
+			}
+			count++;
+		}
+		double spent = seconds_of(CLOCK_PROCESS_CPUTIME_ID) - cpu;
+		wall = seconds_of(CLOCK_MONOTONIC) - wall;
+		printf("PERF-WAKEUPS %s via=%s interval_ms=%d wakeups=%ld per_second=%.1f cpu=%.2f "
+		       "us_per_wakeup=%.0f\n", label, use_poll ? "poll" : "nanosleep", ms, count,
+		       count / wall, 100.0 * spent / wall, 1e6 * spent / count);
+	}
+}
+
 int main(int argc, char **argv) {
 	setvbuf(stdout, NULL, _IOLBF, 0);
+	if (argc >= 5 && strcmp(argv[1], "wakeups") == 0) {
+		char label[512] = "";
+		for (int i = 4; i < argc; i++) {
+			if (i > 4)
+				strncat(label, " ", sizeof label - strlen(label) - 1);
+			strncat(label, argv[i], sizeof label - strlen(label) - 1);
+		}
+		wakeups(atoi(argv[2]), atoi(argv[3]), label);
+		return 0;
+	}
 	if (argc == 2 && strcmp(argv[1], "used") == 0) {
 		if (take(&last) < 0)
 			return 1;
