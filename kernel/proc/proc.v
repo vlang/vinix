@@ -4,6 +4,7 @@ module proc
 import klock
 import lib
 import katomic
+import krandom
 import memory
 import event.eventstruct
 import time
@@ -398,21 +399,66 @@ fn id_is_a_live_group(id int) bool {
 	return false
 }
 
-// Ids are handed out in increasing order and wrap at max_pid, as on Linux, so
-// one is not reused until the others have had their turn. Taking the lowest
-// free id instead gave a process that had just died's pid to the next one
-// started, within moments. Whatever still watches the old pid then acts on the
-// new process: busybox timeout's watcher polls kill(parent, 0) to see whether
-// the command it guards has finished, kept seeing the recycled pid alive, and
-// at the deadline sent its SIGTERM to an unrelated process -- a container
-// shim, runc, the docker client.
+// Whether `id` can be given out: no process or thread holds it, and no group
+// or session still goes by it. Called with pid_lock held.
+fn id_is_free(id int) bool {
+	return processes[id] == unsafe { nil } && threads_by_tid[id] == unsafe { nil }
+		&& !id_is_a_live_group(id)
+}
+
+// Ids released most recently, which a random pick passes over; see
+// find_free_id(). OpenBSD keeps the same kind of list, its oldpids.
+const recent_ids_kept = 128
+
+__global (
+	recent_ids      [128]int
+	recent_ids_next = int(0)
+)
+
+// Called with pid_lock held.
+fn remember_released_id(id int) {
+	recent_ids[recent_ids_next % recent_ids_kept] = id
+	recent_ids_next = (recent_ids_next + 1) % recent_ids_kept
+}
+
+fn id_recently_released(id int) bool {
+	for i := 0; i < recent_ids_kept; i++ {
+		if recent_ids[i] == id {
+			return true
+		}
+	}
+	return false
+}
+
+// Once init has pid 1, ids are random, as OpenBSD has made them since 1997:
+// the pid of the next process -- a daemon's child, the temporary file named
+// after it -- is not a guess away from the last one. A pid released moments
+// ago is not handed out again straight away, nor is any other that is still
+// in use or still names a group. Whatever watches an old pid would act on
+// the process that inherits it: busybox timeout's watcher polls
+// kill(parent, 0) to see whether the command it guards has finished, and on
+// seeing a recycled pid alive, sent its SIGTERM at the deadline to an
+// unrelated process -- a container shim, runc, the docker client.
+//
+// Before init, and should random picks keep landing on taken ids in a table
+// that is nearly full, ids are handed out in increasing order instead, wrapping
+// at max_pid. Called with pid_lock held.
 fn find_free_id() ?int {
+	if processes[1] != unsafe { nil } {
+		for _ in 0 .. 32 {
+			mut random := u32(0)
+			if !krandom.fill(voidptr(&random), sizeof(random), true) {
+				break
+			}
+			i := int(random % u32(max_pid - 2)) + 2
+			if id_is_free(i) && !id_recently_released(i) {
+				return i
+			}
+		}
+	}
 	for n := 0; n < max_pid - 1; n++ {
 		i := (next_id_cursor - 1 + n) % (max_pid - 1) + 1
-		if processes[i] != unsafe { nil } || threads_by_tid[i] != unsafe { nil } {
-			continue
-		}
-		if id_is_a_live_group(i) {
+		if !id_is_free(i) {
 			continue
 		}
 		next_id_cursor = if i + 1 >= max_pid { 1 } else { i + 1 }
@@ -470,6 +516,7 @@ pub fn free_pid(pid int) {
 	mut reaped := processes[pid]
 	release_process_number(reaped)
 	processes[pid] = unsafe { nil }
+	remember_released_id(pid)
 	if reaped != unsafe { nil } {
 		unveil_release(mut reaped)
 	}
@@ -688,6 +735,7 @@ pub fn free_tid(tid int) {
 	}
 
 	release_thread_slot(tid)
+	remember_released_id(tid)
 }
 
 pub fn thread_affinity(tid int) ?u64 {

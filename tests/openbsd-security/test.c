@@ -4,7 +4,8 @@
 
 /* SPDX-License-Identifier: BSD-2-Clause
  * In-guest regression coverage for Vinix's OpenBSD security features:
- * pledge(2), unveil(2) and signed signal frames. Built statically for either architecture and run
+ * pledge(2), unveil(2), signed signal frames and random process ids.
+ * Built statically for either architecture and run
  * as PID 1; every case runs in a child, so a pledge violation that kills the
  * child is an outcome the parent can check. */
 #define _GNU_SOURCE
@@ -588,9 +589,38 @@ static int run_signal_tests(void)
 	return 0;
 }
 
+/* ── random process ids ───────────────────────────────────────── */
+
+static int exit_at_once(void)
+{
+	return 0;
+}
+
+static int run_pid_tests(void)
+{
+	/* Back-to-back forks: sequential ids would differ by one every time. */
+	pid_t previous = 0;
+	int consecutive = 0;
+	for (int i = 0; i < 16; i++) {
+		fflush(stdout);
+		pid_t child = fork();
+		CHECK(child >= 0);
+		if (child == 0)
+			_exit(exit_at_once());
+		CHECK(exited_ok(reap(child)));
+		if (previous != 0 && child == previous + 1)
+			consecutive++;
+		previous = child;
+	}
+	CHECK(consecutive < 4);
+	puts("OPENBSD SECURITY PASS: process ids are random");
+	return 0;
+}
+
 static int run_tests(void)
 {
-	if (run_pledge_tests() != 0 || run_unveil_tests() != 0 || run_signal_tests() != 0)
+	if (run_pledge_tests() != 0 || run_unveil_tests() != 0 || run_signal_tests() != 0
+	    || run_pid_tests() != 0)
 		return 1;
 	puts("VINIX OPENBSD SECURITY: PASS");
 	return 0;

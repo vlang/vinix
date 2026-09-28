@@ -33,6 +33,7 @@ FEATURE_MARKERS = (
     b"OPENBSD SECURITY PASS: unveil hides and limits paths",
     b"OPENBSD SECURITY PASS: unveil across exec and pledge",
     b"OPENBSD SECURITY PASS: signal frames are signed",
+    b"OPENBSD SECURITY PASS: process ids are random",
 )
 REPORT_MARKER = b': pledge "rpath", syscall '
 

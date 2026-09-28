@@ -115,6 +115,17 @@ maps, because glibc leaves `sa_restorer` unset. That page used to be at a
 fixed address. It now sits at a random page in the gigabyte above the stack,
 chosen for each program, much as OpenBSD places its signal trampoline.
 
+## Random process IDs
+
+Once init has pid 1, process and thread IDs are random, as OpenBSD has
+made them since 1997, so the next process's pid is not a guess away from the
+last one. An ID released in the last 128 is not handed out again, like
+OpenBSD's `oldpids`. Neither is one that still names a live process group or
+session, which Vinix already checked. If random picks keep landing on
+taken IDs in a nearly full table, allocation falls back to the old
+sequential scan. PID namespaces number their processes on their own, so
+container init is still pid 1 inside the container.
+
 ## Calling them
 
 The syscall numbers sit next to `mimmutable(2)`, in ranges Linux leaves
