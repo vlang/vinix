@@ -21,6 +21,10 @@ const files_context_clear = 'files.context.clear'
 const files_context_rename_key_prefix = 'files.context.rename.key.'
 const desktop_file_action_prefix = 'desktop.file.'
 const create_context_panel = 'context.create.panel'
+const taskbar_context_pin = 'taskbar.context.pin'
+const taskbar_context_unpin = 'taskbar.context.unpin'
+const taskbar_context_open = 'taskbar.context.open'
+const taskbar_context_close = 'taskbar.context.close'
 const create_context_width = 180
 const create_context_padding = 4
 const create_context_row_height = 30
@@ -72,10 +76,24 @@ const create_context_files_item_entries = [
 	ui2.MenuEntry{ id: file_context_delete, title: 'Delete' },
 ]
 
+const taskbar_context_running_entries = [
+	ui2.MenuEntry{ id: taskbar_context_pin, title: 'Pin to taskbar' },
+	ui2.MenuEntry{ id: taskbar_context_close, title: 'Close window' },
+]
+const taskbar_context_pinned_running_entries = [
+	ui2.MenuEntry{ id: taskbar_context_unpin, title: 'Unpin from taskbar' },
+	ui2.MenuEntry{ id: taskbar_context_close, title: 'Close window' },
+]
+const taskbar_context_pinned_closed_entries = [
+	ui2.MenuEntry{ id: taskbar_context_open, title: 'Open' },
+	ui2.MenuEntry{ id: taskbar_context_unpin, title: 'Unpin from taskbar' },
+]
+
 enum CreateContextTarget {
 	none_
 	desktop
 	files
+	taskbar
 }
 
 enum RenameInputState {
@@ -98,6 +116,7 @@ mut:
 	x                     int
 	y                     int
 	app_index             int = -1
+	taskbar_window_id     int
 	rename_app_index      int = -1
 	swallow_left_release  bool
 	swallow_right_release bool
@@ -919,7 +938,9 @@ fn (mut d Desktop) clear_context_item_path() {
 }
 
 fn context_menu_height(target CreateContextTarget, has_item bool) int {
-	count := if has_item {
+	count := if target == .taskbar {
+		2
+	} else if has_item {
 		if target == .files {
 			create_context_files_item_entries.len
 		} else {
@@ -956,6 +977,7 @@ fn (mut d Desktop) set_create_context_menu(target CreateContextTarget, app_index
 	create_context_menu.target = target
 	create_context_menu.has_item = has_item
 	create_context_menu.app_index = app_index
+	create_context_menu.taskbar_window_id = 0
 	create_context_menu.x = menu_x
 	create_context_menu.y = menu_y
 	create_context_menu.swallow_right_release = true
@@ -970,6 +992,7 @@ fn (mut d Desktop) close_create_context_menu() {
 	create_context_menu.target = .none_
 	create_context_menu.has_item = false
 	create_context_menu.app_index = -1
+	create_context_menu.taskbar_window_id = 0
 	d.clear_context_item_path()
 	d.set_hover('')
 	d.dirty = true
@@ -1004,6 +1027,16 @@ fn (mut d Desktop) open_create_context_menu(x int, y int) bool {
 	}
 	d.cancel_file_context_rename()
 	underlying, world := d.hit_action_world(x, y)
+	if world == .desktop && (underlying.starts_with('task.')
+		|| underlying.starts_with(taskbar_pin_action_prefix)) {
+		if entry := d.taskbar_entry_for_action(underlying) {
+			if entry.app_index >= 0 {
+				d.set_create_context_menu(.taskbar, entry.app_index, true, '', x, y)
+				create_context_menu.taskbar_window_id = entry.window_id
+				return true
+			}
+		}
+	}
 	if world == .application && (underlying.starts_with('files.settings.')
 		|| underlying.starts_with('files.tags.')) {
 		d.close_create_context_menu()
@@ -1061,6 +1094,8 @@ fn context_menu_action(action string) bool {
 	return action == create_context_new_folder || action == create_context_new_file
 		|| action == file_context_rename || action == file_context_copy || action == file_context_cut
 		|| action == file_context_paste || action == file_context_delete || action == file_context_tags
+		|| action == taskbar_context_pin || action == taskbar_context_unpin
+		|| action == taskbar_context_open || action == taskbar_context_close
 }
 
 fn action_starts_rename(action string) bool {
@@ -1135,6 +1170,7 @@ fn (mut d Desktop) create_context_left_down(x int, y int) bool {
 	d.trace_selector(action, world)
 	target := create_context_menu.target
 	app_index := create_context_menu.app_index
+	taskbar_window_id := create_context_menu.taskbar_window_id
 	item_path := if create_context_menu.item_path.len > 0 {
 		create_context_menu.item_path.clone()
 	} else {
@@ -1163,6 +1199,23 @@ fn (mut d Desktop) create_context_left_down(x int, y int) bool {
 					d.refresh_desktop_directory()
 					d.refresh_files_settings_clients(app_index)
 				}
+			}
+		}
+		.taskbar {
+			match action {
+				taskbar_context_pin {
+					if !d.pin_taskbar_app_in(desktop_home, app_index) {
+						eprintln('vinix-desktop: could not pin taskbar app')
+					}
+				}
+				taskbar_context_unpin {
+					if !d.unpin_taskbar_app_in(desktop_home, app_index) {
+						eprintln('vinix-desktop: could not unpin taskbar app')
+					}
+				}
+				taskbar_context_open { d.launch_index(app_index) }
+				taskbar_context_close { d.close_window(taskbar_window_id) }
+				else {}
 			}
 		}
 		.none_ {}
@@ -1337,7 +1390,15 @@ fn (mut d Desktop) render_create_context_menu() {
 	// the same hit testing as app shortcuts and context-menu rows.
 	d.render_desktop_file_icons()
 	if create_context_menu.visible {
-		if create_context_menu.has_item {
+		if create_context_menu.target == .taskbar {
+			if create_context_menu.taskbar_window_id == 0 {
+				d.render_context_entries(taskbar_context_pinned_closed_entries)
+			} else if d.taskbar_is_pinned(create_context_menu.app_index) {
+				d.render_context_entries(taskbar_context_pinned_running_entries)
+			} else {
+				d.render_context_entries(taskbar_context_running_entries)
+			}
+		} else if create_context_menu.has_item {
 			if create_context_menu.target == .files {
 				d.render_context_entries(create_context_files_item_entries)
 			} else {

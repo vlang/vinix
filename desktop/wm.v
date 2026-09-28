@@ -20,7 +20,7 @@ const action_shortcut_prefix = 'shortcut.'
 // came from the desktop world. An application's selectors are opaque, even if
 // their spelling collides with one of these prefixes.
 const desktop_action_prefixes = ['taskbar.', 'task.', 'win.', 'shortcut.', 'start.',
-	action_switch_prefix, action_workspace_prefix]
+	action_switch_prefix, action_workspace_prefix, taskbar_pin_action_prefix]
 
 enum DragKind {
 	none_
@@ -98,6 +98,7 @@ mut:
 	pointer_present bool
 	pointer_capture int
 	shortcut_order  []int
+	pinned_apps     []int
 	shortcut_press  ShortcutPress
 	// Window chrome owns the primary-button gesture through its release, even
 	// when the button-up packet ends the drag during the move pass first.
@@ -594,6 +595,7 @@ fn (mut d Desktop) launch_with_timeout(factory AppFactory, timeout_ms int) {
 	id := d.spawn(factory.title, .app, x, y, factory.width, factory.height)
 	index := d.window_index(id) or { return }
 	d.windows[index].app_index = d.apps.len - 1
+	d.windows[index].factory_index = shortcut_app_index_named(factory.process_name)
 	d.windows[index].icon = factory.icon
 	d.windows[index].hide_body_cursor = factory.hide_body_cursor
 	d.clamp_to_screen(index)
@@ -1074,7 +1076,7 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 	icon_only := theme.taskbar_icon_only
 	edge_padding := if dock { theme.dock_padding } else { taskbar_padding }
 
-	mut children := frame_elements(d.windows.len + workspace_count + 6)
+	mut children := frame_elements(d.windows.len + d.pinned_apps.len + workspace_count + 6)
 	item_height := if icon_only { taskbar_icon_item_height } else { taskbar_item_height }
 	item_y := (taskbar_height - item_height) / 2
 
@@ -1091,9 +1093,8 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 		color: theme.taskbar_text_active
 	})
 
-	// After Start, show only what is open. `standard` gives every window an entry, the way
-	// Windows XP did; `combined` gives each application one entry however many
-	// windows it has, the way Windows 7 did.
+	// Pinned apps stay here after closing. Other apps appear while open:
+	// `standard` gives every window an entry, while `combined` groups them.
 	entries := d.taskbar_entries()
 	defer {
 		unsafe { entries.free() }
@@ -1262,32 +1263,63 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 	}, children)
 }
 
-// TaskbarEntry is one button in the middle of the bar. In standard mode it is
-// a window; in combined mode it is an application, and its id names the window
-// clicking it should raise.
+// TaskbarEntry is one button in the middle of the bar. A pinned app keeps its
+// own action id when closed; an open window uses its task action id.
 struct TaskbarEntry {
 	id        string
 	label     string
 	icon      string
 	active    bool
 	minimized bool
+	app_index int = -1
+	window_id int
 }
 
 fn (d &Desktop) taskbar_entries() []TaskbarEntry {
-	mut out := []TaskbarEntry{cap: d.windows.len}
+	mut out := []TaskbarEntry{cap: d.windows.len + d.pinned_apps.len}
 	unsafe { out.flags |= .noslices }
+	for index in d.pinned_apps {
+		if index < 0 || index >= available_apps.len || index >= taskbar_pin_actions.len {
+			continue
+		}
+		window_id := d.taskbar_window_for_app(index)
+		mut active := false
+		mut minimized := false
+		if window_id != 0 {
+			window_index := d.window_index(window_id) or { -1 }
+			if window_index >= 0 {
+				window := &d.windows[window_index]
+				active = window.id == d.focus && !window.minimized
+				minimized = window.minimized
+			}
+		}
+		out << TaskbarEntry{
+			id:        taskbar_pin_actions[index]
+			label:     available_apps[index].title
+			icon:      available_apps[index].icon
+			active:    active
+			minimized: minimized
+			app_index: index
+			window_id: window_id
+		}
+	}
 	if d.settings.taskbar_mode == .standard {
 		mut last_id := 0
 		for {
 			index := d.next_window_by_age(last_id) or { break }
 			window := &d.windows[index]
 			last_id = window.id
+			if d.taskbar_is_pinned(window.factory_index) {
+				continue
+			}
 			out << TaskbarEntry{
 				id:        window.id_task
 				label:     window.title
 				icon:      window.icon
 				active:    window.id == d.focus && !window.minimized
 				minimized: window.minimized
+				app_index: window.factory_index
+				window_id: window.id
 			}
 		}
 		return out
@@ -1303,6 +1335,9 @@ fn (d &Desktop) taskbar_entries() []TaskbarEntry {
 		if window.workspace != d.current_workspace {
 			continue
 		}
+		if d.taskbar_is_pinned(window.factory_index) {
+			continue
+		}
 		if window.title in seen {
 			continue
 		}
@@ -1312,7 +1347,8 @@ fn (d &Desktop) taskbar_entries() []TaskbarEntry {
 		mut active := false
 		mut all_minimized := true
 		for other in d.windows {
-			if other.workspace != d.current_workspace || other.title != window.title {
+			if other.workspace != d.current_workspace || other.title != window.title
+				|| d.taskbar_is_pinned(other.factory_index) {
 				continue
 			}
 			count++
@@ -1326,7 +1362,8 @@ fn (d &Desktop) taskbar_entries() []TaskbarEntry {
 		// The last in painting order is the one on top.
 		for i := d.windows.len - 1; i >= 0; i-- {
 			if d.windows[i].workspace == d.current_workspace
-				&& d.windows[i].title == window.title {
+				&& d.windows[i].title == window.title
+				&& !d.taskbar_is_pinned(d.windows[i].factory_index) {
 				newest_index = i
 				break
 			}
@@ -1337,10 +1374,23 @@ fn (d &Desktop) taskbar_entries() []TaskbarEntry {
 			icon:      d.windows[newest_index].icon
 			active:    active
 			minimized: all_minimized
+			app_index: d.windows[newest_index].factory_index
+			window_id: d.windows[newest_index].id
 		}
 	}
 	unsafe { seen.free() }
 	return out
+}
+
+fn (d &Desktop) taskbar_entry_for_action(action string) ?TaskbarEntry {
+	entries := d.taskbar_entries()
+	defer { unsafe { entries.free() } }
+	for entry in entries {
+		if entry.id == action {
+			return entry
+		}
+	}
+	return none
 }
 
 // ── Pointer handling ───────────────────────────────────────────────
@@ -1674,6 +1724,19 @@ fn (mut d Desktop) on_pointer_down(x int, y int) {
 	if action.starts_with('task.') {
 		id := action[5..].int()
 		d.activate(id)
+		return
+	}
+
+	if action.starts_with(taskbar_pin_action_prefix) {
+		index := action[taskbar_pin_action_prefix.len..].int()
+		if d.taskbar_is_pinned(index) {
+			window_id := d.taskbar_window_for_app(index)
+			if window_id != 0 {
+				d.activate(window_id)
+			} else {
+				d.launch_index(index)
+			}
+		}
 		return
 	}
 

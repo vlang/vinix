@@ -40,6 +40,11 @@ rm -f "$work/ui/terminal_rebuild_test.v"
     -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/utilities_test.v"
 rm -f "$work/ui/utilities_test.v"
 
+cp "$root/desktop/tools/tests/taskbar_pinning_test.v" "$work/ui/"
+"$v" -new-compiler -nocache -gc none -manualfree -enable-globals -stats -d ui2_headless \
+    -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/taskbar_pinning_test.v"
+rm -f "$work/ui/taskbar_pinning_test.v"
+
 # Quick Launch shares the switcher's global keyboard path. Keep its Cmd-Space,
 # query filtering and modal overlay cases isolated from the broader utility
 # suite so sequence state cannot leak between tests.

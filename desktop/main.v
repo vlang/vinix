@@ -183,6 +183,7 @@ fn main() {
 		canvas:            canvas
 		fonts:             fonts
 		shortcut_order:    load_shortcut_order(desktop_home)
+		pinned_apps:       load_taskbar_pins(desktop_home)
 		tz_offset_seconds: options.tz_offset
 		trace_selectors:   options.trace_selectors
 	}

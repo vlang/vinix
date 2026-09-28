@@ -71,6 +71,8 @@ mut:
 	workspace int
 	// Index into Desktop.apps for a `.app` window, or -1 for a built-in page.
 	app_index int = -1
+	// Stable catalog identity for taskbar pinning; separate from the client slot.
+	factory_index int = -1
 }
 
 fn (w &Window) frame_rect() ui2.Rect {
