@@ -186,12 +186,21 @@ fn main() {
 	assert crashed_pid > 0
 	assert C.kill(crashed_pid, C.SIGKILL) == 0
 	mut failure_was_isolated := false
+	mut first_failure := ''
 	crashing_files.build(ui2.rect(0, 0, 460, 326)) or {
 		failure_was_isolated = true
+		first_failure = err.msg().clone()
 	}
 	assert failure_was_isolated
+	assert first_failure != ''
+	mut failure_was_preserved := false
+	crashing_files.build(ui2.rect(0, 0, 460, 326)) or {
+		failure_was_preserved = err.msg() == first_failure
+	}
+	assert failure_was_preserved
 	if mut crashing_files is RemoteApp {
 		assert crashing_files.closed
+		assert crashing_files.failure_reason == first_failure
 	}
 
 	mut settings := start_remote_app_at_with_timeout(arguments()[0], available_apps[4], mut desktop,

@@ -794,10 +794,23 @@ fn app_response_ready(fd int, timeout_ms int) bool {
 		fd:     fd
 		events: i16(C.POLLIN)
 	}
+	mut retried_after_pause := false
 	for {
+		started := desktop_monotonic_ms()
 		ready := C.poll(&descriptor, 1, timeout_ms)
 		if ready < 0 && C.errno == C.EINTR {
 			continue
+		}
+		// A host sleep or a paused QEMU can advance the guest's monotonic
+		// clock far past this poll's deadline without scheduling the app at
+		// all. Let it run once after the VM resumes before declaring it dead.
+		if ready == 0 && !retried_after_pause && started != ~u64(0) {
+			finished := desktop_monotonic_ms()
+			if finished != ~u64(0) && finished >= started
+				&& finished - started > u64(timeout_ms) + 1000 {
+				retried_after_pause = true
+				continue
+			}
 		}
 		return ready > 0
 			&& descriptor.revents & i16(C.POLLIN | C.POLLHUP | C.POLLERR) != 0
@@ -1002,6 +1015,7 @@ mut:
 	keyboard         bool
 	pointer          bool
 	closed           bool
+	failure_reason   string
 	desktop          &Desktop = unsafe { nil }
 }
 
@@ -1077,7 +1091,7 @@ fn start_remote_app_at_with_timeout(path string, factory AppFactory, mut desktop
 
 fn (mut a RemoteApp) transact(command AppCommand, width int, height int, payload string) !AppReply {
 	if a.closed || a.request_fd < 0 || a.response_fd < 0 {
-		return error('application process has exited')
+		return error(if a.failure_reason.len > 0 { a.failure_reason } else { 'application process has exited' })
 	}
 	state := if unsafe { a.desktop != nil } {
 		app_current_state(a.desktop)
@@ -1085,17 +1099,26 @@ fn (mut a RemoteApp) transact(command AppCommand, width int, height int, payload
 		AppWireState{}
 	}
 	if !send_app_request(a.request_fd, command, width, height, state, payload) {
+		a.remember_transport_failure('application request pipe closed')
 		a.abort_transport()
-		return error('application request pipe closed')
+		return error(a.failure_reason)
 	}
 	reply := receive_app_response(a.response_fd) or {
+		a.remember_transport_failure(err.msg())
 		a.abort_transport()
-		return err
+		return error(a.failure_reason)
 	}
 	if unsafe { a.desktop != nil } {
 		apply_app_state(mut a.desktop, reply.state)
 	}
 	return reply
+}
+
+fn (mut a RemoteApp) remember_transport_failure(reason string) {
+	if a.failure_reason.len == 0 {
+		a.failure_reason = reason.clone()
+		eprintln('vinix-desktop: ${a.title} (pid ${a.pid}) transport failed: ${reason}')
+	}
 }
 
 fn (mut a RemoteApp) build(size ui2.Rect) !ui2.Element {

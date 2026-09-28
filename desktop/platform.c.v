@@ -572,7 +572,9 @@ fn desktop_read_all_with_timeout(fd int, buffer voidptr, count u64, timeout_ms i
 	if start == ~u64(0) || timeout_ms < 0 || u64(timeout_ms) > ~u64(0) - start {
 		return false
 	}
-	deadline := start + u64(timeout_ms)
+	mut deadline := start + u64(timeout_ms)
+	mut last_check := start
+	mut retried_after_pause := false
 	mut done := u64(0)
 	for done < count {
 		got := desktop_read(fd, unsafe { voidptr(&u8(buffer) + done) }, count - done)
@@ -585,9 +587,22 @@ fn desktop_read_all_with_timeout(fd int, buffer voidptr, count u64, timeout_ms i
 		}
 		if got < 0 && (C.errno == C.EAGAIN || C.errno == C.EWOULDBLOCK) {
 			now := desktop_monotonic_ms()
-			if now == ~u64(0) || now >= deadline {
+			if now == ~u64(0) {
 				return false
 			}
+			if now >= deadline {
+				// QEMU can resume from a host pause after the original
+				// deadline. A normal stalled writer is checked throughout the
+				// wait; only a large gap between checks earns a fresh budget.
+				if retried_after_pause || now < last_check
+					|| now - last_check <= u64(timeout_ms) + 1000
+					|| u64(timeout_ms) > ~u64(0) - now {
+					return false
+				}
+				deadline = now + u64(timeout_ms)
+				retried_after_pause = true
+			}
+			last_check = now
 			desktop_sleep_ms(1)
 			continue
 		}
