@@ -8,11 +8,11 @@
  * mean, so a single sample that caught a process mid-remap (the kernel reports
  * it as 0) cannot decide the result.
  *
- * The kernel's per-process figure is committed address space: large anonymous
- * mappings are faulted in on demand, so it overstates what is resident. The
- * physical answer is the machine's used memory while the desktop runs, less
- * what was used just before it started (`measure used`); nothing else changes
- * between those two readings.
+ * The kernel's per-process figure is the memory each process has resident,
+ * each page counted as its share. The total is also measured another way: the
+ * machine's used memory while the desktop runs, less what was used just before
+ * it started (`measure used`); nothing else changes between those two
+ * readings, and it includes what the kernel keeps for the processes.
  *
  * The desktop is the compositor and every process below it: its native
  * application processes and whatever those started, such as the Terminal's

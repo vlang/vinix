@@ -44,9 +44,9 @@ pub const table_version = u32(1)
 // the number of processes it will ever run at once.
 pub const max_records = 512
 
-// ProcessSample is one process. `memory_bytes` is the sum of its committed
-// mapped ranges. Accessible mappings are pre-faulted by this kernel, while a
-// PROT_NONE range is only an address-space reservation and owns no pages.
+// ProcessSample is one process. `memory_bytes` is the memory it has resident,
+// each page counted as its share when other processes map it too; see
+// mmap.process_memory.
 pub struct ProcessSample {
 pub mut:
 	pid     i32
@@ -93,36 +93,18 @@ fn (mut this Processes) mmap(_handle voidptr, _page u64, _flags int) voidptr {
 	return unsafe { nil }
 }
 
-// resident_bytes sums a process' committed mapped ranges. mmap() pre-faults
-// every accessible range, so its length is resident; PROT_NONE reservations
-// deliberately have no pages and must not be reported as RAM. Allocators use
-// those reservations for metadata arenas, and counting them made an idle
-// process appear to leak even while its actual allocations were all freed.
+// resident_bytes is what a process has in memory. It used to be the length
+// of its accessible mappings, when mmap() still filled every one of them in
+// at once. Large anonymous mappings and most of each program's 256 MiB stack
+// reservation are now filled in as they are touched, and that length showed
+// an idle shell, `sleep` and init as 270 MB each.
 //
-// The pagemap lock is taken without blocking on purpose. This runs with the
-// process table locked, and a process in the middle of an mmap holds its
-// pagemap while it goes on to touch the allocator; blocking here would put a
-// lock this node holds underneath one the rest of the kernel takes first, and
-// that is how a monitor deadlocks the machine it is monitoring. A process that
-// is busy remapping itself is reported as 0 for one sample instead.
+// The pagemap is counted without waiting for its lock, as this runs with the
+// process table locked. A process that is busy remapping itself is reported
+// as 0 for one sample.
 fn resident_bytes(process &proc.Process) u64 {
-	mut pagemap := process.pagemap
-	if unsafe { pagemap == nil } {
-		return 0
-	}
-	if !pagemap.l.test_and_acquire() {
-		return 0
-	}
-	mut total := u64(0)
-	for i := 0; i < pagemap.mmap_ranges.len; i++ {
-		range := unsafe { &mmap.MmapRangeLocal(pagemap.mmap_ranges[i]) }
-		if unsafe { range == nil } || range.prot == mmap.prot_none {
-			continue
-		}
-		total += range.length
-	}
-	pagemap.l.release()
-	return total
+	counted := mmap.process_memory(process.pagemap) or { return 0 }
+	return counted.resident
 }
 
 // copy_name writes a process' name into a record, truncated to fit and always

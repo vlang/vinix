@@ -10,7 +10,7 @@
 // what a percentage is made of.
 //
 // The kernel deliberately reports totals rather than rates — a running count of
-// nanoseconds on a CPU, and a count of mapped bytes — because it has no idea
+// nanoseconds on a CPU, and a count of resident bytes — because it has no idea
 // what interval anyone cares about. Turning those into "percent of a CPU" is
 // this file's job, and it is the only place in the desktop that has to
 // remember what the previous frame saw.

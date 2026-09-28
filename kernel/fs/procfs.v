@@ -503,11 +503,13 @@ fn (this &ProcFSResource) contents() string {
 			return proc.process_stat_line(this.pid, unsafe { &proc.Namespace(this.view) })
 		}
 		.statm {
-			pages := resident_bytes(this.pid) / page_size
+			// Linux's first two fields: the size of the address space and what
+			// of it is resident.
+			counted := process_memory(this.pid)
 			mut text := lib.new_text(64)
-			text.add_unsigned(pages)
+			text.add_unsigned(counted.mapped / page_size)
 			text.add_byte(` `)
-			text.add_unsigned(pages)
+			text.add_unsigned(counted.resident / page_size)
 			text.add(' 0 0 0 0 0\n')
 			return text.str()
 		}
@@ -804,39 +806,20 @@ fn (mut this ProcFSResource) filesystem_stat() resource.FileSystemStat {
 	}
 }
 
-// A process' committed address space. mmap() pre-faults every accessible range,
-// so its length is resident; a PROT_NONE reservation deliberately owns no pages
-// and must not be counted as memory in use.
-fn resident_bytes(pid int) u64 {
+// What a process maps and has resident; see mmap.process_memory. The table
+// lock keeps the process from being freed meanwhile, and the pagemap is
+// counted without waiting for its own lock, so a busy process reads as empty
+// once rather than as a deadlock.
+fn process_memory(pid int) mmap.ProcessMemory {
 	proc.lock_table()
 	defer {
 		proc.unlock_table()
 	}
 	process := proc.process_at(pid)
 	if process == unsafe { nil } {
-		return 0
+		return mmap.ProcessMemory{}
 	}
-	mut pagemap := process.pagemap
-	if unsafe { pagemap == nil } {
-		return 0
-	}
-	// Taken without blocking: a process in the middle of an mmap holds its
-	// pagemap while it goes on to touch the allocator, and blocking here would
-	// put a lock this file takes underneath one the rest of the kernel takes
-	// first. A process that is busy remapping itself reports zero this once.
-	if !pagemap.l.test_and_acquire() {
-		return 0
-	}
-	mut total := u64(0)
-	for i := 0; i < pagemap.mmap_ranges.len; i++ {
-		local_range := unsafe { &mmap.MmapRangeLocal(pagemap.mmap_ranges[i]) }
-		if unsafe { local_range == nil } || local_range.prot == mmap.prot_none {
-			continue
-		}
-		total += local_range.length
-	}
-	pagemap.l.release()
-	return total
+	return mmap.process_memory(process.pagemap) or { mmap.ProcessMemory{} }
 }
 
 // /proc/<pid>/maps, and with `detailed` smaps: every mapping of the process

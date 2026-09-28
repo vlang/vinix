@@ -107,6 +107,58 @@ pub fn mappings(_pagemap &memory.Pagemap, count_pages bool) ?[]MappingInfo {
 	return list
 }
 
+// ProcessMemory is what an address space holds. `mapped` is the length of its
+// accessible mappings: address space, much of which a program never touches.
+// Every program's first thread alone reserves a 256 MiB stack, so this is
+// never below that. `resident` is the memory actually present, each page
+// counted as its share when other processes map it too, so the figures of a
+// group of processes add up to the memory they use between them. Device
+// memory, such as a mapped framebuffer, is in neither: it is not RAM the
+// program uses.
+pub struct ProcessMemory {
+pub:
+	mapped   u64
+	resident u64
+}
+
+// process_memory counts an address space without waiting for its lock, so a
+// caller may hold the process table: a process in the middle of an mmap holds
+// its pagemap while it goes on to take locks that come after the table, and
+// waiting here is how a monitor deadlocks the machine it is monitoring. None
+// when the lock is busy, which the caller reports as nothing for one sample.
+pub fn process_memory(_pagemap &memory.Pagemap) ?ProcessMemory {
+	mut pagemap := unsafe { _pagemap }
+	if pagemap == unsafe { nil } {
+		return ProcessMemory{}
+	}
+	if !pagemap.l.test_and_acquire() {
+		return none
+	}
+	defer {
+		pagemap.l.release()
+	}
+	mut mapped := u64(0)
+	mut resident := u64(0)
+	for i := 0; i < pagemap.mmap_ranges.len; i++ {
+		range := unsafe { &MmapRangeLocal(pagemap.mmap_ranges[i]) }
+		// A PROT_NONE range only reserves addresses: allocators keep metadata
+		// arenas that way, and the program break's arena is one.
+		if unsafe { range == nil } || range.prot == prot_none {
+			continue
+		}
+		if range.global != unsafe { nil }
+			&& range.global.pte_extra & (memory.pte_uncached | memory.pte_device) != 0 {
+			continue
+		}
+		mapped += range.length
+		resident += pagemap.resident_share(range.base, range.base + range.length)
+	}
+	return ProcessMemory{
+		mapped:   mapped
+		resident: resident
+	}
+}
+
 // Let go of the files mappings() held.
 pub fn release_mappings(mut list []MappingInfo) {
 	for info in list {
