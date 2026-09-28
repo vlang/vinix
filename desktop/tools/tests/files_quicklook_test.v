@@ -17,6 +17,18 @@ fn quicklook_tree_has_action(element ui2.Element, action string) bool {
 	return false
 }
 
+fn quicklook_tree_has_preview_image(element ui2.Element) bool {
+	if element.image_path.starts_with(vinix_preview_image_prefix) {
+		return true
+	}
+	for child in element.children {
+		if quicklook_tree_has_preview_image(child) {
+			return true
+		}
+	}
+	return false
+}
+
 fn quicklook_entry_index(entries []FileEntry, name string) int {
 	for index, entry in entries {
 		if entry.name == name { return index }
@@ -85,8 +97,45 @@ fn test_files_quicklook_decodes_png_into_a_shared_surface() {
 	assert surface.pixel(0, 0) == 0xff0000
 	assert surface.pixel(1, 0) == 0x7fff7f
 	surface.close()
+	view := preview.build(ui2.rect(0, 0, 400, 260))
+	assert quicklook_tree_has_preview_image(view)
+	free_tree(view)
+	mut cache := VinixPreviewCache{}
+	mut canvas := new_scaled_canvas(6, 4, 6, 4, 1)
+	defer {
+		cache.clear()
+		unsafe { free(canvas.pixels) }
+	}
+	canvas.clear(0x123456)
+	assert cache.draw(mut canvas, surface_path, 1, 1, 4, 2)
+	assert canvas.logical_pixel(1, 1) == 0xff0000
+	assert canvas.logical_pixel(4, 2) == 0x7fff7f
+	assert canvas.logical_pixel(0, 0) == 0x123456
+	cached_pixels := cache.pixels
+	canvas.clear(0x123456)
+	canvas.clip = Clip{ x: 2, y: 1, w: 1, h: 1 }
+	assert cache.draw(mut canvas, surface_path, 1, 1, 4, 2)
+	assert cache.pixels == cached_pixels
+	assert canvas.logical_pixel(1, 1) == 0x123456
+	assert canvas.logical_pixel(2, 1) != 0x123456
+	assert canvas.logical_pixel(3, 1) == 0x123456
+	mut hidpi := new_scaled_canvas(6, 4, 12, 8, 2)
+	defer { unsafe { free(hidpi.pixels) } }
+	hidpi.clear(0x123456)
+	assert cache.draw(mut hidpi, surface_path, 1, 1, 4, 2)
+	assert unsafe { hidpi.pixels[2 * hidpi.stride + 2] } == 0xff0000
+	assert unsafe { hidpi.pixels[3 * hidpi.stride + 3] } == 0xff0000
+	assert unsafe { hidpi.pixels[5 * hidpi.stride + 9] } == 0x7fff7f
+	canvas.clip = Clip{ x: 0, y: 0, w: 6, h: 4 }
+	assert cache.draw(mut canvas, surface_path, 1, 1, 2, 1)
+	assert cache.width == 2 && cache.height == 1
 	preview.close()
 	assert !os.exists(surface_path)
+	preview.show(path)
+	assert preview.message == '' && preview.surface_path != surface_path
+	assert cache.draw(mut canvas, preview.surface_path, 1, 1, 2, 1)
+	assert cache.path == preview.surface_path
+	preview.close()
 	unsafe { surface_path.free() }
 }
 

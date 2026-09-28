@@ -27,16 +27,17 @@ enum FilesQuickLookKind {
 
 struct FilesQuickLook {
 mut:
-	open         bool
-	kind         FilesQuickLookKind
-	path         string
-	surface_path string
-	image_width  int
-	image_height int
-	lines        []string
-	scroll       int
-	message      string
-	truncated    bool
+	open           bool
+	kind           FilesQuickLookKind
+	path           string
+	surface_path   string
+	image_width    int
+	image_height   int
+	lines          []string
+	scroll         int
+	message        string
+	truncated      bool
+	surface_serial u64
 }
 
 fn files_quicklook_kind(path string) FilesQuickLookKind {
@@ -148,7 +149,9 @@ fn (mut p FilesQuickLook) load_image() bool {
 			}
 		}
 	}
-	path := '/tmp/vinix-files-preview-${C.getpid()}.surface'
+	// A new path also gives the compositor's scaled-preview cache a new key.
+	p.surface_serial++
+	path := '/tmp/vinix-files-preview-${C.getpid()}-${p.surface_serial}.surface'
 	fd := C.open(&char(path.str), C.O_WRONLY | C.O_CREAT | C.O_EXCL, 0o600)
 	if fd < 0 {
 		unsafe { path.free() }
@@ -287,7 +290,7 @@ fn (p &FilesQuickLook) build(size ui2.Rect) ui2.Element {
 		} else {
 			image_height = p.image_height * available_width / p.image_width
 		}
-		body << ui2.image('', '${vinix_surface_image_prefix}${p.surface_path}', ui2.rect(f64((width - image_width) / 2), f64(50 + (available_height - image_height) / 2),
+		body << ui2.image('', '${vinix_preview_image_prefix}${p.surface_path}', ui2.rect(f64((width - image_width) / 2), f64(50 + (available_height - image_height) / 2),
 			f64(image_width), f64(image_height)))
 	} else {
 		mut text_children := frame_elements(p.visible_lines(int(size.height)) + 1)

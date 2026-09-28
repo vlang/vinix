@@ -63,8 +63,9 @@ mut:
 
 struct Desktop {
 mut:
-	canvas Canvas
-	fonts  []FontFace
+	canvas        Canvas
+	preview_cache VinixPreviewCache
+	fonts         []FontFace
 	// Official 512px app artwork, loaded once by the compositor. Native app
 	// helper processes leave these empty because they never rasterize frames.
 	firefox_icon    AppIcon
@@ -774,6 +775,7 @@ fn (mut d Desktop) take_power_signal() {
 // slots are intentionally stable while windows are open, so walk the slots
 // themselves: a closed window has already closed its process and is harmless.
 fn (mut d Desktop) close_apps() {
+	d.preview_cache.clear()
 	for index in 0 .. d.apps.len {
 		mut app := d.apps[index]
 		if mut app is RemoteApp {

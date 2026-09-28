@@ -293,7 +293,9 @@ fn (mut d Desktop) render_element(el ui2.Element, off_x int, off_y int, depth in
 			d.draw_button(el, x, y, w, h)
 		}
 		.image {
-			if el.image_path.starts_with(vinix_surface_image_prefix) {
+			if el.image_path.starts_with(vinix_preview_image_prefix) {
+				d.preview_cache.draw(mut d.canvas, el.image_path[vinix_preview_image_prefix.len..], x, y, w, h)
+			} else if el.image_path.starts_with(vinix_surface_image_prefix) {
 				d.canvas.draw_vinix_surface(el.image_path[vinix_surface_image_prefix.len..], x, y, w, h)
 			} else if el.image_path.starts_with(office_xwd_image_prefix) {
 				drawn, has_ribbon := d.canvas.draw_office_xwd_surface(el.image_path[office_xwd_image_prefix.len..], x, y, w, h)
