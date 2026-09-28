@@ -6,7 +6,7 @@
 
 #define NANOPRINTF_IMPLEMENTATION
 #define NANOPRINTF_USE_FIELD_WIDTH_FORMAT_SPECIFIERS 1
-#define NANOPRINTF_USE_PRECISION_FORMAT_SPECIFIERS 0
+#define NANOPRINTF_USE_PRECISION_FORMAT_SPECIFIERS 1
 #define NANOPRINTF_USE_FLOAT_FORMAT_SPECIFIERS 0
 #define NANOPRINTF_USE_LARGE_FORMAT_SPECIFIERS 1
 #define NANOPRINTF_USE_BINARY_FORMAT_SPECIFIERS 1
@@ -85,6 +85,40 @@ int printf_panic(char *fmt, ...) {
     return ret;
 }
 
+// kprintf is V's print() for formatted text: the same console and terminal,
+// in PROD builds too, but formatted into a buffer on the stack. Interpolating
+// into print() allocates the whole text and a string for every value in it,
+// and nothing frees them. A V string goes in as "%.*s" with its length as an
+// i32 and then its bytes.
+void kprint__kwrite(char *message, uint64_t length);
+
+struct kprintf_buffer {
+    char data[256];
+    size_t len;
+};
+
+static void _putchar_buffer(int character, void *extra_arg) {
+    struct kprintf_buffer *buffer = extra_arg;
+    if (buffer->len == sizeof(buffer->data)) {
+        kprint__kwrite(buffer->data, buffer->len);
+        buffer->len = 0;
+    }
+    buffer->data[buffer->len++] = (char)character;
+}
+
+int kprintf(const char *fmt, ...) {
+    struct kprintf_buffer buffer;
+    buffer.len = 0;
+    va_list l;
+    va_start(l, fmt);
+    int ret = npf_vpprintf(_putchar_buffer, &buffer, fmt, l);
+    va_end(l);
+    if (buffer.len != 0) {
+        kprint__kwrite(buffer.data, buffer.len);
+    }
+    return ret;
+}
+
 // V's own generated code (v3_eprint_lit/v3_eprintln_string in the C backend,
 // emitted for every `assert` statement's failure path) calls fprintf(stderr,
 // ...) directly, unconditionally, with no target-specific override the way
@@ -97,13 +131,10 @@ int printf_panic(char *fmt, ...) {
 static struct __file _stderr_file;
 FILE *stderr = &_stderr_file;
 
-// Deliberately not routed through nanoprintf: this build compiles out
-// NANOPRINTF_USE_PRECISION_FORMAT_SPECIFIERS, which "%.*s" (V's length-
-// prefixed string format) needs, so nanoprintf would silently misparse it.
-// V's C backend only ever emits two call shapes here -- "%s" for a NUL-
-// terminated C string literal, "%.*s" for a length-prefixed V string, both
-// followed by whatever literal text (e.g. "\n") the format string carries --
-// so this handles exactly those instead of being a general fprintf.
+// Not a general fprintf. V's C backend only ever emits two call shapes here
+// -- "%s" for a NUL-terminated C string literal, "%.*s" for a length-prefixed
+// V string, both followed by whatever literal text (e.g. "\n") the format
+// string carries -- so this handles exactly those.
 int fprintf(FILE *restrict stream, const char *restrict fmt, ...) {
     (void)stream;
     va_list l;

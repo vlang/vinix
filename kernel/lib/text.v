@@ -12,8 +12,10 @@ mut:
 }
 
 pub fn new_text(capacity int) Text {
+	// str() frees it, or reserve() when it moves to a bigger one.
+	bytes := []u8{cap: if capacity > 16 { capacity } else { 16 }} @[freed]
 	return Text{
-		bytes: []u8{cap: if capacity > 16 { capacity } else { 16 }}
+		bytes: bytes
 	}
 }
 
@@ -25,7 +27,7 @@ fn (mut t Text) reserve(extra int) {
 	if capacity < t.bytes.len + extra {
 		capacity = t.bytes.len + extra
 	}
-	mut bigger := []u8{cap: capacity}
+	mut bigger := []u8{cap: capacity} @[freed]
 	for c in t.bytes {
 		bigger << c
 	}
