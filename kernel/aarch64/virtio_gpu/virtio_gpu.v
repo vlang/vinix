@@ -449,7 +449,7 @@ fn ensure_context(mut file VirtioFile) bool {
 	for i in 0 .. name.len {
 		request.debug_name[i] = name[i]
 	}
-	if !nodata(voidptr(&request), sizeof(request), unsafe { nil }, 0, true) {
+	if !nodata(voidptr(&request), sizeof(request), unsafe { nil }, 0, false) {
 		return false
 	}
 	file.context_created = true
@@ -514,7 +514,9 @@ fn context_resource(command_type u32, context_id u32, resource_id u32) bool {
 		hdr: header(command_type, context_id)
 		resource_id: resource_id
 	}
-	return nodata(voidptr(&request), sizeof(request), unsafe { nil }, 0, true)
+	// Attach and detach update the renderer's resource table synchronously.
+	// Teardown still fences RESOURCE_UNREF before freeing guest backing.
+	return nodata(voidptr(&request), sizeof(request), unsafe { nil }, 0, false)
 }
 
 fn retain_object(_object &VirtioObject) {
@@ -662,7 +664,9 @@ fn resource_create_handler(_dev &drm.DrmDevice, handle voidptr, data voidptr) in
 		nr_samples: request.nr_samples
 		flags: request.flags
 	}
-	if !nodata(voidptr(&create), sizeof(create), unsafe { nil }, 0, true) {
+	// The host finishes creating and attaching these resources before it
+	// acknowledges each control command. Neither needs a GPU completion fence.
+	if !nodata(voidptr(&create), sizeof(create), unsafe { nil }, 0, false) {
 		gem.unref(object)
 		return -5
 	}
@@ -676,7 +680,7 @@ fn resource_create_handler(_dev &drm.DrmDevice, handle voidptr, data voidptr) in
 		length: u32(object.size)
 	}
 	if object.size > u64(0xffff_ffff)
-		|| !nodata(voidptr(&attach), sizeof(attach), voidptr(&entry), sizeof(entry), true) {
+		|| !nodata(voidptr(&attach), sizeof(attach), voidptr(&entry), sizeof(entry), false) {
 		mut unref := ResourceCommand{
 			hdr: header(cmd_resource_unref, 0)
 			resource_id: resource_id
