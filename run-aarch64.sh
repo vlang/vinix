@@ -330,6 +330,7 @@ fi
 # VINIX_INITRAMFS selects a different image, e.g. the one
 # ./build-desktop-aarch64.sh stages to boot straight into the desktop.
 INITRAMFS="${VINIX_INITRAMFS:-$INIT_DIR/initramfs.tar}"
+MODULE_ISO="${VINIX_QEMU_MODULE_ISO:-}"
 BASE_ARCHIVE="${VINIX_QEMU_BASE_ARCHIVE:-}"
 MODULE_MANIFEST="${VINIX_QEMU_MODULE_MANIFEST:-}"
 EXTRA_MODULES=()
@@ -355,6 +356,24 @@ esac
 if [ "${#EXTRA_MODULES[@]}" -gt 0 ] && [ "$INITRAMFS_COMPRESSED" -eq 1 ]; then
     echo "ERROR: additional QEMU initramfs modules require uncompressed tar files" >&2
     exit 1
+fi
+if [ -n "$MODULE_ISO" ]; then
+    if [ ! -f "$MODULE_ISO" ]; then
+        echo "ERROR: QEMU module ISO is missing: $MODULE_ISO" >&2
+        exit 1
+    fi
+    if [ ! -f "$INITRAMFS" ]; then
+        echo "ERROR: QEMU module source is missing: $INITRAMFS" >&2
+        exit 1
+    fi
+    if [ "$INITRAMFS_COMPRESSED" -eq 1 ] || [ "${#EXTRA_MODULES[@]}" -gt 0 ]; then
+        echo "ERROR: QEMU module ISO needs one uncompressed initramfs archive" >&2
+        exit 1
+    fi
+    if [ "$MODULE_ISO" = "$BOOT_DISK" ] || [ "$MODULE_ISO" = "$PERSIST_DISK" ]; then
+        echo "ERROR: QEMU module ISO must differ from the boot and persistent disks" >&2
+        exit 1
+    fi
 fi
 if [ -n "$BASE_ARCHIVE" ] && [ ! -f "$BASE_ARCHIVE" ]; then
     echo "ERROR: QEMU base archive is missing: $BASE_ARCHIVE" >&2
@@ -430,10 +449,22 @@ if [ "$DISK_ROOT" -eq 1 ]; then
     sed -E -i '' '/^[[:space:]]*cmdline:/ s#$# vinix.qemu_root=1#' "$LIMINE_CONF_QEMU"
 fi
 
-# A compressed module keeps complete desktop images below FAT32's 4 GiB
-# single-file limit. The leading '$' asks Limine to decompress it before the
-# kernel receives the module; its on-disk name stays stable for mtools.
-if [ "$INITRAMFS_COMPRESSED" -eq 1 ]; then
+# Limine reads a large desktop module from ISO9660 on the QEMU CD drive.
+# The small FAT volume still carries the UEFI loader and kernel.
+if [ -n "$MODULE_ISO" ]; then
+    LIMINE_CONF_ISO="$LIMINE_CONF_QEMU.iso"
+    awk '
+        /^[[:space:]]*module_path:/ && !replaced {
+            print "    module_path: odd(1:):/boot/initramfs.tar"
+            replaced = 1
+            next
+        }
+        { print }
+        END { if (!replaced) print "    module_path: odd(1:):/boot/initramfs.tar" }
+    ' "$LIMINE_CONF_QEMU" > "$LIMINE_CONF_ISO"
+    mv -f "$LIMINE_CONF_ISO" "$LIMINE_CONF_QEMU"
+elif [ "$INITRAMFS_COMPRESSED" -eq 1 ]; then
+    # '$' asks Limine to decompress a FAT-resident module before kernel entry.
     LIMINE_CONF_COMPRESSED="$LIMINE_CONF_QEMU.compressed"
     awk '
         /^[[:space:]]*module_path:/ && !replaced {
@@ -447,6 +478,15 @@ if [ "$INITRAMFS_COMPRESSED" -eq 1 ]; then
         }
     ' "$LIMINE_CONF_QEMU" > "$LIMINE_CONF_COMPRESSED"
     mv -f "$LIMINE_CONF_COMPRESSED" "$LIMINE_CONF_QEMU"
+fi
+
+MODULE_ISO_DEVICE_ARGS=()
+if [ -n "$MODULE_ISO" ]; then
+    MODULE_ISO_DEVICE_ARGS=(
+        -drive "if=none,id=vinix-module,media=cdrom,format=raw,readonly=on,file=$MODULE_ISO"
+        -device virtio-scsi-device,id=vinix-module-scsi
+        -device scsi-cd,bus=vinix-module-scsi.0,drive=vinix-module
+    )
 fi
 
 if [ "$FAKE_G17" -eq 1 ]; then
@@ -744,11 +784,13 @@ if [ "$PERSIST_ENABLED" -eq 1 ] && command -v lsof >/dev/null 2>&1; then
     fi
 fi
 
-# Size a new boot disk from the actual initramfs and package archive. Existing
+# Size a new boot disk from its FAT payload and package archive. Existing
 # disks are never reformatted behind the caller's back; an undersized legacy
 # image gets a direct migration error instead of a cryptic mcopy failure.
 if [ -f "$INITRAMFS" ]; then
-    if stat -f%z "$INITRAMFS" >/dev/null 2>&1; then
+    if [ -n "$MODULE_ISO" ]; then
+        initramfs_bytes=0
+    elif stat -f%z "$INITRAMFS" >/dev/null 2>&1; then
         initramfs_bytes="$(stat -f%z "$INITRAMFS")"
     else
         initramfs_bytes="$(stat -c%s "$INITRAMFS")"
@@ -842,34 +884,50 @@ if [ -f "$INITRAMFS" ]; then
     # build-userland-aarch64.sh. Naming it matters: booting the desktop image
     # and booting the shell one look identical up to this line.
     echo "==> Using initramfs: $(basename "$INITRAMFS")"
-    COPY_BASE_MODULES=1
-    if [ -n "$MODULE_MANIFEST" ] &&
-       mtype -i "$BOOT_DISK" ::/boot/initramfs-parts.json 2>/dev/null | cmp -s - "$MODULE_MANIFEST"; then
-        COPY_BASE_MODULES=0
-        mdir -i "$BOOT_DISK" ::/boot/initramfs.tar >/dev/null 2>&1 || COPY_BASE_MODULES=1
-        module_number=2
-        for module in "${EXTRA_MODULES[@]}"; do
-            mdir -i "$BOOT_DISK" "::/boot/initramfs-part${module_number}.tar" >/dev/null 2>&1 || COPY_BASE_MODULES=1
-            module_number=$((module_number + 1))
-        done
-    fi
-    if [ "$COPY_BASE_MODULES" -eq 0 ]; then
-        echo "==> Reusing uncompressed initramfs modules on boot disk"
-    fi
-    if [ "$COPY_BASE_MODULES" -eq 1 ]; then
-        if [ "${#EXTRA_MODULES[@]}" -gt 0 ] || [ -n "$MODULE_MANIFEST" ]; then
-            mdel -i "$BOOT_DISK" ::/boot/initramfs.tar 2>/dev/null || true
-            mdel -i "$BOOT_DISK" '::/boot/initramfs-part*.tar' 2>/dev/null || true
+    if [ -n "$MODULE_ISO" ]; then
+        # Limine reads the real archive from ISO9660. Replace any stale FAT
+        # copy when reusing a caller-selected boot disk from an older layout.
+        if [ -f "$INIT_DIR/initramfs-minimal.tar" ]; then
+            boot_placeholder="$INIT_DIR/initramfs-minimal.tar"
+        else
+            RECOVERY_DIR="$(mktemp -d "${TMPDIR:-/tmp}/vinix-iso-placeholder.XXXXXX")"
+            boot_placeholder="$RECOVERY_DIR/empty.tar"
+            tar -cf "$boot_placeholder" --files-from /dev/null
         fi
-        mcopy -o -i "$BOOT_DISK" "$INITRAMFS" ::/boot/initramfs.tar
-        module_number=2
-        for module in "${EXTRA_MODULES[@]}"; do
-            echo "==> Copying initramfs part ${module_number}..."
-            mcopy -i "$BOOT_DISK" "$module" "::/boot/initramfs-part${module_number}.tar"
-            module_number=$((module_number + 1))
-        done
-        if [ -n "$MODULE_MANIFEST" ]; then
-            mcopy -o -i "$BOOT_DISK" "$MODULE_MANIFEST" ::/boot/initramfs-parts.json
+        mdel -i "$BOOT_DISK" ::/boot/initramfs.tar 2>/dev/null || true
+        mdel -i "$BOOT_DISK" '::/boot/initramfs-part*.tar' 2>/dev/null || true
+        mdel -i "$BOOT_DISK" ::/boot/initramfs-parts.json 2>/dev/null || true
+        mcopy -i "$BOOT_DISK" "$boot_placeholder" ::/boot/initramfs.tar
+    else
+        COPY_BASE_MODULES=1
+        if [ -n "$MODULE_MANIFEST" ] &&
+           mtype -i "$BOOT_DISK" ::/boot/initramfs-parts.json 2>/dev/null | cmp -s - "$MODULE_MANIFEST"; then
+            COPY_BASE_MODULES=0
+            mdir -i "$BOOT_DISK" ::/boot/initramfs.tar >/dev/null 2>&1 || COPY_BASE_MODULES=1
+            module_number=2
+            for module in "${EXTRA_MODULES[@]}"; do
+                mdir -i "$BOOT_DISK" "::/boot/initramfs-part${module_number}.tar" >/dev/null 2>&1 || COPY_BASE_MODULES=1
+                module_number=$((module_number + 1))
+            done
+        fi
+        if [ "$COPY_BASE_MODULES" -eq 0 ]; then
+            echo "==> Reusing uncompressed initramfs modules on boot disk"
+        fi
+        if [ "$COPY_BASE_MODULES" -eq 1 ]; then
+            if [ "${#EXTRA_MODULES[@]}" -gt 0 ] || [ -n "$MODULE_MANIFEST" ]; then
+                mdel -i "$BOOT_DISK" ::/boot/initramfs.tar 2>/dev/null || true
+                mdel -i "$BOOT_DISK" '::/boot/initramfs-part*.tar' 2>/dev/null || true
+            fi
+            mcopy -o -i "$BOOT_DISK" "$INITRAMFS" ::/boot/initramfs.tar
+            module_number=2
+            for module in "${EXTRA_MODULES[@]}"; do
+                echo "==> Copying initramfs part ${module_number}..."
+                mcopy -i "$BOOT_DISK" "$module" "::/boot/initramfs-part${module_number}.tar"
+                module_number=$((module_number + 1))
+            done
+            if [ -n "$MODULE_MANIFEST" ]; then
+                mcopy -o -i "$BOOT_DISK" "$MODULE_MANIFEST" ::/boot/initramfs-parts.json
+            fi
         fi
     fi
     ACTIVE_INITRAMFS="${BASE_ARCHIVE:-$INITRAMFS}"
@@ -1270,6 +1328,7 @@ set +e
     -drive if=pflash,format=raw,file="$OVMF_VARS" \
     -drive format=raw,file="$BOOT_DISK" \
     "${PERSIST_DEVICE_ARGS[@]}" \
+    "${MODULE_ISO_DEVICE_ARGS[@]}" \
     -device virtio-keyboard-device \
     -device virtio-tablet-device \
     "${AUDIO_FLAGS[@]}" \

@@ -618,15 +618,16 @@ starts the image's GPU-linked desktop again.
 The in-guest build uses V3 and native TCC without `-prod`. Compilation stops if
 V or TCC fails, without trying the V1 compiler or another C compiler.
 
-For the RAM-system layouts, the runner caches the immutable QEMU image as
-uncompressed tar modules below FAT32's single-file limit. Limine loads them in
-order from the UEFI boot disk. `/root` remains on a separate persistent ext2
-volume.
+For the RAM-system layouts, the runner caches the immutable QEMU image on a
+separate ISO9660 disk. Limine loads the uncompressed tar from that disk; the
+FAT volume carries EFI and the kernel. When `xorriso` is unavailable,
+the runner uses smaller uncompressed FAT modules. `/root` remains on a separate
+persistent ext2 volume.
 
 It builds the kernel, builds the desktop, and starts QEMU on the result. The
-launcher reuses `boot-image/boot-desktop-qemu-uncompressed.img` for EFI, the
-kernel and the immutable system modules, and
-mounts `boot-image/desktop-root.ext2` at `/root`. On the first run it derives a
+launcher reuses `boot-image/boot-desktop-qemu-iso.img` for EFI and the kernel,
+loads `build/initramfs-desktop-qemu.iso` as the system module, and mounts
+`boot-image/desktop-root.ext2` at `/root`. On the first run it derives a
 smaller QEMU initramfs from the self-contained hardware image and seeds the
 persistent volume with the desktop files and other per-user state. Later runs
 reuse those files instead of copying them into another boot image.

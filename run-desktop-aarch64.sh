@@ -44,6 +44,8 @@ DESKTOP_INITRAMFS="${VINIX_DESKTOP_INITRAMFS:-$SCRIPT_DIR/build-support/init-aar
 QEMU_DESKTOP_INITRAMFS="$SCRIPT_DIR/build/initramfs-desktop-qemu.tar"
 QEMU_DESKTOP_PARTS="$SCRIPT_DIR/build/initramfs-desktop-qemu-parts"
 QEMU_DESKTOP_FULL_PARTS="$SCRIPT_DIR/build/initramfs-desktop-full-parts"
+QEMU_DESKTOP_ISO="$SCRIPT_DIR/build/initramfs-desktop-qemu.iso"
+QEMU_DESKTOP_FULL_ISO="$SCRIPT_DIR/build/initramfs-desktop-full.iso"
 DESKTOP_ROOT_SEED="$SCRIPT_DIR/build/desktop-root-seed.tar.gz"
 DESKTOP_STORAGE_MANIFEST="$SCRIPT_DIR/build/desktop-qemu-storage.json"
 DESKTOP_BUILD_KEY="$SCRIPT_DIR/build/run-desktop-aarch64.key"
@@ -210,9 +212,29 @@ prepare_qemu_initramfs_parts() {
     export VINIX_INITRAMFS_COMPRESSED=0
     export VINIX_QEMU_BASE_ARCHIVE="$source"
     export VINIX_QEMU_MODULE_MANIFEST="$directory/manifest.json"
+    export VINIX_QEMU_MODULE_ISO=""
     export VINIX_QEMU_EXTRA_MODULES=""
     if [ "${#parts[@]}" -gt 1 ]; then
         export VINIX_QEMU_EXTRA_MODULES="$(printf '%s\n' "${parts[@]:1}")"
+    fi
+}
+
+prepare_qemu_initramfs() {
+    local source="$1"
+    local iso="$2"
+    local parts="$3"
+
+    if command -v xorriso >/dev/null 2>&1; then
+        python3 "$SCRIPT_DIR/tools/build-qemu-module-iso.py" "$source" "$iso"
+        export VINIX_INITRAMFS="$source"
+        export VINIX_INITRAMFS_COMPRESSED=0
+        export VINIX_QEMU_MODULE_ISO="$iso"
+        export VINIX_QEMU_BASE_ARCHIVE=""
+        export VINIX_QEMU_MODULE_MANIFEST=""
+        export VINIX_QEMU_EXTRA_MODULES=""
+    else
+        echo "==> xorriso is unavailable; using split FAT32 modules"
+        prepare_qemu_initramfs_parts "$source" "$parts"
     fi
 }
 
@@ -266,6 +288,10 @@ if [ "$DISK_ROOT_DESKTOP" -eq 1 ]; then
     export VINIX_QEMU_ROOT_IMAGE="$DESKTOP_INITRAMFS"
     export VINIX_INITRAMFS="$DESKTOP_INITRAMFS"
     export VINIX_INITRAMFS_COMPRESSED=0
+    export VINIX_QEMU_MODULE_ISO=""
+    export VINIX_QEMU_EXTRA_MODULES=""
+    export VINIX_QEMU_BASE_ARCHIVE=""
+    export VINIX_QEMU_MODULE_MANIFEST=""
     export VINIX_QEMU_PERSIST=1
     if [ "$EPHEMERAL_DESKTOP" -eq 0 ]; then
         # A different file from the /root-only volume on purpose: that one has
@@ -288,7 +314,7 @@ elif [ "$PERSIST_DESKTOP" -eq 1 ]; then
     python3 "$SCRIPT_DIR/tools/split-desktop-initramfs.py" \
         "$DESKTOP_INITRAMFS" "$QEMU_DESKTOP_INITRAMFS" \
         "$DESKTOP_ROOT_SEED" "$DESKTOP_STORAGE_MANIFEST"
-    prepare_qemu_initramfs_parts "$QEMU_DESKTOP_INITRAMFS" "$QEMU_DESKTOP_PARTS"
+    prepare_qemu_initramfs "$QEMU_DESKTOP_INITRAMFS" "$QEMU_DESKTOP_ISO" "$QEMU_DESKTOP_PARTS"
     export VINIX_QEMU_PERSIST=1
     if [ "$EPHEMERAL_DESKTOP" -eq 0 ]; then
         export VINIX_QEMU_PERSIST_DISK="${VINIX_QEMU_PERSIST_DISK:-$SCRIPT_DIR/boot-image/desktop-root.ext2}"
@@ -296,17 +322,35 @@ elif [ "$PERSIST_DESKTOP" -eq 1 ]; then
     export VINIX_QEMU_PERSIST_SIZE_MB="${VINIX_QEMU_PERSIST_SIZE_MB:-3072}"
     export VINIX_QEMU_PERSIST_SEED="${VINIX_QEMU_PERSIST_SEED:-$DESKTOP_ROOT_SEED}"
     if [ "$EPHEMERAL_DESKTOP" -eq 0 ]; then
-        export VINIX_BOOT_DISK="${VINIX_BOOT_DISK:-$SCRIPT_DIR/boot-image/boot-desktop-qemu-uncompressed.img}"
+        if [ -n "$VINIX_QEMU_MODULE_ISO" ]; then
+            export VINIX_BOOT_DISK="${VINIX_BOOT_DISK:-$SCRIPT_DIR/boot-image/boot-desktop-qemu-iso.img}"
+        else
+            export VINIX_BOOT_DISK="${VINIX_BOOT_DISK:-$SCRIPT_DIR/boot-image/boot-desktop-qemu-uncompressed.img}"
+        fi
     fi
-    export VINIX_BOOT_DISK_SIZE_MB="${VINIX_BOOT_DISK_SIZE_MB:-6144}"
+    if [ -n "$VINIX_QEMU_MODULE_ISO" ]; then
+        # Leave room for packages installed after the first boot. The FAT
+        # image is sparse, and the base desktop module stays on the ISO.
+        export VINIX_BOOT_DISK_SIZE_MB="${VINIX_BOOT_DISK_SIZE_MB:-3072}"
+    else
+        export VINIX_BOOT_DISK_SIZE_MB="${VINIX_BOOT_DISK_SIZE_MB:-6144}"
+    fi
 else
     export VINIX_QEMU_ROOT_DISK=0
-    prepare_qemu_initramfs_parts "$DESKTOP_INITRAMFS" "$QEMU_DESKTOP_FULL_PARTS"
+    prepare_qemu_initramfs "$DESKTOP_INITRAMFS" "$QEMU_DESKTOP_FULL_ISO" "$QEMU_DESKTOP_FULL_PARTS"
     export VINIX_QEMU_PERSIST=0
     if [ "$EPHEMERAL_DESKTOP" -eq 0 ]; then
-        export VINIX_BOOT_DISK="${VINIX_BOOT_DISK:-$SCRIPT_DIR/boot-image/boot-desktop-full-uncompressed.img}"
+        if [ -n "$VINIX_QEMU_MODULE_ISO" ]; then
+            export VINIX_BOOT_DISK="${VINIX_BOOT_DISK:-$SCRIPT_DIR/boot-image/boot-desktop-full-iso.img}"
+        else
+            export VINIX_BOOT_DISK="${VINIX_BOOT_DISK:-$SCRIPT_DIR/boot-image/boot-desktop-full-uncompressed.img}"
+        fi
     fi
-    export VINIX_BOOT_DISK_SIZE_MB="${VINIX_BOOT_DISK_SIZE_MB:-8192}"
+    if [ -n "$VINIX_QEMU_MODULE_ISO" ]; then
+        export VINIX_BOOT_DISK_SIZE_MB="${VINIX_BOOT_DISK_SIZE_MB:-4096}"
+    else
+        export VINIX_BOOT_DISK_SIZE_MB="${VINIX_BOOT_DISK_SIZE_MB:-8192}"
+    fi
 fi
 if [ "$EPHEMERAL_DESKTOP" -eq 0 ]; then
     export VINIX_QEMU_PACKAGE_STORE="${VINIX_QEMU_PACKAGE_STORE:-$SCRIPT_DIR/boot-image/boot-desktop-4096.img.packages.tar}"

@@ -190,9 +190,10 @@ firmware and proprietary Office media remain explicit inputs and are never
 downloaded by the aggregate build.
 
 The desktop runner splits the writable `/root` seed from the immutable image.
-For the RAM-system layouts, it caches the QEMU image as uncompressed tar
-modules, each below FAT32's 4 GiB single-file limit. Limine loads them in
-order from the UEFI boot disk, so no decompression step is needed during boot.
+For the RAM-system layouts, it caches the uncompressed QEMU image on a separate
+ISO9660 disk. Limine loads it from there, even when the tar exceeds FAT32's
+single-file limit. The FAT volume still boots UEFI and carries a small boot
+payload. Without `xorriso`, the runner uses smaller uncompressed FAT modules.
 
 The individual layer builders described below remain available for iterating
 on one component, but are not required for a normal default-image build.
