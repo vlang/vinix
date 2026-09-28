@@ -395,6 +395,10 @@ fn join_path(nodes []&VFSNode) string {
 pub fn symlink(parent &VFSNode, dest string, target string) ?&VFSNode {
 	mut parent_of_tgt_node, mut target_node, basename := path2node(parent, target)
 
+	if parent_of_tgt_node != unsafe { nil }
+		&& !policy_check_name(parent_of_tgt_node, basename, proc.policy_create) {
+		return none
+	}
 	if unsafe { target_node != 0 } || unsafe { parent_of_tgt_node == 0 } {
 		errno.set(errno.eexist)
 		return none
@@ -443,6 +447,7 @@ pub fn link(parent &VFSNode, dest string, target string) ?&VFSNode {
 pub fn unlink(parent &VFSNode, name string, remove_dir bool) ? {
 	mut parent_of_tgt, mut node, basename := path2node(parent, name)
 	if node == unsafe { nil } || parent_of_tgt == unsafe { nil } { return none }
+	if !policy_check_name(parent_of_tgt, basename, proc.policy_create) { return none }
 	if read_only(node) || read_only(parent_of_tgt) { errno.set(errno.erofs); return none }
 	if !may_remove(parent_of_tgt, node) { errno.set(errno.eacces); return none }
 	if basename == '.' || basename == '..' || basename == '' { errno.set(errno.einval); return none }
@@ -521,7 +526,14 @@ pub fn create(parent &VFSNode, name string, mode u32) ?&VFSNode {
 	defer {
 		vfs_lock.release()
 	}
-	return internal_create(parent, name, mode)
+	// bind(2) makes a socket's name with this; pledge(2) covers that with
+	// "unix" rather than "cpath".
+	access := if mode & stat.ifmt == stat.ifsock {
+		proc.policy_socket | proc.policy_create
+	} else {
+		proc.policy_create
+	}
+	return internal_create_checked(parent, name, mode, access)
 }
 
 // Have a node create() just made lead to `res` instead of the file it was
@@ -558,8 +570,19 @@ pub fn write_kernel_file(path string, data voidptr, length u64) bool {
 }
 
 pub fn internal_create(parent &VFSNode, name string, mode u32) ?&VFSNode {
+	return internal_create_checked(parent, name, mode, 0)
+}
+
+// internal_create(), for a syscall that makes `access` (proc.policy_*) to the
+// new name; see policy.v. The name is judged in the directory the walk found,
+// before anything is said about whether it exists.
+fn internal_create_checked(parent &VFSNode, name string, mode u32, access u32) ?&VFSNode {
 	mut parent_of_tgt_node, mut target_node, basename := path2node(parent, name)
 
+	if access != 0 && parent_of_tgt_node != unsafe { nil }
+		&& !policy_check_name(parent_of_tgt_node, basename, access) {
+		return none
+	}
 	if unsafe { target_node != 0 } {
 		errno.set(errno.eexist)
 		return none
@@ -695,6 +718,9 @@ pub fn syscall_mkdirat(_ voidptr, dirfd int, _path charptr, mode u32) (u64, u64)
 	if unsafe { parent_of_tgt_node == 0 } {
 		return errno.err, errno.enoent
 	}
+	if !policy_check_name(parent_of_tgt_node, basename, proc.policy_create) {
+		return errno.err, errno.get()
+	}
 
 	if unsafe { target_node != 0 } {
 		return errno.err, errno.eexist
@@ -756,6 +782,9 @@ pub fn syscall_readlinkat(_ voidptr, dirfd int, _path charptr, buf voidptr, limi
 	parent := get_parent_dir(dirfd, path) or { return errno.err, errno.get() }
 
 	node := get_node(parent, path, false) or { return errno.err, errno.get() }
+	if !policy_check(node, proc.policy_inspect) {
+		return errno.err, errno.get()
+	}
 
 	if stat.islnk(node.resource.stat.mode) == false {
 		return errno.err, errno.einval
@@ -825,8 +854,8 @@ pub fn syscall_openat(_ voidptr, dirfd int, _path charptr, flags int, mode u32) 
 		// The Alpine package database creates executables directly with openat;
 		// preserve the requested permission bits instead of forcing every new
 		// regular file to 0644.
-		new_node := internal_create(parent, path,
-			stat.ifreg | ((mode & 0o7777) & ~process.umask)) or {
+		new_node := internal_create_checked(parent, path,
+			stat.ifreg | ((mode & 0o7777) & ~process.umask), policy_open_access(flags)) or {
 			return errno.err, errno.get()
 		}
 		created = true
@@ -847,6 +876,10 @@ pub fn syscall_openat(_ voidptr, dirfd int, _path charptr, flags int, mode u32) 
 	node = reduce_node(node, true)
 	if unsafe { node == 0 } {
 		return errno.err, errno.enoent
+	}
+	// A file the call just made was judged by its name before it was made.
+	if !created && !policy_check(node, policy_open_access(flags)) {
+		return errno.err, errno.get()
 	}
 	if descriptor := procfs_anonymous_descriptor(node) {
 		return open_anonymous_descriptor(descriptor, flags)
@@ -1149,6 +1182,20 @@ pub fn syscall_faccessat(_ voidptr, dirfd int, _path charptr, mode u32, flags in
 
 	node := get_node_with_credentials(parent, path, follow_links,
 		flags & at_eaccess != 0) or { return errno.err, errno.get() }
+	// pledge(2) asks only "rpath" of access(2); unveil(2) the access asked about.
+	mut policy_access := proc.policy_inspect
+	if mode & access_read != 0 {
+		policy_access |= proc.policy_read
+	}
+	if mode & access_write != 0 {
+		policy_access |= proc.policy_write
+	}
+	if mode & access_exec != 0 {
+		policy_access |= proc.policy_exec
+	}
+	if !policy_check(node, policy_access) {
+		return errno.err, errno.get()
+	}
 	if mode != 0 && !check_access(node, mode, flags & at_eaccess != 0) {
 		return errno.err, errno.eacces
 	}
@@ -1200,6 +1247,9 @@ pub fn syscall_fstatat(_ voidptr, dirfd int, _path charptr, statbuf &stat.Stat, 
 		follow_links := flags & at_symlink_nofollow == 0
 
 		node := get_node(parent, path, follow_links) or { return errno.err, errno.get() }
+		if !policy_check(node, proc.policy_inspect) {
+			return errno.err, errno.get()
+		}
 		if follow_links {
 			if descriptor := procfs_anonymous_descriptor(node) {
 				return stat_anonymous_descriptor(descriptor, statbuf)
@@ -1280,6 +1330,9 @@ pub fn syscall_linkat(_ voidptr, olddirfd int, _oldpath charptr, newdirfd int, _
 	if stat.isdir(old_node.resource.stat.mode) {
 		return errno.err, errno.eperm
 	}
+	if !policy_check_link(old_node, newparent, basename) {
+		return errno.err, errno.get()
+	}
 	if !check_access(newparent, access_write | access_exec, true) {
 		return errno.err, errno.eacces
 	}
@@ -1343,6 +1396,9 @@ pub fn syscall_fchmodat(_ voidptr, dirfd int, _path charptr, mode u32) (u64, u64
 
 	parent := get_parent_dir(dirfd, path) or { return errno.err, errno.get() }
 	mut node := get_node(parent, path, true) or { return errno.err, errno.get() }
+	if !policy_check(node, proc.policy_fattr) {
+		return errno.err, errno.get()
+	}
 	if read_only(node) {
 		return errno.err, errno.erofs
 	}
@@ -1382,6 +1438,9 @@ pub fn syscall_chdir(_ voidptr, _path charptr) (u64, u64) {
 	}
 
 	mut node := get_node(proc.current_directory_of(process), path, true) or {
+		return errno.err, errno.get()
+	}
+	if !policy_check(node, proc.policy_inspect) {
 		return errno.err, errno.get()
 	}
 
@@ -1606,6 +1665,10 @@ pub fn rename(oldparent &VFSNode, oldpath string, newparent &VFSNode, newpath st
 	mut new_parent_of, mut new_node, new_basename := path2node(newparent, newpath)
 	if unsafe { new_parent_of == 0 } {
 		errno.set(errno.enoent)
+		return none
+	}
+	if !policy_check_name(old_parent_of, old_basename, proc.policy_create)
+		|| !policy_check_name(new_parent_of, new_basename, proc.policy_create) {
 		return none
 	}
 
@@ -1865,6 +1928,9 @@ pub fn syscall_truncate(_ voidptr, _path charptr, length i64) (u64, u64) {
 	mut node := get_node(proc.current_directory_of(process), path, true) or {
 		return errno.err, errno.get()
 	}
+	if !policy_check(node, proc.policy_write) {
+		return errno.err, errno.get()
+	}
 	mut res := node.resource
 
 	if stat.isdir(res.stat.mode) {
@@ -1945,6 +2011,9 @@ pub fn syscall_fchownat(_ voidptr, dirfd int, _path charptr, uid u32, gid u32, f
 
 	follow_links := flags & at_symlink_nofollow == 0
 	mut node := get_node(parent, path, follow_links) or { return errno.err, errno.get() }
+	if !policy_check(node, proc.policy_chown) {
+		return errno.err, errno.get()
+	}
 	if read_only(node) { return errno.err, errno.erofs }
 	mut res := node.resource
 	if !may_chown(res.stat.uid, uid, gid) {
@@ -1998,6 +2067,9 @@ pub fn syscall_statfs(_ voidptr, _path charptr, buf u64) (u64, u64) {
 	mut process := proc.current_thread().process
 
 	node := get_node(proc.current_directory_of(process), path, true) or {
+		return errno.err, errno.get()
+	}
+	if !policy_check(node, proc.policy_inspect) {
 		return errno.err, errno.get()
 	}
 
@@ -2080,6 +2152,9 @@ pub fn syscall_utimensat(_ voidptr, dirfd int, _path charptr, times u64, flags i
 	} else {
 		parent := get_parent_dir(dirfd, path) or { return errno.err, errno.get() }
 		node = get_node(parent, path, flags & at_symlink_nofollow == 0) or {
+			return errno.err, errno.get()
+		}
+		if !policy_check(node, proc.policy_fattr) {
 			return errno.err, errno.get()
 		}
 		res = node.resource

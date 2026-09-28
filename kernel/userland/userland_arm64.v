@@ -1010,6 +1010,18 @@ fn exec_format_error(err IError) ?&proc.Process {
 // The part of exec that follows finding the program. execveat(2) on a
 // descriptor comes here directly: a memfd has no name to be found by.
 pub fn start_program_node(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, path string, argv []string, envp []string, stdin_path string, stdout_path string, stderr_path string) ?&proc.Process {
+	// What the caller names is subject to pledge(2) and unveil(2), a script's
+	// interpreter included. What the kernel picks itself -- the ELF
+	// interpreter, the x86 translator -- is not, as OpenBSD does not judge
+	// ld.so.
+	if execve && !fs.policy_check(prog_node, proc.policy_exec) {
+		return none
+	}
+	return load_program_node(execve, dir, prog_node, path, argv, envp, stdin_path, stdout_path,
+		stderr_path)
+}
+
+fn load_program_node(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, path string, argv []string, envp []string, stdin_path string, stdout_path string, stderr_path string) ?&proc.Process {
 	trace_gpu := execve && path == gpu_desktop_executable
 	gpu_exec_trace(trace_gpu, 'resolved executable path')
 	gpu_exec_trace(trace_gpu, 'opened executable node')
@@ -1142,8 +1154,9 @@ pub fn start_program_node(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, p
 			translated_envp << 'LD_LIBRARY_PATH=${guest_root}/lib:${guest_root}/usr/lib'
 		}
 
-		return start_program(execve, root, translator, translated_argv, translated_envp,
-			stdin_path, stdout_path, stderr_path)
+		translator_node := fs.get_node(root, translator, true)?
+		return load_program_node(execve, root, translator_node, translator, translated_argv,
+			translated_envp, stdin_path, stdout_path, stderr_path)
 	}
 	// QEMU's -E preload belongs to the emulated x86 process. Its children may
 	// exec a native helper (for example Steam's /bin/sh uname wrapper), passing
@@ -1341,6 +1354,8 @@ pub fn start_program_node(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, p
 		// the bounding set, which is how a container's root ends up with only
 		// the capabilities its runtime left it.
 		proc.capabilities_after_exec(mut curr_process)
+		// The new program runs under the execpromises, or unpledged.
+		proc.pledge_after_exec(mut curr_process)
 		gpu_exec_trace(trace_gpu, 'installed replacement process metadata')
 
 		gpu_exec_trace(trace_gpu, 'switching CPU to kernel page map')

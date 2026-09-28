@@ -10,8 +10,8 @@
 //
 // The x86-64 port predates Vinix's Linux-compatible arm64 ABI, so its native
 // libc puts the syscall number in rdi and receives errno in rdx. Alpine uses
-// the Linux register convention instead; syscall_is_linux() says which one the
-// current process speaks.
+// the Linux register convention instead; syscall_enter() says which one the
+// current process speaks, and whether pledge(2) lets the call through.
 
 .section .text
 
@@ -48,15 +48,20 @@ syscall_entry:
     mov %ds, %eax
     push %rax
     sti
-    call syscall_is_linux
+    // rax: 1 for the Linux ABI, 0 for the native one. rdx: 0, or the errno a
+    // call pledge(2) refused fails with.
+    mov %rsp, %rdi
+    call syscall_enter
+    test %rdx, %rdx
+    jnz 8f
     test %rax, %rax
     jnz 1f
 
     // Native Vinix ABI: rdi is the syscall number and arguments start in rsi.
-    // Reload everything because syscall_is_linux() may clobber it.
+    // Reload everything because syscall_enter() may clobber it.
     xor %r12, %r12
     mov 56(%rsp), %rbx
-    cmp $66, %rbx
+    cmp $68, %rbx
     jae 2f
     mov 48(%rsp), %rsi
     mov 40(%rsp), %rdx
@@ -103,6 +108,13 @@ syscall_entry:
     mov $38, %rax
     neg %rax
     xor %rdx, %rdx
+    jmp 4f
+
+    // Refused by pledge(2). Each ABI reports the errno in rdx its own way
+    // below.
+8:
+    mov %rax, %r12
+    mov $0xffffffffffffffff, %rax
 
 4:
     // Native calls return (result, errno) in rax/rdx. Linux encodes errno as a

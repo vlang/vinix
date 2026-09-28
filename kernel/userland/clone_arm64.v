@@ -394,6 +394,13 @@ fn thread_exit(status int, group bool) {
 	exit_process(mut current_process, mut current_thread, encode_exit_status(status))
 }
 
+// OpenBSD kills a process that breaks a pledge(2) promise with SIGABRT,
+// which it cannot catch or ignore.
+@[noreturn]
+pub fn exit_on_pledge_violation() {
+	exit_with_fatal_signal(u8(6))
+}
+
 // Terminate the calling process because one of its own instructions raised a
 // fatal signal nothing handled: a BRK, an undefined instruction or a memory
 // fault with no handler and no way to retry. Linux reports that to wait(2) as

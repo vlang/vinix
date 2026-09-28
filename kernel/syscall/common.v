@@ -2,12 +2,18 @@ module syscall
 
 import aarch64.cpu
 import aarch64.cpu.local as cpulocal
+import proc
 import sched
 import userland
 
 @[markused]
 fn leave(context &cpulocal.GPRState) {
 	userland.flush_owed_sync()
+	// A call that broke a pledge(2) promise has unwound and holds nothing;
+	// the process dies here, before it can run another instruction.
+	if proc.pledge_violation_pending() {
+		userland.exit_on_pledge_violation()
+	}
 	cpu.interrupt_toggle(false)
 	userland.exit_if_told_to()
 	userland.prepare_syscall_restart(context)

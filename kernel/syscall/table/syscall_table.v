@@ -15,9 +15,10 @@ import net
 import sched
 import errno
 
+// Keep the size in step with the bound syscall_entry.S checks numbers against.
 @[export: 'syscall_table']
 __global (
-	syscall_table [66]voidptr
+	syscall_table [68]voidptr
 )
 
 fn syscall_vacant(_ voidptr) (u64, u64) {
@@ -91,4 +92,6 @@ pub fn init_syscall_table() {
 	syscall_table[63] = voidptr(syscall_vacant)
 	syscall_table[64] = voidptr(syscall_vacant)
 	syscall_table[65] = voidptr(sched.syscall_new_thread)
+	syscall_table[66] = voidptr(fs.syscall_pledge)
+	syscall_table[67] = voidptr(fs.syscall_unveil)
 }

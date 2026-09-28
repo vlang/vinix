@@ -94,6 +94,11 @@ pub mut:
 	// carry the mask from before the call, so that sigreturn restores it.
 	saved_mask       u64
 	saved_mask_valid bool
+	// The promises a call this thread is making broke, with pledge_set, or
+	// 0; the thread is killed on its way back to userspace. And the call's
+	// number, for the report. See proc/pledge.v.
+	pledge_violation u64
+	pledge_syscall   i64
 }
 
 pub fn current_thread() &Thread {

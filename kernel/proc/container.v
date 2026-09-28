@@ -289,6 +289,7 @@ pub fn inherit_container_state(mut child Process, parent &Process) {
 	child.cgroup_account = parent.cgroup_account
 	child.oom_score_adj = parent.oom_score_adj
 	child.exe_node = parent.exe_node
+	pledge_inherit(mut child, parent)
 }
 
 pub fn full_capabilities() Capabilities {

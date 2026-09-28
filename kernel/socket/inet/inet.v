@@ -10,6 +10,7 @@ import ioctl
 import katomic
 import klock
 import lib
+import proc
 import resource
 import socket.public as sock_pub
 import stat
@@ -413,6 +414,12 @@ fn address(_addr voidptr, addrlen u32) ?&SockaddrIn {
 	addr := unsafe { &SockaddrIn(_addr) }
 	if addr.sin_family != sock_pub.af_inet {
 		errno.set(errno.eafnosupport)
+		return none
+	}
+	// pledge(2): "dns" without "inet" reaches name servers and nothing else.
+	refused := proc.pledge_check_inet_destination(addr.sin_port)
+	if refused != 0 {
+		errno.set(refused)
 		return none
 	}
 	return addr

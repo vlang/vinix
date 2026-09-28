@@ -809,6 +809,11 @@ fn lookup_bound(_addr voidptr, addrlen u32) ?&UnixSocket {
 		unsafe { path.free() }
 	}
 	target := fs.get_node(proc.current_directory_of(t.process), path, true) or { return none }
+	// Connecting to a socket by name asks "unix" of pledge(2) and "w" of
+	// unveil(2), as on OpenBSD.
+	if !fs.policy_check(target, proc.policy_socket | proc.policy_write) {
+		return none
+	}
 	mut target_res := target.resource
 	if mut target_res is UnixSocket {
 		return target_res
@@ -1453,6 +1458,12 @@ fn (mut this UnixSocket) recvmsg(_handle voidptr, msg &sock_pub.MsgHdr, flags in
 				}
 				capacity_fds--
 			}
+		}
+		// pledge(2): taking descriptors in needs "recvfd". Refused, they are
+		// dropped as a control buffer too small for them would drop them.
+		if capacity_fds != 0 && pending_fds.len != 0
+			&& proc.pledge_check(proc.pledge_recvfd) != 0 {
+			capacity_fds = 0
 		}
 		mut deliver := u64(pending_fds.len)
 		if deliver > capacity_fds {

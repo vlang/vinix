@@ -42,7 +42,8 @@ mut:
 	res  &resource.Resource = unsafe { nil }
 }
 
-fn xattr_target_by_path(_path charptr, follow bool) ?XAttrTarget {
+// `access` is what the call asks of the file, for pledge(2) and unveil(2).
+fn xattr_target_by_path(_path charptr, follow bool, access u32) ?XAttrTarget {
 	path := usercopy.copy_cstring_from_user(u64(_path), 4096)?
 	defer {
 		unsafe { path.free() }
@@ -53,6 +54,9 @@ fn xattr_target_by_path(_path charptr, follow bool) ?XAttrTarget {
 	}
 	parent := get_parent_dir(at_fdcwd, path)?
 	node := get_node(parent, path, follow)?
+	if !policy_check(node, access) {
+		return none
+	}
 	return XAttrTarget{
 		node: node
 		res:  node.resource
@@ -465,12 +469,12 @@ fn free_xattrs(set &XAttrSet) {
 }
 
 pub fn syscall_setxattr(_ voidptr, _path charptr, _name charptr, value voidptr, size u64, flags int) (u64, u64) {
-	target := xattr_target_by_path(_path, true) or { return errno.err, errno.get() }
+	target := xattr_target_by_path(_path, true, proc.policy_fattr) or { return errno.err, errno.get() }
 	return xattr_set(target, _name, value, size, flags)
 }
 
 pub fn syscall_lsetxattr(_ voidptr, _path charptr, _name charptr, value voidptr, size u64, flags int) (u64, u64) {
-	target := xattr_target_by_path(_path, false) or { return errno.err, errno.get() }
+	target := xattr_target_by_path(_path, false, proc.policy_fattr) or { return errno.err, errno.get() }
 	return xattr_set(target, _name, value, size, flags)
 }
 
@@ -483,12 +487,12 @@ pub fn syscall_fsetxattr(_ voidptr, fdnum int, _name charptr, value voidptr, siz
 }
 
 pub fn syscall_getxattr(_ voidptr, _path charptr, _name charptr, value voidptr, size u64) (u64, u64) {
-	target := xattr_target_by_path(_path, true) or { return errno.err, errno.get() }
+	target := xattr_target_by_path(_path, true, proc.policy_read) or { return errno.err, errno.get() }
 	return xattr_get(target, _name, value, size)
 }
 
 pub fn syscall_lgetxattr(_ voidptr, _path charptr, _name charptr, value voidptr, size u64) (u64, u64) {
-	target := xattr_target_by_path(_path, false) or { return errno.err, errno.get() }
+	target := xattr_target_by_path(_path, false, proc.policy_read) or { return errno.err, errno.get() }
 	return xattr_get(target, _name, value, size)
 }
 
@@ -501,12 +505,12 @@ pub fn syscall_fgetxattr(_ voidptr, fdnum int, _name charptr, value voidptr, siz
 }
 
 pub fn syscall_listxattr(_ voidptr, _path charptr, list voidptr, size u64) (u64, u64) {
-	target := xattr_target_by_path(_path, true) or { return errno.err, errno.get() }
+	target := xattr_target_by_path(_path, true, proc.policy_read) or { return errno.err, errno.get() }
 	return xattr_list(target, list, size)
 }
 
 pub fn syscall_llistxattr(_ voidptr, _path charptr, list voidptr, size u64) (u64, u64) {
-	target := xattr_target_by_path(_path, false) or { return errno.err, errno.get() }
+	target := xattr_target_by_path(_path, false, proc.policy_read) or { return errno.err, errno.get() }
 	return xattr_list(target, list, size)
 }
 
@@ -519,12 +523,12 @@ pub fn syscall_flistxattr(_ voidptr, fdnum int, list voidptr, size u64) (u64, u6
 }
 
 pub fn syscall_removexattr(_ voidptr, _path charptr, _name charptr) (u64, u64) {
-	target := xattr_target_by_path(_path, true) or { return errno.err, errno.get() }
+	target := xattr_target_by_path(_path, true, proc.policy_fattr) or { return errno.err, errno.get() }
 	return xattr_remove(target, _name)
 }
 
 pub fn syscall_lremovexattr(_ voidptr, _path charptr, _name charptr) (u64, u64) {
-	target := xattr_target_by_path(_path, false) or { return errno.err, errno.get() }
+	target := xattr_target_by_path(_path, false, proc.policy_fattr) or { return errno.err, errno.get() }
 	return xattr_remove(target, _name)
 }
 

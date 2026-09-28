@@ -70,6 +70,15 @@ fn collect_passed_fds(msg &sock_pub.MsgHdr) ?[]&file.FD {
 		}
 
 		fd_count := (header.cmsg_len - cmsg_header_size) / sizeof(i32)
+		// pledge(2): passing descriptors on needs "sendfd".
+		if fd_count != 0 {
+			refused := proc.pledge_check(proc.pledge_sendfd)
+			if refused != 0 {
+				release_passed_fds(mut result)
+				errno.set(refused)
+				return none
+			}
+		}
 		for i := u64(0); i < fd_count; i++ {
 			fdnum := unsafe { *(&i32(voidptr(u64(header) + cmsg_header_size + i * sizeof(i32)))) }
 			mut source := file.fd_from_fdnum(unsafe { nil }, int(fdnum)) or {
@@ -97,6 +106,26 @@ fn collect_passed_fds(msg &sock_pub.MsgHdr) ?[]&file.FD {
 
 pub fn initialise() {
 	sock_inet.initialise()
+}
+
+// The address family of the socket `fdnum` names, or -1 when it names no
+// socket. pledge(2) decides by it which promise a call on the socket needs.
+pub fn family_of(fdnum int) int {
+	mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or { return -1 }
+	defer {
+		fd.unref()
+	}
+	mut res := fd.handle.resource
+	if mut res is sock_unix.UnixSocket {
+		return sock_pub.af_unix
+	}
+	if mut res is sock_inet.InetSocket {
+		return sock_pub.af_inet
+	}
+	if mut res is sock_netlink.NetlinkSocket {
+		return sock_pub.af_netlink
+	}
+	return -1
 }
 
 fn socketpair_create(domain int, @type int, _protocol int) ?(&resource.Resource, &resource.Resource) {

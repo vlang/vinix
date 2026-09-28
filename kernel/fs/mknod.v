@@ -233,6 +233,15 @@ pub fn syscall_mknodat(_ voidptr, dirfd int, _path charptr, mode u32, dev u64) (
 	if unsafe { parent_of_tgt_node == 0 } {
 		return errno.err, errno.enoent
 	}
+	// pledge(2) asks "dpath" for a FIFO or a device and "cpath" for a file.
+	policy_access := if kind == stat.ififo || kind == stat.ifchr || kind == stat.ifblk {
+		proc.policy_device
+	} else {
+		proc.policy_create
+	}
+	if !policy_check_name(parent_of_tgt_node, basename, policy_access) {
+		return errno.err, errno.get()
+	}
 	if unsafe { target_node != 0 } {
 		return errno.err, errno.eexist
 	}

@@ -313,6 +313,12 @@ pub mut:
 	// The file the process is running. /proc/<pid>/exe leads here when
 	// followed, which is what makes an exec from a memfd resolvable.
 	exe_node voidptr
+	// OpenBSD's pledge(2) promises and execpromises, each carrying
+	// pledge_set once given, and its unveil(2) view, nil while nothing has
+	// been unveiled. Inherited across fork; see pledge.v for exec.
+	pledge     u64
+	execpledge u64
+	unveil     &UnveilSet = unsafe { nil }
 }
 
 // Read-mostly limits are naturally aligned u64s.  Writers serialize complete
@@ -435,6 +441,20 @@ pub fn allocate_pid(process &Process) ?int {
 	return i
 }
 
+// Whether `tid` is one of `process`'s threads. pledge(2) lets a process
+// signal its own threads with "stdio".
+pub fn tid_in_process(tid int, process &Process) bool {
+	if tid <= 0 || tid >= max_pid {
+		return false
+	}
+	pid_lock.acquire()
+	defer {
+		pid_lock.release()
+	}
+	t := threads_by_tid[tid]
+	return t != unsafe { nil } && voidptr(t.process) == voidptr(process)
+}
+
 pub fn free_pid(pid int) {
 	if pid <= 0 || pid >= max_pid {
 		return
@@ -448,6 +468,9 @@ pub fn free_pid(pid int) {
 	mut reaped := processes[pid]
 	release_process_number(reaped)
 	processes[pid] = unsafe { nil }
+	if reaped != unsafe { nil } {
+		unveil_release(mut reaped)
+	}
 	// Nothing can find the process now, and every descriptor it had was closed
 	// when it exited.
 	if reaped != unsafe { nil } && reaped.fds.len != 0 {

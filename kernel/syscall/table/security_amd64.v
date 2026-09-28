@@ -6,6 +6,8 @@
 module table
 
 import errno
+import fs
+import memory.mmap
 
 // kernel/memory/mmap uses this bit only to account the reserved brk arena
 // differently from ordinary mappings. It is never part of either userspace ABI.
@@ -32,4 +34,10 @@ fn syscall_linux_mmap_hardened(gpr_state voidptr, addr voidptr, length u64, prot
 pub fn init_security_syscalls() {
 	syscall_table[1] = voidptr(syscall_vinix_mmap_hardened)
 	linux_syscall_table[9] = voidptr(syscall_linux_mmap_hardened)
+	// OpenBSD's mimmutable(2), pledge(2) and unveil(2). Linux leaves x86-64
+	// numbers past 462 unused for now; these sit well clear of them, below
+	// the 512 syscall_entry.S accepts.
+	linux_syscall_table[500] = voidptr(mmap.syscall_mimmutable)
+	linux_syscall_table[501] = voidptr(fs.syscall_pledge)
+	linux_syscall_table[502] = voidptr(fs.syscall_unveil)
 }

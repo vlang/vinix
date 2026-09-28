@@ -165,7 +165,13 @@ pub fn syscall_trace(gpr_state voidptr) u64 {
 	sc_trace_gpr_state = u64(gpr_state)
 	sc_trace_active = true
 	if current_thread.process.seccomp_mode != proc.seccomp_mode_disabled {
-		return seccomp_entry(mut current_thread, gpr, nr)
+		slot := seccomp_entry(mut current_thread, gpr, nr)
+		if slot != nr {
+			return slot
+		}
+	}
+	if current_thread.process.pledge != 0 {
+		return pledge_entry(mut current_thread, gpr, nr)
 	}
 	return nr
 }

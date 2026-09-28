@@ -4,6 +4,7 @@ module table
 
 import apple.ans
 import file
+import fs
 import pagecache
 import pipe
 import proc
@@ -32,6 +33,9 @@ pub fn init_storage_syscalls() {
 	// 245/246 for native arm64 extensions; keep mimmutable in that reserved
 	// block rather than stealing a Linux ABI syscall number.
 	syscall_table[247] = voidptr(mmap.syscall_mimmutable)
+	// OpenBSD's pledge(2) and unveil(2), next to mimmutable in the same block.
+	syscall_table[248] = voidptr(fs.syscall_pledge)
+	syscall_table[249] = voidptr(fs.syscall_unveil)
 }
 
 fn security_linux_mmap(gpr_state voidptr, addr voidptr, length u64, prot u64,

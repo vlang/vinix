@@ -342,6 +342,10 @@ pub fn syscall_mount(_ voidptr, src charptr, tgt charptr, fs_type charptr, mount
 	if !security.permitted(security.filesystem_mount) {
 		return errno.err, errno.eperm
 	}
+	// A mount could put anything under a path the caller has unveiled.
+	if !policy_may_change_mounts() {
+		return errno.err, errno.get()
+	}
 	// Copy the names before resolving anything: the caller may change or unmap
 	// its buffers afterwards, and a bad pointer must be an EFAULT rather than a
 	// kernel dereference. The source is required, as the smoke test expects. The
@@ -696,6 +700,10 @@ pub fn syscall_umount(_ voidptr, tgt charptr, flags u64) (u64, u64) {
 	if !security.permitted(security.filesystem_unmount) {
 		return errno.err, errno.eperm
 	}
+	// A mount could put anything under a path the caller has unveiled.
+	if !policy_may_change_mounts() {
+		return errno.err, errno.get()
+	}
 	target := usercopy.copy_cstring_from_user(u64(tgt), 4096) or { return errno.err, errno.get() }
 	defer { unsafe { target.free() } }
 	if flags & ~u64(0xf) != 0 {
@@ -781,6 +789,10 @@ pub fn syscall_chroot(_ voidptr, _path charptr) (u64, u64) {
 pub fn syscall_pivot_root(_ voidptr, _new_root charptr, _put_old charptr) (u64, u64) {
 	if !security.permitted(security.filesystem_mount) {
 		return errno.err, errno.eperm
+	}
+	// A mount could put anything under a path the caller has unveiled.
+	if !policy_may_change_mounts() {
+		return errno.err, errno.get()
 	}
 	new_path := user_path(_new_root) or { return errno.err, errno.get() }
 	old_path := user_path(_put_old) or { return errno.err, errno.get() }

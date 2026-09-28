@@ -618,6 +618,13 @@ pub fn syscall_exit(_ voidptr, status int) {
 	exit_process(u32(status) << 8)
 }
 
+// OpenBSD kills a process that breaks a pledge(2) promise with SIGABRT,
+// which it cannot catch or ignore.
+@[noreturn]
+pub fn exit_on_pledge_violation() {
+	exit_by_signal(6)
+}
+
 // End the calling process as one killed by `signal`, which is what wait()
 // then reports instead of an exit status.
 @[noreturn]
@@ -769,6 +776,11 @@ pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, 
 	// child's own /proc/self/exe point back at itself forever.
 	path := fs.resolve_self_reference(_path)
 	prog_node := fs.get_node(dir, path, true)?
+	// The program, or a script's interpreter, is subject to pledge(2) and
+	// unveil(2); the ELF interpreter the kernel loads for it is not.
+	if execve && !fs.policy_check(prog_node, proc.policy_exec) {
+		return none
+	}
 	if !stat.isreg(prog_node.resource.stat.mode)
 		|| !fs.check_access(prog_node, fs.access_exec, true) {
 		errno.set(errno.eacces)
@@ -891,6 +903,8 @@ pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, 
 		process.executable_path = path.clone()
 		process.linux_abi = linux_abi
 		process.allow_wx = allow_wx
+		// The new program runs under the execpromises, or unpledged.
+		proc.pledge_after_exec(mut process)
 
 		kernel_pagemap.switch_to()
 		t.process = kernel_process

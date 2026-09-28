@@ -313,6 +313,9 @@ pub fn syscall_inotify_add_watch(_ voidptr, fdnum int, _path charptr, mask u32) 
 	node := get_node(proc.current_directory_of(proc.current_thread().process), path, follow) or {
 		return errno.err, errno.get()
 	}
+	if !policy_check(node, proc.policy_read) {
+		return errno.err, errno.get()
+	}
 	if mask & in_onlydir != 0 && !stat.isdir(node.resource.stat.mode) {
 		return errno.err, errno.enotdir
 	}
