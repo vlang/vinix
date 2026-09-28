@@ -26,6 +26,10 @@ mut:
 	spare    u64
 	// XNU scan cursor, serialized by the class lock (not per-CPU yet).
 	alloc_rr u16
+	// Objects handed out and not yet freed, and pages this class holds; kept
+	// under the class lock, for /proc/slabinfo and meminfo's Slab line.
+	live  u64
+	pages u64
 }
 
 struct SlabHeader {
@@ -133,6 +137,7 @@ fn (mut this Slab) grow() {
 			hdr.used[int(i / 64)] &= ~(u64(1) << (i % 64))
 		}
 	}
+	this.pages++
 	this.add_partial(mut hdr)
 }
 
@@ -176,6 +181,7 @@ pub fn (mut this Slab) alloc() voidptr {
 		return unsafe { nil }
 	}
 	hdr.in_use++
+	this.live++
 	if hdr.in_use == hdr.capacity {
 		this.remove_partial(mut hdr)
 	}
@@ -235,6 +241,7 @@ pub fn (mut this Slab) sfree(ptr voidptr) {
 		hdr.used[word] &= ~bit
 	}
 	hdr.in_use--
+	this.live--
 	mut release_page := u64(0)
 	if hdr.in_use == 0 {
 		if !was_full {
@@ -245,6 +252,7 @@ pub fn (mut this Slab) sfree(ptr voidptr) {
 		} else {
 			release_page = u64(hdr)
 			hdr.magic = 0
+			this.pages--
 		}
 	} else if was_full {
 		this.add_partial(mut hdr)
@@ -254,6 +262,33 @@ pub fn (mut this Slab) sfree(ptr voidptr) {
 		// Detached and empty: no valid outstanding object can reference it.
 		pmm_free(voidptr(release_page - higher_half), 1)
 	}
+}
+
+// HeapClass is one slab size class as /proc/slabinfo shows it.
+pub struct HeapClass {
+pub:
+	size  u64
+	live  u64
+	pages u64
+}
+
+// heap_classes reads every class's counts, each under its own lock.
+pub fn heap_classes() []HeapClass {
+	mut out := []HeapClass{cap: slabs.len}
+	for mut slab in slabs {
+		if slab.ent_size == 0 {
+			continue
+		}
+		slab.@lock.acquire()
+		class := HeapClass{
+			size:  slab.ent_size
+			live:  slab.live
+			pages: slab.pages
+		}
+		slab.@lock.release()
+		out << class
+	}
+	return out
 }
 
 // Return empty spare pages explicitly; excess empty pages are already
@@ -272,6 +307,7 @@ pub fn heap_trim() u64 {
 		if base != 0 {
 			mut hdr := unsafe { &SlabHeader(base) }
 			hdr.magic = 0
+			slab.pages--
 		}
 		slab.@lock.release()
 		if base != 0 {

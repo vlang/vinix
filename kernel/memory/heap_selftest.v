@@ -24,6 +24,9 @@ fn heap_selftest() {
 	heap_trim()
 	baseline := free_bytes()
 	for mut slab in slabs {
+		if slab.ent_size == 0 {
+			continue
+		}
 		mut offset := slab_data_offset()
 		$if xnu_zone ? {
 			offset = lib.align_up(u64(sizeof(XnuHeapHeader)), 16)
@@ -57,6 +60,9 @@ fn heap_selftest() {
 
 	// Every slab boundary, including zero and the transition to big_alloc.
 	for mut slab in slabs {
+		if slab.ent_size == 0 {
+			continue
+		}
 		for delta := u64(0); delta < 3; delta++ {
 			size := slab.ent_size - 1 + delta
 			ptr := malloc(size)

@@ -49,6 +49,22 @@ pub fn register_cache(cache &Cache, context voidptr, store IO) bool {
 	return true
 }
 
+// resident_bytes is the file data every registered cache holds, for meminfo's
+// Cached line.
+pub fn resident_bytes() u64 {
+	registered_caches_lock.acquire()
+	count := registered_caches_len
+	registered_caches_lock.release()
+	mut total := u64(0)
+	for i := 0; i < count; i++ {
+		mut cache := registered_caches[i]
+		cache.l.acquire()
+		total += u64(cache.resident) * page_bytes
+		cache.l.release()
+	}
+	return total
+}
+
 // Write every registered cache's dirty pages back to its backing store. This
 // is what sync(2), syncfs(2) and the shutdown path need: a filesystem whose
 // pages are only flushed on eviction otherwise loses every small write when

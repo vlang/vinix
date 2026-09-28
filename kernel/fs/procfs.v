@@ -28,6 +28,7 @@ import file
 import resource
 import event.eventstruct
 import memory.mmap
+import pagecache
 import time
 
 pub type NetTcpSnapshot = fn () string
@@ -49,6 +50,7 @@ enum ProcFSKind {
 	statm
 	status
 	meminfo
+	slabinfo
 	uptime
 	version
 	text
@@ -228,6 +230,7 @@ fn (mut this ProcFS) build_root(parent &VFSNode, name string, view voidptr) &VFS
 	// sysconf() counts processors through sched_getaffinity(2), which is
 	// accurate.
 	add_procfs_file(mut root, 'meminfo', .meminfo)
+	add_procfs_file(mut root, 'slabinfo', .slabinfo)
 	add_procfs_file(mut root, 'uptime', .uptime)
 	add_procfs_file(mut root, 'version', .version)
 	mut sysrq := add_procfs_file(mut root, 'sysrq-trigger', .sysrq_trigger)
@@ -477,7 +480,14 @@ fn (this &ProcFSResource) contents() string {
 		.meminfo {
 			total_kb := memory.total_bytes() / 1024
 			free_kb := memory.free_bytes() / 1024
-			return 'MemTotal:       ${total_kb} kB\nMemFree:        ${free_kb} kB\nMemAvailable:   ${free_kb} kB\nBuffers:               0 kB\nCached:                0 kB\nSwapTotal:             0 kB\nSwapFree:              0 kB\n'
+			// Cached is the file data the page caches hold; Slab is every page
+			// the kernel heap has, the page caches' own storage included.
+			cached_kb := pagecache.resident_bytes() / 1024
+			slab_kb := heap_pages() * page_size / 1024
+			return 'MemTotal:       ${total_kb} kB\nMemFree:        ${free_kb} kB\nMemAvailable:   ${free_kb} kB\nBuffers:               0 kB\nCached:         ${cached_kb} kB\nSwapTotal:             0 kB\nSwapFree:              0 kB\nSlab:           ${slab_kb} kB\n'
+		}
+		.slabinfo {
+			return slabinfo_text()
 		}
 		.uptime {
 			seconds := time.monotonic_ns() / 1000000000
@@ -804,6 +814,43 @@ fn (mut this ProcFSResource) filesystem_stat() resource.FileSystemStat {
 		namelen: 255
 		frsize:  page_size
 	}
+}
+
+// The pages the kernel heap holds: every size class's, and those of
+// allocations too large for any class.
+fn heap_pages() u64 {
+	mut pages := memory.heap_big_pages()
+	classes := memory.heap_classes()
+	for class in classes {
+		pages += class.pages
+	}
+	unsafe { classes.free() }
+	return pages
+}
+
+// /proc/slabinfo: each heap size class, what is allocated from it and the
+// pages it holds, then the allocations too large for any class. A count that
+// only grows while processes come and go is a leak, and its size says where.
+fn slabinfo_text() string {
+	mut text := lib.new_text(1024)
+	text.add('# class      size    objects   pages\n')
+	classes := memory.heap_classes()
+	for class in classes {
+		text.add('size-')
+		text.add_unsigned(class.size)
+		text.add_byte(` `)
+		text.add_unsigned(class.size)
+		text.add_byte(` `)
+		text.add_unsigned(class.live)
+		text.add_byte(` `)
+		text.add_unsigned(class.pages)
+		text.add_byte(`\n`)
+	}
+	unsafe { classes.free() }
+	text.add('large - - ')
+	text.add_unsigned(memory.heap_big_pages())
+	text.add_byte(`\n`)
+	return text.str()
 }
 
 // What a process maps and has resident; see mmap.process_memory. The table

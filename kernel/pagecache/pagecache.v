@@ -4,6 +4,7 @@ module pagecache
 
 import errno
 import klock
+import memory
 
 pub const page_bytes = u64(4096)
 pub const default_capacity = 128
@@ -302,7 +303,9 @@ fn (mut this Cache) get(context voidptr, load IO, store IO, index u64, fill bool
 		this.flush_page(mut page, context, store) or { return none }
 		this.withdraw(mut page)
 	} else {
-		page = unsafe { &Page(malloc(sizeof(Page))) }
+		// Packed: a Page is a little over 4 KiB, and a whole-page allocation
+		// of it took 32 KiB on a 16 KiB-page machine.
+		page = unsafe { &Page(memory.malloc_packed(sizeof(Page))) }
 		if page == unsafe { nil } {
 			errno.set(errno.enomem)
 			return none

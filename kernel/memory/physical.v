@@ -247,6 +247,7 @@ pub fn pmm_init() {
 	slabs[11].init(1024)
 	slabs[12].init(1536)
 	slabs[13].init(2048)
+	init_medium_slabs()
 
 	$if xnu_zone ? {
 		xnu_heap_init()
@@ -516,9 +517,31 @@ pub fn pmm_refcount(ptr voidptr) u32 {
 	return unsafe { (&u32(pmm_refcounts))[page] }
 }
 
+// The fourteen fixed classes, and up to four medium ones where a page is large
+// enough for them; see init_medium_slabs. A class that was never initialised
+// has an ent_size of 0 and is skipped.
 __global (
-	slabs [14]Slab
+	slabs [18]Slab
 )
+
+// Objects over 2 KiB and up to half a page are given whole pages by big_alloc,
+// plus a page for its metadata. On a 16 KiB-page machine a 4 KiB page-cache
+// block took 32 KiB that way. These classes split a page evenly into 6, 4, 3
+// and 2 instead, for malloc_packed(); a page-cache block now shares its page
+// with two others. A 4 KiB page fits none of them, so an amd64 kernel has
+// only the fourteen.
+fn init_medium_slabs() {
+	divisors := [u64(6), 4, 3, 2]!
+	mut next := 14
+	for divisor in divisors {
+		size := ((page_size - slab_data_offset()) / divisor) & ~(slab_alignment - 1)
+		if size <= 2048 || size > page_size / 2 || next >= slabs.len {
+			continue
+		}
+		slabs[next].init(size)
+		next++
+	}
+}
 
 struct MallocMetadata {
 mut:
@@ -554,13 +577,46 @@ pub fn free(ptr voidptr) {
 fn big_free(ptr voidptr) {
 	metadata := unsafe { &MallocMetadata(u64(ptr) - page_size) }
 
+	// A metadata page that has already been freed reads as pmm_free()'s
+	// poison, so a second free of the same allocation finds an impossible page
+	// count here, which pmm_free() refuses. Something in the kernel does free
+	// one twice; keep it out of the count as well.
+	if metadata.pages == 0 || metadata.pages >= pmm_avl_page_count {
+		return
+	}
+	adjust_big_alloc_pages(-i64(metadata.pages + 1))
 	pmm_free(voidptr(u64(metadata) - higher_half), metadata.pages + 1)
 }
 
-fn slab_for(size u64) ?&Slab {
-	for mut s in slabs {
+// Pages held by allocations too large for a slab class, their metadata pages
+// included; see heap_big_pages. Zeroed storage rather than an initialiser,
+// which would run after the first allocations had already been counted.
+__global (
+	big_alloc_pages u64
+)
+
+pub fn heap_big_pages() u64 {
+	return katomic.load(&big_alloc_pages)
+}
+
+fn adjust_big_alloc_pages(delta i64) {
+	for {
+		total := katomic.load(&big_alloc_pages)
+		if katomic.cas(mut &big_alloc_pages, total, u64(i64(total) + delta)) {
+			return
+		}
+	}
+}
+
+// The fourteen fixed classes serve malloc(); the medium ones only
+// malloc_packed(), see there.
+const general_slab_classes = 14
+
+fn slab_for(size u64, classes int) ?&Slab {
+	for i in 0 .. classes {
+		mut s := unsafe { &slabs[i] }
 		if s.ent_size >= size {
-			return unsafe { s }
+			return s
 		}
 	}
 
@@ -572,7 +628,21 @@ pub fn malloc(size u64) voidptr {
 	$if xnu_zone ? {
 		return xnu_heap_alloc(size)
 	}
-	mut slab := slab_for(size) or { return big_alloc(size) }
+	mut slab := slab_for(size, general_slab_classes) or { return big_alloc(size) }
+
+	return slab.alloc()
+}
+
+// malloc_packed is malloc for an object that needs no more than 16-byte
+// alignment. Anything over 2 KiB that malloc() hands out comes whole pages at
+// a time and page-aligned, and callers have come to rely on that; this one may
+// instead come from a medium class that shares a page with others of its size.
+// free() and realloc() take either.
+pub fn malloc_packed(size u64) voidptr {
+	$if xnu_zone ? {
+		return xnu_heap_alloc(size)
+	}
+	mut slab := slab_for(size, slabs.len) or { return big_alloc(size) }
 
 	return slab.alloc()
 }
@@ -594,6 +664,7 @@ fn big_alloc(size u64) voidptr {
 
 	metadata.pages = page_count
 	metadata.size = size
+	adjust_big_alloc_pages(i64(page_count + 1))
 
 	return voidptr(u64(ptr) + higher_half + page_size)
 }
