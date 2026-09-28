@@ -28,7 +28,7 @@ usage() {
 usage: pkg <command> [package ...]
 
 commands:
-  install PACKAGE...  install packages (includes Firefox, Chromium, VOffice, Minecraft, Java, FFmpeg, GTK, GIMP, Blender, and Sublime Text)
+  install PACKAGE...  install packages (includes Firefox, Chromium, OBS Studio, VOffice, Minecraft, Java, FFmpeg, GTK, GIMP, Blender, and Sublime Text)
   remove PACKAGE...   remove packages
   update              refresh Alpine repository indexes
   upgrade             upgrade installed packages
@@ -298,6 +298,9 @@ resolve_packages() {
 			chromium)
 				resolved="$resolved chromium chromium-swiftshader adwaita-icon-theme font-dejavu"
 				;;
+			obs|obs-studio)
+				resolved="$resolved obs-studio qt6-qtbase-x11 font-dejavu"
+				;;
 			libreoffice|libreoffice-writer|libreoffice-calc)
 				# One name for the suite. The two document modules share the
 				# 311 MiB libreoffice-common, and the GTK 3 VCL plugin is what
@@ -363,6 +366,10 @@ install_packages() {
 			ffmpeg)
 				apk_install ffmpeg
 				finalize_ffmpeg
+				;;
+			obs|obs-studio)
+				apk_install obs-studio qt6-qtbase-x11 font-dejavu
+				finalize_obs
 				;;
 			blender)
 				# libgmpxx is what the native Vinix backend adds to Alpine's
@@ -729,6 +736,20 @@ finalize_ffmpeg() {
 	if [ ! -x "$(root_path /usr/bin/ffmpeg)" ] \
 		|| [ ! -x "$(root_path /usr/bin/ffprobe)" ]; then
 		echo "pkg: FFmpeg package has no executable tools" >&2
+		exit 1
+	fi
+}
+
+finalize_obs() {
+	# apk extraction on Vinix does not yet restore executable metadata for
+	# package payloads. OBS spawns its own FFmpeg muxer for recordings.
+	for program in obs obs-ffmpeg-mux; do
+		path=$(root_path "/usr/bin/$program")
+		[ ! -f "$path" ] || bb chmod 0755 "$path"
+	done
+	if [ ! -x "$(root_path /usr/bin/obs)" ] \
+		|| [ ! -x "$(root_path /usr/bin/obs-ffmpeg-mux)" ]; then
+		echo "pkg: OBS Studio package has no executable application or muxer" >&2
 		exit 1
 	fi
 }
@@ -1198,6 +1219,9 @@ case "$command_name" in
 		fi
 		if [ -e "$(root_path /usr/bin/ffmpeg)" ]; then
 			finalize_ffmpeg
+		fi
+		if [ -e "$(root_path /usr/bin/obs)" ]; then
+			finalize_obs
 		fi
 		if [ -e "$(root_path "/usr/lib/jvm/java-${MINECRAFT_JAVA_MAJOR}-openjdk/bin/java")" ]; then
 			finalize_java "$MINECRAFT_JAVA_MAJOR"

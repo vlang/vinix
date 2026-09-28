@@ -165,6 +165,16 @@ case "$*" in
 			if [ "$seen_add" = true ]; then
 				printf '%s\n' "$argument" >>"$VINIX_TEST_INSTALLED_PACKAGES"
 				case "$argument" in
+					obs-studio)
+						mkdir -p "$VINIX_TEST_ROOT/usr/bin"
+						for program in obs obs-ffmpeg-mux; do
+							printf '#!/bin/sh\nexit 0\n' \
+								>"$VINIX_TEST_ROOT/usr/bin/$program"
+							chmod 0644 "$VINIX_TEST_ROOT/usr/bin/$program"
+						done
+						printf 'P:%s\nF:usr/bin\nR:obs\nR:obs-ffmpeg-mux\n\n' \
+							"$argument"
+						;;
 					ffmpeg)
 						mkdir -p "$VINIX_TEST_ROOT/usr/bin"
 						for program in ffmpeg ffprobe qt-faststart; do
@@ -436,6 +446,18 @@ tail -n 1 "$log" | grep -q -- \
 run_pkg remove ffmpeg
 tail -n 1 "$log" | grep -q -- \
 	'--no-progress --no-scripts del ffmpeg$'
+
+run_pkg install obs-studio
+test -x "$root/usr/bin/obs"
+test -x "$root/usr/bin/obs-ffmpeg-mux"
+tail -n 2 "$log" | sed -n '1p' | grep -q -- \
+	'--cache-dir .* --no-progress cache download obs-studio qt6-qtbase-x11 font-dejavu$'
+tail -n 1 "$log" | grep -q -- \
+	'--cache-dir .* --no-network --no-progress --no-scripts add obs-studio qt6-qtbase-x11 font-dejavu$'
+
+run_pkg remove obs-studio
+tail -n 1 "$log" | grep -q -- \
+	'--no-progress --no-scripts del obs-studio qt6-qtbase-x11 font-dejavu$'
 
 run_pkg install gimp
 test -x "$root/usr/bin/gimp"

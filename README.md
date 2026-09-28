@@ -424,6 +424,19 @@ run-gimp
 ./gimp-package-smoke.sh
 ```
 
+OBS Studio runs in a native desktop window through the same private X11 host.
+Install its Alpine AArch64 package and Qt X11 runtime, then open **OBS Studio**
+from Start or the wallpaper:
+
+```sh
+pkg install obs-studio
+```
+
+To record the Vinix desktop, add a **Display Capture (XSHM)** source in OBS and
+select **Display 1**. The private display's screen 0 contains OBS's controls;
+screen 1 receives the final native compositor frame at 1280×900, including
+windows, pointer, and taskbar. Capture stays available independently of OBS.
+
 VOffice Writer and Calc are native ui2 clients of the desktop rather than X11
 programs, and they are not part of the image either. Right after a new user is
 created, the first-run app picker offers them along with Firefox, Chromium and

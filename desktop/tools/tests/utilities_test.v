@@ -601,7 +601,7 @@ fn test_terminal_can_edit_a_file_with_vim_over_its_real_pty() {
 }
 
 fn test_available_utility_applications_and_shortcut_layouts() {
-	assert available_apps.len == 23
+	assert available_apps.len == 25
 	assert available_apps[0].process_name == 'vinix-files'
 	assert available_apps[0].icon == 'asset:files'
 	assert available_apps[1].title == 'Firefox'
@@ -654,46 +654,50 @@ fn test_available_utility_applications_and_shortcut_layouts() {
 	assert available_apps[14].polling
 	assert available_apps[13].keyboard && available_apps[13].polling
 	assert available_apps[13].pointer
-	assert available_apps[15].title == 'GIMP'
-	assert available_apps[15].process_name == 'vinix-gimp'
-	assert available_apps[15].width == gimp_window_width
-	assert available_apps[15].height == gimp_window_height + default_title_height
+	assert available_apps[15].title == 'OBS Studio'
+	assert available_apps[15].process_name == 'vinix-obs'
 	assert available_apps[15].keyboard && available_apps[15].pointer
-	assert available_apps[15].polling && available_apps[15].poll_interval_ms == 50
-	assert available_apps[16].title == 'VSpace'
-	assert available_apps[16].process_name == 'vinix-vspace'
-	assert available_apps[16].icon == 'asset:vspace'
-	assert available_apps[16].polling && available_apps[16].poll_interval_ms == 33
-	assert !available_apps[16].keyboard && !available_apps[16].pointer
-	assert available_apps[17].title == 'VOffice Writer'
-	assert available_apps[17].process_name == 'voffice-writer'
-	assert available_apps[17].standalone && available_apps[17].keyboard
-	assert available_apps[17].pointer && available_apps[17].polling
-	assert available_apps[17].install_package == 'voffice'
-	assert available_apps[18].title == 'VOffice Calc'
-	assert available_apps[18].process_name == 'voffice-calc'
+	assert available_apps[15].polling
+	assert available_apps[16].title == 'GIMP'
+	assert available_apps[16].process_name == 'vinix-gimp'
+	assert available_apps[16].width == gimp_window_width
+	assert available_apps[16].height == gimp_window_height + default_title_height
+	assert available_apps[16].keyboard && available_apps[16].pointer
+	assert available_apps[16].polling && available_apps[16].poll_interval_ms == 50
+	assert available_apps[17].title == 'VSpace'
+	assert available_apps[17].process_name == 'vinix-vspace'
+	assert available_apps[17].icon == 'asset:vspace'
+	assert available_apps[17].polling && available_apps[17].poll_interval_ms == 33
+	assert !available_apps[17].keyboard && !available_apps[17].pointer
+	assert available_apps[18].title == 'VOffice Writer'
+	assert available_apps[18].process_name == 'voffice-writer'
 	assert available_apps[18].standalone && available_apps[18].keyboard
 	assert available_apps[18].pointer && available_apps[18].polling
 	assert available_apps[18].install_package == 'voffice'
-	assert available_apps[20].title == 'Chromium'
-	assert available_apps[20].process_name == 'vinix-chromium'
-	assert available_apps[20].icon == 'asset:chromium'
-	assert available_apps[20].width == chromium_window_width
-	assert available_apps[20].height == chromium_window_height + default_title_height
-	assert available_apps[20].keyboard && available_apps[20].pointer
-	assert available_apps[20].polling && available_apps[20].poll_interval_ms == 50
-	assert available_apps[21].title == 'DOOM'
-	assert available_apps[21].process_name == 'vinix-doom'
-	assert available_apps[21].icon == 'asset:doom'
+	assert available_apps[19].title == 'VOffice Calc'
+	assert available_apps[19].process_name == 'voffice-calc'
+	assert available_apps[19].standalone && available_apps[19].keyboard
+	assert available_apps[19].pointer && available_apps[19].polling
+	assert available_apps[19].install_package == 'voffice'
+	assert available_apps[21].title == 'Chromium'
+	assert available_apps[21].process_name == 'vinix-chromium'
+	assert available_apps[21].icon == 'asset:chromium'
+	assert available_apps[21].width == chromium_window_width
+	assert available_apps[21].height == chromium_window_height + default_title_height
 	assert available_apps[21].keyboard && available_apps[21].pointer
-	assert available_apps[22].title == 'Vinix in QEMU'
-	assert available_apps[22].process_name == 'vinix-qemu-window'
-	assert available_apps[23].title == 'Steam'
-	assert available_apps[23].process_name == 'vinix-steam'
-	assert available_apps[23].icon == 'asset:steam'
-	assert available_apps[23].keyboard && available_apps[23].pointer
-	assert available_apps[23].polling
-	assert available_apps.len == 24
+	assert available_apps[21].polling && available_apps[21].poll_interval_ms == 50
+	assert available_apps[22].title == 'DOOM'
+	assert available_apps[22].process_name == 'vinix-doom'
+	assert available_apps[22].icon == 'asset:doom'
+	assert available_apps[22].keyboard && available_apps[22].pointer
+	assert available_apps[23].title == 'Vinix in QEMU'
+	assert available_apps[23].process_name == 'vinix-qemu-window'
+	assert available_apps[24].title == 'Steam'
+	assert available_apps[24].process_name == 'vinix-steam'
+	assert available_apps[24].icon == 'asset:steam'
+	assert available_apps[24].keyboard && available_apps[24].pointer
+	assert available_apps[24].polling
+	assert available_apps.len == 25
 	assert app_start_actions.len == available_apps.len
 	assert app_shortcut_actions.len == available_apps.len
 	assert shortcut_rows_for_height(720) == 8
@@ -707,6 +711,7 @@ fn test_pointer_wire_records_have_fixed_cross_compiler_layouts() {
 	assert sizeof(PointerPacket) == 32
 	assert sizeof(AppPointerPayload) == 28
 	assert sizeof(WineHostEvent) == 20
+	assert int(WineHostEventKind.wheel_down) == 10
 	assert sizeof(VinixInputEvent) == 24
 }
 
@@ -729,6 +734,29 @@ fn test_native_surface_input_preserves_buttons_and_scroll() {
 	assert records[0].x == 50 && records[0].y == 25
 	assert records[1].kind == u32(VinixInputEventKind.wheel)
 	assert records[1].value == -2
+
+	C.close(input_pipe[0])
+	C.close(input_pipe[1])
+}
+
+fn test_hosted_x11_input_forwards_context_menu_and_wheel() {
+	mut input_pipe := [2]i32{}
+	assert C.pipe(&input_pipe[0]) == 0
+	mut app := HostedX11App{
+		input_fd: int(input_pipe[1])
+		surface_width: 100
+		surface_height: 50
+		ready: true
+	}
+
+	app.pointer_event(.down, .right, 0, 100, 100, 200, 200)
+	app.pointer_event(.scroll, .no_button, -2, 100, 100, 200, 200)
+	mut records := [3]WineHostEvent{}
+	assert C.read(input_pipe[0], &records[0], sizeof(WineHostEvent) * 3) == sizeof(WineHostEvent) * 3
+	assert records[0].kind == u32(WineHostEventKind.right_down)
+	assert records[0].x == 50 && records[0].y == 25
+	assert records[1].kind == u32(WineHostEventKind.wheel_down)
+	assert records[2].kind == u32(WineHostEventKind.wheel_down)
 
 	C.close(input_pipe[0])
 	C.close(input_pipe[1])
@@ -1193,7 +1221,7 @@ fn test_firefox_uses_the_hosted_x11_window_path() {
 }
 
 fn test_gimp_uses_the_hosted_x11_window_path() {
-	factory := available_apps[15]
+	factory := available_apps[16]
 	assert factory.process_name == 'vinix-gimp'
 	assert factory.exclusive_command == ''
 	assert factory.open != unsafe { nil }
@@ -1201,7 +1229,7 @@ fn test_gimp_uses_the_hosted_x11_window_path() {
 }
 
 fn test_libreoffice_uses_the_hosted_x11_window_path() {
-	factory := available_apps[19]
+	factory := available_apps[20]
 	assert factory.title == 'LibreOffice'
 	assert factory.process_name == 'vinix-libreoffice'
 	assert factory.exclusive_command == ''
@@ -1212,7 +1240,7 @@ fn test_libreoffice_uses_the_hosted_x11_window_path() {
 }
 
 fn test_chromium_uses_the_hosted_x11_window_path() {
-	factory := available_apps[20]
+	factory := available_apps[21]
 	assert factory.process_name == 'vinix-chromium'
 	assert factory.exclusive_command == ''
 	assert factory.open != unsafe { nil }

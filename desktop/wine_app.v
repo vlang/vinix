@@ -27,6 +27,10 @@ const gimp_surface_width = 1280
 const gimp_surface_height = 900
 const gimp_window_width = 1280
 const gimp_window_height = 900
+const obs_surface_width = 1280
+const obs_surface_height = 900
+const obs_window_width = 1280
+const obs_window_height = 900
 // Writer lays a page out for the width it is given. 1280x900 is the same
 // surface the browsers use, and wide enough for a document page beside the
 // sidebar without the toolbars wrapping onto a third row.
@@ -74,6 +78,12 @@ enum WineHostEventKind as u32 {
 	button_down
 	button_up
 	keys
+	middle_down
+	middle_up
+	right_down
+	right_up
+	wheel_up
+	wheel_down
 }
 
 struct WineHostEvent {
@@ -140,6 +150,21 @@ fn open_gimp(mut _ Desktop) !NativeApp {
 		}
 	}
 	return open_hosted_x11_app('gimp', '/usr/bin/run-gimp', gimp_surface_width, gimp_surface_height, 'builtin:editor', 'Starting GIMP…', 'GIMP is not installed. Run pkg install gimp in Terminal.', 'GIMP exited.')
+}
+
+fn open_obs(mut _ Desktop) !NativeApp {
+	if C.access(c'/usr/bin/obs', C.X_OK) != 0 {
+		return &HostedX11App{
+			surface_width: obs_surface_width
+			surface_height: obs_surface_height
+			icon: 'asset:capture'
+			failed: true
+			error_message: 'OBS Studio is not installed. Run pkg install obs-studio in Terminal.'
+		}
+	}
+	return open_hosted_x11_app('obs', '/usr/bin/run-obs', obs_surface_width,
+		obs_surface_height, 'asset:capture', 'Starting OBS Studio…',
+		'OBS Studio is not installed. Run pkg install obs-studio in Terminal.', 'OBS Studio exited.')
 }
 
 // LibreOffice is a 900 MiB closure that an image can reasonably be built
@@ -297,7 +322,7 @@ fn open_hosted_x11_app(name string, command string, surface_width int, surface_h
 	// passing them to the launcher, so an old or ignored game-size option can
 	// never leave a smaller GLFW window floating in a white root surface.
 	host := desktop_spawn_wine_host(app.directory, surface_width, surface_height, command,
-		name == 'minecraft', name == 'doom' || name == 'qemu') or {
+		name == 'minecraft', name == 'doom' || name == 'qemu', name == 'obs') or {
 		app.failed = true
 		app.error_message = 'Vinix could not start the embedded X11 host.'
 		return app
@@ -428,13 +453,8 @@ fn (mut app HostedX11App) send_host_event(kind WineHostEventKind, x int, y int, 
 	}
 }
 
-fn (mut app HostedX11App) pointer_event(phase AppPointerPhase, button AppPointerButton, _ int, x int, y int, width int, height int) {
+fn (mut app HostedX11App) pointer_event(phase AppPointerPhase, button AppPointerButton, scroll int, x int, y int, width int, height int) {
 	if !app.pointer_input_enabled() || width <= 0 || height <= 0 {
-		return
-	}
-	// The legacy X host protocol only describes its original left button. The
-	// native Vinix protocol below carries all buttons and wheel input.
-	if phase == .scroll || (phase != .move && button != .left) {
 		return
 	}
 	mut surface_x := x * app.surface_width / width
@@ -453,9 +473,31 @@ fn (mut app HostedX11App) pointer_event(phase AppPointerPhase, button AppPointer
 	}
 	kind := match phase {
 		.move { WineHostEventKind.motion }
-		.down { WineHostEventKind.button_down }
-		.up { WineHostEventKind.button_up }
+		.down {
+			match button {
+				.left { WineHostEventKind.button_down }
+				.middle { WineHostEventKind.middle_down }
+				.right { WineHostEventKind.right_down }
+				else { return }
+			}
+		}
+		.up {
+			match button {
+				.left { WineHostEventKind.button_up }
+				.middle { WineHostEventKind.middle_up }
+				.right { WineHostEventKind.right_up }
+				else { return }
+			}
+		}
 		.scroll {
+			if scroll == 0 {
+				return
+			}
+			count := if scroll < -4 || scroll > 4 { 4 } else if scroll < 0 { -scroll } else { scroll }
+			for _ in 0 .. count {
+				app.send_host_event(if scroll > 0 { WineHostEventKind.wheel_up } else { WineHostEventKind.wheel_down },
+					surface_x, surface_y, '')
+			}
 			return
 		}
 	}

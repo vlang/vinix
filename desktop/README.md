@@ -40,6 +40,8 @@ What it does:
 - a **clock** with a large local-time display and a tenth-second stopwatch
 - **Capture**, a native screenshot and screen-recording app with delayed PNG
   screenshots, 5/10 fps AVI recording, automatic self-hiding and live status
+- optional **OBS Studio** (`pkg install obs-studio`), hosted in a private X11
+  window with a second screen that receives the native compositor image
 - a **settings application**: window button side, taskbar style, theme,
   wallpaper, display, battery and experimental M1 Wi-Fi controls
 - **native ui2 applications**: every Files, Calculator, Terminal, Settings and
@@ -225,6 +227,12 @@ desktop's `run-gimp` launcher disables the unavailable AT-SPI service and opens
 GIMP without its splash screen inside a movable Vinix window. Its system
 configuration selects the common image-format plug-ins so a first launch stays
 within Vinix's current exited-process reclamation limit.
+
+OBS Studio uses the same X11 host, with an additional 1280×900 screen. After
+`pkg install obs-studio`, open it from Start and add **Display Capture (XSHM)**
+with **Display 1** selected. The compositor writes each presented frame into
+that screen's Xvfb framebuffer. Display 0 contains the OBS UI, so the capture
+source shows the Vinix desktop without OBS recursively capturing itself.
 
 `pkg install minecraft` installs Alpine's OpenJDK 21 and native runtime, then
 downloads the newest compatible official Minecraft: Java Edition client from

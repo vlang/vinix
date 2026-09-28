@@ -79,6 +79,16 @@ mut:
 
 __global mapped_surfaces = []MappedSurface{}
 
+struct ObsCaptureMapping {
+mut:
+	surface XwdSurface
+	device  u64
+	inode   u64
+	valid   bool
+}
+
+__global obs_capture_mapping = ObsCaptureMapping{}
+
 fn mapped_surface(path string) ?XwdSurface {
 	for entry in mapped_surfaces {
 		if entry.path == path {
@@ -102,15 +112,19 @@ fn mapped_surface(path string) ?XwdSurface {
 }
 
 fn open_xwd_surface(path string) ?XwdSurface {
+	return open_xwd_surface_access(path, false)
+}
+
+fn open_xwd_surface_access(path string, writable bool) ?XwdSurface {
 	info := desktop_stat(path) or { return none }
 	if info.size < xwd_fixed_header_size || info.size > xwd_max_surface_bytes {
 		return none
 	}
-	fd := desktop_open_ro_nonblock(path)
+	fd := if writable { desktop_open_rw(path) } else { desktop_open_ro_nonblock(path) }
 	if fd < 0 {
 		return none
 	}
-	mapping := desktop_mmap_readonly(fd, info.size)
+	mapping := if writable { desktop_mmap_shared(fd, info.size) } else { desktop_mmap_readonly(fd, info.size) }
 	desktop_close(fd)
 	if mapping == unsafe { nil } {
 		return none
@@ -165,6 +179,66 @@ fn open_xwd_surface(path string) ?XwdSurface {
 		red_max:        red_max
 		green_max:      green_max
 		blue_max:       blue_max
+	}
+}
+
+// OBS runs on screen 0 of a private Xvfb. Its screen 1 is a live XWD mapping
+// backed by the X server's root pixmap. Publish the same final canvas that
+// Capture records there, so OBS's Display Capture (XSHM) sees the Vinix
+// desktop without recording OBS's own controls recursively.
+fn obs_capture_surface() ?XwdSurface {
+	mut info := C.stat{}
+	if unsafe { C.stat(c'/run/vinix-obs-screen', &info) } != 0 {
+		if obs_capture_mapping.valid {
+			obs_capture_mapping.surface.close()
+			obs_capture_mapping.valid = false
+		}
+		return none
+	}
+	device := u64(info.st_dev)
+	inode := u64(info.st_ino)
+	if obs_capture_mapping.valid && obs_capture_mapping.device == device
+		&& obs_capture_mapping.inode == inode {
+		return obs_capture_mapping.surface
+	}
+	if obs_capture_mapping.valid {
+		obs_capture_mapping.surface.close()
+		obs_capture_mapping.valid = false
+	}
+	surface := open_xwd_surface_access('/run/vinix-obs-screen', true)?
+	obs_capture_mapping.surface = surface
+	obs_capture_mapping.device = device
+	obs_capture_mapping.inode = inode
+	obs_capture_mapping.valid = true
+	return surface
+}
+
+fn obs_capture_presented(canvas &Canvas) {
+	if canvas.pixels == unsafe { nil } || canvas.physical_width <= 0
+		|| canvas.physical_height <= 0 {
+		return
+	}
+	surface := obs_capture_surface() or { return }
+	if !surface.direct || surface.width != obs_surface_width
+		|| surface.height != obs_surface_height {
+		return
+	}
+	if surface.width == canvas.physical_width && surface.height == canvas.physical_height {
+		for y := 0; y < surface.height; y++ {
+			unsafe {
+				vmemcpy(&surface.pixels[y * surface.bytes_per_line],
+					&canvas.pixels[y * canvas.stride], usize(surface.width * 4))
+			}
+		}
+		return
+	}
+	for y := 0; y < surface.height; y++ {
+		source_y := y * canvas.physical_height / surface.height
+		row := unsafe { &u32(&surface.pixels[y * surface.bytes_per_line]) }
+		for x := 0; x < surface.width; x++ {
+			source_x := x * canvas.physical_width / surface.width
+			unsafe { row[x] = canvas.pixels[source_y * canvas.stride + source_x] }
+		}
 	}
 }
 

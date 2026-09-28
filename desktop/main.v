@@ -374,6 +374,7 @@ fn main() {
 			gpu_present_startup_stage(c'first canvas presented')
 		}
 		desktop.capture_presented(&desktop.canvas)
+		obs_capture_presented(&desktop.canvas)
 		after_present := monotonic_millis()
 		desktop.drag_damage = DamageRect{}
 

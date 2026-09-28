@@ -32,12 +32,20 @@
 
 #define WINE_HOST_EVENT_MAGIC UINT32_C(0x56574831) /* VWH1 */
 #define WINE_HOST_MAX_KEYS 4096
+#define OBS_SCREEN_LINK "/run/vinix-obs-screen"
+#define OBS_CAPTURE_GEOMETRY "1280x900x24"
 
 enum wine_host_event_kind {
     WINE_HOST_MOTION = 1,
     WINE_HOST_BUTTON_DOWN,
     WINE_HOST_BUTTON_UP,
     WINE_HOST_KEYS,
+    WINE_HOST_MIDDLE_DOWN,
+    WINE_HOST_MIDDLE_UP,
+    WINE_HOST_RIGHT_DOWN,
+    WINE_HOST_RIGHT_UP,
+    WINE_HOST_WHEEL_UP,
+    WINE_HOST_WHEEL_DOWN,
 };
 
 struct wine_host_event {
@@ -132,7 +140,7 @@ static void remove_display_files(int number) {
  * repeated game launches retain one framebuffer per run. */
 static void remove_surface_files(const char *directory) {
     char path[PATH_MAX];
-    const char *names[] = { "Xvfb_screen0", "damage" };
+    const char *names[] = { "Xvfb_screen0", "Xvfb_screen1", "damage" };
     for (size_t index = 0; index < sizeof(names) / sizeof(names[0]); ++index) {
         if (snprintf(path, sizeof(path), "%s/%s", directory, names[index]) <
             (int)sizeof(path))
@@ -186,7 +194,7 @@ static const char *claim_display(const char *requested, char *storage,
 }
 
 static pid_t spawn_xvfb(const char *display_name, const char *directory,
-                        const char *geometry, int game_input) {
+                        const char *geometry, int game_input, int obs_capture) {
     pid_t pid = fork();
     const char *xvfb;
     if (pid != 0)
@@ -198,10 +206,20 @@ static pid_t spawn_xvfb(const char *display_name, const char *directory,
     setenv("GALLIUM_DRIVER", "softpipe", 1);
     xvfb = !game_input && access("/usr/bin/Xvfb-glx", X_OK) == 0
                ? "/usr/bin/Xvfb-glx" : "/usr/bin/Xvfb";
-    /* Vinix does not provide SysV shared memory. Do not advertise MIT-SHM to
-     * clients only to make every attachment fail with ENOSYS; ordinary X11
-     * image transport is reliable for this private local display. */
-    if (game_input) {
+    /* Preserve the proven ordinary X11 transport for existing hosted apps.
+     * OBS needs MIT-SHM for Display Capture, so only its private server
+     * advertises the extension. Vinix implements the SysV backing now. */
+    if (obs_capture) {
+        /* Screen 0 holds the Qt controls. Screen 1 is fed by the native
+         * compositor and is the source OBS records. XSHM needs MIT-SHM;
+         * Vinix's SysV shared-memory syscalls provide it. RandR reports only
+         * the first Xvfb root here, so disable it to let OBS enumerate both
+         * X11 screens as Display 0 and Display 1. */
+        execl(xvfb, "Xvfb", display_name, "-screen", "0", geometry,
+              "-screen", "1", OBS_CAPTURE_GEOMETRY, "-fbdir", directory,
+              "-nolisten", "tcp", "-noreset", "-ac", "+extension", "GLX",
+              "+iglx", "-extension", "RANDR", (char *)NULL);
+    } else if (game_input) {
         execl(xvfb, "Xvfb", display_name, "-screen", "0", geometry,
               "-fbdir", directory, "-nolisten", "tcp", "-noreset", "-ac",
               "-extension", "MIT-SHM", (char *)NULL);
@@ -212,6 +230,37 @@ static pid_t spawn_xvfb(const char *display_name, const char *directory,
               (char *)NULL);
     }
     _exit(127);
+}
+
+static int publish_obs_screen(const char *directory) {
+    char path[PATH_MAX];
+    if (snprintf(path, sizeof(path), "%s/Xvfb_screen1", directory) >=
+        (int)sizeof(path))
+        return -1;
+    if (access(path, F_OK) != 0)
+        return -1;
+    /* An orphaned link from a crashed host may remain. A live host's link
+     * still has its target, so leave that session alone. */
+    if (access(OBS_SCREEN_LINK, F_OK) != 0)
+        unlink(OBS_SCREEN_LINK);
+    if (symlink(path, OBS_SCREEN_LINK) != 0)
+        return -1;
+    return 0;
+}
+
+static void unpublish_obs_screen(const char *directory) {
+    char expected[PATH_MAX];
+    char current[PATH_MAX];
+    ssize_t length;
+    if (snprintf(expected, sizeof(expected), "%s/Xvfb_screen1", directory) >=
+        (int)sizeof(expected))
+        return;
+    length = readlink(OBS_SCREEN_LINK, current, sizeof(current) - 1);
+    if (length < 0)
+        return;
+    current[length] = '\0';
+    if (strcmp(current, expected) == 0)
+        unlink(OBS_SCREEN_LINK);
 }
 
 static Display *open_display(const char *display_name, pid_t xvfb_pid) {
@@ -491,6 +540,25 @@ static int process_event(Display *display, const struct wine_host_event *event,
     case WINE_HOST_BUTTON_UP:
         XTestFakeButtonEvent(display, 1, False, CurrentTime);
         break;
+    case WINE_HOST_MIDDLE_DOWN:
+        XTestFakeButtonEvent(display, 2, True, CurrentTime);
+        break;
+    case WINE_HOST_MIDDLE_UP:
+        XTestFakeButtonEvent(display, 2, False, CurrentTime);
+        break;
+    case WINE_HOST_RIGHT_DOWN:
+        XTestFakeButtonEvent(display, 3, True, CurrentTime);
+        break;
+    case WINE_HOST_RIGHT_UP:
+        XTestFakeButtonEvent(display, 3, False, CurrentTime);
+        break;
+    case WINE_HOST_WHEEL_UP:
+    case WINE_HOST_WHEEL_DOWN:
+        XTestFakeButtonEvent(display, event->kind == WINE_HOST_WHEEL_UP ? 4 : 5,
+                             True, CurrentTime);
+        XTestFakeButtonEvent(display, event->kind == WINE_HOST_WHEEL_UP ? 4 : 5,
+                             False, CurrentTime);
+        break;
     case WINE_HOST_KEYS:
         focus_top_window(display);
         send_keys(display, payload, event->length);
@@ -593,10 +661,11 @@ int main(int argc, char **argv) {
     Damage damage;
     int fill_surface = 0;
     int game_input = 0;
+    int obs_capture = 0;
     unsigned int fill_tick = 0;
 
     if (argc != 5 && argc != 6) {
-        fprintf(stderr, "usage: %s DISPLAY FBDIR GEOMETRY COMMAND [--fill|--game-input]\n",
+        fprintf(stderr, "usage: %s DISPLAY FBDIR GEOMETRY COMMAND [--fill|--game-input|--obs]\n",
                 argv[0]);
         return 2;
     }
@@ -605,6 +674,8 @@ int main(int argc, char **argv) {
             fill_surface = 1;
         } else if (strcmp(argv[5], "--game-input") == 0) {
             game_input = 1;
+        } else if (strcmp(argv[5], "--obs") == 0) {
+            obs_capture = 1;
         } else {
             fprintf(stderr, "vinix-wine-host: unknown option: %s\n", argv[5]);
             return 2;
@@ -634,7 +705,8 @@ int main(int argc, char **argv) {
         rmdir(directory);
         return 1;
     }
-    xvfb_pid = spawn_xvfb(display_name, directory, geometry, game_input);
+    xvfb_pid = spawn_xvfb(display_name, directory, geometry, game_input,
+                          obs_capture);
     if (xvfb_pid < 0) {
         perror("vinix-wine-host: fork Xvfb");
         rmdir(directory);
@@ -649,10 +721,20 @@ int main(int argc, char **argv) {
         return 1;
     }
     XSetErrorHandler(ignore_x_error);
+    if (obs_capture && publish_obs_screen(directory) != 0) {
+        perror("vinix-wine-host: publish OBS capture screen");
+        XCloseDisplay(display);
+        stop_child(xvfb_pid);
+        remove_surface_files(directory);
+        rmdir(directory);
+        return 1;
+    }
     if (!XTestQueryExtension(display, &xtest_event_base, &xtest_error_base,
                              &xtest_major, &xtest_minor)) {
         fprintf(stderr, "vinix-wine-host: XTEST extension is unavailable\n");
         XCloseDisplay(display);
+        if (obs_capture)
+            unpublish_obs_screen(directory);
         stop_child(xvfb_pid);
         remove_surface_files(directory);
         rmdir(directory);
@@ -753,6 +835,8 @@ int main(int argc, char **argv) {
     if (damage_counter != NULL)
         munmap((void *)damage_counter, sizeof(uint32_t));
     XCloseDisplay(display);
+    if (obs_capture)
+        unpublish_obs_screen(directory);
     stop_child(xvfb_pid);
     /* Xvfb removes these when it is asked to stop, but not when it has to be
      * killed. Leave nothing behind for the next server on this number. */

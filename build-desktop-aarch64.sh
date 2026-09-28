@@ -1075,6 +1075,10 @@ install -m755 "$X11_STAGING/usr/bin/vinix-xinput" "$STAGING/usr/bin/vinix-xinput
 install -m755 "$X11_STAGING/usr/bin/vinix-wine-host" "$STAGING/usr/bin/vinix-wine-host"
 install -m755 "$SCRIPT_DIR/build-support/firefox/run-firefox" "$STAGING/usr/bin/run-firefox"
 install -m755 "$SCRIPT_DIR/build-support/gimp/run-gimp" "$STAGING/usr/bin/run-gimp"
+install -m755 "$SCRIPT_DIR/build-support/obs/run-obs" "$STAGING/usr/bin/run-obs"
+"$LLVM_BIN/clang" --target=aarch64-linux-musl -shared -fPIC -nostdlib \
+    -fuse-ld=lld "$SCRIPT_DIR/build-support/obs/compat.S" \
+    -o "$STAGING/usr/lib/vinix-obs-compat.so"
 install -m755 "$SCRIPT_DIR/build-support/doom/run-doom" "$STAGING/usr/bin/run-doom"
 install -m755 "$SCRIPT_DIR/build-support/libreoffice/run-libreoffice" \
     "$STAGING/usr/bin/run-libreoffice"
@@ -1170,13 +1174,17 @@ for development_file in usr/lib/vlang/cmd/v/v.v usr/lib/libtcc.so; do
         exit 1
     fi
 done
-for runtime_path in usr/bin/Xorg usr/bin/Xvfb usr/bin/startx usr/bin/vinix-xinput usr/bin/vinix-wine-host usr/bin/run-firefox usr/bin/run-gimp usr/bin/run-chromium usr/bin/run-libreoffice; do
+for runtime_path in usr/bin/Xorg usr/bin/Xvfb usr/bin/startx usr/bin/vinix-xinput usr/bin/vinix-wine-host usr/bin/run-firefox usr/bin/run-gimp usr/bin/run-obs usr/bin/run-chromium usr/bin/run-libreoffice; do
     if [ ! -x "$STAGING/$runtime_path" ]; then
         echo "ERROR: desktop hosted-X11 runtime is missing /$runtime_path" >&2
         echo "Run ./build-x11-aarch64.sh and ./build-firefox-aarch64.sh, then rebuild the desktop." >&2
         exit 1
     fi
 done
+if [ ! -f "$STAGING/usr/lib/vinix-obs-compat.so" ]; then
+    echo "ERROR: OBS compatibility library is missing" >&2
+    exit 1
+fi
 if [ "$firefox_app_found" -ne 1 ]; then
     echo "ERROR: desktop image has no Firefox application directory" >&2
     echo "Run ./build-firefox-aarch64.sh and ./build-userland-aarch64.sh first." >&2
@@ -1191,7 +1199,7 @@ if ! { [ -x "$STAGING/usr/lib/firefox-esr/firefox-esr" ] &&
     exit 1
 fi
 if [ "$COMPACT_INITRAMFS" -eq 1 ]; then
-    for command_path in bin/sh bin/zsh bin/id bin/sed bin/mkdir bin/sleep bin/df bin/du bin/ls bin/tar usr/bin/pkg sbin/apk usr/bin/vim usr/bin/python3 usr/bin/git usr/bin/Xorg usr/bin/Xvfb usr/bin/startx usr/bin/vinix-xinput usr/bin/vinix-wine-host usr/bin/run-firefox usr/bin/run-gimp usr/bin/run-chromium usr/bin/run-libreoffice usr/libexec/vinix-minecraft/fetch-minecraft.py usr/bin/gcc usr/bin/tcc usr/bin/ldd usr/bin/v usr/bin/vinix-desktop-build usr/bin/vinix-desktop-reload usr/bin/vinix-host-sync; do
+    for command_path in bin/sh bin/zsh bin/id bin/sed bin/mkdir bin/sleep bin/df bin/du bin/ls bin/tar usr/bin/pkg sbin/apk usr/bin/vim usr/bin/python3 usr/bin/git usr/bin/Xorg usr/bin/Xvfb usr/bin/startx usr/bin/vinix-xinput usr/bin/vinix-wine-host usr/bin/run-firefox usr/bin/run-gimp usr/bin/run-obs usr/bin/run-chromium usr/bin/run-libreoffice usr/libexec/vinix-minecraft/fetch-minecraft.py usr/bin/gcc usr/bin/tcc usr/bin/ldd usr/bin/v usr/bin/vinix-desktop-build usr/bin/vinix-desktop-reload usr/bin/vinix-host-sync; do
         if [ ! -x "$STAGING/$command_path" ]; then
             echo "ERROR: compact desktop is missing /$command_path" >&2
             exit 1
@@ -1387,6 +1395,7 @@ CONTENT_KEY_INPUTS=(
     "$SCRIPT_DIR/build-support/xorg-server/startx"
     "$SCRIPT_DIR/build-support/firefox"
     "$SCRIPT_DIR/build-support/gimp"
+    "$SCRIPT_DIR/build-support/obs"
     "$SCRIPT_DIR/build-support/libreoffice"
     "$SCRIPT_DIR/build-support/chromium"
     "$SCRIPT_DIR/build-support/hyprland"
