@@ -236,6 +236,8 @@ mut:
 	context_id      u32
 	context_created bool
 	objects         []&VirtioObject
+	// Execbuffer validates every BO handle; keep that lookup constant-time.
+	owned           [max_resources]&VirtioObject
 	mmap_objects    []&VirtioObject
 	lock            klock.Lock
 }
@@ -298,7 +300,9 @@ fn submit(command voidptr, command_length u64, payload u64, payload_length u64,
 
 	unsafe {
 		C.memcpy(voidptr(virtgpu_transport.request_virt), command, command_length)
-		C.memset(voidptr(virtgpu_transport.response_virt), 0, response_capacity)
+		// QEMU overwrites the response header and reports its used length.
+		// Clearing 128 KiB for every GL command just burns guest CPU time.
+		C.memset(voidptr(virtgpu_transport.response_virt), 0, sizeof(ControlHeader))
 	}
 	if payload_length != 0 {
 		destination := voidptr(virtgpu_transport.request_virt + command_length)
@@ -453,12 +457,14 @@ fn ensure_context(mut file VirtioFile) bool {
 }
 
 fn find_owned(mut file VirtioFile, handle u32) ?&VirtioObject {
-	for object in file.objects {
-		if object.gem_object != unsafe { nil } && object.gem_object.handle == handle {
-			return object
-		}
+	if handle >= max_resources {
+		return none
 	}
-	return none
+	object := file.owned[handle]
+	if object == unsafe { nil } {
+		return none
+	}
+	return object
 }
 
 fn allocate_resource_id() u32 {
@@ -524,6 +530,7 @@ fn remove_owned(mut file VirtioFile, handle u32) int {
 	for index, object in file.objects {
 		if object.gem_object != unsafe { nil } && object.gem_object.handle == handle {
 			file.objects.delete(index)
+			file.owned[handle] = unsafe { nil }
 			file.lock.release()
 			context_resource(cmd_ctx_detach_resource, file.context_id, object.resource_id)
 			release_object(object)
@@ -661,6 +668,7 @@ fn resource_create_handler(_dev &drm.DrmDevice, handle voidptr, data voidptr) in
 	objects_lock.release()
 	file.lock.acquire()
 	file.objects << virtio_object
+	file.owned[object.handle] = virtio_object
 	file.lock.release()
 	request.bo_handle = object.handle
 	request.res_handle = resource_id
@@ -710,8 +718,11 @@ fn transfer_handler(handle voidptr, data voidptr, to_host bool) int {
 		stride: request.stride
 		layer_stride: request.layer_stride
 	}
-	// Keep the file's resource alive until the fenced transfer completes.
-	completed := nodata(voidptr(&command), sizeof(command), unsafe { nil }, 0, true)
+	// QEMU calls virgl_renderer_transfer_write_iov before acknowledging an
+	// unfenced upload, so it has finished reading guest backing at return.
+	// A readback still needs the GPU fence before userspace sees its pixels.
+	completed := nodata(voidptr(&command), sizeof(command), unsafe { nil }, 0,
+		!to_host)
 	file.lock.release()
 	return if completed { 0 } else { -5 }
 }
@@ -882,6 +893,7 @@ fn import_object(_dev &drm.DrmDevice, handle voidptr, object &gem.GemObject) ?u3
 		return none
 	}
 	file.objects << virtio_object
+	file.owned[object.handle] = virtio_object
 	file.lock.release()
 	return object.handle
 }
@@ -917,6 +929,9 @@ fn close_file(_dev &drm.DrmDevice, handle voidptr) {
 	mapped_objects := file.mmap_objects.clone()
 	context_created := file.context_created
 	context_id := file.context_id
+	for object in file.objects {
+		file.owned[object.gem_object.handle] = unsafe { nil }
+	}
 	file.objects.clear()
 	file.mmap_objects.clear()
 	file.lock.release()

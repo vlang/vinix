@@ -53,7 +53,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 if [ -x "$SCRIPT_DIR/link-worktree-build-dirs.sh" ]; then
     "$SCRIPT_DIR/link-worktree-build-dirs.sh"
 fi
-KERNEL_DIR="$SCRIPT_DIR/kernel"
+KERNEL_DIR="${VINIX_KERNEL_DIR:-$SCRIPT_DIR/kernel}"
 BOOT_DIR="$SCRIPT_DIR/boot-image"
 # The normal path is deliberately stable and is reused across launches.
 # Isolated tests should use --ephemeral; an explicit path remains available

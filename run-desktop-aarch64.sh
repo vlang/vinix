@@ -37,7 +37,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-KERNEL_DIR="$SCRIPT_DIR/kernel"
+KERNEL_DIR="${VINIX_KERNEL_DIR:-$SCRIPT_DIR/kernel}"
 # Overridable so a test can boot an image of its own without replacing the one
 # build-desktop-aarch64.sh writes for the deployment scripts.
 DESKTOP_INITRAMFS="${VINIX_DESKTOP_INITRAMFS:-$SCRIPT_DIR/build-support/init-aarch64/initramfs-desktop.tar}"
