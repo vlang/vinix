@@ -9,9 +9,9 @@
 // target.
 //
 // Runs are decoded as UTF-8 and looked up by code point. The atlases carry
-// printable ASCII plus the handful of supplemental runes in font_extra_runes,
-// which is what lets an application like ui2's calculator, whose keys are
-// labelled with the real division and plus-minus signs, come out right.
+// printable ASCII plus the supplemental runes in font_extra_runes: the Latin-1
+// and Russian letters the keyboard layouts type, and signs such as the real
+// division and plus-minus that label ui2's calculator keys.
 module main
 
 import encoding.base64
@@ -111,16 +111,25 @@ fn next_rune(text string, index int) (u32, int) {
 // glyph_for maps a code point to its slot. Anything the atlases do not carry
 // is drawn as a space rather than as a missing-glyph box, so an unexpected
 // character costs a gap and not a broken layout. The supplemental block is
-// short enough that scanning it beats carrying a map.
+// ascending, so a binary search finds a slot without carrying a map.
 @[inline]
 fn (f &FontFace) glyph_for(code_point u32) Glyph {
 	if code_point >= u32(font_first_char) && code_point <= u32(font_last_char) {
 		return f.glyphs[int(code_point) - font_first_char]
 	}
 	ascii_count := font_last_char - font_first_char + 1
-	for i, extra in font_extra_runes {
+	mut low := 0
+	mut high := font_extra_runes.len
+	for low < high {
+		middle := (low + high) / 2
+		extra := font_extra_runes[middle]
 		if extra == code_point {
-			return f.glyphs[ascii_count + i]
+			return f.glyphs[ascii_count + middle]
+		}
+		if extra < code_point {
+			low = middle + 1
+		} else {
+			high = middle
 		}
 	}
 	return f.glyphs[0]

@@ -391,11 +391,267 @@ static void type_ascii(Display *display, unsigned char byte) {
         tap_key(display, (KeySym)byte, 0, 0);
 }
 
+/* Characters beyond ASCII arrive as UTF-8, and the keymap Xvfb starts with is
+ * plain US: an é, a й or a € usually has no key at all. Do what xdotool does
+ * and borrow a keycode nothing uses, bind the character's keysym to it with
+ * XChangeKeyboardMapping and tap that. The server tells every client about the
+ * change with a MappingNotify, and because the binding and the fake key are
+ * requests on this one connection, it applies the binding and queues that
+ * notification to each client before it synthesizes the key.
+ *
+ * What ordering cannot promise is when the application reads the new map:
+ * Xlib and GTK fetch it again lazily and get whatever the server holds by
+ * then. Rebinding a keycode while the application still has an unread key
+ * event on it would make that event type the newer character. So bindings
+ * stay in a set of borrowed keycodes that repeated characters reuse without
+ * remapping, and the keycode given up for a new character is the one tapped
+ * longest ago, never one tapped within UNICODE_KEY_SETTLE_MS: long enough for
+ * an application on an emulated core to reach a queued key, short enough that
+ * only a burst of new characters, never typing, has to wait for it.
+ *
+ * The borrowed bindings are not undone: this Xvfb is private to one
+ * application and goes away with it. */
+#define UNICODE_KEY_SLOTS 32
+#define UNICODE_KEY_SETTLE_MS 500
+
+/* A burst taps many keys within one millisecond, so the order they were tapped
+ * in is kept as a count; the clock only times the settle. */
+struct unicode_key {
+    KeyCode code;
+    KeySym symbol; /* NoSymbol until the keycode is first borrowed. */
+    uint64_t tap_number; /* 0 until first tapped. */
+    uint64_t tapped_at_ms;
+};
+
+static int keyboard_scanned = 0;
+/* Unshifted and shifted keysym of every key in group 1 of the map Xvfb
+ * started with, before anything was borrowed. */
+static KeySym original_keysyms[256][2];
+static struct unicode_key unicode_keys[UNICODE_KEY_SLOTS];
+static int unicode_key_count = 0;
+static uint64_t unicode_key_taps = 0;
+
+/* The compositor sends whole characters today, but nothing in the record
+ * format promises it, so a sequence split between two records is finished by
+ * the next one rather than lost. */
+static uint32_t utf8_code_point = 0;
+static int utf8_length = 0;    /* Bytes in the sequence being read. */
+static int utf8_remaining = 0; /* Continuation bytes still to come. */
+
+static int keycode_is_modifier(const XModifierKeymap *modifiers, int code) {
+    int index;
+
+    if (modifiers == NULL)
+        return 0;
+    for (index = 0; index < 8 * modifiers->max_keypermod; ++index) {
+        if (modifiers->modifiermap[index] == code)
+            return 1;
+    }
+    return 0;
+}
+
+/* Read the keymap once, at the first character that needs it, so that it is
+ * the one the application started with. A spare keycode has nothing bound in
+ * any column: <ALT>, <META> and friends leave the first column empty but carry
+ * a modifier keysym further along, and are left alone along with anything
+ * else in the modifier map. */
+static void scan_keyboard_map(Display *display) {
+    XModifierKeymap *modifiers;
+    KeySym *map;
+    int min_code = 0;
+    int max_code = 0;
+    int per_code = 0;
+    int code;
+
+    if (keyboard_scanned)
+        return;
+    keyboard_scanned = 1;
+    XDisplayKeycodes(display, &min_code, &max_code);
+    if (min_code < 0 || max_code > 255 || min_code > max_code)
+        return;
+    map = XGetKeyboardMapping(display, (KeyCode)min_code,
+                              max_code - min_code + 1, &per_code);
+    if (map == NULL)
+        return;
+    if (per_code <= 0) {
+        XFree(map);
+        return;
+    }
+    modifiers = XGetModifierMapping(display);
+    for (code = min_code; code <= max_code; ++code) {
+        const KeySym *row = map + (size_t)(code - min_code) * (size_t)per_code;
+        int bound = 0;
+        int column;
+
+        for (column = 0; column < per_code; ++column) {
+            if (row[column] != NoSymbol)
+                bound = 1;
+        }
+        original_keysyms[code][0] = row[0];
+        original_keysyms[code][1] = per_code > 1 ? row[1] : NoSymbol;
+        if (!bound && unicode_key_count < UNICODE_KEY_SLOTS &&
+            !keycode_is_modifier(modifiers, code)) {
+            unicode_keys[unicode_key_count].code = (KeyCode)code;
+            unicode_keys[unicode_key_count].symbol = NoSymbol;
+            unicode_keys[unicode_key_count].tap_number = 0;
+            unicode_keys[unicode_key_count].tapped_at_ms = 0;
+            ++unicode_key_count;
+        }
+    }
+    if (modifiers != NULL)
+        XFreeModifiermap(modifiers);
+    XFree(map);
+}
+
+/* Find the character on an ordinary key: unshifted anywhere first, then
+ * shifted, as XKeysymToKeycode searches. Characters on the third level or in
+ * another group would need AltGr or a group switch; borrowing a keycode is
+ * simpler than reproducing either. */
+static int find_original_key(KeySym symbol, KeyCode *code, int *shift) {
+    int column;
+    int index;
+
+    for (column = 0; column < 2; ++column) {
+        for (index = 0; index < 256; ++index) {
+            if (original_keysyms[index][column] == symbol) {
+                *code = (KeyCode)index;
+                *shift = column;
+                return 1;
+            }
+        }
+    }
+    return 0;
+}
+
+/* Wait out the settle time of a borrowed keycode without starving held game
+ * keys, which are due for release on their own clock. */
+static void wait_until(Display *display, uint64_t deadline_ms) {
+    while (monotonic_millis() < deadline_ms) {
+        if (hold_game_keys)
+            release_expired_game_keys(display);
+        sleep_10ms();
+    }
+}
+
+static struct unicode_key *borrow_key(Display *display, KeySym symbol) {
+    struct unicode_key *oldest = NULL;
+    KeySym columns[2];
+    int index;
+
+    for (index = 0; index < unicode_key_count; ++index) {
+        struct unicode_key *key = &unicode_keys[index];
+        if (key->symbol == symbol)
+            return key;
+        if (oldest == NULL || key->tap_number < oldest->tap_number)
+            oldest = key;
+    }
+    if (oldest == NULL)
+        return NULL;
+    if (oldest->symbol != NoSymbol)
+        wait_until(display, oldest->tapped_at_ms + UNICODE_KEY_SETTLE_MS);
+    /* Bind the keysym in both columns. Given only one, the server fills in
+     * the case pair itself and makes the key alphabetic, so a borrowed É
+     * would become [é, É] and type é when tapped unshifted. */
+    columns[0] = symbol;
+    columns[1] = symbol;
+    XChangeKeyboardMapping(display, oldest->code, 2, columns, 1);
+    oldest->symbol = symbol;
+    return oldest;
+}
+
+static void tap_keycode(Display *display, KeyCode code, int shift) {
+    if (shift)
+        fake_key(display, XK_Shift_L, True);
+    XTestFakeKeyEvent(display, code, True, CurrentTime);
+    XTestFakeKeyEvent(display, code, False, CurrentTime);
+    if (shift)
+        fake_key(display, XK_Shift_L, False);
+}
+
+/* Non-ASCII characters are always tapped, also for games: they are text, and
+ * holding a borrowed keycode would pin its binding for the length of the
+ * hold. */
+static void type_code_point(Display *display, uint32_t code_point) {
+    struct unicode_key *key;
+    KeySym symbol;
+    KeyCode code;
+    int shift;
+
+    /* C1 controls have no keysym and nothing to type. */
+    if (code_point < 0xa0)
+        return;
+    /* Latin-1 keysyms equal their code points; everything else uses the
+     * Unicode keysym range, as XStringToKeysym("U0439") does. */
+    symbol = code_point <= 0xff ? (KeySym)code_point
+                                : (KeySym)(UINT32_C(0x01000000) | code_point);
+    scan_keyboard_map(display);
+    if (find_original_key(symbol, &code, &shift)) {
+        tap_keycode(display, code, shift);
+        return;
+    }
+    key = borrow_key(display, symbol);
+    if (key == NULL)
+        return;
+    tap_keycode(display, key->code, 0);
+    /* Start the settle time once the server has delivered the key, not when
+     * Xlib buffered it: until XSync returns it may not have left this
+     * process. */
+    XSync(display, False);
+    key->tap_number = ++unicode_key_taps;
+    key->tapped_at_ms = monotonic_millis();
+}
+
+/* Feed one byte of 0x80 and up, or any byte while a sequence is open. Return
+ * 0 when the byte broke off an unfinished sequence and has to be read again on
+ * its own; the broken sequence is dropped. Stray continuation bytes, overlong
+ * forms, surrogates and anything past U+10FFFF are ignored. */
+static int take_utf8_byte(Display *display, unsigned char byte) {
+    uint32_t code_point;
+
+    if (utf8_remaining == 0) {
+        if (byte >= 0xc2 && byte <= 0xdf) {
+            utf8_length = 2;
+            utf8_code_point = byte & 0x1f;
+        } else if (byte >= 0xe0 && byte <= 0xef) {
+            utf8_length = 3;
+            utf8_code_point = byte & 0x0f;
+        } else if (byte >= 0xf0 && byte <= 0xf4) {
+            utf8_length = 4;
+            utf8_code_point = byte & 0x07;
+        } else {
+            return 1;
+        }
+        utf8_remaining = utf8_length - 1;
+        return 1;
+    }
+    if ((byte & 0xc0) != 0x80) {
+        utf8_remaining = 0;
+        return 0;
+    }
+    utf8_code_point = (utf8_code_point << 6) | (byte & 0x3f);
+    if (--utf8_remaining != 0)
+        return 1;
+    code_point = utf8_code_point;
+    if ((utf8_length == 3 && code_point < 0x800) ||
+        (utf8_length == 4 && (code_point < 0x10000 || code_point > 0x10ffff)) ||
+        (code_point >= 0xd800 && code_point <= 0xdfff))
+        return 1;
+    type_code_point(display, code_point);
+    return 1;
+}
+
 static void send_keys(Display *display, const unsigned char *keys,
                       size_t length) {
     size_t index = 0;
 
     while (index < length) {
+        /* Bytes from 0x80 up only ever belong to UTF-8, and a sequence the
+         * previous record left open claims what follows it. */
+        if (keys[index] >= 0x80 || utf8_remaining != 0) {
+            if (take_utf8_byte(display, keys[index]))
+                ++index;
+            continue;
+        }
         if (keys[index] == 0x1b && index + 2 < length &&
             keys[index + 1] == '[') {
             KeySym symbol = NoSymbol;

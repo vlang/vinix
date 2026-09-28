@@ -64,6 +64,8 @@ const terminal_reads_per_frame = 8
 const terminal_csi_parameter_limit = 16
 const terminal_default_rows = 24
 const terminal_default_columns = 80
+// Malformed UTF-8 takes one cell per rejected byte or cut-short sequence.
+const terminal_replacement_char = rune(0xfffd)
 
 const terminal_action_scroll_up = 'term.scroll.up'
 const terminal_action_scroll_down = 'term.scroll.down'
@@ -78,9 +80,10 @@ const terminal_rebuild_snapshot_max_bytes = u64(1024 * 1024)
 
 struct TerminalApp {
 mut:
-	// The visible terminal is a fixed grid of bytes. Keeping it flat makes
-	// scrolling and erasing deterministic and avoids one allocation per cell.
-	screen         []u8
+	// The visible terminal is a fixed grid of code points, one per cell. Keeping
+	// it flat makes scrolling and erasing deterministic and avoids one
+	// allocation per cell.
+	screen         []rune
 	rendered_rows  []string
 	dirty_rows     []bool
 	rows           int
@@ -91,7 +94,7 @@ mut:
 	autowrap       bool = true
 	wrap_pending   bool
 	insert_mode    bool
-	last_printed   u8 = ` `
+	last_printed   rune = ` `
 
 	scroll_top          int
 	scroll_bottom       int
@@ -101,7 +104,7 @@ mut:
 	// Vim uses the alternate screen. Preserve the shell's main screen so leaving
 	// Vim reveals the command that launched it and its prompt again.
 	alternate_screen   bool
-	main_screen        []u8
+	main_screen        []rune
 	main_rows          int
 	main_columns       int
 	main_cursor_row    int
@@ -126,6 +129,14 @@ mut:
 	// Taskbar state published for this window: progress from OSC 9;4 and a
 	// new attention serial for each bell.
 	taskbar TaskStatus
+
+	// Text outside escape sequences is UTF-8, and a sequence may straddle two
+	// reads. The bounds limit the next byte so overlong forms, surrogates and
+	// code points past U+10FFFF are rejected as they arrive.
+	utf8_code   u32
+	utf8_needed int
+	utf8_lower  u8 = 0x80
+	utf8_upper  u8 = 0xbf
 
 	read_buf []u8
 
@@ -322,11 +333,11 @@ fn terminal_clamp(value int, low int, high int) int {
 	return value
 }
 
-fn terminal_blank_screen(rows int, columns int) []u8 {
-	return []u8{len: rows * columns, init: ` `}
+fn terminal_blank_screen(rows int, columns int) []rune {
+	return []rune{len: rows * columns, init: ` `}
 }
 
-fn terminal_resize_cells(cells []u8, old_rows int, old_columns int, rows int, columns int) []u8 {
+fn terminal_resize_cells(cells []rune, old_rows int, old_columns int, rows int, columns int) []rune {
 	mut resized := terminal_blank_screen(rows, columns)
 	copy_rows := if old_rows < rows { old_rows } else { rows }
 	copy_columns := if old_columns < columns { old_columns } else { columns }
@@ -446,7 +457,58 @@ fn (a &TerminalApp) row_string(row int) string {
 	for end > start && a.screen[end - 1] == ` ` {
 		end--
 	}
-	return a.screen[start..end].bytestr()
+	return terminal_cells_text(a.screen, start, end, -1)
+}
+
+// Cells only ever hold valid scalar values, so encoding has no error case.
+fn terminal_utf8_len(ch rune) int {
+	code := u32(ch)
+	return if code < 0x80 {
+		1
+	} else if code < 0x800 {
+		2
+	} else if code < 0x10000 {
+		3
+	} else {
+		4
+	}
+}
+
+fn terminal_append_utf8(mut output []u8, ch rune) {
+	code := u32(ch)
+	if code < 0x80 {
+		output << u8(code)
+	} else if code < 0x800 {
+		output << u8(0xc0 | (code >> 6))
+		output << u8(0x80 | (code & 0x3f))
+	} else if code < 0x10000 {
+		output << u8(0xe0 | (code >> 12))
+		output << u8(0x80 | ((code >> 6) & 0x3f))
+		output << u8(0x80 | (code & 0x3f))
+	} else {
+		output << u8(0xf0 | (code >> 18))
+		output << u8(0x80 | ((code >> 12) & 0x3f))
+		output << u8(0x80 | ((code >> 6) & 0x3f))
+		output << u8(0x80 | (code & 0x3f))
+	}
+}
+
+// terminal_cells_text encodes cells[start..end] as the UTF-8 a label draws.
+// The cell at index `cursor`, if any, is drawn as the cursor instead.
+fn terminal_cells_text(cells []rune, start int, end int, cursor int) string {
+	mut size := 0
+	for index in start .. end {
+		size += if index == cursor { 1 } else { terminal_utf8_len(cells[index]) }
+	}
+	mut bytes := []u8{cap: size}
+	for index in start .. end {
+		terminal_append_utf8(mut bytes, if index == cursor { `_` } else { cells[index] })
+	}
+	next := bytes.bytestr()
+	if bytes.cap > 0 {
+		unsafe { bytes.free() }
+	}
+	return next
 }
 
 fn (mut a TerminalApp) push_history_row(row int) {
@@ -524,7 +586,9 @@ fn (mut a TerminalApp) reverse_index() {
 	a.mark_row_dirty(a.cursor_row)
 }
 
-fn (mut a TerminalApp) put_visible_byte(ch u8) {
+// Every code point takes one cell; wide and combining characters are not
+// distinguished yet.
+fn (mut a TerminalApp) put_visible_char(ch rune) {
 	if a.wrap_pending {
 		a.cursor_column = 0
 		a.line_feed()
@@ -607,12 +671,72 @@ fn (mut a TerminalApp) ingest_output(output []u8) {
 			a.ingest_escape_byte(ch)
 			continue
 		}
+		if a.utf8_needed > 0 {
+			if a.continue_utf8(ch) {
+				continue
+			}
+			// A sequence cut short is replaced as a whole, and the byte that
+			// interrupted it is read afresh rather than swallowed.
+			a.put_visible_char(terminal_replacement_char)
+		}
 		if ch == 0x1b {
 			a.escape_state = 1
 			continue
 		}
+		if ch >= 0x80 {
+			a.begin_utf8(ch)
+			continue
+		}
 		a.ingest_terminal_byte(ch)
 	}
+}
+
+// begin_utf8 starts a sequence at its lead byte. E0, ED, F0 and F4 narrow the
+// range of the next byte; that is what rules out overlong forms, surrogates
+// and code points past U+10FFFF. A byte that cannot lead is replaced alone.
+fn (mut a TerminalApp) begin_utf8(ch u8) {
+	a.utf8_lower = 0x80
+	a.utf8_upper = 0xbf
+	if ch >= 0xc2 && ch <= 0xdf {
+		a.utf8_code = u32(ch & 0x1f)
+		a.utf8_needed = 1
+	} else if ch >= 0xe0 && ch <= 0xef {
+		if ch == 0xe0 {
+			a.utf8_lower = 0xa0
+		} else if ch == 0xed {
+			a.utf8_upper = 0x9f
+		}
+		a.utf8_code = u32(ch & 0x0f)
+		a.utf8_needed = 2
+	} else if ch >= 0xf0 && ch <= 0xf4 {
+		if ch == 0xf0 {
+			a.utf8_lower = 0x90
+		} else if ch == 0xf4 {
+			a.utf8_upper = 0x8f
+		}
+		a.utf8_code = u32(ch & 0x07)
+		a.utf8_needed = 3
+	} else {
+		a.put_visible_char(terminal_replacement_char)
+	}
+}
+
+// continue_utf8 reports whether ch belongs to the pending sequence, and prints
+// the code point once the sequence is complete. C1 controls have no glyph and
+// are dropped, like DEL.
+fn (mut a TerminalApp) continue_utf8(ch u8) bool {
+	if ch < a.utf8_lower || ch > a.utf8_upper {
+		a.utf8_needed = 0
+		return false
+	}
+	a.utf8_lower = 0x80
+	a.utf8_upper = 0xbf
+	a.utf8_code = (a.utf8_code << 6) | u32(ch & 0x3f)
+	a.utf8_needed--
+	if a.utf8_needed == 0 && a.utf8_code >= 0xa0 {
+		a.put_visible_char(rune(a.utf8_code))
+	}
+	return true
 }
 
 fn (mut a TerminalApp) ingest_terminal_byte(ch u8) {
@@ -635,7 +759,7 @@ fn (mut a TerminalApp) ingest_terminal_byte(ch u8) {
 		}
 		else {
 			if ch >= 0x20 && ch != 0x7f {
-				a.put_visible_byte(ch)
+				a.put_visible_char(rune(ch))
 			}
 		}
 	}
@@ -903,7 +1027,7 @@ fn (mut a TerminalApp) leave_alternate_screen() {
 	}
 	old_alternate := a.screen
 	a.screen = a.main_screen
-	a.main_screen = []u8{}
+	a.main_screen = []rune{}
 	if old_alternate.cap > 0 {
 		unsafe { old_alternate.free() }
 	}
@@ -978,7 +1102,7 @@ fn (mut a TerminalApp) apply_csi(command u8) {
 		`T` { a.scroll_region_down(a.scroll_top, a.scroll_bottom, amount) }
 		`b` {
 			for _ in 0 .. amount {
-				a.put_visible_byte(a.last_printed)
+				a.put_visible_char(a.last_printed)
 			}
 		}
 		`r` {
@@ -1058,17 +1182,8 @@ fn (mut a TerminalApp) rendered_row(row int) string {
 			end = cursor_end
 		}
 	}
-	mut bytes := []u8{len: end - start}
-	for index in 0 .. bytes.len {
-		bytes[index] = a.screen[start + index]
-	}
-	if a.cursor_visible && row == a.cursor_row && a.cursor_column < bytes.len {
-		bytes[a.cursor_column] = `_`
-	}
-	next := bytes.bytestr()
-	if bytes.cap > 0 {
-		unsafe { bytes.free() }
-	}
+	cursor := if a.cursor_visible && row == a.cursor_row { start + a.cursor_column } else { -1 }
+	next := terminal_cells_text(a.screen, start, end, cursor)
 	a.rendered_rows[row] = replaced_terminal_text(a.rendered_rows[row], next)
 	a.dirty_rows[row] = false
 	return a.rendered_rows[row]

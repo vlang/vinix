@@ -33,12 +33,24 @@ cp "$root/desktop/tools/tests/terminal_rebuild_test.v" "$work/ui/"
     -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/terminal_rebuild_test.v"
 rm -f "$work/ui/terminal_rebuild_test.v"
 
+# The terminal grid holds code points decoded from the PTY's UTF-8 output.
+cp "$root/desktop/tools/tests/terminal_utf8_test.v" "$work/ui/"
+"$v" -new-compiler -nocache -gc none -manualfree -enable-globals -stats -d ui2_headless \
+    -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/terminal_utf8_test.v"
+rm -f "$work/ui/terminal_utf8_test.v"
+
 # The staged Calculator uses ui2's compile-time `$vml` lowering, which is
 # provided by V's current compiler. Keep test and production compilation on
 # the same frontend.
 "$v" -new-compiler -nocache -gc none -manualfree -enable-globals -stats -d ui2_headless \
     -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/utilities_test.v"
 rm -f "$work/ui/utilities_test.v"
+
+# The Editor stores UTF-8 bytes but moves, deletes and draws by character.
+cp "$root/desktop/tools/tests/editor_utf8_test.v" "$work/ui/"
+"$v" -new-compiler -nocache -gc none -manualfree -enable-globals -stats -d ui2_headless \
+    -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/editor_utf8_test.v"
+rm -f "$work/ui/editor_utf8_test.v"
 
 cp "$root/desktop/tools/tests/taskbar_pinning_test.v" "$work/ui/"
 "$v" -new-compiler -nocache -gc none -manualfree -enable-globals -stats -d ui2_headless \
