@@ -24,6 +24,14 @@ import tempfile
 # that download outlast curl's timeout and stall the build indefinitely.
 MAX_SHARED_FILE_BYTES = 64 * 1024 * 1024
 
+# Native applications a host cross-build can replace in a running guest, by
+# exec name, and the directory under the source root cross-compile-app.sh
+# publishes each one's executable and version to.
+LIVE_APPS = {
+    "vinix-files": "build-aarch64-desktop-apps/files-live",
+    "vinix-activity": "build-aarch64-desktop-apps/activity-live",
+}
+
 
 class OverlayError(Exception):
     pass
@@ -70,18 +78,17 @@ class OverlayHandler(http.server.BaseHTTPRequestHandler):
             self.send_response(204)
             self.end_headers()
             return
-        if self.path in ("/vinix-files/version", "/vinix-files/binary") and self.server.source_root is not None:
-            self.send_files_build()
+        app, _, name = self.path.lstrip("/").partition("/")
+        if app in LIVE_APPS and name in ("version", "binary") and self.server.source_root is not None:
+            self.send_app_build(app, name)
             return
         if self.path == "/vinix-source.tar" and self.server.source_root is not None:
             self.send_source_snapshot()
             return
         self.send_error(404)
 
-    def send_files_build(self) -> None:
-        files_root = self.server.source_root / "build-aarch64-desktop-apps/files-live"
-        name = "version" if self.path.endswith("/version") else "vinix-files"
-        path = files_root / name
+    def send_app_build(self, app: str, name: str) -> None:
+        path = self.server.source_root / LIVE_APPS[app] / ("version" if name == "version" else app)
         try:
             with path.open("rb") as source:
                 size = path.stat().st_size

@@ -331,30 +331,44 @@ static int executable_available(const char *path) {
  * atomically at boot and clear /run state before deciding which session this
  * boot should start. The immutable copy is deliberately outside /usr/bin so a
  * reload can never overwrite it through one of the multicall links. */
+/* The applications vinix-files-sync installs one at a time from a host
+ * cross-build during a QEMU session, replacing their multicall links. Keep
+ * this list in step with that helper's. */
+static const struct {
+	const char *path;
+	const char *temporary;
+	const char *version;
+} live_apps[] = {
+	{ "/usr/bin/vinix-files", "/usr/bin/.vinix-files.system",
+	  "/run/vinix-files-version" },
+	{ "/usr/bin/vinix-activity", "/usr/bin/.vinix-activity.system",
+	  "/run/vinix-activity-version" },
+};
+
 static void prepare_desktop_boot(void) {
 	static const char system_desktop[] =
 		"/usr/libexec/vinix-desktop-system";
 	static const char temporary_desktop[] =
 		"/usr/bin/.vinix-desktop.system";
 	static const char desktop[] = "/usr/bin/vinix-desktop";
-	static const char files[] = "/usr/bin/vinix-files";
-	static const char temporary_files[] = "/usr/bin/.vinix-files.system";
 	const u64 at_fdcwd = (u64)(i64)-100;
 
 	syscall3(35 /* unlinkat */, at_fdcwd,
 	         (u64)"/run/vinix-desktop-development", 0);
 	syscall3(35 /* unlinkat */, at_fdcwd,
 	         (u64)"/run/vinix-desktop-ready", 0);
-	syscall3(35 /* unlinkat */, at_fdcwd,
-	         (u64)"/run/vinix-files-version", 0);
-	/* A Files-only cross-build replaces this symlink during a QEMU session.
-	 * Restore the packaged multicall link before starting the next session. */
-	syscall3(35 /* unlinkat */, at_fdcwd, (u64)temporary_files, 0);
-	if (syscall3(36 /* symlinkat */, (u64)"vinix-desktop", at_fdcwd,
-	             (u64)temporary_files) >= 0) {
-		if (syscall4(38 /* renameat */, at_fdcwd, (u64)temporary_files,
-		             at_fdcwd, (u64)files) < 0)
-			syscall3(35 /* unlinkat */, at_fdcwd, (u64)temporary_files, 0);
+	/* A single-app cross-build replaces that app's symlink during a QEMU
+	 * session. Restore the packaged multicall link before starting the next
+	 * session. */
+	for (u64 i = 0; i < sizeof(live_apps) / sizeof(live_apps[0]); i++) {
+		syscall3(35 /* unlinkat */, at_fdcwd, (u64)live_apps[i].version, 0);
+		syscall3(35 /* unlinkat */, at_fdcwd, (u64)live_apps[i].temporary, 0);
+		if (syscall3(36 /* symlinkat */, (u64)"vinix-desktop", at_fdcwd,
+		             (u64)live_apps[i].temporary) < 0)
+			continue;
+		if (syscall4(38 /* renameat */, at_fdcwd, (u64)live_apps[i].temporary,
+		             at_fdcwd, (u64)live_apps[i].path) < 0)
+			syscall3(35 /* unlinkat */, at_fdcwd, (u64)live_apps[i].temporary, 0);
 	}
 
 	/* Older images have no immutable copy. Leave their existing desktop alone

@@ -1,22 +1,30 @@
 #!/bin/sh
-# Publish committed Files changes to any running desktop QEMU guest.
+# Publish committed Files and Activity Monitor changes to any running desktop
+# QEMU guest. VINIX_APP_SYNC=0 (or the older VINIX_FILES_SYNC=0) skips it.
 set -eu
 
-[ "${VINIX_FILES_SYNC:-1}" != 0 ] || exit 0
+[ "${VINIX_APP_SYNC:-${VINIX_FILES_SYNC:-1}}" != 0 ] || exit 0
 root=$(git rev-parse --show-toplevel)
 subject=$(git log -1 --format=%s)
 paths=$(git diff-tree --root --no-commit-id --name-only -r HEAD)
 
-case "$subject" in
-    Files:*|files:*) files_commit=1 ;;
-    *) files_commit=0 ;;
-esac
-if [ "$files_commit" -eq 0 ]; then
-    printf '%s\n' "$paths" | grep -Eq '^desktop/(files\.v|file_context_ops\.c\.v|create_context_menu\.c\.v)$' || exit 0
+# An application is rebuilt when the subject names it or its sources changed.
+# Files Settings runs from Files' executable, so its sources count as Files'.
+apps=
+if printf '%s\n' "$subject" | grep -Eq '^[Ff]iles:' ||
+    printf '%s\n' "$paths" | grep -Eq '^desktop/(files[a-z_]*(\.c)?\.v|file_context_ops\.c\.v|create_context_menu\.c\.v)$'; then
+    apps="$apps files"
 fi
+if printf '%s\n' "$subject" | grep -Eq '^[Aa]ctivity( [Mm]onitor)?:' ||
+    printf '%s\n' "$paths" | grep -Eq '^desktop/activity\.v$'; then
+    apps="$apps activity"
+fi
+[ -n "$apps" ] || exit 0
 
-echo "==> Files commit detected; cross-compiling for the running VM"
-if ! "$root/cross-compile-files.sh"; then
-    echo "ERROR: Files cross-build or publication failed; run ./cross-compile-files.sh to retry" >&2
+echo "==> Commit changes${apps}; cross-compiling for the running VM"
+# One word per application, so the list is deliberately unquoted.
+# shellcheck disable=SC2086
+if ! "$root/cross-compile-app.sh" $apps; then
+    echo "ERROR: cross-build or publication failed; run ./cross-compile-app.sh${apps} to retry" >&2
     exit 1
 fi

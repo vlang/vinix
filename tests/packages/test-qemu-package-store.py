@@ -191,6 +191,30 @@ class PackageStoreTests(unittest.TestCase):
                 snapshot.extractfile("desktop/main.v").read(),
             )
 
+    def fetch(self, path: str) -> bytes:
+        with urllib.request.urlopen(f"http://127.0.0.1:{self.port}{path}") as response:
+            return response.read()
+
+    def test_serves_each_live_app_build_from_its_own_directory(self) -> None:
+        for app, directory in (("vinix-files", "files-live"), ("vinix-activity", "activity-live")):
+            published = self.source / "build-aarch64-desktop-apps" / directory
+            published.mkdir(parents=True)
+            (published / app).write_bytes(f"{app} executable".encode())
+            (published / "version").write_text("123 17\n", encoding="utf-8")
+        self.assertEqual(self.fetch("/vinix-files/binary"), b"vinix-files executable")
+        self.assertEqual(self.fetch("/vinix-activity/binary"), b"vinix-activity executable")
+        self.assertEqual(self.fetch("/vinix-activity/version"), b"123 17\n")
+        # Only the listed applications, and only their two files, are served.
+        for path in ("/vinix-terminal/binary", "/vinix-files/vinix-files", "/vinix-files/binary/x"):
+            with self.assertRaises(urllib.error.HTTPError) as raised:
+                self.fetch(path)
+            self.assertEqual(raised.exception.code, 404)
+
+    def test_live_app_without_a_build_is_not_found(self) -> None:
+        with self.assertRaises(urllib.error.HTTPError) as raised:
+            self.fetch("/vinix-activity/version")
+        self.assertEqual(raised.exception.code, 404)
+
     def test_source_snapshot_skips_oversized_files(self) -> None:
         # A sparse file costs nothing on disk but would add 65 MiB to every
         # guest sync, as an interrupted desktop build's partial tar once did.
