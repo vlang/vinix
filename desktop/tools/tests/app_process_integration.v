@@ -152,6 +152,21 @@ fn main() {
 	assert cadence_desktop.idle_wait_interval(1000, 16) == 100
 	cadence_app.poll_sampled = false
 	assert cadence_desktop.idle_wait_interval(1000, 16) == 16
+	// After a poll the wait runs to when the next one is due, a little past it
+	// rather than a little before, and an application's own estimate replaces
+	// its cadence within bounds.
+	cadence_app.poll_sampled = true
+	cadence_app.last_poll_ms = desktop_monotonic_ms() - 40
+	remaining := cadence_desktop.idle_wait_interval(1000, 16)
+	assert remaining > 60 && remaining <= 60 + poll_wake_margin_ms
+	cadence_app.poll_hint_ms = 400
+	assert cadence_app.next_poll_interval() == 400
+	cadence_app.poll_hint_ms = 5
+	assert cadence_app.next_poll_interval() == 25
+	cadence_app.poll_hint_ms = 60_000
+	assert cadence_app.next_poll_interval() == remote_poll_hint_max_ms
+	cadence_app.poll_interval_ms = 0
+	assert cadence_app.next_poll_interval() == 0
 
 	mut desktop := Desktop{}
 	mut files := start_remote_app_at_with_timeout(arguments()[0], available_apps[0], mut desktop,

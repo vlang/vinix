@@ -922,6 +922,14 @@ fn (mut a FilesContextApp) pointer_input_enabled() bool {
 	return true
 }
 
+// The settings pane, the tag picker and a preview only take scrolling.
+fn (a &FilesContextApp) pointer_moves_matter() bool {
+	if a.settings_only || a.tag_picker || a.preview.open {
+		return false
+	}
+	return a.files.pointer_moves_matter()
+}
+
 fn (mut a FilesContextApp) pointer_event(phase AppPointerPhase, button AppPointerButton,
 	scroll int, x int, y int, width int, height int) {
 	if a.settings_only {

@@ -793,7 +793,7 @@ fn (d &Desktop) idle_wait_interval(maximum i64, frame_interval i64) i64 {
 			// a pass that finds the poll not yet due.
 			mut candidate := i64(app.next_poll_interval())
 			now := desktop_monotonic_ms()
-			if now != ~u64(0) && now >= app.last_poll_ms {
+			if app.last_poll_ms != 0 && now != ~u64(0) && now >= app.last_poll_ms {
 				since := i64(now - app.last_poll_ms)
 				candidate = if since < candidate { candidate - since + poll_wake_margin_ms } else { 1 }
 			}
@@ -1031,6 +1031,20 @@ fn (mut d Desktop) forward_pointer_to_window(x int, y int, phase AppPointerPhase
 		return selected
 	}
 	return -1
+}
+
+// app_pointer_changed reports whether the pointer event just delivered to the
+// window's application could have changed what it shows.
+fn (d &Desktop) app_pointer_changed(window_index int) bool {
+	app_index := d.windows[window_index].app_index
+	if app_index < 0 || app_index >= d.apps.len {
+		return true
+	}
+	app := d.apps[app_index]
+	if app is RemoteApp {
+		return app.pointer_changed
+	}
+	return true
 }
 
 // shortcut_elements lays the application shortcuts down the left edge of the
@@ -1795,7 +1809,7 @@ fn (mut d Desktop) on_pointer_move(x int, y int) {
 		d.dirty = true
 	}
 	if local {
-		if delivered >= 0 {
+		if delivered >= 0 && d.app_pointer_changed(delivered) {
 			d.damage_window(delivered)
 		}
 		d.dirty = was_dirty

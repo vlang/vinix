@@ -1000,10 +1000,22 @@ fn run_app_process(options AppProcessOptions) {
 					free_app_payload(payload)
 					continue
 				}
+				// Whether the event can have changed the application, asked before
+				// it is handled: a move that ends a drag still changed it.
+				mut changed := true
+				if pointer.kind == i32(AppPointerPhase.move) {
+					if mut app is PointerMoveApp {
+						changed = app.pointer_moves_matter()
+					}
+				}
 				if mut app is PointerApp {
 					app.pointer_event(unsafe { AppPointerPhase(pointer.kind) }, unsafe { AppPointerButton(pointer.button) }, int(pointer.scroll), int(pointer.x), int(pointer.y), int(pointer.width), int(pointer.height))
 				}
-				if !send_app_response(options.response_fd, true, app_current_state(desktop), []u8{}) {
+				pointer_payload := [u8(if changed { 1 } else { 0 })]
+				sent := send_app_response(options.response_fd, true, app_current_state(desktop),
+					pointer_payload)
+				unsafe { pointer_payload.free() }
+				if !sent {
 					free_app_payload(payload)
 					break
 				}
@@ -1060,6 +1072,9 @@ mut:
 	tree_state  AppWireState
 	tree_ms     u64
 	tree_stale  bool = true
+	// Whether the last pointer event delivered could have changed the
+	// application; see PointerMoveApp.
+	pointer_changed bool = true
 	// Whether the frame being built repaints everything. A partial frame
 	// repaints parts of windows around a change elsewhere, and a newer tree
 	// there would leave the window showing two versions of itself; whatever
@@ -1282,8 +1297,16 @@ fn (mut a RemoteApp) pointer_event(phase AppPointerPhase, button AppPointerButto
 		height: i32(height)
 	}
 	payload := unsafe { tos(&u8(&pointer), int(sizeof(AppPointerPayload))) }
+	was_stale := a.tree_stale
+	a.pointer_changed = true
 	a.tree_stale = true
 	reply := a.transact(.pointer, 0, 0, payload) or { return }
+	// An empty reply, from an application that does not say, counts as a
+	// change.
+	if reply.payload.len >= 1 && reply.payload[0] == 0 {
+		a.pointer_changed = false
+		a.tree_stale = was_stale
+	}
 	if reply.payload.cap > 0 {
 		unsafe { reply.payload.free() }
 	}

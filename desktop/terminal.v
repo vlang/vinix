@@ -59,6 +59,14 @@ mut:
 	pointer_event(phase AppPointerPhase, button AppPointerButton, scroll int, x int, y int, width int, height int)
 }
 
+// PointerMoveApp is a PointerApp that can tell whether moving the pointer
+// can change it now. The answer travels back in the pointer reply, so a
+// window whose application ignores a move is neither rebuilt nor repainted
+// for it. An application without this is assumed to change on every event.
+interface PointerMoveApp {
+	pointer_moves_matter() bool
+}
+
 interface ClosingApp {
 mut:
 	close_app()
