@@ -1334,6 +1334,15 @@ pub fn yield(save_ctx bool) {
 	cpu.interrupt_toggle(false)
 	timer.stop()
 	mut current_thread := proc.current_thread()
+	// The thread's turn ends here. What this CPU does until the thread runs
+	// again -- the polling below, which is the idle loop's work done on this
+	// thread's stack, or another thread -- is not the thread's time. Charged
+	// to it, the tick-long poll made every process that sleeps look busy: a
+	// program that did nothing but sleep 16 ms at a time read 10% of a CPU,
+	// and the compositor's frame pacing alone most of a window drag's cost.
+	if unsafe { current_thread != nil } {
+		proc.charge_cpu_time(mut current_thread, timer.get_ns())
+	}
 
 	// Blocking yield: HVF workaround.
 	// IRQ delivery to guest is broken, so we can't rely on preemptive context
@@ -1433,6 +1442,12 @@ pub fn yield(save_ctx bool) {
 		}
 		fpu_restore(current_thread.fpu_storage)
 		katomic.store(mut &current_thread.running_on, cpu_local.cpu_number)
+	}
+
+	// Woken before this CPU gave the thread up: nothing else has started its
+	// turn again. One that was switched away was started when it came back.
+	if current_thread.scheduled_at_ns == 0 {
+		proc.begin_cpu_time(mut current_thread, timer.get_ns())
 	}
 
 	// Thread re-enqueued. Re-arm timer for normal scheduling.
