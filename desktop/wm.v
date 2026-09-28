@@ -72,6 +72,7 @@ mut:
 	blender_icon    AppIcon
 	minecraft_icon  AppIcon
 	doom_icon       AppIcon
+	steam_icon      AppIcon
 	terminal_icon   AppIcon
 	settings_icon   AppIcon
 	activity_icon   AppIcon

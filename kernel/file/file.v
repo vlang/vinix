@@ -146,10 +146,6 @@ fn poll_revents(status int, requested i16) i16 {
 fn ppoll(fds &PollFD, nfds u64, tmo_p &time.TimeSpec, sigmask &u64) (u64, u64) {
 	mut t := proc.current_thread()
 
-	if nfds == 0 {
-		return 0, 0
-	}
-
 	oldmask := t.masked_signals
 	if voidptr(sigmask) != unsafe { nil } {
 		// SIGKILL and SIGSTOP can never be blocked, not even for the wait.
@@ -157,6 +153,35 @@ fn ppoll(fds &PollFD, nfds u64, tmo_p &time.TimeSpec, sigmask &u64) (u64, u64) {
 	}
 	defer {
 		t.masked_signals = oldmask
+	}
+	if voidptr(tmo_p) != unsafe { nil }
+		&& (tmo_p.tv_sec < 0 || tmo_p.tv_nsec < 0 || tmo_p.tv_nsec >= 1000000000) {
+		return errno.err, errno.einval
+	}
+
+	// poll(NULL, 0, timeout) is a sleep used by glibc and UI event loops.
+	// Keep a signal-interruptible event even without a timeout; returning
+	// immediately here makes a supposedly sleeping loop spin at full speed.
+	if nfds == 0 {
+		if voidptr(tmo_p) != unsafe { nil } && tmo_p.tv_sec == 0 && tmo_p.tv_nsec == 0 {
+			return 0, 0
+		}
+		mut sleeper := eventstruct.Event{}
+		mut sleep_events := [&sleeper]
+		defer { unsafe { sleep_events.free() } }
+		mut timer := &time.Timer(unsafe { nil })
+		if voidptr(tmo_p) != unsafe { nil } {
+			timer = time.new_timer(*tmo_p)
+			sleep_events[0] = &timer.event
+		}
+		defer {
+			if voidptr(timer) != unsafe { nil } {
+				timer.disarm()
+				unsafe { free(timer) }
+			}
+		}
+		event.await(mut sleep_events, true) or { return errno.err, errno.eintr }
+		return 0, 0
 	}
 
 	mut fdlist := []&FD{}
@@ -316,6 +341,45 @@ pub fn (mut this Handle) read(buf voidptr, count u64) ?i64 {
 	return ret
 }
 
+// Never pass a userspace buffer to a resource while it holds filesystem or
+// device locks. A missing user page can fault in the middle of that critical
+// section, and the fault handler may need the same resource to page it in.
+// Copy after the resource has returned, in bounded pieces.
+pub fn (mut this Handle) read_to_user(address u64, count u64) ?i64 {
+	if count == 0 {
+		return this.read(unsafe { nil }, 0)
+	}
+	if address == 0 || count - 1 > ~address {
+		errno.set(errno.efault)
+		return none
+	}
+	buffer := unsafe { malloc(if count < 64 * 1024 { count } else { u64(64 * 1024) }) }
+	if buffer == unsafe { nil } {
+		errno.set(errno.enomem)
+		return none
+	}
+	defer { unsafe { free(buffer) } }
+	mut done := u64(0)
+	for done < count {
+		chunk := if count - done < 64 * 1024 { count - done } else { u64(64 * 1024) }
+		read := this.read(buffer, chunk) or {
+			if done != 0 { return i64(done) }
+			return none
+		}
+		if read <= 0 {
+			return i64(done)
+		}
+		if !usercopy.copy_to_user(address + done, buffer, u64(read)) {
+			errno.set(errno.efault)
+			if done != 0 { return i64(done) }
+			return none
+		}
+		done += u64(read)
+		if u64(read) < chunk { break }
+	}
+	return i64(done)
+}
+
 fn limited_write_count(res &resource.Resource, location u64, count u64) ?u64 {
 	if !stat.isreg(res.stat.mode) || count == 0 {
 		return count
@@ -350,6 +414,39 @@ pub fn (mut this Handle) write(buf voidptr, count u64) ?i64 {
 		resource.sync_resource(mut res, voidptr(this)) or { return none }
 	}
 	return ret
+}
+
+pub fn (mut this Handle) write_from_user(address u64, count u64) ?i64 {
+	if count == 0 {
+		return this.write(unsafe { nil }, 0)
+	}
+	if address == 0 || count - 1 > ~address {
+		errno.set(errno.efault)
+		return none
+	}
+	buffer := unsafe { malloc(if count < 64 * 1024 { count } else { u64(64 * 1024) }) }
+	if buffer == unsafe { nil } {
+		errno.set(errno.enomem)
+		return none
+	}
+	defer { unsafe { free(buffer) } }
+	mut done := u64(0)
+	for done < count {
+		chunk := if count - done < 64 * 1024 { count - done } else { u64(64 * 1024) }
+		if !usercopy.copy_from_user(buffer, address + done, chunk) {
+			errno.set(errno.efault)
+			if done != 0 { return i64(done) }
+			return none
+		}
+		written := this.write(buffer, chunk) or {
+			if done != 0 { return i64(done) }
+			return none
+		}
+		if written <= 0 { return i64(done) }
+		done += u64(written)
+		if u64(written) < chunk { break }
+	}
+	return i64(done)
 }
 
 pub fn (mut this Handle) ioctl(request u64, argp voidptr) ?int {
@@ -737,6 +834,9 @@ pub fn syscall_pread(_ voidptr, fdnum int, buf voidptr, count u64, offset i64) (
 	if offset < 0 || count > u64(0x7fffffffffffffff) - u64(offset) {
 		return errno.err, errno.einval
 	}
+	if count != 0 && (buf == unsafe { nil } || count - 1 > ~u64(buf)) {
+		return errno.err, errno.efault
+	}
 
 	mut fd := fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.get() }
 	defer {
@@ -744,10 +844,6 @@ pub fn syscall_pread(_ voidptr, fdnum int, buf voidptr, count u64, offset i64) (
 	}
 
 	mut handle := fd.handle
-	handle.l.acquire()
-	defer {
-		handle.l.release()
-	}
 
 	mode := handle.resource.stat.mode
 	if stat.ischr(mode) || stat.isifo(mode) || stat.issock(mode) || mode & stat.ifmt == stat.ifpipe {
@@ -761,15 +857,41 @@ pub fn syscall_pread(_ voidptr, fdnum int, buf voidptr, count u64, offset i64) (
 		return errno.err, errno.ebadf
 	}
 
-	ret := handle.resource.read(voidptr(handle), buf, u64(offset), count) or {
-		return errno.err, errno.get()
+	if count == 0 {
+		return 0, 0
 	}
-	return u64(ret), 0
+	buffer := unsafe { malloc(if count < 64 * 1024 { count } else { u64(64 * 1024) }) }
+	if buffer == unsafe { nil } {
+		return errno.err, errno.enomem
+	}
+	defer { unsafe { free(buffer) } }
+	mut done := u64(0)
+	for done < count {
+		chunk := if count - done < 64 * 1024 { count - done } else { u64(64 * 1024) }
+		handle.l.acquire()
+		read := handle.resource.read(voidptr(handle), buffer, u64(offset) + done, chunk) or {
+			handle.l.release()
+			if done != 0 { return done, 0 }
+			return errno.err, errno.get()
+		}
+		handle.l.release()
+		if read <= 0 { break }
+		if !usercopy.copy_to_user(u64(buf) + done, buffer, u64(read)) {
+			if done != 0 { return done, 0 }
+			return errno.err, errno.efault
+		}
+		done += u64(read)
+		if u64(read) < chunk { break }
+	}
+	return done, 0
 }
 
 pub fn syscall_pwrite(_ voidptr, fdnum int, buf voidptr, count u64, offset i64) (u64, u64) {
 	if offset < 0 || count > u64(0x7fffffffffffffff) - u64(offset) {
 		return errno.err, errno.einval
+	}
+	if count != 0 && (buf == unsafe { nil } || count - 1 > ~u64(buf)) {
+		return errno.err, errno.efault
 	}
 
 	mut fd := fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.get() }
@@ -778,10 +900,6 @@ pub fn syscall_pwrite(_ voidptr, fdnum int, buf voidptr, count u64, offset i64) 
 	}
 
 	mut handle := fd.handle
-	handle.l.acquire()
-	defer {
-		handle.l.release()
-	}
 
 	mut res := handle.resource
 	mode := res.stat.mode
@@ -799,13 +917,34 @@ pub fn syscall_pwrite(_ voidptr, fdnum int, buf voidptr, count u64, offset i64) 
 	allowed := limited_write_count(res, u64(offset), count) or {
 		return errno.err, errno.get()
 	}
-	ret := res.write(voidptr(handle), buf, u64(offset), allowed) or {
-		return errno.err, errno.get()
+	if allowed == 0 { return 0, 0 }
+	buffer := unsafe { malloc(if allowed < 64 * 1024 { allowed } else { u64(64 * 1024) }) }
+	if buffer == unsafe { nil } {
+		return errno.err, errno.enomem
+	}
+	defer { unsafe { free(buffer) } }
+	mut done := u64(0)
+	for done < allowed {
+		chunk := if allowed - done < 64 * 1024 { allowed - done } else { u64(64 * 1024) }
+		if !usercopy.copy_from_user(buffer, u64(buf) + done, chunk) {
+			if done != 0 { return done, 0 }
+			return errno.err, errno.efault
+		}
+		handle.l.acquire()
+		written := res.write(voidptr(handle), buffer, u64(offset) + done, chunk) or {
+			handle.l.release()
+			if done != 0 { return done, 0 }
+			return errno.err, errno.get()
+		}
+		handle.l.release()
+		if written <= 0 { break }
+		done += u64(written)
+		if u64(written) < chunk { break }
 	}
 	if handle.flags & resource.o_dsync != 0 {
 		resource.sync_resource(mut res, voidptr(handle)) or { return errno.err, errno.get() }
 	}
-	return u64(ret), 0
+	return done, 0
 }
 
 // fallocate(mode=0) guarantees that the requested range exists.  Vinix has no

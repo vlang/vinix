@@ -197,6 +197,11 @@ order from the UEFI boot disk, so no decompression step is needed during boot.
 The individual layer builders described below remain available for iterating
 on one component, but are not required for a normal default-image build.
 
+Valve's Linux Steam client, an x86 glibc program, runs through the same
+translators from a Debian root of its own. Stage it with
+`./build-steam-aarch64.sh` and pass `--with-steam` to the desktop builder;
+see [docs/steam.md](docs/steam.md).
+
 Vinix can also boot another AArch64 Vinix instance through native QEMU system
 emulation. See [docs/qemu-nested.md](docs/qemu-nested.md) for the build, image,
 and launch commands.

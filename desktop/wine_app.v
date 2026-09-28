@@ -53,6 +53,12 @@ const minecraft_surface_height = 720
 // title bar and the Vinix taskbar visible.
 const minecraft_window_width = 1976
 const minecraft_window_height = 1113
+// Steam's client lays its library and store out for a 1280x800 minimum; the
+// same surface the browsers get leaves it a little room.
+const steam_surface_width = 1280
+const steam_surface_height = 900
+const steam_window_width = 1280
+const steam_window_height = 900
 const qemu_surface_width = 1024
 const qemu_surface_height = 768
 const qemu_window_width = 1024
@@ -186,6 +192,23 @@ fn open_wine_word2013(mut _ Desktop) !NativeApp {
 		failed: true
 		error_message: 'Stage licensed Word 2013 x64 media, then launch Word again.'
 	}
+}
+
+// Steam is Valve's x86 Linux client on the translators, staged by
+// build-steam-aarch64.sh. It is not in the default image.
+fn open_steam(mut _ Desktop) !NativeApp {
+	if C.access(c'/usr/bin/steam', C.X_OK) != 0 {
+		return &HostedX11App{
+			surface_width: steam_surface_width
+			surface_height: steam_surface_height
+			icon: 'asset:steam'
+			failed: true
+			error_message: 'Steam is not installed in this desktop image.'
+		}
+	}
+	return open_hosted_x11_app('steam', '/usr/bin/steam-hosted', steam_surface_width,
+		steam_surface_height, 'asset:steam', 'Installing Steam client…',
+		'Steam is not installed in this desktop image.', 'Steam exited.')
 }
 
 fn open_qemu_desktop(mut _ Desktop) !NativeApp {

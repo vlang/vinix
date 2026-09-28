@@ -1,0 +1,9 @@
+#!/bin/sh
+# /bin/bash for an image without a native bash: Steam's runtime scripts start
+# with #!/bin/bash, which the kernel resolves on the real root. Run them with
+# the Debian bash of the x86 glibc root through the translator.
+root="${VINIX_X86_64_ROOT:-/usr/libexec/vinix-steam/root}"
+export VINIX_X86_64_ROOT="$root"
+export VINIX_I386_ROOT="${VINIX_I386_ROOT:-$root}"
+export VINIX_X86_MULTIARCH=1
+exec "$root/usr/bin/bash" "$@"

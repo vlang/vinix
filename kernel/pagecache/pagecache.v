@@ -7,13 +7,13 @@ import klock
 
 pub const page_bytes = u64(4096)
 pub const default_capacity = 128
-// 256 MiB of cached blocks, reached by an 8 GiB device. A machine that runs
-// from its disk demand-pages hundreds of megabytes of executable out of it —
-// a browser's own libraries dwarf anything smaller — and a cache that cannot
-// hold that working set spends its time re-reading pages it has just dropped.
+// Up to 1 GiB of cached blocks, reached by a 16 GiB device. Steam's Chromium
+// helper maps a library larger than the old 256 MiB limit in each subprocess;
+// evicting its first pages while reading its last ones makes every new helper
+// read the library from disk again.
 // Growth stays bounded because the reclaimer hands clean pages back under
 // memory pressure.
-pub const max_capacity = u64(65536)
+pub const max_capacity = u64(262144)
 // How far writers may run ahead of the device. Past this many dirty pages,
 // EXT2 has the writing thread flush on its way back to userspace, holding no
 // lock. Every change to a directory is flushed the same way before the call
@@ -97,7 +97,7 @@ pub:
 // evicts the metadata the next one wants. Growth is bounded because the
 // reclaimer hands clean pages back under memory pressure.
 pub fn new_cache(device_bytes u64) &Cache {
-	mut pages := device_bytes / (128 * 1024)
+	mut pages := device_bytes / (64 * 1024)
 	if pages < u64(default_capacity) {
 		pages = u64(default_capacity)
 	}

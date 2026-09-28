@@ -1,0 +1,60 @@
+#!/bin/sh
+# Keep an X11 host alive while Steam's detached client runs. Valve's shell
+# launcher returns before the client exits, and its first updater exits after
+# installing the current client without starting the new one on Vinix.
+set -u
+
+launcher=${VINIX_STEAM_LAUNCHER:-/usr/bin/steam}
+home=${HOME:-/root}
+data=${STEAM_DATA_HOME:-${XDG_DATA_HOME:-$home/.local/share}}/Steam
+pidfile=$home/.steam/steam.pid
+installed=$data/package/steam_client_ubuntu12.installed
+bootstrap_log=$data/logs/bootstrap_log.txt
+installed_at_start=false
+[ -s "$installed" ] && installed_at_start=true
+
+launches=0
+while [ "$launches" -lt 2 ]; do
+    launches=$((launches + 1))
+    log_bytes=0
+    [ ! -f "$bootstrap_log" ] || log_bytes=$(wc -c < "$bootstrap_log")
+    "$launcher" "$@" || exit $?
+
+    # steam.sh may return just before it writes the client's PID file.
+    pid=
+    attempt=0
+    while [ "$attempt" -lt 60 ]; do
+        candidate=$(cat "$pidfile" 2>/dev/null || true)
+        case "$candidate" in
+            ''|0|*[!0-9]*) ;;
+            *)
+                if kill -0 "$candidate" 2>/dev/null; then
+                    pid=$candidate
+                    break
+                fi
+                ;;
+        esac
+        attempt=$((attempt + 1))
+        sleep 1
+    done
+
+    if [ -n "$pid" ]; then
+        while kill -0 "$pid" 2>/dev/null; do
+            sleep 2
+        done
+    fi
+
+    updated=false
+    if [ -f "$bootstrap_log" ] &&
+        tail -c +"$((log_bytes + 1))" "$bootstrap_log" 2>/dev/null | grep -q 'Update complete'; then
+        updated=true
+    fi
+    if [ "$launches" -eq 1 ] && [ -s "$installed" ] &&
+        { [ "$installed_at_start" = false ] || [ "$updated" = true ]; }; then
+        # Give Valve's updater time to release its lock after closing the
+        # original client, then start the installed client in this X display.
+        sleep 2
+        continue
+    fi
+    exit 0
+done

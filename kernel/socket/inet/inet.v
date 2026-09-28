@@ -9,6 +9,7 @@ import fs
 import ioctl
 import katomic
 import klock
+import lib
 import resource
 import socket.public as sock_pub
 import stat
@@ -105,6 +106,7 @@ __global (
 	net_lock       klock.Lock
 	sockets_lock   klock.Lock
 	sockets        [max_sockets]voidptr
+	socket_inode_counter = u64(1)
 	network_ready  = false
 	last_address   = u32(0)
 	// Whether the resolver file has actually reached the root init will see,
@@ -118,6 +120,54 @@ pub fn initialise() {
 	net_lock.acquire()
 	C.vinix_net_init()
 	net_lock.release()
+	fs.register_net_tcp_snapshot(proc_net_tcp_text)
+}
+
+// Linux tools match the inode in /proc/net/tcp with /proc/<pid>/fd links.
+// Both views must describe the same live Vinix socket.
+fn proc_net_tcp_text() string {
+	mut text := lib.new_text(4096)
+	text.add('  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode\n')
+	net_lock.acquire()
+	sockets_lock.acquire()
+	mut row := 0
+	for i := 0; i < max_sockets; i++ {
+		if sockets[i] == unsafe { nil } {
+			continue
+		}
+		socket := unsafe { &InetSocket(sockets[i]) }
+		if socket.socktype != sock_pub.sock_stream {
+			continue
+		}
+		mut local_address := u32(0)
+		mut local_port := u16(0)
+		if C.vinix_socket_local(socket.handle, &local_address, &local_port) != 0 || local_port == 0 {
+			continue
+		}
+		mut remote_address := u32(0)
+		mut remote_port := u16(0)
+		connected := C.vinix_socket_peer(socket.handle, &remote_address, &remote_port) == 0
+		if !connected && !socket.listening {
+			continue
+		}
+		text.add_unsigned(u64(row))
+		text.add(': ')
+		text.add_radix(u64(local_address), 16, 8)
+		text.add_byte(`:`)
+		text.add_radix(u64((local_port >> 8) | (local_port << 8)), 16, 4)
+		text.add_byte(` `)
+		text.add_radix(u64(remote_address), 16, 8)
+		text.add_byte(`:`)
+		text.add_radix(u64((remote_port >> 8) | (remote_port << 8)), 16, 4)
+		text.add(if connected { ' 01 ' } else { ' 0a ' })
+		text.add('00000000:00000000 00:00000000 00000000 0 0 ')
+		text.add_unsigned(socket.stat.ino)
+		text.add_byte(`\n`)
+		row++
+	}
+	sockets_lock.release()
+	net_lock.release()
+	return text.str()
 }
 
 fn register(mut socket InetSocket) bool {
@@ -127,6 +177,8 @@ fn register(mut socket InetSocket) bool {
 	}
 	for i := 0; i < max_sockets; i++ {
 		if sockets[i] == unsafe { nil } {
+			socket.stat.ino = socket_inode_counter
+			socket_inode_counter++
 			sockets[i] = voidptr(socket)
 			return true
 		}
@@ -312,6 +364,7 @@ fn new_with_handle(handle &C.vinix_socket, socktype int, protocol int) ?&InetSoc
 		socktype: socktype
 		protocol: protocol
 	}
+	socket.stat.mode = stat.ifsock | 0o777
 	if !register(mut socket) {
 		C.vinix_socket_free(handle)
 		unsafe { free(socket) }

@@ -1043,35 +1043,137 @@ pub fn start_program_node(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, p
 			stderr_path)
 	}
 
-	// ARM64 cannot enter an x86-64 ELF directly. Re-exec it through the native
-	// QEMU user-mode translator and its private x86-64 musl root. Doing this in
-	// the kernel exec path also catches helper programs that Wine starts itself,
-	// rather than only binaries launched through the shell wrapper.
+	// ARM64 cannot enter an x86 ELF directly. Re-exec it through the native
+	// QEMU user-mode translator of its word size and a private x86 root. Doing
+	// this in the kernel exec path also catches the helper programs Wine and
+	// Steam start themselves, rather than only binaries launched through a
+	// shell wrapper.
 	architecture := elf.architecture(prog) or { return exec_format_error(err) }
 	gpu_exec_trace(trace_gpu, 'validated ELF architecture')
-	if architecture == elf.arch_x86_64 {
-		translator := '/usr/bin/qemu-x86_64'
-		guest_root := '/usr/libexec/vinix-x86_64/root'
-		mut translated_argv := [translator, '-B', '0x100000000', '-L', guest_root,
-			path]
+	if architecture == elf.arch_x86_64 || architecture == elf.arch_i386 {
+		mut translator := '/usr/bin/qemu-x86_64'
+		mut guest_root := '/usr/libexec/vinix-x86_64/root'
+		mut root_variable := 'VINIX_X86_64_ROOT='
+		if architecture == elf.arch_i386 {
+			translator = '/usr/bin/qemu-i386'
+			guest_root = '/usr/libexec/vinix-i386/root'
+			root_variable = 'VINIX_I386_ROOT='
+		}
+		// The environment can name another root, the way the shell launchers
+		// let it: Steam runs in a glibc tree whose loader knows where its
+		// libraries are. The default musl roots are told through
+		// LD_LIBRARY_PATH.
+		mut own_root := false
+		mut has_library_path := false
+		mut library_path := ''
+		mut i386_preload := ''
+		mut x86_64_preload := ''
+		for environment_entry in envp {
+			if environment_entry.starts_with(root_variable)
+				&& environment_entry.len > root_variable.len {
+				guest_root = environment_entry[root_variable.len..]
+				own_root = true
+			} else if environment_entry.starts_with('LD_LIBRARY_PATH=') {
+				has_library_path = true
+				library_path = environment_entry['LD_LIBRARY_PATH='.len..]
+			} else if environment_entry.starts_with('VINIX_I386_PRELOAD=') {
+				i386_preload = environment_entry['VINIX_I386_PRELOAD='.len..]
+			} else if environment_entry.starts_with('VINIX_X86_64_PRELOAD=') {
+				x86_64_preload = environment_entry['VINIX_X86_64_PRELOAD='.len..]
+			}
+		}
+		multiarch_root := own_root && envp.contains('VINIX_X86_MULTIARCH=1')
+		guest_preload := if architecture == elf.arch_i386 { i386_preload } else { x86_64_preload }
+
+		mut translated_argv := [translator]
+		if architecture == elf.arch_x86_64 {
+			translated_argv << '-B'
+			translated_argv << '0x100000000'
+		}
+		translated_argv << '-L'
+		translated_argv << guest_root
+		if multiarch_root {
+			// QEMU's -E edits the emulated process's environment without
+			// making the native AArch64 translator load x86 libraries. A
+			// multiarch root has both word sizes, so choose the right one
+			// before the application or glibc can find native Vinix libs.
+			mut multiarch := 'x86_64-linux-gnu'
+			if architecture == elf.arch_i386 {
+				multiarch = 'i386-linux-gnu'
+			}
+			mut guest_library_path := '${guest_root}/usr/lib/${multiarch}:${guest_root}/lib/${multiarch}'
+			if library_path != '' {
+				guest_library_path += ':${library_path}'
+			}
+			translated_argv << '-E'
+			translated_argv << 'LD_LIBRARY_PATH=${guest_library_path}'
+			// Mesa opens DRI drivers itself rather than through the ELF loader.
+			// Give the guest the driver directory of its own word size, or an
+			// inherited native path can make it dlopen an AArch64 driver.
+			translated_argv << '-E'
+			translated_argv << 'LIBGL_DRIVERS_PATH=${guest_root}/usr/lib/${multiarch}/dri'
+			if guest_preload != '' {
+				// Each guest preload must match its word size and must never
+				// reach the native translator.
+				translated_argv << '-E'
+				translated_argv << 'LD_PRELOAD=${guest_preload}'
+			}
+		}
+		// argv[0] is the caller's to choose, as it is for a native program:
+		// a multicall binary or a script's `env bash` picks its behaviour by it.
+		if argv.len > 0 && argv[0] != path {
+			translated_argv << '-0'
+			translated_argv << argv[0]
+		}
+		translated_argv << path
 		if argv.len > 1 {
 			translated_argv << argv[1..]
 		}
 
-		mut translated_envp := envp.clone()
-		mut has_library_path := false
-		for environment_entry in translated_envp {
-			if environment_entry.starts_with('LD_LIBRARY_PATH=') {
-				has_library_path = true
-				break
+		mut translated_envp := []string{}
+		for environment_entry in envp {
+			if multiarch_root && (environment_entry.starts_with('LD_LIBRARY_PATH=')
+				|| (guest_preload != '' && environment_entry.starts_with('LD_PRELOAD='))) {
+				continue
 			}
+			translated_envp << environment_entry
 		}
-		if !has_library_path {
+		if !own_root && !has_library_path {
 			translated_envp << 'LD_LIBRARY_PATH=${guest_root}/lib:${guest_root}/usr/lib'
 		}
 
 		return start_program(execve, root, translator, translated_argv, translated_envp,
 			stdin_path, stdout_path, stderr_path)
+	}
+	// QEMU's -E preload belongs to the emulated x86 process. Its children may
+	// exec a native helper (for example Steam's /bin/sh uname wrapper), passing
+	// that LD_PRELOAD along. Do not make the AArch64 loader open an x86 library.
+	// A later x86 exec will receive the matching preload from the handoff above.
+	mut program_envp := envp
+	mut foreign_preload := ''
+	for entry in envp {
+		if entry.starts_with('LD_PRELOAD=') {
+			foreign_preload = entry['LD_PRELOAD='.len..]
+			break
+		}
+	}
+	mut omit_foreign_preload := false
+	if foreign_preload != '' {
+		for entry in envp {
+			if entry == 'VINIX_I386_PRELOAD=${foreign_preload}'
+				|| entry == 'VINIX_X86_64_PRELOAD=${foreign_preload}' {
+				omit_foreign_preload = true
+				break
+			}
+		}
+	}
+	if omit_foreign_preload {
+		program_envp = []string{cap: envp.len}
+		for entry in envp {
+			if !entry.starts_with('LD_PRELOAD=') {
+				program_envp << entry
+			}
+		}
 	}
 
 	gpu_exec_trace(trace_gpu, 'allocating replacement page map')
@@ -1181,7 +1283,10 @@ pub fn start_program_node(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, p
 		new_process.fds[2] = voidptr(stderr_fd)
 
 		sched.new_user_thread(new_process, true, entry_point, unsafe { nil }, 0, argv,
-			envp, auxval, true)?
+			program_envp, auxval, true)?
+		if omit_foreign_preload {
+			unsafe { program_envp.free() }
+		}
 
 		return new_process
 	} else {
@@ -1279,7 +1384,7 @@ pub fn start_program_node(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, p
 		inherited_sched := t.sched
 		gpu_exec_trace(trace_gpu, 'building replacement user thread and stack')
 		mut new_thread := sched.new_user_thread(curr_process, true, entry_point, unsafe { nil },
-			0, argv, envp, auxval, false)?
+			0, argv, program_envp, auxval, false)?
 		if trace_gpu {
 			println('exec[gpu]: replacement thread built pc=0x${new_thread.gpr_state.pc:x} sp=0x${new_thread.gpr_state.sp:x} tid=${new_thread.tid}')
 		}
@@ -1304,6 +1409,9 @@ pub fn start_program_node(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, p
 		unsafe {
 			argv.free()
 			envp.free()
+			if omit_foreign_preload {
+				program_envp.free()
+			}
 		}
 		gpu_exec_trace(trace_gpu, 'retiring original execve thread')
 		if trace_gpu {

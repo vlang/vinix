@@ -30,6 +30,8 @@ import event.eventstruct
 import memory.mmap
 import time
 
+pub type NetTcpSnapshot = fn () string
+
 // Matches what uname(2) reports, so a program that compares the two agrees
 // with itself.
 const uname_release = '0.1.0'
@@ -70,6 +72,7 @@ enum ProcFSKind {
 	environ
 	sysctl
 	sysrq_trigger
+	net_tcp
 }
 
 @[heap]
@@ -98,7 +101,7 @@ pub mut:
 	// On a /proc root and the process and thread directories under it, the
 	// pid namespace whose numbers name them; nil for the initial one.
 	view voidptr
-	// The text each open file of maps or smaps is reading; see snapshot_read().
+	// The text each open file of maps, smaps or tcp is reading; see snapshot_read().
 	snapshots []ProcFSSnapshot
 }
 
@@ -131,7 +134,12 @@ __global (
 	// can run from the middle of path resolution, which does not hold that lock
 	// and must not start to.
 	procfs_lock klock.Lock
+	net_tcp_snapshot NetTcpSnapshot = unsafe { nil }
 )
+
+pub fn register_net_tcp_snapshot(snapshot NetTcpSnapshot) {
+	net_tcp_snapshot = snapshot
+}
 
 fn (this ProcFS) instantiate() &FileSystem {
 	return &ProcFS{}
@@ -280,6 +288,8 @@ fn (mut this ProcFS) build_root(parent &VFSNode, name string, view voidptr) &VFS
 	mut sys_net_core := add_procfs_directory(mut sys_net, 'core')
 	add_procfs_text(mut sys_net_core, 'somaxconn', '4096\n')
 	build_net_sysctls(mut sys_net)
+	mut net := add_procfs_directory(mut root, 'net')
+	add_procfs_file(mut net, 'tcp', .net_tcp)
 
 	return root
 }
@@ -510,6 +520,12 @@ fn (this &ProcFSResource) contents() string {
 		.machine_stat {
 			return machine_stat_text()
 		}
+		.net_tcp {
+			if net_tcp_snapshot != unsafe { nil } {
+				return net_tcp_snapshot()
+			}
+			return '  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode\n'
+		}
 		.filesystems {
 			// The `nodev` column matters: a container runtime skips those when
 			// choosing what to mount for a rootfs.
@@ -611,7 +627,8 @@ fn (mut this ProcFSResource) read(_handle voidptr, buf voidptr, loc u64, count u
 		errno.set(errno.eisdir)
 		return none
 	}
-	if (this.kind == .maps || this.kind == .smaps) && _handle != unsafe { nil } {
+	if (this.kind == .maps || this.kind == .smaps || this.kind == .net_tcp)
+		&& _handle != unsafe { nil } {
 		return this.snapshot_read(_handle, buf, loc, count)
 	}
 
@@ -1564,4 +1581,3 @@ fn prune_directories(mut parent VFSNode, live []int) {
 		}
 	}
 }
-

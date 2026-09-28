@@ -605,10 +605,9 @@ fn has_other_threads(mut process proc.Process, current_thread &proc.Thread) bool
 // epoll_pwait, and each one left references on the sockets and pipes it was
 // watching, which then never closed, plus the thread's own kernel stack.
 //
-// A thread that does not leave within the grace period -- one busy in
-// userspace, which holds nothing of the kernel's -- is stopped where it is.
-// Its kernel stack is deliberately left allocated: it may still be parked
-// mid-syscall on it, and there is no safe moment to free it here.
+// After the grace period, only a thread stopped in userspace can be removed
+// directly. A sibling still in a syscall or page fault must unwind itself;
+// otherwise its filesystem and page-cache locks would be left held.
 fn kill_sibling_threads(mut current_process proc.Process, current_thread &proc.Thread) {
 	// Pinned while still on the list: any of them may leave and die by itself
 	// the moment the lock is let go, and its memory must not be handed to a new
@@ -655,11 +654,33 @@ fn kill_sibling_threads(mut current_process proc.Process, current_thread &proc.T
 	current_process.threads_lock.release()
 
 	for mut victim in victims {
-		// One that has started leaving by itself -- it may have been just about
-		// to when the grace period ran out -- gives back its own tid and root.
-		// Doing that here as well freed them twice, and could stop and free the
-		// tid of whatever new thread had taken its place. Wait for it to be off
-		// the list instead, and leave it alone.
+		if katomic.load(&victim.exit_claimed) != 0 {
+			wait_for_thread_to_leave(mut current_process, victim)
+			proc.unpin_thread(victim)
+			continue
+		}
+		// Quiesce the target before deciding where it was stopped. A thread
+		// faulting a mapped file has no syscall number, but its saved PSTATE
+		// still says EL1. Stopping it there strands EXT2's lock and freeing its
+		// address space or stack leaves every later disk reader spinning.
+		sched.intercept_thread(victim) or {}
+		if katomic.load(&victim.exit_claimed) != 0 {
+			sched.enqueue_thread(victim, true)
+			wait_for_thread_to_leave(mut current_process, victim)
+			proc.unpin_thread(victim)
+			continue
+		}
+		if victim.syscall_nr != -1 || victim.gpr_state.pstate & 0xf != 0 {
+			// The syscall or page fault owns kernel references and locks. Let it
+			// resume and leave through the ordinary must_exit path before the
+			// process tears down what it is using.
+			sched.enqueue_thread(victim, true)
+			wait_for_thread_to_leave(mut current_process, victim)
+			proc.unpin_thread(victim)
+			continue
+		}
+		// One that has started leaving by itself gives back its own tid and
+		// root. Wait for it rather than tearing down its address space early.
 		if !proc.claim_thread_exit(victim) {
 			wait_for_thread_to_leave(mut current_process, victim)
 			proc.unpin_thread(victim)
@@ -668,7 +689,6 @@ fn kill_sibling_threads(mut current_process proc.Process, current_thread &proc.T
 		// Marked first so that an event trigger racing with us cannot put the
 		// thread back on the run queue behind our back.
 		katomic.store(mut &victim.is_dead, true)
-		sched.intercept_thread(victim) or {}
 		sched.dequeue_thread(victim)
 		// It may still be on another CPU finishing what it was doing; the
 		// descriptors and address space it could reach are torn down next.
@@ -704,12 +724,12 @@ fn thread_listed(mut process proc.Process, t &proc.Thread) bool {
 	return false
 }
 
-// A thread that has claimed its own exit has nothing left to block on, so it
-// is off the list within moments. The bound is only there so that a teardown
-// can never hang on one.
+// A process cannot release its address space while a sibling still runs in
+// the kernel on it. The sibling was told to exit and woken above; wait until
+// it has left the thread list, even if a loaded guest needs longer than the
+// usual grace period to finish its file I/O.
 fn wait_for_thread_to_leave(mut process proc.Process, t &proc.Thread) {
-	deadline := time.monotonic_ns() + sibling_exit_grace_ns
-	for thread_listed(mut process, t) && time.monotonic_ns() < deadline {
+	for thread_listed(mut process, t) {
 		mut timer := time.new_timer(time.TimeSpec{
 			tv_sec:  0
 			tv_nsec: 1000000

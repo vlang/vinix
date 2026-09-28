@@ -13,6 +13,7 @@ import katomic
 import time
 import errno
 import memory.mmap as mmap_mod
+import file
 
 @[packed]
 struct EXT2Superblock {
@@ -254,8 +255,11 @@ fn (mut this EXT2Resource) ioctl(handle voidptr, request u64, argp voidptr) ?int
 fn (mut this EXT2Resource) unref(handle voidptr) ? {
 	if katomic.dec(mut &this.refcount) {
 		// The VFS name owns one reference. Reaching it means the last open file
-		// description closed; make ordinary buffered writes persistent.
-		if this.refcount == 1 {
+		// description closed. A read-only close has written no data and must
+		// not flush the entire filesystem cache: package installers close many
+		// large input archives while other files still have dirty pages.
+		if this.refcount == 1 && handle != unsafe { nil }
+			&& (unsafe { &file.Handle(handle) }.flags & resource_mod.o_accmode) in [resource_mod.o_wronly, resource_mod.o_rdwr] {
 			this.sync(handle)?
 		}
 		return
@@ -403,7 +407,7 @@ fn (mut this EXT2Filesystem) populate(node &vfs.VFSNode) {
 		resource.stat.size = u64(inode.size32l) | (u64(inode.size32h) << 32)
 		resource.stat.nlink = inode.hard_link_cnt
 		resource.stat.blksize = this.block_size
-		resource.stat.blocks = lib.div_roundup(resource.stat.size, resource.stat.blksize)
+		resource.stat.blocks = inode.sector_cnt
 
 		resource.stat.atim = time.TimeSpec{i64(inode.access_time), 0}
 		resource.stat.ctim = time.TimeSpec{i64(inode.creation_time), 0}
@@ -496,7 +500,7 @@ fn (mut this EXT2Filesystem) mount(parent &vfs.VFSNode, name string, source &vfs
 
 	resource.stat.size = u64(this.root_inode.size32l) | (u64(this.root_inode.size32h) << 32)
 	resource.stat.blksize = this.block_size
-	resource.stat.blocks = lib.div_roundup(resource.stat.size, resource.stat.blksize)
+	resource.stat.blocks = this.root_inode.sector_cnt
 	resource.stat.dev = this.dev_id
 	resource.stat.mode = this.root_inode.permissions
 	resource.stat.uid = this.root_inode.user_id
@@ -522,8 +526,7 @@ fn (mut this EXT2Filesystem) mount(parent &vfs.VFSNode, name string, source &vfs
 // pointers yields whatever the target's characters happen to address, so a
 // volume prepared on the host has to be recognised rather than followed.
 //
-// This driver's own symlinks are slow ones; both spellings are valid, and this
-// only has to read what it is given.
+// Read the inline form used by ext2 tools and by this driver's symlink writer.
 fn (inode &EXT2Inode) fast_symlink_target() ?string {
 	if inode.sector_cnt != 0 || inode.size32l == 0
 		|| inode.size32l > u32(sizeof(inode.blocks)) {
@@ -541,6 +544,11 @@ fn (mut inode EXT2Inode) read(mut filesystem EXT2Filesystem, buf voidptr, off u6
 
 	if (off + count) > inode.size32l {
 		count = inode.size32l - off
+	}
+	if stat.islnk(u32(inode.permissions)) && inode.sector_cnt == 0
+		&& inode.size32l <= u32(sizeof(inode.blocks)) {
+		unsafe { C.memcpy(buf, voidptr(u64(&inode.blocks[0]) + off), count) }
+		return i64(count)
 	}
 
 	for headway := u64(0); headway < count;  {
@@ -714,6 +722,7 @@ fn (mut inode EXT2Inode) set_block(mut filesystem EXT2Filesystem, inode_index u3
 
 			if inode.blocks[14] == 0 {
 				inode.blocks[14] = filesystem.allocate_block() or { return none }
+				inode.sector_cnt += u32(filesystem.block_size / filesystem.backing_device.resource.stat.blksize)
 
 				inode.write_entry(mut filesystem, inode_index) or { return none }
 			}
@@ -722,6 +731,7 @@ fn (mut inode EXT2Inode) set_block(mut filesystem EXT2Filesystem, inode_index u3
 
 			if single_indirect_index == 0 {
 				new_block := filesystem.allocate_block() or { return none }
+				inode.sector_cnt += u32(filesystem.block_size / filesystem.backing_device.resource.stat.blksize)
 
 				filesystem.raw_device_write(voidptr(&new_block), inode.blocks[14] * filesystem.block_size + double_indirect_index * 4, 4) or { return none }
 
@@ -732,6 +742,7 @@ fn (mut inode EXT2Inode) set_block(mut filesystem EXT2Filesystem, inode_index u3
 
 			if indirect_block == 0 {
 				new_block := filesystem.allocate_block() or { return none }
+				inode.sector_cnt += u32(filesystem.block_size / filesystem.backing_device.resource.stat.blksize)
 
 				filesystem.raw_device_write(voidptr(&indirect_block), double_indirect_index * filesystem.block_size + single_indirect_index * 4, 4) or { return none }
 
@@ -745,6 +756,7 @@ fn (mut inode EXT2Inode) set_block(mut filesystem EXT2Filesystem, inode_index u3
 
 		if inode.blocks[13] == 0 {
 			inode.blocks[13] = filesystem.allocate_block() or { return none }
+			inode.sector_cnt += u32(filesystem.block_size / filesystem.backing_device.resource.stat.blksize)
 
 			inode.write_entry(mut filesystem, inode_index) or { return none }
 		}
@@ -753,6 +765,7 @@ fn (mut inode EXT2Inode) set_block(mut filesystem EXT2Filesystem, inode_index u3
 
 		if indirect_block == 0 {
 			new_block := filesystem.allocate_block() or { return none }
+			inode.sector_cnt += u32(filesystem.block_size / filesystem.backing_device.resource.stat.blksize)
 
 			filesystem.raw_device_write(voidptr(&new_block), inode.blocks[13] * filesystem.block_size + single_index * 4, 4) or { return none }
 
@@ -765,6 +778,7 @@ fn (mut inode EXT2Inode) set_block(mut filesystem EXT2Filesystem, inode_index u3
 	} else {
 		if inode.blocks[12] == 0 {
 			inode.blocks[12] = filesystem.allocate_block() or { return none }
+			inode.sector_cnt += u32(filesystem.block_size / filesystem.backing_device.resource.stat.blksize)
 
 			inode.write_entry(mut filesystem, inode_index) or { return none }
 		}

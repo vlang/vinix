@@ -688,7 +688,12 @@ fn test_available_utility_applications_and_shortcut_layouts() {
 	assert available_apps[21].keyboard && available_apps[21].pointer
 	assert available_apps[22].title == 'Vinix in QEMU'
 	assert available_apps[22].process_name == 'vinix-qemu-window'
-	assert available_apps.len == 23
+	assert available_apps[23].title == 'Steam'
+	assert available_apps[23].process_name == 'vinix-steam'
+	assert available_apps[23].icon == 'asset:steam'
+	assert available_apps[23].keyboard && available_apps[23].pointer
+	assert available_apps[23].polling
+	assert available_apps.len == 24
 	assert app_start_actions.len == available_apps.len
 	assert app_shortcut_actions.len == available_apps.len
 	assert shortcut_rows_for_height(720) == 8

@@ -1,0 +1,21 @@
+#!/bin/sh
+# Stand-in for zenity on Steam's PATH. Steam's scripts use zenity for their
+# progress bars and error prompts and fall back to xterm, then to reading a
+# key from standard input, when it is missing. None of those belong under the
+# desktop, so report the message on standard error and carry on.
+text=''
+progress=0
+for argument do
+    case "$argument" in
+        --text=*) text="${argument#--text=}" ;;
+        --progress) progress=1 ;;
+    esac
+done
+if [ -n "$text" ]; then
+    printf 'steam: %s\n' "$text" >&2
+fi
+if [ "$progress" -eq 1 ]; then
+    # tar pipes its checkpoints here until the archive is unpacked.
+    cat > /dev/null
+fi
+exit 0

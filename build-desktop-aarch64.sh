@@ -64,6 +64,7 @@ ASAHI_STAGING="${VINIX_ASAHI_STAGING:-$SCRIPT_DIR/build-aarch64-asahi/staging}"
 HYPRLAND_STAGING="${VINIX_HYPRLAND_STAGING:-$SCRIPT_DIR/build-aarch64-hyprland/staging}"
 BLENDER_NATIVE_STAGING="${VINIX_BLENDER_NATIVE_STAGING:-$SCRIPT_DIR/build-aarch64-blender-native/staging}"
 X86_TRANSLATION_STAGING="${VINIX_X86_TRANSLATION_STAGING:-$SCRIPT_DIR/build-aarch64-x86-translation/staging}"
+STEAM_STAGING="${VINIX_STEAM_STAGING:-$SCRIPT_DIR/build-aarch64-steam/staging}"
 QEMU_SYSTEM_STAGING="${VINIX_QEMU_SYSTEM_STAGING:-$SCRIPT_DIR/build-aarch64-qemu-system/staging}"
 GPU_SYSROOT="${VINIX_GPU_SYSROOT:-$SCRIPT_DIR/build-aarch64-x11/sysroot}"
 
@@ -90,7 +91,7 @@ path_generation() {
         return 0
     fi
     if [ "$path" = "$X11_STAGING" ] || [ "$path" = "$GPU_SYSROOT" ] ||
-       [ "$path" = "$DOOM_STAGING" ]; then
+       [ "$path" = "$DOOM_STAGING" ] || [ "$path" = "$STEAM_STAGING" ]; then
         python3 "$SCRIPT_DIR/build-support/content-key.py" --metadata "$path"
         return 0
     fi
@@ -113,6 +114,7 @@ write_staging_cache_manifest() {
     printf 'minecraft=%s\n' "$WITH_MINECRAFT"
     printf 'asahi=%s\n' "$WITH_ASAHI_GPU"
     printf 'x86=%s\n' "$WITH_X86_TRANSLATION"
+    printf 'steam=%s\n' "$WITH_STEAM"
     printf 'qemu_system=%s\n' "$WITH_QEMU_SYSTEM"
     for input in \
         "$BASE_INITRAMFS" "$DEVTOOLS_ARCHIVE" "$SYSROOT" \
@@ -121,7 +123,7 @@ write_staging_cache_manifest() {
         "$FIREFOX_STAGING" "$CHROMIUM_STAGING" "$LIBREOFFICE_STAGING" \
         "$MINECRAFT_STAGING" "$ASAHI_STAGING" "$HYPRLAND_STAGING" \
         "$DOOM_STAGING" \
-        "$BLENDER_NATIVE_STAGING" "$X86_TRANSLATION_STAGING" \
+        "$BLENDER_NATIVE_STAGING" "$X86_TRANSLATION_STAGING" "$STEAM_STAGING" \
         "$QEMU_SYSTEM_STAGING" \
         "$GPU_SYSROOT"; do
         printf '%s=%s\n' "$input" "$(path_generation "$input")"
@@ -150,6 +152,7 @@ merge_staging_tree() {
 MAKE_INITRAMFS=1
 COMPACT_INITRAMFS=0
 WITH_X86_TRANSLATION=0
+WITH_STEAM=0
 WITH_QEMU_SYSTEM=0
 WITH_CHROMIUM=0
 WITH_LIBREOFFICE=0
@@ -164,6 +167,7 @@ for arg in "$@"; do
         --no-initramfs) MAKE_INITRAMFS=0 ;;
         --compact-initramfs) COMPACT_INITRAMFS=1 ;;
         --with-x86-translation) WITH_X86_TRANSLATION=1 ;;
+        --with-steam) WITH_STEAM=1 ;;
         --with-qemu-system) WITH_QEMU_SYSTEM=1 ;;
         --with-chromium) WITH_CHROMIUM=1 ;;
         --with-libreoffice) WITH_LIBREOFFICE=1 ;;
@@ -171,13 +175,14 @@ for arg in "$@"; do
         --with-asahi-gpu) WITH_ASAHI_GPU=1 ;;
         --wifi-bundle=*) WIFI_BUNDLE="${arg#*=}" ;;
         --help|-h)
-            echo "usage: $0 [--no-initramfs] [--compact-initramfs] [--with-chromium] [--with-libreoffice] [--with-minecraft] [--with-asahi-gpu] [--with-x86-translation] [--with-qemu-system] [--wifi-bundle=DIR]"
+            echo "usage: $0 [--no-initramfs] [--compact-initramfs] [--with-chromium] [--with-libreoffice] [--with-minecraft] [--with-asahi-gpu] [--with-x86-translation] [--with-steam] [--with-qemu-system] [--wifi-bundle=DIR]"
             echo "  --compact-initramfs stages the desktop, core developer tools and Firefox"
             echo "  --with-chromium adds a previously staged Chromium; otherwise it is a pkg install"
             echo "  --with-libreoffice adds a previously staged LibreOffice; otherwise it is a pkg install"
             echo "  --with-minecraft adds a previously staged Minecraft; otherwise it is a pkg install"
             echo "  --with-asahi-gpu overlays the Apple GPU Mesa; only correct for an M1 image"
             echo "  --with-x86-translation adds a previously built x86/Wine runtime"
+            echo "  --with-steam adds a previously staged Steam client and its x86 glibc runtime"
             echo "  --with-qemu-system adds native QEMU and UEFI firmware for nested Vinix"
             echo "  --wifi-bundle stages a package.py output and loads it before the desktop"
             echo "  VINIX_REFRESH_DESKTOP_STAGING=1 discards the cached assembled layers"
@@ -200,8 +205,8 @@ case "$REFRESH_STAGING" in
 esac
 
 if [ "$MAKE_INITRAMFS" -eq 0 ] &&
-   { [ -n "$WIFI_BUNDLE" ] || [ "$WITH_X86_TRANSLATION" -eq 1 ] || [ "$WITH_QEMU_SYSTEM" -eq 1 ]; }; then
-    echo "ERROR: --wifi-bundle, --with-x86-translation and --with-qemu-system require initramfs generation" >&2
+   { [ -n "$WIFI_BUNDLE" ] || [ "$WITH_X86_TRANSLATION" -eq 1 ] || [ "$WITH_STEAM" -eq 1 ] || [ "$WITH_QEMU_SYSTEM" -eq 1 ]; }; then
+    echo "ERROR: --wifi-bundle, --with-x86-translation, --with-steam and --with-qemu-system require initramfs generation" >&2
     exit 1
 fi
 
@@ -596,6 +601,20 @@ if [ "$WITH_X86_TRANSLATION" -eq 1 ] &&
     echo "Run ./build-x86-translation-aarch64.sh first." >&2
     exit 1
 fi
+if [ "$WITH_STEAM" -eq 1 ] &&
+   { [ ! -x "$STEAM_STAGING/usr/bin/steam" ] ||
+     [ ! -x "$STEAM_STAGING/usr/libexec/vinix-steam/root/usr/bin/bash" ]; }; then
+    echo "ERROR: --with-steam needs $STEAM_STAGING/usr/bin/steam and its x86 glibc root" >&2
+    echo "Run ./build-steam-aarch64.sh first." >&2
+    exit 1
+fi
+if [ "$WITH_STEAM" -eq 1 ] &&
+   { [ ! -x "$X86_TRANSLATION_STAGING/usr/bin/qemu-i386" ] ||
+     [ ! -x "$X86_TRANSLATION_STAGING/usr/bin/qemu-x86_64" ]; }; then
+    echo "ERROR: --with-steam needs both x86 translators in $X86_TRANSLATION_STAGING" >&2
+    echo "Run ./build-x86-translation-aarch64.sh --translator-only first." >&2
+    exit 1
+fi
 if [ "$WITH_QEMU_SYSTEM" -eq 1 ] &&
    { [ ! -x "$QEMU_SYSTEM_STAGING/usr/bin/qemu-system-aarch64" ] ||
      [ ! -x "$QEMU_SYSTEM_STAGING/usr/bin/vinix-qemu" ] ||
@@ -846,7 +865,7 @@ if [ "$REUSE_STAGING" -eq 0 ]; then
 
     # The translator is architecture-isolated: its x86-64 libraries live below
     # /usr/libexec, so they cannot replace native ARM64 libraries.
-    if { [ "$COMPACT_INITRAMFS" -eq 0 ] || [ "$WITH_X86_TRANSLATION" -eq 1 ]; } &&
+    if { [ "$COMPACT_INITRAMFS" -eq 0 ] || [ "$WITH_X86_TRANSLATION" -eq 1 ] || [ "$WITH_STEAM" -eq 1 ]; } &&
        [ -x "$X86_TRANSLATION_STAGING/usr/bin/qemu-x86_64" ]; then
         echo "==> Staging x86-64 translation layer"
         merge_staging_tree "$X86_TRANSLATION_STAGING"
@@ -876,6 +895,20 @@ if [ "$REUSE_STAGING" -eq 0 ]; then
         office_vsta_metadata="$STAGING/root/.wine-word2013-x86_64/drive_c/Program Files (x86)/Common Files/Microsoft Shared/VSTA/AppInfoDocument/Microsoft.VisualStudio.Tools.Office.AppInfoDocument/Microsoft.VisualStudio.Tools.Office.AppInfoDocument.v9.0.dll"
         if [ -f "$office_vsta_metadata" ]; then
             rm -f "$office_vsta_metadata"
+        fi
+    fi
+
+    # Steam is Valve's x86 glibc client on the same translators, with its own
+    # Debian root below /usr/libexec; nothing of it replaces a native file.
+    if [ "$WITH_STEAM" -eq 1 ]; then
+        echo "==> Staging Steam"
+        merge_staging_tree "$STEAM_STAGING"
+        # Valve's runtime scripts start with #!/bin/bash. An image without a
+        # bash of its own gets one that runs the Debian bash through the
+        # translator; an installed native bash is left alone.
+        if [ ! -e "$STAGING/bin/bash" ] && [ ! -e "$STAGING/usr/bin/bash" ]; then
+            install -m755 "$STEAM_STAGING/usr/libexec/vinix-steam/bash" \
+                "$STAGING/bin/bash"
         fi
     fi
 
@@ -1020,7 +1053,7 @@ install -m644 "$SCRIPT_DIR/desktop/assets/blender.qoi" \
 install -m644 "$SCRIPT_DIR/desktop/assets/minecraft.qoi" \
     "$STAGING/usr/share/vinix/icons/minecraft.qoi"
 
-for app_icon in terminal settings activity calculator vspace editor files clock calendar capture doom; do
+for app_icon in terminal settings activity calculator vspace editor files clock calendar capture doom steam; do
     install -m644 "$SCRIPT_DIR/desktop/assets/${app_icon}.qoi" \
         "$STAGING/usr/share/vinix/icons/${app_icon}.qoi"
 done
@@ -1180,6 +1213,20 @@ if [ "$WITH_X86_TRANSLATION" -eq 1 ]; then
             exit 1
         fi
     done
+fi
+if [ "$WITH_STEAM" -eq 1 ]; then
+    for command_path in usr/bin/qemu-i386 usr/bin/qemu-x86_64 usr/bin/steam \
+        usr/bin/steam-smoke usr/libexec/vinix-steam/root/usr/bin/bash \
+        usr/libexec/vinix-steam/root/lib/ld-linux.so.2 bin/bash; do
+        if [ ! -e "$STAGING/$command_path" ]; then
+            echo "ERROR: Steam desktop is missing /$command_path" >&2
+            exit 1
+        fi
+    done
+    if [ ! -f "$STAGING/usr/lib/steam/bootstraplinux_ubuntu12_32.tar.xz" ]; then
+        echo "ERROR: Steam desktop is missing Valve's bootstrap archive" >&2
+        exit 1
+    fi
 fi
 
 if [ "$COMPACT_INITRAMFS" -eq 0 ] && [ -x "$HYPRLAND_STAGING/usr/bin/start-hyprland-vinix" ]; then
@@ -1343,6 +1390,7 @@ CONTENT_KEY_INPUTS=(
     "$SCRIPT_DIR/build-support/libreoffice"
     "$SCRIPT_DIR/build-support/chromium"
     "$SCRIPT_DIR/build-support/hyprland"
+    "$SCRIPT_DIR/build-support/steam"
     "$SCRIPT_DIR/gl-triangle/run-m1-agx-smoke"
     "$SCRIPT_DIR/gl-triangle/egl_triangle.c"
     "$SCRIPT_DIR/tests/browsers/firefox-smoke.html"
@@ -1354,6 +1402,10 @@ if [ -n "$WIFI_BUNDLE" ]; then
 fi
 python3 "$SCRIPT_DIR/build-support/content-key.py" \
     "${CONTENT_KEY_INPUTS[@]}" > "$CONTENT_KEY_EXPECTED"
+if [ "$WITH_STEAM" -eq 1 ]; then
+    printf 'steam-layer=%s\n' "$(path_generation "$STEAM_STAGING")" \
+        >> "$CONTENT_KEY_EXPECTED"
+fi
 
 if [ "$REUSE_STAGING" -eq 1 ] &&
    [ -f "$CONTENT_KEY" ] && cmp -s "$CONTENT_KEY_EXPECTED" "$CONTENT_KEY" &&
@@ -1386,7 +1438,14 @@ echo "    $DESKTOP_INITRAMFS ($(file_size "$DESKTOP_INITRAMFS") bytes)"
 # looking partial image for deploy-m1-efi.sh.
 if [ "$COMPACT_INITRAMFS" -eq 1 ]; then
     DESKTOP_INITRAMFS_GZ_TMP="$(mktemp "$(dirname "$DESKTOP_INITRAMFS_GZ")/.initramfs-desktop.tar.gz.XXXXXX")"
-    if ! gzip -n -6 -c "$DESKTOP_INITRAMFS" > "$DESKTOP_INITRAMFS_GZ_TMP"; then
+    # Large optional layers such as Steam make repeat VM builds expensive.
+    # Keep the release default while allowing a faster local test archive.
+    gzip_level="${VINIX_DESKTOP_GZIP_LEVEL:-6}"
+    case "$gzip_level" in
+        [1-9]) ;;
+        *) echo "ERROR: VINIX_DESKTOP_GZIP_LEVEL must be 1 through 9" >&2; exit 2 ;;
+    esac
+    if ! gzip -n "-$gzip_level" -c "$DESKTOP_INITRAMFS" > "$DESKTOP_INITRAMFS_GZ_TMP"; then
         rm -f "$DESKTOP_INITRAMFS_GZ_TMP"
         exit 1
     fi

@@ -49,7 +49,10 @@ const mmio_slot_size = u64(0x200)
 const mmio_slot_count = u64(32)
 const queue_align = u64(4096)
 const max_transfer = u64(128 * 1024)
-const request_timeout_ns = u64(5_000_000_000)
+// A loaded host can pause the VM for several seconds while large Steam and
+// browser libraries fault in from the disk image. Keep an outstanding request
+// alive across those pauses instead of reporting a spurious I/O failure.
+const request_timeout_ns = u64(30_000_000_000)
 
 @[packed]
 struct RequestHeader {
@@ -166,7 +169,8 @@ fn (mut device VirtioBlockDevice) collect_one() bool {
 			break
 		}
 		spins++
-		if spins > 100_000_000 || time.monotonic_ns() >= deadline {
+		if spins > 1_000_000_000 || time.monotonic_ns() >= deadline {
+			uart.puts(c'virtio-blk: request timed out\n')
 			return false
 		}
 	}

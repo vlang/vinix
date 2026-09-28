@@ -131,7 +131,9 @@ fn (mut filesystem EXT2Filesystem) dir_add(mut parent EXT2Inode, parent_index u3
 			}
 			if entry.inode_index == 0 && record >= needed {
 				mut used := record
-				if record - needed >= sizeof(EXT2DirectoryEntry) {
+				// e2fsck requires a free record to hold at least one
+				// name byte, even though its name length is zero.
+				if record - needed >= 12 {
 					used = needed
 					mut tail := unsafe { &EXT2DirectoryEntry(u64(entry) + used) }
 					fill_dir_entry(tail, 0, 0, '', u16(record - used))
@@ -255,7 +257,7 @@ fn resource_from_inode(filesystem &EXT2Filesystem, inode_index u32,
 	res.stat.size = i64(u64(inode.size32l) | (u64(inode.size32h) << 32))
 	res.stat.nlink = inode.hard_link_cnt
 	res.stat.blksize = i64(filesystem.block_size)
-	res.stat.blocks = i64(lib.div_roundup(u64(res.stat.size), filesystem.block_size))
+	res.stat.blocks = inode.sector_cnt
 	res.stat.atim = time.TimeSpec{i64(inode.access_time), 0}
 	res.stat.ctim = time.TimeSpec{i64(inode.creation_time), 0}
 	res.stat.mtim = time.TimeSpec{i64(inode.mod_time), 0}
@@ -302,10 +304,21 @@ fn (mut filesystem EXT2Filesystem) create_persistent(parent &vfs.VFSNode,
 			return unsafe { nil }
 		}
 	} else if stat.islnk(mode) && symlink_target.len != 0 {
-		inode.write(mut filesystem, symlink_target.str, inode_index, 0,
-			u64(symlink_target.len)) or {
-			inode.free_entry(mut filesystem, inode_index) or {}
-			return unsafe { nil }
+		if symlink_target.len <= sizeof(inode.blocks) {
+			// ext2 stores short symlink targets in the inode's block-pointer
+			// array. e2fsck rejects a short symlink backed by a data block.
+			unsafe { C.memcpy(&inode.blocks[0], symlink_target.str, u64(symlink_target.len)) }
+			inode.size32l = u32(symlink_target.len)
+			inode.write_entry(mut filesystem, inode_index) or {
+				inode.free_entry(mut filesystem, inode_index) or {}
+				return unsafe { nil }
+			}
+		} else {
+			inode.write(mut filesystem, symlink_target.str, inode_index, 0,
+				u64(symlink_target.len)) or {
+				inode.free_entry(mut filesystem, inode_index) or {}
+				return unsafe { nil }
+			}
 		}
 	}
 

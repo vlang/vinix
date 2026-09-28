@@ -75,6 +75,7 @@ pub const abi_gnu = 0x03
 fn supported_osabi(osabi u8) bool {
 	return osabi == abi_sysv || osabi == abi_gnu
 }
+pub const arch_i386 = 0x03
 pub const arch_x86_64 = 0x3e
 pub const arch_aarch64 = 0xb7
 pub const bits_le = 0x01
@@ -191,8 +192,11 @@ pub fn architecture(_res &resource.Resource) !u16 {
 	if unsafe { C.memcmp(&header.ident, c'\177ELF', 4) } != 0 {
 		return error('elf: Invalid magic')
 	}
-	if header.ident[ei_class] != 0x02 || header.ident[ei_data] != bits_le
-		|| !supported_osabi(header.ident[ei_osabi]) {
+	// The machine of a 32-bit file is in the same place as a 64-bit one's;
+	// the exec path asks so it can hand i386 programs to their translator.
+	// Loading one natively is still refused by load.
+	if (header.ident[ei_class] != 0x01 && header.ident[ei_class] != 0x02)
+		|| header.ident[ei_data] != bits_le || !supported_osabi(header.ident[ei_osabi]) {
 		return error('elf: Unsupported ELF file')
 	}
 

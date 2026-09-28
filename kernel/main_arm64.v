@@ -225,6 +225,13 @@ fn kmain_thread(qemu_platform bool, acpi_platform bool) {
 		}
 	}
 
+	// Shared-memory files need tmpfs's paged backing. A regular file left on
+	// devtmpfs grows as one contiguous allocation; Chromium creates segments
+	// larger than that allocator can reliably extend. Mount this after the
+	// disk-root handoff so both boot modes use the same /dev/shm.
+	fs.create(vfs_root, '/dev/shm', 0o1777 | stat.ifdir) or {}
+	fs.mount(vfs_root, '', '/dev/shm', 'tmpfs') or {}
+
 	// /sys after the root is settled rather than alongside /dev and /proc: a
 	// disk root replaces the tree those two are carried across into, and this
 	// one has nothing in it that the block device was read through.
