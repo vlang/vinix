@@ -57,12 +57,12 @@ const minecraft_surface_height = 720
 // title bar and the Vinix taskbar visible.
 const minecraft_window_width = 1976
 const minecraft_window_height = 1113
-// Steam's client lays its library and store out for a 1280x800 minimum; the
-// same surface the browsers get leaves it a little room.
-const steam_surface_width = 1280
-const steam_surface_height = 900
-const steam_window_width = 1280
-const steam_window_height = 900
+// Steam's sign-in window is 700x440. Match its private X11 root and native
+// frame so the root background does not surround the client window.
+const steam_surface_width = 700
+const steam_surface_height = 440
+const steam_window_width = 700
+const steam_window_height = 440
 const qemu_surface_width = 1024
 const qemu_surface_height = 768
 const qemu_window_width = 1024
