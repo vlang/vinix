@@ -15,6 +15,7 @@ cat > "$VINIX_STEAM_LAUNCHER" <<'FAKE'
 count=$(cat "$HOME/count" 2>/dev/null || echo 0)
 count=$((count + 1))
 echo "$count" > "$HOME/count"
+printf '<%s>\n' "$*" >> "$HOME/args"
 if [ "$count" -eq 1 ] && [ "${INSTALL_ON_FIRST:-0}" -eq 1 ]; then
     mkdir -p "$HOME/.local/share/Steam/package"
     echo installed > "$HOME/.local/share/Steam/package/steam_client_ubuntu12.installed"
@@ -39,8 +40,11 @@ PY
     echo 'the hosted launcher did not restart after the first update' >&2
     exit 1
 }
+[ "$(sed -n '1p' "$HOME/args")" = '<>' ] || exit 1
+[ "$(sed -n '2p' "$HOME/args")" = '<-noverifyfiles -nobootstrapperupdate>' ] || exit 1
 
 echo 0 > "$HOME/count"
+rm "$HOME/args"
 INSTALL_ON_FIRST=0 python3 - "$repo/build-support/steam/steam-hosted" <<'PY'
 import os
 import subprocess
@@ -52,8 +56,10 @@ PY
     echo 'an installed client was launched more than once' >&2
     exit 1
 }
+[ "$(cat "$HOME/args")" = '<-noverifyfiles -nobootstrapperupdate>' ] || exit 1
 
 echo 0 > "$HOME/count"
+rm "$HOME/args"
 UPDATE_ON_FIRST=1 python3 - "$repo/build-support/steam/steam-hosted" <<'PY'
 import os
 import subprocess
@@ -65,4 +71,7 @@ PY
     echo 'the hosted launcher did not restart after repairing an installed client' >&2
     exit 1
 }
+[ "$(wc -l < "$HOME/args" | tr -d ' ')" = 2 ] || exit 1
+[ "$(sed -n '1p' "$HOME/args")" = '<-noverifyfiles -nobootstrapperupdate>' ] || exit 1
+[ "$(sed -n '2p' "$HOME/args")" = '<-noverifyfiles -nobootstrapperupdate>' ] || exit 1
 echo 'Steam hosted launcher tests passed.'

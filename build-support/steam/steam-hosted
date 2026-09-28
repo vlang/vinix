@@ -14,10 +14,18 @@ installed_at_start=false
 [ -s "$installed" ] && installed_at_start=true
 
 launches=0
+installed_flags_added=false
 while [ "$launches" -lt 2 ]; do
     launches=$((launches + 1))
     log_bytes=0
     [ ! -f "$bootstrap_log" ] || log_bytes=$(wc -c < "$bootstrap_log")
+    # The installed client still checks Valve's update manifest with these
+    # flags. Its full verification path can detach before the X11 host sees
+    # the client, leaving the desktop with an empty Steam window.
+    if [ "$installed_flags_added" = false ] && [ -s "$installed" ]; then
+        set -- -noverifyfiles -nobootstrapperupdate "$@"
+        installed_flags_added=true
+    fi
     "$launcher" "$@" || exit $?
 
     # steam.sh may return just before it writes the client's PID file.
