@@ -115,6 +115,7 @@ mut:
 	error         string
 	process_total u32
 	used_memory   u64
+	cached_memory u64
 	total_memory  u64
 	// The language the kept text is in. build rewrites it after a change,
 	// rather than leaving the old words up until the next sample.
@@ -229,11 +230,16 @@ fn (mut m ActivityMonitor) apply_snapshot(header &ActivityTable, records &Activi
 	m.sort_rows()
 	m.clamp_scroll()
 
-	used := if header.total_memory > header.free_memory {
+	mut used := if header.total_memory > header.free_memory {
 		header.total_memory - header.free_memory
 	} else {
 		u64(0)
 	}
+	// File data the kernel keeps cached is given back when programs need the
+	// memory, so it is shown on its own rather than as memory in use.
+	cached := activity_cached_bytes()
+	m.cached_memory = if cached < used { cached } else { u64(0) }
+	used -= m.cached_memory
 	m.process_total = header.total
 	m.used_memory = used
 	m.total_memory = header.total_memory
@@ -269,13 +275,59 @@ fn (mut m ActivityMonitor) update_summary() {
 	unsafe { m.summary.free() }
 	// Each plural form is a whole sentence, so every language orders the
 	// count and the two sizes its own way.
-	m.summary = tr_substitute(tr_plural_form('activity.summary', i64(m.process_total)),
+	summary := tr_substitute(tr_plural_form('activity.summary', i64(m.process_total)),
 		process_count, used_text, total_text)
 	unsafe {
 		process_count.free()
 		used_text.free()
 		total_text.free()
 	}
+	if m.cached_memory == 0 {
+		m.summary = summary
+		return
+	}
+	cached_text := human_size(m.cached_memory)
+	cached := tr_substitute(tr('activity.cached'), cached_text, '', '')
+	m.summary = '${summary}   ${cached}'
+	unsafe {
+		cached_text.free()
+		cached.free()
+		summary.free()
+	}
+}
+
+// activity_cached_bytes reads the Cached line of /proc/meminfo: the file data
+// the kernel's page caches hold. 0 when there is none or no such line.
+fn activity_cached_bytes() u64 {
+	fd := desktop_open_ro_nonblock('/proc/meminfo')
+	if fd < 0 {
+		return 0
+	}
+	mut buffer := [1024]u8{}
+	got := desktop_read(fd, &buffer[0], u64(buffer.len))
+	desktop_close(fd)
+	label := 'Cached:'
+	mut line_start := 0
+	for i := 0; i < int(got); i++ {
+		if buffer[i] != `\n` && i + 1 < int(got) {
+			continue
+		}
+		mut matches := i - line_start > label.len
+		for j := 0; matches && j < label.len; j++ {
+			matches = buffer[line_start + j] == label[j]
+		}
+		if matches {
+			mut kb := u64(0)
+			for k := line_start + label.len; k < i; k++ {
+				if buffer[k] >= `0` && buffer[k] <= `9` {
+					kb = kb * 10 + u64(buffer[k] - `0`)
+				}
+			}
+			return kb * 1024
+		}
+		line_start = i + 1
+	}
+	return 0
 }
 
 // relocalize rewrites the kept text in the desktop's language from the numbers

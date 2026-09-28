@@ -46,6 +46,9 @@ Ordenar por PID
 activity.summary
 {0} proceso   {1} de {2} en uso|{0} procesos   {1} de {2} en uso
 -----
+activity.cached
+{0} en caché de archivos
+-----
 activity.unnamed
 (sin nombre)
 -----

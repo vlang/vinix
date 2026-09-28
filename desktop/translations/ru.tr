@@ -46,6 +46,9 @@ activity.sort_by.pid
 activity.summary
 {0} процесс   занято {1} из {2}|{0} процесса   занято {1} из {2}|{0} процессов   занято {1} из {2}
 -----
+activity.cached
+{0} в кэше файлов
+-----
 activity.unnamed
 (без имени)
 -----

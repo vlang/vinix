@@ -46,6 +46,9 @@ Sort by PID
 activity.summary
 {0} process   {1} of {2} used|{0} processes   {1} of {2} used
 -----
+activity.cached
+{0} cached files
+-----
 activity.unnamed
 (unnamed)
 -----
