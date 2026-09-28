@@ -343,7 +343,7 @@ pub fn populate_g13_hwdata_b_blob(mut data G13HwDataBBlob, config &hw.HwConfig,
 		return false
 	}
 	// unk_ae4 is common to both layouts, but its G13 values narrowed at 13.0.
-	for index, value in [u32(0), 3, 7, 7] {
+	for index, value in [u32(0), 3, 7, 7]! {
 		if !g13_hwdata_b_blob_put_u32(mut data, config.firmware_abi,
 			0x16ec + u32(index * 4), value) {
 			return false

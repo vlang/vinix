@@ -669,7 +669,7 @@ fn run_fake_render(mut queue workqueue.WorkQueue, mut vm FakeG17Vm,
 		}
 	}
 	mut inputs := FakeG17EncoderInputs{}
-	mut writes := []FakeG17ExpectedWrite{len: int(fake_g17_max_writes)}
+	mut writes := []FakeG17ExpectedWrite{len: int(fake_g17_max_writes)} @[freed]
 	encoding := encode_fake_g17_3d(command, g17_command_bytes, descriptor, g17_descriptor_bytes, vm.kernel_start, &inputs, mut writes)
 	if !encoding.succeeded() {
 		unsafe {
@@ -908,7 +908,11 @@ fn (mut file FakeG17File) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 				// C.printf is deliberately compiled out in production kernels.  This
 				// lifecycle marker is consumed by the VM integration test, so route it
 				// through the kernel console instead.
-				println('fake-g17: first Mesa render verified; id=${render_command.fragment_command_id} size=${render_command.framebuffer_width}x${render_command.framebuffer_height} resources=${render_resources.len} depth=${depth_bound} depth-meta=${depth_meta_bound} stencil=${stencil_bound} stencil-meta=${stencil_meta_bound} actual writes=${report.expected_writes} capacity=${fake_g17_max_writes}')
+				C.kprintf(c'fake-g17: first Mesa render verified; id=%llu size=%llux%llu resources=%lld depth=%llu depth-meta=%llu stencil=%llu stencil-meta=%llu actual writes=%llu capacity=%llu\n',
+					u64(render_command.fragment_command_id), u64(render_command.framebuffer_width),
+					u64(render_command.framebuffer_height), i64(render_resources.len),
+					u64(depth_bound), u64(depth_meta_bound), u64(stencil_bound),
+					u64(stencil_meta_bound), u64(report.expected_writes), u64(fake_g17_max_writes))
 			}
 		}
 	} else {
@@ -1090,7 +1094,8 @@ pub fn initialise() bool {
 	}
 	fake_driver_state.device = device
 	fake_driver_state.initialized = true
-	println('fake-g17: software-only G17C render node ready as renderD${128 + device.dev_id}')
+	C.kprintf(c'fake-g17: software-only G17C render node ready as renderD%llu\n',
+		u64(128 + device.dev_id))
 	return true
 }
 

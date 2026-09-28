@@ -467,6 +467,7 @@ fn (mut mgr GpuManager) free_g13_render_buffer_locked(mut buffer G13RenderBuffer
 	if buffer.slot_reserved && buffer.slot < fw.g13_tvb_slot_count {
 		mgr.g13_tvb_slots[buffer.slot] = false
 	}
+	unsafe { buffer.blocks.free() }
 	buffer = G13RenderBufferResources{}
 	mgr.g13_private.gc()
 	mgr.g13_shared.gc()
@@ -481,6 +482,8 @@ fn (mut mgr GpuManager) initialize_g13_render_buffer(mut resources G13QueueResou
 	}
 	mut buffer := &resources.render_buffer
 	buffer.context = unsafe { ctx }
+	// Nothing slices the block list, so growing it can free the old buffer.
+	buffer.blocks.flags |= .noslices
 	buffer.slot = mgr.reserve_g13_tvb_slot() or { return false }
 	buffer.slot_reserved = true
 	mut complete := false
@@ -607,14 +610,17 @@ fn (mut mgr GpuManager) handle_g13_grow_tvb(event_msg &fw.FwGrowTVBEvent) {
 		}
 	}
 	if !found {
-		println('agx: GrowTVB requested unknown slot=${event_msg.buffer_slot} vm=${event_msg.vm_slot}')
+		C.kprintf(c'agx: GrowTVB requested unknown slot=%llu vm=%llu\n', u64(event_msg.buffer_slot),
+			u64(event_msg.vm_slot))
 	} else if !grew {
-		println('agx: failed to grow TVB slot=${event_msg.buffer_slot} vm=${event_msg.vm_slot}')
+		C.kprintf(c'agx: failed to grow TVB slot=%llu vm=%llu\n', u64(event_msg.buffer_slot),
+			u64(event_msg.vm_slot))
 	}
 
 	ack := fw.make_grow_tvb_ack(event_msg.buffer_slot, event_msg.vm_slot, event_msg.counter)
 	if !mgr.channels.device_ctrl.enqueue(voidptr(&ack)) || !mgr.ring_device_control() {
-		println('agx: failed to acknowledge GrowTVB slot=${event_msg.buffer_slot} vm=${event_msg.vm_slot}')
+		C.kprintf(c'agx: failed to acknowledge GrowTVB slot=%llu vm=%llu\n',
+			u64(event_msg.buffer_slot), u64(event_msg.vm_slot))
 		mgr.state = .error
 	}
 }
@@ -850,7 +856,17 @@ fn (mut mgr GpuManager) submit_g13_queue_commands(resources &G13QueueResources,
 
 fn (mut mgr GpuManager) submit_g13_queue_command(resources &G13QueueResources,
 	pipe_type u32, command_va u64, event_slot u32) bool {
-	return mgr.submit_g13_queue_commands(resources, pipe_type, [command_va], event_slot)
+	// A list over the stack: a `[command_va]` literal was a heap allocation on
+	// every compute submission.
+	mut storage := [command_va]!
+	mut command_vas := []u64{}
+	unsafe {
+		command_vas.data = voidptr(&storage[0])
+		command_vas.len = 1
+		command_vas.cap = 1
+		command_vas.flags = .nogrow | .nofree
+	}
+	return mgr.submit_g13_queue_commands(resources, pipe_type, command_vas, event_slot)
 }
 
 fn build_g13_attachments(count u32,
@@ -1572,8 +1588,12 @@ pub fn (mut mgr GpuManager) release_g13_render_job(job &G13RenderJobResources) {
 	mut owned := unsafe { job }
 	if !owned.submitted {
 		complete_g13_render_job(mut owned, false)
-		if !mgr.free_g13_render_job_locked(mut owned, owned.mappings_published)
-			&& !owned.quarantined {
+		if mgr.free_g13_render_job_locked(mut owned, owned.mappings_published) {
+			// The caller gives the job up; a quarantined one is still listed.
+			if !owned.quarantined {
+				unsafe { free(owned) }
+			}
+		} else if !owned.quarantined {
 			owned.quarantined = true
 			mgr.g13_render_jobs << owned
 		}
@@ -1811,6 +1831,8 @@ fn (mut mgr GpuManager) reap_g13_render_jobs() {
 		if mgr.free_g13_render_job_locked(mut owned, true) {
 			mgr.g13_render_jobs.delete(index)
 			complete_g13_render_job(mut owned, true)
+			// The completion was the last user of the job.
+			unsafe { free(owned) }
 		} else {
 			owned.quarantined = true
 			complete_g13_render_job(mut owned, false)
@@ -2141,8 +2163,12 @@ pub fn (mut mgr GpuManager) release_g13_compute_job(job &G13ComputeJobResources)
 	mut owned := unsafe { job }
 	if !owned.submitted {
 		complete_g13_compute_job(mut owned, false)
-		if !mgr.free_g13_compute_job_locked(mut owned, owned.mappings_published)
-			&& !owned.quarantined {
+		if mgr.free_g13_compute_job_locked(mut owned, owned.mappings_published) {
+			// The caller gives the job up; a quarantined one is still listed.
+			if !owned.quarantined {
+				unsafe { free(owned) }
+			}
+		} else if !owned.quarantined {
 			owned.quarantined = true
 			mgr.g13_compute_jobs << owned
 		}
@@ -2228,6 +2254,8 @@ fn (mut mgr GpuManager) reap_g13_compute_jobs() {
 		if mgr.free_g13_compute_job_locked(mut owned, true) {
 			mgr.g13_compute_jobs.delete(index)
 			complete_g13_compute_job(mut owned, true)
+			// The completion was the last user of the job.
+			unsafe { free(owned) }
 		} else {
 			owned.quarantined = true
 			complete_g13_compute_job(mut owned, false)

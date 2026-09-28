@@ -136,7 +136,7 @@ pub fn new_gpu_manager(res &regs.GpuResources, cfg &hw.HwConfig, rtk &rtkit.RTKi
 		return none
 	}
 	version, core_count := res.get_gpu_id()
-	println('agx: GPU ID version=0x${version:x} cores=${core_count}')
+	C.kprintf(c'agx: GPU ID version=0x%llx cores=%llu\n', u64(version), u64(core_count))
 
 	mut mgr := &GpuManager{
 		res: unsafe { *res }
@@ -153,6 +153,12 @@ pub fn new_gpu_manager(res &regs.GpuResources, cfg &hw.HwConfig, rtk &rtkit.RTKi
 		g13_rtkit: alloc.new_heap('g13-rtkit', alloc.g13_rtkit_start, alloc.g13_rtkit_end)
 		g13_timestamp: alloc.new_heap('g13-timestamp', alloc.g13_timestamp_start, alloc.g13_timestamp_end)
 	}
+	// Nothing slices these lists, so growing one can free its old buffer.
+	mgr.g13_queues.flags |= .noslices
+	mgr.g13_compute_jobs.flags |= .noslices
+	mgr.g13_render_jobs.flags |= .noslices
+	mgr.g17_queues.flags |= .noslices
+	mgr.rtkit_buffers.flags |= .noslices
 	if cfg.gpu_gen == .g13 {
 		mgr.rtk.set_shmem_allocator(voidptr(mgr), allocate_rtkit_shmem)
 		mgr.rtk.set_shmem_resolver(resolve_rtkit_shmem)
@@ -764,10 +770,13 @@ fn (mut mgr GpuManager) init_channels() bool {
 	stats_ring := &allocations.rings[g13_stats_index]
 	stats_entry_size := fw.g13_stats_entry_size(mgr.hw_config.firmware_abi) or { return false }
 	mgr.channels.stats = channel.new_rx_channel('stats', stats_state.va, stats_state.phys, stats_ring.va, stats_ring.phys, fw.stats_size, stats_entry_size)
+	// The channels keep their names, so they are literals rather than built.
+	pipe_names := ['pipe0', 'pipe1', 'pipe2', 'pipe3', 'pipe4', 'pipe5', 'pipe6', 'pipe7',
+		'pipe8', 'pipe9', 'pipe10', 'pipe11']!
 	for pipe := u32(0); pipe < 12; pipe++ {
 		state := &allocations.states[g13_pipe_base_index + pipe]
 		ring := &allocations.rings[g13_pipe_base_index + pipe]
-		mgr.channels.pipes[pipe] = channel.new_tx_channel('pipe${pipe}', state.va, state.phys, ring.va, ring.phys, fw.pipe_size, u32(sizeof(fw.FwRunWorkQueueMsg)))
+		mgr.channels.pipes[pipe] = channel.new_tx_channel(pipe_names[pipe], state.va, state.phys, ring.va, ring.phys, fw.pipe_size, u32(sizeof(fw.FwRunWorkQueueMsg)))
 	}
 	mgr.g13_channels = allocations
 	return true
@@ -799,7 +808,7 @@ pub fn (mut mgr GpuManager) initialize_event_resources() bool {
 		}
 		else {
 			generation := u32(mgr.hw_config.gpu_gen)
-			println('agx: no event-resource bring-up for GPU generation ${generation}')
+			C.kprintf(c'agx: no event-resource bring-up for GPU generation %llu\n', u64(generation))
 			return false
 		}
 	}
@@ -821,7 +830,7 @@ pub fn (mut mgr GpuManager) init() bool {
 	// Step 1: Start every firmware role's independent ASC CPU via ASC_CTL.
 	for role := u32(0); role < mgr.firmware_roles; role++ {
 		if !mgr.res.start_cpu(role) {
-			println('agx: Failed to start ASC role ${role}')
+			C.kprintf(c'agx: Failed to start ASC role %llu\n', u64(role))
 			mgr.stop_firmware_cpus(role)
 			mgr.state = .error
 			return false
@@ -840,7 +849,9 @@ pub fn (mut mgr GpuManager) init() bool {
 			mgr.state = .error
 			return false
 		}
-		println('agx: G13 topology: ${identity.total_active_cores}/${identity.num_cores_per_cluster * identity.num_clusters} active cores, mask 0x${identity.core_masks[0]:x}')
+		C.kprintf(c'agx: G13 topology: %llu/%llu active cores, mask 0x%llx\n',
+			u64(identity.total_active_cores),
+			u64(identity.num_cores_per_cluster * identity.num_clusters), u64(identity.core_masks[0]))
 	}
 
 	// Step 2: Complete the uPPL handoff as soon as the ASC is running. RTKit
@@ -877,7 +888,7 @@ pub fn (mut mgr GpuManager) init() bool {
 	// Step 6: Negotiate the RTKit transport independently for every role.
 	for role := u32(0); role < mgr.firmware_roles; role++ {
 		if !mgr.boot_firmware_role(role) {
-			println('agx: RTKit boot failed for role ${role}')
+			C.kprintf(c'agx: RTKit boot failed for role %llu\n', u64(role))
 			return mgr.fail_g13_initialization()
 		}
 	}
@@ -885,7 +896,7 @@ pub fn (mut mgr GpuManager) init() bool {
 	// Step 7: Start GPU-specific firmware endpoint (0x20) on each role.
 	for role := u32(0); role < mgr.firmware_roles; role++ {
 		if !mgr.start_firmware_endpoint(role, u8(ep_firmware)) {
-			println('agx: Failed to start firmware endpoint for role ${role}')
+			C.kprintf(c'agx: Failed to start firmware endpoint for role %llu\n', u64(role))
 			return mgr.fail_g13_initialization()
 		}
 	}
@@ -893,7 +904,7 @@ pub fn (mut mgr GpuManager) init() bool {
 	// Step 8: Start doorbell endpoint (0x21) on each role.
 	for role := u32(0); role < mgr.firmware_roles; role++ {
 		if !mgr.start_firmware_endpoint(role, u8(ep_doorbell)) {
-			println('agx: Failed to start doorbell endpoint for role ${role}')
+			C.kprintf(c'agx: Failed to start doorbell endpoint for role %llu\n', u64(role))
 			return mgr.fail_g13_initialization()
 		}
 	}
@@ -1162,8 +1173,10 @@ pub fn (mut mgr GpuManager) handle_event() {
 			fw.fw_event_fault {
 				println('agx: GPU firmware error event')
 				if info := mgr.res.get_g13_fault_info() {
-					access := if info.read { 'read' } else { 'write' }
-					println('agx: Fault addr=0x${info.address:x} unit=${info.unit_code} vm=${info.vm_slot} reason=${info.reason_code} ${access}')
+					access := if info.read { c'read' } else { c'write' }
+					C.kprintf(c'agx: Fault addr=0x%llx unit=%llu vm=%llu reason=%llu %s\n',
+						u64(info.address), u64(info.unit_code), u64(info.vm_slot),
+						u64(info.reason_code), access)
 				} else {
 					println('agx: fault event without a valid G13 fault register')
 				}
@@ -1178,7 +1191,7 @@ pub fn (mut mgr GpuManager) handle_event() {
 				mgr.handle_g13_grow_tvb(grow)
 			}
 			else {
-				println('agx: Unhandled event type ${event_type}')
+				C.kprintf(c'agx: Unhandled event type %llu\n', u64(event_type))
 			}
 		}
 	}
@@ -1215,7 +1228,8 @@ fn (mut mgr GpuManager) poll_rtkit_messages() bool {
 			if ep == u8(ep_firmware) && msg.data0 == msg_rx_doorbell {
 				continue
 			}
-			println('agx: unexpected RTKit role=${role} ep=0x${ep:x} message=0x${msg.data0:x}')
+			C.kprintf(c'agx: unexpected RTKit role=%llu ep=0x%llx message=0x%llx\n', u64(role),
+				u64(ep), u64(msg.data0))
 		}
 	}
 	return true

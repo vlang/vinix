@@ -178,7 +178,8 @@ pub fn new_manager(ttbs_base u64, handoff_base u64, pagetables_base u64, ias u32
 	}
 	uat_mgr = mgr
 
-	println('uat mmu: attached IAS=${ias} OAS=${oas} TTBs=0x${ttbs_base:x} handoff=0x${handoff_base:x} TTBR1=0x${pagetables_base:x}')
+	C.kprintf(c'uat mmu: attached IAS=%llu OAS=%llu TTBs=0x%llx handoff=0x%llx TTBR1=0x%llx\n',
+		u64(ias), u64(oas), u64(ttbs_base), u64(handoff_base), u64(pagetables_base))
 	return mgr
 }
 
@@ -354,7 +355,7 @@ pub fn (mut mgr UatManager) create_context(kernel_start u64, kernel_end u64) ?&U
 				pgtable.destroy(pt)
 				return none
 			}
-			ctx := &UatContext{
+			mut ctx := &UatContext{
 				id: i
 				pgtable: pt
 				active: true
@@ -365,6 +366,8 @@ pub fn (mut mgr UatManager) create_context(kernel_start u64, kernel_end u64) ?&U
 				driver_gpu: gpu_alloc.new_heap('uat-user-gpu', kernel_start, kernel_midpoint)
 				driver_private: gpu_alloc.new_heap('uat-user-private', kernel_midpoint, kernel_end)
 			}
+			// Nothing slices the list, so growing it can free the old buffer.
+			ctx.driver_buffers.flags |= .noslices
 			mgr.contexts[i] = ctx
 			return ctx
 		}
@@ -605,6 +608,11 @@ pub fn (mut ctx UatContext) release_driver_buffer(buffer &UatBuffer) {
 		if voidptr(candidate) == voidptr(buffer) {
 			ctx.release_driver_buffer_locked(candidate)
 			ctx.driver_buffers.delete(index)
+			// Its owner lets go of it here, so the record goes as well. Jobs
+			// and render buffers allocate these for every frame.
+			// release_all_driver_buffers() keeps its records, which owners
+			// may still hold.
+			unsafe { free(candidate) }
 			break
 		}
 	}

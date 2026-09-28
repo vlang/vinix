@@ -17,6 +17,7 @@ import drm.ioctl
 import drm.syncobj
 import memory
 import usercopy
+import lib
 
 // DRM driver feature flags
 pub const driver_gem = u32(0x1)
@@ -442,7 +443,8 @@ fn ioctl_layout(dev &DrmDevice, cmd u32) ?DrmIoctlLayout {
 	return common_ioctl_layout(cmd)
 }
 
-fn create_device_node(dev &DrmDevice, name string, render bool) ?&DrmNode {
+// The node is /dev/dri/<prefix><number>.
+fn create_device_node(dev &DrmDevice, prefix string, number u64, render bool) ?&DrmNode {
 	fs.create(vfs_root, '/dev/dri', stat.ifdir | 0o755) or {}
 
 	mut node := &DrmNode{
@@ -459,7 +461,14 @@ fn create_device_node(dev &DrmDevice, name string, render bool) ?&DrmNode {
 	node.stat.mode = stat.ifchr | 0o666
 	node.can_mmap = voidptr(dev.driver) != unsafe { nil } && dev.driver.mmap != unsafe { nil }
 
-	fs.devtmpfs_add_device(node, 'dri/${name}')
+	mut path := lib.new_text(32)
+	path.add('dri/')
+	path.add(prefix)
+	path.add_unsigned(number)
+	name := path.str() @[freed]
+	// devtmpfs keeps its own copy of the last path component.
+	fs.devtmpfs_add_device(node, name)
+	unsafe { name.free() }
 	return node
 }
 
@@ -590,16 +599,19 @@ pub fn register_driver(driver &DrmDriver) ?&DrmDevice {
 		registered: true
 	}
 
-	dev.node = create_device_node(dev, 'card${id}', false) or { return none }
+	dev.node = create_device_node(dev, 'card', u64(id), false) or { return none }
 	if driver.features & driver_render != 0 {
-		dev.render_node = create_device_node(dev, 'renderD${128 + id}', true) or { return none }
+		dev.render_node = create_device_node(dev, 'renderD', u64(128 + id), true) or {
+			return none
+		}
 	}
 	registered_devices[id] = dev
 
-	println('drm: Registered driver ${driver.name} as card${id}')
-	println('drm: created device node /dev/dri/card${id}')
+	C.kprintf(c'drm: Registered driver %.*s as card%llu\n', i32(driver.name.len), driver.name.str,
+		u64(id))
+	C.kprintf(c'drm: created device node /dev/dri/card%llu\n', u64(id))
 	if dev.render_node != unsafe { nil } {
-		println('drm: created device node /dev/dri/renderD${128 + id}')
+		C.kprintf(c'drm: created device node /dev/dri/renderD%llu\n', u64(128 + id))
 	}
 	return dev
 }
@@ -615,7 +627,7 @@ pub fn unregister_device(dev &DrmDevice) {
 		mut d := unsafe { dev }
 		d.registered = false
 		registered_devices[dev.dev_id] = unsafe { nil }
-		println('drm: Unregistered card${dev.dev_id}')
+		C.kprintf(c'drm: Unregistered card%llu\n', u64(dev.dev_id))
 	}
 }
 

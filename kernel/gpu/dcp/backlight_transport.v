@@ -142,7 +142,10 @@ __global (
 )
 
 fn has_compatible(node &devicetree.DTNode, wanted string) bool {
-	values := devicetree.get_string_list(node, 'compatible') or { return false }
+	mut values := devicetree.get_string_list(node, 'compatible') or { return false }
+	defer {
+		unsafe { values.free() }
+	}
 	for value in values {
 		if value == wanted {
 			return true
@@ -170,6 +173,9 @@ fn discover_firmware(node &devicetree.DTNode) ?RealFirmware {
 	compat := devicetree.get_u32_array(node, 'apple,firmware-compat') or {
 		println('dcp-backlight: missing apple,firmware-compat')
 		return none
+	}
+	defer {
+		unsafe { compat.free() }
 	}
 	if compat.len < 3 {
 		println('dcp-backlight: short apple,firmware-compat')
@@ -209,6 +215,9 @@ fn discover_panel(node &devicetree.DTNode) ?u32 {
 
 fn discover_iommu(node &devicetree.DTNode) ?(&devicetree.DTNode, u8) {
 	cells := devicetree.get_u32_array(node, 'iommus') or { return none }
+	defer {
+		unsafe { cells.free() }
+	}
 	if cells.len != 2 || cells[1] > 15 {
 		return none
 	}
@@ -221,6 +230,9 @@ fn discover_iommu(node &devicetree.DTNode) ?(&devicetree.DTNode, u8) {
 
 fn discover_dma_range(node &devicetree.DTNode) ?(u64, u64) {
 	cells := devicetree.get_u32_array(node, 'apple,dma-range') or { return none }
+	defer {
+		unsafe { cells.free() }
+	}
 	if cells.len != 4 {
 		return none
 	}
@@ -238,6 +250,9 @@ fn append_reserved_mappings(node &devicetree.DTNode, display bool, mut plan Real
 		println('dcp-backlight: DCP firmware memory regions are missing')
 		return false
 	}
+	defer {
+		unsafe { handles.free() }
+	}
 	dcp_phandle := devicetree.get_u32(node, 'phandle') or {
 		devicetree.get_u32(node, 'linux,phandle') or { u32(0) }
 	}
@@ -249,10 +264,19 @@ fn append_reserved_mappings(node &devicetree.DTNode, display bool, mut plan Real
 	for handle in handles {
 		region_node := devicetree.find_phandle(handle) or { continue }
 		regions := devicetree.get_translated_reg_ranges(region_node) or { continue }
-		addresses := devicetree.get_u32_array(region_node, 'iommu-addresses') or { continue }
-		if regions.len == 0 || addresses.len % 5 != 0 {
+		addresses := devicetree.get_u32_array(region_node, 'iommu-addresses') or {
+			unsafe { regions.free() }
 			continue
 		}
+		if regions.len == 0 || addresses.len % 5 != 0 {
+			unsafe {
+				regions.free()
+				addresses.free()
+			}
+			continue
+		}
+		region := regions[0]
+		unsafe { regions.free() }
 		for index := 0; index < addresses.len; index += 5 {
 			if addresses[index] != dcp_phandle {
 				continue
@@ -260,14 +284,15 @@ fn append_reserved_mappings(node &devicetree.DTNode, display bool, mut plan Real
 			iova := (u64(addresses[index + 1]) << 32) | u64(addresses[index + 2])
 			size := (u64(addresses[index + 3]) << 32) | u64(addresses[index + 4])
 			aligned_size := lib.align_up(size, real_dart_page_size)
-			if size == 0 || aligned_size < size || aligned_size > regions[0].size
+			if size == 0 || aligned_size < size || aligned_size > region.size
 				|| iova & (real_dart_page_size - 1) != 0
-				|| regions[0].base & (real_dart_page_size - 1) != 0 {
+				|| region.base & (real_dart_page_size - 1) != 0 {
 				println('dcp-backlight: invalid reserved DCP mapping')
+				unsafe { addresses.free() }
 				return false
 			}
 			mapping := RealMapping{
-				phys: regions[0].base
+				phys: region.base
 				iova: iova
 				size: aligned_size
 			}
@@ -277,6 +302,7 @@ fn append_reserved_mappings(node &devicetree.DTNode, display bool, mut plan Real
 				plan.mappings << mapping
 			}
 		}
+		unsafe { addresses.free() }
 	}
 	if (if display { plan.display_mappings.len } else { plan.mappings.len }) == before {
 		println('dcp-backlight: no reserved DART mappings were described')
@@ -288,11 +314,17 @@ fn append_reserved_mappings(node &devicetree.DTNode, display bool, mut plan Real
 fn append_bandwidth_register(node &devicetree.DTNode, property string, expected_args int,
 	mut plan RealPlan) bool {
 	cells := devicetree.get_u32_array(node, property) or { return false }
+	defer {
+		unsafe { cells.free() }
+	}
 	if cells.len != expected_args + 1 {
 		return false
 	}
 	provider := devicetree.find_phandle(cells[0]) or { return false }
 	ranges := devicetree.get_translated_reg_ranges(provider) or { return false }
+	defer {
+		unsafe { ranges.free() }
+	}
 	address_index := cells[1]
 	display_index := cells[2]
 	if address_index >= u32(ranges.len) || display_index != u32(plan.registers.len)
@@ -336,11 +368,17 @@ fn discover_real_plan() ?RealPlan {
 	coproc := devicetree.get_named_reg(node, 'coproc') or { return none }
 	mailbox_node := devicetree.get_phandle_node(node, 'mboxes', 0) or { return none }
 	mailbox_regs := devicetree.get_translated_reg_ranges(mailbox_node) or { return none }
+	defer {
+		unsafe { mailbox_regs.free() }
+	}
 	if mailbox_regs.len == 0 || !has_compatible(mailbox_node, 'apple,asc-mailbox-v4') {
 		return none
 	}
 	dcp_dart_node, dcp_sid := discover_iommu(node) or { return none }
 	dcp_dart_regs := devicetree.get_translated_reg_ranges(dcp_dart_node) or { return none }
+	defer {
+		unsafe { dcp_dart_regs.free() }
+	}
 	if dcp_dart_regs.len == 0 {
 		return none
 	}
@@ -348,13 +386,22 @@ fn discover_real_plan() ?RealPlan {
 	piodma := find_named_child(node, 'piodma') or { return none }
 	disp_dart_node, disp_sid := discover_iommu(piodma) or { return none }
 	disp_dart_regs := devicetree.get_translated_reg_ranges(disp_dart_node) or { return none }
+	defer {
+		unsafe { disp_dart_regs.free() }
+	}
 	if disp_dart_regs.len == 0 || disp_sid != 4 {
 		println('dcp-backlight: PIODMA stream is not display DART SID 4')
 		return none
 	}
 
 	all_regs := devicetree.get_translated_reg_ranges(node) or { return none }
-	reg_names := devicetree.get_string_list(node, 'reg-names') or { return none }
+	defer {
+		unsafe { all_regs.free() }
+	}
+	mut reg_names := devicetree.get_string_list(node, 'reg-names') or { return none }
+	defer {
+		unsafe { reg_names.free() }
+	}
 	if all_regs.len != reg_names.len {
 		return none
 	}
@@ -403,6 +450,9 @@ fn enable_power_domains(node &devicetree.DTNode, depth u32) bool {
 	handles := devicetree.get_u32_array(node, 'power-domains') or {
 		return depth != 0
 	}
+	defer {
+		unsafe { handles.free() }
+	}
 	if depth == 0 && handles.len == 0 {
 		return false
 	}
@@ -418,7 +468,10 @@ fn enable_power_domains(node &devicetree.DTNode, depth u32) bool {
 			return false
 		}
 		apertures := devicetree.get_translated_reg_ranges(domain.parent) or { return false }
-		if apertures.len == 0 || !pmgr.enable_region(apertures[0].base, apertures[0].size, offset) {
+		enabled := apertures.len != 0
+			&& pmgr.enable_region(apertures[0].base, apertures[0].size, offset)
+		unsafe { apertures.free() }
+		if !enabled {
 			return false
 		}
 	}
@@ -1362,7 +1415,8 @@ fn real_backlight_notify(context voidptr) {
 fn real_backlight_worker() {
 	mut transport := real_panel_transport
 	mut poll_timer := time.new_timer(time.TimeSpec{ tv_nsec: real_worker_period_ns })
-	mut events := [&transport.wake, &poll_timer.event]
+	mut storage := [&transport.wake, &poll_timer.event]!
+	mut events := unsafe { event.stack_list(&storage[0], storage.len) }
 	for !transport.poisoned {
 		event.await(mut events, true) or {}
 		poll_timer.disarm()
@@ -1386,7 +1440,6 @@ fn real_backlight_worker() {
 		transport.device.set_online(false)
 	}
 	println('dcp-backlight: transport stopped after firmware/protocol failure')
-	unsafe { events.free() }
 	unsafe { free(poll_timer) }
 	sched.dequeue_and_die()
 }

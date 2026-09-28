@@ -350,7 +350,7 @@ pub fn (r &GpuResources) start_cpu(role u32) bool {
 	}
 	cpu.dsb_sy()
 	cpu.isb()
-	println('agx: GPU ASC role ${role} CPU started')
+	C.kprintf(c'agx: GPU ASC role %llu CPU started\n', u64(role))
 	return true
 }
 
