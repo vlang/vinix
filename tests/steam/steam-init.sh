@@ -144,6 +144,43 @@ finally:
 PY
 echo "VINIX STEAM PASS: Unix recvmsg hangup"
 
+# QEMU translates IPv4 recvmsg control messages. Return the actual ancillary
+# length (zero here) so it never interprets the caller's spare buffer as data.
+/bin/busybox timeout 5 /usr/bin/python3 - <<'PY' || fail "IPv4 recvmsg ancillary length failed"
+import ctypes
+import socket
+
+class IOVec(ctypes.Structure):
+    _fields_ = [('base', ctypes.c_void_p), ('length', ctypes.c_size_t)]
+
+class MsgHdr(ctypes.Structure):
+    _fields_ = [('name', ctypes.c_void_p), ('namelen', ctypes.c_uint),
+                ('iov', ctypes.POINTER(IOVec)), ('iovlen', ctypes.c_size_t),
+                ('control', ctypes.c_void_p), ('controllen', ctypes.c_size_t),
+                ('flags', ctypes.c_int)]
+
+reader = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+writer = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+try:
+    reader.bind(('127.0.0.1', 0))
+    assert writer.sendto(b'x', reader.getsockname()) == 1
+    payload = ctypes.create_string_buffer(8)
+    control = ctypes.create_string_buffer(128)
+    iov = IOVec(ctypes.addressof(payload), len(payload))
+    msg = MsgHdr(None, 0, ctypes.pointer(iov), 1,
+                 ctypes.addressof(control), len(control), -1)
+    libc = ctypes.CDLL(None, use_errno=True)
+    libc.recvmsg.argtypes = [ctypes.c_int, ctypes.POINTER(MsgHdr), ctypes.c_int]
+    libc.recvmsg.restype = ctypes.c_ssize_t
+    assert libc.recvmsg(reader.fileno(), ctypes.byref(msg), 0) == 1, ctypes.get_errno()
+    assert payload.raw[0:1] == b'x'
+    assert msg.controllen == 0 and msg.flags == 0, (msg.controllen, msg.flags)
+finally:
+    reader.close()
+    writer.close()
+PY
+echo "VINIX STEAM PASS: IPv4 recvmsg ancillary length"
+
 # A browser thread may use an empty ppoll as a timed sleep. Returning at once
 # makes its event loop spin and can starve the translated client.
 /bin/busybox timeout 5 /usr/bin/python3 - <<'PY' || fail "empty ppoll sleep failed"

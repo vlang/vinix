@@ -763,7 +763,14 @@ fn (mut this InetSocket) recvmsg(handle voidptr, msg &sock_pub.MsgHdr, flags int
 		unsafe { free(buffer) }
 		return none
 	}
-	unsafe { msg.msg_namelen = source_len }
+	// No IPv4 ancillary data is supplied by this socket implementation. The
+	// caller's msg_controllen is an input capacity, not an output length;
+	// leaving it intact makes qemu-user parse uninitialised control bytes.
+	unsafe {
+		msg.msg_namelen = source_len
+		msg.msg_controllen = 0
+		msg.msg_flags = 0
+	}
 	mut copied := u64(0)
 	for i := u64(0); i < msg.msg_iovlen && copied < u64(read_count); i++ {
 		iov := unsafe { msg.msg_iov[i] }
