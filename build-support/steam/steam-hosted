@@ -13,6 +13,27 @@ bootstrap_log=$data/logs/bootstrap_log.txt
 installed_at_start=false
 [ -s "$installed" ] && installed_at_start=true
 
+# Steam's bundled font leaves conspicuous gaps in the small login labels
+# (notably G-N in SIGN and C-C in ACCOUNT) on the private X display. The
+# client CSS has the same label rule in both login layouts. Use the DejaVu
+# Sans font already in the Vinix image for those labels alone, and reapply
+# after an updater has replaced the stylesheet.
+fix_login_label_spacing() {
+    original='font-size:12px;color:#afafaf;text-transform:uppercase;letter-spacing:.02em;user-select:none'
+    for sheet in "$data"/steamui/css/*.css; do
+        [ -f "$sheet" ] || continue
+        grep -Fq "$original" "$sheet" || continue
+        temporary="${sheet}.vinix-font.$$"
+        if LC_ALL=C sed 's|font-size:12px;color:#afafaf;text-transform:uppercase;letter-spacing:\.02em;user-select:none|font-family:DejaVu Sans,Arial,Helvetica,sans-serif;font-size:12px;color:#afafaf;text-transform:uppercase;letter-spacing:0;user-select:none|g' "$sheet" > "$temporary" &&
+            chmod 0644 "$temporary" && mv -f "$temporary" "$sheet"; then
+            :
+        else
+            rm -f "$temporary"
+            echo "steam-hosted: could not adjust login label font: $sheet" >&2
+        fi
+    done
+}
+
 launches=0
 installed_flags_added=false
 while [ "$launches" -lt 2 ]; do
@@ -26,6 +47,7 @@ while [ "$launches" -lt 2 ]; do
         set -- -noverifyfiles -nobootstrapperupdate "$@"
         installed_flags_added=true
     fi
+    fix_login_label_spacing
     "$launcher" "$@" || exit $?
 
     # steam.sh may return just before it writes the client's PID file.
