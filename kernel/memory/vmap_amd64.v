@@ -1,10 +1,10 @@
 module memory
 
 // big_alloc's fallback of separate pages mapped side by side (vmap_arm64.v) is
-// not built here: freeing such an allocation must drop its translations on
-// every CPU before the pages are reused, and amd64 has no TLB shootdown yet
-// (flush_tlb_everywhere() is empty). Without one, a big allocation that finds
-// no contiguous run still stops the kernel.
+// not built here: its kernel mappings, and dropping them from every CPU
+// through the shootdown in sched/tlb_amd64.v when one is freed, have not been
+// written for x86. A big allocation that finds no contiguous run still stops
+// the kernel.
 
 fn vmap_contains(_ u64) bool {
 	return false

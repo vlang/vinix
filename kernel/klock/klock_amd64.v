@@ -1,7 +1,22 @@
+@[has_globals]
 module klock
 
 import katomic
 import x86.cpu
+
+__global (
+	// Run by a CPU spinning for a lock. One spinning with interrupts off
+	// cannot take the IPI of a TLB shootdown, and the CPU that sent it, which
+	// may hold the lock, waits for it: this is how it answers. See
+	// sched/tlb_amd64.v.
+	spin_hook voidptr
+)
+
+type SpinHook = fn ()
+
+pub fn register_spin_hook(hook voidptr) {
+	spin_hook = hook
+}
 
 pub struct Lock {
 pub mut:
@@ -15,6 +30,10 @@ pub fn (mut l Lock) acquire() {
 	for {
 		if l.test_and_acquire() == true {
 			return
+		}
+		if spin_hook != unsafe { nil } {
+			hook := unsafe { SpinHook(spin_hook) }
+			hook()
 		}
 		asm volatile amd64 {
 			pause

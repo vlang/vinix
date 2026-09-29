@@ -14,6 +14,7 @@
 #include <poll.h>
 #include <pthread.h>
 #include <sched.h>
+#include <setjmp.h>
 #include <signal.h>
 #include <stdatomic.h>
 #include <stddef.h>
@@ -1705,6 +1706,139 @@ static int test_console_controls_a_session(void)
 	return 0;
 }
 
+/* A page table change reaches every CPU a process runs on, not only the CPU
+ * that made it: x86 has to ask the others to drop what they hold. */
+static volatile unsigned long *shootdown_page;
+static volatile sig_atomic_t shootdown_faulted;
+static volatile sig_atomic_t shootdown_stop;
+static _Atomic unsigned long shootdown_reads;
+static unsigned long shootdown_reads_at_fault;
+static sigjmp_buf shootdown_jump;
+
+static void shootdown_fault(int signal)
+{
+	(void)signal;
+	shootdown_reads_at_fault = atomic_load(&shootdown_reads);
+	shootdown_faulted = 1;
+	siglongjmp(shootdown_jump, 1);
+}
+
+/* Pin the calling thread to `cpu`, and return once it runs there: affinity
+ * moves a thread only when it next comes through the scheduler. */
+static int pin_to(int cpu)
+{
+	cpu_set_t affinity;
+	CPU_ZERO(&affinity);
+	CPU_SET(cpu, &affinity);
+	if (sched_setaffinity(0, sizeof(affinity), &affinity) != 0)
+		return -1;
+	for (int i = 0; i < 1000 && sched_getcpu() != cpu; ++i)
+		usleep(1000);
+	return sched_getcpu() == cpu ? 0 : -1;
+}
+
+static void *shootdown_reader(void *argument)
+{
+	if (pin_to((int)(intptr_t)argument) != 0)
+		return (void *)1;
+	if (sigsetjmp(shootdown_jump, 1) != 0)
+		return NULL;
+	while (!shootdown_stop) {
+		(void)*shootdown_page;
+		atomic_fetch_add(&shootdown_reads, 1);
+	}
+	return NULL;
+}
+
+static void *shootdown_writer(void *argument)
+{
+	if (pin_to((int)(intptr_t)argument) != 0)
+		return (void *)1;
+	while (!shootdown_stop) {
+		++*shootdown_page;
+		atomic_fetch_add(&shootdown_reads, 1);
+	}
+	return NULL;
+}
+
+static int wait_for_reads(void)
+{
+	unsigned long start = atomic_load(&shootdown_reads);
+	for (int i = 0; i < 2000 && atomic_load(&shootdown_reads) < start + 1000; ++i)
+		usleep(1000);
+	CHECK(atomic_load(&shootdown_reads) >= start + 1000);
+	return 0;
+}
+
+static int test_page_table_changes_reach_every_cpu(void)
+{
+	long cpus = sysconf(_SC_NPROCESSORS_ONLN);
+	CHECK(cpus >= 2);
+	/* The helper on the last CPU, this thread on the first. */
+	void *other = (void *)(intptr_t)(cpus - 1);
+	cpu_set_t original;
+	CHECK(sched_getaffinity(0, sizeof(original), &original) == 0);
+
+	/* munmap: a thread reading the page on another CPU faults on its next
+	 * read after munmap returns, not whenever its CPU next happens to load
+	 * another page map. */
+	struct sigaction action = {.sa_handler = shootdown_fault}, previous;
+	sigemptyset(&action.sa_mask);
+	CHECK(sigaction(SIGSEGV, &action, &previous) == 0);
+	shootdown_page = mmap(NULL, 4096, PROT_READ | PROT_WRITE,
+	    MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+	CHECK(shootdown_page != MAP_FAILED);
+	*shootdown_page = 1;
+	shootdown_faulted = 0;
+	shootdown_stop = 0;
+	pthread_t reader;
+	CHECK(pthread_create(&reader, NULL, shootdown_reader, other) == 0);
+	CHECK(wait_for_reads() == 0);
+	CHECK(pin_to(0) == 0);
+	CHECK(munmap((void *)shootdown_page, 4096) == 0);
+	unsigned long reads_at_unmap = atomic_load(&shootdown_reads);
+	for (int i = 0; i < 1000 && !shootdown_faulted; ++i)
+		usleep(1000);
+	int faulted = shootdown_faulted;
+	shootdown_stop = 1;
+	void *pinned;
+	CHECK(pthread_join(reader, &pinned) == 0 && pinned == NULL);
+	CHECK(sigaction(SIGSEGV, &previous, NULL) == 0);
+	if (!faulted || shootdown_reads_at_fault > reads_at_unmap + 16) {
+		printf("shootdown: faulted %d, %lu reads after munmap\n", faulted,
+		    faulted ? shootdown_reads_at_fault - reads_at_unmap : 0);
+		CHECK(0);
+	}
+
+	/* fork: a thread writing on another CPU does not write into the child. */
+	shootdown_page = mmap(NULL, 4096, PROT_READ | PROT_WRITE,
+	    MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+	CHECK(shootdown_page != MAP_FAILED);
+	*shootdown_page = 0;
+	shootdown_stop = 0;
+	CHECK(sched_setaffinity(0, sizeof(original), &original) == 0);
+	pthread_t writer;
+	CHECK(pthread_create(&writer, NULL, shootdown_writer, other) == 0);
+	CHECK(wait_for_reads() == 0);
+	CHECK(pin_to(0) == 0);
+	pid_t child = fork();
+	if (child == 0) {
+		unsigned long first = *shootdown_page;
+		usleep(100000);
+		_exit(*shootdown_page == first ? 0 : 1);
+	}
+	CHECK(child > 0);
+	int status;
+	CHECK(waitpid(child, &status, 0) == child);
+	shootdown_stop = 1;
+	CHECK(pthread_join(writer, &pinned) == 0 && pinned == NULL);
+	CHECK(munmap((void *)shootdown_page, 4096) == 0);
+	CHECK(sched_setaffinity(0, sizeof(original), &original) == 0);
+	CHECK(WIFEXITED(status) && WEXITSTATUS(status) == 0);
+	puts("QEMU CORE PASS: page table changes reach every CPU");
+	return 0;
+}
+
 /* An event has room for 64 listeners. More threads than that waiting on one
  * futex see a spurious wake, which they retry, rather than stop the kernel. */
 #define MANY_WAITERS 80
@@ -2056,6 +2190,7 @@ static int run_tests(void)
 	CHECK(test_cpuinfo() == 0);
 	CHECK(test_joined_threads_return_their_memory() == 0);
 	CHECK(test_console_controls_a_session() == 0);
+	CHECK(test_page_table_changes_reach_every_cpu() == 0);
 	CHECK(test_fifo_keeps_its_cpu() == 0);
 	CHECK(test_frozen_cgroup_stops_its_threads() == 0);
 	CHECK(test_wait_ends_for_a_pending_signal() == 0);

@@ -62,6 +62,8 @@ pub fn initialise() {
 	interrupt_table[scheduler_vector] = voidptr(scheduler_isr)
 	idt.set_ist(scheduler_vector, 1)
 
+	initialise_tlb_shootdown()
+
 	// The kernel acts with every capability: file permissions are lifted by
 	// capabilities, not by a uid of zero, and kernel threads create files
 	// wherever the initramfs puts them.
@@ -202,6 +204,7 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 		cpu.set_kernel_gs_base(u64(&cpu_local.cpu_number))
 		katomic.store(mut &cpu_local.is_idle, true)
 		kernel_pagemap.switch_to()
+		memory.note_active_pagemap(cpu_local.cpu_number, u64(kernel_pagemap.top_level))
 		cpu_local.tss.ist3 = cpu_local.idle_pf_stack
 		reap_dead_threads(mut cpu_local)
 		await()
@@ -241,6 +244,8 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 	cpu_local.tss.ist3 = current_thread.pf_stack
 	reap_dead_threads(mut cpu_local)
 
+	// Recorded before it is loaded; see memory.note_active_pagemap().
+	memory.note_active_pagemap(cpu_local.cpu_number, current_thread.cr3)
 	if cpu.read_cr3() != current_thread.cr3 {
 		cpu.write_cr3(current_thread.cr3)
 	}
@@ -384,6 +389,7 @@ pub fn stop_thread_for_good(_thread &proc.Thread) {
 			apic.lapic_send_ipi(u8(cpu_locals[on].lapic_id), scheduler_vector)
 			kicked_cpu = on
 		}
+		answer_tlb_shootdown()
 		asm volatile amd64 {
 			pause
 			; ; ; memory

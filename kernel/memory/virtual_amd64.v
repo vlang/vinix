@@ -1,6 +1,7 @@
 @[has_globals]
 module memory
 
+import katomic
 import lib
 import limine
 import x86.cpu
@@ -176,7 +177,13 @@ pub fn (mut pagemap Pagemap) unmap_page_unlocked(virt u64) ? {
 	mut pte_p := unsafe { &u64(u64(&pml1[pml1_entry]) + higher_half) }
 
 	unsafe {
+		old := *pte_p
 		*pte_p = 0
+		// Before any table below goes back: a CPU still holding a translation
+		// through it would walk a page that is someone else's by then.
+		if old & 1 != 0 {
+			pagemap.invalidate(virt)
+		}
 
 		mut i := u64(0)
 		for ; i < 512; i++ {
@@ -228,10 +235,6 @@ pub fn (mut pagemap Pagemap) unmap_page_unlocked(virt u64) ? {
 			}
 		}
 	}
-	current_cr3 := cpu.read_cr3()
-	if current_cr3 == u64(pagemap.top_level) {
-		cpu.invlpg(virt)
-	}
 }
 
 // Change the protection of a page that is mapped. One that is not is left
@@ -248,10 +251,7 @@ pub fn (mut pagemap Pagemap) flag_page(virt u64, flags u64) ? {
 	unsafe {
 		*pte_p |= flags
 	}
-	current_cr3 := cpu.read_cr3()
-	if current_cr3 == u64(pagemap.top_level) {
-		cpu.invlpg(virt)
-	}
+	pagemap.invalidate(virt)
 }
 
 pub fn (mut pagemap Pagemap) map_page(virt u64, phys u64, flags u64) ? {
@@ -281,12 +281,13 @@ pub fn (mut pagemap Pagemap) map_page_unlocked(virt u64, phys u64, flags u64) ? 
 
 	entry := unsafe { &u64(u64(pml1) + higher_half + pml1_entry * 8) }
 
+	old := unsafe { *entry }
 	unsafe {
 		*entry = phys | flags
 	}
-	current_cr3 := cpu.read_cr3()
-	if current_cr3 == u64(pagemap.top_level) {
-		cpu.invlpg(virt)
+	// Nothing caches an entry that was not present.
+	if old & 1 != 0 {
+		pagemap.invalidate(virt)
 	}
 }
 
@@ -500,6 +501,70 @@ pub fn (pagemap &Pagemap) next_present(start u64, end u64) u64 {
 	return end
 }
 
-// The flush that follows tearing down a page map no CPU runs any more. The
-// x86 unmap path still invalidates each page itself.
+// The flush that follows tearing down a page map no CPU runs any more. Loading
+// another CR3 dropped its translations on each of them already: user pages are
+// not global, and there are no PCIDs.
 pub fn flush_tlb_everywhere() {}
+
+// ── TLB shootdown ────────────────────────────────────────────────────────────
+//
+// x86 has no broadcast invalidation, as arm64's TLBI ...IS has: INVLPG drops a
+// translation from this CPU's TLB only. Every other CPU running a thread of
+// the same process kept the old one -- and went on using a page munmap had
+// given back to be someone else's, writing a page fork had just shared with
+// the child, and reading the old copy of one a copy-on-write fault had
+// replaced. So a change to a present entry is shot down on every CPU that may
+// hold it, through an IPI the scheduler sends and waits for.
+
+const max_tlb_cpus = 256
+
+__global (
+	// The CR3 each CPU loaded last, as far as a shootdown needs to know: a
+	// CPU whose entry is not a page map's has loaded another CR3 since, which
+	// dropped that page map's translations.
+	tlb_active_cr3 [max_tlb_cpus]u64
+	tlb_shootdown  fn (u64, u64, bool)
+)
+
+@[inline]
+fn full_fence() {
+	asm volatile amd64 {
+		mfence
+		; ; ; memory
+	}
+}
+
+pub fn register_tlb_shootdown(shootdown fn (u64, u64, bool)) {
+	tlb_shootdown = shootdown
+}
+
+// Called on CPU `cpu_number` before it loads `cr3`. The fence pairs with the
+// one after a page table change: either the shootdown sees this CPU's record,
+// or this CPU's page walks see the change.
+pub fn note_active_pagemap(cpu_number u64, cr3 u64) {
+	if cpu_number < max_tlb_cpus {
+		katomic.store(mut &tlb_active_cr3[cpu_number], cr3)
+	}
+	full_fence()
+}
+
+pub fn pagemap_may_be_active_on(cpu_number u64, cr3 u64) bool {
+	return cpu_number >= max_tlb_cpus || katomic.load(&tlb_active_cr3[cpu_number]) == cr3
+}
+
+// Drop the translation of `virt` from every CPU that may hold one. A page map
+// being torn down runs on no CPU. A change to the kernel's own mappings, which
+// every page map shares, is dropped everywhere.
+fn (pagemap &Pagemap) invalidate(virt u64) {
+	if pagemap.dying {
+		return
+	}
+	top_level := u64(pagemap.top_level)
+	if cpu.read_cr3() == top_level {
+		cpu.invlpg(virt)
+	}
+	if tlb_shootdown != unsafe { nil } {
+		full_fence()
+		tlb_shootdown(top_level, virt, voidptr(pagemap) == voidptr(&kernel_pagemap))
+	}
+}
