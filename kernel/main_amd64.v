@@ -33,6 +33,7 @@ import dev.random
 import dev.mouse
 import dev.procdev
 import dev.pty
+import dev.tty
 import syscall.table
 import socket
 import socket.inet
@@ -99,6 +100,7 @@ fn kmain_thread() {
 	fbdev.initialise()
 	fbdev.register_driver(simple.get_driver())
 	console.initialise()
+	tty.initialise()
 	serial.initialise()
 	mouse.initialise()
 	hda.initialize()

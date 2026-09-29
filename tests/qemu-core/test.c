@@ -23,6 +23,7 @@
 #include <string.h>
 #include <sys/file.h>
 #include <sys/inotify.h>
+#include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <sys/mount.h>
 #include <sys/random.h>
@@ -39,6 +40,7 @@
 #include <sys/uio.h>
 #include <sys/un.h>
 #include <sys/wait.h>
+#include <termios.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -1653,6 +1655,56 @@ static int test_joined_threads_return_their_memory(void)
 	return 0;
 }
 
+/* The console as a controlling terminal: a session leader takes it with
+ * TIOCSCTTY, and the session and foreground group it reports, its window
+ * size, and /dev/tty all follow, until TIOCNOTTY gives it up. */
+static int console_session_child(void)
+{
+	if (setsid() < 0)
+		return 1;
+	int console = open("/dev/console", O_RDWR | O_NOCTTY);
+	if (console < 0)
+		return 2;
+	if (ioctl(console, TIOCSCTTY, 0) != 0)
+		return 3;
+	pid_t session = -1;
+	if (ioctl(console, TIOCGSID, &session) != 0 || session != getsid(0))
+		return 4;
+	if (tcgetpgrp(console) != getpgrp() || tcsetpgrp(console, getpgrp()) != 0)
+		return 5;
+	int tty = open("/dev/tty", O_RDWR);
+	if (tty < 0)
+		return 6;
+	struct winsize original, wanted = {.ws_row = 24, .ws_col = 80}, seen;
+	if (ioctl(tty, TIOCGWINSZ, &original) != 0 || ioctl(tty, TIOCSWINSZ, &wanted) != 0
+	    || ioctl(console, TIOCGWINSZ, &seen) != 0 || seen.ws_row != 24 || seen.ws_col != 80
+	    || ioctl(tty, TIOCSWINSZ, &original) != 0)
+		return 7;
+	close(tty);
+	if (ioctl(console, TIOCNOTTY) != 0)
+		return 8;
+	errno = 0;
+	if (open("/dev/tty", O_RDWR) >= 0 || errno != ENXIO)
+		return 9;
+	return 0;
+}
+
+static int test_console_controls_a_session(void)
+{
+	pid_t child = fork();
+	CHECK(child >= 0);
+	if (child == 0)
+		_exit(console_session_child());
+	int status;
+	CHECK(waitpid(child, &status, 0) == child);
+	if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
+		printf("console session: status 0x%x\n", status);
+		CHECK(0);
+	}
+	puts("QEMU CORE PASS: the console controls a session");
+	return 0;
+}
+
 /* An event has room for 64 listeners. More threads than that waiting on one
  * futex see a spurious wake, which they retry, rather than stop the kernel. */
 #define MANY_WAITERS 80
@@ -2003,6 +2055,7 @@ static int run_tests(void)
 	CHECK(test_fork_inherits_process_state() == 0);
 	CHECK(test_cpuinfo() == 0);
 	CHECK(test_joined_threads_return_their_memory() == 0);
+	CHECK(test_console_controls_a_session() == 0);
 	CHECK(test_fifo_keeps_its_cpu() == 0);
 	CHECK(test_frozen_cgroup_stops_its_threads() == 0);
 	CHECK(test_wait_ends_for_a_pending_signal() == 0);

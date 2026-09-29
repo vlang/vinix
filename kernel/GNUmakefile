@@ -227,7 +227,6 @@ override VFILES := $(shell find -L * -type f -name '*.v' \
     ! -path 'acpi/*' \
     ! -path 'uacpi/*' \
     ! -path 'dev/ata/*' \
-    ! -path 'dev/console/console.v' \
     ! -path 'dev/hda/*' \
     ! -path 'dev/mouse/*' \
     ! -path 'dev/nvme/*' \

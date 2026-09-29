@@ -6,19 +6,6 @@ import x86.apic
 import x86.kio
 import dev.keyboard
 import event
-import event.eventstruct
-import klock
-import stat
-import term
-import fs
-import ioctl
-import resource
-import errno
-import termios
-import file
-import userland
-import proc
-import katomic
 import flanterm as _
 
 const capslock = 0x3a
@@ -38,14 +25,9 @@ const left_meta = 0x5b
 const right_meta = 0x5c
 const left_meta_rel = 0xdb
 const right_meta_rel = 0xdc
-const console_buffer_size = 1024
-const console_bigbuf_size = 4096
 
 __global (
 	console_convtab_numpad_numlock map[u8]u8
-	console_res                    = &Console(unsafe { nil })
-	console_read_lock              klock.Lock
-	console_event                  eventstruct.Event
 	console_numlock_active         = bool(false)
 	console_capslock_active        = bool(false)
 	console_shift_active           = bool(false)
@@ -57,129 +39,7 @@ __global (
 	console_meta_active            = bool(false)
 	console_meta_chorded           = bool(false)
 	console_extra_scancodes        = bool(false)
-	console_buffer                 [console_buffer_size]u8
-	console_buffer_i               = u64(0)
-	console_bigbuf                 [console_bigbuf_size]u8
-	console_bigbuf_i               = u64(0)
-	console_termios                = &termios.Termios(unsafe { nil })
-	console_decckm                 = false
-	// XXX this is a massive hack to allow ctrl-c and friends without process
-	// groups
-	latest_thread                  = &proc.Thread(unsafe { nil })
 )
-
-fn is_printable(c u8) bool {
-	return c >= 0x20 && c <= 0x7e
-}
-
-fn add_to_buf_char(_c u8, echo bool) {
-	mut c := _c
-
-	if c == `\r` && console_termios.c_iflag & termios.igncr != 0 {
-		return
-	}
-
-	if c == `\n` && console_termios.c_iflag & termios.icrnl == 0 {
-		c = `\r`
-	} else if c == `\r` && console_termios.c_iflag & termios.icrnl != 0 {
-		c = `\n`
-	} else if c == `\r` && console_termios.c_iflag & termios.inlcr == 0 {
-		c = `\n`
-	} else if c == `\n` && console_termios.c_iflag & termios.inlcr != 0 {
-		c = `\r`
-	}
-
-	if console_termios.c_lflag & termios.icanon != 0 {
-		match c {
-			`\n` {
-				if console_buffer_i == console_buffer_size {
-					return
-				}
-				console_buffer[console_buffer_i] = c
-				console_buffer_i++
-				if echo && console_termios.c_lflag & termios.echo != 0 {
-					C.kprintf(c'%c', i32(c))
-				}
-				for i := u64(0); i < console_buffer_i; i++ {
-					if console_res.status & file.pollin == 0 {
-						console_res.status |= file.pollin
-						event.trigger(mut console_res.event, false)
-					}
-					if console_bigbuf_i == console_bigbuf_size {
-						return
-					}
-					console_bigbuf[console_bigbuf_i] = console_buffer[i]
-					console_bigbuf_i++
-				}
-				console_buffer_i = 0
-				return
-			}
-			`\b` {
-				if console_buffer_i == 0 {
-					return
-				}
-				console_buffer_i--
-				to_backspace := if console_buffer[console_buffer_i] >= 0x01
-					&& console_buffer[console_buffer_i] <= 0x1f {
-					2
-				} else {
-					1
-				}
-				console_buffer[console_buffer_i] = 0
-				if echo && console_termios.c_lflag & termios.echo != 0 {
-					for i := 0; i < to_backspace; i++ {
-						print('\b \b')
-					}
-				}
-				return
-			}
-			else {}
-		}
-
-		if console_buffer_i == console_buffer_size {
-			return
-		}
-		console_buffer[console_buffer_i] = c
-		console_buffer_i++
-	} else {
-		if console_res.status & file.pollin == 0 {
-			console_res.status |= file.pollin
-			event.trigger(mut console_res.event, false)
-		}
-		if console_bigbuf_i == console_bigbuf_size {
-			return
-		}
-		console_bigbuf[console_bigbuf_i] = c
-		console_bigbuf_i++
-	}
-
-	if echo && console_termios.c_lflag & termios.echo != 0 {
-		if is_printable(c) {
-			C.kprintf(c'%c', i32(c))
-		} else if c >= 0x01 && c <= 0x1f {
-			C.kprintf(c'^%c', i32(c + 0x40))
-		}
-	}
-}
-
-fn add_to_buf(ptr &u8, count u64, echo bool) {
-	console_read_lock.acquire()
-	defer {
-		console_read_lock.release()
-	}
-
-	for i := u64(0); i < count; i++ {
-		c := unsafe { ptr[i] }
-		if console_termios.c_lflag & termios.isig != 0 {
-			if c == console_termios.c_cc[termios.vintr] {
-				userland.sendsig(latest_thread, userland.sigint)
-			}
-		}
-		add_to_buf_char(c, echo)
-	}
-
-	event.trigger(mut console_event, false)
-}
 
 // Modified navigation keys use xterm's CSI 1;<modifier><final> encoding.
 // Keeping Super in this stream lets the framebuffer desktop offer the same
@@ -550,35 +410,6 @@ fn write_ps2_config(value u8) {
 	write_ps2(0x60, value)
 }
 
-fn dec_private(_esc_val_count u64, esc_values &u32, final u64) {
-	C.printf(c'dec private: ? %llu %c\n', unsafe { esc_values[0] }, final)
-	match unsafe { esc_values[0] } {
-		1 {
-			match final {
-				u64(`h`) {
-					console_decckm = true
-				}
-				u64(`l`) {
-					console_decckm = false
-				}
-				else {}
-			}
-		}
-		else {}
-	}
-}
-
-pub fn flanterm_callback(p voidptr, t u64, a u64, b u64, c u64) {
-	C.printf(c'Flanterm callback called\n')
-
-	match t {
-		10 {
-			dec_private(a, unsafe { &u32(b) }, c)
-		}
-		else {}
-	}
-}
-
 pub fn initialise() {
 	// A serial-only QEMU boot can legitimately have no Limine framebuffer.
 	// The console device still provides stdin/stdout; only the terminal callback
@@ -587,182 +418,14 @@ pub fn initialise() {
 		C.flanterm_set_callback(flanterm_ctx, voidptr(flanterm_callback))
 	}
 
-	console_res = &Console{}
-	console_res.stat.size = 0
-	console_res.stat.blocks = 0
-	console_res.stat.blksize = 512
-	console_res.stat.rdev = resource.create_dev_id()
-	console_res.stat.mode = 0o644 | stat.ifchr
-
-	// Initialise termios
-	console_res.termios.c_iflag = termios.brkint | termios.icrnl | termios.ixon | termios.imaxbel
-	console_res.termios.c_oflag = termios.opost | termios.onlcr
-	console_res.termios.c_cflag = termios.cs8 | termios.cread | termios.b38400
-	console_res.termios.c_lflag = termios.isig | termios.icanon | termios.iexten | termios.echo | termios.echoe | termios.echok | termios.echoctl | termios.echoke
-	console_res.termios.c_cc[termios.vintr] = termios.ctrl(`C`)
-	console_res.termios.c_cc[termios.vquit] = termios.ctrl(`\\`)
-	console_res.termios.c_cc[termios.verase] = 0x7f // termios.ctrl(`?`)
-	console_res.termios.c_cc[termios.vkill] = termios.ctrl(`U`)
-	console_res.termios.c_cc[termios.veof] = termios.ctrl(`D`)
-	console_res.termios.c_cc[termios.vstart] = termios.ctrl(`Q`)
-	console_res.termios.c_cc[termios.vstop] = termios.ctrl(`S`)
-	console_res.termios.c_cc[termios.vsusp] = termios.ctrl(`Z`)
-	console_res.termios.c_cc[termios.vreprint] = termios.ctrl(`R`)
-	console_res.termios.c_cc[termios.vwerase] = termios.ctrl(`W`)
-	console_res.termios.c_cc[termios.vlnext] = termios.ctrl(`V`)
-	console_res.termios.c_cc[termios.vdiscard] = termios.ctrl(`O`)
-	console_res.termios.c_cc[termios.vmin] = 1
-
-	console_termios = &console_res.termios
-
-	console_res.status |= file.pollout
-
-	fs.devtmpfs_add_device(console_res, 'console')
+	setup_console()
 
 	spawn keyboard_handler()
 }
 
-struct Console {
-pub mut:
-	stat     stat.Stat
-	refcount int
-	l        klock.Lock
-	event    eventstruct.Event
-	status   int
-	can_mmap bool
-
-	termios termios.Termios
+fn caps_lock_on() bool {
+	return console_capslock_active
 }
 
-fn (mut this Console) mmap(_handle voidptr, _page u64, _flags int) voidptr {
-	return 0
-}
-
-fn (mut this Console) read(_handle voidptr, void_buf voidptr, _loc u64, count u64) ?i64 {
-	latest_thread = proc.current_thread()
-	if count == 0 {
-		return 0
-	}
-	handle := unsafe { &file.Handle(_handle) }
-	nonblocking := handle != unsafe { nil } && handle.flags & resource.o_nonblock != 0
-
-	mut buf := unsafe { &u8(void_buf) }
-
-	for console_read_lock.test_and_acquire() == false {
-		if nonblocking {
-			errno.set(errno.ewouldblock)
-			return none
-		}
-		event.await_one(mut console_event, true) or {
-			errno.set(errno.eintr)
-			return none
-		}
-	}
-
-	mut wait := true
-
-	for i := u64(0); i < count; {
-		if console_bigbuf_i != 0 {
-			unsafe {
-				buf[i] = console_bigbuf[0]
-			}
-			i++
-			console_bigbuf_i--
-			for j := u64(0); j < console_bigbuf_i; j++ {
-				console_bigbuf[j] = console_bigbuf[j + 1]
-			}
-			if console_bigbuf_i == 0 && console_res.status & file.pollin != 0 {
-				console_res.status &= ~file.pollin
-				event.trigger(mut console_res.event, false)
-			}
-			wait = false
-		} else {
-			if wait == true {
-				// The desktop polls this descriptor each frame. Do not wait
-				// for a keystroke when the caller requested O_NONBLOCK.
-				if nonblocking {
-					console_read_lock.release()
-					errno.set(errno.ewouldblock)
-					return none
-				}
-				console_read_lock.release()
-				for {
-					event.await_one(mut console_event, true) or {
-						errno.set(errno.eintr)
-						return none
-					}
-					if console_read_lock.test_and_acquire() == true {
-						break
-					}
-				}
-			} else {
-				console_read_lock.release()
-				return i64(i)
-			}
-		}
-	}
-
-	console_read_lock.release()
-	return i64(count)
-}
-
-fn (mut this Console) write(_handle voidptr, buf voidptr, _loc u64, count u64) ?i64 {
-	latest_thread = proc.current_thread()
-
-	copy := unsafe { malloc(count) }
-	defer {
-		unsafe { free(copy) }
-	}
-	unsafe { C.memcpy(copy, buf, count) }
-	term.print(copy, count)
-	return i64(count)
-}
-
-fn (mut this Console) ioctl(handle voidptr, request u64, argp voidptr) ?int {
-	latest_thread = proc.current_thread()
-
-	match request {
-		ioctl.tiocgwinsz {
-			mut w := unsafe { &ioctl.WinSize(argp) }
-			w.ws_row = u16(terminal_rows)
-			w.ws_col = u16(terminal_cols)
-			w.ws_xpixel = u16(framebuffer_width)
-			w.ws_ypixel = u16(framebuffer_height)
-			return 0
-		}
-		ioctl.tcgets {
-			unsafe { C.memcpy(argp, &this.termios, termios.user_size()) }
-			return 0
-		}
-		ioctl.kdgetled {
-			unsafe {
-				*&u8(argp) = u8(if console_capslock_active { ioctl.led_cap } else { 0 })
-			}
-			return 0
-		}
-		// TODO: handle these differently
-		ioctl.tcsets, ioctl.tcsetsw, ioctl.tcsetsf {
-			unsafe { C.memcpy(&this.termios, argp, termios.user_size()) }
-			return 0
-		}
-		else {
-			return resource.default_ioctl(handle, request, argp)
-		}
-	}
-}
-
-fn (mut this Console) unref(_handle voidptr) ? {
-	katomic.dec(mut &this.refcount)
-}
-
-fn (mut this Console) link(_handle voidptr) ? {
-	katomic.inc(mut &this.stat.nlink)
-}
-
-fn (mut this Console) unlink(_handle voidptr) ? {
-	katomic.dec(mut &this.stat.nlink)
-}
-
-fn (mut this Console) grow(_handle voidptr, _new_size u64) ? {
-	return none
-}
+// The framebuffer is the console here; the serial port is a device of its own.
+fn mirror_to_serial(_ voidptr, _ u64) {}
