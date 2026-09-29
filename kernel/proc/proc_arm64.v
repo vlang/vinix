@@ -166,6 +166,12 @@ pub fn (t &Thread) syscall_args_text() string {
 		text.add_unsigned(t.running_on)
 	}
 	text.add(if t.is_in_queue { ' queued=true' } else { ' queued=false' })
+	// Two dumps apart, CPU time that grew means the thread is spinning; a
+	// wait says it is asleep on events instead.
+	text.add(' ran_ms=')
+	text.add_unsigned(t.cpu_time_ns / 1000000)
+	text.add(' waiting_on=')
+	text.add_unsigned(t.attached_events_i)
 	return text.str()
 }
 

@@ -1181,10 +1181,35 @@ pub fn directory_in_use(directory voidptr) bool {
 	return false
 }
 
+const max_sysrq_hooks = 4
+
+__global (
+	sysrq_hooks     [max_sysrq_hooks]fn ()
+	sysrq_hooks_len = int(0)
+)
+
+// A driver that has state worth seeing in a hang adds it to sysrq 't', after
+// the threads. Registered once, at boot.
+pub fn register_sysrq_hook(hook fn ()) bool {
+	if sysrq_hooks_len == max_sysrq_hooks {
+		return false
+	}
+	sysrq_hooks[sysrq_hooks_len] = hook
+	sysrq_hooks_len++
+	return true
+}
+
 // sysrq 't': every thread on the console, with the syscall it is in and that
 // call's first argument, which is how a hang in userspace is told apart from
 // one in the kernel and pinned to the call that never returned.
 pub fn dump_tasks() {
+	dump_threads()
+	for i := 0; i < sysrq_hooks_len; i++ {
+		sysrq_hooks[i]()
+	}
+}
+
+fn dump_threads() {
 	lock_table()
 	defer { unlock_table() }
 	for pid := 1; pid < max_pid; pid++ {
