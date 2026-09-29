@@ -644,6 +644,17 @@ pub fn malloc(size u64) voidptr {
 // a time and page-aligned, and callers have come to rely on that; this one may
 // instead come from a medium class that shares a page with others of its size.
 // free() and realloc() take either.
+// malloc_packed(), but nil rather than a stopped kernel when memory has run
+// out, for a caller with something else to fall back on.
+pub fn malloc_packed_fallible(size u64) voidptr {
+	$if xnu_zone ? {
+		return xnu_heap_alloc(size)
+	}
+	mut slab := slab_for(size, slabs.len) or { return big_alloc(size) }
+
+	return slab.alloc_fallible()
+}
+
 pub fn malloc_packed(size u64) voidptr {
 	$if xnu_zone ? {
 		return xnu_heap_alloc(size)

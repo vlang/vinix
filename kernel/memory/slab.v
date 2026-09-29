@@ -118,8 +118,9 @@ fn slab_first_zero(word u64) u64 {
 	return index
 }
 
-fn (mut this Slab) grow() {
-	base := u64(pmm_alloc_nozero(1)) + higher_half
+// Make the physical page `page` a page of this class's objects.
+fn (mut this Slab) grow(page u64) {
+	base := page + higher_half
 	mut hdr := unsafe { &SlabHeader(base) }
 	unsafe {
 		C.memset(voidptr(hdr), 0, sizeof(SlabHeader))
@@ -142,6 +143,16 @@ fn (mut this Slab) grow() {
 }
 
 pub fn (mut this Slab) alloc() voidptr {
+	return this.take(false)
+}
+
+// alloc(), but nil rather than a stopped kernel when there is no page left to
+// grow by, for a caller with something else to fall back on.
+pub fn (mut this Slab) alloc_fallible() voidptr {
+	return this.take(true)
+}
+
+fn (mut this Slab) take(fallible bool) voidptr {
 	this.@lock.acquire()
 	if this.ent_size == 0 {
 		this.@lock.release()
@@ -154,8 +165,27 @@ pub fn (mut this Slab) alloc() voidptr {
 			this.spare = 0
 			this.add_partial(mut spare)
 		} else {
-			// Existing lock order: slab -> PMM. The PMM does not use malloc.
-			this.grow()
+			// The page is taken with the lock let go. Taking it can run the
+			// reclaimers, and the page cache's frees into the slabs, this
+			// class among them: the CPU then waited on its own lock for good.
+			this.@lock.release()
+			page := if fallible {
+				u64(pmm_alloc_nozero_fallible(1))
+			} else {
+				u64(pmm_alloc_nozero(1))
+			}
+			this.@lock.acquire()
+			if this.partial == 0 {
+				if page == 0 {
+					this.@lock.release()
+					return unsafe { nil }
+				}
+				this.grow(page)
+			} else if page != 0 {
+				// Something freed into the class meanwhile. Lock order:
+				// slab -> PMM; the PMM does not use malloc.
+				pmm_free(voidptr(page), 1)
+			}
 		}
 	}
 	mut hdr := unsafe { &SlabHeader(this.partial) }
