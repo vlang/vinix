@@ -1,11 +1,40 @@
+@[has_globals]
 module ext2
 
 import errno
 import fs as vfs
+import klock
 import memory
 import pagecache
 import resource as resource_mod
 import stat
+
+__global (
+	// Where transfers between the caches and their devices are staged: a run
+	// of max_run_pages, physically contiguous, set aside when the first volume
+	// is found. Allocated per transfer, it was a run of up to 32 pages asked
+	// for with a cache's lock held, when that cache had filled memory and was
+	// the one thing the reclaimers could not free: no run was left, and the
+	// allocator stopped the kernel.
+	ext2_bounce      voidptr
+	ext2_bounce_lock klock.Lock
+)
+
+fn bounce_pages() u64 {
+	return (pagecache.max_run_pages * pagecache.page_bytes + page_size - 1) / page_size
+}
+
+fn reserve_bounce() {
+	ext2_bounce_lock.acquire()
+	defer { ext2_bounce_lock.release() }
+	if ext2_bounce != unsafe { nil } {
+		return
+	}
+	physical := memory.pmm_alloc_fallible(bounce_pages())
+	if physical != unsafe { nil } {
+		ext2_bounce = voidptr(u64(physical) + higher_half)
+	}
+}
 
 // Cache keys are offsets in the backing resource, not inode-relative offsets.
 // Metadata and data therefore share one coherent cache, including byte-sized
@@ -13,7 +42,8 @@ import stat
 // filesystem share the cache created by ext2_init.
 // Preserve the old raw-I/O adapter's physically contiguous, page-aligned
 // buffers. Cached bytes themselves live in heap allocations and must not be
-// handed straight to a DMA backend. Only misses/writeback allocate a bounce.
+// handed straight to a DMA backend, so misses and write-backs are staged in
+// ext2_bounce.
 // A write-back sends a run of consecutive pages in one transfer.
 fn device_transfer(context voidptr, buf voidptr, loc u64, count u64, writing bool) ?i64 {
 	if count == 0 {
@@ -23,14 +53,27 @@ fn device_transfer(context voidptr, buf voidptr, loc u64, count u64, writing boo
 		errno.set(errno.einval)
 		return none
 	}
-	pages := (count + pagecache.page_bytes - 1) / pagecache.page_bytes
-	physical := memory.pmm_alloc(pages)
-	if physical == unsafe { nil } {
-		errno.set(errno.enomem)
-		return none
+	ext2_bounce_lock.acquire()
+	defer { ext2_bounce_lock.release() }
+	mut bounce := ext2_bounce
+	mut physical := voidptr(unsafe { nil })
+	pages := (count + page_size - 1) / page_size
+	if bounce == unsafe { nil } {
+		// None could be set aside: take one for this transfer, failing it
+		// rather than the kernel when there is none. The cache keeps what it
+		// could not write and tries again.
+		physical = memory.pmm_alloc_nozero_fallible(pages)
+		if physical == unsafe { nil } {
+			errno.set(errno.enomem)
+			return none
+		}
+		bounce = voidptr(u64(physical) + higher_half)
 	}
-	bounce := voidptr(u64(physical) + higher_half)
-	defer { memory.pmm_free(physical, pages) }
+	defer {
+		if physical != unsafe { nil } {
+			memory.pmm_free(physical, pages)
+		}
+	}
 	// Keep the VFS node as the opaque callback context. A V interface is two
 	// words (the object pointer and its method table); converting the interface
 	// itself to voidptr loses the method table and makes the indirect read/write

@@ -1154,6 +1154,7 @@ pub fn ext2_init(backing_device &vfs.VFSNode) (&EXT2Filesystem, bool) {
 		|| u64(backing_device.resource.stat.size) % sector_size != 0 {
 		return 0, false
 	}
+	reserve_bounce()
 	mut new_filesystem := &EXT2Filesystem{
 		backing_device: unsafe { backing_device }
 		superblock: &EXT2Superblock{}
