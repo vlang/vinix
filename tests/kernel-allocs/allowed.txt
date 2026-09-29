@@ -25,5 +25,4 @@ memory/virtual_arm64.v string interpolation	2
 proc/proc.v array initialization	2
 sched/sched_amd64.v array initialization	1
 sched/sched_arm64.v array initialization	1
-socket/socket.v cast to interface	2
 syscall/table/container.v array initialization	1

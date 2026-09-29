@@ -108,10 +108,20 @@ pub mut:
 	// an SCM_CREDENTIALS record. Crashpad, D-Bus and systemd-style services use
 	// it to find out who is on the other end of a connection they accepted.
 	passcred int
-	// Keep closed endpoint objects as small tombstones because their peers refer
-	// to them without taking a resource reference; the large receive buffer and
-	// queued state are still reclaimed immediately.
+	// Closed: the receive buffer and queued state are gone. The object itself
+	// goes once nothing leads to it; see maybe_free().
 	closed bool
+	// How many other sockets point at this one, as their peer or datagram
+	// target, or queue it for accept(2). They hold no resource reference.
+	links int
+	// Whether a pathname holds the socket, as the resource reference it made
+	// with; see maybe_free().
+	path_bound bool
+	// A bind(2) in progress; see bind().
+	binding bool
+	freed   u32
+	// The interface box every descriptor and the pathname hold; freed with it.
+	box &resource.Resource = unsafe { nil }
 
 	data      &u8 = unsafe { nil }
 	read_ptr  u64
@@ -151,6 +161,46 @@ struct DatagramSender {
 	pid      int
 	uid      u32
 	gid      u32
+}
+
+// boxed is the socket as descriptors and its pathname hold it: one box, made
+// the first time. A conversion for each socket(), accept() and bind() made a
+// box of 384 bytes that nothing freed.
+pub fn (mut this UnixSocket) boxed() &resource.Resource {
+	if this.box == unsafe { nil } {
+		this.box = &resource.Resource(this) @[freed]
+	}
+	return this.box
+}
+
+// hold and release count another socket's pointer to `target`.
+fn hold(mut target UnixSocket) {
+	katomic.inc(mut &target.links)
+}
+
+fn release(mut target UnixSocket) {
+	if !katomic.dec(mut &target.links) {
+		target.maybe_free()
+	}
+}
+
+// maybe_free frees a socket nothing leads to any more: it is closed, no other
+// socket points at it, and no descriptor, epoll wait or pathname holds it. An
+// unnamed socket keeps the reference it was made with for good, and a bound
+// one hands it to its pathname, so that floor differs. It is freed after a
+// grace period: sendto(2) and connect(2) may have just looked it up by name.
+// Closed sockets were kept as tombstones before, some 2 KB for every
+// connection or socketpair.
+fn (mut this UnixSocket) maybe_free() {
+	floor := if this.path_bound { 0 } else { 1 }
+	if !this.closed || katomic.load(&this.refcount) > floor || katomic.load(&this.links) != 0 {
+		return
+	}
+	if !katomic.cas(mut &this.freed, u32(0), u32(1)) {
+		return
+	}
+	fs.free_after_grace(voidptr(this.box))
+	fs.free_after_grace(voidptr(this))
 }
 
 // Whether this endpoint keeps message boundaries (SOCK_SEQPACKET).
@@ -897,6 +947,8 @@ fn (mut this UnixSocket) close_endpoint() {
 
 	mut peer := this.peer
 	this.peer = unsafe { nil }
+	mut target := this.dgram_target
+	this.dgram_target = unsafe { nil }
 	mut queued := unsafe { this.backlog }
 	this.backlog = []&UnixSocket{}
 	mut pending := unsafe { this.pending_fd_groups }
@@ -932,12 +984,17 @@ fn (mut this UnixSocket) close_endpoint() {
 		peer.status |= file.pollin | file.pollhup | file.pollerr
 		peer.l.release()
 		event.trigger(mut peer.event, false)
+		release(mut peer)
+	}
+	if target != unsafe { nil } {
+		release(mut target)
 	}
 
 	// A listener owns accepted endpoints until accept(2) publishes a file
 	// descriptor for them. Closing the listener must release those buffers too.
 	for mut connection in queued {
 		connection.close_endpoint()
+		release(mut connection)
 	}
 	unsafe { queued.free() }
 	event.trigger(mut this.event, false)
@@ -945,9 +1002,12 @@ fn (mut this UnixSocket) close_endpoint() {
 
 fn (mut this UnixSocket) unref(handle voidptr) ? {
 	still_referenced := katomic.dec(mut &this.refcount)
-	// A nil handle is the VFS dropping a pathname, not an open socket being
-	// closed. If a descriptor is still alive it must retain the endpoint.
+	// A nil handle is the VFS dropping a pathname, or an epoll wait letting go,
+	// not an open socket being closed. If a descriptor is still alive it must
+	// retain the endpoint.
 	if handle == unsafe { nil } && still_referenced {
+		// The last thing keeping a closed socket may just have gone.
+		this.maybe_free()
 		return
 	}
 
@@ -956,6 +1016,7 @@ fn (mut this UnixSocket) unref(handle voidptr) ? {
 	// open-handle release at count one is the final descriptor close.
 	release_abstract_name(this)
 	this.close_endpoint()
+	this.maybe_free()
 }
 
 fn (mut this UnixSocket) link(_handle voidptr) ? {
@@ -1141,6 +1202,8 @@ fn (mut this UnixSocket) accept(_handle voidptr) ?&resource.Resource {
 	// connect-then-accept sequence deadlock.
 	mut connection_socket := this.backlog[0]
 	this.backlog.delete(0)
+	// Its descriptor holds it from here, rather than the queue.
+	release(mut connection_socket)
 
 	if this.backlog.len == 0 {
 		this.status &= ~file.pollin
@@ -1150,7 +1213,7 @@ fn (mut this UnixSocket) accept(_handle voidptr) ?&resource.Resource {
 	event.trigger(mut this.event, false)
 
 	print('unix accept: done\n')
-	return connection_socket
+	return connection_socket.boxed()
 }
 
 fn (mut this UnixSocket) connect(_handle voidptr, _addr voidptr, addrlen u32) ? {
@@ -1167,7 +1230,23 @@ fn (mut this UnixSocket) connect(_handle voidptr, _addr voidptr, addrlen u32) ? 
 			errno.set(errno.econnrefused)
 			return none
 		}
+		// Held under the target's lock, where close_endpoint() marks it
+		// closed, so a target closing now is either refused or held.
+		socket.l.acquire()
+		if socket.closed {
+			socket.l.release()
+			errno.set(errno.econnrefused)
+			return none
+		}
+		hold(mut socket)
+		socket.l.release()
+		this.l.acquire()
+		mut previous := this.dgram_target
 		this.dgram_target = socket
+		this.l.release()
+		if previous != unsafe { nil } {
+			release(mut previous)
+		}
 		this.status |= file.pollout
 		return
 	}
@@ -1204,6 +1283,10 @@ fn (mut this UnixSocket) connect(_handle voidptr, _addr voidptr, addrlen u32) ? 
 	connection_socket.peer_uid = client.euid
 	connection_socket.peer_gid = client.egid
 
+	// Each end points at the other, and the listener queues the new one.
+	hold(mut connection_socket)
+	hold(mut this)
+	hold(mut connection_socket)
 	this.peer = connection_socket
 	this.connected = true
 	this.peer_pid = socket.owner_pid
@@ -1223,6 +1306,23 @@ fn (mut this UnixSocket) bind(_handle voidptr, _addr voidptr, addrlen u32) ? {
 	if addr.sun_family != sock_pub.af_unix {
 		errno.set(errno.einval)
 		return none
+	}
+	// A socket has one name, as on Linux. A second pathname would lead to it
+	// without the reference the first holds, and outlive it. Claimed under the
+	// lock before anything is made, so two binds at once cannot both pass.
+	this.l.acquire()
+	if this.binding || this.path_bound || this.name_len > u32(sizeof(u16)) {
+		this.l.release()
+		errno.set(errno.einval)
+		return none
+	}
+	this.binding = true
+	this.l.release()
+	mut bound := false
+	defer {
+		if !bound {
+			this.binding = false
+		}
 	}
 
 	// Abstract socket: sun_path[0] == '\0', name is in sun_path[1..addrlen-2]
@@ -1250,6 +1350,7 @@ fn (mut this UnixSocket) bind(_handle voidptr, _addr voidptr, addrlen u32) ? {
 				abstract_sockets[i].socket = unsafe { this }
 				this.name = *addr
 				this.name_len = addrlen
+				bound = true
 				return
 			}
 		}
@@ -1261,13 +1362,19 @@ fn (mut this UnixSocket) bind(_handle voidptr, _addr voidptr, addrlen u32) ? {
 	mut t := proc.current_thread()
 
 	path := unsafe { cstring_to_vstring(&addr.sun_path[0]) }
+	// The node makes a copy of its own.
+	defer {
+		unsafe { path.free() }
+	}
 
 	mut node := fs.create(proc.current_directory_of(t.process), path, stat.ifsock | 0o777) or {
 		return none
 	}
 
 	this.stat = node.resource.stat
-	fs.replace_resource(mut node, this)
+	this.path_bound = true
+	bound = true
+	fs.replace_resource(mut node, this.boxed())
 
 	this.name = *addr
 	this.name_len = u32(sizeof(u16)) + u32(path.len) + 1
@@ -1637,6 +1744,8 @@ pub fn create_pair(@type int) ?(&UnixSocket, &UnixSocket) {
 	// read waited for data that had nowhere to come from.
 	a.peer = b
 	b.peer = a
+	hold(mut a)
+	hold(mut b)
 	a.connected = true
 	b.connected = true
 	a.peer_pid = b.owner_pid

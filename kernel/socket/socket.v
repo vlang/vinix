@@ -133,8 +133,8 @@ pub fn family_of(fdnum int) int {
 fn socketpair_create(domain int, @type int, _protocol int) ?(&resource.Resource, &resource.Resource) {
 	match domain {
 		sock_pub.af_unix {
-			socket0, socket1 := sock_unix.create_pair(@type)?
-			return &resource.Resource(socket0), &resource.Resource(socket1)
+			mut socket0, mut socket1 := sock_unix.create_pair(@type)?
+			return socket0.boxed(), socket1.boxed()
 		}
 		// Linux's IPv4 has no socketpair(2); a family there is none of has
 		// no sockets at all.
@@ -153,8 +153,8 @@ fn socketpair_create(domain int, @type int, _protocol int) ?(&resource.Resource,
 fn socket_create(domain int, @type int, protocol int) ?&resource.Resource {
 	match domain {
 		sock_pub.af_unix {
-			ret := sock_unix.create(@type)?
-			return ret
+			mut ret := sock_unix.create(@type)?
+			return ret.boxed()
 		}
 		sock_pub.af_inet {
 			ret := sock_inet.create(@type, protocol)?
