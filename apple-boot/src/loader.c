@@ -113,6 +113,11 @@ void loader_main(uint64_t boot_args, uint64_t image_base)
         .next = window,
         .end = window + ALLOCATION_WINDOW_BYTES,
     };
+    /* Everything below is written with the MMU off, straight to DRAM. A
+     * dirty line iBoot left over the window could be evicted on top of it
+     * later, so drop them all first; the same range is invalidated again
+     * before the kernel reads it cacheably. */
+    cache_invalidate_range(window, window + ALLOCATION_WINDOW_BYTES);
     struct loaded_kernel kernel;
     const uint8_t *kernel_file = (const uint8_t *)payload + payload->kernel_offset;
     if (load_elf(kernel_file, payload->kernel_bytes, &allocator, &kernel))
@@ -211,8 +216,8 @@ void loader_main(uint64_t boot_args, uint64_t image_base)
     quiesce_fiq_sources();
 
     /* Written with the caches off: drop whatever the firmware still holds
-     * for these lines before the kernel reads them cacheably. */
-    cache_invalidate_range(kernel.phys_base, kernel_end);
+     * for these lines before the kernel reads them cacheably. The window
+     * holds the kernel, the FDT, the tables, the responses and the stack. */
     cache_invalidate_range(allocator.start, late_end);
 
     enter_kernel(kernel.entry, stack + KERNEL_STACK_BYTES + HHDM_OFFSET, SCTLR_KERNEL,
