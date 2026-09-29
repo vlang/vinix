@@ -54,6 +54,9 @@ const button_icon_size = 16
 // constructing heap-backed array literals for every icon on every redraw.
 const gear_tooth_x = [1, 0, -1, 0]
 const gear_tooth_y = [0, 1, 0, -1]
+// Finder's action gear has eight teeth, six pixels out from its centre.
+const finder_gear_x = [6, 4, 0, -4, -6, -4, 0, 4]
+const finder_gear_y = [0, 4, 6, 4, 0, -4, -6, -4]
 // Doubled unit directions for the brightness sun's eight rays; diagonals are
 // shortened so every ray has about the same length.
 const brightness_ray_x = [2, 1, 0, -1, -2, -1, 0, 1]
@@ -872,14 +875,25 @@ fn (mut d Desktop) draw_catalina_dropdown(el &ui2.Element, x int, y int, w int, 
 }
 
 fn (mut d Desktop) draw_catalina_text_input(el &ui2.Element, x int, y int, w int, h int) {
-	bezel_height := if el.kind == .text_area || h < catalina_text_input_height {
+	// A text field with a leading image is a search field, as Finder's toolbar
+	// has: its declared height, rounder, and the magnifier before its text.
+	search := el.kind == .text_field && el.image_path.len > 0
+	bezel_height := if el.kind == .text_area || h < catalina_text_input_height || search {
 		h
 	} else {
 		catalina_text_input_height
 	}
 	bezel_y := if el.kind == .text_area { y } else { y + (h - bezel_height) / 2 }
-	radius := if bezel_height < 8 { bezel_height / 2 } else { 2 }
-	if el.focused && el.enabled {
+	radius := if bezel_height < 8 {
+		bezel_height / 2
+	} else if search {
+		catalina_search_radius
+	} else {
+		2
+	}
+	// Only the key window shows where typing goes, as with push buttons.
+	has_focus := el.focused && el.enabled && !d.inactive_window
+	if has_focus {
 		// Catalina uses a crisp three-pixel focus ring, not the translucent
 		// double outline produced by the old generic accent treatment.
 		d.canvas.stroke_round_rect(x - 3, bezel_y - 3, w + 6, bezel_height + 6, radius + 3,
@@ -892,13 +906,22 @@ fn (mut d Desktop) draw_catalina_text_input(el &ui2.Element, x int, y int, w int
 	d.canvas.fill_round_rect(x, bezel_y, w, bezel_height, radius,
 		if el.enabled { catalina_control_face } else { u32(0xf3f3f3) })
 	d.canvas.stroke_round_rect(x, bezel_y, w, bezel_height, radius,
-		if el.focused && el.enabled { catalina_text_focus_edge } else { catalina_control_edge },
-		255)
+		if has_focus {
+		catalina_text_focus_edge
+	} else if search {
+		catalina_search_edge
+	} else {
+		catalina_control_edge
+	}, 255)
 	mut shown := el.text
 	mut color := if el.enabled { el.text_style.color } else { catalina_control_disabled_text }
 	if shown.len == 0 {
 		shown = el.placeholder
-		color = 0x9a9a9a
+		color = if search { catalina_search_placeholder } else { u32(0x9a9a9a) }
+	}
+	if search {
+		d.draw_builtin_glyph(el.image_path, x + 4, bezel_y + (bezel_height - 16) / 2, 16, 16,
+			catalina_search_glyph)
 	}
 	if el.kind == .text_area {
 		face := d.face_for(el.text_style)
@@ -921,8 +944,9 @@ fn (mut d Desktop) draw_catalina_text_input(el &ui2.Element, x int, y int, w int
 		return
 	}
 	face := d.face_for(el.text_style)
-	content_x := x + catalina_text_input_inset
-	content_width := w - catalina_text_input_inset * 2
+	lead := if search { catalina_search_text_inset } else { catalina_text_input_inset }
+	content_x := x + lead
+	content_width := w - lead - catalina_text_input_inset
 	if content_width <= 0 {
 		return
 	}
@@ -965,7 +989,7 @@ fn (mut d Desktop) draw_catalina_text_input(el &ui2.Element, x int, y int, w int
 	if owned {
 		unsafe { display.free() }
 	}
-	if el.focused && el.enabled {
+	if has_focus {
 		before_caret := runes[..caret].string()
 		mut caret_x := content_x + face.text_width(before_caret)
 		if caret_x > content_x + content_width {
@@ -1609,6 +1633,75 @@ fn (mut d Desktop) draw_builtin_glyph(path string, x int, y int, w int, h int, c
 			arm := if w < h { w / 4 } else { h / 4 }
 			d.canvas.draw_line(cx - arm, cy + arm / 2, cx, cy - arm / 2, color, 1)
 			d.canvas.draw_line(cx, cy - arm / 2, cx + arm, cy + arm / 2, color, 1)
+		}
+		'chevron_left', 'chevron_right' {
+			// Finder's Back and Forward: an open chevron five pixels deep and
+			// eleven tall, pointing the way it goes.
+			tip := if name == 'chevron_left' { cx - 3 } else { cx + 2 }
+			back := if name == 'chevron_left' { cx + 2 } else { cx - 3 }
+			d.canvas.draw_line(back, cy - 5, tip, cy, color, 1)
+			d.canvas.draw_line(tip, cy, back, cy + 5, color, 1)
+		}
+		'finder_list' {
+			// Finder's list view: four rules, three pixels apart.
+			for row in 0 .. 4 {
+				d.canvas.fill_rect(cx - 7, cy - 5 + row * 3, 15, 1, color)
+			}
+		}
+		'finder_gear' {
+			for i in 0 .. finder_gear_x.len {
+				d.canvas.fill_rect(cx + finder_gear_x[i] - 1, cy + finder_gear_y[i] - 1, 3, 3, color)
+			}
+			d.canvas.fill_circle(cx, cy, 5, color)
+			d.canvas.fill_circle(cx, cy, 2, d.surface_under(x, y))
+		}
+		'finder_search' {
+			// The search field's magnifier: a one-pixel ring and a heavier handle.
+			d.canvas.fill_circle(cx - 1, cy - 1, 5, color)
+			d.canvas.fill_circle(cx - 1, cy - 1, 4, d.surface_under(x, y))
+			d.canvas.draw_line(cx + 2, cy + 2, cx + 5, cy + 5, color, 2)
+		}
+		'finder_folder' {
+			// Finder's small folder: the back with its tab, and the front over
+			// it, each a shade of the folder's colour inside a darker edge.
+			left := cx - 8
+			top := cy - 7
+			edge := mix(color, 0x000000, 50)
+			d.canvas.fill_round_rect(left, top, 7, 4, 1, edge)
+			d.canvas.fill_round_rect(left, top + 1, 16, 13, 2, edge)
+			d.canvas.fill_round_rect(left + 1, top + 2, 14, 11, 1, mix(color, 0x000000, 22))
+			d.canvas.fill_round_rect(left, top + 4, 16, 10, 2, edge)
+			d.canvas.fill_round_rect(left + 1, top + 5, 14, 8, 1, color)
+			d.canvas.fill_rect(left + 1, top + 5, 14, 1, mix(color, 0xffffff, 90))
+		}
+		'finder_document' {
+			// A white page in the given edge colour, its corner folded down.
+			left := cx - 6
+			top := cy - 8
+			behind := d.surface_under(x, y)
+			d.canvas.fill_rect(left, top, 12, 16, color)
+			d.canvas.fill_rect(left + 1, top + 1, 10, 14, 0xffffff)
+			d.canvas.fill_rect(left + 8, top, 4, 4, behind)
+			d.canvas.draw_line(left + 8, top, left + 11, top + 3, color, 1)
+			d.canvas.fill_rect(left + 8, top, 1, 4, color)
+			d.canvas.fill_rect(left + 8, top + 3, 4, 1, color)
+		}
+		'tag' {
+			// Finder's Edit Tags: a label pointing left, with its hole.
+			d.canvas.draw_line(cx - 7, cy, cx - 3, cy - 4, color, 1)
+			d.canvas.draw_line(cx - 3, cy - 4, cx + 7, cy - 4, color, 1)
+			d.canvas.draw_line(cx + 7, cy - 4, cx + 7, cy + 4, color, 1)
+			d.canvas.draw_line(cx + 7, cy + 4, cx - 3, cy + 4, color, 1)
+			d.canvas.draw_line(cx - 3, cy + 4, cx - 7, cy, color, 1)
+			d.canvas.fill_rect(cx - 4, cy - 1, 2, 2, color)
+		}
+		'disclosure_right' {
+			// The solid triangle at the end of a Finder column's folder row,
+			// measured as rows two, three, five, five, three and two wide.
+			for row in 0 .. 6 {
+				reach := if row < 3 { row } else { 5 - row }
+				d.canvas.fill_rect(cx - 2, cy - 3 + row, 2 + reach * 3 / 2, 1, color)
+			}
 		}
 		'search' {
 			radius := if w < h { w / 4 } else { h / 4 }

@@ -739,17 +739,29 @@ files.tag.yellow
 files.tag_results.empty
 Нет файлов с этим тегом.
 -----
+files.toolbar.back
+Назад
+-----
 files.toolbar.columns
 Просмотр в виде колонок
 -----
 files.toolbar.commander
 Просмотр в две панели
 -----
+files.toolbar.forward
+Вперёд
+-----
 files.toolbar.list
 Просмотр в виде списка
 -----
+files.toolbar.search
+Поиск
+-----
 files.toolbar.settings
 Настройки Файлов (Cmd+,)
+-----
+files.toolbar.tags
+Изменить теги
 -----
 files.toolbar.up
 Вверх

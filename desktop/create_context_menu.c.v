@@ -308,6 +308,9 @@ fn (mut d Desktop) desktop_directory_rename_key(input string) {
 // filesystem actions and the inline rename field used by the shared menu.
 struct FilesContextApp {
 mut:
+	// The process's desktop state, which each request refreshes; Files reads
+	// its theme there. Nil in tests that build the app on its own.
+	desktop             &Desktop = unsafe { nil }
 	files               FileBrowserApp
 	settings_only       bool
 	settings_tab        int
@@ -326,7 +329,10 @@ mut:
 }
 
 fn open_files_with_context_menu(mut desktop Desktop) !NativeApp {
-	mut app := &FilesContextApp{}
+	mut app := &FilesContextApp{
+		desktop: desktop
+	}
+	app.follow_theme()
 	app.files.tz_offset_seconds = desktop.tz_offset_seconds
 	app.files.browser.tz_offset_seconds = desktop.tz_offset_seconds
 	app.files.settings = load_files_settings(desktop_home)
@@ -352,6 +358,12 @@ fn open_files_with_context_menu(mut desktop Desktop) !NativeApp {
 	}
 	app.restore_files_view_mode(desktop_home)
 	return app
+}
+
+fn (a &FilesContextApp) follow_theme() {
+	if a.desktop != unsafe { nil } {
+		files_follow_theme(a.desktop.settings.theme)
+	}
 }
 
 fn (mut a FilesContextApp) restore_files_view_mode(home string) {
@@ -556,8 +568,8 @@ fn (a &FilesContextApp) rename_overlay(size ui2.Rect) ?ui2.Element {
 			return none
 		}
 		return ui2.text_field('', '', rename_buffer_text(a.rename_text), ui2.rect(f64(content_left + 36),
-			f64(files_header_height + 27 + (index - a.files.browser.scroll) * files_row_height),
-			f64(width - content_left - 62), f64(files_row_height - 2)), ui2.BoxStyle{
+			f64(files_header_height() + 27 + (index - a.files.browser.scroll) * files_row_height()),
+			f64(width - content_left - 62), f64(files_row_height() - 2)), ui2.BoxStyle{
 			bg:     editor_path_focus
 			radius: 4
 		}, ui2.TextStyle{ color: body_text, size: 12 }, 0)
@@ -575,8 +587,8 @@ fn (a &FilesContextApp) rename_overlay(size ui2.Rect) ?ui2.Element {
 		pane_x := files_commander_pane_x(width, pane)
 		pane_width := files_commander_pane_width(width, pane)
 		return ui2.text_field('', '', rename_buffer_text(a.rename_text), ui2.rect(f64(pane_x + files_padding + 22),
-			f64(a.files.rows_top + (index - browser.scroll) * files_row_height + 1),
-			f64(pane_width - 2 * files_padding - 28), f64(files_row_height - 2)), ui2.BoxStyle{
+			f64(a.files.rows_top + (index - browser.scroll) * files_row_height() + 1),
+			f64(pane_width - 2 * files_padding - 28), f64(files_row_height() - 2)), ui2.BoxStyle{
 			bg:     editor_path_focus
 			radius: 4
 		}, ui2.TextStyle{ color: body_text, size: 12 }, 0)
@@ -590,13 +602,13 @@ fn (a &FilesContextApp) rename_overlay(size ui2.Rect) ?ui2.Element {
 			return none
 		}
 		x := content_left + files_padding + 20
-		y := files_header_height + (index - a.files.browser.scroll) * files_row_height
+		y := a.files.rows_top + (index - a.files.browser.scroll) * files_row_height()
 		mut field_width := width - x - files_padding - 72
 		if field_width < 80 {
 			field_width = 80
 		}
 		return ui2.text_field('', '', rename_buffer_text(a.rename_text), ui2.rect(f64(x),
-			f64(y + 1), f64(field_width), f64(files_row_height - 2)), ui2.BoxStyle{
+			f64(y + 1), f64(field_width), f64(files_row_height() - 2)), ui2.BoxStyle{
 			bg:     editor_path_focus
 			radius: 4
 		}, ui2.TextStyle{
@@ -619,7 +631,7 @@ fn (a &FilesContextApp) rename_overlay(size ui2.Rect) ?ui2.Element {
 					x = content_left + files_padding
 				}
 				y := a.files.rows_top +
-					(index - column.browser.scroll) * files_row_height
+					(index - column.browser.scroll) * files_row_height()
 				mut field_width := column_width - 2 * files_padding - 52
 				visible_right := if column_x + column_width < a.files.viewport_width {
 					content_left + column_x + column_width
@@ -633,7 +645,7 @@ fn (a &FilesContextApp) rename_overlay(size ui2.Rect) ?ui2.Element {
 					return none
 				}
 				return ui2.text_field('', '', rename_buffer_text(a.rename_text), ui2.rect(f64(x),
-					f64(y + 1), f64(field_width), f64(files_row_height - 2)), ui2.BoxStyle{
+					f64(y + 1), f64(field_width), f64(files_row_height() - 2)), ui2.BoxStyle{
 					bg:     editor_path_focus
 					radius: 4
 				}, ui2.TextStyle{
@@ -647,6 +659,7 @@ fn (a &FilesContextApp) rename_overlay(size ui2.Rect) ?ui2.Element {
 }
 
 fn (mut a FilesContextApp) build(size ui2.Rect) !ui2.Element {
+	a.follow_theme()
 	if a.settings_only {
 		return a.settings_window(size)
 	}
@@ -800,6 +813,7 @@ fn (mut a FilesContextApp) rename_key_input(input string) ! {
 }
 
 fn (mut a FilesContextApp) handle(event_id string) ! {
+	a.follow_theme()
 	if event_id == files_settings_refresh {
 		a.reload_files_settings(desktop_home)
 		return
@@ -829,6 +843,16 @@ fn (mut a FilesContextApp) handle(event_id string) ! {
 			a.files.settings.save(desktop_home)
 		}
 		return
+	}
+	// Finder's search field has the keyboard from a click on it until a click
+	// anywhere else.
+	if event_id == files_action_search {
+		a.files.note_location()
+		a.files.search_focused = true
+		return
+	}
+	if !event_id.starts_with(files_context_rename_key_prefix) {
+		a.files.search_focused = false
 	}
 	if event_id.starts_with(files_context_select_prefix) {
 		a.select_action(event_id[files_context_select_prefix.len..])
@@ -890,7 +914,8 @@ fn (mut a FilesContextApp) handle(event_id string) ! {
 		|| event_id.starts_with(files_action_tag_row)
 		|| parse_miller_row_action(event_id) != none {
 		a.select_action(event_id)
-	} else if event_id == files_action_up || event_id == files_action_view_list
+	} else if event_id == files_action_up || event_id == files_action_back
+		|| event_id == files_action_forward || event_id == files_action_view_list
 		|| event_id == files_action_view_columns || event_id == files_action_view_commander
 		|| event_id == files_action_pane_left || event_id == files_action_pane_right
 		|| event_id.starts_with('files.location.')
@@ -951,6 +976,7 @@ fn (a &FilesContextApp) pointer_moves_matter() bool {
 
 fn (mut a FilesContextApp) pointer_event(phase AppPointerPhase, button AppPointerButton,
 	scroll int, x int, y int, width int, height int) {
+	a.follow_theme()
 	if a.settings_only {
 		if phase == .scroll && a.settings_tab == 1 {
 			a.settings_scroll = files_clamp(a.settings_scroll - scroll,
@@ -974,7 +1000,14 @@ fn (mut a FilesContextApp) pointer_event(phase AppPointerPhase, button AppPointe
 	if button == .back {
 		if phase == .down {
 			a.clear_context_path()
-			a.files.handle(files_action_up) or {}
+			// Finder's mouse Back retraces the history, and Up is all that is
+			// left once there is none.
+			a.files.note_location()
+			a.files.handle(if files_catalina && a.files.history_back.len > 0 {
+				files_action_back
+			} else {
+				files_action_up
+			}) or {}
 		}
 		return
 	}
@@ -982,6 +1015,7 @@ fn (mut a FilesContextApp) pointer_event(phase AppPointerPhase, button AppPointe
 }
 
 fn (mut a FilesContextApp) key_input(input string) {
+	a.follow_theme()
 	if a.settings_only {
 		a.settings_key_input(input)
 		return
@@ -992,6 +1026,10 @@ fn (mut a FilesContextApp) key_input(input string) {
 	}
 	if a.tag_picker {
 		if input == '\x1b' { a.tag_picker = false }
+		return
+	}
+	if a.files.search_focused {
+		a.files.search_key_input(input)
 		return
 	}
 	if a.files.view_mode == .commander && input == '\t' {

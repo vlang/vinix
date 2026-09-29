@@ -97,7 +97,7 @@ fn test_file_browser_miller_columns_follow_directory_selection() {
 	path_view := files_columns_tree_path_view(tree, selected_path) or { panic('missing path') }
 	assert int(path_view.frame.x) == files_path_left
 	assert int(path_view.frame.y) == files_path_top
-	assert app.rows_top == files_header_height
+	assert app.rows_top == files_header_height()
 	assert app.column_offset == app.max_column_offset()
 	assert app.max_column_offset() > 0
 	assert files_columns_tree_has_view_button(tree, files_action_view_list, 'builtin:list_view',

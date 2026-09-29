@@ -91,6 +91,13 @@ const catalina_checkbox_size = 14
 const catalina_popup_height = 22
 const catalina_text_input_height = 22
 const catalina_text_input_inset = 6
+// Finder's toolbar search field: rounder than a text field, a lighter edge,
+// and its text after the magnifier.
+const catalina_search_radius = 5
+const catalina_search_edge = u32(0xc8c8c8)
+const catalina_search_glyph = u32(0x6f6f6f)
+const catalina_search_placeholder = u32(0xa6a6a6)
+const catalina_search_text_inset = 24
 const catalina_slider_track = u32(0xc8c8c8)
 const catalina_slider_track_edge = u32(0xb4b4b4)
 const catalina_switch_on = u32(0x64c466)
@@ -118,6 +125,55 @@ const files_file_icon = u32(0x9aa5b5)
 const files_sidebar_bg = u32(0xf3f5f9)
 const files_sidebar_selected = u32(0xdfe7f5)
 const files_sidebar_icon = u32(0x6d82a0)
+
+// Finder in Catalina 10.15.7, which Files becomes under the macOS theme. The
+// toolbar and sidebar come from docs/catalina-reference/installed-finder-window.png,
+// the columns from a 1x column-view capture of the same system. The toolbar
+// shares the title bar's gradient, 55 pixels in all, and its controls are 24
+// pixels tall, two below the 22-pixel title bar and seven from either edge.
+const finder_toolbar_height = 33
+const finder_control_top = 2
+const finder_control_height = 24
+const finder_control_inset = 7
+const finder_control_face = u32(0xf8f8f8)
+const finder_control_edge = u32(0xc6c6c6)
+const finder_control_bottom = u32(0xaeaeae)
+const finder_control_divider = u32(0xdfdfdf)
+const finder_control_glyph = u32(0x565656)
+const finder_control_disabled = u32(0xacacac)
+const finder_control_selected = u32(0x6a6a6a)
+const finder_control_selected_bottom = u32(0x5b5b5b)
+// Before the compositor draws the toolbar into the title bar, it is a body
+// strip like any other, in the middle of that gradient.
+const finder_toolbar_fallback = u32(0xdadada)
+const finder_search_width = 276
+const finder_sidebar_width = 147
+const finder_sidebar_bg = u32(0xebebeb)
+const finder_sidebar_rule = u32(0xd4d4d4)
+const finder_sidebar_selected = u32(0xc3c3c3)
+const finder_sidebar_heading = u32(0x6e6e6e)
+const finder_sidebar_icon = u32(0x6c6c6c)
+const finder_sidebar_row_height = 26
+const finder_text = u32(0x262626)
+const finder_text_muted = u32(0x808080)
+const finder_selection = u32(0x0063e1)
+const finder_selection_inactive = u32(0xdcdcdc)
+const finder_on_selection = u32(0xffffff)
+const finder_folder_icon = u32(0x8ac8f2)
+const finder_file_icon = u32(0xa8a8a8)
+const finder_chevron = u32(0x6e6e6e)
+const finder_row_height = 18
+// A column is 190 pixels of rows and a 15-pixel always-visible scroller,
+// whose lower end is the grip that resizes the column.
+const finder_column_width = 190
+const finder_scroller_width = 15
+const finder_scroller_track = u32(0xf8f8f8)
+const finder_scroller_left = u32(0xe8e8e8)
+const finder_scroller_right = u32(0xededed)
+const finder_scroller_thumb = u32(0xc1c1c1)
+const finder_scroller_grip = u32(0xa3a3a3)
+const finder_list_header_height = 17
+const finder_list_rule = u32(0xdcdcdc)
 
 // ── Activity monitor ───────────────────────────────────────────────
 // A long list of small numbers, so the stripe is barely there and only the

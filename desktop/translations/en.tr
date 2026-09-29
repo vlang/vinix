@@ -739,17 +739,29 @@ Yellow
 files.tag_results.empty
 No files have this tag.
 -----
+files.toolbar.back
+Back
+-----
 files.toolbar.columns
 Column view
 -----
 files.toolbar.commander
 Two pane view
 -----
+files.toolbar.forward
+Forward
+-----
 files.toolbar.list
 List view
 -----
+files.toolbar.search
+Search
+-----
 files.toolbar.settings
 Files Settings (Cmd+,)
+-----
+files.toolbar.tags
+Edit Tags
 -----
 files.toolbar.up
 Up

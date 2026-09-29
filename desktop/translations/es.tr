@@ -739,17 +739,29 @@ Amarillo
 files.tag_results.empty
 Ningún archivo tiene esta etiqueta.
 -----
+files.toolbar.back
+Atrás
+-----
 files.toolbar.columns
 Ver en columnas
 -----
 files.toolbar.commander
 Ver en dos paneles
 -----
+files.toolbar.forward
+Adelante
+-----
 files.toolbar.list
 Ver como lista
 -----
+files.toolbar.search
+Buscar
+-----
 files.toolbar.settings
 Ajustes de Archivos (Cmd+,)
+-----
+files.toolbar.tags
+Editar etiquetas
 -----
 files.toolbar.up
 Subir

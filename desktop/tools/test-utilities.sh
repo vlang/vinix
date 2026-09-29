@@ -129,6 +129,13 @@ cp "$root/desktop/tools/tests/files_commander_test.v" "$work/ui/"
     -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/files_commander_test.v"
 rm -f "$work/ui/files_commander_test.v"
 
+# Finder's look under the macOS theme: the toolbar the window draws in its
+# title bar, Back and Forward, Finder's columns and the search field.
+cp "$root/desktop/tools/tests/files_finder_test.v" "$work/ui/"
+"$v" -new-compiler -nocache -gc none -manualfree -enable-globals -stats -d ui2_headless \
+    -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/files_finder_test.v"
+rm -f "$work/ui/files_finder_test.v"
+
 cp "$root/desktop/tools/tests/files_settings_process_integration.v" "$work/ui/main.v"
 "$v" -new-compiler -nocache -gc none -manualfree -enable-globals -d ui2_headless \
     -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" -o "$work/files-settings-process" "$work/ui"

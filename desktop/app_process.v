@@ -36,6 +36,16 @@ const app_response_timeout_ms = 5000
 // timeout above.
 const app_startup_response_timeout_ms = 30000
 const remote_owned_element_key = '__vinix.remote.owned'
+// What a compositor draws beyond the elements themselves, in a request header
+// byte that was kept free. A compositor older than this sends 0 there, so an
+// application published to a running desktop on its own draws only what that
+// compositor can.
+const app_feature_toolbar = u8(1) // app_toolbar_id toolbars and Finder's glyphs
+const app_features = app_feature_toolbar
+
+// What the compositor at the other end of the pipe draws: this program's own
+// features until a request says otherwise.
+__global app_compositor_features = app_features
 const native_app_directory = '/usr/bin/'
 
 // A local PollingApp can cheaply answer "nothing changed" on every compositor
@@ -738,7 +748,7 @@ fn send_app_request(fd int, command AppCommand, width int, height int, state App
 	wire_put_u32(mut header, app_protocol_magic)
 	wire_put_u8(mut header, app_protocol_version)
 	wire_put_u8(mut header, u8(command))
-	wire_put_u8(mut header, 0)
+	wire_put_u8(mut header, app_features)
 	wire_put_u8(mut header, 0)
 	wire_put_i32(mut header, width)
 	wire_put_i32(mut header, height)
@@ -761,7 +771,7 @@ fn receive_app_request(fd int) !(AppCommand, int, int, AppWireState, string) {
 	magic := reader.take_u32()!
 	version := reader.take_u8()!
 	command_value := int(reader.take_u8()!)
-	reader.take_u8()!
+	features := reader.take_u8()!
 	reader.take_u8()!
 	width := reader.take_i32()!
 	height := reader.take_i32()!
@@ -782,6 +792,7 @@ fn receive_app_request(fd int) !(AppCommand, int, int, AppWireState, string) {
 	if payload.cap > 0 {
 		unsafe { payload.free() }
 	}
+	app_compositor_features = features
 	return unsafe { AppCommand(command_value) }, width, height, state, text
 }
 

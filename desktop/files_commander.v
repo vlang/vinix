@@ -37,14 +37,29 @@ fn files_commander_pane(mut children []ui2.Element, browser &FileBrowser, settin
 	mut header := frame_elements(1)
 	header << ui2.label('', browser.path, ui2.rect(files_padding, 3, f64(width - 2 * files_padding),
 		files_pane_header_height - 6), ui2.TextStyle{
-		color: if selected { app_on_accent } else { body_heading }
-		size:  12
+		color: if files_catalina {
+			finder_text
+		} else if selected {
+			app_on_accent
+		} else {
+			body_heading
+		}
+		size:  if files_catalina { 11 } else { 12 }
 		bold:  selected
 	})
+	// Under Finder's look the active pane's heading is grey, as a selection
+	// that is not the keyboard's is.
+	header_bg := if files_catalina {
+		if selected { finder_selection_inactive } else { finder_sidebar_bg }
+	} else if selected {
+		files_up
+	} else {
+		body_panel
+	}
 	children << ui2.Element{
-		...ui2.clickable_view(action, ui2.rect(f64(x), files_header_height, f64(width),
+		...ui2.clickable_view(action, ui2.rect(f64(x), files_header_height(), f64(width),
 			files_pane_header_height), ui2.BoxStyle{
-			bg: if selected { files_up } else { body_panel }
+			bg: header_bg
 		}, header)
 		tooltip: browser.path
 	}
@@ -79,6 +94,33 @@ fn files_commander_pane(mut children []ui2.Element, browser &FileBrowser, settin
 		entry_path := join_path(browser.path, entry.name)
 		tag_color := settings.first_color(entry_path)
 		mut row := frame_elements(3)
+		row_selected := browser.selected_row == index
+		if files_catalina {
+			fill, text_color, muted := finder_row_style(row_selected, selected)
+			row << finder_entry_icon(entry, settings, tag_color, files_padding)
+			row << ui2.label('', entry.name, ui2.rect(files_padding + 24, 0, f64(name_width),
+				files_row_height()), ui2.TextStyle{
+				color: text_color
+				size:  13
+			})
+			if size_width > 0 {
+				row << ui2.label('', if entry.is_dir { '' } else { entry.size_text },
+					ui2.rect(f64(width - files_padding - size_width), 0, f64(size_width), files_row_height()),
+					ui2.TextStyle{ color: muted, size: 13, align: .right })
+			}
+			if tag_color != 0 {
+				row << ui2.view('', ui2.rect(f64(width - files_padding - size_width - 11),
+					f64((files_row_height() - 8) / 2), 8, 8), ui2.BoxStyle{ bg: tag_color, radius: 4 }, [])
+			}
+			children << ui2.clickable_view(entry.row_action, ui2.rect(f64(x),
+				f64(rows_top + slot * files_row_height()), f64(width), files_row_height()), ui2.BoxStyle{
+				bg:          fill
+				transparent: !row_selected
+			}, row)
+			unsafe { entry_path.free() }
+			slot++
+			continue
+		}
 		row << ui2.button_with_image('', '', if entry.is_dir {
 			'builtin:folder'
 		} else {
@@ -94,13 +136,13 @@ fn files_commander_pane(mut children []ui2.Element, browser &FileBrowser, settin
 				}
 			})
 		row << ui2.label('', entry.name, ui2.rect(files_padding + 24, 0, f64(name_width),
-			files_row_height), ui2.TextStyle{
+			files_row_height()), ui2.TextStyle{
 			color: if entry.is_dir { body_heading } else { body_text }
 			size:  12
 		})
 		if size_width > 0 {
 			row << ui2.label('', if entry.is_dir { '' } else { entry.size_text },
-				ui2.rect(f64(width - files_padding - size_width), 0, f64(size_width), files_row_height),
+				ui2.rect(f64(width - files_padding - size_width), 0, f64(size_width), files_row_height()),
 				ui2.TextStyle{ color: body_muted, size: 11, align: .right })
 		}
 		if tag_color != 0 {
@@ -108,9 +150,9 @@ fn files_commander_pane(mut children []ui2.Element, browser &FileBrowser, settin
 				7), ui2.BoxStyle{ bg: tag_color, radius: 4 }, [])
 		}
 		children << ui2.clickable_view(entry.row_action, ui2.rect(f64(x),
-			f64(rows_top + slot * files_row_height), f64(width), files_row_height), ui2.BoxStyle{
+			f64(rows_top + slot * files_row_height()), f64(width), files_row_height()), ui2.BoxStyle{
 			bg:          files_row_hover
-			transparent: browser.hover_row != index && browser.selected_row != index
+			transparent: browser.hover_row != index && !row_selected
 		}, row)
 		unsafe { entry_path.free() }
 		slot++
@@ -168,8 +210,8 @@ fn (mut a FileBrowserApp) build_commander(width int, height int, mut children []
 		left_width, a.rows_top, a.rows_height, a.visible_rows)
 	files_commander_pane(mut children, &a.dual_right, &a.settings, 1, a.active_pane, right_x,
 		right_width, a.rows_top, a.rows_height, a.visible_rows)
-	children << ui2.view('', ui2.rect(f64(right_x), files_header_height, 1,
-		f64(height - files_header_height)), ui2.BoxStyle{ bg: body_rule }, [])
+	children << ui2.view('', ui2.rect(f64(right_x), files_header_height(), 1,
+		f64(height - files_header_height())), ui2.BoxStyle{ bg: body_rule }, [])
 	return a.screen_with_sidebar(width, height, mut children)
 }
 

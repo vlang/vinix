@@ -238,8 +238,8 @@ fn (mut a FileBrowserApp) follow_language() {
 }
 
 fn files_list_separator(x int) ui2.Element {
-	return ui2.view('', ui2.rect(f64(x), files_header_height + 5, 1,
-		files_list_header_height - 10), ui2.BoxStyle{ bg: body_rule }, [])
+	return ui2.view('', ui2.rect(f64(x), files_header_height() + 5, 1,
+		files_list_header_height() - 10), ui2.BoxStyle{ bg: body_rule }, [])
 }
 
 // label says what clicking does ("Sort by Size"). It belongs to the
@@ -251,13 +251,17 @@ fn files_list_header_sort_target(mut children []ui2.Element, action string, labe
 	if selected {
 		children << ui2.Element{
 			...ui2.image('', if descending { 'builtin:arrow_down' } else { 'builtin:arrow_up' },
-				ui2.rect(f64(x + width - 19), files_header_height + 9, 11, 11))
+				ui2.rect(f64(x + width - 19), files_header_height() + if files_catalina {
+				3
+			} else {
+				9
+			}, 11, 11))
 			text_style: ui2.TextStyle{ color: body_heading }
 		}
 	}
 	children << ui2.Element{
-		...ui2.clickable_view(action, ui2.rect(f64(x), files_header_height, f64(width),
-			files_list_header_height), ui2.BoxStyle{ transparent: true }, [])
+		...ui2.clickable_view(action, ui2.rect(f64(x), files_header_height(), f64(width),
+			files_list_header_height()), ui2.BoxStyle{ transparent: true }, [])
 		tooltip:             label
 		accessibility_label: label
 		accessibility_value: if selected {
@@ -270,11 +274,11 @@ fn files_list_header_sort_target(mut children []ui2.Element, action string, labe
 
 fn files_list_header(mut children []ui2.Element, x int, width int, layout FilesListLayout,
 	sort_column FilesListSortColumn, descending bool) {
-	y := files_header_height
-	children << ui2.view('', ui2.rect(f64(x), y, f64(width), files_list_header_height),
+	y := files_header_height()
+	children << ui2.view('', ui2.rect(f64(x), y, f64(width), files_list_header_height()),
 		ui2.BoxStyle{ bg: body_panel }, [])
 	children << ui2.label('files.list.header.name', tr('files.list.name'), ui2.rect(f64(x + files_padding + 24),
-		y + 2, f64(layout.name_end - files_padding - 32), files_list_header_height - 4), ui2.TextStyle{
+		y + 2, f64(layout.name_end - files_padding - 32), files_list_header_height() - 4), ui2.TextStyle{
 		color: if sort_column == .name { body_heading } else { body_muted }
 		size:  12
 		bold:  sort_column == .name
@@ -282,21 +286,21 @@ fn files_list_header(mut children []ui2.Element, x int, width int, layout FilesL
 	if layout.show_modified {
 		children << ui2.label('files.list.header.modified', tr('files.list.modified'),
 			ui2.rect(f64(x + layout.modified_x + 7), y + 2,
-				f64(layout.modified_width - 12), files_list_header_height - 4), ui2.TextStyle{
+				f64(layout.modified_width - 12), files_list_header_height() - 4), ui2.TextStyle{
 				color: if sort_column == .modified { body_heading } else { body_muted }
 				size:  12
 				bold:  sort_column == .modified
 			})
 	}
 	children << ui2.label('files.list.header.size', tr('files.list.size'), ui2.rect(f64(x + layout.size_x + 6),
-		y + 2, f64(layout.size_width - 10), files_list_header_height - 4), ui2.TextStyle{
+		y + 2, f64(layout.size_width - 10), files_list_header_height() - 4), ui2.TextStyle{
 		color: if sort_column == .size { body_heading } else { body_muted }
 		size:  12
 		bold:  sort_column == .size
 	})
 	if layout.show_kind {
 		children << ui2.label('files.list.header.kind', tr('files.list.kind'), ui2.rect(f64(x + layout.kind_x + 7),
-			y + 2, f64(layout.kind_width - 10), files_list_header_height - 4), ui2.TextStyle{
+			y + 2, f64(layout.kind_width - 10), files_list_header_height() - 4), ui2.TextStyle{
 			color: if sort_column == .kind { body_heading } else { body_muted }
 			size:  12
 			bold:  sort_column == .kind
@@ -305,7 +309,7 @@ fn files_list_header(mut children []ui2.Element, x int, width int, layout FilesL
 	children << files_list_separator(x + layout.size_x)
 	if layout.show_modified { children << files_list_separator(x + layout.modified_x) }
 	if layout.show_kind { children << files_list_separator(x + layout.kind_x) }
-	children << ui2.view('', ui2.rect(f64(x), y + files_list_header_height - 1,
+	children << ui2.view('', ui2.rect(f64(x), y + files_list_header_height() - 1,
 		f64(width), 1), ui2.BoxStyle{ bg: body_rule }, [])
 	files_list_header_sort_target(mut children, files_action_sort_name, tr('files.list.sort_by_name'), x,
 		layout.name_end, sort_column == .name, descending)
@@ -343,7 +347,7 @@ fn files_list_row_children(entry &FileEntry, settings &FilesSettings, tag_color 
 	mut name_width := layout.name_end - name_x - 8
 	if tag_color != 0 { name_width -= 12 }
 	if name_width < 1 { name_width = 1 }
-	row << ui2.label('', entry.name, ui2.rect(f64(name_x), 0, f64(name_width), files_row_height),
+	row << ui2.label('', entry.name, ui2.rect(f64(name_x), 0, f64(name_width), files_row_height()),
 		ui2.TextStyle{
 			color: if entry.is_dir { body_heading } else { body_text }
 			size:  13
@@ -356,17 +360,17 @@ fn files_list_row_children(entry &FileEntry, settings &FilesSettings, tag_color 
 	}
 	if layout.show_modified {
 		row << ui2.label('', entry.modified_text, ui2.rect(f64(layout.modified_x + 7), 0,
-			f64(layout.modified_width - 12), files_row_height), ui2.TextStyle{
+			f64(layout.modified_width - 12), files_row_height()), ui2.TextStyle{
 			color: body_muted
 			size:  11
 		})
 	}
 	row << ui2.label('', if entry.is_dir { '—' } else { entry.size_text },
-		ui2.rect(f64(layout.size_x + 3), 0, f64(layout.size_width - 10), files_row_height),
+		ui2.rect(f64(layout.size_x + 3), 0, f64(layout.size_width - 10), files_row_height()),
 		ui2.TextStyle{ color: body_muted, size: 11, align: .right })
 	if layout.show_kind {
 		row << ui2.label('', entry.kind_text, ui2.rect(f64(layout.kind_x + 7), 0,
-			f64(layout.kind_width - 10), files_row_height), ui2.TextStyle{
+			f64(layout.kind_width - 10), files_row_height()), ui2.TextStyle{
 			color: body_muted
 			size:  11
 		})

@@ -36,18 +36,18 @@ fn test_files_sidebar_locations_and_navigation_in_both_views() {
 		assert files_sidebar_find(list, location.action) != none
 	}
 	row := files_sidebar_find(list, app.browser.entries[0].row_action) or { panic('missing file row') }
-	assert int(row.frame.x) == files_sidebar_width
+	assert int(row.frame.x) == files_sidebar_width()
 	free_tree(list)
 
 	app.set_view_mode(.columns)
 	columns := app.build(ui2.rect(0, 0, 700, 400))!
-	assert app.viewport_width == 700 - files_sidebar_width
+	assert app.viewport_width == 700 - files_sidebar_width()
 	assert app.column_width >= files_column_min_width
 	assert files_sidebar_find(columns, 'files.location.downloads') != none
 	column_row := files_sidebar_find(columns, app.columns.last().browser.entries[0].row_action) or {
 		panic('missing column row')
 	}
-	assert int(column_row.frame.x) >= files_sidebar_width
+	assert int(column_row.frame.x) >= files_sidebar_width()
 	free_tree(columns)
 
 	app.handle('files.location.home')!
@@ -81,7 +81,7 @@ fn test_files_list_draws_last_row_that_fits_above_window_bottom() {
 	mut app := FileBrowserApp{}
 	app.browser.read(root.clone())
 	assert app.browser.entries.len == 14
-	height := files_header_height + files_list_header_height + 14 * files_row_height
+	height := files_header_height() + files_list_header_height() + 14 * files_row_height()
 	tree := app.build(ui2.rect(0, 0, 700, f64(height)))!
 	last := files_sidebar_find(tree, 'files.row.13') or { panic('last visible file row is missing') }
 	assert app.visible_rows == 14

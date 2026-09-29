@@ -65,7 +65,7 @@ fn test_commander_panes_navigate_and_scroll_independently() ! {
 	right_pane := commander_element(tree, files_action_pane_right) or { panic('missing right pane') }
 	assert left_pane.frame.x + left_pane.frame.width == right_pane.frame.x
 	assert right_pane.frame.x + right_pane.frame.width == 700
-	assert app.rows_top == files_header_height + files_pane_header_height
+	assert app.rows_top == files_header_height() + files_pane_header_height
 	free_tree(tree)
 
 	app.pointer_event(.scroll, .no_button, -1, files_commander_pane_x(700, 1) + 30,

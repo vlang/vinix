@@ -64,7 +64,7 @@ fn test_files_list_reads_metadata_and_draws_responsive_columns() ! {
 	assert folder.kind_text == 'Folder'
 
 	wide := app.build(ui2.rect(0, 0, 1000, 360))!
-	assert app.rows_top == files_header_height + files_list_header_height
+	assert app.rows_top == files_header_height() + files_list_header_height()
 	name := files_list_find_id(wide, 'files.list.header.name') or { panic('missing Name header') }
 	modified := files_list_find_id(wide, 'files.list.header.modified') or {
 		panic('missing Date Modified header')
@@ -87,7 +87,7 @@ fn test_files_list_reads_metadata_and_draws_responsive_columns() ! {
 
 	app.set_view_mode(.columns)
 	columns := app.build(ui2.rect(0, 0, 1000, 360))!
-	assert app.rows_top == files_header_height
+	assert app.rows_top == files_header_height()
 	assert files_list_find_id(columns, 'files.list.header.name') == none
 	free_tree(columns)
 }

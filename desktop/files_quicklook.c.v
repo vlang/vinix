@@ -372,7 +372,7 @@ fn (mut a FilesContextApp) quicklook_key_input(input string) {
 			code := input[index + 2]
 			if code == `A` || code == `B` {
 				if a.preview.open {
-					a.preview.scroll_by(if code == `A` { -1 } else { 1 }, a.files.rows_height + files_header_height)
+					a.preview.scroll_by(if code == `A` { -1 } else { 1 }, a.files.rows_height + files_header_height())
 				} else {
 					a.quicklook_move_selection(if code == `A` { -1 } else { 1 })
 				}

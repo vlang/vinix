@@ -470,6 +470,11 @@ fn (mut d Desktop) build_tree() ui2.Element {
 	}, children)
 }
 
+// An application's first element with this id is its toolbar. Under the macOS
+// theme the window draws it in the title bar, titled with the toolbar's text
+// and its image, if the application gives them; see window_element.
+const app_toolbar_id = 'app.toolbar'
+
 fn (mut d Desktop) window_element(window_index int) ui2.Element {
 	window := &d.windows[window_index]
 	theme := d.theme()
@@ -542,36 +547,85 @@ fn (mut d Desktop) window_element(window_index int) ui2.Element {
 	maximize := d.title_button(middle, middle_glyph, middle_x, active, set_hovered)
 	minimize := d.title_button(inner, inner_glyph, inner_x, active, set_hovered)
 
-	// The title takes what the buttons leave. Centred themes centre it over the
-	// whole bar and simply accept a shorter run.
-	text_inset_left := if buttons_left { theme.button_inset + span + 10 } else { 14 }
-	title_limit := window.width - span - theme.button_inset - text_inset_left - 10
-	title := ui2.label(window.id_title, app_title_text(window.title), ui2.rect(f64(if theme.title_centered {
-		0
-	} else {
-		text_inset_left
-	}), 0, f64(if theme.title_centered { window.width } else { title_limit }), f64(theme.title_height)), ui2.TextStyle{
+	background, mut contents := d.window_contents(window_index, body_height)
+	// Catalina draws a window's toolbar in its title bar, under one gradient,
+	// and Finder titles the window after the folder it shows. An application
+	// asks for both by leading with an app_toolbar_id view: it moves here, out
+	// of the body, so each of its elements is in the tree -- and freed -- once.
+	// The body keeps its place, and the application its coordinates.
+	mut toolbar := ui2.Element{}
+	mut toolbar_height := 0
+	if d.settings.theme == .macos && contents.len > 0 && contents[0].id == app_toolbar_id
+		&& contents[0].frame.height >= 1 && int(contents[0].frame.height) < body_height {
+		toolbar = contents[0]
+		toolbar_height = int(toolbar.frame.height)
+		for index in 1 .. contents.len {
+			contents[index - 1] = contents[index]
+		}
+		unsafe {
+			contents.len = contents.len - 1
+		}
+	}
+	title_text := if toolbar.text.len > 0 { toolbar.text } else { app_title_text(window.title) }
+	title_style := ui2.TextStyle{
 		color: title_text_color
 		size:  theme.title_size
 		bold:  theme.title_bold
 		align: if theme.title_centered { .center } else { .left }
 		lines: 1
-	})
+	}
 
-	mut title_children := frame_elements(4)
+	// The title takes what the buttons leave. Centred themes centre it over the
+	// whole bar and simply accept a shorter run.
+	text_inset_left := if buttons_left { theme.button_inset + span + 10 } else { 14 }
+	title_limit := window.width - span - theme.button_inset - text_inset_left - 10
+	// A folder's title carries its icon, as Finder's does, the two centred as one.
+	title_icon_width := if toolbar.image_path.len > 0 && theme.title_centered && d.fonts.len > 0 {
+		20
+	} else {
+		0
+	}
+	title := ui2.label(window.id_title, title_text, ui2.rect(f64(if theme.title_centered {
+		title_icon_width / 2
+	} else {
+		text_inset_left
+	}), 0, f64(if theme.title_centered { window.width } else { title_limit }), f64(theme.title_height)),
+		title_style)
+
+	mut title_children := frame_elements(6)
 	title_children << title
+	if title_icon_width > 0 {
+		text_width := d.face_for(title_style).text_width(title_text)
+		title_children << ui2.Element{
+			...ui2.image('', toolbar.image_path, ui2.rect(f64((window.width - text_width) / 2 +
+				title_icon_width / 2 - title_icon_width), f64((theme.title_height - 16) / 2), 16, 16))
+			text_style: ui2.TextStyle{
+				color: toolbar.text_style.color
+			}
+		}
+	}
 	title_children << minimize
 	title_children << maximize
 	title_children << close
-	title_bar := ui2.draggable_view(window.id_titlebar, ui2.rect(0, 0, f64(window.width), f64(theme.title_height)), ui2.BoxStyle{
+	if toolbar_height > 0 {
+		title_children << ui2.Element{
+			...toolbar
+			frame: ui2.rect(0, f64(theme.title_height), f64(window.width), f64(toolbar_height))
+			box:   ui2.BoxStyle{
+				transparent: true
+			}
+		}
+	}
+	title_bar := ui2.draggable_view(window.id_titlebar, ui2.rect(0, 0, f64(window.width), f64(theme.title_height +
+		toolbar_height)), ui2.BoxStyle{
 		bg: title_bg
 	}, title_children)
 
-	divider := ui2.view(window.id_divider, ui2.rect(0, f64(theme.title_height - 1), f64(window.width), 1), ui2.BoxStyle{
+	divider := ui2.view(window.id_divider, ui2.rect(0, f64(theme.title_height + toolbar_height - 1),
+		f64(window.width), 1), ui2.BoxStyle{
 		bg: if active { theme.title_divider } else { theme.title_inactive_divider }
 	}, [])
 
-	background, contents := d.window_contents(window_index, body_height)
 	// Clickable so that touching a window anywhere brings it to the front,
 	// not only its title bar.
 	body := ui2.clickable_view(window.id_body, ui2.rect(0, f64(theme.title_height), f64(window.width), f64(body_height)), ui2.BoxStyle{
@@ -579,9 +633,10 @@ fn (mut d Desktop) window_element(window_index int) ui2.Element {
 	}, contents)
 
 	mut window_children := frame_elements(4)
+	// The body goes first: a toolbar's title bar reaches down over its top.
+	window_children << body
 	window_children << title_bar
 	window_children << divider
-	window_children << body
 	// Arranged windows already fill a desktop-defined region. A normal window
 	// retains an invisible lower-right target for pointer resizing, without
 	// adding chrome over the application's surface.

@@ -300,9 +300,36 @@ const files_action_tag_row = 'files.tag.row.'
 const files_action_column_row = 'files.column.row.'
 const files_action_scrollbar = 'files.scrollbar'
 
-const files_row_height = 24
-const files_header_height = 38
-const files_list_header_height = 28
+// Whether this Files process looks like Finder in Catalina, as it does under
+// the desktop's macOS theme. Every request carries the desktop's settings, and
+// Files follows them before it lays itself out or reads a click, the way it
+// follows desktop_language.
+__global files_catalina = false
+
+fn files_follow_theme(theme ThemeKind) {
+	// A compositor that cannot draw Finder's toolbar keeps Files as it was.
+	files_catalina = theme == .macos && app_compositor_features & app_feature_toolbar != 0
+}
+
+fn files_row_height() int {
+	return if files_catalina { finder_row_height } else { 24 }
+}
+
+// files_header_height is the toolbar's. Finder's hangs below the title bar,
+// which the compositor draws over the top of it.
+fn files_header_height() int {
+	return if files_catalina { finder_toolbar_height } else { 38 }
+}
+
+fn files_list_header_height() int {
+	return if files_catalina { finder_list_header_height } else { 28 }
+}
+
+// files_sidebar_width is where the listing starts.
+fn files_sidebar_width() int {
+	return if files_catalina { finder_sidebar_width + 1 } else { 152 }
+}
+
 const files_pane_header_height = 27
 const files_padding = 10
 const files_column_min_width = 200
@@ -313,7 +340,6 @@ const files_path_height = 22
 const files_horizontal_bar_height = 20
 const files_scrollbar_width = 8
 const files_scrollbar_min_thumb = 20
-const files_sidebar_width = 152
 const files_sidebar_min_window_width = 360
 const files_sidebar_row_height = 29
 
@@ -357,7 +383,7 @@ fn (l &FilesLocation) display_title() string {
 }
 
 fn files_content_left(width int) int {
-	return if width >= files_sidebar_min_window_width { files_sidebar_width } else { 0 }
+	return if width >= files_sidebar_min_window_width { files_sidebar_width() } else { 0 }
 }
 
 fn files_path_width(width int) int {
@@ -426,6 +452,27 @@ mut:
 	path_drag_x            int
 	path_drag_offset       int
 	reveal_path_end        bool
+	// Finder's Back and Forward; see note_location. Owned paths, oldest first.
+	history_back    []string
+	history_forward []string
+	history_path    string
+	// Finder's search field, which narrows the folder being shown to the
+	// names containing its text. See files_finder.v.
+	search         []u8
+	search_focused bool
+	// What the search narrowed: a Miller column's id, -1 for the list, -3 and
+	// -4 for the commander's panes, -2 for nothing.
+	search_column int = -2
+	// The horizontal scroller's track, as the last build laid it out.
+	hbar_x      int
+	hbar_width  int
+	hbar_top    int
+	hbar_bottom int
+	// Finder's title for the folder, and the folder and language it is for.
+	title          string
+	title_path     string
+	title_language DesktopLanguage
+	tag_actions    map[int]string
 }
 
 fn open_files(mut _ Desktop) !NativeApp {
@@ -545,6 +592,7 @@ fn (mut a FileBrowserApp) set_view_mode(mode FilesViewMode) {
 	if mode == a.view_mode {
 		return
 	}
+	a.end_search()
 	if a.view_mode == .commander {
 		a.browser.read(a.current_path().clone())
 	}
@@ -621,14 +669,14 @@ fn (mut a FileBrowserApp) navigate_commander_active_to(path string) {
 
 fn (a &FileBrowserApp) sidebar(height int) ui2.Element {
 	mut rows := frame_elements(files_locations.len + a.settings.tags.len + 4)
-	rows << ui2.label('', tr('files.sidebar.favorites'), ui2.rect(14, f64(10 - a.sidebar_scroll), files_sidebar_width - 28, 20), ui2.TextStyle{
+	rows << ui2.label('', tr('files.sidebar.favorites'), ui2.rect(14, f64(10 - a.sidebar_scroll), files_sidebar_width() - 28, 20), ui2.TextStyle{
 		color: body_muted
 		size:  11
 		bold:  true
 	})
 	for index, location in files_locations {
 		if index == files_locations.len - 1 {
-			rows << ui2.label('', tr('files.sidebar.locations'), ui2.rect(14, f64(225 - a.sidebar_scroll), files_sidebar_width - 28, 20), ui2.TextStyle{
+			rows << ui2.label('', tr('files.sidebar.locations'), ui2.rect(14, f64(225 - a.sidebar_scroll), files_sidebar_width() - 28, 20), ui2.TextStyle{
 				color: body_muted
 				size:  11
 				bold:  true
@@ -649,11 +697,11 @@ fn (a &FileBrowserApp) sidebar(height int) ui2.Element {
 		}, ui2.TextStyle{
 			color: files_sidebar_icon
 		})
-		contents << ui2.label('', location.display_title(), ui2.rect(43, 0, files_sidebar_width - 48, files_sidebar_row_height), ui2.TextStyle{
+		contents << ui2.label('', location.display_title(), ui2.rect(43, 0, files_sidebar_width() - 48, files_sidebar_row_height), ui2.TextStyle{
 			color: body_text
 			size:  12
 		})
-		rows << ui2.clickable_view(location.action, ui2.rect(0, f64(y), files_sidebar_width, files_sidebar_row_height), ui2.BoxStyle{
+		rows << ui2.clickable_view(location.action, ui2.rect(0, f64(y), files_sidebar_width(), files_sidebar_row_height), ui2.BoxStyle{
 			bg:          files_sidebar_selected
 			transparent: !selected
 		}, contents)
@@ -662,7 +710,7 @@ fn (a &FileBrowserApp) sidebar(height int) ui2.Element {
 	for tag in a.settings.tags {
 		if !tag.sidebar { continue }
 		if tag_row == 0 {
-			rows << ui2.label('', tr('files.settings.tags'), ui2.rect(14, f64(290 - a.sidebar_scroll), files_sidebar_width - 28, 20), ui2.TextStyle{
+			rows << ui2.label('', tr('files.settings.tags'), ui2.rect(14, f64(290 - a.sidebar_scroll), files_sidebar_width() - 28, 20), ui2.TextStyle{
 				color: body_muted
 				size:  11
 				bold:  true
@@ -673,26 +721,34 @@ fn (a &FileBrowserApp) sidebar(height int) ui2.Element {
 		if y + files_sidebar_row_height > height || y < 0 { continue }
 		mut contents := frame_elements(2)
 		contents << ui2.view('', ui2.rect(20, 10, 9, 9), ui2.BoxStyle{ bg: tag.color, radius: 5 }, [])
-		contents << ui2.label('', tag.display_name(), ui2.rect(42, 0, files_sidebar_width - 47, files_sidebar_row_height), ui2.TextStyle{
+		contents << ui2.label('', tag.display_name(), ui2.rect(42, 0, files_sidebar_width() - 47, files_sidebar_row_height), ui2.TextStyle{
 			color: body_text
 			size:  12
 		})
-		rows << ui2.clickable_view('${files_action_tag_prefix}${tag.id}', ui2.rect(0, f64(y), files_sidebar_width, files_sidebar_row_height), ui2.BoxStyle{
+		rows << ui2.clickable_view('${files_action_tag_prefix}${tag.id}', ui2.rect(0, f64(y), files_sidebar_width(), files_sidebar_row_height), ui2.BoxStyle{
 			bg:          files_sidebar_selected
 			transparent: a.active_tag_id != tag.id
 		}, contents)
 	}
-	return ui2.clickable_view('files.sidebar', ui2.rect(0, files_header_height, files_sidebar_width, f64(height)), ui2.BoxStyle{
+	return ui2.clickable_view('files.sidebar', ui2.rect(0, files_header_height(), files_sidebar_width(), f64(height)), ui2.BoxStyle{
 		bg: files_sidebar_bg
 	}, rows)
 }
 
-fn (a &FileBrowserApp) screen_with_sidebar(width int, height int, mut children []ui2.Element) ui2.Element {
+fn (mut a FileBrowserApp) screen_with_sidebar(width int, height int, mut children []ui2.Element) ui2.Element {
 	content_left := files_content_left(width)
+	if content_left > 0 && files_catalina {
+		children << a.finder_sidebar(height - files_header_height())
+		children << ui2.view('', ui2.rect(finder_sidebar_width, f64(files_header_height()), 1,
+			f64(height - files_header_height())), ui2.BoxStyle{
+			bg: finder_sidebar_rule
+		}, [])
+		return ui2.screen(files_row_base, children)
+	}
 	if content_left > 0 {
-		children << a.sidebar(height - files_header_height)
-		children << ui2.view('', ui2.rect(f64(content_left), files_header_height, 1,
-			f64(height - files_header_height)), ui2.BoxStyle{
+		children << a.sidebar(height - files_header_height())
+		children << ui2.view('', ui2.rect(f64(content_left), files_header_height(), 1,
+			f64(height - files_header_height())), ui2.BoxStyle{
 			bg: body_rule
 		}, [])
 	}
@@ -708,13 +764,13 @@ fn files_zebra_background(mut children []ui2.Element, x int, top int, width int,
 	children << ui2.view('', ui2.rect(f64(x), f64(top), f64(width), f64(height)), ui2.BoxStyle{
 		bg: files_row_base
 	}, [])
-	for slot := 0; slot * files_row_height < height; slot++ {
+	for slot := 0; slot * files_row_height() < height; slot++ {
 		if (first_row + slot) % 2 == 0 {
 			continue
 		}
-		remaining := height - slot * files_row_height
-		stripe_height := if remaining < files_row_height { remaining } else { files_row_height }
-		children << ui2.view('', ui2.rect(f64(x), f64(top + slot * files_row_height), f64(width), f64(stripe_height)), ui2.BoxStyle{
+		remaining := height - slot * files_row_height()
+		stripe_height := if remaining < files_row_height() { remaining } else { files_row_height() }
+		children << ui2.view('', ui2.rect(f64(x), f64(top + slot * files_row_height()), f64(width), f64(stripe_height)), ui2.BoxStyle{
 			bg: files_row_alt
 		}, [])
 	}
@@ -848,6 +904,10 @@ fn (a &FileBrowserApp) pointer_over_path(x int, y int) bool {
 fn (mut a FileBrowserApp) build(size ui2.Rect) !ui2.Element {
 	a.follow_language()
 	prepare_file_rows(mut a.browser.entries, files_action_row)
+	a.note_location()
+	if files_catalina {
+		return a.build_finder(size)
+	}
 	width := int(size.width)
 	height := int(size.height)
 	content_left := files_content_left(width)
@@ -883,11 +943,11 @@ fn (mut a FileBrowserApp) build(size ui2.Rect) !ui2.Element {
 	} else {
 		a.column_offset = files_clamp(a.column_offset, column_max)
 	}
-	a.rows_top = files_header_height
+	a.rows_top = files_header_height()
 	if a.view_mode == .commander {
 		a.rows_top += files_pane_header_height
 	} else if a.view_mode == .list && a.active_tag_id < 0 {
-		a.rows_top += files_list_header_height
+		a.rows_top += files_list_header_height()
 	}
 	bar_height := if a.view_mode == .columns && column_max > 0 {
 		files_horizontal_bar_height
@@ -896,13 +956,17 @@ fn (mut a FileBrowserApp) build(size ui2.Rect) !ui2.Element {
 	}
 	bottom_padding := if a.view_mode == .columns { files_padding } else { 0 }
 	a.rows_height = height - a.rows_top - bar_height - bottom_padding
-	if a.rows_height < files_row_height {
-		a.rows_height = files_row_height
+	if a.rows_height < files_row_height() {
+		a.rows_height = files_row_height()
 	}
-	a.visible_rows = a.rows_height / files_row_height
+	a.visible_rows = a.rows_height / files_row_height()
 	if a.visible_rows < 1 {
 		a.visible_rows = 1
 	}
+	a.hbar_x = content_left + files_padding
+	a.hbar_width = a.viewport_width - 2 * files_padding
+	a.hbar_top = height - files_horizontal_bar_height
+	a.hbar_bottom = height - files_padding / 2
 	if a.view_mode == .list {
 		a.clamp_scroll()
 	}
@@ -993,10 +1057,10 @@ fn (mut a FileBrowserApp) build(size ui2.Rect) !ui2.Element {
 		entry := &a.browser.entries[index]
 		entry_path := join_path(a.browser.path, entry.name)
 		tag_color := a.settings.first_color(entry_path)
-		y := a.rows_top + row * files_row_height
+		y := a.rows_top + row * files_row_height()
 		hovered := a.browser.hover_row == index || a.browser.selected_row == index
 		row_children := files_list_row_children(entry, &a.settings, tag_color, layout)
-		children << ui2.clickable_view(entry.row_action, ui2.rect(f64(content_left), f64(y), f64(content_width), f64(files_row_height)), ui2.BoxStyle{
+		children << ui2.clickable_view(entry.row_action, ui2.rect(f64(content_left), f64(y), f64(content_width), f64(files_row_height())), ui2.BoxStyle{
 			bg:          files_row_hover
 			transparent: !hovered
 		}, row_children)
@@ -1028,6 +1092,10 @@ fn files_view_button(action string, label string, icon string, x int, selected b
 }
 
 fn files_vertical_scrollbar(x int, y int, height int, visible int, total int, scroll int) ui2.Element {
+	if files_catalina {
+		return finder_vertical_scroller(x + files_scrollbar_width + 2 - finder_scroller_width, y,
+			height, visible, total, scroll)
+	}
 	position, thumb_height := files_scroll_thumb(height, visible, total, scroll)
 	mut bar_children := frame_elements(1)
 	bar_children << ui2.view('', ui2.rect(1, f64(position), 6, f64(thumb_height)), ui2.BoxStyle{
@@ -1082,7 +1150,7 @@ fn (mut a FileBrowserApp) build_tag_results(width int, height int, mut children 
 			'builtin:folder'
 		} else {
 			'builtin:file'
-		}, ui2.rect(10, 4, 16, 16), ui2.BoxStyle{ transparent: true }, ui2.TextStyle{
+		}, ui2.rect(10, f64((files_row_height() - 16) / 2), 16, 16), ui2.BoxStyle{ transparent: true }, ui2.TextStyle{
 			color: if info.is_dir && a.settings.tint_folders {
 				tag.color
 			} else if info.is_dir {
@@ -1091,12 +1159,12 @@ fn (mut a FileBrowserApp) build_tag_results(width int, height int, mut children 
 				files_file_icon
 			}
 		})
-		item << ui2.label('', file_path_name(path), ui2.rect(34, 0, f64(content_width - 80), files_row_height), ui2.TextStyle{
+		item << ui2.label('', file_path_name(path), ui2.rect(34, 0, f64(content_width - 80), files_row_height()), ui2.TextStyle{
 			color: body_text
 			size:  12
 		})
-		item << ui2.view('', ui2.rect(f64(content_width - 25), 9, 7, 7), ui2.BoxStyle{ bg: tag.color, radius: 4 }, [])
-		children << ui2.clickable_view('${files_action_tag_row}${row}', ui2.rect(f64(content_left), f64(a.rows_top + 26 + slot * files_row_height), f64(content_width), files_row_height), ui2.BoxStyle{
+		item << ui2.view('', ui2.rect(f64(content_width - 25), f64(files_row_height() / 2 - 3), 7, 7), ui2.BoxStyle{ bg: tag.color, radius: 4 }, [])
+		children << ui2.clickable_view('${files_action_tag_row}${row}', ui2.rect(f64(content_left), f64(a.rows_top + 26 + slot * files_row_height()), f64(content_width), files_row_height()), ui2.BoxStyle{
 			transparent: true
 		}, item)
 	}
@@ -1136,7 +1204,7 @@ fn (mut a FileBrowserApp) build_miller_columns(width int, height int, mut childr
 				entry := &column.browser.entries[entry_index]
 				entry_path := join_path(column.browser.path, entry.name)
 				tag_color := a.settings.first_color(entry_path)
-				y := rows_top + row_slot * files_row_height
+				y := rows_top + row_slot * files_row_height()
 				selected := column.selected_row == entry_index
 				mut row_children := frame_elements(3)
 				row_children << ui2.button_with_image('', '', if entry.is_dir {
@@ -1154,11 +1222,11 @@ fn (mut a FileBrowserApp) build_miller_columns(width int, height int, mut childr
 						files_file_icon
 					}
 				})
-				row_children << ui2.label('', entry.name, ui2.rect(f64(files_padding + 24), 0, f64(column_width - 2 * files_padding - 24 - 34), f64(files_row_height)), ui2.TextStyle{
+				row_children << ui2.label('', entry.name, ui2.rect(f64(files_padding + 24), 0, f64(column_width - 2 * files_padding - 24 - 34), f64(files_row_height())), ui2.TextStyle{
 					color: if entry.is_dir { body_heading } else { body_text }
 					size:  12
 				})
-				row_children << ui2.label('', if entry.is_dir { '>' } else { entry.size_text }, ui2.rect(f64(column_width - files_padding - 30), 0, 30, f64(files_row_height)), ui2.TextStyle{
+				row_children << ui2.label('', if entry.is_dir { '>' } else { entry.size_text }, ui2.rect(f64(column_width - files_padding - 30), 0, 30, f64(files_row_height())), ui2.TextStyle{
 					color: body_muted
 					size:  11
 					align: .right
@@ -1169,7 +1237,7 @@ fn (mut a FileBrowserApp) build_miller_columns(width int, height int, mut childr
 						radius: 4
 					}, [])
 				}
-				children << ui2.clickable_view(entry.row_action, ui2.rect(f64(x), f64(y), f64(column_width), f64(files_row_height)), ui2.BoxStyle{
+				children << ui2.clickable_view(entry.row_action, ui2.rect(f64(x), f64(y), f64(column_width), f64(files_row_height())), ui2.BoxStyle{
 					bg:          files_row_hover
 					transparent: !selected
 				}, row_children)
@@ -1225,12 +1293,14 @@ fn (mut a FileBrowserApp) scroll_at(x int, y int, steps int, width int) {
 	if x < content_left && content_left > 0 {
 		mut count := 0
 		for tag in a.settings.tags { if tag.sidebar { count++ } }
-		maximum := if 313 + count * files_sidebar_row_height > a.rows_height {
-			313 + count * files_sidebar_row_height - a.rows_height
+		contents := if files_catalina {
+			a.finder_sidebar_height()
 		} else {
-			0
+			313 + count * files_sidebar_row_height
 		}
-		a.sidebar_scroll = files_clamp(a.sidebar_scroll - steps * files_sidebar_row_height, maximum)
+		row := if files_catalina { finder_sidebar_row_height } else { files_sidebar_row_height }
+		maximum := if contents > a.rows_height { contents - a.rows_height } else { 0 }
+		a.sidebar_scroll = files_clamp(a.sidebar_scroll - steps * row, maximum)
 		return
 	}
 	if a.view_mode == .columns && a.pointer_over_path(x, y) {
@@ -1313,7 +1383,12 @@ fn (mut a FileBrowserApp) begin_vertical_drag(id int, y int, total int, current 
 	}
 }
 
-fn (mut a FileBrowserApp) pointer_event(phase AppPointerPhase, button AppPointerButton, scroll int, x int, y int, width int, height int) {
+fn (mut a FileBrowserApp) pointer_event(phase AppPointerPhase, button AppPointerButton, scroll int, x int, y int, width int, _ int) {
+	if phase == .down {
+		// A press anywhere takes the keyboard from the search field; one on
+		// the field gives it back as the press's action.
+		a.search_focused = false
+	}
 	if a.view_mode == .commander {
 		a.commander_pointer_event(phase, button, scroll, x, y, width)
 		return
@@ -1335,7 +1410,7 @@ fn (mut a FileBrowserApp) pointer_event(phase AppPointerPhase, button AppPointer
 				a.max_path_offset())
 		} else if a.horizontal_drag {
 			maximum := a.max_column_offset()
-			track := a.viewport_width - 2 * files_padding
+			track := a.hbar_width
 			_, thumb := files_scroll_thumb(track, a.viewport_width, a.columns.len * a.column_width,
 				a.column_offset)
 			travel := track - thumb
@@ -1396,16 +1471,16 @@ fn (mut a FileBrowserApp) pointer_event(phase AppPointerPhase, button AppPointer
 		return
 	}
 	if a.view_mode == .columns && a.max_column_offset() > 0
-		&& y >= height - files_horizontal_bar_height && y < height - files_padding / 2 {
-		track := a.viewport_width - 2 * files_padding
+		&& y >= a.hbar_top && y < a.hbar_bottom {
+		track := a.hbar_width
 		position, thumb := files_scroll_thumb(track, a.viewport_width, a.columns.len * a.column_width,
 			a.column_offset)
 		maximum := a.max_column_offset()
-		if x >= content_left + files_padding && x < width - files_padding {
-			if x < content_left + files_padding + position || x >= content_left + files_padding + position + thumb {
+		if x >= a.hbar_x && x < a.hbar_x + track {
+			if x < a.hbar_x + position || x >= a.hbar_x + position + thumb {
 				travel := track - thumb
 				if travel > 0 {
-					a.column_offset = files_clamp((x - content_left - files_padding - thumb / 2) * maximum / travel,
+					a.column_offset = files_clamp((x - a.hbar_x - thumb / 2) * maximum / travel,
 						maximum)
 				}
 			}
@@ -1500,6 +1575,14 @@ fn (mut a FileBrowserApp) handle(event_id string) ! {
 			} else {
 				a.browser.go_up()
 			}
+			return
+		}
+		files_action_back {
+			a.go_back()
+			return
+		}
+		files_action_forward {
+			a.go_forward()
 			return
 		}
 		files_action_view_list {
