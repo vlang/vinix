@@ -208,14 +208,15 @@ fn clone_new_process(state &cpulocal.GPRState, flags u64, child_stack u64, paren
 	// is, which takes the process's number.
 	proc.number_process(mut new_process, old_process)
 
+	// A copy of the LDT, as of the address space, before the child can run.
+	if !sched.copy_ldt(old_process, mut new_process) {
+		abandon_new_process(mut new_process)
+		return errno.err, errno.enomem
+	}
 	mut new_thread := sched.new_cloned_thread(new_process, old_thread, state, child_sp, tls,
 		flags & clone_settls != 0) or {
-		proc.lock_table()
-		mut doomed := new_process.pagemap
-		new_process.pagemap = unsafe { nil }
-		proc.unlock_table()
-		mmap.delete_pagemap(mut doomed) or {}
-		proc.free_pid(new_process.pid)
+		sched.discard_ldt(mut new_process)
+		abandon_new_process(mut new_process)
 		return errno.err, errno.eagain
 	}
 
@@ -246,16 +247,31 @@ fn clone_new_process(state &cpulocal.GPRState, flags u64, child_stack u64, paren
 	return u64(proc.pid_in(new_process, viewer)), 0
 }
 
+// Give back a process clone_new_process() made but could not start.
+fn abandon_new_process(mut new_process proc.Process) {
+	proc.lock_table()
+	mut doomed := new_process.pagemap
+	new_process.pagemap = unsafe { nil }
+	proc.unlock_table()
+	mmap.delete_pagemap(mut doomed) or {}
+	proc.free_pid(new_process.pid)
+}
+
 // fork(2) and vfork(2).
 pub fn syscall_fork(gpr_state &cpulocal.GPRState) (u64, u64) {
 	return clone_new_process(gpr_state, u64(sigchld), 0, 0, 0, 0, false, unsafe { nil })
+}
+
+// What exit gives back of the process' x86 segments: its LDT.
+fn release_process_segments(mut process proc.Process) {
+	sched.drop_ldt(mut process)
 }
 
 // Whether `t`, stopped by a sibling tearing the process down, was inside the
 // kernel -- a syscall, or a page fault -- rather than in userspace. See
 // kill_sibling_threads() in exit.v.
 fn thread_in_kernel(t &proc.Thread) bool {
-	return t.gpr_state.cs != u64(gdt.user_code_selector)
+	return t.gpr_state.cs & 3 == 0
 }
 
 // Take `victim`, stopped in userspace and claimed for exit by a sibling

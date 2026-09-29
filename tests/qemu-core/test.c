@@ -8,6 +8,7 @@
  * installed as PID 1: by run-aarch64.sh's --guest-init hook on arm64, and in
  * a throwaway ISO on amd64; see run.sh. */
 #define _GNU_SOURCE
+#include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
@@ -28,6 +29,7 @@
 #include <sys/mman.h>
 #include <sys/mount.h>
 #include <sys/random.h>
+#include <sys/time.h>
 #include <sys/resource.h>
 #include <sys/select.h>
 #include <sys/stat.h>
@@ -43,6 +45,7 @@
 #include <sys/un.h>
 #include <sys/wait.h>
 #include <termios.h>
+#include <ucontext.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -2260,6 +2263,705 @@ static int test_abstract_socket_reuse(void)
 	return 0;
 }
 
+#if defined(__x86_64__)
+/* x86-64's calls from before the *at() family and getdents64, which older
+ * programs and static binaries still make: utime(2), utimes(2), futimesat(2)
+ * and getdents(2), whose struct linux_dirent has the type in its last byte. */
+struct linux_dirent_legacy {
+	unsigned long d_ino;
+	unsigned long d_off;
+	unsigned short d_reclen;
+	char d_name[];
+};
+
+static int timestamp_is(const struct timespec *at, time_t seconds, long nanoseconds)
+{
+	return at->tv_sec == seconds && at->tv_nsec == nanoseconds;
+}
+
+static int test_x86_legacy_file_calls(void)
+{
+	static const char dir[] = "/tmp/x86-legacy";
+	char path[64];
+	CHECK(mkdir(dir, 0755) == 0);
+	for (int i = 0; i < 5; ++i) {
+		snprintf(path, sizeof(path), "%s/file-%d", dir, i);
+		int fd = open(path, O_CREAT | O_EXCL | O_WRONLY, 0644);
+		CHECK(fd >= 0);
+		CHECK(close(fd) == 0);
+	}
+	snprintf(path, sizeof(path), "%s/sub", dir);
+	CHECK(mkdir(path, 0755) == 0);
+
+	/* Every entry once, a few at a time; a buffer too small for one is
+	 * EINVAL, and does not lose the entry. */
+	int fd = open(dir, O_RDONLY | O_DIRECTORY);
+	CHECK(fd >= 0);
+	char small[16];
+	errno = 0;
+	CHECK(syscall(SYS_getdents, fd, small, sizeof(small)) == -1 && errno == EINVAL);
+	int files = 0, subdirectories = 0;
+	for (;;) {
+		char buf[96] __attribute__((aligned(8)));
+		long got = syscall(SYS_getdents, fd, buf, sizeof(buf));
+		CHECK(got >= 0);
+		if (got == 0)
+			break;
+		for (long at = 0; at < got;) {
+			struct linux_dirent_legacy *entry = (void *)(buf + at);
+			CHECK(entry->d_reclen >= 24 && entry->d_reclen % 8 == 0);
+			CHECK(at + entry->d_reclen <= got);
+			unsigned char type = (unsigned char)buf[at + entry->d_reclen - 1];
+			if (strncmp(entry->d_name, "file-", 5) == 0) {
+				CHECK(type == DT_REG);
+				++files;
+			} else if (strcmp(entry->d_name, "sub") == 0) {
+				CHECK(type == DT_DIR);
+				++subdirectories;
+			}
+			at += entry->d_reclen;
+		}
+	}
+	CHECK(files == 5 && subdirectories == 1);
+	CHECK(close(fd) == 0);
+
+	/* utime: whole seconds, or now. */
+	snprintf(path, sizeof(path), "%s/file-0", dir);
+	struct stat st;
+	const long utimbuf[2] = {1000000000, 1000000100};
+	CHECK(syscall(SYS_utime, path, utimbuf) == 0);
+	CHECK(stat(path, &st) == 0);
+	CHECK(timestamp_is(&st.st_atim, 1000000000, 0));
+	CHECK(timestamp_is(&st.st_mtim, 1000000100, 0));
+	time_t now = time(NULL);
+	CHECK(syscall(SYS_utime, path, NULL) == 0);
+	CHECK(stat(path, &st) == 0);
+	CHECK(st.st_mtim.tv_sec >= now - 5 && st.st_mtim.tv_sec <= now + 5);
+	errno = 0;
+	CHECK(syscall(SYS_utime, "/tmp/x86-legacy/none", utimbuf) == -1 && errno == ENOENT);
+
+	/* utimes: microseconds, which must be whole and less than a second. */
+	struct timeval timevals[2] = {{1100000000, 250000}, {1100000100, 750000}};
+	CHECK(syscall(SYS_utimes, path, timevals) == 0);
+	CHECK(stat(path, &st) == 0);
+	CHECK(timestamp_is(&st.st_atim, 1100000000, 250000000));
+	CHECK(timestamp_is(&st.st_mtim, 1100000100, 750000000));
+	timevals[1].tv_usec = 1000000;
+	errno = 0;
+	CHECK(syscall(SYS_utimes, path, timevals) == -1 && errno == EINVAL);
+	timevals[1].tv_usec = -1;
+	errno = 0;
+	CHECK(syscall(SYS_utimes, path, timevals) == -1 && errno == EINVAL);
+
+	/* futimesat: relative to a directory, or with no path the file a
+	 * descriptor is open on. */
+	struct timeval later[2] = {{1200000000, 1}, {1200000100, 2}};
+	int dirfd = open(dir, O_RDONLY | O_DIRECTORY);
+	CHECK(dirfd >= 0);
+	CHECK(syscall(SYS_futimesat, dirfd, "file-1", later) == 0);
+	CHECK(fstatat(dirfd, "file-1", &st, 0) == 0);
+	CHECK(timestamp_is(&st.st_atim, 1200000000, 1000));
+	CHECK(timestamp_is(&st.st_mtim, 1200000100, 2000));
+	CHECK(close(dirfd) == 0);
+	snprintf(path, sizeof(path), "%s/file-2", dir);
+	int file = open(path, O_RDONLY);
+	CHECK(file >= 0);
+	CHECK(syscall(SYS_futimesat, file, NULL, later) == 0);
+	CHECK(fstat(file, &st) == 0);
+	CHECK(timestamp_is(&st.st_mtim, 1200000100, 2000));
+	CHECK(close(file) == 0);
+
+	for (int i = 0; i < 5; ++i) {
+		snprintf(path, sizeof(path), "%s/file-%d", dir, i);
+		CHECK(unlink(path) == 0);
+	}
+	snprintf(path, sizeof(path), "%s/sub", dir);
+	CHECK(rmdir(path) == 0);
+	CHECK(rmdir(dir) == 0);
+	puts("QEMU CORE PASS: x86-64 utime, utimes, futimesat and getdents");
+	return 0;
+}
+
+/* struct user_desc, which modify_ldt(2) and set_thread_area(2) take. */
+struct x86_user_desc {
+	unsigned int entry_number;
+	unsigned int base_addr;
+	unsigned int limit;
+	unsigned int seg_32bit : 1;
+	unsigned int contents : 2;
+	unsigned int read_exec_only : 1;
+	unsigned int limit_in_pages : 1;
+	unsigned int seg_not_present : 1;
+	unsigned int useable : 1;
+	unsigned int lm : 1;
+};
+
+/* Selector n of the LDT, and TLS entry n of the GDT, both of privilege 3. */
+#define LDT_SELECTOR(n) ((unsigned short)((n) << 3 | 7))
+#define TLS_SELECTOR(n) ((unsigned short)((n) << 3 | 3))
+
+/* 32-bit code and the data segments point at run below 4 GiB, all that
+ * compatibility mode and a descriptor's base reach: code in the first page,
+ * data in the second, whose second half keeps what run32() saves. */
+#define LOW_PAGE ((uintptr_t)0x30000000)
+#define LOW_DATA ((volatile uint64_t *)(LOW_PAGE + 4096))
+#define LOW_SAVE (LOW_PAGE + 4096 + 2048)
+
+static long modify_ldt_call(int func, void *ptr, unsigned long count)
+{
+	return syscall(SYS_modify_ldt, func, ptr, count);
+}
+
+/* A 32-bit segment of privilege 3 in LDT entry `entry`: data for contents 0,
+ * code for contents 2. */
+static int set_ldt(unsigned entry, uintptr_t base, unsigned limit, unsigned contents, unsigned pages)
+{
+	struct x86_user_desc d = {
+		.entry_number = entry, .base_addr = (unsigned)base, .limit = limit,
+		.seg_32bit = 1, .contents = contents & 3, .limit_in_pages = pages & 1,
+	};
+	return (int)modify_ldt_call(0x11, &d, sizeof(d));
+}
+
+static int clear_ldt(unsigned entry)
+{
+	struct x86_user_desc d = {.entry_number = entry, .read_exec_only = 1, .seg_not_present = 1};
+	return (int)modify_ldt_call(0x11, &d, sizeof(d));
+}
+
+static void load_gs(unsigned short selector)
+{
+	__asm__ volatile("mov %0, %%gs" : : "r"(selector) : "memory");
+}
+
+static unsigned short gs_selector(void)
+{
+	unsigned short selector;
+	__asm__ volatile("mov %%gs, %0" : "=r"(selector));
+	return selector;
+}
+
+static uint64_t gs_word(unsigned long offset)
+{
+	uint64_t value;
+	__asm__ volatile("mov %%gs:(%1), %0" : "=r"(value) : "r"(offset) : "memory");
+	return value;
+}
+
+static void load_ds(unsigned short selector)
+{
+	__asm__ volatile("mov %0, %%ds" : : "r"(selector) : "memory");
+}
+
+static unsigned short ds_selector(void)
+{
+	unsigned short selector;
+	__asm__ volatile("mov %%ds, %0" : "=r"(selector));
+	return selector;
+}
+
+static unsigned char *put_u32(unsigned char *at, uint32_t value)
+{
+	memcpy(at, &value, sizeof(value));
+	return at + sizeof(value);
+}
+
+/* Put 32-bit code `body` in the low page, for run32() to run from code
+ * segment `cs32`. The 64-bit code around it saves the registers the caller
+ * keeps and the stack pointer in the data page, far-returns to the body, and
+ * puts them back when it far-jumps back. The body may not use the stack. */
+static int load_32bit_code(unsigned short cs32, const unsigned char *body, size_t length)
+{
+	static const unsigned char rex[7] = {0x48, 0x48, 0x48, 0x4c, 0x4c, 0x4c, 0x4c};
+	static const unsigned char modrm[7] = {0x24, 0x1c, 0x2c, 0x24, 0x2c, 0x34, 0x3c};
+	unsigned short cs64;
+	__asm__ volatile("mov %%cs, %0" : "=r"(cs64));
+	unsigned char *code = (unsigned char *)LOW_PAGE;
+	if (mprotect(code, 4096, PROT_READ | PROT_WRITE) != 0)
+		return -1;
+	unsigned char *at = code;
+	for (int i = 0; i < 7; ++i) { /* mov %rsp, %rbx, %rbp, %r12-%r15 to the save area */
+		*at++ = rex[i];
+		*at++ = 0x89;
+		*at++ = modrm[i];
+		*at++ = 0x25;
+		at = put_u32(at, (uint32_t)(LOW_SAVE + 8 * i));
+	}
+	*at++ = 0x68; /* push $cs32 */
+	at = put_u32(at, cs32);
+	*at++ = 0x68; /* push $body */
+	at = put_u32(at, (uint32_t)(LOW_PAGE + 0x100));
+	*at++ = 0x48; /* lretq */
+	*at++ = 0xcb;
+	at = code + 0x100;
+	memcpy(at, body, length);
+	at += length;
+	*at++ = 0xea; /* ljmp $cs64, $back */
+	at = put_u32(at, (uint32_t)(LOW_PAGE + 0x200));
+	*at++ = (unsigned char)cs64;
+	*at++ = (unsigned char)(cs64 >> 8);
+	at = code + 0x200;
+	for (int i = 0; i < 7; ++i) {
+		*at++ = rex[i];
+		*at++ = 0x8b;
+		*at++ = modrm[i];
+		*at++ = 0x25;
+		at = put_u32(at, (uint32_t)(LOW_SAVE + 8 * i));
+	}
+	*at++ = 0xc3; /* ret */
+	return mprotect(code, 4096, PROT_READ | PROT_EXEC);
+}
+
+/* What the 32-bit code left in eax. */
+static unsigned run32(void)
+{
+	return ((unsigned (*)(void))LOW_PAGE)();
+}
+
+static const unsigned char body_result[] = {0xb8, 0x5e, 0xb5, 0xeb, 0x5e}; /* mov $0x5eebb55e, %eax */
+/* mov $100000000, %ecx; 1: dec %ecx; jnz 1b; mov $0x600df00d, %eax */
+static const unsigned char body_loop[] = {0xb9, 0x00, 0xe1, 0xf5, 0x05, 0x49, 0x75, 0xfd,
+	0xb8, 0x0d, 0xf0, 0x0d, 0x60};
+static const unsigned char body_spin[] = {0xeb, 0xfe}; /* 1: jmp 1b */
+static const unsigned char body_syscall[] = {0x0f, 0x05}; /* syscall */
+
+static volatile sig_atomic_t alarms_in_32bit_code;
+
+static void count_alarm_in_32bit_code(int signal, siginfo_t *info, void *context)
+{
+	(void)signal;
+	(void)info;
+	ucontext_t *uc = context;
+	if ((uc->uc_mcontext.gregs[REG_CSGSFS] & 0xffff) == LDT_SELECTOR(1))
+		++alarms_in_32bit_code;
+}
+
+/* In a child of its own: the signals leave nothing behind in the test. */
+static int signals_in_32bit_code_child(void)
+{
+	static char altstack[65536];
+	stack_t alternate = {.ss_sp = altstack, .ss_size = sizeof(altstack)};
+	struct sigaction action = {.sa_sigaction = count_alarm_in_32bit_code,
+		.sa_flags = SA_SIGINFO | SA_ONSTACK};
+	sigemptyset(&action.sa_mask);
+	struct itimerval every = {{0, 5000}, {0, 5000}}, off = {{0, 0}, {0, 0}};
+	if (sigaltstack(&alternate, NULL) != 0 || sigaction(SIGALRM, &action, NULL) != 0
+	    || load_32bit_code(LDT_SELECTOR(1), body_loop, sizeof(body_loop)) != 0
+	    || setitimer(ITIMER_REAL, &every, NULL) != 0)
+		return 1;
+	unsigned looped = 0;
+	for (int round = 0; round < 20 && alarms_in_32bit_code < 3; ++round)
+		looped = run32();
+	if (setitimer(ITIMER_REAL, &off, NULL) != 0)
+		return 2;
+	if (looped != 0x600df00d)
+		return 3;
+	return alarms_in_32bit_code >= 3 ? 0 : 4;
+}
+
+struct tls_worker {
+	volatile uint64_t *word;
+	int ok;
+};
+
+/* Two of these share one CPU and one TLS entry number, each with its own
+ * descriptor: switching between them has to swap what that entry is. */
+static void *tls_worker(void *argument)
+{
+	struct tls_worker *worker = argument;
+	cpu_set_t one;
+	CPU_ZERO(&one);
+	CPU_SET(sysconf(_SC_NPROCESSORS_ONLN) > 1 ? 1 : 0, &one);
+	if (sched_setaffinity(0, sizeof(one), &one) != 0)
+		return NULL;
+	struct x86_user_desc d = {
+		.entry_number = 13, .base_addr = (unsigned)(uintptr_t)worker->word, .limit = 7,
+		.seg_32bit = 1,
+	};
+	if (syscall(SYS_set_thread_area, &d) != 0)
+		return NULL;
+	load_gs(TLS_SELECTOR(13));
+	for (int i = 0; i < 2000; ++i) {
+		if (gs_selector() != TLS_SELECTOR(13) || gs_word(0) != *worker->word)
+			return NULL;
+		sched_yield();
+	}
+	load_gs(0);
+	worker->ok = 1;
+	return NULL;
+}
+
+static void *inherited_gs(void *argument)
+{
+	(void)argument;
+	struct x86_user_desc d = {.entry_number = 14};
+	if (syscall(SYS_get_thread_area, &d) != 0 || d.base_addr != (unsigned)(uintptr_t)&LOW_DATA[2])
+		return NULL;
+	return gs_selector() == TLS_SELECTOR(14) && gs_word(0) == LOW_DATA[2] ? argument : NULL;
+}
+
+static atomic_int stale_ready, stale_seen;
+
+/* A data segment that goes while a thread has it in DS or GS is loaded null
+ * where the thread has it next: on the way out of a syscall, out of an
+ * interrupt, or on its way back onto a CPU. */
+static void *stale_ds_in_syscalls(void *argument)
+{
+	(void)argument;
+	load_ds(LDT_SELECTOR(2));
+	atomic_fetch_add(&stale_ready, 1);
+	for (long i = 0; i < 5000000; ++i) {
+		getppid();
+		if (ds_selector() == 0) {
+			atomic_fetch_add(&stale_seen, 1);
+			break;
+		}
+	}
+	return NULL;
+}
+
+static void *stale_ds_without_syscalls(void *argument)
+{
+	(void)argument;
+	load_ds(LDT_SELECTOR(3));
+	atomic_fetch_add(&stale_ready, 1);
+	for (long i = 0; i < 2000000000L; ++i) {
+		if (ds_selector() == 0) {
+			atomic_fetch_add(&stale_seen, 1);
+			break;
+		}
+	}
+	return NULL;
+}
+
+static void *stale_gs_while_asleep(void *argument)
+{
+	(void)argument;
+	load_gs(LDT_SELECTOR(4));
+	atomic_fetch_add(&stale_ready, 1);
+	for (int i = 0; i < 5000; ++i) {
+		usleep(1000);
+		if (gs_selector() == 0) {
+			atomic_fetch_add(&stale_seen, 1);
+			break;
+		}
+	}
+	return NULL;
+}
+
+static int stale_segments_child(void)
+{
+	if (set_ldt(2, 0, 0xfffff, 0, 1) != 0 || set_ldt(3, 0, 0xfffff, 0, 1) != 0
+	    || set_ldt(4, (uintptr_t)&LOW_DATA[0], 7, 0, 0) != 0)
+		return 1;
+	pthread_t threads[3];
+	void *(*const bodies[3])(void *) = {stale_ds_in_syscalls, stale_ds_without_syscalls,
+		stale_gs_while_asleep};
+	for (int i = 0; i < 3; ++i)
+		if (pthread_create(&threads[i], NULL, bodies[i], NULL) != 0)
+			return 2;
+	while (atomic_load(&stale_ready) != 3)
+		usleep(1000);
+	usleep(20000);
+	if (clear_ldt(2) != 0 || clear_ldt(3) != 0 || clear_ldt(4) != 0)
+		return 3;
+	for (int i = 0; i < 3; ++i)
+		pthread_join(threads[i], NULL);
+	return atomic_load(&stale_seen) == 3 ? 0 : 4;
+}
+
+static atomic_int spinning;
+
+static void *spin_in_32bit_code(void *argument)
+{
+	(void)argument;
+	atomic_store(&spinning, 1);
+	run32();
+	return NULL;
+}
+
+/* A code segment that goes from under a thread running in it: the thread
+ * cannot be resumed there, and takes a SIGSEGV. On a CPU of its own it finds
+ * out on the way back from an interrupt, and sharing one with the thread that
+ * takes the segment away, when the scheduler resumes it. */
+static int stale_code_segment_child(int one_cpu)
+{
+	if (one_cpu) {
+		cpu_set_t first;
+		CPU_ZERO(&first);
+		CPU_SET(0, &first);
+		if (sched_setaffinity(0, sizeof(first), &first) != 0)
+			return 5;
+	}
+	if (load_32bit_code(LDT_SELECTOR(1), body_spin, sizeof(body_spin)) != 0)
+		return 1;
+	pthread_t thread;
+	if (pthread_create(&thread, NULL, spin_in_32bit_code, NULL) != 0)
+		return 2;
+	while (!atomic_load(&spinning))
+		usleep(1000);
+	usleep(20000);
+	if (clear_ldt(1) != 0)
+		return 3;
+	sleep(5);
+	return 4;
+}
+
+/* A handler that sends sigreturn to a code segment of privilege 0, or to
+ * none, only gets its thread a SIGSEGV. */
+static unsigned short forged_cs;
+
+static void forge_code_segment(int signal, siginfo_t *info, void *context)
+{
+	(void)signal;
+	(void)info;
+	ucontext_t *uc = context;
+	uc->uc_mcontext.gregs[REG_CSGSFS] = (uc->uc_mcontext.gregs[REG_CSGSFS] & ~0xffffLL) | forged_cs;
+}
+
+static int forged_code_segment_child(unsigned short cs)
+{
+	forged_cs = cs;
+	struct sigaction action = {.sa_sigaction = forge_code_segment, .sa_flags = SA_SIGINFO};
+	sigemptyset(&action.sa_mask);
+	if (sigaction(SIGUSR1, &action, NULL) != 0)
+		return 1;
+	raise(SIGUSR1);
+	return 2;
+}
+
+static int exec_segment_probe(void)
+{
+	unsigned char ldt[64];
+	if (modify_ldt_call(0, ldt, sizeof(ldt)) != 0)
+		return 1;
+	for (unsigned entry = 12; entry <= 14; ++entry) {
+		struct x86_user_desc d = {.entry_number = entry};
+		if (syscall(SYS_get_thread_area, &d) != 0 || d.base_addr != 0 || !d.seg_not_present)
+			return 2;
+	}
+	return gs_selector() == 0 ? 0 : 3;
+}
+
+static int test_x86_segments(void)
+{
+	void *low = mmap((void *)LOW_PAGE, 8192, PROT_READ | PROT_WRITE,
+	    MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
+	CHECK(low == (void *)LOW_PAGE);
+	LOW_DATA[0] = 0x1122334455667788ULL;
+	LOW_DATA[1] = 0x99aabbccddeeff00ULL;
+	LOW_DATA[2] = 0x0123456789abcdefULL;
+	LOW_DATA[3] = 0xfedcba9876543210ULL;
+
+	/* set_thread_area: the first free TLS entry, 12, which GS then reaches
+	 * through the selector for it, across syscalls, sleeps and CPUs. */
+	struct x86_user_desc tls = {
+		.entry_number = (unsigned)-1, .base_addr = (unsigned)(uintptr_t)&LOW_DATA[0],
+		.limit = 0xfff, .seg_32bit = 1, .useable = 1,
+	};
+	CHECK(syscall(SYS_set_thread_area, &tls) == 0);
+	CHECK(tls.entry_number == 12);
+	load_gs(TLS_SELECTOR(12));
+	CHECK(gs_word(0) == LOW_DATA[0] && gs_word(8) == LOW_DATA[1]);
+	for (int i = 0; i < 200; ++i) {
+		sched_yield();
+		if (i % 50 == 0)
+			usleep(2000);
+		CHECK(gs_selector() == TLS_SELECTOR(12) && gs_word(8) == LOW_DATA[1]);
+	}
+	struct x86_user_desc got = {.entry_number = 12};
+	CHECK(syscall(SYS_get_thread_area, &got) == 0);
+	CHECK(got.base_addr == tls.base_addr && got.limit == 0xfff && got.seg_32bit && got.useable);
+	CHECK(got.contents == 0 && !got.read_exec_only && !got.limit_in_pages && !got.seg_not_present);
+	struct x86_user_desc more = tls;
+	more.entry_number = (unsigned)-1;
+	CHECK(syscall(SYS_set_thread_area, &more) == 0 && more.entry_number == 13);
+	more.entry_number = (unsigned)-1;
+	more.base_addr = (unsigned)(uintptr_t)&LOW_DATA[2];
+	CHECK(syscall(SYS_set_thread_area, &more) == 0 && more.entry_number == 14);
+	more.entry_number = (unsigned)-1;
+	errno = 0;
+	CHECK(syscall(SYS_set_thread_area, &more) == -1 && errno == ESRCH);
+	/* No 16-bit segment, no code and no entry outside the three. */
+	more = tls;
+	more.entry_number = 13;
+	more.seg_32bit = 0;
+	errno = 0;
+	CHECK(syscall(SYS_set_thread_area, &more) == -1 && errno == EINVAL);
+	more.seg_32bit = 1;
+	more.contents = 2;
+	errno = 0;
+	CHECK(syscall(SYS_set_thread_area, &more) == -1 && errno == EINVAL);
+	more.contents = 0;
+	more.entry_number = 11;
+	errno = 0;
+	CHECK(syscall(SYS_set_thread_area, &more) == -1 && errno == EINVAL);
+	/* A new thread starts with the descriptors and selectors it was made
+	 * with. */
+	load_gs(TLS_SELECTOR(14));
+	pthread_t thread;
+	void *result = NULL;
+	CHECK(pthread_create(&thread, NULL, inherited_gs, &tls) == 0);
+	CHECK(pthread_join(thread, &result) == 0 && result == &tls);
+	/* Emptying the entry GS has loads GS null. */
+	struct x86_user_desc empty = {.entry_number = 14, .read_exec_only = 1, .seg_not_present = 1};
+	CHECK(syscall(SYS_set_thread_area, &empty) == 0);
+	CHECK(gs_selector() == 0);
+	got.entry_number = 14;
+	CHECK(syscall(SYS_get_thread_area, &got) == 0);
+	CHECK(got.base_addr == 0 && got.limit == 0 && got.seg_not_present && got.read_exec_only);
+	empty.entry_number = 12;
+	CHECK(syscall(SYS_set_thread_area, &empty) == 0);
+	empty.entry_number = 13;
+	CHECK(syscall(SYS_set_thread_area, &empty) == 0);
+	/* Each thread has its own, even on one CPU. */
+	struct tls_worker workers[2] = {{&LOW_DATA[1], 0}, {&LOW_DATA[3], 0}};
+	pthread_t worker_threads[2];
+	for (int i = 0; i < 2; ++i)
+		CHECK(pthread_create(&worker_threads[i], NULL, tls_worker, &workers[i]) == 0);
+	for (int i = 0; i < 2; ++i)
+		CHECK(pthread_join(worker_threads[i], NULL) == 0);
+	CHECK(workers[0].ok && workers[1].ok);
+
+	/* modify_ldt: nothing to read before there is an LDT, and Linux's
+	 * default one is 128 bytes of zeroes. */
+	unsigned char ldt[64];
+	CHECK(modify_ldt_call(0, ldt, sizeof(ldt)) == 0);
+	unsigned char default_ldt[256];
+	memset(default_ldt, 0xff, sizeof(default_ldt));
+	CHECK(modify_ldt_call(2, default_ldt, sizeof(default_ldt)) == 128);
+	for (int i = 0; i < 128; ++i)
+		CHECK(default_ldt[i] == 0);
+	CHECK(default_ldt[128] == 0xff);
+	/* Errors are negative ints, zero-extended, as Linux returns them. */
+	struct x86_user_desc d = {.entry_number = 0, .base_addr = 0, .limit = 0xfffff,
+		.seg_32bit = 1, .limit_in_pages = 1};
+	CHECK(modify_ldt_call(0x11, &d, sizeof(d) - 1) == (long)(unsigned)-EINVAL);
+	CHECK(modify_ldt_call(3, &d, sizeof(d)) == (long)(unsigned)-ENOSYS);
+	d.entry_number = 8192;
+	CHECK(modify_ldt_call(0x11, &d, sizeof(d)) == (long)(unsigned)-EINVAL);
+	d.entry_number = 0;
+	d.seg_32bit = 0;
+	CHECK(modify_ldt_call(0x11, &d, sizeof(d)) == (long)(unsigned)-EINVAL);
+	d.seg_32bit = 1;
+	d.contents = 3;
+	CHECK(modify_ldt_call(0x11, &d, sizeof(d)) == (long)(unsigned)-EINVAL);
+
+	/* A data segment in entry 0, reached through GS and read back. */
+	CHECK(set_ldt(0, (uintptr_t)&LOW_DATA[1], 15, 0, 0) == 0);
+	load_gs(LDT_SELECTOR(0));
+	CHECK(gs_word(0) == LOW_DATA[1] && gs_word(8) == LOW_DATA[2]);
+	memset(ldt, 0xff, sizeof(ldt));
+	CHECK(modify_ldt_call(0, ldt, sizeof(ldt)) == (long)sizeof(ldt));
+	uint64_t descriptor;
+	memcpy(&descriptor, ldt, sizeof(descriptor));
+	uint32_t base = (uint32_t)(((descriptor >> 16) & 0xffffff) | (((descriptor >> 56) & 0xff) << 24));
+	CHECK(base == (uint32_t)(uintptr_t)&LOW_DATA[1]);
+	CHECK((descriptor & 0xffff) == 15 && ((descriptor >> 45) & 3) == 3);
+	for (size_t i = 8; i < sizeof(ldt); ++i)
+		CHECK(ldt[i] == 0);
+	load_gs(0);
+
+	/* A flat 32-bit code segment in entry 1, which 64-bit code far-calls
+	 * into and back out of. */
+	CHECK(set_ldt(1, 0, 0xfffff, 2, 1) == 0);
+	CHECK(load_32bit_code(LDT_SELECTOR(1), body_result, sizeof(body_result)) == 0);
+	CHECK(run32() == 0x5eebb55e);
+	/* Interrupted, switched away from and sent signals while it runs, whose
+	 * handlers run in 64-bit mode and return to it. */
+	pid_t child = fork();
+	CHECK(child >= 0);
+	if (child == 0)
+		_exit(signals_in_32bit_code_child());
+	CHECK(reap_ok(child) == 0);
+
+	/* fork copies the LDT, and what the child changes is its own. */
+	child = fork();
+	CHECK(child >= 0);
+	if (child == 0) {
+		unsigned char copy[64];
+		if (modify_ldt_call(0, copy, sizeof(copy)) != (long)sizeof(copy))
+			_exit(1);
+		if (load_32bit_code(LDT_SELECTOR(1), body_result, sizeof(body_result)) != 0
+		    || run32() != 0x5eebb55e)
+			_exit(2);
+		_exit(clear_ldt(1) == 0 && clear_ldt(0) == 0 ? 0 : 3);
+	}
+	CHECK(reap_ok(child) == 0);
+	CHECK(load_32bit_code(LDT_SELECTOR(1), body_result, sizeof(body_result)) == 0);
+	CHECK(run32() == 0x5eebb55e);
+
+	/* exec leaves the new program no LDT and no TLS descriptors. */
+	child = fork();
+	CHECK(child >= 0);
+	if (child == 0) {
+		struct x86_user_desc mine = tls;
+		mine.entry_number = 12;
+		if (syscall(SYS_set_thread_area, &mine) != 0)
+			_exit(10);
+		load_gs(TLS_SELECTOR(12));
+		char *const argv[] = {"/sbin/init", "--exec-segment-probe", NULL};
+		execv(argv[0], argv);
+		_exit(11);
+	}
+	CHECK(reap_ok(child) == 0);
+
+	/* A segment another thread takes away is loaded null where the thread
+	 * next has it, and a code segment taken from under a thread gets it a
+	 * SIGSEGV: neither faults the kernel. */
+	child = fork();
+	CHECK(child >= 0);
+	if (child == 0)
+		_exit(stale_segments_child());
+	CHECK(reap_ok(child) == 0);
+	int status;
+	for (int one_cpu = 0; one_cpu < 2; ++one_cpu) {
+		child = fork();
+		CHECK(child >= 0);
+		if (child == 0)
+			_exit(stale_code_segment_child(one_cpu));
+		CHECK(waitpid(child, &status, 0) == child);
+		CHECK(WIFSIGNALED(status) && WTERMSIG(status) == SIGSEGV);
+	}
+	/* None, the kernel's own 64-bit code (gdt.kernel_code_selector), which
+	 * sigreturn must not return to with privilege 0, and an empty entry. */
+	const unsigned short forged[] = {0, 0x28, LDT_SELECTOR(5)};
+	for (size_t i = 0; i < sizeof(forged) / sizeof(forged[0]); ++i) {
+		child = fork();
+		CHECK(child >= 0);
+		if (child == 0)
+			_exit(forged_code_segment_child(forged[i]));
+		CHECK(waitpid(child, &status, 0) == child);
+		CHECK(WIFSIGNALED(status) && WTERMSIG(status) == SIGSEGV);
+	}
+	/* SYSCALL from 32-bit code has no way back: SIGILL. */
+	child = fork();
+	CHECK(child >= 0);
+	if (child == 0) {
+		if (load_32bit_code(LDT_SELECTOR(1), body_syscall, sizeof(body_syscall)) == 0)
+			run32();
+		_exit(1);
+	}
+	CHECK(waitpid(child, &status, 0) == child);
+	CHECK(WIFSIGNALED(status) && WTERMSIG(status) == SIGILL);
+
+	/* Every change is a new LDT, and the old one is given back. */
+	unsigned long before = free_ram();
+	for (int i = 0; i < 1000; ++i)
+		CHECK(set_ldt(4000, (uintptr_t)&LOW_DATA[i & 3], 7, 0, 0) == 0);
+	unsigned long after = free_ram();
+	if (after + 8UL * 1024 * 1024 < before) {
+		printf("LDT churn: free before %lu, after %lu\n", before, after);
+		CHECK(0);
+	}
+
+	CHECK(clear_ldt(0) == 0 && clear_ldt(1) == 0 && clear_ldt(4000) == 0);
+	CHECK(munmap(low, 8192) == 0);
+	puts("QEMU CORE PASS: x86-64 TLS descriptors, LDT and 32-bit code");
+	return 0;
+}
+#endif
+
 static int run_tests(void)
 {
 	int persistence_boot = verify_persistence_boot();
@@ -2316,6 +3018,10 @@ static int run_tests(void)
 	CHECK(test_epoll_abi_and_count() == 0);
 	CHECK(test_syscall_int_truncation() == 0);
 	CHECK(test_abstract_socket_reuse() == 0);
+#if defined(__x86_64__)
+	CHECK(test_x86_legacy_file_calls() == 0);
+	CHECK(test_x86_segments() == 0);
+#endif
 	CHECK(unlink(file_a) == 0);
 	CHECK(unlink(file_b) == 0);
 	CHECK(unlink(file_c) == 0);
@@ -2362,6 +3068,10 @@ int main(int argc, char **argv)
 {
 	if (argc == 2 && strcmp(argv[1], "--exec-memory-probe") == 0)
 		return exec_probe(argv);
+#if defined(__x86_64__)
+	if (argc == 2 && strcmp(argv[1], "--exec-segment-probe") == 0)
+		return exec_segment_probe();
+#endif
 	setbuf(stdout, NULL);
 	setbuf(stderr, NULL);
 	if (getpid() != 1)

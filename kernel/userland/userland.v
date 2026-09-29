@@ -38,11 +38,23 @@ fn valid_sigreturn_context(context &cpulocal.GPRState) bool {
 		&& context.rsp < user_limit
 }
 
-fn sanitize_sigreturn_context(mut context cpulocal.GPRState) {
-	context.cs = u64(gdt.user_code_selector)
-	context.ss = u64(gdt.user_data_selector)
-	context.ds = u64(gdt.user_data_selector)
-	context.es = u64(gdt.user_data_selector)
+// `cs` and `ss` are the frame's; `live` is the rt_sigreturn syscall's own
+// frame. As on Linux, the code and stack segments come from the signal frame,
+// so that a handler that interrupted 32-bit code goes back to it, with
+// privilege 3 whatever the frame says: one this CPU's GDT or LDT does not
+// have is refused on the way back, with a SIGSEGV (see interrupt_return()).
+// 64-bit code gets the usual stack segment for one that is no use, as Linux's
+// force_valid_ss() gives it. DS and ES are not in the frame and stay as they
+// are.
+fn sanitize_sigreturn_context(mut context cpulocal.GPRState, cs u16, ss u16, live &cpulocal.GPRState) {
+	context.cs = u64(cs | 3)
+	context.ss = u64(ss | 3)
+	if context.cs == u64(gdt.user_code_selector) && context.ss != u64(gdt.user_data_selector)
+		&& !sched.user_frame_segments_ok(&context) {
+		context.ss = u64(gdt.user_data_selector)
+	}
+	context.ds = live.ds
+	context.es = live.es
 	context.rflags = (context.rflags & amd64_sigreturn_rflags_mask) | amd64_sigreturn_rflags_fixed
 }
 
@@ -106,14 +118,32 @@ fn owes_async_work(t &proc.Thread) bool {
 // to the CPU and must not block; so the frame is pointed at
 // async_signal_entry() on the thread's own kernel stack, which is idle while
 // the thread is in userspace, and the thread goes on from there.
-pub fn interrupt_return(frame &cpulocal.GPRState) {
-	mut t := proc.current_thread()
-	if t == unsafe { nil } || t.process == unsafe { nil } || !owes_async_work(t) {
+//
+// So is a thread whose code or stack segment its LDT no longer describes --
+// another thread took the entry away -- or whose instruction pointer is past
+// the end of its code segment: the IRETQ would fault in the kernel. It is
+// sent to take the SIGSEGV Linux gives it for that.
+//
+// `thread` is the one `frame` belongs to: the scheduler calls this before GS
+// finds it.
+pub fn interrupt_return(thread &proc.Thread, frame &cpulocal.GPRState) {
+	mut t := unsafe { thread }
+	if !sched.user_frame_segments_ok(frame) {
+		enter_kernel(mut t, frame, voidptr(bad_segment_entry))
 		return
 	}
+	if t.process == unsafe { nil } || !owes_async_work(t) {
+		return
+	}
+	enter_kernel(mut t, frame, voidptr(async_signal_entry))
+}
+
+// Point `frame`, the thread `t` in userspace, at `entry` in the kernel, on
+// the thread's own stack, with what it interrupted in async_context.
+fn enter_kernel(mut t proc.Thread, frame &cpulocal.GPRState, entry voidptr) {
 	mut f := unsafe { frame }
 	t.async_context = *f
-	f.rip = u64(voidptr(async_signal_entry))
+	f.rip = u64(entry)
 	f.cs = u64(gdt.kernel_code_selector)
 	f.ss = u64(gdt.kernel_data_selector)
 	f.ds = u64(gdt.kernel_data_selector)
@@ -121,6 +151,18 @@ pub fn interrupt_return(frame &cpulocal.GPRState) {
 	// As if called: the return address slot a function expects to find.
 	f.rsp = t.kernel_stack - 8
 	f.rflags = cpu.rflags_fixed
+}
+
+// Where interrupt_return() sends a thread whose code or stack segment is gone,
+// with the frame it could not go back to in async_context: a SIGSEGV, as for
+// any other fault, which kills it when nothing handles it.
+@[noreturn]
+fn bad_segment_entry() {
+	mut t := proc.current_thread()
+	mut context := t.async_context
+	sendsig(t, u8(sigsegv))
+	dispatch_a_signal_info(&context, sigsegv, 128, 0) // SI_KERNEL
+	exit_with_fatal_signal(u8(sigsegv))
 }
 
 // Where interrupt_return() sends a thread, in the kernel on its own stack,
@@ -436,6 +478,9 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, path 
 		mut old_pagemap := process.pagemap
 		process.pagemap = new_pagemap
 		proc.unlock_table()
+		// The LDT goes with the program, as on Linux; the new thread's TLS
+		// descriptors start empty.
+		sched.drop_ldt(mut process)
 
 		// The copies fork made are replaced, not kept alongside.
 		unsafe {

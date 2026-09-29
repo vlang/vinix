@@ -17,6 +17,9 @@ import x86.hypervisor
 // asm/x86_64/syscall_entry.S
 fn C.syscall_entry()
 
+// asm/x86_64/segment.S
+fn C.syscall32_entry()
+
 const cpuid7_ebx_smep = u32(1) << 7
 const cpuid7_ecx_umip = u32(1) << 2
 const cr0_write_protect = u64(1) << 16
@@ -29,14 +32,16 @@ pub fn initialise(smp_info &limine.LimineSMPInfo) {
 
 	cpu_local.lapic_id = smp_info.lapic_id
 
-	gdt.reload()
+	gdt.install(&cpu_local.gdt[0])
+	cpu_local.ldt = unsafe { nil }
+	cpu_local.ldt_process = unsafe { nil }
 	idt.reload()
 
 	// No userspace port I/O: place the bitmap beyond the inclusive TSS limit (0x67).
 	// A zero base would interpret the TSS itself as I/O permission bits.
 	cpu_local.tss.unused3 = 0
 	cpu_local.tss.iopb = u16(sizeof(cpulocal.TSS))
-	gdt.load_tss(voidptr(&cpu_local.tss))
+	gdt.load_tss(&cpu_local.gdt[0], voidptr(&cpu_local.tss))
 
 	cpu_local.tss.ist4 = u64(&cpu_local.abort_stack[cpulocal.abort_stack_size - 1])
 
@@ -70,6 +75,10 @@ pub fn initialise(smp_info &limine.LimineSMPInfo) {
 
 	// Entry address
 	msr.wrmsr(0xc0000082, u64(voidptr(C.syscall_entry)))
+	// And from 32-bit code, which an LDT code segment can run: AMD CPUs take
+	// SYSCALL there to CSTAR, which left at zero had the kernel jump to
+	// address 0. Intel ones refuse it with #UD.
+	msr.wrmsr(0xc0000083, u64(voidptr(C.syscall32_entry)))
 
 	// Flags mask
 	msr.wrmsr(0xc0000084, u64(~u32(0x002)))

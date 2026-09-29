@@ -2187,12 +2187,26 @@ fn fill_statfs_resource(mut res resource.Resource, buf u64) bool {
 	return usercopy.copy_to_user(buf, voidptr(&raw[0]), sizeof(u64) * 15)
 }
 
-const utime_now = i64(0x3fffffff)
+pub const utime_now = i64(0x3fffffff)
 const utime_omit = i64(0x3ffffffe)
 
 // utimensat updates the common VFS timestamps and asks persistent filesystems
 // to commit the inode metadata before reporting success.
 pub fn syscall_utimensat(_ voidptr, dirfd int, _path charptr, times u64, flags int) (u64, u64) {
+	// No times is the time now for both.
+	mut requested := [2]time.TimeSpec{init: time.TimeSpec{
+		tv_nsec: utime_now
+	}}
+	if times != 0
+		&& !usercopy.copy_from_user(voidptr(&requested[0]), times, sizeof(time.TimeSpec) * 2) {
+		return errno.err, errno.efault
+	}
+	return set_file_times(dirfd, _path, requested, flags)
+}
+
+// utimensat(2) with the times given, for utime(2), utimes(2) and
+// futimesat(2) as well: each tv_nsec may be UTIME_NOW or UTIME_OMIT.
+pub fn set_file_times(dirfd int, _path charptr, requested [2]time.TimeSpec, flags int) (u64, u64) {
 	if flags & ~(at_symlink_nofollow | at_empty_path) != 0 {
 		return errno.err, errno.einval
 	}
@@ -2240,21 +2254,14 @@ pub fn syscall_utimensat(_ voidptr, dirfd int, _path charptr, times u64, flags i
 	if node != unsafe { nil } && read_only(node) { return errno.err, errno.erofs }
 
 	now := time.clock_now(time.clock_type_realtime) or { time.TimeSpec{} }
-	mut requested := [2]time.TimeSpec{init: now}
 	mut explicit := false
-	if times != 0 {
-		if !usercopy.copy_from_user(voidptr(&requested[0]), times,
-			sizeof(time.TimeSpec) * 2) {
-			return errno.err, errno.efault
+	for value in requested {
+		if value.tv_nsec != utime_now && value.tv_nsec != utime_omit
+			&& (value.tv_nsec < 0 || value.tv_nsec >= 1000000000) {
+			return errno.err, errno.einval
 		}
-		for value in requested {
-			if value.tv_nsec != utime_now && value.tv_nsec != utime_omit
-				&& (value.tv_nsec < 0 || value.tv_nsec >= 1000000000) {
-				return errno.err, errno.einval
-			}
-			if value.tv_nsec != utime_now && value.tv_nsec != utime_omit {
-				explicit = true
-			}
+		if value.tv_nsec != utime_now && value.tv_nsec != utime_omit {
+			explicit = true
 		}
 	}
 	if explicit {

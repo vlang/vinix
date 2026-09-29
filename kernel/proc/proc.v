@@ -318,6 +318,9 @@ pub mut:
 	unveil     &UnveilSet = unsafe { nil }
 	// The secret every signal frame is signed with; see sigcookie.v.
 	sigcookie u64
+	// x86: the LDT modify_ldt(2) gave the process, a sched.Ldt, or nil.
+	// Changed under sched's ldt_lock; see sched/segments_amd64.v.
+	ldt voidptr
 }
 
 // Read-mostly limits are naturally aligned u64s.  Writers serialize complete

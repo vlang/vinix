@@ -72,13 +72,42 @@ fn abort_handler(_num u32, _gpr_state &cpulocal.GPRState) {
 	}
 }
 
+// asm/int_thunks_asm.S and asm/x86_64/syscall_entry.S: where the way back to
+// a thread reloads the DS and ES it had.
+fn C.interrupt_exit_load_ds()
+fn C.interrupt_exit_load_es()
+fn C.syscall_exit_load_ds()
+fn C.syscall_exit_load_es()
+
+// A data segment the way back to a thread reloads, which its LDT or TLS
+// descriptors no longer describe -- another thread took the entry away, or
+// the thread came back on a CPU with a newer LDT -- is loaded null instead,
+// as Linux's exception fixup has it. Whether the fault was one of those.
+fn fix_segment_reload(num u32, mut gpr_state cpulocal.GPRState) bool {
+	// #NP for a descriptor that is not present, #GP for any other.
+	if num != 11 && num != 13 {
+		return false
+	}
+	rip := gpr_state.rip
+	if rip != u64(voidptr(C.interrupt_exit_load_ds)) && rip != u64(voidptr(C.interrupt_exit_load_es))
+		&& rip != u64(voidptr(C.syscall_exit_load_ds))
+		&& rip != u64(voidptr(C.syscall_exit_load_es)) {
+		return false
+	}
+	// Each loads the segment from eax: it runs again, with null.
+	gpr_state.rax = 0
+	return true
+}
+
 fn exception_handler(num u32, mut gpr_state cpulocal.GPRState) {
 	exception_handler_at(num, mut gpr_state, if num == 14 { cpu.read_cr2() } else { u64(0) })
 }
 
 // `cr2` is the faulting address of a page fault, read on entry.
 fn exception_handler_at(num u32, mut gpr_state cpulocal.GPRState, cr2 u64) {
-	if gpr_state.cs == user_code_seg {
+	// Userspace is any code segment of privilege 3: an LDT can give a process
+	// others than the GDT's.
+	if gpr_state.cs & 3 == 3 {
 		mut signal := u8(0)
 
 		match num {
@@ -122,6 +151,9 @@ fn exception_handler_at(num u32, mut gpr_state cpulocal.GPRState, cr2 u64) {
 		// be retried: the process dies of the signal, as on arm64 and Linux.
 		userland.exit_with_fatal_signal(signal)
 	} else {
+		if fix_segment_reload(num, mut gpr_state) {
+			return
+		}
 		lib.kpanic(gpr_state, exception_names[num])
 	}
 }

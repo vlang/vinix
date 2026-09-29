@@ -95,9 +95,15 @@ syscall_entry:
     mov %rax, 16(%rsp)
     mov %rsp, %rdi
     call syscall_leave
+    // A data segment the syscall's thread lost while it was in the kernel
+    // faults here, and the fault handler has it loaded null; see isr.v.
     pop %rax
+.global syscall_exit_load_ds
+syscall_exit_load_ds:
     mov %eax, %ds
     pop %rax
+.global syscall_exit_load_es
+syscall_exit_load_es:
     mov %eax, %es
     pop %rax
     pop %rbx

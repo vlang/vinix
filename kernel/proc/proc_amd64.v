@@ -61,6 +61,12 @@ pub mut:
 	gpr_state          cpulocal.GPRState
 	gs_base            u64
 	fs_base            u64
+	// The selectors the thread had in FS and GS when it came off its CPU,
+	// and the TLS descriptors set_thread_area(2) gave it, GDT entries
+	// gdt.tls_first_entry on. See sched/segments_amd64.v.
+	fs_selector u16
+	gs_selector u16
+	tls         [3]u64
 	pf_stack           u64
 	cr3                u64
 	fpu_storage        voidptr

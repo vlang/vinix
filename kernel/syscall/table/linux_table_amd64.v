@@ -32,6 +32,7 @@ import time
 import time.sys
 import usercopy
 import userland
+import x86.cpu
 import x86.msr
 
 const linux_syscall_max = 512
@@ -86,7 +87,9 @@ fn syscall_linux_pipe(gpr_state voidptr, pipefds &i32) (u64, u64) {
 }
 
 // arch_prctl(code, address): the calling thread's FS and GS bases. Inside a
-// syscall the user's GS base is the one SWAPGS parked in KERNEL_GS_BASE.
+// syscall the user's GS base is the one SWAPGS parked in KERNEL_GS_BASE. The
+// segment register is loaded null first, as Linux does: a selector in it
+// would give its descriptor's base instead; see sched.load_fs_gs().
 fn syscall_linux_arch_prctl(_ voidptr, code int, address u64) (u64, u64) {
 	mut current_thread := proc.current_thread()
 	match code {
@@ -97,9 +100,11 @@ fn syscall_linux_arch_prctl(_ voidptr, code int, address u64) (u64, u64) {
 			}
 			if code == 0x1002 {
 				current_thread.fs_base = address
+				cpu.load_fs_selector(0)
 				msr.wrmsr(0xc0000100, address)
 			} else {
 				current_thread.gs_base = address
+				cpu.load_user_gs_selector(0)
 				msr.wrmsr(0xc0000102, address)
 			}
 			return 0, 0
@@ -144,8 +149,24 @@ fn syscall_linux_readlink(gpr_state voidptr, path charptr, buf voidptr, size u64
 }
 
 fn syscall_linux_getdents64(gpr_state voidptr, fdnum int, dirp u64, count u64) (u64, u64) {
+	return linux_getdents(gpr_state, fdnum, dirp, count, false)
+}
+
+// getdents(fd, dirp, count): getdents64's entries in the layout from before
+// it, struct linux_dirent: the name straight after the record length, and
+// the type in the record's last byte.
+fn syscall_linux_getdents(gpr_state voidptr, fdnum int, dirp u64, count u64) (u64, u64) {
+	return linux_getdents(gpr_state, fdnum, dirp, count, true)
+}
+
+// As many of the directory's entries as fit in `count` bytes at `dirp`, as
+// struct linux_dirent64, or as struct linux_dirent when `legacy`. Both are
+// the inode, the offset and the record length first, and padded to 8 bytes;
+// the same length holds either. An entry that does not fit is left for the
+// next call, and EINVAL is the answer when it is the first, as on Linux.
+fn linux_getdents(gpr_state voidptr, fdnum int, dirp u64, count u64, legacy bool) (u64, u64) {
 	mut offset := u64(0)
-	for offset + 20 <= count {
+	for {
 		mut dirent := stat.Dirent{}
 		ret, err := fs.syscall_readdir(gpr_state, fdnum, mut &dirent)
 		if err != 0 {
@@ -161,6 +182,9 @@ fn syscall_linux_getdents64(gpr_state voidptr, fdnum int, dirp u64, count u64) (
 		reclen := (u64(20) + name_len + 7) & ~u64(7)
 		if offset + reclen > count {
 			fs.readdir_unread(fdnum)
+			if offset == 0 {
+				return errno.err, errno.einval
+			}
 			break
 		}
 		mut record := []u8{len: int(reclen)} @[freed]
@@ -168,8 +192,13 @@ fn syscall_linux_getdents64(gpr_state voidptr, fdnum int, dirp u64, count u64) (
 			*&u64(&record[0]) = dirent.ino
 			*&u64(&record[8]) = dirent.off
 			*&u16(&record[16]) = u16(reclen)
-			record[18] = dirent.@type
-			C.memcpy(voidptr(&record[19]), &dirent.name[0], name_len + 1)
+			if legacy {
+				C.memcpy(voidptr(&record[18]), &dirent.name[0], name_len + 1)
+				record[reclen - 1] = dirent.@type
+			} else {
+				record[18] = dirent.@type
+				C.memcpy(voidptr(&record[19]), &dirent.name[0], name_len + 1)
+			}
 		}
 		if !usercopy.copy_to_user(dirp + offset, unsafe { voidptr(&record[0]) }, reclen) {
 			unsafe { record.free() }
@@ -243,6 +272,58 @@ fn syscall_linux_signalfd(gpr_state voidptr, fdnum int, mask_ptr u64, sizemask u
 	return userland.syscall_signalfd4(gpr_state, fdnum, mask_ptr, sizemask, 0)
 }
 
+// utime(path, times): utimensat() with a struct utimbuf, whole seconds of
+// access and modification, or none for now.
+fn syscall_linux_utime(_ voidptr, path charptr, times u64) (u64, u64) {
+	mut requested := [2]time.TimeSpec{init: time.TimeSpec{
+		tv_nsec: fs.utime_now
+	}}
+	if times != 0 {
+		mut seconds := [2]i64{}
+		if !usercopy.copy_from_user(voidptr(&seconds[0]), times, sizeof(i64) * 2) {
+			return errno.err, errno.efault
+		}
+		requested[0] = time.TimeSpec{
+			tv_sec: seconds[0]
+		}
+		requested[1] = time.TimeSpec{
+			tv_sec: seconds[1]
+		}
+	}
+	return fs.set_file_times(fs.at_fdcwd, path, requested, 0)
+}
+
+// futimesat(dirfd, path, times): utimensat() with two struct timevals, or
+// none for now. Microseconds out of range are refused before they become
+// nanoseconds, which would let UTIME_NOW and UTIME_OMIT through, as on Linux.
+fn syscall_linux_futimesat(_ voidptr, dirfd int, path charptr, times u64) (u64, u64) {
+	mut requested := [2]time.TimeSpec{init: time.TimeSpec{
+		tv_nsec: fs.utime_now
+	}}
+	if times != 0 {
+		mut timevals := [4]i64{}
+		if !usercopy.copy_from_user(voidptr(&timevals[0]), times, sizeof(i64) * 4) {
+			return errno.err, errno.efault
+		}
+		for i := 0; i < 2; i++ {
+			microseconds := timevals[i * 2 + 1]
+			if microseconds < 0 || microseconds >= 1000000 {
+				return errno.err, errno.einval
+			}
+			requested[i] = time.TimeSpec{
+				tv_sec:  timevals[i * 2]
+				tv_nsec: microseconds * 1000
+			}
+		}
+	}
+	return fs.set_file_times(dirfd, path, requested, 0)
+}
+
+// utimes(path, times) is futimesat(AT_FDCWD, path, times).
+fn syscall_linux_utimes(gpr_state voidptr, path charptr, times u64) (u64, u64) {
+	return syscall_linux_futimesat(gpr_state, fs.at_fdcwd, path, times)
+}
+
 // time(tloc): the seconds of the realtime clock, stored at tloc as well when
 // it is given.
 fn syscall_linux_time(_ voidptr, tloc u64) (u64, u64) {
@@ -301,6 +382,7 @@ pub fn init_syscall_table() {
 	syscall_table[75] = voidptr(file.syscall_fsync) // fdatasync
 	syscall_table[76] = voidptr(fs.syscall_truncate) // truncate
 	syscall_table[77] = voidptr(file.syscall_ftruncate) // ftruncate
+	syscall_table[78] = voidptr(syscall_linux_getdents) // getdents
 	syscall_table[79] = voidptr(fs.syscall_getcwd) // getcwd
 	syscall_table[80] = voidptr(fs.syscall_chdir) // chdir
 	syscall_table[81] = voidptr(fs.syscall_fchdir) // fchdir
@@ -318,6 +400,7 @@ pub fn init_syscall_table() {
 	syscall_table[93] = voidptr(fs.syscall_fchown) // fchown
 	syscall_table[94] = voidptr(syscall_linux_lchown) // lchown
 	syscall_table[95] = voidptr(fs.syscall_umask) // umask
+	syscall_table[132] = voidptr(syscall_linux_utime) // utime
 	syscall_table[133] = voidptr(syscall_linux_mknod) // mknod
 	syscall_table[137] = voidptr(fs.syscall_statfs) // statfs
 	syscall_table[138] = voidptr(fs.syscall_fstatfs) // fstatfs
@@ -337,6 +420,7 @@ pub fn init_syscall_table() {
 	syscall_table[199] = voidptr(fs.syscall_fremovexattr) // fremovexattr
 	syscall_table[217] = voidptr(syscall_linux_getdents64) // getdents64
 	syscall_table[221] = voidptr(file.syscall_fadvise64) // fadvise64
+	syscall_table[235] = voidptr(syscall_linux_utimes) // utimes
 	syscall_table[253] = voidptr(syscall_linux_inotify_init) // inotify_init
 	syscall_table[254] = voidptr(fs.syscall_inotify_add_watch) // inotify_add_watch
 	syscall_table[255] = voidptr(fs.syscall_inotify_rm_watch) // inotify_rm_watch
@@ -344,6 +428,7 @@ pub fn init_syscall_table() {
 	syscall_table[258] = voidptr(fs.syscall_mkdirat) // mkdirat
 	syscall_table[259] = voidptr(fs.syscall_mknodat) // mknodat
 	syscall_table[260] = voidptr(fs.syscall_fchownat) // fchownat
+	syscall_table[261] = voidptr(syscall_linux_futimesat) // futimesat
 	syscall_table[262] = voidptr(fs.syscall_fstatat) // newfstatat
 	syscall_table[263] = voidptr(fs.syscall_unlinkat) // unlinkat
 	syscall_table[264] = voidptr(fs.syscall_renameat) // renameat
@@ -492,12 +577,15 @@ pub fn init_syscall_table() {
 	syscall_table[147] = voidptr(syscall_linux_sched_get_priority_min) // sched_get_priority_min
 	syscall_table[148] = voidptr(syscall_linux_sched_rr_get_interval) // sched_rr_get_interval
 	syscall_table[157] = voidptr(syscall_container_prctl) // prctl
+	syscall_table[154] = voidptr(syscall_linux_modify_ldt) // modify_ldt
 	syscall_table[158] = voidptr(syscall_linux_arch_prctl) // arch_prctl
 	syscall_table[160] = voidptr(syscall_linux_setrlimit) // setrlimit
 	syscall_table[186] = voidptr(syscall_linux_gettid) // gettid
 	syscall_table[202] = voidptr(syscall_linux_futex) // futex
 	syscall_table[203] = voidptr(syscall_linux_sched_setaffinity) // sched_setaffinity
 	syscall_table[204] = voidptr(syscall_linux_sched_getaffinity) // sched_getaffinity
+	syscall_table[205] = voidptr(syscall_linux_set_thread_area) // set_thread_area
+	syscall_table[211] = voidptr(syscall_linux_get_thread_area) // get_thread_area
 	syscall_table[218] = voidptr(userland.syscall_set_tid_address) // set_tid_address
 	syscall_table[231] = voidptr(userland.syscall_exit_group) // exit_group
 	syscall_table[247] = voidptr(userland.syscall_waitid) // waitid

@@ -244,6 +244,9 @@ fn clone_new_process(state &cpulocal.GPRState, flags u64, child_stack u64, paren
 	return u64(proc.pid_in(new_process, viewer)), 0
 }
 
+// What exit gives back of the process' x86 segments: nothing, on arm64.
+fn release_process_segments(mut _ proc.Process) {}
+
 // Whether `t`, stopped by a sibling tearing the process down, was inside the
 // kernel -- a syscall, or a page fault -- rather than in userspace: its saved
 // PSTATE says EL1. See kill_sibling_threads() in exit.v.

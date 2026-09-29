@@ -137,6 +137,7 @@ fn exit_process(mut current_process proc.Process, mut current_thread proc.Thread
 	// Get every other thread off the CPUs before the address space goes away.
 	kill_sibling_threads(mut current_process, current_thread)
 	posixtimer.remove_process_timers(current_process)
+	release_process_segments(mut current_process)
 
 	// If this process had the framebuffer (the desktop, say), the console is
 	// dark on its account; give it back before the shell that follows prints.

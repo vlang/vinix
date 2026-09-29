@@ -89,7 +89,14 @@ fn interrupts_off() {
 
 // See cgroup_holds_thread_back(). `state` is where the thread would resume.
 fn cgroup_parks(t &proc.Thread, state &cpulocal.GPRState) bool {
-	return cgroup_holds_thread_back(t, state.cs != user_code_seg)
+	return cgroup_holds_thread_back(t, !in_userspace(state))
+}
+
+// Whether `state` resumes userspace: a code segment of privilege 3, which an
+// LDT's can be as well as the GDT's.
+@[inline]
+fn in_userspace(state &cpulocal.GPRState) bool {
+	return state.cs & 3 == 3
 }
 
 fn get_next_thread() &proc.Thread {
@@ -105,7 +112,7 @@ __global (
 	user_signal_hook voidptr
 )
 
-type UserSignalHook = fn (&cpulocal.GPRState)
+type UserSignalHook = fn (&proc.Thread, &cpulocal.GPRState)
 
 // userland registers what an interrupt returning to userspace has to do for
 // the thread; it cannot be imported. As on arm64.
@@ -173,6 +180,9 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 		}
 		if keeps_cpu && !preset {
 			current_thread.yield_requested = false
+			// An LDT another thread of the process has made since, which
+			// set_ldt_entry() may be waiting for this CPU to take up.
+			load_process_ldt(mut cpu_local, current_thread.process)
 			apic.lapic_eoi()
 			apic.lapic_timer_oneshot(mut cpu_local, scheduler_vector, effective_timeslice(current_thread))
 			return
@@ -192,6 +202,7 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 		}
 		current_thread.gs_base = cpu.get_kernel_gs_base()
 		current_thread.fs_base = cpu.get_fs_base()
+		save_fs_gs(mut current_thread)
 		current_thread.cr3 = cpu.read_cr3()
 		fpu_save(current_thread.fpu_storage)
 		katomic.store(mut &current_thread.running_on, u64(-1))
@@ -206,6 +217,9 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 		kernel_pagemap.switch_to()
 		memory.note_active_pagemap(cpu_local.cpu_number, u64(kernel_pagemap.top_level))
 		cpu_local.tss.ist3 = cpu_local.idle_pf_stack
+		// No LDT for an idle CPU, so that one being freed is not held up
+		// waiting for this CPU to run something.
+		load_process_ldt(mut cpu_local, unsafe { nil })
 		reap_dead_threads(mut cpu_local)
 		await()
 	}
@@ -220,12 +234,18 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 		current_thread.numa_node = int(cpu_local.numa_node)
 	}
 
+	// Its TLS descriptors and LDT, before anything checks a segment of its
+	// frame against them.
+	load_segment_tables(mut cpu_local, mut current_thread)
+
 	// A thread going back to userspace with a signal it has to take, or an exit
 	// a sibling asked for, is sent to take care of it first; the hook points
-	// the frame into the kernel. See userland.interrupt_return().
-	if current_thread.gpr_state.cs == user_code_seg && user_signal_hook != unsafe { nil } {
+	// the frame into the kernel. So is one whose code or stack segment is gone.
+	// See userland.interrupt_return().
+	if in_userspace(&current_thread.gpr_state) && user_signal_hook != unsafe { nil } {
 		hook := unsafe { UserSignalHook(user_signal_hook) }
-		hook(&current_thread.gpr_state)
+		// The thread is named: GS still finds the one leaving, or none.
+		hook(current_thread, &current_thread.gpr_state)
 	}
 
 	cpu_local.tss.ist3 = current_thread.pf_stack
@@ -254,14 +274,15 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 	// thread that died here used to come after it, and anything on the way
 	// that looked at GS -- a lock answering a TLB shootdown asks which CPU it
 	// is on -- read address 0, and its fault handler faulted for good.
-	if current_thread.gpr_state.cs == user_code_seg {
+	fs_base, user_gs_base := load_fs_gs(current_thread)
+	if in_userspace(&current_thread.gpr_state) {
 		cpu.set_gs_base(u64(current_thread))
-		cpu.set_kernel_gs_base(current_thread.gs_base)
+		cpu.set_kernel_gs_base(user_gs_base)
 	} else {
-		cpu.set_gs_base(current_thread.gs_base)
+		cpu.set_gs_base(user_gs_base)
 		cpu.set_kernel_gs_base(u64(current_thread))
 	}
-	cpu.set_fs_base(current_thread.fs_base)
+	cpu.set_fs_base(fs_base)
 
 	new_gpr_state := &current_thread.gpr_state
 
@@ -721,6 +742,11 @@ pub fn new_cloned_thread(_process &proc.Process, _source &proc.Thread, state &cp
 	// In a syscall the user's GS base is the one swapgs put aside.
 	t.gs_base = cpu.get_kernel_gs_base()
 	t.fs_base = if set_tls { tls } else { cpu.get_fs_base() }
+	// Its selectors and TLS descriptors too, as Linux copies them. A TLS
+	// pointer is a 64-bit FS base, which a selector would replace.
+	t.fs_selector = if set_tls { u16(0) } else { cpu.fs_selector() }
+	t.gs_selector = cpu.gs_selector()
+	t.tls = source.tls
 
 	// The saved copy is from the last switch; the child has to start with
 	// the FPU state the caller has at this syscall.

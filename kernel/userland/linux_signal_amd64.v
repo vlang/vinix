@@ -20,6 +20,7 @@ import event.eventstruct
 import errno
 import time
 import x86.cpu.local as cpulocal
+import x86.gdt
 
 const linux_sig_dfl = u64(0)
 const linux_sig_ign = u64(1)
@@ -199,6 +200,11 @@ fn dispatch_linux_signal(context &cpulocal.GPRState, which int, info_signum int,
 	t.gpr_state.rdx = frame + frame_ucontext
 	t.gpr_state.rax = 0
 	t.gpr_state.rflags &= ~rflags_handler_clear
+	// In 64-bit mode, whatever code the signal interrupted, as Linux runs a
+	// handler: 32-bit code an LDT code segment ran among them. sigreturn
+	// goes back to that code segment.
+	t.gpr_state.cs = u64(gdt.user_code_selector)
+	t.gpr_state.ss = u64(gdt.user_data_selector)
 
 	sched.resume_saved_context()
 }
@@ -246,11 +252,12 @@ pub fn syscall_linux_rt_sigreturn(gpr_state voidptr) (u64, u64) {
 	}
 	fpstate := get_u64(buf, mc + mc_fpstate)
 	mask := get_u64(buf, frame_sigmask)
+	selectors := get_u64(buf, mc + mc_cs)
 	unsafe { buf.free() }
 	if !valid_sigreturn_context(&context) {
 		exit_with_fatal_signal(u8(sigsegv))
 	}
-	sanitize_sigreturn_context(mut context)
+	sanitize_sigreturn_context(mut context, u16(selectors), u16(selectors >> 48), syscall_frame)
 
 	if fpstate != 0 {
 		mut t := unsafe { proc.current_thread() }

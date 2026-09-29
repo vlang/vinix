@@ -73,6 +73,14 @@ pub mut:
 	// A thread that has just left this CPU for good, whose stacks the
 	// scheduler gives back once it is off them. See sched.dequeue_and_die().
 	dying_thread voidptr
+	// This CPU's GDT, x86.gdt's entry_count entries. Its own, as it holds
+	// the TLS descriptors of the thread the CPU runs and the LDT of its
+	// process.
+	gdt [17]u64
+	// The LDT loaded, a sched.Ldt, or nil, and the process whose thread the
+	// CPU is running, or nil. See sched.load_process_ldt().
+	ldt         voidptr
+	ldt_process voidptr
 }
 
 __global (

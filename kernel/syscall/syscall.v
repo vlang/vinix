@@ -33,5 +33,12 @@ fn leave(context &cpulocal.GPRState) {
 // userspace, with the interrupted frame.
 @[export: 'interrupt_leave']
 fn interrupt_leave(context &cpulocal.GPRState) {
-	userland.interrupt_return(context)
+	userland.interrupt_return(proc.current_thread(), context)
+}
+
+// Called by syscall32_entry in asm/x86_64/segment.S for SYSCALL made from
+// 32-bit code, which has no way back: the program dies of SIGILL.
+@[export: 'syscall32_refused']
+fn syscall32_refused(_ &cpulocal.GPRState) {
+	userland.exit_with_fatal_signal(u8(userland.sigill))
 }

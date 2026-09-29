@@ -70,6 +70,11 @@ FEATURE_MARKERS = (
     b"QEMU CORE PASS: abstract socket names are released",
     b"QEMU CORE PASS: persistence markers synchronized",
 )
+# The x86-64 ABI's own calls, which only the amd64 boot runs.
+AMD64_FEATURE_MARKERS = (
+    b"QEMU CORE PASS: x86-64 utime, utimes, futimesat and getdents",
+    b"QEMU CORE PASS: x86-64 TLS descriptors, LDT and 32-bit code",
+)
 
 
 def available_port() -> str:
@@ -305,7 +310,8 @@ def run_amd64(iso: Path, qemu: str, firmware: Path, timeout: int) -> int:
         os.close(master)
 
     output = bytes(transcript)
-    missing = [marker.decode("ascii") for marker in (*FEATURE_MARKERS, PASS_MARKER)
+    missing = [marker.decode("ascii")
+               for marker in (*FEATURE_MARKERS, *AMD64_FEATURE_MARKERS, PASS_MARKER)
                if output.count(marker) != 1]
     failures = [marker.decode("ascii", errors="replace")
                 for marker in FAIL_MARKERS if marker in output]
