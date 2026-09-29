@@ -644,16 +644,16 @@ fn (a &FileBrowserApp) sidebar(height int) ui2.Element {
 		}
 		selected := a.current_path() == location.path
 		mut contents := frame_elements(2)
-		contents << ui2.button_with_image('', '', location.icon, ui2.rect(10, 5, 18, 18), ui2.BoxStyle{
+		contents << ui2.button_with_image('', '', location.icon, ui2.rect(16, 5, 18, 18), ui2.BoxStyle{
 			transparent: true
 		}, ui2.TextStyle{
 			color: files_sidebar_icon
 		})
-		contents << ui2.label('', location.display_title(), ui2.rect(37, 0, files_sidebar_width - 48, files_sidebar_row_height), ui2.TextStyle{
+		contents << ui2.label('', location.display_title(), ui2.rect(43, 0, files_sidebar_width - 48, files_sidebar_row_height), ui2.TextStyle{
 			color: body_text
 			size:  12
 		})
-		rows << ui2.clickable_view(location.action, ui2.rect(6, f64(y), files_sidebar_width - 12, files_sidebar_row_height), ui2.BoxStyle{
+		rows << ui2.clickable_view(location.action, ui2.rect(0, f64(y), files_sidebar_width, files_sidebar_row_height), ui2.BoxStyle{
 			bg:          files_sidebar_selected
 			transparent: !selected
 		}, contents)
@@ -672,12 +672,12 @@ fn (a &FileBrowserApp) sidebar(height int) ui2.Element {
 		tag_row++
 		if y + files_sidebar_row_height > height || y < 0 { continue }
 		mut contents := frame_elements(2)
-		contents << ui2.view('', ui2.rect(14, 10, 9, 9), ui2.BoxStyle{ bg: tag.color, radius: 5 }, [])
-		contents << ui2.label('', tag.display_name(), ui2.rect(36, 0, files_sidebar_width - 47, files_sidebar_row_height), ui2.TextStyle{
+		contents << ui2.view('', ui2.rect(20, 10, 9, 9), ui2.BoxStyle{ bg: tag.color, radius: 5 }, [])
+		contents << ui2.label('', tag.display_name(), ui2.rect(42, 0, files_sidebar_width - 47, files_sidebar_row_height), ui2.TextStyle{
 			color: body_text
 			size:  12
 		})
-		rows << ui2.clickable_view('${files_action_tag_prefix}${tag.id}', ui2.rect(6, f64(y), files_sidebar_width - 12, files_sidebar_row_height), ui2.BoxStyle{
+		rows << ui2.clickable_view('${files_action_tag_prefix}${tag.id}', ui2.rect(0, f64(y), files_sidebar_width, files_sidebar_row_height), ui2.BoxStyle{
 			bg:          files_sidebar_selected
 			transparent: a.active_tag_id != tag.id
 		}, contents)
