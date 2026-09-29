@@ -29,13 +29,32 @@
  *                                                 print the CPU time each cost: the
  *                                                 kernel's share of the compositor's
  *                                                 frame pacing, with nothing drawn
+ *     measure ops COUNT LABEL...                  do each common kind of system call
+ *                                                 COUNT times and print what the
+ *                                                 kernel heap kept, per size class
+ *                                                 from /proc/slabinfo: what a desktop
+ *                                                 doing it all day would leak
  */
+#define _GNU_SOURCE
+#include <dirent.h>
 #include <fcntl.h>
 #include <poll.h>
+#include <pthread.h>
+#include <signal.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/epoll.h>
+#include <sys/eventfd.h>
+#include <sys/mman.h>
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <sys/syscall.h>
+#include <sys/timerfd.h>
+#include <sys/un.h>
+#include <sys/wait.h>
+#include <netinet/in.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -250,6 +269,449 @@ static void wakeups(int ms, int seconds, const char *label) {
 	}
 }
 
+/* ── ops: what each kind of system call leaves in the kernel heap ── */
+
+#define MAX_CLASSES 32
+
+struct heap {
+	int count;
+	long size[MAX_CLASSES];
+	long objects[MAX_CLASSES];
+	long large_pages;
+};
+
+static int read_heap(struct heap *h) {
+	FILE *f = fopen("/proc/slabinfo", "r");
+	if (!f)
+		return -1;
+	char line[256];
+	h->count = 0;
+	h->large_pages = 0;
+	while (fgets(line, sizeof line, f)) {
+		long size, objects, pages;
+		if (sscanf(line, "size-%*ld %ld %ld %ld", &size, &objects, &pages) == 3 &&
+		    h->count < MAX_CLASSES) {
+			h->size[h->count] = size;
+			h->objects[h->count] = objects;
+			h->count++;
+		} else if (sscanf(line, "large - - %ld", &pages) == 1) {
+			h->large_pages = pages;
+		}
+	}
+	fclose(f);
+	return 0;
+}
+
+static const char *scratch_dir = "/tmp";
+
+/* Each line of `path` to `out` after `prefix`, or just read when out is NULL. */
+static void copy_lines(const char *path, const char *prefix, FILE *out) {
+	FILE *f = fopen(path, "r");
+	if (!f)
+		return;
+	char line[512];
+	while (fgets(line, sizeof line, f))
+		if (out)
+			fprintf(out, "%s %s", prefix, line);
+	fclose(f);
+}
+
+static void op_tmp_file(int i) {
+	char path[64];
+	snprintf(path, sizeof path, "%s/ops-file-%d", scratch_dir, i);
+	int fd = open(path, O_CREAT | O_WRONLY | O_TRUNC, 0644);
+	if (fd >= 0) {
+		write(fd, "x", 1);
+		close(fd);
+	}
+	unlink(path);
+}
+
+static void op_rename(int i) {
+	char from[64], to[64];
+	snprintf(from, sizeof from, "%s/ops-from-%d", scratch_dir, i);
+	snprintf(to, sizeof to, "%s/ops-to-%d", scratch_dir, i);
+	int fd = open(from, O_CREAT | O_WRONLY | O_TRUNC, 0644);
+	if (fd >= 0)
+		close(fd);
+	rename(from, to);
+	unlink(to);
+}
+
+static void op_unlink_open(int i) {
+	char path[64];
+	snprintf(path, sizeof path, "%s/ops-open-%d", scratch_dir, i);
+	int fd = open(path, O_CREAT | O_RDWR | O_TRUNC, 0644);
+	if (fd < 0)
+		return;
+	/* Removed while open: the file lives on until the close. */
+	unlink(path);
+	write(fd, "x", 1);
+	close(fd);
+}
+
+static void op_rename_over(int i) {
+	char from[64], to[64];
+	snprintf(from, sizeof from, "%s/ops-new-%d", scratch_dir, i);
+	snprintf(to, sizeof to, "%s/ops-old-%d", scratch_dir, i);
+	int fd = open(to, O_CREAT | O_WRONLY | O_TRUNC, 0644);
+	if (fd >= 0)
+		close(fd);
+	fd = open(from, O_CREAT | O_WRONLY | O_TRUNC, 0644);
+	if (fd >= 0)
+		close(fd);
+	/* As mv -f replaces a file. */
+	rename(from, to);
+	unlink(to);
+}
+
+static void op_hardlink(int i) {
+	char path[64], other[64];
+	snprintf(path, sizeof path, "%s/ops-name-%d", scratch_dir, i);
+	snprintf(other, sizeof other, "%s/ops-alias-%d", scratch_dir, i);
+	int fd = open(path, O_CREAT | O_WRONLY | O_TRUNC, 0644);
+	if (fd >= 0)
+		close(fd);
+	link(path, other);
+	unlink(path);
+	unlink(other);
+}
+
+static void op_mkdir(int i) {
+	char path[64];
+	snprintf(path, sizeof path, "%s/ops-dir-%d", scratch_dir, i);
+	mkdir(path, 0755);
+	rmdir(path);
+}
+
+static void op_symlink(int i) {
+	char path[64], target[64];
+	snprintf(path, sizeof path, "%s/ops-link-%d", scratch_dir, i);
+	symlink("/usr/bin/curl", path);
+	readlink(path, target, sizeof target);
+	unlink(path);
+}
+
+static void op_stat(int i) {
+	(void)i;
+	struct stat st;
+	stat("/usr/bin/curl", &st);
+	stat("/usr/lib/../bin/./curl", &st);
+}
+
+static void op_pipe(int i) {
+	(void)i;
+	int fds[2];
+	char c;
+	if (pipe(fds) == 0) {
+		write(fds[1], "x", 1);
+		read(fds[0], &c, 1);
+		close(fds[0]);
+		close(fds[1]);
+	}
+}
+
+static void op_socketpair(int i) {
+	(void)i;
+	int fds[2];
+	char c;
+	if (socketpair(AF_UNIX, SOCK_STREAM, 0, fds) == 0) {
+		write(fds[0], "x", 1);
+		read(fds[1], &c, 1);
+		close(fds[0]);
+		close(fds[1]);
+	}
+}
+
+static void op_unix_connect(int i) {
+	struct sockaddr_un addr = {.sun_family = AF_UNIX};
+	snprintf(addr.sun_path, sizeof addr.sun_path, "%s/ops-sock-%d", scratch_dir, i);
+	int listener = socket(AF_UNIX, SOCK_STREAM, 0);
+	if (listener < 0)
+		return;
+	if (bind(listener, (struct sockaddr *)&addr, sizeof addr) == 0 && listen(listener, 1) == 0) {
+		int client = socket(AF_UNIX, SOCK_STREAM, 0);
+		if (client >= 0) {
+			if (connect(client, (struct sockaddr *)&addr, sizeof addr) == 0) {
+				int server = accept(listener, NULL, NULL);
+				if (server >= 0)
+					close(server);
+			}
+			close(client);
+		}
+	}
+	close(listener);
+	unlink(addr.sun_path);
+}
+
+static void op_unix_datagram(int i) {
+	struct sockaddr_un addr = {.sun_family = AF_UNIX};
+	snprintf(addr.sun_path, sizeof addr.sun_path, "%s/ops-dgram-%d", scratch_dir, i);
+	int receiver = socket(AF_UNIX, SOCK_DGRAM, 0);
+	if (receiver < 0)
+		return;
+	if (bind(receiver, (struct sockaddr *)&addr, sizeof addr) == 0) {
+		int sender = socket(AF_UNIX, SOCK_DGRAM, 0);
+		if (sender >= 0) {
+			char c;
+			/* As syslog(3) sends to /dev/log. */
+			if (connect(sender, (struct sockaddr *)&addr, sizeof addr) == 0 &&
+			    send(sender, "x", 1, 0) == 1)
+				recv(receiver, &c, 1, 0);
+			close(sender);
+		}
+	}
+	close(receiver);
+	unlink(addr.sun_path);
+}
+
+static void op_inet_socket(int i) {
+	(void)i;
+	int tcp = socket(AF_INET, SOCK_STREAM, 0);
+	if (tcp >= 0)
+		close(tcp);
+	int udp = socket(AF_INET, SOCK_DGRAM, 0);
+	if (udp >= 0)
+		close(udp);
+}
+
+static void op_eventfd(int i) {
+	(void)i;
+	int fd = eventfd(0, 0);
+	if (fd >= 0)
+		close(fd);
+}
+
+static void op_epoll(int i) {
+	(void)i;
+	int fds[2];
+	int ep = epoll_create1(0);
+	if (ep < 0)
+		return;
+	if (pipe(fds) == 0) {
+		struct epoll_event event = {.events = EPOLLIN, .data.fd = fds[0]};
+		epoll_ctl(ep, EPOLL_CTL_ADD, fds[0], &event);
+		write(fds[1], "x", 1);
+		epoll_wait(ep, &event, 1, 0);
+		close(fds[0]);
+		close(fds[1]);
+	}
+	close(ep);
+}
+
+static void op_timerfd(int i) {
+	(void)i;
+	int fd = timerfd_create(CLOCK_MONOTONIC, 0);
+	if (fd >= 0) {
+		struct itimerspec spec = {.it_value = {.tv_nsec = 1000}};
+		timerfd_settime(fd, 0, &spec, NULL);
+		close(fd);
+	}
+}
+
+static void op_poll(int i) {
+	(void)i;
+	int fds[2];
+	if (pipe(fds) == 0) {
+		struct pollfd p = {.fd = fds[0], .events = POLLIN};
+		poll(&p, 1, 0);
+		struct timespec zero = {0};
+		ppoll(&p, 1, &zero, NULL);
+		close(fds[0]);
+		close(fds[1]);
+	}
+}
+
+static void op_proc_read(int i) {
+	(void)i;
+	static const char *files[] = {"/proc/self/stat", "/proc/self/status", "/proc/meminfo",
+	                              "/proc/uptime", "/proc/self/maps", "/proc/stat"};
+	char buffer[4096];
+	for (unsigned f = 0; f < sizeof files / sizeof files[0]; f++) {
+		int fd = open(files[f], O_RDONLY);
+		if (fd >= 0) {
+			while (read(fd, buffer, sizeof buffer) > 0) {
+			}
+			close(fd);
+		}
+	}
+}
+
+static void op_proc_list(int i) {
+	(void)i;
+	DIR *dir = opendir("/proc");
+	if (!dir)
+		return;
+	struct dirent *entry;
+	while ((entry = readdir(dir)) != NULL) {
+	}
+	closedir(dir);
+}
+
+static void op_readdir(int i) {
+	(void)i;
+	DIR *dir = opendir("/usr/bin");
+	if (!dir)
+		return;
+	struct dirent *entry;
+	while ((entry = readdir(dir)) != NULL) {
+	}
+	closedir(dir);
+}
+
+static void op_dup(int i) {
+	(void)i;
+	int fd = open("/dev/null", O_RDWR);
+	if (fd >= 0) {
+		int copy = dup(fd);
+		if (copy >= 0)
+			close(copy);
+		close(fd);
+	}
+}
+
+static void op_mmap(int i) {
+	(void)i;
+	size_t page = (size_t)sysconf(_SC_PAGESIZE);
+	char *p = mmap(NULL, 4 * page, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+	if (p == MAP_FAILED)
+		return;
+	p[0] = 1;
+	p[3 * page] = 1;
+	/* A split: the middle pages read-only, then the whole range gone. */
+	mprotect(p + page, page, PROT_READ);
+	munmap(p, 4 * page);
+}
+
+static void *thread_body(void *arg) {
+	return arg;
+}
+
+static void op_thread(int i) {
+	(void)i;
+	pthread_t thread;
+	if (pthread_create(&thread, NULL, thread_body, NULL) == 0)
+		pthread_join(thread, NULL);
+}
+
+static volatile sig_atomic_t signals_seen;
+
+static void on_signal(int number) {
+	(void)number;
+	signals_seen++;
+}
+
+static void op_signal(int i) {
+	(void)i;
+	sigset_t set, old;
+	sigemptyset(&set);
+	sigaddset(&set, SIGUSR2);
+	sigprocmask(SIG_BLOCK, &set, &old);
+	sigprocmask(SIG_SETMASK, &old, NULL);
+	raise(SIGUSR1);
+}
+
+static void op_fork(int i) {
+	(void)i;
+	pid_t pid = fork();
+	if (pid == 0)
+		_exit(0);
+	if (pid > 0)
+		waitpid(pid, NULL, 0);
+}
+
+static void op_memfd(int i) {
+	(void)i;
+	int fd = (int)syscall(SYS_memfd_create, "ops", 0);
+	if (fd >= 0)
+		close(fd);
+}
+
+struct op {
+	const char *name;
+	void (*run)(int);
+};
+
+static void measure_op(const struct op *op, int count, const char *label) {
+	/* A first round fills whatever the kernel keeps for good. */
+	for (int i = 0; i < 20; i++)
+		op->run(i);
+	sleep(1);
+	struct heap before, after;
+	if (read_heap(&before) < 0) {
+		printf("PERF-ERROR %s cannot read /proc/slabinfo\n", label);
+		return;
+	}
+	/* A kernel built with ALLOC_TRACK=1 can also say where from. */
+	int tracked = access("/proc/allocstart", R_OK) == 0;
+	if (tracked)
+		copy_lines("/proc/allocstart", NULL, NULL);
+	for (int i = 0; i < count; i++)
+		op->run(i);
+	/* Reaped processes and threads are freed two seconds on, at the next
+	 * reap, and removed files five seconds on, at the next unlink. */
+	sleep(6);
+	op_tmp_file(-1);
+	op_fork(0);
+	read_heap(&after);
+	if (tracked) {
+		char prefix[640];
+		snprintf(prefix, sizeof prefix, "PERF-SITE %s op=%s dir=%s", label, op->name,
+		         scratch_dir);
+		copy_lines("/proc/allocsites", prefix, stdout);
+	}
+	long bytes = (after.large_pages - before.large_pages) * 16384;
+	char classes[512] = "";
+	for (int c = 0; c < after.count && c < before.count; c++) {
+		long delta = after.objects[c] - before.objects[c];
+		if (delta == 0)
+			continue;
+		bytes += delta * after.size[c];
+		char part[48];
+		snprintf(part, sizeof part, " size-%ld:%+ld", after.size[c], delta);
+		strncat(classes, part, sizeof classes - strlen(classes) - 1);
+	}
+	if (after.large_pages != before.large_pages) {
+		char part[48];
+		snprintf(part, sizeof part, " large_pages:%+ld", after.large_pages - before.large_pages);
+		strncat(classes, part, sizeof classes - strlen(classes) - 1);
+	}
+	printf("PERF-OPS %s op=%s dir=%s count=%d bytes_per_op=%ld%s\n", label, op->name,
+	       scratch_dir, count, bytes / count, classes);
+}
+
+static void ops(int count, const char *label) {
+	static const struct op table[] = {
+		{"stat", op_stat},               {"pipe", op_pipe},
+		{"socketpair", op_socketpair},   {"inet_socket", op_inet_socket},
+		{"eventfd", op_eventfd},         {"epoll", op_epoll},
+		{"timerfd", op_timerfd},         {"poll", op_poll},
+		{"proc_read", op_proc_read},     {"proc_list", op_proc_list},
+		{"readdir", op_readdir},         {"dup", op_dup},
+		{"mmap", op_mmap},               {"thread", op_thread},
+		{"signal", op_signal},           {"fork", op_fork},
+		{"memfd", op_memfd},
+	};
+	/* The ones that make and remove names, on the RAM root and on ext2. */
+	static const struct op files[] = {
+		{"file", op_tmp_file},          {"rename", op_rename},
+		{"unlink_open", op_unlink_open}, {"rename_over", op_rename_over},
+		{"hardlink", op_hardlink},       {"mkdir", op_mkdir},
+		{"symlink", op_symlink},         {"unix_connect", op_unix_connect},
+		{"unix_datagram", op_unix_datagram},
+	};
+	struct sigaction action = {.sa_handler = on_signal};
+	sigaction(SIGUSR1, &action, NULL);
+	for (unsigned t = 0; t < sizeof table / sizeof table[0]; t++)
+		measure_op(&table[t], count, label);
+	static const char *dirs[] = {"/tmp", "/root"};
+	for (unsigned d = 0; d < sizeof dirs / sizeof dirs[0]; d++) {
+		scratch_dir = dirs[d];
+		for (unsigned t = 0; t < sizeof files / sizeof files[0]; t++)
+			measure_op(&files[t], count, label);
+	}
+}
+
 int main(int argc, char **argv) {
 	setvbuf(stdout, NULL, _IOLBF, 0);
 	if (argc >= 5 && strcmp(argv[1], "wakeups") == 0) {
@@ -260,6 +722,16 @@ int main(int argc, char **argv) {
 			strncat(label, argv[i], sizeof label - strlen(label) - 1);
 		}
 		wakeups(atoi(argv[2]), atoi(argv[3]), label);
+		return 0;
+	}
+	if (argc >= 4 && strcmp(argv[1], "ops") == 0) {
+		char label[512] = "";
+		for (int i = 3; i < argc; i++) {
+			if (i > 3)
+				strncat(label, " ", sizeof label - strlen(label) - 1);
+			strncat(label, argv[i], sizeof label - strlen(label) - 1);
+		}
+		ops(atoi(argv[2]), label);
 		return 0;
 	}
 	if (argc == 2 && strcmp(argv[1], "used") == 0) {

@@ -73,6 +73,12 @@ run_case() {
 		"$perf/measure" wakeups 16 "$MEASURE" "$label"
 		return
 	fi
+	# No desktop either: what each kind of system call leaves in the kernel
+	# heap, run 200 times over.
+	if [ "$scenario" = ops ]; then
+		"$perf/measure" ops 200 "$label"
+		return
+	fi
 	# No desktop either: what the page cache costs. 32 MiB goes through the
 	# persistent ext2 /root and is read back, filling the cache to capacity.
 	if [ "$scenario" = cache ]; then
