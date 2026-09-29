@@ -695,32 +695,6 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 // pid space, as on Linux and on arm64: the first thread of a process takes the
 // pid as its tid, every other one an id no process can have while it lives.
 // gettid(), tgkill() and the scheduling calls find a thread by that number.
-fn attach_thread(mut process proc.Process, mut t proc.Thread) ?int {
-	process.threads_lock.acquire()
-	defer {
-		process.threads_lock.release()
-	}
-
-	if process.threads.len == 0 && process.pid != 0 {
-		t.tid = process.pid
-		proc.bind_tid(t.tid, t)
-		proc.number_thread(mut t, true)
-	} else {
-		t.tid = proc.allocate_tid(t)?
-		proc.number_thread(mut t, false)
-		// Signal dispositions are the process's, and rt_sigaction keeps every
-		// thread on this list in step under this lock. The copy the caller made
-		// from its creator can predate an rt_sigaction that ran on another CPU
-		// in the meantime, and would then stay behind for good: musl's barrier
-		// handler found such a thread still carrying another handler for
-		// SIGSYNCCALL, which never acknowledged, and Firefox hung at startup.
-		t.sigactions = process.threads[0].sigactions
-	}
-
-	process.threads << t
-	return t.tid
-}
-
 // A thread for clone(CLONE_THREAD), or the one thread of a process
 // clone()/fork() makes: it resumes where `source` made the syscall, from the
 // registers in `state`, with 0 as the syscall's result and `child_sp` as its
@@ -751,7 +725,7 @@ pub fn new_cloned_thread(_process &proc.Process, _source &proc.Thread, state &cp
 		sigactions:     source.sigactions
 		masked_signals: source.masked_signals
 		affinity_mask:  source.affinity_mask
-		sched:          source.sched
+		sched:          inherited_sched_params(source)
 		comm:           source.comm.clone()
 	}
 
@@ -774,70 +748,6 @@ pub fn new_cloned_thread(_process &proc.Process, _source &proc.Thread, state &cp
 	}
 
 	return t
-}
-
-pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) ?&proc.Process {
-	if unsafe { old_process != nil } && !proc.may_create_process(old_process) {
-		errno.set(errno.eagain)
-		return none
-	}
-	// Freed when the process is reaped, in proc.free_pid().
-	fds := []voidptr{len: proc.initial_fds} @[freed]
-	mut new_proc := &proc.Process{
-		pagemap: unsafe { nil }
-		fds:     fds
-	}
-
-	new_proc.pid = proc.allocate_pid(new_proc) or {
-		unsafe {
-			new_proc.fds.free()
-			free(new_proc)
-		}
-		return none
-	}
-
-	if unsafe { old_process != 0 } {
-		new_proc.ppid = old_process.pid
-		new_proc.pgid = old_process.pgid
-		new_proc.sid = old_process.sid
-		new_proc.tty_session = old_process.tty_session
-		new_proc.pagemap = mmap.fork_pagemap(old_process.pagemap) or { return none }
-		new_proc.thread_stack_top = old_process.thread_stack_top
-		// The child has the parent's heap, so it has its break too; see
-		// sched_arm64.v.
-		new_proc.brk_base = old_process.brk_base
-		new_proc.brk_current = old_process.brk_current
-		new_proc.mmap_anon_non_fixed_base = old_process.mmap_anon_non_fixed_base
-		new_proc.current_directory = old_process.current_directory
-		proc.inherit_container_state(mut new_proc, old_process)
-		new_proc.allow_wx = old_process.allow_wx
-		new_proc.uid = old_process.uid
-		new_proc.euid = old_process.euid
-		new_proc.suid = old_process.suid
-		new_proc.gid = old_process.gid
-		new_proc.egid = old_process.egid
-		new_proc.sgid = old_process.sgid
-		new_proc.groups = old_process.groups.clone()
-		new_proc.umask = old_process.umask
-		new_proc.nice = old_process.nice
-		new_proc.rlimits = old_process.rlimits
-		// A NUMA memory policy is process state, like nice and the rlimits, so
-		// a fork keeps the placement its parent asked for.
-		new_proc.mempolicy_mode = old_process.mempolicy_mode
-		new_proc.mempolicy_nodemask = old_process.mempolicy_nodemask
-	} else {
-		new_proc.ppid = 0
-		new_proc.pgid = new_proc.pid
-		new_proc.sid = new_proc.pid
-		new_proc.pagemap = unsafe { pagemap }
-		new_proc.thread_stack_top = elf.initial_stack_top()
-		new_proc.mmap_anon_non_fixed_base = elf.initial_mmap_base()
-		new_proc.current_directory = voidptr(vfs_root)
-		new_proc.rlimits = proc.default_rlimits()
-		proc.inherit_container_state(mut new_proc, unsafe { nil })
-	}
-
-	return new_proc
 }
 
 pub fn await() {

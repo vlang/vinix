@@ -1369,6 +1369,67 @@ static int test_futex_wake_op(void)
 	return 0;
 }
 
+/* A thread with a working directory of its own forks from there. */
+static void *fork_from_own_directory(void *argument)
+{
+	int *ok = argument;
+	if (unshare(CLONE_FS) != 0 || chdir("/dev") != 0)
+		return NULL;
+	pid_t child = fork();
+	if (child == 0) {
+		char path[64];
+		_exit(getcwd(path, sizeof(path)) != NULL
+		    && strcmp(path, "/dev") == 0 ? 0 : 1);
+	}
+	*ok = reap_ok(child) == 0;
+	return NULL;
+}
+
+/* A forked child runs the same program, from the same auxiliary vector and
+ * working directory, but does not keep a scheduling policy its parent set with
+ * SCHED_RESET_ON_FORK. musl stubs the sched_*scheduler calls out, hence the
+ * raw syscalls. */
+static int test_fork_inherits_process_state(void)
+{
+	char exe[256], auxv[1024];
+	ssize_t exe_length = readlink("/proc/self/exe", exe, sizeof(exe));
+	CHECK(exe_length > 0);
+	int fd = open("/proc/self/auxv", O_RDONLY);
+	CHECK(fd >= 0);
+	ssize_t auxv_length = read(fd, auxv, sizeof(auxv));
+	CHECK(close(fd) == 0);
+	CHECK(auxv_length > 0);
+
+	struct sched_param priority = {.sched_priority = 1};
+	CHECK(syscall(SYS_sched_setscheduler, 0,
+	    SCHED_FIFO | SCHED_RESET_ON_FORK, &priority) == 0);
+	pid_t child = fork();
+	if (child == 0) {
+		char seen[1024];
+		ssize_t length = readlink("/proc/self/exe", seen, sizeof(seen));
+		if (length != exe_length || memcmp(seen, exe, (size_t)length) != 0)
+			_exit(1);
+		int auxv_fd = open("/proc/self/auxv", O_RDONLY);
+		if (auxv_fd < 0 || read(auxv_fd, seen, sizeof(seen)) != auxv_length
+		    || memcmp(seen, auxv, (size_t)auxv_length) != 0)
+			_exit(2);
+		if (syscall(SYS_sched_getscheduler, 0) != SCHED_OTHER)
+			_exit(3);
+		_exit(0);
+	}
+	priority.sched_priority = 0;
+	CHECK(syscall(SYS_sched_setscheduler, 0, SCHED_OTHER, &priority) == 0);
+	CHECK(reap_ok(child) == 0);
+
+	int ok = 0;
+	pthread_t thread;
+	CHECK(pthread_create(&thread, NULL, fork_from_own_directory, &ok) == 0);
+	CHECK(pthread_join(thread, NULL) == 0);
+	CHECK(ok);
+	puts("QEMU CORE PASS: fork keeps the program, auxv and directory");
+	return 0;
+}
+
 /* An event has room for 64 listeners. More threads than that waiting on one
  * futex see a spurious wake, which they retry, rather than stop the kernel. */
 #define MANY_WAITERS 80
@@ -1716,6 +1777,7 @@ static int run_tests(void)
 	CHECK(test_unix_socket_full_write_readiness() == 0);
 	CHECK(test_futex_wake_op() == 0);
 	CHECK(test_more_waiters_than_an_event_holds() == 0);
+	CHECK(test_fork_inherits_process_state() == 0);
 	CHECK(test_wait_ends_for_a_pending_signal() == 0);
 	CHECK(test_default_terminating_signals() == 0);
 	CHECK(test_signals_reach_a_busy_loop() == 0);
