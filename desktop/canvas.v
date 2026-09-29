@@ -860,6 +860,57 @@ fn (mut c Canvas) draw_hidpi_checkmark(x int, y int, size int, color u32) {
 	}
 }
 
+// draw_download_icon draws the Downloads mark, an arrow onto a bar inside a
+// ring. Like the checkmark it measures each backing pixel's distance to the
+// strokes, so the ring and the round ends stay smooth at either scale. The
+// proportions are the artwork's, in units of the ring's outer radius.
+fn (mut c Canvas) draw_download_icon(x int, y int, w int, h int, color u32) {
+	size := if w < h { w } else { h }
+	if size <= 0 || c.scale <= 0 {
+		return
+	}
+	scale := f64(c.scale)
+	center_x := (f64(x) + f64(w) / 2) * scale
+	center_y := (f64(y) + f64(h) / 2) * scale
+	outer := f64(size) * 0.47 * scale
+	// Thinner than a logical pixel, a stroke fades rather than thins.
+	ring := if outer * 0.116 > scale { outer * 0.116 } else { scale }
+	arrow := if outer * 0.2 > 1.5 * scale { outer * 0.2 } else { 1.5 * scale }
+	bar := if outer * 0.123 > scale { outer * 0.123 } else { scale }
+	ring_radius := outer - ring / 2
+	tip := outer * 0.3
+	arm := outer * 0.32
+	bar_y := outer * 0.533
+	bar_end := outer * 0.41
+	left := int(center_x - outer) - 1
+	top := int(center_y - outer) - 1
+	right := int(center_x + outer) + 1
+	bottom := int(center_y + outer) + 1
+	for py := top; py <= bottom; py++ {
+		for px := left; px <= right; px++ {
+			sx := f64(px) + 0.5 - center_x
+			sy := f64(py) + 0.5 - center_y
+			// The distance outside the nearest stroke, negative inside it.
+			ring_off := math.sqrt(sx * sx + sy * sy) - ring_radius
+			mut edge := (if ring_off < 0 { -ring_off } else { ring_off }) - ring / 2
+			for part in [
+				distance_to_segment(sx, sy, 0, -outer * 0.5, 0, tip) - arrow / 2,
+				distance_to_segment(sx, sy, -arm, 0, 0, tip) - arrow / 2,
+				distance_to_segment(sx, sy, arm, 0, 0, tip) - arrow / 2,
+				distance_to_segment(sx, sy, -bar_end, bar_y, bar_end, bar_y) - bar / 2,
+			]! {
+				if part < edge {
+					edge = part
+				}
+			}
+			if edge < 0.5 {
+				coverage := if edge <= -0.5 { u32(255) } else { u32((0.5 - edge) * 255) }
+				c.blend_physical_pixel(px, py, color, coverage)
+			}
+		}
+	}
+}
+
 // drop_shadow stacks a few translucent rounded rects behind a window.
 // Layering cheap shapes reads as a soft edge without the cost of a real blur.
 fn (mut c Canvas) drop_shadow(x int, y int, w int, h int, radius int, spread int, alpha u32) {

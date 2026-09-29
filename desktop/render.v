@@ -1338,12 +1338,7 @@ fn (mut d Desktop) draw_builtin_glyph(path string, x int, y int, w int, h int, c
 			d.canvas.draw_line(cx - 3, cy + 4, cx + 1, cy + 4, color, 1)
 		}
 		'downloads' {
-			d.canvas.draw_line(cx, cy - 7, cx, cy + 2, color, 2)
-			d.canvas.draw_line(cx - 4, cy - 1, cx, cy + 3, color, 2)
-			d.canvas.draw_line(cx, cy + 3, cx + 4, cy - 1, color, 2)
-			d.canvas.draw_line(cx - 6, cy + 4, cx - 6, cy + 7, color, 2)
-			d.canvas.draw_line(cx - 6, cy + 7, cx + 6, cy + 7, color, 2)
-			d.canvas.draw_line(cx + 6, cy + 7, cx + 6, cy + 4, color, 2)
+			d.canvas.draw_download_icon(x, y, w, h, color)
 		}
 		'drive' {
 			d.canvas.stroke_round_rect(cx - 7, cy - 5, 14, 10, 2, color, 255)
