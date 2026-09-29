@@ -196,7 +196,11 @@ class PackageStoreTests(unittest.TestCase):
             return response.read()
 
     def test_serves_each_live_app_build_from_its_own_directory(self) -> None:
-        for app, directory in (("vinix-files", "files-live"), ("vinix-activity", "activity-live")):
+        for app, directory in (
+            ("vinix-files", "files-live"),
+            ("vinix-activity", "activity-live"),
+            ("vinix-settings", "settings-live"),
+        ):
             published = self.source / "build-aarch64-desktop-apps" / directory
             published.mkdir(parents=True)
             (published / app).write_bytes(f"{app} executable".encode())
@@ -204,6 +208,7 @@ class PackageStoreTests(unittest.TestCase):
         self.assertEqual(self.fetch("/vinix-files/binary"), b"vinix-files executable")
         self.assertEqual(self.fetch("/vinix-activity/binary"), b"vinix-activity executable")
         self.assertEqual(self.fetch("/vinix-activity/version"), b"123 17\n")
+        self.assertEqual(self.fetch("/vinix-settings/binary"), b"vinix-settings executable")
         # Only the listed applications, and only their two files, are served.
         for path in ("/vinix-terminal/binary", "/vinix-files/vinix-files", "/vinix-files/binary/x"):
             with self.assertRaises(urllib.error.HTTPError) as raised:

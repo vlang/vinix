@@ -2,7 +2,7 @@
 # Build the committed desktop for AArch64 and publish it as one or more native
 # applications to running QEMU guests:
 #
-#   ./cross-compile-app.sh files activity
+#   ./cross-compile-app.sh files activity settings
 #
 # Every native application is an exec name of the one multicall desktop, so a
 # single build serves all of them. Guests started with the current desktop
@@ -19,14 +19,14 @@ SYSROOT="${VINIX_AARCH64_SYSROOT:-$SCRIPT_DIR/build-aarch64-userland/staging}"
 # in LIVE_APPS in tools/qemu-package-store.py, in build-support/vinix-files-sync
 # and in live_apps in build-support/init-aarch64/desktop-init.c.
 if [ "$#" -eq 0 ]; then
-    echo "usage: $0 files|activity..." >&2
+    echo "usage: $0 files|activity|settings..." >&2
     exit 2
 fi
 for app in "$@"; do
     case "$app" in
-        files|activity) ;;
+        files|activity|settings) ;;
         *)
-            echo "ERROR: $app cannot be published to a running guest (files, activity)" >&2
+            echo "ERROR: $app cannot be published to a running guest (files, activity, settings)" >&2
             exit 2
             ;;
     esac

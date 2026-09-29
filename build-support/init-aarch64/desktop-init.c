@@ -376,6 +376,8 @@ static const struct {
 	  "/run/vinix-files-version" },
 	{ "/usr/bin/vinix-activity", "/usr/bin/.vinix-activity.system",
 	  "/run/vinix-activity-version" },
+	{ "/usr/bin/vinix-settings", "/usr/bin/.vinix-settings.system",
+	  "/run/vinix-settings-version" },
 };
 
 static void prepare_desktop_boot(void) {

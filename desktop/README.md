@@ -649,22 +649,25 @@ The host runner builds the kernel and packaged desktop with `-prod` and uses
 Clang for cross compilation. A warm run reuses cached build outputs. For quick
 desktop edits inside the running VM, use `vinix-desktop-build` below.
 
-For Files and Activity Monitor changes, `./cross-compile-app.sh files activity`
-(or `./cross-compile-files.sh`, `./cross-compile-activity.sh`) builds the
+For Files, Activity Monitor and Settings changes,
+`./cross-compile-app.sh files activity settings` (or `./cross-compile-files.sh`,
+`./cross-compile-activity.sh`, `./cross-compile-settings.sh`) builds the
 committed desktop sources for AArch64 once and publishes the binary for each
 app through the QEMU host source server. The guest checks every two seconds and
-atomically replaces `/usr/bin/vinix-files` or `/usr/bin/vinix-activity`. Close
-and reopen the app to run the new version; the desktop and OS keep running.
-The guest helper, `vinix-files-sync`, is started by the desktop image and
-installed by the runner, so a VM started before an app was added to it needs
-one restart before that app syncs. The next boot puts the packaged app back.
+atomically replaces `/usr/bin/vinix-files`, `/usr/bin/vinix-activity` or
+`/usr/bin/vinix-settings`. Close and reopen the app to run the new version; the
+desktop and OS keep running. The guest helper, `vinix-files-sync`, is started
+by the desktop image and installed by the runner, so a VM started before an app
+was added to it needs one restart before that app syncs. The next boot puts the
+packaged app back.
 
 This checkout also provides `.githooks/post-commit`, which runs the script
 after commits that change an app's sources (`desktop/files*.v` and the Files
-context-menu files, or `desktop/activity.v`) or whose subject starts with
-`Files:` or `Activity Monitor:`. Enable it in this checkout with
-`git config core.hooksPath .githooks`. Set `VINIX_APP_SYNC=0` for a commit when
-you need to skip the build, then run `./cross-compile-app.sh` later.
+context-menu files, `desktop/activity.v`, or `desktop/settings_*.v`) or whose
+subject starts with `Files:`, `Activity Monitor:` or `Settings:`. Enable it in
+this checkout with `git config core.hooksPath .githooks`. Set `VINIX_APP_SYNC=0`
+for a commit when you need to skip the build, then run `./cross-compile-app.sh`
+later.
 
 To build a single desktop image with the default portable software set
 (Python, Ruby, Go, V, developer tools, X11, Firefox, Hyprland, x86 translation,

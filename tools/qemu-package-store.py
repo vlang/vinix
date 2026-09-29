@@ -30,6 +30,7 @@ MAX_SHARED_FILE_BYTES = 64 * 1024 * 1024
 LIVE_APPS = {
     "vinix-files": "build-aarch64-desktop-apps/files-live",
     "vinix-activity": "build-aarch64-desktop-apps/activity-live",
+    "vinix-settings": "build-aarch64-desktop-apps/settings-live",
 }
 
 

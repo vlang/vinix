@@ -1,6 +1,6 @@
 #!/bin/sh
-# Publish committed Files and Activity Monitor changes to any running desktop
-# QEMU guest. VINIX_APP_SYNC=0 (or the older VINIX_FILES_SYNC=0) skips it.
+# Publish committed Files, Activity Monitor and Settings changes to any running
+# desktop QEMU guest. VINIX_APP_SYNC=0 (or the older VINIX_FILES_SYNC=0) skips it.
 set -eu
 
 [ "${VINIX_APP_SYNC:-${VINIX_FILES_SYNC:-1}}" != 0 ] || exit 0
@@ -18,6 +18,10 @@ fi
 if printf '%s\n' "$subject" | grep -Eq '^[Aa]ctivity( [Mm]onitor)?:' ||
     printf '%s\n' "$paths" | grep -Eq '^desktop/activity\.v$'; then
     apps="$apps activity"
+fi
+if printf '%s\n' "$subject" | grep -Eq '^[Ss]ettings:' ||
+    printf '%s\n' "$paths" | grep -Eq '^desktop/settings_[a-z_]*\.v$'; then
+    apps="$apps settings"
 fi
 [ -n "$apps" ] || exit 0
 

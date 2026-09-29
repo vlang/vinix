@@ -14,7 +14,7 @@ url_file=/etc/vinix/qemu-host-source-url
 base_url=$(cat "$url_file")
 case "$base_url" in http://10.0.2.2:*) ;; *) exit 0 ;; esac
 
-apps='vinix-files vinix-activity'
+apps='vinix-files vinix-activity vinix-settings'
 
 # sync_app installs the host's build of one application when its version
 # differs from the one installed last. A version the host does not have yet,
