@@ -106,8 +106,8 @@ selector/value graph, the color/depth/stencil resource traces, and m1n1
 global selector address space, and no partial-pipeline, partial-depth, or
 partial-stencil member is promoted by analogy.
 
-The expected-write list is deliberately path-specific. The recovered 314
-virtual encoder call sites cover 3D, TA, FastBlit, and CL; they are not 314
+The expected-write list is deliberately path-specific. The recovered virtual,
+inline and direct-append sites cover 3D, TA, FastBlit, and CL; they are not
 writes that every render must execute.
 
 `tools/agx-re/compile_fake_g17_plan.py` independently compiles a concrete 3D
@@ -149,8 +149,9 @@ bookkeeping as a hardware completion.
 
 The host test compiles the exact allocation-free C verifier linked into the
 kernel together with the recovered encoder. It covers successful traces, every
-validation class, a 314-entry stress trace, and all 16 combinations of the
-three descriptor-controlled branches and external channel branch. Stable
+validation class, a 314-entry stress trace, all 16 combinations of the
+three descriptor-controlled branches and a narrow or wide column count, and
+the descriptor `+0x7f8` append. Stable
 whole-buffer hashes produced by the separate Python reference make the C
 encoder comparison byte-exact:
 

@@ -42,7 +42,7 @@ pub const fake_g17_vm_write = u32(1) << 1
 pub const fake_g17_external_event_count = 2
 // Fixed output capacity for the recovered encoder. This is not the number of
 // writes required by every job: write_count is descriptor/path dependent.
-pub const fake_g17_max_writes = 392
+pub const fake_g17_max_writes = 404
 pub const fake_g17_encode_ok = u32(0)
 pub const fake_g17_encode_invalid_argument = u32(1)
 pub const fake_g17_encode_write_capacity = u32(2)
@@ -170,7 +170,7 @@ pub fn (report &FakeG17Verification) succeeded() bool {
 pub fn encode_fake_g17_3d(command voidptr, command_bytes u64,
 	descriptor voidptr, descriptor_bytes u64, command_gpu_address u64,
 	inputs &FakeG17EncoderInputs, mut writes []FakeG17ExpectedWrite) FakeG17Encoding {
-	// The normal call uses the fixed 392-write capacity. Compare unusually large
+	// The normal call uses the fixed 404-write capacity. Compare unusually large
 	// slices as u64: int(~u32(0)) is -1 because V's int is signed.
 	if sizeof(FakeG17EncoderInputs) != C.vinix_fake_g17_encoder_inputs_size()
 		|| u64(writes.len) > u64(~u32(0)) {

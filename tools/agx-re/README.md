@@ -320,10 +320,16 @@ literal audit). All ten inline forms are located too; two CL selectors remain
 symbolic, while their value formulas are complete. Value provenance is
 classified at every virtual call (209 constants
 or direct descriptor loads plus 105 recovered expression trees), so all 314
-call-value formulas are now represented. A complete machine-level emission CFG
-also records possible ordering for all 324 virtual and inline sites, and all 21
-ordering predicates have expression trees. The two runtime CL selectors keep
-the finite static set open, but every selector formula is complete.
+call-value formulas are now represented. A machine-level emission CFG also
+records possible ordering for every virtual, inline and direct
+`AGXKRCEBufferEncoder::append` site (the appends were missed at first: three
+each in 3D, TA and FastBlit, seven in CL). 29 of the 30 ordering predicates
+have expression trees; the one missing is a CL guard, so the 3D, TA and
+FastBlit graphs are complete. CL's runtime selectors, in two inline records
+and six appends, keep the finite static set open.
+Vinix treats the performance-counter sampler as stopped (it implements none),
+which `channels.accelerator_inputs.perf_counter_sampler` records as an explicit
+Vinix policy rather than a property of the Apple driver.
 Channel and scheduler-state construction no longer needs unknown inputs: the
 per-queue timestamp and `_AGFISchedulerState` elements, the 80-unit/1,280-entry
 channel ring geometry, the creating process ID and the app GPU role are all

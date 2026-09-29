@@ -4324,8 +4324,23 @@ class RecoverG17AbiTests(unittest.TestCase):
             recover_g17_abi.G17_CONFIGURE_DEVICE: 0x120000,
             recover_g17_abi.G17_SET_SMART_IDLE_OFF_ENABLE: 0x130000,
             recover_g17_abi.G17_RETRIEVE_CHIP_INFO: 0x140000,
+            recover_g17_abi.G17_ACCELERATOR_X_START: 0x150000,
+            recover_g17_abi.G17_PERF_SAMPLER_INIT: 0x160000,
+            recover_g17_abi.G17_PERF_SAMPLER_START: 0x170000,
+            recover_g17_abi.G17_PERF_SAMPLER_VTABLE: 0x180598,
         }
         code = {name: bytearray(0x2600) for name in addresses}
+        start = code[recover_g17_abi.G17_ACCELERATOR_X_START]
+        for offset, word in {
+            0x1E4: 0x91404668, 0x1E8: 0x91074116, 0x1F4: 0x52802301,
+            0x220: 0x91166210, 0x224: 0x91004210, 0x248: 0xF9000010,
+            0x264: 0xF90002D4,
+        }.items():
+            struct.pack_into("<I", start, offset, word)
+        struct.pack_into("<I", start, 0x21C, adrp(0x150000 + 0x21C, 0x180000, 16))
+        struct.pack_into("<I", code[recover_g17_abi.G17_PERF_SAMPLER_INIT], 0x88, 0x3901529F)
+        for offset in (0x150, 0x184, 0x1AC):
+            struct.pack_into("<I", code[recover_g17_abi.G17_PERF_SAMPLER_START], offset, 0x39015268)
         for symbol, _offset, pins, _recipe in recover_g17_abi.G17_FEATURE_FLAG_WRITERS:
             for offset, word in pins.items():
                 struct.pack_into("<I", code[symbol], offset, word)
@@ -4407,6 +4422,9 @@ class RecoverG17AbiTests(unittest.TestCase):
             for bit in (0, 1, 2, 8, 21, 25, 34, 57):
                 self.assertEqual(flags["may_set_mask"] >> bit & 1, 1)
             self.assertEqual(recovered["chip_information"]["override_value"], literal.hex())
+            sampler = recovered["perf_counter_sampler"]
+            self.assertEqual((sampler["pointer_member"], sampler["running_member"]), (0x111D0, 0x54))
+            self.assertEqual(sampler["vinix_policy"]["running"], 0)
 
             # A branch that jumps past the override to anything but a panic.
             struct.pack_into("<I", g17, 0x100, b(g17_address + 0x100, g17_address + 0x800))
@@ -6355,7 +6373,9 @@ class RecoverG17AbiTests(unittest.TestCase):
                 recover_g17_abi.recover_g17_channel_command_common_fields(b"")
 
     def test_recovers_g17_register_selectors(self) -> None:
-        def producer(literals, emissions: int) -> bytes:
+        append_address = 0x900000
+
+        def producer(literals, emissions: int, append: bool = False) -> bytes:
             code = bytearray()
             for value in literals:
                 code += struct.pack("<I", 0x52800000 | ((value & 0xFFFF) << 5) | 11)
@@ -6374,7 +6394,22 @@ class RecoverG17AbiTests(unittest.TestCase):
             for _ in range(emissions):
                 code += struct.pack("<I", 0x11003129)  # add w9, w9, #0xc
                 code += struct.pack("<I", 0x790E1509)  # strh w9, [x8, #0x70a]
+            if append:
+                code += struct.pack("<I", 0x910083E0)  # add x0, sp, #0x20
+                code += struct.pack("<I", movz_w(1, 0xA0E0))
+                code += struct.pack("<I", movz_w(2, 1))
+                code += struct.pack("<I", movz(3, 0x40))
+                code += struct.pack("<I", bl(0x800000 + len(code), append_address))
             return bytes(code)
+
+        append_code = bytearray(0x60)
+        for offset, word in {
+            0x10: 0xAA0303E4, 0x14: 0xAA0203E3, 0x18: 0xAA0103E2,
+            0x3C: 0xF2FDC450, 0x40: 0xD73F0950, 0x48: 0x794E1509,
+            0x4C: 0x11003129, 0x50: 0x790E1509, 0x54: 0x794E1109,
+            0x58: 0x11000529, 0x5C: 0x790E1109,
+        }.items():
+            struct.pack_into("<I", append_code, offset, word)
 
         literals = {
             "3D": [0x1739, 0x17E1, 0x16020],
@@ -6385,10 +6420,11 @@ class RecoverG17AbiTests(unittest.TestCase):
         codes = {
             recover_g17_abi.REGISTER_LIST_PRODUCERS[label]: (
                 0x800000,
-                producer(values, 40),
+                producer(values, 40, append=label == "3D"),
             )
             for label, values in literals.items()
         }
+        codes[recover_g17_abi.REGISTER_ENTRY_APPEND] = (append_address, bytes(append_code))
         symbols = {name: address for name, (address, _c) in codes.items()}
         with (
             mock.patch.object(recover_g17_abi, "macho_symbols", return_value=symbols),
@@ -6417,10 +6453,17 @@ class RecoverG17AbiTests(unittest.TestCase):
             [0x1738, 0x17E0, 0x16020],
         )
         self.assertEqual(recovered["producers"]["3D"]["entry_emission_sites"], 40)
-        self.assertEqual(recovered["producers"]["3D"]["encoder_call_sites"], 1)
+        self.assertEqual(recovered["producers"]["3D"]["encoder_call_sites"], 2)
+        self.assertEqual(recovered["producers"]["3D"]["append_entries"], 1)
         self.assertEqual(recovered["producers"]["3D"]["mode_0_calls"], 1)
-        self.assertEqual(recovered["producers"]["3D"]["mode_1_calls"], 0)
-        self.assertEqual(recovered["producers"]["3D"]["constant_value_calls"], 1)
+        self.assertEqual(recovered["producers"]["3D"]["mode_1_calls"], 1)
+        self.assertEqual(recovered["producers"]["3D"]["constant_value_calls"], 2)
+        appended = recovered["producers"]["3D"]["encoder_entries"][1]
+        self.assertEqual(
+            (appended["form"], appended["selector"], appended["mode"]),
+            ("append", 0xA0E0, 1),
+        )
+        self.assertEqual(appended["value_source"]["value"], 0x40)
         value_source = recovered["producers"]["3D"]["encoder_entries"][0][
             "value_source"
         ]
@@ -6428,7 +6471,7 @@ class RecoverG17AbiTests(unittest.TestCase):
         self.assertEqual(value_source["value"], 0)
         self.assertEqual(
             recovered["producers"]["3D"]["resolved_encoder_selectors"],
-            [0x15378],
+            [0xA0E0, 0x15378],
         )
         self.assertIn(0x15378, recovered["producers"]["3D"]["static_selectors"])
         self.assertEqual(recovered["distinct_literal_selectors"], 11)

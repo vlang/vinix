@@ -615,6 +615,20 @@ class AcceleratorFoldingTests(unittest.TestCase):
         self.assertEqual(self.evaluate(narrow[0x30]), 7)
         self.assertEqual(self.evaluate(wide[0x30]), 9)
 
+    def test_register_comparisons_use_first_and_shifted_second(self):
+        predicate = {
+            "kind": "condition", "operation": "cmp", "bytes": 4,
+            "first": {"kind": "descriptor_load", "member": 0, "bytes": 4},
+            "second": {"kind": "constant", "value": 1},
+            "modifier": "lsl", "amount": 4,
+        }
+        descriptor = (15).to_bytes(4, "little")
+        self.assertTrue(fake._condition(predicate, "cc", descriptor, b""))
+        self.assertFalse(fake._condition(predicate, "cs", descriptor, b""))
+        descriptor = (16).to_bytes(4, "little")
+        self.assertTrue(fake._condition(predicate, "hs", descriptor, b""))
+        self.assertIn("source", fake.normalize_predicate(predicate))
+
     def test_abi_without_accelerator_inputs_is_unchanged(self):
         abi = folding_abi()
         del abi["channels"]["accelerator_inputs"]

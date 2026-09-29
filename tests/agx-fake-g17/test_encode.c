@@ -223,11 +223,49 @@ static int run_dense_reference(void)
         sizeof(fixture.descriptor), GPU_BASE, &fixture.inputs,
         fixture.writes, VINIX_FAKE_G17_MAX_WRITES, &write_count) ==
         VINIX_FAKE_G17_ENCODE_OK);
-    CHECK(write_count == 384);
+    CHECK(write_count == 388);
     hash = fnv1a(fixture.descriptor, sizeof(fixture.descriptor),
                  fnv1a(fixture.command, sizeof(fixture.command),
                        UINT64_C(0xcbf29ce484222325)));
-    CHECK(hash == UINT64_C(0x08079d7e567fc415));
+    CHECK(hash == UINT64_C(0xfa742deac45458bd));
+    CHECK(vinix_fake_g17_verify(
+        fixture.command, sizeof(fixture.command), fixture.descriptor,
+        sizeof(fixture.descriptor), GPU_BASE, fixture.writes, write_count,
+        NULL, 0, NULL, 0, &report) == VINIX_FAKE_G17_OK);
+    return 0;
+}
+
+/* A nonzero descriptor +0x7f8 adds one appended register per pass, selector
+ * 0xa0e0 whose value is that address rounded down to 4 KiB. */
+static int run_append_reference(void)
+{
+    struct fixture fixture;
+    struct vinix_fake_g17_report report;
+    uint32_t write_count = 0;
+    uint32_t appended = 0;
+    uint32_t index;
+    uint64_t address = UINT64_C(0x0000123456789abc);
+
+    initialize_fixture(&fixture);
+    fixture.inputs.column_count = 4;
+    memcpy(fixture.descriptor + 0x7f8, &address, sizeof(address));
+    CHECK(vinix_fake_g17_encode_3d(
+        fixture.command, sizeof(fixture.command), fixture.descriptor,
+        sizeof(fixture.descriptor), GPU_BASE, &fixture.inputs,
+        fixture.writes, VINIX_FAKE_G17_MAX_WRITES, &write_count) ==
+        VINIX_FAKE_G17_ENCODE_OK);
+    CHECK(write_count == 372);
+    CHECK(fnv1a(fixture.descriptor, sizeof(fixture.descriptor),
+                fnv1a(fixture.command, sizeof(fixture.command),
+                      UINT64_C(0xcbf29ce484222325))) ==
+          UINT64_C(0x628f4651b79099f7));
+    for (index = 0; index < write_count; index++) {
+        if (fixture.writes[index].selector == UINT32_C(0xa0e0)) {
+            CHECK(fixture.writes[index].value == UINT64_C(0x123456789000));
+            appended++;
+        }
+    }
+    CHECK(appended == VINIX_FAKE_G17_REGISTER_PASSES);
     CHECK(vinix_fake_g17_verify(
         fixture.command, sizeof(fixture.command), fixture.descriptor,
         sizeof(fixture.descriptor), GPU_BASE, fixture.writes, write_count,
@@ -241,9 +279,10 @@ int main(void)
           sizeof(struct vinix_fake_g17_encoder_inputs));
     CHECK(VINIX_FAKE_G17_EXTERNAL_EVENT_COUNT == 2);
     CHECK(VINIX_FAKE_G17_EXTERNAL_DECISION_COUNT == 0);
-    CHECK(VINIX_FAKE_G17_MAX_WRITES == 392);
+    CHECK(VINIX_FAKE_G17_MAX_WRITES == 404);
     CHECK(run_branch_matrix() == 0);
     CHECK(run_dense_reference() == 0);
+    CHECK(run_append_reference() == 0);
     CHECK(run_failure_checks() == 0);
     puts("fake G17 recovered 3D encoder tests passed");
     return 0;

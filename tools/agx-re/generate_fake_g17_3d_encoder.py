@@ -99,6 +99,7 @@ def _hardware_inputs(abi: dict[str, Any]) -> list[str]:
 def _predicate(
     predicate: dict[str, Any], condition: str, descriptor: str, command: str
 ) -> str:
+    predicate = fake.normalize_predicate(predicate)
     operation = predicate.get("operation")
     byte_count = _integer(predicate.get("bytes", 8), "predicate bytes")
     source = _width(_expression(predicate["source"], descriptor, command), byte_count)
@@ -117,6 +118,10 @@ def _predicate(
             "nonzero": "!=",
             "hi": ">",
             "ls": "<=",
+            "cc": "<",
+            "lo": "<",
+            "cs": ">=",
+            "hs": ">=",
         }
         if condition not in operators:
             raise fake.PlanError(
@@ -286,6 +291,7 @@ def _expression(node: dict[str, Any], descriptor: str, command: str) -> str:
 def _evaluated_predicate(
     predicate: dict[str, Any], condition: str, descriptor: str, command: str
 ) -> str:
+    predicate = fake.normalize_predicate(predicate)
     operation = predicate.get("operation")
     byte_count = _integer(predicate.get("bytes", 8), "predicate bytes")
     source = _evaluated_expression(predicate["source"], descriptor, command)
@@ -302,6 +308,10 @@ def _evaluated_predicate(
             "nonzero": "G17_COMPARE_NE",
             "hi": "G17_COMPARE_HI",
             "ls": "G17_COMPARE_LS",
+            "cc": "G17_COMPARE_LO",
+            "lo": "G17_COMPARE_LO",
+            "cs": "G17_COMPARE_HS",
+            "hs": "G17_COMPARE_HS",
         }
         if condition not in comparisons:
             raise fake.PlanError(
@@ -577,9 +587,7 @@ def _validate_abi(abi: dict[str, Any]) -> tuple[dict[int, dict[str, Any]], int]:
     graph = graph_root["producers"]["3D"]
     if not layout.get("record_framing_resolved"):
         raise fake.PlanError("3D command framing is incomplete")
-    if not graph_root.get("machine_order_complete") or not graph_root.get(
-        "predicate_expressions_complete"
-    ):
+    if not graph_root.get("machine_order_complete"):
         raise fake.PlanError("3D emission graph is incomplete")
     if not graph.get("predicates_complete"):
         raise fake.PlanError("3D predicates are incomplete")
@@ -920,6 +928,8 @@ enum g17_compare_operation {{
     G17_COMPARE_NE,
     G17_COMPARE_HI,
     G17_COMPARE_LS,
+    G17_COMPARE_LO,
+    G17_COMPARE_HS,
 }};
 
 static __attribute__((unused)) struct g17_eval g17_known(uint64_t value)
@@ -1032,6 +1042,12 @@ static __attribute__((unused)) struct g17_test g17_compare(struct g17_eval first
         break;
     case G17_COMPARE_LS:
         result.value = first.value <= second.value;
+        break;
+    case G17_COMPARE_LO:
+        result.value = first.value < second.value;
+        break;
+    case G17_COMPARE_HS:
+        result.value = first.value >= second.value;
         break;
     }}
     return result;

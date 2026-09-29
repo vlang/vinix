@@ -626,6 +626,7 @@ COMMAND_POOL_CREATE_BACKING = (
 )
 REQUEST_CHANNEL_COMMAND_BARRIER = "__ZN11AGXFirmware28requestChannelCommandBarrierEPy"
 TA_COMMAND_POOL = 0x1648
+REGISTER_ENTRY_APPEND = "__ZN20AGXKRCEBufferEncoder6appendEjhy"
 GENERATE_REGISTER_LIST_3D = (
     "__ZN33AGX·PI_300·X·A0·3DChannelSKSM25generateRegisterListFor3D"
     "EP20AGFIChannelCommand3DP22AGX3DCommandDescriptor"
@@ -700,6 +701,12 @@ G17_ACCELERATOR_FEATURE_FLAGS = 0x6D0
 G17_ACCELERATOR_POWER_COLUMN_COUNT = 0x4E4
 G17_ACCELERATOR_CHIP_INFO = 0xF7C8
 G17_ACCELERATOR_CHIP_INFO_OVERRIDE = 0xF7F0
+G17_ACCELERATOR_X_START = "__ZN32AGX·PI_300·X·A0·AcceleratorX5startEP9IOService"
+G17_PERF_SAMPLER_VTABLE = "__ZTV22AGXPerfCtrSamplerGen15"
+G17_PERF_SAMPLER_INIT = "__ZN17AGXPerfCtrSampler4initEP14AGXAcceleratorP16AGXPerfCtrConfig"
+G17_PERF_SAMPLER_START = "__ZN17AGXPerfCtrSampler18sourceSamplerStartEv"
+G17_ACCELERATOR_PERF_SAMPLER = 0x111D0
+G17_PERF_SAMPLER_RUNNING = 0x54
 G17_CONFIGURE_DEVICE_VTABLE_SLOT = 0x958
 G17_CONFIGURE_POWER_VTABLE_SLOT = 0xA20
 G17_PIO_TABLE_VTABLE_SLOT = 0x1168
@@ -3229,9 +3236,13 @@ def trace_g17_value_expression(
 
 
 def classify_g17_value_argument(
-    instructions: list[tuple[int, int]], before: int
+    instructions: list[tuple[int, int]], before: int, register: int = 4
 ) -> dict[str, object]:
-    """Classify the last x4/w4 writer before one register encoder call."""
+    """Classify the last writer of the value register before an encoder call.
+
+    The virtual encoder takes its value in x4; AGXKRCEBufferEncoder::append
+    takes it in x3.
+    """
 
     classes = {
         0x0A000000: "logical_register",
@@ -3246,7 +3257,7 @@ def classify_g17_value_argument(
     for index in range(before - 1, start - 1, -1):
         offset, word = instructions[index]
         load = decode_integer_load_unsigned(word)
-        if load is not None and load[0] == 4:
+        if load is not None and load[0] == register:
             _destination, base, member, width = load
             return {
                 "kind": "descriptor_load" if base == 19 else "indirect_load",
@@ -3256,7 +3267,7 @@ def classify_g17_value_argument(
                 "bytes": width,
                 "signed": False,
             }
-        if word & 0xFFC0001F == 0xB9800004:  # LDRSW x4, [xn, #imm]
+        if word & 0xFFC0001F == 0xB9800000 | register:  # LDRSW xN, [xn, #imm]
             base = (word >> 5) & 0x1F
             member = ((word >> 10) & 0xFFF) * 4
             return {
@@ -3273,12 +3284,12 @@ def classify_g17_value_argument(
         update_w = decode_movk_w(word)
         wide = decode_move_wide(word)
         if (
-            move_w is not None and move_w[0] == 4
-            or move_n_w is not None and move_n_w[0] == 4
-            or update_w is not None and update_w[0] == 4
-            or wide is not None and wide[1] == 4
+            move_w is not None and move_w[0] == register
+            or move_n_w is not None and move_n_w[0] == register
+            or update_w is not None and update_w[0] == register
+            or wide is not None and wide[1] == register
         ):
-            value = resolve_static_x_register(instructions, before, 4)
+            value = resolve_static_x_register(instructions, before, register)
             if value is None:
                 raise ValueError(
                     f"G17 value at producer +{offset:#x} is no longer constant"
@@ -3290,7 +3301,7 @@ def classify_g17_value_argument(
             }
 
         copy = decode_register_copy(word)
-        if copy is not None and copy[0] == 4:
+        if copy is not None and copy[0] == register:
             _destination, source, width = copy
             traced = trace_g17_register_copy(instructions, index, source)
             if traced is not None:
@@ -3303,24 +3314,24 @@ def classify_g17_value_argument(
                 "bytes": width,
                 "instruction": word,
             }
-            expression = trace_g17_value_expression(instructions, before, 4)
+            expression = trace_g17_value_expression(instructions, before, register)
             if expression is not None:
                 result["expression"] = expression
             return result
 
         instruction_class = word & 0x1F000000
-        if word & 0x1F == 4 and instruction_class in classes:
+        if word & 0x1F == register and instruction_class in classes:
             result: dict[str, object] = {
                 "kind": "computed",
                 "producer_offset": offset,
                 "operation": classes[instruction_class],
                 "instruction": word,
             }
-            expression = trace_g17_value_expression(instructions, before, 4)
+            expression = trace_g17_value_expression(instructions, before, register)
             if expression is not None:
                 result["expression"] = expression
             return result
-    raise ValueError("G17 register-entry value has no nearby x4 writer")
+    raise ValueError(f"G17 register-entry value has no nearby x{register} writer")
 
 
 def decode_umaddl(word: int) -> tuple[int, int, int, int] | None:
@@ -8268,6 +8279,39 @@ def recover_g17_accelerator_channel_inputs(
                 f"AcceleratorX configureDevice can skip the override from +{offset:#x}"
             )
 
+    # The 3D, TA and FastBlit producers add two register-entry appends while
+    # the performance-counter sampler at +0x111d0 is running.
+    for name in (G17_ACCELERATOR_X_START, G17_PERF_SAMPLER_VTABLE, G17_PERF_SAMPLER_INIT, G17_PERF_SAMPLER_START):
+        if name not in symbols:
+            raise ValueError(f"Mach-O has no {name} symbol")
+    start_address, start_code = symbol_code(image, G17_ACCELERATOR_X_START)
+    require_instruction_words_at(
+        start_code,
+        "G17 performance-counter sampler creation",
+        {
+            0x1E4: 0x91404668,  # x8 = this + 0x11000
+            0x1E8: 0x91074116,  # x22 = this + 0x111d0
+            0x1F4: 0x52802301,  # a 0x118-byte object
+            0x220: 0x91166210,  # vtable page offset
+            0x224: 0x91004210,  # past the vtable header
+            0x248: 0xF9000010,  # installed as the object's vtable
+            0x264: 0xF90002D4,  # object stored at this + 0x111d0
+        },
+    )
+    page = decode_adrp(start_address + 0x21C, struct.unpack_from("<I", start_code, 0x21C)[0])
+    if page is None or page[1] + 0x598 != symbols[G17_PERF_SAMPLER_VTABLE]:
+        raise ValueError("accelerator +0x111d0 is no longer an AGXPerfCtrSamplerGen15")
+    require_instruction_words_at(
+        symbol_code(image, G17_PERF_SAMPLER_INIT)[1],
+        "performance-counter sampler init",
+        {0x88: 0x3901529F},  # running byte cleared
+    )
+    require_instruction_words_at(
+        symbol_code(image, G17_PERF_SAMPLER_START)[1],
+        "performance-counter sampler start",
+        {0x150: 0x39015268, 0x184: 0x39015268, 0x1AC: 0x39015268},
+    )
+
     never_set = ~may_set & 0xFFFFFFFFFFFFFFFF
     return {
         "power_column_count": {
@@ -8296,6 +8340,21 @@ def recover_g17_accelerator_channel_inputs(
             "override_value": literal.hex(),
             "override_producer": G17_CONFIGURE_DEVICE,
             "unbounded": chip["unbounded"][0],
+        },
+        "perf_counter_sampler": {
+            "pointer_member": G17_ACCELERATOR_PERF_SAMPLER,
+            "vtable": G17_PERF_SAMPLER_VTABLE,
+            "object_bytes": 0x118,
+            "running_member": G17_PERF_SAMPLER_RUNNING,
+            "running_bytes": 1,
+            "cleared_by": G17_PERF_SAMPLER_INIT,
+            "set_by": G17_PERF_SAMPLER_START,
+            # A Vinix decision, not a property of the Apple driver.
+            "vinix_policy": {
+                "running": 0,
+                "reason": "Vinix has no AGX performance-counter sampler, so "
+                "sourceSamplerStart never runs",
+            },
         },
     }
 
@@ -13314,18 +13373,44 @@ def recover_g17_register_selectors(image: bytes) -> dict[str, object]:
         raise ValueError(f"unexpected G17 selector field {settable:#x}")
     encoder_selector_field = settable & ~0x1
 
+    if REGISTER_ENTRY_APPEND not in symbols:
+        raise ValueError(f"Mach-O is missing {REGISTER_ENTRY_APPEND}")
+    append_address = symbols[REGISTER_ENTRY_APPEND]
+    _append_address, append_code = symbol_code(image, REGISTER_ENTRY_APPEND)
+    # append(selector, mode, value) shifts its arguments into the virtual
+    # encoder's registers, calls it on the current entry and publishes the
+    # entry exactly like an inline encoder call.
+    require_instruction_words_at(
+        append_code,
+        "G17 register-entry append",
+        {
+            0x10: 0xAA0303E4,  # value x3 -> x4
+            0x14: 0xAA0203E3,  # mode w2 -> w3
+            0x18: 0xAA0103E2,  # selector w1 -> w2
+            0x3C: 0xF2FDC450,  # the encoder vtable discriminator 0xee22
+            0x40: 0xD73F0950,  # the encoder's virtual call
+            0x48: 0x794E1509,  # byte length
+            0x4C: 0x11003129,  # advanced by 12
+            0x50: 0x790E1509,
+            0x54: 0x794E1109,  # entry count
+            0x58: 0x11000529,  # advanced by one
+            0x5C: 0x790E1109,
+        },
+    )
+
     producers: dict[str, object] = {}
     literal_encoded_union: set[int] = set()
     literal_selector_union: set[int] = set()
     static_union: set[int] = set()
     for label, name in sorted(REGISTER_LIST_PRODUCERS.items()):
-        _address, code = symbol_code(image, name)
+        producer_address, code = symbol_code(image, name)
         buffered = list(words(code))
         immediates: dict[int, int] = {}
         recency: dict[int, int] = {}
         found: set[int] = set()
         context = -SELECTOR_ARGUMENT_WINDOW
         encoder_calls: list[dict[str, object]] = []
+        dynamic_appends: list[dict[str, object]] = []
         for index, (offset, word) in enumerate(buffered):
             # The producers materialize selectors with the 32-bit move forms.
             opcode = word & 0xFF800000
@@ -13353,6 +13438,32 @@ def recover_g17_register_selectors(image: bytes) -> dict[str, object]:
             # ordinary virtual calls, which pass an object in x0, out.
             if word & 0xFFC003FF == 0x910003E0:
                 context = index
+                continue
+            if decode_bl_target(producer_address + offset, word) == append_address:
+                if index - context > SELECTOR_ARGUMENT_WINDOW:
+                    raise ValueError(
+                        f"{label} append at producer +{offset:#x} has no stack encoder"
+                    )
+                resolved = resolve_static_w_register(buffered, index, 1)
+                mode = resolve_static_w_register(buffered, index, 2)
+                if mode not in (0, 1):
+                    raise ValueError(
+                        f"{label} append mode at producer +{offset:#x} is no "
+                        "longer a static bit"
+                    )
+                entry = {
+                    "producer_offset": offset,
+                    "mode": mode,
+                    "form": "append",
+                    "value_source": classify_g17_value_argument(buffered, index, 3),
+                }
+                if resolved is None:
+                    # A runtime selector, like CL's mode-selected bases. The
+                    # site is still an event; its formula may stay symbolic.
+                    formula = trace_g17_value_expression(buffered, index, 1)
+                    dynamic_appends.append({**entry, "selector_formula": formula})
+                else:
+                    encoder_calls.append({**entry, "selector": resolved})
                 continue
             if word & 0xFFFFFC00 == 0xD73F0800:
                 candidate = immediates.get(2)
@@ -13510,7 +13621,12 @@ def recover_g17_register_selectors(image: bytes) -> dict[str, object]:
             ),
             "resolved_encoder_selectors": sorted(resolved),
             "static_selectors": sorted(static),
+            "append_entries": sum(entry.get("form") == "append" for entry in encoder_calls),
             "encoder_entries": encoder_calls,
+            "dynamic_append_entries": dynamic_appends,
+            "append_selectors_complete": all(
+                entry["selector_formula"] is not None for entry in dynamic_appends
+            ),
         }
 
     return {
@@ -13524,9 +13640,10 @@ def recover_g17_register_selectors(image: bytes) -> dict[str, object]:
         "selectors_complete": False,
         "selector_formulas_complete": False,
         "completeness_note": (
-            "every virtual encoder selector argument is statically resolved, "
-            "but the finite static selector set excludes two inline CL words "
-            "whose complete formulas are runtime-dependent"
+            "every virtual encoder and 3D/TA/FastBlit append selector is "
+            "statically resolved, but the finite static selector set excludes "
+            "two inline CL words and six CL appends whose selectors are "
+            "runtime-dependent"
         ),
         "distinct_literal_encoded_fields": len(literal_encoded_union),
         "distinct_literal_selectors": len(literal_selector_union),
@@ -13929,6 +14046,10 @@ def recover_g17_register_emission_cfg(
         _address, code = symbol_code(image, name)
         calls = selectors["producers"][label]["encoder_entries"]
         events = {int(entry["producer_offset"]) for entry in calls}
+        events.update(
+            int(entry["producer_offset"])
+            for entry in selectors["producers"][label].get("dynamic_append_entries", [])
+        )
         events.update(
             int(entry["producer_offset"])
             for entry in static_records.get(label, [])

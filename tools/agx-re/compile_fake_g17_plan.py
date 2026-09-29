@@ -103,9 +103,42 @@ def _buffer_reference(node: dict[str, Any], command: bytes) -> tuple[bytes, int]
     raise UnresolvedValue(f"object base rooted in {kind or 'unknown'}")
 
 
+def normalize_predicate(predicate: dict[str, Any]) -> dict[str, Any]:
+    """Give a register-register comparison the source/second shape.
+
+    Comparisons recovered from `CMP Wn, Wm{, shift}` carry `first` and a
+    possibly shifted `second`; the shifted operand becomes `0 | second`
+    with the shift, which every evaluator already understands.
+    """
+    if "source" in predicate or "first" not in predicate:
+        return predicate
+    normalized = {
+        key: value
+        for key, value in predicate.items()
+        if key not in ("first", "second", "shift", "modifier", "amount")
+    }
+    normalized["source"] = predicate["first"]
+    second = predicate["second"]
+    shift = predicate.get("shift", predicate.get("modifier"))
+    amount = _integer(predicate.get("amount", 0), "compare shift amount")
+    if amount:
+        second = {
+            "kind": "expression",
+            "operation": "orr",
+            "bytes": predicate.get("bytes", 8),
+            "first": {"kind": "constant", "value": 0},
+            "second": second,
+            "shift": shift,
+            "amount": amount,
+        }
+    normalized["second"] = second
+    return normalized
+
+
 def _condition(
     predicate: dict[str, Any], condition: str, descriptor: bytes, command: bytes
 ) -> bool:
+    predicate = normalize_predicate(predicate)
     operation = predicate.get("operation")
     byte_count = _integer(predicate.get("bytes", 8), "predicate bytes")
     mask = _width_mask(byte_count)
@@ -125,6 +158,10 @@ def _condition(
             "nonzero": source != other,
             "hi": source > other,
             "ls": source <= other,
+            "cc": source < other,
+            "lo": source < other,
+            "cs": source >= other,
+            "hs": source >= other,
         }
     elif operation == "tst":
         other = (
@@ -295,6 +332,29 @@ class _AcceleratorFacts:
         self.column_member = _integer(column["member"], "column member")
         self.column_bytes = _integer(column["bytes"], "column bytes")
         self.column_input = column["hardware_input"]
+        # Bytes of objects the accelerator points to, by (pointer member,
+        # object member): (value, known mask).
+        self.pointed: dict[tuple[int, int], tuple[int, int]] = {}
+        sampler = inputs.get("perf_counter_sampler")
+        if sampler is not None:
+            policy = sampler["vinix_policy"]
+            if _integer(sampler["running_bytes"], "sampler running bytes") != 1:
+                raise PlanError("sampler running state is not one byte")
+            self.pointed[
+                (
+                    _integer(sampler["pointer_member"], "sampler pointer"),
+                    _integer(sampler["running_member"], "sampler running member"),
+                )
+            ] = (_integer(policy["running"], "sampler running policy") & 0xFF, 0xFF)
+
+    def load_pointed(self, pointer: int, start: int, width: int) -> tuple[int, int]:
+        value = 0
+        known = 0
+        for index in range(width):
+            byte_value, byte_known = self.pointed.get((pointer, start + index), (0, 0))
+            value |= byte_value << (index * 8)
+            known |= byte_known << (index * 8)
+        return value, known
 
     def load(self, start: int, width: int) -> tuple[int, int]:
         """Little-endian (value, known-bit mask) of accelerator bytes."""
@@ -333,16 +393,31 @@ def _accelerator_offset(node: Any) -> int | None:
         and node["base"].get("name") == "channel"
     ):
         return 0
-    if (
-        kind == "expression"
-        and node.get("operation") == "add"
-        and not node.get("amount")
-        and isinstance(node.get("second"), dict)
-        and node["second"].get("kind") == "constant"
-    ):
-        base = _accelerator_offset(node.get("first"))
+    if kind == "expression" and node.get("operation") == "add" and not node.get("amount"):
+        if "source" in node and "immediate" in node:
+            base = _accelerator_offset(node["source"])
+            if base is not None:
+                return base + _integer(node["immediate"], "pointer offset")
+        elif isinstance(node.get("second"), dict) and node["second"].get("kind") == "constant":
+            base = _accelerator_offset(node.get("first"))
+            if base is not None:
+                return base + _integer(node["second"]["value"], "pointer offset")
+    return None
+
+
+def _accelerator_pointer_member(node: Any) -> int | None:
+    """Accelerator member holding a pointer that `node` loads, if any."""
+    if not isinstance(node, dict):
+        return None
+    kind = node.get("kind")
+    if kind == "stack_reload":
+        return _accelerator_pointer_member(node.get("source"))
+    if kind == "expression" and node.get("operation") in ("copy", "register_copy"):
+        return _accelerator_pointer_member(node.get("source", node.get("expression")))
+    if kind == "object_load" and node.get("bytes") == 8:
+        base = _accelerator_offset(node.get("base"))
         if base is not None:
-            return base + _integer(node["second"]["value"], "pointer offset")
+            return base + _integer(node["member"], "pointer member")
     return None
 
 
@@ -369,6 +444,7 @@ def _fold_condition(
     facts: _AcceleratorFacts,
     hardware: dict[str, int],
 ) -> tuple[dict[str, Any], bool | None]:
+    predicate = normalize_predicate(predicate)
     operation = predicate.get("operation")
     byte_count = _integer(predicate.get("bytes", 8), "predicate bytes")
     mask = _width_mask(byte_count)
@@ -397,6 +473,10 @@ def _fold_condition(
                 "nonzero": value != other,
                 "hi": value > other,
                 "ls": value <= other,
+                "cc": value < other,
+                "lo": value < other,
+                "cs": value >= other,
+                "hs": value >= other,
             }.get(condition)
     elif operation == "tst":
         zero = (known & ~value) | (other_known & ~other)
@@ -437,7 +517,17 @@ def _fold(
     if kind == "object_load":
         base = _accelerator_offset(node.get("base"))
         if base is None:
-            return node, 0, 0
+            pointer = _accelerator_pointer_member(node.get("base"))
+            if pointer is None or node.get("signed", False):
+                return node, 0, 0
+            width = _integer(node["bytes"], "object load width")
+            value, known = facts.load_pointed(
+                pointer, _integer(node["member"], "object member"), width
+            )
+            known |= UINT64_MASK & ~_width_mask(width)
+            if known == UINT64_MASK:
+                return _constant(value, f"accelerator[{pointer:#x}]+{node['member']:#x}"), value, known
+            return node, value, known
         start = base + _integer(node["member"], "object member")
         width = _integer(node["bytes"], "object load width")
         if (start, width) == (facts.column_member, facts.column_bytes):
@@ -660,7 +750,7 @@ def fold_accelerator_inputs(
                 entry["value_source"] = _fold(entry["value_source"], facts, hardware)[0]
     for graph in folded_channels["register_emission_cfg"]["producers"].values():
         for decision in graph.get("decisions", []):
-            if not _mentions_accelerator(decision["predicate"]):
+            if "predicate" not in decision or not _mentions_accelerator(decision["predicate"]):
                 continue
             predicate, outcome = _fold_condition(
                 decision["predicate"], decision["condition"], facts, hardware
@@ -693,6 +783,8 @@ def _event_catalog(abi: dict[str, Any], producer: str) -> dict[int, dict[str, An
         entries = selectors["producers"][producer]["encoder_entries"]
     except KeyError as error:
         raise PlanError(f"no recovered register producer {producer!r}") from error
+    if selectors["producers"][producer].get("dynamic_append_entries"):
+        raise PlanError(f"{producer} appends registers with runtime selectors")
 
     catalog: dict[int, dict[str, Any]] = {}
     for entry in entries:
@@ -702,7 +794,7 @@ def _event_catalog(abi: dict[str, Any], producer: str) -> dict[int, dict[str, An
             "selector": _integer(entry["selector"], "selector"),
             "mode": _integer(entry["mode"], "mode"),
             "value_source": entry["value_source"],
-            "form": "virtual",
+            "form": entry.get("form", "virtual"),
         }
 
     inline = channels["inline_register_records"]
@@ -913,9 +1005,7 @@ def compile_plan(
     cfg_root = channels.get("register_emission_cfg", {})
     if not layout.get("record_framing_resolved"):
         raise PlanError("3D register-list framing is incomplete")
-    if not cfg_root.get("machine_order_complete") or not cfg_root.get(
-        "predicate_expressions_complete"
-    ):
+    if not cfg_root.get("machine_order_complete"):
         raise PlanError("register emission graph is incomplete")
     graph = cfg_root["producers"]["3D"]
     if not graph.get("predicates_complete"):
