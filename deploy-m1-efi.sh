@@ -129,8 +129,12 @@ for argument in "$@"; do
             # itself is on by default; this only checks that it was built in.
             REQUIRE_APPLE_SPEAKERS=1
             ;;
+        --no-apple-speakers)
+            # Leave the built-in speakers off: no /dev/dsp on this boot.
+            CMDLINE_EXTRA="$CMDLINE_EXTRA vinix.apple_speakers=0"
+            ;;
         --help|-h)
-            echo "usage: $0 [--apple-studio-display|--external-display] [--apple-display-hotplug] [--apple-gpu] [--gpu-probe-only] [--apple-dcp] [--apple-battery] [--apple-wifi] [--apple-ans] [--ans-rw=UUID] [--ans-root=UUID] [--all-drivers] [--minimal-initramfs] [--sound-initramfs] [--apple-speakers] [--desktop-initramfs] [--no-early-term] [--halt-at=N] [--native-resolution] [--force-fault] <mounted_esp_path>"
+            echo "usage: $0 [--apple-studio-display|--external-display] [--apple-display-hotplug] [--apple-gpu] [--gpu-probe-only] [--apple-dcp] [--apple-battery] [--apple-wifi] [--apple-ans] [--ans-rw=UUID] [--ans-root=UUID] [--all-drivers] [--minimal-initramfs] [--sound-initramfs] [--apple-speakers] [--no-apple-speakers] [--desktop-initramfs] [--no-early-term] [--halt-at=N] [--native-resolution] [--force-fault] <mounted_esp_path>"
             exit 0
             ;;
         --*)

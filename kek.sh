@@ -21,6 +21,8 @@
 #                               without Mesa for early bring-up diagnostics
 #   sudo ~/code/kek.sh desktop-gpu   desktop + experimental Apple GPU
 #   sudo ~/code/kek.sh desktop-sound desktop + M1 Air sound, no GPU or Wi-Fi
+#   sudo ~/code/kek.sh desktop-basic desktop alone: software rendering, no GPU,
+#                               Wi-Fi or speakers
 #   sudo ~/code/kek.sh sound-diag    low-level speaker test, no GPU or Wi-Fi
 #   sudo ~/code/kek.sh desktop-wifi  desktop + experimental BCM4378 Wi-Fi
 #   sudo ~/code/kek.sh studio   desktop on a Studio Display selected by the
@@ -108,6 +110,10 @@ case "${1:-desktop}" in
         FLAGS=(--native-resolution --desktop-initramfs --apple-speakers)
         MODE="desktop + M1 Air sound (software rendering)"
         ;;
+    desktop-basic)
+        FLAGS=(--native-resolution --desktop-initramfs --no-apple-speakers)
+        MODE="desktop (software rendering, no GPU, Wi-Fi or speakers)"
+        ;;
     sound-diag)
         FLAGS=(--native-resolution --sound-initramfs)
         MODE="M1 Air speaker test (no GPU or Wi-Fi)"
@@ -146,7 +152,7 @@ case "${1:-desktop}" in
         exit 0
         ;;
     *)
-        echo "error: unknown mode '$1' (use: desktop | desktop-sound | sound-diag | studio | full | gpu | gpu-probe | gpu-diag | desktop-gpu | desktop-wifi | battery | dcp | storage | drivers | desktop-drivers | diag | halt N | selftest)" >&2
+        echo "error: unknown mode '$1' (use: desktop | desktop-basic | desktop-sound | sound-diag | studio | full | gpu | gpu-probe | gpu-diag | desktop-gpu | desktop-wifi | battery | dcp | storage | drivers | desktop-drivers | diag | halt N | selftest)" >&2
         exit 1
         ;;
 esac
