@@ -89,6 +89,7 @@ int main(void)
     struct stat st;
     if (stat("/dev/dsp", &st) != 0 || !S_ISCHR(st.st_mode)) {
         puts("VINIX M1 SOUND: FAIL - no /dev/dsp; see apple-speakers boot log");
+        puts("VINIX M1 SOUND: no apple-speakers line at all = kernel lacks the driver");
         goto hold;
     }
     puts("VINIX M1 SOUND: opening DSP");

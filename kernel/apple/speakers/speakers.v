@@ -687,10 +687,16 @@ pub fn initialise() {
 	}
 }
 
+// Every way out of here prints an apple-speakers line, so a boot log with
+// none at all means a kernel built without this driver.
 fn initialise_hardware() {
-	root := devicetree.find_node('/') or { return }
+	root := devicetree.find_node('/') or {
+		println('apple-speakers: no device tree root; speakers off')
+		return
+	}
 	if !compatible(root, 'apple,j313') || !compatible(root, 'apple,t8103') {
 		// The protection parameters are the J313's; nothing else is safe.
+		println('apple-speakers: not a MacBook Air J313; speakers off')
 		return
 	}
 	mut plan := Plan{}

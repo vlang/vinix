@@ -105,7 +105,7 @@ case "${1:-desktop}" in
         MODE="desktop + Apple GPU"
         ;;
     desktop-sound)
-        FLAGS=(--native-resolution --desktop-initramfs)
+        FLAGS=(--native-resolution --desktop-initramfs --apple-speakers)
         MODE="desktop + M1 Air sound (software rendering)"
         ;;
     sound-diag)

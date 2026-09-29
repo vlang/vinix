@@ -310,9 +310,13 @@ fn kmain_thread(qemu_platform bool, acpi_platform bool) {
 	print('kmain_thread: random done\n')
 	if qemu_platform {
 		virtio_snd.initialise(memory.get_hhdm_offset())
-	} else if devicetree.is_available() && !early_cmdline_contains('vinix.apple_speakers=0') {
+	} else if devicetree.is_available() {
 		// The MacBook Air's built-in speakers, with their protection model.
-		speakers.initialise()
+		if early_cmdline_contains('vinix.apple_speakers=0') {
+			print('apple-speakers: off (vinix.apple_speakers=0)\n')
+		} else {
+			speakers.initialise()
+		}
 	}
 	if qemu_platform {
 		virtio_gpu.initialise(memory.get_hhdm_offset())

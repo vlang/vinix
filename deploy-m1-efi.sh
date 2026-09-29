@@ -10,6 +10,7 @@ ENABLE_APPLE_GPU=0
 GPU_PROBE_ONLY=0
 USE_MINIMAL_INITRAMFS=0
 USE_SOUND_INITRAMFS=0
+REQUIRE_APPLE_SPEAKERS=0
 USE_DESKTOP_INITRAMFS=0
 INITRAMFS_COMPRESSED=0
 USE_NATIVE_RESOLUTION=0
@@ -121,9 +122,15 @@ for argument in "$@"; do
             ;;
         --sound-initramfs)
             USE_SOUND_INITRAMFS=1
+            REQUIRE_APPLE_SPEAKERS=1
+            ;;
+        --apple-speakers)
+            # Refuse a kernel without the M1 Air speaker driver. The driver
+            # itself is on by default; this only checks that it was built in.
+            REQUIRE_APPLE_SPEAKERS=1
             ;;
         --help|-h)
-            echo "usage: $0 [--apple-studio-display|--external-display] [--apple-display-hotplug] [--apple-gpu] [--gpu-probe-only] [--apple-dcp] [--apple-battery] [--apple-wifi] [--apple-ans] [--ans-rw=UUID] [--ans-root=UUID] [--all-drivers] [--minimal-initramfs] [--sound-initramfs] [--desktop-initramfs] [--no-early-term] [--halt-at=N] [--native-resolution] [--force-fault] <mounted_esp_path>"
+            echo "usage: $0 [--apple-studio-display|--external-display] [--apple-display-hotplug] [--apple-gpu] [--gpu-probe-only] [--apple-dcp] [--apple-battery] [--apple-wifi] [--apple-ans] [--ans-rw=UUID] [--ans-root=UUID] [--all-drivers] [--minimal-initramfs] [--sound-initramfs] [--apple-speakers] [--desktop-initramfs] [--no-early-term] [--halt-at=N] [--native-resolution] [--force-fault] <mounted_esp_path>"
             exit 0
             ;;
         --*)
@@ -219,6 +226,18 @@ if ! LC_ALL=C grep -aFq "$SMP_REQUEST_ID" "$KERNEL"; then
     exit 1
 fi
 echo "kernel includes Limine MP request (native boot limit: 4 CPUs)"
+
+# A kernel built from a tree that never calls speakers.initialise() boots
+# normally and leaves no /dev/dsp. The speaker test then reads as a driver
+# failure with no apple-speakers line on screen, when the driver never ran.
+if [ "$REQUIRE_APPLE_SPEAKERS" -eq 1 ]; then
+    if ! LC_ALL=C grep -aFq "apple-speakers: MacBook Air J313 speakers" "$KERNEL"; then
+        echo "error: this kernel has no M1 Air speaker driver: $KERNEL" >&2
+        echo "hint: rebuild it from a tree whose kernel/main_arm64.v calls speakers.initialise()" >&2
+        exit 1
+    fi
+    echo "kernel includes the M1 Air speaker driver"
+fi
 
 if [ "$ENABLE_APPLE_GPU" -eq 1 ]; then
     echo "APPLE GPU: kernel AGX probe enabled"
