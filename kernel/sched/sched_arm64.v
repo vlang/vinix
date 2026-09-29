@@ -61,8 +61,6 @@ fn C.yield_dispatch(handler voidptr)
 
 const max_reap_slots = 256
 
-const max_deferred_reaps = 64
-
 // The same count as the per-CPU exception stacks. A CPU past the end shares the
 // last stack, which is only reached when that CPU is idling anyway.
 const max_idle_stacks = 8
@@ -72,9 +70,6 @@ const idle_stack_size = 32768
 __global (
 	// Per-CPU parking slot for the thread that most recently died there.
 	reap_slots [max_reap_slots]&proc.Thread
-	// Corpses still pinned when their turn to be freed came. See defer_reap().
-	reap_deferred_slots [max_deferred_reaps]&proc.Thread
-	reap_deferred_lock  klock.Lock
 	// One idle stack per CPU, for the case where a CPU has to leave a thread's
 	// stack behind rather than return onto it: see evict_to_idle(). 32 KiB is
 	// what await() and one pass of the scheduler need.
@@ -1181,16 +1176,10 @@ fn hand_over_to_reaper(cpu_number u64, t &proc.Thread) {
 	reap_slots[cpu_number] = unsafe { t }
 
 	if unsafe { previous != nil } {
-		// Something that found the thread before it died -- a signal on its way
-		// to it, a sibling stopping it -- may still be using it. Hold on to the
-		// corpse until the last of them has let go.
-		if proc.thread_is_pinned(previous) {
-			defer_reap(previous)
-		} else {
-			free_thread_memory(previous)
-		}
+		reap_thread(previous)
+	} else {
+		reap_deferred()
 	}
-	reap_deferred()
 }
 
 fn free_thread_memory(t &proc.Thread) {
@@ -1203,45 +1192,6 @@ fn free_thread_memory(t &proc.Thread) {
 	unsafe {
 		t.comm.free()
 		free(voidptr(t))
-	}
-}
-
-// A pinned corpse waits here. Pins last only as long as a signal delivery or a
-// sibling's teardown, so the list stays short; one that does not fit is kept
-// for good rather than freed under somebody's feet.
-fn defer_reap(t &proc.Thread) {
-	reap_deferred_lock.acquire()
-	defer {
-		reap_deferred_lock.release()
-	}
-	for i := 0; i < max_deferred_reaps; i++ {
-		if unsafe { reap_deferred_slots[i] == nil } {
-			reap_deferred_slots[i] = unsafe { t }
-			return
-		}
-	}
-}
-
-// Free every waiting corpse whose last pin has gone. Nothing can pin a corpse
-// again: it left the tid table and its process' thread list before it died.
-fn reap_deferred() {
-	if !reap_deferred_lock.test_and_acquire() {
-		return
-	}
-	mut ready := [max_deferred_reaps]&proc.Thread{}
-	mut count := 0
-	for i := 0; i < max_deferred_reaps; i++ {
-		t := reap_deferred_slots[i]
-		if unsafe { t == nil } || proc.thread_is_pinned(t) {
-			continue
-		}
-		reap_deferred_slots[i] = unsafe { nil }
-		ready[count] = t
-		count++
-	}
-	reap_deferred_lock.release()
-	for i := 0; i < count; i++ {
-		free_thread_memory(ready[i])
 	}
 }
 

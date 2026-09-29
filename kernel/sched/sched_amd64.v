@@ -917,17 +917,29 @@ fn free_thread_stacks(mut t proc.Thread) {
 	}
 }
 
+// The stacks, and then the Thread, of a thread that died by itself: it left
+// the tid table, its process and every event it waited on before it died.
+fn free_thread_memory(t &proc.Thread) {
+	mut thread := unsafe { t }
+	free_thread_stacks(mut thread)
+	unsafe {
+		thread.comm.free()
+		free(voidptr(thread))
+	}
+}
+
 // Called by scheduler_isr once this CPU is on its own stacks and its IST3
 // points at the thread it is about to run, or at its idle stack: the thread
-// that died on this CPU is off its stacks by then. The Thread itself stays,
-// as events and the tid table may still point at it.
+// that died on this CPU is off its stacks by then, and goes, as on arm64. One
+// a sibling stopped keeps its Thread, as events it was waiting on may still
+// point at it, and only gives its stacks back.
 fn reap_dead_threads(mut cpu_local cpulocal.Local) {
 	if cpu_local.dying_thread == unsafe { nil } {
 		return
 	}
-	mut dead := unsafe { &proc.Thread(cpu_local.dying_thread) }
+	dead := unsafe { &proc.Thread(cpu_local.dying_thread) }
 	cpu_local.dying_thread = unsafe { nil }
-	free_thread_stacks(mut dead)
+	reap_thread(dead)
 
 	// The threads it stopped on its way out were taken off their CPUs before
 	// it went on to die itself, so by now nothing can be on their stacks.

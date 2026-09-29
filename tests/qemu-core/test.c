@@ -1624,6 +1624,35 @@ static int test_cpuinfo(void)
 	return 0;
 }
 
+static void *return_at_once(void *argument)
+{
+	return argument;
+}
+
+/* A thread that has exited and been joined leaves nothing of itself in the
+ * kernel: a program that starts a thread per request runs for good. The first
+ * round lets allocator caches fill; the second may not cost more. */
+static int test_joined_threads_return_their_memory(void)
+{
+	unsigned long before = 0;
+	for (int round = 0; round < 2; ++round) {
+		if (round == 1)
+			before = free_ram();
+		for (int i = 0; i < 2000; ++i) {
+			pthread_t thread;
+			CHECK(pthread_create(&thread, NULL, return_at_once, NULL) == 0);
+			CHECK(pthread_join(thread, NULL) == 0);
+		}
+	}
+	unsigned long after = free_ram();
+	if (after + 4UL * 1024 * 1024 < before) {
+		printf("thread churn: free before %lu, after %lu\n", before, after);
+		CHECK(0);
+	}
+	puts("QEMU CORE PASS: joined threads return their memory");
+	return 0;
+}
+
 /* An event has room for 64 listeners. More threads than that waiting on one
  * futex see a spurious wake, which they retry, rather than stop the kernel. */
 #define MANY_WAITERS 80
@@ -1973,6 +2002,7 @@ static int run_tests(void)
 	CHECK(test_more_waiters_than_an_event_holds() == 0);
 	CHECK(test_fork_inherits_process_state() == 0);
 	CHECK(test_cpuinfo() == 0);
+	CHECK(test_joined_threads_return_their_memory() == 0);
 	CHECK(test_fifo_keeps_its_cpu() == 0);
 	CHECK(test_frozen_cgroup_stops_its_threads() == 0);
 	CHECK(test_wait_ends_for_a_pending_signal() == 0);
