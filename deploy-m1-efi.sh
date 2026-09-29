@@ -170,6 +170,17 @@ if [ ! -d "$ESP_MOUNT" ]; then
     exit 1
 fi
 
+# macOS indexes every volume it mounts, this one included: Spotlight stored a
+# 20 MB index of the boot image in the same 500 MiB ESP that barely holds the
+# image. Keep Spotlight and fsevents off this volume and drop what they kept,
+# before the free space is measured.
+if [ "$(uname -s)" = Darwin ]; then
+    mdutil -i off "$ESP_MOUNT" >/dev/null 2>&1 || true
+    rm -rf "$ESP_MOUNT/.Spotlight-V100/Store-V1" "$ESP_MOUNT/.Spotlight-V100/Store-V2"
+    touch "$ESP_MOUNT/.metadata_never_index" 2>/dev/null || true
+    mkdir -p "$ESP_MOUNT/.fseventsd" 2>/dev/null && touch "$ESP_MOUNT/.fseventsd/no_log" 2>/dev/null || true
+fi
+
 KERNEL="$SCRIPT_DIR/kernel/bin/vinix"
 INITRAMFS="$SCRIPT_DIR/build-support/init-aarch64/initramfs.tar"
 MINIMAL_INITRAMFS="$SCRIPT_DIR/build-support/init-aarch64/initramfs-minimal.tar"
@@ -335,8 +346,12 @@ mkdir -p "$ESP_MOUNT/EFI/BOOT"
 mkdir -p "$ESP_MOUNT/boot"
 mkdir -p "$ESP_MOUNT/limine"
 
-if [ -f "$ESP_MOUNT/EFI/BOOT/BOOTAA64.EFI" ]; then
-    cp "$ESP_MOUNT/EFI/BOOT/BOOTAA64.EFI" "$ESP_MOUNT/EFI/BOOT/BOOTAA64.EFI.bak"
+# Keep the loader this replaces only when it is not an earlier Limine: that
+# one is the next deployment's to overwrite, and a copy of it is just less
+# room for the image.
+if [ -f "$ESP_MOUNT/EFI/BOOT/BOOTAA64.EFI" ] &&
+   ! LC_ALL=C grep -aqF "Limine" "$ESP_MOUNT/EFI/BOOT/BOOTAA64.EFI"; then
+    COPYFILE_DISABLE=1 cp "$ESP_MOUNT/EFI/BOOT/BOOTAA64.EFI" "$ESP_MOUNT/EFI/BOOT/BOOTAA64.EFI.bak"
 fi
 if [ "$USE_NATIVE_RESOLUTION" -eq 1 ]; then
     sed -i '' '/^[[:space:]]*resolution:/d' "$RUNTIME_CONF"
