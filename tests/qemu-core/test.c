@@ -618,6 +618,50 @@ static int test_ext2_mapping_and_namespace(void)
 /* A private file mapping is filled in as it is touched. Each page still has to
  * hold the file's bytes when first read, a write has to stay in the mapping,
  * and the rest of the last page past the end of the file reads as zeroes. */
+/*
+ * A syscall's buffer may lie in a page nothing has touched yet: a private file
+ * mapping, and a large anonymous one, are paged in on first use. The kernel
+ * copying to or from such a page has to page it in as a fault would, not fail
+ * the call with EFAULT.
+ */
+static int test_syscall_buffers_in_untouched_pages(void)
+{
+	static const char *path = "/dev/shm/vinix-qemu-core-untouched";
+	const size_t page = 4096;
+	const size_t size = 64UL * 1024 * 1024;
+	char text[64];
+	for (size_t i = 0; i < sizeof(text); ++i)
+		text[i] = (char)('a' + i % 26);
+
+	int fd = open(path, O_CREAT | O_TRUNC | O_RDWR, 0600);
+	CHECK(fd >= 0);
+	CHECK(pwrite(fd, text, sizeof(text), 2 * page) == (ssize_t)sizeof(text));
+	char *file = mmap(NULL, 3 * page, PROT_READ, MAP_PRIVATE, fd, 0);
+	CHECK(file != MAP_FAILED);
+	char *area = mmap(NULL, size, PROT_READ | PROT_WRITE,
+	    MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+	CHECK(area != MAP_FAILED);
+
+	/* An empty signal set in a file's page, as musl keeps one in read-only
+	 * data. */
+	CHECK(sigprocmask(SIG_BLOCK, (const sigset_t *)file, NULL) == 0);
+	/* A file write from the file's own mapping... */
+	CHECK(lseek(fd, 3 * page, SEEK_SET) == (off_t)(3 * page));
+	CHECK(write(fd, file + 2 * page, sizeof(text)) == (ssize_t)sizeof(text));
+	/* ...and a file read into anonymous memory. */
+	char *target = area + size / 2 + 100;
+	CHECK(lseek(fd, 3 * page, SEEK_SET) == (off_t)(3 * page));
+	CHECK(read(fd, target, sizeof(text)) == (ssize_t)sizeof(text));
+	CHECK(memcmp(target, text, sizeof(text)) == 0);
+
+	CHECK(munmap(area, size) == 0);
+	CHECK(munmap(file, 3 * page) == 0);
+	CHECK(close(fd) == 0);
+	CHECK(unlink(path) == 0);
+	puts("QEMU CORE PASS: syscalls page in untouched buffers");
+	return 0;
+}
+
 static int test_private_file_mapping(void)
 {
 	static const char *path = "/root/vinix-qemu-core/private";
@@ -1522,6 +1566,7 @@ static int run_tests(void)
 	CHECK(test_large_pipe_progress() == 0);
 	CHECK(test_sparse_tmpfs_shared_mapping() == 0);
 	CHECK(test_cow() == 0);
+	CHECK(test_syscall_buffers_in_untouched_pages() == 0);
 	CHECK(test_partial_munmap_reclaims_pages() == 0);
 	CHECK(test_madvise_reclaims_anonymous_pages() == 0);
 	CHECK(test_short_lived_process_memory_reclamation() == 0);
