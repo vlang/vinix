@@ -2,6 +2,7 @@
 // Copyright (c) 2026 Alexander Medvednikov
 module file
 
+import proc
 import usercopy
 
 // x86-64's struct epoll_event is packed: events, then data straight after it
@@ -31,4 +32,9 @@ fn write_epoll_event(address u64, event EpollEvent) bool {
 		*&u64(&raw[4]) = event.data
 	}
 	return usercopy.copy_to_user(address, voidptr(&raw[0]), epoll_event_size)
+}
+
+// amd64 threads are not told to exit by a sibling; see epoll_arm64.v.
+fn thread_told_to_exit(_ &proc.Thread) bool {
+	return false
 }

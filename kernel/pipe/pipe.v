@@ -499,7 +499,18 @@ fn (mut this Pipe) unref(handle voidptr) ? {
 	// and a wakeup after that took the lock of freed memory: it spun on the
 	// poison, which reads as held, until the memory was reused, and then took
 	// a "lock" inside whatever lived there by then.
-	event.trigger(mut this.event, false)
+	//
+	// Only an end closing changes what anyone waits for. A reference that is
+	// neither end -- epoll's hold on a pipe it watches, an unlinked FIFO, an
+	// O_PATH descriptor -- goes quietly. epoll_pwait() lets go of what it
+	// watches after every wakeup; waking the pipe for that left an event
+	// pending for its next pass, which found nothing to read, let go again
+	// and woke itself again, for good. Firefox's IPC threads spun there on
+	// their wakeup pipes, every CPU busy, and a content process that exited
+	// never finished, as one of its threads never came back out.
+	if accmode != -1 {
+		event.trigger(mut this.event, false)
+	}
 	if !katomic.dec(mut &this.refcount) {
 		unsafe {
 			free(this.data)

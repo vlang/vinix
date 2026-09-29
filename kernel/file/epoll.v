@@ -489,8 +489,11 @@ pub fn syscall_epoll_pwait(_ voidptr, epfd int, events_buf u64, maxevents int, t
 		// signal is waiting to be taken, which only the way out delivers, as
 		// Linux's ep_poll() looks before every pass. An event that kept firing
 		// with nothing ready kept postgres's processes looping here with a
-		// SIGTERM pending for good, and a shutdown never finished.
-		if t.pending_signals & ~t.masked_signals != 0 {
+		// SIGTERM pending for good, and a shutdown never finished. Nor a
+		// thread whose process is exiting: the sibling tearing it down waits
+		// for it to come back out, and a wait here never reaches the check in
+		// event.await while an event stays pending.
+		if t.pending_signals & ~t.masked_signals != 0 || thread_told_to_exit(t) {
 			return errno.err, errno.eintr
 		}
 	}
