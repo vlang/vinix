@@ -42,6 +42,8 @@ FEATURE_MARKERS = (
     b"QEMU CORE PASS: socket interface boxes are reclaimed",
     b"QEMU CORE PASS: full UNIX stream clears write readiness",
     b"QEMU CORE PASS: futex wake-op updates and compares user words",
+    b"QEMU CORE PASS: more waiters than an event holds",
+    b"QEMU CORE PASS: a wait ends for a signal already pending",
     b"QEMU CORE PASS: ext2 cache, mmap, sync, namespace, timestamps",
     b"QEMU CORE PASS: a shared mapping is visible to every reader",
     b"QEMU CORE PASS: a released pid stays out of use while its group lives",

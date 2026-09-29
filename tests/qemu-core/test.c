@@ -10,10 +10,12 @@
 #define _GNU_SOURCE
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <poll.h>
 #include <pthread.h>
 #include <sched.h>
 #include <signal.h>
+#include <stdatomic.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -1366,6 +1368,89 @@ static int test_futex_wake_op(void)
 	return 0;
 }
 
+/* An event has room for 64 listeners. More threads than that waiting on one
+ * futex see a spurious wake, which they retry, rather than stop the kernel. */
+#define MANY_WAITERS 80
+#define FUTEX_WAIT_PRIVATE_OP (0 | 128)
+#define FUTEX_WAKE_PRIVATE_OP (1 | 128)
+static _Atomic int many_waiters_word;
+static _Atomic int many_waiters_woken;
+
+static void *many_waiters_thread(void *argument)
+{
+	(void)argument;
+	while (atomic_load(&many_waiters_word) == 0)
+		syscall(SYS_futex, &many_waiters_word, FUTEX_WAIT_PRIVATE_OP,
+		    0, NULL, NULL, 0);
+	atomic_fetch_add(&many_waiters_woken, 1);
+	return NULL;
+}
+
+static int test_more_waiters_than_an_event_holds(void)
+{
+	pthread_t threads[MANY_WAITERS];
+	for (int i = 0; i < MANY_WAITERS; ++i)
+		CHECK(pthread_create(&threads[i], NULL, many_waiters_thread,
+		    NULL) == 0);
+	usleep(300000);
+	atomic_store(&many_waiters_word, 1);
+	syscall(SYS_futex, &many_waiters_word, FUTEX_WAKE_PRIVATE_OP,
+	    INT_MAX, NULL, NULL, 0);
+	for (int i = 0; i < MANY_WAITERS; ++i)
+		CHECK(pthread_join(threads[i], NULL) == 0);
+	CHECK(atomic_load(&many_waiters_woken) == MANY_WAITERS);
+	puts("QEMU CORE PASS: more waiters than an event holds");
+	return 0;
+}
+
+static volatile sig_atomic_t counted_signals;
+
+static void count_signal(int signal)
+{
+	(void)signal;
+	++counted_signals;
+}
+
+/* A wait does not start with a signal already pending that it does not block:
+ * ppoll(2) whose mask lets in a pending signal ends at once. */
+static int test_wait_ends_for_a_pending_signal(void)
+{
+	struct sigaction action = {.sa_handler = count_signal}, previous;
+	sigemptyset(&action.sa_mask);
+	CHECK(sigaction(SIGUSR1, &action, &previous) == 0);
+	sigset_t blocked, original, open;
+	sigemptyset(&blocked);
+	sigaddset(&blocked, SIGUSR1);
+	CHECK(sigprocmask(SIG_BLOCK, &blocked, &original) == 0);
+	open = original;
+	sigdelset(&open, SIGUSR1);
+	CHECK(kill(getpid(), SIGUSR1) == 0);
+
+	int fds[2];
+	CHECK(pipe(fds) == 0);
+	struct pollfd descriptor = {.fd = fds[0], .events = POLLIN};
+	struct timespec timeout = {3, 0}, start, end;
+	CHECK(clock_gettime(CLOCK_MONOTONIC, &start) == 0);
+	errno = 0;
+	int ready = ppoll(&descriptor, 1, &timeout, &open);
+	int error = errno;
+	CHECK(clock_gettime(CLOCK_MONOTONIC, &end) == 0);
+	CHECK(ready == -1 && error == EINTR);
+	CHECK(end.tv_sec - start.tv_sec < 2);
+
+	sigset_t pending;
+	CHECK(sigpending(&pending) == 0);
+	if (sigismember(&pending, SIGUSR1)) {
+		/* Taken as the mask opens, not left for a later test. */
+		CHECK(sigprocmask(SIG_SETMASK, &open, NULL) == 0);
+	}
+	CHECK(sigprocmask(SIG_SETMASK, &original, NULL) == 0);
+	CHECK(sigaction(SIGUSR1, &previous, NULL) == 0);
+	CHECK(close(fds[0]) == 0 && close(fds[1]) == 0);
+	puts("QEMU CORE PASS: a wait ends for a signal already pending");
+	return 0;
+}
+
 /* V3 makes the V `int` type pointer-width. Linux still defines pollfd.fd as a
  * 32-bit C int, so exercise the structure from a real libc caller: widening
  * the kernel field makes it combine fd/events into one invalid descriptor. */
@@ -1577,6 +1662,8 @@ static int run_tests(void)
 	CHECK(test_unix_socket_buffer_growth() == 0);
 	CHECK(test_unix_socket_full_write_readiness() == 0);
 	CHECK(test_futex_wake_op() == 0);
+	CHECK(test_more_waiters_than_an_event_holds() == 0);
+	CHECK(test_wait_ends_for_a_pending_signal() == 0);
 	CHECK(test_default_terminating_signals() == 0);
 	CHECK(test_signals_reach_a_busy_loop() == 0);
 	CHECK(test_syscall_restart() == 0);

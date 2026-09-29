@@ -235,7 +235,6 @@ override VFILES := $(shell find -L * -type f -name '*.v' \
     ! -path 'time/pit.v' \
     ! -path 'syscall/syscall.v' \
     ! -path 'userland/userland.v' \
-    ! -path 'event/event.v' \
     ! -name 'katomic.v' \
     ! -name 'klock.v' \
     ! -name '*_amd64.v' \

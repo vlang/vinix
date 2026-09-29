@@ -4,13 +4,20 @@ module event
 import proc
 import sched
 import event.eventstruct
-import x86.cpu
-import x86.cpu.local as cpulocal
 import katomic
 
 __global (
 	waiting_event_count = u64(0)
 )
+
+fn duplicate_event_before(events []&eventstruct.Event, index u64) bool {
+	for previous := u64(0); previous < index; previous++ {
+		if events[previous] == events[index] {
+			return true
+		}
+	}
+	return false
+}
 
 fn check_for_pending(mut events []&eventstruct.Event) ?u64 {
 	for i := u64(0); i < events.len; i++ {
@@ -23,14 +30,25 @@ fn check_for_pending(mut events []&eventstruct.Event) ?u64 {
 	return none
 }
 
-fn attach_listeners(mut events []&eventstruct.Event, mut t proc.Thread) {
+// Returns false when the fixed-size listener tables cannot take this waiter.
+// Userspace can reach that with enough threads on one futex, so it has to unwind
+// and report an interruption rather than take the kernel down; every caller here
+// already retries, which is also what a spurious futex wakeup would ask of them.
+fn attach_listeners(mut events []&eventstruct.Event, mut t proc.Thread) bool {
 	t.attached_events_i = 0
 
 	for i := u64(0); i < events.len; i++ {
+		// poll/select callers may name the same underlying resource more than
+		// once. One listener is sufficient and avoids enqueueing a thread
+		// repeatedly when that shared event fires.
+		if duplicate_event_before(events, i) {
+			continue
+		}
 		mut e := events[i]
 
-		if !e.reserve() {
-			panic('event listeners exhausted')
+		if t.attached_events_i == proc.max_events || !e.reserve() {
+			detach_listeners(mut t)
+			return false
 		}
 
 		mut listener := e.slot(e.listeners_i)
@@ -40,13 +58,11 @@ fn attach_listeners(mut events []&eventstruct.Event, mut t proc.Thread) {
 
 		e.listeners_i++
 
-		if t.attached_events_i == proc.max_events {
-			panic('listening on too many events')
-		}
-
 		t.attached_events[t.attached_events_i] = e
 		t.attached_events_i++
 	}
+
+	return true
 }
 
 fn detach_listeners(mut t proc.Thread) {
@@ -73,29 +89,72 @@ fn detach_listeners(mut t proc.Thread) {
 	t.attached_events_i = 0
 }
 
+// Every waiter takes the locks of the events it waits on in one order, by
+// address, and gives them back in the reverse. Taken in the order they were
+// listed, two threads waiting on the same two events -- one listing them
+// [a, b], the other [b, a] -- could each hold one and spin for the other with
+// interrupts off, and every CPU that then touched either event stopped too:
+// the machine froze without a word, at the busiest moments of container
+// starts and exits. An event listed twice is locked once.
 fn lock_events(mut events []&eventstruct.Event) {
-	for mut e in events {
-		e.@lock.acquire()
+	mut last := u64(0)
+	for {
+		index := next_event_above(events, last)
+		if index < 0 {
+			return
+		}
+		events[index].@lock.acquire()
+		last = u64(voidptr(events[index]))
 	}
 }
 
 fn unlock_events(mut events []&eventstruct.Event) {
-	for mut e in events {
-		e.@lock.release()
+	mut last := u64(-1)
+	for {
+		index := next_event_below(events, last)
+		if index < 0 {
+			return
+		}
+		events[index].@lock.release()
+		last = u64(voidptr(events[index]))
 	}
+}
+
+// The event with the lowest address above `bound`, or -1.
+fn next_event_above(events []&eventstruct.Event, bound u64) int {
+	mut chosen := -1
+	mut lowest := u64(-1)
+	for i := 0; i < events.len; i++ {
+		address := u64(voidptr(events[i]))
+		if address > bound && address <= lowest {
+			lowest = address
+			chosen = i
+		}
+	}
+	return chosen
+}
+
+// The event with the highest address below `bound`, or -1.
+fn next_event_below(events []&eventstruct.Event, bound u64) int {
+	mut chosen := -1
+	mut highest := u64(0)
+	for i := 0; i < events.len; i++ {
+		address := u64(voidptr(events[i]))
+		if address < bound && address >= highest {
+			highest = address
+			chosen = i
+		}
+	}
+	return chosen
 }
 
 fn await_internal(mut events []&eventstruct.Event, block bool, watch_generation bool,
 	watched_index u64, generation u64) ?u64 {
 	mut t := proc.current_thread()
 
-	asm volatile amd64 {
-		cli
-	}
+	interrupt_toggle(false)
 	defer {
-		asm volatile amd64 {
-			sti
-		}
+		interrupt_toggle(true)
 	}
 
 	lock_events(mut events)
@@ -111,7 +170,18 @@ fn await_internal(mut events []&eventstruct.Event, block bool, watch_generation 
 		return watched_index
 	}
 
-	if block == false {
+	// A thread its process has told to exit must not go to sleep again: the
+	// sibling tearing the process down is waiting for it to unwind and leave.
+	if block == false || katomic.load(&t.must_exit) {
+		unlock_events(mut events)
+		return none
+	}
+	// Nor go to sleep with a signal it does not block already pending: the wait
+	// ends as interrupted, as Linux's signal_pending() check ends it. A signal
+	// sent while the thread was not asleep had nothing to wake, and the next
+	// wait slept through it for as long as its timeout, or for good: none of
+	// postgres's processes saw the SIGTERM of a shutdown.
+	if t.pending_signals & ~t.masked_signals != 0 {
 		unlock_events(mut events)
 		return none
 	}
@@ -119,17 +189,18 @@ fn await_internal(mut events []&eventstruct.Event, block bool, watch_generation 
 	katomic.inc(mut &waiting_event_count)
 	t.which_event = u64(-1)
 
-	attach_listeners(mut events, mut t)
+	if !attach_listeners(mut events, mut t) {
+		katomic.dec(mut &waiting_event_count)
+		unlock_events(mut events)
+		return none
+	}
+
 	defer {
-		asm volatile amd64 {
-			cli
-		}
+		interrupt_toggle(false)
 		lock_events(mut events)
 		detach_listeners(mut t)
 		unlock_events(mut events)
-		asm volatile amd64 {
-			sti
-		}
+		interrupt_toggle(true)
 	}
 
 	sched.dequeue_thread(t)
@@ -153,49 +224,57 @@ fn await_internal(mut events []&eventstruct.Event, block bool, watch_generation 
 	}
 	// Child exit raises an event and SIGCHLD together. If both wake this wait,
 	// retain the consumed event; otherwise waitpid loses the zombie forever.
-	if interrupted_by_signal && t.which_event == u64(-1) {
+	if (interrupted_by_signal || katomic.load(&t.must_exit)) && t.which_event == u64(-1) {
 		return none
 	}
 
 	return t.which_event
 }
 
+// One wait, repeated while it only ends in a spurious wake: woken without one
+// of these events having fired for it, or told of an index that is not into
+// this wait's list. Handing such an index back had callers index their own
+// lists out of range, which panicked the kernel.
+fn await_valid(mut events []&eventstruct.Event, block bool, watch_generation bool,
+	watched_index u64, generation u64) ?u64 {
+	for {
+		which := await_internal(mut events, block, watch_generation, watched_index,
+			generation)?
+		if which < u64(events.len) {
+			return which
+		}
+	}
+	return none
+}
+
 pub fn await(mut events []&eventstruct.Event, block bool) ?u64 {
-	return await_internal(mut events, block, false, 0, 0)
+	return await_valid(mut events, block, false, 0, 0)
 }
 
 pub fn await_from_generation(mut events []&eventstruct.Event, block bool, watched_index u64,
 	generation u64) ?u64 {
-	return await_internal(mut events, block, true, watched_index, generation)
+	return await_valid(mut events, block, true, watched_index, generation)
 }
 
 pub fn generation(mut e eventstruct.Event) u64 {
-	interrupts := cpu.interrupt_state()
-	asm volatile amd64 {
-		cli
-	}
+	interrupts := interrupt_state()
+	interrupt_toggle(false)
 	e.@lock.acquire()
 	value := e.generation
 	e.@lock.release()
 	if interrupts {
-		asm volatile amd64 {
-			sti
-		}
+		interrupt_toggle(true)
 	}
 	return value
 }
 
 pub fn trigger(mut e eventstruct.Event, drop bool) u64 {
-	ints := cpu.interrupt_state()
+	ints := interrupt_state()
 
-	asm volatile amd64 {
-		cli
-	}
+	interrupt_toggle(false)
 	defer {
 		if ints == true {
-			asm volatile amd64 {
-				sti
-			}
+			interrupt_toggle(true)
 		}
 	}
 
@@ -217,6 +296,8 @@ pub fn trigger(mut e eventstruct.Event, drop bool) u64 {
 		listener := e.slot(i)
 		mut t := unsafe { &proc.Thread(listener.thrd) }
 
+		// A thread may listen to several events. Once one has made it runnable,
+		// do not overwrite that selection; retain this event for its next await.
 		if katomic.load(&t.is_in_queue) {
 			preserve_pending = true
 			continue
@@ -240,18 +321,12 @@ pub fn trigger(mut e eventstruct.Event, drop bool) u64 {
 }
 
 pub fn pthread_exit(ret voidptr) {
-	asm volatile amd64 {
-		cli
-	}
-
-	mut cpu_local := cpulocal.current()
+	interrupt_toggle(false)
 
 	mut current_thread := proc.current_thread()
 
 	sched.dequeue_thread(current_thread)
-
-	cpu.set_gs_base(u64(&cpu_local.cpu_number))
-	cpu.set_kernel_gs_base(u64(current_thread))
+	leave_for_good(current_thread)
 
 	current_thread.exit_value = ret
 	trigger(mut current_thread.exited, false)
