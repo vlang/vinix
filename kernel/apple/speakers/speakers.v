@@ -60,6 +60,7 @@ mut:
 	sense_buffer      u64
 	sense_iova        u64
 	sense_bytes       u32
+	cluster_power     voidptr
 }
 
 struct C.vinix_apple_speakers_status {
@@ -77,7 +78,7 @@ mut:
 
 fn C.vinix_apple_speakers_init(cfg &C.vinix_apple_speakers_config) int
 fn C.vinix_apple_speakers_configure(rate u32) int
-fn C.vinix_apple_speakers_start_clocks() u32
+fn C.vinix_apple_speakers_start_clocks() int
 fn C.vinix_apple_speakers_start_stream() int
 fn C.vinix_apple_speakers_stop()
 fn C.vinix_apple_speakers_wants_start() int
@@ -128,6 +129,7 @@ const ev_fault_power = 7
 const ev_fault_i2c = 8
 const ev_dma_error = 9
 const ev_serdes = 10
+const ev_power = 11
 
 const service_running = u32(1)
 const service_progress = u32(2)
@@ -774,6 +776,7 @@ fn initialise_hardware() {
 	cfg.sense_buffer = sense_phys + hhdm
 	cfg.sense_iova = sense_iova
 	cfg.sense_bytes = u32(sense_ring_bytes)
+	cfg.cluster_power = voidptr(cluster_power)
 	ok := C.vinix_apple_speakers_init(&cfg) != 0
 	print_events()
 	if !ok {
@@ -849,6 +852,10 @@ fn print_events() {
 		} else if code == ev_serdes {
 			C.kprintf(c'apple-speakers: MCA cluster %lld serializer did not leave reset\n',
 				i64(e[1]))
+		} else if code == ev_power {
+			state := if e[2] != 0 { c'on' } else { c'off' }
+			C.kprintf(c'apple-speakers: MCA cluster %lld power domain did not turn %s\n',
+				i64(e[1]), state)
 		}
 	}
 }
@@ -868,31 +875,34 @@ fn (mut s SpeakerStream) unlock() {
 // A stream that will not start once will not start the next time either:
 // shut the amplifiers down rather than retry behind every write.
 fn start_locked() {
-	mask := C.vinix_apple_speakers_start_clocks()
-	if mask == 0 {
+	if C.vinix_apple_speakers_start_clocks() == 0 {
 		if C.vinix_apple_speakers_faulted() == 0 {
 			println('apple-speakers: clocks did not start; speakers off')
 		}
 		C.vinix_apple_speakers_fail()
 		return
 	}
-	for i, cluster in [tx_cluster, sense_cluster]! {
-		if mask & (u32(1) << cluster) == 0 {
-			continue
-		}
-		d := speaker_plan.cluster_power[i]
-		if !pmgr.enable_region_externally_clocked(d.region.base, d.region.size, d.offset) {
-			C.kprintf(c'apple-speakers: MCA cluster %llu did not power up; speakers off\n',
-				u64(cluster))
-			C.vinix_apple_speakers_stop()
-			C.vinix_apple_speakers_fail()
-			return
-		}
-	}
 	if C.vinix_apple_speakers_start_stream() == 0 {
 		C.vinix_apple_speakers_stop()
 		C.vinix_apple_speakers_fail()
 	}
+}
+
+// The C driver switches an MCA cluster's power domain through this, under the
+// stream lock, at the point in its start or stop sequence where the cluster's
+// clock runs.
+fn cluster_power(cluster u32, on i32) i32 {
+	if cluster != tx_cluster && cluster != sense_cluster {
+		return 0
+	}
+	d := speaker_plan.cluster_power[if cluster == tx_cluster { 0 } else { 1 }]
+	mut ok := false
+	if on != 0 {
+		ok = pmgr.enable_region_externally_clocked(d.region.base, d.region.size, d.offset)
+	} else {
+		ok = pmgr.disable_region(d.region.base, d.region.size, d.offset)
+	}
+	return if ok { i32(1) } else { i32(0) }
 }
 
 fn service_thread() {

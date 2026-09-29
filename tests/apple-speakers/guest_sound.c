@@ -12,6 +12,20 @@
 #include <time.h>
 #include <unistd.h>
 
+// If the test stops, this says whether the machine stopped with it: a
+// heartbeat that keeps coming means only the test is stuck.
+static void heartbeat(void)
+{
+    pid_t pid = fork();
+    if (pid != 0)
+        return;
+    for (int seconds = 5; seconds <= 60; seconds += 5) {
+        sleep(5);
+        printf("VINIX M1 SOUND: heartbeat %d s\n", seconds);
+    }
+    _exit(0);
+}
+
 static long long milliseconds(void)
 {
     struct timespec now;
@@ -83,6 +97,7 @@ static int tone(int fd)
 int main(void)
 {
     setvbuf(stdout, NULL, _IONBF, 0);
+    heartbeat();
     puts("VINIX M1 SOUND: starting speaker test in 3 seconds");
     sleep(3);
 

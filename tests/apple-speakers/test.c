@@ -342,6 +342,44 @@ static void advance(uint64_t us)
     hw_frames(total / 1000000);
 }
 
+/* ---- MCA cluster power domains ---- */
+
+static int domain_on[6];
+static int fail_power_on, fail_power_off;
+
+static int tx_clock_runs(void)
+{
+    return (reg_get(FAKE_NCO + NCO_STRIDE + NCO_CTRL) & NCO_ENABLE) != 0;
+}
+
+/* Sense is clocked by speaker port 0, which the playback cluster drives. */
+static int sense_clock_runs(void)
+{
+    return tx_clock_runs() && (reg_get(FAKE_MCA + MCA_PORT_ENABLES) & PORT_CLOCKS);
+}
+
+static int io_power(void *cookie, uint32_t cluster, int on)
+{
+    (void)cookie;
+    assert(cluster == 1 || cluster == 2);
+    /* Externally clocked: a domain only switches while its clock runs. */
+    assert(cluster == 1 ? tx_clock_runs() : sense_clock_runs());
+    if (on ? fail_power_on : fail_power_off)
+        return 0;
+    domain_on[cluster] = on;
+    return 1;
+}
+
+/* Only a cluster's port block is used while its domain is off. */
+static void check_cluster_access(uint64_t address)
+{
+    uint32_t n = (uint32_t)((address - FAKE_MCA) / MCA_STRIDE);
+    uint32_t off = (uint32_t)((address - FAKE_MCA) % MCA_STRIDE);
+    if (off >= MCA_PORT_ENABLES && off <= MCA_PORT_DATA_SEL)
+        return;
+    assert(n < 6 && domain_on[n]);
+}
+
 static uint32_t io_read(void *cookie, uint64_t address)
 {
     (void)cookie;
@@ -353,7 +391,9 @@ static uint32_t io_read(void *cookie, uint64_t address)
         return admac_read(address - FAKE_ADMAC);
     if (address >= FAKE_MCA && address < FAKE_MCA + 0x18000) {
         uint32_t off = (uint32_t)((address - FAKE_MCA) % MCA_STRIDE);
-        uint32_t v = reg_get(address);
+        uint32_t v;
+        check_cluster_access(address);
+        v = reg_get(address);
         if (off == MCA_TXA + SERDES_STATUS || off == MCA_RXB + SERDES_STATUS) {
             reg_set(address, v & ~SERDES_RST);   /* reset completes at once */
             return v & ~SERDES_RST;
@@ -378,6 +418,8 @@ static void io_write(void *cookie, uint64_t address, uint32_t value)
         admac_write(address - FAKE_ADMAC, value);
         return;
     }
+    if (address >= FAKE_MCA && address < FAKE_MCA + 0x18000)
+        check_cluster_access(address);
     reg_set(address, value);
 }
 
@@ -431,6 +473,8 @@ static void boot(void)
     memset(chans, 0, sizeof(chans));
     memset(buses, 0, sizeof(buses));
     memset(&sut, 0, sizeof(sut));
+    memset(domain_on, 0, sizeof(domain_on));
+    fail_power_on = fail_power_off = 0;
     amp_defaults(&amps[0]);
     amp_defaults(&amps[1]);
     amps[0].address = 0x31;
@@ -450,7 +494,7 @@ static void boot(void)
     frac_frames = 0;
     played_count = 0;
     sense_mode = MODE_NORMAL;
-    sut.io = (struct spk_io){io_read, io_write, io_now, io_delay, io_cache, io_cache, 0};
+    sut.io = (struct spk_io){io_read, io_write, io_now, io_delay, io_cache, io_cache, io_power, 0};
     c = machine_config();
     assert(init(&sut, &c) == 1);
 }
@@ -498,8 +542,7 @@ static uint32_t pump(uint64_t us, int keep_feeding)
         if (keep_feeding)
             feed(~0u);
         if (wants_start(&sut)) {
-            uint32_t mask = start_clocks(&sut);
-            assert(mask == ((1u << 1) | (1u << 2)));
+            assert(start_clocks(&sut) == 1);
             assert(start_stream(&sut) == 1);
         }
         flags |= service(&sut);
@@ -666,7 +709,7 @@ static void test_amplifier_setup(void)
     /* An amplifier that does not answer fails init and drops the line. */
     memset(&sut, 0, sizeof(sut));
     amps[1].address = 0x35;
-    sut.io = (struct spk_io){io_read, io_write, io_now, io_delay, io_cache, io_cache, 0};
+    sut.io = (struct spk_io){io_read, io_write, io_now, io_delay, io_cache, io_cache, io_power, 0};
     {
         struct vinix_apple_speakers_config c = machine_config();
         assert(init(&sut, &c) == 0);
@@ -683,8 +726,10 @@ static void test_stream_registers(void)
     assert(configure(&sut, 48000) == 1);
     feed(3 * TX_PERIOD_BYTES);
     assert(wants_start(&sut));
-    assert(start_clocks(&sut) == 6);
+    assert(start_clocks(&sut) == 1);
+    assert(domain_on[1] && !domain_on[2]);
     assert(start_stream(&sut) == 1);
+    assert(domain_on[1] && domain_on[2]);
     assert((reg_get(tx + MCA_TXA + TX_CONF) & 0x7ffff) ==
         (7 | CONF_WIDTH_32 | (2u << 16) | CONF_UNK1 | CONF_UNK2 | CONF_UNK3));
     assert(reg_get(tx + MCA_TXA + TX_BITSTART) == 1);
@@ -724,6 +769,7 @@ static void test_stream_registers(void)
     assert(amps[0].regs[TAS_TDM0] == 0x06);
 
     stop(&sut);
+    assert(!domain_on[1] && !domain_on[2] && !sut.powered);
     assert(!chans[TX_CH].running && !chans[SENSE_CH].running);
     assert((amps[0].regs[TAS_PWR_CTRL] & 3) == PWR_SHUTDOWN);
     assert(amps[1].regs[TAS_PLAY_CFG2] == ATT_MUTE);
@@ -1062,8 +1108,82 @@ static void test_abandoned_start_stops_clocks(void)
     assert(start_clocks(&sut));
     fault_shutdown(&sut);
     assert(sut.state == ST_FAULT && !sut.clocks_on);
+    assert(!domain_on[1] && !domain_on[2]);
     assert(!(reg_get(FAKE_NCO + NCO_STRIDE + NCO_CTRL) & NCO_ENABLE));
     assert(!(reg_get(FAKE_GPIO) & GPIO_DATA));
+    tests++;
+}
+
+/* Stream after stream, as a program playing, draining and pausing does: each
+ * one powers the clusters up behind their clock and down ahead of it. */
+static void test_streams_cycle_cluster_power(void)
+{
+    int pass;
+    boot();
+    tone_level = 0.1;
+    for (pass = 0; pass < 3; pass++) {
+        size_t before = played_count;
+        configure(&sut, 48000);
+        pump(200000, 1);
+        assert(sut.state == ST_RUNNING && domain_on[1] && domain_on[2]);
+        drain(&sut);
+        while (!drained(&sut))
+            pump(2000, 0);
+        stop(&sut);
+        assert(sut.state == ST_IDLE && !domain_on[1] && !domain_on[2]);
+        assert(!tx_clock_runs() && !sut.clocks_on);
+        assert(played_count > before + 2 * 48000 / 10);
+        advance(2000000);
+    }
+    assert(count_events(SPK_EV_POWER) == 0);
+    clear_events();
+    tests++;
+}
+
+/* A domain that will not switch is reported, and never leaves a clock or
+ * another domain behind. */
+static void test_cluster_power_failures(void)
+{
+    struct speaker_event e;
+
+    boot();
+    clear_events();
+    configure(&sut, 48000);
+    feed(3 * TX_PERIOD_BYTES);
+    fail_power_on = 1;
+    assert(start_clocks(&sut) == 0);
+    assert(take_event(&sut, &e) && e.code == SPK_EV_POWER && e.a == 1 && e.b == 1);
+    fault_shutdown(&sut);                    /* what the V layer does next */
+    assert(!tx_clock_runs() && !domain_on[1] && !domain_on[2]);
+    assert(reg_get(FAKE_MCA + MCA_PORT_ENABLES) == 0);
+
+    /* The sense cluster refuses: the playback cluster is powered down too. */
+    boot();
+    clear_events();
+    configure(&sut, 48000);
+    feed(3 * TX_PERIOD_BYTES);
+    assert(start_clocks(&sut) == 1);
+    fail_power_on = 1;
+    assert(start_stream(&sut) == 0);
+    assert(take_event(&sut, &e) && e.code == SPK_EV_POWER && e.a == 2 && e.b == 1);
+    stop(&sut);
+    assert(!tx_clock_runs() && !domain_on[1] && !domain_on[2]);
+
+    /* Neither turns off: said so, clocks stopped anyway, and the next
+     * stream powers them up again. */
+    boot();
+    clear_events();
+    configure(&sut, 48000);
+    pump(100000, 1);
+    clear_events();
+    fail_power_off = 1;
+    stop(&sut);
+    assert(count_events(SPK_EV_POWER) == 2 && !sut.powered && !tx_clock_runs());
+    clear_events();
+    fail_power_off = 0;
+    configure(&sut, 48000);
+    pump(100000, 1);
+    assert(sut.state == ST_RUNNING && domain_on[1] && domain_on[2]);
     tests++;
 }
 
@@ -1106,6 +1226,8 @@ int main(void)
     test_lost_attenuation_faults();
     test_idle_cooling_between_streams();
     test_abandoned_start_stops_clocks();
+    test_streams_cycle_cluster_power();
+    test_cluster_power_failures();
     free(played);
     printf("apple-speakers: %u tests passed\n", tests);
     return 0;

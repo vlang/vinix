@@ -15,6 +15,10 @@ P.A. Semi I2C buses. ADMAC reaches memory through the SIO DART, and the MCA
 bit clock comes from the NCO clock generator. The register sequences follow
 Asahi Linux's drivers (`mca.c`, `apple-admac.c`, `clk-apple-nco.c`,
 `tas2770.c`, `i2c-pasemi-core.c` and the `macaudio.c` machine driver).
+The two MCA clusters in use sit in power domains that are externally clocked:
+they change state only while their clock runs. Each stream powers a cluster up
+after its clock starts and down before it stops, in the order `mca.c` uses,
+and touches a cluster's registers only while it is powered.
 
 Everything is taken from the device tree the Asahi boot chain passes on: the
 `Speakers` link of the `apple,j313-macaudio` sound node names the MCA ports

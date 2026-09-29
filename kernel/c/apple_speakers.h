@@ -13,6 +13,13 @@
  * which are what ADMAC sees through the SIO DART. The V platform layer
  * validates the device tree, powers the blocks and maps them before calling
  * vinix_apple_speakers_init(). All functions are serialized by that layer. */
+
+/* Switches the power domain of MCA cluster `cluster` on or off; 1 on
+ * success. The cluster domains are externally clocked and change state only
+ * while their clock runs, so the driver calls this itself at the one point in
+ * the start and stop sequences where that holds. */
+typedef int (*vinix_apple_speakers_power_fn)(uint32_t cluster, int on);
+
 struct vinix_apple_speakers_config {
     uint64_t mca_clusters;      /* MCA reg[0]: one 0x4000 window per cluster */
     uint32_t mca_cluster_count;
@@ -44,6 +51,8 @@ struct vinix_apple_speakers_config {
     uint64_t sense_buffer;
     uint64_t sense_iova;
     uint32_t sense_bytes;
+
+    vinix_apple_speakers_power_fn cluster_power;
 };
 
 #define VINIX_SPK_SERVICE_RUNNING   1u  /* keep calling service */
@@ -71,11 +80,10 @@ int vinix_apple_speakers_init(const struct vinix_apple_speakers_config *cfg);
 /* Prepare for a stream at `rate` Hz, S16_LE stereo. 0 if unsupported. */
 int vinix_apple_speakers_configure(uint32_t rate);
 
-/* Stream start, in two halves: the MCA cluster power domains are externally
- * clocked and may only be enabled between them, once their clocks run.
- * start_clocks returns the bit mask of clusters whose domains the caller must
- * enable before calling start_stream. */
-uint32_t vinix_apple_speakers_start_clocks(void);
+/* Stream start, in two halves, each 1 on success: the clocks and the
+ * playback cluster, then the amplifiers, DMA and sense capture. The caller
+ * stops the stream if either fails. */
+int vinix_apple_speakers_start_clocks(void);
 int vinix_apple_speakers_start_stream(void);
 void vinix_apple_speakers_stop(void);
 
@@ -107,7 +115,8 @@ void vinix_apple_speakers_get_status(struct vinix_apple_speakers_status *out);
  * Codes: 1 amp found (amp, revision), 2 sense verified, 3 sense stale (ms),
  * 4 sense dead (speaker), 5 model gain (mdB), 6 over temperature (speaker,
  * milli-degrees), 7 negative power (speaker, mW), 8 I2C error (amp, error),
- * 9 DMA error (channel, ring), 10 serializer reset stuck (cluster). */
+ * 9 DMA error (channel, ring), 10 serializer reset stuck (cluster),
+ * 11 cluster power domain did not switch (cluster, on). */
 int vinix_apple_speakers_take_event(int32_t out[3]);
 
 #endif

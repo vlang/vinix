@@ -257,6 +257,7 @@ enum {
     SPK_EV_FAULT_I2C,       /* a = amp, b = error */
     SPK_EV_DMA_ERROR,       /* a = channel */
     SPK_EV_SERDES,          /* a = cluster: reset bit stuck */
+    SPK_EV_POWER,           /* a = cluster, b = on: domain did not switch */
 };
 
 struct speaker_event {
@@ -274,6 +275,7 @@ struct spk_io {
     void (*delay_us)(void *cookie, uint32_t us);
     void (*clean)(void *cookie, uint64_t address, uint32_t length);
     void (*invalidate)(void *cookie, uint64_t address, uint32_t length);
+    int (*power)(void *cookie, uint32_t cluster, int on);
     void *cookie;
 };
 
@@ -284,6 +286,7 @@ struct speakers {
     struct vinix_apple_speakers_config cfg;
     int state;
     int clocks_on;          /* start_clocks ran; hardware_stop undoes it */
+    uint32_t powered;       /* MCA clusters whose power domains are on */
     uint32_t rate;
     uint32_t i2c_div;
     uint32_t i2c_rev[SPK_COUNT];
@@ -707,6 +710,29 @@ static void nco_enable(struct speakers *s, uint32_t channel, int enable)
 static uint64_t cluster(struct speakers *s, uint32_t n)
 {
     return s->cfg.mca_clusters + (uint64_t)n * MCA_STRIDE;
+}
+
+/* The cluster power domains are externally clocked: they change state only
+ * while their clock runs. So a domain goes on after its clock starts and off
+ * before it stops, as mca_fe_enable_clocks and mca_fe_disable_clocks order
+ * it. Nothing in a cluster but its port block is touched while it is off. */
+static int cluster_on(struct speakers *s, uint32_t n)
+{
+    if (!s->io.power(s->io.cookie, n, 1)) {
+        post(s, SPK_EV_POWER, (int32_t)n, 1);
+        return 0;
+    }
+    s->powered |= 1u << n;
+    return 1;
+}
+
+static void cluster_off(struct speakers *s, uint32_t n)
+{
+    if (!(s->powered & (1u << n)))
+        return;
+    s->powered &= ~(1u << n);
+    if (!s->io.power(s->io.cookie, n, 0))
+        post(s, SPK_EV_POWER, (int32_t)n, 0);
 }
 
 /* I2S, CPU provides the clocks, both inverted (macaudio's DAI format). */
@@ -1352,13 +1378,21 @@ static void hardware_stop(struct speakers *s)
     delay_us(s, 1000);
     for (i = 0; i < SPK_COUNT; i++)
         (void)tas_power(s, (int)i, PWR_SHUTDOWN);
-    serdes_enable(s, s->cfg.sense_cluster, MCA_RXB, 0);
+    /* Sense is clocked through the speaker port: power it down while that
+     * still runs. */
+    if (s->powered & (1u << s->cfg.sense_cluster)) {
+        serdes_enable(s, s->cfg.sense_cluster, MCA_RXB, 0);
+        modify(s, cluster(s, s->cfg.sense_cluster) + MCA_SYNCGEN_STATUS, MCA_SYNCGEN_EN, 0);
+    }
     admac_run(s, s->cfg.sense_dma, 0);
-    modify(s, cluster(s, s->cfg.sense_cluster) + MCA_SYNCGEN_STATUS, MCA_SYNCGEN_EN, 0);
-    serdes_enable(s, s->cfg.tx_cluster, MCA_TXA, 0);
+    cluster_off(s, s->cfg.sense_cluster);
+    if (s->powered & (1u << s->cfg.tx_cluster)) {
+        serdes_enable(s, s->cfg.tx_cluster, MCA_TXA, 0);
+        modify(s, tx + MCA_SYNCGEN_STATUS, MCA_SYNCGEN_EN, 0);
+        modify(s, tx + MCA_STATUS, MCA_MCLK_EN, 0);
+    }
     admac_run(s, s->cfg.tx_dma, 0);
-    modify(s, tx + MCA_SYNCGEN_STATUS, MCA_SYNCGEN_EN, 0);
-    modify(s, tx + MCA_STATUS, MCA_MCLK_EN, 0);
+    cluster_off(s, s->cfg.tx_cluster);
     nco_enable(s, s->cfg.tx_nco, 0);
     mca_ports(s, 0);
     s->clocks_on = 0;
@@ -1395,7 +1429,7 @@ static int wants_start(struct speakers *s)
         s->draining || now_us(s) - s->first_write_us >= START_DELAY_US;
 }
 
-static uint32_t start_clocks(struct speakers *s)
+static int start_clocks(struct speakers *s)
 {
     uint32_t i;
     if (s->state != ST_PREPARED)
@@ -1412,17 +1446,17 @@ static uint32_t start_clocks(struct speakers *s)
         }
     }
     s->applied_att = ATT_SAFE;
-    mca_ports(s, 1);
-    mca_configure_tx(s);
-    mca_configure_sense(s);
     if (nco_set_rate(s, s->cfg.tx_nco, BCLK_RATIO * s->rate) ||
-        nco_set_rate(s, s->cfg.sense_nco, BCLK_RATIO * s->rate)) {
-        mca_ports(s, 0);
+        nco_set_rate(s, s->cfg.sense_nco, BCLK_RATIO * s->rate))
         return 0;
-    }
+    mca_ports(s, 1);
     nco_enable(s, s->cfg.tx_nco, 1);
     s->clocks_on = 1;
-    return (1u << s->cfg.tx_cluster) | (1u << s->cfg.sense_cluster);
+    if (!cluster_on(s, s->cfg.tx_cluster))
+        return 0;
+    mca_set_format(s, s->cfg.tx_cluster);
+    mca_configure_tx(s);
+    return 1;
 }
 
 static int start_stream(struct speakers *s)
@@ -1459,7 +1493,12 @@ static int start_stream(struct speakers *s)
         tx_submit(s);
     serdes_enable(s, s->cfg.tx_cluster, MCA_TXA, 1);
 
-    /* Sense: a clock consumer framed by the first speaker port. */
+    /* Sense: a clock consumer framed by the first speaker port, which runs
+     * now. */
+    if (!cluster_on(s, s->cfg.sense_cluster))
+        return 0;
+    mca_set_format(s, s->cfg.sense_cluster);
+    mca_configure_sense(s);
     wr(s, sense + MCA_SYNCGEN_SEL, lowest_port(s->cfg.port_mask) + 6 + 1);
     modify(s, sense + MCA_SYNCGEN_STATUS, MCA_SYNCGEN_EN, MCA_SYNCGEN_EN);
     serdes_reset(s, s->cfg.sense_cluster, MCA_RXB, RX_CONF);
@@ -1641,8 +1680,6 @@ static int init(struct speakers *s, const struct vinix_apple_speakers_config *cf
         sdz_set(s, 0);
         return 0;
     }
-    mca_set_format(s, cfg->tx_cluster);
-    mca_set_format(s, cfg->sense_cluster);
     s->rate = 48000;
     model_rate(s);
     model_reset(s);
@@ -1731,10 +1768,16 @@ static void kernel_invalidate(void *cookie, uint64_t address, uint32_t length)
     __asm__ volatile("dsb sy" ::: "memory");
 }
 
+static int kernel_power(void *cookie, uint32_t cluster, int on)
+{
+    (void)cookie;
+    return speakers.cfg.cluster_power(cluster, on);
+}
+
 int vinix_apple_speakers_init(const struct vinix_apple_speakers_config *cfg)
 {
     uint64_t ctr;
-    if (!cfg || speakers.state != ST_OFF)
+    if (!cfg || !cfg->cluster_power || speakers.state != ST_OFF)
         return 0;
     __asm__ volatile("mrs %0, cntfrq_el0" : "=r"(counter_frequency));
     __asm__ volatile("mrs %0, ctr_el0" : "=r"(ctr));
@@ -1742,12 +1785,12 @@ int vinix_apple_speakers_init(const struct vinix_apple_speakers_config *cfg)
     if (!counter_frequency)
         return 0;
     speakers.io = (struct spk_io){kernel_read32, kernel_write32, kernel_now_us,
-        kernel_delay_us, kernel_clean, kernel_invalidate, 0};
+        kernel_delay_us, kernel_clean, kernel_invalidate, kernel_power, 0};
     return init(&speakers, cfg);
 }
 
 int vinix_apple_speakers_configure(uint32_t rate) { return configure(&speakers, rate); }
-uint32_t vinix_apple_speakers_start_clocks(void) { return start_clocks(&speakers); }
+int vinix_apple_speakers_start_clocks(void) { return start_clocks(&speakers); }
 int vinix_apple_speakers_start_stream(void) { return start_stream(&speakers); }
 void vinix_apple_speakers_stop(void) { stop(&speakers); }
 int vinix_apple_speakers_wants_start(void) { return wants_start(&speakers); }

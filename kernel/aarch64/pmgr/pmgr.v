@@ -112,7 +112,38 @@ pub fn enable_region_externally_clocked(physical_base u64, region_size u64, offs
 		}
 		timer.busywait_us(10)
 	}
-	C.printf(c'pmgr: Timeout enabling externally clocked domain at offset 0x%x\n', offset)
+	C.kprintf(c'pmgr: Timeout enabling externally clocked domain at offset 0x%x\n', offset)
+	return false
+}
+
+// Power a domain down in an explicitly identified PMGR aperture, as Linux's
+// apple_pmgr_ps_power_off: target the power-gated state, without auto-enable,
+// and wait for it. An externally clocked domain gets there only while its
+// clock still runs.
+pub fn disable_region(physical_base u64, region_size u64, offset u32) bool {
+	if physical_base == 0 || region_size < 4 || u64(offset) > region_size - 4 {
+		return false
+	}
+	mapped := memory.map_mmio(physical_base, region_size)
+	if mapped == 0 {
+		return false
+	}
+	pmgr_lock.acquire()
+	defer {
+		pmgr_lock.release()
+	}
+	addr := unsafe { &u32(mapped + offset) }
+	mut val := kio.mmin32(addr)
+	val &= ~(pmgr_auto_enable | pmgr_transient_flags | pmgr_ps_target_mask | pmgr_dev_disable | pmgr_ps_reset)
+	kio.mmout32(addr, val)
+	for _ in 0 .. 10000 {
+		if kio.mmin32(addr) & pmgr_ps_actual_mask == 0 {
+			return true
+		}
+		timer.busywait_us(10)
+	}
+	C.kprintf(c'pmgr: Timeout disabling domain at offset 0x%x (state 0x%x)\n', offset,
+		kio.mmin32(addr))
 	return false
 }
 
