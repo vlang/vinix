@@ -255,7 +255,15 @@ run_qemu_boot() {
     VM_KIND=qemu
     VM_QMP="$dir/qmp.sock"
     check_boot "$name" "$dir/serial.log" "$pid" || status=1
+    # QEMU with HVF can fail to pause a vCPU that keeps taking MMIO exits --
+    # the guest polling its virtio devices -- and then waits for it forever on
+    # the way out of SIGTERM. That held a release's boot tests up for good.
     kill "$pid" 2>/dev/null || true
+    for _ in $(seq 1 50); do
+        kill -0 "$pid" 2>/dev/null || break
+        sleep 0.2
+    done
+    kill -9 "$pid" 2>/dev/null || true
     wait "$pid" 2>/dev/null || true
     if [ "$status" -eq 0 ]; then
         PASSED+=("$name")
