@@ -598,30 +598,12 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 		unsafe { stacks.free() }
 	}
 
-	mut stack := unsafe { &u64(0) }
 	mut stack_vma := u64(0)
+	mut stack_bottom_vma := u64(0)
 
 	if _stack == 0 {
-		mut user_stack_size := default_user_stack_size
-		stack_limit := proc.soft_limit(process, proc.rlimit_stack)
-		if stack_limit != proc.rlim_infinity && stack_limit < user_stack_size {
-			user_stack_size = lib.align_down(stack_limit, page_size)
-		}
-		if user_stack_size < page_size {
-			errno.set(errno.enomem)
-			return none
-		}
-		stack_phys := memory.pmm_alloc(user_stack_size / page_size)
-		stack = unsafe { &u64(u64(stack_phys) + user_stack_size + higher_half) }
-
-		stack_vma = process.thread_stack_top
-		process.thread_stack_top -= user_stack_size
-		stack_bottom_vma := process.thread_stack_top
-		process.thread_stack_top -= page_size
-
-		mmap.map_range(mut process.pagemap, stack_bottom_vma, u64(stack_phys), user_stack_size, mmap.prot_read | mmap.prot_write, mmap.map_anonymous) or { return none }
+		stack_vma, stack_bottom_vma = reserve_main_stack(mut process, want_elf)?
 	} else {
-		stack = &u64(voidptr(_stack))
 		stack_vma = _stack
 	}
 
@@ -687,104 +669,8 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 	}
 
 	if want_elf == true {
-		unsafe {
-			stack_top := stack
-			mut orig_stack_vma := stack_vma
-
-			for elem in envp {
-				stack = &u64(u64(stack) - u64(elem.len + 1))
-				C.memcpy(voidptr(stack), elem.str, elem.len + 1)
-			}
-			for elem in argv {
-				stack = &u64(u64(stack) - u64(elem.len + 1))
-				C.memcpy(voidptr(stack), elem.str, elem.len + 1)
-			}
-
-			stack = &u64(u64(stack) - (u64(stack) & 0x0f))
-
-			// Ensure final stack pointer is 16 byte aligned
-			if (argv.len + envp.len + 1) & 1 != 0 {
-				stack = &stack[-1]
-			}
-
-			// Linux libcs use AT_RANDOM for their stack canary.
-			stack = &u64(u64(stack) - 16)
-			random_kernel_addr := u64(stack)
-			if !krandom.fill(voidptr(random_kernel_addr), 16, true) {
-				C.memset(voidptr(random_kernel_addr), 0, 16)
-			}
-			random_vma := stack_vma - (u64(stack_top) - random_kernel_addr)
-
-			// Zero auxiliary vector entry
-			stack[-1] = 0
-			stack = &stack[-1]
-			stack[-1] = 0
-			stack = &stack[-1]
-
-			stack = &stack[-2]
-			stack[0] = elf.at_secure
-			stack[1] = 0
-			stack = &stack[-2]
-			stack[0] = elf.at_hwcap2
-			stack[1] = 0
-			stack = &stack[-2]
-			stack[0] = elf.at_hwcap
-			stack[1] = 0
-			stack = &stack[-2]
-			stack[0] = elf.at_random
-			stack[1] = random_vma
-			stack = &stack[-2]
-			stack[0] = elf.at_pagesz
-			stack[1] = page_size
-			stack = &stack[-2]
-			stack[0] = elf.at_uid
-			stack[1] = u64(process.uid)
-			stack = &stack[-2]
-			stack[0] = elf.at_euid
-			stack[1] = u64(process.euid)
-			stack = &stack[-2]
-			stack[0] = elf.at_gid
-			stack[1] = u64(process.gid)
-			stack = &stack[-2]
-			stack[0] = elf.at_egid
-			stack[1] = u64(process.egid)
-			stack = &stack[-2]
-			stack[0] = elf.at_entry
-			stack[1] = auxval.at_entry
-			stack = &stack[-2]
-			stack[0] = elf.at_phdr
-			stack[1] = auxval.at_phdr
-			stack = &stack[-2]
-			stack[0] = elf.at_phent
-			stack[1] = auxval.at_phent
-			stack = &stack[-2]
-			stack[0] = elf.at_phnum
-			stack[1] = auxval.at_phnum
-			stack = &stack[-2]
-			stack[0] = elf.at_base
-			stack[1] = auxval.at_base
-
-			stack[-1] = 0
-			stack = &stack[-1]
-			stack = &stack[-envp.len]
-			for i := u64(0); i < envp.len; i++ {
-				orig_stack_vma -= u64(envp[i].len) + 1
-				stack[i] = orig_stack_vma
-			}
-
-			stack[-1] = 0
-			stack = &stack[-1]
-			stack = &stack[-argv.len]
-			for i := u64(0); i < argv.len; i++ {
-				orig_stack_vma -= u64(argv[i].len) + 1
-				stack[i] = orig_stack_vma
-			}
-
-			stack[-1] = u64(argv.len)
-			stack = &stack[-1]
-
-			t.gpr_state.rsp -= u64(stack_top) - u64(stack)
-		}
+		t.gpr_state.rsp = build_initial_stack(mut process, stack_vma, stack_bottom_vma, argv, envp,
+			auxval)?
 	}
 
 	// Published processes (proc.allocate_pid()/new_process()) can be visible
@@ -1173,4 +1059,10 @@ fn reap_dead_threads(mut cpu_local cpulocal.Local) {
 		}
 	}
 	graveyard_lock.release()
+}
+
+// The CPU features a program is told of in AT_HWCAP and AT_HWCAP2; see
+// build_initial_stack().
+fn user_hwcaps() (u64, u64) {
+	return cpu.user_hwcaps()
 }

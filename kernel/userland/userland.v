@@ -179,15 +179,7 @@ pub fn dispatch_a_signal_info(context &cpulocal.GPRState, signal int, code int, 
 }
 
 pub fn syscall_execve(_ voidptr, _path charptr, _argv &charptr, _envp &charptr) (u64, u64) {
-	mut current_thread := proc.current_thread()
-	mut process := current_thread.process
-
-	C.printf(c'\n\e[32m%s\e[m: execve(%s, [omit], [omit])\n', process.name.str, _path)
-	defer {
-		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
-	}
-
-	path := unsafe { cstring_to_vstring(_path) }
+	path := fs.user_path(_path) or { return errno.err, errno.get() }
 	// Both vectors are only built here, so growing them can give back what
 	// they outgrow.
 	mut argv := []string{}
@@ -239,20 +231,6 @@ pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, 
 	}
 	return start_program_node(execve, dir, prog_node, path, argv, envp, stdin_path,
 		stdout_path, stderr_path)
-}
-
-// Frees what an exec was handed, once it has failed or is about to leave for
-// good. `path` can be one of the arguments too: a script's interpreter is put
-// into argv as well.
-fn free_exec_arguments(path string, argv []string, envp []string) {
-	path_in_argv := argv.any(it.str == path.str)
-	unsafe {
-		if !path_in_argv {
-			path.free()
-		}
-		argv.free()
-		envp.free()
-	}
 }
 
 // The part of exec that follows finding the program. execveat(2) on a
@@ -329,10 +307,19 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, path 
 		return process
 	}
 
+	// Only x86-64 programs run here. arm64 hands x86 programs to a
+	// translator; there is none for the other way round, and no 32-bit
+	// support, so anything else is not an executable to this machine.
+	architecture := elf.architecture(prog) or { return exec_format_error(err) }
+	if architecture != elf.arch_x86_64 {
+		errno.set(errno.enoexec)
+		return none
+	}
+
 	// Made after the shebang check: a script never used it, and lost it.
 	mut new_pagemap := memory.new_pagemap()
 
-	mut auxval, ld_path := elf.load(new_pagemap, prog, 0) or { return none }
+	mut auxval, ld_path := elf.load(new_pagemap, prog, 0) or { return exec_format_error(err) }
 	allow_wx := envp.contains('VINIX_ALLOW_WX=1')
 
 	mut entry_point := unsafe { nil }
@@ -340,7 +327,9 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, path 
 	if ld_path == '' {
 		entry_point = voidptr(auxval.at_entry)
 	} else {
-		ld_node := fs.get_node(vfs_root, ld_path, true)?
+		// Found from the root of the process that runs it -- a container's,
+		// after pivot_root -- as on arm64.
+		ld_node := fs.get_node(fs.process_root(proc.current_thread().process), ld_path, true)?
 		if !stat.isreg(ld_node.resource.stat.mode)
 			|| !fs.check_access(ld_node, fs.access_exec, true) {
 			errno.set(errno.eacces)
@@ -349,7 +338,7 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, path 
 		ld := ld_node.resource
 
 		ld_auxval, interp := elf.load(new_pagemap, ld, elf.interpreter_load_base()) or {
-			return none
+			return exec_format_error(err)
 		}
 
 		if interp != '' {
@@ -413,6 +402,8 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, path 
 	} else {
 		mut t := proc.current_thread()
 		mut process := t.process
+		// Named before the close-on-exec descriptors go: fexecve() runs one.
+		program_path := fs.program_path(prog_node, path)
 
 		// Every other thread has to be gone before the address space it runs
 		// in is replaced, and before the close-on-exec descriptors go. POSIX
@@ -434,6 +425,9 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, path 
 				file.fdnum_close(process, i, true) or {}
 			}
 		}
+		// This thread never returns to userspace to pay for what those closes
+		// changed; the new program's thread starts there.
+		flush_owed_sync()
 
 		// Swapped under the process table lock, which cgroup memory accounting
 		// and /proc hold while they walk a process' page map: the old one is
@@ -452,9 +446,13 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, path 
 		// /proc/self/exe leads to the program's node, as on arm64, so that it
 		// names the file wherever the exec found it -- by a relative path, or
 		// through a descriptor.
-		process.executable_path = fs.program_path(prog_node, path)
+		process.executable_path = program_path
 		process.exe_node = voidptr(prog_node)
 		process.allow_wx = allow_wx
+		// execve recomputes the capability sets from the new credentials and
+		// the bounding set, which is how a container's root ends up with only
+		// the capabilities its runtime left it.
+		proc.capabilities_after_exec(mut process)
 		// The new program runs under the execpromises, or unpledged.
 		proc.pledge_after_exec(mut process)
 		// Frames the old program was given must not return into the new one.
@@ -487,8 +485,12 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, path 
 			proc.free_tid(t.tid)
 		}
 
+		// The program keeps the scheduling policy of the thread that execs it,
+		// installed before the thread is enqueued: `chrt -f 50 ./program`.
+		inherited_sched := t.sched
 		mut new_thread := sched.new_user_thread(process, true, entry_point, unsafe { nil },
 			0, argv, envp, auxval, false)?
+		proc.set_thread_sched_params(new_thread.tid, inherited_sched)
 
 		// execve keeps the signal mask and what was ignored; only handlers,
 		// which pointed into the old program, go back to the default.

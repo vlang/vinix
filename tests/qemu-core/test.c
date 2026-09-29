@@ -25,6 +25,7 @@
 #include <sys/random.h>
 #include <sys/resource.h>
 #include <sys/stat.h>
+#include <sys/auxv.h>
 #include <sys/eventfd.h>
 #include <sys/epoll.h>
 #include <sys/socket.h>
@@ -1575,10 +1576,29 @@ static int run_tests(void)
 	return 0;
 }
 
+/* What an exec'd program finds, checked by the program exec'd in
+ * test_short_lived_process_memory_reclamation(): its argument strings laid
+ * out as Linux lays them out, argv[0] lowest, and an auxiliary vector both on
+ * its stack and in /proc/self/auxv. */
+static int exec_probe(char **argv)
+{
+	if (argv[0] >= argv[1])
+		return 1;
+	if (getauxval(AT_PAGESZ) == 0 || getauxval(AT_RANDOM) == 0)
+		return 2;
+	int fd = open("/proc/self/auxv", O_RDONLY);
+	if (fd < 0)
+		return 3;
+	unsigned long entry[2];
+	ssize_t got = read(fd, entry, sizeof(entry));
+	close(fd);
+	return got == (ssize_t)sizeof(entry) ? 0 : 4;
+}
+
 int main(int argc, char **argv)
 {
 	if (argc == 2 && strcmp(argv[1], "--exec-memory-probe") == 0)
-		return 0;
+		return exec_probe(argv);
 	setbuf(stdout, NULL);
 	setbuf(stderr, NULL);
 	if (getpid() != 1)

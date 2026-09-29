@@ -301,3 +301,14 @@ __global (
 	fpu_save         fn (voidptr)
 	fpu_restore      fn (voidptr)
 )
+
+// What AT_HWCAP and AT_HWCAP2 tell a program about the CPU, as Linux tells it
+// on x86-64: CPUID leaf 1's EDX, and none of the HWCAP2 bits, which name
+// FSGSBASE and ring-3 MWAIT, neither of which Vinix turns on.
+pub fn user_hwcaps() (u64, u64) {
+	ok, _, _, _, edx := cpuid(1, 0)
+	if !ok {
+		return 0, 0
+	}
+	return u64(edx), 0
+}

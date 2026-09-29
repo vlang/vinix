@@ -720,20 +720,6 @@ pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, 
 		stdout_path, stderr_path)
 }
 
-// Frees what an exec was handed, once it has failed or is about to leave for
-// good. `path` can be one of the arguments too: a script's interpreter and the
-// x86 translator are put into argv as well.
-fn free_exec_arguments(path string, argv []string, envp []string) {
-	path_in_argv := argv.any(it.str == path.str)
-	unsafe {
-		if !path_in_argv {
-			path.free()
-		}
-		argv.free()
-		envp.free()
-	}
-}
-
 // What follows the first `prefix` bytes of an environment entry, as a view
 // into it: nothing to free, and good only for as long as the entry is.
 fn env_value(entry string, prefix int) string {
@@ -744,18 +730,6 @@ fn env_value(entry string, prefix int) string {
 fn env_entry_is(entry string, name string, value string) bool {
 	return entry.len == name.len + value.len && entry.starts_with(name)
 		&& entry.ends_with(value)
-}
-
-// An image the loader turned down is not an executable, as Linux answers:
-// ENOEXEC. The loader's errors carry no errno, and exec reported whatever
-// an earlier call had left -- ENOENT once, EPERM after -- for a program it
-// could not read. Only a segment that could not be mapped keeps the errno
-// the mapping set.
-fn exec_format_error(err IError) ?&proc.Process {
-	if !err.msg().starts_with('elf: unable to map') {
-		errno.set(errno.enoexec)
-	}
-	return none
 }
 
 // The part of exec that follows finding the program. execveat(2) on a
