@@ -1564,6 +1564,66 @@ static int test_frozen_cgroup_stops_its_threads(void)
 	return 0;
 }
 
+/* Whether the /proc/cpuinfo line starting `key` names `flag` as a word. */
+static int cpuinfo_has(const char *text, const char *key, const char *flag)
+{
+	const char *line = strstr(text, key);
+	if (line == NULL)
+		return 0;
+	const char *end = strchr(line, '\n');
+	size_t length = strlen(flag);
+	for (const char *at = strstr(line, flag); at != NULL && (end == NULL || at < end);
+	    at = strstr(at + 1, flag)) {
+		if (at[-1] == ' ' && (at[length] == ' ' || at[length] == '\n'))
+			return 1;
+	}
+	return 0;
+}
+
+/* /proc/cpuinfo describes the machine's own architecture, one block per CPU:
+ * on x86-64 the flags line programs grep for their extensions in, and which
+ * names AVX2 exactly when a program may use it. */
+static int test_cpuinfo(void)
+{
+	static char text[65536];
+	int fd = open("/proc/cpuinfo", O_RDONLY);
+	CHECK(fd >= 0);
+	size_t length = 0;
+	for (;;) {
+		ssize_t got = read(fd, text + length, sizeof(text) - 1 - length);
+		CHECK(got >= 0);
+		if (got == 0)
+			break;
+		length += (size_t)got;
+	}
+	text[length] = 0;
+	CHECK(close(fd) == 0);
+
+	long processors = 0;
+	for (const char *at = text; (at = strstr(at, "processor\t: ")) != NULL; ++at)
+		++processors;
+	CHECK(processors == sysconf(_SC_NPROCESSORS_ONLN));
+#if defined(__x86_64__)
+	CHECK(strstr(text, "vendor_id\t: ") != NULL);
+	CHECK(cpuinfo_has(text, "flags\t\t:", "sse2"));
+	CHECK(cpuinfo_has(text, "flags\t\t:", "lm"));
+	unsigned a, b, c, d;
+	__asm__ volatile("cpuid" : "=a"(a), "=b"(b), "=c"(c), "=d"(d) : "a"(1), "c"(0));
+	int usable = 0;
+	if (c & (1u << 27)) {
+		unsigned xcr0, high;
+		__asm__ volatile("xgetbv" : "=a"(xcr0), "=d"(high) : "c"(0));
+		__asm__ volatile("cpuid" : "=a"(a), "=b"(b), "=c"(c), "=d"(d) : "a"(7), "c"(0));
+		usable = (xcr0 & 6) == 6 && (b & (1u << 5)) != 0;
+	}
+	CHECK(cpuinfo_has(text, "flags\t\t:", "avx2") == usable);
+#else
+	CHECK(cpuinfo_has(text, "Features\t:", "fp"));
+#endif
+	puts("QEMU CORE PASS: /proc/cpuinfo describes the machine");
+	return 0;
+}
+
 /* An event has room for 64 listeners. More threads than that waiting on one
  * futex see a spurious wake, which they retry, rather than stop the kernel. */
 #define MANY_WAITERS 80
@@ -1912,6 +1972,7 @@ static int run_tests(void)
 	CHECK(test_futex_wake_op() == 0);
 	CHECK(test_more_waiters_than_an_event_holds() == 0);
 	CHECK(test_fork_inherits_process_state() == 0);
+	CHECK(test_cpuinfo() == 0);
 	CHECK(test_fifo_keeps_its_cpu() == 0);
 	CHECK(test_frozen_cgroup_stops_its_threads() == 0);
 	CHECK(test_wait_ends_for_a_pending_signal() == 0);

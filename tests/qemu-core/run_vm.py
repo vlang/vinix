@@ -44,6 +44,7 @@ FEATURE_MARKERS = (
     b"QEMU CORE PASS: futex wake-op updates and compares user words",
     b"QEMU CORE PASS: more waiters than an event holds",
     b"QEMU CORE PASS: fork keeps the program, auxv and directory",
+    b"QEMU CORE PASS: /proc/cpuinfo describes the machine",
     b"QEMU CORE PASS: a FIFO thread keeps its CPU",
     b"QEMU CORE PASS: a frozen cgroup stops its threads",
     b"QEMU CORE PASS: a wait ends for a signal already pending",
