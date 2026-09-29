@@ -1371,6 +1371,11 @@ pub fn syscall_munmap(_ voidptr, addr voidptr, length u64) (u64, u64) {
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
+	// An address inside a page is refused, as Linux refuses it, rather than
+	// taken for the page around it.
+	if u64(addr) % page_size != 0 {
+		return errno.err, errno.einval
+	}
 	munmap(mut process.pagemap, addr, length) or { return errno.err, errno.get() }
 
 	return 0, 0
@@ -1380,6 +1385,13 @@ pub fn syscall_mprotect(_ voidptr, addr voidptr, length u64, prot int) (u64, u64
 	mut current_thread := proc.current_thread()
 	mut process := current_thread.process
 
+	// Likewise. On arm64's 16 KiB pages a program written for 4 KiB ones
+	// protected the second half of a page and had the whole page taken from
+	// it: its next write to the first half faulted, and a SIGSEGV handler
+	// that returned faulted on it again for good.
+	if u64(addr) % page_size != 0 {
+		return errno.err, errno.einval
+	}
 	mprotect(mut process.pagemap, addr, length, prot) or { return errno.err, errno.get() }
 
 	return 0, 0

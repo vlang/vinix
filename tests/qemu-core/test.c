@@ -1917,6 +1917,27 @@ static int test_alarm_fires_on_time(void)
 	return 0;
 }
 
+/* mprotect(2) and munmap(2) refuse an address inside a page, as Linux does,
+ * rather than change the whole page around it. Raw syscalls: musl's mprotect()
+ * rounds the address down itself, glibc's passes it on. */
+static int test_unaligned_protection_changes_fail(void)
+{
+	size_t page = (size_t)sysconf(_SC_PAGESIZE);
+	volatile char *area = mmap(NULL, 2 * page, PROT_READ | PROT_WRITE,
+	    MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+	CHECK(area != MAP_FAILED);
+	errno = 0;
+	CHECK(syscall(SYS_mprotect, area + page / 2, page / 2, PROT_NONE) == -1 && errno == EINVAL);
+	errno = 0;
+	CHECK(syscall(SYS_munmap, area + page / 2, page / 2) == -1 && errno == EINVAL);
+	area[0] = 1;
+	area[page - 1] = 2;
+	CHECK(area[0] == 1 && area[page - 1] == 2);
+	CHECK(munmap((void *)area, 2 * page) == 0);
+	puts("QEMU CORE PASS: mprotect and munmap refuse an address inside a page");
+	return 0;
+}
+
 /* An event has room for 64 listeners. More threads than that waiting on one
  * futex see a spurious wake, which they retry, rather than stop the kernel. */
 #define MANY_WAITERS 80
@@ -2264,6 +2285,7 @@ static int run_tests(void)
 	CHECK(test_unix_socket_full_write_readiness() == 0);
 	CHECK(test_futex_wake_op() == 0);
 	CHECK(test_alarm_fires_on_time() == 0);
+	CHECK(test_unaligned_protection_changes_fail() == 0);
 	CHECK(test_more_waiters_than_an_event_holds() == 0);
 	CHECK(test_fork_inherits_process_state() == 0);
 	CHECK(test_cpuinfo() == 0);
