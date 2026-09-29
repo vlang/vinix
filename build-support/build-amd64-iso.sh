@@ -84,6 +84,19 @@ mkdir -p "$ISO_ROOT/boot" "$ISO_ROOT/EFI/BOOT"
 install -m644 "$KERNEL" "$ISO_ROOT/boot/vinix"
 install -m644 "$INITRAMFS" "$ISO_ROOT/boot/initramfs.tar"
 install -m644 "$SCRIPT_DIR/build-support/limine.conf" "$ISO_ROOT/boot/limine.conf"
+# A machine booted from the ISO keeps its system on a blank disk if it has
+# one, installing it there on the first boot (kernel/sysdisk). The entry is the
+# file's last, so the option goes at the end.
+printf '    cmdline: vinix.disk=auto\n' >> "$ISO_ROOT/boot/limine.conf"
+# The image's identity, which a system installed from it keeps in
+# /.vinix-image-id: an ISO with a different image updates that system. Taken
+# from the image's contents, so an unchanged image rebuilt is no update.
+IMAGE_ID_DIR="$BUILD_DIR/image-id"
+rm -rf "$IMAGE_ID_DIR"
+mkdir -p "$IMAGE_ID_DIR"
+sha256_file "$INITRAMFS" | cut -c1-16 > "$IMAGE_ID_DIR/.vinix-image-id"
+COPYFILE_DISABLE=1 tar --format=ustar -rf "$ISO_ROOT/boot/initramfs.tar" \
+    -C "$IMAGE_ID_DIR" ./.vinix-image-id
 install -m644 "$BUILD_DIR/limine/limine-uefi-cd.bin" \
     "$ISO_ROOT/boot/limine-uefi-cd.bin"
 install -m644 "$BUILD_DIR/limine/limine-bios-cd.bin" \

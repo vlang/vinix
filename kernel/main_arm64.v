@@ -44,6 +44,7 @@ import gpu.agx.fake as fake_agx
 import gpu.dcp
 import syscall as _
 import syscall.table
+import sysdisk
 import dev.console
 import dev.e1000
 import dev.fbdev
@@ -211,11 +212,22 @@ fn kmain_thread(qemu_platform bool, acpi_platform bool) {
 	// volume instead of unpacking the image into RAM. The initramfs stays in
 	// the boot payload as the fallback for a volume that does not carry a
 	// system, so an unusable disk still reaches a usable machine.
-	disk_root := qemu_platform && virtio_blk.mount_persistent_root()
+	//
+	// A machine booted from an installer image does the same with a disk of
+	// its own, installing the image onto a blank one first; see sysdisk.
+	mut disk_root := qemu_platform && virtio_blk.mount_persistent_root()
+	mut unpacked := false
+	if !disk_root && sysdisk.requested() {
+		outcome := sysdisk.mount_or_install()
+		disk_root = outcome != .in_memory
+		unpacked = outcome == .installed || outcome == .updated
+	}
 	if disk_root {
 		// The image itself is already installed on the volume; the per-run
 		// overlay modules after it are not, and still have to be applied.
-		initramfs.initialise_overlays()
+		if !unpacked {
+			initramfs.initialise_overlays()
+		}
 		print('kmain_thread: persistent root done\n')
 	} else {
 		initramfs.initialise()

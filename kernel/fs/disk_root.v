@@ -19,6 +19,27 @@ const disk_root_required_directories = ['tmp', 'run']
 // Boot-only transaction: no user process has been started yet, and every
 // console descriptor and device resource survives because /dev is reused.
 pub fn install_disk_root(mut root VFSNode) bool {
+	return switch_to_disk_root(mut root, true)
+}
+
+// Make a freshly formatted volume the root before anything is on it, so that
+// the system image can be unpacked straight onto the disk rather than into RAM:
+// a machine booted from an installer image with an empty disk attached. The
+// mount points the switch carries /dev and /proc onto, and /tmp and /run, are
+// made on the volume first. There is no /sbin/init to check yet; the caller
+// unpacks the image next and starts init from what it wrote.
+pub fn install_empty_disk_root(mut root VFSNode) bool {
+	for name in ['dev', 'proc', 'tmp', 'run']! {
+		if name in root.children {
+			continue
+		}
+		mode := if name == 'tmp' { u32(0o1777) } else { u32(0o755) }
+		create(root, name, mode | stat.ifdir) or { return false }
+	}
+	return switch_to_disk_root(mut root, false)
+}
+
+fn switch_to_disk_root(mut root VFSNode, require_init bool) bool {
 	vfs_lock.acquire()
 	defer { vfs_lock.release() }
 	if root.resource == unsafe { nil } || root.read_only
@@ -82,10 +103,12 @@ pub fn install_disk_root(mut root VFSNode) bool {
 	// file that one of them hides, or escape through the old /dev/.. into the
 	// initramfs. A volume with no init is refused and the caller keeps the
 	// root it already had.
-	init := get_node(root, '/sbin/init', true) or { return false }
-	if !same_filesystem(root, init) || !stat.isreg(init.resource.stat.mode)
-		|| init.resource.stat.mode & 0o111 == 0 || init.resource.stat.size <= 0 {
-		return false
+	if require_init {
+		init := get_node(root, '/sbin/init', true) or { return false }
+		if !same_filesystem(root, init) || !stat.isreg(init.resource.stat.mode)
+			|| init.resource.stat.mode & 0o111 == 0 || init.resource.stat.size <= 0 {
+			return false
+		}
 	}
 
 	// The only mutation of old-root objects happens after every fallible step.

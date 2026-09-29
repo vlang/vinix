@@ -71,6 +71,16 @@ __global (
 	}
 )
 
+__global (
+	// Set while the image is unpacked onto a disk for sysdisk. Its id entry
+	// is then left for the installer to write once everything else is there.
+	installing bool
+	// While an image is unpacked over an installed system to update it, the
+	// entries under this directory that the system already has are left as
+	// they are: the user's own files outlive the image they came with.
+	keep_existing_under string
+)
+
 fn uart_puts(s string) {
 	for c in s {
 		uart_putc(c)
@@ -185,6 +195,26 @@ fn unpack(initramfs_begin voidptr, initramfs_size u64, module_index u64) {
 			}
 		}
 
+		if installing {
+			if full_name == './.vinix-image-id' || full_name == '.vinix-image-id' {
+				unsafe {
+					goto next
+				}
+			}
+			if keep_existing_under.len > 0 {
+				if kept_by_update(full_name) {
+					unsafe {
+						goto next
+					}
+				}
+				if !clear_for_update(full_name, current_header.filetype, link_name) {
+					unsafe {
+						goto next
+					}
+				}
+			}
+		}
+
 		match unsafe { USTARFileType(current_header.filetype) } {
 			.gnu_long_path {
 				if size >= 65536 {
@@ -257,6 +287,116 @@ fn unpack(initramfs_begin voidptr, initramfs_size u64, module_index u64) {
 @[manualfree]
 pub fn initialise() {
 	unpack_modules(0)
+}
+
+// Unpack the image onto a disk that is now the root, for sysdisk: onto a
+// blank volume, or over a system installed from an earlier image, leaving the
+// entries under `keep` (the user's home; '' for none) that it already has.
+// The image's own /.vinix-image-id is left out; the installer writes it last.
+@[manualfree]
+pub fn install(keep string) {
+	installing = true
+	keep_existing_under = keep
+	unpack_modules(0)
+	installing = false
+	keep_existing_under = ''
+}
+
+// Whether an entry of the image is one an update keeps: something below the
+// kept directory that the installed system already has. The directory itself
+// is not an entry to skip; its contents are decided one by one.
+fn kept_by_update(name string) bool {
+	start := if name.starts_with('./') { 2 } else { 0 }
+	prefix := keep_existing_under
+	if name.len <= start + prefix.len + 1 || name[start + prefix.len] != `/` {
+		return false
+	}
+	for i in 0 .. prefix.len {
+		if name[start + i] != prefix[i] {
+			return false
+		}
+	}
+	if _ := fs.get_node(vfs_root, name, false) {
+		return true
+	}
+	return false
+}
+
+// Make way for an entry of the image that an update cannot simply write over
+// what the installed system has there: a file where there is something else,
+// a symlink that now points elsewhere, a hard link to another file. A
+// directory is never removed; what is in it is decided entry by entry. False
+// when what is there could not be removed, and the entry is to be skipped: an
+// ext2 unlink can fail having half happened, and the name then leads to an
+// inode that is no longer there to write.
+fn clear_for_update(name string, filetype u8, link_name string) bool {
+	existing := fs.get_node(vfs_root, name, false) or { return true }
+	if existing.resource == unsafe { nil } || stat.isdir(existing.resource.stat.mode) {
+		return true
+	}
+	// Only what is on the disk itself: not the device nodes and processes
+	// of the /dev and /proc carried over onto it.
+	if voidptr(existing.filesystem) != voidptr(vfs_root.filesystem) {
+		return true
+	}
+	mode := existing.resource.stat.mode
+	match unsafe { USTARFileType(filetype) } {
+		.regular_file {
+			// Written over in place, unless another name shares the file:
+			// a hard link in the old image need not be one in the new.
+			if stat.isreg(mode) && existing.resource.stat.nlink <= 1 {
+				return true
+			}
+		}
+		.sym_link {
+			if stat.islnk(mode) && existing.symlink_target == link_name {
+				return true
+			}
+		}
+		.hard_link {
+			target := fs.get_node(vfs_root, link_name, false) or { return true }
+			if target.resource != unsafe { nil } && target.resource.stat.ino == existing.resource.stat.ino {
+				return true
+			}
+		}
+		else {
+			return true
+		}
+	}
+	fs.unlink(vfs_root, name, false) or { return false }
+	return true
+}
+
+// The image's identity: the contents of its /.vinix-image-id, or '' when it
+// has none. Only the archive's headers are read, which takes a moment where
+// unpacking takes seconds. A system installed on a disk from this image keeps
+// the same file, which is how a boot tells whether the disk is up to date.
+pub fn image_id() string {
+	if module_req.response == unsafe { nil } || module_req.response.module_count < 1 {
+		return ''
+	}
+	archive := unsafe { module_req.response.modules[0] }
+	if archive == unsafe { nil } || archive.size < 512 {
+		return ''
+	}
+	end := u64(archive.address) + archive.size
+	mut header := unsafe { &USTARHeader(archive.address) }
+	for u64(header) + 512 <= end && check_ustar(header) {
+		size := octal_to_int(ustar_field_string(&header.size[0], header.size.len))
+		name := ustar_field_string(&header.name[0], header.name.len)
+		if header.filetype == u8(USTARFileType.regular_file)
+			&& (name == './.vinix-image-id' || name == '.vinix-image-id')
+			&& u64(header) + 512 + size <= end && size > 0 && size < 256 {
+			text := unsafe { &u8(u64(header) + 512) }
+			mut length := int(size)
+			for length > 0 && unsafe { text[length - 1] } <= ` ` {
+				length--
+			}
+			return unsafe { tos(text, length) }.clone()
+		}
+		header = unsafe { &USTARHeader(usize(header) + usize(512) + usize(lib.align_up(size, 512))) }
+	}
+	return ''
 }
 
 // Unpack every module except the first. The first is the system image, which a

@@ -35,6 +35,7 @@ import dev.procdev
 import dev.pty
 import dev.tty
 import syscall.table
+import sysdisk
 import socket
 import socket.inet
 import time
@@ -80,7 +81,23 @@ fn kmain_thread() {
 	fs.mount(vfs_root, '', '/proc', 'procfs') or {}
 	hypervisor.initialise()
 
-	initramfs.initialise()
+	// A machine booted from an installer image (vinix.disk=auto) keeps its
+	// system on a disk, so the disk drivers come up before the image is
+	// unpacked, and the image goes onto the disk rather than into RAM when
+	// there is one to take it. See sysdisk. IDE and SATA only: the NVMe
+	// driver is not fit for a release kernel yet.
+	disk_requested := sysdisk.requested()
+	mut outcome := sysdisk.Outcome.in_memory
+	if disk_requested {
+		ata.initialise()
+		ahci.initialise()
+		outcome = sysdisk.mount_or_install()
+	}
+	match outcome {
+		.in_memory { initramfs.initialise() }
+		.booted { initramfs.initialise_overlays() }
+		else {}
+	}
 
 	// Shared-memory files need tmpfs's paged backing, as on arm64: a regular
 	// file on devtmpfs grows as one contiguous allocation.
@@ -106,9 +123,11 @@ fn kmain_thread() {
 	hda.initialize()
 
 	$if !prod {
-		ata.initialise()
+		if !disk_requested {
+			ata.initialise()
+			ahci.initialise()
+		}
 		nvme.initialise()
-		ahci.initialise()
 	}
 
 	sched.new_kernel_thread(voidptr(writeback_thread), unsafe { nil }, true)
