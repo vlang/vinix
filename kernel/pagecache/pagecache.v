@@ -56,7 +56,50 @@ mut:
 	lru_previous &Page = unsafe { nil }
 	lru_next     &Page = unsafe { nil }
 	bucket_next  &Page = unsafe { nil }
-	data         [4096]u8
+	// page_bytes of the page's contents, allocated apart; see new_data().
+	data &u8 = unsafe { nil }
+}
+
+// Where a page's contents are kept. Header and contents in one allocation
+// were a little over 4 KiB, more than any slab holds on a machine with 4 KiB
+// pages, so each cached page took three contiguous physical pages: 12 KiB, in
+// runs that left memory too broken up for any larger allocation. There the
+// contents now take one page of their own; larger pages are shared.
+fn new_data() &u8 {
+	if page_size == page_bytes {
+		physical := memory.pmm_alloc_nozero_fallible(1)
+		if physical == unsafe { nil } {
+			return unsafe { nil }
+		}
+		return unsafe { &u8(u64(physical) + higher_half) }
+	}
+	return unsafe { &u8(memory.malloc_packed_fallible(page_bytes)) }
+}
+
+// A page that is in no cache yet, or nil when memory has run out.
+fn new_page() &Page {
+	mut page := unsafe { &Page(memory.malloc_packed_fallible(sizeof(Page))) }
+	if page == unsafe { nil } {
+		return page
+	}
+	page.data = new_data()
+	if page.data == unsafe { nil } {
+		unsafe { free(page) }
+		return unsafe { nil }
+	}
+	return page
+}
+
+// Free a page that has left the cache, contents and header.
+fn free_page(page &Page) {
+	if page.data != unsafe { nil } {
+		if page_size == page_bytes {
+			memory.pmm_free(voidptr(u64(page.data) - higher_half), 1)
+		} else {
+			unsafe { free(page.data) }
+		}
+	}
+	unsafe { free(page) }
 }
 
 pub struct Cache {
@@ -136,7 +179,7 @@ fn (mut this Cache) flush_page(mut page Page, context voidptr, store IO) ? {
 	if !page.dirty {
 		return
 	}
-	ret := store(context, voidptr(&page.data[0]), page.index * page_bytes, page.valid) or {
+	ret := store(context, voidptr(page.data), page.index * page_bytes, page.valid) or {
 		return none
 	}
 	// A short write is not a completed page writeback. Keep the entire page
@@ -295,36 +338,48 @@ fn (mut this Cache) get(context voidptr, load IO, store IO, index u64, fill bool
 	}
 
 	mut page := &Page(unsafe { nil })
+	mut recycled := false
 	// With nothing it may replace, the cache runs over its capacity by the
 	// pages in flight, rather than waiting for them with the lock held.
 	if this.resident >= this.capacity {
 		page = this.victim()
+		recycled = page != unsafe { nil }
 	}
-	if page != unsafe { nil } {
-		this.flush_page(mut page, context, store) or { return none }
-		this.withdraw(mut page)
-	} else {
-		// Packed: a Page is a little over 4 KiB, and a whole-page allocation
-		// of it took 32 KiB on a 16 KiB-page machine.
-		page = unsafe { &Page(memory.malloc_packed(sizeof(Page))) }
+	if page == unsafe { nil } {
+		page = new_page()
 		if page == unsafe { nil } {
-			errno.set(errno.enomem)
-			return none
+			// Out of memory, and the reclaimers cannot take this cache's
+			// pages while its lock is held here: reuse one of them.
+			page = this.victim()
+			if page == unsafe { nil } {
+				errno.set(errno.enomem)
+				return none
+			}
+			recycled = true
 		}
 	}
-	unsafe { C.memset(page, 0, sizeof(Page)) }
+	if recycled {
+		this.flush_page(mut page, context, store) or { return none }
+		this.withdraw(mut page)
+	}
+	data := page.data
+	unsafe {
+		C.memset(page, 0, sizeof(Page))
+		C.memset(data, 0, page_bytes)
+	}
+	page.data = data
 	page.index = index
 	page.valid = page_bytes
 	if this.size - index * page_bytes < page.valid {
 		page.valid = this.size - index * page_bytes
 	}
 	if fill {
-		ret := load(context, voidptr(&page.data[0]), index * page_bytes, page.valid) or {
-			unsafe { free(page) }
+		ret := load(context, voidptr(page.data), index * page_bytes, page.valid) or {
+			free_page(page)
 			return none
 		}
 		if ret != i64(page.valid) {
-			unsafe { free(page) }
+			free_page(page)
 			errno.set(errno.eio)
 			return none
 		}
@@ -354,7 +409,7 @@ pub fn (mut this Cache) read(context voidptr, load IO, store IO, buf voidptr, lo
 			if done != 0 { return i64(done) }
 			return none
 		}
-		unsafe { C.memcpy(voidptr(u64(buf) + done), &page.data[int(offset)], amount) }
+		unsafe { C.memcpy(voidptr(u64(buf) + done), &page.data[offset], amount) }
 		done += amount
 	}
 	return i64(done)
@@ -382,7 +437,7 @@ pub fn (mut this Cache) write(context voidptr, load IO, store IO, buf voidptr, l
 			if done != 0 { return i64(done) }
 			return none
 		}
-		unsafe { C.memcpy(&page.data[int(offset)], voidptr(u64(buf) + done), amount) }
+		unsafe { C.memcpy(&page.data[offset], voidptr(u64(buf) + done), amount) }
 		this.mark_dirty(mut page)
 		done += amount
 	}
@@ -449,7 +504,7 @@ fn (this &Cache) gather_run(first u64, count u64, buffer voidptr) u64 {
 	mut length := u64(0)
 	for i in 0 .. count {
 		page := this.resident_page(first + i)
-		unsafe { C.memcpy(voidptr(u64(buffer) + length), &page.data[0], page.valid) }
+		unsafe { C.memcpy(voidptr(u64(buffer) + length), page.data, page.valid) }
 		length += page.valid
 	}
 	return length
@@ -588,7 +643,7 @@ pub fn (mut this Cache) discard(loc u64, count u64) {
 		if !victim.dirty && !victim.writeback && start >= loc
 			&& start + victim.valid <= end {
 			this.withdraw(mut victim)
-			unsafe { free(victim) }
+			free_page(victim)
 		}
 	}
 }
@@ -611,7 +666,7 @@ pub fn (mut this Cache) reclaim_clean(budget u64) u64 {
 			continue
 		}
 		this.withdraw(mut victim)
-		unsafe { free(victim) }
+		free_page(victim)
 		reclaimed++
 	}
 	return reclaimed
@@ -644,7 +699,7 @@ pub fn (mut this Cache) release(context voidptr, store IO) ? {
 	page = this.lru_first
 	for page != unsafe { nil } {
 		next := page.lru_next
-		unsafe { free(page) }
+		free_page(page)
 		page = next
 	}
 	unsafe { this.buckets.free() }
