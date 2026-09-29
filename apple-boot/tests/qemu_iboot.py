@@ -34,6 +34,7 @@ HERE = Path(__file__).resolve().parent
 APPLE_BOOT = HERE.parent
 REPO = APPLE_BOOT.parent
 sys.path.insert(0, str(APPLE_BOOT))
+import build  # noqa: E402
 import pack  # noqa: E402
 
 LLVM = Path(os.environ.get("LLVM_BIN", "/opt/homebrew/opt/llvm/bin"))
@@ -173,21 +174,6 @@ def build_stub(work: Path, boot_args_address: int, entry: int) -> Path:
     return path
 
 
-def build_initramfs(work: Path) -> Path:
-    sysroot = Path(os.environ.get("VINIX_AARCH64_SYSROOT",
-                                  REPO / "build-aarch64-userland/sysroot"))
-    root = work / "rootfs"
-    (root / "sbin").mkdir(parents=True)
-    (root / "dev").mkdir()
-    run([str(LLVM / "clang"), "--target=aarch64-linux-musl", f"--sysroot={sysroot}", "-static",
-         "-O2", "-Wall", "-Wextra", "-Werror", "-fuse-ld=lld", f"-L{sysroot}/lib",
-         str(HERE / "init.c"), "-o", str(root / "sbin/init")])
-    tar = work / "initramfs.tar"
-    run(["tar", "--format=ustar", "-cf", str(tar), "-C", str(root), "."],
-        env={**os.environ, "COPYFILE_DISABLE": "1"})
-    return tar
-
-
 class Qmp:
     """Just enough of QEMU's machine protocol to save memory and quit."""
 
@@ -245,7 +231,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--kernel", type=Path, default=Path(
         os.environ.get("VINIX_KERNEL_DIR", REPO / "kernel")) / "bin/vinix")
-    parser.add_argument("--initramfs", type=Path, help="default: a one-program test init")
+    parser.add_argument("--initramfs", type=Path, help="default: build.py's report_init.c")
     parser.add_argument("--cmdline", default="vinix.qemu_platform=1")
     parser.add_argument("--timeout", type=int, default=300)
     parser.add_argument("--keep", type=Path, help="keep the work directory here")
@@ -258,7 +244,7 @@ def main() -> int:
     run(["make", "-C", str(APPLE_BOOT), "-s"])
     work = Path(tempfile.mkdtemp(prefix="vinix-apple-boot."))
     try:
-        initramfs = arguments.initramfs or build_initramfs(work)
+        initramfs = arguments.initramfs or build.build_initramfs(work)
         image = pack.pack(
             (APPLE_BOOT / "build/vinix-apple-loader.bin").read_bytes(),
             pack.elf_symbol(APPLE_BOOT / "build/vinix-apple-loader.elf", "loader_end"),
