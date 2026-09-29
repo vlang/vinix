@@ -42,7 +42,7 @@ fn (mut this DevTmpFSResource) mmap(_handle voidptr, page u64, flags int) voidpt
 
 	if flags & mmap.map_shared != 0 {
 		unsafe {
-			return voidptr(u64(&this.storage[page * page_size]) - higher_half)
+			return voidptr(memory.kernel_virt2phys(u64(&this.storage[page * page_size])))
 		}
 	}
 

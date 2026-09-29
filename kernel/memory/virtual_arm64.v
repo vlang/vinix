@@ -699,6 +699,10 @@ pub fn vmm_init() {
 	print('vmm: kernel page tables live\n')
 
 	vmm_initialised = true
+
+	$if vmap_selftest ? {
+		vmap_selftest()
+	}
 }
 
 // Put this CPU on the kernel's page tables and memory attributes.

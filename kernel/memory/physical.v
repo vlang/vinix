@@ -575,6 +575,12 @@ pub fn free(ptr voidptr) {
 }
 
 fn big_free(ptr voidptr) {
+	if vmap_contains(u64(ptr)) {
+		pages := vmap_free(u64(ptr) - page_size)
+		adjust_big_alloc_pages(-i64(pages))
+		return
+	}
+
 	metadata := unsafe { &MallocMetadata(u64(ptr) - page_size) }
 
 	// A metadata page that has already been freed reads as pmm_free()'s
@@ -654,19 +660,33 @@ fn big_alloc(size u64) voidptr {
 	}
 	page_count := lib.div_roundup(size, page_size)
 
-	ptr := pmm_alloc(page_count + 1)
-
-	if ptr == 0 {
-		return 0
+	mut base := u64(0)
+	$if vmap_always ? {
+		// Testing only: every allocation that can, takes the fallback below.
+		base = u64(vmap_alloc(page_count + 1))
+	}
+	if base == 0 {
+		ptr := pmm_alloc_fallible(page_count + 1)
+		if ptr != 0 {
+			base = u64(ptr) + higher_half
+		}
+	}
+	if base == 0 {
+		// No free run is that long, which says little about how much memory is
+		// free. Take the pages one at a time and map them side by side.
+		base = u64(vmap_alloc(page_count + 1))
+		if base == 0 {
+			lib.kpanic(unsafe { nil }, c'Out of memory after reclaim')
+		}
 	}
 
-	mut metadata := unsafe { &MallocMetadata(u64(ptr) + higher_half) }
+	mut metadata := unsafe { &MallocMetadata(base) }
 
 	metadata.pages = page_count
 	metadata.size = size
 	adjust_big_alloc_pages(i64(page_count + 1))
 
-	return voidptr(u64(ptr) + higher_half + page_size)
+	return voidptr(base + page_size)
 }
 
 @[export: 'realloc']
