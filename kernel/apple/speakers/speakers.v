@@ -95,6 +95,7 @@ fn C.vinix_apple_speakers_faulted() int
 fn C.vinix_apple_speakers_fail()
 fn C.vinix_apple_speakers_get_status(out &C.vinix_apple_speakers_status)
 fn C.vinix_apple_speakers_take_event(out &i32) int
+fn C.vinix_apple_speakers_debug(out &u64)
 
 // macaudio's frontends: playback on the secondary (BCLK = 256 fs, room for
 // the sense slots), sense capture on the third.
@@ -194,7 +195,20 @@ __global (
 	speaker_stream  SpeakerStream
 	speaker_plan    Plan
 	speaker_present = false
+	// For sysrq 't': the service thread, how many times its loop has gone
+	// round, and where the thread inside the driver for a program is.
+	speaker_service      voidptr
+	speaker_service_laps = u64(0)
+	speaker_caller_phase = u64(0)
 )
+
+// Where a program's thread is in the driver, for sysrq 't'.
+const phase_none = u64(0)
+const phase_write = u64(1)
+const phase_write_wait = u64(2)
+const phase_drain = u64(3)
+const phase_drain_tail = u64(4)
+const phase_stop = u64(5)
 
 // ---- device tree ----
 
@@ -790,7 +804,29 @@ fn initialise_hardware() {
 	C.kprintf(c'apple-speakers: MacBook Air J313 speakers on MCA ports 0x%llx, amplifiers 0x%llx and 0x%llx; output held at -20 dB until the sense data checks out\n',
 		u64(plan.port_mask), u64(plan.address[0]), u64(plan.address[1]))
 	oss.create_device(&speaker_card)
+	proc.register_sysrq_hook(sysrq_state)
 	spawn service_thread()
+}
+
+// sysrq 't': the stream as the driver sees it and whether its two sides are
+// still moving. Read unlocked; a hang may be holding the lock.
+fn sysrq_state() {
+	mut v := [12]u64{}
+	C.vinix_apple_speakers_debug(&v[0])
+	C.kprintf(c'sysrq: apple-speakers state=%llu powered=0x%llx clocks=%llu written=%llu queued=%llu played=%llu draining=%llu target=%llu reserved=%llu underruns=%llu sense=%llu dma_errors=%llu\n',
+		v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7], v[8], v[9], v[10], v[11])
+	held := u64(katomic.load(&speaker_stream.mutex))
+	phase := u64(katomic.load(&speaker_caller_phase))
+	laps := u64(katomic.load(&speaker_service_laps))
+	C.kprintf(c'sysrq: apple-speakers lock=%llu caller_phase=%llu service_laps=%llu\n', held,
+		phase, laps)
+	if speaker_service != unsafe { nil } {
+		t := unsafe { &proc.Thread(speaker_service) }
+		args := t.syscall_args_text()
+		C.kprintf(c'sysrq: apple-speakers service tid=%lld %.*s\n', i64(t.tid), i32(args.len),
+			args.str)
+		unsafe { args.free() }
+	}
 }
 
 fn allocate_rings() ?(u64, u64) {
@@ -906,8 +942,10 @@ fn cluster_power(cluster u32, on i32) i32 {
 }
 
 fn service_thread() {
+	speaker_service = voidptr(proc.current_thread())
 	mut faulted := false
 	for {
+		katomic.inc(mut &speaker_service_laps)
 		mut s := &speaker_stream
 		s.lock()
 		if C.vinix_apple_speakers_wants_start() != 0 {
@@ -1065,6 +1103,10 @@ fn (mut s SpeakerStream) sync_write(buf voidptr, _loc u64, count u64) ?i64 {
 	can_finish := count <= tx_ring_bytes
 	mut done := u64(0)
 	mut last_progress := time.monotonic_ns()
+	katomic.store(mut &speaker_caller_phase, phase_write)
+	defer {
+		katomic.store(mut &speaker_caller_phase, phase_none)
+	}
 	for done < count {
 		s.lock()
 		if C.vinix_apple_speakers_faulted() != 0 {
@@ -1097,7 +1139,10 @@ fn (mut s SpeakerStream) sync_write(buf voidptr, _loc u64, count u64) ?i64 {
 			s.lock()
 			C.vinix_apple_speakers_commit(0)
 			s.unlock()
-			match nap(running_period_ns) {
+			katomic.store(mut &speaker_caller_phase, phase_write_wait)
+			napped := nap(running_period_ns)
+			katomic.store(mut &speaker_caller_phase, phase_write)
+			match napped {
 				.slept {}
 				.signalled {
 					if !can_finish {
@@ -1140,6 +1185,10 @@ fn (mut s SpeakerStream) sync_write(buf voidptr, _loc u64, count u64) ?i64 {
 }
 
 fn (mut s SpeakerStream) wait_until_empty() {
+	katomic.store(mut &speaker_caller_phase, phase_drain)
+	defer {
+		katomic.store(mut &speaker_caller_phase, phase_none)
+	}
 	s.lock()
 	if C.vinix_apple_speakers_active() == 0 {
 		s.unlock()
@@ -1163,7 +1212,9 @@ fn (mut s SpeakerStream) wait_until_empty() {
 			break
 		}
 	}
+	katomic.store(mut &speaker_caller_phase, phase_drain_tail)
 	nap(drain_tail_ns)
+	katomic.store(mut &speaker_caller_phase, phase_stop)
 	s.lock()
 	C.vinix_apple_speakers_stop()
 	s.unlock()

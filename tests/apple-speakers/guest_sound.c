@@ -13,7 +13,10 @@
 #include <unistd.h>
 
 // If the test stops, this says whether the machine stopped with it: a
-// heartbeat that keeps coming means only the test is stuck.
+// heartbeat that keeps coming means only the test is stuck. At 15 and 30 s,
+// by when a passing test has finished, the kernel lists every thread and the
+// speaker driver's state (sysrq 't'); the test is pid 1. What changed between
+// the two lists says whether a stuck thread is spinning or asleep.
 static void heartbeat(void)
 {
     pid_t pid = fork();
@@ -22,6 +25,13 @@ static void heartbeat(void)
     for (int seconds = 5; seconds <= 60; seconds += 5) {
         sleep(5);
         printf("VINIX M1 SOUND: heartbeat %d s\n", seconds);
+        if (seconds == 15 || seconds == 30) {
+            int fd = open("/proc/sysrq-trigger", O_WRONLY);
+            if (fd < 0 || write(fd, "t", 1) != 1)
+                printf("VINIX M1 SOUND: no task list (%d)\n", errno);
+            if (fd >= 0)
+                close(fd);
+        }
     }
     _exit(0);
 }

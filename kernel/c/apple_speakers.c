@@ -1818,6 +1818,23 @@ void vinix_apple_speakers_get_status(struct vinix_apple_speakers_status *out)
     get_status(&speakers, out);
 }
 
+void vinix_apple_speakers_debug(uint64_t out[VINIX_SPK_DEBUG_WORDS])
+{
+    const volatile struct speakers *s = &speakers;
+    out[0] = (uint64_t)s->state;
+    out[1] = s->powered;
+    out[2] = (uint64_t)s->clocks_on;
+    out[3] = s->written;
+    out[4] = s->queued;
+    out[5] = s->played;
+    out[6] = (uint64_t)s->draining;
+    out[7] = s->drain_target;
+    out[8] = s->reserved;
+    out[9] = s->underruns;
+    out[10] = s->sense_chunks;
+    out[11] = s->dma_errors;
+}
+
 int vinix_apple_speakers_take_event(int32_t out[3])
 {
     struct speaker_event e;

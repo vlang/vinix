@@ -111,6 +111,12 @@ void vinix_apple_speakers_fail(void);
 
 void vinix_apple_speakers_get_status(struct vinix_apple_speakers_status *out);
 
+/* For sysrq 't', read without the caller's lock, which a hang may hold:
+ * state, powered clusters, clocks_on, written, queued, played, draining,
+ * drain_target, reserved, underruns, sense_chunks, dma_errors. */
+#define VINIX_SPK_DEBUG_WORDS 12
+void vinix_apple_speakers_debug(uint64_t out[VINIX_SPK_DEBUG_WORDS]);
+
 /* Pops the oldest driver event into {code, a, b}; 0 when there is none.
  * Codes: 1 amp found (amp, revision), 2 sense verified, 3 sense stale (ms),
  * 4 sense dead (speaker), 5 model gain (mdB), 6 over temperature (speaker,
