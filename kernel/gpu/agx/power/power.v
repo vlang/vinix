@@ -26,7 +26,10 @@ const pmp_ptd_record_size = u32(32)
 const pmp_ptd_name_offset = u32(16)
 const pmp_ptd_name_size = u32(16)
 const t6050_ptd_reg_index = 7
-const t6050_ptd_base = u64(0x84240000)
+// CPU physical addresses, as get_translated_reg_ranges and XNU both resolve
+// them: /arm-io's ranges move the template's 0x8xxxxxxx child addresses up by
+// 0x200000000 (IODeviceMemory on an M5 Max agrees).
+const t6050_ptd_base = u64(0x284240000)
 const t6050_ptd_size = u64(0x40000)
 const t6050_die_stride = u64(0x4000000000)
 const t6050_ptd_read_stride = u64(16)
@@ -1978,7 +1981,7 @@ fn validate_ptd_apertures(pmgr_node &devicetree.DTNode) bool {
 	}
 	// AppleT6050PMGR maps this same RegMap entry once per die. Keep both
 	// physical results explicit even though this validator performs no mapping.
-	if ptd.base + die_stride != 0x4084240000 {
+	if ptd.base + die_stride != 0x4284240000 {
 		println('agx: t6050 die-1 PTD aperture changed')
 		return false
 	}
@@ -2005,7 +2008,7 @@ fn validate_pmp_wrapper(wrapper &devicetree.DTNode, die u32) bool {
 	// aperture. AppleASCWrapV6 maps reg[1] as its 64-bit IORVBAR aperture,
 	// while ApplePMPv2 independently resolves reg[3] as PTD-update memory.
 	// Keep reg[2] unlabeled until its consumer is proven.
-	bases := [u64(0x84e00000), 0x84850000, 0x84500000, 0x84250000]!
+	bases := [u64(0x284e00000), 0x284850000, 0x284500000, 0x284250000]!
 	sizes := [u64(0x88000), 0x4000, 0x100000, 0x4000]!
 	die_offset := u64(die) * t6050_die_stride
 	for index := 0; index < regions.len; index++ {
