@@ -449,7 +449,15 @@ pub fn link(parent &VFSNode, dest string, target string) ?&VFSNode {
 	if read_only(parent_of_tgt_node) { errno.set(errno.erofs); return none }
 	require_access(parent_of_tgt_node, access_write | access_exec)?
 	require_linked(parent_of_tgt_node)?
-	target_node = parent_of_tgt_node.filesystem.link(parent_of_tgt_node, dest, mut dest_node) ?
+	// The new entry's name, as linkat() passes it. This passed `dest`, the
+	// existing file's path, which ext2 wrote into the directory as the name:
+	// every hard link in an image unpacked onto a disk was called
+	// `./usr/bin/...`.
+	name := basename.clone()
+	target_node = parent_of_tgt_node.filesystem.link(parent_of_tgt_node, name, mut dest_node) or {
+		unsafe { name.free() }
+		return none
+	}
 	if target_node == unsafe { nil } { return none }
 
 	unsafe {
