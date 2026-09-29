@@ -57,13 +57,90 @@ fn resume_sigreturn(context cpulocal.GPRState, old_mask u64) {
 	t.gpr_state = context
 	t.masked_signals = old_mask & ~unblockable_mask()
 
+	// A signal the restored mask lets through runs now, as on arm64, whose
+	// rt_sigreturn goes back through the syscall exit: one that had waited
+	// for the handler to finish was otherwise left for the next syscall.
+	mut resumed := context
+	dispatch_signal(&resumed, 0, 0, 0)
+
 	sched.resume_saved_context()
 
 	for {}
 }
 
+// A syscall that a signal interrupted before it had done anything returns
+// ERESTARTSYS. Rewind to the SYSCALL so that it runs again once the signal
+// has been dealt with, as Linux and arm64 do: Go relies on SA_RESTART for
+// calls it does not retry itself, while its runtime preempts goroutines with
+// SIGURG. The signal dispatched next takes the rewind back if its handler was
+// installed without SA_RESTART.
+pub fn prepare_syscall_restart(context &cpulocal.GPRState) {
+	mut ctx := unsafe { context }
+	if ctx.rax != u64(-i64(proc.interrupted_errno)) {
+		return
+	}
+	mut t := proc.current_thread()
+	ctx.rax = t.restart_nr
+	// SYSCALL is two bytes long, and SYSRET returns to rcx.
+	ctx.rip -= 2
+	ctx.rcx = ctx.rip
+	t.restarting_syscall = true
+}
+
+// Whether `t` has a signal it does not block waiting for it, or has been told
+// to exit: what an interrupt returning to userspace sends it into the kernel
+// for.
+fn owes_async_work(t &proc.Thread) bool {
+	if katomic.load(&t.must_exit) {
+		return true
+	}
+	pending := katomic.load(&t.pending_signals)
+	return pending & ~t.masked_signals != 0 || pending & unblockable_mask() != 0
+}
+
+// An interrupt, the scheduler's included, is about to return to `frame`, the
+// thread in userspace. A signal that is pending for it now, or an exit a
+// sibling asked for, has to be dealt with there and then, as on arm64: a loop
+// that makes no syscalls is otherwise never interrupted, and cannot even be
+// killed. That cannot be done on the stack interrupts run on, which belongs
+// to the CPU and must not block; so the frame is pointed at
+// async_signal_entry() on the thread's own kernel stack, which is idle while
+// the thread is in userspace, and the thread goes on from there.
+pub fn interrupt_return(frame &cpulocal.GPRState) {
+	mut t := proc.current_thread()
+	if t == unsafe { nil } || t.process == unsafe { nil } || !owes_async_work(t) {
+		return
+	}
+	mut f := unsafe { frame }
+	t.async_context = *f
+	f.rip = u64(voidptr(async_signal_entry))
+	f.cs = u64(gdt.kernel_code_selector)
+	f.ss = u64(gdt.kernel_data_selector)
+	f.ds = u64(gdt.kernel_data_selector)
+	f.es = u64(gdt.kernel_data_selector)
+	// As if called: the return address slot a function expects to find.
+	f.rsp = t.kernel_stack - 8
+	f.rflags = cpu.rflags_fixed
+}
+
+// Where interrupt_return() sends a thread, in the kernel on its own stack,
+// with what it interrupted in async_context.
+@[noreturn]
+fn async_signal_entry() {
+	mut t := proc.current_thread()
+	mut context := t.async_context
+	exit_if_told_to()
+	dispatch_signal(&context, 0, 0, 0)
+	// Nothing was delivered after all: go back where the thread was.
+	t.gpr_state = context
+	sched.resume_saved_context()
+	for {}
+}
+
 fn dispatch_signal(context &cpulocal.GPRState, info_signum int, info_code int, info_addr u64) {
 	mut t := unsafe { proc.current_thread() }
+	restarting := t.restarting_syscall
+	t.restarting_syscall = false
 
 	mut which := -1
 
@@ -86,7 +163,7 @@ fn dispatch_signal(context &cpulocal.GPRState, info_signum int, info_code int, i
 		return
 	}
 
-	dispatch_linux_signal(context, which, info_signum, info_code, info_addr)
+	dispatch_linux_signal(context, which, info_signum, info_code, info_addr, restarting)
 }
 
 // Dispatch a signal to _self_, this is called from the scheduler or at the

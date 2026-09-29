@@ -53,6 +53,9 @@ fn kmain_thread() {
 
 	table.init_syscall_table()
 	table.init_storage_syscalls()
+	// What an interrupt returning to userspace does for a thread with a signal
+	// to take; the scheduler cannot import userland.
+	sched.register_user_signal_hook(voidptr(userland.interrupt_return))
 	table.init_pipe_usercopy_syscalls()
 	table.init_mmap_aslr_syscalls()
 	table.init_security_syscalls()

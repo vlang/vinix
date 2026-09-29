@@ -3,9 +3,10 @@
 // that can be found in the LICENSE file.
 
 /* SPDX-License-Identifier: BSD-2-Clause
- * In-guest regression coverage for the VM, VFS, and Linux ABI fundamentals.
- * The binary is linked statically and installed as PID 1 by run-aarch64.sh's
- * --guest-init hook. */
+ * In-guest regression coverage for the VM, VFS, and Linux ABI fundamentals,
+ * the same on both architectures. The binary is linked statically and
+ * installed as PID 1: by run-aarch64.sh's --guest-init hook on arm64, and in
+ * a throwaway ISO on amd64; see run.sh. */
 #define _GNU_SOURCE
 #include <errno.h>
 #include <fcntl.h>
@@ -369,6 +370,103 @@ static int test_default_terminating_signals(void)
 	/* These signals have ignored default dispositions on Linux. */
 	CHECK(kill(getpid(), SIGWINCH) == 0);
 	puts("QEMU CORE PASS: default signal dispositions");
+	return 0;
+}
+
+static volatile sig_atomic_t busy_loop_signalled;
+
+static void busy_loop_handler(int signal)
+{
+	(void)signal;
+	busy_loop_signalled = 1;
+}
+
+/* A thread that makes no syscalls still takes its signals: they are
+ * delivered when an interrupt returns to it, as Linux delivers them. Without
+ * that, a handler never ran and even SIGKILL could not stop the loop. */
+static int test_signals_reach_a_busy_loop(void)
+{
+	pid_t child = fork();
+	CHECK(child >= 0);
+	if (child == 0) {
+		struct sigaction action;
+		memset(&action, 0, sizeof(action));
+		action.sa_handler = busy_loop_handler;
+		sigemptyset(&action.sa_mask);
+		if (sigaction(SIGUSR1, &action, NULL) != 0)
+			_exit(2);
+		while (!busy_loop_signalled) {
+		}
+		_exit(0);
+	}
+	struct timespec pause_for = { .tv_sec = 0, .tv_nsec = 200000000 };
+	nanosleep(&pause_for, NULL);
+	CHECK(kill(child, SIGUSR1) == 0);
+	CHECK(reap_ok(child) == 0);
+
+	child = fork();
+	CHECK(child >= 0);
+	if (child == 0) {
+		for (;;) {
+		}
+	}
+	nanosleep(&pause_for, NULL);
+	CHECK(kill(child, SIGKILL) == 0);
+	int status = -1;
+	CHECK(waitpid(child, &status, 0) == child);
+	CHECK(WIFSIGNALED(status) && WTERMSIG(status) == SIGKILL);
+	puts("QEMU CORE PASS: signals reach a thread that makes no syscalls");
+	return 0;
+}
+
+static void restart_handler(int signal)
+{
+	(void)signal;
+}
+
+/* A read(2) a signal interrupts before any data came runs again once the
+ * handler returns when the handler was installed with SA_RESTART, and fails
+ * with EINTR when it was not. Go relies on the first; most C code on the
+ * second. */
+static int interrupted_read(int restart)
+{
+	int channel[2];
+	CHECK(pipe(channel) == 0);
+	pid_t child = fork();
+	CHECK(child >= 0);
+	if (child == 0) {
+		close(channel[1]);
+		struct sigaction action;
+		memset(&action, 0, sizeof(action));
+		action.sa_handler = restart_handler;
+		action.sa_flags = restart ? SA_RESTART : 0;
+		sigemptyset(&action.sa_mask);
+		if (sigaction(SIGUSR1, &action, NULL) != 0)
+			_exit(2);
+		char byte = 0;
+		ssize_t got = read(channel[0], &byte, 1);
+		if (restart)
+			_exit(got == 1 && byte == 'r' ? 0 : 3);
+		_exit(got == -1 && errno == EINTR ? 0 : 4);
+	}
+	close(channel[0]);
+	struct timespec pause_for = { .tv_sec = 0, .tv_nsec = 200000000 };
+	nanosleep(&pause_for, NULL);
+	CHECK(kill(child, SIGUSR1) == 0);
+	nanosleep(&pause_for, NULL);
+	/* Unread when the read failed with EINTR; the child is gone by then. */
+	signal(SIGPIPE, SIG_IGN);
+	write(channel[1], "r", 1);
+	close(channel[1]);
+	CHECK(reap_ok(child) == 0);
+	return 0;
+}
+
+static int test_syscall_restart(void)
+{
+	CHECK(interrupted_read(1) == 0);
+	CHECK(interrupted_read(0) == 0);
+	puts("QEMU CORE PASS: SA_RESTART restarts an interrupted read");
 	return 0;
 }
 
@@ -1394,6 +1492,8 @@ static int run_tests(void)
 	CHECK(test_unix_socket_full_write_readiness() == 0);
 	CHECK(test_futex_wake_op() == 0);
 	CHECK(test_default_terminating_signals() == 0);
+	CHECK(test_signals_reach_a_busy_loop() == 0);
+	CHECK(test_syscall_restart() == 0);
 	CHECK(prepare_directory() == 0);
 	CHECK(test_ext2_mapping_and_namespace() == 0);
 	CHECK(test_private_file_mapping() == 0);
@@ -1442,7 +1542,10 @@ int main(int argc, char **argv)
 	setbuf(stderr, NULL);
 	if (getpid() != 1)
 		return run_tests();
-	int console = open("/dev/console", O_WRONLY);
+	/* amd64's console is the framebuffer; its serial port is /dev/com1. */
+	int console = open("/dev/com1", O_WRONLY);
+	if (console < 0)
+		console = open("/dev/console", O_WRONLY);
 	if (console >= 0) {
 		dup2(console, STDOUT_FILENO);
 		dup2(console, STDERR_FILENO);

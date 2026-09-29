@@ -47,6 +47,13 @@ interrupt_thunk_\num:
     xor %rbp, %rbp
     call *(%rbx)
 
+    // Back to userspace: a signal to take, or an exit a sibling asked for,
+    // sends the thread into the kernel first; see userland.interrupt_return().
+    cmpq $0x43, 152(%rsp)
+    jne 2f
+    mov %rsp, %rdi
+    call interrupt_leave
+2:
     pop %rax
     mov %eax, %ds
     pop %rax

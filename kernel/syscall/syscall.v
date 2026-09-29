@@ -5,7 +5,8 @@ import proc
 import userland
 
 // Called by syscall_entry in asm/x86_64/syscall_entry.S on the way back to
-// userspace, with the saved GPR frame.
+// userspace, with the saved GPR frame, as syscall/common.v's leave() is on
+// arm64.
 @[export: 'syscall_leave']
 fn leave(context &cpulocal.GPRState) {
 	userland.flush_owed_sync()
@@ -17,6 +18,14 @@ fn leave(context &cpulocal.GPRState) {
 	asm volatile amd64 {
 		cli
 	}
-
+	userland.exit_if_told_to()
+	userland.prepare_syscall_restart(context)
 	userland.dispatch_a_signal(context)
+}
+
+// Called by the interrupt thunks in asm/int_thunks_asm.S on the way back to
+// userspace, with the interrupted frame.
+@[export: 'interrupt_leave']
+fn interrupt_leave(context &cpulocal.GPRState) {
+	userland.interrupt_return(context)
 }

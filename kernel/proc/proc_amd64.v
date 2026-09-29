@@ -3,20 +3,40 @@ module proc
 
 import klock
 import katomic
+import lib
 import x86.cpu.local as cpulocal
 import event.eventstruct
 
 pub fn (t &Thread) current_syscall() (i64, u64) {
-	return -1, 0
+	return t.syscall_nr, t.syscall_x0
 }
 
+// The caller frees the text.
 pub fn (t &Thread) syscall_args_text() string {
-	return ''
+	mut text := lib.new_text(160)
+	text.add('rsi=0x')
+	text.add_radix(t.syscall_x1, 16, 0)
+	text.add(' rdx=0x')
+	text.add_radix(t.syscall_x2, 16, 0)
+	text.add(' r10=0x')
+	text.add_radix(t.syscall_x3, 16, 0)
+	text.add(' blocked=0x')
+	text.add_radix(t.masked_signals, 16, 0)
+	text.add(' pending=0x')
+	text.add_radix(t.pending_signals, 16, 0)
+	text.add(' cpu=')
+	if t.running_on == u64(-1) {
+		text.add('-')
+	} else {
+		text.add_unsigned(t.running_on)
+	}
+	text.add(if t.is_in_queue { ' queued=true' } else { ' queued=false' })
+	return text.str()
 }
 
-// What a wait a signal interrupted reports. The x86-64 syscall exit has no
-// restart, so the caller sees EINTR.
-pub const interrupted_errno = 4
+// What a wait a signal interrupted reports: a restart once the signal is
+// handled, which the syscall exit knows how to do, as on arm64.
+pub const interrupted_errno = 512
 
 pub struct Thread {
 pub mut:
@@ -121,6 +141,23 @@ pub mut:
 	sigaltstack_size u64
 	// What the syscall a seccomp filter turned away returns: an errno, or 0.
 	seccomp_errno u64
+	// The syscall this thread is in, or -1 when it is in userspace, and its
+	// first arguments, for what sysrq 't' reports. And the number it was made
+	// with, which the result overwrites in rax: a restarted syscall needs it
+	// back.
+	syscall_nr i64 = -1
+	syscall_x0 u64
+	syscall_x1 u64
+	syscall_x2 u64
+	syscall_x3 u64
+	restart_nr u64
+	// Set on the way out of a syscall that is being rewound to run again, for
+	// the signal dispatched next to take back if its handler wants EINTR.
+	restarting_syscall bool
+	// Where an interrupt found the thread in userspace, when it had a signal
+	// to take or had been told to exit: the kernel runs that on the thread's
+	// own stack first, and then comes back here. See interrupt_return().
+	async_context cpulocal.GPRState
 	// Set by sched.resume_saved_context(): the thread resumes from the context
 	// already in gpr_state, not from where the scheduler interrupted it.
 	context_preset bool

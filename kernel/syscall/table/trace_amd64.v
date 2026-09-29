@@ -32,6 +32,12 @@ fn syscall_seccomp_verdict(_ voidptr) (u64, u64) {
 pub fn syscall_trace(frame &cpulocal.GPRState) u64 {
 	nr := frame.rax
 	mut t := proc.current_thread()
+	t.syscall_nr = i64(nr)
+	t.restart_nr = nr
+	t.syscall_x0 = frame.rdi
+	t.syscall_x1 = frame.rsi
+	t.syscall_x2 = frame.rdx
+	t.syscall_x3 = frame.r10
 	process := t.process
 	if process.seccomp_mode != proc.seccomp_mode_disabled {
 		slot := seccomp_entry(mut t, frame, nr)
@@ -49,6 +55,8 @@ pub fn syscall_trace(frame &cpulocal.GPRState) u64 {
 // errno.
 @[export: 'syscall_trace_ret']
 pub fn syscall_trace_ret(ret u64, err u64) {
+	mut t := proc.current_thread()
+	t.syscall_nr = -1
 }
 
 // What a call runs as once the process's seccomp filters have seen it: the

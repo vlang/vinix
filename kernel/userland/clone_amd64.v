@@ -13,6 +13,7 @@ module userland
 import errno
 import file
 import fs
+import katomic
 import lib
 import memory
 import memory.mmap
@@ -316,4 +317,14 @@ fn kill_sibling_threads(mut process proc.Process, current &proc.Thread) {
 			proc.free_tid(t.tid)
 		}
 	}
+}
+
+// A thread told to go by a sibling's exit_group() or execve() leaves here, on
+// its way back to userspace, once the syscall it was in has unwound.
+pub fn exit_if_told_to() {
+	t := proc.current_thread()
+	if t == unsafe { nil } || !katomic.load(&t.must_exit) {
+		return
+	}
+	syscall_linux_exit(unsafe { nil }, 0)
 }

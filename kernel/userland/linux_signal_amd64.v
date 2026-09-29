@@ -27,6 +27,7 @@ const linux_sig_ign = u64(1)
 const linux_sa_onstack = 0x08000000
 const linux_sa_restorer = 0x04000000
 const linux_sa_nodefer = 0x40000000
+const linux_sa_restart = 0x10000000
 const linux_sa_resethand = int(u32(0x80000000))
 
 // struct rt_sigframe (arch/x86/kernel/signal_64.c): the return address the
@@ -85,7 +86,7 @@ fn get_u64(buf []u8, offset u64) u64 {
 }
 
 // Deliver `which` to the calling Linux process on its way back to userspace.
-fn dispatch_linux_signal(context &cpulocal.GPRState, which int, info_signum int, info_code int, info_addr u64) {
+fn dispatch_linux_signal(context &cpulocal.GPRState, which int, info_signum int, info_code int, info_addr u64, restarting bool) {
 	mut t := unsafe { proc.current_thread() }
 	sigaction := t.sigactions[which]
 	handler := u64(sigaction.sa_sigaction)
@@ -105,6 +106,15 @@ fn dispatch_linux_signal(context &cpulocal.GPRState, which int, info_signum int,
 	}
 	if handler == linux_sig_dfl || sigaction.sa_flags & linux_sa_restorer == 0 {
 		exit_by_signal(which)
+	}
+
+	// A handler that did not ask for SA_RESTART sees the syscall fail with
+	// EINTR instead of running again behind its back.
+	if restarting && sigaction.sa_flags & linux_sa_restart == 0 {
+		mut ctx := unsafe { context }
+		ctx.rip += 2
+		ctx.rcx = ctx.rip
+		ctx.rax = u64(-i64(errno.eintr))
 	}
 
 	// An SA_ONSTACK handler runs on the alternate stack sigaltstack() set up,

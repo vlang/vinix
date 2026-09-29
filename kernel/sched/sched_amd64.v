@@ -153,7 +153,17 @@ fn effective_timeslice(t &proc.Thread) u64 {
 	return slice
 }
 
-fn C.userland__dispatch_a_signal(context &cpulocal.GPRState)
+__global (
+	user_signal_hook voidptr
+)
+
+type UserSignalHook = fn (&cpulocal.GPRState)
+
+// userland registers what an interrupt returning to userspace has to do for
+// the thread; it cannot be imported. As on arm64.
+pub fn register_user_signal_hook(hook voidptr) {
+	user_signal_hook = hook
+}
 
 fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 	apic.lapic_timer_stop()
@@ -231,10 +241,23 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 		current_thread.numa_node = int(cpu_local.numa_node)
 	}
 
-	cpu.set_gs_base(u64(current_thread))
-	if current_thread.gpr_state.cs == 0x43 {
+	// A thread going back to userspace with a signal it has to take, or an exit
+	// a sibling asked for, is sent to take care of it first; the hook points
+	// the frame into the kernel. See userland.interrupt_return().
+	if current_thread.gpr_state.cs == user_code_seg && user_signal_hook != unsafe { nil } {
+		hook := unsafe { UserSignalHook(user_signal_hook) }
+		hook(&current_thread.gpr_state)
+	}
+
+	// The SWAPGS below leaves GS on the thread for the kernel, and the
+	// thread's own base parked in KERNEL_GS_BASE, whichever mode it returns
+	// to; in userspace the two are the other way round. A user thread resumed
+	// inside a syscall used to lose the GS base it had set with arch_prctl.
+	if current_thread.gpr_state.cs == user_code_seg {
+		cpu.set_gs_base(u64(current_thread))
 		cpu.set_kernel_gs_base(current_thread.gs_base)
 	} else {
+		cpu.set_gs_base(current_thread.gs_base)
 		cpu.set_kernel_gs_base(u64(current_thread))
 	}
 	cpu.set_fs_base(current_thread.fs_base)
@@ -254,10 +277,6 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 	apic.lapic_timer_oneshot(mut cpu_local, scheduler_vector, effective_timeslice(current_thread))
 
 	new_gpr_state := &current_thread.gpr_state
-
-	if new_gpr_state.cs == user_code_seg {
-		// C.userland__dispatch_a_signal(new_gpr_state)
-	}
 
 	asm volatile amd64 {
 		mov rsp, new_gpr_state
