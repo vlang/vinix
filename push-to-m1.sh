@@ -57,6 +57,11 @@ fi
 # desktop initramfs shows a live percentage instead of looking hung, and
 # --partial lets the next invocation resume after an interrupted Wi-Fi push.
 echo "==> Comparing files; changed files show a live percentage..."
+# Every top-level build-* directory but build-support is a workspace or cache
+# that no M1 deployment reads -- build-release alone had grown to 15 GB -- and
+# so is every ISO. Naming them one at a time let each new one through: the
+# M1's checkout had gathered 10 GB of Office installer probes and release
+# images that rsync, which deletes nothing, then kept.
 # The build workspaces are host-side intermediates, not boot inputs. The
 # kernel and selected initramfs remain included below, while their staging
 # trees are deliberately left out of an M1 deployment.  The boot-image disk
@@ -84,6 +89,9 @@ if ! rsync -a --partial --progress --stats \
     --exclude 'boot-image/*.ext2.tmp.*' \
     --exclude 'boot-image/edk2-aarch64-code-*.fd' \
     --exclude 'build-*-probe/*.img' \
+    --include '/build-support/' \
+    --exclude '/build-*/' \
+    --exclude '*.iso' \
     --exclude 'build-amd64-*/' \
     --exclude 'boot-image/limine-src-*/' \
     --exclude 'tools/agx-re/build/' \
