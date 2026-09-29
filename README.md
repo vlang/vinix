@@ -39,26 +39,40 @@ The latest release has a bootable desktop image for each architecture:
 
 Older and nightly images are at https://github.com/vlang/vinix/releases.
 
-Give the VM at least 4 GiB of memory: for now Vinix loads its entire root
-filesystem into a ramdisk, which makes it easier to boot on real hardware.
+Give the VM at least 4 GiB of memory and an empty disk of 4 GiB or more
+(16 GiB leaves room for apps). The first boot installs Vinix onto the disk;
+from then on the machine starts from it and keeps everything, as a QEMU machine
+started by `run-desktop-aarch64.sh` does: users, files, installed apps. Keep
+the ISO attached, since it still boots the machine. Booting a newer ISO with
+the same disk updates the system and keeps `/root`, where the users' homes are.
+Vinix only formats a disk that is entirely empty, as a new VM disk is. Without
+one it runs from memory, and a restart starts from a clean image.
+
+Vinix drives IDE and SATA disks on amd64 and VirtIO block devices on arm64.
 
 ```sh
+qemu-img create -f qcow2 vinix-amd64.qcow2 16G
 qemu-system-x86_64 -machine q35 -accel kvm -cpu host -m 4096 -smp 2 -cdrom vinix-amd64.iso \
-    -nic user,model=e1000
+    -drive file=vinix-amd64.qcow2,format=qcow2 -nic user,model=e1000
 
+qemu-img create -f qcow2 vinix-arm64.qcow2 16G
 qemu-system-aarch64 -machine virt -accel hvf -cpu host -m 4096 -smp 4 \
     -bios "$(brew --prefix qemu)/share/qemu/edk2-aarch64-code.fd" \
     -device virtio-scsi-pci -device scsi-cd,drive=cd \
     -drive if=none,id=cd,media=cdrom,file=vinix-arm64.iso \
+    -drive if=none,id=hd,file=vinix-arm64.qcow2,format=qcow2 \
+    -device virtio-blk-device,drive=hd \
     -device ramfb -device qemu-xhci -device usb-kbd -device usb-tablet \
     -netdev user,id=net0 -device virtio-net-device,netdev=net0
 ```
 
 In VirtualBox, create a VM of type *Other/Unknown (64-bit)* or *Other/Unknown
-(ARM 64-bit)* with 4096 MB of memory and no hard disk, attach the ISO, and set
-the network adapter type to *Intel PRO/1000 MT Desktop (82540EM)*; or let
-`./run-iso-virtualbox.sh vinix-arm64.iso` create one. VirtualBox only runs
-guests of its host's architecture.
+(ARM 64-bit)* with 4096 MB of memory, attach the ISO, and set the network
+adapter type to *Intel PRO/1000 MT Desktop (82540EM)*. For amd64, add a new
+16 GB hard disk on a SATA controller; Vinix has no driver for the disk
+controllers VirtualBox gives an arm64 VM, so that one runs from memory.
+`./run-iso-virtualbox.sh vinix-amd64.iso` creates such a VM, disk included.
+VirtualBox only runs guests of its host's architecture.
 
 Both images carry the same software: X.org with Mesa, GTK, Python, V, GCC,
 git, curl and `pkg`. Firefox, Chromium and the other larger apps are not on the

@@ -4,8 +4,10 @@
 # Usage: ./run-iso-virtualbox.sh [options] vinix-amd64.iso|vinix-arm64.iso
 #
 #   --name=NAME      VM name (default: vinix-<arch>)
-#   --memory=MB      guest RAM (default: 4096; the whole image is loaded into it)
+#   --memory=MB      guest RAM (default: 4096)
 #   --cpus=N         virtual CPUs (default: 2)
+#   --disk=GB        size of the system disk (amd64; default: 16)
+#   --no-disk        run from memory: nothing is kept across a restart
 #   --efi            boot an amd64 VM through EFI instead of BIOS
 #   --headless       run without a window
 #   --serial=FILE    log the first serial port to FILE
@@ -17,9 +19,17 @@
 # ones Vinix needs, applied over VirtualBox's defaults for the guest type:
 #
 #   amd64  "Other/Unknown (64-bit)", BIOS (or EFI), I/O APIC, PS/2 keyboard and
-#          mouse, VMSVGA graphics, the ISO on the IDE controller
+#          mouse, VMSVGA graphics, the ISO on the IDE controller, the system
+#          disk on a SATA controller
 #   arm64  "Other/Unknown (ARM 64-bit)", EFI, USB keyboard and tablet on xHCI,
 #          VMSVGA graphics, the ISO on the VirtioSCSI controller
+#
+# The first boot installs Vinix onto the empty system disk and later boots run
+# from it, so the machine keeps its files, users and apps; a newer ISO updates
+# the system and keeps /root. The disk, <name>-system.vdi in VirtualBox's
+# machine folder, outlives the VM: replacing the VM keeps it. Delete it to
+# start over. Vinix has no driver for the disk controllers of an arm64
+# VirtualBox VM, so that one runs from memory.
 #
 # VirtualBox runs guests of its host's architecture only: the arm64 image on
 # Apple Silicon Macs and other arm64 hosts, the amd64 image everywhere else.
@@ -34,6 +44,7 @@ FRONTEND=gui
 SERIAL_LOG=''
 START=1
 ARCH=''
+DISK_GB=16
 ISO=''
 
 usage() {
@@ -45,6 +56,8 @@ for arg in "$@"; do
         --name=*) NAME="${arg#*=}" ;;
         --memory=*) MEMORY="${arg#*=}" ;;
         --cpus=*) CPUS="${arg#*=}" ;;
+        --disk=*) DISK_GB="${arg#*=}" ;;
+        --no-disk) DISK_GB=0 ;;
         --efi) FIRMWARE=efi ;;
         --headless) FRONTEND=headless ;;
         --serial=*) SERIAL_LOG="${arg#*=}" ;;
@@ -108,10 +121,32 @@ case "$ARCH" in
         ;;
 esac
 NAME="${NAME:-vinix-$ARCH}"
+case "$DISK_GB" in
+    ''|*[!0-9]*)
+        echo "ERROR: --disk takes a size in GB" >&2
+        exit 1
+        ;;
+esac
+if [ "$ARCH" = arm64 ] && [ "$DISK_GB" -ne 0 ]; then
+    # Vinix drives virtio-blk on arm64; VirtualBox offers VirtioSCSI, NVMe and
+    # the like.
+    DISK_GB=0
+fi
+if [ "$DISK_GB" -ne 0 ] && [ "$DISK_GB" -lt 4 ]; then
+    echo "ERROR: the system disk needs at least 4 GB" >&2
+    exit 1
+fi
 
 vbox() {
     "$VBOXMANAGE" "$@"
 }
+
+DISK=''
+if [ "$DISK_GB" -ne 0 ]; then
+    machine_folder="$(vbox list systemproperties |
+        sed -n 's/^Default machine folder: *//p')"
+    DISK="${machine_folder:-$HOME/VirtualBox VMs}/$NAME-system.vdi"
+fi
 
 if vbox showvminfo "$NAME" >/dev/null 2>&1; then
     echo "==> Replacing the existing VM '$NAME'..."
@@ -122,6 +157,20 @@ if vbox showvminfo "$NAME" >/dev/null 2>&1; then
             sleep 1
         done
     fi
+    # unregistervm --delete deletes the VM's disks as well: take the system
+    # disk out first, wherever it is attached ("SATA-0-0"="/path/disk.vdi").
+    attached="$(vbox showvminfo "$NAME" --machinereadable |
+        grep -F -- '-system.vdi"' || true)"
+    while IFS= read -r line; do
+        [ -n "$line" ] || continue
+        slot="${line%%=*}"
+        slot="${slot//\"/}"
+        device="${slot##*-}"
+        slot="${slot%-*}"
+        port="${slot##*-}"
+        vbox storageattach "$NAME" --storagectl "${slot%-*}" --port "$port" \
+            --device "$device" --medium none >/dev/null 2>&1 || true
+    done <<< "$attached"
     # The session lock outlives the VM process by a moment.
     for _ in $(seq 1 10); do
         vbox unregistervm "$NAME" --delete >/dev/null 2>&1 && break
@@ -158,6 +207,20 @@ else
 fi
 vbox storageattach "$NAME" --storagectl "$controller" --port 0 --device 0 \
     --type dvddrive --medium "$ISO"
+if [ -n "$DISK" ]; then
+    if [ -f "$DISK" ]; then
+        echo "==> Keeping the system disk $DISK"
+    else
+        echo "==> Creating a ${DISK_GB} GB system disk $DISK"
+        mkdir -p "$(dirname "$DISK")"
+        vbox createmedium disk --filename "$DISK" --size $((DISK_GB * 1024)) \
+            --format VDI --variant Standard >/dev/null
+    fi
+    vbox storagectl "$NAME" --name SATA --add sata --controller IntelAhci \
+        --portcount 1 --bootable off
+    vbox storageattach "$NAME" --storagectl SATA --port 0 --device 0 \
+        --type hdd --medium "$DISK"
+fi
 
 if [ -n "$SERIAL_LOG" ]; then
     mkdir -p "$(dirname "$SERIAL_LOG")"

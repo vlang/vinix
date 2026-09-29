@@ -14,16 +14,21 @@
 # Each image is booted from a virtual CD with nothing but its own files:
 #
 #   amd64  QEMU, BIOS, i440fx, no HPET, one CPU (what VirtualBox gives a new VM)
-#          QEMU, UEFI, q35, two CPUs
-#          VirtualBox, BIOS                          (x86 hosts)
-#   arm64  QEMU, UEFI, virt, virtio keyboard and tablet
+#          QEMU, UEFI, q35, two CPUs, a blank SATA disk
+#          the same again, from the system it installed on the disk
+#          VirtualBox, BIOS, a blank SATA disk       (x86 hosts)
+#   arm64  QEMU, UEFI, virt, virtio keyboard and tablet, a blank virtio disk
+#          the same again, from the system it installed on the disk
 #          QEMU, UEFI, virt, USB keyboard and tablet on xHCI
 #          VirtualBox, EFI                           (arm64 hosts)
 #
 # A boot passes when the serial port says "Vinix: starting the desktop" (or,
 # failing that, the screen does), a screenshot shows the desktop rather than a
 # console, and typing and (outside VirtualBox, which cannot script its pointer)
-# moving the pointer both change what is on the screen.
+# moving the pointer both change what is on the screen. A boot with a blank disk
+# passes only if it installed the system there, and the boot after it only if
+# it ran from that system; debugfs (e2fsprogs), where it is installed, checks
+# the disk in between.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -133,6 +138,52 @@ vm_shoot() {
         qmp "{\"execute\":\"screendump\",\"arguments\":{\"filename\":\"$1.ppm\"}}"
     else
         "$VBOXMANAGE_BIN" controlvm "$VM_NAME" screenshotpng "$1.png"
+    fi
+}
+
+# A blank disk for a boot to install onto, as a new VM's is.
+blank_disk() {
+    rm -f "$1"
+    truncate -s 8G "$1" 2>/dev/null || mkfile -n 8g "$1"
+}
+
+find_debugfs() {
+    local candidate
+    for candidate in "$(command -v debugfs 2>/dev/null || true)" /sbin/debugfs \
+        /usr/sbin/debugfs /opt/homebrew/opt/e2fsprogs/sbin/debugfs \
+        /usr/local/opt/e2fsprogs/sbin/debugfs; do
+        if [ -n "$candidate" ] && [ -x "$candidate" ]; then
+            echo "$candidate"
+            return 0
+        fi
+    done
+    return 1
+}
+
+# Fail boot "$1" unless its disk "$2" holds a system installed from an image:
+# /.vinix-image-id names it, and reads "pending" while one is being written.
+require_installed() {
+    local name="$1" disk="$2" debugfs id
+    if ! debugfs="$(find_debugfs)"; then
+        echo "    $name: no debugfs here to look at the disk with"
+        return
+    fi
+    id="$("$debugfs" -R 'cat /.vinix-image-id' "$disk" 2>/dev/null | tr -d ' \r\n' || true)"
+    if [ -z "$id" ] || [ "$id" = pending ]; then
+        echo "    $name: no system was installed on the disk" >&2
+        FAILED+=("$name (no system installed on its disk)")
+        return
+    fi
+    echo "    $name: installed image $id on the disk"
+}
+
+# Fail boot "$1" unless its serial log says "$2". Only arm64 kernels print to
+# the serial port.
+require_serial() {
+    local name="$1" pattern="$2"
+    if ! grep -aq "$pattern" "$OUT/$name/serial.log" 2>/dev/null; then
+        echo "    $name: the serial log never says \"$pattern\"" >&2
+        FAILED+=("$name (no \"$pattern\" on serial)")
     fi
 }
 
@@ -292,10 +343,18 @@ qemu_amd64() {
     if ovmf="$(qemu_firmware "$qemu_bin" edk2-x86_64-code.fd \
         /usr/share/OVMF/OVMF_CODE.fd /usr/share/edk2/x64/OVMF_CODE.fd \
         /usr/share/qemu/OVMF.fd)"; then
-        run_qemu_boot qemu-amd64-uefi "$qemu_bin" "${accel[@]}" \
-            -machine q35 -m 4096 -smp 2 -vga std \
-            -drive "if=pflash,format=raw,unit=0,readonly=on,file=$ovmf" \
-            -cdrom "$iso" -nic user,model=e1000
+        # A disk on q35's SATA controller: the first boot installs onto it,
+        # the second runs from what it installed.
+        local disk="$OUT/qemu-amd64-disk.img" name
+        blank_disk "$disk"
+        for name in qemu-amd64-uefi qemu-amd64-uefi-disk; do
+            run_qemu_boot "$name" "$qemu_bin" "${accel[@]}" \
+                -machine q35 -m 4096 -smp 2 -vga std \
+                -drive "if=pflash,format=raw,unit=0,readonly=on,file=$ovmf" \
+                -cdrom "$iso" -drive "file=$disk,format=raw" -nic user,model=e1000
+            require_installed "$name" "$disk"
+        done
+        rm -f "$disk"
     else
         FAILED+=("qemu-amd64-uefi (no x86_64 UEFI firmware found)")
     fi
@@ -321,8 +380,11 @@ qemu_arm64() {
         return
     fi
     template="$(qemu_firmware "$qemu_bin" edk2-arm-vars.fd /usr/share/AAVMF/AAVMF_VARS.fd || true)"
-    local input name vars
-    for input in virtio usb; do
+    local input name vars disk="$OUT/qemu-arm64-disk.img"
+    blank_disk "$disk"
+    # The virtio boot installs onto a blank virtio disk; virtio-disk boots the
+    # same machine again, from what it installed.
+    for input in virtio virtio-disk usb; do
         name="qemu-arm64-$input"
         vars="$OUT/$name-vars.fd"
         if [ -n "$template" ]; then
@@ -333,10 +395,18 @@ qemu_arm64() {
         # The USB boot stands in for VirtualBox: xHCI input and an e1000.
         local devices=(-device virtio-keyboard-device -device virtio-tablet-device
             -netdev user,id=net0 -device virtio-net-device,netdev=net0)
+        if [ "$input" = virtio-disk ]; then
+            input=virtio
+        fi
         if [ "$input" = usb ]; then
             devices=(-device qemu-xhci,id=xhci -device usb-kbd,bus=xhci.0
                 -device usb-tablet,bus=xhci.0
                 -netdev user,id=net0 -device e1000,netdev=net0)
+        fi
+        local storage=()
+        if [ "$input" = virtio ]; then
+            storage=(-drive "if=none,id=hd0,format=raw,file=$disk"
+                -device virtio-blk-device,drive=hd0)
         fi
         run_qemu_boot "$name" "$qemu_bin" "${accel[@]}" \
             -machine virt -m 4096 -smp 4 \
@@ -345,8 +415,19 @@ qemu_arm64() {
             -device virtio-scsi-pci,id=scsi0 \
             -drive "if=none,id=cd0,media=cdrom,readonly=on,file=$iso" \
             -device scsi-cd,drive=cd0,bus=scsi0.0 \
+            ${storage[@]+"${storage[@]}"} \
             -device ramfb "${devices[@]}"
+        case "$name" in
+            qemu-arm64-virtio)
+                require_serial "$name" 'sysdisk: installed'
+                require_installed "$name" "$disk"
+                ;;
+            qemu-arm64-virtio-disk)
+                require_serial "$name" 'sysdisk: running from the system'
+                ;;
+        esac
     done
+    rm -f "$disk"
 }
 
 find_vboxmanage() {
@@ -370,6 +451,15 @@ virtualbox_boot() {
     echo "==> $name"
     VM_KIND=virtualbox
     VM_NAME="vinix-test-$arch"
+    # run-iso-virtualbox.sh keeps a system disk from an earlier VM of the
+    # same name. The test wants a blank one.
+    local folder
+    folder="$("$VBOXMANAGE_BIN" list systemproperties |
+        sed -n 's/^Default machine folder: *//p')"
+    if [ -f "$folder/$VM_NAME-system.vdi" ]; then
+        "$VBOXMANAGE_BIN" closemedium disk "$folder/$VM_NAME-system.vdi" --delete \
+            >/dev/null 2>&1 || rm -f "$folder/$VM_NAME-system.vdi"
+    fi
     if ! VBOXMANAGE="$VBOXMANAGE_BIN" "$SCRIPT_DIR/run-iso-virtualbox.sh" --headless \
         --name="$VM_NAME" --arch="$arch" --serial="$dir/serial.log" "$iso" \
         > "$dir/virtualbox.log" 2>&1; then

@@ -308,10 +308,12 @@ cat "$OUT/SHA256SUMS"
 describe_boot() {
     case "$1" in
         qemu-amd64-bios) echo "QEMU, BIOS (i440fx, no HPET, one CPU: VirtualBox's defaults)" ;;
-        qemu-amd64-uefi) echo "QEMU, UEFI (q35)" ;;
-        qemu-arm64-virtio) echo "QEMU, UEFI (virt, virtio keyboard and tablet)" ;;
+        qemu-amd64-uefi) echo "QEMU, UEFI (q35), installing onto a blank SATA disk" ;;
+        qemu-amd64-uefi-disk) echo "QEMU, UEFI (q35), again, from the system on that disk" ;;
+        qemu-arm64-virtio) echo "QEMU, UEFI (virt, virtio keyboard and tablet), installing onto a blank virtio disk" ;;
+        qemu-arm64-virtio-disk) echo "QEMU, UEFI (virt), again, from the system on that disk" ;;
         qemu-arm64-usb) echo "QEMU, UEFI (virt, USB keyboard and tablet)" ;;
-        virtualbox-amd64) echo "VirtualBox, BIOS" ;;
+        virtualbox-amd64) echo "VirtualBox, BIOS, installing onto a blank SATA disk" ;;
         virtualbox-arm64) echo "VirtualBox, EFI" ;;
         *) echo "$1" ;;
     esac
@@ -332,21 +334,32 @@ describe_boot() {
         esac
     done
     echo
-    echo "The whole system is loaded into memory, so give the VM **at least 4 GB**."
-    echo "Nothing is written to disk: a reboot starts from a clean image."
+    echo "Give the VM **at least 4 GB** of memory and an **empty disk of 4 GB or more**"
+    echo "(16 GB leaves room for apps). The first boot installs Vinix onto the disk;"
+    echo "later boots start from it and keep users, files and installed apps. Keep the"
+    echo "ISO attached: it still boots the machine. Booting a newer ISO with the same"
+    echo "disk updates the system and keeps \`/root\`, where the users' homes are. Vinix"
+    echo "only formats a disk that is entirely empty. Without one it runs from memory,"
+    echo "and a restart starts from a clean image."
+    echo
+    echo "Vinix drives IDE and SATA disks on amd64 and VirtIO block devices on arm64."
     echo
     echo "### QEMU"
     echo
     echo '```sh'
     echo '# amd64 (use -accel kvm -cpu host on Linux, -accel hvf on an Intel Mac)'
+    echo 'qemu-img create -f qcow2 vinix-amd64.qcow2 16G'
     echo 'qemu-system-x86_64 -machine q35 -m 4096 -smp 2 -cdrom vinix-amd64.iso \'
-    echo '    -nic user,model=e1000'
+    echo '    -drive file=vinix-amd64.qcow2,format=qcow2 -nic user,model=e1000'
     echo
     echo '# arm64 (use -accel kvm on an arm64 Linux host)'
+    echo 'qemu-img create -f qcow2 vinix-arm64.qcow2 16G'
     echo 'qemu-system-aarch64 -machine virt -accel hvf -cpu host -m 4096 -smp 4 \'
     echo '    -bios "$(brew --prefix qemu)/share/qemu/edk2-aarch64-code.fd" \'
     echo '    -device virtio-scsi-pci -device scsi-cd,drive=cd \'
     echo '    -drive if=none,id=cd,media=cdrom,file=vinix-arm64.iso \'
+    echo '    -drive if=none,id=hd,file=vinix-arm64.qcow2,format=qcow2 \'
+    echo '    -device virtio-blk-device,drive=hd \'
     echo '    -device ramfb -device qemu-xhci -device usb-kbd -device usb-tablet \'
     echo '    -netdev user,id=net0 -device virtio-net-device,netdev=net0'
     echo '```'
@@ -361,11 +374,14 @@ describe_boot() {
     echo "AMD machines, the arm64 image on Apple Silicon Macs."
     echo
     echo "Create a VM of type **Other/Unknown (64-bit)** or **Other/Unknown (ARM 64-bit)**,"
-    echo "give it **4096 MB** of memory and two CPUs, skip the hard disk, and attach the ISO"
-    echo "to its optical drive. For the network, set the adapter type to **Intel PRO/1000"
-    echo "MT Desktop (82540EM)**. Everything else can stay as VirtualBox sets it; the amd64"
+    echo "give it **4096 MB** of memory and two CPUs, and attach the ISO to its optical"
+    echo "drive. For amd64, add a new **16 GB** hard disk on a **SATA** controller; Vinix"
+    echo "has no driver for the disk controllers VirtualBox gives an arm64 VM, so that one"
+    echo "runs from memory. For the network, set the adapter type to **Intel PRO/1000 MT"
+    echo "Desktop (82540EM)**. Everything else can stay as VirtualBox sets it; the amd64"
     echo "image boots with EFI switched on or off. From a checkout of this repository,"
-    echo "\`./run-iso-virtualbox.sh vinix-arm64.iso\` creates and starts such a VM."
+    echo "\`./run-iso-virtualbox.sh vinix-amd64.iso\` creates and starts such a VM, disk"
+    echo "included."
     if [ -n "$TEST_SUMMARY" ]; then
         echo
         echo "### Tested before release"
