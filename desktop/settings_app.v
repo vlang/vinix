@@ -188,11 +188,10 @@ fn (a &SettingsApp) category_rows() []ui2.Element {
 	for index, category in settings_categories {
 		selected := category == a.category
 		y := settings_padding + index * 32
-		rows << ui2.clickable_view('${settings_action_category}${index}', ui2.rect(6, f64(y), f64(settings_sidebar_width - 12), 28), ui2.BoxStyle{
+		rows << ui2.clickable_view('${settings_action_category}${index}', ui2.rect(0, f64(y), f64(settings_sidebar_width), 28), ui2.BoxStyle{
 			bg: settings_category_selected
-			radius: 6
 			transparent: !selected
-		}, frame_child(ui2.label('', category.title(), ui2.rect(12, 0, f64(settings_sidebar_width - 24), 28), ui2.TextStyle{
+		}, frame_child(ui2.label('', category.title(), ui2.rect(18, 0, f64(settings_sidebar_width - 24), 28), ui2.TextStyle{
 			color: if selected { body_heading } else { body_text }
 			size: 13
 			bold: selected
