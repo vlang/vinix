@@ -37,7 +37,6 @@ import syscall.table
 import socket
 import socket.inet
 import time
-import event
 import x86.hpet
 import x86.hypervisor
 import limine
@@ -49,36 +48,17 @@ fn poll_network() {
 	inet.poll()
 }
 
-// DHCP finishes inside the scheduler's poll, which is no place to write a file.
-// This thread writes /etc/resolv.conf for it, retrying until the root it lands
-// on exists.
-fn resolver_thread() {
-	for {
-		mut interval := time.new_timer(time.TimeSpec{
-			tv_sec:  1
-			tv_nsec: 0
-		})
-		event.await_one(mut interval.event, true) or {}
-		interval.disarm()
-		unsafe { free(interval) }
-		inet.publish_resolver()
-		// Removed files whose grace period has run out, when no more unlinks
-		// come to free them.
-		fs.reap_removed()
-	}
-}
-
 fn kmain_thread() {
 	term.framebuffer_init()
 
 	table.init_syscall_table()
+	table.init_storage_syscalls()
 	table.init_pipe_usercopy_syscalls()
 	table.init_mmap_aslr_syscalls()
 	table.init_security_syscalls()
 	socket.initialise()
 	if e1000.initialise() {
 		sched.set_device_poll_callback(voidptr(poll_network))
-		sched.new_kernel_thread(voidptr(resolver_thread), unsafe { nil }, true)
 	}
 	pipe.initialise()
 	futex.initialise()
@@ -95,6 +75,11 @@ fn kmain_thread() {
 	hypervisor.initialise()
 
 	initramfs.initialise()
+
+	// Shared-memory files need tmpfs's paged backing, as on arm64: a regular
+	// file on devtmpfs grows as one contiguous allocation.
+	fs.create(vfs_root, '/dev/shm', 0o1777 | stat.ifdir) or {}
+	fs.mount(vfs_root, '', '/dev/shm', 'tmpfs') or {}
 
 	// The CPU and memory-node topology, at the paths Linux userspace reads it
 	// from. Mounted after the initramfs has been unpacked so the mount point is
@@ -118,6 +103,8 @@ fn kmain_thread() {
 		nvme.initialise()
 		ahci.initialise()
 	}
+
+	sched.new_kernel_thread(voidptr(writeback_thread), unsafe { nil }, true)
 
 	userland.start_program(false, vfs_root, '/sbin/init', ['/sbin/init'], [], '/dev/console',
 		'/dev/console', '/dev/console') or { panic('Could not start init process') }

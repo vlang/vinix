@@ -3,11 +3,9 @@
 module table
 
 import apple.ans
-import file
 import fs
 import pagecache
 import pipe
-import proc
 import errno
 import aarch64.cpu
 import memory.mmap
@@ -55,26 +53,6 @@ fn storage_flush_everything() bool {
 	// healthy block device's pages in memory, or the reverse.
 	caches_flushed := pagecache.sync_all()
 	return ans.flush() && caches_flushed
-}
-
-fn storage_sync(_ voidptr) (u64, u64) {
-	if !storage_flush_everything() { return errno.err, errno.eio }
-	return 0, 0
-}
-
-fn storage_fsync(_ voidptr, fdnum int) (u64, u64) {
-	// The descriptor's own sync is what folds a shared file mapping back into
-	// the inode; a flush driven from the cache registry cannot find those pages.
-	// It also performs the EBADF and EINVAL checks fsync(2) owes its caller.
-	ret, code := file.syscall_fsync(unsafe { nil }, fdnum)
-	if ret != 0 { return ret, code }
-	return storage_sync(unsafe { nil })
-}
-
-fn storage_syncfs(_ voidptr, fdnum int) (u64, u64) {
-	mut fd := file.fd_from_fdnum(proc.current_thread().process, fdnum) or { return errno.err, errno.get() }
-	defer { fd.unref() }
-	return storage_sync(unsafe { nil })
 }
 
 fn storage_reboot(_ voidptr, magic1 u32, magic2 u32, command u32, _arg voidptr) (u64, u64) {
