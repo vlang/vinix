@@ -330,11 +330,25 @@ fn try_alloc_nozero(count u64) voidptr {
 	return ret
 }
 
+// How many pages pmm_alloc_nozero() has the reclaimers give back at a time
+// while it looks for a run: each batch is freed with a cache's lock held.
+const reclaim_batch = u64(4096)
+
 pub fn pmm_alloc_nozero(count u64) voidptr {
 	mut ret := try_alloc_nozero(count)
 	if ret == unsafe { nil } {
 		reclaim_pages(count)
 		ret = try_alloc_nozero(count)
+		// The reclaimers give back what was least recently used, wherever
+		// it lies, so `count` pages back need not make a run of `count`:
+		// after an install onto a disk had filled the page cache, a
+		// multi-page allocation on amd64 found no run with 2 GiB free. Rather
+		// than stop the kernel, go on giving back, a batch at a time, until a
+		// run turns up or nothing is left to give. Fallible callers have
+		// other ways out and keep the cache.
+		for count > 1 && ret == unsafe { nil } && reclaim_pages(reclaim_batch) > 0 {
+			ret = try_alloc_nozero(count)
+		}
 		if ret == unsafe { nil } {
 			lib.kpanic(unsafe { nil }, c'Out of memory after reclaim')
 		}
