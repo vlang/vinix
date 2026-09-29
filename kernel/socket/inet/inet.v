@@ -10,6 +10,7 @@ import ioctl
 import katomic
 import klock
 import lib
+import limine
 import proc
 import resource
 import socket.public as sock_pub
@@ -118,9 +119,16 @@ __global (
 	resolver_published = false
 	pending_resolver   = ''
 	last_poll_ms       = u32(0)
+	// Resolvers the boot command line lists after the ones DHCP gives.
+	extra_nameservers [max_extra_nameservers]u32
 )
 
+// Two, so that with DHCP's own at least one fits in the three that musl and
+// glibc read from resolv.conf.
+const max_extra_nameservers = 2
+
 pub fn initialise() {
+	read_extra_nameservers()
 	net_lock.acquire()
 	C.vinix_net_init()
 	net_lock.release()
@@ -278,19 +286,21 @@ pub fn poll() {
 				u64((address >> 8) & 0xff), u64((address >> 16) & 0xff), u64(address >> 24))
 		}
 		network_ready = true
-		mut contents := lib.new_text(128)
+		mut contents := lib.new_text(160)
+		mut listed := 0
 		for server in dns {
 			if server != 0 {
-				contents.add('nameserver ')
-				contents.add_unsigned(u64(server & 0xff))
-				contents.add_byte(`.`)
-				contents.add_unsigned(u64((server >> 8) & 0xff))
-				contents.add_byte(`.`)
-				contents.add_unsigned(u64((server >> 16) & 0xff))
-				contents.add_byte(`.`)
-				contents.add_unsigned(u64((server >> 24) & 0xff))
-				contents.add_byte(`\n`)
+				add_nameserver(mut contents, server)
+				listed++
 			}
+		}
+		for server in extra_nameservers {
+			if server == 0 || listed >= 3 || server == dns[0] || server == dns[1]
+				|| server == dns[2] {
+				continue
+			}
+			add_nameserver(mut contents, server)
+			listed++
 		}
 		contents.add('options attempts:2 timeout:2\n')
 		// This runs from the scheduler's poll callback, which is no place to
@@ -299,6 +309,106 @@ pub fn poll() {
 		// is not freed: publish_resolver() may be writing it out right now.
 		pending_resolver = contents.str()
 		last_address = address
+	}
+}
+
+fn add_nameserver(mut contents lib.Text, server u32) {
+	contents.add('nameserver ')
+	contents.add_unsigned(u64(server & 0xff))
+	contents.add_byte(`.`)
+	contents.add_unsigned(u64((server >> 8) & 0xff))
+	contents.add_byte(`.`)
+	contents.add_unsigned(u64((server >> 16) & 0xff))
+	contents.add_byte(`.`)
+	contents.add_unsigned(u64((server >> 24) & 0xff))
+	contents.add_byte(`\n`)
+}
+
+fn is_cmdline_space(c u8) bool {
+	return c == ` ` || c == `\t` || c == `\r` || c == `\n`
+}
+
+// `vinix.nameservers=A.B.C.D[,A.B.C.D]` on the command line names resolvers to
+// list after DHCP's. QEMU's user network answers DNS at 10.0.2.3 by asking
+// only the first resolver the host has; when that one does not answer -- one
+// set by hand for another network -- the guest resolved nothing while the
+// host, which asks the others too, worked. run-aarch64.sh passes the others.
+fn read_extra_nameservers() {
+	kernel_file := limine.kernel_file()
+	if kernel_file == unsafe { nil } || kernel_file.cmdline == unsafe { nil } {
+		return
+	}
+	text := unsafe { &u8(kernel_file.cmdline) }
+	key := 'vinix.nameservers='
+	mut index := 0
+	for unsafe { text[index] } != 0 {
+		if is_cmdline_space(unsafe { text[index] }) {
+			index++
+			continue
+		}
+		// The command line's terminating zero differs from every key byte,
+		// so this stops at the end of a short command line.
+		mut matches := true
+		for offset := 0; offset < key.len; offset++ {
+			if unsafe { text[index + offset] } != key[offset] {
+				matches = false
+				break
+			}
+		}
+		if matches {
+			parse_nameservers(unsafe { &text[index + key.len] })
+			return
+		}
+		for unsafe { text[index] } != 0 && !is_cmdline_space(unsafe { text[index] }) {
+			index++
+		}
+	}
+}
+
+// Dotted quads separated by commas, up to a space or the end. One that does
+// not parse is skipped. The address is kept in network order, as lwIP's are.
+fn parse_nameservers(value &u8) {
+	mut count := 0
+	mut address := u32(0)
+	mut octet := u32(0)
+	mut octets := 0
+	mut digits := 0
+	mut valid := true
+	for index := 0; count < max_extra_nameservers; index++ {
+		c := unsafe { value[index] }
+		if c >= `0` && c <= `9` {
+			octet = octet * 10 + u32(c - `0`)
+			digits++
+			if digits > 3 || octet > 255 {
+				valid = false
+			}
+			continue
+		}
+		if c != `.` && c != `,` && c != 0 && !is_cmdline_space(c) {
+			valid = false
+			continue
+		}
+		if digits == 0 || octets == 4 {
+			valid = false
+		} else {
+			address |= octet << (8 * octets)
+			octets++
+		}
+		octet = 0
+		digits = 0
+		if c == `.` {
+			continue
+		}
+		if valid && octets == 4 && address != 0 {
+			extra_nameservers[count] = address
+			count++
+		}
+		if c != `,` {
+			return
+		}
+		address = 0
+		octets = 0
+		valid = true
 	}
 }
 

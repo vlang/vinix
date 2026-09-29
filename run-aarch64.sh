@@ -459,6 +459,20 @@ if [ "$DISK_ROOT" -eq 1 ]; then
     sed -E -i '' '/^[[:space:]]*cmdline:/ s#$# vinix.qemu_root=1#' "$LIMINE_CONF_QEMU"
 fi
 
+# QEMU's user network answers the guest's DNS at 10.0.2.3 by asking only the
+# host's first IPv4 resolver. When that one does not answer -- a server set by
+# hand for another network -- no name resolves in the guest, while the host,
+# which asks all of its resolvers, works. Give the guest the host's others as
+# well; the kernel lists them after 10.0.2.3 in /etc/resolv.conf.
+HOST_NAMESERVERS="$(awk '
+    $1 == "nameserver" && $2 ~ /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/ {
+        if (seen++ && $2 !~ /^127\./) print $2
+    }' /etc/resolv.conf 2>/dev/null | head -n 2 | paste -sd, -)"
+if [ -n "$HOST_NAMESERVERS" ]; then
+    sed -E -i '' "/^[[:space:]]*cmdline:/ s#\$# vinix.nameservers=$HOST_NAMESERVERS#" "$LIMINE_CONF_QEMU"
+    echo "==> Guest DNS: 10.0.2.3, then the host's $HOST_NAMESERVERS"
+fi
+
 # Limine reads a large desktop module from ISO9660 on the QEMU CD drive.
 # The small FAT volume still carries the UEFI loader and kernel.
 if [ -n "$MODULE_ISO" ]; then
