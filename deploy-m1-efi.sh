@@ -57,6 +57,13 @@ for argument in "$@"; do
             # macOS on it. There is no default and there must not be one.
             CMDLINE_EXTRA="$CMDLINE_EXTRA vinix.apple_ans=1 vinix.ans_rw=PARTUUID=${argument#*=}"
             ;;
+        --ans-persist=*)
+            # Mount one ext2 partition, by PARTUUID, read-write over /root:
+            # the desktop's users and files survive a reboot. Vinix refuses
+            # a volume an unclean shutdown left dirty, so kek.sh checks it
+            # from macOS before each deployment.
+            CMDLINE_EXTRA="$CMDLINE_EXTRA vinix.apple_ans=1 vinix.persist=PARTUUID=${argument#*=}"
+            ;;
         --ans-root=*)
             # Boot root from that partition instead of the initramfs, read-only.
             CMDLINE_EXTRA="$CMDLINE_EXTRA vinix.apple_ans=1 vinix.root=PARTUUID=${argument#*=} vinix.rootfstype=ext2 vinix.rootmode=ro vinix.rootfallback=initramfs"
@@ -134,7 +141,7 @@ for argument in "$@"; do
             CMDLINE_EXTRA="$CMDLINE_EXTRA vinix.apple_speakers=0"
             ;;
         --help|-h)
-            echo "usage: $0 [--apple-studio-display|--external-display] [--apple-display-hotplug] [--apple-gpu] [--gpu-probe-only] [--apple-dcp] [--apple-battery] [--apple-wifi] [--apple-ans] [--ans-rw=UUID] [--ans-root=UUID] [--all-drivers] [--minimal-initramfs] [--sound-initramfs] [--apple-speakers] [--no-apple-speakers] [--desktop-initramfs] [--no-early-term] [--halt-at=N] [--native-resolution] [--force-fault] <mounted_esp_path>"
+            echo "usage: $0 [--apple-studio-display|--external-display] [--apple-display-hotplug] [--apple-gpu] [--gpu-probe-only] [--apple-dcp] [--apple-battery] [--apple-wifi] [--apple-ans] [--ans-rw=UUID] [--ans-persist=UUID] [--ans-root=UUID] [--all-drivers] [--minimal-initramfs] [--sound-initramfs] [--apple-speakers] [--no-apple-speakers] [--desktop-initramfs] [--no-early-term] [--halt-at=N] [--native-resolution] [--force-fault] <mounted_esp_path>"
             exit 0
             ;;
         --*)
@@ -380,6 +387,11 @@ install_verified() {
     label="$3"
     stage="$dst.vinix-new"
     rm -f "$stage"
+    # Unchanged since the last deployment: rewriting it would only risk it.
+    if [ -f "$dst" ] && cmp -s "$src" "$dst"; then
+        echo "$label unchanged"
+        return 0
+    fi
 
     size="$(wc -c < "$src" | tr -d ' ')"
     if [ "$size" -gt 4294967295 ]; then

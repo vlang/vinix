@@ -23,6 +23,14 @@
 #   sudo ~/code/kek.sh desktop-sound desktop + M1 Air sound, no GPU or Wi-Fi
 #   sudo ~/code/kek.sh desktop-basic desktop alone: software rendering, no GPU,
 #                               Wi-Fi or speakers
+#   sudo ~/code/kek.sh fsck     check and repair the Vinix disk, deploy nothing
+#
+# Vinix's disk: vinix-disk.conf beside the checkout (~/code/vinix-disk.conf)
+# names one ext2 partition by its GPT unique GUID, as PARTUUID=<guid>. Desktop
+# modes mount it read-write over /root, where users and their files live.
+# Vinix will not mount it after a crash or forced power-off, so every
+# deployment first checks and repairs it here (e2fsck from Homebrew's
+# e2fsprogs); after such a stop, boot macOS and run this with `fsck`.
 #   sudo ~/code/kek.sh sound-diag    low-level speaker test, no GPU or Wi-Fi
 #   sudo ~/code/kek.sh desktop-wifi  desktop + experimental BCM4378 Wi-Fi
 #   sudo ~/code/kek.sh studio   desktop on a Studio Display selected by the
@@ -60,6 +68,53 @@ if [ -z "$REPO" ]; then
 fi
 DISK="disk0s4"
 ESP="/Volumes/EFI - FEDOR"
+DISK_CONF="$(dirname "$REPO")/vinix-disk.conf"
+E2FSCK=/opt/homebrew/opt/e2fsprogs/sbin/e2fsck
+
+# The configured Vinix disk: prints its PARTUUID, or nothing without one.
+vinix_disk_partuuid() {
+    [ -f "$DISK_CONF" ] || return 0
+    local uuid
+    uuid="$(sed -n 's/^PARTUUID=\([0-9A-Fa-f-]*\)[[:space:]]*$/\1/p' "$DISK_CONF" | head -1)"
+    if ! [[ "$uuid" =~ ^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$ ]]; then
+        echo "error: $DISK_CONF must hold one line PARTUUID=<gpt-unique-guid>" >&2
+        exit 1
+    fi
+    printf '%s\n' "$uuid"
+}
+
+# Check the disk and repair what e2fsck can repair on its own, which includes
+# the dirty mark an unclean Vinix shutdown leaves. Anything worse stops here:
+# Vinix would only refuse the volume and stop its boot.
+vinix_disk_check() {
+    local uuid="$1" node rc
+    node="$(diskutil info "$uuid" 2>/dev/null | awk -F': *' '/Device Node/ {print $2}')" || node=""
+    if [ -z "$node" ]; then
+        echo "error: no partition has PARTUUID $uuid (from $DISK_CONF)" >&2
+        exit 1
+    fi
+    if [ ! -x "$E2FSCK" ]; then
+        echo "error: $E2FSCK is missing; install it with: brew install e2fsprogs" >&2
+        exit 1
+    fi
+    echo "==> checking the Vinix disk ($node)"
+    if "$E2FSCK" -p "$node"; then rc=0; else rc=$?; fi
+    if [ "$rc" -ge 4 ]; then
+        echo "error: the Vinix disk needs a manual repair: sudo $E2FSCK -f $node" >&2
+        exit 1
+    fi
+}
+
+if [ "${1:-}" = fsck ]; then
+    disk_uuid="$(vinix_disk_partuuid)"
+    if [ -z "$disk_uuid" ]; then
+        echo "error: no Vinix disk configured in $DISK_CONF" >&2
+        exit 1
+    fi
+    vinix_disk_check "$disk_uuid"
+    echo "OK. The Vinix disk is clean."
+    exit 0
+fi
 
 case "${1:-desktop}" in
     desktop)
@@ -152,10 +207,18 @@ case "${1:-desktop}" in
         exit 0
         ;;
     *)
-        echo "error: unknown mode '$1' (use: desktop | desktop-basic | desktop-sound | sound-diag | studio | full | gpu | gpu-probe | gpu-diag | desktop-gpu | desktop-wifi | battery | dcp | storage | drivers | desktop-drivers | diag | halt N | selftest)" >&2
+        echo "error: unknown mode '$1' (use: desktop | desktop-basic | desktop-sound | sound-diag | fsck | studio | full | gpu | gpu-probe | gpu-diag | desktop-gpu | desktop-wifi | battery | dcp | storage | drivers | desktop-drivers | diag | halt N | selftest)" >&2
         exit 1
         ;;
 esac
+
+# The desktop's users and files live in /root: give it the Vinix disk.
+disk_uuid="$(vinix_disk_partuuid)"
+if [ -n "$disk_uuid" ] && [[ " ${FLAGS[*]} " == *" --desktop-initramfs "* ]]; then
+    vinix_disk_check "$disk_uuid"
+    FLAGS+=("--ans-persist=$disk_uuid")
+    MODE="$MODE, /root on the Vinix disk"
+fi
 
 # deploy-m1-efi.sh and kernel/bin/vinix are relative paths.
 cd "$REPO"
