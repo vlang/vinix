@@ -35,6 +35,7 @@ FEATURE_MARKERS = (
     b"QEMU CORE PASS: default signal dispositions",
     b"QEMU CORE PASS: signals reach a thread that makes no syscalls",
     b"QEMU CORE PASS: SA_RESTART restarts an interrupted read",
+    b"QEMU CORE PASS: exit and exec take down threads blocked in the kernel",
     b"QEMU CORE PASS: interrupted nanosleep returns a relative remainder",
     b"QEMU CORE PASS: anonymous IPC buffers are reclaimed",
     b"QEMU CORE PASS: socket interface boxes are reclaimed",

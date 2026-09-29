@@ -456,7 +456,7 @@ pub fn init_syscall_table() {
 	syscall_table[57] = voidptr(userland.syscall_fork) // fork
 	syscall_table[58] = voidptr(userland.syscall_fork) // vfork
 	syscall_table[59] = voidptr(userland.syscall_execve) // execve
-	syscall_table[60] = voidptr(userland.syscall_linux_exit) // exit
+	syscall_table[60] = voidptr(userland.syscall_exit) // exit
 	syscall_table[61] = voidptr(userland.syscall_wait4) // wait4
 	syscall_table[63] = voidptr(syscall_linux_uname) // uname
 	syscall_table[97] = voidptr(syscall_linux_getrlimit) // getrlimit

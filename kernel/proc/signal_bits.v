@@ -2,6 +2,8 @@
 // Copyright (c) 2026 Alexander Medvednikov
 module proc
 
+import katomic
+
 // Masks and pending sets keep signal n in bit n-1, the layout of Linux's
 // sigsets, on both architectures, so what userspace hands over is taken as
 // it is.
@@ -20,3 +22,10 @@ pub fn pending_bit(signum int) u8 {
 }
 
 pub const max_pending_signal = 64
+
+// Take charge of `t`'s exit. Exactly one caller -- the thread leaving on its
+// own, or a sibling stopping it -- is told yes.
+pub fn claim_thread_exit(t &Thread) bool {
+	mut thread := unsafe { t }
+	return katomic.cas(mut &thread.exit_claimed, u32(0), u32(1))
+}

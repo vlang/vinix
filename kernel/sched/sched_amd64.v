@@ -485,6 +485,15 @@ pub fn dequeue_and_yield() {
 	yield(true)
 }
 
+// Leave the CPU for good, as a thread whose exit a sibling tearing the process
+// down has already taken charge of (see proc.claim_thread_exit). That sibling's
+// stop_thread_for_good() and dequeue_and_die() settle between them, through
+// reap_claim, which gives back the stacks.
+@[noreturn]
+pub fn park_stopped_thread() {
+	dequeue_and_die()
+}
+
 @[noreturn]
 pub fn dequeue_and_die() {
 	asm volatile amd64 {

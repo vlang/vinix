@@ -68,7 +68,7 @@ fn seccomp_entry(mut t proc.Thread, frame &cpulocal.GPRState, nr u64) u64 {
 		if nr == 0 || nr == 1 || nr == 60 || nr == 15 {
 			return nr
 		}
-		userland.exit_by_signal(9)
+		userland.exit_with_fatal_signal(u8(9))
 	}
 	// The instruction after the syscall is what Linux reports as its address.
 	verdict := proc.seccomp_verdict(process.seccomp, nr, frame.rip, [frame.rdi, frame.rsi,
@@ -97,7 +97,7 @@ fn seccomp_entry(mut t proc.Thread, frame &cpulocal.GPRState, nr u64) u64 {
 		}
 		else {
 			// SIGSYS kills the process.
-			userland.exit_by_signal(31)
+			userland.exit_with_fatal_signal(u8(31))
 		}
 	}
 	return seccomp_verdict_nr

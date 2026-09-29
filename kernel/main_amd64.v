@@ -53,6 +53,8 @@ fn kmain_thread() {
 
 	table.init_syscall_table()
 	table.init_storage_syscalls()
+	// cgroup.kill sends a signal, which lives above fs; hand it the entry point.
+	fs.set_cgroup_signal_hook(voidptr(userland.cgroup_kill_process))
 	// What an interrupt returning to userspace does for a thread with a signal
 	// to take; the scheduler cannot import userland.
 	sched.register_user_signal_hook(voidptr(userland.interrupt_return))

@@ -21,6 +21,7 @@ import proc
 import sched
 import usercopy
 import x86.cpu.local as cpulocal
+import x86.gdt
 
 // The signal number a clone's low byte carries.
 const clone_exit_signal_mask = u64(0xff)
@@ -250,81 +251,22 @@ pub fn syscall_fork(gpr_state &cpulocal.GPRState) (u64, u64) {
 	return clone_new_process(gpr_state, u64(sigchld), 0, 0, 0, 0, false, unsafe { nil })
 }
 
-// exit(2) for a Linux program: only the calling thread ends. The process goes
-// with its last thread. pthread_exit() and a returning thread function both
-// arrive here.
-@[noreturn]
-pub fn syscall_linux_exit(_ voidptr, status int) {
-	mut current_thread := proc.current_thread()
-	mut process := current_thread.process
-
-	// Hand back what this thread still owns while its address space is
-	// mapped: the robust futexes it holds and the tid word pthread_join()
-	// waits on.
-	release_robust_list(mut current_thread)
-	clear_child_tid(mut current_thread)
-	fs.release_thread_fs(mut current_thread)
-
-	process.threads_lock.acquire()
-	index := process.threads.index(current_thread)
-	last := process.threads.len == 1 && index == 0
-	if !last && index >= 0 && !process.exiting {
-		process.threads.delete(index)
-		process.threads_lock.release()
-		proc.free_tid(current_thread.tid)
-		// Off the process's page tables before the thread goes: a sibling's
-		// exit may free them while this CPU is still on its way out.
-		kernel_pagemap.switch_to()
-		sched.dequeue_and_die()
-	}
-	process.threads_lock.release()
-
-	exit_process(u32(status & 0xff) << 8)
+// Whether `t`, stopped by a sibling tearing the process down, was inside the
+// kernel -- a syscall, or a page fault -- rather than in userspace. See
+// kill_sibling_threads() in exit.v.
+fn thread_in_kernel(t &proc.Thread) bool {
+	return t.gpr_state.cs != u64(gdt.user_code_selector)
 }
 
-// exit_group(2): every thread of the process ends.
-@[noreturn]
-pub fn syscall_exit_group(_ voidptr, status int) {
-	mut current_thread := proc.current_thread()
-	release_robust_list(mut current_thread)
-	exit_process(u32(status & 0xff) << 8)
-}
-
-// Stop every thread of `process` but the caller, for good: exit_group() and
-// execve() both need the rest gone before the address space goes. A thread
-// taken off the CPU here is marked dead first, so no wakeup can put it back.
-fn kill_sibling_threads(mut process proc.Process, current &proc.Thread) {
-	mut victims := []&proc.Thread{}
-	defer {
-		unsafe { victims.free() }
-	}
-
-	process.threads_lock.acquire()
-	for t in process.threads {
-		if voidptr(t) != voidptr(current) {
-			victims << t
-		}
-	}
-	process.threads.clear()
-	process.threads << unsafe { current }
-	process.threads_lock.release()
-
-	for victim in victims {
-		mut t := unsafe { victim }
-		t.is_dead = true
-		sched.stop_thread_for_good(t)
-		if t.tid != process.pid {
-			proc.free_tid(t.tid)
-		}
-	}
-}
-
-// A thread told to go by a sibling's exit_group() or execve() leaves here, on
-// its way back to userspace, once the syscall it was in has unwound.
-pub fn exit_if_told_to() {
-	t := proc.current_thread()
-	if t == unsafe { nil } || !katomic.load(&t.must_exit) {
-		return
-	}
-	syscall_linux_exit(unsafe { nil }, 0)
+// Take `victim`, stopped in userspace and claimed for exit by a sibling
+// tearing the process down, off the CPUs for good and give back what it
+// holds. See kill_sibling_threads() in exit.v.
+fn stop_claimed_thread(mut victim proc.Thread) {
+	// Marked first so that no wakeup can put it back on the run queue.
+	katomic.store(mut &victim.is_dead, true)
+	// Waits until it is off every CPU, disarms its ITIMER_REAL and gives its
+	// stacks back.
+	sched.stop_thread_for_good(victim)
+	fs.release_thread_fs(mut victim)
+	proc.free_tid(victim.tid)
 }

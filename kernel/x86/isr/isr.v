@@ -120,7 +120,7 @@ fn exception_handler_at(num u32, mut gpr_state cpulocal.GPRState, cr2 u64) {
 		// dispatch_a_signal() switches away when it delivered the exception. A
 		// fault nothing handles -- no handler, or the signal blocked -- cannot
 		// be retried: the process dies of the signal, as on arm64 and Linux.
-		userland.exit_by_signal(int(signal))
+		userland.exit_with_fatal_signal(signal)
 	} else {
 		lib.kpanic(gpr_state, exception_names[num])
 	}

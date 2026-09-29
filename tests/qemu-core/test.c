@@ -11,6 +11,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <poll.h>
+#include <pthread.h>
 #include <sched.h>
 #include <signal.h>
 #include <stddef.h>
@@ -467,6 +468,45 @@ static int test_syscall_restart(void)
 	CHECK(interrupted_read(1) == 0);
 	CHECK(interrupted_read(0) == 0);
 	puts("QEMU CORE PASS: SA_RESTART restarts an interrupted read");
+	return 0;
+}
+
+static void *block_in_read(void *argument)
+{
+	int fd = *(int *)argument;
+	char byte;
+	read(fd, &byte, 1);
+	return NULL;
+}
+
+/* A process with a thread asleep in the kernel still ends when another of its
+ * threads calls exit_group(2), and still execs: the sleeper is told to go and
+ * woken, leaves through its syscall's exit, and the status the caller gave is
+ * the one wait() reports. */
+static int test_exit_takes_down_blocked_threads(void)
+{
+	for (int exec_instead = 0; exec_instead < 2; exec_instead++) {
+		pid_t child = fork();
+		CHECK(child >= 0);
+		if (child == 0) {
+			static int channel[2];
+			if (pipe(channel) != 0)
+				_exit(2);
+			pthread_t sleeper;
+			if (pthread_create(&sleeper, NULL, block_in_read, &channel[0]) != 0)
+				_exit(3);
+			struct timespec settle = { .tv_sec = 0, .tv_nsec = 100000000 };
+			nanosleep(&settle, NULL);
+			if (exec_instead) {
+				char *const argv[] = {"/sbin/init", "--exec-memory-probe", NULL};
+				execv(argv[0], argv);
+				_exit(4);
+			}
+			_exit(0);
+		}
+		CHECK(reap_ok(child) == 0);
+	}
+	puts("QEMU CORE PASS: exit and exec take down threads blocked in the kernel");
 	return 0;
 }
 
@@ -1494,6 +1534,7 @@ static int run_tests(void)
 	CHECK(test_default_terminating_signals() == 0);
 	CHECK(test_signals_reach_a_busy_loop() == 0);
 	CHECK(test_syscall_restart() == 0);
+	CHECK(test_exit_takes_down_blocked_threads() == 0);
 	CHECK(prepare_directory() == 0);
 	CHECK(test_ext2_mapping_and_namespace() == 0);
 	CHECK(test_private_file_mapping() == 0);

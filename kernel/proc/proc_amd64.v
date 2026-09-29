@@ -136,6 +136,10 @@ pub mut:
 	// Set by a sibling's exit_group() or execve(): leave at the next return to
 	// userspace, once the syscall in progress has unwound.
 	must_exit bool
+	// Whoever sets this owns taking the thread down: the thread itself on its
+	// way out, or a sibling tearing the process down. Never both, so nothing
+	// is released twice. A word, as katomic.cas works on 4 and 8 bytes only.
+	exit_claimed u32
 	// sigaltstack(2): where SA_ONSTACK handlers run.
 	sigaltstack_sp   u64
 	sigaltstack_size u64

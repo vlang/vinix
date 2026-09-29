@@ -253,13 +253,6 @@ pub fn get_main_thread(process &Process) &Thread {
 	return t
 }
 
-// Take charge of `t`'s exit. Exactly one caller -- the thread leaving on its
-// own, or a sibling stopping it -- is told yes.
-pub fn claim_thread_exit(t &Thread) bool {
-	mut thread := unsafe { t }
-	return katomic.cas(mut &thread.exit_claimed, u32(0), u32(1))
-}
-
 // What a seccomp program sees as seccomp_data.arch.
 pub const seccomp_audit_arch = audit_arch_aarch64
 

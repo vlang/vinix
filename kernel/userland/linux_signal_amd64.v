@@ -105,7 +105,7 @@ fn dispatch_linux_signal(context &cpulocal.GPRState, which int, info_signum int,
 		return
 	}
 	if handler == linux_sig_dfl || sigaction.sa_flags & linux_sa_restorer == 0 {
-		exit_by_signal(which)
+		exit_with_fatal_signal(u8(which))
 	}
 
 	// A handler that did not ask for SA_RESTART sees the syscall fail with
@@ -131,7 +131,7 @@ fn dispatch_linux_signal(context &cpulocal.GPRState, which int, info_signum int,
 	frame := sp
 
 	// Freed once pushed, not by a defer: this ends in resume_saved_context()
-	// or exit_by_signal(), neither of which returns, and a signal delivered
+	// or exit_with_fatal_signal(), neither of which returns, and a signal delivered
 	// through here lost it every time.
 	mut buf := []u8{len: int(frame_size)} @[freed]
 	put_u64(mut buf, 0, u64(sigaction.sa_restorer))
@@ -177,7 +177,7 @@ fn dispatch_linux_signal(context &cpulocal.GPRState, which int, info_signum int,
 	unsafe { buf.free() }
 	if !pushed {
 		// No stack to put the frame on: Linux kills the process with SIGSEGV.
-		exit_by_signal(sigsegv)
+		exit_with_fatal_signal(u8(sigsegv))
 	}
 
 	t.masked_signals = previous_mask | sigaction.sa_mask
@@ -212,7 +212,7 @@ pub fn syscall_linux_rt_sigreturn(gpr_state voidptr) (u64, u64) {
 	mut buf := []u8{len: int(frame_size)} @[freed]
 	if !usercopy.copy_from_user(voidptr(&buf[0]), frame, frame_size) {
 		unsafe { buf.free() }
-		exit_by_signal(sigsegv)
+		exit_with_fatal_signal(u8(sigsegv))
 	}
 	mc := frame_mcontext
 	// Nothing in the frame is believed until its cookie is, and the cookie is
@@ -222,7 +222,7 @@ pub fn syscall_linux_rt_sigreturn(gpr_state voidptr) (u64, u64) {
 	if get_u64(buf, mc + mc_cookie) != proc.sigframe_cookie(proc.current_thread().process, frame)
 		|| !usercopy.copy_to_user(frame + mc + mc_cookie, voidptr(&spent), sizeof(u64)) {
 		unsafe { buf.free() }
-		exit_by_signal(sigsegv)
+		exit_with_fatal_signal(u8(sigsegv))
 	}
 	mut context := cpulocal.GPRState{
 		r8:     get_u64(buf, mc + mc_r8)
@@ -248,7 +248,7 @@ pub fn syscall_linux_rt_sigreturn(gpr_state voidptr) (u64, u64) {
 	mask := get_u64(buf, frame_sigmask)
 	unsafe { buf.free() }
 	if !valid_sigreturn_context(&context) {
-		exit_by_signal(sigsegv)
+		exit_with_fatal_signal(u8(sigsegv))
 	}
 	sanitize_sigreturn_context(mut context)
 
@@ -257,7 +257,7 @@ pub fn syscall_linux_rt_sigreturn(gpr_state voidptr) (u64, u64) {
 		mut saved := unsafe { &u8(malloc(fpu_storage_size)) }
 		if !usercopy.copy_from_user(voidptr(saved), fpstate, fpu_storage_size) {
 			unsafe { free(voidptr(saved)) }
-			exit_by_signal(sigsegv)
+			exit_with_fatal_signal(u8(sigsegv))
 		}
 		asm volatile amd64 {
 			cli
