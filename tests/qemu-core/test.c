@@ -731,7 +731,9 @@ static unsigned long free_ram(void)
  * and those pages stayed allocated until the whole mapping was gone. */
 static int test_partial_munmap_returns_pages(void)
 {
-	const size_t page = 4096;
+	/* 16 KiB on arm64: a length of 4 KiB short of the head would round up to
+	 * the page that is meant to stay. */
+	const size_t page = (size_t)sysconf(_SC_PAGESIZE);
 	const size_t length = 32UL * 1024 * 1024;
 	const unsigned long slack = 8UL * 1024 * 1024;
 	unsigned char *region = mmap(NULL, length, PROT_READ | PROT_WRITE,
