@@ -24,6 +24,7 @@
 #include <sys/file.h>
 #include <sys/inotify.h>
 #include <sys/mman.h>
+#include <sys/mount.h>
 #include <sys/random.h>
 #include <sys/resource.h>
 #include <sys/select.h>
@@ -1430,6 +1431,139 @@ static int test_fork_inherits_process_state(void)
 	return 0;
 }
 
+/* A child that counts as fast as it can on CPU `cpu`, into `counter`, without
+ * ever making a syscall. */
+static pid_t start_counter(volatile unsigned long *counter, int cpu)
+{
+	pid_t child = fork();
+	if (child != 0)
+		return child;
+	cpu_set_t affinity;
+	CPU_ZERO(&affinity);
+	CPU_SET(cpu, &affinity);
+	if (sched_setaffinity(0, sizeof(affinity), &affinity) != 0)
+		_exit(2);
+	for (;;)
+		++*counter;
+}
+
+static unsigned long monotonic_ms(void)
+{
+	struct timespec now;
+	clock_gettime(CLOCK_MONOTONIC, &now);
+	return (unsigned long)now.tv_sec * 1000 + (unsigned long)now.tv_nsec / 1000000;
+}
+
+/* How far `counter` gets in `ms` milliseconds of this process sleeping, or of
+ * it spinning when `spin` is set. */
+static unsigned long count_for(volatile unsigned long *counter, unsigned long ms, int spin)
+{
+	unsigned long before = *counter;
+	if (spin) {
+		unsigned long end = monotonic_ms() + ms;
+		while (monotonic_ms() < end)
+			;
+	} else {
+		usleep((useconds_t)ms * 1000);
+	}
+	return *counter - before;
+}
+
+static int kill_counter(pid_t child)
+{
+	CHECK(kill(child, SIGKILL) == 0);
+	int status;
+	CHECK(waitpid(child, &status, 0) == child);
+	CHECK(WIFSIGNALED(status) && WTERMSIG(status) == SIGKILL);
+	return 0;
+}
+
+/* A SCHED_FIFO thread keeps the CPU it is on from an ordinary one for as long as
+ * it has work, and gives it back when it goes back to SCHED_OTHER. musl stubs
+ * sched_setscheduler out, hence the raw syscall. */
+static int test_fifo_keeps_its_cpu(void)
+{
+	long cpus = sysconf(_SC_NPROCESSORS_ONLN);
+	CHECK(cpus >= 2);
+	int cpu = (int)cpus - 1;
+	volatile unsigned long *counter = mmap(NULL, 4096, PROT_READ | PROT_WRITE,
+	    MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+	CHECK(counter != MAP_FAILED);
+	pid_t child = start_counter(counter, cpu);
+	CHECK(child > 0);
+	cpu_set_t affinity, original;
+	CHECK(sched_getaffinity(0, sizeof(original), &original) == 0);
+	CPU_ZERO(&affinity);
+	CPU_SET(cpu, &affinity);
+	CHECK(sched_setaffinity(0, sizeof(affinity), &affinity) == 0);
+
+	/* Sharing the CPU, the child gets some of every stretch. */
+	unsigned long shared = count_for(counter, 300, 1);
+	struct sched_param priority = {.sched_priority = 10};
+	CHECK(syscall(SYS_sched_setscheduler, 0, SCHED_FIFO, &priority) == 0);
+	unsigned long held = count_for(counter, 300, 1);
+	priority.sched_priority = 0;
+	CHECK(syscall(SYS_sched_setscheduler, 0, SCHED_OTHER, &priority) == 0);
+	unsigned long after = count_for(counter, 300, 0);
+
+	CHECK(sched_setaffinity(0, sizeof(original), &original) == 0);
+	CHECK(kill_counter(child) == 0);
+	CHECK(munmap((void *)counter, 4096) == 0);
+	if (!(shared > 0 && after > 0 && held * 20 < shared)) {
+		printf("fifo counts: shared %lu, held %lu, after %lu\n", shared, held, after);
+		CHECK(0);
+	}
+	puts("QEMU CORE PASS: a FIFO thread keeps its CPU");
+	return 0;
+}
+
+static int write_text(const char *path, const char *text)
+{
+	int fd = open(path, O_WRONLY);
+	CHECK(fd >= 0);
+	CHECK(write(fd, text, strlen(text)) == (ssize_t)strlen(text));
+	CHECK(close(fd) == 0);
+	return 0;
+}
+
+/* A frozen cgroup's threads stop, even one that makes no syscalls, and go on
+ * once it thaws. */
+static int test_frozen_cgroup_stops_its_threads(void)
+{
+	static const char *root = "/dev/shm/vinix-qemu-core-cgroup";
+	CHECK(mkdir(root, 0755) == 0);
+	CHECK(mount("cgroup2", root, "cgroup2", 0, NULL) == 0);
+	CHECK(mkdir("/dev/shm/vinix-qemu-core-cgroup/frozen", 0755) == 0);
+
+	volatile unsigned long *counter = mmap(NULL, 4096, PROT_READ | PROT_WRITE,
+	    MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+	CHECK(counter != MAP_FAILED);
+	pid_t child = start_counter(counter, 0);
+	CHECK(child > 0);
+	char pid_text[32];
+	snprintf(pid_text, sizeof(pid_text), "%d\n", child);
+	CHECK(write_text("/dev/shm/vinix-qemu-core-cgroup/frozen/cgroup.procs", pid_text) == 0);
+
+	CHECK(count_for(counter, 200, 0) > 0);
+	CHECK(write_text("/dev/shm/vinix-qemu-core-cgroup/frozen/cgroup.freeze", "1\n") == 0);
+	usleep(50000);
+	unsigned long frozen = count_for(counter, 300, 0);
+	CHECK(write_text("/dev/shm/vinix-qemu-core-cgroup/frozen/cgroup.freeze", "0\n") == 0);
+	unsigned long thawed = count_for(counter, 300, 0);
+	if (!(frozen == 0 && thawed > 0)) {
+		printf("cgroup counts: frozen %lu, thawed %lu\n", frozen, thawed);
+		CHECK(0);
+	}
+
+	CHECK(kill_counter(child) == 0);
+	CHECK(munmap((void *)counter, 4096) == 0);
+	CHECK(rmdir("/dev/shm/vinix-qemu-core-cgroup/frozen") == 0);
+	CHECK(umount(root) == 0);
+	CHECK(rmdir(root) == 0);
+	puts("QEMU CORE PASS: a frozen cgroup stops its threads");
+	return 0;
+}
+
 /* An event has room for 64 listeners. More threads than that waiting on one
  * futex see a spurious wake, which they retry, rather than stop the kernel. */
 #define MANY_WAITERS 80
@@ -1778,6 +1912,8 @@ static int run_tests(void)
 	CHECK(test_futex_wake_op() == 0);
 	CHECK(test_more_waiters_than_an_event_holds() == 0);
 	CHECK(test_fork_inherits_process_state() == 0);
+	CHECK(test_fifo_keeps_its_cpu() == 0);
+	CHECK(test_frozen_cgroup_stops_its_threads() == 0);
 	CHECK(test_wait_ends_for_a_pending_signal() == 0);
 	CHECK(test_default_terminating_signals() == 0);
 	CHECK(test_signals_reach_a_busy_loop() == 0);

@@ -72,85 +72,31 @@ pub fn initialise() {
 	}
 }
 
-// May this thread run on this CPU at all? Asked by the run-queue scan before it
-// picks a thread up, and by the timer handler about the thread already on the
-// CPU: an affinity change while a thread is running has to take effect, so a CPU
-// it may no longer use puts it down even with nothing to replace it. Safe to do
-// here because this scheduler's idle path never returns to the caller -- it ends
-// in await(), on the per-CPU interrupt stack.
-fn may_run_here(t &proc.Thread, cpu_number u64) bool {
-	if cpu_number >= 64 {
-		return true
-	}
-	return t.affinity_mask & (u64(1) << cpu_number) != 0
+// The scheduler's clock: the monotonic clock, which the timer tick advances.
+@[inline]
+fn clock_ns() u64 {
+	return time.monotonic_ns()
 }
 
-// Pick a thread for this CPU. On a machine with more than one memory node this
-// runs twice: once accepting only threads already at home on this CPU's node,
-// and then accepting anything. A thread therefore tends to keep running next to
-// the memory it faulted in, while a node with nothing to do still takes work
-// from a busy one rather than idling.
+@[inline]
+fn interrupts_off() {
+	asm volatile amd64 {
+		cli
+	}
+}
+
+// See cgroup_holds_thread_back(). `state` is where the thread would resume.
+fn cgroup_parks(t &proc.Thread, state &cpulocal.GPRState) bool {
+	return cgroup_holds_thread_back(t, state.cs != user_code_seg)
+}
+
 fn get_next_thread() &proc.Thread {
 	scheduler_queue_lock.acquire()
 	defer {
 		scheduler_queue_lock.release()
 	}
 	mut cpu_local := cpulocal.current()
-
-	if numa_multinode {
-		local_thread := scan_run_queue(mut cpu_local, int(cpu_local.numa_node))
-		if unsafe { local_thread != nil } {
-			return local_thread
-		}
-	}
-	return scan_run_queue(mut cpu_local, -1)
-}
-
-// `want_node` of -1 accepts every thread; otherwise only those whose home node
-// matches, plus those no CPU has claimed yet.
-//
-// Exactly one lap of the queue, from wherever this CPU last stopped, so the
-// order stays round-robin. The lap is counted rather than compared against a
-// starting index: the skip cases used to `continue` straight past the
-// wrap-around check, so a slot that this CPU could not take and that happened
-// to sit at the start index sent the scan round the queue for ever. Nothing was
-// skipped before affinity masks and memory nodes existed, which is why it took
-// until a pinned thread on another node to find.
-fn scan_run_queue(mut cpu_local cpulocal.Local, want_node int) &proc.Thread {
-	mut start := cpu_local.last_run_queue_index
-	if start < 0 || start >= max_running_threads {
-		start = 0
-	}
-
-	for step := 1; step <= max_running_threads; step++ {
-		index := (start + step) % max_running_threads
-
-		mut t := scheduler_running_queue[index]
-		if unsafe { t == nil } {
-			continue
-		}
-		if !may_run_here(t, cpu_local.cpu_number) {
-			continue
-		}
-		if want_node >= 0 && t.numa_node >= 0 && t.numa_node != want_node {
-			continue
-		}
-		if t.l.test_and_acquire() == true {
-			cpu_local.last_run_queue_index = index
-			return t
-		}
-	}
-
-	return unsafe { nil }
-}
-
-fn effective_timeslice(t &proc.Thread) u64 {
-	weight := u64(20 - t.process.nice)
-	mut slice := t.timeslice * weight / 20
-	if slice == 0 {
-		slice = 1
-	}
-	return slice
+	return pick_next_thread(cpu_local.cpu_number, int(cpu_local.numa_node), mut cpu_local.last_run_queue_index)
 }
 
 __global (
@@ -176,7 +122,19 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 	// waiting on a socket -- can be picked straight away.
 	poll_devices()
 
+	// The same reading bills the outgoing thread and starts the incoming one,
+	// so a switch neither loses time between the two nor counts it twice.
+	now_ns := clock_ns()
+
 	mut current_thread := proc.current_thread()
+
+	// Charge the turn that has just ended against the real-time entitlements it
+	// was spending, and against its cgroup's cpu.max, before the pick below: a
+	// thread that has just run out is passed over on the scan it ran out on.
+	account_realtime_time(cpu_local.cpu_number, current_thread, now_ns)
+	if unsafe { current_thread != 0 } {
+		proc.charge_cgroup_cpu(mut current_thread, now_ns)
+	}
 
 	mut next_thread := get_next_thread()
 
@@ -194,17 +152,35 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 		// A thread whose context resume_saved_context() preset is not resumed
 		// where it was interrupted, but from that context.
 		preset := current_thread.context_preset
-		if unsafe { next_thread == nil } && katomic.load(&current_thread.is_in_queue)
-			&& may_run_here(current_thread, cpu_local.cpu_number) && !preset {
+		entitled := katomic.load(&current_thread.is_in_queue)
+			&& may_run_here(current_thread, cpu_local.cpu_number)
+			&& !cgroup_parks(current_thread, gpr_state)
+		mut keeps_cpu := unsafe { next_thread == nil } && entitled
+		if unsafe { next_thread != nil } && entitled {
+			// Something else is runnable, but whether it takes the CPU is the
+			// policies' business: a FIFO thread is not interrupted by an equal,
+			// and no thread at all is interrupted by something ranked below it.
+			throttled := realtime_throttled(cpu_local.cpu_number, now_ns)
+			if !should_preempt(mut current_thread, next_thread, now_ns, throttled) {
+				// Hand back the thread the scan took for us. Taken here, its
+				// lock gives interrupts back off.
+				next_thread.l.release()
+				next_thread = unsafe { nil }
+				keeps_cpu = true
+			}
+		}
+		if keeps_cpu && !preset {
+			current_thread.yield_requested = false
 			apic.lapic_eoi()
 			apic.lapic_timer_oneshot(mut cpu_local, scheduler_vector, effective_timeslice(current_thread))
 			return
 		}
+		current_thread.yield_requested = false
 		// Past the early return above this thread really is coming off the
 		// CPU, so the turn it has just had is charged to its process. The
 		// monotonic clock is the tick source here rather than a counter read,
 		// which puts the resolution at one timer tick.
-		proc.charge_cpu_time(mut current_thread, time.monotonic_ns())
+		proc.charge_cpu_time(mut current_thread, now_ns)
 		if preset {
 			current_thread.context_preset = false
 		} else {
@@ -232,7 +208,7 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 	}
 
 	current_thread = next_thread
-	proc.begin_cpu_time(mut current_thread, time.monotonic_ns())
+	proc.begin_cpu_time(mut current_thread, now_ns)
 
 	// The first CPU to run a thread claims it for its node, so that the pages
 	// the thread goes on to fault in and the CPU it keeps returning to are on

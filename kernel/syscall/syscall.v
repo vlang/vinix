@@ -2,6 +2,7 @@ module syscall
 
 import x86.cpu.local as cpulocal
 import proc
+import sched
 import userland
 
 // Called by syscall_entry in asm/x86_64/syscall_entry.S on the way back to
@@ -21,6 +22,9 @@ fn leave(context &cpulocal.GPRState) {
 	userland.exit_if_told_to()
 	userland.prepare_syscall_restart(context)
 	userland.end_wait_mask_unless_interrupted(context.rax)
+	// Before a signal is dispatched, so one that arrived while the thread
+	// waited is delivered once its group may run again.
+	sched.park_for_cgroup()
 	userland.dispatch_a_signal(context)
 	userland.end_wait_mask()
 }
