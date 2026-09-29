@@ -126,6 +126,12 @@ def encode_3d(
         raise fake.PlanError("external input must be a JSON object")
     external_decisions = _offset_map(external_root.get("decisions"), "decisions")
     external_values = _offset_map(external_root.get("values"), "values")
+    hardware = external_root.get("hardware") or {}
+    if not isinstance(hardware, dict):
+        raise fake.PlanError("hardware inputs must be a JSON object")
+    abi = fake.fold_accelerator_inputs(
+        abi, {name: _scalar(value, name) for name, value in hardware.items()}
+    )
 
     passes = fake._integer(layout["passes"], "register passes")
     stride = fake._integer(layout["stride"], "register stride")
@@ -223,7 +229,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "--externals", type=Path,
-        help="JSON values for unresolved decisions and events",
+        help="JSON hardware inputs and values for unresolved decisions and events",
     )
     parser.add_argument("--command-output", type=Path, required=True)
     parser.add_argument("--descriptor-output", type=Path, required=True)

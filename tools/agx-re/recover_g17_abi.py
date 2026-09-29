@@ -691,6 +691,15 @@ INIT_UAT_HANDOFF = "__ZN27AGXUnifiedAddressTranslator11initHandoffEv"
 KERNEL_COLLECTION_BASE = 0xFFFFFE0007004000
 G17_INIT_SEQUENCE_VTABLE_SLOT = 0xA88
 G17_FW_BRN_SIZE_VTABLE_SLOT = 0xF90
+G17_ACCELERATOR_META_ALLOC = "__ZNK18AGXAcceleratorG17X9MetaClass5allocEv"
+G17_SET_SMART_IDLE_OFF_ENABLE = "__ZN14AGXArmFirmware21setSmartIdleOffEnableEb"
+G17_ACCELERATOR_OBJECT_BYTES = 0x1CBD0
+G17_RETRIEVE_CHIP_INFO = "__ZN14AGXAccelerator16retrieveChipInfoEP12AGXSChipInfo"
+G17_RETRIEVE_CHIP_INFO_VTABLE_SLOT = 0xD60
+G17_ACCELERATOR_FEATURE_FLAGS = 0x6D0
+G17_ACCELERATOR_POWER_COLUMN_COUNT = 0x4E4
+G17_ACCELERATOR_CHIP_INFO = 0xF7C8
+G17_ACCELERATOR_CHIP_INFO_OVERRIDE = 0xF7F0
 G17_CONFIGURE_DEVICE_VTABLE_SLOT = 0x958
 G17_CONFIGURE_POWER_VTABLE_SLOT = 0xA20
 G17_PIO_TABLE_VTABLE_SLOT = 0x1168
@@ -7858,6 +7867,439 @@ def recover_g17_feature_defaults(
     }
 
 
+# Every accelerator site that stores the +0x6d0 feature-flag word. Each is a
+# read-modify-write of the word; `sets` names how the bits it can newly set
+# are recovered from the pinned instructions ("none" for AND-only sites).
+G17_FEATURE_FLAG_WRITERS: tuple[tuple[str, int, dict[int, int], tuple], ...] = (
+    (BASE_CONFIGURE_DEVICE, 0x22C,
+     {0x208: 0xF9436A68, 0x20C: 0x9261F908, 0x228: 0xB2400108, 0x22C: 0xF9036A68},
+     ("orr_immediate", 0x228)),
+    # (old & 0xffffffffff061281) | (0x100 or 0) | (6 or 4)
+    (BASE_CONFIGURE_DEVICE, 0x310,
+     {0x26C: 0xF9436A68, 0x274: 0x52800095, 0x278: 0x528000C9, 0x27C: 0x9A951129,
+      0x28C: 0x929DAFCA, 0x290: 0xF2BFE0CA, 0x294: 0x8A0A010A, 0x29C: 0x92620108,
+      0x2A4: 0x52802008, 0x2A8: 0x9A9F0108, 0x2AC: 0xAA0A0108, 0x2B0: 0xAA090108,
+      0x310: 0xF9036A68},
+     ("movz_w", 0x2A4, 0x278, 0x274)),
+    (BASE_CONFIGURE_DEVICE, 0x524,
+     {0x4F0: 0xF9436A68, 0x4F4: 0x92B7E009, 0x4F8: 0xF2DFFE29, 0x4FC: 0x8A090108,
+      0x524: 0xF9036A68},
+     ("none",)),
+    (BASE_CONFIGURE_DEVICE, 0x60C,
+     {0x5A4: 0xF9436A69, 0x5E4: 0x92801008, 0x5E8: 0xF2D003E8, 0x5EC: 0xF2FFBE88,
+      0x5F0: 0x8A080128, 0x600: 0xD2C50009, 0x604: 0xF2E04009, 0x608: 0xAA090108,
+      0x60C: 0xF9036A68},
+     ("move_wide_x", 0x600, 0x604)),
+    (BASE_CONFIGURE_DEVICE, 0x684,
+     {0x67C: 0xF9436A68, 0x680: 0x925BF908, 0x684: 0xF9036A68}, ("none",)),
+    (BASE_CONFIGURE_DEVICE, 0x71C,
+     {0x714: 0xF9436A68, 0x718: 0x9246F908, 0x71C: 0xF9036A68}, ("none",)),
+    (BASE_CONFIGURE_DEVICE, 0xB8C,
+     {0xB7C: 0xF9436A68, 0xB80: 0x92830009, 0xB84: 0xF2BFFD69, 0xB88: 0x8A090108,
+      0xB8C: 0xF9036A68},
+     ("none",)),
+    # Only when the power-column count is at least two.
+    (BASE_CONFIGURE_DEVICE, 0xBA0,
+     {0xB90: 0xB944E669, 0xB94: 0x7100093F, 0xB9C: 0xB26B0108, 0xBA0: 0xF9036A68},
+     ("orr_immediate", 0xB9C)),
+    (BASE_CONFIGURE_DEVICE, 0xCD4,
+     {0xCCC: 0xF9436A69, 0xCD0: 0x9269F928, 0xCD4: 0xF9036A68}, ("none",)),
+    # Copies the old bit 30 into bit 25.
+    (BASE_CONFIGURE_DEVICE, 0xD0C,
+     {0xCD8: 0xD35EFD35, 0xD04: 0xF9436A68, 0xD08: 0xB36702A8, 0xD0C: 0xF9036A68},
+     ("bfi", 0xD08)),
+    (BASE_CONFIGURE_DEVICE, 0xD80,
+     {0xD38: 0xF9436A68, 0xD7C: 0x924BF908, 0xD80: 0xF9036A68}, ("none",)),
+    (BASE_CONFIGURE_DEVICE, 0x1FE8,
+     {0x1FE0: 0xF9436A68, 0x1FE4: 0x924AF908, 0x1FE8: 0xF9036A68}, ("none",)),
+    (BASE_CONFIGURE_DEVICE, 0x24AC,
+     {0x24A4: 0xF9436A68, 0x24A8: 0x9247F908, 0x24AC: 0xF9036A68}, ("none",)),
+    (PI300_CONFIGURE_DEVICE, 0xA8,
+     {0x84: 0xF9436A68, 0x9C: 0x52909809, 0xA0: 0x72B00029, 0xA4: 0xAA090108,
+      0xA8: 0xF9036A68},
+     ("move_wide_w", 0x9C, 0xA0)),
+    (PI300_CONFIGURE_DEVICE, 0x278,
+     {0x224: 0xF9436A69, 0x26C: 0xD2C00C0A, 0x270: 0xF2E0004A, 0x274: 0xAA0A0129,
+      0x278: 0xF9036A69},
+     ("move_wide_x", 0x26C, 0x270)),
+    (G17_CONFIGURE_DEVICE, 0xA4,
+     {0x94: 0xF9436A68, 0x98: 0xD2A30049, 0x9C: 0xF2E00029, 0xA0: 0xAA090108,
+      0xA4: 0xF9036A68},
+     ("move_wide_x", 0x98, 0x9C)),
+    (G17_CONFIGURE_DEVICE, 0x62C,
+     {0x61C: 0xF9436A6A, 0x620: 0xB25E014A, 0x62C: 0xF9036A6A},
+     ("orr_immediate", 0x620)),
+    # Reached through firmware +0x298; it can only toggle bit 1.
+    (G17_SET_SMART_IDLE_OFF_ENABLE, 0x20,
+     {0x08: 0xF9436909, 0x10: 0x5280004A, 0x14: 0x9A9F114A, 0x18: 0x927EF929,
+      0x1C: 0xAA0A0129, 0x20: 0xF9036909},
+     ("movz_w", 0x10)),
+)
+
+# Census entries that write +0x6d0..+0x6d7 of some *other* object, with the
+# reason they cannot be the accelerator. Keys are (kind, symbol, offset).
+G17_FEATURE_FLAG_OTHER_OBJECTS: dict[tuple[str, str, int], str] = {
+    ("store", "__ZN22AGXCLCommandDescriptor4initEP5IOGPUP17IOGPUCommandQueueP9IOGPUTaskPKcyP19AGXDebugBufferShmem", 0x114):
+        "this is the AGXCLCommandDescriptor being initialized",
+    ("store", "__ZN14AGXArmFirmware27initPowerAndPerformanceDataEv", 0x1A50):
+        "zero store to firmware power data [firmware+0x2d8]+0x46d0",
+    ("store", "__ZN14AGXArmFirmware27initPowerAndPerformanceDataEv", 0x24F0):
+        "firmware runtime data [firmware+0x380]+0x12c+0x5a0",
+    ("store", "__ZN14AGXArmFirmware27initPowerAndPerformanceDataEv", 0x24F8):
+        "firmware runtime data [firmware+0x380]+0x12c+0x5a8",
+    ("store", "__ZN28AGXHardwareKernelCommandUtil27copy3DCommonPassthroughDataEP22AGX3DCommandDescriptorRK21AGX3DCommandCommonRec", 0xF0):
+        "the first argument is the AGX3DCommandDescriptor",
+    ("global", "__GLOBAL__sub_I_agxk_firmware.cpp", 0x44):
+        "static initializer storing an ADRP-addressed global",
+    ("global", "__GLOBAL__sub_I_agxk_internal_resource.cpp", 0xBC):
+        "static initializer storing an ADRP-addressed global",
+    ("memory_routine", BASE_CONFIGURE_DEVICE, 0x25EC):
+        "copies into the IOMallocData buffer allocated just before",
+    ("memory_routine", BASE_CONFIGURE_DEVICE, 0x26C8):
+        "copies into the IOMallocData buffer allocated just before",
+    ("memory_routine", "__ZN11AGXFirmware23ensureStatisticsUpdatedEv", 0x1A0):
+        "copies into AGXStatistics +0x480, reached through accelerator +0x1cb20",
+    ("memory_routine", "__ZN14AGXArmFirmware27initPowerAndPerformanceDataEv", 0x2B64):
+        "copies a table into firmware power data",
+    ("memory_routine", "__ZN22AGXPerfCtrSamplerGen1123commitSourceCounterListEv", 0x214):
+        "refills the 0x800-byte source array cleared at the same address",
+    ("memory_routine", "__ZN16AGXRestartReport22finalizeAndSendReportsEP14AGXAccelerator", 0x91C):
+        "copies into the IOMallocData report buffer allocated just before",
+}
+
+# Escaped interior pointers are accepted by callee when the callee cannot write
+# the word: event tokens, noreturn traps, IOGPUEvent members (0x40 bytes; the
+# accelerator keeps an 8-byte deadline at +0x6c8, so none sits there) and the
+# 8-byte deadline itself.
+G17_FEATURE_FLAG_SAFE_CALLEES = {
+    "_clock_interval_to_deadline": "writes one u64 deadline ending before the word",
+    "_IOLockWakeup": "the pointer is an event token",
+    "__ZN14AGXAccelerator16acceleratorSleepEPv": "the pointer is an event token",
+    "_panic": "does not return",
+    "__ZN9os_detail21panic_trapping_policy4trapEPKc": "does not return",
+    "__ZN9os_detail21panic_trapping_policy4trapEPKc.232": "does not return",
+    "__ZNK17IOGPUEventMachine9copyEventEPK10IOGPUEventPS0_": "IOGPUEvent member",
+    "__ZNK17IOGPUEventMachine10mergeEventEPK10IOGPUEventPS0_": "IOGPUEvent member",
+    "__ZNK17IOGPUEventMachine10scrubEventEP10IOGPUEvent": "IOGPUEvent member",
+    "__ZN17IOGPUEventMachine9initEventEP10IOGPUEvent": "IOGPUEvent member",
+    "__ZNK17IOGPUEventMachine17isStampIdxInEventEP10IOGPUEventiPj": "IOGPUEvent member",
+    "__ZNK17IOGPUEventMachine18eventHasStampIndexEPK10IOGPUEventi": "IOGPUEvent member",
+    "__ZN15AGXEventMachine10traceEventE18AGXSTraceEventTypeP10IOGPUEventy": "IOGPUEvent member",
+    "__ZN13AGXStatistics22updateThrottleCountersEP29AGFPowerThrottleCountersStatsPVj21AGFAControlDomainType":
+        "a u32 counter in the firmware statistics object",
+    "__ZN15AGXCommandQueue25populateCommandHWDSIDDataERK24AGXHardwareKernelCommandP12IOGPUChanneljP20AGXCommandHWDSIDData":
+        "the AGXCommandHWDSIDData of a compute descriptor",
+}
+# Escapes through a virtual call, which the census cannot name, by site.
+G17_FEATURE_FLAG_VIRTUAL_ESCAPES: dict[tuple[str, int], str] = {
+    ("__ZN14AGXAccelerator25mcacheApertureBufferSetupER20AGXCommandHWDSIDDataiR25_AGFICommandKSMBufferInfoi", 0xF0):
+        "member of the _AGFICommandKSMBufferInfo argument",
+    ("__ZN14AGXAccelerator18drainCommandsTimerEv", 0x88):
+        "event token for a wakeup; the byte at +0x681 is below the word",
+    ("__ZN14AGXAccelerator17drainDeviceEventsEv", 0x124):
+        "event token for a wakeup; the byte at +0x681 is below the word",
+    ("__ZN16AGXCLChannelSKSM12submitBufferEP22IOGPUCommandDescriptor", 0x6A4):
+        "member of the IOGPUCommandDescriptor argument",
+}
+G17_FEATURE_FLAG_VIRTUAL_ESCAPE_PREFIXES = (
+    # Float out-parameters of the firmware power-controller configuration.
+    "__ZN14AGXArmFirmware31getPIControllerConfigDictionaryE",
+)
+
+# Census entries writing accelerator +0xf7ec..+0xf7ff that are not the chip
+# information override, with the reason they cannot change its final value.
+G17_CHIP_INFO_OTHER_WRITERS: dict[tuple[str, str, int], str] = {
+    ("memory_routine", BASE_CONFIGURE_DEVICE, 0x25EC):
+        "copies into the IOMallocData buffer allocated just before",
+    ("memory_routine", BASE_CONFIGURE_DEVICE, 0x26C8):
+        "copies into the IOMallocData buffer allocated just before",
+    ("memory_routine", "__ZN11AGXFirmware27initPowerAndPerformanceDataEv", 0x2C):
+        "clears the firmware power data [firmware+0x2d8]",
+    ("memory_routine", "__ZN14AGXArmFirmware27initPowerAndPerformanceDataEv", 0xD38):
+        "clears a firmware power-data table",
+    ("memory_routine", "__ZN14AGXArmFirmware27initPowerAndPerformanceDataEv", 0xE30):
+        "clears a firmware power-data table",
+    ("memory_routine", "__ZN14AGXArmFirmware27initPowerAndPerformanceDataEv", 0x1F78):
+        "clears firmware power data [firmware+0x2d8]+0x52d4",
+    ("memory_routine", "__ZN14AGXArmFirmware27initPowerAndPerformanceDataEv", 0x2B64):
+        "copies a table into firmware power data",
+    ("memory_routine", "__ZN22AGXPerfCtrSamplerGen1123commitSourceCounterListEv", 0x214):
+        "refills the 0x800-byte source array cleared at the same address",
+    ("memory_routine", "__ZN16AGXRestartReport22finalizeAndSendReportsEP14AGXAccelerator", 0x91C):
+        "copies into the IOMallocData report buffer allocated just before",
+    # retrieveChipInfo fills AGXSChipInfo at +0xf7c8 from inside the base
+    # configureDevice, which returns before the override is stored.
+    ("escape", BASE_CONFIGURE_DEVICE, 0x64C):
+        "retrieveChipInfo, called before the override",
+}
+
+
+def _feature_flag_set_bits(code: bytes, recipe: tuple) -> int:
+    kind = recipe[0]
+    word = lambda offset: struct.unpack_from("<I", code, offset)[0]  # noqa: E731
+    if kind == "none":
+        return 0
+    if kind == "orr_immediate":
+        decoded = decode_logical_immediate_x(word(recipe[1]))
+        if decoded is None or decoded[0] != "orr":
+            raise ValueError("feature-flag OR immediate no longer decodes")
+        return decoded[3]
+    if kind == "movz_w":
+        bits = 0
+        for offset in recipe[1:]:
+            move = decode_movz_w(word(offset))
+            if move is None:
+                raise ValueError("feature-flag MOVZ no longer decodes")
+            bits |= move[1]
+        return bits
+    if kind == "move_wide_w":
+        low = decode_movz_w(word(recipe[1]))
+        high = decode_movk_w(word(recipe[2]))
+        if low is None or high is None:
+            raise ValueError("feature-flag 32-bit constant no longer decodes")
+        return (low[1] & ~(0xFFFF << high[2])) | high[1] << high[2]
+    if kind == "move_wide_x":
+        value = 0
+        for offset in recipe[1:]:
+            move = decode_move_wide(word(offset))
+            if move is None or move[0] not in ("movz", "movk"):
+                raise ValueError("feature-flag 64-bit constant no longer decodes")
+            _kind, _register, immediate, shift = move
+            if move[0] == "movz":
+                value = immediate << shift
+            else:
+                value = (value & ~(0xFFFF << shift)) | immediate << shift
+        return value
+    if kind == "bfi":
+        decoded = decode_bfi_x(word(recipe[1]))
+        if decoded is None:
+            raise ValueError("feature-flag BFI no longer decodes")
+        _destination, _source, lsb, width = decoded
+        return ((1 << width) - 1) << lsb
+    raise ValueError(f"unknown feature-flag recipe {kind!r}")
+
+
+def _census_key(entry: dict[str, object]) -> tuple[str, str, int]:
+    return str(entry["kind"]), str(entry["symbol"]), int(entry["offset"])
+
+
+def require_zeroed_accelerator_allocation(image: bytes, kernel_image: bytes) -> dict[str, object]:
+    """Prove the G17 accelerator object starts zero-filled."""
+
+    symbols = macho_symbols(image)
+    kernel_symbols = macho_symbols(kernel_image)
+    if G17_ACCELERATOR_META_ALLOC not in symbols:
+        raise ValueError(f"Mach-O has no {G17_ACCELERATOR_META_ALLOC} symbol")
+    for name in (OS_OBJECT_TYPED_OPERATOR_NEW, KALLOC_TYPE_IMPL):
+        if name not in kernel_symbols:
+            raise ValueError(f"kernel Mach-O has no {name} symbol")
+    address, code = symbol_code(image, G17_ACCELERATOR_META_ALLOC)
+    require_instruction_words_at(
+        code,
+        "G17 accelerator typed allocation",
+        {0x18: 0x52997A01, 0x1C: 0x72A00021},  # w1 = 0x1cbd0
+    )
+    call = decode_bl_target(address + 0x20, struct.unpack_from("<I", code, 0x20)[0])
+    if call != kernel_symbols[OS_OBJECT_TYPED_OPERATOR_NEW]:
+        raise ValueError("G17 accelerator is not allocated by OSObject typed operator new")
+    new_address, new_code = symbol_code(kernel_image, OS_OBJECT_TYPED_OPERATOR_NEW)
+    require_instruction_words_at(
+        new_code, "OSObject zeroed typed allocation", {0x44: 0x52800081}
+    )
+    if decode_bl_target(
+        new_address + 0x48, struct.unpack_from("<I", new_code, 0x48)[0]
+    ) != kernel_symbols[KALLOC_TYPE_IMPL]:
+        raise ValueError("OSObject typed operator new has an unexpected allocator target")
+    return {
+        "allocator": OS_OBJECT_TYPED_OPERATOR_NEW,
+        "object_bytes": G17_ACCELERATOR_OBJECT_BYTES,
+        "allocator_flag_name": "Z_ZERO",
+    }
+
+
+def recover_g17_accelerator_channel_inputs(
+    image: bytes,
+    kernel_image: bytes,
+    iogpu_image: bytes,
+    chip_info_decode: dict[str, object],
+) -> dict[str, object]:
+    """Recover the accelerator members the channel register producers read.
+
+    The 3D, TA, FastBlit and CL producers load three accelerator members:
+    the power-column count at +0x4e4, bits of the 64-bit feature-flag word at
+    +0x6d0, and chip information at +0xf7ec..+0xf7fb. The first is hardware
+    topology. For the other two, a census of every instruction in the driver
+    that can write those bytes shows which bits can ever become set and that
+    AcceleratorX::configureDevice overrides chip-information bytes
+    +0x28..+0x37 with a fixed literal after retrieveChipInfo fills them.
+    """
+
+    symbols = macho_symbols(image)
+    kernel_symbols = macho_symbols(kernel_image)
+    required = (
+        BASE_CONFIGURE_DEVICE,
+        PI300_CONFIGURE_DEVICE,
+        G17_CONFIGURE_DEVICE,
+        G17_SET_SMART_IDLE_OFF_ENABLE,
+        G17_RETRIEVE_CHIP_INFO,
+    )
+    missing = [name for name in required if name not in symbols]
+    if missing:
+        raise ValueError(f"Mach-O has no {missing[0]} symbol")
+    if recover_vtable_target(
+        image, G17_ACCELERATOR_VTABLE, G17_RETRIEVE_CHIP_INFO_VTABLE_SLOT
+    ) != symbols[G17_RETRIEVE_CHIP_INFO]:
+        raise ValueError("unexpected G17 retrieveChipInfo provider")
+    column = chip_info_decode["fields"]["power_column_count"]
+    if column.get("accelerator_member") != G17_ACCELERATOR_POWER_COLUMN_COUNT:
+        raise ValueError("power-column count is no longer copied to accelerator +0x4e4")
+    allocation = require_zeroed_accelerator_allocation(image, kernel_image)
+
+    # Feature flags: every census entry is either a pinned accelerator
+    # read-modify-write, a write to another object, or a clear.
+    flags = census_g17_member_writes(
+        image, G17_ACCELERATOR_FEATURE_FLAGS, G17_ACCELERATOR_FEATURE_FLAGS + 8,
+        kernel_symbols,
+    )
+    writers = {(symbol, offset): (pins, recipe) for symbol, offset, pins, recipe in G17_FEATURE_FLAG_WRITERS}
+    may_set = 0
+    seen_writers: set[tuple[str, int]] = set()
+    other_objects: list[dict[str, object]] = []
+    for entry in flags["stores"] + flags["global_stores"] + flags["memory_routines"]:
+        key = _census_key(entry)
+        if entry["kind"] == "store" and (key[1], key[2]) in writers:
+            pins, recipe = writers[(key[1], key[2])]
+            _address, code = symbol_code(image, key[1])
+            require_instruction_words_at(code, f"feature-flag writer {key[2]:#x}", pins)
+            may_set |= _feature_flag_set_bits(code, recipe)
+            seen_writers.add((key[1], key[2]))
+        elif entry.get("clears_only"):
+            other_objects.append({**entry, "reason": "clears only"})
+        elif key in G17_FEATURE_FLAG_OTHER_OBJECTS:
+            other_objects.append({**entry, "reason": G17_FEATURE_FLAG_OTHER_OBJECTS[key]})
+        else:
+            raise ValueError(
+                f"unclassified write to feature flags: {key[0]} {key[1]}+{key[2]:#x}"
+            )
+    if seen_writers != set(writers):
+        raise ValueError(f"feature-flag writers not found: {sorted(set(writers) - seen_writers)}")
+    reverse = {address: name for name, address in kernel_symbols.items()}
+    reverse.update({address: name for name, address in macho_symbols(iogpu_image).items()})
+    reverse.update({address: name for name, address in symbols.items()})
+    for entry in flags["escapes"]:
+        callee = reverse.get(entry.get("target"))
+        site = (str(entry["symbol"]), int(entry["offset"]))
+        if callee in G17_FEATURE_FLAG_SAFE_CALLEES:
+            reason = G17_FEATURE_FLAG_SAFE_CALLEES[callee]
+        elif site in G17_FEATURE_FLAG_VIRTUAL_ESCAPES:
+            reason = G17_FEATURE_FLAG_VIRTUAL_ESCAPES[site]
+        elif any(site[0].startswith(prefix) for prefix in G17_FEATURE_FLAG_VIRTUAL_ESCAPE_PREFIXES) and entry["member"] < G17_ACCELERATOR_FEATURE_FLAGS - 4:
+            reason = "4-byte float out-parameter below the word"
+        else:
+            raise ValueError(
+                f"unclassified pointer to feature flags passed by {site[0]}+{site[1]:#x}"
+            )
+        other_objects.append({**entry, "reason": reason, "callee": callee})
+
+    # Chip information: exactly one store, the unconditional override.
+    chip = census_g17_member_writes(
+        image, G17_ACCELERATOR_CHIP_INFO + 0x24, G17_ACCELERATOR_CHIP_INFO + 0x38,
+        kernel_symbols,
+    )
+    override_sites = [
+        entry for entry in chip["stores"]
+        if (entry["symbol"], entry["offset"]) == (G17_CONFIGURE_DEVICE, 0x748)
+    ]
+    others = [entry for entry in chip["stores"] + chip["global_stores"] if entry not in override_sites]
+    others += chip["memory_routines"] + chip["escapes"]
+    if len(override_sites) != 1:
+        raise ValueError("chip-information override store is missing")
+    for entry in others:
+        if _census_key(entry) not in G17_CHIP_INFO_OTHER_WRITERS:
+            raise ValueError(
+                f"unclassified write to chip information: {entry['kind']} "
+                f"{entry['symbol']}+{entry['offset']:#x}"
+            )
+    address, code = symbol_code(image, G17_CONFIGURE_DEVICE)
+    require_instruction_words_at(
+        code,
+        "G17 chip-information override",
+        {0x744: 0x3DC35500, 0x748: 0x3DBDFE60},  # ldr q0, =literal; str q0, [x19, #0xf7f0]
+    )
+    _base_address, base_code = symbol_code(image, BASE_CONFIGURE_DEVICE)
+    require_instruction_words_at(
+        base_code,
+        "G17 retrieveChipInfo call",
+        {
+            0x610: 0x529EF908,  # mov w8, #0xf7c8
+            0x638: 0xF946B20A,  # vtable slot 0xd60
+            0x63C: 0x8B080261,  # x1 = this + 0xf7c8
+            0x640: 0xAA1303E0,  # x0 = this
+            0x64C: 0xD73F0951,  # blraa
+        },
+    )
+    page = decode_adrp(address + 0x740, struct.unpack_from("<I", code, 0x740)[0])
+    if page is None or page[0] != 8:
+        raise ValueError("chip-information override literal is no longer PC-relative")
+    literal_address = page[1] + ((0x3DC35500 >> 10) & 0xFFF) * 16
+    literal_offset = virtual_to_file(image, literal_address)
+    literal = image[literal_offset : literal_offset + 16]
+    # The PI_300 base (which runs retrieveChipInfo) returns before the store,
+    # and the store is reached on every path that does not panic.
+    if decode_bl_target(address + 0x70, struct.unpack_from("<I", code, 0x70)[0]) != symbols[PI300_CONFIGURE_DEVICE]:
+        raise ValueError("AcceleratorX configureDevice no longer calls its PI_300 base first")
+    panic = kernel_symbols.get("_panic")
+    for offset, word in words(code[:0x748]):
+        branch_address = address + offset
+        if word & 0xFFFFFC1F == 0xD65F0000 or word in (0xD65F0BFF, 0xD65F0FFF):
+            raise ValueError("AcceleratorX configureDevice returns before the override")
+        if word & 0xFFFFFC1F == 0xD61F0000 or word & 0xFFFFF800 == 0xD71F0800:
+            raise ValueError("AcceleratorX configureDevice branches indirectly before the override")
+        target = decode_local_branch_target(branch_address, word)
+        if target is None or target <= address + 0x748:
+            continue
+        panic_offset = target - address
+        tail = code[panic_offset : panic_offset + 0x30]
+        if not any(
+            decode_bl_target(target + index, value) == panic
+            for index, value in words(tail)
+        ):
+            raise ValueError(
+                f"AcceleratorX configureDevice can skip the override from +{offset:#x}"
+            )
+
+    never_set = ~may_set & 0xFFFFFFFFFFFFFFFF
+    return {
+        "power_column_count": {
+            "member": G17_ACCELERATOR_POWER_COLUMN_COUNT,
+            "bytes": 4,
+            "source": "hardware_config.chip_info_decode.fields.power_column_count",
+            "hardware_input": "column_count",
+        },
+        "feature_flags": {
+            "member": G17_ACCELERATOR_FEATURE_FLAGS,
+            "bytes": 8,
+            "initial": allocation,
+            "may_set_mask": may_set,
+            "never_set_mask": never_set,
+            "writers": [
+                {"symbol": symbol, "offset": offset} for symbol, offset, _pins, _recipe in G17_FEATURE_FLAG_WRITERS
+            ],
+            "other_objects": len(other_objects),
+            "unbounded": flags["unbounded"][0],
+        },
+        "chip_information": {
+            "member": G17_ACCELERATOR_CHIP_INFO,
+            "producer": G17_RETRIEVE_CHIP_INFO,
+            "override_member": G17_ACCELERATOR_CHIP_INFO_OVERRIDE,
+            "override_bytes": 16,
+            "override_value": literal.hex(),
+            "override_producer": G17_CONFIGURE_DEVICE,
+            "unbounded": chip["unbounded"][0],
+        },
+    }
+
+
 def recover_g17_relative_boost_frequency_table(
     image: bytes, arm_power_code: bytes
 ) -> dict[str, object]:
@@ -8881,6 +9323,495 @@ def stores_covering(code: bytes, base: int, target: int) -> list[int]:
             if immediate <= target < immediate + width * 2:
                 hits.append(offset)
     return hits
+
+
+# Store encodings understood by census_g17_member_writes, keyed by the opcode
+# bits that fix the access width. The unsigned-offset forms scale imm12.
+CENSUS_UNSIGNED_STORES = {
+    0x39000000: 1, 0x79000000: 2, 0xB9000000: 4, 0xF9000000: 8,
+    0x3D000000: 1, 0x7D000000: 2, 0xBD000000: 4, 0xFD000000: 8, 0x3D800000: 16,
+}
+# Signed imm9 forms. Bits 11:10 select unscaled (0), post-index (1),
+# unprivileged (2) and pre-index (3) addressing.
+CENSUS_IMM9_STORES = {
+    0x38000000: 1, 0x78000000: 2, 0xB8000000: 4, 0xF8000000: 8,
+    0x3C000000: 1, 0x7C000000: 2, 0xBC000000: 4, 0xFC000000: 8, 0x3C800000: 16,
+}
+CENSUS_REGISTER_STORES = {
+    0x38200800: 1, 0x78200800: 2, 0xB8200800: 4, 0xF8200800: 8,
+    0x3C200800: 1, 0x7C200800: 2, 0xBC200800: 4, 0xFC200800: 8, 0x3CA00800: 16,
+}
+CENSUS_PAIR_STORES: dict[int, tuple[int, str]] = {}
+for _pair_opcode, _pair_width in (
+    (0x28000000, 4), (0xA8000000, 8), (0x2C000000, 4), (0x6C000000, 8), (0xAC000000, 16)
+):
+    CENSUS_PAIR_STORES[_pair_opcode] = (_pair_width, "offset")  # STNP
+    CENSUS_PAIR_STORES[_pair_opcode | 0x00800000] = (_pair_width, "post")
+    CENSUS_PAIR_STORES[_pair_opcode | 0x01000000] = (_pair_width, "offset")
+    CENSUS_PAIR_STORES[_pair_opcode | 0x01800000] = (_pair_width, "pre")
+# Kernel routines that write memory through a pointer argument, with the
+# argument registers holding the destination and the byte count.
+CENSUS_MEMORY_WRITERS = {
+    "_memcpy": (0, 2),
+    "_memmove": (0, 2),
+    "_memset": (0, 2),
+    "_bzero": (0, 1),
+    "___bzero": (0, 1),
+}
+# How far below a member an interior pointer may start and still be reported
+# when it escapes into a call: a callee writing through a pointer to a
+# neighbouring embedded object is then visible to the reviewer.
+CENSUS_ESCAPE_WINDOW = 0x100
+
+
+def _census_store(word: int) -> tuple[int, int, int, str] | None:
+    """Decode a store addressed by base+immediate.
+
+    Returns (base, immediate, bytes written, addressing) where addressing is
+    "offset", "pre" or "post". Post-indexed stores write at the base itself.
+    """
+
+    width = CENSUS_UNSIGNED_STORES.get(word & 0xFFC00000)
+    if width is not None:
+        return (word >> 5) & 0x1F, ((word >> 10) & 0xFFF) * width, width, "offset"
+    width = CENSUS_IMM9_STORES.get(word & 0xFFE00000)
+    if width is not None:
+        immediate = (word >> 12) & 0x1FF
+        if immediate & 0x100:
+            immediate -= 0x200
+        form = ("offset", "post", "offset", "pre")[(word >> 10) & 3]
+        return (word >> 5) & 0x1F, immediate, width, form
+    pair = CENSUS_PAIR_STORES.get(word & 0xFFC00000)
+    if pair is not None:
+        width, form = pair
+        immediate = (word >> 15) & 0x7F
+        if immediate & 0x40:
+            immediate -= 0x80
+        return (word >> 5) & 0x1F, immediate * width, width * 2, form
+    size = 1 << (word >> 30)
+    if word & 0x3FFFFC00 in (0x089FFC00, 0x089F7C00):  # STLR, STLLR
+        return (word >> 5) & 0x1F, 0, size, "offset"
+    if word & 0x3FE07C00 == 0x08007C00:  # STXR, STLXR
+        return (word >> 5) & 0x1F, 0, size, "offset"
+    if word & 0xBFE00000 == 0x88200000:  # STXP, STLXP
+        return (word >> 5) & 0x1F, 0, 16 if word & 0x40000000 else 8, "offset"
+    if word & 0x3FA07C00 == 0x08A07C00:  # CAS
+        return (word >> 5) & 0x1F, 0, size, "offset"
+    if word & 0x3F200C00 == 0x38200000:  # LSE atomics and SWP
+        return (word >> 5) & 0x1F, 0, size, "offset"
+    return None
+
+
+def _census_register_store(word: int) -> tuple[int, int, int, int] | None:
+    """Decode STR [Xn, Rm{, extend #shift}] as (base, index, shift, width)."""
+
+    width = CENSUS_REGISTER_STORES.get(word & 0xFFE00C00)
+    if width is None:
+        return None
+    shift = (width.bit_length() - 1) if word & 0x1000 else 0
+    return (word >> 5) & 0x1F, (word >> 16) & 0x1F, shift, width
+
+
+def _census_written_registers(word: int) -> tuple[int, ...]:
+    """General-purpose registers an instruction certainly writes.
+
+    Only confident writers are reported: forgetting a derivation could hide a
+    store, while keeping a stale one merely adds a spurious hit.
+    """
+
+    destination = word & 0x1F
+    second = (word >> 10) & 0x1F
+    if word & 0x1C000000 == 0x10000000:  # data processing, immediate
+        if word & 0x1F000000 == 0x11000000 and word & 0x20000000 and destination == 31:
+            return ()  # CMP/CMN immediate
+        if word & 0x1F800000 == 0x12000000 and word & 0x60000000 == 0x60000000 and destination == 31:
+            return ()  # TST immediate
+        return () if destination == 31 else (destination,)
+    if word & 0x0E000000 == 0x0A000000:  # data processing, register
+        if word & 0x3FE00000 == 0x3A400000:
+            return ()  # CCMP/CCMN
+        if word & 0x1F000000 in (0x0A000000,) and word & 0x60000000 == 0x60000000 and destination == 31:
+            return ()  # TST shifted register
+        if word & 0x1F000000 == 0x0B000000 and word & 0x20000000 and destination == 31:
+            return ()  # CMP/CMN register
+        return () if destination == 31 else (destination,)
+    if word & 0x0A000000 == 0x08000000:  # loads and stores
+        vector = bool(word & 0x04000000)
+        if word & 0x3B000000 == 0x18000000:  # load literal
+            return () if vector or word & 0xC0000000 == 0xC0000000 else (destination,)
+        if word & 0x3A000000 == 0x28000000:  # pairs
+            if not word & 0x00400000 or vector:
+                return ()
+            return (destination, second)
+        if word & 0x3F000000 == 0x08000000:  # exclusive and ordered
+            status = (word >> 16) & 0x1F
+            if word & 0x3FA07C00 == 0x08A07C00 or word & 0xBFA07C00 == 0x08207C00:
+                return (status,)  # CAS/CASP return the old value in Rs
+            if word & 0x00400000:  # loads
+                return (destination,) if not word & 0x00200000 else (destination, second)
+            if word & 0x3FE07C00 == 0x08007C00 or word & 0xBFE00000 == 0x88200000:
+                return (status,)
+            return ()
+        if word & 0x3B000000 in (0x38000000, 0x39000000):
+            if vector:
+                return ()
+            if word & 0x3F200C00 == 0x38200000:  # LSE atomics return the old value
+                return () if destination == 31 else (destination,)
+            opc = (word >> 22) & 3
+            if opc == 0:
+                return ()
+            if opc == 2 and word >> 30 == 3:
+                return ()  # PRFM
+            return (destination,)
+        return ()
+    if word & 0x1C000000 == 0x14000000:  # branches and system
+        if word & 0xFFF00000 == 0xD5300000:  # MRS
+            return (destination,)
+        return ()
+    if word & 0x5F20FC00 == 0x1E200000:  # FP/integer conversion
+        if (word >> 16) & 7 in (0, 1, 4, 5, 6):
+            return (destination,)
+        return ()
+    if word & 0xBFE0FC00 in (0x0E003C00, 0x0E002C00):  # UMOV, SMOV
+        return (destination,)
+    return ()
+
+
+def _census_is_call(word: int) -> bool:
+    return (
+        word & 0xFC000000 == 0x94000000  # BL
+        or word & 0xFFFFFC1F == 0xD63F0000  # BLR
+        or word & 0xFFFFF81F == 0xD63F081F  # BLRAAZ, BLRABZ
+        or word & 0xFFFFF800 == 0xD73F0800  # BLRAA, BLRAB
+    )
+
+
+def _census_writeback(word: int) -> tuple[int, int] | None:
+    """Base register and increment of a pre- or post-indexed load or store."""
+
+    if word & 0x3B200000 == 0x38000000 and (word >> 10) & 3 in (1, 3):
+        immediate = (word >> 12) & 0x1FF
+        if immediate & 0x100:
+            immediate -= 0x200
+        return (word >> 5) & 0x1F, immediate
+    if word & 0x3A000000 == 0x28000000 and (word >> 23) & 3 in (1, 3):
+        width = 4 << ((word >> 31) & 1)
+        if word & 0x04000000:
+            width = 4 << ((word >> 30) & 3)
+        immediate = (word >> 15) & 0x7F
+        if immediate & 0x40:
+            immediate -= 0x80
+        return (word >> 5) & 0x1F, immediate * width
+    return None
+
+
+def census_g17_member_writes(
+    image: bytes, low: int, high: int, kernel_symbols: dict[str, int]
+) -> dict[str, list[dict[str, object]]]:
+    """Run census_g17_code_member_writes over the image's __TEXT_EXEC."""
+
+    symbols = macho_symbols(image)
+    ordered = sorted((address, name) for name, address in symbols.items())
+    memory_writers = {
+        kernel_symbols[name]: (name, arguments)
+        for name, arguments in CENSUS_MEMORY_WRITERS.items()
+        if name in kernel_symbols
+    }
+    for item in load_commands(image):
+        if item.command != LC_SEGMENT_64:
+            continue
+        segment = parse_segment(image, item)
+        if segment.name == "__TEXT_EXEC":
+            code = image[segment.file_offset : segment.file_offset + segment.file_size]
+            return census_g17_code_member_writes(
+                code, segment.virtual_address, ordered, low, high, memory_writers
+            )
+    raise ValueError("Mach-O has no __TEXT_EXEC segment")
+
+
+def census_g17_code_member_writes(
+    code: bytes,
+    code_address: int,
+    ordered: list[tuple[int, str]],
+    low: int,
+    high: int,
+    memory_writers: dict[int, tuple[str, tuple[int, int]]],
+) -> dict[str, list[dict[str, object]]]:
+    """Every instruction in __TEXT_EXEC that can write bytes [low, high).
+
+    The census is relative to an object pointer of unknown identity, so it
+    reports writes to that member of *any* object; the caller classifies each
+    one. A store counts when either its raw base+immediate, or its immediate
+    plus an interior-pointer offset tracked from an earlier ADD, reaches the
+    range. Tracking follows ADD/SUB immediate, ADD of a MOVZ/MOVK constant,
+    register moves and pre/post-index writeback. It is reset at every symbol,
+    after calls for the caller-saved registers, and whenever a register is
+    certainly overwritten. Each hit carries the pointer's origin: `argN` when
+    the base is still derived from argument register N at function entry
+    (arg0 is `this` for a C++ method), otherwise `unknown`. ADRP-derived
+    (global) and SP-derived bases are reported separately or skipped.
+
+    Calls are checked too: memcpy/memmove/memset/bzero into an interior
+    pointer whose constant length reaches the range (bzero, and memset of a
+    constant zero, are marked as clearing only), and any interior pointer
+    within CENSUS_ESCAPE_WINDOW below the range passed to another call.
+    Register-indexed stores and memory-routine calls through an untracked
+    base pointer cannot be bounded statically; they are only counted.
+    """
+
+    result: dict[str, list[dict[str, object]]] = {
+        "stores": [],
+        "global_stores": [],
+        "memory_routines": [],
+        "escapes": [],
+    }
+    unbounded = {"register_indexed_stores": 0, "untracked_memory_routines": 0}
+    result["unbounded_sites"] = []
+
+    def overlaps(start: int, length: int) -> bool:
+        return start < high and low < start + length
+
+    def entry_state() -> dict[int, tuple]:
+        return {argument: ("offset", 0, f"arg{argument}") for argument in range(8)}
+
+    owner_index = -1
+    state: dict[int, tuple] = {}
+    for offset, word in words(code):
+        address = code_address + offset
+        advanced = False
+        while owner_index + 1 < len(ordered) and ordered[owner_index + 1][0] <= address:
+            owner_index += 1
+            advanced = True
+        if advanced:
+            state = entry_state()
+        owner, owner_address = (
+            (ordered[owner_index][1], ordered[owner_index][0])
+            if owner_index >= 0
+            else ("", code_address)
+        )
+
+        def site(kind: str, **extra: object) -> dict[str, object]:
+            return {
+                "symbol": owner,
+                "offset": address - owner_address,
+                "word": word,
+                "kind": kind,
+                **extra,
+            }
+
+        def pointer(register: int) -> tuple:
+            if register == 31:
+                return ("stack",)
+            return state.get(register, ("offset", 0, "unknown"))
+
+        def write_back() -> None:
+            writeback = _census_writeback(word)
+            if writeback is None or writeback[0] == 31:
+                return
+            base, amount = writeback
+            origin = pointer(base)
+            if origin[0] == "offset":
+                state[base] = ("offset", origin[1] + amount, origin[2])
+
+        store = _census_store(word)
+        if store is not None:
+            base, immediate, width, form = store
+            effective = 0 if form == "post" else immediate
+            origin = pointer(base)
+            if origin[0] in ("absolute", "constant"):
+                if overlaps(effective, width):
+                    result["global_stores"].append(site("global", bytes=width))
+            elif origin[0] == "offset":
+                # Check the raw immediate as well as the tracked offset: a
+                # stale derivation then only adds a spurious hit.
+                for start, derived in ((origin[1] + effective, True), (effective, False)):
+                    if derived and origin[1] == 0:
+                        continue
+                    if overlaps(start, width):
+                        result["stores"].append(
+                            site(
+                                "store",
+                                member=start,
+                                bytes=width,
+                                origin=origin[2] if derived or origin[1] == 0 else "unknown",
+                                derived=derived,
+                            )
+                        )
+                        break
+            write_back()
+            for register in _census_written_registers(word):
+                state.pop(register, None)
+            continue
+
+        indexed = _census_register_store(word)
+        if indexed is not None:
+            base, index, shift, width = indexed
+            origin = pointer(base)
+            known = state.get(index)
+            if origin[0] == "offset" and known and known[0] == "constant":
+                start = origin[1] + (known[1] << shift)
+                if overlaps(start, width):
+                    result["stores"].append(
+                        site("store", member=start, bytes=width, origin=origin[2], derived=True)
+                    )
+            elif origin[0] == "offset" and origin[1] != 0:
+                if low - CENSUS_ESCAPE_WINDOW <= origin[1] < high:
+                    result["stores"].append(
+                        site(
+                            "indexed_store",
+                            member=origin[1],
+                            bytes=width,
+                            origin=origin[2],
+                            derived=True,
+                        )
+                    )
+            elif origin[0] == "offset":
+                unbounded["register_indexed_stores"] += 1
+                result["unbounded_sites"].append(
+                    site("indexed_store", origin=origin[2], index=index)
+                )
+            continue
+
+        if _census_is_call(word):
+            target = decode_bl_target(address, word)
+            if target in memory_writers:
+                name, (destination, length) = memory_writers[target]
+                origin = pointer(destination)
+                count = state.get(length)
+                clears = name in ("_bzero", "___bzero") or (
+                    name == "_memset" and state.get(1) == ("constant", 0)
+                )
+                if origin[0] == "offset":
+                    start = origin[1]
+                    if count and count[0] == "constant":
+                        if overlaps(start, count[1]):
+                            result["memory_routines"].append(
+                                site(
+                                    "memory_routine",
+                                    routine=name,
+                                    member=start,
+                                    bytes=count[1],
+                                    origin=origin[2],
+                                    clears_only=clears,
+                                )
+                            )
+                    elif start != 0 and start < high:
+                        result["memory_routines"].append(
+                            site(
+                                "memory_routine",
+                                routine=name,
+                                member=start,
+                                bytes=None,
+                                origin=origin[2],
+                                clears_only=clears,
+                            )
+                        )
+                    else:
+                        unbounded["untracked_memory_routines"] += 1
+                        result["unbounded_sites"].append(
+                            site("memory_routine", routine=name, origin=origin[2])
+                        )
+            else:
+                for argument in range(8):
+                    origin = state.get(argument)
+                    if (
+                        origin
+                        and origin[0] == "offset"
+                        and origin[1] != 0
+                        and low - CENSUS_ESCAPE_WINDOW <= origin[1] < high
+                    ):
+                        result["escapes"].append(
+                            site(
+                                "escape",
+                                member=origin[1],
+                                argument=argument,
+                                origin=origin[2],
+                                target=target,
+                            )
+                        )
+            for register in list(range(19)) + [30]:
+                state.pop(register, None)
+            continue
+
+        written = _census_written_registers(word)
+        write_back()
+        if not written:
+            continue
+        destination = written[0]
+        update: tuple | None = None
+        if decode_adrp(address, word) is not None or word & 0x9F000000 == 0x10000000:
+            update = ("absolute",)
+        elif word & 0xFF000000 in (0x91000000, 0xD1000000):  # ADD/SUB Xd, Xn, #imm
+            source = (word >> 5) & 0x1F
+            amount = ((word >> 10) & 0xFFF) << (12 if word & 0x00400000 else 0)
+            if word & 0x40000000:
+                amount = -amount
+            origin = pointer(source)
+            if origin[0] == "offset":
+                update = ("offset", origin[1] + amount, origin[2])
+            elif origin[0] == "constant":
+                update = ("constant", (origin[1] + amount) & UINT64_MASK_CENSUS)
+            else:
+                update = origin
+        elif word & 0xFFE0FFE0 == 0xAA0003E0:  # MOV Xd, Xm
+            update = state.get((word >> 16) & 0x1F, ("offset", 0, "unknown"))
+        elif word & 0xFF200000 == 0x8B000000 or word & 0xFFE00000 == 0x8B200000:
+            first = pointer((word >> 5) & 0x1F)
+            other = state.get((word >> 16) & 0x1F)
+            if word & 0xFF200000 == 0x8B000000:
+                shift_kind = (word >> 22) & 3
+                shift = (word >> 10) & 0x3F
+            else:
+                shift_kind = 0
+                shift = (word >> 10) & 7
+            if other and other[0] == "constant" and shift_kind == 0 and first[0] == "offset":
+                amount = (other[1] << shift) & UINT64_MASK_CENSUS
+                update = ("offset", first[1] + amount, first[2])
+        else:
+            move = decode_move_wide(word)
+            if move is not None:
+                kind, register, immediate, shift = move
+                if kind == "movz":
+                    update = ("constant", immediate << shift)
+                elif kind == "movn":
+                    update = ("constant", ~(immediate << shift) & UINT64_MASK_CENSUS)
+                else:
+                    prior = state.get(register)
+                    if prior and prior[0] == "constant":
+                        update = (
+                            "constant",
+                            (prior[1] & ~(0xFFFF << shift)) | (immediate << shift),
+                        )
+            else:
+                move_w = decode_movz_w(word)
+                update_w = decode_movk_w(word)
+                if move_w is not None:
+                    update = ("constant", move_w[1])
+                elif update_w is not None:
+                    prior = state.get(update_w[0])
+                    if prior and prior[0] == "constant":
+                        immediate, shift = update_w[1], update_w[2]
+                        update = (
+                            "constant",
+                            (prior[1] & 0xFFFFFFFF & ~(0xFFFF << shift))
+                            | (immediate << shift),
+                        )
+                elif word & 0xFFE0FFE0 == 0x2A0003E0:  # MOV Wd, Wm
+                    prior = state.get((word >> 16) & 0x1F)
+                    if prior and prior[0] == "constant":
+                        update = ("constant", prior[1] & 0xFFFFFFFF)
+                elif word == 0x2A1F03E0 | destination or word == 0xAA1F03E0 | destination:
+                    update = ("constant", 0)  # MOV Rd, ZR
+        for register in written:
+            state.pop(register, None)
+        if update is not None and destination != 31:
+            state[destination] = update
+
+    result["unbounded"] = [unbounded]
+    return result
+
+
+UINT64_MASK_CENSUS = 0xFFFFFFFFFFFFFFFF
 
 
 def recover_g17_perf_state_map_block(
@@ -16096,6 +17027,9 @@ def main() -> int:
         )
         hardware_config["pio_mappings"] = recover_g17_pio_mappings(driver)
         hardware_config["pio_uat_mapping"] = recover_g17_pio_uat_mapping(driver)
+        channels["accelerator_inputs"] = recover_g17_accelerator_channel_inputs(
+            driver, kernel, iogpu, hardware_config["chip_info_decode"]
+        )
         firmware_root = recover_firmware_root(firmware)
     except (OSError, ValueError) as error:
         parser.error(str(error))

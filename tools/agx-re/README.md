@@ -343,15 +343,42 @@ concrete path by evaluating the recovered predicates, emits all four register
 streams while preserving a supplied pool template, and compiles its own output
 back into a verifier plan. Unresolved channel/accelerator branches and values
 must be supplied explicitly; `--zero-template` is intentionally limited to
-fake execution. The full recovered ABI's zero-descriptor fallthrough fixture
-currently emits 376 writes, of which 356 have independently reproducible
-values and 20 remain explicit external inputs.
+fake execution. The full recovered ABI's zero-descriptor fixture emits 368
+writes. Given the power-column count, 360 have independently reproducible
+values and 8 remain explicit external inputs: per pass, the addresses of the
+parameter-management object (descriptor `+0x918`, set by
+`loadParameterManagementData`) and of the USC private-memory pool (descriptor
+`+0xb80`, copied from the channel next to `syncUMAPoolPriority`). Both are
+host-owned pools that Vinix does not implement yet; they are also what the
+type-6, -13 and -15 firmware events grow.
+
+The producers' other accelerator inputs are resolved by
+`channels.accelerator_inputs`. The power-column count at accelerator `+0x4e4`
+is hardware topology and becomes a named `column_count` input. For the 64-bit
+feature-flag word at `+0x6d0` and chip information at `+0xf7ec`, a census
+walks all of `__TEXT_EXEC` for any store, pair store, memory routine or
+escaping interior pointer that can reach those bytes, following pointers
+derived by ADD from function arguments. Every hit is either one of the 18
+pinned accelerator read-modify-write sites or classified as another object
+(with its reason in the table); anything new fails the recovery. With the
+object zero-filled by `OSObject_typed_operator_new`, the union of what those
+sites can OR in gives the bits that may ever be set; bits 20, 29 and 53, which
+the 3D, TA and FastBlit producers test, never are. `AcceleratorX::configureDevice`
+unconditionally overwrites chip-information bytes `+0x28..+0x37` with
+`(0, 1 << 32)` after `retrieveChipInfo` fills them, which is all the 3D
+producer reads there. The census counts, but cannot bound, 96 register-indexed
+stores and 41 memory-routine calls through untracked pointers; those inside
+accelerator methods are clears or fill arrays well away from both ranges.
+`compile_fake_g17_plan.fold_accelerator_inputs` folds these facts into every
+producer's value and branch expressions with a known-bits evaluator, shared by
+the plan compiler (`--column-count`), the reference encoder (`hardware` in the
+externals JSON) and the C generator.
 `generate_fake_g17_3d_encoder.py` lowers the same UUID-pinned graph into the
 checked-in, freestanding C encoder used by the kernel. It emits direct bounded
 integer expressions and graph branches, not a runtime JSON interpreter, and
 returns a fixed-capacity verifier trace alongside the command. Its host test
-checks all 16 branch combinations against byte-exact hashes from the separate
-Python reference. Use `make -f GNUmakefile check-fake-g17-encoder` after a new
+checks all 16 combinations of three descriptor branches and a narrow or wide
+column count against byte-exact hashes from the separate Python reference. Use `make -f GNUmakefile check-fake-g17-encoder` after a new
 recovery to catch any stale generated source.
 The first parser-to-descriptor bridge is executable: the recovery pins the
 retained render payload's `+0x2d0` common record, all 49 scatter-copy ranges,

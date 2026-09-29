@@ -21,25 +21,25 @@
 
 /* FNV-1a of command followed by descriptor for every
  * {descriptor[0x800].bit0, descriptor[0x418].bit0,
- * descriptor[0xb48].bit0, decision-0x2410} combination. These were produced
- * by the separate recovered-ABI Python reference encoder. */
+ * descriptor[0xb48].bit0, column_count 4 or 8} combination. These were
+ * produced by the separate recovered-ABI Python reference encoder. */
 static const uint64_t reference_hashes[16] = {
-    UINT64_C(0x6cabfeb77c9ff1fd),
-    UINT64_C(0x282c4f2a02c7f519),
-    UINT64_C(0x7491ab191654b3ac),
-    UINT64_C(0x5cf196038cbea110),
-    UINT64_C(0x199f053e72e02a90),
-    UINT64_C(0x5b4de52a868a3444),
-    UINT64_C(0x76f7da63224818e9),
-    UINT64_C(0x9d965fd57942c7ed),
-    UINT64_C(0x234cdfde0a19be54),
-    UINT64_C(0x298930b6716d6770),
-    UINT64_C(0xde4912d2d4c7b135),
-    UINT64_C(0x53cd3a872ec54cb1),
-    UINT64_C(0x4ee9ed17891f0119),
-    UINT64_C(0x85de7990d86d82b5),
-    UINT64_C(0x8889c25a0b3dd158),
-    UINT64_C(0xbb15e534477d8fbc),
+    UINT64_C(0xe08e26d9c86b26ed),
+    UINT64_C(0x7d25ff57c1c923ad),
+    UINT64_C(0x6633cda4130e23e8),
+    UINT64_C(0xc198dcc7895e8fc8),
+    UINT64_C(0xeb5655cae0f9d928),
+    UINT64_C(0x3731746069103020),
+    UINT64_C(0x303eb538faa8b93d),
+    UINT64_C(0x4f1b28b6f878f645),
+    UINT64_C(0x46dbfa35a5032104),
+    UINT64_C(0xf57977e9a29b44dc),
+    UINT64_C(0x478ffd50361f34e1),
+    UINT64_C(0x22d03028aba24919),
+    UINT64_C(0x93e4f531e719adb9),
+    UINT64_C(0x4a2d8b744d4d7ad9),
+    UINT64_C(0xb5a8d810346c9054),
+    UINT64_C(0x49877fccbb777724),
 };
 
 struct fixture {
@@ -98,23 +98,21 @@ static int run_branch_matrix(void)
     unsigned int bit_800;
     unsigned int bit_418;
     unsigned int bit_b48;
-    unsigned int external_branch;
+    unsigned int wide;
 
     for (bit_800 = 0; bit_800 <= 1; bit_800++) {
         for (bit_418 = 0; bit_418 <= 1; bit_418++) {
             for (bit_b48 = 0; bit_b48 <= 1; bit_b48++) {
-                for (external_branch = 0; external_branch <= 1;
-                     external_branch++) {
+                for (wide = 0; wide <= 1; wide++) {
                     struct fixture fixture;
                     struct vinix_fake_g17_report report;
-                    uint32_t expected_per_pass = 94 + 2 * bit_800 +
-                        2 * bit_b48 - 2 * external_branch;
+                    uint32_t expected_per_pass = 92 + 2 * bit_800 +
+                        2 * bit_b48;
                     uint32_t expected_writes = 4 * expected_per_pass;
                     uint32_t branch_key = bit_800 << 3 | bit_418 << 2 |
-                                          bit_b48 << 1 | external_branch;
+                                          bit_b48 << 1 | wide;
                     uint32_t external_writes = 0;
                     uint32_t write_count = UINT32_MAX;
-                    uint32_t pass;
                     uint32_t index;
                     int result;
 
@@ -122,9 +120,7 @@ static int run_branch_matrix(void)
                     fixture.descriptor[0x800] = bit_800;
                     fixture.descriptor[0x418] = bit_418;
                     fixture.descriptor[0xb48] = bit_b48;
-                    for (pass = 0;
-                         pass < VINIX_FAKE_G17_REGISTER_PASSES; pass++)
-                        fixture.inputs.decisions[pass][0] = external_branch;
+                    fixture.inputs.column_count = wide ? 8 : 4;
 
                     result = vinix_fake_g17_encode_3d(
                         fixture.command, sizeof(fixture.command),
@@ -182,15 +178,6 @@ static int run_failure_checks(void)
         VINIX_FAKE_G17_ENCODE_WRITE_CAPACITY);
     CHECK(write_count == 0);
 
-    fixture.inputs.decisions[0][0] = 2;
-    write_count = UINT32_MAX;
-    CHECK(vinix_fake_g17_encode_3d(
-        fixture.command, sizeof(fixture.command), fixture.descriptor,
-        sizeof(fixture.descriptor), GPU_BASE, &fixture.inputs,
-        fixture.writes, VINIX_FAKE_G17_MAX_WRITES, &write_count) ==
-        VINIX_FAKE_G17_ENCODE_INVALID_ARGUMENT);
-    CHECK(write_count == 0);
-
     initialize_fixture(&fixture);
     CHECK(vinix_fake_g17_encode_3d(
         fixture.command, sizeof(fixture.command), fixture.descriptor,
@@ -224,8 +211,8 @@ static int run_dense_reference(void)
 
     memset(&fixture, 1, sizeof(fixture));
     memset(&fixture.inputs, 0, sizeof(fixture.inputs));
+    fixture.inputs.column_count = 8;
     for (pass = 0; pass < VINIX_FAKE_G17_REGISTER_PASSES; pass++) {
-        fixture.inputs.decisions[pass][0] = pass & 1;
         for (event = 0; event < VINIX_FAKE_G17_EXTERNAL_EVENT_COUNT; event++)
             fixture.inputs.values[pass][event] =
                 UINT64_C(0xcafe000000000000) |
@@ -236,11 +223,11 @@ static int run_dense_reference(void)
         sizeof(fixture.descriptor), GPU_BASE, &fixture.inputs,
         fixture.writes, VINIX_FAKE_G17_MAX_WRITES, &write_count) ==
         VINIX_FAKE_G17_ENCODE_OK);
-    CHECK(write_count == 388);
+    CHECK(write_count == 384);
     hash = fnv1a(fixture.descriptor, sizeof(fixture.descriptor),
                  fnv1a(fixture.command, sizeof(fixture.command),
                        UINT64_C(0xcbf29ce484222325)));
-    CHECK(hash == UINT64_C(0x6bdce89bf0d9eaf1));
+    CHECK(hash == UINT64_C(0x08079d7e567fc415));
     CHECK(vinix_fake_g17_verify(
         fixture.command, sizeof(fixture.command), fixture.descriptor,
         sizeof(fixture.descriptor), GPU_BASE, fixture.writes, write_count,
@@ -252,8 +239,8 @@ int main(void)
 {
     CHECK(vinix_fake_g17_encoder_inputs_size() ==
           sizeof(struct vinix_fake_g17_encoder_inputs));
-    CHECK(VINIX_FAKE_G17_EXTERNAL_EVENT_COUNT == 5);
-    CHECK(VINIX_FAKE_G17_EXTERNAL_DECISION_COUNT == 1);
+    CHECK(VINIX_FAKE_G17_EXTERNAL_EVENT_COUNT == 2);
+    CHECK(VINIX_FAKE_G17_EXTERNAL_DECISION_COUNT == 0);
     CHECK(VINIX_FAKE_G17_MAX_WRITES == 392);
     CHECK(run_branch_matrix() == 0);
     CHECK(run_dense_reference() == 0);

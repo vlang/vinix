@@ -29,6 +29,9 @@ const max_submission_syncs = agxsubmission.max_syncs
 const max_submission_commands = agxsubmission.max_commands
 const max_command_attachments = u32(16)
 const fake_completion_delay_ns = i64(100_000_000)
+// Power-column count the fake device reports to the encoder. Hardware takes it
+// from GPU_ID_CLUSTERCFG; eight is the most the recovered G17C power model accepts.
+const fake_g17_column_count = u32(8)
 
 @[heap]
 struct FakeG17File {
@@ -668,7 +671,9 @@ fn run_fake_render(mut queue workqueue.WorkQueue, mut vm FakeG17Vm,
 			report: FakeG17Verification{ error: fake_g17_invalid_argument }
 		}
 	}
-	mut inputs := FakeG17EncoderInputs{}
+	mut inputs := FakeG17EncoderInputs{
+		column_count: fake_g17_column_count
+	}
 	mut writes := []FakeG17ExpectedWrite{len: int(fake_g17_max_writes)} @[freed]
 	encoding := encode_fake_g17_3d(command, g17_command_bytes, descriptor, g17_descriptor_bytes, vm.kernel_start, &inputs, mut writes)
 	if !encoding.succeeded() {

@@ -133,8 +133,10 @@ graph into the freestanding, allocation-free
 `kernel/c/agx_fake_g17_encode.c`. The generated encoder contains no JSON parser
 or dynamic expression interpreter: descriptor/command expressions are emitted
 as checked integer operations, graph successors are direct branches, and the
-five external values plus the one external decision live in a fixed input
-structure. `gpu.agx.fake.encode_fake_g17_3d` exposes it to the V backend and returns the
+two external values (the parameter-management and USC private-memory pool
+addresses) plus the power-column count live in a fixed input structure. The
+accelerator fields the producer also reads are folded in as recovered
+constants; see `channels.accelerator_inputs` in the recovery. `gpu.agx.fake.encode_fake_g17_3d` exposes it to the V backend and returns the
 exact golden writes consumed by `submit_fake_g17`.
 
 `gpu.agx.fake.verify_fake_g17` is the V adapter. `gpu.agx.fake.submit_fake_g17` first installs a
