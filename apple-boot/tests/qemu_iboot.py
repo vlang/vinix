@@ -37,6 +37,9 @@ sys.path.insert(0, str(APPLE_BOOT))
 import build  # noqa: E402
 import pack  # noqa: E402
 
+sys.path.insert(0, str(HERE))
+import ioreg_adt  # noqa: E402
+
 LLVM = Path(os.environ.get("LLVM_BIN", "/opt/homebrew/opt/llvm/bin"))
 MARKER = b"APPLE-BOOT: init reached user space"
 
@@ -143,6 +146,26 @@ def build_adt(segment: int, with_aic: bool) -> bytes:
     ], [chosen, arm_io])
 
 
+def real_adt() -> bytes:
+    """This Mac's own tree, from the IORegistry, with the two nodes QEMU
+    cannot back taken out of reach: the watchdog is renamed so the loader
+    finds none, and the AIC's compatible is changed so the kernel keeps to
+    the GIC. Everything else -- about 2,000 nodes -- goes through the
+    loader and the kernel as it would on the machine."""
+    root = ioreg_adt.load_ioreg()
+
+    def visit(entry: dict, path: str) -> None:
+        if path == "/arm-io/wdt":
+            entry["name"] = b"wdt-not-in-qemu\0"
+        if path == "/arm-io/aic":
+            entry["compatible"] = b"aic,not-in-qemu\0"
+        for child in entry.get("IORegistryEntryChildren", []):
+            visit(child, f"{path.rstrip('/')}/{ioreg_adt.node_name(child)}")
+
+    visit(root, "/")
+    return ioreg_adt.build(root)[0]
+
+
 def boot_args(devtree: int, devtree_size: int, top_of_kernel_data: int) -> bytes:
     """Revision 2 (a 608-byte command line), as m1n1's xnuboot.h lays it out."""
     args = bytearray(0x6C + 608 + 16 + 4)
@@ -239,6 +262,8 @@ def main() -> int:
     parser.add_argument("--accel", default="tcg")
     parser.add_argument("--no-aic", action="store_true",
                         help="leave the AIC out, so the kernel takes QEMU's GIC path")
+    parser.add_argument("--real-adt", action="store_true",
+                        help="hand over this Mac's own ADT (from the IORegistry) instead")
     arguments = parser.parse_args()
 
     run(["make", "-C", str(APPLE_BOOT), "-s"])
@@ -255,12 +280,12 @@ def main() -> int:
         adt_base = align(image_base + len(image), 0x4000)
         # The segment goes after the loader's data, where its allocator would
         # otherwise start: it has to move past it.
-        with_aic = not arguments.no_aic
-        provisional_adt = build_adt(0, with_aic)
+        with_aic = not arguments.no_aic and not arguments.real_adt
+        provisional_adt = real_adt() if arguments.real_adt else build_adt(0, with_aic)
         args_base = align(adt_base + len(provisional_adt), 0x4000)
         top_of_kernel_data = args_base + 0x4000
         segment = align(top_of_kernel_data, 0x200000) + 0x100000
-        adt = build_adt(segment, with_aic)
+        adt = provisional_adt if arguments.real_adt else build_adt(segment, with_aic)
         assert len(adt) == len(provisional_adt)
         args = boot_args(adt_base, len(adt), top_of_kernel_data)
 
@@ -318,11 +343,12 @@ def main() -> int:
             qmp.execute("quit")
             qemu.wait(timeout=30)
             scratch = (work / "scratch.dump").read_bytes()
-            if scratch[WDT_CONTROL:WDT_CONTROL + 4] != bytes(4):
+            if not arguments.real_adt and scratch[WDT_CONTROL:WDT_CONTROL + 4] != bytes(4):
                 failures.append("the watchdog's control register was not cleared")
-            if scratch[0x100:0x104] != bytes(4):
+            if not arguments.real_adt and scratch[0x100:0x104] != bytes(4):
                 failures.append("the watchdog's second control word was not cleared")
-            if (work / "segment.dump").read_bytes() != bytes([SEGMENT_FILL]) * SEGMENT_BYTES:
+            if (not arguments.real_adt and (work / "segment.dump").read_bytes()
+                    != bytes([SEGMENT_FILL]) * SEGMENT_BYTES):
                 failures.append("the reserved firmware segment was overwritten")
             if with_aic:
                 aic = (work / "aic.dump").read_bytes()

@@ -51,6 +51,7 @@ $(BUILD)/adt2fdt: tests/adt2fdt.c src/adt.c src/fdt.c src/lib.c src/*.h
 test: $(BUILD)/adt2fdt $(BUILD)/vinix-apple-loader.bin
 	python3 tests/check_converter.py
 	python3 tests/qemu_iboot.py
+	python3 tests/qemu_iboot.py --real-adt
 
 clean:
 	rm -rf $(BUILD)

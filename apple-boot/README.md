@@ -59,6 +59,9 @@ make -C apple-boot test
   watchdog registers were cleared, the segment is untouched and the kernel
   masked every AIC IRQ. `--screenshot out.png` saves the screen,
   `--kernel` picks the kernel, `--no-aic` takes QEMU's GIC path instead.
+  `--real-adt` hands over this Mac's own tree (about 2,000 nodes, 726 KB on
+  an M5 Max) with only the watchdog and AIC hidden, so the loader and the
+  kernel get through all of it.
 
 ## Install on a Mac
 
