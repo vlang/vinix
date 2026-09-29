@@ -349,12 +349,19 @@ fn (mut d Desktop) render_element(el &ui2.Element, off_x int, off_y int, depth i
 		}
 	}
 
+	// A window's controls know from this whether they are in the focused one.
+	was_inactive := d.inactive_window
+	if depth == 1 && el.kind == .view && el.id.starts_with('win.') {
+		d.inactive_window = !el.focused
+	}
+
 	// By reference: an Element is several hundred bytes, and copying each one
 	// into every call on every pass was a large part of a frame.
 	for i in 0 .. el.children.len {
 		d.render_element(unsafe { &el.children[i] }, x, y, depth + 1)
 	}
 
+	d.inactive_window = was_inactive
 	if pushed {
 		d.canvas.restore_clip(saved)
 	}
@@ -688,7 +695,8 @@ fn shadow_for(color u32) u32 {
 
 // draw_catalina_button paints the native AppKit push-button renditions measured
 // in docs/catalina-reference/push-buttons-*.png. The element's frame remains the
-// hit target; a taller frame centres the native 21-pixel bezel vertically.
+// hit target; a taller frame centres the native 21-pixel bezel vertically, and
+// the bezel's shadow and focus ring may reach a few pixels past the frame.
 fn (mut d Desktop) draw_catalina_button(el &ui2.Element, x int, y int, w int, h int) u32 {
 	if w <= 0 || h <= 0 {
 		return catalina_button_text
@@ -704,17 +712,35 @@ fn (mut d Desktop) draw_catalina_button(el &ui2.Element, x int, y int, w int, h 
 	hovered := action.len > 0 && d.hover == action
 	pressed := hovered && d.buttons & button_left != 0
 	// While a regular button is held, AppKit temporarily removes the blue
-	// default face from the other button in the group.
-	default_suppressed := el.checked && d.buttons & button_left != 0 && d.hover.len > 0
-		&& d.hover != action
+	// default face from the other button in the group. Outside the key window
+	// a default button is white as well. A selected choice or toggle is a
+	// state rather than a default, and keeps its blue so it still shows.
+	is_state := el.kind == .toggle_button || el.accessibility_role == 'radio'
+		|| el.accessibility_role == 'checkbox'
+	default_suppressed := el.checked && ((d.buttons & button_left != 0 && d.hover.len > 0
+		&& d.hover != action) || (d.inactive_window && !is_state))
+
+	default_face := el.enabled && !pressed && el.checked && !default_suppressed
+	// The blue default bezel has tighter corners than the white one.
+	face_radius := if default_face && catalina_button_default_radius < radius {
+		catalina_button_default_radius
+	} else {
+		radius
+	}
 
 	mut text_color := catalina_button_text
 	if !el.enabled {
 		text_color = catalina_button_disabled_text
-	} else if pressed || (el.checked && !default_suppressed) {
+	} else if pressed || default_face {
 		text_color = app_on_accent
 	}
 
+	// The shadow is the bezel one pixel lower; only its bottom row shows. A
+	// frame no taller than the bezel has no row to put it in.
+	if bezel_y + bezel_height < y + h {
+		d.canvas.blend_round_rect(x, bezel_y + 1, w, bezel_height, face_radius, 0x000000,
+			catalina_button_shadow_alpha)
+	}
 	// AppKit has no hover-only push-button rendition. Mouse-down, however, uses
 	// the darker blue face even when the button was white before the click.
 	if !el.enabled {
@@ -723,15 +749,15 @@ fn (mut d Desktop) draw_catalina_button(el &ui2.Element, x int, y int, w int, h 
 	} else if pressed {
 		d.canvas.fill_native_vertical_palette_round_rect(x, bezel_y, w, bezel_height,
 			radius, catalina_button_pressed_outer)
-	} else if el.checked && !default_suppressed {
+	} else if default_face {
 		d.canvas.fill_native_vertical_palette_round_rect(x, bezel_y, w, bezel_height,
-			radius, catalina_button_default_outer)
+			face_radius, catalina_button_default_outer)
 	} else {
 		d.canvas.fill_native_vertical_palette_round_rect(x, bezel_y, w, bezel_height,
 			radius, catalina_button_normal_outer)
 	}
 	if w > 2 && bezel_height > 2 {
-		inner_radius := if radius > 0 { radius - 1 } else { 0 }
+		inner_radius := if face_radius > 0 { face_radius - 1 } else { 0 }
 		if !el.enabled {
 			d.canvas.fill_native_vertical_palette_round_rect(x + 1, bezel_y + 1, w - 2,
 				bezel_height - 2, inner_radius, [catalina_button_disabled_face,
@@ -739,13 +765,21 @@ fn (mut d Desktop) draw_catalina_button(el &ui2.Element, x int, y int, w int, h 
 		} else if pressed {
 			d.canvas.fill_native_vertical_palette_round_rect(x + 1, bezel_y + 1, w - 2,
 				bezel_height - 2, inner_radius, catalina_button_pressed_inner)
-		} else if el.checked && !default_suppressed {
+		} else if default_face {
 			d.canvas.fill_native_vertical_palette_round_rect(x + 1, bezel_y + 1, w - 2,
 				bezel_height - 2, inner_radius, catalina_button_default_inner)
 		} else {
 			d.canvas.fill_native_vertical_palette_round_rect(x + 1, bezel_y + 1, w - 2,
 				bezel_height - 2, inner_radius, [catalina_button_face, catalina_button_face])
 		}
+	}
+	// The ring covers the bezel's one-pixel edge and the three pixels around
+	// it, and is only drawn in the key window.
+	if el.focused && el.enabled && !d.inactive_window {
+		ring := catalina_button_focus_width
+		d.canvas.blend_native_round_ring(x - ring, bezel_y - ring, w + 2 * ring,
+			bezel_height + 2 * ring, face_radius + ring, ring + 1, catalina_button_focus_ring,
+			catalina_button_focus_alpha)
 	}
 	return text_color
 }

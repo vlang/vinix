@@ -568,6 +568,86 @@ fn (mut c Canvas) fill_native_vertical_palette_round_rect(x int, y int, w int, h
 	}
 }
 
+// round_rect_coverage is how much of the pixel at (px, py) a rounded
+// rectangle covers. Everything is in the same pixels, and the radius is at
+// most half the shorter side.
+@[inline]
+fn round_rect_coverage(px int, py int, x int, y int, w int, h int, radius int) u32 {
+	if w <= 0 || h <= 0 || px < x || py < y || px >= x + w || py >= y + h {
+		return 0
+	}
+	if radius <= 0 {
+		return 255
+	}
+	mut center_x := 0
+	mut center_y := 0
+	if px < x + radius {
+		center_x = x + radius
+	} else if px >= x + w - radius {
+		center_x = x + w - radius
+	} else {
+		return 255
+	}
+	if py < y + radius {
+		center_y = y + radius
+	} else if py >= y + h - radius {
+		center_y = y + h - radius
+	} else {
+		return 255
+	}
+	return corner_coverage(f64(px) + 0.5, f64(py) + 0.5, f64(center_x), f64(center_y),
+		f64(radius))
+}
+
+// blend_native_round_ring blends the band between a rounded rectangle and
+// the same shape inset by `width`, whose radius is smaller by as much. It is
+// computed on the physical pixel grid, so a focus ring's corners stay smooth
+// at HiDPI scale.
+fn (mut c Canvas) blend_native_round_ring(x int, y int, w int, h int, radius int, width int,
+	color u32, alpha u32) {
+	if w <= 0 || h <= 0 || width <= 0 || alpha == 0 || c.scale <= 0 {
+		return
+	}
+	outer_x := x * c.scale
+	outer_y := y * c.scale
+	outer_w := w * c.scale
+	outer_h := h * c.scale
+	half := if outer_w < outer_h { outer_w / 2 } else { outer_h / 2 }
+	mut outer_radius := radius * c.scale
+	if outer_radius > half {
+		outer_radius = half
+	}
+	band := width * c.scale
+	inner_x := outer_x + band
+	inner_y := outer_y + band
+	inner_w := outer_w - 2 * band
+	inner_h := outer_h - 2 * band
+	inner_half := if inner_w < inner_h { inner_w / 2 } else { inner_h / 2 }
+	mut inner_radius := if outer_radius > band { outer_radius - band } else { 0 }
+	if inner_radius > inner_half {
+		inner_radius = if inner_half > 0 { inner_half } else { 0 }
+	}
+	for py := outer_y; py < outer_y + outer_h; py++ {
+		// Between the inner shape's corners a row only crosses the band at
+		// its two ends.
+		straight := inner_w > 0 && py >= inner_y + inner_radius
+			&& py < inner_y + inner_h - inner_radius
+		mut px := outer_x
+		for px < outer_x + outer_w {
+			if straight && px == inner_x {
+				px = inner_x + inner_w
+				continue
+			}
+			outer := round_rect_coverage(px, py, outer_x, outer_y, outer_w, outer_h, outer_radius)
+			inner := round_rect_coverage(px, py, inner_x, inner_y, inner_w, inner_h, inner_radius)
+			if outer > inner {
+				c.blend_physical_pixel(px, py, color, (outer - inner) * alpha / 255)
+			}
+			px++
+		}
+	}
+}
+
 // fill_round_rect draws the body as plain spans and only pays for coverage
 // inside the four corner squares.
 fn (mut c Canvas) fill_round_rect(x int, y int, w int, h int, radius int, color u32) {

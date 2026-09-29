@@ -516,8 +516,9 @@ Everything that varies between themes is a field of `Theme` in `settings.v`;
 anything that does not stays a plain constant in `theme.v`. Application
 interiors normally keep their declared styles, but controls marked
 `native_style` use Catalina's measured 21-pixel AppKit bezel under the macOS
-theme, including hover, pressed, selected and disabled states. Other controls
-continue to use their declared `app_*` colours.
+theme, including hover, pressed, selected, focused and disabled states, and
+draw a window's default button white while the window is not focused. Other
+controls continue to use their declared `app_*` colours.
 
 ## The taskbar
 

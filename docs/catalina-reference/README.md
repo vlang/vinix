@@ -37,6 +37,11 @@ committed.
 - `push-buttons-pressed.png` — the same controls while the regular button is
   held down; Catalina makes the pressed control blue and temporarily returns
   the former default control to its white rendition.
+- `push-buttons-inactive.png` and `push-buttons-focus-default.png` — the
+  push buttons the macOS theme is drawn to match. They are not Catalina
+  captures. In an inactive window both buttons are white. In the key window
+  the default button is blue and the focused one has a focus ring. These
+  set the default face, its corners, the focus ring and the bezel shadow.
 - The installed desktop and Finder captures also provide the pointer reference:
   a 14×21 logical-pixel black arrow with a white antialiased rim. Vinix keeps
   separately reconstructed 1x and native-resolution 2x alpha masks so its
@@ -65,7 +70,9 @@ All measurements are logical pixels at 1x.
 | Standard window body | `#ececec` |
 | Push-button visible bezel | 21 px |
 | Regular button face / top / bottom edge | `#ffffff` / `#c9c9c9` / `#acacac` |
-| Default button face | `#6ba0fb` to `#1164ff` |
+| Default button face / edge | `#779ff5` to `#2e62f6` / `#5b89f2` to `#2657f5`, 4 px corners |
+| Button shadow | 1 px below the bezel, `#ececec` becomes `#e5e5e5` |
+| Focus ring | 3 px outside the bezel and over its edge, `#125ae6` at 49%: `#82a5e9` on the body |
 | Pressed button face | `#4c8bfe` to `#0c55e5` |
 | Checkbox visible box | 14 px |
 | Pop-up / text-field bezel | 22 px |
@@ -81,6 +88,10 @@ Vinix used before this reference was collected.
 AppKit reveals all available control glyphs when the pointer is over any member
 of the group. Vinix preserves that group-hover behaviour as well as the native
 red-yellow-green order.
+
+Outside the key window a default button has the white face and a focused
+button no ring. Vinix leaves a selected choice or toggle blue, because for
+those the colour shows the state.
 
 Regular push buttons do not have a hover-only visual change. On mouse-down,
 Catalina uses its darker blue pressed rendition for either a regular or default

@@ -117,6 +117,9 @@ mut:
 	// Whether the frame being built repaints everything. Only such a frame
 	// asks applications for a tree just because the one it has is old.
 	paint_full bool = true
+	// Set while rendering paints a window that is not focused, whose default
+	// button and focus ring the macOS theme leaves out.
+	inactive_window bool
 	// The pixels under the software pointer, so a pointer that only moved can
 	// be redrawn without recomposing anything else.
 	cursor_backing CursorBacking
@@ -589,10 +592,15 @@ fn (mut d Desktop) window_element(window_index int) ui2.Element {
 			transparent: true
 		}, ui2.cursor_resize_nwse, frame_elements(0))
 	}
-	return ui2.view(window.id_frame, window.frame_rect(), ui2.BoxStyle{
-		bg:     background
-		radius: theme.window_radius
-	}, window_children)
+	// `focused` tells the renderer which window's controls are drawn as the
+	// key window's.
+	return ui2.Element{
+		...ui2.view(window.id_frame, window.frame_rect(), ui2.BoxStyle{
+			bg:     background
+			radius: theme.window_radius
+		}, window_children)
+		focused: active
+	}
 }
 
 // window_contents is the body's background colour and its children. A native

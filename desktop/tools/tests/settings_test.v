@@ -619,6 +619,144 @@ fn test_catalina_native_button_rasterizes_curves_and_gradients_at_hidpi_scale() 
 	}
 }
 
+fn test_catalina_native_button_casts_a_shadow_and_rings_focus() {
+	mut desktop := Desktop{
+		canvas:   new_scaled_canvas(260, 40, 260, 40, 1)
+		settings: Settings{
+			theme: .macos
+		}
+	}
+	defer {
+		unsafe { free(desktop.canvas.pixels) }
+	}
+	desktop.canvas.clear(theme_macos.window_body)
+	plain := ui2.Element{
+		kind:         .button
+		id:           'plain'
+		frame:        ui2.rect(10, 6, 100, 28)
+		native_style: true
+	}
+	desktop.draw_button(&plain, 10, 6, 100, 28)
+	focused := ui2.Element{
+		kind:         .button
+		id:           'focused'
+		frame:        ui2.rect(140, 6, 100, 28)
+		native_style: true
+		focused:      true
+	}
+	desktop.draw_button(&focused, 140, 6, 100, 28)
+	// Both bezels span rows 9..29. The colours are those of
+	// docs/catalina-reference/push-buttons-focus-default.png.
+	stride := desktop.canvas.stride
+	unsafe {
+		assert desktop.canvas.pixels[8 * stride + 60] == theme_macos.window_body
+		assert desktop.canvas.pixels[30 * stride + 60] == 0xe5e5e5
+		assert desktop.canvas.pixels[31 * stride + 60] == theme_macos.window_body
+		for row in 6 .. 9 {
+			assert desktop.canvas.pixels[row * stride + 190] == 0x82a5e9
+		}
+		assert desktop.canvas.pixels[9 * stride + 190] == 0x7093d7
+		assert desktop.canvas.pixels[10 * stride + 190] == catalina_button_face
+		for column in 137 .. 140 {
+			assert desktop.canvas.pixels[19 * stride + column] == 0x82a5e9
+		}
+		assert desktop.canvas.pixels[19 * stride + 141] == catalina_button_face
+		assert desktop.canvas.pixels[33 * stride + 190] == theme_macos.window_body
+	}
+}
+
+fn test_catalina_inactive_window_drops_default_face_and_focus_ring() {
+	mut desktop := Desktop{
+		canvas:   new_scaled_canvas(380, 40, 380, 40, 1)
+		settings: Settings{
+			theme: .macos
+		}
+	}
+	defer {
+		unsafe { free(desktop.canvas.pixels) }
+	}
+	desktop.canvas.clear(theme_macos.window_body)
+	desktop.inactive_window = true
+	default_button := ui2.Element{
+		kind:         .button
+		id:           'open'
+		frame:        ui2.rect(10, 6, 100, 28)
+		native_style: true
+		checked:      true
+		focused:      true
+	}
+	desktop.draw_button(&default_button, 10, 6, 100, 28)
+	// A selected choice is a state, not a default, and stays blue.
+	choice := ui2.Element{
+		kind:               .button
+		id:                 'choice'
+		frame:              ui2.rect(140, 6, 100, 28)
+		native_style:       true
+		checked:            true
+		accessibility_role: 'radio'
+	}
+	desktop.draw_button(&choice, 140, 6, 100, 28)
+	toggle := ui2.Element{
+		kind:         .toggle_button
+		id:           'toggle'
+		frame:        ui2.rect(270, 6, 100, 28)
+		native_style: true
+		checked:      true
+	}
+	desktop.draw_button(&toggle, 270, 6, 100, 28)
+	stride := desktop.canvas.stride
+	unsafe {
+		assert desktop.canvas.pixels[9 * stride + 60] == catalina_button_normal_outer[0]
+		assert desktop.canvas.pixels[10 * stride + 60] == catalina_button_face
+		assert desktop.canvas.pixels[8 * stride + 60] == theme_macos.window_body
+		assert desktop.canvas.pixels[19 * stride + 8] == theme_macos.window_body
+		assert desktop.canvas.pixels[10 * stride + 190] == catalina_button_default_inner[0]
+		assert desktop.canvas.pixels[10 * stride + 320] == catalina_button_default_inner[0]
+	}
+}
+
+fn test_catalina_window_frame_tells_its_buttons_whether_it_is_focused() {
+	mut desktop := Desktop{
+		canvas:   new_scaled_canvas(160, 80, 160, 80, 1)
+		settings: Settings{
+			theme: .macos
+		}
+	}
+	defer {
+		unsafe { free(desktop.canvas.pixels) }
+	}
+	for active in [false, true] {
+		desktop.canvas.clear(theme_macos.window_body)
+		button := ui2.Element{
+			kind:         .button
+			id:           'open'
+			frame:        ui2.rect(10, 10, 100, 28)
+			native_style: true
+			checked:      true
+		}
+		window := ui2.Element{
+			...ui2.view('win.1', ui2.rect(10, 10, 130, 50), ui2.BoxStyle{
+				bg: theme_macos.window_body
+			}, [button])
+			focused: active
+		}
+		root := ui2.view('desktop', ui2.rect(0, 0, 160, 80), ui2.BoxStyle{
+			transparent: true
+		}, [window])
+		desktop.render_element(&root, 0, 0, 0)
+		// The bezel's top row is at 10 + 10 + 3.
+		expected := if active {
+			catalina_button_default_outer[0]
+		} else {
+			catalina_button_normal_outer[0]
+		}
+		unsafe {
+			assert desktop.canvas.pixels[23 * desktop.canvas.stride + 60] == expected
+		}
+		assert !desktop.inactive_window
+	}
+}
+
 fn test_catalina_directional_button_captions_are_visible_without_font_glyphs() {
 	mut desktop := Desktop{
 		canvas:   new_scaled_canvas(220, 44, 220, 44, 1)
