@@ -658,8 +658,18 @@ fn scheduler_timer_handler(_gpr_state voidptr) {
 		// The run-queue candidate is still eligible for the idle loop's next
 		// scan. Drop its lock before parking, but retain the outgoing thread's
 		// lock until the assembly handoff has changed stacks.
+		//
+		// That scan must come to the candidate first. The one that found it
+		// left this CPU's place in the queue on it, so the next lap started
+		// just past it and reached it last -- after the thread being put
+		// down, which is runnable again by then. A thread that gave the CPU
+		// up with sched_yield(2) took it straight back, every time, and one
+		// waiting for a CPU with every CPU busy never got one: with a worker
+		// pinned to each, qemu-core's concurrent-wakeups coordinator ran only
+		// when something else happened to wake, and took minutes.
 		if unsafe { next_thread != nil } {
 			next_thread.l.release()
+			cpu_local.last_run_queue_index = (cpu_local.last_run_queue_index + max_running_threads - 1) % max_running_threads
 		}
 		if trace_gpu_interrupt {
 			clear_gpu_exec_interrupt_trace()
