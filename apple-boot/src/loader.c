@@ -208,6 +208,8 @@ void loader_main(uint64_t boot_args, uint64_t image_base)
     console_hex(5, 0xc0, answered);
     console_stage(7);
 
+    quiesce_fiq_sources();
+
     /* Written with the caches off: drop whatever the firmware still holds
      * for these lines before the kernel reads them cacheably. */
     cache_invalidate_range(kernel.phys_base, kernel_end);

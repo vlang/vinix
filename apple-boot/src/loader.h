@@ -181,6 +181,7 @@ __attribute__((noreturn)) void enter_kernel(uint64_t entry, uint64_t stack, uint
                                             uint64_t mair, uint64_t tcr, uint64_t ttbr0,
                                             uint64_t ttbr1);
 void cache_invalidate_range(uint64_t start, uint64_t end);
+void quiesce_fiq_sources(void);
 uint64_t read_id_aa64mmfr0(void);
 uint64_t read_current_el(void);
 uint64_t read_midr(void);

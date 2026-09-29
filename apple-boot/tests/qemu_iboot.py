@@ -44,7 +44,8 @@ RAM_BYTES = 0x80000000
 # QEMU puts its own DTB in the first MiB of RAM when it has no firmware.
 STUB = RAM_BASE + 0x100000
 SCRATCH = RAM_BASE + 0x110000  # the fake watchdog's registers
-PHYS_BASE = RAM_BASE + 0x200000  # iBoot's usable range starts above itself
+FAKE_AIC = RAM_BASE + 0x400000  # an AICv3 laid out like the M5's, in RAM
+PHYS_BASE = RAM_BASE + 0x800000  # iBoot's usable range starts above itself
 VIRT_BASE = 0xFFFFFE0007004000
 FB_WIDTH, FB_HEIGHT = 1024, 768
 FB_STRIDE = FB_WIDTH * 4
@@ -53,6 +54,16 @@ FB_BASE = RAM_BASE + RAM_BYTES - FB_BYTES
 WDT_CONTROL = 0x1C
 SEGMENT_BYTES = 0x10000
 SEGMENT_FILL = 0xA5
+# The M5 Max's /arm-io/aic (this Mac's IORegistry): 4096 IRQ slots per die,
+# so 0x4a00-byte die blocks from extint-baseaddress 0x10000.
+AIC_SIZE = 0x1CC000
+AIC_IACK = 0x40000
+AIC_CONFIG = 0x10000
+AIC_STRIDE = 0x4A00
+AIC_GLOBAL_CONFIG = 0x14
+AIC_NR_IRQ = 1000
+AIC_MAX_IRQ = 0x1000
+AIC_MASK_SET = AIC_CONFIG + 4 * AIC_MAX_IRQ + 8 * (AIC_MAX_IRQ // 32)
 
 
 def align(value: int, alignment: int) -> int:
@@ -81,10 +92,11 @@ def u64s(*values: int) -> bytes:
     return struct.pack(f"<{len(values)}Q", *values)
 
 
-def build_adt(segment: int) -> bytes:
-    """A tree with what the loader reads: a watchdog behind a translating bus
-    and one coprocessor's firmware segment. No Apple compatibles, so the
-    kernel takes its QEMU path."""
+def build_adt(segment: int, with_aic: bool) -> bytes:
+    """A tree with what the loader reads -- a watchdog behind a translating
+    bus and one coprocessor's firmware segment -- and, unless asked not to,
+    an AICv3 described as the M5's is, for the kernel. Nothing else Apple, so
+    the kernel otherwise takes its QEMU path."""
     # arm-io maps its child address 0 to RAM_BASE: the watchdog's reg (child
     # addresses 0x110000 and 0x110100) only lands on SCRATCH if the loader
     # applies the bus's ranges.
@@ -98,12 +110,25 @@ def build_adt(segment: int) -> bytes:
         ("name", cstr("test-asc")),
         ("segment-ranges", u64s(segment, 0, 0) + struct.pack("<II", SEGMENT_BYTES, 0)),
     ])
+    aic = adt_node([
+        ("name", cstr("aic")),
+        ("compatible", cstr("aic,3")),
+        ("reg", u64s(FAKE_AIC - RAM_BASE, AIC_SIZE)),
+        ("aic-iack-offset", u64s(AIC_IACK)),
+        ("cap0-offset", u32(4)),
+        ("maxnumirq-offset", u32(0xC)),
+        ("extint-baseaddress", u32(AIC_CONFIG)),
+        ("extintrcfg-stride", u32(AIC_STRIDE)),
+        ("intmaskset-stride", u32(AIC_STRIDE)),
+        ("intmaskclear-stride", u32(AIC_STRIDE)),
+        ("aicglbcfg-offset", u32(AIC_GLOBAL_CONFIG)),
+    ])
     arm_io = adt_node([
         ("name", cstr("arm-io")),
         ("#address-cells", u32(2)),
         ("#size-cells", u32(2)),
-        ("ranges", u64s(0, RAM_BASE, 0x200000)),
-    ], [wdt, firmware])
+        ("ranges", u64s(0, RAM_BASE, PHYS_BASE - RAM_BASE)),
+    ], [wdt, firmware] + ([aic] if with_aic else []))
     chosen = adt_node([
         ("name", cstr("chosen")),
         ("dram-base", u64s(RAM_BASE)),
@@ -226,6 +251,8 @@ def main() -> int:
     parser.add_argument("--keep", type=Path, help="keep the work directory here")
     parser.add_argument("--screenshot", type=Path, help="save the framebuffer as a PNG")
     parser.add_argument("--accel", default="tcg")
+    parser.add_argument("--no-aic", action="store_true",
+                        help="leave the AIC out, so the kernel takes QEMU's GIC path")
     arguments = parser.parse_args()
 
     run(["make", "-C", str(APPLE_BOOT), "-s"])
@@ -242,11 +269,12 @@ def main() -> int:
         adt_base = align(image_base + len(image), 0x4000)
         # The segment goes after the loader's data, where its allocator would
         # otherwise start: it has to move past it.
-        provisional_adt = build_adt(0)
+        with_aic = not arguments.no_aic
+        provisional_adt = build_adt(0, with_aic)
         args_base = align(adt_base + len(provisional_adt), 0x4000)
         top_of_kernel_data = args_base + 0x4000
         segment = align(top_of_kernel_data, 0x200000) + 0x100000
-        adt = build_adt(segment)
+        adt = build_adt(segment, with_aic)
         assert len(adt) == len(provisional_adt)
         args = boot_args(adt_base, len(adt), top_of_kernel_data)
 
@@ -257,6 +285,11 @@ def main() -> int:
             "scratch.bin": (SCRATCH, b"\xff" * 0x400),
             "segment.bin": (segment, bytes([SEGMENT_FILL]) * SEGMENT_BYTES),
         }
+        if with_aic:
+            aic = bytearray(AIC_SIZE)
+            struct.pack_into("<I", aic, 4, AIC_NR_IRQ)  # cap0: one die
+            struct.pack_into("<I", aic, 0xC, AIC_MAX_IRQ)
+            files["aic.bin"] = (FAKE_AIC, bytes(aic))
         stub = build_stub(work, args_base, image_base + 0x800)
         loaders = ["-device", f"loader,file={stub},addr={STUB:#x},cpu-num=0,force-raw=on"]
         for name, (address, data) in files.items():
@@ -288,6 +321,8 @@ def main() -> int:
             failures.append("PID 1 never printed its marker")
         if qemu.poll() is None:
             dumps = {"scratch": (SCRATCH, 0x400), "segment": (segment, SEGMENT_BYTES)}
+            if with_aic:
+                dumps["aic"] = (FAKE_AIC, AIC_SIZE)
             if arguments.screenshot:
                 dumps["framebuffer"] = (FB_BASE, FB_STRIDE * FB_HEIGHT)
             qmp = Qmp(sock)
@@ -303,6 +338,16 @@ def main() -> int:
                 failures.append("the watchdog's second control word was not cleared")
             if (work / "segment.dump").read_bytes() != bytes([SEGMENT_FILL]) * SEGMENT_BYTES:
                 failures.append("the reserved firmware segment was overwritten")
+            if with_aic:
+                aic = (work / "aic.dump").read_bytes()
+                words = (AIC_NR_IRQ + 31) // 32
+                masks = aic[AIC_MASK_SET:AIC_MASK_SET + 4 * words]
+                if masks != b"\xff" * len(masks):
+                    failures.append("the kernel did not mask every AIC IRQ")
+                if not aic[AIC_GLOBAL_CONFIG] & 1:
+                    failures.append("the kernel did not enable the AIC")
+                if b"aic: masked" not in serial.read_bytes():
+                    failures.append("the kernel did not take the AICv3 path")
             if arguments.screenshot:
                 write_png(arguments.screenshot, (work / "framebuffer.dump").read_bytes())
                 print(f"framebuffer: {arguments.screenshot}")

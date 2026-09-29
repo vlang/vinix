@@ -203,6 +203,35 @@ cache_invalidate_range:
     isb
     ret
 
+// void quiesce_fiq_sources(void): what m1n1's exception_initialize does
+// before it unmasks FIQs, since iBoot may leave any of these asserted and the
+// kernel's FIQ handler only knows the timer. Every timer is disabled and
+// masked; on Apple cores the PMU's FIQ mode is turned off and a pending fast
+// IPI acknowledged.
+.globl quiesce_fiq_sources
+quiesce_fiq_sources:
+    msr oslar_el1, xzr // release the OS lock, as m1n1 does
+    mov x0, #2 // ENABLE=0, IMASK=1
+    msr cntp_ctl_el0, x0
+    msr cntv_ctl_el0, x0
+    mrs x1, hcr_el2
+    tbz x1, #34, 1f
+    msr S3_5_C14_C2_1, x0 // CNTP_CTL_EL02: the EL1 timers, under E2H
+    msr S3_5_C14_C3_1, x0 // CNTV_CTL_EL02
+1:
+    mrs x1, midr_el1
+    lsr x1, x1, #24
+    cmp x1, #0x61 // implementer 'a': Apple
+    b.ne 2f
+    mrs x1, S3_1_C15_C0_0 // PMCR0
+    bic x1, x1, #0xf00 // IACT, IMODE
+    msr S3_1_C15_C0_0, x1
+    mov x1, #1
+    msr S3_5_C15_C1_1, x1 // IPI_SR_EL1: acknowledge a pending fast IPI
+2:
+    isb
+    ret
+
 .globl read_id_aa64mmfr0
 read_id_aa64mmfr0:
     mrs x0, id_aa64mmfr0_el1
