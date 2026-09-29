@@ -228,19 +228,6 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 		hook(&current_thread.gpr_state)
 	}
 
-	// The SWAPGS below leaves GS on the thread for the kernel, and the
-	// thread's own base parked in KERNEL_GS_BASE, whichever mode it returns
-	// to; in userspace the two are the other way round. A user thread resumed
-	// inside a syscall used to lose the GS base it had set with arch_prctl.
-	if current_thread.gpr_state.cs == user_code_seg {
-		cpu.set_gs_base(u64(current_thread))
-		cpu.set_kernel_gs_base(current_thread.gs_base)
-	} else {
-		cpu.set_gs_base(current_thread.gs_base)
-		cpu.set_kernel_gs_base(u64(current_thread))
-	}
-	cpu.set_fs_base(current_thread.fs_base)
-
 	cpu_local.tss.ist3 = current_thread.pf_stack
 	reap_dead_threads(mut cpu_local)
 
@@ -256,6 +243,25 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 
 	apic.lapic_eoi()
 	apic.lapic_timer_oneshot(mut cpu_local, scheduler_vector, effective_timeslice(current_thread))
+
+	// The SWAPGS below leaves GS on the thread for the kernel, and the
+	// thread's own base parked in KERNEL_GS_BASE, whichever mode it returns
+	// to; in userspace the two are the other way round. A user thread resumed
+	// inside a syscall used to lose the GS base it had set with arch_prctl.
+	//
+	// Last, as nothing past this point may use GS: for a thread resumed in
+	// the kernel it holds the thread's own base until the SWAPGS. Freeing the
+	// thread that died here used to come after it, and anything on the way
+	// that looked at GS -- a lock answering a TLB shootdown asks which CPU it
+	// is on -- read address 0, and its fault handler faulted for good.
+	if current_thread.gpr_state.cs == user_code_seg {
+		cpu.set_gs_base(u64(current_thread))
+		cpu.set_kernel_gs_base(current_thread.gs_base)
+	} else {
+		cpu.set_gs_base(current_thread.gs_base)
+		cpu.set_kernel_gs_base(u64(current_thread))
+	}
+	cpu.set_fs_base(current_thread.fs_base)
 
 	new_gpr_state := &current_thread.gpr_state
 
