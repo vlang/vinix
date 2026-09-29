@@ -9,6 +9,8 @@ import x86.hpet as hpet_clock
 
 const lapic_reg_icr0 = 0x300
 const lapic_reg_icr1 = 0x310
+// ICR's delivery status: the last IPI has not been accepted yet.
+const icr_delivery_pending = u32(1) << 12
 const lapic_reg_spurious = 0x0f0
 const lapic_reg_eoi = 0x0b0
 const lapic_reg_timer = 0x320
@@ -151,10 +153,23 @@ pub fn lapic_eoi() {
 pub fn lapic_send_ipi(lapic_id u32, vector u8) {
 	if x2apic_mode {
 		x2apic_write(lapic_reg_icr0, (u64(lapic_id) << 32) | vector)
-	} else {
-		xapic_write(lapic_reg_icr1, u32(lapic_id) << 24)
-		xapic_write(lapic_reg_icr0, vector)
+		return
 	}
+	// The xAPIC takes an IPI as two writes, destination and then vector. An
+	// interrupt between them whose handler sent an IPI of its own changed the
+	// destination under this one, which went to the wrong CPU; and one written
+	// while the last was still being delivered could be lost. Either way a
+	// TLB shootdown waiting for the answer waited for good.
+	ints := cpu.interrupt_toggle(false)
+	for xapic_read(lapic_reg_icr0) & icr_delivery_pending != 0 {
+		asm volatile amd64 {
+			pause
+			; ; ; memory
+		}
+	}
+	xapic_write(lapic_reg_icr1, u32(lapic_id) << 24)
+	xapic_write(lapic_reg_icr0, vector)
+	cpu.interrupt_toggle(ints)
 }
 
 fn io_apic_read(io_apic int, reg u32) u32 {

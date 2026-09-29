@@ -22,6 +22,10 @@ import x86.idt
 
 const max_tlb_cpus = 256
 
+// How long a shootdown waits for a CPU to answer before sending it the IPI
+// again, in spins: some milliseconds.
+const tlb_resend_spins = 1000000
+
 __global (
 	tlb_vector u8
 	// One shootdown at a time: what it drops, and which CPUs are yet to.
@@ -103,7 +107,13 @@ fn tlb_shootdown(cr3 u64, virt u64, everywhere bool) {
 		apic.lapic_send_ipi(cpu_locals[i].lapic_id, tlb_vector)
 	}
 	for i := 0; i < count; i++ {
+		// An IPI can go astray; ask again rather than wait for good.
+		mut spins := 0
 		for katomic.load(&tlb_pending[i]) != 0 {
+			spins++
+			if spins % tlb_resend_spins == 0 {
+				apic.lapic_send_ipi(cpu_locals[i].lapic_id, tlb_vector)
+			}
 			asm volatile amd64 {
 				pause
 				; ; ; memory
