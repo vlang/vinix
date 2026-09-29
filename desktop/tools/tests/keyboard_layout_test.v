@@ -425,7 +425,7 @@ fn test_keyboard_taskbar_menu_lists_and_chooses_input_sources() {
 	assert d.tray.flyout == .none_
 }
 
-fn test_keyboard_settings_pane_enables_and_selects_input_sources() {
+fn test_keyboard_settings_pane_enables_input_sources() {
 	mut desktop := Desktop{}
 	mut app := SettingsApp{
 		desktop:  &desktop
@@ -435,7 +435,7 @@ fn test_keyboard_settings_pane_enables_and_selects_input_sources() {
 	assert keyboard_index >= 0
 	assert SettingsCategory.keyboard.title() == 'Keyboard'
 
-	mut root := app.build(ui2.rect(0, 0, 620, 376)) or { panic(err) }
+	root := app.build(ui2.rect(0, 0, 620, 376)) or { panic(err) }
 	keyboard_test_element(root, '${settings_action_category}${keyboard_index}') or {
 		panic('missing Keyboard category')
 	}
@@ -444,20 +444,13 @@ fn test_keyboard_settings_pane_enables_and_selects_input_sources() {
 	}
 	assert us_toggle.checked && us_toggle.accessibility_role == 'checkbox'
 	russian_index := keyboard_layouts.index(KeyboardLayout.russian)
-	if _ := keyboard_test_element(root, '${settings_action_keyboard_current}${russian_index}') {
-		assert false, 'a layout that is off offered as the current one'
-	}
 
-	// Turn Russian on, then type with it.
+	// Turning Russian on leaves typing where it was: the taskbar's input menu
+	// picks the current one.
 	app.handle('${settings_action_keyboard_enable}${russian_index}') or { panic(err) }
 	assert desktop.settings.keyboard_layouts == KeyboardLayout.us.bit() | KeyboardLayout.russian.bit()
 	assert desktop.settings.keyboard_layout == .us
-	root = app.build(ui2.rect(0, 0, 620, 376)) or { panic(err) }
-	keyboard_test_element(root, '${settings_action_keyboard_current}${russian_index}') or {
-		panic('missing Russian choice')
-	}
-	app.handle('${settings_action_keyboard_current}${russian_index}') or { panic(err) }
-	assert desktop.settings.keyboard_layout == .russian
+	desktop.settings.keyboard_layout = .russian
 
 	// Turning off the current input source moves typing to the first left on,
 	// and the last one cannot be turned off.
@@ -466,25 +459,10 @@ fn test_keyboard_settings_pane_enables_and_selects_input_sources() {
 	assert desktop.settings.keyboard_layout == .us
 	app.handle('${settings_action_keyboard_enable}0') or { panic(err) }
 	assert desktop.settings.keyboard_layouts == KeyboardLayout.us.bit()
-	// A layout that is off cannot be chosen, and out-of-range ids do nothing.
-	app.handle('${settings_action_keyboard_current}${russian_index}') or { panic(err) }
+	// Out-of-range ids do nothing.
 	app.handle('${settings_action_keyboard_enable}99') or { panic(err) }
 	assert desktop.settings.keyboard_layout == .us
 	assert keyboard_settings_valid(desktop.settings.keyboard_layouts, desktop.settings.keyboard_layout)
-
-	// Every layout's pane builds, and says what it types.
-	for layout in keyboard_layouts {
-		desktop.settings.keyboard_layouts = keyboard_layout_all_mask
-		desktop.settings.keyboard_layout = layout
-		pane := app.build(ui2.rect(0, 0, 620, 376)) or { panic(err) }
-		preview := keyboard_previews[int(layout)]
-		assert preview.letters.len > 0
-		assert keyboard_test_has_text(pane, 'Types: ${preview.letters}')
-	}
-	assert keyboard_previews[int(KeyboardLayout.russian)].letters == 'й ц у к е н г ш щ з х ъ'
-	assert keyboard_previews[int(KeyboardLayout.german)].option.contains('@')
-	assert keyboard_previews[int(KeyboardLayout.french)].accents.contains('^')
-	assert keyboard_previews[int(KeyboardLayout.russian)].accents == ''
 }
 
 fn test_keyboard_settings_cross_the_application_protocol() {
@@ -520,23 +498,11 @@ fn test_keyboard_settings_cross_the_application_protocol() {
 		assert false, 'accepted ${accepted.settings.keyboard_layouts}'
 	}
 
-	// Settings choosing a new input source drops an accent the compositor
-	// was holding for the old one.
+	// Settings moving typing to another input source drops an accent the
+	// compositor was holding for the old one.
 	mut desktop := Desktop{}
 	desktop.keyboard.dead = dead_acute
 	apply_app_state(mut desktop, state)
 	assert desktop.settings.keyboard_layout == .portuguese
 	assert desktop.keyboard.dead == 0
-}
-
-fn keyboard_test_has_text(el ui2.Element, text string) bool {
-	if el.text == text {
-		return true
-	}
-	for child in el.children {
-		if keyboard_test_has_text(child, text) {
-			return true
-		}
-	}
-	return false
 }

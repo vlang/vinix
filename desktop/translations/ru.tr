@@ -1063,9 +1063,6 @@ settings.display.unavailable
 settings.display.unknown
 Неизвестно
 -----
-settings.keyboard.accents
-Клавиши акцентов {0} ждут буквы, к которой относятся.
------
 settings.keyboard.layout.french
 Французская
 -----
@@ -1096,23 +1093,11 @@ settings.keyboard.off
 settings.keyboard.on
 включено
 -----
-settings.keyboard.option_types
-С Option (Alt): {0}
------
 settings.keyboard.sources
 Источники ввода
 -----
 settings.keyboard.sources_note
 Ctrl-пробел переключает раскладки, включённые здесь.
------
-settings.keyboard.types
-Печатает: {0}
------
-settings.keyboard.typing
-Текущая раскладка
------
-settings.keyboard.typing_note
-Сочетания вроде Ctrl-C и Cmd-W работают одинаково в любой раскладке.
 -----
 settings.language.apps_note
 Другие приложения выбирают язык сами.

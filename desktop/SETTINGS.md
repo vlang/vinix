@@ -117,12 +117,12 @@ default.
 
 Select **Keyboard** to choose input sources. **Input sources** turns layouts on
 and off: English (US), Russian, Spanish, French, German and Portuguese
-(Portugal). At least one stays on. **Typing with** picks the current one among
-those that are on, and the pane shows what its top letter row, Option key and
-accent keys type. **Ctrl-Space** moves to the next input source that is on and
-briefly shows its name in the middle of the screen; with a single source, it
-reaches applications as NUL (Ctrl-@) as before. The current source is saved
-like every other preference, so a switch survives a restart.
+(Portugal). At least one stays on; turning off the current one moves typing to
+the first still on. The current one is picked from the taskbar's input menu
+beside the clock, described below. **Ctrl-Space** moves to the next input
+source that is on and briefly shows its name in the middle of the screen; with
+a single source, it reaches applications as NUL (Ctrl-@) as before. The current
+source is saved like every other preference, so a switch survives a restart.
 
 While more than one input source is on, the taskbar shows the current one's
 short name (`EN`, `RU`, ...) just left of the clock, as Windows' language bar

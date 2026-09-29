@@ -108,8 +108,8 @@ fn test_every_key_the_sources_use_is_defined() {
 
 // UI helpers whose first argument is the text they show, and those whose
 // second argument is, after an element id.
-const i18n_text_first = ['settings_heading', 'settings_note', 'settings_owned_note', 'heading',
-	'body_line', 'owned_body_line', 'muted_line', 'tray_flyout_heading']
+const i18n_text_first = ['settings_heading', 'settings_note', 'heading', 'body_line', 'owned_body_line',
+	'muted_line', 'tray_flyout_heading']
 const i18n_text_second = ['ui2.label', 'ui2.button', 'ui2.button_with_image', 'settings_choice',
 	'settings_toggle', 'editor_toolbar_button']
 // Names that read the same in every language.
@@ -414,7 +414,7 @@ fn test_settings_jump_tasks_open_the_page_they_name() {
 	}
 }
 
-fn test_keyboard_pane_names_layouts_and_keys_in_the_language() {
+fn test_keyboard_pane_names_layouts_in_the_language() {
 	defer {
 		set_desktop_language(.en)
 	}
@@ -430,7 +430,6 @@ fn test_keyboard_pane_names_layouts_and_keys_in_the_language() {
 	i18n_collect_text(app.build(ui2_rect_for_i18n_test())!, mut labels)
 	assert 'Клавиатура' in labels
 	assert 'Русская' in labels && 'Португальская' in labels
-	assert 'Печатает: й ц у к е н г ш щ з х ъ' in labels
 	// The model keeps its English names; only what is shown changes.
 	assert KeyboardLayout.russian.title() == 'Russian'
 	assert keyboard_layout_text(.russian) == 'Русская'
