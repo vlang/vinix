@@ -362,10 +362,10 @@ static void type_ascii(Display *display, unsigned char byte) {
     static const char bases[] = "1234567890-=[]\\;'\x60,./";
     const char *position;
 
-    if (byte >= 1 && byte <= 26) {
-        tap_key(display, (KeySym)('a' + byte - 1), 0, 1);
-        return;
-    }
+    /* Return, Tab and Backspace are control characters too, so they go before
+     * the Ctrl chords, which would otherwise take them. Enter became Ctrl+J or
+     * Ctrl+M and Backspace Ctrl+H: a Windows edit control reads those as the
+     * same keys, but GTK does not, and Enter never reached Firefox. */
     if (byte == '\n' || byte == '\r') {
         tap_key(display, XK_Return, 0, 0);
         return;
@@ -376,6 +376,10 @@ static void type_ascii(Display *display, unsigned char byte) {
     }
     if (byte == '\b' || byte == 0x7f) {
         tap_key(display, XK_BackSpace, 0, 0);
+        return;
+    }
+    if (byte >= 1 && byte <= 26) {
+        tap_key(display, (KeySym)('a' + byte - 1), 0, 1);
         return;
     }
     if (byte >= 'A' && byte <= 'Z') {
@@ -739,9 +743,112 @@ static Window topmost_input_window(Display *display, Window parent) {
     return descendant == None ? candidate : descendant;
 }
 
+/* The topmost viewable application window directly under the root. Popups,
+ * menus and tooltips are override-redirect and never take the focus: GTK and
+ * Qt send them keys through a grab of their own. */
+static Window topmost_toplevel(Display *display) {
+    Window root = DefaultRootWindow(display);
+    Window root_return;
+    Window parent_return;
+    Window *children = NULL;
+    unsigned int count = 0;
+    unsigned int index;
+    Window result = None;
+
+    if (!XQueryTree(display, root, &root_return, &parent_return, &children,
+                    &count))
+        return None;
+    for (index = count; index > 0; --index) {
+        XWindowAttributes attributes;
+        Window candidate = children[index - 1];
+        if (XGetWindowAttributes(display, candidate, &attributes) &&
+            attributes.map_state == IsViewable &&
+            attributes.class == InputOutput &&
+            !attributes.override_redirect && attributes.width >= 32 &&
+            attributes.height >= 32) {
+            result = candidate;
+            break;
+        }
+    }
+    if (children != NULL)
+        XFree(children);
+    return result;
+}
+
+static int takes_focus_itself(Display *display, Window window) {
+    Atom take_focus = XInternAtom(display, "WM_TAKE_FOCUS", False);
+    Atom *protocols = NULL;
+    int count = 0;
+    int index;
+    int found = 0;
+
+    if (!XGetWMProtocols(display, window, &protocols, &count))
+        return 0;
+    for (index = 0; index < count; ++index)
+        if (protocols[index] == take_focus)
+            found = 1;
+    XFree(protocols);
+    return found;
+}
+
+static int focus_is_within(Display *display, Window top) {
+    Window focus;
+    int revert;
+
+    XGetInputFocus(display, &focus, &revert);
+    while (focus != None && focus != PointerRoot) {
+        Window root_return;
+        Window parent;
+        Window *children = NULL;
+        unsigned int count = 0;
+
+        if (focus == top)
+            return 1;
+        if (!XQueryTree(display, focus, &root_return, &parent, &children,
+                        &count))
+            return 0;
+        if (children != NULL)
+            XFree(children);
+        if (parent == root_return)
+            return 0;
+        focus = parent;
+    }
+    return 0;
+}
+
+/* What a window manager does for a toplevel that takes WM_TAKE_FOCUS, as GTK
+ * and Qt toplevels do: focus the toplevel and let it pass the focus on. GTK
+ * moves it to a hidden 1x1 child of its own; given a window inside the
+ * toplevel instead, as the descent below would pick, Firefox saw no focus and
+ * dropped every key. */
+static void focus_toplevel(Display *display, Window top) {
+    XEvent event;
+
+    XSetInputFocus(display, top, RevertToPointerRoot, CurrentTime);
+    memset(&event, 0, sizeof(event));
+    event.xclient.type = ClientMessage;
+    event.xclient.window = top;
+    event.xclient.message_type = XInternAtom(display, "WM_PROTOCOLS", False);
+    event.xclient.format = 32;
+    event.xclient.data.l[0] = (long)XInternAtom(display, "WM_TAKE_FOCUS", False);
+    event.xclient.data.l[1] = CurrentTime;
+    XSendEvent(display, top, False, NoEventMask, &event);
+}
+
 static void focus_top_window(Display *display) {
     Window root = DefaultRootWindow(display);
     Window target;
+
+    if (!hold_game_keys) {
+        Window top = topmost_toplevel(display);
+        if (top != None && takes_focus_itself(display, top)) {
+            /* A click already focused it, or it moved the focus inside
+             * itself: leave that alone. */
+            if (!focus_is_within(display, top))
+                focus_toplevel(display, top);
+            return;
+        }
+    }
 
     /* Xvfb has no window manager to assign keyboard focus. Wine nests its
      * application windows and dialogs below Explorer's virtual-desktop root
