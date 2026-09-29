@@ -191,12 +191,22 @@ pub fn (mut this Slab) alloc() voidptr {
 
 	// The reserved slot keeps its page live. Zeroing need not hold the lock.
 	unsafe { C.memset(ptr, 0, size) }
+	$if alloc_track ? {
+		C.alloc_track(ptr, size)
+	}
 	return ptr
 }
+
+// See c/alloc_track.c; built in with `make ALLOC_TRACK=1`.
+fn C.alloc_track(ptr voidptr, size u64)
+fn C.alloc_untrack(ptr voidptr)
 
 pub fn (mut this Slab) sfree(ptr voidptr) {
 	if ptr == unsafe { nil } {
 		return
+	}
+	$if alloc_track ? {
+		C.alloc_untrack(ptr)
 	}
 	this.@lock.acquire()
 	mut hdr := unsafe { &SlabHeader(u64(ptr) & ~(page_size - 1)) }

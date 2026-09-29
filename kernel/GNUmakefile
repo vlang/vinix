@@ -195,7 +195,15 @@ endif
 # changes. Keep the selected configuration in the prerequisite name so moving
 # between a QEMU SMP build and a hardware-safe Apple build cannot reuse a
 # stale obj/blob.c.o.
-V_CONFIG_STAMP := obj/.v-config-$(ARCH)-limine-mp-$(LIMINE_MP)
+V_CONFIG_STAMP := obj/.v-config-$(ARCH)-limine-mp-$(LIMINE_MP)-alloc-track-$(ALLOC_TRACK)
+
+# ALLOC_TRACK=1 records the call chain of every live slab allocation, for
+# hunting leaks; see c/alloc_track.c. It costs a 7 MiB table and a lock on
+# every allocation, so it is off unless asked for.
+ifeq ($(ALLOC_TRACK),1)
+    override VFLAGS += -d alloc_track
+    override CPPFLAGS += -DVINIX_ALLOC_TRACK
+endif
 
 ifeq ($(PROD),false)
     override VFLAGS += -warn-about-allocs
@@ -298,6 +306,9 @@ $(V_CONFIG_STAMP):
 	mkdir -p obj
 	rm -f obj/.v-config-*
 	touch $@
+
+# The tracker's C half follows the same switch as its V half.
+obj/c/alloc_track.c.o: $(V_CONFIG_STAMP)
 
 obj/blob.c.o: GNUmakefile $(VFILES) $(V_CONFIG_STAMP)
 	mkdir -p "$$(dirname $@)"

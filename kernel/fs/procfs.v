@@ -53,6 +53,8 @@ enum ProcFSKind {
 	status
 	meminfo
 	slabinfo
+	allocstart
+	allocsites
 	uptime
 	version
 	text
@@ -233,6 +235,10 @@ fn (mut this ProcFS) build_root(parent &VFSNode, name string, view voidptr) &VFS
 	// accurate.
 	add_procfs_file(mut root, 'meminfo', .meminfo)
 	add_procfs_file(mut root, 'slabinfo', .slabinfo)
+	$if alloc_track ? {
+		add_procfs_file(mut root, 'allocstart', .allocstart)
+		add_procfs_file(mut root, 'allocsites', .allocsites)
+	}
 	add_procfs_file(mut root, 'uptime', .uptime)
 	add_procfs_file(mut root, 'version', .version)
 	mut sysrq := add_procfs_file(mut root, 'sysrq-trigger', .sysrq_trigger)
@@ -511,6 +517,24 @@ fn (this &ProcFSResource) contents() string {
 		}
 		.slabinfo {
 			return slabinfo_text()
+		}
+		// Leak hunting, in an ALLOC_TRACK=1 kernel: see c/alloc_track.c.
+		.allocstart {
+			$if alloc_track ? {
+				C.alloc_track_start()
+			}
+			return 'ok\n'
+		}
+		.allocsites {
+			$if alloc_track ? {
+				// A group seen fewer than 50 times is noise for a leak that
+				// repeats with what is being measured.
+				cap := u64(256 * 1024)
+				buf := unsafe { &u8(memory.malloc(cap)) }
+				n := C.alloc_track_dump(buf, cap, 50)
+				return unsafe { tos(buf, int(n)) }
+			}
+			return ''
 		}
 		.uptime {
 			seconds := time.monotonic_ns() / 1000000000
@@ -882,6 +906,9 @@ fn heap_pages() u64 {
 // /proc/slabinfo: each heap size class, what is allocated from it and the
 // pages it holds, then the allocations too large for any class. A count that
 // only grows while processes come and go is a leak, and its size says where.
+fn C.alloc_track_start()
+fn C.alloc_track_dump(buf &u8, cap u64, min_count u64) u64
+
 fn slabinfo_text() string {
 	mut text := lib.new_text(1024)
 	text.add('# class      size    objects   pages\n')
