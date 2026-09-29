@@ -57,20 +57,22 @@ FAULT_MARKERS = (
 FAULT_REJECTION_MARKER = (
     b"vinix-agx-fault: invalid Mesa resource submission rejected"
 )
-SHELL_PROMPT = re.compile(rb"(?:^|\r*\n)[^\r\n]{0,96}# $")
+# A plain `# ` prompt, or zsh turning on bracketed paste once its line editor
+# is ready (kernel log lines may follow its prompt in the same read).
+SHELL_PROMPT = re.compile(rb"(?:^|\r*\n)[^\r\n]{0,96}# $|\x1b\[\?2004h")
 GUEST_COMMAND = (
-    b"status=0; for mode in --depth --stencil --depth-stencil; do "
+    b"rc=0; for mode in --depth --stencil --depth-stencil; do "
     b"/usr/bin/run-gl-triangle-agx --submit-only \"$mode\" || "
-    b"{ status=$?; break; }; done; "
-    b"if [ \"$status\" -eq 0 ]; then for fault in overlap rebind lifetime; do "
+    b"{ rc=$?; break; }; done; "
+    b"if [ \"$rc\" -eq 0 ]; then for fault in overlap rebind lifetime; do "
     b"env VINIX_AGX_FAULT=\"$fault\" /usr/bin/run-gl-triangle-agx "
-    b"--submit-only --depth-stencil || { status=$?; break; }; done; fi; "
-    b"if [ \"$status\" -eq 0 ]; then for fault in unbind readonly; do "
+    b"--submit-only --depth-stencil || { rc=$?; break; }; done; fi; "
+    b"if [ \"$rc\" -eq 0 ]; then for fault in unbind readonly; do "
     b"if env VINIX_AGX_FAULT=\"$fault\" /usr/bin/run-gl-triangle-agx "
-    b"--submit-only --depth-stencil; then status=1; break; fi; done; fi; "
-    b"if [ \"$status\" -eq 0 ]; then "
+    b"--submit-only --depth-stencil; then rc=1; break; fi; done; fi; "
+    b"if [ \"$rc\" -eq 0 ]; then "
     b"printf 'VINIX_FAKE_G17_VM_%s\\n' PASS; "
-    b"else printf 'VINIX_FAKE_G17_VM_FAIL:%s\\n' \"$status\"; fi\n"
+    b"else printf 'VINIX_FAKE_G17_VM_FAIL:%s\\n' \"$rc\"; fi\n"
 )
 
 
