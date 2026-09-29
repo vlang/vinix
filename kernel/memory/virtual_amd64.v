@@ -383,6 +383,10 @@ pub fn vmm_init() {
 	kernel_pagemap.switch_to()
 
 	vmm_initialised = true
+
+	$if vmap_selftest ? {
+		vmap_selftest()
+	}
 }
 
 // The last-level table that maps `virt`, as a kernel pointer, or nil and the
@@ -560,11 +564,13 @@ fn (pagemap &Pagemap) invalidate(virt u64) {
 		return
 	}
 	top_level := u64(pagemap.top_level)
-	if cpu.read_cr3() == top_level {
+	// A kernel mapping is cached whichever page map a CPU is on.
+	everywhere := voidptr(pagemap) == voidptr(&kernel_pagemap)
+	if everywhere || cpu.read_cr3() == top_level {
 		cpu.invlpg(virt)
 	}
 	if tlb_shootdown != unsafe { nil } {
 		full_fence()
-		tlb_shootdown(top_level, virt, voidptr(pagemap) == voidptr(&kernel_pagemap))
+		tlb_shootdown(top_level, virt, everywhere)
 	}
 }
