@@ -386,6 +386,84 @@ fn start_pci() {
 	e1000.initialise()
 }
 
+// iBoot's tree names the controller by version under /arm-io and describes
+// an AICv2/v3's layout in vendor properties.
+fn find_adt_aic() ?(&devicetree.DTNode, u32) {
+	if node := devicetree.find_compatible('aic,3') {
+		return node, u32(3)
+	}
+	if node := devicetree.find_compatible('aic,2') {
+		return node, u32(2)
+	}
+	if node := devicetree.find_compatible('aic,1') {
+		return node, u32(1)
+	}
+	return none
+}
+
+fn initialise_adt_aic() bool {
+	node, version := find_adt_aic() or {
+		print('aic: no aic,1/2/3 node in the Apple device tree\n')
+		return false
+	}
+	regs := devicetree.get_translated_reg_ranges(node) or {
+		print('aic: unreadable reg\n')
+		return false
+	}
+	defer {
+		unsafe { regs.free() }
+	}
+	if regs.len == 0 {
+		return false
+	}
+	if version == 1 {
+		return aic.initialise(regs[0].base)
+	}
+	iack := devicetree.get_le_u64(node, 'aic-iack-offset') or {
+		print('aic: no aic-iack-offset\n')
+		return false
+	}
+	// AICv2 has these at fixed offsets and its config words at 0x2000;
+	// AICv3 only says where they are.
+	cap0 := devicetree.get_le_u32(node, 'cap0-offset') or {
+		if version != 2 {
+			print('aic: no cap0-offset\n')
+			return false
+		}
+		u32(4)
+	}
+	maxnumirq := devicetree.get_le_u32(node, 'maxnumirq-offset') or {
+		if version != 2 {
+			print('aic: no maxnumirq-offset\n')
+			return false
+		}
+		u32(0xc)
+	}
+	config := devicetree.get_le_u32(node, 'extint-baseaddress') or {
+		if version != 2 {
+			print('aic: no extint-baseaddress\n')
+			return false
+		}
+		u32(0x2000)
+	}
+	layout := aic.V2Layout{
+		version:             version
+		base:                regs[0].base
+		size:                regs[0].size
+		event:               iack
+		cap0:                cap0
+		maxnumirq:           maxnumirq
+		config:              config
+		global_config:       devicetree.get_le_u32(node, 'aicglbcfg-offset') or {
+			if version == 2 { u32(0x14) } else { u32(0) }
+		}
+		extintrcfg_stride:   devicetree.get_le_u32(node, 'extintrcfg-stride') or { u32(0) }
+		intmaskset_stride:   devicetree.get_le_u32(node, 'intmaskset-stride') or { u32(0) }
+		intmaskclear_stride: devicetree.get_le_u32(node, 'intmaskclear-stride') or { u32(0) }
+	}
+	return aic.initialise_v2(layout)
+}
+
 fn get_dt_base(compat string, default_base u64) u64 {
 	node := devicetree.find_compatible(compat) or { return default_base }
 	regs := devicetree.get_reg(node) or { return default_base }
@@ -751,12 +829,17 @@ fn kmain() {
 
 	// Apple-specific hardware init (only with device tree / Apple Silicon)
 	if have_dt {
-		// Apple Interrupt Controller
-		mut aic_phys := get_dt_base('apple,aic2', 0)
-		if aic_phys == 0 {
-			aic_phys = get_dt_base('apple,aic', 0)
+		// Apple Interrupt Controller: from m1n1's Linux tree, or from iBoot's
+		// own when the Apple loader started us.
+		apple_adt := devicetree.is_apple_adt()
+		mut aic_phys := u64(0)
+		if !apple_adt {
+			aic_phys = get_dt_base('apple,aic2', 0)
+			if aic_phys == 0 {
+				aic_phys = get_dt_base('apple,aic', 0)
+			}
 		}
-		if aic_phys != 0 {
+		if apple_adt || aic_phys != 0 {
 			print('init aic...\n')
 			// Two channels around the call: a red bar (row 40) and a line with
 			// the CPU state, so "nothing after init aic" can be pinned to the
@@ -764,7 +847,8 @@ fn kmain() {
 			term.early_stage_mark(40)
 			C.kprintf(c'aic.0 calling initialise, CurrentEL=%llu DAIF=0x%llx\n', u64(cpu.read_currentel()),
 				u64(cpu.read_daif()))
-			if aic.initialise(aic_phys) {
+			started := if apple_adt { initialise_adt_aic() } else { aic.initialise(aic_phys) }
+			if started {
 				if timer_irq := parse_aic_guest_virtual_timer_irq() {
 					aic_timer_irq = timer_irq
 				}

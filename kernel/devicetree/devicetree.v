@@ -56,9 +56,10 @@ pub mut:
 }
 
 __global (
-	dt_root    &DTNode
-	dt_strings voidptr
-	dt_struct  voidptr
+	dt_root      &DTNode
+	dt_strings   voidptr
+	dt_struct    voidptr
+	dt_apple_adt bool
 )
 
 // Returns true if the device tree was successfully parsed.
@@ -135,7 +136,11 @@ pub fn parse(dtb_addr voidptr) bool {
 	dt_root = parse_node(mut &offset, unsafe { nil })
 
 	if dt_root != unsafe { nil } {
+		dt_apple_adt = has_property(dt_root, 'vinix,apple-adt')
 		println('devicetree: Parsed root node successfully')
+		if dt_apple_adt {
+			println("devicetree: iBoot's Apple device tree, converted by the Apple loader")
+		}
 		return true
 	}
 
@@ -303,6 +308,22 @@ fn find_compatible_in(node &DTNode, compat string) ?&DTNode {
 		return result
 	}
 	return none
+}
+
+// A tree apple-boot/ converted from the ADT iBoot handed over, rather than
+// one m1n1 wrote for Linux. Nodes keep Apple's names, compatibles and
+// little-endian vendor values; only the cell properties are big-endian.
+pub fn is_apple_adt() bool {
+	return dt_apple_adt
+}
+
+fn has_property(node &DTNode, name string) bool {
+	for prop in node.properties {
+		if prop.name == name {
+			return true
+		}
+	}
+	return false
 }
 
 // Get a property from a node
@@ -480,6 +501,13 @@ fn translate_address(node &DTNode, input u64) ?u64 {
 	mut address := input
 	mut bus := node.parent
 	for bus != unsafe { nil } {
+		// In Apple's tree a bus without ranges ends the walk, as it does in
+		// XNU's IODTResolveAddressCell: DMA controllers and the like below
+		// such a bus already give CPU addresses, and the ranges of the bus
+		// above would move them somewhere else.
+		if dt_apple_adt && bus.parent != unsafe { nil } && !has_property(bus, 'ranges') {
+			break
+		}
 		address = translate_one_bus(bus, address) or { return none }
 		bus = bus.parent
 	}
