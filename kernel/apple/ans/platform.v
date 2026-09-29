@@ -223,8 +223,7 @@ fn initialise_hardware() bool {
 	result := C.vinix_ans_init(nvme, asc, mailbox, sart, reset + plan.reset.offset,
 		voidptr(physical + memory.get_hhdm_offset()), physical, bytes)
 	if result != 0 {
-		C.printf(c'ans: initialization failed error=%d stage=%u nvme_status=0x%x (DMA pinned)\n',
-			result, C.vinix_ans_stage(), C.vinix_ans_completion_status())
+		report('initialization failed (DMA pinned)', result)
 		return false
 	}
 	return true

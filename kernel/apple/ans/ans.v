@@ -38,6 +38,57 @@ fn C.vinix_ans_partition_blocks(index u32, partition u32) u64
 fn C.vinix_ans_read(index u32, buffer voidptr, offset u64, count u64) int
 fn C.vinix_ans_stage() u32
 fn C.vinix_ans_completion_status() u16
+fn C.vinix_ans_error() int
+
+// The C driver's error codes (enum ANS_*), by name.
+fn error_name(code int) string {
+	value := if code < 0 { -code } else { code }
+	return match value {
+		0 { 'none' }
+		1 { 'config' }
+		2 { 'handoff' }
+		3 { 'timeout' }
+		4 { 'protocol' }
+		5 { 'firmware' }
+		6 { 'sart' }
+		7 { 'completion' }
+		8 { 'capability' }
+		9 { 'namespace' }
+		10 { 'gpt' }
+		11 { 'range' }
+		12 { 'read-only' }
+		13 { 'stopped' }
+		else { 'unknown' }
+	}
+}
+
+// How far a_start() had got.
+fn stage_name(stage u32) string {
+	return match stage {
+		0 { 'not started' }
+		1 { 'taking the controller over from the loader' }
+		2 { 'booting the ANS firmware' }
+		3 { 'waiting for the firmware' }
+		4 { 'enabling NVMe' }
+		5 { 'reading namespaces' }
+		6 { 'reading the GPT' }
+		else { 'running' }
+	}
+}
+
+// One line that says where the SSD driver stopped and why. These used to be
+// C.printf, which a production kernel compiles out: an M1 whose persistent
+// volume failed showed only the panic, with nothing to say what had failed.
+fn report(what string, result int) {
+	code := if result != 0 { result } else { C.vinix_ans_error() }
+	name := error_name(code)
+	stage := C.vinix_ans_stage()
+	phase := stage_name(stage)
+	status := u64(C.vinix_ans_completion_status())
+	C.kprintf(c'ans: %.*s: error %lld (%.*s) at stage %llu (%.*s), NVMe status 0x%llx\n',
+		i32(what.len), what.str, i64(code), i32(name.len), name.str, u64(stage),
+		i32(phase.len), phase.str, status)
+}
 
 __global (
 	ans_lock klock.Lock
@@ -78,8 +129,7 @@ fn (mut this AnsBlock) read(_handle voidptr, buffer voidptr, loc u64, count u64)
 	if result != 0 {
 		if !ans_read_error_reported {
 			ans_read_error_reported = true
-			C.printf(c'ans: read failed error=%d stage=%u nvme_status=0x%x\n',
-				result, C.vinix_ans_stage(), C.vinix_ans_completion_status())
+			report('read failed', result)
 		}
 		errno.set(errno.eio)
 		return none
@@ -103,8 +153,7 @@ fn (mut this AnsBlock) write(_handle voidptr, buffer voidptr, loc u64, count u64
 	// C uses an offset relative to this partition; there is no raw-write API.
 	result := C.vinix_ans_write(this.ns_index, u32(this.partition), buffer, loc, bytes)
 	if result != 0 {
-		C.printf(c'ans: write/flush failed error=%d stage=%u status=0x%x; writes stopped\n',
-			result, C.vinix_ans_stage(), C.vinix_ans_completion_status())
+		report('write or flush failed; writes stopped', result)
 		errno.set(u64(if result == -12 { errno.erofs } else { errno.eio }))
 		return none
 	}
@@ -180,7 +229,7 @@ fn publish(index u32, partition int, start u64, blocks u64, name string) {
 	if partition >= 0 {
 		mut uuid := [37]u8{}
 		if C.vinix_ans_partition_uuid(index, u32(partition), unsafe { &char(&uuid[0]) }, 37) == 0 {
-			C.printf(c'ans: %s PARTUUID=%s\n', name.str, &uuid[0])
+			C.kprintf(c'ans: %.*s PARTUUID=%s\n', i32(name.len), name.str, &uuid[0])
 		}
 	}
 }
@@ -203,8 +252,10 @@ pub fn initialise(cmdline string) {
 		if ans_attempted { return }
 		ans_attempted = true
 		if !initialise_hardware() { return }
-		if C.vinix_ans_apply_policy(unsafe { &char(cmdline.str) }, u64(cmdline.len)) != 0 {
-			println('ans: PARTUUID policy could not be resolved safely; no block devices published')
+		policy := C.vinix_ans_apply_policy(unsafe { &char(cmdline.str) }, u64(cmdline.len))
+		if policy != 0 {
+			report('PARTUUID policy could not be resolved safely; no block devices published',
+				policy)
 			return
 		}
 		ans_ready = true
@@ -250,8 +301,7 @@ pub fn shutdown() bool {
 	}
 	result := C.vinix_ans_shutdown()
 	if result != 0 {
-		C.printf(c'ans: shutdown refused error=%d stage=%u status=0x%x\n',
-			result, C.vinix_ans_stage(), C.vinix_ans_completion_status())
+		report('shutdown refused', result)
 		return false
 	}
 	ans_ready = false

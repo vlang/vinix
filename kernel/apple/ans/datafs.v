@@ -309,6 +309,12 @@ fn (mut this AnsDataFS) mount(parent &fs.VFSNode, name string, _source &fs.VFSNo
 	result := C.vinix_ans_data_open()
 	ans_lock.release()
 	if result != 0 {
+		// ext2 answers with negative errnos: 95 a feature or layout this
+		// writer does not handle, 22 inconsistent geometry, 5 a read error.
+		C.kprintf(c'ans-data: ext2 volume refused (error %lld)\n', i64(result))
+		if result == -5 {
+			report('reading the ext2 volume', 0)
+		}
 		data_errno(result)
 		return none
 	}
@@ -320,6 +326,9 @@ fn (mut this AnsDataFS) mount(parent &fs.VFSNode, name string, _source &fs.VFSNo
 	begin_result := C.vinix_ans_data_begin()
 	ans_lock.release()
 	if begin_result != 0 {
+		C.kprintf(c'ans-data: could not mark the ext2 volume in use (error %lld)\n',
+			i64(begin_result))
+		report('marking the ext2 volume in use', 0)
 		data_errno(begin_result)
 		return none
 	}
@@ -405,6 +414,7 @@ pub fn mount_persistent() bool {
 	}
 	if !ans_ready {
 		println('ans-data: requested persistent volume is unavailable')
+		report('the SSD driver is not running', 0)
 		return false
 	}
 	fs.add_filesystem(&AnsDataFS{}, 'ans-persist')
