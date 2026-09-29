@@ -758,135 +758,20 @@ pub fn await() {
 	}
 }
 
-// ── ITIMER_REAL ──────────────────────────────────────────────────────────────
-
-// setitimer(ITIMER_REAL) and alarm(): SIGALRM once the time is up, and again
-// every interval after that. The same bookkeeping as arm64's, counted down
-// from the clock tick instead of from the generic timer's counter.
-const max_itimer_real = 32
-
-struct ItimerRealEntry {
-mut:
-	thrd        &proc.Thread = unsafe { nil }
-	value_us    i64
-	interval_us i64
-	active      bool
-}
-
-__global (
-	itimer_real_entries [max_itimer_real]ItimerRealEntry
-	itimer_real_lock    klock.Lock
-	itimer_last_ns      u64
-	// Set once by whichever set_itimer_real() gets to register the tick hook.
-	// A word, as katomic.cas needs 4 or 8 bytes.
-	itimer_hook_claimed u32
-)
-
-// Called by the clock tick. A tick that finds the table busy leaves the time
-// to the next one, which counts it: the elapsed time is measured, not assumed.
-fn tick_itimers() {
-	if !itimer_real_lock.test_and_acquire() {
-		return
-	}
-	defer {
-		itimer_real_lock.release()
-	}
-
-	now := time.monotonic_ns()
-	if itimer_last_ns == 0 || now <= itimer_last_ns {
-		itimer_last_ns = now
-		return
-	}
-	elapsed_us := i64((now - itimer_last_ns) / 1000)
-	if elapsed_us <= 0 {
-		return
-	}
-	itimer_last_ns += u64(elapsed_us) * 1000
-
-	for i := 0; i < max_itimer_real; i++ {
-		mut e := unsafe { &itimer_real_entries[i] }
-		if !e.active || e.value_us <= 0 {
-			continue
-		}
-		e.value_us -= elapsed_us
-		if e.value_us <= 0 {
-			// SIGALRM.
-			katomic.bts(mut &e.thrd.pending_signals, proc.pending_bit(14))
-			enqueue_thread(e.thrd, true)
-			if e.interval_us > 0 {
-				e.value_us = e.interval_us
-			} else {
-				e.active = false
-			}
-		}
-	}
-}
-
-// set_itimer_real arms or disarms `thrd`'s ITIMER_REAL timer and returns the
-// previous (value_us, interval_us).
-pub fn set_itimer_real(thrd &proc.Thread, value_us i64, interval_us i64) (i64, i64) {
-	arming := value_us > 0 || interval_us > 0
-	if arming && katomic.cas(mut &itimer_hook_claimed, u32(0), u32(1)) {
+// ITIMER_REAL is counted down by the clock tick here: see sched/itimer.v.
+fn itimer_armed() {
+	if katomic.cas(mut &itimer_hook_claimed, u32(0), u32(1)) {
 		if !time.register_tick_hook(tick_itimers) {
 			katomic.store(mut &itimer_hook_claimed, u32(0))
 		}
 	}
-
-	itimer_real_lock.acquire()
-	defer {
-		itimer_real_lock.release()
-	}
-
-	for i := 0; i < max_itimer_real; i++ {
-		mut e := unsafe { &itimer_real_entries[i] }
-		if e.active && e.thrd == thrd {
-			old_value := e.value_us
-			old_interval := e.interval_us
-			if !arming {
-				e.active = false
-			} else {
-				e.value_us = value_us
-				e.interval_us = interval_us
-			}
-			return old_value, old_interval
-		}
-	}
-
-	if arming {
-		if itimer_last_ns == 0 {
-			itimer_last_ns = time.monotonic_ns()
-		}
-		for i := 0; i < max_itimer_real; i++ {
-			mut e := unsafe { &itimer_real_entries[i] }
-			if !e.active {
-				e.thrd = unsafe { thrd }
-				e.value_us = value_us
-				e.interval_us = interval_us
-				e.active = true
-				break
-			}
-		}
-	}
-
-	return 0, 0
 }
 
-// get_itimer_real returns the current (value_us, interval_us) for a thread.
-pub fn get_itimer_real(thrd &proc.Thread) (i64, i64) {
-	itimer_real_lock.acquire()
-	defer {
-		itimer_real_lock.release()
-	}
-
-	for i := 0; i < max_itimer_real; i++ {
-		e := itimer_real_entries[i]
-		if e.active && e.thrd == thrd {
-			return e.value_us, e.interval_us
-		}
-	}
-
-	return 0, 0
-}
+__global (
+	// Set once by whichever set_itimer_real() gets to register the tick hook.
+	// A word, as katomic.cas needs 4 or 8 bytes.
+	itimer_hook_claimed u32
+)
 
 // ── giving back the stacks of dead threads ──────────────────────────────────
 

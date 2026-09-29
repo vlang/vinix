@@ -42,6 +42,7 @@ FEATURE_MARKERS = (
     b"QEMU CORE PASS: socket interface boxes are reclaimed",
     b"QEMU CORE PASS: full UNIX stream clears write readiness",
     b"QEMU CORE PASS: futex wake-op updates and compares user words",
+    b"QEMU CORE PASS: alarm and ITIMER_REAL fire on time",
     b"QEMU CORE PASS: more waiters than an event holds",
     b"QEMU CORE PASS: fork keeps the program, auxv and directory",
     b"QEMU CORE PASS: /proc/cpuinfo describes the machine",

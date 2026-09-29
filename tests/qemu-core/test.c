@@ -38,6 +38,7 @@
 #include <sys/statfs.h>
 #include <sys/sysinfo.h>
 #include <sys/syscall.h>
+#include <sys/time.h>
 #include <sys/uio.h>
 #include <sys/un.h>
 #include <sys/wait.h>
@@ -1839,6 +1840,81 @@ static int test_page_table_changes_reach_every_cpu(void)
 	return 0;
 }
 
+static volatile sig_atomic_t alarms;
+
+static void count_alarm(int signal)
+{
+	(void)signal;
+	++alarms;
+}
+
+static long elapsed_ms(const struct timespec *start)
+{
+	struct timespec now;
+	clock_gettime(CLOCK_MONOTONIC, &now);
+	return (now.tv_sec - start->tv_sec) * 1000 + (now.tv_nsec - start->tv_nsec) / 1000000;
+}
+
+static _Atomic int yielders_stop;
+
+static void *keep_yielding(void *argument)
+{
+	(void)argument;
+	while (!atomic_load(&yielders_stop))
+		sched_yield();
+	return NULL;
+}
+
+/* alarm(2) and an ITIMER_REAL interval fire when they are due, with every CPU
+ * busy going through the scheduler. Each CPU's tick counts the timers down,
+ * and arm64 once let a CPU with an older clock reading count a wrap-around:
+ * alarm(60) raised SIGALRM in milliseconds. */
+static int test_alarm_fires_on_time(void)
+{
+	long cpus = sysconf(_SC_NPROCESSORS_ONLN);
+	pthread_t yielders[8];
+	int yielder_count = cpus < 8 ? (int)cpus : 8;
+	atomic_store(&yielders_stop, 0);
+	for (int i = 0; i < yielder_count; ++i)
+		CHECK(pthread_create(&yielders[i], NULL, keep_yielding, NULL) == 0);
+
+	struct sigaction action = {.sa_handler = count_alarm}, previous;
+	sigemptyset(&action.sa_mask);
+	CHECK(sigaction(SIGALRM, &action, &previous) == 0);
+
+	alarms = 0;
+	struct timespec start;
+	CHECK(clock_gettime(CLOCK_MONOTONIC, &start) == 0);
+	alarm(1);
+	while (alarms == 0 && elapsed_ms(&start) < 3000)
+		usleep(10000);
+	long fired = elapsed_ms(&start);
+	CHECK(alarms == 1);
+	if (fired < 900 || fired > 2000) {
+		printf("alarm(1) fired after %ld ms\n", fired);
+		CHECK(0);
+	}
+
+	alarms = 0;
+	struct itimerval interval = {{0, 50000}, {0, 50000}}, off = {{0, 0}, {0, 0}};
+	CHECK(clock_gettime(CLOCK_MONOTONIC, &start) == 0);
+	CHECK(setitimer(ITIMER_REAL, &interval, NULL) == 0);
+	while (elapsed_ms(&start) < 1000)
+		usleep(10000);
+	CHECK(setitimer(ITIMER_REAL, &off, NULL) == 0);
+	int count = alarms;
+	CHECK(sigaction(SIGALRM, &previous, NULL) == 0);
+	atomic_store(&yielders_stop, 1);
+	for (int i = 0; i < yielder_count; ++i)
+		CHECK(pthread_join(yielders[i], NULL) == 0);
+	if (count < 10 || count > 25) {
+		printf("a 50 ms ITIMER_REAL fired %d times in a second\n", count);
+		CHECK(0);
+	}
+	puts("QEMU CORE PASS: alarm and ITIMER_REAL fire on time");
+	return 0;
+}
+
 /* An event has room for 64 listeners. More threads than that waiting on one
  * futex see a spurious wake, which they retry, rather than stop the kernel. */
 #define MANY_WAITERS 80
@@ -2185,6 +2261,7 @@ static int run_tests(void)
 	CHECK(test_unix_socket_buffer_growth() == 0);
 	CHECK(test_unix_socket_full_write_readiness() == 0);
 	CHECK(test_futex_wake_op() == 0);
+	CHECK(test_alarm_fires_on_time() == 0);
 	CHECK(test_more_waiters_than_an_event_holds() == 0);
 	CHECK(test_fork_inherits_process_state() == 0);
 	CHECK(test_cpuinfo() == 0);
