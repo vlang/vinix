@@ -61,30 +61,8 @@ const mc_oldmask = u64(168)
 const mc_cr2 = u64(176)
 const mc_fpstate = u64(184)
 
-const ss_disable = u32(2)
-
 // RFLAGS bits a handler starts without: trap, direction and resume.
 const rflags_handler_clear = u64((1 << 8) | (1 << 10) | (1 << 16))
-
-pub fn linux_mask_to_vinix(mask u64) u64 {
-	return mask << 1
-}
-
-pub fn vinix_mask_to_linux(mask u64) u64 {
-	return mask >> 1
-}
-
-fn unblockable_mask() u64 {
-	return (u64(1) << sigkill) | (u64(1) << sigstop)
-}
-
-// The size of a sigset, and the bit signal `signum` has in this kernel's
-// masks, which is bit n.
-const sigset_size = u64(8)
-
-fn signal_bit(signum int) u64 {
-	return u64(1) << u64(signum)
-}
 
 fn put_u64(mut buf []u8, offset u64, value u64) {
 	for i := u64(0); i < 8; i++ {
@@ -106,15 +84,6 @@ fn get_u64(buf []u8, offset u64) u64 {
 	return value
 }
 
-// What SIG_DFL does with `signal`: true to ignore it. Everything else ends the
-// process. The stop signals are ignored too, there being no job control.
-fn linux_default_ignores(signal int) bool {
-	return match signal {
-		sigchld, sigcont, sigurg, sigwinch, sigstop, sigtstp, sigttin, sigttou { true }
-		else { false }
-	}
-}
-
 // Deliver `which` to the calling Linux process on its way back to userspace.
 fn dispatch_linux_signal(context &cpulocal.GPRState, which int, info_signum int, info_code int, info_addr u64) {
 	mut t := unsafe { proc.current_thread() }
@@ -126,12 +95,15 @@ fn dispatch_linux_signal(context &cpulocal.GPRState, which int, info_signum int,
 	previous_mask := if t.saved_mask_valid { t.saved_mask } else { t.masked_signals }
 	t.saved_mask_valid = false
 
-	if handler == linux_sig_ign || (handler == linux_sig_dfl && linux_default_ignores(which)) {
+	// SIG_DFL ignores what Linux's default ignores, and the stop and continue
+	// signals too, there being no job control; everything else ends the
+	// process. So does a handler with no way back from it, which Linux x86-64
+	// requires an sa_restorer for.
+	if handler == linux_sig_ign || (handler == linux_sig_dfl && default_ignores(which)) {
 		t.masked_signals = previous_mask
 		return
 	}
 	if handler == linux_sig_dfl || sigaction.sa_flags & linux_sa_restorer == 0 {
-		// The default action, or a handler with no way back from it.
 		exit_by_signal(which)
 	}
 
@@ -168,10 +140,10 @@ fn dispatch_linux_signal(context &cpulocal.GPRState, which int, info_signum int,
 	put_u64(mut buf, mc + mc_cs, context.cs | (context.ss << 48))
 	put_u64(mut buf, mc + mc_err, context.err & 0xffffffff)
 	put_u64(mut buf, mc + mc_trapno, context.err >> 32)
-	put_u64(mut buf, mc + mc_oldmask, vinix_mask_to_linux(previous_mask))
+	put_u64(mut buf, mc + mc_oldmask, previous_mask)
 	put_u64(mut buf, mc + mc_cr2, info_addr)
 	put_u64(mut buf, mc + mc_fpstate, fpstate)
-	put_u64(mut buf, frame_sigmask, vinix_mask_to_linux(previous_mask))
+	put_u64(mut buf, frame_sigmask, previous_mask)
 	put_u64(mut buf, mc + mc_cookie, proc.sigframe_cookie(t.process, frame))
 	put_u32(mut buf, frame_siginfo, u32(which))
 	if info_signum == which {
@@ -198,9 +170,9 @@ fn dispatch_linux_signal(context &cpulocal.GPRState, which int, info_signum int,
 		exit_by_signal(sigsegv)
 	}
 
-	t.masked_signals = previous_mask | linux_mask_to_vinix(sigaction.sa_mask)
+	t.masked_signals = previous_mask | sigaction.sa_mask
 	if sigaction.sa_flags & linux_sa_nodefer == 0 {
-		t.masked_signals |= u64(1) << which
+		t.masked_signals |= signal_bit(which)
 	}
 	t.masked_signals &= ~unblockable_mask()
 	if sigaction.sa_flags & linux_sa_resethand != 0 {
@@ -263,7 +235,7 @@ pub fn syscall_linux_rt_sigreturn(gpr_state voidptr) (u64, u64) {
 		rflags: get_u64(buf, mc + mc_eflags)
 	}
 	fpstate := get_u64(buf, mc + mc_fpstate)
-	mask := linux_mask_to_vinix(get_u64(buf, frame_sigmask))
+	mask := get_u64(buf, frame_sigmask)
 	unsafe { buf.free() }
 	if !valid_sigreturn_context(&context) {
 		exit_by_signal(sigsegv)
@@ -303,42 +275,7 @@ pub fn syscall_linux_rt_sigreturn(gpr_state voidptr) (u64, u64) {
 	resume_sigreturn(context, mask)
 }
 
-// rt_sigsuspend(mask, sigsetsize): sleep with `mask` in place until a signal
-// that gets through it arrives; its handler runs on the way out.
-pub fn syscall_linux_rt_sigsuspend(_ voidptr, mask_ptr u64, sigsetsize u64) (u64, u64) {
-	if sigsetsize != 8 {
-		return errno.err, errno.einval
-	}
-	mut linux_mask := u64(0)
-	if !usercopy.copy_from_user(voidptr(&linux_mask), mask_ptr, 8) {
-		return errno.err, errno.efault
-	}
-	mut t := proc.current_thread()
-	temporary := linux_mask_to_vinix(linux_mask) & ~unblockable_mask()
-	original := t.masked_signals
-	t.masked_signals = temporary
-
-	mut events := []&eventstruct.Event{}
-	for katomic.load(&t.pending_signals) & ~temporary == 0 {
-		// Nothing to wait on but a signal, which is what ends the wait.
-		event.await(mut events, true) or {}
-	}
-	unsafe { events.free() }
-
-	t.saved_mask = original
-	t.saved_mask_valid = true
-	return errno.err, errno.eintr
-}
-
 // ── alternate signal stack ───────────────────────────────────────────────────
-
-const ss_onstack = u32(1)
-
-// The smallest alternate stack Linux accepts, MINSIGSTKSZ.
-const min_sigstack_size = u64(2048)
-
-// struct stack_t: ss_sp, ss_flags (padded to 8), ss_size.
-const stack_t_size = u64(24)
 
 // Whether `sp` is on `t`'s alternate signal stack, which is how Linux tells a
 // handler already running there.
@@ -348,169 +285,25 @@ fn on_sigaltstack(t &proc.Thread, sp u64) bool {
 
 fn altstack_flags(t &proc.Thread, sp u64) u32 {
 	if t.sigaltstack_size == 0 {
-		return ss_disable
+		return u32(ss_disable)
 	}
-	return if on_sigaltstack(t, sp) { ss_onstack } else { u32(0) }
+	return if on_sigaltstack(t, sp) { u32(ss_onstack) } else { u32(0) }
 }
 
-// sigaltstack(ss, old_ss).
-pub fn syscall_sigaltstack(gpr_state voidptr, ss_ptr u64, old_ss_ptr u64) (u64, u64) {
-	mut t := proc.current_thread()
-	frame := unsafe { &cpulocal.GPRState(gpr_state) }
-	on_stack := on_sigaltstack(t, frame.rsp)
-
-	// Read the new stack first: a faulting `ss` leaves the old one in place.
-	mut incoming_sp := u64(0)
-	mut incoming_size := u64(0)
-	mut disabling := false
-	if ss_ptr != 0 {
-		// Changing the alternate stack while running on it would pull it out
-		// from under the handler.
-		if on_stack {
-			return errno.err, errno.eperm
-		}
-		mut raw := [3]u64{}
-		if !usercopy.copy_from_user(voidptr(&raw[0]), ss_ptr, stack_t_size) {
-			return errno.err, errno.efault
-		}
-		flags := u32(raw[1])
-		if flags & ~ss_disable != 0 {
-			return errno.err, errno.einval
-		}
-		disabling = flags & ss_disable != 0
-		if !disabling {
-			if raw[2] < min_sigstack_size {
-				return errno.err, errno.enomem
-			}
-			incoming_sp = raw[0]
-			incoming_size = raw[2]
-		}
-	}
-
-	if old_ss_ptr != 0 {
-		mut raw := [3]u64{}
-		raw[0] = t.sigaltstack_sp
-		raw[1] = u64(altstack_flags(t, frame.rsp))
-		raw[2] = t.sigaltstack_size
-		if !usercopy.copy_to_user(old_ss_ptr, voidptr(&raw[0]), stack_t_size) {
-			return errno.err, errno.efault
-		}
-	}
-
-	if ss_ptr != 0 {
-		t.sigaltstack_sp = incoming_sp
-		t.sigaltstack_size = incoming_size
-	}
-	return 0, 0
+// Whether the thread is running on its alternate signal stack now, for
+// sigaltstack(2) in signal.v: whether the stack pointer it made the syscall
+// with is on it.
+fn thread_on_sigaltstack(t &proc.Thread) bool {
+	return on_sigaltstack(t, t.user_stack)
 }
 
-// ── waiting for a signal ─────────────────────────────────────────────────────
-
-// Sleep until a signal or, when `timeout` is given, the time runs out. True if
-// a signal ended the wait.
-fn sleep_for_signal(timeout &time.TimeSpec) bool {
-	mut events := []&eventstruct.Event{}
-	defer {
-		unsafe { events.free() }
-	}
-	mut timer := &time.Timer(unsafe { nil })
-	if timeout != unsafe { nil } {
-		timer = time.new_timer(*timeout)
-		events << &timer.event
-	}
-	defer {
-		if timer != unsafe { nil } {
-			timer.disarm()
-			unsafe { free(timer) }
-		}
-	}
-	event.await(mut events, true) or { return true }
-	return false
+// What SIG_DFL does with `signum`: true to ignore it, as Linux ignores it by
+// default and, there being no job control, the stop and continue signals as
+// arm64 does.
+fn default_ignores(signum int) bool {
+	return has_default_ignore_action(signum) || signum == sigcont || signum == sigstop
+		|| signum == sigtstp || signum == sigttin || signum == sigttou
 }
-
-// Claim the lowest pending signal in `wanted`, a mask in this kernel's layout.
-fn take_pending(mut t proc.Thread, wanted u64) ?int {
-	for signum := 1; signum < 64; signum++ {
-		if wanted & (u64(1) << signum) == 0 {
-			continue
-		}
-		if katomic.btr(mut &t.pending_signals, u8(signum)) {
-			return signum
-		}
-	}
-	return none
-}
-
-// rt_sigtimedwait(set, info, timeout, sigsetsize): take one of `set` without
-// running a handler for it. sigwait() and sigtimedwait() are built on this,
-// and so is the helper thread behind a SIGEV_THREAD timer.
-pub fn syscall_rt_sigtimedwait(_ voidptr, set_ptr u64, info_ptr u64, timeout_ptr u64, sigsetsize u64) (u64, u64) {
-	if sigsetsize != 8 {
-		return errno.err, errno.einval
-	}
-	mut t := proc.current_thread()
-
-	mut linux_set := u64(0)
-	if !usercopy.copy_from_user(voidptr(&linux_set), set_ptr, 8) {
-		return errno.err, errno.efault
-	}
-	wanted := linux_mask_to_vinix(linux_set) & ~unblockable_mask()
-
-	mut deadline := time.TimeSpec{}
-	mut timed := false
-	if timeout_ptr != 0 {
-		if !usercopy.copy_from_user(voidptr(&deadline), timeout_ptr, sizeof(time.TimeSpec)) {
-			return errno.err, errno.efault
-		}
-		if deadline.tv_sec < 0 || deadline.tv_nsec < 0 || deadline.tv_nsec >= 1000000000 {
-			return errno.err, errno.einval
-		}
-		timed = true
-	}
-
-	for {
-		if which := take_pending(mut t, wanted) {
-			if info_ptr != 0 {
-				// A 128-byte siginfo_t: si_signo, si_errno, then si_code,
-				// SI_USER (0) for anything raised by kill(), and SI_TIMER with
-				// the overrun count and value for a POSIX timer's.
-				mut info := [16]u64{}
-				info[0] = u64(u32(which))
-				timer_info := posixtimer.signal_info(t, which)
-				if timer_info.found {
-					info[1] = u64(u32(timer_info.code))
-					info[2] = u64(u32(timer_info.overrun)) << 32
-					info[3] = timer_info.value
-				}
-				if !usercopy.copy_to_user(info_ptr, voidptr(&info[0]), 128) {
-					// Hand the signal back rather than losing it.
-					katomic.bts(mut &t.pending_signals, u8(which))
-					return errno.err, errno.efault
-				}
-			}
-			posixtimer.acknowledge_signal(mut t, which)
-			return u64(which), 0
-		}
-		if timed && deadline.tv_sec == 0 && deadline.tv_nsec == 0 {
-			return errno.err, errno.eagain
-		}
-		// A signal outside the set that the mask lets through interrupts the
-		// wait; its handler runs on the way out.
-		if katomic.load(&t.pending_signals) & ~(t.masked_signals | wanted) != 0 {
-			return errno.err, errno.eintr
-		}
-		if timed {
-			if !sleep_for_signal(&deadline) {
-				// The timer ran out: look once more, then give up.
-				deadline = time.TimeSpec{}
-			}
-		} else {
-			sleep_for_signal(unsafe { nil })
-		}
-	}
-	return errno.err, errno.eagain
-}
-
 
 // pause(): sleep until a signal is delivered, then fail with EINTR once its
 // handler has run.

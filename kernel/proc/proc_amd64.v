@@ -53,6 +53,9 @@ pub mut:
 	pending_signals    u64
 	masked_signals     u64
 	enqueued_by_signal bool
+	// The signals rt_sigtimedwait(2) is waiting for on this thread, and zero
+	// the rest of the time.
+	sigwait_set u64
 	// Per-signal origin data for Linux siginfo_t, indexed by signal - 1.
 	// Ordinary signals keep these zero; POSIX timers populate them until
 	// delivery consumes the pending bit.
@@ -110,6 +113,9 @@ pub mut:
 	// Torn down by exit_group() or execve() in a sibling; it must never be
 	// enqueued again.
 	is_dead bool
+	// Set by a sibling's exit_group() or execve(): leave at the next return to
+	// userspace, once the syscall in progress has unwound.
+	must_exit bool
 	// sigaltstack(2): where SA_ONSTACK handlers run.
 	sigaltstack_sp   u64
 	sigaltstack_size u64
@@ -191,24 +197,6 @@ pub fn get_main_thread(process &Process) &Thread {
 	return t
 }
 
-// A Linux sigset keeps signal n in bit n-1; this kernel's amd64 masks and
-// pending sets keep it in bit n. Shared code that takes a sigset from the
-// calling program, or hands one back, converts through these.
-pub fn sigset_from_user(set u64) u64 {
-	return set << 1
-}
-
-pub fn sigset_to_user(mask u64) u64 {
-	return mask >> 1
-}
-
 // What a seccomp program sees as seccomp_data.arch.
 pub const seccomp_audit_arch = audit_arch_x86_64
 
-// The bit of a pending or masked set signal `signum` takes: signal n in bit n,
-// which leaves no room for signal 64.
-pub fn pending_bit(signum int) u8 {
-	return u8(signum)
-}
-
-pub const max_pending_signal = 63

@@ -122,89 +122,6 @@ fn syscall_linux_rseq(_ voidptr) (u64, u64) {
 	return errno.err, errno.enosys
 }
 
-fn syscall_linux_rt_sigaction(gpr_state voidptr, signum int, act_ptr u64, oldact_ptr u64, sigsetsize u64) (u64, u64) {
-	if sigsetsize != 8 {
-		return errno.err, errno.einval
-	}
-	// The kernel's masks keep signal n in bit n, so 63 is the highest there
-	// is room for.
-	if signum < 1 || signum > 63 || signum == userland.sigkill || signum == userland.sigstop {
-		return errno.err, errno.einval
-	}
-	mut current_thread := proc.current_thread()
-	// Read the new disposition before handing back the old one, so a faulting
-	// `act` leaves the disposition untouched.
-	mut incoming := proc.SigAction{}
-	mut raw := [4]u64{}
-	if act_ptr != 0 {
-		if !usercopy.copy_from_user(voidptr(&raw[0]), act_ptr, 32) {
-			return errno.err, errno.efault
-		}
-		incoming = proc.SigAction{
-			sa_sigaction: voidptr(raw[0])
-			sa_flags:     int(raw[1])
-			sa_restorer:  voidptr(raw[2])
-			sa_mask:      userland.linux_mask_to_vinix(raw[3])
-		}
-	}
-	if oldact_ptr != 0 {
-		old := current_thread.sigactions[signum]
-		raw[0] = u64(old.sa_sigaction)
-		raw[1] = u64(u32(old.sa_flags))
-		raw[2] = u64(old.sa_restorer)
-		raw[3] = userland.vinix_mask_to_linux(old.sa_mask)
-		if !usercopy.copy_to_user(oldact_ptr, voidptr(&raw[0]), 32) {
-			return errno.err, errno.efault
-		}
-	}
-	if act_ptr != 0 {
-		// Dispositions belong to the process; masks and pending signals are
-		// per thread.
-		mut process := current_thread.process
-		process.threads_lock.acquire()
-		for mut target_thread in process.threads {
-			target_thread.sigactions[signum] = incoming
-		}
-		process.threads_lock.release()
-	}
-	return 0, 0
-}
-
-fn syscall_linux_rt_sigprocmask(gpr_state voidptr, how int, set_ptr u64, oldset_ptr u64, sigsetsize u64) (u64, u64) {
-	if sigsetsize != 8 {
-		return errno.err, errno.einval
-	}
-	mut current_thread := proc.current_thread()
-	// Linux numbers signal n as bit n-1; the kernel's masks use bit n.
-	mut set := u64(0)
-	if set_ptr != 0 {
-		if !usercopy.copy_from_user(voidptr(&set), set_ptr, 8) {
-			return errno.err, errno.efault
-		}
-		if how != userland.sig_block && how != userland.sig_unblock && how != userland.sig_setmask {
-			return errno.err, errno.einval
-		}
-		set = userland.linux_mask_to_vinix(set)
-	}
-	if oldset_ptr != 0 {
-		linux_old := userland.vinix_mask_to_linux(current_thread.masked_signals)
-		if !usercopy.copy_to_user(oldset_ptr, voidptr(&linux_old), 8) {
-			return errno.err, errno.efault
-		}
-	}
-	if set_ptr != 0 {
-		mut mask := current_thread.masked_signals
-		match how {
-			userland.sig_block { mask |= set }
-			userland.sig_unblock { mask &= ~set }
-			else { mask = set }
-		}
-		// SIGKILL and SIGSTOP cannot be blocked; Linux drops them silently.
-		current_thread.masked_signals = mask & ~((u64(1) << 9) | (u64(1) << 19))
-	}
-	return 0, 0
-}
-
 // Linux uname(buf); see linux_uname().
 fn syscall_linux_uname(_ voidptr, buf u64) (u64, u64) {
 	return linux_uname(buf, c'Vinix 0.1.0 amd64', c'x86_64')
@@ -503,14 +420,14 @@ pub fn init_syscall_table() {
 	syscall_table[325] = voidptr(syscall_linux_mlock2) // mlock2
 
 	// Signals
-	syscall_table[13] = voidptr(syscall_linux_rt_sigaction) // rt_sigaction
-	syscall_table[14] = voidptr(syscall_linux_rt_sigprocmask) // rt_sigprocmask
+	syscall_table[13] = voidptr(userland.syscall_rt_sigaction) // rt_sigaction
+	syscall_table[14] = voidptr(userland.syscall_rt_sigprocmask) // rt_sigprocmask
 	syscall_table[15] = voidptr(userland.syscall_linux_rt_sigreturn) // rt_sigreturn
 	syscall_table[34] = voidptr(userland.syscall_pause) // pause
 	syscall_table[62] = voidptr(userland.syscall_kill) // kill
 	syscall_table[127] = voidptr(syscall_linux_rt_sigpending) // rt_sigpending
 	syscall_table[128] = voidptr(userland.syscall_rt_sigtimedwait) // rt_sigtimedwait
-	syscall_table[130] = voidptr(userland.syscall_linux_rt_sigsuspend) // rt_sigsuspend
+	syscall_table[130] = voidptr(userland.syscall_rt_sigsuspend) // rt_sigsuspend
 	syscall_table[131] = voidptr(userland.syscall_sigaltstack) // sigaltstack
 	syscall_table[200] = voidptr(userland.syscall_tkill) // tkill
 	syscall_table[234] = voidptr(userland.syscall_tgkill) // tgkill

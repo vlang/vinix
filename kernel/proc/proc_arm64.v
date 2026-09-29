@@ -260,23 +260,6 @@ pub fn claim_thread_exit(t &Thread) bool {
 	return katomic.cas(mut &thread.exit_claimed, u32(0), u32(1))
 }
 
-// arm64 keeps its masks and pending sets in the Linux layout already, signal n
-// in bit n-1; see the amd64 counterparts.
-pub fn sigset_from_user(set u64) u64 {
-	return set
-}
-
-pub fn sigset_to_user(mask u64) u64 {
-	return mask
-}
-
 // What a seccomp program sees as seccomp_data.arch.
 pub const seccomp_audit_arch = audit_arch_aarch64
 
-// The bit of a pending or masked set signal `signum` takes: the Linux layout,
-// signal n in bit n-1. 64 is the last signal there is.
-pub fn pending_bit(signum int) u8 {
-	return u8(signum - 1)
-}
-
-pub const max_pending_signal = 64

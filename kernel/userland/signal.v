@@ -2,9 +2,11 @@
 // Copyright (c) 2026 Alexander Medvednikov
 module userland
 
-// Linux signal syscalls: disposition, masking, and the two ways a thread can
-// wait for a signal (rt_sigsuspend, rt_sigtimedwait) plus the alternate stack
-// handlers can run on.
+// Linux signal syscalls, the same on both architectures: disposition,
+// masking, and the two ways a thread can wait for a signal (rt_sigsuspend,
+// rt_sigtimedwait) plus the alternate stack handlers can run on. Delivery,
+// which builds each architecture's own frame, is in userland_arm64.v and
+// linux_signal_amd64.v.
 
 import errno
 import event
@@ -19,7 +21,8 @@ import usercopy
 // fit in a u64.
 const max_signal = 64
 
-// A sigset_t is one 64-bit word on aarch64; the kernel rejects any other size.
+// A sigset_t is one 64-bit word on both architectures; the kernel rejects any
+// other size.
 const sigset_size = u64(8)
 
 // struct k_sigaction as the raw syscall sees it: handler, flags, restorer, mask.
@@ -368,7 +371,7 @@ pub fn syscall_sigaltstack(_ voidptr, ss_ptr u64, old_ss_ptr u64) (u64, u64) {
 	if ss_ptr != 0 {
 		// Changing the alternate stack while running on it would pull the rug
 		// out from under the handler.
-		if current_thread.on_sigaltstack {
+		if thread_on_sigaltstack(current_thread) {
 			return errno.err, errno.eperm
 		}
 
@@ -394,7 +397,7 @@ pub fn syscall_sigaltstack(_ voidptr, ss_ptr u64, old_ss_ptr u64) (u64, u64) {
 	if old_ss_ptr != 0 {
 		mut raw := [3]u64{}
 		raw[0] = current_thread.sigaltstack_sp
-		raw[1] = if current_thread.on_sigaltstack {
+		raw[1] = if thread_on_sigaltstack(current_thread) {
 			u64(ss_onstack)
 		} else if current_thread.sigaltstack_size == 0 {
 			u64(ss_disable)
@@ -415,33 +418,6 @@ pub fn syscall_sigaltstack(_ voidptr, ss_ptr u64, old_ss_ptr u64) (u64, u64) {
 			current_thread.sigaltstack_sp = incoming_sp
 			current_thread.sigaltstack_size = incoming_size
 		}
-	}
-
-	return 0, 0
-}
-
-// Kept so the arm64 build still has a definition for the mlibc-shaped entry
-// point the Vinix-native table used; the Linux table routes 134/135 to the
-// rt_ variants above.
-pub fn syscall_sigaction(_ voidptr, signum int, act &proc.SigAction, oldact &proc.SigAction) (u64, u64) {
-	if !valid_signal(signum) || signum == sigkill || signum == sigstop {
-		return errno.err, errno.einval
-	}
-
-	mut current_thread := proc.current_thread()
-
-	if oldact != unsafe { nil } {
-		unsafe {
-			*oldact = current_thread.sigactions[signum]
-		}
-	}
-	if act != unsafe { nil } {
-		mut process := current_thread.process
-		process.threads_lock.acquire()
-		for mut target_thread in process.threads {
-			target_thread.sigactions[signum] = *act
-		}
-		process.threads_lock.release()
 	}
 
 	return 0, 0

@@ -32,34 +32,6 @@ const amd64_sigreturn_rflags_mask = cpu.rflags_cf | cpu.rflags_pf | cpu.rflags_a
 
 const amd64_sigreturn_rflags_fixed = cpu.rflags_fixed | cpu.rflags_if
 
-pub fn syscall_getpid(_ voidptr) (u64, u64) {
-	mut current_thread := proc.current_thread()
-	mut process := current_thread.process
-
-	C.printf(c'\n\e[32m%s\e[m: getpid()\n', process.name.str)
-	defer {
-		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
-	}
-
-	mut t := unsafe { proc.current_thread() }
-
-	return u64(t.process.pid), 0
-}
-
-pub fn syscall_getppid(_ voidptr) (u64, u64) {
-	mut current_thread := proc.current_thread()
-	mut process := current_thread.process
-
-	C.printf(c'\n\e[32m%s\e[m: getppid()\n', process.name.str)
-	defer {
-		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
-	}
-
-	mut t := unsafe { proc.current_thread() }
-
-	return u64(t.process.ppid), 0
-}
-
 fn valid_sigreturn_context(context &cpulocal.GPRState) bool {
 	user_limit := memory.user_address_limit()
 	return context.rip != 0 && context.rip < user_limit && context.rsp != 0
@@ -83,8 +55,7 @@ fn resume_sigreturn(context cpulocal.GPRState, old_mask u64) {
 	}
 
 	t.gpr_state = context
-	// Vinix's amd64 signal bitmap uses the signal number as its bit index.
-	t.masked_signals = old_mask & ~((u64(1) << sigkill) | (u64(1) << sigstop))
+	t.masked_signals = old_mask & ~unblockable_mask()
 
 	sched.resume_saved_context()
 
@@ -96,12 +67,17 @@ fn dispatch_signal(context &cpulocal.GPRState, info_signum int, info_code int, i
 
 	mut which := -1
 
+	// Signal n is bit n-1, as in Linux's sigsets. SIGKILL and SIGSTOP get
+	// through whatever the mask says, so that a wait that installed a full
+	// temporary mask cannot keep the process alive against kill -9.
 	for i := u8(0); i < 64; i++ {
-		if t.masked_signals & (u64(1) << i) != 0 {
+		signum := int(i) + 1
+		unblockable := signum == sigkill || signum == sigstop
+		if !unblockable && t.masked_signals & (u64(1) << i) != 0 {
 			continue
 		}
 		if katomic.btr(mut &t.pending_signals, i) == true {
-			which = i
+			which = signum
 			break
 		}
 	}
@@ -123,93 +99,6 @@ pub fn dispatch_a_signal(context &cpulocal.GPRState) {
 // reads from siginfo and ucontext.
 pub fn dispatch_a_signal_info(context &cpulocal.GPRState, signal int, code int, addr u64) {
 	dispatch_signal(context, signal, code, addr)
-}
-
-pub fn sendsig(_thread &proc.Thread, signal u8) {
-	mut t := unsafe { _thread }
-
-	katomic.bts(mut &t.pending_signals, signal)
-	// A signalfd of the process that reads this signal is readable now.
-	if t.process != unsafe { nil } {
-		notify_signalfds(t.process.pid, int(signal))
-	}
-
-	// Try to stop an event_await()
-	sched.enqueue_thread(t, true)
-}
-
-// signal_process safely delivers a signal to a process's first thread,
-// synchronized against thread creation/replacement via the same lock
-// new_user_thread's append and start_program()'s exec-time reset both
-// hold. proc.allocate_pid()/new_process() can publish a process before
-// its first thread is appended, and start_program() briefly empties
-// process.threads mid-exec -- a bare process.threads[0] can land in
-// either window. Returns false, rather than indexing an empty array,
-// when there is currently no thread to signal.
-fn signal_process(_process &proc.Process, signal u8) bool {
-	mut process := unsafe { _process }
-	process.threads_lock.acquire()
-	defer {
-		process.threads_lock.release()
-	}
-	if process.threads.len == 0 {
-		return false
-	}
-	sendsig(process.threads[0], signal)
-	return true
-}
-
-pub fn syscall_kill(_ voidptr, pid int, signal int) (u64, u64) {
-	mut current_thread := proc.current_thread()
-	mut process := current_thread.process
-
-	C.printf(c'\n\e[32m%s\e[m: kill(%d, %d)\n', process.name.str, pid, signal)
-	defer {
-		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
-	}
-
-	if signal < 0 {
-		return errno.err, errno.einval
-	}
-
-	if pid == -1 {
-		if signal == 0 {
-			// The same existence/permission probe as kill(pid, 0), just
-			// against "does any eligible target exist" instead of one
-			// specific pid. Signal 0 is never actually sent, so it doesn't
-			// need root's real system-wide broadcast (out of scope here) to
-			// be implemented first -- the calling process itself is always
-			// an eligible target, so this always succeeds.
-			return 0, 0
-		}
-		// Broadcast. Root's true system-wide broadcast (including pid 1) is
-		// out of scope here; a non-root caller gets the real POSIX/Linux
-		// behavior, every process at its own uid, itself included.
-		if process.euid != 0 {
-			for i := 1; i < proc.max_pid; i++ {
-				candidate := processes[i]
-				if candidate != unsafe { nil } && candidate.uid == process.uid {
-					signal_process(candidate, u8(signal))
-				}
-			}
-			return 0, 0
-		}
-		return errno.err, errno.eperm
-	}
-
-	if pid < 0 || pid >= proc.max_pid || processes[pid] == unsafe { nil } {
-		return errno.err, errno.esrch
-	}
-
-	// signal == 0 is the standard POSIX existence/permission probe: no signal
-	// sent, the lookup above already did the check.
-	if signal > 0 {
-		if !signal_process(processes[pid], u8(signal)) {
-			return errno.err, errno.esrch
-		}
-	}
-
-	return 0, 0
 }
 
 pub fn syscall_execve(_ voidptr, _path charptr, _argv &charptr, _envp &charptr) (u64, u64) {
@@ -336,9 +225,9 @@ fn exit_process(wait_status u32) {
 	// The parent hears of it through SIGCHLD as well as wait(): a shell such as
 	// zsh reaps from its SIGCHLD handler, and sleeps in sigsuspend() until then.
 	if current_process.ppid > 0 && current_process.ppid < proc.max_pid {
-		parent := processes[current_process.ppid]
+		mut parent := processes[current_process.ppid]
 		if parent != unsafe { nil } {
-			signal_process(parent, sigchld)
+			signal_process(mut parent, sigchld)
 		}
 	}
 
