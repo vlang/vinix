@@ -298,6 +298,8 @@ fn (mut filesystem EXT2Filesystem) create_persistent(parent &vfs.VFSNode,
 		return unsafe { nil }
 	}
 	if stat.isdir(mode) {
+		// Counted from here on: freeing the inode uncounts it.
+		filesystem.count_directory(inode_index, true)
 		filesystem.initialize_directory(mut inode, inode_index,
 			u32(parent.resource.stat.ino)) or {
 			inode.free_entry(mut filesystem, inode_index) or {}

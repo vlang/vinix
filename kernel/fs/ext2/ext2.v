@@ -642,6 +642,7 @@ fn (mut inode EXT2Inode) resize(mut filesystem EXT2Filesystem, inode_index u32, 
 				memory.free(zero)
 			}
 		}
+		inode.free_indirect_blocks(mut filesystem, new_blocks)?
 	} else if new_blocks > old_blocks {
 		for i := old_blocks; i < new_blocks; i++ {
 			if inode.get_block(mut filesystem, u32(i)) or { u32(0) } != 0 {
@@ -701,8 +702,12 @@ fn (mut inode EXT2Inode) free_entry(mut filesystem EXT2Filesystem, inode_index u
 	// fields. Interpreting those bytes as block numbers while unlinking or
 	// replacing the symlink corrupts the allocation bitmap (and made apk fail
 	// as soon as it replaced one of Alpine's compatibility links).
-	is_fast_symlink := stat.islnk(u32(inode.permissions)) && inode.sector_cnt == 0
-		&& inode.size32l != 0 && inode.size32l <= u32(sizeof(inode.blocks))
+	// Linux's test: no blocks but an extended-attribute one. Taking that
+	// block for data read a target's bytes as block numbers, and freed them.
+	attribute_sectors := if inode.eab != 0 { u32(filesystem.block_size / 512) } else { u32(0) }
+	is_fast_symlink := stat.islnk(u32(inode.permissions))
+		&& inode.sector_cnt == attribute_sectors && inode.size32l != 0
+		&& inode.size32l <= u32(sizeof(inode.blocks))
 	if !is_fast_symlink {
 		for i := u64(0); i < lib.div_roundup(u64(inode.size32l), filesystem.block_size); i++ {
 			block_index := inode.get_block(mut filesystem, u32(i)) or { return none }
@@ -711,6 +716,10 @@ fn (mut inode EXT2Inode) free_entry(mut filesystem EXT2Filesystem, inode_index u
 				inode.set_block(mut filesystem, inode_index, u32(i), 0) or { return none }
 			}
 		}
+		inode.free_indirect_blocks(mut filesystem, 0)?
+	}
+	if stat.isdir(u32(inode.permissions)) {
+		filesystem.count_directory(inode_index, false)
 	}
 	inode.size32l = 0
 	inode.size32h = 0
@@ -721,6 +730,62 @@ fn (mut inode EXT2Inode) free_entry(mut filesystem EXT2Filesystem, inode_index u
 	filesystem.free_inode(inode_index) or { return none }
 
 	return 0
+}
+
+// Free the indirect blocks that map nothing below `kept` (a block count) once
+// the data blocks past it have gone. Deleting or shrinking a file freed only
+// the data, and every file over 12 blocks left its indirect blocks allocated
+// for good. The triple-indirect level is still left: with 4 KiB blocks and
+// 32-bit sizes nothing reaches it, with 1 KiB blocks files over 64 MiB do.
+fn (mut inode EXT2Inode) free_indirect_blocks(mut filesystem EXT2Filesystem, kept u64) ? {
+	per_block := filesystem.block_size / 4
+	sectors := u32(filesystem.block_size / filesystem.backing_device.resource.stat.blksize)
+	if kept <= 12 && inode.blocks[12] != 0 {
+		filesystem.free_block(inode.blocks[12])?
+		inode.blocks[12] = 0
+		inode.sector_cnt = if inode.sector_cnt >= sectors { inode.sector_cnt - sectors } else { 0 }
+	}
+	if inode.blocks[13] == 0 {
+		return
+	}
+	double_start := 12 + per_block
+	// The first of the double-indirect block's entries that maps nothing kept.
+	first_unkept := if kept <= double_start {
+		u64(0)
+	} else {
+		lib.div_roundup(kept - double_start, per_block)
+	}
+	if first_unkept >= per_block {
+		return
+	}
+	entries := unsafe { &u32(memory.calloc(filesystem.block_size, 1)) }
+	if entries == unsafe { nil } {
+		errno.set(errno.enomem)
+		return none
+	}
+	defer { memory.free(entries) }
+	table := u64(inode.blocks[13]) * filesystem.block_size
+	filesystem.raw_device_read(entries, table, filesystem.block_size)?
+	mut changed := false
+	for i in first_unkept .. per_block {
+		indirect := unsafe { entries[i] }
+		if indirect == 0 {
+			continue
+		}
+		filesystem.free_block(indirect)?
+		unsafe {
+			entries[i] = 0
+		}
+		changed = true
+		inode.sector_cnt = if inode.sector_cnt >= sectors { inode.sector_cnt - sectors } else { 0 }
+	}
+	if first_unkept == 0 {
+		filesystem.free_block(inode.blocks[13])?
+		inode.blocks[13] = 0
+		inode.sector_cnt = if inode.sector_cnt >= sectors { inode.sector_cnt - sectors } else { 0 }
+	} else if changed {
+		filesystem.raw_device_write(entries, table, filesystem.block_size)?
+	}
 }
 
 fn (mut inode EXT2Inode) set_block(mut filesystem EXT2Filesystem, inode_index u32, iblock u32, disk_block u32) ?u32 {
@@ -943,6 +1008,20 @@ fn (mut filesystem EXT2Filesystem) free_block(block u32) ?int {
 	memory.free(bitmap)
 
 	return 0
+}
+
+// Each group counts the directories among its inodes. Nothing here reads the
+// count, but e2fsck checks it and Linux places new directories by it.
+fn (mut filesystem EXT2Filesystem) count_directory(inode_index u32, added bool) {
+	bgd_index := (inode_index - 1) / filesystem.superblock.inodes_per_group
+	mut bgd := EXT2BlockGroupDescriptor{}
+	bgd.read_entry(mut filesystem, bgd_index)
+	if added {
+		bgd.dir_cnt++
+	} else if bgd.dir_cnt > 0 {
+		bgd.dir_cnt--
+	}
+	bgd.write_entry(mut filesystem, bgd_index)
 }
 
 fn (mut filesystem EXT2Filesystem) free_inode(inode u32) ?int {
