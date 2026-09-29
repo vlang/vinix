@@ -1129,6 +1129,28 @@ pub fn thread_ids(pid int) []int {
 // Whether some process or thread stands in `directory`: has it as its working
 // directory or its root. Neither holds a reference on it, so removing the
 // directory has to ask. A process whose thread list is busy counts as one.
+// mark_programs_in_use sets in_use[i] for each of `nodes` some process runs,
+// as its exe_node: /proc/<pid>/exe reads it for as long as the process is
+// listed, exited or not. One pass over the table for all of them.
+pub fn mark_programs_in_use(nodes []voidptr, mut in_use []bool) {
+	if nodes.len == 0 {
+		return
+	}
+	lock_table()
+	defer { unlock_table() }
+	for pid := 1; pid < max_pid; pid++ {
+		process := processes[pid]
+		if process == unsafe { nil } || process.exe_node == unsafe { nil } {
+			continue
+		}
+		for i, node in nodes {
+			if process.exe_node == node {
+				in_use[i] = true
+			}
+		}
+	}
+}
+
 pub fn directory_in_use(directory voidptr) bool {
 	lock_table()
 	defer { unlock_table() }

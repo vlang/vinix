@@ -188,6 +188,12 @@ fn record_mount(mut table MountTable, covered &VFSNode, root &VFSNode, source st
 		mut root_node := unsafe { root }
 		root_node.mount_root = true
 	}
+	// Entries are never freed, and copies in other namespaces keep this one's
+	// node after the mount here is gone: it is never freed either.
+	if covered != unsafe { nil } {
+		mut covered_node := unsafe { covered }
+		covered_node.mount_covered = true
+	}
 	table.lock.acquire()
 	table.mounts << entry
 	table.lock.release()

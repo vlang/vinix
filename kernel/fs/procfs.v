@@ -1532,6 +1532,21 @@ fn refresh_fd_directory(mut descriptors VFSNode, pid int) {
 		proc.unlock_table()
 	}
 	if !scanned {
+		// The process is gone, or its descriptor table stayed busy. Either
+		// way what the links lead to may be gone: a closed file's node is
+		// freed some seconds on. The listing goes if the process has, and the
+		// links stop leading anywhere otherwise, until the next lookup here.
+		if proc.process_at(pid) == unsafe { nil } {
+			prune_directories(mut descriptors, live)
+			return
+		}
+		for _, child in descriptors.children {
+			if child != unsafe { nil } && child.name.len > 0 && child.name[0] >= `0`
+				&& child.name[0] <= `9` {
+				mut link := unsafe { child }
+				link.magic_target = unsafe { nil }
+			}
+		}
 		return
 	}
 
@@ -1719,6 +1734,9 @@ fn prune_directories(mut parent VFSNode, live []int) {
 
 	for stale_node in stale {
 		mut node := unsafe { stale_node }
+		// A pruned link may still be held by a lookup, and must not lead to a
+		// node that goes when its descriptor does.
+		node.magic_target = unsafe { nil }
 		parent.children.delete(node.name)
 		unsafe {
 			if parent.resource.stat.nlink > 2 {

@@ -38,7 +38,6 @@ import socket
 import socket.inet
 import time
 import event
-import event.eventstruct
 import x86.hpet
 import x86.hypervisor
 import limine
@@ -55,17 +54,17 @@ fn poll_network() {
 // on exists.
 fn resolver_thread() {
 	for {
-		mut events := []&eventstruct.Event{}
 		mut interval := time.new_timer(time.TimeSpec{
 			tv_sec:  1
 			tv_nsec: 0
 		})
-		events << &interval.event
-		event.await(mut events, true) or {}
+		event.await_one(mut interval.event, true) or {}
 		interval.disarm()
 		unsafe { free(interval) }
-		unsafe { events.free() }
 		inet.publish_resolver()
+		// Removed files whose grace period has run out, when no more unlinks
+		// come to free them.
+		fs.reap_removed()
 	}
 }
 

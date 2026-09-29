@@ -3,6 +3,7 @@ module fs
 
 import resource
 import stat
+import katomic
 import klock
 import proc
 import file
@@ -58,6 +59,15 @@ pub mut:
 	removed bool
 	// What an overlay node is made of; see overlay.v.
 	overlay &OverlayEntry = unsafe { nil }
+	// How many open-file descriptions lead to this node, whether no name does
+	// any more, and whether it has been handed to the grace queue; see
+	// removed.v. An overlay built on the node, or a mount that has covered
+	// it, keeps it for good.
+	handles       int
+	orphan        bool
+	retired       u32
+	overlaid      bool
+	mount_covered bool
 }
 
 __global (
@@ -90,6 +100,7 @@ pub fn add_filesystem(filesystem &FileSystem, identifier string) {
 
 pub fn initialise() {
 	vfs_root = create_node(&TmpFS(unsafe { nil }), &VFSNode(unsafe { nil }), '', false)
+	file.on_handle_released(release_handle_node)
 
 	filesystems = map[string]&FileSystem{}
 
@@ -508,15 +519,30 @@ pub fn unlink(parent &VFSNode, name string, remove_dir bool) ? {
 				free(node.children['.'])
 				free(node.children['..'].children)
 				free(node.children['..'])
+				// The map's own storage and keys as well as the map: freeing
+				// only the latter lost the rest at every rmdir.
+				node.children.free()
 				free(node.children)
 				node.children = nil
 			}
 		}
 	}
 	parent_of_tgt.children.delete(basename)
+	mode := node.resource.stat.mode
 	if !held {
 		node.resource.unref(unsafe { nil })?
 	}
+	orphan_node(mut node, mode)
+}
+
+// Whether the entry `name` in `parent` has something mounted on it, in this
+// or any other mount namespace.
+fn name_is_mounted_on(parent &VFSNode, name string) bool {
+	if parent.children == unsafe { nil } || name !in parent.children {
+		return false
+	}
+	covered := unsafe { parent.children[name] }
+	return covered.mountpoint != unsafe { nil } || covered.ns_mounts > 0
 }
 
 // Nothing is made in a directory that has been removed; Linux says ENOENT.
@@ -632,6 +658,7 @@ fn fdnum_create_from_node(mut node VFSNode, flags int, oldfd int, specific bool)
 	}
 	mut fd := file.fd_create_from_resource(mut opened_resource, flags) or { return none }
 	fd.handle.node = voidptr(node)
+	katomic.inc(mut &node.handles)
 	return file.fdnum_create_from_fd(current_process, fd, oldfd, specific) or {
 		// In particular, roll back a /dev/ptmx allocation or slave-open count if
 		// the process descriptor table is full.
@@ -1743,6 +1770,14 @@ pub fn rename(oldparent &VFSNode, oldpath string, newparent &VFSNode, newpath st
 		errno.set(errno.exdev)
 		return none
 	}
+	// Something mounted on either name keeps it, as unlink() finds: the walk
+	// leads to what is mounted there, and renaming over it dropped the
+	// mounted-on node while the mount still led to it.
+	if name_is_mounted_on(old_parent_of, old_basename)
+		|| name_is_mounted_on(new_parent_of, new_basename) {
+		errno.set(errno.ebusy)
+		return none
+	}
 	require_linked(new_parent_of)?
 
 	if flags & rename_exchange != 0 {
@@ -1843,7 +1878,9 @@ pub fn rename(oldparent &VFSNode, oldpath string, newparent &VFSNode, newpath st
 		inotify_emit(new_node, '', in_delete_self, 0)
 		inotify_forget(new_node)
 		new_parent_of.children.delete(new_basename)
+		replaced_mode := new_node.resource.stat.mode
 		new_node.resource.unref(unsafe { nil })?
+		orphan_node(mut new_node, replaced_mode)
 	}
 
 	old_parent_of.children.delete(old_basename)
@@ -2339,12 +2376,13 @@ pub fn syscall_memfd_create(_ voidptr, name u64, flags u32) (u64, u64) {
 	// A node that is in no directory. It is what /proc/self/fd/N leads to, and
 	// it is what lets execveat(2) -- or an exec of that /proc path -- run the
 	// file, which is how runc starts its init from a sealed copy of itself.
-	// The node keeps its name. Neither goes away: /proc/<pid>/fd and exec
-	// may still reach the node after the file is closed.
-	node_name := 'memfd:${shown}'
+	// With no name to lead to it, it goes once its descriptors and any
+	// process running it have; see removed.v.
+	node_name := 'memfd:${shown}' @[freed]
 	unsafe { shown.free() }
 	mut node := create_node(unsafe { filesystems['tmpfs'] }, unsafe { nil }, node_name, false)
 	node.resource = res
+	node.orphan = true
 	// Drop the reference create_anonymous() handed us once the descriptor holds
 	// its own. Keeping both left every memfd alive after its last descriptor and
 	// mapping were gone: runc's 10 MiB copy of itself, for every container.
@@ -2353,6 +2391,7 @@ pub fn syscall_memfd_create(_ voidptr, name u64, flags u32) (u64, u64) {
 	}
 	mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or { return u64(fdnum), 0 }
 	fd.handle.node = voidptr(node)
+	katomic.inc(mut &node.handles)
 	fd.unref()
 
 	return u64(fdnum), 0

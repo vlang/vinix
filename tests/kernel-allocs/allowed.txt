@@ -14,7 +14,6 @@ fs/mount.v array initialization	1
 fs/procfs.v array initialization	1
 fs/procfs.v string concatenation	1
 fs/tmpfs.v cast to interface	1
-fs/vfs.v string interpolation	1
 gpu/agx/fake/driver.v array initialization	1
 gpu/agx/file/file.v array initialization	1
 gpu/agx/fw/g13_initdata_layout.v array initialization	1

@@ -38,7 +38,6 @@ import socket
 import socket.inet
 import limine
 import event
-import event.eventstruct
 import pagecache
 import gpu.agx.driver as agx_driver
 import gpu.agx.fake as fake_agx
@@ -383,22 +382,22 @@ fn start_pci() {
 
 fn writeback_thread() {
 	for {
-		mut events := []&eventstruct.Event{}
 		mut interval := time.new_timer(time.TimeSpec{
 			tv_sec: writeback_interval_seconds
 			tv_nsec: 0
 		})
-		events << &interval.event
-		event.await(mut events, true) or {}
+		event.await_one(mut interval.event, true) or {}
 		interval.disarm()
 		unsafe { free(interval) }
-		unsafe { events.free() }
 		// A device that cannot take the write keeps its pages dirty and
 		// retryable, so the next round tries again rather than giving up.
 		pagecache.sync_all()
 		// DHCP runs from the scheduler's poll callback, which cannot write to
 		// the root filesystem. This is a thread that can.
 		inet.publish_resolver()
+		// Removed files whose grace period has run out, when no more unlinks
+		// come to free them.
+		fs.reap_removed()
 	}
 }
 

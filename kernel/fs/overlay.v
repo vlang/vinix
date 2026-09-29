@@ -234,7 +234,21 @@ fn overlay_node(parent &VFSNode, name string, real &VFSNode, entry &OverlayEntry
 		node.symlink_target = real.symlink_target.clone()
 	}
 	node.overlay = unsafe { entry }
+	mark_overlaid(entry)
 	return node
+}
+
+// The real nodes an overlay entry is made of are never freed: the entry holds
+// them without a count. See removed.v.
+fn mark_overlaid(entry &OverlayEntry) {
+	if entry.upper != unsafe { nil } {
+		mut upper := entry.upper
+		upper.overlaid = true
+	}
+	for lower in entry.lowers {
+		mut layer := unsafe { lower }
+		layer.overlaid = true
+	}
 }
 
 // Work out a directory's entries from its layers, the first time it is
@@ -443,6 +457,7 @@ fn overlay_copy_up_locked(mut node VFSNode) ? {
 	to.stat.mtim = from.stat.mtim
 	copy_xattrs(from, to, 'trusted.overlay.')
 	entry.upper = real
+	mark_overlaid(entry)
 	node.resource = real.resource
 }
 
@@ -762,5 +777,6 @@ fn overlay_mount(parent &VFSNode, mount_parent &VFSNode, name string, options st
 		upper:  upper
 		lowers: lowers
 	}
+	mark_overlaid(root.overlay)
 	return root
 }

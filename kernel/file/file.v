@@ -79,6 +79,16 @@ pub mut:
 	epoll_refs int
 }
 
+__global (
+	handle_released fn (voidptr)
+)
+
+// on_handle_released has `f` called with a handle's node as the handle is
+// freed: the VFS counts the handles that lead to each node.
+pub fn on_handle_released(f fn (voidptr)) {
+	handle_released = f
+}
+
 // A Handle is the open-file description shared by dup() and fork(). Its
 // resource reference must therefore be released exactly once, after both the
 // final descriptor and every in-flight lookup have dropped their references.
@@ -96,6 +106,9 @@ fn (mut this Handle) unref() {
 	release_flock(this)
 	mut res := this.resource
 	res.unref(voidptr(this)) or {}
+	if this.node != unsafe { nil } && voidptr(handle_released) != unsafe { nil } {
+		handle_released(this.node)
+	}
 	unsafe {
 		this.dirlist.free()
 		free(voidptr(this))
