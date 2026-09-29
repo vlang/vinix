@@ -107,8 +107,6 @@ fn do_select(nfds int, readfds u64, writefds u64, exceptfds u64, timed bool, dea
 
 	// pselect6 swaps in a signal mask for the duration of the wait, the same
 	// way ppoll does.
-	old_mask := current_thread.masked_signals
-	mut masked := false
 	if sigmask != 0 {
 		mut arg := SigmaskArg{}
 		if !usercopy.copy_from_user(voidptr(&arg), sigmask, sizeof(SigmaskArg)) {
@@ -122,15 +120,7 @@ fn do_select(nfds int, readfds u64, writefds u64, exceptfds u64, timed bool, dea
 			if !usercopy.copy_from_user(voidptr(&wanted), arg.mask, sizeof(u64)) {
 				return errno.err, errno.efault
 			}
-			// SIGKILL and SIGSTOP can never be blocked, not even for the
-			// duration of the wait.
-			current_thread.masked_signals = proc.sigset_from_user(wanted & ~((u64(1) << 8) | (u64(1) << 18)))
-			masked = true
-		}
-	}
-	defer {
-		if masked {
-			current_thread.masked_signals = old_mask
+			proc.begin_wait_mask(mut current_thread, wanted)
 		}
 	}
 

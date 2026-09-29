@@ -20,7 +20,9 @@ fn leave(context &cpulocal.GPRState) {
 	}
 	userland.exit_if_told_to()
 	userland.prepare_syscall_restart(context)
+	userland.end_wait_mask_unless_interrupted(context.rax)
 	userland.dispatch_a_signal(context)
+	userland.end_wait_mask()
 }
 
 // Called by the interrupt thunks in asm/int_thunks_asm.S on the way back to

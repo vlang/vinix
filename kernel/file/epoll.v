@@ -382,17 +382,12 @@ pub fn syscall_epoll_pwait(_ voidptr, epfd int, events_buf u64, maxevents int, t
 	} else {
 		return errno.err, errno.einval
 	}
-	oldmask := t.masked_signals
 	if sigmask != 0 {
 		mut incoming_mask := u64(0)
 		if !usercopy.copy_from_user(voidptr(&incoming_mask), sigmask, sizeof(u64)) {
 			return errno.err, errno.efault
 		}
-		// SIGKILL and SIGSTOP can never be blocked, not even for the wait.
-		t.masked_signals = proc.sigset_from_user(incoming_mask & ~((u64(1) << 8) | (u64(1) << 18)))
-	}
-	defer {
-		t.masked_signals = oldmask
+		proc.begin_wait_mask(mut t, incoming_mask)
 	}
 
 	// First pass: check if any fds are already ready.

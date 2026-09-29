@@ -29,3 +29,17 @@ pub fn claim_thread_exit(t &Thread) bool {
 	mut thread := unsafe { t }
 	return katomic.cas(mut &thread.exit_claimed, u32(0), u32(1))
 }
+
+// ppoll(2), pselect6(2) and epoll_pwait(2) wait under the mask their caller
+// hands them, less SIGKILL and SIGSTOP, which cannot be blocked even then. The
+// mask from before stays saved for the syscall's end to put back -- after a
+// signal that ended the wait has been taken under the wait's mask, with the
+// saved one in the handler's frame for sigreturn to restore, as sigsuspend(2)
+// does and as Linux does for all four. Put back as the wait returned, the mask
+// blocked that signal again: it stayed pending, its handler never ran, and the
+// wait's EINTR came for nothing.
+pub fn begin_wait_mask(mut t Thread, user_mask u64) {
+	t.saved_mask = t.masked_signals
+	t.saved_mask_valid = true
+	t.masked_signals = sigset_from_user(user_mask & ~((u64(1) << 8) | (u64(1) << 18)))
+}

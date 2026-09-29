@@ -193,6 +193,28 @@ fn sleep_for_signal(timeout &time.TimeSpec) bool {
 	return false
 }
 
+// The end of a syscall that waited under a mask of its caller's: see
+// proc.begin_wait_mask. One that was not interrupted puts the saved mask back
+// before any signal is taken, so none that only the wait's mask let in is
+// taken on its way out.
+pub fn end_wait_mask_unless_interrupted(ret u64) {
+	mut t := proc.current_thread()
+	if t.saved_mask_valid && ret != u64(-i64(errno.eintr)) {
+		t.masked_signals = t.saved_mask
+		t.saved_mask_valid = false
+	}
+}
+
+// Once a signal has been taken, a saved mask no handler's frame took is put
+// back: the signal that interrupted the wait was ignored, or there was none.
+pub fn end_wait_mask() {
+	mut t := proc.current_thread()
+	if t.saved_mask_valid {
+		t.masked_signals = t.saved_mask
+		t.saved_mask_valid = false
+	}
+}
+
 // rt_sigsuspend(mask, sigsetsize): swap in a temporary mask, wait for something
 // to get through it, and leave the original mask for the handler's sigreturn to
 // put back.

@@ -26,6 +26,7 @@
 #include <sys/mman.h>
 #include <sys/random.h>
 #include <sys/resource.h>
+#include <sys/select.h>
 #include <sys/stat.h>
 #include <sys/auxv.h>
 #include <sys/eventfd.h>
@@ -1411,8 +1412,50 @@ static void count_signal(int signal)
 	++counted_signals;
 }
 
-/* A wait does not start with a signal already pending that it does not block:
- * ppoll(2) whose mask lets in a pending signal ends at once. */
+/* Wait on an empty pipe for up to three seconds under `mask`: ppoll(2),
+ * pselect(2) or epoll_pwait(2). */
+static int wait_under_mask(int kind, int fd, const sigset_t *mask)
+{
+	struct timespec timeout = {3, 0};
+	if (kind == 0) {
+		struct pollfd descriptor = {.fd = fd, .events = POLLIN};
+		return ppoll(&descriptor, 1, &timeout, mask);
+	}
+	if (kind == 1) {
+		fd_set readable;
+		FD_ZERO(&readable);
+		FD_SET(fd, &readable);
+		return pselect(fd + 1, &readable, NULL, NULL, &timeout, mask);
+	}
+	int poller = epoll_create1(0);
+	if (poller < 0)
+		return -2;
+	struct epoll_event watched = {.events = EPOLLIN, .data.fd = fd}, ready;
+	if (epoll_ctl(poller, EPOLL_CTL_ADD, fd, &watched) != 0)
+		return -2;
+	int result = epoll_pwait(poller, &ready, 1, 3000, mask);
+	int error = errno;
+	close(poller);
+	errno = error;
+	return result;
+}
+
+static int usr1_blocked_and_not_pending(void)
+{
+	sigset_t mask, pending;
+	CHECK(sigprocmask(SIG_BLOCK, NULL, &mask) == 0);
+	CHECK(sigismember(&mask, SIGUSR1));
+	CHECK(sigpending(&pending) == 0);
+	CHECK(!sigismember(&pending, SIGUSR1));
+	return 0;
+}
+
+/* A wait does not start with a signal already pending that it does not block,
+ * and the handler of a signal that only the wait's own mask lets in runs under
+ * that mask: ppoll(2), pselect(2) and epoll_pwait(2) end at once with EINTR,
+ * the handler runs, and the mask from before comes back afterwards. A wait
+ * that ends for anything else puts its caller's mask back first, and the
+ * signal stays pending. */
 static int test_wait_ends_for_a_pending_signal(void)
 {
 	struct sigaction action = {.sa_handler = count_signal}, previous;
@@ -1424,26 +1467,36 @@ static int test_wait_ends_for_a_pending_signal(void)
 	CHECK(sigprocmask(SIG_BLOCK, &blocked, &original) == 0);
 	open = original;
 	sigdelset(&open, SIGUSR1);
-	CHECK(kill(getpid(), SIGUSR1) == 0);
-
 	int fds[2];
 	CHECK(pipe(fds) == 0);
-	struct pollfd descriptor = {.fd = fds[0], .events = POLLIN};
-	struct timespec timeout = {3, 0}, start, end;
-	CHECK(clock_gettime(CLOCK_MONOTONIC, &start) == 0);
-	errno = 0;
-	int ready = ppoll(&descriptor, 1, &timeout, &open);
-	int error = errno;
-	CHECK(clock_gettime(CLOCK_MONOTONIC, &end) == 0);
-	CHECK(ready == -1 && error == EINTR);
-	CHECK(end.tv_sec - start.tv_sec < 2);
 
+	for (int kind = 0; kind < 3; ++kind) {
+		counted_signals = 0;
+		CHECK(kill(getpid(), SIGUSR1) == 0);
+		struct timespec start, end;
+		CHECK(clock_gettime(CLOCK_MONOTONIC, &start) == 0);
+		errno = 0;
+		int ready = wait_under_mask(kind, fds[0], &open);
+		int error = errno;
+		CHECK(clock_gettime(CLOCK_MONOTONIC, &end) == 0);
+		CHECK(ready == -1 && error == EINTR);
+		CHECK(end.tv_sec - start.tv_sec < 2);
+		CHECK(counted_signals == 1);
+		CHECK(usr1_blocked_and_not_pending() == 0);
+	}
+
+	counted_signals = 0;
+	CHECK(write(fds[1], "x", 1) == 1);
+	CHECK(kill(getpid(), SIGUSR1) == 0);
+	struct pollfd descriptor = {.fd = fds[0], .events = POLLIN};
+	CHECK(ppoll(&descriptor, 1, NULL, &open) == 1);
+	CHECK(counted_signals == 0);
 	sigset_t pending;
 	CHECK(sigpending(&pending) == 0);
-	if (sigismember(&pending, SIGUSR1)) {
-		/* Taken as the mask opens, not left for a later test. */
-		CHECK(sigprocmask(SIG_SETMASK, &open, NULL) == 0);
-	}
+	CHECK(sigismember(&pending, SIGUSR1));
+	CHECK(sigprocmask(SIG_SETMASK, &open, NULL) == 0);
+	CHECK(counted_signals == 1);
+
 	CHECK(sigprocmask(SIG_SETMASK, &original, NULL) == 0);
 	CHECK(sigaction(SIGUSR1, &previous, NULL) == 0);
 	CHECK(close(fds[0]) == 0 && close(fds[1]) == 0);

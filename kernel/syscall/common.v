@@ -17,10 +17,12 @@ fn leave(context &cpulocal.GPRState) {
 	cpu.interrupt_toggle(false)
 	userland.exit_if_told_to()
 	userland.prepare_syscall_restart(context)
+	userland.end_wait_mask_unless_interrupted(context.x0)
 	// Before a signal is dispatched, so one that arrived while the thread
 	// waited is delivered once its group may run again.
 	sched.park_for_cgroup()
 	userland.dispatch_a_signal(context)
+	userland.end_wait_mask()
 }
 
 // On the way back to userspace from an interrupt. A thread that only computes

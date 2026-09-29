@@ -158,15 +158,9 @@ fn poll_revents(status int, requested i16) i16 {
 }
 
 fn ppoll(fds &PollFD, nfds u64, tmo_p &time.TimeSpec, sigmask &u64) (u64, u64) {
-	mut t := proc.current_thread()
-
-	oldmask := t.masked_signals
 	if voidptr(sigmask) != unsafe { nil } {
-		// SIGKILL and SIGSTOP can never be blocked, not even for the wait.
-		t.masked_signals = proc.sigset_from_user(*sigmask & ~((u64(1) << 8) | (u64(1) << 18)))
-	}
-	defer {
-		t.masked_signals = oldmask
+		mut t := proc.current_thread()
+		proc.begin_wait_mask(mut t, *sigmask)
 	}
 	if voidptr(tmo_p) != unsafe { nil }
 		&& (tmo_p.tv_sec < 0 || tmo_p.tv_nsec < 0 || tmo_p.tv_nsec >= 1000000000) {
