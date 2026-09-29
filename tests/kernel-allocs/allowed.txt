@@ -9,6 +9,7 @@ fs/devtmpfs.v cast to interface	1
 fs/devtmpfs.v string interpolation	1
 fs/disk_root_arm64.v array initialization	2
 fs/ext2/ext2.v cast to interface	1
+fs/ext2/mkfs.v array initialization	4
 fs/mknod.v cast to interface	2
 fs/mount.v array initialization	1
 fs/procfs.v array initialization	1
