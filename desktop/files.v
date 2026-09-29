@@ -655,7 +655,6 @@ fn (a &FileBrowserApp) sidebar(height int) ui2.Element {
 		})
 		rows << ui2.clickable_view(location.action, ui2.rect(6, f64(y), files_sidebar_width - 12, files_sidebar_row_height), ui2.BoxStyle{
 			bg:          files_sidebar_selected
-			radius:      6
 			transparent: !selected
 		}, contents)
 	}
@@ -680,7 +679,6 @@ fn (a &FileBrowserApp) sidebar(height int) ui2.Element {
 		})
 		rows << ui2.clickable_view('${files_action_tag_prefix}${tag.id}', ui2.rect(6, f64(y), files_sidebar_width - 12, files_sidebar_row_height), ui2.BoxStyle{
 			bg:          files_sidebar_selected
-			radius:      6
 			transparent: a.active_tag_id != tag.id
 		}, contents)
 	}
