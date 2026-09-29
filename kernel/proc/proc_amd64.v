@@ -49,7 +49,6 @@ pub mut:
 	which_event        u64
 	exit_value         voidptr
 	exited             eventstruct.Event
-	sigentry           u64
 	sigactions         [256]SigAction
 	pending_signals    u64
 	masked_signals     u64
@@ -193,21 +192,14 @@ pub fn get_main_thread(process &Process) &Thread {
 }
 
 // A Linux sigset keeps signal n in bit n-1; this kernel's amd64 masks and
-// pending sets, and the native Vinix ABI's sigsets, keep it in bit n. Shared
-// code that takes a sigset from the calling program, or hands one back,
-// converts through these.
+// pending sets keep it in bit n. Shared code that takes a sigset from the
+// calling program, or hands one back, converts through these.
 pub fn sigset_from_user(set u64) u64 {
-	if current_thread().process.linux_abi {
-		return set << 1
-	}
-	return set
+	return set << 1
 }
 
 pub fn sigset_to_user(mask u64) u64 {
-	if current_thread().process.linux_abi {
-		return mask >> 1
-	}
-	return mask
+	return mask >> 1
 }
 
 // What a seccomp program sees as seccomp_data.arch.

@@ -1,15 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (c) 2026 Alexander Medvednikov
 //
-// Signal delivery for Linux programs on amd64.
-//
-// A native Vinix program registers an entry point with sigentry() and its libc
-// builds the handler's frame itself. A Linux program -- everything in the
-// Alpine userland -- expects the kernel to push Linux's rt_sigframe onto its
-// stack, enter the handler, and take the frame back in rt_sigreturn when the
-// handler returns into its sa_restorer. Without that a musl process never had
-// a handler run, nor a default action taken: zsh blocked forever waiting for
-// the SIGCHLD that tells it a command has finished.
+// Signal delivery on amd64. A program expects the kernel to push Linux's
+// rt_sigframe onto its stack, enter the handler, and take the frame back in
+// rt_sigreturn when the handler returns into its sa_restorer.
 //
 // Linux numbers signal n as bit n-1 of a sigset; this kernel's masks and
 // pending bits use bit n. The Linux entry points convert at the boundary.

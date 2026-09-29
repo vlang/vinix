@@ -103,8 +103,9 @@ fn exception_handler_at(num u32, mut gpr_state cpulocal.GPRState, cr2 u64) {
 		}
 
 		// Preserve both pieces of x86 exception state in the existing frame.
-		// Hardware error codes occupy the low bits; mlibc exposes the vector in
-		// the high half as uc_mcontext.gregs[REG_TRAPNO].
+		// Hardware error codes occupy the low bits and the vector the high half;
+		// the signal frame hands them out as uc_mcontext's REG_ERR and
+		// REG_TRAPNO.
 		gpr_state.err = (gpr_state.err & u64(0xffffffff)) | (u64(num) << 32)
 		fault_addr := if num == 14 { cr2 } else { u64(0) }
 		fault_code := match num {
@@ -116,10 +117,10 @@ fn exception_handler_at(num u32, mut gpr_state cpulocal.GPRState, cr2 u64) {
 		}
 		userland.sendsig(proc.current_thread(), signal)
 		userland.dispatch_a_signal_info(gpr_state, int(signal), fault_code, fault_addr)
-		// dispatch_a_signal() switches away when it delivered the exception. If
-		// no userspace signal entry exists (or SIGSEGV was blocked), do not retry
-		// the same fault forever.
-		userland.syscall_exit(unsafe { nil }, 128 + signal)
+		// dispatch_a_signal() switches away when it delivered the exception. A
+		// fault nothing handles -- no handler, or the signal blocked -- cannot
+		// be retried: the process dies of the signal, as on arm64 and Linux.
+		userland.exit_by_signal(int(signal))
 	} else {
 		lib.kpanic(gpr_state, exception_names[num])
 	}

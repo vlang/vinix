@@ -1,18 +1,16 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (c) 2026 Alexander Medvednikov
 //
-// pledge(2) for the x86-64 syscall numbers: Linux's, which Alpine binaries
-// use, and the original Vinix ABI's, which mlibc programs use. See pledge.v
-// for how a call's promise is decided, and proc/pledge.v for what the
-// promises are.
+// pledge(2) for the Linux x86-64 syscall numbers. See pledge.v for how a
+// call's promise is decided, and proc/pledge.v for what the promises are.
 module table
 
 import proc
 import x86.cpu.local as cpulocal
 
-// The promise the Linux x86-64 call `nr` needs, given its arguments. Anything
-// not listed is allowed by no promise.
-fn pledge_linux_needs(nr u64, a [6]u64) u64 {
+// The promise the call `nr` needs, given its arguments. Anything not listed
+// is allowed by no promise.
+fn pledge_needs(nr u64, a [6]u64) u64 {
 	return match nr {
 		// read, write, close, fstat, poll, lseek.
 		0, 1, 3, 5, 7, 8 { pledge_stdio }
@@ -128,58 +126,16 @@ fn pledge_linux_needs(nr u64, a [6]u64) u64 {
 	}
 }
 
-// The promise the original Vinix ABI's call `nr` needs; see syscall_table.v
-// for what each number is. The arguments are the handler's own, in order.
-fn pledge_native_needs(nr u64, a [6]u64) u64 {
-	return match nr {
-		// kprint, openat (judged once the file is found), read, write, seek,
-		// close, set_fs_base, set_gs_base, fstat, fstatat, dup3.
-		0, 2, 3, 4, 5, 6, 7, 8, 10, 11, 13 { pledge_stdio }
-		1 { pledge_prot(a[2] >> 32) } // mmap: prot and flags in one word
-		9 { pledge_ioctl(a[1]) }
-		12 { pledge_fcntl(a[1]) }
-		14 { p_proc } // fork
-		15 { pledge_always } // exit
-		16 { pledge_stdio } // waitpid
-		17 { p_exec } // execve
-		18, 19, 33 { p_rpath } // chdir, readdir, readlinkat
-		// faccessat (judged once the file is found), pipe, futex_wait,
-		// futex_wake.
-		20, 21, 23, 24 { pledge_stdio }
-		22, 37, 58 { p_cpath } // mkdirat, rmdirat, linkat
-		25 { p_rpath | p_wpath } // getcwd
-		26 { pledge_kill(a[0]) } // kill
-		// sigentry, sigprocmask, sigaction, sigreturn, getpid, getppid.
-		27...32 { pledge_stdio }
-		34, 36, 38 { pledge_stdio } // munmap, ppoll, getgroups
-		35 { p_cpath | proc.pledge_tmppath } // unlinkat
-		39 { pledge_socket(a[0], a[2]) } // socket
-		40, 41, 61 { pledge_socket_fd(a[0], false) } // bind, listen, accept
-		59 { pledge_socket_fd(a[0], true) } // connect
-		// inotify_init, signalfd, socketpair.
-		42, 45, 46 { pledge_stdio }
-		48 { pledge_prot(a[2]) } // mprotect
-		// mimmutable, clock_get, gethostname, nanosleep.
-		49, 50, 51, 53 { pledge_stdio }
-		54 { p_proc } // setsid
-		57 { p_fattr } // fchmod
-		60, 62, 65 { pledge_stdio } // getpeername, recvmsg, new_thread
-		66 { pledge_always } // pledge
-		67 { proc.pledge_unveil } // unveil
-		else { pledge_never }
+// Called by syscall_trace() on every syscall of a pledged process. Answers the
+// table slot to run: the call itself, or the stand-in that returns the errno
+// the call was refused with.
+fn pledge_entry(mut t proc.Thread, frame &cpulocal.GPRState, nr u64) u64 {
+	t.pledge_syscall = i64(nr)
+	code := pledge_verdict(pledge_needs(nr, [frame.rdi, frame.rsi, frame.rdx, frame.r10, frame.r8,
+		frame.r9]!))
+	if code == 0 {
+		return nr
 	}
-}
-
-// Called by syscall_enter() on every syscall of a pledged process. Answers 0
-// when the call may go ahead, or the errno it fails with.
-pub fn pledge_amd64_entry(frame &cpulocal.GPRState, linux bool) u64 {
-	mut t := proc.current_thread()
-	if linux {
-		t.pledge_syscall = i64(frame.rax)
-		return pledge_verdict(pledge_linux_needs(frame.rax, [frame.rdi, frame.rsi, frame.rdx,
-			frame.r10, frame.r8, frame.r9]!))
-	}
-	t.pledge_syscall = i64(frame.rdi)
-	return pledge_verdict(pledge_native_needs(frame.rdi, [frame.rsi, frame.rdx, frame.r10,
-		frame.r8, frame.r9, u64(0)]!))
+	t.seccomp_errno = code
+	return seccomp_verdict_nr
 }

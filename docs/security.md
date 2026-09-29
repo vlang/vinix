@@ -16,7 +16,7 @@ The rule applies to both architecture ABIs where those operations exist. A denie
 
 For `mount` and `umount2`, authorization precedes all argument reads. Authorized calls copy the source, target, and filesystem type from userspace into bounded kernel-owned strings, checking each mapped page and requiring a NUL byte within 4096 bytes. Invalid pointers return `EFAULT`; unterminated strings return `ENAMETOOLONG`. A NULL source or target is an invalid pointer. The filesystem type may be NULL, as on Linux, for a remount, bind, move, or propagation change. This keeps a root caller's bad pointer from becoming an unchecked kernel dereference.
 
-The AArch64 Linux ABI and the amd64 native ABI map mount and unmount directly to the shared VFS syscall handlers. The current amd64 Linux compatibility table leaves those syscall numbers vacant, returning `ENOSYS`. Kernel boot and storage code uses `mount_at_root()` with kernel-created arguments; it is not a userspace entry path.
+Both architectures map mount and unmount directly to the shared VFS syscall handlers. Kernel boot and storage code uses `mount_at_root()` with kernel-created arguments; it is not a userspace entry path.
 
 For an authorized caller, `umount2` detaches the mount at its target, and returns `EINVAL` when nothing is mounted there.
 

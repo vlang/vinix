@@ -53,17 +53,6 @@ pub fn domainname_text() string {
 	return unsafe { cstring_to_vstring(charptr(&domainname[0])) }
 }
 
-pub fn syscall_gethostname(_ voidptr, name charptr, len u64) (u64, u64) {
-	source := hostname_text()
-	if len <= u64(source.len) {
-		return errno.err, errno.enametoolong
-	}
-	if !usercopy.copy_to_user(u64(name), voidptr(source.str), u64(source.len + 1)) {
-		return errno.err, errno.efault
-	}
-	return 0, 0
-}
-
 fn copy_name_from_user(name charptr, len u64) ?string {
 	if len > uts_name_len - 1 {
 		errno.set(errno.einval)

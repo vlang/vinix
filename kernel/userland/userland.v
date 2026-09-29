@@ -22,104 +22,6 @@ import term
 import usercopy
 import stat
 
-pub const wnohang = 1
-
-pub const sig_block = 1
-
-pub const sig_unblock = 2
-
-pub const sig_setmask = 3
-
-pub const sighup = 1
-
-pub const sigint = 2
-
-pub const sigquit = 3
-
-pub const sigill = 4
-
-pub const sigtrap = 5
-
-pub const sigabrt = 6
-
-pub const sigbus = 7
-
-pub const sigfpe = 8
-
-pub const sigkill = 9
-
-pub const sigusr1 = 10
-
-pub const sigsegv = 11
-
-pub const sigusr2 = 12
-
-pub const sigpipe = 13
-
-pub const sigalrm = 14
-
-pub const sigterm = 15
-
-pub const sigstkflt = 16
-
-pub const sigchld = 17
-
-pub const sigcont = 18
-
-pub const sigstop = 19
-
-pub const sigtstp = 20
-
-pub const sigttin = 21
-
-pub const sigttou = 22
-
-pub const sigurg = 23
-
-pub const sigxcpu = 24
-
-pub const sigxfsz = 25
-
-pub const sigvtalrm = 26
-
-pub const sigprof = 27
-
-pub const sigwinch = 28
-
-pub const sigio = 29
-
-pub const sigpoll = sigio
-
-pub const sigpwr = 30
-
-pub const sigsys = 31
-
-pub const sigrtmin = 32
-
-pub const sigrtmax = 33
-
-pub const sigcancel = 34
-
-pub const sig_err = voidptr(-1)
-
-pub const sig_dfl = voidptr(-2)
-
-pub const sig_ign = voidptr(-3)
-
-pub const sa_nocldstop = 1 << 0
-
-pub const sa_onstack = 1 << 1
-
-pub const sa_resethand = 1 << 2
-
-pub const sa_restart = 1 << 3
-
-pub const sa_siginfo = 1 << 4
-
-pub const sa_nocldwait = 1 << 5
-
-pub const sa_nodefer = 1 << 6
-
 // Only condition/status bits that userspace can normally change may cross the
 // sigreturn boundary. In particular, IOPL, NT, VM, VIF and VIP must never be
 // restored from an untrusted signal frame. IF is forced on so a forged frame
@@ -129,23 +31,6 @@ const amd64_sigreturn_rflags_mask = cpu.rflags_cf | cpu.rflags_pf | cpu.rflags_a
 	cpu.rflags_rf | cpu.rflags_id
 
 const amd64_sigreturn_rflags_fixed = cpu.rflags_fixed | cpu.rflags_if
-
-union SigVal {
-	sival_int i32
-	sival_ptr voidptr
-}
-
-pub struct SigInfo {
-pub mut:
-	si_signo  i32
-	si_code   i32
-	si_errno  i32
-	si_pid    i32
-	si_uid    i32
-	si_addr   voidptr
-	si_status i32
-	si_value  SigVal
-}
 
 pub fn syscall_getpid(_ voidptr) (u64, u64) {
 	mut current_thread := proc.current_thread()
@@ -173,22 +58,6 @@ pub fn syscall_getppid(_ voidptr) (u64, u64) {
 	mut t := unsafe { proc.current_thread() }
 
 	return u64(t.process.ppid), 0
-}
-
-pub fn syscall_sigentry(_ voidptr, sigentry u64) (u64, u64) {
-	mut current_thread := proc.current_thread()
-	mut process := current_thread.process
-
-	C.printf(c'\n\e[32m%s\e[m: sigentry(0x%llx)\n', process.name.str, sigentry)
-	defer {
-		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
-	}
-
-	mut t := proc.current_thread()
-
-	t.sigentry = sigentry
-
-	return 0, 0
 }
 
 fn valid_sigreturn_context(context &cpulocal.GPRState) bool {
@@ -222,101 +91,8 @@ fn resume_sigreturn(context cpulocal.GPRState, old_mask u64) {
 	for {}
 }
 
-pub fn syscall_sigreturn(_ voidptr, context_ptr u64, old_mask u64) (u64, u64) {
-	// Signal frames live in userspace and are attacker-controlled. Resolve the
-	// whole frame through the process pagemap before trusting any of it; a bad
-	// pointer must not turn into a kernel-mode page fault.
-	mut context := cpulocal.GPRState{}
-	if !usercopy.copy_from_user(voidptr(&context), context_ptr, sizeof(cpulocal.GPRState)) {
-		return errno.err, errno.efault
-	}
-	if !valid_sigreturn_context(&context) {
-		return errno.err, errno.einval
-	}
-	sanitize_sigreturn_context(mut context)
-
-	resume_sigreturn(context, old_mask)
-}
-
-pub fn syscall_sigaction(_ voidptr, signum int, act &proc.SigAction, oldact &proc.SigAction) (u64, u64) {
-	mut current_thread := proc.current_thread()
-	mut process := current_thread.process
-
-	C.printf(c'\n\e[32m%s\e[m: sigaction(%d, 0x%llx, 0x%llx)\n', process.name.str, signum,
-		voidptr(act), voidptr(oldact))
-	defer {
-		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
-	}
-
-	if signum < 0 || signum > 34 || signum == sigkill || signum == sigstop {
-		return errno.err, errno.einval
-	}
-
-	mut t := proc.current_thread()
-
-	if oldact != unsafe { nil } {
-		unsafe {
-			*oldact = t.sigactions[signum]
-		}
-	}
-
-	if act != unsafe { nil } {
-		// Dispositions belong to the process; masks and pending signals remain
-		// per-thread. Keep existing helpers synchronized with the caller.
-		mut target_process := t.process
-		target_process.threads_lock.acquire()
-		for mut target_thread in target_process.threads {
-			target_thread.sigactions[signum] = *act
-		}
-		target_process.threads_lock.release()
-	}
-
-	return 0, 0
-}
-
-pub fn syscall_sigprocmask(_ voidptr, how int, set &u64, oldset &u64) (u64, u64) {
-	mut current_thread := proc.current_thread()
-	mut process := current_thread.process
-
-	C.printf(c'\n\e[32m%s\e[m: sigprocmask(%d, 0x%llx, 0x%llx)\n', process.name.str, how,
-		voidptr(set), voidptr(oldset))
-	defer {
-		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
-	}
-
-	mut t := proc.current_thread()
-
-	if oldset != unsafe { nil } {
-		unsafe {
-			*oldset = t.masked_signals
-		}
-	}
-
-	if set != unsafe { nil } {
-		match how {
-			sig_block {
-				t.masked_signals |= *set
-			}
-			sig_unblock {
-				t.masked_signals &= ~*set
-			}
-			sig_setmask {
-				t.masked_signals = *set
-			}
-			else {}
-		}
-	}
-
-	return 0, 0
-}
-
 fn dispatch_signal(context &cpulocal.GPRState, info_signum int, info_code int, info_addr u64) {
 	mut t := unsafe { proc.current_thread() }
-	linux := t.process.linux_abi
-
-	if t.sigentry == 0 && !linux {
-		return
-	}
 
 	mut which := -1
 
@@ -334,61 +110,7 @@ fn dispatch_signal(context &cpulocal.GPRState, info_signum int, info_code int, i
 		return
 	}
 
-	if linux {
-		dispatch_linux_signal(context, which, info_signum, info_code, info_addr)
-		return
-	}
-
-	sigaction := t.sigactions[which]
-
-	previous_mask := t.masked_signals
-
-	t.masked_signals |= sigaction.sa_mask
-	if sigaction.sa_flags & sa_nodefer == 0 {
-		t.masked_signals |= u64(1) << which
-	}
-
-	// Work from the live syscall/interrupt frame. t.gpr_state is only updated
-	// by the scheduler and can otherwise describe an older timeslice.
-	t.gpr_state = *context
-
-	// Respect the redzone
-	t.gpr_state.rsp -= 128
-	t.gpr_state.rsp = lib.align_down(t.gpr_state.rsp, 16)
-
-	// Return context
-	t.gpr_state.rsp -= sizeof(cpulocal.GPRState)
-	t.gpr_state.rsp = lib.align_down(t.gpr_state.rsp, 16)
-	mut return_context := unsafe { &cpulocal.GPRState(t.gpr_state.rsp) }
-
-	unsafe {
-		*return_context = *context
-	}
-	// Siginfo
-	t.gpr_state.rsp -= sizeof(SigInfo)
-	t.gpr_state.rsp = lib.align_down(t.gpr_state.rsp, 16)
-	mut siginfo := unsafe { &SigInfo(t.gpr_state.rsp) }
-
-	unsafe { C.memset(voidptr(siginfo), 0, sizeof(SigInfo)) }
-	siginfo.si_signo = i32(which)
-	if info_signum == which {
-		siginfo.si_code = i32(info_code)
-		siginfo.si_addr = voidptr(info_addr)
-	}
-
-	// Alignment
-	t.gpr_state.rsp -= 8
-
-	// Common handler will take (which, siginfo, sigaction, ret_context, prev_mask)
-	t.gpr_state.rip = t.sigentry
-
-	t.gpr_state.rdi = u64(which)
-	t.gpr_state.rsi = u64(siginfo)
-	t.gpr_state.rdx = u64(sigaction.sa_sigaction)
-	t.gpr_state.rcx = u64(return_context)
-	t.gpr_state.r8 = previous_mask
-
-	sched.resume_saved_context()
+	dispatch_linux_signal(context, which, info_signum, info_code, info_addr)
 }
 
 // Dispatch a signal to _self_, this is called from the scheduler or at the
@@ -414,15 +136,6 @@ pub fn sendsig(_thread &proc.Thread, signal u8) {
 
 	// Try to stop an event_await()
 	sched.enqueue_thread(t, true)
-}
-
-// signalfd for the native Vinix ABI, which passes the mask itself, in this
-// kernel's layout, rather than a pointer to a Linux sigset.
-pub fn syscall_signalfd(_ voidptr, fdnum int, mask u64, flags int) (u64, u64) {
-	if flags & ~(sfd_nonblock | sfd_cloexec) != 0 {
-		return errno.err, errno.einval
-	}
-	return signalfd_set(fdnum, mask & ~unblockable_mask(), flags)
 }
 
 // signal_process safely delivers a signal to a process's first thread,
@@ -538,78 +251,6 @@ pub fn syscall_execve(_ voidptr, _path charptr, _argv &charptr, _envp &charptr) 
 		envp, '', '', '') or { return errno.err, errno.get() }
 
 	return errno.err, errno.get()
-}
-
-pub fn syscall_waitpid(_ voidptr, pid int, _status &i32, options int) (u64, u64) {
-	mut current_thread := proc.current_thread()
-	mut current_process := current_thread.process
-
-	C.printf(c'\n\e[32m%s\e[m: waitpid(%d, 0x%llx, %d)\n', current_process.name.str, pid,
-		_status, options)
-	defer {
-		C.printf(c'\e[32m%s\e[m: returning\n', current_process.name.str)
-	}
-
-	mut status := unsafe { _status }
-
-	mut events := []&eventstruct.Event{}
-	defer {
-		unsafe { events.free() }
-	}
-	mut child := &proc.Process(unsafe { nil })
-
-	if pid == -1 {
-		if current_process.children.len == 0 {
-			return errno.err, errno.echild
-		}
-		for c in current_process.children {
-			events << &c.event
-		}
-	} else if pid < -1 || pid == 0 {
-		print('\nwaitpid: value of pid not supported\n')
-		return errno.err, errno.einval
-	} else {
-		if current_process.children.len == 0 {
-			return errno.err, errno.echild
-		}
-		child = processes[pid]
-		if child == unsafe { nil } || child.ppid != current_process.pid {
-			return errno.err, errno.echild
-		}
-		events << &child.event
-	}
-
-	block := options & wnohang == 0
-	which := event.await(mut events, block) or {
-		// Under WNOHANG this means no child has exited yet, which Linux
-		// reports as 0. EINTR sent libcs that retry interrupted calls -- musl,
-		// and BusyBox's `wait` -- round a loop that never slept.
-		if !block {
-			return 0, 0
-		}
-		return errno.err, errno.eintr
-	}
-
-	if child == unsafe { nil } {
-		child = current_process.children[which]
-	}
-
-	unsafe {
-		*status = i32(child.status)
-	}
-	ret := child.pid
-
-	proc.account_reaped_child(mut current_process, child)
-	proc.free_pid(ret)
-
-	current_process.children.delete(current_process.children.index(child))
-
-	return u64(ret), 0
-}
-
-@[noreturn]
-pub fn syscall_exit(_ voidptr, status int) {
-	exit_process(u32(status) << 8)
 }
 
 // OpenBSD kills a process that breaks a pledge(2) promise with SIGABRT,
@@ -818,10 +459,6 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, path 
 	mut new_pagemap := memory.new_pagemap()
 
 	mut auxval, ld_path := elf.load(new_pagemap, prog, 0) or { return none }
-	// Vinix's mlibc toolchain uses /usr/lib/ld.so. Everything else accepted by
-	// the amd64 ELF loader follows the Linux syscall ABI; this includes Alpine's
-	// /lib/ld-musl-x86_64.so.1 and static Linux executables.
-	linux_abi := ld_path != '/usr/lib/ld.so'
 	allow_wx := envp.contains('VINIX_ALLOW_WX=1')
 
 	mut entry_point := unsafe { nil }
@@ -857,7 +494,6 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, path 
 		new_process.name = proc.process_name(path, new_process.pid)
 		new_process.executable_path = fs.program_path(prog_node, path)
 		new_process.exe_node = voidptr(prog_node)
-		new_process.linux_abi = linux_abi
 		new_process.allow_wx = allow_wx
 		new_process.sigcookie = proc.new_sigcookie()
 
@@ -933,7 +569,6 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, path 
 		process.pagemap = new_pagemap
 		proc.unlock_table()
 
-		was_linux := process.linux_abi
 		// The copies fork made are replaced, not kept alongside.
 		unsafe {
 			process.name.free()
@@ -945,7 +580,6 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, path 
 		// through a descriptor.
 		process.executable_path = fs.program_path(prog_node, path)
 		process.exe_node = voidptr(prog_node)
-		process.linux_abi = linux_abi
 		process.allow_wx = allow_wx
 		// The new program runs under the execpromises, or unpledged.
 		proc.pledge_after_exec(mut process)
@@ -985,11 +619,9 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, path 
 		// execve keeps the signal mask and what was ignored; only handlers,
 		// which pointed into the old program, go back to the default.
 		new_thread.masked_signals = t.masked_signals
-		if linux_abi && was_linux {
-			for i := 0; i < t.sigactions.len; i++ {
-				if u64(t.sigactions[i].sa_sigaction) == linux_sig_ign {
-					new_thread.sigactions[i].sa_sigaction = voidptr(linux_sig_ign)
-				}
+		for i := 0; i < t.sigactions.len; i++ {
+			if u64(t.sigactions[i].sa_sigaction) == linux_sig_ign {
+				new_thread.sigactions[i].sa_sigaction = voidptr(linux_sig_ign)
 			}
 		}
 		sched.enqueue_thread(new_thread, false)

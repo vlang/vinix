@@ -242,10 +242,6 @@ pub mut:
 	// Resolved program path used by the Linux /proc/self/exe compatibility
 	// link. Keep it separate from name, which prctl(PR_SET_NAME) may change.
 	executable_path string
-	// amd64 supports both the original Vinix/mlibc syscall convention and the
-	// Linux convention used by unmodified Alpine binaries. exec sets this from
-	// the ELF interpreter; fork inherits it with the rest of the process ABI.
-	linux_abi bool
 	// Some compatibility runtimes require an RWX probe even when their generated
 	// code runs interpreted. Exec replaces this opt-in; fork preserves it.
 	allow_wx bool

@@ -108,7 +108,7 @@ On amd64 the cookie is in the first word of `sigcontext.reserved1`, which
 Linux leaves zero and libc never reads. On arm64 it is in the kernel-private
 header at the start of the frame, and `rt_sigreturn` also refuses a
 ucontext pointer other than the one the kernel wrote. The native Vinix
-signal ABI on arm64 is covered too; the legacy native ABI on amd64 is not.
+signal ABI on arm64 is covered too.
 
 A glibc program on arm64 returns from its handlers through a page the kernel
 maps, because glibc leaves `sa_restorer` unset. That page used to be at a
@@ -174,11 +174,11 @@ and run on stacks that were never mapped with `MAP_STACK`.
 The syscall numbers sit next to `mimmutable(2)`, in ranges Linux leaves
 unused:
 
-| | arm64 | amd64 (Linux ABI) | amd64 (Vinix ABI) |
-| --- | --- | --- | --- |
-| `mimmutable` | 247 | 500 | 49 |
-| `pledge` | 248 | 501 | 66 |
-| `unveil` | 249 | 502 | 67 |
+| | arm64 | amd64 |
+| --- | --- | --- |
+| `mimmutable` | 247 | 500 |
+| `pledge` | 248 | 501 |
+| `unveil` | 249 | 502 |
 
 ```c
 #include <sys/syscall.h>

@@ -14,6 +14,7 @@ import errno
 import file
 import fs
 import lib
+import memory
 import memory.mmap
 import proc
 import sched
@@ -81,6 +82,11 @@ pub fn syscall_clone3(gpr_state voidptr, uargs u64, size u64) (u64, u64) {
 }
 
 fn do_clone(state &cpulocal.GPRState, flags u64, child_stack u64, parent_tid u64, child_tid u64, tls u64, into_cgroup bool, cgroup voidptr) (u64, u64) {
+	// The TLS pointer becomes the child's FS base. A non-canonical one would
+	// fault the kernel's own WRMSR, so it is refused as Linux refuses it.
+	if flags & clone_settls != 0 && tls >= memory.user_address_limit() {
+		return errno.err, errno.eperm
+	}
 	// A new namespace other than a user namespace takes CAP_SYS_ADMIN, and none
 	// can be made for a thread, which shares its process' namespaces.
 	if flags & proc.clone_namespace_flags != 0 {
@@ -211,12 +217,6 @@ fn clone_new_process(state &cpulocal.GPRState, flags u64, child_stack u64, paren
 		return errno.err, errno.eagain
 	}
 
-	// The native Vinix ABI returns errno in rdx, and the child's is 0. The
-	// Linux one leaves rdx as it was, which the child's copy already is.
-	if !old_process.linux_abi {
-		new_thread.gpr_state.rdx = 0
-	}
-
 	if flags & clone_child_cleartid != 0 {
 		new_thread.clear_child_tid = child_tid
 	}
@@ -244,7 +244,7 @@ fn clone_new_process(state &cpulocal.GPRState, flags u64, child_stack u64, paren
 	return u64(proc.pid_in(new_process, viewer)), 0
 }
 
-// fork(2) and vfork(2) for both ABIs.
+// fork(2) and vfork(2).
 pub fn syscall_fork(gpr_state &cpulocal.GPRState) (u64, u64) {
 	return clone_new_process(gpr_state, u64(sigchld), 0, 0, 0, 0, false, unsafe { nil })
 }

@@ -72,7 +72,6 @@ fn kmain_thread() {
 	term.framebuffer_init()
 
 	table.init_syscall_table()
-	table.init_linux_syscall_table()
 	table.init_pipe_usercopy_syscalls()
 	table.init_mmap_aslr_syscalls()
 	table.init_security_syscalls()

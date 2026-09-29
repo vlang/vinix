@@ -101,3 +101,10 @@ pub const linux_size = u64(36)
 pub fn ctrl(c u8) u8 {
 	return c & 0o37
 }
+
+// How much of a termios userspace passes to TCGETS and TCSETS. Every program
+// is linked against a Linux libc, whose struct may be larger than Linux's --
+// musl's is -- and relies on the kernel touching only Linux's part of it.
+pub fn user_size() u64 {
+	return linux_size
+}

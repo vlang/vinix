@@ -99,26 +99,6 @@ pub fn get_fs_base() u64 {
 	return msr.rdmsr(0xc0000100)
 }
 
-pub fn syscall_set_fs_base(_ voidptr, base voidptr) (u64, u64) {
-	C.printf(c'\n\e[32m[]\e[m: set_fs_base(0x%llx)\n', base)
-	defer {
-		C.printf(c'\e[32m[]\e[m: returning\n')
-	}
-
-	set_fs_base(u64(base))
-	return 0, 0
-}
-
-pub fn syscall_set_gs_base(_ voidptr, base voidptr) (u64, u64) {
-	C.printf(c'\n\e[32m[]\e[m: set_gs_base(0x%llx)\n', base)
-	defer {
-		C.printf(c'\e[32m[]\e[m: returning\n')
-	}
-
-	set_kernel_gs_base(u64(base))
-	return 0, 0
-}
-
 pub fn read_cr0() u64 {
 	mut ret := u64(0)
 	asm volatile amd64 {

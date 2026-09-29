@@ -562,35 +562,6 @@ pub fn new_kernel_thread(pc voidptr, arg voidptr, autoenqueue bool) &proc.Thread
 	return t
 }
 
-pub fn syscall_new_thread(_ voidptr, pc voidptr, stack u64) (u64, u64) {
-	mut current_thread := proc.current_thread()
-	mut process := current_thread.process
-
-	C.printf(c'\n\e[32m%s\e[m: new_thread(0x%llx, 0x%llx)\n', process.name.str, pc, stack)
-	defer {
-		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
-	}
-
-	mut empty_string_array := []string{}
-	defer {
-		unsafe { empty_string_array.free() }
-	}
-
-	mut new_thread := new_user_thread(process, false, pc, unsafe { nil }, stack, empty_string_array, empty_string_array, unsafe { nil }, false) or { return errno.err, errno.get() }
-
-	// POSIX threads inherit the creating thread's signal mask, while signal
-	// dispositions are shared by the process. Vinix stores both on Thread, so
-	// copy the current values before the new thread can be scheduled. Wine
-	// installs its exception handlers before creating Windows threads.
-	new_thread.sigentry = current_thread.sigentry
-	new_thread.sigactions = current_thread.sigactions
-	new_thread.masked_signals = current_thread.masked_signals
-
-	enqueue_thread(new_thread, false)
-
-	return u64(new_thread.tid), 0
-}
-
 pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg voidptr, _stack u64, argv []string, envp []string, auxval &elf.Auxval, autoenqueue bool) ?&proc.Thread {
 	mut process := unsafe { _process }
 
@@ -682,13 +653,9 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 
 	fpu_save(t.fpu_storage)
 
-	// Linux spells SIG_DFL as zero. The original Vinix/mlibc ABI uses -2.
+	// SIG_DFL, which Linux spells as zero.
 	for mut sa in t.sigactions {
-		if process.linux_abi {
-			sa.sa_sigaction = voidptr(0)
-		} else {
-			sa.sa_sigaction = voidptr(-2)
-		}
+		sa.sa_sigaction = voidptr(0)
 	}
 
 	if want_elf == true {
@@ -712,8 +679,7 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 				stack = &stack[-1]
 			}
 
-			// Linux libcs use AT_RANDOM for their stack canary. It is also harmless
-			// for the legacy mlibc loader, which ignores unknown entries.
+			// Linux libcs use AT_RANDOM for their stack canary.
 			stack = &u64(u64(stack) - 16)
 			random_kernel_addr := u64(stack)
 			if !krandom.fill(voidptr(random_kernel_addr), 16, true) {
@@ -868,7 +834,6 @@ pub fn new_cloned_thread(_process &proc.Process, _source &proc.Thread, state &cp
 		kernel_stack:   u64(kernel_stack_phys) + stack_size + higher_half
 		pf_stack:       u64(pf_stack_phys) + stack_size + higher_half
 		fpu_storage:    voidptr(u64(fpu_phys) + higher_half)
-		sigentry:       source.sigentry
 		sigactions:     source.sigactions
 		masked_signals: source.masked_signals
 		affinity_mask:  source.affinity_mask
@@ -931,7 +896,6 @@ pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) ?&proc.Pr
 		new_proc.mmap_anon_non_fixed_base = old_process.mmap_anon_non_fixed_base
 		new_proc.current_directory = old_process.current_directory
 		proc.inherit_container_state(mut new_proc, old_process)
-		new_proc.linux_abi = old_process.linux_abi
 		new_proc.allow_wx = old_process.allow_wx
 		new_proc.uid = old_process.uid
 		new_proc.euid = old_process.euid

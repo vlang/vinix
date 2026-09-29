@@ -8,10 +8,10 @@
 // moved and the next `ret` jumped into the stack. Plain assembly cannot grow a
 // prologue.
 //
-// The x86-64 port predates Vinix's Linux-compatible arm64 ABI, so its native
-// libc puts the syscall number in rdi and receives errno in rdx. Alpine uses
-// the Linux register convention instead; syscall_enter() says which one the
-// current process speaks, and whether pledge(2) lets the call through.
+// Only the Linux x86-64 convention is spoken, as on arm64: rax holds the
+// number, rdi, rsi, rdx, r10, r8 and r9 the arguments, and the result comes
+// back in rax, a negative errno on failure. syscall_trace() answers which
+// table slot runs the call, as arm64's does; see syscall/table.
 
 .section .text
 
@@ -48,44 +48,17 @@ syscall_entry:
     mov %ds, %eax
     push %rax
     sti
-    // rax: 1 for the Linux ABI, 0 for the native one. rdx: 0, or the errno a
-    // call pledge(2) refused fails with.
+    // syscall_trace() answers the table slot to run: the call's number, or
+    // the stand-in returning the errno seccomp or pledge(2) refused it with.
     mov %rsp, %rdi
-    call syscall_enter
-    test %rdx, %rdx
-    jnz 8f
-    test %rax, %rax
-    jnz 1f
-
-    // Native Vinix ABI: rdi is the syscall number and arguments start in rsi.
-    // Reload everything because syscall_enter() may clobber it.
-    xor %r12, %r12
-    mov 56(%rsp), %rbx
-    cmp $68, %rbx
-    jae 2f
-    mov 48(%rsp), %rsi
-    mov 40(%rsp), %rdx
-    mov 88(%rsp), %rcx
-    mov 72(%rsp), %r8
-    mov 80(%rsp), %r9
-    mov %rsp, %rdi
-    lea syscall_table(%rip), %rax
-    call *(%rax, %rbx, 8)
-    jmp 4f
-
-    // Linux x86-64 ABI: rax is the number, followed by rdi, rsi, rdx, r10, r8,
-    // r9. Vinix handlers take the saved GPR frame as their first argument, so
-    // shift the six Linux arguments right once; the last one is passed on the
-    // C stack.
-1:
-    mov $1, %r12
-    // linux_syscall_slot() answers the table slot to run: the call's number,
-    // or the stand-in for one the process's seccomp filters turned away.
-    mov %rsp, %rdi
-    call linux_syscall_slot
+    call syscall_trace
     mov %rax, %r13
     cmp $512, %r13
     jae 3f
+
+    // Vinix handlers take the saved GPR frame as their first argument, so
+    // shift the six Linux arguments right once; the last one is passed on the
+    // C stack.
     mov %rsp, %rax
     sub $16, %rsp
     mov %rax, %rdi
@@ -96,46 +69,30 @@ syscall_entry:
     mov 72(%rax), %r9
     mov 80(%rax), %rbx
     mov %rbx, (%rsp)
-    lea linux_syscall_table(%rip), %rbx
+    lea syscall_table(%rip), %rbx
     call *(%rbx, %r13, 8)
     add $16, %rsp
     jmp 4f
 
-2:
-    xor %r12, %r12
+3:
     mov $0xffffffffffffffff, %rax
     mov $38, %rdx
-    jmp 4f
-
-3:
-    mov $1, %r12
-    mov $38, %rax
-    neg %rax
-    xor %rdx, %rdx
-    jmp 4f
-
-    // Refused by pledge(2). Each ABI reports the errno in rdx its own way
-    // below.
-8:
-    mov %rax, %r12
-    mov $0xffffffffffffffff, %rax
 
 4:
-    // Native calls return (result, errno) in rax/rdx. Linux encodes errno as a
+    // Handlers return (result, errno) in rax/rdx. Linux encodes an errno as a
     // negative result and otherwise preserves the caller's rdx.
-    test %r12, %r12
-    jz 5f
-    test %rdx, %rdx
+    mov %rax, %r12
+    mov %rdx, %r13
+    mov %rax, %rdi
+    mov %rdx, %rsi
+    call syscall_trace_ret
+    mov %r12, %rax
+    test %r13, %r13
     jz 6f
-    neg %rdx
-    mov %rdx, %rax
+    mov %r13, %rax
+    neg %rax
 6:
     mov %rax, 16(%rsp)
-    jmp 7f
-5:
-    mov %rax, 16(%rsp)
-    mov %rdx, 40(%rsp)
-7:
     mov %rsp, %rdi
     call syscall_leave
     pop %rax

@@ -193,27 +193,3 @@ pub fn wake(virt u64) u64 {
 	return woken
 }
 
-pub fn syscall_futex_wait(_ voidptr, ptr &i32, expected int) (u64, u64) {
-	mut current_thread := proc.current_thread()
-	mut process := current_thread.process
-
-	C.printf(c'\n\e[32m%s\e[m: futex_wait(0x%llx, %d)\n', process.name.str, voidptr(ptr),
-		expected)
-	defer {
-		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
-	}
-
-	return wait(u64(ptr), expected)
-}
-
-pub fn syscall_futex_wake(_ voidptr, ptr &i32) (u64, u64) {
-	mut current_thread := proc.current_thread()
-	mut process := current_thread.process
-
-	C.printf(c'\n\e[32m%s\e[m: futex_wake(0x%llx)\n', process.name.str, voidptr(ptr))
-	defer {
-		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
-	}
-
-	return wake(u64(ptr)), 0
-}

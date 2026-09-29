@@ -706,30 +706,6 @@ pub fn syscall_unlinkat(_ voidptr, dirfd int, _path charptr, flags int) (u64, u6
 	return 0, 0
 }
 
-pub fn syscall_rmdirat(_ voidptr, dirfd int, _path charptr) (u64, u64) {
-	mut current_thread := proc.current_thread()
-	mut process := current_thread.process
-
-	C.printf(c'\n\e[32m%s\e[m: rmdirat(%d, %s)\n', process.name.str, dirfd, _path)
-	defer {
-		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
-	}
-
-	path := user_path(_path) or { return errno.err, errno.get() }
-	defer {
-		unsafe { path.free() }
-	}
-
-	if path.len == 0 {
-		return errno.err, errno.enoent
-	}
-
-	parent := get_parent_dir(dirfd, path) or { return errno.err, errno.get() }
-	unlink(parent, path, true) or { return errno.err, errno.get() }
-
-	return 0, 0
-}
-
 pub fn syscall_mkdirat(_ voidptr, dirfd int, _path charptr, mode u32) (u64, u64) {
 	mut current_thread := proc.current_thread()
 	mut process := current_thread.process

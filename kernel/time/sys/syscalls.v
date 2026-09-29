@@ -29,36 +29,6 @@ pub fn nsleep(ns i64) {
 	event.await(mut events, true) or {}
 }
 
-pub fn syscall_clock_get(_ voidptr, clock_type int, ret &time.TimeSpec) (u64, u64) {
-	mut current_thread := proc.current_thread()
-	mut process := current_thread.process
-
-	C.printf(c'\n\e[32m%s\e[m: clock_get(%d, 0x%llx)\n', process.name.str, clock_type,
-		voidptr(ret))
-	defer {
-		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
-	}
-
-	match clock_type {
-		time.clock_type_monotonic {
-			unsafe {
-				*ret = monotonic_clock
-			}
-		}
-		time.clock_type_realtime {
-			unsafe {
-				*ret = realtime_clock
-			}
-		}
-		else {
-			C.printf(c'clock_get: Unknown clock type\n')
-			return errno.err, errno.einval
-		}
-	}
-
-	return 0, 0
-}
-
 pub fn syscall_nanosleep(_ voidptr, request u64, remain u64) (u64, u64) {
 	mut current_thread := proc.current_thread()
 	mut process := current_thread.process

@@ -2,10 +2,10 @@
 // Copyright (c) 2026 Alexander Medvednikov
 module table
 
-// seccomp for Linux programs on amd64: every call a process with a filter
-// makes goes through its BPF programs before it runs, as arm64's
-// syscall_trace() does. seccomp(2) and prctl(PR_SET_SECCOMP) install them; see
-// container.v and proc/seccomp.v.
+// Every amd64 syscall's way in and out, as syscall_table_arm64.v has them for
+// arm64: a call goes through the process's seccomp filters, then its pledge(2)
+// promises, before it runs. seccomp(2) and prctl(PR_SET_SECCOMP) install the
+// filters; see container.v and proc/seccomp.v.
 
 import errno
 import proc
@@ -24,18 +24,37 @@ fn syscall_seccomp_verdict(_ voidptr) (u64, u64) {
 	return errno.err, e
 }
 
-// Called by syscall_entry for every Linux call, with the saved registers.
-// Answers the table slot to run: the call's own, or the stand-in returning
-// the verdict of the process's seccomp filters. A call whose verdict is death
-// does not come back from here.
-@[export: 'linux_syscall_slot']
-pub fn linux_syscall_slot(frame &cpulocal.GPRState) u64 {
+// Called by syscall_entry on every syscall's way in, with the saved
+// registers. Answers the table slot to run: the call's own, or the stand-in
+// returning the errno a seccomp filter or pledge(2) refused it with. A call
+// whose verdict is death does not come back from here.
+@[export: 'syscall_trace']
+pub fn syscall_trace(frame &cpulocal.GPRState) u64 {
 	nr := frame.rax
 	mut t := proc.current_thread()
 	process := t.process
-	if process.seccomp_mode == proc.seccomp_mode_disabled {
-		return nr
+	if process.seccomp_mode != proc.seccomp_mode_disabled {
+		slot := seccomp_entry(mut t, frame, nr)
+		if slot != nr {
+			return slot
+		}
 	}
+	if process.pledge != 0 {
+		return pledge_entry(mut t, frame, nr)
+	}
+	return nr
+}
+
+// Called by syscall_entry on every syscall's way out, with its result and
+// errno.
+@[export: 'syscall_trace_ret']
+pub fn syscall_trace_ret(ret u64, err u64) {
+}
+
+// What a call runs as once the process's seccomp filters have seen it: the
+// call itself, or the stand-in returning their verdict.
+fn seccomp_entry(mut t proc.Thread, frame &cpulocal.GPRState, nr u64) u64 {
+	process := t.process
 	if process.seccomp_mode == proc.seccomp_mode_strict {
 		// read, write, exit and rt_sigreturn are all strict mode allows.
 		if nr == 0 || nr == 1 || nr == 60 || nr == 15 {
