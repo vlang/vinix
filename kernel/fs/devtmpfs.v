@@ -22,6 +22,16 @@ pub mut:
 
 	storage  &u8
 	capacity u64
+	// The interface box its nodes and descriptors hold, freed with it; see
+	// TmpFSResource.box.
+	box &resource.Resource = unsafe { nil }
+}
+
+fn (mut this DevTmpFSResource) boxed() &resource.Resource {
+	if this.box == unsafe { nil } {
+		this.box = &resource.Resource(this) @[freed]
+	}
+	return this.box
 }
 
 fn (mut this DevTmpFSResource) mmap(_handle voidptr, page u64, flags int) voidptr {
@@ -128,7 +138,10 @@ fn (mut this DevTmpFSResource) unref(_handle voidptr) ? {
 		memory.free(this.storage)
 	}
 
-	unsafe { free(this) }
+	unsafe {
+		free(voidptr(this.box))
+		free(this)
+	}
 }
 
 fn (mut this DevTmpFSResource) link(_handle voidptr) ? {
@@ -163,7 +176,18 @@ fn (mut this DevTmpFSResource) grow(_handle voidptr, new_size u64) ? {
 	this.stat.blocks = lib.div_roundup(new_size, u64(this.stat.blksize))
 }
 
-struct DevTmpFS {}
+struct DevTmpFS {
+mut:
+	// See TmpFS.as_filesystem().
+	box &FileSystem = unsafe { nil }
+}
+
+fn (mut this DevTmpFS) as_filesystem() &FileSystem {
+	if this.box == unsafe { nil } {
+		this.box = &FileSystem(this)
+	}
+	return this.box
+}
 
 __global (
 	devtmpfs_dev_id        u64
@@ -172,8 +196,8 @@ __global (
 )
 
 fn (this DevTmpFS) instantiate() &FileSystem {
-	new := &DevTmpFS{}
-	return new
+	mut new := &DevTmpFS{}
+	return new.as_filesystem()
 }
 
 fn (this DevTmpFS) populate(_node &VFSNode) {}
@@ -191,7 +215,7 @@ fn (mut this DevTmpFS) mount(parent &VFSNode, name string, _source &VFSNode) ?&V
 
 // TODO	should it be maybe `mut parent`? doesn't `create_node` mutate `parent` in `unsafe`(passing it to `mut` field)?
 fn (mut this DevTmpFS) create(parent &VFSNode, name string, mode u32) &VFSNode {
-	mut new_node := create_node(this, parent, name, stat.isdir(mode))
+	mut new_node := create_node(this.as_filesystem(), parent, name, stat.isdir(mode))
 
 	mut new_resource := &DevTmpFSResource{
 		storage: unsafe { nil }
@@ -216,13 +240,13 @@ fn (mut this DevTmpFS) create(parent &VFSNode, name string, mode u32) &VFSNode {
 	new_resource.stat.ctim = realtime_clock
 	new_resource.stat.mtim = realtime_clock
 
-	new_node.resource = new_resource
+	new_node.resource = new_resource.boxed()
 
 	return new_node
 }
 
 fn (mut this DevTmpFS) link(parent &VFSNode, path string, mut old_node VFSNode) ?&VFSNode {
-	mut new_node := create_node(this, parent, path, false)
+	mut new_node := create_node(this.as_filesystem(), parent, path, false)
 
 	katomic.inc(mut &old_node.resource.refcount)
 	katomic.inc(mut &old_node.resource.stat.nlink)
@@ -237,7 +261,7 @@ fn (mut this DevTmpFS) rename(_old_parent &VFSNode, _old_name string,
 	_new_parent &VFSNode, _new_name string, _flags int) ? {}
 
 fn (mut this DevTmpFS) symlink(parent &VFSNode, dest string, target string) &VFSNode {
-	mut new_node := create_node(this, parent, target, false)
+	mut new_node := create_node(this.as_filesystem(), parent, target, false)
 
 	mut new_resource := &DevTmpFSResource{
 		storage: unsafe { nil }
@@ -256,7 +280,7 @@ fn (mut this DevTmpFS) symlink(parent &VFSNode, dest string, target string) &VFS
 	new_resource.stat.ctim = realtime_clock
 	new_resource.stat.mtim = realtime_clock
 
-	new_node.resource = new_resource
+	new_node.resource = new_resource.boxed()
 
 	// A copy of its own, as every filesystem keeps: symlinkat(2) frees the
 	// text it was given.
@@ -288,7 +312,7 @@ fn ensure_devtmpfs_dir(parent &VFSNode, name string) &VFSNode {
 	new_resource.stat.ctim = realtime_clock
 	new_resource.stat.mtim = realtime_clock
 
-	new_node.resource = new_resource
+	new_node.resource = new_resource.boxed()
 	new_node.create_dotentries(parent)
 	mut p := unsafe { parent }
 	unsafe {

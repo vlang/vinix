@@ -98,12 +98,13 @@ pub fn mappings(_pagemap &memory.Pagemap, count_pages bool) ?[]MappingInfo {
 				}
 			}
 		}
+		// Pushed and moved into place rather than inserted: insert() takes the
+		// value's address, and V copied `info` to the heap for it every time.
+		list << info
 		// Kept in address order, as the ranges need not be.
-		mut at := list.len
-		for at > 0 && list[at - 1].base > info.base {
-			at--
+		for at := list.len - 1; at > 0 && list[at - 1].base > list[at].base; at-- {
+			list[at - 1], list[at] = list[at], list[at - 1]
 		}
-		list.insert(at, info)
 	}
 	return list
 }

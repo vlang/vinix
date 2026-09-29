@@ -5,12 +5,15 @@ devicetree/devicetree.v array initialization	3
 drm/simple/simple.v array initialization	1
 event/event_arm64.v array initialization	1
 fs/cgroup.v array initialization	1
+fs/devtmpfs.v cast to interface	1
 fs/devtmpfs.v string interpolation	1
 fs/disk_root_arm64.v array initialization	2
+fs/ext2/ext2.v cast to interface	1
 fs/mknod.v cast to interface	2
 fs/mount.v array initialization	1
 fs/procfs.v array initialization	1
 fs/procfs.v string concatenation	1
+fs/tmpfs.v cast to interface	1
 fs/vfs.v string interpolation	1
 gpu/agx/fake/driver.v array initialization	1
 gpu/agx/file/file.v array initialization	1

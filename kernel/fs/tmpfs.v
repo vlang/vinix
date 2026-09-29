@@ -22,6 +22,10 @@ pub mut:
 
 	storage  &u8
 	capacity u64
+	// The interface box every node and descriptor of it holds, made once and
+	// freed with it. Converting `this` at each use made a 384-byte box, as
+	// the box carries copies of the interface's fields, that nothing freed.
+	box &resource.Resource = unsafe { nil }
 	// Initramfs files initially point straight into the Limine module.  The
 	// module remains reserved for the life of the kernel, so keeping that
 	// pointer avoids allocating and copying the whole root filesystem during
@@ -492,7 +496,18 @@ fn (mut this TmpFSResource) unref(_handle voidptr) ? {
 	}
 	free_xattrs(this.xattrs)
 
-	unsafe { free(this) }
+	unsafe {
+		free(voidptr(this.box))
+		free(this)
+	}
+}
+
+// boxed is the resource as nodes and descriptors hold it; see `box`.
+fn (mut this TmpFSResource) boxed() &resource.Resource {
+	if this.box == unsafe { nil } {
+		this.box = &resource.Resource(this) @[freed]
+	}
+	return this.box
 }
 
 fn (mut this TmpFSResource) link(_handle voidptr) ? {
@@ -559,11 +574,22 @@ struct TmpFS {
 pub mut:
 	dev_id        u64
 	inode_counter u64
+	// See as_filesystem().
+	box &FileSystem = unsafe { nil }
+}
+
+// as_filesystem is the filesystem as the VFS holds it, boxed once. Passing
+// `this` to create_node() boxed it again for every node made.
+fn (mut this TmpFS) as_filesystem() &FileSystem {
+	if this.box == unsafe { nil } {
+		this.box = &FileSystem(this)
+	}
+	return this.box
 }
 
 fn (this TmpFS) instantiate() &FileSystem {
-	new := &TmpFS{}
-	return new
+	mut new := &TmpFS{}
+	return new.as_filesystem()
 }
 
 fn (this TmpFS) populate(_node &VFSNode) {}
@@ -574,7 +600,7 @@ fn (mut this TmpFS) mount(parent &VFSNode, name string, _source &VFSNode) ?&VFSN
 }
 
 fn (mut this TmpFS) create(parent &VFSNode, name string, mode u32) &VFSNode {
-	mut new_node := create_node(this, parent, name, stat.isdir(mode))
+	mut new_node := create_node(this.as_filesystem(), parent, name, stat.isdir(mode))
 
 	mut new_resource := &TmpFSResource{
 		storage: unsafe { nil }
@@ -597,13 +623,13 @@ fn (mut this TmpFS) create(parent &VFSNode, name string, mode u32) &VFSNode {
 	new_resource.stat.ctim = realtime_clock
 	new_resource.stat.mtim = realtime_clock
 
-	new_node.resource = new_resource
+	new_node.resource = new_resource.boxed()
 
 	return new_node
 }
 
 fn (mut this TmpFS) link(parent &VFSNode, path string, mut old_node VFSNode) ?&VFSNode {
-	mut new_node := create_node(this, parent, path, false)
+	mut new_node := create_node(this.as_filesystem(), parent, path, false)
 
 	katomic.inc(mut &old_node.resource.refcount)
 	katomic.inc(mut &old_node.resource.stat.nlink)
@@ -618,7 +644,7 @@ fn (mut this TmpFS) rename(_old_parent &VFSNode, _old_name string,
 	_new_parent &VFSNode, _new_name string, _flags int) ? {}
 
 fn (mut this TmpFS) symlink(parent &VFSNode, dest string, target string) &VFSNode {
-	mut new_node := create_node(this, parent, target, false)
+	mut new_node := create_node(this.as_filesystem(), parent, target, false)
 
 	mut new_resource := &TmpFSResource{
 		storage: unsafe { nil }
@@ -638,7 +664,7 @@ fn (mut this TmpFS) symlink(parent &VFSNode, dest string, target string) &VFSNod
 	new_resource.stat.ctim = realtime_clock
 	new_resource.stat.mtim = realtime_clock
 
-	new_node.resource = new_resource
+	new_node.resource = new_resource.boxed()
 
 	// A copy of its own, as every filesystem keeps: symlinkat(2) frees the
 	// text it was given.
@@ -670,5 +696,5 @@ pub fn create_anonymous(mode u32) &resource.Resource {
 	new_resource.stat.ctim = realtime_clock
 	new_resource.stat.mtim = realtime_clock
 
-	return new_resource
+	return new_resource.boxed()
 }

@@ -344,8 +344,9 @@ fn (mut filesystem EXT2Filesystem) create_persistent(parent &vfs.VFSNode,
 	}
 	flush_on_return()
 
-	mut node := vfs.create_node(filesystem, parent, name, stat.isdir(mode))
-	node.resource = resource_from_inode(filesystem, inode_index, inode)
+	mut node := vfs.create_node(filesystem.as_filesystem(), parent, name, stat.isdir(mode))
+	mut res := resource_from_inode(filesystem, inode_index, inode)
+	node.resource = res.boxed()
 	if stat.islnk(mode) { node.symlink_target = symlink_target.clone() }
 	mut parent_node := unsafe { parent }
 	parent_node.resource.stat.mtim = time.TimeSpec{i64(now), 0}
@@ -422,7 +423,7 @@ fn (mut this EXT2Filesystem) link_persistent(parent &vfs.VFSNode, name string,
 		return none
 	}
 	flush_on_return()
-	mut node := vfs.create_node(this, parent, name, false)
+	mut node := vfs.create_node(this.as_filesystem(), parent, name, false)
 	katomic.inc(mut &old_node.resource.refcount)
 	old_node.resource.stat.nlink = inode.hard_link_cnt
 	node.resource = old_node.resource
