@@ -2,7 +2,7 @@
 # Boot the kernel already built for ARCH (aarch64, the default, or amd64) with
 # the OpenBSD security test as PID 1. Build the kernel first:
 #   make -C kernel CC=clang ARCH=aarch64 LIMINE_MP=1 V=...
-#   V=... ./build-amd64.sh --no-userland --no-iso
+#   V=... ./scripts/build-amd64.sh --no-userland --no-iso
 set -eu
 
 repo=$(cd "$(dirname "$0")/../.." && pwd)

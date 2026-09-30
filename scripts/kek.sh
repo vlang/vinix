@@ -1,0 +1,397 @@
+#!/bin/bash
+# Deploy Vinix to the M1 ESP, verify it landed, and say what to look for. The
+# desktop modes use Limine's transparent gzip loading so the full image fits
+# the M1's separate 500 MiB ESP; free space on the macOS data volume does not
+# increase that partition.
+#
+# Installed on the M1 by push-to-m1.sh; edit it in the repo, not in place, or
+# the next push overwrites your changes.
+#
+#   sudo ~/code/kek.sh          boot into the desktop with Wi-Fi and the
+#                               experimental Apple GPU (default)
+#   sudo ~/code/kek.sh full     BusyBox shell userland + terminal
+#   sudo ~/code/kek.sh diag     minimal initramfs, no terminal, stage bars only
+#   sudo ~/code/kek.sh halt N   power off at stage N -- machine turning itself
+#                               off means the kernel reached that stage
+#   sudo ~/code/kek.sh selftest fault on purpose; the machine MUST reboot.
+#                               run this first: it proves the signal works
+#   sudo ~/code/kek.sh gpu      shell userland + experimental Apple GPU; the
+#                               AGX render test is available from the shell
+#   sudo ~/code/kek.sh gpu-probe  kernel/RTKit probe only; allows an image
+#                               without Mesa for early bring-up diagnostics
+#   sudo ~/code/kek.sh desktop-gpu   desktop + experimental Apple GPU
+#   sudo ~/code/kek.sh desktop-sound desktop + M1 Air sound, no GPU or Wi-Fi
+#   sudo ~/code/kek.sh desktop-basic desktop alone: software rendering, no GPU,
+#                               Wi-Fi or speakers
+#   sudo ~/code/kek.sh fsck     check and repair the Vinix disk, deploy nothing
+#
+# Vinix's disk: vinix-disk.conf beside the checkout (~/code/vinix-disk.conf)
+# names one ext2 partition by its GPT unique GUID, as PARTUUID=<guid>. Desktop
+# modes mount it read-write over /root, where users and their files live.
+# Vinix will not mount it after a crash or forced power-off, so every
+# deployment first checks and repairs it here (e2fsck from Homebrew's
+# e2fsprogs); after such a stop, boot macOS and run this with `fsck`.
+#   sudo ~/code/kek.sh sound-diag    low-level speaker test, no GPU or Wi-Fi
+#   sudo ~/code/kek.sh desktop-wifi  desktop + experimental BCM4378 Wi-Fi
+#   sudo ~/code/kek.sh studio   desktop on a Studio Display selected by the
+#                               boot firmware; post-boot attach reboots once
+#
+# GPU, DCP and Wi-Fi below are off by default in the kernel. This M1 deployment
+# helper explicitly enables GPU and Wi-Fi for its normal desktop mode so that
+# the accelerated desktop and Firefox paths are exercised on hardware. The
+# read-only SMC battery client is enabled in every ARM64 mode and safely
+# declines non-Apple device trees. Use `desktop-wifi` to recover the previous
+# software-desktop mode if the experimental GPU probe resets the machine.
+#
+#   sudo ~/code/kek.sh battery  shell + explicit SMC battery flag; read-only.
+#                               `cat /dev/battery` reports the charge
+#   sudo ~/code/kek.sh dcp      shell + incomplete display-coprocessor probe;
+#                               it does not provide panel brightness yet
+#   sudo ~/code/kek.sh storage  shell + the SSD, read-only. Nothing is written:
+#                               authorising that needs a partition named by
+#                               PARTUUID, which deploy-m1-efi.sh takes as
+#                               --ans-rw= and this mode deliberately does not
+#   sudo ~/code/kek.sh drivers  shell + battery, DCP, GPU and Wi-Fi together
+#   sudo ~/code/kek.sh desktop-drivers   desktop + all four; Settings exposes
+#                               Wi-Fi, but brightness stays disabled until a
+#                               real IOMFB backend creates its device
+#
+set -euo pipefail
+
+# A deploy wrapper may use a non-default remote checkout. Keep the historic
+# user-home default for direct invocations, but honour the explicit checkout
+# passed by that wrapper even though this script runs under sudo.
+REPO="${VINIX_REPO:-}"
+if [ -z "$REPO" ]; then
+    REPO="$HOME/code/vinix"
+    [ "$(id -u)" -eq 0 ] && REPO="$(eval echo ~"${SUDO_USER:-$USER}")/code/vinix"
+fi
+DISK="disk0s4"
+ESP="/Volumes/EFI - FEDOR"
+DISK_CONF="$(dirname "$REPO")/vinix-disk.conf"
+E2FSCK=/opt/homebrew/opt/e2fsprogs/sbin/e2fsck
+
+# The configured Vinix disk: prints its PARTUUID, or nothing without one.
+vinix_disk_partuuid() {
+    [ -f "$DISK_CONF" ] || return 0
+    local uuid
+    uuid="$(sed -n 's/^PARTUUID=\([0-9A-Fa-f-]*\)[[:space:]]*$/\1/p' "$DISK_CONF" | head -1)"
+    if ! [[ "$uuid" =~ ^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$ ]]; then
+        echo "error: $DISK_CONF must hold one line PARTUUID=<gpt-unique-guid>" >&2
+        exit 1
+    fi
+    printf '%s\n' "$uuid"
+}
+
+# Check the disk and repair what e2fsck can repair on its own, which includes
+# the dirty mark an unclean Vinix shutdown leaves. Anything worse stops here:
+# Vinix would only refuse the volume and stop its boot.
+vinix_disk_check() {
+    local uuid="$1" node rc
+    node="$(diskutil info "$uuid" 2>/dev/null | awk -F': *' '/Device Node/ {print $2}')" || node=""
+    if [ -z "$node" ]; then
+        echo "error: no partition has PARTUUID $uuid (from $DISK_CONF)" >&2
+        exit 1
+    fi
+    if [ ! -x "$E2FSCK" ]; then
+        echo "error: $E2FSCK is missing; install it with: brew install e2fsprogs" >&2
+        exit 1
+    fi
+    echo "==> checking the Vinix disk ($node)"
+    if "$E2FSCK" -p "$node"; then rc=0; else rc=$?; fi
+    if [ "$rc" -ge 4 ]; then
+        echo "error: the Vinix disk needs a manual repair: sudo $E2FSCK -f $node" >&2
+        exit 1
+    fi
+}
+
+if [ "${1:-}" = fsck ]; then
+    disk_uuid="$(vinix_disk_partuuid)"
+    if [ -z "$disk_uuid" ]; then
+        echo "error: no Vinix disk configured in $DISK_CONF" >&2
+        exit 1
+    fi
+    vinix_disk_check "$disk_uuid"
+    echo "OK. The Vinix disk is clean."
+    exit 0
+fi
+
+case "${1:-desktop}" in
+    desktop)
+        FLAGS=(--apple-gpu --apple-wifi --native-resolution --desktop-initramfs)
+        MODE="desktop + Apple GPU + Wi-Fi"
+        ;;
+    diag)
+        FLAGS=(--native-resolution --minimal-initramfs --no-early-term)
+        MODE="diagnostic"
+        ;;
+    halt)
+        if [ -z "${2:-}" ]; then
+            echo "error: 'halt' needs a stage number, e.g. kek.sh halt 0" >&2
+            exit 1
+        fi
+        FLAGS=(--native-resolution --minimal-initramfs --no-early-term "--halt-at=$2")
+        MODE="halt at stage $2"
+        ;;
+    selftest)
+        FLAGS=(--native-resolution --minimal-initramfs --no-early-term --halt-at=99 --force-fault)
+        MODE="selftest"
+        ;;
+    full)
+        FLAGS=(--native-resolution)
+        MODE="shell"
+        ;;
+    gpu)
+        FLAGS=(--apple-gpu --native-resolution)
+        MODE="shell + Apple GPU"
+        ;;
+    gpu-probe)
+        FLAGS=(--apple-gpu --gpu-probe-only --native-resolution)
+        MODE="shell + Apple GPU probe only"
+        ;;
+    gpu-diag)
+        # The GPU probe with nothing else running. gpu-probe above boots the
+        # 2.9 GB base initramfs, which does not fit a 512 MB ESP; this one is a
+        # few KB. Unlike diag it keeps flanterm, because the point here is to
+        # read what the probe printed rather than to count stage bars.
+        FLAGS=(--apple-gpu --gpu-probe-only --native-resolution --minimal-initramfs)
+        MODE="diagnostic + Apple GPU probe"
+        ;;
+    desktop-gpu)
+        FLAGS=(--apple-gpu --native-resolution --desktop-initramfs)
+        MODE="desktop + Apple GPU"
+        ;;
+    desktop-sound)
+        FLAGS=(--native-resolution --desktop-initramfs --apple-speakers)
+        MODE="desktop + M1 Air sound (software rendering)"
+        ;;
+    desktop-basic)
+        FLAGS=(--native-resolution --desktop-initramfs --no-apple-speakers)
+        MODE="desktop (software rendering, no GPU, Wi-Fi or speakers)"
+        ;;
+    sound-diag)
+        FLAGS=(--native-resolution --sound-initramfs)
+        MODE="M1 Air speaker test (no GPU or Wi-Fi)"
+        ;;
+    desktop-wifi)
+        FLAGS=(--apple-wifi --native-resolution --desktop-initramfs)
+        MODE="desktop + Apple Wi-Fi"
+        ;;
+    studio)
+        FLAGS=(--apple-studio-display --apple-wifi --desktop-initramfs)
+        MODE="Apple Studio Display desktop + Apple Wi-Fi"
+        ;;
+    storage)
+        FLAGS=(--apple-ans --native-resolution)
+        MODE="shell + ANS storage (read-only)"
+        ;;
+    battery)
+        FLAGS=(--apple-battery --native-resolution)
+        MODE="shell + SMC battery"
+        ;;
+    dcp)
+        FLAGS=(--apple-dcp --native-resolution)
+        MODE="shell + Apple DCP"
+        ;;
+    drivers)
+        FLAGS=(--all-drivers --native-resolution)
+        MODE="shell + all Apple drivers"
+        ;;
+    desktop-drivers)
+        FLAGS=(--all-drivers --native-resolution --desktop-initramfs)
+        MODE="desktop + all Apple drivers"
+        ;;
+    -h|--help)
+        # The whole leading comment block, however long it grows.
+        awk 'NR > 1 { if (/^#/) print; else exit }' "$0"
+        exit 0
+        ;;
+    *)
+        echo "error: unknown mode '$1' (use: desktop | desktop-basic | desktop-sound | sound-diag | fsck | studio | full | gpu | gpu-probe | gpu-diag | desktop-gpu | desktop-wifi | battery | dcp | storage | drivers | desktop-drivers | diag | halt N | selftest)" >&2
+        exit 1
+        ;;
+esac
+
+# The desktop's users and files live in /root: give it the Vinix disk.
+disk_uuid="$(vinix_disk_partuuid)"
+if [ -n "$disk_uuid" ] && [[ " ${FLAGS[*]} " == *" --desktop-initramfs "* ]]; then
+    vinix_disk_check "$disk_uuid"
+    FLAGS+=("--ans-persist=$disk_uuid")
+    MODE="$MODE, /root on the Vinix disk"
+fi
+
+# deploy-m1-efi.sh and kernel/bin/vinix are relative paths.
+cd "$REPO"
+
+# EFI partitions need root to mount; without it diskutil reports "failed to
+# mount ... try the readOnly option", which looks like corruption but is not.
+if ! mount | grep -q "on $ESP "; then
+    diskutil mount "$DISK"
+fi
+
+echo "==> deploying ($MODE)"
+./scripts/deploy-m1-efi.sh "${FLAGS[@]}" "$ESP"
+sync
+
+built="$(shasum -a 256 kernel/bin/vinix | awk '{print $1}')"
+landed="$(shasum -a 256 "$ESP/boot/vinix" | awk '{print $1}')"
+if [ "$built" != "$landed" ]; then
+    echo "ERROR: deployed kernel does not match the build" >&2
+    echo "  built:  $built" >&2
+    echo "  landed: $landed" >&2
+    diskutil unmount "$DISK" || true
+    exit 1
+fi
+
+# The filesystem was copied and verified above. macOS may have auto-unmounted
+# removable EFI media after sync; that makes this cleanup return non-zero even
+# though the deploy completed, so leave it as a warning rather than rejecting
+# an otherwise verified image.
+if ! diskutil unmount "$DISK"; then
+    echo "WARNING: $DISK was already unmounted after deployment." >&2
+fi
+echo
+echo "OK. Reboot: hold power -> startup options -> the Asahi/Linux disk."
+
+case "$MODE" in
+selftest)
+    cat <<'ST'
+
+The machine must REBOOT. That proves PSCI works and that a silent machine
+in the other modes is real information rather than a broken signal.
+If it does NOT reboot, PSCI is unavailable and the halt modes mean nothing.
+ST
+    ;;
+*Studio\ Display*)
+    cat <<'STUDIO'
+
+Boot Vinix with the cable disconnected, then connect the Studio Display after
+the internal-panel desktop starts. The kernel should detect the Type-C mode and
+warm-reboot once; leave the cable attached so firmware can train the link. Use
+clamshell mode if firmware keeps selecting the Air panel. Look for:
+
+  apple-typec: external display attached (debounced Type-C mode)
+  display: first post-boot Studio Display attach; rebooting once ...
+
+After recovery, the next boot should select a 5120x2880 external framebuffer.
+This mode owns one firmware framebuffer. Reconnecting that established output
+works live; switching between the internal and external outputs crosses a boot.
+STUDIO
+    ;;
+diagnostic\ +\ Apple\ GPU\ probe)
+    cat <<'GPUDIAG'
+
+Nothing runs after the probe in this mode: what is on screen is the probe's own
+output. The M1 Air is handed m1n1's FDT, not Apple boot data, so the m1n1 branch
+runs and the operating-point table loads:
+
+  agx: Probing Apple GPU
+  agx: loaded 7 t8103 operating points (1 off, 396..1278 MHz, 19488 mW max)
+
+Seven states with one off, over 396..1278 MHz, is that machine's fused ladder.
+A different count, a missing "1 off", or a narrower range means the boot device
+tree changed. Any "G13 ABI self-check failed" line names a layout in this tree
+that no longer matches the recovered firmware ABI; see docs/m1-agx-bringup.md.
+Photograph the screen either way.
+GPUDIAG
+    ;;
+*Apple\ GPU*)
+    cat <<'GPU'
+
+The M1 GPU probe is enabled. The serial/early console should reach all of:
+
+  apple bring-up: GPU=enabled
+  drm: created device node /dev/dri/renderD128
+  agx: Apple GPU driver initialized successfully
+
+The desktop image then prints "Vinix: starting the GPU-enabled desktop" and
+the compositor reports its renderer. In a terminal, verify and rerun the
+hardware-only render test with:
+
+  ls -l /dev/dri/renderD128
+  run-m1-agx-smoke --rebuild
+
+Only "VINIX M1 AGX RENDER TEST: PASS" is proof of native GPU execution: the
+test rejects software/VirGL/fake renderers and validates pixels after glFinish.
+The boot should also report exactly four Vinix CPUs online:
+
+  smp: Discovered CPUs: 8
+  smp: Starting CPUs:   4
+  smp: 4 CPUs online
+
+Use `sudo ~/code/kek.sh desktop-wifi` if the GPU probe prevents the desktop
+from starting; that keeps Wi-Fi and the same desktop image but disables AGX.
+GPU
+    ;;
+*Apple\ drivers|*SMC\ battery|*Apple\ DCP|*Apple\ Wi-Fi)
+    cat <<'DRV'
+
+The boot log names both default and explicitly selected drivers, so it is the
+first thing to check:
+
+  apple bring-up: GPU=... DCP=... battery=enabled
+  apple-smc: /dev/battery: 73%               <- a successful battery probe
+
+Then, on the shell:
+  cat /dev/battery       the charge, as the desktop's taskbar reads it
+  ls /dev/apple-panel-bl absent until the real DCP/IOMFB backend is implemented
+  ls /dev/wlan0          the Wi-Fi control/raw Ethernet device
+  wifi-ctl status        chip identity and firmware/radio state
+
+The touchpad needs no flag and comes up in every mode: it rides the SPI
+transport the keyboard already uses, and the first /dev/pointer read asks for
+native mode. It announces itself once:
+
+  apple-spi-tp: first valid touchpad report received
+
+No such line and a cursor that does not move means the reports never arrived.
+Until one does, /dev/pointer falls back to VirtIO, which this machine has none
+of, so the cursor simply stays put rather than misbehaving.
+
+A machine that resets instead of booting means one of these faulted. Re-run
+with `battery` alone first -- it is read-only and touches no display -- then
+`dcp`, `desktop-wifi`, and only then `drivers`. Which one resets it is the answer.
+DRV
+    ;;
+halt*)
+    cat <<'HALT'
+
+The machine powering itself off means the kernel reached that stage.
+Staying on a black screen means it did not.
+
+Black by itself proves nothing: Limine clears the screen before handing
+over, so every boot goes black no matter what the kernel does. Powering
+off is the only real signal.
+
+Reboot instead of power off means the kernel faulted before that stage.
+Start at 0. Stage 0 runs before the kernel touches the display at all,
+so it answers "was the kernel entered?" and nothing else.
+  0  entered kmain, cmdline readable
+  1  the whole-screen fill did not fault
+  2  pmm_init done
+  4  exception vectors installed
+  7  survived the page-table switch
+HALT
+    ;;
+esac
+
+if [ "$MODE" = "diagnostic" ]; then
+    cat <<'LEGEND'
+
+Nothing clears the framebuffer in this mode, so the coloured bars stay up.
+Count them from the top; the count is the last stage kmain reached:
+
+   1  entered kmain
+   2  pmm_init done
+   3  V runtime _vinit done
+   4  exception vectors installed
+   5  device tree parsed        (6 instead = no device tree found)
+   7  vmm_init done  <- survived the page-table switch
+   8  Apple hardware init done
+   9  timer done
+  10  scheduler running
+  11  12  later kernel init
+
+No bars at all means it dies before the first instruction of kmain.
+LEGEND
+fi

@@ -18,7 +18,7 @@ SOCKET="${VINIX_QMP_SOCKET:-/tmp/vinix-qmp}"
 
 if [ ! -S "$SOCKET" ]; then
     echo "ERROR: no QMP socket at $SOCKET" >&2
-    echo "Start the VM with ./run-desktop-aarch64.sh --monitor" >&2
+    echo "Start the VM with ./scripts/run-desktop-aarch64.sh --monitor" >&2
     exit 1
 fi
 

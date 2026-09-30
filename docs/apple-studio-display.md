@@ -41,14 +41,14 @@ inherit.
 Build the desktop image and the AArch64 kernel as usual:
 
 ```sh
-./build-desktop-aarch64.sh
+./scripts/build-desktop-aarch64.sh
 make -C kernel ARCH=aarch64 CC=clang
 ```
 
 Deploy with the external-display handoff flag:
 
 ```sh
-./deploy-m1-efi.sh --apple-studio-display --desktop-initramfs /Volumes/EFI
+./scripts/deploy-m1-efi.sh --apple-studio-display --desktop-initramfs /Volumes/EFI
 ```
 
 On the development M1 configured by `kek.sh`, the shorthand is:

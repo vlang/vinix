@@ -25,8 +25,8 @@ virtual machines.
 <img width="600" alt="image" src="https://github.com/user-attachments/assets/d2277e43-e088-4b8c-a9aa-c688c07bd439" />
 <img width="600" alt="image" src="https://github.com/user-attachments/assets/60d421d7-664b-4249-b084-d4417bed8522" />
 
-![Screenshot 0](/screenshot0.png?raw=true "Screenshot 0")
-![Screenshot 1](/screenshot1.png?raw=true "Screenshot 1")
+![Screenshot 0](/docs/screenshots/screenshot0.png?raw=true "Screenshot 0")
+![Screenshot 1](/docs/screenshots/screenshot1.png?raw=true "Screenshot 1")
 
 ## Download an image
 
@@ -71,7 +71,7 @@ In VirtualBox, create a VM of type *Other/Unknown (64-bit)* or *Other/Unknown
 adapter type to *Intel PRO/1000 MT Desktop (82540EM)*. For amd64, add a new
 16 GB hard disk on a SATA controller; Vinix has no driver for the disk
 controllers VirtualBox gives an arm64 VM, so that one runs from memory.
-`./run-iso-virtualbox.sh vinix-amd64.iso` creates such a VM, disk included.
+`./scripts/run-iso-virtualbox.sh vinix-amd64.iso` creates such a VM, disk included.
 VirtualBox only runs guests of its host's architecture.
 
 Both images carry the same software: X.org with Mesa, GTK, Python, V, GCC,
@@ -167,7 +167,7 @@ the aarch64 workflow. After checking out ui2, run:
 
 ```sh
 git clone https://github.com/vlang/ui2 third_party/ui2
-./run-desktop-amd64.sh
+./scripts/run-desktop-amd64.sh
 ```
 
 For local development, a sibling `../ui2` checkout (for example
@@ -186,7 +186,7 @@ Build the languages, developer tools, X11 applications and alternate desktop
 into one image with a single command:
 
 ```sh
-./build-all-aarch64.sh
+./scripts/build-all-aarch64.sh
 ```
 
 The resulting `build-support/init-aarch64/initramfs-desktop.tar` contains
@@ -197,7 +197,7 @@ left out of this default image so users can install them on demand with `pkg`.
 It is the image booted by:
 
 ```sh
-./run-desktop-aarch64.sh --no-desktop
+./scripts/run-desktop-aarch64.sh --no-desktop
 ```
 
 The aggregate builder rebuilds every owned layer and refuses to publish a
@@ -223,7 +223,7 @@ on one component, but are not required for a normal default-image build.
 
 Valve's Linux Steam client, an x86 glibc program, runs through the same
 translators from a Debian root of its own. Stage it with
-`./build-steam-aarch64.sh` and pass `--with-steam` to the desktop builder;
+`./scripts/build-steam-aarch64.sh` and pass `--with-steam` to the desktop builder;
 see [docs/steam.md](docs/steam.md).
 
 Vinix can also boot another AArch64 Vinix instance through native QEMU system
@@ -267,7 +267,7 @@ itself to refresh `/mnt/host/vinix` for inspection. The VirGL runner remains
 offline and therefore uses the image's staged source copy.
 
 The compiler layer is pinned to the newest V revision qualified by this tree.
-Build it separately with `./build-v-aarch64.sh`; set `VINIX_V_SOURCE` to a V
+Build it separately with `./scripts/build-v-aarch64.sh`; set `VINIX_V_SOURCE` to a V
 checkout when qualifying a newer revision without downloading another copy.
 The layer includes the matching compiler sources, so `v self` rebuilds and
 replaces `/usr/lib/vlang/v` inside Vinix. Ordinary V builds use the native TCC
@@ -283,8 +283,8 @@ The aarch64 image can include Alpine's musl CPython 3.12 runtime and its native
 standard-library dependencies. Stage it before assembling the userland:
 
 ```sh
-./build-python-aarch64.sh
-./build-userland-aarch64.sh
+./scripts/build-python-aarch64.sh
+./scripts/build-userland-aarch64.sh
 ```
 
 Both aarch64 userland builders automatically merge
@@ -299,8 +299,8 @@ Ruby 3.3, RubyGems, Bundler, Rake, and the native standard-library dependencies
 can be staged and merged into the same aarch64 image:
 
 ```sh
-./build-ruby-aarch64.sh
-./build-userland-aarch64.sh
+./scripts/build-ruby-aarch64.sh
+./scripts/build-userland-aarch64.sh
 ```
 
 The userland builders merge `build-aarch64-ruby/staging` when present. Set
@@ -314,8 +314,8 @@ The Go compiler, linker, formatter and standard library can be staged for
 native development inside Vinix:
 
 ```sh
-./build-go-aarch64.sh
-./build-userland-aarch64.sh
+./scripts/build-go-aarch64.sh
+./scripts/build-userland-aarch64.sh
 ```
 
 Both aarch64 userland builders merge `build-aarch64-go/staging` when present.
@@ -331,8 +331,8 @@ The aarch64 image supports the complete OpenJDK 25 JDK and JRE from Alpine
 Linux 3.24, the latest stable Alpine branch:
 
 ```sh
-./build-java-aarch64.sh
-./build-userland-aarch64.sh
+./scripts/build-java-aarch64.sh
+./scripts/build-userland-aarch64.sh
 ```
 
 Both userland builders merge `build-aarch64-java/staging` when present. Set
@@ -348,8 +348,8 @@ Alpine's musl builds of its `rg` and `zsh` helpers. Stage it before assembling
 the userland:
 
 ```sh
-./build-codex-aarch64.sh
-./build-userland-aarch64.sh
+./scripts/build-codex-aarch64.sh
+./scripts/build-userland-aarch64.sh
 ```
 
 Both userland builders merge `build-aarch64-codex/staging` when present. Set
@@ -373,8 +373,8 @@ CLI. The staging layer supplies the Alpine `libgcc`, `libstdc++`, and `ripgrep`
 dependencies required by the musl build:
 
 ```sh
-./build-claude-aarch64.sh
-./build-userland-aarch64.sh
+./scripts/build-claude-aarch64.sh
+./scripts/build-userland-aarch64.sh
 ```
 
 Both userland builders merge `build-aarch64-claude/staging` when present. Set
@@ -395,8 +395,8 @@ the network-tools layer before the userland (the desktop's compact image already
 requires this layer):
 
 ```sh
-./build-network-tools-aarch64.sh
-./build-userland-aarch64.sh
+./scripts/build-network-tools-aarch64.sh
+./scripts/build-userland-aarch64.sh
 ```
 
 The desktop builder also overlays the current network-tools layer directly,
@@ -471,12 +471,12 @@ pkg install voffice
 
 `pkg` downloads `VOffice-vinix-aarch64.tar.gz` from the latest `vlang/office`
 release and checks it against the published `.sha256`.
-`./build-voffice-aarch64.sh` cross-compiles that asset from a VOffice checkout
+`./scripts/build-voffice-aarch64.sh` cross-compiles that asset from a VOffice checkout
 (`VINIX_OFFICE_SOURCE` or `../office`). Publish it from the commit the release
 was built from, so it matches the release's other binaries:
 
 ```sh
-./build-voffice-aarch64.sh --ref=release-0.0.3-build --publish
+./scripts/build-voffice-aarch64.sh --ref=release-0.0.3-build --publish
 ```
 
 `--publish` uploads with `gh` and refuses uncommitted source or a `VERSION`
@@ -495,8 +495,8 @@ A bootable image can carry it already installed, which is what the office
 regression test boots:
 
 ```sh
-./build-libreoffice-aarch64.sh
-./build-desktop-aarch64.sh --compact-initramfs --with-libreoffice
+./scripts/build-libreoffice-aarch64.sh
+./scripts/build-desktop-aarch64.sh --compact-initramfs --with-libreoffice
 ./tests/office/run.sh
 ```
 
@@ -526,8 +526,8 @@ ABI, without Xorg or Wayland. Build that executable once on Alpine/aarch64 and
 then rebuild the desktop image:
 
 ```sh
-./build-blender-native-aarch64.sh
-./build-desktop-aarch64.sh
+./scripts/build-blender-native-aarch64.sh
+./scripts/build-desktop-aarch64.sh
 pkg install blender
 ./blender-package-smoke.sh
 ```
@@ -571,7 +571,7 @@ The QEMU runner keeps the base system in its initramfs-backed tmpfs and mounts
 a separate persistent ext2 disk at `/root` by default:
 
 ```sh
-./run-aarch64.sh
+./scripts/run-aarch64.sh
 ```
 
 The generic runner creates one fixed `boot-image/boot.img.root.ext2` volume
@@ -600,8 +600,8 @@ overlay before the userland to have tmux and its terminal definitions available
 from first boot:
 
 ```sh
-./build-developer-tools-aarch64.sh
-./build-userland-aarch64.sh
+./scripts/build-developer-tools-aarch64.sh
+./scripts/build-userland-aarch64.sh
 tmux
 ```
 
@@ -615,7 +615,7 @@ effects. On macOS the guest plays through the host's default output. Set
 everything the guest plays, or to `off` to leave the card out:
 
 ```sh
-VINIX_QEMU_AUDIO=wav:/tmp/vinix.wav ./run-desktop-aarch64.sh --no-build
+VINIX_QEMU_AUDIO=wav:/tmp/vinix.wav ./scripts/run-desktop-aarch64.sh --no-build
 ```
 
 Only playback is supported. On the base M1 MacBook Air, `/dev/dsp` is the
@@ -643,11 +643,11 @@ the large game data remains outside the base image. To stage the current
 release with OpenJDK 25 directly into a custom image instead, run:
 
 ```sh
-./build-x11-aarch64.sh
-./build-java-aarch64.sh
-./build-minecraft-aarch64.sh
-./build-desktop-aarch64.sh
-./run-desktop-aarch64.sh --no-desktop
+./scripts/build-x11-aarch64.sh
+./scripts/build-java-aarch64.sh
+./scripts/build-minecraft-aarch64.sh
+./scripts/build-desktop-aarch64.sh
+./scripts/run-desktop-aarch64.sh --no-desktop
 ```
 
 `VINIX_MINECRAFT_VERSION` selects an exact version or release channel;
@@ -667,7 +667,7 @@ For the QEMU desktop, give the preinstalled game layer 10 GiB of RAM and use
 one virtual CPU while running Minecraft:
 
 ```sh
-VINIX_QEMU_MEM=10240 VINIX_QEMU_SMP=1 ./run-desktop-aarch64.sh
+VINIX_QEMU_MEM=10240 VINIX_QEMU_SMP=1 ./scripts/run-desktop-aarch64.sh
 ```
 
 The launcher uses HotSpot's interpreter and reports one active processor. This
@@ -685,9 +685,9 @@ Central; and those are glibc objects, so they load through `gcompat`, with
 Alpine's native OpenAL and jemalloc substituted for the bundled copies that do
 not survive that translation. The generic VM uses Mesa's llvmpipe. A GPU VM
 with the GLX-enabled Asahi/VirGL Mesa runtime uses hardware OpenGL when the
-game starts through direct Xorg. Build that runtime with `./build-asahi-aarch64.sh`
+game starts through direct Xorg. Build that runtime with `./scripts/build-asahi-aarch64.sh`
 in the ARM64 build VM, copy its staging tree back, then boot with
-`./run-desktop-aarch64.sh gpuvm --no-build`. Run `minecraft` from a guest console
+`./scripts/run-desktop-aarch64.sh gpuvm --no-build`. Run `minecraft` from a guest console
 without an existing `DISPLAY` so `startx` creates the DRI3 display. The
 launcher checks the GLX renderer and stops if it falls back to software.
 Minecraft opened from the desktop icon uses a private Xvfb display and remains
@@ -710,9 +710,9 @@ not implemented in the kernel or in `vinix-desktop`.
 Build the X server and stage Firefox before assembling the full userland:
 
 ```sh
-./build-x11-aarch64.sh
-./build-firefox-aarch64.sh
-./build-userland-aarch64.sh
+./scripts/build-x11-aarch64.sh
+./scripts/build-firefox-aarch64.sh
+./scripts/build-userland-aarch64.sh
 ```
 
 Boot with at least 8 GiB of RAM, then launch the browser. The first command
@@ -720,7 +720,7 @@ creates a 2 GiB sparse boot disk when one does not already exist. With no URL,
 Firefox opens the bundled smoke page; pass a URL to browse normally:
 
 ```sh
-./run-aarch64.sh --mem=8192 --disk=2048
+./scripts/run-aarch64.sh --mem=8192 --disk=2048
 run-firefox
 run-firefox https://example.com
 ```
@@ -730,8 +730,8 @@ Firefox launcher. Clicking it opens Firefox in a normal movable Vinix window;
 the native desktop and taskbar remain visible around its private Xvfb display:
 
 ```sh
-./build-desktop-aarch64.sh
-./run-desktop-aarch64.sh --no-build --mem=8192
+./scripts/build-desktop-aarch64.sh
+./scripts/run-desktop-aarch64.sh --no-build --mem=8192
 ```
 
 The X11 session uses a small Vinix-specific input bridge for the native
@@ -781,14 +781,14 @@ A bootable image can carry the browser already installed, which is what the
 Chromium regression test boots:
 
 ```sh
-./build-chromium-aarch64.sh
-./build-desktop-aarch64.sh --compact-initramfs --with-chromium
+./scripts/build-chromium-aarch64.sh
+./scripts/build-desktop-aarch64.sh --compact-initramfs --with-chromium
 ```
 
 Chromium, Firefox and LibreOffice staging builders reuse their extracted
 package trees when their package archives and build inputs are unchanged.
 Repeated desktop builds reuse the compiled compositor.
-Use `./build-all-aarch64.sh --reuse-layers` to assemble a new
+Use `./scripts/build-all-aarch64.sh --reuse-layers` to assemble a new
 image from the existing language and desktop layers.
 
 Chromium is a much heavier guest than Firefox, and four kernel facilities were
@@ -827,7 +827,7 @@ back to the CPU Vulkan device in `chromium-swiftshader`; `VINIX_FORCE_SOFTWARE_G
 forces that path, and `VINIX_CHROMIUM_SINGLE_PROCESS=1` collapses the browser
 into one process, which is what separates an IPC failure from a rendering one.
 
-![Chromium in a Vinix window](/chromium-vinix-qemu.png?raw=true "Chromium on the Vinix desktop")
+![Chromium in a Vinix window](/docs/screenshots/chromium-vinix-qemu.png?raw=true "Chromium on the Vinix desktop")
 
 Both browsers render their full interface on the desktop's hosted X11 display.
 The bring-up tests boot QEMU, start a browser through the same bridge the
@@ -872,9 +872,9 @@ Build the shared Asahi/VirGL Mesa runtime in the Debian ARM64 build VM, copy
 desktop through KekVM's Metal-enabled QEMU:
 
 ```sh
-./build-asahi-aarch64.sh
-./build-desktop-aarch64.sh
-./run-desktop-aarch64.sh gpuvm --no-build
+./scripts/build-asahi-aarch64.sh
+./scripts/build-desktop-aarch64.sh
+./scripts/run-desktop-aarch64.sh gpuvm --no-build
 ```
 
 Inside Vinix, the hardware smoke test prints the selected renderer and rejects
@@ -887,7 +887,7 @@ run-firefox
 ```
 
 `gpuvm` is the desktop shortcut for `--virgl`; run
-`./run-desktop-aarch64.sh gpuvm` to build and boot in one command once the
+`./scripts/run-desktop-aarch64.sh gpuvm` to build and boot in one command once the
 staged Mesa runtime is available. It defaults to 12 GiB of guest RAM for the
 RAM-backed image; `--mem=MB` or `VINIX_QEMU_MEM` overrides that.
 
@@ -919,10 +919,10 @@ macOS host. If using the Debian ARM64 build VM, copy its staging directory back
 to the checkout used to assemble the desktop image:
 
 ```sh
-./build-hyprland-aarch64.sh
+./scripts/build-hyprland-aarch64.sh
 # copy build-aarch64-hyprland/staging to the macOS checkout when needed
-./build-desktop-aarch64.sh
-./run-hyprland-aarch64.sh --no-build
+./scripts/build-desktop-aarch64.sh
+./scripts/run-hyprland-aarch64.sh --no-build
 ```
 
 `run-hyprland-aarch64.sh` selects Hyprland for that boot; the ordinary desktop
@@ -958,7 +958,7 @@ Build Mesa in the Debian ARM64 VM (install `clang`, `lld`, `meson`, `ninja`,
 `spirv-tools` there):
 
 ```sh
-./build-asahi-aarch64.sh
+./scripts/build-asahi-aarch64.sh
 ```
 
 Copy `build-aarch64-asahi/staging` back to the same path in the macOS checkout,
@@ -966,7 +966,7 @@ then build the full ARM64 userland and kernel. The userland build needs the
 Homebrew LLVM tools (`brew install llvm`):
 
 ```sh
-./build-userland-aarch64.sh
+./scripts/build-userland-aarch64.sh
 make -C kernel ARCH=aarch64 CC=clang
 ```
 
@@ -976,7 +976,7 @@ BusyBox, or GCC. The old VM entry point remains as a compatibility wrapper:
 
 ```sh
 VINIX_ASAHI_STAGING="$PWD/build-aarch64-asahi/staging" \
-    ./build-userland-aarch64-vm.sh
+    ./scripts/build-userland-aarch64-vm.sh
 ```
 
 This produces `build-support/init-aarch64/initramfs.tar`; copy that file and
@@ -987,8 +987,8 @@ desktop after copying the Asahi staging tree, then select both the GPU and that
 image at deployment:
 
 ```sh
-./build-desktop-aarch64.sh --compact-initramfs
-./deploy-m1-efi.sh --apple-gpu --desktop-initramfs /Volumes/EFI
+./scripts/build-desktop-aarch64.sh --compact-initramfs
+./scripts/deploy-m1-efi.sh --apple-gpu --desktop-initramfs /Volumes/EFI
 ```
 
 The compact build publishes both the uncompressed tar used by QEMU and a
@@ -1018,7 +1018,7 @@ Deploy to an already-mounted M1 EFI system partition with the explicit GPU
 opt-in, then boot through m1n1 so Vinix receives the patched device tree:
 
 ```sh
-./deploy-m1-efi.sh --apple-gpu /Volumes/EFI
+./scripts/deploy-m1-efi.sh --apple-gpu /Volumes/EFI
 ```
 
 After the desktop starts, open Terminal and run the hardware-only demo below.
@@ -1056,9 +1056,9 @@ post-boot connection performs one ANS-ordered warm reboot so firmware can
 establish the external scanout.
 
 ```sh
-./build-desktop-aarch64.sh
+./scripts/build-desktop-aarch64.sh
 make -C kernel ARCH=aarch64 CC=clang
-./deploy-m1-efi.sh --apple-studio-display --desktop-initramfs /Volumes/EFI
+./scripts/deploy-m1-efi.sh --apple-studio-display --desktop-initramfs /Volumes/EFI
 ```
 
 The deploy flag keeps the firmware's native mode, selects the largest GOP
@@ -1072,17 +1072,17 @@ procedure, expected log lines, and failure diagnosis.
 
 ### Release images
 
-`./deploy-iso.sh` builds both desktop ISOs from a clean checkout of a commit,
+`./scripts/deploy-iso.sh` builds both desktop ISOs from a clean checkout of a commit,
 boots each of them to the desktop in QEMU (and in VirtualBox, when it can run
 that architecture here), and publishes them with checksums as a GitHub release:
 
 ```sh
-./deploy-iso.sh                # release HEAD, which must already be pushed
-./deploy-iso.sh --no-publish   # build and test only; see build-release/<tag>/
-./deploy-iso.sh --draft --tag=iso-2026-10-01
+./scripts/deploy-iso.sh                # release HEAD, which must already be pushed
+./scripts/deploy-iso.sh --no-publish   # build and test only; see build-release/<tag>/
+./scripts/deploy-iso.sh --draft --tag=iso-2026-10-01
 ```
 
-`./test-iso.sh vinix-amd64.iso vinix-arm64.iso` runs the same boot tests on any
+`./scripts/test-iso.sh vinix-amd64.iso vinix-arm64.iso` runs the same boot tests on any
 image: amd64 through BIOS with VirtualBox's defaults and through UEFI, arm64 with
 virtio and with USB input. A boot passes when the desktop is on screen and
 answers the keyboard and the pointer. The arm64 desktop is assembled from the

@@ -131,7 +131,7 @@ def initramfs(path: Path, step: str) -> None:
 
 def boot(root: Path, arguments: argparse.Namespace, environment: dict[str, str],
          build: bool, step: str) -> tuple[bool, int]:
-    command = [str(root / "run-aarch64.sh"), "--serial", "--mem=2048",
+    command = [str(root / "scripts/run-aarch64.sh"), "--serial", "--mem=2048",
                f"--guest-init={arguments.init}"]
     if not build:
         command.insert(1, "--no-build")

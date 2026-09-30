@@ -13,7 +13,7 @@ the volume and verifies the marker before removing the temporary VM state.
 Build the AArch64 userland once to provide the musl test sysroot, then run:
 
 ```sh
-./build-userland-aarch64.sh
+./scripts/build-userland-aarch64.sh
 tests/qemu-core/run.sh
 ```
 
@@ -29,6 +29,6 @@ descriptors and LDT of set_thread_area and modify_ldt, with 32-bit code run
 from an LDT code segment:
 
 ```sh
-V=/path/to/v ./build-amd64.sh --no-userland --no-iso
+V=/path/to/v ./scripts/build-amd64.sh --no-userland --no-iso
 tests/qemu-core/run.sh amd64
 ```

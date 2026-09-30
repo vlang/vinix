@@ -4,13 +4,13 @@ on:
   push:
     paths:
       - .github/workflows/macos-installer.yml
-      - build-macos-installer.sh
+      - scripts/build-macos-installer.sh
       - build-support/find-v.sh
       - installer/macos/**
   pull_request:
     paths:
       - .github/workflows/macos-installer.yml
-      - build-macos-installer.sh
+      - scripts/build-macos-installer.sh
       - build-support/find-v.sh
       - installer/macos/**
   workflow_dispatch:
@@ -57,7 +57,7 @@ jobs:
         run: |
           set -euo pipefail
           ./installer/macos/test.sh
-          ./build-macos-installer.sh
+          ./scripts/build-macos-installer.sh
           test ! -e "build/vinix-installer/Vinix Installer.app/Contents/Resources/payload"
           test "$(uname -m)" = arm64
           file "build/vinix-installer/Vinix Installer.app/Contents/MacOS/vinix-installer" | grep -q arm64

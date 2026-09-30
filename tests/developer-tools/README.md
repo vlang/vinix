@@ -15,7 +15,7 @@ lifecycle, and PTY-backed pane.
 Build the package overlay with:
 
 ```sh
-./build-developer-tools-aarch64.sh
+./scripts/build-developer-tools-aarch64.sh
 ```
 
 The aarch64 userland builder automatically copies the overlay when the staging

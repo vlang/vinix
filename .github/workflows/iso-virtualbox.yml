@@ -46,7 +46,7 @@ jobs:
           VBoxManage --version
 
       - name: Boot it
-        run: sudo --preserve-env=PATH ./test-iso.sh --no-qemu --virtualbox --timeout=600 --out=test iso/vinix-amd64.iso
+        run: sudo --preserve-env=PATH ./scripts/test-iso.sh --no-qemu --virtualbox --timeout=600 --out=test iso/vinix-amd64.iso
 
       # The test runs as root and leaves root-only files, which the upload
       # below cannot read; the first release's screenshots were lost that way.

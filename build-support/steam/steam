@@ -22,37 +22,37 @@ translator64="${VINIX_X86_64_EMULATOR:-/usr/bin/qemu-x86_64}"
 for translator in "$translator32" "$translator64"; do
     if [ ! -x "$translator" ]; then
         echo "steam: translator is not installed: $translator" >&2
-        echo "build the x86 layer with ./build-x86-translation-aarch64.sh" >&2
+        echo "build the x86 layer with ./scripts/build-x86-translation-aarch64.sh" >&2
         exit 127
     fi
 done
 if [ ! -x "$root/usr/bin/bash" ] || [ ! -e "$root/lib/ld-linux.so.2" ]; then
     echo "steam: the x86 glibc runtime is not installed: $root" >&2
-    echo "build it with ./build-steam-aarch64.sh" >&2
+    echo "build it with ./scripts/build-steam-aarch64.sh" >&2
     exit 127
 fi
 robust_shim="$root/usr/lib/i386-linux-gnu/libvinix-steam-robust.so"
 if [ ! -f "$robust_shim" ]; then
     echo "steam: the i386 robust-list shim is missing: $robust_shim" >&2
-    echo "rebuild the runtime with ./build-steam-aarch64.sh" >&2
+    echo "rebuild the runtime with ./scripts/build-steam-aarch64.sh" >&2
     exit 127
 fi
 xrandr_library="$root/usr/lib/i386-linux-gnu/libXrandr.so.2"
 if [ ! -f "$xrandr_library" ]; then
     echo "steam: the i386 Xrandr library is missing: $xrandr_library" >&2
-    echo "rebuild the runtime with ./build-steam-aarch64.sh" >&2
+    echo "rebuild the runtime with ./scripts/build-steam-aarch64.sh" >&2
     exit 127
 fi
 robust_shim64="$root/usr/lib/x86_64-linux-gnu/libvinix-steam-robust.so"
 if [ ! -f "$robust_shim64" ]; then
     echo "steam: the x86-64 robust-list shim is missing: $robust_shim64" >&2
-    echo "rebuild the runtime with ./build-steam-aarch64.sh" >&2
+    echo "rebuild the runtime with ./scripts/build-steam-aarch64.sh" >&2
     exit 127
 fi
 steamrt_direct="$helpers/steamrt-direct"
 if [ ! -x "$steamrt_direct/_v2-entry-point" ]; then
     echo "steam: the direct web helper entry point is missing: $steamrt_direct" >&2
-    echo "rebuild the runtime with ./build-steam-aarch64.sh" >&2
+    echo "rebuild the runtime with ./scripts/build-steam-aarch64.sh" >&2
     exit 127
 fi
 if [ ! -f "$bootstrap" ]; then

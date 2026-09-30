@@ -29,10 +29,10 @@ user-mode translation. Build the optional layer before assembling the userland
 or desktop image:
 
 ```sh
-./build-x86-translation-aarch64.sh
-./build-userland-aarch64.sh
+./scripts/build-x86-translation-aarch64.sh
+./scripts/build-userland-aarch64.sh
 # Or rebuild the desktop image directly; it also discovers the staging layer.
-./build-desktop-aarch64.sh
+./scripts/build-desktop-aarch64.sh
 ```
 
 The layer keeps every x86-64 library under
@@ -68,8 +68,8 @@ the tested volume image is
 image, then stage its root directory:
 
 ```sh
-VINIX_WORD2013_MEDIA=/path/to/word-2013-disc ./build-x86-translation-aarch64.sh
-./build-desktop-aarch64.sh --compact-initramfs --with-x86-translation
+VINIX_WORD2013_MEDIA=/path/to/word-2013-disc ./scripts/build-x86-translation-aarch64.sh
+./scripts/build-desktop-aarch64.sh --compact-initramfs --with-x86-translation
 ```
 
 Open **Microsoft Word 2013** on the Vinix desktop. On first launch it opens the
@@ -103,7 +103,7 @@ root filesystem and needs substantially more memory than the ordinary desktop
 image. Allocate 32 GiB when booting the tested configuration:
 
 ```sh
-VINIX_QEMU_MEM=32768 ./run-desktop-aarch64.sh --no-build
+VINIX_QEMU_MEM=32768 ./scripts/run-desktop-aarch64.sh --no-build
 ```
 
 The compatibility layer does not activate Office. Use a properly licensed
@@ -111,7 +111,7 @@ installation and complete Microsoft's normal activation flow. An expired
 trial can still demonstrate startup and rendering, but Word disables document
 editing in that state.
 
-![Microsoft Word 2013 x64 running through Wine and x86-64 translation in a native Vinix window](../wine-word2013-x64-aarch64.png)
+![Microsoft Word 2013 x64 running through Wine and x86-64 translation in a native Vinix window](screenshots/wine-word2013-x64-aarch64.png)
 
 ### Microsoft Word 2010 x64
 
@@ -124,8 +124,8 @@ isolated and do not use it for untrusted documents. Stage a mounted or extracted
 licensed disc while building the translation layer:
 
 ```sh
-VINIX_OFFICE2010_MEDIA=/path/to/office-disc ./build-x86-translation-aarch64.sh
-./build-desktop-aarch64.sh
+VINIX_OFFICE2010_MEDIA=/path/to/office-disc ./scripts/build-x86-translation-aarch64.sh
+./scripts/build-desktop-aarch64.sh
 ```
 
 Open **Microsoft Word 2010** on the Vinix desktop. On first launch it opens the
@@ -143,11 +143,11 @@ installed, licensed prefix in a rebuilt image, pass its path as
 `VINIX_OFFICE2010_PREFIX` when rebuilding the translation layer. The desktop
 launcher verifies that `Office14/WINWORD.EXE` exists before starting Word.
 
-![Win64 calculator running through Wine and x86-64 translation on Vinix AArch64](../wine-calculator-aarch64.png)
+![Win64 calculator running through Wine and x86-64 translation on Vinix AArch64](screenshots/wine-calculator-aarch64.png)
 
-![Win64 Calculator and Notepad running together in Vinix windows](../wine-calculator-notepad-aarch64.png)
+![Win64 Calculator and Notepad running together in Vinix windows](screenshots/wine-calculator-notepad-aarch64.png)
 
-Use `./build-x86-translation-aarch64.sh --translator-only` for the small Linux
+Use `./scripts/build-x86-translation-aarch64.sh --translator-only` for the small Linux
 translation layer without Wine. The Wine bundle is much larger because it
 includes a complete private x86-64 graphics and multimedia dependency closure.
 The translated runtime verifies its separate i386 Linux/Wine32 path with

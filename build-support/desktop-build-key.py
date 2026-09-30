@@ -136,7 +136,7 @@ def compute_key(root: Path, v_compiler: Path, env: dict[str, str]) -> str:
     ui2_source = resolved_env_path(env, "VINIX_UI2_SOURCE", default_ui2)
 
     source_paths = [
-        root / "build-desktop-aarch64.sh",
+        root / "scripts/build-desktop-aarch64.sh",
         root / "build-support/content-key.py",
         root / "build-support/desktop-build-key.py",
         root / "desktop",

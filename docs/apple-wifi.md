@@ -16,7 +16,7 @@ of those choices intentionally has no `/dev/wlan0`.
 
 The desktop initramfs includes the target `wifi-ctl` utility. To make a locally
 packaged, matching bundle available at boot, build with
-`VINIX_WIFI_BUNDLE=/path/to/wifi-bundle ./build-desktop-aarch64.sh` or pass
+`VINIX_WIFI_BUNDLE=/path/to/wifi-bundle ./scripts/build-desktop-aarch64.sh` or pass
 `--wifi-bundle=/path/to/wifi-bundle`. The build requires all five package files,
 and init runs `wifi-ctl load /usr/share/vinix/wifi` before starting the desktop.
 The loader rechecks the bundle manifest against the detected chip and refuses a

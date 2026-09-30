@@ -12,7 +12,7 @@ and has not been exercised from this checkout on a physical machine. Enable it
 with `vinix.apple_dcp=1`, or deploy a desktop image with:
 
 ```sh
-./deploy-m1-efi.sh --desktop-initramfs --apple-dcp /path/to/mounted/esp
+./scripts/deploy-m1-efi.sh --desktop-initramfs --apple-dcp /path/to/mounted/esp
 ```
 
 The current transport intentionally supports only t8103 internal panels and
