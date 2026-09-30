@@ -10,8 +10,7 @@
 #
 # V only reports an imported module whose files are under the project root,
 # and the kernel build links its sources into obj/vsrc, so each arch's files
-# are copied into a scratch tree first. vnew, which find-v.sh prefers,
-# predates reporting imported modules at all: the v beside it is used.
+# are copied into a scratch tree first.
 set -eu
 
 repo=$(cd "$(dirname "$0")/../.." && pwd)
@@ -19,9 +18,6 @@ kernel=$repo/kernel
 allowed=$repo/tests/kernel-allocs/allowed.txt
 
 . "$repo/build-support/find-v.sh"
-case $V in
-*/vnew) [ -x "${V%/vnew}/v" ] && V=${V%/vnew}/v ;;
-esac
 
 work=$(mktemp -d "${TMPDIR:-/tmp}/vinix-kernel-allocs.XXXXXX")
 trap 'rm -rf "$work"' EXIT INT TERM

@@ -31,7 +31,7 @@ without `ranges` -- and drives the interrupt controller from the ADT's
 ## Build
 
 ```
-make -C kernel CC=clang ARCH=aarch64 LIMINE_MP=1 V=~/code/v/vnew -j8
+make -C kernel CC=clang ARCH=aarch64 LIMINE_MP=1 V=~/code/v/v -j8
 apple-boot/build.py                 # -> apple-boot/build/vinix-apple.bin
 ```
 

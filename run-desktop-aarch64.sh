@@ -15,7 +15,7 @@
 #   gpuvm           boot with KekVM's accelerated VirGL GPU
 #   --virgl         use KekVM's GPU backend with a RAM system and persistent /root
 #   --mem=MB        guest RAM (default: 8192 MiB, or 12288 MiB for gpuvm)
-#   --v=PATH        V compiler executable or checkout (for example ~/code/v7)
+#   --v=PATH        V compiler executable or checkout (for example ~/code/v/v)
 #   --help
 #
 # Anything else is passed through to run-aarch64.sh, which is what actually

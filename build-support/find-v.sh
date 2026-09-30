@@ -10,22 +10,26 @@
 #
 # $V is honoured if already set, so a caller can point at a particular build.
 # VINIX_V_COMPILER is the equivalent project-specific setting.  Either may be
-# an executable or a V checkout directory; for a directory, vnew is preferred
-# over v so a freshly rebuilt compiler is selected.
+# an executable or a V checkout directory, whose `v` is used.
+#
+# Vinix builds with a checkout's `v` (~/code/v/v here), never with the `vnew`
+# a V developer's tree may also hold: those go stale and stop building the
+# desktop. A `vnew` named explicitly is swapped for the `v` beside it.
 
 select_v() {
     local candidate="$1"
 
     if [ -d "$candidate" ]; then
-        for candidate in "$candidate/vnew" "$candidate/v"; do
-            if [ -x "$candidate" ]; then
-                V="$candidate"
-                return 0
-            fi
-        done
-        echo "ERROR: V checkout has no executable vnew or v: $1" >&2
-        return 1
+        candidate="${candidate%/}/v"
     fi
+    case "$candidate" in
+        */vnew)
+            if [ -x "${candidate%vnew}v" ]; then
+                echo "NOTE: using ${candidate%vnew}v, not $candidate" >&2
+                candidate="${candidate%vnew}v"
+            fi
+            ;;
+    esac
 
     if [ -x "$candidate" ]; then
         V="$candidate"
@@ -34,20 +38,6 @@ select_v() {
 
     echo "ERROR: V compiler is not executable: $candidate" >&2
     return 1
-}
-
-# Follow a chain of symlinks to the file at the end of it. `readlink -f` is
-# not available everywhere this runs.
-resolve_symlinks() {
-    local path="$1" target
-    while [ -L "$path" ]; do
-        target="$(readlink "$path")"
-        case "$target" in
-            /*) path="$target" ;;
-            *) path="$(dirname "$path")/$target" ;;
-        esac
-    done
-    printf '%s\n' "$path"
 }
 
 find_v() {
@@ -62,29 +52,13 @@ find_v() {
     fi
 
     if command -v v >/dev/null 2>&1; then
-        candidate="$(command -v v)"
-        # ~/.local/bin/v is often a symlink into a checkout; look beside the
-        # compiler it points at, not beside the link.
-        candidate_dir="$(CDPATH= cd -- "$(dirname -- "$(resolve_symlinks "$candidate")")" && pwd)"
-        # A source checkout keeps `v` as its bootstrap compiler and writes a
-        # freshly built development compiler to `vnew`. Automatic discovery
-        # should use that development compiler; setting V to the exact `v`
-        # path above remains the opt-out for callers that need the bootstrap.
-        if [ -f "$candidate_dir/cmd/v/v.v" ] && [ -x "$candidate_dir/vnew" ]; then
-            V="$candidate_dir/vnew"
-        else
-            V="$candidate"
-        fi
+        V="$(command -v v)"
         return 0
     fi
 
-    # The usual checkout layout. `vnew` is the freshly built compiler a V
-    # developer runs from a source tree; `v` is the released one. A
-    # development checkout is sometimes half rebuilt -- a vnew whose embedded
-    # sources have moved panics before doing anything -- so take the first
-    # one that can at least report its version.
-    for candidate in "$HOME/code/v7/vnew" "$HOME/code/v7/v" \
-        "$HOME/code/v/vnew" "$HOME/code/v/v" "$HOME/v/v"; do
+    # The usual checkout layout. Take the first one that can at least report
+    # its version.
+    for candidate in "$HOME/code/v/v" "$HOME/v/v"; do
         if [ -x "$candidate" ] && "$candidate" version >/dev/null 2>&1; then
             V="$candidate"
             return 0
@@ -93,8 +67,8 @@ find_v() {
 
     echo "ERROR: cannot find the V compiler." >&2
     echo "Put it on PATH, or set V/VINIX_V_COMPILER to it:" >&2
-    echo "    V=/path/to/v $0 $*" >&2
-    echo "    VINIX_V_COMPILER=/path/to/v-checkout $0 $*" >&2
+    echo "    V=~/code/v/v $0 $*" >&2
+    echo "    VINIX_V_COMPILER=~/code/v $0 $*" >&2
     return 1
 }
 

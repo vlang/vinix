@@ -29,27 +29,31 @@ selected=$(V="$work/explicit-v" sh -c \
 	'. "$1"; printf "%s" "$V"' sh "$repo/build-support/find-v.sh")
 test "$selected" = "$work/explicit-v"
 
-# Passing a checkout selects its development compiler before its bootstrap.
+# Passing a checkout selects its `v`, even beside a `vnew`.
 mkdir -p "$work/explicit-checkout/cmd/v"
 : >"$work/explicit-checkout/cmd/v/v.v"
 make_executable "$work/explicit-checkout/v"
 make_executable "$work/explicit-checkout/vnew"
 selected=$(VINIX_V_COMPILER="$work/explicit-checkout" sh -c \
 	'. "$1"; printf "%s" "$V"' sh "$repo/build-support/find-v.sh")
-test "$selected" = "$work/explicit-checkout/vnew"
+test "$selected" = "$work/explicit-checkout/v"
 
 # An exact executable requested through V remains exact even inside a checkout.
 selected=$(V="$work/explicit-checkout/v" sh -c \
 	'. "$1"; printf "%s" "$V"' sh "$repo/build-support/find-v.sh")
 test "$selected" = "$work/explicit-checkout/v"
 
-# Automatic PATH discovery recognises a source checkout and uses the freshly
-# built development compiler rather than its bootstrap compiler.
+# Except a `vnew`: Vinix does not build with one, so the `v` beside it is used.
+selected=$(V="$work/explicit-checkout/vnew" sh -c \
+	'. "$1"; printf "%s" "$V"' sh "$repo/build-support/find-v.sh" 2>/dev/null)
+test "$selected" = "$work/explicit-checkout/v"
+
+# Automatic PATH discovery uses the `v` it finds, not a `vnew` beside it.
 mkdir -p "$work/path-checkout/cmd/v"
 : >"$work/path-checkout/cmd/v/v.v"
 make_executable "$work/path-checkout/v"
 make_executable "$work/path-checkout/vnew"
-assert_selected "$work/path-checkout/vnew" env PATH="$work/path-checkout:$PATH"
+assert_selected "$work/path-checkout/v" env PATH="$work/path-checkout:$PATH"
 
 # An installed compiler with no source checkout beside it is used as-is.
 make_executable "$work/installed/v"
