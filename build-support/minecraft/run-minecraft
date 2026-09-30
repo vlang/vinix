@@ -64,7 +64,7 @@ case "${1:-}" in
 esac
 
 if [ ! -f "$launch_env" ]; then
-	echo "minecraft: the game is not staged; run ./build-minecraft-aarch64.sh and rebuild the desktop image" >&2
+	echo "minecraft: the game is not staged; run ./scripts/build-minecraft-aarch64.sh and rebuild the desktop image" >&2
 	exit 1
 fi
 # shellcheck source=/dev/null

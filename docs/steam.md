@@ -21,9 +21,9 @@ downloads Valve's installer package and the Debian libraries Valve's
 desktop image with both:
 
 ```sh
-./build-x86-translation-aarch64.sh --translator-only
-./build-steam-aarch64.sh
-./build-desktop-aarch64.sh --compact-initramfs --with-steam
+./scripts/build-x86-translation-aarch64.sh --translator-only
+./scripts/build-steam-aarch64.sh
+./scripts/build-desktop-aarch64.sh --compact-initramfs --with-steam
 ```
 
 The Steam layer adds about 1.3 GiB before compression. For a faster VM build,

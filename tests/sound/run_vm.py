@@ -59,7 +59,7 @@ def boot(root: Path, guest_init: Path, initramfs: Path, state: Path, wav: Path,
     if platform.system() != "Darwin":
         environment.setdefault("USE_TCG", "1")
 
-    command = [str(root / "run-aarch64.sh"), "--serial", "--mem=2048",
+    command = [str(root / "scripts/run-aarch64.sh"), "--serial", "--mem=2048",
                f"--guest-init={guest_init}"]
     if no_build:
         command.insert(1, "--no-build")

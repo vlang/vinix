@@ -174,7 +174,7 @@ def run_vm(root: Path, timeout: int, desktop_startup: bool) -> int:
 
         if desktop_startup:
             command = [
-                str(root / "run-desktop-aarch64.sh"),
+                str(root / "scripts/run-desktop-aarch64.sh"),
                 "--no-build",
                 "--no-disk-root",
                 "--ephemeral",
@@ -184,7 +184,7 @@ def run_vm(root: Path, timeout: int, desktop_startup: bool) -> int:
         else:
             environment["VINIX_INITRAMFS"] = str(source_image)
             command = [
-                str(root / "run-aarch64.sh"),
+                str(root / "scripts/run-aarch64.sh"),
                 "--no-build",
                 "--no-persist",
                 "--ephemeral",

@@ -11,7 +11,7 @@ tool="${0##*/}"
 
 if [ ! -x "$wine" ] || [ ! -x "$preloader" ]; then
     echo "$tool: i386 Wine is not installed" >&2
-    echo "build the layer with ./build-x86-translation-aarch64.sh" >&2
+    echo "build the layer with ./scripts/build-x86-translation-aarch64.sh" >&2
     exit 127
 fi
 

@@ -146,7 +146,7 @@ def run_phase(
         environment.setdefault("USE_TCG", "1")
 
     command = [
-        str(root / "run-aarch64.sh"),
+        str(root / "scripts/run-aarch64.sh"),
         "--serial",
         "--mem=2048",
         f"--guest-init={guest_init}",

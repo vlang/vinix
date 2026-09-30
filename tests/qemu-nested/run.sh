@@ -25,7 +25,7 @@ for input in "$minirootfs" "$qemu_staging/usr/bin/qemu-system-aarch64" \
     "$repo/kernel/bin/vinix" "$repo/boot-image/limine-bin/BOOTAA64.EFI"; do
     if [ ! -f "$input" ]; then
         echo "missing nested QEMU test input: $input" >&2
-        echo 'Run ./build-qemu-system-aarch64.sh and build the AArch64 kernel and Limine.' >&2
+        echo 'Run ./scripts/build-qemu-system-aarch64.sh and build the AArch64 kernel and Limine.' >&2
         exit 1
     fi
 done
@@ -45,7 +45,7 @@ mkdir -p "$work/inner-root/sbin"
 install -m755 "$work/inner-init" "$work/inner-root/sbin/init"
 COPYFILE_DISABLE=1 tar --format=ustar -cf "$work/inner-initramfs.tar" \
     -C "$work/inner-root" .
-"$repo/build-vinix-guest-disk.sh" "$work/vinix-inner.img" \
+"$repo/scripts/build-vinix-guest-disk.sh" "$work/vinix-inner.img" \
     "$work/inner-initramfs.tar"
 
 echo '==> Assembling the outer Vinix initramfs'

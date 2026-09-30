@@ -4,9 +4,9 @@
 # The image has to have been built with the x86 translators and the Steam
 # layer in it:
 #
-#   ./build-x86-translation-aarch64.sh --translator-only
-#   ./build-steam-aarch64.sh
-#   ./build-desktop-aarch64.sh --compact-initramfs --with-steam
+#   ./scripts/build-x86-translation-aarch64.sh --translator-only
+#   ./scripts/build-steam-aarch64.sh
+#   ./scripts/build-desktop-aarch64.sh --compact-initramfs --with-steam
 #
 # The boot is a RAM root, so the guest needs enough memory to hold the whole
 # image plus the machine, plus the client the bootstrapper downloads.
@@ -20,7 +20,7 @@ fi
 
 if [ ! -f "$initramfs" ]; then
 	echo "ERROR: desktop image not found: $initramfs" >&2
-	echo "       Run ./build-desktop-aarch64.sh --compact-initramfs --with-steam" >&2
+	echo "       Run ./scripts/build-desktop-aarch64.sh --compact-initramfs --with-steam" >&2
 	exit 1
 fi
 

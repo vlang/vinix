@@ -122,7 +122,7 @@ Do not substitute files from a different Mac or bypass power/regulatory limits.
    script does not guess a firmware filename hierarchy. Its identity manifest
    does not prove that the supplied files are appropriate; correct selection
    remains required. SHA-256 provenance records are provided for auditing.
-3. For a desktop image, run `./build-desktop-aarch64.sh
+3. For a desktop image, run `./scripts/build-desktop-aarch64.sh
    --wifi-bundle=/path/to/wifi-bundle`; the image includes `wifi-ctl`, stages
    the bundle, and runs its identity-checked loader before the desktop. For a
    different test image, include the utility and bundle yourself, then use

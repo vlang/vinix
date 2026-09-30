@@ -130,7 +130,7 @@ def run_vm(
         environment.setdefault("USE_TCG", "1")
 
     command = [
-        str(root / "run-aarch64.sh"),
+        str(root / "scripts/run-aarch64.sh"),
         "--serial",
         f"--mem={GUEST_MEMORY_MB}",
         f"--guest-init={guest_init}",

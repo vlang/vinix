@@ -170,7 +170,7 @@ and mapped-memory values for every app. The build uses `VINIX_UI2_SOURCE` when
 set, otherwise a sibling `../ui2` checkout when present, and finally
 `third_party/ui2`.
 
-VOffice is not built with the image. `../build-voffice-aarch64.sh` uses
+VOffice is not built with the image. `../scripts/build-voffice-aarch64.sh` uses
 `tools/build_voffice.py` and `tools/ui2_vinix_backend.v` to cross-compile
 Writer and Calc as static musl applications from `VINIX_OFFICE_SOURCE`, a
 sibling `../office`, or `third_party/office`. It packages both executables with
@@ -261,11 +261,11 @@ Keyboard and pointer events are forwarded into the private X11 display. The
 desktop builder picks up a prebuilt layer when present; otherwise its Minecraft
 window points to the on-demand package command.
 
-`./build-doom-aarch64.sh` cross-compiles [Chocolate Doom](https://github.com/chocolate-doom/chocolate-doom)
+`./scripts/build-doom-aarch64.sh` cross-compiles [Chocolate Doom](https://github.com/chocolate-doom/chocolate-doom)
 3.1.1 and stages its SDL2 and SDL2_mixer runtime. It reads the local WAD at
 `../3rd/doom/doom1.wad` by default; set `VINIX_DOOM_WAD` to select another
 file. The WAD stays in ignored build output and is never committed. Rebuild the
-desktop image with `./build-desktop-aarch64.sh`, then launch **DOOM**
+desktop image with `./scripts/build-desktop-aarch64.sh`, then launch **DOOM**
 from its desktop shortcut or Start menu. The launcher opens E1M1 in a 720×540
 window at the top right, leaving the wallpaper logo visible. The pointer is
 hidden over the game content and remains visible over the title bar and other
@@ -397,7 +397,7 @@ number in them is an ancestor's pid, and this process' own has a column.
 
 ## VSpace, the disk inventory
 
-![VSpace measuring a Vinix image under QEMU](../vinix-vspace-qemu.png)
+![VSpace measuring a Vinix image under QEMU](../docs/screenshots/vinix-vspace-qemu.png)
 
 `vspace.v` is a port of the standalone V/ui2 program of the same name — a disk
 usage analyzer: four metrics across the top, and below them the largest folders
@@ -639,20 +639,20 @@ current V3 compiler; set `V=/path/to/current/v3` when it is not your default:
 
     git clone https://github.com/vlang/ui2 third_party/ui2
 
-    V=/path/to/current/v3 ./run-desktop-aarch64.sh
+    V=/path/to/current/v3 ./scripts/run-desktop-aarch64.sh
 
 Then, from the repository root, with Homebrew `llvm`, `lld` and `qemu`
 installed, one command builds the aarch64 image and boots into the desktop:
 
-    ./run-desktop-aarch64.sh
+    ./scripts/run-desktop-aarch64.sh
 
 The host runner builds the kernel and packaged desktop with `-prod` and uses
 Clang for cross compilation. A warm run reuses cached build outputs. For quick
 desktop edits inside the running VM, use `vinix-desktop-build` below.
 
 For Files, Activity Monitor and Settings changes,
-`./cross-compile-app.sh files activity settings` (or `./cross-compile-files.sh`,
-`./cross-compile-activity.sh`, `./cross-compile-settings.sh`) builds the
+`./scripts/cross-compile-app.sh files activity settings` (or `./scripts/cross-compile-files.sh`,
+`./scripts/cross-compile-activity.sh`, `./scripts/cross-compile-settings.sh`) builds the
 committed desktop sources for AArch64 once and publishes the binary for each
 app through the QEMU host source server. The guest checks every two seconds and
 atomically replaces `/usr/bin/vinix-files`, `/usr/bin/vinix-activity` or
@@ -667,7 +667,7 @@ after commits that change an app's sources (`desktop/files*.v` and the Files
 context-menu files, `desktop/activity.v`, or `desktop/settings_*.v`) or whose
 subject starts with `Files:`, `Activity Monitor:` or `Settings:`. Enable it in
 this checkout with `git config core.hooksPath .githooks`. Set `VINIX_APP_SYNC=0`
-for a commit when you need to skip the build, then run `./cross-compile-app.sh`
+for a commit when you need to skip the build, then run `./scripts/cross-compile-app.sh`
 later.
 
 To build a single desktop image with the default portable software set
@@ -676,8 +676,8 @@ and the CLI tools), use the aggregate builder and then boot its result. Java,
 Minecraft and Wine remain on-demand `pkg` installs instead of taking space in
 every image:
 
-    ./build-all-aarch64.sh
-    ./run-desktop-aarch64.sh --no-desktop
+    ./scripts/build-all-aarch64.sh
+    ./scripts/run-desktop-aarch64.sh --no-desktop
 
 That image supports the complete edit-build-reload loop from its own Terminal.
 The files in `/root/desktop` are an editable copy of the exact staged source
@@ -751,7 +751,7 @@ starts the desktop directly. `run-aarch64.sh` boots any image named by
 
 The equivalent amd64 workflow is:
 
-    ./run-desktop-amd64.sh
+    ./scripts/run-desktop-amd64.sh
 
 It extracts Alpine's prebuilt x86_64 userland and toolchain packages, then
 creates a dedicated `vinix-desktop-amd64.iso`; no mlibc or custom GCC bootstrap
@@ -781,7 +781,7 @@ Options the desktop itself takes:
 tools under `tools/` then drive and photograph it without a human at the
 keyboard:
 
-    ./run-desktop-aarch64.sh --monitor
+    ./scripts/run-desktop-aarch64.sh --monitor
 
     python3 desktop/tools/input.py drag 200 90 620 480
     python3 desktop/tools/input.py click 344 412
@@ -798,7 +798,7 @@ network. Guest-init boots need the compact image, which fits the FAT32 boot
 disk:
 
     VINIX_DESKTOP_INITRAMFS=$PWD/build/first-run.tar \
-        ./build-desktop-aarch64.sh --compact-initramfs
+        ./scripts/build-desktop-aarch64.sh --compact-initramfs
     python3 tests/browsers/run_vm.py --first-run --initramfs build/first-run.tar
 
 Setting `VOFFICE_BUNDLE_URL` at the top of `tests/desktop/first-run-apps-init.sh`

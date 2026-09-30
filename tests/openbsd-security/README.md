@@ -12,12 +12,12 @@ Build the kernel for the architecture under test, then boot it with the test:
 make -C kernel CC=clang ARCH=aarch64 LIMINE_MP=1 V=/path/to/v
 tests/openbsd-security/run.sh aarch64
 
-V=/path/to/v ./build-amd64.sh --no-userland --no-iso
+V=/path/to/v ./scripts/build-amd64.sh --no-userland --no-iso
 tests/openbsd-security/run.sh amd64
 ```
 
 The aarch64 run compiles against the musl sysroot from
-`./build-userland-aarch64.sh` (or `VINIX_AARCH64_SYSROOT`) and boots through
+`./scripts/build-userland-aarch64.sh` (or `VINIX_AARCH64_SYSROOT`) and boots through
 `run-aarch64.sh --guest-init` with its own boot disk, EFI variables and
 persistent volume. The amd64 run compiles with `x86_64-linux-musl-gcc` (or
 `CC_AMD64`), builds a throwaway ISO around `build-amd64-kernel/bin/vinix`, and

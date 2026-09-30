@@ -121,7 +121,7 @@ def main() -> int:
     if platform.system() != "Darwin":
         environment.setdefault("USE_TCG", "1")
 
-    command = [str(root / "run-aarch64.sh"), "--serial", "--mem=2048",
+    command = [str(root / "scripts/run-aarch64.sh"), "--serial", "--mem=2048",
                "--disk-root"]
     if os.environ.get("VINIX_DISK_ROOT_NO_BUILD") == "1":
         command.insert(1, "--no-build")

@@ -315,7 +315,7 @@ def main() -> int:
         "VINIX_QEMU_AUDIO": "off",
     })
     environment.pop("VINIX_QEMU_PERSIST", None)
-    command = [str(ROOT / "run-aarch64.sh"), "--no-build", "--serial",
+    command = [str(ROOT / "scripts/run-aarch64.sh"), "--no-build", "--serial",
                f"--mem={arguments.mem}", f"--guest-init={Path(__file__).with_name('perf-init.sh')}"]
 
     per_run = arguments.settle + arguments.seconds + 60

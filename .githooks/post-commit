@@ -28,7 +28,7 @@ fi
 echo "==> Commit changes${apps}; cross-compiling for the running VM"
 # One word per application, so the list is deliberately unquoted.
 # shellcheck disable=SC2086
-if ! "$root/cross-compile-app.sh" $apps; then
-    echo "ERROR: cross-build or publication failed; run ./cross-compile-app.sh${apps} to retry" >&2
+if ! "$root/scripts/cross-compile-app.sh" $apps; then
+    echo "ERROR: cross-build or publication failed; run ./scripts/cross-compile-app.sh${apps} to retry" >&2
     exit 1
 fi
