@@ -129,20 +129,25 @@ static int mount_rejects_bad_strings(void) {
     valid &= failed_with_errno(syscall(SYS_mount, overlong, "/tmp", "tmpfs", 0, NULL),
                                ENAMETOOLONG, "mount unterminated source");
 
-    char *pages = mmap(NULL, 8192, PROT_READ | PROT_WRITE,
+    // Two pages of the machine's size, the second inaccessible, with the
+    // string on the last byte of the first. arm64 Vinix has 16 KiB pages: with
+    // 4 KiB assumed, musl's mprotect() rounded the second "page" down to the
+    // one real page, and writing the string faulted for good.
+    size_t page = (size_t)sysconf(_SC_PAGESIZE);
+    char *pages = mmap(NULL, 2 * page, PROT_READ | PROT_WRITE,
                        MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-    if (pages == MAP_FAILED || mprotect(pages + 4096, 4096, PROT_NONE) != 0) {
+    if (pages == MAP_FAILED || mprotect(pages + page, page, PROT_NONE) != 0) {
         if (pages != MAP_FAILED)
-            munmap(pages, 8192);
+            munmap(pages, 2 * page);
         return 0;
     }
-    pages[4095] = '\0';
-    valid &= failed_with_errno(syscall(SYS_mount, pages + 4095, "/tmp", "unknownfs", 0, NULL),
+    pages[page - 1] = '\0';
+    valid &= failed_with_errno(syscall(SYS_mount, pages + page - 1, "/tmp", "unknownfs", 0, NULL),
                                ENODEV, "mount terminator at page boundary");
-    pages[4095] = 'x';
-    valid &= failed_with_errno(syscall(SYS_mount, pages + 4095, "/tmp", "tmpfs", 0, NULL),
+    pages[page - 1] = 'x';
+    valid &= failed_with_errno(syscall(SYS_mount, pages + page - 1, "/tmp", "tmpfs", 0, NULL),
                                EFAULT, "mount string crosses into unmapped page");
-    munmap(pages, 8192);
+    munmap(pages, 2 * page);
     return valid;
 }
 
