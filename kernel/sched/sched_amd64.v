@@ -134,6 +134,8 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 	// The same reading bills the outgoing thread and starts the incoming one,
 	// so a switch neither loses time between the two nor counts it twice.
 	now_ns := clock_ns()
+	// When each tick lands, to the cycle, is what the generator reseeds from.
+	krandom.add_event(now_ns)
 
 	mut current_thread := proc.current_thread()
 

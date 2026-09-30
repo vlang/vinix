@@ -6,6 +6,7 @@ module main
 
 import event
 import fs
+import krandom
 import lib.stubs
 import limine
 import pagecache
@@ -42,6 +43,7 @@ const writeback_interval_seconds = i64(5)
 // and reboot(2) are still the exact guarantees, and this only bounds the window
 // for everything that never calls them, including a VM window simply closed.
 fn writeback_thread() {
+	mut seconds := i64(0)
 	for {
 		mut interval := time.new_timer(time.TimeSpec{
 			tv_sec: writeback_interval_seconds
@@ -59,5 +61,11 @@ fn writeback_thread() {
 		// Removed files whose grace period has run out, when no more unlinks
 		// come to free them.
 		fs.reap_removed()
+		// Reseed the random generator half a minute after boot, once the
+		// boot's own events are in its pool, and every five minutes after.
+		seconds += writeback_interval_seconds
+		if seconds == 30 || seconds % 300 == 0 {
+			krandom.stir()
+		}
 	}
 }

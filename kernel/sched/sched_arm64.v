@@ -515,6 +515,8 @@ fn scheduler_timer_handler(_gpr_state voidptr) {
 	// so a switch neither loses time between the two nor counts it twice.
 	now_ns := timer.get_ns()
 	time.advance_to_ns(now_ns)
+	// When each tick lands, to the cycle, is what the generator reseeds from.
+	krandom.add_event(now_ns)
 	if trace_gpu_dispatch {
 		C.kprintf(c'exec[gpu]/sched: scheduler clock advanced to %llu ns\n', u64(now_ns))
 	}

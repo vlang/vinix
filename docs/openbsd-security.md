@@ -164,6 +164,28 @@ address could have patched the kernel's code that way. As OpenBSD and Linux
 keep them, those pages are now read-only in the direct map, and not
 executable. A write through the alias faults on both architectures.
 
+## The kernel's random generator
+
+The kernel's generator is ChaCha20, as OpenBSD's arc4random is, and it now
+works the way arc4random does:
+
+- Fast key erasure. The key that produced a request is replaced before the
+  next request can be served, from a block no caller sees. Someone who reads
+  the generator's state later cannot work back to output it already gave.
+- Reseeding. The generator used to run for the machine's whole life on its
+  boot seed, so a state read out once predicted everything after it. Now it
+  pools the timing of events, scheduler ticks and keystrokes, as OpenBSD's
+  random(4) pools interrupt timings. Half a minute after boot, and every five
+  minutes after that, it hashes the key, the pool and whatever the CPU's own
+  generator offers (RDSEED or RDRAND, or RNDR where arm64 has it) into a new
+  key. A generator that booted without a trustworthy seed becomes ready once
+  the CPU contributes one.
+- Explicit erasure. Keys, seeds and working blocks are cleared with
+  `explicit_bzero`, whose stores the compiler cannot remove as dead.
+
+`tests/krandom/run.sh` runs the generator's own code on the host against
+ChaCha20 test vectors and checks each of these.
+
 ## Already in place
 
 These came before and are unchanged: W^X for user mappings, `mimmutable(2)`

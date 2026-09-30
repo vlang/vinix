@@ -24,6 +24,7 @@ import userland
 import proc
 import usercopy
 import katomic
+import krandom
 
 const console_buffer_size = 1024
 const console_bigbuf_size = 4096
@@ -206,6 +207,8 @@ fn add_to_buf(ptr &u8, count u64, echo bool) {
 
 	for i := u64(0); i < count; i++ {
 		c := unsafe { ptr[i] }
+		// Keystrokes and their timing, as OpenBSD pools them.
+		krandom.add_event(u64(c))
 		if console_termios.c_lflag & termios.isig != 0 {
 			if c == console_termios.c_cc[termios.vintr] {
 				userland.sendsig(latest_thread, userland.sigint)

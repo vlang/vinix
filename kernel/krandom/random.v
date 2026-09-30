@@ -4,6 +4,16 @@ module krandom
 import crypto.sha256
 import klock
 
+fn C.vinix_explicit_bzero(buf voidptr, len u64)
+fn C.vinix_hw_random64(out &u64) int
+
+// OpenBSD's explicit_bzero(3): clear memory that held a secret, with stores
+// the compiler may not drop as dead, which it may do to a memset() of a buffer
+// about to go out of scope.
+pub fn explicit_bzero(buf voidptr, len u64) {
+	C.vinix_explicit_bzero(buf, len)
+}
+
 struct Generator {
 mut:
 	lock       klock.Lock
@@ -16,6 +26,13 @@ mut:
 
 __global (
 	generator &Generator
+	// Timings of events -- scheduler ticks, keystrokes -- folded together by
+	// add_event() until stir() draws on them, as OpenBSD's random(4) pools
+	// device interrupt timings for arc4random's reseeding.
+	entropy_pool   [8]u64
+	entropy_events u64
+	// Whether stir() has run: the first reseed is logged.
+	reseeded bool
 )
 
 @[inline]
@@ -67,6 +84,9 @@ fn (mut this Generator) block(mut out [16]u32) {
 	for i := 0; i < 16; i++ {
 		out[i] = x[i] + state[i]
 	}
+	// Both working copies hold the key.
+	explicit_bzero(&x[0], sizeof(x))
+	explicit_bzero(&state[0], sizeof(state))
 }
 
 fn (mut this Generator) rekey() {
@@ -79,7 +99,7 @@ fn (mut this Generator) rekey() {
 	this.nonce[1] = block[9]
 	this.counter = 0
 	this.output_ctr = 0
-	unsafe { C.memset(&block[0], 0, sizeof(block)) }
+	explicit_bzero(&block[0], sizeof(block))
 }
 
 fn (mut this Generator) fill_locked(buf voidptr, count u64) {
@@ -97,7 +117,15 @@ fn (mut this Generator) fill_locked(buf voidptr, count u64) {
 			this.rekey()
 		}
 	}
-	unsafe { C.memset(&block[0], 0, sizeof(block)) }
+	explicit_bzero(&block[0], sizeof(block))
+	// Fast key erasure, as arc4random does it: the key that produced this
+	// request is replaced before anyone else can ask, from a block no caller
+	// ever sees. Whoever reads the generator's state afterwards cannot work
+	// back to what it has already handed out. An empty request changes
+	// nothing, and one that ended exactly on a rekey needs no other.
+	if count != 0 && this.output_ctr != 0 {
+		this.rekey()
+	}
 }
 
 pub fn initialise() {
@@ -116,9 +144,82 @@ pub fn initialise() {
 		C.memcpy(&rng.nonce[0], &seed[32], 4)
 		C.memcpy(&rng.nonce[1], &seed[36], 4)
 		C.memcpy(&rng.counter, &seed[40], 8)
-		C.memset(&seed[0], 0, sizeof(seed))
 	}
+	explicit_bzero(&seed[0], sizeof(seed))
 	generator = rng
+}
+
+// Fold an event into the pool: its value and the cycle counter at which it
+// happened. Called on paths that must stay cheap, so it takes no lock; two
+// CPUs racing lose a sample, nothing more.
+pub fn add_event(value u64) {
+	n := entropy_events
+	entropy_events = n + 1
+	i := n & 7
+	v := entropy_pool[i]
+	entropy_pool[i] = ((v << 7) | (v >> 57)) ^ cycle_counter() ^ (value * 0x9e3779b97f4a7c15)
+}
+
+// Reseed: hash the key together with the pooled event timings and whatever
+// the CPU's own generator offers, and make that the new key. Without it the
+// generator ran for the machine's whole life on its boot seed, so a state
+// read out once predicted everything it would produce after; OpenBSD reseeds
+// arc4random from the entropy pool every few minutes for the same reason.
+// Called from a kernel thread: it allocates, so not from an interrupt.
+pub fn stir() {
+	if generator == unsafe { nil } {
+		return
+	}
+	mut fresh := [4]u64{}
+	mut fresh_words := 0
+	for fresh_words < fresh.len && C.vinix_hw_random64(&fresh[fresh_words]) != 0 {
+		fresh_words++
+	}
+	domain := 'Vinix kernel CSPRNG reseed v1'
+	mut input := []u8{len: domain.len + 32 + 64 + 32 + 8} @[freed]
+	mut at := domain.len
+	unsafe { C.memcpy(input.data, domain.str, domain.len) }
+	generator.lock.acquire()
+	unsafe { C.memcpy(&input[at], &generator.key[0], 32) }
+	generator.lock.release()
+	at += 32
+	unsafe {
+		C.memcpy(&input[at], &entropy_pool[0], 64)
+		C.memcpy(&input[at + 64], &fresh[0], 32)
+		C.memcpy(&input[at + 96], &entropy_events, 8)
+	}
+	events := entropy_events
+	explicit_bzero(&entropy_pool[0], 8 * sizeof(u64))
+	explicit_bzero(&fresh[0], sizeof(fresh))
+	digest := sha256.sum(input)
+
+	generator.lock.acquire()
+	// XORed in rather than put in place, so output taken since the key was
+	// read above still counts towards the new one.
+	for i := 0; i < 8; i++ {
+		mut word := u32(0)
+		unsafe { C.memcpy(&word, &digest[i * 4], 4) }
+		generator.key[i] ^= word
+	}
+	generator.rekey()
+	// A generator seeded from nothing better than the clock at boot becomes
+	// trustworthy once the CPU has given it real entropy.
+	if fresh_words == fresh.len {
+		generator.secure = true
+	}
+	generator.lock.release()
+
+	if !reseeded {
+		reseeded = true
+		C.kprintf(c'random: reseeded from %llu events, %d hardware words\n', events,
+			fresh_words)
+	}
+	unsafe {
+		explicit_bzero(digest.data, u64(digest.len))
+		digest.free()
+		explicit_bzero(input.data, u64(input.len))
+		input.free()
+	}
 }
 
 pub fn is_ready() bool {
@@ -199,12 +300,12 @@ fn jitter_entropy_seed(mut output [64]u8) bool {
 			digest := sha256.sum(input)
 			unsafe {
 				C.memcpy(&output[i * 32], digest.data, 32)
-				C.memset(digest.data, 0, digest.len)
+				explicit_bzero(digest.data, u64(digest.len))
 				digest.free()
 			}
 		}
 		unsafe {
-			C.memset(input.data, 0, input.len)
+			explicit_bzero(input.data, u64(input.len))
 			input.free()
 		}
 	}
@@ -213,7 +314,7 @@ fn jitter_entropy_seed(mut output [64]u8) bool {
 	C.kprintf(c'random: CPU timing jitter %s (%lld distinct timings, commonest %llu%%)\n',
 		outcome, i64(distinct), u64(share))
 	unsafe {
-		C.memset(samples.data, 0, samples.len)
+		explicit_bzero(samples.data, u64(samples.len))
 		samples.free()
 	}
 	return healthy
