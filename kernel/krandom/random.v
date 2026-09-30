@@ -3,6 +3,7 @@ module krandom
 
 import crypto.sha256
 import klock
+import securemem
 
 struct Generator {
 mut:
@@ -67,6 +68,9 @@ fn (mut this Generator) block(mut out [16]u32) {
 	for i := 0; i < 16; i++ {
 		out[i] = x[i] + state[i]
 	}
+	// Both scratch arrays contain key-dependent state.
+	securemem.zero(&x[0], usize(sizeof(x)))
+	securemem.zero(&state[0], usize(sizeof(state)))
 }
 
 fn (mut this Generator) rekey() {
@@ -79,7 +83,7 @@ fn (mut this Generator) rekey() {
 	this.nonce[1] = block[9]
 	this.counter = 0
 	this.output_ctr = 0
-	unsafe { C.memset(&block[0], 0, sizeof(block)) }
+	securemem.zero(&block[0], usize(sizeof(block)))
 }
 
 fn (mut this Generator) fill_locked(buf voidptr, count u64) {
@@ -97,7 +101,7 @@ fn (mut this Generator) fill_locked(buf voidptr, count u64) {
 			this.rekey()
 		}
 	}
-	unsafe { C.memset(&block[0], 0, sizeof(block)) }
+	securemem.zero(&block[0], usize(sizeof(block)))
 }
 
 pub fn initialise() {
@@ -116,8 +120,8 @@ pub fn initialise() {
 		C.memcpy(&rng.nonce[0], &seed[32], 4)
 		C.memcpy(&rng.nonce[1], &seed[36], 4)
 		C.memcpy(&rng.counter, &seed[40], 8)
-		C.memset(&seed[0], 0, sizeof(seed))
 	}
+	securemem.zero(&seed[0], usize(sizeof(seed)))
 	generator = rng
 }
 
