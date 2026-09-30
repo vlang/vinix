@@ -197,7 +197,8 @@ fn copy_between_mappings(mut pagemap memory.Pagemap, destination u64, source u64
 		source_phys := pagemap.virt2phys(source + offset) or { continue }
 		mut destination_phys := pagemap.virt2phys(destination + offset) or { u64(0) }
 		if destination_phys == 0 {
-			populate_missing_pages(mut pagemap, destination + offset, page_size, prot) or {
+			// The page is read back below, so a lazy shared one is filled in too.
+			populate_missing_pages(mut pagemap, destination + offset, page_size, prot, false) or {
 				return false
 			}
 			destination_phys = pagemap.virt2phys(destination + offset) or { return false }
