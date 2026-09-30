@@ -684,6 +684,8 @@ pub fn vmm_init() {
 	C.kprintf(c'vmm: framebuffer 0x%llx +0x%llx mapped (memmap FB entries: %llu, HHDM 0x%llx)\n',
 		u64(vmm_framebuffer_base), u64(vmm_framebuffer_len), u64(fb_entries), u64(higher_half))
 
+	protect_kernel_image_alias(text_phys, u64(voidptr(C.rodata_end)) - text_virt)
+
 	// Activate the kernel page tables. This is a live switch: the MMU is already
 	// on (Limine handed off with it enabled), so the running instruction stream,
 	// stack and framebuffer must stay mapped across it. The kernel's tables map

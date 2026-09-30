@@ -96,6 +96,23 @@ __global (
 	}
 )
 
+// The direct map covers every physical page, the kernel's own among them, and
+// mapped them all writable: the kernel's text and read-only data were W^X at
+// their own addresses and writable through their alias, so anything able to
+// write kernel memory at a chosen address could patch the kernel's code. As
+// OpenBSD and Linux keep them, the alias of both is read-only here, and not
+// executable. `phys` and `len` cover text through rodata, which the linker
+// scripts align to pages.
+fn protect_kernel_image_alias(phys u64, len u64) {
+	for i := u64(0); i < lib.align_up(len, kernel_page_size); i += kernel_page_size {
+		kernel_pagemap.map_page(phys + i + higher_half, phys + i, pte_present | pte_noexec) or {
+			panic('vmm init failure: kernel image alias')
+		}
+	}
+	C.kprintf(c'vmm: kernel text and rodata read-only in the direct map (0x%llx +0x%llx)\n',
+		phys, len)
+}
+
 fn map_kernel_span(virt u64, phys u64, len u64, flags u64) {
 	aligned_len := lib.align_up(len, kernel_page_size)
 

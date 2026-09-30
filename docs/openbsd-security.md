@@ -154,6 +154,16 @@ jitter since reset. The guard's lowest byte is zero, as glibc makes it, so an
 overflow through a string function stops at the terminator it would have to
 write there.
 
+## A read-only direct map of the kernel
+
+The kernel maps all of physical memory at one more address, the direct map,
+and mapped every page of it writable. That included the pages holding the
+kernel's own code and read-only data: W^X at the kernel's addresses, but
+writable through their alias. Anything able to write kernel memory at a chosen
+address could have patched the kernel's code that way. As OpenBSD and Linux
+keep them, those pages are now read-only in the direct map, and not
+executable. A write through the alias faults on both architectures.
+
 ## Already in place
 
 These came before and are unchanged: W^X for user mappings, `mimmutable(2)`

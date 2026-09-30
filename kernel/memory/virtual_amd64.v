@@ -380,6 +380,8 @@ pub fn vmm_init() {
 		}
 	}
 
+	protect_kernel_image_alias(text_phys, u64(voidptr(C.rodata_end)) - text_virt)
+
 	kernel_pagemap.switch_to()
 
 	vmm_initialised = true
