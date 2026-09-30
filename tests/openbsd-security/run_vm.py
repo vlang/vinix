@@ -35,6 +35,7 @@ FEATURE_MARKERS = (
     b"OPENBSD SECURITY PASS: signal frames are signed",
     b"OPENBSD SECURITY PASS: process ids are random",
     b"OPENBSD SECURITY PASS: the program break is random",
+    b"OPENBSD SECURITY PASS: minherit and fork-time wiping",
 )
 REPORT_MARKER = b': pledge "rpath", syscall '
 

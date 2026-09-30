@@ -34,6 +34,8 @@ pub fn init_storage_syscalls() {
 	// OpenBSD's pledge(2) and unveil(2), next to mimmutable in the same block.
 	syscall_table[248] = voidptr(fs.syscall_pledge)
 	syscall_table[249] = voidptr(fs.syscall_unveil)
+	// And OpenBSD's minherit(2).
+	syscall_table[250] = voidptr(mmap.syscall_minherit)
 }
 
 fn security_linux_mmap(gpr_state voidptr, addr voidptr, length u64, prot u64,

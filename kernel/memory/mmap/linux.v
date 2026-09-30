@@ -94,6 +94,13 @@ pub fn syscall_mremap(_ voidptr, old_address u64, old_size u64, new_size u64, fl
 	}
 	prot := source.prot
 	map_flags := source.flags
+	// What fork does with the range moves with it, as on Linux.
+	inheritance := InheritChange{
+		set_dont_fork: true
+		dont_fork: source.dont_fork
+		set_wipe_on_fork: true
+		wipe_on_fork: source.wipe_on_fork
+	}
 	// A move has to re-establish the mapping against whatever backs it, so the
 	// resource and its handle come along, and the file offset is the source
 	// range's own offset advanced to wherever inside it the move starts.
@@ -152,6 +159,13 @@ pub fn syscall_mremap(_ voidptr, old_address u64, old_size u64, new_size u64, fl
 
 	destination := mmap_with_credit(pagemap, destination_hint, new_length, prot, destination_flags, source_resource, destination_offset, source_handle, source_handle_ref, source_handle_unref, old_length, source_options) or {
 		return errno.err, errno.get()
+	}
+	// Before anything is copied in: a thread forking meanwhile must not hand
+	// its child what the range was kept from children for.
+	if inheritance.dont_fork || inheritance.wipe_on_fork {
+		pagemap.l.acquire()
+		set_inheritance_unlocked(mut pagemap, u64(destination), new_length, inheritance) or {}
+		pagemap.l.release()
 	}
 
 	// Only anonymous pages have to be carried over by hand. A file mapping is
@@ -271,6 +285,10 @@ pub fn syscall_madvise(_ voidptr, address u64, length u64, advice int) (u64, u64
 	// the requested subpage so adjacent guest pages keep their contents.
 	guest_page_size := if process.executable_path == '/usr/bin/qemu-x86_64'
 		|| process.executable_path == '/usr/bin/qemu-i386' { u64(4096) } else { page_size }
+	if advice == madv_dontfork || advice == madv_dofork || advice == madv_wipeonfork
+		|| advice == madv_keeponfork {
+		return madvise_inheritance(address, length, advice)
+	}
 	if address % guest_page_size != 0 {
 		return errno.err, errno.einval
 	}

@@ -31,4 +31,5 @@ pub fn init_security_syscalls() {
 	syscall_table[500] = voidptr(mmap.syscall_mimmutable)
 	syscall_table[501] = voidptr(fs.syscall_pledge)
 	syscall_table[502] = voidptr(fs.syscall_unveil)
+	syscall_table[503] = voidptr(mmap.syscall_minherit)
 }

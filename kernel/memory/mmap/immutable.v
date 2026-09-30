@@ -102,6 +102,8 @@ fn mimmutable_unlocked(mut pagemap memory.Pagemap, base u64, length u64) ? {
 				flags: local_range.flags
 				cow: local_range.cow
 				immutable: local_range.immutable
+				dont_fork: local_range.dont_fork
+				wipe_on_fork: local_range.wipe_on_fork
 				global: local_range.global
 			}
 			range_locals_lock.acquire()
@@ -130,6 +132,8 @@ fn mimmutable_unlocked(mut pagemap memory.Pagemap, base u64, length u64) ? {
 				flags: local_range.flags
 				cow: local_range.cow
 				immutable: true
+				dont_fork: local_range.dont_fork
+				wipe_on_fork: local_range.wipe_on_fork
 				global: local_range.global
 			}
 			range_locals_lock.acquire()

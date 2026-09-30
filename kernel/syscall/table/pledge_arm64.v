@@ -104,8 +104,8 @@ fn pledge_needs(nr u64, a [6]u64) u64 {
 		// remap_file_pages, mbind, get_mempolicy, set_mempolicy.
 		227...237 { pledge_stdio }
 		238, 239, 424, 434, 440, 448 { p_proc } // migrate_pages, move_pages, pidfd_*, process_madvise, process_mrelease
-		// Vinix: set_tls, sigentry, mimmutable.
-		245, 246, 247 { pledge_stdio }
+		// Vinix: set_tls, sigentry, mimmutable, minherit.
+		245, 246, 247, 250 { pledge_stdio }
 		248 { pledge_always } // pledge: only ever narrows
 		249 { proc.pledge_unveil } // unveil
 		260 { pledge_stdio } // wait4

@@ -4,8 +4,8 @@
 
 /* SPDX-License-Identifier: BSD-2-Clause
  * In-guest regression coverage for Vinix's OpenBSD security features:
- * pledge(2), unveil(2), signed signal frames, random process ids and a
- * random program break. Built statically for either architecture and run
+ * pledge(2), unveil(2), signed signal frames, random process ids, a
+ * random program break and minherit(2). Built statically for either architecture and run
  * as PID 1; every case runs in a child, so a pledge violation that kills the
  * child is an outcome the parent can check. */
 #define _GNU_SOURCE
@@ -29,14 +29,27 @@
 #include <unistd.h>
 
 #if defined(__aarch64__)
+#define SYS_vinix_mimmutable 247
 #define SYS_vinix_pledge 248
 #define SYS_vinix_unveil 249
+#define SYS_vinix_minherit 250
 #elif defined(__x86_64__)
+#define SYS_vinix_mimmutable 500
 #define SYS_vinix_pledge 501
 #define SYS_vinix_unveil 502
+#define SYS_vinix_minherit 503
 #else
 #error "unsupported architecture"
 #endif
+
+#ifndef MADV_WIPEONFORK
+#define MADV_WIPEONFORK 18
+#define MADV_KEEPONFORK 19
+#endif
+#define MAP_INHERIT_SHARE 0
+#define MAP_INHERIT_COPY 1
+#define MAP_INHERIT_NONE 2
+#define MAP_INHERIT_ZERO 3
 
 static char *self_path = "/sbin/init";
 
@@ -668,10 +681,157 @@ static int run_break_tests(void)
 	return 0;
 }
 
+static int minherit(void *address, size_t length, int inherit)
+{
+	return (int)syscall(SYS_vinix_minherit, address, length, inherit);
+}
+
+static size_t page;
+
+/* Every byte of `length` at `address` is `value`. */
+static int filled(const unsigned char *address, size_t length, unsigned char value)
+{
+	for (size_t i = 0; i < length; i++)
+		if (address[i] != value)
+			return 0;
+	return 1;
+}
+
+/* A child that reads a byte of each page it is given, to be killed by
+ * SIGSEGV on one its parent left out of it. */
+static volatile unsigned char *probe_address;
+
+static int probe_reads(void)
+{
+	return probe_address[0] == 0x5a ? 0 : 2;
+}
+
+static unsigned char *inherit_pages;
+
+/* What a forked child sees of the pages run_inherit_tests set up. */
+static int inherit_child(void)
+{
+	unsigned char *p = inherit_pages;
+	CHECK(filled(p, page, 0));             /* MADV_WIPEONFORK */
+	CHECK(filled(p + 2 * page, page, 0));  /* MAP_INHERIT_ZERO */
+	CHECK(filled(p + 3 * page, page, 4));  /* copied as usual */
+	/* MADV_DONTFORK: not mapped in the child at all. */
+	CHECK(refused(minherit(p + page, page, MAP_INHERIT_COPY), ENOMEM));
+	probe_address = p + page;
+	CHECK(killed_by(in_child(probe_reads), SIGSEGV));
+	/* A wiped range stays so in the child, and is wiped again for its own. */
+	memset(p, 7, page);
+	probe_address = p;
+	int status = in_child(probe_reads);
+	CHECK(WIFEXITED(status) && WEXITSTATUS(status) == 2);
+	CHECK(filled(p, page, 7));
+	return 0;
+}
+
+static int inherit_split_child(void)
+{
+	CHECK(filled(inherit_pages, page, 1));
+	CHECK(filled(inherit_pages + page, page, 0));
+	CHECK(filled(inherit_pages + 2 * page, page, 3));
+	return 0;
+}
+
+static int inherit_kept_child(void)
+{
+	CHECK(filled(inherit_pages, 3 * page, 9));
+	return 0;
+}
+
+static int inherit_hole_child(void)
+{
+	CHECK(filled(inherit_pages, page, 9));
+	CHECK(filled(inherit_pages + 2 * page, page, 9));
+	return 0;
+}
+
+static int pledged_minherit(void)
+{
+	CHECK(pledge("stdio", NULL) == 0);
+	unsigned char *p = mmap(NULL, page, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+	CHECK(p != MAP_FAILED);
+	CHECK(minherit(p, page, MAP_INHERIT_ZERO) == 0);
+	CHECK(madvise(p, page, MADV_WIPEONFORK) == 0);
+	return 0;
+}
+
+static int run_inherit_tests(void)
+{
+	page = (size_t)sysconf(_SC_PAGESIZE);
+
+	/* Each of four pages inherited its own way. */
+	unsigned char *p = mmap(NULL, 4 * page, PROT_READ | PROT_WRITE,
+	    MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+	CHECK(p != MAP_FAILED);
+	for (int i = 0; i < 4; i++)
+		memset(p + i * page, i + 1, page);
+	CHECK(madvise(p, page, MADV_WIPEONFORK) == 0);
+	CHECK(madvise(p + page, page, MADV_DONTFORK) == 0);
+	CHECK(minherit(p + 2 * page, page, MAP_INHERIT_ZERO) == 0);
+	inherit_pages = p;
+	CHECK(exited_ok(in_child(inherit_child)));
+	/* The parent keeps what it had. */
+	for (int i = 0; i < 4; i++)
+		CHECK(filled(p + i * page, page, i + 1));
+	CHECK(munmap(p, 4 * page) == 0);
+
+	/* The middle of a range, which splits it in three. */
+	p = mmap(NULL, 3 * page, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+	CHECK(p != MAP_FAILED);
+	for (int i = 0; i < 3; i++)
+		memset(p + i * page, i + 1, page);
+	CHECK(minherit(p + page, page, MAP_INHERIT_ZERO) == 0);
+	inherit_pages = p;
+	CHECK(exited_ok(in_child(inherit_split_child)));
+
+	/* Undone: MADV_KEEPONFORK, MADV_DOFORK and MAP_INHERIT_COPY. */
+	memset(p, 9, 3 * page);
+	CHECK(madvise(p, 3 * page, MADV_KEEPONFORK) == 0);
+	CHECK(madvise(p, 3 * page, MADV_DONTFORK) == 0);
+	CHECK(madvise(p, 3 * page, MADV_DOFORK) == 0);
+	CHECK(minherit(p, 3 * page, MAP_INHERIT_NONE) == 0);
+	CHECK(minherit(p, 3 * page, MAP_INHERIT_COPY) == 0);
+	CHECK(exited_ok(in_child(inherit_kept_child)));
+
+	/* A hole refuses the whole request: nothing before it changed. */
+	CHECK(munmap(p + page, page) == 0);
+	CHECK(refused(minherit(p, 3 * page, MAP_INHERIT_ZERO), ENOMEM));
+	CHECK(refused(madvise(p, 3 * page, MADV_WIPEONFORK), ENOMEM));
+	inherit_pages = p;
+	CHECK(exited_ok(in_child(inherit_hole_child)));
+	CHECK(munmap(p, 3 * page) == 0);
+
+	/* Wiping is for private anonymous memory; a shared mapping stays one. */
+	p = mmap(NULL, page, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+	CHECK(p != MAP_FAILED);
+	CHECK(refused(madvise(p, page, MADV_WIPEONFORK), EINVAL));
+	CHECK(refused(minherit(p, page, MAP_INHERIT_ZERO), EINVAL));
+	CHECK(refused(minherit(p, page, MAP_INHERIT_COPY), EINVAL));
+	CHECK(minherit(p, page, MAP_INHERIT_SHARE) == 0);
+	CHECK(refused(minherit(p, page, 7), EINVAL));
+	CHECK(munmap(p, page) == 0);
+
+	/* mimmutable(2) fixes how a range is inherited too. */
+	p = mmap(NULL, page, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+	CHECK(p != MAP_FAILED);
+	CHECK(syscall(SYS_vinix_mimmutable, p, page) == 0);
+	CHECK(refused(minherit(p, page, MAP_INHERIT_ZERO), EPERM));
+	CHECK(refused(madvise(p, page, MADV_DONTFORK), EPERM));
+
+	/* The stdio promise allows it. */
+	CHECK(exited_ok(in_child(pledged_minherit)));
+	puts("OPENBSD SECURITY PASS: minherit and fork-time wiping");
+	return 0;
+}
+
 static int run_tests(void)
 {
 	if (run_pledge_tests() != 0 || run_unveil_tests() != 0 || run_signal_tests() != 0
-	    || run_pid_tests() != 0 || run_break_tests() != 0)
+	    || run_pid_tests() != 0 || run_break_tests() != 0 || run_inherit_tests() != 0)
 		return 1;
 	puts("VINIX OPENBSD SECURITY: PASS");
 	return 0;

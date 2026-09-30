@@ -103,6 +103,10 @@ pub mut:
 	flags     int
 	cow       bool
 	immutable bool
+	// What fork(2) does with the range, set by madvise(2) and minherit(2):
+	// leaves it out of the child, or gives the child an empty one.
+	dont_fork    bool
+	wipe_on_fork bool
 	tree_left &MmapRangeLocal = unsafe { nil }
 	tree_right &MmapRangeLocal = unsafe { nil }
 	tree_priority u64
@@ -580,6 +584,11 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap) ?&memory.Pagemap {
 		mut local_range := unsafe { &MmapRangeLocal(ptr) }
 		mut global_range := local_range.global
 
+		// MADV_DONTFORK, minherit(MAP_INHERIT_NONE): not the child's at all.
+		if local_range.dont_fork {
+			continue
+		}
+
 		mut new_local_range := &MmapRangeLocal{
 			pagemap: unsafe { nil }
 			global: unsafe { nil }
@@ -588,6 +597,27 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap) ?&memory.Pagemap {
 			*new_local_range = *local_range
 		}
 		new_local_range.pagemap = new_pagemap
+
+		// MADV_WIPEONFORK, minherit(MAP_INHERIT_ZERO): the child gets the
+		// range empty, to fill with zero pages as it touches them, and none
+		// of what the parent kept there: a random generator's state, a key.
+		if local_range.wipe_on_fork {
+			new_local_range.cow = false
+			new_local_range.offset = 0
+			mut empty_global := &MmapRangeGlobal{
+				locals: []&MmapRangeLocal{}
+				base: local_range.base
+				length: local_range.length
+				shadow_pagemap: memory.Pagemap{
+					top_level: unsafe { &u64(0) }
+				}
+			}
+			empty_global.shadow_pagemap.top_level = &u64(memory.pmm_alloc(1))
+			new_local_range.global = empty_global
+			empty_global.add_local(new_local_range)
+			insert_range_unlocked(mut new_pagemap, new_local_range)
+			continue
+		}
 
 		if local_range.flags & map_shared != 0 {
 			range_locals_lock.acquire()
@@ -1569,7 +1599,8 @@ fn extend_brk_range_unlocked(mut pagemap memory.Pagemap, base u64, length u64, p
 	if committed == unsafe { nil } || reserve == unsafe { nil }
 		|| committed.global != reserve.global || committed.flags != reserve.flags
 		|| committed.cow != reserve.cow || committed.immutable != reserve.immutable
-		|| committed.offset + i64(committed.length) != reserve.offset {
+		|| committed.dont_fork != reserve.dont_fork
+		|| committed.wipe_on_fork != reserve.wipe_on_fork || committed.offset + i64(committed.length) != reserve.offset {
 		return false
 	}
 
@@ -1646,6 +1677,8 @@ pub fn mprotect_unlocked(mut pagemap memory.Pagemap, addr voidptr, _length u64, 
 				flags: local_range.flags
 				cow: local_range.cow
 				immutable: local_range.immutable
+				dont_fork: local_range.dont_fork
+				wipe_on_fork: local_range.wipe_on_fork
 				global: local_range.global
 			}
 			range_locals_lock.acquire()
@@ -1689,6 +1722,8 @@ pub fn mprotect_unlocked(mut pagemap memory.Pagemap, addr voidptr, _length u64, 
 				flags: local_range.flags
 				cow: local_range.cow
 				immutable: local_range.immutable
+				dont_fork: local_range.dont_fork
+				wipe_on_fork: local_range.wipe_on_fork
 				global: local_range.global
 			}
 			range_locals_lock.acquire()
@@ -1796,6 +1831,8 @@ fn munmap_unlocked_impl(mut pagemap memory.Pagemap, addr voidptr, _length u64,
 				flags: local_range.flags
 				cow: local_range.cow
 				immutable: local_range.immutable
+				dont_fork: local_range.dont_fork
+				wipe_on_fork: local_range.wipe_on_fork
 				global: local_range.global
 			}
 			range_locals_lock.acquire()

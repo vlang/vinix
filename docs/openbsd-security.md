@@ -186,6 +186,30 @@ works the way arc4random does:
 `tests/krandom/run.sh` runs the generator's own code on the host against
 ChaCha20 test vectors and checks each of these.
 
+## minherit(2) and fork-time wiping
+
+A forked child used to get a copy of everything its parent had mapped,
+including a user-space random generator's state: parent and child then
+produced the same "random" bytes. OpenBSD's `minherit(2)` lets a program say
+what fork does with a range, and Linux's `madvise(2)` has the same advice, so
+both are there:
+
+- `MAP_INHERIT_ZERO`, `MADV_WIPEONFORK`: the child gets the range filled
+  with zeros. The setting stays with the child's copy. Only private anonymous
+  memory can be wiped (EINVAL otherwise), as on Linux.
+- `MAP_INHERIT_NONE`, `MADV_DONTFORK`: the range is not mapped in the child
+  at all.
+- `MAP_INHERIT_COPY`, `MAP_INHERIT_SHARE`, `MADV_KEEPONFORK`,
+  `MADV_DOFORK` undo those. COPY is accepted only for a private mapping and
+  SHARE only for a shared one: the kernel does not turn one into the other.
+
+A request that covers a hole fails with ENOMEM, and one that covers an
+immutable range fails with EPERM; either way nothing changes. The setting
+moves with a range that `mremap(2)` moves, and exec clears it. `minherit`
+needs only the `stdio` promise. OpenBSD's arc4random keeps its state in a
+`MAP_INHERIT_ZERO` range, and finding it zeroed after a fork is how it knows
+to rekey instead of repeating its parent.
+
 ## Already in place
 
 These came before and are unchanged: W^X for user mappings, `mimmutable(2)`
@@ -211,6 +235,7 @@ unused:
 | `mimmutable` | 247 | 500 |
 | `pledge` | 248 | 501 |
 | `unveil` | 249 | 502 |
+| `minherit` | 250 | 503 |
 
 ```c
 #include <sys/syscall.h>
@@ -219,9 +244,11 @@ unused:
 #if defined(__aarch64__)
 #define SYS_pledge 248
 #define SYS_unveil 249
+#define SYS_minherit 250
 #else
 #define SYS_pledge 501
 #define SYS_unveil 502
+#define SYS_minherit 503
 #endif
 
 static int pledge(const char *promises, const char *execpromises)
@@ -232,5 +259,10 @@ static int pledge(const char *promises, const char *execpromises)
 static int unveil(const char *path, const char *permissions)
 {
 	return syscall(SYS_unveil, path, permissions);
+}
+
+static int minherit(void *addr, size_t len, int inherit)
+{
+	return syscall(SYS_minherit, addr, len, inherit);
 }
 ```
