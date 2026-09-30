@@ -38,11 +38,16 @@ mut:
 	offset_x int
 	offset_y int
 	// A resize is measured from the frame at pointer-down, so grabbing anywhere
-	// in the corner does not make the edge jump under the pointer.
+	// in the corner does not make the edge jump under the pointer. The grabbed
+	// corner's two edges follow the pointer; the opposite corner stays put.
 	start_pointer_x int
 	start_pointer_y int
+	start_x         int
+	start_y         int
 	start_width     int
 	start_height    int
+	resize_left     bool
+	resize_top      bool
 	// Edge placement is a drag gesture, not a side effect of clicking an
 	// already edge-touching title bar without moving it.
 	moved               bool
@@ -243,6 +248,9 @@ fn (mut d Desktop) spawn(title string, page Page, x int, y int, width int, heigh
 		id_divider:     '${prefix}.divider'
 		id_body:        '${prefix}.body'
 		id_resize:      '${prefix}.resize'
+		id_resize_sw:   '${prefix}.resize_sw'
+		id_resize_nw:   '${prefix}.resize_nw'
+		id_resize_ne:   '${prefix}.resize_ne'
 		id_task:        'task.${id}'
 		task_rank:      id
 		id_preview:       '${taskbar_preview_prefix}${id}'
@@ -633,20 +641,29 @@ fn (mut d Desktop) window_element(window_index int) ui2.Element {
 		bg: background
 	}, contents)
 
-	mut window_children := frame_elements(4)
+	mut window_children := frame_elements(9)
 	// The body goes first: a toolbar's title bar reaches down over its top.
 	window_children << body
 	window_children << title_bar
 	window_children << divider
 	// Arranged windows already fill a desktop-defined region. A normal window
-	// retains an invisible lower-right target for pointer resizing, without
+	// retains an invisible target at each corner for pointer resizing, without
 	// adding chrome over the application's surface.
 	if !window.maximized && window.snap == .none_ {
-		grip_size := window_resize_grip_size
-		window_children << ui2.draggable_view_with_cursor(window.id_resize, ui2.rect(f64(window.width -
-			grip_size), f64(window.height - grip_size), f64(grip_size), f64(grip_size)), ui2.BoxStyle{
-			transparent: true
-		}, ui2.cursor_resize_nwse, frame_elements(0))
+		grip := window_resize_grip_size
+		edge := window_resize_edge_size
+		right := window.width - grip
+		bottom := window.height - grip
+		window_children << resize_grip(window.id_resize, right, bottom, grip, grip, ui2.cursor_resize_nwse)
+		window_children << resize_grip(window.id_resize_sw, 0, bottom, grip, grip, ui2.cursor_resize_nesw)
+		// The upper corners are the title bar's, whose buttons sit a few pixels
+		// in from them. There the grip is an L along the two outer edges, so
+		// the buttons and the bar's own drag keep the rest.
+		window_children << resize_grip(window.id_resize_nw, 0, 0, grip, edge, ui2.cursor_resize_nwse)
+		window_children << resize_grip(window.id_resize_nw, 0, 0, edge, grip, ui2.cursor_resize_nwse)
+		window_children << resize_grip(window.id_resize_ne, right, 0, grip, edge, ui2.cursor_resize_nesw)
+		window_children << resize_grip(window.id_resize_ne, window.width - edge, 0, edge, grip,
+			ui2.cursor_resize_nesw)
 	}
 	// `focused` tells the renderer which window's controls are drawn as the
 	// key window's.
@@ -657,6 +674,23 @@ fn (mut d Desktop) window_element(window_index int) ui2.Element {
 		}, window_children)
 		focused: active
 	}
+}
+
+// resize_grip is one invisible, draggable part of a corner's resize target.
+fn resize_grip(id string, x int, y int, width int, height int, cursor string) ui2.Element {
+	return ui2.draggable_view_with_cursor(id, ui2.rect(f64(x), f64(y), f64(width), f64(height)),
+		ui2.BoxStyle{
+			transparent: true
+		}, cursor, frame_elements(0))
+}
+
+// window_resize_action tells a corner grip's selector, 'win.<id>.resize' for
+// the lower right and 'win.<id>.resize_<corner>' for the others, from the rest
+// of a window's chrome.
+fn window_resize_action(action string) bool {
+	return action.starts_with('win.') && (action.ends_with('.resize')
+		|| action.ends_with('.resize_sw') || action.ends_with('.resize_nw')
+		|| action.ends_with('.resize_ne'))
 }
 
 // window_contents is the body's background colour and its children. A native
@@ -1911,16 +1945,25 @@ fn (mut d Desktop) on_pointer_move(x int, y int) {
 	}
 }
 
-// resize_window_to_pointer changes the lower and right edges while leaving the
-// window's origin fixed. The usable desktop bounds the growing edge; a window
+// resize_window_to_pointer moves the two edges of the grabbed corner while
+// leaving the opposite corner fixed. The usable desktop bounds the growing
+// edge, so a top edge never takes the title bar off the screen; a window
 // already positioned too near an edge still retains the global minimum size.
 fn (mut d Desktop) resize_window_to_pointer(x int, y int) {
 	index := d.window_index(d.drag.window_id) or {
 		d.drag = Drag{}
 		return
 	}
-	mut width := d.drag.start_width + x - d.drag.start_pointer_x
-	mut height := d.drag.start_height + y - d.drag.start_pointer_y
+	dx := x - d.drag.start_pointer_x
+	dy := y - d.drag.start_pointer_y
+	right := d.drag.start_x + d.drag.start_width
+	bottom := d.drag.start_y + d.drag.start_height
+	mut width := if d.drag.resize_left { d.drag.start_width - dx } else { d.drag.start_width + dx }
+	mut height := if d.drag.resize_top {
+		d.drag.start_height - dy
+	} else {
+		d.drag.start_height + dy
+	}
 	min_height := d.theme().title_height + window_min_body_height
 	if width < window_min_width {
 		width = window_min_width
@@ -1928,15 +1971,24 @@ fn (mut d Desktop) resize_window_to_pointer(x int, y int) {
 	if height < min_height {
 		height = min_height
 	}
-	max_width := d.canvas.width - d.windows[index].x
-	max_height := d.canvas.height - taskbar_height - d.windows[index].y
+	max_width := if d.drag.resize_left { right } else { d.canvas.width - d.drag.start_x }
+	max_height := if d.drag.resize_top {
+		bottom
+	} else {
+		d.canvas.height - taskbar_height - d.drag.start_y
+	}
 	if max_width >= window_min_width && width > max_width {
 		width = max_width
 	}
 	if max_height >= min_height && height > max_height {
 		height = max_height
 	}
-	if width != d.windows[index].width || height != d.windows[index].height {
+	new_x := if d.drag.resize_left { right - width } else { d.drag.start_x }
+	new_y := if d.drag.resize_top { bottom - height } else { d.drag.start_y }
+	if width != d.windows[index].width || height != d.windows[index].height
+		|| new_x != d.windows[index].x || new_y != d.windows[index].y {
+		d.windows[index].x = new_x
+		d.windows[index].y = new_y
 		d.windows[index].width = width
 		d.windows[index].height = height
 		d.dirty = true
@@ -2086,7 +2138,7 @@ fn (mut d Desktop) on_pointer_down(x int, y int) {
 		d.close_start_menu()
 	}
 
-	resizing_window := world == .desktop && action.starts_with('win.') && action.ends_with('.resize')
+	resizing_window := world == .desktop && window_resize_action(action)
 	if !resizing_window && d.forward_pointer_to_app(x, y, .down, .left, 0) && action == '' {
 		// Raw-surface clicks were already delivered and focused above. Falling
 		// through would interpret their deliberately action-less content as an
@@ -2167,7 +2219,7 @@ fn (mut d Desktop) on_pointer_down(x int, y int) {
 				d.chrome_pointer_capture = true
 				d.drag_damage = DamageRect{}
 			}
-			'resize' {
+			'resize', 'resize_sw', 'resize_nw', 'resize_ne' {
 				index := d.window_index(id) or { return }
 				if d.windows[index].maximized || d.windows[index].snap != .none_ {
 					return
@@ -2179,8 +2231,12 @@ fn (mut d Desktop) on_pointer_down(x int, y int) {
 					window_id:       id
 					start_pointer_x: x
 					start_pointer_y: y
+					start_x:         d.windows[resized].x
+					start_y:         d.windows[resized].y
 					start_width:     d.windows[resized].width
 					start_height:    d.windows[resized].height
+					resize_left:     part == 'resize_sw' || part == 'resize_nw'
+					resize_top:      part == 'resize_nw' || part == 'resize_ne'
 				}
 				d.chrome_pointer_capture = true
 				d.drag_damage = DamageRect{}

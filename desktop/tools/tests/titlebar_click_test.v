@@ -304,10 +304,15 @@ fn test_clicking_an_edge_touching_titlebar_does_not_snap_without_a_drag() {
 fn set_resize_test_target(mut desktop Desktop, id int) {
 	index := desktop.window_index(id) or { panic('missing test window') }
 	window := desktop.windows[index]
+	set_corner_test_target(mut desktop, window.id_resize, window.x + window.width - window_resize_grip_size,
+		window.y + window.height - window_resize_grip_size)
+}
+
+fn set_corner_test_target(mut desktop Desktop, action_id string, x int, y int) {
 	target := HitTarget{
-		action_id: window.id_resize
-		x:         window.x + window.width - window_resize_grip_size
-		y:         window.y + window.height - window_resize_grip_size
+		action_id: action_id
+		x:         x
+		y:         y
 		width:     window_resize_grip_size
 		height:    window_resize_grip_size
 	}
@@ -316,6 +321,152 @@ fn set_resize_test_target(mut desktop Desktop, id int) {
 	} else {
 		desktop.targets[0] = target
 	}
+}
+
+// record_window_test_targets collects the hit targets the window's real frame
+// produces, as the render pass does.
+fn record_window_test_targets(mut desktop Desktop, id int) {
+	index := desktop.window_index(id) or { panic('missing test window') }
+	frame := desktop.window_element(index)
+	desktop.targets.clear()
+	desktop.record_subtree_targets(&frame, desktop.windows[index].x, desktop.windows[index].y,
+		desktop.windows[index].width, desktop.windows[index].height)
+	free_tree(frame)
+}
+
+fn test_every_corner_of_a_normal_window_is_a_resize_grip() {
+	for side in [ButtonSide.right, ButtonSide.left] {
+		for theme in [ThemeKind.default_, ThemeKind.macos] {
+			mut desktop := Desktop{
+				canvas: Canvas{
+					width:  800
+					height: 600
+				}
+			}
+			desktop.settings.theme = theme
+			desktop.settings.button_side = side
+			id := desktop.spawn('Welcome', .welcome, 120, 80, 400, 260)
+			record_window_test_targets(mut desktop, id)
+			index := desktop.window_index(id) or { panic('missing test window') }
+			window := desktop.windows[index]
+			left := window.x
+			top := window.y
+			right := window.x + window.width - 1
+			bottom := window.y + window.height - 1
+			assert desktop.hit_action(right, bottom) == window.id_resize
+			assert desktop.hit_action(left, bottom) == window.id_resize_sw
+			assert desktop.hit_action(left, top) == window.id_resize_nw
+			assert desktop.hit_action(right, top) == window.id_resize_ne
+			// The upper grips run along the top and side edges only, leaving
+			// the buttons, the title and the bar's drag where they were.
+			assert desktop.hit_action(left + window_resize_grip_size - 1, top) == window.id_resize_nw
+			assert desktop.hit_action(left, top + window_resize_grip_size - 1) == window.id_resize_nw
+			assert desktop.hit_action(right, top + window_resize_grip_size - 1) == window.id_resize_ne
+			assert desktop.hit_action(left + window_resize_edge_size, top + window_resize_edge_size) != window.id_resize_nw
+			assert desktop.hit_action(right - window_resize_edge_size, top + window_resize_edge_size) != window.id_resize_ne
+			buttons := [window.id_close, window.id_maximize, window.id_minimize]
+			for target in desktop.targets {
+				if target.action_id in buttons {
+					assert desktop.hit_action(target.x, target.y) == target.action_id
+					assert desktop.hit_action(target.x + target.width - 1, target.y) == target.action_id
+				}
+			}
+		}
+	}
+}
+
+fn test_maximized_window_has_no_resize_grips() {
+	mut desktop := Desktop{
+		canvas: Canvas{
+			width:  800
+			height: 600
+		}
+	}
+	id := desktop.spawn('Welcome', .welcome, 120, 80, 400, 260)
+	desktop.maximize(id)
+	record_window_test_targets(mut desktop, id)
+	for target in desktop.targets {
+		assert !window_resize_action(target.action_id)
+	}
+}
+
+fn test_upper_left_corner_moves_the_top_and_left_edges() {
+	mut desktop := Desktop{
+		canvas: Canvas{
+			width:  800
+			height: 600
+		}
+	}
+	id := desktop.spawn('Welcome', .welcome, 120, 80, 400, 260)
+	index := desktop.window_index(id) or { panic('missing resized window') }
+	set_corner_test_target(mut desktop, desktop.windows[index].id_resize_nw, 120, 80)
+	desktop.on_pointer_down(121, 81)
+	assert desktop.drag.kind == .resize
+	desktop.buttons = button_left
+	desktop.on_pointer_move(71, 41)
+	assert desktop.windows[index].x == 70
+	assert desktop.windows[index].y == 40
+	assert desktop.windows[index].width == 450
+	assert desktop.windows[index].height == 300
+	// Shrinking stops at the minimum size with the lower-right corner still
+	// where it was.
+	desktop.on_pointer_move(700, 500)
+	assert desktop.windows[index].width == window_min_width
+	assert desktop.windows[index].height == desktop.theme().title_height + window_min_body_height
+	assert desktop.windows[index].x + desktop.windows[index].width == 520
+	assert desktop.windows[index].y + desktop.windows[index].height == 340
+	// Growing stops at the screen's top and left edges, so the title bar
+	// stays reachable.
+	desktop.on_pointer_move(-50, -50)
+	assert desktop.windows[index].x == 0
+	assert desktop.windows[index].y == 0
+	assert desktop.windows[index].width == 520
+	assert desktop.windows[index].height == 340
+	desktop.buttons = 0
+	desktop.on_pointer_up(-50, -50)
+	assert desktop.drag.kind == .none_
+	assert desktop.windows[index].restore_x == 0
+	assert desktop.windows[index].restore_y == 0
+	assert desktop.windows[index].restore_width == 520
+	assert desktop.windows[index].restore_height == 340
+}
+
+fn test_upper_right_and_lower_left_corners_move_their_own_edges() {
+	mut desktop := Desktop{
+		canvas: Canvas{
+			width:  800
+			height: 600
+		}
+	}
+	id := desktop.spawn('Welcome', .welcome, 120, 80, 400, 260)
+	index := desktop.window_index(id) or { panic('missing resized window') }
+	set_corner_test_target(mut desktop, desktop.windows[index].id_resize_ne, 520 - window_resize_grip_size,
+		80)
+	desktop.on_pointer_down(518, 82)
+	desktop.buttons = button_left
+	desktop.on_pointer_move(568, 52)
+	assert desktop.windows[index].x == 120
+	assert desktop.windows[index].y == 50
+	assert desktop.windows[index].width == 450
+	assert desktop.windows[index].height == 290
+	desktop.buttons = 0
+	desktop.on_pointer_up(568, 52)
+
+	set_corner_test_target(mut desktop, desktop.windows[index].id_resize_sw, 120, 340 - window_resize_grip_size)
+	desktop.on_pointer_down(122, 338)
+	desktop.buttons = button_left
+	desktop.on_pointer_move(92, 368)
+	assert desktop.windows[index].x == 90
+	assert desktop.windows[index].y == 50
+	assert desktop.windows[index].width == 480
+	assert desktop.windows[index].height == 320
+	// The lower edge stops at the taskbar.
+	desktop.on_pointer_move(92, 599)
+	assert desktop.windows[index].y + desktop.windows[index].height == 600 - taskbar_height
+	desktop.buttons = 0
+	desktop.on_pointer_up(92, 599)
+	assert desktop.windows[index].restore_x == 90
+	assert desktop.windows[index].restore_width == 480
 }
 
 fn test_lower_right_corner_resizes_window_and_updates_restore_frame() {

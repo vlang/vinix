@@ -57,8 +57,12 @@ mut:
 	id_minimize string
 	id_divider  string
 	id_body     string
-	id_resize   string
-	id_task     string
+	// One grip per corner; id_resize is the lower right.
+	id_resize    string
+	id_resize_sw string
+	id_resize_nw string
+	id_resize_ne string
+	id_task      string
 	// Geometry to come back to when a maximised window is restored.
 	restore_x      int
 	restore_y      int
