@@ -42,9 +42,9 @@ fn stat_seconds(value time.TimeSpec) u32 {
 // The thread flushes on its way back to userspace instead, holding nothing. A
 // kernel thread's change goes out with the next writeback pass.
 fn flush_on_return() {
-	mut thread := proc.current_thread()
-	if thread != unsafe { nil } {
-		thread.owes_sync = true
+	mut thr := proc.current_thread()
+	if thr != unsafe { nil } {
+		thr.owes_sync = true
 	}
 }
 

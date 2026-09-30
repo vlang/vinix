@@ -126,8 +126,8 @@ fn owes_async_work(t &proc.Thread) bool {
 //
 // `thread` is the one `frame` belongs to: the scheduler calls this before GS
 // finds it.
-pub fn interrupt_return(thread &proc.Thread, frame &cpulocal.GPRState) {
-	mut t := unsafe { thread }
+pub fn interrupt_return(thr &proc.Thread, frame &cpulocal.GPRState) {
+	mut t := unsafe { thr }
 	if !sched.user_frame_segments_ok(frame) {
 		enter_kernel(mut t, frame, voidptr(bad_segment_entry))
 		return
@@ -282,7 +282,7 @@ pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, 
 pub fn start_program_node(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, path string, argv []string, envp []string, stdin_path string, stdout_path string, stderr_path string) ?&proc.Process {
 	mut handed_on := false
 	process := load_program_image(execve, dir, prog_node, path, argv, envp, stdin_path,
-		stdout_path, stderr_path, mut handed_on) or {
+		stdout_path, stderr_path, unsafe { &handed_on }) or {
 		if execve && !handed_on {
 			free_exec_arguments(path, argv, envp)
 		}
@@ -291,7 +291,7 @@ pub fn start_program_node(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, p
 	return process
 }
 
-fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, path string, argv []string, envp []string, stdin_path string, stdout_path string, stderr_path string, mut handed_on bool) ?&proc.Process {
+fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, path string, argv []string, envp []string, stdin_path string, stdout_path string, stderr_path string, handed_on &bool) ?&proc.Process {
 	// The program, or a script's interpreter, is subject to pledge(2) and
 	// unveil(2); the ELF interpreter the kernel loads for it is not.
 	if execve && !fs.policy_check(prog_node, proc.policy_exec) {
@@ -328,7 +328,9 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, path 
 		if execve {
 			// The interpreter's exec frees final_argv and envp; the rest of
 			// what this exec was handed goes now.
-			handed_on = true
+			unsafe {
+				*handed_on = true
+			}
 			path_in_argv := argv.any(it.str == path.str)
 			unsafe {
 				if !path_in_argv {

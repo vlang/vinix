@@ -635,14 +635,14 @@ fn grow_fd_table(mut process proc.Process, fdnum int) bool {
 	if length > proc.max_fds {
 		length = proc.max_fds
 	}
-	mut bigger := []voidptr{len: length} @[freed]
+	mut bigger := unsafe { []voidptr{len: length} } @[freed]
 	if bigger.len != length {
 		return false
 	}
 	for i in 0 .. process.fds.len {
 		bigger[i] = process.fds[i]
 	}
-	mut old := process.fds
+	mut old := unsafe { process.fds }
 	process.fds = bigger
 	unsafe { old.free() }
 	return true

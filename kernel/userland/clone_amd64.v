@@ -191,9 +191,9 @@ fn clone_new_process(state &cpulocal.GPRState, flags u64, child_stack u64, paren
 	mut open := file.open_fdnums(old_process)
 	for i in open {
 		mut old_fd := file.fd_from_fdnum(old_process, i) or { continue }
-		flags := old_fd.flags
+		fd_flags := old_fd.flags
 		old_fd.unref()
-		file.fdnum_dup(old_process, i, new_process, i, flags, true, false) or {
+		file.fdnum_dup(old_process, i, new_process, i, fd_flags, true, false) or {
 			continue
 		}
 	}

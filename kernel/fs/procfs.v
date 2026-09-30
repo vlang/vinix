@@ -29,6 +29,7 @@ import resource
 import event.eventstruct
 import memory.mmap
 import pagecache
+import numa
 import time
 
 pub type NetTcpSnapshot = fn () string
@@ -123,6 +124,7 @@ struct ProcFS {}
 // by the numbers it gives them. Each namespace gets its own tree, made the
 // first time it mounts one.
 struct ProcFSView {
+mut:
 	ns   voidptr
 	root &VFSNode = unsafe { nil }
 }
@@ -960,7 +962,7 @@ fn maps_text(pid int, detailed bool) string {
 			continue
 		}
 		proc.unlock_table()
-		list = got
+		list = unsafe { got }
 		break
 	}
 	defer {
@@ -1505,7 +1507,7 @@ fn refresh_fd_directory(mut descriptors VFSNode, pid int) {
 					// name. Linux shows their kind and inode instead, and so
 					// does this; opening one again by this name is not
 					// supported.
-					nodes << unsafe { nil }
+					nodes << &VFSNode(unsafe { nil })
 					texts << anonymous_descriptor_text(entry.handle.resource)
 				} else {
 					nodes << unsafe { &VFSNode(entry.handle.node) }
@@ -1628,10 +1630,10 @@ fn anonymous_descriptor_text(res &resource.Resource) string {
 fn add_process_file(mut parent VFSNode, name string, kind ProcFSKind, pid int) {
 	mut node := create_node(parent.filesystem, parent, name, false)
 	// A file in /proc/<pid>/task/<tid> knows its thread.
-	mut file := new_procfs_resource(kind, stat.ifreg | 0o444, pid,
+	mut pfile := new_procfs_resource(kind, stat.ifreg | 0o444, pid,
 		unsafe { &ProcFSResource(parent.resource) }.tid)
-	file.view = unsafe { &ProcFSResource(parent.resource) }.view
-	node.resource = file
+	pfile.view = unsafe { &ProcFSResource(parent.resource) }.view
+	node.resource = pfile
 	unsafe {
 		parent.children[name] = node
 	}

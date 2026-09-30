@@ -47,7 +47,7 @@ pub fn interfaces() []Interface {
 	}
 	mut mac := [6]u8{}
 	mut mtu := u32(0)
-	if link_info(mut mac, mut mtu) {
+	if link_info(mut mac, unsafe { &mtu }) {
 		mut address := u32(0)
 		mut netmask := u32(0)
 		mut gateway := u32(0)

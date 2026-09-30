@@ -203,15 +203,15 @@ pub fn current_thread() &Thread {
 // Pin a thread found under pid_lock or its process' threads_lock, before
 // letting go of that lock.
 pub fn pin_thread(t &Thread) {
-	mut thread := unsafe { t }
-	katomic.inc(mut &thread.pins)
+	mut thr := unsafe { t }
+	katomic.inc(mut &thr.pins)
 }
 
 // Give back a pin. The thread may be freed as soon as this returns, so this is
 // the last thing the caller does with it.
 pub fn unpin_thread(t &Thread) {
-	mut thread := unsafe { t }
-	katomic.dec(mut &thread.pins)
+	mut thr := unsafe { t }
+	katomic.dec(mut &thr.pins)
 }
 
 pub fn thread_is_pinned(t &Thread) bool {

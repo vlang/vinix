@@ -246,16 +246,16 @@ pub fn park_for_cgroup() {
 // this runs twice: once accepting only threads already at home on this CPU's
 // node, and then accepting anything. A thread therefore tends to keep running
 // next to the memory it faulted in, while a node with nothing to do still
-// takes work from a busy one rather than idling. `last_index` is where this
-// CPU's last scan stopped.
-fn pick_next_thread(cpu_number u64, numa_node int, mut last_index int) &proc.Thread {
+// takes work from a busy one rather than idling. `last_index` points to where
+// this CPU's last scan stopped, and is moved to where this one stops.
+fn pick_next_thread(cpu_number u64, numa_node int, last_index &int) &proc.Thread {
 	if numa_multinode {
-		local_thread := scan_run_queue(cpu_number, mut last_index, numa_node)
+		local_thread := scan_run_queue(cpu_number, last_index, numa_node)
 		if unsafe { local_thread != nil } {
 			return local_thread
 		}
 	}
-	return scan_run_queue(cpu_number, mut last_index, -1)
+	return scan_run_queue(cpu_number, last_index, -1)
 }
 
 // `want_node` of -1 accepts every thread; otherwise only those whose home node
@@ -265,11 +265,11 @@ fn pick_next_thread(cpu_number u64, numa_node int, mut last_index int) &proc.Thr
 // thread it finds; one where anything has asked for a policy weighs the whole
 // queue instead. The two are the same lap, and the split exists so that the
 // ordinary machine goes on paying exactly what it used to.
-fn scan_run_queue(cpu_number u64, mut last_index int, want_node int) &proc.Thread {
+fn scan_run_queue(cpu_number u64, last_index &int, want_node int) &proc.Thread {
 	if proc.scheduling_policies_in_use() {
-		return scan_run_queue_ranked(cpu_number, mut last_index, want_node)
+		return scan_run_queue_ranked(cpu_number, last_index, want_node)
 	}
-	return scan_run_queue_in_turn(cpu_number, mut last_index, want_node)
+	return scan_run_queue_in_turn(cpu_number, last_index, want_node)
 }
 
 // Exactly one lap of the queue, from wherever this CPU last stopped, so the
@@ -279,8 +279,8 @@ fn scan_run_queue(cpu_number u64, mut last_index int, want_node int) &proc.Threa
 // to sit at the start index sent the scan round the queue for ever. Nothing was
 // skipped before affinity masks and memory nodes existed, which is why it took
 // until a pinned thread on another node to find.
-fn scan_run_queue_in_turn(cpu_number u64, mut last_index int, want_node int) &proc.Thread {
-	mut start := last_index
+fn scan_run_queue_in_turn(cpu_number u64, last_index &int, want_node int) &proc.Thread {
+	mut start := *last_index
 	if start < 0 || start >= max_running_threads {
 		start = 0
 	}
@@ -305,7 +305,9 @@ fn scan_run_queue_in_turn(cpu_number u64, mut last_index int, want_node int) &pr
 			continue
 		}
 		if t.l.test_and_acquire() == true {
-			last_index = index
+			unsafe {
+				*last_index = index
+			}
 			return t
 		}
 	}
@@ -324,12 +326,12 @@ fn scan_run_queue_in_turn(cpu_number u64, mut last_index int, want_node int) &pr
 // lock and only takes the one it has settled on. If another CPU takes that one
 // first, it looks again -- and on that pass the lock it lost to is held, and
 // skipped like any other.
-fn scan_run_queue_ranked(cpu_number u64, mut last_index int, want_node int) &proc.Thread {
+fn scan_run_queue_ranked(cpu_number u64, last_index &int, want_node int) &proc.Thread {
 	now_ns := clock_ns()
 	throttled := realtime_throttled(cpu_number, now_ns)
 
 	for attempt := 0; attempt < pick_attempts; attempt++ {
-		mut start := last_index
+		mut start := *last_index
 		if start < 0 || start >= max_running_threads {
 			start = 0
 		}
@@ -380,7 +382,9 @@ fn scan_run_queue_ranked(cpu_number u64, mut last_index int, want_node int) &pro
 			return unsafe { nil }
 		}
 		if best.l.test_and_acquire() == true {
-			last_index = best_index
+			unsafe {
+				*last_index = best_index
+			}
 			return best
 		}
 	}

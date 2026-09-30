@@ -10,9 +10,9 @@ import proc
 // flush_on_return in fs/ext2. A failure leaves the pages dirty, for the next
 // fsync or sync to report.
 pub fn flush_owed_sync() {
-	mut thread := proc.current_thread()
-	if thread != unsafe { nil } && thread.owes_sync {
-		thread.owes_sync = false
+	mut thr := proc.current_thread()
+	if thr != unsafe { nil } && thr.owes_sync {
+		thr.owes_sync = false
 		pagecache.sync_all()
 	}
 }

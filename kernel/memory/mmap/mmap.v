@@ -280,7 +280,7 @@ fn remove_range_unlocked(mut pagemap memory.Pagemap, local &MmapRangeLocal) {
 	index := local.list_index
 	last := pagemap.mmap_ranges.len - 1
 	if index != last {
-		moved := unsafe { &MmapRangeLocal(pagemap.mmap_ranges[last]) }
+		mut moved := unsafe { &MmapRangeLocal(pagemap.mmap_ranges[last]) }
 		pagemap.mmap_ranges[index] = voidptr(moved)
 		moved.list_index = index
 	}

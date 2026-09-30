@@ -247,8 +247,8 @@ fn (mut dev AHCIDevice) transfer(buffer voidptr, loc u64, count u64, write bool)
 		if write {
 			unsafe { C.memcpy(dev.bounce, near, chunk) }
 		}
-		ok := dev.rw_lba(dev.bounce, (loc + done) / dev.stat.blksize, chunk / dev.stat.blksize,
-			write) != -1
+		ok := dev.rw_lba(dev.bounce, (loc + done) / u64(dev.stat.blksize),
+			chunk / u64(dev.stat.blksize), write) != -1
 		if ok && !write {
 			unsafe { C.memcpy(near, dev.bounce, chunk) }
 		}

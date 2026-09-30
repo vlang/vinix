@@ -844,7 +844,7 @@ fn (mut this CGroupResource) write(_handle voidptr, buf voidptr, _loc u64, count
 			return i64(count)
 		}
 		'cgroup.freeze' {
-			if value != '0' && value != '1' || group.account == unsafe { nil } {
+			if (value != '0' && value != '1') || group.account == unsafe { nil } {
 				errno.set(errno.einval)
 				return none
 			}
@@ -907,7 +907,7 @@ fn (mut this CGroupResource) write(_handle voidptr, buf voidptr, _loc u64, count
 			return i64(count)
 		}
 		'memory.oom.group' {
-			if value != '0' && value != '1' || group.account == unsafe { nil } {
+			if (value != '0' && value != '1') || group.account == unsafe { nil } {
 				errno.set(errno.einval)
 				return none
 			}

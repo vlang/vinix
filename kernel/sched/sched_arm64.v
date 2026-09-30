@@ -26,8 +26,8 @@ fn C.vinix_enter_idle(stack_top u64, entry voidptr, thread voidptr)
 // resume that thread and overwrite the scheduler's still-active return frames.
 @[noreturn]
 fn finish_eviction(_thread voidptr) {
-	mut thread := unsafe { &proc.Thread(_thread) }
-	thread.l.release()
+	mut thr := unsafe { &proc.Thread(_thread) }
+	thr.l.release()
 	// A replacement was often already runnable. Dispatch it now instead of
 	// adding an idle-timer tick to every ordinary context switch.
 	scheduler_timer_handler(unsafe { nil })
@@ -44,14 +44,14 @@ fn finish_eviction(_thread voidptr) {
 // CPU is free to resume it, so returning would put two CPUs on one stack. Leave
 // for a stack nobody else can be using.
 @[noreturn]
-fn evict_to_idle(cpu_number u64, thread &proc.Thread) {
+fn evict_to_idle(cpu_number u64, thr &proc.Thread) {
 	mut index := cpu_number
 	if index >= max_idle_stacks {
 		index = max_idle_stacks - 1
 	}
 	mut top := u64(voidptr(&idle_stacks[index][0])) + u64(idle_stack_size)
 	top &= ~u64(0xf)
-	C.vinix_enter_idle(top, voidptr(finish_eviction), voidptr(thread))
+	C.vinix_enter_idle(top, voidptr(finish_eviction), voidptr(thr))
 	for {}
 }
 
@@ -311,7 +311,7 @@ pub fn initialise() {
 	kernel_process = &proc.Process{
 		pagemap: &kernel_pagemap
 		caps:    proc.full_capabilities()
-		fds:     []voidptr{len: proc.initial_fds}
+		fds:     unsafe { []voidptr{len: proc.initial_fds} }
 	}
 
 	// Release the secondary CPUs into the scheduler.
@@ -466,7 +466,7 @@ fn get_next_thread() &proc.Thread {
 		scheduler_queue_lock.release()
 	}
 	mut cpu_local := cpulocal.current()
-	return pick_next_thread(cpu_local.cpu_number, int(cpu_local.numa_node), mut cpu_local.last_run_queue_index)
+	return pick_next_thread(cpu_local.cpu_number, int(cpu_local.numa_node), &cpu_local.last_run_queue_index)
 }
 
 fn scheduler_timer_handler(_gpr_state voidptr) {

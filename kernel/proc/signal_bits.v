@@ -26,8 +26,8 @@ pub const max_pending_signal = 64
 // Take charge of `t`'s exit. Exactly one caller -- the thread leaving on its
 // own, or a sibling stopping it -- is told yes.
 pub fn claim_thread_exit(t &Thread) bool {
-	mut thread := unsafe { t }
-	return katomic.cas(mut &thread.exit_claimed, u32(0), u32(1))
+	mut thr := unsafe { t }
+	return katomic.cas(mut &thr.exit_claimed, u32(0), u32(1))
 }
 
 // ppoll(2), pselect6(2) and epoll_pwait(2) wait under the mask their caller

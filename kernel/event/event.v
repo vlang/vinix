@@ -332,6 +332,8 @@ pub fn pthread_exit(ret voidptr) {
 	trigger(mut current_thread.exited, false)
 
 	sched.yield(false)
+	// A thread taken off the run queue is never switched back to.
+	for {}
 }
 
 pub fn pthread_wait(t &proc.Thread) voidptr {

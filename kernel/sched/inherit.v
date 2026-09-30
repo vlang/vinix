@@ -66,7 +66,7 @@ pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) ?&proc.Pr
 		return none
 	}
 	// Freed when the process is reaped, in proc.free_pid().
-	fds := []voidptr{len: proc.initial_fds} @[freed]
+	fds := unsafe { []voidptr{len: proc.initial_fds} } @[freed]
 	mut new_proc := &proc.Process{
 		pagemap: unsafe { nil }
 		fds:     fds

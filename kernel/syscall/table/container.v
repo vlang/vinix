@@ -45,10 +45,10 @@ fn cap_target(local_pid int) &proc.Process {
 	// capget/capset name a thread, not a thread group: their "pid" is really a
 	// tid. A runtime applying its own caps passes gettid(), which is not the
 	// group leader's, so resolve it through the thread as well.
-	thread := proc.get_thread(pid)
-	if thread != unsafe { nil } {
-		owner := thread.process
-		proc.unpin_thread(thread)
+	thr := proc.get_thread(pid)
+	if thr != unsafe { nil } {
+		owner := thr.process
+		proc.unpin_thread(thr)
 		return owner
 	}
 	return unsafe { nil }
@@ -230,7 +230,7 @@ fn seccomp_install(prog u64) (u64, u64) {
 		return errno.err, errno.einval
 	}
 	mut instructions := []proc.SockFilter{len: length}
-	if !usercopy.copy_from_user(voidptr(&instructions[0]), header[1], u64(length) * sizeof(proc.SockFilter)) {
+	if !usercopy.copy_from_user(unsafe { voidptr(&instructions[0]) }, header[1], u64(length) * sizeof(proc.SockFilter)) {
 		unsafe { instructions.free() }
 		return errno.err, errno.efault
 	}

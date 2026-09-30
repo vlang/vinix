@@ -37,7 +37,7 @@ pub mut:
 	share    u64
 }
 
-__global (
+pub __global (
 	page_size        = u64(0x1000)
 	kernel_pagemap   Pagemap
 	vmm_initialised  = bool(false)

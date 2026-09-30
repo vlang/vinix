@@ -210,8 +210,8 @@ fn close_file(_dev &drm.DrmDevice, handle voidptr) {
 	simple_files_lock.release()
 
 	file.lock.acquire()
-	mut objects := file.objects
-	mut mapped := file.mmap_objects
+	mut objects := unsafe { file.objects }
+	mut mapped := unsafe { file.mmap_objects }
 	file.objects = []&gem.GemObject{}
 	file.mmap_objects = []&gem.GemObject{}
 	file.lock.release()

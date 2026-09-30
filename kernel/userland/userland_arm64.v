@@ -752,7 +752,7 @@ pub fn start_program_node(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, p
 fn load_program_node(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, path string, argv []string, envp []string, stdin_path string, stdout_path string, stderr_path string) ?&proc.Process {
 	mut handed_on := false
 	process := load_program_image(execve, dir, prog_node, path, argv, envp, stdin_path,
-		stdout_path, stderr_path, mut handed_on) or {
+		stdout_path, stderr_path, unsafe { &handed_on }) or {
 		if execve && !handed_on {
 			free_exec_arguments(path, argv, envp)
 		}
@@ -761,7 +761,7 @@ fn load_program_node(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, path s
 	return process
 }
 
-fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, path string, argv []string, envp []string, stdin_path string, stdout_path string, stderr_path string, mut handed_on bool) ?&proc.Process {
+fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, path string, argv []string, envp []string, stdin_path string, stdout_path string, stderr_path string, handed_on &bool) ?&proc.Process {
 	trace_gpu := execve && path == gpu_desktop_executable
 	gpu_exec_trace(trace_gpu, 'resolved executable path')
 	gpu_exec_trace(trace_gpu, 'opened executable node')
@@ -802,7 +802,9 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, path 
 		if execve {
 			// The interpreter's exec frees final_argv and envp; the rest of
 			// what this exec was handed goes now.
-			handed_on = true
+			unsafe {
+				*handed_on = true
+			}
 			path_in_argv := argv.any(it.str == path.str)
 			unsafe {
 				if !path_in_argv {
@@ -956,7 +958,9 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, path 
 		if execve {
 			// The translator's exec frees both lists. What this exec was
 			// handed goes now, and with envp the views into it.
-			handed_on = true
+			unsafe {
+				*handed_on = true
+			}
 			free_exec_arguments(path, argv, envp)
 			return load_program_node(true, root, translator_node, translator, translated_argv,
 				translated_envp, stdin_path, stdout_path, stderr_path)

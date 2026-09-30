@@ -91,10 +91,12 @@ mut:
 // retired every command that references it.
 pub struct UatBuffer {
 pub:
-	va         u64
-	phys       u64
-	size       u64
-	private    bool
+	va      u64
+	phys    u64
+	size    u64
+	private bool
+pub mut:
+	// The mmu module makes a mapping uncached; the GPU driver does too.
 	protection u64
 mut:
 	mapped              bool

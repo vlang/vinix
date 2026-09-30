@@ -9,7 +9,7 @@ pub fn kwrite(message charptr, msglen u64) {
 	$if !prod {
 		unsafe {
 			for i := 0; i < msglen; i++ {
-				serial.out(message[i])
+				serial.out(u8(message[i]))
 			}
 		}
 	}

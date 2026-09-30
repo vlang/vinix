@@ -52,7 +52,7 @@ fn reap_deferred() {
 	if !reap_deferred_lock.test_and_acquire() {
 		return
 	}
-	mut ready := [max_deferred_reaps]&proc.Thread{}
+	mut ready := unsafe { [max_deferred_reaps]&proc.Thread{} }
 	mut count := 0
 	for i := 0; i < max_deferred_reaps; i++ {
 		t := reap_deferred_slots[i]

@@ -86,11 +86,11 @@ fn init_mount_tables() {
 }
 
 fn calling_process() &proc.Process {
-	thread := proc.current_thread()
-	if thread == unsafe { nil } {
+	thr := proc.current_thread()
+	if thr == unsafe { nil } {
 		return unsafe { nil }
 	}
-	return thread.process
+	return thr.process
 }
 
 fn table_of(process &proc.Process) &MountTable {

@@ -173,7 +173,7 @@ fn dispatch_linux_signal(context &cpulocal.GPRState, which int, info_signum int,
 
 	// The registers still hold the program's FPU state; the kernel uses none.
 	fpu_save(t.fpu_storage)
-	pushed := usercopy.copy_to_user(frame, voidptr(&buf[0]), frame_size)
+	pushed := usercopy.copy_to_user(frame, unsafe { voidptr(&buf[0]) }, frame_size)
 		&& usercopy.copy_to_user(fpstate, t.fpu_storage, fpu_storage_size)
 	unsafe { buf.free() }
 	if !pushed {
@@ -216,7 +216,7 @@ pub fn syscall_linux_rt_sigreturn(gpr_state voidptr) (u64, u64) {
 	frame := syscall_frame.rsp - 8
 
 	mut buf := []u8{len: int(frame_size)} @[freed]
-	if !usercopy.copy_from_user(voidptr(&buf[0]), frame, frame_size) {
+	if !usercopy.copy_from_user(unsafe { voidptr(&buf[0]) }, frame, frame_size) {
 		unsafe { buf.free() }
 		exit_with_fatal_signal(u8(sigsegv))
 	}

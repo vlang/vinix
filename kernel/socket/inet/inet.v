@@ -462,9 +462,9 @@ pub fn configuration(address &u32, netmask &u32, gateway &u32, dns &[3]u32) bool
 
 // The hardware address and MTU of the network interface, once a driver has
 // attached one.
-pub fn link_info(mut mac [6]u8, mut mtu u32) bool {
+pub fn link_info(mut mac [6]u8, mtu &u32) bool {
 	net_lock.acquire()
-	ret := C.vinix_net_link(&mac[0], &mtu)
+	ret := C.vinix_net_link(&mac[0], mtu)
 	net_lock.release()
 	return ret != 0
 }

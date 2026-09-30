@@ -634,7 +634,7 @@ fn (mut mgr GpuManager) map_g13_io_mappings(mut allocations G13ChannelAllocation
 			allocations.io_mapping_vas[index] = next_va
 			allocations.io_mapping_sizes[index] = map_size
 			if !fw.set_g13_hwdata_b_io_mapping(mut data, mgr.hw_config.firmware_abi,
-				index, fw.G13IoMapping{
+				u32(index), fw.G13IoMapping{
 				physical_address: mapping.phys
 				virtual_address: next_va + page_offset
 				total_size: u32(mapping.size)

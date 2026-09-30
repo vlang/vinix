@@ -201,7 +201,7 @@ pub fn initialise() bool {
 
 	mut other_mac := [6]u8{}
 	mut other_mtu := u32(0)
-	if inet.link_info(mut other_mac, mut other_mtu) {
+	if inet.link_info(mut other_mac, unsafe { &other_mtu }) {
 		C.kprintf(c'e1000: %.*s left alone: another network interface is attached\n',
 			i32(name.len), name.str)
 		return false

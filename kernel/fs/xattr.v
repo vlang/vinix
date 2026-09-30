@@ -222,7 +222,7 @@ fn xattr_set(given XAttrTarget, _name charptr, value voidptr, size u64, flags in
 	// Freed on every failure below, and otherwise kept as the value, which
 	// free_xattrs() frees with the file.
 	mut data := []u8{len: int(size)} @[freed]
-	if size > 0 && !usercopy.copy_from_user(&data[0], u64(value), size) {
+	if size > 0 && !usercopy.copy_from_user(unsafe { &data[0] }, u64(value), size) {
 		unsafe {
 			name.free()
 			data.free()
@@ -379,19 +379,19 @@ fn xattr_remove(given XAttrTarget, _name charptr) (u64, u64) {
 
 // Whether a tmpfs file has the attribute `name` set to `expected`.
 fn xattr_equals(res &resource.Resource, name string, expected string) bool {
-	mut file := tmpfs_resource_of(res)
-	if file == unsafe { nil } {
+	mut tfile := tmpfs_resource_of(res)
+	if tfile == unsafe { nil } {
 		return false
 	}
-	file.l.acquire()
+	tfile.l.acquire()
 	defer {
-		file.l.release()
+		tfile.l.release()
 	}
-	index := xattr_find(file.xattrs, name)
+	index := xattr_find(tfile.xattrs, name)
 	if index < 0 {
 		return false
 	}
-	value := file.xattrs.entries[index].value
+	value := tfile.xattrs.entries[index].value
 	if value.len != expected.len {
 		return false
 	}
@@ -403,17 +403,17 @@ fn xattr_equals(res &resource.Resource, name string, expected string) bool {
 	return true
 }
 
-fn xattr_put_bytes(mut file TmpFSResource, name string, value []u8) {
-	if file.xattrs == unsafe { nil } {
-		file.xattrs = new_xattr_set()
+fn xattr_put_bytes(mut tfile TmpFSResource, name string, value []u8) {
+	if tfile.xattrs == unsafe { nil } {
+		tfile.xattrs = new_xattr_set()
 	}
-	index := xattr_find(file.xattrs, name)
+	index := xattr_find(tfile.xattrs, name)
 	if index >= 0 {
-		unsafe { file.xattrs.entries[index].value.free() }
-		file.xattrs.entries[index].value = value
+		unsafe { tfile.xattrs.entries[index].value.free() }
+		tfile.xattrs.entries[index].value = value
 		return
 	}
-	file.xattrs.entries << XAttr{
+	tfile.xattrs.entries << XAttr{
 		name:  name.clone()
 		value: value
 	}
@@ -422,15 +422,15 @@ fn xattr_put_bytes(mut file TmpFSResource, name string, value []u8) {
 // Set an attribute from inside the kernel, as overlay marks a directory
 // opaque. Files that keep none are left alone.
 fn xattr_put(res &resource.Resource, name string, value string) {
-	mut file := tmpfs_resource_of(res)
-	if file == unsafe { nil } {
+	mut tfile := tmpfs_resource_of(res)
+	if tfile == unsafe { nil } {
 		return
 	}
-	file.l.acquire()
+	tfile.l.acquire()
 	defer {
-		file.l.release()
+		tfile.l.release()
 	}
-	xattr_put_bytes(mut file, name, value.bytes())
+	xattr_put_bytes(mut tfile, name, value.bytes())
 }
 
 // Give `to` the attributes `from` has, but for those whose names start with

@@ -70,7 +70,7 @@ pub fn initialise() {
 	kernel_process = &proc.Process{
 		pagemap: &kernel_pagemap
 		caps:    proc.full_capabilities()
-		fds:     []voidptr{len: proc.initial_fds}
+		fds:     unsafe { []voidptr{len: proc.initial_fds} }
 	}
 }
 
@@ -105,7 +105,7 @@ fn get_next_thread() &proc.Thread {
 		scheduler_queue_lock.release()
 	}
 	mut cpu_local := cpulocal.current()
-	return pick_next_thread(cpu_local.cpu_number, int(cpu_local.numa_node), mut cpu_local.last_run_queue_index)
+	return pick_next_thread(cpu_local.cpu_number, int(cpu_local.numa_node), &cpu_local.last_run_queue_index)
 }
 
 __global (
@@ -845,11 +845,11 @@ fn free_thread_stacks(mut t proc.Thread) {
 // The stacks, and then the Thread, of a thread that died by itself: it left
 // the tid table, its process and every event it waited on before it died.
 fn free_thread_memory(t &proc.Thread) {
-	mut thread := unsafe { t }
-	free_thread_stacks(mut thread)
+	mut thr := unsafe { t }
+	free_thread_stacks(mut thr)
 	unsafe {
-		thread.comm.free()
-		free(voidptr(thread))
+		thr.comm.free()
+		free(voidptr(thr))
 	}
 }
 

@@ -56,21 +56,25 @@ fn write_initial_stack(pagemap &memory.Pagemap, addr u64, src voidptr, length u6
 	return true
 }
 
-fn push_initial_bytes(pagemap &memory.Pagemap, bottom u64, mut cursor u64, src voidptr, length u64) bool {
-	if cursor < bottom || length > cursor - bottom {
+// The helpers below move `cursor`, the address the stack has grown down to,
+// past what they push.
+fn push_initial_bytes(pagemap &memory.Pagemap, bottom u64, cursor &u64, src voidptr, length u64) bool {
+	if *cursor < bottom || length > *cursor - bottom {
 		return false
 	}
-	cursor -= length
-	return write_initial_stack(pagemap, cursor, src, length)
+	unsafe {
+		*cursor -= length
+	}
+	return write_initial_stack(pagemap, *cursor, src, length)
 }
 
-fn push_initial_word(pagemap &memory.Pagemap, bottom u64, mut cursor u64, value u64) bool {
-	return push_initial_bytes(pagemap, bottom, mut cursor, voidptr(&value), sizeof(u64))
+fn push_initial_word(pagemap &memory.Pagemap, bottom u64, cursor &u64, value u64) bool {
+	return push_initial_bytes(pagemap, bottom, cursor, voidptr(&value), sizeof(u64))
 }
 
-fn push_initial_pair(pagemap &memory.Pagemap, bottom u64, mut cursor u64, key u64, value u64) bool {
-	return push_initial_word(pagemap, bottom, mut cursor, value)
-		&& push_initial_word(pagemap, bottom, mut cursor, key)
+fn push_initial_pair(pagemap &memory.Pagemap, bottom u64, cursor &u64, key u64, value u64) bool {
+	return push_initial_word(pagemap, bottom, cursor, value)
+		&& push_initial_word(pagemap, bottom, cursor, key)
 }
 
 // Reserve the first thread's stack below process.thread_stack_top. Answers its
@@ -140,7 +144,7 @@ fn build_initial_stack(mut process proc.Process, stack_vma u64, stack_bottom_vma
 		}
 	}
 	for i := envp.len - 1; i >= 0; i-- {
-		if !push_initial_bytes(process.pagemap, stack_bottom_vma, mut cursor, voidptr(envp[i].str),
+		if !push_initial_bytes(process.pagemap, stack_bottom_vma, unsafe { &cursor }, voidptr(envp[i].str),
 			u64(envp[i].len) + 1) {
 			errno.set(errno.e2big)
 			return none
@@ -148,7 +152,7 @@ fn build_initial_stack(mut process proc.Process, stack_vma u64, stack_bottom_vma
 		env_strings[i] = cursor
 	}
 	for i := argv.len - 1; i >= 0; i-- {
-		if !push_initial_bytes(process.pagemap, stack_bottom_vma, mut cursor, voidptr(argv[i].str),
+		if !push_initial_bytes(process.pagemap, stack_bottom_vma, unsafe { &cursor }, voidptr(argv[i].str),
 			u64(argv[i].len) + 1) {
 			errno.set(errno.e2big)
 			return none
@@ -164,7 +168,7 @@ fn build_initial_stack(mut process proc.Process, stack_vma u64, stack_bottom_vma
 	if !krandom.fill(voidptr(&random_bytes[0]), 16, true) {
 		unsafe { C.memset(voidptr(&random_bytes[0]), 0, 16) }
 	}
-	if !push_initial_bytes(process.pagemap, stack_bottom_vma, mut cursor, voidptr(&random_bytes[0]),
+	if !push_initial_bytes(process.pagemap, stack_bottom_vma, unsafe { &cursor }, voidptr(&random_bytes[0]),
 		16) {
 		errno.set(errno.e2big)
 		return none
@@ -175,22 +179,22 @@ fn build_initial_stack(mut process proc.Process, stack_vma u64, stack_bottom_vma
 	// Auxiliary vector (NULL-terminated), with the CPU features userspace can
 	// use; see user_hwcaps().
 	auxv_top := cursor
-	if !push_initial_pair(process.pagemap, stack_bottom_vma, mut cursor, 0, 0)
-		|| !push_initial_pair(process.pagemap, stack_bottom_vma, mut cursor, elf.at_secure, 0)
-		|| !push_initial_pair(process.pagemap, stack_bottom_vma, mut cursor, elf.at_hwcap2, hwcap2)
-		|| !push_initial_pair(process.pagemap, stack_bottom_vma, mut cursor, elf.at_hwcap, hwcap)
-		|| !push_initial_pair(process.pagemap, stack_bottom_vma, mut cursor, elf.at_random, random_vma)
-		|| !push_initial_pair(process.pagemap, stack_bottom_vma, mut cursor, elf.at_pagesz, page_size)
-		|| !push_initial_pair(process.pagemap, stack_bottom_vma, mut cursor, elf.at_uid, u64(process.uid))
-		|| !push_initial_pair(process.pagemap, stack_bottom_vma, mut cursor, elf.at_euid, u64(process.euid))
-		|| !push_initial_pair(process.pagemap, stack_bottom_vma, mut cursor, elf.at_gid, u64(process.gid))
-		|| !push_initial_pair(process.pagemap, stack_bottom_vma, mut cursor, elf.at_egid, u64(process.egid))
-		|| !push_initial_pair(process.pagemap, stack_bottom_vma, mut cursor, elf.at_entry, auxval.at_entry)
-		|| !push_initial_pair(process.pagemap, stack_bottom_vma, mut cursor, elf.at_phdr, auxval.at_phdr)
-		|| !push_initial_pair(process.pagemap, stack_bottom_vma, mut cursor, elf.at_phent, auxval.at_phent)
-		|| !push_initial_pair(process.pagemap, stack_bottom_vma, mut cursor, elf.at_phnum, auxval.at_phnum)
-		|| !push_initial_pair(process.pagemap, stack_bottom_vma, mut cursor, elf.at_base, auxval.at_base)
-		|| !push_initial_word(process.pagemap, stack_bottom_vma, mut cursor, 0) {
+	if !push_initial_pair(process.pagemap, stack_bottom_vma, unsafe { &cursor }, 0, 0)
+		|| !push_initial_pair(process.pagemap, stack_bottom_vma, unsafe { &cursor }, elf.at_secure, 0)
+		|| !push_initial_pair(process.pagemap, stack_bottom_vma, unsafe { &cursor }, elf.at_hwcap2, hwcap2)
+		|| !push_initial_pair(process.pagemap, stack_bottom_vma, unsafe { &cursor }, elf.at_hwcap, hwcap)
+		|| !push_initial_pair(process.pagemap, stack_bottom_vma, unsafe { &cursor }, elf.at_random, random_vma)
+		|| !push_initial_pair(process.pagemap, stack_bottom_vma, unsafe { &cursor }, elf.at_pagesz, page_size)
+		|| !push_initial_pair(process.pagemap, stack_bottom_vma, unsafe { &cursor }, elf.at_uid, u64(process.uid))
+		|| !push_initial_pair(process.pagemap, stack_bottom_vma, unsafe { &cursor }, elf.at_euid, u64(process.euid))
+		|| !push_initial_pair(process.pagemap, stack_bottom_vma, unsafe { &cursor }, elf.at_gid, u64(process.gid))
+		|| !push_initial_pair(process.pagemap, stack_bottom_vma, unsafe { &cursor }, elf.at_egid, u64(process.egid))
+		|| !push_initial_pair(process.pagemap, stack_bottom_vma, unsafe { &cursor }, elf.at_entry, auxval.at_entry)
+		|| !push_initial_pair(process.pagemap, stack_bottom_vma, unsafe { &cursor }, elf.at_phdr, auxval.at_phdr)
+		|| !push_initial_pair(process.pagemap, stack_bottom_vma, unsafe { &cursor }, elf.at_phent, auxval.at_phent)
+		|| !push_initial_pair(process.pagemap, stack_bottom_vma, unsafe { &cursor }, elf.at_phnum, auxval.at_phnum)
+		|| !push_initial_pair(process.pagemap, stack_bottom_vma, unsafe { &cursor }, elf.at_base, auxval.at_base)
+		|| !push_initial_word(process.pagemap, stack_bottom_vma, unsafe { &cursor }, 0) {
 		errno.set(errno.e2big)
 		return none
 	}
@@ -211,7 +215,7 @@ fn build_initial_stack(mut process proc.Process, stack_vma u64, stack_bottom_vma
 			return none
 		}
 	}
-	if !push_initial_word(process.pagemap, stack_bottom_vma, mut cursor, 0) {
+	if !push_initial_word(process.pagemap, stack_bottom_vma, unsafe { &cursor }, 0) {
 		errno.set(errno.e2big)
 		return none
 	}
@@ -227,7 +231,7 @@ fn build_initial_stack(mut process proc.Process, stack_vma u64, stack_bottom_vma
 			return none
 		}
 	}
-	if !push_initial_word(process.pagemap, stack_bottom_vma, mut cursor, u64(argv.len)) {
+	if !push_initial_word(process.pagemap, stack_bottom_vma, unsafe { &cursor }, u64(argv.len)) {
 		errno.set(errno.e2big)
 		return none
 	}

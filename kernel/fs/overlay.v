@@ -515,7 +515,8 @@ fn overlay_prepare_name_locked(mut dir VFSNode, name string) ?bool {
 fn overlay_new_node(dir &VFSNode, name string, real &VFSNode, replaced_whiteout bool) &VFSNode {
 	return overlay_node(dir, name, real, &OverlayEntry{
 		fs:        dir.overlay.fs
-		upper:     real
+		// Overlay nodes are heap objects the tree keeps.
+		upper:     unsafe { real }
 		lowers:    []&VFSNode{}
 		has_lower: replaced_whiteout
 		populated: true
