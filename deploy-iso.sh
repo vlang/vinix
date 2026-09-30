@@ -193,6 +193,10 @@ cp -f "$SCRIPT_DIR"/kernel/c/nanoprintf* "$SRC/kernel/c/" 2>/dev/null || true
 # Release kernels are production builds.
 unset PROD
 export V
+# Each image records the release it is as /etc/vinix-release. At boot it asks
+# vinix-os.org/version for the newest one and, when that is newer, the desktop
+# tells the user to download it (build-support/vinix-version-check).
+export VINIX_RELEASE="$TAG"
 
 IMAGES=()
 

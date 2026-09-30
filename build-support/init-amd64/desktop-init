@@ -14,6 +14,14 @@ export VINIX_SYSTEM_SESSION=1
 
 cd /root || exit 1
 
+# /run is on the system disk and outlives a reboot. Drop last boot's answer
+# from vinix-version-check, then ask vinix-os.org again whether a newer Vinix
+# has been released; the desktop tells the user (see the arm64 init).
+rm -f /run/vinix-latest-release
+if [ -x /usr/libexec/vinix-version-check ]; then
+	/usr/libexec/vinix-version-check </dev/null >/dev/null 2>&1 &
+fi
+
 desktop_pid=
 reload_requested=0
 

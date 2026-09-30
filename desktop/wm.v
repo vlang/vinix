@@ -195,6 +195,7 @@ mut:
 	taskbar_preview          TaskbarPreview
 	show_desktop             ShowDesktop
 	tray                     TrayState
+	version_check            VersionCheck
 	next_status_token        int
 	taskbar_status_polled_ms i64
 	taskbar_marquee_ms       i64

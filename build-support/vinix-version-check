@@ -1,0 +1,41 @@
+#!/bin/sh
+# Ask vinix-os.org which Vinix release is the newest, once per boot, and leave
+# its tag in /run/vinix-latest-release. The desktop compares that with
+# /etc/vinix-release, the release this system was built as, and tells the user
+# to download the new ISO when theirs is older (desktop/version_check.v).
+#
+# PID 1 starts this in the background at boot. Only release images carry
+# /etc/vinix-release (deploy-iso.sh sets VINIX_RELEASE for the desktop
+# builds); a development build has nothing to compare, so nothing is asked.
+set -u
+
+RELEASE_FILE=${VINIX_RELEASE_FILE:-/etc/vinix-release}
+LATEST_FILE=${VINIX_LATEST_RELEASE_FILE:-/run/vinix-latest-release}
+URL=${VINIX_VERSION_URL:-https://vinix-os.org/version}
+CURL=${VINIX_VERSION_CURL:-/usr/bin/curl}
+# The network may come up well after the desktop, or not at all: ask every
+# 20 seconds for ten minutes, then give up quietly until the next boot.
+ATTEMPTS=${VINIX_VERSION_ATTEMPTS:-30}
+DELAY=${VINIX_VERSION_DELAY:-20}
+
+[ -s "$RELEASE_FILE" ] || exit 0
+[ -x "$CURL" ] || exit 0
+# Not `read < file`: a redirected read can block on Vinix regular files.
+installed=$(head -n 1 "$RELEASE_FILE")
+
+attempt=0
+while [ "$attempt" -lt "$ATTEMPTS" ]; do
+	latest=$("$CURL" -fsS --max-time 20 -A "Vinix/$installed" "$URL" 2>/dev/null |
+		head -n 1 | tr -d '\r')
+	case "$latest" in
+		iso-[0-9]*)
+			# The desktop may read the file at any moment: publish it whole.
+			printf '%s\n' "$latest" > "$LATEST_FILE.tmp" &&
+				mv -f "$LATEST_FILE.tmp" "$LATEST_FILE"
+			exit 0
+			;;
+	esac
+	attempt=$((attempt + 1))
+	sleep "$DELAY"
+done
+exit 0

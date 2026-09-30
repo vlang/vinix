@@ -1570,6 +1570,27 @@ window.notes.line_3
 window.notes.line_4
 из дерева ui2, которое строится каждый кадр.
 -----
+window.outdated
+Обновление Vinix
+-----
+window.outdated.heading
+Ваша версия Vinix устарела
+-----
+window.outdated.line_1
+К сожалению, эта версия Vinix устарела.
+-----
+window.outdated.line_2
+Vinix быстро развивается: в каждом выпуске много новых
+-----
+window.outdated.line_3
+возможностей и исправленных ошибок.
+-----
+window.outdated.line_4
+Зайдите на vinix-os.org и скачайте свежий ISO-образ.
+-----
+window.outdated.versions
+Установлена: {0}    Новейшая: {1}
+-----
 window.palette
 Палитра
 -----

@@ -1570,6 +1570,27 @@ La disposición y la detección de clics
 window.notes.line_4
 vienen de un árbol ui2 rehecho en cada fotograma.
 -----
+window.outdated
+Actualización de Vinix
+-----
+window.outdated.heading
+Tu Vinix está desactualizado
+-----
+window.outdated.line_1
+Lo sentimos, esta versión de Vinix está desactualizada.
+-----
+window.outdated.line_2
+Vinix se actualiza muy a menudo: cada versión trae muchas
+-----
+window.outdated.line_3
+funciones nuevas y corrige muchos errores.
+-----
+window.outdated.line_4
+Ve a vinix-os.org y descarga la ISO más reciente.
+-----
+window.outdated.versions
+Instalada: {0}    Más reciente: {1}
+-----
 window.palette
 Paleta
 -----

@@ -16,6 +16,8 @@ enum Page {
 	palette
 	notes
 	external_error
+	// Says a newer Vinix release is out. See version_check.v.
+	outdated
 	// A window whose contents come from a native application process rather than
 	// from one of the pages below.
 	app
@@ -109,6 +111,7 @@ fn (w &Window) content(width int, height int, desktop &Desktop) []ui2.Element {
 		.palette { palette_page(width, height) }
 		.notes { notes_page(width, height) }
 		.external_error { external_error_page(width, desktop) }
+		.outdated { outdated_page(width, desktop) }
 		// An application's contents are built by the window manager, which is
 		// the only thing holding a mutable reference to it.
 		.app { []ui2.Element{} }

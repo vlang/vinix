@@ -1140,6 +1140,17 @@ install -m755 "$SCRIPT_DIR/build-support/vinix-desktop-reload" \
     "$STAGING/usr/bin/vinix-desktop-reload"
 install -m755 "$SCRIPT_DIR/build-support/vinix-host-sync" \
     "$STAGING/usr/bin/vinix-host-sync"
+# The release this image is, for the desktop to compare with the newest one
+# vinix-os.org names (build-support/vinix-version-check). deploy-iso.sh sets
+# VINIX_RELEASE; any other build is a development image and does not ask.
+mkdir -p "$STAGING/usr/libexec"
+install -m755 "$SCRIPT_DIR/build-support/vinix-version-check" \
+    "$STAGING/usr/libexec/vinix-version-check"
+if [ -n "${VINIX_RELEASE:-}" ]; then
+    printf '%s\n' "$VINIX_RELEASE" > "$STAGING/etc/vinix-release"
+else
+    rm -f "$STAGING/etc/vinix-release"
+fi
 install -m644 "$SCRIPT_DIR/tests/browsers/chromium-smoke.html" \
     "$STAGING/usr/share/vinix/chromium-smoke.html"
 install -m755 "$SCRIPT_DIR/tests/packages/x-window-check.py" \
@@ -1425,6 +1436,7 @@ CONTENT_KEY_INPUTS=(
     "$SCRIPT_DIR/build-support/vinix-desktop-build"
     "$SCRIPT_DIR/build-support/vinix-desktop-reload"
     "$SCRIPT_DIR/build-support/vinix-host-sync"
+    "$SCRIPT_DIR/build-support/vinix-version-check"
     "$SCRIPT_DIR/build-support/xorg-server/startx"
     "$SCRIPT_DIR/build-support/firefox"
     "$SCRIPT_DIR/build-support/gimp"
@@ -1448,6 +1460,7 @@ if [ "$WITH_STEAM" -eq 1 ]; then
     printf 'steam-layer=%s\n' "$(path_generation "$STEAM_STAGING")" \
         >> "$CONTENT_KEY_EXPECTED"
 fi
+printf 'release=%s\n' "${VINIX_RELEASE:-}" >> "$CONTENT_KEY_EXPECTED"
 
 if [ "$REUSE_STAGING" -eq 1 ] &&
    [ -f "$CONTENT_KEY" ] && cmp -s "$CONTENT_KEY_EXPECTED" "$CONTENT_KEY" &&

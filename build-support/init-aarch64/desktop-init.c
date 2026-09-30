@@ -298,6 +298,25 @@ static void start_files_sync(char **environment) {
 	}
 }
 
+/* Ask vinix-os.org, in the background, whether a newer Vinix has been
+ * released. The helper leaves the answer in /run for the desktop to compare
+ * with /etc/vinix-release; like vinix-files-sync it outlives compositor
+ * restarts, and it exits at once on a development image, which has no
+ * release to compare. */
+static void start_version_check(char **environment) {
+	char *arguments[] = { "/usr/libexec/vinix-version-check", (char *)0 };
+	i64 child;
+	if (!executable_available(arguments[0]))
+		return;
+	child = syscall5(220 /* clone */, 17 /* SIGCHLD */, 0, 0, 0, 0);
+	if (child == 0) {
+		syscall2(154 /* setpgid */, 0, 0);
+		syscall3(221 /* execve */, (u64)arguments[0], (u64)arguments,
+		         (u64)environment);
+		syscall1(93 /* exit */, 127);
+	}
+}
+
 static void reap_exited_children(void) {
 	int status;
 	while (syscall4(260 /* wait4 */, (u64)(i64)-1, (u64)&status,
@@ -392,6 +411,10 @@ static void prepare_desktop_boot(void) {
 	         (u64)"/run/vinix-desktop-development", 0);
 	syscall3(35 /* unlinkat */, at_fdcwd,
 	         (u64)"/run/vinix-desktop-ready", 0);
+	/* Last boot's answer from vinix-version-check, if the desktop never took
+	 * it; this boot asks again. */
+	syscall3(35 /* unlinkat */, at_fdcwd,
+	         (u64)"/run/vinix-latest-release", 0);
 	/* A single-app cross-build replaces that app's symlink during a QEMU
 	 * session. Restore the packaged multicall link before starting the next
 	 * session. */
@@ -493,6 +516,7 @@ void _start(void) {
 	install_power_signals();
 	install_child_signal();
 	start_files_sync(environment);
+	start_version_check(environment);
 
 #ifdef VINIX_WIFI_BUNDLE
 	char *wifi[] = {

@@ -1570,6 +1570,27 @@ Layout and hit testing come from a
 window.notes.line_4
 ui2 element tree, rebuilt each frame.
 -----
+window.outdated
+Vinix Update
+-----
+window.outdated.heading
+Your Vinix is out of date
+-----
+window.outdated.line_1
+Sorry, this version of Vinix is outdated.
+-----
+window.outdated.line_2
+Vinix is updated quickly: each release adds lots of new
+-----
+window.outdated.line_3
+features and fixes lots of bugs.
+-----
+window.outdated.line_4
+Please go to vinix-os.org and download the latest ISO.
+-----
+window.outdated.versions
+Installed: {0}    Latest: {1}
+-----
 window.palette
 Palette
 -----

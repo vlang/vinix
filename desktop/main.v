@@ -327,6 +327,7 @@ fn main() {
 		// against the clock, so an idle pass costs only these comparisons.
 		desktop.update_taskbar_hover()
 		desktop.update_tray()
+		desktop.poll_version_check()
 		desktop.poll_taskbar_status()
 		desktop.tick_taskbar_marquee()
 		other_dirty := desktop.dirty

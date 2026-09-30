@@ -226,6 +226,15 @@ install -m755 "$SCRIPT_DIR/tests/packages/x-window-check.py" \
     "$STAGING/usr/share/vinix/x-window-check.py"
 rm -f "$STAGING/sbin/init"
 install -m755 "$SCRIPT_DIR/build-support/init-amd64/desktop-init" "$STAGING/sbin/init"
+# The release this image is, for the desktop to compare with the newest one
+# vinix-os.org names (build-support/vinix-version-check). deploy-iso.sh sets
+# VINIX_RELEASE; any other build is a development image and does not ask.
+mkdir -p "$STAGING/usr/libexec"
+install -m755 "$SCRIPT_DIR/build-support/vinix-version-check" \
+    "$STAGING/usr/libexec/vinix-version-check"
+if [ -n "${VINIX_RELEASE:-}" ]; then
+    printf '%s\n' "$VINIX_RELEASE" > "$STAGING/etc/vinix-release"
+fi
 for command_path in bin/zsh usr/bin/python3 usr/bin/v usr/bin/tcc usr/bin/pkg sbin/apk \
     usr/bin/curl usr/bin/git usr/bin/Xorg usr/bin/Xvfb usr/bin/Xvfb-glx \
     usr/bin/vinix-wine-host usr/bin/vinix-xinput usr/bin/run-firefox; do

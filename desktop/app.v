@@ -405,6 +405,7 @@ fn app_title_text(title string) string {
 		capture_app_title { 'app.capture' }
 		files_settings_window_title { 'app.files_settings' }
 		external_app_title { 'window.external_app' }
+		outdated_window_title { 'window.outdated' }
 		'Welcome' { 'window.welcome' }
 		'System' { 'window.system' }
 		'Palette' { 'window.palette' }
