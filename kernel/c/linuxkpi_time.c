@@ -49,6 +49,7 @@ void vinix_linuxkpi_time_tick(u64 now_ns)
         }
     }
     raw_spin_unlock_irqrestore(&deadline_lock, flags);
+    vinix_linuxkpi_timer_tick();
 }
 
 size_t vinix_linuxkpi_time_waiters(void)

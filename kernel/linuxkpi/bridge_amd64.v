@@ -349,6 +349,9 @@ fn C.vinix_linuxkpi_sync_selftest() int
 fn C.vinix_linuxkpi_sync_native_selftest() int
 fn C.vinix_linuxkpi_time_selftest() int
 fn C.vinix_linuxkpi_time_native_selftest() int
+fn C.vinix_linuxkpi_timer_bootstrap() int
+fn C.vinix_linuxkpi_timer_selftest() int
+fn C.vinix_linuxkpi_timer_native_selftest() int
 fn C.vinix_linuxkpi_percpu_bootstrap(u32) int
 
 pub fn initialise() {
@@ -362,10 +365,14 @@ pub fn initialise() {
 		if !time.register_tick_hook(tick_deadlines) {
 			lib.kpanic(unsafe { nil }, c'Linux compatibility timer hook registration failed')
 		}
+		if C.vinix_linuxkpi_timer_bootstrap() != 0 {
+			lib.kpanic(unsafe { nil }, c'Linux compatibility timer worker initialization failed')
+		}
 		before := memory.free_bytes()
 		for _ in 0 .. 200 {
 			if C.vinix_linuxkpi_selftest() != 0 || C.vinix_linuxkpi_task_selftest() != 0
-				|| C.vinix_linuxkpi_sync_selftest() != 0 || C.vinix_linuxkpi_time_selftest() != 0 {
+				|| C.vinix_linuxkpi_sync_selftest() != 0 || C.vinix_linuxkpi_time_selftest() != 0
+				|| C.vinix_linuxkpi_timer_selftest() != 0 {
 				lib.kpanic(unsafe { nil }, c'Linux compatibility layer self-test failed')
 			}
 		}
@@ -452,6 +459,24 @@ pub fn initialise() {
 			lib.kpanic(unsafe { nil }, c'Linux timed-wait self-test retained native pages')
 		}
 		C.kprintf(c'linuxkpi: monotonic clocks and timed task/queue/completion waits passed on 4 workers; no pages retained\n')
+		for _ in 0 .. 3 {
+			if C.vinix_linuxkpi_timer_native_selftest() != 0 {
+				lib.kpanic(unsafe { nil }, c'Linux timer callback self-test failed')
+			}
+		}
+		timer_before := memory.free_bytes()
+		if C.vinix_linuxkpi_timer_native_selftest() != 0 {
+			lib.kpanic(unsafe { nil }, c'Linux timer callback self-test failed')
+		}
+		timer_reap_start := hpet_clock.nanoseconds()
+		for memory.free_bytes() != timer_before && hpet_clock.nanoseconds() - timer_reap_start < 1000000000 {
+			sched.reap_deferred()
+			sched.reschedule()
+		}
+		if memory.free_bytes() != timer_before {
+			lib.kpanic(unsafe { nil }, c'Linux timer callback self-test retained native pages')
+		}
+		C.kprintf(c'linuxkpi: timer callbacks, IRQSAFE, self-rearm and synchronous shutdown passed on 4 workers; no pages retained\n')
 		// Exercise a real scheduler interrupt with preemption disabled and
 		// IRQs still enabled, rather than relying only on host lock tests.
 		preempt_disable()

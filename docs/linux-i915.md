@@ -89,9 +89,31 @@ the complete i915 source tree is not evidence that the driver runs.
   successful completion at expiry returning at least one tick.
   `msleep` retries early wakes, `msleep_interruptible` returns remaining
   milliseconds, and `udelay`/`ndelay` poll the real counter while answering
-  native TLB shootdowns. General timer callbacks, high-resolution timers,
+  native TLB shootdowns. High-resolution timers,
   `usleep_range`, workqueues, realtime/TAI/suspend clock offsets and I/O waits
   remain unimplemented.
+- Unmodified Linux `timer.h` and its `timer_list` layout support static,
+  dynamic and stack initialization, pending queries, `add_timer`, `mod_timer`,
+  pending-only modification, deadline reduction and jiffy rounding. The PIT
+  promotes expired timers into a ready queue and wakes one native kernel
+  worker. Callbacks run with preemption disabled and cannot sleep; ordinary
+  callbacks permit interrupts, while `TIMER_IRQSAFE` callbacks disable them.
+  Rearming at or before the current jiffy waits for a subsequent tick.
+  A timer never overlaps its own callback, including after rearming.
+  Deletion has asynchronous, try-synchronous and synchronous forms;
+  shutdown also prevents future rearming until explicit reinitialization.
+  Synchronous calls wait for the running callback before returning. Callers
+  must stop external producers before freeing their object and must not hold
+  locks needed by its callback. Blocking deletion from the same callback fails
+  explicitly. A callback may free its own detached timer; dispatch keeps a
+  separate stack record and never dereferences that timer after the callback.
+  Timer entries and running records require no per-arm allocation. The worker
+  and its retained task reference have boot lifetime and are created before
+  measuring repeated operations. `TIMER_PINNED`, `TIMER_DEFERRABLE`,
+  `add_timer_on`, CPU hotplug, NOHZ placement and Linux softirq accounting
+  remain pending. Unsupported initialization flags fail explicitly.
+  All callbacks currently share one worker, so timer throughput and placement
+  differ from Linux's per-CPU timer wheels.
 - Static `DEFINE_PER_CPU` variables preserve their initializers and alignment
   in a separate copy for every boot CPU. Dynamic `alloc_percpu`,
   `alloc_percpu_gfp` and `free_percpu` use zeroed, aligned slots, with checked
@@ -243,6 +265,19 @@ timed-wait workers, each repeating task/queue/completion expiry and signal
 checks eight times. Every deadline list is empty after the batch and the
 measured physical free-page count returns to its warmed baseline.
 
+Timer host tests check pre-expiry/promoted cancellation, return values,
+shutdown and reinitialization, static/stack timers, same-jiffy self-rearming,
+IRQ/preemption balance and non-overlapping callbacks. Controlled callbacks
+on another host thread hold execution while a synchronous deleter waits;
+tests cover asynchronous deletion/shutdown and running callbacks that rearm.
+Two hundred callbacks free their own heap object under ASan, with every page
+returned. Four producers perform 2,000 shared-timer modification/cancellation
+cycles while another thread advances ticks and dispatches callbacks. Rounding
+checks cover four CPU skews and 2,000 offsets each. Native four-CPU tests run
+four batches of four workers, each using 12 stack timers that rearm four times,
+alternating ordinary and IRQSAFE callbacks. Synchronous shutdown precedes
+stack exit; after warmup, the measured batch returns every physical page.
+
 An enabled kernel runs the allocator/list/sort/tree/IRQ-lock tests 200 times
 and verifies that the physical free-page count returns to its initial value.
 The same repeated test also checks raw locks, bit searches, byte-order helpers,
@@ -294,7 +329,8 @@ runtime subsystems:
 2. MMIO mapping with correct cache attributes, DMA/scatter-gather APIs,
    page/shmem management, GPU address spaces and TTM/GEM memory management.
 3. Remaining lock/wait variants (including wound/wait mutexes and I/O waits),
-   workqueues, timer callbacks, high-resolution timers and RCU lifetime rules.
+   workqueues, remaining timer modes, high-resolution timers and RCU lifetime
+   rules.
 4. Linux IRQ registration, interrupt synchronization and safe GPU reset paths.
 5. C DRM core integration, device nodes, file ownership, ioctl/mmap handling,
    DMA fences, sync objects and dma-buf lifetime handling. The existing V DRM

@@ -18,6 +18,7 @@ MARKERS = [
     "linuxkpi: blocking wakeups, join/detach and 70 retained exited tasks passed; no pages retained",
     "linuxkpi: sleeping mutexes, wait queues and completions passed on 4 workers; no pages retained",
     "linuxkpi: monotonic clocks and timed task/queue/completion waits passed on 4 workers; no pages retained",
+    "linuxkpi: timer callbacks, IRQSAFE, self-rearm and synchronous shutdown passed on 4 workers; no pages retained",
     "linuxkpi: scheduler deferred preemption while IRQs stayed enabled",
     "and FPU preservation passed",
     "LINUXKPI GUEST: PASS",

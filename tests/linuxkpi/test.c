@@ -34,6 +34,7 @@ static _Thread_local bool interrupts = true;
 static _Thread_local unsigned int preempt_depth;
 static _Thread_local unsigned int current_cpu;
 static _Thread_local void (*host_irq_restore_hook)(void);
+static _Thread_local unsigned int *timer_sync_spins;
 static atomic_t refcount_warnings = ATOMIC_INIT(0);
 static atomic_t time_warnings = ATOMIC_INIT(0);
 static u64 host_clock_ns;
@@ -323,7 +324,11 @@ void vinix_linuxkpi_irq_restore(unsigned long flags)
     }
 }
 unsigned long vinix_linuxkpi_irq_flags(void) { return interrupts ? 1UL << 9 : 0; }
-void vinix_linuxkpi_spin_wait(void) { __asm__ volatile("" ::: "memory"); }
+void vinix_linuxkpi_spin_wait(void)
+{
+    if (timer_sync_spins) __atomic_fetch_add(timer_sync_spins, 1, __ATOMIC_RELEASE);
+    __asm__ volatile("" ::: "memory");
+}
 void vinix_linuxkpi_preempt_disable(void) { preempt_depth++; }
 void vinix_linuxkpi_preempt_enable(void) { assert(preempt_depth); preempt_depth--; }
 void vinix_linuxkpi_preempt_enable_no_resched(void) { assert(preempt_depth); preempt_depth--; }
@@ -967,6 +972,7 @@ static void reference_tests(void)
 
 #include "sync_test.h"
 #include "time_test.h"
+#include "timer_test.h"
 
 int main(void)
 {
@@ -990,6 +996,7 @@ int main(void)
     task_wait_tests();
     sync_tests();
     time_tests();
+    timer_tests();
     list_tests();
     tree_tests();
     concurrency_tests();
@@ -997,6 +1004,6 @@ int main(void)
     reference_tests();
     vinix_linuxkpi_percpu_destroy_for_test();
     assert(live_pages == 0);
-    puts("LinuxKPI: PASS (Linux helpers, allocation/OOM, strings, bitmaps, SMP/IRQ locks, per-CPU storage, task references, wake races, sleeping mutexes, queues, completions, monotonic clocks and timed waits)");
+    puts("LinuxKPI: PASS (Linux helpers, allocation/OOM, strings, bitmaps, SMP/IRQ locks, per-CPU storage, task references, wake races, sleeping mutexes, queues, completions, clocks, timed waits and timer callbacks)");
     return 0;
 }
