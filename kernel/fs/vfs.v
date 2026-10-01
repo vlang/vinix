@@ -1224,7 +1224,11 @@ pub fn syscall_getcwd(_ voidptr, buf charptr, len u64) (u64, u64) {
 		return errno.err, errno.erange
 	}
 
-	C.strcpy(buf, cwd.str)
+	// Checked, so a bad `buf` fails with EFAULT rather than faulting the
+	// kernel with a write to a user address it never validated.
+	if !usercopy.copy_to_user(u64(buf), cwd.str, bytes_needed) {
+		return errno.err, errno.efault
+	}
 	return bytes_needed, 0
 }
 

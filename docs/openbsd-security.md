@@ -353,6 +353,22 @@ guarantees on OpenBSD.
 append-only, checks that each kind of change is refused, and that at
 securelevel 1 the bits can no longer be cleared.
 
+## Checked copies out of the stat and getcwd syscalls
+
+A syscall that writes its result straight through a user-supplied pointer
+panics the kernel when that pointer is bad: a fault at a user address taken
+while the CPU is in the kernel has no handler and brings the machine down, so
+`fstat(fd, (void *)1)` from any process was a one-line local denial of
+service. OpenBSD never dereferences a user pointer directly; every transfer
+goes through `copyin`/`copyout`, which check the address. `fstat`, `fstatat`,
+`stat`, `lstat`, `statx` and `getcwd` now do the same: each builds its result
+in a kernel buffer and copies it out through the checked path, so a bad
+pointer fails with `EFAULT` and the kernel keeps running. On amd64 the stat
+syscalls reached the user buffer directly; on arm64 the layout conversion did.
+
+`tests/openbsd-security` makes each of these calls with an unmapped buffer and
+checks for `EFAULT`, and that a valid buffer still returns the right data.
+
 ## Already in place
 
 These came before and are unchanged: W^X for user mappings, `mimmutable(2)`
@@ -362,11 +378,15 @@ syscalls, SMEP, UMIP, NXE and `CR0.WP` on amd64, and PXN on every user page
 on arm64.
 
 Not yet: SMAP and PAN need the kernel's remaining direct dereferences of user
-pointers converted to checked copies first. `fstatat` still writes its
-`struct stat` straight to the user's buffer, for example. `MAP_STACK`
+pointers converted to checked copies first. The stat family and `getcwd` now
+copy their results out through the checked path, but the `read`/`write`
+family and the per-driver `ioctl` handlers still reach a user buffer
+directly, so enabling the hardware bit would fault on them. `MAP_STACK`
 checking and syscall-origin pinning (`pinsyscalls`) would break Go and
 statically linked Linux programs, which make syscalls from their own text
-and run on stacks that were never mapped with `MAP_STACK`.
+and run on stacks that were never mapped with `MAP_STACK`. Mapping program
+text execute-only (`xonly`) is native on arm64 but needs memory protection
+keys on amd64, and risks Linux binaries that read their own text.
 
 ## Calling them
 

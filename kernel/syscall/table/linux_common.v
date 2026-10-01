@@ -649,7 +649,9 @@ fn write_statx_timestamp(dst u64, sec i64, nsec i64) {
 	}
 }
 
-fn convert_stat_to_statx(src &stat.Stat, dst u64) {
+fn convert_stat_to_statx(src &stat.Stat, user_dst u64) bool {
+	mut buf := [256]u8{}
+	dst := unsafe { u64(&buf[0]) }
 	unsafe {
 		C.memset(voidptr(dst), 0, 256)
 
@@ -675,6 +677,7 @@ fn convert_stat_to_statx(src &stat.Stat, dst u64) {
 		*&u32(dst + 136) = u32(src.dev >> 32) // stx_dev_major
 		*&u32(dst + 140) = u32(src.dev & 0xffffffff) // stx_dev_minor
 	}
+	return usercopy.copy_to_user(user_dst, unsafe { voidptr(&buf[0]) }, u64(sizeof(buf)))
 }
 
 // statx(dirfd, path, flags, mask, buf). The mask is a request, and a kernel is
@@ -691,7 +694,9 @@ fn syscall_linux_statx(gpr_state voidptr, dirfd int, path charptr, flags int, _m
 		return ret, err
 	}
 
-	convert_stat_to_statx(&vinix_stat, buf)
+	if !convert_stat_to_statx(&vinix_stat, buf) {
+		return errno.err, errno.efault
+	}
 	return 0, 0
 }
 

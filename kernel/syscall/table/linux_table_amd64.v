@@ -50,12 +50,41 @@ fn syscall_linux_open(gpr_state voidptr, path charptr, flags int, mode u32) (u64
 	return fs.syscall_openat(gpr_state, fs.at_fdcwd, path, flags, mode)
 }
 
-fn syscall_linux_stat(gpr_state voidptr, path charptr, buf &stat.Stat) (u64, u64) {
-	return fs.syscall_fstatat(gpr_state, fs.at_fdcwd, path, buf, 0)
+// A bad user `stat` buffer must fail with EFAULT, not fault the kernel: the
+// result goes into a kernel struct that is then copied out through the
+// checked path. On amd64 the Vinix stat.Stat already has the Linux struct
+// stat layout, so the copy is verbatim.
+fn copy_stat_to_user(src &stat.Stat, buf u64) (u64, u64) {
+	if !usercopy.copy_to_user(buf, voidptr(src), u64(sizeof(stat.Stat))) {
+		return errno.err, errno.efault
+	}
+	return 0, 0
 }
 
-fn syscall_linux_lstat(gpr_state voidptr, path charptr, buf &stat.Stat) (u64, u64) {
-	return fs.syscall_fstatat(gpr_state, fs.at_fdcwd, path, buf, fs.at_symlink_nofollow)
+fn syscall_linux_fstat(gpr_state voidptr, fdnum int, buf u64) (u64, u64) {
+	mut vinix_stat := stat.Stat{}
+	ret, err := fs.syscall_fstat(gpr_state, fdnum, unsafe { &vinix_stat })
+	if err != 0 {
+		return ret, err
+	}
+	return copy_stat_to_user(&vinix_stat, buf)
+}
+
+fn syscall_linux_fstatat(gpr_state voidptr, dirfd int, path charptr, buf u64, flags int) (u64, u64) {
+	mut vinix_stat := stat.Stat{}
+	ret, err := fs.syscall_fstatat(gpr_state, dirfd, path, unsafe { &vinix_stat }, flags)
+	if err != 0 {
+		return ret, err
+	}
+	return copy_stat_to_user(&vinix_stat, buf)
+}
+
+fn syscall_linux_stat(gpr_state voidptr, path charptr, buf u64) (u64, u64) {
+	return syscall_linux_fstatat(gpr_state, fs.at_fdcwd, path, buf, 0)
+}
+
+fn syscall_linux_lstat(gpr_state voidptr, path charptr, buf u64) (u64, u64) {
+	return syscall_linux_fstatat(gpr_state, fs.at_fdcwd, path, buf, fs.at_symlink_nofollow)
 }
 
 fn syscall_linux_access(gpr_state voidptr, path charptr, mode u32) (u64, u64) {
@@ -361,7 +390,7 @@ pub fn init_syscall_table() {
 	syscall_table[2] = voidptr(syscall_linux_open) // open
 	syscall_table[3] = voidptr(fs.syscall_close) // close
 	syscall_table[4] = voidptr(syscall_linux_stat) // stat
-	syscall_table[5] = voidptr(fs.syscall_fstat) // fstat
+	syscall_table[5] = voidptr(syscall_linux_fstat) // fstat
 	syscall_table[6] = voidptr(syscall_linux_lstat) // lstat
 	syscall_table[7] = voidptr(file.syscall_poll) // poll
 	syscall_table[8] = voidptr(fs.syscall_seek) // lseek
@@ -429,7 +458,7 @@ pub fn init_syscall_table() {
 	syscall_table[259] = voidptr(fs.syscall_mknodat) // mknodat
 	syscall_table[260] = voidptr(fs.syscall_fchownat) // fchownat
 	syscall_table[261] = voidptr(syscall_linux_futimesat) // futimesat
-	syscall_table[262] = voidptr(fs.syscall_fstatat) // newfstatat
+	syscall_table[262] = voidptr(syscall_linux_fstatat) // newfstatat
 	syscall_table[263] = voidptr(fs.syscall_unlinkat) // unlinkat
 	syscall_table[264] = voidptr(fs.syscall_renameat) // renameat
 	syscall_table[265] = voidptr(fs.syscall_linkat) // linkat

@@ -296,7 +296,9 @@ fn syscall_linux_recvfrom(gpr_state voidptr, fdnum int, buf voidptr, len u64, fl
 
 // Convert Vinix stat.Stat (144 bytes, x86_64 layout) to Linux aarch64 struct stat (128 bytes).
 // Field order and sizes differ: mode/nlink are swapped and narrower on aarch64, blksize is i32.
-fn convert_stat_to_linux(src &stat.Stat, dst u64) {
+fn convert_stat_to_linux(src &stat.Stat, user_dst u64) bool {
+	mut buf := [128]u8{}
+	dst := unsafe { u64(&buf[0]) }
 	unsafe {
 		*&u64(dst + 0) = src.dev
 		*&u64(dst + 8) = src.ino
@@ -319,6 +321,7 @@ fn convert_stat_to_linux(src &stat.Stat, dst u64) {
 		*&u32(dst + 120) = 0 // __unused4
 		*&u32(dst + 124) = 0 // __unused5
 	}
+	return usercopy.copy_to_user(user_dst, unsafe { voidptr(&buf[0]) }, u64(sizeof(buf)))
 }
 
 // fstatat wrapper: call Vinix fstatat with a local buffer, then convert to Linux layout.
@@ -328,7 +331,9 @@ fn syscall_linux_fstatat(gpr_state voidptr, dirfd int, path charptr, linux_buf u
 	if err != 0 {
 		return ret, err
 	}
-	convert_stat_to_linux(&vinix_stat, linux_buf)
+	if !convert_stat_to_linux(&vinix_stat, linux_buf) {
+		return errno.err, errno.efault
+	}
 	return 0, 0
 }
 
@@ -339,7 +344,9 @@ fn syscall_linux_fstat(gpr_state voidptr, fdnum int, linux_buf u64) (u64, u64) {
 	if err != 0 {
 		return ret, err
 	}
-	convert_stat_to_linux(&vinix_stat, linux_buf)
+	if !convert_stat_to_linux(&vinix_stat, linux_buf) {
+		return errno.err, errno.efault
+	}
 	return 0, 0
 }
 

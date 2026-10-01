@@ -1235,9 +1235,41 @@ static int run_attribute_tests(void)
 	return 0;
 }
 
+/* A syscall handed an unmapped struct pointer must fail with EFAULT, not
+ * dereference it straight into a kernel fault. Before these were checked
+ * copies, each of these calls panicked the kernel from userspace. */
+#ifndef STATX_BASIC_STATS
+#define STATX_BASIC_STATS 0x000007ffU
+#endif
+
+static int run_fault_tests(void)
+{
+	size_t page = (size_t)sysconf(_SC_PAGESIZE);
+	/* A page with no access: a copy into it resolves no writable page and
+	 * fails, as an unmapped address would. */
+	void *bad = mmap(NULL, page, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+	CHECK(bad != MAP_FAILED);
+
+	/* Raw syscalls, so libc does not touch `bad` in userspace first. */
+	CHECK(syscall(SYS_fstat, 0, bad) == -1 && errno == EFAULT);
+	CHECK(syscall(SYS_newfstatat, AT_FDCWD, "/", bad, 0) == -1 && errno == EFAULT);
+	CHECK(syscall(SYS_statx, AT_FDCWD, "/", 0, STATX_BASIC_STATS, bad) == -1 && errno == EFAULT);
+	CHECK(syscall(SYS_getcwd, bad, page) == -1 && errno == EFAULT);
+
+	/* A valid buffer still works, so the checked path did not break stat. */
+	struct stat good;
+	CHECK(stat("/", &good) == 0 && (good.st_mode & S_IFMT) == S_IFDIR);
+	char cwd[64];
+	CHECK(getcwd(cwd, sizeof(cwd)) == cwd);
+
+	CHECK(munmap(bad, page) == 0);
+	puts("OPENBSD SECURITY PASS: bad user pointers fault rather than panic");
+	return 0;
+}
+
 static int run_tests(void)
 {
-	if (run_pledge_tests() != 0 || run_unveil_tests() != 0 || run_signal_tests() != 0
+	if (run_fault_tests() != 0 || run_pledge_tests() != 0 || run_unveil_tests() != 0 || run_signal_tests() != 0
 	    || run_pid_tests() != 0 || run_break_tests() != 0 || run_inherit_tests() != 0
 	    || run_network_tests() != 0 || run_layout_tests() != 0
 	    || run_read_only_tests() != 0 || run_attribute_tests() != 0)
