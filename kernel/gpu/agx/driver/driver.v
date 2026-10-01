@@ -1176,7 +1176,7 @@ pub fn initialise() {
 		return
 	}
 
-	agx_driver_inst.gpu = &mgr
+	agx_driver_inst.gpu = mgr
 	gpu.set_global_manager(agx_driver_inst.gpu)
 
 	// Step 7: Register DRM driver (name "asahi", features GEM|RENDER|COMPUTE)
