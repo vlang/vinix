@@ -10,7 +10,11 @@ fi
 
 # Keep the Vulkan/LLVM generation private to the game. Xvfb and other desktop
 # applications retain the libraries their own staging layers were built with.
-export LD_LIBRARY_PATH=/opt/opengothic/lib:${LD_LIBRARY_PATH:-/usr/lib}
+venus=/opt/venus/share/vulkan/icd.d/virtio_icd.aarch64.json
+if [ -z "${VK_DRIVER_FILES:-${VK_ICD_FILENAMES:-}}" ] && [ -r "$venus" ] && /opt/venus/bin/venus-available; then
+    export VK_ICD_FILENAMES="$venus"
+fi
+export LD_LIBRARY_PATH=/opt/opengothic/lib:/opt/venus/lib:${LD_LIBRARY_PATH:-/usr/lib}
 export VK_ICD_FILENAMES=${VK_ICD_FILENAMES:-/opt/opengothic/icd/lvp.json}
 export LP_NUM_THREADS=${LP_NUM_THREADS:-4}
 export ALSOFT_DRIVERS=${ALSOFT_DRIVERS:-null}
@@ -18,6 +22,12 @@ export ALSOFT_DRIVERS=${ALSOFT_DRIVERS:-null}
 state=${XDG_DATA_HOME:-$HOME/.local/share}/opengothic
 mkdir -p "$state"
 cd "$state"
+# OpenAL's null output still requests SCHED_RR by default. In the QEMU
+# polling scheduler that keeps every idle vCPU busy for inaudible mixing.
+if [ "$ALSOFT_DRIVERS" = null ] && [ -z "${ALSOFT_CONF:-}" ]; then
+    printf '[general]\nrt-prio = 0\n' > "$state/vinix-null-audio.conf"
+    export ALSOFT_CONF="$state/vinix-null-audio.conf"
+fi
 # The demo is classic Gothic II: say so rather than leave it to what the
 # engine reads out of the demo's Gothic.ini.
 if [ -f "$game/.vinix-demo" ]; then

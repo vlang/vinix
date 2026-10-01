@@ -16,7 +16,7 @@ pub fn set_ecam(virt u64) {
 // ECAM config space: each device's 4KB config space is memory-mapped
 // at ecam_base + (bus << 20 | slot << 15 | func << 12 | offset).
 fn ecam_address(bus u8, slot u8, function u8, offset u32) u64 {
-	return ecam_base + (u64(bus) << 20) | (u64(slot) << 15) | (u64(function) << 12) | u64(offset & 0xffc)
+	return ecam_base + (u64(bus) << 20) | (u64(slot) << 15) | (u64(function) << 12) | u64(offset & 0xfff)
 }
 
 pub fn (dev &PCIDevice) read[T](offset u32) T {

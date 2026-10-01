@@ -9,10 +9,14 @@ the engine crashes or exits. It leaves a screenshot.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import importlib.util
 import os
 from pathlib import Path
 import pty
+import re
+import statistics
+import json
 import select
 import shutil
 import signal
@@ -26,7 +30,7 @@ LOADING = b"Parsing object [MeshAndBsp"
 # A new game plays the intro once its world is loaded. The test's copy of the
 # game has none, so this line is the engine going on to the world itself.
 WORLD = b"unable to locate video file"
-FAILURES = (b"---crashlog(", b"KERNEL PANIC", b"OPENGOTHIC-GONE")
+FAILURES = (b"---crashlog(", b"KERNEL PANIC", b"OPENGOTHIC-GONE", b"VENUS-ABI-FAIL", b"VENUS-SMOKE-FAIL")
 TOOLS = ("sh", "cat", "mkdir", "chmod", "sleep", "uname", "grep", "ps", "tail")
 
 
@@ -41,7 +45,7 @@ def copy_layer(source: Path, dest: Path) -> None:
         elif entry.is_dir():
             copy_layer(entry, target)
         else:
-            if target.is_symlink():
+            if target.exists() or target.is_symlink():
                 target.unlink()
             shutil.copy2(entry, target)
 
@@ -75,6 +79,8 @@ def prepare(args, work: Path) -> Path:
         if (root / stale).exists():
             shutil.rmtree(root / stale)
     copy_layer(args.build / "staging", root)
+    if args.engine:
+        shutil.copy2(args.engine, root / "opt/opengothic/Gothic2Notr")
     for video in (root / "usr/share/games/gothic2").rglob("*"):
         if video.name.lower() == "intro.bik":
             video.unlink()
@@ -91,12 +97,22 @@ def prepare(args, work: Path) -> Path:
                     f"-L{sysroot}/usr/lib", f"-L{sysroot}/lib", "-Wl,--allow-shlib-undefined",
                     "-lXtst", "-lXdamage", "-lX11", "-lXext", "-lxcb",
                     "-o", str(root / "usr/bin/vinix-wine-host")], check=True)
+    if args.venus:
+        copy_layer(args.venus_runtime, root)
+        launcher = (ROOT / "build-support/opengothic/run-opengothic").read_text()
+        launcher = launcher.replace("set -eu", """set -eu
+export VK_INSTANCE_LAYERS=VK_LAYER_MESA_overlay
+export VK_LAYER_PATH=/opt/venus/share/vulkan/explicit_layer.d
+export VK_LAYER_MESA_OVERLAY_CONFIG=fps,frame_timing,position=top-left,output_file=/tmp/gothic-fps.csv,fps_sampling_period=500""")
+        (root / "usr/bin/run-opengothic").unlink()
+        (root / "usr/bin/run-opengothic").write_text(launcher)
+        (root / "usr/bin/run-opengothic").chmod(0o755)
     shutil.copy2(Path(__file__).with_name("guest-init.sh"), root / "sbin/init")
     (root / "sbin/init").chmod(0o755)
     return root
 
 
-def press(socket_path: Path, key: str) -> None:
+def press(socket_path: Path, key: str, seconds: float = 0.12) -> None:
     spec = importlib.util.spec_from_file_location("vinix_input", ROOT / "desktop/tools/input.py")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -106,8 +122,9 @@ def press(socket_path: Path, key: str) -> None:
     try:
         for down in (True, False):
             monitor.send_input([{"type": "key", "data": {"down": down, "key": {"type": "qcode", "data": key}}}])
-            time.sleep(0.12)
+            time.sleep(seconds if down else 0.12)
     finally:
+        monitor.stream.close()
         monitor.sock.close()
 
 
@@ -137,6 +154,7 @@ def stop(pid: int, master: int) -> None:
 
 
 def run_guest(args, work: Path, root: Path) -> Path:
+    kernel_digest = hashlib.sha256((args.kernel_dir / "bin/vinix").read_bytes()).hexdigest()
     archive = work / "initramfs.tar"
     with tarfile.open(archive, "w", format=tarfile.USTAR_FORMAT) as tar:
         tar.add(root, arcname=".")
@@ -146,18 +164,18 @@ def run_guest(args, work: Path, root: Path) -> Path:
     environment = os.environ.copy()
     environment.update({
         "VINIX_KERNEL_DIR": str(args.kernel_dir), "VINIX_INITRAMFS": str(archive),
-        "VINIX_INITRAMFS_COMPRESSED": "0", "VINIX_QEMU_ROOT_DISK": "0",
+        "VINIX_INITRAMFS_COMPRESSED": "0", "VINIX_QEMU_ROOT_DISK": "0", "VINIX_VENUS_STAGING": str(args.venus_runtime),
         "VINIX_BOOT_DISK": str(work / "boot.img"), "VINIX_EFIVARS": str(work / "efivars.fd"),
         "VINIX_BOOT_DISK_SIZE_MB": "2048", "VINIX_QEMU_PACKAGE_STORE": str(work / "packages.tar"),
         "VINIX_QEMU_PACKAGE_PERSIST": "0", "VINIX_QEMU_HOST_SOURCE": "0",
-        "VINIX_QEMU_AUDIO": "off", "VINIX_QEMU_SMP": "4", "VINIX_KEEP_TEMP_BOOT_DISK": "1",
-        "VINIX_QEMU_EXTRA": f"-qmp unix:{socket_path},server=on,wait=off",
+        "VINIX_QEMU_AUDIO": "off", "VINIX_QEMU_SMP": str(args.cpus), "VINIX_KEEP_TEMP_BOOT_DISK": "1",
+        "VINIX_QEMU_EXTRA": f"-qmp unix:{socket_path},server=on,wait=off -d guest_errors -D {work}/qemu-errors.log",
     })
     # The desktop's own 2x framebuffer, where the firmware for it is built.
     firmware = args.repo / "boot-image/edk2-aarch64-code-2048x1536.fd"
     if firmware.exists():
         environment.update({"VINIX_QEMU_RESOLUTION": "2048x1536x32", "VINIX_OVMF_CODE": str(firmware)})
-    command = [str(args.repo / "run-aarch64.sh"), "--no-build", "--serial", "--no-persist", "--mem=8192"]
+    command = [str(args.repo / "run-aarch64.sh"), "--no-build", "--no-persist", "--mem=12288" if args.venus else "--mem=8192", "--venus" if args.venus else "--serial"]
     print("Booting Vinix with Gothic II open", flush=True)
     pid, master = pty.fork()
     if pid == 0:
@@ -167,6 +185,7 @@ def run_guest(args, work: Path, root: Path) -> Path:
     screenshot = work / "gothic.png"
     menu_at = started_at = world_at = None
     loading = passed = False
+    fps = []
     deadline = time.monotonic() + args.timeout
     try:
         with (work / "vinix.log").open("wb") as log:
@@ -178,6 +197,13 @@ def run_guest(args, work: Path, root: Path) -> Path:
                         break
                     if not chunk:
                         break
+                    if args.venus and world_at and time.monotonic() - world_at >= args.warmup:
+                        # Preserve split serial lines between reads.
+                        begin = len(transcript)
+                        combined = bytes(transcript[max(0, begin - 100):]) + chunk
+                        for match in re.finditer(rb"(?m)^0, 0, ([0-9.]+), ([0-9]+)\r*\n", combined):
+                            if match.end() > min(100, begin):
+                                fps.append(float(match.group(1)))
                     transcript.extend(chunk)
                     log.write(chunk)
                     log.flush()
@@ -200,7 +226,10 @@ def run_guest(args, work: Path, root: Path) -> Path:
                     if WORLD in transcript:
                         world_at = now
                         print("The world is running", flush=True)
-                elif now - world_at > args.seconds:
+                elif now - world_at > args.warmup + args.seconds:
+                    # Exercise gameplay input before the screenshot as well
+                    # as the Return key used to start the world.
+                    press(socket_path, "up", 1)
                     subprocess.run([str(ROOT / "desktop/tools/screenshot.sh"), str(screenshot)], check=True,
                                    env={**os.environ, "VINIX_QMP_SOCKET": str(socket_path)},
                                    stdout=subprocess.DEVNULL)
@@ -211,6 +240,22 @@ def run_guest(args, work: Path, root: Path) -> Path:
     if not passed:
         reached = "the world" if world_at else "the loading screen" if loading else "the menu" if menu_at else "nothing"
         raise SystemExit(f"OpenGothic failed after reaching {reached}; inspect {work}/vinix.log")
+    if args.venus:
+        if b"VINIX_VENUS_FENCE_FD_PASS" not in transcript or b"VINIX_VENUS_GPU_FILL_PASS" not in transcript or b"VENUS GPU: Virtio-GPU Venus" not in transcript:
+            raise SystemExit("Native Venus GPU smoke failed")
+        if len(fps) < args.seconds // 2:
+            raise SystemExit("Too few gameplay FPS samples")
+        result = {"samples": len(fps), "median_fps": statistics.median(fps),
+                  "min_fps": min(fps), "max_fps": max(fps), "seconds": args.seconds,
+                  "warmup_seconds": args.warmup, "cpus": args.cpus,
+                  "kernel_sha256": kernel_digest,
+                  "engine_sha256": hashlib.sha256((root / "opt/opengothic/Gothic2Notr").read_bytes()).hexdigest(),
+                  "venus_sha256": hashlib.sha256((root / "opt/venus/lib/libvulkan_virtio.so").read_bytes()).hexdigest(),
+                  "screenshot": str(screenshot)}
+        (work / "performance.json").write_text(json.dumps(result, indent=2) + "\n")
+        print(f"Native Venus gameplay: median {result['median_fps']:.2f} FPS ({len(fps)} samples)", flush=True)
+        if result["median_fps"] < args.min_fps:
+            raise SystemExit(f"Gameplay median below required {args.min_fps} FPS; inspect {work}/performance.json")
     return screenshot
 
 
@@ -221,11 +266,22 @@ def main() -> None:
     parser.add_argument("--desktop", type=Path, help="cross-built desktop (default: build/vinix-desktop here)")
     parser.add_argument("--kernel-dir", type=Path)
     parser.add_argument("--work", type=Path, required=True)
-    parser.add_argument("--seconds", type=int, default=30, help="how long the world must render")
+    parser.add_argument("--seconds", type=int, default=60, help="how long the world must render")
+    parser.add_argument("--engine", type=Path)
+    parser.add_argument("--cpus", type=int, default=4)
+    parser.add_argument("--venus", action="store_true", help="require native GPU acceleration in KekVM")
+    parser.add_argument("--venus-runtime", type=Path, help="Venus staging tree (default: REPO/build-aarch64-venus/staging)")
+    parser.add_argument("--warmup", type=int, default=10, help="discard initial gameplay frames")
+    parser.add_argument("--min-fps", type=float, default=55, help="required median gameplay FPS with --venus")
     parser.add_argument("--timeout", type=int, default=900)
     args = parser.parse_args()
+    if not 1 <= args.cpus <= 8:
+        parser.error("--cpus must be between 1 and 8")
+    if args.seconds < 1 or args.warmup < 0 or args.min_fps <= 0 or args.timeout < 1:
+        parser.error("durations and --min-fps must be positive; --warmup can be zero")
     args.repo = args.repo.resolve()
     args.build = (args.build or args.repo / "build/opengothic").resolve()
+    args.venus_runtime = (args.venus_runtime or args.repo / "build-aarch64-venus/staging").resolve()
     args.desktop = (args.desktop or ROOT / "build/vinix-desktop").resolve()
     args.kernel_dir = (args.kernel_dir or args.repo / "kernel").resolve()
     if not (args.build / "staging/usr/share/games/gothic2/_work/Data").is_dir():

@@ -320,9 +320,6 @@ fn kmain_thread(qemu_platform bool, acpi_platform bool) {
 			speakers.initialise()
 		}
 	}
-	if qemu_platform {
-		virtio_gpu.initialise(memory.get_hhdm_offset())
-	}
 
 	fbdev.initialise()
 	fbdev.register_driver(simple.get_driver())
@@ -333,6 +330,9 @@ fn kmain_thread(qemu_platform bool, acpi_platform bool) {
 	// network card is on PCIe too.
 	if qemu_platform || acpi_platform {
 		start_pci()
+	}
+	if qemu_platform {
+		virtio_gpu.initialise(memory.get_hhdm_offset())
 	}
 	pointerdev.initialise()
 	print('kmain_thread: pointer done\n')
@@ -951,6 +951,8 @@ fn kmain() {
 	numa.initialise()
 	print('numa done\n')
 
+	sched.configure_virtual_idle(!use_aic && force_qemu_platform,
+		early_cmdline_has_token('vinix.hvf_fast_idle=1'))
 	// Limine 12.8's VHE-aware trampoline can safely park Apple APs at EL2. Use
 	// four logical CPUs on Apple hardware while retaining the existing all-CPU
 	// behaviour in virtual machines (currently configured with four vCPUs).

@@ -2,7 +2,8 @@
 
 The native ARM64/musl build of [OpenGothic](https://github.com/Try/OpenGothic)
 runs in a movable Gothic II window in the Vinix desktop. Its Vulkan renderer
-uses Mesa Lavapipe and LLVM on the CPU. Xvfb supplies the X11 window and the
+uses Mesa Venus on the host GPU when booted in KekVM with `--venus`,
+or Mesa Lavapipe and LLVM on the CPU on other configurations. Xvfb supplies the X11 window and the
 existing desktop bridge forwards keyboard and pointer events. No Wine or x86
 translation is involved.
 
@@ -12,9 +13,16 @@ Build on a host with Python 3, Git, curl, tar, CMake, Ninja, glslang and the
 
 ```sh
 ./build-opengothic-aarch64.sh --demo
+./build-venus-aarch64.sh
 ./build-desktop-aarch64.sh
-./run-desktop-aarch64.sh --no-build
+VINIX_KEKVM_DIR="$HOME/code/kekvm" ./run-desktop-aarch64.sh --venus
 ```
+
+The accelerated path needs KekVM's prepared GPU backend (`make setup-gpu`
+in `~/code/kekvm`) and a kernel built from this checkout. Vinix uses the
+modern PCI VirtIO GPU, Venus capset and 4 GiB host-visible aperture; the
+private Mesa runtime is described in [../venus/README.md](../venus/README.md).
+The Gothic window presents a 1280×720 surface at its native size.
 
 Open **Gothic II** from the Start menu or its desktop shortcut. `--demo`
 downloads the original German Gothic II demo from
@@ -64,11 +72,16 @@ first frame of the world can be drawn on Lavapipe:
 The launcher uses a writable per-user directory for settings, logs, saves and
 shader caches. Mesa, LLVM and their dependencies live under
 `/opt/opengothic/lib`, leaving the X11 runtime's Mesa generation separate.
+The launcher probes the render node before selecting `/opt/venus`; it
+requires host-visible blobs, context initialization and Venus capset 4.
 `VK_ICD_FILENAMES` can select another Vulkan ICD and `LP_NUM_THREADS` controls
 the software renderer's worker count. Ray tracing, mesh shaders and AA default
 to off. Additional arguments to `run-opengothic` override those defaults.
-The current build uses OpenAL's null audio backend. Hardware Vulkan and audio
-playback have not been qualified.
+The worker-count patch creates only as many worker threads as the guest has
+CPUs, up to the engine's existing limit of 16. The current build uses OpenAL's
+null audio backend and disables its real-time mixer priority, allowing idle
+vCPUs to park. An explicit `ALSOFT_CONF` overrides that configuration. Audio
+playback has not been qualified.
 
 Lavapipe draws every frame on the CPU, and the engine's renderer is written
 for a GPU: in QEMU on four cores the opening scene draws one or two frames a

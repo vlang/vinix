@@ -1,6 +1,6 @@
 #!/bin/bash
 # Fast build + run cycle for Vinix aarch64 in QEMU
-# Usage: ./run-aarch64.sh [--no-build] [--serial] [--virtio-gpu|--virgl]
+# Usage: ./run-aarch64.sh [--no-build] [--serial] [--virtio-gpu|--virgl|--venus]
 #                         [--fake-g17]
 #                         [--guest-init=PATH]
 #                         [--mem=MB]
@@ -171,6 +171,7 @@ for arg in "$@"; do
         --serial)     SERIAL_ONLY=1 ;;
         --virtio-gpu) VIRTIO_GPU=1 ;;
         --virgl)      VIRTIO_GPU=2 ;;
+        --venus)      VIRTIO_GPU=3 ;;
         --fake-g17)   FAKE_G17=1 ;;
         --guest-init=*) GUEST_INIT="${arg#*=}"; GUEST_INIT_REQUESTED=1 ;;
         --mem=*)      QEMU_MEM="${arg#*=}" ;;
@@ -292,8 +293,8 @@ if [ "$DISK_ROOT" -eq 1 ] && [ "$PERSIST_ENABLED" -eq 0 ]; then
     echo "ERROR: --disk-root is the persistent volume; it cannot be combined with --no-persist" >&2
     exit 1
 fi
-if [ "$VIRTIO_GPU" -eq 2 ] && [ "$DISK_ROOT" -eq 1 ]; then
-    echo "ERROR: --virgl needs a RAM root so its Mesa runtime overlays the guest image" >&2
+if [ "$VIRTIO_GPU" -ge 2 ] && [ "$DISK_ROOT" -eq 1 ]; then
+    echo "ERROR: accelerated GPU modes need a RAM root for their per-boot Mesa runtime" >&2
     echo "       Use --no-disk-root with run-desktop-aarch64.sh." >&2
     exit 1
 fi
@@ -444,6 +445,12 @@ else
     sed -i '' '/^[[:space:]]*kaslr:/a\
     cmdline: vinix.qemu_platform=1
 ' "$LIMINE_CONF_QEMU"
+fi
+
+# The Venus launcher prepares a private HVF runtime which can sleep for
+# sub-2 ms deadlines. Stock QEMU retains the kernel's 4 ms idle interval.
+if [ "$VIRTIO_GPU" -eq 3 ] && [ "$(uname -s)" = Darwin ]; then
+    sed -E -i '' '/^[[:space:]]*cmdline:/ s#$# vinix.hvf_fast_idle=1#' "$LIMINE_CONF_QEMU"
 fi
 
 if [ "$PERSIST_ENABLED" -eq 1 ]; then
@@ -1061,6 +1068,17 @@ if [ "$VIRTIO_GPU" -eq 2 ]; then
         "$PACKAGE_RUNTIME_ROOT/usr/lib"/libgcc_s.so*
 fi
 
+if [ "$VIRTIO_GPU" -eq 3 ]; then
+    VENUS_RUNTIME="${VINIX_VENUS_STAGING:-$SCRIPT_DIR/build-aarch64-venus/staging}"
+    if [ ! -x "$VENUS_RUNTIME/opt/venus/bin/venus-available" ] || \
+       [ ! -f "$VENUS_RUNTIME/opt/venus/lib/libvulkan_virtio.so" ]; then
+        echo "ERROR: staged Venus runtime is missing; run ./build-venus-aarch64.sh first." >&2
+        exit 1
+    fi
+    echo "==> Injecting private Venus Vulkan runtime for this boot"
+    cp -R "$VENUS_RUNTIME/." "$PACKAGE_RUNTIME_ROOT/"
+fi
+
 # Hyprland is an explicit alternate desktop session. Keep the selection in
 # this per-run module rather than the image itself: a staged Hyprland runtime
 # must not turn the ordinary desktop launcher into its full-screen terminal.
@@ -1218,12 +1236,19 @@ mcopy -o -i "$BOOT_DISK" "$KERNEL_DIR/bin/vinix" ::/boot/vinix
 
 # ── Launch QEMU ──
 QEMU_BIN="${VINIX_QEMU_BIN:-qemu-system-aarch64}"
-if [ "$VIRTIO_GPU" -eq 2 ]; then
-    QEMU_BIN="${VINIX_VIRGL_QEMU:-$SCRIPT_DIR/../kekvm/.tools/qemu-virgl/bin/kekvm-qemu-system-aarch64}"
+if [ "$VIRTIO_GPU" -ge 2 ]; then
+    kekvm_dir="${VINIX_KEKVM_DIR:-$SCRIPT_DIR/../kekvm}"
+    QEMU_BIN="${VINIX_VIRGL_QEMU:-$kekvm_dir/.tools/qemu-virgl/bin/kekvm-qemu-system-aarch64}"
     if [ ! -x "$QEMU_BIN" ]; then
         echo "ERROR: KekVM's VirGL QEMU was not found at $QEMU_BIN" >&2
         echo "       Run 'make setup-gpu' in ../kekvm or set VINIX_VIRGL_QEMU." >&2
         exit 1
+    fi
+    kekvm_prefix="$(dirname "$(dirname "$QEMU_BIN")")"
+    if [ "$VIRTIO_GPU" -eq 3 ] && [ "$(uname -s)" = Darwin ]; then
+        venus_qemu="$SCRIPT_DIR/build/venus-host/vinix-venus-qemu-system-aarch64"
+        python3 "$SCRIPT_DIR/build-support/venus/prepare-qemu.py" "$QEMU_BIN" "$venus_qemu" || exit 1
+        QEMU_BIN="$venus_qemu"
     fi
     if [ "$(uname -s)" = Darwin ]; then
         # Apple's OpenGL driver can crash when a texture buffer remains bound
@@ -1239,7 +1264,7 @@ fi
 # backend and forward Ethernet frames to the VirGL VM over a local stream.
 NETWORK_BACKEND="${VINIX_NETWORK_QEMU:-qemu-system-aarch64}"
 NETWORK_FLAGS=(-netdev user,id=net0 -device virtio-net-device,netdev=net0,mac=52:54:00:12:34:56)
-if [ "$VIRTIO_GPU" -eq 2 ] && ! "$QEMU_BIN" -machine virt -netdev help 2>/dev/null | grep -qx user; then
+if [ "$VIRTIO_GPU" -ge 2 ] && ! "$QEMU_BIN" -machine virt -netdev help 2>/dev/null | grep -qx user; then
     if ! command -v "$NETWORK_BACKEND" >/dev/null 2>&1 ||
        ! "$NETWORK_BACKEND" -machine virt -netdev help 2>/dev/null | grep -qx user; then
         echo "ERROR: VirGL networking needs a QEMU with the user network backend; set VINIX_NETWORK_QEMU" >&2
@@ -1279,15 +1304,19 @@ if [ "$HOST_SOURCE_ENABLED" -eq 1 ]; then
 fi
 echo "==> Starting QEMU (Ctrl-A X to quit)..."
 
-if [ "$VIRTIO_GPU" -eq 2 ] && [ "$SERIAL_ONLY" -eq 1 ]; then
-    echo "ERROR: --virgl needs a GL-capable display; do not combine it with --serial" >&2
+if [ "$VIRTIO_GPU" -ge 2 ] && [ "$SERIAL_ONLY" -eq 1 ]; then
+    echo "ERROR: accelerated GPU modes need a GL-capable display; do not combine them with --serial" >&2
     exit 1
-elif [ "$VIRTIO_GPU" -eq 2 ]; then
+elif [ "$VIRTIO_GPU" -ge 2 ]; then
     # virglrenderer needs a GL-capable host display context to execute the
     # guest's Gallium commands. KekVM's macOS backend also needs a core
     # profile for its scanout shaders. Callers may override the backend.
     if [ "$(uname -s)" = Darwin ]; then
-        DISPLAY_BACKEND_FLAGS="-display ${QEMU_DISPLAY_BACKEND:-cocoa,gl=core}"
+        if [ "$VIRTIO_GPU" -eq 3 ]; then
+            DISPLAY_BACKEND_FLAGS="-display ${QEMU_DISPLAY_BACKEND:-cocoa,gl=es}"
+        else
+            DISPLAY_BACKEND_FLAGS="-display ${QEMU_DISPLAY_BACKEND:-cocoa,gl=core}"
+        fi
     else
         DISPLAY_BACKEND_FLAGS="-display ${QEMU_DISPLAY_BACKEND:-default,gl=on}"
     fi
@@ -1301,7 +1330,11 @@ else
     DISPLAY_BACKEND_FLAGS="-display default"
 fi
 
-if [ "$VIRTIO_GPU" -eq 2 ]; then
+if [ "$VIRTIO_GPU" -eq 3 ]; then
+    DISPLAY_DEVICE_FLAGS="-device ramfb -device virtio-gpu-gl-pci,blob=on,hostmem=4G,venus=on,max_outputs=1"
+    export VK_DRIVER_FILES="$kekvm_prefix/share/vulkan/icd.d/libkosmickrisp_icd.json"
+    export DYLD_FALLBACK_LIBRARY_PATH="$kekvm_prefix/lib:/usr/local/lib:/usr/lib"
+elif [ "$VIRTIO_GPU" -eq 2 ]; then
     DISPLAY_DEVICE_FLAGS="-device ramfb -device virtio-gpu-gl-device,max_outputs=1"
 elif [ "$VIRTIO_GPU" -eq 1 ]; then
     # Keep ramfb as primary scanout so firmware/GOP always exposes a visible

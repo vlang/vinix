@@ -1213,6 +1213,40 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
 	if flags & map_anonymous == 0 {
 		range_handle = handle
 	}
+	// Device ownership and attributes must be settled before the VMA is
+	// visible, without holding pagemap.l across driver/usercopy locks.
+	mut mapping_retained := false
+	mut resource_retained := false
+	mut handle_retained := false
+	mut published := false
+	defer {
+		if !published {
+			if mapping_retained {
+				resource.release_mapping_range(mut resource_, range_handle, u64(offset), length)
+			}
+			if handle_retained {
+				handle_unref(range_handle)
+			} else if resource_retained {
+				resource.release_resource(mut resource_)
+			}
+		}
+	}
+	if range_handle != unsafe { nil } && handle_ref != unsafe { nil } {
+		handle_ref(range_handle)
+		handle_retained = true
+	} else if flags & map_anonymous == 0 && voidptr(resource_) != unsafe { nil } {
+		resource.retain_resource(mut resource_)
+		resource_retained = true
+	}
+	if flags & map_anonymous == 0 && voidptr(resource_) != unsafe { nil } {
+		if !resource.retain_mapping_range(mut resource_, range_handle, u64(offset), length) {
+			unsafe { free(range_local) }
+			errno.set(errno.einval)
+			return none
+		}
+		mapping_retained = true
+		extra_pte |= resource.mapping_attributes(mut resource_, range_handle, u64(offset))
+	}
 	lazy_file := options.lazy_file || (flags & map_anonymous == 0
 		&& flags & map_shared != 0 && voidptr(resource_) != unsafe { nil }
 		&& resource.lazy_shared_mapping(mut resource_))
@@ -1227,6 +1261,8 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
 		handle_unref: handle_unref
 		offset: offset
 		pte_extra: extra_pte
+		owns_mapping_ref: mapping_retained
+		owns_resource_ref: resource_retained
 		lazy_file: lazy_file
 		segmented_file: options.segmented_file
 		file_data_start: options.file_data_start
@@ -1325,23 +1361,9 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
 	}
 	range_local.base = base
 	range_global.base = base
+	published = true
 	insert_range_unlocked(mut pagemap, range_local)
 	pagemap.l.release()
-
-	if range_handle != unsafe { nil } && handle_ref != unsafe { nil } {
-		handle_ref(range_handle)
-	} else if flags & map_anonymous == 0 && voidptr(resource_) != unsafe { nil } {
-		resource.retain_resource(mut resource_)
-		range_global.owns_resource_ref = true
-	}
-	if flags & map_anonymous == 0 && voidptr(resource_) != unsafe { nil } {
-		if !resource.retain_mapping_range(mut resource_, range_handle, u64(offset), length) {
-			munmap(mut pagemap, voidptr(base), length) or {}
-			errno.set(errno.einval)
-			return none
-		}
-		range_global.owns_mapping_ref = true
-	}
 
 	// PROT_NONE and large anonymous mappings are address-space reservations, not
 	// committed memory. Large runtimes reserve far more virtual memory than they

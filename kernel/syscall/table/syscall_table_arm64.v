@@ -335,12 +335,12 @@ fn convert_stat_to_linux(src &stat.Stat, user_dst u64) bool {
 
 // fstatat wrapper: call Vinix fstatat with a local buffer, then convert to Linux layout.
 fn syscall_linux_fstatat(gpr_state voidptr, dirfd int, path charptr, linux_buf u64, flags int) (u64, u64) {
-	mut vinix_stat := stat.Stat{}
-	ret, err := fs.syscall_fstatat(gpr_state, dirfd, path, unsafe { &vinix_stat }, flags)
+	mut stat_storage := [stat.Stat{}]!
+	ret, err := fs.syscall_fstatat(gpr_state, dirfd, path, unsafe { &stat_storage[0] }, flags)
 	if err != 0 {
 		return ret, err
 	}
-	if !convert_stat_to_linux(&vinix_stat, linux_buf) {
+	if !convert_stat_to_linux(unsafe { &stat_storage[0] }, linux_buf) {
 		return errno.err, errno.efault
 	}
 	return 0, 0
@@ -348,12 +348,12 @@ fn syscall_linux_fstatat(gpr_state voidptr, dirfd int, path charptr, linux_buf u
 
 // fstat wrapper: call Vinix fstat with a local buffer, then convert to Linux layout.
 fn syscall_linux_fstat(gpr_state voidptr, fdnum int, linux_buf u64) (u64, u64) {
-	mut vinix_stat := stat.Stat{}
-	ret, err := fs.syscall_fstat(gpr_state, fdnum, unsafe { &vinix_stat })
+	mut stat_storage := [stat.Stat{}]!
+	ret, err := fs.syscall_fstat(gpr_state, fdnum, unsafe { &stat_storage[0] })
 	if err != 0 {
 		return ret, err
 	}
-	if !convert_stat_to_linux(&vinix_stat, linux_buf) {
+	if !convert_stat_to_linux(unsafe { &stat_storage[0] }, linux_buf) {
 		return errno.err, errno.efault
 	}
 	return 0, 0

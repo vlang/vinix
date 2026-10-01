@@ -585,7 +585,7 @@ pub fn new_kernel_thread(pc voidptr, arg voidptr, autoenqueue bool) &proc.Thread
 	// SysV ABI still requires (RSP + 8) to be 16-byte aligned at entry, so
 	// reserve that word within the owned stack rather than starting at its top.
 	entry_stack := stack - 8
-	C.memset(voidptr(entry_stack), 0, 8)
+	unsafe { C.memset(voidptr(entry_stack), 0, 8) }
 
 	gpr_state := cpulocal.GPRState{
 		cs: kernel_code_seg

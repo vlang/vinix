@@ -306,26 +306,27 @@ pub fn syscall_ppoll(_ voidptr, user_fds u64, nfds u64, user_timeout u64, user_s
 		return errno.err, errno.efault
 	}
 
-	mut timeout := time.TimeSpec{}
+	mut timeout_storage := [time.TimeSpec{}]!
 	mut timeout_ptr := &time.TimeSpec(unsafe { nil })
 	if user_timeout != 0 {
-		if !usercopy.copy_from_user(voidptr(&timeout), user_timeout, sizeof(time.TimeSpec)) {
+		if !usercopy.copy_from_user(unsafe { voidptr(&timeout_storage[0]) }, user_timeout, sizeof(time.TimeSpec)) {
 			return errno.err, errno.efault
 		}
 		// In unsafe, so that timeout stays on the stack: see getdents64.
-		timeout_ptr = unsafe { &timeout }
+		timeout_ptr = unsafe { &timeout_storage[0] }
 	}
 
-	mut sigmask := u64(0)
+	mut sigmask_storage := [u64(0)]!
 	mut sigmask_ptr := &u64(unsafe { nil })
 	if user_sigmask != 0 {
-		if !usercopy.copy_from_user(voidptr(&sigmask), user_sigmask, sizeof(u64)) {
+		if !usercopy.copy_from_user(unsafe { voidptr(&sigmask_storage[0]) }, user_sigmask, sizeof(u64)) {
 			return errno.err, errno.efault
 		}
 		// In unsafe, so that sigmask stays on the stack: see getdents64.
-		sigmask_ptr = unsafe { &sigmask }
+		sigmask_ptr = unsafe { &sigmask_storage[0] }
 	}
-	return poll_user_fds(pagemap, user_fds, mut pollfds, nfds, timeout_ptr, sigmask_ptr)
+	ret, err := poll_user_fds(pagemap, user_fds, mut pollfds, nfds, timeout_ptr, sigmask_ptr)
+	return ret, err
 }
 
 // poll(2), which x86-64 Linux programs call rather than ppoll: musl's DNS
@@ -347,16 +348,17 @@ pub fn syscall_poll(_ voidptr, user_fds u64, nfds u64, timeout_ms u64) (u64, u64
 
 	// The C int arrives in a 64-bit register; only its low half is defined.
 	milliseconds := i64(i32(u32(timeout_ms)))
-	timeout := time.TimeSpec{
-		tv_sec:  milliseconds / 1000
+	timeout_storage := [time.TimeSpec{
+		tv_sec: milliseconds / 1000
 		tv_nsec: (milliseconds % 1000) * 1000000
-	}
+	}]!
 	mut timeout_ptr := &time.TimeSpec(unsafe { nil })
 	if milliseconds >= 0 {
 		// In unsafe, so that timeout stays on the stack: see getdents64.
-		timeout_ptr = unsafe { &timeout }
+		timeout_ptr = unsafe { &timeout_storage[0] }
 	}
-	return poll_user_fds(pagemap, user_fds, mut pollfds, nfds, timeout_ptr, unsafe { nil })
+	ret, err := poll_user_fds(pagemap, user_fds, mut pollfds, nfds, timeout_ptr, unsafe { nil })
+	return ret, err
 }
 
 // Wait on a poll array already copied in from `pagemap`, then copy the

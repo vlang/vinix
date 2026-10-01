@@ -435,17 +435,6 @@ pub fn write_cntv_ctl_el0(value u64) {
 }
 
 pub fn write_cntv_tval_el0(value u64) {
-	asm volatile aarch64 {
-		msr cntv_tval_el0, value
-		isb
-		; ; r (value)
-		; memory
-	}
-
-	index := cntv_deadline_index()
-	if index < 0 {
-		return
-	}
 	// TVAL is architecturally a signed 32-bit countdown. Every Vinix use is a
 	// small positive interval, but preserve the immediate-expiry meaning of a
 	// value whose sign bit is set rather than turning it into a far-future u64.
@@ -453,6 +442,18 @@ pub fn write_cntv_tval_el0(value u64) {
 	delta := if raw & u32(0x80000000) != 0 { u64(0) } else { u64(raw) }
 	now := read_cntvct_el0()
 	deadline := now + delta
+	// Program the same absolute deadline used by the polling fallback.
+	// HVF's WFI handler reads CVAL to decide how long to park the vCPU.
+	asm volatile aarch64 {
+		msr cntv_cval_el0, deadline
+		isb
+		; ; r (deadline)
+		; memory
+	}
+	index := cntv_deadline_index()
+	if index < 0 {
+		return
+	}
 	cntv_deadlines[index] = if deadline < now { ~u64(0) } else { deadline }
 }
 

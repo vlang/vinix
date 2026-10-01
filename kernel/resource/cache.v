@@ -54,14 +54,19 @@ mut:
 
 pub fn retain_mapping_range(mut res Resource, handle voidptr, offset u64, length u64) bool {
 	if mut res is MappingLifetimeResource {
-		return res.retain_mapping_range(handle, offset, length)
+		mut lifetime := MappingLifetimeResource(res)
+		mut stack_lifetime := unsafe { &lifetime }
+		retained := stack_lifetime.retain_mapping_range(handle, offset, length)
+		return retained
 	}
 	return true
 }
 
 pub fn release_mapping_range(mut res Resource, handle voidptr, offset u64, length u64) {
 	if mut res is MappingLifetimeResource {
-		res.release_mapping_range(handle, offset, length)
+		mut lifetime := MappingLifetimeResource(res)
+		mut stack_lifetime := unsafe { &lifetime }
+		stack_lifetime.release_mapping_range(handle, offset, length)
 	}
 }
 
@@ -202,4 +207,23 @@ pub fn filesystem_stat(mut res Resource) FileSystemStat {
 		namelen: 255
 		frsize:  4096
 	}
+}
+
+// A device aperture may contain buffers with different cache attributes.
+// The driver supplies portable PTE bits for this mapping's buffer, once at
+// mapping creation; aliases and inherited VMAs retain the same attributes.
+pub interface MappingAttributesResource {
+mut:
+	mapping_attributes(handle voidptr, offset u64) u64
+}
+
+pub fn mapping_attributes(mut res Resource, handle voidptr, offset u64) u64 {
+	if mut res is MappingAttributesResource {
+		mut attributes := MappingAttributesResource(res)
+		mut stack_attributes := unsafe { &attributes }
+		// Returning the call directly makes V heap-promote the interface.
+		bits := stack_attributes.mapping_attributes(handle, offset)
+		return bits
+	}
+	return 0
 }

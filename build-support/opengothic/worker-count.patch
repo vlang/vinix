@@ -1,0 +1,53 @@
+diff --git a/common/utils/workers.cpp b/common/utils/workers.cpp
+index f8badbd..6936aa5 100644
+--- a/common/utils/workers.cpp
++++ b/common/utils/workers.cpp
+@@ -72,19 +72,16 @@ const size_t Workers::taskPerThread = 128;
+ const size_t Workers::taskPerStep   = 16;
+ 
+ Workers::Workers() {
+-  size_t id=0;
+-  for(auto& i:th) {
+-    i = std::thread([this,id]() noexcept {
+-      threadFunc(id);
+-      });
+-    ++id;
+-    }
++  const size_t count=maxThreads();
++  th.reserve(count);
++  for(size_t id=0;id<count;++id)
++    th.emplace_back([this,id]() noexcept { threadFunc(id); });
+   }
+ 
+ Workers::~Workers() {
+-  running  = false;
+-  workSet  = nullptr;
+-  workSize = MAX_THREADS;
++  running=false;
++  workSet=nullptr;
++  workSize=th.size();
+   execWork(minWorkSize<void,void>());
+   for(auto& i:th)
+     i.join();
+@@ -155,7 +152,7 @@ void Workers::execWork(uint32_t& minElts) {
+     return;
+ 
+   if(workSet!=nullptr) {
+-    const auto maxTheads = maxThreads();
++    const auto maxTheads = uint8_t(std::min<size_t>(maxThreads(),th.size()));
+     taskCount = uint32_t((workSize+taskPerThread-1)/taskPerThread);
+     taskCount--; // main thread also do tasks
+     if(taskCount>maxTheads)
+diff --git a/common/utils/workers.h b/common/utils/workers.h
+index 7d40d2c..3f9a2eb 100644
+--- a/common/utils/workers.h
++++ b/common/utils/workers.h
+@@ -84,7 +84,7 @@ class Workers final {
+     static const size_t               taskPerStep;
+     bool                              running=true;
+ 
+-    std::thread                       th[MAX_THREADS];
++    std::vector<std::thread>           th;
+ 
+     std::mutex                        sync;
+     std::condition_variable           workWait;

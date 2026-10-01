@@ -2,8 +2,8 @@
 // OpenGothic's native ARM64 Vulkan client, hosted in a Vinix desktop window.
 module main
 
-const gothic_surface_width = 960
-const gothic_surface_height = 540
+const gothic_surface_width = 1280
+const gothic_surface_height = 720
 const gothic_window_width = 1280
 const gothic_window_height = 720
 

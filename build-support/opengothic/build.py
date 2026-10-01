@@ -27,6 +27,16 @@ def run(*args, **kwargs):
     subprocess.run([str(a) for a in args], check=True, **kwargs)
 
 
+def apply_patch(source: Path, name: str):
+    patch = ROOT / "build-support/opengothic" / name
+    clean = subprocess.run(["git", "-C", str(source), "apply", "--check", str(patch)], capture_output=True)
+    if clean.returncode == 0:
+        run("git", "-C", source, "apply", patch)
+    else:
+        # Already applied by an earlier build: anything else is an error.
+        run("git", "-C", source, "apply", "--reverse", "--check", patch)
+
+
 def download(url: str, path: Path):
     if path.is_file() and path.stat().st_size:
         return
@@ -98,13 +108,8 @@ def main():
     checkout("https://github.com/KhronosGroup/Vulkan-Headers.git", headers, HEADERS)
     tempest = source / "lib/Tempest"
     for name in PATCHES:
-        patch = ROOT / "build-support/opengothic" / name
-        clean = subprocess.run(["git", "-C", str(tempest), "apply", "--check", str(patch)], capture_output=True)
-        if clean.returncode == 0:
-            run("git", "-C", tempest, "apply", patch)
-        else:
-            # Already applied by an earlier build: anything else is an error.
-            run("git", "-C", tempest, "apply", "--reverse", "--check", patch)
+        apply_patch(tempest, name)
+    apply_patch(source, "worker-count.patch")
 
     command = ["python3", str(ROOT / "build-support/alpine-resolve.py")]
     indexes = {}

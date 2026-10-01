@@ -3,6 +3,7 @@ module sched
 
 import aarch64.cpu
 import aarch64.cpu.local as cpulocal
+import aarch64.gic
 import aarch64.timer
 import aarch64.uart
 import aarch64.virtio_input
@@ -68,6 +69,8 @@ const max_idle_stacks = 8
 const idle_stack_size = 32768
 
 __global (
+	virtual_idle bool
+	virtual_idle_hz = u64(250)
 	// Per-CPU parking slot for the thread that most recently died there.
 	reap_slots [max_reap_slots]&proc.Thread
 	// One idle stack per CPU, for the case where a CPU has to leave a thread's
@@ -960,6 +963,10 @@ pub fn yield(save_ctx bool) {
 	if unsafe { current_thread != nil } {
 		proc.charge_cpu_time(mut current_thread, timer.get_ns())
 	}
+	// A waiter has already left the run queue. Save its context and hand off
+	// now; waiting for a polling tick adds a millisecond to every IPC/futex
+	// sleep and keeps an otherwise idle vCPU spinning on the waiter's stack.
+	C.yield_dispatch(voidptr(scheduler_timer_handler))
 
 	// Blocking yield: HVF workaround.
 	// IRQ delivery to guest is broken, so we can't rely on preemptive context
@@ -1477,21 +1484,33 @@ pub fn new_cloned_thread(_process &proc.Process, _source &proc.Thread, state &cp
 // idle_tick_hz is how often the idle loop dispatches the scheduler. It bounds
 // the wakeup latency of every sleeping thread: nothing that is waiting on a
 // timer can run again sooner than the next tick, so a 20 Hz idle tick made
-// *every* nanosleep cost about 50 ms however short it asked for. The loop
-// already polls rather than waiting on an interrupt, so ticking a thousand
-// times a second costs it nothing it was not already spending.
+// every nanosleep cost about 50 ms however short it asked for. Physical
+// bring-up still polls at 1 kHz. HVF's WFI handler deliberately skips host
+// sleep below 2 ms, so stock virtual idle uses 4 ms to park its vCPU.
+// The prepared Venus host runtime supports the faster 1 ms interval.
 const idle_tick_hz = u64(1000)
+
+// Set before APs start: Limine's firmware tables are bootloader-owned and
+// must not be consulted by the idle loop after userspace has started.
+pub fn configure_virtual_idle(enabled bool, fast_timer bool) {
+	virtual_idle = enabled
+	virtual_idle_hz = if fast_timer { idle_tick_hz } else { u64(250) }
+}
 
 pub fn await() {
 	await_impl(false)
 }
 
 fn await_impl(trace_gpu_handoff bool) {
+	// QEMU's virtual timer wakes WFI even with IRQs masked. Let HVF park
+	// idle vCPUs instead of flooding its device lock with input/timer polls.
+	// Keep the polling bring-up path on physical Apple hardware.
 	if trace_gpu_handoff {
 		println('exec[gpu]/sched: traced idle loop entered; reading timer frequency')
 	}
 	freq := cpu.read_cntfrq_el0()
-	mut ticks := freq / idle_tick_hz
+	idle_hz := if virtual_idle { virtual_idle_hz } else { idle_tick_hz }
+	mut ticks := freq / idle_hz
 	if ticks == 0 {
 		ticks = 1
 	}
@@ -1523,8 +1542,19 @@ fn await_impl(trace_gpu_handoff bool) {
 			if trace_gpu_handoff {
 				println('exec[gpu]/sched: idle timer fired; dispatching scheduler')
 			}
-			// Timer fired. Dispatch scheduler in polling mode.
-			scheduler_timer_handler(unsafe { nil })
+			// Retire the pending GIC interrupt as well as the timer level;
+			// otherwise a masked, pending PPI makes every WFI return at once.
+			mut timer_dispatched := false
+			if virtual_idle {
+				intid := gic.poll_iar1()
+				if intid < 1020 {
+					gic.dispatch_polled(intid, unsafe { nil })
+					timer_dispatched = intid == 27
+				}
+			}
+			if !timer_dispatched {
+				scheduler_timer_handler(unsafe { nil })
+			}
 			if trace_gpu_handoff {
 				println('exec[gpu]/sched: idle scheduler dispatch returned without a target; rearming timer')
 			}
@@ -1534,10 +1564,9 @@ fn await_impl(trace_gpu_handoff bool) {
 			cpu.write_cntv_ctl_el0(1)
 		} else if proc.scheduling_policies_in_use() {
 			// A real-time thread must not wait for the idle tick. This loop
-			// runs at a thousand ticks a second, which is the granularity a
-			// sleeping thread's wakeup is noticed at and the granularity the
-			// run queue is looked at again -- a millisecond of dispatch latency
-			// on a CPU that has nothing else to do.
+			// otherwise notices a sleeping thread only at its idle tick,
+			// adding up to four milliseconds of dispatch latency on a CPU
+			// that has nothing else to do.
 			//
 			// So look more often than that, at a rate set by how long a real-
 			// time thread should have to wait rather than by how often the
@@ -1556,13 +1585,15 @@ fn await_impl(trace_gpu_handoff bool) {
 			}
 		}
 
-		// Poll UART input while idle (no separate thread — HVF workaround).
-		// Uses a callback set by the console module to avoid circular imports.
-		poll_platform_input()
-
-		asm volatile aarch64 {
-			yield
-			; ; ; memory
+		if virtual_idle && !proc.scheduling_policies_in_use() {
+			cpu.wfi()
+		} else {
+			// The physical bring-up path still polls input without IRQs.
+			poll_platform_input()
+			asm volatile aarch64 {
+				yield
+				; ; ; memory
+			}
 		}
 	}
 }

@@ -18,11 +18,17 @@ printf '%s\n' 'version=1' 'name=564d' 'kdf=scrypt' 'n=16384' 'r=8' 'p=1' \
     > /root/.vinix-user
 chmod 600 /root/.vinix-user
 
+if [ -x /opt/venus/bin/venus-smoke ]; then
+    /opt/venus/bin/venus-abi || echo VENUS-ABI-FAIL
+    LD_LIBRARY_PATH=/opt/venus/lib:/opt/opengothic/lib:/usr/lib \
+    VK_ICD_FILENAMES=/opt/venus/share/vulkan/icd.d/virtio_icd.aarch64.json \
+    VN_DEBUG=init /opt/venus/bin/venus-smoke || echo VENUS-SMOKE-FAIL
+fi
 echo OPENGOTHIC-START
 uname -a
 # The desktop reads its keyboard from standard input, and a shell without job
 # control gives a background job /dev/null there.
-/usr/bin/vinix-desktop --open='Gothic II' </dev/console &
+/usr/bin/vinix-desktop --open='Gothic II' --stats </dev/console &
 
 log=
 while [ -z "$log" ]; do
@@ -32,6 +38,10 @@ while [ -z "$log" ]; do
     done
 done
 tail -f "$log" &
+if [ -x /opt/venus/bin/venus-smoke ]; then
+    while [ ! -f /tmp/gothic-fps.csv ]; do sleep 1; done
+    tail -f /tmp/gothic-fps.csv &
+fi
 
 # The engine names its main thread, so look for the path it was started by.
 seen=0

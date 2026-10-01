@@ -194,7 +194,7 @@ static const char *claim_display(const char *requested, char *storage,
 }
 
 static pid_t spawn_xvfb(const char *display_name, const char *directory,
-                        const char *geometry, int game_input, int obs_capture) {
+                        const char *geometry, int game_input, int obs_capture, int shm_present) {
     pid_t pid = fork();
     const char *xvfb;
     if (pid != 0)
@@ -219,6 +219,11 @@ static pid_t spawn_xvfb(const char *display_name, const char *directory,
               "-screen", "1", OBS_CAPTURE_GEOMETRY, "-fbdir", directory,
               "-nolisten", "tcp", "-noreset", "-ac", "+extension", "GLX",
               "+iglx", "-extension", "RANDR", (char *)NULL);
+    } else if (shm_present) {
+        /* Venus renders on the host GPU and presents through MIT-SHM. */
+        execl(xvfb, "Xvfb", display_name, "-screen", "0", geometry,
+              "-fbdir", directory, "-nolisten", "tcp", "-noreset", "-ac",
+              (char *)NULL);
     } else if (game_input) {
         execl(xvfb, "Xvfb", display_name, "-screen", "0", geometry,
               "-fbdir", directory, "-nolisten", "tcp", "-noreset", "-ac",
@@ -1069,7 +1074,7 @@ int main(int argc, char **argv) {
         return 1;
     }
     xvfb_pid = spawn_xvfb(display_name, directory, geometry, game_input,
-                          obs_capture);
+                          obs_capture, strcmp(command, "/usr/bin/run-opengothic") == 0);
     if (xvfb_pid < 0) {
         perror("vinix-wine-host: fork Xvfb");
         rmdir(directory);

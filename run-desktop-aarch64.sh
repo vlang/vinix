@@ -14,6 +14,7 @@
 #   --ephemeral     isolate and automatically delete this run's boot image
 #   gpuvm           boot with KekVM's accelerated VirGL GPU
 #   --virgl         use KekVM's GPU backend with a RAM system and persistent /root
+#   --venus         use KekVM's Venus Vulkan GPU (OpenGothic)
 #   --mem=MB        guest RAM (default: 8192 MiB, or 12288 MiB for gpuvm)
 #   --v=PATH        V compiler executable or checkout (for example ~/code/v/v)
 #   --help
@@ -84,6 +85,7 @@ while [ "$#" -gt 0 ]; do
         --disk-root)    DISK_ROOT_DESKTOP=1; ROOT_LAYOUT_EXPLICIT=1 ;;
         --no-disk-root) DISK_ROOT_DESKTOP=0; ROOT_LAYOUT_EXPLICIT=1 ;;
         gpuvm|--virgl) VIRGL_DESKTOP=1; PASSTHROUGH+=(--virgl) ;;
+        --venus) VIRGL_DESKTOP=1; PASSTHROUGH+=(--venus) ;;
         --ephemeral)  EPHEMERAL_DESKTOP=1; PASSTHROUGH+=("$arg") ;;
         --v=*)        VINIX_V_COMPILER="${arg#*=}" ;;
         --v)

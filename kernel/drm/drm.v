@@ -16,6 +16,7 @@ import drm.gem
 import drm.ioctl
 import drm.syncobj
 import memory
+import memory.mmap
 import usercopy
 import lib
 
@@ -48,6 +49,7 @@ pub mut:
 	gem_export     fn (&DrmDevice, voidptr, u32) ?&gem.GemObject = unsafe { nil }
 	gem_export_put fn (&DrmDevice, &gem.GemObject) = unsafe { nil }
 	gem_import     fn (&DrmDevice, voidptr, &gem.GemObject) ?u32 = unsafe { nil }
+	mmap_attributes fn (&DrmDevice, voidptr, u64) u64 = unsafe { nil }
 	mmap           fn (&DrmDevice, voidptr, u64, int) voidptr = unsafe { nil }
 	mmap_retain    fn (&DrmDevice, voidptr, u64, u64) bool = unsafe { nil }
 	mmap_release   fn (&DrmDevice, voidptr, u64, u64) = unsafe { nil }
@@ -97,6 +99,7 @@ pub mut:
 	status   int
 	can_mmap bool
 	fence    &syncobj.DmaFence = unsafe { nil }
+	box &resource.Resource = unsafe { nil }
 }
 
 // A PRIME fd keeps one GEM object alive while it is passed to another DRM
@@ -112,10 +115,12 @@ pub mut:
 	can_mmap bool
 	dev      &DrmDevice = unsafe { nil }
 	obj      &gem.GemObject = unsafe { nil }
+	box &resource.Resource = unsafe { nil }
 }
 
-fn (mut this GemPrimeResource) mmap(_handle voidptr, page u64, _flags int) voidptr {
-	if this.obj == unsafe { nil } || page > u64(-1) / page_size {
+fn (mut this GemPrimeResource) mmap(_handle voidptr, page u64, flags int) voidptr {
+	if this.obj == unsafe { nil } || page > u64(-1) / page_size
+		|| (this.obj.external && (this.obj.phys_addr == 0 || flags & mmap.map_shared == 0)) {
 		return unsafe { nil }
 	}
 	offset := page * page_size
@@ -123,6 +128,10 @@ fn (mut this GemPrimeResource) mmap(_handle voidptr, page u64, _flags int) voidp
 		return unsafe { nil }
 	}
 	return voidptr(this.obj.phys_addr + offset)
+}
+
+fn (mut this GemPrimeResource) mapping_attributes(_handle voidptr, _offset u64) u64 {
+	return if this.obj != unsafe { nil } { this.obj.pte_extra } else { 0 }
 }
 
 fn (mut this GemPrimeResource) read(_handle voidptr, _buf voidptr, _loc u64, _count u64) ?i64 {
@@ -151,7 +160,10 @@ fn (mut this GemPrimeResource) unref(_handle voidptr) ? {
 			gem.unref(this.obj)
 		}
 	}
-	unsafe { free(voidptr(this)) }
+	unsafe {
+		free(voidptr(this.box))
+		free(voidptr(this))
+	}
 }
 
 fn (mut this GemPrimeResource) link(_handle voidptr) ? {
@@ -185,7 +197,10 @@ fn (mut this SyncFileResource) unref(_handle voidptr) ? {
 	if katomic.dec(mut &this.refcount) {
 		return
 	}
-	unsafe { free(voidptr(this)) }
+	unsafe {
+		free(voidptr(this.box))
+		free(voidptr(this))
+	}
 }
 
 fn (mut this SyncFileResource) link(_handle voidptr) ? {
@@ -470,6 +485,12 @@ fn create_device_node(dev &DrmDevice, prefix string, number u64, render bool) ?&
 	fs.devtmpfs_add_device(node, name)
 	unsafe { name.free() }
 	return node
+}
+
+fn (mut this DrmNode) mapping_attributes(handle voidptr, offset u64) u64 {
+	if this.dev == unsafe { nil } || this.dev.driver == unsafe { nil }
+		|| this.dev.driver.mmap_attributes == unsafe { nil } { return 0 }
+	return this.dev.driver.mmap_attributes(this.dev, handle, offset)
 }
 
 fn (mut this DrmNode) mmap(handle voidptr, page u64, flags int) voidptr {
@@ -758,13 +779,18 @@ fn create_prime_fd(dev &DrmDevice, obj &gem.GemObject, flags u32) ?int {
 	if flags & ioctl.drm_rdwr != 0 {
 		fd_flags |= resource.o_rdwr
 	}
-	mut fd := file.fd_create_from_resource(mut wrapper, fd_flags) or {
+	wrapper.box = &resource.Resource(unsafe { wrapper }) @[freed]
+	mut res := wrapper.box
+	mut fd := file.fd_create_from_resource(mut res, fd_flags) or {
 		if dev.driver.gem_export_put != unsafe { nil } {
 			dev.driver.gem_export_put(dev, obj)
 		} else {
 			gem.unref(obj)
 		}
-		unsafe { free(voidptr(wrapper)) }
+		unsafe {
+			free(voidptr(wrapper.box))
+			free(voidptr(wrapper))
+		}
 		return none
 	}
 	fdnum := file.fdnum_create_from_fd(unsafe { nil }, fd, 0, false) or {
@@ -834,15 +860,21 @@ fn ioctl_syncobj_destroy(handle voidptr, data voidptr) int {
 	return if syncobj.destroy(u64(handle), request.handle) { 0 } else { -22 }
 }
 
-fn create_sync_file_fd(fence &syncobj.DmaFence) ?int {
+pub fn create_sync_file_fd(fence &syncobj.DmaFence) ?int {
 	if fence == unsafe { nil } {
 		return none
 	}
 	mut wrapper := &SyncFileResource{
 		fence: unsafe { fence }
+		status: if syncobj.is_signaled(fence) { file.pollin } else { 0 }
 	}
-	mut fd := file.fd_create_from_resource(mut wrapper, resource.o_cloexec) or {
-		unsafe { free(voidptr(wrapper)) }
+	wrapper.box = &resource.Resource(unsafe { wrapper }) @[freed]
+	mut res := wrapper.box
+	mut fd := file.fd_create_from_resource(mut res, resource.o_cloexec) or {
+		unsafe {
+			free(voidptr(wrapper.box))
+			free(voidptr(wrapper))
+		}
 		return none
 	}
 	fdnum := file.fdnum_create_from_fd(unsafe { nil }, fd, 0, false) or {
@@ -854,7 +886,7 @@ fn create_sync_file_fd(fence &syncobj.DmaFence) ?int {
 
 // Resolve only fds created by create_sync_file_fd. The interface type check
 // rejects arbitrary user-provided descriptors before accessing fence state.
-fn sync_file_fence_from_fd(fdnum int) ?&syncobj.DmaFence {
+pub fn sync_file_fence_from_fd(fdnum int) ?&syncobj.DmaFence {
 	mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or { return none }
 	defer {
 		fd.unref()

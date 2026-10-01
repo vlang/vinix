@@ -3,7 +3,7 @@
 `run.py` boots ARM64 Vinix under QEMU/HVF with only what the game needs: the
 desktop, Xvfb, the X11 input bridge and the OpenGothic layer. The desktop
 opens its Gothic II window, the test presses Return in the game's menu to start
-a new game, and the world then has to render for `--seconds` (30 by default)
+a new game, and the world then has to render for `--seconds` (60 by default, after a 10-second warmup)
 without the engine crashing or exiting. It fails on a crash log, a kernel panic
 or a game that has gone, and leaves `gothic.png`, a capture of the whole
 desktop, and `vinix.log`, the serial console with the engine's log, in
@@ -32,6 +32,24 @@ menu ignores that.
 The key is sent through QEMU's QMP socket, so it travels the whole path a real
 keyboard does: the kernel's console, the compositor, the Gothic II process, the
 bridge and XTEST.
+
+For native GPU validation, build the private Venus runtime and select KekVM:
+
+```sh
+./build-venus-aarch64.sh
+VINIX_KEKVM_DIR="$HOME/code/kekvm" python3 tests/opengothic/run.py \
+    --venus --work build/opengothic/venus-test
+```
+
+`--venus-runtime` selects another staged runtime. Before opening the game,
+the guest runs the [native DRM and GPU tests](../virtio-gpu-venus/README.md).
+The harness requires their pass markers and the Venus GPU name, records
+steady gameplay FPS from the Mesa overlay in `performance.json`, and fails
+below a median of 55 FPS. `--min-fps` changes that threshold explicitly.
+Menu and loading frames are excluded. The Vulkan overlay also appears in the
+screenshot. `--cpus` defaults to four; `--engine` selects an instrumented
+engine executable for profiling. Use a normal kernel, without `ALLOC_TRACK`,
+for performance measurements.
 
 The accelerated Debian comparison is documented in [kekvm.md](kekvm.md),
 with a guest build and launch helper. It exercises KekVM's Venus backend on

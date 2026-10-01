@@ -492,6 +492,12 @@ pub fn map_mmio(phys u64, len u64) u64 {
 	return remap_hhdm_span(phys, len, pte_device, 'map_mmio')
 }
 
+// Host-visible VirtIO GPU memory is coherent with the host GPU. The direct
+// alias must match the Normal cacheable user mapping used by DRM mmap.
+pub fn map_shared_memory(phys u64, len u64) u64 {
+	return remap_hhdm_span(phys, len, 0, 'map_shared_memory')
+}
+
 // Map reserved coprocessor shared memory as Normal Non-Cacheable. Apple maps
 // the AGX uPPL handoff and TTB array with write-combining semantics; leaving
 // their HHDM aliases Write-Back cacheable can hide AP stores from firmware.
