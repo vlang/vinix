@@ -3,6 +3,7 @@
 #define VINIX_LINUX_SCHED_H
 #include <linux/types.h>
 #include <linux/kernel.h>
+#include <linux/limits.h>
 #include <linux/preempt.h>
 #include <linux/spinlock_types_raw.h>
 #include <asm/current.h>
@@ -36,6 +37,12 @@ void vinix_linuxkpi_set_task_state(unsigned int state);
 #define __set_current_state(state) vinix_linuxkpi_set_task_state(state)
 #define task_is_running(task) (__atomic_load_n(&(task)->__state, __ATOMIC_RELAXED) == TASK_RUNNING)
 void schedule(void);
+#define MAX_SCHEDULE_TIMEOUT LONG_MAX
+long schedule_timeout(long timeout);
+long schedule_timeout_interruptible(long timeout);
+long schedule_timeout_uninterruptible(long timeout);
+long schedule_timeout_killable(long timeout);
+long schedule_timeout_idle(long timeout);
 int wake_up_process(struct task_struct *task);
 int wake_up_state(struct task_struct *task, unsigned int state);
 static inline int task_pid_nr(const struct task_struct *task) { return task->pid; }

@@ -12,6 +12,7 @@ import proc
 import klock
 import katomic
 import x86.hpet as hpet_clock
+import time
 
 __global (
 	preempt_depth     [256]u32
@@ -265,6 +266,27 @@ fn bug(_file &char, _line int) {
 	lib.kpanic(unsafe { nil }, c'Linux compatibility layer BUG')
 }
 
+@[export: 'vinix_linuxkpi_warn']
+fn warn(file &char, line int) {
+	C.kprintf(c'linuxkpi: warning at %s:%d\n', file, line)
+}
+
+@[export: 'vinix_linuxkpi_clock_ns']
+fn clock_ns() u64 {
+	return hpet_clock.nanoseconds()
+}
+
+@[export: 'vinix_linuxkpi_clock_resolution_ns']
+fn clock_resolution_ns() u32 {
+	return hpet_clock.resolution_nanoseconds()
+}
+
+fn C.vinix_linuxkpi_time_tick(u64)
+
+fn tick_deadlines() {
+	C.vinix_linuxkpi_time_tick(hpet_clock.nanoseconds())
+}
+
 @[export: 'vinix_linuxkpi_refcount_warning']
 fn refcount_warning(kind int) {
 	C.kprintf(c'linuxkpi: refcount saturated after invalid operation %d; retaining object\n', kind)
@@ -325,6 +347,8 @@ fn C.vinix_linuxkpi_wc_selftest() int
 fn C.vinix_linuxkpi_task_native_selftest() int
 fn C.vinix_linuxkpi_sync_selftest() int
 fn C.vinix_linuxkpi_sync_native_selftest() int
+fn C.vinix_linuxkpi_time_selftest() int
+fn C.vinix_linuxkpi_time_native_selftest() int
 fn C.vinix_linuxkpi_percpu_bootstrap(u32) int
 
 pub fn initialise() {
@@ -334,10 +358,14 @@ pub fn initialise() {
 			lib.kpanic(unsafe { nil }, c'Linux compatibility per-CPU initialization failed')
 		}
 		C.i915_memcpy_init_early(unsafe { nil })
+		tick_deadlines()
+		if !time.register_tick_hook(tick_deadlines) {
+			lib.kpanic(unsafe { nil }, c'Linux compatibility timer hook registration failed')
+		}
 		before := memory.free_bytes()
 		for _ in 0 .. 200 {
 			if C.vinix_linuxkpi_selftest() != 0 || C.vinix_linuxkpi_task_selftest() != 0
-				|| C.vinix_linuxkpi_sync_selftest() != 0 {
+				|| C.vinix_linuxkpi_sync_selftest() != 0 || C.vinix_linuxkpi_time_selftest() != 0 {
 				lib.kpanic(unsafe { nil }, c'Linux compatibility layer self-test failed')
 			}
 		}
@@ -406,6 +434,24 @@ pub fn initialise() {
 			lib.kpanic(unsafe { nil }, c'Linux synchronization self-test retained native pages')
 		}
 		C.kprintf(c'linuxkpi: sleeping mutexes, wait queues and completions passed on 4 workers; no pages retained\n')
+		for _ in 0 .. 3 {
+			if C.vinix_linuxkpi_time_native_selftest() != 0 {
+				lib.kpanic(unsafe { nil }, c'Linux timed-wait self-test failed')
+			}
+		}
+		time_before := memory.free_bytes()
+		if C.vinix_linuxkpi_time_native_selftest() != 0 {
+			lib.kpanic(unsafe { nil }, c'Linux timed-wait self-test failed')
+		}
+		time_reap_start := hpet_clock.nanoseconds()
+		for memory.free_bytes() != time_before && hpet_clock.nanoseconds() - time_reap_start < 1000000000 {
+			sched.reap_deferred()
+			sched.reschedule()
+		}
+		if memory.free_bytes() != time_before {
+			lib.kpanic(unsafe { nil }, c'Linux timed-wait self-test retained native pages')
+		}
+		C.kprintf(c'linuxkpi: monotonic clocks and timed task/queue/completion waits passed on 4 workers; no pages retained\n')
 		// Exercise a real scheduler interrupt with preemption disabled and
 		// IRQs still enabled, rather than relying only on host lock tests.
 		preempt_disable()

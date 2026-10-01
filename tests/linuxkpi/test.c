@@ -33,7 +33,13 @@ static bool last_reclaim;
 static _Thread_local bool interrupts = true;
 static _Thread_local unsigned int preempt_depth;
 static _Thread_local unsigned int current_cpu;
+static _Thread_local void (*host_irq_restore_hook)(void);
 static atomic_t refcount_warnings = ATOMIC_INIT(0);
+static atomic_t time_warnings = ATOMIC_INIT(0);
+static u64 host_clock_ns;
+u64 vinix_linuxkpi_clock_ns(void) { return __atomic_load_n(&host_clock_ns, __ATOMIC_ACQUIRE); }
+u32 vinix_linuxkpi_clock_resolution_ns(void) { return 1000000; }
+void vinix_linuxkpi_warn(const char *file, int line) { atomic_inc(&time_warnings); }
 struct native_task_model {
     u64 storage[8];
     int pid, tgid;
@@ -307,7 +313,15 @@ unsigned long vinix_linuxkpi_irq_save(void)
     return flags;
 }
 
-void vinix_linuxkpi_irq_restore(unsigned long flags) { interrupts = !!(flags & (1UL << 9)); }
+void vinix_linuxkpi_irq_restore(unsigned long flags)
+{
+    interrupts = !!(flags & (1UL << 9));
+    if (interrupts && host_irq_restore_hook) {
+        void (*hook)(void) = host_irq_restore_hook;
+        host_irq_restore_hook = NULL;
+        hook();
+    }
+}
 unsigned long vinix_linuxkpi_irq_flags(void) { return interrupts ? 1UL << 9 : 0; }
 void vinix_linuxkpi_spin_wait(void) { __asm__ volatile("" ::: "memory"); }
 void vinix_linuxkpi_preempt_disable(void) { preempt_depth++; }
@@ -952,6 +966,7 @@ static void reference_tests(void)
 }
 
 #include "sync_test.h"
+#include "time_test.h"
 
 int main(void)
 {
@@ -974,6 +989,7 @@ int main(void)
     task_tests();
     task_wait_tests();
     sync_tests();
+    time_tests();
     list_tests();
     tree_tests();
     concurrency_tests();
@@ -981,6 +997,6 @@ int main(void)
     reference_tests();
     vinix_linuxkpi_percpu_destroy_for_test();
     assert(live_pages == 0);
-    puts("LinuxKPI: PASS (Linux helpers, allocation/OOM, strings, bitmaps, SMP/IRQ locks, per-CPU storage, task references, wake races, sleeping mutexes, wait queues and completions)");
+    puts("LinuxKPI: PASS (Linux helpers, allocation/OOM, strings, bitmaps, SMP/IRQ locks, per-CPU storage, task references, wake races, sleeping mutexes, queues, completions, monotonic clocks and timed waits)");
     return 0;
 }

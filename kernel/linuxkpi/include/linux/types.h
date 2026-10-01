@@ -4,6 +4,10 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#ifdef VINIX_LINUXKPI_HOST_TEST
+/* Read libc types before Linux redefines compiler inline annotations. */
+#include <sys/types.h>
+#endif
 #include <linux/compiler.h>
 #include <asm/bitsperlong.h>
 typedef uint8_t u8;
@@ -49,6 +53,7 @@ typedef unsigned long ulong;
 #ifndef VINIX_LINUXKPI_HOST_TEST
 typedef __kernel_pid_t pid_t;
 typedef __kernel_clockid_t clockid_t;
+typedef __kernel_clock_t clock_t;
 typedef __kernel_uid32_t uid_t;
 typedef __kernel_gid32_t gid_t;
 typedef __kernel_mode_t mode_t;

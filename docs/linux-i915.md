@@ -63,16 +63,35 @@ the complete i915 source tree is not evidence that the driver runs.
   exclusive and priority order, wake quotas, callback keys and automatic
   removal. Simple waits use FIFO entries and drop their lock between wakes
   in `swake_up_all`. Completions support pre-issued tokens, single/all wakeups,
-  saturation, try-wait and interruptible/killable ordinary waits.
+  saturation, try-wait and interruptible/killable waits, including timeouts.
   Waiters live on the sleeping task's stack; finish/cancellation takes the
   queue lock before returning, including after a producer removed the entry.
   Callers must keep the enclosing object alive until every waiter and producer
   has returned. Reinitialization requires quiescent users.
-  Timed waits, freezer states, I/O waits, CPU-placement wake hints, pollfree/RCU
+  Freezer states, I/O waits, CPU-placement wake hints, pollfree/RCU
   lifetime handling and lockdep validation remain unimplemented. Regular queue
   wake traversal currently holds the lock for the whole walk; it does not
   implement Linux's optional bookmark batching. Unsupported out-of-line APIs
   remain unresolved rather than reporting fictitious success.
+- Unmodified Linux `jiffies.h`, `ktime.h`, `time64.h`, `timekeeping.h` and
+  `delay.h` use native monotonic/raw clock reads and fixed `HZ=1000` conversion
+  helpers. Linux's own `timeconst.bc` generated the conversion constants.
+  The HPET counter (or calibrated TSC fallback) supplies timestamps and the
+  clock-resolution query; the PIT tick advances `jiffies` and expires sleeps.
+  Raw and monotonic clocks currently agree because no NTP discipline exists.
+  Coarse timestamps use the last tick; deadline wake granularity is 1 ms.
+  `schedule_timeout` and its interruptible/uninterruptible/killable/idle
+  wrappers return remaining ticks after early wakes and zero after expiry.
+  `MAX_SCHEDULE_TIMEOUT` has no deadline. Each finite deadline lives on the
+  caller's stack; both expiry and cancellation detach it under the same raw
+  lock before the caller can return. Ordinary/simple queue timeout macros
+  and timed completions use this backend, including signal cancellation and
+  successful completion at expiry returning at least one tick.
+  `msleep` retries early wakes, `msleep_interruptible` returns remaining
+  milliseconds, and `udelay`/`ndelay` poll the real counter while answering
+  native TLB shootdowns. General timer callbacks, high-resolution timers,
+  `usleep_range`, workqueues, realtime/TAI/suspend clock offsets and I/O waits
+  remain unimplemented.
 - Static `DEFINE_PER_CPU` variables preserve their initializers and alignment
   in a separate copy for every boot CPU. Dynamic `alloc_percpu`,
   `alloc_percpu_gfp` and `free_percpu` use zeroed, aligned slots, with checked
@@ -107,7 +126,7 @@ the complete i915 source tree is not evidence that the driver runs.
   Native signals are checked after removal to avoid lost wakeups. Ordinary
   signals cannot finish uninterruptible/idle waits or killable waits; their
   native enqueue makes the task sleep again. Special parked/stopped/frozen
-  states, timeouts and Linux scheduler internals remain unimplemented.
+  states and Linux scheduler internals remain unimplemented.
 - `signal_pending` and `fatal_signal_pending` query native pending/masked
   signals and forced thread exit. `need_resched` reports deferred native
   preemption. `cond_resched` voluntarily enters the actual scheduler when
@@ -212,6 +231,18 @@ publish data through wakeups and consume completion tokens before a latched
 all-wake. Every worker's retained task is released after exit; after allocator
 warmup, the final batch restores the physical free-page count.
 
+Timed-wait host tests use a controlled clock for 240 expiry/early-wake/signal
+cases across tasks, ordinary/simple queues and completions. Additional cases
+force expiry immediately after deadline publication and before task removal,
+check completion tokens/signals at expiry, killable signal filtering,
+zero/infinite timeouts and interrupted/retried `msleep`. Advancing the clock
+after each waiter returns checks for stale stack pointers under ASan. Numeric
+tests cover rounding, saturation, tick wrap comparisons, negative time64
+values and nanosecond overflow. The enabled guest runs four batches of four
+timed-wait workers, each repeating task/queue/completion expiry and signal
+checks eight times. Every deadline list is empty after the batch and the
+measured physical free-page count returns to its warmed baseline.
+
 An enabled kernel runs the allocator/list/sort/tree/IRQ-lock tests 200 times
 and verifies that the physical free-page count returns to its initial value.
 The same repeated test also checks raw locks, bit searches, byte-order helpers,
@@ -220,8 +251,8 @@ including allocated-string and dynamic-slot release. The static per-CPU pool
 has boot lifetime and is initialized before the free-page baseline is taken.
 Every iteration also checks current-task identity across a real voluntary
 scheduler yield, and rejects yields inside a CPU pin or IRQ-off section.
-It checks uncontended mutexes, wake-before-sleep queue removal and completion
-tokens without allocating waiter objects.
+It checks uncontended mutexes, wake-before-sleep queue removal, completion
+tokens and clock/conversion helpers without allocating waiter objects.
 It then holds preemption disabled with IRQs enabled until a real scheduler
 interrupt defers a context switch, checks that no-reschedule release preserves
 pending scheduling work with IRQs disabled, and services it on IRQ restoration.
@@ -262,8 +293,8 @@ runtime subsystems:
 1. Linux device/PCI registration and removal, configuration access and devres.
 2. MMIO mapping with correct cache attributes, DMA/scatter-gather APIs,
    page/shmem management, GPU address spaces and TTM/GEM memory management.
-3. Remaining lock/wait variants (including wound/wait mutexes and timed
-   waits), workqueues, timers and RCU lifetime rules.
+3. Remaining lock/wait variants (including wound/wait mutexes and I/O waits),
+   workqueues, timer callbacks, high-resolution timers and RCU lifetime rules.
 4. Linux IRQ registration, interrupt synchronization and safe GPU reset paths.
 5. C DRM core integration, device nodes, file ownership, ioctl/mmap handling,
    DMA fences, sync objects and dma-buf lifetime handling. The existing V DRM

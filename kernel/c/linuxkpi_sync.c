@@ -387,27 +387,40 @@ void complete_all(struct completion *completion)
     raw_spin_unlock_irqrestore(&completion->wait.lock, flags);
 }
 
-int wait_for_completion_state(struct completion *completion, unsigned int state)
+static long completion_wait(struct completion *completion, long timeout, unsigned int state)
 {
     might_sleep();
     BUG_ON(state != TASK_UNINTERRUPTIBLE && state != TASK_INTERRUPTIBLE &&
            state != TASK_KILLABLE && state != TASK_IDLE);
     DECLARE_SWAITQUEUE(wait);
     unsigned long flags;
-    int result = 0;
     raw_spin_lock_irqsave(&completion->wait.lock, flags);
     while (!completion->done) {
-        if (signal_pending_state(state, current)) { result = -ERESTARTSYS; break; }
+        if (signal_pending_state(state, current)) { timeout = -ERESTARTSYS; break; }
+        if (!timeout) break;
         __prepare_to_swait(&completion->wait, &wait);
         set_current_state(state);
         raw_spin_unlock_irqrestore(&completion->wait.lock, flags);
-        schedule();
+        timeout = schedule_timeout(timeout);
         raw_spin_lock_irqsave(&completion->wait.lock, flags);
+        /* Match Linux's post-schedule loop condition: expiry ends the wait
+         * before a newly pending signal can replace the timeout result. */
+        if (!timeout) break;
     }
     __finish_swait(&completion->wait, &wait);
-    if (completion->done && completion->done != UINT_MAX) completion->done--;
+    if (completion->done) {
+        if (completion->done != UINT_MAX) completion->done--;
+        /* A token observed at expiry still succeeds with at least one tick. */
+        if (!timeout) timeout = 1;
+    }
     raw_spin_unlock_irqrestore(&completion->wait.lock, flags);
-    return result;
+    return timeout;
+}
+
+int wait_for_completion_state(struct completion *completion, unsigned int state)
+{
+    long result = completion_wait(completion, MAX_SCHEDULE_TIMEOUT, state);
+    return result == -ERESTARTSYS ? result : 0;
 }
 
 void wait_for_completion(struct completion *completion)
@@ -421,6 +434,19 @@ int wait_for_completion_interruptible(struct completion *completion)
 int wait_for_completion_killable(struct completion *completion)
 {
     return wait_for_completion_state(completion, TASK_KILLABLE);
+}
+
+unsigned long wait_for_completion_timeout(struct completion *completion, unsigned long timeout)
+{
+    return completion_wait(completion, timeout, TASK_UNINTERRUPTIBLE);
+}
+long wait_for_completion_interruptible_timeout(struct completion *completion, unsigned long timeout)
+{
+    return completion_wait(completion, timeout, TASK_INTERRUPTIBLE);
+}
+long wait_for_completion_killable_timeout(struct completion *completion, unsigned long timeout)
+{
+    return completion_wait(completion, timeout, TASK_KILLABLE);
 }
 
 bool try_wait_for_completion(struct completion *completion)

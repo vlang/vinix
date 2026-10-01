@@ -62,6 +62,12 @@ pub fn nanoseconds() u64 {
 		(ticks % hpet_frequency) * 1000000000 / hpet_frequency
 }
 
+// Integer nanoseconds per counter tick, separate from the PIT wake interval.
+// A counter faster than 1 GHz has a sub-nanosecond period and reports 0.
+pub fn resolution_nanoseconds() u32 {
+	return u32(u64(1000000000) / hpet_frequency)
+}
+
 fn pit_count() u64 {
 	// Latch channel 0, then read its count low byte first.
 	kio.port_out[u8](0x43, 0)
