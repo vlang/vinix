@@ -1,0 +1,26 @@
+#!/bin/sh
+set -eu
+
+game=/usr/share/games/gothic2
+if [ ! -d "$game/Data" ] || [ ! -d "$game/_work/Data" ]; then
+    echo "OpenGothic needs a Gothic II installation in $game." >&2
+    echo "Copy its Data, _work and System directories there, or build the public demo with --demo." >&2
+    exit 1
+fi
+
+# Keep the Vulkan/LLVM generation private to the game. Xvfb and other desktop
+# applications retain the libraries their own staging layers were built with.
+export LD_LIBRARY_PATH=/opt/opengothic/lib:${LD_LIBRARY_PATH:-/usr/lib}
+export VK_ICD_FILENAMES=${VK_ICD_FILENAMES:-/opt/opengothic/icd/lvp.json}
+export LP_NUM_THREADS=${LP_NUM_THREADS:-4}
+export ALSOFT_DRIVERS=${ALSOFT_DRIVERS:-null}
+# Settings, saves, logs and shader caches go beside the working directory.
+state=${XDG_DATA_HOME:-$HOME/.local/share}/opengothic
+mkdir -p "$state"
+cd "$state"
+# The demo is classic Gothic II: say so rather than leave it to what the
+# engine reads out of the demo's Gothic.ini.
+if [ -f "$game/.vinix-demo" ]; then
+    set -- -g2c "$@"
+fi
+exec /opt/opengothic/Gothic2Notr -g "$game" -window -rt 0 -gi 0 -ms 0 -aa 0 "$@"

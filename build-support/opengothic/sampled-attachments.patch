@@ -1,0 +1,21 @@
+diff --git a/Engine/gapi/vulkan/vallocator.cpp b/Engine/gapi/vulkan/vallocator.cpp
+index 38287c2..c9b9eb5 100644
+--- a/Engine/gapi/vulkan/vallocator.cpp
++++ b/Engine/gapi/vulkan/vallocator.cpp
+@@ -279,7 +279,15 @@ VTexture VAllocator::alloc(const uint32_t w, const uint32_t h, const uint32_t d,
+   imageInfo.sharingMode   = VK_SHARING_MODE_EXCLUSIVE;
+   imageInfo.format        = nativeFormat(frm);
+ 
+-  if(provider.device->props.hasSamplerFormat(frm)) {
++  // hasSamplerFormat also asks for blits, which only mipmap generation of an
++  // uploaded pixmap needs. An image allocated by size is rendered or computed
++  // into and then sampled: Lavapipe offers R11G11B10UF that way without
++  // advertising blits into it.
++  const VkFormatFeatureFlags sampledRqFlags = VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT|VK_FORMAT_FEATURE_TRANSFER_SRC_BIT|VK_FORMAT_FEATURE_TRANSFER_DST_BIT;
++  VkFormatProperties frmProps = {};
++  vkGetPhysicalDeviceFormatProperties(provider.device->physicalDevice, imageInfo.format, &frmProps);
++
++  if(provider.device->props.hasSamplerFormat(frm) || (frmProps.optimalTilingFeatures & sampledRqFlags)==sampledRqFlags) {
+     imageInfo.usage |= VK_IMAGE_USAGE_SAMPLED_BIT;
+     // Formats that are required to support VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT
+     // must also support VK_FORMAT_FEATURE_TRANSFER_SRC_BIT and VK_FORMAT_FEATURE_TRANSFER_DST_BIT.

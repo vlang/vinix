@@ -1,0 +1,13 @@
+diff --git a/Engine/gapi/vulkan/vpushdescriptor.cpp b/Engine/gapi/vulkan/vpushdescriptor.cpp
+index f002ef2..8321da9 100644
+--- a/Engine/gapi/vulkan/vpushdescriptor.cpp
++++ b/Engine/gapi/vulkan/vpushdescriptor.cpp
+@@ -183,6 +183,8 @@ VkDescriptorSet VPushDescriptor::push(const PushBlock& pb, const LayoutDesc& lay
+   uint32_t               cntWr = 0;
+ 
+   for(size_t i=0; i<MaxBindings; ++i) {
++    if((lay.active & (1u << i))==0)
++      continue;
+     auto  cls = lay.bindings[i];
+     auto& wx  = wr[cntWr];
+     VPushDescriptor::write(dev, wx, winfo[cntWr], uint32_t(i), cls,
