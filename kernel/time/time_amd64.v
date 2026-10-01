@@ -23,3 +23,7 @@ pub fn initialise() {
 
 	pit_initialise()
 }
+
+pub fn clock_resolution_ns() u64 {
+	return 1000000000 / timer_frequency
+}

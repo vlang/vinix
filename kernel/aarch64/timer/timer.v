@@ -61,6 +61,11 @@ pub fn get_ns() u64 {
 	return secs * 1000000000 + frac * 1000000000 / timer_freq
 }
 
+// The smallest positive interval representable by the architectural counter.
+pub fn resolution_ns() u64 {
+	return (1000000000 + timer_freq - 1) / timer_freq
+}
+
 // Get current time in microseconds
 pub fn get_us() u64 {
 	count := get_count()

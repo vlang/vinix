@@ -64,6 +64,9 @@ __global (
 // Return a stable snapshot of a clock for interfaces, such as absolute futex
 // deadlines, that need to translate a point in time into a timer duration.
 pub fn clock_now(clock_id int) ?TimeSpec {
+	$if aarch64 {
+		return precise_clock_now(clock_id)
+	}
 	match clock_id {
 		clock_type_realtime {
 			return realtime_clock
@@ -164,7 +167,13 @@ pub fn advance_clocks(interval TimeSpec) {
 			if timer.fired == true {
 				continue
 			}
-			if timer.when.sub(applied) {
+			mut expired := false
+			$if aarch64 {
+				expired = counter_timer_expired(timer.deadline_ns)
+			} $else {
+				expired = timer.when.sub(applied)
+			}
+			if expired {
 				C.event__trigger(mut &timer.event, false)
 				timer.fired = true
 			}
@@ -193,6 +202,9 @@ pub mut:
 	event eventstruct.Event
 	index int
 	fired bool
+	// ARM64 timers expire against the counter, so a tick cannot charge them
+	// for time that passed before they were armed.
+	deadline_ns u64
 }
 
 __global (
@@ -223,6 +235,9 @@ pub fn (mut this Timer) arm() {
 	timers_lock.acquire()
 
 	this.fired = false
+	$if aarch64 {
+		this.deadline_ns = counter_timer_deadline(this.when)
+	}
 	this.index = armed_timers.len
 	armed_timers << this
 
@@ -236,7 +251,7 @@ pub fn new_timer(when TimeSpec) &Timer {
 	mut timer := &Timer{
 		when:  when
 		fired: false
-		index: -1,
+		index: -1
 	}
 
 	timer.arm()

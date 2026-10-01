@@ -19,16 +19,16 @@ const timer_abstime = 1
 fn read_clock(clock_id int) ?time.TimeSpec {
 	match clock_id {
 		time.clock_type_realtime {
-			return realtime_clock
+			return time.clock_now(time.clock_type_realtime)
 		}
 		time.clock_type_monotonic {
-			return monotonic_clock
+			return time.clock_now(time.clock_type_monotonic)
 		}
 		// CLOCK_MONOTONIC_RAW and CLOCK_BOOTTIME differ from CLOCK_MONOTONIC
 		// only in ways this kernel does not model: no frequency adjustment and
 		// no suspend to miss.
 		4, 7 {
-			return monotonic_clock
+			return time.clock_now(time.clock_type_monotonic)
 		}
 		// The _COARSE clocks are the same clocks, sampled cheaply.
 		5 {
@@ -105,7 +105,7 @@ pub fn syscall_clock_gettime(_ voidptr, clock_id int, result u64) (u64, u64) {
 // Linux still accepts it and fills it with zeroes.
 pub fn syscall_gettimeofday(_ voidptr, tv u64, tz u64) (u64, u64) {
 	if tv != 0 {
-		now := realtime_clock
+		now := time.clock_now(time.clock_type_realtime) or { return errno.err, errno.einval }
 		mut out := [2]i64{}
 		out[0] = now.tv_sec
 		out[1] = now.tv_nsec / 1000
@@ -124,15 +124,20 @@ pub fn syscall_gettimeofday(_ voidptr, tv u64, tz u64) (u64, u64) {
 	return 0, 0
 }
 
-// clock_getres(clock_id, res). Every clock here advances on the same timer
-// tick, so they all have the same resolution.
+// Precise wall clocks use the architectural counter on ARM64. Coarse clocks
+// and CPU accounting are still sampled by the timer tick.
 pub fn syscall_clock_getres(_ voidptr, clock_id int, res u64) (u64, u64) {
 	read_clock(clock_id) or { return errno.err, errno.get() }
 
 	if res != 0 {
+		tick_sampled := is_cpu_clock(clock_id) || clock_id == 5 || clock_id == 6
 		resolution := time.TimeSpec{
 			tv_sec:  0
-			tv_nsec: 1
+			tv_nsec: i64(if tick_sampled {
+				1000000000 / time.timer_frequency
+			} else {
+				time.clock_resolution_ns()
+			})
 		}
 		if !usercopy.copy_to_user(res, voidptr(&resolution), sizeof(time.TimeSpec)) {
 			return errno.err, errno.efault

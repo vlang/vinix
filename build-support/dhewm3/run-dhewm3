@@ -1,0 +1,12 @@
+#!/bin/sh
+# Start inside an X11 session (including vinix-wine-host's private display).
+set -eu
+export HOME=${HOME:-/root}
+export SDL_VIDEODRIVER=x11
+export LIBGL_ALWAYS_SOFTWARE=${LIBGL_ALWAYS_SOFTWARE:-1}
+export GALLIUM_DRIVER=${GALLIUM_DRIVER:-llvmpipe}
+export LIBGL_DRIVERS_PATH=${LIBGL_DRIVERS_PATH:-/usr/lib/xorg/modules/dri}
+export LD_LIBRARY_PATH=/usr/lib/dhewm3:/usr/lib:${LD_LIBRARY_PATH:-}
+exec /usr/bin/dhewm3 +set fs_basepath /usr/share/games/dhewm3 \
+    +set fs_gameDllPath /usr/lib/dhewm3 +set r_fullscreen 0 \
+    +set r_mode 3 +set r_swapInterval 0 "$@"

@@ -19,6 +19,7 @@ boot-image/
 /build-aarch64-x11/
 /build-aarch64-chromium/
 /build-aarch64-doom/
+/build-aarch64-dhewm3/
 build-support/init-aarch64/init
 build-support/init-aarch64/initramfs.tar
 build-support/init-aarch64/initramfs-minimal.tar
