@@ -10,7 +10,9 @@ ${CC:-clang} -std=gnu11 -O1 -g -fwrapv -Wall -Wextra -Werror -Wno-unused-paramet
     -fsanitize=address,undefined -fno-omit-frame-pointer -pthread \
     -DVINIX_LINUXKPI -DVINIX_LINUXKPI_HOST_TEST -D__KERNEL__ -include linux/kconfig.h \
     -I"$repo/kernel/linuxkpi/include" -I"$source_dir/include" -I"$source_dir/include/uapi" \
-    "$repo/kernel/c/linuxkpi.c" "$repo/kernel/c/linuxkpi_refcount.c" "$repo/kernel/c/linuxkpi_string.c" "$repo/tests/linuxkpi/test.c" \
+    -I"$source_dir/arch/x86/include" -I"$source_dir/arch/x86/include/uapi" \
+    "$repo/kernel/c/linuxkpi.c" "$repo/kernel/c/linuxkpi_refcount.c" "$repo/kernel/c/linuxkpi_string.c" \
+    "$repo/kernel/c/linuxkpi_percpu.c" "$repo/tests/linuxkpi/test.c" \
     "$source_dir/lib/list_sort.c" "$source_dir/lib/sort.c" "$source_dir/lib/rbtree.c" \
     "$source_dir/lib/find_bit.c" "$source_dir/lib/hweight.c" \
     -o "$work/test"

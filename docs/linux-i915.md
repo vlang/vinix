@@ -50,6 +50,18 @@ the complete i915 source tree is not evidence that the driver runs.
   guards. Lock spinning continues to answer Vinix's TLB shootdowns. IRQ flags belong to
   the caller, not to shared lock storage.
   Failed IRQ-save trylocks restore both IRQ and preemption state.
+- Static `DEFINE_PER_CPU` variables preserve their initializers and alignment
+  in a separate copy for every boot CPU. Dynamic `alloc_percpu`,
+  `alloc_percpu_gfp` and `free_percpu` use zeroed, aligned slots, with checked
+  overflow and allocation failure. Pointer translation supports struct fields
+  and uses Vinix CPU IDs; Linux pointers never access Vinix's GS segment.
+  Linux's generic `this_cpu` accessors and `get_cpu_ptr`/`get_cpu_var` retain
+  their IRQ/preemption protection. Callers must stop all readers before
+  `free_percpu`; CPU hotplug and Linux early-boot per-CPU machinery are pending.
+- Ordinary `preempt_disable`/`preempt_enable`, nested counts, `preemptible`,
+  no-reschedule release and deferred rescheduling. `preempt_count` currently
+  reports scheduler pins only. Linux IRQ/NMI/softirq context accounting and
+  `in_interrupt`/`in_atomic` are not implemented.
 - Atomic bit operations, including acquire/release bit locking, using Linux's
   generic implementation and the native atomic backend. Unmodified Linux
   bitmap headers, bit searches and population counts work across word
@@ -117,13 +129,24 @@ place source/destination buffers against protected pages, check truncation
 and zero padding, and verify allocation failure and release. Unaligned
 byte-order tests check both values and encoded bytes. Raw-lock tests include
 failed trylocks and nested IRQ state restoration.
+Per-CPU tests run four CPU-labelled workers, check static initializers and
+independent updates, and exercise interior-field translation, scalar widths,
+compare/exchange, nested preemption and IRQ restoration. Dynamic allocation
+tests cover alignments from 1 to 4096 bytes, overflow, OOM, zero-fill and release.
+The static template is copied as a complete linker section; host template
+globals omit ASan redzones so that alignment padding is readable. Allocated
+CPU copies and runtime accesses remain instrumented.
 
 An enabled kernel runs the allocator/list/sort/tree/IRQ-lock tests 200 times
 and verifies that the physical free-page count returns to its initial value.
-The same repeated test also checks raw locks, bit searches, byte-order helpers
-and bounded strings, including allocated-string release.
+The same repeated test also checks raw locks, bit searches, byte-order helpers,
+bounded strings and static/dynamic per-CPU isolation across all four CPUs,
+including allocated-string and dynamic-slot release. The static per-CPU pool
+has boot lifetime and is initialized before the free-page baseline is taken.
 It then holds preemption disabled with IRQs enabled until a real scheduler
-interrupt defers a context switch. The WC-copy test checks FPU register/MXCSR
+interrupt defers a context switch, checks that no-reschedule release preserves
+pending scheduling work with IRQs disabled, and services it on IRQ restoration.
+The WC-copy test checks FPU register/MXCSR
 preservation, buffer alignment and aligned/unaligned copies. Upstream i915
 disables acceleration when CPUID reports a hypervisor; the second TCG guest
 disables that CPUID flag to exercise the actual SSE4.1 path. This is a CPU
@@ -146,9 +169,10 @@ object linking, unresolved-symbol checks and runtime/hardware testing.
 
 ## Remaining driver integration
 
-The complete i915 build still fails. The audit now reaches Linux per-CPU
-state, task/preemption headers and page-table types that require native
-implementations. The next work includes these interfaces and substantial
+The complete i915 build still fails. Ordinary per-CPU storage and scheduler
+pins now have native implementations; Linux task/thread state, SMP dispatch,
+interrupt-context accounting and page-table types still need a bridge.
+The next work includes these interfaces and substantial
 runtime subsystems:
 
 1. Linux device/PCI registration and removal, configuration access and devres.

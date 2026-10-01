@@ -7,6 +7,8 @@
 #define CONFIG_X86_64 1
 #define CONFIG_SMP 1
 #define CONFIG_NR_CPUS 256
+/* x86-64 Linux's task layout; a native task bridge is still pending. */
+#define CONFIG_THREAD_INFO_IN_TASK 1
 /* Tiger Lake has 64-byte cache lines; there is no NUMA configuration here. */
 #define CONFIG_X86_L1_CACHE_SHIFT 6
 #define CONFIG_X86_INTERNODE_CACHE_SHIFT 6

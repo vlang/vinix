@@ -12,6 +12,7 @@
 #include <linux/kref.h>
 #include <linux/bitmap.h>
 #include <asm/unaligned.h>
+#include <linux/percpu.h>
 #include <vinix/runtime.h>
 #include <drm/i915_pciids.h>
 #ifndef VINIX_LINUXKPI_HOST_TEST
@@ -137,6 +138,7 @@ static int compare_int(const void *a, const void *b)
 }
 
 struct test_node { int key; struct list_head list; struct rb_node tree; };
+static DEFINE_PER_CPU_ALIGNED(unsigned long, percpu_probe) = 17;
 
 static int compare_test_node(void *priv, const struct list_head *a, const struct list_head *b)
 {
@@ -158,6 +160,26 @@ int vinix_linuxkpi_selftest(void)
     if (!grown) { kfree(ptr); return -ENOMEM; }
     ptr = grown;
     int result = 0;
+    unsigned long *local_probe = get_cpu_ptr(&percpu_probe);
+    if (*local_probe != 17 || !preempt_count()) result = -EIO;
+    this_cpu_add(percpu_probe, 5);
+    if (this_cpu_read(percpu_probe) != 22) result = -EIO;
+    this_cpu_write(percpu_probe, 17);
+    put_cpu_ptr(local_probe);
+    unsigned long *slots = alloc_percpu(unsigned long);
+    if (!slots) result = -ENOMEM;
+    else {
+        unsigned int count = vinix_linuxkpi_percpu_count();
+        for (unsigned int index = 0; index < count; index++) {
+            unsigned long *slot = per_cpu_ptr(slots, index);
+            if (*slot || per_cpu(percpu_probe, index) != 17) result = -EIO;
+            *slot = 0x12345678UL + index;
+        }
+        for (unsigned int index = 0; index < count; index++) {
+            if (*per_cpu_ptr(slots, index) != 0x12345678UL + index) result = -EIO;
+        }
+        free_percpu(slots);
+    }
     for (size_t i = 0; i < 16385; i++) {
         unsigned char expected = i < 8193 ? (unsigned char)i : 0;
         if (ptr[i] != expected) result = -EIO;

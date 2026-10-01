@@ -43,13 +43,53 @@ fn preempt_disable() {
 
 @[export: 'vinix_linuxkpi_preempt_enable']
 fn preempt_enable() {
+	release_preemption(true)
+}
+
+@[export: 'vinix_linuxkpi_preempt_enable_no_resched']
+fn preempt_enable_no_resched() {
+	release_preemption(false)
+}
+
+fn release_preemption(allow_reschedule bool) {
 	ints := cpu.interrupt_toggle(false)
 	index := cpulocal.current().cpu_number
 	if preempt_depth[index] == 0 {
 		lib.kpanic(unsafe { nil }, c'linuxkpi: unbalanced preempt_enable')
 	}
 	preempt_depth[index]--
-	reschedule := preempt_depth[index] == 0 && preempt_pending[index] && ints
+	reschedule := allow_reschedule && preempt_depth[index] == 0 && preempt_pending[index]
+		&& ints
+	if reschedule {
+		preempt_pending[index] = false
+	}
+	cpu.interrupt_toggle(ints)
+	if reschedule {
+		sched.reschedule()
+	}
+}
+
+@[export: 'vinix_linuxkpi_preempt_count']
+fn native_preempt_count() u32 {
+	ints := cpu.interrupt_toggle(false)
+	depth := preempt_depth[cpulocal.current().cpu_number]
+	cpu.interrupt_toggle(ints)
+	return depth
+}
+
+@[export: 'vinix_linuxkpi_cpu_id']
+fn native_cpu_id() u32 {
+	ints := cpu.interrupt_toggle(false)
+	index := u32(cpulocal.current().cpu_number)
+	cpu.interrupt_toggle(ints)
+	return index
+}
+
+@[export: 'vinix_linuxkpi_preempt_check_resched']
+fn preempt_check_resched() {
+	ints := cpu.interrupt_toggle(false)
+	index := cpulocal.current().cpu_number
+	reschedule := ints && preempt_depth[index] == 0 && preempt_pending[index]
 	if reschedule {
 		preempt_pending[index] = false
 	}
@@ -186,10 +226,14 @@ fn fpu_end() {
 
 fn C.i915_memcpy_init_early(voidptr)
 fn C.vinix_linuxkpi_wc_selftest() int
+fn C.vinix_linuxkpi_percpu_bootstrap(u32) int
 
 pub fn initialise() {
 	$if linuxkpi ? {
 		sched.register_preemption_guard(voidptr(may_preempt))
+		if C.vinix_linuxkpi_percpu_bootstrap(u32(cpu_locals.len)) != 0 {
+			lib.kpanic(unsafe { nil }, c'Linux compatibility per-CPU initialization failed')
+		}
 		C.i915_memcpy_init_early(unsafe { nil })
 		before := memory.free_bytes()
 		for _ in 0 .. 200 {
@@ -202,6 +246,8 @@ pub fn initialise() {
 		}
 		C.kprintf(c'linuxkpi: 200 allocator, IRQ lock, Linux list/sort/rbtree self-tests passed; no pages retained\n')
 		C.kprintf(c'linuxkpi: raw locks, bitmaps, byte order and bounded strings passed\n')
+		C.kprintf(c'linuxkpi: static and dynamic per-CPU isolation passed on %u CPUs\n',
+			u32(cpu_locals.len))
 		// Exercise a real scheduler interrupt with preemption disabled and
 		// IRQs still enabled, rather than relying only on host lock tests.
 		preempt_disable()
@@ -215,12 +261,17 @@ pub fn initialise() {
 		}
 		cpu.interrupt_toggle(false)
 		deferred := preempt_deferrals[index] > deferred_before
-		cpu.interrupt_toggle(ints)
-		preempt_enable()
+		preempt_enable_no_resched()
+		no_resched_balanced := preempt_depth[index] == 0 && preempt_pending[index]
+		if !no_resched_balanced {
+			lib.kpanic(unsafe { nil }, c'Linux compatibility no-resched lost pending preemption')
+		}
+		irq_restore(if ints { u64(1) << 9 } else { u64(0) })
 		if !deferred {
 			lib.kpanic(unsafe { nil }, c'Linux compatibility preemption guard was not exercised')
 		}
 		C.kprintf(c'linuxkpi: scheduler deferred preemption while IRQs stayed enabled\n')
+		C.kprintf(c'linuxkpi: no-resched preserved pending preemption\n')
 		if C.vinix_linuxkpi_wc_selftest() != 0 {
 			lib.kpanic(unsafe { nil }, c'Linux i915 WC copy or FPU preservation failed')
 		}

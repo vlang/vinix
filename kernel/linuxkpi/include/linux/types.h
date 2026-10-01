@@ -46,6 +46,19 @@ typedef unsigned int uint;
 typedef unsigned long ulong;
 #define DECLARE_BITMAP(name, bits) unsigned long name[BITS_TO_LONGS(bits)]
 #include <asm/posix_types.h>
+#ifndef VINIX_LINUXKPI_HOST_TEST
+typedef __kernel_pid_t pid_t;
+typedef __kernel_clockid_t clockid_t;
+typedef __kernel_uid32_t uid_t;
+typedef __kernel_gid32_t gid_t;
+typedef __kernel_mode_t mode_t;
+#endif
+struct callback_head {
+    struct callback_head *next;
+    void (*func)(struct callback_head *head);
+} __aligned(sizeof(void *));
+#define rcu_head callback_head
+typedef void (*rcu_callback_t)(struct rcu_head *);
 struct list_head { struct list_head *next, *prev; };
 struct hlist_head { struct hlist_node *first; };
 struct hlist_node { struct hlist_node *next, **pprev; };

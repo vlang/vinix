@@ -12,6 +12,8 @@ ROOT = Path(__file__).resolve().parents[2]
 MARKERS = [
     "linuxkpi: 200 allocator, IRQ lock, Linux list/sort/rbtree self-tests passed; no pages retained",
     "linuxkpi: raw locks, bitmaps, byte order and bounded strings passed",
+    "linuxkpi: static and dynamic per-CPU isolation passed on 4 CPUs",
+    "linuxkpi: no-resched preserved pending preemption",
     "linuxkpi: scheduler deferred preemption while IRQs stayed enabled",
     "and FPU preservation passed",
     "LINUXKPI GUEST: PASS",
@@ -70,7 +72,7 @@ def main():
                     if args.no_linuxkpi and "linuxkpi:" in output:
                         raise RuntimeError("API layer unexpectedly enabled; see " + str(serial))
                     print("Default guest: PASS (4 CPUs, Linux ABI)" if args.no_linuxkpi else
-                          "LinuxKPI guest: PASS (4 CPUs, allocator, raw locks, bitmaps/strings, scheduler, i915 copy/FPU)")
+                          "LinuxKPI guest: PASS (4 CPUs, allocator, raw locks, per-CPU isolation, bitmaps/strings, scheduler, i915 copy/FPU)")
                     print("Serial log: " + str(serial))
                     return 0
                 if process.poll() is not None:

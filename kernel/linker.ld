@@ -45,6 +45,11 @@ SECTIONS
     data_start = .;
 
     .data : {
+        /* Linux per-CPU symbols describe a template, copied once per CPU. */
+        . = ALIGN(CONSTANT(MAXPAGESIZE));
+        __vinix_percpu_start = .;
+        KEEP(*(.data..percpu .data..percpu.*))
+        __vinix_percpu_end = .;
         *(.data .data.*)
 
         /* Place the sections that contain the Limine requests as part of the .data */

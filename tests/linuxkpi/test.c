@@ -13,6 +13,7 @@
 #include <linux/kref.h>
 #include <linux/bits.h>
 #include <linux/bitmap.h>
+#include <linux/percpu.h>
 #include <linux/list.h>
 #include <linux/list_sort.h>
 #include <linux/rbtree_augmented.h>
@@ -22,10 +23,12 @@
 #include <vinix/runtime.h>
 
 static size_t live_pages;
+static size_t permanent_pages;
 static bool fail_allocation;
 static bool last_reclaim;
 static _Thread_local bool interrupts = true;
 static _Thread_local unsigned int preempt_depth;
+static _Thread_local unsigned int current_cpu;
 static atomic_t refcount_warnings = ATOMIC_INIT(0);
 
 void *vinix_linuxkpi_alloc_pages(size_t pages, bool reclaim)
@@ -65,6 +68,10 @@ unsigned long vinix_linuxkpi_irq_flags(void) { return interrupts ? 1UL << 9 : 0;
 void vinix_linuxkpi_spin_wait(void) { __asm__ volatile("" ::: "memory"); }
 void vinix_linuxkpi_preempt_disable(void) { preempt_depth++; }
 void vinix_linuxkpi_preempt_enable(void) { assert(preempt_depth); preempt_depth--; }
+void vinix_linuxkpi_preempt_enable_no_resched(void) { assert(preempt_depth); preempt_depth--; }
+unsigned int vinix_linuxkpi_preempt_count(void) { return preempt_depth; }
+void vinix_linuxkpi_preempt_check_resched(void) { }
+unsigned int vinix_linuxkpi_cpu_id(void) { return current_cpu; }
 bool vinix_linuxkpi_may_sleep(void) { return interrupts && !preempt_depth; }
 void vinix_linuxkpi_refcount_warning(int kind)
 {
@@ -78,7 +85,7 @@ static void allocation_tests(void)
     assert(type_max(s64) == 0x7fffffffffffffffLL && type_max(u64) == ~0ULL);
     assert(GENMASK_ULL(39, 21) == 0x000000ffffe00000ULL);
     assert(vinix_linuxkpi_selftest() == 0);
-    assert(live_pages == 0);
+    assert(live_pages == permanent_pages);
     assert(kmalloc(0, GFP_KERNEL) == ZERO_SIZE_PTR);
     assert(ksize(ZERO_SIZE_PTR) == 0);
     kfree(NULL);
@@ -121,11 +128,118 @@ static void allocation_tests(void)
         assert(duplicate && !memcmp(duplicate, grown, n + 17));
         kfree(duplicate);
         assert(krealloc(grown, 0, GFP_KERNEL) == ZERO_SIZE_PTR);
-        assert(live_pages == 0);
+        assert(live_pages == permanent_pages);
     }
     assert(PTR_ERR(ERR_PTR(-ENOMEM)) == -ENOMEM);
     assert(IS_ERR(ERR_PTR(-ENOMEM)) && IS_ERR_OR_NULL(NULL));
     assert(!IS_ERR((void *)4096) && PTR_ERR_OR_ZERO((void *)4096) == 0);
+}
+
+#ifdef __APPLE__
+extern const unsigned char host_percpu_start[] __asm__("section$start$__DATA$vinixpcpu");
+extern const unsigned char host_percpu_end[] __asm__("section$end$__DATA$vinixpcpu");
+#else
+extern const unsigned char __start_vinixpcpu[], __stop_vinixpcpu[];
+#define host_percpu_start __start_vinixpcpu
+#define host_percpu_end __stop_vinixpcpu
+#endif
+void vinix_linuxkpi_percpu_destroy_for_test(void);
+static DEFINE_PER_CPU(u8, cpu_byte) = 0x37;
+static DEFINE_PER_CPU(u16, cpu_half) = 0x1234;
+static DEFINE_PER_CPU(u32, cpu_word) = 0x12345678;
+static DEFINE_PER_CPU(u64, cpu_wide) = 0x123456789abcdef0ULL;
+struct cpu_record { unsigned long counter; unsigned char bytes[15]; } __aligned(64);
+static DEFINE_PER_CPU_ALIGNED(struct cpu_record, cpu_record) = { .counter = 17, .bytes = { 1, 2, 3 } };
+
+struct cpu_worker { unsigned int cpu; struct cpu_record *dynamic; };
+
+static void *percpu_worker(void *argument)
+{
+    struct cpu_worker *worker = argument;
+    current_cpu = worker->cpu;
+    assert(preemptible() && preempt_count() == 0);
+    assert(this_cpu_read(cpu_byte) == 0x37 && this_cpu_read(cpu_half) == 0x1234);
+    assert(this_cpu_read(cpu_word) == 0x12345678);
+    assert(this_cpu_read(cpu_wide) == 0x123456789abcdef0ULL);
+    unsigned long *pinned = get_cpu_ptr(&cpu_record.counter);
+    assert(preempt_count() == 1 && !preemptible() && *pinned == 17);
+    preempt_disable();
+    assert(preempt_count() == 2);
+    preempt_enable_no_resched();
+    assert(preempt_count() == 1);
+    put_cpu_ptr(pinned);
+    assert(preemptible());
+    for (unsigned int i = 0; i < 20000; i++) {
+        this_cpu_inc(cpu_wide);
+        this_cpu_add(cpu_record.counter, 3);
+        this_cpu_inc(worker->dynamic->counter);
+        this_cpu_write(cpu_byte, (u8)i);
+        assert(preempt_count() == 0 && interrupts);
+    }
+    u32 expected = 0;
+    assert(!this_cpu_try_cmpxchg(cpu_word, &expected, 1) && expected == 0x12345678);
+    assert(this_cpu_try_cmpxchg(cpu_word, &expected, worker->cpu + 1));
+    assert(this_cpu_xchg(cpu_half, 7) == 0x1234 && this_cpu_read_stable(cpu_half) == 7);
+    get_cpu_var(cpu_half) = 9;
+    assert(preempt_count() == 1);
+    put_cpu_var(cpu_half);
+    unsigned long flags;
+    local_irq_save(flags);
+    this_cpu_or(cpu_byte, 0x80);
+    assert(irqs_disabled() && preempt_count() == 0);
+    local_irq_restore(flags);
+    preempt_disable();
+    this_cpu_ptr(&worker->dynamic->bytes[3])[0] = (unsigned char)(worker->cpu + 1);
+    preempt_enable();
+    return NULL;
+}
+
+static void percpu_tests(void)
+{
+    assert(vinix_linuxkpi_percpu_init(4, host_percpu_start, host_percpu_end) == -EBUSY);
+    assert(!__alloc_percpu(0, 8) && !__alloc_percpu(8, 0) && !__alloc_percpu(8, 3));
+    assert(!__alloc_percpu(8, 8192) && !__alloc_percpu(SIZE_MAX, 8));
+    assert(!__alloc_percpu(SIZE_MAX / 2, 8));
+    assert(!__alloc_percpu_gfp(8, 8, GFP_KERNEL | __GFP_DMA32));
+    fail_allocation = true;
+    assert(!alloc_percpu(struct cpu_record));
+    fail_allocation = false;
+    free_percpu(NULL);
+    assert(!per_cpu_ptr((u8 *)NULL, 0));
+    for (size_t align = 1; align <= 4096; align *= 2) {
+        unsigned char *buffer = __alloc_percpu_gfp(align + 1, align, GFP_ATOMIC);
+        assert(buffer && !last_reclaim);
+        for (unsigned int cpu = 0; cpu < 4; cpu++) {
+            unsigned char *slot = per_cpu_ptr(buffer, cpu);
+            assert((uintptr_t)slot % align == 0 && !memchr_inv(slot, 0, align + 1));
+            memset(slot, cpu + 1, align + 1);
+        }
+        for (unsigned int cpu = 0; cpu < 4; cpu++) {
+            assert(!memchr_inv(per_cpu_ptr(buffer, cpu), cpu + 1, align + 1));
+        }
+        free_percpu(buffer);
+    }
+    struct cpu_record *dynamic = alloc_percpu(struct cpu_record);
+    assert(dynamic);
+    struct cpu_worker workers[4];
+    pthread_t threads[4];
+    for (unsigned int cpu = 0; cpu < 4; cpu++) {
+        assert((uintptr_t)per_cpu_ptr(&cpu_record, cpu) % 64 == 0);
+        assert(!memchr_inv(per_cpu_ptr(dynamic, cpu), 0, sizeof(*dynamic)));
+        assert(per_cpu_ptr(&cpu_record.bytes[3], cpu) == &per_cpu(cpu_record, cpu).bytes[3]);
+        workers[cpu] = (struct cpu_worker){ cpu, dynamic };
+        assert(!pthread_create(&threads[cpu], NULL, percpu_worker, &workers[cpu]));
+    }
+    for (unsigned int cpu = 0; cpu < 4; cpu++) assert(!pthread_join(threads[cpu], NULL));
+    for (unsigned int cpu = 0; cpu < 4; cpu++) {
+        assert(per_cpu(cpu_wide, cpu) == 0x123456789abcdef0ULL + 20000);
+        assert(per_cpu(cpu_record.counter, cpu) == 17 + 60000);
+        assert(per_cpu(cpu_word, cpu) == cpu + 1 && per_cpu(cpu_half, cpu) == 9);
+        assert(per_cpu_ptr(dynamic, cpu)->counter == 20000);
+        assert(*per_cpu_ptr(&dynamic->bytes[3], cpu) == cpu + 1);
+    }
+    free_percpu(dynamic);
+    assert(live_pages == permanent_pages && preemptible());
 }
 
 static void string_tests(void)
@@ -187,7 +301,7 @@ static void string_tests(void)
     assert(!kstrdup("failed", GFP_KERNEL) && !kstrndup("failed", 3, GFP_KERNEL));
     assert(!kmemdup_nul("failed", 6, GFP_KERNEL));
     fail_allocation = false;
-    assert(live_pages == 0);
+    assert(live_pages == permanent_pages);
 }
 
 static unsigned long scalar_next(const unsigned long *map, unsigned long size,
@@ -586,7 +700,7 @@ static void reference_tests(void)
     }
     kref_put(&object->refs, release_object);
     for (size_t i = 0; i < ARRAY_SIZE(threads); i++) assert(!pthread_join(threads[i], NULL));
-    assert(atomic_read(&releases) == 1 && live_pages == 0);
+    assert(atomic_read(&releases) == 1 && live_pages == permanent_pages);
     pthread_t writer, reader;
     assert(!pthread_create(&writer, NULL, message_writer, NULL));
     assert(!pthread_create(&reader, NULL, message_reader, NULL));
@@ -595,18 +709,29 @@ static void reference_tests(void)
 
 int main(void)
 {
+    assert(vinix_linuxkpi_percpu_init(0, host_percpu_start, host_percpu_end) == -EINVAL);
+    assert(vinix_linuxkpi_percpu_init(NR_CPUS + 1, host_percpu_start, host_percpu_end) == -EINVAL);
+    assert(vinix_linuxkpi_percpu_init(4, host_percpu_end, host_percpu_start) == -EINVAL);
+    fail_allocation = true;
+    assert(vinix_linuxkpi_percpu_init(4, host_percpu_start, host_percpu_end) == -ENOMEM);
+    assert(live_pages == 0);
+    fail_allocation = false;
+    assert(vinix_linuxkpi_percpu_init(4, host_percpu_start, host_percpu_end) == 0);
+    permanent_pages = live_pages;
     allocation_tests();
     string_tests();
     bitmap_tests();
     bit_concurrency_tests();
     byteorder_tests();
     raw_lock_tests();
+    percpu_tests();
     list_tests();
     tree_tests();
     concurrency_tests();
     atomic_api_tests();
     reference_tests();
+    vinix_linuxkpi_percpu_destroy_for_test();
     assert(live_pages == 0);
-    puts("LinuxKPI: PASS (Linux helpers, allocation/OOM, page-boundary strings, bitmaps, SMP/IRQ locks)");
+    puts("LinuxKPI: PASS (Linux helpers, allocation/OOM, page-boundary strings, bitmaps, SMP/IRQ locks, per-CPU storage)");
     return 0;
 }
