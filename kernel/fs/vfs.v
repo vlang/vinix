@@ -414,6 +414,7 @@ pub fn symlink(parent &VFSNode, dest string, target string) ?&VFSNode {
 	}
 
 	if read_only(parent_of_tgt_node) { errno.set(errno.erofs); return none }
+	if !attr_allows_dir_add(parent_of_tgt_node) { return none }
 	require_access(parent_of_tgt_node, access_write | access_exec)?
 	require_linked(parent_of_tgt_node)?
 	// The node keeps its name; `basename` points into `target`.
@@ -447,6 +448,7 @@ pub fn link(parent &VFSNode, dest string, target string) ?&VFSNode {
 	if read_only(dest_node) { errno.set(errno.erofs); return none }
 
 	if read_only(parent_of_tgt_node) { errno.set(errno.erofs); return none }
+	if !attr_allows_dir_add(parent_of_tgt_node) { return none }
 	require_access(parent_of_tgt_node, access_write | access_exec)?
 	require_linked(parent_of_tgt_node)?
 	// The new entry's name, as linkat() passes it. This passed `dest`, the
@@ -474,6 +476,9 @@ pub fn unlink(parent &VFSNode, name string, remove_dir bool) ? {
 	if node == unsafe { nil } || parent_of_tgt == unsafe { nil } { return none }
 	if !policy_check_name(parent_of_tgt, basename, proc.policy_create) { return none }
 	if read_only(node) || read_only(parent_of_tgt) { errno.set(errno.erofs); return none }
+	// An immutable or append-only file cannot be removed, nor anything from an
+	// immutable or append-only directory.
+	if !attr_allows_remove(node) || !attr_allows_dir_remove(parent_of_tgt) { return none }
 	if !may_remove(parent_of_tgt, node) { errno.set(errno.eacces); return none }
 	if basename == '.' || basename == '..' || basename == '' { errno.set(errno.einval); return none }
 	// Something mounted here, in this or any other namespace, keeps the name.
@@ -634,6 +639,7 @@ fn internal_create_checked(parent &VFSNode, name string, mode u32, access u32) ?
 	}
 
 	if read_only(parent_of_tgt_node) { errno.set(errno.erofs); return none }
+	if !attr_allows_dir_add(parent_of_tgt_node) { return none }
 	require_access(parent_of_tgt_node, access_write | access_exec)?
 	require_linked(parent_of_tgt_node)?
 	// The node keeps its name; `basename` points into `name`.
@@ -937,6 +943,16 @@ pub fn syscall_openat(_ voidptr, dirfd int, _path charptr, flags int, mode u32) 
 	if read_only(node) && ((flags & 3) != 0 || flags & resource.o_trunc != 0) {
 		return errno.err, errno.erofs
 	}
+	// An immutable file refuses to open for writing; an append-only one only
+	// in append mode, and never to be truncated.
+	if stat.isreg(node.resource.stat.mode) && flags & resource.o_path == 0 {
+		writing := (flags & 3) != 0
+		truncating := flags & resource.o_trunc != 0
+		append := flags & resource.o_append != 0
+		if (writing && !attr_allows_write(node, append)) || (truncating && !attr_allows_write(node, false)) {
+			return errno.err, errno.get()
+		}
+	}
 	// A file on an overlay opened to be written is copied up first, so the
 	// writes land in the upper layer.
 	if node.overlay != unsafe { nil } && stat.isreg(node.resource.stat.mode)
@@ -1107,7 +1123,12 @@ pub fn syscall_close(_ voidptr, fdnum int) (u64, u64) {
 	return 0, 0
 }
 
-pub fn syscall_ioctl(_ voidptr, fdnum int, request u64, argp voidptr) (u64, u64) {
+pub fn syscall_ioctl(_ voidptr, fdnum int, _request u64, argp voidptr) (u64, u64) {
+	// The ioctl command is 32 bits. musl declares ioctl(2)'s request as an
+	// int, so a command with bit 31 set, such as FS_IOC_GETFLAGS, reaches the
+	// kernel sign-extended to 64 bits; Linux truncates it to unsigned int. Do
+	// the same, or the match below never recognises one.
+	request := _request & u64(0xffffffff)
 	mut current_thread := proc.current_thread()
 	mut process := current_thread.process
 
@@ -1158,6 +1179,24 @@ pub fn syscall_ioctl(_ voidptr, fdnum int, request u64, argp voidptr) (u64, u64)
 				handle.flags &= ~bit
 			}
 			return 0, 0
+		}
+		fs_ioc_getflags, fs_ioc_setflags {
+			// chattr's immutable and append-only bits. Settled here as Linux's
+			// do_vfs_ioctl() does, before any driver: a device that maps these
+			// request numbers to something of its own is reached only when the
+			// descriptor leads to no inode that keeps them.
+			if argp == unsafe { nil } {
+				return errno.err, errno.efault
+			}
+			if fd.handle.node != unsafe { nil } {
+				mut node := unsafe { &VFSNode(fd.handle.node) }
+				if result := file_flags_ioctl(mut node, request, argp) {
+					return u64(result), 0
+				}
+				if errno.get() != errno.enotty {
+					return errno.err, errno.get()
+				}
+			}
 		}
 		else {}
 	}
@@ -1380,6 +1419,12 @@ pub fn syscall_linkat(_ voidptr, olddirfd int, _oldpath charptr, newdirfd int, _
 	}
 
 	if read_only(newparent) || read_only(old_node) { return errno.err, errno.erofs }
+	// An immutable or append-only file gets no new name, and none is made in
+	// an immutable directory, as Linux's vfs_link refuses both.
+	if !attr_allows_dir_add(newparent)
+		|| node_attributes(old_node) & resource.attributes_kept != 0 {
+		return errno.err, errno.eperm
+	}
 	name := basename.clone()
 	mut new_node := newparent.filesystem.link(newparent, name, mut old_node) or {
 		unsafe { name.free() }
@@ -1409,6 +1454,7 @@ pub fn syscall_fchmod(_ voidptr, fdnum int, mode u32) (u64, u64) {
 	if fd.handle.node != unsafe { nil } {
 		node := unsafe { &VFSNode(fd.handle.node) }
 		if read_only(node) { return errno.err, errno.erofs }
+		if !attr_allows_metadata(node) { return errno.err, errno.get() }
 	}
 	if !owns_resource(fd.handle.resource.stat.uid) {
 		return errno.err, errno.eperm
@@ -1445,6 +1491,9 @@ pub fn syscall_fchmodat(_ voidptr, dirfd int, _path charptr, mode u32) (u64, u64
 	}
 	if read_only(node) {
 		return errno.err, errno.erofs
+	}
+	if !attr_allows_metadata(node) {
+		return errno.err, errno.get()
 	}
 	if !owns_resource(node.resource.stat.uid) {
 		return errno.err, errno.eperm
@@ -1737,6 +1786,14 @@ pub fn rename(oldparent &VFSNode, oldpath string, newparent &VFSNode, newpath st
 		errno.set(errno.erofs)
 		return none
 	}
+	// An immutable or append-only file is not moved, nor an entry out of such
+	// a directory, nor one into an immutable directory. An existing name that
+	// an immutable or append-only file holds is not replaced.
+	if !attr_allows_remove(old_node) || !attr_allows_dir_remove(old_parent_of)
+		|| !attr_allows_dir_add(new_parent_of)
+		|| (new_node != unsafe { nil } && !attr_allows_remove(new_node)) {
+		return none
+	}
 	if !may_remove(old_parent_of, old_node) {
 		errno.set(errno.eacces)
 		return none
@@ -2009,6 +2066,9 @@ pub fn syscall_truncate(_ voidptr, _path charptr, length i64) (u64, u64) {
 	if !policy_check(node, proc.policy_write) {
 		return errno.err, errno.get()
 	}
+	if !attr_allows_write(node, false) {
+		return errno.err, errno.get()
+	}
 	mut res := node.resource
 
 	if stat.isdir(res.stat.mode) {
@@ -2070,9 +2130,10 @@ pub fn syscall_fchownat(_ voidptr, dirfd int, _path charptr, uid u32, gid u32, f
 			fd.unref()
 		}
 		mut res := fd.handle.resource
-		if fd.handle.node != unsafe { nil }
-			&& read_only(unsafe { &VFSNode(fd.handle.node) }) {
-			return errno.err, errno.erofs
+		if fd.handle.node != unsafe { nil } {
+			node := unsafe { &VFSNode(fd.handle.node) }
+			if read_only(node) { return errno.err, errno.erofs }
+			if !attr_allows_metadata(node) { return errno.err, errno.get() }
 		}
 		if !may_chown(res.stat.uid, uid, gid) {
 			return errno.err, errno.eperm
@@ -2093,6 +2154,7 @@ pub fn syscall_fchownat(_ voidptr, dirfd int, _path charptr, uid u32, gid u32, f
 		return errno.err, errno.get()
 	}
 	if read_only(node) { return errno.err, errno.erofs }
+	if !attr_allows_metadata(node) { return errno.err, errno.get() }
 	mut res := node.resource
 	if !may_chown(res.stat.uid, uid, gid) {
 		return errno.err, errno.eperm
@@ -2112,9 +2174,10 @@ pub fn syscall_fchown(_ voidptr, fdnum int, uid u32, gid u32) (u64, u64) {
 	}
 
 	mut res := fd.handle.resource
-	if fd.handle.node != unsafe { nil }
-		&& read_only(unsafe { &VFSNode(fd.handle.node) }) {
-		return errno.err, errno.erofs
+	if fd.handle.node != unsafe { nil } {
+		node := unsafe { &VFSNode(fd.handle.node) }
+		if read_only(node) { return errno.err, errno.erofs }
+		if !attr_allows_metadata(node) { return errno.err, errno.get() }
 	}
 	if !may_chown(res.stat.uid, uid, gid) {
 		return errno.err, errno.eperm
@@ -2252,6 +2315,7 @@ pub fn set_file_times(dirfd int, _path charptr, requested [2]time.TimeSpec, flag
 		res = node.resource
 	}
 	if node != unsafe { nil } && read_only(node) { return errno.err, errno.erofs }
+	if node != unsafe { nil } && !attr_allows_metadata(node) { return errno.err, errno.get() }
 
 	now := time.clock_now(time.clock_type_realtime) or { time.TimeSpec{} }
 	mut explicit := false

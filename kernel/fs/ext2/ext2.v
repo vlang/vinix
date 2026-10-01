@@ -109,9 +109,20 @@ pub mut:
 
 	filesystem   &EXT2Filesystem
 	mapped_pages []&EXT2MappedPage
+	// chattr's immutable and append-only bits, the EXT2_*_FL on-disk flags of
+	// the same value; see fs/attributes.v.
+	attr_bits u32
 	// The interface box its nodes and descriptors hold, made once and freed
 	// with it; a box per conversion was 384 bytes nothing freed.
 	box &resource_mod.Resource = unsafe { nil }
+}
+
+fn (mut this EXT2Resource) attribute_bits() u32 {
+	return this.attr_bits
+}
+
+fn (mut this EXT2Resource) set_attribute_bits(bits u32) ? {
+	this.attr_bits = bits & resource_mod.attributes_kept
 }
 
 fn (mut this EXT2Resource) boxed() &resource_mod.Resource {

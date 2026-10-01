@@ -40,6 +40,7 @@ FEATURE_MARKERS = (
     b"OPENBSD SECURITY PASS: ports, sequence numbers and IP IDs are random",
     b"OPENBSD SECURITY PASS: memory layouts are private",
     b"OPENBSD SECURITY PASS: read-only files stay read-only",
+    b"OPENBSD SECURITY PASS: immutable and append-only files",
 )
 REPORT_MARKER = b': pledge "rpath", syscall '
 # The guest's NIC, as both runs give it, and how many connections and

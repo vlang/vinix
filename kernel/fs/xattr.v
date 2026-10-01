@@ -158,6 +158,9 @@ fn xattr_may_change(target XAttrTarget, res &TmpFSResource, name string) ? {
 		errno.set(errno.erofs)
 		return none
 	}
+	if target.node != unsafe { nil } && !attr_allows_metadata(target.node) {
+		return none
+	}
 	if name.starts_with('trusted.') {
 		if !proc.current_has_capability(proc.cap_sys_admin) {
 			errno.set(errno.eperm)

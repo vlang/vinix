@@ -30,6 +30,7 @@ import event.eventstruct
 import memory.mmap
 import pagecache
 import numa
+import security
 import time
 
 pub type NetTcpSnapshot = fn () string
@@ -79,6 +80,7 @@ enum ProcFSKind {
 	environ
 	sysctl
 	sysrq_trigger
+	securelevel
 	net_tcp
 }
 
@@ -258,6 +260,9 @@ fn (mut this ProcFS) build_root(parent &VFSNode, name string, view voidptr) &VFS
 	add_procfs_text(mut sys_kernel, 'osrelease', uname_release_line)
 	add_procfs_text(mut sys_kernel, 'pid_max', decimal_line(proc.max_pid))
 	add_procfs_text(mut sys_kernel, 'threads-max', decimal_line(proc.max_pid))
+	// Writable, so root can raise it; see security.set_securelevel.
+	mut securelevel_node := add_procfs_file(mut sys_kernel, 'securelevel', .securelevel)
+	securelevel_node.resource.stat.mode = stat.ifreg | 0o644
 	mut sys_kernel_keys := add_procfs_directory(mut sys_kernel, 'keys')
 	add_procfs_text(mut sys_kernel_keys, 'root_maxkeys', '1000000\n')
 	add_procfs_text(mut sys_kernel_keys, 'root_maxbytes', '25000000\n')
@@ -653,6 +658,12 @@ fn (this &ProcFSResource) contents() string {
 		.environ {
 			return ''
 		}
+		.securelevel {
+			mut text := lib.new_text(8)
+			text.add_decimal(i64(security.securelevel()))
+			text.add_byte(`\n`)
+			return text.str()
+		}
 		else {
 			return ''
 		}
@@ -745,6 +756,17 @@ fn (mut this ProcFSResource) write(_handle voidptr, buf voidptr, _loc u64, count
 			value := trimmed.int()
 			unsafe { trimmed.free() }
 			proc.set_process_oom_score_adj(this.pid, value)
+			return i64(count)
+		}
+		.securelevel {
+			if count == 0 {
+				return i64(0)
+			}
+			written := unsafe { tos(&u8(buf), int(count)) }
+			trimmed := written.trim_space()
+			value := trimmed.int()
+			unsafe { trimmed.free() }
+			security.set_securelevel(value) or { return none }
 			return i64(count)
 		}
 		.uid_map, .gid_map, .setgroups, .loginuid {

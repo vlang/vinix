@@ -63,6 +63,7 @@ fn (mut this EXT2Resource) persist_metadata() ? {
 	inode.access_time = stat_seconds(this.stat.atim)
 	inode.creation_time = stat_seconds(this.stat.ctim)
 	inode.mod_time = stat_seconds(this.stat.mtim)
+	inode.flags = (inode.flags & ~resource_mod.attributes_kept) | (this.attr_bits & resource_mod.attributes_kept)
 	inode.write_entry(mut this.filesystem, u32(this.stat.ino))?
 	flush_on_return()
 }
@@ -262,6 +263,7 @@ fn resource_from_inode(filesystem &EXT2Filesystem, inode_index u32,
 	res.stat.ctim = time.TimeSpec{i64(inode.creation_time), 0}
 	res.stat.mtim = time.TimeSpec{i64(inode.mod_time), 0}
 	res.can_mmap = stat.isreg(res.stat.mode)
+	res.attr_bits = inode.flags & resource_mod.attributes_kept
 	return res
 }
 

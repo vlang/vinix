@@ -58,6 +58,13 @@
 #define MAP_INHERIT_NONE 2
 #define MAP_INHERIT_ZERO 3
 
+/* chattr flags and their ioctls, from <linux/fs.h>, which a musl sysroot
+ * refuses to include from userspace. */
+#define FS_IOC_GETFLAGS 0x80086601UL
+#define FS_IOC_SETFLAGS 0x40086602UL
+#define FS_IMMUTABLE_FL 0x00000010
+#define FS_APPEND_FL 0x00000020
+
 static char *self_path = "/sbin/init";
 
 static int pledge(const char *promises, const char *execpromises)
@@ -1132,12 +1139,108 @@ static int run_read_only_tests(void)
 	return 0;
 }
 
+/* chattr's immutable and append-only bits, FS_IOC_SETFLAGS, on a file and a
+ * directory, and that securelevel keeps them from being cleared. Run as root
+ * (this test is PID 1), the way a file is sealed on a real system. */
+static int getflags(const char *path, int *flags)
+{
+	int fd = open(path, O_RDONLY);
+	if (fd < 0)
+		return -1;
+	int ok = ioctl(fd, FS_IOC_GETFLAGS, flags);
+	close(fd);
+	return ok;
+}
+
+static int setflags(const char *path, int flags)
+{
+	int fd = open(path, O_RDONLY);
+	if (fd < 0)
+		return -1;
+	int ok = ioctl(fd, FS_IOC_SETFLAGS, &flags);
+	int saved = errno;
+	close(fd);
+	errno = saved;
+	return ok;
+}
+
+static int write_securelevel(int level)
+{
+	int fd = open("/proc/sys/kernel/securelevel", O_WRONLY);
+	if (fd < 0)
+		return -1;
+	char text[8];
+	int n = snprintf(text, sizeof(text), "%d", level);
+	int ok = write(fd, text, (size_t)n) == n ? 0 : -1;
+	close(fd);
+	return ok;
+}
+
+static int run_attribute_tests(void)
+{
+	const char *file = "/tmp/vinix-immutable";
+	const char *dir = "/tmp/vinix-immutable-dir";
+	CHECK(write_file(file, "sealed") == 0);
+	CHECK(mkdir(dir, 0755) == 0);
+	int flags = -1;
+	CHECK(getflags(file, &flags) == 0 && flags == 0);
+
+	/* Immutable: no write, truncate, chmod, rename or unlink. */
+	CHECK(setflags(file, FS_IMMUTABLE_FL) == 0);
+	CHECK(getflags(file, &flags) == 0 && (flags & FS_IMMUTABLE_FL));
+	CHECK(open(file, O_WRONLY) == -1 && errno == EPERM);
+	CHECK(truncate(file, 0) == -1 && errno == EPERM);
+	CHECK(chmod(file, 0600) == -1 && errno == EPERM);
+	CHECK(rename(file, "/tmp/vinix-moved") == -1 && errno == EPERM);
+	CHECK(unlink(file) == -1 && errno == EPERM);
+	CHECK(link(file, "/tmp/vinix-link") == -1 && errno == EPERM);
+	/* Cleared again, it is an ordinary file. */
+	CHECK(setflags(file, 0) == 0);
+	CHECK(open(file, O_WRONLY) >= 0);
+
+	/* Append-only: opens only O_APPEND, no truncate, no unlink. */
+	CHECK(setflags(file, FS_APPEND_FL) == 0);
+	CHECK(open(file, O_WRONLY) == -1 && errno == EPERM);
+	CHECK(open(file, O_WRONLY | O_TRUNC | O_APPEND) == -1 && errno == EPERM);
+	int afd = open(file, O_WRONLY | O_APPEND);
+	CHECK(afd >= 0 && write(afd, "more", 4) == 4);
+	/* pwrite and fallocate may not reach past the append, nor overwrite it. */
+	CHECK(pwrite(afd, "zz", 2, 0) == -1 && errno == EPERM);
+	CHECK(fallocate(afd, 0, 0, 4096) == -1 && errno == EPERM);
+	close(afd);
+	CHECK(link(file, "/tmp/vinix-append-link") == -1 && errno == EPERM);
+	CHECK(unlink(file) == -1 && errno == EPERM);
+	/* chmod is allowed on an append-only file, as on Linux. */
+	CHECK(chmod(file, 0640) == 0);
+	CHECK(setflags(file, 0) == 0);
+
+	/* Immutable directory: nothing made or removed in it. */
+	CHECK(write_file("/tmp/vinix-immutable-dir/keep", "x") == 0);
+	CHECK(setflags(dir, FS_IMMUTABLE_FL) == 0);
+	CHECK(open("/tmp/vinix-immutable-dir/new", O_WRONLY | O_CREAT, 0644) == -1 && errno == EPERM);
+	CHECK(mkdir("/tmp/vinix-immutable-dir/sub", 0755) == -1 && errno == EPERM);
+	CHECK(unlink("/tmp/vinix-immutable-dir/keep") == -1 && errno == EPERM);
+	CHECK(setflags(dir, 0) == 0);
+	CHECK(unlink("/tmp/vinix-immutable-dir/keep") == 0);
+	CHECK(rmdir(dir) == 0);
+
+	/* securelevel: a set bit cannot be cleared above 0, even by root. */
+	CHECK(setflags(file, FS_IMMUTABLE_FL) == 0);
+	CHECK(write_securelevel(1) == 0);
+	CHECK(setflags(file, 0) == -1 && errno == EPERM);
+	CHECK(getflags(file, &flags) == 0 && (flags & FS_IMMUTABLE_FL));
+	/* Raising a bit, without clearing the set one, is still allowed. */
+	CHECK(setflags(file, FS_IMMUTABLE_FL | FS_APPEND_FL) == 0);
+	puts("OPENBSD SECURITY PASS: immutable and append-only files");
+	return 0;
+}
+
 static int run_tests(void)
 {
 	if (run_pledge_tests() != 0 || run_unveil_tests() != 0 || run_signal_tests() != 0
 	    || run_pid_tests() != 0 || run_break_tests() != 0 || run_inherit_tests() != 0
 	    || run_network_tests() != 0 || run_layout_tests() != 0
-	    || run_read_only_tests() != 0)
+	    || run_read_only_tests() != 0 || run_attribute_tests() != 0)
 		return 1;
 	puts("VINIX OPENBSD SECURITY: PASS");
 	return 0;

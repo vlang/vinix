@@ -94,6 +94,7 @@ pub const cap_setgid = 6
 pub const cap_setuid = 7
 pub const cap_setpcap = 8
 pub const cap_net_admin = 12
+pub const cap_linux_immutable = 9
 pub const cap_ipc_owner = 15
 pub const cap_sys_chroot = 18
 pub const cap_sys_ptrace = 19

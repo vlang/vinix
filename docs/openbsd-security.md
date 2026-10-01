@@ -308,6 +308,51 @@ are all the reader's effective IDs, and for a reader with `CAP_SYS_PTRACE`,
 as Linux's ptrace check has it. Anyone else's read fails with `EACCES`. The
 rest of `/proc/<pid>`, `stat` and `status` among them, stays public.
 
+## Immutable and append-only files
+
+A file can be sealed, with `chattr(1)`'s `+i` and `+a`, as OpenBSD seals one
+with `schg` and `sappnd`:
+
+- An **immutable** file cannot be changed in any way -- not its data, its
+  mode, its owner, its times, its extended attributes or its name -- and
+  nothing can be made or removed in an immutable directory. A write, chmod,
+  chown, truncate, rename, unlink or hard link to it fails with `EPERM`.
+- An **append-only** file opens for writing only in append mode, never to be
+  truncated, and cannot be deleted or renamed; its metadata may still change.
+  An append-only directory takes new entries but gives none up.
+
+The bits are Linux's `FS_IMMUTABLE_FL` and `FS_APPEND_FL`, set and read with
+`FS_IOC_SETFLAGS` and `FS_IOC_GETFLAGS` (what `chattr` and `lsattr` use), and
+kept per inode: on tmpfs in memory, on ext2 in the on-disk `i_flags`, where
+they are the same bit values, so a sealed file on disk stays sealed across a
+remount. Setting them needs `CAP_LINUX_IMMUTABLE`.
+
+The enforcement is at every place a file or a directory entry changes, beside
+the read-only-mount checks already there, since a resolved symbolic link must
+not redirect the operation past the check.
+
+## securelevel
+
+`kern.securelevel`, at `/proc/sys/kernel/securelevel`, is OpenBSD's lock on
+the running system:
+
+| | |
+| --- | --- |
+| -1 | permanently insecure: as 0, and init does not raise it |
+| 0 | insecure: the usual permissions, the default |
+| 1 | secure: a set immutable or append-only bit cannot be cleared, even by root |
+| 2 | highly secure: as 1 |
+
+It can always be raised, by root with `CAP_SYS_ADMIN`; once it is above 0,
+only `init` (pid 1) can lower it, as OpenBSD lowers it on the way to
+single-user mode. So a file sealed immutable at securelevel 1 stays sealed for
+as long as the machine runs multi-user, which is what `schg` at securelevel 1
+guarantees on OpenBSD.
+
+`tests/openbsd-security` seals a file and a directory immutable and
+append-only, checks that each kind of change is refused, and that at
+securelevel 1 the bits can no longer be cleared.
+
 ## Already in place
 
 These came before and are unchanged: W^X for user mappings, `mimmutable(2)`

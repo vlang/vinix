@@ -261,6 +261,9 @@ pub fn syscall_mknodat(_ voidptr, dirfd int, _path charptr, mode u32, dev u64) (
 	if read_only(parent_of_tgt_node) {
 		return errno.err, errno.erofs
 	}
+	if !attr_allows_dir_add(parent_of_tgt_node) {
+		return errno.err, errno.get()
+	}
 	require_access(parent_of_tgt_node, access_write | access_exec) or {
 		return errno.err, errno.get()
 	}

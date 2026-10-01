@@ -11,6 +11,7 @@ pub const filesystem_unmount = 'filesystem/unmount'
 pub const system_hostname_set = 'system/hostname/set'
 pub const system_domainname_set = 'system/domainname/set'
 pub const system_reboot = 'system/reboot'
+pub const system_securelevel_set = 'system/securelevel/set'
 
 // A selector has to be explicitly listed here. Unknown operations fail closed.
 // Each operation requires an effective UID of zero and the Linux capability
@@ -18,7 +19,8 @@ pub const system_reboot = 'system/reboot'
 // cannot mount or rename the machine even as root.
 pub fn permitted(selector string) bool {
 	capability := match selector {
-		filesystem_mount, filesystem_unmount, system_hostname_set, system_domainname_set {
+		filesystem_mount, filesystem_unmount, system_hostname_set, system_domainname_set,
+		system_securelevel_set {
 			proc.cap_sys_admin
 		}
 		system_reboot {

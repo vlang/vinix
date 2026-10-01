@@ -45,6 +45,16 @@ pub mut:
 	allocated_pages u64
 	// Extended attributes, nil until one is set; see xattr.v.
 	xattrs &XAttrSet = unsafe { nil }
+	// chattr's immutable and append-only bits; see fs/attributes.v.
+	attr_bits u32
+}
+
+fn (mut this TmpFSResource) attribute_bits() u32 {
+	return this.attr_bits
+}
+
+fn (mut this TmpFSResource) set_attribute_bits(bits u32) ? {
+	this.attr_bits = bits & resource.attributes_kept
 }
 
 // A file larger than this lives in individual pages rather than in one buffer.

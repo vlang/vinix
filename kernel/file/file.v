@@ -868,6 +868,10 @@ pub fn syscall_ftruncate(_ voidptr, fdnum int, length i64) (u64, u64) {
 	if handle.flags & resource.o_accmode == resource.o_rdonly {
 		return errno.err, errno.einval
 	}
+	// An immutable or append-only file cannot be truncated.
+	if resource.is_protected(mut res) {
+		return errno.err, errno.eperm
+	}
 
 	res.grow(voidptr(handle), u64(length)) or { return errno.err, errno.get() }
 
@@ -960,6 +964,12 @@ pub fn syscall_pwrite(_ voidptr, fdnum int, buf voidptr, count u64, offset i64) 
 	if access != resource.o_wronly && access != resource.o_rdwr {
 		return errno.err, errno.ebadf
 	}
+	// pwrite names an offset, which an append-only file does not take, nor an
+	// immutable one any write at all. An O_APPEND file would otherwise be
+	// overwritten in place through this, past Handle.write's append.
+	if resource.is_protected(mut res) {
+		return errno.err, errno.eperm
+	}
 
 	allowed := limited_write_count(res, u64(offset), count) or {
 		return errno.err, errno.get()
@@ -1024,6 +1034,11 @@ pub fn syscall_fallocate(_ voidptr, fdnum int, mode int, offset i64, length i64)
 			return errno.err, errno.espipe
 		}
 		return errno.err, errno.enodev
+	}
+	// An immutable or append-only file is not grown this way either; Linux's
+	// vfs_fallocate refuses both.
+	if resource.is_protected(mut res) {
+		return errno.err, errno.eperm
 	}
 
 	end := u64(offset) + u64(length)
