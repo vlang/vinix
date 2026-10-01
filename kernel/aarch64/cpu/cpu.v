@@ -51,6 +51,45 @@ pub fn enable_el0_cache_access() {
 	write_sctlr_el1(read_sctlr_el1() | sctlr_dze | sctlr_uct | sctlr_uci)
 }
 
+// PSTATE.PAN. While it is set, an access from the kernel to a page userspace
+// can reach takes a permission fault.
+pub const pstate_pan = u64(1) << 22
+
+fn read_id_aa64mmfr1_el1() u64 {
+	mut ret := u64(0)
+	asm volatile aarch64 {
+		mrs ret, id_aa64mmfr1_el1
+		; =r (ret)
+		; ; memory
+	}
+	return ret
+}
+
+// FEAT_PAN, ARMv8.1.
+pub fn has_pan() bool {
+	return (read_id_aa64mmfr1_el1() >> 20) & 0xf != 0
+}
+
+// PSTATE.PAN where PAN is on, and 0 where it is not: what a kernel context's
+// saved PSTATE is made with, when it is made rather than taken from an
+// exception. yield_dispatch reads it by its linker symbol; see
+// asm/aarch64/sched_switch.S.
+@[export: 'kernel_pstate_pan']
+__global kernel_pstate_pan u64
+
+// Set PAN on this CPU, and have every exception into the kernel set it:
+// SCTLR_EL1.SPAN is the bit that would leave it as the interrupted code had
+// it.
+pub fn enable_pan() {
+	kernel_pstate_pan = pstate_pan
+	sctlr_span := u64(1) << 23
+	write_sctlr_el1(read_sctlr_el1() & ~sctlr_span)
+	asm volatile aarch64 {
+		msr pan, 1
+		; ; ; memory
+	}
+}
+
 pub fn read_ttbr0_el1() u64 {
 	mut ret := u64(0)
 	asm volatile aarch64 {

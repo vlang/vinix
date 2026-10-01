@@ -1,3 +1,4 @@
+@[has_globals]
 module initialisation
 
 import x86.gdt
@@ -21,10 +22,17 @@ fn C.syscall_entry()
 fn C.syscall32_entry()
 
 const cpuid7_ebx_smep = u32(1) << 7
+const cpuid7_ebx_smap = u32(1) << 20
+const cr4_smap = u64(1) << 21
 const cpuid7_ecx_umip = u32(1) << 2
 const cr0_write_protect = u64(1) << 16
 const cr4_umip = u64(1) << 11
 const cr4_smep = u64(1) << 20
+
+// Whether the interrupt thunks execute CLAC. They address it by its linker
+// symbol: see asm/int_thunks_asm.S.
+@[export: 'smap_enabled']
+__global smap_enabled u8
 
 pub fn initialise(smp_info &limine.LimineSMPInfo) {
 	mut cpu_local := unsafe { &cpulocal.Local(smp_info.extra_argument) }
@@ -114,6 +122,30 @@ pub fn initialise(smp_info &limine.LimineSMPInfo) {
 		cpu.write_cr4(cr4)
 		if cpu_number == 0 {
 			println('security: SMEP enabled')
+		}
+	}
+
+	// And SMAP, which OpenBSD has enabled since 5.3: a supervisor-mode access
+	// to a userspace page faults unless EFLAGS.AC is set. The kernel never
+	// sets it. Its copies to and from a process go through the direct map, so
+	// what faults is a path that follows a user pointer as it stands; see
+	// memory/user_guard.v.
+	if memory.user_guard_requested() != memory.user_guard_off {
+		if smep_supported && smep_ebx & cpuid7_ebx_smap != 0 {
+			// The interrupt thunks clear AC from here on.
+			smap_enabled = 1
+			cr4 = cpu.read_cr4()
+			cr4 |= cr4_smap
+			cpu.write_cr4(cr4)
+			if cpu_number == 0 {
+				println(if memory.user_guard_auditing() {
+					'security: SMAP enabled, auditing'
+				} else {
+					'security: SMAP enabled'
+				})
+			}
+		} else {
+			memory.user_guard_unsupported()
 		}
 	}
 

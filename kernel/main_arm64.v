@@ -6,6 +6,7 @@ import term
 import lib.stubs
 import aarch64.cpu
 import aarch64.cpu.local as cpulocal
+import aarch64.cpu.initialisation
 import aarch64.exception
 import aarch64.firmware
 import aarch64.aic
@@ -174,6 +175,7 @@ fn bootstrap_cpu0() {
 	cpu_locals << cpu_local
 	cpu.write_tpidr_el1(0)
 	cpu.enable_el0_cache_access()
+	initialisation.enable_user_guard(true)
 	cpu.init_fpu_globals()
 	print('CPU 0 bootstrap done\n')
 }

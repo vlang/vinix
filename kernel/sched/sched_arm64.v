@@ -1247,7 +1247,9 @@ pub fn new_kernel_thread(pc voidptr, arg voidptr, autoenqueue bool) &proc.Thread
 		sp: stack
 		// Kernel-context marker plus masked DAIF. The assembly restore maps
 		// EL1h to the current handler level (EL2h on Apple VHE).
-		pstate: 0x3c5
+		// PAN, where it is on, from the thread's first instruction: it takes no
+		// exception that would set it on the way in.
+		pstate: u64(0x3c5) | kernel_pstate_pan
 	}
 
 	fpu_storage_phys := memory.pmm_alloc(lib.div_roundup(fpu_storage_size, page_size))

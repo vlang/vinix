@@ -41,6 +41,14 @@ interrupt_thunk_\num:
     mov %eax, %es
     mov %eax, %ss
 
+    // SMAP holds only while AC is clear, and an interrupt leaves AC as the
+    // interrupted code had it: userspace can set it. SYSCALL clears it through
+    // the flags mask. CLAC is an invalid opcode on a CPU without SMAP.
+    cmpb $0, smap_enabled(%rip)
+    je 5f
+    clac
+5:
+
     mov $\num, %rdi
     mov $(\num * 8), %rax
     lea interrupt_table(%rip), %rbx

@@ -47,6 +47,9 @@
 # VINIX_QEMU_AUDIO picks where the guest's /dev/dsp plays: a QEMU audiodev
 # driver (coreaudio, the default on macOS; none elsewhere), wav:PATH to record
 # everything the guest plays into a WAV file, or off for no sound card.
+#
+# VINIX_CMDLINE adds options to the kernel's command line, such as
+# vinix.user_access=audit (docs/openbsd-security.md).
 set -eo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -515,6 +518,10 @@ fi
 
 if [ "$FAKE_G17" -eq 1 ]; then
     sed -E -i '' '/^[[:space:]]*cmdline:/ s#$# vinix.fake_g17=1#' "$LIMINE_CONF_QEMU"
+fi
+
+if [ -n "${VINIX_CMDLINE:-}" ]; then
+    sed -E -i '' "/^[[:space:]]*cmdline:/ s#\$# $VINIX_CMDLINE#" "$LIMINE_CONF_QEMU"
 fi
 
 # Install, or reinstall, the whole system onto the persistent volume.

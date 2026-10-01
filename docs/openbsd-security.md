@@ -407,6 +407,50 @@ lost nothing to the failed call, and that transfers larger than one kernel
 buffer, datagrams and records, scattered messages and passed descriptors still
 arrive whole.
 
+## SMAP and PAN
+
+With every transfer going through `usercopy`, the kernel has no reason to
+touch a page of a process at the process's own address, and the CPU can be
+told so. OpenBSD has run with SMAP since 5.3. Vinix turns on SMAP on amd64,
+on any CPU that has it, and PAN on arm64 (ARMv8.1): while the bit is set, an
+access from the kernel to a page userspace can reach faults. A kernel bug
+that follows a pointer an attacker chose -- a null function table, a
+corrupted object -- can no longer be steered at memory the attacker prepared.
+
+On amd64 the bit holds only while `EFLAGS.AC` is clear. `SYSCALL` clears it
+through the flags mask, and every interrupt entry executes `CLAC`, since
+userspace can set AC and an interrupt leaves it as it was. On arm64, clearing
+`SCTLR_EL1.SPAN` has every exception into the kernel set `PSTATE.PAN`, and
+kernel threads start with it set and keep it across a sleep.
+
+`vinix.user_access=` on the kernel command line chooses what a violation
+does:
+
+| | |
+| --- | --- |
+| `strict` | the fault is a kernel fault, as on OpenBSD. The default |
+| `audit` | the access is let through, and the kernel address is logged, once for each path |
+| `off` | the bit stays clear |
+
+An audit is how the conversion was done, and how to find a path it missed. The
+log has a `user-access:` line for each one, and
+`tests/user-access/sites.py kernel/bin/vinix < serial.log` names the function
+and what called it:
+
+```
+wrote memcpy < pipe__Pipe__read < resource__Resource__read < file__Handle__read < fs__syscall_read
+read  stubs__strlen < strlen < vstrlen < tos2 < cstring_to_vstring < fs__user_path < fs__syscall_openat
+```
+
+`VINIX_CMDLINE=vinix.user_access=audit` passes the option through
+`run-aarch64.sh` and the amd64 test ISO. A debug kernel (`PROD=false`) audits
+unless told otherwise, since it traces each syscall's path argument where the
+process has it.
+
+On Apple hardware the kernel runs at EL2. PAN works the same way there, but
+it has only been run at EL1, under QEMU, so on those machines it stays off
+until `vinix.user_access=audit` or `strict` asks for it.
+
 ## Already in place
 
 These came before and are unchanged: W^X for user mappings, `mimmutable(2)`
@@ -414,8 +458,7 @@ and immutable ELF text, randomized `mmap`, PIE, interpreter and stack
 placement, SMEP, UMIP, NXE and `CR0.WP` on amd64, and PXN on every user page
 on arm64.
 
-Not yet: SMAP and PAN, the CPU's own enforcement of the rule above.
-`MAP_STACK` checking and syscall-origin pinning (`pinsyscalls`) would
+Not yet: `MAP_STACK` checking and syscall-origin pinning (`pinsyscalls`) would
 break Go and statically linked Linux programs, which make syscalls from their
 own text and run on stacks that were never mapped with `MAP_STACK`. Mapping
 program text execute-only (`xonly`) is native on arm64 but needs memory

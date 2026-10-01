@@ -158,7 +158,12 @@ yield_dispatch:
 
     // A non-zero saved mode marks this as kernel context. sched_switch_context
     // replaces EL1h with the current EL's handler mode before every eret.
+    // With PAN where the machine has it on: a thread that sleeps in the kernel
+    // comes back as protected as it went.
     mov x2, #0x5
+    adrp x3, kernel_pstate_pan
+    ldr x3, [x3, #:lo12:kernel_pstate_pan]
+    orr x2, x2, x3
     str x2, [sp, #264]
 
     // Call handler(gpr_state_ptr): x0 = GPRState*, handler = saved x0
