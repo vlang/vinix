@@ -168,7 +168,7 @@ fn linux_getdents(gpr_state voidptr, fdnum int, dirp u64, count u64, legacy bool
 	mut offset := u64(0)
 	for {
 		mut dirent := stat.Dirent{}
-		ret, err := fs.syscall_readdir(gpr_state, fdnum, mut &dirent)
+		ret, err := fs.syscall_readdir(gpr_state, fdnum, mut dirent)
 		if err != 0 {
 			return if offset != 0 { offset, u64(0) } else { ret, err }
 		}
