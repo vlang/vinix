@@ -408,9 +408,8 @@ const reap_claim_stopped = 2
 // of its siblings: it is off every CPU when this returns, and never runs
 // again. The caller has marked it dead, so no wakeup can put it back. A thread
 // that is already on its way out through dequeue_and_die() is left to go by
-// itself -- it never lets go of its lock, so waiting for that would be waiting
-// forever -- and its stacks are then its own CPU's to give back. Otherwise
-// they are buried here.
+// itself: its own CPU has claimed reaping after the final switch. Otherwise
+// its stacks are buried here.
 pub fn stop_thread_for_good(_thread &proc.Thread) {
 	mut t := unsafe { _thread }
 	if voidptr(t) == voidptr(proc.current_thread()) {
@@ -442,6 +441,7 @@ pub fn stop_thread_for_good(_thread &proc.Thread) {
 	}
 	set_itimer_real(t, 0, 0)
 	if katomic.cas(mut &t.reap_claim, u32(0), u32(reap_claim_stopped)) {
+		proc.linuxkpi_mark_task_dead(mut t)
 		bury_thread(t)
 	}
 }
@@ -528,6 +528,7 @@ pub fn dequeue_and_die() {
 	}
 	mut t := proc.current_thread()
 	t.is_dead = true
+	proc.linuxkpi_mark_task_dead(mut t)
 	// A sibling's exit_group() may be stopping this thread at the same time.
 	// Whichever of the two claims it gives back its stacks.
 	claimed := katomic.cas(mut &t.reap_claim, u32(0), u32(reap_claim_self))
@@ -577,11 +578,9 @@ pub fn reschedule() {
 }
 
 pub fn new_kernel_thread(pc voidptr, arg voidptr, autoenqueue bool) &proc.Thread {
-	mut stacks := []voidptr{}
-
 	stack_phys := memory.pmm_alloc(stack_size / page_size)
-	stacks << stack_phys
 	stack := u64(stack_phys) + stack_size + higher_half
+	pf_stack_phys := memory.pmm_alloc(stack_size / page_size)
 	// IRET enters the function without CALL pushing a return address. The
 	// SysV ABI still requires (RSP + 8) to be 16-byte aligned at entry, so
 	// reserve that word within the owned stack rather than starting at its top.
@@ -606,11 +605,10 @@ pub fn new_kernel_thread(pc voidptr, arg voidptr, autoenqueue bool) &proc.Thread
 		gpr_state: gpr_state
 		timeslice: 5000
 		running_on: u64(-1)
-		stacks: stacks
+		kernel_stack: stack
+		pf_stack: u64(pf_stack_phys) + stack_size + higher_half
 		fpu_storage: voidptr(u64(memory.pmm_alloc(lib.div_roundup(fpu_storage_size, page_size))) + higher_half)
 	}
-
-	unsafe { stacks.free() }
 
 	t.self = voidptr(t)
 	t.gs_base = u64(voidptr(t))
@@ -886,8 +884,12 @@ fn reap_dead_threads(mut cpu_local cpulocal.Local) {
 	if cpu_local.dying_thread == unsafe { nil } {
 		return
 	}
-	dead := unsafe { &proc.Thread(cpu_local.dying_thread) }
+	mut dead := unsafe { &proc.Thread(cpu_local.dying_thread) }
 	cpu_local.dying_thread = unsafe { nil }
+	// yield(false) clears GS before the interrupt, so the outgoing-thread
+	// branch cannot release this lock. We are now on the scheduler's stack.
+	katomic.store(mut &dead.running_on, u64(-1))
+	katomic.store(mut &dead.l.l, false)
 	reap_thread(dead)
 
 	// The threads it stopped on its way out were taken off their CPUs before

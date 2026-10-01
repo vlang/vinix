@@ -42,6 +42,8 @@ pub mut:
 	timeslice          u64
 	which_event        u64
 	exit_value         voidptr
+	pthread_exited     bool
+	pthread_joinable   u32
 	exited             eventstruct.Event
 	sigentry           u64
 	sigactions         [256]SigAction
@@ -135,6 +137,9 @@ pub mut:
 	// using it after letting go. The reaper does not free a pinned corpse. See
 	// pin_thread().
 	pins int
+	// Intrusive reaper links, protected by sched.reap_deferred_lock.
+	reap_next   &Thread = unsafe { nil }
+	reap_queued bool
 	// Whoever sets this owns taking the thread down: the thread itself on its
 	// way out, or a sibling tearing the process down that has given up waiting
 	// for it. Never both, so nothing is released twice. A word rather than a
@@ -205,24 +210,6 @@ pub fn set_current_thread(cpu_num u64, thrd &Thread) {
 // a thread past the lock it found it under pins it first, while still holding
 // that lock, and unpins it when done; the reaper keeps a pinned corpse until
 // the last pin is gone.
-
-// Pin a thread found under pid_lock or its process' threads_lock, before
-// letting go of that lock.
-pub fn pin_thread(t &Thread) {
-	mut thr := unsafe { t }
-	katomic.inc(mut &thr.pins)
-}
-
-// Give back a pin. The thread may be freed as soon as this returns, so this is
-// the last thing the caller does with it.
-pub fn unpin_thread(t &Thread) {
-	mut thr := unsafe { t }
-	katomic.dec(mut &thr.pins)
-}
-
-pub fn thread_is_pinned(t &Thread) bool {
-	return katomic.load(&t.pins) != 0
-}
 
 // The thread with id `tid`, pinned; the caller unpins it. Nil if there is none.
 pub fn get_thread(tid int) &Thread {

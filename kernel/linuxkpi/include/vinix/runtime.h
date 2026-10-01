@@ -24,6 +24,14 @@ bool vinix_linuxkpi_may_sleep(void);
 bool vinix_linuxkpi_need_resched(void);
 int vinix_linuxkpi_cond_resched(void);
 bool vinix_linuxkpi_task_signal_pending(const void *thread, bool fatal);
+void vinix_linuxkpi_task_get(void *thread);
+void vinix_linuxkpi_task_put(void *thread);
+bool vinix_linuxkpi_task_is_dead(const void *thread);
+bool vinix_linuxkpi_task_queued(const void *thread);
+bool vinix_linuxkpi_task_enqueue(void *thread);
+void vinix_linuxkpi_task_dequeue(void *thread);
+void vinix_linuxkpi_task_park(void);
+void vinix_linuxkpi_task_dead(void *storage);
 void vinix_linuxkpi_task_init(void *storage, void *thread, int pid, int tgid,
                             const char *name, size_t length);
 void vinix_linuxkpi_task_inherit(void *storage, void *thread, int pid, int tgid,
@@ -31,6 +39,7 @@ void vinix_linuxkpi_task_inherit(void *storage, void *thread, int pid, int tgid,
 void *vinix_linuxkpi_task_view(void *storage, void *thread, int pid, int tgid,
                              const char *name, size_t length, bool exiting);
 int vinix_linuxkpi_task_selftest(void);
+int vinix_linuxkpi_task_native_selftest(void);
 void vinix_linuxkpi_refcount_warning(int kind);
 bool vinix_linuxkpi_cpu_has(unsigned int feature);
 void vinix_linuxkpi_fpu_begin(void);

@@ -62,13 +62,29 @@ the complete i915 source tree is not evidence that the driver runs.
   no-reschedule release and deferred rescheduling. `preempt_count` currently
   reports scheduler pins only. Linux IRQ/NMI/softirq context accounting and
   `in_interrupt`/`in_atomic` are not implemented.
-- A borrowed `current` task view embedded in the native x86 Thread, with
+- A `current` task view embedded in the native x86 Thread, with
   initial-namespace PID/TGID queries, a bounded name and a read-only snapshot
   of `PF_EXITING`. Construction copies the program name; clone inherits its
   running parent's name. Queries reflect `PR_SET_NAME`, with the copied
   initial name as fallback, without borrowing mutable process-name storage.
   Native unnumbered kernel threads currently report PID/TGID 0.
   Each x86 Thread reserves a 64-byte view buffer; it needs no allocation.
+- `get_task_struct` and `put_task_struct` retain the native Thread across
+  exit. Reference counts detect unmatched releases and saturate on overflow
+  rather than wrapping to zero. An intrusive deferred-reap list has no fixed
+  corpse limit; the final release collects eligible exited threads even when
+  no further thread exits. Native pthread join/detach use these same pins;
+  x86 kernel threads record both owned stacks for reclamation after switching
+  away. The existing arm64 reaper still reserves the most recent corpse per
+  CPU until that CPU's next exit, because its idle path can use that stack.
+- `set_current_state`, `__set_current_state`, `schedule`, `wake_up_process`
+  and `wake_up_state` support running, interruptible, uninterruptible,
+  killable and idle wait states. State publication has the required full
+  barrier, and a per-task lock serializes queue removal with Linux wakeups.
+  Native signals are checked after removal to avoid lost wakeups. Ordinary
+  signals cannot finish uninterruptible/idle waits or killable waits; their
+  native enqueue makes the task sleep again. Special parked/stopped/frozen
+  states, timeouts and Linux scheduler internals remain unimplemented.
 - `signal_pending` and `fatal_signal_pending` query native pending/masked
   signals and forced thread exit. `need_resched` reports deferred native
   preemption. `cond_resched` voluntarily enters the actual scheduler when
@@ -153,6 +169,14 @@ identity through simulated CPU migration, and check name truncation, padding,
 renaming and child inheritance. The initial name's source buffer is overwritten
 after construction to verify that the view owns its copy. They also cover
 masked SIGTERM, SIGKILL, forced exit and scheduling guards.
+One thousand host wait/wake iterations cover wakes before removal, after
+removal and at the point of sleeping, including state-mask matching and
+disallowed native signal enqueues. The enabled four-CPU guest runs four
+batches of 70 exited workers, alternating early/blocked wakes and join/detach,
+while retaining their task views. It checks reference saturation, ignored
+SIGTERM wakeups, dead-task wake rejection and release of every worker's native
+stacks, FPU buffer and Thread. After warming the native allocator, physical
+free pages return to the baseline.
 
 An enabled kernel runs the allocator/list/sort/tree/IRQ-lock tests 200 times
 and verifies that the physical free-page count returns to its initial value.
@@ -189,13 +213,13 @@ object linking, unresolved-symbol checks and runtime/hardware testing.
 ## Remaining driver integration
 
 The complete i915 build still fails. Ordinary per-CPU storage and scheduler
-pins and borrowed current-task identity now have native implementations.
-Blocking task states/wakeups, retained task references, namespace-relative
+pins, current-task identity, ordinary blocking task states/wakeups and retained
+task references now have native implementations. Namespace-relative
 PID queries, SMP dispatch, interrupt-context accounting and page-table types
 still need a bridge. No `mm` field or dummy address space is exposed.
-The existing `event.pthread_wait` cleanup directly frees a Thread instead of
-using the pin-aware reaper; task retention must wait until every cleanup path
-honors it. A borrowed view must not be used after its running thread exits.
+Borrowed `current` must not be used after exit; callers retaining a view use
+`get_task_struct` before surrendering its running/owned lifetime and release
+it with `put_task_struct`.
 The next work includes these interfaces and substantial
 runtime subsystems:
 

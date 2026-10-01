@@ -3,21 +3,40 @@
 #define VINIX_LINUX_SCHED_H
 #include <linux/types.h>
 #include <linux/preempt.h>
+#include <linux/spinlock_types_raw.h>
 #include <asm/current.h>
 #include <vinix/runtime.h>
 
 #define TASK_COMM_LEN 16
 #define PF_EXITING 0x00000004
-/* A borrowed view embedded in the native Thread. Only current-task access is
- * supported. Retained task references, mm, blocking states and Linux scheduler
- * internals need native lifetime/waiting implementations before being exposed. */
+#define TASK_RUNNING 0x00000000
+#define TASK_INTERRUPTIBLE 0x00000001
+#define TASK_UNINTERRUPTIBLE 0x00000002
+#define TASK_DEAD 0x00000080
+#define TASK_WAKEKILL 0x00000100
+#define TASK_NOLOAD 0x00000400
+#define TASK_KILLABLE (TASK_WAKEKILL | TASK_UNINTERRUPTIBLE)
+#define TASK_IDLE (TASK_UNINTERRUPTIBLE | TASK_NOLOAD)
+#define TASK_NORMAL (TASK_INTERRUPTIBLE | TASK_UNINTERRUPTIBLE)
+/* Embedded in the native Thread. current is borrowed; get_task_struct pins
+ * that owner across exit. Linux address spaces and scheduler internals are
+ * deliberately absent until their native implementations exist. */
 struct task_struct {
     void *vinix_thread;
     int pid, tgid;
     unsigned int flags;
+    unsigned int __state;
+    raw_spinlock_t vinix_wait_lock;
     char comm[TASK_COMM_LEN];
     char vinix_initial_comm[TASK_COMM_LEN];
 };
+void vinix_linuxkpi_set_task_state(unsigned int state);
+#define set_current_state(state) vinix_linuxkpi_set_task_state(state)
+#define __set_current_state(state) vinix_linuxkpi_set_task_state(state)
+#define task_is_running(task) (__atomic_load_n(&(task)->__state, __ATOMIC_RELAXED) == TASK_RUNNING)
+void schedule(void);
+int wake_up_process(struct task_struct *task);
+int wake_up_state(struct task_struct *task, unsigned int state);
 static inline int task_pid_nr(const struct task_struct *task) { return task->pid; }
 static inline int task_tgid_nr(const struct task_struct *task) { return task->tgid; }
 static inline bool need_resched(void) { return vinix_linuxkpi_need_resched(); }

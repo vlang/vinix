@@ -12,12 +12,10 @@ module sched
 import klock
 import proc
 
-const max_deferred_reaps = 64
-
 __global (
 	// Corpses still pinned when their turn to be freed came. See defer_reap().
-	reap_deferred_slots [max_deferred_reaps]&proc.Thread
-	reap_deferred_lock  klock.Lock
+	reap_deferred_head &proc.Thread = unsafe { nil }
+	reap_deferred_lock klock.Lock
 )
 
 // Free `t` now, or once nothing has it pinned.
@@ -30,41 +28,59 @@ fn reap_thread(t &proc.Thread) {
 	reap_deferred()
 }
 
-// A pinned corpse waits here. Pins last only as long as a signal delivery or a
-// sibling's teardown, so the list stays short; one that does not fit is kept
-// for good rather than freed under somebody's feet.
+// An intrusive list needs no allocation and has no fixed capacity. Linux
+// task references can keep more than 64 exited threads alive at once.
 fn defer_reap(t &proc.Thread) {
 	reap_deferred_lock.acquire()
 	defer {
 		reap_deferred_lock.release()
 	}
-	for i := 0; i < max_deferred_reaps; i++ {
-		if unsafe { reap_deferred_slots[i] == nil } {
-			reap_deferred_slots[i] = unsafe { t }
-			return
-		}
+	mut thr := unsafe { t }
+	if thr.reap_queued {
+		return
 	}
+	thr.reap_next = reap_deferred_head
+	thr.reap_queued = true
+	reap_deferred_head = thr
 }
 
 // Free every waiting corpse whose last pin has gone. Nothing can pin a corpse
-// again: it left the tid table and its process' thread list before it died.
-fn reap_deferred() {
-	if !reap_deferred_lock.test_and_acquire() {
-		return
-	}
-	mut ready := unsafe { [max_deferred_reaps]&proc.Thread{} }
-	mut count := 0
-	for i := 0; i < max_deferred_reaps; i++ {
-		t := reap_deferred_slots[i]
-		if unsafe { t == nil } || proc.thread_is_pinned(t) {
-			continue
+// from an unowned pointer: it left the tid table and its process' thread list
+// before it died. Existing reference owners may acquire another pin while the
+// count remains nonzero.
+pub fn reap_deferred() {
+	// The last put must finish a scan even if another CPU just scanned while
+	// its pin was still held. A trylock could leave that corpse forever.
+	reap_deferred_lock.acquire()
+	mut ready := &proc.Thread(unsafe { nil })
+	mut previous := &proc.Thread(unsafe { nil })
+	mut t := reap_deferred_head
+	for t != unsafe { nil } {
+		next := t.reap_next
+		if proc.thread_is_pinned(t) {
+			previous = t
+		} else {
+			if previous == unsafe { nil } {
+				reap_deferred_head = next
+			} else {
+				previous.reap_next = next
+			}
+			t.reap_next = ready
+			t.reap_queued = false
+			ready = t
 		}
-		reap_deferred_slots[i] = unsafe { nil }
-		ready[count] = t
-		count++
+		t = next
 	}
 	reap_deferred_lock.release()
-	for i := 0; i < count; i++ {
-		free_thread_memory(ready[i])
+	for ready != unsafe { nil } {
+		next := ready.reap_next
+		free_thread_memory(ready)
+		ready = next
 	}
+}
+
+// Constructor failure before publication: no CPU or event ever owned t.
+pub fn discard_unstarted_thread(t &proc.Thread) {
+	assert !t.is_in_queue && t.running_on == u64(-1) && !proc.thread_is_pinned(t)
+	free_thread_memory(t)
 }

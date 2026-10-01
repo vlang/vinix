@@ -16,6 +16,7 @@
 #include <linux/percpu.h>
 #include <linux/sched.h>
 #include <linux/sched/signal.h>
+#include <linux/sched/task.h>
 #include <linux/smp.h>
 #include <linux/list.h>
 #include <linux/list_sort.h>
@@ -40,9 +41,69 @@ struct native_task_model {
     u64 pending, masked;
     bool must_exit, exiting;
     unsigned int yields;
+    unsigned int pins;
+    bool dead, queued;
+    pthread_mutex_t queue_lock;
+    pthread_cond_t queue_changed;
+    unsigned int iteration, dequeued, parked;
 };
 static _Thread_local struct native_task_model *native_task;
 static _Thread_local bool resched_pending;
+
+#define HOST_TASK_QUEUE_INIT .queued = true, .queue_lock = PTHREAD_MUTEX_INITIALIZER, \
+                             .queue_changed = PTHREAD_COND_INITIALIZER
+
+void vinix_linuxkpi_task_get(void *thread)
+{
+    struct native_task_model *task = thread;
+    __atomic_fetch_add(&task->pins, 1, __ATOMIC_RELAXED);
+}
+void vinix_linuxkpi_task_put(void *thread)
+{
+    struct native_task_model *task = thread;
+    assert(__atomic_fetch_sub(&task->pins, 1, __ATOMIC_ACQ_REL) != 0);
+}
+bool vinix_linuxkpi_task_is_dead(const void *thread)
+{
+    return __atomic_load_n(&((const struct native_task_model *)thread)->dead, __ATOMIC_ACQUIRE);
+}
+bool vinix_linuxkpi_task_queued(const void *thread)
+{
+    struct native_task_model *task = (void *)thread;
+    assert(!pthread_mutex_lock(&task->queue_lock));
+    bool queued = task->queued;
+    assert(!pthread_mutex_unlock(&task->queue_lock));
+    return queued;
+}
+bool vinix_linuxkpi_task_enqueue(void *thread)
+{
+    struct native_task_model *task = thread;
+    assert(!pthread_mutex_lock(&task->queue_lock));
+    bool alive = !vinix_linuxkpi_task_is_dead(task);
+    if (alive) {
+        task->queued = true;
+        assert(!pthread_cond_signal(&task->queue_changed));
+    }
+    assert(!pthread_mutex_unlock(&task->queue_lock));
+    return alive;
+}
+void vinix_linuxkpi_task_dequeue(void *thread)
+{
+    struct native_task_model *task = thread;
+    assert(task == native_task && !pthread_mutex_lock(&task->queue_lock));
+    task->queued = false;
+    __atomic_store_n(&task->dequeued, task->iteration, __ATOMIC_RELEASE);
+    assert(!pthread_mutex_unlock(&task->queue_lock));
+}
+void vinix_linuxkpi_task_park(void)
+{
+    struct native_task_model *task = native_task;
+    assert(task && vinix_linuxkpi_may_sleep());
+    __atomic_store_n(&task->parked, task->iteration, __ATOMIC_RELEASE);
+    assert(!pthread_mutex_lock(&task->queue_lock));
+    while (!task->queued) assert(!pthread_cond_wait(&task->queue_changed, &task->queue_lock));
+    assert(!pthread_mutex_unlock(&task->queue_lock));
+}
 
 struct task_struct *vinix_linuxkpi_current_task(void)
 {
@@ -54,8 +115,9 @@ struct task_struct *vinix_linuxkpi_current_task(void)
 bool vinix_linuxkpi_task_signal_pending(const void *thread, bool fatal)
 {
     const struct native_task_model *task = thread;
-    if (task->must_exit || (task->pending & (1ULL << 8))) return true;
-    return !fatal && (task->pending & ~task->masked);
+    u64 pending = __atomic_load_n(&task->pending, __ATOMIC_RELAXED);
+    if (task->must_exit || (pending & (1ULL << 8))) return true;
+    return !fatal && (pending & ~task->masked);
 }
 bool vinix_linuxkpi_need_resched(void) { return resched_pending; }
 int vinix_linuxkpi_cond_resched(void)
@@ -70,13 +132,17 @@ int vinix_linuxkpi_cond_resched(void)
 static void *task_worker(void *argument)
 {
     unsigned int index = *(unsigned int *)argument;
-    struct native_task_model model = { .pid = 100 + index, .tgid = 100, .name = "long-task-name-needs-truncation" };
+    struct native_task_model model = { .pid = 100 + index, .tgid = 100,
+        .name = "long-task-name-needs-truncation", HOST_TASK_QUEUE_INIT };
     native_task = &model;
     current_cpu = index;
     char initial_name[] = "initial-name";
     vinix_linuxkpi_task_init(model.storage, &model, model.pid, model.tgid, initial_name, 12);
     memset(initial_name, 'x', sizeof(initial_name));
     struct task_struct *task = current;
+    assert(get_task_struct(task) == task && model.pins == 1);
+    put_task_struct(task);
+    assert(!model.pins && task_is_running(task));
     assert(task_pid_nr(task) == model.pid && task_tgid_nr(task) == 100);
     assert(!strcmp(task->comm, "long-task-name-") && !task->flags);
     for (unsigned int i = 0; i < 1000; i++) {
@@ -96,10 +162,19 @@ static void *task_worker(void *argument)
     assert(!signal_pending(task) && !fatal_signal_pending(task));
     model.pending = 1ULL << 14; /* SIGTERM */
     assert(signal_pending(task) && !fatal_signal_pending(task));
+    set_current_state(TASK_INTERRUPTIBLE);
+    schedule();
+    assert(task_is_running(task) && vinix_linuxkpi_task_queued(&model));
+    set_current_state(TASK_KILLABLE);
+    assert(!signal_pending_state(TASK_KILLABLE, task));
+    __set_current_state(TASK_RUNNING);
     model.masked = model.pending;
     assert(!signal_pending(task) && !fatal_signal_pending(task));
     model.pending |= 1ULL << 8; /* SIGKILL */
     assert(signal_pending(task) && fatal_signal_pending(task));
+    set_current_state(TASK_KILLABLE);
+    schedule();
+    assert(task_is_running(task) && vinix_linuxkpi_task_queued(&model));
     model.pending = model.masked = 0;
     model.must_exit = true;
     assert(signal_pending(task) && fatal_signal_pending(task) && (current->flags & PF_EXITING));
@@ -114,8 +189,81 @@ static void *task_worker(void *argument)
     preempt_enable_no_resched();
     assert(need_resched() && cond_resched() == 1 && !need_resched());
     assert(preempt_depth == 0 && interrupts && model.yields == 1001);
+    assert(!pthread_mutex_destroy(&model.queue_lock) && !pthread_cond_destroy(&model.queue_changed));
     native_task = NULL;
     return NULL;
+}
+
+struct wait_worker_test {
+    struct native_task_model model;
+    struct task_struct *task;
+    unsigned int armed, proceed, completed;
+};
+
+static void *wait_worker(void *argument)
+{
+    struct wait_worker_test *test = argument;
+    native_task = &test->model;
+    struct task_struct *task = current;
+    test->task = get_task_struct(task);
+    for (unsigned int i = 1; i <= 1000; i++) {
+        test->model.iteration = i;
+        static const unsigned int states[] = {
+            TASK_INTERRUPTIBLE, TASK_UNINTERRUPTIBLE, TASK_KILLABLE, TASK_IDLE
+        };
+        set_current_state(states[i % ARRAY_SIZE(states)]);
+        __atomic_store_n(&test->armed, i, __ATOMIC_RELEASE);
+        if (i % 3 == 0)
+            while (__atomic_load_n(&test->proceed, __ATOMIC_ACQUIRE) < i) vinix_linuxkpi_spin_wait();
+        schedule();
+        assert(task_is_running(task) && vinix_linuxkpi_task_queued(native_task));
+        __atomic_store_n(&test->completed, i, __ATOMIC_RELEASE);
+    }
+    __atomic_store_n(&test->model.dead, true, __ATOMIC_RELEASE);
+    vinix_linuxkpi_task_dead(test->model.storage);
+    native_task = NULL;
+    return NULL;
+}
+
+static void task_wait_tests(void)
+{
+    struct wait_worker_test test = { .model = {
+        .pid = 123, .tgid = 123, .name = "waiter", HOST_TASK_QUEUE_INIT
+    }};
+    vinix_linuxkpi_task_init(test.model.storage, &test.model, 123, 123, "waiter", 6);
+    pthread_t thread;
+    assert(!pthread_create(&thread, NULL, wait_worker, &test));
+    for (unsigned int i = 1; i <= 1000; i++) {
+        while (__atomic_load_n(&test.armed, __ATOMIC_ACQUIRE) < i) vinix_linuxkpi_spin_wait();
+        if (i % 3 == 1)
+            while (__atomic_load_n(&test.model.dequeued, __ATOMIC_ACQUIRE) < i) vinix_linuxkpi_spin_wait();
+        if (i % 3 == 2)
+            while (__atomic_load_n(&test.model.parked, __ATOMIC_ACQUIRE) < i) vinix_linuxkpi_spin_wait();
+        if (i % 4 != 0) assert(!wake_up_state(test.task, TASK_INTERRUPTIBLE));
+        if (i % 3 != 0 && i % 4 != 0) {
+            /* Vinix's signal delivery uses native enqueue regardless of the
+             * Linux state. SIGTERM cannot end these three wait modes. */
+            __atomic_store_n(&test.model.pending, 1ULL << 14, __ATOMIC_RELAXED);
+            assert(vinix_linuxkpi_task_enqueue(&test.model));
+            while (vinix_linuxkpi_task_queued(&test.model)) vinix_linuxkpi_spin_wait();
+            assert(__atomic_load_n(&test.completed, __ATOMIC_ACQUIRE) < i);
+            assert(!task_is_running(test.task));
+            __atomic_store_n(&test.model.pending, 0, __ATOMIC_RELAXED);
+        }
+        if (i % 4 == 2) assert(wake_up_state(test.task, TASK_WAKEKILL) == 1);
+        else if (i % 4 == 3) assert(wake_up_state(test.task, TASK_NOLOAD) == 1);
+        else assert(wake_up_process(test.task) == 1);
+        /* In the early-wake case, hold the worker until the wake has finished. */
+        if (i % 3 == 0) __atomic_store_n(&test.proceed, i, __ATOMIC_RELEASE);
+        while (__atomic_load_n(&test.completed, __ATOMIC_ACQUIRE) < i) vinix_linuxkpi_spin_wait();
+    }
+    assert(!pthread_join(thread, NULL));
+    assert(test.model.pins == 1 && task_is_running(test.task) == false);
+    assert(test.task->__state == TASK_DEAD && (test.task->flags & PF_EXITING));
+    assert(!wake_up_process(test.task) && !vinix_linuxkpi_task_enqueue(&test.model));
+    put_task_struct(test.task);
+    assert(!test.model.pins);
+    assert(!pthread_mutex_destroy(&test.model.queue_lock) && !pthread_cond_destroy(&test.model.queue_changed));
 }
 
 static void task_tests(void)
@@ -822,6 +970,7 @@ int main(void)
     raw_lock_tests();
     percpu_tests();
     task_tests();
+    task_wait_tests();
     list_tests();
     tree_tests();
     concurrency_tests();
@@ -829,6 +978,6 @@ int main(void)
     reference_tests();
     vinix_linuxkpi_percpu_destroy_for_test();
     assert(live_pages == 0);
-    puts("LinuxKPI: PASS (Linux helpers, allocation/OOM, page-boundary strings, bitmaps, SMP/IRQ locks, per-CPU storage, task views)");
+    puts("LinuxKPI: PASS (Linux helpers, allocation/OOM, page-boundary strings, bitmaps, SMP/IRQ locks, per-CPU storage, task references and wake races)");
     return 0;
 }

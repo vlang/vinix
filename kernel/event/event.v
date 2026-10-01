@@ -325,13 +325,12 @@ pub fn pthread_exit(ret voidptr) {
 
 	mut current_thread := proc.current_thread()
 
+	katomic.store(mut &current_thread.is_dead, true)
 	sched.dequeue_thread(current_thread)
-	leave_for_good(current_thread)
-
 	current_thread.exit_value = ret
+	katomic.store(mut &current_thread.pthread_exited, true)
 	trigger(mut current_thread.exited, false)
-
-	sched.yield(false)
+	sched.dequeue_and_die()
 	// A thread taken off the run queue is never switched back to.
 	for {}
 }
@@ -339,8 +338,14 @@ pub fn pthread_exit(ret voidptr) {
 pub fn pthread_wait(t &proc.Thread) voidptr {
 	mut storage := [&t.exited]!
 	mut events := unsafe { stack_list(&storage[0], storage.len) }
-	await(mut events, true) or {}
+	for !katomic.load(&t.pthread_exited) {
+		await(mut events, true) or { sched.reschedule() }
+	}
 	exit_value := t.exit_value
-	unsafe { free(t) }
+	// pthread_create owns this join reference before the thread can run.
+	// The scheduler frees the thread only once it is off its stacks and its
+	// last reference is gone. It may still be leaving this CPU right now.
+	proc.unpin_thread(t)
+	sched.reap_deferred()
 	return exit_value
 }

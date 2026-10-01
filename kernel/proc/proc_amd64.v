@@ -83,6 +83,8 @@ pub mut:
 	timeslice          u64
 	which_event        u64
 	exit_value         voidptr
+	pthread_exited     bool
+	pthread_joinable   u32
 	exited             eventstruct.Event
 	sigactions         [256]SigAction
 	pending_signals    u64
@@ -134,6 +136,9 @@ pub mut:
 	// References held by code that found this thread under a lock and went on
 	// using it after letting go. See pin_thread().
 	pins int
+	// Intrusive reaper links, protected by sched.reap_deferred_lock.
+	reap_next   &Thread = unsafe { nil }
+	reap_queued bool
 	// A mask sigsuspend(2) installed temporarily. The next handler frame has to
 	// carry the mask from before the call, so that sigreturn restores it.
 	saved_mask       u64
@@ -202,24 +207,6 @@ pub fn current_thread() &Thread {
 // Code that keeps using a thread past the lock it found it under pins it first
 // and unpins it when done. The arm64 reaper holds a pinned corpse back; see the
 // longer note in proc_arm64.v. Shared callers use the same calls on both.
-
-// Pin a thread found under pid_lock or its process' threads_lock, before
-// letting go of that lock.
-pub fn pin_thread(t &Thread) {
-	mut thr := unsafe { t }
-	katomic.inc(mut &thr.pins)
-}
-
-// Give back a pin. The thread may be freed as soon as this returns, so this is
-// the last thing the caller does with it.
-pub fn unpin_thread(t &Thread) {
-	mut thr := unsafe { t }
-	katomic.dec(mut &thr.pins)
-}
-
-pub fn thread_is_pinned(t &Thread) bool {
-	return katomic.load(&t.pins) != 0
-}
 
 // The thread with id `tid`, pinned; the caller unpins it. Nil if there is none.
 pub fn get_thread(tid int) &Thread {

@@ -1235,10 +1235,7 @@ pub fn reschedule() {
 }
 
 pub fn new_kernel_thread(pc voidptr, arg voidptr, autoenqueue bool) &proc.Thread {
-	mut stacks := []voidptr{}
-
 	stack_phys := memory.pmm_alloc(kernel_stack_size / page_size)
-	stacks << stack_phys
 	stack := u64(stack_phys) + kernel_stack_size + higher_half
 
 	gpr_state := cpulocal.GPRState{
@@ -1260,13 +1257,10 @@ pub fn new_kernel_thread(pc voidptr, arg voidptr, autoenqueue bool) &proc.Thread
 		gpr_state: gpr_state
 		timeslice: 5000
 		running_on: u64(-1)
-		stacks: stacks
 		kstack_phys: u64(stack_phys)
 		fpu_storage: voidptr(u64(fpu_storage_phys) + higher_half)
 		fpu_storage_phys: u64(fpu_storage_phys)
 	}
-
-	unsafe { stacks.free() }
 
 	t.self = voidptr(t)
 

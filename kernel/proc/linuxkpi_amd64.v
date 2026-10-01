@@ -4,6 +4,13 @@ module proc
 fn C.vinix_linuxkpi_task_init(voidptr, voidptr, int, int, voidptr, u64)
 fn C.vinix_linuxkpi_task_inherit(voidptr, voidptr, int, int, voidptr)
 fn C.vinix_linuxkpi_task_view(voidptr, voidptr, int, int, voidptr, u64, bool) voidptr
+fn C.vinix_linuxkpi_task_dead(voidptr)
+
+pub fn linuxkpi_mark_task_dead(mut t Thread) {
+	$if linuxkpi ? {
+		C.vinix_linuxkpi_task_dead(voidptr(&t.linuxkpi_task[0]))
+	}
+}
 
 // Called by the three thread constructors before the thread can run.
 // Fresh-process/exec construction owns the program name; clone inherits a

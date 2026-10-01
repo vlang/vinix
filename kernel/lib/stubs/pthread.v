@@ -4,6 +4,8 @@ import lib
 import sched
 import event
 import proc
+import katomic
+import errno
 
 struct C.__thread_data {}
 
@@ -15,21 +17,39 @@ pub fn pthread_create(t &&C.__thread_data, attr &C.__threadattr, start_routine f
 		lib.kpanic(unsafe { nil }, c'pthread_create() called with non-NULL attr')
 	}
 
+	mut thrd := sched.new_kernel_thread(voidptr(start_routine), arg, false)
+	proc.pin_thread(thrd)
+	thrd.pthread_joinable = 1
+	if !sched.enqueue_thread(thrd, false) {
+		proc.unpin_thread(thrd)
+		sched.discard_unstarted_thread(thrd)
+		return errno.eagain
+	}
 	unsafe {
 		mut ptr := &voidptr(t)
-		*ptr = sched.new_kernel_thread(voidptr(start_routine), arg, true)
+		*ptr = thrd
 	}
 	return 0
 }
 
 @[export: 'pthread_detach']
 pub fn pthread_detach(t &C.__thread_data) int {
+	mut thrd := unsafe { &proc.Thread(t) }
+	if !katomic.cas(mut &thrd.pthread_joinable, u32(1), u32(0)) {
+		return errno.einval
+	}
+	proc.unpin_thread(thrd)
+	sched.reap_deferred()
 	return 0
 }
 
 @[export: 'pthread_join']
 pub fn pthread_join(t &C.__thread_data, retval &voidptr) int {
-	value := event.pthread_wait(unsafe { &proc.Thread(t) })
+	mut thrd := unsafe { &proc.Thread(t) }
+	if !katomic.cas(mut &thrd.pthread_joinable, u32(1), u32(0)) {
+		return errno.einval
+	}
+	value := event.pthread_wait(thrd)
 	// C's `void **retval`, which may be NULL when the result is not wanted.
 	if retval != unsafe { nil } {
 		unsafe {

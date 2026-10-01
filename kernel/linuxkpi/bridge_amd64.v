@@ -125,6 +125,57 @@ fn task_signal_pending(owner voidptr, fatal bool) bool {
 	return !fatal && pending & ~katomic.load(&t.masked_signals) != 0
 }
 
+@[export: 'vinix_linuxkpi_task_get']
+fn task_get(owner voidptr) {
+	proc.pin_thread(unsafe { &proc.Thread(owner) })
+}
+
+@[export: 'vinix_linuxkpi_task_put']
+fn task_put(owner voidptr) {
+	proc.unpin_thread(unsafe { &proc.Thread(owner) })
+	// Last put must also collect when no subsequent thread exits.
+	sched.reap_deferred()
+}
+
+@[export: 'vinix_linuxkpi_task_is_dead']
+fn task_is_dead(owner voidptr) bool {
+	t := unsafe { &proc.Thread(owner) }
+	return katomic.load(&t.is_dead)
+}
+
+@[export: 'vinix_linuxkpi_task_queued']
+fn task_queued(owner voidptr) bool {
+	t := unsafe { &proc.Thread(owner) }
+	return katomic.load(&t.is_in_queue)
+}
+
+// Self-test injection follows native signal publication/enqueue ordering.
+@[export: 'vinix_linuxkpi_test_task_signal']
+fn test_task_signal(owner voidptr, pending u64) {
+	mut t := unsafe { &proc.Thread(owner) }
+	katomic.store(mut &t.pending_signals, pending)
+	if pending != 0 {
+		sched.enqueue_thread(t, true)
+	}
+}
+
+@[export: 'vinix_linuxkpi_task_enqueue']
+fn task_enqueue(owner voidptr) bool {
+	return sched.enqueue_thread(unsafe { &proc.Thread(owner) }, false)
+}
+
+@[export: 'vinix_linuxkpi_task_dequeue']
+fn task_dequeue(owner voidptr) {
+	assert owner == voidptr(proc.current_thread())
+	sched.dequeue_thread(unsafe { &proc.Thread(owner) })
+}
+
+@[export: 'vinix_linuxkpi_task_park']
+fn task_park() {
+	assert may_sleep()
+	sched.yield(true)
+}
+
 @[export: 'vinix_linuxkpi_need_resched']
 fn need_resched() bool {
 	ints := cpu.interrupt_toggle(false)
@@ -271,6 +322,7 @@ fn fpu_end() {
 
 fn C.i915_memcpy_init_early(voidptr)
 fn C.vinix_linuxkpi_wc_selftest() int
+fn C.vinix_linuxkpi_task_native_selftest() int
 fn C.vinix_linuxkpi_percpu_bootstrap(u32) int
 
 pub fn initialise() {
@@ -294,6 +346,45 @@ pub fn initialise() {
 		C.kprintf(c'linuxkpi: static and dynamic per-CPU isolation passed on %u CPUs\n',
 			u32(cpu_locals.len))
 		C.kprintf(c'linuxkpi: current task identity and guarded voluntary rescheduling passed\n')
+		// A stack-only probe exercises the native counters without retaining a
+		// real saturated Thread. Never publish this object to the scheduler.
+		mut ref_probe := proc.Thread{}
+		proc.pin_thread(unsafe { &ref_probe })
+		if ref_probe.pins != 1 {
+			lib.kpanic(unsafe { nil }, c'Native thread reference acquire failed')
+		}
+		proc.unpin_thread(unsafe { &ref_probe })
+		if ref_probe.pins != 0 {
+			lib.kpanic(unsafe { nil }, c'Native thread reference release failed')
+		}
+		ref_probe.pins = 0x7ffffffe
+		proc.pin_thread(unsafe { &ref_probe })
+		proc.pin_thread(unsafe { &ref_probe })
+		proc.unpin_thread(unsafe { &ref_probe })
+		if ref_probe.pins != 0x7fffffff {
+			lib.kpanic(unsafe { nil }, c'Native thread references did not saturate')
+		}
+		// Warm the native Thread slab on the CPUs used by the worker test.
+		for _ in 0 .. 3 {
+			if C.vinix_linuxkpi_task_native_selftest() != 0 {
+				lib.kpanic(unsafe { nil }, c'Linux task wait/reference self-test failed')
+			}
+		}
+		task_before := memory.free_bytes()
+		if C.vinix_linuxkpi_task_native_selftest() != 0 {
+			lib.kpanic(unsafe { nil }, c'Linux task wait/reference self-test failed')
+		}
+		// join publishes its result before the target finishes switching away.
+		// Give that final scheduler reaper a chance to finish on another CPU.
+		reap_start := hpet_clock.nanoseconds()
+		for memory.free_bytes() != task_before && hpet_clock.nanoseconds() - reap_start < 1000000000 {
+			sched.reap_deferred()
+			sched.reschedule()
+		}
+		if memory.free_bytes() != task_before {
+			lib.kpanic(unsafe { nil }, c'Linux task self-test retained native pages')
+		}
+		C.kprintf(c'linuxkpi: blocking wakeups, join/detach and 70 retained exited tasks passed; no pages retained\n')
 		// Exercise a real scheduler interrupt with preemption disabled and
 		// IRQs still enabled, rather than relying only on host lock tests.
 		preempt_disable()

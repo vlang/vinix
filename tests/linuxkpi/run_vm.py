@@ -15,6 +15,7 @@ MARKERS = [
     "linuxkpi: static and dynamic per-CPU isolation passed on 4 CPUs",
     "linuxkpi: no-resched preserved pending preemption",
     "linuxkpi: current task identity and guarded voluntary rescheduling passed",
+    "linuxkpi: blocking wakeups, join/detach and 70 retained exited tasks passed; no pages retained",
     "linuxkpi: scheduler deferred preemption while IRQs stayed enabled",
     "and FPU preservation passed",
     "LINUXKPI GUEST: PASS",
@@ -73,7 +74,7 @@ def main():
                     if args.no_linuxkpi and "linuxkpi:" in output:
                         raise RuntimeError("API layer unexpectedly enabled; see " + str(serial))
                     print("Default guest: PASS (4 CPUs, Linux ABI)" if args.no_linuxkpi else
-                          "LinuxKPI guest: PASS (4 CPUs, allocator, raw locks, per-CPU isolation, task identity, bitmaps/strings, scheduler, i915 copy/FPU)")
+                          "LinuxKPI guest: PASS (4 CPUs, allocator, locks, per-CPU storage, task waits/references, scheduler, i915 copy/FPU)")
                     print("Serial log: " + str(serial))
                     return 0
                 if process.poll() is not None:
