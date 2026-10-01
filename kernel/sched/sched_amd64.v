@@ -110,9 +110,17 @@ fn get_next_thread() &proc.Thread {
 
 __global (
 	user_signal_hook voidptr
+	preemption_guard voidptr
 )
 
 type UserSignalHook = fn (&proc.Thread, &cpulocal.GPRState)
+type PreemptionGuard = fn () bool
+
+// A compatibility subsystem can defer a timer switch while holding a Linux
+// spinlock. Registered at boot; the callback runs with interrupts disabled.
+pub fn register_preemption_guard(guard voidptr) {
+	preemption_guard = guard
+}
 
 // userland registers what an interrupt returning to userspace has to do for
 // the thread; it cannot be imported. As on arm64.
@@ -126,6 +134,14 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 	mut cpu_local := cpulocal.current()
 
 	katomic.store(mut &cpu_local.is_idle, false)
+	if preemption_guard != unsafe { nil } {
+		guard := unsafe { PreemptionGuard(preemption_guard) }
+		if !guard() {
+			apic.lapic_eoi()
+			apic.lapic_timer_oneshot(mut cpu_local, scheduler_vector, 1000)
+			return
+		}
+	}
 
 	// Before the run queue is read, so a thread that the poll wakes -- one
 	// waiting on a socket -- can be picked straight away.

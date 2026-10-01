@@ -14,6 +14,18 @@ __global (
 
 type SpinHook = fn ()
 
+// C compatibility locks need the same shootdown progress as native locks.
+pub fn spin_hint() {
+	if spin_hook != unsafe { nil } {
+		hook := unsafe { SpinHook(spin_hook) }
+		hook()
+	}
+	asm volatile amd64 {
+		pause
+		; ; ; memory
+	}
+}
+
 pub fn register_spin_hook(hook voidptr) {
 	spin_hook = hook
 }
@@ -31,14 +43,7 @@ pub fn (mut l Lock) acquire() {
 		if l.test_and_acquire() == true {
 			return
 		}
-		if spin_hook != unsafe { nil } {
-			hook := unsafe { SpinHook(spin_hook) }
-			hook()
-		}
-		asm volatile amd64 {
-			pause
-			; ; ; memory
-		}
+		spin_hint()
 	}
 }
 

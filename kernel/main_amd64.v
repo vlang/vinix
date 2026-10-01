@@ -42,6 +42,7 @@ import time
 import x86.hpet
 import x86.hypervisor
 import limine
+import linuxkpi
 
 // The scheduler's device poll: hand what the network card received to the IP
 // stack, then run the stack's timers -- DHCP, ARP, TCP retransmission.
@@ -52,6 +53,7 @@ fn poll_network() {
 
 fn kmain_thread() {
 	term.framebuffer_init()
+	linuxkpi.initialise()
 
 	table.init_syscall_table()
 	table.init_storage_syscalls()

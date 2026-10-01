@@ -98,7 +98,7 @@ Intel e1000 network cards.
 - [x] NUMA / multi-socket memory topology (see [documentation](docs/numa.md))
 - [x] Real-time scheduling: SCHED_FIFO/RR/DEADLINE (see [documentation](docs/realtime.md))
 - [x] V-UI 2
-- [ ] Intel HD graphics driver (Linux port)
+- [ ] Intel HD graphics driver (Linux port; [compatibility layer status](docs/linux-i915.md))
 ## Build instructions
 
 ### Distro-agnostic build prerequisites

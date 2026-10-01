@@ -373,6 +373,11 @@ pub fn pmm_alloc(count u64) voidptr {
 // (e.g. user-controlled GEM/driver allocations). Unlike pmm_alloc these return
 // nil on out-of-memory instead of panicking, so resource pressure cannot be
 // turned into a kernel panic by a userspace request.
+// IRQ/atomic callers cannot run reclaimers, which can enter filesystem code.
+pub fn pmm_alloc_nozero_nowait(count u64) voidptr {
+	return try_alloc_nozero(count)
+}
+
 pub fn pmm_alloc_nozero_fallible(count u64) voidptr {
 	mut ret := try_alloc_nozero(count)
 	if ret == unsafe { nil } {

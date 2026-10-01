@@ -12,6 +12,22 @@ PREFIX := /usr/local
 # Target architecture: x86_64 (default) or aarch64.
 ARCH ?= x86_64
 
+# Opt-in until the complete i915 kernel API surface is implemented. The
+# imported Linux driver stays byte-for-byte upstream in third_party/.
+LINUXKPI ?= 0
+LINUXKPI_SOURCE_DIR ?= $(abspath ../third_party/linux-i915/linux-6.6.157)
+ifneq ($(LINUXKPI),0)
+ifneq ($(LINUXKPI),1)
+    $(error LINUXKPI must be 0 or 1)
+endif
+ifneq ($(ARCH),x86_64)
+    $(error LINUXKPI currently supports ARCH=x86_64 only)
+endif
+ifeq ($(wildcard $(LINUXKPI_SOURCE_DIR)/.vinix-upstream.json),)
+    $(error Run python3 linuxkpi/upstream.py fetch before enabling LINUXKPI)
+endif
+endif
+
 # User controllable C compiler command.
 CC := cc
 
@@ -195,7 +211,15 @@ endif
 # changes. Keep the selected configuration in the prerequisite name so moving
 # between a QEMU SMP build and a hardware-safe Apple build cannot reuse a
 # stale obj/blob.c.o.
-V_CONFIG_STAMP := obj/.v-config-$(ARCH)-limine-mp-$(LIMINE_MP)-alloc-track-$(ALLOC_TRACK)
+V_CONFIG_STAMP := obj/.v-config-$(ARCH)-limine-mp-$(LIMINE_MP)-alloc-track-$(ALLOC_TRACK)-linuxkpi-$(LINUXKPI)
+
+ifeq ($(LINUXKPI),1)
+    override VFLAGS += -d linuxkpi
+    override CPPFLAGS += -DVINIX_LINUXKPI
+    LINUXKPI_CPPFLAGS := -I linuxkpi/include -I $(LINUXKPI_SOURCE_DIR)/include -Wno-unused-parameter
+    LINUXKPI_OBJ := obj/linuxkpi/list_sort.o obj/linuxkpi/sort.o obj/linuxkpi/rbtree.o
+    obj/c/linuxkpi.c.o: override CPPFLAGS += $(LINUXKPI_CPPFLAGS)
+endif
 
 # ALLOC_TRACK=1 records the call chain of every live slab allocation, for
 # hunting leaks; see c/alloc_track.c. It costs a 7 MiB table and a lock on
@@ -266,15 +290,29 @@ override CFILES := $(shell cd c && find -L * -type f -name '*.c' | LC_ALL=C sort
 # imported `uacpi` package while compiling obj/vsrc.
 override COBJ := $(addprefix obj/c/,$(CFILES:.c=.c.o))
 override ASOBJ := $(addprefix obj/asm/,$(ASFILES:.S=.S.o))
-override OBJ := $(COBJ) $(ASOBJ)
+override OBJ := $(COBJ) $(ASOBJ) $(LINUXKPI_OBJ)
 override HEADER_DEPS := $(addprefix obj/c/,$(CFILES:.c=.c.d)) $(addprefix obj/asm/,$(ASFILES:.S=.S.d))
 
 # Default target. This must come first, before header dependencies.
 .PHONY: all
 all: bin/$(OUTPUT)
+obj/c/linuxkpi.c.o: $(V_CONFIG_STAMP)
+
+ifeq ($(LINUXKPI),1)
+.PHONY: linuxkpi-verify
+linuxkpi-verify:
+	python3 linuxkpi/upstream.py verify --base $(dir $(LINUXKPI_SOURCE_DIR))
+all: linuxkpi-verify
+
+$(LINUXKPI_OBJ) obj/c/linuxkpi.c.o: | linuxkpi-verify
+
+obj/linuxkpi/%.o: $(LINUXKPI_SOURCE_DIR)/lib/%.c GNUmakefile $(V_CONFIG_STAMP)
+	mkdir -p "$(@D)"
+	$(CC) $(CFLAGS) $(CPPFLAGS) $(LINUXKPI_CPPFLAGS) -std=gnu11 -c $< -o $@
+endif
 
 # Include header dependencies.
--include obj/blob.c.d $(HEADER_DEPS)
+-include obj/blob.c.d $(HEADER_DEPS) $(LINUXKPI_OBJ:.o=.d)
 
 # Link rules for building the C compiler runtime.
 cc-runtime-$(ARCH)/cc-runtime.a: GNUmakefile cc-runtime/*
