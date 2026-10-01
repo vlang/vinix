@@ -51,6 +51,9 @@ screenshot. `--cpus` defaults to four; `--engine` selects an instrumented
 engine executable for profiling. Use a normal kernel, without `ALLOC_TRACK`,
 for performance measurements.
 
+The [native validation result](venus-results.md) records the measured release
+build performance, binary hashes, screenshot and other verification.
+
 The accelerated Debian comparison is documented in [kekvm.md](kekvm.md),
 with a guest build and launch helper. It exercises KekVM's Venus backend on
 the Apple GPU, independently of this Vinix desktop test.

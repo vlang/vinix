@@ -1,12 +1,15 @@
 # Native Vinix / KekVM validation
 
 The release ARM64 OpenGothic build rendered the Gothic II public demo's
-opening world at a median **89.63 FPS** over 60 seconds after a 10-second
-warmup (111 Mesa overlay samples). The window rendered at 1280×720 inside
+opening world at a median **83.45 FPS** over 60 seconds after a 10-second
+warmup (115 Mesa overlay samples). The window rendered at 1280×720 inside
 the 2048×1536 Vinix desktop. The host was an Apple M5 Max, with four guest
 vCPUs and 12 GiB guest RAM; other host compiler jobs remained running.
 This validates the opening scene, rather than a complete playthrough.
-Individual samples ranged from 0.94 to 125.58 FPS during host contention.
+Individual samples ranged from 21.57 to 135.95 FPS during host contention.
+The [recorded result](venus-performance.json) includes the exact binary hashes.
+An earlier release run measured 89.63 FPS before integration with the latest
+kernel changes from other sessions.
 
 The [screenshot](../../vinix-opengothic-venus.png) is QEMU's framebuffer
 capture after starting a new game and sending movement input. Its overlay
@@ -31,7 +34,7 @@ Additional checks:
   using the same V compiler. Poll retained bytes fell from 68 to 4 per test
   operation; the ARM64 stat wrapper no longer retained its 192-byte buffer.
 - The allocation warning check reports 155 entries against the repository's
-  allowlist, versus 156 on the base kernel with this compiler. The difference
+  allowlist, versus 156 on base `eabfebf7` with this compiler. The difference
   removes two interface conversions and two heap-promoted poll locals;
   the remaining warnings predate this change. The allowlist was not expanded.
 - A separate review checked new GEM, mapping, fence descriptor and scheduler
