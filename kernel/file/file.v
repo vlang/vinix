@@ -387,30 +387,68 @@ pub fn (mut this Handle) read(buf voidptr, count u64) ?i64 {
 	return ret
 }
 
-// Never pass a userspace buffer to a resource while it holds filesystem or
-// device locks. A missing user page can fault in the middle of that critical
-// section, and the fault handler may need the same resource to page it in.
-// Copy after the resource has returned, in bounded pieces.
+// The largest piece of a read or write that goes through one kernel buffer.
+const user_io_chunk = u64(64 * 1024)
+
+// The most taken at once from what hands over a message: a socket or a pipe.
+// No socket family takes a message longer than this (socket.unix.sock_buf).
+const user_io_message_max = u64(1024 * 1024)
+
+// A transfer this small uses a buffer on the stack.
+const user_io_small = u64(512)
+
+// A resource's read() and write() are given kernel memory, always. What a
+// process reads or writes goes through a kernel buffer here, and to or from
+// the process through usercopy, which is what tells a pointer that leads
+// nowhere, or into the kernel, from one that is the process's own. A resource
+// also must not touch a user page while it holds filesystem or device locks: a
+// missing page faults in the middle of that critical section, and the fault
+// handler may need the same resource to page it in.
 pub fn (mut this Handle) read_to_user(address u64, count u64) ?i64 {
 	if count == 0 {
 		return this.read(unsafe { nil }, 0)
 	}
-	if address == 0 || count - 1 > ~address {
+	if !usercopy.user_range(address, count) {
 		errno.set(errno.efault)
 		return none
 	}
-	buffer := unsafe { malloc(if count < 64 * 1024 { count } else { u64(64 * 1024) }) }
+	mode := this.resource.stat.mode
+	// What a pipe, a socket or a device gives up is gone from it: find out
+	// that there is nowhere to put it before taking it.
+	if !stat.isreg(mode) && !usercopy.writable(address) {
+		errno.set(errno.efault)
+		return none
+	}
+	// A socket or a pipe gives what it has, once: asking again would wait for
+	// more, and would run two messages together.
+	once := stat.issock(mode) || stat.isifo(mode)
+	limit := if once { user_io_message_max } else { user_io_chunk }
+	size := if count < limit { count } else { limit }
+	mut small := [512]u8{}
+	buffer := if size <= user_io_small { unsafe { voidptr(&small[0]) } } else { unsafe { malloc(size) } }
 	if buffer == unsafe { nil } {
 		errno.set(errno.enomem)
 		return none
 	}
-	defer { unsafe { free(buffer) } }
+	defer {
+		if size > user_io_small {
+			unsafe { free(buffer) }
+		}
+	}
+	// A file or a disk is read to the end of what was asked for. A device
+	// gives its first piece as the caller's flags say, and more only if it has
+	// more without waiting: /dev/zero always has, a terminal seldom.
+	waits := stat.isreg(mode) || stat.isblk(mode)
 	mut done := u64(0)
 	for done < count {
-		chunk := if count - done < 64 * 1024 { count - done } else { u64(64 * 1024) }
-		read := this.read(buffer, chunk) or {
-			if done != 0 { return i64(done) }
-			return none
+		chunk := if count - done < size { count - done } else { size }
+		read := if done == 0 || waits {
+			this.read(buffer, chunk) or {
+				if done != 0 { return i64(done) }
+				return none
+			}
+		} else {
+			this.read_without_waiting(buffer, chunk) or { return i64(done) }
 		}
 		if read <= 0 {
 			return i64(done)
@@ -421,9 +459,31 @@ pub fn (mut this Handle) read_to_user(address u64, count u64) ?i64 {
 			return none
 		}
 		done += u64(read)
-		if u64(read) < chunk { break }
+		if once || u64(read) < chunk { break }
 	}
 	return i64(done)
+}
+
+// read(), as if the descriptor were O_NONBLOCK for this one call. The flag is
+// set and cleared under the lock every read of this open file takes.
+fn (mut this Handle) read_without_waiting(buf voidptr, count u64) ?i64 {
+	this.l.acquire()
+	defer {
+		this.l.release()
+	}
+	waited := this.flags & resource.o_nonblock == 0
+	this.flags |= resource.o_nonblock
+	ret := this.resource.read(voidptr(this), buf, u64(this.loc), count) or {
+		if waited {
+			this.flags &= ~resource.o_nonblock
+		}
+		return none
+	}
+	if waited {
+		this.flags &= ~resource.o_nonblock
+	}
+	this.loc += ret
+	return ret
 }
 
 fn limited_write_count(res &resource.Resource, location u64, count u64) ?u64 {
@@ -462,23 +522,39 @@ pub fn (mut this Handle) write(buf voidptr, count u64) ?i64 {
 	return ret
 }
 
+// write(2)'s side of read_to_user(). A long write goes in pieces, which is all
+// a stream promises. A socket's pieces are one byte longer than the longest
+// message any family takes: a stream takes them as it takes any, and a
+// datagram too long to send is refused by its family, with EMSGSIZE, rather
+// than cut in two here.
 pub fn (mut this Handle) write_from_user(address u64, count u64) ?i64 {
 	if count == 0 {
 		return this.write(unsafe { nil }, 0)
 	}
-	if address == 0 || count - 1 > ~address {
+	if !usercopy.user_range(address, count) {
 		errno.set(errno.efault)
 		return none
 	}
-	buffer := unsafe { malloc(if count < 64 * 1024 { count } else { u64(64 * 1024) }) }
+	limit := if stat.issock(this.resource.stat.mode) {
+		user_io_message_max + 1
+	} else {
+		user_io_chunk
+	}
+	size := if count < limit { count } else { limit }
+	mut small := [512]u8{}
+	buffer := if size <= user_io_small { unsafe { voidptr(&small[0]) } } else { unsafe { malloc(size) } }
 	if buffer == unsafe { nil } {
 		errno.set(errno.enomem)
 		return none
 	}
-	defer { unsafe { free(buffer) } }
+	defer {
+		if size > user_io_small {
+			unsafe { free(buffer) }
+		}
+	}
 	mut done := u64(0)
 	for done < count {
-		chunk := if count - done < 64 * 1024 { count - done } else { u64(64 * 1024) }
+		chunk := if count - done < size { count - done } else { size }
 		if !usercopy.copy_from_user(buffer, address + done, chunk) {
 			errno.set(errno.efault)
 			if done != 0 { return i64(done) }
@@ -882,10 +958,19 @@ pub fn syscall_ftruncate(_ voidptr, fdnum int, length i64) (u64, u64) {
 // file description's position.  Keeping the operation under Handle.l makes
 // this atomic with ordinary read/write/lseek on a shared descriptor.
 pub fn syscall_pread(_ voidptr, fdnum int, buf voidptr, count u64, offset i64) (u64, u64) {
+	return pread(fdnum, buf, count, offset, true)
+}
+
+// pread(2) into the kernel's own buffer, for sendfile(2).
+pub fn pread_to_kernel(fdnum int, buf voidptr, count u64, offset i64) (u64, u64) {
+	return pread(fdnum, buf, count, offset, false)
+}
+
+fn pread(fdnum int, buf voidptr, count u64, offset i64, to_user bool) (u64, u64) {
 	if offset < 0 || count > u64(0x7fffffffffffffff) - u64(offset) {
 		return errno.err, errno.einval
 	}
-	if count != 0 && (buf == unsafe { nil } || count - 1 > ~u64(buf)) {
+	if to_user && !usercopy.user_range(u64(buf), count) {
 		return errno.err, errno.efault
 	}
 
@@ -911,14 +996,23 @@ pub fn syscall_pread(_ voidptr, fdnum int, buf voidptr, count u64, offset i64) (
 	if count == 0 {
 		return 0, 0
 	}
-	buffer := unsafe { malloc(if count < 64 * 1024 { count } else { u64(64 * 1024) }) }
+	if !to_user {
+		handle.l.acquire()
+		read := handle.resource.read(voidptr(handle), buf, u64(offset), count) or {
+			handle.l.release()
+			return errno.err, errno.get()
+		}
+		handle.l.release()
+		return u64(read), 0
+	}
+	buffer := unsafe { malloc(if count < user_io_chunk { count } else { user_io_chunk }) }
 	if buffer == unsafe { nil } {
 		return errno.err, errno.enomem
 	}
 	defer { unsafe { free(buffer) } }
 	mut done := u64(0)
 	for done < count {
-		chunk := if count - done < 64 * 1024 { count - done } else { u64(64 * 1024) }
+		chunk := if count - done < user_io_chunk { count - done } else { user_io_chunk }
 		handle.l.acquire()
 		read := handle.resource.read(voidptr(handle), buffer, u64(offset) + done, chunk) or {
 			handle.l.release()
@@ -941,7 +1035,7 @@ pub fn syscall_pwrite(_ voidptr, fdnum int, buf voidptr, count u64, offset i64) 
 	if offset < 0 || count > u64(0x7fffffffffffffff) - u64(offset) {
 		return errno.err, errno.einval
 	}
-	if count != 0 && (buf == unsafe { nil } || count - 1 > ~u64(buf)) {
+	if !usercopy.user_range(u64(buf), count) {
 		return errno.err, errno.efault
 	}
 
@@ -975,14 +1069,14 @@ pub fn syscall_pwrite(_ voidptr, fdnum int, buf voidptr, count u64, offset i64) 
 		return errno.err, errno.get()
 	}
 	if allowed == 0 { return 0, 0 }
-	buffer := unsafe { malloc(if allowed < 64 * 1024 { allowed } else { u64(64 * 1024) }) }
+	buffer := unsafe { malloc(if allowed < user_io_chunk { allowed } else { user_io_chunk }) }
 	if buffer == unsafe { nil } {
 		return errno.err, errno.enomem
 	}
 	defer { unsafe { free(buffer) } }
 	mut done := u64(0)
 	for done < allowed {
-		chunk := if allowed - done < 64 * 1024 { allowed - done } else { u64(64 * 1024) }
+		chunk := if allowed - done < user_io_chunk { allowed - done } else { user_io_chunk }
 		if !usercopy.copy_from_user(buffer, u64(buf) + done, chunk) {
 			if done != 0 { return done, 0 }
 			return errno.err, errno.efault

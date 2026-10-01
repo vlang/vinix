@@ -17,6 +17,7 @@ import resource
 import socket.public as sock_pub
 import stat
 import time
+import usercopy
 
 struct C.vinix_socket {}
 
@@ -1043,7 +1044,11 @@ fn (mut this InetSocket) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 		net_lock.acquire()
 		value := C.vinix_socket_available(this.handle)
 		net_lock.release()
-		unsafe { *&i32(argp) = i32(value) }
+		queued := i32(value)
+		if !usercopy.copy_to_user(u64(argp), voidptr(&queued), sizeof(i32)) {
+			errno.set(errno.efault)
+			return none
+		}
 		return 0
 	}
 	if is_interface_ioctl(request) {

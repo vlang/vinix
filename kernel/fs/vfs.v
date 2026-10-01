@@ -681,15 +681,13 @@ fn fdnum_create_from_node(mut node VFSNode, flags int, oldfd int, specific bool)
 	}
 }
 
-// A path pointer from userspace can be null, and cstring_to_vstring() panics on
-// one -- which let any process stop the machine by passing NULL where a path
-// was expected. Report it as the fault it is instead.
+// PATH_MAX: the longest path a syscall takes, its terminator included.
+pub const path_max = 4096
+
+// A path from userspace, copied in: EFAULT for a pointer that leads nowhere,
+// which read as it stood stopped the machine, and ENAMETOOLONG past PATH_MAX.
 pub fn user_path(pointer charptr) ?string {
-	if pointer == unsafe { nil } {
-		errno.set(errno.efault)
-		return none
-	}
-	return unsafe { cstring_to_vstring(pointer) }
+	return usercopy.copy_cstring_from_user(u64(pointer), path_max)
 }
 
 pub fn syscall_unlinkat(_ voidptr, dirfd int, _path charptr, flags int) (u64, u64) {
@@ -848,7 +846,9 @@ pub fn syscall_readlinkat(_ voidptr, dirfd int, _path charptr, buf voidptr, limi
 		to_copy = limit
 	}
 
-	unsafe { C.memcpy(buf, node.symlink_target.str, to_copy) }
+	if !usercopy.copy_to_user(u64(buf), node.symlink_target.str, to_copy) {
+		return errno.err, errno.efault
+	}
 
 	return to_copy, 0
 }
@@ -1048,6 +1048,18 @@ pub fn syscall_read(_ voidptr, fdnum int, buf voidptr, count u64) (u64, u64) {
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
+	return read_descriptor(fdnum, buf, count, true)
+}
+
+// read(2) into the kernel's own buffer, for the calls built on it: sendfile(2).
+pub fn read_to_kernel(fdnum int, buf voidptr, count u64) (u64, u64) {
+	return read_descriptor(fdnum, buf, count, false)
+}
+
+// `to_user` says whose memory `buf` is, and it is the caller that knows: a
+// buffer that came from a process is never taken for the kernel's, whatever
+// address the process gave.
+fn read_descriptor(fdnum int, buf voidptr, count u64, to_user bool) (u64, u64) {
 	mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.get() }
 	defer {
 		fd.unref()
@@ -1056,8 +1068,7 @@ pub fn syscall_read(_ voidptr, fdnum int, buf voidptr, count u64) (u64, u64) {
 	if access != resource.o_rdonly && access != resource.o_rdwr {
 		return errno.err, errno.ebadf
 	}
-	ret := if stat.isreg(fd.handle.resource.stat.mode)
-		&& u64(buf) < u64(0xffff000000000000) {
+	ret := if to_user {
 		fd.handle.read_to_user(u64(buf), count) or { return errno.err, errno.get() }
 	} else {
 		fd.handle.read(buf, count) or { return errno.err, errno.get() }
@@ -1078,6 +1089,16 @@ pub fn syscall_write(_ voidptr, fdnum int, buf voidptr, count u64) (u64, u64) {
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
+	return write_descriptor(fdnum, buf, count, true)
+}
+
+// write(2) from the kernel's own buffer, for the calls built on it: writev(2)
+// and sendfile(2).
+pub fn write_from_kernel(fdnum int, buf voidptr, count u64) (u64, u64) {
+	return write_descriptor(fdnum, buf, count, false)
+}
+
+fn write_descriptor(fdnum int, buf voidptr, count u64, from_user bool) (u64, u64) {
 	mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.get() }
 	defer {
 		fd.unref()
@@ -1086,8 +1107,7 @@ pub fn syscall_write(_ voidptr, fdnum int, buf voidptr, count u64) (u64, u64) {
 	if access != resource.o_wronly && access != resource.o_rdwr {
 		return errno.err, errno.ebadf
 	}
-	ret := if stat.isreg(fd.handle.resource.stat.mode)
-		&& u64(buf) < u64(0xffff000000000000) {
+	ret := if from_user {
 		fd.handle.write_from_user(u64(buf), count) or { return errno.err, errno.get() }
 	} else {
 		fd.handle.write(buf, count) or { return errno.err, errno.get() }

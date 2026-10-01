@@ -122,6 +122,11 @@ mut:
 
 const linux_iov_max = 1024
 
+// The most writev(2) gathers into one kernel buffer: one byte more than the
+// longest message a socket takes, so that a datagram too long to send is
+// refused by its family rather than cut in two.
+const linux_writev_max = u64(1024 * 1024) + 1
+
 // Validate the complete vector before doing any I/O.  Linux rejects a bad
 // iovcnt, pointer, or aggregate length without partially consuming the file.
 fn validate_linux_iov(iov_ptr u64, iovcnt int) (u64, u64) {
@@ -174,7 +179,12 @@ fn syscall_linux_writev(gpr_state voidptr, fdnum int, iov_ptr u64, iovcnt int) (
 		return 0, 0
 	}
 
-	buffer := unsafe { malloc(total) }
+	// One buffer and one write for anything up to linux_writev_max, which is
+	// every header-and-payload a protocol sends. The vector's lengths are the
+	// caller's to choose, and a buffer of their sum was a kernel allocation of
+	// any size the caller liked: more than this goes out a buffer at a time.
+	size := if total < linux_writev_max { total } else { linux_writev_max }
+	buffer := unsafe { malloc(size) }
 	if buffer == unsafe { nil } {
 		return errno.err, errno.enomem
 	}
@@ -182,18 +192,54 @@ fn syscall_linux_writev(gpr_state voidptr, fdnum int, iov_ptr u64, iovcnt int) (
 		unsafe { free(buffer) }
 	}
 
-	mut offset := u64(0)
+	mut filled := u64(0)
+	mut written := u64(0)
 	for i := 0; i < iovcnt; i++ {
-		iov := read_linux_iov(iov_ptr, i) or { return errno.err, errno.efault }
-		if iov.len == 0 {
-			continue
-		}
-		if !usercopy.copy_from_user(voidptr(u64(buffer) + offset), iov.base, iov.len) {
+		iov := read_linux_iov(iov_ptr, i) or {
+			if written != 0 {
+				return written, 0
+			}
 			return errno.err, errno.efault
 		}
-		offset += iov.len
+		mut taken := u64(0)
+		for taken < iov.len {
+			chunk := if iov.len - taken < size - filled { iov.len - taken } else { size - filled }
+			if !usercopy.copy_from_user(voidptr(u64(buffer) + filled), iov.base + taken, chunk) {
+				if written != 0 {
+					return written, 0
+				}
+				return errno.err, errno.efault
+			}
+			filled += chunk
+			taken += chunk
+			if filled < size {
+				continue
+			}
+			ret, err := fs.write_from_kernel(fdnum, buffer, filled)
+			if err != 0 {
+				if written != 0 {
+					return written, 0
+				}
+				return ret, err
+			}
+			written += ret
+			if ret < filled {
+				return written, 0
+			}
+			filled = 0
+		}
 	}
-	return fs.syscall_write(gpr_state, fdnum, buffer, total)
+	if filled != 0 {
+		ret, err := fs.write_from_kernel(fdnum, buffer, filled)
+		if err != 0 {
+			if written != 0 {
+				return written, 0
+			}
+			return ret, err
+		}
+		written += ret
+	}
+	return written, 0
 }
 
 // uname(buf): struct utsname, six 65-byte fields. `version` and `machine`
@@ -449,9 +495,9 @@ fn syscall_linux_sendfile(gpr_state voidptr, out_fd int, in_fd int, offset_ptr u
 		}
 
 		got, read_error := if positioned {
-			file.syscall_pread(gpr_state, in_fd, buffer, chunk, input_offset)
+			file.pread_to_kernel(in_fd, buffer, chunk, input_offset)
 		} else {
-			fs.syscall_read(gpr_state, in_fd, buffer, chunk)
+			fs.read_to_kernel(in_fd, buffer, chunk)
 		}
 		if read_error != 0 {
 			if total > 0 {
@@ -463,7 +509,7 @@ fn syscall_linux_sendfile(gpr_state voidptr, out_fd int, in_fd int, offset_ptr u
 			break
 		}
 
-		written, write_error := fs.syscall_write(gpr_state, out_fd, buffer, got)
+		written, write_error := fs.write_from_kernel(out_fd, buffer, got)
 		if written < got && !positioned {
 			// read() already advanced the shared input position.  Put back the
 			// suffix the output did not accept.

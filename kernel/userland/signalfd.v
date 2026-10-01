@@ -217,14 +217,8 @@ fn (mut this SignalFD) read(_handle voidptr, buf voidptr, _loc u64, count u64) ?
 		mut info := [16]u64{}
 		signum := take_for_signalfd(current, wanted, mut info)
 		if signum != 0 {
-			if !usercopy.copy_to_user(u64(buf) + done, voidptr(&info[0]), signalfd_siginfo_size) {
-				// Hand the signal back rather than losing it.
-				katomic.bts(mut &current.pending_signals, proc.pending_bit(signum))
-				if done != 0 {
-					break
-				}
-				errno.set(errno.efault)
-				return none
+			unsafe {
+				C.memcpy(voidptr(u64(buf) + done), voidptr(&info[0]), signalfd_siginfo_size)
 			}
 			done += signalfd_siginfo_size
 			continue

@@ -9,6 +9,7 @@ import katomic
 import resource
 import errno
 import lib
+import usercopy
 
 const ctl_mix_read = u64(0xc0345805)
 const ctl_mix_write = u64(0xc0345806)
@@ -170,15 +171,33 @@ fn (mut dev OssMixerDevice) write(_handle voidptr, _buf voidptr, _loc u64, _coun
 	return none
 }
 
+// A mixer request's structure, copied in from the caller and, filled in, back
+// out to it.
+fn mixer_argument(argp voidptr, value voidptr, size u64) ? {
+	if !usercopy.copy_from_user(value, u64(argp), size) {
+		errno.set(errno.efault)
+		return none
+	}
+}
+
+fn mixer_result(argp voidptr, value voidptr, size u64) ? {
+	if !usercopy.copy_to_user(u64(argp), value, size) {
+		errno.set(errno.efault)
+		return none
+	}
+}
+
 fn (mut dev OssMixerDevice) ioctl(handle voidptr, _request u64, argp voidptr) ?int {
 	request := command(_request)
 	match request {
 		ctl_mix_read {
-			mut value := unsafe { &OssMixerValue(argp) }
+			mut value := OssMixerValue{}
+			mixer_argument(argp, voidptr(&value), sizeof(OssMixerValue))?
 			match value.ctrl {
 				2 {
 					mut stream := dev.main_device.stream
 					value.value = i32(stream.volume())
+					mixer_result(argp, voidptr(&value), sizeof(OssMixerValue))?
 					return 0
 				}
 				else {
@@ -188,7 +207,8 @@ fn (mut dev OssMixerDevice) ioctl(handle voidptr, _request u64, argp voidptr) ?i
 			}
 		}
 		ctl_mix_write {
-			mut value := unsafe { &OssMixerValue(argp) }
+			mut value := OssMixerValue{}
+			mixer_argument(argp, voidptr(&value), sizeof(OssMixerValue))?
 			match value.ctrl {
 				2 {
 					mut percentage := int(value.value)
@@ -209,7 +229,8 @@ fn (mut dev OssMixerDevice) ioctl(handle voidptr, _request u64, argp voidptr) ?i
 			}
 		}
 		ctl_mix_extinfo {
-			mut info := unsafe { &OssMixExt(argp) }
+			mut info := OssMixExt{}
+			mixer_argument(argp, voidptr(&info), sizeof(OssMixExt))?
 
 			match info.ctrl {
 				0 {
@@ -226,10 +247,12 @@ fn (mut dev OssMixerDevice) ioctl(handle voidptr, _request u64, argp voidptr) ?i
 						C.memcpy(&root.name, name.str, name.len + 1)
 						name.free()
 					}
+					mixer_result(argp, voidptr(&info), sizeof(OssMixExt))?
 					return 0
 				}
 				1 {
 					info.entry_type = mixt_marker
+					mixer_result(argp, voidptr(&info), sizeof(OssMixExt))?
 					return 0
 				}
 				2 {
@@ -247,6 +270,7 @@ fn (mut dev OssMixerDevice) ioctl(handle voidptr, _request u64, argp voidptr) ?i
 						C.memcpy(&info.ext_name, name.str, name.len + 1)
 						name.free()
 					}
+					mixer_result(argp, voidptr(&info), sizeof(OssMixExt))?
 					return 0
 				}
 				else {
@@ -256,7 +280,8 @@ fn (mut dev OssMixerDevice) ioctl(handle voidptr, _request u64, argp voidptr) ?i
 			}
 		}
 		ctl_mixerinfo {
-			mut info := unsafe { &OssMixerInfo(argp) }
+			mut info := OssMixerInfo{}
+			mixer_argument(argp, voidptr(&info), sizeof(OssMixerInfo))?
 
 			mut text := lib.new_text(32)
 			text.add(dev.main_device.device.name())
@@ -282,6 +307,7 @@ fn (mut dev OssMixerDevice) ioctl(handle voidptr, _request u64, argp voidptr) ?i
 			info.nrext = 3
 			info.priority = 1
 			info.legacy_device = i32(dev.index)
+			mixer_result(argp, voidptr(&info), sizeof(OssMixerInfo))?
 			return 0
 		}
 		else {

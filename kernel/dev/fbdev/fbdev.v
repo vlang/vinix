@@ -12,6 +12,7 @@ import katomic
 import errno
 import lib
 import memory.mmap
+import usercopy
 
 pub struct FramebufferNode {
 pub mut:
@@ -85,15 +86,26 @@ fn (mut this FramebufferNode) write(_handle voidptr, buf voidptr, loc u64, count
 fn (mut this FramebufferNode) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 	match request {
 		ioctl.fbioget_vscreeninfo {
-			unsafe { C.memcpy(argp, &this.info.variable, sizeof(api.FBVarScreenInfo)) }
+			if !usercopy.copy_to_user(u64(argp), voidptr(&this.info.variable), sizeof(api.FBVarScreenInfo)) {
+				errno.set(errno.efault)
+				return none
+			}
 			return 0
 		}
 		ioctl.fbioput_vscreeninfo {
-			unsafe { C.memcpy(&this.info.variable, argp, sizeof(api.FBVarScreenInfo)) }
+			mut variable := api.FBVarScreenInfo{}
+			if !usercopy.copy_from_user(voidptr(&variable), u64(argp), sizeof(api.FBVarScreenInfo)) {
+				errno.set(errno.efault)
+				return none
+			}
+			this.info.variable = variable
 			return 0
 		}
 		ioctl.fbioget_fscreeninfo {
-			unsafe { C.memcpy(argp, &this.info.fixed, sizeof(api.FBFixScreenInfo)) }
+			if !usercopy.copy_to_user(u64(argp), voidptr(&this.info.fixed), sizeof(api.FBFixScreenInfo)) {
+				errno.set(errno.efault)
+				return none
+			}
 			return 0
 		}
 		ioctl.fbioblank {

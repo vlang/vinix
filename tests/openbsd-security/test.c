@@ -23,11 +23,13 @@
 #include <sys/mman.h>
 #include <sys/ioctl.h>
 #include <sys/mount.h>
+#include <sys/sendfile.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
 #include <sys/time.h>
 #include <sys/uio.h>
+#include <sys/un.h>
 #include <sys/wait.h>
 #include <net/if.h>
 #include <netinet/in.h>
@@ -1280,11 +1282,299 @@ static int run_fault_tests(void)
 	return 0;
 }
 
+/* Somewhere in the kernel's image, which is mapped at the same address on
+ * both architectures. */
+#define KERNEL_ADDRESS ((void *)0xffffffff80001000UL)
+
+static int pipe_is_empty(int fd)
+{
+	struct pollfd poll_fd = { .fd = fd, .events = POLLIN };
+	return poll(&poll_fd, 1, 0) == 0;
+}
+
+/* read, write and the socket calls, given a buffer that leads nowhere or into
+ * the kernel. A pipe, a socket and a device used to copy to and from whatever
+ * address the caller gave: write(pipe, kernel address) put kernel memory in
+ * the pipe, and read() wrote the pipe's bytes over the kernel's. */
+static int run_transfer_tests(void)
+{
+	size_t page = (size_t)sysconf(_SC_PAGESIZE);
+	char *bad = mmap(NULL, page, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+	CHECK(bad != MAP_FAILED);
+	void *kernel = KERNEL_ADDRESS;
+	char got[64];
+
+	int fds[2];
+	CHECK(pipe(fds) == 0);
+	CHECK(syscall(SYS_write, fds[1], bad, 16) == -1 && errno == EFAULT);
+	CHECK(syscall(SYS_write, fds[1], kernel, 16) == -1 && errno == EFAULT);
+	CHECK(syscall(SYS_write, fds[1], NULL, 16) == -1 && errno == EFAULT);
+	struct iovec vector[2] = { { "ab", 2 }, { bad, 4 } };
+	CHECK(syscall(SYS_writev, fds[1], vector, 2) == -1 && errno == EFAULT);
+	vector[1].iov_base = kernel;
+	CHECK(syscall(SYS_writev, fds[1], vector, 2) == -1 && errno == EFAULT);
+	CHECK(syscall(SYS_writev, fds[1], bad, 1) == -1 && errno == EFAULT);
+	/* Nothing of any of them reached the pipe. */
+	CHECK(pipe_is_empty(fds[0]));
+
+	/* A read that has nowhere to put what it reads takes nothing. */
+	CHECK(write(fds[1], "transfer", 8) == 8);
+	CHECK(syscall(SYS_read, fds[0], bad, 8) == -1 && errno == EFAULT);
+	CHECK(syscall(SYS_read, fds[0], kernel, 8) == -1 && errno == EFAULT);
+	vector[0].iov_base = bad;
+	CHECK(syscall(SYS_readv, fds[0], vector, 1) == -1 && errno == EFAULT);
+	CHECK(read(fds[0], got, sizeof(got)) == 8 && memcmp(got, "transfer", 8) == 0);
+
+	/* More than one kernel buffer's worth arrives whole and in order. */
+	enum { large = 300000 };
+	unsigned char *pattern = malloc(large), *arrived = malloc(large);
+	CHECK(pattern != NULL && arrived != NULL);
+	for (int i = 0; i < large; i++)
+		pattern[i] = (unsigned char)(i * 31 + (i >> 9));
+	pid_t writer = fork();
+	CHECK(writer >= 0);
+	if (writer == 0) {
+		close(fds[0]);
+		size_t sent = 0;
+		while (sent < large) {
+			ssize_t n = write(fds[1], pattern + sent, large - sent);
+			if (n <= 0)
+				_exit(1);
+			sent += (size_t)n;
+		}
+		_exit(0);
+	}
+	/* Only the writer holds the other end, so that its failing ends the
+	 * read rather than leaving it waiting. */
+	close(fds[1]);
+	size_t total = 0;
+	while (total < large) {
+		ssize_t n = read(fds[0], arrived + total, large - total);
+		CHECK(n > 0);
+		total += (size_t)n;
+	}
+	CHECK(exited_ok(reap(writer)));
+	CHECK(memcmp(pattern, arrived, large) == 0);
+	close(fds[0]);
+
+	/* A device with no end gives all that was asked for in one call, though
+	 * it goes through the kernel's buffer a piece at a time. */
+	int zero = open("/dev/zero", O_RDONLY);
+	CHECK(zero >= 0);
+	memset(arrived, 0xa5, large);
+	CHECK(read(zero, arrived, large) == large);
+	int zeroed = 1;
+	for (int i = 0; i < large; i++)
+		zeroed &= arrived[i] == 0;
+	CHECK(zeroed);
+	close(zero);
+
+	/* A file, by position and by offset. */
+	int file = open("/tmp/transfer", O_CREAT | O_RDWR | O_TRUNC, 0600);
+	CHECK(file >= 0);
+	CHECK(pwrite(file, pattern, large, 0) == large);
+	memset(arrived, 0, large);
+	CHECK(pread(file, arrived, large, 0) == large && memcmp(pattern, arrived, large) == 0);
+	CHECK(syscall(SYS_pread64, file, bad, 16, 0) == -1 && errno == EFAULT);
+	CHECK(syscall(SYS_pread64, file, kernel, 16, 0) == -1 && errno == EFAULT);
+	CHECK(syscall(SYS_pwrite64, file, kernel, 16, 0) == -1 && errno == EFAULT);
+	CHECK(lseek(file, 0, SEEK_SET) == 0);
+	CHECK(syscall(SYS_read, file, kernel, 16) == -1 && errno == EFAULT);
+	CHECK(syscall(SYS_write, file, kernel, 16) == -1 && errno == EFAULT);
+	/* sendfile(2) reads into the kernel's own buffer, with an offset too. */
+	int copy = open("/tmp/transfer.copy", O_CREAT | O_RDWR | O_TRUNC, 0600);
+	CHECK(copy >= 0);
+	off_t offset = 100;
+	CHECK(sendfile(copy, file, &offset, 20000) == 20000 && offset == 20100);
+	CHECK(lseek(file, 50000, SEEK_SET) == 50000);
+	CHECK(sendfile(copy, file, NULL, 10000) == 10000);
+	CHECK(pread(copy, arrived, 30000, 0) == 30000);
+	CHECK(memcmp(arrived, pattern + 100, 20000) == 0);
+	CHECK(memcmp(arrived + 20000, pattern + 50000, 10000) == 0);
+	close(copy);
+	close(file);
+	unlink("/tmp/transfer.copy");
+	unlink("/tmp/transfer");
+
+	/* Sockets: the message, its header, its vectors, its addresses. */
+	int lowest = dup(0);
+	CHECK(lowest >= 0);
+	close(lowest);
+	CHECK(syscall(SYS_socketpair, AF_UNIX, SOCK_STREAM, 0, bad) == -1 && errno == EFAULT);
+	int pair[2];
+	CHECK(socketpair(AF_UNIX, SOCK_STREAM, 0, pair) == 0);
+	/* The refused pair left no descriptors behind. */
+	CHECK(pair[0] == lowest);
+	CHECK(syscall(SYS_sendto, pair[0], bad, 8, 0, NULL, 0) == -1 && errno == EFAULT);
+	CHECK(syscall(SYS_sendto, pair[0], kernel, 8, 0, NULL, 0) == -1 && errno == EFAULT);
+	CHECK(syscall(SYS_sendmsg, pair[0], bad, 0) == -1 && errno == EFAULT);
+	CHECK(syscall(SYS_sendmsg, pair[0], kernel, 0) == -1 && errno == EFAULT);
+	struct iovec piece = { kernel, 8 };
+	struct msghdr message = { .msg_iov = &piece, .msg_iovlen = 1 };
+	CHECK(syscall(SYS_sendmsg, pair[0], &message, 0) == -1 && errno == EFAULT);
+	message.msg_iov = (struct iovec *)bad;
+	CHECK(syscall(SYS_sendmsg, pair[0], &message, 0) == -1 && errno == EFAULT);
+	CHECK(pipe_is_empty(pair[1]));
+	CHECK(send(pair[0], "socket", 6, 0) == 6);
+	CHECK(syscall(SYS_recvfrom, pair[1], bad, 6, 0, NULL, NULL) == -1 && errno == EFAULT);
+	CHECK(syscall(SYS_recvfrom, pair[1], kernel, 6, 0, NULL, NULL) == -1 && errno == EFAULT);
+	CHECK(syscall(SYS_recvmsg, pair[1], bad, 0) == -1 && errno == EFAULT);
+	piece.iov_base = kernel;
+	message.msg_iov = &piece;
+	CHECK(syscall(SYS_recvmsg, pair[1], &message, 0) == -1 && errno == EFAULT);
+	/* None of those took the message. */
+	CHECK(recv(pair[1], got, sizeof(got), 0) == 6 && memcmp(got, "socket", 6) == 0);
+
+	/* A message gathered from two pieces and scattered into two, with a
+	 * descriptor alongside. */
+	int passed[2];
+	CHECK(pipe(passed) == 0);
+	union {
+		struct cmsghdr header;
+		char buffer[CMSG_SPACE(sizeof(int))];
+	} control;
+	memset(&control, 0, sizeof(control));
+	struct iovec out[2] = { { "gathered ", 9 }, { "and scattered", 13 } };
+	struct msghdr sending = {
+		.msg_iov = out,
+		.msg_iovlen = 2,
+		.msg_control = control.buffer,
+		.msg_controllen = sizeof(control.buffer),
+	};
+	struct cmsghdr *header = CMSG_FIRSTHDR(&sending);
+	header->cmsg_level = SOL_SOCKET;
+	header->cmsg_type = SCM_RIGHTS;
+	header->cmsg_len = CMSG_LEN(sizeof(int));
+	memcpy(CMSG_DATA(header), &passed[1], sizeof(int));
+	CHECK(sendmsg(pair[0], &sending, 0) == 22);
+	char first[4], second[32];
+	struct iovec in[2] = { { first, sizeof(first) }, { second, sizeof(second) } };
+	memset(&control, 0, sizeof(control));
+	struct msghdr receiving = {
+		.msg_iov = in,
+		.msg_iovlen = 2,
+		.msg_control = control.buffer,
+		.msg_controllen = sizeof(control.buffer),
+	};
+	CHECK(recvmsg(pair[1], &receiving, 0) == 22);
+	CHECK(memcmp(first, "gath", 4) == 0 && memcmp(second, "ered and scattered", 18) == 0);
+	header = CMSG_FIRSTHDR(&receiving);
+	CHECK(header != NULL && header->cmsg_level == SOL_SOCKET && header->cmsg_type == SCM_RIGHTS);
+	int received_fd;
+	memcpy(&received_fd, CMSG_DATA(header), sizeof(int));
+	CHECK(write(received_fd, "through", 7) == 7);
+	CHECK(read(passed[0], got, sizeof(got)) == 7 && memcmp(got, "through", 7) == 0);
+	close(received_fd);
+	close(passed[0]);
+	close(passed[1]);
+	close(pair[0]);
+	close(pair[1]);
+
+	/* A datagram or a record arrives as it was sent, however it was written
+	 * and read: not cut at a kernel buffer's size, not joined to the next. */
+	enum { record = 100000 };
+	for (int kind = 0; kind < 2; kind++) {
+		int ends[2];
+		CHECK(socketpair(AF_UNIX, kind == 0 ? SOCK_DGRAM : SOCK_SEQPACKET, 0, ends) == 0);
+		struct stat is_socket;
+		CHECK(fstat(ends[0], &is_socket) == 0 && S_ISSOCK(is_socket.st_mode));
+		CHECK(write(ends[0], pattern, record) == record);
+		CHECK(write(ends[0], pattern + record, 1000) == 1000);
+		memset(arrived, 0, large);
+		CHECK(read(ends[1], arrived, large) == record);
+		CHECK(memcmp(arrived, pattern, record) == 0);
+		CHECK(read(ends[1], arrived, large) == 1000);
+		CHECK(memcmp(arrived, pattern + record, 1000) == 0);
+		/* And one longer than any socket takes is refused whole. */
+		enum { too_long = 1024 * 1024 + 4096 };
+		unsigned char *oversize = calloc(1, too_long);
+		CHECK(oversize != NULL);
+		CHECK(write(ends[0], oversize, too_long) == -1 && errno == EMSGSIZE);
+		CHECK(send(ends[0], oversize, too_long, 0) == -1 && errno == EMSGSIZE);
+		struct iovec whole = { oversize, too_long };
+		CHECK(writev(ends[0], &whole, 1) == -1 && errno == EMSGSIZE);
+		struct msghdr long_message = { .msg_iov = &whole, .msg_iovlen = 1 };
+		CHECK(sendmsg(ends[0], &long_message, 0) == -1 && errno == EMSGSIZE);
+		CHECK(pipe_is_empty(ends[1]));
+		free(oversize);
+		close(ends[0]);
+		close(ends[1]);
+	}
+
+	/* A socket address that is missing, or longer than its family's. */
+	int unbound = socket(AF_UNIX, SOCK_STREAM, 0);
+	CHECK(unbound >= 0);
+	CHECK(syscall(SYS_bind, unbound, NULL, 16) == -1 && errno == EFAULT);
+	CHECK(syscall(SYS_connect, unbound, NULL, 16) == -1 && errno == EFAULT);
+	struct {
+		struct sockaddr_un address;
+		char more[32];
+	} long_name;
+	memset(&long_name, 'n', sizeof(long_name));
+	long_name.address.sun_family = AF_UNIX;
+	long_name.address.sun_path[0] = 0;
+	CHECK(syscall(SYS_bind, unbound, &long_name, sizeof(long_name.address) + 16) == -1
+	    && errno == EINVAL);
+	CHECK(syscall(SYS_connect, unbound, &long_name, sizeof(long_name.address) + 16) == -1
+	    && errno == EINVAL);
+	socklen_t name_length = sizeof(long_name);
+	CHECK(syscall(SYS_getsockname, unbound, NULL, &name_length) == -1 && errno == EFAULT);
+	close(unbound);
+
+	/* Addresses, in and out. */
+	int datagram = socket(AF_INET, SOCK_DGRAM, 0);
+	CHECK(datagram >= 0);
+	struct sockaddr_in local = ipv4_address("127.0.0.1", 0);
+	CHECK(syscall(SYS_bind, datagram, bad, sizeof(local)) == -1 && errno == EFAULT);
+	CHECK(syscall(SYS_bind, datagram, kernel, sizeof(local)) == -1 && errno == EFAULT);
+	CHECK(bind(datagram, (struct sockaddr *)&local, sizeof(local)) == 0);
+	socklen_t length = sizeof(local);
+	CHECK(syscall(SYS_getsockname, datagram, bad, &length) == -1 && errno == EFAULT);
+	CHECK(syscall(SYS_getsockname, datagram, &local, bad) == -1 && errno == EFAULT);
+	CHECK(syscall(SYS_getsockname, datagram, kernel, &length) == -1 && errno == EFAULT);
+	length = sizeof(local);
+	CHECK(getsockname(datagram, (struct sockaddr *)&local, &length) == 0);
+	CHECK(length == sizeof(local) && local.sin_family == AF_INET && local.sin_port != 0);
+	/* A buffer too short for the address gets its start, and the length the
+	 * whole address needs. */
+	struct sockaddr_in partial;
+	memset(&partial, 0x5a, sizeof(partial));
+	length = 4;
+	CHECK(getsockname(datagram, (struct sockaddr *)&partial, &length) == 0);
+	CHECK(length == sizeof(local) && partial.sin_port == local.sin_port);
+	CHECK(((unsigned char *)&partial)[4] == 0x5a);
+	int sender = socket(AF_INET, SOCK_DGRAM, 0);
+	CHECK(sender >= 0);
+	CHECK(syscall(SYS_connect, sender, bad, sizeof(local)) == -1 && errno == EFAULT);
+	CHECK(syscall(SYS_sendto, sender, "x", 1, 0, bad, sizeof(local)) == -1 && errno == EFAULT);
+	/* A datagram whose source has nowhere to go is lost, as on Linux; the
+	 * next one arrives with its source. */
+	CHECK(sendto(sender, "lost", 4, 0, (struct sockaddr *)&local, sizeof(local)) == 4);
+	CHECK(sendto(sender, "datagram", 8, 0, (struct sockaddr *)&local, sizeof(local)) == 8);
+	struct sockaddr_in from;
+	memset(&from, 0, sizeof(from));
+	length = sizeof(from);
+	CHECK(syscall(SYS_recvfrom, datagram, got, sizeof(got), 0, bad, &length) == -1
+	    && errno == EFAULT);
+	length = sizeof(from);
+	CHECK(recvfrom(datagram, got, sizeof(got), 0, (struct sockaddr *)&from, &length) == 8);
+	CHECK(memcmp(got, "datagram", 8) == 0 && length == sizeof(from));
+	CHECK(from.sin_family == AF_INET && from.sin_port == htons((uint16_t)local_port(sender)));
+	close(sender);
+	close(datagram);
+
+	free(pattern);
+	free(arrived);
+	CHECK(munmap(bad, page) == 0);
+	puts("OPENBSD SECURITY PASS: a process's buffers are never taken for the kernel's");
+	return 0;
+}
+
 static int run_tests(void)
 {
 	if (run_fault_tests() != 0 || run_pledge_tests() != 0 || run_unveil_tests() != 0 || run_signal_tests() != 0
 	    || run_pid_tests() != 0 || run_break_tests() != 0 || run_inherit_tests() != 0
-	    || run_network_tests() != 0 || run_layout_tests() != 0
+	    || run_network_tests() != 0 || run_transfer_tests() != 0 || run_layout_tests() != 0
 	    || run_read_only_tests() != 0 || run_attribute_tests() != 0)
 		return 1;
 	puts("VINIX OPENBSD SECURITY: PASS");

@@ -27,7 +27,6 @@ import proc
 import time
 import time.sys
 import userland
-import usercopy
 
 #include "apple_speakers.h"
 
@@ -1167,17 +1166,10 @@ fn (mut s SpeakerStream) sync_write(buf voidptr, _loc u64, count u64) ?i64 {
 		if n > count - done {
 			n = count - done
 		}
-		copied := usercopy.copy_from_user(voidptr(region), u64(buf) + done, n)
+		unsafe { C.memcpy(voidptr(region), voidptr(u64(buf) + done), n) }
 		s.lock()
-		C.vinix_apple_speakers_commit(if copied { u32(n) } else { u32(0) })
+		C.vinix_apple_speakers_commit(u32(n))
 		s.unlock()
-		if !copied {
-			if done > 0 {
-				return i64(done)
-			}
-			errno.set(errno.efault)
-			return none
-		}
 		done += n
 		last_progress = time.monotonic_ns()
 	}

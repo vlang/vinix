@@ -20,7 +20,6 @@ import proc
 import time
 import time.sys
 import userland
-import usercopy
 
 const reg_magic = u64(0x000)
 const reg_version = u64(0x004)
@@ -594,13 +593,7 @@ fn (mut s SoundStream) sync_write(buf voidptr, _loc u64, count u64) ?i64 {
 			n = count - done
 		}
 		destination := voidptr(data_virt(s.filling) + u64(s.fill_len))
-		if !usercopy.copy_from_user(destination, u64(buf) + done, n) {
-			if done > 0 {
-				return i64(done)
-			}
-			errno.set(errno.efault)
-			return none
-		}
+		unsafe { C.memcpy(destination, voidptr(u64(buf) + done), n) }
 		s.fill_len += u32(n)
 		done += n
 

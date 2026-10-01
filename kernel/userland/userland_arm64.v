@@ -663,30 +663,17 @@ pub fn syscall_execve(_ voidptr, _path charptr, _argv &charptr, _envp &charptr) 
 	}
 	trace_gpu := path == gpu_desktop_executable
 	gpu_exec_trace(trace_gpu, 'user path copied')
-	// Both vectors are only built here, so growing them can give back what
-	// they outgrow; V otherwise keeps it, and every exec lost it.
-	mut argv := []string{}
-	argv.flags |= .noslices
 	gpu_exec_trace(trace_gpu, 'copying argument vector')
-	for i := 0; true; i++ {
-		unsafe {
-			if _argv[i] == nil {
-				break
-			}
-			argv << cstring_to_vstring(_argv[i])
-		}
+	mut argv := exec_strings_from_user(u64(_argv), exec_total_max) or {
+		unsafe { path.free() }
+		return errno.err, errno.get()
 	}
 	gpu_exec_trace(trace_gpu, 'argument vector copied')
-	mut envp := []string{}
-	envp.flags |= .noslices
 	gpu_exec_trace(trace_gpu, 'copying environment')
-	for i := 0; true; i++ {
-		unsafe {
-			if _envp[i] == nil {
-				break
-			}
-			envp << cstring_to_vstring(_envp[i])
-		}
+	envp := exec_strings_from_user(u64(_envp), exec_total_max - exec_strings_size(argv)) or {
+		unsafe { path.free() }
+		free_exec_strings(mut argv)
+		return errno.err, errno.get()
 	}
 	gpu_exec_trace(trace_gpu, 'environment copied; entering ELF loader')
 
@@ -1361,25 +1348,14 @@ pub fn syscall_execveat(_ voidptr, dirfd int, _path charptr, _argv &charptr, _en
 		}
 	}
 
-	mut argv := []string{}
-	argv.flags |= .noslices
-	for i := 0; true; i++ {
-		unsafe {
-			if _argv[i] == nil {
-				break
-			}
-			argv << cstring_to_vstring(_argv[i])
-		}
+	mut argv := exec_strings_from_user(u64(_argv), exec_total_max) or {
+		unsafe { target.free() }
+		return errno.err, errno.get()
 	}
-	mut envp := []string{}
-	envp.flags |= .noslices
-	for i := 0; true; i++ {
-		unsafe {
-			if _envp[i] == nil {
-				break
-			}
-			envp << cstring_to_vstring(_envp[i])
-		}
+	envp := exec_strings_from_user(u64(_envp), exec_total_max - exec_strings_size(argv)) or {
+		unsafe { target.free() }
+		free_exec_strings(mut argv)
+		return errno.err, errno.get()
 	}
 
 	// The path and both vectors are the exec's now, freed whether it works or

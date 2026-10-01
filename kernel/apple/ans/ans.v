@@ -12,6 +12,7 @@ import lib
 import katomic
 import errno
 import event.eventstruct
+import usercopy
 
 #include "apple_ans.h"
 
@@ -160,6 +161,14 @@ fn (mut this AnsBlock) write(_handle voidptr, buffer voidptr, loc u64, count u64
 	return i64(bytes)
 }
 
+// A block geometry query's answer, copied out to the caller.
+fn block_ioctl_result(argp voidptr, value voidptr, size u64) ? {
+	if !usercopy.copy_to_user(u64(argp), value, size) {
+		errno.set(errno.efault)
+		return none
+	}
+}
+
 fn (mut this AnsBlock) ioctl(_handle voidptr, request u64, argp voidptr) ?int {
 	// BLKFLSBUF has no pointer argument. This driver has no software block
 	// cache to invalidate; issue a real NVMe flush and propagate its failure.
@@ -175,22 +184,22 @@ fn (mut this AnsBlock) ioctl(_handle voidptr, request u64, argp voidptr) ?int {
 	match request {
 		0x1268 { // BLKSSZGET
 			value := i32(this.stat.blksize)
-			unsafe { C.memcpy(argp, &value, sizeof(value)) }
+			block_ioctl_result(argp, voidptr(&value), sizeof(i32))?
 		}
 		0x80081272 { // BLKGETSIZE64: size of THIS namespace/partition view
 			value := u64(this.stat.size)
-			unsafe { C.memcpy(argp, &value, sizeof(value)) }
+			block_ioctl_result(argp, voidptr(&value), sizeof(u64))?
 		}
 		0x1260 { // BLKGETSIZE: count of 512-byte sectors, unsigned long on arm64
 			value := u64(this.stat.size) / 512
-			unsafe { C.memcpy(argp, &value, sizeof(value)) }
+			block_ioctl_result(argp, voidptr(&value), sizeof(u64))?
 		}
 		0x125e { // BLKROGET
 			ans_lock.acquire()
 			writable := this.partition >= 0 && C.vinix_ans_partition_writable(this.ns_index, u32(this.partition)) != 0
 			ans_lock.release()
 			value := i32(if writable { 0 } else { 1 })
-			unsafe { C.memcpy(argp, &value, sizeof(value)) }
+			block_ioctl_result(argp, voidptr(&value), sizeof(i32))?
 		}
 		else {
 			errno.set(errno.enotty)

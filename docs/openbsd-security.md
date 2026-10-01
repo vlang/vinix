@@ -353,43 +353,73 @@ guarantees on OpenBSD.
 append-only, checks that each kind of change is refused, and that at
 securelevel 1 the bits can no longer be cleared.
 
-## Checked copies out of the stat and getcwd syscalls
+## Checked copies to and from userspace
 
-A syscall that writes its result straight through a user-supplied pointer
-panics the kernel when that pointer is bad: a fault at a user address taken
-while the CPU is in the kernel has no handler and brings the machine down, so
-`fstat(fd, (void *)1)` from any process was a one-line local denial of
-service. OpenBSD never dereferences a user pointer directly; every transfer
-goes through `copyin`/`copyout`, which check the address. `fstat`, `fstatat`,
-`stat`, `lstat`, `statx`, `getcwd`, `getdents64`, `getitimer` and `setitimer`
-now do the same: each builds its result in a kernel buffer and copies it out
-through the checked path, and `setitimer` reads its argument in through it, so
-a bad pointer fails with `EFAULT` and the kernel keeps running. On amd64 the
-stat syscalls reached the user buffer directly; on arm64 the stat layout
-conversion and `getdents64` did.
+OpenBSD never dereferences a pointer a process gave it: every transfer goes
+through `copyin`/`copyout`, which check the address. Vinix now does the same.
+`kernel/usercopy` resolves each page through the process's page tables and
+copies through the kernel's own mapping of the page, so a pointer that leads
+nowhere, to a page the process may not write, or into the kernel's half of the
+address space is `EFAULT`.
+
+Three things were wrong before, in rising order:
+
+- A syscall that wrote its result straight through a user pointer took a fault
+  in the kernel when the pointer was bad, and a fault at a user address taken
+  in the kernel had no handler: `fstat(fd, (void *)1)` from any process stopped
+  the machine. `fstat`, `fstatat`, `stat`, `lstat`, `statx`, `getcwd`,
+  `getdents64`, `getitimer`, `setitimer`, `readlinkat`, `socketpair`,
+  `getsockname`, `getpeername` and the block, framebuffer, sound and socket
+  `ioctl`s now build their result in the kernel and copy it out.
+- A path, an `execve` argument or an environment string was read where the
+  process had it, to whatever came first: a terminator or the end of mapped
+  memory. They are copied in now, a page at a time, with `PATH_MAX` for a path
+  and Linux's limits for `execve`: 128 KiB a string, 2 MiB for both vectors. A
+  null `argv` or `envp` is an empty one, as on Linux; it used to be a kernel
+  fault.
+- `read(2)` and `write(2)` on anything but a regular file, and the socket
+  calls, handed the caller's buffer to the driver, which copied to or from
+  that address as it stood, whatever it was. `write(pipe, kernel_address, n)`
+  put `n` bytes of kernel memory in the pipe for the process to read back, and
+  `read(pipe, kernel_address, n)` wrote the pipe's bytes over the kernel's.
+
+So the rule is now the kernel's own, rather than each driver's: a resource's
+`read` and `write`, and every socket family, are given kernel memory only.
+`read`, `write`, `readv`, `writev`, `pread`, `pwrite`, `sendto`, `recvfrom`,
+`sendmsg`, `recvmsg`, `sendmmsg` and `recvmmsg` go through a kernel buffer at
+the syscall, and so do a socket call's addresses, its message header, its
+vectors and its ancillary data. What a pipe, a socket or a device gives up is
+gone from it, so a read first checks that there is somewhere to put it: a
+failed read takes nothing. The calls the kernel builds on its own buffers,
+`sendfile` and `writev`, have their own way in, so that an address is never
+judged the kernel's or the process's by its value.
+
+`writev` and `sendmsg` also sized a kernel allocation by the lengths in the
+caller's vector, as large as the caller liked. They gather 1 MiB at a time
+now: a stream takes that much and says so, and a datagram that is longer is
+`EMSGSIZE`, as it was. A socket address is copied in at no more than its
+family's size: a `sockaddr_un` longer than the structure, which used to run
+past the name the kernel keeps for a socket, is `EINVAL`.
 
 `tests/openbsd-security` makes each of these calls with an unmapped buffer and
-checks for `EFAULT`, and that a valid buffer still returns the right data.
+with a kernel address, checks for `EFAULT`, checks that the pipe or socket
+lost nothing to the failed call, and that transfers larger than one kernel
+buffer, datagrams and records, scattered messages and passed descriptors still
+arrive whole.
 
 ## Already in place
 
 These came before and are unchanged: W^X for user mappings, `mimmutable(2)`
 and immutable ELF text, randomized `mmap`, PIE, interpreter and stack
-placement, checked copies to and from userspace in a growing number of
-syscalls, SMEP, UMIP, NXE and `CR0.WP` on amd64, and PXN on every user page
+placement, SMEP, UMIP, NXE and `CR0.WP` on amd64, and PXN on every user page
 on arm64.
 
-Not yet: SMAP and PAN need the kernel's remaining direct dereferences of user
-pointers converted to checked copies first. The fixed-layout result
-syscalls (the stat family, `getcwd`, `getdents64`, the interval timers) now
-copy through the checked path, but the `read`/`write` family and the
-per-driver `ioctl` handlers still reach a user buffer directly, so enabling
-the hardware bit would fault on them. `MAP_STACK`
-checking and syscall-origin pinning (`pinsyscalls`) would break Go and
-statically linked Linux programs, which make syscalls from their own text
-and run on stacks that were never mapped with `MAP_STACK`. Mapping program
-text execute-only (`xonly`) is native on arm64 but needs memory protection
-keys on amd64, and risks Linux binaries that read their own text.
+Not yet: SMAP and PAN, the CPU's own enforcement of the rule above.
+`MAP_STACK` checking and syscall-origin pinning (`pinsyscalls`) would
+break Go and statically linked Linux programs, which make syscalls from their
+own text and run on stacks that were never mapped with `MAP_STACK`. Mapping
+program text execute-only (`xonly`) is native on arm64 but needs memory
+protection keys on amd64, and risks Linux binaries that read their own text.
 
 ## Calling them
 

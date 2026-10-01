@@ -139,10 +139,7 @@ fn (mut session HypervisorSession) read(_handle voidptr, buf voidptr, loc u64, c
 	remaining := session.vm.memory_size() - loc
 	actual := if count < remaining { count } else { remaining }
 	source := voidptr(u64(session.vm.guest_page(loc / page_size)) + memory_page_offset(loc) + memory_hhdm())
-	if !usercopy.copy_to_user(u64(buf), source, actual) {
-		errno.set(errno.efault)
-		return none
-	}
+	unsafe { C.memcpy(buf, source, actual) }
 	return i64(actual)
 }
 
@@ -156,10 +153,7 @@ fn (mut session HypervisorSession) write(_handle voidptr, buf voidptr, loc u64, 
 		return 0
 	}
 	destination := voidptr(u64(session.vm.guest_page(loc / page_size)) + memory_page_offset(loc) + memory_hhdm())
-	if !usercopy.copy_from_user(destination, u64(buf), count) {
-		errno.set(errno.efault)
-		return none
-	}
+	unsafe { C.memcpy(destination, buf, count) }
 	return i64(count)
 }
 

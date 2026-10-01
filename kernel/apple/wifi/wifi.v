@@ -580,10 +580,7 @@ fn (mut d WifiDevice) read(_ voidptr, output voidptr, _ u64, count u64) ?i64 {
 		error_code(got)
 		return none
 	}
-	if !usercopy.copy_to_user(u64(output), &data[0], u64(got)) {
-		errno.set(errno.efault)
-		return none
-	}
+	unsafe { C.memcpy(output, voidptr(&data[0]), u64(got)) }
 	return i64(got)
 }
 
@@ -593,10 +590,7 @@ fn (mut d WifiDevice) write(_ voidptr, input voidptr, _ u64, count u64) ?i64 {
 		return none
 	}
 	mut data := [1514]u8{}
-	if !usercopy.copy_from_user(&data[0], u64(input), count) {
-		errno.set(errno.efault)
-		return none
-	}
+	unsafe { C.memcpy(voidptr(&data[0]), input, count) }
 	wifi_lock.acquire()
 	defer { wifi_lock.release() }
 	result := C.brcm_m1_write(&data[0], usize(count))

@@ -42,6 +42,7 @@ FEATURE_MARKERS = (
     b"OPENBSD SECURITY PASS: read-only files stay read-only",
     b"OPENBSD SECURITY PASS: immutable and append-only files",
     b"OPENBSD SECURITY PASS: bad user pointers fault rather than panic",
+    b"OPENBSD SECURITY PASS: a process's buffers are never taken for the kernel's",
 )
 REPORT_MARKER = b': pledge "rpath", syscall '
 # The guest's NIC, as both runs give it, and how many connections and

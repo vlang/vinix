@@ -127,6 +127,9 @@ fn command(request u64) u64 {
 	return request & 0xffffffff
 }
 
+// sizeof(oss_longname_t).
+const song_name_max = 64
+
 fn read_int(argp voidptr) ?int {
 	mut value := i32(0)
 	if !usercopy.copy_from_user(&value, u64(argp), sizeof(i32)) {
@@ -226,15 +229,30 @@ fn (mut dev OssDevice) ioctl(handle voidptr, _request u64, argp voidptr) ?int {
 			return 0
 		}
 		ctl_setsong {
-			ptr := unsafe { &char(argp) }
-			dev.song_name = unsafe { cstring_to_vstring(ptr) }
+			// An oss_longname_t: 64 bytes, the terminator among them.
+			name := usercopy.copy_cstring_from_user(u64(argp), song_name_max) or {
+				if errno.get() == errno.enametoolong {
+					errno.set(errno.einval)
+				}
+				return none
+			}
+			dev.l.acquire()
+			old := dev.song_name
+			dev.song_name = name
+			dev.l.release()
+			unsafe { old.free() }
 			return 0
 		}
 		ctl_getsong {
-			ptr := unsafe { &char(argp) }
-			unsafe {
-				C.memcpy(ptr, dev.song_name.str, dev.song_name.len)
-				ptr[dev.song_name.len] = 0
+			mut name := [64]u8{}
+			// Under the lock a SETSONG frees the old name with.
+			dev.l.acquire()
+			length := if dev.song_name.len < song_name_max { dev.song_name.len } else { song_name_max - 1 }
+			unsafe { C.memcpy(voidptr(&name[0]), dev.song_name.str, length) }
+			dev.l.release()
+			if !usercopy.copy_to_user(u64(argp), unsafe { voidptr(&name[0]) }, u64(length) + 1) {
+				errno.set(errno.efault)
+				return none
 			}
 			return 0
 		}

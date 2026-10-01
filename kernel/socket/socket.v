@@ -19,6 +19,59 @@ struct CMsgHdr {
 	cmsg_type  i32
 }
 
+// The largest address any family has: struct sockaddr_storage.
+const sockaddr_max = u32(128)
+
+// The longest message any family takes, and so the most a receive needs room
+// for. A send goes through a buffer one byte longer: a stream takes that much
+// and says so, and a datagram too long to send is refused by its family, with
+// EMSGSIZE, rather than cut short here.
+const message_max = u64(sock_unix.sock_buf)
+
+// The most ancillary data a message carries.
+const control_max = u64(64 * 1024)
+
+// UIO_MAXIOV.
+const iov_max = u64(1024)
+
+// A transfer this small uses a buffer on the stack.
+const small_message = u64(512)
+
+// The socket families are handed kernel memory, always: an address, a
+// message, its ancillary data. The calls here copy each in from the process
+// and each result back out through usercopy, which is what tells a pointer
+// that leads nowhere, or into the kernel, from one that is the process's own.
+
+// An address a process passed, copied into `storage`. A null one stays null:
+// each family says what a missing address means.
+fn address_from_user(addr voidptr, addrlen u32, storage voidptr) ?voidptr {
+	if addr == unsafe { nil } {
+		return unsafe { nil }
+	}
+	if addrlen > sockaddr_max {
+		errno.set(errno.einval)
+		return none
+	}
+	if !usercopy.copy_from_user(storage, u64(addr), addrlen) {
+		errno.set(errno.efault)
+		return none
+	}
+	return storage
+}
+
+// An address on its way out: as much as the caller's buffer holds, and the
+// length the address needs.
+fn address_to_user(addr voidptr, addrlen_ptr u64, storage voidptr, capacity u32, length u32) bool {
+	mut to_copy := if length < capacity { length } else { capacity }
+	if to_copy > sockaddr_max {
+		to_copy = sockaddr_max
+	}
+	if to_copy > 0 && !usercopy.copy_to_user(u64(addr), storage, to_copy) {
+		return false
+	}
+	return usercopy.copy_to_user(addrlen_ptr, voidptr(&length), sizeof(u32))
+}
+
 fn release_passed_fds(mut fds []&file.FD) {
 	for mut fd in fds {
 		fd.unref()
@@ -200,14 +253,18 @@ pub fn syscall_socketpair(_ voidptr, domain int, @type int, protocol int, ret &i
 		flags |= resource.o_nonblock
 	}
 
-	unsafe {
-		ret[0] = i32(file.fdnum_create_from_resource(nil, mut socket0, flags, 0, false) or {
-			return errno.err, errno.get()
-		})
-
-		ret[1] = i32(file.fdnum_create_from_resource(nil, mut socket1, flags, 0, false) or {
-			return errno.err, errno.get()
-		})
+	mut fds := [2]i32{}
+	fds[0] = i32(file.fdnum_create_from_resource(unsafe { nil }, mut socket0, flags, 0, false) or {
+		return errno.err, errno.get()
+	})
+	fds[1] = i32(file.fdnum_create_from_resource(unsafe { nil }, mut socket1, flags, 0, false) or {
+		file.fdnum_close(unsafe { nil }, int(fds[0]), true) or {}
+		return errno.err, errno.get()
+	})
+	if !usercopy.copy_to_user(u64(voidptr(ret)), unsafe { voidptr(&fds[0]) }, sizeof(i32) * 2) {
+		file.fdnum_close(unsafe { nil }, int(fds[0]), true) or {}
+		file.fdnum_close(unsafe { nil }, int(fds[1]), true) or {}
+		return errno.err, errno.efault
 	}
 	return 0, 0
 }
@@ -314,7 +371,15 @@ pub fn syscall_bind(_ voidptr, fdnum int, _addr voidptr, addrlen u32) (u64, u64)
 		unsafe { free(sock) }
 	}
 
-	sock.bind(fd.handle, _addr, addrlen) or { return errno.err, errno.get() }
+	// bind(2) and connect(2) have no meaning for a missing address.
+	if _addr == unsafe { nil } {
+		return errno.err, if addrlen == 0 { errno.einval } else { errno.efault }
+	}
+	mut storage := [128]u8{}
+	address := address_from_user(_addr, addrlen, unsafe { voidptr(&storage[0]) }) or {
+		return errno.err, errno.get()
+	}
+	sock.bind(fd.handle, address, addrlen) or { return errno.err, errno.get() }
 
 	return 0, 0
 }
@@ -367,6 +432,126 @@ pub fn syscall_recvmsg(_ voidptr, fdnum int, msg &sock_pub.MsgHdr, flags int) (u
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
+	mut header := sock_pub.MsgHdr{}
+	if !usercopy.copy_from_user(voidptr(&header), u64(voidptr(msg)), sizeof(sock_pub.MsgHdr)) {
+		return errno.err, errno.efault
+	}
+	ret, err := receive_message(fdnum, mut header, flags)
+	if err != 0 {
+		return ret, err
+	}
+	// The pointers go back as they came; the lengths and flags are the call's.
+	if !usercopy.copy_to_user(u64(voidptr(msg)), voidptr(&header), sizeof(sock_pub.MsgHdr)) {
+		return errno.err, errno.efault
+	}
+	return ret, 0
+}
+
+// recvmsg(2) for a header already copied in, as recvmmsg(2) has each of its
+// own. What the header points at is still the process's; its lengths and flags
+// are updated in place for the caller to copy out.
+pub fn receive_message(fdnum int, mut header sock_pub.MsgHdr, flags int) (u64, u64) {
+	total := iovec_total(header) or { return errno.err, errno.get() }
+	size := if total < message_max { total } else { message_max }
+	// What a socket gives up is gone from it: find out that there is nowhere
+	// to put it before taking it.
+	if size != 0 {
+		first := iovec_from_user(header.msg_iov, 0) or { return errno.err, errno.get() }
+		if first.iov_len != 0 && !usercopy.writable(u64(first.iov_base)) {
+			return errno.err, errno.efault
+		}
+	}
+	mut small := [512]u8{}
+	buffer := if size <= small_message { unsafe { voidptr(&small[0]) } } else { unsafe { malloc(size) } }
+	if buffer == unsafe { nil } {
+		return errno.err, errno.enomem
+	}
+	defer {
+		if size > small_message {
+			unsafe { free(buffer) }
+		}
+	}
+	mut vector := sock_pub.IoVec{
+		iov_base: buffer
+		iov_len:  size
+	}
+	control_size := if header.msg_control == unsafe { nil } {
+		u64(0)
+	} else if header.msg_controllen < control_max {
+		header.msg_controllen
+	} else {
+		control_max
+	}
+	control := if control_size != 0 { unsafe { malloc(control_size) } } else { unsafe { nil } }
+	defer {
+		if control != unsafe { nil } {
+			unsafe { free(control) }
+		}
+	}
+	// A family with no address to report leaves these as they are, and then
+	// so is the caller's buffer left.
+	mut storage := [128]u8{init: 0xff}
+	offered := if header.msg_name == unsafe { nil } {
+		u32(0)
+	} else if header.msg_namelen < sockaddr_max {
+		header.msg_namelen
+	} else {
+		sockaddr_max
+	}
+	mut kernel_message := sock_pub.MsgHdr{
+		msg_name:       if header.msg_name == unsafe { nil } {
+			unsafe { nil }
+		} else {
+			unsafe { voidptr(&storage[0]) }
+		}
+		msg_namelen:    offered
+		msg_iov:        unsafe { &vector }
+		msg_iovlen:     1
+		msg_control:    control
+		msg_controllen: control_size
+	}
+	message := unsafe { &kernel_message }
+	received, err := receive_into(fdnum, message, flags)
+	if err != 0 {
+		return received, err
+	}
+
+	// MSG_TRUNC reports the whole message's length, which may be more than
+	// there was room for.
+	mut left := if received < size { received } else { size }
+	mut copied := u64(0)
+	for i := u64(0); i < header.msg_iovlen && left != 0; i++ {
+		iov := iovec_from_user(header.msg_iov, i) or { return errno.err, errno.get() }
+		amount := if iov.iov_len < left { iov.iov_len } else { left }
+		if amount != 0 {
+			if !usercopy.copy_to_user(u64(iov.iov_base), voidptr(u64(buffer) + copied), amount) {
+				return errno.err, errno.efault
+			}
+			copied += amount
+			left -= amount
+		}
+	}
+	if header.msg_control != unsafe { nil } {
+		used := if message.msg_controllen < control_size { message.msg_controllen } else { control_size }
+		if used != 0 && !usercopy.copy_to_user(u64(header.msg_control), control, used) {
+			return errno.err, errno.efault
+		}
+	}
+	header.msg_controllen = message.msg_controllen
+	if header.msg_name != unsafe { nil }
+		&& (message.msg_namelen != offered || storage[0] != 0xff || storage[1] != 0xff) {
+		named := if message.msg_namelen < offered { message.msg_namelen } else { offered }
+		if named != 0 && !usercopy.copy_to_user(u64(header.msg_name), unsafe { voidptr(&storage[0]) }, named) {
+			return errno.err, errno.efault
+		}
+		header.msg_namelen = message.msg_namelen
+	}
+	header.msg_flags = message.msg_flags
+	return received, 0
+}
+
+// recvmsg(2) with the header and all it points at in kernel memory.
+fn receive_into(fdnum int, message &sock_pub.MsgHdr, flags int) (u64, u64) {
 	mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.get() }
 	defer {
 		fd.unref()
@@ -401,7 +586,7 @@ pub fn syscall_recvmsg(_ voidptr, fdnum int, msg &sock_pub.MsgHdr, flags int) (u
 	if mut res is sock_unix.UnixSocket {
 		remaining_flags = flags & ~0x40 // Unix recvmsg consumes MSG_CMSG_CLOEXEC.
 	}
-	ret := sock.recvmsg(fd.handle, msg, remaining_flags) or { return errno.err, errno.get() }
+	ret := sock.recvmsg(fd.handle, message, remaining_flags) or { return errno.err, errno.get() }
 
 	return ret, 0
 }
@@ -410,6 +595,52 @@ pub fn syscall_recvmsg(_ voidptr, fdnum int, msg &sock_pub.MsgHdr, flags int) (u
 // old aarch64 compatibility wrapper reduced every call to write(2), losing the
 // destination that DNS and DHCP clients need.
 pub fn syscall_sendto(_ voidptr, fdnum int, buf voidptr, len u64, flags int, dest_addr voidptr, addrlen u32) (u64, u64) {
+	if !usercopy.user_range(u64(buf), len) {
+		return errno.err, errno.efault
+	}
+	mut storage := [128]u8{}
+	address := address_from_user(dest_addr, addrlen, unsafe { voidptr(&storage[0]) }) or {
+		return errno.err, errno.get()
+	}
+	size := if len <= message_max { len } else { message_max + 1 }
+	mut small := [512]u8{}
+	buffer := if size <= small_message { unsafe { voidptr(&small[0]) } } else { unsafe { malloc(size) } }
+	if buffer == unsafe { nil } {
+		return errno.err, errno.enomem
+	}
+	defer {
+		if size > small_message {
+			unsafe { free(buffer) }
+		}
+	}
+	// A message goes whole. What is longer than one can only be a stream's,
+	// which takes it in pieces.
+	mut done := u64(0)
+	for {
+		chunk := if len - done < size { len - done } else { size }
+		if chunk != 0 && !usercopy.copy_from_user(buffer, u64(buf) + done, chunk) {
+			if done != 0 {
+				return done, 0
+			}
+			return errno.err, errno.efault
+		}
+		sent, err := send_from_kernel(fdnum, buffer, chunk, flags, address, addrlen)
+		if err != 0 {
+			if done != 0 {
+				return done, 0
+			}
+			return sent, err
+		}
+		done += sent
+		if sent < chunk || done >= len {
+			break
+		}
+	}
+	return done, 0
+}
+
+// sendto(2) with the message and the address in kernel memory.
+fn send_from_kernel(fdnum int, buf voidptr, len u64, flags int, dest_addr voidptr, addrlen u32) (u64, u64) {
 	if flags & ~0x4040 != 0 { // MSG_DONTWAIT | MSG_NOSIGNAL
 		return errno.err, errno.eopnotsupp
 	}
@@ -467,6 +698,59 @@ pub fn syscall_sendto(_ voidptr, fdnum int, buf voidptr, len u64, flags int, des
 }
 
 pub fn syscall_recvfrom(_ voidptr, fdnum int, buf voidptr, len u64, flags int, src_addr voidptr, addrlen &u32) (u64, u64) {
+	// What a socket gives up is gone from it: find out that there is nowhere
+	// to put it before taking it.
+	if !usercopy.user_range(u64(buf), len) || (len != 0 && !usercopy.writable(u64(buf))) {
+		return errno.err, errno.efault
+	}
+	wants_address := src_addr != unsafe { nil } && addrlen != unsafe { nil }
+	mut capacity := u32(0)
+	if wants_address
+		&& !usercopy.copy_from_user(voidptr(&capacity), u64(voidptr(addrlen)), sizeof(u32)) {
+		return errno.err, errno.efault
+	}
+	// A family that has no address to report leaves these as they are, and
+	// then so is the caller's buffer left.
+	mut storage := [128]u8{init: 0xff}
+	offered := if capacity < sockaddr_max { capacity } else { sockaddr_max }
+	mut length := offered
+	size := if len < message_max { len } else { message_max }
+	mut small := [512]u8{}
+	buffer := if size <= small_message { unsafe { voidptr(&small[0]) } } else { unsafe { malloc(size) } }
+	if buffer == unsafe { nil } {
+		return errno.err, errno.enomem
+	}
+	defer {
+		if size > small_message {
+			unsafe { free(buffer) }
+		}
+	}
+	mut address_out := unsafe { nil }
+	mut length_out := &u32(unsafe { nil })
+	if wants_address {
+		address_out = unsafe { voidptr(&storage[0]) }
+		length_out = unsafe { &length }
+	}
+	received, err := receive_to_kernel(fdnum, buffer, size, flags, address_out, length_out)
+	if err != 0 {
+		return received, err
+	}
+	// MSG_TRUNC reports the whole datagram's length, which may be more than
+	// there was room for.
+	copied := if received < size { received } else { size }
+	if copied != 0 && !usercopy.copy_to_user(u64(buf), buffer, copied) {
+		return errno.err, errno.efault
+	}
+	if wants_address && (length != offered || storage[0] != 0xff || storage[1] != 0xff)
+		&& !address_to_user(src_addr, u64(voidptr(addrlen)), unsafe { voidptr(&storage[0]) },
+		capacity, length) {
+		return errno.err, errno.efault
+	}
+	return received, 0
+}
+
+// recvfrom(2) with the buffer and the address in kernel memory.
+fn receive_to_kernel(fdnum int, buf voidptr, len u64, flags int, src_addr voidptr, addrlen &u32) (u64, u64) {
 	// MSG_PEEK, MSG_TRUNC, MSG_DONTWAIT, MSG_WAITALL and MSG_CMSG_CLOEXEC. A
 	// length-prefix protocol on a SOCK_SEQPACKET socket reads a record's size
 	// with recvfrom(0, MSG_PEEK|MSG_TRUNC); the unix seqpacket path honours it.
@@ -526,65 +810,138 @@ pub fn syscall_recvfrom(_ voidptr, fdnum int, buf voidptr, len u64, flags int, s
 	return errno.err, errno.enotsock
 }
 
-pub fn syscall_sendmsg(gpr_state voidptr, fdnum int, msg &sock_pub.MsgHdr, flags int) (u64, u64) {
-	if msg == unsafe { nil } {
-		return errno.err, errno.efault
+// One of a message's iovecs, copied in.
+fn iovec_from_user(vector voidptr, index u64) ?sock_pub.IoVec {
+	mut iov := sock_pub.IoVec{}
+	if !usercopy.copy_from_user(voidptr(&iov), u64(vector) + index * sizeof(sock_pub.IoVec),
+		sizeof(sock_pub.IoVec)) {
+		errno.set(errno.efault)
+		return none
 	}
-	if msg.msg_control == unsafe { nil } && msg.msg_controllen != 0 {
-		return errno.err, errno.efault
+	return iov
+}
+
+// What a message's iovecs hold together.
+fn iovec_total(header &sock_pub.MsgHdr) ?u64 {
+	if header.msg_iovlen > iov_max {
+		errno.set(errno.emsgsize)
+		return none
 	}
 	mut total := u64(0)
-	for i := u64(0); i < msg.msg_iovlen; i++ {
-		total += unsafe { msg.msg_iov[i].iov_len }
-		if total > u64(0x7fffffff) {
-			return errno.err, errno.emsgsize
+	for i := u64(0); i < header.msg_iovlen; i++ {
+		iov := iovec_from_user(header.msg_iov, i)?
+		if iov.iov_len > u64(0x7fffffff) || total + iov.iov_len > u64(0x7fffffff) {
+			errno.set(errno.emsgsize)
+			return none
 		}
+		total += iov.iov_len
 	}
-	buffer := unsafe { malloc(if total > 0 { total } else { 1 }) }
+	return total
+}
+
+pub fn syscall_sendmsg(_ voidptr, fdnum int, msg &sock_pub.MsgHdr, flags int) (u64, u64) {
+	mut header := sock_pub.MsgHdr{}
+	if !usercopy.copy_from_user(voidptr(&header), u64(voidptr(msg)), sizeof(sock_pub.MsgHdr)) {
+		return errno.err, errno.efault
+	}
+	return send_message(fdnum, unsafe { &header }, flags)
+}
+
+// sendmsg(2) for a header already copied in, as sendmmsg(2) has each of its
+// own. What the header points at is still the process's.
+pub fn send_message(fdnum int, header &sock_pub.MsgHdr, flags int) (u64, u64) {
+	if header.msg_control == unsafe { nil } && header.msg_controllen != 0 {
+		return errno.err, errno.efault
+	}
+	if header.msg_controllen > control_max {
+		return errno.err, errno.enobufs
+	}
+	mut total := iovec_total(header) or { return errno.err, errno.get() }
+	if total > message_max {
+		total = message_max + 1
+	}
+	mut small := [512]u8{}
+	buffer := if total <= small_message { unsafe { voidptr(&small[0]) } } else { unsafe { malloc(total) } }
 	if buffer == unsafe { nil } {
 		return errno.err, errno.enomem
 	}
 	defer {
-		unsafe { free(buffer) }
-	}
-	mut copied := u64(0)
-	for i := u64(0); i < msg.msg_iovlen; i++ {
-		iov := unsafe { msg.msg_iov[i] }
-		if iov.iov_len != 0 {
-			unsafe { C.memcpy(voidptr(u64(buffer) + copied), iov.iov_base, iov.iov_len) }
-			copied += iov.iov_len
+		if total > small_message {
+			unsafe { free(buffer) }
 		}
+	}
+	// The iovecs are read again, and may have changed: never past `total`.
+	mut copied := u64(0)
+	for i := u64(0); i < header.msg_iovlen && copied < total; i++ {
+		iov := iovec_from_user(header.msg_iov, i) or { return errno.err, errno.get() }
+		amount := if iov.iov_len < total - copied { iov.iov_len } else { total - copied }
+		if amount != 0 {
+			if !usercopy.copy_from_user(voidptr(u64(buffer) + copied), u64(iov.iov_base), amount) {
+				return errno.err, errno.efault
+			}
+			copied += amount
+		}
+	}
+	total = copied
+
+	mut storage := [128]u8{}
+	name := address_from_user(header.msg_name, header.msg_namelen, unsafe { voidptr(&storage[0]) }) or {
+		return errno.err, errno.get()
 	}
 
-	if msg.msg_controllen != 0 {
-		if flags & ~0x4040 != 0 || msg.msg_name != unsafe { nil } {
+	if header.msg_controllen != 0 {
+		if flags & ~0x4040 != 0 || header.msg_name != unsafe { nil } {
 			return errno.err, errno.eopnotsupp
 		}
-		mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or {
+		sent, err := send_with_control(fdnum, buffer, total, header, flags)
+		return sent, err
+	}
+	// Not returned as it stands: V moves a local to the heap, never to be
+	// freed, when a pointer into it appears in what a function returns.
+	sent, err := send_from_kernel(fdnum, buffer, total, flags, name, header.msg_namelen)
+	return sent, err
+}
+
+// A message with ancillary data: descriptors to pass, credentials. `buffer`
+// is the kernel's; the control data is still where the process has it.
+fn send_with_control(fdnum int, buffer voidptr, total u64, header &sock_pub.MsgHdr, flags int) (u64, u64) {
+	control := unsafe { malloc(header.msg_controllen) }
+	if control == unsafe { nil } {
+		return errno.err, errno.enomem
+	}
+	defer {
+		unsafe { free(control) }
+	}
+	if !usercopy.copy_from_user(control, u64(header.msg_control), header.msg_controllen) {
+		return errno.err, errno.efault
+	}
+	message := sock_pub.MsgHdr{
+		msg_control:    control
+		msg_controllen: header.msg_controllen
+	}
+	mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.get() }
+	defer {
+		fd.unref()
+	}
+	mut res := fd.handle.resource
+	if mut res is sock_unix.UnixSocket {
+		mut passed_fds := collect_passed_fds(unsafe { &message }) or {
 			return errno.err, errno.get()
 		}
-		defer { fd.unref() }
-		mut res := fd.handle.resource
-		if mut res is sock_unix.UnixSocket {
-			mut passed_fds := collect_passed_fds(msg) or {
-				return errno.err, errno.get()
-			}
-			old_flags := fd.handle.flags
-			if flags & 0x40 != 0 {
-				fd.handle.flags |= resource.o_nonblock
-			}
-			ret := res.write_with_fds(fd.handle, buffer, total, passed_fds) or {
-				fd.handle.flags = old_flags
-				release_passed_fds(mut passed_fds)
-				return errno.err, errno.get()
-			}
-			fd.handle.flags = old_flags
-			unsafe { passed_fds.free() }
-			return u64(ret), 0
+		old_flags := fd.handle.flags
+		if flags & 0x40 != 0 {
+			fd.handle.flags |= resource.o_nonblock
 		}
-		return errno.err, errno.eopnotsupp
+		ret := res.write_with_fds(fd.handle, buffer, total, passed_fds) or {
+			fd.handle.flags = old_flags
+			release_passed_fds(mut passed_fds)
+			return errno.err, errno.get()
+		}
+		fd.handle.flags = old_flags
+		unsafe { passed_fds.free() }
+		return u64(ret), 0
 	}
-	return syscall_sendto(gpr_state, fdnum, buffer, total, flags, msg.msg_name, msg.msg_namelen)
+	return errno.err, errno.eopnotsupp
 }
 
 pub fn syscall_connect(_ voidptr, fdnum int, _addr voidptr, addrlen u32) (u64, u64) {
@@ -621,7 +978,14 @@ pub fn syscall_connect(_ voidptr, fdnum int, _addr voidptr, addrlen u32) (u64, u
 		unsafe { free(sock) }
 	}
 
-	sock.connect(fd.handle, _addr, addrlen) or { return errno.err, errno.get() }
+	if _addr == unsafe { nil } {
+		return errno.err, if addrlen == 0 { errno.einval } else { errno.efault }
+	}
+	mut storage := [128]u8{}
+	address := address_from_user(_addr, addrlen, unsafe { voidptr(&storage[0]) }) or {
+		return errno.err, errno.get()
+	}
+	sock.connect(fd.handle, address, addrlen) or { return errno.err, errno.get() }
 
 	return 0, 0
 }
@@ -632,11 +996,21 @@ pub fn syscall_getpeername(_ voidptr, fdnum int, _addr voidptr, addrlen &u32) (u
 		fd.unref()
 	}
 
-	if addrlen == unsafe { nil } {
+	mut capacity := u32(0)
+	if !usercopy.copy_from_user(voidptr(&capacity), u64(voidptr(addrlen)), sizeof(u32)) {
 		return errno.err, errno.efault
 	}
-
-	sock.peername(fd.handle, _addr, addrlen) or { return errno.err, errno.get() }
+	mut storage := [128]u8{}
+	mut length := if capacity < sockaddr_max { capacity } else { sockaddr_max }
+	// The family always has somewhere to write. A null address with room
+	// claimed for it is found out on the way back to the caller.
+	sock.peername(fd.handle, unsafe { voidptr(&storage[0]) }, unsafe { &length }) or {
+		return errno.err, errno.get()
+	}
+	if !address_to_user(_addr, u64(voidptr(addrlen)), unsafe { voidptr(&storage[0]) }, capacity,
+		length) {
+		return errno.err, errno.efault
+	}
 
 	return 0, 0
 }
@@ -672,11 +1046,21 @@ pub fn syscall_getsockname(_ voidptr, fdnum int, _addr voidptr, addrlen &u32) (u
 		fd.unref()
 	}
 
-	if addrlen == unsafe { nil } {
+	mut capacity := u32(0)
+	if !usercopy.copy_from_user(voidptr(&capacity), u64(voidptr(addrlen)), sizeof(u32)) {
 		return errno.err, errno.efault
 	}
-
-	sock.sockname(fd.handle, _addr, addrlen) or { return errno.err, errno.get() }
+	mut storage := [128]u8{}
+	mut length := if capacity < sockaddr_max { capacity } else { sockaddr_max }
+	// The family always has somewhere to write. A null address with room
+	// claimed for it is found out on the way back to the caller.
+	sock.sockname(fd.handle, unsafe { voidptr(&storage[0]) }, unsafe { &length }) or {
+		return errno.err, errno.get()
+	}
+	if !address_to_user(_addr, u64(voidptr(addrlen)), unsafe { voidptr(&storage[0]) }, capacity,
+		length) {
+		return errno.err, errno.efault
+	}
 
 	return 0, 0
 }

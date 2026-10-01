@@ -24,7 +24,6 @@ import resource
 import sched
 import stat
 import time
-import usercopy
 
 #include "apple_display_hotplug.h"
 
@@ -106,10 +105,7 @@ fn (mut controller Controller) read(_handle voidptr, buffer voidptr, offset u64,
 		return 0
 	}
 	amount := if count < u64(word.len) - offset { count } else { u64(word.len) - offset }
-	if !usercopy.copy_to_user(u64(buffer), voidptr(u64(word.str) + offset), amount) {
-		errno.set(errno.efault)
-		return none
-	}
+	unsafe { C.memcpy(buffer, voidptr(u64(word.str) + offset), amount) }
 	return i64(amount)
 }
 

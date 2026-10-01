@@ -222,27 +222,14 @@ pub fn dispatch_a_signal_info(context &cpulocal.GPRState, signal int, code int, 
 
 pub fn syscall_execve(_ voidptr, _path charptr, _argv &charptr, _envp &charptr) (u64, u64) {
 	path := fs.user_path(_path) or { return errno.err, errno.get() }
-	// Both vectors are only built here, so growing them can give back what
-	// they outgrow.
-	mut argv := []string{}
-	argv.flags |= .noslices
-	for i := 0; true; i++ {
-		unsafe {
-			if _argv[i] == nil {
-				break
-			}
-			argv << cstring_to_vstring(_argv[i])
-		}
+	mut argv := exec_strings_from_user(u64(_argv), exec_total_max) or {
+		unsafe { path.free() }
+		return errno.err, errno.get()
 	}
-	mut envp := []string{}
-	envp.flags |= .noslices
-	for i := 0; true; i++ {
-		unsafe {
-			if _envp[i] == nil {
-				break
-			}
-			envp << cstring_to_vstring(_envp[i])
-		}
+	envp := exec_strings_from_user(u64(_envp), exec_total_max - exec_strings_size(argv)) or {
+		unsafe { path.free() }
+		free_exec_strings(mut argv)
+		return errno.err, errno.get()
 	}
 
 	// The path and both vectors are the exec's now, freed whether it works or
@@ -645,25 +632,14 @@ pub fn syscall_execveat(_ voidptr, dirfd int, _path charptr, _argv &charptr, _en
 		}
 	}
 
-	mut argv := []string{}
-	argv.flags |= .noslices
-	for i := 0; true; i++ {
-		unsafe {
-			if _argv[i] == nil {
-				break
-			}
-			argv << cstring_to_vstring(_argv[i])
-		}
+	mut argv := exec_strings_from_user(u64(_argv), exec_total_max) or {
+		unsafe { target.free() }
+		return errno.err, errno.get()
 	}
-	mut envp := []string{}
-	envp.flags |= .noslices
-	for i := 0; true; i++ {
-		unsafe {
-			if _envp[i] == nil {
-				break
-			}
-			envp << cstring_to_vstring(_envp[i])
-		}
+	envp := exec_strings_from_user(u64(_envp), exec_total_max - exec_strings_size(argv)) or {
+		unsafe { target.free() }
+		free_exec_strings(mut argv)
+		return errno.err, errno.get()
 	}
 
 	// The path and both vectors are the exec's now, freed whether it works or

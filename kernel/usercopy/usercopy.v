@@ -23,6 +23,47 @@ fn valid_user_range(address u64, length u64) bool {
 	return true
 }
 
+// Whether [address, address + length) is somewhere a process can have memory:
+// not null, not wrapping, and below the kernel's half. The copies check this
+// as they go; a caller about to take something that cannot be put back -- a
+// pipe's bytes, a socket's message -- asks first.
+pub fn user_range(address u64, length u64) bool {
+	if length == 0 {
+		return true
+	}
+	if !valid_user_range(address, length) {
+		return false
+	}
+	return address + (length - 1) < memory.user_address_limit()
+}
+
+// Whether the current process can write the byte at `address`, after doing
+// what a write there would: copying a page still shared with a fork child,
+// paging in one nothing has touched. For a caller about to take something
+// that cannot be put back, which then learns of a pointer that leads nowhere
+// while it still has nothing to lose.
+pub fn writable(address u64) bool {
+	mut process := proc.current_thread().process
+	if process == unsafe { nil } || !user_range(address, 1) {
+		return false
+	}
+	mut pagemap := process.pagemap
+	for _ in 0 .. 4 {
+		pagemap.l.acquire()
+		if _ := pagemap.user_page_phys(address, true) {
+			pagemap.l.release()
+			return true
+		}
+		pagemap.l.release()
+		if memory.resolve_cow(pagemap, address) || memory.resolve_missing_page(pagemap,
+			address) {
+			continue
+		}
+		return false
+	}
+	return false
+}
+
 fn copy_user(kernel_address voidptr, user_address u64, length u64, to_user bool) bool {
 	mut process := proc.current_thread().process
 	if process == unsafe { nil } {
@@ -97,7 +138,8 @@ pub fn copy_from_user(destination voidptr, source u64, length u64) bool {
 // Copy a NUL-terminated userspace string into owned kernel memory. Read only
 // within the current mapped page before looking for NUL: a terminator at the
 // end of a page must not require the following page to be mapped. max_bytes
-// includes the terminator, as with PATH_MAX-style limits.
+// includes the terminator, as with PATH_MAX-style limits. The buffer starts
+// small and grows, since nearly every string is far shorter than its limit.
 pub fn copy_cstring_from_user(address u64, max_bytes int) ?string {
 	if max_bytes <= 0 {
 		errno.set(errno.einval)
@@ -107,35 +149,42 @@ pub fn copy_cstring_from_user(address u64, max_bytes int) ?string {
 		errno.set(errno.efault)
 		return none
 	}
-	mut bytes := []u8{len: max_bytes} @[freed]
-	defer {
-		unsafe { bytes.free() }
-	}
+	mut capacity := if max_bytes < 256 { max_bytes } else { 256 }
+	mut bytes := unsafe { &u8(malloc(capacity)) }
 	mut copied := 0
 	for copied < max_bytes {
 		if u64(copied) > ~address {
-			errno.set(errno.efault)
-			return none
+			break
+		}
+		if copied == capacity {
+			capacity = if capacity * 4 < max_bytes { capacity * 4 } else { max_bytes }
+			grown := unsafe { &u8(malloc(capacity)) }
+			unsafe {
+				C.memcpy(grown, bytes, copied)
+				free(bytes)
+			}
+			bytes = grown
 		}
 		current := address + u64(copied)
 		page_remaining := int(page_size - (current & (page_size - 1)))
-		chunk := if page_remaining < max_bytes - copied {
+		chunk := if page_remaining < capacity - copied {
 			page_remaining
 		} else {
-			max_bytes - copied
+			capacity - copied
 		}
-		if !copy_from_user(unsafe { voidptr(&bytes[copied]) }, current, u64(chunk)) {
-			errno.set(errno.efault)
-			return none
+		if !copy_from_user(unsafe { voidptr(bytes + copied) }, current, u64(chunk)) {
+			break
 		}
 		for i in copied .. copied + chunk {
-			if bytes[i] == 0 {
-				return bytes[..i].bytestr()
+			if unsafe { bytes[i] } == 0 {
+				// The string owns the buffer: its free() gives it back.
+				return unsafe { tos(bytes, i) }
 			}
 		}
 		copied += chunk
 	}
-	errno.set(errno.enametoolong)
+	unsafe { free(bytes) }
+	errno.set(if copied >= max_bytes { errno.enametoolong } else { errno.efault })
 	return none
 }
 

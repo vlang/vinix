@@ -548,7 +548,7 @@ fn syscall_linux_sendmmsg(gpr_state voidptr, fdnum int, vec u64, vlen u32, flags
 			}
 			break
 		}
-		ret, err := socket.syscall_sendmsg(gpr_state, fdnum, unsafe { &message.hdr }, flags)
+		ret, err := socket.send_message(fdnum, unsafe { &message.hdr }, flags)
 		if err != 0 {
 			if sent == 0 {
 				return errno.err, err
@@ -583,7 +583,7 @@ fn syscall_linux_recvmmsg(gpr_state voidptr, fdnum int, vec u64, vlen u32, flags
 		if received > 0 && flags & linux_msg_waitforone != 0 {
 			these_flags |= linux_msg_dontwait
 		}
-		ret, err := socket.syscall_recvmsg(gpr_state, fdnum, unsafe { &message.hdr }, these_flags)
+		ret, err := socket.receive_message(fdnum, mut message.hdr, these_flags)
 		if err != 0 {
 			if received == 0 {
 				return errno.err, err

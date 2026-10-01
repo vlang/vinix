@@ -14,6 +14,7 @@ import resource
 import katomic
 import ioctl
 import time
+import usercopy
 
 pub const sock_buf = 0x100000
 
@@ -833,15 +834,7 @@ pub fn (mut this UnixSocket) send_datagram_to(_handle voidptr, buf voidptr, coun
 // The socket bound at a sockaddr_un: a name in the abstract namespace, or a
 // path.
 fn lookup_bound(_addr voidptr, addrlen u32) ?&UnixSocket {
-	if addrlen < sizeof(u16) {
-		errno.set(errno.einval)
-		return none
-	}
-	addr := unsafe { &SockaddrUn(_addr) }
-	if addr.sun_family != sock_pub.af_unix {
-		errno.set(errno.einval)
-		return none
-	}
+	addr := unix_address(_addr, addrlen)?
 
 	// Abstract socket: sun_path[0] == '\0'
 	if addrlen > 2 && addr.sun_path[0] == 0 {
@@ -891,9 +884,11 @@ fn (mut this UnixSocket) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 				errno.set(errno.einval)
 				return none
 			}
-			mut retp := unsafe { &u64(argp) }
-			unsafe {
-				*retp = this.used
+			// An int, as Linux gives it.
+			queued := i32(if this.used > u64(0x7fffffff) { u64(0x7fffffff) } else { this.used })
+			if !usercopy.copy_to_user(u64(argp), voidptr(&queued), sizeof(i32)) {
+				errno.set(errno.efault)
+				return none
 			}
 			return 0
 		}
@@ -1278,6 +1273,7 @@ fn (mut this UnixSocket) connect(_handle voidptr, _addr voidptr, addrlen u32) ? 
 		owner_uid: socket.owner_uid
 		owner_gid: socket.owner_gid
 	}
+	connection_socket.stat.mode = stat.ifsock | 0o777
 	client := proc.current_thread().process
 	connection_socket.peer_pid = client.pid
 	connection_socket.peer_uid = client.euid
@@ -1300,13 +1296,29 @@ fn (mut this UnixSocket) connect(_handle voidptr, _addr voidptr, addrlen u32) ? 
 	event.trigger(mut this.event, false)
 }
 
-fn (mut this UnixSocket) bind(_handle voidptr, _addr voidptr, addrlen u32) ? {
+// The sockaddr_un a call was given: there, long enough to say its family, no
+// longer than the structure, and AF_UNIX. A longer one ran past the name a
+// socket and the abstract namespace keep. The caller's copy of it is zeroed
+// past addrlen, so a path that fills sun_path still ends.
+fn unix_address(_addr voidptr, addrlen u32) ?&SockaddrUn {
+	if _addr == unsafe { nil } {
+		errno.set(errno.efault)
+		return none
+	}
+	if addrlen < sizeof(u16) || addrlen > sizeof(SockaddrUn) {
+		errno.set(errno.einval)
+		return none
+	}
 	addr := unsafe { &SockaddrUn(_addr) }
-
 	if addr.sun_family != sock_pub.af_unix {
 		errno.set(errno.einval)
 		return none
 	}
+	return addr
+}
+
+fn (mut this UnixSocket) bind(_handle voidptr, _addr voidptr, addrlen u32) ? {
+	addr := unix_address(_addr, addrlen)?
 	// A socket has one name, as on Linux. A second pathname would lead to it
 	// without the reference the first holds, and outlive it. Claimed under the
 	// lock before anything is made, so two binds at once cannot both pass.
@@ -1713,6 +1725,9 @@ pub fn create(@type int) ?&UnixSocket {
 	ret.name.sun_family = sock_pub.af_unix
 	ret.socktype = @type & sock_pub.sock_type_mask
 	ret.status |= file.pollout
+	// A socket by its file type too, as the other families' are: fstat(2)
+	// says so, and read(2) and write(2) keep its messages whole by it.
+	ret.stat.mode = stat.ifsock | 0o777
 	return ret
 }
 
@@ -1728,6 +1743,7 @@ pub fn create_pair(@type int) ?(&UnixSocket, &UnixSocket) {
 	a.name.sun_family = sock_pub.af_unix
 	a.socktype = @type & sock_pub.sock_type_mask
 	a.status |= file.pollout
+	a.stat.mode = stat.ifsock | 0o777
 	mut b := &UnixSocket{
 		refcount:  1
 		peer:      unsafe { nil }
@@ -1738,6 +1754,7 @@ pub fn create_pair(@type int) ?(&UnixSocket, &UnixSocket) {
 	b.name.sun_family = sock_pub.af_unix
 	b.socktype = @type & sock_pub.sock_type_mask
 	b.status |= file.pollout
+	b.stat.mode = stat.ifsock | 0o777
 
 	// The two ends were never joined up, so socketpair(2) handed back a pair
 	// that was not connected to anything: a write dereferenced a nil peer and a

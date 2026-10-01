@@ -112,7 +112,7 @@ fn syscall_linux_dup2(gpr_state voidptr, oldfd int, newfd int) (u64, u64) {
 }
 
 fn syscall_linux_pipe(gpr_state voidptr, pipefds &i32) (u64, u64) {
-	return pipe.syscall_pipe(gpr_state, pipefds, 0)
+	return pipe.syscall_pipe_checked(gpr_state, pipefds, 0)
 }
 
 // arch_prctl(code, address): the calling thread's FS and GS bases. Inside a

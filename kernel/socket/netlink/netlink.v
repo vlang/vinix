@@ -465,7 +465,7 @@ fn (mut this NetlinkSocket) read(_handle voidptr, buf voidptr, _loc u64, count u
 }
 
 pub fn (mut this NetlinkSocket) bind(_handle voidptr, _addr voidptr, addrlen u32) ? {
-	if addrlen >= u32(sizeof(SockaddrNl)) {
+	if _addr != unsafe { nil } && addrlen >= u32(sizeof(SockaddrNl)) {
 		addr := unsafe { &SockaddrNl(_addr) }
 		this.nl_pid = addr.nl_pid
 		this.groups = addr.nl_groups
