@@ -44,12 +44,35 @@ the complete i915 source tree is not evidence that the driver runs.
   the architecture primitives use compiler atomics. Compatibility C uses
   `-fwrapv`, as required by Linux's signed-overflow convention.
 - Upstream `refcount_t` and ordinary `kref_get`/`kref_put`, including saturation,
-  final-release ordering and spinlock release helpers. Mutex release helpers
-  remain unresolved until the sleepable mutex backend exists.
+  final-release ordering, spinlock release helpers and
+  `refcount_dec_and_mutex_lock`.
 - Spinlocks and raw spinlocks, nested IRQ save/restore and scheduler preemption
   guards. Lock spinning continues to answer Vinix's TLB shootdowns. IRQ flags belong to
   the caller, not to shared lock storage.
   Failed IRQ-save trylocks restore both IRQ and preemption state.
+- Ordinary sleepable mutexes use a raw lock only to protect their wait list;
+  contending tasks block in the native scheduler. Direct FIFO handoff prevents
+  new arrivals from stealing ownership. Interruptible/killable acquisition
+  removes cancelled stack waiters before returning `-EINTR`; an assigned
+  handoff wins a concurrent signal. Static/dynamic initialization, trylock,
+  ownership checks and `atomic_dec_and_mutex_lock` are implemented.
+  Recursive acquisition and unlocking another task's mutex fail explicitly.
+  Wound/wait mutexes, optimistic spinning, I/O accounting and devres are pending.
+- Unmodified Linux `wait.h`, `swait.h` and `completion.h` use native-backed
+  queues and task wakeups. Ordinary wait queues preserve nonexclusive,
+  exclusive and priority order, wake quotas, callback keys and automatic
+  removal. Simple waits use FIFO entries and drop their lock between wakes
+  in `swake_up_all`. Completions support pre-issued tokens, single/all wakeups,
+  saturation, try-wait and interruptible/killable ordinary waits.
+  Waiters live on the sleeping task's stack; finish/cancellation takes the
+  queue lock before returning, including after a producer removed the entry.
+  Callers must keep the enclosing object alive until every waiter and producer
+  has returned. Reinitialization requires quiescent users.
+  Timed waits, freezer states, I/O waits, CPU-placement wake hints, pollfree/RCU
+  lifetime handling and lockdep validation remain unimplemented. Regular queue
+  wake traversal currently holds the lock for the whole walk; it does not
+  implement Linux's optional bookmark batching. Unsupported out-of-line APIs
+  remain unresolved rather than reporting fictitious success.
 - Static `DEFINE_PER_CPU` variables preserve their initializers and alignment
   in a separate copy for every boot CPU. Dynamic `alloc_percpu`,
   `alloc_percpu_gfp` and `free_percpu` use zeroed, aligned slots, with checked
@@ -177,6 +200,17 @@ while retaining their task views. It checks reference saturation, ignored
 SIGTERM wakeups, dead-task wake rejection and release of every worker's native
 stacks, FPU buffer and Thread. After warming the native allocator, physical
 free pages return to the baseline.
+Four host workers exercise 4,000 contended mutex acquisitions, including a
+yield inside each critical section. Controlled queues check FIFO handoff,
+middle/tail cancellation, ignored ordinary signals in killable waits and
+final-reference helpers. Wait tests cover priority callbacks, exclusive
+quotas, callback removal/stop/key behavior, early and parked wakeups, signal
+cleanup, condition-vs-signal ordering and completion saturation/reinitialization.
+The four-CPU guest also runs four batches of four concurrent synchronization
+workers. They yield while holding a mutex, block on ordinary/simple queues,
+publish data through wakeups and consume completion tokens before a latched
+all-wake. Every worker's retained task is released after exit; after allocator
+warmup, the final batch restores the physical free-page count.
 
 An enabled kernel runs the allocator/list/sort/tree/IRQ-lock tests 200 times
 and verifies that the physical free-page count returns to its initial value.
@@ -186,6 +220,8 @@ including allocated-string and dynamic-slot release. The static per-CPU pool
 has boot lifetime and is initialized before the free-page baseline is taken.
 Every iteration also checks current-task identity across a real voluntary
 scheduler yield, and rejects yields inside a CPU pin or IRQ-off section.
+It checks uncontended mutexes, wake-before-sleep queue removal and completion
+tokens without allocating waiter objects.
 It then holds preemption disabled with IRQs enabled until a real scheduler
 interrupt defers a context switch, checks that no-reschedule release preserves
 pending scheduling work with IRQs disabled, and services it on IRQ restoration.
@@ -226,8 +262,8 @@ runtime subsystems:
 1. Linux device/PCI registration and removal, configuration access and devres.
 2. MMIO mapping with correct cache attributes, DMA/scatter-gather APIs,
    page/shmem management, GPU address spaces and TTM/GEM memory management.
-3. Sleepable locks, completions, wait queues, workqueues, timers and RCU
-   lifetime rules.
+3. Remaining lock/wait variants (including wound/wait mutexes and timed
+   waits), workqueues, timers and RCU lifetime rules.
 4. Linux IRQ registration, interrupt synchronization and safe GPU reset paths.
 5. C DRM core integration, device nodes, file ownership, ioctl/mmap handling,
    DMA fences, sync objects and dma-buf lifetime handling. The existing V DRM

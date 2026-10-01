@@ -3,6 +3,7 @@
 #define VINIX_LINUX_SPINLOCK_H
 #include <vinix/runtime.h>
 #include <linux/spinlock_types.h>
+#include <asm/barrier.h>
 static inline void spin_lock_init(spinlock_t *lock) { __atomic_store_n(&lock->locked, 0, __ATOMIC_RELAXED); }
 static inline bool vinix_raw_spin_trylock(spinlock_t *lock) {
     unsigned int expected = 0;

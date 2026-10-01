@@ -40,6 +40,8 @@ void *vinix_linuxkpi_task_view(void *storage, void *thread, int pid, int tgid,
                              const char *name, size_t length, bool exiting);
 int vinix_linuxkpi_task_selftest(void);
 int vinix_linuxkpi_task_native_selftest(void);
+int vinix_linuxkpi_sync_selftest(void);
+int vinix_linuxkpi_sync_native_selftest(void);
 void vinix_linuxkpi_refcount_warning(int kind);
 bool vinix_linuxkpi_cpu_has(unsigned int feature);
 void vinix_linuxkpi_fpu_begin(void);

@@ -2,11 +2,12 @@
 #ifdef VINIX_LINUXKPI
 #include <linux/refcount.h>
 #include <linux/spinlock.h>
+#include <linux/mutex.h>
 #include <vinix/runtime.h>
 
 /* The algorithms and saturation checks in Linux's refcount/kref headers stay
- * upstream. Sleepable mutex final-release helpers remain unresolved until a
- * real mutex backend exists; they must never degrade into spinning locks. */
+ * upstream. Final-release helpers acquire the native-backed lock before
+ * attempting the last decrement, just as Linux does. */
 void refcount_warn_saturate(refcount_t *r, enum refcount_saturation_type kind)
 {
     refcount_set(r, REFCOUNT_SATURATED);
@@ -39,6 +40,15 @@ bool refcount_dec_and_lock(refcount_t *r, spinlock_t *lock)
     spin_lock(lock);
     if (refcount_dec_and_test(r)) return true;
     spin_unlock(lock);
+    return false;
+}
+
+bool refcount_dec_and_mutex_lock(refcount_t *r, struct mutex *lock)
+{
+    if (refcount_dec_not_one(r)) return false;
+    mutex_lock(lock);
+    if (refcount_dec_and_test(r)) return true;
+    mutex_unlock(lock);
     return false;
 }
 

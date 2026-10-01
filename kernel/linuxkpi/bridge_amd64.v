@@ -323,6 +323,8 @@ fn fpu_end() {
 fn C.i915_memcpy_init_early(voidptr)
 fn C.vinix_linuxkpi_wc_selftest() int
 fn C.vinix_linuxkpi_task_native_selftest() int
+fn C.vinix_linuxkpi_sync_selftest() int
+fn C.vinix_linuxkpi_sync_native_selftest() int
 fn C.vinix_linuxkpi_percpu_bootstrap(u32) int
 
 pub fn initialise() {
@@ -334,7 +336,8 @@ pub fn initialise() {
 		C.i915_memcpy_init_early(unsafe { nil })
 		before := memory.free_bytes()
 		for _ in 0 .. 200 {
-			if C.vinix_linuxkpi_selftest() != 0 || C.vinix_linuxkpi_task_selftest() != 0 {
+			if C.vinix_linuxkpi_selftest() != 0 || C.vinix_linuxkpi_task_selftest() != 0
+				|| C.vinix_linuxkpi_sync_selftest() != 0 {
 				lib.kpanic(unsafe { nil }, c'Linux compatibility layer self-test failed')
 			}
 		}
@@ -385,6 +388,24 @@ pub fn initialise() {
 			lib.kpanic(unsafe { nil }, c'Linux task self-test retained native pages')
 		}
 		C.kprintf(c'linuxkpi: blocking wakeups, join/detach and 70 retained exited tasks passed; no pages retained\n')
+		for _ in 0 .. 3 {
+			if C.vinix_linuxkpi_sync_native_selftest() != 0 {
+				lib.kpanic(unsafe { nil }, c'Linux synchronization self-test failed')
+			}
+		}
+		sync_before := memory.free_bytes()
+		if C.vinix_linuxkpi_sync_native_selftest() != 0 {
+			lib.kpanic(unsafe { nil }, c'Linux synchronization self-test failed')
+		}
+		sync_reap_start := hpet_clock.nanoseconds()
+		for memory.free_bytes() != sync_before && hpet_clock.nanoseconds() - sync_reap_start < 1000000000 {
+			sched.reap_deferred()
+			sched.reschedule()
+		}
+		if memory.free_bytes() != sync_before {
+			lib.kpanic(unsafe { nil }, c'Linux synchronization self-test retained native pages')
+		}
+		C.kprintf(c'linuxkpi: sleeping mutexes, wait queues and completions passed on 4 workers; no pages retained\n')
 		// Exercise a real scheduler interrupt with preemption disabled and
 		// IRQs still enabled, rather than relying only on host lock tests.
 		preempt_disable()

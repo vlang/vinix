@@ -951,6 +951,8 @@ static void reference_tests(void)
     assert(!pthread_join(writer, NULL) && !pthread_join(reader, NULL));
 }
 
+#include "sync_test.h"
+
 int main(void)
 {
     assert(vinix_linuxkpi_percpu_init(0, host_percpu_start, host_percpu_end) == -EINVAL);
@@ -971,6 +973,7 @@ int main(void)
     percpu_tests();
     task_tests();
     task_wait_tests();
+    sync_tests();
     list_tests();
     tree_tests();
     concurrency_tests();
@@ -978,6 +981,6 @@ int main(void)
     reference_tests();
     vinix_linuxkpi_percpu_destroy_for_test();
     assert(live_pages == 0);
-    puts("LinuxKPI: PASS (Linux helpers, allocation/OOM, page-boundary strings, bitmaps, SMP/IRQ locks, per-CPU storage, task references and wake races)");
+    puts("LinuxKPI: PASS (Linux helpers, allocation/OOM, strings, bitmaps, SMP/IRQ locks, per-CPU storage, task references, wake races, sleeping mutexes, wait queues and completions)");
     return 0;
 }

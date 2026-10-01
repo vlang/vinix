@@ -2,6 +2,7 @@
 #ifndef VINIX_LINUX_SCHED_H
 #define VINIX_LINUX_SCHED_H
 #include <linux/types.h>
+#include <linux/kernel.h>
 #include <linux/preempt.h>
 #include <linux/spinlock_types_raw.h>
 #include <asm/current.h>
