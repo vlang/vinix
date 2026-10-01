@@ -26,6 +26,7 @@
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
+#include <sys/time.h>
 #include <sys/uio.h>
 #include <sys/wait.h>
 #include <net/if.h>
@@ -1255,12 +1256,24 @@ static int run_fault_tests(void)
 	CHECK(syscall(SYS_newfstatat, AT_FDCWD, "/", bad, 0) == -1 && errno == EFAULT);
 	CHECK(syscall(SYS_statx, AT_FDCWD, "/", 0, STATX_BASIC_STATS, bad) == -1 && errno == EFAULT);
 	CHECK(syscall(SYS_getcwd, bad, page) == -1 && errno == EFAULT);
+	CHECK(syscall(SYS_getitimer, 0, bad) == -1 && errno == EFAULT);
+	CHECK(syscall(SYS_setitimer, 0, bad, (void *)0) == -1 && errno == EFAULT);
+	int dirfd = open("/", O_RDONLY | O_DIRECTORY);
+	CHECK(dirfd >= 0);
+	CHECK(syscall(SYS_getdents64, dirfd, bad, page) == -1 && errno == EFAULT);
+	close(dirfd);
 
-	/* A valid buffer still works, so the checked path did not break stat. */
+	/* Valid buffers still work, so the checked paths did not break anything. */
 	struct stat good;
 	CHECK(stat("/", &good) == 0 && (good.st_mode & S_IFMT) == S_IFDIR);
 	char cwd[64];
 	CHECK(getcwd(cwd, sizeof(cwd)) == cwd);
+	struct itimerval it;
+	CHECK(getitimer(ITIMER_REAL, &it) == 0);
+	dirfd = open("/", O_RDONLY | O_DIRECTORY);
+	char dents[1024];
+	CHECK(dirfd >= 0 && syscall(SYS_getdents64, dirfd, dents, sizeof(dents)) > 0);
+	close(dirfd);
 
 	CHECK(munmap(bad, page) == 0);
 	puts("OPENBSD SECURITY PASS: bad user pointers fault rather than panic");

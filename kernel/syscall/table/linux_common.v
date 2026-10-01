@@ -513,7 +513,10 @@ fn syscall_linux_setitimer(_ voidptr, which int, new_value u64, old_value u64) (
 		// Only ITIMER_REAL (0) supported; ITIMER_VIRTUAL (1) and
 		// ITIMER_PROF (2) are no-ops.
 		if old_value != 0 {
-			unsafe { C.memset(voidptr(old_value), 0, 32) }
+			zero := [4]i64{}
+			if !usercopy.copy_to_user(old_value, unsafe { voidptr(&zero[0]) }, 32) {
+				return errno.err, errno.efault
+			}
 		}
 		return 0, 0
 	}
@@ -523,22 +526,20 @@ fn syscall_linux_setitimer(_ voidptr, which int, new_value u64, old_value u64) (
 	mut value_us := i64(0)
 	mut interval_us := i64(0)
 	if new_value != 0 {
-		interval_sec := unsafe { *&i64(new_value) }
-		interval_usec := unsafe { *&i64(new_value + 8) }
-		value_sec := unsafe { *&i64(new_value + 16) }
-		value_usec := unsafe { *&i64(new_value + 24) }
-		interval_us = interval_sec * 1000000 + interval_usec
-		value_us = value_sec * 1000000 + value_usec
+		mut iv := [4]i64{}
+		if !usercopy.copy_from_user(unsafe { voidptr(&iv[0]) }, new_value, 32) {
+			return errno.err, errno.efault
+		}
+		interval_us = iv[0] * 1000000 + iv[1]
+		value_us = iv[2] * 1000000 + iv[3]
 	}
 
 	old_val, old_int := sched.set_itimer_real(current_thread, value_us, interval_us)
 
 	if old_value != 0 {
-		unsafe {
-			*&i64(old_value) = old_int / 1000000 // it_interval.tv_sec
-			*&i64(old_value + 8) = old_int % 1000000 // it_interval.tv_usec
-			*&i64(old_value + 16) = old_val / 1000000 // it_value.tv_sec
-			*&i64(old_value + 24) = old_val % 1000000 // it_value.tv_usec
+		ov := [old_int / 1000000, old_int % 1000000, old_val / 1000000, old_val % 1000000]!
+		if !usercopy.copy_to_user(old_value, unsafe { voidptr(&ov[0]) }, 32) {
+			return errno.err, errno.efault
 		}
 	}
 
@@ -548,7 +549,10 @@ fn syscall_linux_setitimer(_ voidptr, which int, new_value u64, old_value u64) (
 fn syscall_linux_getitimer(_ voidptr, which int, curr_value u64) (u64, u64) {
 	if which != 0 || curr_value == 0 {
 		if curr_value != 0 {
-			unsafe { C.memset(voidptr(curr_value), 0, 32) }
+			zero := [4]i64{}
+			if !usercopy.copy_to_user(curr_value, unsafe { voidptr(&zero[0]) }, 32) {
+				return errno.err, errno.efault
+			}
 		}
 		return 0, 0
 	}
@@ -556,11 +560,9 @@ fn syscall_linux_getitimer(_ voidptr, which int, curr_value u64) (u64, u64) {
 	current_thread := proc.current_thread()
 	val, intv := sched.get_itimer_real(current_thread)
 
-	unsafe {
-		*&i64(curr_value) = intv / 1000000 // it_interval.tv_sec
-		*&i64(curr_value + 8) = intv % 1000000 // it_interval.tv_usec
-		*&i64(curr_value + 16) = val / 1000000 // it_value.tv_sec
-		*&i64(curr_value + 24) = val % 1000000 // it_value.tv_usec
+	cv := [intv / 1000000, intv % 1000000, val / 1000000, val % 1000000]!
+	if !usercopy.copy_to_user(curr_value, unsafe { voidptr(&cv[0]) }, 32) {
+		return errno.err, errno.efault
 	}
 
 	return 0, 0

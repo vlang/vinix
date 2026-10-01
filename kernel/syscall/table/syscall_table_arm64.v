@@ -262,13 +262,22 @@ fn syscall_linux_getdents64(gpr_state voidptr, fdnum int, dirp u64, count u64) (
 			fs.readdir_unread(fdnum)
 			break
 		}
-		// Write linux_dirent64 to user buffer
+		// Build the entry in a kernel buffer and copy it out, so a bad `dirp`
+		// fails with EFAULT rather than faulting the kernel. reclen is bounded
+		// by the 1024-byte name limit above.
+		mut record := [1064]u8{}
 		unsafe {
-			*&u64(dirp + offset) = dirent.ino
-			*&u64(dirp + offset + 8) = dirent.off
-			*&u16(dirp + offset + 16) = u16(reclen)
-			*&u8(dirp + offset + 18) = dirent.@type
-			C.memcpy(voidptr(dirp + offset + 19), &dirent.name[0], name_len + 1)
+			*&u64(&record[0]) = dirent.ino
+			*&u64(&record[8]) = dirent.off
+			*&u16(&record[16]) = u16(reclen)
+			record[18] = dirent.@type
+			C.memcpy(voidptr(&record[19]), &dirent.name[0], name_len + 1)
+		}
+		if !usercopy.copy_to_user(dirp + offset, unsafe { voidptr(&record[0]) }, reclen) {
+			if offset > 0 {
+				return offset, 0
+			}
+			return errno.err, errno.efault
 		}
 		offset += reclen
 	}
