@@ -1458,6 +1458,19 @@ fn (mut d Desktop) draw_builtin_glyph(path string, x int, y int, w int, h int, c
 			d.canvas.draw_line(cx - radius / 2, cy - radius + 3, cx - radius / 2, cy + radius - 3, color, 1)
 			d.canvas.draw_line(cx + radius / 2, cy - radius + 3, cx + radius / 2, cy + radius - 3, color, 1)
 		}
+		'gamepad' {
+			body := w * 4 / 5
+			tall := h / 2
+			left := cx - body / 2
+			top := cy - tall / 2
+			behind := d.surface_under(x, y)
+			d.canvas.fill_round_rect(left, top, body, tall, tall / 3, color)
+			arm := if tall / 6 > 1 { tall / 6 } else { 1 }
+			d.canvas.fill_rect(left + body / 4 - arm, cy - 1, arm * 2 + 1, 2, behind)
+			d.canvas.fill_rect(left + body / 4, cy - arm, 2, arm * 2 + 1, behind)
+			d.canvas.fill_circle(left + body * 3 / 4 - arm, cy + arm / 2, arm, behind)
+			d.canvas.fill_circle(left + body * 3 / 4 + arm, cy - arm / 2, arm, behind)
+		}
 		'block' {
 			// A compact voxel: the outer square is a block face and the three
 			// interior edges hint at its top and two sides at every icon size.

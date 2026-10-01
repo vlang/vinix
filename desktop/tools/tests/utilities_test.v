@@ -601,7 +601,7 @@ fn test_terminal_can_edit_a_file_with_vim_over_its_real_pty() {
 }
 
 fn test_available_utility_applications_and_shortcut_layouts() {
-	assert available_apps.len == 25
+	assert available_apps.len == 26
 	assert available_apps[0].process_name == 'vinix-files'
 	assert available_apps[0].icon == 'asset:files'
 	assert available_apps[1].title == 'Firefox'
@@ -697,7 +697,14 @@ fn test_available_utility_applications_and_shortcut_layouts() {
 	assert available_apps[24].icon == 'asset:steam'
 	assert available_apps[24].keyboard && available_apps[24].pointer
 	assert available_apps[24].polling
-	assert available_apps.len == 25
+	assert available_apps[25].title == 'Gothic II'
+	assert available_apps[25].process_name == 'vinix-opengothic'
+	assert available_apps[25].icon == 'builtin:gamepad'
+	assert available_apps[25].width == gothic_window_width
+	assert available_apps[25].height == gothic_window_height + default_title_height
+	assert available_apps[25].keyboard && available_apps[25].pointer
+	assert available_apps[25].polling && available_apps[25].us_keys
+	assert available_apps.len == 26
 	assert app_start_actions.len == available_apps.len
 	assert app_shortcut_actions.len == available_apps.len
 	assert shortcut_rows_for_height(720) == 8

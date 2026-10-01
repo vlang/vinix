@@ -170,6 +170,7 @@ fn test_hosted_windows_follow_the_language() {
 	free_tree(english)
 	assert HostedText.windows_exited.text() == 'The Windows application exited.'
 	assert HostedText.doom_wad_missing.text() == 'DOOM WAD is missing. Set VINIX_DOOM_WAD and rebuild the image.'
+	assert HostedText.gothic_data_missing.text() == "Gothic II's data is missing. Copy Data, _work and System to /usr/share/games/gothic2."
 	assert SurfaceText.blender_exited.text() == 'Blender exited.'
 }
 

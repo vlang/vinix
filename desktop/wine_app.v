@@ -159,6 +159,10 @@ enum HostedText {
 	doom_missing
 	doom_wad_missing
 	doom_exited
+	gothic_starting
+	gothic_missing
+	gothic_data_missing
+	gothic_exited
 	xvfb_missing
 	host_failed
 }
@@ -203,6 +207,10 @@ fn (t HostedText) text() string {
 		.doom_missing { tr('wine.doom.missing') }
 		.doom_wad_missing { tr('wine.doom.wad_missing') }
 		.doom_exited { tr('wine.doom.exited') }
+		.gothic_starting { tr('wine.gothic.starting') }
+		.gothic_missing { tr('wine.gothic.missing') }
+		.gothic_data_missing { tr('wine.gothic.data_missing') }
+		.gothic_exited { tr('wine.gothic.exited') }
 		.xvfb_missing { tr('wine.xvfb_missing') }
 		.host_failed { tr('wine.host_failed') }
 	}
@@ -424,7 +432,7 @@ fn open_hosted_x11_app(name string, command string, surface_width int, surface_h
 	// passing them to the launcher, so an old or ignored game-size option can
 	// never leave a smaller GLFW window floating in a white root surface.
 	host := desktop_spawn_wine_host(app.directory, surface_width, surface_height, command,
-		name == 'minecraft', name == 'doom' || name == 'qemu', name == 'obs') or {
+		name == 'minecraft', name == 'doom' || name == 'qemu' || name == 'opengothic', name == 'obs') or {
 		app.failed = true
 		app.failure = .host_failed
 		return app

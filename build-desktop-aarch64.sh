@@ -3,7 +3,7 @@
 # initramfs that boots straight into it.
 #
 # Usage: ./build-desktop-aarch64.sh [--no-initramfs] [--compact-initramfs]
-#        [--without-firefox] [--with-libreoffice] [--with-minecraft] [--with-asahi-gpu] [--with-x86-translation] [--wifi-bundle=DIR]
+#        [--without-firefox] [--with-libreoffice] [--with-minecraft] [--with-opengothic] [--with-asahi-gpu] [--with-x86-translation] [--wifi-bundle=DIR]
 # Set V or VINIX_V_COMPILER to a V executable or checkout directory to select
 # a compiler explicitly (for example V=~/code/v/v).
 #
@@ -60,6 +60,7 @@ CHROMIUM_STAGING="${VINIX_CHROMIUM_STAGING:-$SCRIPT_DIR/build-aarch64-chromium/s
 LIBREOFFICE_STAGING="${VINIX_LIBREOFFICE_STAGING:-$SCRIPT_DIR/build-aarch64-libreoffice/staging}"
 MINECRAFT_STAGING="${VINIX_MINECRAFT_STAGING:-$SCRIPT_DIR/build-aarch64-minecraft/staging}"
 DOOM_STAGING="${VINIX_DOOM_STAGING:-$SCRIPT_DIR/build-aarch64-doom/staging}"
+OPENGOTHIC_STAGING="${VINIX_OPENGOTHIC_STAGING:-$SCRIPT_DIR/build/opengothic/staging}"
 ASAHI_STAGING="${VINIX_ASAHI_STAGING:-$SCRIPT_DIR/build-aarch64-asahi/staging}"
 HYPRLAND_STAGING="${VINIX_HYPRLAND_STAGING:-$SCRIPT_DIR/build-aarch64-hyprland/staging}"
 BLENDER_NATIVE_STAGING="${VINIX_BLENDER_NATIVE_STAGING:-$SCRIPT_DIR/build-aarch64-blender-native/staging}"
@@ -91,7 +92,7 @@ path_generation() {
         return 0
     fi
     if [ "$path" = "$X11_STAGING" ] || [ "$path" = "$GPU_SYSROOT" ] ||
-       [ "$path" = "$DOOM_STAGING" ] || [ "$path" = "$STEAM_STAGING" ]; then
+       [ "$path" = "$DOOM_STAGING" ] || [ "$path" = "$OPENGOTHIC_STAGING" ] || [ "$path" = "$STEAM_STAGING" ]; then
         python3 "$SCRIPT_DIR/build-support/content-key.py" --metadata "$path"
         return 0
     fi
@@ -113,6 +114,7 @@ write_staging_cache_manifest() {
     printf 'chromium=%s\n' "$WITH_CHROMIUM"
     printf 'libreoffice=%s\n' "$WITH_LIBREOFFICE"
     printf 'minecraft=%s\n' "$WITH_MINECRAFT"
+    printf 'opengothic=%s\n' "$WITH_OPENGOTHIC"
     printf 'asahi=%s\n' "$WITH_ASAHI_GPU"
     printf 'x86=%s\n' "$WITH_X86_TRANSLATION"
     printf 'steam=%s\n' "$WITH_STEAM"
@@ -123,7 +125,7 @@ write_staging_cache_manifest() {
         "$VLANG_STAGING" \
         "$FIREFOX_STAGING" "$CHROMIUM_STAGING" "$LIBREOFFICE_STAGING" \
         "$MINECRAFT_STAGING" "$ASAHI_STAGING" "$HYPRLAND_STAGING" \
-        "$DOOM_STAGING" \
+        "$DOOM_STAGING" "$OPENGOTHIC_STAGING" \
         "$BLENDER_NATIVE_STAGING" "$X86_TRANSLATION_STAGING" "$STEAM_STAGING" \
         "$QEMU_SYSTEM_STAGING" \
         "$GPU_SYSROOT"; do
@@ -158,6 +160,7 @@ WITH_QEMU_SYSTEM=0
 WITH_CHROMIUM=0
 WITH_LIBREOFFICE=0
 WITH_MINECRAFT=0
+WITH_OPENGOTHIC=0
 WITHOUT_FIREFOX=0
 REFRESH_STAGING="${VINIX_REFRESH_DESKTOP_STAGING:-0}"
 # The Apple GPU userspace is only correct on Apple hardware; see the overlay
@@ -174,17 +177,19 @@ for arg in "$@"; do
         --with-chromium) WITH_CHROMIUM=1 ;;
         --with-libreoffice) WITH_LIBREOFFICE=1 ;;
         --with-minecraft) WITH_MINECRAFT=1 ;;
+        --with-opengothic) WITH_OPENGOTHIC=1 ;;
         --without-firefox) WITHOUT_FIREFOX=1 ;;
         --with-asahi-gpu) WITH_ASAHI_GPU=1 ;;
         --wifi-bundle=*) WIFI_BUNDLE="${arg#*=}" ;;
         --help|-h)
-            echo "usage: $0 [--no-initramfs] [--compact-initramfs] [--without-firefox] [--with-chromium] [--with-libreoffice] [--with-minecraft] [--with-asahi-gpu] [--with-x86-translation] [--with-steam] [--with-qemu-system] [--wifi-bundle=DIR]"
+            echo "usage: $0 [--no-initramfs] [--compact-initramfs] [--without-firefox] [--with-chromium] [--with-libreoffice] [--with-minecraft] [--with-opengothic] [--with-asahi-gpu] [--with-x86-translation] [--with-steam] [--with-qemu-system] [--wifi-bundle=DIR]"
             echo "  --compact-initramfs stages the desktop, core developer tools and Firefox"
             echo "  --without-firefox leaves the browser out of a compact image, keeping its"
             echo "      GTK/media runtime; the first-run app page offers it through pkg"
             echo "  --with-chromium adds a previously staged Chromium; otherwise it is a pkg install"
             echo "  --with-libreoffice adds a previously staged LibreOffice; otherwise it is a pkg install"
             echo "  --with-minecraft adds a previously staged Minecraft; otherwise it is a pkg install"
+            echo "  --with-opengothic adds a previously staged OpenGothic and its game data to a compact image"
             echo "  --with-asahi-gpu overlays the Apple GPU Mesa; only correct for an M1 image"
             echo "  --with-x86-translation adds a previously built x86/Wine runtime"
             echo "  --with-steam adds a previously staged Steam client and its x86 glibc runtime"
@@ -605,6 +610,12 @@ if [ "$WITH_MINECRAFT" -eq 1 ] &&
     echo "Run ./build-minecraft-aarch64.sh first." >&2
     exit 1
 fi
+if [ "$WITH_OPENGOTHIC" -eq 1 ] &&
+   [ ! -x "$OPENGOTHIC_STAGING/opt/opengothic/Gothic2Notr" ]; then
+    echo "ERROR: --with-opengothic needs $OPENGOTHIC_STAGING/opt/opengothic/Gothic2Notr" >&2
+    echo "Run ./build-opengothic-aarch64.sh first." >&2
+    exit 1
+fi
 if [ "$WITH_X86_TRANSLATION" -eq 1 ] &&
    [ ! -x "$X86_TRANSLATION_STAGING/usr/bin/qemu-x86_64" ]; then
     echo "ERROR: --with-x86-translation needs $X86_TRANSLATION_STAGING/usr/bin/qemu-x86_64" >&2
@@ -883,6 +894,14 @@ if [ "$REUSE_STAGING" -eq 0 ]; then
     if [ -x "$DOOM_STAGING/usr/bin/chocolate-doom" ]; then
         echo "==> Staging Chocolate Doom"
         merge_staging_tree "$DOOM_STAGING"
+    fi
+
+    # The engine's private Mesa and LLVM, and whatever game data was staged
+    # with it: hundreds of megabytes a compact image has to ask for.
+    if { [ "$COMPACT_INITRAMFS" -eq 0 ] || [ "$WITH_OPENGOTHIC" -eq 1 ]; } &&
+       [ -x "$OPENGOTHIC_STAGING/opt/opengothic/Gothic2Notr" ]; then
+        echo "==> Staging OpenGothic"
+        merge_staging_tree "$OPENGOTHIC_STAGING"
     fi
 
     # The translator is architecture-isolated: its x86-64 libraries live below
@@ -1322,6 +1341,7 @@ chmod +x "$STAGING/sbin/init" "$STAGING/usr/bin/vinix-desktop" \
 # distinct names and truthful per-app accounting without storing a copy of the
 # same static executable for every native application in the initramfs.
 for app_name in vinix-files vinix-calculator vinix-terminal vinix-settings \
+    vinix-opengothic \
     vinix-activity vinix-editor vinix-calendar vinix-clock \
     vinix-vspace \
     vinix-firefox vinix-chromium vinix-gimp vinix-libreoffice vinix-minecraft vinix-doom vinix-wine-calculator vinix-wine-notepad \

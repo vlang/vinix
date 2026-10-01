@@ -40,7 +40,8 @@ then the Gothic II window says the data is missing. The original game assets
 are required and are not included in the source repository.
 
 `build/opengothic/staging` contains the executable, launcher and private
-runtime. The desktop builder picks up this layer automatically. Override it
+runtime. A full desktop image picks up this layer automatically; a compact one
+takes it with `--with-opengothic`. Override it
 with `VINIX_OPENGOTHIC_STAGING`; `VINIX_OPENGOTHIC_BUILD_DIR` changes the
 engine builder's output directory. `GLSLANGVALIDATOR` selects a host shader
 compiler. Optional layers and any demo assets stay in generated build output.

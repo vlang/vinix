@@ -1684,6 +1684,18 @@ GIMP no está instalado. Ejecuta pkg install gimp en Terminal.
 wine.gimp.starting
 Iniciando GIMP…
 -----
+wine.gothic.data_missing
+Faltan los datos de Gothic II. Copia Data, _work y System en /usr/share/games/gothic2.
+-----
+wine.gothic.exited
+Gothic II se ha cerrado.
+-----
+wine.gothic.missing
+Gothic II no está instalado. Ejecuta build-opengothic-aarch64.sh.
+-----
+wine.gothic.starting
+Iniciando Gothic II…
+-----
 wine.host_failed
 Vinix no pudo iniciar el host X11 integrado.
 -----
