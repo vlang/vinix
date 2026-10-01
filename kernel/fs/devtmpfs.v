@@ -376,7 +376,25 @@ pub fn devtmpfs_add_device(device &resource.Resource, name string) {
 // Remove a dynamically-created device node. The resource held one reference
 // on behalf of the node; open file descriptions keep their own references and
 // can therefore drain normally after the pathname disappears.
+//
+// The node itself goes the way an unlinked file's does (see removed.v), once
+// the last description that leads to it has: they count themselves in it, and
+// a shell whose terminal window closed first still had its /dev/pts/N open.
+// Freed here at once, it was then written to as each of those closed -- the
+// last one's close is what removes a pty's node -- and the kernel heap
+// reported a 192-byte object written after it was freed.
 pub fn devtmpfs_remove_device(name string) bool {
+	mut node := detach_device_node(name) or { return false }
+	node.orphan = true
+	if katomic.load(&node.handles) == 0 {
+		retire_node(mut node)
+	}
+	return true
+}
+
+// Take a device node out of devtmpfs, and its name's reference to its
+// resource; the node, for the caller to retire.
+fn detach_device_node(name string) ?&VFSNode {
 	vfs_lock.acquire()
 	defer {
 		vfs_lock.release()
@@ -395,7 +413,7 @@ pub fn devtmpfs_remove_device(name string) bool {
 			if end > start {
 				if last.len > 0 {
 					if parent.children == unsafe { nil } || last !in parent.children {
-						return false
+						return none
 					}
 					parent = unsafe { parent.children[last] }
 				}
@@ -404,26 +422,20 @@ pub fn devtmpfs_remove_device(name string) bool {
 			start = end + 1
 		}
 		if last.len == 0 {
-			return false
+			return none
 		}
 		leaf = last
 	}
 
 	if parent == unsafe { nil } || parent.children == unsafe { nil } || leaf !in parent.children {
-		return false
+		return none
 	}
 	mut node := unsafe { parent.children[leaf] }
 	parent.children.delete(leaf)
 	node.resource.stat.nlink = 0
 	mut removed_resource := node.resource
 	removed_resource.unref(unsafe { nil }) or {}
-	unsafe {
-		if node.name.len > 0 {
-			node.name.free()
-		}
-		free(node)
-	}
-	return true
+	return node
 }
 
 pub fn devtmpfs_get_root() &VFSNode {
