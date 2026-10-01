@@ -32,3 +32,7 @@ menu ignores that.
 The key is sent through QEMU's QMP socket, so it travels the whole path a real
 keyboard does: the kernel's console, the compositor, the Gothic II process, the
 bridge and XTEST.
+
+The accelerated Debian comparison is documented in [kekvm.md](kekvm.md),
+with a guest build and launch helper. It exercises KekVM's Venus backend on
+the Apple GPU, independently of this Vinix desktop test.
