@@ -62,6 +62,18 @@ the complete i915 source tree is not evidence that the driver runs.
   no-reschedule release and deferred rescheduling. `preempt_count` currently
   reports scheduler pins only. Linux IRQ/NMI/softirq context accounting and
   `in_interrupt`/`in_atomic` are not implemented.
+- A borrowed `current` task view embedded in the native x86 Thread, with
+  initial-namespace PID/TGID queries, a bounded name and a read-only snapshot
+  of `PF_EXITING`. Construction copies the program name; clone inherits its
+  running parent's name. Queries reflect `PR_SET_NAME`, with the copied
+  initial name as fallback, without borrowing mutable process-name storage.
+  Native unnumbered kernel threads currently report PID/TGID 0.
+  Each x86 Thread reserves a 64-byte view buffer; it needs no allocation.
+- `signal_pending` and `fatal_signal_pending` query native pending/masked
+  signals and forced thread exit. `need_resched` reports deferred native
+  preemption. `cond_resched` voluntarily enters the actual scheduler when
+  IRQs are enabled and no preemption pin is held; otherwise it returns 0.
+  `get_cpu`/`put_cpu` and CPU-ID queries use native CPU IDs and scheduler pins.
 - Atomic bit operations, including acquire/release bit locking, using Linux's
   generic implementation and the native atomic backend. Unmodified Linux
   bitmap headers, bit searches and population counts work across word
@@ -136,6 +148,11 @@ tests cover alignments from 1 to 4096 bytes, overflow, OOM, zero-fill and releas
 The static template is copied as a complete linker section; host template
 globals omit ASan redzones so that alignment padding is readable. Allocated
 CPU copies and runtime accesses remain instrumented.
+Task tests run four workers with independent native task models, retain
+identity through simulated CPU migration, and check name truncation, padding,
+renaming and child inheritance. The initial name's source buffer is overwritten
+after construction to verify that the view owns its copy. They also cover
+masked SIGTERM, SIGKILL, forced exit and scheduling guards.
 
 An enabled kernel runs the allocator/list/sort/tree/IRQ-lock tests 200 times
 and verifies that the physical free-page count returns to its initial value.
@@ -143,6 +160,8 @@ The same repeated test also checks raw locks, bit searches, byte-order helpers,
 bounded strings and static/dynamic per-CPU isolation across all four CPUs,
 including allocated-string and dynamic-slot release. The static per-CPU pool
 has boot lifetime and is initialized before the free-page baseline is taken.
+Every iteration also checks current-task identity across a real voluntary
+scheduler yield, and rejects yields inside a CPU pin or IRQ-off section.
 It then holds preemption disabled with IRQs enabled until a real scheduler
 interrupt defers a context switch, checks that no-reschedule release preserves
 pending scheduling work with IRQs disabled, and services it on IRQ restoration.
@@ -170,8 +189,13 @@ object linking, unresolved-symbol checks and runtime/hardware testing.
 ## Remaining driver integration
 
 The complete i915 build still fails. Ordinary per-CPU storage and scheduler
-pins now have native implementations; Linux task/thread state, SMP dispatch,
-interrupt-context accounting and page-table types still need a bridge.
+pins and borrowed current-task identity now have native implementations.
+Blocking task states/wakeups, retained task references, namespace-relative
+PID queries, SMP dispatch, interrupt-context accounting and page-table types
+still need a bridge. No `mm` field or dummy address space is exposed.
+The existing `event.pthread_wait` cleanup directly frees a Thread instead of
+using the pin-aware reaper; task retention must wait until every cleanup path
+honors it. A borrowed view must not be used after its running thread exits.
 The next work includes these interfaces and substantial
 runtime subsystems:
 

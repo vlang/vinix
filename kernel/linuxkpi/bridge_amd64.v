@@ -10,6 +10,7 @@ import x86.cpu.local as cpulocal
 import sched
 import proc
 import klock
+import katomic
 import x86.hpet as hpet_clock
 
 __global (
@@ -97,6 +98,50 @@ fn preempt_check_resched() {
 	if reschedule {
 		sched.reschedule()
 	}
+}
+
+fn C.vinix_linuxkpi_task_view(voidptr, voidptr, int, int, voidptr, u64, bool) voidptr
+fn C.vinix_linuxkpi_task_selftest() int
+
+@[export: 'vinix_linuxkpi_current_task']
+fn current_task() voidptr {
+	mut t := proc.current_thread()
+	if t == unsafe { nil } {
+		lib.kpanic(unsafe { nil }, c'linuxkpi: current requested without a running thread')
+	}
+	name := t.comm
+	exiting := katomic.load(&t.must_exit) || katomic.load(&t.exit_claimed) != 0
+	return C.vinix_linuxkpi_task_view(voidptr(&t.linuxkpi_task[0]), voidptr(t), t.tid,
+		t.process.pid, name.str, u64(name.len), exiting)
+}
+
+@[export: 'vinix_linuxkpi_task_signal_pending']
+fn task_signal_pending(owner voidptr, fatal bool) bool {
+	t := unsafe { &proc.Thread(owner) }
+	pending := katomic.load(&t.pending_signals)
+	if katomic.load(&t.must_exit) || pending & (u64(1) << 8) != 0 {
+		return true
+	}
+	return !fatal && pending & ~katomic.load(&t.masked_signals) != 0
+}
+
+@[export: 'vinix_linuxkpi_need_resched']
+fn need_resched() bool {
+	ints := cpu.interrupt_toggle(false)
+	needed := preempt_pending[cpulocal.current().cpu_number]
+	cpu.interrupt_toggle(ints)
+	return needed
+}
+
+@[export: 'vinix_linuxkpi_cond_resched']
+fn cond_resched() int {
+	if !may_sleep() {
+		return 0
+	}
+	// A voluntary yield is valid even when the timer already preempted us.
+	// No preemption pin or IRQ-off section may cross this scheduling point.
+	sched.reschedule()
+	return 1
 }
 
 fn C.vinix_linuxkpi_selftest() int
@@ -237,7 +282,7 @@ pub fn initialise() {
 		C.i915_memcpy_init_early(unsafe { nil })
 		before := memory.free_bytes()
 		for _ in 0 .. 200 {
-			if C.vinix_linuxkpi_selftest() != 0 {
+			if C.vinix_linuxkpi_selftest() != 0 || C.vinix_linuxkpi_task_selftest() != 0 {
 				lib.kpanic(unsafe { nil }, c'Linux compatibility layer self-test failed')
 			}
 		}
@@ -248,6 +293,7 @@ pub fn initialise() {
 		C.kprintf(c'linuxkpi: raw locks, bitmaps, byte order and bounded strings passed\n')
 		C.kprintf(c'linuxkpi: static and dynamic per-CPU isolation passed on %u CPUs\n',
 			u32(cpu_locals.len))
+		C.kprintf(c'linuxkpi: current task identity and guarded voluntary rescheduling passed\n')
 		// Exercise a real scheduler interrupt with preemption disabled and
 		// IRQs still enabled, rather than relying only on host lock tests.
 		preempt_disable()

@@ -14,6 +14,9 @@
 #include <linux/bits.h>
 #include <linux/bitmap.h>
 #include <linux/percpu.h>
+#include <linux/sched.h>
+#include <linux/sched/signal.h>
+#include <linux/smp.h>
 #include <linux/list.h>
 #include <linux/list_sort.h>
 #include <linux/rbtree_augmented.h>
@@ -30,6 +33,99 @@ static _Thread_local bool interrupts = true;
 static _Thread_local unsigned int preempt_depth;
 static _Thread_local unsigned int current_cpu;
 static atomic_t refcount_warnings = ATOMIC_INIT(0);
+struct native_task_model {
+    u64 storage[8];
+    int pid, tgid;
+    const char *name;
+    u64 pending, masked;
+    bool must_exit, exiting;
+    unsigned int yields;
+};
+static _Thread_local struct native_task_model *native_task;
+static _Thread_local bool resched_pending;
+
+struct task_struct *vinix_linuxkpi_current_task(void)
+{
+    assert(native_task);
+    return vinix_linuxkpi_task_view(native_task->storage, native_task, native_task->pid,
+        native_task->tgid, native_task->name, strlen(native_task->name),
+        native_task->must_exit || native_task->exiting);
+}
+bool vinix_linuxkpi_task_signal_pending(const void *thread, bool fatal)
+{
+    const struct native_task_model *task = thread;
+    if (task->must_exit || (task->pending & (1ULL << 8))) return true;
+    return !fatal && (task->pending & ~task->masked);
+}
+bool vinix_linuxkpi_need_resched(void) { return resched_pending; }
+int vinix_linuxkpi_cond_resched(void)
+{
+    if (!vinix_linuxkpi_may_sleep()) return 0;
+    assert(native_task);
+    native_task->yields++;
+    resched_pending = false;
+    return 1;
+}
+
+static void *task_worker(void *argument)
+{
+    unsigned int index = *(unsigned int *)argument;
+    struct native_task_model model = { .pid = 100 + index, .tgid = 100, .name = "long-task-name-needs-truncation" };
+    native_task = &model;
+    current_cpu = index;
+    char initial_name[] = "initial-name";
+    vinix_linuxkpi_task_init(model.storage, &model, model.pid, model.tgid, initial_name, 12);
+    memset(initial_name, 'x', sizeof(initial_name));
+    struct task_struct *task = current;
+    assert(task_pid_nr(task) == model.pid && task_tgid_nr(task) == 100);
+    assert(!strcmp(task->comm, "long-task-name-") && !task->flags);
+    for (unsigned int i = 0; i < 1000; i++) {
+        assert(vinix_linuxkpi_task_selftest() == 0);
+        current_cpu = (current_cpu + 1) % 4;
+        assert(current == task && task_pid_nr(task) == model.pid);
+    }
+    model.name = "short";
+    assert(!strcmp(current->comm, "short") && !memchr_inv(task->comm + 5, 0, TASK_COMM_LEN - 5));
+    struct native_task_model child = { .pid = 200 + index, .tgid = 200 };
+    vinix_linuxkpi_task_inherit(child.storage, &child, child.pid, child.tgid, task);
+    struct task_struct *child_view = vinix_linuxkpi_task_view(child.storage, &child,
+        child.pid, child.tgid, NULL, 0, false);
+    assert(!strcmp(child_view->comm, "short") && child_view != task);
+    model.name = "";
+    assert(!strcmp(current->comm, "initial-name"));
+    assert(!signal_pending(task) && !fatal_signal_pending(task));
+    model.pending = 1ULL << 14; /* SIGTERM */
+    assert(signal_pending(task) && !fatal_signal_pending(task));
+    model.masked = model.pending;
+    assert(!signal_pending(task) && !fatal_signal_pending(task));
+    model.pending |= 1ULL << 8; /* SIGKILL */
+    assert(signal_pending(task) && fatal_signal_pending(task));
+    model.pending = model.masked = 0;
+    model.must_exit = true;
+    assert(signal_pending(task) && fatal_signal_pending(task) && (current->flags & PF_EXITING));
+    model.must_exit = false;
+    model.exiting = true;
+    assert(current->flags & PF_EXITING);
+    model.exiting = false;
+    assert(!current->flags);
+    resched_pending = true;
+    preempt_disable();
+    assert(need_resched() && !cond_resched() && need_resched());
+    preempt_enable_no_resched();
+    assert(need_resched() && cond_resched() == 1 && !need_resched());
+    assert(preempt_depth == 0 && interrupts && model.yields == 1001);
+    native_task = NULL;
+    return NULL;
+}
+
+static void task_tests(void)
+{
+    pthread_t threads[4];
+    unsigned int indexes[4] = {0, 1, 2, 3};
+    for (unsigned int i = 0; i < 4; i++) assert(!pthread_create(&threads[i], NULL, task_worker, &indexes[i]));
+    for (unsigned int i = 0; i < 4; i++) assert(!pthread_join(threads[i], NULL));
+    assert(live_pages == permanent_pages);
+}
 
 void *vinix_linuxkpi_alloc_pages(size_t pages, bool reclaim)
 {
@@ -725,6 +821,7 @@ int main(void)
     byteorder_tests();
     raw_lock_tests();
     percpu_tests();
+    task_tests();
     list_tests();
     tree_tests();
     concurrency_tests();
@@ -732,6 +829,6 @@ int main(void)
     reference_tests();
     vinix_linuxkpi_percpu_destroy_for_test();
     assert(live_pages == 0);
-    puts("LinuxKPI: PASS (Linux helpers, allocation/OOM, page-boundary strings, bitmaps, SMP/IRQ locks, per-CPU storage)");
+    puts("LinuxKPI: PASS (Linux helpers, allocation/OOM, page-boundary strings, bitmaps, SMP/IRQ locks, per-CPU storage, task views)");
     return 0;
 }

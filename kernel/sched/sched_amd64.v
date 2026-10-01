@@ -614,6 +614,7 @@ pub fn new_kernel_thread(pc voidptr, arg voidptr, autoenqueue bool) &proc.Thread
 
 	t.self = voidptr(t)
 	t.gs_base = u64(voidptr(t))
+	proc.linuxkpi_init_task(mut t, unsafe { nil })
 
 	if autoenqueue == true {
 		enqueue_thread(t, false)
@@ -715,6 +716,7 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 		errno.set(errno.eagain)
 		return none
 	}
+	proc.linuxkpi_init_task(mut t, unsafe { nil })
 
 	if autoenqueue == true {
 		enqueue_thread(t, false)
@@ -783,6 +785,7 @@ pub fn new_cloned_thread(_process &proc.Process, _source &proc.Thread, state &cp
 		errno.set(errno.eagain)
 		return none
 	}
+	proc.linuxkpi_init_task(mut t, source)
 
 	return t
 }

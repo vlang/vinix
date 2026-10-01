@@ -21,6 +21,16 @@ void *vinix_linuxkpi_percpu_ptr(const void *ptr, unsigned int cpu);
 int vinix_linuxkpi_percpu_init(unsigned int count, const void *begin, const void *end);
 unsigned int vinix_linuxkpi_percpu_count(void);
 bool vinix_linuxkpi_may_sleep(void);
+bool vinix_linuxkpi_need_resched(void);
+int vinix_linuxkpi_cond_resched(void);
+bool vinix_linuxkpi_task_signal_pending(const void *thread, bool fatal);
+void vinix_linuxkpi_task_init(void *storage, void *thread, int pid, int tgid,
+                            const char *name, size_t length);
+void vinix_linuxkpi_task_inherit(void *storage, void *thread, int pid, int tgid,
+                               const void *source);
+void *vinix_linuxkpi_task_view(void *storage, void *thread, int pid, int tgid,
+                             const char *name, size_t length, bool exiting);
+int vinix_linuxkpi_task_selftest(void);
 void vinix_linuxkpi_refcount_warning(int kind);
 bool vinix_linuxkpi_cpu_has(unsigned int feature);
 void vinix_linuxkpi_fpu_begin(void);

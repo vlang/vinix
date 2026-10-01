@@ -54,6 +54,9 @@ pub mut:
 	user_stack   u64
 	syscall_num  u64
 	// Movable members
+	// Borrowed Linux current-task view, owned by this Thread. Its C layout
+	// and alignment are checked in c/linuxkpi_task.c; it adds no allocation.
+	linuxkpi_task       [8]u64
 	tid                int
 	ns_tid             int
 	is_in_queue        bool
