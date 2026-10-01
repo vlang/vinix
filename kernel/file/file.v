@@ -1298,14 +1298,23 @@ pub fn syscall_mmap(_ voidptr, addr voidptr, length u64, prot_and_flags u64, fdn
 	if flags & mmap.map_anonymous == 0 && voidptr(resource_) == unsafe { nil } {
 		return errno.err, errno.ebadf
 	}
+	mut map_flags := flags & ~mmap.map_no_write
 	if flags & mmap.map_anonymous == 0 {
+		// O_PATH opens a file without any permission to it, and so lent its
+		// contents to anyone mapping it, as Linux does not.
+		if fd.handle.flags & resource.o_path != 0 {
+			return errno.err, errno.ebadf
+		}
 		access := fd.handle.flags & resource.o_accmode
 		if access == resource.o_wronly {
 			return errno.err, errno.eacces
 		}
-		if flags & mmap.map_shared != 0 && prot & mmap.prot_write != 0
-			&& access != resource.o_rdwr {
-			return errno.err, errno.eacces
+		if flags & mmap.map_shared != 0 && access != resource.o_rdwr {
+			if prot & mmap.prot_write != 0 {
+				return errno.err, errno.eacces
+			}
+			// Nor may mprotect() make it writable later.
+			map_flags |= mmap.map_no_write
 		}
 	}
 
@@ -1313,7 +1322,7 @@ pub fn syscall_mmap(_ voidptr, addr voidptr, length u64, prot_and_flags u64, fdn
 	if fdnum != -1 {
 		mapping_handle = voidptr(fd.handle)
 	}
-	ret := mmap.mmap(process.pagemap, addr, length, prot, flags, resource_, offset, mapping_handle, retain_mmap_handle, release_mmap_handle) or {
+	ret := mmap.mmap(process.pagemap, addr, length, prot, map_flags, resource_, offset, mapping_handle, retain_mmap_handle, release_mmap_handle) or {
 		return errno.err, errno.get()
 	}
 

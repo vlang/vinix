@@ -9,6 +9,7 @@ module pipe
 import errno
 import file
 import memory
+import resource
 import usercopy
 
 // splice(2)/vmsplice(2)/tee(2) flags. None of them change what happens here —
@@ -19,6 +20,21 @@ const splice_f_known = 0xf
 // How much is moved per round trip. Bounded so that a caller asking to move a
 // gigabyte does not ask the kernel for a gigabyte of bounce buffer.
 const transfer_chunk = u64(16384)
+
+// Whether a descriptor was opened for reading, or for writing. These calls
+// went straight to the files' own read and write, which do not look, so
+// anyone could write a file they could only open for reading, or a FIFO
+// another user reads, by copying, splicing or vmsplicing into it, and read
+// one opened only for writing.
+fn readable(fd &file.FD) bool {
+	access := fd.handle.flags & resource.o_accmode
+	return access == resource.o_rdonly || access == resource.o_rdwr
+}
+
+fn writable(fd &file.FD) bool {
+	access := fd.handle.flags & resource.o_accmode
+	return access == resource.o_wronly || access == resource.o_rdwr
+}
 
 // The pipe behind a descriptor, or none when it is not one.
 fn pipe_from_fd(fd &file.FD) ?&Pipe {
@@ -48,6 +64,15 @@ pub fn syscall_splice(_ voidptr, fd_in int, off_in u64, fd_out int, off_out u64,
 	mut sink := file.fd_from_fdnum(unsafe { nil }, fd_out) or { return errno.err, errno.ebadf }
 	defer {
 		sink.unref()
+	}
+
+	if !readable(source) || !writable(sink) {
+		return errno.err, errno.ebadf
+	}
+	// It writes at an offset, which an O_APPEND file does not take, as on
+	// Linux.
+	if sink.handle.flags & resource.o_append != 0 {
+		return errno.err, errno.einval
 	}
 
 	source_pipe := pipe_from_fd(source) or { unsafe { nil } }
@@ -84,6 +109,9 @@ pub fn syscall_tee(_ voidptr, fd_in int, fd_out int, length u64, flags u32) (u64
 		sink.unref()
 	}
 
+	if !readable(source) || !writable(sink) {
+		return errno.err, errno.ebadf
+	}
 	mut source_pipe := pipe_from_fd(source) or { return errno.err, errno.einval }
 	mut sink_pipe := pipe_from_fd(sink) or { return errno.err, errno.einval }
 
@@ -143,6 +171,10 @@ pub fn syscall_vmsplice(_ voidptr, fdnum int, iov u64, nr_segs u64, flags u32) (
 	}
 
 	pipe_from_fd(fd) or { return errno.err, errno.ebadf }
+	// It only ever puts the caller's memory into the pipe.
+	if !writable(fd) {
+		return errno.err, errno.ebadf
+	}
 
 	mut handle := fd.handle
 	mut total := u64(0)
@@ -215,6 +247,10 @@ pub fn syscall_copy_file_range(_ voidptr, fd_in int, off_in u64, fd_out int, off
 	// Both sides must be ordinary files; a pipe is splice(2)'s business.
 	if pipe_from_fd(source) != none || pipe_from_fd(sink) != none {
 		return errno.err, errno.einval
+	}
+	// As on Linux, an O_APPEND file cannot be written at an offset this way.
+	if !readable(source) || !writable(sink) || sink.handle.flags & resource.o_append != 0 {
+		return errno.err, errno.ebadf
 	}
 
 	return move_between(mut source, off_in, mut sink, off_out, length)

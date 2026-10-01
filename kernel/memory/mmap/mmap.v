@@ -45,6 +45,9 @@ fn validate_protection(prot int) ? {
 // portion up to brk_current is charged to RLIMIT_AS; the inaccessible reserve
 // exists solely to keep unrelated mappings out of future heap addresses.
 const map_brk_reservation = 0x20000000
+// Asked by the caller for a shared mapping of a file opened without write
+// access, which mprotect() then may not make writable; see no_write.
+pub const map_no_write = 0x40000000
 
 // Runtimes such as JavaScriptCore reserve multi-gigabyte anonymous arenas but
 // commit only a small fraction of them. Keep large reservations sparse and let
@@ -131,6 +134,11 @@ pub mut:
 	segmented_file    bool
 	file_data_start   u64
 	file_data_length  u64
+	// A shared mapping of something the mapper could only read. It may never
+	// be writable: mprotect() would otherwise have let anyone who can read a
+	// file write it, through a mapping made read-only. Linux clears
+	// VM_MAYWRITE for the same reason.
+	no_write bool
 }
 
 struct MmapOptions {
@@ -139,6 +147,7 @@ mut:
 	segmented_file   bool
 	file_data_start  u64
 	file_data_length u64
+	no_write         bool
 }
 
 pub fn list_ranges(pagemap &memory.Pagemap) {
@@ -1124,11 +1133,18 @@ pub fn mmap_file_segment(_pagemap &memory.Pagemap, addr u64, length u64, prot in
 // which the same operation is about to unmap so RLIMIT_AS applies to its final
 // footprint instead of the harmless temporary overlap.
 fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot int,
-	flags int, _resource &resource.Resource, offset i64, handle voidptr,
+	requested_flags int, _resource &resource.Resource, offset i64, handle voidptr,
 	handle_ref fn (voidptr), handle_unref fn (voidptr), limit_credit u64,
 	options MmapOptions) ?voidptr {
 	mut pagemap := unsafe { _pagemap }
 	mut resource_ := unsafe { _resource }
+	flags := requested_flags & ~map_no_write
+	no_write := (options.no_write || requested_flags & map_no_write != 0)
+		&& flags & map_shared != 0 && flags & map_anonymous == 0
+	if no_write && prot & prot_write != 0 {
+		errno.set(errno.eacces)
+		return none
+	}
 
 	// Every user mapping, the program's own segments included, is made here,
 	// so the resolver is in place before anything can copy from one.
@@ -1215,6 +1231,7 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
 		segmented_file: options.segmented_file
 		file_data_start: options.file_data_start
 		file_data_length: options.file_data_length
+		no_write: no_write
 		shadow_pagemap: memory.Pagemap{
 			top_level: unsafe { &u64(0) }
 		}
@@ -1512,6 +1529,11 @@ pub fn mprotect(mut pagemap memory.Pagemap, addr voidptr, len u64, prot int) ? {
 		errno.set(errno.eperm)
 		return none
 	}
+	if prot & prot_write != 0 && no_write_overlap_unlocked(pagemap, u64(addr), length) {
+		pagemap.l.release()
+		errno.set(errno.eacces)
+		return none
+	}
 	pagemap.l.release()
 
 	// mmap() deliberately leaves PROT_NONE reservations without physical pages.
@@ -1646,6 +1668,31 @@ fn extend_brk_range_unlocked(mut pagemap memory.Pagemap, base u64, length u64, p
 	return true
 }
 
+// Whether a shared mapping that may never be writable overlaps the range.
+fn no_write_overlap_unlocked(pagemap &memory.Pagemap, base u64, length u64) bool {
+	if length == 0 || base > u64(-1) - length {
+		return false
+	}
+	end := base + length
+	mut range_local := range_floor(pagemap, base)
+	if range_local == unsafe { nil } {
+		range_local = range_lower_bound(pagemap, base)
+	}
+	for range_local != unsafe { nil } {
+		if range_local.base >= end {
+			break
+		}
+		if range_local.global.no_write && base < range_local.base + range_local.length {
+			return true
+		}
+		if range_local.base == u64(-1) {
+			break
+		}
+		range_local = range_lower_bound(pagemap, range_local.base + 1)
+	}
+	return false
+}
+
 pub fn mprotect_unlocked(mut pagemap memory.Pagemap, addr voidptr, _length u64, prot int) ? {
 	validate_protection(prot)?
 	if _length == 0 {
@@ -1661,6 +1708,10 @@ pub fn mprotect_unlocked(mut pagemap memory.Pagemap, addr voidptr, _length u64, 
 	}
 	if immutable_overlap_unlocked(pagemap, u64(addr), length) {
 		errno.set(errno.eperm)
+		return none
+	}
+	if prot & prot_write != 0 && no_write_overlap_unlocked(pagemap, u64(addr), length) {
+		errno.set(errno.eacces)
 		return none
 	}
 	if extend_brk_range_unlocked(mut pagemap, u64(addr), length, prot) {

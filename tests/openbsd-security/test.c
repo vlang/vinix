@@ -6,8 +6,9 @@
  * In-guest regression coverage for Vinix's OpenBSD security features:
  * pledge(2), unveil(2), signed signal frames, random process ids, a
  * random program break, minherit(2), the network stack's random ports,
- * sequence numbers and IP IDs, and memory layouts kept from other users.
- * Built statically for either architecture and run
+ * sequence numbers and IP IDs, memory layouts kept from other users, and
+ * read-only files that no back door writes. Built statically for either
+ * architecture and run
  * as PID 1; every case runs in a child, so a pledge violation that kills the
  * child is an outcome the parent can check. */
 #define _GNU_SOURCE
@@ -1062,11 +1063,81 @@ static int run_layout_tests(void)
 	return 0;
 }
 
+/* A root-owned file uid 1000 may only read, and one of uid 1000's own. */
+static const char read_only_path[] = "/tmp/vinix-read-only";
+static const char own_path[] = "/tmp/vinix-own";
+
+static int read_only_writer(void)
+{
+	size_t size = (size_t)sysconf(_SC_PAGESIZE);
+	CHECK(become(1000) == 0);
+	CHECK(open(read_only_path, O_RDWR) == -1 && errno == EACCES);
+	int fd = open(read_only_path, O_RDONLY);
+	CHECK(fd >= 0);
+	/* mprotect() may not make a shared mapping of it writable... */
+	char *shared = mmap(NULL, size, PROT_READ, MAP_SHARED, fd, 0);
+	CHECK(shared != MAP_FAILED);
+	CHECK(mprotect(shared, size, PROT_READ | PROT_WRITE) == -1 && errno == EACCES);
+	CHECK(munmap(shared, size) == 0);
+	/* ...though it may a private one, which is a copy. */
+	char *copy = mmap(NULL, size, PROT_READ, MAP_PRIVATE, fd, 0);
+	CHECK(copy != MAP_FAILED);
+	CHECK(mprotect(copy, size, PROT_READ | PROT_WRITE) == 0);
+	copy[0] = 'X';
+	CHECK(munmap(copy, size) == 0);
+	/* Nor may copy_file_range() or splice() write it. */
+	int own = open(own_path, O_RDWR | O_TRUNC);
+	CHECK(own >= 0 && write(own, "attacker", 8) == 8);
+	loff_t from = 0, to = 0;
+	CHECK(refused((int)copy_file_range(own, &from, fd, &to, 8, 0), EBADF));
+	int channel[2];
+	CHECK(pipe(channel) == 0 && write(channel[1], "attacker", 8) == 8);
+	to = 0;
+	CHECK(refused((int)splice(channel[0], NULL, fd, &to, 8, 0), EBADF));
+	/* Or read what was opened only for writing. */
+	int write_only = open(own_path, O_WRONLY);
+	CHECK(write_only >= 0);
+	from = 0;
+	CHECK(refused((int)splice(write_only, &from, channel[1], NULL, 8, 0), EBADF));
+	/* A file opened for writing too can still be mapped shared and raised. */
+	shared = mmap(NULL, size, PROT_READ, MAP_SHARED, own, 0);
+	CHECK(shared != MAP_FAILED);
+	CHECK(mprotect(shared, size, PROT_READ | PROT_WRITE) == 0);
+	CHECK(munmap(shared, size) == 0);
+	/* O_PATH asks no permission, so it may not be mapped at all. */
+	int path_fd = open(read_only_path, O_PATH);
+	CHECK(path_fd >= 0);
+	CHECK(mmap(NULL, size, PROT_READ, MAP_PRIVATE, path_fd, 0) == MAP_FAILED && errno == EBADF);
+	close(path_fd);
+	/* vmsplice may not write into a pipe's read end. */
+	struct iovec piece = {.iov_base = (void *)"attacker", .iov_len = 8};
+	CHECK(vmsplice(channel[0], &piece, 1, 0) == -1 && errno == EBADF);
+	return 0;
+}
+
+static int run_read_only_tests(void)
+{
+	CHECK(write_file(read_only_path, "original") == 0);
+	CHECK(chmod(read_only_path, 0644) == 0);
+	/* The test image's /tmp may not be one that anyone can create files in. */
+	CHECK(write_file(own_path, "") == 0 && chown(own_path, 1000, 1000) == 0);
+	CHECK(exited_ok(in_child(read_only_writer)));
+	char text[16] = {0};
+	int fd = open(read_only_path, O_RDONLY);
+	CHECK(fd >= 0 && read(fd, text, sizeof(text) - 1) == 8);
+	close(fd);
+	CHECK(strcmp(text, "original") == 0);
+	CHECK(unlink(read_only_path) == 0 && unlink(own_path) == 0);
+	puts("OPENBSD SECURITY PASS: read-only files stay read-only");
+	return 0;
+}
+
 static int run_tests(void)
 {
 	if (run_pledge_tests() != 0 || run_unveil_tests() != 0 || run_signal_tests() != 0
 	    || run_pid_tests() != 0 || run_break_tests() != 0 || run_inherit_tests() != 0
-	    || run_network_tests() != 0 || run_layout_tests() != 0)
+	    || run_network_tests() != 0 || run_layout_tests() != 0
+	    || run_read_only_tests() != 0)
 		return 1;
 	puts("VINIX OPENBSD SECURITY: PASS");
 	return 0;

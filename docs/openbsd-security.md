@@ -271,6 +271,33 @@ the zeroing of each allocation and makes one pass over the object, as the
 zeroing did. A kernel built with `-d heap_selftest` writes to a freed object
 at boot and checks that it is caught.
 
+## Read-only descriptors that nothing writes through
+
+A descriptor opened without write access could still reach the file behind
+it for writing, three ways, all now closed:
+
+- `mprotect(2)` never looked at what a mapping was made from, so a
+  `MAP_SHARED`, `PROT_READ` mapping of a file opened `O_RDONLY` could be
+  raised to `PROT_WRITE` and written through. Such a mapping, and a
+  `shmat(2)` with `SHM_RDONLY`, now carry a flag that forks, splits and
+  `mremap(2)` keep, and `mprotect` refuses `PROT_WRITE` over it with
+  `EACCES`, as Linux does by clearing `VM_MAYWRITE`. A private mapping, a
+  copy, may still be made writable.
+- `copy_file_range(2)`, `splice(2)`, `tee(2)` and `vmsplice(2)` went
+  straight to the files' own read and write, which do not check the
+  descriptor's access mode, so one opened only for reading could be written
+  and one opened only for writing could be read. They now need the source
+  open for reading and the sink for writing, `EBADF` otherwise, and
+  `copy_file_range` refuses an `O_APPEND` sink.
+- An `O_PATH` descriptor, which is opened with no permission to the file at
+  all, could be `mmap(2)`ed and so gave up the file's contents. It is now
+  refused with `EBADF`, as on Linux.
+
+SysV shared memory had no permission checks at all: any process could attach,
+read and write another user's segment, or take it over with `IPC_SET` or
+`IPC_RMID`. `shmget`, `shmat` and `shmctl` now apply the segment's mode and
+ownership, as Linux's `ipcperms()` does.
+
 ## Memory layouts kept from other users
 
 `/proc/<pid>/maps`, `smaps` and `auxv` say where a process's program,
