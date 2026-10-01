@@ -687,9 +687,21 @@ fn machine_stat_text() string {
 	return text.str()
 }
 
+// The files that say where a process keeps things; see proc.may_inspect.
+fn (this &ProcFSResource) shows_layout() bool {
+	return match this.kind {
+		.maps, .smaps, .auxv { true }
+		else { false }
+	}
+}
+
 fn (mut this ProcFSResource) read(_handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
 	if stat.isdir(this.stat.mode) {
 		errno.set(errno.eisdir)
+		return none
+	}
+	if this.shows_layout() && !proc.may_inspect(this.pid) {
+		errno.set(errno.eacces)
 		return none
 	}
 	if (this.kind == .maps || this.kind == .smaps || this.kind == .net_tcp)
@@ -951,7 +963,7 @@ fn maps_text(pid int, detailed bool) string {
 	for _ in 0 .. 50 {
 		proc.lock_table()
 		process := proc.process_at(pid)
-		if process == unsafe { nil } {
+		if process == unsafe { nil } || !proc.may_inspect_locked(process) {
 			proc.unlock_table()
 			return ''
 		}

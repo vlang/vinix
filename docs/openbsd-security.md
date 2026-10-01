@@ -271,6 +271,16 @@ the zeroing of each allocation and makes one pass over the object, as the
 zeroing did. A kernel built with `-d heap_selftest` writes to a freed object
 at boot and checks that it is caught.
 
+## Memory layouts kept from other users
+
+`/proc/<pid>/maps`, `smaps` and `auxv` say where a process's program,
+libraries, stack and heap are, and every user could read them for every
+process, which undid all of the randomization above for a local attacker.
+They are now for the process itself, for a process whose user and group IDs
+are all the reader's effective IDs, and for a reader with `CAP_SYS_PTRACE`,
+as Linux's ptrace check has it. Anyone else's read fails with `EACCES`. The
+rest of `/proc/<pid>`, `stat` and `status` among them, stays public.
+
 ## Already in place
 
 These came before and are unchanged: W^X for user mappings, `mimmutable(2)`

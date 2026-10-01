@@ -5,8 +5,9 @@
 /* SPDX-License-Identifier: BSD-2-Clause
  * In-guest regression coverage for Vinix's OpenBSD security features:
  * pledge(2), unveil(2), signed signal frames, random process ids, a
- * random program break, minherit(2) and the network stack's random ports,
- * sequence numbers and IP IDs. Built statically for either architecture and run
+ * random program break, minherit(2), the network stack's random ports,
+ * sequence numbers and IP IDs, and memory layouts kept from other users.
+ * Built statically for either architecture and run
  * as PID 1; every case runs in a child, so a pledge violation that kills the
  * child is an outcome the parent can check. */
 #define _GNU_SOURCE
@@ -983,11 +984,89 @@ static int run_network_tests(void)
 	return 0;
 }
 
+/* 1 if `path` can be opened and read, -errno if not. */
+static int readable(const char *path)
+{
+	int fd = open(path, O_RDONLY);
+	if (fd < 0)
+		return -errno;
+	char buffer[64];
+	ssize_t length = read(fd, buffer, sizeof(buffer));
+	int error = errno;
+	close(fd);
+	return length >= 0 ? 1 : -error;
+}
+
+static int proc_readable(pid_t pid, const char *file)
+{
+	char path[64];
+	snprintf(path, sizeof(path), "/proc/%d/%s", (int)pid, file);
+	return readable(path);
+}
+
+static int become(uid_t id)
+{
+	return setresgid(id, id, id) == 0 && setresuid(id, id, id) == 0 ? 0 : -1;
+}
+
+/* Processes of users 1000 and 1001, waiting to be told to exit. */
+static pid_t layout_same, layout_other;
+
+static pid_t user_process(uid_t id, const int ready[2], const int done[2])
+{
+	fflush(stdout);
+	pid_t child = fork();
+	if (child == 0) {
+		char byte = 0;
+		close(done[1]);
+		_exit(become(id) == 0 && write(ready[1], &byte, 1) == 1 && read(done[0], &byte, 1) >= 0 ? 0 : 1);
+	}
+	char byte;
+	return child > 0 && read(ready[0], &byte, 1) == 1 ? child : -1;
+}
+
+static int layout_reader(void)
+{
+	static const char *const layout[] = {"maps", "smaps", "auxv"};
+	CHECK(become(1000) == 0);
+	for (int i = 0; i < 3; i++) {
+		CHECK(proc_readable(getpid(), layout[i]) == 1);
+		CHECK(proc_readable(layout_same, layout[i]) == 1);
+		CHECK(proc_readable(1, layout[i]) == -EACCES);
+		CHECK(proc_readable(layout_other, layout[i]) == -EACCES);
+	}
+	CHECK(readable("/proc/self/maps") == 1);
+	/* What any process may know of another stays public. */
+	CHECK(proc_readable(1, "status") == 1);
+	CHECK(proc_readable(layout_other, "stat") == 1);
+	return 0;
+}
+
+static int run_layout_tests(void)
+{
+	int ready[2], done[2];
+	CHECK(pipe(ready) == 0 && pipe(done) == 0);
+	layout_same = user_process(1000, ready, done);
+	layout_other = user_process(1001, ready, done);
+	CHECK(layout_same > 0 && layout_other > 0);
+	CHECK(proc_readable(layout_other, "maps") == 1);
+	int status = in_child(layout_reader);
+	close(done[1]);
+	CHECK(exited_ok(reap(layout_same)));
+	CHECK(exited_ok(reap(layout_other)));
+	CHECK(exited_ok(status));
+	close(ready[0]);
+	close(ready[1]);
+	close(done[0]);
+	puts("OPENBSD SECURITY PASS: memory layouts are private");
+	return 0;
+}
+
 static int run_tests(void)
 {
 	if (run_pledge_tests() != 0 || run_unveil_tests() != 0 || run_signal_tests() != 0
 	    || run_pid_tests() != 0 || run_break_tests() != 0 || run_inherit_tests() != 0
-	    || run_network_tests() != 0)
+	    || run_network_tests() != 0 || run_layout_tests() != 0)
 		return 1;
 	puts("VINIX OPENBSD SECURITY: PASS");
 	return 0;

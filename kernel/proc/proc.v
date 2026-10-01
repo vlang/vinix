@@ -1089,7 +1089,7 @@ pub fn process_auxv(pid int) []u8 {
 	lock_table()
 	defer { unlock_table() }
 	process := process_at(pid)
-	if process == unsafe { nil } {
+	if process == unsafe { nil } || !may_inspect_locked(process) {
 		return []u8{}
 	}
 	return process.saved_auxv.clone()

@@ -38,6 +38,7 @@ FEATURE_MARKERS = (
     b"OPENBSD SECURITY PASS: the program break is random",
     b"OPENBSD SECURITY PASS: minherit and fork-time wiping",
     b"OPENBSD SECURITY PASS: ports, sequence numbers and IP IDs are random",
+    b"OPENBSD SECURITY PASS: memory layouts are private",
 )
 REPORT_MARKER = b': pledge "rpath", syscall '
 # The guest's NIC, as both runs give it, and how many connections and
