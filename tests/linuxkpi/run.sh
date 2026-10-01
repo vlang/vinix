@@ -6,10 +6,11 @@ work=$(mktemp -d "${TMPDIR:-/tmp}/vinix-linuxkpi-test.XXXXXX")
 trap 'rm -rf "$work"' EXIT INT TERM
 python3 -B "$repo/kernel/linuxkpi/upstream.py" verify --base "$(dirname "$source_dir")"
 # Upstream Linux enables -Wall/-Wextra but disables unused-parameter warnings.
-${CC:-clang} -std=gnu11 -O1 -g -Wall -Wextra -Werror -Wno-unused-parameter \
+${CC:-clang} -std=gnu11 -O1 -g -fwrapv -Wall -Wextra -Werror -Wno-unused-parameter \
     -fsanitize=address,undefined -fno-omit-frame-pointer -pthread \
-    -DVINIX_LINUXKPI -I"$repo/kernel/linuxkpi/include" -I"$source_dir/include" \
-    "$repo/kernel/c/linuxkpi.c" "$repo/tests/linuxkpi/test.c" \
+    -DVINIX_LINUXKPI -DVINIX_LINUXKPI_HOST_TEST -D__KERNEL__ -include linux/kconfig.h \
+    -I"$repo/kernel/linuxkpi/include" -I"$source_dir/include" -I"$source_dir/include/uapi" \
+    "$repo/kernel/c/linuxkpi.c" "$repo/kernel/c/linuxkpi_refcount.c" "$repo/tests/linuxkpi/test.c" \
     "$source_dir/lib/list_sort.c" "$source_dir/lib/sort.c" "$source_dir/lib/rbtree.c" \
     -o "$work/test"
 "$work/test"

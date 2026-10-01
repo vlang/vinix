@@ -8,6 +8,7 @@ import lib
 import x86.cpu
 import x86.cpu.local as cpulocal
 import sched
+import proc
 import klock
 import x86.hpet as hpet_clock
 
@@ -15,6 +16,7 @@ __global (
 	preempt_depth     [256]u32
 	preempt_pending   [256]bool
 	preempt_deferrals [256]u64
+	fpu_borrowed      [256]bool
 )
 
 fn may_preempt() bool {
@@ -122,9 +124,68 @@ fn bug(_file &char, _line int) {
 	lib.kpanic(unsafe { nil }, c'Linux compatibility layer BUG')
 }
 
+@[export: 'vinix_linuxkpi_refcount_warning']
+fn refcount_warning(kind int) {
+	C.kprintf(c'linuxkpi: refcount saturated after invalid operation %d; retaining object\n', kind)
+}
+
+@[export: 'vinix_linuxkpi_cpu_has']
+fn cpu_has(feature u32) bool {
+	// Linux's feature word 0 is leaf 1 EDX; word 4 is leaf 1 ECX.
+	ok, _, _, ecx, edx := cpu.cpuid(1, 0)
+	if !ok {
+		return false
+	}
+	bits := match feature / 32 {
+		0 { edx }
+		4 { ecx }
+		else {
+			lib.kpanic(unsafe { nil }, c'linuxkpi: unsupported CPU feature word')
+			u32(0)
+		}
+	}
+	return bits & (u32(1) << (feature % 32)) != 0
+}
+
+@[export: 'vinix_linuxkpi_fpu_begin']
+fn fpu_begin() {
+	preempt_disable()
+	ints := cpu.interrupt_toggle(false)
+	local := cpulocal.current()
+	index := local.cpu_number
+	borrower := proc.current_thread()
+	if fpu_borrowed[index] || borrower == unsafe { nil }
+		|| borrower.fpu_storage == unsafe { nil } {
+		lib.kpanic(unsafe { nil }, c'linuxkpi: invalid kernel FPU borrow')
+	}
+	// The running thread already owns aligned XSAVE/FXSAVE storage. Keeping
+	// preemption disabled pins that owner until all its registers are restored.
+	fpu_borrowed[index] = true
+	fpu_save(borrower.fpu_storage)
+	cpu.interrupt_toggle(ints)
+}
+
+@[export: 'vinix_linuxkpi_fpu_end']
+fn fpu_end() {
+	ints := cpu.interrupt_toggle(false)
+	local := cpulocal.current()
+	index := local.cpu_number
+	if !fpu_borrowed[index] {
+		lib.kpanic(unsafe { nil }, c'linuxkpi: unbalanced kernel FPU end')
+	}
+	fpu_restore(proc.current_thread().fpu_storage)
+	fpu_borrowed[index] = false
+	cpu.interrupt_toggle(ints)
+	preempt_enable()
+}
+
+fn C.i915_memcpy_init_early(voidptr)
+fn C.vinix_linuxkpi_wc_selftest() int
+
 pub fn initialise() {
 	$if linuxkpi ? {
 		sched.register_preemption_guard(voidptr(may_preempt))
+		C.i915_memcpy_init_early(unsafe { nil })
 		before := memory.free_bytes()
 		for _ in 0 .. 200 {
 			if C.vinix_linuxkpi_selftest() != 0 {
@@ -154,6 +215,9 @@ pub fn initialise() {
 			lib.kpanic(unsafe { nil }, c'Linux compatibility preemption guard was not exercised')
 		}
 		C.kprintf(c'linuxkpi: scheduler deferred preemption while IRQs stayed enabled\n')
+		if C.vinix_linuxkpi_wc_selftest() != 0 {
+			lib.kpanic(unsafe { nil }, c'Linux i915 WC copy or FPU preservation failed')
+		}
 		dev := pci.get_device_by_vendor(0x8086, 0x9a49, 0) or { return }
 		class_code := (u32(dev.class) << 16) | (u32(dev.subclass) << 8) | u32(dev.prog_if)
 		if C.vinix_linuxkpi_tigerlake_id(dev.vendor_id, dev.device_id, class_code) {

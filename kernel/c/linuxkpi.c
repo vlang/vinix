@@ -9,8 +9,13 @@
 #include <linux/rbtree.h>
 #include <linux/sort.h>
 #include <linux/spinlock.h>
+#include <linux/kref.h>
 #include <vinix/runtime.h>
 #include <drm/i915_pciids.h>
+#ifndef VINIX_LINUXKPI_HOST_TEST
+#include <asm/fpu/api.h>
+#include "i915_memcpy.h"
+#endif
 
 /* kmalloc uses contiguous physical pages. This first backend deliberately
  * trades space for an honest, fallible allocation path; no vmalloc fallback
@@ -188,6 +193,14 @@ int vinix_linuxkpi_selftest(void)
     }
     for (size_t i = 0; i < ARRAY_SIZE(nodes); i++) rb_erase(&nodes[i].tree, &root);
     if (!RB_EMPTY_ROOT(&root)) result = -EIO;
+    refcount_t refs = REFCOUNT_INIT(1);
+    refcount_inc(&refs);
+    if (refcount_dec_and_test(&refs) || !refcount_dec_and_test(&refs) ||
+        refcount_inc_not_zero(&refs)) result = -EIO;
+    atomic_long_t wide = ATOMIC_LONG_INIT(1L << 40);
+    long expected = 1L << 40;
+    if (!atomic_long_try_cmpxchg(&wide, &expected, expected + 1) ||
+        atomic_long_read(&wide) != (1L << 40) + 1) result = -EIO;
     spinlock_t lock;
     spin_lock_init(&lock);
     unsigned long flags;
@@ -202,4 +215,49 @@ int vinix_linuxkpi_selftest(void)
         vinix_linuxkpi_tigerlake_id(0x1234, 0x9a49, 0x030000)) result = -EIO;
     return result;
 }
+
+#ifndef VINIX_LINUXKPI_HOST_TEST
+int vinix_linuxkpi_wc_selftest(void)
+{
+    _Alignas(16) u64 original[2], pattern[2] = { 0x1122334455667788ULL, 0xffeeddccbbaa0099ULL };
+    _Alignas(16) u64 observed[2];
+    _Alignas(16) unsigned char source[96], destination[96];
+    unsigned int original_csr, observed_csr;
+    int result = 0;
+    /* Compatibility C is built with general registers only, like the native
+     * kernel. Explicit SIMD use here verifies preservation of live state. */
+    __asm__ volatile("movdqu %%xmm0, %0; stmxcsr %1" : "=m"(original), "=m"(original_csr) : : "memory");
+    unsigned int test_csr = (original_csr & ~0x6000U) | 0x2000;
+    __asm__ volatile("movdqu %0, %%xmm0; ldmxcsr %1" : : "m"(pattern), "m"(test_csr) : "memory");
+    kernel_fpu_begin();
+    __asm__ volatile("pxor %%xmm0, %%xmm0" : : : "memory");
+    kernel_fpu_end();
+    __asm__ volatile("movdqu %%xmm0, %0; stmxcsr %1" : "=m"(observed), "=m"(observed_csr) : : "memory");
+    if (observed[0] != pattern[0] || observed[1] != pattern[1] || observed_csr != test_csr) result |= 1;
+    for (size_t i = 0; i < sizeof(source); i++) source[i] = (unsigned char)i;
+    memset(destination, 0xa5, sizeof(destination));
+    bool accelerated = i915_has_memcpy_from_wc();
+    if (i915_memcpy_from_wc(destination + 1, source, 32)) result |= 2;
+    if (i915_memcpy_from_wc(destination, source, 64) != accelerated) result |= 4;
+    if (accelerated) {
+        if (memcmp(destination, source, 64)) result |= 8;
+        i915_unaligned_memcpy_from_wc(destination + 3, source + 1, 33);
+        if (memcmp(destination + 3, source + 1, 33)) result |= 16;
+        __asm__ volatile("movdqu %%xmm0, %0; stmxcsr %1" : "=m"(observed), "=m"(observed_csr) : : "memory");
+        if (observed[0] != pattern[0] || observed[1] != pattern[1] || observed_csr != test_csr) result |= 32;
+    } else {
+        for (size_t i = 0; i < sizeof(destination); i++) if (destination[i] != 0xa5) result |= 64;
+    }
+    __asm__ volatile("movdqu %0, %%xmm0; ldmxcsr %1" : : "m"(original), "m"(original_csr) : "memory");
+    extern int kprintf(const char *, ...);
+    if (!result) {
+        kprintf("linuxkpi: unmodified i915 WC copy (%s) and FPU preservation passed\n",
+                accelerated ? "SSE4.1" : "safe fallback");
+    } else {
+        kprintf("linuxkpi: WC copy failed checks 0x%x; XMM0 %llx:%llx, MXCSR %x (expected %x)\n",
+                result, observed[1], observed[0], observed_csr, test_csr);
+    }
+    return result ? -EIO : 0;
+}
+#endif
 #endif

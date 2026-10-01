@@ -30,14 +30,21 @@ rejects a rewritten manifest. Original copyright notices, `COPYING` and
 their case-distinct filenames cannot coexist on default macOS filesystems.
 
 The current build compiles and links unmodified Linux `lib/list_sort.c`,
-`lib/sort.c` and `lib/rbtree.c`. Importing the complete i915 source tree is
-not evidence that the driver runs.
+`lib/sort.c`, `lib/rbtree.c` and i915's `i915_memcpy.c`. The last file is a WC
+memory-copy component, not GPU initialization or command submission. Importing
+the complete i915 source tree is not evidence that the driver runs.
 
 ## Implemented APIs
 
 - Linux integer types, error pointers, overflow helpers and compiler macros.
 - Linux list/tree/sort APIs using the actual upstream headers and algorithms.
-- 32/64-bit atomic operations and memory barriers.
+- 32/64-bit, `atomic_long`, raw and conditional atomic operations and memory
+  barriers. Linux's generated API wrappers and compiler helpers stay upstream;
+  the architecture primitives use compiler atomics. Compatibility C uses
+  `-fwrapv`, as required by Linux's signed-overflow convention.
+- Upstream `refcount_t` and ordinary `kref_get`/`kref_put`, including saturation,
+  final-release ordering and spinlock release helpers. Mutex release helpers
+  remain unresolved until the sleepable mutex backend exists.
 - Spinlocks, nested IRQ save/restore and scheduler preemption guards. Lock
   spinning continues to answer Vinix's TLB shootdowns. IRQ flags belong to
   the caller, not to shared lock storage.
@@ -52,6 +59,10 @@ not evidence that the driver runs.
   `__GFP_NOFAIL` and memory-cgroup-accounted allocations are not supported.
 - A read-only target identity check against the unmodified Tiger Lake PCI
   table. This does not register an i915 device or change GPU registers.
+- Boolean static branches without text patching; CPUID feature words 0 and 4.
+- Kernel FPU borrowing that saves/restores the running thread's existing
+  XSAVE/FXSAVE storage while preemption is disabled. The upstream i915 WC-copy
+  component uses it for SSE4.1 copies; other CPU-feature words fail explicitly.
 
 The compatibility build is opt-in, x86-64 only:
 
@@ -75,27 +86,41 @@ python3 kernel/linuxkpi/audit.py
 python3 tests/linuxkpi/run_vm.py \
     --kernel build-amd64-kernel/bin/vinix \
     --state-dir /tmp/vinix-linuxkpi-guest
+python3 tests/linuxkpi/run_vm.py \
+    --kernel build-amd64-kernel/bin/vinix \
+    --cpu max,hypervisor=off --state-dir /tmp/vinix-linuxkpi-guest-sse
 ```
 
 The host tests use ASan and UBSan. They exercise allocation failure and
 preservation of the original buffer after failed `krealloc`, zero-fill,
 alignment, list stability, red-black tree invariants, concurrent atomic/lock
-operations and nested IRQ restoration. Source-import tests cover modification,
-manifest tampering and archive path traversal.
+operations and nested IRQ restoration. Refcount tests cover overflow/underflow
+saturation, concurrent final release, and acquire/release publication.
+Source-import tests cover modification, manifest tampering and archive path
+traversal.
 
 An enabled kernel runs the allocator/list/sort/tree/IRQ-lock tests 200 times
 and verifies that the physical free-page count returns to its initial value.
 It then holds preemption disabled with IRQs enabled until a real scheduler
-interrupt defers a context switch. The QEMU test requires both kernel test
-markers and a static Linux-ABI PID 1 marker on COM1. Use a kernel built with
+interrupt defers a context switch. The WC-copy test checks FPU register/MXCSR
+preservation, buffer alignment and aligned/unaligned copies. Upstream i915
+disables acceleration when CPUID reports a hypervisor; the second TCG guest
+disables that CPUID flag to exercise the actual SSE4.1 path. This is a CPU
+memory-copy test, not a test against GPU WC-mapped memory.
+The QEMU test requires all kernel test markers and a static Linux-ABI PID 1
+marker on COM1. Use a kernel built with
 `PROD=false` for serial diagnostics. The test creates its own guest and disk
-image; its state directory must not already exist.
+image; its state directory must not already exist. `--no-linuxkpi` checks a
+default kernel's Linux-ABI startup and verifies that the API layer is disabled.
+The WC test also exposed and verified a fix to the initial x86 kernel-thread
+stack: entry now reserves a return-address word to satisfy SysV alignment.
 
 `audit.py` obtains the driver translation-unit list from the original Linux
 Kbuild Makefile, with ACPI and fbdev enabled and optional self-tests/GVT off.
 It attempts every translation unit and writes complete compiler diagnostics
 to `build/linuxkpi/i915-audit.json`. An incomplete API layer makes this command
-exit with status 1. Even a successful syntax audit would still require actual
+exit with status 1. The current result is **1/269** translation units passing.
+Even a successful syntax audit would still require actual
 object linking, unresolved-symbol checks and runtime/hardware testing.
 
 ## Remaining driver integration

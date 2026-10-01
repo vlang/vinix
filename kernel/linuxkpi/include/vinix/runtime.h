@@ -13,6 +13,10 @@ void vinix_linuxkpi_spin_wait(void);
 void vinix_linuxkpi_preempt_disable(void);
 void vinix_linuxkpi_preempt_enable(void);
 bool vinix_linuxkpi_may_sleep(void);
+void vinix_linuxkpi_refcount_warning(int kind);
+bool vinix_linuxkpi_cpu_has(unsigned int feature);
+void vinix_linuxkpi_fpu_begin(void);
+void vinix_linuxkpi_fpu_end(void);
 bool vinix_linuxkpi_tigerlake_id(u16 vendor, u16 device, u32 class_code);
 int vinix_linuxkpi_selftest(void);
 #endif

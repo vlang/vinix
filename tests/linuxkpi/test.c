@@ -7,6 +7,7 @@
 #include <linux/err.h>
 #include <linux/errno.h>
 #include <linux/kernel.h>
+#include <linux/kref.h>
 #include <linux/bits.h>
 #include <linux/list.h>
 #include <linux/list_sort.h>
@@ -21,6 +22,7 @@ static bool fail_allocation;
 static bool last_reclaim;
 static _Thread_local bool interrupts = true;
 static _Thread_local unsigned int preempt_depth;
+static atomic_t refcount_warnings = ATOMIC_INIT(0);
 
 void *vinix_linuxkpi_alloc_pages(size_t pages, bool reclaim)
 {
@@ -59,6 +61,11 @@ void vinix_linuxkpi_spin_wait(void) { __asm__ volatile("" ::: "memory"); }
 void vinix_linuxkpi_preempt_disable(void) { preempt_depth++; }
 void vinix_linuxkpi_preempt_enable(void) { assert(preempt_depth); preempt_depth--; }
 bool vinix_linuxkpi_may_sleep(void) { return interrupts && !preempt_depth; }
+void vinix_linuxkpi_refcount_warning(int kind)
+{
+    assert(kind >= REFCOUNT_ADD_NOT_ZERO_OVF && kind <= REFCOUNT_DEC_LEAK);
+    atomic_inc(&refcount_warnings);
+}
 
 static void allocation_tests(void)
 {
@@ -243,12 +250,145 @@ static void concurrency_tests(void)
     assert(preempt_depth == 0 && interrupts);
 }
 
+static void atomic_api_tests(void)
+{
+    atomic_t value = ATOMIC_INIT(INT_MAX);
+    assert(atomic_fetch_inc_relaxed(&value) == INT_MAX);
+    assert(atomic_read(&value) == INT_MIN);
+    int old = 7;
+    assert(!atomic_try_cmpxchg_acquire(&value, &old, 4) && old == INT_MIN);
+    assert(atomic_try_cmpxchg_release(&value, &old, 4));
+    assert(atomic_fetch_andnot(1, &value) == 4 && atomic_read(&value) == 4);
+    atomic_or(3, &value);
+    assert(atomic_fetch_xor_acquire(2, &value) == 7 && atomic_read(&value) == 5);
+    assert(atomic_add_unless(&value, -1, 0) && atomic_read(&value) == 4);
+    atomic_set(&value, 0);
+    assert(!atomic_inc_not_zero(&value));
+    atomic64_t big = ATOMIC64_INIT(S64_MAX);
+    assert(atomic64_add_return_relaxed(1, &big) == S64_MIN);
+    s64 previous = 0;
+    assert(!atomic64_try_cmpxchg_relaxed(&big, &previous, 0) && previous == S64_MIN);
+    assert(atomic64_try_cmpxchg(&big, &previous, 0));
+    atomic_long_t wide = ATOMIC_LONG_INIT(1L << 40);
+    assert(atomic_long_fetch_add_release(1L << 40, &wide) == 1L << 40);
+    assert(atomic_long_read_acquire(&wide) == 1L << 41);
+    unsigned long bits = 7;
+    assert(xchg(&bits, 9) == 7);
+    assert(cmpxchg_acquire(&bits, 9, 11) == 9 && bits == 11);
+    unsigned long expected = 0;
+    assert(!try_cmpxchg_release(&bits, &expected, 0) && expected == 11);
+    assert(try_cmpxchg(&bits, &expected, 0) && bits == 0);
+}
+
+static atomic_t published = ATOMIC_INIT(0);
+static u64 message[2];
+
+static void *message_writer(void *unused)
+{
+    (void)unused;
+    for (u64 i = 1; i <= 20000; i++) {
+        atomic_cond_read_acquire(&published, VAL == 0);
+        message[0] = i;
+        message[1] = ~i;
+        atomic_set_release(&published, 1);
+    }
+    return NULL;
+}
+
+static void *message_reader(void *unused)
+{
+    (void)unused;
+    for (u64 i = 1; i <= 20000; i++) {
+        atomic_cond_read_acquire(&published, VAL == 1);
+        assert(message[0] == i && message[1] == ~i);
+        atomic_set_release(&published, 0);
+    }
+    return NULL;
+}
+
+struct shared_object {
+    struct kref refs;
+    unsigned int completed[4];
+};
+struct reference_worker { struct shared_object *object; unsigned int index; };
+static atomic_t releases = ATOMIC_INIT(0);
+
+static void release_object(struct kref *refs)
+{
+    struct shared_object *object = container_of(refs, struct shared_object, refs);
+    /* Each worker publishes this before dropping its final reference. The
+     * final release must acquire all prior writes and happen exactly once. */
+    for (size_t i = 0; i < ARRAY_SIZE(object->completed); i++) assert(object->completed[i] == i + 1);
+    assert(atomic_fetch_inc(&releases) == 0);
+    kfree(object);
+}
+
+static void *reference_worker(void *argument)
+{
+    struct reference_worker *worker = argument;
+    struct shared_object *object = worker->object;
+    for (int i = 0; i < 30000; i++) {
+        kref_get(&object->refs);
+        assert(!kref_put(&object->refs, release_object));
+    }
+    object->completed[worker->index] = worker->index + 1;
+    kref_put(&object->refs, release_object);
+    return NULL;
+}
+
+static void reference_tests(void)
+{
+    refcount_t refs = REFCOUNT_INIT(0);
+    assert(!refcount_inc_not_zero(&refs) && atomic_read(&refcount_warnings) == 0);
+    refcount_inc(&refs);
+    assert(refcount_read(&refs) == (unsigned)REFCOUNT_SATURATED);
+    assert(!refcount_dec_and_test(&refs));
+    refcount_set(&refs, 1);
+    refcount_add(INT_MAX, &refs);
+    assert(refcount_read(&refs) == (unsigned)REFCOUNT_SATURATED);
+    refcount_set(&refs, 1);
+    assert(!refcount_sub_and_test(2, &refs));
+    assert(refcount_read(&refs) == (unsigned)REFCOUNT_SATURATED);
+    assert(atomic_read(&refcount_warnings) == 4);
+    refcount_set(&refs, 1);
+    assert(refcount_dec_if_one(&refs) && !refcount_dec_if_one(&refs));
+    spinlock_t lock;
+    spin_lock_init(&lock);
+    unsigned long flags = 0;
+    refcount_set(&refs, 2);
+    assert(!refcount_dec_and_lock_irqsave(&refs, &lock, &flags));
+    assert(interrupts && preempt_depth == 0 && refcount_read(&refs) == 1);
+    assert(refcount_dec_and_lock_irqsave(&refs, &lock, &flags));
+    assert(!interrupts && preempt_depth == 1 && refcount_read(&refs) == 0);
+    spin_unlock_irqrestore(&lock, flags);
+    assert(interrupts && preempt_depth == 0);
+    struct shared_object *object = kzalloc(sizeof(*object), GFP_KERNEL);
+    assert(object);
+    kref_init(&object->refs);
+    struct reference_worker workers[4];
+    pthread_t threads[4];
+    for (size_t i = 0; i < ARRAY_SIZE(workers); i++) {
+        workers[i] = (struct reference_worker){ object, (unsigned)i };
+        kref_get(&object->refs);
+        assert(!pthread_create(&threads[i], NULL, reference_worker, &workers[i]));
+    }
+    kref_put(&object->refs, release_object);
+    for (size_t i = 0; i < ARRAY_SIZE(threads); i++) assert(!pthread_join(threads[i], NULL));
+    assert(atomic_read(&releases) == 1 && live_pages == 0);
+    pthread_t writer, reader;
+    assert(!pthread_create(&writer, NULL, message_writer, NULL));
+    assert(!pthread_create(&reader, NULL, message_reader, NULL));
+    assert(!pthread_join(writer, NULL) && !pthread_join(reader, NULL));
+}
+
 int main(void)
 {
     allocation_tests();
     list_tests();
     tree_tests();
     concurrency_tests();
+    atomic_api_tests();
+    reference_tests();
     assert(live_pages == 0);
     puts("LinuxKPI: PASS (unmodified Linux helpers, allocation/OOM, tree/list invariants, SMP locks)");
     return 0;

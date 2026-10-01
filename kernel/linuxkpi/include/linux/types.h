@@ -36,11 +36,7 @@ typedef long ssize_t;
 #define __aligned_u64 __u64 __aligned(8)
 #define __aligned_s64 __s64 __aligned(8)
 typedef unsigned long kernel_ulong_t;
-typedef unsigned long __kernel_ulong_t;
-typedef long __kernel_long_t;
-typedef int __kernel_pid_t;
-typedef unsigned int __kernel_uid32_t;
-typedef unsigned long __kernel_size_t;
+#include <asm/posix_types.h>
 struct list_head { struct list_head *next, *prev; };
 struct hlist_head { struct hlist_node *first; };
 struct hlist_node { struct hlist_node *next, **pprev; };

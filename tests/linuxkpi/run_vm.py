@@ -12,6 +12,7 @@ ROOT = Path(__file__).resolve().parents[2]
 MARKERS = [
     "linuxkpi: 200 allocator, IRQ lock, Linux list/sort/rbtree self-tests passed; no pages retained",
     "linuxkpi: scheduler deferred preemption while IRQs stayed enabled",
+    "and FPU preservation passed",
     "LINUXKPI GUEST: PASS",
 ]
 
@@ -23,6 +24,8 @@ def main():
     parser.add_argument("--firmware", type=Path)
     parser.add_argument("--qemu", default="qemu-system-x86_64")
     parser.add_argument("--cc", default="clang")
+    parser.add_argument("--cpu", default="max")
+    parser.add_argument("--no-linuxkpi", action="store_true", help="check a default kernel without the API layer")
     parser.add_argument("--timeout", type=int, default=90)
     args = parser.parse_args()
     state = args.state_dir.resolve()
@@ -50,7 +53,7 @@ def main():
                    stdout=subprocess.DEVNULL)
     serial = state / "serial.log"
     command = [str(qemu), "-M", "q35,smm=off", "-m", "512", "-smp", "4",
-               "-accel", "tcg", "-cpu", "max", "-display", "none", "-monitor", "none",
+               "-accel", "tcg", "-cpu", args.cpu, "-display", "none", "-monitor", "none",
                "-drive", "if=pflash,format=raw,unit=0,readonly=on,file=" + str(firmware),
                "-cdrom", str(iso), "-serial", "file:" + str(serial), "-no-reboot"]
     with (state / "qemu.log").open("wb") as log:
@@ -61,8 +64,12 @@ def main():
                 output = serial.read_text(errors="replace") if serial.exists() else ""
                 if any(marker in output for marker in ["KERNEL PANIC", "FATAL EXCEPTION", "self-test failed"]):
                     raise RuntimeError("guest failed; see " + str(serial))
-                if all(marker in output for marker in MARKERS):
-                    print("LinuxKPI guest: PASS (4 CPUs, allocator reclamation and scheduler guard)")
+                expected = MARKERS[-1:] if args.no_linuxkpi else MARKERS
+                if all(marker in output for marker in expected):
+                    if args.no_linuxkpi and "linuxkpi:" in output:
+                        raise RuntimeError("API layer unexpectedly enabled; see " + str(serial))
+                    print("Default guest: PASS (4 CPUs, Linux ABI)" if args.no_linuxkpi else
+                          "LinuxKPI guest: PASS (4 CPUs, allocator, scheduler, i915 copy/FPU)")
                     print("Serial log: " + str(serial))
                     return 0
                 if process.poll() is not None:

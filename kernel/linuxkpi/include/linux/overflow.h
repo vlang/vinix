@@ -5,7 +5,6 @@
 #define check_add_overflow(a, b, d) __builtin_add_overflow((a), (b), (d))
 #define check_sub_overflow(a, b, d) __builtin_sub_overflow((a), (b), (d))
 #define check_mul_overflow(a, b, d) __builtin_mul_overflow((a), (b), (d))
-#define is_signed_type(t) (((t)-1) < (t)1)
 #define type_max(t) ((t)((((t)1 << (sizeof(t) * 8 - 1 - is_signed_type(t))) - 1) * 2 + 1))
 static inline size_t array_size(size_t a, size_t b) {
     size_t result;
