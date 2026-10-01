@@ -33,9 +33,18 @@ typedef u64 phys_addr_t;
 typedef u64 dma_addr_t;
 typedef u64 resource_size_t;
 typedef long ssize_t;
+#if defined(VINIX_LINUXKPI_HOST_TEST) && defined(__linux__)
+/* libc uses a different C spelling for this ABI-identical host test type. */
+#include <sys/types.h>
+#else
+typedef long long loff_t;
+#endif
 #define __aligned_u64 __u64 __aligned(8)
 #define __aligned_s64 __s64 __aligned(8)
 typedef unsigned long kernel_ulong_t;
+typedef unsigned int uint;
+typedef unsigned long ulong;
+#define DECLARE_BITMAP(name, bits) unsigned long name[BITS_TO_LONGS(bits)]
 #include <asm/posix_types.h>
 struct list_head { struct list_head *next, *prev; };
 struct hlist_head { struct hlist_node *first; };

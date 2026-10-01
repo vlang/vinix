@@ -99,6 +99,11 @@ fn irq_save() u64 {
 	return if cpu.interrupt_toggle(false) { u64(1) << 9 } else { u64(0) }
 }
 
+@[export: 'vinix_linuxkpi_irq_flags']
+fn irq_flags() u64 {
+	return if cpu.interrupt_state() { u64(1) << 9 } else { u64(0) }
+}
+
 @[export: 'vinix_linuxkpi_irq_restore']
 fn irq_restore(flags u64) {
 	index := cpulocal.current().cpu_number
@@ -196,6 +201,7 @@ pub fn initialise() {
 			lib.kpanic(unsafe { nil }, c'Linux compatibility layer self-test leaked pages')
 		}
 		C.kprintf(c'linuxkpi: 200 allocator, IRQ lock, Linux list/sort/rbtree self-tests passed; no pages retained\n')
+		C.kprintf(c'linuxkpi: raw locks, bitmaps, byte order and bounded strings passed\n')
 		// Exercise a real scheduler interrupt with preemption disabled and
 		// IRQs still enabled, rather than relying only on host lock tests.
 		preempt_disable()

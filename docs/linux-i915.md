@@ -30,8 +30,9 @@ rejects a rewritten manifest. Original copyright notices, `COPYING` and
 their case-distinct filenames cannot coexist on default macOS filesystems.
 
 The current build compiles and links unmodified Linux `lib/list_sort.c`,
-`lib/sort.c`, `lib/rbtree.c` and i915's `i915_memcpy.c`. The last file is a WC
-memory-copy component, not GPU initialization or command submission. Importing
+`lib/sort.c`, `lib/rbtree.c`, `lib/find_bit.c`, `lib/hweight.c` and i915's
+`i915_memcpy.c`. The last file is a WC memory-copy component, not GPU
+initialization or command submission. Importing
 the complete i915 source tree is not evidence that the driver runs.
 
 ## Implemented APIs
@@ -45,9 +46,20 @@ the complete i915 source tree is not evidence that the driver runs.
 - Upstream `refcount_t` and ordinary `kref_get`/`kref_put`, including saturation,
   final-release ordering and spinlock release helpers. Mutex release helpers
   remain unresolved until the sleepable mutex backend exists.
-- Spinlocks, nested IRQ save/restore and scheduler preemption guards. Lock
-  spinning continues to answer Vinix's TLB shootdowns. IRQ flags belong to
+- Spinlocks and raw spinlocks, nested IRQ save/restore and scheduler preemption
+  guards. Lock spinning continues to answer Vinix's TLB shootdowns. IRQ flags belong to
   the caller, not to shared lock storage.
+  Failed IRQ-save trylocks restore both IRQ and preemption state.
+- Atomic bit operations, including acquire/release bit locking, using Linux's
+  generic implementation and the native atomic backend. Unmodified Linux
+  bitmap headers, bit searches and population counts work across word
+  boundaries. Other out-of-line bitmap operations remain unresolved.
+- Linux byte-order and unaligned-access helpers, using the upstream generic
+  implementations without Linux's instruction-patching machinery.
+- `memchr`, `memchr_inv`, `strnlen`, `strscpy`, `strscpy_pad`, `kstrdup`,
+  `kstrndup` and `kmemdup_nul`. Bounded string operations use byte accesses
+  and do not read into an adjacent unmapped page. String duplication returns
+  a `kfree`-owned allocation and propagates overflow/OOM failure.
 - `kmalloc`, `kzalloc`, `kcalloc`, `kmalloc_array`, `kmemdup`, `krealloc`,
   `ksize` and `kfree`, including zero-size pointers, overflow/OOM handling
   and Linux allocation alignment. The initial backend uses contiguous
@@ -98,9 +110,18 @@ operations and nested IRQ restoration. Refcount tests cover overflow/underflow
 saturation, concurrent final release, and acquire/release publication.
 Source-import tests cover modification, manifest tampering and archive path
 traversal.
+Bitmap tests compare searches against a scalar reference for every size from
+0 to 256 bits, including set operations and word boundaries. Four threads
+exercise shared-word atomic updates and bit-lock publication. String tests
+place source/destination buffers against protected pages, check truncation
+and zero padding, and verify allocation failure and release. Unaligned
+byte-order tests check both values and encoded bytes. Raw-lock tests include
+failed trylocks and nested IRQ state restoration.
 
 An enabled kernel runs the allocator/list/sort/tree/IRQ-lock tests 200 times
 and verifies that the physical free-page count returns to its initial value.
+The same repeated test also checks raw locks, bit searches, byte-order helpers
+and bounded strings, including allocated-string release.
 It then holds preemption disabled with IRQs enabled until a real scheduler
 interrupt defers a context switch. The WC-copy test checks FPU register/MXCSR
 preservation, buffer alignment and aligned/unaligned copies. Upstream i915
@@ -125,8 +146,10 @@ object linking, unresolved-symbol checks and runtime/hardware testing.
 
 ## Remaining driver integration
 
-The complete i915 build still fails. The next work includes the wider Linux
-compiler/type/atomic interface and these substantial runtime subsystems:
+The complete i915 build still fails. The audit now reaches Linux per-CPU
+state, task/preemption headers and page-table types that require native
+implementations. The next work includes these interfaces and substantial
+runtime subsystems:
 
 1. Linux device/PCI registration and removal, configuration access and devres.
 2. MMIO mapping with correct cache attributes, DMA/scatter-gather APIs,

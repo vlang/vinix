@@ -10,6 +10,8 @@
 #include <linux/sort.h>
 #include <linux/spinlock.h>
 #include <linux/kref.h>
+#include <linux/bitmap.h>
+#include <asm/unaligned.h>
 #include <vinix/runtime.h>
 #include <drm/i915_pciids.h>
 #ifndef VINIX_LINUXKPI_HOST_TEST
@@ -210,6 +212,34 @@ int vinix_linuxkpi_selftest(void)
     if (!atomic) result = -ENOMEM;
     kfree(atomic);
     spin_unlock_irqrestore(&lock, flags);
+    raw_spinlock_t raw;
+    raw_spin_lock_init(&raw);
+    raw_spin_lock(&raw);
+    if (raw_spin_trylock_irqsave(&raw, flags)) {
+        raw_spin_unlock_irqrestore(&raw, flags);
+        result = -EIO;
+    }
+    raw_spin_unlock(&raw);
+    if (!vinix_linuxkpi_may_sleep()) result = -EIO;
+    DECLARE_BITMAP(bits, 129);
+    bitmap_zero(bits, 129);
+    set_bit(64, bits);
+    set_bit(128, bits);
+    if (find_first_bit(bits, 129) != 64 || find_next_bit(bits, 129, 65) != 128 ||
+        find_next_bit(bits, 129, 129) != 129 || find_last_bit(bits, 129) != 128 ||
+        find_nth_bit(bits, 129, 1) != 128 || hweight_long(bits[1]) != 1) result = -EIO;
+    unsigned char encoded[10];
+    put_unaligned_be64(0x123456789abcdef0ULL, encoded + 1);
+    if (encoded[1] != 0x12 || encoded[8] != 0xf0 ||
+        get_unaligned_be64(encoded + 1) != 0x123456789abcdef0ULL) result = -EIO;
+    char text[8];
+    if (strscpy_pad(text, "i915", sizeof(text)) != 4 ||
+        memchr_inv(text + 4, 0, sizeof(text) - 4) ||
+        strscpy(text, "truncated", 4) != -E2BIG || memcmp(text, "tru\0", 4)) result = -EIO;
+    char *name = kstrndup("Tiger Lake", 5, GFP_KERNEL);
+    if (!name) result = -ENOMEM;
+    else if (strcmp(name, "Tiger")) result = -EIO;
+    kfree(name);
     if (!vinix_linuxkpi_tigerlake_id(0x8086, 0x9a49, 0x030000) ||
         vinix_linuxkpi_tigerlake_id(0x8086, 0x9a49, 0x020000) ||
         vinix_linuxkpi_tigerlake_id(0x1234, 0x9a49, 0x030000)) result = -EIO;

@@ -3,12 +3,16 @@
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#include <asm/unaligned.h>
 #include <linux/atomic.h>
 #include <linux/err.h>
 #include <linux/errno.h>
 #include <linux/kernel.h>
 #include <linux/kref.h>
 #include <linux/bits.h>
+#include <linux/bitmap.h>
 #include <linux/list.h>
 #include <linux/list_sort.h>
 #include <linux/rbtree_augmented.h>
@@ -57,6 +61,7 @@ unsigned long vinix_linuxkpi_irq_save(void)
 }
 
 void vinix_linuxkpi_irq_restore(unsigned long flags) { interrupts = !!(flags & (1UL << 9)); }
+unsigned long vinix_linuxkpi_irq_flags(void) { return interrupts ? 1UL << 9 : 0; }
 void vinix_linuxkpi_spin_wait(void) { __asm__ volatile("" ::: "memory"); }
 void vinix_linuxkpi_preempt_disable(void) { preempt_depth++; }
 void vinix_linuxkpi_preempt_enable(void) { assert(preempt_depth); preempt_depth--; }
@@ -121,6 +126,213 @@ static void allocation_tests(void)
     assert(PTR_ERR(ERR_PTR(-ENOMEM)) == -ENOMEM);
     assert(IS_ERR(ERR_PTR(-ENOMEM)) && IS_ERR_OR_NULL(NULL));
     assert(!IS_ERR((void *)4096) && PTR_ERR_OR_ZERO((void *)4096) == 0);
+}
+
+static void string_tests(void)
+{
+    /* Function pointers keep the compiler from replacing these calls with
+     * host libc builtins, so the compatibility implementation is exercised. */
+    void *(*volatile scan)(const void *, int, size_t) = memchr;
+    size_t (*volatile bounded_length)(const char *, size_t) = strnlen;
+    unsigned char bytes[] = { 0xff, 0x80, 0, 0xff, 0x42 };
+    assert(scan(bytes, 0x1ff, sizeof(bytes)) == bytes);
+    assert(scan(bytes, 0x42, sizeof(bytes)) == bytes + 4);
+    assert(!scan(bytes, 1, sizeof(bytes)) && !scan(NULL, 0, 0));
+    assert(memchr_inv(bytes, 0xff, sizeof(bytes)) == bytes + 1);
+    assert(!memchr_inv(bytes, 0xff, 1) && !memchr_inv(NULL, 0, 0));
+    assert(bounded_length("", 1) == 0 && bounded_length("abc", 2) == 2);
+
+    size_t page = (size_t)sysconf(_SC_PAGESIZE);
+    char *source = mmap(NULL, page * 2, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
+    char *destination = mmap(NULL, page * 2, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
+    assert(source != MAP_FAILED && destination != MAP_FAILED);
+    assert(!mprotect(source + page, page, PROT_NONE));
+    assert(!mprotect(destination + page, page, PROT_NONE));
+    assert(!scan(source + page, 0, 0) && !bounded_length(source + page, 0));
+    assert(strscpy(destination + page, source + page, 0) == -E2BIG);
+    assert(strscpy(destination + page, source + page, (size_t)INT_MAX + 1) == -E2BIG);
+    for (size_t n = 1; n <= 32; n++) {
+        char *src = source + page - n, *dst = destination + page - n;
+        memset(src, 'a', n);
+        memset(dst, 0x5a, n);
+        assert(bounded_length(src, n) == n && !scan(src, 0, n));
+        assert(strscpy(dst, src, n) == -E2BIG && !dst[n - 1]);
+        for (size_t i = 0; i < n - 1; i++) assert(dst[i] == 'a');
+        src[n - 1] = '\0';
+        assert(strscpy(dst, src, n) == (ssize_t)n - 1 && !memcmp(src, dst, n));
+        char *copy = kstrdup(src, GFP_KERNEL);
+        assert(copy && !memcmp(copy, src, n));
+        kfree(copy);
+    }
+    assert(!munmap(source, page * 2) && !munmap(destination, page * 2));
+    char padded[12];
+    memset(padded, 0x5a, sizeof(padded));
+    assert(strscpy_pad(padded, "abc", sizeof(padded)) == 3);
+    assert(!memcmp(padded, "abc", 3) && !memchr_inv(padded + 3, 0, sizeof(padded) - 3));
+    memset(padded, 0x5a, sizeof(padded));
+    assert(strscpy_pad(padded, "abcdefghijklm", 3) == -E2BIG);
+    assert(!memcmp(padded, "ab\0", 3) && !memchr_inv(padded + 3, 0x5a, sizeof(padded) - 3));
+    char *copy = kstrndup("abcd", 2, GFP_KERNEL);
+    assert(copy && !strcmp(copy, "ab"));
+    kfree(copy);
+    copy = kmemdup_nul((const char *)bytes, sizeof(bytes), GFP_KERNEL);
+    assert(copy && !memcmp(copy, bytes, sizeof(bytes)) && !copy[sizeof(bytes)]);
+    kfree(copy);
+    copy = kmemdup_nul(NULL, 0, GFP_KERNEL);
+    assert(copy && !copy[0]);
+    kfree(copy);
+    assert(!kmemdup_nul(NULL, SIZE_MAX, GFP_KERNEL));
+    assert(!kstrdup(NULL, GFP_KERNEL) && !kstrndup(NULL, 1, GFP_KERNEL));
+    fail_allocation = true;
+    assert(!kstrdup("failed", GFP_KERNEL) && !kstrndup("failed", 3, GFP_KERNEL));
+    assert(!kmemdup_nul("failed", 6, GFP_KERNEL));
+    fail_allocation = false;
+    assert(live_pages == 0);
+}
+
+static unsigned long scalar_next(const unsigned long *map, unsigned long size,
+                                 unsigned long start, bool value)
+{
+    for (unsigned long bit = start; bit < size; bit++) {
+        if (!!(map[bit / BITS_PER_LONG] & BIT(bit % BITS_PER_LONG)) == value) return bit;
+    }
+    return size;
+}
+
+static void bitmap_tests(void)
+{
+    DECLARE_BITMAP(map, 256);
+    DECLARE_BITMAP(other, 256);
+    DECLARE_BITMAP(both, 256);
+    DECLARE_BITMAP(either, 256);
+    DECLARE_BITMAP(except, 256);
+    for (unsigned int pattern = 0; pattern < 12; pattern++) {
+        for (unsigned int word = 0; word < ARRAY_SIZE(map); word++) {
+            map[word] = pattern == 0 ? 0 : pattern == 1 ? ~0UL :
+                0x8421084210842108UL ^ (0x9e3779b97f4a7c15UL * (pattern + word));
+            other[word] = 0x1248124812481248UL * (pattern + word + 1);
+            both[word] = map[word] & other[word];
+            either[word] = map[word] | other[word];
+            except[word] = map[word] & ~other[word];
+            unsigned int weight = 0;
+            for (unsigned int bit = 0; bit < BITS_PER_LONG; bit++) weight += !!(map[word] & BIT(bit));
+            assert(hweight_long(map[word]) == weight);
+        }
+        for (unsigned long size = 0; size <= 256; size++) {
+            assert(find_first_bit(map, size) == scalar_next(map, size, 0, true));
+            assert(find_first_zero_bit(map, size) == scalar_next(map, size, 0, false));
+            assert(find_first_and_bit(map, other, size) == scalar_next(both, size, 0, true));
+            unsigned long last = size, rank = 0;
+            for (unsigned long start = 0; start <= size + 1; start++) {
+                assert(find_next_bit(map, size, start) == scalar_next(map, size, start, true));
+                assert(find_next_zero_bit(map, size, start) == scalar_next(map, size, start, false));
+                assert(find_next_and_bit(map, other, size, start) == scalar_next(both, size, start, true));
+                assert(find_next_or_bit(map, other, size, start) == scalar_next(either, size, start, true));
+                assert(find_next_andnot_bit(map, other, size, start) == scalar_next(except, size, start, true));
+                if (start < size && test_bit(start, map)) {
+                    assert(find_nth_bit(map, size, rank++) == start);
+                    last = start;
+                }
+            }
+            assert(find_nth_bit(map, size, rank) == size && find_last_bit(map, size) == last);
+        }
+    }
+    bitmap_zero(map, 256);
+    for (unsigned long bit = 0; bit < 256; bit++) {
+        assert(!test_and_set_bit(bit, map) && test_and_set_bit(bit, map));
+        assert(test_bit(bit, map) && test_bit_acquire(bit, map));
+        assert(test_and_clear_bit(bit, map) && !test_and_clear_bit(bit, map));
+        __set_bit(bit, map);
+        assert(__test_and_change_bit(bit, map) && !test_bit(bit, map));
+        assert(!test_and_change_bit(bit, map) && test_and_change_bit(bit, map));
+    }
+    assert(bitmap_empty(map, 256));
+    assert(!test_and_set_bit_lock(65, map));
+    assert(test_and_set_bit_lock(65, map));
+    clear_bit_unlock(65, map);
+    assert(!test_bit(65, map));
+    set_bit(7, map);
+    set_bit(0, map);
+    assert(clear_bit_unlock_is_negative_byte(0, map) && test_bit(7, map));
+    clear_bit(7, map);
+    assert(!clear_bit_unlock_is_negative_byte(0, map));
+    bitmap_fill(map, 65);
+    assert(bitmap_full(map, 65));
+    assert(hweight8(0xff) == 8 && hweight16(0xffff) == 16 && hweight32(~0U) == 32);
+}
+
+static DECLARE_BITMAP(shared_bits, 128);
+static unsigned int bit_lock_count;
+
+static void *bit_worker(void *argument)
+{
+    unsigned long index = *(unsigned long *)argument;
+    for (unsigned int i = 0; i < 20000; i++) {
+        set_bit(index, shared_bits);
+        while (test_and_set_bit_lock(65, shared_bits)) vinix_linuxkpi_spin_wait();
+        bit_lock_count++;
+        clear_bit_unlock(65, shared_bits);
+    }
+    return NULL;
+}
+
+static void bit_concurrency_tests(void)
+{
+    unsigned long indexes[] = { 0, 1, 62, 63 };
+    pthread_t threads[ARRAY_SIZE(indexes)];
+    for (size_t i = 0; i < ARRAY_SIZE(threads); i++) {
+        assert(!pthread_create(&threads[i], NULL, bit_worker, &indexes[i]));
+    }
+    for (size_t i = 0; i < ARRAY_SIZE(threads); i++) assert(!pthread_join(threads[i], NULL));
+    assert(bit_lock_count == 20000 * ARRAY_SIZE(threads) && !test_bit(65, shared_bits));
+    for (size_t i = 0; i < ARRAY_SIZE(indexes); i++) assert(test_bit(indexes[i], shared_bits));
+}
+
+static void byteorder_tests(void)
+{
+    unsigned char bytes[18];
+    memset(bytes, 0xa5, sizeof(bytes));
+    put_unaligned_le16(0x1234, bytes + 1);
+    assert(bytes[1] == 0x34 && bytes[2] == 0x12 && get_unaligned_le16(bytes + 1) == 0x1234);
+    put_unaligned_be24(0x123456, bytes + 1);
+    assert(bytes[1] == 0x12 && bytes[3] == 0x56 && get_unaligned_be24(bytes + 1) == 0x123456);
+    put_unaligned_le32(0x12345678, bytes + 1);
+    assert(bytes[1] == 0x78 && bytes[4] == 0x12 && get_unaligned_le32(bytes + 1) == 0x12345678);
+    put_unaligned_be48(0x123456789abcULL, bytes + 1);
+    assert(bytes[1] == 0x12 && bytes[6] == 0xbc && get_unaligned_be48(bytes + 1) == 0x123456789abcULL);
+    put_unaligned_be64(0x123456789abcdef0ULL, bytes + 1);
+    assert(bytes[1] == 0x12 && bytes[8] == 0xf0 && get_unaligned_be64(bytes + 1) == 0x123456789abcdef0ULL);
+    assert(bytes[0] == 0xa5 && bytes[9] == 0xa5);
+    assert(be32_to_cpu(cpu_to_be32(0x12345678)) == 0x12345678);
+    assert(le64_to_cpu(cpu_to_le64(0x123456789abcdef0ULL)) == 0x123456789abcdef0ULL);
+}
+
+static void raw_lock_tests(void)
+{
+    DEFINE_RAW_SPINLOCK(lock);
+    unsigned long flags, nested;
+    assert(!raw_spin_is_locked(&lock) && !irqs_disabled());
+    assert(raw_spin_trylock_irqsave(&lock, flags));
+    assert(raw_spin_is_locked(&lock) && irqs_disabled() && preempt_depth == 1);
+    assert(!raw_spin_trylock_irqsave(&lock, nested));
+    assert(irqs_disabled() && preempt_depth == 1 && irqs_disabled_flags(nested));
+    raw_spin_unlock_irqrestore(&lock, flags);
+    assert(!irqs_disabled() && preempt_depth == 0);
+    raw_spin_lock(&lock);
+    /* Ordinary caller names must not collide with the macro's temporary. */
+    unsigned long acquired;
+    assert(!raw_spin_trylock_irqsave(&lock, acquired));
+    assert(!irqs_disabled() && preempt_depth == 1);
+    raw_spin_unlock(&lock);
+    local_irq_save(flags);
+    raw_spin_lock_irqsave(&lock, nested);
+    raw_spin_unlock_irqrestore(&lock, nested);
+    assert(irqs_disabled() && preempt_depth == 0);
+    local_irq_restore(flags);
+    raw_spin_lock_irq(&lock);
+    assert(irqs_disabled() && preempt_depth == 1);
+    raw_spin_unlock_irq(&lock);
+    assert(!irqs_disabled() && preempt_depth == 0);
 }
 
 struct entry { int key, order; struct list_head link; struct rb_node tree; };
@@ -384,12 +596,17 @@ static void reference_tests(void)
 int main(void)
 {
     allocation_tests();
+    string_tests();
+    bitmap_tests();
+    bit_concurrency_tests();
+    byteorder_tests();
+    raw_lock_tests();
     list_tests();
     tree_tests();
     concurrency_tests();
     atomic_api_tests();
     reference_tests();
     assert(live_pages == 0);
-    puts("LinuxKPI: PASS (unmodified Linux helpers, allocation/OOM, tree/list invariants, SMP locks)");
+    puts("LinuxKPI: PASS (Linux helpers, allocation/OOM, page-boundary strings, bitmaps, SMP/IRQ locks)");
     return 0;
 }

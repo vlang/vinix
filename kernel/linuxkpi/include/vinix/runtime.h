@@ -8,6 +8,7 @@ void vinix_linuxkpi_free_pages(void *base, size_t pages);
 size_t vinix_linuxkpi_page_size(void);
 /* Return Linux IRQ flags, not a flags value stored in a shared lock. */
 unsigned long vinix_linuxkpi_irq_save(void);
+unsigned long vinix_linuxkpi_irq_flags(void);
 void vinix_linuxkpi_irq_restore(unsigned long flags);
 void vinix_linuxkpi_spin_wait(void);
 void vinix_linuxkpi_preempt_disable(void);
