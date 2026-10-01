@@ -1,6 +1,7 @@
 @[has_globals; manualfree]
 module memory
 
+import katomic
 import klock
 import lib
 import xnualloc
@@ -17,6 +18,17 @@ const slab_magic = u64(0x56494e4958534c42)
 const slab_alignment = u64(16)
 const slab_bitmap_words = 16
 const slab_max_capacity = u64(slab_bitmap_words * 64)
+// What a free slot holds: sfree() fills an object with it, and grow() a new
+// page's slots.
+const slab_poison = u64(0xaaaaaaaaaaaaaaaa)
+// How many objects found written after they were freed are described in the
+// kernel log; the rest are only counted.
+const slab_reports = u64(32)
+
+__global (
+	// Objects found written to while they were free, for /proc/slabinfo.
+	slab_written_after_free u64
+)
 
 pub struct Slab {
 mut:
@@ -128,6 +140,9 @@ fn (mut this Slab) grow(page u64) {
 	}
 	hdr.magic = slab_magic
 	hdr.capacity = (page_size - slab_data_offset()) / this.ent_size
+	// Every free slot holds the poison, so take() can tell one that was
+	// written while free from one that never held an object.
+	unsafe { C.memset(voidptr(base + slab_data_offset()), 0xaa, hdr.capacity * this.ent_size) }
 	$if xnu_bitmap ? {
 		xnualloc.zone_bits_init_ref(unsafe { &hdr.used[0] }, slab_bitmap_words, u32(hdr.capacity))
 	} $else {
@@ -220,11 +235,68 @@ fn (mut this Slab) take(fallible bool) voidptr {
 	this.@lock.release()
 
 	// The reserved slot keeps its page live. Zeroing need not hold the lock.
-	unsafe { C.memset(ptr, 0, size) }
+	clear_free_slot(ptr, size)
 	$if alloc_track ? {
 		C.alloc_track(ptr, size)
 	}
 	return ptr
+}
+
+// Zero a slot about to be handed out, checking on the way that it still
+// holds the poison sfree() left: as OpenBSD's malloc(9) checks its free
+// lists, so that something still writing to an object it freed -- a
+// use-after-free, which the object's next owner would otherwise find its
+// data changed by -- is caught and named. One pass, as the memset it
+// replaces was.
+fn clear_free_slot(ptr voidptr, size u64) {
+	words := unsafe { &u64(ptr) }
+	mut first := size
+	mut value := u64(0)
+	for i := u64(0); i < size / 8; i++ {
+		word := unsafe { words[i] }
+		unsafe {
+			words[i] = 0
+		}
+		if word != slab_poison && first == size {
+			first = i * 8
+			value = word
+		}
+	}
+	if first != size {
+		report_written_after_free(ptr, size, first, value)
+	}
+}
+
+// Whether the slots of an empty page, about to go back to the page allocator,
+// still hold their poison: a write to an object freed from it would otherwise
+// land in whatever took the page next, unseen.
+fn check_empty_page(hdr &SlabHeader, size u64) {
+	for slot := u64(0); slot < hdr.capacity; slot++ {
+		ptr := voidptr(u64(hdr) + slab_data_offset() + slot * size)
+		words := unsafe { &u64(ptr) }
+		for i := u64(0); i < size / 8; i++ {
+			word := unsafe { words[i] }
+			if word != slab_poison {
+				report_written_after_free(ptr, size, i * 8, word)
+				break
+			}
+		}
+	}
+}
+
+// Said, not stopped for, as OpenBSD's malloc(9) reports a modified free
+// list: the slot was free, so the object it now goes to starts zeroed, and a
+// stopped kernel would say less about where the write came from.
+fn report_written_after_free(ptr voidptr, size u64, offset u64, value u64) {
+	if katomic.inc(mut &slab_written_after_free) < slab_reports {
+		C.kprintf(c'Slab: %llu-byte object %p written after it was freed: 0x%llx at offset %llu\n',
+			size, ptr, value, offset)
+	}
+}
+
+// Objects found written to while they were free since boot.
+pub fn heap_written_after_free() u64 {
+	return katomic.load(&slab_written_after_free)
 }
 
 // See c/alloc_track.c; built in with `make ALLOC_TRACK=1`.
@@ -300,6 +372,7 @@ pub fn (mut this Slab) sfree(ptr voidptr) {
 	this.@lock.release()
 	if release_page != 0 {
 		// Detached and empty: no valid outstanding object can reference it.
+		check_empty_page(unsafe { &SlabHeader(release_page) }, this.ent_size)
 		pmm_free(voidptr(release_page - higher_half), 1)
 	}
 }
@@ -352,6 +425,7 @@ pub fn heap_trim() u64 {
 		}
 		slab.@lock.release()
 		if base != 0 {
+			check_empty_page(unsafe { &SlabHeader(base) }, slab.ent_size)
 			pmm_free(voidptr(base - higher_half), 1)
 			released += page_size
 		}

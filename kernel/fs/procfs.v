@@ -914,6 +914,8 @@ fn slabinfo_text() string {
 	unsafe { classes.free() }
 	text.add('large - - ')
 	text.add_unsigned(memory.heap_big_pages())
+	text.add('\n# written after free ')
+	text.add_unsigned(memory.heap_written_after_free())
 	text.add_byte(`\n`)
 	return text.str()
 }

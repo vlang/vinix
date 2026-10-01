@@ -245,6 +245,32 @@ vectors, that no ID repeats within 32768, how the sequence numbers move with
 the clock and the ports. The QEMU test captures what the guest sends to the
 host and checks the sequence numbers, source ports and IP IDs on the wire.
 
+## Writes to freed kernel memory
+
+The kernel's slab allocator fills a freed object with `0xaa`, and refuses a
+double free. Now it also checks that poison, as OpenBSD's `malloc(9)` checks
+its free lists: a slot about to be handed out again, and every slot of an
+empty page about to go back to the page allocator, must still hold it. A
+freed object that something went on writing to, a use-after-free that would
+otherwise show up as its next owner's data changing under it, is reported in
+the kernel log with its size, its address, the first offset that changed and
+what was written there:
+
+```
+Slab: 192-byte object 0xffff0000a15e5af0 written after it was freed: 0xaaaaaaaaaaaaaaa9 at offset 136
+```
+
+That one came from a desktop session: devtmpfs had freed a terminal's
+`/dev/pts/N` node while the shell still had it open, and the shell's exit
+then took one off the node's count of open files, at offset 136. As
+OpenBSD's does, the kernel carries on, and the slot goes to its new owner
+zeroed. The first 32 are described; `/proc/slabinfo` counts them all on its
+last line, `# written after free`. New slab pages are poisoned when they are
+made, so that every free slot holds the poison. The check takes the place of
+the zeroing of each allocation and makes one pass over the object, as the
+zeroing did. A kernel built with `-d heap_selftest` writes to a freed object
+at boot and checks that it is caught.
+
 ## Already in place
 
 These came before and are unchanged: W^X for user mappings, `mimmutable(2)`

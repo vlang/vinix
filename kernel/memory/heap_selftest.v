@@ -5,6 +5,12 @@ import lib
 
 // Boot-time tests of the actual allocator, enabled with -d heap_selftest.
 // Run before SMP startup; free-page snapshots assume no concurrent clients.
+// Two pages' worth of the smallest class and one more. On the stack it was 512,
+// which an arm64 kernel's 16 KiB pages outgrow.
+__global (
+	heap_test_objects [2 * slab_max_capacity + 1]voidptr
+)
+
 fn heap_test_require(ok bool) {
 	if !ok {
 		lib.kpanic(unsafe { nil }, c'Heap self-test failed')
@@ -33,24 +39,25 @@ fn heap_selftest() {
 		}
 		capacity := (page_size - offset) / slab.ent_size
 		count := capacity * 2 + 1
-		heap_test_require(count <= 512)
-		mut objects := unsafe { [512]voidptr{} }
+		heap_test_require(count <= u64(heap_test_objects.len))
 		for i := u64(0); i < count; i++ {
-			ptr := malloc(slab.ent_size)
+			// malloc_packed() reaches every class; malloc() gives an arm64
+			// kernel's medium ones, over 2 KiB, whole pages instead.
+			ptr := malloc_packed(slab.ent_size)
 			heap_test_require(ptr != unsafe { nil } && u64(ptr) % slab_alignment == 0)
 			for j := u64(0); j < i; j++ {
-				heap_test_require(objects[int(j)] != ptr)
+				heap_test_require(heap_test_objects[int(j)] != ptr)
 			}
 			heap_test_bytes(ptr, slab.ent_size, 0)
 			unsafe { C.memset(ptr, int(i % 251 + 1), slab.ent_size) }
-			objects[int(i)] = ptr
+			heap_test_objects[int(i)] = ptr
 		}
 		for i := u64(0); i < count; i += 2 {
-			free(objects[int(i)])
+			free(heap_test_objects[int(i)])
 		}
 		for i := u64(1); i < count; i += 2 {
-			heap_test_bytes(objects[int(i)], slab.ent_size, u8(i % 251 + 1))
-			free(objects[int(i)])
+			heap_test_bytes(heap_test_objects[int(i)], slab.ent_size, u8(i % 251 + 1))
+			free(heap_test_objects[int(i)])
 		}
 		// All but one empty page must have been returned automatically.
 		heap_test_require(free_bytes() == baseline - page_size)
@@ -93,6 +100,36 @@ fn heap_selftest() {
 	heap_test_require(realloc(bigger, u64(-1)) == unsafe { nil })
 	heap_test_bytes(bigger, page_size + 1, 0x6b)
 	free(bigger)
+
+	// A write to a freed object is found when its slot is handed out again,
+	// and the object's new owner still gets zeroes. The slot comes back once
+	// the free slots ahead of it are taken.
+	$if !xnu_zone ? {
+		size := slabs[3].ent_size
+		before := heap_written_after_free()
+		mut freed := unsafe { &u64(malloc(size)) }
+		free(freed)
+		unsafe {
+			freed[1] = 0x5ca1ab1e
+		}
+		mut count := 0
+		for count < heap_test_objects.len {
+			ptr := malloc(size)
+			heap_test_objects[count] = ptr
+			count++
+			if ptr == voidptr(freed) {
+				break
+			}
+		}
+		heap_test_require(heap_test_objects[count - 1] == voidptr(freed))
+		heap_test_bytes(freed, size, 0)
+		heap_test_require(heap_written_after_free() == before + 1)
+		for i := 0; i < count; i++ {
+			free(heap_test_objects[i])
+		}
+		heap_trim()
+		heap_test_require(heap_written_after_free() == before + 1)
+	}
 
 	cleared := calloc(7, 13)
 	heap_test_require(cleared != unsafe { nil })
