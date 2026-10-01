@@ -582,6 +582,11 @@ pub fn new_kernel_thread(pc voidptr, arg voidptr, autoenqueue bool) &proc.Thread
 	stack_phys := memory.pmm_alloc(stack_size / page_size)
 	stacks << stack_phys
 	stack := u64(stack_phys) + stack_size + higher_half
+	// IRET enters the function without CALL pushing a return address. The
+	// SysV ABI still requires (RSP + 8) to be 16-byte aligned at entry, so
+	// reserve that word within the owned stack rather than starting at its top.
+	entry_stack := stack - 8
+	C.memset(voidptr(entry_stack), 0, 8)
 
 	gpr_state := cpulocal.GPRState{
 		cs: kernel_code_seg
@@ -592,7 +597,7 @@ pub fn new_kernel_thread(pc voidptr, arg voidptr, autoenqueue bool) &proc.Thread
 		rip: u64(pc)
 		rdi: u64(arg)
 		rbp: u64(0)
-		rsp: stack
+		rsp: entry_stack
 	}
 
 	mut t := &proc.Thread{
