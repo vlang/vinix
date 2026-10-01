@@ -3,15 +3,19 @@
 // that can be found in the LICENSE file.
 
 #include "vinix_net.h"
+#include "net_random.h"
 
 #include <lwip/dhcp.h>
 #include <lwip/dns.h>
 #include <lwip/etharp.h>
+#include <lwip/inet_chksum.h>
 #include <lwip/init.h>
 #include <lwip/ip.h>
 #include <lwip/mem.h>
 #include <lwip/netif.h>
 #include <lwip/pbuf.h>
+#include <lwip/priv/tcp_priv.h>
+#include <lwip/prot/ip4.h>
 #include <lwip/tcp.h>
 #include <lwip/timeouts.h>
 #include <lwip/udp.h>
@@ -89,7 +93,8 @@ static uint8_t active_mac[6];
 static uint32_t clock_ms;
 static uint32_t clock_anchor_ms;
 static int clock_anchored;
-static uint32_t random_state = 0x6d2b79f5U;
+/* The ID the fragments after the first of a datagram go out with. */
+static uint16_t fragment_id;
 
 static int linux_error(err_t error) {
     switch (error) {
@@ -146,15 +151,6 @@ void vinix_lwip_assert(const char *message, const char *file, int line) {
     assert_serial("\n");
 #endif
     for (;;) { }
-}
-
-uint32_t vinix_lwip_rand(void) {
-    uint32_t value = random_state ^ clock_ms;
-    value ^= value << 13;
-    value ^= value >> 17;
-    value ^= value << 5;
-    random_state = value ? value : 0x6d2b79f5U;
-    return random_state;
 }
 
 uint32_t sys_now(void) {
@@ -348,6 +344,27 @@ static err_t link_output(struct netif *netif, struct pbuf *p) {
     return ERR_OK;
 }
 
+/* Every datagram leaves the machine with an ID from ip_randomid() in place of
+ * lwIP's, which counts up by one: anyone who saw two of them knew how much the
+ * machine had sent in between. The fragments of a datagram share its ID, and
+ * ip4_frag() sends them in order, one after another, the first at offset 0. */
+static err_t output_ipv4(struct netif *netif, struct pbuf *p, const ip4_addr_t *destination) {
+    struct ip_hdr *header = (struct ip_hdr *)p->payload;
+    uint16_t header_length;
+    if (p->len >= IP_HLEN && IPH_V(header) == 4) {
+        header_length = IPH_HL_BYTES(header);
+        if (header_length >= IP_HLEN && p->len >= header_length) {
+            if ((lwip_ntohs(IPH_OFFSET(header)) & IP_OFFMASK) == 0) {
+                fragment_id = vinix_ip_randomid();
+            }
+            IPH_ID_SET(header, fragment_id);
+            IPH_CHKSUM_SET(header, 0);
+            IPH_CHKSUM_SET(header, inet_chksum(header, header_length));
+        }
+    }
+    return etharp_output(netif, p, destination);
+}
+
 static err_t physical_init(struct netif *netif) {
     netif->name[0] = 'e';
     netif->name[1] = 'n';
@@ -355,7 +372,7 @@ static err_t physical_init(struct netif *netif) {
     memcpy(netif->hwaddr, active_mac, 6);
     netif->mtu = 1500;
     netif->flags = NETIF_FLAG_BROADCAST | NETIF_FLAG_ETHARP | NETIF_FLAG_ETHERNET;
-    netif->output = etharp_output;
+    netif->output = output_ipv4;
     netif->linkoutput = link_output;
     return ERR_OK;
 }
@@ -563,6 +580,47 @@ static ip_addr_t ipv4(uint32_t address) {
     return result;
 }
 
+static int tcp_port_taken(uint16_t port, void *context) {
+    int i;
+    struct tcp_pcb *pcb;
+    (void)context;
+    for (i = 0; i < NUM_TCP_PCB_LISTS; i++) {
+        for (pcb = *tcp_pcb_lists[i]; pcb != NULL; pcb = pcb->next) {
+            if (pcb->local_port == port) {
+                return 1;
+            }
+        }
+    }
+    return 0;
+}
+
+static int udp_port_taken(uint16_t port, void *context) {
+    struct udp_pcb *pcb;
+    (void)context;
+    for (pcb = udp_pcbs; pcb != NULL; pcb = pcb->next) {
+        if (pcb->local_port == port) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+/* Bind an unbound socket to an ephemeral port picked at random, where lwIP
+ * would have taken the one after the last it gave out. Every way a socket can
+ * be given a port without naming one comes through here: bind() to port 0,
+ * and connect(), listen() and sendto() on a socket not yet bound. 99 is
+ * EADDRNOTAVAIL, Linux's answer when the range is used up. */
+static int bind_ephemeral(struct vinix_socket *socket, const ip_addr_t *address) {
+    int stream = socket->type == VINIX_NET_STREAM;
+    uint16_t port = vinix_pick_port(VINIX_EPHEMERAL_FIRST, VINIX_EPHEMERAL_LAST,
+                                    stream ? tcp_port_taken : udp_port_taken, NULL);
+    if (!port) {
+        return 99;
+    }
+    return linux_error(stream ? tcp_bind(socket->tcp, address, port)
+                              : udp_bind(socket->udp, address, port));
+}
+
 int vinix_socket_bind(struct vinix_socket *socket, uint32_t address, uint16_t port) {
     ip_addr_t ip;
     err_t error;
@@ -570,8 +628,13 @@ int vinix_socket_bind(struct vinix_socket *socket, uint32_t address, uint16_t po
         return 88;
     }
     ip = ipv4(address);
+    if (socket->type == VINIX_NET_STREAM && !socket->tcp) {
+        return socket->error ? socket->error : 107;
+    }
+    if (port == 0) {
+        return bind_ephemeral(socket, &ip);
+    }
     if (socket->type == VINIX_NET_STREAM) {
-        if (!socket->tcp) return socket->error ? socket->error : 107;
         error = tcp_bind(socket->tcp, &ip, lwip_ntohs(port));
     } else {
         error = udp_bind(socket->udp, &ip, lwip_ntohs(port));
@@ -594,6 +657,12 @@ int vinix_socket_connect(struct vinix_socket *socket, uint32_t address, uint16_t
         if (socket->connecting) {
             return 114;
         }
+        if (socket->tcp->local_port == 0) {
+            int bound = bind_ephemeral(socket, &socket->tcp->local_ip);
+            if (bound) {
+                return bound;
+            }
+        }
         socket->connecting = 1;
         error = tcp_connect(socket->tcp, &ip, lwip_ntohs(port), tcp_connected);
         if (error != ERR_OK) {
@@ -614,6 +683,12 @@ int vinix_socket_connect(struct vinix_socket *socket, uint32_t address, uint16_t
         }
         return 115;
     }
+    if (socket->udp->local_port == 0) {
+        int bound = bind_ephemeral(socket, &socket->udp->local_ip);
+        if (bound) {
+            return bound;
+        }
+    }
     error = udp_connect(socket->udp, &ip, lwip_ntohs(port));
     if (error == ERR_OK) {
         socket->connected = 1;
@@ -632,6 +707,12 @@ int vinix_socket_listen(struct vinix_socket *socket, int backlog) {
     }
     if (backlog > 255) {
         backlog = 255;
+    }
+    if (socket->tcp->local_port == 0) {
+        int bound = bind_ephemeral(socket, &socket->tcp->local_ip);
+        if (bound) {
+            return bound;
+        }
     }
     listener = tcp_listen_with_backlog_and_err(socket->tcp, (uint8_t)backlog, &error);
     if (!listener) {
@@ -704,6 +785,12 @@ int vinix_socket_send(struct vinix_socket *socket, const void *data, size_t leng
         }
         if (length > 65507) {
             return -90;
+        }
+        if (socket->udp->local_port == 0) {
+            int bound = bind_ephemeral(socket, &socket->udp->local_ip);
+            if (bound) {
+                return -bound;
+            }
         }
         p = pbuf_alloc(PBUF_TRANSPORT, (uint16_t)length, PBUF_RAM);
         if (!p) {

@@ -5,7 +5,8 @@
 /* SPDX-License-Identifier: BSD-2-Clause
  * In-guest regression coverage for Vinix's OpenBSD security features:
  * pledge(2), unveil(2), signed signal frames, random process ids, a
- * random program break and minherit(2). Built statically for either architecture and run
+ * random program break, minherit(2) and the network stack's random ports,
+ * sequence numbers and IP IDs. Built statically for either architecture and run
  * as PID 1; every case runs in a child, so a pledge violation that kills the
  * child is an outcome the parent can check. */
 #define _GNU_SOURCE
@@ -18,14 +19,18 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
+#include <sys/ioctl.h>
 #include <sys/mount.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
 #include <sys/uio.h>
 #include <sys/wait.h>
+#include <net/if.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <poll.h>
+#include <time.h>
 #include <unistd.h>
 
 #if defined(__aarch64__)
@@ -828,10 +833,161 @@ static int run_inherit_tests(void)
 	return 0;
 }
 
+/* The port getsockname() gives an IPv4 socket, or 0. */
+static unsigned local_port(int fd)
+{
+	struct sockaddr_in address;
+	socklen_t length = sizeof(address);
+	if (getsockname(fd, (struct sockaddr *)&address, &length) != 0)
+		return 0;
+	return ntohs(address.sin_port);
+}
+
+/* How many of `count` ports come right after the one before. */
+static int in_sequence(const unsigned *ports, int count)
+{
+	int consecutive = 0;
+	for (int i = 1; i < count; i++)
+		if (ports[i] == ports[i - 1] + 1)
+			consecutive++;
+	return consecutive;
+}
+
+static int ephemeral(unsigned port)
+{
+	return port >= 49152 && port <= 65535;
+}
+
+static struct sockaddr_in ipv4_address(const char *text, unsigned port)
+{
+	struct sockaddr_in address;
+	memset(&address, 0, sizeof(address));
+	address.sin_family = AF_INET;
+	address.sin_port = htons((uint16_t)port);
+	inet_pton(AF_INET, text, &address.sin_addr);
+	return address;
+}
+
+static double seconds_now(void)
+{
+	struct timespec now;
+	clock_gettime(CLOCK_MONOTONIC, &now);
+	return (double)now.tv_sec + now.tv_nsec / 1e9;
+}
+
+/* Whether eth0 has an address from DHCP by `deadline`. */
+static int wait_for_address(double deadline)
+{
+	int fd = socket(AF_INET, SOCK_DGRAM, 0);
+	if (fd < 0)
+		return 0;
+	for (;;) {
+		struct ifreq request;
+		memset(&request, 0, sizeof(request));
+		strcpy(request.ifr_name, "eth0");
+		if (ioctl(fd, SIOCGIFADDR, &request) == 0) {
+			close(fd);
+			return 1;
+		}
+		if (seconds_now() > deadline) {
+			close(fd);
+			return 0;
+		}
+		usleep(100000);
+	}
+}
+
+/* Rounds of connections and datagrams to QEMU's host, whose sequence
+ * numbers, ports and IP IDs run_vm.py reads from its capture. Port 9 is
+ * discard; whether anything answers does not matter. */
+enum { wire_rounds = 8 };
+
+static void send_to_host(void)
+{
+	struct sockaddr_in host = ipv4_address("10.0.2.2", 9);
+	for (int i = 0; i < wire_rounds; i++) {
+		int stream = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
+		if (stream >= 0) {
+			connect(stream, (struct sockaddr *)&host, sizeof(host));
+			struct pollfd wait = {.fd = stream, .events = POLLOUT};
+			poll(&wait, 1, 500);
+			close(stream);
+		}
+		int datagram = socket(AF_INET, SOCK_DGRAM, 0);
+		if (datagram >= 0) {
+			sendto(datagram, "vinix", 5, 0, (struct sockaddr *)&host, sizeof(host));
+			close(datagram);
+		}
+	}
+	puts("OPENBSD SECURITY WIRE: sent");
+}
+
+static int run_network_tests(void)
+{
+	enum { count = 16 };
+	unsigned ports[count];
+	int fds[count];
+	struct sockaddr_in loopback = ipv4_address("127.0.0.1", 0);
+
+	/* bind() to port 0. */
+	for (int i = 0; i < count; i++) {
+		fds[i] = socket(AF_INET, SOCK_DGRAM, 0);
+		CHECK(fds[i] >= 0);
+		CHECK(bind(fds[i], (struct sockaddr *)&loopback, sizeof(loopback)) == 0);
+		ports[i] = local_port(fds[i]);
+		CHECK(ephemeral(ports[i]));
+	}
+	CHECK(in_sequence(ports, count) < 3);
+	/* sendto() and connect() on a socket bound to nothing. */
+	struct sockaddr_in target = ipv4_address("127.0.0.1", local_port(fds[0]));
+	for (int i = 0; i < count; i++) {
+		int fd = socket(AF_INET, SOCK_DGRAM, 0);
+		CHECK(fd >= 0);
+		if (i % 2 == 0)
+			CHECK(sendto(fd, "x", 1, 0, (struct sockaddr *)&target, sizeof(target)) == 1);
+		else
+			CHECK(connect(fd, (struct sockaddr *)&target, sizeof(target)) == 0);
+		ports[i] = local_port(fd);
+		CHECK(ephemeral(ports[i]));
+		close(fd);
+	}
+	CHECK(in_sequence(ports, count) < 3);
+	for (int i = 0; i < count; i++)
+		close(fds[i]);
+
+	/* TCP: a listener that never bound, and connections to it. */
+	int listener = socket(AF_INET, SOCK_STREAM, 0);
+	CHECK(listener >= 0);
+	CHECK(listen(listener, count) == 0);
+	unsigned listening = local_port(listener);
+	CHECK(ephemeral(listening));
+	struct sockaddr_in server = ipv4_address("127.0.0.1", listening);
+	for (int i = 0; i < count; i++) {
+		int client = socket(AF_INET, SOCK_STREAM, 0);
+		CHECK(client >= 0);
+		CHECK(connect(client, (struct sockaddr *)&server, sizeof(server)) == 0);
+		ports[i] = local_port(client);
+		CHECK(ephemeral(ports[i]) && ports[i] != listening);
+		int accepted = accept(listener, NULL, NULL);
+		CHECK(accepted >= 0);
+		close(accepted);
+		close(client);
+	}
+	CHECK(in_sequence(ports, count) < 3);
+	close(listener);
+
+	/* On the wire, once DHCP has given eth0 an address. */
+	CHECK(wait_for_address(seconds_now() + 120));
+	send_to_host();
+	puts("OPENBSD SECURITY PASS: ports, sequence numbers and IP IDs are random");
+	return 0;
+}
+
 static int run_tests(void)
 {
 	if (run_pledge_tests() != 0 || run_unveil_tests() != 0 || run_signal_tests() != 0
-	    || run_pid_tests() != 0 || run_break_tests() != 0 || run_inherit_tests() != 0)
+	    || run_pid_tests() != 0 || run_break_tests() != 0 || run_inherit_tests() != 0
+	    || run_network_tests() != 0)
 		return 1;
 	puts("VINIX OPENBSD SECURITY: PASS");
 	return 0;

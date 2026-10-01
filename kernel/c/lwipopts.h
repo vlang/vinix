@@ -54,6 +54,15 @@
 #define LWIP_NETIF_LOOPBACK_MULTITHREADING 0
 #define LWIP_NETIF_TX_SINGLE_PBUF 0
 
+/* Initial sequence numbers as RFC 6528 has them, keyed by a secret, rather
+ * than lwIP's sum of the ticks since boot: see net_random.c. */
+#include <stdint.h>
+uint32_t vinix_tcp_isn(uint32_t local_address, uint16_t local_port,
+                       uint32_t remote_address, uint16_t remote_port);
+#define LWIP_HOOK_TCP_ISN(local_ip, local_port, remote_ip, remote_port) \
+    vinix_tcp_isn(ip4_addr_get_u32(ip_2_ip4(local_ip)), (local_port), \
+                  ip4_addr_get_u32(ip_2_ip4(remote_ip)), (remote_port))
+
 #define LWIP_STATS 0
 #define LWIP_DEBUG 0
 #define LWIP_CHECKSUM_CTRL_PER_NETIF 0

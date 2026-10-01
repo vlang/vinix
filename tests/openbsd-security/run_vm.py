@@ -12,6 +12,7 @@ import pty
 import select
 import signal
 import socket
+import struct
 import sys
 import time
 
@@ -36,8 +37,81 @@ FEATURE_MARKERS = (
     b"OPENBSD SECURITY PASS: process ids are random",
     b"OPENBSD SECURITY PASS: the program break is random",
     b"OPENBSD SECURITY PASS: minherit and fork-time wiping",
+    b"OPENBSD SECURITY PASS: ports, sequence numbers and IP IDs are random",
 )
 REPORT_MARKER = b': pledge "rpath", syscall '
+# The guest's NIC, as both runs give it, and how many connections and
+# datagrams test.c's send_to_host() makes to QEMU's host.
+GUEST_MAC = bytes.fromhex("525400123456")
+WIRE_ROUNDS = 8
+
+
+def capture_frames(path: Path) -> list[bytes]:
+    """The Ethernet frames in a pcap file that QEMU's filter-dump wrote."""
+    data = path.read_bytes()
+    if len(data) < 24:
+        return []
+    magic = struct.unpack("<I", data[:4])[0]
+    order = "<" if magic in (0xA1B2C3D4, 0xA1B23C4D) else ">"
+    frames = []
+    at = 24
+    while at + 16 <= len(data):
+        _, _, included, _ = struct.unpack(order + "IIII", data[at:at + 16])
+        frames.append(data[at + 16:at + 16 + included])
+        at += 16 + included
+    return frames
+
+
+def close_pairs(values: list[int], modulus: int, within: int) -> int:
+    """How many values come within `within` after the one before, mod `modulus`."""
+    return sum(1 for a, b in zip(values, values[1:]) if 0 < (b - a) % modulus <= within)
+
+
+def check_capture(path: Path) -> list[str]:
+    """Problems with what the guest sent: sequence numbers, ports or IP IDs
+    a counter would have produced."""
+    if not path.exists():
+        return ["QEMU wrote no packet capture"]
+    ids: list[int] = []
+    syns: dict[int, int] = {}
+    datagram_ports: list[int] = []
+    for frame in capture_frames(path):
+        if len(frame) < 34 or frame[6:12] != GUEST_MAC or frame[12:14] != b"\x08\x00":
+            continue
+        ip = frame[14:]
+        header = (ip[0] & 0xF) * 4
+        ids.append(struct.unpack(">H", ip[4:6])[0])
+        transport = ip[header:]
+        if ip[16:20] != bytes([10, 0, 2, 2]) or len(transport) < 8:
+            continue
+        source, destination = struct.unpack(">HH", transport[:4])
+        if destination != 9:
+            continue
+        if ip[9] == 6 and len(transport) >= 14 and transport[13] & 0x12 == 0x02:
+            syns.setdefault(source, struct.unpack(">I", transport[4:8])[0])
+        elif ip[9] == 17:
+            datagram_ports.append(source)
+    problems = []
+    if len(ids) < 2 * WIRE_ROUNDS:
+        return [f"the capture has only {len(ids)} packets from the guest"]
+    sequential = close_pairs(ids, 1 << 16, 64)
+    if sequential > max(2, len(ids) // 20):
+        problems.append(f"{sequential} of {len(ids) - 1} IP IDs follow the one before")
+    if len(syns) < WIRE_ROUNDS // 2:
+        problems.append(f"only {len(syns)} SYNs reached the capture")
+    isns = list(syns.values())
+    near = sum(1 for a, b in zip(isns, isns[1:])
+               if min((b - a) % (1 << 32), (a - b) % (1 << 32)) < (1 << 24))
+    if near > 1:
+        problems.append(f"{near} of {len(isns) - 1} initial sequence numbers are near the last")
+    for kind, ports in (("TCP", list(syns)), ("UDP", datagram_ports)):
+        if any(port < 49152 for port in ports):
+            problems.append(f"a {kind} source port is outside the ephemeral range: {ports}")
+        if close_pairs(ports, 1 << 16, 1) > 2:
+            problems.append(f"{kind} source ports are handed out in sequence: {ports}")
+    print(f"==> capture: {len(ids)} guest packets, {sequential} IDs in sequence, "
+          f"{len(isns)} SYNs, {near} close ISNs, {len(datagram_ports)} datagrams")
+    return problems
 
 
 def available_port() -> str:
@@ -88,6 +162,9 @@ def command_for(arguments: argparse.Namespace, root: Path) -> tuple[list[str], d
         environment["VINIX_QEMU_PERSIST_DISK"] = str(state / "root.ext2")
         environment["VINIX_QEMU_PERSIST_SIZE_MB"] = "64"
         environment.pop("VINIX_QEMU_PERSIST", None)
+        dump = f"-object filter-dump,id=vinixdump,netdev=net0,file={arguments.capture}"
+        environment["VINIX_QEMU_EXTRA"] = " ".join(
+            filter(None, (environment.get("VINIX_QEMU_EXTRA"), dump)))
         environment.setdefault("VINIX_QEMU_PACKAGE_STORE_PORT", available_port())
         if platform.system() != "Darwin":
             environment.setdefault("USE_TCG", "1")
@@ -108,6 +185,9 @@ def command_for(arguments: argparse.Namespace, root: Path) -> tuple[list[str], d
         "-smp", "2",
         "-drive", f"if=pflash,format=raw,unit=0,readonly=on,file={firmware}",
         "-cdrom", str(arguments.iso),
+        "-netdev", "user,id=net0",
+        "-device", "e1000,netdev=net0,mac=52:54:00:12:34:56",
+        "-object", f"filter-dump,id=vinixdump,netdev=net0,file={arguments.capture}",
         "-display", "none",
         "-monitor", "none",
         "-serial", "stdio",
@@ -125,6 +205,7 @@ def main() -> int:
     parser.add_argument("--qemu", default="qemu-system-x86_64")
     parser.add_argument("--firmware", type=Path)
     parser.add_argument("--timeout", type=int, default=600)
+    parser.add_argument("--capture", type=Path, required=True)
     arguments = parser.parse_args()
     root = Path(__file__).resolve().parents[2]
     if arguments.state_dir is not None:
@@ -175,6 +256,8 @@ def main() -> int:
     failures = [marker.decode() for marker in FAIL_MARKERS if marker in output]
     if finished_at is None:
         failures.append("the test did not finish before the timeout")
+    if b"OPENBSD SECURITY WIRE: sent" in output:
+        failures.extend(check_capture(arguments.capture))
     for item in missing:
         print(f"ERROR: missing expected result: {item}", file=sys.stderr)
     for item in failures:

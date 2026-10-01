@@ -9,6 +9,7 @@ import fs
 import ioctl
 import katomic
 import klock
+import krandom
 import lib
 import limine
 import proc
@@ -129,6 +130,10 @@ const max_extra_nameservers = 2
 
 pub fn initialise() {
 	read_extra_nameservers()
+	// lwIP draws its ports, IDs and sequence numbers from the kernel's
+	// generator (c/net_random.c) from lwip_init() on, before /dev/random is
+	// set up.
+	krandom.initialise()
 	net_lock.acquire()
 	C.vinix_net_init()
 	net_lock.release()

@@ -210,6 +210,41 @@ needs only the `stdio` promise. OpenBSD's arc4random keeps its state in a
 `MAP_INHERIT_ZERO` range, and finding it zeroed after a fork is how it knows
 to rekey instead of repeating its parent.
 
+## Random ports, sequence numbers and IP IDs
+
+The kernel's IP stack, lwIP, made up the numbers in its packets the
+predictable way. OpenBSD has made each of them random for more than twenty
+years, and so does Vinix now (`kernel/c/net_random.c`):
+
+- **IP IDs.** lwIP numbered datagrams one after another, so anyone who saw
+  two of them knew how much else the machine had sent in between, which is
+  what an idle scan measures. Each datagram now leaves with an ID from
+  OpenBSD's `ip_randomid()`: a shuffle of every ID, read in order, with the
+  one just used swapped back into a random place among the 32768 before it.
+  No ID comes back within 32768 datagrams, and the next one cannot be told
+  from those before. The fragments of a datagram share its ID.
+- **TCP initial sequence numbers.** lwIP added the ticks since boot to the
+  last one it gave out, so the next connection's could be guessed, and a
+  connection forged or reset by someone who could not see its packets. They
+  are RFC 6528's now: a clock that ticks every 4 microseconds, plus
+  SipHash-2-4 of the connection's addresses and ports under a key made at the
+  first connection. OpenBSD's `tcp_set_iss_tsm()` does the same with SHA-512.
+- **Ephemeral ports.** A socket that was bound to port 0, or that connected,
+  listened or sent without being bound, got the port after the last one
+  handed out. Now it gets a free port picked at random from 49152-65535, as
+  OpenBSD's `in_pcbpickport()` picks them, so that poisoning a resolver's
+  cache means guessing the port its query came from as well as the query's
+  ID. `listen(2)` on an unbound socket now binds it too, as on Linux.
+- **lwIP's own random numbers**, behind its DNS query IDs and ports and
+  DHCP's transaction IDs, came from an xorshift seeded from the clock. They
+  come from the kernel's ChaCha20 generator now, a few blocks at a time, with
+  each byte cleared from the buffer as it is used.
+
+`tests/net-random/run.sh` checks the code on the host: the SipHash test
+vectors, that no ID repeats within 32768, how the sequence numbers move with
+the clock and the ports. The QEMU test captures what the guest sends to the
+host and checks the sequence numbers, source ports and IP IDs on the wire.
+
 ## Already in place
 
 These came before and are unchanged: W^X for user mappings, `mimmutable(2)`

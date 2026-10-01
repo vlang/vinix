@@ -22,7 +22,8 @@ aarch64)
 	COPYFILE_DISABLE=1 tar --format=ustar -cf "$work/initramfs.tar" -C "$work/rootfs" .
 	python3 "$repo/tests/openbsd-security/run_vm.py" --arch aarch64 \
 		--init "$work/init" --initramfs "$work/initramfs.tar" \
-		--state-dir "$work/vm" --timeout "${VINIX_QEMU_TIMEOUT:-600}"
+		--state-dir "$work/vm" --capture "$work/net.pcap" \
+		--timeout "${VINIX_QEMU_TIMEOUT:-600}"
 	;;
 amd64)
 	"${CC_AMD64:-x86_64-linux-musl-gcc}" -static -O2 -Wall -Wextra -Werror \
@@ -38,7 +39,7 @@ amd64)
 	firmware=${VINIX_OVMF_CODE:-"$(cd "$(dirname "$qemu")/.." && pwd)/share/qemu/edk2-x86_64-code.fd"}
 	python3 "$repo/tests/openbsd-security/run_vm.py" --arch amd64 \
 		--iso "$work/test.iso" --qemu "$qemu" --firmware "$firmware" \
-		--timeout "${VINIX_QEMU_TIMEOUT:-600}"
+		--capture "$work/net.pcap" --timeout "${VINIX_QEMU_TIMEOUT:-600}"
 	;;
 *)
 	echo "usage: $0 [aarch64|amd64]" >&2

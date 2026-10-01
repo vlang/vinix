@@ -24,6 +24,10 @@ persistent volume. The amd64 run compiles with `x86_64-linux-musl-gcc` (or
 boots it under TCG. Both runs leave nothing behind. `VINIX_QEMU_TIMEOUT`
 changes the default 600-second deadline.
 
+The runner records the guest's network traffic with QEMU's `filter-dump`
+and checks the TCP sequence numbers, source ports and IP IDs of what the test
+sends to the host, 10.0.2.2, once DHCP has given it an address.
+
 On aarch64 the runner also expects the kernel's report of a violation on
 serial. amd64 production kernels print only to the framebuffer, so that check
 is skipped there. The amd64 Linux ABI has no `clone`, `rename`, `link`,
