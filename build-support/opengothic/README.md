@@ -70,5 +70,11 @@ to off. Additional arguments to `run-opengothic` override those defaults.
 The current build uses OpenAL's null audio backend. Hardware Vulkan and audio
 playback have not been qualified.
 
+Lavapipe draws every frame on the CPU, and the engine's renderer is written
+for a GPU: in QEMU on four cores the opening scene draws one or two frames a
+second. The engine reads its own settings from `Gothic.ini` in the launcher's
+state directory, `~/.local/share/opengothic`; `vidResIndex=2` under
+`[INTERNAL]` renders the world at half resolution.
+
 [tests/opengothic](../../tests/opengothic/README.md) boots the desktop in QEMU
 and plays a new game from the keyboard.
