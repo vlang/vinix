@@ -30,6 +30,7 @@ FEATURE_MARKERS = (
     b"QEMU CORE PASS: copy-on-write fork",
     b"QEMU CORE PASS: syscalls page in untouched buffers",
     b"QEMU CORE PASS: partial unmap reclaims pages and retains forked shares",
+    b"QEMU CORE PASS: a range split while a sharer unmaps it keeps its pages",
     b"QEMU CORE PASS: madvise returns anonymous pages to the allocator",
     b"QEMU CORE PASS: exit and exec reclaim process mappings",
     b"QEMU CORE PASS: forked copy-on-write pages are reclaimed",

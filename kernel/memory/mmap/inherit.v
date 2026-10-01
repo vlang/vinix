@@ -102,11 +102,6 @@ fn set_inheritance_unlocked(mut pagemap memory.Pagemap, base u64, length u64, ch
 			continue
 		}
 
-		// Each split shrinks the range and adds the piece it lost in one hold
-		// of range_locals_lock: a process unmapping a shared range meanwhile
-		// would otherwise find the piece's pages mapped by no one, and free
-		// them.
-		mut global_range := local_range.global
 		if snip_begin > local_range.base && snip_end < local_end {
 			mut postsplit_range := &MmapRangeLocal{
 				pagemap: local_range.pagemap
@@ -121,11 +116,7 @@ fn set_inheritance_unlocked(mut pagemap memory.Pagemap, base u64, length u64, ch
 				wipe_on_fork: local_range.wipe_on_fork
 				global: local_range.global
 			}
-			range_locals_lock.acquire()
-			global_range.add_local(postsplit_range)
-			local_range.length -= postsplit_range.length
-			range_locals_lock.release()
-			insert_range_unlocked(mut pagemap, postsplit_range)
+			split_off_unlocked(mut pagemap, local_range, postsplit_range)
 		}
 
 		snip_size := snip_end - snip_begin
@@ -147,15 +138,7 @@ fn set_inheritance_unlocked(mut pagemap memory.Pagemap, base u64, length u64, ch
 			wipe_on_fork: wipe_on_fork
 			global: local_range.global
 		}
-		range_locals_lock.acquire()
-		global_range.add_local(changed_range)
-		if snip_begin == local_range.base {
-			local_range.offset += i64(snip_size)
-			local_range.base = snip_end
-		}
-		local_range.length -= snip_size
-		range_locals_lock.release()
-		insert_range_unlocked(mut pagemap, changed_range)
+		split_off_unlocked(mut pagemap, local_range, changed_range)
 	}
 }
 

@@ -805,6 +805,27 @@ fn (mut g MmapRangeGlobal) add_local(local &MmapRangeLocal) {
 	g.locals << unsafe { local }
 }
 
+// Split `piece` off `_local`: a new range on the same global, covering the
+// low or the high end of what `_local` covers, which keeps the rest. The
+// piece goes on the global's list and `_local` shrinks in one hold of
+// range_locals_lock, so the pages changing hands are some local's
+// throughout. Shrunk first and added after, they were no one's in between,
+// and another process unmapping the same shared range then freed them under
+// this one's page tables. The caller holds the page map's lock.
+fn split_off_unlocked(mut pagemap memory.Pagemap, _local &MmapRangeLocal, piece &MmapRangeLocal) {
+	mut local := unsafe { _local }
+	mut global := local.global
+	range_locals_lock.acquire()
+	global.add_local(piece)
+	if piece.base == local.base {
+		local.offset += i64(piece.length)
+		local.base += piece.length
+	}
+	local.length -= piece.length
+	range_locals_lock.release()
+	insert_range_unlocked(mut pagemap, piece)
+}
+
 pub fn map_page_in_range(_g &MmapRangeGlobal, virt_addr u64, phys_addr u64, _prot int) ? {
 	mut g := unsafe { _g }
 
@@ -1681,11 +1702,7 @@ pub fn mprotect_unlocked(mut pagemap memory.Pagemap, addr voidptr, _length u64, 
 				wipe_on_fork: local_range.wipe_on_fork
 				global: local_range.global
 			}
-			range_locals_lock.acquire()
-			global_range.add_local(postsplit_range)
-			range_locals_lock.release()
-			insert_range_unlocked(mut pagemap, postsplit_range)
-			local_range.length -= postsplit_range.length
+			split_off_unlocked(mut pagemap, local_range, postsplit_range)
 		}
 
 		// Only a page that is there has a protection to change.
@@ -1705,19 +1722,11 @@ pub fn mprotect_unlocked(mut pagemap memory.Pagemap, addr voidptr, _length u64, 
 		if snip_size == local_range.length {
 			local_range.prot = prot
 		} else {
-			new_offset := local_range.offset + i64(snip_begin - local_range.base)
-
-			if snip_begin == local_range.base {
-				local_range.offset += i64(snip_size)
-				local_range.base = snip_end
-			}
-			local_range.length -= snip_size
-
 			mut new_range := &MmapRangeLocal{
 				pagemap: local_range.pagemap
 				base: snip_begin
 				length: snip_size
-				offset: new_offset
+				offset: local_range.offset + i64(snip_begin - local_range.base)
 				prot: prot
 				flags: local_range.flags
 				cow: local_range.cow
@@ -1726,10 +1735,7 @@ pub fn mprotect_unlocked(mut pagemap memory.Pagemap, addr voidptr, _length u64, 
 				wipe_on_fork: local_range.wipe_on_fork
 				global: local_range.global
 			}
-			range_locals_lock.acquire()
-			global_range.add_local(new_range)
-			range_locals_lock.release()
-			insert_range_unlocked(mut pagemap, new_range)
+			split_off_unlocked(mut pagemap, local_range, new_range)
 		}
 	}
 }
@@ -1835,11 +1841,7 @@ fn munmap_unlocked_impl(mut pagemap memory.Pagemap, addr voidptr, _length u64,
 				wipe_on_fork: local_range.wipe_on_fork
 				global: local_range.global
 			}
-			range_locals_lock.acquire()
-			global_range.add_local(postsplit_range)
-			range_locals_lock.release()
-			insert_range_unlocked(mut pagemap, postsplit_range)
-			local_range.length -= postsplit_range.length
+			split_off_unlocked(mut pagemap, local_range, postsplit_range)
 		}
 
 		// Only the pages there are: MariaDB's 8 TiB reservation took ten

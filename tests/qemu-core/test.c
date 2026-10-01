@@ -263,6 +263,77 @@ static int test_partial_munmap_reclaims_pages(void)
 	return 0;
 }
 
+#if defined(__aarch64__)
+#define SYS_vinix_mimmutable 247
+#else
+#define SYS_vinix_mimmutable 500
+#endif
+
+/* Split a shared range -- change one page of it -- at the moment the process
+ * it is shared with unmaps the whole of it. `how` picks the call and the
+ * page. Answers zero when every page still holds what was written to it: a
+ * page the kernel freed reads as its allocator's poison instead. */
+static int split_while_a_sharer_unmaps(int how)
+{
+	enum { unit = 16384, pages = 4 };
+	volatile int *go = mmap(NULL, unit, PROT_READ | PROT_WRITE,
+	    MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+	unsigned char *shared = mmap(NULL, pages * unit, PROT_READ | PROT_WRITE,
+	    MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+	if (go == MAP_FAILED || shared == MAP_FAILED)
+		return 1;
+	memset(shared, 0xa5, pages * unit);
+	pid_t sharer = fork();
+	if (sharer < 0)
+		return 2;
+	if (sharer == 0) {
+		while (!*go)
+			;
+		_exit(munmap(shared, pages * unit) == 0 ? 0 : 1);
+	}
+	unsigned char *page = shared + (how & 1) * unit;
+	*go = 1;
+	int result;
+	if (how < 2)
+		result = mprotect(page, unit, PROT_READ);
+	else if (how < 4)
+		result = (int)syscall(SYS_vinix_mimmutable, page, (size_t)unit);
+	else
+		result = madvise(page, unit, MADV_DONTFORK);
+	if (result != 0)
+		return 3;
+	int status = -1;
+	if (waitpid(sharer, &status, 0) != sharer || !WIFEXITED(status) || WEXITSTATUS(status) != 0)
+		return 4;
+	for (size_t i = 0; i < pages * unit; i++)
+		if (shared[i] != 0xa5)
+			return 5;
+	return 0;
+}
+
+/* A range's pages belong to it for as long as some process maps them. A
+ * split used to take the changed page out of the range before putting the
+ * piece that held it in, and an unmap by the range's other process in
+ * between found the page mapped by no one and freed it. Each round runs in
+ * a process of its own, since an immutable range lasts as long as one. */
+static int test_split_keeps_pages_a_sharer_unmaps(void)
+{
+	for (int round = 0; round < 150; ++round) {
+		pid_t splitter = fork();
+		CHECK(splitter >= 0);
+		if (splitter == 0)
+			_exit(split_while_a_sharer_unmaps(round % 6));
+		int status = -1;
+		CHECK(waitpid(splitter, &status, 0) == splitter);
+		if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
+			printf("split round %d (kind %d): status %#x\n", round, round % 6, status);
+			CHECK(0);
+		}
+	}
+	puts("QEMU CORE PASS: a range split while a sharer unmaps it keeps its pages");
+	return 0;
+}
+
 static int test_madvise_reclaims_anonymous_pages(void)
 {
 	const size_t size = 32UL * 1024 * 1024;
@@ -2977,6 +3048,7 @@ static int run_tests(void)
 	CHECK(test_cow() == 0);
 	CHECK(test_syscall_buffers_in_untouched_pages() == 0);
 	CHECK(test_partial_munmap_reclaims_pages() == 0);
+	CHECK(test_split_keeps_pages_a_sharer_unmaps() == 0);
 	CHECK(test_madvise_reclaims_anonymous_pages() == 0);
 	CHECK(test_short_lived_process_memory_reclamation() == 0);
 	CHECK(test_forked_cow_memory_reclamation() == 0);
