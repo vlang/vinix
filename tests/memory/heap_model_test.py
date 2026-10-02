@@ -16,13 +16,14 @@ import unittest
 
 PAGE = 4096
 MASK = (1 << 64) - 1
+BITMAP_WORDS = 16
 CLASSES = (16, 32, 48, 64, 96, 128, 192, 256, 384, 512, 768, 1024, 1536, 2048)
 
 
 class HeaderLayout(ctypes.Structure):
     _fields_ = [(name, ctypes.c_uint64) for name in
                 ('slab', 'magic', 'prev', 'next', 'capacity', 'in_use')]
-    _fields_.append(('used', ctypes.c_uint64 * 4))
+    _fields_.append(('used', ctypes.c_uint64 * BITMAP_WORDS))
 
 
 OFFSET = (ctypes.sizeof(HeaderLayout) + 15) & ~15
@@ -49,7 +50,7 @@ class Page:
     prev: int = 0
     next: int = 0
     count: int = 0
-    bits: list[int] = field(default_factory=lambda: [MASK] * 4)
+    bits: list[int] = field(default_factory=lambda: [MASK] * BITMAP_WORDS)
     payload: bytearray = field(default_factory=lambda: bytearray([0xAA] * PAGE))
 
     @property
@@ -213,12 +214,13 @@ class Slab:
 class HeapModelTests(unittest.TestCase):
     def test_source_geometry_and_classes(self) -> None:
         root = Path(__file__).resolve().parents[2]
-        source = (root / 'kernel/modules/memory/physical.v').read_text()
+        source = (root / 'kernel/memory/physical.v').read_text()
         sizes = tuple(map(int, re.findall(r'slabs\[\d+\]\.init\((\d+)\)', source)))
         self.assertEqual(sizes, CLASSES)
-        self.assertEqual(OFFSET, 80)
-        slab = (root / 'kernel/modules/memory/slab.v').read_text()
-        self.assertRegex(slab, r'used\s+\[4\]u64')
+        self.assertEqual(OFFSET, 176)
+        slab = (root / 'kernel/memory/slab.v').read_text()
+        self.assertIn(f'const slab_bitmap_words = {BITMAP_WORDS}', slab)
+        self.assertRegex(slab, r'used\s+\[slab_bitmap_words\]u64')
         self.assertIn('const slab_alignment = u64(16)', slab)
         for size in CLASSES:
             self.assertEqual(size % 16, 0)
@@ -341,14 +343,14 @@ class HeapModelTests(unittest.TestCase):
             self.assertLessEqual((pages + 1) * PAGE, MASK)
         self.assertGreater(((maximum + 1 + PAGE - 1) // PAGE + 1) * PAGE, MASK)
         root = Path(__file__).resolve().parents[2]
-        source = (root / 'kernel/modules/memory/physical.v').read_text()
+        source = (root / 'kernel/memory/physical.v').read_text()
         self.assertIn('if b != 0 && a > u64(-1) / b', source)
         self.assertIn('if new_ptr == unsafe { nil }', source)
         self.assertEqual(source.count('(u64(-1) / page_size - 1) * page_size'), 2)
 
     def test_irq_snapshot_source_order(self) -> None:
         root = Path(__file__).resolve().parents[2]
-        source = (root / 'kernel/modules/klock/klock_amd64.v').read_text()
+        source = (root / 'kernel/klock/klock_amd64.v').read_text()
         release = source.split('pub fn (mut l Lock) release() {', 1)[1].split('\n}', 1)[0]
         self.assertLess(release.index('ints := l.ints'), release.index('katomic.store'))
         self.assertIn('cpu.interrupt_toggle(ints)', release)
