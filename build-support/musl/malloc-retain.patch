@@ -43,7 +43,67 @@
  	return m->avail_mask = mask & act;
  }
  
-@@ -181,7 +199,7 @@
+@@ -126,7 +144,14 @@
+ 	return p[-3] & 31;
+ }
+ 
+-static inline struct meta *get_meta(const unsigned char *p)
++struct slot_info {
++	size_t stride, class_stride;
++	int index;
++};
++
++/* Share values already needed for header validation with free(). Other
++ * callers keep the same pointer-only get_meta interface. */
++static inline struct meta *get_meta_with_info(const unsigned char *p, struct slot_info *info)
+ {
+ 	assert(!((uintptr_t)p & 15));
+ 	int offset = *(const uint16_t *)(p - 2);
+@@ -144,16 +169,35 @@
+ 	assert(!(meta->freed_mask & (1u<<index)));
+ 	const struct meta_area *area = (void *)((uintptr_t)meta & -4096);
+ 	assert(area->check == ctx.secret);
+-	if (meta->sizeclass < 48) {
+-		assert(offset >= size_classes[meta->sizeclass]*index);
+-		assert(offset < size_classes[meta->sizeclass]*(index+1));
+-	} else {
+-		assert(meta->sizeclass == 63);
+-	}
+-	if (meta->maplen) {
+-		assert(offset <= meta->maplen*4096UL/UNIT - 1);
++	size_t class_stride = 0;
++	int sc = meta->sizeclass;
++	if (sc < 48) {
++		int units = size_classes[sc];
++		assert(offset >= units*index);
++		assert(offset < units*(index+1));
++		class_stride = UNIT*units;
++	} else {
++		assert(sc == 63);
++		/* Direct mappings always own one slot and a nonempty map. */
++		assert(!meta->last_idx);
++		assert(meta->maplen);
++	}
++	size_t maplen = meta->maplen;
++	if (maplen) {
++		assert(offset <= maplen*4096UL/UNIT - 1);
++	}
++	if (info) {
++		info->index = index;
++		info->class_stride = class_stride;
++		info->stride = !meta->last_idx && maplen ? maplen*4096UL-UNIT :
++			class_stride;
+ 	}
+ 	return (struct meta *)meta;
++}
++
++static inline struct meta *get_meta(const unsigned char *p)
++{
++	return get_meta_with_info(p, 0);
+ }
+ 
+ static inline size_t get_nominal_size(const unsigned char *p, const unsigned char *end)
+@@ -181,7 +225,7 @@
  	}
  }
  
@@ -52,7 +112,7 @@
  {
  	int reserved = end-p-n;
  	if (reserved) end[-reserved] = 0;
-@@ -190,7 +208,12 @@
+@@ -190,7 +234,12 @@
  		end[-5] = 0;
  		reserved = 5;
  	}
@@ -66,7 +126,7 @@
  }
  
  static inline void *enframe(struct meta *g, int idx, size_t n, int ctr)
-@@ -201,14 +224,20 @@
+@@ -201,14 +250,20 @@
  	unsigned char *end = p+stride-IB;
  	// cycle offset within slot to increase interval to address
  	// reuse, facilitate trapping double-free.
@@ -94,7 +154,7 @@
  	}
  	if (off) {
  		// store offset in unused header at offset zero
-@@ -221,8 +250,8 @@
+@@ -221,8 +276,8 @@
  		p[-4] = 0;
  	}
  	*(uint16_t *)(p-2) = (size_t)(p-g->mem->storage)/UNIT;
@@ -105,7 +165,7 @@
  	return p;
  }
  
-@@ -231,7 +260,7 @@
+@@ -231,7 +286,7 @@
  	n = (n+IB-1)>>4;
  	if (n<10) return n;
  	n++;
@@ -114,7 +174,7 @@
  	if (n>size_classes[i+1]) i+=2;
  	if (n>size_classes[i]) i++;
  	return i;
-@@ -244,6 +273,18 @@
+@@ -244,6 +299,18 @@
  		return 1;
  	}
  	return 0;
@@ -167,6 +227,15 @@
  
  	struct meta *g = alloc_group(sc, req);
  	if (!g) return -1;
+@@ -296,7 +303,7 @@
+ 	return 0;
+ }
+ 
+-void *malloc(size_t n)
++static __attribute__((noinline)) void *malloc_slow(size_t n)
+ {
+ 	if (size_overflows(n)) return 0;
+ 	struct meta *g;
 @@ -307,6 +314,20 @@
  
  	if (n >= MMAP_THRESHOLD) {
@@ -210,7 +279,39 @@
  		goto success;
  	}
  	upgradelock();
-@@ -382,6 +407,8 @@
+@@ -379,9 +404,40 @@
+ 	return enframe(g, idx, n, ctr);
+ }
+ 
++void *malloc(size_t n)
++{
++	/* Keep the ordinary single-thread path free of mapping and lock calls.
++	 * Negative need_locks transitions and any held/congested malloc lock
++	 * use the original path, including its actual-state unlock. */
++	if (n < MMAP_THRESHOLD && !MT && !*(volatile int *)__malloc_lock) {
++		int sc = size_to_class(n);
++		struct meta *g = ctx.active[sc];
++		if (g) {
++			uint32_t mask = g->avail_mask;
++			/* Refilling the sole group needs no queue changes when some
++			 * freed slots are already active. Grow inactive pages and
++			 * traverse other groups through the unchanged slow path. */
++			if (!mask && g->next == g &&
++			    (g->freed_mask & ((2u<<g->mem->active_idx)-1))) {
++				mask = activate_group(g);
++				assert(mask);
++				decay_bounces(g->sizeclass);
++			}
++			if (mask) {
++				uint32_t first = mask & -mask;
++				g->avail_mask = mask-first;
++				return enframe(g, __builtin_ctz(first), n, ctx.mmap_counter);
++			}
++		}
++	}
++	return malloc_slow(n);
++}
++
  int is_allzero(void *p)
  {
  	struct meta *g = get_meta(p);
@@ -276,7 +377,21 @@
  	return (struct mapinfo){ 0 };
  }
  
-@@ -113,6 +142,18 @@
+@@ -102,9 +131,10 @@
+ {
+ 	if (!p) return;
+ 
+-	struct meta *g = get_meta(p);
+-	int idx = get_slot_index(p);
+-	size_t stride = get_stride(g);
++	struct slot_info info;
++	struct meta *g = get_meta_with_info(p, &info);
++	int idx = info.index;
++	size_t stride = info.stride;
+ 	unsigned char *start = g->mem->storage + stride*idx;
+ 	unsigned char *end = start + stride - IB;
+ 	get_nominal_size(p, end);
+@@ -113,6 +143,18 @@
  	// invalidate offset to group header, and cycle offset of
  	// used region within slot if current offset is zero.
  	*(uint16_t *)((char *)p-2) = 0;
@@ -286,7 +401,7 @@
 +	 * publication so activation still rotates through all its slots.
 +	 * Metadata, redzones and the caller header were checked above. */
 +	if (VINIX_MALLOC_RETAIN && !MT && g->sizeclass < 48 && g->next == g &&
-+	    stride >= UNIT*size_classes[g->sizeclass] &&
++	    stride >= info.class_stride &&
 +	    (g->maplen ? g->maplen*4096UL : UNIT + stride*(g->last_idx+1))
 +	    <= RETAIN_GROUP_MAX_BYTES) {
 +		g->freed_mask |= self;
@@ -295,7 +410,7 @@
  
  	// release any whole pages contained in the slot to be freed
  	// unless it's a single-slot group that will be unmapped.
-@@ -149,3 +190,45 @@
+@@ -149,3 +191,45 @@
  		errno = e;
  	}
  }
