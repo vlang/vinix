@@ -1145,6 +1145,8 @@ done
 # full base userland predates them. The bridge is a cross-compiled executable;
 # package/Firefox launchers and policy files can be installed directly from
 # source.
+# Refresh security utilities even with cached staging or a compact root.
+python3 "$SCRIPT_DIR/build-support/security-tools/stage.py" --arch aarch64 --staging "$STAGING"
 install -m755 "$SCRIPT_DIR/build-support/vinix-pkg" "$STAGING/usr/bin/pkg"
 mkdir -p "$STAGING/usr/libexec/vinix-minecraft"
 for minecraft_support in \
@@ -1493,6 +1495,10 @@ CONTENT_KEY_INPUTS=(
     "$BUILD_DIR/wifi-ctl"
     "$BUILD_DIR/wallpapers"
     "$SCRIPT_DIR/desktop"
+    "$SCRIPT_DIR/build-support/security-tools"
+    "$SCRIPT_DIR/build-support/security-audit"
+    "$SCRIPT_DIR/tools/security-audit"
+    "$SCRIPT_DIR/tools/sandbox"
     "$SCRIPT_DIR/build-support/musl/stage.py"
     "$SCRIPT_DIR/build-support/musl/malloc-retain.patch"
     "$SCRIPT_DIR/build-support/musl/alpine"
