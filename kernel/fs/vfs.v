@@ -722,11 +722,8 @@ fn internal_create_with_acl(parent &VFSNode, name string, mode u32, access u32,
 
 fn fdnum_create_from_node(mut node VFSNode, flags int, oldfd int, specific bool, identity &lib.MountContext) ?int {
 	current_process := proc.current_thread().process
-	mut opened_resource := node.resource
 	mut node_resource := node.resource
-	if mut node_resource is resource.OpenableResource {
-		opened_resource = node_resource.open(flags)?
-	}
+	mut opened_resource := resource.open_resource(mut node_resource, flags)?
 	mut fd := file.fd_create_from_resource(mut opened_resource, flags) or { return none }
 	fd.handle.mac_device = stat.ischr(node.resource.stat.mode) || stat.isblk(node.resource.stat.mode)
 	fd.handle.mac_block_device = stat.isblk(node.resource.stat.mode)
@@ -1077,10 +1074,7 @@ fn open_anonymous_descriptor(descriptor AnonymousDescriptor, flags int) (u64, u6
 	if !stat.isifo(res.stat.mode) {
 		return errno.err, errno.enxio
 	}
-	mut opened := res
-	if mut res is resource.OpenableResource {
-		opened = res.open(flags) or { return errno.err, errno.get() }
-	}
+	mut opened := resource.open_resource(mut res, flags) or { return errno.err, errno.get() }
 	mut new_fd := file.fd_create_from_resource(mut opened, flags) or {
 		return errno.err, errno.get()
 	}

@@ -40,8 +40,9 @@ pub mut:
 // must decide it for the container's node too.
 fn (mut this MknodDeviceResource) open(flags int) ?&resource.Resource {
 	mut backing := this.backing
-	if mut backing is resource.OpenableResource {
-		return backing.open(flags)
+	backing_opens := backing is resource.OpenableResource
+	if backing_opens {
+		return resource.open_resource(mut backing, flags)
 	}
 	return this.boxed
 }
