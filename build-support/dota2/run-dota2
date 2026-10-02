@@ -1,0 +1,103 @@
+#!/bin/sh
+# Experimental launcher for Valve's Linux Dota 2 build on Vinix/aarch64.
+# The game runs through QEMU against a private x86-64 glibc runtime.
+# Launch the ELF directly: dota.sh requires Valve's sniper distribution even
+# when the necessary libraries are supplied outside its container.
+set -eu
+# Native helper commands and the translator must not inherit x86 libraries.
+# VINIX_DOTA2_LD_LIBRARY_PATH and VINIX_X86_64_PRELOAD supply guest overrides.
+unset LD_LIBRARY_PATH LD_PRELOAD QEMU_LD_PREFIX QEMU_SET_ENV
+
+if [ "${1:-}" = --help ]; then
+    echo 'usage: dota2 [GAME ARGUMENT ...]'
+    echo 'VINIX_DOTA2_DIR selects the installed game (default: /usr/share/games/dota2).'
+    echo 'VINIX_DOTA2_ROOT selects its private glibc runtime.'
+    exit 0
+fi
+
+game_dir="${VINIX_DOTA2_DIR:-/usr/share/games/dota2}"
+runtime="${VINIX_DOTA2_ROOT:-${VINIX_STEAM_ROOT:-/usr/libexec/vinix-dota2/root}}"
+emulator="${VINIX_X86_64_EMULATOR:-/usr/bin/qemu-x86_64}"
+width="${VINIX_DOTA2_WIDTH:-1280}"
+height="${VINIX_DOTA2_HEIGHT:-720}"
+
+fail() {
+    echo "dota2: $*" >&2
+    exit 127
+}
+
+for dimension in "$width" "$height"; do
+    case "$dimension" in
+        ''|*[!0-9]*) fail 'window dimensions must be positive integers' ;;
+    esac
+    [ "$dimension" -gt 0 ] || fail 'window dimensions must be positive integers'
+done
+[ -n "${DISPLAY:-}" ] || fail 'an X11 display is required; launch from the Vinix desktop'
+[ -x "$emulator" ] || fail "the x86-64 translator is not installed: $emulator"
+[ -d "$runtime" ] || fail "the private glibc runtime is not installed: $runtime"
+runtime=$(CDPATH= cd -- "$runtime" && pwd)
+[ -e "$runtime/lib64/ld-linux-x86-64.so.2" ] ||
+    fail "the x86-64 glibc loader is missing from $runtime"
+[ -e "$runtime/usr/lib/x86_64-linux-gnu/libvulkan.so.1" ] ||
+    fail "the x86-64 Vulkan loader is missing from $runtime"
+[ -d "$game_dir/game" ] || fail "the game is not installed: $game_dir"
+game_dir=$(CDPATH= cd -- "$game_dir" && pwd)
+game_root="$game_dir/game"
+game_bin="$game_root/bin/linuxsteamrt64"
+game="$game_bin/dota2"
+[ -x "$game" ] || fail "Valve's Linux executable is missing: $game"
+
+# Reject a macOS install, Windows executable, or shell stub before translation.
+elf_header=$(od -An -v -tx1 -N64 "$game" | tr -d '[:space:]')
+elf_ident=$(od -An -tx1 -N7 "$game" | tr -d '[:space:]')
+elf_type=$(od -An -tx1 -j16 -N2 "$game" | tr -d '[:space:]')
+elf_machine=$(od -An -tx1 -j18 -N2 "$game" | tr -d '[:space:]')
+[ "${#elf_header}" -eq 128 ] && [ "$elf_ident" = 7f454c46020101 ] &&
+    [ "$elf_machine" = 3e00 ] ||
+    fail "the game executable must be a Linux x86-64 ELF: $game"
+case "$elf_type" in
+    0200|0300) ;;
+    *) fail "the game executable must be a Linux x86-64 ELF: $game" ;;
+esac
+for asset in dota/gameinfo.gi dota/pak01_dir.vpk core/pak01_dir.vpk; do
+    [ -s "$game_root/$asset" ] || fail "the game content is missing: $game_root/$asset"
+done
+
+# Native AArch64 ICDs cannot be loaded into this translated glibc process.
+# An explicit caller selection takes priority, including an intentionally
+# empty selection. Otherwise use only the staged amd64 software Vulkan driver.
+if [ "${VK_DRIVER_FILES+x}" != x ] && [ "${VK_ICD_FILENAMES+x}" != x ] &&
+   [ "${VK_LOADER_DRIVERS_SELECT+x}" != x ]; then
+    icd="$runtime/usr/share/vulkan/icd.d/lvp_icd.x86_64.json"
+    [ -s "$icd" ] || fail "the x86-64 Lavapipe ICD is missing: $icd"
+    [ -e "$runtime/usr/lib/x86_64-linux-gnu/libvulkan_lvp.so" ] ||
+        fail "the x86-64 Lavapipe driver is missing from $runtime"
+    export VK_ICD_FILENAMES="$icd"
+fi
+
+export VINIX_I386_ROOT="$runtime"
+export VINIX_X86_64_ROOT="$runtime"
+export VINIX_X86_MULTIARCH=1
+export VINIX_ALLOW_WX=1
+export QEMU_CPU="${QEMU_CPU:-max}"
+export SteamAppId=570
+export SteamGameId=570
+export ENABLE_PATHMATCH=1
+export SDL_VIDEO_DRIVER="${SDL_VIDEO_DRIVER:-x11}"
+export FONTCONFIG_FILE="$runtime/etc/fonts/fonts.conf"
+export FONTCONFIG_PATH="$runtime/etc/fonts"
+export FONTCONFIG_SYSROOT="$runtime"
+
+guest_libraries="$game_bin:$runtime/usr/lib/x86_64-linux-gnu:$runtime/lib/x86_64-linux-gnu"
+if [ -n "${VINIX_DOTA2_LD_LIBRARY_PATH:-}" ]; then
+    guest_libraries="$guest_libraries:$VINIX_DOTA2_LD_LIBRARY_PATH"
+fi
+# The translator itself is native. QEMU's -E applies these foreign library
+# settings only after it has loaded, so the AArch64 loader never sees them.
+set -- "$game" -windowed -w "$width" -h "$height" "$@"
+if [ -n "${VINIX_X86_64_PRELOAD:-}" ]; then
+    set -- -E "LD_PRELOAD=$VINIX_X86_64_PRELOAD" "$@"
+fi
+cd "$game_root"
+exec "$emulator" -B "${VINIX_X86_64_GUEST_BASE:-0x100000000}" -L "$runtime" \
+    -E "LD_LIBRARY_PATH=$guest_libraries" "$@"
