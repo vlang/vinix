@@ -428,6 +428,11 @@ pub fn enqueue_thread(_thread &proc.Thread, by_signal bool) bool {
 
 	for i := u64(0); i < max_running_threads; i++ {
 		if katomic.cas[&proc.Thread](mut &scheduler_running_queue[i], unsafe { nil }, t) {
+			$if linuxkpi ? {
+				// The slot is guaranteed now. Failed/full enqueue must leave
+				// an I/O reservation intact for its later successful wake.
+				linuxkpi_iowait_end_locked(mut t)
+			}
 			katomic.store(mut &t.is_in_queue, true)
 
 			request_enqueue_preemption(t)
@@ -454,6 +459,12 @@ pub fn dequeue_thread(_thread &proc.Thread) bool {
 		}
 	}
 	katomic.store(mut &t.is_in_queue, false)
+	$if linuxkpi ? {
+		if t.is_dead {
+			// Permanent stop/exit can bypass a returning I/O scope.
+			linuxkpi_iowait_end_locked(mut t)
+		}
+	}
 
 	return removed || !was_enqueued
 }
@@ -927,6 +938,11 @@ fn free_thread_stacks(mut t proc.Thread) {
 // the tid table, its process and every event it waited on before it died.
 fn free_thread_memory(t &proc.Thread) {
 	mut thr := unsafe { t }
+	$if linuxkpi ? {
+		if thr.linuxkpi_iowait_cpu_plus_one != 0 {
+			lib.kpanic(unsafe { nil }, c'linuxkpi: reclaiming counted I/O task')
+		}
+	}
 	free_thread_stacks(mut thr)
 	unsafe {
 		thr.comm.free()

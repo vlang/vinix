@@ -69,6 +69,9 @@ pub mut:
 	// flush_on_return in fs/ext2.
 	owes_sync bool
 	l         klock.Lock
+	// Origin CPU + 1 for a Linux I/O block, protected by scheduler_queue_lock.
+	// Zero means no reservation; it occupies the existing alignment gap.
+	linuxkpi_iowait_cpu_plus_one u32
 	process   &Process = unsafe { nil }
 	gpr_state cpulocal.GPRState
 	gs_base   u64

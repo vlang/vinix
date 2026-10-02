@@ -61,3 +61,29 @@ fn worker_bind(target u32) int {
 	}
 	return 0
 }
+
+// The caller retains the anonymous worker while changing its affinity. This
+// fixture hook uses the same native mask publication and target wake as bind;
+// it does not change an I/O block's stored origin CPU.
+@[export: 'vinix_linuxkpi_test_worker_route']
+fn test_worker_route(owner voidptr, target u32) int {
+	ints := cpu.interrupt_toggle(false)
+	mut t := unsafe { &proc.Thread(owner) }
+	if cpu_locals.len > 64 {
+		cpu.interrupt_toggle(ints)
+		return -errno.eopnotsupp
+	}
+	if target >= u32(cpu_locals.len) || katomic.load(&cpu_locals[target].online) == 0 {
+		cpu.interrupt_toggle(ints)
+		return -errno.einval
+	}
+	if t == unsafe { nil } || t.process != kernel_process || katomic.load(&t.is_dead) {
+		cpu.interrupt_toggle(ints)
+		return -errno.eperm
+	}
+	katomic.store(mut &t.numa_node, -1)
+	katomic.store(mut &t.affinity_mask, u64(1) << target)
+	cpu.interrupt_toggle(ints)
+	assert sched.wake_cpu(target)
+	return 0
+}

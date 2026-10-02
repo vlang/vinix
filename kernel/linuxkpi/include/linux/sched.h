@@ -31,12 +31,18 @@ struct task_struct {
     raw_spinlock_t vinix_wait_lock;
     char comm[TASK_COMM_LEN];
     char vinix_initial_comm[TASK_COMM_LEN];
+    /* Fits the native view tail padding; nested I/O scopes restore this flag. */
+    unsigned int in_iowait;
 };
 void vinix_linuxkpi_set_task_state(unsigned int state);
 #define set_current_state(state) vinix_linuxkpi_set_task_state(state)
 #define __set_current_state(state) vinix_linuxkpi_set_task_state(state)
 #define task_is_running(task) (__atomic_load_n(&(task)->__state, __ATOMIC_RELAXED) == TASK_RUNNING)
 void schedule(void);
+int io_schedule_prepare(void) __must_check;
+void io_schedule_finish(int token);
+void io_schedule(void);
+long io_schedule_timeout(long timeout);
 #define MAX_SCHEDULE_TIMEOUT LONG_MAX
 long schedule_timeout(long timeout);
 long schedule_timeout_interruptible(long timeout);

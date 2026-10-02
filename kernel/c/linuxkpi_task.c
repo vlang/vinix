@@ -32,6 +32,7 @@ void vinix_linuxkpi_task_init(void *storage, void *thread, int pid, int tgid,
     task->tgid = tgid;
     task->flags = 0;
     task->__state = TASK_RUNNING;
+    task->in_iowait = 0;
     raw_spin_lock_init(&task->vinix_wait_lock);
     copy_comm(task->vinix_initial_comm, name, length);
     memcpy(task->comm, task->vinix_initial_comm, TASK_COMM_LEN);
@@ -105,6 +106,11 @@ void schedule(void)
             raw_spin_unlock_irqrestore(&task->vinix_wait_lock, flags);
             return;
         }
+        /* Intent belongs to this current task. Ordinary waits need no new
+         * native queue-lock acquisition; real I/O admission is serialized
+         * against every wake after accepted signals have been excluded. */
+        if (vinix_linuxkpi_task_in_iowait(task))
+            vinix_linuxkpi_iowait_block(task->vinix_thread);
         raw_spin_unlock_irqrestore(&task->vinix_wait_lock, flags);
         vinix_linuxkpi_task_park();
         /* Native signal delivery wakes every unmasked signal. Only the Linux

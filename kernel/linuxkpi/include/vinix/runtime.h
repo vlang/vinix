@@ -31,6 +31,11 @@ bool vinix_linuxkpi_task_queued(const void *thread);
 bool vinix_linuxkpi_task_enqueue(void *thread);
 void vinix_linuxkpi_task_dequeue(void *thread);
 void vinix_linuxkpi_task_park(void);
+/* Called under the Linux task wait lock, before restoring IRQs. No C task
+ * lock may be acquired by the queue-serialized native accounting helpers. */
+bool vinix_linuxkpi_task_in_iowait(const void *storage);
+void vinix_linuxkpi_iowait_block(void *thread);
+unsigned int vinix_linuxkpi_iowait_count(unsigned int cpu);
 void vinix_linuxkpi_task_dead(void *storage);
 void vinix_linuxkpi_task_init(void *storage, void *thread, int pid, int tgid,
                             const char *name, size_t length);
@@ -60,6 +65,7 @@ int vinix_linuxkpi_workqueue_bootstrap(void);
 void vinix_linuxkpi_workqueue_task_sleep(void *task_view);
 void vinix_linuxkpi_workqueue_task_resume(void *task_view);
 int vinix_linuxkpi_worker_bind(unsigned int cpu);
+int vinix_linuxkpi_test_worker_route(void *thread, unsigned int cpu);
 int vinix_linuxkpi_worker_set_nice(int nice);
 int vinix_linuxkpi_worker_nice(void);
 u64 vinix_linuxkpi_worker_timeslice(void);
@@ -80,4 +86,5 @@ int vinix_linuxkpi_bitmap_runtime_selftest(void);
 int vinix_linuxkpi_srcu_native_selftest(void);
 int vinix_linuxkpi_ww_mutex_native_selftest(void);
 int vinix_linuxkpi_wait_bit_native_selftest(void);
+int vinix_linuxkpi_io_native_selftest(void);
 #endif

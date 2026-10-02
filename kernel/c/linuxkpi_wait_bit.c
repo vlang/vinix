@@ -176,6 +176,5 @@ int bit_wait_timeout(struct wait_bit_key *key, int mode)
     return signal_pending_state(mode, current) ? -EINTR : 0;
 }
 
-/* bit_wait_io/bit_wait_io_timeout deliberately remain unresolved. Ordinary
- * schedule is not an implementation of Linux I/O-wait scheduler accounting. */
+/* I/O actions live in linuxkpi_io.c with native blocked-CPU accounting. */
 #endif

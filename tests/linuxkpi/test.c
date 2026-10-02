@@ -54,6 +54,8 @@ struct native_task_model {
     unsigned int yields;
     unsigned int pins;
     bool dead, queued;
+    unsigned int iowait_cpu_plus_one;
+    bool reject_enqueue;
     bool heap_owned;
     pthread_mutex_t queue_lock;
     pthread_cond_t queue_changed;
@@ -93,12 +95,14 @@ bool vinix_linuxkpi_task_queued(const void *thread)
     assert(!pthread_mutex_unlock(&task->queue_lock));
     return queued;
 }
+static void host_iowait_end_locked(struct native_task_model *task);
 bool vinix_linuxkpi_task_enqueue(void *thread)
 {
     struct native_task_model *task = thread;
     assert(!pthread_mutex_lock(&task->queue_lock));
-    bool alive = !vinix_linuxkpi_task_is_dead(task);
+    bool alive = !vinix_linuxkpi_task_is_dead(task) && !task->reject_enqueue;
     if (alive) {
+        host_iowait_end_locked(task);
         task->queued = true;
         assert(!pthread_cond_signal(&task->queue_changed));
     }
@@ -110,6 +114,7 @@ void vinix_linuxkpi_task_dequeue(void *thread)
     struct native_task_model *task = thread;
     assert(task == native_task && !pthread_mutex_lock(&task->queue_lock));
     task->queued = false;
+    if (vinix_linuxkpi_task_is_dead(task)) host_iowait_end_locked(task);
     __atomic_store_n(&task->dequeued, task->iteration, __ATOMIC_RELEASE);
     assert(!pthread_mutex_unlock(&task->queue_lock));
 }
@@ -1024,6 +1029,7 @@ static void reference_tests(void)
 #include "bitmap_runtime_test.h"
 #include "srcu_test.h"
 #include "wait_bit_test.h"
+#include "io_test.h"
 
 int main(void)
 {
@@ -1050,6 +1056,7 @@ int main(void)
     ww_mutex_tests();
     time_tests();
     wait_bit_tests();
+    io_tests();
     timer_tests();
     workqueue_tests();
     delayed_work_tests();
@@ -1063,6 +1070,6 @@ int main(void)
     reference_tests();
     vinix_linuxkpi_percpu_destroy_for_test();
     assert(live_pages == 0);
-    puts("LinuxKPI: PASS (Linux helpers, allocation/OOM, strings, bitmaps, SMP/IRQ locks, per-CPU storage, task references, wake races, synchronization, wound/wait mutexes, clocks, bit/variable waits, timers, ordered/delayed/unbound/bound work, runnable concurrency, priority, system queues and SRCU)");
+    puts("LinuxKPI: PASS (Linux helpers, allocation/OOM, strings, bitmaps, SMP/IRQ locks, per-CPU storage, task references, wake races, synchronization, wound/wait mutexes, clocks, bit/variable and I/O waits, timers, ordered/delayed/unbound/bound work, runnable concurrency, priority, system queues and SRCU)");
     return 0;
 }

@@ -166,6 +166,16 @@ fn task_enqueue(owner voidptr) bool {
 	return sched.enqueue_thread(unsafe { &proc.Thread(owner) }, false)
 }
 
+@[export: 'vinix_linuxkpi_iowait_block']
+fn iowait_block(owner voidptr) {
+	sched.linuxkpi_iowait_block(unsafe { &proc.Thread(owner) })
+}
+
+@[export: 'vinix_linuxkpi_iowait_count']
+fn iowait_count(index u32) u32 {
+	return sched.linuxkpi_iowait_count(index)
+}
+
 @[export: 'vinix_linuxkpi_task_dequeue']
 fn task_dequeue(owner voidptr) {
 	assert owner == voidptr(proc.current_thread())
@@ -410,6 +420,7 @@ fn C.vinix_linuxkpi_srcu_native_selftest() int
 fn C.vinix_linuxkpi_ww_mutex_native_selftest() int
 fn C.wait_bit_init()
 fn C.vinix_linuxkpi_wait_bit_native_selftest() int
+fn C.vinix_linuxkpi_io_native_selftest() int
 
 // join/TASK_DEAD can precede the final switch away and scheduler reaping.
 // Taking a baseline immediately after warmup can count those dying stacks,
@@ -737,6 +748,25 @@ pub fn initialise() {
 			lib.kpanic(unsafe { nil }, c'Linux bit/variable wait self-test retained native pages')
 		}
 		C.kprintf(c'linuxkpi: keyed bit/variable waits, exclusive locks, deadlines and signal cancellation passed; no pages retained\n')
+		for _ in 0 .. 3 {
+			if C.vinix_linuxkpi_io_native_selftest() != 0 {
+				lib.kpanic(unsafe { nil }, c'Linux I/O wait self-test failed')
+			}
+		}
+		io_before := selftest_free_baseline()
+		if C.vinix_linuxkpi_io_native_selftest() != 0 {
+			lib.kpanic(unsafe { nil }, c'Linux I/O wait self-test failed')
+		}
+		io_reap_start := hpet_clock.nanoseconds()
+		for memory.free_bytes() != io_before && hpet_clock.nanoseconds() - io_reap_start < 1000000000 {
+			sched.reap_deferred()
+			sched.reschedule()
+		}
+		if memory.free_bytes() != io_before {
+			C.kprintf(c'linuxkpi: I/O wait free-byte baseline=%llu after=%llu\n', io_before, memory.free_bytes())
+			lib.kpanic(unsafe { nil }, c'Linux I/O wait self-test retained native pages')
+		}
+		C.kprintf(c'linuxkpi: I/O wait scopes, CPU accounting, migration, deadlines and exit cleanup passed; no pages retained\n')
 		// Exercise a real scheduler interrupt with preemption disabled and
 		// IRQs still enabled, rather than relying only on host lock tests.
 		preempt_disable()

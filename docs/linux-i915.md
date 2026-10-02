@@ -101,7 +101,7 @@ the complete i915 source tree is not evidence that the driver runs.
   queue lock before returning, including after a producer removed the entry.
   Callers must keep the enclosing object alive until every waiter and producer
   has returned. Reinitialization requires quiescent users.
-  Freezer states, I/O waits, CPU-placement wake hints, pollfree/RCU
+  Freezer states, CPU-placement wake hints, pollfree/RCU
   lifetime handling and lockdep validation remain unimplemented. Regular queue
   wake traversal currently holds the lock for the whole walk; it does not
   implement Linux's optional bookmark batching. Unsupported out-of-line APIs
@@ -119,9 +119,25 @@ the complete i915 source tree is not evidence that the driver runs.
   Wait/wake paths allocate nothing and IRQ-off wakes are supported. Records
   remain on the waiter stack; finish/removal synchronizes with bucket traversal
   before returning. Keep bit/condition storage alive through every waiter and
-  stop producers before releasing it. I/O-wait actions remain unresolved until
-  native scheduler I/O accounting exists; freezer and special task states are
-  also unsupported.
+  stop producers before releasing it. I/O actions use the native accounting
+  described below; freezer and special task states remain unsupported.
+- `io_schedule_prepare`, `io_schedule_finish`, `io_schedule` and
+  `io_schedule_timeout` preserve nested per-task I/O intent. Intent alone never
+  counts a runnable task: the native run-queue lock admits a reservation only
+  after actual removal and accepted-signal filtering. Successful enqueue ends
+  it before runnable publication; duplicate or failed/full enqueue cannot
+  subtract it twice or lose it. Permanent dead-task removal also retires it.
+  `nr_iowait_cpu` and `nr_iowait` report these actual blocked tasks across boot
+  CPUs. A sleeping task retains its blocking CPU for accounting even if its
+  affinity changes and it resumes elsewhere. The total reads each CPU in turn,
+  without promising a simultaneous global snapshot. Original bit-I/O actions
+  retain signal/error results and absolute deadlines. These paths allocate
+  nothing; intent fits the existing 64-byte task view, the native CPU token
+  occupies existing Thread padding and fixed counters have boot lifetime.
+  `CONFIG_BLOCK` and `CONFIG_TASK_DELAY_ACCT` remain disabled: this supplies no
+  block-plug service, per-task delay statistics or CPU idle-time accounting.
+  I/O-specific mutex wrappers, freezer/special task states and CPU hotplug
+  remain unresolved.
 - Unmodified Linux `jiffies.h`, `ktime.h`, `time64.h`, `timekeeping.h` and
   `delay.h` use native monotonic/raw clock reads and fixed `HZ=1000` conversion
   helpers. Linux's own `timeconst.bc` generated the conversion constants.
@@ -139,7 +155,7 @@ the complete i915 source tree is not evidence that the driver runs.
   `msleep` retries early wakes, `msleep_interruptible` returns remaining
   milliseconds, and `udelay`/`ndelay` poll the real counter while answering
   native TLB shootdowns. High-resolution timers,
-  `usleep_range`, realtime/TAI/suspend clock offsets and I/O waits
+  `usleep_range` and realtime/TAI/suspend clock offsets
   remain unimplemented.
 - Unmodified Linux `timer.h` and its `timer_list` layout support static,
   dynamic and stack initialization, pending queries, `add_timer`, `mod_timer`,
@@ -502,6 +518,17 @@ killable filtering, retired variable keys and 256 repeated action/deadline
 cases per batch. After three warmups, a fourth batch releases all temporary
 threads and restores the exact physical-page count in normal/SSE guests.
 
+I/O host tests cover nested intent, runnable/zero/infinite/pending-signal paths,
+multiple blocked CPUs, duplicate and cross-CPU wakes, finite expiry/early/signal
+returns, bit waits and exclusive bit-lock handoff/cancellation. Controlled
+full-queue failures retain the reservation until a successful wake, and signals
+between removal and admission cannot count an already runnable task. Repeated
+tests run with page allocation disabled. Native tests use actual CPU-bound
+sleepers, forced preemption before explicit park, ignored signals, sleeping
+affinity migration, real timed/bit waits and counted pthread exit. Three warmup
+batches precede a measured fourth; every temporary worker is joined and released
+and the physical-page count returns exactly to its baseline.
+
 Wound/wait host tests exercise two/three-object Wait-Die cycles, cross-object
 Wound-Wait wakeups, queued older transactions, original-stamp slow retry,
 first-lock exclusions and stamp wraparound. They check interspersed context-free
@@ -577,7 +604,7 @@ runtime subsystems:
 1. Linux device/PCI registration and removal, configuration access and devres.
 2. MMIO mapping with correct cache attributes, DMA/scatter-gather APIs,
    page/shmem management, GPU address spaces and TTM/GEM memory management.
-3. Remaining lock/wait variants (including I/O waits),
+3. Remaining lock/wait variants (including I/O-specific mutex wrappers),
    freezable/reclaim workqueues, remaining system queues, RCU work, remaining
    timer modes, high-resolution timers and RCU lifetime rules.
 4. Linux IRQ registration, interrupt synchronization and safe GPU reset paths.
