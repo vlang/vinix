@@ -35,6 +35,8 @@ def main() -> None:
     parser.add_argument("--mode", choices=("anonymous", "safe", "safe-anonymous", "load"), default="anonymous")
     parser.add_argument("--game-library-priority", action="store_true",
                         help="Use the game's shared libraries first and the launcher's soft limits")
+    parser.add_argument("--pin-network-manager", action="store_true",
+                        help="Retain the real libnm while testing client unload and reload")
     parser.add_argument("--strace", action="store_true")
     parser.add_argument("--timeout", type=int, default=600)
     args = parser.parse_args()
@@ -85,6 +87,7 @@ def main() -> None:
     (root / "sbin/init").chmod(0o755)
     (root / "etc/steam-smoke-mode").write_text(args.mode + "\n")
     (root / "etc/steam-smoke-game-priority").write_text("1\n" if args.game_library_priority else "0\n")
+    (root / "etc/steam-smoke-pin-nm").write_text("1\n" if args.pin_network_manager else "0\n")
     (root / "etc/steam-smoke-strace").write_text("1\n" if args.strace else "0\n")
     archive = work / "initramfs.tar.gz"
     with tarfile.open(archive, "w:gz", compresslevel=1, format=tarfile.USTAR_FORMAT) as tar:
@@ -147,6 +150,7 @@ def main() -> None:
     expected = b"VINIX-DOTA2-STEAM-SMOKE-LOAD-PASS" if args.mode == "load" else b"VINIX-DOTA2-STEAM-SMOKE-PASS"
     result = {"mode": args.mode,
               "game_library_priority": args.game_library_priority,
+              "pin_network_manager": args.pin_network_manager,
               "passed": expected in transcript and b"VINIX-DOTA2-STEAM-SMOKE-EXIT: 0" in transcript,
               "api_returned": b"VINIX-DOTA2-STEAM-SMOKE-RETURN:" in transcript,
               "completed": b"VINIX-DOTA2-STEAM-SMOKE-END" in transcript,

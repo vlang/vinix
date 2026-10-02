@@ -29,6 +29,9 @@ if [ "$(cat /etc/steam-smoke-game-priority)" = 1 ]; then
     ulimit -Ss 2048
 fi
 preloads="$runtime/usr/lib/x86_64-linux-gnu/libvinix-steam-robust.so:$runtime/usr/lib/x86_64-linux-gnu/libvinix-dota2-mmap32.so:$runtime/usr/lib/x86_64-linux-gnu/libmpg123.so.0"
+if [ "$(cat /etc/steam-smoke-pin-nm)" = 1 ]; then
+    preloads="$preloads:$runtime/usr/lib/x86_64-linux-gnu/libnm.so.0"
+fi
 export VINIX_X86_64_PRELOAD="$preloads"
 mode=$(cat /etc/steam-smoke-mode)
 status=0
