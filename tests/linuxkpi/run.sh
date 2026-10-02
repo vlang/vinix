@@ -21,4 +21,18 @@ ${CC:-clang} -std=gnu11 -O1 -g -fwrapv -fno-strict-aliasing -Wall -Wextra -Werro
     "$source_dir/lib/find_bit.c" "$source_dir/lib/hweight.c" \
     -o "$work/test"
 "$work/test"
+# Each translation unit keeps its public Linux/DRM header first. Building
+# separately catches missing transitive includes that the runtime test's
+# broader include list would conceal.
+for helper in helper_kernel helper_drm_color; do
+    ${CC:-clang} -std=gnu11 -O1 -g -fwrapv -fno-strict-aliasing -Wall -Wextra -Werror -Wno-unused-parameter \
+        -fsanitize=address,undefined -fno-omit-frame-pointer \
+        -DVINIX_LINUXKPI -DVINIX_LINUXKPI_HOST_TEST -D__KERNEL__ \
+        -include "$repo/tests/linuxkpi/host_types.h" -include linux/kconfig.h \
+        -I"$repo/kernel/linuxkpi/include" -I"$source_dir/include" -I"$source_dir/include/uapi" \
+        -I"$source_dir/arch/x86/include" -I"$source_dir/arch/x86/include/uapi" \
+        "$repo/tests/linuxkpi/${helper}_test.c" -o "$work/$helper"
+    "$work/$helper"
+done
+printf '%s\n' 'LinuxKPI: upstream integer helpers and standalone DRM LUT tests passed'
 python3 -B "$repo/tests/linuxkpi/upstream_test.py"

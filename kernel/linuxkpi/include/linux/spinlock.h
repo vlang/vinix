@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 #ifndef VINIX_LINUX_SPINLOCK_H
 #define VINIX_LINUX_SPINLOCK_H
+#include <linux/kernel.h>
 #include <vinix/runtime.h>
 #include <linux/spinlock_types.h>
 #include <asm/barrier.h>

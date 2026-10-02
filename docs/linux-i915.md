@@ -38,6 +38,9 @@ the complete i915 source tree is not evidence that the driver runs.
 ## Implemented APIs
 
 - Linux integer types, error pointers, overflow helpers and compiler macros.
+  Original Linux `log2.h` and `minmax.h` supply power-of-two, logarithm,
+  rounding and clamp operations. Native headers preserve the transitive
+  includes required by the unchanged DRM color LUT helpers.
 - Linux list/tree/sort APIs using the actual upstream headers and algorithms.
 - 32/64-bit, `atomic_long`, raw and conditional atomic operations and memory
   barriers. Linux's generated API wrappers and compiler helpers stay upstream;
@@ -373,6 +376,10 @@ operations and nested IRQ restoration. Refcount tests cover overflow/underflow
 saturation, concurrent final release, and acquire/release publication.
 Source-import tests cover modification, manifest tampering and archive path
 traversal.
+Separate host executables include `kernel.h` and `drm_color_mgmt.h` first,
+checking header dependencies independently of the runtime's other includes.
+They verify integer boundaries, single argument evaluation, LUT half-step
+rounding/clamping and every full-precision u16 LUT value under ASan/UBSan.
 Bitmap tests compare searches against a scalar reference for every size from
 0 to 256 bits, including set operations and word boundaries. Four threads
 exercise shared-word atomic updates and bit-lock publication. String tests
