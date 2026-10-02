@@ -388,37 +388,38 @@ fn xattr_put(res &resource.Resource, name string, value string) {
 	xattr_put_bytes(mut tfile, name, value.bytes())
 }
 
-// Give `to` the attributes `from` has, but for those whose names start with
-// `skip`.
-fn copy_xattrs(from &resource.Resource, to &resource.Resource, skip string) {
-	mut source := tmpfs_resource_of(from)
-	mut dest := tmpfs_resource_of(to)
-	if source == unsafe { nil } || dest == unsafe { nil } {
-		return
+// Backends copy the input before returning. A value removed after listing is
+// absent from this copy; other failures must prevent publishing the upper file.
+fn copy_one_xattr(mut source resource.Resource, mut dest resource.Resource, name string) ? {
+	mut value := []u8{} @[freed]
+	value.flags |= .noslices
+	defer { unsafe { value.free() } }
+	resource.get_xattr(mut source, name, mut value) or {
+		if errno.get() == errno.enodata { return }
+		return none
 	}
-	mut copied := []XAttr{} @[freed]
-	copied.flags |= .noslices
-	source.l.acquire()
-	if source.xattrs != unsafe { nil } {
-		for i in 0 .. source.xattrs.entries.len {
-			if !source.xattrs.entries[i].name.starts_with(skip) {
-				copied << XAttr{
-					name:  source.xattrs.entries[i].name.clone()
-					value: source.xattrs.entries[i].value.clone()
-				}
-			}
-		}
+	resource.set_xattr(mut dest, name, value, 0)?
+}
+
+// Give `to` the attributes `from` has, except names beginning with `skip`.
+// The list and each value are caller-owned snapshots. No backend name is
+// borrowed across its lock release, including when the source is changed.
+fn copy_xattrs(from &resource.Resource, to &resource.Resource, skip string) ? {
+	mut source := unsafe { from }
+	mut dest := unsafe { to }
+	mut names := []u8{} @[freed]
+	names.flags |= .noslices
+	defer { unsafe { names.free() } }
+	resource.xattr_names(mut source, mut names)?
+	mut start := 0
+	for i, c in names {
+		if c != 0 { continue }
+		name := unsafe { tos(&u8(u64(names.data) + u64(start)), i - start) }
+		if name.len == 0 { errno.set(errno.eio); return none }
+		if !name.starts_with(skip) { copy_one_xattr(mut source, mut dest, name)? }
+		start = i + 1
 	}
-	source.l.release()
-	dest.l.acquire()
-	for i in 0 .. copied.len {
-		xattr_put_bytes(mut dest, copied[i].name, copied[i].value)
-		// The destination clones new names and takes ownership of values.
-		// Source removals can run after its lock is released above.
-		unsafe { copied[i].name.free() }
-	}
-	dest.l.release()
-	unsafe { copied.free() }
+	if start != names.len { errno.set(errno.eio); return none }
 }
 
 // Called when a tmpfs file goes.

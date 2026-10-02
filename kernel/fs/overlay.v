@@ -455,7 +455,18 @@ fn overlay_copy_up_locked(mut node VFSNode) ? {
 	to.stat.gid = from.stat.gid
 	to.stat.atim = from.stat.atim
 	to.stat.mtim = from.stat.mtim
-	copy_xattrs(from, to, 'trusted.overlay.')
+	copy_xattrs(from, to, 'trusted.overlay.') or {
+		failure := errno.get()
+		overlay_drop_real_locked(mut upper_dir, name, false)
+		errno.set(failure)
+		return none
+	}
+	resource.persist_metadata(mut to) or {
+		failure := errno.get()
+		overlay_drop_real_locked(mut upper_dir, name, false)
+		errno.set(failure)
+		return none
+	}
 	entry.upper = real
 	mark_overlaid(entry)
 	node.resource = real.resource

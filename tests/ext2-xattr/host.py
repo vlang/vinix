@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[2]
 with tempfile.TemporaryDirectory(prefix="vinix-xattr-codec-") as directory:
     work = Path(directory)
     (work / "ext2").mkdir()
-    for module in ("errno", "memory", "time"):
+    for module in ("errno", "memory", "time", "fs", "resource"):
         (work / module).mkdir()
     (work / "v.mod").write_text("Module { name: 'vinix_xattr_tests' }\n")
     source = (ROOT / "kernel/fs/ext2/xattr_block.v").read_text()
@@ -21,7 +21,7 @@ with tempfile.TemporaryDirectory(prefix="vinix-xattr-codec-") as directory:
     (work / "ext2/codec_test.v").write_text("module ext2\n\nfn test_sorted_entries" + tests)
     (work / "ext2/xattr.v").write_text((ROOT / "kernel/fs/ext2/xattr.v").read_text())
     (work / "ext2/persistence_test.v").write_text((ROOT / "tests/ext2-xattr/persistence_test.v").read_text())
-    (work / "errno/errno.v").write_text("module errno\npub const enospc = 28\npub const enodata = 61\npub const enotsup = 95\npub const eio = 5\npub const enomem = 12\npub const eexist = 17\npub fn set(_ int) {}\n")
+    (work / "errno/errno.v").write_text("@[has_globals]\nmodule errno\n__global current_errno = int(0)\npub const enospc = 28\npub const enodata = 61\npub const enotsup = 95\npub const eio = 5\npub const enomem = 12\npub const eexist = 17\npub fn set(value int) { current_errno = value }\npub fn get() int { return current_errno }\n")
     (work / "time/time.v").write_text("module time\npub struct TimeSpec { pub mut: tv_sec i64 }\n")
     (work / "memory/memory.v").write_text("""@[has_globals]
 module memory
@@ -100,4 +100,35 @@ fn (mut fs EXT2Filesystem) write_superblock() ? {}
 fn ext2_now() u32 { return 1 }
 fn flush_on_return() {}
 """)
-    subprocess.run([os.environ.get("V", "v"), "-enable-globals", "-gc", "none", "test", "ext2"], cwd=work, check=True)
+    copy_source = (ROOT / "kernel/fs/xattr.v").read_text()
+    copy_source = copy_source.split("fn copy_one_xattr", 1)[1].split("// Called when a tmpfs file goes.", 1)[0]
+    (work / "fs/copy.v").write_text("module fs\nimport errno\nimport resource\nfn copy_one_xattr" + copy_source)
+    (work / "fs/copy_test.v").write_text((ROOT / "tests/ext2-xattr/copy_test.v").read_text())
+    (work / "resource/resource.v").write_text("""module resource
+import errno
+pub struct Resource { pub mut:
+ names []u8
+ value []u8
+ missing string
+ list_error int
+ get_error int
+ set_error int
+ copied_names []string
+ copied_values [][]u8
+}
+pub fn xattr_names(mut res Resource, mut names []u8) ? {
+ if res.list_error != 0 { errno.set(res.list_error); return none }
+ for c in res.names { names << c }
+}
+pub fn get_xattr(mut res Resource, name string, mut value []u8) ? {
+ if name == res.missing { errno.set(errno.enodata); return none }
+ if res.get_error != 0 { errno.set(res.get_error); return none }
+ for c in res.value { value << c }
+}
+pub fn set_xattr(mut res Resource, name string, value []u8, _ int) ? {
+ if res.set_error != 0 { errno.set(res.set_error); return none }
+ res.copied_names << name.clone()
+ res.copied_values << value.clone()
+}
+""")
+    subprocess.run([os.environ.get("V", "v"), "-enable-globals", "-gc", "none", "test", "ext2", "fs"], cwd=work, check=True)

@@ -14,6 +14,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/xattr.h>
+#include <time.h>
 #include <unistd.h>
 
 #define CHECK(condition) do { if (!(condition)) { \
@@ -62,6 +63,42 @@ static int operations(int fd, int repeats)
   CHECK(fsetxattr(fd, "user.repeat", "replacement", 11, XATTR_REPLACE) == 0);
   CHECK(fremovexattr(fd, "user.repeat") == 0);
  }
+ return 0;
+}
+
+static int metadata_operations(int fd, int repeats)
+{
+ const struct timespec times[2] = {{1700000000, 0}, {1700000001, 0}};
+ for (int i = 0; i < repeats; i++) {
+  CHECK(fchmod(fd, 0600) == 0 && fchown(fd, 0, 0) == 0 && futimens(fd, times) == 0);
+ }
+ return 0;
+}
+
+static int metadata_measure(const char *path, const char *backend)
+{
+ int fd = open(path, O_RDWR);
+ CHECK(fd >= 0 && metadata_operations(fd, 100) == 0);
+ struct heap before, after;
+ CHECK(heap_snapshot(&before) == 0 && metadata_operations(fd, 200) == 0 && heap_snapshot(&after) == 0);
+ CHECK(before.count == after.count);
+ for (int i = 0; i < before.count; i++) {
+  long kept = after.objects[i] - before.objects[i];
+  printf("PERF-METADATA %s class=%ld objects=%ld kept-bytes=%ld\n", backend, before.size[i], kept, kept * before.size[i]);
+  CHECK(kept <= 0);
+ }
+ printf("PERF-METADATA %s large-pages=%ld\n", backend, after.large - before.large);
+ CHECK(after.large <= before.large);
+ CHECK(close(fd) == 0);
+ return 0;
+}
+
+static int copied_identity(const char *path)
+{
+ struct stat file;
+ CHECK(stat(path, &file) == 0);
+ CHECK(file.st_uid == 321 && file.st_gid == 654 && (file.st_mode & 07777) == 0600);
+ CHECK(file.st_atim.tv_sec == 1700000000 && file.st_mtim.tv_sec == 1700000001);
  return 0;
 }
 
@@ -187,46 +224,100 @@ static void *change_source_attributes(void *argument)
  return NULL;
 }
 
-static int concurrent_copy_up(void)
+static int concurrent_copy_up(const char *lower_base, const char *upper_base, const char *label)
 {
- CHECK(mkdir("/tmp/xattr-lower", 0700) == 0);
- CHECK(mkdir("/tmp/xattr-upper", 0700) == 0);
- CHECK(mkdir("/tmp/xattr-work", 0700) == 0);
- CHECK(mkdir("/tmp/xattr-merged", 0700) == 0);
+ char lower[192], upper[192], work[192], merged[192], options[768];
+ snprintf(lower, sizeof(lower), "%s/xattr-%s-lower", lower_base, label);
+ snprintf(upper, sizeof(upper), "%s/xattr-%s-upper", upper_base, label);
+ snprintf(work, sizeof(work), "%s/xattr-%s-work", upper_base, label);
+ snprintf(merged, sizeof(merged), "/tmp/xattr-tmpfs/xattr-%s-merged", label);
+ CHECK(mkdir(lower, 0700) == 0 && mkdir(upper, 0700) == 0);
+ CHECK(mkdir(work, 0700) == 0 && mkdir(merged, 0700) == 0);
  struct copy_race race = {0};
  for (int i = 0; i < COPY_FILES; i++) {
-  char path[96], name[96];
-  snprintf(path, sizeof(path), "/tmp/xattr-lower/file-%02d", i);
+  char path[256], name[96];
+  snprintf(path, sizeof(path), "%s/file-%02d", lower, i);
   race.fds[i] = open(path, O_CREAT | O_EXCL | O_RDWR, 0600);
   CHECK(race.fds[i] >= 0);
   CHECK(fsetxattr(race.fds[i], "user.stable", payload, sizeof(payload), 0) == 0);
+  CHECK(fsetxattr(race.fds[i], "trusted.copy", payload, sizeof(payload), 0) == 0);
+  CHECK(fsetxattr(race.fds[i], "security.copy", payload, sizeof(payload), 0) == 0);
   CHECK(fsetxattr(race.fds[i], "trusted.overlay.hidden", "y", 1, 0) == 0);
   for (int j = 0; j < COPY_ATTRIBUTES; j++) {
    snprintf(name, sizeof(name), "user.concurrent-%02d-long-name-for-copy-ownership", j);
    CHECK(fsetxattr(race.fds[i], name, payload, sizeof(payload), 0) == 0);
   }
+  const struct timespec times[2] = {{1700000000, 0}, {1700000001, 0}};
+  CHECK(fchown(race.fds[i], 321, 654) == 0 && futimens(race.fds[i], times) == 0);
  }
- CHECK(mount("overlay", "/tmp/xattr-merged", "overlay", 0,
-             "lowerdir=/tmp/xattr-lower,upperdir=/tmp/xattr-upper,workdir=/tmp/xattr-work") == 0);
+ int capacity_fd = -1;
+ int identity_fd = -1;
+ char capacity_lower[256], capacity_upper[256], capacity_merged[256];
+ char identity_lower[256], identity_upper[256], identity_merged[256];
+ if (strcmp(label, "tmpfs-ext2") == 0) {
+  char large[4096] = {0};
+  snprintf(capacity_lower, sizeof(capacity_lower), "%s/too-large", lower);
+  snprintf(capacity_upper, sizeof(capacity_upper), "%s/too-large", upper);
+  snprintf(capacity_merged, sizeof(capacity_merged), "%s/too-large", merged);
+  capacity_fd = open(capacity_lower, O_CREAT | O_EXCL | O_RDWR, 0600);
+  CHECK(capacity_fd >= 0);
+  CHECK(fsetxattr(capacity_fd, "user.first", payload, sizeof(payload), 0) == 0);
+  CHECK(fsetxattr(capacity_fd, "user.large", large, sizeof(large), 0) == 0);
+  snprintf(identity_lower, sizeof(identity_lower), "%s/large-uid", lower);
+  snprintf(identity_upper, sizeof(identity_upper), "%s/large-uid", upper);
+  snprintf(identity_merged, sizeof(identity_merged), "%s/large-uid", merged);
+  identity_fd = open(identity_lower, O_CREAT | O_EXCL | O_RDWR, 0600);
+  CHECK(identity_fd >= 0 && fchown(identity_fd, 70000, 654) == 0);
+  CHECK(fsetxattr(identity_fd, "user.first", payload, sizeof(payload), 0) == 0);
+ }
+ snprintf(options, sizeof(options), "lowerdir=%s,upperdir=%s,workdir=%s", lower, upper, work);
+ CHECK(mount("overlay", merged, "overlay", 0, options) == 0);
+ if (capacity_fd >= 0) {
+  struct stat ignored;
+  struct statfs before_failure, after_failure;
+  CHECK(statfs(upper, &before_failure) == 0);
+  EXPECT_ERROR(setxattr(capacity_merged, "user.trigger", payload, sizeof(payload), 0), ENOSPC);
+  EXPECT_ERROR(stat(capacity_upper, &ignored), ENOENT);
+  CHECK(statfs(upper, &after_failure) == 0);
+  CHECK(before_failure.f_bfree == after_failure.f_bfree && before_failure.f_ffree == after_failure.f_ffree);
+  CHECK(fgetxattr(capacity_fd, "user.large", NULL, 0) == 4096);
+  CHECK(fremovexattr(capacity_fd, "user.large") == 0);
+  CHECK(setxattr(capacity_merged, "user.trigger", payload, sizeof(payload), 0) == 0);
+  CHECK(getxattr(capacity_upper, "user.first", NULL, 0) == sizeof(payload));
+  CHECK(close(capacity_fd) == 0);
+ }
+ if (identity_fd >= 0) {
+  struct stat ignored;
+  struct statfs before_failure, after_failure;
+  CHECK(statfs(upper, &before_failure) == 0);
+  EXPECT_ERROR(setxattr(identity_merged, "user.trigger", payload, sizeof(payload), 0), EOVERFLOW);
+  EXPECT_ERROR(stat(identity_upper, &ignored), ENOENT);
+  CHECK(statfs(upper, &after_failure) == 0);
+  CHECK(before_failure.f_bfree == after_failure.f_bfree && before_failure.f_ffree == after_failure.f_ffree);
+  const struct timespec times[2] = {{1700000000, 0}, {1700000001, 0}};
+  CHECK(fchown(identity_fd, 321, 654) == 0 && futimens(identity_fd, times) == 0);
+  CHECK(setxattr(identity_merged, "user.trigger", payload, sizeof(payload), 0) == 0);
+  CHECK(copied_identity(identity_upper) == 0 && close(identity_fd) == 0);
+ }
  pthread_t writer;
  CHECK(pthread_create(&writer, NULL, change_source_attributes, &race) == 0);
  while (!atomic_load(&race.changes) && !atomic_load(&race.failed)) sched_yield();
  CHECK(!atomic_load(&race.failed));
  for (int i = 0; i < COPY_FILES; i++) {
-  char path[96];
-  snprintf(path, sizeof(path), "/tmp/xattr-merged/file-%02d", i);
-  int fd = open(path, O_WRONLY);
-  CHECK(fd >= 0 && write(fd, "x", 1) == 1 && close(fd) == 0);
+  char path[256];
+  snprintf(path, sizeof(path), "%s/file-%02d", merged, i);
+  CHECK(setxattr(path, "user.stable", payload, sizeof(payload), XATTR_REPLACE) == 0);
   sched_yield();
  }
  atomic_store(&race.stop, 1);
  CHECK(pthread_join(writer, NULL) == 0 && !atomic_load(&race.failed) && atomic_load(&race.changes) > 0);
  for (int i = 0; i < COPY_FILES; i++) {
-  char path[96], names[2048];
+  char path[256], names[2048];
   unsigned char got[32];
-  snprintf(path, sizeof(path), "/tmp/xattr-upper/file-%02d", i);
+  snprintf(path, sizeof(path), "%s/file-%02d", upper, i);
   int fd = open(path, O_RDONLY);
   CHECK(fd >= 0);
+  CHECK(copied_identity(path) == 0);
   CHECK(fgetxattr(fd, "user.stable", got, sizeof(got)) == sizeof(payload));
   CHECK(memcmp(got, payload, sizeof(payload)) == 0);
   EXPECT_ERROR(fgetxattr(fd, "trusted.overlay.hidden", got, sizeof(got)), ENODATA);
@@ -234,14 +325,16 @@ static int concurrent_copy_up(void)
   CHECK(length > 0);
   for (ssize_t offset = 0; offset < length; offset += strlen(names + offset) + 1) {
    CHECK(strcmp(names + offset, "user.stable") == 0
+         || strcmp(names + offset, "trusted.copy") == 0
+         || strcmp(names + offset, "security.copy") == 0
          || strncmp(names + offset, "user.concurrent-", 16) == 0);
    CHECK(fgetxattr(fd, names + offset, got, sizeof(got)) == sizeof(payload));
    CHECK(memcmp(got, payload, sizeof(payload)) == 0);
   }
   CHECK(close(fd) == 0 && close(race.fds[i]) == 0);
  }
- CHECK(umount("/tmp/xattr-merged") == 0);
- puts("XATTR: CONCURRENT COPY-UP PASS");
+ CHECK(umount(merged) == 0);
+ printf("XATTR: CONCURRENT COPY-UP %s PASS\n", label);
  return 0;
 }
 
@@ -267,14 +360,30 @@ int main(void)
   CHECK(memcmp(target, "xattr-marker", 12) == 0);
   CHECK(lgetxattr("/root/xattr-link", "security.test", got, sizeof(got)) == 4);
   CHECK(close(fd) == 0);
+  const char *copies[] = {"/root/xattr-tmpfs-ext2-upper/file-00", "/root/xattr-ext2-ext2-upper/file-00"};
+  for (unsigned i = 0; i < sizeof(copies) / sizeof(copies[0]); i++) {
+   CHECK(copied_identity(copies[i]) == 0);
+   CHECK(getxattr(copies[i], "user.stable", got, sizeof(got)) == sizeof(payload));
+   CHECK(memcmp(got, payload, sizeof(payload)) == 0);
+   CHECK(getxattr(copies[i], "trusted.copy", got, sizeof(got)) == sizeof(payload));
+   CHECK(getxattr(copies[i], "security.copy", got, sizeof(got)) == sizeof(payload));
+  }
   puts("XATTR: PASS");
   reboot(RB_POWER_OFF);
   for (;;) pause();
  }
  CHECK(errno == ENOENT);
- CHECK(exercise("/tmp/xattr-file", 0) == 0);
+ CHECK(mkdir("/tmp/xattr-tmpfs", 0700) == 0);
+ CHECK(mount("tmpfs", "/tmp/xattr-tmpfs", "tmpfs", 0, NULL) == 0);
+ CHECK(statfs("/tmp/xattr-tmpfs", &filesystem) == 0 && filesystem.f_type == 0x01021994);
+ CHECK(exercise("/tmp/xattr-tmpfs/xattr-file", 0) == 0);
  CHECK(exercise("/root/xattr-marker", 1) == 0);
- CHECK(concurrent_copy_up() == 0);
+ CHECK(metadata_measure("/tmp/xattr-tmpfs/xattr-file", "tmpfs") == 0);
+ CHECK(metadata_measure("/root/xattr-marker", "ext2") == 0);
+ CHECK(concurrent_copy_up("/tmp/xattr-tmpfs", "/tmp/xattr-tmpfs", "tmpfs-tmpfs") == 0);
+ CHECK(concurrent_copy_up("/tmp/xattr-tmpfs", "/root", "tmpfs-ext2") == 0);
+ CHECK(concurrent_copy_up("/root", "/tmp/xattr-tmpfs", "ext2-tmpfs") == 0);
+ CHECK(concurrent_copy_up("/root", "/root", "ext2-ext2") == 0);
  CHECK(block_release() == 0);
  CHECK(symlink("xattr-marker", "/root/xattr-link") == 0);
  CHECK(lsetxattr("/root/xattr-link", "security.test", "link", 4, 0) == 0);

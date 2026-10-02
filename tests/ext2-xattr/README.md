@@ -43,12 +43,20 @@ The guest checks binary and empty values, create/replace/remove flags, size
 queries, listings, namespace permissions, maximum names, capacity failures,
 and retained heap objects over 200 iterations on both backends. A second
 thread removes and reinserts lower-layer attributes while overlay copy-up
-copies their names and values into 64 upper-layer files. It then
-restarts itself and checks persisted attributes and a short symlink. After
+copies their names and values into 64 upper-layer files for each tmpfs/ext2
+backend pairing. An oversized tmpfs attribute must return `ENOSPC` during
+copy-up into ext2 without leaving an upper file, and retry must succeed after
+removal; block and inode free counts must return to their previous values.
+The guest then restarts itself and checks copied user/trusted/security values
+in ext2 uppers, copied ownership/timestamps, persisted attributes and a short
+symlink. A tmpfs owner ID outside ext2's supported range must return
+`EOVERFLOW`, release the partial copy, and allow retry after changing the ID.
+Repeated chmod/chown/timestamp operations print separate `PERF-METADATA`
+retained-allocation measurements on both backends and reject any growth. After
 QEMU exits, `e2fsck -fn` must pass and `debugfs` must read the attributes.
 The retained-object check rejects growth in every size class and in large
 pages. Integrated ARM64 and x86 guests retain exactly zero objects over 200
-iterations on each backend after correcting the procfs metric reader and
+iterations of both attribute and metadata operations on each backend after correcting the procfs metric reader and
 the temporary inode allocation in ext2 file-backed faults. The parser must
 read all 18 ARM64 or 14 x86 classes and the large-page row before accepting
 the measurement. Both guests

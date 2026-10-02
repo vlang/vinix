@@ -55,7 +55,8 @@ fn (mut this EXT2Resource) persist_metadata() ? {
 	}
 	this.filesystem.l.acquire()
 	defer { this.filesystem.l.release() }
-	mut inode := EXT2Inode{}
+	mut inode := unsafe { &EXT2Inode(C.__builtin_alloca(sizeof(EXT2Inode))) }
+	unsafe { *inode = EXT2Inode{} }
 	inode.read_entry(mut this.filesystem, u32(this.stat.ino))?
 	inode.permissions = u16(this.stat.mode)
 	inode.user_id = u16(this.stat.uid)

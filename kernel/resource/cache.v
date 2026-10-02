@@ -140,7 +140,9 @@ pub fn set_pipe_capacity(mut res Resource, requested u64) ?u64 {
 
 pub fn persist_metadata(mut res Resource) ? {
 	if mut res is MetadataResource {
-		res.persist_metadata()?
+		mut backend := MetadataResource(res)
+		mut stack := unsafe { &backend }
+		stack.persist_metadata()?
 	}
 }
 
