@@ -13,6 +13,11 @@ import subprocess
 import sys
 
 REPO = Path(__file__).resolve().parents[2]
+MMAP32_SOURCE = REPO / "build-support/dota2/mmap32.c"
+MMAP32_LIBRARY = "usr/lib/x86_64-linux-gnu/libvinix-dota2-mmap32.so"
+MMAP32_COMPILE = ["clang", "--target=x86_64-linux-gnu", "-fPIC", "-shared",
+                  "-nostdlib", "-fuse-ld=lld", "-Wall", "-Wextra", "-Werror",
+                  "-Wl,-soname,libvinix-dota2-mmap32.so"]
 
 
 def clone_tree(source: Path, destination: Path) -> None:
@@ -63,17 +68,20 @@ def main() -> None:
                       key=lambda p: p.name)
     rows = [{"package": p.name, "version": p.version, "filename": p.filename,
              "sha256": p.sha256} for p in selected]
-    inputs = {"format": 2, "source": str(source), "guest_root": args.guest_root,
+    inputs = {"format": 3, "source": str(source), "guest_root": args.guest_root,
               "release": args.release, "packages": rows,
               "amd64": manifest.read_text(),
-              "i386": (steam / "i386-packages").read_text()}
+              "i386": (steam / "i386-packages").read_text(),
+              "mmap32_source": hashlib.sha256(MMAP32_SOURCE.read_bytes()).hexdigest(),
+              "mmap32_compile": MMAP32_COMPILE}
     generation = hashlib.sha256(json.dumps(inputs, sort_keys=True).encode()).hexdigest()
     stamp = root / ".vinix-dota2-vulkan-generation"
     if root.exists() and not stamp.exists() and not args.refresh:
         parser.error("existing destination has no generation stamp; use --refresh to replace this private root")
     required = ["lib64/ld-linux-x86-64.so.2", "usr/bin/vulkaninfo", "usr/bin/vkcube",
                 "usr/lib/x86_64-linux-gnu/libvulkan_lvp.so", "usr/lib/x86_64-linux-gnu/libvulkan.so.1",
-                "usr/share/vulkan/icd.d/lvp_icd.x86_64.json", "etc/ssl/certs/ca-certificates.crt"]
+                "usr/share/vulkan/icd.d/lvp_icd.x86_64.json", "etc/ssl/certs/ca-certificates.crt",
+                MMAP32_LIBRARY]
     build.mkdir(parents=True, exist_ok=True)
     (build / "vulkan-packages.json").write_text(json.dumps(rows, indent=2) + "\n")
     if stamp.exists() and stamp.read_text().strip() == generation and all((root / p).exists() for p in required):
@@ -86,6 +94,10 @@ def main() -> None:
     for package in selected:
         archive = resolver.download(args.mirror, package, cache)
         resolver.extract_deb(archive, pending)
+    # Resolve libc symbols only inside the translated process. No native
+    # headers, startup files, or x86 development packages are required.
+    subprocess.run([*MMAP32_COMPILE, str(MMAP32_SOURCE), "-o", str(pending / MMAP32_LIBRARY)],
+                   check=True)
     public_certificates = sorted((pending / "usr/share/ca-certificates/mozilla").glob("*.crt"))
     if not public_certificates:
         raise SystemExit("ca-certificates package contains no public trust certificates")
