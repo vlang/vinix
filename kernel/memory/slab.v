@@ -341,7 +341,13 @@ pub fn (mut this Slab) sfree(ptr voidptr) {
 	}
 	was_full := hdr.in_use == hdr.capacity
 	// Poison before publishing the slot as free.
-	unsafe { C.memset(ptr, 0xaa, this.ent_size) }
+	// Validated slots and class sizes are 16-byte aligned, so whole words
+	// cover the payload without touching the adjacent object or page header.
+	word_count := this.ent_size / 8
+	words := unsafe { &u64(ptr) }
+	for i := u64(0); i < word_count; i++ {
+		unsafe { words[i] = slab_poison }
+	}
 	$if xnu_bitmap ? {
 		// The class lock and preceding check guarantee success.
 		if !xnualloc.zone_bits_mark_free_ref(unsafe { &hdr.used[0] }, slab_bitmap_words, slot) {

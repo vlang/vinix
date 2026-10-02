@@ -366,9 +366,10 @@ pub fn pmm_alloc(count u64) voidptr {
 	ret := pmm_alloc_nozero(count)
 
 	// We always zero out memory for security reasons
+	word_count := (count * page_size) / 8
 	unsafe {
 		mut ptr := &u64(u64(ret) + higher_half)
-		for i := u64(0); i < (count * page_size) / 8; i++ {
+		for i := u64(0); i < word_count; i++ {
 			ptr[i] = 0
 		}
 	}
@@ -400,9 +401,10 @@ pub fn pmm_alloc_fallible(count u64) voidptr {
 	}
 
 	// We always zero out memory for security reasons
+	word_count := (count * page_size) / 8
 	unsafe {
 		mut ptr := &u64(u64(ret) + higher_half)
-		for i := u64(0); i < (count * page_size) / 8; i++ {
+		for i := u64(0); i < word_count; i++ {
 			ptr[i] = 0
 		}
 	}
@@ -471,6 +473,7 @@ pub fn pmm_free(ptr voidptr, count u64) {
 	defer {
 		pmm_lock.release()
 	}
+	words_per_page := page_size / 8
 	for i := page; i < page + count; i++ {
 		mut refs := unsafe { &u32(pmm_refcounts) }
 		if unsafe { refs[i] } > 1 {
@@ -482,7 +485,7 @@ pub fn pmm_free(ptr voidptr, count u64) {
 		}
 		unsafe {
 			mut words := &u64(i * page_size + higher_half)
-			for word := u64(0); word < page_size / 8; word++ {
+			for word := u64(0); word < words_per_page; word++ {
 				words[word] = 0xaaaaaaaaaaaaaaaa
 			}
 			refs[i] = 0
