@@ -42,10 +42,12 @@ else
     set --
 fi
 debug=$(cat /etc/steam-smoke-ld-debug)
+set -- /usr/bin/steam-smoke /usr/libexec/vinix-dota2/smoke/libsteam_api.so "$mode" "$@"
+. /etc/steam-smoke-game-env.sh
 status=0
 /usr/bin/qemu-x86_64 -B 0x100000000 -L "$runtime" \
     -E "LD_LIBRARY_PATH=$libraries" -E "LD_PRELOAD=$preloads" -E "LD_DEBUG=$debug" \
-    /usr/bin/steam-smoke /usr/libexec/vinix-dota2/smoke/libsteam_api.so "$mode" "$@" || status=$?
+    "$@" || status=$?
 echo "VINIX-DOTA2-STEAM-SMOKE-EXIT: $status"
 echo VINIX-DOTA2-STEAM-SMOKE-END
 while :; do sleep 60; done

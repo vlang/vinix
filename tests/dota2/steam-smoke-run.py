@@ -8,7 +8,9 @@ import json
 import os
 from pathlib import Path
 import pty
+import re
 import select
+import shlex
 import shutil
 import signal
 import subprocess
@@ -43,9 +45,19 @@ def main() -> None:
                         help="Record the guest glibc loader's actual symbol bindings")
     parser.add_argument("--extra-preload", type=Path, action="append", default=[],
                         help="Add a test-only x86-64 library to the guest preloads; repeatable")
+    parser.add_argument("--game-env", action="append", default=[], metavar="NAME=VALUE",
+                        help="Set a translated target environment variable with QEMU -E; repeatable")
     parser.add_argument("--strace", action="store_true")
     parser.add_argument("--timeout", type=int, default=600)
     args = parser.parse_args()
+    game_environment = {}
+    for setting in args.game_env:
+        name, separator, value = setting.partition("=")
+        if not separator or not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", name):
+            parser.error(f"invalid --game-env: {setting}")
+        if "\0" in value or "," in value:
+            parser.error("--game-env values cannot contain NUL or QEMU's comma separator")
+        game_environment[name] = value
     if args.load_tier0:
         args.game_library_priority = True
     extra_preloads = []
@@ -122,6 +134,10 @@ def main() -> None:
     (root / "etc/steam-smoke-ld-debug").write_text("bindings\n" if args.ld_debug_bindings else "\n")
     (root / "etc/steam-smoke-extra-preload").write_text(
         ":".join(preload["guest_path"] for preload in extra_preloads) + "\n")
+    (root / "etc/steam-smoke-game-env.sh").write_text(
+        "# Target environment; leave native QEMU's loader environment unchanged.\n" +
+        "".join(f'set -- -E {shlex.quote(name + "=" + value)} "$@"\n'
+                for name, value in game_environment.items()))
     (root / "etc/steam-smoke-strace").write_text("1\n" if args.strace else "0\n")
     archive = work / "initramfs.tar.gz"
     with tarfile.open(archive, "w:gz", compresslevel=1, format=tarfile.USTAR_FORMAT) as tar:
@@ -188,6 +204,7 @@ def main() -> None:
               "load_tier0": args.load_tier0,
               "ld_debug_bindings": args.ld_debug_bindings,
               "extra_preloads": extra_preloads,
+              "game_env": game_environment,
               "passed": expected in transcript and b"VINIX-DOTA2-STEAM-SMOKE-EXIT: 0" in transcript,
               "api_returned": b"VINIX-DOTA2-STEAM-SMOKE-RETURN:" in transcript,
               "completed": b"VINIX-DOTA2-STEAM-SMOKE-END" in transcript,
