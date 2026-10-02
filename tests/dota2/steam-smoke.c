@@ -48,7 +48,7 @@ int main(int argc, char **argv)
     signal(11, failure);
     signal(6, failure);
     if (argc < 2) {
-        puts("usage: steam-smoke /path/to/actual/libsteam_api.so [anonymous|safe|load]");
+        puts("usage: steam-smoke /path/to/actual/libsteam_api.so [anonymous|safe|safe-anonymous|load]");
         return 2;
     }
     printf("VINIX-DOTA2-STEAM-SMOKE-DLOPEN: %s\n", argv[1]);
@@ -70,6 +70,23 @@ int main(int argc, char **argv)
     if (!initialize || !shutdown || !callbacks) {
         printf("VINIX-DOTA2-STEAM-SMOKE-SYMBOL-FAIL: %s\n", dlerror());
         return 4;
+    }
+    if (argc > 2 && !strcmp(argv[2], "safe-anonymous")) {
+        unsigned char (*safe)(void) = (unsigned char (*)(void))dlsym(library, "SteamAPI_InitSafe");
+        if (!safe) {
+            printf("VINIX-DOTA2-STEAM-SMOKE-SYMBOL-FAIL: %s\n", dlerror());
+            return 4;
+        }
+        puts("VINIX-DOTA2-STEAM-SMOKE-CALL: SteamAPI_InitSafe");
+        fflush((void *)0);
+        unsigned char normal = safe();
+        printf("VINIX-DOTA2-STEAM-SMOKE-SAFE-RETURN: %u\n", (unsigned int)normal);
+        fflush((void *)0);
+        if (normal) {
+            shutdown();
+            puts("VINIX-DOTA2-STEAM-SMOKE-UNEXPECTED-CLIENT");
+            return 6;
+        }
     }
     printf("VINIX-DOTA2-STEAM-SMOKE-CALL: %s\n", name);
     fflush((void *)0);

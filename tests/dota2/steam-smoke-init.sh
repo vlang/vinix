@@ -23,7 +23,13 @@ export SSL_CERT_FILE="$runtime/etc/ssl/certs/ca-certificates.crt"
 unset QEMU_STRACE
 [ "$(cat /etc/steam-smoke-strace)" != 1 ] || export QEMU_STRACE=1
 libraries="/home/dota2/.steam/sdk64:$runtime/usr/lib/x86_64-linux-gnu:$runtime/lib/x86_64-linux-gnu"
-preloads="$runtime/usr/lib/x86_64-linux-gnu/libvinix-steam-robust.so:$runtime/usr/lib/x86_64-linux-gnu/libmpg123.so.0"
+if [ "$(cat /etc/steam-smoke-game-priority)" = 1 ]; then
+    libraries="/usr/libexec/vinix-dota2/smoke/game-bin:$runtime/usr/lib/x86_64-linux-gnu:$runtime/lib/x86_64-linux-gnu:/home/dota2/.steam/sdk64"
+    ulimit -Sn 2048
+    ulimit -Ss 2048
+fi
+preloads="$runtime/usr/lib/x86_64-linux-gnu/libvinix-steam-robust.so:$runtime/usr/lib/x86_64-linux-gnu/libvinix-dota2-mmap32.so:$runtime/usr/lib/x86_64-linux-gnu/libmpg123.so.0"
+export VINIX_X86_64_PRELOAD="$preloads"
 mode=$(cat /etc/steam-smoke-mode)
 status=0
 /usr/bin/qemu-x86_64 -B 0x100000000 -L "$runtime" \

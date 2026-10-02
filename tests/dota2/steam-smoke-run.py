@@ -32,7 +32,9 @@ def main() -> None:
     parser.add_argument("--work", type=Path, default=REPO / "build/dota2-steam-smoke")
     parser.add_argument("--library", type=Path, default=REPO / "build/dota2/steamcmd/steamapps/content/app_570/depot_373306/game/bin/linuxsteamrt64/libsteam_api.so")
     parser.add_argument("--kernel-dir", type=Path, default=REPO / "kernel")
-    parser.add_argument("--mode", choices=("anonymous", "safe", "load"), default="anonymous")
+    parser.add_argument("--mode", choices=("anonymous", "safe", "safe-anonymous", "load"), default="anonymous")
+    parser.add_argument("--game-library-priority", action="store_true",
+                        help="Use the game's shared libraries first and the launcher's soft limits")
     parser.add_argument("--strace", action="store_true")
     parser.add_argument("--timeout", type=int, default=600)
     args = parser.parse_args()
@@ -67,9 +69,22 @@ def main() -> None:
                     str(runtime / "lib/x86_64-linux-gnu/libc.so.6"), "-o", str(binary)], check=True)
     install(binary, root / "usr/bin/steam-smoke")
     install(args.library, root / "usr/libexec/vinix-dota2/smoke/libsteam_api.so")
+    game_bin = root / "usr/libexec/vinix-dota2/smoke/game-bin"
+    if args.game_library_priority:
+        game_bin.mkdir(parents=True, exist_ok=True)
+        for path in args.library.resolve().parent.iterdir():
+            if path.is_file() and (path.name.endswith(".so") or ".so." in path.name):
+                destination = game_bin / path.name
+                if destination.is_symlink():
+                    destination.unlink()
+                if sys.platform == "darwin":
+                    subprocess.run(["cp", "-cp", str(path), str(destination)], check=True)
+                else:
+                    install(path, destination)
     install(Path(__file__).with_name("steam-smoke-init.sh"), root / "sbin/init")
     (root / "sbin/init").chmod(0o755)
     (root / "etc/steam-smoke-mode").write_text(args.mode + "\n")
+    (root / "etc/steam-smoke-game-priority").write_text("1\n" if args.game_library_priority else "0\n")
     (root / "etc/steam-smoke-strace").write_text("1\n" if args.strace else "0\n")
     archive = work / "initramfs.tar.gz"
     with tarfile.open(archive, "w:gz", compresslevel=1, format=tarfile.USTAR_FORMAT) as tar:
@@ -131,10 +146,12 @@ def main() -> None:
         os.close(master)
     expected = b"VINIX-DOTA2-STEAM-SMOKE-LOAD-PASS" if args.mode == "load" else b"VINIX-DOTA2-STEAM-SMOKE-PASS"
     result = {"mode": args.mode,
+              "game_library_priority": args.game_library_priority,
               "passed": expected in transcript and b"VINIX-DOTA2-STEAM-SMOKE-EXIT: 0" in transcript,
               "api_returned": b"VINIX-DOTA2-STEAM-SMOKE-RETURN:" in transcript,
               "completed": b"VINIX-DOTA2-STEAM-SMOKE-END" in transcript,
               "kernel_sha256": hashlib.sha256(kernel.read_bytes()).hexdigest(),
+              "translator_sha256": hashlib.sha256((root / "usr/bin/qemu-x86_64").read_bytes()).hexdigest(),
               "steam_api_sha256": hashlib.sha256(args.library.read_bytes()).hexdigest(),
               "steamclient_sha256": hashlib.sha256((root / "home/dota2/.steam/sdk64/steamclient.so").read_bytes()).hexdigest(),
               "log": str(work / "vinix.log")}
