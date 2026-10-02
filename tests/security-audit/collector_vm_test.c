@@ -6,6 +6,7 @@
 #include <sys/prctl.h>
 #include <sys/syscall.h>
 #include <sys/wait.h>
+#include <sched.h>
 #define CHECK(x) do { if (!(x)) { printf("SECURITY AUDIT COLLECTOR VM FAIL line %d: %s errno=%d\n", __LINE__, #x, errno); return 1; } } while (0)
 struct filter { uint16_t code; uint8_t jt, jf; uint32_t k; };
 struct program { unsigned short length; struct filter *instructions; };
@@ -61,6 +62,29 @@ static int tests(void)
 	CHECK(link(path, "/root/audit-collector-test/hardlink.log") == 0 && run_once(path) == 1);
 	CHECK(unlink("/root/audit-collector-test/hardlink.log") == 0);
 	CHECK(run_once(path) == 0);
+	/* A user-namespace root must not fabricate records using --source. */
+	const char *source_path = "/root/audit-collector-test/snapshot";
+	fd = open("/proc/security_audit", O_RDONLY); CHECK(fd >= 0);
+	used = read(fd, buffer, sizeof(buffer)); CHECK(used > 0); close(fd);
+	fd = open(source_path, O_WRONLY | O_CREAT | O_EXCL, 0600); CHECK(fd >= 0);
+	CHECK(write(fd, buffer, (size_t)used) == used); close(fd);
+	char *diagnostic_args[] = { "vinix-security-audit", "--once", "--log", (char *)path,
+		"--source", (char *)source_path, NULL };
+	CHECK(collector_main(6, diagnostic_args) == 0);
+	struct stat before, after;
+	CHECK(stat(path, &before) == 0);
+	child = fork(); CHECK(child >= 0);
+	if (!child) {
+		if (unshare(CLONE_NEWUSER)) _exit(2);
+		struct snapshot diagnostic;
+		if (read_snapshot(source_path, &diagnostic)) _exit(4);
+		int accessible_log = open_log(path, -1);
+		if (accessible_log < 0) _exit(5);
+		close(accessible_log);
+		_exit(collector_main(6, diagnostic_args) == 1 ? 0 : 3);
+	}
+	CHECK(waitpid(child, &status, 0) == child && WIFEXITED(status) && WEXITSTATUS(status) == 0);
+	CHECK(stat(path, &after) == 0 && before.st_size == after.st_size);
 	puts("SECURITY AUDIT COLLECTOR VM PASS");
 	return 0;
 }

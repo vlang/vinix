@@ -401,8 +401,12 @@ int main(int argc, char **argv)
 	struct collector c = {0};
 	if (session_id(c.session)) { perror("vinix-security-audit: session entropy"); return 1; }
 	struct snapshot s;
-	/* The kernel authorizes this read before any collector session is created. */
-	if (read_snapshot(source, &s)) { perror("vinix-security-audit: snapshot"); return 1; }
+	/* Always ask the canonical kernel endpoint for initial-namespace audit
+	 * authority. A diagnostic source override must not bypass that gate. */
+	if (read_snapshot("/proc/security_audit", &s)
+	    || (strcmp(source, "/proc/security_audit") && read_snapshot(source, &s))) {
+		perror("vinix-security-audit: snapshot"); return 1;
+	}
 	int fd = open_log(path, -1);
 	if (fd < 0) { perror("vinix-security-audit: secure log"); return 1; }
 	struct output o = {0};

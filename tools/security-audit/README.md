@@ -51,7 +51,8 @@ python3 tests/kernel-gaps/run.py --source tests/security-audit/collector_vm_test
 ```
 
 `--interval-ms` accepts 10 through 60000. `--log` must be an absolute secure path;
-`--source` selects a snapshot source for controlled diagnostics. The helper
+`--source` selects a snapshot source for controlled diagnostics and still
+requires authorization to read the canonical kernel audit endpoint. The helper
 `build-support/security-tools/stage.py --arch aarch64 --staging /path/to/root`
 packages a static collector and launcher using the target musl compiler. Both
 userland and desktop image builders run this step.
