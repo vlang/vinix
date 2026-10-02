@@ -1,0 +1,17 @@
+{
+  "builder": "/Users/alex/code/vinix/build-userland-amd64.sh",
+  "builder_sha256": "4e6eaa4fa1a84b85479a08ae5d0daa928a8be4841d6d6d94814505cef7a8b517",
+  "stage_helper_sha256": "0a15d3ca7562d3fbf1fc66df570d8516cdde39e52343116ebf8f4a795e90084d",
+  "settings": {
+    "VINIX_AMD64_USERLAND_BUILD_DIR": "/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc-production-v5/amd64",
+    "VINIX_AMD64_INITRAMFS": "/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc-production-v5/amd64/initramfs.tar",
+    "VINIX_MUSL_BUILD_DIR": "/Users/alex/code/vinix/third_party/useralloc-libc/build/musl",
+    "VINIX_MUSL_RETAIN": "1",
+    "VINIX_OPTIMIZED_MUSL": "1",
+    "VINIX_ALPINE_DEVTOOLS": "1",
+    "VINIX_ALPINE_BASE_ONLY": "1",
+    "NPROC": "2",
+    "ALPINE_VERSION": "3.21.7",
+    "ALPINE_BRANCH": "v3.21"
+  }
+}

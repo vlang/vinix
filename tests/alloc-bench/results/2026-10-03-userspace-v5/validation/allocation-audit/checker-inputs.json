@@ -1,0 +1,8 @@
+{
+  "source_sha256": {
+    "tests/kernel-allocs/run.sh": "9ec3d2cd28f316dd366f3b0bd71cda9b25387d37b081db5ec2d360ebd3373fa4",
+    "tests/kernel-allocs/copy_sources.py": "d3cff17e8ec28be83cdfce2a67e8a330e86466ca1e83390f509b15c87f8d872a",
+    "tests/kernel-allocs/allowed.txt": "5292f32c5efc75689d7c74401afe28833270108cee70cd82af6048ed66999a8c"
+  },
+  "notes": "The current fixed checker and complete unchanged literal allowlist copied into the isolated frozen kernel worktree. Never --update."
+}

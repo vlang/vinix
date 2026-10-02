@@ -1,0 +1,109 @@
+{
+  "captured_utc": "2026-10-02T21:40:49.472570+00:00",
+  "implementation_delta_sha256": "2869ff6983fa30aa0395b3039a6a90ffe704c2eb73a48f1ab802c6f5c41db492",
+  "combined_source_manifest_sha256": "68840cd9718bf15dc0a3335f263928f7dcd34f6f6da2a26128f62c35d42e8387",
+  "main_changed_sources": {
+    "kernel/memory/virtual_amd64.v": "718daf59003f9d992237fd41e26cea4de97600afaf874e24359118f6df70430a",
+    "tests/memory/pagetable.c": "f71d45c78c2db0e1c198d2aa3443513a5fd2f51975a8209a8fdbf374dc7abf5d",
+    "tests/memory/pagetable.md": "a99a617ec201b35dfd3f387d35206eb4c2121ed0b677ea0cbf542b1f47759a42"
+  },
+  "builds": {
+    "x86_64": {
+      "kernel_sha256": "16140916ef5abca52cc6f0a8e80bb6dedc24b5e5f05efd747f57182523098e74",
+      "source_file_count": 18,
+      "objects": {
+        "62": 106
+      },
+      "standard_modules_match": true
+    },
+    "aarch64": {
+      "kernel_sha256": "3d721f3168a990373cb2549bd26322329923014ee4613cda2ae3d4f6884bf8f7",
+      "source_file_count": 18,
+      "objects": {
+        "183": 108
+      },
+      "standard_modules_match": true
+    }
+  },
+  "core": {
+    "core-x86_64": {
+      "exit_code": 0,
+      "boundary_supplement_sha256": "f71d45c78c2db0e1c198d2aa3443513a5fd2f51975a8209a8fdbf374dc7abf5d",
+      "core_source_bundle_sha256": "b85c346762a1fcff9188a0e09970eece8ff449b71f0eaec1d5ae0642e7b4232a",
+      "serial_sha256": "bfdc136f510df7eeb873ab310d98f48326ae96a62e76f8d64e3e8533cea42691",
+      "started_utc": "2026-10-02T21:37:38.486308+00:00",
+      "finished_utc": "2026-10-02T21:38:39.862522+00:00"
+    },
+    "core-x86_64-four-level": {
+      "exit_code": 0,
+      "boundary_supplement_sha256": "f71d45c78c2db0e1c198d2aa3443513a5fd2f51975a8209a8fdbf374dc7abf5d",
+      "core_source_bundle_sha256": "b85c346762a1fcff9188a0e09970eece8ff449b71f0eaec1d5ae0642e7b4232a",
+      "serial_sha256": "c1e74e9f3711968530ec741e2a1ca1ea99bf3f1ba11cfbef3285c507fb4e3eb7",
+      "started_utc": "2026-10-02T21:37:39.760801+00:00",
+      "finished_utc": "2026-10-02T21:38:40.449732+00:00"
+    },
+    "core-aarch64": {
+      "exit_code": 0,
+      "boundary_supplement_sha256": "f71d45c78c2db0e1c198d2aa3443513a5fd2f51975a8209a8fdbf374dc7abf5d",
+      "core_source_bundle_sha256": "b85c346762a1fcff9188a0e09970eece8ff449b71f0eaec1d5ae0642e7b4232a",
+      "serial_sha256": "5abedf5e02f71edf2db64a483d2bfc2a6bdfecabc208f56974d940c3007d06fc",
+      "started_utc": "2026-10-02T21:37:39.754399+00:00",
+      "finished_utc": "2026-10-02T21:38:23.946110+00:00"
+    }
+  },
+  "allocation_audit": {
+    "command": [
+      "/Users/alex/code/vinix/third_party/useralloc-speed-v5/tests/kernel-allocs/run.sh"
+    ],
+    "environment": {
+      "V": "/Users/alex/code/vinix/build/useralloc-final-audit/compiler/v"
+    },
+    "candidate_exit_code": 1,
+    "baseline_source": "build/useralloc-kernel-speed-v5/allocation-audit/baseline.log",
+    "baseline_sites": 440,
+    "candidate_sites": 440,
+    "path_kind_deltas": {},
+    "allocation_site_regression": false,
+    "reported_architectures": [
+      [
+        "aarch64",
+        "322 source files, 374 allocation sites (V exit 0)"
+      ],
+      [
+        "x86_64",
+        "251 source files, 316 allocation sites (V exit 0)"
+      ]
+    ],
+    "compiler_sha256": "80c39942a71a8323754159b37624b69fe9469ca90892e97ea721fa4d5ac86bf0",
+    "notes": "Same fixed current checker and complete unchanged literal allowlist for frozen v4 baseline and v5 candidate. Both architecture compilations succeeded, literal unchanged allowlist remains failing; no allowance edits. Compare full path-kind counts without line-number drift.",
+    "baseline_exit_code": 1,
+    "baseline_reported_architectures": [
+      [
+        "aarch64",
+        "322 source files, 374 allocation sites (V exit 0)"
+      ],
+      [
+        "x86_64",
+        "251 source files, 316 allocation sites (V exit 0)"
+      ]
+    ],
+    "candidate_reported_architectures": [
+      [
+        "aarch64",
+        "322 source files, 374 allocation sites (V exit 0)"
+      ],
+      [
+        "x86_64",
+        "251 source files, 316 allocation sites (V exit 0)"
+      ]
+    ]
+  },
+  "owned_jobs_running": [],
+  "notes": "Both actual kernel builds and all three final full core modes pass. Literal pre-existing allocation allowlist remains failing in both exact v4 baseline and v5; same fixed checker compiles both arches and reports identical440 site union. No allowance update. Earlier dependency/harness failures and passing precorrection runs retained.",
+  "implementation_commit": "9d6f3e1aa31b47e25ddaa243949dc6a97c198601",
+  "owned_changed_paths_committed": [
+    "kernel/memory/virtual_amd64.v",
+    "tests/memory/pagetable.c",
+    "tests/memory/pagetable.md"
+  ]
+}

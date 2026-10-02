@@ -1,0 +1,95 @@
+{
+  "status": "PASS",
+  "arch": "aarch64",
+  "inputs": {
+    "builder": "/Users/alex/code/vinix/build-userland-aarch64.sh",
+    "builder_sha256": "0acd0f8cc0a5c55cc70cc3a774e8cf645155652f131b9f10de3f0702da71885d",
+    "stage_helper_sha256": "0a15d3ca7562d3fbf1fc66df570d8516cdde39e52343116ebf8f4a795e90084d",
+    "settings": {
+      "VINIX_AARCH64_USERLAND_BUILD_DIR": "/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc-production-v5/aarch64",
+      "VINIX_AARCH64_INITRAMFS": "/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc-production-v5/aarch64/initramfs.tar",
+      "VINIX_MUSL_BUILD_DIR": "/Users/alex/code/vinix/third_party/useralloc-libc/build/musl",
+      "VINIX_MUSL_RETAIN": "1",
+      "VINIX_OPTIMIZED_MUSL": "1",
+      "VINIX_ALPINE_DEVTOOLS": "1",
+      "VINIX_ALPINE_BASE_ONLY": "1",
+      "NPROC": "2",
+      "ALPINE_VERSION": "3.21.7",
+      "ALPINE_BRANCH": "v3.21"
+    }
+  },
+  "libc_build": {
+    "version": "1.2.5",
+    "alpine_package": "musl-1.2.5-r11",
+    "arch": "aarch64",
+    "source_url": "https://musl.libc.org/releases/musl-1.2.5.tar.gz",
+    "source_sha256": "a9a118bbe84d8764da0ea0d28b3ab3fae8477fc7e4085d90102b8596fc7c75e4",
+    "patches": [
+      {
+        "name": "handle-aux-at_base.patch",
+        "sha256": "2a65e03b94217063d72fe998e5fb2e25cd01716078a3ba1b0ab574ab205111e6"
+      },
+      {
+        "name": "isatty-glibc-align.patch",
+        "sha256": "1321d542b40921a4c248bb2d15dbd03fcbbf008c8725eb2043d3cab62faeba48"
+      },
+      {
+        "name": "ldso-fix-non-functional-fix-to-early-dynamic-PAGE_SI.patch",
+        "sha256": "7f5806124d4a89536e53a07bfe95fcd0a8f1b7a27fc0dfc89c78c724dea1c924"
+      },
+      {
+        "name": "loongarch64-Add-lsx-and-lasx-vector-structure-defini.patch",
+        "sha256": "28efacd507c01b89e1725ed33723f3f9fdfe6cb83eb78ffea1e2acb7fda8a52c"
+      },
+      {
+        "name": "loongarch64-add-TLSDESC-support.patch",
+        "sha256": "1efb4604e0b28b84e10faf37d17bad448510e73f6a3db89c8be47d38b9e85138"
+      },
+      {
+        "name": "loongarch64-add-fpu-and-simd-context-to-signal.h.patch",
+        "sha256": "d73f85a90fe52930dd8b5d16cb7f3369a994918c0e41ae3c3dc9a25df4b45099"
+      },
+      {
+        "name": "loongarch64-add-bits-hwcap.h.patch",
+        "sha256": "8849080b49dff046b1f29db24e54ffe6262b5884078091994db77efdafca2505"
+      },
+      {
+        "name": "CVE-2025-26519.patch",
+        "sha256": "ab382da2bb5e1cc32d8904be28fb13f8ad3ce813967bd4bf7f5b1c6baee33e17"
+      },
+      {
+        "name": "CVE-2026-6042.patch",
+        "sha256": "1d0be2e72b9d5bd16546b923aa8af861d271322f01644716a81823bec4065c99"
+      },
+      {
+        "name": "CVE-2026-40200.patch",
+        "sha256": "1ee29f64f9ca8e8ad7c349779d661ff6b52126a27575d3586981357a52c406fb"
+      },
+      {
+        "name": "malloc-retain.patch",
+        "sha256": "5ff7f0e2fdc9525d83b43fa98fdc27e34d5ef2e6d7f7b74e29c57113a34eca86"
+      }
+    ],
+    "cc": [
+      "/opt/homebrew/Cellar/musl-cross/0.9.11/libexec/bin/aarch64-linux-musl-gcc"
+    ],
+    "compiler_version": "aarch64-linux-musl-gcc (GCC) 14.2.0",
+    "compiler_target": "aarch64-linux-musl",
+    "cflags": "-fstack-protector-strong -DVINIX_MALLOC_RETAIN=1",
+    "ldflags": "-Wl,-soname,libc.musl-aarch64.so.1",
+    "optimize": "internal,malloc,malloc/mallocng/*.c,string",
+    "retention": 1,
+    "configure_argv": [
+      "/Users/alex/code/vinix/third_party/useralloc-libc/build/musl/aarch64/16c56d8ece6fb58a2eed5987372e257d09f3bf1b74ddc21e4ad126c0f966a250/musl-1.2.5/configure",
+      "--target=aarch64-linux-musl",
+      "--prefix=/usr",
+      "--syslibdir=/lib",
+      "--disable-wrapper",
+      "--enable-optimize=internal,malloc,malloc/mallocng/*.c,string"
+    ],
+    "libc_so_sha256": "509c99c6f48ce909d2346bc0228af1a7e66c9ece33f4ac3dd1476bc72505a439",
+    "libc_a_sha256": "97516875543172dd81acb8d6cbe391beb5207e9daf28c952838ef587ee2f67f9"
+  },
+  "initramfs_sha256": "6460554f4679be2ad76d0727ca2fb52739b31ed63210a0654a89eb50d9a671c9",
+  "builder_log_sha256": "89b85cc989ff05078cc193b5fbf3e54d4e87e026c5fc942ff9db2b6483865ba3"
+}
