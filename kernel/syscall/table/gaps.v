@@ -37,6 +37,7 @@ fn sched_target_tid(local_pid int) ?int {
 	if pid == 0 {
 		return proc.current_thread().tid
 	}
+	if !proc.mac_thread_peer_allowed(pid) { return none }
 	proc.thread_sched_params(pid) or { return none }
 	return pid
 }
@@ -45,7 +46,9 @@ fn sched_target_tid(local_pid int) ?int {
 // thread could ever hold, which is a different answer from an id that simply
 // does not belong to a thread just now.
 fn sched_target_errno(pid int) u64 {
-	return if pid < 0 { u64(errno.einval) } else { u64(errno.esrch) }
+	return if pid < 0 { u64(errno.einval) } else if errno.get() == errno.eperm {
+		u64(errno.eperm)
+	} else { u64(errno.esrch) }
 }
 
 // May the caller give this thread that priority? Root may do anything;
@@ -53,19 +56,19 @@ fn sched_target_errno(pid int) u64 {
 // their own user.
 fn may_set_sched_params(target_tid int, policy int, priority int) bool {
 	caller := proc.current_thread().process
-	if caller.euid == 0 {
-		return true
-	}
-
-	target := proc.get_thread(target_tid)
+	if target_tid <= 0 || target_tid >= proc.max_pid { return false }
+	proc.lock_table()
+	defer { proc.unlock_table() }
+	target := threads_by_tid[target_tid]
 	if target == unsafe { nil } {
 		return false
 	}
 	owner := target.process
-	proc.unpin_thread(target)
 	if owner == unsafe { nil } {
 		return false
 	}
+	if !proc.mac_peer_allowed(caller, owner) { return false }
+	if caller.euid == 0 { return true }
 	if caller.euid != owner.euid && caller.euid != owner.uid {
 		return false
 	}
@@ -107,7 +110,7 @@ fn validate_sched_priority(policy int, priority int) ?int {
 
 fn syscall_linux_sched_getscheduler(_ voidptr, pid int) (u64, u64) {
 	tid := sched_target_tid(pid) or { return errno.err, sched_target_errno(pid) }
-	params := proc.thread_sched_params(tid) or { return errno.err, errno.esrch }
+	params := proc.thread_sched_params(tid) or { return errno.err, errno.get() }
 	if params.reset_on_fork {
 		return u64(params.policy | proc.sched_reset_on_fork), 0
 	}
@@ -145,7 +148,7 @@ fn syscall_linux_sched_setscheduler(_ voidptr, pid int, policy int, param u64) (
 		priority: checked
 		reset_on_fork: reset_on_fork
 	}) {
-		return errno.err, errno.esrch
+		return errno.err, errno.get()
 	}
 	return 0, 0
 }
@@ -157,7 +160,7 @@ fn syscall_linux_sched_getparam(_ voidptr, pid int, param u64) (u64, u64) {
 		return errno.err, errno.efault
 	}
 	tid := sched_target_tid(pid) or { return errno.err, sched_target_errno(pid) }
-	params := proc.thread_sched_params(tid) or { return errno.err, errno.esrch }
+	params := proc.thread_sched_params(tid) or { return errno.err, errno.get() }
 
 	priority := i32(params.priority)
 	if !usercopy.copy_to_user(param, voidptr(&priority), sizeof(i32)) {
@@ -171,7 +174,7 @@ fn syscall_linux_sched_setparam(_ voidptr, pid int, param u64) (u64, u64) {
 		return errno.err, errno.einval
 	}
 	tid := sched_target_tid(pid) or { return errno.err, sched_target_errno(pid) }
-	mut params := proc.thread_sched_params(tid) or { return errno.err, errno.esrch }
+	mut params := proc.thread_sched_params(tid) or { return errno.err, errno.get() }
 
 	mut priority32 := i32(0)
 	if !usercopy.copy_from_user(voidptr(&priority32), param, sizeof(i32)) {
@@ -194,7 +197,7 @@ fn syscall_linux_sched_setparam(_ voidptr, pid int, param u64) (u64, u64) {
 
 	params.priority = checked
 	if !proc.set_thread_sched_params(tid, params) {
-		return errno.err, errno.esrch
+		return errno.err, errno.get()
 	}
 	return 0, 0
 }
@@ -321,21 +324,23 @@ fn syscall_linux_sched_setattr(_ voidptr, pid int, attr_ptr u64, flags u32) (u64
 	}
 
 	if !proc.set_thread_sched_params(tid, params) {
-		return errno.err, errno.esrch
+		return errno.err, errno.get()
 	}
 
 	// sched_attr carries nice alongside the policy, and a caller that has
 	// filled it in should not need a second call to have it take effect.
 	if policy != proc.sched_deadline && attr.sched_nice >= -20 && attr.sched_nice <= 19 {
-		target := proc.get_thread(tid)
+		proc.lock_table()
+		target := threads_by_tid[tid]
 		if target != unsafe { nil } {
 			mut owner := target.process
-			proc.unpin_thread(target)
-			if owner != unsafe { nil } && (attr.sched_nice >= owner.nice
+			if owner != unsafe { nil } && proc.mac_peer_allowed(proc.current_thread().process, owner)
+				&& (attr.sched_nice >= owner.nice
 				|| proc.current_thread().process.euid == 0) {
 				owner.nice = int(attr.sched_nice)
 			}
 		}
+		proc.unlock_table()
 	}
 
 	return 0, 0
@@ -352,17 +357,22 @@ fn syscall_linux_sched_getattr(_ voidptr, pid int, attr_ptr u64, size u32, flags
 		return errno.err, errno.einval
 	}
 	tid := sched_target_tid(pid) or { return errno.err, sched_target_errno(pid) }
-	params := proc.thread_sched_params(tid) or { return errno.err, errno.esrch }
+	params := proc.thread_sched_params(tid) or { return errno.err, errno.get() }
 
 	mut nice := int(0)
-	target := proc.get_thread(tid)
+	proc.lock_table()
+	target := threads_by_tid[tid]
 	if target != unsafe { nil } {
 		owner := target.process
-		proc.unpin_thread(target)
 		if owner != unsafe { nil } {
+			if !proc.mac_peer_allowed(proc.current_thread().process, owner) {
+				proc.unlock_table()
+				return errno.err, errno.eperm
+			}
 			nice = owner.nice
 		}
 	}
+	proc.unlock_table()
 
 	mut attr := SchedAttr{
 		size: u32(sizeof(SchedAttr))
@@ -421,7 +431,8 @@ fn syscall_linux_sched_getaffinity(_ voidptr, local_pid int, size u64, mask u64)
 		bits |= u64(1) << u64(i)
 	}
 	tid := if pid == 0 { proc.current_thread().tid } else { pid }
-	configured := proc.thread_affinity(tid) or { return errno.err, errno.esrch }
+	if !proc.mac_thread_peer_allowed(tid) { return errno.err, errno.get() }
+	configured := proc.thread_affinity(tid) or { return errno.err, errno.get() }
 	bits &= configured
 
 	mut written := size
@@ -463,8 +474,9 @@ fn syscall_linux_sched_setaffinity(_ voidptr, local_pid int, size u64, mask u64)
 		return errno.err, errno.einval
 	}
 	tid := if pid == 0 { proc.current_thread().tid } else { pid }
+	if !proc.mac_thread_peer_allowed(tid) { return errno.err, errno.get() }
 	if !proc.set_thread_affinity(tid, bits & present) {
-		return errno.err, errno.esrch
+		return errno.err, errno.get()
 	}
 
 	return 0, 0

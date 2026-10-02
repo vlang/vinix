@@ -8,6 +8,7 @@ import krandom
 import memory
 import event.eventstruct
 import time
+import errno
 
 // The most descriptors a process may have: Linux's nr_open, and the hard
 // RLIMIT_NOFILE a process starts with. Its table starts with initial_fds
@@ -333,6 +334,8 @@ pub mut:
 	exe_mount       lib.MountContext
 	ns              NamespaceSet
 	caps            Capabilities
+	mac_domain     u32
+	mac_next_domain u32
 	no_new_privs    bool
 	// The seccomp programs a process has installed, newest first, and
 	// whether it is in strict mode instead; see seccomp.v.
@@ -841,26 +844,36 @@ pub fn free_tid(tid int) {
 
 pub fn thread_affinity(tid int) ?u64 {
 	if tid <= 0 || tid >= max_pid {
+		errno.set(errno.esrch)
 		return none
 	}
 	pid_lock.acquire()
 	defer { pid_lock.release() }
 	t := threads_by_tid[tid]
 	if t == unsafe { nil } {
+		errno.set(errno.esrch)
 		return none
+	}
+	if !mac_peer_allowed(current_thread().process, t.process) {
+		errno.set(errno.eperm); return none
 	}
 	return t.affinity_mask
 }
 
 pub fn set_thread_affinity(tid int, mask u64) bool {
 	if tid <= 0 || tid >= max_pid {
+		errno.set(errno.esrch)
 		return false
 	}
 	pid_lock.acquire()
 	defer { pid_lock.release() }
 	mut t := threads_by_tid[tid]
 	if t == unsafe { nil } {
+		errno.set(errno.esrch)
 		return false
+	}
+	if !mac_peer_allowed(current_thread().process, t.process) {
+		errno.set(errno.eperm); return false
 	}
 	t.affinity_mask = mask
 	// Forget which memory node this thread was at home on. The scheduler looks
@@ -876,13 +889,18 @@ pub fn set_thread_affinity(tid int, mask u64) bool {
 
 pub fn thread_sched_params(tid int) ?SchedParams {
 	if tid <= 0 || tid >= max_pid {
+		errno.set(errno.esrch)
 		return none
 	}
 	pid_lock.acquire()
 	defer { pid_lock.release() }
 	t := threads_by_tid[tid]
 	if t == unsafe { nil } {
+		errno.set(errno.esrch)
 		return none
+	}
+	if !mac_peer_allowed(current_thread().process, t.process) {
+		errno.set(errno.eperm); return none
 	}
 	return t.sched
 }
@@ -893,13 +911,18 @@ pub fn thread_sched_params(tid int) ?SchedParams {
 // is no longer in.
 pub fn set_thread_sched_params(tid int, params SchedParams) bool {
 	if tid <= 0 || tid >= max_pid {
+		errno.set(errno.esrch)
 		return false
 	}
 	pid_lock.acquire()
 	defer { pid_lock.release() }
 	mut t := threads_by_tid[tid]
 	if t == unsafe { nil } {
+		errno.set(errno.esrch)
 		return false
+	}
+	if !mac_peer_allowed(current_thread().process, t.process) {
+		errno.set(errno.eperm); return false
 	}
 	was_special := t.sched.is_special()
 	mut next := params

@@ -276,7 +276,7 @@ fn syscall_linux_sched_rr_get_interval(_ voidptr, pid int, interval_ptr u64) (u6
 		return errno.err, errno.efault
 	}
 	tid := sched_target_tid(pid) or { return errno.err, sched_target_errno(pid) }
-	params := proc.thread_sched_params(tid) or { return errno.err, errno.esrch }
+	params := proc.thread_sched_params(tid) or { return errno.err, errno.get() }
 
 	// Only SCHED_RR rotates on a quantum. Every other policy has none to
 	// report, and says so with a zero interval, as Linux does.

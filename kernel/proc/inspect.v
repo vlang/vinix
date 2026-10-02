@@ -17,6 +17,7 @@ fn inspection_capable(caller &Process, target &Process, permitted bool) bool {
 }
 
 fn inspection_allowed(caller &Process, target &Process, real_creds bool) bool {
+	if !mac_peer_allowed(caller, target) { return false }
 	if voidptr(caller) == voidptr(target) || inspection_capable(caller, target, real_creds) {
 		return true
 	}
@@ -103,4 +104,12 @@ pub fn inspect_pagemap(local_pid int) ?ProcessInspection {
 		pagemap:       pagemap
 		fault_missing: voidptr(target) == voidptr(caller)
 	}
+}
+
+// Allocation call chains expose kernel addresses and the global tracker can
+// be reset. Namespace root and confined domains cannot operate this facility.
+pub fn may_read_kernel_diagnostics() bool {
+	p := current_thread().process
+	return mac_trusted() && p.euid == 0 && is_initial_namespace(p.ns.user)
+		&& has_capability(p, cap_sys_admin)
 }

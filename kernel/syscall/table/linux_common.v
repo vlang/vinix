@@ -305,6 +305,9 @@ fn syscall_linux_prctl(_ voidptr, option int, arg2 u64, _arg3 u64, _arg4 u64, _a
 	mut process := proc.current_thread().process
 
 	match option {
+		proc.mac_prctl {
+			return proc.mac_control(arg2, _arg3, _arg4, _arg5)
+		}
 		pr_set_name {
 			// The name is the thread's, up to 16 bytes including the null. It
 			// was made the whole process's: node's threads name themselves, and
@@ -401,6 +404,10 @@ fn syscall_linux_prlimit64(_ voidptr, local_pid int, res int, new_rlim u64, old_
 	}
 	mut caller := proc.current_thread().process
 	mut process := caller
+	mut held_process := &proc.Process(unsafe { nil })
+	defer {
+		if held_process != unsafe { nil } { proc.unpin_process(held_process) }
+	}
 	if pid != 0 && pid != caller.pid {
 		// A container runtime sets its init's limits from the parent, so
 		// prlimit has to reach another process, not only the caller.
@@ -408,17 +415,27 @@ fn syscall_linux_prlimit64(_ voidptr, local_pid int, res int, new_rlim u64, old_
 			return errno.err, errno.esrch
 		}
 		proc.lock_table()
-		target := proc.process_at(pid)
-		proc.unlock_table()
+		target := proc.process_in(caller.numbered_in, local_pid)
 		if target == unsafe { nil } {
+			proc.unlock_table()
 			return errno.err, errno.esrch
+		}
+		if !proc.mac_peer_allowed(caller, target) {
+			proc.unlock_table()
+			return errno.err, errno.eperm
 		}
 		// Linux allows this with CAP_SYS_RESOURCE or a matching real/effective
 		// user; root, which every container runtime runs as here, has both.
 		if caller.euid != 0 && caller.euid != target.euid {
+			proc.unlock_table()
 			return errno.err, errno.eperm
 		}
+		// This synchronous call continues after dropping the lookup lock.
+		// Its pin keeps the target and limits lock alive through all errors.
+		proc.pin_process(target)
+		held_process = target
 		process = target
+		proc.unlock_table()
 	}
 
 	process.rlimits_lock.acquire()
@@ -630,29 +647,33 @@ fn syscall_linux_setpgid(_ voidptr, pid int, pgid int) (u64, u64) {
 		return errno.err, errno.einval
 	}
 
-	mut target := proc.current_thread().process
+	mut caller := proc.current_thread().process
+	mut target := caller
 	// Both numbers are the caller's pid namespace's.
 	viewer := target.numbered_in
+	proc.lock_table()
+	defer { proc.unlock_table() }
 	if pid != 0 {
 		if pid >= proc.max_pid {
 			return errno.err, errno.esrch
 		}
-		global := proc.pid_from(viewer, pid)
-		target = if global > 0 { processes[global] } else { unsafe { nil } }
+		target = proc.process_in(viewer, pid)
 		if target == unsafe { nil } {
 			return errno.err, errno.esrch
 		}
 	}
+	if !proc.mac_peer_allowed(caller, target) { return errno.err, errno.eperm }
 
 	local := if pgid == 0 { proc.pid_in(target, viewer) } else { pgid }
 	mut group := if pgid == 0 || local == proc.pid_in(target, viewer) {
 		target.pid
 	} else {
-		proc.group_from(viewer, local)
+		proc.group_from_locked(viewer, local)
 	}
 	if group == 0 {
 		// A group whose leader is alive but has nobody in it yet.
-		group = proc.pid_from(viewer, local)
+		leader := proc.process_in(viewer, local)
+		group = if leader == unsafe { nil } { 0 } else { leader.pid }
 	}
 	if group == 0 {
 		return errno.err, errno.eperm
@@ -666,18 +687,21 @@ fn syscall_linux_setpgid(_ voidptr, pid int, pgid int) (u64, u64) {
 }
 
 fn syscall_linux_getpgid(_ voidptr, pid int) (u64, u64) {
-	mut target := proc.current_thread().process
+	caller := proc.current_thread().process
+	mut target := caller
 	viewer := target.numbered_in
+	proc.lock_table()
+	defer { proc.unlock_table() }
 	if pid != 0 {
 		if pid < 0 || pid >= proc.max_pid {
 			return errno.err, errno.esrch
 		}
-		global := proc.pid_from(viewer, pid)
-		target = if global > 0 { processes[global] } else { unsafe { nil } }
+		target = proc.process_in(viewer, pid)
 		if target == unsafe { nil } {
 			return errno.err, errno.esrch
 		}
 	}
+	if !proc.mac_peer_allowed(caller, target) { return errno.err, errno.eperm }
 
 	return u64(proc.pgid_in(target, viewer)), 0
 }
@@ -860,6 +884,7 @@ fn syscall_linux_setpriority(_ voidptr, which int, local_who int, prio int) (u64
 	if target == unsafe { nil } {
 		return errno.err, errno.esrch
 	}
+	if !proc.mac_peer_allowed(caller, target) { return errno.err, errno.eperm }
 	if caller.euid != 0 && caller.euid != target.euid && caller.euid != target.uid {
 		return errno.err, errno.eperm
 	}
@@ -881,6 +906,9 @@ fn syscall_linux_getpriority(_ voidptr, which int, local_who int) (u64, u64) {
 	target := proc.process_at(target_pid)
 	if target == unsafe { nil } {
 		return errno.err, errno.esrch
+	}
+	if !proc.mac_peer_allowed(proc.current_thread().process, target) {
+		return errno.err, errno.eperm
 	}
 	// The raw syscall returns 20 - nice so every successful result is positive.
 	return u64(20 - target.nice), 0

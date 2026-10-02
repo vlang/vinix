@@ -263,6 +263,7 @@ pub fn syscall_flock(_ voidptr, fdnum int, operation int) (u64, u64) {
 	mut fd := fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.ebadf }
 	defer { fd.unref() }
 	mut handle := fd.handle
+	handle.mac_check(proc.mac_metadata) or { return errno.err, errno.get() }
 	if !stat.isreg(handle.resource.stat.mode) && !stat.isdir(handle.resource.stat.mode) {
 		return errno.err, errno.einval
 	}

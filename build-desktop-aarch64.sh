@@ -1498,6 +1498,7 @@ CONTENT_KEY_INPUTS=(
     "$SCRIPT_DIR/build-support/security-tools"
     "$SCRIPT_DIR/build-support/security-audit"
     "$SCRIPT_DIR/tools/security-audit"
+    "$SCRIPT_DIR/tools/security-mac"
     "$SCRIPT_DIR/tools/sandbox"
     "$SCRIPT_DIR/build-support/musl/stage.py"
     "$SCRIPT_DIR/build-support/musl/malloc-retain.patch"

@@ -3,6 +3,17 @@ module security
 
 import proc
 
+fn test_confined_root_cannot_administer_host_policy() {
+	proc.set_test_euid(0)
+	proc.set_test_caps(u64(-1))
+	proc.set_test_domain(1)
+	defer { proc.set_test_domain(0) }
+	for selector in [filesystem_mount, filesystem_unmount, system_hostname_set,
+		system_domainname_set, system_reboot, system_securelevel_set] {
+		assert !permitted(selector)
+	}
+}
+
 fn test_unknown_selector_fails_closed_even_for_root() {
 	proc.set_test_euid(0)
 	proc.set_test_caps(u64(-1))

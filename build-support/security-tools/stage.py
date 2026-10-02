@@ -44,6 +44,7 @@ def main() -> None:
     with tempfile.TemporaryDirectory(prefix="vinix-security-tools-") as directory:
         for source, destination in (
                 ("tools/sandbox/vinix-sandbox.c", "usr/bin/vinix-sandbox"),
+                ("tools/security-mac/mac.c", "usr/sbin/vinix-mac"),
                 ("tools/security-audit/collector.c", "usr/sbin/vinix-security-audit")):
             binary = Path(directory) / Path(destination).name
             subprocess.run(cc + ["-static", "-std=c11", "-O2", "-Wall", "-Wextra",
@@ -60,7 +61,7 @@ def main() -> None:
         raise RuntimeError("audit log staging directory cannot be a symlink")
     log.mkdir(parents=True, exist_ok=True)
     log.chmod(0o700)
-    print(f"Staged Vinix sandbox and audit utilities ({args.arch}).")
+    print(f"Staged Vinix sandbox, mandatory policy and audit utilities ({args.arch}).")
 
 
 if __name__ == "__main__":

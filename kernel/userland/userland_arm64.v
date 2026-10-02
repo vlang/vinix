@@ -732,6 +732,10 @@ pub fn syscall_execve(_ voidptr, _path charptr, _argv &charptr, _envp &charptr) 
 // whether it works or not; one that works never returns. The boot path that
 // starts init passes `execve` unset and keeps them.
 pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, envp []string, stdin_path string, stdout_path string, stderr_path string) ?&proc.Process {
+	mut mac_thread := proc.current_thread()
+	mac_previous := mac_thread.mac_loading
+	if execve { mac_thread.mac_loading = true }
+	defer { mac_thread.mac_loading = mac_previous }
 	// Chromium starts every child process by executing /proc/self/exe. The VFS
 	// resolves that to this process's program, but the new process must record
 	// where the program really is: keeping the literal path would make the
@@ -768,6 +772,10 @@ fn env_entry_is(entry string, name string, value string) bool {
 // The part of exec that follows finding the program. execveat(2) on a
 // descriptor comes here directly: a memfd has no name to be found by.
 pub fn start_program_node(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_mount &lib.MountContext, path string, argv []string, envp []string, stdin_path string, stdout_path string, stderr_path string) ?&proc.Process {
+	mut mac_thread := proc.current_thread()
+	mac_previous := mac_thread.mac_loading
+	if execve { mac_thread.mac_loading = true }
+	defer { mac_thread.mac_loading = mac_previous }
 	// What the caller names is subject to pledge(2) and unveil(2), a script's
 	// interpreter included. What the kernel picks itself -- the ELF
 	// interpreter, the x86 translator -- is not, as OpenBSD does not judge
@@ -1244,6 +1252,9 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 		curr_process.executable_path = program_path
 		proc.set_command_line(mut curr_process, argv)
 		proc.set_executable_fs(mut curr_process, voidptr(prog_node), prog_mount)
+		// The replacement mappings now own their inode references, and the
+		// executable node is recorded before its final descriptor goes.
+		release_exec_descriptor(mut t)
 		curr_process.allow_wx = allow_wx
 		curr_process.sigreturn_page = sigreturn_page
 		// Frames the old program was given must not return into the new one.
@@ -1252,6 +1263,7 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 		// the bounding set, which is how a container's root ends up with only
 		// the capabilities its runtime left it.
 		proc.capabilities_after_exec(mut curr_process)
+		proc.mac_after_exec(mut curr_process)
 		// The new program runs under the execpromises, or unpledged.
 		proc.pledge_after_exec(mut curr_process)
 		gpu_exec_trace(trace_gpu, 'installed replacement process metadata')
@@ -1384,6 +1396,11 @@ pub fn parse_shebang(mut res resource.Resource) ?(string, string) {
 // descriptor. AT_EMPTY_PATH with an empty path runs the descriptor itself,
 // which is what fexecve(3) is built from.
 pub fn syscall_execveat(_ voidptr, dirfd int, _path charptr, _argv &charptr, _envp &charptr, flags int) (u64, u64) {
+	mut mac_thread := proc.current_thread()
+	mac_previous := mac_thread.mac_loading
+	mac_thread.mac_loading = true
+	defer { mac_thread.mac_loading = mac_previous }
+	defer { release_exec_descriptor(mut mac_thread) }
 	mut process := proc.current_thread().process
 
 	path := fs.user_path(_path) or { return errno.err, errno.get() }
@@ -1403,9 +1420,10 @@ pub fn syscall_execveat(_ voidptr, dirfd int, _path charptr, _argv &charptr, _en
 		// Run the descriptor's image with its actual mount route. A relative
 		// shebang interpreter is resolved from cwd, as for ordinary execve.
 		mut fd := file.fd_from_fdnum(process, dirfd) or { return errno.err, errno.ebadf }
+		mac_thread.exec_descriptor = voidptr(fd)
+		fd.handle.mac_check(proc.mac_execute) or { return errno.err, errno.get() }
 		node := unsafe { &fs.VFSNode(fd.handle.node) }
 		lib.copy_mount_context(direct_mount, &fd.handle.mount)
-		fd.unref()
 		if node == unsafe { nil } {
 			return errno.err, errno.eacces
 		}

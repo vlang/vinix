@@ -235,13 +235,17 @@ pub fn thread_in(viewer &Namespace, local int) &Thread {
 // The kernel's id for a process group or session `viewer` calls `local`, 0 if
 // it has none. Its leader may have gone; its members keep the number.
 pub fn group_from(viewer &Namespace, local int) int {
-	if !numbers_own(viewer) {
-		return local
-	}
+	if !numbers_own(viewer) { return local }
 	lock_table()
 	defer {
 		unlock_table()
 	}
+	return group_from_locked(viewer, local)
+}
+
+// The caller holds the process table lock through its subsequent use.
+pub fn group_from_locked(viewer &Namespace, local int) int {
+	if !numbers_own(viewer) { return local }
 	for i := 1; i < max_pid; i++ {
 		p := processes[i]
 		if p == unsafe { nil } || voidptr(p.numbered_in) != voidptr(viewer) {

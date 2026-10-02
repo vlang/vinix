@@ -59,6 +59,7 @@ fn stop_for_signal(signal int) {
 }
 
 fn may_signal(caller &proc.Process, target &proc.Process, signal int) bool {
+	if !proc.mac_peer_allowed(caller, target) { return false }
 	// Capabilities acquired in a user namespace cannot signal its host.
 	same_namespace := voidptr(caller.ns.user) == voidptr(target.ns.user)
 	if proc.has_capability(caller, proc.cap_kill)

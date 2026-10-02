@@ -168,6 +168,8 @@ fn reduce_node_on_mount(node &VFSNode, follow_symlinks bool, depth int, effectiv
 		return unsafe { node }
 	}
 	if node.symlink_target.len != 0 && follow_symlinks == true {
+		// Resolving a link reads its contents even when the target is public.
+		mac_node(node, proc.mac_read) or { return unsafe { nil } }
 		target := node.symlink_target
 		_, next_node, _ := walk_path_on_mount(node.parent, target, depth + 1,
 			effective, identity)
@@ -450,7 +452,12 @@ pub fn symlink(parent &VFSNode, dest string, target string) ?&VFSNode {
 		unsafe { name.free() }
 		return none
 	}
-	apply_creation_identity(mut target_node, parent_of_tgt_node)?
+	apply_creation_identity(mut target_node, parent_of_tgt_node) or {
+		failure := errno.get()
+		discard_created_node(mut target_node, parent_of_tgt_node)
+		errno.set(failure)
+		return none
+	}
 
 	unsafe {
 		parent_of_tgt_node.children[basename] = target_node
@@ -473,6 +480,8 @@ pub fn link(parent &VFSNode, dest string, target string) ?&VFSNode {
 	_, mut dest_node, _ := walk_path(calling_root(), dest, 0, true)
 	if dest_node == unsafe { nil } { return none }
 	if read_only(dest_node) { errno.set(errno.erofs); return none }
+	mac_node(dest_node, proc.mac_metadata)?
+	mac_node(parent_of_tgt_node, proc.mac_create)?
 
 	if read_only(parent_of_tgt_node) { errno.set(errno.erofs); return none }
 	if !attr_allows_dir_add(parent_of_tgt_node) { return none }
@@ -719,6 +728,8 @@ fn fdnum_create_from_node(mut node VFSNode, flags int, oldfd int, specific bool,
 		opened_resource = node_resource.open(flags)?
 	}
 	mut fd := file.fd_create_from_resource(mut opened_resource, flags) or { return none }
+	fd.handle.mac_device = stat.ischr(node.resource.stat.mode) || stat.isblk(node.resource.stat.mode)
+	fd.handle.mac_block_device = stat.isblk(node.resource.stat.mode)
 	fd.handle.node = voidptr(node)
 	lib.copy_mount_context(&fd.handle.mount, identity)
 	katomic.inc(mut &node.handles)
@@ -1083,10 +1094,11 @@ fn open_anonymous_descriptor(descriptor AnonymousDescriptor, flags int) (u64, u6
 // stat(2) of the same: what the descriptor is open on.
 fn stat_anonymous_descriptor(descriptor AnonymousDescriptor, statbuf &stat.Stat) (u64, u64) {
 	mut fd := anonymous_descriptor_fd(descriptor) or { return errno.err, errno.get() }
+	defer { fd.unref() }
+	fd.handle.mac_check(proc.mac_inspect) or { return errno.err, errno.get() }
 	unsafe {
 		*statbuf = fd.handle.resource.stat
 	}
-	fd.unref()
 	return 0, 0
 }
 
@@ -1214,6 +1226,7 @@ pub fn syscall_ioctl(_ voidptr, fdnum int, _request u64, argp voidptr) (u64, u64
 	defer {
 		fd.unref()
 	}
+	fd.handle.mac_check(proc.mac_ioctl) or { return errno.err, errno.get() }
 
 	// A handful of requests belong to the descriptor rather than to whatever it
 	// points at, and Linux settles them in do_vfs_ioctl() before any driver is
@@ -1379,12 +1392,14 @@ pub fn syscall_fstatat(_ voidptr, dirfd int, _path charptr, statbuf &stat.Stat, 
 
 		if is_fdcwd(dirfd) {
 			node := unsafe { &VFSNode(proc.current_directory_of(current_process)) }
+			mac_node(node, proc.mac_inspect) or { return errno.err, errno.get() }
 			statsrc = &node.resource.stat
 		} else {
 			// The lookup holds the descriptor, which has to be given back.
 			mut fd := file.fd_from_fdnum(current_process, dirfd) or {
 				return errno.err, errno.get()
 			}
+			fd.handle.mac_check(proc.mac_inspect) or { fd.unref(); return errno.err, errno.get() }
 			unsafe {
 				*statbuf = fd.handle.resource.stat
 			}
@@ -1428,6 +1443,7 @@ pub fn syscall_fstat(_ voidptr, fdnum int, statbuf &stat.Stat) (u64, u64) {
 	defer {
 		fd.unref()
 	}
+	fd.handle.mac_check(proc.mac_inspect) or { return errno.err, errno.get() }
 
 	unsafe {
 		*statbuf = fd.handle.resource.stat
@@ -1487,6 +1503,7 @@ pub fn syscall_linkat(_ voidptr, olddirfd int, _oldpath charptr, newdirfd int, _
 	if stat.isdir(old_node.resource.stat.mode) {
 		return errno.err, errno.eperm
 	}
+	mac_node(old_node, proc.mac_metadata) or { return errno.err, errno.get() }
 	if !policy_check_link(old_node, newparent, basename) {
 		return errno.err, errno.get()
 	}
@@ -1524,6 +1541,7 @@ pub fn syscall_fchmod(_ voidptr, fdnum int, mode u32) (u64, u64) {
 	defer {
 		fd.unref()
 	}
+	fd.handle.mac_check(proc.mac_metadata) or { return errno.err, errno.get() }
 
 	if fd.handle.node != unsafe { nil } {
 		node := unsafe { &VFSNode(fd.handle.node) }
@@ -1630,6 +1648,7 @@ pub fn syscall_readdir(_ voidptr, fdnum int, mut buf stat.Dirent) (u64, u64) {
 	}
 
 	mut dir_handle := dir_fd.handle
+	dir_handle.mac_check(proc.mac_read) or { return errno.err, errno.get() }
 	dir_resource := dir_handle.resource
 
 	if stat.isdir(dir_resource.stat.mode) == false {
@@ -1738,6 +1757,7 @@ pub fn syscall_seek(_ voidptr, fdnum int, offset i64, whence int) (u64, u64) {
 	}
 
 	mut handle := fd.handle
+	handle.mac_check(proc.mac_inspect) or { return errno.err, errno.get() }
 
 	handle.l.acquire()
 	defer {
@@ -1870,6 +1890,8 @@ pub fn rename(oldparent &VFSNode, oldpath string, newparent &VFSNode, newpath st
 		errno.set(errno.ebusy)
 		return none
 	}
+	mac_node(old_node, proc.mac_metadata) or { return none }
+	if new_node != unsafe { nil } { mac_node(new_node, proc.mac_metadata) or { return none } }
 	require_linked(new_parent_of)?
 
 	if flags & rename_exchange != 0 {
@@ -2176,6 +2198,7 @@ pub fn syscall_fchownat(_ voidptr, dirfd int, _path charptr, uid u32, gid u32, f
 		defer {
 			fd.unref()
 		}
+		fd.handle.mac_check(proc.mac_metadata) or { return errno.err, errno.get() }
 		mut res := fd.handle.resource
 		if fd.handle.node != unsafe { nil } {
 			node := unsafe { &VFSNode(fd.handle.node) }
@@ -2219,6 +2242,7 @@ pub fn syscall_fchown(_ voidptr, fdnum int, uid u32, gid u32) (u64, u64) {
 	defer {
 		fd.unref()
 	}
+	fd.handle.mac_check(proc.mac_metadata) or { return errno.err, errno.get() }
 
 	mut res := fd.handle.resource
 	if fd.handle.node != unsafe { nil } {
@@ -2275,6 +2299,7 @@ pub fn syscall_fstatfs(_ voidptr, fdnum int, buf u64) (u64, u64) {
 		return errno.err, errno.get()
 	}
 	defer { fd.unref() }
+	fd.handle.mac_check(proc.mac_inspect) or { return errno.err, errno.get() }
 	mut res := fd.handle.resource
 	if !fill_statfs_resource(mut res, buf) { return errno.err, errno.efault }
 	return 0, 0
@@ -2336,6 +2361,10 @@ pub fn set_file_times(dirfd int, _path charptr, requested [2]time.TimeSpec, flag
 	}
 	mut node := &VFSNode(unsafe { nil })
 	mut res := &resource.Resource(unsafe { nil })
+	// Keep descriptor-owned anonymous and unlinked resources alive through
+	// every metadata access, including concurrent close of the table entry.
+	mut held_fd := &file.FD(unsafe { nil })
+	defer { if held_fd != unsafe { nil } { held_fd.unref() } }
 	if path.len == 0 {
 		if !on_descriptor && flags & at_empty_path == 0 { return errno.err, errno.enoent }
 		if is_fdcwd(dirfd) {
@@ -2347,9 +2376,10 @@ pub fn set_file_times(dirfd int, _path charptr, requested [2]time.TimeSpec, flag
 			mut fd := file.fd_from_fdnum(unsafe { nil }, dirfd) or {
 				return errno.err, errno.get()
 			}
+			held_fd = fd
+			fd.handle.mac_check(proc.mac_metadata) or { return errno.err, errno.get() }
 			node = unsafe { &VFSNode(fd.handle.node) }
 			res = fd.handle.resource
-			fd.unref()
 		}
 	} else {
 		parent := get_parent_dir(dirfd, path) or { return errno.err, errno.get() }
@@ -2361,6 +2391,7 @@ pub fn set_file_times(dirfd int, _path charptr, requested [2]time.TimeSpec, flag
 		}
 		res = node.resource
 	}
+	mac_resource(mut res, proc.mac_metadata) or { return errno.err, errno.get() }
 	if node != unsafe { nil } && read_only(node) { return errno.err, errno.erofs }
 	if node != unsafe { nil } && !attr_allows_metadata(node) { return errno.err, errno.get() }
 
@@ -2492,6 +2523,8 @@ pub fn syscall_memfd_create(_ voidptr, name u64, flags u32) (u64, u64) {
 		res.unref(unsafe { nil }) or {}
 	}
 	mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or { return u64(fdnum), 0 }
+	fd.handle.mac_device = stat.ischr(node.resource.stat.mode) || stat.isblk(node.resource.stat.mode)
+	fd.handle.mac_block_device = stat.isblk(node.resource.stat.mode)
 	fd.handle.node = voidptr(node)
 	fd.handle.mount.depth = 0
 	katomic.inc(mut &node.handles)

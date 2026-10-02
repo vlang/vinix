@@ -57,6 +57,7 @@ mut:
 
 	watches    []InotifyWatch
 	queue      []u8
+	creator_domain u32
 	next_wd    int = 1
 	overflowed bool
 	// The interface box its descriptors share, freed with the instance.
@@ -193,6 +194,8 @@ fn inotify_wait(mut this INotify, handle_ptr voidptr) bool {
 }
 
 fn (mut this INotify) read(handle_ptr voidptr, buf voidptr, _loc u64, count u64) ?i64 {
+	domain := proc.mac_current_domain()
+	if domain != 0 && domain != this.creator_domain { errno.set(errno.eacces); return none }
 	if buf == unsafe { nil } {
 		errno.set(errno.efault)
 		return none
@@ -287,7 +290,7 @@ pub fn syscall_inotify_init(_ voidptr, flags int) (u64, u64) {
 	// The descriptor's Handle owns the resource reference.  The registry is
 	// only an index protected by inotify_lock, so it must not keep a closed
 	// instance alive indefinitely.
-	mut inotify := &INotify{}
+	mut inotify := &INotify{creator_domain: proc.mac_current_domain()}
 	inotify.stat.mode = stat.ifchr | 0o600
 	inotify.stat.blksize = 1
 	// Nothing slices these, so a grown one frees the buffer it outgrew.
@@ -331,6 +334,9 @@ pub fn syscall_inotify_add_watch(_ voidptr, fdnum int, _path charptr, mask u32) 
 	defer { fd.unref() }
 	mut res := fd.handle.resource
 	if mut res is INotify {
+		if proc.mac_current_domain() != 0 && proc.mac_current_domain() != res.creator_domain {
+			return errno.err, errno.eacces
+		}
 		res.l.acquire()
 		defer { res.l.release() }
 		for mut watch in res.watches {
@@ -362,6 +368,9 @@ pub fn syscall_inotify_rm_watch(_ voidptr, fdnum int, wd int) (u64, u64) {
 	defer { fd.unref() }
 	mut res := fd.handle.resource
 	if mut res is INotify {
+		if proc.mac_current_domain() != 0 && proc.mac_current_domain() != res.creator_domain {
+			return errno.err, errno.eacces
+		}
 		res.l.acquire()
 		defer { res.l.release() }
 		for i, watch in res.watches {

@@ -198,7 +198,16 @@ fn install_device_node(mut parent VFSNode, name string, mode u32, rdev u64, back
 	res.boxed = boxed
 	number_special_node(mut boxed, parent)
 	node.resource = boxed
-	apply_creation_identity(mut node, parent)?
+	apply_creation_identity(mut node, parent) or {
+		failure := errno.get()
+		// This wrapper has not been published or opened; it owns neither
+		// the backing device nor any queued work. Retire only its node.
+		node.resource = unsafe { nil }
+		unsafe { free(boxed); free(res) }
+		retire_node(mut node)
+		errno.set(failure)
+		return none
+	}
 	unsafe {
 		parent.children[name] = node
 	}
@@ -213,11 +222,16 @@ fn make_fifo_node(mut parent VFSNode, name string, mode u32) ?&VFSNode {
 		return none
 	}
 	// One interface value for the node, rather than one more for the call.
-	mut boxed := &resource.Resource(new_pipe)
+	mut boxed := new_pipe.box
 	number_special_node(mut boxed, parent)
 	mut node := create_node(parent.filesystem, parent, name, false)
 	node.resource = boxed
-	apply_creation_identity(mut node, parent)?
+	apply_creation_identity(mut node, parent) or {
+		failure := errno.get()
+		discard_created_node(mut node, parent)
+		errno.set(failure)
+		return none
+	}
 	unsafe {
 		parent.children[name] = node
 	}
@@ -236,7 +250,7 @@ pub fn syscall_mknodat(_ voidptr, dirfd int, _path charptr, mode u32, dev u64) (
 	// A device node needs the privilege to make one; a FIFO or a plain file
 	// does not, exactly as on Linux.
 	if (kind == stat.ifchr || kind == stat.ifblk)
-		&& !proc.current_has_capability(proc.cap_mknod) {
+		&& (!proc.mac_trusted() || !proc.current_has_capability(proc.cap_mknod)) {
 		return errno.err, errno.eperm
 	}
 

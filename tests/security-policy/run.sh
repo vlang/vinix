@@ -25,6 +25,19 @@ module proc
 
 __global test_euid = u32(0)
 __global test_caps = u64(-1)
+__global test_domain = u32(0)
+
+pub struct Namespace {
+pub:
+    initial bool = true
+}
+
+pub struct NamespaceSet {
+pub:
+    user &Namespace = &Namespace{}
+    uts &Namespace = &Namespace{}
+    mount &Namespace = &Namespace{}
+}
 
 pub const cap_sys_admin = 21
 pub const cap_sys_boot = 22
@@ -38,6 +51,7 @@ pub struct Process {
 pub:
     euid u32
     caps Capabilities
+    ns NamespaceSet
 }
 
 pub struct Thread {
@@ -53,6 +67,22 @@ pub fn set_test_caps(caps u64) {
     test_caps = caps
 }
 
+pub fn set_test_domain(domain u32) {
+    test_domain = domain
+}
+
+pub fn mac_trusted() bool {
+    return test_domain == 0
+}
+
+pub fn is_initial_namespace(ns &Namespace) bool {
+    return ns.initial
+}
+
+pub fn mount_namespace_of(process &Process) &Namespace {
+    return process.ns.mount
+}
+
 pub fn current_thread() &Thread {
     return &Thread{process: &Process{euid: test_euid, caps: Capabilities{effective: test_caps}}}
 }
@@ -63,4 +93,5 @@ pub fn has_capability(process &Process, cap int) bool {
 EOF
 
 "$v" -new-compiler -gc none -manualfree -enable-globals \
-    -path "@vlib|$work|@vmodules" test "$work/security/policy_test.v"
+    -path "@vlib|$work|@vmodules" -o "$work/policy-test" "$work/security/policy_test.v"
+"$work/policy-test"

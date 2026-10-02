@@ -293,6 +293,8 @@ pub fn inherit_container_state(mut child Process, parent &Process) {
 	child.root_directory = snapshot_root_directory(parent, &child.root_mount)
 	child.current_directory = snapshot_current_directory(parent, &child.current_mount)
 	child.exe_node = snapshot_executable(parent, &child.exe_mount)
+	child.mac_domain = parent.mac_domain
+	child.mac_next_domain = parent.mac_next_domain
 	child.no_new_privs = parent.no_new_privs
 	child.seccomp_mode = parent.seccomp_mode
 	child.seccomp = parent.seccomp

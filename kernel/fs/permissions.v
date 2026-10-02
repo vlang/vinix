@@ -48,6 +48,13 @@ pub fn check_access(node &VFSNode, requested u32, effective bool) ? {
 		return none
 	}
 	if requested == 0 { return }
+	mut mandatory := u32(0)
+	if requested & access_read != 0 { mandatory |= proc.mac_read }
+	if requested & access_write != 0 { mandatory |= proc.mac_write }
+	if requested & access_exec != 0 {
+		mandatory |= if stat.isdir(node.resource.stat.mode) { proc.mac_search } else { proc.mac_execute }
+	}
+	mac_node(node, mandatory)?
 	process := proc.current_thread().process
 	uid := if effective { process.euid } else { process.uid }
 	gid := if effective { process.egid } else { process.gid }
@@ -95,6 +102,8 @@ fn require_access(node &VFSNode, requested u32) ? {
 }
 
 fn may_remove(parent &VFSNode, target &VFSNode) ? {
+	mac_node(target, proc.mac_remove)?
+	mac_node(parent, proc.mac_remove)?
 	check_access(parent, access_write | access_exec, true)?
 	if parent.resource.stat.mode & 0o1000 == 0 {
 		return
@@ -133,6 +142,7 @@ fn may_chown(uid u32, new_uid u32, new_gid u32) bool {
 }
 
 fn apply_creation_identity(mut node VFSNode, parent &VFSNode) ? {
+	mac_creation(parent, mut node)?
 	process := proc.current_thread().process
 	desired_gid := if parent.resource.stat.mode & 0o2000 != 0 {
 		parent.resource.stat.gid

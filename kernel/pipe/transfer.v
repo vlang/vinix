@@ -8,6 +8,7 @@ module pipe
 
 import errno
 import file
+import proc
 import memory
 import resource
 import usercopy
@@ -112,6 +113,8 @@ pub fn syscall_tee(_ voidptr, fd_in int, fd_out int, length u64, flags u32) (u64
 	if !readable(source) || !writable(sink) {
 		return errno.err, errno.ebadf
 	}
+	source.handle.mac_check(proc.mac_read) or { return errno.err, errno.get() }
+	sink.handle.mac_check(proc.mac_write) or { return errno.err, errno.get() }
 	mut source_pipe := pipe_from_fd(source) or { return errno.err, errno.einval }
 	mut sink_pipe := pipe_from_fd(sink) or { return errno.err, errno.einval }
 
@@ -177,6 +180,7 @@ pub fn syscall_vmsplice(_ voidptr, fdnum int, iov u64, nr_segs u64, flags u32) (
 	}
 
 	mut handle := fd.handle
+	handle.mac_check(proc.mac_write) or { return errno.err, errno.get() }
 	mut total := u64(0)
 
 	for i := u64(0); i < nr_segs; i++ {
@@ -282,6 +286,8 @@ fn move_between(mut source file.FD, off_in u64, mut sink file.FD, off_out u64, l
 
 	mut source_handle := source.handle
 	mut sink_handle := sink.handle
+	source_handle.mac_check(proc.mac_read) or { return errno.err, errno.get() }
+	sink_handle.mac_check(proc.mac_write) or { return errno.err, errno.get() }
 
 	mut moved := u64(0)
 

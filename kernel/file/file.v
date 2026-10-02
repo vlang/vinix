@@ -13,6 +13,7 @@ import memory.mmap
 import time
 import usercopy
 import lib
+import security
 
 pub const f_dupfd = 0
 pub const f_dupfd_cloexec = 1030
@@ -63,6 +64,10 @@ pub struct Handle {
 pub mut:
 	l             klock.Lock
 	resource      &resource.Resource = unsafe { nil }
+	// An openable device may return another resource class. Keep its origin
+	// so that passing the resulting descriptor cannot erase the device gate.
+	mac_device bool
+	mac_block_device bool
 	node          voidptr
 	// Identity of the mount traversed at open, rather than the inode's aliases.
 	// Mount entries are permanent; fs resolves namespace copies by mount id.
@@ -388,7 +393,18 @@ fn poll_user_fds(pagemap &memory.Pagemap, user_fds u64, mut pollfds []PollFD, nf
 	return ret, 0
 }
 
+pub fn (mut this Handle) mac_check(access u32) ? {
+	if !proc.mac_trusted() && this.mac_device {
+		if this.mac_block_device || !proc.mac_allows(proc.mac_current_domain(), proc.mac_device_type, access) {
+			errno.set(errno.eacces); return none
+		}
+	}
+	mut res := this.resource
+	security.mac_require(mut res, access)?
+}
+
 pub fn (mut this Handle) read(buf voidptr, count u64) ?i64 {
+	this.mac_check(proc.mac_read)?
 	this.l.acquire()
 	defer {
 		this.l.release()
@@ -475,6 +491,7 @@ pub fn (mut this Handle) read_to_user(address u64, count u64) ?i64 {
 // read(), as if the descriptor were O_NONBLOCK for this one call. The flag is
 // set and cleared under the lock every read of this open file takes.
 fn (mut this Handle) read_without_waiting(buf voidptr, count u64) ?i64 {
+	this.mac_check(proc.mac_read)?
 	this.l.acquire()
 	defer {
 		this.l.release()
@@ -511,6 +528,7 @@ fn limited_write_count(res &resource.Resource, location u64, count u64) ?u64 {
 }
 
 pub fn (mut this Handle) write(buf voidptr, count u64) ?i64 {
+	this.mac_check(proc.mac_write)?
 	this.l.acquire()
 	defer {
 		this.l.release()
@@ -595,6 +613,7 @@ pub fn (mut this Handle) write_from_user(address u64, count u64) ?i64 {
 }
 
 pub fn (mut this Handle) ioctl(request u64, argp voidptr) ?int {
+	this.mac_check(proc.mac_ioctl)?
 	return this.resource.ioctl(voidptr(this), request, argp)
 }
 
@@ -933,6 +952,7 @@ pub fn syscall_fsync(_ voidptr, fdnum int) (u64, u64) {
 	mut fd := fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.ebadf }
 	defer { fd.unref() }
 	mut handle := fd.handle
+	handle.mac_check(proc.mac_write) or { return errno.err, errno.get() }
 	handle.l.acquire()
 	defer { handle.l.release() }
 	if handle.flags & resource.o_path != 0 {
@@ -959,6 +979,7 @@ pub fn syscall_ftruncate(_ voidptr, fdnum int, length i64) (u64, u64) {
 	}
 
 	mut handle := fd.handle
+	handle.mac_check(proc.mac_write) or { return errno.err, errno.get() }
 	mut res := handle.resource
 
 	if stat.isdir(res.stat.mode) {
@@ -1003,6 +1024,7 @@ fn pread(fdnum int, buf voidptr, count u64, offset i64, to_user bool) (u64, u64)
 	}
 
 	mut handle := fd.handle
+	handle.mac_check(proc.mac_read) or { return errno.err, errno.get() }
 
 	mode := handle.resource.stat.mode
 	if stat.ischr(mode) || stat.isifo(mode) || stat.issock(mode) || mode & stat.ifmt == stat.ifpipe {
@@ -1070,6 +1092,7 @@ pub fn syscall_pwrite(_ voidptr, fdnum int, buf voidptr, count u64, offset i64) 
 	}
 
 	mut handle := fd.handle
+	handle.mac_check(proc.mac_write) or { return errno.err, errno.get() }
 
 	mut res := handle.resource
 	mode := res.stat.mode
@@ -1141,6 +1164,7 @@ pub fn syscall_fallocate(_ voidptr, fdnum int, mode int, offset i64, length i64)
 	}
 
 	mut handle := fd.handle
+	handle.mac_check(proc.mac_write) or { return errno.err, errno.get() }
 	access := handle.flags & resource.o_accmode
 	if access != resource.o_wronly && access != resource.o_rdwr {
 		return errno.err, errno.ebadf
@@ -1178,6 +1202,7 @@ pub fn syscall_fadvise64(_ voidptr, fdnum int, offset i64, length i64, advice in
 	defer {
 		fd.unref()
 	}
+	fd.handle.mac_check(proc.mac_read) or { return errno.err, errno.get() }
 
 	mut handle := fd.handle
 	if handle.flags & resource.o_path != 0 {
@@ -1204,6 +1229,7 @@ pub fn syscall_sync_file_range(_ voidptr, fdnum int, offset i64, count i64, flag
 	defer {
 		fd.unref()
 	}
+	fd.handle.mac_check(proc.mac_write) or { return errno.err, errno.get() }
 	access := fd.handle.flags & resource.o_accmode
 	if access != resource.o_wronly && access != resource.o_rdwr {
 		return errno.err, errno.ebadf
@@ -1235,6 +1261,18 @@ pub fn syscall_fcntl(_ voidptr, fdnum int, cmd int, arg u64) (u64, u64) {
 
 	mut ret := u64(0)
 
+	if cmd == f_getlk || cmd == f_ofd_getlk {
+		fd.handle.mac_check(proc.mac_inspect) or { failure := errno.get(); fd.unref(); return errno.err, failure }
+	}
+	if cmd == f_setlk || cmd == f_setlkw || cmd == f_ofd_setlk || cmd == f_ofd_setlkw {
+		fd.handle.mac_check(proc.mac_metadata) or { failure := errno.get(); fd.unref(); return errno.err, failure }
+	}
+	if cmd == f_add_seals {
+		fd.handle.mac_check(proc.mac_metadata) or { failure := errno.get(); fd.unref(); return errno.err, failure }
+	}
+	if cmd == f_get_seals {
+		fd.handle.mac_check(proc.mac_inspect) or { failure := errno.get(); fd.unref(); return errno.err, failure }
+	}
 	match cmd {
 		f_dupfd {
 			ret = u64(fdnum_dup(unsafe { nil }, fdnum, unsafe { nil }, int(arg), 0, false, false) or {
@@ -1439,6 +1477,19 @@ pub fn syscall_mmap(_ voidptr, addr voidptr, length u64, prot_and_flags u64, fdn
 			&& mount_policy_flags(&fd.handle.mount) & u64(0x8) != 0 {
 			if prot & mmap.prot_exec != 0 { return errno.err, errno.eperm }
 			map_flags |= mmap.map_no_exec
+		}
+		fd.handle.mac_check(proc.mac_read) or { return errno.err, errno.get() }
+		// Device-open factories can return another resource class. Preserve
+		// both the requested protections and their maxima from the origin.
+		fd.handle.mac_check(proc.mac_execute) or {
+			if prot & mmap.prot_exec != 0 { return errno.err, errno.get() }
+			map_flags |= mmap.map_no_exec
+		}
+		if flags & mmap.map_shared != 0 {
+			fd.handle.mac_check(proc.mac_write) or {
+				if prot & mmap.prot_write != 0 { return errno.err, errno.get() }
+				map_flags |= mmap.map_no_write
+			}
 		}
 		// O_PATH opens a file without any permission to it, and so lent its
 		// contents to anyone mapping it, as Linux does not.

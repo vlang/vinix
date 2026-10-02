@@ -30,6 +30,7 @@ pub fn permitted(selector string) bool {
 			return false
 		}
 	}
+	if !proc.mac_trusted() { return false }
 	process := proc.current_thread().process
 	// Namespace-local capabilities do not authorize changes to host state.
 	// Private mount and UTS namespaces retain their existing controls.

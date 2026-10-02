@@ -9,6 +9,7 @@ import proc
 import errno
 import lib
 import event
+import security
 
 pub const prot_none = 0x00
 pub const prot_read = 0x01
@@ -1177,13 +1178,22 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
 	mut pagemap := unsafe { _pagemap }
 	mut resource_ := unsafe { _resource }
 	flags := requested_flags & ~(map_no_write | map_no_exec)
-	no_exec := (options.no_exec || requested_flags & map_no_exec != 0)
+	mut mac_no_exec := false
+	mut mac_no_write := false
+	if flags & map_anonymous == 0 && resource_ != unsafe { nil } {
+		security.mac_require(mut resource_, proc.mac_read)?
+		if prot & prot_exec != 0 { security.mac_require(mut resource_, proc.mac_execute)? }
+		if flags & map_shared != 0 && prot & prot_write != 0 { security.mac_require(mut resource_, proc.mac_write)? }
+		mac_no_exec = !security.mac_permitted(mut resource_, proc.mac_execute)
+		mac_no_write = !security.mac_permitted(mut resource_, proc.mac_write)
+	}
+	no_exec := (mac_no_exec || options.no_exec || requested_flags & map_no_exec != 0)
 		&& flags & map_anonymous == 0
 	if no_exec && prot & prot_exec != 0 {
 		errno.set(errno.eperm)
 		return none
 	}
-	no_write := (options.no_write || requested_flags & map_no_write != 0)
+	no_write := (mac_no_write || options.no_write || requested_flags & map_no_write != 0)
 		&& flags & map_shared != 0 && flags & map_anonymous == 0
 	if no_write && prot & prot_write != 0 {
 		errno.set(errno.eacces)

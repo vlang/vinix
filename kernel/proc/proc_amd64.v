@@ -62,6 +62,10 @@ pub mut:
 	ns_tid        int
 	// Correlates a selected seccomp action with this syscall's result.
 	audit_sequence u64
+	// Only the synchronous executable loader consults the staged domain.
+	mac_loading bool
+	// AT_EMPTY_PATH owns this FD until failure or the loader commits.
+	exec_descriptor voidptr
 	is_in_queue   bool
 	// A filesystem change this thread made during its syscall that is not on
 	// the device yet. It is flushed on the way back to userspace, or once an

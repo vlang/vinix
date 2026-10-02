@@ -33,6 +33,7 @@ const fs_ioc_setflags = u64(0x40086602)
 // filesystem that does not support them.
 fn file_flags_ioctl(mut node VFSNode, request u64, argp voidptr) ?int {
 	mut res := node.resource
+	security.mac_require(mut res, if request == fs_ioc_getflags { proc.mac_inspect } else { proc.mac_metadata })?
 	if !resource.can_have_attributes(mut res) {
 		// Let the caller fall through to the file's own ioctl.
 		errno.set(errno.enotty)

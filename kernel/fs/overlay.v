@@ -34,6 +34,7 @@ import errno
 import klock
 import proc
 import resource
+import security
 import stat
 
 struct OverlayFS {
@@ -141,12 +142,22 @@ fn is_opaque(node &VFSNode) bool {
 
 // A name in a real directory, made as the kernel makes it, without the
 // caller's permission checks: a copy up is done for the caller, whoever it is.
-fn overlay_real_create(mut dir VFSNode, name string, mode u32) ?&VFSNode {
+fn overlay_real_create(mut dir VFSNode, name string, mode u32, label_source &resource.Resource) ?&VFSNode {
 	mut real := dir.filesystem.create(dir, name, mode)
 	if real == unsafe { nil } {
 		if errno.get() == 0 {
 			errno.set(errno.eio)
 		}
+		return none
+	}
+	// The upper path is independently reachable: inherit the final label
+	// before exposing even a partially copied inode through that route.
+	mut source := unsafe { label_source }
+	mut target := real.resource
+	security.mac_inherit(mut source, mut target) or {
+		failure := errno.get()
+		discard_created_node(mut real, dir)
+		errno.set(failure)
 		return none
 	}
 	unsafe {
@@ -158,12 +169,22 @@ fn overlay_real_create(mut dir VFSNode, name string, mode u32) ?&VFSNode {
 	return real
 }
 
-fn overlay_real_symlink(mut dir VFSNode, dest string, name string) ?&VFSNode {
+fn overlay_real_symlink(mut dir VFSNode, dest string, name string, label_source &resource.Resource) ?&VFSNode {
 	mut real := dir.filesystem.symlink(dir, dest, name)
 	if real == unsafe { nil } {
 		if errno.get() == 0 {
 			errno.set(errno.eio)
 		}
+		return none
+	}
+	// The upper path is independently reachable: inherit the final label
+	// before exposing even a partially copied inode through that route.
+	mut source := unsafe { label_source }
+	mut target := real.resource
+	security.mac_inherit(mut source, mut target) or {
+		failure := errno.get()
+		discard_created_node(mut real, dir)
+		errno.set(failure)
 		return none
 	}
 	unsafe {
@@ -425,7 +446,7 @@ fn overlay_copy_up_locked(mut node VFSNode) ? {
 	mut real := &VFSNode(unsafe { nil })
 	match mode & stat.ifmt {
 		stat.ifdir, stat.ifreg {
-			real = overlay_real_create(mut upper_dir, name, mode)?
+			real = overlay_real_create(mut upper_dir, name, mode, from)?
 			if stat.isreg(mode) {
 				mut to := real.resource
 				overlay_copy_data(mut from, mut to) or {
@@ -436,7 +457,7 @@ fn overlay_copy_up_locked(mut node VFSNode) ? {
 		}
 		stat.iflnk {
 			// The upper filesystem keeps a copy of its own.
-			real = overlay_real_symlink(mut upper_dir, lower.symlink_target, name)?
+			real = overlay_real_symlink(mut upper_dir, lower.symlink_target, name, from)?
 		}
 		stat.ififo {
 			real = make_fifo_node(mut upper_dir, name, mode & 0o7777)?
@@ -537,7 +558,7 @@ fn overlay_new_node(dir &VFSNode, name string, real &VFSNode, replaced_whiteout 
 fn overlay_create_locked(mut dir VFSNode, name string, mode u32) ?&VFSNode {
 	replaced_whiteout := overlay_prepare_name_locked(mut dir, name)?
 	mut upper_dir := dir.overlay.upper
-	real := overlay_real_create(mut upper_dir, name, mode)?
+	real := overlay_real_create(mut upper_dir, name, mode, dir.resource)?
 	// A directory made where a lower one was removed must not show what that
 	// one held.
 	if stat.isdir(mode) && replaced_whiteout {
@@ -550,7 +571,7 @@ fn overlay_create_locked(mut dir VFSNode, name string, mode u32) ?&VFSNode {
 fn overlay_symlink_locked(mut dir VFSNode, dest string, name string) ?&VFSNode {
 	replaced_whiteout := overlay_prepare_name_locked(mut dir, name)?
 	mut upper_dir := dir.overlay.upper
-	real := overlay_real_symlink(mut upper_dir, dest, name)?
+	real := overlay_real_symlink(mut upper_dir, dest, name, dir.resource)?
 	return overlay_new_node(dir, name, real, replaced_whiteout)
 }
 
@@ -772,7 +793,7 @@ fn overlay_mount(parent &VFSNode, mount_parent &VFSNode, name string, options st
 		// Linux keeps its own directory in the work directory, and Docker
 		// chowns it right after mounting.
 		if 'work' !in work.children {
-			overlay_real_create(mut work, 'work', stat.ifdir)?
+			overlay_real_create(mut work, 'work', stat.ifdir, work.resource)?
 		}
 	}
 	mut ofs := &OverlayFS{

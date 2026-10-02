@@ -15,6 +15,7 @@ import file
 import proc
 import posix_acl
 import resource
+import security
 import stat
 import usercopy
 
@@ -151,6 +152,8 @@ fn xattr_target_to_change(target XAttrTarget, name string) ?XAttrTarget {
 
 // What setting or removing `name` on `target` needs, as on Linux.
 fn xattr_may_change(target XAttrTarget, name string, removing bool) ? {
+	mut mandatory_res := target.res
+	security.mac_require(mut mandatory_res, proc.mac_metadata)?
 	if target.node != unsafe { nil } && read_only(target.node) {
 		errno.set(errno.erofs)
 		return none
@@ -176,7 +179,8 @@ fn xattr_may_change(target XAttrTarget, name string, removing bool) ? {
 		return
 	}
 	if name.starts_with('security.') {
-		needed := if name == 'security.capability' { proc.cap_setfcap } else { proc.cap_sys_admin }
+		needed := if name == security.mac_label_name { proc.cap_mac_admin }
+			else if name == 'security.capability' { proc.cap_setfcap } else { proc.cap_sys_admin }
 		if !proc.current_has_capability(needed) {
 			errno.set(errno.eperm)
 			return none
@@ -219,6 +223,9 @@ fn xattr_set(given XAttrTarget, _name charptr, value voidptr, size u64, flags in
 	if size > xattr_size_max { return errno.err, errno.e2big }
 	name := xattr_name(_name) or { return errno.err, errno.get() }
 	defer { unsafe { name.free() } }
+	label_change := name == security.mac_label_name
+	if label_change && !proc.mac_begin_label_change() { return errno.err, errno.eperm }
+	defer { if label_change { proc.mac_end_label_change() } }
 	target := xattr_target_to_change(given, name) or { return errno.err, errno.get() }
 	mut res := target.res
 	if !resource.has_xattrs(mut res) { return errno.err, errno.enotsup }
@@ -227,6 +234,7 @@ fn xattr_set(given XAttrTarget, _name charptr, value voidptr, size u64, flags in
 	if size > 0 && !usercopy.copy_from_user(unsafe { &data[0] }, u64(value), size) {
 		return errno.err, errno.efault
 	}
+	if label_change { security.mac_parse_label(data) or { return errno.err, errno.get() } }
 	if posix_acl.is_name(name) && data.len != 0 && !posix_acl.valid(data) {
 		return errno.err, errno.einval
 	}
@@ -241,6 +249,8 @@ fn xattr_set(given XAttrTarget, _name charptr, value voidptr, size u64, flags in
 }
 
 fn xattr_may_read(target XAttrTarget, name string) ? {
+	mut mandatory_res := target.res
+	security.mac_require(mut mandatory_res, proc.mac_read)?
 	if posix_acl.is_name(name) {
 		if stat.islnk(target.res.stat.mode) { errno.set(errno.enotsup); return none }
 		if name == posix_acl.default_name && !stat.isdir(target.res.stat.mode) {
@@ -278,6 +288,7 @@ fn xattr_get(target XAttrTarget, _name charptr, value voidptr, size u64) (u64, u
 
 fn xattr_list(target XAttrTarget, list voidptr, size u64) (u64, u64) {
 	mut res := target.res
+	security.mac_require(mut res, proc.mac_inspect) or { return errno.err, errno.get() }
 	mut all_names := []u8{} @[freed]
 	all_names.flags |= .noslices
 	defer { unsafe { all_names.free() } }
@@ -306,6 +317,9 @@ fn xattr_list(target XAttrTarget, list voidptr, size u64) (u64, u64) {
 fn xattr_remove(given XAttrTarget, _name charptr) (u64, u64) {
 	name := xattr_name(_name) or { return errno.err, errno.get() }
 	defer { unsafe { name.free() } }
+	label_change := name == security.mac_label_name
+	if label_change && !proc.mac_begin_label_change() { return errno.err, errno.eperm }
+	defer { if label_change { proc.mac_end_label_change() } }
 	target := xattr_target_to_change(given, name) or { return errno.err, errno.get() }
 	xattr_may_change(target, name, true) or { return errno.err, errno.get() }
 	mut res := target.res
@@ -533,6 +547,7 @@ pub fn syscall_fsetxattr(_ voidptr, fdnum int, _name charptr, value voidptr, siz
 	defer {
 		fd.unref()
 	}
+	fd.handle.mac_check(proc.mac_metadata) or { return errno.err, errno.get() }
 	return xattr_set(xattr_target_of_fd(fd), _name, value, size, flags)
 }
 
@@ -551,6 +566,7 @@ pub fn syscall_fgetxattr(_ voidptr, fdnum int, _name charptr, value voidptr, siz
 	defer {
 		fd.unref()
 	}
+	fd.handle.mac_check(proc.mac_read) or { return errno.err, errno.get() }
 	return xattr_get(xattr_target_of_fd(fd), _name, value, size)
 }
 
@@ -569,6 +585,7 @@ pub fn syscall_flistxattr(_ voidptr, fdnum int, list voidptr, size u64) (u64, u6
 	defer {
 		fd.unref()
 	}
+	fd.handle.mac_check(proc.mac_inspect) or { return errno.err, errno.get() }
 	return xattr_list(xattr_target_of_fd(fd), list, size)
 }
 
@@ -587,5 +604,6 @@ pub fn syscall_fremovexattr(_ voidptr, fdnum int, _name charptr) (u64, u64) {
 	defer {
 		fd.unref()
 	}
+	fd.handle.mac_check(proc.mac_metadata) or { return errno.err, errno.get() }
 	return xattr_remove(xattr_target_of_fd(fd), _name)
 }

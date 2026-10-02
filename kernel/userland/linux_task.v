@@ -148,12 +148,22 @@ pub fn syscall_set_robust_list(_ voidptr, head u64, len u64) (u64, u64) {
 pub fn syscall_get_robust_list(_ voidptr, tid int, head_ptr u64, len_ptr u64) (u64, u64) {
 	mut head := proc.current_thread().robust_list_head
 	if tid != 0 {
-		target := proc.thread_in(proc.current_pid_namespace(), tid)
+		global := proc.kernel_id(tid)
+		if global <= 0 || global >= proc.max_pid { return errno.err, errno.esrch }
+		proc.lock_table()
+		target := threads_by_tid[global]
 		if target == unsafe { nil } {
+			proc.unlock_table()
 			return errno.err, errno.esrch
 		}
+		// The pointer is process layout. Check and copy under the lookup
+		// lock rather than retaining a Thread and borrowing its Process.
+		if !proc.may_inspect_locked(target.process) {
+			proc.unlock_table()
+			return errno.err, errno.eperm
+		}
 		head = target.robust_list_head
-		proc.unpin_thread(target)
+		proc.unlock_table()
 	}
 
 	if head_ptr == 0 || len_ptr == 0 {

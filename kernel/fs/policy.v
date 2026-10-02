@@ -98,6 +98,7 @@ fn policy_check_impl(node &VFSNode, name string, access u32) bool {
 // Whether the calling process may make `access` (proc.policy_*) to `node`,
 // the file a lookup ended at. Sets errno when it may not.
 pub fn policy_check(node &VFSNode, access u32) bool {
+	if !mac_path_allowed(node, access) { return false }
 	if !policy_restricted(proc.current_thread().process) {
 		return true
 	}
@@ -111,6 +112,7 @@ pub fn policy_check(node &VFSNode, access u32) bool {
 // Whether the calling process may make `access` to the name `name` in
 // `directory`, which it is about to create or remove.
 pub fn policy_check_name(directory &VFSNode, name string, access u32) bool {
+	if !mac_path_allowed(directory, access) { return false }
 	if !policy_restricted(proc.current_thread().process) {
 		return true
 	}
@@ -148,6 +150,7 @@ pub fn policy_open_access(flags int) u32 {
 // refuses them already: no promise covers them. chroot(2) is harmless, since
 // unveiled paths are judged from the system root.
 pub fn policy_may_change_mounts() bool {
+	if !proc.mac_trusted() { errno.set(errno.eperm); return false }
 	if proc.current_thread().process.unveil != unsafe { nil } {
 		errno.set(errno.eperm)
 		return false
@@ -263,6 +266,8 @@ pub fn syscall_unveil(_ voidptr, path_ptr u64, perms_ptr u64) (u64, u64) {
 // did, either: a hard link from a read-only directory into a writable one
 // would otherwise make the file writable.
 pub fn policy_check_link(target &VFSNode, directory &VFSNode, name string) bool {
+	if !mac_path_allowed(target, proc.policy_fattr)
+		|| !mac_path_allowed(directory, proc.policy_create) { return false }
 	process := proc.current_thread().process
 	if !policy_restricted(process) {
 		return true

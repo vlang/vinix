@@ -764,6 +764,11 @@ fn (mut this ProcFSResource) read(_handle voidptr, buf voidptr, loc u64, count u
 		errno.set(errno.eisdir)
 		return none
 	}
+	if (this.kind == .allocstart || this.kind == .allocsites)
+		&& !proc.may_read_kernel_diagnostics() {
+		errno.set(errno.eacces)
+		return none
+	}
 	if this.kind == .security_audit && !security.audit_may_read() {
 		errno.set(errno.eacces)
 		return none

@@ -102,7 +102,7 @@ pub fn audit_complete(sequence u64, result u64, err u64) {
 
 pub fn audit_may_read() bool {
 	p := proc.current_thread().process
-	return p.euid == 0 && proc.is_initial_namespace(p.ns.user)
+	return proc.mac_trusted() && p.euid == 0 && proc.is_initial_namespace(p.ns.user)
 		&& proc.has_capability(p, proc.cap_audit_read)
 }
 
