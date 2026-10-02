@@ -99,7 +99,15 @@ fn (mut app CalculatorApp) build(size ui2.Rect) !ui2.Element {
 }
 
 fn (mut app CalculatorApp) handle(event_id string) ! {
-	app.calculator.press(event_id)
+	// The protocol request owns event_id and frees it after this call. The
+	// example model keeps digit/operator strings, so give it the matching key
+	// stored for the model's lifetime instead of that transient request.
+	for key in app.calculator.keys {
+		if key.text == event_id {
+			app.calculator.press(key.text)
+			return
+		}
+	}
 }
 
 fn (mut app CalculatorApp) close_app() {
