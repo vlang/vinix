@@ -28,14 +28,33 @@ static int ignore_error(Display *display, XErrorEvent *event) {
     (void)display; (void)event; return 0;
 }
 
+static char *window_name(Display *display, Window window) {
+    Atom property = XInternAtom(display, "_NET_WM_NAME", True);
+    Atom utf8 = XInternAtom(display, "UTF8_STRING", True);
+    if (property != None && utf8 != None) {
+        Atom actual_type;
+        int format;
+        unsigned long length, remaining;
+        unsigned char *value = NULL;
+        if (XGetWindowProperty(display, window, property, 0, 1024, False, utf8,
+                               &actual_type, &format, &length, &remaining, &value) == Success &&
+            actual_type == utf8 && format == 8 && length && value) {
+            return (char *)value;
+        }
+        if (value) XFree(value);
+    }
+    char *name = NULL;
+    XFetchName(display, window, &name);
+    return name;
+}
+
 static Window find_window(Display *display, Window parent, const char *title, int depth) {
     Window root, ancestor, *children = NULL, found = None;
     unsigned count = 0;
     if (depth > 8 || !XQueryTree(display, parent, &root, &ancestor, &children, &count)) return None;
     for (unsigned i = 0; i < count && found == None; i++) {
         XWindowAttributes attrs;
-        char *name = NULL;
-        XFetchName(display, children[i], &name);
+        char *name = window_name(display, children[i]);
         if (XGetWindowAttributes(display, children[i], &attrs) && attrs.map_state == IsViewable &&
             attrs.width >= 100 && attrs.height >= 100 && (!*title || (name && strstr(name, title)))) {
             printf("ANDROID-WINDOW id=%lu title=%s width=%d height=%d\n",

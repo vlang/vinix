@@ -220,7 +220,7 @@ static pid_t spawn_xvfb(const char *display_name, const char *directory,
               "-nolisten", "tcp", "-noreset", "-ac", "+extension", "GLX",
               "+iglx", "-extension", "RANDR", (char *)NULL);
     } else if (shm_present) {
-        /* Venus renders on the host GPU and presents through MIT-SHM. */
+        /* Venus and the nested Weston Pixman renderer present through MIT-SHM. */
         execl(xvfb, "Xvfb", display_name, "-screen", "0", geometry,
               "-fbdir", directory, "-nolisten", "tcp", "-noreset", "-ac",
               (char *)NULL);
@@ -284,9 +284,16 @@ static Display *open_display(const char *display_name, pid_t xvfb_pid) {
 }
 
 static pid_t spawn_wine(const char *display_name, const char *command) {
+    int private_group = strcmp(command, "/usr/bin/run-roblox-client") == 0;
     pid_t pid = fork();
-    if (pid != 0)
+    if (pid != 0) {
+        if (pid > 0 && private_group)
+            (void)setpgid(pid, pid);
         return pid;
+    }
+    /* Keep Weston and translated web helpers in this window's own group. */
+    if (private_group && setpgid(0, 0) != 0)
+        _exit(127);
 
     setenv("DISPLAY", display_name, 1);
     setenv("LIBGL_ALWAYS_SOFTWARE", "1", 1);
@@ -1005,6 +1012,29 @@ static void stop_child(pid_t pid) {
         ;
 }
 
+static void stop_application(pid_t pid, pid_t group) {
+    if (group <= 1) {
+        stop_child(pid);
+        return;
+    }
+    kill(-group, SIGTERM);
+    for (int attempt = 0; attempt < 100; ++attempt) {
+        int status;
+        if (pid > 0 && waitpid(pid, &status, WNOHANG) == pid)
+            pid = -1;
+        if (kill(-group, 0) != 0 && errno == ESRCH)
+            return;
+        sleep_10ms();
+    }
+    /* The launcher may have exited while a WebKit helper was still alive. */
+    kill(-group, SIGKILL);
+    if (pid > 0) {
+        int status;
+        while (waitpid(pid, &status, 0) < 0 && errno == EINTR)
+            ;
+    }
+}
+
 int main(int argc, char **argv) {
     struct sigaction action;
     unsigned char input[8192];
@@ -1017,6 +1047,7 @@ int main(int argc, char **argv) {
     Display *display;
     pid_t xvfb_pid;
     pid_t wine_pid = -1;
+    pid_t application_group = -1;
     int stdin_flags;
     int status;
     int xtest_event_base;
@@ -1053,7 +1084,8 @@ int main(int argc, char **argv) {
     directory = argv[2];
     geometry = argv[3];
     command = argv[4];
-    hold_game_keys = game_input;
+    /* Roblox's login fields need one complete event pair for every character. */
+    hold_game_keys = game_input && strcmp(command, "/usr/bin/run-roblox-client") != 0;
 
     memset(&action, 0, sizeof(action));
     action.sa_handler = stop_running;
@@ -1074,7 +1106,8 @@ int main(int argc, char **argv) {
         return 1;
     }
     xvfb_pid = spawn_xvfb(display_name, directory, geometry, game_input,
-                          obs_capture, strcmp(command, "/usr/bin/run-opengothic") == 0);
+                          obs_capture, strcmp(command, "/usr/bin/run-opengothic") == 0 ||
+                                       strcmp(command, "/usr/bin/run-roblox-client") == 0);
     if (xvfb_pid < 0) {
         perror("vinix-wine-host: fork Xvfb");
         rmdir(directory);
@@ -1128,6 +1161,8 @@ int main(int argc, char **argv) {
     }
 
     wine_pid = spawn_wine(display_name, command);
+    if (wine_pid > 1 && strcmp(command, "/usr/bin/run-roblox-client") == 0)
+        application_group = wine_pid;
     if (wine_pid < 0) {
         perror("vinix-wine-host: fork Wine");
         running = 0;
@@ -1199,7 +1234,7 @@ int main(int argc, char **argv) {
         sleep_10ms();
     }
 
-    stop_child(wine_pid);
+    stop_application(wine_pid, application_group);
     if (damage_counter != NULL)
         munmap((void *)damage_counter, sizeof(uint32_t));
     XCloseDisplay(display);

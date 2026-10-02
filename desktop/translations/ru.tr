@@ -2210,3 +2210,14 @@ activity.inspector.io.unknown
 activity.search.done
 Закрыть поиск
 -----
+roblox.starting
+Запуск Roblox…
+-----
+roblox.missing
+Среда Roblox отсутствует. Пересоберите рабочий стол с --with-roblox.
+-----
+roblox.apk_missing
+Скопируйте APK Roblox в ~/Roblox.apk или укажите его путь в VINIX_ROBLOX_APK.
+-----
+roblox.exited
+Roblox завершил работу. Подробности в журнале приложения.

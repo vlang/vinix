@@ -1,0 +1,87 @@
+#!/bin/sh
+# Run Roblox's unchanged Android native engine with Cordial's framework bridge.
+set -eu
+runtime=/opt/vinix-roblox-x86_64
+loader="$runtime/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2"
+emulator=${VINIX_ANDROID_EMULATOR:-/usr/bin/qemu-x86_64}
+libpath="$runtime/usr/lib:$runtime/usr/lib/x86_64-linux-gnu"
+if [ "$#" -eq 0 ]; then
+    echo 'usage: run-roblox APK [--native-apk X86_SPLIT_APK] [Cordial options]' >&2
+    exit 2
+fi
+case "$1" in
+    --help|-h)
+        echo 'usage: run-roblox APK [--native-apk X86_SPLIT_APK] [Cordial options]'
+        echo 'Supply the official Android APK; split builds need the x86_64 native split.'
+        exit 0
+        ;;
+esac
+apk=$1
+shift
+native_apk=$apk
+if [ "${1:-}" = --native-apk ]; then
+    [ "$#" -ge 2 ] || { echo 'run-roblox: --native-apk needs a path' >&2; exit 2; }
+    native_apk=$2
+    shift 2
+fi
+for file in "$apk" "$native_apk"; do
+    [ -r "$file" ] || { echo "run-roblox: cannot read APK: $file" >&2; exit 2; }
+done
+[ -x "$loader" ] && [ -x "$runtime/usr/bin/cordial-run" ] && [ -x "$emulator" ] \
+    || { echo 'run-roblox: stage the Roblox runtime first' >&2; exit 127; }
+command -v unzip >/dev/null 2>&1 || { echo 'run-roblox: unzip is required' >&2; exit 127; }
+# Keep each unchanged build's libraries separate, including a separate ABI split.
+build=$(sha256sum < "$native_apk")
+build=${build%% *}
+data=${VINIX_ROBLOX_DATA_DIR:-${XDG_DATA_HOME:-${HOME:-/root}/.local/share}/vinix/roblox}
+libdir="$data/libraries/$build"
+if [ ! -f "$libdir/.complete" ]; then
+    mkdir -p "$data/libraries"
+    extracting=$(mktemp -d "$data/libraries/.extract-XXXXXX")
+    trap 'rm -rf "$extracting"' EXIT HUP INT TERM
+    unzip -jo "$native_apk" 'lib/x86_64/*.so' -d "$extracting" \
+        || { echo 'run-roblox: APK has no x86_64 native engine; supply its native split' >&2; exit 2; }
+    [ -s "$extracting/libroblox.so" ] \
+        || { echo 'run-roblox: x86_64 engine missing' >&2; exit 2; }
+    touch "$extracting/.complete"
+    # rename publishes the full immutable library directory at once. A
+    # concurrent winner leaves a nonempty directory that mv cannot replace.
+    if ! mv -T "$extracting" "$libdir" 2>/dev/null; then
+        [ -f "$libdir/.complete" ] \
+            || { echo "run-roblox: cannot publish native library cache: $libdir" >&2; exit 1; }
+        rm -rf "$extracting"
+    fi
+    trap - EXIT HUP INT TERM
+fi
+[ -s "$libdir/libroblox.so" ] \
+    || { echo 'run-roblox: lib/x86_64/libroblox.so is missing' >&2; exit 2; }
+
+export CORDIAL_PROFILE_ROOT="${CORDIAL_PROFILE_ROOT:-$data/profiles}"
+export VINIX_X86_64_ROOT="$runtime" VINIX_X86_MULTIARCH=1 VINIX_ALLOW_WX=1
+export DISPLAY="${DISPLAY:-:1}"
+export CORDIAL_GAMEMODE="${CORDIAL_GAMEMODE:-0}"
+if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ]; then
+    export CORDIAL_SECRET_STORE="${CORDIAL_SECRET_STORE:-file}"
+fi
+# Embedded sign-in and game pages need a real Wayland host. Cordial treats
+# CORDIAL_X11's presence as the override, including a value of zero.
+if [ -n "${WAYLAND_DISPLAY:-}" ]; then
+    unset CORDIAL_X11
+    export GDK_BACKEND=wayland
+else
+    export CORDIAL_X11=1 GDK_BACKEND=x11
+fi
+export CORDIAL_GRAPHICS=gles CORDIAL_NO_VULKAN=1
+export GSK_RENDERER=cairo GTK_A11Y=none NO_AT_BRIDGE=1
+export GSETTINGS_BACKEND=memory GSETTINGS_SCHEMA_DIR="$runtime/usr/share/glib-2.0/schemas"
+export XDG_DATA_DIRS="$runtime/usr/share:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
+export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/tmp/runtime-root}"
+export LIBGL_ALWAYS_SOFTWARE=1 LIBGL_DRIVERS_PATH="$runtime/usr/lib/x86_64-linux-gnu/dri"
+export __EGL_VENDOR_LIBRARY_FILENAMES="$runtime/usr/share/glvnd/egl_vendor.d/50_mesa.json"
+mkdir -p "$XDG_RUNTIME_DIR"
+chmod 700 "$XDG_RUNTIME_DIR"
+unset LD_LIBRARY_PATH LD_PRELOAD QEMU_LD_PREFIX QEMU_SET_ENV QEMU_RESERVED_VA
+exec "$emulator" -s 33554432 -B 0x100000000 -L "$runtime" \
+    -E "LD_LIBRARY_PATH=$libpath" "$loader" --library-path "$libpath" \
+    "$runtime/usr/bin/cordial-run" --apk "$apk" --lib-dir "$libdir" \
+    --host-libc --game-activity --run 0 "$@"

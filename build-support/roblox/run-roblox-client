@@ -1,0 +1,63 @@
+#!/bin/sh
+# The desktop hosts Weston on Xvfb so Cordial can attach its embedded web pages.
+set -eu
+apk=${VINIX_ROBLOX_APK:-${HOME:-/root}/Roblox.apk}
+wl=/opt/vinix-roblox-wayland
+[ -x "$wl/lib/ld-musl-aarch64.so.1" ] && [ -x "$wl/usr/bin/weston" ] \
+    || { echo 'run-roblox-client: native Wayland host is missing; rebuild the Roblox runtime' >&2; exit 127; }
+[ -r "$apk" ] || { echo "run-roblox-client: cannot read APK: $apk" >&2; exit 2; }
+base=/tmp
+if [ -r /run/vinix-hosted-x11/.tmpfs-ready ]; then
+    base=/run/vinix-hosted-x11
+fi
+session=$(mktemp -d "$base/roblox-wl-XXXXXX")
+weston_pid=
+client_pid=
+cleanup() {
+    trap - EXIT HUP INT TERM
+    if [ -n "$client_pid" ]; then
+        kill "$client_pid" 2>/dev/null || :
+    fi
+    if [ -n "$weston_pid" ]; then
+        kill "$weston_pid" 2>/dev/null || :
+    fi
+    if [ -n "$client_pid" ]; then
+        wait "$client_pid" 2>/dev/null || :
+    fi
+    if [ -n "$weston_pid" ]; then
+        wait "$weston_pid" 2>/dev/null || :
+    fi
+    if [ -f "$session/weston.log" ]; then
+        cat "$session/weston.log" >&2 || :
+    fi
+    rm -r -- "$session" || :
+}
+trap 'status=$?; cleanup; exit "$status"' EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
+export XDG_RUNTIME_DIR="$session" WAYLAND_DISPLAY=wayland-roblox
+export XKB_CONFIG_ROOT="$wl/usr/share/X11/xkb"
+export WESTON_MODULE_MAP="x11-backend.so=$wl/usr/lib/libweston-14/x11-backend.so;kiosk-shell.so=$wl/usr/lib/weston/kiosk-shell.so"
+export CORDIAL_RESOLUTION=1280x720 CORDIAL_WINDOW_POS=0,0
+unset CORDIAL_X11
+LD_LIBRARY_PATH="$wl/lib:$wl/usr/lib:$wl/usr/lib/weston" \
+    "$wl/lib/ld-musl-aarch64.so.1" --library-path "$wl/lib:$wl/usr/lib:$wl/usr/lib/weston" \
+    "$wl/usr/bin/weston" --no-config --backend=x11 --renderer=pixman \
+    --shell=kiosk-shell.so --width=1280 --height=720 --socket=wayland-roblox \
+    --idle-time=0 --log="$session/weston.log" &
+weston_pid=$!
+count=0
+while [ ! -S "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY" ] && [ "$count" -lt 200 ]; do
+    kill -0 "$weston_pid" || { echo 'run-roblox-client: Wayland host exited' >&2; exit 1; }
+    sleep .1
+    count=$((count + 1))
+done
+[ -S "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY" ] \
+    || { echo 'run-roblox-client: Wayland host did not become ready' >&2; exit 1; }
+/usr/bin/run-roblox "$apk" "$@" &
+client_pid=$!
+status=0
+wait "$client_pid" || status=$?
+client_pid=
+exit "$status"

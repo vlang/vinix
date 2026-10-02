@@ -166,6 +166,10 @@ enum HostedText {
 	android_starting
 	android_missing
 	android_exited
+	roblox_starting
+	roblox_missing
+	roblox_apk_missing
+	roblox_exited
 	xvfb_missing
 	host_failed
 }
@@ -217,6 +221,10 @@ fn (t HostedText) text() string {
 		.android_starting { tr('android.starting') }
 		.android_missing { tr('android.missing') }
 		.android_exited { tr('android.exited') }
+		.roblox_starting { tr('roblox.starting') }
+		.roblox_missing { tr('roblox.missing') }
+		.roblox_apk_missing { tr('roblox.apk_missing') }
+		.roblox_exited { tr('roblox.exited') }
 		.xvfb_missing { tr('wine.xvfb_missing') }
 		.host_failed { tr('wine.host_failed') }
 	}
@@ -438,7 +446,8 @@ fn open_hosted_x11_app(name string, command string, surface_width int, surface_h
 	// passing them to the launcher, so an old or ignored game-size option can
 	// never leave a smaller GLFW window floating in a white root surface.
 	host := desktop_spawn_wine_host(app.directory, surface_width, surface_height, command,
-		name == 'minecraft', name == 'doom' || name == 'qemu' || name == 'opengothic', name == 'obs') or {
+		name == 'minecraft', name == 'doom' || name == 'qemu' || name == 'opengothic'
+		|| name == 'roblox', name == 'obs') or {
 		app.failed = true
 		app.failure = .host_failed
 		return app

@@ -2210,3 +2210,14 @@ Desconocido
 activity.search.done
 Cerrar búsqueda
 -----
+roblox.starting
+Iniciando Roblox…
+-----
+roblox.missing
+Falta el entorno de Roblox. Reconstruye el escritorio con --with-roblox.
+-----
+roblox.apk_missing
+Copia tu APK de Roblox a ~/Roblox.apk o indica su ruta en VINIX_ROBLOX_APK.
+-----
+roblox.exited
+Roblox se ha cerrado. Consulta el registro de la aplicación.

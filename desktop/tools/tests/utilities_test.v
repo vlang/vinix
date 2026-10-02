@@ -601,7 +601,7 @@ fn test_terminal_can_edit_a_file_with_vim_over_its_real_pty() {
 }
 
 fn test_available_utility_applications_and_shortcut_layouts() {
-	assert available_apps.len == 27
+	assert available_apps.len == 28
 	assert available_apps[0].process_name == 'vinix-files'
 	assert available_apps[0].icon == 'asset:files'
 	assert available_apps[1].title == 'Firefox'
@@ -710,10 +710,53 @@ fn test_available_utility_applications_and_shortcut_layouts() {
 	assert available_apps[26].height == android_surface_height + default_title_height
 	assert available_apps[26].keyboard && available_apps[26].pointer
 	assert available_apps[26].polling
+	assert available_apps[27].title == 'Roblox'
+	assert available_apps[27].process_name == 'vinix-roblox'
+	assert available_apps[27].width == roblox_surface_width
+	assert available_apps[27].height == roblox_surface_height + default_title_height
+	assert available_apps[27].keyboard && available_apps[27].pointer
+	assert available_apps[27].polling && available_apps[27].us_keys
 	assert app_start_actions.len == available_apps.len
+	assert app_start_jump_actions.len == available_apps.len
 	assert app_shortcut_actions.len == available_apps.len
+	assert taskbar_pin_actions.len == available_apps.len
 	assert shortcut_rows_for_height(720) == 8
 	assert shortcut_rows_for_height(600) == 6
+}
+
+fn test_roblox_apk_override_survives_app_exec() {
+	key := 'VINIX_ROBLOX_APK'
+	had_value := C.getenv(c'VINIX_ROBLOX_APK') != unsafe { nil }
+	previous := os.getenv(key)
+	defer {
+		if had_value {
+			os.setenv(key, previous, true)
+		} else {
+			os.unsetenv(key)
+		}
+	}
+	work := '/tmp/vinix-roblox-env-${C.getpid()}'
+	os.mkdir_all(work) or { panic(err) }
+	defer { os.rmdir_all(work) or {} }
+	result := '${work}/result'
+	fixture := '${work}/child'
+	os.write_file(fixture, '#!/bin/sh\nprintf "%s" "\$VINIX_ROBLOX_APK" > "${result}"\n') or {
+		panic(err)
+	}
+	os.chmod(fixture, 0o755) or { panic(err) }
+	apk := '/tmp/Roblox APKs/base.apk'
+	assert os.setenv(key, apk, true) == 0
+	for name in ['vinix-roblox', 'vinix-firefox'] {
+		process := desktop_spawn_app(fixture, name, 0, 'en', true, '') or {
+			panic('cannot execute environment fixture')
+		}
+		desktop_close(process.to_child)
+		desktop_close(process.from_child)
+		assert desktop_wait_child(process.pid) == 0
+		captured := os.read_file(result) or { panic(err) }
+		expected := if name == 'vinix-roblox' { apk } else { '' }
+		assert captured == expected
+	}
 }
 
 fn test_pointer_wire_records_have_fixed_cross_compiler_layouts() {

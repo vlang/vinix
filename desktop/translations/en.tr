@@ -2210,3 +2210,14 @@ Unknown
 activity.search.done
 Close search
 -----
+roblox.starting
+Starting Roblox…
+-----
+roblox.missing
+Roblox runtime is missing. Rebuild the desktop with --with-roblox.
+-----
+roblox.apk_missing
+Copy your Roblox APK to ~/Roblox.apk, or set VINIX_ROBLOX_APK to its path.
+-----
+roblox.exited
+Roblox has exited. See the application log for details.

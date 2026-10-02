@@ -3,7 +3,7 @@
 # initramfs that boots straight into it.
 #
 # Usage: ./build-desktop-aarch64.sh [--no-initramfs] [--compact-initramfs]
-#        [--without-firefox] [--with-libreoffice] [--with-minecraft] [--with-opengothic] [--with-asahi-gpu] [--with-x86-translation] [--wifi-bundle=DIR]
+#        [--without-firefox] [--with-libreoffice] [--with-minecraft] [--with-opengothic] [--with-asahi-gpu] [--with-x86-translation] [--with-roblox] [--wifi-bundle=DIR]
 # Set V or VINIX_V_COMPILER to a V executable or checkout directory to select
 # a compiler explicitly (for example V=~/code/v/v).
 #
@@ -55,6 +55,7 @@ PYTHON_STAGING="${VINIX_PYTHON_STAGING:-$SCRIPT_DIR/build-aarch64-python/staging
 NETWORK_TOOLS_STAGING="${VINIX_NETWORK_TOOLS_STAGING:-$SCRIPT_DIR/build-aarch64-network-tools/staging}"
 VLANG_STAGING="${VINIX_VLANG_STAGING:-$SCRIPT_DIR/build-aarch64-v/staging}"
 X11_STAGING="${VINIX_X11_STAGING:-$SCRIPT_DIR/build-aarch64-x11/staging}"
+X11_SYSROOT="${VINIX_X11_SYSROOT:-${X11_STAGING%/staging}/sysroot}"
 FIREFOX_STAGING="${VINIX_FIREFOX_STAGING:-$SCRIPT_DIR/build-aarch64-firefox/staging}"
 CHROMIUM_STAGING="${VINIX_CHROMIUM_STAGING:-$SCRIPT_DIR/build-aarch64-chromium/staging}"
 LIBREOFFICE_STAGING="${VINIX_LIBREOFFICE_STAGING:-$SCRIPT_DIR/build-aarch64-libreoffice/staging}"
@@ -68,6 +69,7 @@ X86_TRANSLATION_STAGING="${VINIX_X86_TRANSLATION_STAGING:-$SCRIPT_DIR/build-aarc
 STEAM_STAGING="${VINIX_STEAM_STAGING:-$SCRIPT_DIR/build-aarch64-steam/staging}"
 QEMU_SYSTEM_STAGING="${VINIX_QEMU_SYSTEM_STAGING:-$SCRIPT_DIR/build-aarch64-qemu-system/staging}"
 ANDROID_STAGING="${VINIX_ANDROID_STAGING:-$SCRIPT_DIR/build-aarch64-android/x86_64/staging}"
+ROBLOX_STAGING="${VINIX_ROBLOX_STAGING:-$SCRIPT_DIR/build-aarch64-roblox/x86_64/staging}"
 GPU_SYSROOT="${VINIX_GPU_SYSROOT:-$SCRIPT_DIR/build-aarch64-x11/sysroot}"
 
 file_size() {
@@ -109,7 +111,7 @@ write_staging_cache_manifest() {
 
     # Change this when the immutable-layer assembly logic changes. Desktop
     # source and launcher edits are refreshed below without restaging 6+ GiB.
-    printf 'version=4\n'
+    printf 'version=5\n'
     printf 'compact=%s\n' "$COMPACT_INITRAMFS"
     printf 'without_firefox=%s\n' "$WITHOUT_FIREFOX"
     printf 'chromium=%s\n' "$WITH_CHROMIUM"
@@ -121,6 +123,7 @@ write_staging_cache_manifest() {
     printf 'steam=%s\n' "$WITH_STEAM"
     printf 'qemu_system=%s\n' "$WITH_QEMU_SYSTEM"
     printf 'android=%s\n' "$WITH_ANDROID"
+    printf 'roblox=%s\n' "$WITH_ROBLOX"
     for input in \
         "$BASE_INITRAMFS" "$DEVTOOLS_ARCHIVE" "$SYSROOT" \
         "$PYTHON_STAGING" "$NETWORK_TOOLS_STAGING" "$X11_STAGING" \
@@ -129,7 +132,7 @@ write_staging_cache_manifest() {
         "$MINECRAFT_STAGING" "$ASAHI_STAGING" "$HYPRLAND_STAGING" \
         "$DOOM_STAGING" "$OPENGOTHIC_STAGING" \
         "$BLENDER_NATIVE_STAGING" "$X86_TRANSLATION_STAGING" "$STEAM_STAGING" \
-        "$QEMU_SYSTEM_STAGING" "$ANDROID_STAGING" \
+        "$QEMU_SYSTEM_STAGING" "$ANDROID_STAGING" "$ROBLOX_STAGING" \
         "$GPU_SYSROOT"; do
         printf '%s=%s\n' "$input" "$(path_generation "$input")"
     done
@@ -160,6 +163,7 @@ WITH_X86_TRANSLATION=0
 WITH_STEAM=0
 WITH_QEMU_SYSTEM=0
 WITH_ANDROID=0
+WITH_ROBLOX=0
 WITH_CHROMIUM=0
 WITH_LIBREOFFICE=0
 WITH_MINECRAFT=0
@@ -178,6 +182,7 @@ for arg in "$@"; do
         --with-steam) WITH_STEAM=1 ;;
         --with-qemu-system) WITH_QEMU_SYSTEM=1 ;;
         --with-android) WITH_ANDROID=1 ;;
+        --with-roblox) WITH_ROBLOX=1 ;;
         --with-chromium) WITH_CHROMIUM=1 ;;
         --with-libreoffice) WITH_LIBREOFFICE=1 ;;
         --with-minecraft) WITH_MINECRAFT=1 ;;
@@ -186,7 +191,7 @@ for arg in "$@"; do
         --with-asahi-gpu) WITH_ASAHI_GPU=1 ;;
         --wifi-bundle=*) WIFI_BUNDLE="${arg#*=}" ;;
         --help|-h)
-            echo "usage: $0 [--no-initramfs] [--compact-initramfs] [--without-firefox] [--with-chromium] [--with-libreoffice] [--with-minecraft] [--with-opengothic] [--with-asahi-gpu] [--with-x86-translation] [--with-steam] [--with-qemu-system] [--with-android] [--wifi-bundle=DIR]"
+            echo "usage: $0 [--no-initramfs] [--compact-initramfs] [--without-firefox] [--with-chromium] [--with-libreoffice] [--with-minecraft] [--with-opengothic] [--with-asahi-gpu] [--with-x86-translation] [--with-steam] [--with-qemu-system] [--with-android] [--with-roblox] [--wifi-bundle=DIR]"
             echo "  --compact-initramfs stages the desktop, core developer tools and Firefox"
             echo "  --without-firefox leaves the browser out of a compact image, keeping its"
             echo "      GTK/media runtime; the first-run app page offers it through pkg"
@@ -199,6 +204,7 @@ for arg in "$@"; do
             echo "  --with-steam adds a previously staged Steam client and its x86 glibc runtime"
             echo "  --with-qemu-system adds native QEMU and UEFI firmware for nested Vinix"
             echo "  --with-android adds Android Translation Layer and any staged APKs"
+            echo "  --with-roblox adds a previously staged Cordial runtime; supply your own APK"
             echo "  --wifi-bundle stages a package.py output and loads it before the desktop"
             echo "  VINIX_REFRESH_DESKTOP_STAGING=1 discards the cached assembled layers"
             echo "  VINIX_AARCH64_APP_CACHE changes the persistent desktop binary cache"
@@ -225,8 +231,8 @@ case "$REFRESH_STAGING" in
 esac
 
 if [ "$MAKE_INITRAMFS" -eq 0 ] &&
-   { [ -n "$WIFI_BUNDLE" ] || [ "$WITH_X86_TRANSLATION" -eq 1 ] || [ "$WITH_STEAM" -eq 1 ] || [ "$WITH_QEMU_SYSTEM" -eq 1 ] || [ "$WITH_ANDROID" -eq 1 ]; }; then
-    echo "ERROR: --wifi-bundle, --with-x86-translation, --with-steam, --with-qemu-system and --with-android require initramfs generation" >&2
+   { [ -n "$WIFI_BUNDLE" ] || [ "$WITH_X86_TRANSLATION" -eq 1 ] || [ "$WITH_STEAM" -eq 1 ] || [ "$WITH_QEMU_SYSTEM" -eq 1 ] || [ "$WITH_ANDROID" -eq 1 ] || [ "$WITH_ROBLOX" -eq 1 ]; }; then
+    echo "ERROR: --wifi-bundle, --with-x86-translation, --with-steam, --with-qemu-system, --with-android and --with-roblox require initramfs generation" >&2
     exit 1
 fi
 
@@ -664,6 +670,19 @@ if [ "$WITH_ANDROID" -eq 1 ] &&
     exit 1
 fi
 
+if [ "$WITH_ROBLOX" -eq 1 ] &&
+   { [ ! -x "$ROBLOX_STAGING/usr/bin/run-roblox" ] ||
+     [ ! -x "$ROBLOX_STAGING/usr/bin/run-roblox-client" ] ||
+     [ ! -x "$ROBLOX_STAGING/usr/bin/qemu-x86_64" ] ||
+     [ ! -x "$ROBLOX_STAGING/opt/vinix-roblox-x86_64/usr/bin/cordial-run" ] ||
+     [ ! -x "$ROBLOX_STAGING/opt/vinix-roblox-x86_64/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2" ] ||
+     [ ! -x "$ROBLOX_STAGING/opt/vinix-roblox-wayland/lib/ld-musl-aarch64.so.1" ] ||
+     [ ! -x "$ROBLOX_STAGING/opt/vinix-roblox-wayland/usr/bin/weston" ]; }; then
+    echo "ERROR: --with-roblox needs $ROBLOX_STAGING" >&2
+    echo "Run ./build-roblox-aarch64.sh first." >&2
+    exit 1
+fi
+
 # `package.py` produces the only supported bundle format. Its manifest binds
 # the opaque vendor files to identity captured from the target, and wifi-ctl
 # repeats that identity check on the M1 before uploading a byte.
@@ -996,6 +1015,11 @@ if [ "$REUSE_STAGING" -eq 0 ]; then
         done
     fi
 
+    if [ "$WITH_ROBLOX" -eq 1 ]; then
+        echo "==> Staging Roblox's private Cordial runtime"
+        merge_staging_tree "$ROBLOX_STAGING"
+    fi
+
     # Hyprland is an optional build layer because its patched Aquamarine library
     # is produced in the native ARM64 build VM. Its dedicated launcher selects it
     # at boot; simply having the layer installed leaves the native desktop first.
@@ -1159,6 +1183,24 @@ install -m755 "$SCRIPT_DIR/build-support/java-cacerts.py" \
 install -m755 "$SCRIPT_DIR/build-support/xorg-server/startx" "$STAGING/usr/bin/startx"
 install -m755 "$X11_STAGING/usr/bin/vinix-xinput" "$STAGING/usr/bin/vinix-xinput"
 install -m755 "$X11_STAGING/usr/bin/vinix-wine-host" "$STAGING/usr/bin/vinix-wine-host"
+if [ "$WITH_ROBLOX" -eq 1 ]; then
+    # Cached X11 layers can predate the native compositor's MIT-SHM selector.
+    # Refresh this small host without rebuilding the complete Xorg/Mesa layer.
+    if [ ! -f "$X11_SYSROOT/usr/include/X11/Xlib.h" ]; then
+        echo "ERROR: --with-roblox needs the X11 sysroot at $X11_SYSROOT" >&2
+        echo "Run ./build-x11-aarch64.sh or set VINIX_X11_SYSROOT." >&2
+        exit 1
+    fi
+    echo "==> Building Roblox's native X11 host"
+    "$LLVM_BIN/clang" --target=aarch64-linux-musl --sysroot="$X11_SYSROOT" \
+        --gcc-install-dir="$GCCLIB" -static-libgcc -O2 -Wall -Wextra -Werror \
+        -D__vinix__ -I"$X11_SYSROOT/usr/include" \
+        "$SCRIPT_DIR/build-support/xorg-server/vinix-wine-host.c" \
+        -fuse-ld=lld -L"$X11_SYSROOT/usr/lib" -L"$X11_SYSROOT/lib" \
+        -Wl,-rpath-link,"$X11_SYSROOT/usr/lib" -Wl,-rpath-link,"$X11_SYSROOT/lib" \
+        -lXtst -lXdamage -lX11 -lXext -lxcb -o "$BUILD_DIR/vinix-wine-host-roblox"
+    install -m755 "$BUILD_DIR/vinix-wine-host-roblox" "$STAGING/usr/bin/vinix-wine-host"
+fi
 install -m755 "$SCRIPT_DIR/build-support/firefox/run-firefox" "$STAGING/usr/bin/run-firefox"
 install -m755 "$SCRIPT_DIR/build-support/gimp/run-gimp" "$STAGING/usr/bin/run-gimp"
 install -m755 "$SCRIPT_DIR/build-support/obs/run-obs" "$STAGING/usr/bin/run-obs"
@@ -1329,6 +1371,18 @@ if [ "$WITH_X86_TRANSLATION" -eq 1 ]; then
         fi
     done
 fi
+if [ "$WITH_ROBLOX" -eq 1 ]; then
+    for command_path in usr/bin/qemu-x86_64 usr/bin/run-roblox usr/bin/run-roblox-client \
+        opt/vinix-roblox-x86_64/usr/bin/cordial-run \
+        opt/vinix-roblox-x86_64/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2 \
+        opt/vinix-roblox-wayland/lib/ld-musl-aarch64.so.1 \
+        opt/vinix-roblox-wayland/usr/bin/weston; do
+        if [ ! -x "$STAGING/$command_path" ]; then
+            echo "ERROR: Roblox desktop is missing /$command_path" >&2
+            exit 1
+        fi
+    done
+fi
 if [ "$WITH_STEAM" -eq 1 ]; then
     for command_path in usr/bin/qemu-i386 usr/bin/qemu-x86_64 usr/bin/steam \
         usr/bin/steam-smoke usr/libexec/vinix-steam/root/usr/bin/bash \
@@ -1385,7 +1439,7 @@ chmod +x "$STAGING/sbin/init" "$STAGING/usr/bin/vinix-desktop" \
 # distinct names and truthful per-app accounting without storing a copy of the
 # same static executable for every native application in the initramfs.
 for app_name in vinix-files vinix-calculator vinix-terminal vinix-settings \
-    vinix-opengothic vinix-android-calculator \
+    vinix-opengothic vinix-android-calculator vinix-roblox \
     vinix-activity vinix-editor vinix-calendar vinix-clock \
     vinix-vspace \
     vinix-firefox vinix-chromium vinix-gimp vinix-libreoffice vinix-minecraft vinix-doom vinix-wine-calculator vinix-wine-notepad \
@@ -1512,6 +1566,7 @@ CONTENT_KEY_INPUTS=(
     "$SCRIPT_DIR/build-support/vinix-host-sync"
     "$SCRIPT_DIR/build-support/vinix-version-check"
     "$SCRIPT_DIR/build-support/xorg-server/startx"
+    "$SCRIPT_DIR/build-support/xorg-server/vinix-wine-host.c"
     "$SCRIPT_DIR/build-support/firefox"
     "$SCRIPT_DIR/build-support/gimp"
     "$SCRIPT_DIR/build-support/obs"

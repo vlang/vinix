@@ -171,6 +171,8 @@ fn test_hosted_windows_follow_the_language() {
 	assert HostedText.windows_exited.text() == 'The Windows application exited.'
 	assert HostedText.doom_wad_missing.text() == 'DOOM WAD is missing. Set VINIX_DOOM_WAD and rebuild the image.'
 	assert HostedText.gothic_data_missing.text() == "Gothic II's data is missing. Copy Data, _work and System to /usr/share/games/gothic2."
+	assert HostedText.roblox_apk_missing.text() == 'Copy your Roblox APK to ~/Roblox.apk, or set VINIX_ROBLOX_APK to its path.'
+	assert HostedText.roblox_missing.text() == 'Roblox runtime is missing. Rebuild the desktop with --with-roblox.'
 	assert SurfaceText.blender_exited.text() == 'Blender exited.'
 }
 

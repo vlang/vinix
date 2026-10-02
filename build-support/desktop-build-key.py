@@ -130,6 +130,12 @@ def compute_key(root: Path, v_compiler: Path, env: dict[str, str]) -> str:
     x86_staging = resolved_env_path(
         env, "VINIX_X86_TRANSLATION_STAGING", root / "build-aarch64-x86-translation/staging"
     )
+    x11_sysroot = resolved_env_path(
+        env, "VINIX_X11_SYSROOT", x11_staging.parent / "sysroot"
+    )
+    roblox_staging = resolved_env_path(
+        env, "VINIX_ROBLOX_STAGING", root / "build-aarch64-roblox/x86_64/staging"
+    )
     gpu_sysroot = resolved_env_path(
         env, "VINIX_GPU_SYSROOT", root / "build-aarch64-x11/sysroot"
     )
@@ -166,11 +172,13 @@ def compute_key(root: Path, v_compiler: Path, env: dict[str, str]) -> str:
         root / "build-support/vinix-desktop-reload",
         root / "build-support/vinix-host-sync",
         root / "build-support/xorg-server/startx",
+        root / "build-support/xorg-server/vinix-wine-host.c",
         root / "build-support/firefox",
         root / "build-support/gimp",
         root / "build-support/libreoffice",
         root / "build-support/chromium",
         root / "build-support/hyprland",
+        root / "build-support/roblox",
         root / "gl-triangle/run-m1-agx-smoke",
         root / "gl-triangle/egl_triangle.c",
         root / "tests/browsers/firefox-smoke.html",
@@ -198,6 +206,7 @@ def compute_key(root: Path, v_compiler: Path, env: dict[str, str]) -> str:
         hyprland_staging,
         blender_staging,
         x86_staging,
+        roblox_staging,
     ]
 
     llvm_bin = Path(os.path.expanduser(env.get("LLVM_BIN", "/opt/homebrew/opt/llvm/bin")))
@@ -249,7 +258,7 @@ def compute_key(root: Path, v_compiler: Path, env: dict[str, str]) -> str:
     add_text(
         digest,
         "inplace-layer-generation",
-        tree_key([x11_staging, gpu_sysroot, doom_staging], metadata_only=True),
+        tree_key([x11_staging, x11_sysroot, gpu_sysroot, doom_staging], metadata_only=True),
     )
     for path in layer_roots:
         add_text(digest, f"layer:{path}", root_generation(path))
