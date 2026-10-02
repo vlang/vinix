@@ -114,7 +114,9 @@ while [ "$i" -lt "$TEST_TIMEOUT" ]; do
 done
 [ -n "$display" ] && [ -n "$surface" ] && [ "$resumed" = 1 ] \
     || fail "APK did not finish starting within ${i}s"
-[ -s /tmp/android-text.log ] || fail "test text observer was not loaded"
+if [ "$TEST_OBSERVE" = 0 ]; then
+    [ -s /tmp/android-text.log ] || fail "test text observer was not loaded"
+fi
 cat /tmp/android-window.log
 echo "ANDROID-SURFACE $surface/Xvfb_screen0"
 echo "ANDROID-DISPLAY $display"
@@ -123,6 +125,20 @@ if [ "$TEST_MODE" = direct ]; then
 fi
 rm -f /tmp/android-result
 echo ANDROID-READY
+if [ "$TEST_OBSERVE" = 1 ]; then
+    i=0
+    while [ "$i" -lt "$TEST_OBSERVATION_SECONDS" ]; do
+        kill -0 "$app_pid" 2>/dev/null || fail "application host exited during observation"
+        /opt/android-test/x11-probe "$display" inspect "$TEST_TITLE" >/tmp/android-window.log 2>&1 \
+            || fail "APK window disappeared or stopped drawing"
+        sleep 1
+        i=$((i + 1))
+    done
+    cat /tmp/android-window.log
+    diagnostics
+    echo "ANDROID-OBSERVED seconds=$i functionality=unchecked"
+    exec /bin/sh </dev/console >/dev/console 2>&1
+fi
 if [ "$TEST_INPUT" = xtest ]; then
     /opt/android-test/x11-probe "$display" type "$TEST_TITLE" "$TEST_KEYS" "$TEST_FOCUS_X" "$TEST_FOCUS_Y" \
         || fail "keyboard input failed"

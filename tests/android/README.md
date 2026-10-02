@@ -51,3 +51,20 @@ bounds, worker stack guards and ART's memory mapping prerequisites in the real
 guest. `--strace` adds translated runtime syscall diagnostics.
 `--click X Y` changes the desktop screen position clicked before typing;
 `--focus X Y` changes the APK window position clicked in direct mode.
+
+For bring-up of another APK, capture its actual window and startup diagnostics
+without the calculator observer or simulated input:
+
+```sh
+python3 tests/android/run.py --apk /path/to/application.apk \
+    --activity package/Activity --title package --observe \
+    --mode direct --state-dir /tmp/vinix-apk-observation
+```
+
+`--observe` requires a painted APK window to remain visible for 30 seconds
+(`--observation-seconds` changes this duration). It captures `application.png`
+and records `observed: true` with `passed: null` in `result.json`; this only
+establishes that a window was observed, not that the application's functionality
+works. Startup failures retain a screenshot where possible, diagnostic logs
+and an explicit failure reason. A proprietary APK must be supplied locally;
+the harness does not modify or redistribute it.

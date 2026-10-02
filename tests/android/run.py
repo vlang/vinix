@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run an Android calculator APK on Vinix, check arithmetic, and save its screen."""
+"""Run an Android APK on Vinix, check a calculator or observe its real window."""
 from __future__ import annotations
 
 import argparse
@@ -180,9 +180,10 @@ def prepare(args: argparse.Namespace) -> Path | None:
         observer_compiler = shutil.which("x86_64-linux-musl-gcc")
         if not observer_compiler:
             raise SystemExit("x86_64-linux-musl-gcc is required for the translated runtime observer")
-    subprocess.run([observer_compiler, "-O2", "-Wall", "-Wextra", "-Werror", "-shared", "-fPIC",
-                    str(ROOT / "tests/android/text-observer.c"), "-ldl",
-                    "-o", str(test / "text-observer.so")], check=True)
+    if not args.observe:
+        subprocess.run([observer_compiler, "-O2", "-Wall", "-Wextra", "-Werror", "-shared", "-fPIC",
+                        str(ROOT / "tests/android/text-observer.c"), "-ldl",
+                        "-o", str(test / "text-observer.so")], check=True)
     if args.runtime_arch == "x86_64":
         subprocess.run([observer_compiler, "-O2", "-Wall", "-Wextra", "-Werror",
                         str(ROOT / "tests/android/runtime-stack-probe.c"), "-pthread",
@@ -208,23 +209,25 @@ def prepare(args: argparse.Namespace) -> Path | None:
     icons.mkdir(parents=True, exist_ok=True)
     for icon in (args.repo / "desktop/assets").glob("*.qoi"):
         shutil.copy2(icon, icons / icon.name)
-    apk = overlay / "opt/android-test/calculator.apk"
+    apk = overlay / "opt/android-test/application.apk"
     shutil.copy2(args.apk, apk)
     configuration = {
-        "TEST_APK": "/opt/android-test/calculator.apk", "TEST_MODE": args.mode,
+        "TEST_APK": "/opt/android-test/application.apk", "TEST_MODE": args.mode,
         "TEST_INPUT": args.input, "TEST_KEYS": args.keys, "TEST_TITLE": args.title,
         "TEST_TIMEOUT": str(args.startup_timeout), "VINIX_ANDROID_EXPECTED_RESULT": args.expect,
         "TEST_RUNTIME_ARCH": args.runtime_arch, "TEST_STRACE": "1" if args.strace else "0",
         "TEST_FOCUS_X": str(args.focus[0]), "TEST_FOCUS_Y": str(args.focus[1]),
         "TEST_WAIT_FOR_RESUME": "1" if hashlib.sha256(args.apk.read_bytes()).hexdigest() == CALCULATOR_SHA256 else "0",
+        "TEST_OBSERVE": "1" if args.observe else "0",
+        "TEST_OBSERVATION_SECONDS": str(args.observation_seconds),
     }
     (test / "config.sh").write_text("".join(f"{key}={shlex.quote(value)}\n" for key, value in configuration.items()))
     (test / "launch").write_text(
         "#!/bin/sh\n. /opt/android-test/config.sh\n"
         "export VINIX_ANDROID_EXPECTED_RESULT\n"
         "[ \"$TEST_STRACE\" = 0 ] || export QEMU_STRACE=1\n"
-        "export VINIX_ANDROID_TEST_PRELOAD=/opt/android-test/text-observer.so\n"
-        + ("export LD_PRELOAD=\"$VINIX_ANDROID_TEST_PRELOAD\"\n" if args.runtime_arch == "aarch64" else "")
+        + ("export VINIX_ANDROID_TEST_PRELOAD=/opt/android-test/text-observer.so\n" if not args.observe else "")
+        + ("export LD_PRELOAD=\"$VINIX_ANDROID_TEST_PRELOAD\"\n" if args.runtime_arch == "aarch64" and not args.observe else "")
         +
         f"exec /usr/bin/run-android \"$TEST_APK\" -l {shlex.quote(args.activity)} -w 480 -h 640\n")
     (test / "launch").chmod(0o755)
@@ -388,6 +391,7 @@ def run(args: argparse.Namespace, overlay: Path | None) -> int:
         os.execve(command[0], command, environment)
     transcript = bytearray()
     passed = False
+    observed = False
     guest_failed = False
     typed = False
     input_thread = None
@@ -446,7 +450,7 @@ def run(args: argparse.Namespace, overlay: Path | None) -> int:
                 break
             time.sleep(0.1)
             recent = bytes(transcript[-262144:])
-            if b"ANDROID-READY" in recent and args.input == "qmp" and not typed:
+            if b"ANDROID-READY" in recent and args.input == "qmp" and not args.observe and not typed:
                 typed = True
                 input_thread = threading.Thread(target=send_input, daemon=True)
                 input_thread.start()
@@ -463,6 +467,10 @@ def run(args: argparse.Namespace, overlay: Path | None) -> int:
                 passed = True
                 time.sleep(2)
                 break
+            if b"ANDROID-OBSERVED" in recent and args.observe and not guest_failed:
+                observed = True
+                time.sleep(2)
+                break
         if input_thread:
             input_thread.join(timeout=25)
             if input_thread.is_alive() or input_errors:
@@ -476,9 +484,11 @@ def run(args: argparse.Namespace, overlay: Path | None) -> int:
                 except (OSError, RuntimeError, ImportError) as error:
                     print(f"Screenshot failed: {error}", file=sys.stderr)
                     passed = False
+                    observed = False
                     failure = "screenshot failed"
             else:
                 passed = False
+                observed = False
                 failure = "VM did not expose QMP"
         finally:
             stop_vm(pid, master)
@@ -486,18 +496,25 @@ def run(args: argparse.Namespace, overlay: Path | None) -> int:
             reader.join(timeout=2)
             os.close(master)
             socket_path.unlink(missing_ok=True)
-    result = {"passed": passed, "mode": args.mode, "apk": str(args.apk),
+    result = {"passed": None if args.observe and observed else passed,
+              "observed": observed, "check": "window-observation" if args.observe else "calculator",
+              "failure": None if passed or observed else failure,
+              "mode": args.mode, "apk": str(args.apk),
               "apk_sha256": hashlib.sha256(args.apk.read_bytes()).hexdigest(),
               "initramfs": str(args.initramfs), "runtime_arch": args.runtime_arch,
               "memory_mb": args.memory, "desktop": str(args.desktop), "kernel_dir": str(args.kernel_dir),
-              "keys": args.keys, "expected": args.expect, "screenshot": str(args.screenshot),
+              "keys": None if args.observe else args.keys,
+              "expected": None if args.observe else args.expect, "screenshot": str(args.screenshot),
               "key_retries": input_retries[0] if input_retries else None,
               "serial_log": str(state / "serial.log")}
     (state / "result.json").write_text(json.dumps(result, indent=2) + "\n")
-    if not passed:
+    if not passed and not observed:
         print(f"Android smoke test failed ({failure}); inspect {state / 'serial.log'}", file=sys.stderr)
         return 1
-    print(f"Android calculator displayed {args.expect}; screenshot: {args.screenshot}")
+    if observed:
+        print(f"Observed the APK's painted window; application functionality was not checked. Screenshot: {args.screenshot}")
+    else:
+        print(f"Android calculator displayed {args.expect}; screenshot: {args.screenshot}")
     return 0
 
 
@@ -528,7 +545,13 @@ def main() -> int:
     parser.add_argument("--timeout", type=int, default=420)
     parser.add_argument("--prepare-only", action="store_true", help="assemble and cross-build the test image without booting")
     parser.add_argument("--strace", action="store_true", help="trace translated runtime syscalls for bring-up diagnostics")
+    parser.add_argument("--observe", action="store_true",
+                        help="capture a generic APK window and logs without input or a functional pass claim")
+    parser.add_argument("--observation-seconds", type=int, default=30,
+                        help="seconds a generic APK's painted window must remain visible (default: 30)")
     args = parser.parse_args()
+    if args.observation_seconds < 1:
+        parser.error("--observation-seconds must be positive")
     if not args.prepare_only:
         try:
             import PIL
@@ -544,7 +567,7 @@ def main() -> int:
     args.kernel_dir = (args.kernel_dir or args.repo / "kernel").resolve()
     args.initramfs = args.initramfs.resolve() if args.initramfs else None
     args.apk = (args.apk or args.runtime / "usr/share/vinix/android/Arity-1.1.apk").resolve()
-    args.screenshot = (args.screenshot or args.state_dir / "calculator.png").resolve()
+    args.screenshot = (args.screenshot or args.state_dir / ("application.png" if args.observe else "calculator.png")).resolve()
     args.input = args.input or ("xtest" if args.mode == "direct" else "qmp")
     base = args.initramfs or args.repo / "build-aarch64-userland/downloads/alpine-minirootfs-3.21.7-aarch64.tar.gz"
     for path in (args.runtime / "usr/bin/run-android", args.desktop, args.kernel_dir / "bin/vinix", base, args.apk):
