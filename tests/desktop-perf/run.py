@@ -38,6 +38,7 @@ import pty
 import queue
 import re
 import shutil
+import shlex
 import signal
 import socket
 import statistics
@@ -50,9 +51,166 @@ import time
 ROOT = Path(__file__).resolve().parents[2]
 ABS_MAX = 32767
 SCENARIOS = ("idle", "apps", "pointer", "drag", "wakeups", "churn", "cache", "ops")
-RESULT = re.compile(rb"PERF-RESULT variant=(\S+) scenario=(\S+) round=(\d+) (.*)")
 SHOT = re.compile(rb"PERF-SHOT variant=(\S+) scenario=(\S+) round=(\d+)")
 DRIVE = re.compile(rb"PERF-DRIVE (\S+) (\d+)")
+MEASUREMENT = re.compile(
+    rb"(PERF-(?:RESULT|WAKEUPS|CHURN|CACHE|OPS)) variant=(\S+) scenario=(\S+) round=(\d+) (.*)")
+DONE = b"VINIX DESKTOP PERF: DONE"
+REPORT_MARKERS = (b"PERF-WAKEUPS", b"PERF-CHURN", b"PERF-SLAB", b"PERF-CACHE",
+                  b"PERF-MEMINFO", b"PERF-OPS", b"PERF-SITE")
+DESKTOP_METRICS = ("desktop_cpu", "apps_cpu", "total_cpu", "physical_mb", "desktop_mb",
+                   "apps_mb", "total_mb")
+# Keep these contracts in sync with measure.c's ops tables and perf-init.sh's
+# churn program list. Each item is one required measurement, not an auxiliary
+# slab/site/meminfo line, which may legitimately appear any number of times.
+OPS_GENERAL = ("stat", "pipe", "socketpair", "inet_socket", "eventfd", "epoll",
+               "timerfd", "poll", "proc_read", "proc_list", "readdir", "dup",
+               "mmap", "thread", "signal", "fork", "memfd")
+OPS_FILES = ("file", "rename", "unlink_open", "rename_over", "hardlink", "mkdir",
+             "symlink", "unix_connect", "unix_datagram")
+CHURN_PROGRAMS = ("/bin/true", "/bin/sleep 0", "/usr/bin/curl --version",
+                  "/bin/busybox awk BEGIN{}")
+
+
+def measurement_detail(row: dict) -> tuple[str, ...]:
+    kind = row.get("report", "PERF-RESULT")
+    if kind == "PERF-WAKEUPS":
+        return (kind, row.get("via", ""))
+    if kind == "PERF-CHURN":
+        return (kind, row.get("program", ""))
+    if kind == "PERF-OPS":
+        return (kind, row.get("op", ""), row.get("dir", ""))
+    return (kind,)
+
+
+def expected_measurements(variants: list[str], scenarios: list[str], rounds: int) -> set[tuple]:
+    expected = set()
+    for variant in variants:
+        for scenario in scenarios:
+            if scenario == "wakeups":
+                details = [("PERF-WAKEUPS", via) for via in ("nanosleep", "poll")]
+            elif scenario == "churn":
+                details = [("PERF-CHURN", program) for program in CHURN_PROGRAMS]
+            elif scenario == "cache":
+                details = [("PERF-CACHE",)]
+            elif scenario == "ops":
+                details = [("PERF-OPS", op, "/tmp") for op in OPS_GENERAL]
+                details += [("PERF-OPS", op, directory)
+                            for directory in ("/tmp", "/root") for op in OPS_FILES]
+            else:
+                details = [("PERF-RESULT",)]
+            for round_number in range(1, rounds + 1):
+                for detail in details:
+                    expected.add((variant, scenario, round_number, *detail))
+    return expected
+
+
+def valid_desktop_result(row: dict) -> bool:
+    try:
+        seconds = float(row["seconds"])
+        return (all(math.isfinite(float(row[key])) for key in
+                    (*DESKTOP_METRICS, "system_used_mb"))
+                and math.isfinite(seconds) and seconds > 0 and int(row["processes"]) >= 0)
+    except (KeyError, ValueError, TypeError):
+        return False
+
+
+def inspect_run(transcript: bytes, variants: list[str], scenarios: list[str], rounds: int,
+                timed_out: bool = False, exit_code: int | None = None
+                ) -> tuple[list[dict], list[str], list[str]]:
+    """Keep partial measurements, but accept only a complete, error-free plan."""
+    rows: list[dict] = []
+    reports: list[str] = []
+    errors: list[str] = []
+    expected = expected_measurements(variants, scenarios, rounds)
+    seen: set[tuple] = set()
+    done = 0
+    for line in transcript.splitlines():
+        if line.strip() == DONE:
+            done += 1
+        for marker in (b"KERNEL PANIC", b"FATAL EXCEPTION", b"PERF-ERROR"):
+            if marker in line:
+                errors.append(line.decode(errors="replace"))
+                break
+        for marker in REPORT_MARKERS:
+            if marker in line:
+                reports.append(line[line.index(marker):].decode(errors="replace"))
+                break
+        match = MEASUREMENT.search(line)
+        if not match:
+            # An incomplete/malformed measurement must not silently count as
+            # coverage. The serial log retains its exact original bytes.
+            if any(marker in line for marker in
+                   (b"PERF-RESULT", b"PERF-WAKEUPS", b"PERF-CHURN", b"PERF-CACHE", b"PERF-OPS")):
+                errors.append("malformed measurement: " + line.decode(errors="replace"))
+            continue
+        kind, variant, scenario, round_number, payload = match.groups()
+        row = {"variant": variant.decode(errors="replace"),
+               "scenario": scenario.decode(errors="replace"), "round": int(round_number)}
+        if kind != b"PERF-RESULT":
+            row["report"] = kind.decode()
+        try:
+            for field in shlex.split(payload.decode(errors="replace")):
+                key, separator, value = field.partition("=")
+                if not separator:  # OPS's optional size-class deltas.
+                    continue
+                if key in row or key == "report":
+                    raise ValueError(f"duplicate field {key}")
+                row[key] = value
+        except ValueError as error:
+            errors.append(f"malformed measurement fields: {error}: {line.decode(errors='replace')}")
+        rows.append(row)
+        identity = (row["variant"], row["scenario"], row["round"], *measurement_detail(row))
+        if identity not in expected:
+            errors.append(f"unexpected measurement: {identity}")
+        elif identity in seen:
+            errors.append(f"duplicate measurement: {identity}")
+        else:
+            seen.add(identity)
+        if kind == b"PERF-RESULT" and not valid_desktop_result(row):
+            errors.append(f"missing or invalid desktop metrics: {identity}")
+        required = {
+            b"PERF-WAKEUPS": ("interval_ms", "wakeups", "per_second", "cpu", "us_per_wakeup"),
+            b"PERF-CHURN": ("runs", "retained_kb", "per_run_bytes"),
+            b"PERF-CACHE": ("written_mb", "used_mb", "cached_kb", "slab_kb"),
+            b"PERF-OPS": ("count", "bytes_per_op"),
+        }.get(kind, ())
+        try:
+            if any(not math.isfinite(float(row[key])) for key in required):
+                raise ValueError("non-finite metric")
+            fixed = {b"PERF-WAKEUPS": ("interval_ms", 16), b"PERF-CHURN": ("runs", 300),
+                     b"PERF-CACHE": ("written_mb", 32), b"PERF-OPS": ("count", 200)}.get(kind)
+            if fixed and int(row[fixed[0]]) != fixed[1]:
+                raise ValueError(f"expected {fixed[0]}={fixed[1]}")
+        except (KeyError, ValueError, TypeError) as error:
+            errors.append(f"missing or invalid report metrics: {identity}: {error}")
+    if timed_out:
+        errors.append("overall measurement timeout expired")
+    if exit_code not in (None, 0):
+        errors.append(f"guest process exited with status {exit_code}")
+    if done != 1:
+        errors.append(f"expected one VINIX DESKTOP PERF: DONE marker, received {done}")
+    missing = expected - seen
+    if missing:
+        sample = "; ".join(str(identity) for identity in sorted(missing)[:5])
+        errors.append(f"{len(missing)} of {len(expected)} measurements missing: {sample}")
+    return rows, reports, errors
+
+
+def finish_run(transcript: bytes, variants: list[str], scenarios: list[str], rounds: int,
+               json_path: Path | None = None, timed_out: bool = False,
+               exit_code: int | None = None) -> int:
+    rows, reports, errors = inspect_run(transcript, variants, scenarios, rounds, timed_out, exit_code)
+    if json_path:
+        json_path.write_text(json.dumps(rows, indent=2) + "\n")
+    results = [row for row in rows if "report" not in row and valid_desktop_result(row)]
+    if results:
+        print(summarize(results))
+    for line in reports:
+        print(line)
+    for error in errors:
+        print(f"ERROR: {error}", file=sys.stderr)
+    return 1 if errors else 0
 
 
 class Pointer:
@@ -164,29 +322,30 @@ class Console:
         self.closed.set()
 
 
-def stop_child(pid: int, console: Console) -> None:
+def stop_child(pid: int, console: Console) -> int | None:
     try:
-        waited, _ = os.waitpid(pid, os.WNOHANG)
+        waited, status = os.waitpid(pid, os.WNOHANG)
     except ChildProcessError:
         return
     if waited == pid:
-        return
+        return os.waitstatus_to_exitcode(status)
     try:
         os.write(console.master, b"\x01x")
     except OSError:
         pass
     deadline = time.monotonic() + 10
     while time.monotonic() < deadline:
-        waited, _ = os.waitpid(pid, os.WNOHANG)
+        waited, status = os.waitpid(pid, os.WNOHANG)
         if waited == pid:
-            return
+            return os.waitstatus_to_exitcode(status)
         time.sleep(0.1)
     try:
         os.killpg(pid, signal.SIGKILL)
     except (ProcessLookupError, PermissionError):
         pass
     try:
-        os.waitpid(pid, 0)
+        _, status = os.waitpid(pid, 0)
+        return os.waitstatus_to_exitcode(status)
     except ChildProcessError:
         pass
 
@@ -212,8 +371,7 @@ def compile_measure(source: Path, output: Path) -> None:
 
 
 def summarize(results: list[dict]) -> str:
-    keys = ("desktop_cpu", "apps_cpu", "total_cpu", "physical_mb", "desktop_mb",
-            "apps_mb", "total_mb")
+    keys = DESKTOP_METRICS
     groups: dict[tuple[str, str], list[dict]] = {}
     for result in results:
         groups.setdefault((result["scenario"], result["variant"]), []).append(result)
@@ -253,6 +411,10 @@ def main() -> int:
     arguments = parser.parse_args()
 
     scenarios = [name for name in arguments.scenarios.split(",") if name]
+    if not scenarios or len(set(scenarios)) != len(scenarios):
+        parser.error("choose at least one scenario without duplicates")
+    if arguments.rounds < 1 or arguments.seconds < 1 or arguments.settle < 0 or arguments.timeout < 0:
+        parser.error("rounds and seconds must be positive; settle and timeout must be nonnegative")
     for name in scenarios:
         if name not in SCENARIOS:
             parser.error(f"unknown scenario {name}; choose from {', '.join(SCENARIOS)}")
@@ -264,6 +426,8 @@ def main() -> int:
         if not Path(binary).is_file():
             parser.error(f"no such binary: {binary}")
         builds.append((name, Path(binary)))
+    if len({name for name, _ in builds}) != len(builds):
+        parser.error("build labels must be unique")
 
     work = Path(tempfile.mkdtemp(prefix="vinix-desktop-perf."))
     overlay = work / "overlay/opt/vinix-perf"
@@ -324,8 +488,6 @@ def main() -> int:
           f"{', '.join(scenarios)} x{arguments.rounds} (up to {timeout}s)", flush=True)
 
     pointer = Pointer(qmp)
-    results: list[dict] = []
-    reports: list[str] = []
     pid, master = pty.fork()
     if pid == 0:
         os.chdir(ROOT)
@@ -333,11 +495,20 @@ def main() -> int:
     console = Console(master)
     driver = None
     deadline = time.monotonic() + timeout
+    timed_out = False
     try:
-        while time.monotonic() < deadline and not console.closed.is_set():
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                timed_out = True
+                break
             try:
-                line = console.lines.get(timeout=0.5)
+                line = console.lines.get(timeout=min(0.5, remaining))
             except queue.Empty:
+                # Drain already-queued lines even when the reader has reached
+                # EOF. It may have enqueued DONE just before publishing closed.
+                if console.closed.is_set():
+                    break
                 continue
             drive = DRIVE.search(line)
             if drive:
@@ -349,45 +520,28 @@ def main() -> int:
                 arguments.shots.mkdir(parents=True, exist_ok=True)
                 name = "-".join(part.decode() for part in shot.groups())
                 pointer.screendump(arguments.shots.resolve() / f"{name}.ppm")
-            for marker in (b"PERF-WAKEUPS", b"PERF-CHURN", b"PERF-SLAB", b"PERF-CACHE",
-                           b"PERF-MEMINFO", b"PERF-OPS"):
-                if marker in line:
-                    reports.append(line[line.index(marker):].decode(errors="replace"))
-            result = RESULT.search(line)
-            if result:
-                row = {"variant": result.group(1).decode(),
-                       "scenario": result.group(2).decode(),
-                       "round": int(result.group(3))}
-                for field in result.group(4).decode().split():
-                    key, _, value = field.partition("=")
-                    row[key] = value
-                results.append(row)
-            if b"VINIX DESKTOP PERF: DONE" in line or b"KERNEL PANIC" in line \
-                    or b"FATAL EXCEPTION" in line:
+            if line.strip() == DONE or b"KERNEL PANIC" in line \
+                    or b"FATAL EXCEPTION" in line or b"PERF-ERROR" in line:
                 break
     finally:
-        stop_child(pid, console)
+        exit_code = stop_child(pid, console)
+        # The reader owns the transcript. Let it drain the child's final
+        # output before closing the pty and evaluating the complete log, so a
+        # panic/error queued after DONE cannot be mistaken for a passing run.
+        console.thread.join(timeout=2)
         os.close(master)
+        console.thread.join(timeout=1)
+        console_drained = console.closed.is_set()
+        transcript = bytes(console.transcript)
         log = work / "serial.log"
-        log.write_bytes(bytes(console.transcript))
+        log.write_bytes(transcript)
         print(f"\n==> Serial log: {log}")
-
-    if arguments.json:
-        arguments.json.write_text(json.dumps(results, indent=2) + "\n")
-    if not results and not reports:
-        print("ERROR: no measurements were reported", file=sys.stderr)
+    result = finish_run(transcript, [name for name, _ in builds], scenarios, arguments.rounds,
+                        arguments.json, timed_out, exit_code)
+    if not console_drained:
+        print("ERROR: serial console did not finish draining after guest shutdown", file=sys.stderr)
         return 1
-    if results:
-        print(summarize(results))
-    for line in reports:
-        print(line)
-    expected = len(builds) * len([name for name in scenarios
-                                  if name not in ("wakeups", "churn", "cache", "ops")])
-    expected *= arguments.rounds
-    if len(results) != expected:
-        print(f"ERROR: {len(results)} of {expected} measurements were reported", file=sys.stderr)
-        return 1
-    return 0
+    return result
 
 
 if __name__ == "__main__":
