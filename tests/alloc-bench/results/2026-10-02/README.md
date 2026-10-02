@@ -1,5 +1,12 @@
 # Allocation measurements, 2026-10-02
 
+**User-space timing correction:** subsequent validation found that Vinix's
+x86 `CLOCK_MONOTONIC` counted received PIT interrupts and lost elapsed time
+under TCG and long kernel operations. The user-space nanosecond timings and
+ratios below are retained as historical captures and cannot establish
+performance parity. The direct kernel measurements use serialized TSC reads
+and are independent of that clock bug.
+
 The shared GCC C kernel workload was run in actual Vinix and macOS Catalina
 QEMU guests with matched CPU, RAM, machine and TCG settings. Across all three
 recorded cohorts, the optimized Vinix kernel took **21% less time for hot
@@ -8,8 +15,8 @@ pairs** than the original Vinix implementation, using pooled sample medians.
 Its median was below Catalina's in all three kernel workloads. The original
 Vinix kernel's pooled medians were also below Catalina's.
 
-The completed user-space benchmark gives a different result: Vinix remains
-slower in **five of six** workloads. These results do not establish that every
+The historical user-space captures reported Vinix slower in **five of six**
+workloads, using the affected clock. These results do not establish that every
 Vinix allocation is as fast as macOS. User-space `malloc`, VM policy and kernel
 heap allocation have different costs, and these are emulated measurements
 with substantial host scheduling noise.
