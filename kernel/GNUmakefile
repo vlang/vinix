@@ -28,6 +28,17 @@ ifeq ($(wildcard $(LINUXKPI_SOURCE_DIR)/.vinix-upstream.json),)
 endif
 endif
 
+# Optional ARM transport validation; ordinary/default kernels leave it off.
+PCI_CONFIG_TEST ?= 0
+ifneq ($(PCI_CONFIG_TEST),0)
+ifneq ($(PCI_CONFIG_TEST),1)
+    $(error PCI_CONFIG_TEST must be 0 or 1)
+endif
+ifneq ($(ARCH),aarch64)
+    $(error PCI_CONFIG_TEST currently supports ARCH=aarch64 only)
+endif
+endif
+
 # User controllable C compiler command.
 CC := cc
 
@@ -220,14 +231,19 @@ endif
 # changes. Keep the selected configuration in the prerequisite name so moving
 # between a QEMU SMP build and a hardware-safe Apple build cannot reuse a
 # stale obj/blob.c.o.
-V_CONFIG_STAMP := obj/.v-config-$(ARCH)-limine-mp-$(LIMINE_MP)-alloc-track-$(ALLOC_TRACK)-linuxkpi-$(LINUXKPI)
+V_CONFIG_STAMP := obj/.v-config-$(ARCH)-limine-mp-$(LIMINE_MP)-alloc-track-$(ALLOC_TRACK)-linuxkpi-$(LINUXKPI)-pci-test-$(PCI_CONFIG_TEST)
+
+ifeq ($(PCI_CONFIG_TEST),1)
+    override VFLAGS += -d pci_config_test
+    override CPPFLAGS += -DVINIX_PCI_CONFIG_TEST
+endif
 
 ifeq ($(LINUXKPI),1)
     override VFLAGS += -d linuxkpi
     override CPPFLAGS += -DVINIX_LINUXKPI
     LINUXKPI_CPPFLAGS := -D__KERNEL__ -include linux/kconfig.h -include $(LINUXKPI_SOURCE_DIR)/include/linux/compiler_types.h -I linuxkpi/include -I $(LINUXKPI_SOURCE_DIR)/include -I $(LINUXKPI_SOURCE_DIR)/include/uapi -I $(LINUXKPI_SOURCE_DIR)/arch/x86/include -I $(LINUXKPI_SOURCE_DIR)/drivers/gpu/drm/i915 -Wno-unused-parameter -fwrapv
     LINUXKPI_OBJ := obj/linuxkpi/list_sort.o obj/linuxkpi/sort.o obj/linuxkpi/rbtree.o obj/linuxkpi/find_bit.o obj/linuxkpi/hweight.o obj/linuxkpi/ctype.o obj/linuxkpi/siphash.o obj/linuxkpi/i915_config.o obj/linuxkpi/intel_qp_tables.o obj/linuxkpi/i915_memcpy.o
-    obj/c/linuxkpi.c.o obj/c/linuxkpi_refcount.c.o obj/c/linuxkpi_string.c.o obj/c/linuxkpi_percpu.c.o obj/c/linuxkpi_task.c.o obj/c/linuxkpi_sync.c.o obj/c/linuxkpi_time.c.o obj/c/linuxkpi_timer.c.o obj/c/linuxkpi_workqueue.c.o obj/c/linuxkpi_worker_test.c.o obj/c/linuxkpi_bitmap.c.o obj/c/linuxkpi_srcu.c.o obj/c/linuxkpi_srcu_test.c.o obj/c/linuxkpi_ww_mutex.c.o obj/c/linuxkpi_ww_mutex_test.c.o obj/c/linuxkpi_wait_bit.c.o obj/c/linuxkpi_wait_bit_test.c.o obj/c/linuxkpi_io.c.o obj/c/linuxkpi_io_test.c.o obj/c/linuxkpi_cache.c.o obj/c/linuxkpi_cache_test.c.o obj/c/linuxkpi_seqcount_test.c.o obj/c/linuxkpi_format.c.o obj/c/linuxkpi_printk.c.o obj/c/linuxkpi_printk_test.c.o obj/c/linuxkpi_taint.c.o obj/c/linuxkpi_i915_policy_test.c.o obj/c/linuxkpi_usleep_test.c.o obj/c/linuxkpi_kstrtox.c.o: override CPPFLAGS += $(LINUXKPI_CPPFLAGS)
+    obj/c/linuxkpi.c.o obj/c/linuxkpi_refcount.c.o obj/c/linuxkpi_string.c.o obj/c/linuxkpi_percpu.c.o obj/c/linuxkpi_task.c.o obj/c/linuxkpi_sync.c.o obj/c/linuxkpi_time.c.o obj/c/linuxkpi_timer.c.o obj/c/linuxkpi_workqueue.c.o obj/c/linuxkpi_worker_test.c.o obj/c/linuxkpi_bitmap.c.o obj/c/linuxkpi_srcu.c.o obj/c/linuxkpi_srcu_test.c.o obj/c/linuxkpi_ww_mutex.c.o obj/c/linuxkpi_ww_mutex_test.c.o obj/c/linuxkpi_wait_bit.c.o obj/c/linuxkpi_wait_bit_test.c.o obj/c/linuxkpi_io.c.o obj/c/linuxkpi_io_test.c.o obj/c/linuxkpi_cache.c.o obj/c/linuxkpi_cache_test.c.o obj/c/linuxkpi_seqcount_test.c.o obj/c/linuxkpi_format.c.o obj/c/linuxkpi_printk.c.o obj/c/linuxkpi_printk_test.c.o obj/c/linuxkpi_taint.c.o obj/c/linuxkpi_i915_policy_test.c.o obj/c/linuxkpi_usleep_test.c.o obj/c/linuxkpi_kstrtox.c.o obj/c/linuxkpi_pci_config_test.c.o: override CPPFLAGS += $(LINUXKPI_CPPFLAGS)
 endif
 
 # ALLOC_TRACK=1 records the call chain of every live slab allocation, for
@@ -305,7 +321,7 @@ override HEADER_DEPS := $(addprefix obj/c/,$(CFILES:.c=.c.d)) $(addprefix obj/as
 # Default target. This must come first, before header dependencies.
 .PHONY: all
 all: bin/$(OUTPUT)
-obj/c/linuxkpi.c.o obj/c/linuxkpi_refcount.c.o obj/c/linuxkpi_string.c.o obj/c/linuxkpi_percpu.c.o obj/c/linuxkpi_task.c.o obj/c/linuxkpi_sync.c.o obj/c/linuxkpi_time.c.o obj/c/linuxkpi_timer.c.o obj/c/linuxkpi_workqueue.c.o obj/c/linuxkpi_worker_test.c.o obj/c/linuxkpi_bitmap.c.o obj/c/linuxkpi_srcu.c.o obj/c/linuxkpi_srcu_test.c.o obj/c/linuxkpi_ww_mutex.c.o obj/c/linuxkpi_ww_mutex_test.c.o obj/c/linuxkpi_wait_bit.c.o obj/c/linuxkpi_wait_bit_test.c.o obj/c/linuxkpi_io.c.o obj/c/linuxkpi_io_test.c.o obj/c/linuxkpi_cache.c.o obj/c/linuxkpi_cache_test.c.o obj/c/linuxkpi_seqcount_test.c.o obj/c/linuxkpi_format.c.o obj/c/linuxkpi_printk.c.o obj/c/linuxkpi_printk_test.c.o obj/c/linuxkpi_taint.c.o obj/c/linuxkpi_i915_policy_test.c.o obj/c/linuxkpi_usleep_test.c.o obj/c/linuxkpi_kstrtox.c.o: $(V_CONFIG_STAMP)
+obj/c/linuxkpi.c.o obj/c/linuxkpi_refcount.c.o obj/c/linuxkpi_string.c.o obj/c/linuxkpi_percpu.c.o obj/c/linuxkpi_task.c.o obj/c/linuxkpi_sync.c.o obj/c/linuxkpi_time.c.o obj/c/linuxkpi_timer.c.o obj/c/linuxkpi_workqueue.c.o obj/c/linuxkpi_worker_test.c.o obj/c/linuxkpi_bitmap.c.o obj/c/linuxkpi_srcu.c.o obj/c/linuxkpi_srcu_test.c.o obj/c/linuxkpi_ww_mutex.c.o obj/c/linuxkpi_ww_mutex_test.c.o obj/c/linuxkpi_wait_bit.c.o obj/c/linuxkpi_wait_bit_test.c.o obj/c/linuxkpi_io.c.o obj/c/linuxkpi_io_test.c.o obj/c/linuxkpi_cache.c.o obj/c/linuxkpi_cache_test.c.o obj/c/linuxkpi_seqcount_test.c.o obj/c/linuxkpi_format.c.o obj/c/linuxkpi_printk.c.o obj/c/linuxkpi_printk_test.c.o obj/c/linuxkpi_taint.c.o obj/c/linuxkpi_i915_policy_test.c.o obj/c/linuxkpi_usleep_test.c.o obj/c/linuxkpi_kstrtox.c.o obj/c/linuxkpi_pci_config_test.c.o: $(V_CONFIG_STAMP)
 
 ifeq ($(LINUXKPI),1)
 .PHONY: linuxkpi-verify
@@ -313,7 +329,7 @@ linuxkpi-verify:
 	python3 linuxkpi/upstream.py verify --base $(dir $(LINUXKPI_SOURCE_DIR))
 all: linuxkpi-verify
 
-$(LINUXKPI_OBJ) obj/c/linuxkpi.c.o obj/c/linuxkpi_refcount.c.o obj/c/linuxkpi_string.c.o obj/c/linuxkpi_percpu.c.o obj/c/linuxkpi_task.c.o obj/c/linuxkpi_sync.c.o obj/c/linuxkpi_time.c.o obj/c/linuxkpi_timer.c.o obj/c/linuxkpi_workqueue.c.o obj/c/linuxkpi_worker_test.c.o obj/c/linuxkpi_bitmap.c.o obj/c/linuxkpi_srcu.c.o obj/c/linuxkpi_srcu_test.c.o obj/c/linuxkpi_ww_mutex.c.o obj/c/linuxkpi_ww_mutex_test.c.o obj/c/linuxkpi_wait_bit.c.o obj/c/linuxkpi_wait_bit_test.c.o obj/c/linuxkpi_io.c.o obj/c/linuxkpi_io_test.c.o obj/c/linuxkpi_cache.c.o obj/c/linuxkpi_cache_test.c.o obj/c/linuxkpi_seqcount_test.c.o obj/c/linuxkpi_format.c.o obj/c/linuxkpi_printk.c.o obj/c/linuxkpi_printk_test.c.o obj/c/linuxkpi_taint.c.o obj/c/linuxkpi_i915_policy_test.c.o obj/c/linuxkpi_usleep_test.c.o obj/c/linuxkpi_kstrtox.c.o: | linuxkpi-verify
+$(LINUXKPI_OBJ) obj/c/linuxkpi.c.o obj/c/linuxkpi_refcount.c.o obj/c/linuxkpi_string.c.o obj/c/linuxkpi_percpu.c.o obj/c/linuxkpi_task.c.o obj/c/linuxkpi_sync.c.o obj/c/linuxkpi_time.c.o obj/c/linuxkpi_timer.c.o obj/c/linuxkpi_workqueue.c.o obj/c/linuxkpi_worker_test.c.o obj/c/linuxkpi_bitmap.c.o obj/c/linuxkpi_srcu.c.o obj/c/linuxkpi_srcu_test.c.o obj/c/linuxkpi_ww_mutex.c.o obj/c/linuxkpi_ww_mutex_test.c.o obj/c/linuxkpi_wait_bit.c.o obj/c/linuxkpi_wait_bit_test.c.o obj/c/linuxkpi_io.c.o obj/c/linuxkpi_io_test.c.o obj/c/linuxkpi_cache.c.o obj/c/linuxkpi_cache_test.c.o obj/c/linuxkpi_seqcount_test.c.o obj/c/linuxkpi_format.c.o obj/c/linuxkpi_printk.c.o obj/c/linuxkpi_printk_test.c.o obj/c/linuxkpi_taint.c.o obj/c/linuxkpi_i915_policy_test.c.o obj/c/linuxkpi_usleep_test.c.o obj/c/linuxkpi_kstrtox.c.o obj/c/linuxkpi_pci_config_test.c.o: | linuxkpi-verify
 
 # The original SipHash translation unit expects Kbuild export declarations.
 obj/linuxkpi/siphash.o: override CPPFLAGS += -include linux/export.h
@@ -368,6 +384,7 @@ $(V_CONFIG_STAMP):
 
 # The tracker's C half follows the same switch as its V half.
 obj/c/alloc_track.c.o: $(V_CONFIG_STAMP)
+obj/c/pci_config_arm_test.c.o: $(V_CONFIG_STAMP)
 
 obj/blob.c.o: GNUmakefile $(VFILES) $(V_CONFIG_STAMP)
 	mkdir -p "$$(dirname $@)"

@@ -212,10 +212,10 @@ pub fn initialise() bool {
 	// Size the BAR with decoding off, so that the all-ones probe never lands
 	// on top of something else, then turn on memory decoding and bus
 	// mastering. The legacy interrupt stays off: this driver polls.
-	command := dev.read[u32](0x4) & 0xffff
-	dev.write[u32](0x4, command & ~u32(0x7))
+	command := dev.read[u16](0x4)
+	dev.write[u16](0x4, command & ~u16(0x7))
 	bar := dev.get_bar(0)
-	dev.write[u32](0x4, (command & ~u32(1)) | 0x6 | (u32(1) << 10))
+	dev.write[u16](0x4, (command & ~u16(1)) | 0x6 | (u16(1) << 10))
 	if !bar.is_mmio || bar.base == 0 {
 		C.kprintf(c'e1000: %.*s has no memory BAR\n', i32(name.len), name.str)
 		return false

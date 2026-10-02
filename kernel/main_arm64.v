@@ -63,6 +63,9 @@ import userland
 import security
 
 #include "apple_display_hotplug.h"
+#include "pci_config_arm_test.h"
+
+fn C.vinix_pci_config_arm_context_selftest() int
 
 fn C.vinix_display_hotplug_choose_action(connected int, reboot_enabled int,
 	reboot_attempted int, framebuffer_width u64, framebuffer_height u64) int
@@ -386,7 +389,22 @@ fn start_pci() {
 		return
 	}
 	buses := u64(ecam.end_bus) + 1
-	pci.set_ecam(memory.map_mmio(ecam.base, buses << 20))
+	bytes := buses << 20
+	if ecam.start_bus != 0 || ecam.end_bus < ecam.start_bus || ecam.base == 0 ||
+		(ecam.base & 0xfff) != 0 || ecam.base > (u64(1) << 48) - bytes ||
+		bytes > u64(-1) - higher_half || ecam.base > u64(-1) - higher_half - bytes {
+		print('pci: unsupported or invalid MCFG bus aperture; skipping PCIe\n')
+		return
+	}
+	if !pci.set_ecam(memory.map_mmio(ecam.base, bytes), u32(buses)) {
+		panic('Invalid or conflicting PCIe configuration aperture')
+	}
+	$if pci_config_test ? {
+		if C.vinix_pci_config_arm_context_selftest() != 0 {
+			panic('ARM PCI configuration context self-test failed')
+		}
+		C.kprintf(c'pci: ARM checked config widths, bounds and interrupt masks passed\n')
+	}
 	pci.initialise()
 	if !xhci.initialise() {
 		print('xhci: no USB controller\n')

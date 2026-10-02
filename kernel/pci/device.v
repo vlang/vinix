@@ -97,7 +97,6 @@ pub fn (dev &PCIDevice) get_bar(bar u8) PCIBar {
 }
 
 pub fn (dev &PCIDevice) enable_bus_mastering() {
-	if (dev.read[u32](0x4) & (1 << 2)) == 0 {
-		dev.write[u32](0x4, dev.read[u32](0x4) | (1 << 2))
-	}
+	// COMMAND is sixteen bits; rewriting STATUS would clear its RW1C flags.
+	dev.update_command(0, 1 << 2)
 }

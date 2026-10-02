@@ -16,6 +16,7 @@ MARKERS = [
     "linuxkpi: Linux string matching, sysfs newlines and replacement passed; no pages retained",
     "linuxkpi: kernel integer and Boolean parsing, range errors and result ownership passed; no pages retained",
     "linuxkpi: borrowed string tokens, character search and whitespace trimming passed; no pages retained",
+    "linuxkpi: shared PCI config transactions, actual device widths, bounds and worker rollback passed; no pages retained",
     "linuxkpi: 200 multiword bitmap operations, conversion and allocation tests passed; no pages retained",
     "linuxkpi: static and dynamic per-CPU isolation passed on 4 CPUs",
     "linuxkpi: no-resched preserved pending preemption",

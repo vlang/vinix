@@ -315,6 +315,12 @@ struct UACPIPCIAddress {
 
 @[export: 'uacpi_kernel_pci_device_open']
 pub fn uacpi_kernel_pci_device_open(addr UACPIPCIAddress, out_handle &voidptr) UACPIStatus {
+	if out_handle == unsafe { nil } || addr.device > 31 || addr.function > 7 {
+		return UACPIStatus.invalid_argument
+	}
+	if addr.segment != 0 {
+		return UACPIStatus.not_found
+	}
 	mut pci_device := pci.get_device_by_coordinates(addr.bus, addr.device, addr.function,
 		0) or { return UACPIStatus.not_found }
 	unsafe {
@@ -327,50 +333,79 @@ pub fn uacpi_kernel_pci_device_open(addr UACPIPCIAddress, out_handle &voidptr) U
 pub fn uacpi_kernel_pci_device_close(handle voidptr) {
 }
 
+fn pci_config_status(status int) UACPIStatus {
+	return match status {
+		pci.config_ok { UACPIStatus.ok }
+		pci.config_bad_register { UACPIStatus.invalid_argument }
+		else { UACPIStatus.not_found }
+	}
+}
+
 @[export: 'uacpi_kernel_pci_read8']
 pub fn uacpi_kernel_pci_read8(handle voidptr, offset u64, value &u8) UACPIStatus {
-	mut pci_device := unsafe { &pci.PCIDevice(handle) }
-	unsafe {
-		*value = pci_device.read[u8](u32(offset))
+	if handle == unsafe { nil } || value == unsafe { nil } {
+		return UACPIStatus.invalid_argument
 	}
-	return UACPIStatus.ok
+	pci_device := unsafe { &pci.PCIDevice(handle) }
+	mut result := u32(0)
+	status := pci_device.config_read(offset, 1, unsafe { &result })
+	if status == pci.config_ok {
+		unsafe { *value = u8(result) }
+	}
+	return pci_config_status(status)
 }
 
 @[export: 'uacpi_kernel_pci_read16']
 pub fn uacpi_kernel_pci_read16(handle voidptr, offset u64, value &u16) UACPIStatus {
-	mut pci_device := unsafe { &pci.PCIDevice(handle) }
-	unsafe {
-		*value = pci_device.read[u16](u32(offset))
+	if handle == unsafe { nil } || value == unsafe { nil } {
+		return UACPIStatus.invalid_argument
 	}
-	return UACPIStatus.ok
+	pci_device := unsafe { &pci.PCIDevice(handle) }
+	mut result := u32(0)
+	status := pci_device.config_read(offset, 2, unsafe { &result })
+	if status == pci.config_ok {
+		unsafe { *value = u16(result) }
+	}
+	return pci_config_status(status)
 }
 
 @[export: 'uacpi_kernel_pci_read32']
 pub fn uacpi_kernel_pci_read32(handle voidptr, offset u64, value &u32) UACPIStatus {
-	mut pci_device := unsafe { &pci.PCIDevice(handle) }
-	unsafe {
-		*value = pci_device.read[u32](u32(offset))
+	if handle == unsafe { nil } || value == unsafe { nil } {
+		return UACPIStatus.invalid_argument
 	}
-	return UACPIStatus.ok
+	pci_device := unsafe { &pci.PCIDevice(handle) }
+	mut result := u32(0)
+	status := pci_device.config_read(offset, 4, unsafe { &result })
+	if status == pci.config_ok {
+		unsafe { *value = u32(result) }
+	}
+	return pci_config_status(status)
 }
 
 @[export: 'uacpi_kernel_pci_write8']
 pub fn uacpi_kernel_pci_write8(handle voidptr, offset u64, value u8) UACPIStatus {
-	mut pci_device := unsafe { &pci.PCIDevice(handle) }
-	pci_device.write[u8](u32(offset), value)
-	return UACPIStatus.ok
+	if handle == unsafe { nil } {
+		return UACPIStatus.invalid_argument
+	}
+	pci_device := unsafe { &pci.PCIDevice(handle) }
+	return pci_config_status(pci_device.config_write(offset, 1, u32(value)))
 }
 
 @[export: 'uacpi_kernel_pci_write16']
 pub fn uacpi_kernel_pci_write16(handle voidptr, offset u64, value u16) UACPIStatus {
-	mut pci_device := unsafe { &pci.PCIDevice(handle) }
-	pci_device.write[u16](u32(offset), value)
-	return UACPIStatus.ok
+	if handle == unsafe { nil } {
+		return UACPIStatus.invalid_argument
+	}
+	pci_device := unsafe { &pci.PCIDevice(handle) }
+	return pci_config_status(pci_device.config_write(offset, 2, u32(value)))
 }
 
 @[export: 'uacpi_kernel_pci_write32']
 pub fn uacpi_kernel_pci_write32(handle voidptr, offset u64, value u32) UACPIStatus {
-	mut pci_device := unsafe { &pci.PCIDevice(handle) }
-	pci_device.write[u32](u32(offset), value)
-	return UACPIStatus.ok
+	if handle == unsafe { nil } {
+		return UACPIStatus.invalid_argument
+	}
+	pci_device := unsafe { &pci.PCIDevice(handle) }
+	return pci_config_status(pci_device.config_write(offset, 4, u32(value)))
 }

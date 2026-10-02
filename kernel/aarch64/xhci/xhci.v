@@ -493,8 +493,10 @@ pub fn initialise() bool {
 	}
 	// Memory decoding and bus mastering on; the legacy interrupt off, since
 	// this driver polls.
-	command_reg := dev.read[u32](0x4)
-	dev.write[u32](0x4, (command_reg | 0x6) | (u32(1) << 10))
+	if dev.update_command(0, 0x6 | (u16(1) << 10)) != pci.config_ok {
+		println('xhci: PCI command update failed')
+		return false
+	}
 
 	size := if bar.size >= 0x10000 { bar.size } else { u64(0x10000) }
 	xhci_cap = memory.map_mmio(bar.base, size)

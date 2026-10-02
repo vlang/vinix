@@ -456,6 +456,23 @@ the complete i915 source tree is not evidence that the driver runs.
   `__GFP_NOFAIL` and memory-cgroup-accounted allocations are not supported.
 - A read-only target identity check against the unmodified Tiger Lake PCI
   table. This does not register an i915 device or change GPU registers.
+- Native PCI configuration reads, writes and COMMAND updates share one
+  IRQ-safe transport lock across ordinary device users and uACPI callbacks.
+  Domain zero, valid BDF coordinates and aligned 1/2/4-byte registers are
+  checked before I/O; full 64-bit offsets cannot truncate into valid registers.
+  Failed reads leave the borrowed result untouched. Missing functions retain
+  the hardware's successful all-ones reads. x86 uses actual CF8/CFC subword
+  ports within 256 bytes; ARM uses a boot-immutable, Device-nGnRnE ECAM window
+  within 4096 bytes, with checked bus and physical/virtual bounds. ARM preserves
+  every DAIF mask and completes unlock publication before waking waiters.
+  COMMAND updates read/conditionally write sixteen bits in one transaction,
+  preserving adjacent STATUS RW1C flags. Existing ATA, e1000 and xHCI command
+  writes use the proper width. Transactions allocate nothing and never sleep,
+  log or map memory while holding the transport lock. Linux `pci_dev`/bus
+  publication, references, registration/removal and resource ownership remain
+  unresolved; this transport does not provide them. BAR sizing still needs
+  exclusive ownership and safe device quiescence. NMI/FIQ recursion, nonzero
+  segments, nonzero-origin ARM apertures and x86 extended ECAM remain pending.
 - Boolean static branches without text patching; CPUID feature words 0 and 4.
 - Kernel FPU borrowing that saves/restores the running thread's existing
   XSAVE/FXSAVE storage while preemption is disabled. The upstream i915 WC-copy
@@ -487,6 +504,67 @@ python3 tests/linuxkpi/run_vm.py \
     --kernel build-amd64-kernel/bin/vinix \
     --cpu max,hypervisor=off --state-dir /tmp/vinix-linuxkpi-guest-sse
 ```
+
+PCI transport validation uses 18 frozen kernel paths at isolated baseline
+`71426a7e`, enabled ELF SHA256
+`9f76e1954c9188dcffae9035ee1f097d0957ae0947febc49c8371ae05d7ad475`.
+The complete strict ASan/UBSan runtime, unchanged import and standalone-header
+suite passed at `/tmp/vinix-linuxkpi-pci-config-host-final.log`. The added
+standalone `tests/pci-config/run.sh` exercises the actual portable C core under
+both GNU99 and GNU11. Controlled host contention holds a CF8 address/data pair
+while a second device tries to enter; fixed register vectors cover full
+256/4096-byte bounds, real subword lanes, unchanged error outputs and concurrent
+COMMAND updates against a STATUS RW1C model. Core allocation attempts stay zero.
+Host interrupt/pin state is a model, not native architecture evidence.
+
+Four CPU-bound native actors each perform 896 identity/class reads of two
+actual devices, mixing ordinary and IRQ-off calls with nested preemption pins
+and allocation disabled. They check typed results, invalid-only writes, caller
+state and CPU identity after sleeping. All sixteen real worker constructor
+failure cases cover four stages after zero through three successful actors.
+Cleanup joins every started actor, checks DEAD/deadline state while retained,
+waits for the entire cohort to leave its stacks, releases task pins and waits
+for actual deferred frees. Three warmups precede a measured fourth batch with
+exact physical-page recovery. The normal four-CPU guest passed all 33 markers
+and Linux-ABI PID1 at `/tmp/vinix-linuxkpi-pci-config-vm/serial.log`; default x86
+startup passed without LinuxKPI markers. Enabled/default x86 and default ARM
+builds passed. Independent source, fixture and saved generated-C reviews cover
+ABI widths, stack result storage, actual port/MMIO instructions and lifetimes.
+
+The first SSE guest passed the PCI/page checks but later failed the unchanged
+bound self-free watchdog: 15/16 completions at 509 ticks, then 16/16 during the
+cleanup wait in that tick. Its failure remains
+`/tmp/vinix-linuxkpi-pci-config-sse-vm/serial.log`. Callback review found complete
+progress and safe cleanup; it does not explain the delayed completion. A second
+same-ELF SSE guest again passed PCI/page checks, then observed 14/16 at 520 ticks
+and 16/16 at 534 ticks in the same bound test. The pre-PCI enabled ELF from
+`71426a7e` also reproduced that watchdog under identical guest settings:
+14/16 at 534 ticks, then 16/16 in that tick. Its private harness removes only the
+unavailable new PCI marker; provenance and the failing baseline log are saved
+at `/tmp/vinix-linuxkpi-pci-baseline-harness-provenance.json` and
+`/tmp/vinix-linuxkpi-pci-baseline-sse-vm/serial.log`. No callback deadline was
+changed, and neither feature SSE run is a full-suite pass.
+
+The default ARM guest passed with the fixture absent. A separate ARM kernel
+built with `PCI_CONFIG_TEST=1` passed actual ECAM 1/2/4-byte reads, invalid
+offsets and all eight independent D/A/F mask combinations while IRQs remained
+masked. Full DAIF state survives every transaction and the original state is
+restored before return. Both ARM guests reached their raw Linux-ABI PID1;
+logs are `/tmp/vinix-linuxkpi-pci-config-arm-{default,test}-vm/serial.log`.
+The approved harness owns its disk, firmware-variable copy and QEMU process;
+a synthetic late-panic regression also verifies its final log drain. The
+fixture is opt-in, and four configured QEMU CPUs do not establish ARM SMP:
+these context vectors run on the controller CPU. Exact sources, artifact
+hashes, failure logs and independent approvals are recorded in
+`/tmp/vinix-linuxkpi-pci-config-final-validation.json`.
+
+The official allocation gate initially differed after another session rebuilt
+the shared V compiler. Repeated baseline and final feature scans with the same
+compiler both retain **428 sites, 191 groups and 160 existing failure groups**;
+no counts or groups were added by the feature. Both exit 1, and the x86 scan
+retains existing V errors. The initial 411-site reports and their provenance
+remain recorded in `/tmp/vinix-linuxkpi-pci-allocation-comparison.json`.
+This is a scoped comparison, not a global allocation pass or GPU validation.
 
 String-token validation used four frozen kernel paths at isolated baseline
 `ce4606b3`, enabled ELF SHA256

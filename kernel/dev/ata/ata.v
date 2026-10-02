@@ -168,12 +168,8 @@ fn init_ata_drive(port_index int, mut pci_device pci.PCIDevice) ?&ATADrive {
 		identify[i] = kio.port_in[u16](dev.data_port)
 	}
 
-	// Wacky PCI things
-	mut cmd_register := pci_device.read[u32](0x4)
-	if cmd_register & (1 << 2) == 0 {
-		cmd_register |= 1 << 2
-		pci_device.write(0x4, cmd_register)
-	}
+	// Update only COMMAND, leaving adjacent STATUS RW1C flags untouched.
+	pci_device.enable_bus_mastering()
 
 	// Final touches to the dev structure and return.
 	dev.stat.blocks = unsafe { (&u64(u64(&identify[100])))[0] }
