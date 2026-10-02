@@ -1,7 +1,7 @@
 # Linux i915 next-session handoff
 
 Prepared 2026-10-02 for `/Users/alex/code/vinix`, on macOS ARM64 with zsh.
-Committed implementation baseline: **`bfbb99a6`** (including native SRCU). Recheck HEAD and the worktree before
+Committed implementation baseline: **`a554fb3d`** (including SRCU and wound/wait). Recheck HEAD and the worktree before
 starting; other sessions use this checkout. The main status document is
 [linux-i915.md](linux-i915.md).
 
@@ -52,13 +52,15 @@ Bound and high-priority queues are now implemented and committed. The earlier
 final-ELF artifact gap was closed by fresh normal/SSE guest runs using the
 handoff's rebuilt ELF. Ten distinct agents contributed in waves, within the
 four-active-agent limit including root. SRCU is now committed and tested in
-fresh normal/SSE guests. Wound/wait mutexes are the next implementation; inspect
-HEAD and owned diffs before assuming their completion.
+fresh normal/SSE guests. Native Wait-Die/Wound-Wait mutexes are also committed
+and tested. Bit/variable waits are the next implementation; inspect HEAD and
+owned diffs before assuming their completion.
 
 ## Committed progress
 
 | Commit | Completed runtime change |
 | --- | --- |
+| `a554fb3d` | Native stamped Wait-Die and Wound-Wait mutexes, backoff/slow retry and signal cancellation |
 | `bfbb99a6` | Native SRCU readers, persistent grace periods, callbacks/barriers and teardown |
 | `30ac90ae` | Timer self-test failure diagnostics and finite scheduler-tolerant watchdog |
 | `06410c39` | Allocation gate rejects missing reports and checks both architectures even with populated objects |
@@ -240,6 +242,33 @@ archive into another separate reference directory, never into the import.
 - Ordinary RCU, NMI-safe and context-independent down/up SRCU remain unresolved.
   Do not treat explicit SRCU counters as ordinary RCU implicit read protection.
 
+### Wound/wait lifetime contracts
+
+- Preserve the original `ww_mutex.h` layouts and context stamps. The eventual
+  dma-resv core owns `reservation_ww_class` and uses Wait-Die; do not synthesize
+  its remaining fence/reservation runtime in this primitive backend.
+- Every owner/list/context publication uses `base.wait_lock`. Stack waiters
+  detach before returning, and handoff copies task/context before detaching,
+  installs the new context/count/owner before wake, then never reads the record.
+- Acquired counts and wounds use atomics because different locks can expose
+  the same context. Context/task storage stays alive through every lock/wait.
+  Use WW APIs for all accesses, including context-free users of that object.
+- First-lock contexts neither die nor wound an owner. A free lock or assigned
+  handoff wins cancellation/wounding; slow backoff retains its original stamp.
+  Blocking same-context acquisition returns EALREADY; contended trylock is zero.
+
+### Ordinary RCU prerequisites
+
+Explicit SRCU counters do not cover ordinary RCU's implicit IRQ-off, preemption
+or BH read regions. Accurate context tracking requires real native interrupt
+entry/exit, scheduler/idle paths that bypass the common exit, and softirq/BH
+exclusion/dispatch. Current x86 NMI entry also needs paranoid GS and stack
+handling: an NMI can arrive during ring-0 windows with user GS or a released
+old Thread. A counter hook on the current ordinary thunk would be unsafe.
+Do not resolve in_nmi/local_bh/ordinary RCU with constant or explicit-reader-only
+stubs. Read-only next-step design is in
+`/tmp/vinix-linuxkpi-context-design.md`, with pinned entry reference paths.
+
 ## Bound and high-priority contracts
 
 - Bound support explicitly requires at most 64 online CPUs, matching native
@@ -359,6 +388,19 @@ check and prints fixed-stack failure records after shutdown/join. Final guests
 above use that exact source. Failed logs remain as evidence, including
 `/tmp/vinix-linuxkpi-srcu-timer-diagnostic-sse-vm/serial.log`; do not count them
 as successful boots.
+
+Wound/wait strict host tests pass at `/tmp/vinix-linuxkpi-ww-host-final.log`.
+Fresh x86 enabled, ARM disabled and x86 default builds pass at
+`/tmp/vinix-linuxkpi-ww-{x86,arm,default}-build.log`. Four-CPU normal/SSE/default
+guests pass at `/tmp/vinix-linuxkpi-ww-{vm,sse-vm,default-vm}/serial.log`; both
+enabled guests include the wound/wait marker and exact page recovery.
+The tested enabled ELF `/tmp/vinix-linuxkpi-ww-enabled.elf` has SHA256
+`159a6a7c8d25acfac902aa401a1e505ec1caf44f9ebe84a965a5a8baa1e4c5fb`.
+Independent backend/host/native lifetime reviews approved; generated measured
+V code uses scalar locals and adds no hidden allocation. Its fresh allocation
+gate `/tmp/vinix-linuxkpi-ww-alloc.log` matches every existing failure group;
+comparison is `/tmp/vinix-linuxkpi-ww-alloc-comparison.json`. The syntax audit
+still passes 1/269; complete driver linking and hardware remain pending.
 
 The corrected allocation gate reports the same baseline and feature results:
 ARM **293 source files / 361 sites**, x86 **224 files / 253 sites**, combined
@@ -482,7 +524,7 @@ there; preserve known baselines and clearly scope feature-specific evidence.
 
 ## Remaining path to completion
 
-1. Remaining synchronization (ordinary RCU and wound/wait), SMP/context,
+1. Remaining synchronization (ordinary RCU, bit/variable and I/O waits), SMP/context,
    additional system workqueues and timer interfaces.
 2. Linux device/PCI registration/configuration/removal and devres ownership.
 3. MMIO cache attributes, DMA/SG, page/shmem, GPU address spaces and TTM/GEM.
