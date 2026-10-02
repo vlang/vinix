@@ -10,12 +10,16 @@ module sched
 // the thread's stacks and the Thread itself.
 
 import klock
+import lib
 import proc
 
 __global (
 	// Corpses still pinned when their turn to be freed came. See defer_reap().
 	reap_deferred_head &proc.Thread = unsafe { nil }
 	reap_deferred_lock klock.Lock
+	// LinuxKPI native fixtures observe final frees as well as list removal.
+	// Protected by reap_deferred_lock; never holds a pointer to freed storage.
+	linuxkpi_reap_in_flight u64
 )
 
 // Free `t` now, or once nothing has it pinned.
@@ -60,6 +64,12 @@ pub fn reap_deferred() {
 		if proc.thread_is_pinned(t) {
 			previous = t
 		} else {
+			$if linuxkpi ? {
+				if linuxkpi_reap_in_flight == ~u64(0) {
+					lib.kpanic(unsafe { nil }, c'LinuxKPI deferred reaper counter overflow')
+				}
+				linuxkpi_reap_in_flight++
+			}
 			if previous == unsafe { nil } {
 				reap_deferred_head = next
 			} else {
@@ -75,6 +85,14 @@ pub fn reap_deferred() {
 	for ready != unsafe { nil } {
 		next := ready.reap_next
 		free_thread_memory(ready)
+		$if linuxkpi ? {
+			reap_deferred_lock.acquire()
+			if linuxkpi_reap_in_flight == 0 {
+				lib.kpanic(unsafe { nil }, c'LinuxKPI deferred reaper counter underflow')
+			}
+			linuxkpi_reap_in_flight--
+			reap_deferred_lock.release()
+		}
 		ready = next
 	}
 }

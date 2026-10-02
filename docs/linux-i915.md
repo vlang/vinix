@@ -468,6 +468,30 @@ Exact source/build/guest scope is saved in
 `/tmp/vinix-linuxkpi-i915-policy-final-validation.json`. No full driver or
 hardware claim follows from these helper results.
 
+The timed-wait fixture now joins every worker and observes each retained
+thread's off-stack deferred-reaper handoff before releasing any final pin.
+A scalar counter, updated under the existing list lock, keeps detached nodes
+visible through their actual free; the fixture then waits for an empty list
+and zero frees in flight. It never reads a released thread. The shared
+one-second monotonic retirement bound starts after all joins, including DEAD
+publication, readiness and final frees; operation timeouts and exact page
+equality remain unchanged. This establishes retirement of known timed-wait
+workers, not global heap quiescence or the arm64 most-recent-corpse policy.
+
+The retirement fix and I/O mutex tests share the seven-path frozen overlay
+at `b52104ef`, enabled ELF SHA256
+`7ce625f4b7ff4b54c2dd39604274c0b596b18ad75992ef85ee8aed029a69105d`.
+Fresh full normal/SSE guests passed at
+`/tmp/vinix-linuxkpi-mutex-io-retirement-{vm,sse-vm}/serial.log`.
+Enabled/default x86 and disabled ARM builds passed. Independent source and
+both-architecture generated-C reviews found no new hidden allocation.
+Equal-source official allocation gates both retain 440 sites, 193 groups
+and 162 existing failures, adding no sites or groups. Supplementary enabled
+V scans still fail on existing import/interface errors; successful native
+build C supplies the guarded-path review. This is scoped evidence, not a
+global allocation pass. Details are saved in
+`/tmp/vinix-linuxkpi-mutex-reap-allocation-comparison.json`.
+
 Logging validation used the frozen 17-path overlay on isolated baseline
 `a34c2473`, with enabled ELF SHA256
 `318b1939b75b5d2111ea2a306d646c054775d788e086f49dd493615eacb8810b`.

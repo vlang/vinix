@@ -298,13 +298,17 @@ static void *native_time_worker(void *argument)
 int vinix_linuxkpi_time_native_selftest(void)
 {
     extern int kprintf(const char *, ...);
+    extern bool vinix_linuxkpi_test_thread_reap_ready(void *owner);
+    extern bool vinix_linuxkpi_test_reap_quiescent(void);
     struct native_time_worker workers[4] = {0};
     pthread_t threads[4];
     int result = 0;
     for (unsigned int i = 0; i < ARRAY_SIZE(workers); i++)
         BUG_ON(pthread_create(&threads[i], NULL, native_time_worker, &workers[i]));
-    for (unsigned int i = 0; i < ARRAY_SIZE(workers); i++) {
+    for (unsigned int i = 0; i < ARRAY_SIZE(workers); i++)
         BUG_ON(pthread_join(threads[i], NULL));
+    u64 retirement_started = vinix_linuxkpi_clock_ns();
+    for (unsigned int i = 0; i < ARRAY_SIZE(workers); i++) {
         if (workers[i].result) result = -EIO;
         for (unsigned int round = 0; round < ARRAY_SIZE(workers[i].failures); round++) {
             struct native_time_failure *failure = &workers[i].failures[round];
@@ -316,7 +320,13 @@ int vinix_linuxkpi_time_native_selftest(void)
                     failure->queue, failure->simple, failure->completion,
                     failure->completed, failure->interrupted, failure->killable);
         }
-        while (__atomic_load_n(&workers[i].task->__state, __ATOMIC_ACQUIRE) != TASK_DEAD) cond_resched();
+        while (__atomic_load_n(&workers[i].task->__state, __ATOMIC_ACQUIRE) != TASK_DEAD) {
+            if (vinix_linuxkpi_clock_ns() - retirement_started >= 1000000000ULL) {
+                kprintf("linuxkpi: time test worker=%u did not publish TASK_DEAD\n", i);
+                BUG();
+            }
+            cond_resched();
+        }
         size_t retained = native_time_task_waiters(workers[i].task);
         if (retained) {
             kprintf("linuxkpi: time test worker=%u retained %zu timeout records after join\n", i, retained);
@@ -324,7 +334,28 @@ int vinix_linuxkpi_time_native_selftest(void)
              * release its final pin or let the controller's fixture expire. */
             BUG();
         }
+    }
+    /* DEAD and join precede the final switch off the exiting task's stacks.
+     * Observe every retained worker's off-stack deferred-list handoff before
+     * releasing any final pin. A stable free count alone cannot prove it. */
+    for (unsigned int i = 0; i < ARRAY_SIZE(workers); i++)
+        while (!vinix_linuxkpi_test_thread_reap_ready(workers[i].task->vinix_thread)) {
+            if (vinix_linuxkpi_clock_ns() - retirement_started >= 1000000000ULL) {
+                kprintf("linuxkpi: time test worker=%u did not reach off-stack reaper\n", i);
+                BUG(); /* Retain all tasks and the enclosing fixture on failure. */
+            }
+            cond_resched();
+        }
+    for (unsigned int i = 0; i < ARRAY_SIZE(workers); i++)
         put_task_struct(workers[i].task); /* Last access; can free the native Thread. */
+    /* Another CPU can detach a ready node before this CPU's last-put scan.
+     * Wait for its actual free too, without inspecting any released task. */
+    while (!vinix_linuxkpi_test_reap_quiescent()) {
+        if (vinix_linuxkpi_clock_ns() - retirement_started >= 1000000000ULL) {
+            kprintf("linuxkpi: time test deferred frees did not finish\n");
+            BUG();
+        }
+        cond_resched();
     }
     return result;
 }
