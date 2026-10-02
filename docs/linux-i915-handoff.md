@@ -1,7 +1,7 @@
 # Linux i915 next-session handoff
 
 Prepared 2026-10-02 for `/Users/alex/code/vinix`, on macOS ARM64 with zsh.
-Committed implementation baseline: **`a554fb3d`** (including SRCU and wound/wait). Recheck HEAD and the worktree before
+Committed implementation baseline: **`53e42f7e`** (including SRCU, wound/wait and keyed waits). Recheck HEAD and the worktree before
 starting; other sessions use this checkout. The main status document is
 [linux-i915.md](linux-i915.md).
 
@@ -53,13 +53,15 @@ final-ELF artifact gap was closed by fresh normal/SSE guest runs using the
 handoff's rebuilt ELF. Ten distinct agents contributed in waves, within the
 four-active-agent limit including root. SRCU is now committed and tested in
 fresh normal/SSE guests. Native Wait-Die/Wound-Wait mutexes are also committed
-and tested. Bit/variable waits are the next implementation; inspect HEAD and
-owned diffs before assuming their completion.
+and tested. Bit/variable waits are also committed and tested in fresh native
+normal/SSE guests. Genuine scheduler I/O-wait accounting is the next feature;
+inspect HEAD and owned diffs before assuming its implementation.
 
 ## Committed progress
 
 | Commit | Completed runtime change |
 | --- | --- |
+| `53e42f7e` | Allocation-free keyed bit/variable waits, exclusive bit locks, absolute deadlines and stack cancellation |
 | `a554fb3d` | Native stamped Wait-Die and Wound-Wait mutexes, backoff/slow retry and signal cancellation |
 | `bfbb99a6` | Native SRCU readers, persistent grace periods, callbacks/barriers and teardown |
 | `30ac90ae` | Timer self-test failure diagnostics and finite scheduler-tolerant watchdog |
@@ -257,6 +259,24 @@ archive into another separate reference directory, never into the import.
   handoff wins cancellation/wounding; slow backoff retains its original stamp.
   Blocking same-context acquisition returns EALREADY; contended trylock is zero.
 
+### Bit/variable wait lifetime contracts
+
+- The static 256-bucket table has boot lifetime and serialized initialization;
+  later initialization is idempotent and never resets active queues.
+- Complete address/index keys distinguish collisions, multiword bit indices
+  and the variable sentinel. Typed bit wakes read a live bit word only after
+  matching. Variable hashing/matching never reads its opaque address.
+- Display reset places ordinary entries directly on a bit bucket and wakes
+  them when the bit becomes set. Do not globally suppress SET-bit dispatch.
+- Stack records and producer keys stay synchronized by bucket traversal and
+  native finish_wait, which always takes the queue lock before returning.
+  Word and actual condition storage must remain alive through all users;
+  a retired variable address may remain only as an opaque key.
+- Absolute timeout boundaries do not move after spurious wakes. An available
+  lock bit wins an action error/signal after cancellation, matching upstream.
+- Wait/wake paths allocate nothing. I/O-wait actions remain unresolved until
+  real scheduler accounting is integrated; there is no schedule alias stub.
+
 ### Ordinary RCU prerequisites
 
 Explicit SRCU counters do not cover ordinary RCU's implicit IRQ-off, preemption
@@ -402,6 +422,20 @@ gate `/tmp/vinix-linuxkpi-ww-alloc.log` matches every existing failure group;
 comparison is `/tmp/vinix-linuxkpi-ww-alloc-comparison.json`. The syntax audit
 still passes 1/269; complete driver linking and hardware remain pending.
 
+Bit/variable-wait strict host tests pass at
+`/tmp/vinix-linuxkpi-waitbit-host-review.log`. Fresh enabled x86, disabled ARM
+and default x86 builds pass at `/tmp/vinix-linuxkpi-waitbit-{x86,arm,default}-build.log`.
+Fresh normal/SSE/default guests pass at
+`/tmp/vinix-linuxkpi-waitbit-{vm,sse-vm,default-vm}/serial.log`; both enabled
+runs contain the new keyed-wait marker and exact page recovery. Both use
+`/tmp/vinix-linuxkpi-waitbit-enabled.elf`, SHA256
+`a7a244136d74992bcb6fbd69d68af085a93125e4ea3c9924dbbdfdeabebf6a19`.
+Independent backend/host/native reviews approved. Fresh allocation results
+match every baseline group at `/tmp/vinix-linuxkpi-waitbit-alloc-comparison.json`;
+new generated V C contains only scalar measurement locals and direct calls
+(`/tmp/vinix-linuxkpi-waitbit-generatedc-snippet.c`). The audit remains 1/269,
+and import verification again checks all 7,668 unchanged files.
+
 The corrected allocation gate reports the same baseline and feature results:
 ARM **293 source files / 361 sites**, x86 **224 files / 253 sites**, combined
 **425 unique sites / 182 file-kind groups / 155 pre-existing failures**.
@@ -416,14 +450,26 @@ allocator bridge path adds no hidden V allocation. Do not change `allowed.txt`
 to hide these baseline failures.
 
 Broader required ARM ops/churn/cache and desktop idle/apps/drag workloads
-completed without panic. They test LinuxKPI disabled with one online CPU.
-Logs: `/tmp/vinix-linuxkpi-bound-perf-ops-churn-cache-rerun.log` and
-`/tmp/vinix-linuxkpi-bound-perf-idle-apps-drag.log`; parsed results are in
-`/tmp/vinix-linuxkpi-bound-perf-retained-summary.json`. They still show large
-retained allocations (including readdir, proc listing/reads and program
-churn). There was no before/after runtime comparison for those operations;
-do not attribute them to this feature or claim the whole kernel is leak-free.
-Per-feature page recovery is a separate measured result.
+completed without panic, then were repeated against the isolated SRCU-source
+ARM build. Both repeat harnesses exited zero with their completion markers;
+70 syscall reports matched the earlier retained-allocation measurements within
+3 bytes per operation. Existing large readdir, proc listing/reads and program
+churn allocations remain. Cache measurements also match the earlier run.
+These guests use LinuxKPI disabled and one online CPU; they do not execute SRCU,
+wound/wait or bit-wait code. The repeat boot disks contain the measured ELF
+SHA256 `16343fd6ce1269aa2706fcda4e295cae0e51093d227df39ee4fbe5ec38af8d91`,
+and source, generated C and ELF remained unchanged through both runs.
+
+Repeat logs are `/tmp/vinix-linuxkpi-srcu-perf-ops-churn-cache.log` and
+`/tmp/vinix-linuxkpi-srcu-perf-idle-apps-drag.log`; metadata and parsed retained
+results are `/tmp/vinix-linuxkpi-srcu-perf-validation.json` and
+`/tmp/vinix-linuxkpi-srcu-perf-retained-summary.json`. Desktop idle/apps/drag
+physical usage was 65.4/150.3/108.8 MiB. Single samples, concurrent host load
+and differing session binaries do not establish a causal performance change.
+Earlier logs remain `/tmp/vinix-linuxkpi-bound-perf-ops-churn-cache-rerun.log`,
+`/tmp/vinix-linuxkpi-bound-perf-idle-apps-drag.log` and
+`/tmp/vinix-linuxkpi-bound-perf-retained-summary.json`. Do not claim the whole
+kernel is leak-free; per-feature page recovery is a separate measured result.
 
 ## Repeatable commands and build isolation
 
@@ -524,7 +570,7 @@ there; preserve known baselines and clearly scope feature-specific evidence.
 
 ## Remaining path to completion
 
-1. Remaining synchronization (ordinary RCU, bit/variable and I/O waits), SMP/context,
+1. Remaining synchronization (ordinary RCU and I/O waits), SMP/context,
    additional system workqueues and timer interfaces.
 2. Linux device/PCI registration/configuration/removal and devres ownership.
 3. MMIO cache attributes, DMA/SG, page/shmem, GPU address spaces and TTM/GEM.
