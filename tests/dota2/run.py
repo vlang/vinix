@@ -54,6 +54,25 @@ def install(source: Path, target: Path) -> None:
     shutil.copy2(source, target)
 
 
+def stage_vulkan_query(gldriverquery: Path, root: Path) -> None:
+    """Copy the actual optional Linux64 helper beside the supplied GL query."""
+    source = gldriverquery.with_name("vulkandriverquery")
+    target = root / "home/dota2/.steam/ubuntu12_64/vulkandriverquery"
+    if not source.is_file():
+        # A reused fixture must reflect the current supplied SDK, including
+        # the absence of this optional helper.
+        if target.exists() or target.is_symlink():
+            target.unlink()
+        return
+    with source.open("rb") as stream:
+        header = stream.read(64)
+    if (len(header) != 64 or header[:7] != b"\x7fELF\x02\x01\x01" or
+            header[16:18] not in (b"\x02\x00", b"\x03\x00") or
+            header[18:20] != b"\x3e\x00"):
+        raise SystemExit(f"Expected Valve's actual Linux x86-64 Vulkan helper: {source}")
+    install(source, target)
+
+
 def probe_preloads(paths: list[Path]) -> tuple[list[dict], list[bytes]]:
     records, contents = [], []
     for index, path in enumerate(paths):
@@ -145,6 +164,9 @@ def verify_sdk_closure(root: Path) -> None:
                  runtime / "lib/x86_64-linux-gnu", runtime / "lib64"]
     queue = list(sdk.glob("*.so"))
     queue.append(root / "home/dota2/.steam/ubuntu12_64/gldriverquery")
+    vulkan_query = root / "home/dota2/.steam/ubuntu12_64/vulkandriverquery"
+    if vulkan_query.is_file():
+        queue.append(vulkan_query)
     for name in SOFTWARE_GL_DRIVERS:
         driver = runtime / "usr/lib/x86_64-linux-gnu/dri" / name
         if driver.is_file():
@@ -236,6 +258,7 @@ def prepare(args, work: Path) -> tuple[Path, Path]:
             raise SystemExit(f"Expected Valve's actual Linux64 library: {source}")
         install(source, root / "home/dota2/.steam/sdk64" / name)
     install(args.gldriverquery, root / "home/dota2/.steam/ubuntu12_64/gldriverquery")
+    stage_vulkan_query(args.gldriverquery, root)
     verify_sdk_closure(root)
     runtime = root / "usr/libexec/vinix-dota2/root"
     subprocess.run(["clang", "--target=x86_64-linux-gnu", "-fPIE", "-pie",
@@ -468,6 +491,9 @@ def main() -> None:
         "translator_staging": str(args.translator_staging) if args.translator_staging else None,
         "extra_preloads": args.preload_records,
         "steamclient_sha256": sha256(root / "home/dota2/.steam/sdk64/steamclient.so"),
+        "vulkandriverquery_sha256": (
+            sha256(query) if (query := root / "home/dota2/.steam/ubuntu12_64/vulkandriverquery").is_file()
+            else None),
         "export_manifest_sha256": sha256(args.export_state / "manifest.json"),
         "captures": captures, "log": str(work / "vinix.log"),
     }

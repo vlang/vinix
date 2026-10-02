@@ -148,7 +148,9 @@ python3 tests/dota2/run.py \
 
 `--steamclient` supplies Valve's Linux `steamclient.so`, `libtier0_s.so`,
 and `libvstdlib_s.so`, and `--gldriverquery` supplies the real Linux helper;
-the probe never copies an account profile. Its private boot moves the
+if an actual Linux64 `vulkandriverquery` is present beside the supplied GL
+helper, the probe validates and copies it too, recording its hash. The probe
+never copies an account profile. Its private boot moves the
 read-only game mount from `/root` to the game directory and
 leaves both the desktop's and game's settings in writable RAM. Captures and
 serial output are saved under `build/dota2/game-test`. The report requires
