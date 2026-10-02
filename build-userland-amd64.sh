@@ -148,6 +148,7 @@ fi
 
 echo "==> Installing Vinix's optimized musl allocator..."
 python3 "$SCRIPT_DIR/build-support/musl/stage.py" --arch x86_64 --staging "$STAGING"
+python3 "$SCRIPT_DIR/build-support/security-tools/stage.py" --arch x86_64 --staging "$STAGING"
 
 mkdir -p "$(dirname "$INITRAMFS")"
 INITRAMFS_TMP="$(mktemp "$(dirname "$INITRAMFS")/.initramfs.tar.XXXXXX")"

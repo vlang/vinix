@@ -317,6 +317,23 @@ static void start_version_check(char **environment) {
 	}
 }
 
+static void start_security_audit(char **environment) {
+	char *arguments[] = { "/usr/libexec/vinix-security-audit-supervise", (char *)0 };
+	if (!executable_available(arguments[0]))
+		return;
+	i64 child = syscall5(220 /* clone */, 17 /* SIGCHLD */, 0, 0, 0, 0);
+	if (child == 0) {
+		/* Remain outside the compositor's process group across app reloads. */
+		syscall2(154 /* setpgid */, 0, 0);
+		syscall3(221 /* execve */, (u64)arguments[0], (u64)arguments,
+		         (u64)environment);
+		print("init: security audit supervisor could not start\n");
+		syscall1(93 /* exit */, 127);
+	} else if (child < 0) {
+		print("init: security audit supervisor could not fork\n");
+	}
+}
+
 static void reap_exited_children(void) {
 	int status;
 	while (syscall4(260 /* wait4 */, (u64)(i64)-1, (u64)&status,
@@ -515,6 +532,7 @@ void _start(void) {
 	prepare_hosted_x11_storage();
 	install_power_signals();
 	install_child_signal();
+	start_security_audit(environment);
 	start_files_sync(environment);
 	start_version_check(environment);
 
