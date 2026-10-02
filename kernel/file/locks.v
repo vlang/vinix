@@ -194,6 +194,11 @@ fn get_posix_lock(handle &Handle, mut flock Flock) ? {
 }
 
 fn release_posix_locks(res &resource.Resource, pid int) {
+	// fcntl_lock only admits regular files. Other resources cannot have
+	// record locks, so closing them needs no global lock-table work.
+	if !stat.isreg(res.stat.mode) {
+		return
+	}
 	resource_id := lock_resource_id(res)
 	advisory_locks_lock.acquire()
 	mut next := []AdvisoryLock{cap: advisory_locks.len} @[freed]
@@ -219,6 +224,12 @@ fn release_posix_locks(res &resource.Resource, pid int) {
 }
 
 fn release_flock(handle &Handle) {
+	// syscall_flock admits only regular files and directories. Pipe/socket
+	// teardown cannot release an entry from this table.
+	mode := handle.resource.stat.mode
+	if !stat.isreg(mode) && !stat.isdir(mode) {
+		return
+	}
 	resource_id := lock_resource_id(handle.resource)
 	owner := u64(handle)
 	advisory_locks_lock.acquire()

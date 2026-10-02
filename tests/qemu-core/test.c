@@ -1077,6 +1077,15 @@ static int test_locks(void)
 		.l_type = F_WRLCK, .l_whence = SEEK_SET, .l_start = 0, .l_len = 0
 	};
 	CHECK(fcntl(fd, F_SETLK, &lock) == 0);
+	/* Closing resources which cannot acquire locks must leave this lock
+	 * intact, even while the global advisory table contains live entries. */
+	int unrelated[2];
+	CHECK(pipe(unrelated) == 0);
+	CHECK(close(unrelated[0]) == 0);
+	CHECK(close(unrelated[1]) == 0);
+	CHECK(socketpair(AF_UNIX, SOCK_STREAM, 0, unrelated) == 0);
+	CHECK(close(unrelated[0]) == 0);
+	CHECK(close(unrelated[1]) == 0);
 	pid_t child = fork();
 	if (child == 0) {
 		close(fd);
@@ -1106,6 +1115,44 @@ static int test_locks(void)
 	CHECK(flock(fd, LOCK_UN) == 0);
 	CHECK(close(fd) == 0);
 	puts("QEMU CORE PASS: fcntl and flock exclusion");
+
+	/* POSIX locks go on any descriptor close, even with another dup open.
+	 * flock instead lasts until the final open-file-description reference. */
+	fd = open(file_c, O_RDWR);
+	CHECK(fd >= 0);
+	int alias = dup(fd);
+	CHECK(alias >= 0);
+	lock.l_type = F_WRLCK;
+	CHECK(fcntl(fd, F_SETLK, &lock) == 0);
+	CHECK(close(alias) == 0);
+	child = fork();
+	if (child == 0) {
+		close(fd);
+		int other = open(file_c, O_RDWR);
+		_exit(other >= 0 && fcntl(other, F_SETLK, &lock) == 0 ? 0 : 1);
+	}
+	CHECK(reap_ok(child) == 0);
+	CHECK(flock(fd, LOCK_EX) == 0);
+	alias = dup(fd);
+	CHECK(alias >= 0);
+	CHECK(close(fd) == 0);
+	child = fork();
+	if (child == 0) {
+		close(alias);
+		int other = open(file_c, O_RDWR);
+		errno = 0;
+		int result = other >= 0 ? flock(other, LOCK_EX | LOCK_NB) : 0;
+		_exit(result == -1 && (errno == EWOULDBLOCK || errno == EAGAIN) ? 0 : 1);
+	}
+	CHECK(reap_ok(child) == 0);
+	CHECK(close(alias) == 0);
+	child = fork();
+	if (child == 0) {
+		int other = open(file_c, O_RDWR);
+		_exit(other >= 0 && flock(other, LOCK_EX | LOCK_NB) == 0 ? 0 : 1);
+	}
+	CHECK(reap_ok(child) == 0);
+	puts("QEMU CORE PASS: advisory lock close and dup lifetimes");
 	return 0;
 }
 
