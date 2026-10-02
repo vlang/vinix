@@ -136,6 +136,9 @@ class LauncherTest(unittest.TestCase):
             "VINIX_X86_MULTIARCH": "1", "VINIX_ALLOW_WX": "1",
             "QEMU_CPU": "Haswell", "SteamAppId": "570", "SteamGameId": "570",
             "ENABLE_PATHMATCH": "1", "SDL_VIDEO_DRIVER": "x11",
+            "FONTCONFIG_FILE": "/etc/fonts/fonts.conf",
+            "FONTCONFIG_PATH": "/etc/fonts",
+            "FONTCONFIG_SYSROOT": str(self.runtime),
             "VK_ICD_FILENAMES": str(self.icd),
         }.items():
             self.assertEqual(launch["env"][key], value)

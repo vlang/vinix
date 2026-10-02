@@ -64,6 +64,8 @@ The runtime's FreeType is preloaded too. The bundled older FreeType lacks
 its text module. Valve's bundled Pango and PangoFT2 stay together: Panorama
 imports `pango_ft2_new_face_substitute`, which current distro PangoFT2 no longer
 exports.
+Fontconfig uses `/etc/fonts` paths with the private runtime as its sysroot;
+including that root in both places makes its configuration load fail.
 
 A guest library preserves x86 `MAP_32BIT` bounds that QEMU 9.1.2 drops
 when translating mmap flags. It rejects an impossible 2 GiB reservation,

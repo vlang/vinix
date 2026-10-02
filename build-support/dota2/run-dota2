@@ -89,8 +89,10 @@ export SteamAppId=570
 export SteamGameId=570
 export ENABLE_PATHMATCH=1
 export SDL_VIDEO_DRIVER="${SDL_VIDEO_DRIVER:-x11}"
-export FONTCONFIG_FILE="$runtime/etc/fonts/fonts.conf"
-export FONTCONFIG_PATH="$runtime/etc/fonts"
+# Fontconfig prepends its sysroot to configuration paths itself. Supplying
+# the private prefix here as well makes it look beneath that prefix twice.
+export FONTCONFIG_FILE=/etc/fonts/fonts.conf
+export FONTCONFIG_PATH=/etc/fonts
 export FONTCONFIG_SYSROOT="$runtime"
 
 guest_libraries="$game_bin:$runtime/usr/lib/x86_64-linux-gnu:$runtime/lib/x86_64-linux-gnu"
