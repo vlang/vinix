@@ -192,9 +192,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--base-root", type=Path, default=REPO / "build/dota2-vulkan/test/root")
     parser.add_argument("--work", type=Path, default=REPO / "build/dota2/game-test")
-    parser.add_argument("--desktop", type=Path, default=REPO / "third_party/dota2-bringup/build/vinix-desktop")
+    parser.add_argument("--desktop", type=Path, default=REPO / "build/vinix-desktop")
     parser.add_argument("--host-source", type=Path,
-                        default=REPO / "third_party/dota2-bringup/build-support/xorg-server/vinix-wine-host.c")
+                        default=REPO / "build-support/xorg-server/vinix-wine-host.c")
     parser.add_argument("--steamclient", type=Path,
                         default=REPO / "build-aarch64-steam/preseed-home/.local/share/Steam/steamrt64")
     parser.add_argument("--export-state", type=Path, default=REPO / "build/dota2/linux-export")
