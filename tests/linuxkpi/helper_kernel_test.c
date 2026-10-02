@@ -7,6 +7,12 @@ _Static_assert(U32_MAX == 0xffffffffU && S32_MAX == 2147483647, "kernel limits v
 _Static_assert(U64_MAX == 0xffffffffffffffffULL, "64-bit kernel limits visibility");
 _Static_assert(BIT(5) == 32, "kernel bit constants must be available");
 _Static_assert(const_ilog2(1ULL << 63) == 63, "64-bit constant logarithm");
+_Static_assert(__builtin_types_compatible_p(__typeof__(kstrtoull),
+        int(const char *, unsigned int, unsigned long long *)), "kernel unsigned parser visibility");
+_Static_assert(__builtin_types_compatible_p(__typeof__(kstrtoll),
+        int(const char *, unsigned int, long long *)), "kernel signed parser visibility");
+_Static_assert(__builtin_types_compatible_p(__typeof__(kstrtobool),
+        int(const char *, bool *)), "kernel Boolean parser visibility");
 
 int main(void)
 {

@@ -12,14 +12,14 @@ ${CC:-clang} -std=gnu11 -O1 -g -fwrapv -fno-strict-aliasing -Wall -Wextra -Werro
     -include "$repo/tests/linuxkpi/host_types.h" -include linux/kconfig.h -include "$source_dir/include/linux/compiler_types.h" \
     -I"$source_dir/drivers/gpu/drm/i915" -I"$repo/kernel/linuxkpi/include" -I"$source_dir/include" -I"$source_dir/include/uapi" \
     -I"$source_dir/arch/x86/include" -I"$source_dir/arch/x86/include/uapi" \
-    "$repo/kernel/c/linuxkpi.c" "$repo/kernel/c/linuxkpi_refcount.c" "$repo/kernel/c/linuxkpi_string.c" \
+    "$repo/kernel/c/linuxkpi.c" "$repo/kernel/c/linuxkpi_refcount.c" "$repo/kernel/c/linuxkpi_string.c" "$repo/kernel/c/linuxkpi_kstrtox.c" \
     "$repo/kernel/c/linuxkpi_percpu.c" "$repo/kernel/c/linuxkpi_bitmap.c" "$repo/kernel/c/linuxkpi_task.c" \
     "$repo/kernel/c/linuxkpi_sync.c" "$repo/kernel/c/linuxkpi_time.c" \
     "$repo/kernel/c/linuxkpi_timer.c" "$repo/kernel/c/linuxkpi_workqueue.c" \
     "$repo/kernel/c/linuxkpi_srcu.c" "$repo/kernel/c/linuxkpi_ww_mutex.c" "$repo/kernel/c/linuxkpi_wait_bit.c" "$repo/kernel/c/linuxkpi_io.c" "$repo/kernel/c/linuxkpi_cache.c" "$repo/kernel/c/linuxkpi_format.c" \
     "$repo/kernel/c/linuxkpi_printk.c" "$repo/kernel/c/linuxkpi_taint.c" "$repo/tests/linuxkpi/test.c" \
     "$source_dir/lib/list_sort.c" "$source_dir/lib/sort.c" "$source_dir/lib/rbtree.c" \
-    "$source_dir/lib/find_bit.c" "$source_dir/lib/hweight.c" "$source_dir/lib/siphash.c" \
+    "$source_dir/lib/find_bit.c" "$source_dir/lib/hweight.c" "$source_dir/lib/ctype.c" "$source_dir/lib/siphash.c" \
     "$source_dir/drivers/gpu/drm/i915/i915_config.c" \
     "$source_dir/drivers/gpu/drm/i915/display/intel_qp_tables.c" \
     -include linux/export.h \

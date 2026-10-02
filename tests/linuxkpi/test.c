@@ -1056,6 +1056,7 @@ static void reference_tests(void)
 #include "kdev_test.h"
 #include "qp_table_test.h"
 #include "string_helpers_test.h"
+#include "kstrtox_test.h"
 
 int main(int argc, char **argv)
 {
@@ -1104,6 +1105,7 @@ int main(int argc, char **argv)
     cache_tests();
     string_tests();
     string_helpers_tests();
+    kstrtox_tests();
     bitmap_tests();
     test_bitmap_runtime();
     bit_concurrency_tests();

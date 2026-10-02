@@ -10,6 +10,7 @@
 #include <linux/sort.h>
 #include <linux/spinlock.h>
 #include <linux/preempt.h>
+#include <linux/kstrtox.h>
 #include <linux/kref.h>
 #include <linux/bitmap.h>
 #include <asm/unaligned.h>
@@ -158,6 +159,97 @@ static int compare_test_node(void *priv, const struct list_head *a, const struct
     const struct test_node *x = list_entry(a, struct test_node, list);
     const struct test_node *y = list_entry(b, struct test_node, list);
     return (x->key > y->key) - (x->key < y->key);
+}
+
+static int kstrtox_selftest(void)
+{
+    static const struct {
+        const char *text;
+        unsigned int base;
+        int error;
+        unsigned long long value;
+    } unsigned_cases[] = {
+        { "0", 0, 0, 0 }, { "+0\n", 0, 0, 0 }, { "017", 0, 0, 15 },
+        { "0x9a49", 0, 0, 0x9a49 }, { "9A49", 16, 0, 0x9a49 },
+        { "101010", 2, 0, 42 }, { "120", 3, 0, 15 },
+        { "18446744073709551615\n", 10, 0, ULLONG_MAX },
+        { "ffffffffffffffff", 16, 0, ULLONG_MAX },
+        { "18446744073709551616", 10, -ERANGE, 0 },
+        { "18446744073709551616x", 10, -ERANGE, 0 },
+        { "-1", 10, -EINVAL, 0 }, { "08", 0, -EINVAL, 0 },
+        { "0x", 0, -EINVAL, 0 }, { "", 10, -EINVAL, 0 },
+        { "1\n\n", 10, -EINVAL, 0 }, { " 1", 10, -EINVAL, 0 },
+        { "1 ", 10, -EINVAL, 0 }, { "0b10", 0, -EINVAL, 0 },
+    };
+    static const struct { const char *text; int error; long long value; } signed_cases[] = {
+        { "-0", 0, 0 }, { "+42\n", 0, 42 },
+        { "9223372036854775807", 0, LLONG_MAX },
+        { "-9223372036854775808", 0, LLONG_MIN },
+        { "9223372036854775808", -ERANGE, 0 },
+        { "-9223372036854775809", -ERANGE, 0 },
+        { "-+1", -EINVAL, 0 }, { "--1", -EINVAL, 0 },
+    };
+    static const struct { const char *text; int error; bool value; } bool_cases[] = {
+        { "1anything", 0, true }, { "yes", 0, true }, { "TRUE", 0, true },
+        { "ONward", 0, true }, { "offloading", 0, false },
+        { "0anything", 0, false }, { "No", 0, false }, { "FALSE", 0, false },
+        { "o", -EINVAL, false }, { "2", -EINVAL, false },
+        { "", -EINVAL, false }, { NULL, -EINVAL, false },
+    };
+    int result = 0;
+    unsigned long flags = vinix_linuxkpi_irq_save();
+    unsigned int depth = preempt_count();
+    preempt_disable();
+    for (size_t i = 0; i < ARRAY_SIZE(unsigned_cases); i++) {
+        unsigned long long value = 0x123456789abcdef0ULL;
+        int error = kstrtoull(unsigned_cases[i].text, unsigned_cases[i].base, &value);
+        if (error != unsigned_cases[i].error || value !=
+            (error ? 0x123456789abcdef0ULL : unsigned_cases[i].value)) result = -EIO;
+    }
+    for (size_t i = 0; i < ARRAY_SIZE(signed_cases); i++) {
+        long long value = 123456789;
+        int error = kstrtoll(signed_cases[i].text, 10, &value);
+        if (error != signed_cases[i].error || value !=
+            (error ? 123456789 : signed_cases[i].value)) result = -EIO;
+    }
+    for (size_t i = 0; i < ARRAY_SIZE(bool_cases); i++) {
+        bool value = true;
+        int error = kstrtobool(bool_cases[i].text, &value);
+        if (error != bool_cases[i].error || value !=
+            (error ? true : bool_cases[i].value)) result = -EIO;
+    }
+    /* PCI force-probe tokens are hexadecimal unsigned sixteen-bit values.
+     * These checks do not register a device or change the confirmed-ID rule. */
+    u16 pci_id = 0;
+    if (kstrtou16("9a49", 16, &pci_id) || pci_id != 0x9a49 ||
+        kstrtou16("10000", 16, &pci_id) != -ERANGE || pci_id != 0x9a49 ||
+        kstrtou16("-1", 16, &pci_id) != -EINVAL || pci_id != 0x9a49) result = -EIO;
+    u8 small_unsigned = 7;
+    s8 small_signed = 7;
+    s16 medium_signed = 7;
+    unsigned int integer_unsigned = 7;
+    int integer_signed = 7;
+    unsigned long long_unsigned = 7;
+    long long_signed = 7;
+    if (kstrtou8("255", 10, &small_unsigned) || small_unsigned != 255 ||
+        kstrtou8("256", 10, &small_unsigned) != -ERANGE || small_unsigned != 255 ||
+        kstrtos8("-128", 10, &small_signed) || small_signed != -128 ||
+        kstrtos8("128", 10, &small_signed) != -ERANGE || small_signed != -128 ||
+        kstrtos16("-32768", 10, &medium_signed) || medium_signed != -32768 ||
+        kstrtos16("32768", 10, &medium_signed) != -ERANGE || medium_signed != -32768 ||
+        kstrtouint("4294967295", 10, &integer_unsigned) || integer_unsigned != UINT_MAX ||
+        kstrtouint("4294967296", 10, &integer_unsigned) != -ERANGE || integer_unsigned != UINT_MAX ||
+        kstrtoint("-2147483648", 10, &integer_signed) || integer_signed != INT_MIN ||
+        kstrtoint("2147483648", 10, &integer_signed) != -ERANGE || integer_signed != INT_MIN ||
+        _kstrtoul("18446744073709551615", 10, &long_unsigned) || long_unsigned != ULONG_MAX ||
+        _kstrtol("-9223372036854775808", 10, &long_signed) || long_signed != LONG_MIN ||
+        kstrtoul("18446744073709551615", 10, &long_unsigned) || long_unsigned != ULONG_MAX ||
+        kstrtol("-9223372036854775808", 10, &long_signed) || long_signed != LONG_MIN) result = -EIO;
+    if (!irqs_disabled() || preempt_count() != depth + 1) result = -EIO;
+    preempt_enable_no_resched();
+    vinix_linuxkpi_irq_restore(flags);
+    if (vinix_linuxkpi_irq_flags() != flags || preempt_count() != depth) result = -EIO;
+    return result;
 }
 
 static int string_helpers_selftest(void)
@@ -350,6 +442,7 @@ int vinix_linuxkpi_selftest(void)
     else if (strcmp(name, "Tiger")) result = -EIO;
     kfree(name);
     if (string_helpers_selftest()) result = -EIO;
+    if (kstrtox_selftest()) result = -EIO;
     if (!vinix_linuxkpi_tigerlake_id(0x8086, 0x9a49, 0x030000) ||
         vinix_linuxkpi_tigerlake_id(0x8086, 0x9a49, 0x020000) ||
         vinix_linuxkpi_tigerlake_id(0x1234, 0x9a49, 0x030000)) result = -EIO;

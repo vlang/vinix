@@ -14,6 +14,7 @@ MARKERS = [
     "linuxkpi: original i915 timeout and DSC table helpers, Linux device encodings passed; no pages retained",
     "linuxkpi: raw locks, bitmaps, byte order and bounded strings passed",
     "linuxkpi: Linux string matching, sysfs newlines and replacement passed; no pages retained",
+    "linuxkpi: kernel integer and Boolean parsing, range errors and result ownership passed; no pages retained",
     "linuxkpi: 200 multiword bitmap operations, conversion and allocation tests passed; no pages retained",
     "linuxkpi: static and dynamic per-CPU isolation passed on 4 CPUs",
     "linuxkpi: no-resched preserved pending preemption",

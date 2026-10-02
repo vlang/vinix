@@ -31,7 +31,7 @@ their case-distinct filenames cannot coexist on default macOS filesystems.
 
 The current build compiles and links unmodified Linux `lib/list_sort.c`,
 `lib/sort.c`, `lib/rbtree.c`, `lib/find_bit.c`, `lib/hweight.c`,
-`lib/siphash.c` and i915's `i915_config.c`, `display/intel_qp_tables.c` and
+`lib/ctype.c`, `lib/siphash.c` and i915's `i915_config.c`, `display/intel_qp_tables.c` and
 `i915_memcpy.c`. These supply timeout policy, DSC lookup tables and a WC
 memory-copy component; they do not initialize the GPU or submit commands. Importing
 the complete i915 source tree is not evidence that the driver runs.
@@ -409,6 +409,18 @@ the complete i915 source tree is not evidence that the driver runs.
   exact matching. PMU replacement is used on discrete GPUs; Tiger Lake's PMU
   name takes the integrated-GPU branch. Sysfs and display CRC services remain
   unresolved.
+- Kernel-string `kstrtoull`, `kstrtoll`, long/int and 8/16-bit conversions,
+  their unchanged 32/64-bit aliases and `kstrtobool` preserve the pinned Linux
+  algorithms outside the import. The original character-class table is linked.
+  Numeric parsing accepts base zero or 2 through 16, an allowed sign and one
+  trailing newline; syntax/range failures leave the destination unchanged.
+  Boolean parsing retains Linux's first-token rules, including ignored suffixes.
+  Borrowed strings are consumed synchronously without allocation, IRQ changes
+  or preemption changes. The unchanged kernel header supplies their declarations.
+  Real callers include PCI force-probe tokens and GT engine/power settings;
+  the device/settings lifecycles remain unresolved. `_from_user` wrappers and
+  Linux uaccess remain unimplemented: native Boolean user-copy results need
+  an independently validated remaining-byte and zero-tail bridge first.
 - `kmalloc`, `kzalloc`, `kcalloc`, `kmalloc_array`, `kmemdup`, `krealloc`,
   `ksize` and `kfree`, including zero-size pointers, overflow/OOM handling
   and Linux allocation alignment. The initial backend uses contiguous
@@ -465,6 +477,27 @@ python3 tests/linuxkpi/run_vm.py \
     --kernel build-amd64-kernel/bin/vinix \
     --cpu max,hypervisor=off --state-dir /tmp/vinix-linuxkpi-guest-sse
 ```
+
+Kernel-string parser validation used five frozen kernel paths at isolated
+baseline `7735509f`, enabled ELF SHA256
+`cf90f5defc1003984b0c261c85debd4b08d6831884c80c43428fa168e782b996`.
+The complete strict ASan/UBSan runtime, import and standalone-header suite
+passed at `/tmp/vinix-linuxkpi-kstrtox-host-final.log`. Fixed vectors cover
+all supported bases and signed/unsigned widths, boundary values, invalid
+syntax, overflow precedence, unchanged error outputs, permissive Boolean
+suffixes and inaccessible adjacent pages. IRQ-off calls with nested preemption
+pins and allocation disabled preserve caller state. Separate comparison with
+the pinned algorithms passed 16,653 comparisons. All 15 substantive parser
+functions were independently compared with the pinned source.
+
+Fresh enabled/default x86 and disabled ARM builds passed. Normal/SSE four-CPU
+guests passed at `/tmp/vinix-linuxkpi-kstrtox-{vm,sse-vm}/serial.log`, including
+56 native conversion checks per iteration in the existing 200-iteration exact
+physical-page measurement. Default Linux-ABI startup passed with no LinuxKPI
+markers. Independent source and generated-C review found no new allocations or
+retained input/result pointers. Exact evidence is
+`/tmp/vinix-linuxkpi-kstrtox-final-validation.json`. The full syntax audit still
+passes 3/269 units; user-copy parsers and GPU/device operation remain unresolved.
 
 Minimum-duration sleep validation used five frozen kernel paths at isolated
 baseline `53f41b30`, enabled ELF SHA256

@@ -3,6 +3,7 @@
 #define VINIX_LINUX_KERNEL_H
 #include <linux/types.h>
 #include <linux/limits.h>
+#include <linux/kstrtox.h>
 #include <linux/typecheck.h>
 #include <linux/bug.h>
 #include <vinix/runtime.h>
