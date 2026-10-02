@@ -1,7 +1,7 @@
 # Linux i915 next-session handoff
 
 Prepared 2026-10-02 for `/Users/alex/code/vinix`, on macOS ARM64 with zsh.
-Committed implementation baseline: **`ddd1d9f4`** (including plain native object caches). Recheck HEAD and the worktree before
+Committed implementation baseline: **`ea87f353`** (including owned logging/formatting). Recheck HEAD and the worktree before
 starting; other sessions use this checkout. The main status document is
 [linux-i915.md](linux-i915.md).
 
@@ -36,7 +36,7 @@ x86-64 only. Default x86-64 and arm64 kernels leave it disabled.
 
 **There is no working native i915 GPU driver yet.** The complete driver does
 not compile, link or bind; the firmware framebuffer remains the display
-backend. The latest full syntax audit passes **1/269** i915 translation units.
+backend. The latest full syntax audit passes **2/269** i915 translation units.
 The already-linked `i915_memcpy.c` is a CPU WC-copy helper, not GPU bringup.
 Unrelated OpenGothic/Venus/KekVM commits are not evidence of native i915 support.
 
@@ -57,13 +57,20 @@ and tested. Bit/variable waits are also committed and tested in fresh native
 normal/SSE guests. Genuine scheduler I/O-wait accounting is also committed.
 Plain native object caches and the integer/DRM helper include fixes are also
 committed and validated. The allocation harness now rejects incomplete
-reports. Task-flag ownership and sequence counters are the current continuation
-work; inspect HEAD and owned diffs before assuming they are integrated.
+reports. Task-owned flags and original sequence counters are now committed
+and validated. Owned printk records, the inventoried Linux formatting subset,
+warning/taint capture and synchronized native RNG publication are also committed
+and validated. Device-number types and unchanged i915 timeout/DSC policy helpers
+are the next integration work; inspect HEAD and owned diffs before assuming
+prepared fixtures are integrated.
 
 ## Committed progress
 
 | Commit | Completed runtime change |
 | --- | --- |
+| `ea87f353` | Owned printk ring/drain worker, Linux formatting/SipHash, warning/taints, RNG publication and scoped timed-wait fixture |
+| `26f77f05` | Original sequence counters, native lock/retry/latch tests, compiler include contract and SRCU fixture routing |
+| `55294618` | Sticky task-owned flags and native exit publication |
 | `ddd1d9f4` | Packed native object caches, constructor/reuse semantics, atomic allocation, shrink and teardown |
 | `e29bcc4d` | Original integer helpers and standalone unchanged DRM color LUT dependencies/tests |
 | `e4c5ffc4` | Complete allocation/desktop report coverage, completion and console-drain verification |
@@ -127,7 +134,7 @@ files and manifest tampering. Keep overlays and native backends outside that
 tree; do not patch the driver or fill dependencies with fake-success stubs.
 
 Linked original files currently include `list_sort.c`, `sort.c`, `rbtree.c`,
-`find_bit.c`, `hweight.c` and `i915_memcpy.c`. Additional exact-version kernel
+`find_bit.c`, `hweight.c`, `siphash.c` and `i915_memcpy.c`. Additional exact-version kernel
 reference sources were extracted outside the verified tree at
 `/tmp/vinix-linuxkpi-runtime-reference/`, including workqueue/timer/wait/time
 code. If that temporary directory disappears, read or extract the pinned
@@ -578,6 +585,59 @@ generatedc-review,independent-lifetime-review}.json`. The full unchanged i915
 syntax audit still passes only 1/269; the include fixes expose later errors
 rather than a working driver. `/tmp/vinix-linuxkpi-cache-audit.log` and
 `/tmp/vinix-linuxkpi-cache-i915-audit.json` preserve the diagnostics.
+
+## Latest task, sequence and logging validation
+
+`55294618`, `26f77f05` and `ea87f353` are completed changes. Each passed strict
+host sanitizer/import tests, independent lifetime review, isolated enabled
+x86/default x86/disabled ARM builds, normal and SSE4.1 native guests, and scoped
+page recovery. See the main status document for the earlier exact artifacts.
+
+The logging ELF is `/tmp/vinix-linuxkpi-printk-final-enabled-17path.elf`, SHA256
+`318b1939b75b5d2111ea2a306d646c054775d788e086f49dd493615eacb8810b`.
+Normal/SSE logs are `/tmp/vinix-linuxkpi-printk-complete-{vm,sse-vm}/serial.log`;
+both contain the required owned-printk marker and Linux-ABI startup success.
+The measured fourth logging batch returns exactly to baseline after three
+warmups. A permanent worker is initialized before measurement. Final disabled
+ELFs are x86 `e99712632eda2763a927fdb78100719da54079c35bef07b4c42117348eb339ec`
+and ARM `92561bd3df145cb06a1a54a2c86ac316109c6215617dbc823c3df8f196e4ac88`;
+the rebuilt default ELF matches the tested default guest byte for byte.
+
+Logging producers hold only the IRQ-saving ring lock after synchronous
+formatting; they never allocate, wake tasks or write the console. The worker
+copies each record to its stack and unlocks before RNG/sink/console/wait calls.
+An in-flight record retires only after its sink returns. Dropping queued
+entries must not advance that retirement floor. Sink argument storage remains
+alive through paused/quiescent removal. Shutdown drains and joins before
+clearing the retained task pointer and releasing it. The native worker calls
+pthread_exit explicitly because kernel pthread entry has no return trampoline.
+The RNG publishes its boot-lifetime object atomically after complete seeding;
+secure readiness and output are checked under the same generator lock. No
+new hidden allocations appear in those generated V C paths on either target.
+
+The first logging guest failed an old timed-wait fixture that expected the
+entire deadline list to be empty. The permanent logger's msleep(10) legitimately
+uses that list. The fixture now inspects only each joined, retained worker's
+records under the existing lock, before its last task release. A lingering
+reference is fatal before releasing its lifetime. All original API durations
+remain unchanged; final normal/SSE runs pass this check and every other marker.
+
+The final full host log is `/tmp/vinix-linuxkpi-printk-host-final.log`. Source
+freeze/build/guest evidence is `/tmp/vinix-linuxkpi-printk-final-validation.json`.
+Independent formatter/ring/fixture, RNG and final time/taint reviews are saved
+in matching `/tmp/vinix-linuxkpi-*-review.json` files. The equal-baseline V gate
+has 440 sites, 193 groups and 162 existing failures on both sides; no new counts
+or groups. Its original 16-path scope is immutable and the final two C-only
+changes preserve all checked V paths. This remains a scoped feature result,
+not a global allocation pass.
+
+Fresh full audit `/tmp/vinix-linuxkpi-printk-i915-audit.json` passes only 2/269:
+`i915_memcpy.c` and `display/intel_qp_tables.c`. The latter is not yet linked at
+this baseline. Dominant remaining syntax paths include `generated/bounds.h`,
+`dev_t`, `asm/early_ioremap.h`, RCU pointer APIs and `call_single_data_t`.
+Logging does not provide NMI entry, panic bypass, device/facility records,
+per-caller continuation merging, rate limiting or complete lib/vsprintf closure.
+No full i915 object/link or hardware result exists.
 
 ## Repeatable commands and build isolation
 
