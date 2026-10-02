@@ -51,13 +51,19 @@ def main() -> None:
     existing = {line.split("\t")[0] for line in manifest.read_text().splitlines()}
     # vulkan-tools also carries a Python report utility; vulkaninfo and
     # vkcube are ELF programs, so neither Python nor dpkg is needed here.
-    selected = resolver.resolve(resolver.parse_index(index),
+    packages = resolver.parse_index(index)
+    selected = resolver.resolve(packages,
                                 ["libvulkan1", "mesa-vulkan-drivers", "vulkan-tools",
                                  "libpipewire-0.3-0", "libopenal1", "libnm0"],
                                 existing | {"python3", "dpkg"})
+    # Only the public trust data is needed from this package. Its dependencies
+    # run the maintainer script; generate the PEM bundle directly below instead.
+    certificates = next(p for p in packages if p.name == "ca-certificates")
+    selected = sorted({p.name: p for p in [*selected, certificates]}.values(),
+                      key=lambda p: p.name)
     rows = [{"package": p.name, "version": p.version, "filename": p.filename,
              "sha256": p.sha256} for p in selected]
-    inputs = {"source": str(source), "guest_root": args.guest_root,
+    inputs = {"format": 2, "source": str(source), "guest_root": args.guest_root,
               "release": args.release, "packages": rows,
               "amd64": manifest.read_text(),
               "i386": (steam / "i386-packages").read_text()}
@@ -67,7 +73,7 @@ def main() -> None:
         parser.error("existing destination has no generation stamp; use --refresh to replace this private root")
     required = ["lib64/ld-linux-x86-64.so.2", "usr/bin/vulkaninfo", "usr/bin/vkcube",
                 "usr/lib/x86_64-linux-gnu/libvulkan_lvp.so", "usr/lib/x86_64-linux-gnu/libvulkan.so.1",
-                "usr/share/vulkan/icd.d/lvp_icd.x86_64.json"]
+                "usr/share/vulkan/icd.d/lvp_icd.x86_64.json", "etc/ssl/certs/ca-certificates.crt"]
     build.mkdir(parents=True, exist_ok=True)
     (build / "vulkan-packages.json").write_text(json.dumps(rows, indent=2) + "\n")
     if stamp.exists() and stamp.read_text().strip() == generation and all((root / p).exists() for p in required):
@@ -80,6 +86,12 @@ def main() -> None:
     for package in selected:
         archive = resolver.download(args.mirror, package, cache)
         resolver.extract_deb(archive, pending)
+    public_certificates = sorted((pending / "usr/share/ca-certificates/mozilla").glob("*.crt"))
+    if not public_certificates:
+        raise SystemExit("ca-certificates package contains no public trust certificates")
+    bundle = pending / "etc/ssl/certs/ca-certificates.crt"
+    bundle.parent.mkdir(parents=True, exist_ok=True)
+    bundle.write_bytes(b"".join(p.read_bytes().rstrip() + b"\n" for p in public_certificates))
     # An absolute private path also works when an application's own loader
     # opens the ICD without QEMU's -L path redirection.
     icd = pending / "usr/share/vulkan/icd.d/lvp_icd.x86_64.json"
