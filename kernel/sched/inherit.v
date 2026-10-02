@@ -35,29 +35,7 @@ fn inherited_sched_params(source &proc.Thread) proc.SchedParams {
 }
 
 fn attach_thread(mut process proc.Process, mut t proc.Thread) ?int {
-	process.threads_lock.acquire()
-	defer {
-		process.threads_lock.release()
-	}
-
-	if process.threads.len == 0 && process.pid != 0 {
-		t.tid = process.pid
-		proc.bind_tid(t.tid, t)
-		proc.number_thread(mut t, true)
-	} else {
-		t.tid = proc.allocate_tid(t)?
-		proc.number_thread(mut t, false)
-		// Signal dispositions are the process's, and rt_sigaction keeps every
-		// thread on this list in step under this lock. The copy the caller made
-		// from its creator can predate an rt_sigaction that ran on another CPU
-		// in the meantime, and would then stay behind for good: musl's barrier
-		// handler found such a thread still carrying another handler for
-		// SIGSYNCCALL, which never acknowledged, and Firefox hung at startup.
-		t.sigactions = process.threads[0].sigactions
-	}
-
-	process.threads << t
-	return t.tid
+	return proc.attach_thread(mut process, mut t)
 }
 
 pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) ?&proc.Process {

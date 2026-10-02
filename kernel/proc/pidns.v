@@ -87,6 +87,16 @@ pub fn number_process(mut process Process, parent &Process) {
 // Number a thread: the first is known by its process's number, any other gets
 // its own.
 pub fn number_thread(mut t Thread, main bool) {
+	pid_lock.acquire()
+	defer {
+		pid_lock.release()
+	}
+	number_thread_locked(mut t, main)
+}
+
+// Called with the process table lock held. Attachment also holds the
+// process's thread-list lock, after taking the table lock first.
+fn number_thread_locked(mut t Thread, main bool) {
 	process := t.process
 	if process == unsafe { nil } || !numbers_own(process.numbered_in) {
 		return
@@ -94,10 +104,6 @@ pub fn number_thread(mut t Thread, main bool) {
 	if main {
 		t.ns_tid = process.ns_pid
 		return
-	}
-	pid_lock.acquire()
-	defer {
-		pid_lock.release()
 	}
 	mut ns := process.numbered_in
 	t.ns_tid = allocate_local_id(mut ns, t.tid)

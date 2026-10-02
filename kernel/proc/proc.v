@@ -792,6 +792,12 @@ pub fn allocate_tid(thrd &Thread) ?int {
 		pid_lock.release()
 	}
 
+	return allocate_tid_locked(thrd)
+}
+
+// Called with the process table lock held, including thread attachment,
+// which takes that lock before the process's thread-list lock.
+fn allocate_tid_locked(thrd &Thread) ?int {
 	i := find_free_id()?
 	threads_by_tid[i] = unsafe { thrd }
 	adjust_policy_count(false, thrd.sched.is_special())
@@ -810,6 +816,11 @@ pub fn bind_tid(tid int, thrd &Thread) {
 		pid_lock.release()
 	}
 
+	bind_tid_locked(tid, thrd)
+}
+
+// The caller holds the process table lock and has reserved this process id.
+fn bind_tid_locked(tid int, thrd &Thread) {
 	threads_by_tid[tid] = unsafe { thrd }
 	adjust_policy_count(false, thrd.sched.is_special())
 }
