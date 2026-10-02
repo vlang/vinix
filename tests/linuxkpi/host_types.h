@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 /* Parse libc's types and inline annotations before Linux compiler macros. */
 #include <sys/types.h>
+#include <assert.h>
 #include <time.h>
 /* Linux ktime is also included through sched.h. Parse libc first, then let
  * the unchanged kernel headers supply their own clock IDs and tick units. */

@@ -58,7 +58,11 @@ def main():
             "--target=x86_64-unknown-none", "-std=gnu11", "-ffreestanding", "-fwrapv",
             "-nostdinc", "-fsyntax-only", "-ferror-limit=5",
             "-Werror=implicit-function-declaration", "-Wno-unused-parameter",
-            "-D__KERNEL__", "-include", "linux/kconfig.h", "-DCONFIG_X86=1", "-DCONFIG_X86_64=1",
+            "-D__KERNEL__", "-include", "linux/kconfig.h",
+            # Linux 6.6.157 scripts/Makefile.lib adds this after LINUXINCLUDE's
+            # kconfig preinclude, before parsing each C translation unit.
+            "-include", str(root / "include/linux/compiler_types.h"),
+            "-DCONFIG_X86=1", "-DCONFIG_X86_64=1",
             "-DCONFIG_ACPI=1", "-DCONFIG_DRM_I915=1", "-DCONFIG_DRM_FBDEV_EMULATION=1",
             "-isystem", str(HERE.parent / "freestnd-c-hdrs"),
             "-I", str(HERE / "include"), "-I", str(HERE.parent / "c"),

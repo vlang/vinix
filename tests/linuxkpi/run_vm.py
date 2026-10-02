@@ -30,6 +30,7 @@ MARKERS = [
     "linuxkpi: keyed bit/variable waits, exclusive locks, deadlines and signal cancellation passed; no pages retained",
     "linuxkpi: I/O wait scopes, CPU accounting, migration, deadlines and exit cleanup passed; no pages retained",
     "linuxkpi: packed object caches, constructors, atomic allocation, shrink and teardown passed on 4 workers; no pages retained",
+    "linuxkpi: upstream sequence counters, native writer locks, retry and latch snapshots passed on 4 workers; no pages retained",
     "linuxkpi: scheduler deferred preemption while IRQs stayed enabled",
     "and FPU preservation passed",
     "LINUXKPI GUEST: PASS",
@@ -79,16 +80,24 @@ def main():
         process = subprocess.Popen(command, stdout=log, stderr=log)
         try:
             deadline = time.monotonic() + args.timeout
-            while time.monotonic() < deadline:
+            failure_started = None
+            while time.monotonic() < deadline or failure_started is not None:
                 output = serial.read_text(errors="replace") if serial.exists() else ""
-                if any(marker in output for marker in ["KERNEL PANIC", "FATAL EXCEPTION", "self-test failed"]):
-                    raise RuntimeError("guest failed; see " + str(serial))
+                if failure_started is not None or any(marker in output for marker in ["KERNEL PANIC", "FATAL EXCEPTION", "self-test failed"]):
+                    # The panic headline precedes its reason and backtrace.
+                    # Preserve those bytes before terminating our guest.
+                    if failure_started is None:
+                        failure_started = time.monotonic()
+                    if time.monotonic() - failure_started >= 1 or process.poll() is not None:
+                        raise RuntimeError("guest failed; see " + str(serial))
+                    time.sleep(0.1)
+                    continue
                 expected = MARKERS[-1:] if args.no_linuxkpi else MARKERS
                 if all(marker in output for marker in expected):
                     if args.no_linuxkpi and "linuxkpi:" in output:
                         raise RuntimeError("API layer unexpectedly enabled; see " + str(serial))
                     print("Default guest: PASS (4 CPUs, Linux ABI)" if args.no_linuxkpi else
-                          "LinuxKPI guest: PASS (4 CPUs, allocator/object caches, locks, per-CPU storage, task waits/references, synchronization, clocks/timed waits, timers, ordered/delayed/unbound/bound work, priority/system queues, SRCU, wound/wait, bit/variable/I/O waits, scheduler, i915 copy/FPU)")
+                          "LinuxKPI guest: PASS (4 CPUs, allocator/object caches, locks, per-CPU storage, task waits/references, synchronization/sequence counters, clocks/timed waits, timers, ordered/delayed/unbound/bound work, priority/system queues, SRCU, wound/wait, bit/variable/I/O waits, scheduler, i915 copy/FPU)")
                     print("Serial log: " + str(serial))
                     return 0
                 if process.poll() is not None:

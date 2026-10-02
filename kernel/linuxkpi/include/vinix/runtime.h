@@ -88,4 +88,5 @@ int vinix_linuxkpi_ww_mutex_native_selftest(void);
 int vinix_linuxkpi_wait_bit_native_selftest(void);
 int vinix_linuxkpi_io_native_selftest(void);
 int vinix_linuxkpi_cache_native_selftest(void);
+int vinix_linuxkpi_seqcount_native_selftest(void);
 #endif

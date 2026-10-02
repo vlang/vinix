@@ -46,6 +46,9 @@ the complete i915 source tree is not evidence that the driver runs.
   barriers. Linux's generated API wrappers and compiler helpers stay upstream;
   the architecture primitives use compiler atomics. Compatibility C uses
   `-fwrapv`, as required by Linux's signed-overflow convention.
+  Native, hosted and audit translation units force-include the unchanged
+  `compiler_types.h` after `kconfig.h`, matching the pinned Kbuild contract.
+  A separate first-header probe checks the original DRM atomic declarations.
 - Upstream `refcount_t` and ordinary `kref_get`/`kref_put`, including saturation,
   final-release ordering, spinlock release helpers and
   `refcount_dec_and_mutex_lock`.
@@ -53,6 +56,15 @@ the complete i915 source tree is not evidence that the driver runs.
   guards. Lock spinning continues to answer Vinix's TLB shootdowns. IRQ flags belong to
   the caller, not to shared lock storage.
   Failed IRQ-save trylocks restore both IRQ and preemption state.
+- Unmodified Linux `seqlock.h` supplies plain, spinlock-associated and
+  mutex-associated sequence counters, seqlocks and two-copy latch counters.
+  Readers retry inconsistent scalar snapshots; writers use real native locks
+  and preemption guards. The native `cpu_relax` hint services TLB shootdowns.
+  Plain counters require caller serialization and nonpreemptible writers;
+  mutex-associated counters preserve upstream automatic preemption exclusion.
+  Sequence counters do not retain pointers or provide a reclamation grace
+  period. BH exclusion and NMI entry remain unresolved, and their declarations
+  do not supply runtime implementations. Lockdep and PREEMPT_RT remain disabled.
 - Ordinary sleepable mutexes use a raw lock only to protect their wait list;
   contending tasks block in the native scheduler. Direct FIFO handoff prevents
   new arrivals from stealing ownership. Interruptible/killable acquisition
@@ -455,6 +467,33 @@ first-header probes verify original ktime declarations through sched and
 current through ww_mutex. This supplies task flag behavior, without enabling
 virtual CPU time accounting or claiming IRQ/BH packed preemption counts.
 
+Sequence-counter fixtures check static/dynamic initialization, odd/even retry,
+unsigned wrap, invalidation/barriers, writer lock/preemption ownership, nested
+IRQ restoration and exclusive fallback readers. Two serialized writers and
+two readers check scalar pairs through plain, spinlock-associated,
+mutex-associated, seqlock and latch modes. Ordinary odd writers never sleep;
+latch writers yield only while readers use the other copy. Started native
+workers are joined before shared stack storage retires, including partial
+construction failure. Host ASan/UBSan and strict native GNU99/GNU11 probes pass.
+Fresh enabled/default x86 and disabled ARM builds pass. Normal/SSE four-CPU
+guests pass all markers, including exact page recovery after three warmups and
+a measured fourth sequence-counter batch, using ELF SHA256
+`567317e40cc29069338c1d320020d375f5cbc4b33d974061aa2b45e0cb3afbf3`.
+Logs are `/tmp/vinix-linuxkpi-seqcount-final-{vm,sse-vm}/serial.log`.
+Independent lifetime/generated-C reviews approved. The equal-source allocation
+gate at `d63e5c74` reports identical 439 sites, 193 groups and 164 existing
+failures for baseline and feature; it remains a whole-kernel failure.
+
+Two initial guests failed the older SRCU fixture before reaching these tests.
+Failure-only diagnostics passed in both a committed-baseline control and a
+sequence-counter build. Review identified a scheduling hazard: a callback
+could pin the waiter's CPU before the waiter could migrate itself. The fixture
+now routes its retained waiter away before publishing callback entry, then
+checks real placement and grace-period/barrier progress. Final normal/SSE runs
+pass with the original 500-tick deadlines. The initial failures had no stage
+trace, so this is not proof that they had the same cause. The harness also
+drains one second of panic diagnostics before terminating its own guest.
+
 Four host workers exercise 4,000 contended mutex acquisitions, including a
 yield inside each critical section. Controlled queues check FIFO handoff,
 middle/tail cancellation, ignored ordinary signals in killable waits and
@@ -640,6 +679,11 @@ Kbuild Makefile, with ACPI and fbdev enabled and optional self-tests/GVT off.
 It attempts every translation unit and writes complete compiler diagnostics
 to `build/linuxkpi/i915-audit.json`. An incomplete API layer makes this command
 exit with status 1. The current result is **1/269** translation units passing.
+The sequence-counter/compiler-contract audit is recorded separately at
+`/tmp/vinix-linuxkpi-seqcount-i915-audit.json`; leading first errors include
+`pr_warn`, missing `generated/bounds.h`, `WARN_ONCE`, ordinary RCU pointer APIs,
+missing `__init` visibility, `dev_t` and `call_single_data_t`. These are syntax
+paths, not a complete runtime dependency inventory.
 Even a successful syntax audit would still require actual
 object linking, unresolved-symbol checks and runtime/hardware testing.
 

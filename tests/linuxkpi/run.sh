@@ -9,7 +9,7 @@ python3 -B "$repo/kernel/linuxkpi/upstream.py" verify --base "$(dirname "$source
 ${CC:-clang} -std=gnu11 -O1 -g -fwrapv -fno-strict-aliasing -Wall -Wextra -Werror -Wno-unused-parameter \
     -fsanitize=address,undefined -fno-omit-frame-pointer -pthread \
     -DVINIX_LINUXKPI -DVINIX_LINUXKPI_HOST_TEST -D__KERNEL__ \
-    -include "$repo/tests/linuxkpi/host_types.h" -include linux/kconfig.h \
+    -include "$repo/tests/linuxkpi/host_types.h" -include linux/kconfig.h -include "$source_dir/include/linux/compiler_types.h" \
     -I"$repo/kernel/linuxkpi/include" -I"$source_dir/include" -I"$source_dir/include/uapi" \
     -I"$source_dir/arch/x86/include" -I"$source_dir/arch/x86/include/uapi" \
     "$repo/kernel/c/linuxkpi.c" "$repo/kernel/c/linuxkpi_refcount.c" "$repo/kernel/c/linuxkpi_string.c" \
@@ -24,15 +24,15 @@ ${CC:-clang} -std=gnu11 -O1 -g -fwrapv -fno-strict-aliasing -Wall -Wextra -Werro
 # Each translation unit keeps its public Linux/DRM header first. Building
 # separately catches missing transitive includes that the runtime test's
 # broader include list would conceal.
-for helper in helper_kernel helper_drm_color task_header_sched task_header_ww; do
+for helper in helper_kernel helper_drm_color task_header_sched task_header_ww compiler_header; do
     ${CC:-clang} -std=gnu11 -O1 -g -fwrapv -fno-strict-aliasing -Wall -Wextra -Werror -Wno-unused-parameter \
         -fsanitize=address,undefined -fno-omit-frame-pointer \
         -DVINIX_LINUXKPI -DVINIX_LINUXKPI_HOST_TEST -D__KERNEL__ \
-        -include "$repo/tests/linuxkpi/host_types.h" -include linux/kconfig.h \
+        -include "$repo/tests/linuxkpi/host_types.h" -include linux/kconfig.h -include "$source_dir/include/linux/compiler_types.h" \
         -I"$repo/kernel/linuxkpi/include" -I"$source_dir/include" -I"$source_dir/include/uapi" \
         -I"$source_dir/arch/x86/include" -I"$source_dir/arch/x86/include/uapi" \
         "$repo/tests/linuxkpi/${helper}_test.c" -o "$work/$helper"
     "$work/$helper"
 done
-printf '%s\n' 'LinuxKPI: upstream integer helpers and standalone DRM LUT tests passed'
+printf '%s\n' 'LinuxKPI: upstream helpers and standalone Linux/DRM header tests passed'
 python3 -B "$repo/tests/linuxkpi/upstream_test.py"

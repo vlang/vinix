@@ -1032,6 +1032,7 @@ static void reference_tests(void)
 #include "io_test.h"
 #include "cache_test.h"
 #include "task_flag_test.h"
+#include "seqcount_test.h"
 
 int main(void)
 {
@@ -1058,6 +1059,7 @@ int main(void)
     task_wait_tests();
     sync_tests();
     ww_mutex_tests();
+    seqcount_tests();
     time_tests();
     wait_bit_tests();
     io_tests();
@@ -1074,6 +1076,6 @@ int main(void)
     reference_tests();
     vinix_linuxkpi_percpu_destroy_for_test();
     assert(live_pages == 0);
-    puts("LinuxKPI: PASS (Linux helpers, allocation/OOM, packed object caches, strings, bitmaps, SMP/IRQ locks, per-CPU storage, task references, wake races, synchronization, wound/wait mutexes, clocks, bit/variable and I/O waits, timers, ordered/delayed/unbound/bound work, runnable concurrency, priority, system queues and SRCU)");
+    puts("LinuxKPI: PASS (Linux helpers, allocation/OOM, packed object caches, strings, bitmaps, SMP/IRQ locks, per-CPU storage, task references, wake races, synchronization, sequence counters, wound/wait mutexes, clocks, bit/variable and I/O waits, timers, ordered/delayed/unbound/bound work, runnable concurrency, priority, system queues and SRCU)");
     return 0;
 }

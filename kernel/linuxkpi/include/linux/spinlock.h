@@ -52,4 +52,8 @@ static inline void spin_unlock_irq(spinlock_t *lock) { spin_unlock(lock); vinix_
 #define raw_spin_trylock_irqsave spin_trylock_irqsave
 #define raw_spin_lock_irq spin_lock_irq
 #define raw_spin_unlock_irq spin_unlock_irq
+/* Required declarations for unchanged seqlock inlines. Native BH exclusion
+ * is not implemented yet; callers of these APIs remain unresolved at link. */
+void spin_lock_bh(spinlock_t *lock);
+void spin_unlock_bh(spinlock_t *lock);
 #endif
