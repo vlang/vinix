@@ -28,6 +28,10 @@ The game also needs Valve's actual Linux Steam client libraries, normally
 installed by Steam under `$HOME/.steam/sdk64`, and its `ubuntu12_64/gldriverquery`
 helper. The runtime layer supplies their distro dependencies and public TLS
 trust bundle; it does not contain a Steam account or Valve's client binaries.
+The desktop normally uses `/root` as its home. `VINIX_DOTA2_STEAMCLIENT` selects
+another actual Linux64 `steamclient.so`; keep its matching `libtier0_s.so` and
+`libvstdlib_s.so` alongside it. The launcher validates the client's ELF
+architecture before starting the translator.
 The normal launcher keeps Steam's normal authentication behavior. The probe
 below explicitly selects the engine's anonymous test mode for local bring-up.
 
@@ -56,6 +60,17 @@ A third guest library preserves x86 `MAP_32BIT` bounds that QEMU 9.1.2 drops
 when translating mmap flags. It rejects an impossible 2 GiB reservation,
 skips occupied ranges using the translated process's maps, and requests
 non-replacing mappings for smaller low-address ranges.
+
+A fourth guest preload, `libvinix-dota2-steam-loader.so`, opens the actual
+Steam client with `RTLD_NOW | RTLD_LOCAL | RTLD_NODELETE` before Source 2 loads.
+Without this ordering, Steam's coroutine imports bind partly to Source 2's
+different implementation and partly to the SDK, causing assertions and a
+startup crash. The early load resolves all eight client coroutine imports to
+the actual SDK while preserving the global libc compatibility preloads. It
+retains the client for the process lifetime to prevent the measured libnm/GLib
+unload and reload failure. A startup marker is consumed before loading the
+client, so child helpers skip this early load. Valve's ELFs and Steam API
+implementations remain unchanged.
 
 The Dota translator also checks guest-page collisions under QEMU's existing
 mapping lock before handling a partial host page. Without this correction,
@@ -112,6 +127,12 @@ log. A successful enumeration alone is insufficient: shader compilation and
 presentation must complete too. The Dota probe uses Valve's engine test mode
 for anonymous local bring-up and real Steam client libraries; it does not
 establish authenticated matchmaking support.
+
+With the early loader, the real Steam API test passes anonymous initialization,
+callbacks and clean shutdown even with Source 2's tier0 loaded globally. The
+full game advances through anonymous initialization and loads its renderer,
+resource system and schema system, but currently exits from the Vulkan renderer
+with status 1 before displaying the menu. Game rendering is not yet verified.
 
 After the file and graphics probes, capture the real game:
 
