@@ -202,79 +202,103 @@ static void wait_bit_test_basics(void)
     clear_and_wake_up_bit(11, words);
 }
 
-static void wait_bit_test_collision_keys(unsigned long words[][8], size_t count,
-                                        int *first, int *second, unsigned long **other)
+static void wait_bit_test_collision_bits(unsigned long *word, int *first, int *second)
 {
     *first = *second = -1;
     for (int a = 0; a < 8 * BITS_PER_LONG && *first < 0; a++)
         for (int b = a + 1 > BITS_PER_LONG ? a + 1 : BITS_PER_LONG;
              b < 8 * BITS_PER_LONG; b++)
-            if (bit_waitqueue(words[0], a) == bit_waitqueue(words[0], b)) {
+            if (bit_waitqueue(word, a) == bit_waitqueue(word, b)) {
                 *first = a; *second = b; break;
             }
     assert(*first >= 0 && *second > *first);
-    *other = NULL;
-    for (size_t i = 1; i < count; i++)
-        if (bit_waitqueue(words[i], *first) == bit_waitqueue(words[0], *first)) {
-            *other = words[i]; break;
+}
+static void wait_bit_test_collision_addresses(void *storage, size_t stride,
+                                              size_t count, bool variable,
+                                              void **first, void **second)
+{
+    struct wait_queue_head *buckets[256];
+    void *keys[256];
+    unsigned int used = 0;
+    *first = *second = NULL;
+    /* A particular first address need not collide again in a strided sample.
+     * Instead choose any observed pair: 257 distinct addresses and 256 table
+     * buckets guarantee one, independently of stack placement and ASLR. */
+    for (size_t i = 0; i < count; i++) {
+        void *key = (unsigned char *)storage + i * stride;
+        struct wait_queue_head *bucket = variable ? __var_waitqueue(key) : bit_waitqueue(key, 0);
+        for (unsigned int j = 0; j < used; j++) {
+            if (buckets[j] == bucket) {
+                *first = keys[j]; *second = key; return;
+            }
         }
-    assert(*other);
+        assert(used < ARRAY_SIZE(buckets));
+        buckets[used] = bucket; keys[used++] = key;
+    }
+    assert(!"sample did not contain a keyed wait collision");
 }
 static void wait_bit_test_collisions(void)
 {
-    unsigned long words[1024][8] = {{0}}, *other;
+    unsigned long words[1024][8] = {{0}};
+    void *address_first, *address_second;
     int first, second;
-    wait_bit_test_collision_keys(words, ARRAY_SIZE(words), &first, &second, &other);
+    wait_bit_test_collision_bits(words[0], &first, &second);
+    wait_bit_test_collision_addresses(words, sizeof(words[0]), ARRAY_SIZE(words), false,
+                                       &address_first, &address_second);
     for (unsigned int different_address = 0; different_address < 2; different_address++) {
-        unsigned long *wrong_word = different_address ? other : words[0];
-        int wrong_bit = different_address ? first : second;
-        set_bit(first, words[0]); set_bit(wrong_bit, wrong_word);
+        unsigned long *matching_word = different_address ? address_first : words[0];
+        unsigned long *wrong_word = different_address ? address_second : words[0];
+        int matching_bit = different_address ? 0 : first;
+        int wrong_bit = different_address ? 0 : second;
+        set_bit(matching_bit, matching_word); set_bit(wrong_bit, wrong_word);
         struct wait_bit_test_actor matching = {0}, wrong = {0};
         wait_bit_test_start(&wrong, WAIT_BIT_NORMAL, wrong_word, wrong_bit, TASK_UNINTERRUPTIBLE);
         wait_bit_test_parked(&wrong);
-        wait_bit_test_start(&matching, WAIT_BIT_NORMAL, words[0], first, TASK_UNINTERRUPTIBLE);
+        wait_bit_test_start(&matching, WAIT_BIT_NORMAL, matching_word, matching_bit, TASK_UNINTERRUPTIBLE);
         wait_bit_test_parked(&matching);
-        assert(queue_waiters(bit_waitqueue(words[0], first)) == 2);
+        assert(queue_waiters(bit_waitqueue(matching_word, matching_bit)) == 2);
         /* Initializing again must preserve existing boot-lifetime buckets. */
         wait_bit_init();
-        wake_up_bit(words[0], first); /* A still-set matching bit is filtered. */
+        wake_up_bit(matching_word, matching_bit); /* A still-set matching bit is filtered. */
         assert(!vinix_linuxkpi_task_queued(&matching.model));
         assert(!vinix_linuxkpi_task_queued(&wrong.model));
-        assert(test_and_clear_wake_up_bit(first, words[0]));
-        assert(!test_and_clear_wake_up_bit(first, words[0]));
+        assert(test_and_clear_wake_up_bit(matching_bit, matching_word));
+        assert(!test_and_clear_wake_up_bit(matching_bit, matching_word));
         wait_bit_test_join(&matching);
         assert(!__atomic_load_n(&wrong.returned, __ATOMIC_ACQUIRE));
         assert(!vinix_linuxkpi_task_queued(&wrong.model));
-        assert(queue_waiters(bit_waitqueue(words[0], first)) == 1);
+        assert(queue_waiters(bit_waitqueue(matching_word, matching_bit)) == 1);
         clear_and_wake_up_bit(wrong_bit, wrong_word);
         wait_bit_test_join(&wrong);
         assert(!matching.result && !wrong.result);
-        assert(!waitqueue_active(bit_waitqueue(words[0], first)));
+        assert(!waitqueue_active(bit_waitqueue(matching_word, matching_bit)));
     }
 }
 static void wait_bit_test_wake_quota(void)
 {
-    unsigned long words[1024][8] = {{0}}, *other;
-    int bit, wrong_bit;
-    wait_bit_test_collision_keys(words, ARRAY_SIZE(words), &bit, &wrong_bit, &other);
-    set_bit(bit, words[0]); set_bit(wrong_bit, words[0]);
+    unsigned long words[1024][8] = {{0}};
+    void *first, *second;
+    wait_bit_test_collision_addresses(words, sizeof(words[0]), ARRAY_SIZE(words), false, &first, &second);
+    unsigned long *word = first, *other = second;
+    const int bit = 0;
+    set_bit(bit, word); set_bit(bit, other);
     struct wait_bit_test_actor wrong = { .gate_action = true };
     struct wait_bit_test_actor lockers[2] = {{ .gate_action = true }, { .gate_action = true }};
     struct wait_bit_test_actor normal[3] = {{ .gate_action = true },
         { .gate_action = true }, { .gate_action = true }};
     /* A mismatched exclusive waiter precedes the matching exclusive waiters. */
-    wait_bit_test_start(&wrong, WAIT_BIT_LOCK, words[0], wrong_bit, TASK_UNINTERRUPTIBLE);
+    wait_bit_test_start(&wrong, WAIT_BIT_LOCK, other, bit, TASK_UNINTERRUPTIBLE);
     wait_bit_test_parked(&wrong);
     for (unsigned int i = 0; i < ARRAY_SIZE(lockers); i++) {
-        wait_bit_test_start(&lockers[i], WAIT_BIT_LOCK, words[0], bit, TASK_UNINTERRUPTIBLE);
+        wait_bit_test_start(&lockers[i], WAIT_BIT_LOCK, word, bit, TASK_UNINTERRUPTIBLE);
         wait_bit_test_parked(&lockers[i]);
     }
     for (unsigned int i = 0; i < ARRAY_SIZE(normal); i++) {
-        wait_bit_test_start(&normal[i], WAIT_BIT_NORMAL, words[0], bit, TASK_UNINTERRUPTIBLE);
+        wait_bit_test_start(&normal[i], WAIT_BIT_NORMAL, word, bit, TASK_UNINTERRUPTIBLE);
         wait_bit_test_parked(&normal[i]);
     }
     unsigned long flags = vinix_linuxkpi_irq_save();
-    clear_and_wake_up_bit(bit, words[0]);
+    clear_and_wake_up_bit(bit, word);
     assert(!interrupts);
     vinix_linuxkpi_irq_restore(flags);
     for (unsigned int i = 0; i < ARRAY_SIZE(normal); i++) wait_bit_test_wait(&normal[i].awakened, 1);
@@ -282,7 +306,7 @@ static void wait_bit_test_wake_quota(void)
     assert(!vinix_linuxkpi_task_queued(&wrong.model));
     assert(!vinix_linuxkpi_task_queued(&lockers[1].model));
     assert(!wrong.awakened && !lockers[1].awakened);
-    assert(queue_waiters(bit_waitqueue(words[0], bit)) == 2);
+    assert(queue_waiters(bit_waitqueue(word, bit)) == 2);
     /* Hold the selected locker outside its atomic acquisition until every
      * ordinary waiter has observed the cleared bit and retired its stack. */
     for (unsigned int i = 0; i < ARRAY_SIZE(normal); i++) {
@@ -292,20 +316,20 @@ static void wait_bit_test_wake_quota(void)
     }
     __atomic_store_n(&lockers[0].action_release, 1, __ATOMIC_RELEASE);
     wait_bit_test_wait(&lockers[0].returned, 1);
-    assert(!lockers[0].result && test_bit(bit, words[0]));
+    assert(!lockers[0].result && test_bit(bit, word));
     __atomic_store_n(&lockers[0].release, 1, __ATOMIC_RELEASE);
     wait_bit_test_join(&lockers[0]);
     wait_bit_test_wait(&lockers[1].awakened, 1);
     __atomic_store_n(&lockers[1].action_release, 1, __ATOMIC_RELEASE);
     wait_bit_test_wait(&lockers[1].returned, 1);
-    assert(!lockers[1].result && test_bit(bit, words[0]));
+    assert(!lockers[1].result && test_bit(bit, word));
     __atomic_store_n(&lockers[1].release, 1, __ATOMIC_RELEASE);
     wait_bit_test_join(&lockers[1]);
     __atomic_store_n(&wrong.action_release, 1, __ATOMIC_RELEASE);
     __atomic_store_n(&wrong.release, 1, __ATOMIC_RELEASE);
-    clear_and_wake_up_bit(wrong_bit, words[0]);
+    clear_and_wake_up_bit(bit, other);
     wait_bit_test_join(&wrong);
-    assert(!wrong.result && !waitqueue_active(bit_waitqueue(words[0], bit)));
+    assert(!wrong.result && !waitqueue_active(bit_waitqueue(word, bit)));
 }
 
 static unsigned int wait_bit_test_custom_calls;
@@ -448,27 +472,25 @@ static void wait_bit_test_deadlines(void)
 }
 static void wait_bit_test_variables(void)
 {
-    unsigned int values[1024] = {0}, *other = NULL;
-    for (size_t i = 1; i < ARRAY_SIZE(values); i++) {
-        if (__var_waitqueue(&values[i]) == __var_waitqueue(&values[0])) {
-            other = &values[i]; break;
-        }
-    }
-    assert(other);
+    unsigned int values[1024] = {0};
+    void *address_first, *address_second;
+    wait_bit_test_collision_addresses(values, sizeof(values[0]), ARRAY_SIZE(values), true,
+                                       &address_first, &address_second);
+    unsigned int *variable = address_first, *other = address_second;
     unsigned int conditions[2] = {0}, payload = 0;
     struct wait_bit_test_actor wrong = { .key = other, .condition = &conditions[1] };
-    struct wait_bit_test_actor matching = { .key = &values[0], .condition = &conditions[0] };
+    struct wait_bit_test_actor matching = { .key = variable, .condition = &conditions[0] };
     wait_bit_test_start(&wrong, WAIT_VAR_NORMAL, NULL, 0, TASK_UNINTERRUPTIBLE);
     wait_bit_test_parked(&wrong);
     wait_bit_test_start(&matching, WAIT_VAR_NORMAL, NULL, 0, TASK_UNINTERRUPTIBLE);
     wait_bit_test_parked(&matching);
-    __atomic_store_n(&conditions[0], 1, __ATOMIC_RELEASE); smp_mb(); wake_up_var(&values[0]);
+    __atomic_store_n(&conditions[0], 1, __ATOMIC_RELEASE); smp_mb(); wake_up_var(variable);
     wait_bit_test_join(&matching);
     assert(!vinix_linuxkpi_task_queued(&wrong.model));
-    assert(queue_waiters(__var_waitqueue(&values[0])) == 1);
+    assert(queue_waiters(__var_waitqueue(variable)) == 1);
     __atomic_store_n(&conditions[1], 1, __ATOMIC_RELEASE); smp_mb(); wake_up_var(other);
     wait_bit_test_join(&wrong);
-    assert(!waitqueue_active(__var_waitqueue(&values[0])));
+    assert(!waitqueue_active(__var_waitqueue(variable)));
     for (unsigned int round = 0; round < 32; round++) {
         for (unsigned int killable = 0; killable < 2; killable++) {
             unsigned int condition = 0;
