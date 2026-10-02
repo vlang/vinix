@@ -938,6 +938,10 @@ fn run_app_process(options AppProcessOptions) {
 		send_app_error(options.response_fd, app_current_state(desktop), err.msg())
 		return
 	}
+	native_app_apply_sandbox(options) or {
+		send_app_error(options.response_fd, app_current_state(desktop), 'application sandbox: ${err.msg()}')
+		return
+	}
 	if !send_app_response(options.response_fd, true, app_current_state(desktop), []u8{}) {
 		return
 	}
