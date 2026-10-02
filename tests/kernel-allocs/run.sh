@@ -25,12 +25,25 @@ trap 'rm -rf "$work"' EXIT INT TERM
 for arch in aarch64 x86_64; do
 	src=$work/$arch
 	mkdir -p "$src"
-	# The file list the kernel build itself uses for this arch.
-	(cd "$kernel" && make -n obj/blob.c.o ARCH=$arch V="$V" PROD=false 2>/dev/null |
-		grep -o 'for f in [^;]*;' | head -1 | sed 's/^for f in //; s/;$//' | tr ' ' '\n' |
-		while read -r f; do
-			[ -n "$f" ] && mkdir -p "$src/$(dirname "$f")" && cp "$f" "$src/$f"
-		done)
+	# Force the dry-run recipe even when obj/blob.c.o is current. Otherwise
+	# make prints no file list, and V scans an empty tree for this arch.
+	if ! (cd "$kernel" && make -Bn obj/blob.c.o ARCH=$arch V="$V" PROD=false) \
+		> "$work/$arch.make" 2> "$work/$arch.make.log"; then
+		cat "$work/$arch.make.log" >&2
+		echo "ERROR: cannot obtain $arch kernel source list" >&2
+		exit 1
+	fi
+	awk '/^for f in / { sub(/^for f in /, ""); sub(/;.*/, ""); print; exit }' \
+		"$work/$arch.make" | tr ' ' '\n' | sed '/^$/d' > "$work/$arch.files"
+	if [ ! -s "$work/$arch.files" ]; then
+		cat "$work/$arch.make" "$work/$arch.make.log" >&2
+		echo "ERROR: empty $arch kernel source list" >&2
+		exit 1
+	fi
+	while IFS= read -r f; do
+		mkdir -p "$src/$(dirname "$f")"
+		cp "$kernel/$f" "$src/$f"
+	done < "$work/$arch.files"
 	cp "$kernel/v.mod" "$src/"
 	if [ $arch = aarch64 ]; then
 		flags='-arch arm64 -d aarch64 -d limine_mp'
@@ -38,10 +51,19 @@ for arch in aarch64 x86_64; do
 		flags='-arch amd64'
 	fi
 	# Type errors from a newer V than the kernel's do not stop the report.
+	compiler_status=0
 	# shellcheck disable=SC2086
 	"$V" -os vinix -enable-globals -nofloat -manualfree -message-limit 100000 -gc none \
 		-target-libc-headers -no-closures -d no_backtrace $flags -warn-about-allocs \
-		-o "$work/$arch.c" "$src" > "$work/$arch.log" 2>&1 || true
+		-o "$work/$arch.c" "$src" > "$work/$arch.log" 2>&1 || compiler_status=$?
+	if ! grep -q 'allocation (' "$work/$arch.log"; then
+		cat "$work/$arch.log" >&2
+		echo "ERROR: $arch compiler produced no allocation report (exit $compiler_status)" >&2
+		exit 1
+	fi
+	source_count=$(wc -l < "$work/$arch.files" | tr -d ' ')
+	site_count=$(grep -c 'allocation (' "$work/$arch.log")
+	echo "$arch: $source_count source files, $site_count allocation sites (V exit $compiler_status)" >&2
 	grep 'allocation (' "$work/$arch.log" |
 		sed -E 's|^.*vinix-kernel-allocs\.[^/]+/[^/]+/||; s|: warning: allocation \((.*)\)| \1|' \
 		>> "$work/sites"
