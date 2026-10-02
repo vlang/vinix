@@ -68,8 +68,12 @@ def main() -> int:
         },
     }
     (bundle / "Contents/Info.plist").write_bytes(plistlib.dumps(info))
-    sources = [ROOT / "kernel/c/heap_benchmark.c",
-               ROOT / "tests/alloc-bench/macos-kext-info.c"]
+    sources = []
+    for original in [ROOT / "kernel/c/heap_benchmark.c",
+                     ROOT / "tests/alloc-bench/macos-kext-info.c"]:
+        staged = state / original.name
+        staged.write_bytes(original.read_bytes())
+        sources.append(staged)
     commands = []
     objects = []
     with (state / "build.log").open("wb") as log:
