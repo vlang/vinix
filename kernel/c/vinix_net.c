@@ -88,6 +88,8 @@ struct vinix_socket {
     /* tcp_err releases the PCB before user space can query this socket. */
     ip_addr_t last_local_address;
     uint16_t last_local_port;
+    ip_addr_t last_remote_address;
+    uint16_t last_remote_port;
     struct packet *rx_head;
     struct packet *rx_tail;
     struct vinix_socket *accept_head;
@@ -193,18 +195,22 @@ static void free_packets(struct vinix_socket *socket) {
 }
 
 static int queue_packet(struct vinix_socket *socket, struct pbuf *p,
-                        const ip_addr_t *address, uint16_t port) {
+                        const ip_addr_t *address, uint16_t port, int terminal) {
     struct packet *packet;
     uint32_t charge = p->tot_len + sizeof(*packet) + 64;
     if ((charge > socket->receive_limit ||
          socket->receive_queued > socket->receive_limit - charge) &&
-        !(socket->type == VINIX_NET_STREAM && socket->receive_queued == 0)) {
+        !(socket->type == VINIX_NET_STREAM &&
+          (socket->receive_queued == 0 || terminal))) {
         return 0;
     }
     /* TCP may coalesce an entire advertised window into one pbuf chain.
      * Permit that one chain in an empty queue even after SO_RCVBUF shrinks;
      * rejecting it forever would deadlock the stream. Further chains still
-     * apply backpressure. UDP drops datagrams that exceed its budget. */
+     * apply backpressure. Also keep the final TCP chain: a PCB already in
+     * CLOSING or TIME-WAIT will not retry refused data before its timer frees
+     * it. That chain is still bounded by the advertised receive window.
+     * UDP drops datagrams that exceed its budget. */
     packet = (struct packet *)mem_malloc(sizeof(*packet));
     if (!packet) {
         return 0;
@@ -224,6 +230,23 @@ static int queue_packet(struct vinix_socket *socket, struct pbuf *p,
     return 1;
 }
 
+/* lwIP owns a successfully closed PCB, including one still on TIME-WAIT.
+ * Keep only endpoint values after that transfer: its timers may free the PCB
+ * without an error callback. The caller holds the kernel's network lock.
+ */
+static void detach_tcp(struct vinix_socket *socket, struct tcp_pcb *pcb) {
+    ip_addr_copy(socket->last_local_address, pcb->local_ip);
+    socket->last_local_port = lwip_htons(pcb->local_port);
+    ip_addr_copy(socket->last_remote_address, pcb->remote_ip);
+    socket->last_remote_port = lwip_htons(pcb->remote_port);
+    tcp_arg(pcb, NULL);
+    tcp_recv(pcb, NULL);
+    tcp_sent(pcb, NULL);
+    tcp_err(pcb, NULL);
+    socket->tcp = NULL;
+    socket->connecting = 0;
+}
+
 static err_t tcp_received(void *argument, struct tcp_pcb *pcb,
                           struct pbuf *p, err_t error) {
     struct vinix_socket *socket = (struct vinix_socket *)argument;
@@ -239,6 +262,9 @@ static err_t tcp_received(void *argument, struct tcp_pcb *pcb,
     }
     if (!p) {
         socket->peer_closed = 1;
+        if (pcb->state == TIME_WAIT || pcb->state == CLOSING) {
+            detach_tcp(socket, pcb);
+        }
         return ERR_OK;
     }
     if (socket->read_shutdown) {
@@ -246,7 +272,22 @@ static err_t tcp_received(void *argument, struct tcp_pcb *pcb,
         pbuf_free(p);
         return ERR_OK;
     }
-    if (!queue_packet(socket, p, &pcb->remote_ip, pcb->remote_port)) {
+    int terminal = pcb->state == TIME_WAIT || pcb->state == CLOSING;
+    if (!queue_packet(socket, p, &pcb->remote_ip, pcb->remote_port, terminal)) {
+        if (terminal) {
+            /* No metadata memory remains for the final payload. Report the
+             * failure instead of retaining a PCB that will expire silently.
+             * This callback owns p only when accepting it or returning ABRT;
+             * tcp_input will not free it again after ERR_ABRT.
+             */
+            detach_tcp(socket, pcb);
+            socket->connected = 0;
+            socket->peer_closed = 1;
+            socket->error = 12; /* ENOMEM */
+            pbuf_free(p);
+            tcp_abort(pcb);
+            return ERR_ABRT;
+        }
         /* Keeping lwIP's ownership by refusing the packet applies TCP
          * backpressure instead of silently losing stream bytes. */
         return ERR_MEM;
@@ -352,7 +393,7 @@ static void udp_received(void *argument, struct udp_pcb *pcb, struct pbuf *p,
     struct vinix_socket *socket = (struct vinix_socket *)argument;
     (void)pcb;
     if (!socket || socket->read_shutdown ||
-        !queue_packet(socket, p, address, port)) {
+        !queue_packet(socket, p, address, port, 0)) {
         pbuf_free(p);
     }
 }
@@ -1046,7 +1087,27 @@ int vinix_socket_shutdown(struct vinix_socket *socket, int how) {
         socket->write_shutdown = 1;
     }
     if (socket->type == VINIX_NET_STREAM) {
-        if (!socket->tcp) return 107;
+        if (!socket->tcp) return socket->connected ? 0 : 107;
+        if (socket->write_shutdown &&
+            (socket->read_shutdown || socket->peer_closed) &&
+            socket->tcp->state != LISTEN) {
+            struct tcp_pcb *pcb = socket->tcp;
+            int connecting = socket->connecting;
+            /* Even ERR_MEM while enqueueing FIN is converted by lwIP into
+             * ERR_OK plus TF_CLOSEPEND. Detach before calling: a successful
+             * full shutdown may free pcb immediately, or from a later timer.
+             * After peer EOF, write shutdown also completes the protocol;
+             * keep queued receive bytes by leaving its receive side open.
+             */
+            detach_tcp(socket, pcb);
+            error = tcp_shutdown(pcb, socket->read_shutdown, 1);
+            if (error != ERR_OK) {
+                socket->tcp = pcb;
+                socket->connecting = connecting;
+                install_tcp_callbacks(socket);
+            }
+            return linux_error(error);
+        }
         error = tcp_shutdown(socket->tcp, how == 0 || how == 2,
                              how == 1 || how == 2);
         return linux_error(error);
@@ -1075,9 +1136,10 @@ int vinix_socket_local_ip(struct vinix_socket *socket,
 int vinix_socket_peer_ip(struct vinix_socket *socket,
                           struct vinix_ip_address *address, uint16_t *port) {
     if (!socket || !socket->connected) return 107;
-    if (socket->tcp) {
-        encode_address(socket, &socket->tcp->remote_ip, address);
-        if (port) *port = lwip_htons(socket->tcp->remote_port);
+    if (socket->type == VINIX_NET_STREAM) {
+        encode_address(socket, socket->tcp ? &socket->tcp->remote_ip :
+                        &socket->last_remote_address, address);
+        if (port) *port = socket->tcp ? lwip_htons(socket->tcp->remote_port) : socket->last_remote_port;
     } else {
         encode_address(socket, &socket->udp->remote_ip, address);
         if (port) *port = lwip_htons(socket->udp->remote_port);
