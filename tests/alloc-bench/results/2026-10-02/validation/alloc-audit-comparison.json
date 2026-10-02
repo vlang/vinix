@@ -1,0 +1,8 @@
+{
+  "baseline_exit_code": 1,
+  "candidate_exit_code": 1,
+  "baseline_total_reported_sites": 425,
+  "candidate_total_reported_sites": 425,
+  "path_kind_deltas": {},
+  "notes": "Existing allowlist does not match reports from V 0.5.2 0dc6a69; no allowlist changes. Same compiler, baseline has no optimizer modifications. Counts omit line numbers shifted by edits."
+}

@@ -1,0 +1,91 @@
+{
+  "machine": "q35,vmport=off",
+  "cpu": "Penryn,kvm=on,vendor=GenuineIntel,+ssse3,+sse4.2,+popcnt",
+  "smp": "1,sockets=1,cores=1,threads=1",
+  "ssh_port": 22322,
+  "vnc_port": 5914,
+  "qemu_version": "QEMU emulator version 11.1.1",
+  "accelerator": "tcg,thread=single,tb-size=1024",
+  "memory_mb": 4096,
+  "compile_flags": [
+    "-std=c11",
+    "-O2",
+    "-Wall",
+    "-Wextra",
+    "-Werror",
+    "-fno-builtin",
+    "-ffreestanding",
+    "-fno-stack-protector",
+    "-mno-red-zone",
+    "-mno-80387",
+    "-mno-mmx",
+    "-mno-sse",
+    "-mno-sse2"
+  ],
+  "source_sha256": "663fad012d9f55aba73953737bacf245189eafcf784a292d46e2d0a67643d064",
+  "compiler": "gcc14.3.0 MacPorts Darwin19",
+  "build_mode": "native guest GNU GCC14.3 C-to-assembly; host Apple assembler/linker",
+  "boot_args": "keepsyms=1 -s -v serial=3",
+  "boot_mode": "single-user",
+  "transfer_device": "ide-hd on sata.3, raw FAT32 256MiB, attached at boot",
+  "platform_compile_flags": [
+    "-mkernel",
+    "-fno-pie",
+    "-fno-PIC",
+    "-mmacosx-version-min=10.15"
+  ],
+  "guest_version": "macOS 10.15.7 19H15",
+  "guest_kernel": "XNU6153.141.2.2~1",
+  "sip": "disabled in private clone (csr-active-config=0x67)",
+  "build_method": "native guest GNU GCC14.3 C-to-assembly; host Apple assembler/linker",
+  "kernel_invocation": "diagnostic kext after single-user boot; one virtual CPU",
+  "execution_context": "kext",
+  "arch": "x86_64",
+  "guest_compile_commands": [
+    "DYLD_LIBRARY_PATH=/tmp/opt/local/lib /tmp/opt/local/bin/gcc-mp-14 -std=c11 -O2 -Wall -Wextra -Werror -fno-builtin -ffreestanding -fno-stack-protector -mno-red-zone -mno-80387 -mno-mmx -mno-sse -mno-sse2 -mkernel -fno-pie -fno-PIC -mmacosx-version-min=10.15 -nostdinc -isystem /tmp/opt/local/lib/gcc14/gcc/x86_64-apple-darwin19/14.3.0/include -S /tmp/heap_benchmark.c -o /tmp/heap-native.s",
+    "DYLD_LIBRARY_PATH=/tmp/opt/local/lib /tmp/opt/local/bin/gcc-mp-14 -std=c11 -O2 -Wall -Wextra -Werror -fno-builtin -ffreestanding -fno-stack-protector -mno-red-zone -mno-80387 -mno-mmx -mno-sse -mno-sse2 -mkernel -fno-pie -fno-PIC -mmacosx-version-min=10.15 -nostdinc -isystem /tmp/opt/local/lib/gcc14/gcc/x86_64-apple-darwin19/14.3.0/include -S /tmp/macos-kext-info.c -o /tmp/kmod-native.s"
+  ],
+  "host_assembly_commands": [
+    [
+      "xcrun",
+      "clang",
+      "-target",
+      "x86_64-apple-macos10.15",
+      "-mkernel",
+      "-mno-red-zone",
+      "-c",
+      "/Users/alex/code/vinix/build/alloc-bench-macos-kernel/heap-native.s",
+      "-o",
+      "/Users/alex/code/vinix/build/alloc-bench-macos-kernel/heap-native.o"
+    ],
+    [
+      "xcrun",
+      "clang",
+      "-target",
+      "x86_64-apple-macos10.15",
+      "-mkernel",
+      "-mno-red-zone",
+      "-c",
+      "/Users/alex/code/vinix/build/alloc-bench-macos-kernel/kmod-native.s",
+      "-o",
+      "/Users/alex/code/vinix/build/alloc-bench-macos-kernel/kmod-native.o"
+    ]
+  ],
+  "host_link_command": [
+    "xcrun",
+    "ld",
+    "-arch",
+    "x86_64",
+    "-kext",
+    "-undefined",
+    "dynamic_lookup",
+    "-no_uuid",
+    "/Users/alex/code/vinix/build/alloc-bench-macos-kernel/heap-native.o",
+    "/Users/alex/code/vinix/build/alloc-bench-macos-kernel/kmod-native.o",
+    "-o",
+    "/Users/alex/code/vinix/build/alloc-bench-macos-kernel/AllocKernelBench.kext/Contents/MacOS/AllocKernelBench"
+  ],
+  "adapter_sha256": "6e49ff7798e4661aad363a3cfd9b2f8cd6c4c39d04001758fa25bbc0b7802b35",
+  "binary_sha256": "c0e647139d1a299c347fb34f34185b69c798f16582b087bdd3ca3a6e9ca65bc7",
+  "assembly_sha256": "af6e64b84c8562ce76aa17d560a91bbb944953a3fd05ad634915f5181ccad864"
+}
