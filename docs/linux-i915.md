@@ -246,7 +246,12 @@ the complete i915 source tree is not evidence that the driver runs.
 - Atomic bit operations, including acquire/release bit locking, using Linux's
   generic implementation and the native atomic backend. Unmodified Linux
   bitmap headers, bit searches and population counts work across word
-  boundaries. Other out-of-line bitmap operations remain unresolved.
+  boundaries. Native multiword bitmap equality, subset/intersection, Boolean
+  operations, replacement, population counts, range set/clear, shifts and
+  32-bit array conversion preserve tail and in-place alias semantics. Checked
+  bitmap allocation/free supports the native allocation domain (node 0 or
+  `NUMA_NO_NODE`); invalid nodes and unsupported GFP modes fail. Parsing,
+  devres/user-buffer, remapping and region bitmap APIs remain unresolved.
 - Linux byte-order and unaligned-access helpers, using the upstream generic
   implementations without Linux's instruction-patching machinery.
 - `memchr`, `memchr_inv`, `strnlen`, `strscpy`, `strscpy_pad`, `kstrdup`,
@@ -426,6 +431,14 @@ verify pthread handles, successful recovery, queue rollback and page recovery.
 Three warmed batches precede each measured fourth batch. These measurements
 cover the new feature; existing broader kernel allocation failures remain
 outside this support claim.
+
+Bitmap host tests compare against an independent per-bit oracle over widths
+0 through 8193, with dirty tail bits, operand aliases, exact-sized 32-bit arrays,
+zero-width NULL inputs and allocation failures. Oversized-shift checks cover
+the implemented `__bitmap_*` functions; the unchanged upstream single-word
+inline wrappers retain their original behavior. The native kernel repeats
+multiword operations, conversion and allocation/free 200 times and checks
+exact page recovery.
 
 An enabled kernel runs the allocator/list/sort/tree/IRQ-lock tests 200 times
 and verifies that the physical free-page count returns to its initial value.

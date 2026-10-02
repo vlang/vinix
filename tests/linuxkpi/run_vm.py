@@ -12,6 +12,7 @@ ROOT = Path(__file__).resolve().parents[2]
 MARKERS = [
     "linuxkpi: 200 allocator, IRQ lock, Linux list/sort/rbtree self-tests passed; no pages retained",
     "linuxkpi: raw locks, bitmaps, byte order and bounded strings passed",
+    "linuxkpi: 200 multiword bitmap operations, conversion and allocation tests passed; no pages retained",
     "linuxkpi: static and dynamic per-CPU isolation passed on 4 CPUs",
     "linuxkpi: no-resched preserved pending preemption",
     "linuxkpi: current task identity and guarded voluntary rescheduling passed",

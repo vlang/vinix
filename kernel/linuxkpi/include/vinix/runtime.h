@@ -75,4 +75,5 @@ void vinix_linuxkpi_fpu_begin(void);
 void vinix_linuxkpi_fpu_end(void);
 bool vinix_linuxkpi_tigerlake_id(u16 vendor, u16 device, u32 class_code);
 int vinix_linuxkpi_selftest(void);
+int vinix_linuxkpi_bitmap_runtime_selftest(void);
 #endif

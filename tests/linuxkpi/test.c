@@ -1020,6 +1020,7 @@ static void reference_tests(void)
 #include "delayed_work_test.h"
 #include "unbound_work_test.h"
 #include "bound_work_test.h"
+#include "bitmap_runtime_test.h"
 
 int main(void)
 {
@@ -1035,6 +1036,7 @@ int main(void)
     allocation_tests();
     string_tests();
     bitmap_tests();
+    test_bitmap_runtime();
     bit_concurrency_tests();
     byteorder_tests();
     raw_lock_tests();

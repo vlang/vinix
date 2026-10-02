@@ -379,6 +379,7 @@ fn C.vinix_linuxkpi_bound_work_native_selftest() int
 fn C.vinix_linuxkpi_worker_native_selftest() int
 fn C.vinix_linuxkpi_delayed_work_native_selftest() int
 fn C.vinix_linuxkpi_percpu_bootstrap(u32) int
+fn C.vinix_linuxkpi_bitmap_runtime_selftest() int
 
 // join/TASK_DEAD can precede the final switch away and scheduler reaping.
 // Taking a baseline immediately after warmup can count those dying stacks,
@@ -437,6 +438,21 @@ pub fn initialise() {
 		}
 		C.kprintf(c'linuxkpi: 200 allocator, IRQ lock, Linux list/sort/rbtree self-tests passed; no pages retained\n')
 		C.kprintf(c'linuxkpi: raw locks, bitmaps, byte order and bounded strings passed\n')
+		for _ in 0 .. 3 {
+			if C.vinix_linuxkpi_bitmap_runtime_selftest() != 0 {
+				lib.kpanic(unsafe { nil }, c'Linux multiword bitmap self-test failed')
+			}
+		}
+		bitmap_before := selftest_free_baseline()
+		for _ in 0 .. 200 {
+			if C.vinix_linuxkpi_bitmap_runtime_selftest() != 0 {
+				lib.kpanic(unsafe { nil }, c'Linux multiword bitmap self-test failed')
+			}
+		}
+		if memory.free_bytes() != bitmap_before {
+			lib.kpanic(unsafe { nil }, c'Linux multiword bitmap self-test retained native pages')
+		}
+		C.kprintf(c'linuxkpi: 200 multiword bitmap operations, conversion and allocation tests passed; no pages retained\n')
 		C.kprintf(c'linuxkpi: static and dynamic per-CPU isolation passed on %u CPUs\n',
 			u32(cpu_locals.len))
 		C.kprintf(c'linuxkpi: current task identity and guarded voluntary rescheduling passed\n')
