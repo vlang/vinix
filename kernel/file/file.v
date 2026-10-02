@@ -406,9 +406,6 @@ const user_io_chunk = u64(64 * 1024)
 // No socket family takes a message longer than this (socket.unix.sock_buf).
 const user_io_message_max = u64(1024 * 1024)
 
-// A transfer this small uses a buffer on the stack.
-const user_io_small = u64(512)
-
 // A resource's read() and write() are given kernel memory, always. What a
 // process reads or writes goes through a kernel buffer here, and to or from
 // the process through usercopy, which is what tells a pointer that leads
@@ -436,16 +433,15 @@ pub fn (mut this Handle) read_to_user(address u64, count u64) ?i64 {
 	once := stat.issock(mode) || stat.isifo(mode)
 	limit := if once { user_io_message_max } else { user_io_chunk }
 	size := if count < limit { count } else { limit }
-	mut small := [512]u8{}
-	buffer := if size <= user_io_small { unsafe { voidptr(&small[0]) } } else { unsafe { malloc(size) } }
+	// Own this temporary explicitly: the compiler can move a fixed array
+	// whose address reaches a resource to the heap, even inside unsafe.
+	buffer := unsafe { malloc(size) } @[freed]
 	if buffer == unsafe { nil } {
 		errno.set(errno.enomem)
 		return none
 	}
 	defer {
-		if size > user_io_small {
-			unsafe { free(buffer) }
-		}
+		unsafe { free(buffer) }
 	}
 	// A file or a disk is read to the end of what was asked for. A device
 	// gives its first piece as the caller's flags say, and more only if it has
@@ -569,16 +565,15 @@ pub fn (mut this Handle) write_from_user(address u64, count u64) ?i64 {
 		user_io_chunk
 	}
 	size := if count < limit { count } else { limit }
-	mut small := [512]u8{}
-	buffer := if size <= user_io_small { unsafe { voidptr(&small[0]) } } else { unsafe { malloc(size) } }
+	// Own this temporary explicitly: the compiler can move a fixed array
+	// whose address reaches a resource to the heap, even inside unsafe.
+	buffer := unsafe { malloc(size) } @[freed]
 	if buffer == unsafe { nil } {
 		errno.set(errno.enomem)
 		return none
 	}
 	defer {
-		if size > user_io_small {
-			unsafe { free(buffer) }
-		}
+		unsafe { free(buffer) }
 	}
 	mut done := u64(0)
 	for done < count {
