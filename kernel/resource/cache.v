@@ -140,7 +140,11 @@ pub fn sync_mapping(mut res Resource, handle voidptr, offset u64, length u64) ? 
 
 pub fn release_mapping(mut res Resource, handle voidptr, page u64, physical voidptr, flags int) {
 	if mut res is MappingReleaseResource {
-		res.release_mapping(handle, page, physical, flags)
+		// Direct dispatch on a narrowed mutable interface boxes it on the
+		// heap once per page. The callback only needs this synchronous borrow.
+		mut release := MappingReleaseResource(res)
+		mut stack_release := unsafe { &release }
+		stack_release.release_mapping(handle, page, physical, flags)
 	}
 }
 
