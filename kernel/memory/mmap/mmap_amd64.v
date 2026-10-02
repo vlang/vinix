@@ -172,3 +172,8 @@ pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
 
 // x86 keeps the instruction cache coherent with stores.
 fn sync_new_code_page(_page voidptr) {}
+
+// Small private anonymous mappings may wait until their first access.
+fn demand_private_anonymous() bool {
+	return true
+}

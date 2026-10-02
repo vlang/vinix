@@ -21,19 +21,24 @@ fn page_in(mut pagemap memory.Pagemap, addr u64, present_is_done bool) ? {
 		}
 	}
 	flags := range_local.flags
+	generation := range_local.generation
 	executable := range_local.prot & prot_exec != 0
 
 	pagemap.l.release()
 
 	virt := memory_page * page_size
-	page := acquire_range_page(range_local, virt, file_page) or {
+	page := if flags & map_anonymous != 0 {
+		acquire_anonymous_page()
+	} else {
+		acquire_range_page(range_local, virt, file_page)
+	} or {
 		return none
 	}
 	if executable {
 		sync_new_code_page(page)
 	}
 
-	install_range_page(mut pagemap, range_local, virt, file_page, page, flags)?
+	install_range_page(mut pagemap, range_local, generation, virt, file_page, page, flags)?
 	note_anonymous_fault(pagemap, flags)
 }
 

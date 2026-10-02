@@ -10,6 +10,7 @@ import file
 import katomic
 import proc
 import time
+import memory
 
 // Keep POSIX's atomic-write guarantee at one page, but give the circular
 // buffer enough room for ordinary protocol messages. A page-sized capacity
@@ -51,7 +52,10 @@ pub fn initialise() {}
 
 pub fn create() ?&Pipe {
 	mut p := &Pipe{
-		data:     unsafe { malloc(pipe_capacity) }
+		// The capacity and readiness of an empty pipe do not need backing
+		// storage. Allocate the ring on its first nonempty write; shells and
+		// runtimes often create pipes that close without carrying any bytes.
+		data:     unsafe { nil }
 		capacity: pipe_capacity
 		// A pipe starts with one read-side and one write-side open-file
 		// description. dup() and fork() share those descriptions, so their
@@ -334,6 +338,15 @@ fn (mut this Pipe) write(handle voidptr, buf voidptr, _loc u64, _count u64) ?i64
 		errno.set(errno.epipe)
 		return none
 	}
+	if this.data == unsafe { nil } {
+		// The pipe lock also serializes first writers. A failed allocation
+		// leaves an empty, writable pipe so a later write can try again.
+		this.data = memory.malloc_packed_fallible(this.capacity)
+		if this.data == unsafe { nil } {
+			errno.set(errno.enomem)
+			return none
+		}
+	}
 
 	mut written := u64(0)
 	atomic_write := _count <= pipe_buf
@@ -566,6 +579,15 @@ fn (mut this Pipe) set_pipe_capacity(requested u64) ?u64 {
 		this.l.release()
 		errno.set(errno.ebusy)
 		return none
+	}
+	if this.data == unsafe { nil } {
+		// A ring with no storage is empty. Resizing changes its promised
+		// capacity without allocating bytes that no writer has supplied.
+		this.capacity = new_capacity
+		this.status |= file.pollout
+		this.l.release()
+		event.trigger(mut this.event, false)
+		return new_capacity
 	}
 
 	new_data := unsafe { malloc(new_capacity) }

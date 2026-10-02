@@ -124,3 +124,8 @@ fn report_direct_access(gpr_state &cpulocal.GPRState, addr u64, write bool, curr
 fn sync_new_code_page(page voidptr) {
 	cpu.sync_instruction_cache(u64(page) + higher_half, page_size)
 }
+
+// Small private anonymous mappings may wait until their first access.
+fn demand_private_anonymous() bool {
+	return false
+}

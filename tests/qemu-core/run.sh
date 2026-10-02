@@ -27,7 +27,8 @@ if [ "${1:-}" = amd64 ]; then
 	qemu=$(command -v "${VINIX_QEMU_X86_64:-qemu-system-x86_64}")
 	firmware=${VINIX_OVMF_CODE:-"$(cd "$(dirname "$qemu")/.." && pwd)/share/qemu/edk2-x86_64-code.fd"}
 	python3 "$repo/tests/qemu-core/run_vm.py" --arch amd64 --iso "$work/test.iso" \
-		--qemu "$qemu" --firmware "$firmware" --timeout "${VINIX_QEMU_TIMEOUT:-900}"
+		--qemu "$qemu" --firmware "$firmware" --timeout "${VINIX_QEMU_TIMEOUT:-900}" \
+		--cpus "${VINIX_QEMU_CORE_CPUS:-4}"
 	exit
 fi
 

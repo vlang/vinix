@@ -28,6 +28,7 @@ FEATURE_MARKERS = (
     b"QEMU CORE PASS: secure getrandom",
     b"QEMU CORE PASS: sparse tmpfs shared mappings allocate on touch",
     b"QEMU CORE PASS: copy-on-write fork",
+    b"QEMU CORE PASS: anonymous first touch, zero pages, fork and explicit population",
     b"QEMU CORE PASS: syscalls page in untouched buffers",
     b"QEMU CORE PASS: partial unmap reclaims pages and retains forked shares",
     b"QEMU CORE PASS: a range split while a sharer unmaps it keeps its pages",
@@ -66,6 +67,7 @@ FEATURE_MARKERS = (
     b"QEMU CORE PASS: anonymous descriptors are open both ways",
     b"QEMU CORE PASS: Linux pollfd ABI",
     b"QEMU CORE PASS: large blocking pipe transfer makes progress",
+    b"QEMU CORE PASS: empty pipes defer buffers and reclaim first-write storage",
     b"QEMU CORE PASS: Linux epoll ABI and event count",
     b"QEMU CORE PASS: syscall C-int truncation",
     b"QEMU CORE PASS: abstract socket names are released",
@@ -251,7 +253,7 @@ def run_vm(
     return result
 
 
-def run_amd64(iso: Path, qemu: str, firmware: Path, timeout: int) -> int:
+def run_amd64(iso: Path, qemu: str, firmware: Path, timeout: int, cpus: int = 4) -> int:
     """One boot of an amd64 ISO whose init is the test. amd64 has no persistent
     volume for the second boot to check, so only the first runs."""
     command = [
@@ -260,8 +262,8 @@ def run_amd64(iso: Path, qemu: str, firmware: Path, timeout: int) -> int:
         "-accel", os.environ.get("VINIX_QEMU_ACCEL", "tcg"),
         "-cpu", "max",
         "-m", "2048",
-        # The concurrent-wakeup case pins a worker to each of four CPUs.
-        "-smp", "4",
+        # The concurrent-wakeup case pins workers to the available CPUs.
+        "-smp", str(cpus),
         "-drive", f"if=pflash,format=raw,unit=0,readonly=on,file={firmware}",
         "-cdrom", str(iso),
         "-display", "none",
@@ -338,12 +340,16 @@ def main() -> int:
     parser.add_argument("--qemu", default="qemu-system-x86_64")
     parser.add_argument("--firmware", type=Path)
     parser.add_argument("--timeout", type=int, default=300)
+    parser.add_argument("--cpus", type=int, default=4,
+                        help="amd64 boot vCPU count (default: 4)")
     arguments = parser.parse_args()
     if arguments.timeout <= 0:
         parser.error("--timeout must be positive")
+    if not 1 <= arguments.cpus <= 64:
+        parser.error("--cpus must be 1..64")
     if arguments.arch == "amd64":
         return run_amd64(arguments.iso.resolve(), arguments.qemu, arguments.firmware,
-                         arguments.timeout)
+                         arguments.timeout, arguments.cpus)
     root = Path(__file__).resolve().parents[2]
     return run_vm(root, arguments.init.resolve(), arguments.initramfs.resolve(),
                   arguments.state_dir.resolve(), arguments.timeout)

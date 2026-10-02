@@ -167,6 +167,118 @@ static int test_cow(void)
 	return 0;
 }
 
+/* A fault may acquire a zeroed anonymous page while another thread faults on
+ * the same page. Losing that race must retain the first writer's bytes. */
+struct anonymous_touch_worker {
+	volatile unsigned long *slots;
+	pthread_barrier_t *barrier;
+	unsigned int index;
+};
+
+static void *anonymous_touch(void *argument)
+{
+	struct anonymous_touch_worker *worker = argument;
+	pthread_barrier_wait(worker->barrier);
+	worker->slots[worker->index] = 0x56490000UL + worker->index;
+	return NULL;
+}
+
+static int test_anonymous_first_touch(void)
+{
+	const size_t page = (size_t)sysconf(_SC_PAGESIZE);
+	const size_t span = 4UL * 1024 * 1024;
+	struct sysinfo before, reserved, committed;
+	CHECK(sysinfo(&before) == 0);
+	unsigned char *area = mmap(NULL, span, PROT_READ | PROT_WRITE,
+	    MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+	CHECK(area != MAP_FAILED);
+	CHECK(sysinfo(&reserved) == 0);
+#if defined(__x86_64__)
+	/* Metadata and normal kernel activity fit in this margin. The entire
+	 * untouched reservation would consume four MiB if it were pre-faulted. */
+	CHECK(reserved.freeram + 1024UL * 1024 >= before.freeram);
+#endif
+	/* Splitting an untouched mapping must not walk an absent shadow root. */
+	CHECK(munmap(area + page, page) == 0);
+	CHECK(area[0] == 0 && area[2 * page] == 0 && area[span - 1] == 0);
+	CHECK(munmap(area, page) == 0);
+	CHECK(munmap(area + 2 * page, span - 2 * page) == 0);
+
+	area = mmap(NULL, page, PROT_READ | PROT_WRITE,
+	    MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+	CHECK(area != MAP_FAILED);
+	pid_t child = fork();
+	CHECK(child >= 0);
+	if (child == 0) {
+		for (size_t i = 0; i < page; ++i)
+			if (area[i] != 0)
+				_exit(1);
+		memset(area, 0x42, page);
+		_exit(area[page - 1] == 0x42 ? 0 : 1);
+	}
+	CHECK(reap_ok(child) == 0);
+	for (size_t i = 0; i < page; ++i)
+		CHECK(area[i] == 0);
+	CHECK(munmap(area, page) == 0);
+
+	/* A syscall may write the first byte of an absent private page. */
+	area = mmap(NULL, 3 * page, PROT_READ | PROT_WRITE,
+	    MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+	CHECK(area != MAP_FAILED);
+	int endpoints[2];
+	const unsigned char payload = 0x73;
+	CHECK(pipe(endpoints) == 0);
+	CHECK(write(endpoints[1], &payload, 1) == 1);
+	CHECK(read(endpoints[0], area + page, 1) == 1);
+	CHECK(area[page] == payload && area[page + 1] == 0);
+	CHECK(close(endpoints[0]) == 0 && close(endpoints[1]) == 0);
+	CHECK(mprotect(area, page, PROT_READ) == 0);
+	CHECK(area[0] == 0 && area[page - 1] == 0);
+	CHECK(mprotect(area, page, PROT_READ | PROT_WRITE) == 0);
+	area[0] = 0x24;
+	CHECK(area[0] == 0x24);
+	CHECK(munmap(area, 3 * page) == 0);
+
+	area = mmap(NULL, page, PROT_READ | PROT_WRITE,
+	    MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+	CHECK(area != MAP_FAILED);
+	enum { workers = 2 };
+	pthread_t threads[workers];
+	struct anonymous_touch_worker arguments[workers];
+	pthread_barrier_t barrier;
+	CHECK(pthread_barrier_init(&barrier, NULL, workers + 1) == 0);
+	alarm(30);
+	for (unsigned int i = 0; i < workers; ++i) {
+		arguments[i] = (struct anonymous_touch_worker){
+			.slots = (volatile unsigned long *)area,
+			.barrier = &barrier, .index = i,
+		};
+		CHECK(pthread_create(&threads[i], NULL, anonymous_touch, &arguments[i]) == 0);
+	}
+	int barrier_result = pthread_barrier_wait(&barrier);
+	CHECK(barrier_result == 0 || barrier_result == PTHREAD_BARRIER_SERIAL_THREAD);
+	for (unsigned int i = 0; i < workers; ++i) {
+		CHECK(pthread_join(threads[i], NULL) == 0);
+		CHECK(((volatile unsigned long *)area)[i] == 0x56490000UL + i);
+	}
+	alarm(0);
+	CHECK(pthread_barrier_destroy(&barrier) == 0);
+	CHECK(area[page - 1] == 0);
+	CHECK(munmap(area, page) == 0);
+
+	/* MAP_POPULATE explicitly requests physical commitment on both targets. */
+	CHECK(sysinfo(&before) == 0);
+	area = mmap(NULL, span, PROT_READ | PROT_WRITE,
+	    MAP_PRIVATE | MAP_ANONYMOUS | MAP_POPULATE, -1, 0);
+	CHECK(area != MAP_FAILED);
+	CHECK(sysinfo(&committed) == 0);
+	CHECK(committed.freeram + span - 1024UL * 1024 <= before.freeram);
+	CHECK(area[0] == 0 && area[span - 1] == 0);
+	CHECK(munmap(area, span) == 0);
+	puts("QEMU CORE PASS: anonymous first touch, zero pages, fork and explicit population");
+	return 0;
+}
+
 static int test_sparse_tmpfs_shared_mapping(void)
 {
 	const char *path = "/dev/shm/vinix-qemu-core-sparse";
@@ -215,13 +327,14 @@ static int test_sparse_tmpfs_shared_mapping(void)
 static int test_partial_munmap_reclaims_pages(void)
 {
 	const size_t size = 32UL * 1024 * 1024;
+	const size_t page = (size_t)sysconf(_SC_PAGESIZE);
 	const size_t hole = 16UL * 1024 * 1024;
 	struct sysinfo before, populated, after_hole, after_all;
 	CHECK(sysinfo(&before) == 0);
 	unsigned char *area = mmap(NULL, size, PROT_READ | PROT_WRITE,
 	    MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 	CHECK(area != MAP_FAILED);
-	for (size_t offset = 0; offset < size; offset += 16384)
+	for (size_t offset = 0; offset < size; offset += page)
 		area[offset] = 0x5a;
 	CHECK(sysinfo(&populated) == 0);
 	CHECK(populated.freeram + 24UL * 1024 * 1024 <= before.freeram);
@@ -337,11 +450,12 @@ static int test_split_keeps_pages_a_sharer_unmaps(void)
 static int test_madvise_reclaims_anonymous_pages(void)
 {
 	const size_t size = 32UL * 1024 * 1024;
+	const size_t page = (size_t)sysconf(_SC_PAGESIZE);
 	struct sysinfo populated, discarded;
 	volatile unsigned char *area = mmap(NULL, size, PROT_READ | PROT_WRITE,
 	    MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 	CHECK(area != MAP_FAILED);
-	for (size_t offset = 0; offset < size; offset += 16384)
+	for (size_t offset = 0; offset < size; offset += page)
 		area[offset] = 0x5a;
 	CHECK(sysinfo(&populated) == 0);
 	CHECK(madvise((void *)area, size, MADV_DONTNEED) == 0);
@@ -1116,10 +1230,14 @@ struct concurrent_wakeup_state {
  */
 static int run_concurrent_wakeup_race(void)
 {
-	enum { workers = 4, rounds = 512 };
-	int channels[workers][2];
-	pid_t children[workers];
-	struct pollfd descriptors[workers];
+	enum { max_workers = 4, rounds = 512 };
+	int workers = (int)sysconf(_SC_NPROCESSORS_ONLN);
+	CHECK(workers >= 1);
+	if (workers > max_workers)
+		workers = max_workers;
+	int channels[max_workers][2];
+	pid_t children[max_workers];
+	struct pollfd descriptors[max_workers];
 	struct concurrent_wakeup_state *state = mmap(NULL, sizeof(*state),
 	    PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 	CHECK(state != MAP_FAILED);
@@ -1164,7 +1282,7 @@ static int run_concurrent_wakeup_race(void)
 		descriptors[i].revents = 0;
 	}
 	alarm(60);
-	while (__atomic_load_n(&state->ready, __ATOMIC_ACQUIRE) != workers)
+	while (__atomic_load_n(&state->ready, __ATOMIC_ACQUIRE) != (unsigned int)workers)
 		sched_yield();
 	for (unsigned round = 1; round <= rounds; ++round) {
 		__atomic_store_n(&state->generation, round, __ATOMIC_RELEASE);
@@ -1317,6 +1435,88 @@ static int test_anonymous_ipc_memory_reclamation(void)
 	 * services to retain a modest amount. The old leak consumed 320 MiB. */
 	CHECK(after.freeram + 32UL * 1024 * 1024 >= before.freeram);
 	puts("QEMU CORE PASS: anonymous IPC buffers are reclaimed");
+	return 0;
+}
+
+/* Empty pipes promise a capacity, but do not need a ring until a writer puts
+ * bytes in them. Hold enough live pipes to distinguish demand allocation
+ * from allocating and then reclaiming every ring during create/close. */
+static int test_empty_pipe_buffers(void)
+{
+	enum { count = 256 };
+	int pairs[count][2];
+	struct sysinfo before, empty, resized, written, closed;
+	CHECK(sysinfo(&before) == 0);
+	for (int i = 0; i < count; ++i) {
+		CHECK(pipe(pairs[i]) == 0);
+		CHECK(fcntl(pairs[i][0], F_GETPIPE_SZ) == 64 * 1024);
+	}
+	CHECK(sysinfo(&empty) == 0);
+	/* Descriptor objects may grow slab pools. Eager 64 KiB rings retain
+	 * over 16 MiB here; four MiB leaves room for ordinary kernel services. */
+	CHECK(empty.freeram + 4UL * 1024 * 1024 >= before.freeram);
+
+	struct pollfd readiness[2] = {
+		{.fd = pairs[0][0], .events = POLLIN},
+		{.fd = pairs[0][1], .events = POLLOUT},
+	};
+	CHECK(poll(readiness, 2, 0) == 1);
+	CHECK(readiness[0].revents == 0);
+	CHECK((readiness[1].revents & POLLOUT) != 0);
+	int queued = -1;
+	CHECK(ioctl(pairs[0][0], FIONREAD, &queued) == 0 && queued == 0);
+	CHECK(fcntl(pairs[0][0], F_SETFL, O_NONBLOCK) == 0);
+	unsigned char observed = 0;
+	errno = 0;
+	CHECK(read(pairs[0][0], &observed, 1) == -1 && errno == EAGAIN);
+	CHECK(write(pairs[0][1], &observed, 0) == 0);
+	CHECK(fcntl(pairs[0][0], F_SETPIPE_SZ, 1024 * 1024) == 1024 * 1024);
+	CHECK(fcntl(pairs[1][0], F_SETPIPE_SZ, 4096) == 4096);
+	CHECK(sysinfo(&resized) == 0);
+	CHECK(resized.freeram + 4UL * 1024 * 1024 >= before.freeram);
+
+	for (int i = 0; i < count; ++i) {
+		unsigned char payload = (unsigned char)(i ^ 0xa5);
+		CHECK(write(pairs[i][1], &payload, 1) == 1);
+		CHECK(read(pairs[i][0], &observed, 1) == 1 && observed == payload);
+	}
+	CHECK(sysinfo(&written) == 0);
+	/* The first write really acquired backing storage; all live rings must
+	 * retain it even after their readers have drained the byte. */
+	CHECK(written.freeram + 8UL * 1024 * 1024 < resized.freeram);
+	for (int i = 0; i < count; ++i) {
+		CHECK(close(pairs[i][1]) == 0);
+		CHECK(read(pairs[i][0], &observed, 1) == 0);
+		CHECK(close(pairs[i][0]) == 0);
+	}
+	CHECK(sysinfo(&closed) == 0);
+	CHECK(closed.freeram + 4UL * 1024 * 1024 >= before.freeram);
+	printf("QEMU CORE PIPE free bytes: before=%lu empty=%lu resized=%lu written=%lu closed=%lu\n",
+	    before.freeram, empty.freeram, resized.freeram, written.freeram,
+	    closed.freeram);
+	/* The child inherits the same empty resource. A parent already asleep
+	 * reading it must see the child's first write and then the final EOF. */
+	int shared[2];
+	CHECK(pipe(shared) == 0);
+	pid_t child = fork();
+	CHECK(child >= 0);
+	if (child == 0) {
+		close(shared[0]);
+		usleep(20000);
+		ssize_t sent = write(shared[1], "fork", 4);
+		close(shared[1]);
+		_exit(sent == 4 ? 0 : 1);
+	}
+	CHECK(close(shared[1]) == 0);
+	char message[4] = {0};
+	alarm(5);
+	CHECK(read(shared[0], message, sizeof(message)) == (ssize_t)sizeof(message));
+	CHECK(memcmp(message, "fork", sizeof(message)) == 0);
+	CHECK(read(shared[0], message, sizeof(message)) == 0);
+	alarm(0);
+	CHECK(close(shared[0]) == 0);
+	CHECK(reap_ok(child) == 0);
+	puts("QEMU CORE PASS: empty pipes defer buffers and reclaim first-write storage");
 	return 0;
 }
 
@@ -3044,8 +3244,10 @@ static int run_tests(void)
 	 * cases so a failure there cannot prevent this foundational hand-off from
 	 * being exercised. */
 	CHECK(test_large_pipe_progress() == 0);
+	CHECK(test_empty_pipe_buffers() == 0);
 	CHECK(test_sparse_tmpfs_shared_mapping() == 0);
 	CHECK(test_cow() == 0);
+	CHECK(test_anonymous_first_touch() == 0);
 	CHECK(test_syscall_buffers_in_untouched_pages() == 0);
 	CHECK(test_partial_munmap_reclaims_pages() == 0);
 	CHECK(test_split_keeps_pages_a_sharer_unmaps() == 0);
