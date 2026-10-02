@@ -137,7 +137,7 @@ fn (mut this TmpFSResource) add_seals(seals u32) ? {
 // these optional hooks, and V3 compiles `res is MetadataResource` for an
 // interface nothing implements as a non-nil check whose call then panics --
 // chmod, fsync, msync and fadvise all brought the amd64 kernel down that way.
-fn (mut this TmpFSResource) persist_metadata() ? {}
+fn (mut this TmpFSResource) persist_metadata() ? { this.sync_acl_mode()? }
 
 fn (mut this TmpFSResource) sync(_handle voidptr) ? {}
 

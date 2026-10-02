@@ -2,6 +2,7 @@ module fs
 
 import errno
 import proc
+import posix_acl
 import resource
 import stat
 
@@ -39,57 +40,85 @@ fn holds_capability(process &proc.Process, cap int, effective bool) bool {
 // a container's root that has had them dropped is bound by the mode bits:
 // CAP_DAC_OVERRIDE allows any access except executing a file with no execute
 // bit at all, and CAP_DAC_READ_SEARCH allows reading and searching.
-pub fn check_access(node &VFSNode, requested u32, effective bool) bool {
+// Success grants the request; failures preserve EACCES or the backend's EIO.
+// ACL lookup errors cannot be turned into a capability-based permission grant.
+pub fn check_access(node &VFSNode, requested u32, effective bool) ? {
 	if unsafe { node == nil } || unsafe { node.resource == nil } {
-		return false
+		errno.set(errno.eacces)
+		return none
 	}
+	if requested == 0 { return }
 	process := proc.current_thread().process
 	uid := if effective { process.euid } else { process.uid }
-	mode := node.resource.stat.mode
+	gid := if effective { process.egid } else { process.gid }
+	mut res := unsafe { node.resource }
+	mut acl := []u8{} @[freed]
+	acl.flags |= .noslices
+	defer { unsafe { acl.free() } }
+	metadata := resource.permission_snapshot(mut res, mut acl)?
+	mode := metadata.mode
+	has_acl := acl.len != 0
+	mut permitted := false
+	if has_acl {
+		if acl.len <= 4 || !posix_acl.valid(acl) { errno.set(errno.eio); return none }
+		derived, _ := posix_acl.mode(acl, mode)
+		if derived & 0o777 != mode & 0o777 { errno.set(errno.eio); return none }
+		permitted = posix_acl.permits(acl, metadata.uid, metadata.gid, uid, gid,
+			process.groups, requested)
+	} else {
+		mut allowed := mode & 0o7
+		if uid == metadata.uid { allowed = (mode >> 6) & 0o7 }
+		else if credential_in_group(process, metadata.gid, effective) { allowed = (mode >> 3) & 0o7 }
+		permitted = allowed & requested == requested
+	}
+	if permitted { return }
 	if holds_capability(process, proc.cap_dac_override, effective) {
 		if requested & access_exec != 0 && !stat.isdir(mode) && mode & 0o111 == 0 {
-			return false
+			errno.set(errno.eacces)
+			return none
 		}
-		return true
+		return
 	}
 	if holds_capability(process, proc.cap_dac_read_search, effective) {
 		searching := stat.isdir(mode) && requested & ~(access_read | access_exec) == 0
 		if requested & ~access_read == 0 || searching {
-			return true
+			return
 		}
 	}
 
-	mut allowed := mode & 0o7
-	if uid == node.resource.stat.uid {
-		allowed = (mode >> 6) & 0o7
-	} else if credential_in_group(process, node.resource.stat.gid, effective) {
-		allowed = (mode >> 3) & 0o7
-	}
-	return allowed & requested == requested
+	errno.set(errno.eacces)
+	return none
 }
 
 fn require_access(node &VFSNode, requested u32) ? {
-	if !check_access(node, requested, true) {
-		errno.set(errno.eacces)
-		return none
-	}
+	check_access(node, requested, true)?
 }
 
-fn may_remove(parent &VFSNode, target &VFSNode) bool {
-	if !check_access(parent, access_write | access_exec, true) {
-		return false
-	}
+fn may_remove(parent &VFSNode, target &VFSNode) ? {
+	check_access(parent, access_write | access_exec, true)?
 	if parent.resource.stat.mode & 0o1000 == 0 {
-		return true
+		return
 	}
 	process := proc.current_thread().process
-	return holds_capability(process, proc.cap_fowner, true)
-		|| process.euid == parent.resource.stat.uid || process.euid == target.resource.stat.uid
+	if holds_capability(process, proc.cap_fowner, true)
+		|| process.euid == parent.resource.stat.uid || process.euid == target.resource.stat.uid { return }
+	errno.set(errno.eperm)
+	return none
 }
 
 fn owns_resource(uid u32) bool {
 	process := proc.current_thread().process
 	return holds_capability(process, proc.cap_fowner, true) || process.euid == uid
+}
+
+fn may_keep_setgid(gid u32) bool {
+	process := proc.current_thread().process
+	return holds_capability(process, proc.cap_fsetid, true)
+		|| credential_in_group(process, gid, true)
+}
+
+fn chmod_permissions(mode u32, gid u32) u32 {
+	return if may_keep_setgid(gid) { mode } else { mode & ~u32(0o2000) }
 }
 
 fn may_chown(uid u32, new_uid u32, new_gid u32) bool {

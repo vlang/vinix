@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[2]
 with tempfile.TemporaryDirectory(prefix="vinix-xattr-codec-") as directory:
     work = Path(directory)
     (work / "ext2").mkdir()
-    for module in ("errno", "memory", "time", "fs", "resource"):
+    for module in ("errno", "memory", "time", "fs", "resource", "posix_acl"):
         (work / module).mkdir()
     (work / "v.mod").write_text("Module { name: 'vinix_xattr_tests' }\n")
     source = (ROOT / "kernel/fs/ext2/xattr_block.v").read_text()
@@ -21,7 +21,7 @@ with tempfile.TemporaryDirectory(prefix="vinix-xattr-codec-") as directory:
     (work / "ext2/codec_test.v").write_text("module ext2\n\nfn test_sorted_entries" + tests)
     (work / "ext2/xattr.v").write_text((ROOT / "kernel/fs/ext2/xattr.v").read_text())
     (work / "ext2/persistence_test.v").write_text((ROOT / "tests/ext2-xattr/persistence_test.v").read_text())
-    (work / "errno/errno.v").write_text("@[has_globals]\nmodule errno\n__global current_errno = int(0)\npub const enospc = 28\npub const enodata = 61\npub const enotsup = 95\npub const eio = 5\npub const enomem = 12\npub const eexist = 17\npub fn set(value int) { current_errno = value }\npub fn get() int { return current_errno }\n")
+    (work / "errno/errno.v").write_text("@[has_globals]\nmodule errno\n__global current_errno = int(0)\npub const enospc = 28\npub const enodata = 61\npub const enotsup = 95\npub const eio = 5\npub const enomem = 12\npub const eexist = 17\npub const einval = 22\npub fn set(value int) { current_errno = value }\npub fn get() int { return current_errno }\n")
     (work / "time/time.v").write_text("module time\npub struct TimeSpec { pub mut: tv_sec i64 }\n")
     (work / "memory/memory.v").write_text("""@[has_globals]
 module memory
@@ -52,7 +52,7 @@ fn mkfs_has_backup(group u64) bool { return group <= 1 }
 struct Superblock { mut: sb_block u32 block_cnt u32 opt_features u32 non_supported_features u32 blocks_per_group u32 = 64 inodes_per_group u32 = 32 inode_size u16 = 128 }
 struct EXT2BlockGroupDescriptor { mut: block_addr_bitmap u32 = 60 block_addr_inode u32 = 61 inode_table_block u32 = 62 }
 fn (mut bgd EXT2BlockGroupDescriptor) read_entry(mut fs EXT2Filesystem, _ u32) int { return 0 }
-struct EXT2Inode { mut: eab u32 sector_cnt u32 creation_time u32 }
+struct EXT2Inode { mut: eab u32 sector_cnt u32 creation_time u32 permissions u16 user_id u16 group_id u16 access_time u32 mod_time u32 flags u32 }
 struct EXT2Filesystem {
 mut:
  l Lock
@@ -66,8 +66,8 @@ mut:
  fail_header_write bool
  fail_inode_write bool
 }
-struct Stat { mut: ino u64 blocks i64 ctim time.TimeSpec }
-struct EXT2Resource { mut: l Lock filesystem &EXT2Filesystem stat Stat }
+struct Stat { mut: ino u64 blocks i64 ctim time.TimeSpec mode u32 uid u32 gid u32 atim time.TimeSpec mtim time.TimeSpec }
+struct EXT2Resource { mut: l Lock filesystem &EXT2Filesystem stat Stat attr_bits u32 }
 fn fixture() EXT2Filesystem {
  return EXT2Filesystem{block_size: 4096, superblock: Superblock{block_cnt: 64, opt_features: 8},
  blocks: [][]u8{len: 64, init: []u8{len: 4096}}, allocated: []bool{len: 64}}
@@ -98,6 +98,7 @@ fn (mut fs EXT2Filesystem) allocate_block() ?u32 {
 fn (mut fs EXT2Filesystem) free_block(block u32) ?int { fs.allocated[int(block)] = false; return 0 }
 fn (mut fs EXT2Filesystem) write_superblock() ? {}
 fn ext2_now() u32 { return 1 }
+fn stat_seconds(value time.TimeSpec) u32 { return u32(value.tv_sec) }
 fn flush_on_return() {}
 """)
     copy_source = (ROOT / "kernel/fs/xattr.v").read_text()
@@ -106,6 +107,9 @@ fn flush_on_return() {}
     (work / "fs/copy_test.v").write_text((ROOT / "tests/ext2-xattr/copy_test.v").read_text())
     (work / "resource/resource.v").write_text("""module resource
 import errno
+pub const attributes_kept = u32(0)
+pub const acl_clear_setgid = 4
+pub struct PermissionMetadata { pub: mode u32 uid u32 gid u32 }
 pub struct Resource { pub mut:
  names []u8
  value []u8
@@ -131,4 +135,6 @@ pub fn set_xattr(mut res Resource, name string, value []u8, _ int) ? {
  res.copied_values << value.clone()
 }
 """)
-    subprocess.run([os.environ.get("V", "v"), "-enable-globals", "-gc", "none", "test", "ext2", "fs"], cwd=work, check=True)
+    (work / "posix_acl/acl.v").write_text((ROOT / "kernel/posix_acl/acl.v").read_text())
+    (work / "posix_acl/acl_test.v").write_text((ROOT / "tests/ext2-xattr/acl_test.v").read_text())
+    subprocess.run([os.environ.get("V", "v"), "-enable-globals", "-gc", "none", "test", "ext2", "fs", "posix_acl"], cwd=work, check=True)

@@ -367,7 +367,8 @@ fn (mut this EXT2Resource) unref(handle voidptr) ? {
 	}
 	if this.stat.nlink == 0 {
 		this.filesystem.l.acquire()
-		mut inode := EXT2Inode{}
+		mut inode := unsafe { &EXT2Inode(C.__builtin_alloca(sizeof(EXT2Inode))) }
+		unsafe { *inode = EXT2Inode{} }
 		inode.read_entry(mut this.filesystem, u32(this.stat.ino)) or {
 			this.refcount = 1
 			this.filesystem.l.release()
@@ -1024,7 +1025,8 @@ fn (mut inode EXT2Inode) get_block(mut filesystem EXT2Filesystem, iblock u32) ?u
 }
 
 fn (mut filesystem EXT2Filesystem) allocate_block() ?u32 {
-	mut bgd := EXT2BlockGroupDescriptor{}
+	mut bgd := unsafe { &EXT2BlockGroupDescriptor(C.__builtin_alloca(sizeof(EXT2BlockGroupDescriptor))) }
+	unsafe { *bgd = EXT2BlockGroupDescriptor{} }
 
 	for i := u32(0); i < filesystem.bgd_cnt; i++ {
 		bgd.read_entry(mut filesystem, i)
@@ -1051,7 +1053,8 @@ fn (mut filesystem EXT2Filesystem) allocate_block() ?u32 {
 }
 
 fn (mut filesystem EXT2Filesystem) allocate_inode() ?u64 {
-	mut bgd := EXT2BlockGroupDescriptor{}
+	mut bgd := unsafe { &EXT2BlockGroupDescriptor(C.__builtin_alloca(sizeof(EXT2BlockGroupDescriptor))) }
+	unsafe { *bgd = EXT2BlockGroupDescriptor{} }
 
 	for i := u32(0); i < filesystem.bgd_cnt; i++ {
 		bgd.read_entry(mut filesystem, i)
@@ -1072,9 +1075,12 @@ fn (mut filesystem EXT2Filesystem) free_block(block u32) ?int {
 	relative := block - filesystem.superblock.sb_block
 	bgd_index := relative / filesystem.superblock.blocks_per_group
 	bitmap_index := relative % filesystem.superblock.blocks_per_group
-	bitmap := memory.calloc(filesystem.block_size, 1)
+	bitmap := memory.calloc(filesystem.block_size, 1) @[freed]
+	if bitmap == unsafe { nil } { errno.set(errno.enomem); return none }
+	defer { memory.free(bitmap) }
 
-	mut bgd := EXT2BlockGroupDescriptor{}
+	mut bgd := unsafe { &EXT2BlockGroupDescriptor(C.__builtin_alloca(sizeof(EXT2BlockGroupDescriptor))) }
+	unsafe { *bgd = EXT2BlockGroupDescriptor{} }
 	bgd.read_entry(mut filesystem, bgd_index)
 
 	filesystem.raw_device_read(bitmap, bgd.block_addr_bitmap * filesystem.block_size, filesystem.block_size) or {
@@ -1083,7 +1089,6 @@ fn (mut filesystem EXT2Filesystem) free_block(block u32) ?int {
 	}
 
 	if lib.bittest(bitmap, bitmap_index) == false {
-		memory.free(bitmap)
 		return 0
 	}
 
@@ -1099,7 +1104,6 @@ fn (mut filesystem EXT2Filesystem) free_block(block u32) ?int {
 	filesystem.superblock.unallocated_blocks++
 	filesystem.write_superblock()?
 
-	memory.free(bitmap)
 
 	return 0
 }
@@ -1108,7 +1112,8 @@ fn (mut filesystem EXT2Filesystem) free_block(block u32) ?int {
 // count, but e2fsck checks it and Linux places new directories by it.
 fn (mut filesystem EXT2Filesystem) count_directory(inode_index u32, added bool) {
 	bgd_index := (inode_index - 1) / filesystem.superblock.inodes_per_group
-	mut bgd := EXT2BlockGroupDescriptor{}
+	mut bgd := unsafe { &EXT2BlockGroupDescriptor(C.__builtin_alloca(sizeof(EXT2BlockGroupDescriptor))) }
+	unsafe { *bgd = EXT2BlockGroupDescriptor{} }
 	bgd.read_entry(mut filesystem, bgd_index)
 	if added {
 		bgd.dir_cnt++
@@ -1125,9 +1130,12 @@ fn (mut filesystem EXT2Filesystem) free_inode(inode u32) ?int {
 	}
 	bgd_index := (inode - 1) / filesystem.superblock.inodes_per_group
 	bitmap_index := (inode - 1) % filesystem.superblock.inodes_per_group
-	bitmap := memory.calloc(filesystem.block_size, 1)
+	bitmap := memory.calloc(filesystem.block_size, 1) @[freed]
+	if bitmap == unsafe { nil } { errno.set(errno.enomem); return none }
+	defer { memory.free(bitmap) }
 
-	mut bgd := EXT2BlockGroupDescriptor{}
+	mut bgd := unsafe { &EXT2BlockGroupDescriptor(C.__builtin_alloca(sizeof(EXT2BlockGroupDescriptor))) }
+	unsafe { *bgd = EXT2BlockGroupDescriptor{} }
 	bgd.read_entry(mut filesystem, bgd_index)
 
 	filesystem.raw_device_read(bitmap, bgd.block_addr_inode * filesystem.block_size, filesystem.block_size) or {
@@ -1136,7 +1144,6 @@ fn (mut filesystem EXT2Filesystem) free_inode(inode u32) ?int {
 	}
 
 	if lib.bittest(bitmap, bitmap_index) == false {
-		memory.free(bitmap)
 		return 0
 	}
 
@@ -1152,7 +1159,6 @@ fn (mut filesystem EXT2Filesystem) free_inode(inode u32) ?int {
 	filesystem.superblock.unallocated_inodes++
 	filesystem.write_superblock()?
 
-	memory.free(bitmap)
 
 	return 0
 }

@@ -2,6 +2,8 @@
 module resource
 
 import errno
+import posix_acl
+import stat
 
 // Backends own their locking and copy input values. Reads append into buffers
 // owned by the caller; names are a packed, NUL-terminated list. Output arrays
@@ -30,6 +32,10 @@ pub fn get_xattr(mut res Resource, name string, mut value []u8) ? {
 }
 
 pub fn set_xattr(mut res Resource, name string, value []u8, flags int) ? {
+	if posix_acl.is_name(name) {
+		if stat.islnk(res.stat.mode) { errno.set(errno.enotsup); return none }
+		if name == posix_acl.default_name && !stat.isdir(res.stat.mode) && value.len > 4 { errno.set(errno.eacces); return none }
+	}
 	if mut res is XAttrResource {
 		mut backend := XAttrResource(res)
 		mut stack := unsafe { &backend }

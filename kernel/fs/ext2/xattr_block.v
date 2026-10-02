@@ -73,6 +73,7 @@ fn ea_validate(block voidptr, size int) bool {
 		entry := ea_entry(block, offset)
 		next := offset + ea_round(ea_entry_size + int(entry.name_len))
 		if next > size - 4 || entry.index == 0 || entry.value_block != 0 { return false }
+		if (entry.index == 2 || entry.index == 3) && entry.name_len != 0 { return false }
 		name := ea_name(block, offset)
 		for c in name { if c == 0 { return false } }
 		if previous >= 0 {

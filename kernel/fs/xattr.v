@@ -13,6 +13,7 @@ module fs
 import errno
 import file
 import proc
+import posix_acl
 import resource
 import stat
 import usercopy
@@ -93,7 +94,7 @@ fn xattr_name(_name charptr) ?string {
 		errno.set(errno.erange)
 		return none
 	}
-	if !name.starts_with('user.') && !name.starts_with('trusted.')
+	if !posix_acl.is_name(name) && !name.starts_with('user.') && !name.starts_with('trusted.')
 		&& !name.starts_with('security.') {
 		unsafe { name.free() }
 		errno.set(errno.enotsup)
@@ -149,13 +150,23 @@ fn xattr_target_to_change(target XAttrTarget, name string) ?XAttrTarget {
 }
 
 // What setting or removing `name` on `target` needs, as on Linux.
-fn xattr_may_change(target XAttrTarget, name string) ? {
+fn xattr_may_change(target XAttrTarget, name string, removing bool) ? {
 	if target.node != unsafe { nil } && read_only(target.node) {
 		errno.set(errno.erofs)
 		return none
 	}
 	if target.node != unsafe { nil } && !attr_allows_metadata(target.node) {
 		return none
+	}
+	if posix_acl.is_name(name) {
+		if stat.islnk(target.res.stat.mode) { errno.set(errno.enotsup); return none }
+		if name == posix_acl.default_name && !stat.isdir(target.res.stat.mode) {
+			if removing { return }
+			errno.set(errno.eacces)
+			return none
+		}
+		if !owns_resource(target.res.stat.uid) { errno.set(errno.eperm); return none }
+		return
 	}
 	if name.starts_with('trusted.') {
 		if !proc.current_has_capability(proc.cap_sys_admin) {
@@ -209,7 +220,6 @@ fn xattr_set(given XAttrTarget, _name charptr, value voidptr, size u64, flags in
 	name := xattr_name(_name) or { return errno.err, errno.get() }
 	defer { unsafe { name.free() } }
 	target := xattr_target_to_change(given, name) or { return errno.err, errno.get() }
-	xattr_may_change(target, name) or { return errno.err, errno.get() }
 	mut res := target.res
 	if !resource.has_xattrs(mut res) { return errno.err, errno.enotsup }
 	mut data := []u8{len: int(size)} @[freed]
@@ -217,12 +227,27 @@ fn xattr_set(given XAttrTarget, _name charptr, value voidptr, size u64, flags in
 	if size > 0 && !usercopy.copy_from_user(unsafe { &data[0] }, u64(value), size) {
 		return errno.err, errno.efault
 	}
-	resource.set_xattr(mut res, name, data, flags) or { return errno.err, errno.get() }
+	if posix_acl.is_name(name) && data.len != 0 && !posix_acl.valid(data) {
+		return errno.err, errno.einval
+	}
+	xattr_may_change(target, name, data.len <= 4) or { return errno.err, errno.get() }
+	mut backend_flags := if posix_acl.is_name(name) { 0 } else { flags }
+	if name == posix_acl.access_name && !may_keep_setgid(res.stat.gid) {
+		backend_flags |= resource.acl_clear_setgid
+	}
+	resource.set_xattr(mut res, name, data, backend_flags) or { return errno.err, errno.get() }
 	if target.node != unsafe { nil } { inotify_emit(target.node, '', in_attrib, 0) }
 	return 0, 0
 }
 
 fn xattr_may_read(target XAttrTarget, name string) ? {
+	if posix_acl.is_name(name) {
+		if stat.islnk(target.res.stat.mode) { errno.set(errno.enotsup); return none }
+		if name == posix_acl.default_name && !stat.isdir(target.res.stat.mode) {
+			errno.set(errno.enodata)
+			return none
+		}
+	}
 	if name.starts_with('user.') {
 		if !stat.isreg(target.res.stat.mode) && !stat.isdir(target.res.stat.mode) {
 			errno.set(errno.enodata)
@@ -282,7 +307,7 @@ fn xattr_remove(given XAttrTarget, _name charptr) (u64, u64) {
 	name := xattr_name(_name) or { return errno.err, errno.get() }
 	defer { unsafe { name.free() } }
 	target := xattr_target_to_change(given, name) or { return errno.err, errno.get() }
-	xattr_may_change(target, name) or { return errno.err, errno.get() }
+	xattr_may_change(target, name, true) or { return errno.err, errno.get() }
 	mut res := target.res
 	resource.remove_xattr(mut res, name) or { return errno.err, errno.get() }
 	if target.node != unsafe { nil } { inotify_emit(target.node, '', in_attrib, 0) }
@@ -298,12 +323,37 @@ fn (mut res TmpFSResource) read_xattr(name string, mut value []u8) ? {
 	for c in res.xattrs.entries[index].value { value << c }
 }
 
+fn (mut res TmpFSResource) snapshot_permissions(mut acl []u8) ?resource.PermissionMetadata {
+	res.l.acquire()
+	defer { res.l.release() }
+	index := xattr_find(res.xattrs, posix_acl.access_name)
+	if index >= 0 { for byte in res.xattrs.entries[index].value { acl << byte } }
+	return resource.PermissionMetadata{res.stat.mode, res.stat.uid, res.stat.gid}
+}
+
 fn (mut res TmpFSResource) write_xattr(name string, value []u8, flags int) ? {
 	res.l.acquire()
 	defer { res.l.release() }
 	index := xattr_find(res.xattrs, name)
 	if index >= 0 && flags & xattr_create != 0 { errno.set(errno.eexist); return none }
 	if index < 0 && flags & xattr_replace != 0 { errno.set(errno.enodata); return none }
+	if posix_acl.is_name(name) {
+		if value.len != 0 && !posix_acl.valid(value) { errno.set(errno.einval); return none }
+		mut removing := value.len <= 4
+		if !removing && name == posix_acl.access_name {
+			derived, extended := posix_acl.mode(value, res.stat.mode)
+			res.stat.mode = if flags & resource.acl_clear_setgid != 0 { derived & ~u32(0o2000) } else { derived }
+			removing = !extended
+		}
+		if removing {
+			if index >= 0 {
+				unsafe { res.xattrs.entries[index].name.free(); res.xattrs.entries[index].value.free() }
+				res.xattrs.entries.delete(index)
+			}
+		} else { xattr_put_bytes(mut res, name, value.clone()) }
+		res.stat.ctim = realtime_clock
+		return
+	}
 	xattr_put_bytes(mut res, name, value.clone())
 	res.stat.ctim = realtime_clock
 }
@@ -323,7 +373,11 @@ fn (mut res TmpFSResource) delete_xattr(name string) ? {
 	res.l.acquire()
 	defer { res.l.release() }
 	index := xattr_find(res.xattrs, name)
-	if index < 0 { errno.set(errno.enodata); return none }
+	if index < 0 {
+		if posix_acl.is_name(name) { return }
+		errno.set(errno.enodata)
+		return none
+	}
 	unsafe {
 		res.xattrs.entries[index].name.free()
 		res.xattrs.entries[index].value.free()
@@ -437,6 +491,30 @@ fn free_xattrs(set &XAttrSet) {
 	unsafe {
 		owned.entries.free()
 		free(owned)
+	}
+}
+
+fn (mut res TmpFSResource) sync_acl_mode() ? {
+	res.l.acquire()
+	defer { res.l.release() }
+	res.sync_acl_mode_locked(res.stat.mode)?
+}
+
+fn (mut res TmpFSResource) chmod_mode(mode u32) ? {
+	res.l.acquire()
+	defer { res.l.release() }
+	desired := (res.stat.mode & stat.ifmt) | (mode & 0o7777)
+	res.sync_acl_mode_locked(desired)?
+	res.stat.mode = desired
+	res.stat.ctim = realtime_clock
+}
+
+fn (mut res TmpFSResource) sync_acl_mode_locked(mode u32) ? {
+	index := xattr_find(res.xattrs, posix_acl.access_name)
+	if index >= 0 {
+		if !posix_acl.valid(res.xattrs.entries[index].value)
+			|| res.xattrs.entries[index].value.len <= 4 { errno.set(errno.eio); return none }
+		posix_acl.chmod(mut res.xattrs.entries[index].value, mode)
 	}
 }
 

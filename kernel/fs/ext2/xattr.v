@@ -3,6 +3,8 @@ module ext2
 
 import errno
 import memory
+import posix_acl
+import resource as resource_mod
 import time
 
 fn (mut filesystem EXT2Filesystem) ea_data_block(block u32) bool {
@@ -32,6 +34,8 @@ fn (mut filesystem EXT2Filesystem) ea_data_block(block u32) bool {
 }
 
 fn ea_key(name string) ?(u8, string) {
+	if name == posix_acl.access_name { return u8(2), '' }
+	if name == posix_acl.default_name { return u8(3), '' }
 	if name.starts_with('user.') { return u8(1), unsafe { tos(name.str + 5, name.len - 5) } }
 	if name.starts_with('trusted.') { return u8(4), unsafe { tos(name.str + 8, name.len - 8) } }
 	if name.starts_with('security.') { return u8(6), unsafe { tos(name.str + 9, name.len - 9) } }
@@ -40,7 +44,8 @@ fn ea_key(name string) ?(u8, string) {
 }
 
 fn ea_prefix(index u8) string {
-	return match index { 1 { 'user.' } 4 { 'trusted.' } 6 { 'security.' } else { '' } }
+	return match index { 1 { 'user.' } 2 { posix_acl.access_name }
+		3 { posix_acl.default_name } 4 { 'trusted.' } 6 { 'security.' } else { '' } }
 }
 
 // Called under the filesystem lock. The caller always frees the returned
@@ -87,9 +92,35 @@ fn (mut this EXT2Resource) read_xattr(name string, mut value []u8) ? {
 	offset := ea_find(block, index, short_name)
 	if offset < 0 { errno.set(errno.enodata); return none }
 	entry := ea_entry(block, offset)
+	if index == 2 || index == 3 {
+		disk := unsafe { (&u8(u64(block) + u64(entry.value_offset))).vbytes(int(entry.value_size)) }
+		if !posix_acl.from_disk(disk, mut value) { errno.set(errno.eio); return none }
+		return
+	}
 	for i in 0 .. int(entry.value_size) {
 		value << unsafe { *(&u8(u64(block) + u64(entry.value_offset) + u64(i))) }
 	}
+}
+
+fn (mut this EXT2Resource) snapshot_permissions(mut acl []u8) ?resource_mod.PermissionMetadata {
+	this.l.acquire()
+	defer { this.l.release() }
+	this.filesystem.l.acquire()
+	defer { this.filesystem.l.release() }
+	mut inode := unsafe { &EXT2Inode(C.__builtin_alloca(sizeof(EXT2Inode))) }
+	unsafe { *inode = EXT2Inode{} }
+	inode.read_entry(mut this.filesystem, u32(this.stat.ino))?
+	if inode.eab != 0 {
+		block := this.filesystem.ea_read(inode.eab)?
+		defer { memory.free(block) }
+		position := ea_find(block, 2, '')
+		if position >= 0 {
+			entry := ea_entry(block, position)
+			disk := unsafe { (&u8(u64(block) + u64(entry.value_offset))).vbytes(int(entry.value_size)) }
+			if !posix_acl.from_disk(disk, mut acl) { errno.set(errno.eio); return none }
+		}
+	}
+	return resource_mod.PermissionMetadata{u32(inode.permissions), u32(inode.user_id), u32(inode.group_id)}
 }
 
 fn (mut this EXT2Resource) list_xattrs(mut names []u8) ? {
@@ -117,21 +148,49 @@ fn (mut this EXT2Resource) list_xattrs(mut names []u8) ? {
 }
 
 fn (mut this EXT2Resource) write_xattr(name string, value []u8, flags int) ? {
+	if posix_acl.is_name(name) { this.write_acl(name, value, flags)?; return }
 	this.ea_change(name, value, flags, false)?
+}
+
+fn (mut this EXT2Resource) write_acl(name string, value []u8, flags int) ? {
+	if value.len != 0 && !posix_acl.valid(value) { errno.set(errno.einval); return none }
+	this.l.acquire()
+	defer { this.l.release() }
+	this.filesystem.l.acquire()
+	defer { this.filesystem.l.release() }
+	mut desired_mode := u32(0xffffffff)
+	mut removing := value.len <= 4
+	if !removing && name == posix_acl.access_name {
+		derived, extended := posix_acl.mode(value, this.stat.mode)
+		desired_mode = if flags & resource_mod.acl_clear_setgid != 0 { derived & ~u32(0o2000) } else { derived }
+		removing = !extended
+	}
+	mut disk := []u8{} @[freed]
+	disk.flags |= .noslices
+	defer { unsafe { disk.free() } }
+	if !removing && !posix_acl.to_disk(value, mut disk) { errno.set(errno.einval); return none }
+	this.ea_change_locked(name, disk, flags & 3, removing, desired_mode, false)?
 }
 
 fn (mut this EXT2Resource) delete_xattr(name string) ? {
 	empty := []u8{} @[freed]
 	defer { unsafe { empty.free() } }
-	this.ea_change(name, empty, 2, true)?
+	this.ea_change(name, empty, if posix_acl.is_name(name) { 0 } else { 2 }, true)?
 }
 
 fn (mut this EXT2Resource) ea_change(name string, value []u8, flags int, removing bool) ? {
-	index, short_name := ea_key(name)?
 	this.l.acquire()
 	defer { this.l.release() }
 	this.filesystem.l.acquire()
 	defer { this.filesystem.l.release() }
+	this.ea_change_locked(name, value, flags, removing, u32(0xffffffff), false)?
+}
+
+// ACL permission changes use a private EA block even when the old block is
+// exclusive. The inode then publishes its new mode and EA pointer together.
+fn (mut this EXT2Resource) ea_change_locked(name string, value []u8, flags int,
+	removing bool, desired_mode u32, metadata bool) ? {
+	index, short_name := ea_key(name)?
 	mut inode := unsafe { &EXT2Inode(C.__builtin_alloca(sizeof(EXT2Inode))) }
 	unsafe { *inode = EXT2Inode{} }
 	inode.read_entry(mut this.filesystem, u32(this.stat.ino))?
@@ -159,11 +218,11 @@ fn (mut this EXT2Resource) ea_change(name string, value []u8, flags int, removin
 	mut allocated := u32(0)
 	if count == 0 {
 		inode.eab = 0
-		inode.sector_cnt -= u32(this.filesystem.block_size / 512)
+		if old_block != 0 { inode.sector_cnt -= u32(this.filesystem.block_size / 512) }
 	} else {
 		// Exclusive blocks can be rewritten. Shared Linux-created blocks must
 		// be copied before the inode pointer changes.
-		if old == unsafe { nil } || unsafe { &EAHeader(old) }.refs > 1 {
+		if old == unsafe { nil } || unsafe { &EAHeader(old) }.refs > 1 || desired_mode != u32(0xffffffff) {
 			allocated = this.filesystem.allocate_block() or { errno.set(errno.enospc); return none }
 			inode.eab = allocated
 			if old_block == 0 { inode.sector_cnt += u32(this.filesystem.block_size / 512) }
@@ -182,6 +241,14 @@ fn (mut this EXT2Resource) ea_change(name string, value []u8, flags int, removin
 			}
 		}
 	}
+	if desired_mode != u32(0xffffffff) { inode.permissions = u16(desired_mode) }
+	if metadata {
+		inode.user_id = u16(this.stat.uid)
+		inode.group_id = u16(this.stat.gid)
+		inode.access_time = stat_seconds(this.stat.atim)
+		inode.mod_time = stat_seconds(this.stat.mtim)
+		inode.flags = (inode.flags & ~resource_mod.attributes_kept) | (this.attr_bits & resource_mod.attributes_kept)
+	}
 	inode.creation_time = ext2_now()
 	inode.write_entry(mut this.filesystem, u32(this.stat.ino)) or {
 		inode.eab = old_block
@@ -192,6 +259,7 @@ fn (mut this EXT2Resource) ea_change(name string, value []u8, flags int, removin
 		return none
 	}
 	this.stat.blocks = inode.sector_cnt
+	if desired_mode != u32(0xffffffff) { this.stat.mode = desired_mode }
 	this.stat.ctim = time.TimeSpec{tv_sec: i64(inode.creation_time)}
 	if old_block != 0 && old_block != inode.eab { this.filesystem.ea_release(old_block, old)? }
 	flush_on_return()

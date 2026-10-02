@@ -234,10 +234,7 @@ fn walk_path_on_mount(parent &VFSNode, path string, depth int, effective bool, i
 			errno.set(errno.enotdir)
 			return 0, 0, ''
 		}
-		if !check_access(current_node, access_exec, effective) {
-			errno.set(errno.eacces)
-			return 0, 0, ''
-		}
+		check_access(current_node, access_exec, effective) or { return 0, 0, '' }
 		mut new_node := &VFSNode(unsafe { nil })
 		if elem_str == '..' {
 			// The way out of a directory depends on how it was reached: see
@@ -436,7 +433,8 @@ pub fn symlink(parent &VFSNode, dest string, target string) ?&VFSNode {
 		&& !policy_check_name(parent_of_tgt_node, basename, proc.policy_create) {
 		return none
 	}
-	if unsafe { target_node != 0 } || unsafe { parent_of_tgt_node == 0 } {
+	if unsafe { parent_of_tgt_node == 0 } { return none }
+	if unsafe { target_node != 0 } {
 		errno.set(errno.eexist)
 		return none
 	}
@@ -466,7 +464,8 @@ pub fn link(parent &VFSNode, dest string, target string) ?&VFSNode {
 	// looked at.
 	mut parent_of_tgt_node, mut target_node, basename := walk_path(parent, target, 0, true)
 
-	if unsafe { target_node != 0 } || unsafe { parent_of_tgt_node == 0 } {
+	if unsafe { parent_of_tgt_node == 0 } { return none }
+	if unsafe { target_node != 0 } {
 		errno.set(errno.eexist)
 		return none
 	}
@@ -507,7 +506,7 @@ pub fn unlink(parent &VFSNode, name string, remove_dir bool) ? {
 	// An immutable or append-only file cannot be removed, nor anything from an
 	// immutable or append-only directory.
 	if !attr_allows_remove(node) || !attr_allows_dir_remove(parent_of_tgt) { return none }
-	if !may_remove(parent_of_tgt, node) { errno.set(errno.eacces); return none }
+	may_remove(parent_of_tgt, node)?
 	if basename == '.' || basename == '..' || basename == '' { errno.set(errno.einval); return none }
 	// Something mounted here, in this or any other namespace, keeps the name.
 	if basename in parent_of_tgt.children {
@@ -650,6 +649,11 @@ pub fn internal_create(parent &VFSNode, name string, mode u32) ?&VFSNode {
 // new name; see policy.v. The name is judged in the directory the walk found,
 // before anything is said about whether it exists.
 fn internal_create_checked(parent &VFSNode, name string, mode u32, access u32) ?&VFSNode {
+	return internal_create_with_acl(parent, name, mode, access, false)
+}
+
+fn internal_create_with_acl(parent &VFSNode, name string, mode u32, access u32,
+	apply_umask bool) ?&VFSNode {
 	mut parent_of_tgt_node, mut target_node, basename := walk_path(parent, name, 0, true)
 
 	if access != 0 && parent_of_tgt_node != unsafe { nil }
@@ -661,23 +665,39 @@ fn internal_create_checked(parent &VFSNode, name string, mode u32, access u32) ?
 		return none
 	}
 
-	if unsafe { parent_of_tgt_node == 0 } {
-		errno.set(errno.enoent)
-		return none
-	}
+	if unsafe { parent_of_tgt_node == 0 } { return none }
 
 	if read_only(parent_of_tgt_node) { errno.set(errno.erofs); return none }
 	if !attr_allows_dir_add(parent_of_tgt_node) { return none }
 	require_access(parent_of_tgt_node, access_write | access_exec)?
 	require_linked(parent_of_tgt_node)?
+	mut defaults := []u8{} @[freed]
+	defaults.flags |= .noslices
+	defer { unsafe { defaults.free() } }
+	mut acl := []u8{} @[freed]
+	acl.flags |= .noslices
+	defer { unsafe { acl.free() } }
+	final_mode := creation_acl(parent_of_tgt_node, mode, apply_umask, mut defaults, mut acl)?
 	// The node keeps its name; `basename` points into `name`.
 	node_name := basename.clone()
-	target_node = parent_of_tgt_node.filesystem.create(parent_of_tgt_node, node_name, mode)
+	// Keep the inode inaccessible until its identity and ACL are initialized.
+	target_node = parent_of_tgt_node.filesystem.create(parent_of_tgt_node, node_name, mode & stat.ifmt)
 	if target_node == unsafe { nil } {
 		unsafe { node_name.free() }
 		return none
 	}
-	apply_creation_identity(mut target_node, parent_of_tgt_node)?
+	apply_creation_identity(mut target_node, parent_of_tgt_node) or {
+		failure := errno.get()
+		discard_created_node(mut target_node, parent_of_tgt_node)
+		errno.set(failure)
+		return none
+	}
+	apply_creation_acl(mut target_node, final_mode, defaults, acl) or {
+		failure := errno.get()
+		discard_created_node(mut target_node, parent_of_tgt_node)
+		errno.set(failure)
+		return none
+	}
 
 	unsafe {
 		parent_of_tgt_node.children[basename] = target_node
@@ -771,9 +791,7 @@ pub fn syscall_mkdirat(_ voidptr, dirfd int, _path charptr, mode u32) (u64, u64)
 	// internal_create() below makes its own copy of the name for the node.
 	mut parent_of_tgt_node, mut target_node, basename := walk_path(parent, path, 0, true)
 
-	if unsafe { parent_of_tgt_node == 0 } {
-		return errno.err, errno.enoent
-	}
+	if unsafe { parent_of_tgt_node == 0 } { return errno.err, errno.get() }
 	if !policy_check_name(parent_of_tgt_node, basename, proc.policy_create) {
 		return errno.err, errno.get()
 	}
@@ -782,8 +800,7 @@ pub fn syscall_mkdirat(_ voidptr, dirfd int, _path charptr, mode u32) (u64, u64)
 		return errno.err, errno.eexist
 	}
 
-	masked_mode := (mode & 0o7777) & ~process.umask
-	internal_create(parent_of_tgt_node, basename, masked_mode | stat.ifdir) or {
+	internal_create_with_acl(parent_of_tgt_node, basename, (mode & 0o7777) | stat.ifdir, 0, true) or {
 		return errno.err, errno.get()
 	}
 
@@ -922,8 +939,8 @@ pub fn syscall_openat(_ voidptr, dirfd int, _path charptr, flags int, mode u32) 
 		// The Alpine package database creates executables directly with openat;
 		// preserve the requested permission bits instead of forcing every new
 		// regular file to 0644.
-		new_node := internal_create_checked(parent, path,
-			stat.ifreg | ((mode & 0o7777) & ~process.umask), policy_open_access(flags)) or {
+		new_node := internal_create_with_acl(parent, path,
+			stat.ifreg | (mode & 0o7777), policy_open_access(flags), true) or {
 			return errno.err, errno.get()
 		}
 		created = true
@@ -970,9 +987,8 @@ pub fn syscall_openat(_ voidptr, dirfd int, _path charptr, flags int, mode u32) 
 		|| flags & resource.o_trunc != 0 {
 		requested |= access_write
 	}
-	if !created && flags & resource.o_path == 0 && requested != 0
-		&& !check_access(node, requested, true) {
-		return errno.err, errno.eacces
+	if !created && flags & resource.o_path == 0 && requested != 0 {
+		check_access(node, requested, true) or { return errno.err, errno.get() }
 	}
 	if stat.isdir(node.resource.stat.mode) && requested & access_write != 0 {
 		return errno.err, errno.eisdir
@@ -1330,8 +1346,8 @@ pub fn syscall_faccessat(_ voidptr, dirfd int, _path charptr, mode u32, flags in
 	if !policy_check(node, policy_access) {
 		return errno.err, errno.get()
 	}
-	if mode != 0 && !check_access(node, mode, flags & at_eaccess != 0) {
-		return errno.err, errno.eacces
+	if mode != 0 {
+		check_access(node, mode, flags & at_eaccess != 0) or { return errno.err, errno.get() }
 	}
 
 	return 0, 0
@@ -1474,9 +1490,7 @@ pub fn syscall_linkat(_ voidptr, olddirfd int, _oldpath charptr, newdirfd int, _
 	if !policy_check_link(old_node, newparent, basename) {
 		return errno.err, errno.get()
 	}
-	if !check_access(newparent, access_write | access_exec, true) {
-		return errno.err, errno.eacces
-	}
+	check_access(newparent, access_write | access_exec, true) or { return errno.err, errno.get() }
 
 	if read_only(newparent) || read_only(old_node) { return errno.err, errno.erofs }
 	// An immutable or append-only file gets no new name, and none is made in
@@ -1523,12 +1537,7 @@ pub fn syscall_fchmod(_ voidptr, fdnum int, mode u32) (u64, u64) {
 	mut res := handle_resource_to_change(fd.handle.node, fd.handle.resource) or {
 		return errno.err, errno.get()
 	}
-	old_mode := res.stat.mode
-	res.stat.mode = (res.stat.mode & stat.ifmt) | (mode & 0o7777)
-	resource.persist_metadata(mut res) or {
-		res.stat.mode = old_mode
-		return errno.err, errno.get()
-	}
+	resource.set_mode(mut res, chmod_permissions(mode, res.stat.gid)) or { return errno.err, errno.get() }
 	if fd.handle.node != unsafe { nil } {
 		inotify_emit(unsafe { &VFSNode(fd.handle.node) }, '', in_attrib, 0)
 	}
@@ -1562,12 +1571,7 @@ pub fn syscall_fchmodat(_ voidptr, dirfd int, _path charptr, mode u32) (u64, u64
 	// Preserve the object type and update only permission/special bits, just as
 	// fchmod does. Archive extractors use fchmodat after creating each file.
 	mut node_resource := resource_to_change(node) or { return errno.err, errno.get() }
-	old_mode := node_resource.stat.mode
-	node_resource.stat.mode = (node_resource.stat.mode & stat.ifmt) | (mode & 0o7777)
-	resource.persist_metadata(mut node_resource) or {
-		node_resource.stat.mode = old_mode
-		return errno.err, errno.get()
-	}
+	resource.set_mode(mut node_resource, chmod_permissions(mode, node_resource.stat.gid)) or { return errno.err, errno.get() }
 	inotify_emit(node, '', in_attrib, 0)
 	return 0, 0
 }
@@ -1602,9 +1606,7 @@ pub fn syscall_chdir(_ voidptr, _path charptr) (u64, u64) {
 	if !stat.isdir(node.resource.stat.mode) {
 		return errno.err, errno.enotdir
 	}
-	if !check_access(node, access_exec, true) {
-		return errno.err, errno.eacces
-	}
+	check_access(node, access_exec, true) or { return errno.err, errno.get() }
 
 	proc.set_current_fs(mut process, node, identity)
 
@@ -1828,16 +1830,10 @@ pub fn rename(oldparent &VFSNode, oldpath string, newparent &VFSNode, newpath st
 	// Both names are views into the paths. A node that takes a name is given
 	// a copy of its own.
 	mut old_parent_of, mut old_node, old_basename := walk_path(oldparent, oldpath, 0, true)
-	if unsafe { old_node == 0 } || unsafe { old_parent_of == 0 } {
-		errno.set(errno.enoent)
-		return none
-	}
+	if unsafe { old_node == 0 } || unsafe { old_parent_of == 0 } { return none }
 
 	mut new_parent_of, mut new_node, new_basename := walk_path(newparent, newpath, 0, true)
-	if unsafe { new_parent_of == 0 } {
-		errno.set(errno.enoent)
-		return none
-	}
+	if unsafe { new_parent_of == 0 } { return none }
 	if !policy_check_name(old_parent_of, old_basename, proc.policy_create)
 		|| !policy_check_name(new_parent_of, new_basename, proc.policy_create) {
 		return none
@@ -1856,18 +1852,11 @@ pub fn rename(oldparent &VFSNode, oldpath string, newparent &VFSNode, newpath st
 		|| (new_node != unsafe { nil } && !attr_allows_remove(new_node)) {
 		return none
 	}
-	if !may_remove(old_parent_of, old_node) {
-		errno.set(errno.eacces)
-		return none
-	}
+	may_remove(old_parent_of, old_node)?
 	if unsafe { new_node != nil } {
-		if !may_remove(new_parent_of, new_node) {
-			errno.set(errno.eacces)
-			return none
-		}
-	} else if !check_access(new_parent_of, access_write | access_exec, true) {
-		errno.set(errno.eacces)
-		return none
+		may_remove(new_parent_of, new_node)?
+	} else {
+		check_access(new_parent_of, access_write | access_exec, true)?
 	}
 	if !same_filesystem(old_parent_of, new_parent_of) {
 		errno.set(errno.exdev)
@@ -2097,9 +2086,7 @@ pub fn syscall_fchdir(_ voidptr, fdnum int) (u64, u64) {
 	if !stat.isdir(fd.handle.resource.stat.mode) {
 		return errno.err, errno.enotdir
 	}
-	if !check_access(node, access_exec, true) {
-		return errno.err, errno.eacces
-	}
+	check_access(node, access_exec, true) or { return errno.err, errno.get() }
 
 	proc.set_current_fs(mut process, voidptr(node), &fd.handle.mount)
 
@@ -2136,9 +2123,7 @@ pub fn syscall_truncate(_ voidptr, _path charptr, length i64) (u64, u64) {
 	if stat.isdir(res.stat.mode) {
 		return errno.err, errno.eisdir
 	}
-	if !check_access(node, access_write, true) {
-		return errno.err, errno.eacces
-	}
+	check_access(node, access_write, true) or { return errno.err, errno.get() }
 	res = resource_to_change(node) or { return errno.err, errno.get() }
 
 	res.grow(unsafe { nil }, u64(length)) or { return errno.err, errno.get() }
@@ -2392,9 +2377,9 @@ pub fn set_file_times(dirfd int, _path charptr, requested [2]time.TimeSpec, flag
 	}
 	if explicit {
 		if !owns_resource(res.stat.uid) { return errno.err, errno.eperm }
-	} else if !owns_resource(res.stat.uid)
-		&& (node == unsafe { nil } || !check_access(node, access_write, true)) {
-		return errno.err, errno.eacces
+	} else if !owns_resource(res.stat.uid) {
+		if node == unsafe { nil } { return errno.err, errno.eacces }
+		check_access(node, access_write, true) or { return errno.err, errno.get() }
 	}
 	if requested[0].tv_nsec == utime_omit && requested[1].tv_nsec == utime_omit {
 		return 0, 0

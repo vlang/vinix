@@ -804,11 +804,11 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 	caller := proc.current_thread().process
 	root := fs.process_root(caller)
 	if !stat.isreg(prog_node.resource.stat.mode)
-		|| fs.mount_flags(prog_mount) & fs.ms_noexec != 0
-		|| !fs.check_access(prog_node, fs.access_exec, true) {
+		|| fs.mount_flags(prog_mount) & fs.ms_noexec != 0 {
 		errno.set(errno.eacces)
 		return none
 	}
+	fs.check_access(prog_node, fs.access_exec, true)?
 	gpu_exec_trace(trace_gpu, 'validated executable permissions')
 	mut prog := prog_node.resource
 	allow_wx := envp.contains('VINIX_ALLOW_WX=1')
@@ -1089,11 +1089,17 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 			return none
 		}
 		if !stat.isreg(ld_node.resource.stat.mode)
-			|| fs.mount_flags(ld_mount) & fs.ms_noexec != 0
-			|| !fs.check_access(ld_node, fs.access_exec, true) {
+			|| fs.mount_flags(ld_mount) & fs.ms_noexec != 0 {
 			unsafe { ld_path.free() }
 			mmap.delete_pagemap(mut new_pagemap) or {}
 			errno.set(errno.eacces)
+			return none
+		}
+		fs.check_access(ld_node, fs.access_exec, true) or {
+			failure := errno.get()
+			unsafe { ld_path.free() }
+			mmap.delete_pagemap(mut new_pagemap) or {}
+			errno.set(failure)
 			return none
 		}
 		ld := ld_node.resource

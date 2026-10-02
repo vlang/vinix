@@ -876,9 +876,7 @@ pub fn syscall_chroot(_ voidptr, _path charptr) (u64, u64) {
 	if !stat.isdir(node.resource.stat.mode) {
 		return errno.err, errno.enotdir
 	}
-	if !check_access(node, access_exec, true) {
-		return errno.err, errno.eacces
-	}
+	check_access(node, access_exec, true) or { return errno.err, errno.get() }
 	mut process := calling_process()
 	proc.set_root_fs(mut process, voidptr(node), identity)
 	return 0, 0

@@ -94,6 +94,7 @@ pub const cap_chown = 0
 pub const cap_dac_override = 1
 pub const cap_dac_read_search = 2
 pub const cap_fowner = 3
+pub const cap_fsetid = 4
 pub const cap_kill = 5
 pub const cap_setgid = 6
 pub const cap_setuid = 7

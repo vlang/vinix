@@ -326,9 +326,7 @@ pub fn syscall_inotify_add_watch(_ voidptr, fdnum int, _path charptr, mask u32) 
 	if mask & in_onlydir != 0 && !stat.isdir(node.resource.stat.mode) {
 		return errno.err, errno.enotdir
 	}
-	if !check_access(node, access_read, true) {
-		return errno.err, errno.eacces
-	}
+	check_access(node, access_read, true) or { return errno.err, errno.get() }
 	mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.get() }
 	defer { fd.unref() }
 	mut res := fd.handle.resource

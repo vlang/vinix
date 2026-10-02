@@ -6,6 +6,7 @@ import katomic
 import lib
 import memory
 import proc
+import posix_acl
 import resource as resource_mod
 import stat
 import time
@@ -53,12 +54,56 @@ fn (mut this EXT2Resource) persist_metadata() ? {
 		errno.set(errno.eoverflow)
 		return none
 	}
+	this.l.acquire()
+	defer { this.l.release() }
 	this.filesystem.l.acquire()
 	defer { this.filesystem.l.release() }
+	this.persist_metadata_locked(this.stat.mode)?
+}
+
+fn (mut this EXT2Resource) chmod_mode(mode u32) ? {
+	this.l.acquire()
+	defer { this.l.release() }
+	this.filesystem.l.acquire()
+	defer { this.filesystem.l.release() }
+	desired := (this.stat.mode & stat.ifmt) | (mode & 0o7777)
+	this.persist_metadata_locked(desired)?
+	this.stat.mode = desired
+}
+
+fn (mut this EXT2Resource) persist_metadata_locked(mode u32) ? {
+	if this.stat.uid > 0xffff || this.stat.gid > 0xffff { errno.set(errno.eoverflow); return none }
 	mut inode := unsafe { &EXT2Inode(C.__builtin_alloca(sizeof(EXT2Inode))) }
 	unsafe { *inode = EXT2Inode{} }
 	inode.read_entry(mut this.filesystem, u32(this.stat.ino))?
-	inode.permissions = u16(this.stat.mode)
+	if inode.eab != 0 {
+		block := this.filesystem.ea_read(inode.eab)?
+		defer { memory.free(block) }
+		position := ea_find(block, 2, '')
+		if position >= 0 {
+			entry := ea_entry(block, position)
+			disk := unsafe { (&u8(u64(block) + u64(entry.value_offset))).vbytes(int(entry.value_size)) }
+			mut acl := []u8{} @[freed]
+			acl.flags |= .noslices
+			defer { unsafe { acl.free() } }
+			if !posix_acl.from_disk(disk, mut acl) { errno.set(errno.eio); return none }
+			original, _ := posix_acl.mode(acl, u32(inode.permissions))
+			if original & 0o777 != u32(inode.permissions) & 0o777 {
+				errno.set(errno.eio)
+				return none
+			}
+			if u32(inode.permissions) & 0o777 != mode & 0o777 {
+				posix_acl.chmod(mut acl, mode)
+				mut output := []u8{} @[freed]
+				output.flags |= .noslices
+				defer { unsafe { output.free() } }
+				if !posix_acl.to_disk(acl, mut output) { errno.set(errno.eio); return none }
+				this.ea_change_locked(posix_acl.access_name, output, 0, false, mode, true)?
+				return
+			}
+		}
+	}
+	inode.permissions = u16(mode)
 	inode.user_id = u16(this.stat.uid)
 	inode.group_id = u16(this.stat.gid)
 	inode.access_time = stat_seconds(this.stat.atim)
@@ -285,7 +330,8 @@ fn (mut filesystem EXT2Filesystem) create_persistent(parent &vfs.VFSNode,
 		return unsafe { nil }
 	})
 	now := ext2_now()
-	mut inode := EXT2Inode{
+	mut inode := unsafe { &EXT2Inode(C.__builtin_alloca(sizeof(EXT2Inode))) }
+	unsafe { *inode = EXT2Inode{
 		permissions:   u16(if stat.isdir(mode) && parent.resource.stat.mode & 0o2000 != 0 {
 			mode | 0o2000
 		} else { mode })
@@ -295,7 +341,7 @@ fn (mut filesystem EXT2Filesystem) create_persistent(parent &vfs.VFSNode,
 		access_time:   now
 		creation_time: now
 		mod_time:      now
-	}
+	} }
 	inode.write_entry(mut filesystem, inode_index) or {
 		filesystem.free_inode(inode_index) or {}
 		return unsafe { nil }
@@ -327,7 +373,8 @@ fn (mut filesystem EXT2Filesystem) create_persistent(parent &vfs.VFSNode,
 		}
 	}
 
-	mut parent_inode := EXT2Inode{}
+	mut parent_inode := unsafe { &EXT2Inode(C.__builtin_alloca(sizeof(EXT2Inode))) }
+	unsafe { *parent_inode = EXT2Inode{} }
 	parent_inode.read_entry(mut filesystem, u32(parent.resource.stat.ino)) or {
 		inode.free_entry(mut filesystem, inode_index) or {}
 		return unsafe { nil }
@@ -350,7 +397,7 @@ fn (mut filesystem EXT2Filesystem) create_persistent(parent &vfs.VFSNode,
 	flush_on_return()
 
 	mut node := vfs.create_node(filesystem.as_filesystem(), parent, name, stat.isdir(mode))
-	mut res := resource_from_inode(filesystem, inode_index, inode)
+	mut res := resource_from_inode(filesystem, inode_index, *inode)
 	node.resource = res.boxed()
 	if stat.islnk(mode) { node.symlink_target = symlink_target.clone() }
 	mut parent_node := unsafe { parent }
@@ -382,12 +429,14 @@ fn (mut this EXT2Resource) unlink(handle voidptr) ? {
 	if unsafe { node.parent == nil } { errno.set(errno.einval); return none }
 	this.filesystem.l.acquire()
 	defer { this.filesystem.l.release() }
-	mut parent_inode := EXT2Inode{}
+	mut parent_inode := unsafe { &EXT2Inode(C.__builtin_alloca(sizeof(EXT2Inode))) }
+	unsafe { *parent_inode = EXT2Inode{} }
 	parent_index := u32(node.parent.resource.stat.ino)
 	parent_inode.read_entry(mut this.filesystem, parent_index)?
 	removed := this.filesystem.dir_remove(mut parent_inode, parent_index, node.name)?
 	if removed != u32(this.stat.ino) { errno.set(errno.eio); return none }
-	mut inode := EXT2Inode{}
+	mut inode := unsafe { &EXT2Inode(C.__builtin_alloca(sizeof(EXT2Inode))) }
+	unsafe { *inode = EXT2Inode{} }
 	inode.read_entry(mut this.filesystem, u32(this.stat.ino))?
 	if inode.hard_link_cnt == 0 { errno.set(errno.eio); return none }
 	inode.hard_link_cnt--

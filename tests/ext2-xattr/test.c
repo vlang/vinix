@@ -122,7 +122,7 @@ static int exercise(const char *path, int persistent)
  EXPECT_ERROR(fremovexattr(fd, "user.empty"), ENODATA);
  EXPECT_ERROR(fsetxattr(fd, "user.", payload, sizeof(payload), 0), EINVAL);
  EXPECT_ERROR(fsetxattr(fd, "unsupported.name", payload, sizeof(payload), 0), EOPNOTSUPP);
- EXPECT_ERROR(fsetxattr(fd, "system.posix_acl_access", payload, sizeof(payload), 0), EOPNOTSUPP);
+ EXPECT_ERROR(fsetxattr(fd, "system.unsupported", payload, sizeof(payload), 0), EOPNOTSUPP);
  EXPECT_ERROR(fsetxattr(fd, "user.binary", payload, sizeof(payload), 4), EINVAL);
  CHECK(fsetxattr(fd, "trusted.secret", "admin", 5, 0) == 0);
  CHECK(fsetxattr(fd, "security.test", "policy", 6, 0) == 0);
