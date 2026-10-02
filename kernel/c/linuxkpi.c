@@ -14,6 +14,7 @@
 #include <asm/unaligned.h>
 #include <linux/percpu.h>
 #include <vinix/runtime.h>
+#include <vinix/gfp.h>
 #include <drm/i915_pciids.h>
 #ifndef VINIX_LINUXKPI_HOST_TEST
 #include <asm/fpu/api.h>
@@ -29,7 +30,7 @@ struct allocation {
     void *base;
 } __aligned(16);
 
-static bool supported_gfp(gfp_t flags)
+bool vinix_linuxkpi_gfp_supported(gfp_t flags)
 {
     /* Zone constraints, NOFAIL and memory-cgroup accounting need native
      * support. Flags promising those behaviors are never silently ignored. */
@@ -38,10 +39,21 @@ static bool supported_gfp(gfp_t flags)
     return !(flags & ~supported);
 }
 
+void *vinix_linuxkpi_alloc_gfp_pages(size_t pages, gfp_t flags)
+{
+    if (!pages || !vinix_linuxkpi_gfp_supported(flags)) return NULL;
+    size_t page_size = vinix_linuxkpi_page_size();
+    if (!page_size || pages > (size_t)-1 / page_size) return NULL;
+    /* Only unrestricted sleepable requests may invoke native reclaimers.
+     * Cache refills and kmalloc share this policy, including atomic callers. */
+    bool reclaim = (flags & GFP_KERNEL) == GFP_KERNEL && vinix_linuxkpi_may_sleep();
+    return vinix_linuxkpi_alloc_pages(pages, reclaim);
+}
+
 void *kmalloc(size_t size, gfp_t flags)
 {
     if (!size) return ZERO_SIZE_PTR;
-    if (!supported_gfp(flags)) return NULL;
+    if (!vinix_linuxkpi_gfp_supported(flags)) return NULL;
     size_t page_size = vinix_linuxkpi_page_size();
     /* kmalloc guarantees at least the largest power-of-two divisor of size;
      * power-of-two requests must be aligned to the complete request size. */
@@ -55,8 +67,7 @@ void *kmalloc(size_t size, gfp_t flags)
     /* GFP_ATOMIC/NOWAIT, GFP_NOFS/NOIO and IRQ/preempt-disabled callers take
      * the non-reclaiming PMM path. Only unrestricted sleepable requests may
      * invoke Vinix's reclaimers, which can recurse into filesystem code. */
-    bool reclaim = (flags & GFP_KERNEL) == GFP_KERNEL && vinix_linuxkpi_may_sleep();
-    void *base = vinix_linuxkpi_alloc_pages(pages, reclaim);
+    void *base = vinix_linuxkpi_alloc_gfp_pages(pages, flags);
     if (!base) return NULL;
     void *result = (void *)ALIGN((uintptr_t)base + sizeof(struct allocation), alignment);
     struct allocation *allocation = (struct allocation *)result - 1;

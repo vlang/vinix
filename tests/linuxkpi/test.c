@@ -1030,6 +1030,7 @@ static void reference_tests(void)
 #include "srcu_test.h"
 #include "wait_bit_test.h"
 #include "io_test.h"
+#include "cache_test.h"
 
 int main(void)
 {
@@ -1043,6 +1044,7 @@ int main(void)
     assert(vinix_linuxkpi_percpu_init(4, host_percpu_start, host_percpu_end) == 0);
     permanent_pages = live_pages;
     allocation_tests();
+    cache_tests();
     string_tests();
     bitmap_tests();
     test_bitmap_runtime();
@@ -1070,6 +1072,6 @@ int main(void)
     reference_tests();
     vinix_linuxkpi_percpu_destroy_for_test();
     assert(live_pages == 0);
-    puts("LinuxKPI: PASS (Linux helpers, allocation/OOM, strings, bitmaps, SMP/IRQ locks, per-CPU storage, task references, wake races, synchronization, wound/wait mutexes, clocks, bit/variable and I/O waits, timers, ordered/delayed/unbound/bound work, runnable concurrency, priority, system queues and SRCU)");
+    puts("LinuxKPI: PASS (Linux helpers, allocation/OOM, packed object caches, strings, bitmaps, SMP/IRQ locks, per-CPU storage, task references, wake races, synchronization, wound/wait mutexes, clocks, bit/variable and I/O waits, timers, ordered/delayed/unbound/bound work, runnable concurrency, priority, system queues and SRCU)");
     return 0;
 }

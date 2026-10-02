@@ -331,6 +331,20 @@ the complete i915 source tree is not evidence that the driver runs.
   and Linux allocation alignment. The initial backend uses contiguous
   physical pages, including for small allocations; it favors correctness
   over memory efficiency.
+- Plain `kmem_cache_create`, `KMEM_CACHE`, allocation/zero-allocation, free,
+  shrink, size query and destruction use reusable packed native page slabs.
+  Flags zero and `SLAB_HWCACHE_ALIGN` are supported; RCU, reclaim-accounted,
+  zone-constrained and other nonzero cache flags fail creation. Slot metadata
+  stays outside payloads. Constructors run once per fresh slot before slab
+  publication, outside the cache lock and in the allocating caller's context;
+  reuse preserves object contents unless zero-allocation clears them.
+  Allocation/free support IRQ-off callers without changing their IRQ or
+  preemption state, and share kmalloc's checked GFP/reclaim policy. Empty slabs
+  remain reusable until explicit shrink or destruction. Shrink may overlap
+  alloc/free; it detaches only empty slabs under the lock and releases pages
+  afterward. Create/shrink/destroy require sleepable context. Owners must stop
+  every API user and free every live object before destruction. RCU-safe caches,
+  native per-CPU caches, reclaim accounting and NUMA placement remain pending.
 - Non-reclaiming allocation for `GFP_ATOMIC`, `GFP_NOWAIT`, `GFP_NOFS`,
   `GFP_NOIO` and callers with IRQs/preemption disabled. Only unrestricted
   sleepable allocations invoke Vinix's existing reclaimers. Zone-constrained,
@@ -376,6 +390,22 @@ operations and nested IRQ restoration. Refcount tests cover overflow/underflow
 saturation, concurrent final release, and acquire/release publication.
 Source-import tests cover modification, manifest tampering and archive path
 traversal.
+Cache tests exercise descriptor/name/refill OOM rollback, private constructor
+publication, constructor-once reuse, explicit/GFP alignment and payload sizes
+from one byte through multiple pages. Four host allocators race explicit shrink
+under ASan/UBSan; IRQ-off and preemption-pinned refills preserve caller context
+and avoid reclaim. Four native CPU-bound workers allocate/free while the
+controller shrinks. After three warmups, the measured fourth complete batch
+restores the exact physical-page baseline. Fresh normal and SSE4.1 enabled
+four-CPU guests passed using ELF SHA256
+`f5fefb21858cc7d80dd8aa3ef06c203da6c7d84cd4d46b20ea602ca69a8ed93e`;
+logs are `/tmp/vinix-linuxkpi-cache-{vm,sse-vm}/serial.log`. Fresh default x86
+and disabled ARM builds also passed, with default Linux-ABI guest startup.
+Independent backend/fixture lifetime and generated-C reviews approved. The
+fresh equal-source allocation gate at `e29bcc4d` has identical baseline/feature
+results: 416 sites, 184 groups and 155 existing failures; both exit 1. This
+feature adds no gate failure and does not establish a whole-kernel leak pass.
+
 Separate host executables include `kernel.h` and `drm_color_mgmt.h` first,
 checking header dependencies independently of the runtime's other includes.
 They verify integer boundaries, single argument evaluation, LUT half-step

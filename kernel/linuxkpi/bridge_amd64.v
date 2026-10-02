@@ -421,6 +421,7 @@ fn C.vinix_linuxkpi_ww_mutex_native_selftest() int
 fn C.wait_bit_init()
 fn C.vinix_linuxkpi_wait_bit_native_selftest() int
 fn C.vinix_linuxkpi_io_native_selftest() int
+fn C.vinix_linuxkpi_cache_native_selftest() int
 
 // join/TASK_DEAD can precede the final switch away and scheduler reaping.
 // Taking a baseline immediately after warmup can count those dying stacks,
@@ -767,6 +768,25 @@ pub fn initialise() {
 			lib.kpanic(unsafe { nil }, c'Linux I/O wait self-test retained native pages')
 		}
 		C.kprintf(c'linuxkpi: I/O wait scopes, CPU accounting, migration, deadlines and exit cleanup passed; no pages retained\n')
+		for _ in 0 .. 3 {
+			if C.vinix_linuxkpi_cache_native_selftest() != 0 {
+				lib.kpanic(unsafe { nil }, c'Linux object cache self-test failed')
+			}
+		}
+		cache_before := selftest_free_baseline()
+		if C.vinix_linuxkpi_cache_native_selftest() != 0 {
+			lib.kpanic(unsafe { nil }, c'Linux object cache self-test failed')
+		}
+		cache_reap_start := hpet_clock.nanoseconds()
+		for memory.free_bytes() != cache_before && hpet_clock.nanoseconds() - cache_reap_start < 1000000000 {
+			sched.reap_deferred()
+			sched.reschedule()
+		}
+		if memory.free_bytes() != cache_before {
+			C.kprintf(c'linuxkpi: object cache free-byte baseline=%llu after=%llu\n', cache_before, memory.free_bytes())
+			lib.kpanic(unsafe { nil }, c'Linux object cache self-test retained native pages')
+		}
+		C.kprintf(c'linuxkpi: packed object caches, constructors, atomic allocation, shrink and teardown passed on 4 workers; no pages retained\n')
 		// Exercise a real scheduler interrupt with preemption disabled and
 		// IRQs still enabled, rather than relying only on host lock tests.
 		preempt_disable()

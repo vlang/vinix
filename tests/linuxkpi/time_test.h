@@ -317,9 +317,10 @@ static void time_tests(void)
     DECLARE_WAIT_QUEUE_HEAD(queue);
     assert(wait_event_timeout(queue, true, 0) == 1);
     assert(wait_event_timeout(queue, false, 0) == 0);
+    int warnings = atomic_read(&time_warnings);
     set_current_state(TASK_INTERRUPTIBLE);
     assert(schedule_timeout(-1) == 0 && task_is_running(current));
-    assert(atomic_read(&time_warnings) == 1);
+    assert(atomic_read(&time_warnings) == warnings + 1);
     set_current_state(TASK_UNINTERRUPTIBLE);
     assert(schedule_timeout(0) == 0 && task_is_running(current));
     DECLARE_COMPLETION_ONSTACK(completion);
