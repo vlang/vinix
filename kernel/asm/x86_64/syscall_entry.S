@@ -18,6 +18,7 @@
 .global syscall_entry
 syscall_entry:
     swapgs
+    lfence
     // Save the user stack in Thread.user_stack and switch to Thread.kernel_stack.
     mov %rsp, %gs:32
     mov %gs:24, %rsp
@@ -70,7 +71,8 @@ syscall_entry:
     mov 80(%rax), %rbx
     mov %rbx, (%rsp)
     lea syscall_table(%rip), %rbx
-    call *(%rbx, %r13, 8)
+    mov (%rbx, %r13, 8), %rax
+    call vinix_indirect_thunk_rax
     add $16, %rsp
     jmp 4f
 
@@ -123,6 +125,7 @@ syscall_exit_load_es:
     // Restore the user stack. sysretq takes RIP from rcx and RFLAGS from r11.
     mov %gs:32, %rsp
     swapgs
+    lfence
     sysretq
 
 .section .note.GNU-stack,"",%progbits

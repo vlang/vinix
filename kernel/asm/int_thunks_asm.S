@@ -14,6 +14,8 @@ interrupt_thunk_\num:
     swapgs
 
 1:
+    // Also fence the path where a predicted conditional SWAPGS was skipped.
+    lfence
     push %r15
     push %r14
     push %r13
@@ -57,7 +59,8 @@ interrupt_thunk_\num:
     add %rax, %rbx
     mov %rsp, %rsi
     xor %rbp, %rbp
-    call *(%rbx)
+    mov (%rbx), %rax
+    call vinix_indirect_thunk_rax
     jmp interrupt_thunk_exit
 .endm
 
@@ -130,6 +133,7 @@ interrupt_exit_load_es:
     swapgs
 
 1:
+    lfence
     iretq
 
 .section .note.GNU-stack,"",%progbits

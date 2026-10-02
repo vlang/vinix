@@ -72,8 +72,10 @@ x86_load_user_gs:
     pushfq
     cli
     swapgs
+    lfence
     mov %di, %gs
     swapgs
+    lfence
     popfq
     ret
 
@@ -87,6 +89,7 @@ x86_load_user_gs:
 .global syscall32_entry
 syscall32_entry:
     swapgs
+    lfence
     mov %rsp, %gs:32
     mov %gs:24, %rsp
     push $0x3b

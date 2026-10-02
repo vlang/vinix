@@ -154,6 +154,15 @@ override CFLAGS += \
     -mno-red-zone \
     -mcmodel=kernel
 
+# Cover generated V C and C drivers, plus the handwritten dispatch thunks.
+# These flags trap indirect-branch speculation; they do not supply KPTI or
+# CPU-specific return-branch/BHI workarounds.
+ifeq ($(CC_IS_CLANG),1)
+    override CFLAGS += -mretpoline
+else
+    override CFLAGS += -mindirect-branch=thunk-inline -mindirect-branch-register
+endif
+
 # Internal linker flags for x86_64.
 override LDFLAGS += \
     -Wl,-m,elf_x86_64 \

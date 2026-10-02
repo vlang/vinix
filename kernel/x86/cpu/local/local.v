@@ -81,6 +81,8 @@ pub mut:
 	// CPU is running, or nil. See sched.load_process_ldt().
 	ldt         voidptr
 	ldt_process voidptr
+	// Feature-gated speculation controls selected separately on each CPU.
+	speculation_policy u64
 }
 
 __global (

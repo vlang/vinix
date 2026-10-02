@@ -21,6 +21,8 @@ fn C.syscall_entry()
 // asm/x86_64/segment.S
 fn C.syscall32_entry()
 
+fn C.vinix_speculation_init(cpu_number u64) u64
+
 const cpuid7_ebx_smep = u32(1) << 7
 const cpuid7_ebx_smap = u32(1) << 20
 const cr4_smap = u64(1) << 21
@@ -99,6 +101,8 @@ pub fn initialise(smp_info &limine.LimineSMPInfo) {
 
 	cpu.set_gs_base(u64(&cpu_local.cpu_number))
 	cpu.set_kernel_gs_base(u64(&cpu_local.cpu_number))
+
+	cpu_local.speculation_policy = C.vinix_speculation_init(cpu_number)
 
 	// Enable SSE/SSE2 and make supervisor writes obey read-only PTEs. OpenBSD
 	// explicitly enables CR0.WP so kernel text and rodata cannot be modified

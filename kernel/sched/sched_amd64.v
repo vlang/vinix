@@ -19,6 +19,8 @@ import klock
 fn C.vinix_call_void_fn(f voidptr)
 fn C.vinix_linuxkpi_workqueue_task_sleep(task voidptr)
 fn C.vinix_linuxkpi_workqueue_task_resume(task voidptr)
+fn C.vinix_speculation_switch(policy u64)
+fn C.vinix_speculation_fill_rsb()
 
 __global (
 	// Hardware that this kernel drives without interrupts -- a network card --
@@ -287,6 +289,10 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 		await()
 	}
 
+	// Include dispatch from idle: it may retain a previous process's predictor
+	// state. Run before hooks or context restoration consume the new thread.
+	C.vinix_speculation_switch(cpu_local.speculation_policy)
+	C.vinix_speculation_fill_rsb()
 	current_thread = next_thread
 	publish_dispatch_priority(cpu_local.cpu_number, current_thread, now_ns)
 	$if linuxkpi ? {
@@ -378,6 +384,7 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 		pop r15
 		add rsp, 8
 		swapgs
+		lfence
 		iretq
 		; ; rm (new_gpr_state)
 		; memory
