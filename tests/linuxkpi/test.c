@@ -1041,6 +1041,7 @@ static void reference_tests(void)
 #include "i915_config_test.h"
 #include "kdev_test.h"
 #include "qp_table_test.h"
+#include "string_helpers_test.h"
 
 int main(void)
 {
@@ -1061,6 +1062,7 @@ int main(void)
     allocation_tests();
     cache_tests();
     string_tests();
+    string_helpers_tests();
     bitmap_tests();
     test_bitmap_runtime();
     bit_concurrency_tests();

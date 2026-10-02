@@ -393,6 +393,15 @@ the complete i915 source tree is not evidence that the driver runs.
   `kstrndup` and `kmemdup_nul`. Bounded string operations use byte accesses
   and do not read into an adjacent unmapped page. String duplication returns
   a `kfree`-owned allocation and propagates overflow/OOM failure.
+- Original Linux `sysfs_streq`, `match_string`, `__sysfs_match_string` and
+  `strreplace` algorithms use borrowed strings synchronously without allocation.
+  Matching is case-sensitive, returns the first match and stops at the first
+  NULL entry; sysfs matching accepts a trailing newline at the first mismatch.
+  Replacement scans through inserted NULs until the original terminator and
+  returns the caller's original pointer. The unchanged display CRC parser uses
+  exact matching. PMU replacement is used on discrete GPUs; Tiger Lake's PMU
+  name takes the integrated-GPU branch. Sysfs and display CRC services remain
+  unresolved.
 - `kmalloc`, `kzalloc`, `kcalloc`, `kmalloc_array`, `kmemdup`, `krealloc`,
   `ksize` and `kfree`, including zero-size pointers, overflow/OOM handling
   and Linux allocation alignment. The initial backend uses contiguous
@@ -449,6 +458,24 @@ python3 tests/linuxkpi/run_vm.py \
     --kernel build-amd64-kernel/bin/vinix \
     --cpu max,hypervisor=off --state-dir /tmp/vinix-linuxkpi-guest-sse
 ```
+
+String-helper validation used three frozen kernel paths on isolated baseline
+`92c24841`, with enabled ELF SHA256
+`2d976d406a63e4795716521e59fdd3357f9ba42e4018c8fc05062a61fff6c193`.
+The complete strict ASan/UBSan host, import and standalone-header suite passed
+at `/tmp/vinix-linuxkpi-string-helpers-host.log`. Fixed vectors cover newline
+edge cases, duplicate and NULL entries, zero/SIZE_MAX counts, guarded borrowed
+strings and arrays, inserted NULs and inaccessible adjacent pages. Calls with
+allocation disabled, interrupts disabled and nested preemption pins preserve
+their caller's state. Independent comparison against extracted pinned
+algorithms also passed. Fresh enabled/default x86 and disabled ARM builds
+passed. Normal/SSE four-CPU guests passed at
+`/tmp/vinix-linuxkpi-string-helpers-{vm,sse-vm}/serial.log`; the native fixture
+runs 200 times inside the existing exact physical-page measurement. Independent
+source and generated-C review covers these allocation-free operations and the
+literal V diagnostic. This does not establish sysfs, CRC or GPU operation.
+Exact source and validation scope is saved in
+`/tmp/vinix-linuxkpi-string-helpers-final-validation.json`.
 
 Policy/helper validation used nine frozen kernel paths on isolated baseline
 `3d92a08b`, with enabled ELF SHA256

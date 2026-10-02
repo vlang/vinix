@@ -1,4 +1,8 @@
-/* SPDX-License-Identifier: GPL-2.0-or-later */
+/* SPDX-License-Identifier: GPL-2.0-only */
+/* String matching/replacement portions from Linux 6.6.157 lib/string_helpers.c:
+ * Copyright 31 August 2008 James Bottomley
+ * Copyright (C) 2013, Intel Corporation
+ */
 #ifdef VINIX_LINUXKPI
 #include <linux/errno.h>
 #include <linux/limits.h>
@@ -67,5 +71,47 @@ char *kstrndup(const char *s, size_t max, gfp_t flags)
 char *kstrdup(const char *s, gfp_t flags)
 {
     return kstrndup(s, SIZE_MAX, flags);
+}
+
+/* Keep the original synchronous borrowed-string semantics. A newline is
+ * equivalent to NUL only when it is the single trailing newline. */
+bool sysfs_streq(const char *s1, const char *s2)
+{
+    while (*s1 && *s1 == *s2) {
+        s1++;
+        s2++;
+    }
+    if (*s1 == *s2) return true;
+    if (!*s1 && *s2 == '\n' && !s2[1]) return true;
+    if (*s1 == '\n' && !s1[1] && !*s2) return true;
+    return false;
+}
+
+int match_string(const char * const *array, size_t n, const char *string)
+{
+    /* The explicit cast preserves Linux's usual conversion in index < n. */
+    for (int index = 0; (size_t)index < n; index++) {
+        const char *item = array[index];
+        if (!item) break;
+        if (!strcmp(item, string)) return index;
+    }
+    return -EINVAL;
+}
+
+int __sysfs_match_string(const char * const *array, size_t n, const char *str)
+{
+    for (int index = 0; (size_t)index < n; index++) {
+        const char *item = array[index];
+        if (!item) break;
+        if (sysfs_streq(item, str)) return index;
+    }
+    return -EINVAL;
+}
+
+char *strreplace(char *str, char old, char new)
+{
+    for (char *s = str; *s; ++s)
+        if (*s == old) *s = new;
+    return str;
 }
 #endif

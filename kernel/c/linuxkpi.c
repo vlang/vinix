@@ -9,6 +9,7 @@
 #include <linux/rbtree.h>
 #include <linux/sort.h>
 #include <linux/spinlock.h>
+#include <linux/preempt.h>
 #include <linux/kref.h>
 #include <linux/bitmap.h>
 #include <asm/unaligned.h>
@@ -159,6 +160,81 @@ static int compare_test_node(void *priv, const struct list_head *a, const struct
     return (x->key > y->key) - (x->key < y->key);
 }
 
+static int string_helpers_selftest(void)
+{
+    /* Literal names and indices from unchanged intel_pipe_crc.c. These are
+     * pure borrowed-string checks, not a claim of CRC/display operation. */
+    static const char * const crc[] = { "none", "plane1", "plane2", "plane3",
+        "plane4", "plane5", "plane6", "plane7", "pipe", "TV", "DP-B", "DP-C",
+        "DP-D", "auto" };
+    static const char * const duplicates[] = { "none", "pipe", "pipe", NULL, "auto" };
+    static const char * const newline[] = { "pipe\n", "pipe", "DP-B", NULL, "auto" };
+    static const struct { const char *left, *right; bool equal; } pairs[] = {
+        { "", "", true }, { "", "\n", true }, { "\n", "", true },
+        { "pipe", "pipe\n", true }, { "pipe\n", "pipe", true },
+        { "pipe\n", "pipe\n", true }, { "pipe", "pipe\n\n", false },
+        { "pipe\n\n", "pipe", false }, { "pipe\n\n", "pipe\n", true },
+        { "a\nb", "a\nb", true }, { "a\nb", "a", false },
+        { "pipe\r\n", "pipe", false }, { "PIPE", "pipe", false },
+        { "pipe ", "pipe", false }, { "pipe", "pipes", false },
+    };
+    char pmu[] = "!i915_0000:00:02.0\0:?";
+    static const char pmu_expected[] = "!i915_0000_00_02.0\0:?";
+    char replaced[] = { '!', ':', 'a', ':', 'b', ':', '\0', ':', '?' };
+    static const char replaced_expected[] = { '!', '\0', 'a', '\0', 'b', '\0', '\0', ':', '?' };
+    char old_nul[] = { '!', 'a', ':', 'b', '\0', ':', '?' };
+    static const char old_nul_expected[] = { '!', 'a', ':', 'b', '\0', ':', '?' };
+    char empty[] = { '!', '\0', ':', '?' };
+    static const char empty_expected[] = { '!', '\0', ':', '?' };
+    int result = 0;
+    unsigned long flags = vinix_linuxkpi_irq_save();
+    unsigned int depth = preempt_count();
+    preempt_disable();
+    if (!irqs_disabled() || preempt_count() != depth + 1) result = -EIO;
+    if (match_string(crc, ARRAY_SIZE(crc), "none") != 0 ||
+        match_string(crc, ARRAY_SIZE(crc), "plane7") != 7 ||
+        match_string(crc, ARRAY_SIZE(crc), "pipe") != 8 ||
+        match_string(crc, ARRAY_SIZE(crc), "TV") != 9 ||
+        match_string(crc, ARRAY_SIZE(crc), "DP-C") != 11 ||
+        match_string(crc, ARRAY_SIZE(crc), "auto") != 13 ||
+        match_string(crc, 13, "auto") != -EINVAL ||
+        match_string(crc, ARRAY_SIZE(crc), "pipe\n") != -EINVAL ||
+        match_string(crc, ARRAY_SIZE(crc), "tv") != -EINVAL ||
+        match_string(crc, ARRAY_SIZE(crc), "missing") != -EINVAL ||
+        match_string(NULL, 0, NULL) != -EINVAL ||
+        match_string(duplicates, 1, "pipe") != -EINVAL ||
+        match_string(duplicates, ARRAY_SIZE(duplicates), "pipe") != 1 ||
+        match_string(duplicates, SIZE_MAX, "pipe") != 1 ||
+        match_string(duplicates, SIZE_MAX, "auto") != -EINVAL ||
+        match_string(newline, SIZE_MAX, "pipe") != 1) result = -EIO;
+    for (size_t i = 0; i < ARRAY_SIZE(pairs); i++)
+        if (sysfs_streq(pairs[i].left, pairs[i].right) != pairs[i].equal) result = -EIO;
+    if (__sysfs_match_string(NULL, 0, NULL) != -EINVAL ||
+        __sysfs_match_string(newline, 0, "pipe") != -EINVAL ||
+        __sysfs_match_string(newline, 1, "pipe") != 0 ||
+        __sysfs_match_string(newline, SIZE_MAX, "pipe") != 0 ||
+        __sysfs_match_string(newline, SIZE_MAX, "pipe\n") != 0 ||
+        sysfs_match_string(newline, "DP-B\n") != 2 ||
+        __sysfs_match_string(newline, SIZE_MAX, "DP-B\n\n") != -EINVAL ||
+        __sysfs_match_string(newline, SIZE_MAX, "dp-b") != -EINVAL ||
+        __sysfs_match_string(newline, SIZE_MAX, "auto") != -EINVAL) result = -EIO;
+    /* An inserted NUL does not stop replacement of later original bytes.
+     * Every byte after the original terminator and the leading guard stays. */
+    if (strreplace(pmu + 1, ':', '_') != pmu + 1 ||
+        memcmp(pmu, pmu_expected, sizeof(pmu)) ||
+        strreplace(replaced + 1, ':', '\0') != replaced + 1 ||
+        memcmp(replaced, replaced_expected, sizeof(replaced)) ||
+        strreplace(old_nul + 1, '\0', '!') != old_nul + 1 ||
+        memcmp(old_nul, old_nul_expected, sizeof(old_nul)) ||
+        strreplace(empty + 1, ':', '_') != empty + 1 ||
+        memcmp(empty, empty_expected, sizeof(empty))) result = -EIO;
+    if (!irqs_disabled() || preempt_count() != depth + 1) result = -EIO;
+    preempt_enable_no_resched();
+    vinix_linuxkpi_irq_restore(flags);
+    if (vinix_linuxkpi_irq_flags() != flags || preempt_count() != depth) result = -EIO;
+    return result;
+}
+
 int vinix_linuxkpi_selftest(void)
 {
     unsigned char *ptr = kzalloc(8193, GFP_KERNEL);
@@ -273,6 +349,7 @@ int vinix_linuxkpi_selftest(void)
     if (!name) result = -ENOMEM;
     else if (strcmp(name, "Tiger")) result = -EIO;
     kfree(name);
+    if (string_helpers_selftest()) result = -EIO;
     if (!vinix_linuxkpi_tigerlake_id(0x8086, 0x9a49, 0x030000) ||
         vinix_linuxkpi_tigerlake_id(0x8086, 0x9a49, 0x020000) ||
         vinix_linuxkpi_tigerlake_id(0x1234, 0x9a49, 0x030000)) result = -EIO;
