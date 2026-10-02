@@ -3,7 +3,6 @@ module krandom
 import aarch64.cpu
 import aarch64.firmware
 import devicetree
-import crypto.sha256
 import limine
 import memory
 import time
@@ -197,11 +196,11 @@ fn architecture_seed(mut output [64]u8) bool {
 	}
 	for i in 0 .. 2 {
 		input[input.len - 1] = u8(i)
-		digest := sha256.sum(input)
+		mut digest := [32]u8{}
+		sha256_digest(unsafe { &u8(input.data) }, u64(input.len), unsafe { &digest })
 		unsafe {
-			C.memcpy(&output[i * 32], digest.data, 32)
-			explicit_bzero(digest.data, u64(digest.len))
-			digest.free()
+			C.memcpy(&output[i * 32], &digest[0], 32)
+			explicit_bzero(&digest[0], sizeof(digest))
 		}
 	}
 	unsafe {

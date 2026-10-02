@@ -9,9 +9,10 @@ v=${1:-${V:-v}}
 cc=${CC:-cc}
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT HUP INT TERM
-mkdir -p "$work/krandom" "$work/klock"
+mkdir -p "$work/krandom" "$work/klock" "$work/katomic"
 printf "Module {\n name: 'vinix_krandom_host_tests'\n}\n" > "$work/v.mod"
-cp "$root/kernel/krandom/random.v" "$root/tests/krandom/krandom_test.v" \
+cp "$root/kernel/krandom/random.v" "$root/kernel/krandom/sha256.v" "$root/tests/krandom/krandom_test.v" \
+	"$root/tests/krandom/sha256_test.v" \
 	"$root/tests/krandom/host_stubs.v" "$work/krandom/"
 # Single-threaded tests; this never goes near the kernel.
 cat > "$work/klock/klock.v" <<'STUB'
@@ -21,6 +22,11 @@ pub struct Lock {
 }
 pub fn (mut lock Lock) acquire() {}
 pub fn (mut lock Lock) release() {}
+STUB
+cat > "$work/katomic/katomic.v" <<'STUB'
+module katomic
+pub fn load[T](value &T) T { return unsafe { *value } }
+pub fn store[T](mut target T, value T) { target = value }
 STUB
 cp "$root/tests/krandom/host_stubs.h" "$work/"
 # One object: `v test` passes -ldflags through a shell unquoted.

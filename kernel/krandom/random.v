@@ -1,7 +1,6 @@
 @[has_globals]
 module krandom
 
-import crypto.sha256
 import klock
 import katomic
 
@@ -156,6 +155,9 @@ pub fn initialise() {
 	}
 	explicit_bzero(&seed[0], sizeof(seed))
 	katomic.store(mut &generator_bits, u64(rng))
+	$if krandom_selftest ? {
+		reseed_selftest()
+	}
 }
 
 // Fold an event into the pool: its value and the cycle counter at which it
@@ -201,7 +203,8 @@ pub fn stir() {
 	events := entropy_events
 	explicit_bzero(&entropy_pool[0], 8 * sizeof(u64))
 	explicit_bzero(&fresh[0], sizeof(fresh))
-	digest := sha256.sum(input)
+	mut digest := [32]u8{}
+	sha256_digest(unsafe { &u8(input.data) }, u64(input.len), unsafe { &digest })
 
 	rng.lock.acquire()
 	// XORed in rather than put in place, so output taken since the key was
@@ -225,8 +228,7 @@ pub fn stir() {
 			fresh_words)
 	}
 	unsafe {
-		explicit_bzero(digest.data, u64(digest.len))
-		digest.free()
+		explicit_bzero(&digest[0], sizeof(digest))
 		explicit_bzero(input.data, u64(input.len))
 		input.free()
 	}
@@ -320,11 +322,11 @@ fn jitter_entropy_seed(mut output [64]u8) bool {
 		}
 		for i in 0 .. 2 {
 			input[input.len - 1] = u8(i)
-			digest := sha256.sum(input)
+			mut digest := [32]u8{}
+			sha256_digest(unsafe { &u8(input.data) }, u64(input.len), unsafe { &digest })
 			unsafe {
-				C.memcpy(&output[i * 32], digest.data, 32)
-				explicit_bzero(digest.data, u64(digest.len))
-				digest.free()
+				C.memcpy(&output[i * 32], &digest[0], 32)
+				explicit_bzero(&digest[0], sizeof(digest))
 			}
 		}
 		unsafe {

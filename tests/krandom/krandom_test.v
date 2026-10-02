@@ -93,14 +93,15 @@ fn test_large_request_keeps_internal_rekey_limit() {
 }
 
 fn test_readiness_policy_survives_rekey() {
-	generator = unsafe { nil }
+	generator_bits = 0
 	mut out := [u8(0xa5)]!
 	assert !fill(&out[0], 1, false)
 	assert out[0] == 0xa5
 	initialise()
+	mut generator := current_generator()
 	defer {
 		unsafe { free(generator) }
-		generator = unsafe { nil }
+		generator_bits = 0
 	}
 	assert !is_ready()
 	assert !fill(&out[0], 1, false)
@@ -131,11 +132,12 @@ fn test_events_change_the_pool() {
 // A reseed changes the key, empties the pool, and makes an insecure generator
 // trustworthy only when the CPU's own generator took part.
 fn test_stir_reseeds_and_trusts_only_hardware() {
-	generator = unsafe { nil }
+	generator_bits = 0
 	initialise()
+	mut generator := current_generator()
 	defer {
 		unsafe { free(generator) }
-		generator = unsafe { nil }
+		generator_bits = 0
 		C.vinix_test_set_hardware(0)
 	}
 	assert !is_ready()
@@ -160,8 +162,9 @@ fn test_stir_reseeds_and_trusts_only_hardware() {
 fn test_stir_depends_on_the_pool() {
 	mut keys := [][8]u32{}
 	for event in [u64(1), 2] {
-		generator = unsafe { nil }
+		generator_bits = 0
 		initialise()
+		mut generator := current_generator()
 		entropy_pool = [8]u64{}
 		entropy_events = 0
 		host_cycles = 1000
@@ -169,7 +172,7 @@ fn test_stir_depends_on_the_pool() {
 		stir()
 		keys << generator.key
 		unsafe { free(generator) }
-		generator = unsafe { nil }
+		generator_bits = 0
 	}
 	assert keys[0] != keys[1]
 }
