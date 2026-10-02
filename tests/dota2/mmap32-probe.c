@@ -31,6 +31,12 @@ static int low(void *value, unsigned long length) {
     return value != FAILED && start >= 0x10000UL && start <= 0x80000000UL - length;
 }
 
+static int separate(void *left, unsigned long left_length,
+                    void *right, unsigned long right_length) {
+    unsigned long a = (unsigned long)left, b = (unsigned long)right;
+    return a + left_length <= b || b + right_length <= a;
+}
+
 int main(void) {
     puts("VINIX-DOTA2-MMAP32-START");
     CHECK(mmap((void *)0, 0, RW, ANON_PRIVATE | MAP32, -1, 0) == FAILED);
@@ -49,15 +55,33 @@ int main(void) {
     CHECK(low(second, 4096) && second != first);
     *(unsigned char *)second = 0x37;
     CHECK(*(unsigned char *)first == 0x5a);
+    /* A second guest page in the same host page must not weaken NOREPLACE.
+     * QEMU 9.1's unreserved partial-host-page path otherwise aliases first.
+     */
+    CHECK(mmap(first, 4096, RW, ANON_PRIVATE | NOREPLACE, -1, 0) == FAILED);
+    CHECK(*__errno_location() == 17 && *(unsigned char *)first == 0x5a);
+    CHECK(mmap64(second, 4096, RW, ANON_PRIVATE | NOREPLACE, -1, 0) == FAILED);
+    CHECK(*__errno_location() == 17 && *(unsigned char *)second == 0x37);
 
     void *hint = mmap((void *)0x20000001UL, 4096, RW, ANON_PRIVATE | MAP32, -1, 0);
     CHECK(hint == (void *)0x20000000UL);
     *(unsigned char *)hint = 0x6b;
     void *collision = mmap(hint, 4096, RW, ANON_PRIVATE | MAP32, -1, 0);
     CHECK(low(collision, 4096) && collision != hint);
+    CHECK(separate(collision, 4096, first, 4096));
+    CHECK(separate(collision, 4096, second, 4096));
+    *(unsigned char *)collision = 0x42;
     CHECK(*(unsigned char *)hint == 0x6b);
     void *overflow_hint = mmap((void *)0x7ffff000UL, 8192, RW, ANON_PRIVATE | MAP32, -1, 0);
     CHECK(low(overflow_hint, 8192) && overflow_hint != (void *)0x7ffff000UL);
+    CHECK(separate(overflow_hint, 8192, first, 4096));
+    CHECK(separate(overflow_hint, 8192, second, 4096));
+    CHECK(separate(overflow_hint, 8192, hint, 4096));
+    CHECK(separate(overflow_hint, 8192, collision, 4096));
+    *(unsigned char *)overflow_hint = 0x95;
+    *((unsigned char *)overflow_hint + 8191) = 0x28;
+    CHECK(*(unsigned char *)first == 0x5a && *(unsigned char *)second == 0x37);
+    CHECK(*(unsigned char *)hint == 0x6b && *(unsigned char *)collision == 0x42);
     void *boundary = mmap((void *)0x7fff0000UL, 65536, RW, ANON_PRIVATE | MAP32, -1, 0);
     CHECK(boundary == (void *)0x7fff0000UL);
 
