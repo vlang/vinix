@@ -1,0 +1,108 @@
+#!/bin/sh
+# Run an APK through Android Translation Layer on Vinix's hosted X11 display.
+set -eu
+
+runtime=/opt/vinix-android-x86_64
+loader="$runtime/lib/ld-musl-x86_64.so.1"
+binary="$runtime/usr/bin/android-translation-layer"
+emulator=${VINIX_ANDROID_EMULATOR:-/usr/bin/qemu-x86_64}
+guest_preload="$runtime/usr/lib/libvinix-android-compat.so"
+extra_preload=${VINIX_ANDROID_TEST_PRELOAD:-}
+if [ -n "$extra_preload" ]; then
+    guest_preload="$guest_preload:$extra_preload"
+fi
+
+if [ "$#" -eq 0 ]; then
+    echo "usage: run-android APK [Android Translation Layer options]" >&2
+    exit 2
+fi
+case "$1" in
+    -h|--help)
+        echo "usage: run-android APK [-l package/Activity] [-w WIDTH] [-h HEIGHT] [ATL options]"
+        echo "App data: \${ANDROID_APP_DATA_DIR:-\$HOME/.local/share/vinix/android}"
+        exit 0
+        ;;
+esac
+if [ ! -x "$loader" ] || [ ! -x "$binary" ]; then
+    echo "run-android: Android runtime is not installed; build the Android layer first" >&2
+    exit 127
+fi
+if [ ! -x "$emulator" ]; then
+    echo "run-android: x86-64 translator is missing: $emulator" >&2
+    exit 127
+fi
+if [ ! -r "$1" ]; then
+    echo "run-android: cannot read APK: $1" >&2
+    exit 2
+fi
+
+export ANDROID_APP_DATA_DIR="${ANDROID_APP_DATA_DIR:-${XDG_DATA_HOME:-${HOME:-/root}/.local/share}/vinix/android}"
+export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/tmp/runtime-root}"
+mkdir -p "$ANDROID_APP_DATA_DIR" "$XDG_RUNTIME_DIR"
+chmod 700 "$XDG_RUNTIME_DIR"
+
+export DISPLAY="${DISPLAY:-:1}"
+export GDK_BACKEND=x11
+export GSK_RENDERER=cairo
+export GTK_A11Y=none
+export NO_AT_BRIDGE=1
+export GSETTINGS_BACKEND=memory
+export FONTCONFIG_PATH="$runtime/etc/fonts"
+export FONTCONFIG_FILE="$runtime/etc/fonts/fonts.conf"
+export GSETTINGS_SCHEMA_DIR="$runtime/usr/share/glib-2.0/schemas"
+export XDG_DATA_DIRS="$runtime/usr/share:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
+export GIO_EXTRA_MODULES="$runtime/usr/lib/gio/modules"
+export GI_TYPELIB_PATH="$runtime/usr/lib/girepository-1.0"
+export GDK_PIXBUF_MODULEDIR="$runtime/usr/lib/gdk-pixbuf-2.0/2.10.0/loaders"
+export GDK_PIXBUF_MODULE_FILE="$runtime/usr/lib/gdk-pixbuf-2.0/2.10.0/loaders.cache"
+export GST_PLUGIN_PATH_1_0="$runtime/usr/lib/gstreamer-1.0"
+export GST_PLUGIN_SYSTEM_PATH_1_0="$runtime/usr/lib/gstreamer-1.0"
+export LIBGL_DRIVERS_PATH="$runtime/usr/lib/dri"
+export SSL_CERT_FILE="$runtime/etc/ssl/cert.pem"
+for icu_data_file in "$runtime"/usr/share/icu/*/icudt*l.dat; do
+    if [ -f "$icu_data_file" ]; then
+        export ICU_DATA="${icu_data_file%/*}"
+        break
+    fi
+done
+# Keep Linux programs in the rest of the desktop on their own musl/GTK build.
+# ART loads additional native libraries after startup, so retain the same
+# private lookup path for its dlopen calls.
+library_path="$runtime/lib:$runtime/usr/lib:$runtime/usr/lib/art:$runtime/usr/lib/java/dex/android_translation_layer/natives:$runtime/usr/lib/libproxy"
+# QEMU's translator creates executable code mappings for the x86 runtime.
+# Opt in for this runtime process so the compositor keeps its normal policy.
+export VINIX_ALLOW_WX=1
+unset RUN_FROM_BUILDDIR BIONIC_LD_LIBRARY_PATH QEMU_LD_PREFIX QEMU_SET_ENV QEMU_RESERVED_VA
+# QEMU is an ARM executable. Its own loader must see ARM libraries; only
+# the emulated Android process receives x86 libraries and instrumentation.
+unset LD_LIBRARY_PATH LD_PRELOAD
+
+runtime_command() {
+    set -- "$emulator" -s "${VINIX_ANDROID_STACK_SIZE:-33554432}" \
+        -B "${VINIX_ANDROID_GUEST_BASE:-0x100000000}" \
+        -L "$runtime" -E "LD_LIBRARY_PATH=$library_path" \
+        -E "LD_PRELOAD=$guest_preload" "$loader" \
+        --library-path "$library_path" "$@"
+    if [ "$final_command" -eq 1 ]; then
+        exec "$@"
+    fi
+    "$@"
+}
+final_command=0
+
+# Raw APK extraction does not execute Alpine's schema-cache trigger.
+if [ ! -s "$GSETTINGS_SCHEMA_DIR/gschemas.compiled" ] \
+   && [ -x "$runtime/usr/bin/glib-compile-schemas" ]; then
+    runtime_command "$runtime/usr/bin/glib-compile-schemas" "$GSETTINGS_SCHEMA_DIR"
+fi
+if [ ! -s "$GDK_PIXBUF_MODULE_FILE" ] \
+   && [ -x "$runtime/usr/bin/gdk-pixbuf-query-loaders" ]; then
+    runtime_command "$runtime/usr/bin/gdk-pixbuf-query-loaders" > "$GDK_PIXBUF_MODULE_FILE"
+fi
+if [ ! -s "$GIO_EXTRA_MODULES/giomodule.cache" ] \
+   && [ -x "$runtime/usr/bin/gio-querymodules" ]; then
+    runtime_command "$runtime/usr/bin/gio-querymodules" "$GIO_EXTRA_MODULES"
+fi
+
+final_command=1
+runtime_command "$binary" "$@" -X '-Xnoimage-dex2oat' -X '-Xusejit:false'

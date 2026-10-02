@@ -1818,3 +1818,16 @@ wm.not_installed.title
 -----
 wm.taskbar.group
 {0}  ({1})
+
+-----
+app.android_calculator
+Android Calculator
+-----
+android.starting
+Starting the Android APK…
+-----
+android.missing
+Android runtime or calculator APK is missing from this image.
+-----
+android.exited
+The Android APK has exited.

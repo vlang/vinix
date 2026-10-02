@@ -601,7 +601,7 @@ fn test_terminal_can_edit_a_file_with_vim_over_its_real_pty() {
 }
 
 fn test_available_utility_applications_and_shortcut_layouts() {
-	assert available_apps.len == 26
+	assert available_apps.len == 27
 	assert available_apps[0].process_name == 'vinix-files'
 	assert available_apps[0].icon == 'asset:files'
 	assert available_apps[1].title == 'Firefox'
@@ -704,7 +704,12 @@ fn test_available_utility_applications_and_shortcut_layouts() {
 	assert available_apps[25].height == gothic_window_height + default_title_height
 	assert available_apps[25].keyboard && available_apps[25].pointer
 	assert available_apps[25].polling && available_apps[25].us_keys
-	assert available_apps.len == 26
+	assert available_apps[26].title == 'Android Calculator'
+	assert available_apps[26].process_name == 'vinix-android-calculator'
+	assert available_apps[26].width == android_surface_width
+	assert available_apps[26].height == android_surface_height + default_title_height
+	assert available_apps[26].keyboard && available_apps[26].pointer
+	assert available_apps[26].polling
 	assert app_start_actions.len == available_apps.len
 	assert app_shortcut_actions.len == available_apps.len
 	assert shortcut_rows_for_height(720) == 8

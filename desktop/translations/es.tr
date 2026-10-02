@@ -1818,3 +1818,16 @@ wm.not_installed.title
 -----
 wm.taskbar.group
 {0}  ({1})
+
+-----
+app.android_calculator
+Calculadora Android
+-----
+android.starting
+Iniciando el APK de Android…
+-----
+android.missing
+Falta el entorno Android o el APK de la calculadora en esta imagen.
+-----
+android.exited
+El APK de Android ha terminado.

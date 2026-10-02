@@ -230,6 +230,10 @@ Vinix can also boot another AArch64 Vinix instance through native QEMU system
 emulation. See [docs/qemu-nested.md](docs/qemu-nested.md) for the build, image,
 and launch commands.
 
+Android APKs can run on the ARM64 desktop through Android Translation Layer.
+See [docs/android.md](docs/android.md) for the optional runtime, calculator APK,
+and QEMU screenshot test.
+
 ### Develop Vinix desktop inside Vinix
 
 The AArch64 desktop image contains the native V compiler and its matching

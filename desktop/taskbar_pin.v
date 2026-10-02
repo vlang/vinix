@@ -12,7 +12,8 @@ const taskbar_pin_action_prefix = 'taskpin.'
 const taskbar_pin_actions = ['taskpin.0', 'taskpin.1', 'taskpin.2', 'taskpin.3', 'taskpin.4',
 	'taskpin.5', 'taskpin.6', 'taskpin.7', 'taskpin.8', 'taskpin.9', 'taskpin.10', 'taskpin.11',
 	'taskpin.12', 'taskpin.13', 'taskpin.14', 'taskpin.15', 'taskpin.16', 'taskpin.17', 'taskpin.18',
-	'taskpin.19', 'taskpin.20', 'taskpin.21', 'taskpin.22', 'taskpin.23', 'taskpin.24']
+	'taskpin.19', 'taskpin.20', 'taskpin.21', 'taskpin.22', 'taskpin.23', 'taskpin.24',
+	'taskpin.25', 'taskpin.26']
 
 fn taskbar_pins_path(home string) string {
 	return '${home}/${taskbar_pins_filename}'

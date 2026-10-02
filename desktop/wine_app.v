@@ -163,6 +163,9 @@ enum HostedText {
 	gothic_missing
 	gothic_data_missing
 	gothic_exited
+	android_starting
+	android_missing
+	android_exited
 	xvfb_missing
 	host_failed
 }
@@ -211,6 +214,9 @@ fn (t HostedText) text() string {
 		.gothic_missing { tr('wine.gothic.missing') }
 		.gothic_data_missing { tr('wine.gothic.data_missing') }
 		.gothic_exited { tr('wine.gothic.exited') }
+		.android_starting { tr('android.starting') }
+		.android_missing { tr('android.missing') }
+		.android_exited { tr('android.exited') }
 		.xvfb_missing { tr('wine.xvfb_missing') }
 		.host_failed { tr('wine.host_failed') }
 	}
