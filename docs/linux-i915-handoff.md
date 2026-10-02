@@ -1,7 +1,7 @@
 # Linux i915 next-session handoff
 
 Prepared 2026-10-02 for `/Users/alex/code/vinix`, on macOS ARM64 with zsh.
-Committed implementation baseline: **`ea87f353`** (including owned logging/formatting). Recheck HEAD and the worktree before
+Committed implementation baseline: **`7735509f`** (including minimum-duration sleeps). Recheck HEAD and the worktree before
 starting; other sessions use this checkout. The main status document is
 [linux-i915.md](linux-i915.md).
 
@@ -36,7 +36,7 @@ x86-64 only. Default x86-64 and arm64 kernels leave it disabled.
 
 **There is no working native i915 GPU driver yet.** The complete driver does
 not compile, link or bind; the firmware framebuffer remains the display
-backend. The latest full syntax audit passes **2/269** i915 translation units.
+backend. The latest full syntax audit passes **3/269** i915 translation units.
 The already-linked `i915_memcpy.c` is a CPU WC-copy helper, not GPU bringup.
 Unrelated OpenGothic/Venus/KekVM commits are not evidence of native i915 support.
 
@@ -60,14 +60,21 @@ committed and validated. The allocation harness now rejects incomplete
 reports. Task-owned flags and original sequence counters are now committed
 and validated. Owned printk records, the inventoried Linux formatting subset,
 warning/taint capture and synchronized native RNG publication are also committed
-and validated. Device-number types and unchanged i915 timeout/DSC policy helpers
-are the next integration work; inspect HEAD and owned diffs before assuming
-prepared fixtures are integrated.
+and validated. Device-number types, unchanged i915 timeout/DSC policy helpers,
+I/O mutex scopes, precise timed-worker retirement and allocation-free string
+matching/replacement and minimum-duration sleeps are also committed and validated.
+Kernel-string number parsers are being implemented and reviewed; inspect HEAD
+and owned diffs before assuming that next feature is committed.
 
 ## Committed progress
 
 | Commit | Completed runtime change |
 | --- | --- |
+| `7735509f` | Absolute-minimum range sleeps, early-wake/signal retries and full native rollback/retirement tests |
+| `53f41b30` | Pinned borrowed string matching, sysfs newline equivalence and replacement |
+| `92c24841` | I/O mutex scopes, actual blocked-CPU counts and nested intent restoration |
+| `176549b4` | Joined timed-worker off-stack and actual deferred-free retirement before measurement |
+| `3943191d` | Original i915 timeout/DSC policy helpers and Linux device encodings |
 | `ea87f353` | Owned printk ring/drain worker, Linux formatting/SipHash, warning/taints, RNG publication and scoped timed-wait fixture |
 | `26f77f05` | Original sequence counters, native lock/retry/latch tests, compiler include contract and SRCU fixture routing |
 | `55294618` | Sticky task-owned flags and native exit publication |
@@ -109,7 +116,9 @@ the next exit on that CPU. Do not generalize x86 reclamation guarantees to it.
 
 Clocks use HPET or calibrated TSC and PIT ticks at `HZ=1000`; raw and monotonic
 agree without NTP discipline. High-resolution timers, realtime/TAI offsets,
-`usleep_range`, Linux IRQ/NMI/softirq accounting and SMP dispatch remain pending.
+Linux IRQ/NMI/softirq accounting and SMP dispatch remain pending. Minimum-duration
+range sleeps now use absolute monotonic deadlines and the existing 1 ms PIT;
+high-resolution timers and real/TAI/suspend offsets remain pending.
 The allocator uses contiguous physical pages even for small objects; limited
 GFP semantics are enforced rather than pretending unsupported zones work.
 
@@ -309,9 +318,29 @@ archive into another separate reference directory, never into the import.
   task reference or allocation is added on the repeated blocking path.
 - The native token fills Thread padding without moving any existing field;
   task intent fits the existing 64-byte view. Reaping requires the token zero.
-- Block plugs, delay statistics, idle-time accounting, CPU hotplug and
-  I/O-specific mutex wrappers remain unresolved; their flags/APIs are not
-  replaced with fabricated success.
+- `mutex_lock_io` wraps ordinary FIFO acquisition in nested native I/O intent;
+  its public wait is uninterruptible and `_nested` preserves non-lockdep alias
+  semantics. Only actual scheduler blocking charges a CPU. Block plugs, delay
+  statistics, idle-time accounting and CPU hotplug remain unresolved.
+
+### Minimum-duration sleep contracts
+
+- `usleep_range_state` captures one absolute monotonic minimum, keeps it through
+  accepted wakes and signals, and restores TASK_RUNNING on every valid return.
+  RUNNING/interruptible/uninterruptible/killable/idle are the supported states.
+- Absolute records carry a mode tag; designated legacy timeout initialization
+  leaves that tag false and preserves jiffy-based expiry. The arm-time clock
+  recheck and every removal happen under the same deadline lock before stack
+  reuse or return. The PIT compares actual nanoseconds for absolute records.
+- Optional slack is zero. The existing 1 ms PIT promotes at/after the minimum,
+  and scheduling may exceed max. This supplies no hrtimer/hrtimeout service.
+  Reversed or unrepresentable ranges and unsupported states/atomic contexts
+  fail explicitly. Malformed DSI firmware u32 delay+10 wrap is outside the
+  supported domain; unchecked invalid-input equivalence is not claimed.
+- Native cleanup opens every gate and joins through any already-started
+  uninterruptible sleep's natural expiry. It inspects only retained workers'
+  records, observes all off-stack handoffs before any final put, and waits
+  through actual deferred frees under one shared retirement bound.
 
 ### Ordinary RCU prerequisites
 
@@ -405,7 +434,46 @@ or rewrite upstream headers to make a false success.
 
 ## Validation already completed
 
-Fresh continuation checks cover these committed changes:
+The minimum-duration sleep feature used five frozen kernel paths at `53f41b30`,
+enabled ELF SHA256
+`354139c5a2fe25d532aa9e5ec9f84343a19a7f3b2ffac3abd32a082dde56e723`.
+Full strict host/import/header checks include permanent boundary subprocesses;
+enabled/default x86 and disabled ARM builds and default startup passed. Both
+normal and SSE guests passed the new four-batch sleep test with exact page
+recovery. The first normal guest later failed an unchanged unbound self-free
+timeout (3/8 at 502 ticks); the full normal rerun on the identical ELF and the
+full SSE run passed. Preserve that failure: it remains unexplained, and the
+rerun does not repair it. Evidence is
+`/tmp/vinix-linuxkpi-usleep-final-validation.json`. Equal-source allocation
+gates at this newer baseline have 429 sites, 192 groups and 161 existing
+failures on both sides, with no new counts/groups and no global pass.
+
+The latest string-helper feature used a three-path frozen kernel overlay at
+`92c24841`, enabled ELF SHA256
+`2d976d406a63e4795716521e59fdd3357f9ba42e4018c8fc05062a61fff6c193`.
+Strict full ASan/UBSan host/import/header checks, enabled/default x86 and disabled
+ARM builds, full normal/SSE four-CPU guests and default Linux-ABI startup passed.
+The 200-iteration native test returned exactly to its physical-page baseline.
+Sources and generated C were independently reviewed; frozen evidence is
+`/tmp/vinix-linuxkpi-string-helpers-final-validation.json`. Latest full audit
+`/tmp/vinix-linuxkpi-string-helpers-i915-audit.json` remains expected exit 1,
+**3/269**, with all 7,668 imported files unchanged.
+
+Policy/helper validation and the separate timed-worker retirement fix are
+recorded in `/tmp/vinix-linuxkpi-i915-policy-final-validation.json` and
+`/tmp/vinix-linuxkpi-mutex-io-retirement-final-validation.json`. The first policy
+guest passed the new helper page measurement but failed an older timed-wait
+baseline with 1,029 more free pages; a rerun was diagnostic, not a fix. The
+committed retirement fix now waits for all known joined workers' off-stack
+handoffs before releasing any final pin, then observes actual deferred frees
+under a shared one-second bound. The scope is known x86 workers, not global
+heap quiescence or arm64 reclamation. I/O mutex and retirement normal/SSE
+guests passed using enabled ELF SHA256
+`7ce625f4b7ff4b54c2dd39604274c0b596b18ad75992ef85ee8aed029a69105d`.
+Equal-baseline allocation gates retain 440 sites, 193 groups and 162 existing
+failures with no new counts or groups; they are not global allocation passes.
+
+Earlier bound/bitmap continuation checks cover these committed changes:
 
 | Check | Result and artifact |
 | --- | --- |
@@ -415,7 +483,7 @@ Fresh continuation checks cover these committed changes:
 | Default x86 build/guest | Pass; `/tmp/vinix-linuxkpi-bitmap-default-build.log`, `/tmp/vinix-linuxkpi-bitmap-default-vm/serial.log` |
 | Four-CPU enabled normal/SSE guests | Pass; `/tmp/vinix-linuxkpi-bitmap-vm/serial.log`, `/tmp/vinix-linuxkpi-bitmap-sse-vm/serial.log` |
 | Optional XNU allocator build/guest | Pass; `/tmp/vinix-linuxkpi-bound-xnu-build.log`, `/tmp/vinix-linuxkpi-bound-xnu-vm/serial.log` |
-| Full i915 syntax audit | Expected exit 1, still **1/269** |
+| Full i915 syntax audit at the bound/bitmap milestone | Expected exit 1, **1/269** at that revision |
 | Import verification | **7,668** unchanged pinned files |
 
 The enabled bitmap ELF used by both normal/SSE guests is
@@ -631,9 +699,9 @@ or groups. Its original 16-path scope is immutable and the final two C-only
 changes preserve all checked V paths. This remains a scoped feature result,
 not a global allocation pass.
 
-Fresh full audit `/tmp/vinix-linuxkpi-printk-i915-audit.json` passes only 2/269:
+The logging-milestone audit `/tmp/vinix-linuxkpi-printk-i915-audit.json` passed 2/269:
 `i915_memcpy.c` and `display/intel_qp_tables.c`. The latter is not yet linked at
-this baseline. Dominant remaining syntax paths include `generated/bounds.h`,
+that baseline; it is now linked and the current result is 3/269. Remaining syntax paths include `generated/bounds.h`,
 `dev_t`, `asm/early_ioremap.h`, RCU pointer APIs and `call_single_data_t`.
 Logging does not provide NMI entry, panic bypass, device/facility records,
 per-caller continuation merging, rate limiting or complete lib/vsprintf closure.
