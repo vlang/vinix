@@ -106,6 +106,22 @@ the complete i915 source tree is not evidence that the driver runs.
   wake traversal currently holds the lock for the whole walk; it does not
   implement Linux's optional bookmark batching. Unsupported out-of-line APIs
   remain unresolved rather than reporting fictitious success.
+- Unmodified Linux `wait_bit.h` uses a permanent native hashed wait table.
+  Bit waits preserve complete address/index keys, including multiword indices,
+  and bit-lock waits preserve exclusive wake quotas and atomic acquisition.
+  Action errors and interruptible/killable signals retain the upstream return
+  values; acquiring a now-free lock bit wins a concurrent action error.
+  Timed waits capture one absolute jiffies boundary, so spurious wakes do not
+  extend it. Variable-event macros use keyed native queues and never dereference
+  the address passed to `wake_up_var`; the condition must use live storage.
+  Ordinary waiters on a bit bucket can wait for a bit to become set, as i915
+  display reset does. Typed bit waiters still require the bit to clear.
+  Wait/wake paths allocate nothing and IRQ-off wakes are supported. Records
+  remain on the waiter stack; finish/removal synchronizes with bucket traversal
+  before returning. Keep bit/condition storage alive through every waiter and
+  stop producers before releasing it. I/O-wait actions remain unresolved until
+  native scheduler I/O accounting exists; freezer and special task states are
+  also unsupported.
 - Unmodified Linux `jiffies.h`, `ktime.h`, `time64.h`, `timekeeping.h` and
   `delay.h` use native monotonic/raw clock reads and fixed `HZ=1000` conversion
   helpers. Linux's own `timeconst.bc` generated the conversion constants.
@@ -473,6 +489,19 @@ inline wrappers retain their original behavior. The native kernel repeats
 multiword operations, conversion and allocation/free 200 times and checks
 exact page recovery.
 
+Bit/variable-wait host tests check complete keys across colliding words,
+indices and variable sentinels, ordinary SET-bit waits, exclusive quotas,
+wake-before-sleep, action errors and signal/atomic-acquisition races. Repeated
+bit and variable cancellations reuse stack addresses with allocation disabled.
+Real deadline tests include early and spurious wakes; isolated injected
+jiffies values verify wrap arithmetic without overflowing the host clock.
+Variable tests check condition-at-expiry, signal return values and opaque keys
+at inaccessible or unmapped addresses. Native tests use actual parked tasks,
+IRQ-off keyed wakes, exclusive lock ownership, display-reset SET wakes,
+killable filtering, retired variable keys and 256 repeated action/deadline
+cases per batch. After three warmups, a fourth batch releases all temporary
+threads and restores the exact physical-page count in normal/SSE guests.
+
 Wound/wait host tests exercise two/three-object Wait-Die cycles, cross-object
 Wound-Wait wakeups, queued older transactions, original-stamp slow retry,
 first-lock exclusions and stamp wraparound. They check interspersed context-free
@@ -548,7 +577,7 @@ runtime subsystems:
 1. Linux device/PCI registration and removal, configuration access and devres.
 2. MMIO mapping with correct cache attributes, DMA/scatter-gather APIs,
    page/shmem management, GPU address spaces and TTM/GEM memory management.
-3. Remaining lock/wait variants (including bit/variable and I/O waits),
+3. Remaining lock/wait variants (including I/O waits),
    freezable/reclaim workqueues, remaining system queues, RCU work, remaining
    timer modes, high-resolution timers and RCU lifetime rules.
 4. Linux IRQ registration, interrupt synchronization and safe GPU reset paths.

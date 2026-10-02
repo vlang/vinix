@@ -79,4 +79,5 @@ int vinix_linuxkpi_selftest(void);
 int vinix_linuxkpi_bitmap_runtime_selftest(void);
 int vinix_linuxkpi_srcu_native_selftest(void);
 int vinix_linuxkpi_ww_mutex_native_selftest(void);
+int vinix_linuxkpi_wait_bit_native_selftest(void);
 #endif

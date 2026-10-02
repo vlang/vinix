@@ -408,6 +408,8 @@ fn C.vinix_linuxkpi_bitmap_runtime_selftest() int
 fn C.srcu_init()
 fn C.vinix_linuxkpi_srcu_native_selftest() int
 fn C.vinix_linuxkpi_ww_mutex_native_selftest() int
+fn C.wait_bit_init()
+fn C.vinix_linuxkpi_wait_bit_native_selftest() int
 
 // join/TASK_DEAD can precede the final switch away and scheduler reaping.
 // Taking a baseline immediately after warmup can count those dying stacks,
@@ -454,6 +456,7 @@ pub fn initialise() {
 			lib.kpanic(unsafe { nil }, c'Linux compatibility system queue initialization failed')
 		}
 		C.srcu_init()
+		C.wait_bit_init()
 		before := memory.free_bytes()
 		for _ in 0 .. 200 {
 			if C.vinix_linuxkpi_selftest() != 0 || C.vinix_linuxkpi_task_selftest() != 0
@@ -715,6 +718,25 @@ pub fn initialise() {
 			lib.kpanic(unsafe { nil }, c'Linux wound/wait mutex self-test retained native pages')
 		}
 		C.kprintf(c'linuxkpi: wound/wait mutexes, Wait-Die backoff, stamped slow retry and signal cancellation passed; no pages retained\n')
+		for _ in 0 .. 3 {
+			if C.vinix_linuxkpi_wait_bit_native_selftest() != 0 {
+				lib.kpanic(unsafe { nil }, c'Linux bit/variable wait self-test failed')
+			}
+		}
+		bit_before := selftest_free_baseline()
+		if C.vinix_linuxkpi_wait_bit_native_selftest() != 0 {
+			lib.kpanic(unsafe { nil }, c'Linux bit/variable wait self-test failed')
+		}
+		bit_reap_start := hpet_clock.nanoseconds()
+		for memory.free_bytes() != bit_before && hpet_clock.nanoseconds() - bit_reap_start < 1000000000 {
+			sched.reap_deferred()
+			sched.reschedule()
+		}
+		if memory.free_bytes() != bit_before {
+			C.kprintf(c'linuxkpi: bit/variable wait free-byte baseline=%llu after=%llu\n', bit_before, memory.free_bytes())
+			lib.kpanic(unsafe { nil }, c'Linux bit/variable wait self-test retained native pages')
+		}
+		C.kprintf(c'linuxkpi: keyed bit/variable waits, exclusive locks, deadlines and signal cancellation passed; no pages retained\n')
 		// Exercise a real scheduler interrupt with preemption disabled and
 		// IRQs still enabled, rather than relying only on host lock tests.
 		preempt_disable()
