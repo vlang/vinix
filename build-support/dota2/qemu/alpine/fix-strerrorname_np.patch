@@ -1,0 +1,14 @@
+diff --git a/target/riscv/kvm/kvm-cpu.c b/target/riscv/kvm/kvm-cpu.c
+index 94b0e39..41ca3d7 100644
+--- a/target/riscv/kvm/kvm-cpu.c
++++ b/target/riscv/kvm/kvm-cpu.c
+@@ -1731,8 +1731,7 @@ static bool kvm_cpu_realize(CPUState *cs, Error **errp)
+     if (riscv_has_ext(&cpu->env, RVV)) {
+         ret = prctl(PR_RISCV_V_SET_CONTROL, PR_RISCV_V_VSTATE_CTRL_ON);
+         if (ret) {
+-            error_setg(errp, "Error in prctl PR_RISCV_V_SET_CONTROL, code: %s",
+-                       strerrorname_np(errno));
++            error_setg(errp, "Error in prctl PR_RISCV_V_SET_CONTROL, error %d", errno);
+             return false;
+         }
+     }

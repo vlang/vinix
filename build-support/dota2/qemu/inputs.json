@@ -1,0 +1,106 @@
+{
+  "version": "9.1.2",
+  "source_url": "https://download.qemu.org/qemu-9.1.2.tar.xz",
+  "source_sha256": "19fd9d7535a54d6e044e186402aa3b3b1bdfa87c392ec8884855592c8510c96f",
+  "alpine_mirror": "https://dl-cdn.alpinelinux.org/alpine/v3.21",
+  "packages": [
+    {
+      "filename": "glib-dev-2.82.5-r0.apk",
+      "sha256": "ac030abd46d910d514231a48089ba3f372934eb1bef2886d6de2f56b62caedad",
+      "repository": "main"
+    },
+    {
+      "filename": "glib-static-2.82.5-r0.apk",
+      "sha256": "e2c5c47465bda25daabf9d7255b6078492d1816587c1065dfb82446217a92a70",
+      "repository": "main"
+    },
+    {
+      "filename": "gettext-dev-0.22.5-r0.apk",
+      "sha256": "732d9ef0f8baac77dd114b985ded10de438abe756bbfde861bcd57963fe842c3",
+      "repository": "main"
+    },
+    {
+      "filename": "gettext-static-0.22.5-r0.apk",
+      "sha256": "7667e8929e7bfe6ae7e2dd91d7ac985d6771201769d6dc10e65a775ec9ed114a",
+      "repository": "main"
+    },
+    {
+      "filename": "pcre2-dev-10.43-r0.apk",
+      "sha256": "268f84df49bee9bc4ff7d8dda2f49f27c5a1b994abb35101bb9c80356eeead21",
+      "repository": "main"
+    },
+    {
+      "filename": "zlib-dev-1.3.2-r0.apk",
+      "sha256": "02ed78555e37fbdaabc7bc013203eec84f3c91a386e56d08baeae6aaf09512a5",
+      "repository": "main"
+    },
+    {
+      "filename": "zlib-static-1.3.2-r0.apk",
+      "sha256": "f80029f641098e356c072fe6e83547b1b79369c27dcf7303aa349e3a8e5fd3b2",
+      "repository": "main"
+    }
+  ],
+  "alpine_patches": [
+    {
+      "path": "alpine/0006-linux-user-signal.c-define-__SIGRTMIN-MAX-for-non-GN.patch",
+      "sha256": "016a2f7f93fff91fd705e62ab046b4906ed6f2a5573c933f6348b382b524a57e",
+      "url": "https://gitlab.alpinelinux.org/alpine/aports/-/raw/3.21-stable/community/qemu/0006-linux-user-signal.c-define-__SIGRTMIN-MAX-for-non-GN.patch"
+    },
+    {
+      "path": "alpine/xattr_size_max.patch",
+      "sha256": "5d8215937ffd6cfdc97397f2f780f8474731050515a1767bed867ee7b8703835",
+      "url": "https://gitlab.alpinelinux.org/alpine/aports/-/raw/3.21-stable/community/qemu/xattr_size_max.patch"
+    },
+    {
+      "path": "alpine/MAP_SYNC-fix.patch",
+      "sha256": "2f4e3fea6519d50b733bc14a3570bc7a164a86e9266b6a614e3f9092e6e34da3",
+      "url": "https://gitlab.alpinelinux.org/alpine/aports/-/raw/3.21-stable/community/qemu/MAP_SYNC-fix.patch"
+    },
+    {
+      "path": "alpine/fix-sockios-header.patch",
+      "sha256": "11c85e4f14f6fe0fcebce870136acab56a578c24cc81d6ea9886f5b9cbb3011b",
+      "url": "https://gitlab.alpinelinux.org/alpine/aports/-/raw/3.21-stable/community/qemu/fix-sockios-header.patch"
+    },
+    {
+      "path": "alpine/guest-agent-shutdown.patch",
+      "sha256": "5a4948fd9799f103fc836f14752f2ee63aabc96feaf251a89b4aed6ff32d4494",
+      "url": "https://gitlab.alpinelinux.org/alpine/aports/-/raw/3.21-stable/community/qemu/guest-agent-shutdown.patch"
+    },
+    {
+      "path": "alpine/lfs64.patch",
+      "sha256": "0993475d57c874fa248554e45b28c1435605691e11ad978de226259406519832",
+      "url": "https://gitlab.alpinelinux.org/alpine/aports/-/raw/3.21-stable/community/qemu/lfs64.patch"
+    },
+    {
+      "path": "alpine/musl-initialise-msghdr.patch",
+      "sha256": "71ee8bf8ad3341b8e5f8ee8e2272d10d88ad1a7db9460668f2539a372e0a434e",
+      "url": "https://gitlab.alpinelinux.org/alpine/aports/-/raw/3.21-stable/community/qemu/musl-initialise-msghdr.patch"
+    },
+    {
+      "path": "alpine/fix-strerrorname_np.patch",
+      "sha256": "1d14ac78c56b10ed126c785a13112875bc76177ae62e62661fb8b06a42a1bd06",
+      "url": "https://gitlab.alpinelinux.org/alpine/aports/-/raw/3.21-stable/community/qemu/fix-strerrorname_np.patch"
+    },
+    {
+      "path": "alpine/liburing.patch",
+      "sha256": "b397ba0cb764f6993e8ba87d98c16859f06916e2143b55e4369f7fbba46fbc54",
+      "url": "https://gitlab.alpinelinux.org/alpine/aports/-/raw/3.21-stable/community/qemu/liburing.patch"
+    },
+    {
+      "path": "alpine/0001-util-util-cpuinfo-riscv.c-fix-riscv64-build-on-musl-.patch",
+      "sha256": "079ce81bb926f65683ffdcc513147968bab70120c689dbb943d727a738420cb3",
+      "url": "https://gitlab.alpinelinux.org/alpine/aports/-/raw/3.21-stable/community/qemu/0001-util-util-cpuinfo-riscv.c-fix-riscv64-build-on-musl-.patch"
+    }
+  ],
+  "patched_source_sha256": {
+    "hw/9pfs/9p.c": "d8e0a1ae7d26e70537876cd753c2310e29483cf86460d5acb8d732059228dc51",
+    "linux-user/mmap.c": "baa573936b0d59f4911254e6505ab3ca030db1de64f4f25b2b3aba3aac3ba457",
+    "linux-user/signal.c": "73498be257147684b208dcf8124e16447f123b1558e80a0eceaf41d101f94996",
+    "linux-user/syscall.c": "fe56c87f897de0261dc8005c78ca19204ffe23dda3969d0903b288298524d586",
+    "meson.build": "b9398bbc3a290421973d1cbf489643edcedae1e699927bf3c17d3c33a4376965",
+    "qga/commands-posix.c": "240fcbae6e927c255b2434312fea986817042179e6be035f5f0da953cb8d83ef",
+    "target/riscv/kvm/kvm-cpu.c": "de55b91a130a0f650ca39bce8f116d43a144303f75603ddefaccdf881e01fa9b",
+    "util/cpuinfo-riscv.c": "41c2af06be8edf5cfbe68a1955500e4172b61d549394aff9be667d25727b3ee8",
+    "util/mmap-alloc.c": "198367baacb3eef72873a9a4e39399318c5931b3ff997796dce1dbff1aab397d"
+  }
+}
