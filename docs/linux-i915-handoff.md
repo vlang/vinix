@@ -1,7 +1,7 @@
 # Linux i915 next-session handoff
 
 Prepared 2026-10-02 for `/Users/alex/code/vinix`, on macOS ARM64 with zsh.
-Committed implementation baseline: **`71426a7e`** (including kernel-string parsing and tokens). Recheck HEAD and the worktree before
+Committed implementation baseline: **`b9e2f45f`** (including shared native PCI configuration transactions). Recheck HEAD and the worktree before
 starting; other sessions use this checkout. The main status document is
 [linux-i915.md](linux-i915.md).
 
@@ -64,15 +64,18 @@ and validated. Device-number types, unchanged i915 timeout/DSC policy helpers,
 I/O mutex scopes, precise timed-worker retirement and allocation-free string
 matching/replacement, minimum-duration sleeps, kernel-string number/Boolean
 parsers and borrowed token/whitespace helpers are committed and validated.
-Shared native PCI configuration transactions are being integrated in an
-18-path kernel overlay at `/tmp/vinix-linuxkpi-pci-config-overlay.json`.
-That work is not committed yet: inspect HEAD and owned diffs. It provides real
-transport prerequisites, not Linux PCI device registration or GPU binding.
+Shared native PCI configuration transactions are committed and tested on
+actual x86 CF8/CFC and ARM ECAM transports. Linux PCI device registration,
+bus/device references and GPU binding remain unresolved. The next user-copy
+service also requires an owned native mmap fault lifetime: current file-backed
+fault acquisition can follow a removed range after dropping the pagemap lock.
+Read-only lease design is recorded below; it has not been implemented.
 
 ## Committed progress
 
 | Commit | Completed runtime change |
 | --- | --- |
+| `b9e2f45f` | Shared checked PCI transactions, subword I/O, atomic sixteen-bit COMMAND updates and full ARM DAIF preservation |
 | `71426a7e` | Borrowed character search, empty-preserving tokens and bounded equivalent whitespace trimming |
 | `ce4606b3` | Pinned kernel-string integer/Boolean parsing, range errors and output ownership |
 | `7735509f` | Absolute-minimum range sleeps, early-wake/signal retries and full native rollback/retirement tests |
@@ -358,6 +361,73 @@ old Thread. A counter hook on the current ordinary thunk would be unsafe.
 Do not resolve in_nmi/local_bh/ordinary RCU with constant or explicit-reader-only
 stubs. Read-only next-step design is in
 `/tmp/vinix-linuxkpi-context-design.md`, with pinned entry reference paths.
+
+## Shared PCI transport and next user-copy prerequisite
+
+- Every live ordinary PCI device accessor and uACPI callback uses the native
+  C core and the same platform lock. The synchronous result is borrowed and
+  untouched on error; widths/BDF/full 64-bit offsets are validated before I/O.
+  Native statuses must not alias Linux PCIBIOS statuses or Linux error-output
+  semantics. Original `pci_dev`/`pci_bus` and device-core closure are pending.
+- x86 exposes only conventional 256-byte CF8/CFC registers and actual subword
+  port I/O. ARM exposes 4096-byte registers only inside its immutable checked
+  zero-origin segment-zero ECAM window. ARM saves full DAIF, masks only I and
+  emits STLR0, DSB ISHST, SEV before restoring every mask. No NMI/FIQ recursion
+  is supported. Lock holders never allocate, sleep, log or map memory.
+- COMMAND read/conditional-write uses 16 bits in one lock hold; adjacent STATUS
+  RW1C is preserved. Existing BAR probes still require exclusive ownership and
+  quiescence; transport serialization alone does not make them safe for i915.
+- Final 18-path kernel overlay is `/tmp/vinix-linuxkpi-pci-config-overlay.json`,
+  private build baseline `71426a7e`. Full host strict GNU99/GNU11 ASan/UBSan,
+  import and header suite passed. Normal x86 passed all 33 markers. Default x86,
+  default ARM and opt-in ARM context guests reached actual Linux-ABI PID1.
+  Enabled ELF SHA256 is
+  `9f76e1954c9188dcffae9035ee1f097d0957ae0947febc49c8371ae05d7ad475`.
+  Detailed immutable artifact/review/evidence manifest is
+  `/tmp/vinix-linuxkpi-pci-config-final-validation.json`.
+- Both feature SSE guests passed the new PCI exact-page checks, then failed
+  the unchanged bound self-free 500-tick watchdog. Pre-PCI `71426a7e` ELF reproduced
+  the same bound failure in identical guest settings. All 16 callbacks finish
+  through safe cleanup, but delayed progress has no established cause. Do not
+  claim these as full SSE passes or change the deadline to hide the failures.
+  Preserved logs: `/tmp/vinix-linuxkpi-pci-config-sse-vm/serial.log`,
+  `/tmp/vinix-linuxkpi-pci-config-sse-diagnostic-vm/serial.log` and
+  `/tmp/vinix-linuxkpi-pci-baseline-sse-vm/serial.log`.
+- Native x86 actors read two real devices 896 times each across four bound CPUs,
+  with IRQ-off/nested-pin/OOM calls and all 16 actual constructor rollback cases.
+  Three warmups precede exact measured page recovery. ARM `PCI_CONFIG_TEST=1`
+  checks typed actual ECAM identity reads and all 8 independent D/A/F vectors
+  with I masked. Its default build leaves the fixture absent. New isolated
+  harness is `tests/pci-config/arm_vm.py`; four configured CPUs do not prove
+  ARM SMP, since context vectors execute on the controller.
+- The shared V compiler changed during allocation scans. Fresh repeated
+  baseline and final feature scans under compiler SHA256
+  `62e783b877abd3688ddd54806d73e5fd9c51b2a5b4fe9b5780369ffbf7bfa77e`
+  both retain 428 sites, 191 groups and 160 existing failure groups and exit 1. The initial
+  411-site reports and pre-existing x86 V errors remain preserved. This is no
+  global allocation pass: `/tmp/vinix-linuxkpi-pci-allocation-comparison.json`.
+
+Native `copy_pagemap_policy` tracks exact copied prefixes but returns only a
+Boolean. Linux user-copy APIs need remaining-byte counts, whole-range checks,
+raw nonzeroing and public from-user zero-tail semantics. File-backed native
+faults currently look up a local range under pagemap.l, release it, then
+follow local/global/resource/handle pointers during acquisition; concurrent
+munmap can remove all of them. A later generation recheck cannot protect those
+earlier dereferences. The changed-range file-page loser is also deliberately
+leaked because the old code lacks safe backend ownership.
+
+Read-only next-service design is
+`/tmp/vinix-linuxkpi-uaccess-next-lifetime-contract.json`. Proposed allocation-free
+leases increment a scalar fault count under pagemap.l then the common
+range_locals_lock, capture stack metadata and retain the existing global owner
+until the last fault finishes. Last-local unmap must remove mappings immediately,
+defer global/resource/handle destruction while leases exist and never wait
+under lookup locks. Installers compare old identity/generation only after a
+fresh lookup and return every acquired loser page through its retained owner.
+All acquisition, population, split/fork, partial unmap and global-destruction
+paths need new lifetime review and deterministic fault/removal tests. This is a
+proposal; faulting Linux user-copy APIs have not been implemented.
+Atomic/pagefault-disabled/WC user-copy paths remain separate real dependencies.
 
 ## Bound and high-priority contracts
 
@@ -831,7 +901,7 @@ there; preserve known baselines and clearly scope feature-specific evidence.
 
 ## Remaining path to completion
 
-1. Remaining synchronization (ordinary RCU and I/O mutex wrappers), SMP/context,
+1. Remaining synchronization (ordinary RCU), SMP/context,
    additional system workqueues and timer interfaces.
 2. Linux device/PCI registration/configuration/removal and devres ownership.
 3. MMIO cache attributes, DMA/SG, page/shmem, GPU address spaces and TTM/GEM.
