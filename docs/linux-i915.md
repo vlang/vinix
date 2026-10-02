@@ -57,7 +57,23 @@ the complete i915 source tree is not evidence that the driver runs.
   handoff wins a concurrent signal. Static/dynamic initialization, trylock,
   ownership checks and `atomic_dec_and_mutex_lock` are implemented.
   Recursive acquisition and unlocking another task's mutex fail explicitly.
-  Wound/wait mutexes, optimistic spinning, I/O accounting and devres are pending.
+  Optimistic spinning, I/O accounting and devres are pending.
+- Unmodified Linux `ww_mutex.h` uses native Wait-Die and Wound-Wait locking.
+  Transaction stamps order contexts across multiple objects, including wrap;
+  contending transactions return `-EDEADLK` when they must drop their locks.
+  Slow retry preserves the original stamp after backoff. First-lock waiters
+  neither die nor wound an owner; wounded owners wake from waits on another
+  object. Same-context blocking acquisition returns `-EALREADY` without changing
+  the owned count; contended trylock returns zero. Context-free callers retain
+  their queue order alongside stamped transactions. Interruptible cancellation
+  detaches its stack waiter, and an assigned ownership handoff wins concurrent
+  cancellation. Context counts and wounds use atomics across independent locks.
+  Lock, wait, trylock and unlock allocate nothing. Context/task/lock storage
+  must remain alive through every owned lock and waiter; release through the
+  WW API and finish all users before destruction. RT priority inheritance,
+  optimistic spinning and debug lock validation remain pending. i915/TTM's
+  eventual unchanged reservation core uses Wait-Die; this primitive does not
+  provide the remaining dma-resv/fence implementation.
 - Unmodified Linux SRCU headers and public layouts use native two-bank
   per-CPU reader counters and full grace periods. Readers may sleep, nest and
   migrate; counter sums include every CPU. Static domains preserve readers
@@ -457,6 +473,16 @@ inline wrappers retain their original behavior. The native kernel repeats
 multiword operations, conversion and allocation/free 200 times and checks
 exact page recovery.
 
+Wound/wait host tests exercise two/three-object Wait-Die cycles, cross-object
+Wound-Wait wakeups, queued older transactions, original-stamp slow retry,
+first-lock exclusions and stamp wraparound. They check interspersed context-free
+waiters, signal/wound versus handoff races, unrelated nested classes and 400
+reused stack-wait cycles with allocation deliberately disabled. Native tests
+exercise actual blocked tasks, backoff/slow retry, both algorithms, signal
+cancellation, context-free ownership and 256 repeated count/trylock cases per
+batch. After three warmups, the fourth batch releases every temporary thread
+and restores the exact physical-page count.
+
 SRCU host tests exercise nested/migrated readers, both bank phases, full-period
 polling boundaries, static first use and dynamic initialization rollback.
 They check independent grace-period progress while a callback is gated,
@@ -522,7 +548,7 @@ runtime subsystems:
 1. Linux device/PCI registration and removal, configuration access and devres.
 2. MMIO mapping with correct cache attributes, DMA/scatter-gather APIs,
    page/shmem management, GPU address spaces and TTM/GEM memory management.
-3. Remaining lock/wait variants (including wound/wait mutexes and I/O waits),
+3. Remaining lock/wait variants (including bit/variable and I/O waits),
    freezable/reclaim workqueues, remaining system queues, RCU work, remaining
    timer modes, high-resolution timers and RCU lifetime rules.
 4. Linux IRQ registration, interrupt synchronization and safe GPU reset paths.

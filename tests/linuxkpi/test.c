@@ -1014,6 +1014,7 @@ static void reference_tests(void)
 }
 
 #include "sync_test.h"
+#include "ww_mutex_test.h"
 #include "time_test.h"
 #include "timer_test.h"
 #include "workqueue_test.h"
@@ -1045,6 +1046,7 @@ int main(void)
     task_tests();
     task_wait_tests();
     sync_tests();
+    ww_mutex_tests();
     time_tests();
     timer_tests();
     workqueue_tests();
@@ -1059,6 +1061,6 @@ int main(void)
     reference_tests();
     vinix_linuxkpi_percpu_destroy_for_test();
     assert(live_pages == 0);
-    puts("LinuxKPI: PASS (Linux helpers, allocation/OOM, strings, bitmaps, SMP/IRQ locks, per-CPU storage, task references, wake races, synchronization, clocks, timers, ordered/delayed/unbound/bound work, runnable concurrency, priority, system queues and SRCU)");
+    puts("LinuxKPI: PASS (Linux helpers, allocation/OOM, strings, bitmaps, SMP/IRQ locks, per-CPU storage, task references, wake races, synchronization, wound/wait mutexes, clocks, timers, ordered/delayed/unbound/bound work, runnable concurrency, priority, system queues and SRCU)");
     return 0;
 }

@@ -78,4 +78,5 @@ bool vinix_linuxkpi_tigerlake_id(u16 vendor, u16 device, u32 class_code);
 int vinix_linuxkpi_selftest(void);
 int vinix_linuxkpi_bitmap_runtime_selftest(void);
 int vinix_linuxkpi_srcu_native_selftest(void);
+int vinix_linuxkpi_ww_mutex_native_selftest(void);
 #endif

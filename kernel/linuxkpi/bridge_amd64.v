@@ -407,6 +407,7 @@ fn C.vinix_linuxkpi_percpu_bootstrap(u32) int
 fn C.vinix_linuxkpi_bitmap_runtime_selftest() int
 fn C.srcu_init()
 fn C.vinix_linuxkpi_srcu_native_selftest() int
+fn C.vinix_linuxkpi_ww_mutex_native_selftest() int
 
 // join/TASK_DEAD can precede the final switch away and scheduler reaping.
 // Taking a baseline immediately after warmup can count those dying stacks,
@@ -695,6 +696,25 @@ pub fn initialise() {
 			lib.kpanic(unsafe { nil }, c'Linux SRCU self-test retained native pages')
 		}
 		C.kprintf(c'linuxkpi: SRCU sleeping and migrated readers, grace periods, callback barriers and teardown passed; no pages retained\n')
+		for _ in 0 .. 3 {
+			if C.vinix_linuxkpi_ww_mutex_native_selftest() != 0 {
+				lib.kpanic(unsafe { nil }, c'Linux wound/wait mutex self-test failed')
+			}
+		}
+		ww_before := selftest_free_baseline()
+		if C.vinix_linuxkpi_ww_mutex_native_selftest() != 0 {
+			lib.kpanic(unsafe { nil }, c'Linux wound/wait mutex self-test failed')
+		}
+		ww_reap_start := hpet_clock.nanoseconds()
+		for memory.free_bytes() != ww_before && hpet_clock.nanoseconds() - ww_reap_start < 1000000000 {
+			sched.reap_deferred()
+			sched.reschedule()
+		}
+		if memory.free_bytes() != ww_before {
+			C.kprintf(c'linuxkpi: wound/wait free-byte baseline=%llu after=%llu\n', ww_before, memory.free_bytes())
+			lib.kpanic(unsafe { nil }, c'Linux wound/wait mutex self-test retained native pages')
+		}
+		C.kprintf(c'linuxkpi: wound/wait mutexes, Wait-Die backoff, stamped slow retry and signal cancellation passed; no pages retained\n')
 		// Exercise a real scheduler interrupt with preemption disabled and
 		// IRQs still enabled, rather than relying only on host lock tests.
 		preempt_disable()

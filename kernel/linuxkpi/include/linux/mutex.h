@@ -6,7 +6,8 @@
 #include <linux/spinlock_types.h>
 #include <linux/lockdep_types.h>
 
-/* Ordinary non-RT mutex layout. No optimistic spinning or ww_mutex support. */
+/* Ordinary non-RT mutex layout, also reused by native ww_mutex.
+ * Optimistic spinning is not implemented. */
 struct mutex {
     atomic_long_t owner;
     raw_spinlock_t wait_lock;
