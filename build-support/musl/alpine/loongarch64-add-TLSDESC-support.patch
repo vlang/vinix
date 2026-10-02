@@ -1,0 +1,83 @@
+From a3f61671c39f2815a6caa23fe3490481bb24d44a Mon Sep 17 00:00:00 2001
+From: Xing Li <lixing@loongson.cn>
+Date: Thu, 5 Sep 2024 09:20:55 +0800
+Subject: [PATCH] loongarch64: add TLSDESC support
+
+---
+ arch/loongarch64/reloc.h       |  1 +
+ include/elf.h                  |  2 ++
+ src/ldso/loongarch64/tlsdesc.s | 37 ++++++++++++++++++++++++++++++++++
+ 3 files changed, 40 insertions(+)
+ create mode 100644 src/ldso/loongarch64/tlsdesc.s
+
+diff --git a/arch/loongarch64/reloc.h b/arch/loongarch64/reloc.h
+index 61eaca9e..a4db6a9c 100644
+--- a/arch/loongarch64/reloc.h
++++ b/arch/loongarch64/reloc.h
+@@ -17,6 +17,7 @@
+ #define REL_TPOFF       R_LARCH_TLS_TPREL64
+ #define REL_RELATIVE    R_LARCH_RELATIVE
+ #define REL_SYMBOLIC    R_LARCH_64
++#define REL_TLSDESC     R_LARCH_TLS_DESC64
+ 
+ #define CRTJMP(pc,sp) __asm__ __volatile__( \
+ 	"move $sp, %1 ; jr %0" : : "r"(pc), "r"(sp) : "memory" )
+diff --git a/include/elf.h b/include/elf.h
+index 3d5e13e4..b9d22f7a 100644
+--- a/include/elf.h
++++ b/include/elf.h
+@@ -3329,6 +3329,8 @@ enum
+ #define R_LARCH_TLS_TPREL32                 10
+ #define R_LARCH_TLS_TPREL64                 11
+ #define R_LARCH_IRELATIVE                   12
++#define R_LARCH_TLS_DESC32                  13
++#define R_LARCH_TLS_DESC64                  14
+ #define R_LARCH_MARK_LA                     20
+ #define R_LARCH_MARK_PCREL                  21
+ #define R_LARCH_SOP_PUSH_PCREL              22
+diff --git a/src/ldso/loongarch64/tlsdesc.s b/src/ldso/loongarch64/tlsdesc.s
+new file mode 100644
+index 00000000..4b6ea0e5
+--- /dev/null
++++ b/src/ldso/loongarch64/tlsdesc.s
+@@ -0,0 +1,37 @@
++.text
++.global __tlsdesc_static
++.hidden __tlsdesc_static
++.type __tlsdesc_static,%function
++__tlsdesc_static:
++	ld.d $a0, $a0, 8
++	jr $ra
++# size_t __tlsdesc_dynamic(size_t *a)
++# {
++#      struct {size_t modidx,off;} *p = (void*)a[1];
++#      size_t *dtv = *(size_t**)(tp - 8);
++#      return dtv[p->modidx] + p->off - tp;
++# }
++.global __tlsdesc_dynamic
++.hidden __tlsdesc_dynamic
++.type __tlsdesc_dynamic,%function
++__tlsdesc_dynamic:
++	addi.d $sp, $sp, -16
++	st.d $t1, $sp, 0
++	st.d $t2, $sp, 8
++
++	ld.d $t2, $tp, -8 # t2=dtv
++
++	ld.d $a0, $a0, 8  # a0=&{modidx,off}
++	ld.d $t1, $a0, 8  # t1=off
++	ld.d $a0, $a0, 0  # a0=modidx
++	slli.d $a0, $a0, 3  # a0=8*modidx
++
++	add.d $a0, $a0, $t2  # a0=dtv+8*modidx
++	ld.d $a0, $a0, 0  # a0=dtv[modidx]
++	add.d $a0, $a0, $t1 # a0=dtv[modidx]+off
++	sub.d $a0, $a0, $tp # a0=dtv[modidx]+off-tp
++
++	ld.d $t1, $sp, 0
++	ld.d $t2, $sp, 8
++	addi.d $sp, $sp, 16
++	jr $ra
+-- 
+2.27.0
+

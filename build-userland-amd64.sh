@@ -146,6 +146,9 @@ if [ "$ALPINE_DEVTOOLS" = 1 ] && [ ! -x "$STAGING/usr/bin/gcc" ]; then
     exit 1
 fi
 
+echo "==> Installing Vinix's optimized musl allocator..."
+python3 "$SCRIPT_DIR/build-support/musl/stage.py" --arch x86_64 --staging "$STAGING"
+
 mkdir -p "$(dirname "$INITRAMFS")"
 INITRAMFS_TMP="$(mktemp "$(dirname "$INITRAMFS")/.initramfs.tar.XXXXXX")"
 trap 'rm -f "$INITRAMFS_TMP"' EXIT

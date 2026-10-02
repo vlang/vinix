@@ -20,6 +20,8 @@ import importlib.util
 import os
 import platform
 import shutil
+import shlex
+import subprocess
 import sys
 from pathlib import Path
 
@@ -138,6 +140,10 @@ def compute_key(root: Path, v_compiler: Path, env: dict[str, str]) -> str:
     source_paths = [
         root / "build-desktop-aarch64.sh",
         root / "build-support/content-key.py",
+        root / "build-support/musl/stage.py",
+        root / "build-support/musl/malloc-retain.patch",
+        root / "build-support/musl/alpine",
+        root / "build-support/musl/alpine-1.2.6",
         root / "build-support/desktop-build-key.py",
         root / "desktop",
         ui2_source / "v.mod",
@@ -210,6 +216,19 @@ def compute_key(root: Path, v_compiler: Path, env: dict[str, str]) -> str:
         ("python", Path(sys.executable).resolve()),
     ]
 
+    musl_cc = shlex.split(env.get("VINIX_MUSL_CC_AARCH64", "aarch64-linux-musl-gcc"))
+    musl_executable = shutil.which(musl_cc[0], path=env.get("PATH")) if musl_cc else None
+    musl_version = "missing"
+    if musl_executable:
+        tools.append(("musl-cc", Path(musl_executable).resolve()))
+        try:
+            musl_version = subprocess.check_output(
+                [musl_executable, *musl_cc[1:], "--version"], text=True,
+                stderr=subprocess.STDOUT, timeout=10,
+            ).splitlines()[0]
+        except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired, IndexError):
+            musl_version = "unavailable"
+
     digest = hashlib.sha256()
     CONTENT_KEY.add_field(digest, b"vinix-desktop-run-build-key-v1")
     add_text(digest, "platform", platform.system())
@@ -220,6 +239,10 @@ def compute_key(root: Path, v_compiler: Path, env: dict[str, str]) -> str:
         add_text(digest, "pillow-version", getattr(PIL, "__version__", "unknown"))
     except ImportError:
         add_text(digest, "pillow-version", "missing")
+    add_text(digest, "optimized-musl", env.get("VINIX_OPTIMIZED_MUSL", "1"))
+    add_text(digest, "musl-retain", env.get("VINIX_MUSL_RETAIN", "1"))
+    add_text(digest, "musl-compiler", env.get("VINIX_MUSL_CC_AARCH64", "aarch64-linux-musl-gcc"))
+    add_text(digest, "musl-compiler-version", musl_version)
     add_text(digest, "with-asahi", env.get("VINIX_WITH_ASAHI_GPU", "0"))
     add_text(digest, "macho-linker", env.get("VINIX_MACHO_LINKER", "auto"))
     add_text(digest, "sources", tree_key(source_paths, metadata_only=False))

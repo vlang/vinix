@@ -1,6 +1,6 @@
 #!/bin/bash
-# Build the aarch64 Alpine userland, Vinix kernel, and UEFI ISO without a
-# source-built libc, command suite, or target GCC.
+# Build the aarch64 Alpine userland, optimized musl, Vinix kernel, and UEFI ISO.
+# The command suite and guest GCC remain Alpine's packaged binaries.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"

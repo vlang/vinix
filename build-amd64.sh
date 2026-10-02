@@ -1,6 +1,7 @@
 #!/bin/bash
 # Build the amd64 Alpine userland, Vinix kernel, and bootable UEFI ISO. The
-# userland is prebuilt Alpine; the kernel uses the host clang directly.
+# commands and GCC come from Alpine; musl includes Vinix heap reuse and the
+# kernel uses the host clang directly.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
