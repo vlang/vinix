@@ -32,6 +32,8 @@ preloads="$runtime/usr/lib/x86_64-linux-gnu/libvinix-steam-robust.so:$runtime/us
 if [ "$(cat /etc/steam-smoke-pin-nm)" = 1 ]; then
     preloads="$preloads:$runtime/usr/lib/x86_64-linux-gnu/libnm.so.0"
 fi
+extra_preloads=$(cat /etc/steam-smoke-extra-preload)
+[ -z "$extra_preloads" ] || preloads="$preloads:$extra_preloads"
 export VINIX_X86_64_PRELOAD="$preloads"
 mode=$(cat /etc/steam-smoke-mode)
 if [ "$(cat /etc/steam-smoke-load-tier0)" = 1 ]; then

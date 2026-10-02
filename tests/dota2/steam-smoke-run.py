@@ -41,11 +41,27 @@ def main() -> None:
                         help="Load actual game tier0 globally before Steam API; implies game library priority")
     parser.add_argument("--ld-debug-bindings", action="store_true",
                         help="Record the guest glibc loader's actual symbol bindings")
+    parser.add_argument("--extra-preload", type=Path, action="append", default=[],
+                        help="Add a test-only x86-64 library to the guest preloads; repeatable")
     parser.add_argument("--strace", action="store_true")
     parser.add_argument("--timeout", type=int, default=600)
     args = parser.parse_args()
     if args.load_tier0:
         args.game_library_priority = True
+    extra_preloads = []
+    preload_bytes = []
+    for path in args.extra_preload:
+        path = path.resolve()
+        if not path.is_file():
+            parser.error(f"extra preload is not a file: {path}")
+        data = path.read_bytes()
+        if (data[:6] != b"\x7fELF\x02\x01" or len(data) < 20 or
+                int.from_bytes(data[16:18], "little") != 3 or
+                int.from_bytes(data[18:20], "little") != 62):
+            parser.error(f"extra preload must be a Linux x86-64 shared ELF: {path}")
+        extra_preloads.append({"source": str(path),
+                               "sha256": hashlib.sha256(data).hexdigest()})
+        preload_bytes.append(data)
     work = args.work.resolve()
     work.mkdir(parents=True, exist_ok=True)
     root = work / "root"
@@ -77,6 +93,14 @@ def main() -> None:
                     str(runtime / "lib/x86_64-linux-gnu/libc.so.6"), "-o", str(binary)], check=True)
     install(binary, root / "usr/bin/steam-smoke")
     install(args.library, root / "usr/libexec/vinix-dota2/smoke/libsteam_api.so")
+    for index, (preload, data) in enumerate(zip(extra_preloads, preload_bytes)):
+        preload["guest_path"] = f"/usr/libexec/vinix-dota2/smoke/preloads/extra-{index}.so"
+        destination = root / preload["guest_path"].lstrip("/")
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        if destination.is_symlink():
+            destination.unlink()
+        destination.write_bytes(data)
+        destination.chmod(0o644)
     game_bin = root / "usr/libexec/vinix-dota2/smoke/game-bin"
     if args.game_library_priority:
         game_bin.mkdir(parents=True, exist_ok=True)
@@ -96,6 +120,8 @@ def main() -> None:
     (root / "etc/steam-smoke-pin-nm").write_text("1\n" if args.pin_network_manager else "0\n")
     (root / "etc/steam-smoke-load-tier0").write_text("1\n" if args.load_tier0 else "0\n")
     (root / "etc/steam-smoke-ld-debug").write_text("bindings\n" if args.ld_debug_bindings else "\n")
+    (root / "etc/steam-smoke-extra-preload").write_text(
+        ":".join(preload["guest_path"] for preload in extra_preloads) + "\n")
     (root / "etc/steam-smoke-strace").write_text("1\n" if args.strace else "0\n")
     archive = work / "initramfs.tar.gz"
     with tarfile.open(archive, "w:gz", compresslevel=1, format=tarfile.USTAR_FORMAT) as tar:
@@ -161,6 +187,7 @@ def main() -> None:
               "pin_network_manager": args.pin_network_manager,
               "load_tier0": args.load_tier0,
               "ld_debug_bindings": args.ld_debug_bindings,
+              "extra_preloads": extra_preloads,
               "passed": expected in transcript and b"VINIX-DOTA2-STEAM-SMOKE-EXIT: 0" in transcript,
               "api_returned": b"VINIX-DOTA2-STEAM-SMOKE-RETURN:" in transcript,
               "completed": b"VINIX-DOTA2-STEAM-SMOKE-END" in transcript,
