@@ -141,9 +141,12 @@ establish authenticated matchmaking support.
 
 With the early loader, the real Steam API test passes anonymous initialization,
 callbacks and clean shutdown even with Source 2's tier0 loaded globally. The
-full game advances through anonymous initialization and loads its renderer,
-resource system, schema system and material system. A rendered game menu is
-not yet verified.
+full game probe has rendered its [startup logo inside a Vinix window](../vinix-dota2-startup-qemu.png).
+That QEMU framebuffer capture is from the actual game, not the desktop's launch
+placeholder. Subsequent runs load the material, font and networking systems,
+then exit through SteamNetworkingSockets' fatal logging callback. The same
+exit occurs with one and four CPUs. A rendered game menu and online matches
+are not yet verified.
 
 After the file and graphics probes, capture the real game:
 
