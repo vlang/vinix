@@ -719,7 +719,8 @@ pub fn (mut this UnixSocket) write_with_fds(_handle voidptr, buf voidptr, _count
 		group.fds << fds
 		// Nothing slices these queues, so growing can free the old block.
 		peer.pending_fd_groups.flags |= .noslices
-		peer.pending_fd_groups << group
+		// Transfer the backing array with its owned FD references to the queue.
+		peer.pending_fd_groups << unsafe { group }
 	}
 	// On a SOCK_SEQPACKET peer this send is one record. The write above did not
 	// split it -- a message larger than the buffer is refused, and the wait
@@ -793,7 +794,8 @@ pub fn (mut this UnixSocket) send_datagram(mut target UnixSocket, _handle voidpt
 		group.fds << fds
 		// Nothing slices these queues, so growing can free the old block.
 		target.pending_fd_groups.flags |= .noslices
-		target.pending_fd_groups << group
+		// Transfer the backing array with its owned FD references to the queue.
+		target.pending_fd_groups << unsafe { group }
 	}
 	if count != 0 {
 		mut before_wrap := count
