@@ -770,6 +770,7 @@ pub fn initialise() {
 			lib.kpanic(unsafe { nil }, c'Linux I/O wait self-test retained native pages')
 		}
 		C.kprintf(c'linuxkpi: I/O wait scopes, CPU accounting, migration, deadlines and exit cleanup passed; no pages retained\n')
+		C.kprintf(c'linuxkpi: I/O mutex scopes, FIFO handoffs and blocked CPU accounting passed; no pages retained\n')
 		for _ in 0 .. 3 {
 			if C.vinix_linuxkpi_cache_native_selftest() != 0 {
 				lib.kpanic(unsafe { nil }, c'Linux object cache self-test failed')

@@ -30,6 +30,7 @@ MARKERS = [
     "linuxkpi: wound/wait mutexes, Wait-Die backoff, stamped slow retry and signal cancellation passed; no pages retained",
     "linuxkpi: keyed bit/variable waits, exclusive locks, deadlines and signal cancellation passed; no pages retained",
     "linuxkpi: I/O wait scopes, CPU accounting, migration, deadlines and exit cleanup passed; no pages retained",
+    "linuxkpi: I/O mutex scopes, FIFO handoffs and blocked CPU accounting passed; no pages retained",
     "linuxkpi: packed object caches, constructors, atomic allocation, shrink and teardown passed on 4 workers; no pages retained",
     "linuxkpi: logging preboot capture, checked worker construction and reuse passed",
     "linuxkpi: owned printk records, Linux formatting, IRQ capture, overflow and flush snapshots passed on 4 workers; no pages retained",

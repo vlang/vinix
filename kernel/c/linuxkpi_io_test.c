@@ -10,6 +10,7 @@
 #include <linux/delay.h>
 #include <linux/errno.h>
 #include <linux/jiffies.h>
+#include <linux/mutex.h>
 #include <vinix/runtime.h>
 #include <pthread.h>
 
@@ -19,12 +20,14 @@ int vinix_linuxkpi_test_worker_route(void *thread, unsigned int cpu);
 enum native_io_operation {
     NATIVE_IO_SLEEP, NATIVE_IO_TIMEOUT, NATIVE_IO_BIT, NATIVE_IO_LOCK,
     NATIVE_IO_PREEMPT, NATIVE_IO_ORDINARY, NATIVE_IO_EXIT_COUNTED,
+    NATIVE_IO_MUTEX, NATIVE_IO_MUTEX_ORDINARY,
 };
 struct native_io_thread {
     struct task_struct *task;
     pthread_t thread;
     struct completion entered, go, acquired, release, done;
     unsigned long *word;
+    struct mutex *mutex;
     const unsigned int *baseline;
     long timeout, remaining;
     unsigned int cpu, resumed_cpu, state;
@@ -67,7 +70,20 @@ static void *native_io_thread(void *argument)
         complete(&test->done);
         pthread_exit(NULL);
     }
-    if (test->operation == NATIVE_IO_BIT)
+    if (test->operation == NATIVE_IO_MUTEX || test->operation == NATIVE_IO_MUTEX_ORDINARY) {
+        if (test->operation == NATIVE_IO_MUTEX) mutex_lock_io_nested(test->mutex, 1);
+        else mutex_lock(test->mutex);
+        if (!!current->in_iowait != test->nested ||
+            atomic_long_read(&test->mutex->owner) != (long)current) test->result = -EIO;
+        /* The public wrapper restored the outer intent. Finish that separate
+         * test scope before waiting for release, so only the lock wait itself
+         * contributes an I/O slot in the controller's handoff observations. */
+        if (outer >= 0) { io_schedule_finish(outer); outer = -1; }
+        test->resumed_cpu = vinix_linuxkpi_cpu_id();
+        complete(&test->acquired);
+        wait_for_completion(&test->release);
+        mutex_unlock(test->mutex);
+    } else if (test->operation == NATIVE_IO_BIT)
         test->value = wait_on_bit_io(test->word, 0, test->state);
     else if (test->operation == NATIVE_IO_LOCK) {
         test->value = wait_on_bit_lock_io(test->word, 0, test->state);
@@ -263,12 +279,22 @@ out:
 static int native_io_fast_paths(const unsigned int *baseline)
 {
     struct task_struct *task = current;
+    struct mutex mutex;
+    mutex_init(&mutex);
     int result = 0;
     for (unsigned int i = 0; i < 128; i++) {
+        mutex_lock_io(&mutex);
+        if (task->in_iowait || atomic_long_read(&mutex.owner) != (long)task ||
+            native_io_counts(baseline, 0, 0)) result = -EIO;
+        mutex_unlock(&mutex);
         int outer = io_schedule_prepare(), inner = io_schedule_prepare();
         if (outer || inner != 1 || !task->in_iowait) result = -EIO;
         io_schedule_finish(inner);
         if (!task->in_iowait || native_io_counts(baseline, 0, 0)) result = -EIO;
+        mutex_lock_io_nested(&mutex, 1);
+        if (!task->in_iowait || atomic_long_read(&mutex.owner) != (long)task ||
+            native_io_counts(baseline, 0, 0)) result = -EIO;
+        mutex_unlock(&mutex);
         io_schedule(); /* RUNNING yields; it does not become a counted sleeper. */
         if (io_schedule_timeout(MAX_SCHEDULE_TIMEOUT) != MAX_SCHEDULE_TIMEOUT ||
             io_schedule_timeout(0) || !task->in_iowait) result = -EIO;
@@ -300,6 +326,88 @@ static int native_io_fast_paths(const unsigned int *baseline)
         if (bit_wait_io_timeout(&key, TASK_UNINTERRUPTIBLE) != -EAGAIN || task->in_iowait)
             result = -EIO;
     }
+    mutex_destroy(&mutex);
+    return result;
+}
+
+static int native_io_mutex_waiters(struct mutex *mutex, unsigned int expected)
+{
+    unsigned long deadline = jiffies + 500;
+    for (;;) {
+        unsigned long flags;
+        unsigned int count = 0;
+        struct list_head *entry;
+        raw_spin_lock_irqsave(&mutex->wait_lock, flags);
+        list_for_each(entry, &mutex->wait_list) count++;
+        raw_spin_unlock_irqrestore(&mutex->wait_lock, flags);
+        if (count == expected) return 0;
+        if (time_after_eq(jiffies, deadline)) return -EIO;
+        msleep(1);
+    }
+}
+
+static int native_io_mutex_handoffs(const unsigned int *baseline,
+                                    unsigned int fail_after, unsigned int oom_stage)
+{
+    struct native_io_thread tests[3] = {{0}};
+    struct mutex mutex;
+    mutex_init(&mutex);
+    mutex_lock(&mutex);
+    bool held = true;
+    int result = 0;
+    BUG_ON(oom_stage && (oom_stage > 4 || fail_after >= ARRAY_SIZE(tests)));
+    for (unsigned int i = 0; i < ARRAY_SIZE(tests); i++) {
+        /* The controller injects one real constructor-stage failure. Earlier
+         * workers have already reached their mutex waits, so this also tests
+         * teardown with live queued waiters rather than an empty fixture. */
+        if (oom_stage && i == fail_after) vinix_linuxkpi_test_worker_oom(oom_stage);
+        int started = native_io_start(&tests[i],
+                i == 1 ? NATIVE_IO_MUTEX_ORDINARY : NATIVE_IO_MUTEX,
+                i ? 1 : 0, TASK_UNINTERRUPTIBLE, 0, NULL, baseline, i == 0);
+        vinix_linuxkpi_test_worker_oom(0);
+        if (oom_stage && i == fail_after) {
+            if (started != -ENOMEM || tests[i].started ||
+                native_io_counts(baseline, i ? 1 : 0, 0)) result = -EIO;
+            goto out;
+        }
+        if (started)
+            { result = -EIO; goto out; }
+        tests[i].mutex = &mutex; /* Published by the following completion. */
+        complete(&tests[i].go);
+        if (native_io_mutex_waiters(&mutex, i + 1) || native_io_parked(&tests[i]))
+            { result = -EIO; goto out; }
+    }
+    if (native_io_counts(baseline, 1, 1)) { result = -EIO; goto out; }
+    /* Ordinary signals cannot cancel mutex_lock_io's uninterruptible wait.
+     * Their wake ends one native count, and the genuine retry starts another
+     * only once that task is off-queue again. */
+    vinix_linuxkpi_test_task_signal(tests[2].task->vinix_thread, 1ULL << 14);
+    if (native_io_parked(&tests[2]) || native_io_mutex_waiters(&mutex, 3) ||
+        native_io_counts(baseline, 1, 1)) { result = -EIO; goto out; }
+    if (vinix_linuxkpi_test_worker_route(tests[0].task->vinix_thread, 1))
+        { result = -EIO; goto out; }
+    mutex_unlock(&mutex);
+    held = false;
+    for (unsigned int i = 0; i < ARRAY_SIZE(tests); i++) {
+        if (!wait_for_completion_timeout(&tests[i].acquired, 500) ||
+            atomic_long_read(&mutex.owner) != (long)tests[i].task ||
+            (i == 0 && tests[i].resumed_cpu != 1) ||
+            (i + 1 < ARRAY_SIZE(tests) && completion_done(&tests[i + 1].acquired)) ||
+            native_io_counts(baseline, 0, i < 2 ? 1 : 0))
+            { result = -EIO; goto out; }
+        complete(&tests[i].release);
+    }
+out:
+    /* An I/O mutex wait cannot be cancelled. Open every initialized gate and
+     * release the controller's lock, allowing even partial construction or a
+     * timed-out observation to finish each real handoff before stack expiry. */
+    for (unsigned int i = 0; i < ARRAY_SIZE(tests); i++) native_io_release(&tests[i]);
+    if (held) mutex_unlock(&mutex);
+    for (unsigned int i = 0; i < ARRAY_SIZE(tests); i++)
+        if (native_io_join(&tests[i])) result = -EIO;
+    if (native_io_mutex_waiters(&mutex, 0) || mutex_is_locked(&mutex) ||
+        native_io_counts(baseline, 0, 0)) result = -EIO;
+    mutex_destroy(&mutex);
     return result;
 }
 
@@ -330,6 +438,12 @@ int vinix_linuxkpi_io_native_selftest(void)
     for (unsigned int cpu = 0; cpu < count; cpu++) baseline[cpu] = nr_iowait_cpu(cpu);
     if (native_io_fast_paths(baseline)) { kprintf("linuxkpi: I/O fast/nested/early-wake checks failed\n"); result = -EIO; }
     if (native_io_pool_counts(baseline)) { kprintf("linuxkpi: I/O blocked CPU/migration/preempt checks failed\n"); result = -EIO; }
+    for (unsigned int stage = 1; stage <= 4; stage++)
+        for (unsigned int before = 0; before < 3; before++)
+            if (native_io_mutex_handoffs(baseline, before, stage))
+                { kprintf("linuxkpi: I/O mutex constructor rollback stage=%u after=%u failed\n", stage, before); result = -EIO; }
+    if (native_io_mutex_handoffs(baseline, 0, 0))
+        { kprintf("linuxkpi: I/O mutex FIFO/migration/intent checks failed\n"); result = -EIO; }
     for (unsigned int kind = 0; kind < 3; kind++)
         if (native_io_timeout(baseline, kind == 0, kind == 2))
             { kprintf("linuxkpi: I/O timeout/early/signal checks failed\n"); result = -EIO; }

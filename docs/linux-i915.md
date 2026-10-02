@@ -116,8 +116,14 @@ the complete i915 source tree is not evidence that the driver runs.
   removes cancelled stack waiters before returning `-EINTR`; an assigned
   handoff wins a concurrent signal. Static/dynamic initialization, trylock,
   ownership checks and `atomic_dec_and_mutex_lock` are implemented.
+  `mutex_lock_io` prepares native I/O intent around the ordinary lock and
+  restores the caller's previous intent after acquisition; `_nested` preserves
+  the upstream non-lockdep annotation alias. Only actual sleeping scheduler
+  transitions charge a CPU, and FIFO handoff retires the original CPU's count
+  even when the task resumes elsewhere. The public I/O mutex remains
+  uninterruptible; independently prepared interruptible scopes can cancel.
   Recursive acquisition and unlocking another task's mutex fail explicitly.
-  Optimistic spinning, I/O accounting and devres are pending.
+  Optimistic spinning and devres are pending.
 - Unmodified Linux `ww_mutex.h` uses native Wait-Die and Wound-Wait locking.
   Transaction stamps order contexts across multiple objects, including wrap;
   contending transactions return `-EDEADLK` when they must drop their locks.
@@ -492,6 +498,22 @@ build C supplies the guarded-path review. This is scoped evidence, not a
 global allocation pass. Details are saved in
 `/tmp/vinix-linuxkpi-mutex-reap-allocation-comparison.json`.
 
+The I/O mutex host suite passed strict ASan/UBSan and import/header checks at
+`/tmp/vinix-linuxkpi-mutex-io-host.log`. It covers nested intent, mixed FIFO
+waiters, middle-waiter cancellation, disallowed-signal repark, cross-CPU count
+retirement and ownership-before-signal handoff with allocation failures armed.
+Native tests exercise the actual scheduler, routed handoff and all four
+constructor failure stages after zero, one or two queued workers. Gates open,
+the controller unlocks and every started worker joins before stack mutex
+destruction, including unexpectedly successful constructors. Three warmups
+and the measured fourth batch return exactly to baseline. Default guest
+startup also passed. Independent lifetime reviewers approved the wrapper and
+every new cleanup path. Exact evidence is
+`/tmp/vinix-linuxkpi-mutex-io-retirement-final-validation.json`.
+No direct `mutex_lock_io` caller exists in the current imported i915, DRM
+headers or libraries; this implements a real compatibility API without
+claiming driver execution or a new syntax-audit pass.
+
 Logging validation used the frozen 17-path overlay on isolated baseline
 `a34c2473`, with enabled ELF SHA256
 `318b1939b75b5d2111ea2a306d646c054775d788e086f49dd493615eacb8810b`.
@@ -828,7 +850,7 @@ runtime subsystems:
 1. Linux device/PCI registration and removal, configuration access and devres.
 2. MMIO mapping with correct cache attributes, DMA/scatter-gather APIs,
    page/shmem management, GPU address spaces and TTM/GEM memory management.
-3. Remaining lock/wait variants (including I/O-specific mutex wrappers),
+3. Remaining lock/wait variants,
    freezable/reclaim workqueues, remaining system queues, RCU work, remaining
    timer modes, high-resolution timers and RCU lifetime rules.
 4. Linux IRQ registration, interrupt synchronization and safe GPU reset paths.

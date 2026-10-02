@@ -78,6 +78,14 @@ static int mutex_acquire(struct mutex *lock, unsigned int state)
 }
 
 void mutex_lock(struct mutex *lock) { (void)mutex_acquire(lock, TASK_UNINTERRUPTIBLE); }
+void mutex_lock_io(struct mutex *lock)
+{
+    /* Match Linux's non-lockdep scope exactly. Intent alone does not count
+     * runnable tasks; the native scheduler owns actual blocked-CPU slots. */
+    int token = io_schedule_prepare();
+    mutex_lock(lock);
+    io_schedule_finish(token);
+}
 int mutex_lock_interruptible(struct mutex *lock) { return mutex_acquire(lock, TASK_INTERRUPTIBLE); }
 int mutex_lock_killable(struct mutex *lock) { return mutex_acquire(lock, TASK_KILLABLE); }
 

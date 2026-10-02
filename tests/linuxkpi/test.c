@@ -1031,6 +1031,7 @@ static void reference_tests(void)
 #include "srcu_test.h"
 #include "wait_bit_test.h"
 #include "io_test.h"
+#include "mutex_io_test.h"
 #include "cache_test.h"
 #include "task_flag_test.h"
 #include "seqcount_test.h"
@@ -1077,6 +1078,7 @@ int main(void)
     warn_tests();
     wait_bit_tests();
     io_tests();
+    mutex_io_tests();
     timer_tests();
     workqueue_tests();
     delayed_work_tests();
