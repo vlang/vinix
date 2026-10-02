@@ -1,7 +1,9 @@
 # Allocation benchmark in Vinix and macOS
 
-See the [2026-10-02 measurements and preserved raw records](results/2026-10-02/README.md)
-for the actual Catalina comparison and Vinix allocator optimization results.
+See the [user-space comparison and preserved raw records](results/2026-10-02-userspace/README.md)
+for the default musl optimizations and corrected-clock Catalina comparison.
+The [earlier kernel measurements](results/2026-10-02/README.md) preserve the
+direct kernel allocator comparison and qualify the old user-space timings.
 
 `bench.c` runs identical single-thread C workloads on both guests. Compile
 with genuine GNU GCC: Apple's `/usr/bin/gcc` is Clang, and the benchmark records
