@@ -1,8 +1,8 @@
 #!/bin/bash
 # Build the native Vinix desktop for amd64 and assemble a dedicated boot ISO.
 #
-# The desktop is linked against the same official Alpine/musl packages as the
-# base image. No Vinix-specific GCC, libc, or userspace build is required.
+# The desktop uses the base image's optimized musl allocator; normal commands
+# and GCC come from official Alpine packages.
 #
 # The image carries the same package layers as the arm64 desktop; build them
 # first with ./build-x11-amd64.sh, ./build-firefox-amd64.sh,
@@ -101,6 +101,8 @@ fi
 echo "==> Staging Alpine's prebuilt amd64 userland and toolchain..."
 VINIX_AMD64_USERLAND_BUILD_DIR="$USERLAND_DIR" VINIX_ALPINE_DEVTOOLS=1 \
     "$SCRIPT_DIR/build-userland-amd64.sh"
+# Existing/custom sysroots must use the optimized allocator for the static desktop.
+python3 "$SCRIPT_DIR/build-support/musl/stage.py" --arch x86_64 --staging "$SYSROOT"
 if [ ! -f "$SYSROOT/usr/lib/libc.a" ] || [ ! -d "$SYSROOT/usr/include" ]; then
     echo "ERROR: Alpine development sysroot is incomplete: $SYSROOT" >&2
     exit 1
@@ -235,6 +237,10 @@ install -m755 "$SCRIPT_DIR/build-support/vinix-version-check" \
 if [ -n "${VINIX_RELEASE:-}" ]; then
     printf '%s\n' "$VINIX_RELEASE" > "$STAGING/etc/vinix-release"
 fi
+# Restore the default loader after Alpine package layers have been merged.
+echo "==> Installing Vinix's optimized musl allocator..."
+python3 "$SCRIPT_DIR/build-support/musl/stage.py" --arch x86_64 --staging "$STAGING"
+
 for command_path in bin/zsh usr/bin/python3 usr/bin/v usr/bin/tcc usr/bin/pkg sbin/apk \
     usr/bin/curl usr/bin/git usr/bin/Xorg usr/bin/Xvfb usr/bin/Xvfb-glx \
     usr/bin/vinix-wine-host usr/bin/vinix-xinput usr/bin/run-firefox; do

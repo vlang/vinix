@@ -342,6 +342,9 @@ if [ "$MAKE_INITRAMFS" -eq 1 ] && [ ! -x "$VLANG_STAGING/usr/lib/vlang/v" ]; the
 fi
 
 # ── The Alpine musl sysroot ──
+# The desktop is static, so its build sysroot needs the same allocator as apps.
+python3 "$SCRIPT_DIR/build-support/musl/stage.py" --arch aarch64 --staging "$SYSROOT"
+
 if [ ! -f "$SYSROOT/usr/lib/libc.a" ] || [ ! -d "$SYSROOT/usr/include" ]; then
     echo "ERROR: Alpine development sysroot is incomplete: $SYSROOT"
     echo "Run ./build-userland-aarch64.sh first."
@@ -1234,6 +1237,10 @@ if [ ! -x "$STAGING/bin/zsh" ]; then
     echo "ERROR: desktop image has no executable /bin/zsh" >&2
     exit 1
 fi
+# Package overlays carry Alpine loaders; restore the optimized default after them.
+echo "==> Installing Vinix's optimized musl allocator..."
+python3 "$SCRIPT_DIR/build-support/musl/stage.py" --arch aarch64 --staging "$STAGING"
+
 # A staged command whose NEEDED library was left behind still looks correct
 # here: it is present and executable, and only fails in the guest, as a loader
 # error in whatever window started it. Resolve zsh's own dependencies against
@@ -1486,6 +1493,11 @@ CONTENT_KEY_INPUTS=(
     "$BUILD_DIR/wifi-ctl"
     "$BUILD_DIR/wallpapers"
     "$SCRIPT_DIR/desktop"
+    "$SCRIPT_DIR/build-support/musl/stage.py"
+    "$SCRIPT_DIR/build-support/musl/malloc-retain.patch"
+    "$SCRIPT_DIR/build-support/musl/alpine"
+    "$SCRIPT_DIR/build-support/musl/alpine-1.2.6"
+    "$STAGING/usr/share/vinix/musl-build.json"
     "$SCRIPT_DIR/build-support/vinix-pkg"
     "$SCRIPT_DIR/build-support/v-command"
     "$SCRIPT_DIR/build-support/vinix-desktop-build"
