@@ -4,6 +4,12 @@ trimming with live allocations, cross-thread frees, and allocation and trim
 after a multithreaded `fork`. Child processes also verify that double frees
 and nominal-size overruns are rejected.
 
+Allocation framing skips offset cycling when a slot has no whole alignment
+unit to spare, because the selected offset is always zero. Slots with spare
+units keep musl's offset cycling. Header stamping uses the selected slot
+index directly; resize keeps the existing header index. Group, secret,
+nominal-size and overflow-byte checks stay in both paths.
+
 Compile with the guest's native GCC and run both link modes:
 
 ```sh
