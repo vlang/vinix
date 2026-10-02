@@ -12,6 +12,9 @@
 #include <linux/align.h>
 #include <linux/jump_label.h>
 #include <linux/container_of.h>
+#include <linux/panic.h>
+#include <linux/printk.h>
+#include <linux/sprintf.h>
 #define container_of_safe(ptr, type, member) \
     ((ptr) ? container_of((ptr), type, member) : NULL)
 #define might_sleep() BUG_ON(!vinix_linuxkpi_may_sleep())

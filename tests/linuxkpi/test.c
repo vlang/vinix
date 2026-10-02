@@ -44,7 +44,7 @@ static atomic_t time_warnings = ATOMIC_INIT(0);
 static u64 host_clock_ns;
 u64 vinix_linuxkpi_clock_ns(void) { return __atomic_load_n(&host_clock_ns, __ATOMIC_ACQUIRE); }
 u32 vinix_linuxkpi_clock_resolution_ns(void) { return 1000000; }
-void vinix_linuxkpi_warn(const char *file, int line) { atomic_inc(&time_warnings); }
+void vinix_linuxkpi_test_warn_note(const char *file, int line) { atomic_inc(&time_warnings); }
 struct native_task_model {
     u64 storage[8];
     int pid, tgid;
@@ -384,7 +384,7 @@ int vinix_linuxkpi_worker_set_nice(int nice)
 }
 int vinix_linuxkpi_worker_nice(void) { return current_worker_nice; }
 u64 vinix_linuxkpi_worker_timeslice(void) { return 5000 * (20 - current_worker_nice) / 20; }
-void vinix_linuxkpi_refcount_warning(int kind)
+void vinix_linuxkpi_test_refcount_note(int kind)
 {
     assert(kind >= REFCOUNT_ADD_NOT_ZERO_OVF && kind <= REFCOUNT_DEC_LEAK);
     atomic_inc(&refcount_warnings);
@@ -975,8 +975,9 @@ static void *reference_worker(void *argument)
 
 static void reference_tests(void)
 {
+    int warnings_before = atomic_read(&refcount_warnings);
     refcount_t refs = REFCOUNT_INIT(0);
-    assert(!refcount_inc_not_zero(&refs) && atomic_read(&refcount_warnings) == 0);
+    assert(!refcount_inc_not_zero(&refs) && atomic_read(&refcount_warnings) == warnings_before);
     refcount_inc(&refs);
     assert(refcount_read(&refs) == (unsigned)REFCOUNT_SATURATED);
     assert(!refcount_dec_and_test(&refs));
@@ -986,7 +987,7 @@ static void reference_tests(void)
     refcount_set(&refs, 1);
     assert(!refcount_sub_and_test(2, &refs));
     assert(refcount_read(&refs) == (unsigned)REFCOUNT_SATURATED);
-    assert(atomic_read(&refcount_warnings) == 4);
+    assert(atomic_read(&refcount_warnings) == warnings_before + 4);
     refcount_set(&refs, 1);
     assert(refcount_dec_if_one(&refs) && !refcount_dec_if_one(&refs));
     spinlock_t lock;
@@ -1033,6 +1034,9 @@ static void reference_tests(void)
 #include "cache_test.h"
 #include "task_flag_test.h"
 #include "seqcount_test.h"
+#include "format_test.h"
+#include "printk_test.h"
+#include "warn_test.h"
 
 int main(void)
 {
@@ -1045,6 +1049,8 @@ int main(void)
     fail_allocation = false;
     assert(vinix_linuxkpi_percpu_init(4, host_percpu_start, host_percpu_end) == 0);
     permanent_pages = live_pages;
+    format_tests();
+    taint_initial_tests();
     allocation_tests();
     cache_tests();
     string_tests();
@@ -1061,6 +1067,8 @@ int main(void)
     ww_mutex_tests();
     seqcount_tests();
     time_tests();
+    printk_tests();
+    warn_tests();
     wait_bit_tests();
     io_tests();
     timer_tests();
@@ -1074,8 +1082,9 @@ int main(void)
     concurrency_tests();
     atomic_api_tests();
     reference_tests();
+    printk_cleanup_tests();
     vinix_linuxkpi_percpu_destroy_for_test();
     assert(live_pages == 0);
-    puts("LinuxKPI: PASS (Linux helpers, allocation/OOM, packed object caches, strings, bitmaps, SMP/IRQ locks, per-CPU storage, task references, wake races, synchronization, sequence counters, wound/wait mutexes, clocks, bit/variable and I/O waits, timers, ordered/delayed/unbound/bound work, runnable concurrency, priority, system queues and SRCU)");
+    puts("LinuxKPI: PASS (Linux helpers, owned printk/formatting/warnings/taints, allocation/OOM, packed object caches, strings, bitmaps, SMP/IRQ locks, per-CPU storage, task references, wake races, synchronization, sequence counters, wound/wait mutexes, clocks, bit/variable and I/O waits, timers, ordered/delayed/unbound/bound work, runnable concurrency, priority, system queues and SRCU)");
     return 0;
 }

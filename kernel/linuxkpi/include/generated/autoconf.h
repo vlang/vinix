@@ -7,6 +7,12 @@
 #define CONFIG_X86_64 1
 #define CONFIG_SMP 1
 #define CONFIG_NR_CPUS 256
+/* Ordinary process/IRQ capture uses a native owned-byte logger. NMI entry,
+ * panic bypass and device log metadata are separate pending services. */
+#define CONFIG_PRINTK 1
+#define CONFIG_MESSAGE_LOGLEVEL_DEFAULT 4
+#define CONFIG_CONSOLE_LOGLEVEL_DEFAULT 7
+#define CONFIG_CONSOLE_LOGLEVEL_QUIET 4
 /* SMP SRCU has independent reader/grace-period state. Ordinary RCU is pending. */
 #define CONFIG_TREE_SRCU 1
 /* Do not alias NMI entrypoints to readers using the native per-CPU registry. */

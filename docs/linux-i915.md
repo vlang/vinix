@@ -30,7 +30,8 @@ rejects a rewritten manifest. Original copyright notices, `COPYING` and
 their case-distinct filenames cannot coexist on default macOS filesystems.
 
 The current build compiles and links unmodified Linux `lib/list_sort.c`,
-`lib/sort.c`, `lib/rbtree.c`, `lib/find_bit.c`, `lib/hweight.c` and i915's
+`lib/sort.c`, `lib/rbtree.c`, `lib/find_bit.c`, `lib/hweight.c`,
+`lib/siphash.c` and i915's
 `i915_memcpy.c`. The last file is a WC memory-copy component, not GPU
 initialization or command submission. Importing
 the complete i915 source tree is not evidence that the driver runs.
@@ -52,6 +53,40 @@ the complete i915 source tree is not evidence that the driver runs.
 - Upstream `refcount_t` and ordinary `kref_get`/`kref_put`, including saturation,
   final-release ordering, spinlock release helpers and
   `refcount_dec_and_mutex_lock`.
+- Ordinary process and IRQ-off `printk`, `vprintk`, `vprintk_emit` and deferred
+  capture use a fixed 64-record ring with 1,024 bytes per record. Producers
+  synchronously copy borrowed arguments into owned bytes, allocate nothing,
+  and never write the console or wake tasks. A permanent pthread drains records
+  outside the ring lock and polls every 10 ms while idle. Full rings discard
+  the oldest queued record and count drops; an in-flight record stays live
+  until its sink returns. Flush snapshots wait through the captured ordinal,
+  including overwritten entries, without waiting for later submissions.
+  Log levels, prefix removal, truncation and trailing-newline metadata are
+  retained. Unknown-caller continuations remain separate records. NMI capture,
+  panic-console bypass, per-caller continuation merging, device/facility
+  metadata, rate limiting and the broader console machinery remain pending.
+- Native Linux `snprintf`, `vsnprintf`, `scnprintf`, `vscnprintf`, `sprintf`
+  and `vsprintf` implement the inventoried i915 formatting subset outside the
+  unchanged import. Integer/string padding, precision and return conventions
+  follow the pinned source, including Linux-specific boundary rules. Resource,
+  physical/DMA address, bitmap, byte-array, FourCC, error-pointer and nested
+  `%pV` conversions copy borrowed bytes synchronously. Default pointer hashes
+  use the unchanged SipHash implementation and a securely seeded immutable
+  key; before readiness they emit Linux's pointer-value placeholder. Native
+  RNG publication uses acquire/release atomics, and readiness/output share
+  its generator lock. Symbols use the real address fallback with KALLSYMS
+  disabled; pointer restriction policy is zero. Unsupported pointer extensions
+  emit a bounded diagnostic and stop. Invalid `%n` never fetches or writes its
+  argument. Complete `lib/vsprintf.c` dependency closure remains pending.
+- `WARN`, `WARN_ON`, `WARN_ONCE` and `WARN_ON_ONCE` preserve Boolean returns
+  and evaluate conditions once; false conditions suppress formatting and
+  argument evaluation. Concurrent once-callers elect one capture per callsite.
+  Warning and refcount diagnostic frontends record sticky `TAINT_WARN` before
+  asynchronous output; `add_taint`, `test_taint` and `get_taint` cover the 19
+  original taint bits with atomic updates. Stack traces, panic policy, taint
+  reporting strings and lockdep remain unresolved. Existing native refcount
+  diagnostics still report each invalid operation rather than using upstream
+  per-kind once suppression.
 - Spinlocks and raw spinlocks, nested IRQ save/restore and scheduler preemption
   guards. Lock spinning continues to answer Vinix's TLB shootdowns. IRQ flags belong to
   the caller, not to shared lock storage.
@@ -399,6 +434,35 @@ python3 tests/linuxkpi/run_vm.py \
     --cpu max,hypervisor=off --state-dir /tmp/vinix-linuxkpi-guest-sse
 ```
 
+Logging validation used the frozen 17-path overlay on isolated baseline
+`a34c2473`, with enabled ELF SHA256
+`318b1939b75b5d2111ea2a306d646c054775d788e086f49dd493615eacb8810b`.
+Fresh normal and SSE4.1 four-CPU guests passed, including checked preboot worker
+construction, real held scheduler/console lock capture, borrowed-byte lifetime,
+four concurrent producers, overflow, in-flight retirement and flush snapshots.
+After three warmups, the measured fourth batch returned exactly to its physical
+page baseline; the permanent logger was started before measurement. Logs are
+`/tmp/vinix-linuxkpi-printk-complete-{vm,sse-vm}/serial.log`. The first candidate
+guest stopped at an older timed-wait fixture's global-empty assertion: the new
+permanent worker legitimately sleeps on that list. The fixture now checks each
+joined, retained task's own records before its final release, with failure
+reason diagnostics and unchanged timeouts. No timer backend behavior changed.
+
+The complete strict ASan/UBSan host runtime, import and standalone-header suite
+passed at `/tmp/vinix-linuxkpi-printk-host-final.log`. Formatting goldens cover
+Linux boundary rules, pointer forms, key publication and nested argument
+ownership; warning tests cover suppression, concurrent once winners and all
+19 sticky taints, including a first-event refcount warning. Fresh enabled x86,
+default x86 and disabled ARM builds passed; default four-CPU Linux-ABI startup
+also passed. Independent formatter/ring/fixture and final time/taint lifetime
+reviews approved. Frozen generated C on both architectures has no new hidden
+allocation in logging bridges or synchronized RNG readers. The equal-source
+allocation gate remains **440 sites, 193 groups and 162 existing failures**
+on both baseline and feature, with no new allocation counts or failure groups.
+Its earlier 16-path scope is preserved separately; the final native time and
+taint changes are C-only and leave those V paths unchanged. These results do
+not establish a global kernel leak pass or GPU operation.
+
 The host tests use ASan and UBSan. They exercise allocation failure and
 preservation of the original buffer after failed `krealloc`, zero-fill,
 alignment, list stability, red-black tree invariants, concurrent atomic/lock
@@ -678,11 +742,13 @@ stack: entry now reserves a return-address word to satisfy SysV alignment.
 Kbuild Makefile, with ACPI and fbdev enabled and optional self-tests/GVT off.
 It attempts every translation unit and writes complete compiler diagnostics
 to `build/linuxkpi/i915-audit.json`. An incomplete API layer makes this command
-exit with status 1. The current result is **1/269** translation units passing.
-The sequence-counter/compiler-contract audit is recorded separately at
-`/tmp/vinix-linuxkpi-seqcount-i915-audit.json`; leading first errors include
-`pr_warn`, missing `generated/bounds.h`, `WARN_ONCE`, ordinary RCU pointer APIs,
-missing `__init` visibility, `dev_t` and `call_single_data_t`. These are syntax
+exit with status 1. The current result is **2/269** translation units passing.
+The logging audit is recorded separately at
+`/tmp/vinix-linuxkpi-printk-i915-audit.json`; `i915_memcpy.c` and
+`display/intel_qp_tables.c` pass syntax. Logging/WARN/taint and `__init` visibility
+blockers are cleared. Leading first errors now include missing
+`generated/bounds.h`, `dev_t`, `asm/early_ioremap.h`, ordinary RCU pointer APIs
+and `call_single_data_t`. These are syntax
 paths, not a complete runtime dependency inventory.
 Even a successful syntax audit would still require actual
 object linking, unresolved-symbol checks and runtime/hardware testing.

@@ -3,6 +3,7 @@ module krandom
 
 import crypto.sha256
 import klock
+import katomic
 
 fn C.vinix_explicit_bzero(buf voidptr, len u64)
 fn C.vinix_hw_random64(out &u64) int
@@ -25,7 +26,8 @@ mut:
 }
 
 __global (
-	generator &Generator
+	// Published once at boot; every reader acquires the fully seeded object.
+	generator_bits u64
 	// Timings of events -- scheduler ticks, keystrokes -- folded together by
 	// add_event() until stir() draws on them, as OpenBSD's random(4) pools
 	// device interrupt timings for arc4random's reseeding.
@@ -34,6 +36,12 @@ __global (
 	// Whether stir() has run: the first reseed is logged.
 	reseeded bool
 )
+
+// The generator has boot lifetime. Loading an integer slot avoids V generic
+// pointer operands and creates no temporary ownership or heap box.
+fn current_generator() &Generator {
+	return unsafe { &Generator(katomic.load(&generator_bits)) }
+}
 
 @[inline]
 fn rotl32(a u32, shift u32) u32 {
@@ -130,7 +138,7 @@ fn (mut this Generator) fill_locked(buf voidptr, count u64) {
 }
 
 pub fn initialise() {
-	if generator != unsafe { nil } {
+	if current_generator() != unsafe { nil } {
 		return
 	}
 	mut seed := [64]u8{}
@@ -147,7 +155,7 @@ pub fn initialise() {
 		C.memcpy(&rng.counter, &seed[40], 8)
 	}
 	explicit_bzero(&seed[0], sizeof(seed))
-	generator = rng
+	katomic.store(mut &generator_bits, u64(rng))
 }
 
 // Fold an event into the pool: its value and the cycle counter at which it
@@ -168,7 +176,8 @@ pub fn add_event(value u64) {
 // arc4random from the entropy pool every few minutes for the same reason.
 // Called from a kernel thread: it allocates, so not from an interrupt.
 pub fn stir() {
-	if generator == unsafe { nil } {
+	mut rng := current_generator()
+	if rng == unsafe { nil } {
 		return
 	}
 	mut fresh := [4]u64{}
@@ -180,9 +189,9 @@ pub fn stir() {
 	mut input := []u8{len: domain.len + 32 + 64 + 32 + 8} @[freed]
 	mut at := domain.len
 	unsafe { C.memcpy(input.data, domain.str, domain.len) }
-	generator.lock.acquire()
-	unsafe { C.memcpy(&input[at], &generator.key[0], 32) }
-	generator.lock.release()
+	rng.lock.acquire()
+	unsafe { C.memcpy(&input[at], &rng.key[0], 32) }
+	rng.lock.release()
 	at += 32
 	unsafe {
 		C.memcpy(&input[at], &entropy_pool[0], 64)
@@ -194,21 +203,21 @@ pub fn stir() {
 	explicit_bzero(&fresh[0], sizeof(fresh))
 	digest := sha256.sum(input)
 
-	generator.lock.acquire()
+	rng.lock.acquire()
 	// XORed in rather than put in place, so output taken since the key was
 	// read above still counts towards the new one.
 	for i := 0; i < 8; i++ {
 		mut word := u32(0)
 		unsafe { C.memcpy(&word, &digest[i * 4], 4) }
-		generator.key[i] ^= word
+		rng.key[i] ^= word
 	}
-	generator.rekey()
+	rng.rekey()
 	// A generator seeded from nothing better than the clock at boot becomes
 	// trustworthy once the CPU has given it real entropy.
 	if fresh_words == fresh.len {
-		generator.secure = true
+		rng.secure = true
 	}
-	generator.lock.release()
+	rng.lock.release()
 
 	if !reseeded {
 		reseeded = true
@@ -224,19 +233,32 @@ pub fn stir() {
 }
 
 pub fn is_ready() bool {
-	return generator != unsafe { nil } && generator.secure
+	mut rng := current_generator()
+	if rng == unsafe { nil } {
+		return false
+	}
+	rng.lock.acquire()
+	ready := rng.secure
+	rng.lock.release()
+	return ready
 }
 
 // fill writes CSPRNG output to a kernel buffer. Timer-only boot state is
 // available solely to explicitly insecure callers; getrandom(2) never treats
-// it as entropy.
+// it as entropy. Publication and secure readiness synchronize with startup
+// and later hardware reseeding before output is accessed.
 pub fn fill(buf voidptr, count u64, allow_insecure bool) bool {
-	if generator == unsafe { nil } || (!generator.secure && !allow_insecure) {
+	mut rng := current_generator()
+	if rng == unsafe { nil } {
 		return false
 	}
-	generator.lock.acquire()
-	generator.fill_locked(buf, count)
-	generator.lock.release()
+	rng.lock.acquire()
+	if !rng.secure && !allow_insecure {
+		rng.lock.release()
+		return false
+	}
+	rng.fill_locked(buf, count)
+	rng.lock.release()
 	return true
 }
 

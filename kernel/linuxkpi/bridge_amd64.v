@@ -321,11 +321,6 @@ fn bug(_file &char, _line int) {
 	lib.kpanic(unsafe { nil }, c'Linux compatibility layer BUG')
 }
 
-@[export: 'vinix_linuxkpi_warn']
-fn warn(file &char, line int) {
-	C.kprintf(c'linuxkpi: warning at %s:%d\n', file, line)
-}
-
 @[export: 'vinix_linuxkpi_clock_ns']
 fn clock_ns() u64 {
 	return hpet_clock.nanoseconds()
@@ -340,11 +335,6 @@ fn C.vinix_linuxkpi_time_tick(u64)
 
 fn tick_deadlines() {
 	C.vinix_linuxkpi_time_tick(hpet_clock.nanoseconds())
-}
-
-@[export: 'vinix_linuxkpi_refcount_warning']
-fn refcount_warning(kind int) {
-	C.kprintf(c'linuxkpi: refcount saturated after invalid operation %d; retaining object\n', kind)
 }
 
 @[export: 'vinix_linuxkpi_cpu_has']
@@ -423,6 +413,8 @@ fn C.vinix_linuxkpi_wait_bit_native_selftest() int
 fn C.vinix_linuxkpi_io_native_selftest() int
 fn C.vinix_linuxkpi_cache_native_selftest() int
 fn C.vinix_linuxkpi_seqcount_native_selftest() int
+fn C.vinix_linuxkpi_printk_bootstrap_native_selftest() int
+fn C.vinix_linuxkpi_printk_native_selftest() int
 
 // join/TASK_DEAD can precede the final switch away and scheduler reaping.
 // Taking a baseline immediately after warmup can count those dying stacks,
@@ -470,6 +462,12 @@ pub fn initialise() {
 		}
 		C.srcu_init()
 		C.wait_bit_init()
+		printk_bootstrap_result := C.vinix_linuxkpi_printk_bootstrap_native_selftest()
+		if printk_bootstrap_result != 0 {
+			C.kprintf(c'linuxkpi: logging bootstrap self-test condition=%d\n', -printk_bootstrap_result)
+			lib.kpanic(unsafe { nil }, c'Linux logging worker initialization failed')
+		}
+		C.kprintf(c'linuxkpi: logging preboot capture, checked worker construction and reuse passed\n')
 		before := memory.free_bytes()
 		for _ in 0 .. 200 {
 			if C.vinix_linuxkpi_selftest() != 0 || C.vinix_linuxkpi_task_selftest() != 0
@@ -807,6 +805,25 @@ pub fn initialise() {
 			lib.kpanic(unsafe { nil }, c'Linux sequence counter self-test retained native pages')
 		}
 		C.kprintf(c'linuxkpi: upstream sequence counters, native writer locks, retry and latch snapshots passed on 4 workers; no pages retained\n')
+		for _ in 0 .. 3 {
+			if C.vinix_linuxkpi_printk_native_selftest() != 0 {
+				lib.kpanic(unsafe { nil }, c'Linux logging self-test failed')
+			}
+		}
+		printk_before := selftest_free_baseline()
+		if C.vinix_linuxkpi_printk_native_selftest() != 0 {
+			lib.kpanic(unsafe { nil }, c'Linux logging self-test failed')
+		}
+		printk_reap_start := hpet_clock.nanoseconds()
+		for memory.free_bytes() != printk_before && hpet_clock.nanoseconds() - printk_reap_start < 1000000000 {
+			sched.reap_deferred()
+			sched.reschedule()
+		}
+		if memory.free_bytes() != printk_before {
+			C.kprintf(c'linuxkpi: logging free-byte baseline=%llu after=%llu\n', printk_before, memory.free_bytes())
+			lib.kpanic(unsafe { nil }, c'Linux logging self-test retained native pages')
+		}
+		C.kprintf(c'linuxkpi: owned printk records, Linux formatting, IRQ capture, overflow and flush snapshots passed on 4 workers; no pages retained\n')
 		// Exercise a real scheduler interrupt with preemption disabled and
 		// IRQs still enabled, rather than relying only on host lock tests.
 		preempt_disable()

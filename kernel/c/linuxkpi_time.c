@@ -232,28 +232,64 @@ void vinix_linuxkpi_test_task_signal(void *thread, u64 pending);
 struct native_time_worker {
     struct task_struct *task;
     int result;
+    struct native_time_failure {
+        unsigned int reasons;
+        unsigned long elapsed;
+        long timeout, queue, simple, completion, completed, interrupted, killable;
+    } failures[8];
 };
+
+/* Permanent services may legitimately be sleeping while this fixture runs.
+ * Check only its joined workers, retaining each task through this locked
+ * inspection rather than racing an unrelated service's arm/expiry cycle. */
+static size_t native_time_task_waiters(struct task_struct *task)
+{
+    unsigned long flags;
+    size_t result = 0;
+    raw_spin_lock_irqsave(&deadline_lock, flags);
+    struct sleep_deadline *wait;
+    list_for_each_entry(wait, &deadlines, entry)
+        if (wait->task == task) result++;
+    raw_spin_unlock_irqrestore(&deadline_lock, flags);
+    return result;
+}
+
 static void *native_time_worker(void *argument)
 {
     struct native_time_worker *worker = argument;
     worker->task = get_task_struct(current);
     for (unsigned int i = 0; i < 8; i++) {
+        struct native_time_failure failure = {0};
         unsigned long start = jiffies;
-        if (schedule_timeout_uninterruptible(2) || time_before(jiffies, start + 2)) worker->result = -EIO;
+        failure.timeout = schedule_timeout_uninterruptible(2);
+        failure.elapsed = jiffies - start;
+        if (failure.timeout) failure.reasons |= 1;
+        if (time_before(jiffies, start + 2)) failure.reasons |= 2;
         DECLARE_WAIT_QUEUE_HEAD(queue);
-        if (wait_event_timeout(queue, false, 1) || waitqueue_active(&queue)) worker->result = -EIO;
+        failure.queue = wait_event_timeout(queue, false, 1);
+        if (failure.queue || waitqueue_active(&queue)) failure.reasons |= 4;
         DECLARE_SWAIT_QUEUE_HEAD(simple);
-        if (swait_event_timeout_exclusive(simple, false, 1) || swait_active(&simple)) worker->result = -EIO;
+        failure.simple = swait_event_timeout_exclusive(simple, false, 1);
+        if (failure.simple || swait_active(&simple)) failure.reasons |= 8;
         DECLARE_COMPLETION_ONSTACK(completion);
-        if (wait_for_completion_timeout(&completion, 1) || swait_active(&completion.wait)) worker->result = -EIO;
+        failure.completion = wait_for_completion_timeout(&completion, 1);
+        if (failure.completion || swait_active(&completion.wait)) failure.reasons |= 16;
         complete(&completion);
-        if (wait_for_completion_timeout(&completion, 0) != 1) worker->result = -EIO;
+        failure.completed = wait_for_completion_timeout(&completion, 0);
+        if (failure.completed != 1) failure.reasons |= 32;
         vinix_linuxkpi_test_task_signal(worker->task->vinix_thread, 1ULL << 14);
-        if (wait_for_completion_interruptible_timeout(&completion, 5) != -ERESTARTSYS) worker->result = -EIO;
+        failure.interrupted = wait_for_completion_interruptible_timeout(&completion, 5);
+        if (failure.interrupted != -ERESTARTSYS) failure.reasons |= 64;
         /* The native signal enqueue must not finish this killable sleep. */
-        if (schedule_timeout_killable(2)) worker->result = -EIO;
+        failure.killable = schedule_timeout_killable(2);
+        if (failure.killable) failure.reasons |= 128;
         vinix_linuxkpi_test_task_signal(worker->task->vinix_thread, 0);
-        if (!task_is_running(current) || !vinix_linuxkpi_may_sleep()) worker->result = -EIO;
+        if (!task_is_running(current)) failure.reasons |= 256;
+        if (!vinix_linuxkpi_may_sleep()) failure.reasons |= 512;
+        if (failure.reasons) {
+            worker->result = -EIO;
+            worker->failures[i] = failure;
+        }
     }
     pthread_exit(NULL);
     return NULL;
@@ -261,6 +297,7 @@ static void *native_time_worker(void *argument)
 
 int vinix_linuxkpi_time_native_selftest(void)
 {
+    extern int kprintf(const char *, ...);
     struct native_time_worker workers[4] = {0};
     pthread_t threads[4];
     int result = 0;
@@ -269,10 +306,26 @@ int vinix_linuxkpi_time_native_selftest(void)
     for (unsigned int i = 0; i < ARRAY_SIZE(workers); i++) {
         BUG_ON(pthread_join(threads[i], NULL));
         if (workers[i].result) result = -EIO;
+        for (unsigned int round = 0; round < ARRAY_SIZE(workers[i].failures); round++) {
+            struct native_time_failure *failure = &workers[i].failures[round];
+            if (!failure->reasons) continue;
+            /* Diagnostic formatting happens on the controller after join,
+             * without a deadline lock or callback pin held. */
+            kprintf("linuxkpi: time test worker=%u round=%u reasons=0x%x elapsed=%lu timeout=%ld queue=%ld simple=%ld completion=%ld completed=%ld interrupted=%ld killable=%ld\n",
+                    i, round, failure->reasons, failure->elapsed, failure->timeout,
+                    failure->queue, failure->simple, failure->completion,
+                    failure->completed, failure->interrupted, failure->killable);
+        }
         while (__atomic_load_n(&workers[i].task->__state, __ATOMIC_ACQUIRE) != TASK_DEAD) cond_resched();
+        size_t retained = native_time_task_waiters(workers[i].task);
+        if (retained) {
+            kprintf("linuxkpi: time test worker=%u retained %zu timeout records after join\n", i, retained);
+            /* A deadline still owns pointers into this task's stack. Do not
+             * release its final pin or let the controller's fixture expire. */
+            BUG();
+        }
         put_task_struct(workers[i].task); /* Last access; can free the native Thread. */
     }
-    if (vinix_linuxkpi_time_waiters()) result = -EIO;
     return result;
 }
 #endif

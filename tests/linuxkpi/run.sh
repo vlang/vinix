@@ -8,7 +8,7 @@ python3 -B "$repo/kernel/linuxkpi/upstream.py" verify --base "$(dirname "$source
 # Upstream Linux enables -Wall/-Wextra but disables unused-parameter warnings.
 ${CC:-clang} -std=gnu11 -O1 -g -fwrapv -fno-strict-aliasing -Wall -Wextra -Werror -Wno-unused-parameter \
     -fsanitize=address,undefined -fno-omit-frame-pointer -pthread \
-    -DVINIX_LINUXKPI -DVINIX_LINUXKPI_HOST_TEST -D__KERNEL__ \
+    -DVINIX_LINUXKPI -DVINIX_LINUXKPI_HOST_TEST -DVINIX_LINUXKPI_FORMAT_HOST_TEST -D__KERNEL__ \
     -include "$repo/tests/linuxkpi/host_types.h" -include linux/kconfig.h -include "$source_dir/include/linux/compiler_types.h" \
     -I"$repo/kernel/linuxkpi/include" -I"$source_dir/include" -I"$source_dir/include/uapi" \
     -I"$source_dir/arch/x86/include" -I"$source_dir/arch/x86/include/uapi" \
@@ -16,9 +16,11 @@ ${CC:-clang} -std=gnu11 -O1 -g -fwrapv -fno-strict-aliasing -Wall -Wextra -Werro
     "$repo/kernel/c/linuxkpi_percpu.c" "$repo/kernel/c/linuxkpi_bitmap.c" "$repo/kernel/c/linuxkpi_task.c" \
     "$repo/kernel/c/linuxkpi_sync.c" "$repo/kernel/c/linuxkpi_time.c" \
     "$repo/kernel/c/linuxkpi_timer.c" "$repo/kernel/c/linuxkpi_workqueue.c" \
-    "$repo/kernel/c/linuxkpi_srcu.c" "$repo/kernel/c/linuxkpi_ww_mutex.c" "$repo/kernel/c/linuxkpi_wait_bit.c" "$repo/kernel/c/linuxkpi_io.c" "$repo/kernel/c/linuxkpi_cache.c" "$repo/tests/linuxkpi/test.c" \
+    "$repo/kernel/c/linuxkpi_srcu.c" "$repo/kernel/c/linuxkpi_ww_mutex.c" "$repo/kernel/c/linuxkpi_wait_bit.c" "$repo/kernel/c/linuxkpi_io.c" "$repo/kernel/c/linuxkpi_cache.c" "$repo/kernel/c/linuxkpi_format.c" \
+    "$repo/kernel/c/linuxkpi_printk.c" "$repo/kernel/c/linuxkpi_taint.c" "$repo/tests/linuxkpi/test.c" \
     "$source_dir/lib/list_sort.c" "$source_dir/lib/sort.c" "$source_dir/lib/rbtree.c" \
-    "$source_dir/lib/find_bit.c" "$source_dir/lib/hweight.c" \
+    "$source_dir/lib/find_bit.c" "$source_dir/lib/hweight.c" "$source_dir/lib/siphash.c" \
+    -include linux/export.h \
     -o "$work/test"
 "$work/test"
 # Each translation unit keeps its public Linux/DRM header first. Building
