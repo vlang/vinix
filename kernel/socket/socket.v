@@ -419,7 +419,11 @@ pub fn syscall_listen(_ voidptr, fdnum int, backlog int) (u64, u64) {
 		unsafe { free(sock) }
 	}
 
-	sock.listen(fd.handle, backlog) or { return errno.err, errno.get() }
+	// Linux compares backlog as unsigned, so negative values request the
+	// maximum too. Bound it before a protocol uses it as an array capacity.
+	unsigned_backlog := u32(backlog)
+	bounded_backlog := if unsigned_backlog > u32(4096) { 4096 } else { int(unsigned_backlog) }
+	sock.listen(fd.handle, bounded_backlog) or { return errno.err, errno.get() }
 
 	return 0, 0
 }

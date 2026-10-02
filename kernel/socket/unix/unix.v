@@ -1415,6 +1415,14 @@ fn (mut this UnixSocket) bind(_handle voidptr, _addr voidptr, addrlen u32) ? {
 }
 
 fn (mut this UnixSocket) listen(_handle voidptr, backlog int) ? {
+	this.l.acquire()
+	defer {
+		this.l.release()
+	}
+	// Another listen must retain pending connections and their owned queue.
+	if this.listening {
+		return
+	}
 	// close_endpoint() frees it. Nothing slices it, so growing can free the
 	// old block.
 	this.backlog = []&UnixSocket{cap: backlog} @[freed]
