@@ -1,4 +1,6 @@
 aarch64/virtio_gpu/virtio_gpu.v array initialization	1
+apple/smc/smc.v conversion to interface	2
+apple/smc/smc.v struct on the heap	2
 dev/console/console_arm64.v cast to interface	1
 dev/fbdev/fbdev.v string interpolation	1
 devicetree/devicetree.v array initialization	3

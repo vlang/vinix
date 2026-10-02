@@ -713,6 +713,7 @@ fn (mut this InetSocket) read(handle voidptr, buf voidptr, _loc u64, count u64) 
 		this.refresh_status()
 		net_lock.release()
 		if ret >= 0 {
+			proc.account_network_transfer(i64(ret), false)
 			return i64(ret)
 		}
 		if ret != -int(errno.eagain) || open_handle.flags & resource.o_nonblock != 0 {
@@ -739,6 +740,7 @@ fn (mut this InetSocket) write(handle voidptr, buf voidptr, _loc u64, count u64)
 		refresh_registered_sockets()
 		net_lock.release()
 		if ret >= 0 {
+			proc.account_network_transfer(i64(ret), true)
 			return i64(ret)
 		}
 		if ret != -int(errno.eagain) || open_handle.flags & resource.o_nonblock != 0 {
@@ -771,6 +773,7 @@ pub fn (mut this InetSocket) sendto(handle voidptr, buf voidptr, count u64, _add
 		refresh_registered_sockets()
 		net_lock.release()
 		if ret >= 0 {
+			proc.account_network_transfer(i64(ret), true)
 			return i64(ret)
 		}
 		if ret != -int(errno.eagain) || open_handle.flags & resource.o_nonblock != 0 {
@@ -798,6 +801,7 @@ pub fn (mut this InetSocket) recvfrom(handle voidptr, buf voidptr, count u64, _a
 		this.refresh_status()
 		net_lock.release()
 		if ret >= 0 {
+			proc.account_network_transfer(i64(ret), false)
 			if _addr != unsafe { nil } && addrlen != unsafe { nil } {
 				copy_endpoint(_addr, addrlen, source)
 			}

@@ -46,6 +46,13 @@ cp "$root/desktop/tools/tests/activity_kill_test.v" "$work/ui/"
     -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/activity_kill_test.v"
 rm -f "$work/ui/activity_kill_test.v"
 
+# Graceful termination, suspend/resume, tree signals and priority changes use
+# owned children so host verification never signals another session's process.
+cp "$root/desktop/tools/tests/activity_controls_test.v" "$work/ui/"
+"$v" -new-compiler -nocache -gc none -manualfree -enable-globals -stats -d ui2_headless \
+    -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/activity_controls_test.v"
+rm -f "$work/ui/activity_controls_test.v"
+
 # The staged Calculator uses ui2's compile-time `$vml` lowering, which is
 # provided by V's current compiler. Keep test and production compilation on
 # the same frontend.

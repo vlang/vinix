@@ -117,6 +117,7 @@ pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) ?&proc.Pr
 		new_proc.mmap_anon_non_fixed_base = old_process.mmap_anon_non_fixed_base
 		new_proc.current_directory = proc.current_directory_of(old_process)
 		proc.inherit_container_state(mut new_proc, old_process)
+		proc.inherit_command_line(mut new_proc, old_process)
 	} else {
 		new_proc.ppid = 0
 		new_proc.pgid = new_proc.pid

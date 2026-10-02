@@ -45,6 +45,22 @@ pub fn sendsig(_thread &proc.Thread, signal u8) {
 	if signal == 0 || signal > 64 {
 		return
 	}
+	// SIGCONT resumes even when blocked or ignored. SIGSTOP cannot be caught
+	// and stops every sibling, including threads which are not the recipient.
+	if signal == u8(sigcont) {
+		change_job_state(t.process, false, int(signal))
+	} else if signal == u8(sigstop) {
+		change_job_state(t.process, true, int(signal))
+		return
+	} else if is_stop_signal(int(signal)) && t.process != unsafe { nil } {
+		mut process := t.process
+		process.threads_lock.acquire()
+		for sibling in process.threads {
+			mut sibling_thread := unsafe { sibling }
+			katomic.btr(mut &sibling_thread.pending_signals, u8(sigcont - 1))
+		}
+		process.threads_lock.release()
+	}
 
 	// An ignored signal is dropped, unless the thread blocks it: as on Linux,
 	// a blocked signal is kept pending whatever its disposition, for
@@ -54,7 +70,7 @@ pub fn sendsig(_thread &proc.Thread, signal u8) {
 	handler := t.sigactions[signal].sa_sigaction
 	blocked := katomic.load(&t.masked_signals) & (u64(1) << (signal - 1)) != 0
 	if !blocked && (handler == sig_ign
-		|| (handler == sig_dfl && has_default_ignore_action(int(signal)))) {
+		|| (handler == sig_dfl && (has_default_ignore_action(int(signal)) || signal == u8(sigcont)))) {
 		return
 	}
 
@@ -172,6 +188,9 @@ pub fn syscall_kill(_ voidptr, pid int, signal int) (u64, u64) {
 		if target == unsafe { nil } {
 			return errno.err, errno.esrch
 		}
+		if !may_signal(current_process, target, signal) {
+			return errno.err, errno.eperm
+		}
 		if signal == 0 {
 			return 0, 0
 		}
@@ -197,6 +216,7 @@ pub fn syscall_kill(_ voidptr, pid int, signal int) (u64, u64) {
 	init_pid := if proc.numbers_own(viewer) { viewer.init_pid } else { 1 }
 
 	mut found := false
+	mut permitted := false
 	for i := 1; i < proc.max_pid; i++ {
 		mut target := processes[i]
 		if target == unsafe { nil } {
@@ -213,6 +233,8 @@ pub fn syscall_kill(_ voidptr, pid int, signal int) (u64, u64) {
 		}
 
 		found = true
+		if !may_signal(current_process, target, signal) { continue }
+		permitted = true
 		if signal != 0 {
 			signal_process(mut target, signal)
 		}
@@ -221,6 +243,7 @@ pub fn syscall_kill(_ voidptr, pid int, signal int) (u64, u64) {
 	if !found {
 		return errno.err, errno.esrch
 	}
+	if !permitted { return errno.err, errno.eperm }
 
 	return 0, 0
 }
@@ -261,6 +284,9 @@ fn signal_thread(tgid int, tid int, signal int) (u64, u64) {
 	}
 	if tgid > 0 && proc.pid_in(target.process, viewer) != tgid {
 		return errno.err, errno.esrch
+	}
+	if !may_signal(proc.current_thread().process, target.process, signal) {
+		return errno.err, errno.eperm
 	}
 	if signal == 0 {
 		return 0, 0

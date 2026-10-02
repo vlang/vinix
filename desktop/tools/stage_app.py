@@ -113,7 +113,9 @@ def stage_translations(staging, desktop_dir):
         out.append("\t%s: [" % v_string(name))
         for line in text.rstrip("\n").split("\n"):
             out.append("\t\t%s," % v_string(line))
-        out.append("\t].join('\\n')")
+        # i18n parses sections at "-----\\n". Keep the final newline so a
+        # trailing separator cannot become part of the last translation.
+        out.append("\t].join('\\n') + '\\n'")
     out.append("}")
     out.append("")
     with open(os.path.join(staging, TRANSLATIONS_SOURCE), "w", encoding="utf-8") as handle:

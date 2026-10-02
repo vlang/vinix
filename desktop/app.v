@@ -133,14 +133,13 @@ const available_apps = [
 	AppFactory{
 		title: 'Activity Monitor'
 		icon: 'asset:activity'
-		// Wide enough for four columns without the process names truncating,
-		// and tall enough that the list is worth scrolling rather than a
-		// glimpse of one.
-		width: 520
-		height: 400
+		width: 900
+		height: 640
 		process_name: 'vinix-activity'
+		keyboard: true
+		pointer: true
 		polling: true
-		poll_interval_ms: 1000
+		poll_interval_ms: 250
 		open: open_activity
 	},
 	AppFactory{

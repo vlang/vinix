@@ -17,6 +17,7 @@ import klock
 import lib
 import limine
 import memory
+import proc
 import resource
 import stat
 
@@ -297,6 +298,7 @@ fn (mut device VirtioBlockDevice) read(_handle voidptr, buffer voidptr, loc u64,
 			errno.set(errno.eio)
 			return none
 		}
+		proc.account_disk_transfer(chunk, false)
 		done += chunk
 	}
 	return i64(count)
@@ -314,6 +316,7 @@ fn (mut device VirtioBlockDevice) write(_handle voidptr, buffer voidptr, loc u64
 			errno.set(errno.eio)
 			return none
 		}
+		proc.account_disk_transfer(chunk, true)
 		done += chunk
 	}
 	return i64(count)

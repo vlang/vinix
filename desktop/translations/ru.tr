@@ -1831,3 +1831,382 @@ android.missing
 -----
 android.exited
 Приложение Android завершило работу.
+-----
+activity.column.cpu_time
+Время ЦП (с)
+-----
+activity.column.ppid
+PID родителя
+-----
+activity.column.state
+Состояние
+-----
+activity.column.threads
+Потоки
+-----
+activity.column.user
+ID пользователя
+-----
+activity.columns
+Столбцы
+-----
+activity.control.continue
+Продолжить
+-----
+activity.control.failed
+Ошибка действия
+-----
+activity.control.gone
+Процесс завершён
+-----
+activity.control.kill_tree
+Завершить дерево
+-----
+activity.control.nice
+Nice
+-----
+activity.control.permission
+Нет разрешения
+-----
+activity.control.priority_down
+Ниже приоритет
+-----
+activity.control.priority_up
+Выше приоритет
+-----
+activity.control.quit
+Завершить
+-----
+activity.control.sent
+Запрошено
+-----
+activity.control.suspend
+Приостановить
+-----
+activity.energy.application_note
+Энергопотребление отдельных приложений недоступно. История заряда — за последние 24 часа.
+-----
+activity.energy.battery
+Заряд батареи: {0}
+-----
+activity.energy.current
+Ток: {0} А
+-----
+activity.energy.power
+Мощность батареи: {0} Вт
+-----
+activity.energy.sign_note
+Знаковые значения сообщаются контроллером батареи. Ноль находится в центре графика.
+-----
+activity.energy.voltage
+Напряжение: {0} В
+-----
+activity.filter.active
+Активные процессы
+-----
+activity.filter.all
+Все процессы
+-----
+activity.filter.applications
+Приложения
+-----
+activity.filter.user
+Мои процессы
+-----
+activity.gpu.drivers
+Драйверы GPU: {0}
+-----
+activity.gpu.rate
+Заданий в секунду: {0}
+-----
+activity.gpu.sensors_unavailable
+Датчики загрузки, выделенной памяти и мощности GPU недоступны. График показывает принятые задания.
+-----
+activity.gpu.submissions
+Принято заданий: {0}
+-----
+activity.gpu.unavailable
+Данные о GPU недоступны в этой системе.
+-----
+activity.inspect
+Информация о процессе
+-----
+activity.inspector.close
+Закрыть информацию
+-----
+activity.inspector.command
+Команда и аргументы:
+-----
+activity.inspector.executable
+Исполняемый файл:
+-----
+activity.inspector.export
+Сохранить отчёт
+-----
+activity.inspector.export_failed
+Не удалось сохранить отчёт.
+-----
+activity.inspector.exported
+Сохранено в {0}
+-----
+activity.inspector.fd_unavailable
+Недоступен (закрыт или нет доступа)
+-----
+activity.inspector.files
+Файлы / Сокеты
+-----
+activity.inspector.files_unavailable
+Открытые файлы недоступны (процесс завершён или нет доступа).
+-----
+activity.inspector.maps
+Карта памяти:
+-----
+activity.inspector.memory
+Память
+-----
+activity.inspector.memory_unavailable
+Карта памяти недоступна (процесс завершён или нет доступа).
+-----
+activity.inspector.no_files
+Нет открытых файловых дескрипторов
+-----
+activity.inspector.not_available
+Недоступно
+-----
+activity.inspector.overview
+Обзор
+-----
+activity.inspector.smaps
+Подробности памяти (КБ):
+-----
+activity.inspector.socket
+сокет
+-----
+activity.inspector.status_unavailable
+Состояние процесса недоступно.
+-----
+activity.inspector.title
+Информация о процессе
+-----
+activity.inspector.truncated
+Показан ограниченный снимок; часть данных пропущена.
+-----
+activity.inspector.unavailable
+Процесс завершён или доступ запрещён.
+-----
+activity.interval.fast
+0,5 с
+-----
+activity.interval.normal
+1 с
+-----
+activity.interval.slow
+2 с
+-----
+activity.interval.slowest
+5 с
+-----
+activity.no_matches
+Процессы не найдены
+-----
+activity.pause_refresh
+Пауза
+-----
+activity.resources.cached
+Кеш файлов: {0}
+-----
+activity.resources.core
+ЦП {0} · {1}
+-----
+activity.resources.cpu
+ЦП
+-----
+activity.resources.disk
+Диск
+-----
+activity.resources.disk.note
+Переданные байты физических дисков. Чтение из кеша и памяти не обращается к диску.
+-----
+activity.resources.free
+Свободно: {0}
+-----
+activity.resources.io_totals
+Всего с загрузки: {0} вх. · {1} исх.
+-----
+activity.resources.memory
+Память
+-----
+activity.resources.memory.note
+Нагрузка памяти сообщается ядром. Подкачка и сжатие не поддерживаются.
+-----
+activity.resources.network
+Сеть
+-----
+activity.resources.network.note
+Полезные данные IPv4/IPv6, включая loopback; без Unix-сокетов и служебных данных.
+-----
+activity.resources.pressure
+Нагрузка памяти: {0}
+-----
+activity.resources.pressure.critical
+Критическая
+-----
+activity.resources.pressure.high
+Высокая
+-----
+activity.resources.pressure.normal
+Нормальная
+-----
+activity.resources.rate
+{0}/с
+-----
+activity.resources.read
+Чтение: {0}
+-----
+activity.resources.received
+Получено: {0}
+-----
+activity.resources.sent
+Отправлено: {0}
+-----
+activity.resources.slab
+Память ядра: {0}
+-----
+activity.resources.total
+Физическая память: {0}
+-----
+activity.resources.unavailable
+Недоступно
+-----
+activity.resources.used
+Занято: {0}
+-----
+activity.resources.written
+Запись: {0}
+-----
+activity.resume_refresh
+Продолжить
+-----
+activity.search
+Поиск по имени или PID
+-----
+activity.sort_by.cpu_time
+Сортировать по времени ЦП
+-----
+activity.sort_by.ppid
+Сортировать по PID родителя
+-----
+activity.sort_by.state
+Сортировать по состоянию
+-----
+activity.sort_by.threads
+Сортировать по числу потоков
+-----
+activity.sort_by.user
+Сортировать по ID пользователя
+-----
+activity.startup.description
+Выберите приложения для запуска при входе. Изменения применятся в следующем сеансе.
+-----
+activity.startup.disabled
+Выключено
+-----
+activity.startup.enabled
+Включено
+-----
+activity.startup.impact_unavailable
+Влияние автозапуска на CPU не измерено.
+-----
+activity.startup.save_failed
+Не удалось сохранить настройки автозапуска.
+-----
+activity.state.exited
+Завершён
+-----
+activity.state.running
+Выполняется
+-----
+activity.state.sleeping
+Ожидает
+-----
+activity.state.stopped
+Остановлен
+-----
+activity.state.zombie
+Зомби
+-----
+activity.tree
+Дерево процессов
+-----
+activity.view.energy
+Энергия
+-----
+activity.view.gpu
+Графика
+-----
+activity.view.processes
+Процессы
+-----
+activity.view.resources
+Ресурсы
+-----
+activity.view.startup
+Автозапуск
+-----
+activity.startup.launch_ms
+{0} мс
+-----
+activity.startup.launch_note
+Время последнего успешного запуска при входе, включая первый ответ окна. Влияние на ЦП не измеряется.
+-----
+activity.startup.not_measured
+Не измерено
+-----
+activity.filter.system
+Системные (root)
+-----
+activity.scroll_down
+Прокрутить вниз
+-----
+activity.scroll_up
+Прокрутить вверх
+-----
+activity.view.next
+Переключить раздел
+-----
+activity.inspector.io
+Ввод/вывод
+-----
+activity.inspector.io.counter
+{0}: всего {1} байт, {2}
+-----
+activity.inspector.io.disk_read
+Чтение диска
+-----
+activity.inspector.io.disk_write
+Запись диска
+-----
+activity.inspector.io.logical_read
+Чтение файлов
+-----
+activity.inspector.io.logical_write
+Запись файлов
+-----
+activity.inspector.io.net_recv
+Получено
+-----
+activity.inspector.io.net_send
+Отправлено
+-----
+activity.inspector.io.scope
+Скорости требуют двух измерений. Файловые суммы включают кэш и файлы в памяти; дисковые — физическое хранилище. Сеть учитывает данные INET, включая loopback. Фоновая запись относится к отправляющему потоку.
+-----
+activity.inspector.io.unavailable
+Счётчики ввода/вывода процесса недоступны.
+-----
+activity.inspector.io.unknown
+Неизвестно
+-----
+activity.search.done
+Закрыть поиск
+-----

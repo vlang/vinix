@@ -353,7 +353,7 @@ pub fn dispatch_a_signal(context &cpulocal.GPRState) {
 // dispatches fatal dispositions for that ABI. Custom native handlers stay at
 // syscall boundaries. Linux handlers use the complete fpsimd frame above.
 pub fn dispatch_fatal_signal(_ &cpulocal.GPRState) {
-	t := proc.current_thread()
+	mut t := proc.current_thread()
 	if unsafe { t == nil } {
 		return
 	}
@@ -367,6 +367,11 @@ pub fn dispatch_fatal_signal(_ &cpulocal.GPRState) {
 			continue
 		}
 		signum := int(i) + 1
+		if t.sigactions[signum].sa_sigaction == sig_dfl && is_stop_signal(signum) {
+			katomic.btr(mut &t.pending_signals, i)
+			stop_for_signal(signum)
+			return
+		}
 		if t.sigactions[signum].sa_sigaction != sig_dfl || has_default_ignore_action(signum)
 			|| signum == sigcont || signum == sigstop || signum == sigtstp
 			|| signum == sigttin || signum == sigttou {
@@ -433,13 +438,11 @@ fn dispatch_a_signal_with_fault(context &cpulocal.GPRState, synchronous bool, fa
 	if handler == sig_ign {
 		return
 	}
-	// SIG_DFL (0): terminate unless Linux defines an ignored, stop, or
-	// continue disposition. Process stop/continue accounting is not implemented
-	// yet, so those dispositions remain no-ops; ordinary terminating signals
-	// must still tear the process down so kill(2) and shell cleanup work.
+	// Default stop dispositions park every sibling until SIGCONT arrives.
 	if handler == sig_dfl {
-		if !has_default_ignore_action(which) && which != sigcont && which != sigstop
-			&& which != sigtstp && which != sigttin && which != sigttou {
+		if is_stop_signal(which) {
+			stop_for_signal(which)
+		} else if !has_default_ignore_action(which) && which != sigcont {
 			exit_with_fatal_signal(u8(which))
 		}
 		return
@@ -1171,9 +1174,13 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 			handle: stderr_handle
 		}
 		new_process.fds[2] = voidptr(stderr_fd)
+		proc.set_command_line(mut new_process, argv)
+		mut started := false
+		defer { if !started { proc.clear_command_line(mut new_process) } }
 
 		sched.new_user_thread(new_process, true, entry_point, unsafe { nil }, 0, argv,
 			program_envp, auxval, true)?
+		started = true
 
 		return new_process
 	} else {
@@ -1229,6 +1236,7 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 		}
 		curr_process.name = proc.process_name(path, curr_process.pid)
 		curr_process.executable_path = program_path
+		proc.set_command_line(mut curr_process, argv)
 		proc.set_executable_fs(mut curr_process, voidptr(prog_node), prog_mount)
 		curr_process.allow_wx = allow_wx
 		curr_process.sigreturn_page = sigreturn_page

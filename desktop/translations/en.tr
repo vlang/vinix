@@ -1831,3 +1831,382 @@ Android runtime or calculator APK is missing from this image.
 -----
 android.exited
 The Android APK has exited.
+-----
+activity.column.cpu_time
+CPU time (s)
+-----
+activity.column.ppid
+Parent PID
+-----
+activity.column.state
+Status
+-----
+activity.column.threads
+Threads
+-----
+activity.column.user
+User ID
+-----
+activity.columns
+Columns
+-----
+activity.control.continue
+Resume
+-----
+activity.control.failed
+Action failed
+-----
+activity.control.gone
+Process exited
+-----
+activity.control.kill_tree
+Kill tree
+-----
+activity.control.nice
+Nice
+-----
+activity.control.permission
+Permission denied
+-----
+activity.control.priority_down
+Lower priority
+-----
+activity.control.priority_up
+Higher priority
+-----
+activity.control.quit
+Quit
+-----
+activity.control.sent
+Requested
+-----
+activity.control.suspend
+Suspend
+-----
+activity.energy.application_note
+Per-application energy impact is unavailable. Battery history covers the last 24 hours.
+-----
+activity.energy.battery
+Battery charge: {0}
+-----
+activity.energy.current
+Current: {0} A
+-----
+activity.energy.power
+Battery power: {0} W
+-----
+activity.energy.sign_note
+Signed readings are reported by the battery controller. The graph centers on zero.
+-----
+activity.energy.voltage
+Voltage: {0} V
+-----
+activity.filter.active
+Active processes
+-----
+activity.filter.all
+All processes
+-----
+activity.filter.applications
+Applications
+-----
+activity.filter.user
+My processes
+-----
+activity.gpu.drivers
+GPU drivers: {0}
+-----
+activity.gpu.rate
+Submissions per second: {0}
+-----
+activity.gpu.sensors_unavailable
+GPU utilization, dedicated memory and power sensors are unavailable. The graph shows accepted command submissions.
+-----
+activity.gpu.submissions
+Accepted submissions: {0}
+-----
+activity.gpu.unavailable
+GPU activity is unavailable on this system.
+-----
+activity.inspect
+Inspect selected process
+-----
+activity.inspector.close
+Close inspector
+-----
+activity.inspector.command
+Command and arguments:
+-----
+activity.inspector.executable
+Executable:
+-----
+activity.inspector.export
+Save report
+-----
+activity.inspector.export_failed
+Could not save the report.
+-----
+activity.inspector.exported
+Saved to {0}
+-----
+activity.inspector.fd_unavailable
+Unavailable (closed or permission denied)
+-----
+activity.inspector.files
+Files / Sockets
+-----
+activity.inspector.files_unavailable
+Open files unavailable (process exited or access denied).
+-----
+activity.inspector.maps
+Memory maps:
+-----
+activity.inspector.memory
+Memory
+-----
+activity.inspector.memory_unavailable
+Memory maps unavailable (process exited or access denied).
+-----
+activity.inspector.no_files
+No open file descriptors
+-----
+activity.inspector.not_available
+Unavailable
+-----
+activity.inspector.overview
+Overview
+-----
+activity.inspector.smaps
+Memory details (kB):
+-----
+activity.inspector.socket
+socket
+-----
+activity.inspector.status_unavailable
+Process status unavailable.
+-----
+activity.inspector.title
+Process inspector
+-----
+activity.inspector.truncated
+Showing a bounded snapshot; some details were omitted.
+-----
+activity.inspector.unavailable
+Process exited or access denied.
+-----
+activity.interval.fast
+0.5 s
+-----
+activity.interval.normal
+1 s
+-----
+activity.interval.slow
+2 s
+-----
+activity.interval.slowest
+5 s
+-----
+activity.no_matches
+No matching processes
+-----
+activity.pause_refresh
+Pause
+-----
+activity.resources.cached
+File cache: {0}
+-----
+activity.resources.core
+CPU {0} · {1}
+-----
+activity.resources.cpu
+CPU
+-----
+activity.resources.disk
+Disk
+-----
+activity.resources.disk.note
+Completed physical disk bytes. Cached and memory-file reads do not access storage.
+-----
+activity.resources.free
+Free: {0}
+-----
+activity.resources.io_totals
+Totals since boot: {0} in · {1} out
+-----
+activity.resources.memory
+Memory
+-----
+activity.resources.memory.note
+Memory pressure comes from the kernel. Swap and compression are not supported.
+-----
+activity.resources.network
+Network
+-----
+activity.resources.network.note
+IPv4/IPv6 payload bytes, including loopback; excludes Unix sockets and protocol overhead.
+-----
+activity.resources.pressure
+Pressure: {0}
+-----
+activity.resources.pressure.critical
+Critical
+-----
+activity.resources.pressure.high
+High
+-----
+activity.resources.pressure.normal
+Normal
+-----
+activity.resources.rate
+{0}/s
+-----
+activity.resources.read
+Read: {0}
+-----
+activity.resources.received
+Received: {0}
+-----
+activity.resources.sent
+Sent: {0}
+-----
+activity.resources.slab
+Kernel heap: {0}
+-----
+activity.resources.total
+Physical memory: {0}
+-----
+activity.resources.unavailable
+Unavailable
+-----
+activity.resources.used
+Used: {0}
+-----
+activity.resources.written
+Written: {0}
+-----
+activity.resume_refresh
+Resume
+-----
+activity.search
+Search name or PID
+-----
+activity.sort_by.cpu_time
+Sort by CPU time
+-----
+activity.sort_by.ppid
+Sort by parent PID
+-----
+activity.sort_by.state
+Sort by status
+-----
+activity.sort_by.threads
+Sort by thread count
+-----
+activity.sort_by.user
+Sort by user ID
+-----
+activity.startup.description
+Choose apps to open when you sign in. Changes apply to your next desktop session.
+-----
+activity.startup.disabled
+Disabled
+-----
+activity.startup.enabled
+Enabled
+-----
+activity.startup.impact_unavailable
+Startup CPU impact has not been measured.
+-----
+activity.startup.save_failed
+Could not save startup settings.
+-----
+activity.state.exited
+Exited
+-----
+activity.state.running
+Running
+-----
+activity.state.sleeping
+Sleeping
+-----
+activity.state.stopped
+Stopped
+-----
+activity.state.zombie
+Zombie
+-----
+activity.tree
+Process tree
+-----
+activity.view.energy
+Energy
+-----
+activity.view.gpu
+GPU
+-----
+activity.view.processes
+Processes
+-----
+activity.view.resources
+Resources
+-----
+activity.view.startup
+Startup
+-----
+activity.startup.launch_ms
+{0} ms
+-----
+activity.startup.launch_note
+Last successful startup launch time, including the first window response. CPU startup impact is unavailable.
+-----
+activity.startup.not_measured
+Not measured
+-----
+activity.filter.system
+System (root)
+-----
+activity.scroll_down
+Scroll down
+-----
+activity.scroll_up
+Scroll up
+-----
+activity.view.next
+Switch view
+-----
+activity.inspector.io
+I/O
+-----
+activity.inspector.io.counter
+{0}: {1} bytes total, {2}
+-----
+activity.inspector.io.disk_read
+Disk reads
+-----
+activity.inspector.io.disk_write
+Disk writes
+-----
+activity.inspector.io.logical_read
+File reads
+-----
+activity.inspector.io.logical_write
+File writes
+-----
+activity.inspector.io.net_recv
+Received
+-----
+activity.inspector.io.net_send
+Sent
+-----
+activity.inspector.io.scope
+Rates need two samples. File totals include cached and memory files; disk totals count physical storage. Network totals count INET payload, including loopback. Background writeback is charged to the submitting thread.
+-----
+activity.inspector.io.unavailable
+Process I/O counters are unavailable.
+-----
+activity.inspector.io.unknown
+Unknown
+-----
+activity.search.done
+Close search
+-----

@@ -394,6 +394,7 @@ pub fn (mut this Handle) read(buf voidptr, count u64) ?i64 {
 		this.l.release()
 	}
 	ret := this.resource.read(voidptr(this), buf, u64(this.loc), count) or { return none }
+	if stat.isreg(this.resource.stat.mode) { proc.account_file_transfer(ret, false) }
 	this.loc += ret
 	return ret
 }
@@ -490,6 +491,7 @@ fn (mut this Handle) read_without_waiting(buf voidptr, count u64) ?i64 {
 		}
 		return none
 	}
+	if stat.isreg(this.resource.stat.mode) { proc.account_file_transfer(ret, false) }
 	if waited {
 		this.flags &= ~resource.o_nonblock
 	}
@@ -541,6 +543,7 @@ pub fn (mut this Handle) write(buf voidptr, count u64) ?i64 {
 		ret = this.resource.write(voidptr(this), buf, u64(this.loc), allowed)?
 		this.loc += ret
 	}
+	if stat.isreg(this.resource.stat.mode) { proc.account_file_transfer(ret, true) }
 	if this.flags & resource.o_dsync != 0 {
 		resource.sync_resource(mut res, voidptr(this)) or { return none }
 	}
@@ -1027,6 +1030,7 @@ fn pread(fdnum int, buf voidptr, count u64, offset i64, to_user bool) (u64, u64)
 			handle.l.release()
 			return errno.err, errno.get()
 		}
+		if stat.isreg(mode) { proc.account_file_transfer(read, false) }
 		handle.l.release()
 		return u64(read), 0
 	}
@@ -1044,6 +1048,7 @@ fn pread(fdnum int, buf voidptr, count u64, offset i64, to_user bool) (u64, u64)
 			if done != 0 { return done, 0 }
 			return errno.err, errno.get()
 		}
+		if stat.isreg(mode) { proc.account_file_transfer(read, false) }
 		handle.l.release()
 		if read <= 0 { break }
 		if !usercopy.copy_to_user(u64(buf) + done, buffer, u64(read)) {
@@ -1112,6 +1117,7 @@ pub fn syscall_pwrite(_ voidptr, fdnum int, buf voidptr, count u64, offset i64) 
 			if done != 0 { return done, 0 }
 			return errno.err, errno.get()
 		}
+		if stat.isreg(mode) { proc.account_file_transfer(written, true) }
 		handle.l.release()
 		if written <= 0 { break }
 		done += u64(written)

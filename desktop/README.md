@@ -37,8 +37,11 @@ What it does:
   entries, for every application the desktop can open
 - a **file browser** over the real filesystem: directories first, sizes, and a
   way back up
-- an **activity monitor** listing every process on the machine with the share
-  of a CPU and of RAM it is using, updated once a second
+- an **activity monitor** with searchable process lists, owner/application/
+  activity filters, parent/child trees, selectable columns, process inspection
+  and termination, suspend/resume and priority controls; CPU/per-core, memory,
+  disk, network, GPU submission and battery power histories; configurable
+  refresh rates, diagnostic exports and per-user startup applications
 - a **text editor** for plain files, with an editable path, open/save controls,
   cursor navigation and keyboard shortcuts
 - a **calendar** with month navigation, date selection and a jump back to today
@@ -355,49 +358,58 @@ space and shrink only as far as a useful title.
 
 ## The activity monitor
 
-`activity.v` lists every process on the machine with the share of one CPU and
-of RAM it is using. Native apps such as Calculator and Text Editor appear as
-ordinary kernel records with their own PID and measured CPU and RAM. It maps
-their stable executable names (`vinix-calculator`, `vinix-editor`, and so on)
-to the labels shown elsewhere in the desktop. Like the file browser it reads
-the real system.
+Activity Monitor lists live processes from `/dev/processes` and reads details
+from `/proc`. Click a row to select its PID. The icon-only kill button at the
+top left sends SIGKILL and is disabled for init and the monitor itself. The
+inspector also offers graceful quit (SIGTERM), suspend/resume, priority changes
+and child-first process-tree termination, reporting permission or exit errors.
 
-Click a process row to select it, then use the icon-only kill button at the
-top left to send SIGKILL. Selection follows the PID through sorting and refresh;
-the button is disabled without a selection or for the init process (PID 1).
+Search by name or PID, filter applications, your processes, active processes or
+root-owned system processes, and switch between a flat list and a parent/child
+tree. Matching tree rows keep their ancestors for context. Columns for CPU,
+resident memory, PID, parent PID, thread count, accumulated CPU time, user and
+state can be selected and sorted. Scrolling and selection follow the PID across
+sampling and sorting. Refresh can be paused or set to 0.5, 1, 2 or 5 seconds.
 
-Vinix has no procfs, so this needed a kernel interface. `/dev/processes`
-answers a read with one snapshot of the whole table — a short header, then a
-fixed-size record per process — taken under the process table's own lock, so a
-list cannot be half of one moment and half of the next. The kernel side is
-`kernel/modules/dev/procdev/procdev.v`, and the two halves share an ABI that
-`ProcessTable.version` exists to catch drift in.
+The inspector shows the executable, full arguments, status, memory maps,
+private/shared memory, open descriptors and socket targets. Its I/O tab shows
+logical file bytes, foreground physical disk bytes and Internet socket payload
+bytes with cumulative totals and rates. Export writes a diagnostic report to
+the user's home directory through a synced temporary file.
 
-Everything in a snapshot is a running total or an absolute quantity, never a
-rate: the kernel has no idea what interval anyone cares about. `cpu_time_ns` is
-nanoseconds this process' threads have spent on a CPU since it started, and
-turning that into a percentage is the monitor's job — it keeps the previous
-sample and divides the difference by the wall clock between the two. Which is
-also why every process reads 0% for the first second a window is open, and why
-a process that appears between two samples is not credited with what it did
-before anyone was watching.
+Resources graphs show machine CPU history, per-core CPU history, physical
+memory and kernel memory pressure, disk transfers and Internet socket traffic.
+The kernel exports cumulative counters; userspace computes differences over
+the actual sample interval. A first sample, missing counter, process exit or
+counter reset leaves rates unavailable until a valid next sample. CPU load in
+the process list is a percentage of one CPU, so multithreaded work can exceed
+100 percent. The machine graph is normalized across its cores. Memory in the
+list is resident memory; the inspector separately reports mapped space.
 
-The kernel counts those nanoseconds in the scheduler, charging a thread's turn
-to its process at the moment it is switched away; `dequeue_and_die` charges the
-last one, so a process that runs briefly and exits does not report nothing at
-all. Memory is the sum of a process' mapped ranges, which on this kernel is
-also what it has resident — every mapping is pre-faulted when it is made, so
-there is no second number to report.
+The GPU view records accepted driver command submissions and their rate. It
+labels hardware utilization, dedicated-memory and power sensors unavailable
+until drivers expose them. Energy shows voltage and signed current/power readings
+from supported Apple SMC sensors plus battery history; missing sensors and
+per-application energy impact are unavailable. Swap and memory compression are
+also explicitly unsupported rather than inferred from unrelated counters.
 
-Sampling is once a second, not once a frame. A CPU percentage taken over 16 ms
-is mostly noise: a process either did or did not get a timeslice in that
-window, so every figure would read 0% or 100%.
+Startup lets each user choose applications for the next desktop session.
+`.vinix-startup-apps` stores stable executable names in the user's home;
+`.vinix-startup-timings` records the last successful native-app launch handshake
+duration. Without a saved configuration, Files and the development Terminal
+retain their default startup behavior. Launch latency is separate from CPU
+impact, which has not been measured.
 
-The list sorts by CPU, memory or name, and rows are shown with the basename of
-the program. The kernel stores a process' name as the path it ran with its pid
-appended, and a fork appends again — the shell is `/bin/busybox[2]` and a loop
-it starts is `/bin/busybox[2][3]` — so the monitor strips those suffixes. Every
-number in them is an ancestor's pid, and this process' own has a column.
+The fixed version-1 `/dev/processes` ABI remains unchanged: snapshots are taken
+under the process-table lock and contain cumulative CPU nanoseconds and
+resident bytes. Additional counters use `/proc/stat`, `/proc/activity_io`,
+`/proc/activity_gpu` and `/proc/<pid>/io`; full arguments are retained by exec.
+The new counters and job control require booting the rebuilt kernel. Older
+kernels still run the app and show unavailable data where appropriate.
+
+`desktop/tools/test-activity.sh` checks the application, controls and allocation
+lifetimes. `tests/activity-monitor/run.py` boots architecture-specific syscall,
+resource-accounting and repeated-process-read allocation regressions in QEMU.
 
 ## VSpace, the disk inventory
 

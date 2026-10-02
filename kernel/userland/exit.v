@@ -444,9 +444,15 @@ fn notify_process(parent &proc.Process) {
 // parent that blocks it keeps it pending for sigwait(2); it was dropped
 // unless a handler had been installed.
 fn notify_parent(current_process &proc.Process) {
-	mut parent := processes[current_process.ppid]
+	proc.lock_table()
+	mut parent := proc.process_at(current_process.ppid)
 	if parent == unsafe { nil } || parent.pid == current_process.pid {
+		proc.unlock_table()
 		return
 	}
+	proc.pin_process(parent)
+	proc.unlock_table()
+	defer { proc.unpin_process(parent) }
+	event.trigger(mut &parent.child_event, false)
 	signal_process(mut parent, sigchld)
 }

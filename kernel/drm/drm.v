@@ -568,6 +568,7 @@ fn (mut this DrmNode) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 		errno.set(u64(-ret))
 		return none
 	}
+	account_activity(this.dev, cmd)
 	if layout.direction & ioctl_read != 0
 		&& !usercopy.copy_to_user(u64(argp), buffer, u64(layout.size)) {
 		errno.set(errno.efault)

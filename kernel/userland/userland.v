@@ -444,9 +444,13 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 			handle: stderr_handle
 		}
 		new_process.fds[2] = voidptr(stderr_fd)
+		proc.set_command_line(mut new_process, argv)
+		mut started := false
+		defer { if !started { proc.clear_command_line(mut new_process) } }
 
 		sched.new_user_thread(new_process, true, entry_point, unsafe { nil }, 0, argv,
 			envp, auxval, true)?
+		started = true
 
 		return new_process
 	} else {
@@ -501,6 +505,7 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 		// names the file wherever the exec found it -- by a relative path, or
 		// through a descriptor.
 		process.executable_path = program_path
+		proc.set_command_line(mut process, argv)
 		proc.set_executable_fs(mut process, voidptr(prog_node), prog_mount)
 		process.allow_wx = allow_wx
 		// execve recomputes the capability sets from the new credentials and

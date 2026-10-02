@@ -32,6 +32,7 @@ import pagecache
 import numa
 import security
 import time
+import drm
 
 pub type NetTcpSnapshot = fn () string
 
@@ -83,6 +84,9 @@ enum ProcFSKind {
 	securelevel
 	security_audit
 	net_tcp
+	activity_io
+	activity_gpu
+	process_io
 }
 
 @[heap]
@@ -236,11 +240,10 @@ fn (mut this ProcFS) build_root(parent &VFSNode, name string, view voidptr) &VFS
 	root.resource = root_resource
 
 	// The machine-wide files never come and go, so they are made once.
-	// Only what the kernel can answer truthfully. Per-CPU accounting is not
-	// exported yet, so there is no cpuinfo or stat here to be believed;
-	// sysconf() counts processors through sched_getaffinity(2), which is
-	// accurate.
+	// Machine counters are cumulative; userspace chooses its sampling interval.
 	add_procfs_file(mut root, 'meminfo', .meminfo)
+	add_procfs_file(mut root, 'activity_io', .activity_io)
+	add_procfs_file(mut root, 'activity_gpu', .activity_gpu)
 	mut pressure := create_node(root.filesystem, root, 'vmpressure', false)
 	pressure.resource = file.new_memory_pressure_source(stat.Stat{
 		mode: stat.ifreg | 0o444
@@ -533,7 +536,9 @@ fn (this &ProcFSResource) contents() string {
 			meminfo_builder.add_unsigned(cached_kb)
 			meminfo_builder.add(' kB\nSwapTotal:             0 kB\nSwapFree:              0 kB\nSlab:           ')
 			meminfo_builder.add_unsigned(slab_kb)
-			meminfo_builder.add(' kB\n')
+			meminfo_builder.add(' kB\nVinixMemoryPressure: ')
+			meminfo_builder.add_decimal(memory.pressure_snapshot().level)
+			meminfo_builder.add('\n')
 			return lib.finish_text(meminfo_builder)
 		}
 		.slabinfo {
@@ -578,10 +583,7 @@ fn (this &ProcFSResource) contents() string {
 			return text
 		}
 		.cmdline {
-			// Vinix does not retain the argument vector after exec, so the one
-			// thing the kernel does know goes here: the program that is running.
-			// Linux NUL-terminates each argument, and readers split on that.
-			return text_with_ending(proc.process_program(this.pid), 0)
+			return proc.process_command_line(this.pid)
 		}
 		.comm {
 			if this.tid != 0 {
@@ -596,12 +598,12 @@ fn (this &ProcFSResource) contents() string {
 			// Linux's first two fields: the size of the address space and what
 			// of it is resident.
 			counted := process_memory(this.pid)
-			mut text := lib.new_text(64)
-			text.add_unsigned(counted.mapped / page_size)
-			text.add_byte(` `)
-			text.add_unsigned(counted.resident / page_size)
-			text.add(' 0 0 0 0 0\n')
-			return text.str()
+			mut statm_builder := lib.new_text(64)
+			statm_builder.add_unsigned(counted.mapped / page_size)
+			statm_builder.add_byte(` `)
+			statm_builder.add_unsigned(counted.resident / page_size)
+			statm_builder.add(' 0 0 0 0 0\n')
+			return lib.finish_text(statm_builder)
 		}
 		.status {
 			return proc.process_status_text(this.pid, unsafe { &proc.Namespace(this.view) })
@@ -611,6 +613,15 @@ fn (this &ProcFSResource) contents() string {
 		}
 		.machine_stat {
 			return machine_stat_text()
+		}
+		.activity_io {
+			return proc.machine_io_text()
+		}
+		.activity_gpu {
+			return drm.activity_text()
+		}
+		.process_io {
+			return proc.process_io_text(this.pid)
 		}
 		.net_tcp {
 			if net_tcp_snapshot != unsafe { nil } {
@@ -698,14 +709,27 @@ fn text_with_ending(owned string, ending u8) string {
 
 fn machine_stat_text() string {
 	count := numa.cpu_count()
-	// Borrowed synchronously by formatting helpers; the owned bytes are consumed below.
+	now_ns := proc.cpu_time_now_ns()
+	mut user := u64(0)
+	mut system := u64(0)
+	mut idle := u64(0)
+	for i := 0; i < count; i++ {
+		u, s, d := proc.machine_cpu_times(i, now_ns)
+		user += u
+		system += s
+		idle += d
+	}
+	// Formatting helpers borrow the stack builder; finish_text returns owned bytes.
 	mut text := unsafe { &lib.Text(C.__builtin_alloca(sizeof(lib.Text))) }
-	unsafe { *text = lib.new_text(count * 32 + 160) }
-	text.add('cpu  0 0 0 0 0 0 0 0 0 0\n')
+	unsafe { *text = lib.new_text(count * 128 + 256) }
+	text.add('cpu ')
+	add_cpu_stat_fields(mut text, user, system, idle)
 	for i := 0; i < count; i++ {
 		text.add('cpu')
 		text.add_unsigned(u64(i))
-		text.add(' 0 0 0 0 0 0 0 0 0 0\n')
+		text.add_byte(` `)
+		u, s, d := proc.machine_cpu_times(i, now_ns)
+		add_cpu_stat_fields(mut text, u, s, d)
 	}
 	seconds := time.monotonic_ns() / 1000000000
 	boot := (realtime_clock.tv_sec - i64(seconds))
@@ -717,10 +741,20 @@ fn machine_stat_text() string {
 	return lib.finish_text(*text)
 }
 
+// Linux procfs reports USER_HZ=100, as process stat and times(2) do.
+fn add_cpu_stat_fields(mut text lib.Text, user u64, system u64, idle u64) {
+	text.add_unsigned(user / 10000000)
+	text.add(' 0 ')
+	text.add_unsigned(system / 10000000)
+	text.add_byte(` `)
+	text.add_unsigned(idle / 10000000)
+	text.add(' 0 0 0 0 0 0\n')
+}
+
 // The files that say where a process keeps things; see proc.may_inspect.
 fn (this &ProcFSResource) shows_layout() bool {
 	return match this.kind {
-		.maps, .smaps, .auxv { true }
+		.maps, .smaps, .auxv, .process_io { true }
 		else { false }
 	}
 }
@@ -1417,7 +1451,7 @@ fn populate_process_directory(mut node VFSNode, pid int) {
 // What /proc/<pid> and /proc/<pid>/task/<tid> both hold. A thread's
 // descriptors, namespaces and mounts are its process', since Vinix threads
 // share all three.
-const process_entry_names = ['cmdline', 'comm', 'stat', 'statm', 'status', 'cgroup', 'environ',
+const process_entry_names = ['cmdline', 'comm', 'stat', 'statm', 'status', 'io', 'cgroup', 'environ',
 	'mountinfo', 'mounts', 'mountstats', 'maps', 'smaps', 'auxv', 'limits', 'loginuid',
 	'oom_score_adj', 'uid_map', 'gid_map', 'setgroups', 'root', 'cwd', 'exe', 'fd', 'ns', 'attr']
 
@@ -1444,6 +1478,7 @@ fn add_process_entry(mut node VFSNode, pid int, name string, is_process bool) bo
 		'stat' { add_process_file(mut node, 'stat', .process_stat, pid) }
 		'statm' { add_process_file(mut node, 'statm', .statm, pid) }
 		'status' { add_process_file(mut node, 'status', .status, pid) }
+		'io' { add_process_file(mut node, 'io', .process_io, pid) }
 		'cgroup' { add_process_file(mut node, 'cgroup', .process_cgroup, pid) }
 		'environ' { add_process_file(mut node, 'environ', .environ, pid) }
 		'mountinfo' { add_process_file(mut node, 'mountinfo', .mountinfo, pid) }

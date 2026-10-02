@@ -11,7 +11,21 @@ pub mut:
 
 __global (
 	cpu_signal_hook voidptr
+	// Fixed storage: charging CPU time never allocates on a scheduler or IRQ path.
+	machine_cpu_epoch_ns u64
+	machine_cpu_user_ns [256]u64
+	machine_cpu_system_ns [256]u64
 )
+
+pub fn machine_cpu_times(number int, now_ns u64) (u64, u64, u64) {
+	if number < 0 || number >= 256 { return 0, 0, 0 }
+	epoch := katomic.load(&machine_cpu_epoch_ns)
+	user := katomic.load(&machine_cpu_user_ns[number])
+	system := katomic.load(&machine_cpu_system_ns[number])
+	elapsed := if epoch != 0 && now_ns > epoch { now_ns - epoch } else { u64(0) }
+	idle := if elapsed > user + system { elapsed - user - system } else { u64(0) }
+	return user, system, idle
+}
 
 type CPUSignalHook = fn (&Process, int)
 
@@ -90,6 +104,13 @@ fn charge_cpu_locked(mut t Thread, now_ns u64) {
 		return
 	}
 	span := now_ns - started
+	if t.running_on < 256 {
+		if t.cpu_in_kernel {
+			add_cpu_counter(&machine_cpu_system_ns[t.running_on], span)
+		} else {
+			add_cpu_counter(&machine_cpu_user_ns[t.running_on], span)
+		}
+	}
 	t.scheduled_at_ns = now_ns
 	t.cpu_time_ns += span
 	t.process.cpu_time_ns += span
@@ -108,6 +129,7 @@ pub fn begin_cpu_time(mut t Thread, now_ns u64) {
 	// Scheduler/cgroup time can use a tick-driven clock. CPU-mode accounting
 	// always uses the same hardware clock as syscall and interrupt boundaries.
 	t.scheduled_at_ns = cpu_time_now_ns()
+	katomic.cas(mut &machine_cpu_epoch_ns, u64(0), t.scheduled_at_ns)
 	t.cgroup_charged_ns = now_ns
 	t.cpu_in_kernel = saved_context_in_kernel(&t)
 	t.process.cpu_lock.release()

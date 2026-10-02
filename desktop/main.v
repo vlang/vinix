@@ -234,7 +234,6 @@ fn main() {
 	// edge. The calculator remains available from its shortcut and the Start
 	// menu; the Welcome page is available from Help but is not shown at launch.
 	mut launch_default_files := false
-	mut launch_development_terminal := false
 	if options.open.len == 0 {
 		gpu_present_startup_stage(c'creating initial System window')
 		desktop.spawn('System', .system, 580, 60, 372, 232)
@@ -243,10 +242,7 @@ fn main() {
 		// so a delayed application handshake cannot leave the firmware console
 		// looking like the desktop failed to start.
 		launch_default_files = true
-		// The install Terminal ends in an ordinary interactive shell, so it
-		// also serves as the development session's Terminal.
-		launch_development_terminal = desktop_is_development_session()
-			|| launch_install_terminal
+		// Startup settings retain Files and the development Terminal as defaults.
 	} else {
 		for title in options.open {
 			desktop.launch_titled_at_startup(title)
@@ -444,11 +440,7 @@ fn main() {
 
 		if launch_default_files {
 			launch_default_files = false
-			desktop.launch_titled_at_startup('Files')
-			if launch_development_terminal {
-				launch_development_terminal = false
-				desktop.launch_titled_at_startup('Terminal')
-			}
+			desktop.launch_configured_startup(launch_install_terminal)
 			desktop_publish_session_ready()
 		}
 

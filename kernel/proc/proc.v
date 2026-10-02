@@ -227,6 +227,12 @@ pub mut:
 	fds                      []voidptr
 	children                 []&Process
 	children_lock            klock.Lock
+	// All child state changes wake every waiter regardless of child count.
+	child_event eventstruct.Event
+	// A selected wait result retains the object across userspace copy-out.
+	wait_pins int
+	reaped_wait_next &Process = unsafe { nil }
+	reaped_wait_ns u64
 	mmap_anon_non_fixed_base u64
 	// Program break. It gets its own arena so that growing it can never run
 	// into the anonymous mmap region or the thread stacks.
@@ -240,10 +246,19 @@ pub mut:
 	// Set once exit_group() (or a fatal fault) has started tearing the
 	// process down, so late-arriving threads do not try to do it again.
 	exiting bool
+	// Job control is process-wide: every thread parks at a safe user boundary.
+	// The parent's child_event wakes waiters without consuming the exit event.
+	job_stopped bool
+	job_stop_pending bool
+	job_continue_pending bool
+	job_stop_signal int
+	job_lock klock.Lock
 	name    string
 	// Resolved program path used by the Linux /proc/self/exe compatibility
 	// link. Keep it separate from name, which prctl(PR_SET_NAME) may change.
 	executable_path string
+	// NUL-separated arguments retained by exec for /proc/<pid>/cmdline.
+	command_line string
 	// Some compatibility runtimes require an RWX probe even when their generated
 	// code runs interpreted. Exec replaces this opt-in; fork preserves it.
 	allow_wx bool
@@ -280,6 +295,13 @@ pub mut:
 	cpu_time_ns u64
 	cpu_user_ns u64
 	cpu_system_ns u64
+	// Cumulative regular-file, physical-storage and socket payload accounting.
+	io_read_bytes u64
+	io_write_bytes u64
+	disk_read_bytes u64
+	disk_write_bytes u64
+	net_recv_bytes u64
+	net_send_bytes u64
 	// Serializes per-thread accounting and the shared CPU timers, including
 	// simultaneous ticks from threads running on different CPUs.
 	cpu_lock klock.Lock
@@ -580,14 +602,49 @@ __global (
 	reaped_quarantine [256]&Process
 	reaped_at_ns      [256]u64
 	reaped_next       int
+	reaped_waiters &Process = unsafe { nil }
 )
+
+// Acquired under children_lock, or from an existing reference.
+pub fn pin_process(p &Process) {
+	mut process := unsafe { p }
+	katomic.inc(mut &process.wait_pins)
+}
+
+pub fn unpin_process(p &Process) {
+	mut process := unsafe { p }
+	katomic.sync()
+	katomic.dec(mut &process.wait_pins)
+	// Do not touch the object after the final reference is released.
+	pid_lock.acquire()
+	reap_waiting_processes(time.monotonic_ns())
+	pid_lock.release()
+}
+
+// Quarantine overflow must never evict an object a waiter still owns. The
+// intrusive queue needs no allocation; each object supplies its own link.
+fn reap_waiting_processes(now u64) {
+	mut previous := &Process(unsafe { nil })
+	mut current := reaped_waiters
+	for current != unsafe { nil } {
+		next := current.reaped_wait_next
+		if katomic.load(&current.wait_pins) == 0 && now - current.reaped_wait_ns >= reaped_grace_ns {
+			if previous == unsafe { nil } { reaped_waiters = next }
+			else { previous.reaped_wait_next = next }
+			free_process_memory(current)
+		} else { previous = current }
+		current = next
+	}
+}
 
 // Called with pid_lock held.
 fn quarantine_reaped(p &Process) {
 	now := time.monotonic_ns()
+	reap_waiting_processes(now)
 	for i := 0; i < reaped_quarantine_len; i++ {
 		waiting := reaped_quarantine[i]
-		if waiting != unsafe { nil } && now - reaped_at_ns[i] >= reaped_grace_ns {
+		if waiting != unsafe { nil } && katomic.load(&waiting.wait_pins) == 0
+			&& now - reaped_at_ns[i] >= reaped_grace_ns {
 			reaped_quarantine[i] = unsafe { nil }
 			free_process_memory(waiting)
 		}
@@ -598,7 +655,14 @@ fn quarantine_reaped(p &Process) {
 	// period pushes one out early, and then the oldest.
 	oldest := reaped_quarantine[slot]
 	if oldest != unsafe { nil } {
-		free_process_memory(oldest)
+		if katomic.load(&oldest.wait_pins) == 0 && now - reaped_at_ns[slot] >= reaped_grace_ns {
+			free_process_memory(oldest)
+		} else {
+			mut retained := unsafe { oldest }
+			retained.reaped_wait_ns = reaped_at_ns[slot]
+			retained.reaped_wait_next = reaped_waiters
+			reaped_waiters = retained
+		}
 	}
 	reaped_quarantine[slot] = unsafe { p }
 	reaped_at_ns[slot] = now
@@ -612,6 +676,7 @@ fn free_process_memory(p &Process) {
 	unsafe {
 		process.name.free()
 		process.executable_path.free()
+		process.command_line.free()
 		process.saved_auxv.free()
 		process.groups.free()
 		process.threads.free()
@@ -619,6 +684,7 @@ fn free_process_memory(p &Process) {
 		if process.event.overflow != nil {
 			free(process.event.overflow)
 		}
+		if process.child_event.overflow != nil { free(process.child_event.overflow) }
 		free(process)
 	}
 }
@@ -1166,7 +1232,7 @@ fn dump_threads() {
 		if process == unsafe { nil } {
 			continue
 		}
-		state := if process.exiting { c'Z' } else { c'R' }
+		state := match process_state(process) { `Z` { c'Z' } `T` { c'T' } `S` { c'S' } else { c'R' } }
 		start, end := command_name_bounds(process.name)
 		command := unsafe { process.name.str + start }
 		// The list is only safe to walk under its lock: a thread leaving takes
@@ -1213,7 +1279,7 @@ pub fn process_stat_line(pid int, viewer &Namespace) string {
 
 	// Fields 21 to 39, which nothing here keeps, and then rt_priority and
 	// policy in 40 and 41.
-	state := if process.exiting { 'Z' } else { 'R' }
+	state := match process_state(process) { `Z` { 'Z' } `T` { 'T' } `S` { 'S' } else { 'R' } }
 	shown_pid := pid_in(process, viewer)
 	shown_ppid := pid_in(process_at(process.ppid), viewer)
 	shown_pgid := pgid_in(process, viewer)
@@ -1276,7 +1342,7 @@ pub fn process_status_text(pid int, viewer &Namespace) string {
 	threads := if process.threads.len > 0 { process.threads.len } else { 1 }
 	caps := process.caps
 	no_new_privs := if process.no_new_privs { 1 } else { 0 }
-	state := if process.exiting { 'Z (zombie)' } else { 'R (running)' }
+	state := match process_state(process) { `Z` { 'Z (zombie)' } `T` { 'T (stopped)' } `S` { 'S (sleeping)' } else { 'R (running)' } }
 	shown_pid := pid_in(process, viewer)
 	shown_ppid := pid_in(process_at(process.ppid), viewer)
 	// Borrowed synchronously by formatting helpers; the owned bytes are consumed below.
@@ -1329,4 +1395,3 @@ pub fn process_status_text(pid int, viewer &Namespace) string {
 	text.add_byte(`\n`)
 	return lib.finish_text(*text)
 }
-

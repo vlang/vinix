@@ -1831,3 +1831,382 @@ Falta el entorno Android o el APK de la calculadora en esta imagen.
 -----
 android.exited
 El APK de Android ha terminado.
+-----
+activity.column.cpu_time
+Tiempo CPU (s)
+-----
+activity.column.ppid
+PID padre
+-----
+activity.column.state
+Estado
+-----
+activity.column.threads
+Hilos
+-----
+activity.column.user
+ID de usuario
+-----
+activity.columns
+Columnas
+-----
+activity.control.continue
+Reanudar
+-----
+activity.control.failed
+Error de acción
+-----
+activity.control.gone
+Proceso finalizado
+-----
+activity.control.kill_tree
+Finalizar árbol
+-----
+activity.control.nice
+Nice
+-----
+activity.control.permission
+Permiso denegado
+-----
+activity.control.priority_down
+Menos prioridad
+-----
+activity.control.priority_up
+Más prioridad
+-----
+activity.control.quit
+Salir
+-----
+activity.control.sent
+Solicitado
+-----
+activity.control.suspend
+Suspender
+-----
+activity.energy.application_note
+El impacto energético por aplicación no está disponible. El historial de batería cubre 24 horas.
+-----
+activity.energy.battery
+Carga de batería: {0}
+-----
+activity.energy.current
+Corriente: {0} A
+-----
+activity.energy.power
+Potencia de batería: {0} W
+-----
+activity.energy.sign_note
+El controlador de batería informa valores con signo. El gráfico se centra en cero.
+-----
+activity.energy.voltage
+Voltaje: {0} V
+-----
+activity.filter.active
+Procesos activos
+-----
+activity.filter.all
+Todos los procesos
+-----
+activity.filter.applications
+Aplicaciones
+-----
+activity.filter.user
+Mis procesos
+-----
+activity.gpu.drivers
+Controladores GPU: {0}
+-----
+activity.gpu.rate
+Envíos por segundo: {0}
+-----
+activity.gpu.sensors_unavailable
+Los sensores de uso, memoria dedicada y energía GPU no están disponibles. El gráfico muestra envíos aceptados.
+-----
+activity.gpu.submissions
+Envíos aceptados: {0}
+-----
+activity.gpu.unavailable
+La actividad GPU no está disponible en este sistema.
+-----
+activity.inspect
+Inspeccionar proceso seleccionado
+-----
+activity.inspector.close
+Cerrar inspector
+-----
+activity.inspector.command
+Comando y argumentos:
+-----
+activity.inspector.executable
+Ejecutable:
+-----
+activity.inspector.export
+Guardar informe
+-----
+activity.inspector.export_failed
+No se pudo guardar el informe.
+-----
+activity.inspector.exported
+Guardado en {0}
+-----
+activity.inspector.fd_unavailable
+No disponible (cerrado o permiso denegado)
+-----
+activity.inspector.files
+Archivos / Sockets
+-----
+activity.inspector.files_unavailable
+Archivos no disponibles (proceso finalizado o permiso denegado).
+-----
+activity.inspector.maps
+Mapas de memoria:
+-----
+activity.inspector.memory
+Memoria
+-----
+activity.inspector.memory_unavailable
+Mapas no disponibles (proceso finalizado o permiso denegado).
+-----
+activity.inspector.no_files
+No hay descriptores abiertos
+-----
+activity.inspector.not_available
+No disponible
+-----
+activity.inspector.overview
+Resumen
+-----
+activity.inspector.smaps
+Detalles de memoria (kB):
+-----
+activity.inspector.socket
+socket
+-----
+activity.inspector.status_unavailable
+Estado del proceso no disponible.
+-----
+activity.inspector.title
+Inspector de procesos
+-----
+activity.inspector.truncated
+La captura es limitada; se omitieron algunos detalles.
+-----
+activity.inspector.unavailable
+El proceso terminó o no hay permiso.
+-----
+activity.interval.fast
+0,5 s
+-----
+activity.interval.normal
+1 s
+-----
+activity.interval.slow
+2 s
+-----
+activity.interval.slowest
+5 s
+-----
+activity.no_matches
+No hay procesos coincidentes
+-----
+activity.pause_refresh
+Pausar
+-----
+activity.resources.cached
+Caché de archivos: {0}
+-----
+activity.resources.core
+CPU {0} · {1}
+-----
+activity.resources.cpu
+CPU
+-----
+activity.resources.disk
+Disco
+-----
+activity.resources.disk.note
+Bytes transferidos en discos físicos. La caché y los archivos en memoria no acceden al disco.
+-----
+activity.resources.free
+Libre: {0}
+-----
+activity.resources.io_totals
+Totales desde el arranque: {0} entrada · {1} salida
+-----
+activity.resources.memory
+Memoria
+-----
+activity.resources.memory.note
+El núcleo informa de la presión de memoria. No se admiten swap ni compresión.
+-----
+activity.resources.network
+Red
+-----
+activity.resources.network.note
+Datos IPv4/IPv6, incluido loopback; sin sockets Unix ni cabeceras de protocolo.
+-----
+activity.resources.pressure
+Presión: {0}
+-----
+activity.resources.pressure.critical
+Crítica
+-----
+activity.resources.pressure.high
+Alta
+-----
+activity.resources.pressure.normal
+Normal
+-----
+activity.resources.rate
+{0}/s
+-----
+activity.resources.read
+Lectura: {0}
+-----
+activity.resources.received
+Recibidos: {0}
+-----
+activity.resources.sent
+Enviados: {0}
+-----
+activity.resources.slab
+Memoria del núcleo: {0}
+-----
+activity.resources.total
+Memoria física: {0}
+-----
+activity.resources.unavailable
+No disponible
+-----
+activity.resources.used
+Usada: {0}
+-----
+activity.resources.written
+Escritura: {0}
+-----
+activity.resume_refresh
+Continuar
+-----
+activity.search
+Buscar nombre o PID
+-----
+activity.sort_by.cpu_time
+Ordenar por tiempo CPU
+-----
+activity.sort_by.ppid
+Ordenar por PID padre
+-----
+activity.sort_by.state
+Ordenar por estado
+-----
+activity.sort_by.threads
+Ordenar por número de hilos
+-----
+activity.sort_by.user
+Ordenar por ID de usuario
+-----
+activity.startup.description
+Elige las apps que se abrirán al iniciar sesión. Los cambios se aplican a la próxima sesión.
+-----
+activity.startup.disabled
+Desactivado
+-----
+activity.startup.enabled
+Activado
+-----
+activity.startup.impact_unavailable
+No se ha medido el impacto del inicio en CPU.
+-----
+activity.startup.save_failed
+No se pudo guardar la configuración de inicio.
+-----
+activity.state.exited
+Finalizado
+-----
+activity.state.running
+En ejecución
+-----
+activity.state.sleeping
+En espera
+-----
+activity.state.stopped
+Detenido
+-----
+activity.state.zombie
+Zombi
+-----
+activity.tree
+Árbol de procesos
+-----
+activity.view.energy
+Energía
+-----
+activity.view.gpu
+GPU
+-----
+activity.view.processes
+Procesos
+-----
+activity.view.resources
+Recursos
+-----
+activity.view.startup
+Inicio
+-----
+activity.startup.launch_ms
+{0} ms
+-----
+activity.startup.launch_note
+Tiempo del último inicio correcto, incluida la primera respuesta de la ventana. El impacto de CPU no está disponible.
+-----
+activity.startup.not_measured
+Sin medir
+-----
+activity.filter.system
+Sistema (root)
+-----
+activity.scroll_down
+Desplazar abajo
+-----
+activity.scroll_up
+Desplazar arriba
+-----
+activity.view.next
+Cambiar vista
+-----
+activity.inspector.io
+E/S
+-----
+activity.inspector.io.counter
+{0}: {1} bytes en total, {2}
+-----
+activity.inspector.io.disk_read
+Lecturas de disco
+-----
+activity.inspector.io.disk_write
+Escrituras de disco
+-----
+activity.inspector.io.logical_read
+Lecturas de archivo
+-----
+activity.inspector.io.logical_write
+Escrituras de archivo
+-----
+activity.inspector.io.net_recv
+Recibido
+-----
+activity.inspector.io.net_send
+Enviado
+-----
+activity.inspector.io.scope
+Las tasas requieren dos muestras. Los totales de archivos incluyen caché y archivos en memoria; los de disco cuentan almacenamiento físico. La red cuenta datos INET, incluido loopback. La escritura en segundo plano se atribuye al hilo que la envía.
+-----
+activity.inspector.io.unavailable
+Los contadores de E/S del proceso no están disponibles.
+-----
+activity.inspector.io.unknown
+Desconocido
+-----
+activity.search.done
+Cerrar búsqueda
+-----

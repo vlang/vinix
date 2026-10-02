@@ -44,6 +44,16 @@ older firmware. Status, message ID, eight-bit response size and the 0..100 range
 are checked. There is no B0RM fallback. SRAM-address replies are raw addresses
 rather than ordinary tagged command completions.
 
+Activity Monitor also reads optional B0AV/u16 voltage in mV, B0AC/s16 current
+in mA and B0AP/s32 power in mW, following the units in upstream Linux's
+[macsmc-power driver](https://github.com/torvalds/linux/blob/master/drivers/power/supply/macsmc-power.c).
+The worker publishes these read-only samples through `/dev/battery-power`.
+Each supported sensor has one text line (`voltage_mv`, `current_ma`, or
+`power_mw`); missing keys are omitted. Signed current/power are retained without
+guessing charging polarity. Telemetry is sampled at most once per second and
+each open retains a snapshot across partial reads, with the same freshness and
+transport-poison rules as the capacity device.
+
 A worker drains messages approximately every 100 ms and samples at most once
 per second. It owns the protocol state, waits outside the Resource spinlock,
 and publishes a result plus the original sample timestamp under a short lock.

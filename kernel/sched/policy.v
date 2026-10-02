@@ -197,7 +197,7 @@ fn should_preempt(mut current proc.Thread, next &proc.Thread, now_ns u64, thrott
 // throttled container works. `in_kernel` is whether the thread would resume
 // in the kernel.
 fn cgroup_holds_thread_back(t &proc.Thread, in_kernel bool) bool {
-	if unsafe { t.process == nil } || t.process.cgroup_account == unsafe { nil } {
+	if unsafe { t.process == nil } {
 		return false
 	}
 	if in_kernel && !katomic.load(&t.at_user_boundary) {
@@ -206,7 +206,7 @@ fn cgroup_holds_thread_back(t &proc.Thread, in_kernel bool) bool {
 	if katomic.load(&t.must_exit) || katomic.load(&t.pending_signals) & (u64(1) << 8) != 0 {
 		return false
 	}
-	return proc.cgroup_holds_back(t.process, clock_ns())
+	return katomic.load(&t.process.job_stopped) || proc.cgroup_holds_back(t.process, clock_ns())
 }
 
 // Called on the way back to userspace from every syscall. A thread whose cgroup
@@ -217,8 +217,7 @@ fn cgroup_holds_thread_back(t &proc.Thread, in_kernel bool) bool {
 // also the point where a thread holds nothing of the kernel's.
 pub fn park_for_cgroup() {
 	mut t := proc.current_thread()
-	if unsafe { t == nil } || unsafe { t.process == nil }
-		|| t.process.cgroup_account == unsafe { nil } {
+	if unsafe { t == nil } || unsafe { t.process == nil } {
 		return
 	}
 	mut parked := false
@@ -226,7 +225,7 @@ pub fn park_for_cgroup() {
 		if katomic.load(&t.must_exit) || katomic.load(&t.pending_signals) & (u64(1) << 8) != 0 {
 			break
 		}
-		if !proc.cgroup_holds_back(t.process, clock_ns()) {
+		if !katomic.load(&t.process.job_stopped) && !proc.cgroup_holds_back(t.process, clock_ns()) {
 			break
 		}
 		katomic.store(mut &t.at_user_boundary, true)

@@ -97,10 +97,13 @@ fn dispatch_linux_signal(context &cpulocal.GPRState, which int, info_signum int,
 	previous_mask := if t.saved_mask_valid { t.saved_mask } else { t.masked_signals }
 	t.saved_mask_valid = false
 
-	// SIG_DFL ignores what Linux's default ignores, and the stop and continue
-	// signals too, there being no job control; everything else ends the
-	// process. So does a handler with no way back from it, which Linux x86-64
-	// requires an sa_restorer for.
+	if handler == linux_sig_dfl && is_stop_signal(which) {
+		t.masked_signals = previous_mask
+		stop_for_signal(which)
+		return
+	}
+	// Everything except the default ignored and job-control dispositions ends
+	// the process. A handler also requires a valid Linux sa_restorer.
 	if handler == linux_sig_ign || (handler == linux_sig_dfl && default_ignores(which)) {
 		t.masked_signals = previous_mask
 		return
@@ -318,8 +321,7 @@ fn thread_on_sigaltstack(t &proc.Thread) bool {
 // default and, there being no job control, the stop and continue signals as
 // arm64 does.
 fn default_ignores(signum int) bool {
-	return has_default_ignore_action(signum) || signum == sigcont || signum == sigstop
-		|| signum == sigtstp || signum == sigttin || signum == sigttou
+	return has_default_ignore_action(signum) || signum == sigcont
 }
 
 // pause(): sleep until a signal is delivered, then fail with EINTR once its

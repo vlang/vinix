@@ -13,6 +13,7 @@ import fs
 import katomic
 import lib
 import time.sys
+import proc
 import x86.hpet as hpet_clock
 
 const ahci_class = 0x1
@@ -303,6 +304,7 @@ fn (mut dev AHCIDevice) transfer(buffer voidptr, loc u64, count u64, write bool)
 			errno.set(errno.eio)
 			return none
 		}
+		proc.account_disk_transfer(chunk, write)
 		if !write && user {
 			unsafe { C.memcpy(caller, staging, chunk) }
 		}

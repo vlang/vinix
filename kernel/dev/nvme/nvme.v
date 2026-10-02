@@ -11,6 +11,7 @@ import klock
 import event.eventstruct
 import resource
 import errno
+import proc
 import block.partition
 import fs
 import katomic
@@ -395,6 +396,7 @@ fn (mut dev NVMENamespace) transfer(buffer voidptr, loc u64, count u64, write bo
 			errno.set(errno.eio)
 			return none
 		}
+		proc.account_disk_transfer(chunk, write)
 		if !write { unsafe { C.memcpy(caller, bounce, chunk) } }
 		done += chunk
 	}
