@@ -168,10 +168,18 @@ fn (a &FilesContextApp) settings_window(size ui2.Rect) ui2.Element {
 			radius: 5
 		}, ui2.TextStyle{ color: body_text, size: 11, align: .center })
 		if a.settings_editing {
-			rows << ui2.text_field('', '', rename_buffer_text(a.settings_name), ui2.rect(156, f64(buttons_y), f64(panel_width - 176), 25), ui2.BoxStyle{
-				bg:     editor_path_focus
-				radius: 4
-			}, ui2.TextStyle{ color: body_text, size: 12 }, 0)
+			count := files_rune_count(a.settings_name)
+			rows << ui2.Element{
+				...ui2.text_field('', '', rename_buffer_text(a.settings_name), ui2.rect(156, f64(buttons_y), f64(panel_width - 176), 25), ui2.BoxStyle{
+					bg:     editor_path_focus
+					radius: 4
+				}, ui2.TextStyle{ color: body_text, size: 12 }, 0)
+				focused:        true
+				text_selection: ui2.TextSelection{
+					anchor: if a.settings_select_all { 0 } else { count }
+					caret:  count
+				}
+			}
 		} else {
 			for color_index, color in files_settings_colors {
 				rows << ui2.clickable_view('${files_settings_color_prefix}${color_index}', ui2.rect(f64(158 + color_index * 22), f64(buttons_y + 4), 17, 17), ui2.BoxStyle{
