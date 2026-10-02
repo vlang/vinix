@@ -1,0 +1,19 @@
+{
+  "base_commit": "e29bcc4dc62e8861dcef5a52901b5214bac7f073",
+  "kernel_sha256": "35ff216feaa2b9fc7e409decbdb7ece4d8bd60cf1d9044ed3e07ad0d6361be85",
+  "test_sha256": "b8cd130a5b554ef41f5d84841373379409e6a163d6d1eaea5f59b2148a697a71",
+  "init_sha256": "83216fa1bce633352cf39e61ec1206e21a179e47fe07bc757c7453f86a7b3d8f",
+  "compiler": "x86_64-linux-musl-gcc14.2.0 (host cross compile, static stock libc)",
+  "qemu_config": [
+    "q35,smm=off",
+    "tcg",
+    "max",
+    "2048 MiB",
+    "2 vCPU"
+  ],
+  "timeout_seconds": 90,
+  "runner_exit_code": 0,
+  "result": "Expected regression reproduced: CLOCK-FAIL line53 precise CLOCK_MONOTONIC resolution. Baseline reports tick granularity1ms, exceeds1us test bound.",
+  "note": "Runner explicitly expects this failing verdict; this is baseline regression evidence, not a functional test PASS. Identical test/config to corrected final kernel.",
+  "serial_log": "/Users/alex/code/vinix/build/useralloc-pipe/clock-baseline-2cpu/serial.log"
+}

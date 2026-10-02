@@ -1,0 +1,45 @@
+{
+  "kernel_sha256": "c02560d2d4df8b9ff9952b5a2f83023743e8c2212309abe540bf69e076acc592",
+  "test_sha256": "8bfcef630b165fc8b45fb5edb33f414e6e98a60964bfd7ad8add1fedf117cd31",
+  "init_sha256": "0bb2bb4c8da4fbb74ed15ac578f35a8d48de05fa4aa12bfb685f6d917f5674a1",
+  "iso_sha256": "92cb04fc4a0198bc04f4a4864bcfcf50ee2cb6a9a516e18ee52ffb4a9c2f43b4",
+  "runner_sha256": "eb435414cc2aae91806418d609d6035c24ec2231e59398e6184b69b6aa13d026",
+  "compile_command": [
+    "/opt/homebrew/opt/musl-cross/bin/x86_64-linux-musl-gcc",
+    "-static",
+    "-O2",
+    "-Wall",
+    "-Wextra",
+    "-Werror",
+    "/Users/alex/code/vinix/build/useralloc-pipe/socketbox-clock-final-2cpu/test.c",
+    "-o",
+    "/Users/alex/code/vinix/build/useralloc-pipe/socketbox-clock-final-2cpu/rootfs/sbin/init",
+    "-lpthread"
+  ],
+  "run_command": [
+    "/Library/Developer/CommandLineTools/usr/bin/python3",
+    "/Users/alex/code/vinix/build/useralloc-pipe/socketbox-clock-final-2cpu/run_vm.py",
+    "--arch",
+    "amd64",
+    "--iso",
+    "/Users/alex/code/vinix/build/useralloc-pipe/socketbox-clock-final-2cpu/test.iso",
+    "--qemu",
+    "/opt/homebrew/bin/qemu-system-x86_64",
+    "--firmware",
+    "/opt/homebrew/Cellar/qemu/11.1.1/share/qemu/edk2-x86_64-code.fd",
+    "--timeout",
+    "100",
+    "--cpus",
+    "2"
+  ],
+  "qemu_config": [
+    "q35,smm=off",
+    "tcg",
+    "max",
+    "2048 MiB",
+    "2 vCPU"
+  ],
+  "timeout_seconds": 100,
+  "test_source_variant": "final reviewed two-worker first-touch barrier and available-CPU-aware wakeup test",
+  "runner_exit_code": 1
+}

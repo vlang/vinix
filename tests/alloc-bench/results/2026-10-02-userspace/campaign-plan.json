@@ -1,0 +1,27 @@
+{
+  "declared_utc": "2026-10-02T19:18:38.051711+00:00",
+  "purpose": "Fresh complete comparison of the combined v4 user-space and kernel optimizations after all owned heavy correctness work finishes.",
+  "order": [
+    "vinix-1",
+    "catalina-1",
+    "catalina-2",
+    "vinix-2"
+  ],
+  "source_sha256": "bd4a0d74f4f1e8d079d55877f8e90925e2622ce990120b54573a5dc94a9a54b9",
+  "iterations": 200000,
+  "samples": 7,
+  "warmup": "full per workload",
+  "common_qemu": {
+    "qemu_version": "QEMU emulator version 11.1.1",
+    "machine": "q35,vmport=off",
+    "accelerator": "tcg,thread=single,tb-size=1024",
+    "cpu": "Penryn,kvm=on,vendor=GenuineIntel,+ssse3,+sse4.2,+popcnt",
+    "smp": "2,sockets=1,cores=2,threads=1",
+    "memory_mb": 4096
+  },
+  "selection": "Every complete run in this fixed four-capture campaign participates, with all raw samples and outliers; failures are preserved separately, not converted into results.",
+  "comparison": "All six workload medians must be no slower in both individual cohorts and when all 14 samples per guest are pooled.",
+  "limitations": "Other sessions continue running on the shared host. All owned compilation and correctness guests will finish before timing. Recorded timings describe QEMU TCG, not native hardware.",
+  "previous_reference": "earlier-candidate/catalina-reference-v3",
+  "status": "Declared before final v4 artifacts and timings; pending build and regression completion."
+}

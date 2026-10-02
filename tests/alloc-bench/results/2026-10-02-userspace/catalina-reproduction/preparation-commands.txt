@@ -1,0 +1,28 @@
+/sbin/mount -uw /
+/usr/bin/uname -a
+/usr/bin/shasum -a 256 /tmp/alloc-bench-native /tmp/bench.c
+ls -l /tmp/alloc* /tmp/opt/local/bin/gcc-mp-14
+ls /dev/disk*
+ls -l /sbin/mount_msdos /System/Library/Extensions/msdosfs.kext
+/sbin/kextload /System/Library/Extensions/msdosfs.kext
+mkdir -p /Volumes/ALLOCBENCH
+/sbin/mount_msdos /dev/disk0 /Volumes/ALLOCBENCH
+ls /Volumes/ALLOCBENCH
+mkdir -p /tmp/allocfat
+/sbin/mount_msdos /dev/disk0 /tmp/allocfat
+ls /tmp/allocfat
+mount
+/sbin/mount -uw /System/Volumes/Data
+mkdir -p /tmp/allocfat
+/sbin/mount_msdos /dev/disk0 /tmp/allocfat
+ls /tmp/allocfat
+cp -R /tmp/allocfat/opt /tmp/opt
+cp -R /tmp/allocfat/bench-sdk /tmp/bench-sdk
+cp /tmp/allocfat/bench.c /tmp/bench.c
+cp /tmp/allocfat/alloc-bench-native /tmp/alloc-bench-native
+chmod 755 /tmp/alloc-bench-native
+/usr/bin/shasum -a 256 /tmp/alloc-bench-native /tmp/bench.c
+DYLD_LIBRARY_PATH=/tmp/opt/local/lib /tmp/opt/local/bin/gcc-mp-14 --version
+DYLD_LIBRARY_PATH=/tmp/opt/local/lib /tmp/opt/local/bin/gcc-mp-14 -std=c11 -O2 -Wall -Wextra -Werror -fno-builtin -mmacosx-version-min=10.15 -isysroot /tmp/bench-sdk -nostdinc -isystem /tmp/opt/local/lib/gcc14/gcc/x86_64-apple-darwin19/14.3.0/include -isystem /tmp/bench-sdk/usr/include -S /tmp/bench.c -o /tmp/bench-native-fresh.s
+/usr/bin/shasum -a 256 /tmp/bench-native-fresh.s
+echo MACOS-USERALLOC-READY

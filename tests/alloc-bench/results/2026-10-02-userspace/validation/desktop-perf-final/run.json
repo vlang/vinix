@@ -1,0 +1,43 @@
+{
+  "kernel_sha256": "f43f7081476cdeea3e91416aead07014b83bc7532d5ad6bae31adbaa5790f5df",
+  "desktop_sha256": "13c3721b81bc788bd78dbd784780af294774e30a140a356fa73c73b2387cd956",
+  "loader_sha256": "c2261960691912280b2a33c53577a4d18bbc829e19c7cef2a554de052ff781ec",
+  "static_libc_sha256": "2d7538f2fc2ca2c94493fc3d34cbc6bed5cf942063e7ccd365e922156ffdc0d9",
+  "initramfs_sha256": "a0eb49a43cdcac3a0b86298e5c80e9b0b0290a808e0875ef8b77c0668118b38b",
+  "harness_sha256": "91a6af9223d5bd292445de4ac40cf12fc817cc572dbda5a6073f6acb931c346f",
+  "measure_source_sha256": "4d9143034e8c2ef2ee239d61d874ee365a72cc02c4a6c586ff56c275804f0297",
+  "guest_init_sha256": "44a5b432613f7bb45a67e7d8dab489911a51313928c456d67a7c81491f1928c5",
+  "command": [
+    "python3",
+    "/Users/alex/code/vinix/build/useralloc-pipe/perf-final-preparation/run.py",
+    "final=/Users/alex/code/vinix/third_party/useralloc-pipe/build/vinix-desktop",
+    "--scenarios=ops,churn,cache,idle,apps,drag",
+    "--rounds",
+    "1",
+    "--initramfs",
+    "/Users/alex/code/vinix/build/useralloc-pipe/perf-final-preparation/initramfs-desktop-frozen.tar",
+    "--settle",
+    "5",
+    "--seconds",
+    "20",
+    "--timeout",
+    "1800",
+    "--json",
+    "/Users/alex/code/vinix/build/useralloc-desktop-perf-final/results.json",
+    "--shots",
+    "/Users/alex/code/vinix/build/useralloc-desktop-perf-final/shots"
+  ],
+  "environment": {
+    "VINIX_KERNEL_DIR": "/Users/alex/code/vinix/build/useralloc-desktop-perf-final/kernel",
+    "VINIX_AARCH64_SYSROOT": "/Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v3/sysroot",
+    "VINIX_QEMU_SMP": "2",
+    "USE_TCG": "0"
+  },
+  "start_time_utc": "2026-10-02 16:41:39 UTC",
+  "timeout_seconds": 1800,
+  "notes": "Unmodified workload sources; private harness overlays final production loader/manifest. Existing full desktop image, frozen final isolated kernel and new static desktop with verified final libc.a.",
+  "runner_exit_code": 0,
+  "end_time_utc": "2026-10-02 16:50:46 UTC",
+  "serial_sha256": "1d6d12ba9560aced0413f02b19457bb312e959fd262a585b5fdf525c7d0ba447",
+  "guest_temp_state": "/var/folders/5s/gdmd5zq90y52hchygpfzp2m00000gn/T/vinix-desktop-perf.q6ciwsjj"
+}

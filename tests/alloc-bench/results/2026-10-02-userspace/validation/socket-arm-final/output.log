@@ -1,0 +1,4 @@
+Traceback (most recent call last):
+  File "/Users/alex/code/vinix/build/useralloc-final-kernel-aarch64/run-probe.py", line 40, in <module>
+    try:os.killpg(pid,signal.SIGTERM)
+PermissionError: [Errno 1] Operation not permitted

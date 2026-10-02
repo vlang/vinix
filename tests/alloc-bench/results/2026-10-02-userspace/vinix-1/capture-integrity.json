@@ -1,0 +1,14 @@
+{
+  "strict_complete_capture": true,
+  "sample_records": 42,
+  "copied_from": "/Users/alex/code/vinix/build/useralloc-vinix-v4-final-1",
+  "files_sha256": {
+    "runner.log": "b1405ba3725f2dcece8b6af9b837a95dfee0c847a508ab10fdd551e4065d2d69",
+    "config.json": "39373c7a59f990c486e360867f27a4a1f973a2939d92c24117f6c87bf2d5897b",
+    "coordinator-record.json": "196e3a7ef039c593b48386bd10b57108d5e5020b91b2d6392b0856adb2060e58",
+    "serial.log": "c31983e19b2c30cba89f78cff72580b4076f62174ec828923b4412011e575841",
+    "qemu.log": "a385990323b3823301a8f4cc6a33c23556168d67d6aa033a9449987fc510e656",
+    "driver-exit.json": "6c73083ece866cb0d34b7fbf8b6c3cb7f9bb43b818f1e408b822c1968fc726db",
+    "image-build.log": "68f7ef633514534b43935a900b835a89def91f5bbe1dce65ed8a37a89621e84a"
+  }
+}

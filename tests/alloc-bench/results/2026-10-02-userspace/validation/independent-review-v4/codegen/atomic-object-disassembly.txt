@@ -1,0 +1,160 @@
+
+/Users/alex/code/vinix/build/useralloc-kernel-speed-v4/x86_64/blob.c.o:	file format elf64-x86-64
+
+Disassembly of section .text.klock__Lock__release:
+
+0000000000000000 <klock__Lock__release>:
+       0:      	pushq	%rbp
+       1:      	movq	%rsp, %rbp
+       4:      	subq	$0x10, %rsp
+       8:      	movq	(%rip), %rax            # 0xf <klock__Lock__release+0xf>
+       f:      	movq	%rax, -0x8(%rbp)
+      13:      	movzbl	0x1(%rdi), %eax
+      17:      	xorl	%ecx, %ecx
+      19:      	movb	%cl, (%rdi)
+      1b:      	movq	$0x0, -0x10(%rbp)
+      23:      	pushfq
+      24:      	popq	-0x10(%rbp)
+      27:      	testb	%al, %al
+      29:      	je	0x2e <klock__Lock__release+0x2e>
+      2b:      	sti
+      2c:      	jmp	0x2f <klock__Lock__release+0x2f>
+      2e:      	cli
+      2f:      	movq	(%rip), %rax            # 0x36 <klock__Lock__release+0x36>
+      36:      	cmpq	-0x8(%rbp), %rax
+      3a:      	jne	0x42 <klock__Lock__release+0x42>
+      3c:      	addq	$0x10, %rsp
+      40:      	popq	%rbp
+      41:      	retq
+      42:      	callq	0x47 <klock__Lock__release+0x47>
+
+Disassembly of section .text.katomic__store_T_u32:
+
+0000000000000000 <katomic__store_T_u32>:
+       0:      	pushq	%rbp
+       1:      	movq	%rsp, %rbp
+       4:      	lock
+       5:      	xchgl	%esi, (%rdi)
+       7:      	popq	%rbp
+       8:      	retq
+
+Disassembly of section .text.katomic__load_T_u32:
+
+0000000000000000 <katomic__load_T_u32>:
+       0:      	pushq	%rbp
+       1:      	movq	%rsp, %rbp
+       4:      	testb	$0x3, %dil
+       8:      	je	0x12 <katomic__load_T_u32+0x12>
+       a:      	xorl	%eax, %eax
+       c:      	lock
+       d:      	xaddl	%eax, (%rdi)
+      10:      	popq	%rbp
+      11:      	retq
+      12:      	movl	(%rdi), %eax
+      14:      	popq	%rbp
+      15:      	retq
+
+Disassembly of section .text.katomic__sync:
+
+0000000000000000 <katomic__sync>:
+       0:      	pushq	%rbp
+       1:      	movq	%rsp, %rbp
+       4:      	mfence
+       7:      	popq	%rbp
+       8:      	retq
+
+Disassembly of section .text.katomic__load_T_bool:
+
+0000000000000000 <katomic__load_T_bool>:
+       0:      	pushq	%rbp
+       1:      	movq	%rsp, %rbp
+       4:      	movb	(%rdi), %al
+       6:      	andb	$0x1, %al
+       8:      	popq	%rbp
+       9:      	retq
+
+Disassembly of section .text.katomic__store_T_bool:
+
+0000000000000000 <katomic__store_T_bool>:
+       0:      	pushq	%rbp
+       1:      	movq	%rsp, %rbp
+       4:      	lock
+       5:      	xchgb	%sil, (%rdi)
+       8:      	popq	%rbp
+       9:      	retq
+
+Disassembly of section .text.katomic__load_T_v_int:
+
+0000000000000000 <katomic__load_T_v_int>:
+       0:      	pushq	%rbp
+       1:      	movq	%rsp, %rbp
+       4:      	testb	$0x7, %dil
+       8:      	je	0x13 <katomic__load_T_v_int+0x13>
+       a:      	xorl	%eax, %eax
+       c:      	lock
+       d:      	xaddq	%rax, (%rdi)
+      11:      	popq	%rbp
+      12:      	retq
+      13:      	movq	(%rdi), %rax
+      16:      	popq	%rbp
+      17:      	retq
+
+Disassembly of section .text.katomic__load_T_u64:
+
+0000000000000000 <katomic__load_T_u64>:
+       0:      	pushq	%rbp
+       1:      	movq	%rsp, %rbp
+       4:      	testb	$0x7, %dil
+       8:      	je	0x13 <katomic__load_T_u64+0x13>
+       a:      	xorl	%eax, %eax
+       c:      	lock
+       d:      	xaddq	%rax, (%rdi)
+      11:      	popq	%rbp
+      12:      	retq
+      13:      	movq	(%rdi), %rax
+      16:      	popq	%rbp
+      17:      	retq
+
+Disassembly of section .text.katomic__store_T_u64:
+
+0000000000000000 <katomic__store_T_u64>:
+       0:      	pushq	%rbp
+       1:      	movq	%rsp, %rbp
+       4:      	lock
+       5:      	xchgq	%rsi, (%rdi)
+       8:      	popq	%rbp
+       9:      	retq
+
+Disassembly of section .text.katomic__load_T_u8:
+
+0000000000000000 <katomic__load_T_u8>:
+       0:      	pushq	%rbp
+       1:      	movq	%rsp, %rbp
+       4:      	movb	(%rdi), %al
+       6:      	popq	%rbp
+       7:      	retq
+
+Disassembly of section .text.katomic__load_T_i64:
+
+0000000000000000 <katomic__load_T_i64>:
+       0:      	pushq	%rbp
+       1:      	movq	%rsp, %rbp
+       4:      	testb	$0x7, %dil
+       8:      	je	0x13 <katomic__load_T_i64+0x13>
+       a:      	xorl	%eax, %eax
+       c:      	lock
+       d:      	xaddq	%rax, (%rdi)
+      11:      	popq	%rbp
+      12:      	retq
+      13:      	movq	(%rdi), %rax
+      16:      	popq	%rbp
+      17:      	retq
+
+Disassembly of section .text.katomic__store_release:
+
+0000000000000000 <katomic__store_release>:
+       0:      	pushq	%rbp
+       1:      	movq	%rsp, %rbp
+       4:      	movb	%sil, (%rdi)
+       7:      	popq	%rbp
+       8:      	retq

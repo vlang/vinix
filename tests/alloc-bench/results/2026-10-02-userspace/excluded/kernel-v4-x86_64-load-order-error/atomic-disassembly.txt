@@ -1,0 +1,37 @@
+
+third_party/useralloc-speed-v4/kernel/obj/blob.c.o:	file format elf64-x86-64
+
+Disassembly of section .text.katomic__load_T_bool:
+
+0000000000000000 <katomic__load_T_bool>:
+       0: 55                           	pushq	%rbp
+       1: 48 89 e5                     	movq	%rsp, %rbp
+       4: 88 07                        	movb	%al, (%rdi)
+       6: 24 01                        	andb	$0x1, %al
+       8: 5d                           	popq	%rbp
+       9: c3                           	retq
+
+Disassembly of section .text.katomic__load_T_u64:
+
+0000000000000000 <katomic__load_T_u64>:
+       0: 55                           	pushq	%rbp
+       1: 48 89 e5                     	movq	%rsp, %rbp
+       4: 40 f6 c7 07                  	testb	$0x7, %dil
+       8: 74 09                        	je	0x13 <katomic__load_T_u64+0x13>
+       a: 31 c0                        	xorl	%eax, %eax
+       c: f0                           	lock
+       d: 48 0f c1 07                  	xaddq	%rax, (%rdi)
+      11: 5d                           	popq	%rbp
+      12: c3                           	retq
+      13: 48 89 07                     	movq	%rax, (%rdi)
+      16: 5d                           	popq	%rbp
+      17: c3                           	retq
+
+Disassembly of section .text.katomic__store_release:
+
+0000000000000000 <katomic__store_release>:
+       0: 55                           	pushq	%rbp
+       1: 48 89 e5                     	movq	%rsp, %rbp
+       4: 40 88 37                     	movb	%sil, (%rdi)
+       7: 5d                           	popq	%rbp
+       8: c3                           	retq

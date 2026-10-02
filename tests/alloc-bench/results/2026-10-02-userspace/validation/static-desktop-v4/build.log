@@ -1,0 +1,311 @@
++ set -e
++++ dirname /Users/alex/code/vinix/third_party/useralloc-pipe/build-desktop-aarch64.sh
+++ cd /Users/alex/code/vinix/third_party/useralloc-pipe
+++ pwd
++ SCRIPT_DIR=/Users/alex/code/vinix/third_party/useralloc-pipe
++ . /Users/alex/code/vinix/third_party/useralloc-pipe/build-support/find-v.sh
+++ find_v --no-initramfs
+++ '[' -n /Users/alex/code/vinix/build/useralloc-final-audit/compiler/v ']'
+++ select_v /Users/alex/code/vinix/build/useralloc-final-audit/compiler/v
+++ local candidate=/Users/alex/code/vinix/build/useralloc-final-audit/compiler/v
+++ '[' -d /Users/alex/code/vinix/build/useralloc-final-audit/compiler/v ']'
+++ case "$candidate" in
+++ '[' -x /Users/alex/code/vinix/build/useralloc-final-audit/compiler/v ']'
+++ V=/Users/alex/code/vinix/build/useralloc-final-audit/compiler/v
+++ return 0
+++ return
+++ export V
++ '[' -n /Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/ui2 ']'
++ UI2_SOURCE=/Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/ui2
++ BUILD_DIR=/Users/alex/code/vinix/third_party/useralloc-pipe/build
++ APP_CACHE_DIR=/Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/app-cache
++ USERLAND_BUILD_DIR=/Users/alex/code/vinix/third_party/useralloc-pipe/build-aarch64-userland
++ SYSROOT=/Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/sysroot
++ DEVTOOLS_ARCHIVE=/Users/alex/code/vinix/third_party/useralloc-pipe/build-aarch64-userland/alpine-devtools.tar
++ LLVM_BIN=/Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/llvm-bin
++ '[' '!' -x /Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/llvm-bin/clang ']'
++ CC_SHIM=/Users/alex/code/vinix/third_party/useralloc-pipe/build-support/aarch64-cc-shim
++ BASE_INITRAMFS=/Users/alex/code/vinix/third_party/useralloc-pipe/build-support/init-aarch64/initramfs.tar
++ DESKTOP_INITRAMFS=/Users/alex/code/vinix/third_party/useralloc-pipe/build-support/init-aarch64/initramfs-desktop.tar
++ DESKTOP_INITRAMFS_GZ=/Users/alex/code/vinix/third_party/useralloc-pipe/build-support/init-aarch64/initramfs-desktop.tar.gz
++ PYTHON_STAGING=/Users/alex/code/vinix/third_party/useralloc-pipe/build-aarch64-python/staging
++ NETWORK_TOOLS_STAGING=/Users/alex/code/vinix/third_party/useralloc-pipe/build-aarch64-network-tools/staging
++ VLANG_STAGING=/Users/alex/code/vinix/third_party/useralloc-pipe/build-aarch64-v/staging
++ X11_STAGING=/Users/alex/code/vinix/third_party/useralloc-pipe/build-aarch64-x11/staging
++ FIREFOX_STAGING=/Users/alex/code/vinix/third_party/useralloc-pipe/build-aarch64-firefox/staging
++ CHROMIUM_STAGING=/Users/alex/code/vinix/third_party/useralloc-pipe/build-aarch64-chromium/staging
++ LIBREOFFICE_STAGING=/Users/alex/code/vinix/third_party/useralloc-pipe/build-aarch64-libreoffice/staging
++ MINECRAFT_STAGING=/Users/alex/code/vinix/third_party/useralloc-pipe/build-aarch64-minecraft/staging
++ DOOM_STAGING=/Users/alex/code/vinix/third_party/useralloc-pipe/build-aarch64-doom/staging
++ OPENGOTHIC_STAGING=/Users/alex/code/vinix/third_party/useralloc-pipe/build/opengothic/staging
++ ASAHI_STAGING=/Users/alex/code/vinix/third_party/useralloc-pipe/build-aarch64-asahi/staging
++ HYPRLAND_STAGING=/Users/alex/code/vinix/third_party/useralloc-pipe/build-aarch64-hyprland/staging
++ BLENDER_NATIVE_STAGING=/Users/alex/code/vinix/third_party/useralloc-pipe/build-aarch64-blender-native/staging
++ X86_TRANSLATION_STAGING=/Users/alex/code/vinix/third_party/useralloc-pipe/build-aarch64-x86-translation/staging
++ STEAM_STAGING=/Users/alex/code/vinix/third_party/useralloc-pipe/build-aarch64-steam/staging
++ QEMU_SYSTEM_STAGING=/Users/alex/code/vinix/third_party/useralloc-pipe/build-aarch64-qemu-system/staging
++ GPU_SYSROOT=/Users/alex/code/vinix/third_party/useralloc-pipe/build-aarch64-x11/sysroot
++ MAKE_INITRAMFS=1
++ COMPACT_INITRAMFS=0
++ WITH_X86_TRANSLATION=0
++ WITH_STEAM=0
++ WITH_QEMU_SYSTEM=0
++ WITH_CHROMIUM=0
++ WITH_LIBREOFFICE=0
++ WITH_MINECRAFT=0
++ WITH_OPENGOTHIC=0
++ WITHOUT_FIREFOX=0
++ REFRESH_STAGING=0
++ WITH_ASAHI_GPU=0
++ WIFI_BUNDLE=
++ for arg in '"$@"'
++ case "$arg" in
++ MAKE_INITRAMFS=0
++ '[' 0 -eq 1 ']'
++ case "$REFRESH_STAGING" in
++ '[' 0 -eq 0 ']'
++ '[' -n '' ']'
++ '[' 0 -eq 1 ']'
++ '[' 0 -eq 1 ']'
++ '[' 0 -eq 1 ']'
++ '[' -n '' ']'
++ DESKTOP_BUILD_LOCK=/Users/alex/code/vinix/third_party/useralloc-pipe/build/.build-desktop-aarch64.lock
++ mkdir -p /Users/alex/code/vinix/third_party/useralloc-pipe/build
++ build_lock_wait_reported=0
++ ln -s 29202 /Users/alex/code/vinix/third_party/useralloc-pipe/build/.build-desktop-aarch64.lock
++ trap release_desktop_build_lock EXIT
++ '[' 0 -eq 1 ']'
++ '[' 0 -eq 1 ']'
++ python3 /Users/alex/code/vinix/third_party/useralloc-pipe/build-support/musl/stage.py --arch aarch64 --staging /Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/sysroot
+    staged Vinix musl 1.2.6 (aarch64, retention=1, e086c78d50c3)
++ '[' '!' -f /Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/sysroot/usr/lib/libc.a ']'
++ '[' '!' -d /Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/sysroot/usr/include ']'
+++ find /Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/sysroot/usr/lib/gcc/aarch64-alpine-linux-musl -mindepth 1 -maxdepth 1 -type d
+++ LC_ALL=C
+++ sort
+++ tail -n1
++ GCCLIB=/Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/sysroot/usr/lib/gcc/aarch64-alpine-linux-musl/14.2.0
++ '[' -z /Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/sysroot/usr/lib/gcc/aarch64-alpine-linux-musl/14.2.0 ']'
++ '[' '!' -f /Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/sysroot/usr/lib/gcc/aarch64-alpine-linux-musl/14.2.0/libgcc.a ']'
++ '[' '!' -f /Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/ui2/v.mod ']'
++ '[' '!' -f /Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/ui2/ui/vml_compiled.v ']'
++ '[' '!' -f /Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/ui2/examples/calculator/calculator.vml ']'
++ '[' '!' -x /Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/llvm-bin/clang ']'
++ '[' '!' -x /Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/llvm-bin/llvm-strip ']'
++ mkdir -p /Users/alex/code/vinix/third_party/useralloc-pipe/build
++ UI2_MODULES=/Users/alex/code/vinix/third_party/useralloc-pipe/build/vmodules
++ python3 /Users/alex/code/vinix/third_party/useralloc-pipe/desktop/tools/stage_ui2.py /Users/alex/code/vinix/third_party/useralloc-pipe/build/vmodules/ui2 /Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/ui2 /Users/alex/code/vinix/third_party/useralloc-pipe/desktop/tools/ui2_headless_bounds.v
++ echo '==> Staging sources...'
+==> Staging sources...
++ APP_SRC=/Users/alex/code/vinix/third_party/useralloc-pipe/build/app-src
++ python3 /Users/alex/code/vinix/third_party/useralloc-pipe/desktop/tools/stage_app.py /Users/alex/code/vinix/third_party/useralloc-pipe/build/app-src /Users/alex/code/vinix/third_party/useralloc-pipe/desktop /Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/ui2/examples/calculator
+    staged 1 example(s) into /Users/alex/code/vinix/third_party/useralloc-pipe/build/app-src
++ DESKTOP_CACHE_DIR=/Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/app-cache/desktop
++ mkdir -p /Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/app-cache/desktop
+++ python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' /Users/alex/code/vinix/build/useralloc-final-audit/compiler/v
++ V_REAL=/Users/alex/code/vinix/build/useralloc-final-audit/compiler/v
+++ command -v ld.lld
++ LLD_FOR_CACHE=/opt/homebrew/bin/ld.lld
++ DESKTOP_CACHE_ARGS=(--state "$DESKTOP_CACHE_DIR/.build-key" --staging "$DESKTOP_CACHE_DIR" --value desktop-aarch64-command-v1 --source "$APP_SRC" --source "$UI2_MODULES/ui2" --source "$V_REAL" --vlib "$(dirname "$V_REAL")/vlib" --source "$CC_SHIM" --source "$SCRIPT_DIR/desktop/execinfo_compat.c" --metadata "$LLVM_BIN/clang" --metadata "$LLVM_BIN/llvm-strip" --metadata "$SYSROOT/usr/include" --metadata "$GCCLIB/include" --metadata "$SYSROOT/usr/lib/crt1.o" --metadata "$SYSROOT/usr/lib/crti.o" --metadata "$SYSROOT/usr/lib/crtn.o" --metadata "$SYSROOT/usr/lib/libc.a" --metadata "$SYSROOT/usr/lib/libm.a" --metadata "$GCCLIB/crtbeginT.o" --metadata "$GCCLIB/crtend.o" --metadata "$GCCLIB/libgcc.a" --metadata "$GCCLIB/libgcc_eh.a" --executable vinix-desktop)
+++ dirname /Users/alex/code/vinix/build/useralloc-final-audit/compiler/v
++ '[' -n /opt/homebrew/bin/ld.lld ']'
++ DESKTOP_CACHE_ARGS+=(--metadata "$LLD_FOR_CACHE")
++ GPU_CACHE_AVAILABLE=0
++ '[' -f /Users/alex/code/vinix/third_party/useralloc-pipe/build-aarch64-asahi/staging/usr/lib/libEGL.so ']'
++ DESKTOP_CACHE_ARGS+=(--value gpu-unavailable)
++ DESKTOP_CACHE_HIT=0
++ python3 /Users/alex/code/vinix/third_party/useralloc-pipe/build-support/staging-cache.py check --state /Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/app-cache/desktop/.build-key --staging /Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/app-cache/desktop --value desktop-aarch64-command-v1 --source /Users/alex/code/vinix/third_party/useralloc-pipe/build/app-src --source /Users/alex/code/vinix/third_party/useralloc-pipe/build/vmodules/ui2 --source /Users/alex/code/vinix/build/useralloc-final-audit/compiler/v --vlib /Users/alex/code/vinix/build/useralloc-final-audit/compiler/vlib --source /Users/alex/code/vinix/third_party/useralloc-pipe/build-support/aarch64-cc-shim --source /Users/alex/code/vinix/third_party/useralloc-pipe/desktop/execinfo_compat.c --metadata /Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/llvm-bin/clang --metadata /Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/llvm-bin/llvm-strip --metadata /Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/sysroot/usr/include --metadata /Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/sysroot/usr/lib/gcc/aarch64-alpine-linux-musl/14.2.0/include --metadata /Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/sysroot/usr/lib/crt1.o --metadata /Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/sysroot/usr/lib/crti.o --metadata /Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/sysroot/usr/lib/crtn.o --metadata /Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/sysroot/usr/lib/libc.a --metadata /Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/sysroot/usr/lib/libm.a --metadata /Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/sysroot/usr/lib/gcc/aarch64-alpine-linux-musl/14.2.0/crtbeginT.o --metadata /Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/sysroot/usr/lib/gcc/aarch64-alpine-linux-musl/14.2.0/crtend.o --metadata /Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/sysroot/usr/lib/gcc/aarch64-alpine-linux-musl/14.2.0/libgcc.a --metadata /Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/sysroot/usr/lib/gcc/aarch64-alpine-linux-musl/14.2.0/libgcc_eh.a --executable vinix-desktop --metadata /opt/homebrew/bin/ld.lld --value gpu-unavailable
++ '[' 0 -eq 0 ']'
++ echo '==> Translating V to C...'
+==> Translating V to C...
++ /Users/alex/code/vinix/build/useralloc-final-audit/compiler/v -new-compiler -no-memory-limit -os linux -arch arm64 -gc none -manualfree -enable-globals -prod -d glibc -d ui2_headless -path '@vlib|/Users/alex/code/vinix/third_party/useralloc-pipe/build/vmodules|@vmodules|/Users/alex/code/vinix/third_party/useralloc-pipe|/Users/alex/code/vinix/third_party/useralloc-pipe/third_party' -o /Users/alex/code/vinix/third_party/useralloc-pipe/build/desktop.c /Users/alex/code/vinix/third_party/useralloc-pipe/build/app-src
+build/app-src/canvas.v:47:4: notice: unused function: `new_canvas`
+   45 | }
+   46 | 
+   47 | fn new_canvas(width int, height int) Canvas {
+      |    ~~~~~~~~~~
+   48 |     return new_scaled_canvas(width, height, width, height, 1)
+   49 | }
+build/app-src/clock.v:11:7: notice: unused constant: `weekday_names`
+    9 | // English abbreviations, for code that has not yet moved to the translated
+   10 | // names below. Text the user reads comes from date_weekday_short and friends.
+   11 | const weekday_names = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+      |       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   12 | const month_names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov',
+   13 |     'Dec']
+build/app-src/clock.v:12:7: notice: unused constant: `month_names`
+   10 | // names below. Text the user reads comes from date_weekday_short and friends.
+   11 | const weekday_names = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+   12 | const month_names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov',
+      |       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   13 |     'Dec']
+   14 |
+build/app-src/files.v:474:4: notice: unused function: `open_files`
+  472 | }
+  473 | 
+  474 | fn open_files(mut _ Desktop) !NativeApp {
+      |    ~~~~~~~~~~
+  475 |     mut app := &FileBrowserApp{}
+  476 |     // Open on the home directory, the way every file manager does. It is also
+build/app-src/terminal.v:225:4: notice: unused function: `terminal_rebuild_message`
+  223 | }
+  224 | 
+  225 | fn terminal_rebuild_message(value string, compositor_pid int, now_ms u64) string {
+      |    ~~~~~~~~~~~~~~~~~~~~~~~~
+  226 |     record := terminal_rebuild_record(value, compositor_pid, now_ms) or { return '' }
+  227 |     return terminal_rebuild_result(record, now_ms)
+build/app-src/translations.v:93:4: notice: unused function: `tr_count_fill`
+   91 | // tr_count_fill is tr_count for a sentence that names something besides the
+   92 | // count, which goes in `{1}`.
+   93 | fn tr_count_fill(key string, count i64, b string) string {
+      |    ~~~~~~~~~~~~~
+   94 |     number := count.str()
+   95 |     text := tr_substitute(tr_plural_form(key, count), number, b, '')
+build/app-src/file_context_ops.c.v:192:4: notice: unused function: `file_context_clipboard_available`
+  190 | }
+  191 | 
+  192 | fn file_context_clipboard_available() bool {
+      |    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  193 |     clipboard := file_context_clipboard_load() or { return false }
+  194 |     unsafe { clipboard.path.free() }
+/Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/ui2/ui/animation.v:1278:4: notice: unused function: `reset_widget_animations`
+ 1276 | }
+ 1277 | 
+ 1278 | fn reset_widget_animations() {
+      |    ~~~~~~~~~~~~~~~~~~~~~~~
+ 1279 |     mut runtime := g_animation_runtime
+ 1280 |     runtime.mutex.lock()
+/Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/ui2/ui/file_dialog.v:119:4: notice: unused function: `file_dialog_filter_spec`
+  117 | // Windows backend. It is deliberately plain text so each backend can map the
+  118 | // same public filters onto its own native control.
+  119 | fn file_dialog_filter_spec(filters []FileDialogFilter) string {
+      |    ~~~~~~~~~~~~~~~~~~~~~~~
+  120 |     mut parts := []string{}
+  121 |     for filter in filters {
+/Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/ui2/ui/menu.v:110:4: notice: unused function: `emit_menu_event`
+  108 | // emit_menu_event sends a chosen row to the window's event handler, the same
+  109 | // channel a button tap arrives on.
+  110 | fn emit_menu_event(id string) {
+      |    ~~~~~~~~~~~~~~~
+  111 |     st := menu_state()
+  112 |     if id.len > 0 && voidptr(st.dispatch) != unsafe { nil } {
+/Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/ui2/ui/menu.v:117:4: notice: unused function: `menu_app_name`
+  115 | }
+  116 | 
+  117 | fn menu_app_name() string {
+      |    ~~~~~~~~~~~~~
+  118 |     return menu_state().app_name
+  119 | }
+/Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/ui2/ui/menu.v:121:4: notice: unused function: `menu_window`
+  119 | }
+  120 | 
+  121 | fn menu_window() voidptr {
+      |    ~~~~~~~~~~~
+  122 |     return menu_state().window
+  123 | }
+/Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/ui2/ui/menu.v:129:4: notice: unused function: `install_declared_menus`
+  127 | // is installed even when nothing was declared, because macOS still needs its
+  128 | // application menu.
+  129 | fn install_declared_menus() {
+      |    ~~~~~~~~~~~~~~~~~~~~~~
+  130 |     st := menu_state()
+  131 |     native_set_menu_bar(st.menus)
+/Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/ui2/ui/ui.v:308:4: notice: unused function: `box_draws_fill`
+  306 | // box_draws_fill is shared by native and custom renderers so every element
+  307 | // backed by BoxStyle gives transparent the same meaning.
+  308 | fn box_draws_fill(box BoxStyle) bool {
+      |    ~~~~~~~~~~~~~~
+  309 |     return !box.transparent
+  310 | }
+/Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/ui2/ui/ui.v:323:4: notice: unused function: `label_needs_container`
+  321 | // while the text moves within it. A label with none of those stays the control itself,
+  322 | // because a view per label costs a third of a frame in a grid of them.
+  323 | fn label_needs_container(el Element) bool {
+      |    ~~~~~~~~~~~~~~~~~~~~~
+  324 |     return el.kind == .label && (el.tooltip.len > 0 || el.menu.len > 0
+  325 |         || box_draws_border(el.box))
+/Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/ui2/ui/ui.v:439:4: notice: unused function: `reconciliation_child_key`
+  437 | // reconciliation_child_key encodes user keys so separators inside a key
+  438 | // cannot alias a nested key path.
+  439 | fn reconciliation_child_key(parent string, index int, el Element) string {
+      |    ~~~~~~~~~~~~~~~~~~~~~~~~
+  440 |     suffix := if el.key.len > 0 { 'k:' + el.key.bytes().hex() } else { 'i:' + index.str() }
+  441 |     return if parent.len == 0 { suffix } else { parent + '/' + suffix }
+/Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/ui2/ui/vml_compiled.v:85:4: notice: unused function: `vml_dispatch_compiled`
+   83 | }
+   84 | 
+   85 | fn vml_dispatch_compiled[T](mut model T, name string, arguments []string) ! {
+      |    ~~~~~~~~~~~~~~~~~~~~~
+   86 |     $for method in T.methods {
+   87 |         if method.name == name {
+/Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/ui2/ui/vml_model.v:1243:4: notice: unused function: `v_validate_action`
+ 1241 | }
+ 1242 | 
+ 1243 | fn v_validate_action[T](expr &VExpression, scope map[string]VSchema) ! {
+      |    ~~~~~~~~~~~~~~~~~
+ 1244 |     if expr.kind != .call || !expr.value.starts_with('app.') {
+ 1245 |         return error('event handlers must call an app action at line ${expr.line}')
+/Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/ui2/ui/vml_model.v:1258:4: notice: unused function: `v_validate_assignment`
+ 1256 | }
+ 1257 | 
+ 1258 | fn v_validate_assignment[T](expr &VExpression, scope map[string]VSchema) ! {
+      |    ~~~~~~~~~~~~~~~~~~~~~
+ 1259 |     if expr.kind != .assignment || expr.left.kind != .path || !expr.left.value.starts_with('app.')
+ 1260 |         || expr.left.value.count('.') != 1 {
+/Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/ui2/ui/vml_model.v:1269:4: notice: unused function: `v_validate_repeater_schema`
+ 1267 | }
+ 1268 | 
+ 1269 | fn v_validate_repeater_schema[T](node &VNode, scope map[string]VSchema) ! {
+      |    ~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 1270 |     model_expr := node.expressions['model'] or {
+ 1271 |         return error('Repeater requires `model` at line ${node.line}')
+/Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/ui2/ui/vml_model.v:1294:4: notice: unused function: `v_validate_node_schema`
+ 1292 | }
+ 1293 | 
+ 1294 | fn v_validate_node_schema[T](node &VNode, incoming_scope map[string]VSchema) ! {
+      |    ~~~~~~~~~~~~~~~~~~~~~~
+ 1295 |     mut scope := incoming_scope.clone()
+ 1296 |     if node.id.len > 0 {
+/Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/ui2/ui/vml_model.v:1375:4: notice: unused function: `v_validate_template`
+ 1373 | }
+ 1374 | 
+ 1375 | fn v_validate_template[T](root &VNode, model T) ! {
+      |    ~~~~~~~~~~~~~~~~~~~
+ 1376 |     v_validate_node_schema[T](root, {
+ 1377 |         'app': v_schema_from(model)
+/Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/ui2/ui/vml_model.v:1455:4: notice: unused function: `type_check_action`
+ 1453 | }
+ 1454 | 
+ 1455 | fn type_check_action[T](name string, args []VSchema, line int) ! {
+      |    ~~~~~~~~~~~~~~~~~
+ 1456 |     $for method in T.methods {
+ 1457 |         if method.name == name {
++ echo '==> Compiling for aarch64-linux-musl...'
+==> Compiling for aarch64-linux-musl...
++ /Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/llvm-bin/clang --target=aarch64-linux-musl -static -nostdinc -nostdlib -isystem /Users/alex/code/vinix/third_party/useralloc-pipe/build-support/aarch64-cc-shim -isystem /Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/sysroot/usr/lib/gcc/aarch64-alpine-linux-musl/14.2.0/include -isystem /Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/sysroot/usr/include -I /Users/alex/code/vinix/third_party/useralloc-pipe/build/app-src -O2 -fno-stack-protector -w /Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/sysroot/usr/lib/crt1.o /Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/sysroot/usr/lib/crti.o /Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/sysroot/usr/lib/gcc/aarch64-alpine-linux-musl/14.2.0/crtbeginT.o /Users/alex/code/vinix/third_party/useralloc-pipe/build/desktop.c /Users/alex/code/vinix/third_party/useralloc-pipe/desktop/execinfo_compat.c -L/Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/sysroot/usr/lib -L/Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/sysroot/usr/lib/gcc/aarch64-alpine-linux-musl/14.2.0 -lgcc_eh -lc -lgcc -lm /Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/sysroot/usr/lib/gcc/aarch64-alpine-linux-musl/14.2.0/crtend.o /Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/sysroot/usr/lib/crtn.o -fuse-ld=lld -B/Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/llvm-bin -o /Users/alex/code/vinix/third_party/useralloc-pipe/build/vinix-desktop
++ /Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/llvm-bin/llvm-strip /Users/alex/code/vinix/third_party/useralloc-pipe/build/vinix-desktop
+++ file_size /Users/alex/code/vinix/third_party/useralloc-pipe/build/vinix-desktop
+++ stat -f%z /Users/alex/code/vinix/third_party/useralloc-pipe/build/vinix-desktop
+++ stat -f%z /Users/alex/code/vinix/third_party/useralloc-pipe/build/vinix-desktop
++ echo '    /Users/alex/code/vinix/third_party/useralloc-pipe/build/vinix-desktop (4643720 bytes)'
+    /Users/alex/code/vinix/third_party/useralloc-pipe/build/vinix-desktop (4643720 bytes)
++ GPU_DESKTOP_BUILT=0
++ '[' 0 -eq 1 ']'
++ echo '==> Asahi EGL staging not found; keeping the static software desktop only'
+==> Asahi EGL staging not found; keeping the static software desktop only
++ '[' 0 -eq 0 ']'
++ cp -a /Users/alex/code/vinix/third_party/useralloc-pipe/build/vinix-desktop /Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/app-cache/desktop/vinix-desktop.tmp
++ mv -f /Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/app-cache/desktop/vinix-desktop.tmp /Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/app-cache/desktop/vinix-desktop
++ '[' 0 -eq 1 ']'
++ python3 /Users/alex/code/vinix/third_party/useralloc-pipe/build-support/staging-cache.py record --state /Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/app-cache/desktop/.build-key --staging /Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/app-cache/desktop --value desktop-aarch64-command-v1 --source /Users/alex/code/vinix/third_party/useralloc-pipe/build/app-src --source /Users/alex/code/vinix/third_party/useralloc-pipe/build/vmodules/ui2 --source /Users/alex/code/vinix/build/useralloc-final-audit/compiler/v --vlib /Users/alex/code/vinix/build/useralloc-final-audit/compiler/vlib --source /Users/alex/code/vinix/third_party/useralloc-pipe/build-support/aarch64-cc-shim --source /Users/alex/code/vinix/third_party/useralloc-pipe/desktop/execinfo_compat.c --metadata /Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/llvm-bin/clang --metadata /Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/llvm-bin/llvm-strip --metadata /Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/sysroot/usr/include --metadata /Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/sysroot/usr/lib/gcc/aarch64-alpine-linux-musl/14.2.0/include --metadata /Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/sysroot/usr/lib/crt1.o --metadata /Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/sysroot/usr/lib/crti.o --metadata /Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/sysroot/usr/lib/crtn.o --metadata /Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/sysroot/usr/lib/libc.a --metadata /Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/sysroot/usr/lib/libm.a --metadata /Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/sysroot/usr/lib/gcc/aarch64-alpine-linux-musl/14.2.0/crtbeginT.o --metadata /Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/sysroot/usr/lib/gcc/aarch64-alpine-linux-musl/14.2.0/crtend.o --metadata /Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/sysroot/usr/lib/gcc/aarch64-alpine-linux-musl/14.2.0/libgcc.a --metadata /Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/sysroot/usr/lib/gcc/aarch64-alpine-linux-musl/14.2.0/libgcc_eh.a --executable vinix-desktop --metadata /opt/homebrew/bin/ld.lld --value gpu-unavailable
++ '[' 0 -eq 0 ']'
++ exit 0
++ release_desktop_build_lock
++ local owner
+++ desktop_build_lock_owner
+++ '[' -L /Users/alex/code/vinix/third_party/useralloc-pipe/build/.build-desktop-aarch64.lock ']'
+++ readlink /Users/alex/code/vinix/third_party/useralloc-pipe/build/.build-desktop-aarch64.lock
++ owner=29202
++ '[' 29202 = 29202 ']'
++ '[' -L /Users/alex/code/vinix/third_party/useralloc-pipe/build/.build-desktop-aarch64.lock ']'
++ rm -f /Users/alex/code/vinix/third_party/useralloc-pipe/build/.build-desktop-aarch64.lock

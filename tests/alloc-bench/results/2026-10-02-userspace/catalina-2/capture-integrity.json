@@ -1,0 +1,12 @@
+{
+  "strict_complete_capture": true,
+  "sample_records": 42,
+  "copied_from": "/Users/alex/code/vinix/build/useralloc-macos-v4-final-2",
+  "files_sha256": {
+    "runner.log": "b08411d83d972e029525a1b295432e6959083243e1438f84e15532e8fcc6bb82",
+    "config.json": "5781766fb2f17f734a297b10a5fec1a1aaca9f1afdfb6d278069320623cf6b50",
+    "coordinator-record.json": "529a80c7249357b6f7e061fdf743fa593ea1e1aca52b1b431e3ba7f68bf118cc",
+    "serial.log": "0ba044b3a9c1b6cbe24357dcbcd8c58b5d0d167b4d7dd5f9dd8da9d262ad899d",
+    "driver-exit.json": "819abaf4a67590e0651e6283bd79f597f83ccbb4c983ced61453faed1b2abd68"
+  }
+}

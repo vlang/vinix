@@ -1,0 +1,24 @@
+{
+  "at_utc": "2026-10-02T19:50:00.522120+00:00",
+  "reason": "Completed verification exit 0; reclaim reproducible image/rootfs after host disk exhaustion. Actual sources, init script, boot kernel, raw outputs, exact manifests, embedding proof and canonical stages remain.",
+  "artifacts": [
+    {
+      "path": "vinix.iso",
+      "bytes": 138321920,
+      "sha256": "cb48bc8ba96ec2be4fb62a775a6fab4083ec7234af11db93d9cc93d10a657204"
+    },
+    {
+      "path": "initramfs.tar",
+      "bytes": 126955520,
+      "sha256": "9b0b5c1a1f19ffb4eb50783ace0ef2f27868c19ba0eaebb95d13d9e1116a24f7"
+    },
+    {
+      "path": "rootfs",
+      "kind": "disposable directory"
+    },
+    {
+      "path": "iso-build",
+      "kind": "disposable directory"
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "pid": 16386,
+  "argv": [
+    "python3",
+    "/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/verify-x86-v4-final.py",
+    "run",
+    "/Users/alex/code/vinix/build/useralloc-final-kernel-x86_64/vinix-x86_64"
+  ]
+}

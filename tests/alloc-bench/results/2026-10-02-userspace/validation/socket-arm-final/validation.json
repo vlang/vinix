@@ -1,0 +1,9 @@
+{
+  "passed": true,
+  "calls": 65536,
+  "retained_bytes": 0,
+  "kernel_sha256": "f43f7081476cdeea3e91416aead07014b83bc7532d5ad6bae31adbaa5790f5df",
+  "serial_sha256": "d43012279c24cd6ee92ab1bdb95463cb87a33abb890225db8d55fc641d1ea423",
+  "host_collector_exit_code": 1,
+  "notes": "First capture splitlines mishandled CRLF; both complete captures hit PermissionError in owned process-group cleanup after runtime success. Complete raw markers independently revalidated."
+}

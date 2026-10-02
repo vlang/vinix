@@ -1,0 +1,21 @@
+{
+  "argv": [
+    "/Library/Developer/CommandLineTools/usr/bin/python3",
+    "/Users/alex/code/vinix/tests/alloc-bench/run-vinix.py",
+    "--kernel",
+    "/Users/alex/code/vinix/build/useralloc-final-kernel-x86_64/vinix-x86_64",
+    "--sysroot",
+    "/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/optimized-v3",
+    "--state-dir",
+    "/Users/alex/code/vinix/build/useralloc-vinix-release-1",
+    "--iterations",
+    "200000",
+    "--samples",
+    "7",
+    "--timeout",
+    "3600"
+  ],
+  "started_utc": "2026-10-02T16:52:28.629252+00:00",
+  "finished_utc": "2026-10-02T16:52:40.635812+00:00",
+  "exit_code": 1
+}

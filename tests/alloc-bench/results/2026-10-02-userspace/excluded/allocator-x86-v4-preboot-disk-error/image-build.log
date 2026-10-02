@@ -1,0 +1,17 @@
+==> Assembling /Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/verify-x86-v4-final/vinix.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/verify-x86-v4-final/.vinix-amd64.iso.Q8wQ1Y'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data,  280m free
+Added to ISO image: directory '/'='/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/verify-x86-v4-final/iso-build/.iso-staging.l6Wn3W/iso-root'
+xorriso : UPDATE :      10 files added in 1 seconds
+xorriso : UPDATE :      10 files added in 1 seconds
+xorriso : UPDATE :  11.99% done
+xorriso : UPDATE :  41.43% done
+xorriso : UPDATE :  68.46% done
+libisofs: MISHAP : Image write cancelled
+libburn : SORRY : Cannot write desired amount of 32768 bytes. write(2) returned -1. : No space left on device
+xorriso : FAILURE : libburn indicates failure with writing.
+xorriso : NOTE : -return_with SORRY 32 triggered by problem severity FAILURE

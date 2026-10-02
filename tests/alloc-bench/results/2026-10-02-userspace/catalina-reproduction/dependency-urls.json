@@ -1,0 +1,13 @@
+{
+  "libgcc14": "https://packages.macports.org/libgcc14/libgcc14-14.3.0_0+stdlib_flag.darwin_19.x86_64.tbz2",
+  "gmp": "https://packages.macports.org/gmp/gmp-6.3.0_0.darwin_19.x86_64.tbz2",
+  "isl": "https://packages.macports.org/isl/isl-0.24_1.darwin_19.x86_64.tbz2",
+  "libmpc": "https://packages.macports.org/libmpc/libmpc-1.4.1_0.darwin_19.x86_64.tbz2",
+  "mpfr": "https://packages.macports.org/mpfr/mpfr-4.2.2_0.darwin_19.x86_64.tbz2",
+  "zlib": "https://packages.macports.org/zlib/zlib-1.3.2_0.darwin_19.x86_64.tbz2",
+  "zstd": "https://packages.macports.org/zstd/zstd-1.5.7_0.darwin_19.x86_64.tbz2",
+  "libiconv": "https://packages.macports.org/libiconv/libiconv-1.19_0.darwin_19.x86_64.tbz2",
+  "cctools": "https://packages.macports.org/cctools/cctools-949.0.1_3+xcode.darwin_any.noarch.tbz2",
+  "ld64": "https://packages.macports.org/ld64/ld64-3_6+ld64_xcode.darwin_19.x86_64.tbz2",
+  "ld64-latest": "https://packages.macports.org/ld64-latest/ld64-latest-450.3_0+llvm90.darwin_19.x86_64.tbz2"
+}

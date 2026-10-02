@@ -1,0 +1,17 @@
+{
+  "build.log": "58db275878039cef7e78b8aab0e2a460b987a7da2c8a8af92db2ec7b7e0b103c",
+  "receive_message-final.c": "6f110a56852c18c4f8f351ec48a0e7e956dfe881f6a7dfc0facf051a7537f423",
+  "send_datagram-final.c": "9bbf66db998f9f047a7e20bd13ec7b9ada0eddf426648495f0cfa7737e4dcaec",
+  "send_message-final.c": "046fb479c2dc271cc72aa33a37f7ab3d8801de06e9bb0f7f51f2f53a8144d9ee",
+  "send_with_control-final.c": "161493037316a9744b35c9a467ae31a3c9966ac6976a01e77e6420d5b05e997c",
+  "socket-codegen-review.json": "4baf5545582ccbdaebc3220388b6f12bb86c0b3d48cdcccee85249d1077cd168",
+  "standard-modules-check.json": "1bb69b74aeb06db186c26c82e8168cbe3be77d4fa819121fb2b5bf5ca305b633",
+  "syscall_bind-final.c": "5f1180ed9dca28e884b361cfbf2c9af459229c486f8f0216cd29ec68d565af34",
+  "syscall_connect-final.c": "9f68d2eb95c53b61056ebd9f2bc18552f9894927b37a60f0094756b8bcb758f4",
+  "syscall_getpeername-final.c": "4977d1f786b0028e0e2c5801e68018a0ddd6d1fa1254feeaad47dc494090e20b",
+  "syscall_getsockname-final.c": "9cd4e069e37046d076aa315391679cb0338e58bb775b6e633779dee255f88a4c",
+  "syscall_recvfrom-final.c": "f7e37ee6c8415b68da78fc3a64cfc4fa971abdc630314a2ccce1f0fdbce92bdb",
+  "syscall_sendmsg-final.c": "75e0c8061e19c6ad34a963499ba1ab762e54aa0fc6cdafb8484d1a9609437ccb",
+  "syscall_sendto-final.c": "21743a957f918809f68c2f6ca700ff52133dceaa75989c2f3bfbe006306319ac",
+  "write_with_fds-final.c": "7e154e0766ea67c8d2208f9232fdfc0ca363e265ef8aa6d4f3bcbe782260ce7c"
+}

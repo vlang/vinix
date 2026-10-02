@@ -1,0 +1,1 @@
+Dynamic and static allocator checks passed on x86; short diagnostic timing rejected by unchanged benchmark after a zero-duration sample on the old interrupt-counted clock. No completed timing comparison.

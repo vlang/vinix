@@ -1,0 +1,333 @@
+diff --git a/kernel/file/timerfd.v b/kernel/file/timerfd.v
+index 6dfea07c..1f54701b 100644
+--- a/kernel/file/timerfd.v
++++ b/kernel/file/timerfd.v
+@@ -59,7 +59,7 @@ __global (
+ )
+ 
+ fn monotonic_ns() u64 {
+-	now := monotonic_clock
++	now := time.clock_now(time.clock_type_monotonic) or { time.TimeSpec{} }
+ 	return u64(now.tv_sec) * 1000000000 + u64(now.tv_nsec)
+ }
+ 
+@@ -360,12 +360,20 @@ pub fn syscall_timerfd_settime(_ voidptr, fdnum int, flags int, new_value u64, o
+ 	if flags & tfd_timer_abstime != 0 {
+ 		// An absolute deadline is on the timer's own clock. Both clocks advance
+ 		// together here, so the monotonic reading is the one to keep.
+-		now_wall := if timer.clock_id == 0 { timespec_to_ns(realtime_clock) } else { monotonic_ns() }
++		// Read realtime first so conversion skew can only delay an expiry.
++		wall_now := if timer.clock_id == 0 {
++			wall_clock := time.clock_now(time.clock_type_realtime) or { time.TimeSpec{} }
++			timespec_to_ns(wall_clock)
++		} else {
++			u64(0)
++		}
++		now_monotonic := monotonic_ns()
++		now_wall := if timer.clock_id == 0 { wall_now } else { now_monotonic }
+ 		if wanted <= now_wall {
+ 			// Already past: it fires on the next tick.
+-			timer.deadline_ns = monotonic_ns()
++			timer.deadline_ns = now_monotonic
+ 		} else {
+-			timer.deadline_ns = monotonic_ns() + (wanted - now_wall)
++			timer.deadline_ns = now_monotonic + (wanted - now_wall)
+ 		}
+ 	} else {
+ 		timer.deadline_ns = monotonic_ns() + wanted
+diff --git a/kernel/time/sys/linux.v b/kernel/time/sys/linux.v
+index f020fc6d..b7d0d7de 100644
+--- a/kernel/time/sys/linux.v
++++ b/kernel/time/sys/linux.v
+@@ -124,7 +124,7 @@ pub fn syscall_gettimeofday(_ voidptr, tv u64, tz u64) (u64, u64) {
+ 	return 0, 0
+ }
+ 
+-// Precise wall clocks use the architectural counter on ARM64. Coarse clocks
++// Precise wall clocks use a free-running counter. Coarse clocks
+ // and CPU accounting are still sampled by the timer tick.
+ pub fn syscall_clock_getres(_ voidptr, clock_id int, res u64) (u64, u64) {
+ 	read_clock(clock_id) or { return errno.err, errno.get() }
+@@ -179,7 +179,7 @@ pub fn syscall_clock_nanosleep(_ voidptr, clock_id int, flags int, request u64,
+ 		return 0, 0
+ 	}
+ 
+-	started := monotonic_clock
++	started := time.clock_now(time.clock_type_monotonic) or { time.TimeSpec{} }
+ 
+ 	mut events := []&eventstruct.Event{}
+ 	defer {
+@@ -198,7 +198,7 @@ pub fn syscall_clock_nanosleep(_ voidptr, clock_id int, flags int, request u64,
+ 		// the deadline and can simply ask again. A relative one gets what is
+ 		// left, worked out from how long it actually waited.
+ 		if flags & timer_abstime == 0 && remain != 0 {
+-			mut elapsed := monotonic_clock
++			mut elapsed := time.clock_now(time.clock_type_monotonic) or { time.TimeSpec{} }
+ 			elapsed.sub(started)
+ 
+ 			mut left := duration
+diff --git a/kernel/time/sys/syscalls.v b/kernel/time/sys/syscalls.v
+index c3ac9cda..7d0a5354 100644
+--- a/kernel/time/sys/syscalls.v
++++ b/kernel/time/sys/syscalls.v
+@@ -54,7 +54,7 @@ pub fn syscall_nanosleep(_ voidptr, request u64, remain u64) (u64, u64) {
+ 		return errno.err, errno.einval
+ 	}
+ 
+-	started := monotonic_clock
++	started := time.clock_now(time.clock_type_monotonic) or { time.TimeSpec{} }
+ 
+ 	mut events := []&eventstruct.Event{}
+ 	defer {
+@@ -75,7 +75,7 @@ pub fn syscall_nanosleep(_ voidptr, request u64, remain u64) (u64, u64) {
+ 			// the time actually spent asleep, not the absolute monotonic clock.
+ 			// Returning the latter makes libc's ordinary EINTR retry sleep until
+ 			// approximately the Unix epoch measured from now.
+-			mut elapsed := monotonic_clock
++			mut elapsed := time.clock_now(time.clock_type_monotonic) or { time.TimeSpec{} }
+ 			elapsed.sub(started)
+ 
+ 			mut left := duration
+diff --git a/kernel/time/time.v b/kernel/time/time.v
+index 996b2864..7b93b16a 100644
+--- a/kernel/time/time.v
++++ b/kernel/time/time.v
+@@ -2,7 +2,6 @@
+ module time
+ 
+ import event.eventstruct
+-import katomic
+ import klock
+ 
+ pub const timer_frequency = u64(1000)
+@@ -64,28 +63,15 @@ __global (
+ // Return a stable snapshot of a clock for interfaces, such as absolute futex
+ // deadlines, that need to translate a point in time into a timer duration.
+ pub fn clock_now(clock_id int) ?TimeSpec {
+-	$if aarch64 {
+-		return precise_clock_now(clock_id)
+-	}
+-	match clock_id {
+-		clock_type_realtime {
+-			return realtime_clock
+-		}
+-		clock_type_monotonic {
+-			return monotonic_clock
+-		}
+-		else {
+-			return none
+-		}
+-	}
++	return precise_clock_now(clock_id)
+ }
+ 
+ fn C.event__trigger(mut event eventstruct.Event, drop bool) u64
+ 
+-// timer_handler is the fixed frequency case: a tick source that really does
+-// interrupt at `timer_frequency` can just say so.
++// A periodic interrupt samples the counter rather than counting deliveries:
++// hardware can merge multiple ticks while interrupts are disabled.
+ pub fn timer_handler() {
+-	advance_clocks(TimeSpec{0, i64(1000000000 / timer_frequency)})
++	advance_to_ns(counter_now_ns())
+ }
+ 
+ // advance_to_ns moves the clocks forward to a reading of a free running
+@@ -103,14 +89,20 @@ pub fn advance_to_ns(now_ns u64) {
+ 		return
+ 	}
+ 	last := clock_last_ns
+-	clock_last_ns = now_ns
+-	clock_tick_lock.release()
+-
+-	if last == 0 || now_ns <= last {
++	if now_ns <= last {
++		clock_tick_lock.release()
+ 		return
+ 	}
++	clock_last_ns = now_ns
+ 	delta := now_ns - last
+-	advance_clocks(TimeSpec{i64(delta / 1000000000), i64(delta % 1000000000)})
++	interval := TimeSpec{i64(delta / 1000000000), i64(delta % 1000000000)}
++	monotonic_clock.add(interval)
++	realtime_clock.add(interval)
++	clock_tick_lock.release()
++
++	// Events and hooks may take scheduler locks. Keep them outside the clock
++	// update lock; timers compare absolute deadlines if another tick wins.
++	expire_timers()
+ }
+ 
+ // Anything that has to look at the clock every tick registers here. The
+@@ -139,40 +131,18 @@ pub fn register_tick_hook(hook fn ()) bool {
+ 	return true
+ }
+ 
+-// Time that has passed but has not been taken off the armed timers yet,
+-// because the CPU it passed on found another one already walking them. It is
+-// added to the next interval that does get through, so a timer counts down by
+-// every nanosecond that has elapsed rather than only by the ones nobody
+-// collided over -- otherwise a sleep runs long by however much tick time was
+-// dropped, and it runs longer the more CPUs there are to collide.
+-__global (
+-	timers_unapplied_ns = u64(0)
+-)
+-
+-// advance_clocks moves both clocks forward by `interval` and expires every
+-// armed timer that interval covers.
+-pub fn advance_clocks(interval TimeSpec) {
+-	monotonic_clock.add(interval)
+-	realtime_clock.add(interval)
+-
++// Counter deadlines include every interval even when a tick loses this lock.
++fn expire_timers() {
+ 	if timers_lock.test_and_acquire() == true {
+-		mut applied := interval
+-		carried := katomic.load(&timers_unapplied_ns)
+-		if carried > 0 && katomic.cas(mut &timers_unapplied_ns, carried, u64(0)) {
+-			applied.add(TimeSpec{i64(carried / 1000000000), i64(carried % 1000000000)})
+-		}
+-
++		// One counter read covers this pass. A newly armed timer cannot enter
++		// the list until this lock is released.
++		now_ns := counter_now_ns()
+ 		for i := 0; i < armed_timers.len; i++ {
+ 			mut timer := armed_timers[i]
+ 			if timer.fired == true {
+ 				continue
+ 			}
+-			mut expired := false
+-			$if aarch64 {
+-				expired = counter_timer_expired(timer.deadline_ns)
+-			} $else {
+-				expired = timer.when.sub(applied)
+-			}
++			expired := now_ns >= timer.deadline_ns
+ 			if expired {
+ 				C.event__trigger(mut &timer.event, false)
+ 				timer.fired = true
+@@ -180,14 +150,6 @@ pub fn advance_clocks(interval TimeSpec) {
+ 		}
+ 
+ 		timers_lock.release()
+-	} else {
+-		missed := u64(interval.tv_sec) * 1000000000 + u64(interval.tv_nsec)
+-		for {
+-			carried := katomic.load(&timers_unapplied_ns)
+-			if katomic.cas(mut &timers_unapplied_ns, carried, carried + missed) {
+-				break
+-			}
+-		}
+ 	}
+ 
+ 	count := tick_hooks_len
+@@ -202,7 +164,7 @@ pub mut:
+ 	event eventstruct.Event
+ 	index int
+ 	fired bool
+-	// ARM64 timers expire against the counter, so a tick cannot charge them
++	// Timers expire against the counter, so a tick cannot charge them
+ 	// for time that passed before they were armed.
+ 	deadline_ns u64
+ }
+@@ -235,9 +197,7 @@ pub fn (mut this Timer) arm() {
+ 	timers_lock.acquire()
+ 
+ 	this.fired = false
+-	$if aarch64 {
+-		this.deadline_ns = counter_timer_deadline(this.when)
+-	}
++	this.deadline_ns = counter_timer_deadline(this.when)
+ 	this.index = armed_timers.len
+ 	armed_timers << this
+ 
+diff --git a/kernel/time/time_amd64.v b/kernel/time/time_amd64.v
+index bcbc9da2..da13d592 100644
+--- a/kernel/time/time_amd64.v
++++ b/kernel/time/time_amd64.v
+@@ -2,6 +2,12 @@
+ module time
+ 
+ import limine
++import x86.hpet as hpet_clock
++
++__global (
++	clock_origin_ns u64
++	clock_epoch     i64
++)
+ 
+ @[_linker_section: '.requests']
+ @[cinit]
+@@ -20,10 +26,48 @@ pub fn initialise() {
+ 
+ 	monotonic_clock = TimeSpec{i64(epoch), 0}
+ 	realtime_clock = TimeSpec{i64(epoch), 0}
++	clock_epoch = i64(epoch)
++	clock_origin_ns = hpet_clock.nanoseconds()
++	clock_last_ns = clock_origin_ns
+ 
+ 	pit_initialise()
+ }
+ 
+ pub fn clock_resolution_ns() u64 {
+-	return 1000000000 / timer_frequency
++	resolution := u64(hpet_clock.resolution_nanoseconds())
++	return if resolution == 0 { u64(1) } else { resolution }
++}
++
++fn counter_now_ns() u64 {
++	return hpet_clock.nanoseconds()
++}
++
++// IRQ delivery may coalesce while a syscall holds interrupts disabled. The
++// free-running HPET (or calibrated TSC fallback) still counts that time.
++fn precise_clock_now(clock_id int) ?TimeSpec {
++	if clock_id != clock_type_realtime && clock_id != clock_type_monotonic {
++		return none
++	}
++	elapsed := hpet_clock.nanoseconds() - clock_origin_ns
++	return TimeSpec{
++		tv_sec:  clock_epoch + i64(elapsed / 1000000000)
++		tv_nsec: i64(elapsed % 1000000000)
++	}
++}
++
++fn counter_timer_deadline(duration TimeSpec) u64 {
++	now := hpet_clock.nanoseconds()
++	if duration.tv_sec < 0 || duration.tv_nsec < 0 {
++		return now
++	}
++	room := ~u64(0) - now
++	seconds := u64(duration.tv_sec)
++	if seconds > room / 1000000000 {
++		return ~u64(0)
++	}
++	whole := seconds * 1000000000
++	if u64(duration.tv_nsec) > room - whole {
++		return ~u64(0)
++	}
++	return now + whole + u64(duration.tv_nsec)
+ }
+diff --git a/kernel/time/time_arm64.v b/kernel/time/time_arm64.v
+index e5a8e4d6..a15c7e47 100644
+--- a/kernel/time/time_arm64.v
++++ b/kernel/time/time_arm64.v
+@@ -49,6 +49,10 @@ pub fn clock_resolution_ns() u64 {
+ 	return timer.resolution_ns()
+ }
+ 
++fn counter_now_ns() u64 {
++	return timer.get_ns()
++}
++
+ fn counter_timer_deadline(duration TimeSpec) u64 {
+ 	now := timer.get_ns()
+ 	if duration.tv_sec < 0 || duration.tv_nsec < 0 {
+@@ -67,7 +71,3 @@ fn counter_timer_deadline(duration TimeSpec) u64 {
+ 	}
+ 	return now + whole + u64(duration.tv_nsec)
+ }
+-
+-fn counter_timer_expired(deadline u64) bool {
+-	return timer.get_ns() >= deadline
+-}

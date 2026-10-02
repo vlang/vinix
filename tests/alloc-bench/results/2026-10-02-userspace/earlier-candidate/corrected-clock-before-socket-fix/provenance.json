@@ -1,0 +1,8 @@
+{
+  "status": "completed-valid-superseded-candidate",
+  "reason": "Corrected-clock kernel timings precede the measured socket allocation fixes. Final numbered Vinix cohorts use the later regression-checked kernel.",
+  "kernel_sha256": "c02560d2d4df8b9ff9952b5a2f83023743e8c2212309abe540bf69e076acc592",
+  "benchmark_source_sha256": "bd4a0d74f4f1e8d079d55877f8e90925e2622ce990120b54573a5dc94a9a54b9",
+  "comparison_reference": "../../catalina-1",
+  "all_samples_retained": true
+}

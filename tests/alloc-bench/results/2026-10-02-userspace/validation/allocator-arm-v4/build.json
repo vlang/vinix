@@ -1,0 +1,334 @@
+{
+  "commands": [
+    [
+      "/opt/homebrew/Cellar/musl-cross/0.9.11/libexec/bin/aarch64-linux-musl-gcc",
+      "-Wl,--dynamic-linker=/lib/ld-musl-aarch64-optimized.so.1",
+      "-fuse-ld=lld",
+      "--sysroot=/Users/alex/code/vinix/build/useralloc-arm-v4-final/sysroot-optimized",
+      "-B/Users/alex/code/vinix/build/useralloc-arm-v4-final/sysroot-optimized/lib",
+      "-I/Users/alex/code/vinix/build/useralloc-arm-v4-final/sysroot-optimized/include",
+      "-L/Users/alex/code/vinix/build/useralloc-arm-v4-final/sysroot-optimized/lib",
+      "-std=c11",
+      "-O2",
+      "-Wall",
+      "-Wextra",
+      "-Werror",
+      "-fno-builtin",
+      "-mno-outline-atomics",
+      "-pthread",
+      "/Users/alex/code/vinix/build/useralloc-arm-v4-final/verify.c",
+      "-o",
+      "/Users/alex/code/vinix/build/useralloc-arm-v4-final/rootfs/tests/verify-optimized-dynamic"
+    ],
+    [
+      "/opt/homebrew/Cellar/musl-cross/0.9.11/libexec/bin/aarch64-linux-musl-gcc",
+      "-Wl,--dynamic-linker=/lib/ld-musl-aarch64-optimized.so.1",
+      "-fuse-ld=lld",
+      "--sysroot=/Users/alex/code/vinix/build/useralloc-arm-v4-final/sysroot-optimized",
+      "-B/Users/alex/code/vinix/build/useralloc-arm-v4-final/sysroot-optimized/lib",
+      "-I/Users/alex/code/vinix/build/useralloc-arm-v4-final/sysroot-optimized/include",
+      "-L/Users/alex/code/vinix/build/useralloc-arm-v4-final/sysroot-optimized/lib",
+      "-std=c11",
+      "-O2",
+      "-Wall",
+      "-Wextra",
+      "-Werror",
+      "-fno-builtin",
+      "-mno-outline-atomics",
+      "-pthread",
+      "/Users/alex/code/vinix/build/useralloc-arm-v4-final/verify-all-classes.c",
+      "-o",
+      "/Users/alex/code/vinix/build/useralloc-arm-v4-final/rootfs/tests/verify-all-classes-optimized-dynamic"
+    ],
+    [
+      "/opt/homebrew/Cellar/musl-cross/0.9.11/libexec/bin/aarch64-linux-musl-gcc",
+      "-static",
+      "-fuse-ld=lld",
+      "--sysroot=/Users/alex/code/vinix/build/useralloc-arm-v4-final/sysroot-optimized",
+      "-B/Users/alex/code/vinix/build/useralloc-arm-v4-final/sysroot-optimized/lib",
+      "-I/Users/alex/code/vinix/build/useralloc-arm-v4-final/sysroot-optimized/include",
+      "-L/Users/alex/code/vinix/build/useralloc-arm-v4-final/sysroot-optimized/lib",
+      "-std=c11",
+      "-O2",
+      "-Wall",
+      "-Wextra",
+      "-Werror",
+      "-fno-builtin",
+      "-mno-outline-atomics",
+      "-pthread",
+      "/Users/alex/code/vinix/build/useralloc-arm-v4-final/verify.c",
+      "-o",
+      "/Users/alex/code/vinix/build/useralloc-arm-v4-final/rootfs/tests/verify-optimized-static"
+    ],
+    [
+      "/opt/homebrew/Cellar/musl-cross/0.9.11/libexec/bin/aarch64-linux-musl-gcc",
+      "-static",
+      "-fuse-ld=lld",
+      "--sysroot=/Users/alex/code/vinix/build/useralloc-arm-v4-final/sysroot-optimized",
+      "-B/Users/alex/code/vinix/build/useralloc-arm-v4-final/sysroot-optimized/lib",
+      "-I/Users/alex/code/vinix/build/useralloc-arm-v4-final/sysroot-optimized/include",
+      "-L/Users/alex/code/vinix/build/useralloc-arm-v4-final/sysroot-optimized/lib",
+      "-std=c11",
+      "-O2",
+      "-Wall",
+      "-Wextra",
+      "-Werror",
+      "-fno-builtin",
+      "-mno-outline-atomics",
+      "-pthread",
+      "/Users/alex/code/vinix/build/useralloc-arm-v4-final/verify-all-classes.c",
+      "-o",
+      "/Users/alex/code/vinix/build/useralloc-arm-v4-final/rootfs/tests/verify-all-classes-optimized-static"
+    ],
+    [
+      "/opt/homebrew/Cellar/musl-cross/0.9.11/libexec/bin/aarch64-linux-musl-gcc",
+      "-Wl,--dynamic-linker=/lib/ld-musl-aarch64-disabled.so.1",
+      "-fuse-ld=lld",
+      "--sysroot=/Users/alex/code/vinix/build/useralloc-arm-v4-final/sysroot-disabled",
+      "-B/Users/alex/code/vinix/build/useralloc-arm-v4-final/sysroot-disabled/lib",
+      "-I/Users/alex/code/vinix/build/useralloc-arm-v4-final/sysroot-disabled/include",
+      "-L/Users/alex/code/vinix/build/useralloc-arm-v4-final/sysroot-disabled/lib",
+      "-std=c11",
+      "-O2",
+      "-Wall",
+      "-Wextra",
+      "-Werror",
+      "-fno-builtin",
+      "-mno-outline-atomics",
+      "-pthread",
+      "/Users/alex/code/vinix/build/useralloc-arm-v4-final/verify.c",
+      "-o",
+      "/Users/alex/code/vinix/build/useralloc-arm-v4-final/rootfs/tests/verify-disabled-dynamic"
+    ],
+    [
+      "/opt/homebrew/Cellar/musl-cross/0.9.11/libexec/bin/aarch64-linux-musl-gcc",
+      "-Wl,--dynamic-linker=/lib/ld-musl-aarch64-disabled.so.1",
+      "-fuse-ld=lld",
+      "--sysroot=/Users/alex/code/vinix/build/useralloc-arm-v4-final/sysroot-disabled",
+      "-B/Users/alex/code/vinix/build/useralloc-arm-v4-final/sysroot-disabled/lib",
+      "-I/Users/alex/code/vinix/build/useralloc-arm-v4-final/sysroot-disabled/include",
+      "-L/Users/alex/code/vinix/build/useralloc-arm-v4-final/sysroot-disabled/lib",
+      "-std=c11",
+      "-O2",
+      "-Wall",
+      "-Wextra",
+      "-Werror",
+      "-fno-builtin",
+      "-mno-outline-atomics",
+      "-pthread",
+      "/Users/alex/code/vinix/build/useralloc-arm-v4-final/verify-all-classes.c",
+      "-o",
+      "/Users/alex/code/vinix/build/useralloc-arm-v4-final/rootfs/tests/verify-all-classes-disabled-dynamic"
+    ],
+    [
+      "/opt/homebrew/Cellar/musl-cross/0.9.11/libexec/bin/aarch64-linux-musl-gcc",
+      "-static",
+      "-fuse-ld=lld",
+      "--sysroot=/Users/alex/code/vinix/build/useralloc-arm-v4-final/sysroot-disabled",
+      "-B/Users/alex/code/vinix/build/useralloc-arm-v4-final/sysroot-disabled/lib",
+      "-I/Users/alex/code/vinix/build/useralloc-arm-v4-final/sysroot-disabled/include",
+      "-L/Users/alex/code/vinix/build/useralloc-arm-v4-final/sysroot-disabled/lib",
+      "-std=c11",
+      "-O2",
+      "-Wall",
+      "-Wextra",
+      "-Werror",
+      "-fno-builtin",
+      "-mno-outline-atomics",
+      "-pthread",
+      "/Users/alex/code/vinix/build/useralloc-arm-v4-final/verify.c",
+      "-o",
+      "/Users/alex/code/vinix/build/useralloc-arm-v4-final/rootfs/tests/verify-disabled-static"
+    ],
+    [
+      "/opt/homebrew/Cellar/musl-cross/0.9.11/libexec/bin/aarch64-linux-musl-gcc",
+      "-static",
+      "-fuse-ld=lld",
+      "--sysroot=/Users/alex/code/vinix/build/useralloc-arm-v4-final/sysroot-disabled",
+      "-B/Users/alex/code/vinix/build/useralloc-arm-v4-final/sysroot-disabled/lib",
+      "-I/Users/alex/code/vinix/build/useralloc-arm-v4-final/sysroot-disabled/include",
+      "-L/Users/alex/code/vinix/build/useralloc-arm-v4-final/sysroot-disabled/lib",
+      "-std=c11",
+      "-O2",
+      "-Wall",
+      "-Wextra",
+      "-Werror",
+      "-fno-builtin",
+      "-mno-outline-atomics",
+      "-pthread",
+      "/Users/alex/code/vinix/build/useralloc-arm-v4-final/verify-all-classes.c",
+      "-o",
+      "/Users/alex/code/vinix/build/useralloc-arm-v4-final/rootfs/tests/verify-all-classes-disabled-static"
+    ],
+    [
+      "/opt/homebrew/Cellar/musl-cross/0.9.11/libexec/bin/aarch64-linux-musl-gcc",
+      "-static",
+      "-fuse-ld=lld",
+      "--sysroot=/Users/alex/code/vinix/build/useralloc-arm-v4-final/sysroot-optimized",
+      "-B/Users/alex/code/vinix/build/useralloc-arm-v4-final/sysroot-optimized/lib",
+      "-I/Users/alex/code/vinix/build/useralloc-arm-v4-final/sysroot-optimized/include",
+      "-L/Users/alex/code/vinix/build/useralloc-arm-v4-final/sysroot-optimized/lib",
+      "-std=c11",
+      "-O2",
+      "-Wall",
+      "-Wextra",
+      "-Werror",
+      "-fno-builtin",
+      "-mno-outline-atomics",
+      "-pthread",
+      "/Users/alex/code/vinix/build/useralloc-arm-v4-final/clock.c",
+      "-o",
+      "/Users/alex/code/vinix/build/useralloc-arm-v4-final/rootfs/tests/clock"
+    ],
+    [
+      "/opt/homebrew/Cellar/musl-cross/0.9.11/libexec/bin/aarch64-linux-musl-gcc",
+      "-static",
+      "-fuse-ld=lld",
+      "--sysroot=/Users/alex/code/vinix/build/useralloc-arm-v4-final/sysroot-optimized",
+      "-B/Users/alex/code/vinix/build/useralloc-arm-v4-final/sysroot-optimized/lib",
+      "-I/Users/alex/code/vinix/build/useralloc-arm-v4-final/sysroot-optimized/include",
+      "-L/Users/alex/code/vinix/build/useralloc-arm-v4-final/sysroot-optimized/lib",
+      "-std=c11",
+      "-O2",
+      "-Wall",
+      "-Wextra",
+      "-Werror",
+      "-fno-builtin",
+      "-mno-outline-atomics",
+      "-pthread",
+      "/Users/alex/code/vinix/build/useralloc-arm-v4-final/launcher.c",
+      "-o",
+      "/Users/alex/code/vinix/build/useralloc-arm-v4-final/rootfs/sbin/init"
+    ]
+  ],
+  "compiler": "aarch64-linux-musl-gcc (GCC) 14.2.0",
+  "libc_builds": {
+    "optimized": {
+      "version": "1.2.6",
+      "alpine_package": "musl-1.2.6-r2",
+      "arch": "aarch64",
+      "source_url": "https://musl.libc.org/releases/musl-1.2.6.tar.gz",
+      "source_sha256": "d585fd3b613c66151fc3249e8ed44f77020cb5e6c1e635a616d3f9f82460512a",
+      "patches": [
+        {
+          "name": "handle-aux-at_base.patch",
+          "sha256": "2a65e03b94217063d72fe998e5fb2e25cd01716078a3ba1b0ab574ab205111e6"
+        },
+        {
+          "name": "0001-add-stub-for-pthread_mutexattr_setprioceiling.patch",
+          "sha256": "b2067680c66af9eb9f4fdc1fa5d9337a9fd62bdab2c437b416aa97d79eb884ee"
+        },
+        {
+          "name": "fix-loongarch64-zero-len-extcontext.patch",
+          "sha256": "92c8e965798ed516c15cb2a4e7c4ac45ec1eb68b6abff16c73adff2a3bae1b14"
+        },
+        {
+          "name": "CVE-2026-6042.patch",
+          "sha256": "1d0be2e72b9d5bd16546b923aa8af861d271322f01644716a81823bec4065c99"
+        },
+        {
+          "name": "CVE-2026-40200.patch",
+          "sha256": "1ee29f64f9ca8e8ad7c349779d661ff6b52126a27575d3586981357a52c406fb"
+        },
+        {
+          "name": "malloc-retain.patch",
+          "sha256": "ff14e55c5346e6add14c5bb085fcecb957c756b262231e21ee981a4b536d133e"
+        }
+      ],
+      "cc": [
+        "/opt/homebrew/Cellar/musl-cross/0.9.11/libexec/bin/aarch64-linux-musl-gcc"
+      ],
+      "compiler_version": "aarch64-linux-musl-gcc (GCC) 14.2.0",
+      "compiler_target": "aarch64-linux-musl",
+      "cflags": "-fstack-protector-strong -DVINIX_MALLOC_RETAIN=1",
+      "ldflags": "-Wl,-soname,libc.musl-aarch64.so.1",
+      "optimize": "internal,malloc,malloc/mallocng/*.c,string",
+      "retention": 1,
+      "configure_argv": [
+        "/Users/alex/code/vinix/third_party/useralloc-libc/build/musl/aarch64/e086c78d50c3a4af3cfff411829bc6701e352e0efb5501fb16131b49c1219ff2/musl-1.2.6/configure",
+        "--target=aarch64-linux-musl",
+        "--prefix=/usr",
+        "--syslibdir=/lib",
+        "--disable-wrapper",
+        "--enable-optimize=internal,malloc,malloc/mallocng/*.c,string"
+      ],
+      "libc_so_sha256": "62788e183d49d8cb64ee2f91c8f7269b530f2eb04415243271d6601394119138",
+      "libc_a_sha256": "9d5a7236b1d10bbb3f1e37bcb886ffb1421ff3d1a24e22ef51b625b3c53d9bed"
+    },
+    "disabled": {
+      "version": "1.2.6",
+      "alpine_package": "musl-1.2.6-r2",
+      "arch": "aarch64",
+      "source_url": "https://musl.libc.org/releases/musl-1.2.6.tar.gz",
+      "source_sha256": "d585fd3b613c66151fc3249e8ed44f77020cb5e6c1e635a616d3f9f82460512a",
+      "patches": [
+        {
+          "name": "handle-aux-at_base.patch",
+          "sha256": "2a65e03b94217063d72fe998e5fb2e25cd01716078a3ba1b0ab574ab205111e6"
+        },
+        {
+          "name": "0001-add-stub-for-pthread_mutexattr_setprioceiling.patch",
+          "sha256": "b2067680c66af9eb9f4fdc1fa5d9337a9fd62bdab2c437b416aa97d79eb884ee"
+        },
+        {
+          "name": "fix-loongarch64-zero-len-extcontext.patch",
+          "sha256": "92c8e965798ed516c15cb2a4e7c4ac45ec1eb68b6abff16c73adff2a3bae1b14"
+        },
+        {
+          "name": "CVE-2026-6042.patch",
+          "sha256": "1d0be2e72b9d5bd16546b923aa8af861d271322f01644716a81823bec4065c99"
+        },
+        {
+          "name": "CVE-2026-40200.patch",
+          "sha256": "1ee29f64f9ca8e8ad7c349779d661ff6b52126a27575d3586981357a52c406fb"
+        },
+        {
+          "name": "malloc-retain.patch",
+          "sha256": "ff14e55c5346e6add14c5bb085fcecb957c756b262231e21ee981a4b536d133e"
+        }
+      ],
+      "cc": [
+        "/opt/homebrew/Cellar/musl-cross/0.9.11/libexec/bin/aarch64-linux-musl-gcc"
+      ],
+      "compiler_version": "aarch64-linux-musl-gcc (GCC) 14.2.0",
+      "compiler_target": "aarch64-linux-musl",
+      "cflags": "-fstack-protector-strong -DVINIX_MALLOC_RETAIN=0",
+      "ldflags": "-Wl,-soname,libc.musl-aarch64.so.1",
+      "optimize": "internal,malloc,malloc/mallocng/*.c,string",
+      "retention": 0,
+      "configure_argv": [
+        "/Users/alex/code/vinix/third_party/useralloc-libc/build/musl/aarch64/ff88d5a4ea1a8cd33bb50f215311de4767a7deaec49201e25be59abaed06a69c/musl-1.2.6/configure",
+        "--target=aarch64-linux-musl",
+        "--prefix=/usr",
+        "--syslibdir=/lib",
+        "--disable-wrapper",
+        "--enable-optimize=internal,malloc,malloc/mallocng/*.c,string"
+      ],
+      "libc_so_sha256": "9ae001b36f67895a18665dc7ca1b308f30a805bd7d2bd9b63b7bcee39c24b41a",
+      "libc_a_sha256": "9fc45a4630027492d35b5eb7ae4f0b6df0d535343b2752708e788642853e317e"
+    }
+  },
+  "source_sha256": {
+    "verify.c": "9641312c3b7eba760ba1954577ba755fd5565d1832d8f99d21e282ee0a61239e",
+    "verify-all-classes.c": "77ab00f7bace9f654f5824a6fa64a6408daae4b2a84ccacd734ae07385af1db7",
+    "clock.c": "b8cd130a5b554ef41f5d84841373379409e6a163d6d1eaea5f59b2148a697a71",
+    "launcher.c": "27089c9a66b192d0318f2c1a5dd545397a9947527edb58984c6ae7e3a8607c70"
+  },
+  "artifacts_sha256": {
+    "tests/verify-optimized-dynamic": "3971de8351ec21c93c6cb3e2691a034f794e7c0e072a4cdfb85420d5848550ed",
+    "tests/verify-all-classes-optimized-dynamic": "4b3e292a470d50db17491a3e9685669038ac7da35feb20b18c1ead4dc005c14c",
+    "tests/verify-optimized-static": "ae826a6502c9faef77700a7bd57874132553cd7501a2e9b24a63d488b4de3b55",
+    "tests/verify-all-classes-optimized-static": "8467061683b102c2b02c2e5910957dbfdbe1e6e0da1bafd437c7af77c766cfed",
+    "lib/ld-musl-aarch64-optimized.so.1": "62788e183d49d8cb64ee2f91c8f7269b530f2eb04415243271d6601394119138",
+    "tests/verify-disabled-dynamic": "85d377aaf117aec8ff79cf28bc723068a70aff2db775e2f67f98ee71f2754f29",
+    "tests/verify-all-classes-disabled-dynamic": "abc4bba501e03ed3035eddedd7e5e7ba4c6474916309157e13c70d8bf105e4be",
+    "tests/verify-disabled-static": "2663cfc7a215f612c2474873bc664f6facaca59c2ad3bf66bc8c0a54b5e74a55",
+    "tests/verify-all-classes-disabled-static": "7ff6c25bb4b55177aa2e2479a06e38e9f33f9a45cd72f24640de4983e3f62eb0",
+    "lib/ld-musl-aarch64-disabled.so.1": "9ae001b36f67895a18665dc7ca1b308f30a805bd7d2bd9b63b7bcee39c24b41a",
+    "tests/clock": "d9134cfa29ed34a23748ca22bbcbfc9fb173e8647da7eb1c8e40aa9dc20e0752",
+    "sbin/init": "b3a850c1cb140ccbfea80f9632cf51043c6d2e345773e9c904f5dd2f77f61da8"
+  },
+  "kernel_sha256": "f43f7081476cdeea3e91416aead07014b83bc7532d5ad6bae31adbaa5790f5df",
+  "initramfs_sha256": "b000253ed0b3770b7c96ee7155871e85385f65eacdee37ba565a075837ba0aca",
+  "notes": "Supplementary ARM correctness uses genuine GNU14.2 cross compiler plus LLVMlld and immutable final ff14 musl1.2.6 retained/disabled libraries. Both original and supplemental public API suites execute in static/dynamic modes; no allocation timing."
+}

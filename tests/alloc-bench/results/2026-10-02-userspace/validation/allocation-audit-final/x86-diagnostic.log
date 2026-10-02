@@ -1,0 +1,2308 @@
+Compiler output from the default V compiler:
+build/useralloc-allocation-audit-final/x86-diagnostic-source/main.v:10:8: warning: module 'stubs (lib.stubs)' is imported but never used. Use `import stubs (lib.stubs) as _`, to silence this warning, or just remove the unused import line
+    8 | import fs
+    9 | import krandom
+   10 | import lib.stubs
+      |        ~~~~~~~~~
+   11 | import limine
+   12 | import memory
+build/useralloc-allocation-audit-final/x86-diagnostic-source/main_amd64.v:46:8: warning: module 'limine' is imported but never used. Use `import limine as _`, to silence this warning, or just remove the unused import line
+   44 | import x86.hpet
+   45 | import x86.hypervisor
+   46 | import limine
+      |        ~~~~~~
+   47 | import linuxkpi
+   48 |
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/attributes.v:22:8: warning: module 'stat' is imported but never used. Use `import stat as _`, to silence this warning, or just remove the unused import line
+   20 | import resource
+   21 | import security
+   22 | import stat
+      |        ~~~~
+   23 | import usercopy
+   24 |
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/vfs.v:11:8: warning: module 'security' is imported but never used. Use `import security as _`, to silence this warning, or just remove the unused import line
+    9 | import file
+   10 | import errno
+   11 | import security
+      |        ~~~~~~~~
+   12 | import ioctl
+   13 | import time
+build/useralloc-allocation-audit-final/x86-diagnostic-source/memory/slab.v:7:8: warning: module 'xnualloc' is imported but never used. Use `import xnualloc as _`, to silence this warning, or just remove the unused import line
+    5 | import klock
+    6 | import lib
+    7 | import xnualloc
+      |        ~~~~~~~~
+    8 | 
+    9 | // The default bitmap path remains the independent Vinix implementation.
+build/useralloc-allocation-audit-final/x86-diagnostic-source/numa/numa_amd64.v:9:8: warning: module 'acpi' is imported but never used. Use `import acpi as _`, to silence this warning, or just remove the unused import line
+    7 | module numa
+    8 | 
+    9 | import acpi
+      |        ~~~~
+   10 | import x86.cpu.local as cpulocal
+   11 |
+build/useralloc-allocation-audit-final/x86-diagnostic-source/sched/linuxkpi_amd64.v:8:8: warning: module 'cpu (x86.cpu)' is imported but never used. Use `import cpu (x86.cpu) as _`, to silence this warning, or just remove the unused import line
+    6 | import lib
+    7 | import proc
+    8 | import x86.cpu
+      |        ~~~~~~~
+    9 | import x86.cpu.local as cpulocal
+   10 |
+build/useralloc-allocation-audit-final/x86-diagnostic-source/sched/linuxkpi_amd64.v:9:8: warning: module 'cpulocal (x86.cpu.local)' is imported but never used. Use `import cpulocal (x86.cpu.local) as _`, to silence this warning, or just remove the unused import line
+    7 | import proc
+    8 | import x86.cpu
+    9 | import x86.cpu.local as cpulocal
+      |        ~~~~~~~~~~~~~
+   10 | 
+   11 | __global (
+build/useralloc-allocation-audit-final/x86-diagnostic-source/sched/sched_amd64.v:11:8: warning: module 'mmap (memory.mmap)' is imported but never used. Use `import mmap (memory.mmap) as _`, to silence this warning, or just remove the unused import line
+    9 | import proc
+   10 | import memory
+   11 | import memory.mmap
+      |        ~~~~~~~~~~~
+   12 | import elf
+   13 | import lib
+build/useralloc-allocation-audit-final/x86-diagnostic-source/proc/proc_amd64.v:6:8: warning: module 'katomic' is imported but never used. Use `import katomic as _`, to silence this warning, or just remove the unused import line
+    4 | import klock
+    5 | import x86.hpet as hpetclock
+    6 | import katomic
+      |        ~~~~~~~
+    7 | import lib
+    8 | import x86.cpu.local as cpulocal
+build/useralloc-allocation-audit-final/x86-diagnostic-source/userland/clone_amd64.v:24:8: warning: module 'gdt (x86.gdt)' is imported but never used. Use `import gdt (x86.gdt) as _`, to silence this warning, or just remove the unused import line
+   22 | import usercopy
+   23 | import x86.cpu.local as cpulocal
+   24 | import x86.gdt
+      |        ~~~~~~~
+   25 | 
+   26 | // The signal number a clone's low byte carries.
+build/useralloc-allocation-audit-final/x86-diagnostic-source/userland/linux_signal_amd64.v:18:8: warning: module 'event' is imported but never used. Use `import event as _`, to silence this warning, or just remove the unused import line
+   16 | import lib
+   17 | import sched
+   18 | import event
+      |        ~~~~~
+   19 | import event.eventstruct
+   20 | import errno
+build/useralloc-allocation-audit-final/x86-diagnostic-source/userland/linux_signal_amd64.v:19:8: warning: module 'eventstruct (event.eventstruct)' is imported but never used. Use `import eventstruct (event.eventstruct) as _`, to silence this warning, or just remove the unused import line
+   17 | import sched
+   18 | import event
+   19 | import event.eventstruct
+      |        ~~~~~~~~~~~~~~~~~
+   20 | import errno
+   21 | import time
+build/useralloc-allocation-audit-final/x86-diagnostic-source/userland/linux_signal_amd64.v:21:8: warning: module 'time' is imported but never used. Use `import time as _`, to silence this warning, or just remove the unused import line
+   19 | import event.eventstruct
+   20 | import errno
+   21 | import time
+      |        ~~~~
+   22 | import x86.cpu.local as cpulocal
+   23 | import x86.gdt
+build/useralloc-allocation-audit-final/x86-diagnostic-source/userland/userland.v:15:8: warning: module 'event' is imported but never used. Use `import event as _`, to silence this warning, or just remove the unused import line
+   13 | import x86.gdt
+   14 | import katomic
+   15 | import event
+      |        ~~~~~
+   16 | import event.eventstruct
+   17 | import errno
+build/useralloc-allocation-audit-final/x86-diagnostic-source/userland/userland.v:16:8: warning: module 'eventstruct (event.eventstruct)' is imported but never used. Use `import eventstruct (event.eventstruct) as _`, to silence this warning, or just remove the unused import line
+   14 | import katomic
+   15 | import event
+   16 | import event.eventstruct
+      |        ~~~~~~~~~~~~~~~~~
+   17 | import errno
+   18 | import lib
+build/useralloc-allocation-audit-final/x86-diagnostic-source/userland/userland.v:21:8: warning: module 'term' is imported but never used. Use `import term as _`, to silence this warning, or just remove the unused import line
+   19 | import strings
+   20 | import resource
+   21 | import term
+      |        ~~~~
+   22 | import usercopy
+   23 | import stat
+build/useralloc-allocation-audit-final/x86-diagnostic-source/userland/userland.v:22:8: warning: module 'usercopy' is imported but never used. Use `import usercopy as _`, to silence this warning, or just remove the unused import line
+   20 | import resource
+   21 | import term
+   22 | import usercopy
+      |        ~~~~~~~~
+   23 | import stat
+   24 |
+build/useralloc-allocation-audit-final/x86-diagnostic-source/linuxkpi/bridge_amd64.v:6:8: warning: module 'pci' is imported but never used. Use `import pci as _`, to silence this warning, or just remove the unused import line
+    4 | 
+    5 | import memory
+    6 | import pci
+      |        ~~~
+    7 | import lib
+    8 | import x86.cpu
+build/useralloc-allocation-audit-final/x86-diagnostic-source/linuxkpi/bridge_amd64.v:15:8: warning: module 'time' is imported but never used. Use `import time as _`, to silence this warning, or just remove the unused import line
+   13 | import katomic
+   14 | import x86.hpet as hpet_clock
+   15 | import time
+      |        ~~~~
+   16 | 
+   17 | __global (
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/ext2/ext2.v:7:8: warning: module 'event' is imported but never used. Use `import event as _`, to silence this warning, or just remove the unused import line
+    5 | import resource as resource_mod
+    6 | import lib
+    7 | import event
+      |        ~~~~~
+    8 | import event.eventstruct
+    9 | import memory
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/mount.v:519:6: notice: variable `mount_flags` shadows a function declaration
+  517 |     basename := final_component.clone()
+  518 |     mut mount_node := &VFSNode(unsafe { nil })
+  519 |     mut mount_flags := flags
+      |         ~~~~~~~~~~~
+  520 |     if kind == 'cgroup2' {
+  521 |         mount_node = cgroup_mount_root(parent_of_tgt_node, basename) or {
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/mount.v:904:2: notice: variable `new_mount` shadows a function declaration
+  902 |     }
+  903 |     directory := calling_directory()
+  904 |     new_mount := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
+      |     ~~~~~~~~~
+  905 |     mut new_root := get_node_and_mount(directory, new_path, true, new_mount) or { return errno.err, errno.get() }
+  906 |     mut put_old := get_node(directory, old_path, true) or { return errno.err, errno.get() }
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/namespaces.v:183:7: notice: variable `link` shadows a function declaration
+  181 |             continue
+  182 |         }
+  183 |         mut link := create_node(dir.filesystem, dir, name, false)
+      |             ~~~~
+  184 |         link.resource = new_procfs_resource(.symlink, stat.iflnk | 0o777, pid, 0)
+  185 |         link.symlink_target = text
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/procfs.v:219:4: notice: variable `link` shadows a function declaration
+  217 |     for link_name in ['self', 'thread-self']! {
+  218 |         if link_name in root.children {
+  219 |             link := unsafe { root.children[link_name] }
+      |             ~~~~
+  220 |             mut link_resource := unsafe { &ProcFSResource(link.resource) }
+  221 |             link_resource.view = view
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/procfs.v:1163:2: notice: variable `link` shadows a function declaration
+ 1161 |         return false
+ 1162 |     }
+ 1163 |     link := unsafe { &ProcFSResource(node.resource) }
+      |     ~~~~
+ 1164 |     return link.kind == .self_link || link.kind == .thread_self_link
+ 1165 | }
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/procfs.v:1177:2: notice: variable `link` shadows a function declaration
+ 1175 |     // namespace's own, and there it is known by its kernel pid. A reader that
+ 1176 |     // tree cannot see has no self in it.
+ 1177 |     link := unsafe { &ProcFSResource(node.resource) }
+      |     ~~~~
+ 1178 |     view := unsafe { &proc.Namespace(link.view) }
+ 1179 |     pid := proc.pid_in(current.process, view)
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/procfs.v:1284:7: notice: variable `link` shadows a function declaration
+ 1282 |     if directory.pid != 0 && (name == 'exe' || name == 'cwd' || name == 'root')
+ 1283 |         && name in node.children {
+ 1284 |         mut link := unsafe { node.children[name] }
+      |             ~~~~
+ 1285 |         match name {
+ 1286 |             'exe' {
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/procfs.v:1502:6: notice: variable `link` shadows a function declaration
+ 1500 | 
+ 1501 | fn add_process_link(mut node VFSNode, name string, pid int) &VFSNode {
+ 1502 |     mut link := create_node(node.filesystem, node, name, false)
+      |         ~~~~
+ 1503 |     link.resource = new_procfs_resource(.symlink, stat.iflnk | 0o777, pid, 0)
+ 1504 |     unsafe {
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/procfs.v:1593:9: notice: variable `link` shadows a function declaration
+ 1591 |             if child != unsafe { nil } && child.name.len > 0 && child.name[0] >= `0`
+ 1592 |                 && child.name[0] <= `9` {
+ 1593 |                 mut link := unsafe { child }
+      |                     ~~~~
+ 1594 |                 link.magic_target = unsafe { nil }
+ 1595 |             }
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/procfs.v:1618:7: notice: variable `link` shadows a function declaration
+ 1616 |         // stats these names through the directory, and which runc relies on
+ 1617 |         // when it re-executes itself from a memfd.
+ 1618 |         mut link := create_node(descriptors.filesystem, descriptors, name, false)
+      |             ~~~~
+ 1619 |         link.resource = new_procfs_resource(.symlink, stat.iflnk | 0o700, pid, 0)
+ 1620 |         link.magic_target = target
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/procfs.v:1657:2: notice: variable `link` shadows a function declaration
+ 1655 |         return true
+ 1656 |     }
+ 1657 |     link := unsafe { &ProcFSResource(node.resource) }
+      |     ~~~~
+ 1658 |     return link.kind != .symlink || link.pid == 0 || proc.may_inspect(link.pid)
+ 1659 | }
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/procfs.v:1666:2: notice: variable `link` shadows a function declaration
+ 1664 |         return none
+ 1665 |     }
+ 1666 |     link := unsafe { &ProcFSResource(node.resource) }
+      |     ~~~~
+ 1667 |     if link.kind != .symlink || link.pid == 0 || node.parent.name != 'fd' {
+ 1668 |         return none
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/vfs.v:200:80: notice: `identity` is immutable, cannot have a mutable reference to an immutable object
+  198 |     }
+  199 |     mut index := u64(0)
+  200 |     mut current_node := reduce_node_on_mount(parent, false, depth + 1, effective, identity)
+      |                                                                                   ~~~~~~~~
+  201 | 
+  202 |     if path[index] == `/` {
+build/useralloc-allocation-audit-final/x86-diagnostic-source/krandom/random.v:108:16: notice: `buf` is immutable, cannot have a mutable reference to an immutable object
+  106 | fn (mut this Generator) fill_locked(buf voidptr, count u64) {
+  107 |     mut remaining := count
+  108 |     mut target := buf
+      |                   ~~~
+  109 |     mut block := [16]u32{}
+  110 |     for remaining != 0 {
+build/useralloc-allocation-audit-final/x86-diagnostic-source/memory/pressure.v:39:2: notice: variable `free` shadows a function declaration
+   37 | 
+   38 | pub fn pressure_snapshot() PressureSnapshot {
+   39 |     free := free_bytes()
+      |     ~~~~
+   40 |     total := total_bytes()
+   41 |     pressure_lock.acquire()
+build/useralloc-allocation-audit-final/x86-diagnostic-source/memory/pressure.v:63:2: notice: variable `free` shadows a function declaration
+   61 | // for subsequent passes. Anonymous and live file mappings are not evicted.
+   62 | pub fn pressure_maintenance() {
+   63 |     free := free_bytes()
+      |     ~~~~
+   64 |     marks := pressure_watermarks(total_bytes())
+   65 |     pressure_lock.acquire()
+build/useralloc-allocation-audit-final/x86-diagnostic-source/pagecache/pagecache.v:133:2: notice: uninitialized `fn` struct fields are not allowed, since they can result in segfaults; use `?fn` or `@[required]` or initialize the field with `=` (if you absolutely want to have unsafe function pointers, use `= unsafe { nil }`)
+  131 |     // reboot path -- can reach the backing store. Both are nil until then.
+  132 |     writeback_context voidptr
+  133 |     writeback         IO
+      |     ~~~~~~~~~~~~~~~~~~~~
+  134 | pub:
+  135 |     capacity int = default_capacity
+build/useralloc-allocation-audit-final/x86-diagnostic-source/socket/inet/inet.v:299:6: notice: variable `address` shadows a function declaration
+  297 |     last_poll_ms = now_ms
+  298 | 
+  299 |     mut address := u32(0)
+      |         ~~~~~~~
+  300 |     mut netmask := u32(0)
+  301 |     mut gateway := u32(0)
+build/useralloc-allocation-audit-final/x86-diagnostic-source/socket/inet/inet.v:408:6: notice: variable `address` shadows a function declaration
+  406 | fn parse_nameservers(value &u8) {
+  407 |     mut count := 0
+  408 |     mut address := u32(0)
+      |         ~~~~~~~
+  409 |     mut octet := u32(0)
+  410 |     mut octets := 0
+build/useralloc-allocation-audit-final/x86-diagnostic-source/socket/inet/interfaces.v:46:6: notice: variable `address` shadows a function declaration
+   44 | // A fixed lwIP address slot avoids allocating a second interface registry.
+   45 | pub fn ipv6_address(index u32, slot u32) ?IPv6InterfaceAddress {
+   46 |     mut address := C.vinix_ip_address{}
+      |         ~~~~~~~
+   47 |     mut prefix := u32(0)
+   48 |     mut flags := u32(0)
+build/useralloc-allocation-audit-final/x86-diagnostic-source/socket/inet/interfaces.v:82:7: notice: variable `address` shadows a function declaration
+   80 |     mut mtu := u32(0)
+   81 |     if link_info(unsafe { &mac }, unsafe { &mtu }) {
+   82 |         mut address := u32(0)
+      |             ~~~~~~~
+   83 |         mut netmask := u32(0)
+   84 |         mut gateway := u32(0)
+build/useralloc-allocation-audit-final/x86-diagnostic-source/proc/unveil.v:251:6: notice: variable `copy` shadows a function declaration
+  249 |     mut entries := []UnveilEntry{cap: source.entries.len} @[freed]
+  250 |     entries.flags |= .noslices
+  251 |     mut copy := &UnveilSet{
+      |         ~~~~
+  252 |         entries: entries
+  253 |         locked:  source.locked
+build/useralloc-allocation-audit-final/x86-diagnostic-source/dev/console/terminal.v:337:2: notice: variable `copy` shadows a function declaration
+  335 |     latest_thread = proc.current_thread()
+  336 | 
+  337 |     copy := unsafe { malloc(count) }
+      |     ~~~~
+  338 |     defer {
+  339 |         unsafe { free(copy) }
+build/useralloc-allocation-audit-final/x86-diagnostic-source/userland/exit.v:39:6: notice: variable `current_process` shadows a function declaration
+   37 | fn thread_exit(status int, group bool) {
+   38 |     mut current_thread := proc.current_thread()
+   39 |     mut current_process := current_thread.process
+      |         ~~~~~~~~~~~~~~~
+   40 | 
+   41 |     // A sibling tearing the process down may already have given up waiting and
+build/useralloc-allocation-audit-final/x86-diagnostic-source/userland/exit.v:80:6: notice: variable `current_process` shadows a function declaration
+   78 | pub fn exit_with_fatal_signal(signal u8) {
+   79 |     mut current_thread := proc.current_thread()
+   80 |     mut current_process := current_thread.process
+      |         ~~~~~~~~~~~~~~~
+   81 | 
+   82 |     if !proc.claim_thread_exit(current_thread) {
+build/useralloc-allocation-audit-final/x86-diagnostic-source/userland/linux_task.v:368:6: notice: variable `current_process` shadows a function declaration
+  366 | // wait4(pid, status, options, rusage).
+  367 | pub fn syscall_wait4(_ voidptr, pid int, status_ptr u64, options int, rusage_ptr u64) (u64, u64) {
+  368 |     mut current_process := proc.current_thread().process
+      |         ~~~~~~~~~~~~~~~
+  369 | 
+  370 |     mut child, err := take_exited_child(mut current_process, pid, options & wnohang == 0)
+build/useralloc-allocation-audit-final/x86-diagnostic-source/userland/linux_task.v:395:6: notice: variable `current_process` shadows a function declaration
+  393 | // waitid(idtype, id, infop, options, rusage).
+  394 | pub fn syscall_waitid(_ voidptr, idtype int, id u64, infop u64, options int, rusage_ptr u64) (u64, u64) {
+  395 |     mut current_process := proc.current_thread().process
+      |         ~~~~~~~~~~~~~~~
+  396 | 
+  397 |     // Exactly which state changes to report has to be asked for; we only ever
+build/useralloc-allocation-audit-final/x86-diagnostic-source/userland/signal_send.v:159:6: notice: variable `current_process` shadows a function declaration
+  157 |     }
+  158 | 
+  159 |     mut current_process := proc.current_thread().process
+      |         ~~~~~~~~~~~~~~~
+  160 |     // Pids and groups are the caller's namespace's numbers.
+  161 |     viewer := current_process.numbered_in
+build/useralloc-allocation-audit-final/x86-diagnostic-source/syscall/table/mmap_aslr_amd64.v:18:14: notice: `addr` is immutable, cannot have a mutable reference to an immutable object
+   16 | fn syscall_linux_mmap_aslr(gpr_state voidptr, addr voidptr, length u64, prot int,
+   17 |     flags int, fdnum int, offset i64) (u64, u64) {
+   18 |     mut hint := addr
+      |                 ~~~~
+   19 |     if mmap_aslr_eligible(addr, u32(flags)) {
+   20 |         hint = randomized_mmap_hint(length)
+build/useralloc-allocation-audit-final/x86-diagnostic-source/syscall/table/segments_amd64.v:138:7: notice: variable `free` shadows a function declaration
+  136 |     if index == u32(0xffffffff) {
+  137 |         t := proc.current_thread()
+  138 |         mut free := -1
+      |             ~~~~
+  139 |         for i := 0; i < gdt.tls_entry_count; i++ {
+  140 |             if t.tls[i] == 0 {
+build/useralloc-allocation-audit-final/x86-diagnostic-source/x86/hypervisor/device.v:258:4: notice: variable `exit` shadows a function declaration
+  256 |         }
+  257 |         ioctl_run {
+  258 |             exit := session.vm.run() or {
+      |             ~~~~
+  259 |                 errno.set(errno.eio)
+  260 |                 return none
+build/useralloc-allocation-audit-final/x86-diagnostic-source/linuxkpi/bridge_amd64.v:432:6: notice: variable `free` shadows a function declaration
+  430 |     started := hpet_clock.nanoseconds()
+  431 |     mut stable_since := started
+  432 |     mut free := memory.free_bytes()
+      |         ~~~~
+  433 |     for {
+  434 |         sched.reap_deferred()
+build/useralloc-allocation-audit-final/x86-diagnostic-source/x86/cpu/features.v:199:2: notice: variable `identity` shadows a function declaration
+  197 |     }
+  198 | 
+  199 |     identity := Identity{
+      |     ~~~~~~~~
+  200 |         vendor:       vendor.bytestr()
+  201 |         model_name:   brand[start..].bytestr()
+build/useralloc-allocation-audit-final/x86-diagnostic-source/resource/cache.v:222:7: notice: variable `attributes` shadows a function declaration
+  220 | pub fn mapping_attributes(mut res Resource, handle voidptr, offset u64) u64 {
+  221 |     if mut res is MappingAttributesResource {
+  222 |         mut attributes := MappingAttributesResource(res)
+      |             ~~~~~~~~~~
+  223 |         mut stack_attributes := unsafe { &attributes }
+  224 |         // Returning the call directly makes V heap-promote the interface.
+build/useralloc-allocation-audit-final/x86-diagnostic-source/xnualloc/buddy.v:203:15: notice: `chain` is immutable, cannot have a mutable reference to an immutable object
+  201 |             next.prev = index
+  202 |         }
+  203 |         mut node := chain
+      |                     ~~~~~
+  204 |         node.next = hd.next
+  205 |         node.prev = hd_index
+build/useralloc-allocation-audit-final/x86-diagnostic-source/xnualloc/magazine.v:150:13: notice: `minimum` is immutable, cannot have a mutable reference to an immutable object
+  148 |     unsafe {
+  149 |         if minimum != nil && minimum.full > d.full {
+  150 |             mut m := minimum
+      |                      ~~~~~~~
+  151 |             m.full = d.full
+  152 |         }
+build/useralloc-allocation-audit-final/x86-diagnostic-source/xnualloc/magazine.v:168:13: notice: `minimum` is immutable, cannot have a mutable reference to an immutable object
+  166 |         d.empty--
+  167 |         if minimum != nil && minimum.empty > d.empty {
+  168 |             mut m := minimum
+      |                      ~~~~~~~
+  169 |             m.empty = d.empty
+  170 |         }
+build/useralloc-allocation-audit-final/x86-diagnostic-source/xnualloc/magazine.v:186:13: notice: `minimum` is immutable, cannot have a mutable reference to an immutable object
+  184 |     unsafe {
+  185 |         if minimum != nil && minimum.full > src.full {
+  186 |             mut m := minimum
+      |                      ~~~~~~~
+  187 |             m.full = src.full
+  188 |         }
+build/useralloc-allocation-audit-final/x86-diagnostic-source/xnualloc/magazine.v:190:15: notice: `head` is immutable, cannot have a mutable reference to an immutable object
+  188 |         }
+  189 |         head := src.head
+  190 |         mut last := head
+      |                     ~~~~
+  191 |         for i := u32(1); i < n; i++ {
+  192 |             last = last.next
+build/useralloc-allocation-audit-final/x86-diagnostic-source/xnualloc/magazine.v:221:13: notice: `minimum` is immutable, cannot have a mutable reference to an immutable object
+  219 |     unsafe {
+  220 |         if minimum != nil && minimum.empty > src.empty {
+  221 |             mut m := minimum
+      |                      ~~~~~~~
+  222 |             m.empty = src.empty
+  223 |         }
+build/useralloc-allocation-audit-final/x86-diagnostic-source/xnualloc/magazine.v:225:15: notice: `head` is immutable, cannot have a mutable reference to an immutable object
+  223 |         }
+  224 |         head := *src.tail
+  225 |         mut last := head
+      |                     ~~~~
+  226 |         for i := u32(1); i < n; i++ {
+  227 |             last = last.next
+build/useralloc-allocation-audit-final/x86-diagnostic-source/xnualloc/zone.v:279:12: notice: `head` is immutable, cannot have a mutable reference to an immutable object
+  277 | fn (z &Zone) zone_element_resolve_from(head &ZoneChunk, addr u64) &ZoneChunk {
+  278 |     unsafe {
+  279 |         mut p := head
+      |                  ~~~~
+  280 |         for p != nil {
+  281 |             if z.slot(p, addr) != no_element {
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/overlay.v:86:34: notice: unused parameter: `node`
+   84 | }
+   85 | 
+   86 | fn (mut this OverlayFS) populate(node &VFSNode) {}
+      |                                  ~~~~
+   87 | 
+   88 | fn (mut this OverlayFS) mount(parent &VFSNode, name string, source &VFSNode) ?&VFSNode {
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/overlay.v:88:31: notice: unused parameter: `parent`
+   86 | fn (mut this OverlayFS) populate(node &VFSNode) {}
+   87 | 
+   88 | fn (mut this OverlayFS) mount(parent &VFSNode, name string, source &VFSNode) ?&VFSNode {
+      |                               ~~~~~~
+   89 |     // Mounted through overlay_mount(), which gets the options.
+   90 |     errno.set(errno.einval)
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/overlay.v:88:48: notice: unused parameter: `name`
+   86 | fn (mut this OverlayFS) populate(node &VFSNode) {}
+   87 | 
+   88 | fn (mut this OverlayFS) mount(parent &VFSNode, name string, source &VFSNode) ?&VFSNode {
+      |                                                ~~~~
+   89 |     // Mounted through overlay_mount(), which gets the options.
+   90 |     errno.set(errno.einval)
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/overlay.v:88:61: notice: unused parameter: `source`
+   86 | fn (mut this OverlayFS) populate(node &VFSNode) {}
+   87 | 
+   88 | fn (mut this OverlayFS) mount(parent &VFSNode, name string, source &VFSNode) ?&VFSNode {
+      |                                                             ~~~~~~
+   89 |     // Mounted through overlay_mount(), which gets the options.
+   90 |     errno.set(errno.einval)
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/overlay.v:121:32: notice: unused parameter: `old_parent`
+  119 | }
+  120 | 
+  121 | fn (mut this OverlayFS) rename(old_parent &VFSNode, old_name string, new_parent &VFSNode, new_name string, flags int) ? {
+      |                                ~~~~~~~~~~
+  122 |     // rename() hands overlay directories to overlay_rename() instead.
+  123 |     errno.set(errno.exdev)
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/overlay.v:121:53: notice: unused parameter: `old_name`
+  119 | }
+  120 | 
+  121 | fn (mut this OverlayFS) rename(old_parent &VFSNode, old_name string, new_parent &VFSNode, new_name string, flags int) ? {
+      |                                                     ~~~~~~~~
+  122 |     // rename() hands overlay directories to overlay_rename() instead.
+  123 |     errno.set(errno.exdev)
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/overlay.v:121:70: notice: unused parameter: `new_parent`
+  119 | }
+  120 | 
+  121 | fn (mut this OverlayFS) rename(old_parent &VFSNode, old_name string, new_parent &VFSNode, new_name string, flags int) ? {
+      |                                                                      ~~~~~~~~~~
+  122 |     // rename() hands overlay directories to overlay_rename() instead.
+  123 |     errno.set(errno.exdev)
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/overlay.v:121:91: notice: unused parameter: `new_name`
+  119 | }
+  120 | 
+  121 | fn (mut this OverlayFS) rename(old_parent &VFSNode, old_name string, new_parent &VFSNode, new_name string, flags int) ? {
+      |                                                                                           ~~~~~~~~
+  122 |     // rename() hands overlay directories to overlay_rename() instead.
+  123 |     errno.set(errno.exdev)
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/overlay.v:121:108: notice: unused parameter: `flags`
+  119 | }
+  120 | 
+  121 | fn (mut this OverlayFS) rename(old_parent &VFSNode, old_name string, new_parent &VFSNode, new_name string, flags int) ? {
+      |                                                                                                            ~~~~~
+  122 |     // rename() hands overlay directories to overlay_rename() instead.
+  123 |     errno.set(errno.exdev)
+build/useralloc-allocation-audit-final/x86-diagnostic-source/syscall/table/gaps.v:542:27: notice: unused parameter: `gpr_state`
+  540 | // bytes of each left in its msg_len. glibc's resolver sends a lookup's A and
+  541 | // AAAA queries together this way when a host has addresses of both kinds.
+  542 | fn syscall_linux_sendmmsg(gpr_state voidptr, fdnum int, vec u64, vlen u32, flags int) (u64, u64) {
+      |                           ~~~~~~~~~
+  543 |     count := if vlen > linux_uio_maxiov { u32(linux_uio_maxiov) } else { vlen }
+  544 |     mut sent := u32(0)
+build/useralloc-allocation-audit-final/x86-diagnostic-source/syscall/table/gaps.v:573:27: notice: unused parameter: `gpr_state`
+  571 | // only for the first; the timeout is not kept, so without it the call waits
+  572 | // for every message as a blocking socket would.
+  573 | fn syscall_linux_recvmmsg(gpr_state voidptr, fdnum int, vec u64, vlen u32, flags int, _timeout u64) (u64, u64) {
+      |                           ~~~~~~~~~
+  574 |     count := if vlen > linux_uio_maxiov { u32(linux_uio_maxiov) } else { vlen }
+  575 |     mut received := u32(0)
+build/useralloc-allocation-audit-final/x86-diagnostic-source/syscall/table/linux_common.v:169:25: notice: unused parameter: `gpr_state`
+  167 | // one resource write per iovec lets the peer consume an incomplete message and
+  168 | // close before the payload is written.
+  169 | fn syscall_linux_writev(gpr_state voidptr, fdnum int, iov_ptr u64, iovcnt int) (u64, u64) {
+      |                         ~~~~~~~~~
+  170 |     total, validation_error := validate_linux_iov(iov_ptr, iovcnt)
+  171 |     if validation_error != 0 {
+build/useralloc-allocation-audit-final/x86-diagnostic-source/memory/mmap/mmap.v:1615:81: notice: unused parameter: `prot`
+ 1613 | }
+ 1614 | 
+ 1615 | fn populate_missing_pages(mut pagemap memory.Pagemap, address u64, _length u64, prot int,
+      |                                                                                 ~~~~
+ 1616 |     skip_lazy_shared bool) ? {
+ 1617 |     length := lib.align_up(_length, page_size)
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/ext2/ext2.v:321:33: notice: unused parameter: `handle`
+  319 | }
+  320 | 
+  321 | fn (mut this EXT2Resource) grow(handle voidptr, new_size u64) ? {
+      |                                 ~~~~~~
+  322 |     this.l.acquire()
+  323 |     this.filesystem.l.acquire()
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/ext2/ext2.v:534:70: notice: unused parameter: `source`
+  532 | }
+  533 | 
+  534 | fn (mut this EXT2Filesystem) mount(parent &vfs.VFSNode, name string, source &vfs.VFSNode) ?&vfs.VFSNode {
+      |                                                                      ~~~~~~
+  535 |     this.dev_id = resource_mod.create_dev_id()
+  536 |
+build/useralloc-allocation-audit-final/x86-diagnostic-source/main_amd64.v:142:56: warning: allocation (array initialization)
+  140 |     sched.new_kernel_thread(voidptr(writeback_thread), unsafe { nil }, true)
+  141 | 
+  142 |     userland.start_program(false, vfs_root, '/sbin/init', ['/sbin/init'], [], '/dev/console',
+      |                                                           ~~~~~~~~~~~~~~
+  143 |         '/dev/console', '/dev/console') or { panic('Could not start init process') }
+  144 |
+build/useralloc-allocation-audit-final/x86-diagnostic-source/main_amd64.v:142:72: warning: allocation (array initialization)
+  140 |     sched.new_kernel_thread(voidptr(writeback_thread), unsafe { nil }, true)
+  141 | 
+  142 |     userland.start_program(false, vfs_root, '/sbin/init', ['/sbin/init'], [], '/dev/console',
+      |                                                                           ~~
+  143 |         '/dev/console', '/dev/console') or { panic('Could not start init process') }
+  144 |
+build/useralloc-allocation-audit-final/x86-diagnostic-source/main_amd64.v:189:9: warning: allocation (string interpolation)
+  187 |     uacpi_status = C.uacpi_initialize(0)
+  188 |     if uacpi_status != uacpi.UACPIStatus.ok {
+  189 |         panic('uacpi_initialize(): ${C.uacpi_status_to_string(uacpi_status)}')
+      |               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  190 |     }
+  191 |
+build/useralloc-allocation-audit-final/x86-diagnostic-source/main_amd64.v:194:9: warning: allocation (string interpolation)
+  192 |     uacpi_status = C.uacpi_namespace_load()
+  193 |     if uacpi_status != uacpi.UACPIStatus.ok {
+  194 |         panic('uacpi_namespace_load(): ${C.uacpi_status_to_string(uacpi_status)}')
+      |               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  195 |     }
+  196 |
+build/useralloc-allocation-audit-final/x86-diagnostic-source/main_amd64.v:199:9: warning: allocation (string interpolation)
+  197 |     uacpi_status = C.uacpi_set_interrupt_model(uacpi.InterruptModel.ioapic)
+  198 |     if uacpi_status != uacpi.UACPIStatus.ok {
+  199 |         panic('uacpi_interrupt_model(): ${C.uacpi_status_to_string(uacpi_status)}')
+      |               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  200 |     }
+  201 |
+build/useralloc-allocation-audit-final/x86-diagnostic-source/main_amd64.v:204:9: warning: allocation (string interpolation)
+  202 |     uacpi_status = C.uacpi_namespace_initialize()
+  203 |     if uacpi_status != uacpi.UACPIStatus.ok {
+  204 |         panic('uacpi_namespace_initialize(): ${C.uacpi_status_to_string(uacpi_status)}')
+      |               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  205 |     }
+  206 |
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/cgroup.v:40:28: warning: allocation (array initialization)
+   38 | import time
+   39 | 
+   40 | const cgroup_controllers = ['cpuset', 'cpu', 'io', 'memory', 'pids']
+      |                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   41 | 
+   42 | // The interface files every cgroup directory has. The generated ones are
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/cgroup.v:135:9: warning: allocation (conversion to interface)
+  133 | 
+  134 | fn (this CGroupFS) instantiate() &FileSystem {
+  135 |     return &CGroupFS{}
+      |            ~~~~~~~~~~~
+  136 | }
+  137 |
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/cgroup.v:135:9: warning: allocation (struct on the heap)
+  133 | 
+  134 | fn (this CGroupFS) instantiate() &FileSystem {
+  135 |     return &CGroupFS{}
+      |            ~~~~~~~~~~~
+  136 | }
+  137 |
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/cgroup.v:173:13: warning: allocation (struct on the heap)
+  171 |         cgroup_dev_id = resource.create_dev_id()
+  172 |     }
+  173 |     mut res := &CGroupResource{
+      |                ~~~~~~~~~~~~~~~~
+  174 |         refcount: 1
+  175 |     }
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/cgroup.v:209:18: warning: allocation (conversion to interface)
+  207 | fn create_cgroup_directory(parent &VFSNode, name string, parent_group &CGroup) &VFSNode {
+  208 |     mut node := create_node(unsafe { filesystems['cgroup2'] }, parent, name, true)
+  209 |     node.resource = new_cgroup_resource(stat.ifdir | 0o755)
+      |                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  210 |     mut group := &CGroup{
+  211 |         node:   node
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/cgroup.v:210:15: warning: allocation (struct on the heap)
+  208 |     mut node := create_node(unsafe { filesystems['cgroup2'] }, parent, name, true)
+  209 |     node.resource = new_cgroup_resource(stat.ifdir | 0o755)
+  210 |     mut group := &CGroup{
+      |                  ~~~~~~~~
+  211 |         node:   node
+  212 |         parent: unsafe { parent_group }
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/cgroup.v:238:20: warning: allocation (conversion to interface)
+  236 |         res.name = file_name
+  237 |         res.text = default
+  238 |         child.resource = res
+      |                          ~~~
+  239 |         unsafe {
+  240 |             node.children[file_name] = child
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/devtmpfs.v:187:14: warning: allocation (cast to interface)
+  185 | fn (mut this DevTmpFS) as_filesystem() &FileSystem {
+  186 |     if this.box == unsafe { nil } {
+  187 |         this.box = &FileSystem(this)
+      |                    ~~~~~~~~~~~~~~~~~
+  188 |     }
+  189 |     return this.box
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/devtmpfs.v:199:13: warning: allocation (struct on the heap)
+  197 | 
+  198 | fn (this DevTmpFS) instantiate() &FileSystem {
+  199 |     mut new := &DevTmpFS{}
+      |                ~~~~~~~~~~~
+  200 |     return new.as_filesystem()
+  201 | }
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/devtmpfs.v:220:22: warning: allocation (struct on the heap)
+  218 |     mut new_node := create_node(this.as_filesystem(), parent, name, stat.isdir(mode))
+  219 | 
+  220 |     mut new_resource := &DevTmpFSResource{
+      |                         ~~~~~~~~~~~~~~~~~~
+  221 |         storage: unsafe { nil }
+  222 |         refcount: 1
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/devtmpfs.v:266:22: warning: allocation (struct on the heap)
+  264 |     mut new_node := create_node(this.as_filesystem(), parent, target, false)
+  265 | 
+  266 |     mut new_resource := &DevTmpFSResource{
+      |                         ~~~~~~~~~~~~~~~~~~
+  267 |         storage: unsafe { nil }
+  268 |         refcount: 1
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/devtmpfs.v:294:52: warning: allocation (string interpolation)
+  292 | fn ensure_devtmpfs_dir(parent &VFSNode, name string) &VFSNode {
+  293 |     if name in parent.children {
+  294 |         return unsafe { parent.children[name] or { panic('devtmpfs: missing child ${name}') } }
+      |                                                          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  295 |     }
+  296 |
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/devtmpfs.v:299:22: warning: allocation (struct on the heap)
+  297 |     // `name` may point into a longer path; the node keeps a copy.
+  298 |     mut new_node := create_node(unsafe { filesystems['devtmpfs'] }, parent, name.clone(), true)
+  299 |     mut new_resource := &DevTmpFSResource{
+      |                         ~~~~~~~~~~~~~~~~~~
+  300 |         storage: unsafe { nil }
+  301 |         refcount: 1
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/disk_root.v:12:27: warning: allocation (array initialization)
+   10 | // /run remain the volume's own directories: a persistent root must not quietly
+   11 | // retain a second, growing filesystem in RAM.
+   12 | const disk_root_carried = ['dev', 'proc']
+      |                           ~~~~~~~~~~~~~~~
+   13 | const disk_root_required_directories = ['tmp', 'run']
+   14 |
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/disk_root.v:13:40: warning: allocation (array initialization)
+   11 | // retain a second, growing filesystem in RAM.
+   12 | const disk_root_carried = ['dev', 'proc']
+   13 | const disk_root_required_directories = ['tmp', 'run']
+      |                                        ~~~~~~~~~~~~~~
+   14 | 
+   15 | // Replace the bootstrap RAM root with a writable on-disk one, so that the whole
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/inotify.v:290:17: warning: allocation (struct on the heap)
+  288 |     // only an index protected by inotify_lock, so it must not keep a closed
+  289 |     // instance alive indefinitely.
+  290 |     mut inotify := &INotify{}
+      |                    ~~~~~~~~~~
+  291 |     inotify.stat.mode = stat.ifchr | 0o600
+  292 |     inotify.stat.blksize = 1
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/mknod.v:183:13: warning: allocation (struct on the heap)
+  181 | fn install_device_node(mut parent VFSNode, name string, mode u32, rdev u64, backing &resource.Resource) ?&VFSNode {
+  182 |     mut node := create_node(parent.filesystem, parent, name, false)
+  183 |     mut res := &MknodDeviceResource{
+      |                ~~~~~~~~~~~~~~~~~~~~~
+  184 |         refcount: 1
+  185 |         backing:  unsafe { backing }
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/mknod.v:197:15: warning: allocation (cast to interface)
+  195 |     // One interface value, kept for the life of the node: passing `res` where
+  196 |     // a resource.Resource is taken makes a new one each time.
+  197 |     mut boxed := &resource.Resource(res)
+      |                  ~~~~~~~~~~~~~~~~~~~~~~~
+  198 |     res.boxed = boxed
+  199 |     number_special_node(mut boxed, parent)
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/mknod.v:216:15: warning: allocation (cast to interface)
+  214 |     }
+  215 |     // One interface value for the node, rather than one more for the call.
+  216 |     mut boxed := &resource.Resource(new_pipe)
+      |                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  217 |     number_special_node(mut boxed, parent)
+  218 |     mut node := create_node(parent.filesystem, parent, name, false)
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/mount.v:91:24: warning: allocation (struct on the heap)
+   89 | 
+   90 | fn init_mount_tables() {
+   91 |     initial_mount_table = &MountTable{
+      |                           ~~~~~~~~~~~~
+   92 |         initial: true
+   93 |     }
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/mount.v:190:11: warning: allocation (struct on the heap)
+  188 | fn record_mount(mut table MountTable, covered &VFSNode, root &VFSNode, source string,
+  189 |     fstype string, flags u64, options string, parent_mount &lib.MountContext) &Mount {
+  190 |     entry := &Mount{
+      |              ~~~~~~~
+  191 |         id:      katomic.inc(mut &mount_id_counter) + 1
+  192 |         covered: unsafe { covered }
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/mount.v:218:15: warning: allocation (struct on the heap)
+  216 | // The mount table a new mount namespace starts with: a copy of its parent's.
+  217 | pub fn copy_mount_table(parent &MountTable) &MountTable {
+  218 |     mut table := &MountTable{}
+      |                  ~~~~~~~~~~~~~
+  219 |     table.mounts.flags |= .noslices
+  220 |     mut source := unsafe { parent }
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/mount.v:227:19: warning: allocation (struct on the heap)
+  225 |         mut original := unsafe { entry }
+  226 |         original.lock.acquire()
+  227 |         table.mounts << &Mount{
+      |                         ~~~~~~~
+  228 |             id:      entry.id
+  229 |             covered: entry.covered
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/mount.v:469:28: warning: allocation (array initialization)
+  467 | }
+  468 | 
+  469 | const pseudo_filesystems = ['tmpfs', 'procfs', 'sysfs', 'devtmpfs', 'cgroup2', 'overlay']
+      |                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  470 | 
+  471 | fn new_mount(parent &VFSNode, source string, target string, fstype string, flags u64, options string) ? {
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/namespaces.v:77:13: warning: allocation (struct on the heap)
+   75 |         nsfs_dev_id = resource.create_dev_id()
+   76 |     }
+   77 |     mut res := &NsFSResource{
+      |                ~~~~~~~~~~~~~~
+   78 |         refcount: 1
+   79 |         ns:       ns
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/namespaces.v:91:18: warning: allocation (conversion to interface)
+   89 |     mut node := create_node(unsafe { filesystems['tmpfs'] }, unsafe { nil }, namespace_link_text(ns),
+   90 |         false)
+   91 |     node.resource = res
+      |                     ~~~
+   92 |     ns.node = voidptr(node)
+   93 |     return node
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/namespaces.v:184:19: warning: allocation (conversion to interface)
+  182 |         }
+  183 |         mut link := create_node(dir.filesystem, dir, name, false)
+  184 |         link.resource = new_procfs_resource(.symlink, stat.iflnk | 0o777, pid, 0)
+      |                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  185 |         link.symlink_target = text
+  186 |         link.magic_target = target
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/overlay.v:81:9: warning: allocation (conversion to interface)
+   79 | 
+   80 | fn (mut this OverlayFS) instantiate() &FileSystem {
+   81 |     return &OverlayFS{
+      |            ~~~~~~~~~~~
+   82 |         lowers: []&VFSNode{}
+   83 |     }
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/overlay.v:81:9: warning: allocation (struct on the heap)
+   79 | 
+   80 | fn (mut this OverlayFS) instantiate() &FileSystem {
+   81 |     return &OverlayFS{
+      |            ~~~~~~~~~~~
+   82 |         lowers: []&VFSNode{}
+   83 |     }
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/overlay.v:310:16: warning: allocation (struct on the heap)
+  308 |                 continue
+  309 |             }
+  310 |             mut item := &OverlayMerge{
+      |                         ~~~~~~~~~~~~~~
+  311 |                 top:        child
+  312 |                 from_upper: from_upper
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/overlay.v:339:59: warning: allocation (struct on the heap)
+  337 |                 lowers << item.top
+  338 |             }
+  339 |             mut child := overlay_node(dir, name.clone(), item.top, &OverlayEntry{
+      |                                                                    ~~~~~~~~~~~~~~
+  340 |                 fs:        entry.fs
+  341 |                 upper:     if item.from_upper { item.top } else { unsafe { nil } }
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/overlay.v:516:39: warning: allocation (struct on the heap)
+  514 | // The node for a name just made in the upper layer.
+  515 | fn overlay_new_node(dir &VFSNode, name string, real &VFSNode, replaced_whiteout bool) &VFSNode {
+  516 |     return overlay_node(dir, name, real, &OverlayEntry{
+      |                                          ~~~~~~~~~~~~~~
+  517 |         fs:        dir.overlay.fs
+  518 |         // Overlay nodes are heap objects the tree keeps.
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/overlay.v:767:13: warning: allocation (struct on the heap)
+  765 |         }
+  766 |     }
+  767 |     mut ofs := &OverlayFS{
+      |                ~~~~~~~~~~~
+  768 |         dev_id: resource.create_dev_id()
+  769 |         upper:  upper
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/overlay.v:773:26: warning: allocation (conversion to interface)
+  771 |         lowers: lowers.clone()
+  772 |     }
+  773 |     mut root := create_node(ofs, mount_parent, name, true)
+      |                             ~~~
+  774 |     root.resource = if upper != unsafe { nil } { upper.resource } else { lowers[0].resource }
+  775 |     root.read_only = upper == unsafe { nil }
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/overlay.v:776:17: warning: allocation (struct on the heap)
+  774 |     root.resource = if upper != unsafe { nil } { upper.resource } else { lowers[0].resource }
+  775 |     root.read_only = upper == unsafe { nil }
+  776 |     root.overlay = &OverlayEntry{
+      |                    ~~~~~~~~~~~~~~
+  777 |         fs:     ofs
+  778 |         upper:  upper
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/procfs.v:42:28: warning: allocation (string concatenation)
+   40 | const uname_release = '0.1.0'
+   41 | 
+   42 | const uname_release_line = uname_release + '\n'
+      |                            ~~~~~~~~~~~~~~~~~~~~
+   43 | 
+   44 | // What a node under /proc describes. Directories are rebuilt on access; the
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/procfs.v:230:26: warning: allocation (conversion to interface)
+  228 | // namespace `view` (nil for the initial one), filled in on first look.
+  229 | fn (mut this ProcFS) build_root(parent &VFSNode, name string, view voidptr) &VFSNode {
+  230 |     mut root := create_node(this, parent, name, true)
+      |                             ~~~~
+  231 |     mut root_resource := new_procfs_resource(.directory, stat.ifdir | 0o555, 0, 0)
+  232 |     root_resource.view = view
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/procfs.v:236:18: warning: allocation (conversion to interface)
+  234 |         root_resource.stat.ino = 1
+  235 |     }
+  236 |     root.resource = root_resource
+      |                     ~~~~~~~~~~~~~
+  237 | 
+  238 |     // The machine-wide files never come and go, so they are made once.
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/procfs.v:289:31: warning: allocation (conversion to interface)
+  287 |     // stored target is only what a listing shows; resolution goes through
+  288 |     // procfs_self_target().
+  289 |     mut self_node := create_node(this, root, 'self', false)
+      |                                  ~~~~
+  290 |     mut self_resource := new_procfs_resource(.self_link, stat.iflnk | 0o777, 0, 0)
+  291 |     self_resource.view = view
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/procfs.v:292:23: warning: allocation (conversion to interface)
+  290 |     mut self_resource := new_procfs_resource(.self_link, stat.iflnk | 0o777, 0, 0)
+  291 |     self_resource.view = view
+  292 |     self_node.resource = self_resource
+      |                          ~~~~~~~~~~~~~
+  293 |     self_node.symlink_target = 'self'
+  294 |     unsafe {
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/procfs.v:298:33: warning: allocation (conversion to interface)
+  296 |     }
+  297 | 
+  298 |     mut thread_self := create_node(this, root, 'thread-self', false)
+      |                                    ~~~~
+  299 |     mut thread_self_resource := new_procfs_resource(.thread_self_link, stat.iflnk | 0o777,
+  300 |         0, 0)
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/procfs.v:302:25: warning: allocation (conversion to interface)
+  300 |         0, 0)
+  301 |     thread_self_resource.view = view
+  302 |     thread_self.resource = thread_self_resource
+      |                            ~~~~~~~~~~~~~~~~~~~~
+  303 |     thread_self.symlink_target = 'thread-self'
+  304 |     unsafe {
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/procfs.v:349:22: warning: allocation (struct on the heap)
+  347 | 
+  348 | fn new_procfs_resource(kind ProcFSKind, mode u32, pid int, tid int) &ProcFSResource {
+  349 |     mut new_resource := &ProcFSResource{
+      |                         ~~~~~~~~~~~~~~~~
+  350 |         kind:     kind
+  351 |         pid:      pid
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/procfs.v:373:18: warning: allocation (conversion to interface)
+  371 | fn add_procfs_directory(mut parent VFSNode, name string) &VFSNode {
+  372 |     mut node := create_node(parent.filesystem, parent, name, true)
+  373 |     node.resource = new_procfs_resource(.directory, stat.ifdir | 0o555, 0, 0)
+      |                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  374 |     node.create_dotentries(parent)
+  375 |     unsafe {
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/procfs.v:391:18: warning: allocation (conversion to interface)
+  389 |     res.text = default
+  390 |     res.stat.size = u64(default.len)
+  391 |     node.resource = res
+      |                     ~~~
+  392 |     unsafe {
+  393 |         parent.children[name] = node
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/procfs.v:444:18: warning: allocation (conversion to interface)
+  442 | fn add_procfs_file(mut parent VFSNode, name string, kind ProcFSKind) &VFSNode {
+  443 |     mut node := create_node(parent.filesystem, parent, name, false)
+  444 |     node.resource = new_procfs_resource(kind, stat.ifreg | 0o444, 0, 0)
+      |                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  445 |     unsafe {
+  446 |         parent.children[name] = node
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/procfs.v:455:18: warning: allocation (conversion to interface)
+  453 | fn add_process_writable(mut parent VFSNode, name string, kind ProcFSKind, pid int) {
+  454 |     mut node := create_node(parent.filesystem, parent, name, false)
+  455 |     node.resource = new_procfs_resource(kind, stat.ifreg | 0o644, pid, 0)
+      |                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  456 |     unsafe {
+  457 |         parent.children[name] = node
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/procfs.v:1390:18: warning: allocation (conversion to interface)
+ 1388 |     directory.lazy = true
+ 1389 |     directory.view = view
+ 1390 |     node.resource = directory
+      |                     ~~~~~~~~~
+ 1391 |     node.create_dotentries(root)
+ 1392 |     unsafe {
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/procfs.v:1408:29: warning: allocation (array initialization)
+ 1406 | // descriptors, namespaces and mounts are its process', since Vinix threads
+ 1407 | // share all three.
+ 1408 | const process_entry_names = ['cmdline', 'comm', 'stat', 'statm', 'status', 'cgroup', 'environ',
+      |                             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 1409 |     'mountinfo', 'mounts', 'mountstats', 'maps', 'smaps', 'auxv', 'limits', 'loginuid',
+ 1410 |     'oom_score_adj', 'uid_map', 'gid_map', 'setgroups', 'root', 'cwd', 'exe', 'fd', 'ns', 'attr']
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/procfs.v:1503:18: warning: allocation (conversion to interface)
+ 1501 | fn add_process_link(mut node VFSNode, name string, pid int) &VFSNode {
+ 1502 |     mut link := create_node(node.filesystem, node, name, false)
+ 1503 |     link.resource = new_procfs_resource(.symlink, stat.iflnk | 0o777, pid, 0)
+      |                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 1504 |     unsafe {
+ 1505 |         node.children[name] = link
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/procfs.v:1619:19: warning: allocation (conversion to interface)
+ 1617 |         // when it re-executes itself from a memfd.
+ 1618 |         mut link := create_node(descriptors.filesystem, descriptors, name, false)
+ 1619 |         link.resource = new_procfs_resource(.symlink, stat.iflnk | 0o700, pid, 0)
+      |                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 1620 |         link.magic_target = target
+ 1621 |         link.symlink_target = text
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/procfs.v:1707:18: warning: allocation (conversion to interface)
+ 1705 |         unsafe { &ProcFSResource(parent.resource) }.tid)
+ 1706 |     pfile.view = unsafe { &ProcFSResource(parent.resource) }.view
+ 1707 |     node.resource = pfile
+      |                     ~~~~~
+ 1708 |     unsafe {
+ 1709 |         parent.children[name] = node
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/procfs.v:1739:19: warning: allocation (conversion to interface)
+ 1737 |         directory.lazy = true
+ 1738 |         directory.view = view
+ 1739 |         node.resource = directory
+      |                         ~~~~~~~~~
+ 1740 |         node.create_dotentries(task)
+ 1741 |         unsafe {
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/sysfs.v:67:9: warning: allocation (conversion to interface)
+   65 | 
+   66 | fn (this SysFS) instantiate() &FileSystem {
+   67 |     return &SysFS{}
+      |            ~~~~~~~~
+   68 | }
+   69 |
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/sysfs.v:67:9: warning: allocation (struct on the heap)
+   65 | 
+   66 | fn (this SysFS) instantiate() &FileSystem {
+   67 |     return &SysFS{}
+      |            ~~~~~~~~
+   68 | }
+   69 |
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/sysfs.v:80:26: warning: allocation (conversion to interface)
+   78 |     }
+   79 | 
+   80 |     mut root := create_node(this, parent, name, true)
+      |                             ~~~~
+   81 |     root.resource = new_sysfs_resource(.directory, stat.ifdir | 0o555, 0)
+   82 |     sysfs_root = root
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/sysfs.v:81:18: warning: allocation (conversion to interface)
+   79 | 
+   80 |     mut root := create_node(this, parent, name, true)
+   81 |     root.resource = new_sysfs_resource(.directory, stat.ifdir | 0o555, 0)
+      |                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   82 |     sysfs_root = root
+   83 |
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/sysfs.v:119:22: warning: allocation (struct on the heap)
+  117 | 
+  118 | fn new_sysfs_resource(kind SysFSKind, mode u32, node int) &SysFSResource {
+  119 |     mut new_resource := &SysFSResource{
+      |                         ~~~~~~~~~~~~~~~
+  120 |         kind:     kind
+  121 |         node:     node
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/sysfs.v:139:18: warning: allocation (conversion to interface)
+  137 | fn add_sysfs_directory(mut parent VFSNode, name string) &VFSNode {
+  138 |     mut node := create_node(parent.filesystem, parent, name, true)
+  139 |     node.resource = new_sysfs_resource(.directory, stat.ifdir | 0o555, 0)
+      |                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  140 |     node.create_dotentries(parent)
+  141 |     unsafe {
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/sysfs.v:153:18: warning: allocation (conversion to interface)
+  151 |     file_resource.text = text
+  152 |     file_resource.stat.size = u64(text.len)
+  153 |     node.resource = file_resource
+      |                     ~~~~~~~~~~~~~
+  154 |     unsafe {
+  155 |         parent.children[name] = node
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/sysfs.v:162:18: warning: allocation (conversion to interface)
+  160 | fn add_sysfs_generated(mut parent VFSNode, name string, kind SysFSKind, node_id int) &VFSNode {
+  161 |     mut node := create_node(parent.filesystem, parent, name, false)
+  162 |     node.resource = new_sysfs_resource(kind, stat.ifreg | 0o444, node_id)
+      |                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  163 |     unsafe {
+  164 |         parent.children[name] = node
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/tmpfs.v:595:14: warning: allocation (cast to interface)
+  593 | fn (mut this TmpFS) as_filesystem() &FileSystem {
+  594 |     if this.box == unsafe { nil } {
+  595 |         this.box = &FileSystem(this)
+      |                    ~~~~~~~~~~~~~~~~~
+  596 |     }
+  597 |     return this.box
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/tmpfs.v:601:13: warning: allocation (struct on the heap)
+  599 | 
+  600 | fn (this TmpFS) instantiate() &FileSystem {
+  601 |     mut new := &TmpFS{}
+      |                ~~~~~~~~
+  602 |     return new.as_filesystem()
+  603 | }
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/tmpfs.v:615:22: warning: allocation (struct on the heap)
+  613 |     mut new_node := create_node(this.as_filesystem(), parent, name, stat.isdir(mode))
+  614 | 
+  615 |     mut new_resource := &TmpFSResource{
+      |                         ~~~~~~~~~~~~~~~
+  616 |         storage: unsafe { nil }
+  617 |         refcount: 1
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/tmpfs.v:659:22: warning: allocation (struct on the heap)
+  657 |     mut new_node := create_node(this.as_filesystem(), parent, target, false)
+  658 | 
+  659 |     mut new_resource := &TmpFSResource{
+      |                         ~~~~~~~~~~~~~~~
+  660 |         storage: unsafe { nil }
+  661 |         refcount: 1
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/tmpfs.v:690:22: warning: allocation (struct on the heap)
+  688 | // truncated and mapped — and goes away with its last descriptor.
+  689 | pub fn create_anonymous(mode u32) &resource.Resource {
+  690 |     mut new_resource := &TmpFSResource{
+      |                         ~~~~~~~~~~~~~~~
+  691 |         storage: unsafe { nil }
+  692 |         refcount: 1
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/vfs.v:81:14: warning: allocation (struct on the heap)
+   79 | 
+   80 | pub fn create_node(filesystem &FileSystem, parent &VFSNode, name string, dir bool) &VFSNode {
+   81 |     mut node := &VFSNode{
+      |                 ~~~~~~~~~
+   82 |         name:       name
+   83 |         parent:     unsafe { parent }
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/vfs.v:103:25: warning: allocation (conversion to interface)
+  101 | 
+  102 | pub fn initialise() {
+  103 |     vfs_root = create_node(&TmpFS(unsafe { nil }), &VFSNode(unsafe { nil }), '', false)
+      |                            ~~~~~~~~~~~~~~~~~~~~~~
+  104 |     file.on_handle_released(release_handle_node)
+  105 |     file.on_mount_flags(mount_flags)
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/vfs.v:110:25: warning: allocation (conversion to interface)
+  108 | 
+  109 |     // Install filesystems by name string
+  110 |     filesystems['tmpfs'] = &TmpFS{}
+      |                            ~~~~~~~~
+  111 |     filesystems['devtmpfs'] = &DevTmpFS{}
+  112 |     filesystems['procfs'] = &ProcFS{}
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/vfs.v:110:25: warning: allocation (struct on the heap)
+  108 | 
+  109 |     // Install filesystems by name string
+  110 |     filesystems['tmpfs'] = &TmpFS{}
+      |                            ~~~~~~~~
+  111 |     filesystems['devtmpfs'] = &DevTmpFS{}
+  112 |     filesystems['procfs'] = &ProcFS{}
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/vfs.v:111:28: warning: allocation (conversion to interface)
+  109 |     // Install filesystems by name string
+  110 |     filesystems['tmpfs'] = &TmpFS{}
+  111 |     filesystems['devtmpfs'] = &DevTmpFS{}
+      |                               ~~~~~~~~~~~
+  112 |     filesystems['procfs'] = &ProcFS{}
+  113 |     filesystems['sysfs'] = &SysFS{}
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/vfs.v:111:28: warning: allocation (struct on the heap)
+  109 |     // Install filesystems by name string
+  110 |     filesystems['tmpfs'] = &TmpFS{}
+  111 |     filesystems['devtmpfs'] = &DevTmpFS{}
+      |                               ~~~~~~~~~~~
+  112 |     filesystems['procfs'] = &ProcFS{}
+  113 |     filesystems['sysfs'] = &SysFS{}
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/vfs.v:112:26: warning: allocation (conversion to interface)
+  110 |     filesystems['tmpfs'] = &TmpFS{}
+  111 |     filesystems['devtmpfs'] = &DevTmpFS{}
+  112 |     filesystems['procfs'] = &ProcFS{}
+      |                             ~~~~~~~~~
+  113 |     filesystems['sysfs'] = &SysFS{}
+  114 |     filesystems['cgroup2'] = &CGroupFS{}
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/vfs.v:112:26: warning: allocation (struct on the heap)
+  110 |     filesystems['tmpfs'] = &TmpFS{}
+  111 |     filesystems['devtmpfs'] = &DevTmpFS{}
+  112 |     filesystems['procfs'] = &ProcFS{}
+      |                             ~~~~~~~~~
+  113 |     filesystems['sysfs'] = &SysFS{}
+  114 |     filesystems['cgroup2'] = &CGroupFS{}
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/vfs.v:113:25: warning: allocation (conversion to interface)
+  111 |     filesystems['devtmpfs'] = &DevTmpFS{}
+  112 |     filesystems['procfs'] = &ProcFS{}
+  113 |     filesystems['sysfs'] = &SysFS{}
+      |                            ~~~~~~~~
+  114 |     filesystems['cgroup2'] = &CGroupFS{}
+  115 |     init_mount_tables()
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/vfs.v:113:25: warning: allocation (struct on the heap)
+  111 |     filesystems['devtmpfs'] = &DevTmpFS{}
+  112 |     filesystems['procfs'] = &ProcFS{}
+  113 |     filesystems['sysfs'] = &SysFS{}
+      |                            ~~~~~~~~
+  114 |     filesystems['cgroup2'] = &CGroupFS{}
+  115 |     init_mount_tables()
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/vfs.v:114:27: warning: allocation (conversion to interface)
+  112 |     filesystems['procfs'] = &ProcFS{}
+  113 |     filesystems['sysfs'] = &SysFS{}
+  114 |     filesystems['cgroup2'] = &CGroupFS{}
+      |                              ~~~~~~~~~~~
+  115 |     init_mount_tables()
+  116 | }
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/vfs.v:114:27: warning: allocation (struct on the heap)
+  112 |     filesystems['procfs'] = &ProcFS{}
+  113 |     filesystems['sysfs'] = &SysFS{}
+  114 |     filesystems['cgroup2'] = &CGroupFS{}
+      |                              ~~~~~~~~~~~
+  115 |     init_mount_tables()
+  116 | }
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/xattr.v:39:13: warning: allocation (struct on the heap)
+   37 | // Nothing slices the entries, so one that grows frees the buffer it outgrew.
+   38 | fn new_xattr_set() &XAttrSet {
+   39 |     mut set := &XAttrSet{
+      |                ~~~~~~~~~~
+   40 |         entries: []XAttr{}
+   41 |     }
+build/useralloc-allocation-audit-final/x86-diagnostic-source/krandom/random.v:138:13: warning: allocation (struct on the heap)
+  136 |     mut seed := [64]u8{}
+  137 |     secure := architecture_seed(mut seed)
+  138 |     mut rng := &Generator{
+      |                ~~~~~~~~~~~
+  139 |         secure: secure
+  140 |     }
+build/useralloc-allocation-audit-final/x86-diagnostic-source/memory/virtual_amd64.v:52:17: warning: allocation (struct on the heap)
+   50 |         }
+   51 |     }
+   52 |     mut pagemap := &Pagemap{
+      |                    ~~~~~~~~~
+   53 |         top_level:   top_level
+   54 |         mmap_ranges: []voidptr{}
+build/useralloc-allocation-audit-final/x86-diagnostic-source/pagecache/pagecache.v:151:9: warning: allocation (struct on the heap)
+  149 |         pages = max_capacity
+  150 |     }
+  151 |     return &Cache{
+      |            ~~~~~~~
+  152 |         capacity: int(pages)
+  153 |     }
+build/useralloc-allocation-audit-final/x86-diagnostic-source/socket/inet/inet.v:525:16: warning: allocation (struct on the heap)
+  523 |     // every closed socket's pcb, and the 65th UDP socket, one DNS query in a
+  524 |     // docker pull, failed with ENOMEM.
+  525 |     mut socket := &InetSocket{
+      |                   ~~~~~~~~~~~~
+  526 |         refcount: 0
+  527 |         handle:   unsafe { handle }
+build/useralloc-allocation-audit-final/x86-diagnostic-source/time/time.v:211:15: warning: allocation (struct on the heap)
+  209 | // the global schedule and does not release the heap allocation.
+  210 | pub fn new_timer(when TimeSpec) &Timer {
+  211 |     mut timer := &Timer{
+      |                  ~~~~~~~
+  212 |         when:  when
+  213 |         fired: false
+build/useralloc-allocation-audit-final/x86-diagnostic-source/uacpi/uacpi.v:102:11: warning: allocation (struct on the heap)
+  100 | @[export: 'uacpi_kernel_create_spinlock']
+  101 | pub fn uacpi_kernel_create_spinlock() voidptr {
+  102 |     mut l := &klock.Lock{}
+      |              ~~~~~~~~~~~~~
+  103 |     return unsafe { voidptr(l) }
+  104 | }
+build/useralloc-allocation-audit-final/x86-diagnostic-source/initramfs/initramfs.v:239:13: warning: allocation (string interpolation)
+  237 |                         uart_puts(full_name)
+  238 |                         uart_putc(`\n`)
+  239 |                         panic('initramfs: failed to create file ${full_name}')
+      |                               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  240 |                     }
+  241 |                 }
+build/useralloc-allocation-audit-final/x86-diagnostic-source/initramfs/initramfs.v:257:14: warning: allocation (string interpolation)
+  255 |                         new_resource.grow(unsafe { nil }, size) or {}
+  256 |                         new_resource.write(0, buf, 0, size) or {
+  257 |                             panic('initramfs: failed to write file ${full_name}')
+      |                                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  258 |                         }
+  259 |                     }
+build/useralloc-allocation-audit-final/x86-diagnostic-source/sched/inherit.v:70:18: warning: allocation (struct on the heap)
+   68 |     // Freed when the process is reaped, in proc.free_pid().
+   69 |     fds := unsafe { []voidptr{len: proc.initial_fds} } @[freed]
+   70 |     mut new_proc := &proc.Process{
+      |                     ~~~~~~~~~~~~~~
+   71 |         pagemap: unsafe { nil }
+   72 |         fds:     fds
+build/useralloc-allocation-audit-final/x86-diagnostic-source/sched/sched_amd64.v:75:21: warning: allocation (array initialization)
+   73 |         pagemap: &kernel_pagemap
+   74 |         caps:    proc.full_capabilities()
+   75 |         fds:     unsafe { []voidptr{len: proc.initial_fds} }
+      |                           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   76 |     }
+   77 | }
+build/useralloc-allocation-audit-final/x86-diagnostic-source/sched/sched_amd64.v:72:19: warning: allocation (struct on the heap)
+   70 |     // capabilities, not by a uid of zero, and kernel threads create files
+   71 |     // wherever the initramfs puts them.
+   72 |     kernel_process = &proc.Process{
+      |                      ~~~~~~~~~~~~~~
+   73 |         pagemap: &kernel_pagemap
+   74 |         caps:    proc.full_capabilities()
+build/useralloc-allocation-audit-final/x86-diagnostic-source/sched/sched_amd64.v:672:11: warning: allocation (struct on the heap)
+  670 |     }
+  671 | 
+  672 |     mut t := &proc.Thread{
+      |              ~~~~~~~~~~~~~
+  673 |         process:      kernel_process
+  674 |         cr3:          u64(kernel_process.pagemap.top_level)
+build/useralloc-allocation-audit-final/x86-diagnostic-source/sched/sched_amd64.v:730:11: warning: allocation (struct on the heap)
+  728 |     }
+  729 | 
+  730 |     mut t := &proc.Thread{
+      |              ~~~~~~~~~~~~~
+  731 |         process:      process
+  732 |         cr3:          u64(process.pagemap.top_level)
+build/useralloc-allocation-audit-final/x86-diagnostic-source/sched/sched_amd64.v:818:11: warning: allocation (struct on the heap)
+  816 |     }
+  817 | 
+  818 |     mut t := &proc.Thread{
+      |              ~~~~~~~~~~~~~
+  819 |         process:        process
+  820 |         cr3:            u64(process.pagemap.top_level)
+build/useralloc-allocation-audit-final/x86-diagnostic-source/proc/cgroup_account.v:63:9: warning: allocation (struct on the heap)
+   61 | 
+   62 | pub fn new_cgroup_account(parent &CGroupAccount) &CGroupAccount {
+   63 |     return &CGroupAccount{
+      |            ~~~~~~~~~~~~~~~
+   64 |         parent: unsafe { parent }
+   65 |     }
+build/useralloc-allocation-audit-final/x86-diagnostic-source/proc/container.v:119:9: warning: allocation (struct on the heap)
+  117 | 
+  118 | fn new_namespace(kind u64, id u64) &Namespace {
+  119 |     return &Namespace{
+      |            ~~~~~~~~~~~
+  120 |         kind:     kind
+  121 |         id:       id
+build/useralloc-allocation-audit-final/x86-diagnostic-source/proc/container.v:218:14: warning: allocation (struct on the heap)
+  216 |         mut process := t.process
+  217 |         process.fs_lock.acquire()
+  218 |         mut own := &ThreadFS{
+      |                    ~~~~~~~~~~
+  219 |             root_directory:    process.root_directory
+  220 |             current_directory: process.current_directory
+build/useralloc-allocation-audit-final/x86-diagnostic-source/proc/pledge.v:192:12: warning: allocation (string slice)
+  190 |         }
+  191 |         if i > start {
+  192 |             word := text[start..i]
+      |                     ~~~~~~~~~~~~~~
+  193 |             bit := pledge_bit(word)
+  194 |             unsafe { word.free() }
+build/useralloc-allocation-audit-final/x86-diagnostic-source/proc/proc.v:874:9: warning: allocation (string slice)
+  872 |         return name
+  873 |     }
+  874 |     return name[start..end]
+      |            ~~~~~~~~~~~~~~~~
+  875 | }
+  876 |
+build/useralloc-allocation-audit-final/x86-diagnostic-source/proc/proc.v:968:21: warning: allocation (array initialization)
+  966 | 
+  967 | // The names and units /proc/<pid>/limits gives the limits, in resource order.
+  968 | const limit_names = ['Max cpu time', 'Max file size', 'Max data size', 'Max stack size',
+      |                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  969 |     'Max core file size', 'Max resident set', 'Max processes', 'Max open files',
+  970 |     'Max locked memory', 'Max address space', 'Max file locks', 'Max pending signals',
+build/useralloc-allocation-audit-final/x86-diagnostic-source/proc/proc.v:973:21: warning: allocation (array initialization)
+  971 |     'Max msgqueue size', 'Max nice priority', 'Max realtime priority', 'Max realtime timeout']
+  972 | 
+  973 | const limit_units = ['seconds', 'bytes', 'bytes', 'bytes', 'bytes', 'bytes', 'processes', 'files',
+      |                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  974 |     'bytes', 'bytes', 'locks', 'signals', 'bytes', '', '', 'us']
+  975 |
+build/useralloc-allocation-audit-final/x86-diagnostic-source/proc/seccomp.v:236:20: warning: allocation (struct on the heap)
+  234 |         return false
+  235 |     }
+  236 |     process.seccomp = &SeccompFilter{
+      |                       ~~~~~~~~~~~~~~~
+  237 |         instructions: instructions
+  238 |         prev:         process.seccomp
+build/useralloc-allocation-audit-final/x86-diagnostic-source/proc/unveil.v:71:9: warning: allocation (struct on the heap)
+   69 |     mut entries := []UnveilEntry{cap: 8} @[freed]
+   70 |     entries.flags |= .noslices
+   71 |     return &UnveilSet{
+      |            ~~~~~~~~~~~
+   72 |         entries: entries
+   73 |     }
+build/useralloc-allocation-audit-final/x86-diagnostic-source/proc/unveil.v:251:14: warning: allocation (struct on the heap)
+  249 |     mut entries := []UnveilEntry{cap: source.entries.len} @[freed]
+  250 |     entries.flags |= .noslices
+  251 |     mut copy := &UnveilSet{
+      |                 ~~~~~~~~~~~
+  252 |         entries: entries
+  253 |         locked:  source.locked
+build/useralloc-allocation-audit-final/x86-diagnostic-source/dev/console/terminal.v:74:16: warning: allocation (struct on the heap)
+   72 | // The console device, with the termios a terminal starts with, in /dev.
+   73 | fn setup_console() {
+   74 |     console_res = &Console{}
+      |                   ~~~~~~~~~~
+   75 |     console_box = &resource.Resource(unsafe { console_res })
+   76 |     console_res.stat.size = 0
+build/useralloc-allocation-audit-final/x86-diagnostic-source/dev/console/terminal.v:75:16: warning: allocation (cast to interface)
+   73 | fn setup_console() {
+   74 |     console_res = &Console{}
+   75 |     console_box = &resource.Resource(unsafe { console_res })
+      |                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   76 |     console_res.stat.size = 0
+   77 |     console_res.stat.blocks = 0
+build/useralloc-allocation-audit-final/x86-diagnostic-source/userland/signalfd.v:329:13: warning: allocation (struct on the heap)
+  327 |     }
+  328 | 
+  329 |     mut sfd := &SignalFD{
+      |                ~~~~~~~~~~
+  330 |         mask:  mask
+  331 |         owner: pid
+build/useralloc-allocation-audit-final/x86-diagnostic-source/userland/userland.v:414:19: warning: allocation (struct on the heap)
+  412 | 
+  413 |         stdin_node := fs.get_node(vfs_root, stdin_path, true)?
+  414 |         stdin_handle := &file.Handle{
+      |                         ~~~~~~~~~~~~~
+  415 |             resource: stdin_node.resource
+  416 |             node:     stdin_node
+build/useralloc-allocation-audit-final/x86-diagnostic-source/userland/userland.v:419:15: warning: allocation (struct on the heap)
+  417 |             refcount: 1
+  418 |         }
+  419 |         stdin_fd := &file.FD{
+      |                     ~~~~~~~~~
+  420 |             handle: stdin_handle
+  421 |         }
+build/useralloc-allocation-audit-final/x86-diagnostic-source/userland/userland.v:425:20: warning: allocation (struct on the heap)
+  423 | 
+  424 |         stdout_node := fs.get_node(vfs_root, stdout_path, true)?
+  425 |         stdout_handle := &file.Handle{
+      |                          ~~~~~~~~~~~~~
+  426 |             resource: stdout_node.resource
+  427 |             node:     stdout_node
+build/useralloc-allocation-audit-final/x86-diagnostic-source/userland/userland.v:431:16: warning: allocation (struct on the heap)
+  429 |             flags:    resource.o_wronly
+  430 |         }
+  431 |         stdout_fd := &file.FD{
+      |                      ~~~~~~~~~
+  432 |             handle: stdout_handle
+  433 |         }
+build/useralloc-allocation-audit-final/x86-diagnostic-source/userland/userland.v:437:20: warning: allocation (struct on the heap)
+  435 | 
+  436 |         stderr_node := fs.get_node(vfs_root, stderr_path, true)?
+  437 |         stderr_handle := &file.Handle{
+      |                          ~~~~~~~~~~~~~
+  438 |             resource: stderr_node.resource
+  439 |             node:     stderr_node
+build/useralloc-allocation-audit-final/x86-diagnostic-source/userland/userland.v:443:16: warning: allocation (struct on the heap)
+  441 |             flags:    resource.o_wronly
+  442 |         }
+  443 |         stderr_fd := &file.FD{
+      |                      ~~~~~~~~~
+  444 |             handle: stderr_handle
+  445 |         }
+build/useralloc-allocation-audit-final/x86-diagnostic-source/pipe/pipe.v:54:11: warning: allocation (struct on the heap)
+   52 | 
+   53 | pub fn create() ?&Pipe {
+   54 |     mut p := &Pipe{
+      |              ~~~~~~
+   55 |         // The capacity and readiness of an empty pipe do not need backing
+   56 |         // storage. Allocate the ring on its first nonempty write; shells and
+build/useralloc-allocation-audit-final/x86-diagnostic-source/pipe/pipe.v:85:11: warning: allocation (struct on the heap)
+   83 | // for every container.
+   84 | pub fn create_fifo(mode u32) ?&Pipe {
+   85 |     mut p := &Pipe{
+      |              ~~~~~~
+   86 |         data:     unsafe { nil }
+   87 |         capacity: pipe_capacity
+build/useralloc-allocation-audit-final/x86-diagnostic-source/futex/futex.v:89:7: warning: allocation (struct on the heap)
+   87 |     }
+   88 | 
+   89 |     f := &Futex{
+      |          ~~~~~~~
+   90 |         owner: owner
+   91 |         addr:  addr
+build/useralloc-allocation-audit-final/x86-diagnostic-source/pci/scan.v:48:16: warning: allocation (struct on the heap)
+   46 | 
+   47 | fn check_function(bus u8, slot u8, function u8, parent i64) {
+   48 |     mut device := &PCIDevice{
+      |                   ~~~~~~~~~~~
+   49 |         bus:      bus
+   50 |         slot:     slot
+build/useralloc-allocation-audit-final/x86-diagnostic-source/dev/ata/ata.v:81:26: warning: allocation (conversion to interface)
+   79 |         text.add_decimal(index)
+   80 |         name := text.str()
+   81 |         fs.devtmpfs_add_device(drive, name)
+      |                                ~~~~~
+   82 |         C.kprintf(c'ata: Port %lld initialised as %.*s (%lld bytes)\n', i64(i), i32(name.len),
+   83 |             name.str, i64(drive.stat.size))
+build/useralloc-allocation-audit-final/x86-diagnostic-source/dev/ata/ata.v:97:13: warning: allocation (struct on the heap)
+   95 |         bar4 &= 0xfffffffc
+   96 |     }
+   97 |     mut dev := &ATADrive{
+      |                ~~~~~~~~~~
+   98 |         is_master:         port_index % 2 != 0
+   99 |         data_port:         port
+build/useralloc-allocation-audit-final/x86-diagnostic-source/dev/fbdev/fbdev.v:123:10: warning: allocation (string interpolation)
+  121 |         }
+  122 |         else {
+  123 |             panic('${request}')
+      |                   ~~~~~~~~~~~~
+  124 |             return resource.default_ioctl(handle, request, argp)
+  125 |         }
+build/useralloc-allocation-audit-final/x86-diagnostic-source/dev/fbdev/fbdev.v:169:25: warning: allocation (conversion to interface)
+  167 |     name.add('fb')
+  168 |     name.add_unsigned(index)
+  169 |     fs.devtmpfs_add_device(node, name.str())
+      |                            ~~~~
+  170 |     C.kprintf(c'fbdev: created device node /dev/fb%llu\n', u64(index))
+  171 | }
+build/useralloc-allocation-audit-final/x86-diagnostic-source/dev/nvme/nvme.v:787:18: warning: allocation (struct on the heap)
+  785 |     c.qid_bitmap.initialise(0xffff)
+  786 | 
+  787 |     c.admin_queue = &NVMEQueuePair{
+      |                     ~~~~~~~~~~~~~~~
+  788 |         parent_controller:   unsafe { nil }
+  789 |         submission_queue:    unsafe { nil }
+build/useralloc-allocation-audit-final/x86-diagnostic-source/dev/nvme/nvme.v:852:23: warning: allocation (struct on the heap)
+  850 | 
+  851 |     for i := 0; i < nvme_io_queue_cnt; i++ {
+  852 |         mut new_io_queue := &NVMEQueuePair{
+      |                             ~~~~~~~~~~~~~~~
+  853 |             parent_controller:   unsafe { nil }
+  854 |             submission_queue:    unsafe { nil }
+build/useralloc-allocation-audit-final/x86-diagnostic-source/dev/nvme/nvme.v:874:25: warning: allocation (struct on the heap)
+  872 |     for i := u64(0); i < nsid_count; i++ {
+  873 |         if unsafe { nsid_list[i] != 0 } {
+  874 |             mut new_namespace := &NVMENamespace{
+      |                                  ~~~~~~~~~~~~~~~
+  875 |                 parent_controller: unsafe { nil }
+  876 |                 identity:          unsafe { nil }
+build/useralloc-allocation-audit-final/x86-diagnostic-source/dev/nvme/nvme.v:896:27: warning: allocation (conversion to interface)
+  894 |             name.add_byte(`n`)
+  895 |             name.add_unsigned(i)
+  896 |             fs.devtmpfs_add_device(new_namespace, name.str())
+      |                                    ~~~~~~~~~~~~~
+  897 |             mut prefix_text := lib.new_text(16)
+  898 |             prefix_text.add('nvme')
+build/useralloc-allocation-audit-final/x86-diagnostic-source/dev/nvme/nvme.v:904:34: warning: allocation (conversion to interface)
+  902 |             prefix_text.add_byte(`p`)
+  903 |             prefix := prefix_text.str()
+  904 |             partition.scan_partitions(mut new_namespace, prefix)
+      |                                           ~~~~~~~~~~~~~
+  905 |             unsafe { prefix.free() }
+  906 |
+build/useralloc-allocation-audit-final/x86-diagnostic-source/dev/nvme/nvme.v:919:23: warning: allocation (struct on the heap)
+  917 |         if device.class == nvme_class && device.subclass == nvme_subclass
+  918 |             && device.prog_if == nvme_progif {
+  919 |             mut nvme_device := &NVMEController{
+      |                                ~~~~~~~~~~~~~~~~
+  920 |                 regs:          unsafe { nil }
+  921 |                 controller_id: unsafe { nil }
+build/useralloc-allocation-audit-final/x86-diagnostic-source/dev/serial/serial.v:46:18: warning: allocation (struct on the heap)
+   44 | 
+   45 |     // Add the hardcoded port 1.
+   46 |     mut com1_res := &COMPort{}
+      |                     ~~~~~~~~~~
+   47 |     com1_res.stat.size = 0
+   48 |     com1_res.stat.blocks = 0
+build/useralloc-allocation-audit-final/x86-diagnostic-source/dev/serial/serial.v:55:25: warning: allocation (conversion to interface)
+   53 |     com1_res.port = com1_port
+   54 |     com1_res.port_vector = com1_3_vector
+   55 |     fs.devtmpfs_add_device(com1_res, 'com1')
+      |                            ~~~~~~~~
+   56 | 
+   57 |     // Add the rest of ports.
+build/useralloc-allocation-audit-final/x86-diagnostic-source/dev/serial/serial.v:63:19: warning: allocation (struct on the heap)
+   61 |         if success {
+   62 |             // Construct and add device.
+   63 |             mut com_res := &COMPort{}
+      |                            ~~~~~~~~~~
+   64 |             com_res.stat.size = 0
+   65 |             com_res.stat.blocks = 0
+build/useralloc-allocation-audit-final/x86-diagnostic-source/dev/serial/serial.v:76:27: warning: allocation (conversion to interface)
+   74 |             name.add('com')
+   75 |             name.add_decimal(i + 1)
+   76 |             fs.devtmpfs_add_device(com_res, name.str())
+      |                                    ~~~~~~~
+   77 |         }
+   78 |     }
+build/useralloc-allocation-audit-final/x86-diagnostic-source/dev/streams/streams.v:57:17: warning: allocation (struct on the heap)
+   55 | 
+   56 | fn init_null() {
+   57 |     mut devnull := &DevNull{}
+      |                    ~~~~~~~~~~
+   58 | 
+   59 |     devnull.stat.size = 0
+build/useralloc-allocation-audit-final/x86-diagnostic-source/dev/streams/streams.v:65:25: warning: allocation (conversion to interface)
+   63 |     devnull.stat.mode = 0o666 | stat.ifchr
+   64 | 
+   65 |     fs.devtmpfs_add_device(devnull, 'null')
+      |                            ~~~~~~~
+   66 | }
+   67 |
+build/useralloc-allocation-audit-final/x86-diagnostic-source/dev/streams/streams.v:114:17: warning: allocation (struct on the heap)
+  112 | 
+  113 | fn init_zero() {
+  114 |     mut devzero := &DevZero{}
+      |                    ~~~~~~~~~~
+  115 | 
+  116 |     devzero.stat.size = 0
+build/useralloc-allocation-audit-final/x86-diagnostic-source/dev/streams/streams.v:124:25: warning: allocation (conversion to interface)
+  122 |     devzero.can_mmap = true
+  123 | 
+  124 |     fs.devtmpfs_add_device(devzero, 'zero')
+      |                            ~~~~~~~
+  125 | }
+  126 |
+build/useralloc-allocation-audit-final/x86-diagnostic-source/dev/streams/streams.v:174:17: warning: allocation (struct on the heap)
+  172 | 
+  173 | fn init_full() {
+  174 |     mut devfull := &DevFull{}
+      |                    ~~~~~~~~~~
+  175 | 
+  176 |     devfull.stat.size = 0
+build/useralloc-allocation-audit-final/x86-diagnostic-source/dev/streams/streams.v:184:25: warning: allocation (conversion to interface)
+  182 |     devfull.can_mmap = true
+  183 | 
+  184 |     fs.devtmpfs_add_device(devfull, 'full')
+      |                            ~~~~~~~
+  185 | }
+  186 |
+build/useralloc-allocation-audit-final/x86-diagnostic-source/dev/ahci/ahci.v:669:20: warning: allocation (struct on the heap)
+  667 |                     C.kprintf(c'ahci: sata drive found on port %llu\n', u64(i))
+  668 | 
+  669 |                     mut device := &AHCIDevice{
+      |                                   ~~~~~~~~~~~~
+  670 |                         parent_controller: unsafe { c }
+  671 |                         regs:              port
+build/useralloc-allocation-audit-final/x86-diagnostic-source/dev/ahci/ahci.v:684:29: warning: allocation (conversion to interface)
+  682 |                     name.add('sd')
+  683 |                     name.add_decimal(c.device_list.len)
+  684 |                     fs.devtmpfs_add_device(device, name.str())
+      |                                            ~~~~~~
+  685 |                     mut prefix_text := lib.new_text(8)
+  686 |                     prefix_text.add('sd')
+build/useralloc-allocation-audit-final/x86-diagnostic-source/dev/ahci/ahci.v:690:36: warning: allocation (conversion to interface)
+  688 |                     prefix_text.add_byte(`-`)
+  689 |                     prefix := prefix_text.str()
+  690 |                     partition.scan_partitions(mut device, prefix)
+      |                                                   ~~~~~~
+  691 |                     unsafe { prefix.free() }
+  692 |
+build/useralloc-allocation-audit-final/x86-diagnostic-source/dev/ahci/ahci.v:713:23: warning: allocation (struct on the heap)
+  711 |         if device.class == ahci_class && device.subclass == ahci_subclass
+  712 |             && device.prog_if == ahci_progif {
+  713 |             mut ahci_device := &AHCIController{
+      |                                ~~~~~~~~~~~~~~~~
+  714 |                 regs: unsafe { nil }
+  715 |             }
+build/useralloc-allocation-audit-final/x86-diagnostic-source/dev/hda/hda.v:437:9: warning: allocation (conversion to interface)
+  435 | 
+  436 | fn (c HDACodec) get_output_stream() &oss.OssAudioStream {
+  437 |     return &c.controller.out_streams[0]
+      |            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  438 | }
+  439 |
+build/useralloc-allocation-audit-final/x86-diagnostic-source/dev/hda/hda.v:864:20: warning: allocation (conversion to interface)
+  862 |         i64(c.non_overlapping_output_paths.len))
+  863 | 
+  864 |     oss.create_device(c)
+      |                       ^
+  865 | }
+  866 |
+build/useralloc-allocation-audit-final/x86-diagnostic-source/dev/hda/hda.v:1160:5: warning: allocation (struct on the heap)
+ 1158 | 
+ 1159 |             mut codec := unsafe {
+ 1160 |                 &HDACodec{
+      |                 ~~~~~~~~~~
+ 1161 |                     controller: c
+ 1162 |                     cid:        u8(i)
+build/useralloc-allocation-audit-final/x86-diagnostic-source/dev/hda/hda.v:1181:5: warning: allocation (struct on the heap)
+ 1179 |             || (device.vendor_id == tgl_sst_vendor && device.device_id == tgl_sst_device) {
+ 1180 |             mut hda_device := unsafe {
+ 1181 |                 &HDAController{
+      |                 ~~~~~~~~~~~~~~~
+ 1182 |                     regs:    0
+ 1183 |                     index:   i32(hda_controller_list.len)
+build/useralloc-allocation-audit-final/x86-diagnostic-source/dev/random/random.v:62:13: warning: allocation (struct on the heap)
+   60 | pub fn initialise() {
+   61 |     krandom.initialise()
+   62 |     mut rng := &URandom{}
+      |                ~~~~~~~~~~
+   63 |     rng.stat.blksize = 4096
+   64 |     rng.stat.rdev = resource.create_dev_id()
+build/useralloc-allocation-audit-final/x86-diagnostic-source/dev/random/random.v:71:25: warning: allocation (conversion to interface)
+   69 |         println('random: no trusted boot entropy; secure reads return EAGAIN')
+   70 |     }
+   71 |     fs.devtmpfs_add_device(rng, 'urandom')
+      |                            ~~~
+   72 | }
+build/useralloc-allocation-audit-final/x86-diagnostic-source/dev/mouse/mouse.v:397:25: warning: allocation (conversion to interface)
+  395 |     mouse_res.status |= file.pollout
+  396 | 
+  397 |     fs.devtmpfs_add_device(&mouse_res, 'mouse')
+      |                            ~~~~~~~~~~
+  398 | 
+  399 |     pointer_res.stat.size = u64(sizeof(PointerPacket))
+build/useralloc-allocation-audit-final/x86-diagnostic-source/dev/mouse/mouse.v:407:25: warning: allocation (conversion to interface)
+  405 |     // the PS/2 handler only when a fresh packet makes the snapshot change.
+  406 |     pointer_res.status |= file.pollout
+  407 |     fs.devtmpfs_add_device(&pointer_res, 'pointer')
+      |                            ~~~~~~~~~~~~
+  408 | 
+  409 |     ps2_mouse_vector = idt.allocate_vector()
+build/useralloc-allocation-audit-final/x86-diagnostic-source/dev/procdev/procdev.v:207:13: warning: allocation (struct on the heap)
+  205 | // is no sampling thread behind this and nothing to start.
+  206 | pub fn initialise() {
+  207 |     mut res := &Processes{}
+      |                ~~~~~~~~~~~~
+  208 | 
+  209 |     // A whole table's worth, which is what a reader should size its buffer at
+build/useralloc-allocation-audit-final/x86-diagnostic-source/dev/procdev/procdev.v:224:25: warning: allocation (conversion to interface)
+  222 |     processes_res = res
+  223 | 
+  224 |     fs.devtmpfs_add_device(res, 'processes')
+      |                            ~~~
+  225 | }
+build/useralloc-allocation-audit-final/x86-diagnostic-source/dev/pty/pty.v:220:13: warning: allocation (struct on the heap)
+  218 | 
+  219 | pub fn initialise() {
+  220 |     ptmx_res = &Ptmx{}
+      |                ~~~~~~~
+  221 |     initialise_stat(mut ptmx_res.stat, 0o666)
+  222 |     ptmx_res.status = file.pollout
+build/useralloc-allocation-audit-final/x86-diagnostic-source/dev/pty/pty.v:223:25: warning: allocation (conversion to interface)
+  221 |     initialise_stat(mut ptmx_res.stat, 0o666)
+  222 |     ptmx_res.status = file.pollout
+  223 |     fs.devtmpfs_add_device(ptmx_res, 'ptmx')
+      |                            ~~~~~~~~
+  224 |     // A devpts filesystem carries its own ptmx, as on Linux. A container's
+  225 |     // /dev/ptmx is a symlink to pts/ptmx inside the devpts runc mounts for it,
+build/useralloc-allocation-audit-final/x86-diagnostic-source/dev/pty/pty.v:227:25: warning: allocation (conversion to interface)
+  225 |     // /dev/ptmx is a symlink to pts/ptmx inside the devpts runc mounts for it,
+  226 |     // and `docker run -t` failed with "open /dev/ptmx: no such file".
+  227 |     fs.devtmpfs_add_device(ptmx_res, 'pts/ptmx')
+      |                            ~~~~~~~~
+  228 | }
+  229 |
+build/useralloc-allocation-audit-final/x86-diagnostic-source/dev/pty/pty.v:270:14: warning: allocation (struct on the heap)
+  268 |     // destroy_pair() frees it.
+  269 |     path := name.str() @[freed]
+  270 |     mut pair := &PtyPair{
+      |                 ~~~~~~~~~
+  271 |         id: id
+  272 |         path: path
+build/useralloc-allocation-audit-final/x86-diagnostic-source/dev/pty/pty.v:278:16: warning: allocation (struct on the heap)
+  276 |     initialise_termios(mut pair.termios)
+  277 | 
+  278 |     mut master := &PtyMaster{
+      |                   ~~~~~~~~~~~
+  279 |         pair: pair
+  280 |     }
+build/useralloc-allocation-audit-final/x86-diagnostic-source/dev/pty/pty.v:281:15: warning: allocation (struct on the heap)
+  279 |         pair: pair
+  280 |     }
+  281 |     mut slave := &PtySlave{
+      |                  ~~~~~~~~~~
+  282 |         // The pathname owns this first reference. Opening the slave adds an
+  283 |         // open-file-description reference through file.fd_create_from_resource.
+build/useralloc-allocation-audit-final/x86-diagnostic-source/dev/tty/tty.v:75:16: warning: allocation (struct on the heap)
+   73 | 
+   74 | pub fn initialise() {
+   75 |     mut device := &DevTty{}
+      |                   ~~~~~~~~~
+   76 |     device.stat.blksize = 4096
+   77 |     device.stat.rdev = resource.create_dev_id()
+build/useralloc-allocation-audit-final/x86-diagnostic-source/dev/tty/tty.v:79:25: warning: allocation (conversion to interface)
+   77 |     device.stat.rdev = resource.create_dev_id()
+   78 |     device.stat.mode = 0o666 | stat.ifchr
+   79 |     fs.devtmpfs_add_device(device, 'tty')
+      |                            ~~~~~~
+   80 | }
+build/useralloc-allocation-audit-final/x86-diagnostic-source/syscall/table/container.v:232:22: warning: allocation (array initialization)
+  230 |         return errno.err, errno.einval
+  231 |     }
+  232 |     mut instructions := []proc.SockFilter{len: length}
+      |                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  233 |     if !usercopy.copy_from_user(unsafe { voidptr(&instructions[0]) }, header[1], u64(length) * sizeof(proc.SockFilter)) {
+  234 |         unsafe { instructions.free() }
+build/useralloc-allocation-audit-final/x86-diagnostic-source/socket/socket.v:148:18: warning: allocation (struct on the heap)
+  146 |             // fd_from_fdnum() acquired the Handle reference now owned by this
+  147 |             // queued descriptor, so only the source descriptor is let go.
+  148 |             mut passed := &file.FD{
+      |                           ~~~~~~~~~
+  149 |                 handle: source.handle
+  150 |                 flags: 0
+build/useralloc-allocation-audit-final/x86-diagnostic-source/socket/socket.v:321:10: warning: allocation (conversion to interface)
+  319 | 
+  320 |     if mut res is sock_unix.UnixSocket {
+  321 |         sock = res
+      |                ~~~
+  322 |     } else if mut res is sock_inet.InetSocket {
+  323 |         sock = res
+build/useralloc-allocation-audit-final/x86-diagnostic-source/socket/socket.v:323:10: warning: allocation (conversion to interface)
+  321 |         sock = res
+  322 |     } else if mut res is sock_inet.InetSocket {
+  323 |         sock = res
+      |                ~~~
+  324 |     } else if mut res is sock_netlink.NetlinkSocket {
+  325 |         sock = res
+build/useralloc-allocation-audit-final/x86-diagnostic-source/socket/socket.v:325:10: warning: allocation (conversion to interface)
+  323 |         sock = res
+  324 |     } else if mut res is sock_netlink.NetlinkSocket {
+  325 |         sock = res
+      |                ~~~
+  326 |     } else {
+  327 |         return errno.err, errno.einval
+build/useralloc-allocation-audit-final/x86-diagnostic-source/socket/socket.v:361:10: warning: allocation (conversion to interface)
+  359 | 
+  360 |     if mut res is sock_unix.UnixSocket {
+  361 |         sock = res
+      |                ~~~
+  362 |     } else if mut res is sock_inet.InetSocket {
+  363 |         sock = res
+build/useralloc-allocation-audit-final/x86-diagnostic-source/socket/socket.v:363:10: warning: allocation (conversion to interface)
+  361 |         sock = res
+  362 |     } else if mut res is sock_inet.InetSocket {
+  363 |         sock = res
+      |                ~~~
+  364 |     } else if mut res is sock_netlink.NetlinkSocket {
+  365 |         sock = res
+build/useralloc-allocation-audit-final/x86-diagnostic-source/socket/socket.v:365:10: warning: allocation (conversion to interface)
+  363 |         sock = res
+  364 |     } else if mut res is sock_netlink.NetlinkSocket {
+  365 |         sock = res
+      |                ~~~
+  366 |     } else {
+  367 |         return errno.err, errno.einval
+build/useralloc-allocation-audit-final/x86-diagnostic-source/socket/socket.v:408:10: warning: allocation (conversion to interface)
+  406 | 
+  407 |     if mut res is sock_unix.UnixSocket {
+  408 |         sock = res
+      |                ~~~
+  409 |     } else if mut res is sock_inet.InetSocket {
+  410 |         sock = res
+build/useralloc-allocation-audit-final/x86-diagnostic-source/socket/socket.v:410:10: warning: allocation (conversion to interface)
+  408 |         sock = res
+  409 |     } else if mut res is sock_inet.InetSocket {
+  410 |         sock = res
+      |                ~~~
+  411 |     } else if mut res is sock_netlink.NetlinkSocket {
+  412 |         sock = res
+build/useralloc-allocation-audit-final/x86-diagnostic-source/socket/socket.v:412:10: warning: allocation (conversion to interface)
+  410 |         sock = res
+  411 |     } else if mut res is sock_netlink.NetlinkSocket {
+  412 |         sock = res
+      |                ~~~
+  413 |     } else {
+  414 |         return errno.err, errno.einval
+build/useralloc-allocation-audit-final/x86-diagnostic-source/socket/socket.v:569:10: warning: allocation (conversion to interface)
+  567 | 
+  568 |     if mut res is sock_unix.UnixSocket {
+  569 |         sock = res
+      |                ~~~
+  570 |     } else if mut res is sock_inet.InetSocket {
+  571 |         sock = res
+build/useralloc-allocation-audit-final/x86-diagnostic-source/socket/socket.v:571:10: warning: allocation (conversion to interface)
+  569 |         sock = res
+  570 |     } else if mut res is sock_inet.InetSocket {
+  571 |         sock = res
+      |                ~~~
+  572 |     } else if mut res is sock_netlink.NetlinkSocket {
+  573 |         sock = res
+build/useralloc-allocation-audit-final/x86-diagnostic-source/socket/socket.v:573:10: warning: allocation (conversion to interface)
+  571 |         sock = res
+  572 |     } else if mut res is sock_netlink.NetlinkSocket {
+  573 |         sock = res
+      |                ~~~
+  574 |     } else {
+  575 |         return errno.err, errno.einval
+build/useralloc-allocation-audit-final/x86-diagnostic-source/socket/socket.v:982:10: warning: allocation (conversion to interface)
+  980 | 
+  981 |     if mut res is sock_unix.UnixSocket {
+  982 |         sock = res
+      |                ~~~
+  983 |     } else if mut res is sock_inet.InetSocket {
+  984 |         sock = res
+build/useralloc-allocation-audit-final/x86-diagnostic-source/socket/socket.v:984:10: warning: allocation (conversion to interface)
+  982 |         sock = res
+  983 |     } else if mut res is sock_inet.InetSocket {
+  984 |         sock = res
+      |                ~~~
+  985 |     } else if mut res is sock_netlink.NetlinkSocket {
+  986 |         sock = res
+build/useralloc-allocation-audit-final/x86-diagnostic-source/socket/socket.v:986:10: warning: allocation (conversion to interface)
+  984 |         sock = res
+  985 |     } else if mut res is sock_netlink.NetlinkSocket {
+  986 |         sock = res
+      |                ~~~
+  987 |     } else {
+  988 |         return errno.err, errno.einval
+build/useralloc-allocation-audit-final/x86-diagnostic-source/x86/hypervisor/device.v:85:17: warning: allocation (struct on the heap)
+   83 | 
+   84 | fn (mut device HypervisorDevice) open(_flags int) ?&resource.Resource {
+   85 |     mut session := &HypervisorSession{
+      |                    ~~~~~~~~~~~~~~~~~~~
+   86 |         can_mmap: true
+   87 |     }
+build/useralloc-allocation-audit-final/x86-diagnostic-source/x86/hypervisor/device.v:366:16: warning: allocation (struct on the heap)
+  364 |         return
+  365 |     }
+  366 |     mut device := &HypervisorDevice{}
+      |                   ~~~~~~~~~~~~~~~~~~~
+  367 |     device.stat.mode = stat.ifchr | 0o600
+  368 |     device.stat.blksize = int(page_size)
+build/useralloc-allocation-audit-final/x86-diagnostic-source/x86/hypervisor/device.v:371:25: warning: allocation (conversion to interface)
+  369 |     device.stat.rdev = resource.create_dev_id()
+  370 |     hypervisor_device = device
+  371 |     fs.devtmpfs_add_device(device, 'hypervisor')
+      |                            ~~~~~~
+  372 |     println('hypervisor: /dev/hypervisor ready')
+  373 | }
+build/useralloc-allocation-audit-final/x86-diagnostic-source/x86/hypervisor/vmx.v:523:12: warning: allocation (struct on the heap)
+  521 |     }
+  522 |     ram_pages := (memory_size + page_size - 1) / page_size
+  523 |     mut vm := &Vm{
+      |               ~~~~
+  524 |         ram_pages: ram_pages
+  525 |     }
+build/useralloc-allocation-audit-final/x86-diagnostic-source/x86/cpu/features.v:24:25: warning: allocation (array initialization)
+   22 | // arch/x86/include/asm/cpufeatures.h. An empty name is a bit Linux does not
+   23 | // show, or one with no meaning.
+   24 | const leaf1_edx_names = ['fpu', 'vme', 'de', 'pse', 'tsc', 'msr', 'pae', 'mce', 'cx8', 'apic',
+      |                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   25 |     '', 'sep', 'mtrr', 'pge', 'mca', 'cmov', 'pat', 'pse36', 'pn', 'clflush', '', 'dts', 'acpi',
+   26 |     'mmx', 'fxsr', 'sse', 'sse2', 'ss', 'ht', 'tm', 'ia64', 'pbe']
+build/useralloc-allocation-audit-final/x86-diagnostic-source/x86/cpu/features.v:28:25: warning: allocation (array initialization)
+   26 |     'mmx', 'fxsr', 'sse', 'sse2', 'ss', 'ht', 'tm', 'ia64', 'pbe']
+   27 | 
+   28 | const leaf1_ecx_names = ['pni', 'pclmulqdq', 'dtes64', 'monitor', 'ds_cpl', 'vmx', 'smx', 'est',
+      |                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   29 |     'tm2', 'ssse3', 'cid', 'sdbg', 'fma', 'cx16', 'xtpr', 'pdcm', '', 'pcid', 'dca', 'sse4_1',
+   30 |     'sse4_2', 'x2apic', 'movbe', 'popcnt', 'tsc_deadline_timer', 'aes', 'xsave', '', 'avx',
+build/useralloc-allocation-audit-final/x86-diagnostic-source/x86/cpu/features.v:33:24: warning: allocation (array initialization)
+   31 |     'f16c', 'rdrand', 'hypervisor']
+   32 | 
+   33 | const ext1_edx_names = ['', '', '', '', '', '', '', '', '', '', '', 'syscall', '', '', '', '',
+      |                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   34 |     '', '', '', 'mp', 'nx', '', 'mmxext', '', '', 'fxsr_opt', 'pdpe1gb', 'rdtscp', '', 'lm',
+   35 |     '3dnowext', '3dnow']
+build/useralloc-allocation-audit-final/x86-diagnostic-source/x86/cpu/features.v:37:24: warning: allocation (array initialization)
+   35 |     '3dnowext', '3dnow']
+   36 | 
+   37 | const ext1_ecx_names = ['lahf_lm', 'cmp_legacy', 'svm', 'extapic', 'cr8_legacy', 'abm', 'sse4a',
+      |                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   38 |     'misalignsse', '3dnowprefetch', 'osvw', 'ibs', 'xop', 'skinit', 'wdt', '', 'lwp', 'fma4',
+   39 |     'tce', '', 'nodeid_msr', '', 'tbm', 'topoext', 'perfctr_core', 'perfctr_nb', '', 'bpext',
+build/useralloc-allocation-audit-final/x86-diagnostic-source/x86/cpu/features.v:42:25: warning: allocation (array initialization)
+   40 |     'ptsc', 'perfctr_llc', 'mwaitx', '', '']
+   41 | 
+   42 | const leaf7_ebx_names = ['fsgsbase', 'tsc_adjust', 'sgx', 'bmi1', 'hle', 'avx2', '', 'smep',
+      |                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   43 |     'bmi2', 'erms', 'invpcid', 'rtm', 'cqm', '', 'mpx', 'rdt_a', 'avx512f', 'avx512dq', 'rdseed',
+   44 |     'adx', 'smap', 'avx512ifma', '', 'clflushopt', 'clwb', 'intel_pt', 'avx512pf', 'avx512er',
+build/useralloc-allocation-audit-final/x86-diagnostic-source/x86/cpu/features.v:47:25: warning: allocation (array initialization)
+   45 |     'avx512cd', 'sha_ni', 'avx512bw', 'avx512vl']
+   46 | 
+   47 | const leaf7_ecx_names = ['', 'avx512vbmi', 'umip', 'pku', 'ospke', 'waitpkg', 'avx512_vbmi2', '',
+      |                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   48 |     'gfni', 'vaes', 'vpclmulqdq', 'avx512_vnni', 'avx512_bitalg', 'tme', 'avx512_vpopcntdq', '',
+   49 |     'la57', '', '', '', '', '', 'rdpid', '', 'bus_lock_detect', 'cldemote', '', 'movdiri',
+build/useralloc-allocation-audit-final/x86-diagnostic-source/x86/cpu/features.v:52:25: warning: allocation (array initialization)
+   50 |     'movdir64b', 'enqcmd', 'sgx_lc', '']
+   51 | 
+   52 | const leaf7_edx_names = ['', '', 'avx512_4vnniw', 'avx512_4fmaps', 'fsrm', '', '', '',
+      |                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   53 |     'avx512_vp2intersect', '', 'md_clear', '', '', '', 'serialize', '', 'tsxldtrk', '', 'pconfig',
+   54 |     'arch_lbr', 'ibt', '', 'amx_bf16', 'avx512_fp16', 'amx_tile', 'amx_int8', '', '', 'flush_l1d',
+build/useralloc-allocation-audit-final/x86-diagnostic-source/x86/cpu/features.v:57:26: warning: allocation (array initialization)
+   55 |     'arch_capabilities', '', '']
+   56 | 
+   57 | const leafd1_eax_names = ['xsaveopt', 'xsavec', 'xgetbv1', 'xsaves']
+      |                          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   58 | 
+   59 | // Flags whose registers live in the AVX state (XCR0 bit 2), and in the AVX-512
+build/useralloc-allocation-audit-final/x86-diagnostic-source/x86/cpu/features.v:63:19: warning: allocation (array initialization)
+   61 | // that state, since a program using them would lose its registers at every
+   62 | // switch; so does this.
+   63 | const avx_flags = ['avx', 'fma', 'f16c', 'avx2', 'vaes', 'vpclmulqdq']
+      |                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   64 | 
+   65 | fn needs_avx512_state(name string) bool {
+build/useralloc-allocation-audit-final/x86-diagnostic-source/memory/mmap/immutable.v:95:27: warning: allocation (struct on the heap)
+   93 | 
+   94 |         if snip_begin > local_range.base && snip_end < local_end {
+   95 |             mut postsplit_range := &MmapRangeLocal{
+      |                                    ~~~~~~~~~~~~~~~~
+   96 |                 pagemap: local_range.pagemap
+   97 |                 base: snip_end
+build/useralloc-allocation-audit-final/x86-diagnostic-source/memory/mmap/immutable.v:114:27: warning: allocation (struct on the heap)
+  112 |             local_range.immutable = true
+  113 |         } else {
+  114 |             mut immutable_range := &MmapRangeLocal{
+      |                                    ~~~~~~~~~~~~~~~~
+  115 |                 pagemap: local_range.pagemap
+  116 |                 base: snip_begin
+build/useralloc-allocation-audit-final/x86-diagnostic-source/memory/mmap/inherit.v:106:27: warning: allocation (struct on the heap)
+  104 | 
+  105 |         if snip_begin > local_range.base && snip_end < local_end {
+  106 |             mut postsplit_range := &MmapRangeLocal{
+      |                                    ~~~~~~~~~~~~~~~~
+  107 |                 pagemap: local_range.pagemap
+  108 |                 base: snip_end
+build/useralloc-allocation-audit-final/x86-diagnostic-source/memory/mmap/inherit.v:128:24: warning: allocation (struct on the heap)
+  126 |             continue
+  127 |         }
+  128 |         mut changed_range := &MmapRangeLocal{
+      |                              ~~~~~~~~~~~~~~~~
+  129 |             pagemap: local_range.pagemap
+  130 |             base: snip_begin
+build/useralloc-allocation-audit-final/x86-diagnostic-source/memory/mmap/mmap.v:628:26: warning: allocation (struct on the heap)
+  626 |         }
+  627 | 
+  628 |         mut new_local_range := &MmapRangeLocal{
+      |                                ~~~~~~~~~~~~~~~~
+  629 |             pagemap: unsafe { nil }
+  630 |             global: unsafe { nil }
+build/useralloc-allocation-audit-final/x86-diagnostic-source/memory/mmap/mmap.v:643:24: warning: allocation (struct on the heap)
+  641 |             new_local_range.cow = false
+  642 |             new_local_range.offset = 0
+  643 |             mut empty_global := &MmapRangeGlobal{
+      |                                 ~~~~~~~~~~~~~~~~~
+  644 |                 locals: []&MmapRangeLocal{}
+  645 |                 base: local_range.base
+build/useralloc-allocation-audit-final/x86-diagnostic-source/memory/mmap/mmap.v:684:24: warning: allocation (struct on the heap)
+  682 |                 new_global_range = new_private_globals[global_index]
+  683 |             } else {
+  684 |                 new_global_range = &MmapRangeGlobal{
+      |                                    ~~~~~~~~~~~~~~~~~
+  685 |                     resource: global_range.resource
+  686 |                     handle: global_range.handle
+build/useralloc-allocation-audit-final/x86-diagnostic-source/memory/mmap/mmap.v:1072:21: warning: allocation (struct on the heap)
+ 1070 |     length := lib.align_up(_length + (_virt_addr - virt_addr), page_size)
+ 1071 | 
+ 1072 |     mut range_local := &MmapRangeLocal{
+      |                        ~~~~~~~~~~~~~~~~
+ 1073 |         pagemap: unsafe { pagemap }
+ 1074 |         base: virt_addr
+build/useralloc-allocation-audit-final/x86-diagnostic-source/memory/mmap/mmap.v:1081:22: warning: allocation (struct on the heap)
+ 1079 |     }
+ 1080 | 
+ 1081 |     mut range_global := &MmapRangeGlobal{
+      |                         ~~~~~~~~~~~~~~~~~
+ 1082 |         locals: []&MmapRangeLocal{}
+ 1083 |         base: virt_addr
+build/useralloc-allocation-audit-final/x86-diagnostic-source/memory/mmap/mmap.v:1116:21: warning: allocation (struct on the heap)
+ 1114 |     flags := _flags | map_anonymous
+ 1115 |     length := u64(phys_pages.len) * page_size
+ 1116 |     mut range_local := &MmapRangeLocal{
+      |                        ~~~~~~~~~~~~~~~~
+ 1117 |         pagemap: unsafe { pagemap }
+ 1118 |         base: virt_addr
+build/useralloc-allocation-audit-final/x86-diagnostic-source/memory/mmap/mmap.v:1124:22: warning: allocation (struct on the heap)
+ 1122 |         global: unsafe { nil }
+ 1123 |     }
+ 1124 |     mut range_global := &MmapRangeGlobal{
+      |                         ~~~~~~~~~~~~~~~~~
+ 1125 |         locals: []&MmapRangeLocal{}
+ 1126 |         base: virt_addr
+build/useralloc-allocation-audit-final/x86-diagnostic-source/memory/mmap/mmap.v:1238:21: warning: allocation (struct on the heap)
+ 1236 |     }
+ 1237 | 
+ 1238 |     mut range_local := &MmapRangeLocal{
+      |                        ~~~~~~~~~~~~~~~~
+ 1239 |         pagemap: pagemap
+ 1240 |         base: base
+build/useralloc-allocation-audit-final/x86-diagnostic-source/memory/mmap/mmap.v:1298:22: warning: allocation (struct on the heap)
+ 1296 |         && resource.lazy_shared_mapping(mut resource_))
+ 1297 | 
+ 1298 |     mut range_global := &MmapRangeGlobal{
+      |                         ~~~~~~~~~~~~~~~~~
+ 1299 |         locals: []&MmapRangeLocal{}
+ 1300 |         base: base
+build/useralloc-allocation-audit-final/x86-diagnostic-source/memory/mmap/mmap.v:1804:27: warning: allocation (struct on the heap)
+ 1802 |         if snip_begin > local_range.base && snip_end < local_range.base + local_range.length {
+ 1803 |             // Create new range for portion after snip
+ 1804 |             mut postsplit_range := &MmapRangeLocal{
+      |                                    ~~~~~~~~~~~~~~~~
+ 1805 |                 pagemap: local_range.pagemap
+ 1806 |                 base: snip_end
+build/useralloc-allocation-audit-final/x86-diagnostic-source/memory/mmap/mmap.v:1837:21: warning: allocation (struct on the heap)
+ 1835 |             local_range.prot = prot
+ 1836 |         } else {
+ 1837 |             mut new_range := &MmapRangeLocal{
+      |                              ~~~~~~~~~~~~~~~~
+ 1838 |                 pagemap: local_range.pagemap
+ 1839 |                 base: snip_begin
+build/useralloc-allocation-audit-final/x86-diagnostic-source/memory/mmap/mmap.v:1951:27: warning: allocation (struct on the heap)
+ 1949 |         if snip_begin > local_range.base && snip_end < local_range.base + local_range.length {
+ 1950 |             // Create new range for portion after snip
+ 1951 |             mut postsplit_range := &MmapRangeLocal{
+      |                                    ~~~~~~~~~~~~~~~~
+ 1952 |                 pagemap: local_range.pagemap
+ 1953 |                 base: snip_end
+build/useralloc-allocation-audit-final/x86-diagnostic-source/file/epoll.v:177:13: warning: allocation (struct on the heap)
+  175 |     }
+  176 | 
+  177 |     mut res := &EpollResource{}
+      |                ~~~~~~~~~~~~~~~~
+  178 |     res.stat.mode = 0o600
+  179 |
+build/useralloc-allocation-audit-final/x86-diagnostic-source/file/eventfd.v:192:17: warning: allocation (struct on the heap)
+  190 |     }
+  191 | 
+  192 |     mut counter := &EventFD{
+      |                    ~~~~~~~~~
+  193 |         counter:   u64(initial)
+  194 |         semaphore: flags & efd_semaphore != 0
+build/useralloc-allocation-audit-final/x86-diagnostic-source/file/file.v:765:20: warning: allocation (struct on the heap)
+  763 |     katomic.inc(mut &res.refcount)
+  764 | 
+  765 |     mut new_handle := &Handle{}
+      |                       ~~~~~~~~~
+  766 |     new_handle.resource = unsafe { res }
+  767 |     new_handle.refcount = 1
+build/useralloc-allocation-audit-final/x86-diagnostic-source/file/file.v:770:16: warning: allocation (struct on the heap)
+  768 |     new_handle.flags = flags & resource.file_status_flags_mask
+  769 | 
+  770 |     mut new_fd := &FD{}
+      |                   ~~~~~
+  771 |     new_fd.handle = new_handle
+  772 |     new_fd.flags = flags & resource.file_descriptor_flags_mask
+build/useralloc-allocation-audit-final/x86-diagnostic-source/file/memory_pressure.v:44:16: warning: allocation (struct on the heap)
+   42 | // subscription slot; an O_PATH handle keeps the ordinary node resource.
+   43 | pub fn new_memory_pressure_source(metadata stat.Stat) &resource.Resource {
+   44 |     mut source := &MemoryPressureFile{source: true, stat: metadata, refcount: 1}
+      |                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   45 |     source.box = &resource.Resource(unsafe { source })
+   46 |     memory.register_pressure_observer(notify_memory_pressure)
+build/useralloc-allocation-audit-final/x86-diagnostic-source/file/memory_pressure.v:45:15: warning: allocation (cast to interface)
+   43 | pub fn new_memory_pressure_source(metadata stat.Stat) &resource.Resource {
+   44 |     mut source := &MemoryPressureFile{source: true, stat: metadata, refcount: 1}
+   45 |     source.box = &resource.Resource(unsafe { source })
+      |                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   46 |     memory.register_pressure_observer(notify_memory_pressure)
+   47 |     return source.box
+build/useralloc-allocation-audit-final/x86-diagnostic-source/file/timerfd.v:248:15: warning: allocation (struct on the heap)
+  246 |     }
+  247 | 
+  248 |     mut timer := &TimerFD{
+      |                  ~~~~~~~~~
+  249 |         clock_id:    clock_id
+  250 |         nonblocking: flags & tfd_nonblock != 0
+build/useralloc-allocation-audit-final/x86-diagnostic-source/block/partition/partition.v:158:21: warning: allocation (struct on the heap)
+  156 |             }
+  157 | 
+  158 |             mut partition := &Partition{
+      |                              ~~~~~~~~~~~
+  159 |                 device_offset: u64(partition_entry.starting_lba * parent_device.stat.blksize)
+  160 |                 sector_cnt:    partition_entry.last_lba - partition_entry.starting_lba
+build/useralloc-allocation-audit-final/x86-diagnostic-source/block/partition/partition.v:173:27: warning: allocation (conversion to interface)
+  171 |                 u64(partition.device_offset), u64(partition.sector_cnt))
+  172 | 
+  173 |             fs.devtmpfs_add_device(partition, partition_name(prefix, i))
+      |                                    ~~~~~~~~~
+  174 |         }
+  175 |
+build/useralloc-allocation-audit-final/x86-diagnostic-source/block/partition/partition.v:197:21: warning: allocation (struct on the heap)
+  195 |             partition_entry := unsafe { &MBRPartition(&partitions[i]) }
+  196 | 
+  197 |             mut partition := &Partition{
+      |                              ~~~~~~~~~~~
+  198 |                 device_offset: u64(partition_entry.starting_lba * parent_device.stat.blksize)
+  199 |                 sector_cnt:    partition_entry.sector_cnt
+build/useralloc-allocation-audit-final/x86-diagnostic-source/block/partition/partition.v:212:27: warning: allocation (conversion to interface)
+  210 |                 u64(partition.device_offset), u64(partition.sector_cnt))
+  211 | 
+  212 |             fs.devtmpfs_add_device(partition, partition_name(prefix, i))
+      |                                    ~~~~~~~~~
+  213 |         }
+  214 |
+build/useralloc-allocation-audit-final/x86-diagnostic-source/dev/oss/dsp.v:98:20: warning: allocation (struct on the heap)
+   96 | 
+   97 | pub fn create_device(device &OssAudioDevice) {
+   98 |     mut oss_device := &OssDevice{
+      |                       ~~~~~~~~~~~
+   99 |         device:      unsafe { device }
+  100 |         sample_rate: default_rate
+build/useralloc-allocation-audit-final/x86-diagnostic-source/dev/oss/dsp.v:113:25: warning: allocation (conversion to interface)
+  111 |     text.add_decimal(oss_devices.len)
+  112 |     name := text.str()
+  113 |     fs.devtmpfs_add_device(oss_device, name)
+      |                            ~~~~~~~~~~
+  114 |     if oss_devices.len == 0 {
+  115 |         root := fs.devtmpfs_get_root()
+build/useralloc-allocation-audit-final/x86-diagnostic-source/dev/oss/mixer.v:140:3: warning: allocation (struct on the heap)
+  138 | fn create_mixer(main_device &OssDevice, index int) {
+  139 |     mut oss_mixer := unsafe {
+  140 |         &OssMixerDevice{
+      |         ~~~~~~~~~~~~~~~~
+  141 |             main_device: main_device
+  142 |             index:       index
+build/useralloc-allocation-audit-final/x86-diagnostic-source/dev/oss/mixer.v:153:25: warning: allocation (conversion to interface)
+  151 |     text.add_decimal(index)
+  152 |     name := text.str()
+  153 |     fs.devtmpfs_add_device(oss_mixer, name)
+      |                            ~~~~~~~~~
+  154 |     if index == 0 {
+  155 |         root := fs.devtmpfs_get_root()
+build/useralloc-allocation-audit-final/x86-diagnostic-source/sysvsem/sysvsem.v:116:13: warning: allocation (struct on the heap)
+  114 |     // Nothing slices the list, so growing can free the old block.
+  115 |     sets.flags |= .noslices
+  116 |     sets << &Set{
+      |             ~~~~~
+  117 |         id: id
+  118 |         key: key
+build/useralloc-allocation-audit-final/x86-diagnostic-source/sysvshm/sysvshm.v:246:17: warning: allocation (struct on the heap)
+  244 |     id := next_id
+  245 |     next_id++
+  246 |     mut segment := &Segment{
+      |                    ~~~~~~~~~
+  247 |         id: id
+  248 |         key: key
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/ext2/ext2.v:191:24: warning: allocation (struct on the heap)
+  189 |     }
+  190 |     if flags & mmap_mod.map_shared != 0 {
+  191 |         this.mapped_pages << &EXT2MappedPage{
+      |                              ~~~~~~~~~~~~~~~~
+  192 |             page: page
+  193 |             physical: physical
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/ext2/ext2.v:369:14: warning: allocation (cast to interface)
+  367 | fn (mut this EXT2Filesystem) as_filesystem() &vfs.FileSystem {
+  368 |     if this.box == unsafe { nil } {
+  369 |         this.box = &vfs.FileSystem(this)
+      |                    ~~~~~~~~~~~~~~~~~~~~~
+  370 |     }
+  371 |     return this.box
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/ext2/ext2.v:439:19: warning: allocation (struct on the heap)
+  437 | 
+  438 |         mut vfs_node := vfs.create_node(this.as_filesystem(), node, name, stat.isdir(mode))
+  439 |         mut resource := &EXT2Resource{
+      |                         ~~~~~~~~~~~~~~
+  440 |             filesystem: unsafe { this }
+  441 |             refcount: 1
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/ext2/ext2.v:488:14: warning: allocation (struct on the heap)
+  486 | 
+  487 | fn (mut bro EXT2Filesystem) instantiate() &vfs.FileSystem {
+  488 |     mut this := &EXT2Filesystem{
+      |                 ~~~~~~~~~~~~~~~~
+  489 |         backing_device: bro.backing_device
+  490 |         superblock: bro.superblock
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/ext2/ext2.v:511:10: warning: allocation (conversion to interface)
+  509 |     this.root_inode.read_entry(mut this, 2) or {
+  510 |         print('ext2: unable to read root inode\n')
+  511 |         return this
+      |                ~~~~
+  512 |     }
+  513 |
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/ext2/ext2.v:514:9: warning: allocation (conversion to interface)
+  512 |     }
+  513 | 
+  514 |     return this
+      |            ~~~~
+  515 | }
+  516 |
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/ext2/ext2.v:539:18: warning: allocation (struct on the heap)
+  537 |     mut target := vfs.create_node(this.as_filesystem(), parent, name, true)
+  538 | 
+  539 |     mut resource := &EXT2Resource{
+      |                     ~~~~~~~~~~~~~~
+  540 |         filesystem: unsafe { this }
+  541 |         refcount: 1
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/ext2/ext2.v:1265:15: warning: allocation (struct on the heap)
+ 1263 |     mut new_filesystem := &EXT2Filesystem{
+ 1264 |         backing_device: unsafe { backing_device }
+ 1265 |         superblock: &EXT2Superblock{}
+      |                     ~~~~~~~~~~~~~~~~~
+ 1266 |         root_inode: &EXT2Inode{}
+ 1267 |         cache: pagecache.new_cache(u64(backing_device.resource.stat.size))
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/ext2/ext2.v:1266:15: warning: allocation (struct on the heap)
+ 1264 |         backing_device: unsafe { backing_device }
+ 1265 |         superblock: &EXT2Superblock{}
+ 1266 |         root_inode: &EXT2Inode{}
+      |                     ~~~~~~~~~~~~
+ 1267 |         cache: pagecache.new_cache(u64(backing_device.resource.stat.size))
+ 1268 |     }
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/ext2/ext2.v:1263:24: warning: allocation (struct on the heap)
+ 1261 |     }
+ 1262 |     reserve_bounce()
+ 1263 |     mut new_filesystem := &EXT2Filesystem{
+      |                           ~~~~~~~~~~~~~~~~
+ 1264 |         backing_device: unsafe { backing_device }
+ 1265 |         superblock: &EXT2Superblock{}
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/ext2/mkfs.v:96:18: warning: allocation (array initialization)
+   94 |         groups:        groups
+   95 |         gdt_blocks:    gdt_blocks
+   96 |         free_blocks:   []u64{len: int(groups)}
+      |                        ~~~~~~~~~~~~~~~~~~~~~~~
+   97 |         block_bitmaps: []u64{len: int(groups)}
+   98 |         inode_bitmaps: []u64{len: int(groups)}
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/ext2/mkfs.v:97:18: warning: allocation (array initialization)
+   95 |         gdt_blocks:    gdt_blocks
+   96 |         free_blocks:   []u64{len: int(groups)}
+   97 |         block_bitmaps: []u64{len: int(groups)}
+      |                        ~~~~~~~~~~~~~~~~~~~~~~~
+   98 |         inode_bitmaps: []u64{len: int(groups)}
+   99 |         inode_tables:  []u64{len: int(groups)}
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/ext2/mkfs.v:98:18: warning: allocation (array initialization)
+   96 |         free_blocks:   []u64{len: int(groups)}
+   97 |         block_bitmaps: []u64{len: int(groups)}
+   98 |         inode_bitmaps: []u64{len: int(groups)}
+      |                        ~~~~~~~~~~~~~~~~~~~~~~~
+   99 |         inode_tables:  []u64{len: int(groups)}
+  100 |     }
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/ext2/mkfs.v:99:18: warning: allocation (array initialization)
+   97 |         block_bitmaps: []u64{len: int(groups)}
+   98 |         inode_bitmaps: []u64{len: int(groups)}
+   99 |         inode_tables:  []u64{len: int(groups)}
+      |                        ~~~~~~~~~~~~~~~~~~~~~~~
+  100 |     }
+  101 |     for group in 0 .. groups {
+build/useralloc-allocation-audit-final/x86-diagnostic-source/fs/ext2/namespace.v:249:13: warning: allocation (struct on the heap)
+  247 | fn resource_from_inode(filesystem &EXT2Filesystem, inode_index u32,
+  248 |     inode EXT2Inode) &EXT2Resource {
+  249 |     mut res := &EXT2Resource{
+      |                ~~~~~~~~~~~~~~
+  250 |         filesystem: unsafe { filesystem }
+  251 |         refcount: 1
+build/useralloc-allocation-audit-final/x86-diagnostic-source/socket/unix/unix.v:1266:27: warning: allocation (struct on the heap)
+ 1264 |     // listener's queue, not when accept() eventually removes it. This permits a
+ 1265 |     // client to connect and send before the server calls accept(), as Linux does.
+ 1266 |     mut connection_socket := &UnixSocket{
+      |                              ~~~~~~~~~~~~
+ 1267 |         refcount:  1
+ 1268 |         peer:      this
+build/useralloc-allocation-audit-final/x86-diagnostic-source/socket/unix/unix.v:1720:13: warning: allocation (struct on the heap)
+ 1718 | pub fn create(@type int) ?&UnixSocket {
+ 1719 |     process := proc.current_thread().process
+ 1720 |     mut ret := &UnixSocket{
+      |                ~~~~~~~~~~~~
+ 1721 |         refcount:  1
+ 1722 |         peer:      unsafe { nil }
+build/useralloc-allocation-audit-final/x86-diagnostic-source/socket/unix/unix.v:1738:11: warning: allocation (struct on the heap)
+ 1736 | pub fn create_pair(@type int) ?(&UnixSocket, &UnixSocket) {
+ 1737 |     process := proc.current_thread().process
+ 1738 |     mut a := &UnixSocket{
+      |              ~~~~~~~~~~~~
+ 1739 |         refcount:  1
+ 1740 |         peer:      unsafe { nil }
+build/useralloc-allocation-audit-final/x86-diagnostic-source/socket/unix/unix.v:1749:11: warning: allocation (struct on the heap)
+ 1747 |     a.status |= file.pollout
+ 1748 |     a.stat.mode = stat.ifsock | 0o777
+ 1749 |     mut b := &UnixSocket{
+      |              ~~~~~~~~~~~~
+ 1750 |         refcount:  1
+ 1751 |         peer:      unsafe { nil }
+build/useralloc-allocation-audit-final/x86-diagnostic-source/socket/netlink/netlink.v:118:11: warning: allocation (struct on the heap)
+  116 |         return none
+  117 |     }
+  118 |     mut s := &NetlinkSocket{
+      |              ~~~~~~~~~~~~~~~
+  119 |         protocol: protocol
+  120 |         status:   file.pollout
+build/useralloc-allocation-audit-final/x86-diagnostic-source/dev/fbdev/simple/simple.v:5:1: builder error: cannot import module "drm.simple" (not found)
+    3 | 
+    4 | import dev.fbdev.api
+    5 | import drm.simple as simpledrm
+      | ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    6 | 
+    7 | pub struct SimpleFBConfig {
+build/useralloc-allocation-audit-final/x86-diagnostic-source/dev/fbdev/simple/simple.v:5:8: error: cannot import `drm.simple` into a module with the same name
+    3 | 
+    4 | import dev.fbdev.api
+    5 | import drm.simple as simpledrm
+      |        ~~~~~~~~~~
+    6 | 
+    7 | pub struct SimpleFBConfig {
+build/useralloc-allocation-audit-final/x86-diagnostic-source/resource/cache.v:56:9: error: `MappingLifetimeResource` is not compatible with interface `resource.Resource`
+   54 | 
+   55 | pub fn retain_mapping_range(mut res Resource, handle voidptr, offset u64, length u64) bool {
+   56 |     if mut res is MappingLifetimeResource {
+      |            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   57 |         mut lifetime := MappingLifetimeResource(res)
+   58 |         mut stack_lifetime := unsafe { &lifetime }
+build/useralloc-allocation-audit-final/x86-diagnostic-source/resource/cache.v:66:9: error: `MappingLifetimeResource` is not compatible with interface `resource.Resource`
+   64 | 
+   65 | pub fn release_mapping_range(mut res Resource, handle voidptr, offset u64, length u64) {
+   66 |     if mut res is MappingLifetimeResource {
+      |            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   67 |         mut lifetime := MappingLifetimeResource(res)
+   68 |         mut stack_lifetime := unsafe { &lifetime }
+build/useralloc-allocation-audit-final/x86-diagnostic-source/resource/cache.v:221:9: error: `MappingAttributesResource` is not compatible with interface `resource.Resource`
+  219 | 
+  220 | pub fn mapping_attributes(mut res Resource, handle voidptr, offset u64) u64 {
+  221 |     if mut res is MappingAttributesResource {
+      |            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  222 |         mut attributes := MappingAttributesResource(res)
+  223 |         mut stack_attributes := unsafe { &attributes }

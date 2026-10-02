@@ -1,0 +1,82 @@
+SOCKET-OPS-SLAB-BEGIN operation=0 phase=before
+SOCKET-OPS-SLAB-END operation=0 phase=before
+SOCKET-OPS-RESULT operation=0 name=empty_recvmsg calls=8192 before=2027454464 after=2022064128 retained=5390336
+SOCKET-OPS-SLAB-BEGIN operation=0 phase=after
+SOCKET-OPS-SLAB-END operation=0 phase=after
+SOCKET-OPS-SLAB-BEGIN operation=1 phase=before
+SOCKET-OPS-SLAB-END operation=1 phase=before
+SOCKET-OPS-RESULT operation=1 name=empty_recvfrom calls=8192 before=2022014976 after=2016493568 retained=5521408
+SOCKET-OPS-SLAB-BEGIN operation=1 phase=after
+SOCKET-OPS-SLAB-END operation=1 phase=after
+SOCKET-OPS-SLAB-BEGIN operation=2 phase=before
+SOCKET-OPS-SLAB-END operation=2 phase=before
+SOCKET-OPS-RESULT operation=2 name=sendto_recvfrom calls=8192 before=2016346112 after=2005434368 retained=10911744
+SOCKET-OPS-SLAB-BEGIN operation=2 phase=after
+SOCKET-OPS-SLAB-END operation=2 phase=after
+SOCKET-OPS-SLAB-BEGIN operation=3 phase=before
+SOCKET-OPS-SLAB-END operation=3 phase=before
+SOCKET-OPS-RESULT operation=3 name=sendmsg_recvmsg calls=8192 before=2005336064 after=1994031104 retained=11304960
+SOCKET-OPS-SLAB-BEGIN operation=3 phase=after
+SOCKET-OPS-SLAB-END operation=3 phase=after
+SOCKET-OPS-SLAB-BEGIN operation=4 phase=before
+SOCKET-OPS-SLAB-END operation=4 phase=before
+SOCKET-OPS-RESULT operation=4 name=large_sendmsg_recvmsg calls=8192 before=1993932800 after=1982611456 retained=11321344
+SOCKET-OPS-SLAB-BEGIN operation=4 phase=after
+SOCKET-OPS-SLAB-END operation=4 phase=after
+SOCKET-OPS-SLAB-BEGIN operation=5 phase=before
+SOCKET-OPS-SLAB-END operation=5 phase=before
+SOCKET-OPS-RESULT operation=5 name=socket_names calls=8192 before=1982644224 after=1982644224 retained=0
+SOCKET-OPS-SLAB-BEGIN operation=5 phase=after
+SOCKET-OPS-SLAB-END operation=5 phase=after
+SOCKET-OPS-SLAB-BEGIN operation=6 phase=before
+SOCKET-OPS-SLAB-END operation=6 phase=before
+SOCKET-OPS-RESULT operation=6 name=stream_fd_sendmsg_recvmsg calls=8192 before=1982529536 after=1970274304 retained=12255232
+SOCKET-OPS-SLAB-BEGIN operation=6 phase=after
+SOCKET-OPS-SLAB-END operation=6 phase=after
+SOCKET-OPS-SLAB-BEGIN operation=7 phase=before
+SOCKET-OPS-SLAB-END operation=7 phase=before
+SOCKET-OPS-RESULT operation=7 name=datagram_fd_sendmsg_recvmsg calls=8192 before=1970159616 after=1957904384 retained=12255232
+SOCKET-OPS-SLAB-BEGIN operation=7 phase=after
+SOCKET-OPS-SLAB-END operation=7 phase=after
+SOCKET-OPS-SLAB-BEGIN operation=8 phase=before
+SOCKET-OPS-SLAB-END operation=8 phase=before
+SOCKET-OPS-RESULT operation=8 name=seqpacket_fd_sendmsg_recvmsg calls=8192 before=1957806080 after=1945567232 retained=12238848
+SOCKET-OPS-SLAB-BEGIN operation=8 phase=after
+SOCKET-OPS-SLAB-END operation=8 phase=after
+SOCKET-OPS-SLAB-BEGIN operation=9 phase=before
+SOCKET-OPS-SLAB-END operation=9 phase=before
+SOCKET-OPS-RESULT operation=9 name=stream_control_truncate calls=8192 before=1945468928 after=1933197312 retained=12271616
+SOCKET-OPS-SLAB-BEGIN operation=9 phase=after
+SOCKET-OPS-SLAB-END operation=9 phase=after
+SOCKET-OPS-SLAB-BEGIN operation=10 phase=before
+SOCKET-OPS-SLAB-END operation=10 phase=before
+SOCKET-OPS-RESULT operation=10 name=datagram_control_truncate calls=8192 before=1933082624 after=1920843776 retained=12238848
+SOCKET-OPS-SLAB-BEGIN operation=10 phase=after
+SOCKET-OPS-SLAB-END operation=10 phase=after
+SOCKET-OPS-SLAB-BEGIN operation=11 phase=before
+SOCKET-OPS-SLAB-END operation=11 phase=before
+SOCKET-OPS-RESULT operation=11 name=stream_read_discards_rights calls=8192 before=1920761856 after=1909555200 retained=11206656
+SOCKET-OPS-SLAB-BEGIN operation=11 phase=after
+SOCKET-OPS-SLAB-END operation=11 phase=after
+SOCKET-OPS-SLAB-BEGIN operation=12 phase=before
+SOCKET-OPS-SLAB-END operation=12 phase=before
+SOCKET-OPS-RESULT operation=12 name=datagram_read_discards_rights calls=8192 before=1909456896 after=1898283008 retained=11173888
+SOCKET-OPS-SLAB-BEGIN operation=12 phase=after
+SOCKET-OPS-SLAB-END operation=12 phase=after
+SOCKET-OPS-SLAB-BEGIN operation=13 phase=before
+SOCKET-OPS-SLAB-END operation=13 phase=before
+SOCKET-OPS-RESULT operation=13 name=stream_close_queued_rights calls=8192 before=1897955328 after=1856290816 retained=41664512
+SOCKET-OPS-SLAB-BEGIN operation=13 phase=after
+SOCKET-OPS-SLAB-END operation=13 phase=after
+SOCKET-OPS-SLAB-BEGIN operation=14 phase=before
+SOCKET-OPS-SLAB-END operation=14 phase=before
+SOCKET-OPS-RESULT operation=14 name=datagram_close_queued_rights calls=8192 before=1855979520 after=1814347776 retained=41631744
+SOCKET-OPS-SLAB-BEGIN operation=14 phase=after
+SOCKET-OPS-SLAB-END operation=14 phase=after
+SOCKET-OPS-SLAB-BEGIN operation=15 phase=before
+SOCKET-OPS-SLAB-END operation=15 phase=before
+SOCKET-OPS-RESULT operation=15 name=closed_stream_send calls=8192 before=1814020096 after=1774845952 retained=39174144
+SOCKET-OPS-SLAB-BEGIN operation=15 phase=after
+SOCKET-OPS-SLAB-END operation=15 phase=after
+SOCKET-OPS-FAIL kind=17 warm=0 errno=95
+SOCKET-OPS-DONE result=1 completed=16

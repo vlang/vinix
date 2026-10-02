@@ -1,0 +1,18 @@
+{
+  "status": "PASS",
+  "checked_rows": 43,
+  "scenarios": [
+    "ops",
+    "churn",
+    "cache",
+    "idle",
+    "apps",
+    "drag"
+  ],
+  "runner_exit_code": 0,
+  "kernel_sha256": "c617cb9d695bccc3c7ada841fa60ac65fd45b942f45d3462b44c3f0378a995c9",
+  "desktop_sha256": "342951b1f2718833615ba2bf6e32c4f1cc7a0b06dc01b94c459be7beeaf55614",
+  "serial_sha256": "e31d11f00d665fb6199dc6c1d212272707040673a73ff8568c0942b173e5c2ca",
+  "harness_sha256": "2905a5b8e6cf3aa14129b38eb0152b29d5d27dfa6b57640c8f834270bb535d31",
+  "notes": "Complete required functional/memory scenarios. Existing ops/churn growth remains visible; this is not a claim that kernel memory stays flat."
+}

@@ -1,0 +1,74 @@
+{
+  "optimized-v3": {
+    "malloc.o": {
+      "o3": true,
+      "command_sha256": "e57e38a564f35cfb8889fe9bee9f41a956996006abf5cf12765861dd70599f71"
+    },
+    "malloc.lo": {
+      "o3": true,
+      "command_sha256": "7a07702aa18937398775178e603547bcd5a13ea37970166327da0ffe016730bc"
+    },
+    "free.o": {
+      "o3": true,
+      "command_sha256": "fc25616223a16e12090f2b390d5be32e3962db95bdcd6b47f09c95886fc61e07"
+    },
+    "free.lo": {
+      "o3": true,
+      "command_sha256": "4982cbf8788ac64e6e0f34d04e820f2a05b27e2d5b8e88d0466179d705db3325"
+    }
+  },
+  "disabled-v3": {
+    "malloc.o": {
+      "o3": true,
+      "command_sha256": "31413b311af57c6fe54f45af81eb8fd3607636c8914ab023564b0a0a805bbc03"
+    },
+    "malloc.lo": {
+      "o3": true,
+      "command_sha256": "8d74fcb3709cf0a2429fa6d3343db3ed75070a38f4d3c8bb25802fdc28d977f8"
+    },
+    "free.o": {
+      "o3": true,
+      "command_sha256": "f0b3839b14834872a00160ce7b2d1c9d0fab2fc81eb744e83e0288a937cf7bd8"
+    },
+    "free.lo": {
+      "o3": true,
+      "command_sha256": "fea6516df69cae5134c9a174bd96140c1a216362dd61914354d06109ed5ab395"
+    }
+  },
+  "optimized-arm126-v3": {
+    "malloc.o": {
+      "o3": true,
+      "command_sha256": "52ca950af4cf5537f59f242094bdbd89ae2c92aee5a6ea430abd14d709d1c71e"
+    },
+    "malloc.lo": {
+      "o3": true,
+      "command_sha256": "4e3e8f143f680d1fa210701ebaabe1d219980cf2b41eb37790967cf0e902910b"
+    },
+    "free.o": {
+      "o3": true,
+      "command_sha256": "89affaaaa43bdee07c59c098cc9a741fc7b5eb7f3ecbbb884505029ae97ec400"
+    },
+    "free.lo": {
+      "o3": true,
+      "command_sha256": "e2db4a90032ab65c55456f89a25c28d0a15c3f4bec747d74b317d594725192d3"
+    }
+  },
+  "disabled-arm126-v3": {
+    "malloc.o": {
+      "o3": true,
+      "command_sha256": "5e96dcb6e41503df4bfffce55fa6b807fee5b1b9bd8f28a3ae914263cc1b3d48"
+    },
+    "malloc.lo": {
+      "o3": true,
+      "command_sha256": "9a8627919194cf3ef854093b6a025ea933c416f3d127ded023ed932456164292"
+    },
+    "free.o": {
+      "o3": true,
+      "command_sha256": "eea20464bc1665e9403e21a6cb76cfae339042f2d9791a75e3090b0fbccef644"
+    },
+    "free.lo": {
+      "o3": true,
+      "command_sha256": "4a5956baa734bce27e0cbc41f2195de0aee5deb3ccd013256b37da7d3a0defd2"
+    }
+  }
+}

@@ -1,0 +1,107 @@
+{
+  "passed": true,
+  "cases": [
+    {
+      "program": "/tests/verify-optimized-dynamic",
+      "suite": "original",
+      "checks": 1910
+    },
+    {
+      "program": "/tests/verify-all-classes-optimized-dynamic",
+      "suite": "supplemental",
+      "checks": 22776
+    },
+    {
+      "program": "/tests/verify-optimized-static",
+      "suite": "original",
+      "checks": 1910
+    },
+    {
+      "program": "/tests/verify-all-classes-optimized-static",
+      "suite": "supplemental",
+      "checks": 22776
+    },
+    {
+      "program": "/tests/verify-disabled-dynamic",
+      "suite": "original",
+      "checks": 1910
+    },
+    {
+      "program": "/tests/verify-all-classes-disabled-dynamic",
+      "suite": "supplemental",
+      "checks": 22776
+    },
+    {
+      "program": "/tests/verify-disabled-static",
+      "suite": "original",
+      "checks": 1910
+    },
+    {
+      "program": "/tests/verify-all-classes-disabled-static",
+      "suite": "supplemental",
+      "checks": 22776
+    }
+  ],
+  "total_checks": 98744,
+  "footprints": [
+    {
+      "before": 1031061405696,
+      "retained": 1031065059328,
+      "trimmed": 1031061405696,
+      "retained_delta": 3653632,
+      "trimmed_delta": 0
+    },
+    {
+      "before": 1031060750336,
+      "retained": 1031064502272,
+      "trimmed": 1031060750336,
+      "retained_delta": 3751936,
+      "trimmed_delta": 0
+    },
+    {
+      "before": 1031061389312,
+      "retained": 1031061389312,
+      "trimmed": 1031061389312,
+      "retained_delta": 0,
+      "trimmed_delta": 0
+    },
+    {
+      "before": 1031060750336,
+      "retained": 1031060750336,
+      "trimmed": 1031060750336,
+      "retained_delta": 0,
+      "trimmed_delta": 0
+    }
+  ],
+  "corruption_lines": [
+    "UALLOC-CORRUPTION test=0 status=5 signal=5 exit=-1",
+    "UALLOC-CORRUPTION test=1 status=11 signal=11 exit=-1",
+    "UALLOC-CORRUPTION test=2 status=5 signal=5 exit=-1",
+    "UALLOC-CORRUPTION test=3 status=5 signal=5 exit=-1",
+    "UALLOC-CORRUPTION test=0 status=5 signal=5 exit=-1",
+    "UALLOC-CORRUPTION test=1 status=11 signal=11 exit=-1",
+    "UALLOC-CORRUPTION test=2 status=5 signal=5 exit=-1",
+    "UALLOC-CORRUPTION test=3 status=5 signal=5 exit=-1",
+    "UALLOC-CORRUPTION test=0 status=11 signal=11 exit=-1",
+    "UALLOC-CORRUPTION test=1 status=11 signal=11 exit=-1",
+    "UALLOC-CORRUPTION test=2 status=5 signal=5 exit=-1",
+    "UALLOC-CORRUPTION test=3 status=5 signal=5 exit=-1",
+    "UALLOC-CORRUPTION test=0 status=11 signal=11 exit=-1",
+    "UALLOC-CORRUPTION test=1 status=11 signal=11 exit=-1",
+    "UALLOC-CORRUPTION test=2 status=5 signal=5 exit=-1",
+    "UALLOC-CORRUPTION test=3 status=5 signal=5 exit=-1"
+  ],
+  "clock_lines": [
+    "CLOCK-REFERENCE-BEGIN ns=1790969241119962542",
+    "CLOCK-REFERENCE-END ns=1790969241138912875 elapsed=18950333",
+    "CLOCK-COUNTER sleep_ns=51906833 sleep_ticks=1245813 busy_ns=18950333 busy_ticks=444150 ratio=1.024037",
+    "CLOCK-DONE precise counter, coarse snapshots, absolute sleeps, timerfd and futex"
+  ],
+  "source_sha256": {
+    "verify.c": "9641312c3b7eba760ba1954577ba755fd5565d1832d8f99d21e282ee0a61239e",
+    "verify-all-classes.c": "77ab00f7bace9f654f5824a6fa64a6408daae4b2a84ccacd734ae07385af1db7",
+    "clock.c": "b8cd130a5b554ef41f5d84841373379409e6a163d6d1eaea5f59b2148a697a71",
+    "launcher.c": "27089c9a66b192d0318f2c1a5dd545397a9947527edb58984c6ae7e3a8607c70"
+  },
+  "serial_sha256": "7efe21c4734bfb951154308c91b1a662cb3987012fb058d1c83cbfb3dc3ad1f6"
+}

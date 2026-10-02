@@ -1,0 +1,11 @@
+{
+  "argv": [
+    "python3",
+    "/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/verify-x86-v4-final.py",
+    "run",
+    "/Users/alex/code/vinix/build/useralloc-final-kernel-x86_64/vinix-x86_64"
+  ],
+  "exit_code": 1,
+  "start": "2026-10-02T19:23:51.826548+00:00",
+  "finish": "2026-10-02T19:24:02.307303+00:00"
+}

@@ -1,0 +1,146 @@
+{
+  "status": "PASS final x86 atomics/lock codegen, both target memory objects, and host memory sanitizer runtime",
+  "at_utc": "2026-10-02T19:27:17.248734+00:00",
+  "kernel_sha256": "f944412c7e30b2c3a25b2ef93938bdd21c311c6fa611ea08a76d45adfdd76733",
+  "atomic_source_sha256": "ec2d130780fe2fe72bdff53013594e2bc5dbe671c10ab260412f0de8c19d1bf4",
+  "lock_source_sha256": "3db4566c9a05ada0098109928957a56d8248f96a6da3ad95b555d8a35e89c4ee",
+  "memory_source_sha256": "5082c545e7c16318cceeb51bf280c356c6b9713c0de8b336290be165f2a42eb5",
+  "blob_c_sha256": "016cfcbfe87933879852247f449f7def76e30ac80ecc80157a07c6f288f1c649",
+  "blob_object_sha256": "d3c77bfe431a2bacf4e59df9d2367c9f327df45290a83e114f8ec68537ce6466",
+  "memory_object_sha256": "8880813133101c06896824d0d5dda2b78e23b232de91a2275d0b7d4d4e60c1ee",
+  "actual_kernel_load_instantiations": [
+    "katomic__load_T_bool",
+    "katomic__load_T_i64",
+    "katomic__load_T_u32",
+    "katomic__load_T_u64",
+    "katomic__load_T_u8",
+    "katomic__load_T_v_int"
+  ],
+  "reviewed_functions": [
+    {
+      "name": "katomic__load_T_bool",
+      "generated_c_sha256": "29bd52e346240b1870f1722c3288731e9f75d0fd0e529f2ab53fa7d44c12d3f9",
+      "hidden_allocation": false,
+      "compiler_memory_clobber": true
+    },
+    {
+      "name": "katomic__load_T_i64",
+      "generated_c_sha256": "7d1a1a155bdfb223ea5e735cd97e24b4654e4a85eb248d88430ba57be0dffd5c",
+      "hidden_allocation": false,
+      "compiler_memory_clobber": true
+    },
+    {
+      "name": "katomic__load_T_u32",
+      "generated_c_sha256": "4edd24962b8b79ed14f023bea5b5980c631a3957a8b2fcd8193f7b6877226dd3",
+      "hidden_allocation": false,
+      "compiler_memory_clobber": true
+    },
+    {
+      "name": "katomic__load_T_u64",
+      "generated_c_sha256": "70ae4fcc0d9d02fc394529292c076a3c6f4a10a0f920eb78e7dc3c4099f6cf06",
+      "hidden_allocation": false,
+      "compiler_memory_clobber": true
+    },
+    {
+      "name": "katomic__load_T_u8",
+      "generated_c_sha256": "b8e3c8fff2c318dcd076a92fbaaa2a1faeca7d2d021d7a835b5653ad1a7929bb",
+      "hidden_allocation": false,
+      "compiler_memory_clobber": true
+    },
+    {
+      "name": "katomic__load_T_v_int",
+      "generated_c_sha256": "4280e4ac93fb58e329eb694a79c135640b84c9f3de47ed82dc2edf91dae08b8b",
+      "hidden_allocation": false,
+      "compiler_memory_clobber": true
+    },
+    {
+      "name": "katomic__store_release",
+      "generated_c_sha256": "4b07dc9e0337517861e09f9291be2a90294e25f8e6d5f6c717921e050dc4b0c5",
+      "hidden_allocation": false,
+      "compiler_memory_clobber": true
+    },
+    {
+      "name": "klock__Lock__release",
+      "generated_c_sha256": "cd11787a75f5f9944d8623dd99cb7cf094065bb292f20734f01c6ad346e6d452",
+      "hidden_allocation": false,
+      "compiler_memory_clobber": false
+    },
+    {
+      "name": "katomic__store_T_bool",
+      "generated_c_sha256": "ce3bcb532742bdbde46208ab02cc307bca52f9b1c2c4ee6f235d4234f7b43a22",
+      "hidden_allocation": false,
+      "compiler_memory_clobber": true
+    },
+    {
+      "name": "katomic__store_T_u32",
+      "generated_c_sha256": "5ca1fe507c1666f63b1d26579f283fe028c3c398214743816d5de7f17fc873ae",
+      "hidden_allocation": false,
+      "compiler_memory_clobber": true
+    },
+    {
+      "name": "katomic__store_T_u64",
+      "generated_c_sha256": "e976148c2a4e952af6db3a558468d282c51a5bc85b845b878a8e0c950ba599ec",
+      "hidden_allocation": false,
+      "compiler_memory_clobber": true
+    },
+    {
+      "name": "katomic__sync",
+      "generated_c_sha256": "b7c0521083becd103adff56e90c1ba3d4bce2753b46255009526feca22b7b96e",
+      "hidden_allocation": false,
+      "compiler_memory_clobber": true
+    }
+  ],
+  "observations": [
+    "All six real kernel load instantiations read memory into a register at widths 1,4,8.",
+    "Non-aligned widths 4 and 8 retain locked XADD(0).",
+    "Generic SC stores still use locked XCHG; explicit sync still MFENCE.",
+    "The lock release object snapshots l.ints before the byte unlock store and restores interrupts afterwards.",
+    "All inspected load/release bodies have zero hidden V allocations and carry compiler memory clobbers.",
+    "Memcpy and memset use integer byte/word operations with no calls/recursion or SIMD in their final target object.",
+    "Supplemental u16 and pointer-valued templates use exact original generated C bodies, correct load width/direction and locked fallback, without payload extra dereference."
+  ],
+  "supplemental_fixture": {
+    "source_sha256": "d774d09b6c9e986ff4e33530a9eefb04aa4502d70269066a5fe7034a1a9b8fa2",
+    "generated_c_sha256": "3a3ef2aeded061f72d226368ed8cd5449fd7dfd8412cf5fcc2e9b42f257f64e5",
+    "extracted_c_sha256": "64f0d1f48921e5295edb9c0dfa46344191004b67f1837c864783b8ffdfe4193c",
+    "object_sha256": "77fa0ada8ce61dd7e4f525c901df9626c3fbb3cdb8b55d8e5559cfa2193a012f",
+    "functions": [
+      {
+        "name": "katomic__load_T_ptr_Probe",
+        "generated_c_sha256": "92744d37b27fe3e2eeab4ed6e67a66cc15a4c252420d47c5e1cdf6e16ca38f6d",
+        "exact_body_present_in_compiled_extracted_source": true,
+        "hidden_allocation": false,
+        "slot_extra_dereference": false
+      },
+      {
+        "name": "katomic__load_T_u16",
+        "generated_c_sha256": "0cd1b6345bb66d3d2f54fe6c48bb9ecf4681a8d15cf14cf97caae501efce65d0",
+        "exact_body_present_in_compiled_extracted_source": true,
+        "hidden_allocation": false,
+        "slot_extra_dereference": false
+      }
+    ]
+  },
+  "aarch64_memory_proof": {
+    "status": "PASS exact final ARM target object",
+    "kernel_sha256": "c617cb9d695bccc3c7ada841fa60ac65fd45b942f45d3462b44c3f0378a995c9",
+    "object_sha256": "8e34b8d63921c329c067086b86621bbd464b3164de4cac77bdf52cd3d9eab351",
+    "implementation_sha256": "5082c545e7c16318cceeb51bf280c356c6b9713c0de8b336290be165f2a42eb5",
+    "compiler_policy": "-mgeneral-regs-only",
+    "observations": [
+      "Byte-alignment prefixes and word/pair loops remain guarded by remaining lengths.",
+      "AArch64 memcpy/memset object uses only integer registers, loads/stores and arithmetic; no SIMD or function call/recursion.",
+      "Paired accesses operate entirely inside lengths already admitted by the scalar source bounds."
+    ]
+  },
+  "host_memory_runtime_proof": {
+    "status": "PASS ASan+UBSan guard-page and alignment test",
+    "cases": 361573,
+    "host_page_size": 16384,
+    "run_json": "memory-runtime/run.json",
+    "source_sha256": "0bf772b0a0c5c5f64df62f6df37e87a5fcaaef346c069aa505a83b2bc6db869f",
+    "binary_sha256": "ec416dc262cc687b14ca5618d44648d31c366396662a216d3d76086b944cd0e2",
+    "output_sha256": "c2512d83195d219dfdfcdb7b451c6edd63f5cc9d38fafc39c981d53e17f46bc8",
+    "implementation_matches_final_both_architectures": true
+  }
+}

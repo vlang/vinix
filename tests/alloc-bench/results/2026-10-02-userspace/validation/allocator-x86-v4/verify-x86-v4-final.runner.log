@@ -1,0 +1,57 @@
+UALLOC-VERIFY-BEGIN
+CLOCK-REFERENCE-BEGIN ns=1790969451922976000
+CLOCK-REFERENCE-END ns=1790969452338662000 elapsed=415686000
+CLOCK-COUNTER sleep_ns=51730000 sleep_ticks=51772000 busy_ns=415686000 busy_ticks=413925000 ratio=1.005070
+CLOCK-DONE precise counter, coarse snapshots, absolute sleeps, timerfd and futex
+UALLOC-POLICY policy=optimized
+UALLOC-LINKAGE policy=optimized mode=dynamic
+UALLOC-FOOTPRINT before=1031061319680 retained=1031064895488 trimmed=1031061319680
+UALLOC-CORRUPTION test=0 status=11 signal=11 exit=-1
+UALLOC-CORRUPTION test=1 status=11 signal=11 exit=-1
+UALLOC-CORRUPTION test=2 status=4 signal=4 exit=-1
+UALLOC-CORRUPTION test=3 status=4 signal=4 exit=-1
+UALLOC-DONE checks=1910
+UALLOC-ORIGINAL-COMPLETE policy=optimized mode=dynamic
+UALLOC-ALL-CLASSES classes=48 burst=72 rounds=3
+UALLOC-THREAD-TRANSITIONS cycles=24
+UALLOC-SUPPLEMENT-DONE checks=22776
+UALLOC-MODE-COMPLETE policy=optimized mode=dynamic
+UALLOC-LINKAGE policy=optimized mode=static
+UALLOC-FOOTPRINT before=1031060676608 retained=1031064260608 trimmed=1031060676608
+UALLOC-CORRUPTION test=0 status=4 signal=4 exit=-1
+UALLOC-CORRUPTION test=1 status=11 signal=11 exit=-1
+UALLOC-CORRUPTION test=2 status=4 signal=4 exit=-1
+UALLOC-CORRUPTION test=3 status=4 signal=4 exit=-1
+UALLOC-DONE checks=1910
+UALLOC-ORIGINAL-COMPLETE policy=optimized mode=static
+UALLOC-ALL-CLASSES classes=48 burst=72 rounds=3
+UALLOC-THREAD-TRANSITIONS cycles=24
+UALLOC-SUPPLEMENT-DONE checks=22776
+UALLOC-MODE-COMPLETE policy=optimized mode=static
+UALLOC-POLICY policy=disabled
+UALLOC-LINKAGE policy=disabled mode=dynamic
+UALLOC-FOOTPRINT before=1031061311488 retai
+UALLOC-CORRUPTION test=0 status=11 signal=11 exit=-1
+UALLOC-CORRUPTION test=1 status=11 signal=11 exit=-1
+UALLOC-CORRUPTION test=2 status=4 signal=4 exit=-1
+UALLOC-CORRUPTION test=3 status=4 signal=4 exit=-1
+UALLOC-DONE checks=1910
+UALLOC-ORIGINAL-COMPLETE policy=disabled mode=dynamic
+UALLOC-ALL-CLASSES classes=48 burst=72 rounds=3
+UALLOC-THREAD-TRANSITIONS cycles=24
+UALLOC-SUPPLEMENT-DONE checks=22776
+UALLOC-MODE-COMPLETE policy=disabled mode=dynamic
+UALLOC-LINKAGE policy=disabled mode=static
+UALLOC-FOOTPRINT before=1031060668416 retained=1031060672512 trimmed=1031060668416
+UALLOC-CORRUPTION test=0 status=11 signal=11 exit=-1
+UALLOC-CORRUPTION tes
+UALLOC-CORRUPTION test=2 status=4 signal=4 exit=-1
+UALLOC-CORRUPTION test=3 status=4 signal=4 exit=-1
+UALLOC-DONE checks=1910
+UALLOC-ORIGINAL-COMPLETE policy=disabled mode=static
+UALLOC-ALL-CLASSES classes=48 burst=72 rounds=3
+UALLOC-THREAD-TRANSITIONS cycles=24
+UALLOC-SUPPLEMENT-DONE checks=22776
+UALLOC-MODE-COMPLETE policy=disabled mode=static
+UALLOC-VERIFY-COMPLETE
+All four allocator modes and supplemental suites verified

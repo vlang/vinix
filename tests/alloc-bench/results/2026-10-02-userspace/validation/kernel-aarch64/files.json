@@ -1,0 +1,8 @@
+{
+  "combined.patch": "26737d4a00d69cbfb6c3fe498346d4bacc585edc44496685186d736e51c28cf7",
+  "final-build.log": "8d7c101b0161aa2e7dd1a1ad791dbcc1659ad7eb3d147e9f52a25a247e166cce",
+  "final-validation.json": "4ae29bf162705d097cb45120fc02389d46b290c4cef3bc95ba82eefb891c6d74",
+  "finish-build.exit.json": "1b8218e002aff5d6b211693f451fbe635ec7ec7162cb4593086398cdf6e98548",
+  "socket-ownership.patch": "2f3315f3773042dbece7f8f59818715ab79e647857473067ef538026ecf86cca",
+  "socket.patch": "74771d10e97929762429beabe434035c4ae53111d713a743b6397276fbb9adbf"
+}

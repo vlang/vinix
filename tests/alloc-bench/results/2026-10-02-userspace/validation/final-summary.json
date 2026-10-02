@@ -1,0 +1,87 @@
+{
+  "x86_kernel_sha256": "0d02357a37f47ecc7f95b5e0a88f7cf00ab73b4b2d8eba3e9fff552a8b583186",
+  "aarch64_kernel_sha256": "f43f7081476cdeea3e91416aead07014b83bc7532d5ad6bae31adbaa5790f5df",
+  "x86_core": {
+    "result": "PASS",
+    "feature_pass_markers": 52,
+    "artifact_dir": "build/useralloc-final-core-x86_64"
+  },
+  "aarch64_core_and_persistence": {
+    "result": "PASS",
+    "artifact_dir": "build/useralloc-arm-core-final-v5"
+  },
+  "desktop_perf": {
+    "harness_result": "PASS: complete/error-free measurement plan",
+    "memory_flat_result": "Not flat: existing generic I/O and churn growth retained in raw results; no blanket leak-free claim.",
+    "rows": 43,
+    "rounds": 1,
+    "artifact_dir": "build/useralloc-desktop-perf-final",
+    "desktop_rows": [
+      {
+        "variant": "final",
+        "scenario": "idle",
+        "round": 1,
+        "seconds": "20.0",
+        "processes": "2",
+        "desktop_cpu": "0.26",
+        "apps_cpu": "0.00",
+        "total_cpu": "0.26",
+        "desktop_mb": "31.6",
+        "apps_mb": "14.7",
+        "total_mb": "46.3",
+        "system_used_mb": "314.0",
+        "physical_mb": "66.1"
+      },
+      {
+        "variant": "final",
+        "scenario": "apps",
+        "round": 1,
+        "seconds": "20.0",
+        "processes": "7",
+        "desktop_cpu": "0.69",
+        "apps_cpu": "0.06",
+        "total_cpu": "0.75",
+        "desktop_mb": "31.6",
+        "apps_mb": "81.3",
+        "total_mb": "112.9",
+        "system_used_mb": "399.0",
+        "physical_mb": "140.7"
+      },
+      {
+        "variant": "final",
+        "scenario": "drag",
+        "round": 1,
+        "seconds": "20.0",
+        "processes": "2",
+        "desktop_cpu": "4.94",
+        "apps_cpu": "0.00",
+        "total_cpu": "4.94",
+        "desktop_mb": "32.3",
+        "apps_mb": "14.7",
+        "total_mb": "46.9",
+        "system_used_mb": "321.0",
+        "physical_mb": "61.3"
+      }
+    ]
+  },
+  "allocation_audit": {
+    "baseline_unique_reported_sites": 443,
+    "final_unique_reported_sites": 432,
+    "path_kind_deltas": {
+      "socket/socket.v local moved to the heap: its address escapes": -11
+    },
+    "literal_allowlist_result": "FAIL on baseline and final; unchanged allowlist and complete raw reports retained.",
+    "coverage_limit": "ARM V compilation succeeds; x86 audit source extraction is incomplete (drm.simple import and Resource interfaces), though actual clean x86 kernel build and full core pass.",
+    "artifact_dir": "build/useralloc-allocation-audit-final"
+  },
+  "lifetime_review": {
+    "result": "PASS",
+    "artifact_dir": "build/useralloc-socket-lifetime-final"
+  },
+  "limits": [
+    "Existing four-CPU80-waiter thread creation failure is demonstrated on baseline and candidate; complete final suites use2vCPU without reducing waiter count.",
+    "Supplementary stream MSG_PEEK with rights returns EOPNOTSUPP on unchanged baseline and final; source scope frozen.",
+    "Broader plain-read/create-close memory growth persists on baseline; final candidate is no worse in measured five-case grace settlement.",
+    "Full desktop scenarios have one required round,20-second samples; they establish functioning desktop behavior, not a statistical performance comparison."
+  ]
+}

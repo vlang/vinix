@@ -1,0 +1,608 @@
+aarch64: 314 source files, 385 allocation sites (V exit 0)
+x86_64: 246 source files, 247 allocation sites (V exit 1)
+aarch64/virtio_blk/virtio_blk.v:357:17 struct on the heap
+aarch64/virtio_blk/virtio_blk.v:391:26 conversion to interface
+aarch64/virtio_blk/virtio_blk.v:482:21 conversion to interface
+aarch64/virtio_gpu/virtio_gpu.v:1237:16 struct on the heap
+aarch64/virtio_gpu/virtio_gpu.v:1244:20 array initialization
+aarch64/virtio_gpu/virtio_gpu.v:451:14 struct on the heap
+aarch64/virtio_gpu/virtio_gpu.v:748:23 struct on the heap
+aarch64/virtio_snd/virtio_snd.v:313:9 conversion to interface
+aarch64/virtio_snd/virtio_snd.v:920:8 string interpolation
+aarch64/virtio_snd/virtio_snd.v:922:20 conversion to interface
+apple/ans/ans.v:225:13 struct on the heap
+apple/ans/ans.v:234:25 conversion to interface
+apple/ans/datafs.v:190:9 conversion to interface
+apple/ans/datafs.v:190:9 struct on the heap
+apple/ans/datafs.v:196:13 struct on the heap
+apple/ans/datafs.v:202:29 conversion to interface
+apple/ans/datafs.v:203:18 conversion to interface
+apple/ans/datafs.v:295:29 conversion to interface
+apple/ans/datafs.v:296:32 conversion to interface
+apple/ans/datafs.v:370:29 conversion to interface
+apple/ans/datafs.v:420:20 conversion to interface
+apple/ans/datafs.v:420:20 struct on the heap
+apple/ans/rootfs.v:143:9 conversion to interface
+apple/ans/rootfs.v:143:9 struct on the heap
+apple/ans/rootfs.v:183:13 struct on the heap
+apple/ans/rootfs.v:196:29 conversion to interface
+apple/ans/rootfs.v:197:18 conversion to interface
+apple/ans/rootfs.v:235:20 struct on the heap
+apple/ans/rootfs.v:304:29 conversion to interface
+apple/ans/rootfs.v:305:32 conversion to interface
+apple/dart/dart.v:104:10 string interpolation
+apple/smc/smc.v:166:13 struct on the heap
+apple/smc/smc.v:199:25 conversion to interface
+apple/speakers/speakers.v:440:6 local moved to the heap: its address escapes
+apple/speakers/speakers.v:448:6 local moved to the heap: its address escapes
+apple/speakers/speakers.v:805:20 conversion to interface
+apple/speakers/speakers.v:975:9 conversion to interface
+apple/typec/typec.v:529:20 struct on the heap
+apple/typec/typec.v:555:25 conversion to interface
+apple/wifi/wifi.v:469:13 struct on the heap
+apple/wifi/wifi.v:474:25 conversion to interface
+block/partition/partition.v:158:21 struct on the heap
+block/partition/partition.v:173:27 conversion to interface
+block/partition/partition.v:197:21 struct on the heap
+block/partition/partition.v:212:27 conversion to interface
+dev/ahci/ahci.v:669:20 struct on the heap
+dev/ahci/ahci.v:684:29 conversion to interface
+dev/ahci/ahci.v:690:36 conversion to interface
+dev/ahci/ahci.v:713:23 struct on the heap
+dev/ata/ata.v:81:26 conversion to interface
+dev/ata/ata.v:97:13 struct on the heap
+dev/console/terminal.v:74:16 struct on the heap
+dev/console/terminal.v:75:16 cast to interface
+dev/fbdev/fbdev.v:123:10 string interpolation
+dev/fbdev/fbdev.v:169:25 conversion to interface
+dev/hda/hda.v:1160:5 struct on the heap
+dev/hda/hda.v:1181:5 struct on the heap
+dev/hda/hda.v:437:9 conversion to interface
+dev/hda/hda.v:864:20 conversion to interface
+dev/mouse/mouse.v:397:25 conversion to interface
+dev/mouse/mouse.v:407:25 conversion to interface
+dev/nvme/nvme.v:787:18 struct on the heap
+dev/nvme/nvme.v:852:23 struct on the heap
+dev/nvme/nvme.v:874:25 struct on the heap
+dev/nvme/nvme.v:896:27 conversion to interface
+dev/nvme/nvme.v:904:34 conversion to interface
+dev/nvme/nvme.v:919:23 struct on the heap
+dev/oss/dsp.v:113:25 conversion to interface
+dev/oss/dsp.v:98:20 struct on the heap
+dev/oss/mixer.v:140:3 struct on the heap
+dev/oss/mixer.v:153:25 conversion to interface
+dev/pointerdev/pointerdev.v:154:13 struct on the heap
+dev/pointerdev/pointerdev.v:170:25 conversion to interface
+dev/procdev/procdev.v:207:13 struct on the heap
+dev/procdev/procdev.v:224:25 conversion to interface
+dev/pty/pty.v:220:13 struct on the heap
+dev/pty/pty.v:223:25 conversion to interface
+dev/pty/pty.v:227:25 conversion to interface
+dev/pty/pty.v:270:14 struct on the heap
+dev/pty/pty.v:278:16 struct on the heap
+dev/pty/pty.v:281:15 struct on the heap
+dev/random/random.v:62:13 struct on the heap
+dev/random/random.v:71:25 conversion to interface
+dev/serial/serial.v:46:18 struct on the heap
+dev/serial/serial.v:55:25 conversion to interface
+dev/serial/serial.v:63:19 struct on the heap
+dev/serial/serial.v:76:27 conversion to interface
+dev/streams/streams.v:114:17 struct on the heap
+dev/streams/streams.v:124:25 conversion to interface
+dev/streams/streams.v:174:17 struct on the heap
+dev/streams/streams.v:184:25 conversion to interface
+dev/streams/streams.v:57:17 struct on the heap
+dev/streams/streams.v:65:25 conversion to interface
+dev/tty/tty.v:75:16 struct on the heap
+dev/tty/tty.v:79:25 conversion to interface
+devicetree/devicetree.v:170:17 struct on the heap
+devicetree/devicetree.v:248:3 string slice
+devicetree/devicetree.v:380:16 array initialization
+devicetree/devicetree.v:394:16 array initialization
+devicetree/devicetree.v:407:16 array initialization
+drm/drm.v:465:14 struct on the heap
+drm/drm.v:485:25 conversion to interface
+drm/drm.v:617:13 struct on the heap
+drm/drm.v:764:17 struct on the heap
+drm/drm.v:867:17 struct on the heap
+drm/gem/gem.v:105:13 struct on the heap
+drm/mode/mode.v:116:9 struct on the heap
+drm/mode/mode.v:130:9 struct on the heap
+drm/mode/mode.v:142:9 struct on the heap
+drm/mode/mode.v:155:9 struct on the heap
+drm/mode/mode.v:184:9 struct on the heap
+drm/simple/simple.v:237:16 struct on the heap
+drm/simple/simple.v:244:11 array initialization
+drm/simple/simple.v:47:14 struct on the heap
+drm/syncobj/syncobj.v:215:13 struct on the heap
+drm/syncobj/syncobj.v:53:9 struct on the heap
+file/epoll.v:177:13 struct on the heap
+file/eventfd.v:192:17 struct on the heap
+file/file.v:318:6 local moved to the heap: its address escapes
+file/file.v:328:6 local moved to the heap: its address escapes
+file/file.v:438:6 local moved to the heap: its address escapes
+file/file.v:555:6 local moved to the heap: its address escapes
+file/file.v:765:20 struct on the heap
+file/file.v:770:16 struct on the heap
+file/memory_pressure.v:44:16 struct on the heap
+file/memory_pressure.v:45:15 cast to interface
+file/pselect.v:177:6 local moved to the heap: its address escapes
+file/timerfd.v:248:15 struct on the heap
+fs/cgroup.v:135:9 conversion to interface
+fs/cgroup.v:135:9 struct on the heap
+fs/cgroup.v:173:13 struct on the heap
+fs/cgroup.v:209:18 conversion to interface
+fs/cgroup.v:210:15 struct on the heap
+fs/cgroup.v:238:20 conversion to interface
+fs/cgroup.v:338:6 local moved to the heap: its address escapes
+fs/cgroup.v:40:28 array initialization
+fs/cgroup.v:427:6 local moved to the heap: its address escapes
+fs/cgroup.v:439:6 local moved to the heap: its address escapes
+fs/cgroup.v:447:6 local moved to the heap: its address escapes
+fs/cgroup.v:456:6 local moved to the heap: its address escapes
+fs/cgroup.v:644:8 local moved to the heap: its address escapes
+fs/cgroup.v:689:8 local moved to the heap: its address escapes
+fs/cgroup.v:712:8 local moved to the heap: its address escapes
+fs/cgroup.v:736:8 local moved to the heap: its address escapes
+fs/cgroup.v:865:8 local moved to the heap: its address escapes
+fs/cgroup.v:934:6 local moved to the heap: its address escapes
+fs/cpuinfo_arm64.v:16:6 local moved to the heap: its address escapes
+fs/devtmpfs.v:187:14 cast to interface
+fs/devtmpfs.v:199:13 struct on the heap
+fs/devtmpfs.v:220:22 struct on the heap
+fs/devtmpfs.v:266:22 struct on the heap
+fs/devtmpfs.v:294:52 string interpolation
+fs/devtmpfs.v:299:22 struct on the heap
+fs/disk_root.v:12:27 array initialization
+fs/disk_root.v:13:40 array initialization
+fs/ext2/ext2.v:1263:24 struct on the heap
+fs/ext2/ext2.v:1265:15 struct on the heap
+fs/ext2/ext2.v:1266:15 struct on the heap
+fs/ext2/ext2.v:191:24 struct on the heap
+fs/ext2/ext2.v:243:6 local moved to the heap: its address escapes
+fs/ext2/ext2.v:369:14 cast to interface
+fs/ext2/ext2.v:439:19 struct on the heap
+fs/ext2/ext2.v:488:14 struct on the heap
+fs/ext2/ext2.v:511:10 conversion to interface
+fs/ext2/ext2.v:514:9 conversion to interface
+fs/ext2/ext2.v:539:18 struct on the heap
+fs/ext2/mkfs.v:96:18 array initialization
+fs/ext2/mkfs.v:97:18 array initialization
+fs/ext2/mkfs.v:98:18 array initialization
+fs/ext2/mkfs.v:99:18 array initialization
+fs/ext2/namespace.v:249:13 struct on the heap
+fs/inotify.v:290:17 struct on the heap
+fs/mknod.v:183:13 struct on the heap
+fs/mknod.v:197:15 cast to interface
+fs/mknod.v:216:15 cast to interface
+fs/mount.v:1075:6 local moved to the heap: its address escapes
+fs/mount.v:1123:6 local moved to the heap: its address escapes
+fs/mount.v:190:11 struct on the heap
+fs/mount.v:218:15 struct on the heap
+fs/mount.v:227:19 struct on the heap
+fs/mount.v:469:28 array initialization
+fs/mount.v:91:24 struct on the heap
+fs/namespaces.v:184:19 conversion to interface
+fs/namespaces.v:57:6 local moved to the heap: its address escapes
+fs/namespaces.v:77:13 struct on the heap
+fs/namespaces.v:91:18 conversion to interface
+fs/overlay.v:310:16 struct on the heap
+fs/overlay.v:339:59 struct on the heap
+fs/overlay.v:516:39 struct on the heap
+fs/overlay.v:767:13 struct on the heap
+fs/overlay.v:773:26 conversion to interface
+fs/overlay.v:776:17 struct on the heap
+fs/overlay.v:81:9 conversion to interface
+fs/overlay.v:81:9 struct on the heap
+fs/policy.v:35:6 local moved to the heap: its address escapes
+fs/procfs.v:1036:6 local moved to the heap: its address escapes
+fs/procfs.v:1185:6 local moved to the heap: its address escapes
+fs/procfs.v:1390:18 conversion to interface
+fs/procfs.v:1408:29 array initialization
+fs/procfs.v:1503:18 conversion to interface
+fs/procfs.v:1619:19 conversion to interface
+fs/procfs.v:1687:6 local moved to the heap: its address escapes
+fs/procfs.v:1707:18 conversion to interface
+fs/procfs.v:1739:19 conversion to interface
+fs/procfs.v:230:26 conversion to interface
+fs/procfs.v:236:18 conversion to interface
+fs/procfs.v:289:31 conversion to interface
+fs/procfs.v:292:23 conversion to interface
+fs/procfs.v:298:33 conversion to interface
+fs/procfs.v:302:25 conversion to interface
+fs/procfs.v:349:22 struct on the heap
+fs/procfs.v:373:18 conversion to interface
+fs/procfs.v:391:18 conversion to interface
+fs/procfs.v:42:28 string concatenation
+fs/procfs.v:444:18 conversion to interface
+fs/procfs.v:455:18 conversion to interface
+fs/procfs.v:497:6 local moved to the heap: its address escapes
+fs/procfs.v:563:8 local moved to the heap: its address escapes
+fs/procfs.v:599:8 local moved to the heap: its address escapes
+fs/procfs.v:644:4 local moved to the heap: its address escapes
+fs/procfs.v:652:8 local moved to the heap: its address escapes
+fs/procfs.v:676:8 local moved to the heap: its address escapes
+fs/procfs.v:692:6 local moved to the heap: its address escapes
+fs/procfs.v:701:6 local moved to the heap: its address escapes
+fs/ssd_root_arm64.v:29:14 struct on the heap
+fs/sysfs.v:119:22 struct on the heap
+fs/sysfs.v:139:18 conversion to interface
+fs/sysfs.v:153:18 conversion to interface
+fs/sysfs.v:162:18 conversion to interface
+fs/sysfs.v:176:6 local moved to the heap: its address escapes
+fs/sysfs.v:184:6 local moved to the heap: its address escapes
+fs/sysfs.v:192:6 local moved to the heap: its address escapes
+fs/sysfs.v:325:8 local moved to the heap: its address escapes
+fs/sysfs.v:67:9 conversion to interface
+fs/sysfs.v:67:9 struct on the heap
+fs/sysfs.v:80:26 conversion to interface
+fs/sysfs.v:81:18 conversion to interface
+fs/tmpfs.v:595:14 cast to interface
+fs/tmpfs.v:601:13 struct on the heap
+fs/tmpfs.v:615:22 struct on the heap
+fs/tmpfs.v:659:22 struct on the heap
+fs/tmpfs.v:690:22 struct on the heap
+fs/vfs.v:103:25 conversion to interface
+fs/vfs.v:110:25 conversion to interface
+fs/vfs.v:110:25 struct on the heap
+fs/vfs.v:111:28 conversion to interface
+fs/vfs.v:111:28 struct on the heap
+fs/vfs.v:112:26 conversion to interface
+fs/vfs.v:112:26 struct on the heap
+fs/vfs.v:113:25 conversion to interface
+fs/vfs.v:113:25 struct on the heap
+fs/vfs.v:114:27 conversion to interface
+fs/vfs.v:114:27 struct on the heap
+fs/vfs.v:81:14 struct on the heap
+fs/xattr.v:39:13 struct on the heap
+futex/futex.v:89:7 struct on the heap
+gpu/agx/alloc/alloc.v:113:8 struct on the heap
+gpu/agx/alloc/alloc.v:125:7 struct on the heap
+gpu/agx/driver/driver.v:1023:6 local moved to the heap: its address escapes
+gpu/agx/driver/driver.v:1122:2 local moved to the heap: its address escapes
+gpu/agx/driver/driver.v:1158:2 local moved to the heap: its address escapes
+gpu/agx/driver/driver.v:1159:6 local moved to the heap: its address escapes
+gpu/agx/driver/driver.v:1183:20 struct on the heap
+gpu/agx/fake/driver.v:103:14 struct on the heap
+gpu/agx/fake/driver.v:1057:9 array initialization
+gpu/agx/fake/driver.v:1082:16 struct on the heap
+gpu/agx/fake/driver.v:691:14 struct on the heap
+gpu/agx/fake/driver.v:878:17 struct on the heap
+gpu/agx/fake/vm.v:64:9 struct on the heap
+gpu/agx/file/file.v:1153:21 struct on the heap
+gpu/agx/file/file.v:1179:21 struct on the heap
+gpu/agx/file/file.v:1333:9 array initialization
+gpu/agx/file/file.v:146:11 struct on the heap
+gpu/agx/fw/g13_initdata_layout.v:147:48 array initialization
+gpu/agx/fw/g13_initdata_layout_use.v:63:30 slice of a fixed array
+gpu/agx/fw/g13_initdata_layout_use.v:63:62 slice of a fixed array
+gpu/agx/fw/g13_initdata_layout_use.v:68:30 slice of a fixed array
+gpu/agx/fw/g13_initdata_layout_use.v:68:61 slice of a fixed array
+gpu/agx/gpu/g13.v:1052:2 local moved to the heap: its address escapes
+gpu/agx/gpu/g13.v:1065:13 struct on the heap
+gpu/agx/gpu/g13.v:1970:13 struct on the heap
+gpu/agx/gpu/g13.v:2319:19 struct on the heap
+gpu/agx/gpu/g13.v:861:6 local moved to the heap: its address escapes
+gpu/agx/gpu/g17.v:156:19 struct on the heap
+gpu/agx/gpu/g17.v:426:15 struct on the heap
+gpu/agx/gpu/gpu.v:141:13 struct on the heap
+gpu/agx/gpu/gpu.v:706:21 struct on the heap
+gpu/agx/mmu/mmu.v:168:9 struct on the heap
+gpu/agx/mmu/mmu.v:360:15 struct on the heap
+gpu/agx/mmu/mmu.v:471:12 struct on the heap
+gpu/agx/pgtable/pgtable.v:125:9 struct on the heap
+gpu/agx/pgtable/pgtable.v:142:9 struct on the heap
+gpu/agx/power/power.v:1369:2 local moved to the heap: its address escapes
+gpu/agx/submission/submission.v:136:9 local moved to the heap: its address escapes
+gpu/agx/submission/submission.v:158:9 local moved to the heap: its address escapes
+gpu/agx/workqueue/workqueue.v:54:9 struct on the heap
+gpu/dcp/backlight/backlight.v:84:13 struct on the heap
+gpu/dcp/backlight/backlight.v:94:25 conversion to interface
+gpu/dcp/backlight_transport.v:1483:19 struct on the heap
+gpu/dcp/dcp.v:52:13 struct on the heap
+initramfs/initramfs.v:239:13 string interpolation
+initramfs/initramfs.v:257:14 string interpolation
+krandom/random.v:138:13 struct on the heap
+main_amd64.v:142:56 array initialization
+main_amd64.v:142:72 array initialization
+main_amd64.v:189:9 string interpolation
+main_amd64.v:194:9 string interpolation
+main_amd64.v:199:9 string interpolation
+main_amd64.v:204:9 string interpolation
+main_arm64.v:374:56 array initialization
+main_arm64.v:374:72 array initialization
+memory/mmap/immutable.v:114:27 struct on the heap
+memory/mmap/immutable.v:95:27 struct on the heap
+memory/mmap/inherit.v:106:27 struct on the heap
+memory/mmap/inherit.v:128:24 struct on the heap
+memory/mmap/mmap.v:1055:21 struct on the heap
+memory/mmap/mmap.v:1064:22 struct on the heap
+memory/mmap/mmap.v:1099:21 struct on the heap
+memory/mmap/mmap.v:1107:22 struct on the heap
+memory/mmap/mmap.v:1221:21 struct on the heap
+memory/mmap/mmap.v:1281:22 struct on the heap
+memory/mmap/mmap.v:1802:27 struct on the heap
+memory/mmap/mmap.v:1835:21 struct on the heap
+memory/mmap/mmap.v:1941:27 struct on the heap
+memory/mmap/mmap.v:620:26 struct on the heap
+memory/mmap/mmap.v:635:24 struct on the heap
+memory/mmap/mmap.v:676:24 struct on the heap
+memory/virtual_amd64.v:52:17 struct on the heap
+memory/virtual_arm64.v:581:9 string interpolation
+memory/virtual_arm64.v:586:109 string interpolation
+memory/virtual_arm64.v:88:17 struct on the heap
+net/hostname.v:61:6 local moved to the heap: its address escapes
+pagecache/pagecache.v:151:9 struct on the heap
+pci/scan.v:48:16 struct on the heap
+pipe/pipe.v:53:11 struct on the heap
+pipe/pipe.v:81:11 struct on the heap
+pipe/usercopy.v:19:6 local moved to the heap: its address escapes
+proc/cgroup_account.v:176:6 local moved to the heap: its address escapes
+proc/cgroup_account.v:63:9 struct on the heap
+proc/container.v:119:9 struct on the heap
+proc/container.v:218:14 struct on the heap
+proc/pledge.v:192:12 string slice
+proc/pledge.v:207:6 local moved to the heap: its address escapes
+proc/proc.v:1221:6 local moved to the heap: its address escapes
+proc/proc.v:1280:6 local moved to the heap: its address escapes
+proc/proc.v:874:9 string slice
+proc/proc.v:939:6 local moved to the heap: its address escapes
+proc/proc.v:962:6 local moved to the heap: its address escapes
+proc/proc.v:968:21 array initialization
+proc/proc.v:973:21 array initialization
+proc/proc.v:988:6 local moved to the heap: its address escapes
+proc/proc_arm64.v:169:6 local moved to the heap: its address escapes
+proc/seccomp.v:236:20 struct on the heap
+proc/unveil.v:251:14 struct on the heap
+proc/unveil.v:71:9 struct on the heap
+sched/inherit.v:70:18 struct on the heap
+sched/sched_amd64.v:672:11 struct on the heap
+sched/sched_amd64.v:72:19 struct on the heap
+sched/sched_amd64.v:730:11 struct on the heap
+sched/sched_amd64.v:75:21 array initialization
+sched/sched_amd64.v:818:11 struct on the heap
+sched/sched_arm64.v:1259:11 struct on the heap
+sched/sched_arm64.v:1350:11 struct on the heap
+sched/sched_arm64.v:1442:11 struct on the heap
+sched/sched_arm64.v:314:19 struct on the heap
+sched/sched_arm64.v:317:21 array initialization
+socket/inet/inet.v:175:6 local moved to the heap: its address escapes
+socket/inet/inet.v:525:16 struct on the heap
+socket/netlink/netlink.v:118:11 struct on the heap
+socket/socket.v:145:18 struct on the heap
+socket/socket.v:318:10 conversion to interface
+socket/socket.v:320:10 conversion to interface
+socket/socket.v:322:10 conversion to interface
+socket/socket.v:358:10 conversion to interface
+socket/socket.v:360:10 conversion to interface
+socket/socket.v:362:10 conversion to interface
+socket/socket.v:404:10 conversion to interface
+socket/socket.v:406:10 conversion to interface
+socket/socket.v:408:10 conversion to interface
+socket/socket.v:462:6 local moved to the heap: its address escapes
+socket/socket.v:491:6 local moved to the heap: its address escapes
+socket/socket.v:563:10 conversion to interface
+socket/socket.v:565:10 conversion to interface
+socket/socket.v:567:10 conversion to interface
+socket/socket.v:599:6 local moved to the heap: its address escapes
+socket/socket.v:604:6 local moved to the heap: its address escapes
+socket/socket.v:712:6 local moved to the heap: its address escapes
+socket/socket.v:714:6 local moved to the heap: its address escapes
+socket/socket.v:716:6 local moved to the heap: its address escapes
+socket/socket.v:841:6 local moved to the heap: its address escapes
+socket/socket.v:861:6 local moved to the heap: its address escapes
+socket/socket.v:885:6 local moved to the heap: its address escapes
+socket/socket.v:916:2 local moved to the heap: its address escapes
+socket/socket.v:965:10 conversion to interface
+socket/socket.v:967:10 conversion to interface
+socket/socket.v:969:10 conversion to interface
+socket/unix/unix.v:1264:27 struct on the heap
+socket/unix/unix.v:1718:13 struct on the heap
+socket/unix/unix.v:1736:11 struct on the heap
+socket/unix/unix.v:1747:11 struct on the heap
+syscall/table/container.v:232:22 array initialization
+syscall/table/linux_common.v:314:8 local moved to the heap: its address escapes
+syscall/table/linux_common.v:332:8 local moved to the heap: its address escapes
+syscall/table/linux_common.v:748:6 local moved to the heap: its address escapes
+syscall/table/syscall_table_arm64.v:348:6 local moved to the heap: its address escapes
+syscall/table/syscall_table_arm64.v:361:6 local moved to the heap: its address escapes
+sysdisk/sysdisk.v:178:6 local moved to the heap: its address escapes
+sysvsem/sysvsem.v:116:13 struct on the heap
+sysvshm/sysvshm.v:246:17 struct on the heap
+time/time.v:251:15 struct on the heap
+uacpi/uacpi.v:102:11 struct on the heap
+userland/signalfd.v:329:13 struct on the heap
+userland/userland.v:414:19 struct on the heap
+userland/userland.v:419:15 struct on the heap
+userland/userland.v:425:20 struct on the heap
+userland/userland.v:431:16 struct on the heap
+userland/userland.v:437:20 struct on the heap
+userland/userland.v:443:16 struct on the heap
+userland/userland_arm64.v:1141:19 struct on the heap
+userland/userland_arm64.v:1146:15 struct on the heap
+userland/userland_arm64.v:1152:20 struct on the heap
+userland/userland_arm64.v:1158:16 struct on the heap
+userland/userland_arm64.v:1164:20 struct on the heap
+userland/userland_arm64.v:1170:16 struct on the heap
+userland/userland_arm64.v:1327:6 local moved to the heap: its address escapes
+userland/userland_arm64.v:1328:6 local moved to the heap: its address escapes
+userland/userland_arm64.v:931:8 local moved to the heap: its address escapes
+userland/userland_arm64.v:949:8 local moved to the heap: its address escapes
+userland/userland_arm64.v:960:9 local moved to the heap: its address escapes
+userland/userland_arm64.v:987:8 local moved to the heap: its address escapes
+x86/cpu/features.v:24:25 array initialization
+x86/cpu/features.v:28:25 array initialization
+x86/cpu/features.v:33:24 array initialization
+x86/cpu/features.v:37:24 array initialization
+x86/cpu/features.v:42:25 array initialization
+x86/cpu/features.v:47:25 array initialization
+x86/cpu/features.v:52:25 array initialization
+x86/cpu/features.v:57:26 array initialization
+x86/cpu/features.v:63:19 array initialization
+x86/hypervisor/device.v:366:16 struct on the heap
+x86/hypervisor/device.v:371:25 conversion to interface
+x86/hypervisor/device.v:85:17 struct on the heap
+x86/hypervisor/vmx.v:523:12 struct on the heap
+NEW: aarch64/virtio_blk/virtio_blk.v conversion to interface: 2, allowed 0
+NEW: aarch64/virtio_blk/virtio_blk.v struct on the heap: 1, allowed 0
+NEW: aarch64/virtio_gpu/virtio_gpu.v struct on the heap: 3, allowed 0
+NEW: aarch64/virtio_snd/virtio_snd.v conversion to interface: 2, allowed 0
+NEW: aarch64/virtio_snd/virtio_snd.v string interpolation: 1, allowed 0
+NEW: apple/ans/ans.v conversion to interface: 1, allowed 0
+NEW: apple/ans/ans.v struct on the heap: 1, allowed 0
+NEW: apple/ans/datafs.v conversion to interface: 7, allowed 0
+NEW: apple/ans/datafs.v struct on the heap: 3, allowed 0
+NEW: apple/ans/rootfs.v conversion to interface: 5, allowed 0
+NEW: apple/ans/rootfs.v struct on the heap: 3, allowed 0
+NEW: apple/dart/dart.v string interpolation: 1, allowed 0
+NEW: apple/smc/smc.v conversion to interface: 1, allowed 0
+NEW: apple/smc/smc.v struct on the heap: 1, allowed 0
+NEW: apple/speakers/speakers.v conversion to interface: 2, allowed 0
+NEW: apple/speakers/speakers.v local moved to the heap: its address escapes: 2, allowed 0
+NEW: apple/typec/typec.v conversion to interface: 1, allowed 0
+NEW: apple/typec/typec.v struct on the heap: 1, allowed 0
+NEW: apple/wifi/wifi.v conversion to interface: 1, allowed 0
+NEW: apple/wifi/wifi.v struct on the heap: 1, allowed 0
+NEW: block/partition/partition.v conversion to interface: 2, allowed 0
+NEW: block/partition/partition.v struct on the heap: 2, allowed 0
+NEW: dev/ahci/ahci.v conversion to interface: 2, allowed 0
+NEW: dev/ahci/ahci.v struct on the heap: 2, allowed 0
+NEW: dev/ata/ata.v conversion to interface: 1, allowed 0
+NEW: dev/ata/ata.v struct on the heap: 1, allowed 0
+NEW: dev/console/terminal.v cast to interface: 1, allowed 0
+NEW: dev/console/terminal.v struct on the heap: 1, allowed 0
+NEW: dev/fbdev/fbdev.v conversion to interface: 1, allowed 0
+NEW: dev/hda/hda.v conversion to interface: 2, allowed 0
+NEW: dev/hda/hda.v struct on the heap: 2, allowed 0
+NEW: dev/mouse/mouse.v conversion to interface: 2, allowed 0
+NEW: dev/nvme/nvme.v conversion to interface: 2, allowed 0
+NEW: dev/nvme/nvme.v struct on the heap: 4, allowed 0
+NEW: dev/oss/dsp.v conversion to interface: 1, allowed 0
+NEW: dev/oss/dsp.v struct on the heap: 1, allowed 0
+NEW: dev/oss/mixer.v conversion to interface: 1, allowed 0
+NEW: dev/oss/mixer.v struct on the heap: 1, allowed 0
+NEW: dev/pointerdev/pointerdev.v conversion to interface: 1, allowed 0
+NEW: dev/pointerdev/pointerdev.v struct on the heap: 1, allowed 0
+NEW: dev/procdev/procdev.v conversion to interface: 1, allowed 0
+NEW: dev/procdev/procdev.v struct on the heap: 1, allowed 0
+NEW: dev/pty/pty.v conversion to interface: 2, allowed 0
+NEW: dev/pty/pty.v struct on the heap: 4, allowed 0
+NEW: dev/random/random.v conversion to interface: 1, allowed 0
+NEW: dev/random/random.v struct on the heap: 1, allowed 0
+NEW: dev/serial/serial.v conversion to interface: 2, allowed 0
+NEW: dev/serial/serial.v struct on the heap: 2, allowed 0
+NEW: dev/streams/streams.v conversion to interface: 3, allowed 0
+NEW: dev/streams/streams.v struct on the heap: 3, allowed 0
+NEW: dev/tty/tty.v conversion to interface: 1, allowed 0
+NEW: dev/tty/tty.v struct on the heap: 1, allowed 0
+NEW: devicetree/devicetree.v string slice: 1, allowed 0
+NEW: devicetree/devicetree.v struct on the heap: 1, allowed 0
+NEW: drm/drm.v conversion to interface: 1, allowed 0
+NEW: drm/drm.v struct on the heap: 4, allowed 0
+NEW: drm/gem/gem.v struct on the heap: 1, allowed 0
+NEW: drm/mode/mode.v struct on the heap: 5, allowed 0
+NEW: drm/simple/simple.v struct on the heap: 2, allowed 0
+NEW: drm/syncobj/syncobj.v struct on the heap: 2, allowed 0
+NEW: file/epoll.v struct on the heap: 1, allowed 0
+NEW: file/eventfd.v struct on the heap: 1, allowed 0
+NEW: file/file.v local moved to the heap: its address escapes: 4, allowed 0
+NEW: file/file.v struct on the heap: 2, allowed 0
+NEW: file/pselect.v local moved to the heap: its address escapes: 1, allowed 0
+NEW: file/timerfd.v struct on the heap: 1, allowed 0
+NEW: fs/cgroup.v conversion to interface: 3, allowed 0
+NEW: fs/cgroup.v local moved to the heap: its address escapes: 11, allowed 0
+NEW: fs/cgroup.v struct on the heap: 3, allowed 0
+NEW: fs/cpuinfo_arm64.v local moved to the heap: its address escapes: 1, allowed 0
+NEW: fs/devtmpfs.v struct on the heap: 4, allowed 0
+NEW: fs/ext2/ext2.v conversion to interface: 2, allowed 0
+NEW: fs/ext2/ext2.v local moved to the heap: its address escapes: 1, allowed 0
+NEW: fs/ext2/ext2.v struct on the heap: 7, allowed 0
+NEW: fs/ext2/namespace.v struct on the heap: 1, allowed 0
+NEW: fs/inotify.v struct on the heap: 1, allowed 0
+NEW: fs/mknod.v struct on the heap: 1, allowed 0
+NEW: fs/mount.v local moved to the heap: its address escapes: 2, allowed 0
+NEW: fs/mount.v struct on the heap: 4, allowed 0
+NEW: fs/namespaces.v conversion to interface: 2, allowed 0
+NEW: fs/namespaces.v local moved to the heap: its address escapes: 1, allowed 0
+NEW: fs/namespaces.v struct on the heap: 1, allowed 0
+NEW: fs/overlay.v conversion to interface: 2, allowed 0
+NEW: fs/overlay.v struct on the heap: 6, allowed 0
+NEW: fs/policy.v local moved to the heap: its address escapes: 1, allowed 0
+NEW: fs/procfs.v conversion to interface: 15, allowed 0
+NEW: fs/procfs.v local moved to the heap: its address escapes: 11, allowed 0
+NEW: fs/procfs.v struct on the heap: 1, allowed 0
+NEW: fs/ssd_root_arm64.v struct on the heap: 1, allowed 0
+NEW: fs/sysfs.v conversion to interface: 6, allowed 0
+NEW: fs/sysfs.v local moved to the heap: its address escapes: 4, allowed 0
+NEW: fs/sysfs.v struct on the heap: 2, allowed 0
+NEW: fs/tmpfs.v struct on the heap: 4, allowed 0
+NEW: fs/vfs.v conversion to interface: 6, allowed 0
+NEW: fs/vfs.v struct on the heap: 6, allowed 0
+NEW: fs/xattr.v struct on the heap: 1, allowed 0
+NEW: futex/futex.v struct on the heap: 1, allowed 0
+NEW: gpu/agx/alloc/alloc.v struct on the heap: 2, allowed 0
+NEW: gpu/agx/driver/driver.v local moved to the heap: its address escapes: 4, allowed 0
+NEW: gpu/agx/driver/driver.v struct on the heap: 1, allowed 0
+NEW: gpu/agx/fake/driver.v struct on the heap: 4, allowed 0
+NEW: gpu/agx/fake/vm.v struct on the heap: 1, allowed 0
+NEW: gpu/agx/file/file.v struct on the heap: 3, allowed 0
+NEW: gpu/agx/fw/g13_initdata_layout_use.v slice of a fixed array: 4, allowed 0
+NEW: gpu/agx/gpu/g13.v local moved to the heap: its address escapes: 2, allowed 0
+NEW: gpu/agx/gpu/g13.v struct on the heap: 3, allowed 0
+NEW: gpu/agx/gpu/g17.v struct on the heap: 2, allowed 0
+NEW: gpu/agx/gpu/gpu.v struct on the heap: 2, allowed 0
+NEW: gpu/agx/mmu/mmu.v struct on the heap: 3, allowed 0
+NEW: gpu/agx/pgtable/pgtable.v struct on the heap: 2, allowed 0
+NEW: gpu/agx/power/power.v local moved to the heap: its address escapes: 1, allowed 0
+NEW: gpu/agx/submission/submission.v local moved to the heap: its address escapes: 2, allowed 0
+NEW: gpu/agx/workqueue/workqueue.v struct on the heap: 1, allowed 0
+NEW: gpu/dcp/backlight/backlight.v conversion to interface: 1, allowed 0
+NEW: gpu/dcp/backlight/backlight.v struct on the heap: 1, allowed 0
+NEW: gpu/dcp/backlight_transport.v struct on the heap: 1, allowed 0
+NEW: gpu/dcp/dcp.v struct on the heap: 1, allowed 0
+NEW: krandom/random.v struct on the heap: 1, allowed 0
+NEW: memory/mmap/immutable.v struct on the heap: 2, allowed 0
+NEW: memory/mmap/inherit.v struct on the heap: 2, allowed 0
+NEW: memory/mmap/mmap.v struct on the heap: 12, allowed 0
+NEW: memory/virtual_amd64.v struct on the heap: 1, allowed 0
+NEW: memory/virtual_arm64.v struct on the heap: 1, allowed 0
+NEW: net/hostname.v local moved to the heap: its address escapes: 1, allowed 0
+NEW: pagecache/pagecache.v struct on the heap: 1, allowed 0
+NEW: pci/scan.v struct on the heap: 1, allowed 0
+NEW: pipe/pipe.v struct on the heap: 2, allowed 0
+NEW: pipe/usercopy.v local moved to the heap: its address escapes: 1, allowed 0
+NEW: proc/cgroup_account.v local moved to the heap: its address escapes: 1, allowed 0
+NEW: proc/cgroup_account.v struct on the heap: 1, allowed 0
+NEW: proc/container.v struct on the heap: 2, allowed 0
+NEW: proc/pledge.v local moved to the heap: its address escapes: 1, allowed 0
+NEW: proc/pledge.v string slice: 1, allowed 0
+NEW: proc/proc.v local moved to the heap: its address escapes: 5, allowed 0
+NEW: proc/proc.v string slice: 1, allowed 0
+NEW: proc/proc_arm64.v local moved to the heap: its address escapes: 1, allowed 0
+NEW: proc/seccomp.v struct on the heap: 1, allowed 0
+NEW: proc/unveil.v struct on the heap: 2, allowed 0
+NEW: sched/inherit.v struct on the heap: 1, allowed 0
+NEW: sched/sched_amd64.v struct on the heap: 4, allowed 0
+NEW: sched/sched_arm64.v struct on the heap: 4, allowed 0
+NEW: socket/inet/inet.v local moved to the heap: its address escapes: 1, allowed 0
+NEW: socket/inet/inet.v struct on the heap: 1, allowed 0
+NEW: socket/netlink/netlink.v struct on the heap: 1, allowed 0
+NEW: socket/socket.v conversion to interface: 15, allowed 0
+NEW: socket/socket.v local moved to the heap: its address escapes: 11, allowed 0
+NEW: socket/socket.v struct on the heap: 1, allowed 0
+NEW: socket/unix/unix.v struct on the heap: 4, allowed 0
+NEW: syscall/table/linux_common.v local moved to the heap: its address escapes: 3, allowed 0
+NEW: syscall/table/syscall_table_arm64.v local moved to the heap: its address escapes: 2, allowed 0
+NEW: sysdisk/sysdisk.v local moved to the heap: its address escapes: 1, allowed 0
+NEW: sysvsem/sysvsem.v struct on the heap: 1, allowed 0
+NEW: sysvshm/sysvshm.v struct on the heap: 1, allowed 0
+NEW: time/time.v struct on the heap: 1, allowed 0
+NEW: uacpi/uacpi.v struct on the heap: 1, allowed 0
+NEW: userland/signalfd.v struct on the heap: 1, allowed 0
+NEW: userland/userland.v struct on the heap: 6, allowed 0
+NEW: userland/userland_arm64.v local moved to the heap: its address escapes: 6, allowed 0
+NEW: userland/userland_arm64.v struct on the heap: 6, allowed 0
+NEW: x86/cpu/features.v array initialization: 9, allowed 0
+NEW: x86/hypervisor/device.v conversion to interface: 1, allowed 0
+NEW: x86/hypervisor/device.v struct on the heap: 2, allowed 0
+NEW: x86/hypervisor/vmx.v struct on the heap: 1, allowed 0

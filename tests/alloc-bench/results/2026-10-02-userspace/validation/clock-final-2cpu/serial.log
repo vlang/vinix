@@ -1,0 +1,20 @@
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./dev/ sz=0
+!>+ [3] ./proc/ sz=0
+!>+ [4] ./root/ sz=0
+!>+ [5] ./sbin/ sz=0
+!>+ [6] ./sbin/init sz=37536
+!>+ [7] ./sys/ sz=0
+!>+ [8] ./tmp/ sz=0
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff0000007919d800
+initramfs: Done (9 entries)
+CLOCK-REFERENCE-BEGIN ns=1790951928518815000
+CLOCK-REFERENCE-END ns=1790951929062047000 elapsed=543232000
+CLOCK-COUNTER sleep_ns=51404000 sleep_ticks=51445000 busy_ns=543232000 busy_ticks=540828000 ratio=1.005246
+CLOCK-DONE precise counter, coarse snapshots, absolute sleeps, timerfd and futex
+QEMU: Terminated
+
