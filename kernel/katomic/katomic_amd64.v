@@ -142,15 +142,95 @@ pub fn store[T](mut var T, value T) {
 	}
 }
 
+// A release store is sufficient for publishing an unlocked spinlock. Ordinary
+// stores are ordered on x86; the memory clobber also prevents the compiler from
+// moving critical-section accesses after this store. Generic store above keeps
+// its stronger sequentially consistent XCHG ordering.
+pub fn store_release(var &bool, value bool) {
+	mut target := unsafe { &u8(var) }
+	byte := if value { u8(1) } else { u8(0) }
+	asm volatile amd64 {
+		mov target, byte
+		; =m (*target) as target
+		; r (byte) as byte
+		; memory
+	}
+}
+
+// x86 sequential consistency uses MOV loads with fenced (XCHG) stores. Loads
+// therefore need no read-modify-write cycle. Both forms retain a compiler
+// memory barrier. Keep the locked form for a misaligned operand: unlike MOV,
+// it is atomic even if the operand crosses a cache-line boundary.
+// Width-specific views address the slot itself for pointer-valued T, avoiding
+// the V C backend's extra dereference of a generic pointer operand.
 pub fn load[T](var &T) T {
 	mut ret := unsafe { T(0) }
-	unsafe {
+	if sizeof(T) == 1 {
+		target := unsafe { &u8(var) }
 		asm volatile amd64 {
-			lock xadd var, ret
-			; +m (*var) as var
-			  +r (ret)
-			; ; memory
+			mov ret, target
+			; =r (ret)
+			; m (*target) as target
+			; memory
 		}
+		return ret
 	}
-	return ret
+	if sizeof(T) == 2 {
+		target := unsafe { &u16(var) }
+		if usize(var) & 1 != 0 {
+			asm volatile amd64 {
+				lock xadd target, ret
+				; +m (*target) as target
+				  +r (ret)
+				; ; memory
+			}
+			return ret
+		}
+		asm volatile amd64 {
+			mov ret, target
+			; =r (ret)
+			; m (*target) as target
+			; memory
+		}
+		return ret
+	}
+	if sizeof(T) == 4 {
+		target := unsafe { &u32(var) }
+		if usize(var) & 3 != 0 {
+			asm volatile amd64 {
+				lock xadd target, ret
+				; +m (*target) as target
+				  +r (ret)
+				; ; memory
+			}
+			return ret
+		}
+		asm volatile amd64 {
+			mov ret, target
+			; =r (ret)
+			; m (*target) as target
+			; memory
+		}
+		return ret
+	}
+	if sizeof(T) == 8 {
+		target := unsafe { &u64(var) }
+		if usize(var) & 7 != 0 {
+			asm volatile amd64 {
+				lock xadd target, ret
+				; +m (*target) as target
+				  +r (ret)
+				; ; memory
+			}
+			return ret
+		}
+		asm volatile amd64 {
+			mov ret, target
+			; =r (ret)
+			; m (*target) as target
+			; memory
+		}
+		return ret
+	}
+	panic('katomic.load: unsupported operand width')
 }

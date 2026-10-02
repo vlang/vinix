@@ -144,3 +144,17 @@ different CPUs, interrupt-heavy workloads, concurrent trimming, and
 OOM/fragmentation stress. Native throughput, p50/p99 latency, lock contention,
 peak pages, and pages retained after churn remain necessary; QEMU TCG results
 alone do not justify production deployment.
+
+## Freestanding C memory routines
+
+Run `tests/memory/run-runtime.sh` on an ARM64 or x86-64 POSIX host to exercise
+`kernel/c/memory.c` directly. The test compiles it with the kernel's
+freestanding, aliasing and general-register-only flags under private symbol
+names. AddressSanitizer and UndefinedBehaviorSanitizer are enabled by default;
+set `VINIX_MEMORY_SANITIZERS=none` for an uninstrumented run.
+
+The test checks every source/destination alignment modulo 16 for lengths
+through 257, fill-byte conversion, both overlapping move directions, unchanged
+bytes surrounding each request, read-only copy sources, and requests ending
+exactly at protected guard pages. It validates bounds and data correctness;
+multicore kernel locking and VM behavior are covered by `tests/qemu-core`.
