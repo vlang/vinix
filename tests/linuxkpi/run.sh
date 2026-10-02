@@ -25,6 +25,21 @@ ${CC:-clang} -std=gnu11 -O1 -g -fwrapv -fno-strict-aliasing -Wall -Wextra -Werro
     -include linux/export.h \
     -o "$work/test"
 "$work/test"
+python3 - "$work/test" <<'PY'
+import resource
+import signal
+import subprocess
+import sys
+
+resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
+for case in ("reversed", "huge", "clock-horizon", "absolute-overflow", "state", "atomic", "valid-horizon"):
+    result = subprocess.run([sys.argv[1], case], capture_output=True, text=True, timeout=30)
+    expected = 0 if case == "valid-horizon" else -signal.SIGABRT
+    assert result.returncode == expected, (case, result.returncode, result.stderr)
+    if expected:
+        assert "usleep boundary BUG with no published records or pages" in result.stderr, (case, result.stderr)
+print("LinuxKPI: invalid sleep ranges, contexts and signed clock boundaries passed")
+PY
 # Each translation unit keeps its public Linux/DRM header first. Building
 # separately catches missing transitive includes that the runtime test's
 # broader include list would conceal.

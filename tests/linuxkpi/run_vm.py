@@ -21,6 +21,7 @@ MARKERS = [
     "linuxkpi: blocking wakeups, join/detach and 70 retained exited tasks passed; no pages retained",
     "linuxkpi: sleeping mutexes, wait queues and completions passed on 4 workers; no pages retained",
     "linuxkpi: monotonic clocks and timed task/queue/completion waits passed on 4 workers; no pages retained",
+    "linuxkpi: minimum-duration sleeps, fixed deadlines, early wakes and worker rollback passed; no pages retained",
     "linuxkpi: timer callbacks, IRQSAFE, self-rearm and synchronous shutdown passed on 4 workers; no pages retained",
     "linuxkpi: ordered workqueues, sleeping callbacks, cancellation, flush and teardown passed on 4 workers; no pages retained",
     "linuxkpi: delayed work timers, modification, cancellation, flush and self-free callbacks passed on 4 workers; no pages retained",

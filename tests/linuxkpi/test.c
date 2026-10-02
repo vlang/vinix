@@ -42,7 +42,16 @@ static _Thread_local unsigned int *timer_sync_spins;
 static atomic_t refcount_warnings = ATOMIC_INIT(0);
 static atomic_t time_warnings = ATOMIC_INIT(0);
 static u64 host_clock_ns;
-u64 vinix_linuxkpi_clock_ns(void) { return __atomic_load_n(&host_clock_ns, __ATOMIC_ACQUIRE); }
+static bool usleep_boundary_check;
+static _Thread_local void (*host_clock_read_hook)(void);
+u64 vinix_linuxkpi_clock_ns(void)
+{
+    u64 now = __atomic_load_n(&host_clock_ns, __ATOMIC_ACQUIRE);
+    void (*hook)(void) = host_clock_read_hook;
+    host_clock_read_hook = NULL;
+    if (hook) hook();
+    return now;
+}
 u32 vinix_linuxkpi_clock_resolution_ns(void) { return 1000000; }
 void vinix_linuxkpi_test_warn_note(const char *file, int line) { atomic_inc(&time_warnings); }
 struct native_task_model {
@@ -326,6 +335,10 @@ void vinix_linuxkpi_free_pages(void *base, size_t pages)
 size_t vinix_linuxkpi_page_size(void) { return 4096; }
 void vinix_linuxkpi_bug(const char *file, int line)
 {
+    if (usleep_boundary_check) {
+        assert(!vinix_linuxkpi_time_waiters() && !live_pages);
+        fputs("usleep boundary BUG with no published records or pages\n", stderr);
+    }
     fprintf(stderr, "Linux compatibility BUG at %s:%d\n", file, line);
     abort();
 }
@@ -1022,6 +1035,7 @@ static void reference_tests(void)
 #include "sync_test.h"
 #include "ww_mutex_test.h"
 #include "time_test.h"
+#include "usleep_range_test.h"
 #include "timer_test.h"
 #include "workqueue_test.h"
 #include "delayed_work_test.h"
@@ -1043,8 +1057,35 @@ static void reference_tests(void)
 #include "qp_table_test.h"
 #include "string_helpers_test.h"
 
-int main(void)
+int main(int argc, char **argv)
 {
+    if (argc > 1) {
+        usleep_boundary_check = true;
+        struct native_task_model model;
+        sync_model_init(&model, 72);
+        native_task = &model;
+        if (!strcmp(argv[1], "reversed")) usleep_range_state(2, 1, TASK_UNINTERRUPTIBLE);
+        else if (!strcmp(argv[1], "huge")) usleep_range_state(0, ULONG_MAX, TASK_UNINTERRUPTIBLE);
+        else if (!strcmp(argv[1], "clock-horizon")) {
+            host_clock_ns = (u64)KTIME_MAX + 1;
+            usleep_range_state(0, 0, TASK_UNINTERRUPTIBLE);
+        } else if (!strcmp(argv[1], "absolute-overflow")) {
+            host_clock_ns = (u64)KTIME_MAX - NSEC_PER_USEC;
+            usleep_range_state(2, 2, TASK_UNINTERRUPTIBLE);
+        } else if (!strcmp(argv[1], "state")) usleep_range_state(0, 0, 0x4U); /* __TASK_STOPPED. */
+        else if (!strcmp(argv[1], "atomic")) {
+            interrupts = false;
+            usleep_range_state(0, 0, TASK_UNINTERRUPTIBLE);
+        } else if (!strcmp(argv[1], "valid-horizon")) {
+            host_clock_ns = (u64)KTIME_MAX - NSEC_PER_USEC;
+            usleep_range_state(0, 1, TASK_IDLE);
+            assert(task_is_running(current) && !vinix_linuxkpi_time_waiters());
+            native_task = NULL;
+            sync_model_destroy(&model);
+            return 0;
+        }
+        return 77; /* Invalid calls must fail explicitly before publishing. */
+    }
     assert(vinix_linuxkpi_percpu_init(0, host_percpu_start, host_percpu_end) == -EINVAL);
     assert(vinix_linuxkpi_percpu_init(NR_CPUS + 1, host_percpu_start, host_percpu_end) == -EINVAL);
     assert(vinix_linuxkpi_percpu_init(4, host_percpu_end, host_percpu_start) == -EINVAL);
@@ -1076,6 +1117,7 @@ int main(void)
     ww_mutex_tests();
     seqcount_tests();
     time_tests();
+    usleep_range_tests();
     printk_tests();
     warn_tests();
     wait_bit_tests();

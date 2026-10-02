@@ -394,6 +394,7 @@ fn C.vinix_linuxkpi_sync_selftest() int
 fn C.vinix_linuxkpi_sync_native_selftest() int
 fn C.vinix_linuxkpi_time_selftest() int
 fn C.vinix_linuxkpi_time_native_selftest() int
+fn C.vinix_linuxkpi_usleep_native_selftest() int
 fn C.vinix_linuxkpi_timer_bootstrap() int
 fn C.vinix_linuxkpi_timer_selftest() int
 fn C.vinix_linuxkpi_timer_native_selftest() int
@@ -581,6 +582,20 @@ pub fn initialise() {
 			lib.kpanic(unsafe { nil }, c'Linux timed-wait self-test retained native pages')
 		}
 		C.kprintf(c'linuxkpi: monotonic clocks and timed task/queue/completion waits passed on 4 workers; no pages retained\n')
+		for _ in 0 .. 3 {
+			if C.vinix_linuxkpi_usleep_native_selftest() != 0 {
+				lib.kpanic(unsafe { nil }, c'Linux minimum-duration sleep self-test failed')
+			}
+		}
+		usleep_before := selftest_free_baseline()
+		if C.vinix_linuxkpi_usleep_native_selftest() != 0 {
+			lib.kpanic(unsafe { nil }, c'Linux minimum-duration sleep self-test failed')
+		}
+		if memory.free_bytes() != usleep_before {
+			C.kprintf(c'linuxkpi: usleep free-byte baseline=%llu after=%llu\n', usleep_before, memory.free_bytes())
+			lib.kpanic(unsafe { nil }, c'Linux minimum-duration sleep self-test retained native pages')
+		}
+		C.kprintf(c'linuxkpi: minimum-duration sleeps, fixed deadlines, early wakes and worker rollback passed; no pages retained\n')
 		for _ in 0 .. 3 {
 			if C.vinix_linuxkpi_timer_native_selftest() != 0 {
 				lib.kpanic(unsafe { nil }, c'Linux timer callback self-test failed')

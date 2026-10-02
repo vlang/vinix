@@ -53,6 +53,7 @@ void vinix_linuxkpi_time_tick(u64 now_ns);
 size_t vinix_linuxkpi_time_waiters(void);
 int vinix_linuxkpi_time_selftest(void);
 int vinix_linuxkpi_time_native_selftest(void);
+int vinix_linuxkpi_usleep_native_selftest(void);
 void vinix_linuxkpi_timer_tick(void);
 unsigned int vinix_linuxkpi_timer_dispatch(void);
 size_t vinix_linuxkpi_timer_active(void);

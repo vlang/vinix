@@ -202,8 +202,7 @@ the complete i915 source tree is not evidence that the driver runs.
   occupies existing Thread padding and fixed counters have boot lifetime.
   `CONFIG_BLOCK` and `CONFIG_TASK_DELAY_ACCT` remain disabled: this supplies no
   block-plug service, per-task delay statistics or CPU idle-time accounting.
-  I/O-specific mutex wrappers, freezer/special task states and CPU hotplug
-  remain unresolved.
+  Freezer/special task states and CPU hotplug remain unresolved.
 - Unmodified Linux `jiffies.h`, `ktime.h`, `time64.h`, `timekeeping.h` and
   `delay.h` use native monotonic/raw clock reads and fixed `HZ=1000` conversion
   helpers. Linux's own `timeconst.bc` generated the conversion constants.
@@ -220,9 +219,17 @@ the complete i915 source tree is not evidence that the driver runs.
   successful completion at expiry returning at least one tick.
   `msleep` retries early wakes, `msleep_interruptible` returns remaining
   milliseconds, and `udelay`/`ndelay` poll the real counter while answering
-  native TLB shootdowns. High-resolution timers,
-  `usleep_range` and realtime/TAI/suspend clock offsets
-  remain unimplemented.
+  native TLB shootdowns. `usleep_range_state` and the unchanged ordinary/idle
+  wrappers preserve one absolute monotonic minimum through every early wake,
+  including accepted pending signals. They return in TASK_RUNNING and allocate
+  nothing. The PIT wakes at its first 1 ms tick at or after the minimum, choosing
+  zero optional slack; dispatch can overrun the upper bound. These are sleeping
+  minimum-duration waits, without a high-resolution timer service. Invalid
+  reversed ranges, unsupported task states and ranges outside the signed
+  ktime horizon fail explicitly. High-resolution timers and realtime/TAI/suspend
+  clock offsets remain unimplemented. The range check deliberately rejects
+  malformed DSI firmware delays whose upstream u32 `delay + 10` wraps;
+  equivalence to unchecked invalid-input arithmetic is not claimed.
 - Unmodified Linux `timer.h` and its `timer_list` layout support static,
   dynamic and stack initialization, pending queries, `add_timer`, `mod_timer`,
   pending-only modification, deadline reduction and jiffy rounding. The PIT
@@ -458,6 +465,42 @@ python3 tests/linuxkpi/run_vm.py \
     --kernel build-amd64-kernel/bin/vinix \
     --cpu max,hypervisor=off --state-dir /tmp/vinix-linuxkpi-guest-sse
 ```
+
+Minimum-duration sleep validation used five frozen kernel paths at isolated
+baseline `53f41b30`, enabled ELF SHA256
+`354139c5a2fe25d532aa9e5ec9f84343a19a7f3b2ffac3abd32a082dde56e723`.
+The complete strict ASan/UBSan host/import/header suite passed at
+`/tmp/vinix-linuxkpi-usleep-host-final.log`, including seven subprocess boundary
+checks. Deterministic tests cover sub-tick and zero minima, eight early wakes
+through one captured expiry, accepted/ignored signals, expiry before arm/park
+and independent concurrent deadlines. Six invalid-input probes require an
+explicit BUG with no live deadline or page; the exact valid signed-clock
+boundary succeeds. These tests are part of the repeatable host runner.
+
+Native tests use four actual CPU-bound workers with ordinary, idle,
+interruptible, killable and RUNNING waits. They check minimum duration, state,
+CPU identity and caller context with allocations disabled. A longer controlled
+case observes accepted early wakes and ignored-signal repark while waking past
+the original boundary. All four constructor failure stages are tested after
+zero, one, two and three successful workers. Every started worker is joined,
+its deadlines inspected while retained, and all off-stack handoffs precede
+final task releases and actual-free quiescence. Three warmups precede a fourth
+batch with exact physical-page recovery. Source and generated C have independent
+lifetime approval. Enabled/default x86 and disabled ARM builds and default
+Linux-ABI startup passed.
+
+The first normal guest passed the new sleep/page checks but later failed an
+unchanged unbound self-free timeout at 502 ticks with 3/8 callbacks observed.
+That failing log remains `/tmp/vinix-linuxkpi-usleep-vm/serial.log`. A fresh
+normal guest using the identical ELF passed the full suite at
+`/tmp/vinix-linuxkpi-usleep-normal-diagnostic-vm/serial.log`; the full SSE guest
+also passed at `/tmp/vinix-linuxkpi-usleep-sse-vm/serial.log`. This rerun does not
+repair or explain the intermittent unbound timeout. Equal-baseline allocation
+gates both retain 429 sites, 192 groups and 161 existing failures, with no added
+counts or groups; enabled scans also retain their pre-existing V errors.
+Exact evidence is `/tmp/vinix-linuxkpi-usleep-final-validation.json`.
+The 1 ms wake granularity still affects short hardware polling latency;
+these compatibility tests establish no i915 hardware operation.
 
 String-helper validation used three frozen kernel paths on isolated baseline
 `92c24841`, with enabled ELF SHA256

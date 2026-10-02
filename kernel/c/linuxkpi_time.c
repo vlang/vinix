@@ -27,6 +27,8 @@ struct sleep_deadline {
     struct list_head entry;
     struct task_struct *task;
     unsigned long expires;
+    u64 expires_ns;
+    bool absolute;
 };
 
 void vinix_linuxkpi_time_tick(u64 now_ns)
@@ -39,7 +41,8 @@ void vinix_linuxkpi_time_tick(u64 now_ns)
         __atomic_store_n(&jiffies, now, __ATOMIC_RELAXED);
         struct sleep_deadline *wait, *next;
         list_for_each_entry_safe(wait, next, &deadlines, entry) {
-            if (time_after_eq(now, wait->expires)) {
+            if (wait->absolute ? now_ns >= wait->expires_ns :
+                                 time_after_eq(now, wait->expires)) {
                 struct task_struct *task = wait->task;
                 /* Removal and every task dereference finish under the lock.
                  * The waiter takes this same lock before returning. */
@@ -191,6 +194,48 @@ void msleep(unsigned int milliseconds)
     unsigned long remaining = msecs_to_jiffies(milliseconds) + 1;
     while (remaining) remaining = schedule_timeout_uninterruptible(remaining);
 }
+
+/* Linux kernel/time/timer.c keeps the same absolute minimum through every
+ * early wake. The native PIT chooses zero optional slack and promotes this
+ * record on its first tick at or after that minimum; dispatch may overrun
+ * max, and this is not a high-resolution timer implementation. */
+void usleep_range_state(unsigned long min, unsigned long max, unsigned int state)
+{
+    might_sleep();
+    u64 now = vinix_linuxkpi_clock_ns();
+    /* The pinned implementation assumes valid ranges and uses unchecked
+     * ktime arithmetic. Reject unsupported caller misuse explicitly rather
+     * than wrapping a distant deadline into an immediate successful sleep. */
+    BUG_ON(max < min || now > KTIME_MAX ||
+           max > ((u64)KTIME_MAX - now) / NSEC_PER_USEC);
+    struct sleep_deadline wait = {
+        .task = current, .expires_ns = now + min * NSEC_PER_USEC, .absolute = true,
+    };
+    for (;;) {
+        __set_current_state(state);
+        unsigned long flags;
+        raw_spin_lock_irqsave(&deadline_lock, flags);
+        /* Preemption since the original clock sample cannot publish an
+         * already expired record or convert this into a relative timeout. */
+        if (vinix_linuxkpi_clock_ns() >= wait.expires_ns) {
+            raw_spin_unlock_irqrestore(&deadline_lock, flags);
+            __set_current_state(TASK_RUNNING);
+            return;
+        }
+        list_add_tail(&wait.entry, &deadlines);
+        raw_spin_unlock_irqrestore(&deadline_lock, flags);
+        schedule();
+        raw_spin_lock_irqsave(&deadline_lock, flags);
+        list_del_init(&wait.entry);
+        raw_spin_unlock_irqrestore(&deadline_lock, flags);
+        __set_current_state(TASK_RUNNING);
+        if (vinix_linuxkpi_clock_ns() >= wait.expires_ns) return;
+        /* Accepted pending signals and TASK_RUNNING can make schedule()
+         * return without parking. Retrying still honors the minimum while
+         * allowing another runnable thread to make progress. */
+        cond_resched();
+    }
+}
 unsigned long msleep_interruptible(unsigned int milliseconds)
 {
     unsigned long remaining = msecs_to_jiffies(milliseconds) + 1;
@@ -239,10 +284,10 @@ struct native_time_worker {
     } failures[8];
 };
 
-/* Permanent services may legitimately be sleeping while this fixture runs.
- * Check only its joined workers, retaining each task through this locked
- * inspection rather than racing an unrelated service's arm/expiry cycle. */
-static size_t native_time_task_waiters(struct task_struct *task)
+/* Native fixtures retain the borrowed task through this locked pointer-only
+ * inspection. Permanent services may legitimately be sleeping at the same
+ * time; this observer does not inspect their unrelated arm/expiry cycles. */
+size_t vinix_linuxkpi_test_task_time_waiters(struct task_struct *task)
 {
     unsigned long flags;
     size_t result = 0;
@@ -327,7 +372,7 @@ int vinix_linuxkpi_time_native_selftest(void)
             }
             cond_resched();
         }
-        size_t retained = native_time_task_waiters(workers[i].task);
+        size_t retained = vinix_linuxkpi_test_task_time_waiters(workers[i].task);
         if (retained) {
             kprintf("linuxkpi: time test worker=%u retained %zu timeout records after join\n", i, retained);
             /* A deadline still owns pointers into this task's stack. Do not
