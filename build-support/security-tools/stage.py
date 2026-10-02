@@ -33,8 +33,9 @@ def main() -> None:
     staging = args.staging.resolve()
     if staging == Path("/") or not staging.is_dir():
         parser.error("staging must be an existing target filesystem, not /")
-    cc = shlex.split(args.cc or os.environ.get(f"VINIX_SECURITY_CC_{args.arch.upper()}",
-                                              f"{args.arch}-linux-musl-gcc"))
+    cc = shlex.split(args.cc or os.environ.get(f"VINIX_SECURITY_CC_{args.arch.upper()}")
+                    or os.environ.get(f"VINIX_MUSL_CC_{args.arch.upper()}")
+                    or f"{args.arch}-linux-musl-gcc")
     if not cc or not shutil.which(cc[0]):
         parser.error("target musl compiler is missing")
     machine = subprocess.check_output(cc + ["-dumpmachine"], text=True).strip()
