@@ -73,6 +73,31 @@ def complete_native_closure(root: Path, binaries: list[Path]) -> None:
             binaries.append(library)
 
 
+def verify_sdk_closure(root: Path) -> None:
+    runtime = root / "usr/libexec/vinix-dota2/root"
+    sdk = root / "home/dota2/.steam/sdk64"
+    libraries = [sdk, runtime / "usr/lib/x86_64-linux-gnu",
+                 runtime / "lib/x86_64-linux-gnu", runtime / "lib64"]
+    queue = list(sdk.glob("*.so"))
+    seen = set()
+    missing = set()
+    while queue:
+        binary = queue.pop()
+        if binary in seen:
+            continue
+        seen.add(binary)
+        output = subprocess.check_output(["x86_64-linux-musl-readelf", "-d", str(binary)], text=True)
+        for name in re.findall(r"\(NEEDED\).*\[([^]]+)\]", output):
+            library = next((directory / name for directory in libraries
+                            if (directory / name).exists()), None)
+            if library is None:
+                missing.add(name)
+            else:
+                queue.append(library)
+    if missing:
+        raise SystemExit("Private runtime lacks Steam client dependencies: " + ", ".join(sorted(missing)))
+
+
 def prepare(args, work: Path) -> tuple[Path, Path]:
     root = work / "root"
     if not root.exists():
@@ -107,6 +132,7 @@ def prepare(args, work: Path) -> tuple[Path, Path]:
         if ident != b"\x7fELF\x02\x01\x01":
             raise SystemExit(f"Expected Valve's actual Linux64 library: {source}")
         install(source, root / "home/dota2/.steam/sdk64" / name)
+    verify_sdk_closure(root)
     game_environment = {
         "HOME": "/home/dota2", "XDG_RUNTIME_DIR": "/run/user/0", "VALVE_TESTMODE": "1",
         "LP_NUM_THREADS": "2", "MESA_SHADER_CACHE_DISABLE": "true",
@@ -252,6 +278,7 @@ def main() -> None:
                 os.execvpe(command[0], command, environment)
             start = time.monotonic()
             next_capture = start + 30
+            failed_at = None
             try:
                 with (work / "vinix.log").open("wb") as log:
                     while time.monotonic() - start < args.timeout:
@@ -275,9 +302,14 @@ def main() -> None:
                                 b"VINIX-DOTA2-GAME-GONE", b"KERNEL PANIC", b"FATAL EXCEPTION",
                                 b"uncaught target signal", b"LLVM ERROR:",
                             ) if value in tail), None)
-                            if marker:
+                            if marker and failure is None:
                                 failure = marker.decode()
-                                break
+                                failed_at = time.monotonic()
+                        # An echo can arrive in separate writes. Keep serial
+                        # open briefly to retain the complete exit status and
+                        # the final diagnostics before stopping the VM.
+                        if failed_at is not None and time.monotonic() - failed_at >= 2:
+                            break
                         if time.monotonic() >= next_capture:
                             target = work / f"guest-{int(time.monotonic() - start):04d}.png"
                             if screenshot(socket, target):
@@ -296,6 +328,8 @@ def main() -> None:
         "failure": failure, "rendering_verified": False,
         "game_started": b"VINIX-DOTA2-GAME-STARTED:" in transcript,
         "anonymous_steam_initialized": b"initialized steam in anonymous user mode" in transcript,
+        "game_exit_status": (int(match[1]) if (match := re.search(
+            rb"VINIX-DOTA2-GAME-EXIT:\s*(\d+)", transcript)) else None),
         "kernel_sha256": sha256(work / "kernel/bin/vinix"),
         "desktop_sha256": sha256(root / "usr/bin/vinix-desktop"),
         "translator_sha256": sha256(root / "usr/bin/qemu-x86_64"),
