@@ -13,6 +13,10 @@
 typedef uint8_t u8;
 typedef uint16_t u16;
 typedef uint32_t u32;
+/* Original Linux internal device number: 12 major and 20 minor bits.
+ * Native Stat fields have a separate u64 encoding and need an explicit bridge. */
+typedef u32 __kernel_dev_t;
+typedef __kernel_dev_t dev_t;
 typedef unsigned long long u64;
 typedef int8_t s8;
 typedef int16_t s16;

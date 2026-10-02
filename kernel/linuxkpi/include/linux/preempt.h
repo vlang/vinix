@@ -3,6 +3,8 @@
 #define VINIX_LINUX_PREEMPT_H
 #include <linux/irqflags.h>
 #include <vinix/runtime.h>
+/* Original preempt/thread-info imports expose the native CPU spin hint. */
+#include <asm/processor.h>
 /* Native scheduler pins. IRQ/NMI/softirq context accounting is not implemented
  * here: in_interrupt()/in_atomic() remain unavailable. The NMI query is
  * declared for unchanged SRCU inlines but remains unresolved at link time. */

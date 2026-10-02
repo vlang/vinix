@@ -31,9 +31,9 @@ their case-distinct filenames cannot coexist on default macOS filesystems.
 
 The current build compiles and links unmodified Linux `lib/list_sort.c`,
 `lib/sort.c`, `lib/rbtree.c`, `lib/find_bit.c`, `lib/hweight.c`,
-`lib/siphash.c` and i915's
-`i915_memcpy.c`. The last file is a WC memory-copy component, not GPU
-initialization or command submission. Importing
+`lib/siphash.c` and i915's `i915_config.c`, `display/intel_qp_tables.c` and
+`i915_memcpy.c`. These supply timeout policy, DSC lookup tables and a WC
+memory-copy component; they do not initialize the GPU or submit commands. Importing
 the complete i915 source tree is not evidence that the driver runs.
 
 ## Implemented APIs
@@ -42,6 +42,16 @@ the complete i915 source tree is not evidence that the driver runs.
   Original Linux `log2.h` and `minmax.h` supply power-of-two, logarithm,
   rounding and clamp operations. Native headers preserve the transitive
   includes required by the unchanged DRM color LUT helpers.
+- Unsigned 32-bit Linux kernel `dev_t` preserves the original 12-bit major,
+  20-bit minor and old/new/huge/SYSV encodings through unchanged `kdev_t.h`.
+  Hosted tests keep libc's device type, stat layout and mknod prototype separate.
+  Native 64-bit Stat fields and device registration still need an explicit
+  encoding and namespace bridge.
+- Unchanged i915 timeout policy uses the pinned 10,000 ms Kconfig default:
+  context zero returns zero; nonzero 64-bit contexts return 10,001 ticks at
+  native HZ=1000. Unchanged DSC QP lookups cover 8/10/12-bpc 4:4:4 and 4:2:0
+  tables. Callers must supply valid indices. Fence execution, reservation
+  ownership and actual display compression remain unresolved.
 - Linux list/tree/sort APIs using the actual upstream headers and algorithms.
 - 32/64-bit, `atomic_long`, raw and conditional atomic operations and memory
   barriers. Linux's generated API wrappers and compiler helpers stay upstream;
@@ -434,6 +444,30 @@ python3 tests/linuxkpi/run_vm.py \
     --cpu max,hypervisor=off --state-dir /tmp/vinix-linuxkpi-guest-sse
 ```
 
+Policy/helper validation used nine frozen kernel paths on isolated baseline
+`3d92a08b`, with enabled ELF SHA256
+`0208f9ab0f90194c35850220b53a760b6455d30ebd7ad7659a299597f4af0a82`.
+Strict ASan/UBSan runtime, import and standalone-header tests passed at
+`/tmp/vinix-linuxkpi-i915-policy-host-complete.log`. Fixed device-number
+goldens include every legacy identifier and independent bit permutations;
+48 literal DSC goldens and all 3,240 valid min/max pairs exercise the linked
+original tables. The existing native allocation loop repeats the pure helper
+fixture 200 times and returns exactly to its physical-page baseline.
+Fresh enabled/default x86 and disabled ARM builds passed. Full normal/SSE
+guests passed at `/tmp/vinix-linuxkpi-i915-policy-normal-diagnostic-vm/serial.log`
+and `/tmp/vinix-linuxkpi-i915-policy-sse-vm/serial.log`; default startup also
+passed. Independent generated-C review found no hidden allocation in the new
+V call and no policy code in the disabled ARM build.
+
+The initial normal guest passed the new 200-iteration helper measurement but
+failed an existing timed-wait baseline equality with 1,029 more free pages.
+Review identified a gap between TASK_DEAD publication and final scheduler
+reaping: the 50 ms stable-count heuristic can still include one dying thread.
+The unchanged-ELF rerun is diagnostic evidence, not a repair of that fixture.
+Exact source/build/guest scope is saved in
+`/tmp/vinix-linuxkpi-i915-policy-final-validation.json`. No full driver or
+hardware claim follows from these helper results.
+
 Logging validation used the frozen 17-path overlay on isolated baseline
 `a34c2473`, with enabled ELF SHA256
 `318b1939b75b5d2111ea2a306d646c054775d788e086f49dd493615eacb8810b`.
@@ -742,12 +776,13 @@ stack: entry now reserves a return-address word to satisfy SysV alignment.
 Kbuild Makefile, with ACPI and fbdev enabled and optional self-tests/GVT off.
 It attempts every translation unit and writes complete compiler diagnostics
 to `build/linuxkpi/i915-audit.json`. An incomplete API layer makes this command
-exit with status 1. The current result is **2/269** translation units passing.
-The logging audit is recorded separately at
-`/tmp/vinix-linuxkpi-printk-i915-audit.json`; `i915_memcpy.c` and
-`display/intel_qp_tables.c` pass syntax. Logging/WARN/taint and `__init` visibility
+exit with status 1. The current result is **3/269** translation units passing.
+The policy/helper audit is recorded separately at
+`/tmp/vinix-linuxkpi-i915-policy-final-audit.json`; `i915_memcpy.c`,
+`i915_config.c` and `display/intel_qp_tables.c` pass syntax. Logging/WARN/taint,
+device-number types, integer limits and native CPU spin-hint visibility
 blockers are cleared. Leading first errors now include missing
-`generated/bounds.h`, `dev_t`, `asm/early_ioremap.h`, ordinary RCU pointer APIs
+`generated/bounds.h`, `asm/early_ioremap.h`, ordinary RCU pointer APIs
 and `call_single_data_t`. These are syntax
 paths, not a complete runtime dependency inventory.
 Even a successful syntax audit would still require actual

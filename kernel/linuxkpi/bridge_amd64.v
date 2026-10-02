@@ -415,6 +415,7 @@ fn C.vinix_linuxkpi_cache_native_selftest() int
 fn C.vinix_linuxkpi_seqcount_native_selftest() int
 fn C.vinix_linuxkpi_printk_bootstrap_native_selftest() int
 fn C.vinix_linuxkpi_printk_native_selftest() int
+fn C.vinix_linuxkpi_i915_policy_native_selftest() int
 
 // join/TASK_DEAD can precede the final switch away and scheduler reaping.
 // Taking a baseline immediately after warmup can count those dying stacks,
@@ -472,7 +473,8 @@ pub fn initialise() {
 		for _ in 0 .. 200 {
 			if C.vinix_linuxkpi_selftest() != 0 || C.vinix_linuxkpi_task_selftest() != 0
 				|| C.vinix_linuxkpi_sync_selftest() != 0 || C.vinix_linuxkpi_time_selftest() != 0
-				|| C.vinix_linuxkpi_timer_selftest() != 0 {
+				|| C.vinix_linuxkpi_timer_selftest() != 0
+				|| C.vinix_linuxkpi_i915_policy_native_selftest() != 0 {
 				lib.kpanic(unsafe { nil }, c'Linux compatibility layer self-test failed')
 			}
 		}
@@ -481,6 +483,7 @@ pub fn initialise() {
 		}
 		C.kprintf(c'linuxkpi: 200 allocator, IRQ lock, Linux list/sort/rbtree self-tests passed; no pages retained\n')
 		C.kprintf(c'linuxkpi: raw locks, bitmaps, byte order and bounded strings passed\n')
+		C.kprintf(c'linuxkpi: original i915 timeout and DSC table helpers, Linux device encodings passed; no pages retained\n')
 		for _ in 0 .. 3 {
 			if C.vinix_linuxkpi_bitmap_runtime_selftest() != 0 {
 				lib.kpanic(unsafe { nil }, c'Linux multiword bitmap self-test failed')

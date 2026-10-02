@@ -91,6 +91,7 @@ int vinix_linuxkpi_cache_native_selftest(void);
 int vinix_linuxkpi_seqcount_native_selftest(void);
 int vinix_linuxkpi_printk_bootstrap_native_selftest(void);
 int vinix_linuxkpi_printk_native_selftest(void);
+int vinix_linuxkpi_i915_policy_native_selftest(void);
 int vinix_linuxkpi_printk_locked_probe(void);
 int vinix_linuxkpi_test_printk_locks(void);
 #endif

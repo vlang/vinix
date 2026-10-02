@@ -3,6 +3,8 @@
 #include <linux/kernel.h>
 #include <assert.h>
 
+_Static_assert(U32_MAX == 0xffffffffU && S32_MAX == 2147483647, "kernel limits visibility");
+_Static_assert(U64_MAX == 0xffffffffffffffffULL, "64-bit kernel limits visibility");
 _Static_assert(BIT(5) == 32, "kernel bit constants must be available");
 _Static_assert(const_ilog2(1ULL << 63) == 63, "64-bit constant logarithm");
 

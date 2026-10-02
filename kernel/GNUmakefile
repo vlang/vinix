@@ -217,8 +217,8 @@ ifeq ($(LINUXKPI),1)
     override VFLAGS += -d linuxkpi
     override CPPFLAGS += -DVINIX_LINUXKPI
     LINUXKPI_CPPFLAGS := -D__KERNEL__ -include linux/kconfig.h -include $(LINUXKPI_SOURCE_DIR)/include/linux/compiler_types.h -I linuxkpi/include -I $(LINUXKPI_SOURCE_DIR)/include -I $(LINUXKPI_SOURCE_DIR)/include/uapi -I $(LINUXKPI_SOURCE_DIR)/arch/x86/include -I $(LINUXKPI_SOURCE_DIR)/drivers/gpu/drm/i915 -Wno-unused-parameter -fwrapv
-    LINUXKPI_OBJ := obj/linuxkpi/list_sort.o obj/linuxkpi/sort.o obj/linuxkpi/rbtree.o obj/linuxkpi/find_bit.o obj/linuxkpi/hweight.o obj/linuxkpi/siphash.o obj/linuxkpi/i915_memcpy.o
-    obj/c/linuxkpi.c.o obj/c/linuxkpi_refcount.c.o obj/c/linuxkpi_string.c.o obj/c/linuxkpi_percpu.c.o obj/c/linuxkpi_task.c.o obj/c/linuxkpi_sync.c.o obj/c/linuxkpi_time.c.o obj/c/linuxkpi_timer.c.o obj/c/linuxkpi_workqueue.c.o obj/c/linuxkpi_worker_test.c.o obj/c/linuxkpi_bitmap.c.o obj/c/linuxkpi_srcu.c.o obj/c/linuxkpi_srcu_test.c.o obj/c/linuxkpi_ww_mutex.c.o obj/c/linuxkpi_ww_mutex_test.c.o obj/c/linuxkpi_wait_bit.c.o obj/c/linuxkpi_wait_bit_test.c.o obj/c/linuxkpi_io.c.o obj/c/linuxkpi_io_test.c.o obj/c/linuxkpi_cache.c.o obj/c/linuxkpi_cache_test.c.o obj/c/linuxkpi_seqcount_test.c.o obj/c/linuxkpi_format.c.o obj/c/linuxkpi_printk.c.o obj/c/linuxkpi_printk_test.c.o obj/c/linuxkpi_taint.c.o: override CPPFLAGS += $(LINUXKPI_CPPFLAGS)
+    LINUXKPI_OBJ := obj/linuxkpi/list_sort.o obj/linuxkpi/sort.o obj/linuxkpi/rbtree.o obj/linuxkpi/find_bit.o obj/linuxkpi/hweight.o obj/linuxkpi/siphash.o obj/linuxkpi/i915_config.o obj/linuxkpi/intel_qp_tables.o obj/linuxkpi/i915_memcpy.o
+    obj/c/linuxkpi.c.o obj/c/linuxkpi_refcount.c.o obj/c/linuxkpi_string.c.o obj/c/linuxkpi_percpu.c.o obj/c/linuxkpi_task.c.o obj/c/linuxkpi_sync.c.o obj/c/linuxkpi_time.c.o obj/c/linuxkpi_timer.c.o obj/c/linuxkpi_workqueue.c.o obj/c/linuxkpi_worker_test.c.o obj/c/linuxkpi_bitmap.c.o obj/c/linuxkpi_srcu.c.o obj/c/linuxkpi_srcu_test.c.o obj/c/linuxkpi_ww_mutex.c.o obj/c/linuxkpi_ww_mutex_test.c.o obj/c/linuxkpi_wait_bit.c.o obj/c/linuxkpi_wait_bit_test.c.o obj/c/linuxkpi_io.c.o obj/c/linuxkpi_io_test.c.o obj/c/linuxkpi_cache.c.o obj/c/linuxkpi_cache_test.c.o obj/c/linuxkpi_seqcount_test.c.o obj/c/linuxkpi_format.c.o obj/c/linuxkpi_printk.c.o obj/c/linuxkpi_printk_test.c.o obj/c/linuxkpi_taint.c.o obj/c/linuxkpi_i915_policy_test.c.o: override CPPFLAGS += $(LINUXKPI_CPPFLAGS)
 endif
 
 # ALLOC_TRACK=1 records the call chain of every live slab allocation, for
@@ -296,7 +296,7 @@ override HEADER_DEPS := $(addprefix obj/c/,$(CFILES:.c=.c.d)) $(addprefix obj/as
 # Default target. This must come first, before header dependencies.
 .PHONY: all
 all: bin/$(OUTPUT)
-obj/c/linuxkpi.c.o obj/c/linuxkpi_refcount.c.o obj/c/linuxkpi_string.c.o obj/c/linuxkpi_percpu.c.o obj/c/linuxkpi_task.c.o obj/c/linuxkpi_sync.c.o obj/c/linuxkpi_time.c.o obj/c/linuxkpi_timer.c.o obj/c/linuxkpi_workqueue.c.o obj/c/linuxkpi_worker_test.c.o obj/c/linuxkpi_bitmap.c.o obj/c/linuxkpi_srcu.c.o obj/c/linuxkpi_srcu_test.c.o obj/c/linuxkpi_ww_mutex.c.o obj/c/linuxkpi_ww_mutex_test.c.o obj/c/linuxkpi_wait_bit.c.o obj/c/linuxkpi_wait_bit_test.c.o obj/c/linuxkpi_io.c.o obj/c/linuxkpi_io_test.c.o obj/c/linuxkpi_cache.c.o obj/c/linuxkpi_cache_test.c.o obj/c/linuxkpi_seqcount_test.c.o obj/c/linuxkpi_format.c.o obj/c/linuxkpi_printk.c.o obj/c/linuxkpi_printk_test.c.o obj/c/linuxkpi_taint.c.o: $(V_CONFIG_STAMP)
+obj/c/linuxkpi.c.o obj/c/linuxkpi_refcount.c.o obj/c/linuxkpi_string.c.o obj/c/linuxkpi_percpu.c.o obj/c/linuxkpi_task.c.o obj/c/linuxkpi_sync.c.o obj/c/linuxkpi_time.c.o obj/c/linuxkpi_timer.c.o obj/c/linuxkpi_workqueue.c.o obj/c/linuxkpi_worker_test.c.o obj/c/linuxkpi_bitmap.c.o obj/c/linuxkpi_srcu.c.o obj/c/linuxkpi_srcu_test.c.o obj/c/linuxkpi_ww_mutex.c.o obj/c/linuxkpi_ww_mutex_test.c.o obj/c/linuxkpi_wait_bit.c.o obj/c/linuxkpi_wait_bit_test.c.o obj/c/linuxkpi_io.c.o obj/c/linuxkpi_io_test.c.o obj/c/linuxkpi_cache.c.o obj/c/linuxkpi_cache_test.c.o obj/c/linuxkpi_seqcount_test.c.o obj/c/linuxkpi_format.c.o obj/c/linuxkpi_printk.c.o obj/c/linuxkpi_printk_test.c.o obj/c/linuxkpi_taint.c.o obj/c/linuxkpi_i915_policy_test.c.o: $(V_CONFIG_STAMP)
 
 ifeq ($(LINUXKPI),1)
 .PHONY: linuxkpi-verify
@@ -304,12 +304,20 @@ linuxkpi-verify:
 	python3 linuxkpi/upstream.py verify --base $(dir $(LINUXKPI_SOURCE_DIR))
 all: linuxkpi-verify
 
-$(LINUXKPI_OBJ) obj/c/linuxkpi.c.o obj/c/linuxkpi_refcount.c.o obj/c/linuxkpi_string.c.o obj/c/linuxkpi_percpu.c.o obj/c/linuxkpi_task.c.o obj/c/linuxkpi_sync.c.o obj/c/linuxkpi_time.c.o obj/c/linuxkpi_timer.c.o obj/c/linuxkpi_workqueue.c.o obj/c/linuxkpi_worker_test.c.o obj/c/linuxkpi_bitmap.c.o obj/c/linuxkpi_srcu.c.o obj/c/linuxkpi_srcu_test.c.o obj/c/linuxkpi_ww_mutex.c.o obj/c/linuxkpi_ww_mutex_test.c.o obj/c/linuxkpi_wait_bit.c.o obj/c/linuxkpi_wait_bit_test.c.o obj/c/linuxkpi_io.c.o obj/c/linuxkpi_io_test.c.o obj/c/linuxkpi_cache.c.o obj/c/linuxkpi_cache_test.c.o obj/c/linuxkpi_seqcount_test.c.o obj/c/linuxkpi_format.c.o obj/c/linuxkpi_printk.c.o obj/c/linuxkpi_printk_test.c.o obj/c/linuxkpi_taint.c.o: | linuxkpi-verify
+$(LINUXKPI_OBJ) obj/c/linuxkpi.c.o obj/c/linuxkpi_refcount.c.o obj/c/linuxkpi_string.c.o obj/c/linuxkpi_percpu.c.o obj/c/linuxkpi_task.c.o obj/c/linuxkpi_sync.c.o obj/c/linuxkpi_time.c.o obj/c/linuxkpi_timer.c.o obj/c/linuxkpi_workqueue.c.o obj/c/linuxkpi_worker_test.c.o obj/c/linuxkpi_bitmap.c.o obj/c/linuxkpi_srcu.c.o obj/c/linuxkpi_srcu_test.c.o obj/c/linuxkpi_ww_mutex.c.o obj/c/linuxkpi_ww_mutex_test.c.o obj/c/linuxkpi_wait_bit.c.o obj/c/linuxkpi_wait_bit_test.c.o obj/c/linuxkpi_io.c.o obj/c/linuxkpi_io_test.c.o obj/c/linuxkpi_cache.c.o obj/c/linuxkpi_cache_test.c.o obj/c/linuxkpi_seqcount_test.c.o obj/c/linuxkpi_format.c.o obj/c/linuxkpi_printk.c.o obj/c/linuxkpi_printk_test.c.o obj/c/linuxkpi_taint.c.o obj/c/linuxkpi_i915_policy_test.c.o: | linuxkpi-verify
 
 # The original SipHash translation unit expects Kbuild export declarations.
 obj/linuxkpi/siphash.o: override CPPFLAGS += -include linux/export.h
 
 obj/linuxkpi/%.o: $(LINUXKPI_SOURCE_DIR)/lib/%.c GNUmakefile $(V_CONFIG_STAMP)
+	mkdir -p "$(@D)"
+	$(CC) $(CFLAGS) $(CPPFLAGS) $(LINUXKPI_CPPFLAGS) -std=gnu11 -c $< -o $@
+
+obj/linuxkpi/i915_config.o: $(LINUXKPI_SOURCE_DIR)/drivers/gpu/drm/i915/i915_config.c GNUmakefile $(V_CONFIG_STAMP)
+	mkdir -p "$(@D)"
+	$(CC) $(CFLAGS) $(CPPFLAGS) $(LINUXKPI_CPPFLAGS) -std=gnu11 -c $< -o $@
+
+obj/linuxkpi/intel_qp_tables.o: $(LINUXKPI_SOURCE_DIR)/drivers/gpu/drm/i915/display/intel_qp_tables.c GNUmakefile $(V_CONFIG_STAMP)
 	mkdir -p "$(@D)"
 	$(CC) $(CFLAGS) $(CPPFLAGS) $(LINUXKPI_CPPFLAGS) -std=gnu11 -c $< -o $@
 

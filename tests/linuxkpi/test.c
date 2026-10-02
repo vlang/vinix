@@ -1037,6 +1037,9 @@ static void reference_tests(void)
 #include "format_test.h"
 #include "printk_test.h"
 #include "warn_test.h"
+#include "i915_config_test.h"
+#include "kdev_test.h"
+#include "qp_table_test.h"
 
 int main(void)
 {
@@ -1051,6 +1054,9 @@ int main(void)
     permanent_pages = live_pages;
     format_tests();
     taint_initial_tests();
+    i915_config_tests();
+    kdev_tests();
+    qp_table_tests();
     allocation_tests();
     cache_tests();
     string_tests();

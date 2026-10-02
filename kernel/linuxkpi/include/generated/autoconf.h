@@ -24,6 +24,8 @@
 #define CONFIG_X86_INTERNODE_CACHE_SHIFT 6
 /* Native tick frequency and Linux timeout conversion units. */
 #define CONFIG_HZ 1000
+/* Pinned i915 Kconfig.profile default; no fence execution is implied. */
+#define CONFIG_DRM_I915_FENCE_TIMEOUT 10000
 #if defined(VINIX_LINUXKPI_HOST_TEST) && defined(__APPLE__)
 /* Mach-O has no ELF .data..cacheline_aligned section. Keep its alignment. */
 #define __cacheline_aligned __attribute__((__aligned__(64)))

@@ -1,6 +1,16 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 /* Parse libc's types and inline annotations before Linux compiler macros. */
+/* Keep libc's device type and declarations separate from kernel dev_t32. */
+#define dev_t vinix_linuxkpi_host_dev_t
 #include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <stdlib.h>
+#undef dev_t
+/* Preloading libc wait declarations must not override the Linux wait ABI. */
+#undef WSTOPPED
+#undef WCONTINUED
+#undef WNOWAIT
 #include <assert.h>
 #include <time.h>
 /* Linux ktime is also included through sched.h. Parse libc first, then let

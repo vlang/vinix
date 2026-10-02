@@ -10,7 +10,7 @@ ${CC:-clang} -std=gnu11 -O1 -g -fwrapv -fno-strict-aliasing -Wall -Wextra -Werro
     -fsanitize=address,undefined -fno-omit-frame-pointer -pthread \
     -DVINIX_LINUXKPI -DVINIX_LINUXKPI_HOST_TEST -DVINIX_LINUXKPI_FORMAT_HOST_TEST -D__KERNEL__ \
     -include "$repo/tests/linuxkpi/host_types.h" -include linux/kconfig.h -include "$source_dir/include/linux/compiler_types.h" \
-    -I"$repo/kernel/linuxkpi/include" -I"$source_dir/include" -I"$source_dir/include/uapi" \
+    -I"$source_dir/drivers/gpu/drm/i915" -I"$repo/kernel/linuxkpi/include" -I"$source_dir/include" -I"$source_dir/include/uapi" \
     -I"$source_dir/arch/x86/include" -I"$source_dir/arch/x86/include/uapi" \
     "$repo/kernel/c/linuxkpi.c" "$repo/kernel/c/linuxkpi_refcount.c" "$repo/kernel/c/linuxkpi_string.c" \
     "$repo/kernel/c/linuxkpi_percpu.c" "$repo/kernel/c/linuxkpi_bitmap.c" "$repo/kernel/c/linuxkpi_task.c" \
@@ -20,13 +20,15 @@ ${CC:-clang} -std=gnu11 -O1 -g -fwrapv -fno-strict-aliasing -Wall -Wextra -Werro
     "$repo/kernel/c/linuxkpi_printk.c" "$repo/kernel/c/linuxkpi_taint.c" "$repo/tests/linuxkpi/test.c" \
     "$source_dir/lib/list_sort.c" "$source_dir/lib/sort.c" "$source_dir/lib/rbtree.c" \
     "$source_dir/lib/find_bit.c" "$source_dir/lib/hweight.c" "$source_dir/lib/siphash.c" \
+    "$source_dir/drivers/gpu/drm/i915/i915_config.c" \
+    "$source_dir/drivers/gpu/drm/i915/display/intel_qp_tables.c" \
     -include linux/export.h \
     -o "$work/test"
 "$work/test"
 # Each translation unit keeps its public Linux/DRM header first. Building
 # separately catches missing transitive includes that the runtime test's
 # broader include list would conceal.
-for helper in helper_kernel helper_drm_color task_header_sched task_header_ww compiler_header; do
+for helper in helper_kernel helper_drm_color task_header_sched task_header_ww compiler_header spinlock_header preempt_header; do
     ${CC:-clang} -std=gnu11 -O1 -g -fwrapv -fno-strict-aliasing -Wall -Wextra -Werror -Wno-unused-parameter \
         -fsanitize=address,undefined -fno-omit-frame-pointer \
         -DVINIX_LINUXKPI -DVINIX_LINUXKPI_HOST_TEST -D__KERNEL__ \
