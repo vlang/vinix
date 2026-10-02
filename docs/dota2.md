@@ -52,6 +52,12 @@ handles QEMU's missing `get_robust_list`; the second prevents Dota's older
 bundled decoder from breaking the distro audio dependency's `mpg123_info2`
 reference. Caller additions in `VINIX_X86_64_PRELOAD` retain precedence.
 
+A third guest library preserves x86 `MAP_32BIT` bounds that QEMU 9.1.2 drops
+when translating mmap flags. It rejects an impossible 2 GiB reservation and
+uses non-replacing mappings for smaller low-address ranges, without replacing
+existing memory. The actual Vinix contract probe covers both mmap entry points,
+occupied hints, boundary and overflow cases, and fixed mappings.
+
 ## Reuse an existing installation without another full data copy
 
 Steam's macOS installation supplies the common assets, but its executable is
