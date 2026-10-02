@@ -1025,12 +1025,14 @@ python3 "$SCRIPT_DIR/tools/qemu-package-store.py" \
     --ready-file "$PACKAGE_SERVER_READY" "${SOURCE_SERVER_ARGS[@]}" \
     >"$PACKAGE_SERVER_LOG" 2>&1 &
 PACKAGE_SERVER_PID=$!
-for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+# Python startup can take more than a second while other VMs are loading.
+# Keep readiness bounded, and still stop immediately if the server exits.
+for package_server_attempt in {1..100}; do
     [ -s "$PACKAGE_SERVER_READY" ] && break
     if ! kill -0 "$PACKAGE_SERVER_PID" 2>/dev/null; then
         break
     fi
-    sleep 0.05
+    sleep 0.1
 done
 if [ ! -s "$PACKAGE_SERVER_READY" ]; then
     cat "$PACKAGE_SERVER_LOG" >&2
