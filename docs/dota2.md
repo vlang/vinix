@@ -144,8 +144,21 @@ callbacks and clean shutdown even with Source 2's tier0 loaded globally. The
 full game probe has rendered its [startup logo inside a Vinix window](../vinix-dota2-startup-qemu.png).
 That QEMU framebuffer capture is from the actual game, not the desktop's launch
 placeholder. Subsequent runs load the material, font and networking systems,
-then exit through SteamNetworkingSockets' fatal logging callback. The same
-exit occurs with one and four CPUs. A rendered game menu and online matches
+then encounter a SteamNetworkingSockets assertion when a translated service
+thread waits too long for its lock. The same assertion occurs with one and
+four CPUs. Valve's actual `-noassert` option allows startup past that assertion;
+fatal errors remain active. A later run terminated through tier0's fatal path
+with `Error reading from loaded packed store`, before a menu appeared.
+
+The host export previously disconnected after 120 seconds without a request,
+which can occur during shader compilation. It now keeps a negotiated disk
+connected until the client disconnects; a real-socket regression checks both
+idle reads and the retained handshake timeout. The kernel also now scopes
+`fsync` to the descriptor's backing resource: an unrelated failing disk no
+longer makes a writable RAM configuration file return `EIO`. The
+[native regression](../tests/fsync-scope/README.md) preserves errors and dirty
+data on the failing disk. The effect of these fixes on the game's packed-store
+failure still needs a completed game run. A rendered menu and online matches
 are not yet verified.
 
 After the file and graphics probes, capture the real game:
@@ -157,7 +170,8 @@ python3 tests/dota2/run.py \
     --desktop build/vinix-desktop \
     --export-state build/dota2/game-export \
     --steamclient /path/to/Steam/steamrt64 \
-    --gldriverquery /path/to/Steam/ubuntu12_64/gldriverquery
+    --gldriverquery /path/to/Steam/ubuntu12_64/gldriverquery \
+    --extra-game-arg=-noassert
 ```
 
 `--steamclient` supplies Valve's Linux `steamclient.so`, `libtier0_s.so`,
