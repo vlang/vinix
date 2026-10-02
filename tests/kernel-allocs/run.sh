@@ -40,28 +40,32 @@ for arch in aarch64 x86_64; do
 		echo "ERROR: empty $arch kernel source list" >&2
 		exit 1
 	fi
-	while IFS= read -r f; do
-		mkdir -p "$src/$(dirname "$f")"
-		cp "$kernel/$f" "$src/$f"
-	done < "$work/$arch.files"
-	cp "$kernel/v.mod" "$src/"
+	# The real build uses source symlinks, so V can also find imports omitted
+	# from the seed list (for example, x86's shared DRM modules). Keep those
+	# imports inside the scratch project so their allocation warnings count.
+	python3 "$repo/tests/kernel-allocs/copy_sources.py" "$kernel" \
+		"$work/$arch.files" "$src" > "$work/$arch.copied"
 	if [ $arch = aarch64 ]; then
 		flags='-arch arm64 -d aarch64 -d limine_mp'
 	else
 		flags='-arch amd64'
 	fi
-	# Type errors from a newer V than the kernel's do not stop the report.
 	compiler_status=0
 	# shellcheck disable=SC2086
 	"$V" -os vinix -enable-globals -nofloat -manualfree -message-limit 100000 -gc none \
 		-target-libc-headers -no-closures -d no_backtrace $flags -warn-about-allocs \
 		-o "$work/$arch.c" "$src" > "$work/$arch.log" 2>&1 || compiler_status=$?
+	if [ "$compiler_status" -ne 0 ]; then
+		cat "$work/$arch.log" >&2
+		echo "ERROR: $arch compiler failed (exit $compiler_status); allocation report is incomplete" >&2
+		exit 1
+	fi
 	if ! grep -q 'allocation (' "$work/$arch.log"; then
 		cat "$work/$arch.log" >&2
 		echo "ERROR: $arch compiler produced no allocation report (exit $compiler_status)" >&2
 		exit 1
 	fi
-	source_count=$(wc -l < "$work/$arch.files" | tr -d ' ')
+	source_count=$(wc -l < "$work/$arch.copied" | tr -d ' ')
 	site_count=$(grep -c 'allocation (' "$work/$arch.log")
 	echo "$arch: $source_count source files, $site_count allocation sites (V exit $compiler_status)" >&2
 	grep 'allocation (' "$work/$arch.log" |
