@@ -24,6 +24,13 @@ directory, or set `VINIX_DOTA2_DIR`. Run `run-dota2` on an X11 display or open
 **Dota 2** on the desktop. The default window is 1280 by 720; game arguments
 are passed through. `VINIX_DOTA2_ROOT` selects another private runtime.
 
+The game also needs Valve's actual Linux Steam client libraries, normally
+installed by Steam under `$HOME/.steam/sdk64`, and its `ubuntu12_64/gldriverquery`
+helper. The runtime layer supplies their distro dependencies and public TLS
+trust bundle; it does not contain a Steam account or Valve's client binaries.
+The normal launcher keeps Steam's normal authentication behavior. The probe
+below explicitly selects the engine's anonymous test mode for local bring-up.
+
 The launcher selects the staged amd64 Lavapipe ICD unless the caller explicitly
 selects Vulkan drivers. Native ARM64 Venus libraries cannot be loaded by the
 translated x86-64 process. This software path does not provide the GPU
@@ -38,6 +45,12 @@ The launcher enters the Linux ELF directly because Valve's `dota.sh` insists
 on the `sniper` distribution. It does not change Vinix's `/etc/os-release`.
 Foreign library paths are passed through QEMU's `-E` so the native translator
 never attempts to load x86 libraries.
+
+The launcher preloads the existing Bookworm robust-list compatibility library
+and the runtime's `libmpg123.so.0` into the translated process. The first
+handles QEMU's missing `get_robust_list`; the second prevents Dota's older
+bundled decoder from breaking the distro audio dependency's `mpg123_info2`
+reference. Caller additions in `VINIX_X86_64_PRELOAD` retain precedence.
 
 ## Reuse an existing installation without another full data copy
 
@@ -93,12 +106,14 @@ python3 tests/dota2/run.py \
     --base-root build/dota2-vulkan/test/root \
     --desktop build/vinix-desktop \
     --export-state build/dota2/game-export \
-    --steamclient /path/to/Steam/steamrt64
+    --steamclient /path/to/Steam/steamrt64 \
+    --gldriverquery /path/to/Steam/ubuntu12_64/gldriverquery
 ```
 
-`--steamclient` supplies only Valve's Linux `steamclient.so`, `libtier0_s.so`,
-and `libvstdlib_s.so`; the probe never copies an account profile. Its private
-boot moves the read-only game mount from `/root` to the game directory and
+`--steamclient` supplies Valve's Linux `steamclient.so`, `libtier0_s.so`,
+and `libvstdlib_s.so`, and `--gldriverquery` supplies the real Linux helper;
+the probe never copies an account profile. Its private boot moves the
+read-only game mount from `/root` to the game directory and
 leaves both the desktop's and game's settings in writable RAM. Captures and
 serial output are saved under `build/dota2/game-test`. The report requires
 visual review: an engine crash or the desktop's launch/error placeholder is
