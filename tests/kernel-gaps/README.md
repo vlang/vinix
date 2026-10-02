@@ -23,6 +23,8 @@ The runner links a small constructor that redirects x86-64 test output to
 `--state-dir` chooses an artifact directory and `--timeout` sets the boot limit
 in seconds. Repeat `--expect` for independent verdicts and `--fail` for
 test-specific failures. Never reuse a success marker printed before tests run.
+Use `--no-network` for allocation measurements so DHCP setup cannot change the
+heap during a measurement. Networking remains enabled for ordinary test boots.
 
 Host checks for the runner's failure handling:
 

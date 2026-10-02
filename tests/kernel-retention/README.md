@@ -3,9 +3,9 @@
 Build the kernel in an isolated worktree with the pinned V compiler, then run:
 
 ```sh
-python3 tests/kernel-gaps/run.py --arch aarch64 --kernel-dir /path/to/kernel \
+python3 tests/kernel-gaps/run.py --no-network --arch aarch64 --kernel-dir /path/to/kernel \
   --source tests/kernel-retention/test.c --expect 'KERNEL RETENTION: PASS'
-python3 tests/kernel-gaps/run.py --arch x86_64 --kernel-dir /path/to/x86/kernel \
+python3 tests/kernel-gaps/run.py --no-network --arch x86_64 --kernel-dir /path/to/x86/kernel \
   --source tests/kernel-retention/test.c --expect 'KERNEL RETENTION: PASS'
 ```
 
@@ -15,6 +15,8 @@ entry must return `EINVAL` and leave that entry available for the next call.
 After warming the paths, 200 listings and 200 rounds of six procfs reads must
 retain zero objects in every slab class and zero large pages. The observer must
 read all 18 ARM64 or 14 x86 classes before accepting a measurement.
+The isolated boot disables its NIC so a DHCP lease and resolver text cannot
+appear asynchronously in the measured heap.
 
 With `ALLOC_TRACK=1`, the same test prints live allocation chains. The actual
 ARM64 baseline retained 26,400 objects of 1,536 bytes in `getdents64` and 2,400

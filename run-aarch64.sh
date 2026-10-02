@@ -48,6 +48,9 @@
 # driver (coreaudio, the default on macOS; none elsewhere), wav:PATH to record
 # everything the guest plays into a WAV file, or off for no sound card.
 #
+# VINIX_QEMU_NETWORK=0 omits the guest NIC; the default 1 enables networking.
+# Allocation tests can disable it to keep DHCP setup outside measurements.
+#
 # VINIX_CMDLINE adds options to the kernel's command line, such as
 # vinix.user_access=audit (docs/openbsd-security.md).
 set -eo pipefail
@@ -164,6 +167,7 @@ GUEST_INIT_REQUESTED=0
 REPLACE_RUNNING=0
 EPHEMERAL_BOOT=0
 PERSIST_ENABLED="${VINIX_QEMU_PERSIST:-1}"
+NETWORK_ENABLED="${VINIX_QEMU_NETWORK:-1}"
 QEMU_MEM="${VINIX_QEMU_MEM:-2048}"
 for arg in "$@"; do
     case "$arg" in
@@ -190,6 +194,14 @@ for arg in "$@"; do
             ;;
     esac
 done
+
+case "$NETWORK_ENABLED" in
+    0|1) ;;
+    *)
+        echo "ERROR: VINIX_QEMU_NETWORK must be 0 or 1" >&2
+        exit 1
+        ;;
+esac
 
 if [ "$EPHEMERAL_BOOT" -eq 1 ]; then
     if [ -n "${VINIX_BOOT_DISK:-}" ]; then
@@ -1263,8 +1275,11 @@ fi
 # DNS. KekVM's VirGL build lacks libslirp, so a stock QEMU can provide the user
 # backend and forward Ethernet frames to the VirGL VM over a local stream.
 NETWORK_BACKEND="${VINIX_NETWORK_QEMU:-qemu-system-aarch64}"
-NETWORK_FLAGS=(-netdev user,id=net0 -device virtio-net-device,netdev=net0,mac=52:54:00:12:34:56)
-if [ "$VIRTIO_GPU" -ge 2 ] && ! "$QEMU_BIN" -machine virt -netdev help 2>/dev/null | grep -qx user; then
+NETWORK_FLAGS=()
+if [ "$NETWORK_ENABLED" -eq 1 ]; then
+    NETWORK_FLAGS=(-netdev user,id=net0 -device virtio-net-device,netdev=net0,mac=52:54:00:12:34:56)
+fi
+if [ "$NETWORK_ENABLED" -eq 1 ] && [ "$VIRTIO_GPU" -ge 2 ] && ! "$QEMU_BIN" -machine virt -netdev help 2>/dev/null | grep -qx user; then
     if ! command -v "$NETWORK_BACKEND" >/dev/null 2>&1 ||
        ! "$NETWORK_BACKEND" -machine virt -netdev help 2>/dev/null | grep -qx user; then
         echo "ERROR: VirGL networking needs a QEMU with the user network backend; set VINIX_NETWORK_QEMU" >&2

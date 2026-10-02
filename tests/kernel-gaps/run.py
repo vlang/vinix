@@ -150,6 +150,8 @@ def main() -> int:
     parser.add_argument("--fail", action="append", default=[])
     parser.add_argument("--expect-panic", action="store_true",
                         help="Negative boot test: require a panic and the requested verdicts")
+    parser.add_argument("--no-network", action="store_true",
+                        help="Disable the guest NIC for deterministic allocation measurements")
     parser.add_argument("--timeout", type=int, default=180)
     parser.add_argument("--state-dir", type=Path)
     args = parser.parse_args()
@@ -192,6 +194,8 @@ def main() -> int:
                    VINIX_QEMU_PACKAGE_STORE=str(state / "packages.tar"),
                    VINIX_QEMU_AUDIO="off",
                    VINIX_QEMU_EXTRA=f"-qmp unix:{state / 'qmp.sock'},server=on,wait=off")
+        if args.no_network:
+            env["VINIX_QEMU_NETWORK"] = "0"
         if platform.system() != "Darwin":
             env.setdefault("USE_TCG", "1")
         command = [str(ROOT / "run-aarch64.sh"), "--no-build", "--serial",
@@ -218,6 +222,8 @@ def main() -> int:
                    "-cdrom", str(iso), "-display", "none", "-monitor", "none",
                    "-qmp", f"unix:{state / 'qmp.sock'},server=on,wait=off",
                    "-serial", "mon:stdio", "-no-reboot"]
+        if args.no_network:
+            command += ["-nic", "none"]
     print(f"Guest artifacts: {state}", flush=True)
     expected, failures = verdict_policy(args.expect, args.fail, args.expect_panic)
     return boot(command, env, state, expected, failures, args.timeout)
