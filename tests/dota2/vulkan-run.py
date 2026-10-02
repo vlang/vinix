@@ -42,7 +42,8 @@ def copy_layer(source: Path, target: Path) -> None:
 
 def complete_native_closure(root: Path) -> None:
     userland = REPO / "build-aarch64-userland/staging"
-    queue = [root / "usr/bin/Xvfb", root / "usr/bin/xkbcomp"]
+    queue = [root / "usr/bin/Xvfb", root / "usr/bin/xkbcomp",
+             root / "usr/bin/qemu-x86_64"]
     seen = set()
     while queue:
         binary = queue.pop()
@@ -65,15 +66,31 @@ def complete_native_closure(root: Path) -> None:
             queue.append(library)
 
 
+def install_native_translator(staging: Path, root: Path) -> None:
+    binary = staging / "usr/bin/qemu-x86_64"
+    with binary.open("rb") as stream:
+        header = stream.read(20)
+    if (header[:7] != b"\x7fELF\x02\x01\x01" or
+            header[16:18] not in (b"\x02\x00", b"\x03\x00") or
+            header[18:20] != b"\xb7\x00" or not os.access(binary, os.X_OK)):
+        raise SystemExit(f"Expected an executable native AArch64 translator: {binary}")
+    for directory in ("usr/lib", "lib"):
+        if (staging / directory).is_dir():
+            copy_layer(staging / directory, root / directory)
+    (root / "usr/bin").mkdir(parents=True, exist_ok=True)
+    target = root / "usr/bin/qemu-x86_64"
+    if target.is_symlink():
+        target.unlink()
+    shutil.copy2(binary, target)
+
+
 def prepare(args, work: Path) -> Path:
     root = work / "root"
+    staged_translator = (args.staging / "usr/bin/qemu-x86_64").exists()
     if not (root / ".prepared").exists():
         copy_layer(REPO / "build-aarch64-x11/staging", root)
-        native = REPO / "build-aarch64-x86-translation/staging"
-        for directory in ("usr/lib", "lib"):
-            copy_layer(native / directory, root / directory)
-        (root / "usr/bin").mkdir(parents=True, exist_ok=True)
-        shutil.copy2(native / "usr/bin/qemu-x86_64", root / "usr/bin/qemu-x86_64")
+        if not staged_translator:
+            install_native_translator(REPO / "build-aarch64-x86-translation/staging", root)
         (root / "bin").mkdir(exist_ok=True)
         userland = REPO / "build-aarch64-userland/staging"
         shutil.copy2(userland / "bin/busybox", root / "bin/busybox")
@@ -91,6 +108,10 @@ def prepare(args, work: Path) -> Path:
         (root / "etc/passwd").write_text("root:x:0:0:root:/root:/bin/sh\n")
         (root / "etc/group").write_text("root:x:0:root\n")
         (root / ".prepared").touch()
+    # The foreign runtime stamp cannot identify a changed native translator.
+    # Refresh the Dota binary and its native libraries even for a prepared root.
+    if staged_translator:
+        install_native_translator(args.staging, root)
     source = args.staging / "usr/libexec/vinix-dota2/root"
     generation = (source / ".vinix-dota2-vulkan-generation").read_text()
     marker = root / ".vulkan-runtime-generation"
