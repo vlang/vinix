@@ -11,7 +11,8 @@ Vinix uses a small part of [SBP's selector-based design](https://github.com/okTu
 | `system/reboot` | `reboot` | Effective UID 0 and `CAP_SYS_BOOT` |
 | `system/securelevel/set` | `/proc/sys/kernel/securelevel` writes | Effective UID 0 and `CAP_SYS_ADMIN` in the initial user namespace; cannot lower the boot floor |
 
-The rule applies to both architecture ABIs where those operations exist. A denied call returns `EPERM`. The AArch64 syscall smoke test checks full and effective-only privilege drops, invalid userspace pointers, authorized calls with a nonzero real UID, and unchanged host and domain names after denials.
+Host selectors also require trusted mandatory domain 0. The rule applies to
+both architecture ABIs where those operations exist. A denied call returns `EPERM`. The AArch64 syscall smoke test checks full and effective-only privilege drops, invalid userspace pointers, authorized calls with a nonzero real UID, and unchanged host and domain names after denials.
 
 `tests/security-policy/run.sh` exercises the production allowlist with a controlled credential source, including unknown selectors presented by an effective-root caller and a root caller whose capability was dropped, as a container runtime does.
 
@@ -39,13 +40,29 @@ optional device tree. Firmware Secure Boot must be enabled and trust the
 signing certificate for the loader itself to be authenticated. Verification
 uses a trusted certificate supplied separately from the image.
 
-The profile starts from the authenticated initramfs and rejects disk-root and
-persistence command-line overrides. Initial root contents are authenticated;
-the resulting tmpfs is writable at runtime. This supplies neither dm-verity
-for an ext2 root nor executable authentication at page-fault time. The normal
-image builders remain development paths, and the new unsigned mode explicitly
-reports that boot is unauthenticated. Apple m1n1 and BIOS boot are outside this
-UEFI trust chain. Key enrollment and revocation remain deployment choices.
+The default profile starts from the authenticated initramfs; the resulting
+tmpfs is writable at runtime. The optional
+[`verified block root`](../tools/verified-root/README.md) profile pins an exact
+device, data-block count and SHA-256 Merkle root in the signed command line.
+The kernel verifies each block and its complete hash path before returning
+the same verified bytes, using the headerless, unsalted dm-verity v1 format.
+Short reads or mismatches fail with `EIO`. Malformed or conflicting root
+policy, unavailable storage or a failed root mount stops boot without falling
+back to an archive or ordinary disk root.
+
+The ext2 view remains read-only through descriptors, bind mounts, second
+mounts and remounts; writes are refused before changing its coherent cache.
+Verified cached bytes may remain readable after backing storage changes;
+subsequent storage reads are verified again. `/dev`, `/proc` and `/sys` are
+kernel mounts, and `/tmp`, `/run` and optional `/var` and `/root` use writable
+RAM outside that integrity boundary. The bootstrap archives do not overwrite
+the verified root. Writable authenticated storage, antirollback and attestation
+remain separate work.
+
+The normal image builders remain development paths, and unsigned mode
+explicitly reports that boot is unauthenticated. Apple m1n1 and BIOS boot are
+outside this UEFI trust chain. Key enrollment, revocation and protection of the
+signing infrastructure remain deployment choices.
 
 ## Application confinement
 
@@ -62,14 +79,42 @@ locked filesystem view, and the `stdio` promise. Its existing compositor RPC
 descriptors remain available. Startup fails if any restriction cannot be
 installed. Other application profiles need their own measured access needs;
 the privileged compositor and general Files/Settings applications do not gain
-this calculator profile. This is application confinement using existing kernel
-interfaces, not a general labeled mandatory access-control framework.
+this calculator profile. These application restrictions also apply when a
+launcher installs mandatory filesystem policy.
+
+## Mandatory filesystem domains
+
+[`vinix-mac`](../tools/security-mac/README.md) configures a fixed matrix of
+15 confined domains and 32 object types. Inode labels use the `security.vinix`
+xattr; anonymous pipes/sockets, devices and other kernel resources have fixed
+types. Policy and manual labels become immutable after sealing. Installation
+requires trusted domain 0, effective root, `CAP_MAC_ADMIN` and the initial user
+namespace. A single-threaded launcher can activate a confined domain only on
+successful exec after sealing; fork and subsequent exec retain it.
+
+Mandatory checks precede discretionary capability grants and apply to path
+operations, inherited or transferred descriptors, metadata, positioned I/O,
+file transfers, ioctls and file-backed mappings. Mapping ceilings prevent
+later `mprotect` changes from adding denied execution or shared writes. New
+files inherit the parent type before publication. The executable loader also
+checks interpreters in the destination domain. Root capabilities do not bypass
+cross-domain memory inspection, signals, resource limits or scheduling controls.
+Confined domains cannot administer host policy, make device nodes or access
+raw block storage.
+
+This is an initial filesystem and process-domain policy. Network policy,
+general IPC mediation, information-flow control, a policy language and a
+persistent MAC audit stream remain work ahead. Boot starts in trusted domain 0;
+production launchers must install and seal the intended policy. Public process
+metadata remains readable when its kernel-resource type is granted. Integrity of
+persisted labels depends on the authenticated root and deployment trust chain.
 
 ## Durable selected seccomp records
 
 The kernel retains 128 selected seccomp decisions in its bounded allocation-free
-producer ring. `/proc/security_audit` requires initial-user-namespace effective
-root and `CAP_AUDIT_READ` on every read. Its header includes a stable 128-bit
+producer ring. `/proc/security_audit` requires trusted domain 0,
+initial-user-namespace effective root and `CAP_AUDIT_READ` on every read. Its
+header includes a stable 128-bit
 boot identity to distinguish sequence domains across collector restarts.
 That identifier is not an authentication token.
 
@@ -91,17 +136,25 @@ security decisions remain separate work.
 
 The kernel uses compiler and handwritten-dispatch retpolines, fences SWAPGS
 paths, and fills the return predictor before thread dispatch. Each CPU enables
-enhanced IBRS, STIBP and SSBD only when advertised. Supported CPUs run IBPB
-before a thread is dispatched, including dispatch from idle. Applications
-cannot turn these controls off.
+enhanced IBRS, STIBP, SSBD and supervisor BHI protection only when advertised.
+The BHI control also checks the supported CPUID subleaf and `BHI_NO` capability.
+Supported CPUs run IBPB before a thread is dispatched, including dispatch
+from idle. Applications cannot turn these controls off.
 
 [`tests/speculation-policy`](../tests/speculation-policy/README.md) checks
 feature selection and MSR gating. These controls do not establish that a CPU
-is free from speculative side channels. KPTI, BHI, CPU-specific return and
-sampling mitigations, legacy IBRS entry programming and ARM firmware policies
+is free from speculative side channels. KPTI, software BHI sequences,
+CPU-specific return and sampling mitigations, legacy IBRS entry programming
+and ARM firmware policies
 remain unimplemented here. See [Intel's enumeration](https://www.intel.com/content/www/us/en/developer/articles/technical/software-security-guidance/technical-documentation/cpuid-enumeration-and-architectural-msrs.html)
 and [Linux's mitigation guidance](https://docs.kernel.org/admin-guide/hw-vuln/spectre.html)
 for the hardware distinctions.
+
+[`tests/verified-root`](../tools/verified-root/README.md#validation-and-limits)
+checks the authenticated root and read-only mapping lifetimes;
+[`tests/security-mac`](../tests/security-mac/README.md) checks the mandatory
+policy, retained descriptors, executable loaders and process controls. These
+complement the existing OpenBSD security regressions on both architectures.
 
 Vinix remains pre-alpha. These tested mechanisms narrow specific gaps; they
 do not establish security parity with a maintained, well-configured Linux
