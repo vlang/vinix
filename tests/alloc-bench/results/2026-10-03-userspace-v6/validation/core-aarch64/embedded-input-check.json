@@ -1,0 +1,10 @@
+{
+  "kernel_sha256": "3d721f3168a990373cb2549bd26322329923014ee4613cda2ae3d4f6884bf8f7",
+  "init_sha256": "6ce0f9054cb4bdc3111f758393065e97c0d15e318d2da8e2120e99b2a6991d41",
+  "loader_sha256": "0088bfbce37414d13cdbe4c078a13d6b279d727b821e36bbf8044505325e7c02",
+  "base_initramfs_sha256": "ffea6b479b423c8535153db8cebb53b6af940f977fd65e650d64fc7aaaed8793",
+  "runtime_tar_sha256": "61e166be33e706fea099d0f2088bf5fe76035417a2e5a04a01b569f83e0d06a5",
+  "boot_disk_sha256": "9e86ebe6521977b703112b98a4baaf3f1189f50ab1e65de06977681ab8eff839",
+  "captured_after_actual_second_persistent_boot": true,
+  "validated_utc": "2026-10-02T22:56:24.083420+00:00"
+}

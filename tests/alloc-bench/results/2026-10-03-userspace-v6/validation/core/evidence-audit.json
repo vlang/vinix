@@ -1,0 +1,109 @@
+{
+  "captured_utc": "2026-10-02T22:56:23.811304+00:00",
+  "modes": {
+    "x86_64": {
+      "exit_code": 0,
+      "serial_sha256": "3635a64075d6e16f58b060d38a982f202f70df35378802969504d2bbc6b5a461",
+      "all_source_core_pass_marker_count": 53,
+      "pagetable_check_pass_count": 1,
+      "exact_flags_binary_identical": true,
+      "actual_qemu_process_count": 1,
+      "static_archive_sha256": "8d5c3deee3610c07c3f9bbfaee3b4fed244ef35051c3e2390e4452b13db34ace",
+      "actual_crt_sha256": {
+        "/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/optimized-v6-final/usr/lib/crt1.o": "63e5a572b45bf76135f0130d31120dc25564d814bd67f9e2e3b7e6ea3b536a22",
+        "/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/optimized-v6-final/usr/lib/crti.o": "8edb7b9515f2a2c75bc41e773bdf118e82808452b9eef55a8a360e9d8068ead3",
+        "/opt/homebrew/Cellar/musl-cross/0.9.11/libexec/lib/gcc/x86_64-linux-musl/14.2.0/crtbeginT.o": "4ab4ca72c1d71bf7c911ce3fb2f0e7f1351c62534639f6a80cbaf55c546fd323",
+        "/opt/homebrew/Cellar/musl-cross/0.9.11/libexec/lib/gcc/x86_64-linux-musl/14.2.0/crtend.o": "dbcf1ccd3f526c84cfe52a98bde283a548ff3db1a1379f3036be8f9399673e30",
+        "/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/optimized-v6-final/usr/lib/crtn.o": "cbfe47a3fbdbde2c51e2042a1af512bdd4b0e1b0d01f46a54b227c76650335b2"
+      },
+      "source_sha256": {
+        "test.c": "705b57f7ff40b934d438ff62187ca7bc9983839af8ee3ff0039ed59bcbd77abe",
+        "pagetable.c": "f71d45c78c2db0e1c198d2aa3443513a5fd2f51975a8209a8fdbf374dc7abf5d"
+      },
+      "actual_run_command": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/Users/alex/code/vinix/third_party/useralloc-speed-v5/tests/qemu-core/run_vm.py",
+        "--arch",
+        "amd64",
+        "--iso",
+        "/Users/alex/code/vinix/build/useralloc-core-v6/core-x86_64/test.iso",
+        "--qemu",
+        "/opt/homebrew/Cellar/qemu/11.1.1/bin/qemu-system-x86_64",
+        "--firmware",
+        "/opt/homebrew/Cellar/qemu/11.1.1/share/qemu/edk2-x86_64-code.fd",
+        "--timeout",
+        "900",
+        "--cpus",
+        "2"
+      ]
+    },
+    "x86_64-four-level": {
+      "exit_code": 0,
+      "serial_sha256": "60ea36d2437ac8d8b64c397ab94c86964b41c300cdf18ad39bb84b37f21eb1c7",
+      "all_source_core_pass_marker_count": 53,
+      "pagetable_check_pass_count": 1,
+      "exact_flags_binary_identical": true,
+      "actual_qemu_process_count": 1,
+      "static_archive_sha256": "8d5c3deee3610c07c3f9bbfaee3b4fed244ef35051c3e2390e4452b13db34ace",
+      "actual_crt_sha256": {
+        "/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/optimized-v6-final/usr/lib/crt1.o": "63e5a572b45bf76135f0130d31120dc25564d814bd67f9e2e3b7e6ea3b536a22",
+        "/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/optimized-v6-final/usr/lib/crti.o": "8edb7b9515f2a2c75bc41e773bdf118e82808452b9eef55a8a360e9d8068ead3",
+        "/opt/homebrew/Cellar/musl-cross/0.9.11/libexec/lib/gcc/x86_64-linux-musl/14.2.0/crtbeginT.o": "4ab4ca72c1d71bf7c911ce3fb2f0e7f1351c62534639f6a80cbaf55c546fd323",
+        "/opt/homebrew/Cellar/musl-cross/0.9.11/libexec/lib/gcc/x86_64-linux-musl/14.2.0/crtend.o": "dbcf1ccd3f526c84cfe52a98bde283a548ff3db1a1379f3036be8f9399673e30",
+        "/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/optimized-v6-final/usr/lib/crtn.o": "cbfe47a3fbdbde2c51e2042a1af512bdd4b0e1b0d01f46a54b227c76650335b2"
+      },
+      "source_sha256": {
+        "test.c": "705b57f7ff40b934d438ff62187ca7bc9983839af8ee3ff0039ed59bcbd77abe",
+        "pagetable.c": "f71d45c78c2db0e1c198d2aa3443513a5fd2f51975a8209a8fdbf374dc7abf5d"
+      },
+      "actual_run_command": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/Users/alex/code/vinix/build/useralloc-core-v6/core-x86_64-four-level/run_vm.py",
+        "--arch",
+        "amd64",
+        "--iso",
+        "/Users/alex/code/vinix/build/useralloc-core-v6/core-x86_64/test.iso",
+        "--qemu",
+        "/opt/homebrew/Cellar/qemu/11.1.1/bin/qemu-system-x86_64",
+        "--firmware",
+        "/opt/homebrew/Cellar/qemu/11.1.1/share/qemu/edk2-x86_64-code.fd",
+        "--timeout",
+        "900",
+        "--cpus",
+        "2"
+      ]
+    },
+    "aarch64": {
+      "exit_code": 0,
+      "serial_sha256": "bec27b80377ff3a771b799737fca1bac8370336605c83cb859f2fc04a252b432",
+      "all_source_core_pass_marker_count": 51,
+      "pagetable_check_pass_count": 1,
+      "exact_flags_binary_identical": true,
+      "actual_qemu_process_count": 2,
+      "static_archive_sha256": "2a83589ee880356aa73f7809db76ccfa8f803f5ba78908ba2700e702b36620ca",
+      "actual_crt_sha256": {
+        "/opt/homebrew/Cellar/musl-cross/0.9.11/libexec/aarch64-linux-musl/lib/crt1.o": "61a6c18dd819e765f8b067e721c83bec91d19c2d3971a2f7c6a340427089b744",
+        "/opt/homebrew/Cellar/musl-cross/0.9.11/libexec/aarch64-linux-musl/lib/crti.o": "22ae092200823fed6cfe7800cd4f20dd0c09e3d1f3736ce30640f42b70502993",
+        "/opt/homebrew/Cellar/musl-cross/0.9.11/libexec/lib/gcc/aarch64-linux-musl/14.2.0/crtbeginT.o": "75e81ecb82a6f37d2a92a2312370368509b5e2d837aae8122eb18c38901064ee",
+        "/opt/homebrew/Cellar/musl-cross/0.9.11/libexec/lib/gcc/aarch64-linux-musl/14.2.0/crtend.o": "48c94f3909bdaaf08eb5943f71edf4867dc8d65d00265daa7ebcf67cd3ec1ff2",
+        "/opt/homebrew/Cellar/musl-cross/0.9.11/libexec/aarch64-linux-musl/lib/crtn.o": "50ea930e73f339140017b9faf4124313fda4f1c3946b59a6af5f31988336b91b"
+      },
+      "source_sha256": {
+        "test.c": "705b57f7ff40b934d438ff62187ca7bc9983839af8ee3ff0039ed59bcbd77abe",
+        "pagetable.c": "f71d45c78c2db0e1c198d2aa3443513a5fd2f51975a8209a8fdbf374dc7abf5d"
+      },
+      "actual_run_command": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/Users/alex/code/vinix/third_party/useralloc-speed-v5/tests/qemu-core/run_vm.py",
+        "--init",
+        "/Users/alex/code/vinix/build/useralloc-core-v6/core-aarch64/init",
+        "--initramfs",
+        "/Users/alex/code/vinix/build/useralloc-core-v6/core-aarch64/initramfs.tar",
+        "--state-dir",
+        "/Users/alex/code/vinix/build/useralloc-core-v6/core-aarch64/vm",
+        "--timeout",
+        "900"
+      ]
+    }
+  }
+}

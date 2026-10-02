@@ -1,0 +1,87 @@
+{
+  "status": "PASS",
+  "checked_utc": "2026-10-02T22:56:39.088938+00:00",
+  "gates": {
+    "build/useralloc-kernel-speed-v5/x86_64/build.json": {
+      "sha256": "22587cccbed17d10eba667d748d08ce40f893392a1b0c0f5ce35ba11cc4f4c8a",
+      "checked_field": "build_exit_code",
+      "value": 0
+    },
+    "build/useralloc-kernel-speed-v5/aarch64/build.json": {
+      "sha256": "a19cef5cc77637c98938237aa936718ad9eaadb2a939bda7e3bbd82c47567919",
+      "checked_field": "build_exit_code",
+      "value": 0
+    },
+    "build/useralloc-core-v6/core-x86_64/run.json": {
+      "sha256": "0d36696a03b212b75e84f1bf3dacc06ec09259f2d630c518311ce914f60d8565",
+      "checked_field": "exit_code",
+      "value": 0
+    },
+    "build/useralloc-core-v6/core-x86_64-four-level/run.json": {
+      "sha256": "bc8e5eb2f9e766d03232ca18addf7ff27d4696489fde69f6fbc6eb632b221c87",
+      "checked_field": "exit_code",
+      "value": 0
+    },
+    "build/useralloc-core-v6/core-aarch64/run.json": {
+      "sha256": "b86766a22688b34c922ac72b837f5ed58eaa07534530adf61ac72b5227330448",
+      "checked_field": "exit_code",
+      "value": 0
+    },
+    "build/useralloc-core-v6/exit.json": {
+      "sha256": "3cf312895d034556a6492f4ac9b8b99c122868deba65eb7e2410ce6c5ad8b11d",
+      "checked_field": "exit_code",
+      "value": 0
+    },
+    "third_party/useralloc-libc/build/useralloc/v6-verification-summary.json": {
+      "sha256": "2a1cdb85207a3fea7d45556b49a9d79647429889b27c7ad8b3066dfcccc1b05a",
+      "checked_field": "all_passed",
+      "value": true
+    },
+    "third_party/useralloc-libc/build/useralloc-production-v6/amd64/results.json": {
+      "sha256": "6e0d87516f25a443e38b56b5abf5c8d4a852d7cd67e6ddcc2a28c3c6c5a0a5a8",
+      "checked_field": "status",
+      "value": "PASS"
+    },
+    "third_party/useralloc-libc/build/useralloc-production-v6/aarch64/results.json": {
+      "sha256": "0902d3ceb7b32d199f434e1d82e101941e248eac5df24fd1f008150b9befcb5b",
+      "checked_field": "status",
+      "value": "PASS"
+    },
+    "third_party/useralloc-libc/build/useralloc-production-v6/amd64/root-review.json": {
+      "sha256": "f8c03fc2adac74a33acd0bdd0b433b21a9c5a8e706d55a9d07847b3f8dc5eb0d",
+      "checked_field": "status",
+      "value": "PASS"
+    },
+    "third_party/useralloc-libc/build/useralloc-production-v6/aarch64/root-review.json": {
+      "sha256": "82a624b1bc9d32cedc4fcf639f8a37c82f10d1a5b5be26bb96c90f9c7c35b7a6",
+      "checked_field": "status",
+      "value": "PASS"
+    },
+    "build/useralloc-pipe/static-desktop-v6/build.json": {
+      "sha256": "34ee21ab4fcfdbbaefbf79d635183af0f603da7ab27a3082dbe43221783ff508",
+      "checked_field": "build_exit_code",
+      "value": 0
+    },
+    "build/useralloc-pipe/static-desktop-v6/driver.exit.json": {
+      "sha256": "6292ab9138461c2b154282125a0b51e38529a33cee476b4b75442ee5817f4477",
+      "checked_field": "exit_code",
+      "value": 0
+    },
+    "build/useralloc-review-v6/review.json": {
+      "sha256": "fa12911854c88f2a28dbd54de1989e539736b1e6469a15e992f5f4d2f3d8f0a8",
+      "checked_field": "status",
+      "value": "PASS"
+    },
+    "build/useralloc-desktop-perf-v6/validation.json": {
+      "sha256": "22b95485fce140104367f2a006f6ee670cc959d6913d9c953e99dd99064818d5",
+      "checked_field": "status",
+      "value": "PASS"
+    },
+    "build/useralloc-hot-v5-diagnostic/driver.exit.json": {
+      "sha256": "89444e4cff71d10a35076a8876df6fd1caa17c25480dd11ca6bae6a2188bf430",
+      "checked_field": "exit_code",
+      "value": 0
+    }
+  },
+  "notes": "Same immutable validated v5 kernels; final v6 libc correctness, production packaging/static desktop, full3core modes and43rowfunctionaldesktop plan complete. Full allocation checker historical literalallowlist failure remains unchanged with same kernel source."
+}

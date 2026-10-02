@@ -1,0 +1,10 @@
+{
+  "iso_sha256": "aa8d1bf6f69696b6ad48cee4946b2fef93eb9fa66adcf06268e6e9ef33b50c6e",
+  "embedded_kernel_sha256": "16140916ef5abca52cc6f0a8e80bb6dedc24b5e5f05efd747f57182523098e74",
+  "embedded_initramfs_sha256": "ddf3da84e93f80b1c0f75ee50054c6f8f985fce04be5981a4946b4c1e9e06645",
+  "embedded_init_sha256": "2de81919723a98229e79f56f5919103c6073c6740bccd00106b237f5bb44ae85",
+  "pre_image_id_initramfs_sha256": "9b4e34a02402f9e63d526fb251d64f4ecfb1de7cf639b43ba899e80d0319e823",
+  "image_id": "9b4e34a02402f9e6",
+  "verified_utc": "2026-10-02T22:49:57.658565+00:00",
+  "independent_completed_iso_extraction": true
+}

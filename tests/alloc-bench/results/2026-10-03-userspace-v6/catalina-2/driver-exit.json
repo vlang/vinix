@@ -1,0 +1,10 @@
+{
+  "argv": [
+    "/Library/Developer/CommandLineTools/usr/bin/python3",
+    "/Users/alex/code/vinix/build/useralloc-macos-runtime/measure.py",
+    "/Users/alex/code/vinix/build/useralloc-macos-v6-final-2"
+  ],
+  "started_utc": "2026-10-02T23:02:43.923351+00:00",
+  "finished_utc": "2026-10-02T23:07:28.120711+00:00",
+  "exit_code": 0
+}

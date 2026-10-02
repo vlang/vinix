@@ -1,0 +1,26 @@
+{
+  "compile_command": [
+    "/opt/homebrew/opt/musl-cross/bin/x86_64-linux-musl-gcc",
+    "-static",
+    "-fuse-ld=lld",
+    "--sysroot=/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/optimized-v6-final",
+    "-B/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/optimized-v6-final/usr/lib",
+    "-isystem",
+    "/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/optimized-v6-final/usr/include",
+    "-L/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/optimized-v6-final/usr/lib",
+    "-std=gnu11",
+    "-O2",
+    "-Wall",
+    "-Wextra",
+    "-Werror",
+    "-fno-builtin",
+    "-pthread",
+    "/Users/alex/code/vinix/build/useralloc-core-v6/core-x86_64/test.c",
+    "-o",
+    "/Users/alex/code/vinix/build/useralloc-core-v6/core-x86_64/init-exact-flags"
+  ],
+  "exit_code": 0,
+  "init_sha256": "2de81919723a98229e79f56f5919103c6073c6740bccd00106b237f5bb44ae85",
+  "diagnostic_and_exact_flags_binary_identical": true,
+  "validated_utc": "2026-10-02T22:53:57.658386+00:00"
+}

@@ -1,0 +1,12 @@
+{
+  "command": [
+    "/Users/alex/code/vinix/third_party/useralloc-speed-v5/build-support/build-amd64-iso.sh"
+  ],
+  "environment": {
+    "VINIX_AMD64_ISO_BUILD_DIR": "/Users/alex/code/vinix/build/useralloc-core-v6/core-x86_64/iso-build",
+    "VINIX_AMD64_KERNEL": "/Users/alex/code/vinix/build/useralloc-kernel-speed-v5/x86_64/vinix-x86_64",
+    "VINIX_AMD64_INITRAMFS": "/Users/alex/code/vinix/build/useralloc-core-v6/core-x86_64/initramfs.tar",
+    "VINIX_AMD64_ISO": "/Users/alex/code/vinix/build/useralloc-core-v6/core-x86_64/test.iso"
+  },
+  "script_sha256": "38fe8ccbe4082665ab67f12d1b2421724e31729d2a3554143ee2dd53800cda7e"
+}

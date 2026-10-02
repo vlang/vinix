@@ -1,0 +1,12 @@
+{
+  "exit_code": 0,
+  "started_utc": "2026-10-02T22:47:31.536586+00:00",
+  "finished_utc": "2026-10-02T22:54:44.126754+00:00",
+  "argv": [
+    "/Library/Developer/CommandLineTools/usr/bin/python3",
+    "/Users/alex/code/vinix/build/useralloc-pipe/perf-v6-preparation/run-driver.py",
+    "/Users/alex/code/vinix/build/useralloc-desktop-perf-v6",
+    "ops,churn,cache,idle,apps,drag",
+    "/Users/alex/code/vinix/build/useralloc-kernel-speed-v5/aarch64/vinix-aarch64"
+  ]
+}

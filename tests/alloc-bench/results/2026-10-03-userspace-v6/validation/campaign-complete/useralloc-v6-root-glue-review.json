@@ -1,0 +1,502 @@
+{
+  "status": "PASS",
+  "reviewed_utc": "2026-10-02T22:56:56.899144+00:00",
+  "scope": "Read-only glue review; no VM, builds, commits or source mutations. This report is the sole output artifact.",
+  "reviewed_scripts_sha256": {
+    "build/useralloc-v6-final-cohorts.py": "568d515c6843cc20b5e5042de2e086798cccd41cafb8b13779177dacfb36a8bd",
+    "build/useralloc-v6-verify-readiness.py": "83c7e7ae12d9b09f390d9a79cbc5a3389710e981c87f0b142db7983c68018cee",
+    "build/useralloc-pipe/perf-v6-preparation/validate-completed.py": "a4ca325e3399fcb9e64c57443b3bf14a09e119153c331c5042352d7f543ce8e9",
+    "build/useralloc-pipe/perf-v6-preparation/run.py": "6c064e8740d79012c583b856426a56b00a68e87cf97732c53559bda5a39665cd",
+    "build/useralloc-v5-final-cohorts.py": "9ef988102e69693648c42e562124d074472a4048d87a81f3f1d4f64cbc58db53",
+    "build/useralloc-final-driver.py": "271a7215f36c5dfcacc133f0fae2e80f5a8bfd9d1445044f4105843eb53681e8",
+    "build/useralloc-macos-final-driver.py": "d649c51d8f599d4d90c2852fc26892dcc5596d9d5f848f3199698ccd12ddfa48",
+    "build/useralloc-macos-runtime/measure.py": "e321a5d856ff9f046b7ad287799c55199a64b04ea9309cbe0a4b8a33259effd1",
+    "tests/alloc-bench/run-vinix.py": "146a8318f8f2ad1daccf0409f96f88f492563a584fee896697ed2d58409ebb6c",
+    "tests/alloc-bench/compare.py": "e12ec5a8c90cab335c40e68257d596e0a2d0ba9f284b1e4bfe911fffa352dd06"
+  },
+  "plan_sha256": "df9db0e94ba5b9bce3ac71fbdfed469642b5b0a6492c764a44fd69df5e9ba012",
+  "passed_checks": {
+    "capture_order": [
+      "vinix-1",
+      "catalina-1",
+      "catalina-2",
+      "vinix-2"
+    ],
+    "iterations": 200000,
+    "samples": 7,
+    "fresh_state_paths": true,
+    "completed_capture_prefix_currently_absent": true,
+    "frozen_guards_match": true,
+    "guard_count": 34,
+    "same_v5_kernel": true,
+    "unchanged_v5_common_driver_workloads": true,
+    "mac_config_matches_plan_now": true,
+    "mac_argv_matches_plan_now": {
+      "machine": true,
+      "accelerator": true,
+      "cpu": true,
+      "smp": true,
+      "memory_mb": true
+    },
+    "all_available_readiness_gate_schemas_match": true,
+    "perf_inspect_run_return_values": 3,
+    "perf_validator_unpack_values": 3,
+    "perf_expected_rows": 43,
+    "perf_expected_row_counts": {
+      "ops": 35,
+      "idle": 1,
+      "churn": 4,
+      "cache": 1,
+      "drag": 1,
+      "apps": 1
+    },
+    "perf_validator_checks_exact_raw_result_equality": true,
+    "perf_validator_checks_real_runner_exit_code": true,
+    "perf_validator_checks_current_artifact_hashes": true,
+    "explicit_declared_capture_validation": true,
+    "paired_comparability_at_campaign_completion": true,
+    "in_memory_validation_cases": 23
+  },
+  "gates": {
+    "build/useralloc-kernel-speed-v5/x86_64/build.json": {
+      "status": "MATCH",
+      "field": "build_exit_code",
+      "expected": 0,
+      "actual": 0,
+      "sha256": "22587cccbed17d10eba667d748d08ce40f893392a1b0c0f5ce35ba11cc4f4c8a"
+    },
+    "build/useralloc-kernel-speed-v5/aarch64/build.json": {
+      "status": "MATCH",
+      "field": "build_exit_code",
+      "expected": 0,
+      "actual": 0,
+      "sha256": "a19cef5cc77637c98938237aa936718ad9eaadb2a939bda7e3bbd82c47567919"
+    },
+    "build/useralloc-core-v6/core-x86_64/run.json": {
+      "status": "MATCH",
+      "field": "exit_code",
+      "expected": 0,
+      "actual": 0,
+      "sha256": "790f5f1d0fb70d3950b9d636bdedde19d7b80fb1b22c5086b7d91155abb78cc4"
+    },
+    "build/useralloc-core-v6/core-x86_64-four-level/run.json": {
+      "status": "MATCH",
+      "field": "exit_code",
+      "expected": 0,
+      "actual": 0,
+      "sha256": "cde064dec04a0ff680a0384b443696cc1fb0fd6ae9b6c4653cf764852689179d"
+    },
+    "build/useralloc-core-v6/core-aarch64/run.json": {
+      "status": "MATCH",
+      "field": "exit_code",
+      "expected": 0,
+      "actual": 0,
+      "sha256": "eb13da1e2cdbf37f2daead6015548efba375885a8d57de6385cb2e181ba1cf2d"
+    },
+    "build/useralloc-core-v6/exit.json": {
+      "status": "MATCH",
+      "field": "exit_code",
+      "expected": 0,
+      "actual": 0,
+      "sha256": "3cf312895d034556a6492f4ac9b8b99c122868deba65eb7e2410ce6c5ad8b11d"
+    },
+    "third_party/useralloc-libc/build/useralloc/v6-verification-summary.json": {
+      "status": "MATCH",
+      "field": "all_passed",
+      "expected": true,
+      "actual": true,
+      "sha256": "2a1cdb85207a3fea7d45556b49a9d79647429889b27c7ad8b3066dfcccc1b05a"
+    },
+    "third_party/useralloc-libc/build/useralloc-production-v6/amd64/results.json": {
+      "status": "MATCH",
+      "field": "status",
+      "expected": "PASS",
+      "actual": "PASS",
+      "sha256": "6e0d87516f25a443e38b56b5abf5c8d4a852d7cd67e6ddcc2a28c3c6c5a0a5a8"
+    },
+    "third_party/useralloc-libc/build/useralloc-production-v6/aarch64/results.json": {
+      "status": "MATCH",
+      "field": "status",
+      "expected": "PASS",
+      "actual": "PASS",
+      "sha256": "0902d3ceb7b32d199f434e1d82e101941e248eac5df24fd1f008150b9befcb5b"
+    },
+    "third_party/useralloc-libc/build/useralloc-production-v6/amd64/root-review.json": {
+      "status": "MATCH",
+      "field": "status",
+      "expected": "PASS",
+      "actual": "PASS",
+      "sha256": "f8c03fc2adac74a33acd0bdd0b433b21a9c5a8e706d55a9d07847b3f8dc5eb0d"
+    },
+    "third_party/useralloc-libc/build/useralloc-production-v6/aarch64/root-review.json": {
+      "status": "MATCH",
+      "field": "status",
+      "expected": "PASS",
+      "actual": "PASS",
+      "sha256": "82a624b1bc9d32cedc4fcf639f8a37c82f10d1a5b5be26bb96c90f9c7c35b7a6"
+    },
+    "build/useralloc-pipe/static-desktop-v6/build.json": {
+      "status": "MATCH",
+      "field": "build_exit_code",
+      "expected": 0,
+      "actual": 0,
+      "sha256": "34ee21ab4fcfdbbaefbf79d635183af0f603da7ab27a3082dbe43221783ff508"
+    },
+    "build/useralloc-pipe/static-desktop-v6/driver.exit.json": {
+      "status": "MATCH",
+      "field": "exit_code",
+      "expected": 0,
+      "actual": 0,
+      "sha256": "6292ab9138461c2b154282125a0b51e38529a33cee476b4b75442ee5817f4477"
+    },
+    "build/useralloc-review-v6/review.json": {
+      "status": "MATCH",
+      "field": "status",
+      "expected": "PASS",
+      "actual": "PASS",
+      "sha256": "fa12911854c88f2a28dbd54de1989e539736b1e6469a15e992f5f4d2f3d8f0a8"
+    },
+    "build/useralloc-desktop-perf-v6/validation.json": {
+      "status": "PENDING",
+      "field": "status",
+      "expected": "PASS"
+    },
+    "build/useralloc-hot-v5-diagnostic/driver.exit.json": {
+      "status": "MATCH",
+      "field": "exit_code",
+      "expected": 0,
+      "actual": 0,
+      "sha256": "89444e4cff71d10a35076a8876df6fd1caa17c25480dd11ca6bae6a2188bf430"
+    }
+  },
+  "frozen_inputs": {
+    "build/useralloc-kernel-speed-v5/x86_64/vinix-x86_64": {
+      "expected": "16140916ef5abca52cc6f0a8e80bb6dedc24b5e5f05efd747f57182523098e74",
+      "actual": "16140916ef5abca52cc6f0a8e80bb6dedc24b5e5f05efd747f57182523098e74",
+      "match": true
+    },
+    "third_party/useralloc-libc/build/useralloc/v6-source-freeze/build-support/musl/malloc-retain.patch": {
+      "expected": "ec459e48e5c3c9946c91e805428149802d0ab1835c64e5e023811ab54a48af1d",
+      "actual": "ec459e48e5c3c9946c91e805428149802d0ab1835c64e5e023811ab54a48af1d",
+      "match": true
+    },
+    "third_party/useralloc-speed-v5/kernel/katomic/katomic_amd64.v": {
+      "expected": "ec2d130780fe2fe72bdff53013594e2bc5dbe671c10ab260412f0de8c19d1bf4",
+      "actual": "ec2d130780fe2fe72bdff53013594e2bc5dbe671c10ab260412f0de8c19d1bf4",
+      "match": true
+    },
+    "third_party/useralloc-speed-v5/kernel/klock/klock_amd64.v": {
+      "expected": "3db4566c9a05ada0098109928957a56d8248f96a6da3ad95b555d8a35e89c4ee",
+      "actual": "3db4566c9a05ada0098109928957a56d8248f96a6da3ad95b555d8a35e89c4ee",
+      "match": true
+    },
+    "third_party/useralloc-speed-v5/kernel/c/memory.c": {
+      "expected": "5082c545e7c16318cceeb51bf280c356c6b9713c0de8b336290be165f2a42eb5",
+      "actual": "5082c545e7c16318cceeb51bf280c356c6b9713c0de8b336290be165f2a42eb5",
+      "match": true
+    },
+    "third_party/useralloc-speed-v5/kernel/file/locks.v": {
+      "expected": "21937b5a7f0ee5d5bb233d855217d7c431b2793be40263b74f7073ead1327ac3",
+      "actual": "21937b5a7f0ee5d5bb233d855217d7c431b2793be40263b74f7073ead1327ac3",
+      "match": true
+    },
+    "tests/alloc-bench/bench.c": {
+      "expected": "bd4a0d74f4f1e8d079d55877f8e90925e2622ce990120b54573a5dc94a9a54b9",
+      "actual": "bd4a0d74f4f1e8d079d55877f8e90925e2622ce990120b54573a5dc94a9a54b9",
+      "match": true
+    },
+    "third_party/useralloc-libc/build/useralloc/optimized-v6-final/lib/ld-musl-x86_64.so.1": {
+      "expected": "ad78977e92f55d85ace71f1ca43bf650d216923ed3cf6650dd29f22c1d70af9d",
+      "actual": "ad78977e92f55d85ace71f1ca43bf650d216923ed3cf6650dd29f22c1d70af9d",
+      "match": true
+    },
+    "third_party/useralloc-libc/build/useralloc/optimized-v6-final/usr/lib/libc.a": {
+      "expected": "8d5c3deee3610c07c3f9bbfaee3b4fed244ef35051c3e2390e4452b13db34ace",
+      "actual": "8d5c3deee3610c07c3f9bbfaee3b4fed244ef35051c3e2390e4452b13db34ace",
+      "match": true
+    },
+    "third_party/useralloc-speed-v5/kernel/file/timerfd.v": {
+      "expected": "ba38d9a723efd67f9d221cb9c3e5961aeb2e8c1b7d603665aeb05abe44482c23",
+      "actual": "ba38d9a723efd67f9d221cb9c3e5961aeb2e8c1b7d603665aeb05abe44482c23",
+      "match": true
+    },
+    "third_party/useralloc-speed-v5/kernel/memory/mmap/mmap.v": {
+      "expected": "95788b45183c6eac58f4fa5c01d5e5d3d5672e728d3051ce9d71d89107bf9980",
+      "actual": "95788b45183c6eac58f4fa5c01d5e5d3d5672e728d3051ce9d71d89107bf9980",
+      "match": true
+    },
+    "third_party/useralloc-speed-v5/kernel/memory/mmap/mmap_amd64.v": {
+      "expected": "69e3648bb5419a1e0e9f06721080deabdb286abc7c0fdae1b6f5c6515bf85c58",
+      "actual": "69e3648bb5419a1e0e9f06721080deabdb286abc7c0fdae1b6f5c6515bf85c58",
+      "match": true
+    },
+    "third_party/useralloc-speed-v5/kernel/memory/mmap/mmap_arm64.v": {
+      "expected": "ba522bfaff83fcf525ed52a34229c013af0ef1c7a27c099adc9089cd45714e4a",
+      "actual": "ba522bfaff83fcf525ed52a34229c013af0ef1c7a27c099adc9089cd45714e4a",
+      "match": true
+    },
+    "third_party/useralloc-speed-v5/kernel/memory/mmap/page_in.v": {
+      "expected": "1009d493f1998188f5a24c27e443e53f77506cd432e6241b0831bb785bc6ca8d",
+      "actual": "1009d493f1998188f5a24c27e443e53f77506cd432e6241b0831bb785bc6ca8d",
+      "match": true
+    },
+    "third_party/useralloc-speed-v5/kernel/memory/virtual_amd64.v": {
+      "expected": "718daf59003f9d992237fd41e26cea4de97600afaf874e24359118f6df70430a",
+      "actual": "718daf59003f9d992237fd41e26cea4de97600afaf874e24359118f6df70430a",
+      "match": true
+    },
+    "third_party/useralloc-speed-v5/kernel/pipe/pipe.v": {
+      "expected": "2cb2d4e677ca89a16cb85cfbae4b637df9405d1409ab4b479fa24c987f2da411",
+      "actual": "2cb2d4e677ca89a16cb85cfbae4b637df9405d1409ab4b479fa24c987f2da411",
+      "match": true
+    },
+    "third_party/useralloc-speed-v5/kernel/socket/socket.v": {
+      "expected": "c82e100d74c07f3fbd2ddd55a9b8ea54d963ddb7ce4ca2ce7d27d0d66f5881f0",
+      "actual": "c82e100d74c07f3fbd2ddd55a9b8ea54d963ddb7ce4ca2ce7d27d0d66f5881f0",
+      "match": true
+    },
+    "third_party/useralloc-speed-v5/kernel/socket/unix/unix.v": {
+      "expected": "24b8656b644f817bef99d21a19b6ac3b5b7fc424890eb4429f453a372ea4afb6",
+      "actual": "24b8656b644f817bef99d21a19b6ac3b5b7fc424890eb4429f453a372ea4afb6",
+      "match": true
+    },
+    "third_party/useralloc-speed-v5/kernel/time/sys/linux.v": {
+      "expected": "3cb9a6f155affa03a968604ef6de60aa263e38d30c67114d84a7607ce25967b2",
+      "actual": "3cb9a6f155affa03a968604ef6de60aa263e38d30c67114d84a7607ce25967b2",
+      "match": true
+    },
+    "third_party/useralloc-speed-v5/kernel/time/sys/syscalls.v": {
+      "expected": "847e11eef5747b1b63794e27a58321159c9ceead187895449ed710a561650f21",
+      "actual": "847e11eef5747b1b63794e27a58321159c9ceead187895449ed710a561650f21",
+      "match": true
+    },
+    "third_party/useralloc-speed-v5/kernel/time/time.v": {
+      "expected": "40767795f0d35378b010f9e74423d353f0b8194d130978a5e3bc0b961c20ffc3",
+      "actual": "40767795f0d35378b010f9e74423d353f0b8194d130978a5e3bc0b961c20ffc3",
+      "match": true
+    },
+    "third_party/useralloc-speed-v5/kernel/time/time_amd64.v": {
+      "expected": "58449cbb9eab4c201074f7563da7e2817fb5221a5beee61e57ba58f7512f5329",
+      "actual": "58449cbb9eab4c201074f7563da7e2817fb5221a5beee61e57ba58f7512f5329",
+      "match": true
+    },
+    "third_party/useralloc-speed-v5/kernel/time/time_arm64.v": {
+      "expected": "7cc360fd708b13fc67275455dc314d6d64db71769f2f094f5d92b14de0061be5",
+      "actual": "7cc360fd708b13fc67275455dc314d6d64db71769f2f094f5d92b14de0061be5",
+      "match": true
+    },
+    "tests/alloc-bench/compare.py": {
+      "expected": "e12ec5a8c90cab335c40e68257d596e0a2d0ba9f284b1e4bfe911fffa352dd06",
+      "actual": "e12ec5a8c90cab335c40e68257d596e0a2d0ba9f284b1e4bfe911fffa352dd06",
+      "match": true
+    },
+    "build/useralloc-final-audit/compiler/v": {
+      "expected": "80c39942a71a8323754159b37624b69fe9469ca90892e97ea721fa4d5ac86bf0",
+      "actual": "80c39942a71a8323754159b37624b69fe9469ca90892e97ea721fa4d5ac86bf0",
+      "match": true
+    },
+    "tests/alloc-bench/results/2026-10-03-userspace-v6/campaign-plan.json": {
+      "expected": "df9db0e94ba5b9bce3ac71fbdfed469642b5b0a6492c764a44fd69df5e9ba012",
+      "actual": "df9db0e94ba5b9bce3ac71fbdfed469642b5b0a6492c764a44fd69df5e9ba012",
+      "match": true
+    },
+    "tests/alloc-bench/run-vinix.py": {
+      "expected": "146a8318f8f2ad1daccf0409f96f88f492563a584fee896697ed2d58409ebb6c",
+      "actual": "146a8318f8f2ad1daccf0409f96f88f492563a584fee896697ed2d58409ebb6c",
+      "match": true
+    },
+    "build/useralloc-final-driver.py": {
+      "expected": "271a7215f36c5dfcacc133f0fae2e80f5a8bfd9d1445044f4105843eb53681e8",
+      "actual": "271a7215f36c5dfcacc133f0fae2e80f5a8bfd9d1445044f4105843eb53681e8",
+      "match": true
+    },
+    "build/useralloc-macos-final-driver.py": {
+      "expected": "d649c51d8f599d4d90c2852fc26892dcc5596d9d5f848f3199698ccd12ddfa48",
+      "actual": "d649c51d8f599d4d90c2852fc26892dcc5596d9d5f848f3199698ccd12ddfa48",
+      "match": true
+    },
+    "build/useralloc-macos-runtime/measure.py": {
+      "expected": "e321a5d856ff9f046b7ad287799c55199a64b04ea9309cbe0a4b8a33259effd1",
+      "actual": "e321a5d856ff9f046b7ad287799c55199a64b04ea9309cbe0a4b8a33259effd1",
+      "match": true
+    },
+    "tests/alloc-bench/results/2026-10-02/user-macos/config.json": {
+      "expected": "2207dc5b1c4d0782c94b813afd48b4a61a662147a1fc8c29f4a4ecaf8427ceb0",
+      "actual": "2207dc5b1c4d0782c94b813afd48b4a61a662147a1fc8c29f4a4ecaf8427ceb0",
+      "match": true
+    },
+    "build/useralloc-macos-runtime/argv.json": {
+      "expected": "97b1c18ba48f89eb594fe1a7508e6f952824f934a616ec303596cd7e1cea3c60",
+      "actual": "97b1c18ba48f89eb594fe1a7508e6f952824f934a616ec303596cd7e1cea3c60",
+      "match": true
+    },
+    "build/alloc-bench-macos/alloc-bench-native": {
+      "expected": "aed1e90c728e56b77cbff31c62277eb80762b9a0f54b02e815ce581913352b97",
+      "actual": "aed1e90c728e56b77cbff31c62277eb80762b9a0f54b02e815ce581913352b97",
+      "match": true
+    },
+    "build/alloc-bench-macos/bench-native.s": {
+      "expected": "ff4f96b50b88ea1482866c7fed1bbc0750d46e47c0f984466332615439136bdd",
+      "actual": "ff4f96b50b88ea1482866c7fed1bbc0750d46e47c0f984466332615439136bdd",
+      "match": true
+    }
+  },
+  "resident_pipeline_note": "Root reports the already-running pipeline loaded earlier two-value unpack; the on-disk pipeline now unpacks three. Any actual traceback remains evidence. The separate corrected validator is appropriate only after actual guest driver completion and exact raw43row equality; do not translate nonzero guest runner exit into PASS.",
+  "pending_note": "Desktop perf validation is absent at review time; raw transcript and completed results unavailable, so exact actual43rows are not claimed.",
+  "previous_findings": [
+    {
+      "severity": "moderate",
+      "path": "build/useralloc-v6-final-cohorts.py",
+      "issue": "Each new and resumed capture is accepted using compare.read_run plus iterations/samples checks. read_run validates serial completeness but leaves config matching to compare.comparability; source_sha256, compile_flags, common QEMU plan, kernel/libc identities and platform/compiler are not enforced by this coordinator.",
+      "recommendation": "Validate every new/resumed config against campaign-plan source/commonQEMU and exact compile flags, actual Vinix kernel/shared/static libc hashes, expected state paths; validate paired cohorts with compare.comparability before considering campaign complete."
+    },
+    {
+      "severity": "moderate",
+      "path": "build/useralloc-v6-final-cohorts.py",
+      "issue": "The frozen macOS measure script reads tests/alloc-bench/results/2026-10-02/user-macos/config.json and build/useralloc-macos-runtime/argv.json. Those dependency inputs are currently plan-compatible but absent from the guard set.",
+      "recommendation": "Add both existing JSON dependency hashes to frozen guards before timing; this changes verification glue only, not workloads or predeclared selection."
+    }
+  ],
+  "findings": [],
+  "validation_method": "AST extraction executes only validate_declared in memory against prior real V5 metadata/config; only Vinix libc hashes substituted. No synthetic data written as benchmark results.",
+  "validation_cases": [
+    {
+      "guest": "vinix",
+      "case": "valid prior V5 config with only v6 Vinix libc hash substitution",
+      "passed": true
+    },
+    {
+      "guest": "vinix",
+      "case": "reject mutated source",
+      "passed": true,
+      "reason": "Benchmark source mismatch vinix-1"
+    },
+    {
+      "guest": "vinix",
+      "case": "reject mutated flags",
+      "passed": true,
+      "reason": "Compiler flags mismatch vinix-1"
+    },
+    {
+      "guest": "vinix",
+      "case": "reject mutated commonconfig",
+      "passed": true,
+      "reason": "Declared QEMU mismatch vinix-1 memory_mb"
+    },
+    {
+      "guest": "vinix",
+      "case": "reject mutated actualargv",
+      "passed": true,
+      "reason": "Actual QEMU arguments mismatch vinix-1 -m"
+    },
+    {
+      "guest": "vinix",
+      "case": "reject mutated duplicateargv",
+      "passed": true,
+      "reason": "Actual QEMU arguments mismatch vinix-1 -m"
+    },
+    {
+      "guest": "vinix",
+      "case": "reject mutated compiler",
+      "passed": true,
+      "reason": "Guest metadata mismatch vinix-1 compiler_minor"
+    },
+    {
+      "guest": "vinix",
+      "case": "reject mutated guestrelease",
+      "passed": true,
+      "reason": "Guest metadata mismatch vinix-1 release"
+    },
+    {
+      "guest": "vinix",
+      "case": "reject mutated count",
+      "passed": true,
+      "reason": "Guest metadata mismatch vinix-1 iterations"
+    },
+    {
+      "guest": "vinix",
+      "case": "reject mutated kernel",
+      "passed": true,
+      "reason": "Executed Vinix artifact mismatch kernel_sha256"
+    },
+    {
+      "guest": "vinix",
+      "case": "reject mutated sharedlibc",
+      "passed": true,
+      "reason": "Executed Vinix artifact mismatch libc_sha256"
+    },
+    {
+      "guest": "vinix",
+      "case": "reject mutated staticlibc",
+      "passed": true,
+      "reason": "Executed Vinix artifact mismatch libc_a_sha256"
+    },
+    {
+      "guest": "catalina",
+      "case": "valid prior V5 config with only v6 Vinix libc hash substitution",
+      "passed": true
+    },
+    {
+      "guest": "catalina",
+      "case": "reject mutated source",
+      "passed": true,
+      "reason": "Benchmark source mismatch catalina-1"
+    },
+    {
+      "guest": "catalina",
+      "case": "reject mutated flags",
+      "passed": true,
+      "reason": "Compiler flags mismatch catalina-1"
+    },
+    {
+      "guest": "catalina",
+      "case": "reject mutated commonconfig",
+      "passed": true,
+      "reason": "Declared QEMU mismatch catalina-1 memory_mb"
+    },
+    {
+      "guest": "catalina",
+      "case": "reject mutated actualargv",
+      "passed": true,
+      "reason": "Actual QEMU arguments mismatch catalina-1 -m"
+    },
+    {
+      "guest": "catalina",
+      "case": "reject mutated duplicateargv",
+      "passed": true,
+      "reason": "Actual QEMU arguments mismatch catalina-1 -m"
+    },
+    {
+      "guest": "catalina",
+      "case": "reject mutated compiler",
+      "passed": true,
+      "reason": "Guest metadata mismatch catalina-1 compiler_minor"
+    },
+    {
+      "guest": "catalina",
+      "case": "reject mutated guestrelease",
+      "passed": true,
+      "reason": "Guest metadata mismatch catalina-1 release"
+    },
+    {
+      "guest": "catalina",
+      "case": "reject mutated count",
+      "passed": true,
+      "reason": "Guest metadata mismatch catalina-1 iterations"
+    },
+    {
+      "guest": "catalina",
+      "case": "reject mutated assembly",
+      "passed": true,
+      "reason": "Executed Catalina artifact mismatch assembly_sha256"
+    },
+    {
+      "guest": "catalina",
+      "case": "reject mutated binary",
+      "passed": true,
+      "reason": "Executed Catalina artifact mismatch binary_sha256"
+    }
+  ],
+  "resolved_findings": "Root added per-capture source/flags/declared and actual QEMU args, guest/compiler and artifact identity checks; all four pairedcomparability plus four Mac dependency guards.",
+  "remaining_scope": "Desktop perf actual43rows not yet available; corrected separate validator schema reviewed. No new VM/build/commit/sourcechange."
+}
