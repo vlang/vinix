@@ -1218,7 +1218,9 @@ pub fn process_stat_line(pid int, viewer &Namespace) string {
 	shown_ppid := pid_in(process_at(process.ppid), viewer)
 	shown_pgid := pgid_in(process, viewer)
 	shown_sid := sid_in(process, viewer)
-	mut text := lib.new_text(256)
+	// Borrowed synchronously by formatting helpers; the owned bytes are consumed below.
+	mut text := unsafe { &lib.Text(C.__builtin_alloca(sizeof(lib.Text))) }
+	unsafe { *text = lib.new_text(256) }
 	text.add_decimal(shown_pid)
 	text.add(' (')
 	add_command_name(mut text, process.name)
@@ -1252,7 +1254,7 @@ pub fn process_stat_line(pid int, viewer &Namespace) string {
 	text.add_byte(` `)
 	text.add_decimal(params.policy)
 	text.add_byte(`\n`)
-	return text.str()
+	return lib.finish_text(*text)
 }
 
 // The scheduling parameters of a thread that may not be there. Called with the
@@ -1277,7 +1279,9 @@ pub fn process_status_text(pid int, viewer &Namespace) string {
 	state := if process.exiting { 'Z (zombie)' } else { 'R (running)' }
 	shown_pid := pid_in(process, viewer)
 	shown_ppid := pid_in(process_at(process.ppid), viewer)
-	mut text := lib.new_text(512)
+	// Borrowed synchronously by formatting helpers; the owned bytes are consumed below.
+	mut text := unsafe { &lib.Text(C.__builtin_alloca(sizeof(lib.Text))) }
+	unsafe { *text = lib.new_text(512) }
 	text.add('Name:\t')
 	add_command_name(mut text, process.name)
 	text.add('\nUmask:\t0')
@@ -1323,6 +1327,6 @@ pub fn process_status_text(pid int, viewer &Namespace) string {
 	text.add('\nSeccomp_filters:\t')
 	text.add_decimal(seccomp_filter_count(process))
 	text.add_byte(`\n`)
-	return text.str()
+	return lib.finish_text(*text)
 }
 

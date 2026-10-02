@@ -560,17 +560,17 @@ fn (this &ProcFSResource) contents() string {
 		.uptime {
 			seconds := time.monotonic_ns() / 1000000000
 			hundredths := (time.monotonic_ns() / 10000000) % 100
-			mut text := lib.new_text(48)
+			mut uptime_builder := lib.new_text(48)
 			for i in 0 .. 2 {
 				if i > 0 {
-					text.add_byte(` `)
+					uptime_builder.add_byte(` `)
 				}
-				text.add_unsigned(seconds)
-				text.add_byte(`.`)
-				text.add_radix(hundredths, 10, 2)
+				uptime_builder.add_unsigned(seconds)
+				uptime_builder.add_byte(`.`)
+				uptime_builder.add_radix(hundredths, 10, 2)
 			}
-			text.add_byte(`\n`)
-			return text.str()
+			uptime_builder.add_byte(`\n`)
+			return lib.finish_text(uptime_builder)
 		}
 		.version {
 			// Freed by read(), as every generated text is.
@@ -698,7 +698,9 @@ fn text_with_ending(owned string, ending u8) string {
 
 fn machine_stat_text() string {
 	count := numa.cpu_count()
-	mut text := lib.new_text(count * 32 + 160)
+	// Borrowed synchronously by formatting helpers; the owned bytes are consumed below.
+	mut text := unsafe { &lib.Text(C.__builtin_alloca(sizeof(lib.Text))) }
+	unsafe { *text = lib.new_text(count * 32 + 160) }
 	text.add('cpu  0 0 0 0 0 0 0 0 0 0\n')
 	for i := 0; i < count; i++ {
 		text.add('cpu')
@@ -712,7 +714,7 @@ fn machine_stat_text() string {
 	text.add('\nprocesses ')
 	text.add_decimal(i64(proc.process_count()))
 	text.add('\nprocs_running 1\nprocs_blocked 0\n')
-	return text.str()
+	return lib.finish_text(*text)
 }
 
 // The files that say where a process keeps things; see proc.may_inspect.
@@ -1033,7 +1035,9 @@ fn maps_text(pid int, detailed bool) string {
 		exe_dev = exe_node.resource.stat.dev
 		exe_ino = exe_node.resource.stat.ino
 	}
-	mut text := lib.new_text(list.len * if detailed { 900 } else { 100 })
+	// Borrowed synchronously by formatting helpers; the owned bytes are consumed below.
+	mut text := unsafe { &lib.Text(C.__builtin_alloca(sizeof(lib.Text))) }
+	unsafe { *text = lib.new_text(list.len * if detailed { 900 } else { 100 }) }
 	for info in list {
 		line_start := text.len()
 		text.add_radix(info.base, 16, 8)
@@ -1069,7 +1073,7 @@ fn maps_text(pid int, detailed bool) string {
 			add_smaps_details(mut text, info)
 		}
 	}
-	return text.str()
+	return lib.finish_text(*text)
 }
 
 // What names a mapping, as a string of its own: the file it maps, or what
@@ -1182,14 +1186,16 @@ pub fn procfs_dynamic_link_target(node &VFSNode) string {
 	}
 	// Made on every walk through the link, so without the string an
 	// interpolated number leaves behind; the caller frees it.
-	mut text := lib.new_text(40)
+	// Borrowed synchronously by formatting helpers; the owned bytes are consumed below.
+	mut text := unsafe { &lib.Text(C.__builtin_alloca(sizeof(lib.Text))) }
+	unsafe { *text = lib.new_text(40) }
 	text.add('/proc/')
 	text.add_decimal(i64(pid))
 	if link.kind == .thread_self_link {
 		text.add('/task/')
 		text.add_decimal(i64(proc.tid_in(current, view)))
 	}
-	return text.str()
+	return lib.finish_text(*text)
 }
 
 // Kept for callers that only need /proc/self.

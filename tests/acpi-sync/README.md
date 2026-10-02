@@ -25,6 +25,11 @@ architecture. Specify the same V binary for the generator and `VEXE`; the runner
 sets both, forces the objects affected by optional test defines to rebuild,
 saves the build log, and boots the existing isolated QEMU harness:
 
+The runner also removes the generated C dependency file when removing that C
+file; otherwise an incremental build can stop on its stale prerequisite before
+regenerating the kernel. Combined ARM64 and x86 callbacks and userspace boot
+pass after this correction.
+
 ```sh
 python3 tests/acpi-sync/run.py \
   --kernel-dir /path/to/arm-worktree/kernel --arch aarch64 \

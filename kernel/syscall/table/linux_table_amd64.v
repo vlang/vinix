@@ -195,9 +195,11 @@ fn syscall_linux_getdents(gpr_state voidptr, fdnum int, dirp u64, count u64) (u6
 // the same length holds either. An entry that does not fit is left for the
 // next call, and EINVAL is the answer when it is the first, as on Linux.
 fn linux_getdents(gpr_state voidptr, fdnum int, dirp u64, count u64, legacy bool) (u64, u64) {
+	// One synchronous scratch record per syscall, independent of directory size.
+	mut dirent := unsafe { &stat.Dirent(C.__builtin_alloca(sizeof(stat.Dirent))) }
 	mut offset := u64(0)
 	for {
-		mut dirent := stat.Dirent{}
+		unsafe { *dirent = stat.Dirent{} }
 		ret, err := fs.syscall_readdir(gpr_state, fdnum, mut dirent)
 		if err != 0 {
 			return if offset != 0 { offset, u64(0) } else { ret, err }

@@ -32,7 +32,7 @@ def main():
     state.mkdir(parents=True, exist_ok=True)
     # Arbitrary V/C test defines are not included in the repository's normal
     # object stamp. Rebuild their affected objects when switching test mode.
-    for file in ("obj/blob.c", "obj/blob.c.o", "obj/c/acpi_sync_test.c.o"):
+    for file in ("obj/blob.c", "obj/blob.c.o", "obj/blob.c.d", "obj/c/acpi_sync_test.c.o"):
         (kernel / file).unlink(missing_ok=True)
     env = os.environ.copy()
     env["VEXE"] = str(compiler)

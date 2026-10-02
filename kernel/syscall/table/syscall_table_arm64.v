@@ -242,12 +242,11 @@ fn syscall_linux_mmap(gpr_state voidptr, addr voidptr, length u64, prot u64, fla
 // Linux getdents64(fd, dirp, count) — fill buffer with directory entries.
 // Vinix readdir returns one entry at a time; we loop to fill the buffer.
 fn syscall_linux_getdents64(gpr_state voidptr, fdnum int, dirp u64, count u64) (u64, u64) {
+	// One synchronous scratch record per syscall, independent of directory size.
+	mut dirent := unsafe { &stat.Dirent(C.__builtin_alloca(sizeof(stat.Dirent))) }
 	mut offset := u64(0)
-	for offset + 19 < count { // minimum dirent64 size: 19 bytes + 1 name char
-		// Passed as `mut`, not `mut &`: V heap-allocates a local whose address
-		// is taken for a call with multiple results, and nothing frees it.
-		// That was a kilobyte for every entry read.
-		mut dirent := stat.Dirent{}
+	for {
+		unsafe { *dirent = stat.Dirent{} }
 		ret, err := fs.syscall_readdir(gpr_state, fdnum, mut dirent)
 		if err != 0 {
 			if offset > 0 {
@@ -270,6 +269,7 @@ fn syscall_linux_getdents64(gpr_state voidptr, fdnum int, dirp u64, count u64) (
 			// syscall_readdir() advances the shared directory position. Leave
 			// this entry for the next getdents64 call instead of losing it.
 			fs.readdir_unread(fdnum)
+			if offset == 0 { return errno.err, errno.einval }
 			break
 		}
 		// Build the entry in a kernel buffer and copy it out, so a bad `dirp`
