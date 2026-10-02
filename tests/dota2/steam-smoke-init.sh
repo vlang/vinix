@@ -34,10 +34,16 @@ if [ "$(cat /etc/steam-smoke-pin-nm)" = 1 ]; then
 fi
 export VINIX_X86_64_PRELOAD="$preloads"
 mode=$(cat /etc/steam-smoke-mode)
+if [ "$(cat /etc/steam-smoke-load-tier0)" = 1 ]; then
+    set -- /usr/libexec/vinix-dota2/smoke/game-bin/libtier0.so
+else
+    set --
+fi
+debug=$(cat /etc/steam-smoke-ld-debug)
 status=0
 /usr/bin/qemu-x86_64 -B 0x100000000 -L "$runtime" \
-    -E "LD_LIBRARY_PATH=$libraries" -E "LD_PRELOAD=$preloads" \
-    /usr/bin/steam-smoke /usr/libexec/vinix-dota2/smoke/libsteam_api.so "$mode" || status=$?
+    -E "LD_LIBRARY_PATH=$libraries" -E "LD_PRELOAD=$preloads" -E "LD_DEBUG=$debug" \
+    /usr/bin/steam-smoke /usr/libexec/vinix-dota2/smoke/libsteam_api.so "$mode" "$@" || status=$?
 echo "VINIX-DOTA2-STEAM-SMOKE-EXIT: $status"
 echo VINIX-DOTA2-STEAM-SMOKE-END
 while :; do sleep 60; done

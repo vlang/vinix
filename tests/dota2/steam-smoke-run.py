@@ -37,9 +37,15 @@ def main() -> None:
                         help="Use the game's shared libraries first and the launcher's soft limits")
     parser.add_argument("--pin-network-manager", action="store_true",
                         help="Retain the real libnm while testing client unload and reload")
+    parser.add_argument("--load-tier0", action="store_true",
+                        help="Load actual game tier0 globally before Steam API; implies game library priority")
+    parser.add_argument("--ld-debug-bindings", action="store_true",
+                        help="Record the guest glibc loader's actual symbol bindings")
     parser.add_argument("--strace", action="store_true")
     parser.add_argument("--timeout", type=int, default=600)
     args = parser.parse_args()
+    if args.load_tier0:
+        args.game_library_priority = True
     work = args.work.resolve()
     work.mkdir(parents=True, exist_ok=True)
     root = work / "root"
@@ -88,6 +94,8 @@ def main() -> None:
     (root / "etc/steam-smoke-mode").write_text(args.mode + "\n")
     (root / "etc/steam-smoke-game-priority").write_text("1\n" if args.game_library_priority else "0\n")
     (root / "etc/steam-smoke-pin-nm").write_text("1\n" if args.pin_network_manager else "0\n")
+    (root / "etc/steam-smoke-load-tier0").write_text("1\n" if args.load_tier0 else "0\n")
+    (root / "etc/steam-smoke-ld-debug").write_text("bindings\n" if args.ld_debug_bindings else "\n")
     (root / "etc/steam-smoke-strace").write_text("1\n" if args.strace else "0\n")
     archive = work / "initramfs.tar.gz"
     with tarfile.open(archive, "w:gz", compresslevel=1, format=tarfile.USTAR_FORMAT) as tar:
@@ -151,12 +159,16 @@ def main() -> None:
     result = {"mode": args.mode,
               "game_library_priority": args.game_library_priority,
               "pin_network_manager": args.pin_network_manager,
+              "load_tier0": args.load_tier0,
+              "ld_debug_bindings": args.ld_debug_bindings,
               "passed": expected in transcript and b"VINIX-DOTA2-STEAM-SMOKE-EXIT: 0" in transcript,
               "api_returned": b"VINIX-DOTA2-STEAM-SMOKE-RETURN:" in transcript,
               "completed": b"VINIX-DOTA2-STEAM-SMOKE-END" in transcript,
               "kernel_sha256": hashlib.sha256(kernel.read_bytes()).hexdigest(),
               "translator_sha256": hashlib.sha256((root / "usr/bin/qemu-x86_64").read_bytes()).hexdigest(),
               "steam_api_sha256": hashlib.sha256(args.library.read_bytes()).hexdigest(),
+              "tier0_sha256": hashlib.sha256((game_bin / "libtier0.so").read_bytes()).hexdigest()
+                  if args.load_tier0 else None,
               "steamclient_sha256": hashlib.sha256((root / "home/dota2/.steam/sdk64/steamclient.so").read_bytes()).hexdigest(),
               "log": str(work / "vinix.log")}
     (work / "results.json").write_text(json.dumps(result, indent=2) + "\n")
