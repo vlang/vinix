@@ -59,7 +59,7 @@ __global (
 )
 
 fn monotonic_ns() u64 {
-	now := monotonic_clock
+	now := time.clock_now(time.clock_type_monotonic) or { time.TimeSpec{} }
 	return u64(now.tv_sec) * 1000000000 + u64(now.tv_nsec)
 }
 
@@ -360,12 +360,20 @@ pub fn syscall_timerfd_settime(_ voidptr, fdnum int, flags int, new_value u64, o
 	if flags & tfd_timer_abstime != 0 {
 		// An absolute deadline is on the timer's own clock. Both clocks advance
 		// together here, so the monotonic reading is the one to keep.
-		now_wall := if timer.clock_id == 0 { timespec_to_ns(realtime_clock) } else { monotonic_ns() }
+		// Read realtime first so conversion skew can only delay an expiry.
+		wall_now := if timer.clock_id == 0 {
+			wall_clock := time.clock_now(time.clock_type_realtime) or { time.TimeSpec{} }
+			timespec_to_ns(wall_clock)
+		} else {
+			u64(0)
+		}
+		now_monotonic := monotonic_ns()
+		now_wall := if timer.clock_id == 0 { wall_now } else { now_monotonic }
 		if wanted <= now_wall {
 			// Already past: it fires on the next tick.
-			timer.deadline_ns = monotonic_ns()
+			timer.deadline_ns = now_monotonic
 		} else {
-			timer.deadline_ns = monotonic_ns() + (wanted - now_wall)
+			timer.deadline_ns = now_monotonic + (wanted - now_wall)
 		}
 	} else {
 		timer.deadline_ns = monotonic_ns() + wanted

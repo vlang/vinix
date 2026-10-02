@@ -54,7 +54,7 @@ pub fn syscall_nanosleep(_ voidptr, request u64, remain u64) (u64, u64) {
 		return errno.err, errno.einval
 	}
 
-	started := monotonic_clock
+	started := time.clock_now(time.clock_type_monotonic) or { time.TimeSpec{} }
 
 	mut events := []&eventstruct.Event{}
 	defer {
@@ -75,7 +75,7 @@ pub fn syscall_nanosleep(_ voidptr, request u64, remain u64) (u64, u64) {
 			// the time actually spent asleep, not the absolute monotonic clock.
 			// Returning the latter makes libc's ordinary EINTR retry sleep until
 			// approximately the Unix epoch measured from now.
-			mut elapsed := monotonic_clock
+			mut elapsed := time.clock_now(time.clock_type_monotonic) or { time.TimeSpec{} }
 			elapsed.sub(started)
 
 			mut left := duration

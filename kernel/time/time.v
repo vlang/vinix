@@ -2,7 +2,6 @@
 module time
 
 import event.eventstruct
-import katomic
 import klock
 
 pub const timer_frequency = u64(1000)
@@ -64,28 +63,15 @@ __global (
 // Return a stable snapshot of a clock for interfaces, such as absolute futex
 // deadlines, that need to translate a point in time into a timer duration.
 pub fn clock_now(clock_id int) ?TimeSpec {
-	$if aarch64 {
-		return precise_clock_now(clock_id)
-	}
-	match clock_id {
-		clock_type_realtime {
-			return realtime_clock
-		}
-		clock_type_monotonic {
-			return monotonic_clock
-		}
-		else {
-			return none
-		}
-	}
+	return precise_clock_now(clock_id)
 }
 
 fn C.event__trigger(mut event eventstruct.Event, drop bool) u64
 
-// timer_handler is the fixed frequency case: a tick source that really does
-// interrupt at `timer_frequency` can just say so.
+// A periodic interrupt samples the counter rather than counting deliveries:
+// hardware can merge multiple ticks while interrupts are disabled.
 pub fn timer_handler() {
-	advance_clocks(TimeSpec{0, i64(1000000000 / timer_frequency)})
+	advance_to_ns(counter_now_ns())
 }
 
 // advance_to_ns moves the clocks forward to a reading of a free running
@@ -103,14 +89,20 @@ pub fn advance_to_ns(now_ns u64) {
 		return
 	}
 	last := clock_last_ns
-	clock_last_ns = now_ns
-	clock_tick_lock.release()
-
-	if last == 0 || now_ns <= last {
+	if now_ns <= last {
+		clock_tick_lock.release()
 		return
 	}
+	clock_last_ns = now_ns
 	delta := now_ns - last
-	advance_clocks(TimeSpec{i64(delta / 1000000000), i64(delta % 1000000000)})
+	interval := TimeSpec{i64(delta / 1000000000), i64(delta % 1000000000)}
+	monotonic_clock.add(interval)
+	realtime_clock.add(interval)
+	clock_tick_lock.release()
+
+	// Events and hooks may take scheduler locks. Keep them outside the clock
+	// update lock; timers compare absolute deadlines if another tick wins.
+	expire_timers()
 }
 
 // Anything that has to look at the clock every tick registers here. The
@@ -139,40 +131,18 @@ pub fn register_tick_hook(hook fn ()) bool {
 	return true
 }
 
-// Time that has passed but has not been taken off the armed timers yet,
-// because the CPU it passed on found another one already walking them. It is
-// added to the next interval that does get through, so a timer counts down by
-// every nanosecond that has elapsed rather than only by the ones nobody
-// collided over -- otherwise a sleep runs long by however much tick time was
-// dropped, and it runs longer the more CPUs there are to collide.
-__global (
-	timers_unapplied_ns = u64(0)
-)
-
-// advance_clocks moves both clocks forward by `interval` and expires every
-// armed timer that interval covers.
-pub fn advance_clocks(interval TimeSpec) {
-	monotonic_clock.add(interval)
-	realtime_clock.add(interval)
-
+// Counter deadlines include every interval even when a tick loses this lock.
+fn expire_timers() {
 	if timers_lock.test_and_acquire() == true {
-		mut applied := interval
-		carried := katomic.load(&timers_unapplied_ns)
-		if carried > 0 && katomic.cas(mut &timers_unapplied_ns, carried, u64(0)) {
-			applied.add(TimeSpec{i64(carried / 1000000000), i64(carried % 1000000000)})
-		}
-
+		// One counter read covers this pass. A newly armed timer cannot enter
+		// the list until this lock is released.
+		now_ns := counter_now_ns()
 		for i := 0; i < armed_timers.len; i++ {
 			mut timer := armed_timers[i]
 			if timer.fired == true {
 				continue
 			}
-			mut expired := false
-			$if aarch64 {
-				expired = counter_timer_expired(timer.deadline_ns)
-			} $else {
-				expired = timer.when.sub(applied)
-			}
+			expired := now_ns >= timer.deadline_ns
 			if expired {
 				C.event__trigger(mut &timer.event, false)
 				timer.fired = true
@@ -180,14 +150,6 @@ pub fn advance_clocks(interval TimeSpec) {
 		}
 
 		timers_lock.release()
-	} else {
-		missed := u64(interval.tv_sec) * 1000000000 + u64(interval.tv_nsec)
-		for {
-			carried := katomic.load(&timers_unapplied_ns)
-			if katomic.cas(mut &timers_unapplied_ns, carried, carried + missed) {
-				break
-			}
-		}
 	}
 
 	count := tick_hooks_len
@@ -202,7 +164,7 @@ pub mut:
 	event eventstruct.Event
 	index int
 	fired bool
-	// ARM64 timers expire against the counter, so a tick cannot charge them
+	// Timers expire against the counter, so a tick cannot charge them
 	// for time that passed before they were armed.
 	deadline_ns u64
 }
@@ -235,9 +197,7 @@ pub fn (mut this Timer) arm() {
 	timers_lock.acquire()
 
 	this.fired = false
-	$if aarch64 {
-		this.deadline_ns = counter_timer_deadline(this.when)
-	}
+	this.deadline_ns = counter_timer_deadline(this.when)
 	this.index = armed_timers.len
 	armed_timers << this
 

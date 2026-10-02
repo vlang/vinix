@@ -22,3 +22,10 @@ parents gives a conservative 12 MiB ordinary backing bound on 16 KiB ARM
 pages, or less than 16 MiB including the direct cache. The 12 MiB test limit
 is for the observed finite workload, rather than this maximum envelope. Run this test with both
 `VINIX_MUSL_RETAIN=1` and `=0` versions of the same libc recipe.
+
+`clock.c` checks the precise clock against the architectural counter during
+sleep and a syscall-heavy interval. It also checks coarse snapshots, absolute
+monotonic and realtime timerfds, absolute sleep, and absolute futex timeout.
+Compile with `gcc -std=c11 -O2 -Wall -Wextra -Werror -fno-builtin clock.c -o clock`
+and run in the guest; a pass prints `CLOCK-DONE`. This test requires the
+corrected counter-based clock before allocation timings are meaningful.

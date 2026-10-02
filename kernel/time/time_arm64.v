@@ -49,6 +49,10 @@ pub fn clock_resolution_ns() u64 {
 	return timer.resolution_ns()
 }
 
+fn counter_now_ns() u64 {
+	return timer.get_ns()
+}
+
 fn counter_timer_deadline(duration TimeSpec) u64 {
 	now := timer.get_ns()
 	if duration.tv_sec < 0 || duration.tv_nsec < 0 {
@@ -66,8 +70,4 @@ fn counter_timer_deadline(duration TimeSpec) u64 {
 		return ~u64(0)
 	}
 	return now + whole + u64(duration.tv_nsec)
-}
-
-fn counter_timer_expired(deadline u64) bool {
-	return timer.get_ns() >= deadline
 }

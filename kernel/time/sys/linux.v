@@ -124,7 +124,7 @@ pub fn syscall_gettimeofday(_ voidptr, tv u64, tz u64) (u64, u64) {
 	return 0, 0
 }
 
-// Precise wall clocks use the architectural counter on ARM64. Coarse clocks
+// Precise wall clocks use a free-running counter. Coarse clocks
 // and CPU accounting are still sampled by the timer tick.
 pub fn syscall_clock_getres(_ voidptr, clock_id int, res u64) (u64, u64) {
 	read_clock(clock_id) or { return errno.err, errno.get() }
@@ -179,7 +179,7 @@ pub fn syscall_clock_nanosleep(_ voidptr, clock_id int, flags int, request u64, 
 		return 0, 0
 	}
 
-	started := monotonic_clock
+	started := time.clock_now(time.clock_type_monotonic) or { time.TimeSpec{} }
 
 	mut events := []&eventstruct.Event{}
 	defer {
@@ -198,7 +198,7 @@ pub fn syscall_clock_nanosleep(_ voidptr, clock_id int, flags int, request u64, 
 		// the deadline and can simply ask again. A relative one gets what is
 		// left, worked out from how long it actually waited.
 		if flags & timer_abstime == 0 && remain != 0 {
-			mut elapsed := monotonic_clock
+			mut elapsed := time.clock_now(time.clock_type_monotonic) or { time.TimeSpec{} }
 			elapsed.sub(started)
 
 			mut left := duration
