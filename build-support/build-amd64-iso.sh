@@ -24,6 +24,18 @@ case "$BUILD_DIR" in
         exit 1
         ;;
 esac
+mkdir -p "$BUILD_DIR"
+ISO_STAGING_DIR="$(mktemp -d "$BUILD_DIR/.iso-staging.XXXXXX")"
+ISO_ROOT="$ISO_STAGING_DIR/iso-root"
+IMAGE_ID_DIR="$ISO_STAGING_DIR/image-id"
+OUTPUT_ISO_TMP=""
+cleanup() {
+    rm -rf "$ISO_STAGING_DIR"
+    if [ -n "$OUTPUT_ISO_TMP" ]; then
+        rm -f "$OUTPUT_ISO_TMP"
+    fi
+}
+trap cleanup EXIT
 
 for command_name in cc curl xorriso; do
     command -v "$command_name" >/dev/null 2>&1 || {
@@ -78,8 +90,6 @@ if [ ! -x "$LIMINE_TOOL" ] || [ "$LIMINE_TOOL" -ot "$BUILD_DIR/limine/limine.c" 
     cc -O2 -std=c99 -o "$LIMINE_TOOL" "$BUILD_DIR/limine/limine.c"
 fi
 
-ISO_ROOT="$BUILD_DIR/iso-root"
-rm -rf "$ISO_ROOT"
 mkdir -p "$ISO_ROOT/boot" "$ISO_ROOT/EFI/BOOT"
 install -m644 "$KERNEL" "$ISO_ROOT/boot/vinix"
 install -m644 "$INITRAMFS" "$ISO_ROOT/boot/initramfs.tar"
@@ -91,8 +101,6 @@ printf '    cmdline: vinix.disk=auto%s\n' "${VINIX_CMDLINE:+ $VINIX_CMDLINE}" >>
 # The image's identity, which a system installed from it keeps in
 # /.vinix-image-id: an ISO with a different image updates that system. Taken
 # from the image's contents, so an unchanged image rebuilt is no update.
-IMAGE_ID_DIR="$BUILD_DIR/image-id"
-rm -rf "$IMAGE_ID_DIR"
 mkdir -p "$IMAGE_ID_DIR"
 sha256_file "$INITRAMFS" | cut -c1-16 > "$IMAGE_ID_DIR/.vinix-image-id"
 COPYFILE_DISABLE=1 tar --format=ustar -rf "$ISO_ROOT/boot/initramfs.tar" \
@@ -107,7 +115,6 @@ install -m644 "$BUILD_DIR/limine/BOOTX64.EFI" "$ISO_ROOT/EFI/BOOT/BOOTX64.EFI"
 
 mkdir -p "$(dirname "$OUTPUT_ISO")"
 OUTPUT_ISO_TMP="$(mktemp "$(dirname "$OUTPUT_ISO")/.vinix-amd64.iso.XXXXXX")"
-trap 'rm -f "$OUTPUT_ISO_TMP"' EXIT
 echo "==> Assembling $OUTPUT_ISO..."
 # ISO level 3 lets the initramfs grow past 4 GiB.
 xorriso -as mkisofs -iso-level 3 -R -r -J \
@@ -118,5 +125,4 @@ xorriso -as mkisofs -iso-level 3 -R -r -J \
     "$ISO_ROOT" -o "$OUTPUT_ISO_TMP"
 "$LIMINE_TOOL" bios-install "$OUTPUT_ISO_TMP"
 mv -f "$OUTPUT_ISO_TMP" "$OUTPUT_ISO"
-trap - EXIT
 echo "    $OUTPUT_ISO ($(wc -c < "$OUTPUT_ISO" | tr -d ' ') bytes)"

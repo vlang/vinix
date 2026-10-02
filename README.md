@@ -148,6 +148,28 @@ the guest image:
 VINIX_ALPINE_DEVTOOLS=1 make all
 ```
 
+Distro builds, aggregate image builds, desktop runs and performance tests
+automatically remove experimental initramfs archives and benchmark ISOs in
+`build/` after seven days. The normal desktop caches,
+current image overrides and archives open in another process are preserved;
+download caches, staging trees and persistent VM disks are kept. ISO assembly
+removes its staging copy after use, and performance tests keep logs while
+removing their temporary VM disks.
+
+Preview or run the same cleanup explicitly:
+
+```sh
+make prune-build-dry-run
+make prune-build
+```
+
+Set `VINIX_PRUNE_BUILD=0` to disable automatic cleanup. To keep an experimental
+archive, create a marker beside it, such as
+`touch build/minecraft-desktop-initramfs.tar.keep`. Reuse a fixed
+`VINIX_DESKTOP_INITRAMFS` filename for repeated builds. For guest-only changes,
+`VINIX_QEMU_OVERLAY=/path/to/overlay ./run-desktop-aarch64.sh --no-build`
+adds a small overlay without copying the whole image.
+
 ### Zsh and Oh My Zsh
 
 Both Alpine userland images include Zsh and a pinned, local Oh My Zsh

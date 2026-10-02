@@ -136,6 +136,8 @@ if [ "$DISK_ROOT_DESKTOP" -eq 1 ] && [ "$PERSIST_DESKTOP" -eq 0 ]; then
     exit 1
 fi
 
+python3 "$SCRIPT_DIR/tools/prune-build-artifacts.py" --root "$SCRIPT_DIR" --automatic
+
 # Keep the chosen compiler in the environment so build-desktop-aarch64.sh
 # resolves the same compiler after this runner invokes it.
 if [ "$BUILD_KERNEL" -eq 1 ] || [ "$BUILD_DESKTOP" -eq 1 ]; then

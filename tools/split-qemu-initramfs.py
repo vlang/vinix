@@ -9,6 +9,7 @@ import fcntl
 import json
 import os
 from pathlib import Path
+import re
 import tarfile
 import tempfile
 
@@ -98,15 +99,25 @@ def main() -> None:
             print(f"==> Splitting {source.name} into uncompressed FAT32 modules...", file=os.sys.stderr)
             with tempfile.TemporaryDirectory(prefix=".parts.", dir=directory) as temporary:
                 staged = split(source, Path(temporary), args.max_bytes)
-                for part in staged:
-                    os.replace(part, directory / part.name)
                 new_manifest = Path(temporary) / "manifest.json"
                 new_manifest.write_text(
                     json.dumps({"identity": expected, "parts": [part.name for part in staged]}) + "\n",
                     encoding="utf-8",
                 )
+                for part in staged:
+                    os.replace(part, directory / part.name)
                 os.replace(new_manifest, manifest)
                 parts = [directory / part.name for part in staged]
+                # Only discard old modules once the replacement cache is published.
+                # Unlinking a symlink removes the link itself, never its target.
+                current_names = {part.name for part in parts}
+                for obsolete in directory.iterdir():
+                    if (
+                        obsolete.name not in current_names
+                        and re.fullmatch(r"part-[0-9]{3,}\.tar", obsolete.name)
+                        and (obsolete.is_file() or obsolete.is_symlink())
+                    ):
+                        obsolete.unlink()
         for part in parts:
             print(part)
 

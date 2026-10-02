@@ -219,12 +219,18 @@ class MainTests(unittest.TestCase):
             if closed:
                 console.closed.set()
             console.transcript = bytearray(("\n".join(transcript) + "\n").encode())
+
+            def start_guest():
+                for name in ("boot.img", "root.ext2", "efivars.fd", "packages.tar"):
+                    (work / "vm" / name).write_bytes(b"temporary VM image")
+                return 1234, 99
+
             with mock.patch.object(runner.sys, "argv", ["run.py", f"new={binary}", "--rounds=1",
                                                         "--scenarios=ops", "--json", str(output), "--timeout=1"]), \
                     mock.patch.object(runner.tempfile, "mkdtemp", return_value=str(work)), \
                     mock.patch.object(runner, "compile_measure"), \
                     mock.patch.object(runner.subprocess, "run"), \
-                    mock.patch.object(runner.pty, "fork", return_value=(1234, 99)), \
+                    mock.patch.object(runner.pty, "fork", side_effect=start_guest), \
                     mock.patch.object(runner, "Console", return_value=console), \
                     mock.patch.object(runner, "stop_child", return_value=exit_code), \
                     mock.patch.object(runner.os, "close"), \
@@ -232,6 +238,7 @@ class MainTests(unittest.TestCase):
                                       return_value=0), \
                     contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
                 result = runner.main()
+            self.assertFalse((work / "vm").exists())
             return result, json.loads(output.read_text()), (work / "serial.log").read_bytes()
 
     def test_main_drains_done_already_queued_at_eof(self):
@@ -259,6 +266,33 @@ class MainTests(unittest.TestCase):
         self.assertEqual(result, 1)
         self.assertEqual(len(rows), 35)
         self.assertIn(runner.DONE, log)
+
+
+class TemporaryVMTests(unittest.TestCase):
+    def test_interruption_and_setup_failures_remove_images_and_preserve_reports(self):
+        for failure in (RuntimeError("compiler failed"), KeyboardInterrupt()):
+            with self.subTest(failure=type(failure).__name__), tempfile.TemporaryDirectory() as directory:
+                work = Path(directory)
+                log = work / "serial.log"
+                log.write_text("partial report")
+                with self.assertRaises(type(failure)):
+                    with runner.temporary_vm(work) as runtime:
+                        (runtime / "root.ext2").write_bytes(b"temporary VM image")
+                        raise failure
+                self.assertFalse((work / "vm").exists())
+                self.assertEqual(log.read_text(), "partial report")
+
+    def test_sigterm_releases_images_and_restores_signal_handler(self):
+        previous = runner.signal.getsignal(runner.signal.SIGTERM)
+        with tempfile.TemporaryDirectory() as directory:
+            work = Path(directory)
+            with self.assertRaises(SystemExit) as stopped:
+                with runner.temporary_vm(work) as runtime:
+                    (runtime / "boot.img").write_bytes(b"temporary VM image")
+                    runner.signal.raise_signal(runner.signal.SIGTERM)
+            self.assertEqual(stopped.exception.code, 128 + runner.signal.SIGTERM)
+            self.assertFalse((work / "vm").exists())
+        self.assertEqual(runner.signal.getsignal(runner.signal.SIGTERM), previous)
 
 
 if __name__ == "__main__":

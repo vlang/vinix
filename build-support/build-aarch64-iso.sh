@@ -19,6 +19,19 @@ case "$BUILD_DIR" in
         exit 1
         ;;
 esac
+mkdir -p "$BUILD_DIR"
+ISO_STAGING_DIR="$(mktemp -d "$BUILD_DIR/.iso-staging.XXXXXX")"
+ISO_ROOT="$ISO_STAGING_DIR/iso-root"
+IMAGE_ID_DIR="$ISO_STAGING_DIR/image-id"
+OUTPUT_ISO_TMP=""
+cleanup() {
+    rm -rf "$ISO_STAGING_DIR"
+    if [ -n "$OUTPUT_ISO_TMP" ]; then
+        rm -f "$OUTPUT_ISO_TMP"
+    fi
+}
+trap cleanup EXIT
+
 for command_name in curl xorriso; do
     command -v "$command_name" >/dev/null 2>&1 || {
         echo "ERROR: required command not found: $command_name" >&2
@@ -61,8 +74,6 @@ fetch_limine_file() {
 fetch_limine_file BOOTAA64.EFI "$BOOTAA64_SHA256"
 fetch_limine_file limine-uefi-cd.bin "$UEFI_CD_SHA256"
 
-ISO_ROOT="$BUILD_DIR/iso-root"
-rm -rf "$ISO_ROOT"
 mkdir -p "$ISO_ROOT/boot" "$ISO_ROOT/EFI/BOOT"
 install -m644 "$KERNEL" "$ISO_ROOT/boot/vinix"
 install -m644 "$INITRAMFS" "$ISO_ROOT/boot/initramfs.tar"
@@ -74,8 +85,6 @@ printf '    cmdline: vinix.disk=auto\n' >> "$ISO_ROOT/boot/limine.conf"
 # The image's identity, which a system installed from it keeps in
 # /.vinix-image-id: an ISO with a different image updates that system. Taken
 # from the image's contents, so an unchanged image rebuilt is no update.
-IMAGE_ID_DIR="$BUILD_DIR/image-id"
-rm -rf "$IMAGE_ID_DIR"
 mkdir -p "$IMAGE_ID_DIR"
 sha256_file "$INITRAMFS" | cut -c1-16 > "$IMAGE_ID_DIR/.vinix-image-id"
 COPYFILE_DISABLE=1 tar --format=ustar -rf "$ISO_ROOT/boot/initramfs.tar" \
@@ -86,12 +95,10 @@ install -m644 "$BUILD_DIR/limine/BOOTAA64.EFI" "$ISO_ROOT/EFI/BOOT/BOOTAA64.EFI"
 
 mkdir -p "$(dirname "$OUTPUT_ISO")"
 OUTPUT_ISO_TMP="$(mktemp "$(dirname "$OUTPUT_ISO")/.vinix-aarch64.iso.XXXXXX")"
-trap 'rm -f "$OUTPUT_ISO_TMP"' EXIT
 echo "==> Assembling $OUTPUT_ISO..."
 xorriso -as mkisofs -R -r -J \
     --efi-boot boot/limine-uefi-cd.bin \
     -efi-boot-part --efi-boot-image --protective-msdos-label \
     "$ISO_ROOT" -o "$OUTPUT_ISO_TMP"
 mv -f "$OUTPUT_ISO_TMP" "$OUTPUT_ISO"
-trap - EXIT
 echo "    $OUTPUT_ISO ($(wc -c < "$OUTPUT_ISO" | tr -d ' ') bytes)"

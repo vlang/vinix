@@ -40,6 +40,8 @@ for arg in "$@"; do
     esac
 done
 
+python3 "$SCRIPT_DIR/tools/prune-build-artifacts.py" --root "$SCRIPT_DIR" --automatic
+
 # The ordinary userland and desktop builders intentionally merge every cached
 # optional staging tree they find. Point the two native on-demand layers at an
 # empty temporary tree so an earlier component build cannot silently bloat

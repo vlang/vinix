@@ -24,11 +24,14 @@ Scenarios:
 
 The display is QEMU's 2048x1536 desktop resolution, the one
 run-desktop-aarch64.sh boots, at the desktop's default scale for it (100%).
+Each run keeps its serial log and requested reports, and removes its temporary
+VM images and binaries after QEMU stops.
 """
 
 from __future__ import annotations
 
 import argparse
+from contextlib import contextmanager
 import hashlib
 import json
 import math
@@ -386,6 +389,25 @@ def summarize(results: list[dict]) -> str:
     return "\n".join(lines)
 
 
+@contextmanager
+def temporary_vm(work: Path):
+    """Keep reports, but release each run's VM images even on interruption."""
+    runtime = work / "vm"
+    runtime.mkdir()
+
+    def terminate(signum, _frame):
+        raise SystemExit(128 + signum)
+
+    previous_sigterm = signal.signal(signal.SIGTERM, terminate)
+    try:
+        yield runtime
+    finally:
+        try:
+            shutil.rmtree(runtime)
+        finally:
+            signal.signal(signal.SIGTERM, previous_sigterm)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -430,118 +452,127 @@ def main() -> int:
         parser.error("build labels must be unique")
 
     work = Path(tempfile.mkdtemp(prefix="vinix-desktop-perf."))
-    overlay = work / "overlay/opt/vinix-perf"
-    overlay.mkdir(parents=True)
-    for name, binary in builds:
-        shutil.copyfile(binary, overlay / f"vinix-desktop-{name}")
-    compile_measure(Path(__file__).with_name("measure.c"), overlay / "measure")
-    (overlay / "config").write_text(
-        f"VARIANTS='{' '.join(name for name, _ in builds)}'\n"
-        f"SCENARIOS='{' '.join(scenarios)}'\n"
-        f"ROUNDS={arguments.rounds}\nSETTLE={arguments.settle}\n"
-        f"MEASURE={arguments.seconds}\n"
-        f"DESKTOP_ARGS='{arguments.desktop_args}'\n")
-    qmp = str(work / "qmp.sock")
+    with temporary_vm(work) as runtime:
+        overlay = runtime / "overlay/opt/vinix-perf"
+        overlay.mkdir(parents=True)
+        for name, binary in builds:
+            shutil.copyfile(binary, overlay / f"vinix-desktop-{name}")
+        compile_measure(Path(__file__).with_name("measure.c"), overlay / "measure")
+        (overlay / "config").write_text(
+            f"VARIANTS='{' '.join(name for name, _ in builds)}'\n"
+            f"SCENARIOS='{' '.join(scenarios)}'\n"
+            f"ROUNDS={arguments.rounds}\nSETTLE={arguments.settle}\n"
+            f"MEASURE={arguments.seconds}\n"
+            f"DESKTOP_ARGS='{arguments.desktop_args}'\n")
+        qmp = str(work / "qmp.sock")
 
-    # The desktop image is larger than FAT32 allows for one file, so it goes
-    # to Limine on a cached ISO9660 disk, the way run-desktop-aarch64.sh
-    # --no-persist boots it. The cache is keyed by the image's identity.
-    initramfs = arguments.initramfs.resolve()
-    # One cache per image, so measuring a second image never rewrites the
-    # disk a running measurement is reading.
-    tag = hashlib.sha256(str(initramfs).encode()).hexdigest()[:12]
-    module_iso = ROOT / f"build/desktop-perf/{initramfs.stem}-{tag}.iso"
-    subprocess.run([sys.executable, str(ROOT / "tools/build-qemu-module-iso.py"),
-                    str(initramfs), str(module_iso)], check=True)
+        # The desktop image is larger than FAT32 allows for one file, so it goes
+        # to Limine on a cached ISO9660 disk, the way run-desktop-aarch64.sh
+        # --no-persist boots it. The cache is keyed by the image's identity.
+        initramfs = arguments.initramfs.resolve()
+        # One cache per image, so measuring a second image never rewrites the
+        # disk a running measurement is reading.
+        tag = hashlib.sha256(str(initramfs).encode()).hexdigest()[:12]
+        module_iso = ROOT / f"build/desktop-perf/{initramfs.stem}-{tag}.iso"
+        subprocess.run([sys.executable, str(ROOT / "tools/prune-build-artifacts.py"),
+                        "--root", str(ROOT), "--automatic", "--keep", str(initramfs),
+                        "--keep", str(module_iso)], check=True)
+        subprocess.run([sys.executable, str(ROOT / "tools/build-qemu-module-iso.py"),
+                        str(initramfs), str(module_iso)], check=True)
 
-    environment = os.environ.copy()
-    environment.update({
-        "VINIX_INITRAMFS": str(initramfs),
-        "VINIX_INITRAMFS_COMPRESSED": "0",
-        "VINIX_QEMU_MODULE_ISO": str(module_iso),
-        "VINIX_QEMU_BASE_ARCHIVE": "",
-        "VINIX_QEMU_MODULE_MANIFEST": "",
-        "VINIX_QEMU_EXTRA_MODULES": "",
-        "VINIX_QEMU_ROOT_DISK": "0",
-        "VINIX_BOOT_DISK": str(work / "boot.img"),
-        "VINIX_EFIVARS": str(work / "efivars.fd"),
-        "VINIX_QEMU_PACKAGE_STORE": str(work / "packages.tar"),
-        "VINIX_QEMU_PACKAGE_PERSIST": "0",
-        "VINIX_QEMU_PERSIST_DISK": str(work / "root.ext2"),
-        "VINIX_QEMU_PERSIST_SIZE_MB": "256",
-        "VINIX_KEEP_TEMP_BOOT_DISK": "1",
-        "VINIX_QEMU_OVERLAY": str(work / "overlay"),
-        "VINIX_QEMU_RESOLUTION": "2048x1536x32",
-        "VINIX_OVMF_CODE": str(ROOT / "boot-image/edk2-aarch64-code-2048x1536.fd"),
-        "VINIX_QEMU_EXTRA": (environment.get("VINIX_QEMU_EXTRA", "")
-                             + f" -qmp unix:{qmp},server,nowait").strip(),
-        "VINIX_QEMU_HOST_SOURCE": "0",
-        "VINIX_QEMU_AUDIO": "off",
-    })
-    environment.pop("VINIX_QEMU_PERSIST", None)
-    command = [str(ROOT / "run-aarch64.sh"), "--no-build", "--serial",
-               f"--mem={arguments.mem}", f"--guest-init={Path(__file__).with_name('perf-init.sh')}"]
+        environment = os.environ.copy()
+        environment.update({
+            "VINIX_INITRAMFS": str(initramfs),
+            "VINIX_INITRAMFS_COMPRESSED": "0",
+            "VINIX_QEMU_MODULE_ISO": str(module_iso),
+            "VINIX_QEMU_BASE_ARCHIVE": "",
+            "VINIX_QEMU_MODULE_MANIFEST": "",
+            "VINIX_QEMU_EXTRA_MODULES": "",
+            "VINIX_QEMU_ROOT_DISK": "0",
+            "VINIX_BOOT_DISK": str(runtime / "boot.img"),
+            "VINIX_EFIVARS": str(runtime / "efivars.fd"),
+            "VINIX_QEMU_PACKAGE_STORE": str(runtime / "packages.tar"),
+            "VINIX_QEMU_PACKAGE_PERSIST": "0",
+            "VINIX_QEMU_PERSIST_DISK": str(runtime / "root.ext2"),
+            "VINIX_QEMU_PERSIST_SIZE_MB": "256",
+            "VINIX_KEEP_TEMP_BOOT_DISK": "1",
+            "VINIX_QEMU_OVERLAY": str(runtime / "overlay"),
+            "VINIX_QEMU_RESOLUTION": "2048x1536x32",
+            "VINIX_OVMF_CODE": str(ROOT / "boot-image/edk2-aarch64-code-2048x1536.fd"),
+            "VINIX_QEMU_EXTRA": (environment.get("VINIX_QEMU_EXTRA", "")
+                                 + f" -qmp unix:{qmp},server,nowait").strip(),
+            "VINIX_QEMU_HOST_SOURCE": "0",
+            "VINIX_QEMU_AUDIO": "off",
+        })
+        environment.pop("VINIX_QEMU_PERSIST", None)
+        command = [str(ROOT / "run-aarch64.sh"), "--no-build", "--serial",
+                   f"--mem={arguments.mem}", f"--guest-init={Path(__file__).with_name('perf-init.sh')}"]
 
-    per_run = arguments.settle + arguments.seconds + 60
-    timeout = arguments.timeout or (900 + per_run * len(builds) * len(scenarios) * arguments.rounds)
-    print(f"==> Measuring {', '.join(name for name, _ in builds)} over "
-          f"{', '.join(scenarios)} x{arguments.rounds} (up to {timeout}s)", flush=True)
+        per_run = arguments.settle + arguments.seconds + 60
+        timeout = arguments.timeout or (900 + per_run * len(builds) * len(scenarios) * arguments.rounds)
+        print(f"==> Measuring {', '.join(name for name, _ in builds)} over "
+              f"{', '.join(scenarios)} x{arguments.rounds} (up to {timeout}s)", flush=True)
 
-    pointer = Pointer(qmp)
-    pid, master = pty.fork()
-    if pid == 0:
-        os.chdir(ROOT)
-        os.execve(command[0], command, environment)
-    console = Console(master)
-    driver = None
-    deadline = time.monotonic() + timeout
-    timed_out = False
-    try:
-        while True:
-            remaining = deadline - time.monotonic()
-            if remaining <= 0:
-                timed_out = True
-                break
+        pointer = Pointer(qmp)
+        pid, master = pty.fork()
+        if pid == 0:
             try:
-                line = console.lines.get(timeout=min(0.5, remaining))
-            except queue.Empty:
-                # Drain already-queued lines even when the reader has reached
-                # EOF. It may have enqueued DONE just before publishing closed.
-                if console.closed.is_set():
+                os.chdir(ROOT)
+                os.execve(command[0], command, environment)
+            finally:
+                # Only the parent owns the VM directory. An exec failure in
+                # this child must not unwind its copy of temporary_vm().
+                os._exit(1)
+        console = Console(master)
+        driver = None
+        deadline = time.monotonic() + timeout
+        timed_out = False
+        try:
+            while True:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    timed_out = True
                     break
-                continue
-            drive = DRIVE.search(line)
-            if drive:
-                driver = threading.Thread(target=pointer.drive, daemon=True,
-                                          args=(drive.group(1).decode(), float(drive.group(2))))
-                driver.start()
-            shot = SHOT.search(line)
-            if shot and arguments.shots:
-                arguments.shots.mkdir(parents=True, exist_ok=True)
-                name = "-".join(part.decode() for part in shot.groups())
-                pointer.screendump(arguments.shots.resolve() / f"{name}.ppm")
-            if line.strip() == DONE or b"KERNEL PANIC" in line \
-                    or b"FATAL EXCEPTION" in line or b"PERF-ERROR" in line:
-                break
-    finally:
-        exit_code = stop_child(pid, console)
-        # The reader owns the transcript. Let it drain the child's final
-        # output before closing the pty and evaluating the complete log, so a
-        # panic/error queued after DONE cannot be mistaken for a passing run.
-        console.thread.join(timeout=2)
-        os.close(master)
-        console.thread.join(timeout=1)
-        console_drained = console.closed.is_set()
-        transcript = bytes(console.transcript)
-        log = work / "serial.log"
-        log.write_bytes(transcript)
-        print(f"\n==> Serial log: {log}")
-    result = finish_run(transcript, [name for name, _ in builds], scenarios, arguments.rounds,
-                        arguments.json, timed_out, exit_code)
-    if not console_drained:
-        print("ERROR: serial console did not finish draining after guest shutdown", file=sys.stderr)
-        return 1
-    return result
+                try:
+                    line = console.lines.get(timeout=min(0.5, remaining))
+                except queue.Empty:
+                    # Drain already-queued lines even when the reader has reached
+                    # EOF. It may have enqueued DONE just before publishing closed.
+                    if console.closed.is_set():
+                        break
+                    continue
+                drive = DRIVE.search(line)
+                if drive:
+                    driver = threading.Thread(target=pointer.drive, daemon=True,
+                                              args=(drive.group(1).decode(), float(drive.group(2))))
+                    driver.start()
+                shot = SHOT.search(line)
+                if shot and arguments.shots:
+                    arguments.shots.mkdir(parents=True, exist_ok=True)
+                    name = "-".join(part.decode() for part in shot.groups())
+                    pointer.screendump(arguments.shots.resolve() / f"{name}.ppm")
+                if line.strip() == DONE or b"KERNEL PANIC" in line \
+                        or b"FATAL EXCEPTION" in line or b"PERF-ERROR" in line:
+                    break
+        finally:
+            exit_code = stop_child(pid, console)
+            # The reader owns the transcript. Let it drain the child's final
+            # output before closing the pty and evaluating the complete log, so a
+            # panic/error queued after DONE cannot be mistaken for a passing run.
+            console.thread.join(timeout=2)
+            os.close(master)
+            console.thread.join(timeout=1)
+            console_drained = console.closed.is_set()
+            transcript = bytes(console.transcript)
+            log = work / "serial.log"
+            log.write_bytes(transcript)
+            print(f"\n==> Serial log: {log}")
+        result = finish_run(transcript, [name for name, _ in builds], scenarios, arguments.rounds,
+                            arguments.json, timed_out, exit_code)
+        if not console_drained:
+            print("ERROR: serial console did not finish draining after guest shutdown", file=sys.stderr)
+            return 1
+        return result
 
 
 if __name__ == "__main__":
