@@ -533,11 +533,19 @@ The newer isolated ARM I/O-disabled build also completed desktop idle/apps/drag
 with DONE and no panic: `/tmp/vinix-linuxkpi-iowait-perf-idle-apps-drag.log`.
 Physical usage was 65.5/146.3/104.6 MiB. Its initial ops/churn/cache harness
 returned zero at its deadline with incomplete reports and no DONE; that is
-**incomplete validation**, not a pass. A fresh retry with a longer overall
-deadline is running at `/tmp/vinix-linuxkpi-iowait-perf-retry-ops-churn-cache.log`.
+**incomplete validation**, not a pass. A fresh retry completed with DONE,
+exit zero and all 70 OPS, eight CHURN and two CACHE reports:
+`/tmp/vinix-linuxkpi-iowait-perf-retry-ops-churn-cache.log`. The corrected
+harness in `e4c5ffc4` independently replays the actual serial files and
+accepts exactly 80 allocation reports and three desktop scenarios, with no
+errors: `/tmp/vinix-linuxkpi-iowait-perf-retry-completed-verdict-replay.json`.
+Its 19 regression tests also reject missing completion, missing/duplicate
+reports, malformed measurements, fatal exits and incomplete console output.
 The measured ARM ELF is `f449c95e7ef242a2b794b6f883e262ed84da18bdc4f1e54cb8c6cfc8d848ebf4`;
 boot-disk identity and unchanged source/generated-C/ELF/desktop are recorded
-in `/tmp/vinix-linuxkpi-iowait-perf-validation.json`. Existing proc/readdir and
+in `/tmp/vinix-linuxkpi-iowait-perf-retry-analysis.json`. These workloads use
+AArch64 with `LINUXKPI=0`, `LIMINE_MP=0` and CPU0 only; they do not execute
+LinuxKPI I/O APIs. Existing proc/readdir and
 program-churn retention remains. Seventy changed and 26 added kernel paths
 separate this baseline from the older SRCU performance build, so differences
 do not establish an I/O-induced regression or improvement.
