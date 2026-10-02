@@ -18,6 +18,11 @@ MMAP32_LIBRARY = "usr/lib/x86_64-linux-gnu/libvinix-dota2-mmap32.so"
 MMAP32_COMPILE = ["clang", "--target=x86_64-linux-gnu", "-fPIC", "-shared",
                   "-nostdlib", "-fuse-ld=lld", "-Wall", "-Wextra", "-Werror",
                   "-Wl,-soname,libvinix-dota2-mmap32.so"]
+EARLY_CLIENT_SOURCE = REPO / "build-support/dota2/early-client.c"
+EARLY_CLIENT_LIBRARY = "usr/lib/x86_64-linux-gnu/libvinix-dota2-steam-loader.so"
+EARLY_CLIENT_COMPILE = ["clang", "--target=x86_64-linux-gnu", "-fPIC", "-shared",
+                        "-nostdlib", "-fuse-ld=lld", "-Wall", "-Wextra", "-Werror",
+                        "-Wl,-soname,libvinix-dota2-steam-loader.so"]
 
 
 def clone_tree(source: Path, destination: Path) -> None:
@@ -68,12 +73,14 @@ def main() -> None:
                       key=lambda p: p.name)
     rows = [{"package": p.name, "version": p.version, "filename": p.filename,
              "sha256": p.sha256} for p in selected]
-    inputs = {"format": 3, "source": str(source), "guest_root": args.guest_root,
+    inputs = {"format": 4, "source": str(source), "guest_root": args.guest_root,
               "release": args.release, "packages": rows,
               "amd64": manifest.read_text(),
               "i386": (steam / "i386-packages").read_text(),
               "mmap32_source": hashlib.sha256(MMAP32_SOURCE.read_bytes()).hexdigest(),
-              "mmap32_compile": MMAP32_COMPILE}
+              "mmap32_compile": MMAP32_COMPILE,
+              "early_client_source": hashlib.sha256(EARLY_CLIENT_SOURCE.read_bytes()).hexdigest(),
+              "early_client_compile": EARLY_CLIENT_COMPILE}
     generation = hashlib.sha256(json.dumps(inputs, sort_keys=True).encode()).hexdigest()
     stamp = root / ".vinix-dota2-vulkan-generation"
     if root.exists() and not stamp.exists() and not args.refresh:
@@ -81,7 +88,7 @@ def main() -> None:
     required = ["lib64/ld-linux-x86-64.so.2", "usr/bin/vulkaninfo", "usr/bin/vkcube",
                 "usr/lib/x86_64-linux-gnu/libvulkan_lvp.so", "usr/lib/x86_64-linux-gnu/libvulkan.so.1",
                 "usr/share/vulkan/icd.d/lvp_icd.x86_64.json", "etc/ssl/certs/ca-certificates.crt",
-                MMAP32_LIBRARY]
+                MMAP32_LIBRARY, EARLY_CLIENT_LIBRARY]
     build.mkdir(parents=True, exist_ok=True)
     (build / "vulkan-packages.json").write_text(json.dumps(rows, indent=2) + "\n")
     if stamp.exists() and stamp.read_text().strip() == generation and all((root / p).exists() for p in required):
@@ -98,6 +105,8 @@ def main() -> None:
     # headers, startup files, or x86 development packages are required.
     subprocess.run([*MMAP32_COMPILE, str(MMAP32_SOURCE), "-o", str(pending / MMAP32_LIBRARY)],
                    check=True)
+    subprocess.run([*EARLY_CLIENT_COMPILE, str(EARLY_CLIENT_SOURCE),
+                    "-o", str(pending / EARLY_CLIENT_LIBRARY)], check=True)
     public_certificates = sorted((pending / "usr/share/ca-certificates/mozilla").glob("*.crt"))
     if not public_certificates:
         raise SystemExit("ca-certificates package contains no public trust certificates")

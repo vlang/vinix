@@ -28,6 +28,7 @@ class LauncherTest(unittest.TestCase):
             "usr/lib/x86_64-linux-gnu/libvulkan_lvp.so",
             "usr/lib/x86_64-linux-gnu/libvinix-steam-robust.so",
             "usr/lib/x86_64-linux-gnu/libvinix-dota2-mmap32.so",
+            "usr/lib/x86_64-linux-gnu/libvinix-dota2-steam-loader.so",
             "usr/lib/x86_64-linux-gnu/libmpg123.so.0",
             "usr/share/vulkan/icd.d/lvp_icd.x86_64.json",
         ):
@@ -44,6 +45,10 @@ class LauncherTest(unittest.TestCase):
         struct.pack_into("<HH", header, 16, 3, 62)
         self.game.write_bytes(header)
         self.game.chmod(0o755)
+        self.home = self.base / "user home"
+        self.client = self.home / ".steam/sdk64/steamclient.so"
+        self.client.parent.mkdir(parents=True)
+        self.client.write_bytes(header)
         self.output = self.base / "launch.json"
         self.emulator = self.base / "fake-qemu-x86_64"
         self.emulator.write_text(
@@ -62,10 +67,12 @@ class LauncherTest(unittest.TestCase):
             "QEMU_CPU", "VINIX_X86_64_PRELOAD", "VINIX_DOTA2_LD_LIBRARY_PATH",
             "VINIX_DOTA2_WIDTH", "VINIX_DOTA2_HEIGHT", "VINIX_X86_64_GUEST_BASE",
             "VINIX_DOTA2_ROOT", "SDL_VIDEO_DRIVER", "VINIX_DOTA_TEST_STATUS",
+            "VINIX_DOTA2_STEAMCLIENT", "VINIX_DOTA2_EARLY_STEAMCLIENT",
         ):
             self.env.pop(key, None)
         self.env.update(
             DISPLAY=":73",
+            HOME=str(self.home),
             VINIX_DOTA2_DIR=str(self.game_dir),
             VINIX_STEAM_ROOT=str(self.runtime),
             VINIX_X86_64_EMULATOR=str(self.emulator),
@@ -95,6 +102,7 @@ class LauncherTest(unittest.TestCase):
             LD_PRELOAD="/foreign/x86/preload.so",
             QEMU_LD_PREFIX="/unrelated/runtime",
             QEMU_SET_ENV="LD_LIBRARY_PATH=/unrelated/libraries",
+            VINIX_DOTA2_EARLY_STEAMCLIENT="/foreign/unrelated/steamclient.so",
             VINIX_X86_64_PRELOAD="/guest/only/preload.so",
         )
         launch = self.run_launcher("+map", "path with spaces", "-w", "960")
@@ -105,17 +113,20 @@ class LauncherTest(unittest.TestCase):
         self.assertEqual(launch["args"], [
             "-B", "0x100000000", "-L", str(self.runtime),
             "-E", f"LD_LIBRARY_PATH={libraries}",
+            "-E", f"VINIX_DOTA2_EARLY_STEAMCLIENT={self.client}",
             "-E", (f"LD_PRELOAD=/guest/only/preload.so:"
                    f"{self.runtime}/usr/lib/x86_64-linux-gnu/libvinix-steam-robust.so:"
                    f"{self.runtime}/usr/lib/x86_64-linux-gnu/libvinix-dota2-mmap32.so:"
-                   f"{self.runtime}/usr/lib/x86_64-linux-gnu/libmpg123.so.0"),
+                   f"{self.runtime}/usr/lib/x86_64-linux-gnu/libmpg123.so.0:"
+                   f"{self.runtime}/usr/lib/x86_64-linux-gnu/libvinix-dota2-steam-loader.so"),
             str(self.game), "-windowed", "-w", "1280", "-h", "720",
             "+map", "path with spaces", "-w", "960",
         ])
         self.assertEqual(launch["cwd"], str(self.game_root))
         self.assertEqual(launch["nofile"], 2048)
         self.assertEqual(launch["stack"], 2048 * 1024)
-        for key in ("LD_LIBRARY_PATH", "LD_PRELOAD", "QEMU_LD_PREFIX", "QEMU_SET_ENV"):
+        for key in ("LD_LIBRARY_PATH", "LD_PRELOAD", "QEMU_LD_PREFIX", "QEMU_SET_ENV",
+                    "VINIX_DOTA2_EARLY_STEAMCLIENT"):
             self.assertNotIn(key, launch["env"])
         for key, value in {
             "VINIX_I386_ROOT": str(self.runtime),
@@ -186,7 +197,8 @@ class LauncherTest(unittest.TestCase):
         launch = self.run_launcher()
         preloads = (f"{self.runtime}/usr/lib/x86_64-linux-gnu/libvinix-steam-robust.so:"
                     f"{self.runtime}/usr/lib/x86_64-linux-gnu/libvinix-dota2-mmap32.so:"
-                    f"{self.runtime}/usr/lib/x86_64-linux-gnu/libmpg123.so.0")
+                    f"{self.runtime}/usr/lib/x86_64-linux-gnu/libmpg123.so.0:"
+                    f"{self.runtime}/usr/lib/x86_64-linux-gnu/libvinix-dota2-steam-loader.so")
         self.assertIn(f"LD_PRELOAD={preloads}", launch["args"])
         self.assertEqual(launch["env"]["VINIX_X86_64_PRELOAD"], preloads)
         self.assertNotIn("LD_PRELOAD", launch["env"])
@@ -194,6 +206,39 @@ class LauncherTest(unittest.TestCase):
     def test_missing_robust_list_shim_is_rejected(self):
         (self.runtime / "usr/lib/x86_64-linux-gnu/libvinix-steam-robust.so").unlink()
         self.assert_rejected("x86-64 robust-list shim is missing")
+
+    def test_missing_early_client_loader_is_rejected(self):
+        (self.runtime / "usr/lib/x86_64-linux-gnu/libvinix-dota2-steam-loader.so").unlink()
+        self.assert_rejected("early Steam client loader is missing")
+
+    def test_missing_actual_steamclient_is_rejected(self):
+        self.client.unlink()
+        self.assert_rejected("Steam's Linux64 client is missing")
+
+    def test_foreign_steamclient_is_rejected(self):
+        header = bytearray(self.client.read_bytes())
+        struct.pack_into("<H", header, 18, 183)
+        self.client.write_bytes(header)
+        self.assert_rejected("Steam's client must be a Linux x86-64 shared ELF")
+
+    def test_truncated_steamclient_is_rejected(self):
+        self.client.write_bytes(self.client.read_bytes()[:20])
+        self.assert_rejected("Steam's client must be a Linux x86-64 shared ELF")
+
+    def test_actual_client_path_override_is_guest_only(self):
+        custom = self.base / "custom SDK" / "steamclient.so"
+        custom.parent.mkdir()
+        custom.write_bytes(self.client.read_bytes())
+        self.env["VINIX_DOTA2_STEAMCLIENT"] = str(custom.parent / "../custom SDK/steamclient.so")
+        launch = self.run_launcher()
+        self.assertIn(f"VINIX_DOTA2_EARLY_STEAMCLIENT={custom}", launch["args"])
+        self.assertNotIn("VINIX_DOTA2_EARLY_STEAMCLIENT", launch["env"])
+
+    def test_client_path_with_qemu_separator_is_rejected(self):
+        custom = self.base / "steamclient, alternate.so"
+        custom.write_bytes(self.client.read_bytes())
+        self.env["VINIX_DOTA2_STEAMCLIENT"] = str(custom)
+        self.assert_rejected("Steam client path cannot contain a comma")
 
     def test_explicit_cpu_model_is_preserved(self):
         self.env["QEMU_CPU"] = "Nehalem"

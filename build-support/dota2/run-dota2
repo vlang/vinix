@@ -6,12 +6,13 @@
 set -eu
 # Native helper commands and the translator must not inherit x86 libraries.
 # VINIX_DOTA2_LD_LIBRARY_PATH and VINIX_X86_64_PRELOAD supply guest overrides.
-unset LD_LIBRARY_PATH LD_PRELOAD QEMU_LD_PREFIX QEMU_SET_ENV
+unset LD_LIBRARY_PATH LD_PRELOAD QEMU_LD_PREFIX QEMU_SET_ENV VINIX_DOTA2_EARLY_STEAMCLIENT
 
 if [ "${1:-}" = --help ]; then
     echo 'usage: dota2 [GAME ARGUMENT ...]'
     echo 'VINIX_DOTA2_DIR selects the installed game (default: /usr/share/games/dota2).'
     echo 'VINIX_DOTA2_ROOT selects its private glibc runtime.'
+    echo "VINIX_DOTA2_STEAMCLIENT selects Steam's Linux64 steamclient.so."
     exit 0
 fi
 
@@ -101,10 +102,33 @@ fi
 robust_shim="$runtime/usr/lib/x86_64-linux-gnu/libvinix-steam-robust.so"
 low_address_shim="$runtime/usr/lib/x86_64-linux-gnu/libvinix-dota2-mmap32.so"
 decoder="$runtime/usr/lib/x86_64-linux-gnu/libmpg123.so.0"
+early_client="$runtime/usr/lib/x86_64-linux-gnu/libvinix-dota2-steam-loader.so"
 [ -e "$robust_shim" ] || fail "the x86-64 robust-list shim is missing: $robust_shim"
 [ -e "$low_address_shim" ] || fail "the x86-64 low-address mapping shim is missing: $low_address_shim"
 [ -e "$decoder" ] || fail "the runtime mpg123 decoder is missing: $decoder"
-guest_preloads="$robust_shim:$low_address_shim:$decoder"
+[ -e "$early_client" ] || fail "the early Steam client loader is missing: $early_client"
+# Resolve Steam's SDK before loading the engine's different coroutine ABI.
+# The constructor consumes this marker before loading the real client, so
+# translated child helpers inherit the preload without loading another SDK.
+steamclient="${VINIX_DOTA2_STEAMCLIENT:-${HOME:-/root}/.steam/sdk64/steamclient.so}"
+case "$steamclient" in
+    *,*) fail "the Steam client path cannot contain a comma in QEMU's -E syntax" ;;
+esac
+[ -s "$steamclient" ] || fail "Steam's Linux64 client is missing: $steamclient"
+client_name=${steamclient##*/}
+case "$steamclient" in
+    */*) client_dir=${steamclient%/*}; [ -n "$client_dir" ] || client_dir=/ ;;
+    *) client_dir=. ;;
+esac
+steamclient_dir=$(CDPATH= cd -- "$client_dir" && pwd)
+steamclient="$steamclient_dir/$client_name"
+client_ident=$(od -An -tx1 -N7 "$steamclient" | tr -d '[:space:]')
+client_header=$(od -An -v -tx1 -N64 "$steamclient" | tr -d '[:space:]')
+client_type=$(od -An -tx1 -j16 -N2 "$steamclient" | tr -d '[:space:]')
+client_machine=$(od -An -tx1 -j18 -N2 "$steamclient" | tr -d '[:space:]')
+[ "${#client_header}" -eq 128 ] && [ "$client_ident" = 7f454c46020101 ] && [ "$client_type" = 0300 ] &&
+    [ "$client_machine" = 3e00 ] || fail "Steam's client must be a Linux x86-64 shared ELF: $steamclient"
+guest_preloads="$robust_shim:$low_address_shim:$decoder:$early_client"
 if [ -n "${VINIX_X86_64_PRELOAD:-}" ]; then
     guest_preloads="$VINIX_X86_64_PRELOAD:$guest_preloads"
 fi
@@ -113,6 +137,7 @@ export VINIX_X86_64_PRELOAD="$guest_preloads"
 # settings only after it has loaded, so the AArch64 loader never sees them.
 set -- "$game" -windowed -w "$width" -h "$height" "$@"
 set -- -E "LD_PRELOAD=$guest_preloads" "$@"
+set -- -E "VINIX_DOTA2_EARLY_STEAMCLIENT=$steamclient" "$@"
 # Match dota.sh's descriptor allowance and default per-thread stack size.
 # Change only the soft limits, leaving the caller's hard limits available.
 ulimit -Sn 2048 || fail 'could not set the game descriptor limit'
