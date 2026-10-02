@@ -1,7 +1,7 @@
 # Linux i915 next-session handoff
 
 Prepared 2026-10-02 for `/Users/alex/code/vinix`, on macOS ARM64 with zsh.
-Committed implementation baseline: **`7735509f`** (including minimum-duration sleeps). Recheck HEAD and the worktree before
+Committed implementation baseline: **`71426a7e`** (including kernel-string parsing and tokens). Recheck HEAD and the worktree before
 starting; other sessions use this checkout. The main status document is
 [linux-i915.md](linux-i915.md).
 
@@ -62,14 +62,19 @@ and validated. Owned printk records, the inventoried Linux formatting subset,
 warning/taint capture and synchronized native RNG publication are also committed
 and validated. Device-number types, unchanged i915 timeout/DSC policy helpers,
 I/O mutex scopes, precise timed-worker retirement and allocation-free string
-matching/replacement and minimum-duration sleeps are also committed and validated.
-Kernel-string number parsers are being implemented and reviewed; inspect HEAD
-and owned diffs before assuming that next feature is committed.
+matching/replacement, minimum-duration sleeps, kernel-string number/Boolean
+parsers and borrowed token/whitespace helpers are committed and validated.
+Shared native PCI configuration transactions are being integrated in an
+18-path kernel overlay at `/tmp/vinix-linuxkpi-pci-config-overlay.json`.
+That work is not committed yet: inspect HEAD and owned diffs. It provides real
+transport prerequisites, not Linux PCI device registration or GPU binding.
 
 ## Committed progress
 
 | Commit | Completed runtime change |
 | --- | --- |
+| `71426a7e` | Borrowed character search, empty-preserving tokens and bounded equivalent whitespace trimming |
+| `ce4606b3` | Pinned kernel-string integer/Boolean parsing, range errors and output ownership |
 | `7735509f` | Absolute-minimum range sleeps, early-wake/signal retries and full native rollback/retirement tests |
 | `53f41b30` | Pinned borrowed string matching, sysfs newline equivalence and replacement |
 | `92c24841` | I/O mutex scopes, actual blocked-CPU counts and nested intent restoration |
@@ -433,6 +438,26 @@ duplicate-typedef warnings; host/audit use GNU11. Do not hide compiler errors
 or rewrite upstream headers to make a false success.
 
 ## Validation already completed
+
+Token helpers used four frozen kernel paths at `ce4606b3`, enabled ELF
+`8c32940b5f6a4bd707a52a2f3073055ebe5e529190812a2f13a6585f09c0ad8e`.
+Strict full ASan/UBSan host/import/header tests, enabled/default x86 and disabled
+ARM builds, full normal/SSE guests and default Linux-ABI startup passed. The
+final source rebuild, including host-only aliases, produced identical ELF and
+generated-C hashes. Native checks run 200 times with exact page recovery;
+separate actual-backend tests passed 7,542,446 pinned-reference comparisons.
+The local `strim` traversal avoids forming `s - 1` and preserves every observable
+byte/pointer result. Source, host/native fixtures and generated C have independent
+approval. Evidence: `/tmp/vinix-linuxkpi-string-tokens-final-validation.json`.
+Fresh full syntax audit remains 3/269; imported files remain unchanged.
+
+Kernel-string parsers used five frozen kernel paths at `7735509f`, enabled ELF
+`cf90f5defc1003984b0c261c85debd4b08d6831884c80c43428fa168e782b996`.
+The same host/build/normal/SSE/default checks passed, including 56 native
+conversion checks per iteration inside the exact 200-iteration page measurement.
+Independent source/fixture/generated-C review and 16,653 private comparisons
+passed. Evidence: `/tmp/vinix-linuxkpi-kstrtox-final-validation.json`.
+`_from_user` and native remaining-byte/zero-tail user-copy integration are pending.
 
 The minimum-duration sleep feature used five frozen kernel paths at `53f41b30`,
 enabled ELF SHA256
