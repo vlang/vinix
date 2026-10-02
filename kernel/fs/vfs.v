@@ -246,9 +246,9 @@ fn walk_path_on_mount(parent &VFSNode, path string, depth int, effective bool, i
 			new_node = reduce_node_on_mount(parent_node, false, depth + 1,
 				effective, identity)
 		} else {
-			procfs_lookup_refresh(current_node, elem_str)
 			overlay_lookup_refresh(current_node)
-			if elem_str !in current_node.children {
+			child := lookup_child(current_node, elem_str)
+			if child == unsafe { nil } {
 				errno.set(errno.enoent)
 				if last == true {
 					return current_node, 0, elem_str
@@ -256,7 +256,7 @@ fn walk_path_on_mount(parent &VFSNode, path string, depth int, effective bool, i
 				return 0, 0, ''
 			}
 
-			new_node = reduce_node_on_mount(unsafe { current_node.children[elem_str] }, false,
+			new_node = reduce_node_on_mount(child, false,
 				depth + 1, effective, identity)
 		}
 
@@ -1661,23 +1661,26 @@ pub fn syscall_readdir(_ voidptr, fdnum int, mut buf stat.Dirent) (u64, u64) {
 	mut dir_node := unsafe { &VFSNode(dir_handle.node) }
 
 	if dir_handle.dirlist_valid == false {
-		procfs_refresh(dir_node)
 		overlay_lookup_refresh(dir_node)
+		mut names, mut nodes := directory_snapshot(dir_node)
+		defer {
+			unsafe {
+				names.free()
+				nodes.free()
+			}
+		}
 		// Sized for the whole directory up front: growing it would leave each
 		// outgrown buffer behind, and every entry takes a full Dirent.
 		unsafe { dir_handle.dirlist.free() }
 		// Freed when the handle goes, or when the listing is made again.
-		dir_handle.dirlist = []stat.Dirent{cap: dir_node.children.len} @[freed]
-		// A loop over the map itself hands out a copy of every key, and
-		// nothing would free those; these copies are freed below.
-		mut names := dir_node.children.keys()
-		defer {
-			unsafe { names.free() }
-		}
+		entry_count := names.len + nodes.len
+		dir_handle.dirlist = []stat.Dirent{cap: entry_count} @[freed]
 		// Validate the complete snapshot before copying a name into its fixed
 		// Dirent buffer. tmpfs can contain names longer than EXT2's 255-byte
 		// limit; return an error instead of overflowing the cached entry.
-		for name in names {
+		for index in 0 .. entry_count {
+			if nodes.len > 0 && nodes[index] == unsafe { nil } { continue }
+			name := if nodes.len > 0 { nodes[index].name } else { names[index] }
 			if name.len >= 1024 {
 				errno.set(errno.enametoolong)
 				return errno.err, errno.enametoolong
@@ -1685,8 +1688,12 @@ pub fn syscall_readdir(_ voidptr, fdnum int, mut buf stat.Dirent) (u64, u64) {
 		}
 		mut new_dirent := unsafe { &stat.Dirent(C.vinix_stack_alloc(sizeof(stat.Dirent))) }
 		mut i := u64(0)
-		for name in names {
-			node := reduce_node(unsafe { dir_node.children[name] }, false)
+		for index in 0 .. entry_count {
+			child := if nodes.len > 0 { nodes[index] } else { unsafe { dir_node.children[names[index]] } }
+			if child == unsafe { nil } { continue }
+			name := if nodes.len > 0 { child.name } else { names[index] }
+			node := reduce_node(child, false)
+			if node == unsafe { nil } || node.resource == unsafe { nil } { continue }
 			t := match node.resource.stat.mode & stat.ifmt {
 				stat.ifchr {
 					stat.dt_chr

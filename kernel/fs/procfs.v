@@ -741,7 +741,9 @@ fn (this &ProcFSResource) contents() string {
 
 // `owned` with one byte after it, as a new string; `owned` is freed.
 fn text_with_ending(owned string, ending u8) string {
-	mut text := lib.new_text(owned.len + 1)
+	// Formatting helpers borrow this builder; str() returns independent owned bytes.
+	mut text := unsafe { &lib.Text(C.vinix_stack_alloc(sizeof(lib.Text))) }
+	unsafe { *text = lib.new_text(owned.len + 1) }
 	text.add(owned)
 	text.add_byte(ending)
 	unsafe { owned.free() }
@@ -1306,6 +1308,16 @@ pub fn procfs_refresh(node &VFSNode) {
 
 // The same for a lookup of `name` in it; '' is a listing.
 fn procfs_refresh_named(node &VFSNode, name string) {
+	if node == unsafe { nil } || node.resource == unsafe { nil }
+		|| !is_procfs_resource(node.resource) { return }
+	procfs_lock.acquire()
+	defer { procfs_lock.release() }
+	procfs_refresh_named_locked(node, name)
+}
+
+// The caller holds procfs_lock, including while it copies the child pointers
+// produced by this refresh. A map's value storage can move on any insertion.
+fn procfs_refresh_named_locked(node &VFSNode, name string) {
 	if unsafe { procfs_root == 0 } || node == unsafe { nil } {
 		return
 	}
@@ -1320,11 +1332,6 @@ fn procfs_refresh_named(node &VFSNode, name string) {
 		return
 	}
 	mut directory := unsafe { &ProcFSResource(target.resource) }
-
-	procfs_lock.acquire()
-	defer {
-		procfs_lock.release()
-	}
 
 	if directory.lazy && !directory.populated {
 		if name.len > 0 {
@@ -1358,20 +1365,20 @@ fn procfs_refresh_named(node &VFSNode, name string) {
 // namespace directories, and a process' exe, cwd and root links, change under
 // a process that is already listed, so they are brought up to date on each
 // lookup; the rest of the tree only when a name is missing.
-pub fn procfs_lookup_refresh(node &VFSNode, name string) {
+fn procfs_lookup_refresh_locked(node &VFSNode, name string) {
 	if unsafe { procfs_root == 0 } || node == unsafe { nil } || node.resource == unsafe { nil }
 		|| node.children == unsafe { nil } || !is_procfs_resource(node.resource) {
 		return
 	}
 	directory := unsafe { &ProcFSResource(node.resource) }
 	if directory.pid != 0 && (node.name == 'fd' || node.name == 'ns') {
-		procfs_refresh(node)
+		procfs_refresh_named_locked(node, '')
 		return
 	}
 	// A process directory is filled in as it is used; do that before looking
 	// at what it holds.
 	if name !in node.children {
-		procfs_refresh_named(node, name)
+		procfs_refresh_named_locked(node, name)
 	}
 	if directory.pid != 0 && (name == 'exe' || name == 'cwd' || name == 'root')
 		&& name in node.children {
@@ -1395,6 +1402,34 @@ pub fn procfs_lookup_refresh(node &VFSNode, name string) {
 			}
 		}
 	}
+}
+
+// Refresh and copy a directory's child under the same lock. Never pass a map
+// value-storage pointer to the path walker: another procfs lookup can grow or
+// compact that map as soon as this lock is released. Procfs pruning unlinks
+// its nodes without freeing them, so the copied node remains safe to reduce
+// after unlocking, including when reduction recursively follows a symlink.
+fn lookup_child(node &VFSNode, name string) &VFSNode {
+	protected := is_procfs_resource(node.resource)
+	if protected { procfs_lock.acquire() }
+	defer { if protected { procfs_lock.release() } }
+	if protected { procfs_lookup_refresh_locked(node, name) }
+	if name !in node.children { return unsafe { nil } }
+	child := unsafe { node.children[name] }
+	return child
+}
+
+// Procfs listings copy child pointers, then borrow each retained node's name.
+// Other filesystems keep their existing owned-key listing. Resolving redirects
+// and mounts happens after unlocking, never while holding procfs_lock.
+fn directory_snapshot(node &VFSNode) ([]string, []&VFSNode) {
+	if !is_procfs_resource(node.resource) {
+		return node.children.keys(), []&VFSNode{}
+	}
+	procfs_lock.acquire()
+	defer { procfs_lock.release() }
+	procfs_refresh_named_locked(node, '')
+	return []string{}, node.children.values()
 }
 
 // What a process' exe link says: the path, as the reader sees it, of the file

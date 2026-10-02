@@ -1114,7 +1114,9 @@ pub fn process_command(pid int) string {
 	if process == unsafe { nil } {
 		return ''
 	}
-	mut text := lib.new_text(32)
+	// Formatting helpers borrow this builder; str() returns independent owned bytes.
+	mut text := unsafe { &lib.Text(C.vinix_stack_alloc(sizeof(lib.Text))) }
+	unsafe { *text = lib.new_text(32) }
 	add_command_name(mut text, process.name)
 	return text.str()
 }
