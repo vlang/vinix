@@ -79,6 +79,28 @@ int main(void) {
     CHECK(munmap(overflow_hint, 8192) == 0);
     CHECK(munmap(boundary, 65536) == 0);
     CHECK(munmap(high, 4096) == 0);
+
+    /* The real engine reserves large low regions before loading its modules.
+     * Find both the tail gap and a page-sized hole without replacing the
+     * existing reservation, then reject a completely occupied search window.
+     */
+    void *reserved = mmap((void *)0x40000000UL, 0x20000000UL, 0,
+                          ANON_PRIVATE | NOREPLACE, -1, 0);
+    CHECK(reserved == (void *)0x40000000UL);
+    void *tail = mmap((void *)0, 0x08000000UL, 0, ANON_PRIVATE | MAP32, -1, 0);
+    CHECK(low(tail, 0x08000000UL) && (unsigned long)tail >= 0x60000000UL);
+    CHECK(munmap((void *)0x48000000UL, 4096) == 0);
+    void *hole = mmap((void *)0, 4096, RW, ANON_PRIVATE | MAP32, -1, 0);
+    CHECK(hole == (void *)0x48000000UL);
+    *(unsigned char *)hole = 0x81;
+    CHECK(munmap(reserved, 0x20000000UL) == 0);
+    CHECK(munmap(tail, 0x08000000UL) == 0);
+    void *full = mmap((void *)0x40000000UL, 0x40000000UL, 0,
+                      ANON_PRIVATE | NOREPLACE, -1, 0);
+    CHECK(full == (void *)0x40000000UL);
+    CHECK(mmap((void *)0, 4096, RW, ANON_PRIVATE | MAP32, -1, 0) == FAILED);
+    CHECK(*__errno_location() == 12);
+    CHECK(munmap(full, 0x40000000UL) == 0);
     puts("VINIX-DOTA2-MMAP32-PASS");
     fflush((void *)0);
     return 0;
