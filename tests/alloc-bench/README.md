@@ -45,8 +45,8 @@ heap. Its optional `-d xnu_zone` backend is a partial XNU-inspired port running
 inside Vinix; it is **not a macOS guest**. See
 [the earlier port comparison](../../docs/xnualloc/BENCHMARK.md).
 
-Vinix currently pre-populates small anonymous mappings; large reservations
-and private mappings accounted to a cgroup can use its fault path. A timing
+Vinix commits private anonymous x86 mappings on first touch; ARM keeps small
+mappings eager for HVF compatibility. A timing
 difference therefore needs investigation before attributing it to the heap.
 The kernel's zeroing and free-poison checks are part of its measured cost.
 
@@ -77,8 +77,18 @@ python3 tests/alloc-bench/run-vinix.py \
   --kernel /absolute/worktree/kernel/bin/vinix \
   --sysroot build/alloc-userland/staging \
   --state-dir build/alloc-vinix \
-  --iterations 200000 --samples 7
+  --iterations 200000 --samples 7 \
+  --allocator-check tests/user-alloc/verify.c
 ```
+
+The optional allocator check compiles and runs both dynamic and static link
+modes before timing, and rejects incomplete verification. The runner records
+the loader and static libc hashes and checks the staged build manifest.
+Both runners default to 200,000 base iterations, seven samples and a one-hour
+deadline for slow TCG hosts. Vinix's precise x86 clock reads the free-running
+HPET or calibrated TSC; interrupt delivery counts cannot measure these runs
+reliably. Historical captures made with the interrupt-counted clock are
+documented separately in the results directory.
 
 Configure the **macOS guest** with the same QEMU version and common options
 as the Vinix runner:
@@ -121,10 +131,10 @@ Darwin headers. The manifest records both build stages. Example additions:
 --host-sdk /Library/Developer/CommandLineTools/SDKs/MacOSX15.4.sdk
 ```
 
-Vinix's 1 ms reported clock resolution needs reasonably long samples. The
-recommended 200,000 base iterations reduce quantization compared with
-`--quick`; large allocations, mmap and pipes use 10,000 pairs per sample.
-The short mode is for smoke testing.
+Use the corrected precise clock for comparisons. The recommended 200,000
+base iterations give long samples even when allocation reuses cached memory;
+large allocations, mmap and pipes use 10,000 pairs per sample. The short
+mode is for smoke testing.
 
 ## Direct kernel workload
 

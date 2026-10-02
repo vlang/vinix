@@ -30,9 +30,11 @@ def main() -> int:
                         help="new directory for this run; existing directories are refused")
     parser.add_argument("--firmware", type=Path)
     parser.add_argument("--qemu", default="qemu-system-x86_64")
-    parser.add_argument("--iterations", type=int, default=20000)
+    parser.add_argument("--iterations", type=int, default=200000)
     parser.add_argument("--samples", type=int, default=7)
-    parser.add_argument("--timeout", type=int, default=600)
+    parser.add_argument("--timeout", type=int, default=3600)
+    parser.add_argument("--allocator-check", type=Path,
+                        help="C allocator regression program to compile and run dynamically and statically before timing")
     args = parser.parse_args()
     if not 1 <= args.iterations <= 1000000000 or not 5 <= args.samples <= 31 or args.timeout <= 0:
         parser.error("iterations must be 1..1000000000, samples 5..31, timeout positive")
@@ -40,7 +42,11 @@ def main() -> int:
     qemu = Path(shutil.which(args.qemu) or args.qemu).resolve()
     firmware = (args.firmware or qemu.parent.parent / "share/qemu/edk2-x86_64-code.fd").resolve()
     source = ROOT / "tests/alloc-bench/bench.c"
-    for path in [kernel, firmware, source, sysroot / "usr/bin/gcc", sysroot / "bin/busybox"]:
+    inputs = [kernel, firmware, source, sysroot / "usr/bin/gcc", sysroot / "bin/busybox",
+              sysroot / "lib/ld-musl-x86_64.so.1", sysroot / "usr/lib/libc.a"]
+    if args.allocator_check:
+        inputs.append(args.allocator_check.resolve())
+    for path in inputs:
         if not path.is_file():
             parser.error(f"required input missing: {path}")
     state = args.state_dir.resolve()
@@ -53,6 +59,27 @@ def main() -> int:
     guest_source = rootfs / "root/alloc-bench.c"
     shutil.copyfile(source, guest_source)
     source_hash = hashlib.sha256(guest_source.read_bytes()).hexdigest()
+    allocator_check = ""
+    if args.allocator_check:
+        check_source = rootfs / "root/allocator-check.c"
+        check_source.write_bytes(args.allocator_check.resolve().read_bytes())
+        allocator_check = """
+echo UALLOC-VERIFY-BEGIN
+for linkage in dynamic static; do
+    echo UALLOC-LINKAGE mode=$linkage
+    extra=
+    [ "$linkage" = static ] && extra=-static
+    gcc """ + shlex.join(FLAGS) + """ -pthread $extra /root/allocator-check.c -o /root/allocator-check || {
+        echo ALLOC-FAIL stage=allocator-check-compile
+        while :; do sleep 60; done
+    }
+    /root/allocator-check || {
+        echo ALLOC-FAIL stage=allocator-check
+        while :; do sleep 60; done
+    }
+done
+echo UALLOC-VERIFY-COMPLETE
+"""
     init = rootfs / "sbin/init"
     init.unlink(missing_ok=True)
     init.write_text("""#!/bin/sh
@@ -62,7 +89,7 @@ mount -t proc proc /proc
 echo ALLOC-COMPILE-BEGIN
 gcc --version | head -n 1
 gcc -dM -E - </dev/null | grep __clang__ && exit 1
-gcc """ + shlex.join(FLAGS) + """ /root/alloc-bench.c -o /root/alloc-bench || {
+""" + allocator_check + "gcc " + shlex.join(FLAGS) + """ /root/alloc-bench.c -o /root/alloc-bench || {
     echo ALLOC-FAIL stage=compile
     while :; do sleep 60; done
 }
@@ -96,6 +123,18 @@ while :; do sleep 60; done
         "compile_flags": FLAGS, "iterations": args.iterations, "samples": args.samples,
         "argv": command,
     }
+    loader = rootfs / "lib/ld-musl-x86_64.so.1"
+    config["libc_sha256"] = hashlib.sha256(loader.read_bytes()).hexdigest()
+    config["libc_a_sha256"] = hashlib.sha256((rootfs / "usr/lib/libc.a").read_bytes()).hexdigest()
+    libc_manifest = rootfs / "usr/share/vinix/musl-build.json"
+    if libc_manifest.is_file():
+        config["libc_build"] = json.loads(libc_manifest.read_text())
+        for field, actual in [("libc_so_sha256", config["libc_sha256"]),
+                              ("libc_a_sha256", config["libc_a_sha256"])]:
+            if config["libc_build"].get(field) != actual:
+                raise RuntimeError(f"staged libc does not match build manifest: {field}")
+    if args.allocator_check:
+        config["allocator_check_sha256"] = hashlib.sha256(check_source.read_bytes()).hexdigest()
     (state / "config.json").write_text(json.dumps(config, indent=2) + "\n")
     print(f"Booting benchmark; output: {serial}", flush=True)
     with (state / "qemu.log").open("wb") as log:
@@ -112,11 +151,14 @@ while :; do sleep 60; done
                         if stage != last_stage:
                             print(stage, flush=True)
                             last_stage = stage
-                if any(marker in output for marker in ["KERNEL PANIC", "FATAL EXCEPTION", "ALLOC-FAIL", "ALLOC-ERROR"]):
+                if any(marker in output for marker in ["KERNEL PANIC", "FATAL EXCEPTION", "ALLOC-FAIL", "ALLOC-ERROR", "UALLOC-FAIL"]):
                     raise RuntimeError(f"guest failed; see {serial}")
                 if "ALLOC-GUEST-DONE" in output:
                     if "ALLOC-DONE" not in output:
                         raise RuntimeError(f"benchmark did not finish; see {serial}")
+                    if args.allocator_check and ("UALLOC-VERIFY-COMPLETE" not in output or
+                            sum(line.startswith("UALLOC-DONE ") for line in output.splitlines()) != 2):
+                        raise RuntimeError(f"allocator verification incomplete; see {serial}")
                     print("\n".join(line for line in output.splitlines() if line.startswith("ALLOC-")), flush=True)
                     return 0
                 if process.poll() is not None:

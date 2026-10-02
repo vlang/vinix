@@ -28,9 +28,9 @@ def main() -> int:
     parser.add_argument("--vm-config", type=Path, required=True,
                         help="recorded QEMU configuration of the target VM")
     parser.add_argument("--state-dir", type=Path, required=True)
-    parser.add_argument("--iterations", type=int, default=20000)
+    parser.add_argument("--iterations", type=int, default=200000)
     parser.add_argument("--samples", type=int, default=7)
-    parser.add_argument("--timeout", type=int, default=600)
+    parser.add_argument("--timeout", type=int, default=3600)
     args = parser.parse_args()
     if not 1 <= args.iterations <= 1000000000 or not 5 <= args.samples <= 31 or args.timeout <= 0:
         parser.error("iterations must be 1..1000000000, samples 5..31, timeout positive")
