@@ -147,6 +147,9 @@ fn syscall_linux_capset(_ voidptr, header_ptr u64, data_ptr u64) (u64, u64) {
 	caps.effective = effective
 	caps.permitted = permitted
 	caps.inheritable = inheritable
+	// Ambient privileges must always be a subset of both sets. Otherwise
+	// dropping a capability here can silently regain it on the next exec.
+	caps.ambient &= permitted & inheritable
 	process.caps = caps
 	return 0, 0
 }
@@ -302,18 +305,18 @@ fn syscall_container_prctl(gpr_state voidptr, option int, arg2 u64, arg3 u64, ar
 			return if process.caps.keep { u64(1) } else { u64(0) }, 0
 		}
 		pr_cap_ambient {
-			// arg2: 1 raise, 2 lower, 3 is_set, 4 clear_all.
+			// Linux ABI: 1 is_set, 2 raise, 3 lower, 4 clear_all.
 			match arg2 {
 				4 {
 					process.caps.ambient = 0
 					return 0, 0
 				}
-				1, 2 {
+				2, 3 {
 					if arg3 > u64(proc.cap_last_cap) {
 						return errno.err, errno.einval
 					}
 					bit := u64(1) << arg3
-					if arg2 == 1 {
+					if arg2 == 2 {
 						if process.caps.permitted & bit == 0 || process.caps.inheritable & bit == 0 {
 							return errno.err, errno.eperm
 						}
@@ -323,7 +326,7 @@ fn syscall_container_prctl(gpr_state voidptr, option int, arg2 u64, arg3 u64, ar
 					}
 					return 0, 0
 				}
-				3 {
+				1 {
 					if arg3 > u64(proc.cap_last_cap) {
 						return errno.err, errno.einval
 					}

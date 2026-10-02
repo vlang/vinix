@@ -19,6 +19,9 @@ uint32_t vinix_tcp_isn(uint32_t a, uint16_t b, uint32_t c, uint16_t d) {
 uint32_t vinix_tcp_isn_bytes(const void *a, uint16_t b, const void *c, uint16_t d, unsigned n) {
     (void)a; (void)b; (void)c; (void)d; (void)n; return 0x12345678;
 }
+uint32_t vinix_tcp_isn6(const uint32_t a[4], uint16_t b, const uint32_t c[4], uint16_t d) {
+    (void)a; (void)b; (void)c; (void)d; return 0x12345678;
+}
 int vinix_virtio_net_send(const void *p, uint64_t n) { (void)p; (void)n; return 0; }
 int vinix_apple_wifi_send(const void *p, uint64_t n) { (void)p; (void)n; return 0; }
 int vinix_e1000_send(const void *p, uint64_t n) { (void)p; (void)n; return 0; }

@@ -174,11 +174,13 @@ fn do_select(nfds int, readfds u64, writefds u64, exceptfds u64, timed bool, dea
 		return 0, 0
 	}
 
-	mut remaining := deadline
+	mut remaining := unsafe { &time.TimeSpec(C.vinix_stack_alloc(sizeof(time.TimeSpec))) }
+	unsafe { *remaining = deadline }
 	mut timeout_ptr := &time.TimeSpec(unsafe { nil })
 	if timed {
-		// In unsafe, so that the copy stays on the stack: see getdents64.
-		timeout_ptr = unsafe { &remaining }
+		// ppoll consumes this synchronously. An ordinary local whose address
+		// escapes is heap-promoted by V even through unsafe, losing 16 bytes.
+		timeout_ptr = remaining
 	}
 
 	ready, err := ppoll(unsafe { &polls[0] }, u64(polls.len), timeout_ptr, unsafe { nil })

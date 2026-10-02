@@ -17,11 +17,10 @@ import x86.hypervisor
 
 // asm/x86_64/syscall_entry.S
 fn C.syscall_entry()
+fn C.vinix_x86_mitigations_initialise(number u64) bool
 
 // asm/x86_64/segment.S
 fn C.syscall32_entry()
-
-fn C.vinix_speculation_init(cpu_number u64) u64
 
 const cpuid7_ebx_smep = u32(1) << 7
 const cpuid7_ebx_smap = u32(1) << 20
@@ -53,8 +52,6 @@ pub fn initialise(smp_info &limine.LimineSMPInfo) {
 	cpu_local.tss.iopb = u16(sizeof(cpulocal.TSS))
 	gdt.load_tss(&cpu_local.gdt[0], voidptr(&cpu_local.tss))
 
-	cpu_local.tss.ist4 = u64(&cpu_local.abort_stack[cpulocal.abort_stack_size - 1])
-
 	// EFER is per-CPU. APs must enable NXE before switching to Vinix page
 	// tables, just as the BSP does during vmm_init().
 	memory.enable_nx()
@@ -62,19 +59,16 @@ pub fn initialise(smp_info &limine.LimineSMPInfo) {
 
 	unsafe {
 		stack_size := u64(0x200000)
-
-		common_int_stack_phys := memory.pmm_alloc(stack_size / page_size)
-		mut common_int_stack := &u64(u64(common_int_stack_phys) + stack_size + higher_half)
-		cpu_local.tss.rsp0 = u64(common_int_stack)
-
-		sched_stack_phys := memory.pmm_alloc(stack_size / page_size)
-		mut sched_stack := &u64(u64(sched_stack_phys) + stack_size + higher_half)
-		cpu_local.tss.ist1 = u64(sched_stack)
+		cpu_local.tss.rsp0 = cpu_stack_top(stack_size)
+		cpu_local.tss.ist1 = cpu_stack_top(stack_size)
+		// A fault while the page-fault stack itself is exhausted must still
+		// have an independent stack for the fatal double-fault report.
+		cpu_local.tss.ist2 = cpu_stack_top(0x10000)
+		cpu_local.tss.ist4 = cpu_stack_top(0x10000)
 
 		// Every thread brings its own page fault stack; this one is for the
 		// CPU between threads.
-		idle_pf_stack_phys := memory.pmm_alloc(stack_size / page_size)
-		cpu_local.idle_pf_stack = u64(idle_pf_stack_phys) + stack_size + higher_half
+		cpu_local.idle_pf_stack = cpu_stack_top(stack_size)
 		cpu_local.tss.ist3 = cpu_local.idle_pf_stack
 	}
 	// Enable syscall
@@ -101,8 +95,6 @@ pub fn initialise(smp_info &limine.LimineSMPInfo) {
 
 	cpu.set_gs_base(u64(&cpu_local.cpu_number))
 	cpu.set_kernel_gs_base(u64(&cpu_local.cpu_number))
-
-	cpu_local.speculation_policy = C.vinix_speculation_init(cpu_number)
 
 	// Enable SSE/SSE2 and make supervisor writes obey read-only PTEs. OpenBSD
 	// explicitly enables CR0.WP so kernel text and rodata cannot be modified
@@ -223,6 +215,11 @@ pub fn initialise(smp_info &limine.LimineSMPInfo) {
 		fpu_restore = cpu.fxrstor
 	}
 
+	// Program this logical CPU before it can run any user instruction.
+	if !C.vinix_x86_mitigations_initialise(cpu_number) {
+		panic('CPU speculation controls did not take effect')
+	}
+
 	// VMXON is local to each logical CPU. Failure is deliberately non-fatal:
 	// Vinix must still boot when firmware disables VT-x or a host does not
 	// expose nested virtualisation.
@@ -238,6 +235,13 @@ pub fn initialise(smp_info &limine.LimineSMPInfo) {
 
 	if cpu_number != 0 {
 		for katomic.load(&scheduler_vector) == 0 {}
-		sched.await()
+		sched.enter_idle()
 	}
+}
+
+// Per-CPU mappings live for the CPU's lifetime, including fatal reporting.
+fn cpu_stack_top(size u64) u64 {
+	base := memory.kernel_stack_alloc(size)
+	if base == unsafe { nil } { panic('Cannot allocate guarded CPU stack') }
+	return u64(base) + size
 }

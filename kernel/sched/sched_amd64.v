@@ -17,10 +17,10 @@ import krandom
 import klock
 
 fn C.vinix_call_void_fn(f voidptr)
+@[noreturn]
+fn C.vinix_x86_resume_context(frame &cpulocal.GPRState, cpu_number u64)
 fn C.vinix_linuxkpi_workqueue_task_sleep(task voidptr)
 fn C.vinix_linuxkpi_workqueue_task_resume(task voidptr)
-fn C.vinix_speculation_switch(policy u64)
-fn C.vinix_speculation_fill_rsb()
 
 __global (
 	// Hardware that this kernel drives without interrupts -- a network card --
@@ -76,6 +76,8 @@ pub fn initialise() {
 		caps:    proc.full_capabilities()
 		fds:     unsafe { []voidptr{len: proc.initial_fds} }
 	}
+	memory.kernel_stack_selftest()
+	selftest_thread_stacks()
 }
 
 // The scheduler's clock: the monotonic clock, which the timer tick advances.
@@ -232,6 +234,7 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 		// CPU, so the turn it has just had is charged to its process. The
 		// monotonic clock is the tick source here rather than a counter read,
 		// which puts the resolution at one timer tick.
+		proc.account_context_switch(current_thread, !katomic.load(&current_thread.is_in_queue))
 		proc.charge_cpu_time(mut current_thread, now_ns)
 		if preset {
 			current_thread.context_preset = false
@@ -291,8 +294,6 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 
 	// Include dispatch from idle: it may retain a previous process's predictor
 	// state. Run before hooks or context restoration consume the new thread.
-	C.vinix_speculation_switch(cpu_local.speculation_policy)
-	C.vinix_speculation_fill_rsb()
 	current_thread = next_thread
 	publish_dispatch_priority(cpu_local.cpu_number, current_thread, now_ns)
 	$if linuxkpi ? {
@@ -359,36 +360,8 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 	}
 	cpu.set_fs_base(fs_base)
 
-	new_gpr_state := &current_thread.gpr_state
-
-	asm volatile amd64 {
-		mov rsp, new_gpr_state
-		pop rax
-		mov ds, eax
-		pop rax
-		mov es, eax
-		pop rax
-		pop rbx
-		pop rcx
-		pop rdx
-		pop rsi
-		pop rdi
-		pop rbp
-		pop r8
-		pop r9
-		pop r10
-		pop r11
-		pop r12
-		pop r13
-		pop r14
-		pop r15
-		add rsp, 8
-		swapgs
-		lfence
-		iretq
-		; ; rm (new_gpr_state)
-		; memory
-	}
+	// Assembly also applies the local return policy and overwrites the RSB.
+	C.vinix_x86_resume_context(&current_thread.gpr_state, cpu_local.cpu_number)
 
 	for {
 	}
@@ -655,56 +628,13 @@ pub fn reschedule() {
 }
 
 pub fn new_kernel_thread(pc voidptr, arg voidptr, autoenqueue bool) &proc.Thread {
-	stack_phys := memory.pmm_alloc(stack_size / page_size)
-	stack := u64(stack_phys) + stack_size + higher_half
-	pf_stack_phys := memory.pmm_alloc(stack_size / page_size)
-	// IRET enters the function without CALL pushing a return address. The
-	// SysV ABI still requires (RSP + 8) to be 16-byte aligned at entry, so
-	// reserve that word within the owned stack rather than starting at its top.
-	entry_stack := stack - 8
-	unsafe { C.memset(voidptr(entry_stack), 0, 8) }
-
-	gpr_state := cpulocal.GPRState{
-		cs:     kernel_code_seg
-		ds:     kernel_data_seg
-		es:     kernel_data_seg
-		ss:     kernel_data_seg
-		rflags: 0x202
-		rip:    u64(pc)
-		rdi:    u64(arg)
-		rbp:    u64(0)
-		rsp:    entry_stack
-	}
-
-	mut t := &proc.Thread{
-		process:      kernel_process
-		cr3:          u64(kernel_process.pagemap.top_level)
-		gpr_state:    gpr_state
-		timeslice:    5000
-		running_on:   u64(-1)
-		kernel_stack: stack
-		pf_stack:     u64(pf_stack_phys) + stack_size + higher_half
-		fpu_storage:  voidptr(u64(memory.pmm_alloc(lib.div_roundup(fpu_storage_size, page_size))) + higher_half)
-	}
-
-	t.self = voidptr(t)
-	t.gs_base = u64(voidptr(t))
-	proc.linuxkpi_init_task(mut t, unsafe { nil })
-
-	if autoenqueue == true {
-		enqueue_thread(t, false)
-	}
-
+	t := try_new_kernel_thread(pc, arg) or { panic('Cannot allocate guarded kernel thread') }
+	if autoenqueue { enqueue_thread(t, false) }
 	return t
 }
 
 pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg voidptr, _stack u64, argv []string, envp []string, auxval &elf.Auxval, autoenqueue bool) ?&proc.Thread {
 	mut process := unsafe { _process }
-
-	mut stacks := []voidptr{}
-	defer {
-		unsafe { stacks.free() }
-	}
 
 	mut stack_vma := u64(0)
 	mut stack_bottom_vma := u64(0)
@@ -715,13 +645,16 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 		stack_vma = _stack
 	}
 
-	kernel_stack_phys := memory.pmm_alloc(stack_size / page_size)
-	stacks << kernel_stack_phys
-	kernel_stack := u64(kernel_stack_phys) + stack_size + higher_half
+	kernel_stack_base := memory.kernel_stack_alloc(stack_size)
+	if kernel_stack_base == unsafe { nil } { errno.set(errno.enomem); return none }
+	kernel_stack := u64(kernel_stack_base) + stack_size
 
-	pf_stack_phys := memory.pmm_alloc(stack_size / page_size)
-	stacks << pf_stack_phys
-	pf_stack := u64(pf_stack_phys) + stack_size + higher_half
+	pf_stack_base := memory.kernel_stack_alloc(stack_size)
+	if pf_stack_base == unsafe { nil } {
+		memory.kernel_stack_free(u64(kernel_stack_base))
+		errno.set(errno.enomem); return none
+	}
+	pf_stack := u64(pf_stack_base) + stack_size
 
 	gpr_state := cpulocal.GPRState{
 		cs:     user_code_seg
@@ -734,7 +667,21 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 		rsp:    u64(stack_vma)
 	}
 
-	mut t := &proc.Thread{
+	fpu_phys := memory.pmm_alloc_fallible(lib.div_roundup(fpu_storage_size, page_size))
+	if fpu_phys == unsafe { nil } {
+		memory.kernel_stack_free(u64(pf_stack_base))
+		memory.kernel_stack_free(u64(kernel_stack_base))
+		errno.set(errno.enomem); return none
+	}
+	thread_mem := memory.malloc_packed_fallible(sizeof(proc.Thread))
+	if thread_mem == unsafe { nil } {
+		memory.pmm_free(fpu_phys, lib.div_roundup(fpu_storage_size, page_size))
+		memory.kernel_stack_free(u64(pf_stack_base))
+		memory.kernel_stack_free(u64(kernel_stack_base))
+		errno.set(errno.enomem); return none
+	}
+	mut t := unsafe { &proc.Thread(thread_mem) }
+	unsafe { *t = proc.Thread{
 		process:      process
 		cr3:          u64(process.pagemap.top_level)
 		gpr_state:    gpr_state
@@ -742,8 +689,12 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 		running_on:   u64(-1)
 		kernel_stack: kernel_stack
 		pf_stack:     pf_stack
-		stacks:       stacks
-		fpu_storage:  voidptr(u64(memory.pmm_alloc(lib.div_roundup(fpu_storage_size, page_size))) + higher_half)
+		fpu_storage:  voidptr(u64(fpu_phys) + higher_half)
+	} }
+
+	mut attached := false
+	defer {
+		if !attached { free_thread_memory(t) }
 	}
 
 	t.self = voidptr(t)
@@ -779,7 +730,6 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 	if want_elf == true {
 		t.gpr_state.rsp = build_initial_stack(mut process, stack_vma, stack_bottom_vma, argv, envp,
 			auxval) or {
-			free_thread_memory(t)
 			return none
 		}
 	}
@@ -791,10 +741,10 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 	// the identical lock; attach_thread() holds it across the append. The
 	// thread is numbered before it can run, so gettid() never sees it bare.
 	attach_thread(mut process, mut t) or {
-		free_thread_memory(t)
 		errno.set(errno.eagain)
 		return none
 	}
+	attached = true
 	proc.linuxkpi_init_task(mut t, unsafe { nil })
 
 	if autoenqueue == true {
@@ -817,30 +767,44 @@ pub fn new_cloned_thread(_process &proc.Process, _source &proc.Thread, state &cp
 	mut process := unsafe { _process }
 	mut source := unsafe { _source }
 
-	kernel_stack_phys := memory.pmm_alloc(stack_size / page_size)
-	pf_stack_phys := memory.pmm_alloc(stack_size / page_size)
-	fpu_phys := memory.pmm_alloc(lib.div_roundup(fpu_storage_size, page_size))
-	if kernel_stack_phys == unsafe { nil } || pf_stack_phys == unsafe { nil }
-		|| fpu_phys == unsafe { nil } {
-		errno.set(errno.eagain)
-		return none
+	kernel_stack_base := memory.kernel_stack_alloc(stack_size)
+	if kernel_stack_base == unsafe { nil } { errno.set(errno.enomem); return none }
+	pf_stack_base := memory.kernel_stack_alloc(stack_size)
+	if pf_stack_base == unsafe { nil } {
+		memory.kernel_stack_free(u64(kernel_stack_base))
+		errno.set(errno.enomem); return none
+	}
+	fpu_pages := lib.div_roundup(fpu_storage_size, page_size)
+	fpu_phys := memory.pmm_alloc_fallible(fpu_pages)
+	if fpu_phys == unsafe { nil } {
+		memory.kernel_stack_free(u64(pf_stack_base))
+		memory.kernel_stack_free(u64(kernel_stack_base))
+		errno.set(errno.enomem); return none
+	}
+	thread_mem := memory.malloc_packed_fallible(sizeof(proc.Thread))
+	if thread_mem == unsafe { nil } {
+		memory.pmm_free(fpu_phys, fpu_pages)
+		memory.kernel_stack_free(u64(pf_stack_base))
+		memory.kernel_stack_free(u64(kernel_stack_base))
+		errno.set(errno.enomem); return none
 	}
 
-	mut t := &proc.Thread{
+	mut t := unsafe { &proc.Thread(thread_mem) }
+	unsafe { *t = proc.Thread{
 		process:        process
 		cr3:            u64(process.pagemap.top_level)
 		gpr_state:      *state
 		timeslice:      source.timeslice
 		running_on:     u64(-1)
-		kernel_stack:   u64(kernel_stack_phys) + stack_size + higher_half
-		pf_stack:       u64(pf_stack_phys) + stack_size + higher_half
+		kernel_stack:   u64(kernel_stack_base) + stack_size
+		pf_stack:       u64(pf_stack_base) + stack_size
 		fpu_storage:    voidptr(u64(fpu_phys) + higher_half)
 		sigactions:     source.sigactions
 		masked_signals: source.masked_signals
 		affinity_mask:  source.affinity_mask
 		sched:          inherited_sched_params(source)
 		comm:           source.comm.clone()
-	}
+	} }
 
 	t.self = voidptr(t)
 	// In a syscall the user's GS base is the one swapgs put aside.
@@ -861,6 +825,8 @@ pub fn new_cloned_thread(_process &proc.Process, _source &proc.Thread, state &cp
 	t.gpr_state.rsp = child_sp
 
 	attach_thread(mut process, mut t) or {
+		// No tid, process-list entry, runqueue slot or event published t.
+		free_thread_memory(t)
 		errno.set(errno.eagain)
 		return none
 	}
@@ -889,6 +855,16 @@ pub fn await() {
 	}
 }
 
+fn C.vinix_enter_idle(stack_top u64, entry voidptr, arg voidptr)
+
+@[noreturn]
+pub fn enter_idle() {
+	asm volatile amd64 { cli }
+	top := cpulocal.current().tss.rsp0
+	C.vinix_enter_idle(top, voidptr(await), unsafe { nil })
+	for {}
+}
+
 // ITIMER_REAL is counted down by the clock tick here: see sched/itimer.v.
 fn itimer_armed() {
 	if katomic.cas(mut &itimer_hook_claimed, u32(0), u32(1)) {
@@ -906,7 +882,7 @@ __global (
 
 // ── giving back the stacks of dead threads ──────────────────────────────────
 
-// Every thread has a 2 MiB kernel stack, a 2 MiB page fault stack and its FPU
+// Every thread owns a guarded kernel stack, a guarded page fault stack and its FPU
 // area. They used to be kept forever, so every process and thread a program
 // started cost 4 MiB for the rest of the machine's life: a session of shell
 // prompts, compiles and git clones ran a 4 GiB machine out of memory.
@@ -926,16 +902,14 @@ pub fn bury_thread(t &proc.Thread) {
 	graveyard_lock.release()
 }
 
-// The stacks are found from their tops, which the thread keeps; its `stacks`
-// array cannot be used for this, as the functions that make threads free it
-// once they have copied it in.
+// The Thread owns each mapping through its top until the last CPU leaves it.
 fn free_thread_stacks(mut t proc.Thread) {
 	if t.kernel_stack != 0 {
-		memory.pmm_free(voidptr(t.kernel_stack - stack_size - higher_half), stack_size / page_size)
+		memory.kernel_stack_free(t.kernel_stack - stack_size)
 		t.kernel_stack = 0
 	}
 	if t.pf_stack != 0 {
-		memory.pmm_free(voidptr(t.pf_stack - stack_size - higher_half), stack_size / page_size)
+		memory.kernel_stack_free(t.pf_stack - stack_size)
 		t.pf_stack = 0
 	}
 	if t.fpu_storage != unsafe { nil } {

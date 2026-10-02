@@ -50,13 +50,14 @@ mut:
 	owner  &proc.Process = unsafe { nil }
 
 	clock_id int
+	absolute_realtime bool
 	notify   int
 	signum   int
 	tid      int
 	value    u64
 
-	// Deadlines use the monotonic clock internally. Absolute realtime timers
-	// are translated when armed, matching the clocks Vinix currently keeps.
+	// Relative deadlines use monotonic time; absolute realtime deadlines
+	// stay on the realtime clock so wall-clock steps adjust their remaining time.
 	deadline_ns u64
 	interval_ns u64
 
@@ -177,9 +178,11 @@ pub fn tick_posix_timers() {
 		return
 	}
 
-	now_ns := time.monotonic_ns()
+	mono_ns := time.monotonic_ns()
+	wall_ns := clock_now_ns(clock_realtime) or { u64(0) }
 	for i := 0; i < max_posix_timers; i++ {
 		mut timer := unsafe { &posix_timers[i] }
+		now_ns := if timer.absolute_realtime { wall_ns } else { mono_ns }
 		if !timer.in_use || timer.deadline_ns == 0 || now_ns < timer.deadline_ns {
 			continue
 		}
@@ -343,11 +346,14 @@ pub fn syscall_timer_settime(_ voidptr, timer_id int, flags int, new_value u64, 
 	}
 	mut timer := find_timer(timer_id, owner) or { return errno.err, errno.get() }
 	now_ns := time.monotonic_ns()
+	if flags & timer_abstime == 0 && value_ns > u64(-1) - now_ns {
+		return errno.err, errno.eoverflow
+	}
 
 	if old_value != 0 {
 		mut previous := [2]time.TimeSpec{}
 		previous[0] = ns_to_timespec(timer.interval_ns)
-		previous[1] = ns_to_timespec(remaining(timer, now_ns))
+		previous[1] = ns_to_timespec(remaining(timer, if timer.absolute_realtime { clock_now_ns(clock_realtime) or { u64(0) } } else { now_ns }))
 		if !usercopy.copy_to_user(old_value, voidptr(&previous[0]), itimerspec_size) {
 			return errno.err, errno.efault
 		}
@@ -358,23 +364,13 @@ pub fn syscall_timer_settime(_ voidptr, timer_id int, flags int, new_value u64, 
 		timer.deadline_ns = 0
 		return 0, 0
 	}
+	timer.absolute_realtime = flags & timer_abstime != 0 && timer.clock_id == clock_realtime
 	if flags & timer_abstime != 0 {
-		clock_ns := clock_now_ns(timer.clock_id) or { return errno.err, errno.einval }
-		if value_ns <= clock_ns {
-			timer.deadline_ns = now_ns
-		} else {
-			delay := value_ns - clock_ns
-			if delay > u64(-1) - now_ns {
-				return errno.err, errno.eoverflow
-			}
-			timer.deadline_ns = now_ns + delay
-		}
+		timer.deadline_ns = value_ns
 	} else {
-		if value_ns > u64(-1) - now_ns {
-			return errno.err, errno.eoverflow
-		}
 		timer.deadline_ns = now_ns + value_ns
 	}
+
 	return 0, 0
 }
 
@@ -391,7 +387,7 @@ pub fn syscall_timer_gettime(_ voidptr, timer_id int, current_value u64) (u64, u
 	timer := find_timer(timer_id, owner) or { return errno.err, errno.get() }
 	mut current := [2]time.TimeSpec{}
 	current[0] = ns_to_timespec(timer.interval_ns)
-	current[1] = ns_to_timespec(remaining(timer, time.monotonic_ns()))
+	current[1] = ns_to_timespec(remaining(timer, if timer.absolute_realtime { clock_now_ns(clock_realtime) or { u64(0) } } else { time.monotonic_ns() }))
 	if !usercopy.copy_to_user(current_value, voidptr(&current[0]), itimerspec_size) {
 		return errno.err, errno.efault
 	}

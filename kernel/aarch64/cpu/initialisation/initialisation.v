@@ -13,9 +13,11 @@ import sched
 // memory/user_guard.v.
 pub fn enable_user_guard(announce bool) {
 	if memory.user_guard_requested() == memory.user_guard_off {
+		memory.disable_execute_only()
 		return
 	}
 	if !cpu.has_pan() {
+		memory.disable_execute_only()
 		memory.user_guard_unsupported()
 		return
 	}
@@ -25,10 +27,12 @@ pub fn enable_user_guard(announce bool) {
 	if cpu.read_currentel() == 2 {
 		memory.user_guard_untested()
 		if memory.user_guard_requested() == memory.user_guard_off {
+			memory.disable_execute_only()
 			return
 		}
 	}
 	cpu.enable_pan()
+	if !cpu.has_epan() { memory.disable_execute_only() }
 	if announce {
 		println(if memory.user_guard_auditing() {
 			'security: PAN enabled, auditing'
@@ -59,6 +63,8 @@ pub fn initialise(smp_info &limine.LimineSMPInfo) {
 	// that only switched TTBR0 kept translating the higher half through the
 	// bootloader's tables.
 	memory.vmm_activate_on_cpu()
+	exception.install_guarded_stack(cpu_number)
+	sched.prepare_cpu_stacks(cpu_number)
 
 	enable_user_guard(cpu_number == 0)
 
@@ -97,6 +103,6 @@ pub fn initialise(smp_info &limine.LimineSMPInfo) {
 				; ; ; memory
 			}
 		}
-		sched.await()
+		sched.enter_idle()
 	}
 }

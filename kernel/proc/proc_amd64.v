@@ -100,6 +100,10 @@ pub mut:
 	pending_signals    u64
 	masked_signals     u64
 	enqueued_by_signal bool
+	job_stop_generation           u64
+	job_delivered_stop_generation u64
+	job_parked_generation         u64
+	job_event                     eventstruct.Event
 	// The signals rt_sigtimedwait(2) is waiting for on this thread, and zero
 	// the rest of the time.
 	sigwait_set u64
@@ -109,7 +113,6 @@ pub mut:
 	pending_signal_codes    [64]int
 	pending_signal_values   [64]u64
 	pending_signal_overruns [64]int
-	stacks                  []voidptr
 	// The name PR_SET_NAME gave the thread; empty for one never named.
 	comm              string
 	attached_events   [max_events]&eventstruct.Event
@@ -119,6 +122,7 @@ pub mut:
 	// moment it is switched away, so the running total never counts a span
 	// twice and never counts one that has not finished.
 	scheduled_at_ns u64
+	usage UsageCounters
 	cpu_time_ns     u64
 	cpu_user_ns     u64
 	cpu_system_ns   u64

@@ -11,7 +11,7 @@ import usercopy
 pub fn nsleep(ns i64) {
 	mut interval := time.TimeSpec{
 		tv_sec:  ns / 1000000000
-		tv_nsec: ns
+		tv_nsec: ns % 1000000000
 	}
 
 	mut timer := time.new_timer(interval)
@@ -101,26 +101,16 @@ pub const rusage_thread = 1
 // 64-bit architectures. User/system time comes from the same counters that
 // drive ITIMER_VIRTUAL/PROF and the process CPU clocks.
 pub fn syscall_getrusage(_ voidptr, who int, usage u64) (u64, u64) {
-	if usage == 0 { return errno.err, errno.efault }
-	now_ns := time.monotonic_ns()
-	current := proc.current_thread()
-	mut user_ns := u64(0)
-	mut system_ns := u64(0)
-	match who {
-		rusage_self { user_ns, system_ns = proc.process_cpu_times(current.process, now_ns) }
-		rusage_children {
-			user_ns = current.process.children_cpu_user_ns
-			system_ns = current.process.children_cpu_system_ns
-		}
-		rusage_thread { user_ns, system_ns = proc.thread_cpu_times(current, now_ns) }
-		else { return errno.err, errno.einval }
+	if who != rusage_self && who != rusage_children && who != rusage_thread {
+		return errno.err, errno.einval
 	}
-	mut result := [18]i64{}
-	result[0] = i64(user_ns / 1000000000)
-	result[1] = i64((user_ns % 1000000000) / 1000)
-	result[2] = i64(system_ns / 1000000000)
-	result[3] = i64((system_ns % 1000000000) / 1000)
-	if !usercopy.copy_to_user(usage, voidptr(&result[0]), sizeof(i64) * 18) {
+	if usage == 0 { return errno.err, errno.efault }
+	mut result := unsafe { &proc.Rusage(C.vinix_stack_alloc(sizeof(proc.Rusage))) }
+	unsafe { *result = proc.Rusage{} }
+	if !proc.fill_rusage(mut result, who, time.monotonic_ns()) {
+		return errno.err, errno.einval
+	}
+	if !usercopy.copy_to_user(usage, result, sizeof(proc.Rusage)) {
 		return errno.err, errno.efault
 	}
 	return 0, 0

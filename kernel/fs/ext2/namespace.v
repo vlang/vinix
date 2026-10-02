@@ -301,7 +301,7 @@ fn resource_from_inode(filesystem &EXT2Filesystem, inode_index u32,
 	res.stat.mode = inode.permissions
 	res.stat.uid = inode.user_id
 	res.stat.gid = inode.group_id
-	res.stat.size = i64(u64(inode.size32l) | (u64(inode.size32h) << 32))
+	res.stat.size = i64(inode.size())
 	res.stat.nlink = inode.hard_link_cnt
 	res.stat.blksize = i64(filesystem.block_size)
 	res.stat.blocks = inode.sector_cnt
@@ -330,7 +330,7 @@ fn (mut filesystem EXT2Filesystem) create_persistent(parent &vfs.VFSNode,
 		return unsafe { nil }
 	})
 	now := ext2_now()
-	mut inode := unsafe { &EXT2Inode(C.__builtin_alloca(sizeof(EXT2Inode))) }
+	mut inode := unsafe { &EXT2Inode(C.vinix_stack_alloc(sizeof(EXT2Inode))) }
 	unsafe { *inode = EXT2Inode{
 		permissions:   u16(if stat.isdir(mode) && parent.resource.stat.mode & 0o2000 != 0 {
 			mode | 0o2000
@@ -373,7 +373,7 @@ fn (mut filesystem EXT2Filesystem) create_persistent(parent &vfs.VFSNode,
 		}
 	}
 
-	mut parent_inode := unsafe { &EXT2Inode(C.__builtin_alloca(sizeof(EXT2Inode))) }
+	mut parent_inode := unsafe { &EXT2Inode(C.vinix_stack_alloc(sizeof(EXT2Inode))) }
 	unsafe { *parent_inode = EXT2Inode{} }
 	parent_inode.read_entry(mut filesystem, u32(parent.resource.stat.ino)) or {
 		inode.free_entry(mut filesystem, inode_index) or {}
@@ -410,7 +410,8 @@ fn (mut filesystem EXT2Filesystem) create_persistent(parent &vfs.VFSNode,
 fn (mut this EXT2Resource) link(_handle voidptr) ? {
 	this.filesystem.l.acquire()
 	defer { this.filesystem.l.release() }
-	mut inode := EXT2Inode{}
+	mut inode := unsafe { &EXT2Inode(C.vinix_stack_alloc(sizeof(EXT2Inode))) }
+	unsafe { *inode = EXT2Inode{} }
 	inode.read_entry(mut this.filesystem, u32(this.stat.ino))?
 	if inode.hard_link_cnt == 0xffff {
 		errno.set(errno.emlink)
@@ -429,13 +430,13 @@ fn (mut this EXT2Resource) unlink(handle voidptr) ? {
 	if unsafe { node.parent == nil } { errno.set(errno.einval); return none }
 	this.filesystem.l.acquire()
 	defer { this.filesystem.l.release() }
-	mut parent_inode := unsafe { &EXT2Inode(C.__builtin_alloca(sizeof(EXT2Inode))) }
+	mut parent_inode := unsafe { &EXT2Inode(C.vinix_stack_alloc(sizeof(EXT2Inode))) }
 	unsafe { *parent_inode = EXT2Inode{} }
 	parent_index := u32(node.parent.resource.stat.ino)
 	parent_inode.read_entry(mut this.filesystem, parent_index)?
 	removed := this.filesystem.dir_remove(mut parent_inode, parent_index, node.name)?
 	if removed != u32(this.stat.ino) { errno.set(errno.eio); return none }
-	mut inode := unsafe { &EXT2Inode(C.__builtin_alloca(sizeof(EXT2Inode))) }
+	mut inode := unsafe { &EXT2Inode(C.vinix_stack_alloc(sizeof(EXT2Inode))) }
 	unsafe { *inode = EXT2Inode{} }
 	inode.read_entry(mut this.filesystem, u32(this.stat.ino))?
 	if inode.hard_link_cnt == 0 { errno.set(errno.eio); return none }
@@ -458,9 +459,11 @@ fn (mut this EXT2Filesystem) link_persistent(parent &vfs.VFSNode, name string,
 	mut old_node vfs.VFSNode) ?&vfs.VFSNode {
 	this.l.acquire()
 	defer { this.l.release() }
-	mut parent_inode := EXT2Inode{}
+	mut parent_inode := unsafe { &EXT2Inode(C.vinix_stack_alloc(sizeof(EXT2Inode))) }
+	unsafe { *parent_inode = EXT2Inode{} }
 	parent_inode.read_entry(mut this, u32(parent.resource.stat.ino))?
-	mut inode := EXT2Inode{}
+	mut inode := unsafe { &EXT2Inode(C.vinix_stack_alloc(sizeof(EXT2Inode))) }
+	unsafe { *inode = EXT2Inode{} }
 	inode_index := u32(old_node.resource.stat.ino)
 	inode.read_entry(mut this, inode_index)?
 	if inode.hard_link_cnt == 0xffff {
@@ -486,7 +489,8 @@ fn (mut this EXT2Filesystem) link_persistent(parent &vfs.VFSNode, name string,
 }
 
 fn (mut filesystem EXT2Filesystem) decrement_replaced_inode(inode_index u32) ? {
-	mut inode := EXT2Inode{}
+	mut inode := unsafe { &EXT2Inode(C.vinix_stack_alloc(sizeof(EXT2Inode))) }
+	unsafe { *inode = EXT2Inode{} }
 	inode.read_entry(mut filesystem, inode_index)?
 	if inode.hard_link_cnt == 0 { errno.set(errno.eio); return none }
 	inode.hard_link_cnt--
@@ -497,7 +501,8 @@ fn (mut filesystem EXT2Filesystem) decrement_replaced_inode(inode_index u32) ? {
 
 fn (mut filesystem EXT2Filesystem) update_dotdot(inode_index u32,
 	parent_index u32) ? {
-	mut inode := EXT2Inode{}
+	mut inode := unsafe { &EXT2Inode(C.vinix_stack_alloc(sizeof(EXT2Inode))) }
+	unsafe { *inode = EXT2Inode{} }
 	inode.read_entry(mut filesystem, inode_index)?
 	filesystem.dir_replace_inode(mut inode, inode_index, '..', parent_index, 2)?
 }
@@ -508,13 +513,15 @@ fn (mut filesystem EXT2Filesystem) rename_persistent(old_parent &vfs.VFSNode,
 	defer { filesystem.l.release() }
 	old_node := unsafe { old_parent.children[old_name] }
 	if unsafe { old_node == nil } { errno.set(errno.enoent); return none }
-	mut old_dir := EXT2Inode{}
-	mut new_dir := EXT2Inode{}
+	mut old_dir := unsafe { &EXT2Inode(C.vinix_stack_alloc(sizeof(EXT2Inode))) }
+	unsafe { *old_dir = EXT2Inode{} }
+	mut new_dir := unsafe { &EXT2Inode(C.vinix_stack_alloc(sizeof(EXT2Inode))) }
+	unsafe { *new_dir = EXT2Inode{} }
 	old_parent_index := u32(old_parent.resource.stat.ino)
 	new_parent_index := u32(new_parent.resource.stat.ino)
 	old_dir.read_entry(mut filesystem, old_parent_index)?
 	if old_parent_index == new_parent_index {
-		new_dir = old_dir
+		unsafe { *new_dir = *old_dir }
 	} else {
 		new_dir.read_entry(mut filesystem, new_parent_index)?
 	}
@@ -527,7 +534,7 @@ fn (mut filesystem EXT2Filesystem) rename_persistent(old_parent &vfs.VFSNode,
 		new_inode_index := u32(new_node.resource.stat.ino)
 		filesystem.dir_replace_inode(mut old_dir, old_parent_index, old_name,
 			new_inode_index, inode_type(new_node.resource.stat.mode))?
-		if old_parent_index == new_parent_index { new_dir = old_dir }
+		if old_parent_index == new_parent_index { unsafe { *new_dir = *old_dir } }
 		filesystem.dir_replace_inode(mut new_dir, new_parent_index, new_name,
 			old_inode_index, old_kind)?
 		if old_parent_index != new_parent_index {

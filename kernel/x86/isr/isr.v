@@ -8,6 +8,7 @@ import x86.apic
 import x86.cpu
 import x86.cpu.local as cpulocal
 import memory.mmap
+import memory
 import katomic
 import lib
 import userland
@@ -59,6 +60,16 @@ const exception_names = [
 fn pf_handler(num u32, mut gpr_state cpulocal.GPRState) {
 	// Read while interrupts are still off: see mmap.pf_handler().
 	fault_addr := cpu.read_cr2()
+	if gpr_state.cs & 3 == 0 {
+		resume := memory.stack_guard_probe_fixup(gpr_state.rip, fault_addr)
+		if resume != 0 { gpr_state.rip = resume; return }
+		if memory.kernel_stack_guard(fault_addr) {
+			C.vinix_stack_guard_diagnostic(gpr_state.rsp, gpr_state.rip, fault_addr)
+			C.vinix_stack_guard_message(c'STACK-GUARD FATAL kernel-stack exhaustion\n')
+			C.printf_panic(c'kernel stack guard: address=0x%llx sp=0x%llx\n', fault_addr, gpr_state.rsp)
+			lib.kpanic(gpr_state, c'Kernel stack guard')
+		}
+	}
 	mmap.pf_handler(gpr_state) or { exception_handler_at(num, mut gpr_state, fault_addr) }
 }
 
@@ -169,6 +180,10 @@ pub fn initialise() {
 
 	for i := u16(0); i < 32; i++ {
 		match i {
+			8 { // Dedicated double-fault stack, independent of IST3.
+				unsafe { idt.register_handler(i, voidptr(thunks[i]), 2, 0x8e) }
+				interrupt_table[i] = voidptr(exception_handler)
+			}
 			14 { // Page fault
 				unsafe { idt.register_handler(i, voidptr(thunks[i]), 3, 0x8e) }
 				interrupt_table[i] = voidptr(pf_handler)

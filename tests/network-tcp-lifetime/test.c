@@ -44,14 +44,13 @@ static void expire_timewait(void) {
 }
 
 static void check_endpoints(struct vinix_socket *socket,
-                            const struct vinix_ip_address *local, uint16_t local_port,
-                            const struct vinix_ip_address *remote, uint16_t remote_port) {
-    struct vinix_ip_address actual;
-    uint16_t port;
-    assert(vinix_socket_local_ip(socket, &actual, &port) == 0);
-    assert(memcmp(&actual, local, sizeof actual) == 0 && port == local_port);
-    assert(vinix_socket_peer_ip(socket, &actual, &port) == 0);
-    assert(memcmp(&actual, remote, sizeof actual) == 0 && port == remote_port);
+                            const struct vinix_net_endpoint *local,
+                            const struct vinix_net_endpoint *remote) {
+    struct vinix_net_endpoint actual;
+    assert(vinix_socket_name_endpoint(socket, &actual, 0) == 0);
+    assert(memcmp(&actual, local, sizeof actual) == 0);
+    assert(vinix_socket_name_endpoint(socket, &actual, 1) == 0);
+    assert(memcmp(&actual, remote, sizeof actual) == 0);
 }
 
 static void test_shutdown_pool_ownership(void) {
@@ -78,15 +77,14 @@ static void test_shutdown_pool_ownership(void) {
 static void test_shutdown_order(int first) {
     struct vinix_socket *socket = connected_socket();
     struct tcp_pcb *pcb = socket->tcp;
-    struct vinix_ip_address local, remote;
-    uint16_t local_port, remote_port;
-    assert(vinix_socket_local_ip(socket, &local, &local_port) == 0);
-    assert(vinix_socket_peer_ip(socket, &remote, &remote_port) == 0);
+    struct vinix_net_endpoint local, remote;
+    assert(vinix_socket_name_endpoint(socket, &local, 0) == 0);
+    assert(vinix_socket_name_endpoint(socket, &remote, 1) == 0);
     assert(vinix_socket_shutdown(socket, first) == 0 && socket->tcp == pcb);
     assert(vinix_socket_shutdown(socket, !first) == 0 && socket->tcp == NULL);
     assert(pcb->callback_arg == NULL && pcb->recv == NULL &&
            pcb->sent == NULL && pcb->errf == NULL);
-    check_endpoints(socket, &local, local_port, &remote, remote_port);
+    check_endpoints(socket, &local, &remote);
     assert(vinix_socket_shutdown(socket, 2) == 0);
     char byte;
     assert(vinix_socket_recv(socket, &byte, 1, NULL, NULL) == 0);
@@ -99,10 +97,9 @@ static void test_shutdown_order(int first) {
 static void test_write_shutdown_eof(int ack_fin) {
     struct vinix_socket *socket = connected_socket();
     struct tcp_pcb *pcb = socket->tcp;
-    struct vinix_ip_address local, remote;
-    uint16_t local_port, remote_port;
-    assert(vinix_socket_local_ip(socket, &local, &local_port) == 0);
-    assert(vinix_socket_peer_ip(socket, &remote, &remote_port) == 0);
+    struct vinix_net_endpoint local, remote;
+    assert(vinix_socket_name_endpoint(socket, &local, 0) == 0);
+    assert(vinix_socket_name_endpoint(socket, &remote, 1) == 0);
     incoming_data(socket, pcb->rcv_nxt, "abcdefghij");
     assert(vinix_socket_shutdown(socket, 1) == 0 && socket->tcp == pcb);
     incoming_control(pcb, 1, ack_fin);
@@ -118,7 +115,7 @@ static void test_write_shutdown_eof(int ack_fin) {
     assert(vinix_socket_recv(socket, bytes, sizeof bytes, NULL, NULL) == 10);
     assert(memcmp(bytes, "abcdefghij", sizeof bytes) == 0);
     assert(vinix_socket_recv(socket, bytes, sizeof bytes, NULL, NULL) == 0);
-    check_endpoints(socket, &local, local_port, &remote, remote_port);
+    check_endpoints(socket, &local, &remote);
     assert(vinix_socket_shutdown(socket, 0) == 0);
     vinix_socket_free(socket);
     assert(replacement->tcp->state == CLOSED);
@@ -214,10 +211,9 @@ static void test_final_data_metadata_failure(void) {
 static void test_write_shutdown_after_peer_eof(void) {
     struct vinix_socket *socket = connected_socket();
     struct tcp_pcb *pcb = socket->tcp;
-    struct vinix_ip_address local, remote;
-    uint16_t local_port, remote_port;
-    assert(vinix_socket_local_ip(socket, &local, &local_port) == 0);
-    assert(vinix_socket_peer_ip(socket, &remote, &remote_port) == 0);
+    struct vinix_net_endpoint local, remote;
+    assert(vinix_socket_name_endpoint(socket, &local, 0) == 0);
+    assert(vinix_socket_name_endpoint(socket, &remote, 1) == 0);
     struct pbuf *p = control_packet(pcb, 1, 1, "finalbytes", 10);
     assert(ip4_input(p, &physical_netif) == ERR_OK);
     assert(socket->peer_closed && socket->tcp == pcb && pcb->state == CLOSE_WAIT);
@@ -230,7 +226,7 @@ static void test_write_shutdown_after_peer_eof(void) {
     assert(vinix_socket_recv(socket, bytes, sizeof bytes, NULL, NULL) == sizeof bytes);
     assert(memcmp(bytes, "finalbytes", sizeof bytes) == 0);
     assert(vinix_socket_recv(socket, bytes, sizeof bytes, NULL, NULL) == 0);
-    check_endpoints(socket, &local, local_port, &remote, remote_port);
+    check_endpoints(socket, &local, &remote);
     vinix_socket_free(socket);
     assert(replacement->tcp->state == CLOSED);
     vinix_socket_free(replacement);
@@ -247,23 +243,25 @@ static void test_listener_error_ownership(void) {
 }
 
 static void test_ipv6_endpoint_cache(void) {
-    struct vinix_socket *socket = vinix_socket_new_family(10, VINIX_NET_STREAM, 0);
+    struct vinix_socket *socket = vinix_socket_new_family(VINIX_NET_STREAM, 0, 10);
     assert(socket);
     ip6_addr_t local, remote;
     IP6_ADDR(&local, PP_HTONL(0xfe800000), 0, 0, PP_HTONL(1));
     IP6_ADDR(&remote, PP_HTONL(0xfe800000), 0, 0, PP_HTONL(2));
-    ip6_addr_set_zone(&local, 1); ip6_addr_set_zone(&remote, 1);
+    /* Native zones include the merged stack's explicit loopback interface;
+     * the physical interface still reports Linux ifindex 2 publicly. */
+    ip6_addr_set_zone(&local, netif_get_index(&physical_netif));
+    ip6_addr_set_zone(&remote, netif_get_index(&physical_netif));
     ip_addr_copy_from_ip6(socket->tcp->local_ip, local);
     ip_addr_copy_from_ip6(socket->tcp->remote_ip, remote);
     socket->tcp->local_port = 8888; socket->tcp->remote_port = 9999;
     socket->connected = 1;
-    struct vinix_ip_address before_local, before_remote;
-    uint16_t local_port, remote_port;
-    assert(vinix_socket_local_ip(socket, &before_local, &local_port) == 0);
-    assert(vinix_socket_peer_ip(socket, &before_remote, &remote_port) == 0);
+    struct vinix_net_endpoint before_local, before_remote;
+    assert(vinix_socket_name_endpoint(socket, &before_local, 0) == 0);
+    assert(vinix_socket_name_endpoint(socket, &before_remote, 1) == 0);
     assert(before_local.scope == 2 && before_remote.scope == 2);
     assert(vinix_socket_shutdown(socket, 2) == 0 && socket->tcp == NULL);
-    check_endpoints(socket, &before_local, local_port, &before_remote, remote_port);
+    check_endpoints(socket, &before_local, &before_remote);
     vinix_socket_free(socket);
 }
 

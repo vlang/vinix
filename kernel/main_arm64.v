@@ -181,6 +181,7 @@ fn bootstrap_cpu0() {
 	cpu_local.timer_freq = cpu.read_cntfrq_el0()
 	cpu_locals << cpu_local
 	cpu.write_tpidr_el1(0)
+	sched.prepare_cpu_stacks(0)
 	cpu.enable_el0_cache_access()
 	initialisation.enable_user_guard(true)
 	cpu.init_fpu_globals()
@@ -307,10 +308,12 @@ fn kmain_thread(qemu_platform bool, acpi_platform bool) {
 
 	table.init_syscall_table()
 	table.init_storage_syscalls()
+	table.init_clock_control_syscalls()
 	table.init_container_syscalls()
 	// cgroup.kill sends a signal, which lives above fs; hand it the entry point.
 	fs.set_cgroup_signal_hook(voidptr(userland.cgroup_kill_process))
 	proc.register_cpu_signal_hook(voidptr(userland.cpu_signal_process))
+	proc.register_job_orphan_hook(voidptr(userland.signal_orphaned_job_group))
 	sched.register_user_signal_hook(voidptr(userland.interrupt_return))
 	print('kmain_thread: syscall table done\n')
 
@@ -846,6 +849,7 @@ fn kmain() {
 	fb_phys, fb_len := term.framebuffer_phys_span()
 	memory.declare_framebuffer(fb_phys, fb_len)
 	memory.vmm_init()
+	exception.install_guarded_stack(0)
 	boot_stage(7)
 
 	// Init terminal (after vmm_init so page tables are active and framebuffer is mapped)
@@ -1027,5 +1031,5 @@ fn kmain() {
 	spawn kmain_thread(force_qemu_platform, acpi_platform)
 	print('spawn done, calling await...\n')
 
-	sched.await()
+	sched.enter_idle()
 }

@@ -7,6 +7,7 @@ module sched
 
 import elf
 import errno
+import katomic
 import memory
 import memory.mmap
 import proc
@@ -68,11 +69,7 @@ pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) ?&proc.Pr
 	}
 
 	if unsafe { old_process != 0 } {
-		new_proc.ppid = old_process.pid
-		new_proc.pgid = old_process.pgid
-		new_proc.sid = old_process.sid
-		// A child is in its parent's session, so the same terminal controls it.
-		new_proc.tty_session = old_process.tty_session
+		proc.inherit_job_identity(mut new_proc, old_process)
 		new_proc.uid = old_process.uid
 		new_proc.euid = old_process.euid
 		new_proc.suid = old_process.suid
@@ -86,7 +83,7 @@ pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) ?&proc.Pr
 		new_proc.rlimits = old_process.rlimits
 		proc.set_cpu_limit(mut new_proc, new_proc.rlimits[proc.rlimit_cpu])
 		new_proc.allow_wx = old_process.allow_wx
-		new_proc.dumpable = old_process.dumpable
+		new_proc.dumpable = proc.dumpability(old_process)
 		new_proc.sigreturn_page = old_process.sigreturn_page
 		// A NUMA memory policy is process state, like nice and the rlimits, so
 		// a fork keeps the placement its parent asked for.

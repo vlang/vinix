@@ -2,6 +2,7 @@
 module nvme
 
 import pci
+import proc
 import memory
 import lib
 import x86.idt
@@ -11,7 +12,6 @@ import klock
 import event.eventstruct
 import resource
 import errno
-import proc
 import block.partition
 import fs
 import katomic
@@ -398,6 +398,7 @@ fn (mut dev NVMENamespace) transfer(buffer voidptr, loc u64, count u64, write bo
 		}
 		proc.account_disk_transfer(chunk, write)
 		if !write { unsafe { C.memcpy(caller, bounce, chunk) } }
+		proc.account_disk_io(chunk, write)
 		done += chunk
 	}
 	return i64(count)
@@ -433,6 +434,10 @@ fn (mut dev NVMENamespace) unlink(_handle voidptr) ? {
 
 fn (mut dev NVMENamespace) grow(_handle voidptr, _new_size u64) ? {
 	return none
+}
+
+fn (dev &NVMENamespace) block_identity() resource.BlockIdentity {
+	return resource.BlockIdentity{is_block: true, disk_id: dev.stat.rdev, length: u64(dev.stat.size)}
 }
 
 fn (mut dev NVMENamespace) mmap(_handle voidptr, _page u64, _flags int) voidptr {

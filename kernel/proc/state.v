@@ -7,7 +7,7 @@ import katomic
 // live threads is running or queued; waiting on I/O must not read as running.
 pub fn process_state(process &Process) u8 {
 	if process.exiting { return `Z` }
-	if katomic.load(&process.job_stopped) { return `T` }
+	if katomic.load(&process.job_stop_complete) { return `T` }
 	mut owner := unsafe { process }
 	owner.threads_lock.acquire()
 	defer { owner.threads_lock.release() }

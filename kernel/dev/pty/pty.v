@@ -12,7 +12,6 @@ import ioctl
 import katomic
 import klock
 import lib
-import posixtimer
 import proc
 import resource
 import stat
@@ -115,6 +114,9 @@ mut:
 	master_open      bool = true
 	closing_master   bool
 	slave_open_count int
+	// An unref still uses the pair to wake endpoints or remove its pathname
+	// after dropping its endpoint reference. Keep it alive for that callback.
+	slave_closers    int
 	slave_was_open   bool
 	session          int
 	foreground_pgid  int
@@ -308,7 +310,7 @@ fn (mut this Ptmx) open(_flags int) ?&resource.Resource {
 // Open the slave of the terminal that `session` controls, as open(2) of its
 // /dev/pts path would. This is what /dev/tty stands for. The id table's lock
 // is held throughout, so the pair cannot be destroyed underneath the open.
-pub fn open_session_terminal(session int, flags int) ?&resource.Resource {
+pub fn open_session_terminal(device u64, session int, flags int) ?&resource.Resource {
 	if session == 0 {
 		errno.set(errno.enxio)
 		return none
@@ -319,30 +321,61 @@ pub fn open_session_terminal(session int, flags int) ?&resource.Resource {
 	}
 	for i := 0; i < pty_max_pairs; i++ {
 		mut pair := pty_pairs[i]
-		if pair == unsafe { nil } || pair.session != session || !pair.master_open {
-			continue
-		}
+		if pair == unsafe { nil } || pair.slave.stat.rdev != device { continue }
 		mut slave := pair.slave
-		return slave.open(flags | resource.o_noctty)
+		return slave.open_checked(flags | resource.o_noctty, session)
 	}
 	errno.set(errno.enxio)
 	return none
 }
 
-// Let go of a terminal whose session's leader has exited, as Linux does when
-// the leader exits. It stayed that session's for good: apt runs dpkg in a
-// new session on one pty each time, and every run after the first failed to
-// claim it with TIOCSCTTY. Called with the pair locked.
-fn (mut pair PtyPair) release_ended_session() {
-	if pair.session != 0 && !proc.session_leader_alive(pair.session) {
-		pair.session = 0
-		pair.foreground_pgid = 0
-	}
+fn (mut pair PtyPair) set_job_identity_locked(session int, group int) {
+	proc.replace_job_identity(pair.foreground_pgid, pair.session, group, session)
+	pair.session = session
+	pair.foreground_pgid = group
 }
 
-fn (mut this PtySlave) open(flags int) ?&resource.Resource {
+// The table and pair locks protect the borrowed pair until only scalar IDs
+// remain. Matching members lose their controlling terminal before HUP/CONT.
+pub fn session_exit(device u64, session int) bool {
+	pty_id_lock.acquire()
+	mut foreground := 0
+	mut matched := false
+	for i := 0; i < pty_max_pairs; i++ {
+		mut pair := pty_pairs[i]
+		if pair == unsafe { nil } || pair.slave.stat.rdev != device { continue }
+		pair.l.acquire()
+		if pair.session == session {
+			foreground = pair.foreground_pgid
+			proc.retain_job_identity(foreground, session)
+			proc.detach_terminal_members(device, session)
+			pair.set_job_identity_locked(0, 0)
+			matched = true
+		}
+		pair.l.release()
+		break
+	}
+	pty_id_lock.release()
+	if matched {
+		userland.signal_orphaned_job_group(foreground, session)
+		proc.release_job_identity(foreground, session)
+	}
+	return matched
+}
+
+fn (mut this PtySlave) open_owned(flags int) ?&resource.Resource {
+	return this.open_checked(flags, 0)
+}
+
+fn (mut this PtySlave) open_checked(flags int, expected_session int) ?&resource.Resource {
 	mut pair := this.pair
 	pair.l.acquire()
+	if expected_session != 0 && (pair.session != expected_session
+		|| !proc.controls_terminal(this.stat.rdev, expected_session)) {
+		pair.l.release()
+		errno.set(errno.enxio)
+		return none
+	}
 	if pair.locked || !pair.master_open {
 		pair.l.release()
 		errno.set(errno.eio)
@@ -350,18 +383,16 @@ fn (mut this PtySlave) open(flags int) ?&resource.Resource {
 	}
 	pair.slave_open_count++
 	pair.slave_was_open = true
+	// The result outlives both the pair lock and /dev/tty's ID-table lookup.
+	// Closing the master cannot destroy it before the descriptor adopts it.
+	katomic.inc(mut &this.refcount)
 
 	// Opening a terminal without O_NOCTTY lets an eligible session leader
 	// acquire it. openpty users pass O_NOCTTY and claim it explicitly later.
 	mut process := proc.current_thread().process
-	if flags & resource.o_noctty == 0 {
-		pair.release_ended_session()
-	}
 	if flags & resource.o_noctty == 0 && process.sid == process.pid && process.tty_session == 0
-		&& pair.session == 0 {
-		pair.session = process.sid
-		pair.foreground_pgid = process.pgid
-		process.tty_session = process.sid
+		&& pair.session == 0 && proc.claim_controlling_terminal(this.stat.rdev) {
+		pair.set_job_identity_locked(process.sid, process.pgid)
 	}
 	pair.refresh_status_locked()
 	pair.l.release()
@@ -511,36 +542,17 @@ fn input_byte_locked(mut pair PtyPair, incoming u8) u8 {
 	return 0
 }
 
-fn signal_group(pgid int, signal u8) {
-	if pgid <= 0 {
-		return
-	}
-	// Timer expiry and pidfd delivery take this before the process table.
-	// Holding the table and then clearing timer metadata in sendsig would
-	// deadlock a concurrent pidfd send or timer expiry on another CPU.
-	posixtimer.lock_signal_info()
-	proc.lock_table()
-	defer {
-		proc.unlock_table()
-		posixtimer.unlock_signal_info()
-	}
-	for pid := 1; pid < proc.max_pid; pid++ {
-		mut target := proc.process_at(pid)
-		if target == unsafe { nil } || target.pgid != pgid {
-			continue
-		}
-		_, changed := userland.signal_process_locked(mut target, int(signal))
-		if changed {
-			proc.pin_process(target)
-			proc.unlock_table()
-			posixtimer.unlock_signal_info()
-			userland.notify_signal_parent(target)
-			proc.unpin_process(target)
-			// Resume the numeric scan with no old target borrowed. Releasing
-			// locks only for notifications keeps the common PTY path bounded.
-			posixtimer.lock_signal_info()
-			proc.lock_table()
-		}
+// Called with pair.l held; always returns with it held. Signal delivery and
+// process-table inspection happen outside the terminal lock. Retry if the
+// controlling session/group changed while permission was checked.
+fn (mut pair PtyPair) job_check_locked(signal int) u64 {
+	for {
+		session := pair.session
+		foreground := pair.foreground_pgid
+		pair.l.release()
+		result := userland.terminal_job_check(pair.slave.stat.rdev, session, foreground, signal)
+		pair.l.acquire()
+		if result != 0 || (session == pair.session && foreground == pair.foreground_pgid) { return result }
 	}
 }
 
@@ -563,7 +575,7 @@ fn (mut this PtyMaster) read(handle voidptr, buf voidptr, _loc u64, count u64) ?
 		}
 		pair.l.release()
 		event.await_one(mut this.event, true) or {
-			errno.set(errno.eintr)
+			errno.set(proc.interrupted_errno)
 			return none
 		}
 		pair.l.acquire()
@@ -605,7 +617,8 @@ fn (mut this PtyMaster) write(handle voidptr, buf voidptr, _loc u64, count u64) 
 			}
 			pair.l.release()
 			event.await_one(mut this.event, true) or {
-				errno.set(errno.eintr)
+				if written != 0 { return i64(written) }
+				errno.set(proc.interrupted_errno)
 				return none
 			}
 			pair.l.acquire()
@@ -618,11 +631,14 @@ fn (mut this PtyMaster) write(handle voidptr, buf voidptr, _loc u64, count u64) 
 		written++
 	}
 	pgid := pair.foreground_pgid
+	session := pair.session
+	if raised_signal != 0 { proc.retain_job_identity(pgid, session) }
 	pair.refresh_status_locked()
 	pair.l.release()
 	wake_pair(mut pair)
 	if raised_signal != 0 {
-		signal_group(pgid, raised_signal)
+		userland.signal_group(pgid, session, int(raised_signal))
+		proc.release_job_identity(pgid, session)
 	}
 	return i64(written)
 }
@@ -634,6 +650,8 @@ fn (mut this PtySlave) read(handle voidptr, buf voidptr, _loc u64, count u64) ?i
 	open_handle := unsafe { &file.Handle(handle) }
 	mut pair := this.pair
 	pair.l.acquire()
+	permission := pair.job_check_locked(userland.sigttin)
+	if permission != 0 { pair.l.release(); errno.set(permission); return none }
 	mut minimum := u64(1)
 	if pair.termios.c_lflag & termios.icanon == 0 {
 		minimum = u64(pair.termios.c_cc[termios.vmin])
@@ -664,10 +682,12 @@ fn (mut this PtySlave) read(handle voidptr, buf voidptr, _loc u64, count u64) ?i
 		}
 		pair.l.release()
 		event.await_one(mut this.event, true) or {
-			errno.set(errno.eintr)
+			errno.set(proc.interrupted_errno)
 			return none
 		}
 		pair.l.acquire()
+		allowed := pair.job_check_locked(userland.sigttin)
+		if allowed != 0 { pair.l.release(); errno.set(allowed); return none }
 	}
 	read := pair.input.read(buf, count)
 	pair.refresh_status_locked()
@@ -685,6 +705,10 @@ fn (mut this PtySlave) write(handle voidptr, buf voidptr, _loc u64, count u64) ?
 	mut pair := this.pair
 	mut written := u64(0)
 	pair.l.acquire()
+	if pair.termios.c_lflag & termios.tostop != 0 {
+		permission := pair.job_check_locked(userland.sigttou)
+		if permission != 0 { pair.l.release(); errno.set(permission); return none }
+	}
 	for written < count {
 		byte := unsafe { bytes[written] }
 		needed := if pair.termios.c_oflag & termios.opost != 0 && byte == `\n`
@@ -712,10 +736,19 @@ fn (mut this PtySlave) write(handle voidptr, buf voidptr, _loc u64, count u64) ?
 			}
 			pair.l.release()
 			event.await_one(mut this.event, true) or {
-				errno.set(errno.eintr)
+				if written != 0 { return i64(written) }
+				errno.set(proc.interrupted_errno)
 				return none
 			}
 			pair.l.acquire()
+			if pair.termios.c_lflag & termios.tostop != 0 {
+				permission := pair.job_check_locked(userland.sigttou)
+				if permission != 0 {
+					pair.l.release()
+					if written != 0 { return i64(written) }
+					errno.set(permission); return none
+				}
+			}
 		}
 		output_byte_locked(mut pair, byte)
 		written++
@@ -780,16 +813,15 @@ fn terminal_ioctl(mut pair PtyPair, slave_side bool, request u64, argp voidptr) 
 				errno.set(errno.efault)
 				return none
 			}
-			changed := winsize.ws_row != pair.winsize.ws_row || winsize.ws_col != pair.winsize.ws_col
 			pair.winsize = winsize
-			if changed {
-				signal_group(pair.foreground_pgid, u8(userland.sigwinch))
-			}
 			return 0
 		}
 		// Groups and sessions are numbered as the caller's pid namespace
 		// numbers them.
 		ioctl.tiocgpgrp {
+			if slave_side && !userland.terminal_is_controlling(pair.slave.stat.rdev, pair.session) {
+				errno.set(errno.enotty); return none
+			}
 			value := i32(proc.group_in(proc.current_pid_namespace(), pair.foreground_pgid))
 			if !usercopy.copy_to_user(u64(argp), voidptr(&value), sizeof(i32)) {
 				errno.set(errno.efault)
@@ -803,24 +835,19 @@ fn terminal_ioctl(mut pair PtyPair, slave_side bool, request u64, argp voidptr) 
 				errno.set(errno.efault)
 				return none
 			}
-			if value <= 0 {
-				errno.set(errno.einval)
-				return none
+			session := pair.session
+			pair.l.release()
+			group := userland.terminal_foreground_group(pair.slave.stat.rdev, session, int(value)) or { pair.l.acquire(); return none }
+			defer { proc.release_job_identity(group, session) }
+			pair.l.acquire()
+			if pair.session != session || !userland.terminal_is_controlling(pair.slave.stat.rdev, session) {
+				errno.set(errno.enotty); return none
 			}
-			viewer := proc.current_pid_namespace()
-			mut group := proc.group_from(viewer, int(value))
-			if group == 0 {
-				group = proc.pid_from(viewer, int(value))
-			}
-			if group == 0 {
-				errno.set(errno.esrch)
-				return none
-			}
-			pair.foreground_pgid = group
+			pair.set_job_identity_locked(session, group)
 			return 0
 		}
 		ioctl.tiocgsid {
-			if pair.session == 0 {
+			if pair.session == 0 || (slave_side && !userland.terminal_is_controlling(pair.slave.stat.rdev, pair.session)) {
 				errno.set(errno.enotty)
 				return none
 			}
@@ -837,26 +864,23 @@ fn terminal_ioctl(mut pair PtyPair, slave_side bool, request u64, argp voidptr) 
 				return none
 			}
 			mut process := proc.current_thread().process
-			pair.release_ended_session()
-			if process.sid != process.pid || (pair.session != 0 && pair.session != process.sid) {
+			if process.sid != process.pid || (pair.session != 0 && pair.session != process.sid)
+				|| !proc.claim_controlling_terminal(pair.slave.stat.rdev) {
 				errno.set(errno.eperm)
 				return none
 			}
-			pair.session = process.sid
-			pair.foreground_pgid = process.pgid
-			process.tty_session = process.sid
+			pair.set_job_identity_locked(process.sid, process.pgid)
 			return 0
 		}
 		ioctl.tiocnotty {
 			mut process := proc.current_thread().process
-			if process.tty_session != pair.session || pair.session == 0 {
+			if !userland.terminal_is_controlling(pair.slave.stat.rdev, pair.session)
+				|| !proc.release_controlling_terminal(pair.slave.stat.rdev) {
 				errno.set(errno.enotty)
 				return none
 			}
-			process.tty_session = 0
-			if process.sid == pair.session {
-				pair.session = 0
-				pair.foreground_pgid = 0
+			if process.pid == pair.session {
+				pair.set_job_identity_locked(0, 0)
 			}
 			return 0
 		}
@@ -905,6 +929,9 @@ fn terminal_ioctl(mut pair PtyPair, slave_side bool, request u64, argp voidptr) 
 
 fn (mut this PtyMaster) ioctl(_handle voidptr, request u64, argp voidptr) ?int {
 	mut pair := this.pair
+	if request != ioctl.tiocgptn && request != ioctl.tiocsptlck && request != ioctl.tiocgptlck {
+		return pair_ioctl(mut pair, false, request, argp)
+	}
 	pair.l.acquire()
 	defer {
 		pair.l.release()
@@ -936,18 +963,46 @@ fn (mut this PtyMaster) ioctl(_handle voidptr, request u64, argp voidptr) ?int {
 			return 0
 		}
 		else {
-			return terminal_ioctl(mut pair, false, request, argp)
+			errno.set(errno.enotty); return none
 		}
 	}
 }
 
 fn (mut this PtySlave) ioctl(_handle voidptr, request u64, argp voidptr) ?int {
 	mut pair := this.pair
+	return pair_ioctl(mut pair, true, request, argp)
+}
+
+fn pair_ioctl(mut pair PtyPair, slave_side bool, request u64, argp voidptr) ?int {
 	pair.l.acquire()
-	defer {
-		pair.l.release()
+	if request == ioctl.tcsets || request == ioctl.tcsetsw || request == ioctl.tcsetsf
+		|| request == ioctl.tcflsh || request == ioctl.tcsbrk || request == ioctl.tcxonc
+		|| request == ioctl.tiocspgrp {
+		permission := pair.job_check_locked(userland.sigttou)
+		if permission != 0 { pair.l.release(); errno.set(permission); return none }
 	}
-	return terminal_ioctl(mut pair, true, request, argp)
+	old_rows := pair.winsize.ws_row
+	old_cols := pair.winsize.ws_col
+	old_session := pair.session
+	old_foreground := pair.foreground_pgid
+	proc.retain_job_identity(old_foreground, old_session)
+	defer { proc.release_job_identity(old_foreground, old_session) }
+	result := terminal_ioctl(mut pair, slave_side, request, argp) or {
+		pair.l.release()
+		return none
+	}
+	resized := request == ioctl.tiocswinsz && (old_rows != pair.winsize.ws_row || old_cols != pair.winsize.ws_col)
+	session := pair.session
+	foreground := pair.foreground_pgid
+	detached := old_session != 0 && session == 0 && request == ioctl.tiocnotty
+	pair.l.release()
+	wake_pair(mut pair)
+	if resized { userland.signal_group(foreground, session, userland.sigwinch) }
+	if detached {
+		userland.signal_group(old_foreground, old_session, userland.sighup)
+		userland.signal_group(old_foreground, old_session, userland.sigcont)
+	}
+	return result
 }
 
 fn destroy_pair(pair &PtyPair) {
@@ -975,12 +1030,17 @@ fn (mut this PtyMaster) unref(_handle voidptr) ? {
 	katomic.dec(mut &this.refcount)
 	closed := this.refcount == 0 && pair.master_open
 	mut pgid := 0
+	mut session := 0
 	if closed {
 		pair.master_open = false
 		// Slave closes may race the hangup signals and pathname removal below.
 		// Keep the pair alive until this unref has finished using it.
 		pair.closing_master = true
 		pgid = pair.foreground_pgid
+		session = pair.session
+		proc.retain_job_identity(pgid, session)
+		proc.detach_terminal_members(pair.slave.stat.rdev, session)
+		pair.set_job_identity_locked(0, 0)
 		pair.refresh_status_locked()
 	}
 	pair.l.release()
@@ -989,9 +1049,10 @@ fn (mut this PtyMaster) unref(_handle voidptr) ? {
 	}
 	wake_pair(mut pair)
 	if pgid != 0 {
-		signal_group(pgid, u8(userland.sighup))
-		signal_group(pgid, u8(userland.sigcont))
+		userland.signal_group(pgid, session, userland.sighup)
+		userland.signal_group(pgid, session, userland.sigcont)
 	}
+	proc.release_job_identity(pgid, session)
 	// Keep the VFS node alive while a slave descriptor still points at it. If
 	// only the node reference remains, remove it now. closing_master prevents
 	// the recursive slave unref from freeing the pair beneath this function.
@@ -1002,7 +1063,7 @@ fn (mut this PtyMaster) unref(_handle voidptr) ? {
 		pair.l.acquire()
 	}
 	pair.closing_master = false
-	destroy := pair.slave.refcount == 0
+	destroy := pair.slave.refcount == 0 && pair.slave_closers == 0
 	pair.l.release()
 	if destroy {
 		destroy_pair(pair)
@@ -1012,6 +1073,7 @@ fn (mut this PtyMaster) unref(_handle voidptr) ? {
 fn (mut this PtySlave) unref(handle voidptr) ? {
 	mut pair := this.pair
 	pair.l.acquire()
+	pair.slave_closers++
 	katomic.dec(mut &this.refcount)
 	if handle != unsafe { nil } && pair.slave_open_count > 0 {
 		pair.slave_open_count--
@@ -1019,17 +1081,21 @@ fn (mut this PtySlave) unref(handle voidptr) ? {
 	pair.refresh_status_locked()
 	remove_path := handle != unsafe { nil } && !pair.master_open && !pair.closing_master
 		&& this.refcount == 1
-	destroy := !pair.master_open && !pair.closing_master && this.refcount == 0
 	pair.l.release()
-	if destroy {
-		destroy_pair(pair)
-	} else if remove_path {
+	if remove_path {
 		// devtmpfs_remove_device drops the node's last resource reference and
-		// re-enters unref with a nil handle, which then destroys the pair.
+		// re-enters unref with a nil handle. This callback's closer hold keeps
+		// the pair alive until pathname removal finishes.
 		fs.devtmpfs_remove_device(pair.path)
 	} else {
 		wake_pair(mut pair)
 	}
+	pair.l.acquire()
+	pair.slave_closers--
+	destroy := !pair.master_open && !pair.closing_master && this.refcount == 0
+		&& pair.slave_closers == 0
+	pair.l.release()
+	if destroy { destroy_pair(pair) }
 }
 
 fn (mut this Ptmx) read(_handle voidptr, _buf voidptr, _loc u64, _count u64) ?i64 {

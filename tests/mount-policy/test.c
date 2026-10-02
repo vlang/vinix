@@ -561,19 +561,23 @@ static int run_tests(void)
     CHECK(exec_result("/mp/alias/probe", AT_FDCWD, -1, NULL) == 0);
     CHECK(exec_result("../plain/probe", AT_FDCWD, -1, "/mp/src") == 0);
     puts("MOUNT POLICY PASS: namespace remounts and self binds preserve mount identity");
-    /* procfs caches its root by PID namespace; mounting that root again
-     * must preserve readable paths rather than redirecting it to itself. */
-    CHECK(mount("proc", "/proc", "proc", MS_NOEXEC | MS_NODEV, "") == 0);
+    /* procfs caches its root by PID namespace; denying a mount of the
+     * cached root onto itself must leave existing readable paths intact. */
+    errno = 0;
+    CHECK(mount("proc", "/proc", "proc", MS_NOEXEC | MS_NODEV, "") == -1 && errno == EBUSY);
     fd = open("/proc/self/mountinfo", O_RDONLY);
     char proc_buffer[64];
     CHECK(fd >= 0 && read(fd, proc_buffer, sizeof proc_buffer) > 0 && close(fd) == 0);
     child = fork();
     CHECK(child >= 0);
     if (!child) {
-        if (unshare(CLONE_NEWNS) || mount("proc", "/proc", "proc", MS_NOEXEC, "")) _exit(1);
+        if (unshare(CLONE_NEWNS)) _exit(1);
+        errno = 0;
+        if (mount("proc", "/proc", "proc", MS_NOEXEC, "") != -1 || errno != EBUSY) _exit(2);
         int nested = open("/proc/self/mounts", O_RDONLY);
         if (nested < 0 || read(nested, proc_buffer, sizeof proc_buffer) <= 0 || close(nested)) _exit(2);
-        if (umount2("/proc", MNT_DETACH)) _exit(3);
+        errno = 0;
+        if (mount("procfs", "/proc/sys", "procfs", MS_NOEXEC, "") != -1 || errno != EBUSY) _exit(3);
         nested = open("/proc/self/mounts", O_RDONLY);
         _exit(nested >= 0 && read(nested, proc_buffer, sizeof proc_buffer) > 0 && close(nested) == 0 ? 0 : 4);
     }

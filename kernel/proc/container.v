@@ -102,11 +102,13 @@ pub const cap_setpcap = 8
 pub const cap_net_admin = 12
 pub const cap_linux_immutable = 9
 pub const cap_ipc_owner = 15
+pub const cap_ipc_lock = 14
 pub const cap_sys_chroot = 18
 pub const cap_sys_ptrace = 19
 pub const cap_sys_admin = 21
 pub const cap_sys_boot = 22
 pub const cap_sys_resource = 24
+pub const cap_sys_time = 25
 pub const cap_mknod = 27
 pub const cap_setfcap = 31
 pub const cap_audit_read = 37
@@ -114,7 +116,14 @@ pub const cap_audit_read = 37
 __global (
 	namespace_id_counter = u64(4026532000)
 	initial_namespaces   NamespaceSet
+	ipc_namespace_release_hook voidptr
 )
+
+type IPCNamespaceReleaseHook = fn (u64)
+
+pub fn register_ipc_namespace_release_hook(hook voidptr) {
+	ipc_namespace_release_hook = hook
+}
 
 fn new_namespace(kind u64, id u64) &Namespace {
 	return &Namespace{
@@ -164,6 +173,7 @@ pub fn get_namespace(mut ns Namespace) &Namespace {
 // An nsfs open may race the final process leaving. It may retain a live
 // namespace, but cannot bring back state already destroyed at refcount zero.
 pub fn try_get_namespace(mut ns Namespace) bool {
+	if ns == unsafe { nil } { return false }
 	if is_initial_namespace(ns) { return true }
 	for {
 		count := katomic.load(&ns.refcount)
@@ -178,7 +188,12 @@ pub fn put_namespace(mut ns Namespace) bool {
 	if unsafe { ns == nil } || is_initial_namespace(ns) {
 		return false
 	}
-	return !katomic.dec(mut &ns.refcount)
+	last := !katomic.dec(mut &ns.refcount)
+	if last && ns.kind == clone_newipc && ipc_namespace_release_hook != unsafe { nil } {
+		hook := unsafe { IPCNamespaceReleaseHook(ipc_namespace_release_hook) }
+		hook(ns.id)
+	}
+	return last
 }
 
 // A thread's own root, working directory and mount namespace. Linux keeps all
@@ -296,6 +311,8 @@ pub fn inherit_container_state(mut child Process, parent &Process) {
 	child.mac_domain = parent.mac_domain
 	child.mac_next_domain = parent.mac_next_domain
 	child.no_new_privs = parent.no_new_privs
+	child.stack_policy_mode = katomic.load(&parent.stack_policy_mode)
+	syscall_policy_inherit(mut child, parent)
 	child.seccomp_mode = parent.seccomp_mode
 	child.seccomp = parent.seccomp
 	child.cgroup = parent.cgroup
@@ -328,13 +345,25 @@ pub fn current_has_capability(cap int) bool {
 // carries no file capabilities: root gets everything its bounding set and
 // inheritable set allow, everybody else keeps only the ambient set.
 pub fn capabilities_after_exec(mut process Process) {
+	katomic.store(mut &process.did_exec, u32(1))
+	dumpability_after_exec(mut process)
+	katomic.store(mut &process.stack_policy_mode, u32(0))
+	katomic.store(mut &process.stack_policy_violations, u64(0))
+	syscall_policy_reset(mut process)
 	mut caps := process.caps
+	old_permitted := caps.permitted
 	if process.euid == 0 || process.uid == 0 {
 		caps.permitted = (caps.inheritable | caps.bounding) | caps.ambient
 		caps.effective = if process.euid == 0 { caps.permitted } else { caps.ambient }
 	} else {
 		caps.permitted = caps.ambient
 		caps.effective = caps.ambient
+	}
+	// Even uid 0 must not regain dropped privileges through exec when NNP
+	// is set. The bounding/inheritable sets are not the pre-exec ceiling.
+	if process.no_new_privs {
+		caps.permitted &= old_permitted
+		caps.effective &= caps.permitted
 	}
 	// SECBIT_KEEP_CAPS does not survive exec; no_new_privs does.
 	caps.keep = false
@@ -345,9 +374,7 @@ pub fn capabilities_after_exec(mut process Process) {
 // of zero keeps none, unless it asked to keep them; dropping the effective uid
 // alone clears only the effective set. Called after every credential change.
 pub fn capabilities_after_setuid(mut process Process, old_ruid u32, old_euid u32, old_suid u32) {
-	if old_euid != process.euid {
-		process.dumpable = false
-	}
+	if process.euid != old_euid { set_dumpability(mut process, 0) }
 	had_root := old_ruid == 0 || old_euid == 0 || old_suid == 0
 	has_root := process.uid == 0 || process.euid == 0 || process.suid == 0
 	if had_root && !has_root && !process.caps.keep {

@@ -109,6 +109,10 @@ pub mut:
 
 	filesystem   &EXT2Filesystem
 	mapped_pages []&EXT2MappedPage
+	mapped_previous &EXT2Resource = unsafe { nil }
+	mapped_next     &EXT2Resource = unsafe { nil }
+	mapped_serial   u64
+	mapped_registered bool
 	// chattr's immutable and append-only bits, the EXT2_*_FL on-disk flags of
 	// the same value; see fs/attributes.v.
 	attr_bits u32
@@ -197,9 +201,17 @@ fn (mut this EXT2Resource) mmap(_handle voidptr, page u64, flags int) voidptr {
 	if offset >= file_size && flags & mmap_mod.map_shared != 0 {
 		return unsafe { nil }
 	}
-	if flags & mmap_mod.map_shared != 0 {
+	if offset < file_size {
 		if mut cached := this.mapped_page_locked(page) {
-			cached.refs++
+			if flags & mmap_mod.map_shared == 0 {
+				if !memory.pmm_retain(cached.physical, 1) {
+					errno.set(errno.enomem)
+					return unsafe { nil }
+				}
+			} else {
+				cached.refs++
+				cached.shared_dirty = true
+			}
 			return cached.physical
 		}
 	}
@@ -209,10 +221,7 @@ fn (mut this EXT2Resource) mmap(_handle voidptr, page u64, flags int) voidptr {
 		errno.set(errno.enomem)
 		return unsafe { nil }
 	}
-	// The device reads complete synchronously. Keep this scratch inode on
-	// the faulting thread's stack: V otherwise boxes it and retains 128 bytes
-	// for every file-backed page fault with manual memory management.
-	mut inode := unsafe { &EXT2Inode(C.__builtin_alloca(sizeof(EXT2Inode))) }
+	mut inode := unsafe { &EXT2Inode(C.vinix_stack_alloc(sizeof(EXT2Inode))) }
 	unsafe { *inode = EXT2Inode{} }
 	inode.read_entry(mut this.filesystem, u32(this.stat.ino)) or {
 		memory.pmm_free(physical, 1)
@@ -231,12 +240,21 @@ fn (mut this EXT2Resource) mmap(_handle voidptr, page u64, flags int) voidptr {
 			return unsafe { nil }
 		}
 	}
-	if flags & mmap_mod.map_shared != 0 {
+	if offset < file_size {
+		is_shared := flags & mmap_mod.map_shared != 0
+		if !is_shared && !memory.pmm_retain(physical, 1) {
+			memory.pmm_free(physical, 1)
+			errno.set(errno.enomem)
+			return unsafe { nil }
+		}
+		this.mapped_pages.flags |= .noslices
 		this.mapped_pages << &EXT2MappedPage{
 			page: page
 			physical: physical
-			refs: 1
+			refs: if is_shared { u64(1) } else { u64(0) }
+			shared_dirty: is_shared
 		}
+		this.register_mapped_resource()
 	}
 	return physical
 }
@@ -246,9 +264,10 @@ fn (mut this EXT2Resource) read(_handle voidptr, buf voidptr, loc u64, count u64
 	defer { this.l.release() }
 	this.filesystem.l.acquire()
 	defer { this.filesystem.l.release() }
-	mut inode := EXT2Inode{}
+	mut inode := unsafe { &EXT2Inode(C.vinix_stack_alloc(sizeof(EXT2Inode))) }
+	unsafe { *inode = EXT2Inode{} }
 	inode.read_entry(mut this.filesystem, u32(this.stat.ino))?
-	file_size := u64(inode.size32l) | (u64(inode.size32h) << 32)
+	file_size := inode.size()
 	if loc >= file_size || count == 0 {
 		return 0
 	}
@@ -312,7 +331,8 @@ fn (mut this EXT2Resource) write_locked(_handle voidptr, buf voidptr, loc u64, c
 	if count == 0 { return 0 }
 	this.filesystem.l.acquire()
 	defer { this.filesystem.l.release() }
-	mut current_inode := EXT2Inode{}
+	mut current_inode := unsafe { &EXT2Inode(C.vinix_stack_alloc(sizeof(EXT2Inode))) }
+	unsafe { *current_inode = EXT2Inode{} }
 
 	current_inode.read_entry(mut this.filesystem, u32(this.stat.ino)) or { return none }
 	written := current_inode.write(mut this.filesystem, buf, u32(this.stat.ino), write_at, count)?
@@ -338,7 +358,7 @@ fn (mut this EXT2Resource) write_locked(_handle voidptr, buf voidptr, loc u64, c
 		}
 		done += chunk
 	}
-	this.stat.size = i64(u64(current_inode.size32l) | (u64(current_inode.size32h) << 32))
+	this.stat.size = i64(current_inode.size())
 	this.stat.blocks = current_inode.sector_cnt
 	this.stat.mtim = time.TimeSpec{i64(current_inode.mod_time), 0}
 	this.stat.ctim = time.TimeSpec{i64(current_inode.creation_time), 0}
@@ -367,7 +387,7 @@ fn (mut this EXT2Resource) unref(handle voidptr) ? {
 	}
 	if this.stat.nlink == 0 {
 		this.filesystem.l.acquire()
-		mut inode := unsafe { &EXT2Inode(C.__builtin_alloca(sizeof(EXT2Inode))) }
+		mut inode := unsafe { &EXT2Inode(C.vinix_stack_alloc(sizeof(EXT2Inode))) }
 		unsafe { *inode = EXT2Inode{} }
 		inode.read_entry(mut this.filesystem, u32(this.stat.ino)) or {
 			this.refcount = 1
@@ -405,14 +425,32 @@ fn (mut this EXT2Resource) grow(handle voidptr, new_size u64) ? {
 		return none
 	}
 
-	mut current_inode := EXT2Inode{}
+	mut current_inode := unsafe { &EXT2Inode(C.vinix_stack_alloc(sizeof(EXT2Inode))) }
+	unsafe { *current_inode = EXT2Inode{} }
 
 	current_inode.read_entry(mut this.filesystem, u32(this.stat.ino)) or { return none }
 
+	old_size := current_inode.size()
 	current_inode.resize(mut this.filesystem, u32(this.stat.ino), 0, new_size) or { return none }
+	if new_size != old_size {
+		// Truncation clears cached bytes after EOF; growth clears newly
+		// exposed bytes, including old stores made while outside EOF.
+		// Detached private COW copies do not live in this common cache.
+		zero_start := if new_size < old_size { new_size } else { old_size }
+		zero_end := if new_size < old_size { u64(-1) } else { new_size }
+		for cached in this.mapped_pages {
+			start := cached.page * page_size
+			if start + page_size <= zero_start || start >= zero_end { continue }
+			offset := if start < zero_start { zero_start - start } else { u64(0) }
+			end := if start + page_size < zero_end { page_size } else { zero_end - start }
+			unsafe { C.memset(voidptr(u64(cached.physical) + higher_half + offset), 0, end - offset) }
+		}
+	}
 
 	this.stat.size = i64(new_size)
 	this.stat.blocks = current_inode.sector_cnt
+	this.stat.mtim = time.TimeSpec{i64(current_inode.mod_time), 0}
+	this.stat.ctim = time.TimeSpec{i64(current_inode.creation_time), 0}
 }
 
 struct EXT2Filesystem {
@@ -456,7 +494,8 @@ fn (mut this EXT2Filesystem) populate(node &vfs.VFSNode) {
 }
 
 fn (mut this EXT2Filesystem) populate_checked(node &vfs.VFSNode) ? {
-	mut parent := EXT2Inode{}
+	mut parent := unsafe { &EXT2Inode(C.vinix_stack_alloc(sizeof(EXT2Inode))) }
+	unsafe { *parent = EXT2Inode{} }
 	parent.read_entry(mut this, u32(node.resource.stat.ino))?
 
 	buffer := memory.calloc(parent.size32l, 1)
@@ -466,6 +505,8 @@ fn (mut this EXT2Filesystem) populate_checked(node &vfs.VFSNode) ? {
 	}
 	defer { memory.free(buffer) }
 	parent.read(mut this, buffer, 0, parent.size32l)?
+	// One reusable inode slot bounds directory-population stack usage.
+	mut inode := unsafe { &EXT2Inode(C.vinix_stack_alloc(sizeof(EXT2Inode))) }
 
 	for i := u32(0); i < parent.size32l;  {
 		if parent.size32l - i < sizeof(EXT2DirectoryEntry) {
@@ -500,7 +541,7 @@ fn (mut this EXT2Filesystem) populate_checked(node &vfs.VFSNode) ? {
 			continue
 		}
 
-		mut inode := EXT2Inode{}
+		unsafe { *inode = EXT2Inode{} }
 		inode.read_entry(mut this, dir_entry.inode_index) or {
 			memory.free(name_buffer)
 			return none
@@ -544,7 +585,7 @@ fn (mut this EXT2Filesystem) populate_checked(node &vfs.VFSNode) ? {
 		resource.stat.uid = inode.user_id
 		resource.stat.gid = inode.group_id
 		resource.stat.ino = dir_entry.inode_index
-		resource.stat.size = u64(inode.size32l) | (u64(inode.size32h) << 32)
+		resource.stat.size = inode.size()
 		resource.stat.nlink = inode.hard_link_cnt
 		resource.stat.blksize = this.block_size
 		resource.stat.blocks = inode.sector_cnt
@@ -585,6 +626,11 @@ fn (mut this EXT2Filesystem) populate_checked(node &vfs.VFSNode) ? {
 		i += dir_entry.entry_size
 	}
 
+}
+
+fn (this &EXT2Filesystem) block_identity() resource_mod.BlockIdentity {
+	mut device := this.backing_device.resource
+	return resource_mod.block_identity(mut device)
 }
 
 fn (mut bro EXT2Filesystem) instantiate() &vfs.FileSystem {
@@ -652,7 +698,7 @@ fn (mut this EXT2Filesystem) mount(parent &vfs.VFSNode, name string, source &vfs
 		refcount: 1
 	}
 
-	resource.stat.size = u64(this.root_inode.size32l) | (u64(this.root_inode.size32h) << 32)
+	resource.stat.size = this.root_inode.size()
 	resource.stat.blksize = this.block_size
 	resource.stat.blocks = this.root_inode.sector_cnt
 	resource.stat.dev = this.dev_id
@@ -691,138 +737,154 @@ fn (inode &EXT2Inode) fast_symlink_target(block_size u64) ?string {
 }
 
 fn (mut inode EXT2Inode) read(mut filesystem EXT2Filesystem, buf voidptr, off u64, cnt u64) ?i64 {
-	mut count := cnt
-
-	if off > inode.size32l {
-		return 0
-	}
-
-	if (off + count) > inode.size32l {
-		count = inode.size32l - off
-	}
+	file_size := inode.size()
+	if off >= file_size || cnt == 0 { return 0 }
+	count := if cnt < file_size - off { cnt } else { file_size - off }
 	attribute_sectors := if inode.eab != 0 { u32(filesystem.block_size / 512) } else { u32(0) }
 	if stat.islnk(u32(inode.permissions)) && inode.sector_cnt == attribute_sectors
 		&& inode.size32l <= u32(sizeof(inode.blocks)) {
 		unsafe { C.memcpy(buf, voidptr(u64(&inode.blocks[0]) + off), count) }
 		return i64(count)
 	}
-
-	for headway := u64(0); headway < count;  {
-		iblock := (off + headway) / filesystem.block_size
-
-		mut size := count - headway
+	for headway := u64(0); headway < count; {
+		logical := (off + headway) / filesystem.block_size
+		if logical >= u64(0x100000000) { errno.set(errno.efbig); return none }
 		offset := (off + headway) % filesystem.block_size
-
-		if size > (filesystem.block_size - offset) {
-			size = filesystem.block_size - offset
-		}
-
-		disk_block := inode.get_block(mut filesystem, u32(iblock)) or { return none }
-		if disk_block == 0 {
-			unsafe { C.memset(voidptr(u64(buf) + headway), 0, size) }
+		amount := if count - headway < filesystem.block_size - offset {
+			count - headway
+		} else { filesystem.block_size - offset }
+		block := inode.get_block(mut filesystem, u32(logical))?
+		if block == 0 {
+			unsafe { C.memset(voidptr(u64(buf) + headway), 0, amount) }
 		} else {
-			filesystem.raw_device_read(voidptr(u64(buf) + headway), disk_block * filesystem.block_size + offset, size) or { return none }
+			filesystem.raw_device_read(voidptr(u64(buf) + headway), u64(block) * filesystem.block_size + offset, amount)?
 		}
-
-		headway += size
+		headway += amount
 	}
-
 	return i64(count)
 }
 
-fn (mut inode EXT2Inode) resize(mut filesystem EXT2Filesystem, inode_index u32, start u64, cnt u64) ?int {
-	sector_size := filesystem.backing_device.resource.stat.blksize
-	if start > u64(0xffffffff) || cnt > u64(0xffffffff) - start {
-		errno.set(errno.efbig)
-		return none
+fn (mut inode EXT2Inode) prepare_size(mut filesystem EXT2Filesystem, size u64) ? {
+	maximum := if stat.isreg(u32(inode.permissions)) { filesystem.file_capacity() } else { u64(0xffffffff) }
+	if size > maximum { errno.set(errno.efbig); return none }
+	if stat.isreg(u32(inode.permissions)) && size > 0x7fffffff {
+		// Dynamic-revision inodes assign i_dir_acl to the size high word.
+		if filesystem.superblock.version_maj == 0 { errno.set(errno.efbig); return none }
+		filesystem.enable_large_files()?
 	}
-	new_size := start + cnt
-	old_blocks := lib.div_roundup(u64(inode.size32l), filesystem.block_size)
-	new_blocks := lib.div_roundup(new_size, filesystem.block_size)
-	if new_blocks < old_blocks {
-		for i := new_blocks; i < old_blocks; i++ {
-			disk_block := inode.get_block(mut filesystem, u32(i)) or { return none }
-			if disk_block != 0 {
-				filesystem.free_block(disk_block)?
-				inode.set_block(mut filesystem, inode_index, u32(i), 0)?
-				sectors := u32(filesystem.block_size / sector_size)
-				inode.sector_cnt = if inode.sector_cnt >= sectors {
-					inode.sector_cnt - sectors
-				} else {
-					0
-				}
-			}
-		}
-		if new_size != 0 && new_size % filesystem.block_size != 0 {
-			disk_block := inode.get_block(mut filesystem, u32(new_size / filesystem.block_size))?
-			if disk_block != 0 {
-				tail_offset := new_size % filesystem.block_size
-				tail_size := filesystem.block_size - tail_offset
-				zero := memory.calloc(tail_size, 1)
-				if zero == unsafe { nil } {
-					errno.set(errno.enomem)
-					return none
-				}
-				filesystem.raw_device_write(zero, u64(disk_block) * filesystem.block_size + tail_offset, tail_size) or {
-					memory.free(zero)
-					return none
-				}
-				memory.free(zero)
-			}
-		}
-		inode.free_indirect_blocks(mut filesystem, new_blocks)?
-	} else if new_blocks > old_blocks {
-		for i := old_blocks; i < new_blocks; i++ {
-			if inode.get_block(mut filesystem, u32(i)) or { u32(0) } != 0 {
-				continue
-			}
-			disk_block := filesystem.allocate_block() or { return none }
-			inode.set_block(mut filesystem, inode_index, u32(i), disk_block) or {
-				filesystem.free_block(disk_block) or {}
-				return none
-			}
-			inode.sector_cnt += u32(filesystem.block_size / sector_size)
-		}
-	}
-	inode.size32l = u32(new_size)
-	inode.size32h = 0
-
-	inode.write_entry(mut filesystem, inode_index) or { return none }
-
-	return 0
 }
 
-fn (mut inode EXT2Inode) write(mut filesystem EXT2Filesystem, buf voidptr, inode_index u32, off u64, cnt u64) ?i64 {
-	if off > u64(0xffffffff) || cnt > u64(0xffffffff) - off {
-		errno.set(errno.efbig)
-		return none
+fn (mut inode EXT2Inode) set_size(size u64) {
+	inode.size32l = u32(size)
+	if stat.isreg(u32(inode.permissions)) { inode.size32h = u32(size >> 32) }
+}
+
+// Clear the retained block's bytes past a logical EOF. This also prevents
+// a failed extending write from exposing its uncommitted suffix on later growth.
+fn (mut inode EXT2Inode) zero_tail(mut filesystem EXT2Filesystem, size u64) ? {
+	if size == 0 || size % filesystem.block_size == 0 { return }
+	block := inode.get_block(mut filesystem, u32(size / filesystem.block_size))?
+	if block == 0 { return }
+	offset := size % filesystem.block_size
+	amount := filesystem.block_size - offset
+	zero := memory.calloc(amount, 1)
+	if zero == unsafe { nil } { errno.set(errno.enomem); return none }
+	defer { memory.free(zero) }
+	filesystem.raw_device_write(zero, u64(block) * filesystem.block_size + offset, amount)?
+}
+
+fn (mut inode EXT2Inode) resize(mut filesystem EXT2Filesystem, inode_index u32, start u64, count u64) ?int {
+	if count > u64(-1) - start { errno.set(errno.efbig); return none }
+	new_size := start + count
+	inode.prepare_size(mut filesystem, new_size)?
+	old_size := inode.size()
+	if new_size < old_size {
+		inode.zero_tail(mut filesystem, new_size)?
+		inode.truncate_blocks(mut filesystem, inode_index, lib.div_roundup(new_size, filesystem.block_size))?
+	} else if new_size > old_size {
+		inode.zero_tail(mut filesystem, old_size)?
 	}
-	end := off + cnt
-	if end > u64(inode.size32l) {
-		inode.resize(mut filesystem, inode_index, 0, end) or { return none }
-	}
-
-	for headway := u64(0); headway < cnt;  {
-		iblock := (off + headway) / filesystem.block_size
-
-		mut size := cnt - headway
-		offset := (off + headway) % filesystem.block_size
-
-		if size > (filesystem.block_size - offset) {
-			size = filesystem.block_size - offset
-		}
-
-		disk_block := inode.get_block(mut filesystem, u32(iblock)) or { return none }
-
-		filesystem.raw_device_write(voidptr(u64(buf) + headway), disk_block * filesystem.block_size + offset, size) or { return none }
-
-		headway += size
-	}
+	// Growth reserves size only. Holes acquire physical blocks on the first write.
+	inode.set_size(new_size)
 	inode.mod_time = ext2_now()
 	inode.creation_time = inode.mod_time
 	inode.write_entry(mut filesystem, inode_index)?
+	return 0
+}
 
-	return i64(cnt)
+// A new data block remains detached until both its data and pointer tables
+// have been copied successfully into the filesystem cache.
+fn (mut inode EXT2Inode) write_file_block(mut filesystem EXT2Filesystem, buf voidptr,
+	inode_index u32, logical u32, offset u64, amount u64) ? {
+	mut block := inode.get_block(mut filesystem, logical)?
+	fresh := block == 0
+	if fresh { block = inode.allocate_accounted_block(mut filesystem)? }
+	filesystem.raw_device_write(buf, u64(block) * filesystem.block_size + offset, amount) or {
+		if fresh { inode.free_accounted_block(mut filesystem, block) or {} }
+		return none
+	}
+	if fresh {
+		inode.set_block(mut filesystem, inode_index, logical, block) or {
+			// set_block has no failing operation after publication. Single-
+			// page pointer/inode copies fail before mutation, so this data
+			// block and any detached metadata remain safe to return.
+			inode.free_accounted_block(mut filesystem, block) or {}
+			return none
+		}
+	}
+}
+
+fn (mut inode EXT2Inode) write(mut filesystem EXT2Filesystem, buf voidptr, inode_index u32, off u64, count u64) ?i64 {
+	if count == 0 { return 0 }
+	if count > u64(-1) - off { errno.set(errno.efbig); return none }
+	inode.prepare_size(mut filesystem, off + count)?
+	if off > inode.size() { inode.zero_tail(mut filesystem, inode.size())? }
+	mut headway := u64(0)
+	for headway < count {
+		logical := u32((off + headway) / filesystem.block_size)
+		offset := (off + headway) % filesystem.block_size
+		amount := if count - headway < filesystem.block_size - offset {
+			count - headway
+		} else { filesystem.block_size - offset }
+		inode.write_file_block(mut filesystem, voidptr(u64(buf) + headway), inode_index,
+			logical, offset, amount) or {
+			// Keep counters for any already-published tables. The failed
+			// chunk contributes no size or returned bytes.
+			inode.write_entry(mut filesystem, inode_index) or {}
+			if headway != 0 { return i64(headway) }
+			return none
+		}
+		old_size := inode.size()
+		end := off + headway + amount
+		if end > old_size { inode.set_size(end) }
+		inode.mod_time = ext2_now()
+		inode.creation_time = inode.mod_time
+		inode.write_entry(mut filesystem, inode_index) or {
+			// Inode writes fit one cache page (validated at mount), so a
+			// failed cache acquisition has published no new inode bytes.
+			inode.set_size(old_size)
+			if end > old_size {
+				// Return any rejected extending data to holes. Otherwise a
+				// later ftruncate growth could expose this unreported suffix.
+				// Permanent cleanup I/O failures still require FS recovery.
+				inode.zero_tail(mut filesystem, old_size) or {}
+				inode.truncate_blocks(mut filesystem, inode_index,
+					lib.div_roundup(old_size, filesystem.block_size)) or {}
+			}
+			inode.write_entry(mut filesystem, inode_index) or {}
+			// Bytes already within EOF are visible even if their timestamp
+			// update failed. Report them so the Resource's mapped cache gets
+			// the same completed prefix as the backing cache.
+			if off + headway < old_size {
+				visible := if amount < old_size - off - headway { amount } else { old_size - off - headway }
+				return i64(headway + visible)
+			}
+			if headway != 0 { return i64(headway) }
+			return none
+		}
+		headway += amount
+	}
+	return i64(headway)
 }
 
 fn (mut inode EXT2Inode) free_entry(mut filesystem EXT2Filesystem, inode_index u32) ?int {
@@ -837,14 +899,7 @@ fn (mut inode EXT2Inode) free_entry(mut filesystem EXT2Filesystem, inode_index u
 		&& inode.sector_cnt == attribute_sectors && inode.size32l != 0
 		&& inode.size32l <= u32(sizeof(inode.blocks))
 	if !is_fast_symlink {
-		for i := u64(0); i < lib.div_roundup(u64(inode.size32l), filesystem.block_size); i++ {
-			block_index := inode.get_block(mut filesystem, u32(i)) or { return none }
-			if block_index != 0 {
-				filesystem.free_block(block_index) or { return none }
-				inode.set_block(mut filesystem, inode_index, u32(i), 0) or { return none }
-			}
-		}
-		inode.free_indirect_blocks(mut filesystem, 0)?
+		inode.truncate_blocks(mut filesystem, inode_index, 0)?
 	}
 	if stat.isdir(u32(inode.permissions)) {
 		filesystem.count_directory(inode_index, false)
@@ -861,205 +916,8 @@ fn (mut inode EXT2Inode) free_entry(mut filesystem EXT2Filesystem, inode_index u
 	return 0
 }
 
-// Free the indirect blocks that map nothing below `kept` (a block count) once
-// the data blocks past it have gone. Deleting or shrinking a file freed only
-// the data, and every file over 12 blocks left its indirect blocks allocated
-// for good. The triple-indirect level is still left: with 4 KiB blocks and
-// 32-bit sizes nothing reaches it, with 1 KiB blocks files over 64 MiB do.
-fn (mut inode EXT2Inode) free_indirect_blocks(mut filesystem EXT2Filesystem, kept u64) ? {
-	per_block := filesystem.block_size / 4
-	sectors := u32(filesystem.block_size / filesystem.backing_device.resource.stat.blksize)
-	if kept <= 12 && inode.blocks[12] != 0 {
-		filesystem.free_block(inode.blocks[12])?
-		inode.blocks[12] = 0
-		inode.sector_cnt = if inode.sector_cnt >= sectors { inode.sector_cnt - sectors } else { 0 }
-	}
-	if inode.blocks[13] == 0 {
-		return
-	}
-	double_start := 12 + per_block
-	// The first of the double-indirect block's entries that maps nothing kept.
-	first_unkept := if kept <= double_start {
-		u64(0)
-	} else {
-		lib.div_roundup(kept - double_start, per_block)
-	}
-	if first_unkept >= per_block {
-		return
-	}
-	entries := unsafe { &u32(memory.calloc(filesystem.block_size, 1)) }
-	if entries == unsafe { nil } {
-		errno.set(errno.enomem)
-		return none
-	}
-	defer { memory.free(entries) }
-	table := u64(inode.blocks[13]) * filesystem.block_size
-	filesystem.raw_device_read(entries, table, filesystem.block_size)?
-	mut changed := false
-	for i in first_unkept .. per_block {
-		indirect := unsafe { entries[i] }
-		if indirect == 0 {
-			continue
-		}
-		filesystem.free_block(indirect)?
-		unsafe {
-			entries[i] = 0
-		}
-		changed = true
-		inode.sector_cnt = if inode.sector_cnt >= sectors { inode.sector_cnt - sectors } else { 0 }
-	}
-	if first_unkept == 0 {
-		filesystem.free_block(inode.blocks[13])?
-		inode.blocks[13] = 0
-		inode.sector_cnt = if inode.sector_cnt >= sectors { inode.sector_cnt - sectors } else { 0 }
-	} else if changed {
-		filesystem.raw_device_write(entries, table, filesystem.block_size)?
-	}
-}
-
-fn (mut inode EXT2Inode) set_block(mut filesystem EXT2Filesystem, inode_index u32, iblock u32, disk_block u32) ?u32 {
-	mut block := iblock
-	blocks_per_level := u32(filesystem.block_size / 4)
-
-	if block < 12 {
-		inode.blocks[block] = disk_block
-		return disk_block
-	}
-
-	block -= 12
-
-	if block >= blocks_per_level {
-		block -= blocks_per_level
-
-		single_index := block / blocks_per_level
-		mut indirect_offset := block % blocks_per_level
-		mut indirect_block := u32(0)
-
-		if single_index >= blocks_per_level {
-			block -= blocks_per_level * blocks_per_level
-
-			double_indirect_index := block / blocks_per_level
-			indirect_offset = block % blocks_per_level
-			mut single_indirect_index := u32(0)
-
-			if inode.blocks[14] == 0 {
-				inode.blocks[14] = filesystem.allocate_block() or { return none }
-				inode.sector_cnt += u32(filesystem.block_size / filesystem.backing_device.resource.stat.blksize)
-
-				inode.write_entry(mut filesystem, inode_index) or { return none }
-			}
-
-			filesystem.raw_device_read(voidptr(&single_indirect_index), inode.blocks[14] * filesystem.block_size + double_indirect_index * 4, 4) or { return none }
-
-			if single_indirect_index == 0 {
-				new_block := filesystem.allocate_block() or { return none }
-				inode.sector_cnt += u32(filesystem.block_size / filesystem.backing_device.resource.stat.blksize)
-
-				filesystem.raw_device_write(voidptr(&new_block), inode.blocks[14] * filesystem.block_size + double_indirect_index * 4, 4) or { return none }
-
-				single_indirect_index = new_block
-			}
-
-			filesystem.raw_device_read(voidptr(&indirect_block), double_indirect_index * filesystem.block_size + single_indirect_index * 4, 4) or { return none }
-
-			if indirect_block == 0 {
-				new_block := filesystem.allocate_block() or { return none }
-				inode.sector_cnt += u32(filesystem.block_size / filesystem.backing_device.resource.stat.blksize)
-
-				filesystem.raw_device_write(voidptr(&indirect_block), double_indirect_index * filesystem.block_size + single_indirect_index * 4, 4) or { return none }
-
-				indirect_block = new_block
-			}
-
-			filesystem.raw_device_write(voidptr(&disk_block), indirect_block * filesystem.block_size + indirect_offset * 4, 4) or { return none }
-
-			return disk_block
-		}
-
-		if inode.blocks[13] == 0 {
-			inode.blocks[13] = filesystem.allocate_block() or { return none }
-			inode.sector_cnt += u32(filesystem.block_size / filesystem.backing_device.resource.stat.blksize)
-
-			inode.write_entry(mut filesystem, inode_index) or { return none }
-		}
-
-		filesystem.raw_device_read(voidptr(&indirect_block), inode.blocks[13] * filesystem.block_size + single_index * 4, 4) or { return none }
-
-		if indirect_block == 0 {
-			new_block := filesystem.allocate_block() or { return none }
-			inode.sector_cnt += u32(filesystem.block_size / filesystem.backing_device.resource.stat.blksize)
-
-			filesystem.raw_device_write(voidptr(&new_block), inode.blocks[13] * filesystem.block_size + single_index * 4, 4) or { return none }
-
-			indirect_block = new_block
-		}
-
-		filesystem.raw_device_write(voidptr(&disk_block), indirect_block * filesystem.block_size + indirect_offset * 4, 4) or { return none }
-
-		return disk_block
-	} else {
-		if inode.blocks[12] == 0 {
-			inode.blocks[12] = filesystem.allocate_block() or { return none }
-			inode.sector_cnt += u32(filesystem.block_size / filesystem.backing_device.resource.stat.blksize)
-
-			inode.write_entry(mut filesystem, inode_index) or { return none }
-		}
-
-		filesystem.raw_device_write(voidptr(&disk_block), inode.blocks[12] * filesystem.block_size + block * 4, 4) or { return none }
-	}
-
-	return disk_block
-}
-
-fn (mut inode EXT2Inode) get_block(mut filesystem EXT2Filesystem, iblock u32) ?u32 {
-	mut disk_block_index := u32(0)
-	mut block := iblock
-	blocks_per_level := u32(filesystem.block_size / 4)
-
-	if block < 12 {
-		disk_block_index = inode.blocks[iblock]
-		return disk_block_index
-	}
-
-	block -= 12
-
-	if block >= blocks_per_level {
-		block -= blocks_per_level
-
-		single_index := block / blocks_per_level
-		mut indirect_offset := block % blocks_per_level
-		indirect_block := u32(0)
-
-		if single_index >= blocks_per_level {
-			block -= blocks_per_level * blocks_per_level
-
-			double_indirect_index := block / blocks_per_level
-			indirect_offset = block % blocks_per_level
-			single_indirect_index := u32(0)
-
-			filesystem.raw_device_read(voidptr(&single_indirect_index), inode.blocks[14] * filesystem.block_size + double_indirect_index * 4, 4) or { return none }
-
-			filesystem.raw_device_read(voidptr(&indirect_block), double_indirect_index * filesystem.block_size + single_indirect_index * 4, 4) or { return none }
-
-			filesystem.raw_device_read(voidptr(&disk_block_index), indirect_block * filesystem.block_size + indirect_offset * 4, 4) or { return none }
-
-			return disk_block_index
-		}
-
-		filesystem.raw_device_read(voidptr(&indirect_block), inode.blocks[13] * filesystem.block_size + single_index * 4, 4) or { return none }
-
-		filesystem.raw_device_read(voidptr(&disk_block_index), indirect_block * filesystem.block_size + indirect_offset * 4, 4) or { return none }
-
-		return disk_block_index
-	}
-
-	filesystem.raw_device_read(voidptr(&disk_block_index), inode.blocks[12] * filesystem.block_size + block * 4, 4) or { return none }
-
-	return disk_block_index
-}
-
 fn (mut filesystem EXT2Filesystem) allocate_block() ?u32 {
-	mut bgd := unsafe { &EXT2BlockGroupDescriptor(C.__builtin_alloca(sizeof(EXT2BlockGroupDescriptor))) }
+	mut bgd := unsafe { &EXT2BlockGroupDescriptor(C.vinix_stack_alloc(sizeof(EXT2BlockGroupDescriptor))) }
 	unsafe { *bgd = EXT2BlockGroupDescriptor{} }
 
 	for i := u32(0); i < filesystem.bgd_cnt; i++ {
@@ -1087,7 +945,7 @@ fn (mut filesystem EXT2Filesystem) allocate_block() ?u32 {
 }
 
 fn (mut filesystem EXT2Filesystem) allocate_inode() ?u64 {
-	mut bgd := unsafe { &EXT2BlockGroupDescriptor(C.__builtin_alloca(sizeof(EXT2BlockGroupDescriptor))) }
+	mut bgd := unsafe { &EXT2BlockGroupDescriptor(C.vinix_stack_alloc(sizeof(EXT2BlockGroupDescriptor))) }
 	unsafe { *bgd = EXT2BlockGroupDescriptor{} }
 
 	for i := u32(0); i < filesystem.bgd_cnt; i++ {
@@ -1113,7 +971,7 @@ fn (mut filesystem EXT2Filesystem) free_block(block u32) ?int {
 	if bitmap == unsafe { nil } { errno.set(errno.enomem); return none }
 	defer { memory.free(bitmap) }
 
-	mut bgd := unsafe { &EXT2BlockGroupDescriptor(C.__builtin_alloca(sizeof(EXT2BlockGroupDescriptor))) }
+	mut bgd := unsafe { &EXT2BlockGroupDescriptor(C.vinix_stack_alloc(sizeof(EXT2BlockGroupDescriptor))) }
 	unsafe { *bgd = EXT2BlockGroupDescriptor{} }
 	bgd.read_entry(mut filesystem, bgd_index)
 
@@ -1146,7 +1004,7 @@ fn (mut filesystem EXT2Filesystem) free_block(block u32) ?int {
 // count, but e2fsck checks it and Linux places new directories by it.
 fn (mut filesystem EXT2Filesystem) count_directory(inode_index u32, added bool) {
 	bgd_index := (inode_index - 1) / filesystem.superblock.inodes_per_group
-	mut bgd := unsafe { &EXT2BlockGroupDescriptor(C.__builtin_alloca(sizeof(EXT2BlockGroupDescriptor))) }
+	mut bgd := unsafe { &EXT2BlockGroupDescriptor(C.vinix_stack_alloc(sizeof(EXT2BlockGroupDescriptor))) }
 	unsafe { *bgd = EXT2BlockGroupDescriptor{} }
 	bgd.read_entry(mut filesystem, bgd_index)
 	if added {
@@ -1168,7 +1026,7 @@ fn (mut filesystem EXT2Filesystem) free_inode(inode u32) ?int {
 	if bitmap == unsafe { nil } { errno.set(errno.enomem); return none }
 	defer { memory.free(bitmap) }
 
-	mut bgd := unsafe { &EXT2BlockGroupDescriptor(C.__builtin_alloca(sizeof(EXT2BlockGroupDescriptor))) }
+	mut bgd := unsafe { &EXT2BlockGroupDescriptor(C.vinix_stack_alloc(sizeof(EXT2BlockGroupDescriptor))) }
 	unsafe { *bgd = EXT2BlockGroupDescriptor{} }
 	bgd.read_entry(mut filesystem, bgd_index)
 
@@ -1206,7 +1064,7 @@ fn (mut bgd EXT2BlockGroupDescriptor) read_entry(mut filesystem EXT2Filesystem, 
 		bgd_offset = filesystem.block_size * 2
 	}
 
-	filesystem.raw_device_read(unsafe { voidptr(&bgd) }, bgd_offset + sizeof(EXT2BlockGroupDescriptor) * bgd_index, sizeof(EXT2BlockGroupDescriptor)) or {
+	filesystem.raw_device_read(voidptr(unsafe { &bgd }), bgd_offset + sizeof(EXT2BlockGroupDescriptor) * bgd_index, sizeof(EXT2BlockGroupDescriptor)) or {
 		print('ext2: unable to read bgd entry\n')
 		return -1
 	}
@@ -1223,7 +1081,7 @@ fn (mut bgd EXT2BlockGroupDescriptor) write_entry(mut filesystem EXT2Filesystem,
 		bgd_offset = filesystem.block_size * 2
 	}
 
-	filesystem.raw_device_write(unsafe { voidptr(&bgd) }, bgd_offset + sizeof(EXT2BlockGroupDescriptor) * bgd_index, sizeof(EXT2BlockGroupDescriptor)) or {
+	filesystem.raw_device_write(voidptr(unsafe { &bgd }), bgd_offset + sizeof(EXT2BlockGroupDescriptor) * bgd_index, sizeof(EXT2BlockGroupDescriptor)) or {
 		print('ext2: unable to read bgd entry\n')
 		return -1
 	}
@@ -1395,7 +1253,23 @@ pub fn ext2_init(backing_device &vfs.VFSNode) (&EXT2Filesystem, bool) {
 		new_filesystem.cache.release(voidptr(backing_device), device_write) or {}
 		return 0, false
 	}
-	if !pagecache.register_cache(new_filesystem.cache, voidptr(backing_device), device_write) {
+	// Pointer entries, inode headers and a data block must fit one software
+	// cache page. A failed cache acquisition then cannot expose a half inode
+	// or half pointer while the caller rolls back detached allocations.
+	if new_filesystem.superblock.block_size > 2 {
+		new_filesystem.cache.release(voidptr(backing_device), device_write) or {}
+		return 0, false
+	}
+	block_bytes := u64(1024) << new_filesystem.superblock.block_size
+	if new_filesystem.superblock.version_maj == 0 { new_filesystem.superblock.inode_size = 128 }
+	inode_bytes := u64(new_filesystem.superblock.inode_size)
+	if inode_bytes < sizeof(EXT2Inode) || inode_bytes > block_bytes
+		|| inode_bytes & (inode_bytes - 1) != 0 {
+		new_filesystem.cache.release(voidptr(backing_device), device_write) or {}
+		return 0, false
+	}
+	if !register_mapped_writeback()
+		|| !pagecache.register_cache(new_filesystem.cache, voidptr(backing_device), device_write, device_flush) {
 		new_filesystem.cache.release(voidptr(backing_device), device_write) or {}
 		return 0, false
 	}

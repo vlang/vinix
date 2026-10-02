@@ -24,7 +24,7 @@ fn test_unknown_selector_fails_closed_even_for_root() {
 
 fn test_known_selector_requires_effective_root() {
 	for selector in [filesystem_mount, filesystem_unmount, system_hostname_set, system_domainname_set,
-		system_reboot] {
+		system_reboot, system_clock_set] {
 		proc.set_test_caps(u64(-1))
 		proc.set_test_euid(0)
 		assert permitted(selector)
@@ -46,5 +46,16 @@ fn test_root_without_the_guarding_capability_is_denied() {
 	proc.set_test_caps(u64(-1) & ~(u64(1) << proc.cap_sys_boot))
 	assert !permitted(system_reboot)
 	assert permitted(filesystem_mount)
+	proc.set_test_caps(u64(-1))
+}
+
+fn test_clock_requires_sys_time_capability() {
+	proc.set_test_euid(0)
+	proc.set_test_caps(u64(-1) & ~(u64(1) << proc.cap_sys_time))
+	assert !permitted(system_clock_set)
+	assert permitted(system_reboot)
+	proc.set_test_caps(u64(1) << proc.cap_sys_time)
+	assert permitted(system_clock_set)
+	assert !permitted(filesystem_mount)
 	proc.set_test_caps(u64(-1))
 }

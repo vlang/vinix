@@ -22,6 +22,7 @@ pub const map_fixed_noreplace = 0x100000
 pub const map_populate = 0x8000
 pub const map_anon = 0x20
 pub const map_anonymous = 0x20
+pub const map_locked = 0x2000
 
 const prot_mask = prot_read | prot_write | prot_exec
 const ms_async = 1
@@ -54,6 +55,8 @@ const map_brk_reservation = 0x20000000
 pub const map_no_write = 0x40000000
 // Internal permission ceiling for files mapped through a noexec mount.
 pub const map_no_exec = 0x10000000
+// Userspace cannot supply any of the kernel's mapping bookkeeping bits.
+pub const map_internal_mask = map_brk_reservation | map_no_write | map_no_exec
 
 // Runtimes such as JavaScriptCore reserve multi-gigabyte anonymous arenas but
 // commit only a small fraction of them. Keep large reservations sparse and let
@@ -70,6 +73,7 @@ __global (
 	range_locals_lock klock.Lock
 	// Identifies an insertion even when a slab reuses a removed local pointer.
 	next_range_generation = u64(1)
+	range_global_serial u64
 )
 
 // Resources that need uncached page table mappings (e.g., framebuffers).
@@ -129,6 +133,8 @@ pub struct MmapRangeGlobal {
 pub mut:
 	// A reservation needs no physical page tables until its first page is
 	// installed. top_level is created under shadow_pagemap.l at that point.
+	serial u64
+	private_cow bool
 	shadow_pagemap    memory.Pagemap
 	locals            []&MmapRangeLocal
 	resource          &resource.Resource = unsafe { nil }
@@ -161,6 +167,9 @@ mut:
 	file_data_length u64
 	no_write         bool
 	no_exec          bool
+	credit_base      u64
+	credit_serial    u64
+	created_serial   &u64 = unsafe { nil }
 }
 
 pub fn list_ranges(pagemap &memory.Pagemap) {
@@ -634,6 +643,8 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap) ?&memory.Pagemap {
 			*new_local_range = *local_range
 		}
 		new_local_range.pagemap = new_pagemap
+		// Linux does not inherit memory locks or MCL_FUTURE across fork.
+		new_local_range.flags &= ~map_locked
 
 		// MADV_WIPEONFORK, minherit(MAP_INHERIT_ZERO): the child gets the
 		// range empty, to fill with zero pages as it touches them, and none
@@ -669,6 +680,7 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap) ?&memory.Pagemap {
 				unsafe {
 					*new_pte = *old_pte
 				}
+				new_pagemap.account_resident(i, false, true)
 				i = old_pagemap.next_present(i + page_size, range_end)
 			}
 		} else {
@@ -693,6 +705,7 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap) ?&memory.Pagemap {
 					pte_extra: global_range.pte_extra
 					owns_resource_ref: global_range.owns_resource_ref
 					owns_mapping_ref: global_range.owns_mapping_ref
+					private_cow: global_range.private_cow
 					no_write: global_range.no_write
 					no_exec: global_range.no_exec
 					lazy_file: global_range.lazy_file
@@ -745,6 +758,7 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap) ?&memory.Pagemap {
 					*new_pte = *old_pte
 					*new_spte = *new_pte
 				}
+				new_pagemap.account_resident(i, false, true)
 				cow_flags := page_table_flags(local_range.prot, global_range.pte_extra, false)
 				old_pagemap.flag_page(i, cow_flags) or { return none }
 				new_pagemap.flag_page(i, cow_flags) or { return none }
@@ -761,6 +775,13 @@ fn page_table_flags(prot int, extra u64, writable bool) u64 {
 	mut flags := memory.pte_present | extra
 	if prot != prot_none {
 		flags |= memory.pte_user
+	}
+	$if aarch64 {
+		// An explicit PROT_EXEC request opts into native execute-only text.
+		// PROT_WRITE still implies data readability on this architecture.
+		if prot == prot_exec && memory.execute_only_supported() {
+			flags |= memory.pte_execute_only
+		}
 	}
 	if writable && prot & prot_write != 0 {
 		flags |= memory.pte_writable
@@ -780,56 +801,6 @@ fn range_page_has_file_data(global &MmapRangeGlobal, virt u64) bool {
 	return relative < data_end && relative + page_size > global.file_data_start
 }
 
-// This does not follow a local/global range pointer: the caller may have
-// dropped pagemap.l while acquiring memory and the range may have vanished.
-fn acquire_anonymous_page() ?voidptr {
-	// First touch decides where anonymous memory lives, respecting the
-	// faulting thread's set_mempolicy/mbind policy. The allocator zeros it.
-	page := numa.alloc_user_page()
-	if page == unsafe { nil } {
-		errno.set(errno.enomem)
-		return none
-	}
-	return page
-}
-
-fn acquire_range_page(local &MmapRangeLocal, virt u64, file_page u64) ?voidptr {
-	global := local.global
-	if local.flags & map_anonymous != 0
-		|| (global.segmented_file && !range_page_has_file_data(global, virt)) {
-		return acquire_anonymous_page()
-	}
-
-	mut res := global.resource
-	page := res.mmap(global.handle, file_page, local.flags)
-	if page == unsafe { nil } {
-		return none
-	}
-	if global.segmented_file {
-		relative := virt - global.base
-		data_begin := if global.file_data_start > relative {
-			global.file_data_start - relative
-		} else {
-			u64(0)
-		}
-		absolute_end := global.file_data_start + global.file_data_length
-		data_end := if absolute_end < relative + page_size {
-			absolute_end - relative
-		} else {
-			page_size
-		}
-		if data_begin != 0 {
-			unsafe { C.memset(voidptr(u64(page) + higher_half), 0, data_begin) }
-		}
-		if data_end < page_size {
-			unsafe {
-				C.memset(voidptr(u64(page) + higher_half + data_end), 0, page_size - data_end)
-			}
-		}
-	}
-	return page
-}
-
 fn release_range_page(global &MmapRangeGlobal, virt u64, file_page u64,
 	physical voidptr, flags int) {
 	if flags & map_anonymous != 0
@@ -845,6 +816,7 @@ fn release_range_page(global &MmapRangeGlobal, virt u64, file_page u64,
 // list, so one that grows frees the buffer it outgrew: a split of a range
 // that already had two locals lost the old buffer.
 fn (mut g MmapRangeGlobal) add_local(local &MmapRangeLocal) {
+	if g.serial == 0 { g.serial = katomic.inc(mut &range_global_serial) + 1 }
 	g.locals.flags |= .noslices
 	g.locals << unsafe { local }
 }
@@ -913,31 +885,25 @@ pub fn map_page_in_range(_g &MmapRangeGlobal, virt_addr u64, phys_addr u64, _pro
 //
 // Nothing is left for the caller to release: a page that loses is released
 // here, and one that wins belongs to the range.
-pub fn install_range_page(mut pagemap memory.Pagemap, local &MmapRangeLocal, generation u64, virt u64, file_page u64, page voidptr, flags int) ? {
+fn install_range_page(mut pagemap memory.Pagemap, source RangePageSource, virt u64, file_page u64, page voidptr) ? {
 	pagemap.l.acquire()
-	current, _, _ := addr2range(pagemap, virt) or {
+	current, _, current_file_page := addr2range(pagemap, virt) or {
 		pagemap.l.release()
-		drop_unmapped_page(page, flags)
+		source.give_back(file_page, page)
 		return none
 	}
-	// A split or replacement changed the range while the page was acquired.
-	// A pointer match alone is insufficient: slab reuse can give a replacement
-	// the old pointer. Retry against the range which now covers the address.
-	if voidptr(current) != voidptr(local) || current.generation != generation {
+	// Split since, by an mprotect(): the address is still mapped, so the access
+	// is only retried, and faults again against the range as it is now.
+	if voidptr(current) != source.local_identity || current.global.serial != source.global_serial
+		|| current.generation != source.local_generation
+		|| current_file_page != source.file_page || file_page != source.file_page
+		|| current.flags != source.flags {
 		pagemap.l.release()
-		drop_unmapped_page(page, flags)
+		source.give_back(file_page, page)
 		return
 	}
+	local := current
 	mut g := local.global
-	// What giving `page` back takes, read while the range is sure to be there.
-	// The giving back itself waits until the lock is let go: a shared file page
-	// goes back through its filesystem, which may write it out.
-	release := PageRelease{
-		resource: g.resource
-		handle:   g.handle
-		direct:   flags & map_anonymous != 0
-			|| (g.segmented_file && !range_page_has_file_data(g, virt))
-	}
 	shadow_flags := memory.pte_present | memory.pte_writable | memory.pte_noexec
 	mut phys := u64(page)
 	mut surplus := false
@@ -953,7 +919,7 @@ pub fn install_range_page(mut pagemap memory.Pagemap, local &MmapRangeLocal, gen
 		g.shadow_pagemap.map_page_unlocked(virt, phys, shadow_flags) or {
 			g.shadow_pagemap.l.release()
 			pagemap.l.release()
-			release.give_back(file_page, page, flags)
+			source.give_back(file_page, page)
 			return none
 		}
 	}
@@ -961,75 +927,85 @@ pub fn install_range_page(mut pagemap memory.Pagemap, local &MmapRangeLocal, gen
 	// A private page that a fork child still shares stays read-only, so that
 	// the first write copies it instead of changing both processes.
 	writable := !(local.cow && memory.pmm_refcount(voidptr(phys)) > 1)
+	if local.prot & prot_exec != 0 { sync_new_code_page(voidptr(phys)) }
 	pt_flags := page_table_flags(local.prot, g.pte_extra, writable)
 	mut mapped := true
 	pagemap.map_page_unlocked(virt, phys, pt_flags) or { mapped = false }
 	pagemap.l.release()
 	if surplus {
-		release.give_back(file_page, page, flags)
+		source.give_back(file_page, page)
 	}
 	if !mapped {
 		return none
 	}
 }
 
-// How to give back a page a range acquired: straight to the allocator, or to
-// the file it came from. See release_range_page.
-struct PageRelease {
-	resource &resource.Resource = unsafe { nil }
-	handle   voidptr
-	direct   bool
-}
-
-fn (release PageRelease) give_back(file_page u64, physical voidptr, flags int) {
-	if release.direct {
-		memory.pmm_free(physical, 1)
-		return
-	}
-	mut res := release.resource
-	resource.release_mapping(mut res, release.handle, file_page, physical, flags)
-}
-
-// A page acquired for a range that changed before it could be installed.
-// Anonymous memory is ours to free. A file's page is a reference on a page
-// cache entry, released through a range that may be gone; it is left rather
-// than risk the freed range, which only a fault racing its own process'
-// munmap or mprotect can cause.
-fn drop_unmapped_page(page voidptr, flags int) {
-	if flags & map_anonymous != 0 {
-		memory.pmm_free(page, 1)
-	}
-}
-
-// Resolve a write to a private page shared by fork().  A range retains its
-// requested PROT_WRITE bit while its PTE is read-only, so no software-only PTE
-// bit is needed and both architectures use exactly the same state machine.
+// Resolve a write to a private page shared with a file cache or by fork().
+// A range retains PROT_WRITE while its PTE is read-only, so no software-only
+// PTE bit is needed and both architectures use the same state machine.
 pub fn resolve_cow_fault(_pagemap &memory.Pagemap, address u64) bool {
 	mut pagemap := unsafe { _pagemap }
 	virt := lib.align_down(address, page_size)
 	pagemap.l.acquire()
-	defer { pagemap.l.release() }
-
-	mut local_range, _, _ := addr2range(pagemap, virt) or { return false }
-	if !local_range.cow || local_range.flags & map_shared != 0
-		|| local_range.prot & prot_write == 0 {
+	local_range, _, _ := addr2range(pagemap, virt) or {
+		pagemap.l.release()
 		return false
 	}
-	old_phys := pagemap.virt2phys(virt) or { return false }
+	if !local_range.cow || local_range.flags & map_shared != 0
+		|| local_range.prot & prot_write == 0 {
+		pagemap.l.release()
+		return false
+	}
+	old_phys := pagemap.virt2phys(virt) or {
+		pagemap.l.release()
+		return false
+	}
 	// Another thread resolved this page while we waited for the lock, and its
 	// writes already go to the page mapped now. Copying that page again would
 	// lose whatever they change before the new mapping reaches every CPU.
 	if _ := pagemap.user_page_phys(virt, true) {
+		pagemap.l.release()
 		return true
 	}
-	if _ := unshare_private_page_unlocked(mut pagemap, local_range, virt, old_phys, true) {
+	mut source := range_page_source(local_range, virt)
+	pagemap.l.release()
+	defer { source.close() }
+	if !source.prepare() { return false }
+	pagemap.l.acquire()
+	current, _, file_page := addr2range(pagemap, virt) or {
+		pagemap.l.release()
+		return false
+	}
+	if current.global.serial != source.global_serial || current.flags != source.flags
+		|| current.generation != source.local_generation
+		|| file_page != source.file_page || !current.cow || current.prot & prot_write == 0 {
+		pagemap.l.release()
+		return false
+	}
+	if _ := pagemap.user_page_phys(virt, true) {
+		pagemap.l.release()
 		return true
 	}
-	return false
+	physical := pagemap.virt2phys(virt) or {
+		pagemap.l.release()
+		return false
+	}
+	if physical != old_phys {
+		pagemap.l.release()
+		return false
+	}
+	new_phys := unshare_private_page_unlocked(mut pagemap, current, virt, old_phys, true) or {
+		pagemap.l.release()
+		return false
+	}
+	pagemap.l.release()
+	if new_phys != old_phys { source.give_back_cow(voidptr(old_phys)) }
+	proc.account_page_fault(pagemap, false)
+	return true
 }
 
-// A kernel write to a private anonymous mapping must also break fork's
-// sharing. The caller holds the pagemap lock and supplies the mapped page.
+// The caller holds pagemap.l and supplies the mapped page. On success it
+// releases the old reference outside that lock if a new page was installed.
 fn unshare_private_page_unlocked(mut pagemap memory.Pagemap, local_range &MmapRangeLocal, virt u64, old_phys u64, writable bool) ?u64 {
 	flags := page_table_flags(local_range.prot, local_range.global.pte_extra, true)
 	if memory.pmm_refcount(voidptr(old_phys)) <= 1 {
@@ -1056,10 +1032,12 @@ fn unshare_private_page_unlocked(mut pagemap memory.Pagemap, local_range &MmapRa
 	}
 	pagemap.map_page_unlocked(virt, u64(new_page), page_table_flags(local_range.prot,
 		local_range.global.pte_extra, writable)) or {
+		// The shadow still owns the old page when installing the local PTE
+		// fails. Restore it before returning the new allocation.
+		local_range.global.shadow_pagemap.map_page(virt, old_phys, shadow_flags) or {}
 		memory.pmm_free(new_page, 1)
 		return none
 	}
-	memory.pmm_free(voidptr(old_phys), 1)
 	return u64(new_page)
 }
 
@@ -1177,7 +1155,7 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
 	options MmapOptions) ?voidptr {
 	mut pagemap := unsafe { _pagemap }
 	mut resource_ := unsafe { _resource }
-	flags := requested_flags & ~(map_no_write | map_no_exec)
+	mut flags := requested_flags & ~(map_no_write | map_no_exec)
 	mut mac_no_exec := false
 	mut mac_no_write := false
 	if flags & map_anonymous == 0 && resource_ != unsafe { nil } {
@@ -1202,20 +1180,27 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
 
 	// Every user mapping, the program's own segments included, is made here,
 	// so the resolver is in place before anything can copy from one.
+	memory.register_cow_resolver(resolve_cow_fault)
 	register_page_in_resolver()
 
 	validate_protection(prot)?
+	memory.register_locked_bytes_resolver(locked_bytes)
 	if _length == 0 {
 		C.printf(c'mmap: length is 0\n')
 		errno.set(errno.einval)
 		return none
 	}
+	validate_stack_mapping(prot, flags)?
 	if flags & map_anonymous == 0 && (offset < 0 || offset % i64(page_size) != 0) {
 		errno.set(errno.einval)
 		return none
 	}
 
 	length := lib.align_up(_length, page_size)
+	if length < _length {
+		errno.set(errno.einval)
+		return none
+	}
 	fixed := flags & map_fixed != 0
 	fixed_noreplace := flags & map_fixed_noreplace != 0
 	user_limit := memory.user_address_limit()
@@ -1298,6 +1283,9 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
 			return none
 		}
 		mapping_retained = true
+		if flags & map_shared == 0 {
+			range_local.cow = resource.private_mapping_cow(mut resource_)
+		}
 		extra_pte |= resource.mapping_attributes(mut resource_, range_handle, u64(offset))
 	}
 	lazy_file := options.lazy_file || (flags & map_anonymous == 0
@@ -1315,6 +1303,7 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
 		offset: offset
 		pte_extra: extra_pte
 		owns_mapping_ref: mapping_retained
+		private_cow: range_local.cow
 		owns_resource_ref: resource_retained
 		lazy_file: lazy_file
 		segmented_file: options.segmented_file
@@ -1335,6 +1324,10 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
 	// probes preferred PE addresses with MAP_FIXED_NOREPLACE, while POSIX mmap
 	// callers commonly pass the same addresses as best-effort hints.
 	pagemap.l.acquire()
+	if pagemap.lock_future && !(flags & map_brk_reservation != 0 && prot == prot_none) {
+		flags |= map_locked
+	}
+	range_local.flags = flags
 	charged_length := if flags & map_brk_reservation != 0 { u64(0) } else { length }
 	if fixed_noreplace {
 		base = hint
@@ -1372,15 +1365,6 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
 			errno.set(errno.enomem)
 			return none
 		}
-		munmap_unlocked(mut pagemap, addr, length) or {
-			pagemap.l.release()
-			unsafe {
-				range_global.locals.free()
-				free(range_global)
-				free(range_local)
-			}
-			return none
-		}
 	} else if hint != 0 && range_is_free_unlocked(pagemap, hint, length) {
 		base = hint
 	} else {
@@ -1408,9 +1392,30 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
 	}
 	range_local.base = base
 	range_global.base = base
+	if !prepare_mapping_lock_unlocked(pagemap, process, range_local, fixed, limit_credit, options) {
+		pagemap.l.release()
+		if range_global.shadow_pagemap.top_level != unsafe { nil } {
+			memory.pmm_free(range_global.shadow_pagemap.top_level, 1)
+		}
+		unsafe { range_global.locals.free(); free(range_global); free(range_local) }
+		return none
+	}
+	if fixed {
+		munmap_unlocked(mut pagemap, addr, length) or {
+			pagemap.l.release()
+			if range_global.shadow_pagemap.top_level != unsafe { nil } {
+				memory.pmm_free(range_global.shadow_pagemap.top_level, 1)
+			}
+			unsafe { range_global.locals.free(); free(range_global); free(range_local) }
+			return none
+		}
+	}
 	published = true
 	insert_range_unlocked(mut pagemap, range_local)
-	range_generation := range_local.generation
+	mapping_serial := range_global.serial
+	if options.created_serial != unsafe { nil } {
+		unsafe { *options.created_serial = mapping_serial }
+	}
 	pagemap.l.release()
 
 	// Private anonymous x86 mappings are committed on first touch. Reserving
@@ -1436,7 +1441,7 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
 		}
 		if reserve_length > 0
 			&& !resource.reserve_shared_mapping(mut resource_, u64(offset), reserve_length) {
-			munmap(mut pagemap, voidptr(base), length) or {}
+			unmap_created_range(mut pagemap, base, length, mapping_serial)
 			errno.set(errno.enomem)
 			return none
 		}
@@ -1454,36 +1459,54 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
 			if flags & map_anonymous == 0 && u64(offset) + i >= u64(resource_.stat.size) {
 				continue
 			}
-			page := if flags & map_anonymous != 0 {
-				acquire_anonymous_page()
-			} else {
-				acquire_range_page(range_local, base + i, file_page)
-			} or {
-				munmap(mut pagemap, voidptr(base), length) or {}
-				errno.set(errno.einval)
+			pagemap.l.acquire()
+			current, _, _ := addr2range(pagemap, base + i) or {
+				pagemap.l.release()
 				return none
 			}
-			if flags & map_anonymous == 0 && page == unsafe { nil } {
-				if u64(offset) + i < u64(resource_.stat.size) {
-					munmap(mut pagemap, voidptr(base), length) or {}
-					errno.set(errno.einval)
-					return none
-				}
-				continue
+			if current.global.serial != mapping_serial {
+				pagemap.l.release()
+				return none
 			}
-			if page != unsafe { nil } {
-				// The range is already visible to the process' other threads,
-				// which may fault on this very page while it is pre-faulted.
-				install_range_page(mut pagemap, range_local, range_generation, base + i, file_page, page, flags) or {
-					munmap(mut pagemap, voidptr(base), length) or {}
-					errno.set(errno.enomem)
-					return none
-				}
+			source := range_page_source(current, base + i)
+			pagemap.l.release()
+			fill_range_page(mut pagemap, source, base + i, file_page) or {
+				unmap_created_range(mut pagemap, base, length, mapping_serial)
+				errno.set(errno.enomem)
+				return none
 			}
 		}
 	}
 
+	if flags & map_locked != 0 {
+		populate_missing_pages(mut pagemap, base, length, prot, false) or {
+			failure := errno.get()
+			unmap_created_range(mut pagemap, base, length, mapping_serial)
+			errno.set(failure)
+			return none
+		}
+	}
 	return voidptr(base)
+}
+
+// A failed prefill may race MAP_FIXED replacement of the same span. Remove
+// only surviving pieces of the global that this mmap call created.
+fn unmap_created_range(mut pagemap memory.Pagemap, base u64, length u64, serial u64) {
+	pagemap.l.acquire()
+	defer { pagemap.l.release() }
+	end := base + length
+	mut cursor := base
+	for cursor < end {
+		current, _, _ := addr2range(pagemap, cursor) or {
+			cursor = next_mapped_start(pagemap, cursor, end)
+			continue
+		}
+		next := min_u64(current.base + current.length, end)
+		if current.global.serial == serial {
+			munmap_unlocked(mut pagemap, voidptr(cursor), next - cursor) or {}
+		}
+		cursor = next
+	}
 }
 
 pub fn syscall_munmap(_ voidptr, addr voidptr, length u64) (u64, u64) {
@@ -1636,23 +1659,13 @@ fn populate_missing_pages(mut pagemap memory.Pagemap, address u64, _length u64, 
 			continue
 		}
 
-		flags := local_range.flags
-		generation := local_range.generation
-		lazy_shared := skip_lazy_shared && flags & map_shared != 0 && local_range.global.lazy_file
-		pagemap.l.release()
-		if lazy_shared {
+		if skip_lazy_shared && local_range.flags & map_shared != 0 && local_range.global.lazy_file {
+			pagemap.l.release()
 			continue
 		}
-
-		page := if flags & map_anonymous != 0 {
-			acquire_anonymous_page()
-		} else {
-			acquire_range_page(local_range, virt, file_page)
-		} or {
-			errno.set(errno.enomem)
-			return none
-		}
-		install_range_page(mut pagemap, local_range, generation, virt, file_page, page, flags) or {
+		source := range_page_source(local_range, virt)
+		pagemap.l.release()
+		fill_range_page(mut pagemap, source, virt, file_page) or {
 			errno.set(errno.enomem)
 			return none
 		}
@@ -1706,6 +1719,7 @@ fn extend_brk_range_unlocked(mut pagemap memory.Pagemap, base u64, length u64, p
 		}
 	}
 	if committed == unsafe { nil } || reserve == unsafe { nil }
+		|| reserve.length == length
 		|| committed.global != reserve.global || committed.flags != reserve.flags
 		|| committed.cow != reserve.cow || committed.immutable != reserve.immutable
 		|| committed.dont_fork != reserve.dont_fork

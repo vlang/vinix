@@ -41,6 +41,7 @@ pub:
 
 pub const cap_sys_admin = 21
 pub const cap_sys_boot = 22
+pub const cap_sys_time = 25
 
 pub struct Capabilities {
 pub:

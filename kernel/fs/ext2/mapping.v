@@ -9,8 +9,11 @@ struct EXT2MappedPage {
 mut:
 	page     u64
 	physical voidptr
-	refs     u64
+	refs     u64 // Shared global mappings; private globals have PMM refs.
+	shared_dirty bool
 }
+
+fn (mut this EXT2Resource) private_mapping_cow() bool { return true }
 
 // The resource lock is held while looking up pages. Shared mappings and
 // descriptor I/O use the same physical page, which provides immediate
@@ -26,48 +29,59 @@ fn (this &EXT2Resource) mapped_page_locked(page u64) ?&EXT2MappedPage {
 
 fn (mut this EXT2Resource) release_mapping(_handle voidptr, _page u64,
 	physical voidptr, flags int) {
-	// Every private fault gets its own disposable page. Shared pages stay
-	// coherent with read(2) while mapped, then the final unmap writes and drops
-	// them; a failed write leaves the page cached so fsync can retry it.
-	if flags & mmap_mod.map_shared == 0 {
-		memory.pmm_free(physical, 1)
-		return
-	}
-
 	this.l.acquire()
-	defer { this.l.release() }
 	this.filesystem.l.acquire()
-	defer { this.filesystem.l.release() }
+	defer {
+		drop_registry := this.unregister_empty_mapped_resource()
+		this.filesystem.l.release()
+		this.l.release()
+		// The mapping/global range still owns a separate resource reference.
+		if drop_registry { this.unref(unsafe { nil }) or {} }
+	}
 	for index, _ in this.mapped_pages {
 		mut mapped := this.mapped_pages[index]
 		if mapped.page != _page || mapped.physical != physical {
 			continue
 		}
-		if mapped.refs != 0 {
+		if flags & mmap_mod.map_shared == 0 {
+			// Return the private global's reference. The cache still owns one,
+			// so fork and another private mapper may continue reading it.
+			memory.pmm_free(physical, 1)
+		} else if mapped.refs != 0 {
 			mapped.refs--
 		}
 		if mapped.refs != 0 {
 			return
 		}
-		// Immutable mounts never grant shared writes. Their final mapping
-		// reference can drop its clean page without attempting writeback;
-		// EROFS would otherwise pin an unreferenced page forever.
-		if !this.filesystem.read_only {
-			mut inode := EXT2Inode{}
+		if mapped.shared_dirty && !this.filesystem.read_only {
+			mut inode := unsafe { &EXT2Inode(C.vinix_stack_alloc(sizeof(EXT2Inode))) }
+			unsafe { *inode = EXT2Inode{} }
 			inode.read_entry(mut this.filesystem, u32(this.stat.ino)) or { return }
 			this.write_mapped_page_locked(mut inode, mapped) or { return }
+			mapped.shared_dirty = false
 		}
-		this.mapped_pages.delete(index)
-		memory.pmm_free(mapped.physical, 1)
-		unsafe { free(mapped) }
+		if this.filesystem.read_only { mapped.shared_dirty = false }
+		this.retire_clean_page_locked(index)
 		return
 	}
+	// A COW copy or private page beyond EOF is not a cache-owned page.
+	if flags & mmap_mod.map_shared == 0 { memory.pmm_free(physical, 1) }
+}
+
+fn (mut this EXT2Resource) retire_clean_page_locked(index int) bool {
+	mapped := this.mapped_pages[index]
+	if mapped.refs != 0 || mapped.shared_dirty
+		|| memory.pmm_refcount(mapped.physical) != 1 { return false }
+	this.mapped_pages.delete(index)
+	memory.pmm_free(mapped.physical, 1)
+	unsafe { free(mapped) }
+	return true
 }
 
 fn (mut this EXT2Resource) write_mapped_page_locked(mut inode EXT2Inode,
 	mapped &EXT2MappedPage) ? {
 	if this.filesystem.read_only { return }
-	file_size := u64(inode.size32l) | (u64(inode.size32h) << 32)
+	file_size := inode.size()
 	page_offset := mapped.page * page_size
 	if page_offset >= file_size {
 		return
@@ -102,36 +116,46 @@ fn (mut this EXT2Resource) write_mapped_pages(offset u64, length u64) ? {
 	if this.filesystem.read_only { return }
 	end := if length > u64(-1) - offset { u64(-1) } else { offset + length }
 	this.l.acquire()
-	defer { this.l.release() }
 	this.filesystem.l.acquire()
-	defer { this.filesystem.l.release() }
+	defer {
+		drop_registry := this.unregister_empty_mapped_resource()
+		this.filesystem.l.release()
+		this.l.release()
+		// Called through an open handle or a registry sweep's extra pin.
+		if drop_registry { this.unref(unsafe { nil }) or {} }
+	}
 	if this.mapped_pages.len == 0 {
 		return
 	}
 
-	mut inode := EXT2Inode{}
-	inode.read_entry(mut this.filesystem, u32(this.stat.ino))?
+	mut inode := unsafe { &EXT2Inode(C.vinix_stack_alloc(sizeof(EXT2Inode))) }
+	unsafe { *inode = EXT2Inode{} }
+	mut inode_loaded := false
 	mut index := 0
 	for index < this.mapped_pages.len {
-		mapped := this.mapped_pages[index]
+		mut mapped := this.mapped_pages[index]
 		page_offset := mapped.page * page_size
 		if page_offset >= end || page_offset + page_size <= offset {
 			index++
 			continue
 		}
-		this.write_mapped_page_locked(mut inode, mapped)?
-		if mapped.refs == 0 {
-			this.mapped_pages.delete(index)
-			memory.pmm_free(mapped.physical, 1)
-			unsafe { free(mapped) }
-		} else {
-			index++
+		if mapped.shared_dirty {
+			if !inode_loaded {
+				inode.read_entry(mut this.filesystem, u32(this.stat.ino))?
+				inode_loaded = true
+			}
+			this.write_mapped_page_locked(mut inode, mapped)?
+			// Existing shared mappings may write again without a fault.
+			if mapped.refs == 0 { mapped.shared_dirty = false }
 		}
+		if !this.retire_clean_page_locked(index) { index++ }
 	}
-	this.stat.size = i64(u64(inode.size32l) | (u64(inode.size32h) << 32))
-	this.stat.blocks = inode.sector_cnt
-	this.stat.mtim.tv_sec = inode.mod_time
-	this.stat.mtim.tv_nsec = 0
-	this.stat.ctim.tv_sec = inode.creation_time
-	this.stat.ctim.tv_nsec = 0
+	if inode_loaded {
+		this.stat.size = i64(inode.size())
+		this.stat.blocks = inode.sector_cnt
+		this.stat.mtim.tv_sec = inode.mod_time
+		this.stat.mtim.tv_nsec = 0
+		this.stat.ctim.tv_sec = inode.creation_time
+		this.stat.ctim.tv_nsec = 0
+	}
 }

@@ -50,6 +50,11 @@ mut:
 	advise(handle voidptr, offset u64, length u64, advice int) ?
 }
 
+struct AdviceCall {
+mut:
+	resource AdvisableResource
+}
+
 // Anonymous pipes expose their buffer size through fcntl rather than stat.
 // Keep that optional operation out of Resource so ordinary files and devices
 // do not need dummy pipe-capacity methods.
@@ -77,6 +82,26 @@ mut:
 pub interface MappingReleaseResource {
 mut:
 	release_mapping(handle voidptr, page u64, physical voidptr, flags int)
+}
+
+// A file cache owns a physical reference independently of private mappings.
+// The VM maps its clean pages read-only until the mapping's first write.
+// Acquired pages and release_mapping must remain valid while this Resource
+// is retained, even after its VMA/range reference is dropped. This capability
+// is for independently pinned file-cache pages, not a device aperture lease.
+pub interface PrivateCowMappingResource {
+mut:
+	private_mapping_cow() bool
+}
+
+pub fn private_mapping_cow(mut res Resource) bool {
+	if mut res is PrivateCowMappingResource {
+		mut capability := PrivateCowMappingResource(res)
+		mut stack_capability := unsafe { &capability }
+		cow := stack_capability.private_mapping_cow()
+		return cow
+	}
+	return false
 }
 
 // Device mappings can own storage independently of the file descriptor and
@@ -128,13 +153,17 @@ mut:
 
 pub fn sync_resource(mut res Resource, handle voidptr) ? {
 	if mut res is SyncableResource {
-		res.sync(handle) or { return none }
+		mut syncable := SyncableResource(res)
+		mut stack_syncable := unsafe { &syncable }
+		stack_syncable.sync(handle) or { return none }
 	}
 }
 
 pub fn sync_mapping(mut res Resource, handle voidptr, offset u64, length u64) ? {
 	if mut res is MappingSyncResource {
-		res.sync_mapping(handle, offset, length)?
+		mut syncable := MappingSyncResource(res)
+		mut stack_syncable := unsafe { &syncable }
+		stack_syncable.sync_mapping(handle, offset, length)?
 	}
 }
 
@@ -161,7 +190,10 @@ pub fn release_resource(mut res Resource) {
 
 pub fn advise_resource(mut res Resource, handle voidptr, offset u64, length u64, advice int) ? {
 	if mut res is AdvisableResource {
-		res.advise(handle, offset, length, advice) or { return none }
+		mut call := unsafe { &AdviceCall(C.vinix_stack_alloc(sizeof(AdviceCall))) }
+		unsafe { call.resource = AdvisableResource(res) }
+		mut target := unsafe { &call.resource }
+		target.advise(handle, offset, length, advice) or { return none }
 	}
 }
 

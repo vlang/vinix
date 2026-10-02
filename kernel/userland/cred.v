@@ -81,7 +81,7 @@ pub fn syscall_setgid(_ voidptr, gid u32) (u64, u64) {
 	old_egid := process.egid
 	defer {
 		if process.egid != old_egid {
-			process.dumpable = false
+			proc.set_dumpability(mut process, 0)
 		}
 	}
 
@@ -148,7 +148,7 @@ pub fn syscall_setregid(_ voidptr, rgid u32, egid u32) (u64, u64) {
 	old_egid := process.egid
 	defer {
 		if process.egid != old_egid {
-			process.dumpable = false
+			proc.set_dumpability(mut process, 0)
 		}
 	}
 	privileged := may_set_gids(process)
@@ -219,7 +219,7 @@ pub fn syscall_setresgid(_ voidptr, rgid u32, egid u32, sgid u32) (u64, u64) {
 	old_egid := process.egid
 	defer {
 		if process.egid != old_egid {
-			process.dumpable = false
+			proc.set_dumpability(mut process, 0)
 		}
 	}
 
@@ -353,35 +353,10 @@ pub fn syscall_setgroups(_ voidptr, size int, list u64) (u64, u64) {
 // process group leader cannot do this: its group would end up split across
 // two sessions.
 pub fn syscall_setsid(_ voidptr) (u64, u64) {
-	mut process := current_process()
-
-	if process.pgid == process.pid {
-		return errno.err, errno.eperm
-	}
-
-	process.sid = process.pid
-	process.pgid = process.pid
-	process.tty_session = 0
-	proc.renumber_group(mut process)
-
-	return u64(proc.own_pid(process)), 0
+	return proc.create_session()
 }
 
 // getsid(pid). Zero means the caller.
 pub fn syscall_getsid(_ voidptr, pid int) (u64, u64) {
-	mut target := current_process()
-	viewer := target.numbered_in
-
-	if pid != 0 {
-		if pid < 0 || pid >= proc.max_pid {
-			return errno.err, errno.esrch
-		}
-		global := proc.pid_from(viewer, pid)
-		target = if global > 0 { processes[global] } else { unsafe { nil } }
-		if target == unsafe { nil } {
-			return errno.err, errno.esrch
-		}
-	}
-
-	return u64(proc.sid_in(target, viewer)), 0
+	return proc.get_process_session(pid)
 }

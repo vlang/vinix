@@ -1,3 +1,4 @@
+#include "speculation.h"
 // Segment registers and descriptor tables, for the LDT modify_ldt(2) gives a
 // process and the TLS descriptors set_thread_area(2) gives a thread; see
 // sched/segments_amd64.v. Plain assembly, as V3 does not honour everything
@@ -117,6 +118,9 @@ syscall32_entry:
     push %rax
     mov %ds, %eax
     push %rax
+    VINIX_RSB_FILL
+    VINIX_SPEC_ENTER
+    lfence
     sti
     mov %rsp, %rdi
     call syscall32_refused

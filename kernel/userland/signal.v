@@ -168,17 +168,16 @@ fn deliverable_signal(t &proc.Thread, mask u64) bool {
 
 // Sleep until a signal wakes us. Any sendsig() puts the thread back on the run
 // queue and marks the wakeup as signal-driven, which is what ends the await.
-fn sleep_for_signal(timeout &time.TimeSpec) bool {
-	mut events := []&eventstruct.Event{}
-	defer {
-		unsafe { events.free() }
-	}
-
+fn sleep_for_signal(timeout &time.TimeSpec, wanted u64) bool {
 	mut timer := &time.Timer(unsafe { nil })
+	storage := unsafe { &&eventstruct.Event(C.vinix_stack_alloc(sizeof(voidptr))) }
+	mut count := 0
 	if timeout != unsafe { nil } {
 		timer = time.new_timer(*timeout)
-		events << &timer.event
+		unsafe { storage[0] = &timer.event }
+		count = 1
 	}
+	mut events := unsafe { event.stack_list(storage, count) }
 
 	defer {
 		if timer != unsafe { nil } {
@@ -189,7 +188,8 @@ fn sleep_for_signal(timeout &time.TimeSpec) bool {
 
 	// A signal makes await() report an interruption; the timer firing makes it
 	// report which event woke it.
-	event.await(mut events, true) or { return true }
+	interrupt_mask := ~proc.current_thread().masked_signals | wanted
+	event.await_masked(mut events, true, interrupt_mask) or { return true }
 	return false
 }
 
@@ -241,7 +241,7 @@ pub fn syscall_rt_sigsuspend(_ voidptr, mask_ptr u64, sigsetsize u64) (u64, u64)
 			current_thread.masked_signals = original
 			return errno.err, errno.eintr
 		}
-		sleep_for_signal(unsafe { nil })
+		sleep_for_signal(unsafe { nil }, 0)
 	}
 
 	// dispatch_a_signal() runs on the way out of this syscall and must record
@@ -335,14 +335,14 @@ pub fn syscall_rt_sigtimedwait(_ voidptr, set_ptr u64, info_ptr u64, timeout_ptr
 		}
 
 		if timed {
-			if sleep_for_signal(&deadline) == false {
+			if sleep_for_signal(&deadline, wanted) == false {
 				// The timer, not a signal, ended the wait.
 				timed = true
 				deadline = time.TimeSpec{}
 				continue
 			}
 		} else {
-			sleep_for_signal(unsafe { nil })
+			sleep_for_signal(unsafe { nil }, wanted)
 		}
 	}
 

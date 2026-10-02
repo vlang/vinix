@@ -1,3 +1,4 @@
+#include "speculation.h"
 // The x86-64 SYSCALL entry point, installed in IA32_LSTAR.
 //
 // SYSCALL does not switch stacks, so nothing may touch the stack before the
@@ -48,6 +49,9 @@ syscall_entry:
     push %rax
     mov %ds, %eax
     push %rax
+    VINIX_RSB_FILL
+    VINIX_SPEC_ENTER
+    lfence
     sti
     // syscall_trace() answers the table slot to run: the call's number, or
     // the stand-in returning the errno seccomp or pledge(2) refused it with.
@@ -56,6 +60,8 @@ syscall_entry:
     mov %rax, %r13
     cmp $512, %r13
     jae 3f
+    // Resolve the user-controlled bounds check before loading a handler.
+    lfence
 
     // Vinix handlers take the saved GPR frame as their first argument, so
     // shift the six Linux arguments right once; the last one is passed on the
@@ -71,8 +77,8 @@ syscall_entry:
     mov 80(%rax), %rbx
     mov %rbx, (%rsp)
     lea syscall_table(%rip), %rbx
-    mov (%rbx, %r13, 8), %rax
-    call vinix_indirect_thunk_rax
+    mov (%rbx, %r13, 8), %rbx
+    call __x86_indirect_thunk_rbx
     add $16, %rsp
     jmp 4f
 
@@ -107,6 +113,8 @@ syscall_exit_load_ds:
 .global syscall_exit_load_es
 syscall_exit_load_es:
     mov %eax, %es
+    // Keep legacy IBRS enabled if either segment restore faults.
+    VINIX_SPEC_RETURN gs0, 120
     pop %rax
     pop %rbx
     pop %rcx
@@ -122,6 +130,7 @@ syscall_exit_load_es:
     pop %r13
     pop %r14
     pop %r15
+    VINIX_SPEC_CLEAR
     // Restore the user stack. sysretq takes RIP from rcx and RFLAGS from r11.
     mov %gs:32, %rsp
     swapgs

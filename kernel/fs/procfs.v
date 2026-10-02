@@ -87,6 +87,8 @@ enum ProcFSKind {
 	activity_io
 	activity_gpu
 	process_io
+	net_tcp6
+	net_if_inet6
 }
 
 @[heap]
@@ -150,10 +152,17 @@ __global (
 	// and must not start to.
 	procfs_lock klock.Lock
 	net_tcp_snapshot NetTcpSnapshot = unsafe { nil }
+	net_tcp6_snapshot NetTcpSnapshot = unsafe { nil }
+	net_if_inet6_snapshot NetTcpSnapshot = unsafe { nil }
 )
 
 pub fn register_net_tcp_snapshot(snapshot NetTcpSnapshot) {
 	net_tcp_snapshot = snapshot
+}
+
+pub fn register_net_ipv6_snapshots(tcp NetTcpSnapshot, addresses NetTcpSnapshot) {
+	net_tcp6_snapshot = tcp
+	net_if_inet6_snapshot = addresses
 }
 
 fn (this ProcFS) instantiate() &FileSystem {
@@ -165,6 +174,15 @@ fn (this ProcFS) instantiate() &FileSystem {
 fn (this ProcFS) populate(_node &VFSNode) {}
 
 fn (mut this ProcFS) mount(parent &VFSNode, name string, _source &VFSNode) ?&VFSNode {
+	return this.mount_checked(parent, name, unsafe { nil })
+}
+
+// Reject mounting a cached tree on itself or one of its descendants. Select
+// the actual tree, including an inactive namespace's reused root, under the
+// same lock before changing its view. The registered template is permanent.
+fn (mut this ProcFS) mount_checked(parent &VFSNode, name string, target &VFSNode) ?&VFSNode {
+	procfs_lock.acquire()
+	defer { procfs_lock.release() }
 	if procfs_dev_id == 0 {
 		procfs_dev_id = resource.create_dev_id()
 	}
@@ -177,12 +195,12 @@ fn (mut this ProcFS) mount(parent &VFSNode, name string, _source &VFSNode) ?&VFS
 	}
 	view := proc.current_pid_namespace()
 	if proc.numbers_own(view) {
-		procfs_lock.acquire()
-		defer {
-			procfs_lock.release()
-		}
 		for existing in procfs_views {
 			if existing.ns == voidptr(view) {
+				if is_beneath(target, existing.root) {
+					errno.set(errno.ebusy)
+					return none
+				}
 				return existing.root
 			}
 		}
@@ -190,8 +208,12 @@ fn (mut this ProcFS) mount(parent &VFSNode, name string, _source &VFSNode) ?&VFS
 		// container's comes and goes with every run.
 		for i in 0 .. procfs_views.len {
 			if !proc.namespace_has_members(unsafe { &proc.Namespace(procfs_views[i].ns) }) {
-				procfs_views[i].ns = voidptr(view)
 				mut reused := procfs_views[i].root
+				if is_beneath(target, reused) {
+					errno.set(errno.ebusy)
+					return none
+				}
+				procfs_views[i].ns = voidptr(view)
 				retarget_view(mut reused, voidptr(view))
 				return reused
 			}
@@ -204,6 +226,10 @@ fn (mut this ProcFS) mount(parent &VFSNode, name string, _source &VFSNode) ?&VFS
 		return root
 	}
 	if unsafe { procfs_root != 0 } {
+		if is_beneath(target, procfs_root) {
+			errno.set(errno.ebusy)
+			return none
+		}
 		return procfs_root
 	}
 	mut root := this.build_root(parent, name, unsafe { nil })
@@ -325,6 +351,8 @@ fn (mut this ProcFS) build_root(parent &VFSNode, name string, view voidptr) &VFS
 	build_net_sysctls(mut sys_net)
 	mut net := add_procfs_directory(mut root, 'net')
 	add_procfs_file(mut net, 'tcp', .net_tcp)
+	add_procfs_file(mut net, 'tcp6', .net_tcp6)
+	add_procfs_file(mut net, 'if_inet6', .net_if_inet6)
 
 	return root
 }
@@ -525,7 +553,8 @@ fn (this &ProcFSResource) contents() string {
 			// the kernel heap has, the page caches' own storage included.
 			cached_kb := pagecache.resident_bytes() / 1024
 			slab_kb := heap_pages() * page_size / 1024
-			mut meminfo_builder := lib.new_text(256)
+			mut meminfo_builder := unsafe { &lib.Text(C.vinix_stack_alloc(sizeof(lib.Text))) }
+			unsafe { *meminfo_builder = lib.new_text(256) }
 			meminfo_builder.add('MemTotal:       ')
 			meminfo_builder.add_unsigned(total_kb)
 			meminfo_builder.add(' kB\nMemFree:        ')
@@ -539,7 +568,7 @@ fn (this &ProcFSResource) contents() string {
 			meminfo_builder.add(' kB\nVinixMemoryPressure: ')
 			meminfo_builder.add_decimal(memory.pressure_snapshot().level)
 			meminfo_builder.add('\n')
-			return lib.finish_text(meminfo_builder)
+			return lib.finish_text(*meminfo_builder)
 		}
 		.slabinfo {
 			return slabinfo_text()
@@ -565,7 +594,8 @@ fn (this &ProcFSResource) contents() string {
 		.uptime {
 			seconds := time.monotonic_ns() / 1000000000
 			hundredths := (time.monotonic_ns() / 10000000) % 100
-			mut uptime_builder := lib.new_text(48)
+			mut uptime_builder := unsafe { &lib.Text(C.vinix_stack_alloc(sizeof(lib.Text))) }
+			unsafe { *uptime_builder = lib.new_text(48) }
 			for i in 0 .. 2 {
 				if i > 0 {
 					uptime_builder.add_byte(` `)
@@ -575,7 +605,7 @@ fn (this &ProcFSResource) contents() string {
 				uptime_builder.add_radix(hundredths, 10, 2)
 			}
 			uptime_builder.add_byte(`\n`)
-			return lib.finish_text(uptime_builder)
+			return lib.finish_text(*uptime_builder)
 		}
 		.version {
 			// Freed by read(), as every generated text is.
@@ -598,12 +628,13 @@ fn (this &ProcFSResource) contents() string {
 			// Linux's first two fields: the size of the address space and what
 			// of it is resident.
 			counted := process_memory(this.pid)
-			mut statm_builder := lib.new_text(64)
+			mut statm_builder := unsafe { &lib.Text(C.vinix_stack_alloc(sizeof(lib.Text))) }
+			unsafe { *statm_builder = lib.new_text(64) }
 			statm_builder.add_unsigned(counted.mapped / page_size)
 			statm_builder.add_byte(` `)
 			statm_builder.add_unsigned(counted.resident / page_size)
 			statm_builder.add(' 0 0 0 0 0\n')
-			return lib.finish_text(statm_builder)
+			return lib.finish_text(*statm_builder)
 		}
 		.status {
 			return proc.process_status_text(this.pid, unsafe { &proc.Namespace(this.view) })
@@ -628,6 +659,14 @@ fn (this &ProcFSResource) contents() string {
 				return net_tcp_snapshot()
 			}
 			return '  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode\n'
+		}
+		.net_tcp6 {
+			if net_tcp6_snapshot != unsafe { nil } { return net_tcp6_snapshot() }
+			return '  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode\n'
+		}
+		.net_if_inet6 {
+			if net_if_inet6_snapshot != unsafe { nil } { return net_if_inet6_snapshot() }
+			return ''
 		}
 		.filesystems {
 			// The `nodev` column matters: a container runtime skips those when
@@ -660,7 +699,8 @@ fn (this &ProcFSResource) contents() string {
 			return maps_text(this.pid, true)
 		}
 		.oom_score_adj {
-			mut text := lib.new_text(16)
+			mut text := unsafe { &lib.Text(C.vinix_stack_alloc(sizeof(lib.Text))) }
+			unsafe { *text = lib.new_text(16) }
 			text.add_decimal(proc.process_oom_score_adj(this.pid))
 			text.add_byte(`\n`)
 			return text.str()
@@ -684,7 +724,8 @@ fn (this &ProcFSResource) contents() string {
 			return ''
 		}
 		.securelevel {
-			mut text := lib.new_text(8)
+			mut text := unsafe { &lib.Text(C.vinix_stack_alloc(sizeof(lib.Text))) }
+			unsafe { *text = lib.new_text(8) }
 			text.add_decimal(i64(security.securelevel()))
 			text.add_byte(`\n`)
 			return text.str()
@@ -720,7 +761,7 @@ fn machine_stat_text() string {
 		idle += d
 	}
 	// Formatting helpers borrow the stack builder; finish_text returns owned bytes.
-	mut text := unsafe { &lib.Text(C.__builtin_alloca(sizeof(lib.Text))) }
+	mut text := unsafe { &lib.Text(C.vinix_stack_alloc(sizeof(lib.Text))) }
 	unsafe { *text = lib.new_text(count * 128 + 256) }
 	text.add('cpu ')
 	add_cpu_stat_fields(mut text, user, system, idle)
@@ -778,7 +819,7 @@ fn (mut this ProcFSResource) read(_handle voidptr, buf voidptr, loc u64, count u
 		return none
 	}
 	if (this.kind == .maps || this.kind == .smaps || this.kind == .net_tcp
-		|| this.kind == .security_audit)
+		|| this.kind == .security_audit || this.kind == .net_tcp6 || this.kind == .net_if_inet6)
 		&& _handle != unsafe { nil } {
 		return this.snapshot_read(_handle, buf, loc, count)
 	}
@@ -1000,7 +1041,8 @@ fn C.alloc_track_start()
 fn C.alloc_track_dump(buf &u8, cap u64, min_count u64) u64
 
 fn slabinfo_text() string {
-	mut text := lib.new_text(1024)
+	mut text := unsafe { &lib.Text(C.vinix_stack_alloc(sizeof(lib.Text))) }
+	unsafe { *text = lib.new_text(1024) }
 	text.add('# class      size    objects   pages\n')
 	classes := memory.heap_classes()
 	for class in classes {
@@ -1081,7 +1123,7 @@ fn maps_text(pid int, detailed bool) string {
 		exe_ino = exe_node.resource.stat.ino
 	}
 	// Borrowed synchronously by formatting helpers; the owned bytes are consumed below.
-	mut text := unsafe { &lib.Text(C.__builtin_alloca(sizeof(lib.Text))) }
+	mut text := unsafe { &lib.Text(C.vinix_stack_alloc(sizeof(lib.Text))) }
 	unsafe { *text = lib.new_text(list.len * if detailed { 900 } else { 100 }) }
 	for info in list {
 		line_start := text.len()
@@ -1232,7 +1274,7 @@ pub fn procfs_dynamic_link_target(node &VFSNode) string {
 	// Made on every walk through the link, so without the string an
 	// interpolated number leaves behind; the caller frees it.
 	// Borrowed synchronously by formatting helpers; the owned bytes are consumed below.
-	mut text := unsafe { &lib.Text(C.__builtin_alloca(sizeof(lib.Text))) }
+	mut text := unsafe { &lib.Text(C.vinix_stack_alloc(sizeof(lib.Text))) }
 	unsafe { *text = lib.new_text(40) }
 	text.add('/proc/')
 	text.add_decimal(i64(pid))
@@ -1249,7 +1291,8 @@ pub fn procfs_self_target() string {
 	if current == unsafe { nil } || unsafe { current.process == nil } {
 		return ''
 	}
-	mut text := lib.new_text(24)
+	mut text := unsafe { &lib.Text(C.vinix_stack_alloc(sizeof(lib.Text))) }
+	unsafe { *text = lib.new_text(24) }
 	text.add('/proc/')
 	text.add_decimal(i64(proc.own_pid(current.process)))
 	return text.str()

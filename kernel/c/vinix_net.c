@@ -8,6 +8,11 @@
 #include <lwip/dhcp.h>
 #include <lwip/dns.h>
 #include <lwip/etharp.h>
+#include <lwip/ethip6.h>
+#include <lwip/igmp.h>
+#include <lwip/mld6.h>
+#include <lwip/ip6_zone.h>
+#include <lwip/nd6.h>
 #include <lwip/inet_chksum.h>
 #include <lwip/init.h>
 #include <lwip/ip.h>
@@ -62,10 +67,24 @@ struct packet {
     uint32_t charge;
 };
 
+struct membership {
+    ip_addr_t group;
+    uint64_t epoch;
+    uint8_t ifindex;
+    uint8_t used;
+};
+
+#define SOCKET_MEMBERSHIPS 16
+
 struct vinix_socket {
     int family;
     int v6only;
     int bound;
+    int hops4, hops6;
+    int multicast_hops4, multicast_hops6;
+    int multicast_loop4, multicast_loop6;
+    uint32_t multicast_if4, multicast_if6, multicast_addr4;
+    struct membership memberships[SOCKET_MEMBERSHIPS];
     int type;
     int protocol;
     int error;
@@ -107,6 +126,14 @@ static uint32_t clock_anchor_ms;
 static int clock_anchored;
 /* The ID the fragments after the first of a datagram go out with. */
 static uint16_t fragment_id;
+/* Static netif storage is reused after detach; memberships use scalar epochs. */
+static uint64_t link_epoch = 1;
+static struct netif *interface_index(uint32_t index);
+static int has_membership(struct vinix_socket *, const ip_addr_t *, struct netif *);
+static void release_memberships(struct vinix_socket *);
+static struct ip_pcb *socket_ip_pcb(struct vinix_socket *socket);
+static int family_set_option(struct vinix_socket *, int, int, int);
+static int family_get_option(struct vinix_socket *, int, int, int *);
 
 static int linux_error(err_t error) {
     switch (error) {
@@ -356,6 +383,9 @@ static err_t accept_callback(void *argument, struct tcp_pcb *pcb, err_t error) {
     child->family = listener->family;
     child->v6only = listener->v6only;
     child->bound = 1;
+    child->hops4 = listener->hops4;
+    child->hops6 = listener->hops6;
+    pcb->ttl = (uint8_t)(IP_IS_V6(&pcb->remote_ip) ? child->hops6 : child->hops4);
     child->type = VINIX_NET_STREAM;
     child->protocol = 6;
     child->connected = 1;
@@ -393,9 +423,20 @@ static void udp_received(void *argument, struct udp_pcb *pcb, struct pbuf *p,
     struct vinix_socket *socket = (struct vinix_socket *)argument;
     (void)pcb;
     if (!socket || socket->read_shutdown ||
+        (ip_addr_ismulticast(ip_current_dest_addr()) &&
+         !has_membership(socket, ip_current_dest_addr(), ip_current_input_netif())) ||
         !queue_packet(socket, p, address, port, 0)) {
         pbuf_free(p);
     }
+}
+
+/* IP output already enqueues the optional multicast loop copy. The native
+ * loopif output enqueues again, which delivers duplicates and ignores LOOP=0. */
+static err_t loop_output4(struct netif *interface, struct pbuf *p, const ip4_addr_t *destination) {
+    return ip4_addr_ismulticast(destination) ? ERR_OK : netif_loop_output(interface, p);
+}
+static err_t loop_output6(struct netif *interface, struct pbuf *p, const ip6_addr_t *destination) {
+    return ip6_addr_ismulticast(destination) ? ERR_OK : netif_loop_output(interface, p);
 }
 
 void vinix_net_init(void) {
@@ -403,6 +444,23 @@ void vinix_net_init(void) {
         return;
     }
     lwip_init();
+    /* lwIP tags its loop interface for IGMP but leaves MLD to Ethernet
+     * ports. Local IPv6 multicast still needs the same managed group state. */
+    struct netif *interface;
+    NETIF_FOREACH(interface) {
+        if (ip4_addr_isloopback(netif_ip4_addr(interface))) {
+            /* netif_init starts loop IGMP before igmp_init assigns its
+             * all-hosts address. Recreate this boot-only native group before
+             * sockets can borrow it, now that the protocol is initialized. */
+            igmp_stop(interface);
+            if (igmp_start(interface) != ERR_OK) {
+                vinix_lwip_assert("loop IGMP initialization", __FILE__, __LINE__);
+            }
+            interface->flags |= NETIF_FLAG_MLD6;
+            interface->output = loop_output4;
+            interface->output_ip6 = loop_output6;
+        }
+    }
     stack_initialised = 1;
     printf("net: lwIP 2.2.1, IPv4/IPv6 TCP/UDP loopback ready\n");
 }
@@ -453,7 +511,8 @@ static err_t physical_init(struct netif *netif) {
     netif->hwaddr_len = 6;
     memcpy(netif->hwaddr, active_mac, 6);
     netif->mtu = 1500;
-    netif->flags = NETIF_FLAG_BROADCAST | NETIF_FLAG_ETHARP | NETIF_FLAG_ETHERNET;
+    netif->flags = NETIF_FLAG_BROADCAST | NETIF_FLAG_ETHARP | NETIF_FLAG_ETHERNET |
+                   NETIF_FLAG_IGMP | NETIF_FLAG_MLD6;
     netif->output = output_ipv4;
     netif->output_ip6 = ethip6_output;
     netif->flags |= NETIF_FLAG_MLD6;
@@ -482,7 +541,10 @@ int vinix_net_attach(const uint8_t mac[6], int driver) {
         return -12;
     }
     netif_create_ip6_linklocal_address(&physical_netif, 1);
+    ++link_epoch;
     netif_set_default(&physical_netif);
+    netif_create_ip6_linklocal_address(&physical_netif, 1);
+    netif_set_ip6_autoconfig_enabled(&physical_netif, 1);
     netif_set_link_up(&physical_netif);
     netif_set_up(&physical_netif);
     link_attached = 1;
@@ -585,12 +647,11 @@ int vinix_net_link(uint8_t mac[6], uint32_t *mtu) {
     return 1;
 }
 
-struct vinix_socket *vinix_socket_new_family(int family, int type, int protocol) {
+struct vinix_socket *vinix_socket_new(int type, int protocol) {
     struct vinix_socket *socket;
     if (!stack_initialised) {
         vinix_net_init();
     }
-    if (family != 2 && family != 10) return NULL;
     if ((type == VINIX_NET_STREAM && protocol != 0 && protocol != 6) ||
         (type == VINIX_NET_DGRAM && protocol != 0 && protocol != 17)) {
         return NULL;
@@ -599,8 +660,10 @@ struct vinix_socket *vinix_socket_new_family(int family, int type, int protocol)
     if (!socket) {
         return NULL;
     }
-    socket->family = family;
-    ip_addr_set_any(family == 10, &socket->last_local_address);
+    socket->family = 2;
+    socket->hops4 = socket->hops6 = 64;
+    socket->multicast_hops4 = socket->multicast_hops6 = 1;
+    socket->multicast_loop4 = socket->multicast_loop6 = 1;
     socket->type = type;
     socket->protocol = protocol ? protocol : (type == VINIX_NET_STREAM ? 6 : 17);
     socket->send_limit = type == VINIX_NET_STREAM ? TCP_SND_BUF : 212992;
@@ -609,18 +672,19 @@ struct vinix_socket *vinix_socket_new_family(int family, int type, int protocol)
     socket->keep_interval = TCP_KEEPINTVL_DEFAULT;
     socket->keep_count = TCP_KEEPCNT_DEFAULT;
     if (type == VINIX_NET_STREAM) {
-        socket->tcp = tcp_new_ip_type(family == 10 ? IPADDR_TYPE_ANY : IPADDR_TYPE_V4);
+        socket->tcp = tcp_new_ip_type(IPADDR_TYPE_V4);
         if (!socket->tcp) {
             mem_free(socket);
             return NULL;
         }
         install_tcp_callbacks(socket);
     } else if (type == VINIX_NET_DGRAM) {
-        socket->udp = udp_new_ip_type(family == 10 ? IPADDR_TYPE_ANY : IPADDR_TYPE_V4);
+        socket->udp = udp_new_ip_type(IPADDR_TYPE_V4);
         if (!socket->udp) {
             mem_free(socket);
             return NULL;
         }
+        socket->udp->flags |= UDP_FLAGS_MULTICAST_LOOP;
         udp_recv(socket->udp, udp_received, socket);
     } else {
         mem_free(socket);
@@ -633,6 +697,7 @@ void vinix_socket_free(struct vinix_socket *socket) {
     if (!socket) {
         return;
     }
+    release_memberships(socket);
     free_packets(socket);
     while (socket->accept_head) {
         struct vinix_socket *child = socket->accept_head;
@@ -674,100 +739,6 @@ static ip_addr_t ipv4(uint32_t address) {
 }
 
 /* The IPv4 ABI remains available to procfs and existing consumers. */
-struct vinix_socket *vinix_socket_new(int type, int protocol) {
-    return vinix_socket_new_family(2, type, protocol);
-}
-
-static struct vinix_ip_address public_ipv4(uint32_t address) {
-    struct vinix_ip_address result = { .family = 2 };
-    memcpy(result.bytes, &address, 4);
-    return result;
-}
-
-static int decode_address(struct vinix_socket *socket,
-                          const struct vinix_ip_address *address, ip_addr_t *ip,
-                          int binding) {
-    if (!address || !socket) return 22;
-    if (address->family == 2) {
-        if (socket->family != 2) return 97;
-        *ip = ipv4(0);
-        memcpy(&ip_2_ip4(ip)->addr, address->bytes, 4);
-        return 0;
-    }
-    if (address->family != 10 || socket->family != 10) return 97;
-    ip_addr_set_zero_ip6(ip);
-    memcpy(ip_2_ip6(ip)->addr, address->bytes, 16);
-    if (ip6_addr_isipv4mappedipv6(ip_2_ip6(ip))) {
-        if (socket->v6only) return binding ? 22 : 101;
-        uint32_t mapped = ip_2_ip6(ip)->addr[3];
-        *ip = ipv4(mapped);
-        return 0;
-    }
-    if (ip6_addr_has_scope(ip_2_ip6(ip), IP6_UNKNOWN)) {
-        if (!address->scope) return 22;
-        if (address->scope != 2 || !link_attached) return 19;
-        ip6_addr_assign_zone(ip_2_ip6(ip), IP6_UNKNOWN, &physical_netif);
-    } else if (address->scope > 2) {
-        return 19;
-    }
-    if (binding && !ip6_addr_isany(ip_2_ip6(ip)) &&
-        !ip6_addr_isloopback(ip_2_ip6(ip)) && !ip6_addr_ismulticast(ip_2_ip6(ip))) {
-        int found = 0;
-        if (link_attached) {
-            for (unsigned i = 0; i < LWIP_IPV6_NUM_ADDRESSES; ++i) {
-                if (ip6_addr_isvalid(netif_ip6_addr_state(&physical_netif, i)) &&
-                    ip6_addr_cmp(ip_2_ip6(ip), netif_ip6_addr(&physical_netif, i))) found = 1;
-            }
-        }
-        if (!found) return 99;
-    }
-    if (binding && !socket->v6only && ip6_addr_isany(ip_2_ip6(ip))) {
-        IP_SET_TYPE(ip, IPADDR_TYPE_ANY);
-    }
-    return 0;
-}
-
-static void encode_address(struct vinix_socket *socket, const ip_addr_t *ip,
-                           struct vinix_ip_address *address) {
-    if (!address) return;
-    memset(address, 0, sizeof(*address));
-    address->family = (uint32_t)socket->family;
-    if (socket->family == 10) {
-        if (IP_IS_V4(ip)) {
-            address->bytes[10] = address->bytes[11] = 0xff;
-            memcpy(address->bytes + 12, &ip_2_ip4(ip)->addr, 4);
-        } else if (IP_IS_V6(ip)) {
-            memcpy(address->bytes, ip_2_ip6(ip)->addr, 16);
-            if (ip6_addr_has_zone(ip_2_ip6(ip))) address->scope = 2;
-        }
-    } else if (IP_IS_V4(ip)) {
-        memcpy(address->bytes, &ip_2_ip4(ip)->addr, 4);
-    }
-}
-
-int vinix_net_ipv6_address(unsigned index, unsigned slot,
-                           struct vinix_ip_address *address,
-                           unsigned *prefix, unsigned *flags) {
-    if (!address || !prefix || !flags) return 0;
-    memset(address, 0, sizeof(*address));
-    address->family = 10;
-    if (index == 1 && slot == 0) {
-        address->bytes[15] = 1;
-        *prefix = 128;
-        *flags = 0x80; /* IFA_F_PERMANENT */
-        return 1;
-    }
-    if (index != 2 || !link_attached || slot >= LWIP_IPV6_NUM_ADDRESSES) return 0;
-    unsigned state = netif_ip6_addr_state(&physical_netif, slot);
-    if (state == IP6_ADDR_INVALID) return 0;
-    const ip6_addr_t *ip = netif_ip6_addr(&physical_netif, slot);
-    memcpy(address->bytes, ip->addr, 16);
-    address->scope = ip6_addr_islinklocal(ip) ? 2 : 0;
-    *prefix = 64; /* lwIP SLAAC and EUI-64 link-local prefixes. */
-    *flags = ip6_addr_istentative(state) ? 0x40 : 0;
-    if (state == IP6_ADDR_DEPRECATED) *flags |= 0x20;
-    return 1;
-}
 
 static int tcp_port_taken(uint16_t port, void *context) {
     int i;
@@ -810,15 +781,17 @@ static int bind_ephemeral(struct vinix_socket *socket, const ip_addr_t *address)
                               : udp_bind(socket->udp, address, port));
 }
 
-int vinix_socket_bind_ip(struct vinix_socket *socket, const struct vinix_ip_address *address, uint16_t port) {
+static int bind_ip(struct vinix_socket *socket, const ip_addr_t *address, uint16_t port) {
     ip_addr_t ip;
     err_t error;
     if (!socket) {
         return 88;
     }
-    int decoded = decode_address(socket, address, &ip, 1);
-    if (decoded) return decoded;
     if (socket->bound) return 22;
+    ip_addr_copy(ip, *address);
+    struct ip_pcb *ip_pcb = socket->type == VINIX_NET_STREAM ?
+                            (struct ip_pcb *)socket->tcp : (struct ip_pcb *)socket->udp;
+    if (ip_pcb) ip_pcb->ttl = (uint8_t)(IP_IS_V6(&ip) ? socket->hops6 : socket->hops4);
     if (socket->type == VINIX_NET_STREAM && !socket->tcp) {
         return socket->error ? socket->error : 107;
     }
@@ -836,14 +809,15 @@ int vinix_socket_bind_ip(struct vinix_socket *socket, const struct vinix_ip_addr
     return linux_error(error);
 }
 
-int vinix_socket_connect_ip(struct vinix_socket *socket, const struct vinix_ip_address *address, uint16_t port) {
+static int connect_ip(struct vinix_socket *socket, const ip_addr_t *address, uint16_t port) {
     ip_addr_t ip;
     err_t error;
     if (!socket) {
         return 88;
     }
-    int decoded = decode_address(socket, address, &ip, 0);
-    if (decoded) return decoded;
+    ip_addr_copy(ip, *address);
+    struct ip_pcb *ip_pcb = socket_ip_pcb(socket);
+    if (ip_pcb) ip_pcb->ttl = (uint8_t)(IP_IS_V6(&ip) ? socket->hops6 : socket->hops4);
     if (socket->type == VINIX_NET_STREAM) {
         if (!socket->tcp) return socket->error ? socket->error : 107;
         if (socket->connected) {
@@ -935,8 +909,8 @@ struct vinix_socket *vinix_socket_accept(struct vinix_socket *socket) {
     return child;
 }
 
-int vinix_socket_send_ip(struct vinix_socket *socket, const void *data, size_t length,
-                      const struct vinix_ip_address *address, uint16_t port, int has_address) {
+static int send_ip(struct vinix_socket *socket, const void *data, size_t length,
+                    const ip_addr_t *address, uint16_t port, int has_address) {
     err_t error;
     if (!socket || (!data && length)) {
         return -22;
@@ -983,6 +957,17 @@ int vinix_socket_send_ip(struct vinix_socket *socket, const void *data, size_t l
         if (!has_address && !socket->connected) {
             return -89;
         }
+        const ip_addr_t *destination = has_address ? address : &socket->udp->remote_ip;
+        int ipv6 = IP_IS_V6(destination);
+        struct netif *multicast_interface = interface_index(ipv6 ? socket->multicast_if6 : socket->multicast_if4);
+        udp_set_multicast_netif_index(socket->udp, multicast_interface ? netif_get_index(multicast_interface) : 0);
+        ip4_addr_t multicast_address = { socket->multicast_addr4 };
+        udp_set_multicast_netif_addr(socket->udp, &multicast_address);
+        socket->udp->ttl = (uint8_t)(ipv6 ? socket->hops6 : socket->hops4);
+        socket->udp->mcast_ttl = (uint8_t)(ipv6 ? socket->multicast_hops6 : socket->multicast_hops4);
+        if (ipv6 ? socket->multicast_loop6 : socket->multicast_loop4)
+            socket->udp->flags |= UDP_FLAGS_MULTICAST_LOOP;
+        else socket->udp->flags &= (uint8_t)~UDP_FLAGS_MULTICAST_LOOP;
         if (length > 65507 || length > socket->send_limit) {
             return -90;
         }
@@ -1001,10 +986,7 @@ int vinix_socket_send_ip(struct vinix_socket *socket, const void *data, size_t l
             return -12;
         }
         if (has_address) {
-            ip_addr_t ip;
-            int decoded = decode_address(socket, address, &ip, 0);
-            if (decoded) { pbuf_free(p); return -decoded; }
-            error = udp_sendto(socket->udp, p, &ip, lwip_ntohs(port));
+            error = udp_sendto(socket->udp, p, address, lwip_ntohs(port));
         } else {
             error = udp_send(socket->udp, p);
         }
@@ -1019,8 +1001,8 @@ int vinix_socket_send_ip(struct vinix_socket *socket, const void *data, size_t l
     }
 }
 
-int vinix_socket_recv_ip(struct vinix_socket *socket, void *data, size_t length,
-                      struct vinix_ip_address *address, uint16_t *port) {
+static int recv_ip(struct vinix_socket *socket, void *data, size_t length,
+                    ip_addr_t *address, uint16_t *port) {
     struct packet *packet;
     uint16_t available;
     uint16_t amount;
@@ -1046,7 +1028,7 @@ int vinix_socket_recv_ip(struct vinix_socket *socket, void *data, size_t length,
         pbuf_copy_partial(packet->p, data, amount, packet->offset);
     }
     if (address) {
-        encode_address(socket, &packet->address, address);
+        ip_addr_copy(*address, packet->address);
     }
     if (port) {
         *port = lwip_htons(packet->port);
@@ -1119,67 +1101,35 @@ int vinix_socket_shutdown(struct vinix_socket *socket, int how) {
     return 0;
 }
 
-int vinix_socket_local_ip(struct vinix_socket *socket,
-                           struct vinix_ip_address *address, uint16_t *port) {
-    if (!socket) return 88;
+int vinix_socket_local(struct vinix_socket *socket, uint32_t *address, uint16_t *port) {
+    if (!socket) {
+        return 88;
+    }
     if (socket->type == VINIX_NET_STREAM) {
-        encode_address(socket, socket->tcp ? &socket->tcp->local_ip :
-                        &socket->last_local_address, address);
-        if (port) *port = socket->tcp ? lwip_htons(socket->tcp->local_port) : socket->last_local_port;
+        if (address) *address = socket->tcp ?
+            ip_2_ip4(&socket->tcp->local_ip)->addr : ip_2_ip4(&socket->last_local_address)->addr;
+        if (port) *port = socket->tcp ?
+            lwip_htons(socket->tcp->local_port) : socket->last_local_port;
     } else {
-        encode_address(socket, &socket->udp->local_ip, address);
+        if (address) *address = ip_2_ip4(&socket->udp->local_ip)->addr;
         if (port) *port = lwip_htons(socket->udp->local_port);
     }
     return 0;
 }
 
-int vinix_socket_peer_ip(struct vinix_socket *socket,
-                          struct vinix_ip_address *address, uint16_t *port) {
-    if (!socket || !socket->connected) return 107;
+int vinix_socket_peer(struct vinix_socket *socket, uint32_t *address, uint16_t *port) {
+    if (!socket || !socket->connected) {
+        return 107;
+    }
     if (socket->type == VINIX_NET_STREAM) {
-        encode_address(socket, socket->tcp ? &socket->tcp->remote_ip :
-                        &socket->last_remote_address, address);
+        if (address) *address = socket->tcp ? ip_2_ip4(&socket->tcp->remote_ip)->addr : ip_2_ip4(&socket->last_remote_address)->addr;
         if (port) *port = socket->tcp ? lwip_htons(socket->tcp->remote_port) : socket->last_remote_port;
     } else {
-        encode_address(socket, &socket->udp->remote_ip, address);
+        if (address) *address = ip_2_ip4(&socket->udp->remote_ip)->addr;
         if (port) *port = lwip_htons(socket->udp->remote_port);
     }
     return 0;
 }
-
-int vinix_socket_bind(struct vinix_socket *socket, uint32_t address, uint16_t port) {
-    struct vinix_ip_address ip = public_ipv4(address);
-    return vinix_socket_bind_ip(socket, &ip, port);
-}
-int vinix_socket_connect(struct vinix_socket *socket, uint32_t address, uint16_t port) {
-    struct vinix_ip_address ip = public_ipv4(address);
-    return vinix_socket_connect_ip(socket, &ip, port);
-}
-int vinix_socket_send(struct vinix_socket *socket, const void *data, size_t length,
-                      uint32_t address, uint16_t port, int has_address) {
-    struct vinix_ip_address ip = public_ipv4(address);
-    return vinix_socket_send_ip(socket, data, length, &ip, port, has_address);
-}
-int vinix_socket_recv(struct vinix_socket *socket, void *data, size_t length,
-                      uint32_t *address, uint16_t *port) {
-    struct vinix_ip_address ip = {0};
-    int result = vinix_socket_recv_ip(socket, data, length, &ip, port);
-    if (result >= 0 && address) memcpy(address, ip.bytes, 4);
-    return result;
-}
-int vinix_socket_local(struct vinix_socket *socket, uint32_t *address, uint16_t *port) {
-    struct vinix_ip_address ip;
-    int result = vinix_socket_local_ip(socket, &ip, port);
-    if (!result && address) memcpy(address, ip.bytes, 4);
-    return result;
-}
-int vinix_socket_peer(struct vinix_socket *socket, uint32_t *address, uint16_t *port) {
-    struct vinix_ip_address ip;
-    int result = vinix_socket_peer_ip(socket, &ip, port);
-    if (!result && address) memcpy(address, ip.bytes, 4);
-    return result;
-}
-
 int vinix_socket_ready(struct vinix_socket *socket) {
     int ready = 0;
     if (!socket) {
@@ -1245,6 +1195,8 @@ int vinix_socket_set_option(struct vinix_socket *socket, int level, int option,
         return 88;
     }
     pcb = socket_ip_pcb(socket);
+    if (level == 41 || (level == 0 && (option == 2 || option == 33 || option == 34)))
+        return family_set_option(socket, level, option, value);
     if (level == 1) { /* SOL_SOCKET */
         switch (option) {
         case 2:  /* SO_REUSEADDR */
@@ -1362,6 +1314,8 @@ int vinix_socket_get_option(struct vinix_socket *socket, int level, int option,
         return 22;
     }
     pcb = socket_ip_pcb(socket);
+    if (level == 41 || (level == 0 && (option == 2 || option == 33 || option == 34 || option == 32)))
+        return family_get_option(socket, level, option, value);
     if (level == 1) { /* SOL_SOCKET */
         switch (option) {
         case 2:
@@ -1416,3 +1370,6 @@ int vinix_socket_pending(struct vinix_socket *socket) {
 void vinix_socket_abort_close(struct vinix_socket *socket) {
     if (socket) socket->abort_on_close = 1;
 }
+
+/* Family/managed multicast policy stays beside the raw lwIP bridge. */
+#include "vinix_inet6.inc"

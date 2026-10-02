@@ -97,13 +97,12 @@ fn dispatch_linux_signal(context &cpulocal.GPRState, which int, info_signum int,
 	previous_mask := if t.saved_mask_valid { t.saved_mask } else { t.masked_signals }
 	t.saved_mask_valid = false
 
-	if handler == linux_sig_dfl && is_stop_signal(which) {
+	// Default stop dispositions park the whole process. SIGSTOP always stops.
+	if which == sigstop || (handler == linux_sig_dfl && stop_signal(which)) {
 		t.masked_signals = previous_mask
-		stop_for_signal(which)
+		request_group_stop(mut t, which)
 		return
 	}
-	// Everything except the default ignored and job-control dispositions ends
-	// the process. A handler also requires a valid Linux sa_restorer.
 	if handler == linux_sig_ign || (handler == linux_sig_dfl && default_ignores(which)) {
 		t.masked_signals = previous_mask
 		return
@@ -317,9 +316,7 @@ fn thread_on_sigaltstack(t &proc.Thread) bool {
 	return on_sigaltstack(t, t.user_stack)
 }
 
-// What SIG_DFL does with `signum`: true to ignore it, as Linux ignores it by
-// default and, there being no job control, the stop and continue signals as
-// arm64 does.
+// Signals Linux ignores by default.
 fn default_ignores(signum int) bool {
 	return has_default_ignore_action(signum) || signum == sigcont
 }
@@ -329,7 +326,7 @@ fn default_ignores(signum int) bool {
 pub fn syscall_pause(_ voidptr) (u64, u64) {
 	mut t := proc.current_thread()
 	for katomic.load(&t.pending_signals) & ~t.masked_signals == 0 {
-		sleep_for_signal(unsafe { nil })
+		sleep_for_signal(unsafe { nil }, 0)
 	}
 	return errno.err, errno.eintr
 }

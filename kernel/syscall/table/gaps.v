@@ -661,28 +661,3 @@ const sock_cloexec = 0o2000000
 const resource_o_nonblock = 0o4000
 
 const resource_o_cloexec = 0o2000000
-
-// ── memory hints ─────────────────────────────────────────────────────────────
-
-fn syscall_linux_mlock(_ voidptr, _addr u64, _length u64) (u64, u64) {
-	return 0, 0
-}
-
-fn syscall_linux_mlock2(_ voidptr, _addr u64, _length u64, flags int) (u64, u64) {
-	if flags & ~0x1 != 0 {
-		return errno.err, errno.einval
-	}
-	return 0, 0
-}
-
-fn syscall_linux_mlockall(_ voidptr, flags int) (u64, u64) {
-	// MCL_CURRENT | MCL_FUTURE | MCL_ONFAULT, and at least one is required.
-	if flags == 0 || flags & ~0x7 != 0 {
-		return errno.err, errno.einval
-	}
-	return 0, 0
-}
-
-fn syscall_linux_munlockall(_ voidptr) (u64, u64) {
-	return 0, 0
-}

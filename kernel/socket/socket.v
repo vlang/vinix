@@ -147,7 +147,7 @@ fn collect_passed_fds(msg &sock_pub.MsgHdr) ?[]&file.FD {
 			// queued descriptor, so only the source descriptor is let go.
 			mut passed := &file.FD{
 				handle: source.handle
-				flags: 0
+				flags:  0
 			}
 			source.release_descriptor()
 			result << passed
@@ -213,7 +213,7 @@ fn socket_create(domain int, @type int, protocol int) ?&resource.Resource {
 			return ret.boxed()
 		}
 		sock_pub.af_inet, sock_pub.af_inet6 {
-			ret := sock_inet.create(domain, @type, protocol)?
+			ret := sock_inet.create_family(@type, protocol, domain)?
 			return ret.box
 		}
 		sock_pub.af_netlink {
@@ -424,6 +424,20 @@ pub fn syscall_listen(_ voidptr, fdnum int, backlog int) (u64, u64) {
 	return 0, 0
 }
 
+// Each socket family consumes only the Handle's resource and status flags
+// during I/O. The real descriptor keeps the resource alive through the call;
+// this caller-owned view never enters descriptor/reference or position paths.
+// Snapshotting the flags makes MSG_DONTWAIT local to the call and cannot undo
+// a concurrent F_SETFL on a duplicated descriptor when the call returns.
+fn prepare_io_handle(mut target file.Handle, source &file.Handle, flags int) {
+	unsafe { C.memset(voidptr(target), 0, sizeof(file.Handle)) }
+	target.resource = source.resource
+	target.flags = source.flags
+	if flags & 0x40 != 0 {
+		target.flags |= resource.o_nonblock
+	}
+}
+
 pub fn syscall_recvmsg(_ voidptr, fdnum int, msg &sock_pub.MsgHdr, flags int) (u64, u64) {
 	mut current_thread := proc.current_thread()
 	mut process := current_thread.process
@@ -434,8 +448,9 @@ pub fn syscall_recvmsg(_ voidptr, fdnum int, msg &sock_pub.MsgHdr, flags int) (u
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
-	mut header := sock_pub.MsgHdr{}
-	if !usercopy.copy_from_user(voidptr(&header), u64(voidptr(msg)), sizeof(sock_pub.MsgHdr)) {
+	mut header := unsafe { &sock_pub.MsgHdr(C.vinix_stack_alloc(sizeof(sock_pub.MsgHdr))) }
+	unsafe { *header = sock_pub.MsgHdr{} }
+	if !usercopy.copy_from_user(voidptr(header), u64(voidptr(msg)), sizeof(sock_pub.MsgHdr)) {
 		return errno.err, errno.efault
 	}
 	ret, err := receive_message(fdnum, mut header, flags)
@@ -443,7 +458,7 @@ pub fn syscall_recvmsg(_ voidptr, fdnum int, msg &sock_pub.MsgHdr, flags int) (u
 		return ret, err
 	}
 	// The pointers go back as they came; the lengths and flags are the call's.
-	if !usercopy.copy_to_user(u64(voidptr(msg)), voidptr(&header), sizeof(sock_pub.MsgHdr)) {
+	if !usercopy.copy_to_user(u64(voidptr(msg)), voidptr(header), sizeof(sock_pub.MsgHdr)) {
 		return errno.err, errno.efault
 	}
 	return ret, 0
@@ -474,10 +489,8 @@ pub fn receive_message(fdnum int, mut header sock_pub.MsgHdr, flags int) (u64, u
 			unsafe { free(buffer) }
 		}
 	}
-	mut vector := sock_pub.IoVec{
-		iov_base: buffer
-		iov_len:  size
-	}
+	mut vector := unsafe { &sock_pub.IoVec(C.vinix_stack_alloc(sizeof(sock_pub.IoVec))) }
+	unsafe { *vector = sock_pub.IoVec{ iov_base: buffer, iov_len: size } }
 	control_size := if header.msg_control == unsafe { nil } {
 		u64(0)
 	} else if header.msg_controllen < control_max {
@@ -502,19 +515,21 @@ pub fn receive_message(fdnum int, mut header sock_pub.MsgHdr, flags int) (u64, u
 	} else {
 		sockaddr_max
 	}
-	mut kernel_message := sock_pub.MsgHdr{
-		msg_name:       if header.msg_name == unsafe { nil } {
-			unsafe { nil }
-		} else {
-			unsafe { voidptr(&storage[0]) }
+	mut message := unsafe { &sock_pub.MsgHdr(C.vinix_stack_alloc(sizeof(sock_pub.MsgHdr))) }
+	unsafe {
+		*message = sock_pub.MsgHdr{
+			msg_name:       if header.msg_name == unsafe { nil } {
+				unsafe { nil }
+			} else {
+				storage
+			}
+			msg_namelen:    offered
+			msg_iov:        vector
+			msg_iovlen:     1
+			msg_control:    control
+			msg_controllen: control_size
 		}
-		msg_namelen:    offered
-		msg_iov:        unsafe { &vector }
-		msg_iovlen:     1
-		msg_control:    control
-		msg_controllen: control_size
 	}
-	message := unsafe { &kernel_message }
 	received, err := receive_into(fdnum, message, flags)
 	if err != 0 {
 		return received, err
@@ -536,7 +551,11 @@ pub fn receive_message(fdnum int, mut header sock_pub.MsgHdr, flags int) (u64, u
 		}
 	}
 	if header.msg_control != unsafe { nil } {
-		used := if message.msg_controllen < control_size { message.msg_controllen } else { control_size }
+		used := if message.msg_controllen < control_size {
+			message.msg_controllen
+		} else {
+			control_size
+		}
 		if used != 0 && !usercopy.copy_to_user(u64(header.msg_control), control, used) {
 			return errno.err, errno.efault
 		}
@@ -545,7 +564,7 @@ pub fn receive_message(fdnum int, mut header sock_pub.MsgHdr, flags int) (u64, u
 	if header.msg_name != unsafe { nil }
 		&& (message.msg_namelen != offered || unsafe { storage[0] } != 0xff || unsafe { storage[1] } != 0xff) {
 		named := if message.msg_namelen < offered { message.msg_namelen } else { offered }
-		if named != 0 && !usercopy.copy_to_user(u64(header.msg_name), unsafe { voidptr(&storage[0]) }, named) {
+		if named != 0 && !usercopy.copy_to_user(u64(header.msg_name), storage, named) {
 			return errno.err, errno.efault
 		}
 		header.msg_namelen = message.msg_namelen
@@ -579,18 +598,13 @@ fn receive_into(fdnum int, message &sock_pub.MsgHdr, flags int) (u64, u64) {
 	}
 
 	// MSG_DONTWAIT is a per-call override, not a permanent descriptor flag.
-	old_flags := fd.handle.flags
-	if flags & 0x40 != 0 {
-		fd.handle.flags |= resource.o_nonblock
-	}
-	defer {
-		fd.handle.flags = old_flags
-	}
+	mut call_handle := unsafe { &file.Handle(C.vinix_stack_alloc(sizeof(file.Handle))) }
+	prepare_io_handle(mut call_handle, fd.handle, flags)
 	mut remaining_flags := flags & ~0x40000040 // MSG_CMSG_CLOEXEC | MSG_DONTWAIT
 	if mut res is sock_unix.UnixSocket {
 		remaining_flags = flags & ~0x40 // Unix recvmsg consumes MSG_CMSG_CLOEXEC.
 	}
-	ret := sock.recvmsg(fd.handle, message, remaining_flags) or { return errno.err, errno.get() }
+	ret := sock.recvmsg(call_handle, message, remaining_flags) or { return errno.err, errno.get() }
 
 	return ret, 0
 }
@@ -654,50 +668,31 @@ fn send_from_kernel(fdnum int, buf voidptr, len u64, flags int, dest_addr voidpt
 	defer {
 		fd.unref()
 	}
+	mut call_handle := unsafe { &file.Handle(C.vinix_stack_alloc(sizeof(file.Handle))) }
+	prepare_io_handle(mut call_handle, fd.handle, flags)
 	mut res := fd.handle.resource
 	if mut res is sock_inet.InetSocket {
-		old_flags := fd.handle.flags
-		if flags & 0x40 != 0 {
-			fd.handle.flags |= resource.o_nonblock
-		}
-		defer {
-			fd.handle.flags = old_flags
-		}
-		ret := res.sendto(fd.handle, buf, len, dest_addr, addrlen) or {
+		ret := res.sendto(call_handle, buf, len, dest_addr, addrlen) or {
 			return errno.err, errno.get()
 		}
 		return u64(ret), 0
 	}
 	if mut res is sock_unix.UnixSocket {
-		old_flags := fd.handle.flags
-		if flags & 0x40 != 0 {
-			fd.handle.flags |= resource.o_nonblock
-		}
-		defer {
-			fd.handle.flags = old_flags
-		}
 		if dest_addr != unsafe { nil } {
 			// Only a datagram has somewhere to go by address alone.
 			if !res.is_datagram() {
 				return errno.err, errno.eopnotsupp
 			}
-			ret := res.send_datagram_to(voidptr(fd.handle), buf, len, dest_addr, addrlen) or {
+			ret := res.send_datagram_to(voidptr(call_handle), buf, len, dest_addr, addrlen) or {
 				return errno.err, errno.get()
 			}
 			return u64(ret), 0
 		}
-		ret := fd.handle.write(buf, len) or { return errno.err, errno.get() }
+		ret := call_handle.write(buf, len) or { return errno.err, errno.get() }
 		return u64(ret), 0
 	}
 	if mut res is sock_netlink.NetlinkSocket {
-		old_flags := fd.handle.flags
-		if flags & 0x40 != 0 {
-			fd.handle.flags |= resource.o_nonblock
-		}
-		defer {
-			fd.handle.flags = old_flags
-		}
-		ret := fd.handle.write(buf, len) or { return errno.err, errno.get() }
+		ret := call_handle.write(buf, len) or { return errno.err, errno.get() }
 		return u64(ret), 0
 	}
 	return errno.err, errno.enotsock
@@ -710,17 +705,19 @@ pub fn syscall_recvfrom(_ voidptr, fdnum int, buf voidptr, len u64, flags int, s
 		return errno.err, errno.efault
 	}
 	wants_address := src_addr != unsafe { nil } && addrlen != unsafe { nil }
-	mut capacity := u32(0)
+	mut address_lengths := unsafe { &u32(C.vinix_stack_alloc(2 * sizeof(u32))) }
+	unsafe { *address_lengths = 0 }
 	if wants_address
-		&& !usercopy.copy_from_user(voidptr(&capacity), u64(voidptr(addrlen)), sizeof(u32)) {
+		&& !usercopy.copy_from_user(voidptr(address_lengths), u64(voidptr(addrlen)), sizeof(u32)) {
 		return errno.err, errno.efault
 	}
 	// A family that has no address to report leaves these as they are, and
 	// then so is the caller's buffer left.
 	storage := unsafe { &u8(C.vinix_stack_alloc(sockaddr_max)) }
 	unsafe { C.memset(storage, 0xff, sockaddr_max) }
+	capacity := unsafe { *address_lengths }
 	offered := if capacity < sockaddr_max { capacity } else { sockaddr_max }
-	mut length := unsafe { &u32(C.vinix_stack_alloc(sizeof(u32))) }
+	mut length := unsafe { &u32(voidptr(u64(address_lengths) + sizeof(u32))) }
 	unsafe { *length = offered }
 	size := if len < message_max { len } else { message_max }
 	small := unsafe { &u8(C.vinix_stack_alloc(small_message)) }
@@ -771,46 +768,27 @@ fn receive_to_kernel(fdnum int, buf voidptr, len u64, flags int, src_addr voidpt
 	defer {
 		fd.unref()
 	}
+	mut call_handle := unsafe { &file.Handle(C.vinix_stack_alloc(sizeof(file.Handle))) }
+	prepare_io_handle(mut call_handle, fd.handle, flags)
 	mut res := fd.handle.resource
 	if mut res is sock_inet.InetSocket {
-		old_flags := fd.handle.flags
-		if flags & 0x40 != 0 {
-			fd.handle.flags |= resource.o_nonblock
-		}
-		defer {
-			fd.handle.flags = old_flags
-		}
-		ret := res.recvfrom(fd.handle, buf, len, src_addr, addrlen) or {
+		ret := res.recvfrom(call_handle, buf, len, src_addr, addrlen) or {
 			return errno.err, errno.get()
 		}
 		return u64(ret), 0
 	}
 	if mut res is sock_unix.UnixSocket {
-		old_flags := fd.handle.flags
-		if flags & 0x40 != 0 {
-			fd.handle.flags |= resource.o_nonblock
-		}
-		defer {
-			fd.handle.flags = old_flags
-		}
 		if res.keeps_boundaries() {
-			ret := res.recv_seqpacket(voidptr(fd.handle), buf, len, flags, src_addr, addrlen) or {
+			ret := res.recv_seqpacket(voidptr(call_handle), buf, len, flags, src_addr, addrlen) or {
 				return errno.err, errno.get()
 			}
 			return u64(ret), 0
 		}
-		ret := fd.handle.read(buf, len) or { return errno.err, errno.get() }
+		ret := call_handle.read(buf, len) or { return errno.err, errno.get() }
 		return u64(ret), 0
 	}
 	if mut res is sock_netlink.NetlinkSocket {
-		old_flags := fd.handle.flags
-		if flags & 0x40 != 0 {
-			fd.handle.flags |= resource.o_nonblock
-		}
-		defer {
-			fd.handle.flags = old_flags
-		}
-		ret := fd.handle.read(buf, len) or { return errno.err, errno.get() }
+		ret := call_handle.read(buf, len) or { return errno.err, errno.get() }
 		if src_addr != unsafe { nil } && addrlen != unsafe { nil } {
 			sock_netlink.write_kernel_source(src_addr, addrlen)
 		}
@@ -821,13 +799,14 @@ fn receive_to_kernel(fdnum int, buf voidptr, len u64, flags int, src_addr voidpt
 
 // One of a message's iovecs, copied in.
 fn iovec_from_user(vector voidptr, index u64) ?sock_pub.IoVec {
-	mut iov := sock_pub.IoVec{}
-	if !usercopy.copy_from_user(voidptr(&iov), u64(vector) + index * sizeof(sock_pub.IoVec),
+	mut iov := unsafe { &sock_pub.IoVec(C.vinix_stack_alloc(sizeof(sock_pub.IoVec))) }
+	unsafe { *iov = sock_pub.IoVec{} }
+	if !usercopy.copy_from_user(voidptr(iov), u64(vector) + index * sizeof(sock_pub.IoVec),
 		sizeof(sock_pub.IoVec)) {
 		errno.set(errno.efault)
 		return none
 	}
-	return iov
+	return unsafe { *iov }
 }
 
 // What a message's iovecs hold together.
@@ -943,16 +922,12 @@ fn send_with_control(fdnum int, buffer voidptr, total u64, header &sock_pub.MsgH
 		mut passed_fds := collect_passed_fds(message) or {
 			return errno.err, errno.get()
 		}
-		old_flags := fd.handle.flags
-		if flags & 0x40 != 0 {
-			fd.handle.flags |= resource.o_nonblock
-		}
-		ret := res.write_with_fds(fd.handle, buffer, total, passed_fds) or {
-			fd.handle.flags = old_flags
+		mut call_handle := unsafe { &file.Handle(C.vinix_stack_alloc(sizeof(file.Handle))) }
+		prepare_io_handle(mut call_handle, fd.handle, flags)
+		ret := res.write_with_fds(call_handle, buffer, total, passed_fds) or {
 			release_passed_fds(mut passed_fds)
 			return errno.err, errno.get()
 		}
-		fd.handle.flags = old_flags
 		unsafe { passed_fds.free() }
 		return u64(ret), 0
 	}
@@ -1259,6 +1234,14 @@ pub fn syscall_setsockopt(_ voidptr, fdnum int, level int, optname int, optval u
 			} else {
 				res.set_timeout(send, ns)
 			}
+			return 0, 0
+		}
+	}
+
+	if sock_inet.is_structured_ip_option(level, optname) {
+		mut res := fd.handle.resource
+		if mut res is sock_inet.InetSocket {
+			res.set_structured_ip_option(level, optname, optval, optlen) or { return errno.err, errno.get() }
 			return 0, 0
 		}
 	}

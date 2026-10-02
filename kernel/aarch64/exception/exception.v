@@ -28,6 +28,8 @@ const exception_stack_size = 32768
 
 __global (
 	exception_stacks [max_exception_stacks][exception_stack_size]u8
+	guarded_exception_tops [256]u64
+	emergency_stack_tops [256]u64
 	// Static line buffer for the fatal report. The report must not allocate:
 	// a fault inside the allocator (or on memory it relies on) would otherwise
 	// re-fault while being reported, recursing into silence. That is exactly
@@ -96,6 +98,8 @@ fn emit_fatal_line(ec u64, esr u64, far u64, gpr_state &cpulocal.GPRState) {
 }
 
 pub fn initialise() {
+	// Establish the permanent scratch pointer before installing vectors.
+	cpu.write_tpidr_el1(0)
 	irq_dispatch_fn = default_irq_dispatch
 	cpu.write_vbar_el1(u64(voidptr(C.exception_vectors)))
 	cpu.isb()
@@ -127,6 +131,46 @@ fn install_exception_stack(cpu_number u64) {
 	cpu.isb()
 }
 
+// Early Limine entry precedes page tables. Once they are active, replace the
+// bootstrap fallback with a private guarded exception stack on every CPU.
+pub fn install_guarded_stack(cpu_number u64) {
+	// This boot-only handoff may update the inactive SP_EL1 while running
+	// at EL1t/EL2t; the leaf helper deliberately leaves SPSel at zero.
+	if cpu.read_stack_selector() != 0 { panic('Guarded exception setup requires inactive SP_EL1') }
+	if cpu_number >= 256 { panic('Too many CPUs for private exception stacks') }
+	if guarded_exception_tops[cpu_number] == 0 {
+		base := memory.kernel_stack_alloc(exception_stack_size)
+		if base == unsafe { nil } { panic('Cannot allocate guarded exception stack') }
+		guarded_exception_tops[cpu_number] = u64(base) + exception_stack_size
+	}
+	if emergency_stack_tops[cpu_number] == 0 {
+		base := memory.kernel_stack_alloc(exception_stack_size)
+		if base == unsafe { nil } { panic('Cannot allocate guarded emergency stack') }
+		emergency_stack_tops[cpu_number] = u64(base) + exception_stack_size
+	}
+	cpu.set_exception_emergency_stack(cpu_number, emergency_stack_tops[cpu_number])
+	cpu.set_sp_el1(guarded_exception_tops[cpu_number])
+	cpu.isb()
+}
+
+// Vector entry has saved the original registers on an independent owned
+// stack. Only exact compile-time selftest labels may return; real exhaustion
+// is fatal. No Thread pointer or allocation is needed to reach this report.
+@[export: 'exception__stack_exhausted']
+pub fn stack_exhausted(gpr_state &cpulocal.GPRState) {
+	far := cpu.read_far_el1()
+	resume := memory.stack_guard_probe_fixup(gpr_state.pc, far)
+	if resume != 0 {
+		mut state := unsafe { &cpulocal.GPRState(gpr_state) }
+		state.pc = resume
+		return
+	}
+	C.vinix_stack_guard_diagnostic(gpr_state.sp, gpr_state.pc, far)
+	C.vinix_stack_guard_message(c'STACK-GUARD FATAL emergency-stack exhaustion\n')
+	C.printf_panic(c'kernel stack guard: exhausted sp=0x%llx pc=0x%llx far=0x%llx\n', gpr_state.sp, gpr_state.pc, far)
+	fault_handler(0x25, cpu.read_esr_el1(), far, gpr_state)
+}
+
 // Did the instruction that faulted belong to userspace?
 //
 // SPSR's mode field is the exact answer: M[3:0] is zero only for EL0t. The PC
@@ -145,6 +189,17 @@ pub fn sync_handler(esr u64, far u64, gpr_state &cpulocal.GPRState) {
 	if user_entry { proc.cpu_enter_kernel() }
 	defer { if user_entry { proc.cpu_leave_kernel() } }
 	ec := (esr >> 26) & 0x3f // Exception Class
+	if !user_entry && ec == 0x25 {
+		resume := memory.stack_guard_probe_fixup(gpr_state.pc, far)
+		if resume != 0 {
+			mut state := unsafe { &cpulocal.GPRState(gpr_state) }
+			state.pc = resume
+			return
+		}
+		if memory.kernel_stack_guard(far) {
+			C.printf_panic(c'kernel stack guard: address=0x%llx sp=0x%llx\n', far, gpr_state.sp)
+		}
+	}
 
 	match ec {
 		0x01 { // Trapped WFI/WFE from userspace

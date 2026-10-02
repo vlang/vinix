@@ -21,19 +21,6 @@ import usercopy
 
 struct C.vinix_socket {}
 
-struct C.vinix_ip_address {
-mut:
-	family u32
-	scope  u32
-	bytes  [16]u8
-}
-
-struct Endpoint {
-mut:
-	ip   C.vinix_ip_address
-	port u16
-}
-
 fn C.vinix_net_init()
 fn C.vinix_net_poll(now_ms u32)
 fn C.vinix_net_attach(mac &u8, driver int) int
@@ -41,24 +28,18 @@ fn C.vinix_net_link(mac &u8, mtu &u32) int
 fn C.vinix_net_detach()
 fn C.vinix_net_input(frame voidptr, length u64) int
 fn C.vinix_net_config(address &u32, netmask &u32, gateway &u32, dns &u32) int
-fn C.vinix_socket_new_family(family int, @type int, protocol int) &C.vinix_socket
 fn C.vinix_socket_free(socket &C.vinix_socket)
 fn C.vinix_socket_pending(socket &C.vinix_socket) int
 fn C.vinix_socket_abort_close(socket &C.vinix_socket)
-fn C.vinix_socket_bind_ip(socket &C.vinix_socket, address &C.vinix_ip_address, port u16) int
-fn C.vinix_socket_connect_ip(socket &C.vinix_socket, address &C.vinix_ip_address, port u16) int
+fn C.vinix_socket_bind(socket &C.vinix_socket, address u32, port u16) int
+fn C.vinix_socket_connect(socket &C.vinix_socket, address u32, port u16) int
 fn C.vinix_socket_listen(socket &C.vinix_socket, backlog int) int
 fn C.vinix_socket_accept(socket &C.vinix_socket) &C.vinix_socket
 fn C.vinix_socket_send(socket &C.vinix_socket, data voidptr, length u64, address u32, port u16, has_address int) int
-fn C.vinix_socket_send_ip(socket &C.vinix_socket, data voidptr, length u64, address &C.vinix_ip_address, port u16, has_address int) int
 fn C.vinix_socket_recv(socket &C.vinix_socket, data voidptr, length u64, address &u32, port &u16) int
-fn C.vinix_socket_recv_ip(socket &C.vinix_socket, data voidptr, length u64, address &C.vinix_ip_address, port &u16) int
 fn C.vinix_socket_shutdown(socket &C.vinix_socket, how int) int
 fn C.vinix_socket_local(socket &C.vinix_socket, address &u32, port &u16) int
 fn C.vinix_socket_peer(socket &C.vinix_socket, address &u32, port &u16) int
-fn C.vinix_socket_local_ip(socket &C.vinix_socket, address &C.vinix_ip_address, port &u16) int
-fn C.vinix_socket_peer_ip(socket &C.vinix_socket, address &C.vinix_ip_address, port &u16) int
-fn C.vinix_net_ipv6_address(index u32, slot u32, address &C.vinix_ip_address, prefix &u32, flags &u32) int
 fn C.vinix_socket_ready(socket &C.vinix_socket) int
 fn C.vinix_socket_error(socket &C.vinix_socket, clear int) int
 fn C.vinix_socket_available(socket &C.vinix_socket) int
@@ -98,16 +79,6 @@ pub mut:
 	sin_zero   [8]u8
 }
 
-// Linux sockaddr_in6: flow information remains zero on output.
-pub struct SockaddrIn6 {
-pub mut:
-	sin6_family   u16
-	sin6_port     u16
-	sin6_flowinfo u32
-	sin6_addr     [16]u8
-	sin6_scope_id u32
-}
-
 pub struct InetSocket {
 pub mut:
 	stat     stat.Stat
@@ -117,11 +88,11 @@ pub mut:
 	can_mmap bool
 	event    eventstruct.Event
 
-	handle    &C.vinix_socket = unsafe { nil }
-	family    int
-	socktype  int
-	protocol  int
-	listening bool
+	handle     &C.vinix_socket = unsafe { nil }
+	socktype   int
+	protocol   int
+	family     int
+	listening  bool
 	// IP_RECVERR, kept for getsockopt(). No error queue is kept: ICMP errors
 	// are not reported to a socket at all.
 	recverr int
@@ -167,12 +138,14 @@ pub fn initialise() {
 	C.vinix_net_init()
 	net_lock.release()
 	fs.register_net_tcp_snapshot(proc_net_tcp_text)
+	fs.register_net_ipv6_snapshots(proc_net_tcp6_text, proc_net_if_inet6_text)
 }
 
 // Linux tools match the inode in /proc/net/tcp with /proc/<pid>/fd links.
 // Both views must describe the same live Vinix socket.
 fn proc_net_tcp_text() string {
-	mut text := lib.new_text(4096)
+	mut text := unsafe { &lib.Text(C.vinix_stack_alloc(sizeof(lib.Text))) }
+	unsafe { *text = lib.new_text(4096) }
 	text.add('  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode\n')
 	net_lock.acquire()
 	sockets_lock.acquire()
@@ -513,7 +486,7 @@ fn set_error(code int) {
 	}
 }
 
-fn new_with_handle(handle &C.vinix_socket, family int, socktype int, protocol int) ?&InetSocket {
+fn new_with_handle(handle &C.vinix_socket, socktype int, protocol int, family int) ?&InetSocket {
 	if handle == unsafe { nil } {
 		errno.set(errno.enomem)
 		return none
@@ -528,10 +501,13 @@ fn new_with_handle(handle &C.vinix_socket, family int, socktype int, protocol in
 		family:   family
 		socktype: socktype
 		protocol: protocol
+		family: family
 	}
 	socket.stat.mode = stat.ifsock | 0o777
 	if !register(mut socket) {
+		net_lock.acquire()
 		C.vinix_socket_free(handle)
+		net_lock.release()
 		unsafe { free(socket) }
 		errno.set(errno.enfile)
 		return none
@@ -543,7 +519,11 @@ fn new_with_handle(handle &C.vinix_socket, family int, socktype int, protocol in
 	return socket
 }
 
-pub fn create(family int, @type int, protocol int) ?&InetSocket {
+pub fn create(@type int, protocol int) ?&InetSocket {
+	return create_family(@type, protocol, sock_pub.af_inet)
+}
+
+pub fn create_family(@type int, protocol int, family int) ?&InetSocket {
 	socktype := @type & sock_pub.sock_type_mask
 	if socktype != sock_pub.sock_stream && socktype != sock_pub.sock_dgram {
 		errno.set(errno.esocktnosupport)
@@ -562,69 +542,9 @@ pub fn create(family int, @type int, protocol int) ?&InetSocket {
 		17
 	}
 	net_lock.acquire()
-	handle := C.vinix_socket_new_family(family, socktype, actual_protocol)
+	handle := C.vinix_socket_new_family(socktype, actual_protocol, family)
 	net_lock.release()
-	return new_with_handle(handle, family, socktype, actual_protocol)
-}
-
-fn address(family int, _addr voidptr, addrlen u32) ?Endpoint {
-	if _addr == unsafe { nil } {
-		errno.set(errno.efault)
-		return none
-	}
-	if addrlen < 2 {
-		errno.set(errno.einval)
-		return none
-	}
-	actual := unsafe { *(&u16(_addr)) }
-	if int(actual) != family {
-		errno.set(errno.eafnosupport)
-		return none
-	}
-	mut result := Endpoint{}
-	result.ip.family = u32(family)
-	if family == sock_pub.af_inet6 {
-		if addrlen < 24 {
-			errno.set(errno.einval)
-			return none
-		}
-		addr := unsafe { &SockaddrIn6(_addr) }
-		result.port = addr.sin6_port
-		result.ip.bytes = addr.sin6_addr
-		if addrlen >= sizeof(SockaddrIn6) {
-			result.ip.scope = addr.sin6_scope_id
-		}
-	} else {
-		if addrlen < sizeof(SockaddrIn) {
-			errno.set(errno.einval)
-			return none
-		}
-		addr := unsafe { &SockaddrIn(_addr) }
-		result.port = addr.sin_port
-		unsafe { C.memcpy(&result.ip.bytes[0], &addr.sin_addr, 4) }
-	}
-	refused := proc.pledge_check_inet_destination(result.port)
-	if refused != 0 {
-		errno.set(refused)
-		return none
-	}
-	return result
-}
-
-fn copy_endpoint(dest voidptr, length &u32, source Endpoint) {
-	if source.ip.family == u32(sock_pub.af_inet6) {
-		addr := SockaddrIn6{
-			sin6_family:   u16(sock_pub.af_inet6)
-			sin6_port:     source.port
-			sin6_addr:     source.ip.bytes
-			sin6_scope_id: source.ip.scope
-		}
-		sock_pub.copy_out_sockaddr(dest, length, unsafe { &addr }, sizeof(SockaddrIn6))
-	} else {
-		mut addr := SockaddrIn{ sin_family: u16(sock_pub.af_inet), sin_port: source.port }
-		unsafe { C.memcpy(&addr.sin_addr, &source.ip.bytes[0], 4) }
-		sock_pub.copy_out_sockaddr(dest, length, unsafe { &addr }, sizeof(SockaddrIn))
-	}
+	return new_with_handle(handle, socktype, actual_protocol, family)
 }
 
 // When a call that may wait `timeout_ns` gives up, or 0 for never.
@@ -756,10 +676,10 @@ fn (mut this InetSocket) write(handle voidptr, buf voidptr, _loc u64, count u64)
 
 pub fn (mut this InetSocket) sendto(handle voidptr, buf voidptr, count u64, _addr voidptr, addrlen u32) ?i64 {
 	open_handle := unsafe { &file.Handle(handle) }
-	mut addr := Endpoint{}
+	mut endpoint := unsafe { &C.vinix_net_endpoint(C.vinix_stack_alloc(sizeof(C.vinix_net_endpoint))) }
 	mut has_address := 0
 	if _addr != unsafe { nil } {
-		addr = address(this.family, _addr, addrlen)?
+		fill_endpoint(_addr, addrlen, this.family, mut endpoint)?
 		has_address = 1
 	}
 	this.l.acquire()
@@ -769,7 +689,7 @@ pub fn (mut this InetSocket) sendto(handle voidptr, buf voidptr, count u64, _add
 	deadline := deadline_after(this.send_timeout_ns)
 	for {
 		net_lock.acquire()
-		ret := C.vinix_socket_send_ip(this.handle, buf, count, unsafe { &addr.ip }, addr.port, has_address)
+		ret := C.vinix_socket_send_endpoint(this.handle, buf, count, endpoint, has_address)
 		refresh_registered_sockets()
 		net_lock.release()
 		if ret >= 0 {
@@ -793,17 +713,17 @@ pub fn (mut this InetSocket) recvfrom(handle voidptr, buf voidptr, count u64, _a
 	defer {
 		this.l.release()
 	}
+	mut endpoint := unsafe { &C.vinix_net_endpoint(C.vinix_stack_alloc(sizeof(C.vinix_net_endpoint))) }
 	deadline := deadline_after(this.recv_timeout_ns)
 	for {
-		mut source := Endpoint{}
 		net_lock.acquire()
-		ret := C.vinix_socket_recv_ip(this.handle, buf, count, unsafe { &source.ip }, unsafe { &source.port })
+		ret := C.vinix_socket_recv_endpoint(this.handle, buf, count, endpoint)
 		this.refresh_status()
 		net_lock.release()
 		if ret >= 0 {
 			proc.account_network_transfer(i64(ret), false)
 			if _addr != unsafe { nil } && addrlen != unsafe { nil } {
-				copy_endpoint(_addr, addrlen, source)
+				copy_endpoint_out(endpoint, _addr, addrlen)
 			}
 			return i64(ret)
 		}
@@ -819,9 +739,10 @@ pub fn (mut this InetSocket) recvfrom(handle voidptr, buf voidptr, count u64, _a
 }
 
 fn (mut this InetSocket) bind(_handle voidptr, _addr voidptr, addrlen u32) ? {
-	addr := address(this.family, _addr, addrlen)?
+	mut endpoint := unsafe { &C.vinix_net_endpoint(C.vinix_stack_alloc(sizeof(C.vinix_net_endpoint))) }
+	fill_endpoint(_addr, addrlen, this.family, mut endpoint)?
 	net_lock.acquire()
-	ret := C.vinix_socket_bind_ip(this.handle, unsafe { &addr.ip }, addr.port)
+	ret := C.vinix_socket_bind_endpoint(this.handle, endpoint)
 	this.refresh_status()
 	net_lock.release()
 	if ret != 0 {
@@ -831,14 +752,15 @@ fn (mut this InetSocket) bind(_handle voidptr, _addr voidptr, addrlen u32) ? {
 }
 
 fn (mut this InetSocket) connect(handle voidptr, _addr voidptr, addrlen u32) ? {
-	addr := address(this.family, _addr, addrlen)?
+	mut endpoint := unsafe { &C.vinix_net_endpoint(C.vinix_stack_alloc(sizeof(C.vinix_net_endpoint))) }
+	fill_endpoint(_addr, addrlen, this.family, mut endpoint)?
 	open_handle := unsafe { &file.Handle(handle) }
 	this.l.acquire()
 	defer {
 		this.l.release()
 	}
 	net_lock.acquire()
-	ret := C.vinix_socket_connect_ip(this.handle, unsafe { &addr.ip }, addr.port)
+	ret := C.vinix_socket_connect_endpoint(this.handle, endpoint)
 	refresh_registered_sockets()
 	net_lock.release()
 	if ret == 0 {
@@ -908,7 +830,7 @@ fn (mut this InetSocket) accept(handle voidptr) ?&resource.Resource {
 		if child_handle != unsafe { nil } {
 			// Hand out the registered socket itself. Converting *child copied
 			// it, and the copy's status never saw the traffic that arrived.
-			mut child := new_with_handle(child_handle, this.family, sock_pub.sock_stream, ipproto_tcp)?
+			mut child := new_with_handle(child_handle, sock_pub.sock_stream, ipproto_tcp, this.family)?
 			child.recv_timeout_ns = this.recv_timeout_ns
 			child.send_timeout_ns = this.send_timeout_ns
 			child.linger_on = this.linger_on
@@ -931,19 +853,15 @@ fn socket_name(mut this InetSocket, peer bool, _addr voidptr, addrlen &u32) ? {
 		errno.set(errno.efault)
 		return none
 	}
-	mut addr := Endpoint{}
+	mut endpoint := unsafe { &C.vinix_net_endpoint(C.vinix_stack_alloc(sizeof(C.vinix_net_endpoint))) }
 	net_lock.acquire()
-	ret := if peer {
-		C.vinix_socket_peer_ip(this.handle, unsafe { &addr.ip }, unsafe { &addr.port })
-	} else {
-		C.vinix_socket_local_ip(this.handle, unsafe { &addr.ip }, unsafe { &addr.port })
-	}
+	ret := C.vinix_socket_name_endpoint(this.handle, endpoint, if peer { 1 } else { 0 })
 	net_lock.release()
 	if ret != 0 {
 		set_error(ret)
 		return none
 	}
-	copy_endpoint(_addr, addrlen, addr)
+	copy_endpoint_out(endpoint, _addr, addrlen)
 }
 
 fn (mut this InetSocket) peername(_handle voidptr, _addr voidptr, addrlen &u32) ? {
@@ -1037,7 +955,7 @@ fn (mut this InetSocket) getsockopt(_handle voidptr, level int, optname int) ?in
 	}
 	mut value := i32(0)
 	net_lock.acquire()
-	ret := C.vinix_socket_get_option(this.handle, level, optname, unsafe { &value })
+	ret := C.vinix_socket_get_option(this.handle, level, optname, &value)
 	net_lock.release()
 	if ret != 0 {
 		set_error(ret)

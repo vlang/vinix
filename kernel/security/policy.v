@@ -11,6 +11,7 @@ pub const filesystem_unmount = 'filesystem/unmount'
 pub const system_hostname_set = 'system/hostname/set'
 pub const system_domainname_set = 'system/domainname/set'
 pub const system_reboot = 'system/reboot'
+pub const system_clock_set = 'system/clock/set'
 pub const system_securelevel_set = 'system/securelevel/set'
 
 // A selector has to be explicitly listed here. Unknown operations fail closed.
@@ -22,6 +23,9 @@ pub fn permitted(selector string) bool {
 		filesystem_mount, filesystem_unmount, system_hostname_set, system_domainname_set,
 		system_securelevel_set {
 			proc.cap_sys_admin
+		}
+		system_clock_set {
+			proc.cap_sys_time
 		}
 		system_reboot {
 			proc.cap_sys_boot

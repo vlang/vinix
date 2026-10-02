@@ -31,19 +31,29 @@ pub mut:
 	can_mmap bool
 
 	backing &resource.Resource = unsafe { nil }
+	// Snapshot the backing capability, never the caller's rdev or mode. In
+	// particular a basename alias may describe a block disk as a character
+	// node, which must not turn disk writes into unprotected stream writes.
+	block_extent resource.BlockIdentity
 	// The node's own interface value for this, handed to every open that the
 	// backing device does not decide. Making one per open left it behind.
 	boxed &resource.Resource = unsafe { nil }
 }
 
+fn (this &MknodDeviceResource) block_identity() resource.BlockIdentity { return this.block_extent }
+
 // A device that decides what an open returns, as /dev/tty and /dev/ptmx do,
 // must decide it for the container's node too.
-fn (mut this MknodDeviceResource) open(flags int) ?&resource.Resource {
+fn (mut this MknodDeviceResource) open_owned(flags int) ?&resource.Resource {
 	mut backing := this.backing
-	backing_opens := backing is resource.OpenableResource
-	if backing_opens {
-		return resource.open_resource(mut backing, flags)
+	openable := backing is resource.OwnedOpenableResource || backing is resource.OpenableResource
+	if openable {
+		opened := resource.open_resource(mut backing, flags) or { return none }
+		mut result := opened.resource
+		if !opened.owned { katomic.inc(mut &result.refcount) }
+		return result
 	}
+	katomic.inc(mut &this.refcount)
 	return this.boxed
 }
 
@@ -181,9 +191,11 @@ fn make_device_node(mut parent VFSNode, name string, mode u32, rdev u64) ?&VFSNo
 
 fn install_device_node(mut parent VFSNode, name string, mode u32, rdev u64, backing &resource.Resource) ?&VFSNode {
 	mut node := create_node(parent.filesystem, parent, name, false)
+	mut actual_backing := unsafe { backing }
 	mut res := &MknodDeviceResource{
 		refcount: 1
 		backing:  unsafe { backing }
+		block_extent: resource.block_identity(mut actual_backing)
 	}
 	res.stat.mode = mode
 	res.stat.rdev = rdev

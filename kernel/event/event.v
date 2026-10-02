@@ -149,7 +149,7 @@ fn next_event_below(events []&eventstruct.Event, bound u64) int {
 }
 
 fn await_internal(mut events []&eventstruct.Event, block bool, watch_generation bool,
-	watched_index u64, generation u64, generations []u64) ?u64 {
+	watched_index u64, generation u64, generations []u64, explicit_mask bool, interrupt_mask u64) ?u64 {
 	mut t := proc.current_thread()
 
 	interrupt_toggle(false)
@@ -190,7 +190,14 @@ fn await_internal(mut events []&eventstruct.Event, block bool, watch_generation 
 	// sent while the thread was not asleep had nothing to wake, and the next
 	// wait slept through it for as long as its timeout, or for good: none of
 	// postgres's processes saw the SIGTERM of a shutdown.
-	if t.pending_signals & ~t.masked_signals != 0 {
+	// A signal delivered while this thread was running leaves a wake marker,
+	// even after its handler consumed the signal. Retire that old marker before
+	// sampling pending signals. A sender racing before this clear is observed
+	// in pending_signals; one racing after the sample republishes the marker
+	// checked after dequeue. Clearing it later would lose that second wake.
+	katomic.store(mut &t.enqueued_by_signal, false)
+	mask := if explicit_mask { interrupt_mask } else { ~t.masked_signals }
+	if katomic.load(&t.pending_signals) & mask != 0 {
 		unlock_events(mut events)
 		return none
 	}
@@ -234,7 +241,13 @@ fn await_internal(mut events []&eventstruct.Event, block bool, watch_generation 
 	// Child exit raises an event and SIGCHLD together. If both wake this wait,
 	// retain the consumed event; otherwise waitpid loses the zombie forever.
 	if (interrupted_by_signal || katomic.load(&t.must_exit)) && t.which_event == u64(-1) {
-		return none
+		if katomic.load(&t.must_exit) || katomic.load(&t.pending_signals) & mask != 0 {
+			return none
+		}
+		// A sender can publish its wake after the target already consumed the
+		// signal. With no applicable signal left, this is a spurious wake;
+		// await_valid retries it rather than manufacturing a user EINTR.
+		return u64(-1)
 	}
 
 	return t.which_event
@@ -245,10 +258,10 @@ fn await_internal(mut events []&eventstruct.Event, block bool, watch_generation 
 // this wait's list. Handing such an index back had callers index their own
 // lists out of range, which panicked the kernel.
 fn await_valid(mut events []&eventstruct.Event, block bool, watch_generation bool,
-	watched_index u64, generation u64, generations []u64) ?u64 {
+	watched_index u64, generation u64, generations []u64, explicit_mask bool, interrupt_mask u64) ?u64 {
 	for {
 		which := await_internal(mut events, block, watch_generation, watched_index,
-			generation, generations)?
+			generation, generations, explicit_mask, interrupt_mask)?
 		if which < u64(events.len) {
 			return which
 		}
@@ -257,17 +270,31 @@ fn await_valid(mut events []&eventstruct.Event, block bool, watch_generation boo
 }
 
 pub fn await(mut events []&eventstruct.Event, block bool) ?u64 {
-	return await_valid(mut events, block, false, 0, 0, []u64{})
+	return await_valid(mut events, block, false, 0, 0, []u64{}, false, 0)
+}
+
+// Signal acceptance waits must also wake for their requested blocked signals.
+// Keep the same mask for both the pre-sleep check and wake classification.
+pub fn await_masked(mut events []&eventstruct.Event, block bool, interrupt_mask u64) ?u64 {
+	return await_valid(mut events, block, false, 0, 0, []u64{}, true, interrupt_mask)
 }
 
 pub fn await_from_generation(mut events []&eventstruct.Event, block bool, watched_index u64,
 	generation u64) ?u64 {
-	return await_valid(mut events, block, true, watched_index, generation, []u64{})
+	return await_valid(mut events, block, true, watched_index, generation, []u64{}, false, 0)
 }
 
 pub fn await_changes(mut events []&eventstruct.Event, generations []u64, block bool) ?u64 {
 	if generations.len != events.len { return none }
-	return await_valid(mut events, block, false, 0, 0, generations)
+	return await_valid(mut events, block, false, 0, 0, generations, false, 0)
+}
+
+// Job-control waits retain ordinary pending signals while stopped without
+// changing the userspace signal mask. must_exit always interrupts a wait.
+pub fn await_one_masked(mut e eventstruct.Event, interrupt_mask u64) ?u64 {
+	mut storage := [&e]!
+	mut events := unsafe { stack_list(&storage[0], 1) }
+	return await_valid(mut events, true, false, 0, 0, []u64{}, true, interrupt_mask)
 }
 
 pub fn generation(mut e eventstruct.Event) u64 {

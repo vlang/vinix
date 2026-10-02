@@ -311,7 +311,7 @@ pub fn interrupt_return(context &cpulocal.GPRState) {
 	if t == unsafe { nil } || context.pstate & 0xf != 0 { return }
 	pending := katomic.load(&t.pending_signals)
 	deliverable := ~t.masked_signals | unblockable_mask()
-	if !katomic.load(&t.must_exit) && pending & deliverable == 0 { return }
+	if !katomic.load(&t.must_exit) && !owes_job_stop(t) && pending & deliverable == 0 { return }
 	t.async_context = *context
 	mut frame := unsafe { context }
 	frame.pc = u64(voidptr(async_signal_entry))
@@ -329,6 +329,7 @@ fn async_signal_entry() {
 	mut t := proc.current_thread()
 	mut context := t.async_context
 	exit_if_told_to()
+	job_boundary()
 	// The scheduler restored this thread's SIMD state before redirecting its
 	// frame. Dispatch uses the existing fpsimd signal-frame save/restore path;
 	// a no-op dispatch also leaves the live SIMD registers intact.
@@ -353,6 +354,7 @@ pub fn dispatch_a_signal(context &cpulocal.GPRState) {
 // dispatches fatal dispositions for that ABI. Custom native handlers stay at
 // syscall boundaries. Linux handlers use the complete fpsimd frame above.
 pub fn dispatch_fatal_signal(_ &cpulocal.GPRState) {
+	job_boundary()
 	mut t := proc.current_thread()
 	if unsafe { t == nil } {
 		return
@@ -363,13 +365,17 @@ pub fn dispatch_fatal_signal(_ &cpulocal.GPRState) {
 	}
 	for i := u8(0); i < 64; i++ {
 		bit := u64(1) << i
-		if pending & bit == 0 || t.masked_signals & bit != 0 {
+		if pending & bit == 0 || (int(i) + 1 != sigstop && t.masked_signals & bit != 0) {
 			continue
 		}
 		signum := int(i) + 1
-		if t.sigactions[signum].sa_sigaction == sig_dfl && is_stop_signal(signum) {
-			katomic.btr(mut &t.pending_signals, i)
-			stop_for_signal(signum)
+		if signum == sigstop || (stop_signal(signum) && t.sigactions[signum].sa_sigaction == sig_dfl) {
+			mut process := t.process
+			process.job_lock.acquire()
+			selected := katomic.btr(mut &t.pending_signals, i)
+			if selected { t.job_delivered_stop_generation = t.job_stop_generation }
+			process.job_lock.release()
+			if selected { request_group_stop(mut t, signum) }
 			return
 		}
 		if t.sigactions[signum].sa_sigaction != sig_dfl || has_default_ignore_action(signum)
@@ -391,10 +397,10 @@ const linux_sa_restart = 0x10000000
 // next takes the rewind back if its handler was installed without SA_RESTART.
 pub fn prepare_syscall_restart(context &cpulocal.GPRState) {
 	mut ctx := unsafe { context }
-	if ctx.x0 != u64(-i64(proc.interrupted_errno)) {
-		return
-	}
 	mut t := proc.current_thread()
+	job_ipc := ctx.x0 == u64(-i64(errno.eintr)) && (ctx.x8 == 188 || ctx.x8 == 189)
+		&& job_wake_restarts_syscall(t)
+	if ctx.x0 != u64(-i64(proc.interrupted_errno)) && !job_ipc { return }
 	ctx.x0 = t.syscall_x0
 	ctx.pc -= 4
 	t.restarting_syscall = true
@@ -404,26 +410,11 @@ pub fn prepare_syscall_restart(context &cpulocal.GPRState) {
 // user mode depends on both: translated memory accesses deliberately fault in
 // the host and its SIGSEGV handler turns that host context into a guest fault.
 fn dispatch_a_signal_with_fault(context &cpulocal.GPRState, synchronous bool, fault_address u64, fault_esr u64) {
+	job_boundary()
 	mut t := unsafe { proc.current_thread() }
 	restarting := t.restarting_syscall
 	t.restarting_syscall = false
-
-	mut which := -1
-
-	for i := u8(0); i < 64; i++ {
-		signum := int(i) + 1
-		// SIGKILL and SIGSTOP can never be blocked, whatever the mask says. A
-		// wait syscall that installed a full temporary mask must not be able to
-		// keep the process alive against kill -9.
-		unblockable := signum == sigkill || signum == sigstop
-		if !unblockable && t.masked_signals & (u64(1) << i) != 0 {
-			continue
-		}
-		if katomic.btr(mut &t.pending_signals, i) == true {
-			which = signum
-			break
-		}
-	}
+	which := take_pending_signal(mut t)
 
 	if which == -1 {
 		return
@@ -434,15 +425,13 @@ fn dispatch_a_signal_with_fault(context &cpulocal.GPRState, synchronous bool, fa
 	sigaction := t.sigactions[which]
 	handler := sigaction.sa_sigaction
 
-	// SIG_IGN (1): ignore the signal
-	if handler == sig_ign {
+	if which == sigstop || (handler == sig_dfl && stop_signal(which)) {
+		request_group_stop(mut t, which)
 		return
 	}
-	// Default stop dispositions park every sibling until SIGCONT arrives.
+	if handler == sig_ign { return }
 	if handler == sig_dfl {
-		if is_stop_signal(which) {
-			stop_for_signal(which)
-		} else if !has_default_ignore_action(which) && which != sigcont {
+		if !has_default_ignore_action(which) && which != sigcont {
 			exit_with_fatal_signal(u8(which))
 		}
 		return
@@ -1240,8 +1229,9 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 		// freed below.
 		proc.lock_table()
 		mut old_pagemap := curr_process.pagemap
+		proc.preserve_peak_rss(curr_process, old_pagemap)
 		curr_process.pagemap = new_pagemap
-		curr_process.dumpable = curr_process.uid == curr_process.euid && curr_process.gid == curr_process.egid
+		proc.dumpability_after_exec(mut curr_process)
 		proc.unlock_table()
 
 		// The copies fork made are replaced, not kept alongside.
@@ -1272,6 +1262,12 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 		gpu_exec_trace(trace_gpu, 'switching CPU to kernel page map')
 		kernel_pagemap.switch_to()
 		gpu_exec_trace(trace_gpu, 'switched CPU to kernel page map')
+		// Exec retains the calling task's accounting even though Vinix builds
+		// a replacement Thread. Finish its old-process CPU turn before detach.
+		proc.charge_cpu_time(mut t, proc.cpu_time_now_ns())
+		inherited_usage := t.usage
+		inherited_user_ns := t.cpu_user_ns
+		inherited_system_ns := t.cpu_system_ns
 		t.process = kernel_process
 		gpu_exec_trace(trace_gpu, 'detached execve thread from old process')
 
@@ -1326,6 +1322,10 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 			C.kprintf(c'exec[gpu]: replacement thread built pc=0x%llx sp=0x%llx tid=%lld\n',
 				u64(new_thread.gpr_state.pc), u64(new_thread.gpr_state.sp), i64(new_thread.tid))
 		}
+		new_thread.usage = inherited_usage
+		new_thread.cpu_user_ns = inherited_user_ns
+		new_thread.cpu_system_ns = inherited_system_ns
+		new_thread.cpu_time_ns = inherited_user_ns + inherited_system_ns
 		proc.set_thread_sched_params(new_thread.tid, inherited_sched)
 		gpu_exec_trace(trace_gpu, 'inherited scheduler parameters')
 		// exec keeps blocked and ignored signals, as the x86 handoff does.

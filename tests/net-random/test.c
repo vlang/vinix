@@ -111,6 +111,26 @@ static void test_isn(void)
 	printf("isn: %d of 1000 neighbouring ports within 2^24\n", close);
 }
 
+static void test_isn6(void)
+{
+    uint32_t local[4] = {0x01000020, 0, 0, 1}, remote[4] = {0x01000020, 0, 0, 2};
+    uint32_t original = vinix_tcp_isn6_at(0, local, 50000, remote, 80);
+    check(vinix_tcp_isn6_at(4000000, local, 50000, remote, 80) - original == 1000,
+          "isn6: clock");
+    for (int word = 0; word < 4; ++word) {
+        local[word] ^= 0x00008000;
+        check(vinix_tcp_isn6_at(0, local, 50000, remote, 80) != original,
+              "isn6: local address word omitted");
+        local[word] ^= 0x00008000;
+        remote[word] ^= 0x00008000;
+        check(vinix_tcp_isn6_at(0, local, 50000, remote, 80) != original,
+              "isn6: remote address word omitted");
+        remote[word] ^= 0x00008000;
+    }
+    check(vinix_tcp_isn6_at(0, local, 50001, remote, 80) != original, "isn6: local port");
+    check(vinix_tcp_isn6_at(0, local, 50000, remote, 81) != original, "isn6: remote port");
+}
+
 static bool taken[65536];
 
 static int port_taken(uint16_t port, void *context)
@@ -193,6 +213,7 @@ int main(void)
 	}
 	check(first6 != vinix_tcp_isn_bytes(local6, 50000, remote6, 443, 4),
 	      "isn: IPv4 and IPv6 tuples not separated");
+	test_isn6();
 	test_ports();
 	test_uniform();
 	test_pooling();

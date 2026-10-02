@@ -53,7 +53,7 @@ pub fn syscall_pidfd_send_signal(_ voidptr, fdnum i32, signal i32, info u64, fla
 	// these locks: final Resource release may itself take the process table.
 	mut notify := &proc.Process(unsafe { nil })
 	defer {
-		if notify != unsafe { nil } { notify_parent(notify); proc.unpin_process(notify) }
+		if notify != unsafe { nil } { notify_signal_parent(notify); proc.unpin_process(notify) }
 	}
 	posixtimer.lock_signal_info()
 	proc.lock_table()

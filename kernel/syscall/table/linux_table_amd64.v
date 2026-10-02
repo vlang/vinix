@@ -193,59 +193,6 @@ fn syscall_linux_getdents(gpr_state voidptr, fdnum int, dirp u64, count u64) (u6
 	return linux_getdents(gpr_state, fdnum, dirp, count, true)
 }
 
-// As many of the directory's entries as fit in `count` bytes at `dirp`, as
-// struct linux_dirent64, or as struct linux_dirent when `legacy`. Both are
-// the inode, the offset and the record length first, and padded to 8 bytes;
-// the same length holds either. An entry that does not fit is left for the
-// next call, and EINVAL is the answer when it is the first, as on Linux.
-fn linux_getdents(gpr_state voidptr, fdnum int, dirp u64, count u64, legacy bool) (u64, u64) {
-	// One synchronous scratch record per syscall, independent of directory size.
-	mut dirent := unsafe { &stat.Dirent(C.__builtin_alloca(sizeof(stat.Dirent))) }
-	mut offset := u64(0)
-	for {
-		unsafe { *dirent = stat.Dirent{} }
-		ret, err := fs.syscall_readdir(gpr_state, fdnum, mut dirent)
-		if err != 0 {
-			return if offset != 0 { offset, u64(0) } else { ret, err }
-		}
-		if ret == errno.err {
-			break
-		}
-		mut name_len := u64(0)
-		for name_len < 1024 && dirent.name[name_len] != 0 {
-			name_len++
-		}
-		reclen := (u64(20) + name_len + 7) & ~u64(7)
-		if offset + reclen > count {
-			fs.readdir_unread(fdnum)
-			if offset == 0 {
-				return errno.err, errno.einval
-			}
-			break
-		}
-		mut record := []u8{len: int(reclen)} @[freed]
-		unsafe {
-			*&u64(&record[0]) = dirent.ino
-			*&u64(&record[8]) = dirent.off
-			*&u16(&record[16]) = u16(reclen)
-			if legacy {
-				C.memcpy(voidptr(&record[18]), &dirent.name[0], name_len + 1)
-				record[reclen - 1] = dirent.@type
-			} else {
-				record[18] = dirent.@type
-				C.memcpy(voidptr(&record[19]), &dirent.name[0], name_len + 1)
-			}
-		}
-		if !usercopy.copy_to_user(dirp + offset, unsafe { voidptr(&record[0]) }, reclen) {
-			unsafe { record.free() }
-			return errno.err, errno.efault
-		}
-		unsafe { record.free() }
-		offset += reclen
-	}
-	return offset, 0
-}
-
 // ── the calls x86-64 kept from before the *at() family ─────────────────────
 
 fn syscall_linux_rename(gpr_state voidptr, oldpath charptr, newpath charptr) (u64, u64) {
@@ -530,19 +477,15 @@ pub fn init_syscall_table() {
 	syscall_table[65] = voidptr(sysvsem.syscall_semop) // semop
 	syscall_table[66] = voidptr(sysvsem.syscall_semctl) // semctl
 	syscall_table[220] = voidptr(sysvsem.syscall_semtimedop) // semtimedop
-	syscall_table[68] = voidptr(sysvmsg.syscall_msgget)
-	syscall_table[69] = voidptr(sysvmsg.syscall_msgsnd)
-	syscall_table[70] = voidptr(sysvmsg.syscall_msgrcv)
-	syscall_table[71] = voidptr(sysvmsg.syscall_msgctl)
-	syscall_table[149] = voidptr(syscall_linux_mlock) // mlock
-	syscall_table[150] = voidptr(syscall_linux_mlock) // munlock
-	syscall_table[151] = voidptr(syscall_linux_mlockall) // mlockall
-	syscall_table[152] = voidptr(syscall_linux_munlockall) // munlockall
+	syscall_table[149] = voidptr(mmap.syscall_mlock) // mlock
+	syscall_table[150] = voidptr(mmap.syscall_munlock) // munlock
+	syscall_table[151] = voidptr(mmap.syscall_mlockall) // mlockall
+	syscall_table[152] = voidptr(mmap.syscall_munlockall) // munlockall
 	syscall_table[237] = voidptr(numa.syscall_mbind) // mbind
 	syscall_table[238] = voidptr(numa.syscall_set_mempolicy) // set_mempolicy
 	syscall_table[239] = voidptr(numa.syscall_get_mempolicy) // get_mempolicy
 	syscall_table[324] = voidptr(syscall_linux_membarrier) // membarrier
-	syscall_table[325] = voidptr(syscall_linux_mlock2) // mlock2
+	syscall_table[325] = voidptr(mmap.syscall_mlock2) // mlock2
 
 	// Signals
 	syscall_table[13] = voidptr(userland.syscall_rt_sigaction) // rt_sigaction
@@ -680,4 +623,5 @@ pub fn init_syscall_table() {
 	syscall_table[321] = voidptr(syscall_linux_bpf) // bpf
 	syscall_table[317] = voidptr(syscall_linux_seccomp) // seccomp
 	syscall_table[seccomp_verdict_nr] = voidptr(syscall_seccomp_verdict)
+	init_sysv_message_syscalls()
 }

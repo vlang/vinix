@@ -75,6 +75,12 @@ pub mut:
 	refcount      int
 	loc           i64
 	flags         int
+	// Shared by dup/fork with the file position, under l. Random advice
+	// suppresses automatic prefetch; explicit WILLNEED remains available.
+	read_advice   int
+	read_next     u64
+	read_streak   u32
+	read_ahead_end u64
 	dirlist_valid bool
 	dirlist       []stat.Dirent
 	dirlist_index u64
@@ -406,6 +412,12 @@ fn poll_user_fds(pagemap &memory.Pagemap, user_fds u64, mut pollfds []PollFD, nf
 	return ret, 0
 }
 
+// Streams synchronize their own queues and may sleep without the shared offset lock.
+fn stream_mode(mode u32) bool {
+	return stat.ischr(mode) || stat.isifo(mode) || stat.issock(mode)
+		|| mode & stat.ifmt == stat.ifpipe
+}
+
 pub fn (mut this Handle) mac_check(access u32) ? {
 	if !proc.mac_trusted() && this.mac_device {
 		if this.mac_block_device || !proc.mac_allows(proc.mac_current_domain(), proc.mac_device_type, access) {
@@ -418,14 +430,43 @@ pub fn (mut this Handle) mac_check(access u32) ? {
 
 pub fn (mut this Handle) read(buf voidptr, count u64) ?i64 {
 	this.mac_check(proc.mac_read)?
+	if stream_mode(this.resource.stat.mode) {
+		return this.resource.read(voidptr(this), buf, 0, count)
+	}
 	this.l.acquire()
 	defer {
 		this.l.release()
 	}
-	ret := this.resource.read(voidptr(this), buf, u64(this.loc), count) or { return none }
+	start := u64(this.loc)
+	ret := this.resource.read(voidptr(this), buf, start, count) or { return none }
 	if stat.isreg(this.resource.stat.mode) { proc.account_file_transfer(ret, false) }
 	this.loc += ret
+	if ret > 0 && stat.isreg(this.resource.stat.mode) {
+		this.sequential_read(start, u64(ret))
+	}
 	return ret
+}
+
+// The successful read has released the resource's locks; the open description
+// remains pinned and locked. Hints cannot change its return value or errno.
+fn (mut this Handle) sequential_read(start u64, count u64) {
+	if this.read_advice == 1 { return }
+	if start != this.read_next {
+		this.read_streak = 0
+		this.read_ahead_end = 0
+	}
+	this.read_next = start + count
+	if this.read_streak < 2 { this.read_streak++ }
+	if this.read_streak < 2 || this.read_next < this.read_ahead_end { return }
+	size := if this.resource.stat.size > 0 { u64(this.resource.stat.size) } else { u64(0) }
+	if this.read_next >= size { return }
+	window := if this.read_advice == 2 { u64(256 * 1024) } else { u64(128 * 1024) }
+	length := if size - this.read_next < window { size - this.read_next } else { window }
+	old_errno := errno.get()
+	mut res := this.resource
+	resource.advise_resource(mut res, voidptr(this), this.read_next, length, 3) or {}
+	errno.set(old_errno)
+	this.read_ahead_end = this.read_next + length
 }
 
 // The largest piece of a read or write that goes through one kernel buffer.
@@ -457,9 +498,9 @@ pub fn (mut this Handle) read_to_user(address u64, count u64) ?i64 {
 		errno.set(errno.efault)
 		return none
 	}
-	// A socket or a pipe gives what it has, once: asking again would wait for
-	// more, and would run two messages together.
-	once := stat.issock(mode) || stat.isifo(mode)
+	// Streams return one available piece. Another read may wait for more
+	// input or combine separate messages.
+	once := stream_mode(mode)
 	limit := if once { user_io_message_max } else { user_io_chunk }
 	size := if count < limit { count } else { limit }
 	// Own this temporary explicitly: the compiler can move a fixed array
@@ -472,20 +513,14 @@ pub fn (mut this Handle) read_to_user(address u64, count u64) ?i64 {
 	defer {
 		unsafe { free(buffer) }
 	}
-	// A file or a disk is read to the end of what was asked for. A device
-	// gives its first piece as the caller's flags say, and more only if it has
-	// more without waiting: /dev/zero always has, a terminal seldom.
-	waits := stat.isreg(mode) || stat.isblk(mode)
+	// A file or disk can be read in chunks. A stream supplies one piece;
+	// asking again could block after already consuming the caller's data.
 	mut done := u64(0)
 	for done < count {
 		chunk := if count - done < size { count - done } else { size }
-		read := if done == 0 || waits {
-			this.read(buffer, chunk) or {
-				if done != 0 { return i64(done) }
-				return none
-			}
-		} else {
-			this.read_without_waiting(buffer, chunk) or { return i64(done) }
+		read := this.read(buffer, chunk) or {
+			if done != 0 { return i64(done) }
+			return none
 		}
 		if read <= 0 {
 			return i64(done)
@@ -499,30 +534,6 @@ pub fn (mut this Handle) read_to_user(address u64, count u64) ?i64 {
 		if once || u64(read) < chunk { break }
 	}
 	return i64(done)
-}
-
-// read(), as if the descriptor were O_NONBLOCK for this one call. The flag is
-// set and cleared under the lock every read of this open file takes.
-fn (mut this Handle) read_without_waiting(buf voidptr, count u64) ?i64 {
-	this.mac_check(proc.mac_read)?
-	this.l.acquire()
-	defer {
-		this.l.release()
-	}
-	waited := this.flags & resource.o_nonblock == 0
-	this.flags |= resource.o_nonblock
-	ret := this.resource.read(voidptr(this), buf, u64(this.loc), count) or {
-		if waited {
-			this.flags &= ~resource.o_nonblock
-		}
-		return none
-	}
-	if stat.isreg(this.resource.stat.mode) { proc.account_file_transfer(ret, false) }
-	if waited {
-		this.flags &= ~resource.o_nonblock
-	}
-	this.loc += ret
-	return ret
 }
 
 fn limited_write_count(res &resource.Resource, location u64, count u64) ?u64 {
@@ -542,6 +553,11 @@ fn limited_write_count(res &resource.Resource, location u64, count u64) ?u64 {
 
 pub fn (mut this Handle) write(buf voidptr, count u64) ?i64 {
 	this.mac_check(proc.mac_write)?
+	block_token := security.begin_user_device_write(mut this.resource)?
+	defer { security.end_user_device_write(block_token) }
+	if stream_mode(this.resource.stat.mode) {
+		return this.resource.write(voidptr(this), buf, 0, count)
+	}
 	this.l.acquire()
 	defer {
 		this.l.release()
@@ -805,7 +821,19 @@ pub fn open_fdnums(process &proc.Process) []int {
 
 pub fn fd_create_from_resource(mut res resource.Resource, flags int) ?&FD {
 	katomic.inc(mut &res.refcount)
+	return fd_create_adopting_resource(mut res, flags)
+}
 
+// Openable endpoints may return a reference retained under their lookup lock.
+// Adopt it exactly once. The constructors below do not have a fallible step;
+// a later descriptor-table failure drops it through FD.unref with its Handle.
+pub fn fd_create_from_opened(opened resource.OpenedResource, flags int) ?&FD {
+	mut res := opened.resource
+	if !opened.owned { katomic.inc(mut &res.refcount) }
+	return fd_create_adopting_resource(mut res, flags)
+}
+
+fn fd_create_adopting_resource(mut res resource.Resource, flags int) ?&FD {
 	mut new_handle := &Handle{}
 	new_handle.resource = unsafe { res }
 	new_handle.refcount = 1
@@ -1061,6 +1089,7 @@ fn pread(fdnum int, buf voidptr, count u64, offset i64, to_user bool) (u64, u64)
 			return errno.err, errno.get()
 		}
 		if stat.isreg(mode) { proc.account_file_transfer(read, false) }
+		if read > 0 && stat.isreg(mode) { handle.sequential_read(u64(offset), u64(read)) }
 		handle.l.release()
 		return u64(read), 0
 	}
@@ -1079,6 +1108,7 @@ fn pread(fdnum int, buf voidptr, count u64, offset i64, to_user bool) (u64, u64)
 			return errno.err, errno.get()
 		}
 		if stat.isreg(mode) { proc.account_file_transfer(read, false) }
+		if read > 0 && stat.isreg(mode) { handle.sequential_read(u64(offset) + done, u64(read)) }
 		handle.l.release()
 		if read <= 0 { break }
 		if !usercopy.copy_to_user(u64(buf) + done, buffer, u64(read)) {
@@ -1125,6 +1155,7 @@ pub fn syscall_pwrite(_ voidptr, fdnum int, buf voidptr, count u64, offset i64) 
 	if resource.is_protected(mut res) {
 		return errno.err, errno.eperm
 	}
+	if !security.user_device_write_allowed(mut res) { return errno.err, errno.get() }
 
 	allowed := limited_write_count(res, u64(offset), count) or {
 		return errno.err, errno.get()
@@ -1142,14 +1173,20 @@ pub fn syscall_pwrite(_ voidptr, fdnum int, buf voidptr, count u64, offset i64) 
 			if done != 0 { return done, 0 }
 			return errno.err, errno.efault
 		}
+		block_token := security.begin_user_device_write(mut res) or {
+			if done != 0 { return done, 0 }
+			return errno.err, errno.get()
+		}
 		handle.l.acquire()
 		written := res.write(voidptr(handle), buffer, u64(offset) + done, chunk) or {
 			handle.l.release()
+			security.end_user_device_write(block_token)
 			if done != 0 { return done, 0 }
 			return errno.err, errno.get()
 		}
 		if stat.isreg(mode) { proc.account_file_transfer(written, true) }
 		handle.l.release()
+		security.end_user_device_write(block_token)
 		if written <= 0 { break }
 		done += u64(written)
 		if u64(written) < chunk { break }
@@ -1225,6 +1262,13 @@ pub fn syscall_fadvise64(_ voidptr, fdnum int, offset i64, length i64, advice in
 	mode := res.stat.mode
 	if stat.isifo(mode) || stat.issock(mode) || mode & stat.ifmt == stat.ifpipe {
 		return errno.err, errno.espipe
+	}
+	if advice <= 2 {
+		handle.l.acquire()
+		handle.read_advice = advice
+		handle.read_streak = 0
+		handle.read_ahead_end = 0
+		handle.l.release()
 	}
 	resource.advise_resource(mut res, voidptr(handle), u64(offset), u64(length), advice) or {
 		return errno.err, errno.get()
@@ -1484,7 +1528,7 @@ pub fn syscall_mmap(_ voidptr, addr voidptr, length u64, prot_and_flags u64, fdn
 	if flags & mmap.map_anonymous == 0 && voidptr(resource_) == unsafe { nil } {
 		return errno.err, errno.ebadf
 	}
-	mut map_flags := flags & ~(mmap.map_no_write | mmap.map_no_exec)
+	mut map_flags := flags & ~mmap.map_internal_mask
 	if flags & mmap.map_anonymous == 0 {
 		if mount_policy_flags != unsafe { nil }
 			&& mount_policy_flags(&fd.handle.mount) & u64(0x8) != 0 {

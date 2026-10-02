@@ -132,21 +132,23 @@ lossless. Privileged software can alter the local log. Login/session attribution
 Linux's audit ABI, remote tamper-resistant collection and coverage of all
 security decisions remain separate work.
 
-## Initial x86 speculation controls
+## x86 speculation controls
 
-The kernel uses compiler and handwritten-dispatch retpolines, fences SWAPGS
-paths, and fills the return predictor before thread dispatch. Each CPU enables
-enhanced IBRS, STIBP, SSBD and supervisor BHI protection only when advertised.
-The BHI control also checks the supported CPUID subleaf and `BHI_NO` capability.
-Supported CPUs run IBPB before a thread is dispatched, including dispatch
-from idle. Applications cannot turn these controls off.
+The kernel uses external retpolines for compiler and handwritten dispatches,
+fences entry and return paths, and overwrites the return predictor on user
+entry and thread restore. Each CPU selects only advertised Intel or AMD
+controls: legacy or enhanced IBRS, IBPB, STIBP, SSBD, supervisor BHI and RRSBA
+protection, and supported late VERW buffer clearing. An actual thread switch
+marks IBPB pending until that CPU next returns to userspace; an ordinary
+syscall by the same thread does not request another flush. Applications
+cannot turn these controls off.
 
-[`tests/speculation-policy`](../tests/speculation-policy/README.md) checks
-feature selection and MSR gating. These controls do not establish that a CPU
-is free from speculative side channels. KPTI, software BHI sequences,
-CPU-specific return and sampling mitigations, legacy IBRS entry programming
-and ARM firmware policies
-remain unimplemented here. See [Intel's enumeration](https://www.intel.com/content/www/us/en/developer/articles/technical/software-security-guidance/technical-documentation/cpuid-enumeration-and-architectural-msrs.html)
+[`tests/cpu-mitigations`](../tests/cpu-mitigations/README.md) checks the active
+capability/MSR decisions, exact assembly, linked thunks and guest compatibility.
+See [the mitigation contract](x86-cpu-mitigations.md) for coverage and remaining
+scope. KPTI, model-specific return and sampling coverage, software BHI sequences,
+VMX/idle/NMI windows, lifecycle re-evaluation and physical hardware effects
+remain unverified or unimplemented. See [Intel's enumeration](https://www.intel.com/content/www/us/en/developer/articles/technical/software-security-guidance/technical-documentation/cpuid-enumeration-and-architectural-msrs.html)
 and [Linux's mitigation guidance](https://docs.kernel.org/admin-guide/hw-vuln/spectre.html)
 for the hardware distinctions.
 

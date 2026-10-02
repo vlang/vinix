@@ -21,7 +21,7 @@ fn inspection_allowed(caller &Process, target &Process, real_creds bool) bool {
 	if voidptr(caller) == voidptr(target) || inspection_capable(caller, target, real_creds) {
 		return true
 	}
-	if !target.dumpable || voidptr(caller.ns.user) != voidptr(target.ns.user) {
+	if dumpability(target) != 1 || voidptr(caller.ns.user) != voidptr(target.ns.user) {
 		return false
 	}
 	uid := if real_creds { caller.uid } else { caller.euid }

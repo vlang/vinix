@@ -5,6 +5,7 @@
 module pagecache
 
 import errno
+import memory
 import time
 
 struct Device {
@@ -171,6 +172,32 @@ fn test_failed_and_short_fills_are_not_published() {
 	assert d.reads == 3
 }
 
+// EXT2 publishes an inode header or pointer in a single aligned cache page.
+// A failed acquisition must precede every byte of the replacement.
+fn test_single_page_metadata_write_failure_publishes_no_partial_bytes() {
+	mut d := device(8192)
+	mut cache := Cache{capacity: 1}
+	defer { cache.release(voidptr(d), store) or { panic('release failed') } }
+	payload := [128]u8{init: 0x9a}
+	for short in [false, true] {
+		d.fail_read = !short
+		d.short_read = short
+		mut failed := false
+		cache.write(voidptr(d), load, store, unsafe { &payload[0] }, 128, 128, 8192) or { failed = true }
+		assert failed && cache.resident == 0
+		for i in 128 .. 256 { assert d.bytes[i] == u8(i % 251) }
+	}
+	d.fail_read = false; d.short_read = false
+	write_bytes(mut cache, d, 0, []u8{len: 4096, init: 0x71})
+	d.fail_write = true
+	mut failed := false
+	cache.write(voidptr(d), load, store, unsafe { &payload[0] }, 4096 + 128, 128, 8192) or { failed = true }
+	assert failed && cache.resident == 1 && resident_pages(cache)[0].index == 0
+	for i in 4096 + 128 .. 4096 + 256 { assert d.bytes[i] == u8(i % 251) }
+	d.fail_write = false
+	assert read_bytes(mut cache, d, 4096 + 128, 128) == d.bytes[4096 + 128 .. 4096 + 256]
+}
+
 fn test_failed_eviction_retains_dirty_victim_and_retry() {
 	mut d := device(8192)
 	mut cache := Cache{capacity: 1}
@@ -254,7 +281,7 @@ fn test_lru_and_bounded_prefetch() {
 	mut cache := Cache{capacity: 2}
 	defer { cache.release(voidptr(d), store) or { panic('release failed') } }
 	cache.prefetch(voidptr(d), load, store, 0, u64(d.bytes.len), u64(d.bytes.len))
-	assert cache.resident == 2 && d.reads == 2
+	assert cache.resident == 2 && d.reads == 1
 	read_bytes(mut cache, d, 0, 1)
 	read_bytes(mut cache, d, 8192, 1)
 	assert resident_pages(cache)[0].index == 0 && resident_pages(cache)[1].index == 2
@@ -264,6 +291,62 @@ fn test_lru_and_bounded_prefetch() {
 	cache.prefetch(voidptr(d), load, store, 12288, 4096, u64(d.bytes.len))
 	assert d.reads == reads && d.writes == 0
 	assert cache.resident == 2
+}
+
+fn test_clustered_prefetch_preserves_hits_and_device_tail() {
+	mut d := device(67 * 4096 + 137)
+	mut cache := Cache{capacity: 80}
+	defer { cache.release(voidptr(d), store) or { panic('release failed') } }
+	cache.prefetch(voidptr(d), load, store, 0, u64(d.bytes.len), u64(d.bytes.len))
+	assert d.reads == 3 && cache.resident == 68
+	assert read_bytes(mut cache, d, 0, d.bytes.len) == d.bytes
+	assert d.reads == 3
+	// An acknowledged dirty page inside the hint range is not overwritten by
+	// the backing disk; it divides missing pages into separate fill runs.
+	cache.discard(0, u64(d.bytes.len))
+	write_bytes(mut cache, d, 5 * 4096, []u8{len: 4096, init: 0xa7})
+	reads := d.reads
+	cache.prefetch(voidptr(d), load, store, 0, 10 * 4096, u64(d.bytes.len))
+	assert d.reads == reads + 2 && d.writes == 0
+	assert read_bytes(mut cache, d, 5 * 4096, 4096) == []u8{len: 4096, init: 0xa7}
+}
+
+fn test_clustered_prefetch_failure_publishes_no_partial_data() {
+	mut d := device(8 * 4096)
+	mut cache := Cache{capacity: 8}
+	defer { cache.release(voidptr(d), store) or { panic('release failed') } }
+	d.short_read = true
+	cache.prefetch(voidptr(d), load, store, 0, u64(d.bytes.len), u64(d.bytes.len))
+	assert cache.resident == 0 && cache.lru_first == unsafe { nil }
+	d.short_read = false
+	d.fail_read = true
+	cache.prefetch(voidptr(d), load, store, 0, u64(d.bytes.len), u64(d.bytes.len))
+	assert cache.resident == 0 && cache.dirty_pages == 0
+	d.fail_read = false
+	cache.prefetch(voidptr(d), load, store, 0, u64(d.bytes.len), u64(d.bytes.len))
+	assert cache.resident == 8
+	assert read_bytes(mut cache, d, 0, d.bytes.len) == d.bytes
+}
+
+fn test_clustered_prefetch_allocation_failures_keep_owned_prefix() {
+	for failure in 0 .. 4 {
+		mut d := device(8 * 4096)
+		mut cache := Cache{capacity: 8}
+		before := memory.live_pmm
+		memory.packed_left = match failure { 0 { 0 } 1 { 1 } 2 { 4 } else { -1 } }
+		memory.pmm_left = if failure == 3 { 2 } else { -1 }
+		cache.prefetch(voidptr(d), load, store, 0, u64(d.bytes.len), u64(d.bytes.len))
+		expected := match failure { 2 { 3 } 3 { 2 } else { 0 } }
+		assert cache.resident == expected
+		assert memory.live_pmm == before + expected
+		memory.packed_left = -1
+		memory.pmm_left = -1
+		cache.prefetch(voidptr(d), load, store, 0, u64(d.bytes.len), u64(d.bytes.len))
+		assert cache.resident == 8
+		assert read_bytes(mut cache, d, 0, d.bytes.len) == d.bytes
+		cache.release(voidptr(d), store) or { panic('release failed') }
+		assert memory.live_pmm == before
+	}
 }
 
 fn test_bounds_binding_zero_length_and_release_failure() {

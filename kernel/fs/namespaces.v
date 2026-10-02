@@ -54,7 +54,8 @@ fn namespace_kind_name(kind u64) string {
 // Built without the string an interpolated number leaves behind: the links
 // are made again on every lookup in the directory.
 fn namespace_link_text(ns &proc.Namespace) string {
-	mut text := lib.new_text(32)
+	mut text := unsafe { &lib.Text(C.__builtin_alloca(sizeof(lib.Text))) }
+	unsafe { *text = lib.new_text(32) }
 	text.add(namespace_kind_name(ns.kind))
 	text.add(':[')
 	text.add_unsigned(u64(ns.id))
@@ -116,19 +117,22 @@ fn (mut this NsFSResource) grow(_handle voidptr, _new_size u64) ? {
 	return none
 }
 
-fn (mut this NsFSResource) open(_flags int) ?&resource.Resource {
-	if this.ns.kind == proc.clone_newipc && !proc.try_get_namespace(mut this.ns) {
+// Called by the concrete VFS description factory even for O_PATH. dup/fork
+// retain the Handle, so one namespace pin belongs to each open description.
+fn (mut this NsFSResource) pin_description() ? {
+	mut ns := this.ns
+	if !proc.try_get_namespace(mut ns) {
 		errno.set(errno.enoent)
 		return none
 	}
-	// The namespace node owns one permanent interface box; each new handle
-	// owns an IPC namespace pin, while dup/fork retain that existing handle.
-	return unsafe { &VFSNode(this.ns.node) }.resource
 }
 
-fn (mut this NsFSResource) unref(_handle voidptr) ? {
+fn (mut this NsFSResource) unref(handle voidptr) ? {
 	katomic.dec(mut &this.refcount)
-	if this.ns.kind == proc.clone_newipc { release_namespace(mut this.ns) }
+	if handle != unsafe { nil } {
+		mut ns := this.ns
+		release_namespace(mut ns)
+	}
 }
 
 fn (mut this NsFSResource) link(_handle voidptr) ? {
@@ -173,16 +177,19 @@ fn refresh_ns_directory(mut dir VFSNode, pid int) {
 		name := names[i]
 		mut ns := unsafe { ns_ptr }
 		target := namespace_node(mut ns)
-		text := namespace_link_text(ns)
 		if name in dir.children {
 			mut existing := unsafe { dir.children[name] }
+			// A namespace node's kind/id and text are immutable. Keep the
+			// existing string while its identity is unchanged; rebuilding it
+			// promotes a temporary lib.Text on every repeated namespace open.
+			if voidptr(existing.magic_target) == voidptr(target) { continue }
 			existing.magic_target = target
-			set_link_text(mut existing, text)
+			set_link_text(mut existing, namespace_link_text(ns))
 			continue
 		}
 		mut link := create_node(dir.filesystem, dir, name, false)
 		link.resource = new_procfs_resource(.symlink, stat.iflnk | 0o777, pid, 0)
-		link.symlink_target = text
+		link.symlink_target = namespace_link_text(ns)
 		link.magic_target = target
 		unsafe {
 			dir.children[name] = link

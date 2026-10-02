@@ -11,6 +11,7 @@ import file
 import proc
 import memory
 import resource
+import security
 import usercopy
 
 // splice(2)/vmsplice(2)/tee(2) flags. None of them change what happens here —
@@ -292,6 +293,13 @@ fn move_between(mut source file.FD, off_in u64, mut sink file.FD, off_out u64, l
 	mut moved := u64(0)
 
 	for moved < length {
+		// Authorize before reading a pipe: a refused disk sink must leave
+		// its input untouched. Hold the scalar reservation through the read
+		// and write so a mount cannot publish over an in-flight raw transfer.
+		block_token := security.begin_user_device_write(mut sink_handle.resource) or {
+			if moved > 0 { break }
+			return errno.err, errno.get()
+		}
 		mut chunk := length - moved
 		if chunk > transfer_chunk {
 			chunk = transfer_chunk
@@ -307,6 +315,7 @@ fn move_between(mut source file.FD, off_in u64, mut sink file.FD, off_out u64, l
 		got := source_handle.resource.read(voidptr(source_handle), buffer, read_from,
 			chunk) or {
 			unsafe { free(buffer) }
+			security.end_user_device_write(block_token)
 			if moved > 0 {
 				break
 			}
@@ -314,6 +323,7 @@ fn move_between(mut source file.FD, off_in u64, mut sink file.FD, off_out u64, l
 		}
 		if got <= 0 {
 			unsafe { free(buffer) }
+			security.end_user_device_write(block_token)
 			break
 		}
 
@@ -324,12 +334,14 @@ fn move_between(mut source file.FD, off_in u64, mut sink file.FD, off_out u64, l
 		}
 		put := sink_handle.resource.write(voidptr(sink_handle), buffer, write_to, u64(got)) or {
 			unsafe { free(buffer) }
+			security.end_user_device_write(block_token)
 			if moved > 0 {
 				break
 			}
 			return errno.err, errno.get()
 		}
 		unsafe { free(buffer) }
+		security.end_user_device_write(block_token)
 
 		if put <= 0 {
 			break

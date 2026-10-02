@@ -46,12 +46,10 @@ fn finish_eviction(_thread voidptr) {
 // for a stack nobody else can be using.
 @[noreturn]
 fn evict_to_idle(cpu_number u64, thr &proc.Thread) {
-	mut index := cpu_number
-	if index >= max_idle_stacks {
-		index = max_idle_stacks - 1
+	if cpu_number >= max_idle_stacks || idle_stack_tops[cpu_number] == 0 {
+		panic('Missing private CPU idle stack')
 	}
-	mut top := u64(voidptr(&idle_stacks[index][0])) + u64(idle_stack_size)
-	top &= ~u64(0xf)
+	top := idle_stack_tops[cpu_number]
 	C.vinix_enter_idle(top, voidptr(finish_eviction), voidptr(thr))
 	for {}
 }
@@ -62,9 +60,7 @@ fn C.yield_dispatch(handler voidptr)
 
 const max_reap_slots = 256
 
-// The same count as the per-CPU exception stacks. A CPU past the end shares the
-// last stack, which is only reached when that CPU is idling anyway.
-const max_idle_stacks = 8
+const max_idle_stacks = 256
 
 const idle_stack_size = 32768
 
@@ -76,7 +72,7 @@ __global (
 	// One idle stack per CPU, for the case where a CPU has to leave a thread's
 	// stack behind rather than return onto it: see evict_to_idle(). 32 KiB is
 	// what await() and one pass of the scheduler need.
-	idle_stacks [max_idle_stacks][idle_stack_size]u8
+	idle_stack_tops [max_idle_stacks]u64
 	// Held by whichever CPU is running the platform's input poll. Every caller
 	// of poll_platform_input() competes for it, including the syscall fallback
 	// below: the drivers behind that callback expect one poller, and the idle
@@ -110,6 +106,24 @@ __global (
 	// first lower-EL exception has completed.
 	gpu_exec_deferred_timeslice u64
 )
+
+// Called once on each CPU before it enters the scheduler. These mappings
+// outlive every scheduled Thread and are never shared by different CPUs.
+pub fn prepare_cpu_stacks(cpu_number u64) {
+	if cpu_number >= max_idle_stacks { panic('Too many CPUs for private idle stacks') }
+	if idle_stack_tops[cpu_number] != 0 { return }
+	base := memory.kernel_stack_alloc(idle_stack_size)
+	if base == unsafe { nil } { panic('Cannot allocate guarded CPU idle stack') }
+	idle_stack_tops[cpu_number] = u64(base) + idle_stack_size
+}
+
+@[noreturn]
+pub fn enter_idle() {
+	cpu.interrupt_toggle(false)
+	cpu_number := cpu.read_tpidr_el1()
+	C.vinix_enter_idle(idle_stack_tops[cpu_number], voidptr(await), unsafe { nil })
+	for {}
+}
 
 fn gpu_exec_interrupt_trace_active(cpu_number u64) bool {
 	return katomic.load(&gpu_exec_interrupt_active) != 0
@@ -316,6 +330,8 @@ pub fn initialise() {
 		caps:    proc.full_capabilities()
 		fds:     unsafe { []voidptr{len: proc.initial_fds} }
 	}
+	memory.kernel_stack_selftest()
+	selftest_thread_stacks()
 
 	// Release the secondary CPUs into the scheduler.
 	katomic.store(mut &scheduler_ready, true)
@@ -436,7 +452,8 @@ fn deliver_signal_on_tick(t &proc.Thread, state &cpulocal.GPRState) {
 		return
 	}
 	deliverable := ~t.masked_signals | (u64(1) << 8) | (u64(1) << 18)
-	if !katomic.load(&t.must_exit) && katomic.load(&t.pending_signals) & deliverable == 0 {
+	job_stop := t.process != unsafe { nil } && katomic.load(&t.process.job_stop_signal) != 0
+	if !katomic.load(&t.must_exit) && !job_stop && katomic.load(&t.pending_signals) & deliverable == 0 {
 		return
 	}
 	hook := unsafe { UserSignalHook(user_signal_hook) }
@@ -632,6 +649,7 @@ fn scheduler_timer_handler(_gpr_state voidptr) {
 		current_thread.yield_requested = false
 		// Past the early return above, this thread really is coming off the
 		// CPU, so the turn it has just had is charged to its process.
+		proc.account_context_switch(current_thread, !katomic.load(&current_thread.is_in_queue))
 		proc.charge_cpu_time(mut current_thread, now_ns)
 
 		if unsafe { _gpr_state != nil } {
@@ -1118,6 +1136,7 @@ fn dequeue_and_die_impl(trace bool) {
 	// scheduler_timer_handler, so its last turn is charged here or not at all.
 	// A process that runs briefly and exits would otherwise report no CPU time
 	// at all, which is exactly the process worth noticing.
+	proc.account_context_switch(t, true)
 	proc.charge_cpu_time(mut t, timer.get_ns())
 	if trace {
 		println('exec[gpu]/sched: CPU time charged; disarming interval timer')
@@ -1168,6 +1187,7 @@ pub fn park_stopped_thread() {
 	mut t := proc.current_thread()
 	katomic.store(mut &t.is_dead, true)
 	dequeue_thread(t)
+	proc.account_context_switch(t, true)
 	proc.charge_cpu_time(mut t, timer.get_ns())
 	katomic.store(mut &t.running_on, u64(-1))
 	t.l.release()
@@ -1200,8 +1220,8 @@ fn hand_over_to_reaper(cpu_number u64, t &proc.Thread) {
 }
 
 fn free_thread_memory(t &proc.Thread) {
-	if t.kstack_phys != 0 {
-		memory.pmm_free(voidptr(t.kstack_phys), kernel_stack_size / page_size)
+	if t.kernel_stack != 0 {
+		memory.kernel_stack_free(t.kernel_stack - kernel_stack_size)
 	}
 	if t.fpu_storage_phys != 0 {
 		memory.pmm_free(voidptr(t.fpu_storage_phys), lib.div_roundup(fpu_storage_size, page_size))
@@ -1240,39 +1260,8 @@ pub fn reschedule() {
 }
 
 pub fn new_kernel_thread(pc voidptr, arg voidptr, autoenqueue bool) &proc.Thread {
-	stack_phys := memory.pmm_alloc(kernel_stack_size / page_size)
-	stack := u64(stack_phys) + kernel_stack_size + higher_half
-
-	gpr_state := cpulocal.GPRState{
-		pc: u64(pc) // elr_el1 = entry point
-		x0: u64(arg) // first argument in x0
-		sp: stack
-		// Kernel-context marker plus masked DAIF. The assembly restore maps
-		// EL1h to the current handler level (EL2h on Apple VHE).
-		// PAN, where it is on, from the thread's first instruction: it takes no
-		// exception that would set it on the way in.
-		pstate: u64(0x3c5) | kernel_pstate_pan
-	}
-
-	fpu_storage_phys := memory.pmm_alloc(lib.div_roundup(fpu_storage_size, page_size))
-
-	mut t := &proc.Thread{
-		process: kernel_process
-		ttbr0: kernel_process.pagemap.tagged_root()
-		gpr_state: gpr_state
-		timeslice: 5000
-		running_on: u64(-1)
-		kstack_phys: u64(stack_phys)
-		fpu_storage: voidptr(u64(fpu_storage_phys) + higher_half)
-		fpu_storage_phys: u64(fpu_storage_phys)
-	}
-
-	t.self = voidptr(t)
-
-	if autoenqueue == true {
-		enqueue_thread(t, false)
-	}
-
+	t := try_new_kernel_thread(pc, arg) or { panic('Cannot allocate guarded kernel thread') }
+	if autoenqueue { enqueue_thread(t, false) }
 	return t
 }
 
@@ -1304,11 +1293,6 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 		println('exec[gpu]/thread: entered new_user_thread')
 	}
 
-	mut stacks := []voidptr{}
-	defer {
-		unsafe { stacks.free() }
-	}
-
 	mut stack_vma := u64(0)
 	mut stack_bottom_vma := u64(0)
 
@@ -1327,15 +1311,19 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 	if trace_gpu_exec {
 		println('exec[gpu]/thread: allocating kernel stack')
 	}
-	kernel_stack_phys := memory.pmm_alloc(kernel_stack_size / page_size)
-	stacks << kernel_stack_phys
-	kernel_stack := u64(kernel_stack_phys) + kernel_stack_size + higher_half
+	kernel_stack_base := memory.kernel_stack_alloc(kernel_stack_size)
+	if kernel_stack_base == unsafe { nil } { errno.set(errno.enomem); return none }
+	kernel_stack := u64(kernel_stack_base) + kernel_stack_size
 	if trace_gpu_exec {
-		C.kprintf(c'exec[gpu]/thread: kernel stack allocated at 0x%llx\n', u64(kernel_stack_phys))
+		C.kprintf(c'exec[gpu]/thread: kernel stack allocated at 0x%llx\n', u64(kernel_stack_base))
 		println('exec[gpu]/thread: allocating FPU storage')
 	}
 
-	fpu_storage_phys := memory.pmm_alloc(lib.div_roundup(fpu_storage_size, page_size))
+	fpu_storage_phys := memory.pmm_alloc_fallible(lib.div_roundup(fpu_storage_size, page_size))
+	if fpu_storage_phys == unsafe { nil } {
+		memory.kernel_stack_free(u64(kernel_stack_base))
+		errno.set(errno.enomem); return none
+	}
 	if trace_gpu_exec {
 		C.kprintf(c'exec[gpu]/thread: FPU storage allocated at 0x%llx\n', u64(fpu_storage_phys))
 	}
@@ -1347,17 +1335,26 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 		pstate: 0x000 // EL0t, no DAIF masking
 	}
 
-	mut t := &proc.Thread{
+	thread_mem := memory.malloc_packed_fallible(sizeof(proc.Thread))
+	if thread_mem == unsafe { nil } {
+		memory.pmm_free(fpu_storage_phys, lib.div_roundup(fpu_storage_size, page_size))
+		memory.kernel_stack_free(u64(kernel_stack_base))
+		errno.set(errno.enomem); return none
+	}
+	mut t := unsafe { &proc.Thread(thread_mem) }
+	unsafe { *t = proc.Thread{
 		process: process
 		ttbr0: process.pagemap.tagged_root()
 		gpr_state: gpr_state
 		timeslice: 5000
 		running_on: u64(-1)
 		kernel_stack: kernel_stack
-		kstack_phys: u64(kernel_stack_phys)
-		stacks: stacks
 		fpu_storage: voidptr(u64(fpu_storage_phys) + higher_half)
 		fpu_storage_phys: u64(fpu_storage_phys)
+	} }
+	mut attached := false
+	defer {
+		if !attached { free_thread_memory(t) }
 	}
 	if trace_gpu_exec {
 		C.kprintf(c'exec[gpu]/thread: thread object initialized pc=0x%llx sp=0x%llx\n', u64(t.gpr_state.pc),
@@ -1386,10 +1383,7 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 			uart.putc(`\n`)
 		}
 		t.gpr_state.sp = build_initial_stack(mut process, stack_vma, stack_bottom_vma, argv, envp,
-			auxval) or {
-			free_thread_memory(t)
-			return none
-		}
+			auxval) or { return none }
 		if trace_gpu_exec {
 			C.kprintf(c'exec[gpu]/thread: initial ELF stack complete sp=0x%llx\n', u64(t.gpr_state.sp))
 		}
@@ -1398,10 +1392,8 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 	if trace_gpu_exec {
 		println('exec[gpu]/thread: attaching replacement thread to process')
 	}
-	attach_thread(mut process, mut t) or {
-		free_thread_memory(t)
-		return none
-	}
+	attach_thread(mut process, mut t)?
+	attached = true
 	if trace_gpu_exec {
 		C.kprintf(c'exec[gpu]/thread: replacement thread attached tid=%lld\n', i64(t.tid))
 	}
@@ -1432,27 +1424,32 @@ pub fn new_cloned_thread(_process &proc.Process, _source &proc.Thread, state &cp
 	mut process := unsafe { _process }
 	mut source := unsafe { _source }
 
-	stack_pages := kernel_stack_size / page_size
 	fpu_pages := lib.div_roundup(fpu_storage_size, page_size)
 
-	kernel_stack_phys := memory.pmm_alloc_fallible(stack_pages)
-	if kernel_stack_phys == unsafe { nil } {
-		return none
+	kernel_stack_base := memory.kernel_stack_alloc(kernel_stack_size)
+	if kernel_stack_base == unsafe { nil } {
+		errno.set(errno.enomem); return none
 	}
 	fpu_storage_phys := memory.pmm_alloc_fallible(fpu_pages)
 	if fpu_storage_phys == unsafe { nil } {
-		memory.pmm_free(kernel_stack_phys, stack_pages)
-		return none
+		memory.kernel_stack_free(u64(kernel_stack_base))
+		errno.set(errno.enomem); return none
 	}
 
-	mut t := &proc.Thread{
+	thread_mem := memory.malloc_packed_fallible(sizeof(proc.Thread))
+	if thread_mem == unsafe { nil } {
+		memory.pmm_free(fpu_storage_phys, fpu_pages)
+		memory.kernel_stack_free(u64(kernel_stack_base))
+		errno.set(errno.enomem); return none
+	}
+	mut t := unsafe { &proc.Thread(thread_mem) }
+	unsafe { *t = proc.Thread{
 		process: process
 		ttbr0: process.pagemap.tagged_root()
 		gpr_state: state
 		timeslice: source.timeslice
 		running_on: u64(-1)
-		kernel_stack: u64(kernel_stack_phys) + kernel_stack_size + higher_half
-		kstack_phys: u64(kernel_stack_phys)
+		kernel_stack: u64(kernel_stack_base) + kernel_stack_size
 		fpu_storage: voidptr(u64(fpu_storage_phys) + higher_half)
 		fpu_storage_phys: u64(fpu_storage_phys)
 		sigentry: source.sigentry
@@ -1461,7 +1458,7 @@ pub fn new_cloned_thread(_process &proc.Process, _source &proc.Thread, state &cp
 		comm: source.comm.clone()
 		affinity_mask: source.affinity_mask
 		sched: inherited_sched_params(source)
-	}
+	} }
 
 	t.self = voidptr(t)
 
@@ -1477,8 +1474,8 @@ pub fn new_cloned_thread(_process &proc.Process, _source &proc.Thread, state &cp
 	t.gpr_state.tpidr_el0 = t.tpidr_el0
 
 	attach_thread(mut process, mut t) or {
-		memory.pmm_free(kernel_stack_phys, stack_pages)
-		memory.pmm_free(fpu_storage_phys, fpu_pages)
+		// The failed attach published no tid/list/runqueue/event reference.
+		free_thread_memory(t)
 		return none
 	}
 

@@ -9,6 +9,7 @@ module userland
 
 import errno
 import event
+import event.eventstruct
 import futex
 import katomic
 import proc
@@ -65,29 +66,6 @@ const futex_waiters = u32(0x80000000)
 const futex_owner_died = u32(0x40000000)
 
 const futex_tid_mask = u32(0x3fffffff)
-
-// struct rusage, 18 longs on LP64.
-struct Rusage {
-mut:
-	ru_utime_sec  i64
-	ru_utime_usec i64
-	ru_stime_sec  i64
-	ru_stime_usec i64
-	ru_maxrss     i64
-	ru_ixrss      i64
-	ru_idrss      i64
-	ru_isrss      i64
-	ru_minflt     i64
-	ru_majflt     i64
-	ru_nswap      i64
-	ru_inblock    i64
-	ru_oublock    i64
-	ru_msgsnd     i64
-	ru_msgrcv     i64
-	ru_nsignals   i64
-	ru_nvcsw      i64
-	ru_nivcsw     i64
-}
 
 // The SIGCHLD arm of siginfo_t, padded to the full 128-byte structure.
 struct SigInfoChld {
@@ -282,70 +260,147 @@ fn child_matches(current_process &proc.Process, child &proc.Process, pid int) bo
 	return proc.pgid_in(child, viewer) == -pid
 }
 
-// Scan under the parent's child-list lock; only a selected result escapes,
-// carrying one reference through copy-out. Blocking waits use the parent's
-// single child-change event, so a child beyond max_events cannot starve and a
-// concurrent reap wakes the other waiters to rescan instead of dangling.
-fn take_child_change(mut parent proc.Process, pid int, block bool, exits bool,
-	stops bool, continues bool, keep bool) (&proc.Process, int, int, u64) {
-	for {
-		parent.children_lock.acquire()
-		mut found := false
-		for candidate in parent.children {
-			if !child_matches(parent, candidate, pid) { continue }
-			found = true
-			mut child := unsafe { candidate }
-			if exits {
-				if _ := event.await_one(mut &child.event, false) {
-					proc.pin_process(child)
-					parent.children_lock.release()
-					return child, child.status, 1, u64(0)
-				}
-			}
-			child.job_lock.acquire()
-			if stops && child.job_stop_pending {
-				status := (child.job_stop_signal << 8) | 0x7f
-				if !keep { child.job_stop_pending = false }
-				child.job_lock.release()
-				proc.pin_process(child)
-				parent.children_lock.release()
-				return child, status, 2, u64(0)
-			}
-			if continues && child.job_continue_pending {
-				if !keep { child.job_continue_pending = false }
-				child.job_lock.release()
-				proc.pin_process(child)
-				parent.children_lock.release()
-				return child, 0xffff, 3, u64(0)
-			}
-			child.job_lock.release()
-		}
-		parent.children_lock.release()
-		if !found { return unsafe { nil }, 0, 0, errno.echild }
-		if !block { return unsafe { nil }, 0, 0, u64(0) }
-		event.await_one(mut &parent.child_event, true) or {
-			last, last_status, last_kind, last_error := take_child_change(mut parent, pid,
-				false, exits, stops, continues, keep)
-			if last == unsafe { nil } && last_error == 0 {
-				return unsafe { nil }, 0, 0, errno.eintr
-			}
-			return last, last_status, last_kind, last_error
-		}
-	}
-	return unsafe { nil }, 0, 0, u64(0)
+// A waiter owns one stack event. The parent's children_lock protects list
+// traversal and unlink, so arbitrary numbers of children/waiting siblings do
+// not depend on the generic 32-event/64-listener limits.
+struct ChildWaiter {
+mut:
+	next &ChildWaiter = unsafe { nil }
+	wake eventstruct.Event
 }
 
-fn put_back_change(mut child proc.Process, status int, kind int) u64 {
-	if kind == 1 { return put_back(mut child) }
-	child.job_lock.acquire()
-	if kind == 2 {
-		child.job_stop_signal = status >> 8
-		child.job_stop_pending = true
-	} else { child.job_continue_pending = true }
-	child.job_lock.release()
-	mut parent := proc.current_thread().process
+struct ChildChange {
+	child  &proc.Process = unsafe { nil }
+	kind   int
+	status int
+	epoch  u64
+	err    u64
+}
+
+fn C.__builtin_alloca(usize) voidptr
+
+fn wake_child_waiters(mut parent proc.Process) {
+	parent.children_lock.acquire()
+	parent.child_generation++
 	event.trigger(mut &parent.child_event, false)
-	return errno.efault
+	mut waiter := unsafe { &ChildWaiter(parent.child_waiters) }
+	for waiter != unsafe { nil } {
+		event.trigger(mut &waiter.wake, false)
+		waiter = waiter.next
+	}
+	parent.children_lock.release()
+}
+
+fn scan_child_change(mut parent proc.Process, pid int, options int) ChildChange {
+	// The parent list owns a child until its exclusive wait claim is committed.
+	// Unlike a raw process-table snapshot, a claimed child cannot be reaped and
+	// freed while a copy-out faults or another sibling is waiting.
+	mut matches := false
+	for mut child in parent.children {
+		if !child_matches(parent, child, pid) { continue }
+		child.job_lock.acquire()
+		if child.wait_reaped {
+			child.job_lock.release()
+			continue
+		}
+		matches = true
+		if child.wait_busy {
+			child.job_lock.release()
+			continue
+		}
+		mut kind := 0
+		mut status := 0
+		mut epoch := u64(0)
+		if options & wexited != 0 && child.wait_exit_ready {
+			kind = wexited
+			status = child.status
+		} else if options & wstopped != 0 && child.wait_stop_epoch != 0 {
+			kind = wstopped
+			status = (child.wait_stop_signal << 8) | 0x7f
+			epoch = child.wait_stop_epoch
+		} else if options & wcontinued != 0 && child.wait_continue_epoch != 0 {
+			kind = wcontinued
+			status = 0xffff
+			epoch = child.wait_continue_epoch
+		}
+		if kind != 0 {
+			child.wait_busy = true
+			proc.pin_process(child)
+			child.job_lock.release()
+			return ChildChange{ child: child, kind: kind, status: status, epoch: epoch }
+		}
+		child.job_lock.release()
+	}
+	return ChildChange{ err: if matches { u64(0) } else { errno.echild } }
+}
+
+fn take_child_change(mut parent proc.Process, pid int, options int) ChildChange {
+	// alloca stays in this frame until listeners detach and the intrusive link
+	// is removed. Taking &ChildWaiter{} or a promoted fixed array would leak.
+	mut waiter := unsafe { &ChildWaiter(C.__builtin_alloca(sizeof(ChildWaiter))) }
+	unsafe { *waiter = ChildWaiter{} }
+	mut interrupted := false
+	for {
+		parent.children_lock.acquire()
+		result := scan_child_change(mut parent, pid, options)
+		if result.child != unsafe { nil } || result.err != 0 || options & wnohang != 0 || interrupted {
+			parent.children_lock.release()
+			if interrupted && result.child == unsafe { nil } && result.err == 0 {
+				// Let the signal dispatcher apply SA_RESTART, or preserve the wait
+				// across a default group stop with no userspace handler.
+				return ChildChange{ err: proc.interrupted_errno }
+			}
+			return result
+		}
+		// Scanning and publishing this listener use the same owner lock as wakes.
+		// trigger(drop=false) retains a wake before event.await attaches its slot.
+		waiter.next = unsafe { &ChildWaiter(parent.child_waiters) }
+		parent.child_waiters = voidptr(waiter)
+		parent.children_lock.release()
+		interrupted = false
+		event.await_one(mut &waiter.wake, true) or {
+			interrupted = true
+			u64(0)
+		}
+		parent.children_lock.acquire()
+		mut previous := &ChildWaiter(unsafe { nil })
+		mut current := unsafe { &ChildWaiter(parent.child_waiters) }
+		for current != unsafe { nil } {
+			if voidptr(current) == voidptr(waiter) {
+				if previous == unsafe { nil } {
+					parent.child_waiters = voidptr(waiter.next)
+				} else {
+					previous.next = waiter.next
+				}
+				break
+			}
+			previous = current
+			current = current.next
+		}
+		parent.children_lock.release()
+	}
+	return ChildChange{}
+}
+
+fn finish_child_change(mut parent proc.Process, change ChildChange, consume bool) {
+	mut child := change.child
+	child.job_lock.acquire()
+	mut reap := false
+	if consume {
+		if change.kind == wexited {
+			child.wait_reaped = true
+			reap = true
+		} else if change.kind == wstopped && child.wait_stop_epoch == change.epoch {
+			child.wait_stop_epoch = 0
+		} else if change.kind == wcontinued && child.wait_continue_epoch == change.epoch {
+			child.wait_continue_epoch = 0
+		}
+	}
+	child.wait_busy = false
+	child.job_lock.release()
+	if reap { release_child(mut parent, child) }
+	wake_child_waiters(mut parent)
+	proc.unpin_process(child)
 }
 
 fn release_child(mut current_process proc.Process, child &proc.Process) {
@@ -361,51 +416,40 @@ fn release_child(mut current_process proc.Process, child &proc.Process) {
 	proc.free_pid(child.pid)
 }
 
-// A failed copy-out must not swallow the exit: hand the event back so the child
-// is still reapable, and report EFAULT.
-fn put_back(mut child proc.Process) u64 {
-	event.trigger(mut &child.event, false)
-	mut parent := proc.current_thread().process
-	event.trigger(mut &parent.child_event, false)
-	return errno.efault
-}
-
 fn write_child_rusage(rusage_ptr u64, child &proc.Process) bool {
 	if rusage_ptr == 0 {
 		return true
 	}
 
-	user := katomic.load(&child.cpu_user_ns)
-	system := katomic.load(&child.cpu_system_ns)
-	usage := Rusage{
-		ru_utime_sec:  i64(user / 1000000000)
-		ru_utime_usec: i64((user % 1000000000) / 1000)
-		ru_stime_sec: i64(system / 1000000000)
-		ru_stime_usec: i64((system % 1000000000) / 1000)
-	}
-	return usercopy.copy_to_user(rusage_ptr, voidptr(&usage), sizeof(Rusage))
+	mut usage := unsafe { &proc.Rusage(C.vinix_stack_alloc(sizeof(proc.Rusage))) }
+	unsafe { *usage = proc.Rusage{} }
+	proc.fill_process_rusage(mut usage, child, proc.cpu_time_now_ns(), true)
+	return usercopy.copy_to_user(rusage_ptr, usage, sizeof(proc.Rusage))
 }
 
 // wait4(pid, status, options, rusage).
 pub fn syscall_wait4(_ voidptr, pid int, status_ptr u64, options int, rusage_ptr u64) (u64, u64) {
 	mut current_process := proc.current_thread().process
 
-	mut child, raw_status, kind, err := take_child_change(mut current_process, pid,
-		options & wnohang == 0, true, options & wstopped != 0, options & wcontinued != 0, false)
-	if child == unsafe { nil } {
-		if err != 0 { return errno.err, err }
+	if options & ~(wnohang | wstopped | wcontinued) != 0 { return errno.err, errno.einval }
+	change := take_child_change(mut current_process, pid, options | wexited)
+	if change.child == unsafe { nil } {
+		if change.err != 0 { return errno.err, change.err }
 		return 0, 0
 	}
-	defer { proc.unpin_process(child) }
-	status := i32(raw_status)
+	child := change.child
+	status := i32(change.status)
 	reaped := proc.pid_in(child, current_process.numbered_in)
 	if status_ptr != 0 && !usercopy.copy_to_user(status_ptr, voidptr(&status), sizeof(i32)) {
-		return errno.err, put_back_change(mut child, raw_status, kind)
+		finish_child_change(mut current_process, change, false)
+		return errno.err, errno.efault
 	}
 	if !write_child_rusage(rusage_ptr, child) {
-		return errno.err, put_back_change(mut child, raw_status, kind)
+		finish_child_change(mut current_process, change, false)
+		return errno.err, errno.efault
 	}
-	if kind == 1 { release_child(mut current_process, child) }
+
+	finish_child_change(mut current_process, change, true)
 
 	return u64(reaped), 0
 }
@@ -414,8 +458,9 @@ pub fn syscall_wait4(_ voidptr, pid int, status_ptr u64, options int, rusage_ptr
 pub fn syscall_waitid(_ voidptr, idtype int, id u64, infop u64, options int, rusage_ptr u64) (u64, u64) {
 	mut current_process := proc.current_thread().process
 
-	// Exactly which state changes to report has to be asked for.
-	if options & (wexited | wstopped | wcontinued) == 0 {
+	// Linux requires an explicit set of child states to report.
+	if options & (wexited | wstopped | wcontinued) == 0
+		|| options & ~(wnohang | wexited | wstopped | wcontinued | wnowait) != 0 {
 		return errno.err, errno.einval
 	}
 
@@ -441,12 +486,10 @@ pub fn syscall_waitid(_ voidptr, idtype int, id u64, infop u64, options int, rus
 		}
 	}
 
-	mut child, status, kind, err := take_child_change(mut current_process, pid,
-		options & wnohang == 0, options & wexited != 0, options & wstopped != 0,
-		options & wcontinued != 0, options & wnowait != 0)
-	if child == unsafe { nil } {
-		if err != 0 {
-			return errno.err, err
+	change := take_child_change(mut current_process, pid, options)
+	if change.child == unsafe { nil } {
+		if change.err != 0 {
+			return errno.err, change.err
 		}
 		// WNOHANG with nothing to report: Linux signals that with si_pid == 0.
 		if infop != 0 {
@@ -458,17 +501,18 @@ pub fn syscall_waitid(_ voidptr, idtype int, id u64, infop u64, options int, rus
 		return 0, 0
 	}
 
-	defer { proc.unpin_process(child) }
+	child := change.child
+	status := change.status
 	mut info := SigInfoChld{
 		si_signo:  i32(sigchld)
 		si_code:   i32(cld_exited)
 		si_pid:    i32(proc.pid_in(child, current_process.numbered_in))
 		si_status: i32((status >> 8) & 0xff)
 	}
-	if kind == 2 {
+	if change.kind == wstopped {
 		info.si_code = 5 // CLD_STOPPED
-		info.si_status = i32(status >> 8)
-	} else if kind == 3 {
+		info.si_status = i32((status >> 8) & 0xff)
+	} else if change.kind == wcontinued {
 		info.si_code = 6 // CLD_CONTINUED
 		info.si_status = i32(sigcont)
 	} else if status & 0x7f != 0 {
@@ -477,18 +521,15 @@ pub fn syscall_waitid(_ voidptr, idtype int, id u64, infop u64, options int, rus
 	}
 
 	if infop != 0 && !usercopy.copy_to_user(infop, voidptr(&info), sizeof(SigInfoChld)) {
-		return errno.err, put_back_change(mut child, status, kind)
+		finish_child_change(mut current_process, change, false)
+		return errno.err, errno.efault
 	}
 	if !write_child_rusage(rusage_ptr, child) {
-		return errno.err, put_back_change(mut child, status, kind)
+		finish_child_change(mut current_process, change, false)
+		return errno.err, errno.efault
 	}
 
-	if kind == 1 {
-		if options & wnowait != 0 {
-			event.trigger(mut &child.event, false)
-			event.trigger(mut &current_process.child_event, false)
-		} else { release_child(mut current_process, child) }
-	}
+	finish_child_change(mut current_process, change, options & wnowait == 0)
 
 	return 0, 0
 }

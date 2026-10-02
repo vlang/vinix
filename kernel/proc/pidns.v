@@ -75,10 +75,9 @@ pub fn number_process(mut process Process, parent &Process) {
 	}
 	process.numbered_in = ns
 	process.ns_pid = allocate_local_id(mut ns, process.pid)
-	if parent != unsafe { nil } && voidptr(parent.numbered_in) == voidptr(ns) {
-		process.ns_pgid = parent.ns_pgid
-		process.ns_sid = parent.ns_sid
-	} else {
+	// Global and local group IDs were captured together by fork. Do not
+	// reread the parent's later group membership when assigning this PID.
+	if parent == unsafe { nil } || process.inherited_job_namespace != ns.id {
 		process.ns_pgid = 0
 		process.ns_sid = 0
 	}

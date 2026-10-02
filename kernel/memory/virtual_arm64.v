@@ -2,6 +2,7 @@
 module memory
 
 import lib
+import katomic
 import limine
 import klock
 import aarch64.cpu
@@ -36,6 +37,18 @@ const arm64_pte_attr_device = u64(1) << 2 // MAIR index 1 (Device-nGnRnE)
 const arm64_pte_attr_uncached = u64(2) << 2 // MAIR index 2 (Normal Non-Cacheable)
 const arm64_pte_table = u64(0b11)
 
+// Every boot CPU can veto XOM before userspace starts. Once disabled it is
+// never re-enabled: a mapping must remain safe when its process migrates.
+__global arm64_execute_only = true
+
+pub fn disable_execute_only() {
+	katomic.store(mut &arm64_execute_only, false)
+}
+
+pub fn execute_only_supported() bool {
+	return katomic.load(&arm64_execute_only)
+}
+
 // Translate portable flags into an ARM64 L3 page descriptor.
 fn portable_to_arm64_pte(phys u64, flags u64, address_mask u64) u64 {
 	mut attr := arm64_pte_attr_normal
@@ -60,12 +73,23 @@ fn portable_to_arm64_pte(phys u64, flags u64, address_mask u64) u64 {
 	// may still execute at EL0, but EL1 must never fetch instructions from them.
 	// UXN continues to represent the userspace PROT_EXEC decision itself.
 	if flags & pte_user != 0 {
-		pte |= arm64_pte_ap_user | arm64_pte_pxn
+		pte |= arm64_pte_pxn
+		// AP=2 permits EL1 reads but no EL0 data access; UXN clear still
+		// permits EL0 instruction fetch. Checked copies require AP[1], so
+		// the direct-map copy path cannot disclose execute-only bytes.
+		if flags & pte_execute_only == 0 {
+			pte |= arm64_pte_ap_user
+		}
 		if flags & pte_noexec != 0 {
 			pte |= arm64_pte_uxn
 		}
-	} else if flags & pte_noexec != 0 {
-		pte |= arm64_pte_pxn | arm64_pte_uxn
+	} else {
+		// Kernel text must never be executable at EL0. ePAN also uses UXN
+		// to permit EL1 data reads of kernel text and its literal pools.
+		pte |= arm64_pte_uxn
+		if flags & pte_noexec != 0 {
+			pte |= arm64_pte_pxn
+		}
 	}
 
 	// ARM64: AP[2]=0 means writable, AP[2]=1 means read-only.
@@ -87,6 +111,7 @@ pub fn new_pagemap() &Pagemap {
 	// not need higher-half entries copied.
 	mut pagemap := &Pagemap{
 		top_level:   top_level
+		track_residency: true
 		mmap_ranges: []voidptr{}
 		tlb_tag:     arm64_take_asid()
 	}
@@ -441,9 +466,11 @@ pub fn (mut pagemap Pagemap) unmap_page_unlocked(virt u64) ? {
 	// runs the page map any more, when flush_tlb_everywhere() follows the
 	// whole teardown instead. Two broadcast invalidations for every page made
 	// an exit, and the old image's teardown in an exec, cost 10 ms.
+	old := unsafe { l3_p[l3_entry] }
 	unsafe {
 		l3_p[l3_entry] = 0
 	}
+	pagemap.account_resident(virt, old & arm64_pte_valid == arm64_pte_valid, false)
 	if !pagemap.dying {
 		cpu.tlbi_vaae1(virt >> 12)
 		cpu.dsb_sy()
@@ -499,11 +526,13 @@ pub fn (mut pagemap Pagemap) flag_page(virt u64, flags u64) ? {
 	if unsafe { *pte_p } & 1 == 0 {
 		return none
 	}
-	phys := unsafe { *pte_p } & pte_flags_mask
+	old := unsafe { *pte_p }
+	phys := old & pte_flags_mask
 	new_pte := portable_to_arm64_pte(phys, flags, pte_flags_mask)
 	// Tagged maps retain translations while inactive; zero-tag maps can also
 	// be active on another CPU. A present user entry always requires BBM.
 	install_arm64_pte(mut pte_p, virt, new_pte, true)
+	pagemap.account_resident(virt, old & arm64_pte_valid == arm64_pte_valid, true)
 }
 
 // Install a page descriptor in an active page table. Replacing a valid
@@ -572,8 +601,10 @@ pub fn (mut pagemap Pagemap) map_page_unlocked(virt u64, phys u64, flags u64) ? 
 
 	mut entry := unsafe { &u64(u64(l3) + higher_half + l3_entry * 8) }
 
+	old := unsafe { *entry }
 	new_pte := portable_to_arm64_pte(phys, flags, pte_flags_mask)
 	install_arm64_pte(mut entry, virt, new_pte, true)
+	pagemap.account_resident(virt, old & arm64_pte_valid == arm64_pte_valid, true)
 }
 
 fn remap_hhdm_span(phys u64, len u64, flags u64, failure string) u64 {

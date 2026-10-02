@@ -64,7 +64,10 @@ const ctrl_phy_rst = u32(1) << 31
 
 const status_lu = u32(1) << 1
 
-// Receive: enabled, broadcasts accepted, the CRC stripped. BSIZE is left at
+// Receive: enabled, broadcasts/multicast accepted, the CRC stripped. IPv6
+// discovery and IGMP/MLD need multicast reception; group policy is enforced
+// by the native stack and socket memberships until a hardware hash filter
+// callback is available. BSIZE is left at
 // zero with BSEX clear, which is 2048-byte buffers, and long packets are off,
 // so every frame fits one buffer.
 const rctl_en = u32(1) << 1

@@ -24,6 +24,7 @@ const tfd_nonblock = 0o4000
 
 // timerfd_settime flags.
 const tfd_timer_abstime = 1
+const tfd_timer_cancel_on_set = 2
 
 // A struct itimerspec is two timespecs: the interval, then the first deadline.
 const itimerspec_size = u64(32)
@@ -42,7 +43,12 @@ mut:
 	can_mmap bool
 
 	clock_id int
-	// Both in nanoseconds on the monotonic clock. A deadline of zero means the
+	absolute_realtime bool
+	cancel_on_set bool
+	cancelled bool
+	clock_generation u64
+	// Nanoseconds in the selected absolute clock, or monotonic for relative
+	// timers. A deadline of zero means the
 	// timer is disarmed; an interval of zero makes it fire once.
 	deadline_ns u64
 	interval_ns u64
@@ -59,8 +65,7 @@ __global (
 )
 
 fn monotonic_ns() u64 {
-	now := time.clock_now(time.clock_type_monotonic) or { time.TimeSpec{} }
-	return u64(now.tv_sec) * 1000000000 + u64(now.tv_nsec)
+	return time.monotonic_ns()
 }
 
 // Called from the scheduler tick, next to the interval timers. A timerfd that
@@ -72,13 +77,23 @@ pub fn tick_timerfds() {
 		return
 	}
 
-	now := monotonic_ns()
+	mono := monotonic_ns()
+	wall := time.clock_now(time.clock_type_realtime) or { time.TimeSpec{} }
+	generation := time.realtime_generation()
 
 	for i := 0; i < max_timerfds; i++ {
 		mut entry := timerfd_entries[i]
 		if entry == unsafe { nil } || entry.deadline_ns == 0 {
 			continue
 		}
+		if entry.cancel_on_set && entry.clock_generation != generation {
+			entry.cancelled = true
+			entry.deadline_ns = 0
+			entry.status |= pollin
+			event.trigger(mut &entry.event, false)
+			continue
+		}
+		now := if entry.absolute_realtime { timespec_to_ns(wall) or { u64(0) } } else { mono }
 		if now < entry.deadline_ns {
 			continue
 		}
@@ -132,6 +147,13 @@ fn (mut this TimerFD) read(_handle voidptr, buf voidptr, _loc u64, count u64) ?i
 
 	for {
 		timerfd_lock.acquire()
+		if this.cancelled {
+			this.cancelled = false
+			this.status &= ~pollin
+			timerfd_lock.release()
+			errno.set(errno.ecanceled)
+			return none
+		}
 		got := this.expirations
 		if got != 0 {
 			this.expirations = 0
@@ -275,7 +297,15 @@ pub fn syscall_timerfd_create(_ voidptr, clock_id int, flags int) (u64, u64) {
 	return u64(fdnum), 0
 }
 
-fn timespec_to_ns(value time.TimeSpec) u64 {
+fn timespec_to_ns(value time.TimeSpec) ?u64 {
+	if value.tv_sec < 0 || value.tv_nsec < 0 || value.tv_nsec >= 1000000000 {
+		errno.set(errno.einval)
+		return none
+	}
+	if u64(value.tv_sec) > (u64(-1) - u64(value.tv_nsec)) / 1000000000 {
+		errno.set(errno.eoverflow)
+		return none
+	}
 	return u64(value.tv_sec) * 1000000000 + u64(value.tv_nsec)
 }
 
@@ -292,7 +322,10 @@ fn (this &TimerFD) remaining() (u64, u64) {
 	if this.deadline_ns == 0 {
 		return 0, this.interval_ns
 	}
-	now := monotonic_ns()
+	now := if this.absolute_realtime {
+		wall := time.clock_now(time.clock_type_realtime) or { time.TimeSpec{} }
+		timespec_to_ns(wall) or { u64(0) }
+	} else { monotonic_ns() }
 	if this.deadline_ns <= now {
 		// Due but not yet noticed by the tick. Linux never reports zero for an
 		// armed timer, so report the smallest step instead.
@@ -302,7 +335,7 @@ fn (this &TimerFD) remaining() (u64, u64) {
 }
 
 pub fn syscall_timerfd_settime(_ voidptr, fdnum int, flags int, new_value u64, old_value u64) (u64, u64) {
-	if flags & ~tfd_timer_abstime != 0 {
+	if flags & ~(tfd_timer_abstime | tfd_timer_cancel_on_set) != 0 {
 		return errno.err, errno.einval
 	}
 	if new_value == 0 {
@@ -327,56 +360,48 @@ pub fn syscall_timerfd_settime(_ voidptr, fdnum int, flags int, new_value u64, o
 		return errno.err, errno.einval
 	}
 
+	wanted := timespec_to_ns(value) or { return errno.err, errno.get() }
+	period := timespec_to_ns(interval) or { return errno.err, errno.get() }
+	now := monotonic_ns()
+	if flags & tfd_timer_abstime == 0 && wanted > u64(-1) - now {
+		return errno.err, errno.eoverflow
+	}
+	timerfd_lock.acquire()
+	defer { timerfd_lock.release() }
+
 	if old_value != 0 {
-		left, period := timer.remaining()
+		left, old_period := timer.remaining()
 		mut previous := [2]time.TimeSpec{}
-		previous[0] = ns_to_timespec(period)
+		previous[0] = ns_to_timespec(old_period)
 		previous[1] = ns_to_timespec(left)
 		if !usercopy.copy_to_user(old_value, voidptr(&previous[0]), itimerspec_size) {
 			return errno.err, errno.efault
 		}
 	}
 
-	timerfd_lock.acquire()
-	defer {
-		timerfd_lock.release()
-	}
-
-	wanted := timespec_to_ns(value)
 
 	if wanted == 0 {
 		// A zero value disarms, whatever the interval says.
 		timer.deadline_ns = 0
+		timer.cancelled = false
 		timer.interval_ns = 0
 		timer.expirations = 0
 		timer.status &= ~pollin
 		return 0, 0
 	}
 
-	timer.interval_ns = timespec_to_ns(interval)
+	timer.interval_ns = period
 	timer.expirations = 0
 	timer.status &= ~pollin
 
+	timer.absolute_realtime = flags & tfd_timer_abstime != 0 && timer.clock_id == 0
+	timer.cancel_on_set = timer.absolute_realtime && flags & tfd_timer_cancel_on_set != 0
+	timer.cancelled = false
+	timer.clock_generation = time.realtime_generation()
 	if flags & tfd_timer_abstime != 0 {
-		// An absolute deadline is on the timer's own clock. Both clocks advance
-		// together here, so the monotonic reading is the one to keep.
-		// Read realtime first so conversion skew can only delay an expiry.
-		wall_now := if timer.clock_id == 0 {
-			wall_clock := time.clock_now(time.clock_type_realtime) or { time.TimeSpec{} }
-			timespec_to_ns(wall_clock)
-		} else {
-			u64(0)
-		}
-		now_monotonic := monotonic_ns()
-		now_wall := if timer.clock_id == 0 { wall_now } else { now_monotonic }
-		if wanted <= now_wall {
-			// Already past: it fires on the next tick.
-			timer.deadline_ns = now_monotonic
-		} else {
-			timer.deadline_ns = now_monotonic + (wanted - now_wall)
-		}
+		timer.deadline_ns = wanted
 	} else {
-		timer.deadline_ns = monotonic_ns() + wanted
+		timer.deadline_ns = now + wanted
 	}
 
 	return 0, 0
@@ -392,10 +417,12 @@ pub fn syscall_timerfd_gettime(_ voidptr, fdnum int, curr_value u64) (u64, u64) 
 		fd.unref()
 	}
 
-	left, period := timer.remaining()
+	timerfd_lock.acquire()
+	left, old_period := timer.remaining()
+	timerfd_lock.release()
 
 	mut out := [2]time.TimeSpec{}
-	out[0] = ns_to_timespec(period)
+	out[0] = ns_to_timespec(old_period)
 	out[1] = ns_to_timespec(left)
 
 	if !usercopy.copy_to_user(curr_value, voidptr(&out[0]), itimerspec_size) {

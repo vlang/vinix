@@ -37,6 +37,9 @@ fn vmap_leaf(virt u64, make bool) &u64 {
 // Map one physical page at `virt`: four entries for a 16 KiB page.
 fn vmap_install(virt u64, phys u64) bool {
 	for offset := u64(0); offset < page_size; offset += kernel_page_size {
+		$if kernel_stack_selftest ? {
+			if stack_test_fail_subentry == int(offset / kernel_page_size) { return false }
+		}
 		mut reclaimed := false
 		for {
 			vmap_table_lock.acquire()
@@ -97,4 +100,13 @@ fn vmap_translate(addr u64) u64 {
 		return 0
 	}
 	return (pte & kernel_pte_address_mask) | (addr & (kernel_page_size - 1))
+}
+
+fn kernel_stack_protected(addr u64) bool {
+	vmap_table_lock.acquire()
+	entry := vmap_leaf(addr, false)
+	pte := if entry == unsafe { nil } { u64(0) } else { unsafe { *entry } }
+	vmap_table_lock.release()
+	return pte & (arm64_pte_valid | arm64_pte_pxn | arm64_pte_uxn) == (arm64_pte_valid | arm64_pte_pxn | arm64_pte_uxn)
+		&& pte & (arm64_pte_ap_user | arm64_pte_ap_ro) == 0
 }

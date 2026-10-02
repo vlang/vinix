@@ -2,6 +2,7 @@
 module ahci
 
 import pci
+import proc
 import memory
 import stat
 import klock
@@ -13,7 +14,6 @@ import fs
 import katomic
 import lib
 import time.sys
-import proc
 import x86.hpet as hpet_clock
 
 const ahci_class = 0x1
@@ -81,8 +81,8 @@ pub mut:
 	sntf      u32
 	fbs       u32
 	devslp    u32
-	reserved1 [11]u32
-	vs        [10]u32
+	reserved1 [10]u32
+	vs        [4]u32
 }
 
 @[packed]
@@ -308,9 +308,14 @@ fn (mut dev AHCIDevice) transfer(buffer voidptr, loc u64, count u64, write bool)
 		if !write && user {
 			unsafe { C.memcpy(caller, staging, chunk) }
 		}
+		proc.account_disk_io(chunk, write)
 		done += chunk
 	}
 	return i64(count)
+}
+
+fn (dev &AHCIDevice) block_identity() resource.BlockIdentity {
+	return resource.BlockIdentity{is_block: true, disk_id: dev.stat.rdev, length: u64(dev.stat.size)}
 }
 
 fn (mut dev AHCIDevice) ioctl(handle voidptr, request u64, argp voidptr) ?int {
@@ -654,8 +659,10 @@ pub fn (mut c AHCIController) initialise(pci_device &pci.PCIDevice) int {
 	regs.ghc |= (1 << 31)
 	regs.ghc &= ~(1 << 1)
 
-	c.port_cnt = regs.cap & 0b11111
-	c.cmd_slots = (regs.cap >> 8) & 0b11111
+	// CAP.NP encodes the last port number, rather than the port count.
+	c.port_cnt = (regs.cap & 0b11111) + 1
+	// CAP.NCS similarly encodes the last usable command slot.
+	c.cmd_slots = ((regs.cap >> 8) & 0b11111) + 1
 
 	for i := u64(0); i < c.port_cnt; i++ {
 		if regs.pi & (1 << i) != 0 {

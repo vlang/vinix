@@ -723,8 +723,13 @@ fn internal_create_with_acl(parent &VFSNode, name string, mode u32, access u32,
 fn fdnum_create_from_node(mut node VFSNode, flags int, oldfd int, specific bool, identity &lib.MountContext) ?int {
 	current_process := proc.current_thread().process
 	mut node_resource := node.resource
-	mut opened_resource := resource.open_resource(mut node_resource, flags)?
-	mut fd := file.fd_create_from_resource(mut opened_resource, flags) or { return none }
+	opened_resource := resource.open_resource(mut node_resource, flags) or { return none }
+	// Keep nsfs pins on the shared open description, including O_PATH. A
+	// concrete dispatch avoids boxing another interface on every open.
+	if mut node_resource is NsFSResource {
+		node_resource.pin_description()?
+	}
+	mut fd := file.fd_create_from_opened(opened_resource, flags) or { return none }
 	fd.handle.mac_device = stat.ischr(node.resource.stat.mode) || stat.isblk(node.resource.stat.mode)
 	fd.handle.mac_block_device = stat.isblk(node.resource.stat.mode)
 	fd.handle.node = voidptr(node)
@@ -995,6 +1000,10 @@ pub fn syscall_openat(_ voidptr, dirfd int, _path charptr, flags int, mode u32) 
 		|| flags & resource.o_trunc != 0 {
 		requested |= access_write
 	}
+	if flags & resource.o_path == 0 && requested & access_write != 0
+		&& !security.user_device_write_allowed(mut node.resource) {
+		return errno.err, errno.get()
+	}
 	if !created && flags & resource.o_path == 0 && requested != 0 {
 		check_access(node, requested, true) or { return errno.err, errno.get() }
 	}
@@ -1074,8 +1083,8 @@ fn open_anonymous_descriptor(descriptor AnonymousDescriptor, flags int) (u64, u6
 	if !stat.isifo(res.stat.mode) {
 		return errno.err, errno.enxio
 	}
-	mut opened := resource.open_resource(mut res, flags) or { return errno.err, errno.get() }
-	mut new_fd := file.fd_create_from_resource(mut opened, flags) or {
+	opened := resource.open_resource(mut res, flags) or { return errno.err, errno.get() }
+	mut new_fd := file.fd_create_from_opened(opened, flags) or {
 		return errno.err, errno.get()
 	}
 	fdnum := file.fdnum_create_from_fd(unsafe { nil }, new_fd, 0, false) or {
@@ -1665,6 +1674,16 @@ pub fn syscall_readdir(_ voidptr, fdnum int, mut buf stat.Dirent) (u64, u64) {
 		defer {
 			unsafe { names.free() }
 		}
+		// Validate the complete snapshot before copying a name into its fixed
+		// Dirent buffer. tmpfs can contain names longer than EXT2's 255-byte
+		// limit; return an error instead of overflowing the cached entry.
+		for name in names {
+			if name.len >= 1024 {
+				errno.set(errno.enametoolong)
+				return errno.err, errno.enametoolong
+			}
+		}
+		mut new_dirent := unsafe { &stat.Dirent(C.vinix_stack_alloc(sizeof(stat.Dirent))) }
 		mut i := u64(0)
 		for name in names {
 			node := reduce_node(unsafe { dir_node.children[name] }, false)
@@ -1694,14 +1713,16 @@ pub fn syscall_readdir(_ voidptr, fdnum int, mut buf stat.Dirent) (u64, u64) {
 					stat.dt_unknown
 				}
 			}
-			mut new_dirent := stat.Dirent{
-				ino:    node.resource.stat.ino
-				off:    i++
-				reclen: u16(sizeof(stat.Dirent))
-				@type:  u8(t)
+			unsafe {
+				*new_dirent = stat.Dirent{
+					ino:    node.resource.stat.ino
+					off:    i++
+					reclen: u16(sizeof(stat.Dirent))
+					@type:  u8(t)
+				}
 			}
-			C.strcpy(&new_dirent.name[0], name.str)
-			dir_handle.dirlist << new_dirent
+			unsafe { C.memcpy(&new_dirent.name[0], name.str, u64(name.len)) }
+			dir_handle.dirlist << *new_dirent
 		}
 		dir_handle.dirlist_valid = true
 	}

@@ -5,6 +5,7 @@ import lib
 import limine
 import klock
 import event.eventstruct
+import katomic
 
 fn C.text_start()
 
@@ -25,6 +26,7 @@ pub const pte_writable = u64(1) << 1
 pub const pte_user = u64(1) << 2
 pub const pte_device = u64(1) << 3 // ARM64: use Device-nGnRnE memory type for MMIO
 pub const pte_uncached = u64(1) << 4 // ARM64: use Normal Non-Cacheable for framebuffers
+pub const pte_execute_only = u64(1) << 5 // ARM64: EL0 instruction fetch without data access
 pub const pte_noexec = u64(1) << 63
 pub const kernel_page_size = u64(0x1000)
 
@@ -44,6 +46,7 @@ pub __global (
 	vmm_initialised  = bool(false)
 	cow_resolver     fn (&Pagemap, u64) bool
 	page_in_resolver fn (&Pagemap, u64) bool
+	locked_bytes_resolver fn (&Pagemap) u64
 )
 
 pub fn register_cow_resolver(resolver fn (&Pagemap, u64) bool) {
@@ -72,9 +75,24 @@ pub fn resolve_missing_page(pagemap &Pagemap, address u64) bool {
 	return page_in_resolver(pagemap, address)
 }
 
+pub fn register_locked_bytes_resolver(resolver fn (&Pagemap) u64) {
+	locked_bytes_resolver = resolver
+}
+
+pub fn locked_bytes(pagemap &Pagemap) u64 {
+	if pagemap == unsafe { nil } || locked_bytes_resolver == unsafe { nil } { return 0 }
+	return locked_bytes_resolver(pagemap)
+}
+
 pub struct Pagemap {
 pub mut:
 	l           klock.Lock
+	// MCL_FUTURE belongs to the address space shared by CLONE_VM threads.
+	lock_future bool
+	// Resident user-address leaf mappings only; writers hold l, observers use atomics.
+	track_residency bool
+	resident_bytes u64
+	peak_resident_bytes u64
 	top_level   &u64 = unsafe { nil }
 	mmap_ranges []voidptr
 	// Search tree for mmap ranges; its nodes are owned by mmap_ranges.
@@ -129,5 +147,23 @@ fn map_kernel_span(virt u64, phys u64, len u64, flags u64) {
 
 	for i := u64(0); i < aligned_len; i += kernel_page_size {
 		kernel_pagemap.map_page(virt + i, phys + i, flags) or { panic('vmm init failure') }
+	}
+}
+
+// Called under pagemap.l, or while constructing an unpublished fork map,
+// after a successful leaf descriptor update. Shadow
+// backing maps do not track residency; kernel addresses are excluded. A
+// PROT_NONE page still consumes resident memory until actually unmapped.
+pub fn (mut pagemap Pagemap) account_resident(virt u64, was_present bool, is_present bool) {
+	if !pagemap.track_residency || virt >= user_address_limit() || was_present == is_present { return }
+	old := pagemap.resident_bytes
+	if is_present {
+		next := old + page_size
+		katomic.store(mut &pagemap.resident_bytes, next)
+		if next > pagemap.peak_resident_bytes {
+			katomic.store(mut &pagemap.peak_resident_bytes, next)
+		}
+	} else if old >= page_size {
+		katomic.store(mut &pagemap.resident_bytes, old - page_size)
 	}
 }

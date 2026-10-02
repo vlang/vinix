@@ -24,12 +24,12 @@ mut:
 	can_mmap bool
 }
 
-fn (mut this DevTty) open(flags int) ?&resource.Resource {
-	session := proc.current_thread().process.tty_session
-	if terminal := pty.open_session_terminal(session, flags) {
+fn (mut this DevTty) open_owned(flags int) ?&resource.Resource {
+	device, session := proc.controlling_terminal_identity()
+	if terminal := pty.open_session_terminal(device, session, flags) {
 		return terminal
 	}
-	if terminal := console.session_terminal(session) {
+	if terminal := console.session_terminal(device, session) {
 		return terminal
 	}
 	// No controlling terminal, as for a daemon or a process that has called
@@ -72,9 +72,14 @@ fn (mut this DevTty) grow(_handle voidptr, _new_size u64) ? {
 }
 
 pub fn initialise() {
+	proc.register_session_exit_hook(voidptr(session_exit))
 	mut device := &DevTty{}
 	device.stat.blksize = 4096
 	device.stat.rdev = resource.create_dev_id()
 	device.stat.mode = 0o666 | stat.ifchr
 	fs.devtmpfs_add_device(device, 'tty')
+}
+
+fn session_exit(device u64, session int) {
+	if !pty.session_exit(device, session) { console.session_exit(device, session) }
 }

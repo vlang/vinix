@@ -41,7 +41,13 @@ pub fn syscall_trace(frame &cpulocal.GPRState) u64 {
 	t.syscall_x1 = frame.rsi
 	t.syscall_x2 = frame.rdx
 	t.syscall_x3 = frame.r10
-	process := t.process
+	mut process := t.process
+	if !proc.syscall_stack_allowed(mut process, frame.rsp) {
+		userland.exit_with_fatal_signal(u8(11))
+	}
+	if !proc.syscall_origin_allowed(mut process, nr, frame.rip - 2) {
+		userland.exit_with_fatal_signal(u8(6))
+	}
 	if process.seccomp_mode != proc.seccomp_mode_disabled {
 		slot := seccomp_entry(mut t, frame, nr)
 		if slot != nr {

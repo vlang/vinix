@@ -33,6 +33,9 @@ pub const willneed = 3
 pub const dontneed = 4
 
 pub type IO = fn (voidptr, voidptr, u64, u64) ?i64
+pub type Flush = fn (context voidptr) ?
+
+fn C.vinix_stack_alloc(size u64) voidptr
 
 struct Page {
 mut:
@@ -128,9 +131,10 @@ mut:
 	owner        voidptr
 	size         u64
 	// Recorded by register_cache so a descriptor-less flush -- sync(2), or the
-	// reboot path -- can reach the backing store. Both are nil until then.
+	// reboot path -- can reach the backing store and its completion barrier.
 	writeback_context voidptr
 	writeback         IO
+	writeback_flush   Flush = unsafe { nil }
 pub:
 	capacity int = default_capacity
 }
@@ -615,16 +619,68 @@ pub fn (mut this Cache) prefetch(context voidptr, load IO, store IO, loc u64, co
 	last := (loc + count - 1) / page_bytes
 	mut index := loc / page_bytes
 	mut budget := this.capacity
+	// One bounded slot per invocation, outside the loop. The cache owns a
+	// page only after the entire clustered transfer succeeds.
+	pages := unsafe { &voidptr(C.vinix_stack_alloc(max_run_pages * sizeof(voidptr))) }
 	for index <= last && budget > 0 {
-		if this.resident >= this.capacity {
-			victim := this.victim()
-			if victim != unsafe { nil } && victim.dirty {
-				return
-			}
+		mut resident := this.resident_page(index)
+		if resident != unsafe { nil } {
+			this.unlink(mut resident)
+			this.link_recent(mut resident)
+			index++
+			budget--
+			continue
 		}
-		this.get(context, load, store, index, true) or { return }
-		index++
-		budget--
+		mut wanted := u64(1)
+		for wanted < max_run_pages && wanted < u64(budget) && wanted < u64(this.capacity)
+			&& wanted <= last - index && this.resident_page(index + wanted) == unsafe { nil } {
+			wanted++
+		}
+		// Speculation can replace clean pages, but cannot initiate writeback
+		// or exceed the residency bound when every victim is busy or dirty.
+		for this.resident + int(wanted) > this.capacity {
+			mut victim := this.victim()
+			if victim == unsafe { nil } || victim.dirty {
+				available := this.capacity - this.resident
+				if available <= 0 { return }
+				wanted = u64(available)
+				break
+			}
+			this.withdraw(mut victim)
+			free_page(victim)
+		}
+		buffer := memory.malloc_packed_fallible(wanted * page_bytes)
+		if buffer == unsafe { nil } { return }
+		mut made := u64(0)
+		mut bytes := u64(0)
+		for made < wanted {
+			mut page := new_page()
+			if page == unsafe { nil } { break }
+			data := page.data
+			unsafe { C.memset(page, 0, sizeof(Page)) }
+			page.data = data
+			page.index = index + made
+			page.valid = if size - page.index * page_bytes < page_bytes {
+				size - page.index * page_bytes
+			} else { page_bytes }
+			unsafe { pages[made] = voidptr(page) }
+			bytes += page.valid
+			made++
+		}
+		read := if made != 0 { load(context, buffer, index * page_bytes, bytes) or { i64(-1) } } else { i64(-1) }
+		for slot := u64(0); slot < made; slot++ {
+			mut page := unsafe { &Page(pages[slot]) }
+			if read != i64(bytes) {
+				free_page(page)
+				continue
+			}
+			unsafe { C.memcpy(page.data, voidptr(u64(buffer) + slot * page_bytes), page.valid) }
+			this.publish(mut page)
+		}
+		unsafe { free(buffer) }
+		if made == 0 || read != i64(bytes) { return }
+		index += made
+		budget -= int(made)
 	}
 }
 

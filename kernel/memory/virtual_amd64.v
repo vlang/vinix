@@ -51,6 +51,7 @@ pub fn new_pagemap() &Pagemap {
 	}
 	mut pagemap := &Pagemap{
 		top_level:   top_level
+		track_residency: true
 		mmap_ranges: []voidptr{}
 	}
 	// Nothing keeps a copy of the list, so growing it can give back the
@@ -179,6 +180,7 @@ pub fn (mut pagemap Pagemap) unmap_page_unlocked(virt u64) ? {
 	unsafe {
 		old := *pte_p
 		*pte_p = 0
+		pagemap.account_resident(virt, old & pte_present != 0, false)
 		// The next entry usually remains mapped while a contiguous range is
 		// removed in address order. Check it first; sparse tables still get
 		// the complete scan, including entries with software-only flags.
@@ -250,12 +252,15 @@ pub fn (mut pagemap Pagemap) flag_page(virt u64, flags u64) ? {
 		return none
 	}
 
+	old := unsafe { *pte_p }
 	unsafe {
 		*pte_p &= pte_flags_mask
 	}
 	unsafe {
 		*pte_p |= flags
 	}
+	pagemap.account_resident(virt, old & pte_present != 0,
+		flags & pte_present != 0)
 	pagemap.invalidate(virt)
 }
 
@@ -290,6 +295,8 @@ pub fn (mut pagemap Pagemap) map_page_unlocked(virt u64, phys u64, flags u64) ? 
 	unsafe {
 		*entry = phys | flags
 	}
+	pagemap.account_resident(virt, old & pte_present != 0,
+		flags & pte_present != 0)
 	// Nothing caches an entry that was not present.
 	if old & 1 != 0 {
 		pagemap.invalidate(virt)

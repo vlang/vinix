@@ -2,6 +2,7 @@
 module net
 
 import errno
+import klock
 import proc
 import security
 import usercopy
@@ -13,6 +14,7 @@ const uts_name_len = 65
 __global (
 	hostname   [uts_name_len]char
 	domainname [uts_name_len]char
+	domainname_lock klock.Lock
 )
 
 fn uts_namespace() &proc.Namespace {
@@ -93,6 +95,14 @@ pub fn syscall_setdomainname(_ voidptr, name charptr, len u64) (u64, u64) {
 	if ns != unsafe { nil } {
 		ns.domainname = text
 		return 0, 0
+	}
+	defer { unsafe { text.free() } }
+	domainname_lock.acquire()
+	defer { domainname_lock.release() }
+	// Seal an established system domain above insecure mode. Private UTS
+	// namespaces retain their own names and may configure them independently.
+	if security.securelevel() >= 1 && domainname[0] != 0 {
+		return errno.err, errno.eperm
 	}
 	unsafe {
 		C.memset(&domainname[0], 0, uts_name_len)

@@ -9,6 +9,7 @@ import lib
 // Failure injection belongs to the constructing task, so unrelated kernel
 // workers cannot consume it when the caller migrates or sleeps in reclaim.
 pub fn test_kernel_thread_failure(stage int) {
+	$if kernel_stack_selftest ? { kernel_thread_stack_test_stage = stage }
 	$if linuxkpi ? {
 		mut caller := proc.current_thread()
 		if caller != unsafe { nil } {
@@ -21,6 +22,10 @@ pub fn test_kernel_thread_failure(stage int) {
 // thread is not queued or pinned; its caller must publish it or discard it.
 pub fn try_new_kernel_thread(pc voidptr, arg voidptr) ?&proc.Thread {
 	mut fail_stage := 0
+	$if kernel_stack_selftest ? {
+		fail_stage = kernel_thread_stack_test_stage
+		kernel_thread_stack_test_stage = 0
+	}
 	$if linuxkpi ? {
 		mut caller := proc.current_thread()
 		if caller != unsafe { nil } {
@@ -28,29 +33,28 @@ pub fn try_new_kernel_thread(pc voidptr, arg voidptr) ?&proc.Thread {
 			caller.kernel_thread_fail_stage = 0
 		}
 	}
-	stack_pages := stack_size / page_size
 	fpu_pages := lib.div_roundup(fpu_storage_size, page_size)
-	stack_phys := if fail_stage == 1 {
+	stack_base := if fail_stage == 1 {
 		unsafe { nil }
 	} else {
-		memory.pmm_alloc_fallible(stack_pages)
+		memory.kernel_stack_alloc(stack_size)
 	}
-	if stack_phys == unsafe { nil } {
+	if stack_base == unsafe { nil } {
 		return none
 	}
-	pf_stack_phys := if fail_stage == 2 {
+	pf_stack_base := if fail_stage == 2 {
 		unsafe { nil }
 	} else {
-		memory.pmm_alloc_fallible(stack_pages)
+		memory.kernel_stack_alloc(stack_size)
 	}
-	if pf_stack_phys == unsafe { nil } {
-		memory.pmm_free(stack_phys, stack_pages)
+	if pf_stack_base == unsafe { nil } {
+		memory.kernel_stack_free(u64(stack_base))
 		return none
 	}
 	fpu_phys := if fail_stage == 3 { unsafe { nil } } else { memory.pmm_alloc_fallible(fpu_pages) }
 	if fpu_phys == unsafe { nil } {
-		memory.pmm_free(pf_stack_phys, stack_pages)
-		memory.pmm_free(stack_phys, stack_pages)
+		memory.kernel_stack_free(u64(pf_stack_base))
+		memory.kernel_stack_free(u64(stack_base))
 		return none
 	}
 	thread_mem := if fail_stage == 4 {
@@ -60,12 +64,12 @@ pub fn try_new_kernel_thread(pc voidptr, arg voidptr) ?&proc.Thread {
 	}
 	if thread_mem == unsafe { nil } {
 		memory.pmm_free(fpu_phys, fpu_pages)
-		memory.pmm_free(pf_stack_phys, stack_pages)
-		memory.pmm_free(stack_phys, stack_pages)
+		memory.kernel_stack_free(u64(pf_stack_base))
+		memory.kernel_stack_free(u64(stack_base))
 		return none
 	}
 
-	stack := u64(stack_phys) + stack_size + higher_half
+	stack := u64(stack_base) + stack_size
 	// IRET has no CALL return address; preserve the SysV function-entry ABI.
 	entry_stack := stack - 8
 	unsafe { C.memset(voidptr(entry_stack), 0, 8) }
@@ -89,7 +93,7 @@ pub fn try_new_kernel_thread(pc voidptr, arg voidptr) ?&proc.Thread {
 			timeslice:    5000
 			running_on:   u64(-1)
 			kernel_stack: stack
-			pf_stack:     u64(pf_stack_phys) + stack_size + higher_half
+			pf_stack:     u64(pf_stack_base) + stack_size
 			fpu_storage:  voidptr(u64(fpu_phys) + higher_half)
 		}
 	}

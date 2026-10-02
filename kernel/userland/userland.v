@@ -88,10 +88,10 @@ fn resume_sigreturn(context cpulocal.GPRState, old_mask u64) {
 // installed without SA_RESTART.
 pub fn prepare_syscall_restart(context &cpulocal.GPRState) {
 	mut ctx := unsafe { context }
-	if ctx.rax != u64(-i64(proc.interrupted_errno)) {
-		return
-	}
 	mut t := proc.current_thread()
+	job_ipc := ctx.rax == u64(-i64(errno.eintr)) && (t.restart_nr == 69 || t.restart_nr == 70)
+		&& job_wake_restarts_syscall(t)
+	if ctx.rax != u64(-i64(proc.interrupted_errno)) && !job_ipc { return }
 	ctx.rax = t.restart_nr
 	// SYSCALL is two bytes long, and SYSRET returns to rcx.
 	ctx.rip -= 2
@@ -102,8 +102,7 @@ pub fn prepare_syscall_restart(context &cpulocal.GPRState) {
 // An interrupt returning to userspace sends `t` into the kernel for an
 // unblocked signal, a pending exit, or a process stop that must park it.
 fn owes_async_work(t &proc.Thread) bool {
-	if katomic.load(&t.must_exit) || (t.process != unsafe { nil }
-		&& katomic.load(&t.process.job_stopped)) {
+	if katomic.load(&t.must_exit) || owes_job_stop(t) {
 		return true
 	}
 	pending := katomic.load(&t.pending_signals)
@@ -184,26 +183,11 @@ fn async_signal_entry() {
 }
 
 fn dispatch_signal(context &cpulocal.GPRState, info_signum int, info_code int, info_addr u64) {
+	job_boundary()
 	mut t := unsafe { proc.current_thread() }
 	restarting := t.restarting_syscall
 	t.restarting_syscall = false
-
-	mut which := -1
-
-	// Signal n is bit n-1, as in Linux's sigsets. SIGKILL and SIGSTOP get
-	// through whatever the mask says, so that a wait that installed a full
-	// temporary mask cannot keep the process alive against kill -9.
-	for i := u8(0); i < 64; i++ {
-		signum := int(i) + 1
-		unblockable := signum == sigkill || signum == sigstop
-		if !unblockable && t.masked_signals & (u64(1) << i) != 0 {
-			continue
-		}
-		if katomic.btr(mut &t.pending_signals, i) == true {
-			which = signum
-			break
-		}
-	}
+	which := take_pending_signal(mut t)
 
 	if which == -1 {
 		return
@@ -507,8 +491,9 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 		// freed below.
 		proc.lock_table()
 		mut old_pagemap := process.pagemap
+		proc.preserve_peak_rss(process, old_pagemap)
 		process.pagemap = new_pagemap
-		process.dumpable = process.uid == process.euid && process.gid == process.egid
+		proc.dumpability_after_exec(mut process)
 		proc.unlock_table()
 		// The LDT goes with the program, as on Linux; the new thread's TLS
 		// descriptors start empty.
@@ -541,6 +526,12 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 		process.sigcookie = proc.new_sigcookie()
 
 		kernel_pagemap.switch_to()
+		// Exec retains the calling task's accounting even though Vinix builds
+		// a replacement Thread. Finish its old-process CPU turn before detach.
+		proc.charge_cpu_time(mut t, proc.cpu_time_now_ns())
+		inherited_usage := t.usage
+		inherited_user_ns := t.cpu_user_ns
+		inherited_system_ns := t.cpu_system_ns
 		t.process = kernel_process
 
 		mmap.delete_pagemap(mut old_pagemap) or {
@@ -577,6 +568,10 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 		if t.tid != process.pid {
 			proc.free_tid(t.tid)
 		}
+		new_thread.usage = inherited_usage
+		new_thread.cpu_user_ns = inherited_user_ns
+		new_thread.cpu_system_ns = inherited_system_ns
+		new_thread.cpu_time_ns = inherited_user_ns + inherited_system_ns
 		proc.set_thread_sched_params(new_thread.tid, inherited_sched)
 
 		// execve keeps the signal mask and what was ignored; only handlers,

@@ -24,18 +24,18 @@ fn read_clock(clock_id int) ?time.TimeSpec {
 		time.clock_type_monotonic {
 			return time.clock_now(time.clock_type_monotonic)
 		}
-		// CLOCK_MONOTONIC_RAW and CLOCK_BOOTTIME differ from CLOCK_MONOTONIC
-		// only in ways this kernel does not model: no frequency adjustment and
-		// no suspend to miss.
-		4, 7 {
+		// RAW excludes frequency/phase discipline. BOOTTIME has no suspend
+		// interval to include until platform suspend is implemented.
+		4 { return time.clock_now(4) }
+		7 {
 			return time.clock_now(time.clock_type_monotonic)
 		}
 		// The _COARSE clocks are the same clocks, sampled cheaply.
 		5 {
-			return realtime_clock
+			return time.clock_coarse_now(time.clock_type_realtime)
 		}
 		6 {
-			return monotonic_clock
+			return time.clock_coarse_now(time.clock_type_monotonic)
 		}
 		// The CPU time of the calling process and thread.
 		clock_process_cputime_id {
@@ -130,7 +130,8 @@ pub fn syscall_clock_getres(_ voidptr, clock_id int, res u64) (u64, u64) {
 	read_clock(clock_id) or { return errno.err, errno.get() }
 
 	if res != 0 {
-		tick_sampled := is_cpu_clock(clock_id) || clock_id == 5 || clock_id == 6
+		mut tick_sampled := clock_id == 5 || clock_id == 6
+		$if amd64 { tick_sampled = tick_sampled || is_cpu_clock(clock_id) }
 		resolution := time.TimeSpec{
 			tv_sec:  0
 			tv_nsec: i64(if tick_sampled {
@@ -153,7 +154,7 @@ pub fn syscall_clock_getres(_ voidptr, clock_id int, res u64) (u64, u64) {
 pub fn syscall_clock_nanosleep(_ voidptr, clock_id int, flags int, request u64, remain u64) (u64, u64) {
 	// A sleep here is measured in time passing; one until a CPU clock reaches
 	// a value is not something it can wait for.
-	if is_cpu_clock(clock_id) {
+	if is_cpu_clock(clock_id) || flags & ~timer_abstime != 0 {
 		return errno.err, errno.einval
 	}
 	now := read_clock(clock_id) or { return errno.err, errno.get() }
@@ -186,7 +187,9 @@ pub fn syscall_clock_nanosleep(_ voidptr, clock_id int, flags int, request u64, 
 		unsafe { events.free() }
 	}
 
-	mut timer := time.new_timer(duration)
+	mut timer := if flags & timer_abstime != 0 && clock_id == time.clock_type_realtime {
+		time.new_realtime_timer(wanted)
+	} else { time.new_timer(duration) }
 	events << &timer.event
 	defer {
 		timer.disarm()

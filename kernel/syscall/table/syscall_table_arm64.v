@@ -140,6 +140,13 @@ pub fn syscall_trace(gpr_state voidptr) u64 {
 	sched.poll_syscall_input()
 	mut current_thread := proc.current_thread()
 	current_thread.audit_sequence = 0
+	mut stack_process := current_thread.process
+	if !proc.syscall_stack_allowed(mut stack_process, gpr.sp) {
+		userland.exit_with_fatal_signal(u8(11))
+	}
+	if !proc.syscall_origin_allowed(mut stack_process, nr, gpr.pc - 4) {
+		userland.exit_with_fatal_signal(u8(6))
+	}
 	current_thread.syscall_x0 = gpr.x0
 	current_thread.syscall_nr = i64(nr)
 	current_thread.syscall_x1 = gpr.x1
@@ -239,59 +246,9 @@ fn syscall_linux_mmap(gpr_state voidptr, addr voidptr, length u64, prot u64, fla
 	return file.syscall_mmap(gpr_state, addr, length, prot_and_flags, fdnum, offset)
 }
 
-// Linux getdents64(fd, dirp, count) — fill buffer with directory entries.
-// Vinix readdir returns one entry at a time; we loop to fill the buffer.
+// The bounded scratch storage and record layouts are shared with amd64.
 fn syscall_linux_getdents64(gpr_state voidptr, fdnum int, dirp u64, count u64) (u64, u64) {
-	// One synchronous scratch record per syscall, independent of directory size.
-	mut dirent := unsafe { &stat.Dirent(C.__builtin_alloca(sizeof(stat.Dirent))) }
-	mut offset := u64(0)
-	for {
-		unsafe { *dirent = stat.Dirent{} }
-		ret, err := fs.syscall_readdir(gpr_state, fdnum, mut dirent)
-		if err != 0 {
-			if offset > 0 {
-				return offset, 0
-			}
-			return ret, err
-		}
-		// Vinix readdir returns (errno.err, 0) at end of directory
-		if ret == errno.err {
-			break
-		}
-		// Calculate name length
-		mut name_len := u64(0)
-		for name_len < 1024 && dirent.name[name_len] != 0 {
-			name_len++
-		}
-		// Record length: d_ino(8) + d_off(8) + d_reclen(2) + d_type(1) + name + null, aligned to 8
-		reclen := (u64(19) + name_len + u64(1) + u64(7)) & ~u64(7)
-		if offset + reclen > count {
-			// syscall_readdir() advances the shared directory position. Leave
-			// this entry for the next getdents64 call instead of losing it.
-			fs.readdir_unread(fdnum)
-			if offset == 0 { return errno.err, errno.einval }
-			break
-		}
-		// Build the entry in a kernel buffer and copy it out, so a bad `dirp`
-		// fails with EFAULT rather than faulting the kernel. reclen is bounded
-		// by the 1024-byte name limit above.
-		mut record := [1064]u8{}
-		unsafe {
-			*&u64(&record[0]) = dirent.ino
-			*&u64(&record[8]) = dirent.off
-			*&u16(&record[16]) = u16(reclen)
-			record[18] = dirent.@type
-			C.memcpy(voidptr(&record[19]), &dirent.name[0], name_len + 1)
-		}
-		if !usercopy.copy_to_user(dirp + offset, unsafe { voidptr(&record[0]) }, reclen) {
-			if offset > 0 {
-				return offset, 0
-			}
-			return errno.err, errno.efault
-		}
-		offset += reclen
-	}
-	return offset, 0
+	return linux_getdents(gpr_state, fdnum, dirp, count, false)
 }
 
 // Linux uname(buf); see linux_uname().
@@ -609,12 +566,12 @@ pub fn init_syscall_table() {
 	syscall_table[226] = voidptr(mmap.syscall_mprotect) // __NR_mprotect
 	syscall_table[232] = voidptr(mmap.syscall_mincore) // __NR_mincore
 	syscall_table[227] = voidptr(mmap.syscall_msync) // __NR_msync
-	syscall_table[228] = voidptr(syscall_linux_mlock) // __NR_mlock
-	syscall_table[229] = voidptr(syscall_linux_mlock) // __NR_munlock
-	syscall_table[230] = voidptr(syscall_linux_mlockall) // __NR_mlockall
-	syscall_table[231] = voidptr(syscall_linux_munlockall) // __NR_munlockall
+	syscall_table[228] = voidptr(mmap.syscall_mlock) // __NR_mlock
+	syscall_table[229] = voidptr(mmap.syscall_munlock) // __NR_munlock
+	syscall_table[230] = voidptr(mmap.syscall_mlockall) // __NR_mlockall
+	syscall_table[231] = voidptr(mmap.syscall_munlockall) // __NR_munlockall
 	syscall_table[233] = voidptr(mmap.syscall_madvise) // __NR_madvise
-	syscall_table[284] = voidptr(syscall_linux_mlock2) // __NR_mlock2
+	syscall_table[284] = voidptr(mmap.syscall_mlock2) // __NR_mlock2
 
 	// Misc
 	syscall_table[260] = voidptr(userland.syscall_wait4) // __NR_wait4
@@ -632,4 +589,5 @@ pub fn init_syscall_table() {
 	// io_pgetevents: a program calling statx got set_tls with statx's arguments.
 	syscall_table[245] = voidptr(cpu.syscall_set_tls)
 	syscall_table[246] = voidptr(userland.syscall_sigentry)
+	init_sysv_message_syscalls()
 }

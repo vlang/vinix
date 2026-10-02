@@ -234,6 +234,21 @@ pub mut:
 	wait_pins int
 	reaped_wait_next &Process = unsafe { nil }
 	reaped_wait_ns u64
+	// Child state publication and group-stop acknowledgement. Lock ordering is
+	// threads_lock -> job_lock; child wait scans use children_lock -> job_lock.
+	job_lock                klock.Lock
+	job_stop_signal         int
+	job_generation          u64
+	job_continue_generation u64
+	job_stop_complete       bool
+	wait_stop_signal        int
+	wait_stop_epoch         u64
+	wait_continue_epoch     u64
+	wait_exit_ready         bool
+	wait_busy               bool
+	wait_reaped             bool
+	child_generation        u64
+	child_waiters           voidptr
 	mmap_anon_non_fixed_base u64
 	// Program break. It gets its own arena so that growing it can never run
 	// into the anonymous mmap region or the thread stacks.
@@ -260,13 +275,9 @@ pub mut:
 	// Set once exit_group() (or a fatal fault) has started tearing the
 	// process down, so late-arriving threads do not try to do it again.
 	exiting bool
-	// Job control is process-wide: every thread parks at a safe user boundary.
-	// The parent's child_event wakes waiters without consuming the exit event.
-	job_stopped bool
-	job_stop_pending bool
-	job_continue_pending bool
-	job_stop_signal int
-	job_lock klock.Lock
+	// Deferred delivery work is drained after signal-info/table/list locks.
+	job_wake_pending bool
+	job_notify_pending bool
 	name    string
 	// Resolved program path used by the Linux /proc/self/exe compatibility
 	// link. Keep it separate from name, which prctl(PR_SET_NAME) may change.
@@ -276,9 +287,19 @@ pub mut:
 	// Some compatibility runtimes require an RWX probe even when their generated
 	// code runs interpreted. Exec replaces this opt-in; fork preserves it.
 	allow_wx bool
-	// Linux PR_SET_DUMPABLE: also gates unprivileged process inspection.
-	// Fork inherits it; exec and effective credential changes replace it.
-	dumpable bool = true
+	// Linux PR_SET_DUMPABLE governs access to process layout as well as any
+	// future core writer. An ordinary new program starts dumpable.
+	dumpable u32 = 1
+	// A parent may no longer change its child's process group after exec.
+	did_exec u32
+	stack_policy_mode u32
+	stack_policy_violations u64
+	// The immutable syscall table is shared by fork children; this lock pins
+	// it while entry checks or an exec reset read the pointer.
+	syscall_policy_lock klock.Lock
+	syscall_policy &SyscallPolicy = unsafe { nil }
+	syscall_policy_mode u32
+	syscall_policy_violations u64
 	// Where a signal handler returns to when it names no SA_RESTORER of its
 	// own; see install_sigreturn_page() in userland.
 	sigreturn_page u64
@@ -300,6 +321,9 @@ pub mut:
 	// The controlling terminal's session, from setsid(2). A process is a
 	// session leader when sid == pid.
 	tty_session int
+	tty_device u64
+	// Scalar namespace identity for the coherent fork group snapshot.
+	inherited_job_namespace u64
 
 	// Nanoseconds this process' threads have spent on a CPU, summed over the
 	// life of the process and over every thread it has ever had — a thread
@@ -327,6 +351,10 @@ pub mut:
 	children_cpu_time_ns u64
 	children_cpu_user_ns u64
 	children_cpu_system_ns u64
+	usage UsageCounters
+	children_usage UsageCounters
+	peak_rss_bytes u64
+	children_peak_rss_bytes u64
 	// POSIX nice value. The scheduler scales this process' timeslices from
 	// -20 (highest normal priority) through 19 (lowest).
 	nice int
@@ -458,7 +486,7 @@ fn id_is_a_live_group(id int) bool {
 // or session still goes by it. Called with pid_lock held.
 fn id_is_free(id int) bool {
 	return processes[id] == unsafe { nil } && threads_by_tid[id] == unsafe { nil }
-		&& !id_is_a_live_group(id)
+		&& job_identity_holds[id] == 0 && !id_is_a_live_group(id)
 }
 
 // Ids released most recently, which a random pick passes over; see
@@ -685,11 +713,38 @@ fn quarantine_reaped(p &Process) {
 	reaped_at_ns[slot] = now
 }
 
+// A pinned table lookup remains valid after dropping pid_lock. If the bounded
+// quarantine replaces its slot, the last pin takes responsibility for freeing.
+pub fn pin_process_at(pid int) &Process {
+	if pid <= 0 || pid >= max_pid { return unsafe { nil } }
+	pid_lock.acquire()
+	mut process := processes[pid]
+	if process != unsafe { nil } { pin_process(process) }
+	pid_lock.release()
+	return process
+}
+
+pub fn pin_next_group_member(pgid int, sid int, after int) &Process {
+	pid_lock.acquire()
+	defer { pid_lock.release() }
+	for pid := after + 1; pid < max_pid; pid++ {
+		mut process := processes[pid]
+		if process != unsafe { nil } && process.pgid == pgid
+			&& (sid == 0 || process.sid == sid) && !process.exiting {
+			pin_process(process)
+			return process
+		}
+	}
+	return unsafe { nil }
+}
+
+
 // free_process_memory frees a reaped process and what only it owned. Its
 // descriptors, address space, unveil set, namespaces and pid went at exit and
 // reap; its seccomp filters and cgroup are shared and stay.
 fn free_process_memory(p &Process) {
 	mut process := unsafe { p }
+	syscall_policy_reset(mut process)
 	unsafe {
 		process.name.free()
 		process.executable_path.free()
@@ -754,6 +809,9 @@ pub fn cpu_clock_ns(id int, per_thread bool, now_ns u64) ?u64 {
 // A reaped child's time, and that of the children it reaped in turn, is its
 // parent's children's time: `time make` counts the compilers make ran.
 pub fn account_reaped_child(mut parent Process, child &Process) {
+	parent.cpu_lock.acquire()
+	defer { parent.cpu_lock.release() }
+	account_reaped_usage(mut parent, child)
 	child_time := katomic.load(&child.cpu_time_ns) + katomic.load(&child.children_cpu_time_ns)
 	for {
 		total := katomic.load(&parent.children_cpu_time_ns)
@@ -808,6 +866,10 @@ pub fn allocate_tid(thrd &Thread) ?int {
 	defer {
 		pid_lock.release()
 	}
+	// Serialize publication with the teardown owner's exiting flag. A caller
+	// still holds threads_lock, so an owner arriving afterwards must observe
+	// the appended thread in its sibling teardown snapshot.
+	if thrd.process != unsafe { nil } && thrd.process.exiting { return none }
 
 	return allocate_tid_locked(thrd)
 }
@@ -823,17 +885,19 @@ fn allocate_tid_locked(thrd &Thread) ?int {
 
 // Claim an already-reserved id for a thread. Used to give a process' main
 // thread the tid that matches its pid.
-pub fn bind_tid(tid int, thrd &Thread) {
+pub fn bind_tid(tid int, thrd &Thread) bool {
 	if tid <= 0 || tid >= max_pid {
-		return
+		return false
 	}
 
 	pid_lock.acquire()
 	defer {
 		pid_lock.release()
 	}
+	if thrd.process != unsafe { nil } && thrd.process.exiting { return false }
 
 	bind_tid_locked(tid, thrd)
+	return true
 }
 
 // The caller holds the process table lock and has reserved this process id.
@@ -1332,8 +1396,7 @@ pub fn process_stat_line(pid int, viewer &Namespace) string {
 	shown_ppid := pid_in(process_at(process.ppid), viewer)
 	shown_pgid := pgid_in(process, viewer)
 	shown_sid := sid_in(process, viewer)
-	// Borrowed synchronously by formatting helpers; the owned bytes are consumed below.
-	mut text := unsafe { &lib.Text(C.__builtin_alloca(sizeof(lib.Text))) }
+	mut text := unsafe { &lib.Text(C.vinix_stack_alloc(sizeof(lib.Text))) }
 	unsafe { *text = lib.new_text(256) }
 	text.add_decimal(shown_pid)
 	text.add(' (')
@@ -1347,7 +1410,15 @@ pub fn process_stat_line(pid int, viewer &Namespace) string {
 	text.add_byte(` `)
 	text.add_decimal(shown_sid)
 	// User/system and reaped children CPU time, in clock ticks.
-	text.add(' 0 -1 0 0 0 0 0 ')
+	text.add(' 0 -1 0 ')
+	text.add_unsigned(katomic.load(&process.usage.minor_faults))
+	text.add_byte(` `)
+	text.add_unsigned(katomic.load(&process.children_usage.minor_faults))
+	text.add_byte(` `)
+	text.add_unsigned(katomic.load(&process.usage.major_faults))
+	text.add_byte(` `)
+	text.add_unsigned(katomic.load(&process.children_usage.major_faults))
+	text.add_byte(` `)
 	text.add_unsigned(katomic.load(&process.cpu_user_ns) / 10000000)
 	text.add_byte(` `)
 	text.add_unsigned(katomic.load(&process.cpu_system_ns) / 10000000)
@@ -1363,7 +1434,9 @@ pub fn process_stat_line(pid int, viewer &Namespace) string {
 	text.add_decimal(threads)
 	text.add(' 0 ')
 	text.add_unsigned(process.start_time_ticks)
-	text.add(' 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 ')
+	text.add(' 0 ')
+	text.add_unsigned(if process.pagemap == unsafe { nil } { u64(0) } else { katomic.load(&process.pagemap.resident_bytes) / memory.page_size })
+	text.add(' 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 ')
 	text.add_decimal(params.priority)
 	text.add_byte(` `)
 	text.add_decimal(params.policy)
@@ -1394,7 +1467,7 @@ pub fn process_status_text(pid int, viewer &Namespace) string {
 	shown_pid := pid_in(process, viewer)
 	shown_ppid := pid_in(process_at(process.ppid), viewer)
 	// Borrowed synchronously by formatting helpers; the owned bytes are consumed below.
-	mut text := unsafe { &lib.Text(C.__builtin_alloca(sizeof(lib.Text))) }
+	mut text := unsafe { &lib.Text(C.vinix_stack_alloc(sizeof(lib.Text))) }
 	unsafe { *text = lib.new_text(512) }
 	text.add('Name:\t')
 	add_command_name(mut text, process.name)
@@ -1424,6 +1497,9 @@ pub fn process_status_text(pid int, viewer &Namespace) string {
 	}
 	text.add('\nThreads:\t')
 	text.add_decimal(threads)
+	text.add('\nVmLck:\t')
+	text.add_unsigned(memory.locked_bytes(process.pagemap) / 1024)
+	text.add(' kB')
 	text.add('\nCapInh:\t')
 	text.add_radix(caps.inheritable, 16, 16)
 	text.add('\nCapPrm:\t')

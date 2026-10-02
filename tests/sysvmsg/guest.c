@@ -65,7 +65,11 @@ static int basic(void) {
 	CHECK(msgrcv(q,&out,0,0,IPC_NOWAIT)==0 && out.type==7);
 	ERR(msgrcv(q,&out,1,0,MSG_COPY),EINVAL);
 	ERR(msgrcv(q,&out,1,0,MSG_COPY|MSG_EXCEPT|IPC_NOWAIT),EINVAL);
-	ERR(msgrcv(q,&out,1,0,MSG_COPY|IPC_NOWAIT),ENOSYS);
+	ERR(msgrcv(q,&out,1,0,MSG_COPY|IPC_NOWAIT),ENOMSG);
+	CHECK(msgsnd(q,&m,0,0)==0);
+	CHECK(msgrcv(q,&out,0,0,MSG_COPY|IPC_NOWAIT)==0 && out.type==m.type);
+	CHECK(msgctl(q,IPC_STAT,&ds)==0 && ds.msg_qnum==1);
+	CHECK(msgrcv(q,&out,0,0,IPC_NOWAIT)==0 && out.type==m.type);
 	ERR(msgctl(q,99,&ds),EINVAL);
 	ERR(msgctl(q,IPC_STAT,(void *)1),EFAULT);
 	ERR(msgctl(q,IPC_SET,(void *)1),EFAULT);

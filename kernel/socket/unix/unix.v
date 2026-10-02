@@ -461,6 +461,10 @@ fn (mut this UnixSocket) read(_handle voidptr, buf voidptr, _loc u64, _count u64
 
 	this.peer.status |= file.pollout
 	event.trigger(mut this.peer.event, false)
+	// Writers wait for room on this receive buffer's event, including streams.
+	if count != 0 {
+		event.trigger(mut this.event, false)
+	}
 
 	if this.used == 0 {
 		this.status &= ~file.pollin
@@ -573,9 +577,7 @@ pub fn (mut this UnixSocket) recv_seqpacket(_handle voidptr, buf voidptr, count 
 			this.peer.status |= file.pollout
 			event.trigger(mut this.peer.event, false)
 		}
-		if this.is_datagram() {
-			event.trigger(mut this.event, false)
-		}
+		event.trigger(mut this.event, false)
 		if this.nothing_queued() {
 			this.status &= ~file.pollin
 		}
@@ -602,7 +604,11 @@ pub fn (mut this UnixSocket) write_with_fds(_handle voidptr, buf voidptr, _count
 	// A datagram goes to the socket connect(2) named, or to the other end of
 	// a socketpair(2).
 	if this.is_datagram() {
-		mut target := if this.dgram_target != unsafe { nil } { this.dgram_target } else { this.peer }
+		mut target := if this.dgram_target != unsafe { nil } {
+			this.dgram_target
+		} else {
+			this.peer
+		}
 		if target == unsafe { nil } {
 			errno.set(errno.enotconn)
 			return none
@@ -652,8 +658,10 @@ pub fn (mut this UnixSocket) write_with_fds(_handle voidptr, buf voidptr, _count
 			break
 		}
 
+		// A receiver may drain between unlocking and attaching the waiter.
+		generation := event.generation(mut peer.event)
 		peer.l.release()
-		if !wait_on(&peer.event, deadline, false, 0) {
+		if !wait_on(&peer.event, deadline, true, generation) {
 			peer.l.acquire()
 			return none
 		}
@@ -711,11 +719,17 @@ pub fn (mut this UnixSocket) write_with_fds(_handle voidptr, buf voidptr, _count
 		this.status &= ~file.pollout
 	}
 	if fds.len != 0 {
-		mut group := PendingFdGroup{
-			offset: fd_offset
-			span:   count
-			fds:    []&file.FD{}
+		mut group := unsafe { &PendingFdGroup(C.vinix_stack_alloc(sizeof(PendingFdGroup))) }
+		unsafe {
+			*group = PendingFdGroup{
+				offset: fd_offset
+				span:   count
+				fds:    []&file.FD{}
+			}
 		}
+		// Only this queue owns the copied descriptor list; no slice retains a
+		// buffer when it grows. Retirement frees its final buffer and refs.
+		group.fds.flags |= .noslices
 		group.fds << fds
 		// Nothing slices these queues, so growing can free the old block.
 		peer.pending_fd_groups.flags |= .noslices
@@ -786,11 +800,17 @@ pub fn (mut this UnixSocket) send_datagram(mut target UnixSocket, _handle voidpt
 	target.ensure_capacity(if count == 0 { u64(1) } else { target.used + count })
 
 	if fds.len != 0 {
-		mut group := PendingFdGroup{
-			offset: target.used
-			span:   count
-			fds:    []&file.FD{}
+		mut group := unsafe { &PendingFdGroup(C.vinix_stack_alloc(sizeof(PendingFdGroup))) }
+		unsafe {
+			*group = PendingFdGroup{
+				offset: target.used
+				span:   count
+				fds:    []&file.FD{}
+			}
 		}
+		// Only this queue owns the copied descriptor list; no slice retains a
+		// buffer when it grows. Retirement frees its final buffer and refs.
+		group.fds.flags |= .noslices
 		group.fds << fds
 		// Nothing slices these queues, so growing can free the old block.
 		target.pending_fd_groups.flags |= .noslices
@@ -1691,9 +1711,7 @@ fn (mut this UnixSocket) recvmsg(_handle voidptr, msg &sock_pub.MsgHdr, flags in
 		this.peer.status |= file.pollout
 		event.trigger(mut this.peer.event, false)
 	}
-	if this.is_datagram() {
-		event.trigger(mut this.event, false)
-	}
+	event.trigger(mut this.event, false)
 
 	// The peer's address, no longer than it is and no more of it than the
 	// caller has room for. The whole structure was copied whatever room

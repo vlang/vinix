@@ -2,6 +2,7 @@
 module resource
 
 import stat
+import katomic
 import klock
 import ioctl
 import errno
@@ -80,12 +81,26 @@ pub fn backend_is_read_only(mut res Resource) bool {
 	return false
 }
 
+// A dynamic endpoint must retain its result before releasing the lookup/state
+// lock. The descriptor adopts this reference instead of retaining it later.
+pub interface OwnedOpenableResource {
+mut:
+	open_owned(flags int) ?&Resource
+}
+
+pub struct OpenedResource {
+pub:
+	resource &Resource = unsafe { nil }
+	owned bool
+}
+
+
 __global (
 	dev_id_counter = u64(1)
 )
 
 pub fn create_dev_id() u64 {
-	return dev_id_counter++
+	return katomic.inc(mut &dev_id_counter)
 }
 
 pub fn default_ioctl(handle voidptr, request u64, _ voidptr) ?int {

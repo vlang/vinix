@@ -2006,6 +2006,10 @@ static int console_session_child(void)
 	    || ioctl(tty, TIOCSWINSZ, &original) != 0)
 		return 7;
 	close(tty);
+	/* Giving up the controlling terminal sends SIGHUP to its foreground
+	 * group. Keep this child alive to verify the detached /dev/tty lookup. */
+	if (signal(SIGHUP, SIG_IGN) == SIG_ERR)
+		return 10;
 	if (ioctl(console, TIOCNOTTY) != 0)
 		return 8;
 	errno = 0;
@@ -3398,9 +3402,9 @@ int main(int argc, char **argv)
 	if (getpid() != 1)
 		return run_tests();
 	/* amd64's console is the framebuffer; its serial port is /dev/com1. */
-	int console = open("/dev/com1", O_WRONLY);
+	int console = open("/dev/com1", O_WRONLY | O_NOCTTY);
 	if (console < 0)
-		console = open("/dev/console", O_WRONLY);
+		console = open("/dev/console", O_WRONLY | O_NOCTTY);
 	if (console >= 0) {
 		dup2(console, STDOUT_FILENO);
 		dup2(console, STDERR_FILENO);

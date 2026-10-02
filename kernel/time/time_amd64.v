@@ -6,7 +6,6 @@ import x86.hpet as hpet_clock
 
 __global (
 	clock_origin_ns u64
-	clock_epoch     i64
 )
 
 @[_linker_section: '.requests']
@@ -24,9 +23,7 @@ pub fn initialise() {
 		0
 	}
 
-	monotonic_clock = TimeSpec{i64(epoch), 0}
-	realtime_clock = TimeSpec{i64(epoch), 0}
-	clock_epoch = i64(epoch)
+	initialize_clocks(i64(epoch))
 	clock_origin_ns = hpet_clock.nanoseconds()
 	clock_last_ns = clock_origin_ns
 
@@ -40,19 +37,6 @@ pub fn clock_resolution_ns() u64 {
 
 fn counter_now_ns() u64 {
 	return hpet_clock.nanoseconds()
-}
-
-// IRQ delivery may coalesce while a syscall holds interrupts disabled. The
-// free-running HPET (or calibrated TSC fallback) still counts that time.
-fn precise_clock_now(clock_id int) ?TimeSpec {
-	if clock_id != clock_type_realtime && clock_id != clock_type_monotonic {
-		return none
-	}
-	elapsed := hpet_clock.nanoseconds() - clock_origin_ns
-	return TimeSpec{
-		tv_sec:  clock_epoch + i64(elapsed / 1000000000)
-		tv_nsec: i64(elapsed % 1000000000)
-	}
 }
 
 fn counter_timer_deadline(duration TimeSpec) u64 {
@@ -70,4 +54,9 @@ fn counter_timer_deadline(duration TimeSpec) u64 {
 		return ~u64(0)
 	}
 	return now + whole + u64(duration.tv_nsec)
+}
+
+fn raw_clock_now() TimeSpec {
+	elapsed := hpet_clock.nanoseconds() - clock_origin_ns
+	return TimeSpec{i64(elapsed / 1000000000), i64(elapsed % 1000000000)}
 }

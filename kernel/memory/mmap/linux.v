@@ -10,6 +10,7 @@ import krandom
 import lib
 import memory
 import proc
+import resource
 import usercopy
 
 // mremap(2) flags.
@@ -77,16 +78,24 @@ pub fn syscall_mremap(_ voidptr, old_address u64, old_size u64, new_size u64, fl
 
 	old_length := lib.align_up(old_size, page_size)
 	new_length := lib.align_up(new_size, page_size)
+	if old_length < old_size || new_length < new_size
+		|| old_address > u64(-1) - old_length
+		|| (flags & mremap_fixed != 0 && (new_address > u64(-1) - new_length
+			|| (new_address < old_address + old_length && new_address + new_length > old_address))) {
+		return errno.err, errno.einval
+	}
 
 	pagemap.l.acquire()
-	source, _, _ := addr2range(pagemap, old_address) or {
+	source, _, source_file_page := addr2range(pagemap, old_address) or {
 		pagemap.l.release()
 		return errno.err, errno.efault
 	}
-	// Only a mapping we can describe in full can be moved.
-	if old_address + old_length > source.base + source.length {
+	// Restored lock/protection splits can still describe one original mapping.
+	// Incompatible pieces or independently created globals cannot be moved as
+	// though they had a single resource and policy.
+	if !compatible_remap_span_unlocked(pagemap, old_address, old_length, source, source_file_page) {
 		pagemap.l.release()
-		return errno.err, errno.efault
+		return errno.err, errno.get()
 	}
 	if source.immutable {
 		pagemap.l.release()
@@ -94,6 +103,13 @@ pub fn syscall_mremap(_ voidptr, old_address u64, old_size u64, new_size u64, fl
 	}
 	prot := source.prot
 	map_flags := source.flags
+	// The reserved heap belongs to brk bookkeeping, including its uncommitted
+	// tail. Moving or shrinking it would leave the process break naming a
+	// different mapping; copying its private flag would also bypass limits.
+	if map_flags & map_brk_reservation != 0 {
+		pagemap.l.release()
+		return errno.err, errno.einval
+	}
 	// What fork does with the range moves with it, as on Linux.
 	inheritance := InheritChange{
 		set_dont_fork: true
@@ -109,12 +125,35 @@ pub fn syscall_mremap(_ voidptr, old_address u64, old_size u64, new_size u64, fl
 	source_handle := global.handle
 	source_handle_ref := global.handle_ref
 	source_handle_unref := global.handle_unref
+	// Keep the file/description alive while mmap acquires destination ownership.
+	// Driver mapping-range callbacks still run outside the address-space lock.
+	mut held_handle := false
+	mut held_resource := false
+	if map_flags & map_anonymous == 0 {
+		if source_handle != unsafe { nil } && source_handle_ref != unsafe { nil } {
+			source_handle_ref(source_handle)
+			held_handle = true
+		} else if source_resource != unsafe { nil } {
+			mut retained := source_resource
+			resource.retain_resource(mut retained)
+			held_resource = true
+		}
+	}
+	defer {
+		if held_handle { source_handle_unref(source_handle) }
+		else if held_resource {
+			mut retained := source_resource
+			resource.release_resource(mut retained)
+		}
+	}
 	source_offset := source.offset + i64(old_address - source.base)
 	mut source_options := MmapOptions{
 		lazy_file: global.lazy_file
 		segmented_file: global.segmented_file
 		no_write: global.no_write
 		no_exec: global.no_exec
+		credit_base: old_address
+		credit_serial: global.serial
 	}
 	if global.segmented_file {
 		source_relative := old_address - global.base
@@ -132,11 +171,18 @@ pub fn syscall_mremap(_ voidptr, old_address u64, old_size u64, new_size u64, fl
 
 	// Shrinking, or asking for what is already there, needs no new mapping.
 	if new_length <= old_length && flags & mremap_fixed == 0 {
+		pagemap.l.acquire()
+		if !remap_span_unlocked(pagemap, old_address, old_length, source_options.credit_serial, true) {
+			pagemap.l.release()
+			return errno.err, errno.get()
+		}
 		if new_length < old_length {
-			munmap(mut pagemap, voidptr(old_address + new_length), old_length - new_length) or {
+			munmap_unlocked(mut pagemap, voidptr(old_address + new_length), old_length - new_length) or {
+				pagemap.l.release()
 				return errno.err, errno.get()
 			}
 		}
+		pagemap.l.release()
 		return old_address, 0
 	}
 
@@ -147,7 +193,7 @@ pub fn syscall_mremap(_ voidptr, old_address u64, old_size u64, new_size u64, fl
 
 	anonymous := map_flags & map_anonymous != 0
 
-	mut destination_flags := map_flags
+	mut destination_flags := map_flags & ~(map_fixed | map_fixed_noreplace | map_brk_reservation)
 	mut destination_hint := voidptr(0)
 	if flags & mremap_fixed != 0 {
 		destination_flags |= map_fixed
@@ -159,6 +205,9 @@ pub fn syscall_mremap(_ voidptr, old_address u64, old_size u64, new_size u64, fl
 		destination_offset = source_offset
 	}
 
+	mut destination_serial := u64(0)
+	// mmap only writes this synchronous stack output while publishing its VMA.
+	source_options.created_serial = unsafe { &destination_serial }
 	destination := mmap_with_credit(pagemap, destination_hint, new_length, prot, destination_flags, source_resource, destination_offset, source_handle, source_handle_ref, source_handle_unref, old_length, source_options) or {
 		return errno.err, errno.get()
 	}
@@ -166,50 +215,152 @@ pub fn syscall_mremap(_ voidptr, old_address u64, old_size u64, new_size u64, fl
 	// its child what the range was kept from children for.
 	if inheritance.dont_fork || inheritance.wipe_on_fork {
 		pagemap.l.acquire()
-		set_inheritance_unlocked(mut pagemap, u64(destination), new_length, inheritance) or {}
+		if !remap_span_unlocked(pagemap, u64(destination), new_length, destination_serial, true) {
+			failure := errno.get()
+			pagemap.l.release()
+			unmap_created_range(mut pagemap, u64(destination), new_length, destination_serial)
+			return errno.err, failure
+		}
+		set_inheritance_unlocked(mut pagemap, u64(destination), new_length, inheritance) or {
+			failure := errno.get()
+			pagemap.l.release()
+			unmap_created_range(mut pagemap, u64(destination), new_length, destination_serial)
+			return errno.err, failure
+		}
 		pagemap.l.release()
 	}
 
-	// Only anonymous pages have to be carried over by hand. A file mapping is
-	// rebuilt at the same offset against the same resource, so it comes back
-	// holding the same pages, and copying would be writing them onto
-	// themselves.
-	if anonymous {
+	// Private file pages can contain writes that never reached the backing
+	// file. Preserve those just like anonymous pages; shared file pages are
+	// still rebuilt against the same resource without copying.
+	if anonymous || map_flags & map_shared == 0 {
 		carried := if old_length < new_length { old_length } else { new_length }
-		if !copy_between_mappings(mut pagemap, u64(destination), old_address, carried, prot) {
-			munmap(mut pagemap, destination, new_length) or {}
-			return errno.err, errno.efault
+		if !copy_between_mappings(mut pagemap, u64(destination), old_address, carried,
+			source_options.credit_serial, destination_serial, source_file_page) {
+			failure := errno.get()
+			unmap_created_range(mut pagemap, u64(destination), new_length, destination_serial)
+			return errno.err, failure
 		}
 	}
 
-	munmap(mut pagemap, voidptr(old_address), old_length) or {}
+	pagemap.l.acquire()
+	if !remap_span_unlocked(pagemap, old_address, old_length, source_options.credit_serial, true)
+		|| !remap_span_unlocked(pagemap, u64(destination), new_length, destination_serial, false) {
+		failure := errno.get()
+		pagemap.l.release()
+		unmap_created_range(mut pagemap, u64(destination), new_length, destination_serial)
+		return errno.err, failure
+	}
+	munmap_unlocked(mut pagemap, voidptr(old_address), old_length) or {
+		failure := errno.get()
+		pagemap.l.release()
+		unmap_created_range(mut pagemap, u64(destination), new_length, destination_serial)
+		return errno.err, failure
+	}
+	pagemap.l.release()
 
 	return u64(destination), 0
 }
 
-// Move page contents through the direct map, so neither address has to be
-// touched with the user's own mapping active. A page the old mapping never
-// had is zero, as the new one's is. A page the new mapping does not have yet
-// is made first: a mapping in a cgroup, or a large one, is filled in only as
-// it is touched, and every such page failed the move. apt grows its package
-// cache this way, and "Dynamic MMap ran out of room" in every Ubuntu
-// container.
-fn copy_between_mappings(mut pagemap memory.Pagemap, destination u64, source u64, length u64, prot int) bool {
-	for offset := u64(0); offset < length; offset += page_size {
-		source_phys := pagemap.virt2phys(source + offset) or { continue }
-		mut destination_phys := pagemap.virt2phys(destination + offset) or { u64(0) }
-		if destination_phys == 0 {
-			// The page is read back below, so a lazy shared one is filled in too.
-			populate_missing_pages(mut pagemap, destination + offset, page_size, prot, false) or {
-				return false
-			}
-			destination_phys = pagemap.virt2phys(destination + offset) or { return false }
+fn compatible_remap_span_unlocked(pagemap &memory.Pagemap, base u64, length u64,
+	reference &MmapRangeLocal, first_page u64) bool {
+	mut cursor := base
+	for cursor < base + length {
+		local, _, file_page := addr2range(pagemap, cursor) or { errno.set(errno.efault); return false }
+		if local.immutable { errno.set(errno.eperm); return false }
+		if local.global != reference.global || local.prot != reference.prot
+			|| local.flags != reference.flags || local.cow != reference.cow
+			|| local.dont_fork != reference.dont_fork || local.wipe_on_fork != reference.wipe_on_fork
+			|| file_page != first_page + (cursor - base) / page_size {
+			errno.set(errno.efault)
+			return false
 		}
-		unsafe {
-			C.memcpy(voidptr(destination_phys + higher_half), voidptr(source_phys + higher_half), page_size)
-		}
+		cursor = min_u64(base + length, local.base + local.length)
 	}
 	return true
+}
+
+fn remap_span_unlocked(pagemap &memory.Pagemap, base u64, length u64, serial u64, mutable bool) bool {
+	mut cursor := base
+	for cursor < base + length {
+		local, _, _ := addr2range(pagemap, cursor) or { errno.set(errno.efault); return false }
+		if local.global.serial != serial { errno.set(errno.efault); return false }
+		if mutable && local.immutable { errno.set(errno.eperm); return false }
+		cursor = min_u64(base + length, local.base + local.length)
+	}
+	return true
+}
+
+// Carry resident private pages through the direct map. Missing anonymous pages
+// remain zero-filled; missing private file pages keep their lazy file source.
+fn copy_between_mappings(mut pagemap memory.Pagemap, destination u64, source u64, length u64,
+	source_serial u64, destination_serial u64, source_file_page u64) bool {
+	for offset := u64(0); offset < length; offset += page_size {
+		if !copy_remapped_page(mut pagemap, destination + offset, source + offset,
+			source_serial, destination_serial, source_file_page + offset / page_size) { return false }
+	}
+	return true
+}
+
+// Each call owns at most one independently pinned destination source. All
+// physical reads/writes occur under pagemap.l; driver callbacks occur outside.
+fn copy_remapped_page(mut pagemap memory.Pagemap, destination u64, source u64,
+	source_serial u64, destination_serial u64, source_file_page u64) bool {
+	for _ in 0 .. 3 {
+		pagemap.l.acquire()
+		if !remap_span_unlocked(&pagemap, source, page_size, source_serial, false)
+			|| !remap_span_unlocked(&pagemap, destination, page_size, destination_serial, true) {
+			pagemap.l.release()
+			return false
+		}
+		_, _, first_page := addr2range(&pagemap, source) or { pagemap.l.release(); errno.set(errno.efault); return false }
+		if first_page != source_file_page { pagemap.l.release(); errno.set(errno.efault); return false }
+		source_phys := pagemap.virt2phys(source) or { pagemap.l.release(); return true }
+		destination_phys := pagemap.virt2phys(destination) or {
+			pagemap.l.release()
+			populate_missing_pages(mut pagemap, destination, page_size, prot_read | prot_write, false) or {
+				errno.set(errno.enomem)
+				return false
+			}
+			continue
+		}
+		if source_phys == destination_phys { pagemap.l.release(); return true }
+		local, _, _ := addr2range(&pagemap, destination) or { pagemap.l.release(); return false }
+		mut owner := range_page_source(local, destination)
+		pagemap.l.release()
+		defer { owner.close() }
+		if !owner.prepare() { errno.set(errno.enomem); return false }
+		pagemap.l.acquire()
+		if !remap_span_unlocked(&pagemap, source, page_size, source_serial, false)
+			|| !remap_span_unlocked(&pagemap, destination, page_size, destination_serial, true) {
+			pagemap.l.release()
+			return false
+		}
+		current, _, file_page := addr2range(&pagemap, destination) or { pagemap.l.release(); errno.set(errno.efault); return false }
+		if current.flags != owner.flags || file_page != owner.file_page
+			|| current.generation != owner.local_generation {
+			pagemap.l.release()
+			errno.set(errno.efault)
+			return false
+		}
+		_, _, from_page := addr2range(&pagemap, source) or { pagemap.l.release(); errno.set(errno.efault); return false }
+		if from_page != source_file_page { pagemap.l.release(); errno.set(errno.efault); return false }
+		physical := pagemap.virt2phys(destination) or { pagemap.l.release(); errno.set(errno.efault); return false }
+		from := pagemap.virt2phys(source) or { pagemap.l.release(); return true }
+		// A fork may have made the destination private page shared too.
+		mut target := physical
+		if current.flags & map_shared == 0 {
+			target = unshare_private_page_unlocked(mut pagemap, current, destination,
+				physical, current.prot & prot_write != 0) or { pagemap.l.release(); errno.set(errno.enomem); return false }
+		}
+		unsafe { C.memcpy(voidptr(target + higher_half), voidptr(from + higher_half), page_size) }
+		if current.prot & prot_exec != 0 { sync_new_code_page(voidptr(target)) }
+		pagemap.l.release()
+		if target != physical { owner.give_back_cow(voidptr(physical)) }
+		return true
+	}
+	errno.set(errno.eagain)
+	return false
 }
 
 // ── mincore ──────────────────────────────────────────────────────────────────
@@ -315,15 +466,51 @@ pub fn syscall_madvise(_ voidptr, address u64, length u64, advice int) (u64, u64
 	if immutable_overlap_unlocked(pagemap, address, aligned_length) {
 		return errno.err, errno.eperm
 	}
+	if locked_overlap_unlocked(pagemap, lib.align_down(address, page_size),
+		lib.align_up(address % page_size + aligned_length, page_size)) > 0 {
+		return errno.err, errno.einval
+	}
 
 	mut virt := address
 	for virt < end {
 		in_page := virt % page_size
 		available := page_size - in_page
 		chunk := if end - virt < available { end - virt } else { available }
-		local_range, _, _ := addr2range(pagemap, virt) or {
+		local_range, _, file_page := addr2range(pagemap, virt) or {
 			virt += chunk
 			continue
+		}
+		// File-page release callbacks temporarily drop pagemap.l. A lock
+		// installed while they run must protect each following page too.
+		if local_range.flags & map_locked != 0 { return errno.err, errno.einval }
+		if advice == madv_dontneed && local_range.flags & map_shared == 0
+			&& local_range.global.private_cow && in_page == 0 && chunk == page_size {
+			phys := pagemap.virt2phys(virt) or {
+				virt += chunk
+				continue
+			}
+			mut global := local_range.global
+			global.shadow_pagemap.l.acquire()
+			shadow_phys := global.shadow_pagemap.virt2phys(virt) or { u64(0) }
+			if shadow_phys == phys {
+				pagemap.unmap_page_unlocked(virt) or {
+					global.shadow_pagemap.l.release()
+					return errno.err, errno.einval
+				}
+				global.shadow_pagemap.unmap_page_unlocked(virt) or {
+					global.shadow_pagemap.l.release()
+					return errno.err, errno.einval
+				}
+				global.shadow_pagemap.l.release()
+				source := range_page_source(local_range, virt)
+				pagemap.l.release()
+				source.give_back(file_page, voidptr(phys))
+				source.close()
+				pagemap.l.acquire()
+				virt += chunk
+				continue
+			}
+			global.shadow_pagemap.l.release()
 		}
 		if local_range.flags & map_anonymous != 0 && local_range.flags & map_shared == 0 {
 			mut phys := pagemap.virt2phys(virt) or {
@@ -351,8 +538,10 @@ pub fn syscall_madvise(_ voidptr, address u64, length u64, advice int) (u64, u64
 				global_range.shadow_pagemap.l.release()
 			}
 			if local_range.cow {
+				old_phys := phys
 				phys = unshare_private_page_unlocked(mut pagemap, local_range,
 					lib.align_down(virt, page_size), phys, false) or { return errno.err, errno.enomem }
+				if phys != old_phys { memory.pmm_free(voidptr(old_phys), 1) }
 			}
 			unsafe {
 				C.memset(voidptr(phys + higher_half + in_page), 0, chunk)
@@ -408,7 +597,20 @@ pub fn syscall_brk(_ voidptr, address u64) (u64, u64) {
 			return process.brk_current, 0
 		}
 		mut pagemap := process.pagemap
+		pagemap.l.acquire()
+		if immutable_overlap_unlocked(pagemap, current_page, growth) {
+			pagemap.l.release()
+			return process.brk_current, 0
+		}
+		future_locked := pagemap.lock_future
+		pagemap.l.release()
+		if future_locked {
+			lock_range(mut pagemap, current_page, growth, true, true) or {
+				return process.brk_current, 0
+			}
+		}
 		mprotect(mut pagemap, voidptr(current_page), wanted_page - current_page, prot_read | prot_write) or {
+			if future_locked { lock_range(mut pagemap, current_page, growth, false, true) or {} }
 			return process.brk_current, 0
 		}
 	} else if wanted_page < current_page {
@@ -416,6 +618,7 @@ pub fn syscall_brk(_ voidptr, address u64) (u64, u64) {
 		mprotect(mut pagemap, voidptr(wanted_page), current_page - wanted_page, prot_none) or {
 			return process.brk_current, 0
 		}
+		lock_range(mut pagemap, wanted_page, current_page - wanted_page, false, true) or {}
 	}
 
 	process.brk_current = address

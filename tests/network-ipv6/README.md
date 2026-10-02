@@ -1,5 +1,12 @@
 # IPv6 networking regression tests
 
+This document records the earlier XNU implementation checkpoint and its
+measurements. The merged adapter also includes the later OpenBSD work; its
+managed memberships, network proc files and physical-network validation are
+documented in [ipv6-multicast](../ipv6-multicast/README.md). The host fixture
+here now uses that adapter's endpoint API. Historical measurements below are
+not measurements of the final consolidated kernel.
+
 This checkpoint addresses the socket and automatic-address parts of NET1 in
 [the XNU comparison](../../docs/macos-xnu-kernel-gap-analysis.md). It enables the
 pinned lwIP IPv6 implementation, neighbor discovery, router solicitation, SLAAC,
@@ -79,11 +86,18 @@ string-buffer lifetime. Generated C was checked for these allocation sites.
 The CSPRNG sites were also identified with `ALLOC_TRACK=1`: 5000 exchanges
 previously retained 78 refill and 78 rekey blocks of 64 bytes each.
 
-Existing issue found during validation: mounting procfs again over the startup
-mount can produce a VFS redirect cycle and `ELOOP`. This test relies on the
-startup mount; repeated procfs mounting needs a separate VFS fix.
+The earlier validation found a procfs self-mount redirect cycle and `ELOOP`.
+The consolidated kernel rejects mounts of a cached procfs root onto itself
+or its descendants before changing the graph; [procfs-mount](../procfs-mount/README.md)
+covers that repair, including stale PID views and legitimate aliases.
 
-## Remaining networking requirements
+## Historical remaining networking requirements
+
+The following table records the scope left by this earlier checkpoint.
+Managed IPv4/IPv6 memberships, `/proc/net/tcp6` and physical IPv6 acceptance
+tests were subsequently implemented. Current remaining work is tracked in
+the [OpenBSD gap report](../../docs/openbsd-kernel-gap-analysis.md#current-networking)
+and [XNU ledger](../../docs/macos-xnu-implementation-status.md).
 
 | Finding | Remaining work after this checkpoint |
 | --- | --- |

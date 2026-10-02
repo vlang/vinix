@@ -1,3 +1,4 @@
+#include "x86_64/speculation.h"
 .altmacro
 
 .macro THUNK num
@@ -14,7 +15,7 @@ interrupt_thunk_\num:
     swapgs
 
 1:
-    // Also fence the path where a predicted conditional SWAPGS was skipped.
+    // Fence both the taken and skipped SWAPGS paths before GS use.
     lfence
     push %r15
     push %r14
@@ -51,6 +52,13 @@ interrupt_thunk_\num:
     clac
 5:
 
+    testb $3, 152(%rsp)
+    jz 6f
+    VINIX_RSB_FILL
+    VINIX_SPEC_ENTER
+6:
+    // Resolve both user-CS and capability gates before entering C.
+    lfence
     mov %rsp, %rdi
     call interrupt_enter
     mov $\num, %rdi
@@ -59,8 +67,8 @@ interrupt_thunk_\num:
     add %rax, %rbx
     mov %rsp, %rsi
     xor %rbp, %rbp
-    mov (%rbx), %rax
-    call vinix_indirect_thunk_rax
+    mov (%rbx), %rbx
+    call __x86_indirect_thunk_rbx
     jmp interrupt_thunk_exit
 .endm
 
@@ -111,6 +119,12 @@ interrupt_exit_load_ds:
 .global interrupt_exit_load_es
 interrupt_exit_load_es:
     mov %eax, %es
+    // A kernel return must not interpret an old exception error as a flag.
+    movq $0, 120(%rsp)
+    testb $3, 136(%rsp)
+    jz 7f
+    VINIX_SPEC_RETURN gs0, 120
+7:
     pop %rax
     pop %rbx
     pop %rcx
@@ -126,6 +140,7 @@ interrupt_exit_load_es:
     pop %r13
     pop %r14
     pop %r15
+    VINIX_SPEC_CLEAR
     add $8, %rsp
 
     testb $3, 8(%rsp) // if user

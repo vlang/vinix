@@ -42,22 +42,46 @@ pub fn syscall_getppid(_ voidptr) (u64, u64) {
 pub fn sendsig(_thread &proc.Thread, signal u8) {
 	if signal == 0 || signal > 64 { return }
 	mut t := unsafe { _thread }
-	if t.process != unsafe { nil } && (signal == u8(sigcont) || is_stop_signal(int(signal))) {
-		mut target := t.process
-		target.threads_lock.acquire()
-		changed := apply_job_signal_locked(mut target, int(signal))
-		if changed { proc.pin_process(target) }
-		target.threads_lock.release()
-		if changed { notify_parent(target); proc.unpin_process(target) }
+	// Storage pins alone do not preserve Thread.process during exit or exec.
+	// Validate its owner and keep teardown out through the private delivery.
+	posixtimer.lock_signal_info()
+	proc.lock_table()
+	mut target := &proc.Process(unsafe { nil })
+	// A retained corpse can outlive its Process; inspect only Thread fields
+	// before borrowing the owner under the table lock.
+	if !katomic.load(&t.is_dead) && katomic.load(&t.exit_claimed) == 0 {
+		target = t.process
 	}
-	if signal == u8(sigstop) { return }
-	sendsig_with_timer_lock(_thread, signal, false)
+	mut changed := false
+	if target != unsafe { nil } && !target.exiting {
+		target.threads_lock.acquire()
+		mut member := false
+		for owned in target.threads {
+			if voidptr(owned) == voidptr(t) { member = true; break }
+		}
+		// Exec retains its original thread explicitly until pending handoff.
+		member = member || (target.exec_transition
+			&& voidptr(target.exec_signal_thread) == voidptr(t))
+		if member && voidptr(t.process) == voidptr(target) {
+			changed = apply_job_signal_locked(mut target, int(signal))
+			if target.exec_transition {
+				target.exec_pending_signals |= u64(1) << (signal - 1)
+			} else {
+				sendsig_with_timer_lock(t, signal, true)
+			}
+			if changed { proc.pin_process(target) }
+		}
+		target.threads_lock.release()
+	}
+	proc.unlock_table()
+	posixtimer.unlock_signal_info()
+	if changed { notify_signal_parent(target); proc.unpin_process(target) }
 }
 
 fn sendsig_with_timer_lock(_thread &proc.Thread, signal u8, timer_locked bool) {
 	mut t := unsafe { _thread }
 
-	if signal == 0 || signal > 64 {
+	if signal == 0 || signal > 64 || katomic.load(&t.is_dead) {
 		return
 	}
 
@@ -67,18 +91,21 @@ fn sendsig_with_timer_lock(_thread &proc.Thread, signal u8, timer_locked bool) {
 	// sigwait() for the one its shutdown sends it, and the bootstrap server
 	// that creates its data directory never finished stopping.
 	handler := t.sigactions[signal].sa_sigaction
-	blocked := katomic.load(&t.masked_signals) & (u64(1) << (signal - 1)) != 0
-	if !blocked && (handler == sig_ign
-		|| (handler == sig_dfl && (has_default_ignore_action(int(signal)) || signal == u8(sigcont)))) {
+	blocked := signal != sigkill && signal != sigstop
+		&& katomic.load(&t.masked_signals) & (u64(1) << (signal - 1)) != 0
+	orphan_stop := handler == sig_dfl && signal != sigstop && stop_signal(int(signal))
+		&& if timer_locked { proc.job_group_orphaned_locked(t.process.pgid, t.process.sid) } else { proc.job_group_orphaned(t.process.pgid, t.process.sid) }
+	ignored := signal != sigkill && signal != sigstop && !blocked && (handler == sig_ign || orphan_stop
+		|| (handler == sig_dfl && (has_default_ignore_action(int(signal)) || signal == sigcont)))
+	job_signal := if timer_locked { queue_job_signal_locked(mut t, int(signal), !ignored) }
+		else { queue_job_signal(mut t, int(signal), !ignored) }
+	if ignored {
 		return
 	}
 
-	if timer_locked {
-		posixtimer.acknowledge_signal_locked(mut t, int(signal))
-	} else {
-		posixtimer.clear_signal_info(mut t, int(signal))
-	}
-	katomic.bts(mut &t.pending_signals, signal - 1)
+	if timer_locked { posixtimer.acknowledge_signal_locked(mut t, int(signal)) }
+	else { posixtimer.clear_signal_info(mut t, int(signal)) }
+	if !job_signal { katomic.bts(mut &t.pending_signals, signal - 1) }
 	if t.process != unsafe { nil } {
 		notify_signalfds(t.process.pid, int(signal))
 	}
@@ -104,10 +131,16 @@ fn sendsig_with_timer_lock(_thread &proc.Thread, signal u8, timer_locked bool) {
 // its own pid to stop the thread that sigwait()s for it, and that thread
 // never saw it on the main thread, so the server never stopped.
 fn signal_process(mut target proc.Process, signal int) bool {
-	accepted, changed := signal_process_with_timer_lock(mut target, signal, false)
-	// The unlocked delivery path pins a changed process before dropping its
-	// thread-list lock. Locked callers retain it under the table lock instead.
-	if changed { notify_parent(&target); proc.unpin_process(&target) }
+	if signal <= 0 || signal > 64 { return false }
+	posixtimer.lock_signal_info()
+	proc.lock_table()
+	accepted, changed := signal_process_locked(mut target, signal)
+	if changed { proc.pin_process(&target) }
+	proc.unlock_table()
+	posixtimer.unlock_signal_info()
+	// Job-control event/runqueue wakes and parent delivery happen after all
+	// owner locks are released, with the changed Process retained across them.
+	if changed { notify_signal_parent(&target); proc.unpin_process(&target) }
 	return accepted
 }
 
@@ -176,11 +209,6 @@ fn signal_process_with_timer_lock(mut target proc.Process, signal int, timer_loc
 	}
 	changed := apply_job_signal_locked(mut target, signal)
 	if changed && !timer_locked { proc.pin_process(&target) }
-	// STOP changes scheduler eligibility immediately and has no queued signal.
-	if signal == sigstop {
-		target.threads_lock.release()
-		return true, changed
-	}
 	if target.exec_transition {
 		target.exec_pending_signals |= bit
 		target.threads_lock.release()
@@ -232,10 +260,10 @@ pub fn signal_pid(pid int, signal int) {
 	if pid <= 0 || pid >= proc.max_pid || signal <= 0 || signal > 64 {
 		return
 	}
-	mut target := processes[pid]
-	if target == unsafe { nil } || target.exiting {
-		return
-	}
+	mut target := proc.pin_process_at(pid)
+	if target == unsafe { nil } { return }
+	defer { proc.unpin_process(target) }
+	if target.exiting { return }
 	signal_process(mut target, signal)
 }
 
@@ -247,10 +275,9 @@ pub fn cgroup_kill_process(pid int, signal int) {
 	if pid <= 0 || pid >= proc.max_pid {
 		return
 	}
-	mut target := processes[pid]
-	if target == unsafe { nil } {
-		return
-	}
+	mut target := proc.pin_process_at(pid)
+	if target == unsafe { nil } { return }
+	defer { proc.unpin_process(target) }
 	signal_process(mut target, signal)
 }
 
@@ -271,7 +298,8 @@ pub fn syscall_kill(_ voidptr, pid int, signal int) (u64, u64) {
 		if global <= 0 {
 			return errno.err, errno.esrch
 		}
-		mut target := processes[global]
+		mut target := proc.pin_process_at(global)
+		defer { if target != unsafe { nil } { proc.unpin_process(target) } }
 		if target == unsafe { nil } {
 			return errno.err, errno.esrch
 		}
@@ -305,26 +333,30 @@ pub fn syscall_kill(_ voidptr, pid int, signal int) (u64, u64) {
 	mut found := false
 	mut permitted := false
 	for i := 1; i < proc.max_pid; i++ {
-		mut target := processes[i]
+		mut target := proc.pin_process_at(i)
 		if target == unsafe { nil } {
 			continue
 		}
 		if pgid != 0 && target.pgid != pgid {
+			proc.unpin_process(target)
 			continue
 		}
 		if proc.numbers_own(viewer) && voidptr(target.numbered_in) != voidptr(viewer) {
+			proc.unpin_process(target)
 			continue
 		}
 		if pid == -1 && (target.pid == init_pid || target.pid == current_process.pid) {
+			proc.unpin_process(target)
 			continue
 		}
 
 		found = true
-		if !may_signal(current_process, target, signal) { continue }
+		if !may_signal(current_process, target, signal) { proc.unpin_process(target); continue }
 		permitted = true
 		if signal != 0 {
 			signal_process(mut target, signal)
 		}
+		proc.unpin_process(target)
 	}
 
 	if !found {

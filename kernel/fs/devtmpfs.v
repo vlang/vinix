@@ -9,6 +9,7 @@ import resource
 import lib
 import event.eventstruct
 import katomic
+import security
 
 @[heap]
 struct DevTmpFSResource {
@@ -322,6 +323,10 @@ fn ensure_devtmpfs_dir(parent &VFSNode, name string) &VFSNode {
 }
 
 pub fn devtmpfs_add_device(device &resource.Resource, name string) {
+	if stat.isblk(device.stat.mode) {
+		mut actual_device := unsafe { device }
+		security.register_block_device(resource.block_identity(mut actual_device))
+	}
 	vfs_lock.acquire()
 	defer {
 		vfs_lock.release()

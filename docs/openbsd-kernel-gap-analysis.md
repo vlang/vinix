@@ -1,8 +1,140 @@
-# OpenBSD kernel features missing or incomplete in Vinix
+# OpenBSD kernel gap analysis and implementation status
 
-Date: **2026-10-02**. This report records **48 source-backed findings** comparing the downloaded **OpenBSD 8.0-current** kernel with the current Vinix implementation, grouped by security, syscalls, memory, performance, storage, networking, hardware/power, virtualization, and observability. It identifies capability gaps and incomplete semantics; it does not claim that OpenBSD is faster or that every feature should be ported.
+Survey date: **2026-10-02**. Status refreshed: **2026-10-03**. The original survey identified **48 source-backed findings** against the downloaded **OpenBSD 8.0-current** kernel. Completed session changes now close **11 findings**, partially address **17**, and leave **20 open**. **The complete list is not implemented.**
 
-## Source provenance and method
+The current tables describe completed, committed session work and retain each finding's ID. The [implementation ledger](openbsd-feature-implementation.md) records changes, test commands, evidence and remaining scope. Completed session changes are consolidated into one `master` integration commit; original development hashes remain provenance references on the retained branch. Unfinished worktrees, including PAC/BTI and per-CPU scheduling, are excluded from completed results. Existing `master` changes and final consolidation verification are recorded separately below.
+
+**Current status meanings:** Implemented closes the named gap within the stated tested scope; Partial has working behavior but retains named work; Open has no completed implementation of the requested gap in this integration. These differ from the historical survey's missing/partial/stub labels. Neither an implemented row nor a successful QEMU run establishes parity with every OpenBSD feature or every physical device.
+
+## Current status by topic
+
+| Topic | Implemented | Partial | Open | Findings |
+| --- | ---: | ---: | ---: | ---: |
+| [Security](#current-security) | 3 | 8 | 3 | 14 |
+| [Syscalls and process control](#current-syscalls-and-process-control) | 5 | 1 | 0 | 6 |
+| [Virtual memory](#current-virtual-memory) | 0 | 2 | 2 | 4 |
+| [Performance](#current-performance) | 1 | 0 | 3 | 4 |
+| [Filesystems and storage](#current-filesystems-and-storage) | 1 | 2 | 4 | 7 |
+| [Networking](#current-networking) | 1 | 2 | 1 | 4 |
+| [Hardware and power](#current-hardware-and-power) | 0 | 0 | 2 | 2 |
+| [Virtualization](#current-virtualization) | 0 | 0 | 1 | 1 |
+| [Observability](#current-observability) | 0 | 2 | 4 | 6 |
+| **Total** | **11** | **17** | **20** | **48** |
+
+### Current security
+
+| Finding | Status | Result and remaining scope |
+| --- | --- | --- |
+| SEC1. Enforced `noexec` / `nodev` mount policy | **Implemented** | Path/FD/cwd/namespace noexec+nodev enforcement, including nested bind aliases and concurrent filesystem snapshots. Route depth is bounded to 64; overflow fails with ELOOP. |
+| SEC2. Controlled W^X exceptions | **Implemented** | Explicit W^X requests require an initial-user-namespace root launcher with CAP_SYS_ADMIN or wxallowed executable mounts; script/translator chain checked. |
+| SEC3. Full securelevel restrictions | **Partial** | Backward wall-clock steps and all userspace block-device writes restricted at level 2; mounted physical extents/partitions/aliases protected at level 1, including old descriptors and transfers. An established system domain name is sealed at level 1; raises are atomic. Memory devices and future filter controls remain. Mounted protection persists after unmount; hardware identity and device-removal coverage remain limited. |
+| SEC4. Set-ID exec and secure-loader state | **Partial** | Mixed credentials select AT_SECURE and dump protection; no_new_privs prevents capability regain on exec. Linux ambient commands and prerequisite drops preserve ambient policy; both architecture guests pass. Executable set-ID/file-capability transitions, effective nosuid enforcement for those transitions and descriptor hygiene remain. |
+| SEC5. Syscall instruction pinning | **Partial** | Opt-in native runtime registration, exact per-number instruction checks, audit/enforce, immutable anonymous text, fork inheritance and exec reset. Both architecture guests and production sanitizer/lifetime tests pass. Automatic ELF/interpreter tables, normal runtime/toolchain cooperation, translators and default enforcement remain. |
+| SEC6. `MAP_STACK` and syscall stack-pointer validation | **Partial** | MAP_STACK tagging plus opt-in audit/enforcement checks on syscall entry; fork/exec/split/remap tested. Existing Linux runtimes require cooperation to enable enforcement. |
+| SEC7. Execute-only user text and protected copy access | **Partial** | Explicit ARM PROT_EXEC denies data and checked-copy access when every boot CPU enables enhanced PAN; kernel mappings always forbid EL0 fetch. Demand/fork/COW/split/remap and fallback guests pass, as does the exact four-CPU ARM core/persistence suite. AMD64 PKU, loader/toolchain cooperation and ordinary readable ELF text remain. |
+| SEC8. Kernel-stack guard pages | **Implemented** | Runtime thread/per-CPU stacks have unmapped native pages at both ends, with fallible allocation rollback, deferred retirement and fatal underflow diagnostics. Actual faults, physical-page return and tracked churn pass both architectures. Bootstrap stacks before page-table installation and recursive emergency-stack exhaustion remain outside the runtime guard guarantee. |
+| SEC9. Retguard return-address checking | **Open** | Return-address protection for generated C and handwritten kernel assembly remains unimplemented; stack canaries remain a separate existing defense. |
+| SEC10. Kernel link-order randomization | **Partial** | LLD kernel function-section order shuffled on fresh links; positive seeds reproduce identical output. Runtime text-base ASLR, per-boot relinking and unsupported native link drivers remain. |
+| SEC11. CPU-specific x86 transient-execution mitigations | **Partial** | Hardware-gated per-CPU speculation controls, retpolines, entry fences, RSB overwrite and late supported VERW; builds, production sanitizer/assembly/linked checks and current compatibility segments pass. Rapid periodic-signal stress stalls on both consolidated and controlled master kernels; original development fallback runs passed. QEMU does not validate hardware-control effects. KPTI, model-specific coverage, VMX/idle/NMI windows, hardware latency and hotplug/resume/microcode lifecycles remain. |
+| SEC12. ARM64 PAC and BTI support | **Open** | PAC/BTI work is unfinished and excluded from the completed integration. Supported-CPU key lifecycle, instruction enforcement, ABI and fallback tests remain acceptance requirements. |
+| SEC13. SMT isolation policy | **Partial** | CPUID SMT discovery and administrator boot restriction; runtime CPU hotplug and heterogeneous topology remain. |
+| SEC14. Common DMA mapping/isolation | **Open** | A shared DMA mapping/isolation API and generic IOMMU backends remain unimplemented; selected Apple DART clients retain their existing isolation. |
+
+### Current syscalls and process control
+
+| Finding | Status | Result and remaining scope |
+| --- | --- | --- |
+| SC1. Process stop/continue and shell job control | **Implemented** | Process-wide stops/continue, child wait states/restart, exit/group-mutation orphan HUP/CONT, session-leader hangup and terminal/session permissions pass both architecture guests. Concurrent terminal open/close and failed-descriptor rollback are tested. Detached userspace stack-unmapping and generic VFS lifetimes remain separate issues. |
+| SC2. Memory locking | **Implemented** | mlock/munlock/mlockall/munlockall, MCL_CURRENT/FUTURE, MAP_LOCKED, resident population and RLIMIT_MEMLOCK/capability checks. Both architecture guests and locked private-file remap tests pass. Unsupported ONFAULT/device requests return errors; an internal brk remap cannot bypass accounting. |
+| SC3. CPU interval timers | **Implemented** | Process-wide VIRTUAL/PROF CPU interval timers, periodic delivery and user/kernel accounting. Existing REAL timer ownership remains a separate issue. |
+| SC4. CPU resource-limit enforcement | **Implemented** | Summed process CPU soft SIGXCPU and hard whole-process SIGKILL limits; fork inherits limits with fresh counters. |
+| SC5. System V message queues | **Implemented** | Linux msgget/msgsnd/msgrcv/msgctl, IPC namespaces, permissions/quotas, MSG_COPY and removal/wakeup lifetimes are implemented. Both architectures build; actual ARM guest and repeated allocation checks pass. |
+| SC6. Clock adjustment and time discipline | **Partial** | Privileged wall setting, one-shot phase slew and bounded frequency correction; raw/monotonic separation and step-aware timers. PLL/FLL/PPS/leap/TAI/RTC disciplines remain. |
+
+### Current virtual memory
+
+| Finding | Status | Result and remaining scope |
+| --- | --- | --- |
+| VM1. Swap-backed anonymous memory, including encrypted swap | **Open** | Anonymous pageout, swap devices/files, encrypted backing and swap-key lifecycle remain unimplemented. |
+| VM2. A VM page daemon with active/inactive queues and free-memory targets | **Open** | VM-wide active/inactive queues, dirty/mapped-page reclaim and free-memory targets remain unimplemented; existing clean block-cache reclaim continues. |
+| VM3. Share clean vnode pages across unrelated private file mappings, copy only on write | **Partial** | Clean EXT2 pages shared across unrelated mappings with reference-aware private COW, fork, discard and race-safe source pins. Both architecture guests and production host fault/lifetime tests pass. Other filesystem resources retain their existing private-copy policy; pressure-driven cache retention/eviction belongs to VM2. |
+| VM4. Dirty mapped-file pages participate in global sync and background writeback | **Partial** | Live EXT2 mappings enter global/background sync; failed final unmap retains pages and the inode for retry. Both architecture disk-image tests pass. Hardware dirty-aware avoidance/reclamation and final inode-deallocation I/O-error retry remain. |
+
+### Current performance
+
+| Finding | Status | Result and remaining scope |
+| --- | --- | --- |
+| PERF1. Per-CPU priority run queues and CPU-usage feedback for ordinary tasks | **Open** | Per-CPU priority queues, work stealing, removal of the fixed runnable bound and recent-CPU feedback remain unimplemented. An unfinished scheduler worktree does not close this finding. |
+| PERF2. Automatic sequential readahead and clustered cache fills | **Implemented** | Automatic bounded EXT2 prefetch on consecutive read/pread offsets, NORMAL/RANDOM/SEQUENTIAL policy, and clustered missing-page fills. Both architecture disk guests, allocation failure tests and full ARM desktop checks pass. Existing synchronous polling driver and cache-lock limits belong to PERF3. |
+| PERF3. General block request queues, scheduling and multiple in-flight requests | **Open** | A general scheduled block-request pipeline and multiple in-flight transfers remain outstanding; existing NVMe hardware queues do not supply that common layer. |
+| PERF4. Interrupt-driven networking, offloads, and lower-copy paths | **Open** | Interrupt/deferred networking, negotiated offloads and lower-copy packet ownership remain outstanding; performance benefits require comparison measurements. |
+
+### Current filesystems and storage
+
+| Finding | Status | Result and remaining scope |
+| --- | --- | --- |
+| FS1. Hardware-cache flush on the ordinary AHCI, NVMe and VirtIO block paths | **Partial** | AHCI/NVMe/VirtIO flush and partition forwarding plus global/background device barriers tested; actual QEMU disk-view persistence passed both architectures. Real volatile-cache AHCI/NVMe power-cut coverage remains. |
+| FS2. Explicit metadata persistence ordering for destructive filesystem operations | **Open** | Destructive metadata operations still require explicit durable ordering and interrupted-step/flush-failure acceptance tests. |
+| FS3. Large and sparse persistent files | **Implemented** | EXT2 64-bit regular-file size, sparse allocation, all indirect levels, bounded tree pruning and 512-byte sector accounting. Both architecture disk tests pass with exact block reclamation on 1/4 KiB filesystems. FS2 crash ordering and VM truncate/SIGBUS semantics remain separate work. |
+| FS4. Persistent user/group disk quotas | **Open** | Persistent UID/GID block/inode quotas, grace periods and restart accounting remain unimplemented. |
+| FS5. Additional mounted filesystem formats and network filesystems | **Open** | Native additional disk formats and network filesystems remain outstanding; bootloader filesystem support does not provide a mounted kernel filesystem. |
+| FS6. Encrypted/redundant and layered block volumes | **Open** | A composable encrypted/redundant block-volume layer, unlock/key lifecycle and failure/rebuild policy remain unimplemented. |
+| FS7. Bounded generic PCI NVMe completion and recovery | **Partial** | Bounded NVMe completion polling, completion checks and DMA-safe offline containment; automatic online recovery remains. |
+
+### Current networking
+
+| Finding | Status | Result and remaining scope |
+| --- | --- | --- |
+| NET1. Stateful firewall/NAT, logging, and kernel VPN interfaces | **Open** | Stateful packet filtering/NAT, logging and kernel VPN/tunnel paths remain unimplemented. |
+| NET2. IPv6 and managed multicast membership | **Implemented** | IPv6 TCP/UDP, mapped/dual-stack endpoints, scope validation, ND/DAD/SLAAC, fragmentation/reassembly, path MTU and bounded managed IPv4/IPv6 memberships. Production host sanitizer checks and both architecture physical-network guests/captures pass with flat repeated-cycle slab. Raw sockets, ancillary/error queues, source filtering, multicast routing and mutable per-namespace interfaces remain separate extensions. |
+| NET3. Mutable interfaces/routes, multiple NICs, and network isolation | **Partial** | Unsupported netlink mutations return errors instead of false success. Mutable routes/interfaces, multi-NIC and isolation remain. |
+| NET4. Complete socket options and lossy-network behavior | **Partial** | Actual keepalive, queue budgets, linger, TCP timestamps/SACK and send accounting. IPv6 path-MTU reporting is now available through NET2. Full PMTU/error-queue controls, ECN and full socket behavior remain. |
+
+### Current hardware and power
+
+| Finding | Status | Result and remaining scope |
+| --- | --- | --- |
+| HW1. General USB enumeration, hubs, hotplug, and classes | **Open** | A general USB bus lifecycle with hubs, hotplug and storage/network classes remains outstanding; existing ARM HID input support remains. |
+| HW2. Suspend/resume, CPU power policy, and generic thermal/battery support | **Open** | Suspend/resume, driver quiesce/restore and generic CPU/thermal/battery policy remain outstanding; existing shutdown, idle and selected Apple power support remain. |
+
+### Current virtualization
+
+| Finding | Status | Result and remaining scope |
+| --- | --- | --- |
+| HV1. General-purpose VM host | **Open** | Multiple independently scheduled vCPUs, larger guest memory, interrupt/timer injection and AMD SVM remain outstanding; existing VMX experiments remain. |
+
+### Current observability
+
+| Finding | Status | Result and remaining scope |
+| --- | --- | --- |
+| OB1. Debugger attach, register access, and single-step | **Open** | Debugger attach/register/single-step and traced-stop ownership/lifetimes remain unimplemented; inspection permission gates and stable pidfds are separate capabilities. |
+| OB2. User-process core dumps and dumpability policy | **Partial** | PR_GET/SET_DUMPABLE, fork/exec/credential policy and protected proc layout inspection implemented and tested. ELF core writer, RLIMIT_CORE and output policy remain. |
+| OB3. Complete process resource accounting | **Partial** | CPU, resident/high-water memory, successful faults, completed leaf disk I/O and actual switches populate self/thread/children/wait and proc fields. Both architecture physical EXT2 guests pass with flat query-loop slab. Delayed-write original-dirtier attribution, Apple ANS/native C filesystem instrumentation and NVMe hardware coverage remain. |
+| OB4. Controllable syscall tracing and dynamic profiling | **Open** | A permission-controlled tracing/profiling API with event selection, timestamps, bounded buffers and loss accounting remains unimplemented. |
+| OB5. Persistent exited-process accounting | **Open** | An exited-process accounting sink with credential, space and persistence policy remains unimplemented. |
+| OB6. Interactive kernel debugger | **Open** | A stopped-kernel interactive debugger remains unimplemented; panic dumps and external QEMU debugging remain available. |
+
+## Verification and integration boundaries
+
+The consolidated tree passes both tracked production builds, all **47 ARM core checks** and the EXT2 persistence reboot, all **43 ARM desktop measurements**, production sanitizer/assembly checks and **20 checks across the two emitted-C outputs**. ARM focused guests cover clocks, terminal/job control, SysV namespaces/quotas, mount/procfs policy, memory locking, clean-private COW, mapped writeback and sparse EXT2 disk persistence. The linked x86 ELF has **777 retpoline-thunk branches and zero raw indirect CALL/JMP**. Independent review checked process retirement, signal locking, memory/resource pins, precise clocks and filesystem/device ownership against concurrent master features. The [final consolidation record](openbsd-feature-implementation.md#master-consolidation-verification-2026-10-03) separates these results from older development batches and documents remaining test limits.
+
+AMD focused clocks, corrected SysV quotas, bounded pidfd job/exec and MAC guests, and unchanged compatibility segments pass. The full rapid periodic-signal mitigation probes time out, with the same failure reproduced on controlled master; QMP observations do not establish a cause. Full AMD job-control functional checks pass, but its physical teardown-retention bound fails even while slab object classes stay flat. Controlled master teardown repetitions panic before the workload measurements, so a matched physical-retention comparison is unavailable. These are retained test limits in the final verification record, not successful acceptance results.
+
+The final allocation audit completes both compiler scans successfully (356 ARM/295 x86 sites) but fails **158 existing allowance groups**, versus 162 in controlled master `9d6f3e1a`; no failing group is added or increased and `allowed.txt` is unchanged. The desktop sweep still measures 208 retained bytes per removed directory and 169 in its broader pipe operation; physical program-churn totals also remain nonzero. These remain distinct from focused tests whose live object counts are flat. Detached userspace thread-unmapping and generic borrowed VFS-node lifetimes retain separate issues. Completing a feature therefore does not mean every measured allocation or correctness issue is fixed.
+
+Exact consolidation ELF/C hashes, source/dependency manifests, commands and serial evidence are retained locally in `/tmp/vinix-openbsd-master-artifacts/`; focused outcomes are in `/tmp/vinix-master-merge-arm-focused.json` and `/tmp/vinix-master-merge-amd-focused.json`. The earlier frozen development batch `79d3adfb` (matching `1676e6bd`) has separate evidence in `/tmp/vinix-security-final-artifacts/manifest.json`: 45 core checks, 43 desktop measurements and its then-existing incomplete AMD allocation scan. It is not substituted for testing the consolidated tree. Temporary artifact paths may not exist in another checkout; committed test directories provide reproduction checks. No comparative performance ranking, physical power-cut guarantee or unsupported hardware mitigation effect is inferred from these runs.
+
+`master` at consolidation base `59c779bf` also contains concurrent security work: a boot securelevel floor and parser, namespace-aware privileged host controls, sealed mandatory process/filesystem domains and a signed-policy verified block-root path. Their contracts and trust boundaries are described in [security policy](security.md), [verified roots](../tools/verified-root/README.md) and [sealed domain tools](../tools/security-mac/README.md). These do not close SEC3's remaining device/control scope or SEC4's executable privilege-transition gap. In particular, storing/displaying `nosuid` does not implement set-ID/file-capability exec suppression while those transitions are absent. Stable pidfds and related handoff fixes already on `master` are useful process control, but do not implement debugger attach. Concurrent libc/page-table improvements and their benchmark evidence are preserved as their original master commits. The unfinished mapping-lifetime refactor is preserved with its original staging state in `third_party/openbsd-worktrees/master-wip-preserved`, outside the tested commit.
+
+## Next work
+
+Prioritize the remaining acceptance contracts rather than reimplementing closed rows: VM-wide reclaim/swap; metadata crash ordering; executable privilege policy; remaining CPU/DMA defenses; mutable isolated network interfaces and packet policy; debugger/core/tracing; and USB/power lifecycles. Scheduler and I/O/network optimizations require baseline/changed measurements while preserving real-time, affinity and ownership guarantees. The historical recommendations below describe the initial survey and are superseded by the current status tables when a gap is closed.
+
+## Historical source survey (2026-10-02)
+
+The remainder preserves the original source-backed findings, priorities and proposed acceptance tests. Statements about missing behavior describe the inspected **2026-10-02 baseline**, and can be superseded by the current tables above. Vinix source links resolve to the current tree and may now show the implemented behavior. OpenBSD links remain pinned to the downloaded revision. Historical acceptance proposals are not automatically counted as completed tests; completed evidence is recorded separately in the ledger.
+
+### Source provenance and method
 
 | Item | Recorded source |
 | --- | --- |
@@ -16,11 +148,11 @@ Date: **2026-10-02**. This report records **48 source-backed findings** comparin
 
 The review read subsystem implementations, syscall registrations and later overrides, build flags, configurations, and relevant existing tests. A syscall entry, accepted flag, stored setting, bundled library, or advertised capability was not treated as working functionality without a corresponding behavior path. Negative findings were checked against the relevant native subsystem and compiled dependencies. Particularly consequential findings received a second source review.
 
-**Status meanings:** missing = no corresponding implementation found in the inspected paths; partial = useful implementation exists but lacks the named behavior; stub = success or stored state without the requested behavior; ABI-sensitive = the OpenBSD defense needs a compatible Vinix loader/runtime contract. These are source findings, not runtime exploit demonstrations. OpenBSD features can depend on configuration, architecture, and hardware.
+**Historical status meanings:** missing = no corresponding implementation found in the inspected paths; partial = useful implementation exists but lacks the named behavior; stub = success or stored state without the requested behavior; ABI-sensitive = the OpenBSD defense needs a compatible Vinix loader/runtime contract. These are source findings, not runtime exploit demonstrations. OpenBSD features can depend on configuration, architecture, and hardware.
 
 **Priority meanings:** P1 = correctness, enforcement, reliability, or capability directly relevant to current desktop/Linux workloads; P2 = useful expansion or an optimization requiring measurement; P3 = optional capability depending on product goals. Priorities are editorial recommendations, not benchmark results.
 
-## Recommended order
+### Recommended order
 
 | Order | Work | Why first |
 | --- | --- | --- |
@@ -31,7 +163,7 @@ The review read subsystem implementations, syscall registrations and later overr
 | 5 | Expand IPv6, interface/routing control, firewalling, and laptop suspend/resume. | These extend the current workstation's practical network and hardware coverage. |
 | 6 | Measure scheduler, cache, storage-queue, and network bottlenecks before optimization. | Source differences identify experiments; they do not establish performance rankings. |
 
-## Existing Vinix features excluded from the gap list
+### Existing Vinix features excluded from the gap list
 
 Vinix already has a substantial subset of the capabilities often associated with OpenBSD. In particular:
 
@@ -40,7 +172,7 @@ Vinix already has a substantial subset of the capabilities often associated with
 - **Files and events:** writable EXT2, sparse tmpfs, background block-cache writeback on both architectures, fsync/msync, namespaces, overlay, record/file locking, epoll, inotify, signalfd, eventfd, timerfd, POSIX timers, SysV shared memory and semaphores. See [kernel/fs/ext2/ext2.v](../kernel/fs/ext2/ext2.v), [kernel/fs/tmpfs.v](../kernel/fs/tmpfs.v), [kernel/main.v](../kernel/main.v), [kernel/fs/namespaces.v](../kernel/fs/namespaces.v), [kernel/file/locks.v](../kernel/file/locks.v), [kernel/file/epoll.v](../kernel/file/epoll.v), and [kernel/posixtimer/posix_timer.v](../kernel/posixtimer/posix_timer.v).
 - **Networking and hardware:** IPv4 TCP/UDP and loopback, randomized ports/ISNs/IP IDs, UNIX descriptor passing/credentials, e1000, arm64 VirtIO networking, Apple Wi-Fi and selected DART-isolated DMA, ATA/AHCI/NVMe/VirtIO block/ANS, ACPI shutdown/reboot, Apple power-domain and battery support, and Intel VMX/EPT experiments. See [kernel/c/vinix_net.c](../kernel/c/vinix_net.c), [kernel/socket/unix/unix.v](../kernel/socket/unix/unix.v), [kernel/c/net_random.c](../kernel/c/net_random.c), [kernel/apple/dart/dart.v](../kernel/apple/dart/dart.v), [kernel/apple/ans/ans.v](../kernel/apple/ans/ans.v), [kernel/uacpi/uacpi.v](../kernel/uacpi/uacpi.v), and [docs/hypervisor.md](../docs/hypervisor.md).
 
-## Contents
+### Contents
 
 1. [Security and exploit mitigation](#security-and-exploit-mitigation)
 2. [Syscalls, process control, IPC, and clocks](#syscalls-process-control-ipc-and-clocks)
@@ -53,9 +185,9 @@ Vinix already has a substantial subset of the capabilities often associated with
 9. [Debugging, observability, and accounting](#debugging-observability-and-accounting)
 10. [Compatibility boundaries and verification](#compatibility-boundaries-and-verification)
 
-## Security and exploit mitigation
+### Security and exploit mitigation
 
-### Mount, privilege, and global policy
+#### Mount, privilege, and global policy
 
 | Feature | What OpenBSD implements | Vinix evidence and gap | Suggested priority / next step |
 | --- | --- | --- | --- |
@@ -64,7 +196,7 @@ Vinix already has a substantial subset of the capabilities often associated with
 | SEC3. Full securelevel restrictions | [sys/kern/spec_vnops.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/kern/spec_vnops.c)`:spec_open()` restricts disk writes and memory-device access; [sys/net/pf_ioctl.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/net/pf_ioctl.c) limits filter-control ioctls above level 1; [sys/kern/kern_time.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/kern/kern_time.c)`:settime()` restricts backward time changes; [sys/kern/kern_sysctl.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/kern/kern_sysctl.c) protects several writable controls. | [kernel/security/securelevel.v](../kernel/security/securelevel.v) explicitly makes level 2 equivalent to level 1. The only actual consumers of `security.securelevel()` are inode flag removal ([kernel/fs/attributes.v](../kernel/fs/attributes.v)) and reporting/setting. Device-open/write paths, e.g. [kernel/dev/ahci/ahci.v](../kernel/dev/ahci/ahci.v)`:AHCIDevice.write`, have no securelevel policy; domain-name setters do not freeze at securelevel 1. | **P2.** Define a Vinix-specific contract before implementing each control. Apply disk restrictions at the userspace device boundary, so filesystem writeback remains usable. PF/time controls are also contingent on implementing those subsystems. |
 | SEC4. Set-ID exec and secure-loader state | [sys/kern/kern_exec.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/kern/kern_exec.c)`:sys_execve()` applies executable `VSUID/VSGID` ownership after policy checks, marks `PS_SUGIDEXEC` for changed or already mismatched credentials, and repairs closed standard descriptors for set-ID launches. `check_exec()` honors `MNT_NOSUID` and rejects set-ID launches under execpromises. | Vinix can change process credentials, and stores set-ID mode bits, but [kernel/userland/userland.v](../kernel/userland/userland.v)`:load_program_image()` and ARM64 counterpart do not derive effective IDs from the executable. [kernel/proc/container.v](../kernel/proc/container.v)`:capabilities_after_exec()` explicitly handles a file with no file capabilities; stored `security.capability` xattrs are not consulted. [kernel/sched/user_stack.v](../kernel/sched/user_stack.v)`:build_initial_stack()` always emits `AT_SECURE=0`, including when existing real/effective IDs differ. | **P2** for multi-user support. Implement executable credential transitions together with `nosuid`, `no_new_privs`, file-capability policy, secure-loader metadata, descriptor hygiene and dump/inspection restrictions; do not add privilege elevation alone. |
 
-### Process-memory defenses
+#### Process-memory defenses
 
 | Feature | What OpenBSD implements | Vinix evidence and gap | Suggested priority / next step |
 | --- | --- | --- | --- |
@@ -73,7 +205,7 @@ Vinix already has a substantial subset of the capabilities often associated with
 | SEC7. Execute-only user text and protected copy access | OpenBSD ARM64 [sys/arch/arm64/arm64/pmap.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/arch/arm64/arm64/pmap.c)`:protection_codes` gives `PROT_EXEC` mappings EL0-execute permission without EL0 read permission. AMD64 [sys/arch/amd64/amd64/pmap.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/arch/amd64/amd64/pmap.c) uses PKU for execute-only entries when supported; [sys/uvm/uvm_mmap.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/uvm/uvm_mmap.c)`:sys_pinsyscalls()` also registers libc text with the copyin checker where enabled. | Vinix's mapping permission translation ([kernel/memory/mmap/mmap.v](../kernel/memory/mmap/mmap.v)`:page_table_flags`, [kernel/memory/virtual_arm64.v](../kernel/memory/virtual_arm64.v)`:portable_to_arm64_pte`) represents writable/executable/user bits, but not an independent readable bit. An execute-only request remains readable. There is no AMD64 PKU setup. | **P2.** Add ARM64 execute-only translation and usercopy rules together, then optional AMD64 PKU support. Use an opt-in program contract because Linux programs can read their own text. |
 | SEC8. Kernel-stack guard pages | [sys/uvm/uvm_glue.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/uvm/uvm_glue.c)`:uvm_uarea_alloc()` removes the page between PCB and kernel stack; AMD64 [sys/arch/amd64/include/param.h](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/arch/amd64/include/param.h) and ARM64 [sys/arch/arm64/include/param.h](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/arch/arm64/include/param.h) define `__HAVE_USPACE_GUARD`. | Vinix allocates physical kernel stacks and accesses them through the mapped direct map ([kernel/sched/sched_amd64.v](../kernel/sched/sched_amd64.v)`:new_kernel_thread`, [kernel/sched/sched_arm64.v](../kernel/sched/sched_arm64.v)`:new_kernel_thread`, and user-thread creation). There is no unmapped guard page below these stacks. Stack canaries detect some overwrites, but do not make stack exhaustion fault at a boundary. | **P1.** Allocate stacks in dedicated virtual ranges with unmapped guards; review interrupt/page-fault/idle stacks and direct-map alias behavior, not only ordinary thread stacks. |
 
-### Kernel code and CPU defenses
+#### Kernel code and CPU defenses
 
 | Feature | What OpenBSD implements | Vinix evidence and gap | Suggested priority / next step |
 | --- | --- | --- | --- |
@@ -83,7 +215,7 @@ Vinix already has a substantial subset of the capabilities often associated with
 | SEC12. ARM64 PAC and BTI support | [sys/arch/arm64/arm64/cpu.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/arch/arm64/arm64/cpu.c)`:cpu_init()` enables pointer authentication and BTI controls; `pmap.c:pmap_setpauthkeys()` switches per-address-space keys and marks kernel maps guarded. `Makefile.arm64` uses `-mbranch-protection=bti` on normal kernels. | [kernel/aarch64/cpu/cpu.v](../kernel/aarch64/cpu/cpu.v)`:user_hwcaps()` explicitly excludes PAC/BTI because keys/page attributes are not configured. [kernel/memory/virtual_arm64.v](../kernel/memory/virtual_arm64.v) has no guarded-page attribute; [kernel/GNUmakefile](../kernel/GNUmakefile) has no branch-protection flag. | **P2.** Implement key lifecycle across exec/fork/context-switch and guarded-page attributes, then enable compatible kernel/user code and advertise only supported capabilities. |
 | SEC13. SMT isolation policy | OpenBSD AMD64 [sys/arch/amd64/amd64/machdep.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/arch/amd64/amd64/machdep.c) initializes `sched_blockcpu` with `CPUTYP_SMT`; [sys/kern/kern_sched.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/kern/kern_sched.c)`:sysctl_hwsmt()` exposes a switch controlling sibling CPUs. | Vinix's [kernel/limine/smp_amd64.v](../kernel/limine/smp_amd64.v) starts reported CPUs; CPU initialization and scheduler have no physical-core/sibling classification or `hw.smt`-like control. NUMA topology is already present and is a different feature. | **P2, workload-dependent.** Discover SMT siblings and expose an administrator policy; disabling siblings has a throughput cost and should follow the intended trust model. |
 
-### SEC14. Common DMA mapping/isolation — partial; P1
+#### SEC14. Common DMA mapping/isolation — partial; P1
 
 **OpenBSD:** [sys/arch/arm64/dev/apldart.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/arch/arm64/dev/apldart.c)`:apldart_dmamap_load`, `apldart_load_map` and `apldart_unload_map`, and [sys/arch/arm64/dev/smmu.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/arch/arm64/dev/smmu.c)`:smmu_device_map` integrate IOMMUs into `bus_dma` mappings. [sys/dev/ic/nvme.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/dev/ic/nvme.c)`:nvme_scsi_io` uses `bus_dmamap_load/sync/unload` and PRP addresses from DMA segments rather than equating CPU virtual addresses with bus addresses. Intel/AMD remapping machinery exists in [sys/dev/acpi/acpidmar.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/dev/acpi/acpidmar.c), but **amd64 GENERIC explicitly configures `acpidmar0 ... disable`**: this is not evidence that every OpenBSD machine enables DMA isolation by default.
 
@@ -93,7 +225,7 @@ Vinix already has a substantial subset of the capabilities often associated with
 
 **Acceptance:** map scattered buffers for NVMe; verify out-of-range DMA faults are contained with an IOMMU-capable test device; revoke mappings before freeing pages; fail initialization safely on unsupported translated buses. Preserve the existing DART-restricted Wi-Fi path.
 
-## Syscalls, process control, IPC, and clocks
+### Syscalls, process control, IPC, and clocks
 
 Vinix uses the Linux ABI on amd64 and arm64; OpenBSD syscall numbers are not a compatibility target. The gaps below concern behavior that a Linux-compatible kernel can expose through Linux's corresponding interfaces. Both Vinix tables start vacant entries at `ENOSYS`; registrations and later table overrides were inspected, rather than counting syscall names.
 
@@ -108,60 +240,60 @@ Vinix uses the Linux ABI on amd64 and arm64; OpenBSD syscall numbers are not a c
 
 **Suggested verification:** test stop/continue across every thread, signal masks, foreground/background terminals, and `wait4`/`waitid`; exercise locking over holes and read-only mappings, residency before/after success, limits, fork, and unmap; compare CPU timers during sleep versus CPU work; exceed soft and hard CPU limits; test message-queue permissions and namespace isolation; verify clock slewing never makes monotonic time step backward. These are proposed acceptance tests, not tests run for this report.
 
-## Virtual memory and memory pressure
+### Virtual memory and memory pressure
 
-### VM1. Swap-backed anonymous memory, including encrypted swap — missing; P1
+#### VM1. Swap-backed anonymous memory, including encrypted swap — missing; P1
 
 - **OpenBSD:** [sys/uvm/uvm_swap.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/uvm/uvm_swap.c) implements `sys_swapctl`, swap partitions/files, swap priorities and paging I/O. [sys/uvm/uvm_pdaemon.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/uvm/uvm_pdaemon.c) (`swapcluster_*`, `uvmpd_scan_inactive`) can evict anonymous pages to swap. [sys/uvm/uvm_swap_encrypt.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/uvm/uvm_swap_encrypt.c) enables encryption by default (`uvm_doswapencrypt = 1`) and creates and erases swap keys (`swap_key_create`, `swap_key_delete`).
 - **Vinix:** anonymous faults allocate resident physical pages through `acquire_range_page`/`numa.alloc_user_page`; no swap pager or swapon/swapoff implementation was found in `kernel/`. [kernel/fs/procfs.v](../kernel/fs/procfs.v) renders `SwapTotal` and `SwapFree` as zero. The available memory-pressure cache reclaimer only frees clean block-cache pages.
 - **Gap:** no way to page out a process's cold, modified anonymous memory. Cgroup OOM handling does exist, but does not provide backing storage for evicted anonymous pages. If swap is added, encryption needs to be part of that design rather than a separately advertised existing omission.
 - **Acceptance test:** constrain RAM, touch anonymous memory beyond that budget, then revisit old pages and verify contents, useful forward progress, accounting and swapoff behavior. Check that swap data is encrypted and boot-lifetime keys are erased.
 
-### VM2. A VM page daemon with active/inactive queues and free-memory targets — partial; P1
+#### VM2. A VM page daemon with active/inactive queues and free-memory targets — partial; P1
 
 - **OpenBSD:** [sys/uvm/uvm_pdaemon.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/uvm/uvm_pdaemon.c) (`uvmpd_tune`, `uvm_pageout`, `uvmpd_scan_inactive`) maintains `freemin`, `freetarg`, active/inactive targets and kernel reserves. It drains buffer/DRM caches, cleans dirty pages via pagers and frees inactive pages. This is VM-wide reclamation, not just a file-cache limit.
 - **Vinix:** [kernel/memory/physical.v](../kernel/memory/physical.v) calls `reclaim_pages` only after an allocation scan fails, retries, and the infallible path eventually panics with `Out of memory after reclaim`. [kernel/pagecache/reclaim.v](../kernel/pagecache/reclaim.v) registers block caches; `Cache.reclaim_clean` skips dirty and in-flight pages. No equivalent VM-wide active/inactive scan or dirty/mapped-page pager was found. Fallible allocations and cgroup OOM controls already mitigate some pressure paths.
 - **Gap:** cache reclamation is reactive, and cold process/file-mapping pages cannot generally be recovered while mappings remain alive. A free-memory reserve and reclamation worker would reduce the amount of emergency reclaim on allocating threads; actual latency benefits need measurement.
 - **Acceptance test:** run concurrent file-cache and anonymous-memory pressure with a bounded RAM image. Record free pages, allocation failures, reclaim progress, page-fault latency and kernel panics; verify dirty data and mapped pages survive eviction/refault.
 
-### VM3. Share clean vnode pages across unrelated private file mappings, copy only on write — partial; P2
+#### VM3. Share clean vnode pages across unrelated private file mappings, copy only on write — partial; P2
 
 - **OpenBSD:** [sys/uvm/uvm_vnode.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/uvm/uvm_vnode.c) (`uvn_get`) locates reusable pages by vnode/offset with `uvm_pagelookup`. [sys/uvm/uvm_fault.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/uvm/uvm_fault.c) (`uvm_fault_lower`) maps the actual object page read-only for a private read fault and promotes/copies it into an anonymous page only on a write fault. `uvm_mmap.c` marks private mappings `UVM_FLAG_COPYONW`.
 - **Vinix:** fork COW is already implemented. However, [kernel/fs/ext2/ext2.v](../kernel/fs/ext2/ext2.v) (`EXT2Resource.mmap`) reuses its `mapped_pages` only for `MAP_SHARED`; each `MAP_PRIVATE` fault allocates a fresh physical page and reads file bytes into it. [kernel/fs/ext2/mapping.v](../kernel/fs/ext2/mapping.v) explicitly says every private fault gets its own disposable page. The common block cache avoids repeated device reads, but does not remove these private physical copies.
 - **Gap:** unrelated processes mapping the same executable/library read-only retain separate copies of the pages they touch, plus backing block-cache pages. Demand paging reduces untouched-page cost but does not supply sharing after a page is touched.
 - **Acceptance test:** start many unrelated processes that touch the same large read-only private mapping, measure total physical memory, and confirm one shared clean page per file offset; writes to one private mapping must remain invisible to the others.
 
-### VM4. Dirty mapped-file pages participate in global sync and background writeback — partial; P1
+#### VM4. Dirty mapped-file pages participate in global sync and background writeback — partial; P1
 
 - **OpenBSD:** [sys/uvm/uvm_vnode.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/uvm/uvm_vnode.c) (`uvn_flush`) checks `pmap_is_modified` and writes dirty vnode pages; `uvm_vnp_sync` walks writable vnode objects. [sys/kern/vfs_syscalls.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/kern/vfs_syscalls.c) (`sys_sync`) calls `uvm_vnp_sync(mp)` as well as `VFS_SYNC`, so dirty mapping pages are included in global synchronization.
 - **Vinix:** [kernel/main.v](../kernel/main.v) implements a periodic five-second `writeback_thread`, launched on **both** architectures (`main_amd64.v`, `main_arm64.v`), and `pagecache.sync_all` flushes registered block caches. Separate `EXT2MappedPage` pages in [kernel/fs/ext2/mapping.v](../kernel/fs/ext2/mapping.v) are folded into that cache by resource-level fsync/msync or final unmapping. `write_mapped_pages` documents the absence of common hardware dirty-bit tracking and rewrites every eligible mapped page conservatively. Global cache sync itself does not enumerate these live mapped pages.
 - **Gap:** a write through a live shared file mapping need not enter the block cache before global sync or the periodic worker runs. Map pages also lack dirty-aware writeback/reclamation, so repeated fsync can rewrite unchanged mapped data.
 - **Acceptance test:** modify a file only through `MAP_SHARED`, leave it mapped, call global sync and verify the device view contains the update; also verify timed writeback, correct dirty-bit handling after subsequent writes, unchanged-page write counts and I/O-error retries.
 
-## Performance and scheduling
+### Performance and scheduling
 
-### PERF1. Per-CPU priority run queues and CPU-usage feedback for ordinary tasks — partial; P2
+#### PERF1. Per-CPU priority run queues and CPU-usage feedback for ordinary tasks — partial; P2
 
 - **OpenBSD:** [sys/kern/kern_sched.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/kern/kern_sched.c) (`setrunqueue`, `sched_chooseproc`, `sched_choosecpu`, `sched_steal_proc`) uses each CPU's priority queues, a nonempty-queue bitmap, placement costs and work stealing. [sys/kern/sched_bsd.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/kern/sched_bsd.c) (`schedclock`, `schedcpu`, `decay_aftersleep`, `setpriority`) derives normal-task priority from recent CPU use and nice, decaying the CPU-use estimate after sleep. OpenBSD still has a scheduler lock; per-CPU queues should not be presented as a lock-free design.
 - **Vinix:** [kernel/sched/sched.v](../kernel/sched/sched.v) has one fixed 512-slot `scheduler_running_queue`. [kernel/sched/policy.v](../kernel/sched/policy.v) scans it round-robin, or performs ranked scans when policies are in use, with NUMA preference and CPU affinity. Ordinary-task nice changes the quantum in `effective_timeslice`, rather than applying a recent-CPU-use priority model. FIFO, RR, idle, deadline scheduling and real-time bandwidth caps already exist.
 - **Gap:** no per-CPU priority-queue selection/stealing structure or adaptive ordinary-task priority feedback; the runnable-slot bound is fixed in the scheduler. This is a scalability/interactive-policy difference, not evidence that OpenBSD is faster or that Vinix lacks real-time scheduling.
 - **Acceptance test:** measure scheduler selection cost as runnable task count and CPU count rise, including exceeding 512 runnable threads; measure wake-to-run latency for short interactive tasks competing with CPU-bound workers, while preserving affinity, NUMA and real-time policy guarantees.
 
-### PERF2. Automatic sequential readahead and clustered cache fills — partial; P2
+#### PERF2. Automatic sequential readahead and clustered cache fills — partial; P2
 
 - **OpenBSD:** [sys/ufs/ffs/ffs_vnops.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/ufs/ffs/ffs_vnops.c) (`ffs_read`) detects sequential access using `ci_lastr` and calls `bread_cluster`; [sys/kern/vfs_bio.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/kern/vfs_bio.c) implements `breadn`, `bread_cluster` and cluster-completion handling.
 - **Vinix:** [kernel/pagecache/pagecache.v](../kernel/pagecache/pagecache.v) fills a missing cache page through one `load` callback in `Cache.get`; ordinary EXT2 reads in [kernel/fs/ext2/ext2.v](../kernel/fs/ext2/ext2.v) walk the needed blocks. Explicit `WILLNEED` advice exists through `EXT2Resource.advise` and `Cache.prefetch`, and dirty writeback already coalesces up to 32 consecutive pages. No automatic sequential read detector or equivalent clustered demand-read fill was found.
 - **Gap:** a sequential reader must request the pages individually or use explicit advice. Existing writeback clustering and manual prefetch must not be described as absent.
 - **Acceptance test:** use a cold sequential file read, count device requests and useful readahead hits, then compare random reads, memory pressure and competing workloads so speculation does not evict useful dirty data or cause unbounded I/O.
 
-### PERF3. General block request queues, scheduling and multiple in-flight requests — partial; P2
+#### PERF3. General block request queues, scheduling and multiple in-flight requests — partial; P2
 
 - **OpenBSD:** [sys/kern/kern_bufq.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/kern/kern_bufq.c) provides FIFO and N-scan queue implementations, high/low watermarks and outstanding-request accounting. [sys/scsi/sd.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/scsi/sd.c) (`sdstrategy`, `sdstart`) queues buffers and submits them through SCSI transfer resources; controller backends complete requests through the shared storage stack.
 - **Vinix:** [kernel/dev/ahci/ahci.v](../kernel/dev/ahci/ahci.v) explicitly handles one command at a time; [kernel/aarch64/virtio_blk/virtio_blk.v](../kernel/aarch64/virtio_blk/virtio_blk.v) (`transfer`, `collect_one`) shares one request/data buffer and waits for each request. [kernel/fs/ext2/pagecache.v](../kernel/fs/ext2/pagecache.v) serializes backing transfers through the global `ext2_bounce_lock`. Native NVMe does have four I/O queue pairs ([kernel/dev/nvme/nvme.v](../kernel/dev/nvme/nvme.v)), so the gap is not absence of every hardware queue, but there is no corresponding general request-scheduling layer.
 - **Gap:** filesystem I/O cannot generally maintain a scheduled pipeline of pending/in-flight operations across the common block layer, and unrelated EXT2 devices share a staging lock. Effects depend on device and workload and need benchmarks.
 - **Acceptance test:** issue concurrent reads and writeback, track queue depth, completion ordering, fairness and latency, and inject slow completions/timeouts; confirm outstanding DMA buffers are never reused prematurely.
 
-### PERF4. Interrupt-driven networking, offloads, and lower-copy paths — partial; P2, measure first
+#### PERF4. Interrupt-driven networking, offloads, and lower-copy paths — partial; P2, measure first
 
 **OpenBSD:** for the same Intel device family, [sys/dev/pci/if_em.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/dev/pci/if_em.c)`:em_intr`, `em_rxeof`, `em_tso_setup` and `em_transmit_checksum_setup` provide interrupt receive processing, RX-ring accounting, TCP segmentation and checksum offload. [sys/netinet/tcp_input.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/netinet/tcp_input.c) recognizes receive checksum flags. [sys/kern/uipc_socket.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/kern/uipc_socket.c)`:sosplice/somove` provides a kernel-managed socket-splicing path.
 
@@ -171,38 +303,38 @@ Vinix uses the Linux ABI on amd64 and arm64; OpenBSD syscall numbers are not a c
 
 **Acceptance:** compare CPU/throughput and idle power before/after with one and many TCP/UDP flows; measure p95/p99 latency under overload, packet drops and fairness; run malformed-checksum and offload-disabled tests plus lifetime/leak tests for any new buffer ownership.
 
-## Filesystems and persistent storage
+### Filesystems and persistent storage
 
-### FS1. Hardware-cache flush on the ordinary AHCI, NVMe and VirtIO block paths — partial; P1
+#### FS1. Hardware-cache flush on the ordinary AHCI, NVMe and VirtIO block paths — partial; P1
 
 - **OpenBSD:** [sys/scsi/sd.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/scsi/sd.c) (`sd_flush`, `DIOCCACHESYNC`) issues `SYNCHRONIZE_CACHE` and propagates failures. [sys/dev/ic/nvme.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/dev/ic/nvme.c) (`nvme_scsi_sync_fill`) translates it to `NVM_CMD_FLUSH`; [sys/dev/pv/vioblk.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/dev/pv/vioblk.c) negotiates `VIRTIO_BLK_F_FLUSH` and handles `VIRTIO_BLK_T_FLUSH`.
 - **Vinix:** [kernel/fs/ext2/pagecache.v](../kernel/fs/ext2/pagecache.v) (`EXT2Resource.sync`) drains its software cache and invokes optional `resource.sync_resource`; the native AHCI/NVMe/VirtIO block resources do not implement that sync capability or corresponding flush commands. The source explicitly limits the guarantee to completion at the backing resource. **Apple ANS is an existing exception:** [kernel/c/apple_ans_rw.h](../kernel/c/apple_ans_rw.h) uses FUA plus `a_flush_ns` on writes, and [kernel/apple/ans/ans.v](../kernel/apple/ans/ans.v) exposes a real flush operation.
 - **Gap:** software-cache completion on the ordinary block backends does not give a hardware power-loss persistence barrier. This does not imply that ANS lacks durable writes.
 - **Acceptance test:** verify each supported backend submits the protocol flush after software-cache writes and propagates failed flushes; use a device/emulator with a volatile cache model to test loss of power immediately after fsync.
 
-### FS2. Explicit metadata persistence ordering for destructive filesystem operations — partial; P1
+#### FS2. Explicit metadata persistence ordering for destructive filesystem operations — partial; P1
 
 - **OpenBSD:** [sys/ufs/ffs/ffs_inode.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/ufs/ffs/ffs_inode.c) (`ffs_truncate`) clears obsolete inode/block pointers and performs a synchronous `UFS_UPDATE(oip, 1)` **before** freeing the old blocks. The code states the crash-ordering purpose. This is the inspected synchronous-write ordering mechanism; physical power-loss ordering also depends on backend/cache barriers. This evidence does not establish journaling or soft dependencies.
 - **Vinix:** [kernel/fs/ext2/ext2.v](../kernel/fs/ext2/ext2.v) (`EXT2Inode.resize`, `free_entry`, `free_block`, `set_block`) changes allocation bitmaps, block pointers and inode contents through the shared dirty block cache; shrinking frees blocks before updating the associated block pointer and final inode. [kernel/pagecache/pagecache.v](../kernel/pagecache/pagecache.v) orders ordinary dirty pages by when first dirtied and coalesces adjacent pages, with no filesystem metadata dependency/transaction/barrier model. Namespace changes are flushed on syscall return, but there is still an interruption window inside those multi-block operations.
 - **Gap:** no demonstrated durable ordering that prevents a crashed truncate/unlink from retaining an old inode pointer to a block already marked free and potentially reused. Periodic/global writeback is distinct from metadata crash consistency.
 - **Acceptance test:** snapshot/reset the guest after each persistence step of truncate, unlink, rename and file growth; run the offline checker and verify there are no multiply allocated blocks, dangling allocated inode references or silent cross-file data exposure. Audit ordering on every backend, including flush failure.
 
-### FS3. Large and sparse persistent files — partial; P2
+#### FS3. Large and sparse persistent files — partial; P2
 
 - **OpenBSD:** FFS supports UFS1/UFS2 ([sys/ufs/ffs/ffs_vfsops.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/ufs/ffs/ffs_vfsops.c), `fs.h`), 64-bit file offsets and a filesystem-dependent `fs_maxfilesize`. [sys/ufs/ffs/ffs_inode.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/ufs/ffs/ffs_inode.c) (`ffs_truncate`) extends a file by allocating the block containing the new last byte rather than every intervening block; FFS reads preserve holes.
 - **Vinix:** EXT2 metadata/stat reporting combines `size32l` and `size32h`, but `EXT2Inode.resize` and `write` in [kernel/fs/ext2/ext2.v](../kernel/fs/ext2/ext2.v) reject an end beyond `0xffffffff`, resize writes `size32h = 0`, and growth allocates every block from the old end to the new end. `EXT2Inode.read` also bounds reads using `size32l`, so existing larger on-disk files are not fully readable. The read path can read zero-filled holes, and tmpfs already has sparse support ([kernel/fs/tmpfs.v](../kernel/fs/tmpfs.v)); those existing capabilities do not mean EXT2 growth creates sparse disk files.
 - **Gap:** native writable disk files are capped at 4 GiB minus one byte, and seeking/truncating far past EOF consumes intervening disk blocks rather than preserving a sparse gap. This matters for VM images, large archives and datasets.
 - **Acceptance test:** write/read/truncate across the 4 GiB boundary on a sufficiently large image; seek far beyond EOF and write one page, then check size, physical block count, zero reads from the hole, restart behavior and complete indirect-block cleanup.
 
-### FS4. Persistent user/group disk quotas — missing; P2
+#### FS4. Persistent user/group disk quotas — missing; P2
 
 OpenBSD FFS supplies `ufs_quotactl` ([sys/ufs/ffs/ffs_vfsops.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/ufs/ffs/ffs_vfsops.c)) and per-user/group block/inode enforcement ([sys/ufs/ufs/ufs_quota.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/ufs/ufs/ufs_quota.c): `getinoquota`, `ufs_quota_alloc_blocks2`, `ufs_quota_alloc_inode2`). No disk-quota accounting or quotactl implementation was found in Vinix's native filesystem/syscall code. `cpu.max` is CPU bandwidth and cgroup `memory.max` is memory control, so neither supplies persistent disk quotas. Suggested acceptance test: independent UID/GID limits on blocks and inodes, grace expiry, EDQUOT, ownership changes, unlinks and restart persistence.
 
-### FS5. Additional mounted filesystem formats and network filesystems — missing; P2/P3 by use case
+#### FS5. Additional mounted filesystem formats and network filesystems — missing; P2/P3 by use case
 
 OpenBSD has NFS ([sys/nfs/](https://github.com/openbsd/src/tree/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/nfs/)), MSDOS FAT ([sys/msdosfs/](https://github.com/openbsd/src/tree/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/msdosfs/)), ISO9660 ([sys/isofs/cd9660/](https://github.com/openbsd/src/tree/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/isofs/cd9660/)), UDF ([sys/isofs/udf/](https://github.com/openbsd/src/tree/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/isofs/udf/)). No native counterparts were found in Vinix; a UEFI FAT boot partition is not a mounted Vinix FAT filesystem. Treat these as use-case-dependent additions, not universal prerequisites.
 
-### FS6. Encrypted/redundant and layered block volumes — missing; P1 encryption, P3 RAID
+#### FS6. Encrypted/redundant and layered block volumes — missing; P1 encryption, P3 RAID
 
 **OpenBSD:** [sys/dev/softraid.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/dev/softraid.c), [sys/dev/softraid_crypto.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/dev/softraid_crypto.c)`:sr_crypto_create/sr_crypto_rw`, [sys/dev/softraid_raid1.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/dev/softraid_raid1.c)`:sr_raid1_rw` and [sys/dev/softraid_raid5.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/dev/softraid_raid5.c) implement encrypted and redundant block volumes. [sys/conf/GENERIC](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/conf/GENERIC) configures softraid, vnd and virtual SCSI; [sys/dev/bio.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/dev/bio.c) is the administration ioctl multiplexer. This is kernel plumbing; provisioning/unlock tools and boot integration are separate.
 
@@ -212,7 +344,7 @@ OpenBSD has NFS ([sys/nfs/](https://github.com/openbsd/src/tree/3ce1f3f79392ae4d
 
 **Acceptance:** wrong-key refusal, recognizable data absent from the raw device, power-interrupted writes, boot/root unlock, and key erasure on volume teardown. RAID acceptance should include degraded reads, disk replacement, rebuild interruptions and corruption/error reporting.
 
-### FS7. Bounded generic PCI NVMe completion and recovery — partial; P1
+#### FS7. Bounded generic PCI NVMe completion and recovery — partial; P1
 
 **OpenBSD:** [sys/dev/ic/nvme.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/dev/ic/nvme.c)`:nvme_poll` accepts a caller timeout; the driver has shared storage/DMA-map machinery. This establishes a bounded polled-command path, not a claim that every interrupt/reset path was exhaustively audited.
 
@@ -222,9 +354,9 @@ OpenBSD has NFS ([sys/nfs/](https://github.com/openbsd/src/tree/3ce1f3f79392ae4d
 
 **Acceptance:** withhold completions/interrupts, verify bounded failure, then test late completions, controller reset, writeback-error preservation, and safe teardown.
 
-## Networking
+### Networking
 
-### NET1. Stateful firewall/NAT, logging, and kernel VPN interfaces — missing; P1 firewall, P2 VPN
+#### NET1. Stateful firewall/NAT, logging, and kernel VPN interfaces — missing; P1 firewall, P2 VPN
 
 **OpenBSD:** [sys/net/pf.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/net/pf.c)`:pf_test`, [sys/net/pf_ioctl.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/net/pf_ioctl.c)`:pfioctl`, [sys/net/pf_lb.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/net/pf_lb.c) and [sys/net/pf_syncookies.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/net/pf_syncookies.c) provide rule/state processing, NAT/redirection and SYN-cookie machinery. [sys/netinet/ip_input.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/netinet/ip_input.c) calls `pf_test(AF_INET, PF_IN, ...)` on ingress. [sys/conf/GENERIC](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/conf/GENERIC) configures `pf`, `pflog`, `pfsync`, IPsec and `wg`; [sys/netinet/ip_ipsp.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/netinet/ip_ipsp.c) and [sys/net/if_wg.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/net/if_wg.c) implement the latter kernel data paths.
 
@@ -234,7 +366,7 @@ OpenBSD has NFS ([sys/nfs/](https://github.com/openbsd/src/tree/3ce1f3f79392ae4d
 
 **Acceptance:** deny inbound TCP except one configured port; verify established replies still pass; test malformed and fragmented packets, state expiry and state exhaustion; confirm blocked packets and rule counters; add NAT and a tunnel only after the underlying interface/routing work works.
 
-### NET2. IPv6 and managed multicast membership — disabled/missing API; P1 IPv6, P2 membership
+#### NET2. IPv6 and managed multicast membership — disabled/missing API; P1 IPv6, P2 membership
 
 **OpenBSD:** [sys/conf/GENERIC](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/conf/GENERIC) enables `INET6` and `MROUTING`; [sys/netinet6/ip6_input.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/netinet6/ip6_input.c)`:ip6_input_if`, [sys/netinet6/ip6_output.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/netinet6/ip6_output.c)`:ip6_output`, [sys/netinet6/nd6.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/netinet6/nd6.c)`:nd6_resolve` and [sys/netinet6/icmp6.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/netinet6/icmp6.c) implement IPv6/neighbor discovery/ICMPv6, while [sys/netinet/igmp.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/netinet/igmp.c) and [sys/netinet6/mld6.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/netinet6/mld6.c) provide multicast membership protocols.
 
@@ -244,7 +376,7 @@ OpenBSD has NFS ([sys/nfs/](https://github.com/openbsd/src/tree/3ce1f3f79392ae4d
 
 **Acceptance:** loopback and physical TCP/UDP over IPv6, link-local addressing with interface scope, neighbor discovery, RA/SLAAC lifetime expiry, PMTU/ICMPv6, dual-stack listener semantics and multicast join/leave.
 
-### NET3. Mutable interfaces/routes, multiple NICs, and network isolation — partial; P1
+#### NET3. Mutable interfaces/routes, multiple NICs, and network isolation — partial; P1
 
 **OpenBSD:** [sys/net/rtsock.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/net/rtsock.c)`:route_output` handles RTM_ADD/DELETE/CHANGE and route tables; [sys/net/if.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/net/if.c) maintains dynamic interfaces/rdomain state. [sys/conf/GENERIC](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/conf/GENERIC) includes VLAN, bridge/veb, trunk/aggr, tun/tap, pair and tunnel interfaces. Routing domains are a useful isolation reference, but their API/design is not Linux CLONE_NEWNET.
 
@@ -254,7 +386,7 @@ OpenBSD has NFS ([sys/nfs/](https://github.com/openbsd/src/tree/3ce1f3f79392ae4d
 
 **Acceptance:** attach two NICs without losing either, add/remove addresses and routes, change MTU/admin state, create a virtual pair and bridge, verify namespace A cannot bind/connect through B's loopback or interfaces, and confirm sysctl state matches forwarding behavior.
 
-### NET4. Complete socket options and lossy-network behavior — partial; P2
+#### NET4. Complete socket options and lossy-network behavior — partial; P2
 
 **OpenBSD:** [sys/netinet/tcp_input.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/netinet/tcp_input.c) contains TCP SACK processing, [sys/netinet/tcp_subr.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/netinet/tcp_subr.c)`:tcp_ctlinput` handles control errors/PMTU feedback and [sys/conf/GENERIC](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/conf/GENERIC) enables TCP_ECN. [sys/kern/uipc_socket.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/kern/uipc_socket.c)`:soclose` implements linger handling and `sosetopt` configures socket buffer state.
 
@@ -264,9 +396,9 @@ OpenBSD has NFS ([sys/nfs/](https://github.com/openbsd/src/tree/3ce1f3f79392ae4d
 
 **Acceptance:** observe keepalive probes/timing on the wire, test linger with unsent bytes, buffer resizing/backpressure, unreachable/PMTU feedback and retransmission progress under reordering/loss. Existing [tests/network](../tests/network) is a base to extend.
 
-## Hardware and power management
+### Hardware and power management
 
-### HW1. General USB enumeration, hubs, hotplug, and classes — partial; P2
+#### HW1. General USB enumeration, hubs, hotplug, and classes — partial; P2
 
 **OpenBSD:** [sys/dev/usb/usb.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/dev/usb/usb.c)`:usb_explore`, `usb_needs_explore` and `usb_detach`, [sys/dev/usb/uhub.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/dev/usb/uhub.c), and class drivers such as [sys/dev/usb/umass.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/dev/usb/umass.c)`:umass_attach/umass_detach`, audio/network/serial drivers provide a shared USB device lifecycle.
 
@@ -276,7 +408,7 @@ OpenBSD has NFS ([sys/nfs/](https://github.com/openbsd/src/tree/3ce1f3f79392ae4d
 
 **Acceptance:** attach/detach keyboard/mouse through a hub, repeated cycles without leaks or use-after-free, storage disconnect during I/O, endpoint-stall recovery, controller errors, and both supported architectures where the controller exists.
 
-### HW2. Suspend/resume, CPU power policy, and generic thermal/battery support — partial; P1/P2
+#### HW2. Suspend/resume, CPU power policy, and generic thermal/battery support — partial; P1/P2
 
 **OpenBSD:** [sys/dev/acpi/acpi.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/dev/acpi/acpi.c)`:acpi_sleep_pm/acpi_resume_pm`, [sys/arch/amd64/amd64/acpi_machdep.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/arch/amd64/amd64/acpi_machdep.c)`:acpi_sleep_cpu/acpi_resume_cpu`, and [sys/kern/subr_hibernate.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/kern/subr_hibernate.c) implement machine/device sleep and hibernation machinery. Both amd64/arm64 GENERIC enable HIBERNATE. [sys/dev/acpi/acpicpu_x86.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/dev/acpi/acpicpu_x86.c)`:acpicpu_idle/acpicpu_setperf`, [sys/arch/arm64/dev/aplcpu.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/arch/arm64/dev/aplcpu.c)`:aplcpu_setperf`, [sys/dev/acpi/acpitz.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/dev/acpi/acpitz.c)`:acpitz_refresh` and [sys/dev/acpi/acpibat.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/dev/acpi/acpibat.c)`:acpibat_refresh` integrate CPU power states, thermal limits and batteries.
 
@@ -286,9 +418,9 @@ OpenBSD has NFS ([sys/nfs/](https://github.com/openbsd/src/tree/3ce1f3f79392ae4d
 
 **Acceptance:** repeated suspend/resume with filesystem/network/input intact, SMP and clock correctness, wake-source policy, failure rollback, DMA-safe device restoration, thermal trip handling and battery/AC transitions. Verify actual wattage/idle residency rather than treating additional sleep-state code as a measured improvement.
 
-## Virtualization
+### Virtualization
 
-### HV1. General-purpose VM host — partial; P3 unless VM hosting is a target
+#### HV1. General-purpose VM host — partial; P3 unless VM hosting is a target
 
 **OpenBSD:** [sys/dev/vmm/vmm.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/dev/vmm/vmm.c)`:vm_create`, `vm_create_check_mem_ranges`, `vm_resetcpu` and [sys/arch/amd64/amd64/vmm_machdep.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/arch/amd64/amd64/vmm_machdep.c)`:vcpu_run_vmx/vcpu_run_svm` provide multiple vCPUs and Intel/AMD backends. [sys/dev/vmm/vmm.h](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/dev/vmm/vmm.h) permits up to 64 vCPUs per VM and a 128 GiB guest-physical address ceiling, and [sys/arch/amd64/include/vmmvar.h](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/arch/amd64/include/vmmvar.h) defines VMM_IOC_INTR. These are interface limits, not promises of available memory or achieved scalability. Device models and orchestration belong to userspace `vmd`, outside this kernel comparison.
 
@@ -298,7 +430,7 @@ OpenBSD has NFS ([sys/nfs/](https://github.com/openbsd/src/tree/3ce1f3f79392ae4d
 
 **Acceptance:** boot a timer/interrupt-driven guest beyond 2 MiB, run concurrent vCPUs, test guest faults/exit storms and bounded teardown, VM ownership/credential checks, migrated execution across host CPUs, and AMD hardware where available.
 
-## Debugging, observability, and accounting
+### Debugging, observability, and accounting
 
 | ID / priority | Feature and status in Vinix | OpenBSD source evidence | Vinix source evidence and consequence |
 | --- | --- | --- | --- |
@@ -311,7 +443,7 @@ OpenBSD has NFS ([sys/nfs/](https://github.com/openbsd/src/tree/3ce1f3f79392ae4d
 
 **Suggested verification:** debugger ownership and set-ID restrictions, multithread attach/exit races, single-stepping and signal forwarding; core-dump credentials, limits, immutable mappings, and short writes; user/kernel CPU separation and known-count fault/I/O/switch workloads; trace permissions, parallel CPUs, buffer overflow, and disabled tracing overhead. These are proposed acceptance tests.
 
-## Compatibility boundaries and verification
+### Compatibility boundaries and verification
 
 The following are intentionally not counted as missing features merely because the names differ:
 
@@ -321,7 +453,7 @@ The following are intentionally not counted as missing features merely because t
 - **msync and filesystem claims:** current OpenBSD [sys/uvm/uvm_mmap.c](https://github.com/openbsd/src/blob/3ce1f3f79392ae4d60ce67bea5835d517caaa2ca/sys/uvm/uvm_mmap.c) also forces synchronous paging I/O for `MS_ASYNC`. This is not a differentiating gap. The downloaded current tree has no `ffs_softdep.c`; stale comments do not establish current softdep/journaling support. FS2 relies on the actual `ffs_truncate` ordering code.
 - **Hardware qualification:** OpenBSD's Intel DMAR machinery exists but is explicitly disabled in amd64 GENERIC; Vinix already has Apple DART paths. Neither a bundled driver nor a device feature proves universally enabled DMA isolation. CPU defenses and virtualization require appropriate hardware and configuration.
 
-Validation performed for this document: complete `sys/` checkout and file count, clean upstream working tree, Git object connectivity check, version/configuration inspection, implementation and syscall-slot checks, independent review of consequential conclusions, and Markdown evidence-link validation. No Vinix kernel behavior changed, and no comparative boots, exploit tests, power-loss tests, or performance measurements were run. Every acceptance test above is proposed future validation, not a claimed result. This is a targeted source survey, not an exhaustive syscall conformance or hardware support matrix.
+Validation performed for the original survey: complete `sys/` checkout and file count, clean upstream working tree, Git object connectivity check, version/configuration inspection, implementation and syscall-slot checks, independent review of consequential conclusions, and Markdown evidence-link validation. At that survey stage no Vinix kernel behavior changed, and no comparative boots, exploit tests, power-loss tests, or performance measurements were run. Acceptance tests in this historical section were proposed future validation, not claimed results. This is a targeted source survey, not an exhaustive syscall conformance or hardware support matrix.
 
 To reproduce the upstream baseline in a separate directory:
 
@@ -333,4 +465,4 @@ git -C openbsd-current checkout --detach 3ce1f3f79392ae4d60ce67bea5835d517caaa2c
 git -C openbsd-current rev-parse HEAD:sys
 ```
 
-The final command should print `e6d8801d1a60eda9abfb1ec88aba160830b0928b`. OpenBSD evidence links in this report are pinned to the downloaded commit; Vinix links point to the current repository files. Later local changes can make the Vinix findings stale.
+The final command should print `e6d8801d1a60eda9abfb1ec88aba160830b0928b`. OpenBSD evidence links in this report are pinned to the downloaded commit; Vinix links point to the current repository files. Use the current status tables and implementation ledger for subsequent Vinix changes.

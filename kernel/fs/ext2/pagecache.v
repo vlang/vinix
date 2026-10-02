@@ -101,6 +101,31 @@ fn device_write(context voidptr, buf voidptr, loc u64, count u64) ?i64 {
 	return device_transfer(context, buf, loc, count, true)
 }
 
+fn device_flush(context voidptr) ? {
+	backing_device := unsafe { &vfs.VFSNode(context) }
+	mut device := backing_device.resource
+	resource_mod.sync_resource(mut device, unsafe { nil })?
+}
+
+fn (mut filesystem EXT2Filesystem) enable_large_files() ? {
+	if filesystem.superblock.non_supported_features & ext2_feature_ro_compat_large_file != 0 { return }
+	filesystem.superblock.non_supported_features |= ext2_feature_ro_compat_large_file
+	filesystem.write_superblock() or {
+		filesystem.superblock.non_supported_features &= ~ext2_feature_ro_compat_large_file
+		return none
+	}
+	// Publish the format capability durably before publishing an inode that
+	// needs it. This is a one-time transition, not a barrier per file write.
+	filesystem.cache.sync(voidptr(filesystem.backing_device), device_write) or {
+		filesystem.superblock.non_supported_features &= ~ext2_feature_ro_compat_large_file
+		return none
+	}
+	device_flush(voidptr(filesystem.backing_device)) or {
+		filesystem.superblock.non_supported_features &= ~ext2_feature_ro_compat_large_file
+		return none
+	}
+}
+
 fn (mut filesystem EXT2Filesystem) raw_device_read(buf voidptr, loc u64, count u64) ?i64 {
 	ret := filesystem.cache.read(voidptr(filesystem.backing_device), device_read, device_write, buf, loc, count, u64(filesystem.backing_device.resource.stat.size)) or {
 		return none
@@ -149,9 +174,14 @@ fn (mut this EXT2Resource) advise(_handle voidptr, offset u64, length u64, advic
 	if !stat.isreg(this.stat.mode) {
 		return
 	}
-	mut inode := EXT2Inode{}
+	this.l.acquire()
+	defer { this.l.release() }
+	this.filesystem.l.acquire()
+	defer { this.filesystem.l.release() }
+	mut inode := unsafe { &EXT2Inode(C.vinix_stack_alloc(sizeof(EXT2Inode))) }
+	unsafe { *inode = EXT2Inode{} }
 	inode.read_entry(mut this.filesystem, u32(this.stat.ino)) or { return none }
-	size := u64(inode.size32l)
+	size := inode.size()
 	if offset >= size {
 		return
 	}

@@ -43,6 +43,10 @@ fn interrupt_leave(context &cpulocal.GPRState) {
 		return
 	}
 	defer { proc.cpu_leave_kernel() }
+	// Group stops may block. Redirect to the owned Thread kernel stack rather
+	// than dispatching a stop on a CPU's shared interrupt stack.
+	userland.interrupt_return(context)
+	if context.pstate & 0xf != 0 { return }
 	told_to_exit := userland.told_to_exit()
 	if !told_to_exit && !userland.async_signal_deliverable() {
 		return

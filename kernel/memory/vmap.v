@@ -5,6 +5,7 @@ module memory
 
 import lib
 import klock
+import katomic
 
 // What big_alloc falls back to when there is no run of free pages as long as
 // an allocation. A machine that has been busy for a while has its free memory
@@ -29,12 +30,18 @@ __global (
 	// a stray write could have changed.
 	vmap_heads      [8192]u64
 	vmap_tails      [8192]u64
+	// Guarded stacks have a second reserved, unmapped slot before their head.
+	vmap_stack_heads [8192]u64
 	// The region's page tables are its own, and change only under this lock
 	// rather than kernel_pagemap.l. Nothing reclaims memory while it is held:
 	// the page cache's reclaimer frees blocks that may live here, and would
 	// come back for the lock on the same CPU.
 	vmap_table_lock klock.Lock
 )
+
+// Read by ARM vector entry before it can touch an exhausted stack.
+@[export: 'vinix_stack_guard_bitmap']
+__global vmap_stack_guards [8192]u64
 
 fn vmap_contains(addr u64) bool {
 	return addr >= vmap_base && addr < vmap_base + vmap_slots * page_size
@@ -94,33 +101,48 @@ fn vmap_release_pages(base u64, count u64) {
 // `count` zeroed pages at consecutive kernel addresses, or nil if the
 // addresses or the pages run out.
 fn vmap_alloc(count u64) voidptr {
-	if !vmm_initialised || count == 0 || count >= vmap_slots {
+	return vmap_alloc_guarded(count, false)
+}
+
+fn vmap_alloc_guarded(count u64, stack bool) voidptr {
+	guards := if stack { u64(2) } else { u64(1) }
+	if !vmm_initialised || count == 0 || count > vmap_slots - guards {
 		return unsafe { nil }
 	}
 	vmap_lock.acquire()
-	taken := vmap_take(count + 1)
+	taken := vmap_take(count + guards)
 	vmap_lock.release()
 	if taken < 0 {
 		return unsafe { nil }
 	}
-	first := u64(taken)
+	first := u64(taken) + if stack { u64(1) } else { u64(0) }
 	base := vmap_base + first * page_size
+	$if kernel_stack_selftest ? { stack_test_failure_base = base }
 	for i := u64(0); i < count; i++ {
-		phys := u64(pmm_alloc_fallible(1))
+		mut inject_failure := false
+		$if kernel_stack_selftest ? { inject_failure = stack && stack_test_fail_after == int(i) }
+		phys := if inject_failure { u64(0) } else { u64(pmm_alloc_fallible(1)) }
 		if phys != 0 && vmap_install(base + i * page_size, phys) {
 			continue
 		}
 		if phys != 0 {
+			// ARM may have installed only part of this native page. Drop and
+			// invalidate every subentry before returning its physical storage.
 			vmap_remove(base + i * page_size)
 			pmm_free(voidptr(phys), 1)
 		}
 		vmap_release_pages(base, i)
-		vmap_give_back(first, count + 1)
+		vmap_give_back(u64(taken), count + guards)
 		return unsafe { nil }
 	}
 	vmap_lock.acquire()
 	lib.bitset(unsafe { &vmap_heads[0] }, first)
 	lib.bitset(unsafe { &vmap_tails[0] }, first + count)
+	if stack {
+		lib.bitset(unsafe { &vmap_stack_heads[0] }, first)
+		lib.bitset(unsafe { &vmap_stack_guards[0] }, first - 1)
+		lib.bitset(unsafe { &vmap_stack_guards[0] }, first + count)
+	}
 	vmap_lock.release()
 	return voidptr(base)
 }
@@ -138,12 +160,18 @@ fn vmap_free(base u64) u64 {
 		return 0
 	}
 	lib.bitreset(unsafe { &vmap_heads[0] }, first)
+	stack := lib.bittest(unsafe { &vmap_stack_heads[0] }, first)
+	if stack {
+		lib.bitreset(unsafe { &vmap_stack_heads[0] }, first)
+		lib.bitreset(unsafe { &vmap_stack_guards[0] }, first - 1)
+	}
 	mut guard := first + 1
 	for guard < vmap_slots && !lib.bittest(unsafe { &vmap_tails[0] }, guard) {
 		guard++
 	}
 	if guard < vmap_slots {
 		lib.bitreset(unsafe { &vmap_tails[0] }, guard)
+		if stack { lib.bitreset(unsafe { &vmap_stack_guards[0] }, guard) }
 	}
 	vmap_lock.release()
 	if guard == vmap_slots {
@@ -151,8 +179,29 @@ fn vmap_free(base u64) u64 {
 	}
 	count := guard - first
 	vmap_release_pages(base, count)
-	vmap_give_back(first, count + 1)
+	vmap_give_back(if stack { first - 1 } else { first }, count + if stack { u64(2) } else { u64(1) })
 	return count
+}
+
+// The caller owns this dedicated virtual mapping until its CPU has stopped
+// using it. Physical direct-map aliases stay mapped; neither guard owns a
+// physical page. Existing global invalidation completes before page release.
+pub fn kernel_stack_alloc(size u64) voidptr {
+	if size == 0 || size % page_size != 0 { return unsafe { nil } }
+	return vmap_alloc_guarded(size / page_size, true)
+}
+
+pub fn kernel_stack_free(base u64) {
+	vmap_free(base)
+}
+
+pub fn kernel_stack_guard(addr u64) bool {
+	if !vmap_contains(addr) { return false }
+	slot := (addr - vmap_base) / page_size
+	// Fatal diagnosis must not acquire an allocator lock that the exhausted
+	// frame might hold. Aligned word publication is atomic; an active stack's
+	// own guard bits remain set until the last CPU leaves that mapping.
+	return katomic.load(unsafe { &vmap_stack_guards[slot / 64] }) & (u64(1) << (slot % 64)) != 0
 }
 
 // The physical address behind a kernel pointer, whether it is in the direct

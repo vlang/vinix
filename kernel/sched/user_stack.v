@@ -108,7 +108,7 @@ fn reserve_main_stack(mut process proc.Process, want_elf bool) ?(u64, u64) {
 	process.thread_stack_top -= page_size
 
 	mmap.mmap(process.pagemap, voidptr(stack_bottom_vma), user_stack_size,
-		mmap.prot_read | mmap.prot_write, mmap.map_private | mmap.map_anonymous | mmap.map_fixed,
+		mmap.prot_read | mmap.prot_write, mmap.map_private | mmap.map_anonymous | mmap.map_fixed | mmap.map_stack,
 		unsafe { nil }, 0, unsafe { nil }, unsafe { nil }, unsafe { nil }) or { return none }
 	// The 8 MiB a stack had are there from the start, as before; only what lies
 	// past them is filled in as it is touched. HVF does not always resume a
@@ -180,7 +180,8 @@ fn build_initial_stack(mut process proc.Process, stack_vma u64, stack_bottom_vma
 	// use; see user_hwcaps().
 	auxv_top := cursor
 	if !push_initial_pair(process.pagemap, stack_bottom_vma, unsafe { &cursor }, 0, 0)
-		|| !push_initial_pair(process.pagemap, stack_bottom_vma, unsafe { &cursor }, elf.at_secure, 0)
+		|| !push_initial_pair(process.pagemap, stack_bottom_vma, unsafe { &cursor }, elf.at_secure,
+			if proc.secure_loader_required(process) { u64(1) } else { u64(0) })
 		|| !push_initial_pair(process.pagemap, stack_bottom_vma, unsafe { &cursor }, elf.at_hwcap2, hwcap2)
 		|| !push_initial_pair(process.pagemap, stack_bottom_vma, unsafe { &cursor }, elf.at_hwcap, hwcap)
 		|| !push_initial_pair(process.pagemap, stack_bottom_vma, unsafe { &cursor }, elf.at_random, random_vma)

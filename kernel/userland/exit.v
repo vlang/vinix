@@ -95,9 +95,6 @@ pub fn exit_with_fatal_signal(signal u8) {
 // exactly one is told to tear the process down.
 fn leave_process(mut process proc.Process, current_thread &proc.Thread) bool {
 	process.threads_lock.acquire()
-	defer {
-		process.threads_lock.release()
-	}
 
 	for i := 0; i < process.threads.len; i++ {
 		if voidptr(process.threads[i]) == voidptr(current_thread) {
@@ -106,20 +103,24 @@ fn leave_process(mut process proc.Process, current_thread &proc.Thread) bool {
 		}
 	}
 
-	return process.threads.len == 0
+	last := process.threads.len == 0
+	process.threads_lock.release()
+	if !last { recheck_group_stop(mut process) }
+	return last
 }
 
 // Claim the right to tear the process down. exit_group() can arrive while
 // another thread is already at it, and the teardown is not repeatable.
-fn claim_teardown(mut process proc.Process) bool {
-	process.threads_lock.acquire()
+fn claim_teardown(mut process proc.Process, mut orphan_change proc.OrphanChange) bool {
+	proc.lock_table()
 	defer {
-		process.threads_lock.release()
+		proc.unlock_table()
 	}
 
 	if process.exiting {
 		return false
 	}
+	proc.prepare_job_orphan_change_locked(mut orphan_change, process, 0)
 	process.exiting = true
 	process.exec_transition = false
 	process.exec_pending_signals = 0
@@ -142,7 +143,11 @@ fn abort_exec(mut process proc.Process, mut old_thread proc.Thread) {
 
 @[noreturn]
 fn exit_process(mut current_process proc.Process, mut current_thread proc.Thread, status int) {
-	if !claim_teardown(mut current_process) {
+	// The descriptor belongs to this owned Thread frame across teardown. A
+	// fixed alloca avoids V promotion and carries no child/adopter pointers.
+	mut orphan_change := unsafe { &proc.OrphanChange(C.__builtin_alloca(sizeof(proc.OrphanChange))) }
+	unsafe { *orphan_change = proc.OrphanChange{} }
+	if !claim_teardown(mut current_process, mut orphan_change) {
 		// Somebody else got here first. Step out of the thread list before
 		// dying so the thread doing the teardown never has to reach us.
 		leave_process(mut current_process, current_thread)
@@ -152,6 +157,7 @@ fn exit_process(mut current_process proc.Process, mut current_thread proc.Thread
 
 	// Get every other thread off the CPUs before the address space goes away.
 	kill_sibling_threads(mut current_process, current_thread)
+	proc.notify_session_exit(current_process)
 	posixtimer.remove_process_timers(current_process)
 	release_process_segments(mut current_process)
 
@@ -172,6 +178,7 @@ fn exit_process(mut current_process proc.Process, mut current_thread proc.Thread
 	// and /proc hold while they walk a process' page map, so none is still
 	// walking the one freed below, and none finds it on the zombie afterwards.
 	proc.lock_table()
+	proc.preserve_peak_rss(current_process, old_pagemap)
 	current_process.pagemap = unsafe { nil }
 	proc.unlock_table()
 
@@ -194,6 +201,10 @@ fn exit_process(mut current_process proc.Process, mut current_thread proc.Thread
 	mut orphans := unsafe { current_process.children }
 	current_process.children = []&proc.Process{}
 	current_process.children_lock.release()
+	// The sole teardown thread owns this detached list; no old-parent waiter
+	// can reap a child now. Retain each Process before transferring its list
+	// ownership, since the adopter may reap it before our pdeathsig pass.
+	for child_proc in orphans { proc.pin_process_at(child_proc.pid) }
 
 	// The init of a pid namespace takes every other member with it.
 	mut pid_ns := current_process.ns.pid
@@ -207,9 +218,14 @@ fn exit_process(mut current_process proc.Process, mut current_thread proc.Thread
 	mut adopter := find_reaper(current_process)
 	if adopter != unsafe { nil } && voidptr(adopter) != voidptr(current_process) {
 		mut adopted_zombie := false
+		// Parent identity belongs to the process-table snapshot contract. Publish
+		// it before taking the new child-list lock, preserving table/list ordering.
+		proc.lock_table()
+		for mut child_proc in orphans { child_proc.ppid = adopter.pid }
+		proc.filter_job_orphan_change_locked(mut orphan_change)
+		proc.unlock_table()
 		adopter.children_lock.acquire()
 		for mut child_proc in orphans {
-			child_proc.ppid = adopter.pid
 			adopter.children << child_proc
 			if child_proc.exiting {
 				adopted_zombie = true
@@ -221,11 +237,18 @@ fn exit_process(mut current_process proc.Process, mut current_thread proc.Thread
 		if adopted_zombie {
 			notify_process(adopter)
 		}
+	} else {
+		proc.lock_table()
+		proc.filter_job_orphan_change_locked(mut orphan_change)
+		proc.unlock_table()
 	}
+	if adopter != unsafe { nil } { proc.unpin_process(adopter) }
+	proc.dispatch_job_orphan_change(mut orphan_change)
 	for mut child_proc in orphans {
 		if child_proc.pdeathsig > 0 && !child_proc.exiting {
-			signal_pid(child_proc.pid, child_proc.pdeathsig)
+			signal_process(mut child_proc, child_proc.pdeathsig)
 		}
+		proc.unpin_process(child_proc)
 	}
 	unsafe { orphans.free() }
 
@@ -242,11 +265,21 @@ fn exit_process(mut current_process proc.Process, mut current_thread proc.Thread
 
 	proc.free_tid(current_thread.tid)
 
+	// Publishing exit state permits an unrelated waiting CPU to reap us.
+	// Retain the Process until its final event and parent notification finish.
+	publish_ref := proc.pin_process_at(current_process.pid)
+	katomic.store(mut &current_process.status, status)
+	current_process.job_lock.acquire()
+	current_process.wait_exit_ready = true
+	current_process.wait_stop_epoch = 0
+	current_process.wait_continue_epoch = 0
+	current_process.job_lock.release()
 	proc.publish_pidfd_exit(mut current_process, status)
 	// Wakes a parent blocked in wait4()/waitid()...
 	event.trigger(mut &current_process.event, false)
 	// ...and tells one that is not waiting yet, which is how a daemon reaps.
 	notify_parent(current_process)
+	if publish_ref != unsafe { nil } { proc.unpin_process(publish_ref) }
 
 	sched.dequeue_and_die()
 }
@@ -417,6 +450,7 @@ fn wait_for_thread_to_leave(mut process proc.Process, t &proc.Thread) {
 	}
 }
 
+// Returns an owned Process pin for the caller to release.
 // Who adopts the children of `process`: its closest living ancestor that set
 // PR_SET_CHILD_SUBREAPER, or the init of its pid namespace -- a container's,
 // which is what lets tini reap the zombies inside it -- or PID 1.
@@ -426,7 +460,7 @@ fn find_reaper(process &proc.Process) &proc.Process {
 		if ppid <= 1 || ppid >= proc.max_pid {
 			break
 		}
-		ancestor := processes[ppid]
+		ancestor := proc.pin_process_at(ppid)
 		if ancestor == unsafe { nil } {
 			break
 		}
@@ -434,23 +468,26 @@ fn find_reaper(process &proc.Process) &proc.Process {
 			return ancestor
 		}
 		ppid = ancestor.ppid
+		proc.unpin_process(ancestor)
 	}
 	pid_ns := process.numbered_in
 	if proc.numbers_own(pid_ns) && pid_ns.init_pid != process.pid && pid_ns.init_pid > 0
 		&& pid_ns.init_pid < proc.max_pid {
-		namespace_init := processes[pid_ns.init_pid]
+		namespace_init := proc.pin_process_at(pid_ns.init_pid)
 		if namespace_init != unsafe { nil } && !namespace_init.exiting {
 			return namespace_init
 		}
+		if namespace_init != unsafe { nil } { proc.unpin_process(namespace_init) }
 	}
 	if process.pid == 1 {
 		return unsafe { nil }
 	}
-	return processes[1]
+	return proc.pin_process_at(1)
 }
 
 fn notify_process(parent &proc.Process) {
 	mut target := unsafe { parent }
+	wake_child_waiters(mut target)
 	signal_process(mut target, sigchld)
 }
 
@@ -461,15 +498,5 @@ fn notify_process(parent &proc.Process) {
 // parent that blocks it keeps it pending for sigwait(2); it was dropped
 // unless a handler had been installed.
 fn notify_parent(current_process &proc.Process) {
-	proc.lock_table()
-	mut parent := proc.process_at(current_process.ppid)
-	if parent == unsafe { nil } || parent.pid == current_process.pid {
-		proc.unlock_table()
-		return
-	}
-	proc.pin_process(parent)
-	proc.unlock_table()
-	defer { proc.unpin_process(parent) }
-	event.trigger(mut &parent.child_event, false)
-	signal_process(mut parent, sigchld)
+	publish_child_change(current_process, false)
 }

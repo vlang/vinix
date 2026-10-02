@@ -88,3 +88,12 @@ fn vmap_translate(addr u64) u64 {
 	}
 	return (pte & pte_flags_mask) | (addr & (page_size - 1))
 }
+
+fn kernel_stack_protected(addr u64) bool {
+	vmap_table_lock.acquire()
+	entry := vmap_leaf(addr, false)
+	pte := if entry == unsafe { nil } { u64(0) } else { unsafe { *entry } }
+	vmap_table_lock.release()
+	return pte & (pte_present | pte_writable | pte_noexec) == (pte_present | pte_writable | pte_noexec)
+		&& pte & pte_user == 0
+}

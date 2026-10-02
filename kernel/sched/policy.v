@@ -206,7 +206,7 @@ fn cgroup_holds_thread_back(t &proc.Thread, in_kernel bool) bool {
 	if katomic.load(&t.must_exit) || katomic.load(&t.pending_signals) & (u64(1) << 8) != 0 {
 		return false
 	}
-	return katomic.load(&t.process.job_stopped) || proc.cgroup_holds_back(t.process, clock_ns())
+	return katomic.load(&t.process.job_stop_complete) || proc.cgroup_holds_back(t.process, clock_ns())
 }
 
 // Called on the way back to userspace from every syscall. A thread whose cgroup
@@ -225,7 +225,7 @@ pub fn park_for_cgroup() {
 		if katomic.load(&t.must_exit) || katomic.load(&t.pending_signals) & (u64(1) << 8) != 0 {
 			break
 		}
-		if !katomic.load(&t.process.job_stopped) && !proc.cgroup_holds_back(t.process, clock_ns()) {
+		if !katomic.load(&t.process.job_stop_complete) && !proc.cgroup_holds_back(t.process, clock_ns()) {
 			break
 		}
 		katomic.store(mut &t.at_user_boundary, true)

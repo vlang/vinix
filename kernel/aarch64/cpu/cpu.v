@@ -3,6 +3,26 @@ module cpu
 
 fn C.read_current_sp() u64
 
+// Permanent per-CPU exception scratch, with an assembly-defined 64-byte
+// stride: number, emergency top, saved x16/x17/x15, original SP, reserved.
+// TPIDR_EL1 points here, while its public helpers retain the CPU-number API.
+__global exception_records [256][8]u64
+
+pub fn set_exception_emergency_stack(number u64, top u64) {
+	if number >= 256 { panic('Too many CPUs for exception scratch') }
+	exception_records[number][1] = top
+}
+
+pub fn read_stack_selector() u64 {
+	mut selector := u64(0)
+	asm volatile aarch64 {
+		mrs selector, spsel
+		; =r (selector)
+		; ; memory
+	}
+	return selector
+}
+
 // Userspace-visible SPSR_EL1/PSTATE bits. Exception-level selection and DAIF
 // are deliberately absent from this set and therefore cannot cross sigreturn.
 pub const pstate_v = u64(1) << 28
@@ -70,6 +90,13 @@ pub fn has_pan() bool {
 	return (read_id_aa64mmfr1_el1() >> 20) & 0xf != 0
 }
 
+// FEAT_PAN3 also blocks privileged reads of EL0-executable pages whose AP
+// bits prohibit EL0 data access. Ordinary PAN alone cannot protect them.
+pub fn has_epan() bool {
+	level := (read_id_aa64mmfr1_el1() >> 20) & 0xf
+	return level >= 3 && level != 0xf
+}
+
 // PSTATE.PAN where PAN is on, and 0 where it is not: what a kernel context's
 // saved PSTATE is made with, when it is made rather than taken from an
 // exception. yield_dispatch reads it by its linker symbol; see
@@ -83,7 +110,10 @@ __global kernel_pstate_pan u64
 pub fn enable_pan() {
 	kernel_pstate_pan = pstate_pan
 	sctlr_span := u64(1) << 23
-	write_sctlr_el1(read_sctlr_el1() & ~sctlr_span)
+	sctlr_epan := u64(1) << 57
+	mut control := read_sctlr_el1() & ~sctlr_span
+	if has_epan() { control |= sctlr_epan }
+	write_sctlr_el1(control)
 	asm volatile aarch64 {
 		msr pan, 1
 		; ; ; memory
@@ -270,15 +300,22 @@ pub fn read_tpidr_el1() u64 {
 	mut ret := u64(0)
 	asm volatile aarch64 {
 		mrs ret, tpidr_el1
+		ldr ret, [ret]
 		; =r (ret)
 	}
 	return ret
 }
 
 pub fn write_tpidr_el1(value u64) {
+	if value >= 256 { panic('Too many CPUs for exception scratch') }
+	exception_records[value][0] = value
+	record := unsafe { u64(&exception_records[value][0]) }
 	asm volatile aarch64 {
-		msr tpidr_el1, value
-		; ; r (value)
+		msr tpidr_el1, record
+		// Linux exposes zero through the read-only TPIDRRO_EL0 register.
+		// EL0 cannot write it; vector entry restores zero before calling C.
+		msr tpidrro_el0, xzr
+		; ; r (record)
 		; memory
 	}
 }

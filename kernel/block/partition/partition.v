@@ -22,6 +22,7 @@ pub mut:
 	parent_device &resource.Resource
 	device_offset u64
 	sector_cnt    u64
+	identity resource.BlockIdentity
 }
 
 @[packed]
@@ -62,6 +63,15 @@ pub mut:
 	partition_entry_cnt   u32
 	partition_entry_size  u32
 	crc32_partition_array u32
+}
+
+fn (this &Partition) block_identity() resource.BlockIdentity { return this.identity }
+
+fn partition_identity(parent resource.BlockIdentity, offset u64, length u64) resource.BlockIdentity {
+	if !parent.valid() || offset > parent.length || length > parent.length - offset {
+		return resource.BlockIdentity{is_block: true}
+	}
+	return resource.BlockIdentity{is_block: true, disk_id: parent.disk_id, start: parent.start + offset, length: length}
 }
 
 fn (mut this Partition) write(handle voidptr, buffer voidptr, loc u64, count u64) ?i64 {
@@ -118,6 +128,7 @@ fn partition_name(prefix string, index int) string {
 }
 
 pub fn scan_partitions(mut parent_device resource.Resource, prefix string) int {
+	parent_identity := resource.block_identity(mut parent_device)
 	lba_buffer := memory.malloc(u64(parent_device.stat.blksize))
 
 	parent_device.read(0, lba_buffer, u64(parent_device.stat.blksize), u64(parent_device.stat.blksize)) or {
@@ -164,6 +175,8 @@ pub fn scan_partitions(mut parent_device resource.Resource, prefix string) int {
 			partition.stat.blocks = partition.sector_cnt
 			partition.stat.blksize = parent_device.stat.blksize
 			partition.stat.size = partition.sector_cnt * partition.stat.blksize
+			partition.identity = partition_identity(parent_identity, partition.device_offset,
+				u64(partition.stat.size))
 			partition.stat.rdev = resource.create_dev_id()
 			partition.stat.mode = 0o644 | stat.ifblk
 
@@ -203,6 +216,8 @@ pub fn scan_partitions(mut parent_device resource.Resource, prefix string) int {
 			partition.stat.blocks = partition.sector_cnt
 			partition.stat.blksize = parent_device.stat.blksize
 			partition.stat.size = partition.sector_cnt * partition.stat.blksize
+			partition.identity = partition_identity(parent_identity, partition.device_offset,
+				u64(partition.stat.size))
 			partition.stat.rdev = resource.create_dev_id()
 			partition.stat.mode = 0o644 | stat.ifblk
 

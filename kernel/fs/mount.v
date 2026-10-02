@@ -473,6 +473,9 @@ fn new_mount(parent &VFSNode, source string, target string, fstype string, flags
 	if kind == 'devpts' {
 		return mount_devpts(parent, target, flags, options)
 	}
+	mut block_token := -1
+	mut block_committed := false
+	defer { security.finish_block_mount(block_token, block_committed) }
 	if kind !in filesystems && kind != 'overlay' {
 		errno.set(errno.enodev)
 		return none
@@ -531,8 +534,29 @@ fn new_mount(parent &VFSNode, source string, target string, fstype string, flags
 		if mount_node.read_only {
 			mount_flags |= ms_rdonly
 		}
+	} else if kind == 'procfs' {
+		// ProcFS is stateless and owns persistent cached roots. Select on its
+		// registered template, so denial creates no unused instance or box.
+		mut template := unsafe { filesystems[kind] }
+		if mut template is ProcFS {
+			mount_node = template.mount_checked(parent_of_tgt_node, basename, target_node) or {
+				unsafe { basename.free() }
+				return none
+			}
+		} else {
+			errno.set(errno.enodev)
+			unsafe { basename.free() }
+			return none
+		}
 	} else {
-		mut f_sys := unsafe { filesystems[kind].instantiate() }
+		// Reserve on the actual template before instantiate reads backing
+		// metadata or allocates an instance. EXT2 clones this exact device.
+		mut template := unsafe { filesystems[kind] }
+		block_token = begin_filesystem_block_mount(mut template) or {
+			unsafe { basename.free() }
+			return none
+		}
+		mut f_sys := unsafe { template.instantiate() }
 		mount_node = f_sys.mount(parent_of_tgt_node, basename, source_node) or {
 			unsafe { basename.free() }
 			return none
@@ -554,6 +578,7 @@ fn new_mount(parent &VFSNode, source string, target string, fstype string, flags
 	shown := if fstype == kind { display_fstype(kind) } else { fstype }
 	record_mount(mut table, target_node, mount_node, if source.len > 0 { source } else { shown },
 		shown, mount_flags, options, target_mount)
+	block_committed = true
 
 	if source.len > 0 {
 		C.kprintf(c'vfs: Mounted `%.*s` to `%.*s` with filesystem `%.*s`\n', i32(source.len),
@@ -1142,6 +1167,14 @@ pub fn mounts_text(pid int) string {
 // /proc across and giving it RAM-backed scratch directories. The initial
 // table is rebuilt from what the new root has mounted on it.
 pub fn record_root_switch(root &VFSNode, fstype string) {
+	// Boot-only publication has no userspace writers yet. Record the actual
+	// root filesystem capability before any user task can open its disk.
+	mut filesystem := root.filesystem
+	block_token := begin_filesystem_block_mount(mut filesystem) or {
+		lib.kpanic(unsafe { nil }, c'security: disk root has no registered block identity')
+		return
+	}
+	security.finish_block_mount(block_token, true)
 	mut table := initial_mount_table
 	table.lock.acquire()
 	old := table.mounts.clone()

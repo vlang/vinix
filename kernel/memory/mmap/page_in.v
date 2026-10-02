@@ -20,26 +20,14 @@ fn page_in(mut pagemap memory.Pagemap, addr u64, present_is_done bool) ? {
 			return
 		}
 	}
-	flags := range_local.flags
-	generation := range_local.generation
-	executable := range_local.prot & prot_exec != 0
+	source := range_page_source(range_local, memory_page * page_size)
 
 	pagemap.l.release()
-
 	virt := memory_page * page_size
-	page := if flags & map_anonymous != 0 {
-		acquire_anonymous_page()
-	} else {
-		acquire_range_page(range_local, virt, file_page)
-	} or {
-		return none
-	}
-	if executable {
-		sync_new_code_page(page)
-	}
-
-	install_range_page(mut pagemap, range_local, generation, virt, file_page, page, flags)?
-	note_anonymous_fault(pagemap, flags)
+	read_before := proc.current_disk_read_bytes()
+	fill_range_page(mut pagemap, source, virt, file_page)?
+	proc.account_page_fault(pagemap, proc.current_disk_read_bytes() != read_before)
+	note_anonymous_fault(pagemap, source.flags)
 }
 
 // Anonymous memory that is filled in on demand -- a large mapping, or any

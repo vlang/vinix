@@ -43,24 +43,32 @@ pub:
 
 // A fixed lwIP address slot avoids allocating a second interface registry.
 pub fn ipv6_address(index u32, slot u32) ?IPv6InterfaceAddress {
-	mut address := C.vinix_ip_address{}
-	mut prefix := u32(0)
-	mut flags := u32(0)
+	mut address := unsafe { &C.vinix_net_endpoint(C.vinix_stack_alloc(sizeof(C.vinix_net_endpoint))) }
+	state := unsafe { &u32(C.vinix_stack_alloc(sizeof(u32))) }
+	valid := unsafe { &u32(C.vinix_stack_alloc(sizeof(u32))) }
+	preferred := unsafe { &u32(C.vinix_stack_alloc(sizeof(u32))) }
 	net_lock.acquire()
-	ret := C.vinix_net_ipv6_address(index, slot, unsafe { &address }, unsafe { &prefix }, unsafe { &flags })
+	ret := C.vinix_net_ipv6_address(index, slot, address, state, valid, preferred)
 	net_lock.release()
-	if ret == 0 { return none }
+	address_state := unsafe { *state }
+	if ret == 0 || address_state == 0 { return none }
+	mut bytes := [16]u8{}
+	unsafe { C.memcpy(&bytes[0], &address.words[0], 16) }
 	return IPv6InterfaceAddress{
-		bytes:  address.bytes
-		prefix: u8(prefix)
-		flags:  u8(flags)
-		scope:  if index == 1 {
-			u8(254)
-		} else if address.scope != 0 {
-			u8(253)
+		bytes: bytes
+		prefix: if index == 1 { u8(128) } else { u8(64) }
+		flags: if address_state & 0x08 != 0 {
+			u8(0x40)
+		} else if address_state == 0x40 {
+			u8(0x48)
+		} else if address_state == 0x10 && index != 1 {
+			u8(0x20)
+		} else if unsafe { *valid } == 0 {
+			u8(0x80)
 		} else {
 			u8(0)
 		}
+		scope: if index == 1 { u8(254) } else if address.scope != 0 { u8(253) } else { u8(0) }
 	}
 }
 

@@ -16,8 +16,9 @@ import proc
 //  0  insecure: no more than the usual permissions apply.
 //  1  secure: a set immutable or append-only bit cannot be cleared, even by
 //     root, so a sealed file stays sealed as long as the machine is multi-user.
-//  2  highly secure: as 1 for now. OpenBSD also stops writes to a mounted
-//     disk here; Vinix does not raise a disk that way yet.
+//  2  highly secure: userspace cannot open or write block disks for writing,
+//     including descriptions opened before the level was raised. Filesystem
+//     writeback uses Resource directly and remains available.
 //
 // It can always be raised. Once it is above 0, only init, pid 1, can lower
 // it, as OpenBSD's init does on its way to single-user mode. At 0 or -1 it

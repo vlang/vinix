@@ -6,7 +6,6 @@ import aarch64.timer
 
 __global (
 	clock_origin_ns u64
-	clock_epoch     i64
 )
 
 @[_linker_section: '.requests']
@@ -24,9 +23,7 @@ pub fn initialise() {
 		0
 	}
 
-	monotonic_clock = TimeSpec{i64(epoch), 0}
-	realtime_clock = TimeSpec{i64(epoch), 0}
-	clock_epoch = i64(epoch)
+	initialize_clocks(i64(epoch))
 	clock_origin_ns = timer.get_ns()
 	clock_last_ns = clock_origin_ns
 }
@@ -34,15 +31,9 @@ pub fn initialise() {
 // The scheduler may go milliseconds between ticks. Read the architectural
 // counter for precise clocks, independently of the tick-updated snapshots:
 // timing a short operation must not depend on an interrupt arriving during it.
-fn precise_clock_now(clock_id int) ?TimeSpec {
-	if clock_id != clock_type_realtime && clock_id != clock_type_monotonic {
-		return none
-	}
+fn raw_clock_now() TimeSpec {
 	elapsed := timer.get_ns() - clock_origin_ns
-	return TimeSpec{
-		tv_sec:  clock_epoch + i64(elapsed / 1000000000)
-		tv_nsec: i64(elapsed % 1000000000)
-	}
+	return TimeSpec{i64(elapsed / 1000000000), i64(elapsed % 1000000000)}
 }
 
 pub fn clock_resolution_ns() u64 {

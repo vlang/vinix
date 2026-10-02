@@ -39,11 +39,7 @@ __global (
 	console_buffer_i  = u64(0)
 	console_bigbuf    [console_bigbuf_size]u8
 	console_bigbuf_i  = u64(0)
-	console_termios   = &termios.Termios(unsafe { nil })
 	console_decckm    = false
-	// XXX this is a massive hack to allow ctrl-c and friends without process
-	// groups
-	latest_thread     = &proc.Thread(unsafe { nil })
 )
 
 struct Console {
@@ -98,8 +94,6 @@ fn setup_console() {
 	console_res.termios.c_cc[termios.vdiscard] = termios.ctrl(`O`)
 	console_res.termios.c_cc[termios.vmin] = 1
 
-	console_termios = &console_res.termios
-
 	console_res.status |= file.pollout
 
 	fs.devtmpfs_add_device(console_box, 'console')
@@ -109,24 +103,24 @@ fn is_printable(c u8) bool {
 	return c >= 0x20 && c <= 0x7e
 }
 
-fn add_to_buf_char(_c u8, echo bool) {
+fn add_to_buf_char(_c u8, echo bool, settings termios.Termios) {
 	mut c := _c
 
-	if c == `\r` && console_termios.c_iflag & termios.igncr != 0 {
+	if c == `\r` && settings.c_iflag & termios.igncr != 0 {
 		return
 	}
 
-	if c == `\n` && console_termios.c_iflag & termios.icrnl == 0 {
+	if c == `\n` && settings.c_iflag & termios.icrnl == 0 {
 		c = `\r`
-	} else if c == `\r` && console_termios.c_iflag & termios.icrnl != 0 {
+	} else if c == `\r` && settings.c_iflag & termios.icrnl != 0 {
 		c = `\n`
-	} else if c == `\r` && console_termios.c_iflag & termios.inlcr == 0 {
+	} else if c == `\r` && settings.c_iflag & termios.inlcr == 0 {
 		c = `\n`
-	} else if c == `\n` && console_termios.c_iflag & termios.inlcr != 0 {
+	} else if c == `\n` && settings.c_iflag & termios.inlcr != 0 {
 		c = `\r`
 	}
 
-	if console_termios.c_lflag & termios.icanon != 0 {
+	if settings.c_lflag & termios.icanon != 0 {
 		match c {
 			`\n` {
 				if console_buffer_i == console_buffer_size {
@@ -134,7 +128,7 @@ fn add_to_buf_char(_c u8, echo bool) {
 				}
 				console_buffer[console_buffer_i] = c
 				console_buffer_i++
-				if echo && console_termios.c_lflag & termios.echo != 0 {
+				if echo && settings.c_lflag & termios.echo != 0 {
 					C.kprintf(c'%c', i32(c))
 				}
 				for i := u64(0); i < console_buffer_i; i++ {
@@ -163,7 +157,7 @@ fn add_to_buf_char(_c u8, echo bool) {
 					1
 				}
 				console_buffer[console_buffer_i] = 0
-				if echo && console_termios.c_lflag & termios.echo != 0 {
+				if echo && settings.c_lflag & termios.echo != 0 {
 					for i := 0; i < to_backspace; i++ {
 						print('\b \b')
 					}
@@ -190,7 +184,7 @@ fn add_to_buf_char(_c u8, echo bool) {
 		console_bigbuf_i++
 	}
 
-	if echo && console_termios.c_lflag & termios.echo != 0 {
+	if echo && settings.c_lflag & termios.echo != 0 {
 		if is_printable(c) {
 			C.kprintf(c'%c', i32(c))
 		} else if c >= 0x01 && c <= 0x1f {
@@ -200,24 +194,41 @@ fn add_to_buf_char(_c u8, echo bool) {
 }
 
 fn add_to_buf(ptr &u8, count u64, echo bool) {
+	if console_res == unsafe { nil } { return }
+	console_res.l.acquire()
+	settings := console_res.termios
+	group := console_res.foreground_pgid
+	session := console_res.session
+	proc.retain_job_identity(group, session)
+	console_res.l.release()
+	mut signals := u64(0)
 	console_read_lock.acquire()
-	defer {
-		console_read_lock.release()
-	}
-
 	for i := u64(0); i < count; i++ {
 		c := unsafe { ptr[i] }
-		// Keystrokes and their timing, as OpenBSD pools them.
 		krandom.add_event(u64(c))
-		if console_termios.c_lflag & termios.isig != 0 {
-			if c == console_termios.c_cc[termios.vintr] {
-				userland.sendsig(latest_thread, userland.sigint)
-			}
+		mut signal := 0
+		if settings.c_lflag & termios.isig != 0 {
+			if c == settings.c_cc[termios.vintr] { signal = userland.sigint }
+			else if c == settings.c_cc[termios.vquit] { signal = userland.sigquit }
+			else if c == settings.c_cc[termios.vsusp] { signal = userland.sigtstp }
 		}
-		add_to_buf_char(c, echo)
+		if signal != 0 {
+			signals |= u64(1) << (signal - 1)
+			if settings.c_lflag & termios.noflsh == 0 {
+				console_bigbuf_i = 0
+				console_buffer_i = 0
+				console_res.status &= ~file.pollin
+			}
+			continue
+		}
+		add_to_buf_char(c, echo, settings)
 	}
-
+	console_read_lock.release()
 	event.trigger(mut console_event, false)
+	for signal := 1; signal <= 64; signal++ {
+		if signals & (u64(1) << (signal - 1)) != 0 { userland.signal_group(group, session, signal) }
+	}
+	proc.release_job_identity(group, session)
 }
 
 fn dec_private(_esc_val_count u64, esc_values &u32, final u64) {
@@ -249,12 +260,54 @@ pub fn flanterm_callback(p voidptr, t u64, a u64, b u64, c u64) {
 	}
 }
 
+// Opening a terminal without O_NOCTTY lets an eligible session leader
+// acquire it. Device state is held while the process identity is claimed.
+fn (mut this Console) set_job_identity_locked(session int, group int) {
+	proc.replace_job_identity(this.foreground_pgid, this.session, group, session)
+	this.session = session
+	this.foreground_pgid = group
+}
+
+pub fn session_exit(device u64, session int) {
+	if console_res == unsafe { nil } { return }
+	console_res.l.acquire()
+	if console_res.stat.rdev != device || console_res.session != session {
+		console_res.l.release()
+		return
+	}
+	group := console_res.foreground_pgid
+	proc.retain_job_identity(group, session)
+	proc.detach_terminal_members(device, session)
+	console_res.set_job_identity_locked(0, 0)
+	console_res.l.release()
+	userland.signal_orphaned_job_group(group, session)
+	proc.release_job_identity(group, session)
+}
+
+fn (mut this Console) open(flags int) ?&resource.Resource {
+	if flags & resource.o_noctty == 0 {
+		this.l.acquire()
+		process := proc.current_thread().process
+		if this.session == 0 && proc.claim_controlling_terminal(this.stat.rdev) {
+			this.set_job_identity_locked(process.sid, process.pgid)
+		}
+		this.l.release()
+	}
+	return console_box
+}
+
 // The console, if `session` controls it: what /dev/tty stands for there.
-pub fn session_terminal(session int) ?&resource.Resource {
-	if console_res == unsafe { nil } || session == 0 || console_res.session != session {
+pub fn session_terminal(device u64, session int) ?&resource.Resource {
+	if console_res == unsafe { nil } || session == 0 {
 		errno.set(errno.enxio)
 		return none
 	}
+	console_res.l.acquire()
+	matched := console_res.stat.rdev == device && console_res.session == session
+		&& proc.controls_terminal(device, session)
+	if matched { katomic.inc(mut &console_res.refcount) }
+	console_res.l.release()
+	if !matched { errno.set(errno.enxio); return none }
 	// A new box on every open of /dev/tty was never freed.
 	return console_box
 }
@@ -263,11 +316,21 @@ fn (mut this Console) mmap(_handle voidptr, _page u64, _flags int) voidptr {
 	return 0
 }
 
+fn (mut this Console) job_check(signal int, only_tostop bool) u64 {
+	this.l.acquire()
+	session := this.session
+	foreground := this.foreground_pgid
+	apply := !only_tostop || this.termios.c_lflag & termios.tostop != 0
+	this.l.release()
+	return if apply { userland.terminal_job_check(this.stat.rdev, session, foreground, signal) } else { 0 }
+}
+
 fn (mut this Console) read(_handle voidptr, void_buf voidptr, _loc u64, count u64) ?i64 {
-	latest_thread = proc.current_thread()
 	if count == 0 {
 		return 0
 	}
+	permission := this.job_check(userland.sigttin, false)
+	if permission != 0 { errno.set(permission); return none }
 	handle := unsafe { &file.Handle(_handle) }
 	nonblocking := handle != unsafe { nil } && handle.flags & resource.o_nonblock != 0
 
@@ -279,9 +342,11 @@ fn (mut this Console) read(_handle voidptr, void_buf voidptr, _loc u64, count u6
 			return none
 		}
 		event.await_one(mut console_event, true) or {
-			errno.set(errno.eintr)
+			errno.set(proc.interrupted_errno)
 			return none
 		}
+		allowed := this.job_check(userland.sigttin, false)
+		if allowed != 0 { errno.set(allowed); return none }
 	}
 
 	mut wait := true
@@ -313,9 +378,11 @@ fn (mut this Console) read(_handle voidptr, void_buf voidptr, _loc u64, count u6
 				console_read_lock.release()
 				for {
 					event.await_one(mut console_event, true) or {
-						errno.set(errno.eintr)
+						errno.set(proc.interrupted_errno)
 						return none
 					}
+					allowed := this.job_check(userland.sigttin, false)
+					if allowed != 0 { errno.set(allowed); return none }
 					if console_read_lock.test_and_acquire() == true {
 						break
 					}
@@ -332,7 +399,9 @@ fn (mut this Console) read(_handle voidptr, void_buf voidptr, _loc u64, count u6
 }
 
 fn (mut this Console) write(_handle voidptr, buf voidptr, _loc u64, count u64) ?i64 {
-	latest_thread = proc.current_thread()
+	if count == 0 { return 0 }
+	permission := this.job_check(userland.sigttou, true)
+	if permission != 0 { errno.set(permission); return none }
 
 	copy := unsafe { malloc(count) }
 	defer {
@@ -350,9 +419,30 @@ fn (this &Console) input_pending() u64 {
 }
 
 fn (mut this Console) ioctl(handle voidptr, request u64, argp voidptr) ?int {
-	latest_thread = proc.current_thread()
-
 	mut process := proc.current_thread().process
+	if request == ioctl.tcsets || request == ioctl.tcsetsw || request == ioctl.tcsetsf
+		|| request == ioctl.tcflsh || request == ioctl.tcsbrk || request == ioctl.tcxonc
+		|| request == ioctl.tiocspgrp {
+		permission := this.job_check(userland.sigttou, false)
+		if permission != 0 { errno.set(permission); return none }
+	}
+	mut resize_group := 0
+	mut resize_session := 0
+	mut detach_group := 0
+	mut detach_session := 0
+	this.l.acquire()
+	old_group := this.foreground_pgid
+	old_session := this.session
+	proc.retain_job_identity(old_group, old_session)
+	defer {
+		this.l.release()
+		if resize_group != 0 { userland.signal_group(resize_group, resize_session, userland.sigwinch) }
+		if detach_session != 0 {
+			userland.signal_group(detach_group, detach_session, userland.sighup)
+			userland.signal_group(detach_group, detach_session, userland.sigcont)
+		}
+		proc.release_job_identity(old_group, old_session)
+	}
 
 	match request {
 		// KDSETMODE's argument is the mode itself, not a pointer to it.
@@ -418,7 +508,8 @@ fn (mut this Console) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 			// A terminal that changes shape tells the foreground group, which
 			// is how an editor learns to redraw.
 			if changed && this.foreground_pgid != 0 {
-				signal_foreground(this.foreground_pgid, u8(userland.sigwinch))
+				resize_group = this.foreground_pgid
+				resize_session = this.session
 			}
 			return 0
 		}
@@ -451,25 +542,26 @@ fn (mut this Console) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 				errno.set(errno.eperm)
 				return none
 			}
-			if this.session != 0 && this.session != process.sid {
+			if (this.session != 0 && this.session != process.sid)
+				|| !proc.claim_controlling_terminal(this.stat.rdev) {
 				errno.set(errno.eperm)
 				return none
 			}
-			this.session = process.sid
-			this.foreground_pgid = process.pgid
-			process.tty_session = process.sid
+			this.set_job_identity_locked(process.sid, process.pgid)
 			return 0
 		}
 		ioctl.tiocnotty {
-			if this.session == process.sid {
-				this.session = 0
-				this.foreground_pgid = 0
+			if !userland.terminal_is_controlling(this.stat.rdev, this.session)
+				|| !proc.release_controlling_terminal(this.stat.rdev) { errno.set(errno.enotty); return none }
+			if this.session == process.pid {
+				detach_group = this.foreground_pgid
+				detach_session = this.session
+				this.set_job_identity_locked(0, 0)
 			}
-			process.tty_session = 0
 			return 0
 		}
 		ioctl.tiocgsid {
-			if this.session == 0 {
+			if !userland.terminal_is_controlling(this.stat.rdev, this.session) {
 				errno.set(errno.enotty)
 				return none
 			}
@@ -481,12 +573,10 @@ fn (mut this Console) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 			return 0
 		}
 		ioctl.tiocgpgrp {
+			if !userland.terminal_is_controlling(this.stat.rdev, this.session) { errno.set(errno.enotty); return none }
 			// Reporting no foreground group is what made every shell give up on
 			// job control at startup.
-			mut group := this.foreground_pgid
-			if group == 0 {
-				group = process.pgid
-			}
+			group := this.foreground_pgid
 			// As the caller's pid namespace numbers the group.
 			value := i32(proc.group_in(process.numbered_in, group))
 			if !usercopy.copy_to_user(u64(argp), voidptr(&value), sizeof(i32)) {
@@ -501,19 +591,13 @@ fn (mut this Console) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 				errno.set(errno.efault)
 				return none
 			}
-			if value <= 0 {
-				errno.set(errno.einval)
-				return none
-			}
-			mut group := proc.group_from(process.numbered_in, int(value))
-			if group == 0 {
-				group = proc.pid_from(process.numbered_in, int(value))
-			}
-			if group == 0 {
-				errno.set(errno.esrch)
-				return none
-			}
-			this.foreground_pgid = group
+			session := this.session
+			this.l.release()
+			group := userland.terminal_foreground_group(this.stat.rdev, session, int(value)) or { this.l.acquire(); return none }
+			defer { proc.release_job_identity(group, session) }
+			this.l.acquire()
+			if this.session != session || !userland.terminal_is_controlling(this.stat.rdev, session) { errno.set(errno.enotty); return none }
+			this.set_job_identity_locked(session, group)
 			return 0
 		}
 		ioctl.fionread {
@@ -559,21 +643,6 @@ fn discard_console_input() {
 	console_buffer_i = 0
 	console_res.status &= ~file.pollin
 	console_read_lock.release()
-}
-
-// Raise a signal in every process of a process group.
-fn signal_foreground(pgid int, signal u8) {
-	for i := 1; i < proc.max_pid; i++ {
-		mut target := processes[i]
-		if target == unsafe { nil } || target.pgid != pgid {
-			continue
-		}
-		main_thread := proc.get_main_thread(target)
-		if main_thread != unsafe { nil } {
-			userland.sendsig(main_thread, signal)
-			proc.unpin_thread(main_thread)
-		}
-	}
 }
 
 fn (mut this Console) unref(_handle voidptr) ? {

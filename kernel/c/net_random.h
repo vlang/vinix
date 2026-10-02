@@ -23,6 +23,11 @@ uint32_t vinix_tcp_isn_bytes(const void *local, uint16_t local_port,
 uint32_t vinix_tcp_isn_at(uint64_t now_ns, uint32_t local_address, uint16_t local_port,
                           uint32_t remote_address, uint16_t remote_port);
 
+uint32_t vinix_tcp_isn6(const uint32_t local_address[4], uint16_t local_port,
+                        const uint32_t remote_address[4], uint16_t remote_port);
+uint32_t vinix_tcp_isn6_at(uint64_t now_ns, const uint32_t local_address[4], uint16_t local_port,
+                           const uint32_t remote_address[4], uint16_t remote_port);
+
 typedef int (*vinix_port_taken_fn)(uint16_t port, void *context);
 uint16_t vinix_pick_port(uint16_t first, uint16_t last, vinix_port_taken_fn taken,
                          void *context);

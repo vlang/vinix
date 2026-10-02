@@ -301,12 +301,20 @@ const pr_get_timerslack = 30
 
 const task_comm_len = 16
 
-fn syscall_linux_prctl(_ voidptr, option int, arg2 u64, _arg3 u64, _arg4 u64, _arg5 u64) (u64, u64) {
+fn syscall_linux_prctl(gpr_state voidptr, option int, arg2 u64, _arg3 u64, _arg4 u64, _arg5 u64) (u64, u64) {
 	mut process := proc.current_thread().process
 
 	match option {
 		proc.mac_prctl {
 			return proc.mac_control(arg2, _arg3, _arg4, _arg5)
+		}
+		proc.pr_vinix_syscall_policy {
+			if _arg4 != 0 || _arg5 != 0 { return errno.err, errno.einval }
+			return proc.syscall_policy_control(mut process, arg2, _arg3)
+		}
+		proc.pr_vinix_stack_policy {
+			if _arg3 != 0 || _arg4 != 0 || _arg5 != 0 { return errno.err, errno.einval }
+			return proc.stack_policy_control(mut process, arg2, user_stack_pointer(gpr_state))
 		}
 		pr_set_name {
 			// The name is the thread's, up to 16 bytes including the null. It
@@ -346,22 +354,15 @@ fn syscall_linux_prctl(_ voidptr, option int, arg2 u64, _arg3 u64, _arg4 u64, _a
 			return 0, 0
 		}
 		pr_get_dumpable {
-			proc.lock_table()
-			value := if process.dumpable { u64(1) } else { u64(0) }
-			proc.unlock_table()
-			return value, 0
+			return u64(proc.dumpability(process)), 0
 		}
 		pr_set_dumpable {
-			if arg2 > 1 {
-				return errno.err, errno.einval
-			}
-			proc.lock_table()
-			process.dumpable = arg2 == 1
-			proc.unlock_table()
+			if arg2 > 1 { return errno.err, errno.einval }
+			proc.set_dumpability(mut process, u32(arg2))
 			return 0, 0
 		}
 		pr_set_timerslack {
-			// Timer slack is not applied yet.
+			// Timer slack remains a separate compatibility setting.
 			return 0, 0
 		}
 		pr_get_timerslack {
@@ -643,67 +644,11 @@ fn syscall_linux_getitimer(_ voidptr, which int, curr_value u64) (u64, u64) {
 // setpgid / getpgid: wait4()/waitid() select on process groups, so these have
 // to be real.
 fn syscall_linux_setpgid(_ voidptr, pid int, pgid int) (u64, u64) {
-	if pid < 0 || pgid < 0 {
-		return errno.err, errno.einval
-	}
-
-	mut caller := proc.current_thread().process
-	mut target := caller
-	// Both numbers are the caller's pid namespace's.
-	viewer := target.numbered_in
-	proc.lock_table()
-	defer { proc.unlock_table() }
-	if pid != 0 {
-		if pid >= proc.max_pid {
-			return errno.err, errno.esrch
-		}
-		target = proc.process_in(viewer, pid)
-		if target == unsafe { nil } {
-			return errno.err, errno.esrch
-		}
-	}
-	if !proc.mac_peer_allowed(caller, target) { return errno.err, errno.eperm }
-
-	local := if pgid == 0 { proc.pid_in(target, viewer) } else { pgid }
-	mut group := if pgid == 0 || local == proc.pid_in(target, viewer) {
-		target.pid
-	} else {
-		proc.group_from_locked(viewer, local)
-	}
-	if group == 0 {
-		// A group whose leader is alive but has nobody in it yet.
-		leader := proc.process_in(viewer, local)
-		group = if leader == unsafe { nil } { 0 } else { leader.pid }
-	}
-	if group == 0 {
-		return errno.err, errno.eperm
-	}
-	target.pgid = group
-	if proc.numbers_own(target.numbered_in) {
-		target.ns_pgid = local
-	}
-
-	return 0, 0
+	return proc.set_process_group(pid, pgid)
 }
 
 fn syscall_linux_getpgid(_ voidptr, pid int) (u64, u64) {
-	caller := proc.current_thread().process
-	mut target := caller
-	viewer := target.numbered_in
-	proc.lock_table()
-	defer { proc.unlock_table() }
-	if pid != 0 {
-		if pid < 0 || pid >= proc.max_pid {
-			return errno.err, errno.esrch
-		}
-		target = proc.process_in(viewer, pid)
-		if target == unsafe { nil } {
-			return errno.err, errno.esrch
-		}
-	}
-	if !proc.mac_peer_allowed(caller, target) { return errno.err, errno.eperm }
-
-	return u64(proc.pgid_in(target, viewer)), 0
+	return proc.get_process_group(pid)
 }
 
 fn syscall_linux_sched_yield(_ voidptr) (u64, u64) {
@@ -769,13 +714,14 @@ fn syscall_linux_statx(gpr_state voidptr, dirfd int, path charptr, flags int, _m
 		return errno.err, errno.efault
 	}
 
-	mut vinix_stat := stat.Stat{}
-	ret, err := fs.syscall_fstatat(gpr_state, dirfd, path, unsafe { &vinix_stat }, flags)
+	mut vinix_stat := unsafe { &stat.Stat(C.vinix_stack_alloc(sizeof(stat.Stat))) }
+	unsafe { *vinix_stat = stat.Stat{} }
+	ret, err := fs.syscall_fstatat(gpr_state, dirfd, path, vinix_stat, flags)
 	if err != 0 {
 		return ret, err
 	}
 
-	if !convert_stat_to_statx(&vinix_stat, buf) {
+	if !convert_stat_to_statx(vinix_stat, buf) {
 		return errno.err, errno.efault
 	}
 	return 0, 0

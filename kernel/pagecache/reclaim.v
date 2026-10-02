@@ -6,13 +6,33 @@ import katomic
 import memory
 
 const max_registered_caches = 16
+const max_sync_hooks = 8
+
+pub type SyncHook = fn () bool
 
 __global (
 	registered_caches      [max_registered_caches]&Cache
 	registered_caches_len  = int(0)
 	registered_caches_lock klock.Lock
 	reclaimer_registered   = bool(false)
+	sync_hooks             [max_sync_hooks]SyncHook
+	sync_hooks_len         = int(0)
 )
+
+// File-page caches above the backing-device cache must publish their writes
+// before device-cache writeback starts. Hooks are permanent, allocation-free
+// registrations; callbacks run with the registry lock released.
+pub fn register_sync_hook(hook SyncHook) bool {
+	registered_caches_lock.acquire()
+	defer { registered_caches_lock.release() }
+	for i := 0; i < sync_hooks_len; i++ {
+		if sync_hooks[i] == hook { return true }
+	}
+	if sync_hooks_len == max_sync_hooks { return false }
+	sync_hooks[sync_hooks_len] = hook
+	sync_hooks_len++
+	return true
+}
 
 // Filesystems register long-lived shared caches once their backing store has
 // been validated. Cache objects are mount-lifetime allocations in Vinix, so a
@@ -22,7 +42,7 @@ __global (
 // them a registered cache could only be reclaimed, never flushed: sync(2) and
 // reboot(2) have no descriptor to recover them from, and dirty pages reached
 // the device only when the LRU happened to evict them.
-pub fn register_cache(cache &Cache, context voidptr, store IO) bool {
+pub fn register_cache(cache &Cache, context voidptr, store IO, flush Flush) bool {
 	if context == unsafe { nil } {
 		return false
 	}
@@ -45,6 +65,7 @@ pub fn register_cache(cache &Cache, context voidptr, store IO) bool {
 	mut target := unsafe { cache }
 	target.writeback_context = context
 	target.writeback = store
+	target.writeback_flush = flush
 	registered_caches[registered_caches_len] = target
 	katomic.store(mut &registered_caches_len, registered_caches_len + 1)
 	return true
@@ -74,15 +95,24 @@ pub fn resident_bytes() u64 {
 pub fn sync_all() bool {
 	registered_caches_lock.acquire()
 	count := katomic.load(&registered_caches_len)
+	hook_count := sync_hooks_len
 	registered_caches_lock.release()
 
 	mut ok := true
+	for i := 0; i < hook_count; i++ {
+		if !sync_hooks[i]() { ok = false }
+	}
 	for i := 0; i < count; i++ {
 		mut cache := registered_caches[i]
 		if cache.writeback_context == unsafe { nil } {
 			continue
 		}
 		cache.sync(cache.writeback_context, cache.writeback) or { ok = false }
+		// Complete the device's volatile-cache barrier even when another
+		// cache, hook or write failed. Dirty software pages remain retryable.
+		if cache.writeback_flush != unsafe { nil } {
+			cache.writeback_flush(cache.writeback_context) or { ok = false }
+		}
 	}
 	return ok
 }

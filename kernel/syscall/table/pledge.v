@@ -144,7 +144,7 @@ fn pledge_prctl(option u64) u64 {
 		// THP, SVE vector length, pointer authentication, tagged addresses,
 		// and naming an anonymous mapping, which glibc does.
 		1, 2, 3, 4, 7, 15, 16, 21, 22, 23, 27, 29, 30, 37, 38, 39, 40, 41, 42, 50, 51, 54, 55, 56,
-		0x53564d41 {
+		0x53564d41, proc.pr_vinix_stack_policy, proc.pr_vinix_syscall_policy {
 			pledge_stdio
 		}
 		// PR_SET_KEEPCAPS, PR_CAPBSET_DROP, PR_SET_SECUREBITS, PR_CAP_AMBIENT.

@@ -242,6 +242,7 @@ fn (mut device VirtioBlockDevice) transfer(buffer voidptr, sector u64, count u64
 	if read {
 		unsafe { C.memcpy(buffer, voidptr(device.data_virt), count) }
 	}
+	proc.account_disk_io(count, !read)
 	return true
 }
 
@@ -320,6 +321,10 @@ fn (mut device VirtioBlockDevice) write(_handle voidptr, buffer voidptr, loc u64
 		done += chunk
 	}
 	return i64(count)
+}
+
+fn (device &VirtioBlockDevice) block_identity() resource.BlockIdentity {
+	return resource.BlockIdentity{is_block: true, disk_id: device.stat.rdev, length: u64(device.stat.size)}
 }
 
 fn (mut device VirtioBlockDevice) ioctl(handle voidptr, request u64, argp voidptr) ?int {

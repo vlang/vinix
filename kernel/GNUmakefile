@@ -11,6 +11,7 @@ PREFIX := /usr/local
 
 # Target architecture: x86_64 (default) or aarch64.
 ARCH ?= x86_64
+STACK_GUARD_TEST ?= 0
 
 # Opt-in until the complete i915 kernel API surface is implemented. The
 # imported Linux driver stays byte-for-byte upstream in third_party/.
@@ -73,6 +74,15 @@ LDFLAGS :=
 # Optional direct linker for cross-building x86_64 on a non-x86 host. Leave
 # empty to retain the compiler-driver link used by native builds.
 LD_X86_64 ?=
+
+# LLD can shuffle the generated C object's individual function sections.
+# Seed zero asks LLD for a fresh random seed; a positive seed reproduces an
+# exact layout for debugging. Native compiler-driver links remain compatible.
+KERNEL_LINK_RANDOMIZE ?= 1
+KERNEL_LINK_SEED ?= 0
+ifneq ($(filter $(KERNEL_LINK_RANDOMIZE),0 1),$(KERNEL_LINK_RANDOMIZE))
+    $(error KERNEL_LINK_RANDOMIZE must be 0 or 1)
+endif
 
 PROD :=
 
@@ -165,13 +175,12 @@ override CFLAGS += \
     -mno-red-zone \
     -mcmodel=kernel
 
-# Cover generated V C and C drivers, plus the handwritten dispatch thunks.
-# These flags trap indirect-branch speculation; they do not supply KPTI or
-# CPU-specific return-branch/BHI workarounds.
+# Route every compiler-generated indirect call/jump through the same thunks
+# as handwritten dispatches. GNU CC uses the compatible external ABI.
 ifeq ($(CC_IS_CLANG),1)
-    override CFLAGS += -mretpoline
+    override CFLAGS += -mretpoline-external-thunk
 else
-    override CFLAGS += -mindirect-branch=thunk-inline -mindirect-branch-register
+    override CFLAGS += -mindirect-branch=thunk-extern -mindirect-branch-register
 endif
 
 # Internal linker flags for x86_64.
@@ -194,6 +203,14 @@ override LDFLAGS_DIRECT_X86_64 += \
     -T linker.ld
 
 endif # ARCH
+
+ifeq ($(KERNEL_LINK_RANDOMIZE),1)
+ifeq ($(ARCH),aarch64)
+override LDFLAGS_DIRECT += --shuffle-sections=.text.*=$(KERNEL_LINK_SEED)
+else ifneq ($(strip $(LD_X86_64)),)
+override LDFLAGS_DIRECT_X86_64 += --shuffle-sections=.text.*=$(KERNEL_LINK_SEED)
+endif
+endif
 
 # Internal C preprocessor flags that should not be changed by the user.
 override CPPFLAGS := \
@@ -231,11 +248,18 @@ endif
 # changes. Keep the selected configuration in the prerequisite name so moving
 # between a QEMU SMP build and a hardware-safe Apple build cannot reuse a
 # stale obj/blob.c.o.
-V_CONFIG_STAMP := obj/.v-config-$(ARCH)-limine-mp-$(LIMINE_MP)-alloc-track-$(ALLOC_TRACK)-linuxkpi-$(LINUXKPI)-pci-test-$(PCI_CONFIG_TEST)
+V_CONFIG_STAMP := obj/.v-config-$(ARCH)-limine-mp-$(LIMINE_MP)-alloc-track-$(ALLOC_TRACK)-linuxkpi-$(LINUXKPI)-pci-test-$(PCI_CONFIG_TEST)-stack-guard-$(STACK_GUARD_TEST)
 
 ifeq ($(PCI_CONFIG_TEST),1)
     override VFLAGS += -d pci_config_test
     override CPPFLAGS += -DVINIX_PCI_CONFIG_TEST
+endif
+
+ifneq ($(STACK_GUARD_TEST),0)
+    override VFLAGS += -d kernel_stack_selftest
+endif
+ifeq ($(STACK_GUARD_TEST),2)
+    override VFLAGS += -d kernel_stack_overflowtest
 endif
 
 ifeq ($(LINUXKPI),1)
