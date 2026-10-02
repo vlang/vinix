@@ -1163,16 +1163,44 @@ struct native_parallel_test {
     struct completion entered, gate, done;
     struct native_delayed_frees *frees;
     atomic_t active;
-    unsigned int calls, limit;
+    unsigned int calls, limit, failure_reasons;
     int result;
     int *free_result;
+    unsigned int *free_reasons;
     bool hold;
 };
+enum native_parallel_failure_reason {
+    NATIVE_PARALLEL_CONTEXT = BIT(0), NATIVE_PARALLEL_CURRENT = BIT(1),
+    NATIVE_PARALLEL_OVERLAP = BIT(2), NATIVE_PARALLEL_TARGET_QUEUE = BIT(3),
+    NATIVE_PARALLEL_TARGET_RESULT = BIT(4), NATIVE_PARALLEL_REQUEUE = BIT(5),
+    NATIVE_PARALLEL_ACTIVE = BIT(6),
+};
+static void native_parallel_failure(struct native_parallel_test *test, unsigned int reason)
+{
+    test->failure_reasons |= reason;
+    test->result = -EIO;
+}
+/* Read callback-owned fields only after flush/cancel/destruction has stopped
+ * every writer. Timeout reports deliberately pass no live callback record. */
+static void native_parallel_report(const char *stage, unsigned int queue, unsigned int item,
+                                   unsigned long ticks, struct native_parallel_test *test,
+                                   int observed, int expected, unsigned int reasons)
+{
+    extern int kprintf(const char *, ...);
+    kprintf("linuxkpi: unbound test %s failed queue=%u item=%u ticks=%lu observed=%d expected=%d calls=%u active=%d callback_result=%d reasons=0x%x\n",
+            stage, queue, item, ticks, observed, expected, test ? test->calls : 0,
+            test ? atomic_read(&test->active) : 0, test ? test->result : 0,
+            test ? test->failure_reasons : reasons);
+}
 static void native_parallel_callback(struct work_struct *work)
 {
     struct native_parallel_test *test = container_of(work, struct native_parallel_test, work);
-    if (!vinix_linuxkpi_may_sleep() || current_work() != work ||
-        atomic_inc_return(&test->active) != 1) test->result = -EIO;
+    /* Keep the original short-circuit evaluation order, including whether
+     * the initial active increment runs when the context check fails. */
+    if (!vinix_linuxkpi_may_sleep()) native_parallel_failure(test, NATIVE_PARALLEL_CONTEXT);
+    else if (current_work() != work) native_parallel_failure(test, NATIVE_PARALLEL_CURRENT);
+    else if (atomic_inc_return(&test->active) != 1)
+        native_parallel_failure(test, NATIVE_PARALLEL_OVERLAP);
     test->calls++;
     if (test->hold) {
         complete(&test->entered);
@@ -1180,15 +1208,19 @@ static void native_parallel_callback(struct work_struct *work)
     }
     msleep(1);
     if (test->target) {
-        if (!queue_work(test->wq, &test->target->work)) test->result = -EIO;
+        if (!queue_work(test->wq, &test->target->work))
+            native_parallel_failure(test, NATIVE_PARALLEL_TARGET_QUEUE);
         flush_work(&test->target->work);
-        if (test->target->calls != 1 || atomic_read(&test->target->active)) test->result = -EIO;
+        if (test->target->calls != 1 || atomic_read(&test->target->active))
+            native_parallel_failure(test, NATIVE_PARALLEL_TARGET_RESULT);
     }
-    if (test->calls < test->limit && !queue_work(test->wq, work)) test->result = -EIO;
-    if (atomic_dec_return(&test->active)) test->result = -EIO;
+    if (test->calls < test->limit && !queue_work(test->wq, work))
+        native_parallel_failure(test, NATIVE_PARALLEL_REQUEUE);
+    if (atomic_dec_return(&test->active)) native_parallel_failure(test, NATIVE_PARALLEL_ACTIVE);
     if (test->frees) {
         struct native_delayed_frees *frees = test->frees;
         *test->free_result = test->result;
+        *test->free_reasons = test->failure_reasons;
         kfree(test);
         if (atomic_inc_return(&frees->count) == 8) complete(&frees->done);
         return;
@@ -1211,12 +1243,18 @@ int vinix_linuxkpi_unbound_work_native_selftest(void)
     struct native_parallel_test *heap[3][8] = {0};
     struct native_delayed_frees frees[3];
     int free_results[3][8] = {0}, result = 0;
+    unsigned int free_reasons[3][8] = {0};
     const unsigned int limit[3] = {2, 4, 8};
     bool held_submitted = false, heap_submitted = false;
     queues[0] = alloc_workqueue("vinix-parallel-2", WQ_UNBOUND, 2);
     queues[1] = alloc_workqueue("vinix-parallel-4", WQ_UNBOUND, 4);
     queues[2] = system_unbound_wq;
-    if (!queues[0] || !queues[1] || !queues[2]) { result = -ENOMEM; goto out; }
+    if (!queues[0] || !queues[1] || !queues[2]) {
+        result = -ENOMEM;
+        native_parallel_report("queue allocation", 0, 0, 0, NULL,
+                               !!queues[0] + !!queues[1] + !!queues[2], 3, 0);
+        goto out;
+    }
     for (unsigned int q = 0; q < ARRAY_SIZE(queues); q++)
         for (unsigned int i = 0; i < limit[q]; i++) {
             native_parallel_init(&held[q][i], queues[q]);
@@ -1227,25 +1265,42 @@ int vinix_linuxkpi_unbound_work_native_selftest(void)
         for (unsigned int i = 0; i < limit[q]; i++)
             BUG_ON(!queue_work(queues[q], &held[q][i].work));
     for (unsigned int q = 0; q < ARRAY_SIZE(queues); q++)
-        for (unsigned int i = 0; i < limit[q]; i++)
+        for (unsigned int i = 0; i < limit[q]; i++) {
+            unsigned long started = jiffies;
             if (!wait_for_completion_timeout(&held[q][i].entered, 500)) {
                 result = -EIO;
+                native_parallel_report("held entry timeout", q, i, jiffies - started,
+                                       NULL, 0, 1, 0);
                 goto out;
             }
+        }
     for (unsigned int q = 0; q < ARRAY_SIZE(extra); q++) {
         native_parallel_init(&extra[q], queues[q]);
         BUG_ON(!queue_work(queues[q], &extra[q].work));
         msleep(2);
-        if (work_busy(&extra[q].work) != WORK_BUSY_PENDING) result = -EIO;
+        unsigned int busy = work_busy(&extra[q].work);
+        if (busy != WORK_BUSY_PENDING) {
+            result = -EIO;
+            native_parallel_report("active-limit pending state", q, 0, 0, NULL,
+                                   busy, WORK_BUSY_PENDING, 0);
+        }
         complete(&held[q][0].gate);
         flush_work(&extra[q].work);
-        if (extra[q].calls != 1 || extra[q].result) result = -EIO;
+        if (extra[q].calls != 1 || extra[q].result) {
+            result = -EIO;
+            native_parallel_report("deferred callback", q, 0, 0, &extra[q],
+                                   extra[q].calls, 1, 0);
+        }
     }
     for (unsigned int q = 0; q < ARRAY_SIZE(queues); q++) {
         for (unsigned int i = 0; i < limit[q]; i++) complete(&held[q][i].gate);
         flush_workqueue(queues[q]);
         for (unsigned int i = 0; i < limit[q]; i++)
-            if (held[q][i].calls != 1 || held[q][i].result) result = -EIO;
+            if (held[q][i].calls != 1 || held[q][i].result) {
+                result = -EIO;
+                native_parallel_report("held callback", q, i, 0, &held[q][i],
+                                       held[q][i].calls, 1, 0);
+            }
     }
     held_submitted = false;
     for (unsigned int q = 0; q < ARRAY_SIZE(queues); q++)
@@ -1256,27 +1311,54 @@ int vinix_linuxkpi_unbound_work_native_selftest(void)
         }
     for (unsigned int q = 0; q < ARRAY_SIZE(queues); q++)
         for (unsigned int i = 0; i < ARRAY_SIZE(chains[q]); i++) {
-            if (!wait_for_completion_timeout(&chains[q][i].done, 500)) result = -EIO;
+            unsigned long started = jiffies;
+            if (!wait_for_completion_timeout(&chains[q][i].done, 500)) {
+                result = -EIO;
+                native_parallel_report("requeue timeout", q, i, jiffies - started,
+                                       NULL, 0, 1, 0);
+            }
             cancel_work_sync(&chains[q][i].work);
-            if (chains[q][i].calls != 4 || chains[q][i].result) result = -EIO;
+            if (chains[q][i].calls != 4 || chains[q][i].result) {
+                result = -EIO;
+                native_parallel_report("requeue callback", q, i, jiffies - started,
+                                       &chains[q][i], chains[q][i].calls, 4, 0);
+            }
         }
     struct native_parallel_test nested, target;
     native_parallel_init(&nested, queues[0]);
     native_parallel_init(&target, queues[0]);
     nested.target = &target;
     BUG_ON(!queue_work(queues[0], &nested.work));
-    if (!wait_for_completion_timeout(&nested.done, 500)) result = -EIO;
+    unsigned long nested_started = jiffies;
+    if (!wait_for_completion_timeout(&nested.done, 500)) {
+        result = -EIO;
+        native_parallel_report("nested item-flush timeout", 0, 0, jiffies - nested_started,
+                               NULL, 0, 1, 0);
+    }
     cancel_work_sync(&nested.work);
     cancel_work_sync(&target.work);
-    if (nested.result || target.result || target.calls != 1) result = -EIO;
+    if (nested.result || target.result || target.calls != 1) {
+        result = -EIO;
+        if (nested.result)
+            native_parallel_report("nested caller", 0, 0, jiffies - nested_started,
+                                   &nested, nested.result, 0, 0);
+        if (target.result || target.calls != 1)
+            native_parallel_report("nested target", 0, 1, jiffies - nested_started,
+                                   &target, target.calls, 1, 0);
+    }
     for (unsigned int q = 0; q < ARRAY_SIZE(queues); q++) {
         atomic_set(&frees[q].count, 0); init_completion(&frees[q].done);
         for (unsigned int i = 0; i < ARRAY_SIZE(heap[q]); i++) {
             heap[q][i] = kzalloc(sizeof(*heap[q][i]), GFP_KERNEL);
-            if (!heap[q][i]) { result = -ENOMEM; goto out; }
+            if (!heap[q][i]) {
+                result = -ENOMEM;
+                native_parallel_report("self-free allocation", q, i, 0, NULL, 0, 1, 0);
+                goto out;
+            }
             native_parallel_init(heap[q][i], queues[q]);
             heap[q][i]->frees = &frees[q];
             heap[q][i]->free_result = &free_results[q][i];
+            heap[q][i]->free_reasons = &free_reasons[q][i];
         }
     }
     heap_submitted = true;
@@ -1284,14 +1366,25 @@ int vinix_linuxkpi_unbound_work_native_selftest(void)
         for (unsigned int i = 0; i < ARRAY_SIZE(heap[q]); i++)
             BUG_ON(!queue_work(queues[q], &heap[q][i]->work));
     for (unsigned int q = 0; q < ARRAY_SIZE(queues); q++) {
+        unsigned long started = jiffies;
         if (!wait_for_completion_timeout(&frees[q].done, 500)) {
             result = -EIO;
+            native_parallel_report("self-free timeout", q, 0, jiffies - started,
+                                   NULL, atomic_read(&frees[q].count), 8, 0);
             wait_for_completion(&frees[q].done);
         }
         flush_workqueue(queues[q]);
-        if (atomic_read(&frees[q].count) != 8) result = -EIO;
+        if (atomic_read(&frees[q].count) != 8) {
+            result = -EIO;
+            native_parallel_report("self-free count", q, 0, jiffies - started,
+                                   NULL, atomic_read(&frees[q].count), 8, 0);
+        }
         for (unsigned int i = 0; i < ARRAY_SIZE(heap[q]); i++)
-            if (free_results[q][i]) result = -EIO;
+            if (free_results[q][i]) {
+                result = -EIO;
+                native_parallel_report("self-free callback", q, i, jiffies - started,
+                                       NULL, free_results[q][i], 0, free_reasons[q][i]);
+            }
     }
 out:
     for (unsigned int q = 0; q < ARRAY_SIZE(queues); q++) {
@@ -1315,36 +1408,55 @@ struct native_bound_test {
     struct native_delayed_frees *frees;
     int *free_result;
     atomic_t active;
-    unsigned int expected_cpu[2], calls, requeue_cpu;
+    unsigned int expected_cpu[2], calls, requeue_cpu, failure_reasons;
     int expected_nice, result;
     bool hold, spin, release_spin;
 };
+enum native_bound_failure_reason {
+    NATIVE_BOUND_OVERLAP = BIT(0), NATIVE_BOUND_CONTEXT = BIT(1),
+    NATIVE_BOUND_CURRENT = BIT(2), NATIVE_BOUND_CPU = BIT(3),
+    NATIVE_BOUND_NICE = BIT(4), NATIVE_BOUND_SLICE = BIT(5),
+    NATIVE_BOUND_DEPENDENCY_QUEUE = BIT(6), NATIVE_BOUND_DEPENDENCY_TIMEOUT = BIT(7),
+    NATIVE_BOUND_AFTER_SLEEP = BIT(8), NATIVE_BOUND_REQUEUE = BIT(9),
+    NATIVE_BOUND_ACTIVE = BIT(10),
+};
+static void native_bound_failure(struct native_bound_test *test, unsigned int reason)
+{
+    test->failure_reasons |= reason;
+    test->result = -EIO;
+}
 static void native_bound_callback(struct work_struct *work)
 {
     struct native_bound_test *test = container_of(to_delayed_work(work), struct native_bound_test, delayed);
     unsigned int call = test->calls++;
     unsigned int expected = test->expected_cpu[call ? 1 : 0];
-    if (atomic_inc_return(&test->active) != 1 || !vinix_linuxkpi_may_sleep() ||
-        current_work() != work || (expected != WORK_CPU_UNBOUND && vinix_linuxkpi_cpu_id() != expected) ||
-        vinix_linuxkpi_worker_nice() != test->expected_nice ||
-        vinix_linuxkpi_worker_timeslice() != (test->expected_nice == -20 ? 10000 : 5000))
-        test->result = -EIO;
+    if (atomic_inc_return(&test->active) != 1) native_bound_failure(test, NATIVE_BOUND_OVERLAP);
+    if (!vinix_linuxkpi_may_sleep()) native_bound_failure(test, NATIVE_BOUND_CONTEXT);
+    if (current_work() != work) native_bound_failure(test, NATIVE_BOUND_CURRENT);
+    if (expected != WORK_CPU_UNBOUND && vinix_linuxkpi_cpu_id() != expected)
+        native_bound_failure(test, NATIVE_BOUND_CPU);
+    if (vinix_linuxkpi_worker_nice() != test->expected_nice) native_bound_failure(test, NATIVE_BOUND_NICE);
+    if (vinix_linuxkpi_worker_timeslice() != (test->expected_nice == -20 ? 10000 : 5000))
+        native_bound_failure(test, NATIVE_BOUND_SLICE);
     complete(&test->entered);
     while (test->spin && !__atomic_load_n(&test->release_spin, __ATOMIC_ACQUIRE)) cond_resched();
     if (test->hold) wait_for_completion(&test->gate);
     if (test->dependency) {
-        if (!queue_work_on(expected, test->wq, &test->dependency->delayed.work)) test->result = -EIO;
+        if (!queue_work_on(expected, test->wq, &test->dependency->delayed.work))
+            native_bound_failure(test, NATIVE_BOUND_DEPENDENCY_QUEUE);
         /* Force preemption on task-dequeue's IRQ restore, before the explicit
          * park call. The actual scheduler sleep hook must enable replacement. */
         vinix_linuxkpi_test_park_preempt();
-        if (!wait_for_completion_timeout(&test->dependency->done, 500)) test->result = -EIO;
+        if (!wait_for_completion_timeout(&test->dependency->done, 500))
+            native_bound_failure(test, NATIVE_BOUND_DEPENDENCY_TIMEOUT);
     }
     cond_resched();
     msleep(1);
-    if (expected != WORK_CPU_UNBOUND && vinix_linuxkpi_cpu_id() != expected) test->result = -EIO;
+    if (expected != WORK_CPU_UNBOUND && vinix_linuxkpi_cpu_id() != expected)
+        native_bound_failure(test, NATIVE_BOUND_AFTER_SLEEP);
     if (!call && test->requeue_wq && !queue_work_on(test->requeue_cpu, test->requeue_wq, work))
-        test->result = -EIO;
-    if (atomic_dec_return(&test->active)) test->result = -EIO;
+        native_bound_failure(test, NATIVE_BOUND_REQUEUE);
+    if (atomic_dec_return(&test->active)) native_bound_failure(test, NATIVE_BOUND_ACTIVE);
     if (test->frees) {
         struct native_delayed_frees *frees = test->frees;
         *test->free_result = test->result;
@@ -1365,11 +1477,18 @@ static void native_bound_init(struct native_bound_test *test, struct workqueue_s
     init_completion(&test->done);
     atomic_set(&test->active, 0);
 }
-static int native_bound_finish(struct native_bound_test *test)
+static int native_bound_finish(struct native_bound_test *test, const char *stage)
 {
+    extern int kprintf(const char *, ...);
+    unsigned long started = jiffies;
     int result = wait_for_completion_timeout(&test->done, 500) ? 0 : -EIO;
+    bool timed_out = result != 0;
     cancel_delayed_work_sync(&test->delayed);
     if (test->result || atomic_read(&test->active)) result = -EIO;
+    if (result)
+        kprintf("linuxkpi: bound test %s failed: timeout=%u ticks=%lu calls=%u reasons=0x%x active=%d expected_cpu=%u/%u nice=%d\n",
+                stage, timed_out, jiffies - started, test->calls, test->failure_reasons,
+                atomic_read(&test->active), test->expected_cpu[0], test->expected_cpu[1], test->expected_nice);
     return result;
 }
 int vinix_linuxkpi_bound_work_native_selftest(void)
@@ -1382,49 +1501,55 @@ int vinix_linuxkpi_bound_work_native_selftest(void)
     struct native_delayed_frees frees;
     bool held_initialized = false, heap_submitted = false;
     int result = 0;
+    unsigned int failed_stages = 0;
+    unsigned long heap_watchdog_ticks = 0, heap_final_ticks = 0;
+    int heap_watchdog_count = -1, heap_final_count = -1;
     queues[0] = alloc_workqueue("vinix-bound", 0, 2);
     queues[1] = alloc_workqueue("vinix-bound-one", 0, 1);
     queues[2] = alloc_workqueue("vinix-unbound-high", WQ_UNBOUND | WQ_HIGHPRI, 2);
     queues[3] = alloc_workqueue("vinix-bound-high", WQ_HIGHPRI, 1);
     for (unsigned int q = 0; q < ARRAY_SIZE(queues); q++)
-        if (!queues[q]) { result = -ENOMEM; goto out; }
+        if (!queues[q]) { result = -ENOMEM; failed_stages |= BIT(0); goto out; }
     /* Every online test CPU must remain the same across native sleep/yield. */
     for (unsigned int cpu = 0; cpu < cpus; cpu++) {
         native_bound_init(&tests[cpu], queues[0], cpu, false);
         BUG_ON(!queue_work_on(cpu, queues[0], &tests[cpu].delayed.work));
     }
     for (unsigned int cpu = 0; cpu < cpus; cpu++)
-        if (native_bound_finish(&tests[cpu]) || tests[cpu].calls != 1) result = -EIO;
+        if (native_bound_finish(&tests[cpu], "explicit routing") || tests[cpu].calls != 1)
+            { result = -EIO; failed_stages |= BIT(1); }
     unsigned int caller_cpu = get_cpu();
     native_bound_init(&tests[0], queues[0], caller_cpu, false);
-    if (!queue_work(queues[0], &tests[0].delayed.work)) result = -EIO;
+    if (!queue_work(queues[0], &tests[0].delayed.work)) { result = -EIO; failed_stages |= BIT(2); }
     put_cpu();
-    if (native_bound_finish(&tests[0])) result = -EIO;
+    if (native_bound_finish(&tests[0], "caller routing")) { result = -EIO; failed_stages |= BIT(2); }
     native_bound_init(&tests[0], queues[2], WORK_CPU_UNBOUND, true);
     BUG_ON(!queue_work(queues[2], &tests[0].delayed.work));
-    if (native_bound_finish(&tests[0])) result = -EIO;
+    if (native_bound_finish(&tests[0], "unbound high priority")) { result = -EIO; failed_stages |= BIT(3); }
     /* Delayed explicit routing persists despite the global timer worker. */
     native_bound_init(&tests[0], queues[0], cpus - 1, false);
     unsigned long irq_flags = vinix_linuxkpi_irq_save();
     if (!queue_delayed_work_on(0, queues[0], &tests[0].delayed, 100000) ||
-        !mod_delayed_work_on(cpus - 1, queues[0], &tests[0].delayed, 2)) result = -EIO;
+        !mod_delayed_work_on(cpus - 1, queues[0], &tests[0].delayed, 2))
+        { result = -EIO; failed_stages |= BIT(4); }
     vinix_linuxkpi_irq_restore(irq_flags);
-    if (native_bound_finish(&tests[0])) result = -EIO;
+    if (native_bound_finish(&tests[0], "delayed routing")) { result = -EIO; failed_stages |= BIT(4); }
     for (unsigned int migration = 0; migration < 2; migration++) {
         native_bound_init(&tests[0], queues[0], 0, false);
         tests[0].requeue_wq = queues[migration];
         tests[0].requeue_cpu = cpus - 1;
         tests[0].expected_cpu[1] = migration ? cpus - 1 : 0;
         BUG_ON(!queue_work_on(0, queues[0], &tests[0].delayed.work));
-        if (native_bound_finish(&tests[0]) || tests[0].calls != 2) result = -EIO;
+        if (native_bound_finish(&tests[0], migration ? "cross-owner requeue" : "same-owner requeue") ||
+            tests[0].calls != 2) { result = -EIO; failed_stages |= BIT(5 + migration); }
     }
     native_bound_init(&tests[0], queues[0], 0, false);
     native_bound_init(&tests[1], queues[0], 0, false);
     tests[0].dependency = &tests[1];
     BUG_ON(!queue_work_on(0, queues[0], &tests[0].delayed.work));
-    if (native_bound_finish(&tests[0])) result = -EIO;
+    if (native_bound_finish(&tests[0], "nested dependency")) { result = -EIO; failed_stages |= BIT(7); }
     cancel_delayed_work_sync(&tests[1].delayed);
-    if (tests[1].calls != 1 || tests[1].result) result = -EIO;
+    if (tests[1].calls != 1 || tests[1].result) { result = -EIO; failed_stages |= BIT(7); }
     /* Sleeping callbacks retain active slots, independently on every CPU. */
     for (unsigned int cpu = 0; cpu < cpus; cpu++) {
         for (unsigned int slot = 0; slot < 2; slot++) {
@@ -1437,18 +1562,21 @@ int vinix_linuxkpi_bound_work_native_selftest(void)
     for (unsigned int cpu = 0; cpu < cpus; cpu++) {
         for (unsigned int slot = 0; slot < 2; slot++) {
             BUG_ON(!queue_work_on(cpu, queues[0], &held[cpu][slot].delayed.work));
-            if (!wait_for_completion_timeout(&held[cpu][slot].entered, 500)) { result = -EIO; goto out; }
+            if (!wait_for_completion_timeout(&held[cpu][slot].entered, 500))
+                { result = -EIO; failed_stages |= BIT(8); goto out; }
         }
         BUG_ON(!queue_work_on(cpu, queues[0], &extra[cpu].delayed.work));
     }
     msleep(2);
     for (unsigned int cpu = 0; cpu < cpus; cpu++) {
-        if (READ_ONCE(extra[cpu].calls)) result = -EIO;
+        if (READ_ONCE(extra[cpu].calls)) { result = -EIO; failed_stages |= BIT(8); }
         complete(&held[cpu][0].gate);
-        if (native_bound_finish(&extra[cpu])) result = -EIO;
+        if (native_bound_finish(&extra[cpu], "per-CPU deferred active"))
+            { result = -EIO; failed_stages |= BIT(8); }
         complete(&held[cpu][1].gate);
         for (unsigned int slot = 0; slot < 2; slot++)
-            if (native_bound_finish(&held[cpu][slot])) result = -EIO;
+            if (native_bound_finish(&held[cpu][slot], "per-CPU held active"))
+                { result = -EIO; failed_stages |= BIT(8); }
     }
     held_initialized = false;
     /* Normal bound owners share runnable concurrency; high priority uses a
@@ -1458,15 +1586,15 @@ int vinix_linuxkpi_bound_work_native_selftest(void)
     native_bound_init(&priority, queues[3], 0, true);
     spin.spin = spin.hold = true;
     BUG_ON(!queue_work_on(0, queues[0], &spin.delayed.work));
-    if (!wait_for_completion_timeout(&spin.entered, 500)) result = -EIO;
+    if (!wait_for_completion_timeout(&spin.entered, 500)) { result = -EIO; failed_stages |= BIT(9); }
     BUG_ON(!queue_work_on(0, queues[1], &blocked.delayed.work));
     BUG_ON(!queue_work_on(0, queues[3], &priority.delayed.work));
-    if (native_bound_finish(&priority)) result = -EIO;
-    if (READ_ONCE(blocked.calls)) result = -EIO;
+    if (native_bound_finish(&priority, "isolated priority domain")) { result = -EIO; failed_stages |= BIT(9); }
+    if (READ_ONCE(blocked.calls)) { result = -EIO; failed_stages |= BIT(9); }
     __atomic_store_n(&spin.release_spin, true, __ATOMIC_RELEASE);
-    if (native_bound_finish(&blocked)) result = -EIO;
+    if (native_bound_finish(&blocked, "normal domain after sleep")) { result = -EIO; failed_stages |= BIT(9); }
     complete(&spin.gate);
-    if (native_bound_finish(&spin)) result = -EIO;
+    if (native_bound_finish(&spin, "normal domain spinner")) { result = -EIO; failed_stages |= BIT(9); }
     /* Warm both permanent bound system queues on each CPU before allocation
      * measurement. Temporary self-freeing objects exercise detached records. */
     for (unsigned int cpu = 0; cpu < cpus; cpu++) {
@@ -1474,18 +1602,18 @@ int vinix_linuxkpi_bound_work_native_selftest(void)
         BUG_ON(!schedule_work_on(cpu, &tests[cpu].delayed.work));
     }
     for (unsigned int cpu = 0; cpu < cpus; cpu++)
-        if (native_bound_finish(&tests[cpu])) result = -EIO;
+        if (native_bound_finish(&tests[cpu], "system default")) { result = -EIO; failed_stages |= BIT(10); }
     for (unsigned int cpu = 0; cpu < cpus; cpu++) {
         native_bound_init(&tests[cpu], system_highpri_wq, cpu, true);
         BUG_ON(!queue_work_on(cpu, system_highpri_wq, &tests[cpu].delayed.work));
     }
     for (unsigned int cpu = 0; cpu < cpus; cpu++)
-        if (native_bound_finish(&tests[cpu])) result = -EIO;
+        if (native_bound_finish(&tests[cpu], "system high priority")) { result = -EIO; failed_stages |= BIT(11); }
     atomic_set(&frees.count, 0);
     init_completion(&frees.done);
     for (unsigned int i = 0; i < ARRAY_SIZE(heap); i++) {
         heap[i] = kzalloc(sizeof(*heap[i]), GFP_KERNEL);
-        if (!heap[i]) { result = -ENOMEM; goto out; }
+        if (!heap[i]) { result = -ENOMEM; failed_stages |= BIT(12); goto out; }
         native_bound_init(heap[i], queues[0], i % cpus, false);
         heap[i]->frees = &frees;
         heap[i]->free_result = &free_results[i];
@@ -1493,11 +1621,20 @@ int vinix_linuxkpi_bound_work_native_selftest(void)
     heap_submitted = true;
     for (unsigned int i = 0; i < ARRAY_SIZE(heap); i++)
         BUG_ON(!queue_work_on(i % cpus, queues[0], &heap[i]->delayed.work));
-    if (!wait_for_completion_timeout(&frees.done, 500)) { result = -EIO; wait_for_completion(&frees.done); }
+    unsigned long heap_started = jiffies;
+    if (!wait_for_completion_timeout(&frees.done, 500)) {
+        heap_watchdog_ticks = jiffies - heap_started;
+        heap_watchdog_count = atomic_read(&frees.count);
+        result = -EIO;
+        failed_stages |= BIT(13);
+        wait_for_completion(&frees.done);
+    }
     flush_workqueue(queues[0]);
-    if (atomic_read(&frees.count) != ARRAY_SIZE(heap)) result = -EIO;
+    heap_final_ticks = jiffies - heap_started;
+    heap_final_count = atomic_read(&frees.count);
+    if (heap_final_count != ARRAY_SIZE(heap)) { result = -EIO; failed_stages |= BIT(13); }
     for (unsigned int i = 0; i < ARRAY_SIZE(heap); i++)
-        if (free_results[i]) result = -EIO;
+        if (free_results[i]) { result = -EIO; failed_stages |= BIT(14); }
 out:
     if (held_initialized)
         for (unsigned int cpu = 0; cpu < cpus; cpu++)
@@ -1506,6 +1643,14 @@ out:
         for (unsigned int i = 0; i < ARRAY_SIZE(heap); i++) kfree(heap[i]);
     for (unsigned int q = 0; q < ARRAY_SIZE(queues); q++)
         if (queues[q]) destroy_workqueue(queues[q]);
+    if (result) {
+        extern int kprintf(const char *, ...);
+        kprintf("linuxkpi: bound native self-test failed stages=0x%x result=%d\n", failed_stages, result);
+        if (failed_stages & BIT(13))
+            kprintf("linuxkpi: bound self-free completion watchdog_ticks=%lu watchdog_count=%d final_ticks=%lu final_count=%d expected=%u\n",
+                    heap_watchdog_ticks, heap_watchdog_count, heap_final_ticks,
+                    heap_final_count, (unsigned int)ARRAY_SIZE(heap));
+    }
     return result;
 }
 

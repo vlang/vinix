@@ -315,14 +315,41 @@ int vinix_linuxkpi_wait_bit_native_selftest(void)
 {
     extern int kprintf(const char *, ...);
     int result = 0;
+#ifdef VINIX_LINUXKPI_TEST_TRACE
+    kprintf("linuxkpi: wait-bit trace: repeated begin\n");
+#endif
     if (native_bit_repeated()) { kprintf("linuxkpi: wait-bit repeated/action/deadline checks failed\n"); result = -EIO; }
+#ifdef VINIX_LINUXKPI_TEST_TRACE
+    kprintf("linuxkpi: wait-bit trace: repeated end; keyed begin\n");
+#endif
     if (native_bit_keyed()) { kprintf("linuxkpi: wait-bit keyed collision/IRQ-off wake failed\n"); result = -EIO; }
+#ifdef VINIX_LINUXKPI_TEST_TRACE
+    kprintf("linuxkpi: wait-bit trace: keyed end; quota begin\n");
+#endif
     if (native_bit_quota()) { kprintf("linuxkpi: wait-bit exclusive quota failed\n"); result = -EIO; }
+#ifdef VINIX_LINUXKPI_TEST_TRACE
+    kprintf("linuxkpi: wait-bit trace: quota end; display begin\n");
+#endif
     if (native_bit_display()) { kprintf("linuxkpi: wait-bit ordinary SET waiter failed\n"); result = -EIO; }
+#ifdef VINIX_LINUXKPI_TEST_TRACE
+    kprintf("linuxkpi: wait-bit trace: display end; interrupt begin\n");
+#endif
     if (native_bit_interrupt()) { kprintf("linuxkpi: wait-bit signal cancellation failed\n"); result = -EIO; }
+#ifdef VINIX_LINUXKPI_TEST_TRACE
+    kprintf("linuxkpi: wait-bit trace: interrupt end; variable killable begin\n");
+#endif
     if (native_var_test(true, false)) { kprintf("linuxkpi: variable killable filtering failed\n"); result = -EIO; }
+#ifdef VINIX_LINUXKPI_TEST_TRACE
+    kprintf("linuxkpi: wait-bit trace: variable killable end; freed key begin\n");
+#endif
     if (native_var_test(false, false)) { kprintf("linuxkpi: variable freed-address wake failed\n"); result = -EIO; }
+#ifdef VINIX_LINUXKPI_TEST_TRACE
+    kprintf("linuxkpi: wait-bit trace: freed key end; inaccessible key begin\n");
+#endif
     if (native_var_test(false, true)) { kprintf("linuxkpi: variable inaccessible-address wake failed\n"); result = -EIO; }
+#ifdef VINIX_LINUXKPI_TEST_TRACE
+    kprintf("linuxkpi: wait-bit trace: inaccessible key end\n");
+#endif
     return result;
 }
 #endif
