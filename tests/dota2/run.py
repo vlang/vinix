@@ -54,6 +54,22 @@ def install(source: Path, target: Path) -> None:
     shutil.copy2(source, target)
 
 
+def probe_preloads(paths: list[Path]) -> tuple[list[dict], list[bytes]]:
+    records, contents = [], []
+    for index, path in enumerate(paths):
+        path = path.resolve()
+        if not path.is_file():
+            raise SystemExit(f"Extra preload is not a file: {path}")
+        data = path.read_bytes()
+        if (len(data) < 64 or data[:7] != b"\x7fELF\x02\x01\x01" or
+                data[16:18] != b"\x03\x00" or data[18:20] != b"\x3e\x00"):
+            raise SystemExit(f"Extra preload must be a Linux x86-64 shared ELF: {path}")
+        records.append({"source": str(path), "sha256": hashlib.sha256(data).hexdigest(),
+                        "guest_path": f"/usr/libexec/vinix-dota2/probes/extra-{index}.so"})
+        contents.append(data)
+    return records, contents
+
+
 def trim_runtime(root: Path) -> None:
     # Xvfb/SDL and the game supply their own graphics and UI assets.
     for relative in ("usr/lib/i386-linux-gnu", "lib/i386-linux-gnu",
@@ -238,6 +254,17 @@ def prepare(args, work: Path) -> tuple[Path, Path]:
         if not separator or not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", name):
             raise SystemExit(f"Invalid --game-env: {setting}")
         game_environment[name] = value
+    if args.preload_records:
+        for record, contents in zip(args.preload_records, args.preload_contents):
+            target = root / record["guest_path"].lstrip("/")
+            target.parent.mkdir(parents=True, exist_ok=True)
+            if target.is_symlink():
+                target.unlink()
+            target.write_bytes(contents)
+            target.chmod(0o644)
+        preloads = ":".join(record["guest_path"] for record in args.preload_records)
+        existing = game_environment.get("VINIX_X86_64_PRELOAD", "")
+        game_environment["VINIX_X86_64_PRELOAD"] = preloads + (":" + existing if existing else "")
     launcher = root / "usr/bin/run-dota2"
     if launcher.is_symlink():
         launcher.unlink()
@@ -325,6 +352,8 @@ def main() -> None:
     parser.add_argument("--export-state", type=Path, default=REPO / "build/dota2/linux-export")
     parser.add_argument("--kernel-dir", type=Path, default=REPO / "kernel")
     parser.add_argument("--game-env", action="append", default=[], metavar="NAME=VALUE")
+    parser.add_argument("--extra-preload", type=Path, action="append", default=[],
+                        help="Copy a measured x86-64 loader probe into the guest preloads; repeatable")
     parser.add_argument("--extra-game-arg", action="append", default=[])
     parser.add_argument("--timeout", type=int, default=900)
     parser.add_argument("--capture-interval", type=int, default=60)
@@ -332,6 +361,7 @@ def main() -> None:
     args = parser.parse_args()
     if args.timeout <= 0 or args.capture_interval <= 0:
         parser.error("Timeout and capture interval must be positive")
+    args.preload_records, args.preload_contents = probe_preloads(args.extra_preload)
     for name in ("base_root", "work", "desktop", "host_source", "steamclient", "gldriverquery",
                  "export_state", "kernel_dir"):
         setattr(args, name, getattr(args, name).resolve())
@@ -436,6 +466,7 @@ def main() -> None:
         "desktop_sha256": sha256(root / "usr/bin/vinix-desktop"),
         "translator_sha256": sha256(root / "usr/bin/qemu-x86_64"),
         "translator_staging": str(args.translator_staging) if args.translator_staging else None,
+        "extra_preloads": args.preload_records,
         "steamclient_sha256": sha256(root / "home/dota2/.steam/sdk64/steamclient.so"),
         "export_manifest_sha256": sha256(args.export_state / "manifest.json"),
         "captures": captures, "log": str(work / "vinix.log"),
