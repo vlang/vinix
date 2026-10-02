@@ -252,6 +252,60 @@ static int kstrtox_selftest(void)
     return result;
 }
 
+static int string_tokens_selftest(void)
+{
+    static const char search[] = "none,pipe;auto";
+    static const char spaces[] = " \t\n\r\f\vpipe";
+    static const char only_spaces[] = " \t";
+    static const char high[] = { (char)0x80, ' ', (char)0xff, '\0' };
+    char force[] = { '!', '9', 'a', '4', '9', ',', ',', '!', '1', '2',
+        '3', '4', ',', '\0', ',', '?' };
+    static const char force_expected[] = { '!', '9', 'a', '4', '9', '\0',
+        '\0', '!', '1', '2', '3', '4', '\0', '\0', ',', '?' };
+    char trim[] = { '!', '\t', ' ', 'p', 'i', 'p', 'e', ' ', '\r', '\n', '\0', '?' };
+    static const char trim_expected[] = { '!', '\t', ' ', 'p', 'i', 'p', 'e',
+        '\0', '\r', '\n', '\0', '?' };
+    char blank[] = { '!', ' ', '\t', '\n', '\0', '?' };
+    static const char blank_expected[] = { '!', '\0', '\t', '\n', '\0', '?' };
+    char empty[] = { '!', '\0', '?' };
+    char no_delimiter[] = { '!', 'a', ',', 'b', '\0', '?' };
+    char *cursor = force;
+    char *token;
+    int result = 0;
+    unsigned long flags = vinix_linuxkpi_irq_save();
+    unsigned int depth = preempt_count();
+    preempt_disable();
+    /* Delimiters and results stay borrowed from each caller's buffer. The
+     * force-probe syntax is tested without registering or binding a device. */
+    token = strsep(&cursor, ",");
+    if (token != force || strcmp(token, "!9a49") || cursor != force + 6) result = -EIO;
+    token = strsep(&cursor, ",");
+    if (token != force + 6 || *token || cursor != force + 7) result = -EIO;
+    token = strsep(&cursor, ",");
+    if (token != force + 7 || strcmp(token, "!1234") || cursor != force + 13) result = -EIO;
+    token = strsep(&cursor, ",");
+    if (token != force + 13 || *token || cursor != NULL ||
+        strsep(&cursor, ",") != NULL || cursor != NULL ||
+        memcmp(force, force_expected, sizeof(force))) result = -EIO;
+    cursor = no_delimiter + 1;
+    if (strsep(&cursor, "") != no_delimiter + 1 || cursor != NULL ||
+        memcmp(no_delimiter, "!a,b\0?", sizeof(no_delimiter))) result = -EIO;
+    if (strchr(search, ',') != search + 4 || strchr(search, '\0') != search + 14 ||
+        strchr(search, '?') != NULL || strchr(high, 0x180) != high ||
+        strchr(high, -1) != high + 2 || strpbrk(search, ";,") != search + 4 ||
+        strpbrk(search, "?+") != NULL || strpbrk(search, "") != NULL ||
+        skip_spaces(spaces) != spaces + 6 || skip_spaces(high) != high ||
+        skip_spaces(only_spaces) != only_spaces + 2) result = -EIO;
+    if (strim(trim + 1) != trim + 3 || memcmp(trim, trim_expected, sizeof(trim)) ||
+        strim(blank + 1) != blank + 1 || memcmp(blank, blank_expected, sizeof(blank)) ||
+        strim(empty + 1) != empty + 1 || empty[0] != '!' || empty[2] != '?') result = -EIO;
+    if (!irqs_disabled() || preempt_count() != depth + 1) result = -EIO;
+    preempt_enable_no_resched();
+    vinix_linuxkpi_irq_restore(flags);
+    if (vinix_linuxkpi_irq_flags() != flags || preempt_count() != depth) result = -EIO;
+    return result;
+}
+
 static int string_helpers_selftest(void)
 {
     /* Literal names and indices from unchanged intel_pipe_crc.c. These are
@@ -443,6 +497,7 @@ int vinix_linuxkpi_selftest(void)
     kfree(name);
     if (string_helpers_selftest()) result = -EIO;
     if (kstrtox_selftest()) result = -EIO;
+    if (string_tokens_selftest()) result = -EIO;
     if (!vinix_linuxkpi_tigerlake_id(0x8086, 0x9a49, 0x030000) ||
         vinix_linuxkpi_tigerlake_id(0x8086, 0x9a49, 0x020000) ||
         vinix_linuxkpi_tigerlake_id(0x1234, 0x9a49, 0x030000)) result = -EIO;

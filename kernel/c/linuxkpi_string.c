@@ -1,9 +1,13 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
-/* String matching/replacement portions from Linux 6.6.157 lib/string_helpers.c:
+/* Whitespace/matching/replacement portions from Linux 6.6.157 lib/string_helpers.c:
  * Copyright 31 August 2008 James Bottomley
  * Copyright (C) 2013, Intel Corporation
  */
+/* Token/search portions from Linux 6.6.157 lib/string.c:
+ * Copyright (C) 1991, 1992 Linus Torvalds
+ */
 #ifdef VINIX_LINUXKPI
+#include <linux/ctype.h>
 #include <linux/errno.h>
 #include <linux/limits.h>
 #include <linux/slab.h>
@@ -113,5 +117,65 @@ char *strreplace(char *str, char old, char new)
     for (char *s = str; *s; ++s)
         if (*s == old) *s = new;
     return str;
+}
+
+char *strchr(const char *s, int c)
+{
+	for (; *s != (char)c; ++s)
+		if (*s == '\0')
+			return NULL;
+	return (char *)s;
+}
+
+char *strpbrk(const char *cs, const char *ct)
+{
+	const char *sc;
+
+	for (sc = cs; *sc != '\0'; ++sc) {
+		if (strchr(ct, *sc))
+			return (char *)sc;
+	}
+	return NULL;
+}
+
+char *strsep(char **s, const char *ct)
+{
+	char *sbegin = *s;
+	char *end;
+
+	if (sbegin == NULL)
+		return NULL;
+
+	end = strpbrk(sbegin, ct);
+	if (end)
+		*end++ = '\0';
+	*s = end;
+	return sbegin;
+}
+
+char *skip_spaces(const char *str)
+{
+	while (isspace(*str))
+		++str;
+	return (char *)str;
+}
+
+char *strim(char *s)
+{
+	size_t size;
+	char *end;
+
+	size = strlen(s);
+	if (!size)
+		return s;
+
+	/* The pinned algorithm forms s - 1 for all-whitespace input. Keep its
+	 * returned pointer and byte mutations while staying within the string. */
+	end = s + size;
+	while (end > s && isspace(end[-1]))
+		end--;
+	*end = '\0';
+
+	return skip_spaces(s);
 }
 #endif

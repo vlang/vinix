@@ -421,6 +421,16 @@ the complete i915 source tree is not evidence that the driver runs.
   the device/settings lifecycles remain unresolved. `_from_user` wrappers and
   Linux uaccess remain unimplemented: native Boolean user-copy results need
   an independently validated remaining-byte and zero-tail bridge first.
+- `strchr`, `strpbrk`, `strsep`, `skip_spaces`, `strim` and the original
+  `strstrip` alias consume borrowed strings synchronously. Search results and
+  tokens point into the caller's storage; splitting preserves empty tokens and
+  only replaces delimiters. Trimming uses the original Linux character-class
+  table and changes the first trailing whitespace byte. The local trimming
+  loop avoids forming a pointer before the buffer on all-whitespace input,
+  while preserving its return pointer and complete byte mutations. Upstream
+  remains unchanged. These APIs allocate nothing and preserve IRQ/preemption
+  state. Real consumers include the force-probe and mitigation token parsers;
+  their device/module-parameter lifecycles remain unresolved.
 - `kmalloc`, `kzalloc`, `kcalloc`, `kmalloc_array`, `kmemdup`, `krealloc`,
   `ksize` and `kfree`, including zero-size pointers, overflow/OOM handling
   and Linux allocation alignment. The initial backend uses contiguous
@@ -477,6 +487,29 @@ python3 tests/linuxkpi/run_vm.py \
     --kernel build-amd64-kernel/bin/vinix \
     --cpu max,hypervisor=off --state-dir /tmp/vinix-linuxkpi-guest-sse
 ```
+
+String-token validation used four frozen kernel paths at isolated baseline
+`ce4606b3`, enabled ELF SHA256
+`8c32940b5f6a4bd707a52a2f3073055ebe5e529190812a2f13a6585f09c0ad8e`.
+The complete strict ASan/UBSan runtime, import and standalone-header suite
+passed at `/tmp/vinix-linuxkpi-string-tokens-host.log`. Fixed vectors check
+borrowed pointer/cursor positions, empty and repeated delimiters, complete
+buffer mutations, all 256 byte classifications, read-only inputs and guarded
+mutable buffers. Calls preserve IRQ/preemption/CPU state and page counts with
+allocation disabled. The host-only aliases exercise the actual implementations
+without interposing on sanitizer/libc internals; native names stay unchanged.
+Separate actual-backend tests passed 7,542,446 comparisons with the pinned
+algorithms, including the equivalent bounded trimming traversal.
+
+Fresh enabled/default x86 and disabled ARM builds passed. The final rebuild
+including the host-only header aliases produced identical saved ELF/generated-C
+hashes. Normal/SSE four-CPU guests passed at
+`/tmp/vinix-linuxkpi-string-tokens-{vm,sse-vm}/serial.log`. The native fixture
+runs 200 times in the exact physical-page measurement; default startup passed
+without LinuxKPI markers. Independent source, host/native fixture and generated-C
+review covers the borrowed lifetimes and genuine `strchr` link dependency.
+Exact evidence is `/tmp/vinix-linuxkpi-string-tokens-final-validation.json`.
+These checks do not register a PCI device or initialize a GPU.
 
 Kernel-string parser validation used five frozen kernel paths at isolated
 baseline `7735509f`, enabled ELF SHA256
