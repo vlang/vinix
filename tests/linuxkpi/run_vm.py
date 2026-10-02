@@ -25,6 +25,7 @@ MARKERS = [
     "linuxkpi: concurrent unbound workqueues, active limits, system_unbound_wq and teardown passed; no pages retained",
     "linuxkpi: bound CPU routing, runnable concurrency, per-CPU active limits, priority and system queues passed; no pages retained",
     "linuxkpi: native worker allocation rollback, affinity validation and isolated nice weights passed; no pages retained",
+    "linuxkpi: SRCU sleeping and migrated readers, grace periods, callback barriers and teardown passed; no pages retained",
     "linuxkpi: scheduler deferred preemption while IRQs stayed enabled",
     "and FPU preservation passed",
     "LINUXKPI GUEST: PASS",
@@ -83,7 +84,7 @@ def main():
                     if args.no_linuxkpi and "linuxkpi:" in output:
                         raise RuntimeError("API layer unexpectedly enabled; see " + str(serial))
                     print("Default guest: PASS (4 CPUs, Linux ABI)" if args.no_linuxkpi else
-                          "LinuxKPI guest: PASS (4 CPUs, allocator, locks, per-CPU storage, task waits/references, synchronization, clocks/timed waits, timers, ordered/delayed/unbound/bound work, priority/system queues, scheduler, i915 copy/FPU)")
+                          "LinuxKPI guest: PASS (4 CPUs, allocator, locks, per-CPU storage, task waits/references, synchronization, clocks/timed waits, timers, ordered/delayed/unbound/bound work, priority/system queues, SRCU, scheduler, i915 copy/FPU)")
                     print("Serial log: " + str(serial))
                     return 0
                 if process.poll() is not None:

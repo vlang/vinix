@@ -67,6 +67,7 @@ int vinix_linuxkpi_unbound_work_native_selftest(void);
 int vinix_linuxkpi_bound_work_native_selftest(void);
 void vinix_linuxkpi_test_park_preempt(void);
 void vinix_linuxkpi_test_worker_oom(int stage);
+void vinix_linuxkpi_test_alloc_oom(int remaining);
 int vinix_linuxkpi_worker_native_selftest(void);
 int vinix_linuxkpi_delayed_work_native_selftest(void);
 void vinix_linuxkpi_refcount_warning(int kind);
@@ -76,4 +77,5 @@ void vinix_linuxkpi_fpu_end(void);
 bool vinix_linuxkpi_tigerlake_id(u16 vendor, u16 device, u32 class_code);
 int vinix_linuxkpi_selftest(void);
 int vinix_linuxkpi_bitmap_runtime_selftest(void);
+int vinix_linuxkpi_srcu_native_selftest(void);
 #endif

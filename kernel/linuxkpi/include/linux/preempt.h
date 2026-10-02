@@ -4,8 +4,9 @@
 #include <linux/irqflags.h>
 #include <vinix/runtime.h>
 /* Native scheduler pins. IRQ/NMI/softirq context accounting is not implemented
- * here: in_interrupt()/in_atomic() remain unavailable rather than report a
- * fabricated Linux interrupt context. */
+ * here: in_interrupt()/in_atomic() remain unavailable. The NMI query is
+ * declared for unchanged SRCU inlines but remains unresolved at link time. */
+bool in_nmi(void);
 #define preempt_disable() vinix_linuxkpi_preempt_disable()
 #define preempt_enable() vinix_linuxkpi_preempt_enable()
 #define preempt_enable_no_resched() vinix_linuxkpi_preempt_enable_no_resched()

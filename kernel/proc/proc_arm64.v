@@ -104,6 +104,7 @@ pub mut:
 	sched_nice_override      int
 	sched_has_nice_override  bool
 	kernel_thread_fail_stage int
+	linuxkpi_alloc_fail_after int = -1
 	// Set by a thread that has asked to give up the rest of its turn. It is
 	// what tells the scheduler that an equally ranked thread may take the CPU
 	// from a policy which otherwise runs to completion.

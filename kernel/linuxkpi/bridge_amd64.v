@@ -191,6 +191,14 @@ fn test_worker_oom(stage i32) {
 	sched.test_kernel_thread_failure(int(stage))
 }
 
+@[export: 'vinix_linuxkpi_test_alloc_oom']
+fn test_alloc_oom(remaining i32) {
+	assert remaining >= -1
+	mut caller := proc.current_thread()
+	assert caller != unsafe { nil }
+	caller.linuxkpi_alloc_fail_after = int(remaining)
+}
+
 @[export: 'vinix_linuxkpi_task_park']
 fn task_park() {
 	assert may_sleep()
@@ -221,6 +229,23 @@ fn C.vinix_linuxkpi_tigerlake_id(u16, u16, u32) bool
 
 @[export: 'vinix_linuxkpi_alloc_pages']
 fn alloc_pages(count u64, reclaim bool) voidptr {
+	// Consume a one-shot failure on the constructing task. Other workers
+	// cannot consume it, and preemption cannot change current during the read.
+	ints := cpu.interrupt_toggle(false)
+	mut caller := proc.current_thread()
+	mut fail := false
+	if caller != unsafe { nil } && caller.linuxkpi_alloc_fail_after >= 0 {
+		if caller.linuxkpi_alloc_fail_after == 0 {
+			caller.linuxkpi_alloc_fail_after = -1
+			fail = true
+		} else {
+			caller.linuxkpi_alloc_fail_after--
+		}
+	}
+	cpu.interrupt_toggle(ints)
+	if fail {
+		return unsafe { nil }
+	}
 	phys := if reclaim {
 		memory.pmm_alloc_nozero_fallible(count)
 	} else {
@@ -380,6 +405,8 @@ fn C.vinix_linuxkpi_worker_native_selftest() int
 fn C.vinix_linuxkpi_delayed_work_native_selftest() int
 fn C.vinix_linuxkpi_percpu_bootstrap(u32) int
 fn C.vinix_linuxkpi_bitmap_runtime_selftest() int
+fn C.srcu_init()
+fn C.vinix_linuxkpi_srcu_native_selftest() int
 
 // join/TASK_DEAD can precede the final switch away and scheduler reaping.
 // Taking a baseline immediately after warmup can count those dying stacks,
@@ -423,8 +450,9 @@ pub fn initialise() {
 			lib.kpanic(unsafe { nil }, c'Linux compatibility timer worker initialization failed')
 		}
 		if C.vinix_linuxkpi_workqueue_bootstrap() != 0 {
-			lib.kpanic(unsafe { nil }, c'Linux compatibility unbound system queue initialization failed')
+			lib.kpanic(unsafe { nil }, c'Linux compatibility system queue initialization failed')
 		}
+		C.srcu_init()
 		before := memory.free_bytes()
 		for _ in 0 .. 200 {
 			if C.vinix_linuxkpi_selftest() != 0 || C.vinix_linuxkpi_task_selftest() != 0
@@ -648,6 +676,25 @@ pub fn initialise() {
 			lib.kpanic(unsafe { nil }, c'Linux native worker failure self-test retained native pages')
 		}
 		C.kprintf(c'linuxkpi: native worker allocation rollback, affinity validation and isolated nice weights passed; no pages retained\n')
+		for _ in 0 .. 3 {
+			if C.vinix_linuxkpi_srcu_native_selftest() != 0 {
+				lib.kpanic(unsafe { nil }, c'Linux SRCU self-test failed')
+			}
+		}
+		srcu_before := selftest_free_baseline()
+		if C.vinix_linuxkpi_srcu_native_selftest() != 0 {
+			lib.kpanic(unsafe { nil }, c'Linux SRCU self-test failed')
+		}
+		srcu_reap_start := hpet_clock.nanoseconds()
+		for memory.free_bytes() != srcu_before && hpet_clock.nanoseconds() - srcu_reap_start < 1000000000 {
+			sched.reap_deferred()
+			sched.reschedule()
+		}
+		if memory.free_bytes() != srcu_before {
+			C.kprintf(c'linuxkpi: SRCU free-byte baseline=%llu after=%llu\n', srcu_before, memory.free_bytes())
+			lib.kpanic(unsafe { nil }, c'Linux SRCU self-test retained native pages')
+		}
+		C.kprintf(c'linuxkpi: SRCU sleeping and migrated readers, grace periods, callback barriers and teardown passed; no pages retained\n')
 		// Exercise a real scheduler interrupt with preemption disabled and
 		// IRQs still enabled, rather than relying only on host lock tests.
 		preempt_disable()

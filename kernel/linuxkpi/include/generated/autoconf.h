@@ -7,6 +7,10 @@
 #define CONFIG_X86_64 1
 #define CONFIG_SMP 1
 #define CONFIG_NR_CPUS 256
+/* SMP SRCU has independent reader/grace-period state. Ordinary RCU is pending. */
+#define CONFIG_TREE_SRCU 1
+/* Do not alias NMI entrypoints to readers using the native per-CPU registry. */
+#define CONFIG_NEED_SRCU_NMI_SAFE 1
 /* Task identity and ordinary waits are backed by the native Thread. */
 #define CONFIG_THREAD_INFO_IN_TASK 1
 /* Tiger Lake has 64-byte cache lines; there is no NUMA configuration here. */

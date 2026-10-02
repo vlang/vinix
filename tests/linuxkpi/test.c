@@ -1021,6 +1021,7 @@ static void reference_tests(void)
 #include "unbound_work_test.h"
 #include "bound_work_test.h"
 #include "bitmap_runtime_test.h"
+#include "srcu_test.h"
 
 int main(void)
 {
@@ -1050,6 +1051,7 @@ int main(void)
     delayed_work_tests();
     unbound_work_tests();
     bound_work_tests();
+    srcu_tests();
     list_tests();
     tree_tests();
     concurrency_tests();
@@ -1057,6 +1059,6 @@ int main(void)
     reference_tests();
     vinix_linuxkpi_percpu_destroy_for_test();
     assert(live_pages == 0);
-    puts("LinuxKPI: PASS (Linux helpers, allocation/OOM, strings, bitmaps, SMP/IRQ locks, per-CPU storage, task references, wake races, synchronization, clocks, timers, ordered/delayed/unbound/bound work, runnable concurrency, priority and system queues)");
+    puts("LinuxKPI: PASS (Linux helpers, allocation/OOM, strings, bitmaps, SMP/IRQ locks, per-CPU storage, task references, wake races, synchronization, clocks, timers, ordered/delayed/unbound/bound work, runnable concurrency, priority, system queues and SRCU)");
     return 0;
 }

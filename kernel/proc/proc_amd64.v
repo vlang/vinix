@@ -128,6 +128,8 @@ pub mut:
 	sched_has_nice_override bool
 	// Native constructor fault injection belongs to its calling task.
 	kernel_thread_fail_stage int
+	// LinuxKPI page-allocation fault injection belongs to this caller only.
+	linuxkpi_alloc_fail_after int = -1
 	// Set by a thread that has asked to give up the rest of its turn. It is
 	// what tells the scheduler that an equally ranked thread may take the CPU
 	// from a policy which otherwise runs to completion.

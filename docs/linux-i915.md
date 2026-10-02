@@ -58,6 +58,23 @@ the complete i915 source tree is not evidence that the driver runs.
   ownership checks and `atomic_dec_and_mutex_lock` are implemented.
   Recursive acquisition and unlocking another task's mutex fail explicitly.
   Wound/wait mutexes, optimistic spinning, I/O accounting and devres are pending.
+- Unmodified Linux SRCU headers and public layouts use native two-bank
+  per-CPU reader counters and full grace periods. Readers may sleep, nest and
+  migrate; counter sums include every CPU. Static domains preserve readers
+  that entered before lazy updater initialization. Dynamic initialization
+  rolls back usage/per-CPU allocation failures. A private boot queue advances
+  grace periods in persistent nonblocking phases, releasing its active slot
+  while readers remain, independently of callback dispatch. Callbacks run in
+  FIFO order with preemption disabled and interrupts enabled; they may requeue
+  or free their own detached object. Polling cookies require a full period
+  beginning after their snapshot. Normal/expedited synchronization supplies
+  that period; expedited has no separate native latency guarantee. Callback
+  barriers capture their submission boundary before serializing waiters and
+  include callbacks still executing. Cleanup requires stopped readers,
+  producers and API users, then joins GP/timer/callback activity before freeing
+  either allocation. There is no allocation per reader or callback. Ordinary
+  RCU, NMI-safe SRCU, down/up context-independent SRCU and CPU hotplug remain
+  unresolved; SRCU does not provide ordinary RCU's implicit read regions.
 - Unmodified Linux `wait.h`, `swait.h` and `completion.h` use native-backed
   queues and task wakeups. Ordinary wait queues preserve nonexclusive,
   exclusive and priority order, wake quotas, callback keys and automatic
@@ -439,6 +456,21 @@ the implemented `__bitmap_*` functions; the unchanged upstream single-word
 inline wrappers retain their original behavior. The native kernel repeats
 multiword operations, conversion and allocation/free 200 times and checks
 exact page recovery.
+
+SRCU host tests exercise nested/migrated readers, both bank phases, full-period
+polling boundaries, static first use and dynamic initialization rollback.
+They check independent grace-period progress while a callback is gated,
+20 overlapping callback barriers, late submissions, 200 self-free callbacks,
+self-requeue, concurrent pointer reclamation and repeated dynamic teardown.
+With a private active limit of two, reader-blocked domains do not starve an
+unrelated domain; all 256 system-unbound active slots may wait for SRCU without
+blocking its private service. Bootstrap OOM/retry/idempotence and domain
+teardown return every host page and worker. Native tests use sleeping readers
+that migrate between CPUs, actual barrier task parking, a new full period
+while its old callback remains pinned, FIFO self-free callbacks, bound-worker
+synchronization and caller-local OOM injection. Three batches warm the private
+queue's two-worker peak; the measured fourth batch must restore the exact
+physical-page baseline.
 
 An enabled kernel runs the allocator/list/sort/tree/IRQ-lock tests 200 times
 and verifies that the physical free-page count returns to its initial value.
