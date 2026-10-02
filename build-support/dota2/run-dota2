@@ -67,6 +67,7 @@ done
 # Native AArch64 ICDs cannot be loaded into this translated glibc process.
 # An explicit caller selection takes priority, including an intentionally
 # empty selection. Otherwise use only the staged amd64 software Vulkan driver.
+software_vulkan=0
 if [ "${VK_DRIVER_FILES+x}" != x ] && [ "${VK_ICD_FILENAMES+x}" != x ] &&
    [ "${VK_LOADER_DRIVERS_SELECT+x}" != x ]; then
     icd="$runtime/usr/share/vulkan/icd.d/lvp_icd.x86_64.json"
@@ -74,6 +75,7 @@ if [ "${VK_DRIVER_FILES+x}" != x ] && [ "${VK_ICD_FILENAMES+x}" != x ] &&
     [ -e "$runtime/usr/lib/x86_64-linux-gnu/libvulkan_lvp.so" ] ||
         fail "the x86-64 Lavapipe driver is missing from $runtime"
     export VK_ICD_FILENAMES="$icd"
+    software_vulkan=1
 fi
 
 export VINIX_I386_ROOT="$runtime"
@@ -99,13 +101,17 @@ fi
 # Use the existing shim built for this runtime's glibc pthread layout. Its
 # audio dependencies also need the runtime's newer mpg123 ABI: the game's
 # bundled decoder lacks mpg123_info2 required by Bookworm's libsndfile.
+# Bookworm HarfBuzz also needs FT_Get_Transform, which the bundled FreeType
+# lacks. Keep Valve's Pango/PangoFT2: Panorama needs their older FT2 API.
 robust_shim="$runtime/usr/lib/x86_64-linux-gnu/libvinix-steam-robust.so"
 low_address_shim="$runtime/usr/lib/x86_64-linux-gnu/libvinix-dota2-mmap32.so"
 decoder="$runtime/usr/lib/x86_64-linux-gnu/libmpg123.so.0"
+freetype="$runtime/usr/lib/x86_64-linux-gnu/libfreetype.so.6"
 early_client="$runtime/usr/lib/x86_64-linux-gnu/libvinix-dota2-steam-loader.so"
 [ -e "$robust_shim" ] || fail "the x86-64 robust-list shim is missing: $robust_shim"
 [ -e "$low_address_shim" ] || fail "the x86-64 low-address mapping shim is missing: $low_address_shim"
 [ -e "$decoder" ] || fail "the runtime mpg123 decoder is missing: $decoder"
+[ -e "$freetype" ] || fail "the runtime FreeType library is missing: $freetype"
 [ -e "$early_client" ] || fail "the early Steam client loader is missing: $early_client"
 # Resolve Steam's SDK before loading the engine's different coroutine ABI.
 # The constructor consumes this marker before loading the real client, so
@@ -128,13 +134,16 @@ client_type=$(od -An -tx1 -j16 -N2 "$steamclient" | tr -d '[:space:]')
 client_machine=$(od -An -tx1 -j18 -N2 "$steamclient" | tr -d '[:space:]')
 [ "${#client_header}" -eq 128 ] && [ "$client_ident" = 7f454c46020101 ] && [ "$client_type" = 0300 ] &&
     [ "$client_machine" = 3e00 ] || fail "Steam's client must be a Linux x86-64 shared ELF: $steamclient"
-guest_preloads="$robust_shim:$low_address_shim:$decoder:$early_client"
+guest_preloads="$robust_shim:$low_address_shim:$decoder:$freetype:$early_client"
 if [ -n "${VINIX_X86_64_PRELOAD:-}" ]; then
     guest_preloads="$VINIX_X86_64_PRELOAD:$guest_preloads"
 fi
 export VINIX_X86_64_PRELOAD="$guest_preloads"
 # The translator itself is native. QEMU's -E applies these foreign library
 # settings only after it has loaded, so the AArch64 loader never sees them.
+# Valve's renderer excludes CPU adapters unless explicitly allowed. Enable
+# its real option only when this launcher selected the software Vulkan ICD.
+[ "$software_vulkan" -eq 0 ] || set -- -vulkan_allow_cpu "$@"
 set -- "$game" -windowed -w "$width" -h "$height" "$@"
 set -- -E "LD_PRELOAD=$guest_preloads" "$@"
 set -- -E "VINIX_DOTA2_EARLY_STEAMCLIENT=$steamclient" "$@"

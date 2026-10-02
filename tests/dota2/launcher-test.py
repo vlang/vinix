@@ -30,6 +30,7 @@ class LauncherTest(unittest.TestCase):
             "usr/lib/x86_64-linux-gnu/libvinix-dota2-mmap32.so",
             "usr/lib/x86_64-linux-gnu/libvinix-dota2-steam-loader.so",
             "usr/lib/x86_64-linux-gnu/libmpg123.so.0",
+            "usr/lib/x86_64-linux-gnu/libfreetype.so.6",
             "usr/share/vulkan/icd.d/lvp_icd.x86_64.json",
         ):
             path = self.runtime / relative
@@ -118,9 +119,10 @@ class LauncherTest(unittest.TestCase):
                    f"{self.runtime}/usr/lib/x86_64-linux-gnu/libvinix-steam-robust.so:"
                    f"{self.runtime}/usr/lib/x86_64-linux-gnu/libvinix-dota2-mmap32.so:"
                    f"{self.runtime}/usr/lib/x86_64-linux-gnu/libmpg123.so.0:"
+                   f"{self.runtime}/usr/lib/x86_64-linux-gnu/libfreetype.so.6:"
                    f"{self.runtime}/usr/lib/x86_64-linux-gnu/libvinix-dota2-steam-loader.so"),
             str(self.game), "-windowed", "-w", "1280", "-h", "720",
-            "+map", "path with spaces", "-w", "960",
+            "-vulkan_allow_cpu", "+map", "path with spaces", "-w", "960",
         ])
         self.assertEqual(launch["cwd"], str(self.game_root))
         self.assertEqual(launch["nofile"], 2048)
@@ -145,6 +147,7 @@ class LauncherTest(unittest.TestCase):
                 self.env[key] = "/custom/driver selection"
                 launch = self.run_launcher()
                 self.assertEqual(launch["env"][key], self.env[key])
+                self.assertNotIn("-vulkan_allow_cpu", launch["args"])
                 if key != "VK_ICD_FILENAMES":
                     self.assertNotIn("VK_ICD_FILENAMES", launch["env"])
                 del self.env[key]
@@ -155,6 +158,7 @@ class LauncherTest(unittest.TestCase):
         launch = self.run_launcher()
         self.assertEqual(launch["env"]["VK_DRIVER_FILES"], "")
         self.assertNotIn("VK_ICD_FILENAMES", launch["env"])
+        self.assertNotIn("-vulkan_allow_cpu", launch["args"])
 
     def test_dedicated_runtime_override_takes_priority(self):
         self.env["VINIX_DOTA2_ROOT"] = str(self.runtime)
@@ -198,6 +202,7 @@ class LauncherTest(unittest.TestCase):
         preloads = (f"{self.runtime}/usr/lib/x86_64-linux-gnu/libvinix-steam-robust.so:"
                     f"{self.runtime}/usr/lib/x86_64-linux-gnu/libvinix-dota2-mmap32.so:"
                     f"{self.runtime}/usr/lib/x86_64-linux-gnu/libmpg123.so.0:"
+                    f"{self.runtime}/usr/lib/x86_64-linux-gnu/libfreetype.so.6:"
                     f"{self.runtime}/usr/lib/x86_64-linux-gnu/libvinix-dota2-steam-loader.so")
         self.assertIn(f"LD_PRELOAD={preloads}", launch["args"])
         self.assertEqual(launch["env"]["VINIX_X86_64_PRELOAD"], preloads)
@@ -210,6 +215,10 @@ class LauncherTest(unittest.TestCase):
     def test_missing_early_client_loader_is_rejected(self):
         (self.runtime / "usr/lib/x86_64-linux-gnu/libvinix-dota2-steam-loader.so").unlink()
         self.assert_rejected("early Steam client loader is missing")
+
+    def test_missing_freetype_library_is_rejected(self):
+        (self.runtime / "usr/lib/x86_64-linux-gnu/libfreetype.so.6").unlink()
+        self.assert_rejected("runtime FreeType library is missing")
 
     def test_missing_actual_steamclient_is_rejected(self):
         self.client.unlink()

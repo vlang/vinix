@@ -36,7 +36,10 @@ The normal launcher keeps Steam's normal authentication behavior. The probe
 below explicitly selects the engine's anonymous test mode for local bring-up.
 
 The launcher selects the staged amd64 Lavapipe ICD unless the caller explicitly
-selects Vulkan drivers. Native ARM64 Venus libraries cannot be loaded by the
+selects Vulkan drivers. For that default it also passes Valve's
+`-vulkan_allow_cpu` option: the renderer normally excludes CPU adapters from its
+device list. An explicit caller driver selection leaves this option to the
+caller. Native ARM64 Venus libraries cannot be loaded by the
 translated x86-64 process. This software path does not provide the GPU
 acceleration used by native OpenGothic.
 
@@ -56,12 +59,18 @@ handles QEMU's missing `get_robust_list`; the second prevents Dota's older
 bundled decoder from breaking the distro audio dependency's `mpg123_info2`
 reference. Caller additions in `VINIX_X86_64_PRELOAD` retain precedence.
 
-A third guest library preserves x86 `MAP_32BIT` bounds that QEMU 9.1.2 drops
+The runtime's FreeType is preloaded too. The bundled older FreeType lacks
+`FT_Get_Transform`, which the distro HarfBuzz library needs when Panorama loads
+its text module. Valve's bundled Pango and PangoFT2 stay together: Panorama
+imports `pango_ft2_new_face_substitute`, which current distro PangoFT2 no longer
+exports.
+
+A guest library preserves x86 `MAP_32BIT` bounds that QEMU 9.1.2 drops
 when translating mmap flags. It rejects an impossible 2 GiB reservation,
 skips occupied ranges using the translated process's maps, and requests
 non-replacing mappings for smaller low-address ranges.
 
-A fourth guest preload, `libvinix-dota2-steam-loader.so`, opens the actual
+The guest preload `libvinix-dota2-steam-loader.so` opens the actual
 Steam client with `RTLD_NOW | RTLD_LOCAL | RTLD_NODELETE` before Source 2 loads.
 Without this ordering, Steam's coroutine imports bind partly to Source 2's
 different implementation and partly to the SDK, causing assertions and a
@@ -131,8 +140,8 @@ establish authenticated matchmaking support.
 With the early loader, the real Steam API test passes anonymous initialization,
 callbacks and clean shutdown even with Source 2's tier0 loaded globally. The
 full game advances through anonymous initialization and loads its renderer,
-resource system and schema system, but currently exits from the Vulkan renderer
-with status 1 before displaying the menu. Game rendering is not yet verified.
+resource system, schema system and material system. A rendered game menu is
+not yet verified.
 
 After the file and graphics probes, capture the real game:
 

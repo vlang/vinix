@@ -88,6 +88,7 @@ def main() -> None:
     required = ["lib64/ld-linux-x86-64.so.2", "usr/bin/vulkaninfo", "usr/bin/vkcube",
                 "usr/lib/x86_64-linux-gnu/libvulkan_lvp.so", "usr/lib/x86_64-linux-gnu/libvulkan.so.1",
                 "usr/share/vulkan/icd.d/lvp_icd.x86_64.json", "etc/ssl/certs/ca-certificates.crt",
+                "usr/lib/x86_64-linux-gnu/libfreetype.so.6",
                 MMAP32_LIBRARY, EARLY_CLIENT_LIBRARY]
     build.mkdir(parents=True, exist_ok=True)
     (build / "vulkan-packages.json").write_text(json.dumps(rows, indent=2) + "\n")
