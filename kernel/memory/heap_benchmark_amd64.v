@@ -1,7 +1,9 @@
 @[manualfree]
 module memory
 
-fn C.printf_benchmark(charptr, ...voidptr)
+#include <stdio.h>
+
+fn C.printf_benchmark(charptr, ...voidptr) i32
 
 // Opt-in, serial-console microbenchmark of the real kernel heap. It runs on
 // the BSP after SMP has published CPU-cache readiness, so -d xnu_zone measures
