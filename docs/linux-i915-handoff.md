@@ -1,7 +1,7 @@
 # Linux i915 next-session handoff
 
 Prepared 2026-10-02 for `/Users/alex/code/vinix`, on macOS ARM64 with zsh.
-Committed implementation baseline: **`53e42f7e`** (including SRCU, wound/wait and keyed waits). Recheck HEAD and the worktree before
+Committed implementation baseline: **`57a5cc18`** (including native I/O waits). Recheck HEAD and the worktree before
 starting; other sessions use this checkout. The main status document is
 [linux-i915.md](linux-i915.md).
 
@@ -54,13 +54,18 @@ handoff's rebuilt ELF. Ten distinct agents contributed in waves, within the
 four-active-agent limit including root. SRCU is now committed and tested in
 fresh normal/SSE guests. Native Wait-Die/Wound-Wait mutexes are also committed
 and tested. Bit/variable waits are also committed and tested in fresh native
-normal/SSE guests. Genuine scheduler I/O-wait accounting is the next feature;
-inspect HEAD and owned diffs before assuming its implementation.
+normal/SSE guests. Genuine scheduler I/O-wait accounting is also committed.
+Plain object caches, further header integration and validation-harness fixes
+are the current continuation work; inspect HEAD and owned diffs before
+assuming those changes are integrated.
 
 ## Committed progress
 
 | Commit | Completed runtime change |
 | --- | --- |
+| `57a5cc18` | Native I/O intent scopes, blocked-CPU accounting, bit-I/O actions and wake/migration/exit cleanup |
+| `41bd6faf` | Workqueue failure reasons and opt-in worker/keyed-wait traces, preserving callback deadlines |
+| `a15be8d3` | Host keyed-wait collisions selected across arbitrary address layouts |
 | `53e42f7e` | Allocation-free keyed bit/variable waits, exclusive bit locks, absolute deadlines and stack cancellation |
 | `a554fb3d` | Native stamped Wait-Die and Wound-Wait mutexes, backoff/slow retry and signal cancellation |
 | `bfbb99a6` | Native SRCU readers, persistent grace periods, callbacks/barriers and teardown |
@@ -274,8 +279,28 @@ archive into another separate reference directory, never into the import.
   a retired variable address may remain only as an opaque key.
 - Absolute timeout boundaries do not move after spurious wakes. An available
   lock bit wins an action error/signal after cancellation, matching upstream.
-- Wait/wake paths allocate nothing. I/O-wait actions remain unresolved until
-  real scheduler accounting is integrated; there is no schedule alias stub.
+- Wait/wake paths allocate nothing. Bit-I/O actions use real native scheduler
+  accounting and preserve absolute timeout/signal results.
+
+### I/O-wait accounting contracts
+
+- `in_iowait` is a nested intent token, initialized to zero and preserved by
+  task-view refresh. A new/inherited task does not inherit its parent's intent.
+- Admission follows actual dequeue and accepted-signal filtering under the
+  task wait lock with IRQs off. The native queue lock checks intent, dead and
+  runnable state again. Ordinary waits skip the extra accounting lock.
+- An origin CPU + 1 token and fixed boot counters are owned by native queue
+  transitions. End it only after a runnable slot is guaranteed, or on permanent
+  dead removal. Duplicate/failed/full wake attempts must not lose or double
+  subtract it. Migration debits the stored blocking origin.
+- Native accounting never acquires a Linux task lock while holding its queue
+  lock. The task-intent getter performs only an atomic load. No stack record,
+  task reference or allocation is added on the repeated blocking path.
+- The native token fills Thread padding without moving any existing field;
+  task intent fits the existing 64-byte view. Reaping requires the token zero.
+- Block plugs, delay statistics, idle-time accounting, CPU hotplug and
+  I/O-specific mutex wrappers remain unresolved; their flags/APIs are not
+  replaced with fabricated success.
 
 ### Ordinary RCU prerequisites
 
@@ -436,6 +461,39 @@ new generated V C contains only scalar measurement locals and direct calls
 (`/tmp/vinix-linuxkpi-waitbit-generatedc-snippet.c`). The audit remains 1/269,
 and import verification again checks all 7,668 unchanged files.
 
+I/O strict host tests pass at `/tmp/vinix-linuxkpi-iowait-host-final.log`.
+Fresh enabled x86, disabled ARM and default x86 builds pass at
+`/tmp/vinix-linuxkpi-iowait-x86-build-final-diagnostics.log`,
+`/tmp/vinix-linuxkpi-iowait-arm-build-final-diagnostics.log` and
+`/tmp/vinix-linuxkpi-iowait-default-build.log`. Fresh normal/SSE/default guests
+pass at `/tmp/vinix-linuxkpi-iowait-{reviewed-vm,reviewed-sse-vm,default-vm}/serial.log`.
+Both enabled guests include the I/O marker and exact page recovery, using
+`/tmp/vinix-linuxkpi-iowait-enabled-reviewed.elf`, SHA256
+`7ce6e10a50ecec9e3fcef56ef2d0ab3b1a60a6429e6b2e65e9c4c2e8518c9af6`.
+These isolated builds start at `118047fd` plus the owned I/O/diagnostic overlay;
+later unrelated kernel commits are not silently included in this evidence.
+
+Initial I/O guest logs failed or timed out in earlier workqueue/worker tests
+before I/O ran. Preserve `/tmp/vinix-linuxkpi-iowait-{vm,sse-vm,trace-sse-vm,final-vm,worker-trace-vm}/serial.log`
+as failures. Diagnostics identified a bound self-free completion watchdog,
+whose later completion did not change its failed result. The reviewed normal
+run took about 120 seconds including ISO preparation. Final runs used the
+harness's explicit `--timeout 300`; every 500-tick callback check remains intact.
+An earlier identical-runtime ELF also passes both long-budget guests at
+`/tmp/vinix-linuxkpi-iowait-long-{normal,sse}-vm/serial.log`. These checks do not
+establish a cause for every preceding intermittent failure.
+
+Independent I/O backend/host/native and diagnostic lifetime reviews approved.
+Generated V code has no allocation/string-conversion markers in the nine new
+scheduler/bridge/route functions or measured locals:
+`/tmp/vinix-linuxkpi-iowait-generatedc-review.json`. Thread-layout comparison
+keeps size 11,256, alignment 8 and every old offset unchanged; the new token is
+at offset 140. The fresh allocation baseline after unrelated kernel changes
+is **418 sites / 184 groups / 155 existing failures**, matched exactly by the
+I/O overlay (`/tmp/vinix-linuxkpi-iowait-alloc-comparison.json`). The older
+425-site result below describes earlier baselines. The I/O syntax audit still
+passes 1/269, and import verification still checks all 7,668 unchanged files.
+
 The corrected allocation gate reports the same baseline and feature results:
 ARM **293 source files / 361 sites**, x86 **224 files / 253 sites**, combined
 **425 unique sites / 182 file-kind groups / 155 pre-existing failures**.
@@ -470,6 +528,19 @@ Earlier logs remain `/tmp/vinix-linuxkpi-bound-perf-ops-churn-cache-rerun.log`,
 `/tmp/vinix-linuxkpi-bound-perf-idle-apps-drag.log` and
 `/tmp/vinix-linuxkpi-bound-perf-retained-summary.json`. Do not claim the whole
 kernel is leak-free; per-feature page recovery is a separate measured result.
+
+The newer isolated ARM I/O-disabled build also completed desktop idle/apps/drag
+with DONE and no panic: `/tmp/vinix-linuxkpi-iowait-perf-idle-apps-drag.log`.
+Physical usage was 65.5/146.3/104.6 MiB. Its initial ops/churn/cache harness
+returned zero at its deadline with incomplete reports and no DONE; that is
+**incomplete validation**, not a pass. A fresh retry with a longer overall
+deadline is running at `/tmp/vinix-linuxkpi-iowait-perf-retry-ops-churn-cache.log`.
+The measured ARM ELF is `f449c95e7ef242a2b794b6f883e262ed84da18bdc4f1e54cb8c6cfc8d848ebf4`;
+boot-disk identity and unchanged source/generated-C/ELF/desktop are recorded
+in `/tmp/vinix-linuxkpi-iowait-perf-validation.json`. Existing proc/readdir and
+program-churn retention remains. Seventy changed and 26 added kernel paths
+separate this baseline from the older SRCU performance build, so differences
+do not establish an I/O-induced regression or improvement.
 
 ## Repeatable commands and build isolation
 
@@ -570,7 +641,7 @@ there; preserve known baselines and clearly scope feature-specific evidence.
 
 ## Remaining path to completion
 
-1. Remaining synchronization (ordinary RCU and I/O waits), SMP/context,
+1. Remaining synchronization (ordinary RCU and I/O mutex wrappers), SMP/context,
    additional system workqueues and timer interfaces.
 2. Linux device/PCI registration/configuration/removal and devres ownership.
 3. MMIO cache attributes, DMA/SG, page/shmem, GPU address spaces and TTM/GEM.
