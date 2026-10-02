@@ -1,7 +1,7 @@
 # Linux i915 next-session handoff
 
 Prepared 2026-10-02 for `/Users/alex/code/vinix`, on macOS ARM64 with zsh.
-Committed implementation baseline: **`57a5cc18`** (including native I/O waits). Recheck HEAD and the worktree before
+Committed implementation baseline: **`ddd1d9f4`** (including plain native object caches). Recheck HEAD and the worktree before
 starting; other sessions use this checkout. The main status document is
 [linux-i915.md](linux-i915.md).
 
@@ -55,14 +55,18 @@ four-active-agent limit including root. SRCU is now committed and tested in
 fresh normal/SSE guests. Native Wait-Die/Wound-Wait mutexes are also committed
 and tested. Bit/variable waits are also committed and tested in fresh native
 normal/SSE guests. Genuine scheduler I/O-wait accounting is also committed.
-Plain object caches, further header integration and validation-harness fixes
-are the current continuation work; inspect HEAD and owned diffs before
-assuming those changes are integrated.
+Plain native object caches and the integer/DRM helper include fixes are also
+committed and validated. The allocation harness now rejects incomplete
+reports. Task-flag ownership and sequence counters are the current continuation
+work; inspect HEAD and owned diffs before assuming they are integrated.
 
 ## Committed progress
 
 | Commit | Completed runtime change |
 | --- | --- |
+| `ddd1d9f4` | Packed native object caches, constructor/reuse semantics, atomic allocation, shrink and teardown |
+| `e29bcc4d` | Original integer helpers and standalone unchanged DRM color LUT dependencies/tests |
+| `e4c5ffc4` | Complete allocation/desktop report coverage, completion and console-drain verification |
 | `57a5cc18` | Native I/O intent scopes, blocked-CPU accounting, bit-I/O actions and wake/migration/exit cleanup |
 | `41bd6faf` | Workqueue failure reasons and opt-in worker/keyed-wait traces, preserving callback deadlines |
 | `a15be8d3` | Host keyed-wait collisions selected across arbitrary address layouts |
@@ -549,6 +553,31 @@ LinuxKPI I/O APIs. Existing proc/readdir and
 program-churn retention remains. Seventy changed and 26 added kernel paths
 separate this baseline from the older SRCU performance build, so differences
 do not establish an I/O-induced regression or improvement.
+
+The cache feature was tested in fresh detached worktrees at `e29bcc4d` plus
+its eight-path kernel overlay, including the later native page-fill optimization
+and ext2 commits. The enabled ELF SHA256 is
+`f5fefb21858cc7d80dd8aa3ef06c203da6c7d84cd4d46b20ea602ca69a8ed93e`.
+Fresh normal/SSE guests pass all markers, including exact page recovery after
+three cache warmups and a measured fourth batch:
+`/tmp/vinix-linuxkpi-cache-{vm,sse-vm}/serial.log`. Default x86 startup passes
+at `/tmp/vinix-linuxkpi-cache-default-vm/serial.log`; enabled/default x86 and
+ARM-disabled builds pass. Full final host ASan/UBSan and strict helper probes
+pass at `/tmp/vinix-linuxkpi-cache-host-boundaries-final.log`.
+
+Native caches retain empty backing slabs for reuse until explicit shrink or
+quiescent destruction. Only flags zero and `SLAB_HWCACHE_ALIGN` are accepted;
+RCU-safe, reclaim-accounted and other nonzero modes remain unsupported. This
+is not the allocator needed by i915's three RCU/reclaim-dependent caches.
+Backend and fixtures have independent lifetime approval; private generated-C
+review finds no hidden allocation in the added measurement locals. The fresh
+equal-source allocation gate baseline/feature logs are byte-identical:
+416 sites / 184 groups / 155 existing failures, both gate exits 1, ARM V exit
+0 and x86 V exit 1. Evidence is `/tmp/vinix-linuxkpi-cache-{alloc-comparison,
+generatedc-review,independent-lifetime-review}.json`. The full unchanged i915
+syntax audit still passes only 1/269; the include fixes expose later errors
+rather than a working driver. `/tmp/vinix-linuxkpi-cache-audit.log` and
+`/tmp/vinix-linuxkpi-cache-i915-audit.json` preserve the diagnostics.
 
 ## Repeatable commands and build isolation
 
