@@ -53,6 +53,16 @@ def install(source: Path, target: Path) -> None:
     shutil.copy2(source, target)
 
 
+def trim_runtime(root: Path) -> None:
+    # Xvfb/SDL and the game supply their own graphics and UI assets.
+    for relative in ("usr/lib/i386-linux-gnu", "lib/i386-linux-gnu",
+                     "usr/lib/x86_64-linux-gnu/dri", "usr/share/doc",
+                     "usr/share/man", "usr/share/locale", "usr/share/icons"):
+        path = root / relative
+        if path.exists():
+            shutil.rmtree(path)
+
+
 def refresh_runtime(args, root: Path) -> None:
     relative = "usr/libexec/vinix-dota2/root"
     source = args.base_root / relative
@@ -66,13 +76,7 @@ def refresh_runtime(args, root: Path) -> None:
         subprocess.run(["cp", "-cRp", str(source), str(pending)], check=True)
     else:
         shutil.copytree(source, pending, symlinks=True)
-    # Keep only the translated Linux64 client and Vulkan renderer closure.
-    for relative in ("usr/lib/i386-linux-gnu", "lib/i386-linux-gnu",
-                     "usr/lib/x86_64-linux-gnu/dri", "usr/share/doc",
-                     "usr/share/man", "usr/share/locale"):
-        path = pending / relative
-        if path.exists():
-            shutil.rmtree(path)
+    trim_runtime(pending)
     if target.exists():
         shutil.rmtree(target)
     pending.rename(target)
@@ -137,6 +141,7 @@ def prepare(args, work: Path) -> tuple[Path, Path]:
         else:
             shutil.copytree(args.base_root, root, symlinks=True)
     refresh_runtime(args, root)
+    trim_runtime(root / "usr/libexec/vinix-dota2/root")
     for name in ("sh", "cat", "mkdir", "chmod", "sleep", "kill", "tail", "uname",
                  "mount", "od", "tr", "ps", "grep", "ln", "ls", "readlink", "date"):
         target = root / "bin" / name
