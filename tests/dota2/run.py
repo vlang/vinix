@@ -432,7 +432,7 @@ def main() -> None:
                             marker = next((value for value in (
                                 b"VINIX-DOTA2-PROBE-FAIL", b"VINIX-DOTA2-GAME-EXIT:",
                                 b"VINIX-DOTA2-GAME-GONE", b"KERNEL PANIC", b"FATAL EXCEPTION",
-                                b"uncaught target signal", b"LLVM ERROR:",
+                                b"uncaught target signal", b"LLVM ERROR:", b"lwip: assertion",
                             ) if value in tail), None)
                             if marker and failure is None:
                                 failure = marker.decode()
