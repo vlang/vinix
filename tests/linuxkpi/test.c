@@ -207,7 +207,7 @@ static void *task_worker(void *argument)
     model.exiting = true;
     assert(current->flags & PF_EXITING);
     model.exiting = false;
-    assert(!current->flags);
+    assert(current->flags == PF_EXITING);
     resched_pending = true;
     preempt_disable();
     assert(need_resched() && !cond_resched() && need_resched());
@@ -1031,6 +1031,7 @@ static void reference_tests(void)
 #include "wait_bit_test.h"
 #include "io_test.h"
 #include "cache_test.h"
+#include "task_flag_test.h"
 
 int main(void)
 {
@@ -1053,6 +1054,7 @@ int main(void)
     raw_lock_tests();
     percpu_tests();
     task_tests();
+    task_flag_tests();
     task_wait_tests();
     sync_tests();
     ww_mutex_tests();

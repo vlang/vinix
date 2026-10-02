@@ -5,6 +5,7 @@
 #include <linux/list.h>
 #include <linux/spinlock_types.h>
 #include <linux/lockdep_types.h>
+#include <asm/current.h>
 
 /* Ordinary non-RT mutex layout, also reused by native ww_mutex.
  * Optimistic spinning is not implemented. */

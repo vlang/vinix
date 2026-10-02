@@ -1,14 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
-/* The host's legacy structs are unrelated to the kernel's timespec64 API. */
-#undef CLOCKS_PER_SEC
-#undef CLOCK_REALTIME
-#undef CLOCK_MONOTONIC
-#undef CLOCK_PROCESS_CPUTIME_ID
-#undef CLOCK_THREAD_CPUTIME_ID
-#undef CLOCK_MONOTONIC_RAW
-#undef CLOCK_REALTIME_COARSE
-#undef CLOCK_MONOTONIC_COARSE
-#undef TIMER_ABSTIME
+/* host_types.h normalizes clock macros before the first Linux sched/ktime
+ * include. Legacy struct names remain separate from libc's host ABI. */
 #define timespec vinix_linux_timespec
 #define timeval vinix_linux_timeval
 #define itimerspec vinix_linux_itimerspec

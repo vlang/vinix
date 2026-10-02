@@ -4,12 +4,14 @@
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/limits.h>
+#include <linux/ktime.h>
 #include <linux/preempt.h>
 #include <linux/spinlock_types_raw.h>
 #include <asm/current.h>
 #include <vinix/runtime.h>
 
 #define TASK_COMM_LEN 16
+#define PF_VCPU 0x00000001
 #define PF_EXITING 0x00000004
 #define TASK_RUNNING 0x00000000
 #define TASK_INTERRUPTIBLE 0x00000001

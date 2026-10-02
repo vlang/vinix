@@ -24,7 +24,7 @@ ${CC:-clang} -std=gnu11 -O1 -g -fwrapv -fno-strict-aliasing -Wall -Wextra -Werro
 # Each translation unit keeps its public Linux/DRM header first. Building
 # separately catches missing transitive includes that the runtime test's
 # broader include list would conceal.
-for helper in helper_kernel helper_drm_color; do
+for helper in helper_kernel helper_drm_color task_header_sched task_header_ww; do
     ${CC:-clang} -std=gnu11 -O1 -g -fwrapv -fno-strict-aliasing -Wall -Wextra -Werror -Wno-unused-parameter \
         -fsanitize=address,undefined -fno-omit-frame-pointer \
         -DVINIX_LINUXKPI -DVINIX_LINUXKPI_HOST_TEST -D__KERNEL__ \

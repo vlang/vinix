@@ -9,6 +9,7 @@
 #include <linux/smp.h>
 #include <linux/spinlock.h>
 #include <linux/string.h>
+#include <linux/vtime.h>
 
 /* Must match proc.Thread.linuxkpi_task, an aligned, zeroed 64-byte buffer.
  * No allocation or independent lifetime: retained references pin its owner. */
@@ -54,7 +55,10 @@ void *vinix_linuxkpi_task_view(void *storage, void *thread, int pid, int tgid,
     /* IDs are immutable after construction; a retained view never needs to
      * read a process that could already have been destroyed. */
     BUG_ON(task->pid != pid || task->tgid != tgid);
-    __atomic_store_n(&task->flags, exiting ? PF_EXITING : 0, __ATOMIC_RELAXED);
+    /* Linux task flags belong to the task, not this native name/ID refresh.
+     * Exit is terminal: a late non-exiting native snapshot must not erase it
+     * or flags set by unchanged driver inlines. */
+    if (exiting) __atomic_fetch_or(&task->flags, PF_EXITING, __ATOMIC_RELAXED);
     if (length) copy_comm(task->comm, name, length);
     else memcpy(task->comm, task->vinix_initial_comm, TASK_COMM_LEN);
     return task;
@@ -65,7 +69,7 @@ void vinix_linuxkpi_task_dead(void *storage)
     struct task_struct *task = storage;
     unsigned long flags;
     raw_spin_lock_irqsave(&task->vinix_wait_lock, flags);
-    __atomic_store_n(&task->flags, PF_EXITING, __ATOMIC_RELAXED);
+    __atomic_fetch_or(&task->flags, PF_EXITING, __ATOMIC_RELAXED);
     __atomic_store_n(&task->__state, TASK_DEAD, __ATOMIC_RELEASE);
     raw_spin_unlock_irqrestore(&task->vinix_wait_lock, flags);
 }
@@ -137,7 +141,10 @@ int wake_up_state(struct task_struct *task, unsigned int state)
             /* Exiting concurrently is legitimate; a full native run queue
              * must fail explicitly rather than silently losing this wake. */
             BUG_ON(!vinix_linuxkpi_task_is_dead(task->vinix_thread));
-            __atomic_store_n(&task->__state, TASK_DEAD, __ATOMIC_RELAXED);
+            /* Native death can precede task_dead obtaining our wait lock.
+             * Every acquired TASK_DEAD publication also exposes EXITING. */
+            __atomic_fetch_or(&task->flags, PF_EXITING, __ATOMIC_RELAXED);
+            __atomic_store_n(&task->__state, TASK_DEAD, __ATOMIC_RELEASE);
         }
     }
     raw_spin_unlock_irqrestore(&task->vinix_wait_lock, flags);
@@ -149,11 +156,17 @@ int wake_up_process(struct task_struct *task)
     return wake_up_state(task, TASK_NORMAL);
 }
 
+/* Exercise both an upstream-owned bit and an independent sentinel without
+ * changing task layout or allocating test records. */
+#define TASK_TEST_FLAGS (PF_VCPU | 0x40000000U)
+
 int vinix_linuxkpi_task_selftest(void)
 {
     struct task_struct *task = current;
     int pid = task_pid_nr(task), tgid = task_tgid_nr(task);
     if (!task->comm[0] || strnlen(task->comm, TASK_COMM_LEN) == TASK_COMM_LEN) return -EIO;
+    unsigned int original_flags = __atomic_fetch_or(&task->flags, TASK_TEST_FLAGS & ~PF_VCPU, __ATOMIC_RELAXED);
+    vtime_account_guest_enter();
     unsigned int cpu = get_cpu();
     int result = 0;
     if (smp_processor_id() != cpu || raw_smp_processor_id() != cpu || cond_resched()) result = -EIO;
@@ -163,6 +176,15 @@ int vinix_linuxkpi_task_selftest(void)
     vinix_linuxkpi_irq_restore(flags);
     if (cond_resched() != 1 || current != task || task_pid_nr(task) != pid ||
         task_tgid_nr(task) != tgid) result = -EIO;
+    if ((__atomic_load_n(&current->flags, __ATOMIC_RELAXED) & TASK_TEST_FLAGS) != TASK_TEST_FLAGS)
+        result = -EIO;
+    vtime_account_guest_exit();
+    if ((__atomic_load_n(&current->flags, __ATOMIC_RELAXED) & TASK_TEST_FLAGS) != (TASK_TEST_FLAGS & ~PF_VCPU))
+        result = -EIO;
+    if (original_flags & PF_VCPU) vtime_account_guest_enter();
+    /* Remove only bits introduced here; preserve terminal exit and every
+     * pre-existing current-task flag. */
+    __atomic_fetch_and(&task->flags, ~(TASK_TEST_FLAGS & ~original_flags), __ATOMIC_RELAXED);
     return result;
 }
 
@@ -181,13 +203,16 @@ static void *native_wait_worker(void *argument)
 {
     struct native_wait_test *test = argument;
     struct task_struct *task = get_task_struct(current);
+    __atomic_fetch_or(&task->flags, TASK_TEST_FLAGS & ~PF_VCPU, __ATOMIC_RELAXED);
+    vtime_account_guest_enter();
     test->task = task; /* Hand the retained reference to the controller. */
     set_current_state(TASK_UNINTERRUPTIBLE);
     __atomic_store_n(&test->phase, 1, __ATOMIC_RELEASE);
     if (test->early)
         while (__atomic_load_n(&test->phase, __ATOMIC_ACQUIRE) < 2) cond_resched();
     schedule();
-    test->result = task_is_running(task) ? 0 : -EIO;
+    test->result = task_is_running(task) && current == task &&
+        (__atomic_load_n(&task->flags, __ATOMIC_RELAXED) & TASK_TEST_FLAGS) == TASK_TEST_FLAGS ? 0 : -EIO;
     __atomic_store_n(&test->phase, 3, __ATOMIC_RELEASE);
     pthread_exit((void *)0x1234);
     return NULL;
@@ -230,7 +255,8 @@ int vinix_linuxkpi_task_native_selftest(void)
     }
     for (unsigned int i = 0; i < ARRAY_SIZE(held); i++) {
         while (__atomic_load_n(&held[i]->__state, __ATOMIC_ACQUIRE) != TASK_DEAD) cond_resched();
-        if (!(__atomic_load_n(&held[i]->flags, __ATOMIC_RELAXED) & PF_EXITING)) result = -EIO;
+        unsigned int expected = TASK_TEST_FLAGS | PF_EXITING;
+        if ((__atomic_load_n(&held[i]->flags, __ATOMIC_RELAXED) & expected) != expected) result = -EIO;
         if (get_task_struct(held[i]) != held[i]) result = -EIO;
         put_task_struct(held[i]);
         put_task_struct(held[i]); /* Last dereference: can free its native owner. */

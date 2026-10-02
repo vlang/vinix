@@ -284,9 +284,13 @@ the complete i915 source tree is not evidence that the driver runs.
   reports scheduler pins only. Linux IRQ/NMI/softirq context accounting and
   `in_interrupt`/`in_atomic` are not implemented.
 - A `current` task view embedded in the native x86 Thread, with
-  initial-namespace PID/TGID queries, a bounded name and a read-only snapshot
-  of `PF_EXITING`. Construction copies the program name; clone inherits its
-  running parent's name. Queries reflect `PR_SET_NAME`, with the copied
+  initial-namespace PID/TGID queries, a bounded name and task-owned flags.
+  Refresh preserves every Linux-owned bit, including unchanged vtime helper
+  `PF_VCPU` transitions. Native exit atomically adds sticky `PF_EXITING` before
+  release-publication of `TASK_DEAD`, including a wake that discovers death
+  during native queue admission. A stale non-exiting view cannot clear it.
+  Construction starts flags clear and copies the program name; clone inherits
+  its running parent's name with clear flags. Queries reflect `PR_SET_NAME`, with the copied
   initial name as fallback, without borrowing mutable process-name storage.
   Native unnumbered kernel threads currently report PID/TGID 0.
   Each x86 Thread reserves a 64-byte view buffer; it needs no allocation.
@@ -437,6 +441,20 @@ while retaining their task views. It checks reference saturation, ignored
 SIGTERM wakeups, dead-task wake rejection and release of every worker's native
 stacks, FPU buffer and Thread. After warming the native allocator, physical
 free pages return to the baseline.
+Task-flag tests run unchanged disabled-accounting vtime guest helpers through
+repeated current/name refreshes and yields, then verify fresh child flags and
+terminal exit preservation. Controlled host races cover stale non-exiting
+views and death between a waker's alive check and queue admission, with page
+allocation disabled. Native current tests preserve pre-existing flags, and
+70 retained exited workers keep their guest/sentinel bits through acquired
+DEAD and final release. Normal/SSE guests pass using ELF SHA256
+`e51ffd67cdaf20a418be7a7936027f3e0998e59cf01dc64d2dc21db7336383e7`
+at `/tmp/vinix-linuxkpi-taskflags-{vm,sse-vm}/serial.log`, including exact page
+recovery. Fresh enabled/default x86 and disabled ARM builds pass. Standalone
+first-header probes verify original ktime declarations through sched and
+current through ww_mutex. This supplies task flag behavior, without enabling
+virtual CPU time accounting or claiming IRQ/BH packed preemption counts.
+
 Four host workers exercise 4,000 contended mutex acquisitions, including a
 yield inside each critical section. Controlled queues check FIFO handoff,
 middle/tail cancellation, ignored ordinary signals in killable waits and

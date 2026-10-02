@@ -7,6 +7,10 @@
  * here: in_interrupt()/in_atomic() remain unavailable. The NMI query is
  * declared for unchanged SRCU inlines but remains unresolved at link time. */
 bool in_nmi(void);
+/* Exact Linux bit positions needed by unchanged vtime's disabled-accounting
+ * inlines. Native preempt_count does not encode IRQ/BH context in these bits. */
+#define SOFTIRQ_OFFSET (1UL << 8)
+#define HARDIRQ_OFFSET (1UL << 16)
 #define preempt_disable() vinix_linuxkpi_preempt_disable()
 #define preempt_enable() vinix_linuxkpi_preempt_enable()
 #define preempt_enable_no_resched() vinix_linuxkpi_preempt_enable_no_resched()
