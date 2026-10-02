@@ -1,10 +1,10 @@
-/* QEMU linux-user accepts set_robust_list but does not answer
+/* QEMU linux-user returns ENOSYS for both set_robust_list and
  * get_robust_list. Steam's 64-bit web helper calls glibc's syscall() to
  * inspect the current thread and deliberately crashes if the head is absent.
  *
- * Debian Bookworm's x86-64 glibc 2.36 registers pthread_self() + 0x2e0
- * with a 24-byte head. Keep this preload specific to translated x86-64
- * programs; the i386 client has a different pthread layout. */
+ * Debian Bookworm's x86-64 glibc 2.36 initializes a 24-byte robust-list
+ * head at pthread_self() + 0x2e0. Keep this preload specific to translated
+ * x86-64 programs; the i386 client has a different pthread layout. */
 
 extern void *dlsym(void *, const char *);
 extern void *pthread_self(void);
