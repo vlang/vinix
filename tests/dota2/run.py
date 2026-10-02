@@ -45,10 +45,37 @@ def sha256(path: Path) -> str:
 
 
 def install(source: Path, target: Path) -> None:
+    if source.resolve() == target.resolve():
+        return
     target.parent.mkdir(parents=True, exist_ok=True)
     if target.is_symlink():
         target.unlink()
     shutil.copy2(source, target)
+
+
+def refresh_runtime(args, root: Path) -> None:
+    relative = "usr/libexec/vinix-dota2/root"
+    source = args.base_root / relative
+    target = root / relative
+    stamp = ".vinix-dota2-vulkan-generation"
+    generation = (source / stamp).read_text()
+    if (target / stamp).is_file() and (target / stamp).read_text() == generation:
+        return
+    pending = target.with_name(f"root-refresh-{os.getpid()}")
+    if platform.system() == "Darwin":
+        subprocess.run(["cp", "-cRp", str(source), str(pending)], check=True)
+    else:
+        shutil.copytree(source, pending, symlinks=True)
+    # Keep only the translated Linux64 client and Vulkan renderer closure.
+    for relative in ("usr/lib/i386-linux-gnu", "lib/i386-linux-gnu",
+                     "usr/lib/x86_64-linux-gnu/dri", "usr/share/doc",
+                     "usr/share/man", "usr/share/locale"):
+        path = pending / relative
+        if path.exists():
+            shutil.rmtree(path)
+    if target.exists():
+        shutil.rmtree(target)
+    pending.rename(target)
 
 
 def complete_native_closure(root: Path, binaries: list[Path]) -> None:
@@ -79,6 +106,7 @@ def verify_sdk_closure(root: Path) -> None:
     libraries = [sdk, runtime / "usr/lib/x86_64-linux-gnu",
                  runtime / "lib/x86_64-linux-gnu", runtime / "lib64"]
     queue = list(sdk.glob("*.so"))
+    queue.append(root / "home/dota2/.steam/ubuntu12_64/gldriverquery")
     seen = set()
     missing = set()
     while queue:
@@ -108,6 +136,7 @@ def prepare(args, work: Path) -> tuple[Path, Path]:
             subprocess.run(["cp", "-cRp", str(args.base_root), str(root)], check=True)
         else:
             shutil.copytree(args.base_root, root, symlinks=True)
+    refresh_runtime(args, root)
     for name in ("sh", "cat", "mkdir", "chmod", "sleep", "kill", "tail", "uname",
                  "mount", "od", "tr", "ps", "grep", "ln", "ls", "readlink", "date"):
         target = root / "bin" / name
@@ -132,6 +161,7 @@ def prepare(args, work: Path) -> tuple[Path, Path]:
         if ident != b"\x7fELF\x02\x01\x01":
             raise SystemExit(f"Expected Valve's actual Linux64 library: {source}")
         install(source, root / "home/dota2/.steam/sdk64" / name)
+    install(args.gldriverquery, root / "home/dota2/.steam/ubuntu12_64/gldriverquery")
     verify_sdk_closure(root)
     game_environment = {
         "HOME": "/home/dota2", "XDG_RUNTIME_DIR": "/run/user/0", "VALVE_TESTMODE": "1",
@@ -223,6 +253,8 @@ def main() -> None:
                         default=REPO / "build-support/xorg-server/vinix-wine-host.c")
     parser.add_argument("--steamclient", type=Path,
                         default=REPO / "build-aarch64-steam/preseed-home/.local/share/Steam/steamrt64")
+    parser.add_argument("--gldriverquery", type=Path,
+                        default=REPO / "build-aarch64-steam/preseed-home/.local/share/Steam/ubuntu12_64/gldriverquery")
     parser.add_argument("--export-state", type=Path, default=REPO / "build/dota2/linux-export")
     parser.add_argument("--kernel-dir", type=Path, default=REPO / "kernel")
     parser.add_argument("--game-env", action="append", default=[], metavar="NAME=VALUE")
@@ -233,7 +265,8 @@ def main() -> None:
     args = parser.parse_args()
     if args.timeout <= 0 or args.capture_interval <= 0:
         parser.error("Timeout and capture interval must be positive")
-    for name in ("base_root", "work", "desktop", "host_source", "steamclient", "export_state", "kernel_dir"):
+    for name in ("base_root", "work", "desktop", "host_source", "steamclient", "gldriverquery",
+                 "export_state", "kernel_dir"):
         setattr(args, name, getattr(args, name).resolve())
     work = args.work
     work.mkdir(parents=True, exist_ok=True)
