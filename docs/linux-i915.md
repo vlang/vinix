@@ -90,7 +90,7 @@ the complete i915 source tree is not evidence that the driver runs.
   `msleep` retries early wakes, `msleep_interruptible` returns remaining
   milliseconds, and `udelay`/`ndelay` poll the real counter while answering
   native TLB shootdowns. High-resolution timers,
-  `usleep_range`, workqueues, realtime/TAI/suspend clock offsets and I/O waits
+  `usleep_range`, realtime/TAI/suspend clock offsets and I/O waits
   remain unimplemented.
 - Unmodified Linux `timer.h` and its `timer_list` layout support static,
   dynamic and stack initialization, pending queries, `add_timer`, `mod_timer`,
@@ -114,6 +114,29 @@ the complete i915 source tree is not evidence that the driver runs.
   remain pending. Unsupported initialization flags fail explicitly.
   All callbacks currently share one worker, so timer throughput and placement
   differ from Linux's per-CPU timer wheels.
+- Unmodified Linux `workqueue.h`, `work_struct`, static/stack initialization
+  and explicit `alloc_ordered_workqueue(..., 0)` queues. Each queue owns one
+  native worker; FIFO callbacks can sleep, requeue themselves or free their
+  detached work item. A running item cannot overlap itself after migration
+  to another ordered queue. Enqueueing and waiting need no extra allocation.
+  `queue_work`, nonblocking/synchronous cancellation, `work_busy`,
+  `current_work`, work/queue flushing, draining and destruction have native
+  implementations. Stack flush barriers preserve the queueing boundary;
+  flushing a queued item also retains an earlier running instance when
+  cancellation removes the queued copy. Synchronous cancellation suppresses
+  self-requeueing until the running callback ends. Drain/destruction allow
+  callback chaining and wait for the queue to empty; destruction then joins
+  its worker and releases its retained task before freeing the queue.
+  Callers must stop external producers and concurrent API users before
+  freeing a work item or destroying its queue, keep the queue alive throughout
+  cancellation/flushing, and avoid holding locks needed by its callbacks.
+  Waiting for the current callback or flushing/draining its own ordered
+  queue fails explicitly. Concurrent/per-CPU/system queues, delayed/RCU work,
+  CPU placement, priority, reclaim rescuers, freezer support and attribute
+  changes remain pending. Unsupported allocation flags/modes return `NULL`;
+  explicit CPU queueing returns false with a warning. This first backend
+  covers i915's ordinary ordered queues, while its unordered and high-priority
+  flip queues still need implementations.
 - Static `DEFINE_PER_CPU` variables preserve their initializers and alignment
   in a separate copy for every boot CPU. Dynamic `alloc_percpu`,
   `alloc_percpu_gfp` and `free_percpu` use zeroed, aligned slots, with checked
@@ -278,6 +301,22 @@ four batches of four workers, each using 12 stack timers that rearm four times,
 alternating ordinary and IRQSAFE callbacks. Synchronous shutdown precedes
 stack exit; after warmup, the measured batch returns every physical page.
 
+Workqueue host tests cover FIFO execution with a sleeping callback, duplicate
+queueing, pending cancellation, callback chaining, and flush boundaries that
+exclude later submissions. Controlled running callbacks test synchronous
+cancellation suppressing self-requeueing, migration without overlap, and
+flushing a canceled queued instance while an older callback still runs.
+Two hundred callbacks free their own work item under ASan; four producers
+perform 4,000 shared-item enqueue/cancel cycles across two queues. Fifty
+queue creation/destruction cycles verify worker exit and retained-page counts;
+unsupported modes and allocation failure are checked too. Four-CPU native
+tests run four batches of four ordered workers, checking FIFO cancellation,
+sleeping callbacks, eight-instance chains, self-freeing callbacks and complete
+queue/worker teardown. The measured batch restores its physical-page baseline.
+Native thread-test baselines require 50 ms of stable free pages while yielding
+and reaping warmup workers, with a one-second bound. The measured batch still
+must return exactly to that baseline; a mismatch prints both byte counts.
+
 An enabled kernel runs the allocator/list/sort/tree/IRQ-lock tests 200 times
 and verifies that the physical free-page count returns to its initial value.
 The same repeated test also checks raw locks, bit searches, byte-order helpers,
@@ -329,7 +368,8 @@ runtime subsystems:
 2. MMIO mapping with correct cache attributes, DMA/scatter-gather APIs,
    page/shmem management, GPU address spaces and TTM/GEM memory management.
 3. Remaining lock/wait variants (including wound/wait mutexes and I/O waits),
-   workqueues, remaining timer modes, high-resolution timers and RCU lifetime
+   concurrent/system/delayed workqueues, remaining timer modes,
+   high-resolution timers and RCU lifetime
    rules.
 4. Linux IRQ registration, interrupt synchronization and safe GPU reset paths.
 5. C DRM core integration, device nodes, file ownership, ioctl/mmap handling,

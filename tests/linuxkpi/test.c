@@ -50,6 +50,7 @@ struct native_task_model {
     unsigned int yields;
     unsigned int pins;
     bool dead, queued;
+    bool heap_owned;
     pthread_mutex_t queue_lock;
     pthread_cond_t queue_changed;
     unsigned int iteration, dequeued, parked;
@@ -68,7 +69,13 @@ void vinix_linuxkpi_task_get(void *thread)
 void vinix_linuxkpi_task_put(void *thread)
 {
     struct native_task_model *task = thread;
-    assert(__atomic_fetch_sub(&task->pins, 1, __ATOMIC_ACQ_REL) != 0);
+    unsigned int pins = __atomic_fetch_sub(&task->pins, 1, __ATOMIC_ACQ_REL);
+    assert(pins != 0);
+    if (pins == 1 && task->heap_owned && __atomic_load_n(&task->dead, __ATOMIC_ACQUIRE)) {
+        assert(!pthread_mutex_destroy(&task->queue_lock));
+        assert(!pthread_cond_destroy(&task->queue_changed));
+        free(task);
+    }
 }
 bool vinix_linuxkpi_task_is_dead(const void *thread)
 {
@@ -284,19 +291,18 @@ static void task_tests(void)
 
 void *vinix_linuxkpi_alloc_pages(size_t pages, bool reclaim)
 {
-    last_reclaim = reclaim;
+    __atomic_store_n(&last_reclaim, reclaim, __ATOMIC_RELAXED);
     if (fail_allocation) return NULL;
     void *ptr = NULL;
     if (posix_memalign(&ptr, 4096, pages * 4096)) return NULL;
     memset(ptr, 0xa5, pages * 4096);
-    live_pages += pages;
+    __atomic_fetch_add(&live_pages, pages, __ATOMIC_RELAXED);
     return ptr;
 }
 
 void vinix_linuxkpi_free_pages(void *base, size_t pages)
 {
-    assert(live_pages >= pages);
-    live_pages -= pages;
+    assert(__atomic_fetch_sub(&live_pages, pages, __ATOMIC_RELAXED) >= pages);
     free(base);
 }
 
@@ -973,6 +979,7 @@ static void reference_tests(void)
 #include "sync_test.h"
 #include "time_test.h"
 #include "timer_test.h"
+#include "workqueue_test.h"
 
 int main(void)
 {
@@ -997,6 +1004,7 @@ int main(void)
     sync_tests();
     time_tests();
     timer_tests();
+    workqueue_tests();
     list_tests();
     tree_tests();
     concurrency_tests();
@@ -1004,6 +1012,6 @@ int main(void)
     reference_tests();
     vinix_linuxkpi_percpu_destroy_for_test();
     assert(live_pages == 0);
-    puts("LinuxKPI: PASS (Linux helpers, allocation/OOM, strings, bitmaps, SMP/IRQ locks, per-CPU storage, task references, wake races, sleeping mutexes, queues, completions, clocks, timed waits and timer callbacks)");
+    puts("LinuxKPI: PASS (Linux helpers, allocation/OOM, strings, bitmaps, SMP/IRQ locks, per-CPU storage, task references, wake races, sleeping mutexes, queues, completions, clocks, timed waits, timer callbacks and ordered workqueues)");
     return 0;
 }

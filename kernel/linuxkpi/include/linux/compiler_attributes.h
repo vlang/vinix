@@ -14,4 +14,11 @@
 #undef static_assert
 #endif
 #include_next <linux/compiler_attributes.h>
+#if defined(VINIX_LINUXKPI_HOST_TEST) && defined(__APPLE__)
+/* The Mach-O test executable has no Linux linker script or init-section
+ * reclamation. Keep ordinary code/data placement there; the per-CPU template
+ * has its own real host section. Native kernel section attributes are intact. */
+#undef __section
+#define __section(name)
+#endif
 #endif

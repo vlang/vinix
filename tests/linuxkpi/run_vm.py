@@ -19,6 +19,7 @@ MARKERS = [
     "linuxkpi: sleeping mutexes, wait queues and completions passed on 4 workers; no pages retained",
     "linuxkpi: monotonic clocks and timed task/queue/completion waits passed on 4 workers; no pages retained",
     "linuxkpi: timer callbacks, IRQSAFE, self-rearm and synchronous shutdown passed on 4 workers; no pages retained",
+    "linuxkpi: ordered workqueues, sleeping callbacks, cancellation, flush and teardown passed on 4 workers; no pages retained",
     "linuxkpi: scheduler deferred preemption while IRQs stayed enabled",
     "and FPU preservation passed",
     "LINUXKPI GUEST: PASS",
@@ -77,7 +78,7 @@ def main():
                     if args.no_linuxkpi and "linuxkpi:" in output:
                         raise RuntimeError("API layer unexpectedly enabled; see " + str(serial))
                     print("Default guest: PASS (4 CPUs, Linux ABI)" if args.no_linuxkpi else
-                          "LinuxKPI guest: PASS (4 CPUs, allocator, locks, per-CPU storage, task waits/references, synchronization, clocks/timed waits, scheduler, i915 copy/FPU)")
+                          "LinuxKPI guest: PASS (4 CPUs, allocator, locks, per-CPU storage, task waits/references, synchronization, clocks/timed waits, timers, ordered workqueues, scheduler, i915 copy/FPU)")
                     print("Serial log: " + str(serial))
                     return 0
                 if process.poll() is not None:

@@ -352,7 +352,35 @@ fn C.vinix_linuxkpi_time_native_selftest() int
 fn C.vinix_linuxkpi_timer_bootstrap() int
 fn C.vinix_linuxkpi_timer_selftest() int
 fn C.vinix_linuxkpi_timer_native_selftest() int
+fn C.vinix_linuxkpi_workqueue_native_selftest() int
 fn C.vinix_linuxkpi_percpu_bootstrap(u32) int
+
+// join/TASK_DEAD can precede the final switch away and scheduler reaping.
+// Taking a baseline immediately after warmup can count those dying stacks,
+// then report a mismatch when the measured run returns more pages than that
+// baseline. Require a stable count while giving every CPU time to reap.
+fn selftest_free_baseline() u64 {
+	started := hpet_clock.nanoseconds()
+	mut stable_since := started
+	mut free := memory.free_bytes()
+	for {
+		sched.reap_deferred()
+		sched.reschedule()
+		now := hpet_clock.nanoseconds()
+		next := memory.free_bytes()
+		if next != free {
+			free = next
+			stable_since = now
+		}
+		if now - stable_since >= 50000000 {
+			return free
+		}
+		if now - started >= 1000000000 {
+			lib.kpanic(unsafe { nil }, c'Linux self-test free-page baseline did not settle')
+		}
+	}
+	return free
+}
 
 pub fn initialise() {
 	$if linuxkpi ? {
@@ -408,7 +436,7 @@ pub fn initialise() {
 				lib.kpanic(unsafe { nil }, c'Linux task wait/reference self-test failed')
 			}
 		}
-		task_before := memory.free_bytes()
+		task_before := selftest_free_baseline()
 		if C.vinix_linuxkpi_task_native_selftest() != 0 {
 			lib.kpanic(unsafe { nil }, c'Linux task wait/reference self-test failed')
 		}
@@ -420,6 +448,7 @@ pub fn initialise() {
 			sched.reschedule()
 		}
 		if memory.free_bytes() != task_before {
+			C.kprintf(c'linuxkpi: task free-byte baseline=%llu after=%llu\n', task_before, memory.free_bytes())
 			lib.kpanic(unsafe { nil }, c'Linux task self-test retained native pages')
 		}
 		C.kprintf(c'linuxkpi: blocking wakeups, join/detach and 70 retained exited tasks passed; no pages retained\n')
@@ -428,7 +457,7 @@ pub fn initialise() {
 				lib.kpanic(unsafe { nil }, c'Linux synchronization self-test failed')
 			}
 		}
-		sync_before := memory.free_bytes()
+		sync_before := selftest_free_baseline()
 		if C.vinix_linuxkpi_sync_native_selftest() != 0 {
 			lib.kpanic(unsafe { nil }, c'Linux synchronization self-test failed')
 		}
@@ -438,6 +467,7 @@ pub fn initialise() {
 			sched.reschedule()
 		}
 		if memory.free_bytes() != sync_before {
+			C.kprintf(c'linuxkpi: sync free-byte baseline=%llu after=%llu\n', sync_before, memory.free_bytes())
 			lib.kpanic(unsafe { nil }, c'Linux synchronization self-test retained native pages')
 		}
 		C.kprintf(c'linuxkpi: sleeping mutexes, wait queues and completions passed on 4 workers; no pages retained\n')
@@ -446,7 +476,7 @@ pub fn initialise() {
 				lib.kpanic(unsafe { nil }, c'Linux timed-wait self-test failed')
 			}
 		}
-		time_before := memory.free_bytes()
+		time_before := selftest_free_baseline()
 		if C.vinix_linuxkpi_time_native_selftest() != 0 {
 			lib.kpanic(unsafe { nil }, c'Linux timed-wait self-test failed')
 		}
@@ -456,6 +486,7 @@ pub fn initialise() {
 			sched.reschedule()
 		}
 		if memory.free_bytes() != time_before {
+			C.kprintf(c'linuxkpi: time free-byte baseline=%llu after=%llu\n', time_before, memory.free_bytes())
 			lib.kpanic(unsafe { nil }, c'Linux timed-wait self-test retained native pages')
 		}
 		C.kprintf(c'linuxkpi: monotonic clocks and timed task/queue/completion waits passed on 4 workers; no pages retained\n')
@@ -464,7 +495,7 @@ pub fn initialise() {
 				lib.kpanic(unsafe { nil }, c'Linux timer callback self-test failed')
 			}
 		}
-		timer_before := memory.free_bytes()
+		timer_before := selftest_free_baseline()
 		if C.vinix_linuxkpi_timer_native_selftest() != 0 {
 			lib.kpanic(unsafe { nil }, c'Linux timer callback self-test failed')
 		}
@@ -474,9 +505,29 @@ pub fn initialise() {
 			sched.reschedule()
 		}
 		if memory.free_bytes() != timer_before {
+			C.kprintf(c'linuxkpi: timer free-byte baseline=%llu after=%llu\n', timer_before, memory.free_bytes())
 			lib.kpanic(unsafe { nil }, c'Linux timer callback self-test retained native pages')
 		}
 		C.kprintf(c'linuxkpi: timer callbacks, IRQSAFE, self-rearm and synchronous shutdown passed on 4 workers; no pages retained\n')
+		for _ in 0 .. 3 {
+			if C.vinix_linuxkpi_workqueue_native_selftest() != 0 {
+				lib.kpanic(unsafe { nil }, c'Linux ordered workqueue self-test failed')
+			}
+		}
+		work_before := selftest_free_baseline()
+		if C.vinix_linuxkpi_workqueue_native_selftest() != 0 {
+			lib.kpanic(unsafe { nil }, c'Linux ordered workqueue self-test failed')
+		}
+		work_reap_start := hpet_clock.nanoseconds()
+		for memory.free_bytes() != work_before && hpet_clock.nanoseconds() - work_reap_start < 1000000000 {
+			sched.reap_deferred()
+			sched.reschedule()
+		}
+		if memory.free_bytes() != work_before {
+			C.kprintf(c'linuxkpi: work free-byte baseline=%llu after=%llu\n', work_before, memory.free_bytes())
+			lib.kpanic(unsafe { nil }, c'Linux ordered workqueue self-test retained native pages')
+		}
+		C.kprintf(c'linuxkpi: ordered workqueues, sleeping callbacks, cancellation, flush and teardown passed on 4 workers; no pages retained\n')
 		// Exercise a real scheduler interrupt with preemption disabled and
 		// IRQs still enabled, rather than relying only on host lock tests.
 		preempt_disable()

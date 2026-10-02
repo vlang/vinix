@@ -15,7 +15,7 @@ ${CC:-clang} -std=gnu11 -O1 -g -fwrapv -fno-strict-aliasing -Wall -Wextra -Werro
     "$repo/kernel/c/linuxkpi.c" "$repo/kernel/c/linuxkpi_refcount.c" "$repo/kernel/c/linuxkpi_string.c" \
     "$repo/kernel/c/linuxkpi_percpu.c" "$repo/kernel/c/linuxkpi_task.c" \
     "$repo/kernel/c/linuxkpi_sync.c" "$repo/kernel/c/linuxkpi_time.c" \
-    "$repo/kernel/c/linuxkpi_timer.c" "$repo/tests/linuxkpi/test.c" \
+    "$repo/kernel/c/linuxkpi_timer.c" "$repo/kernel/c/linuxkpi_workqueue.c" "$repo/tests/linuxkpi/test.c" \
     "$source_dir/lib/list_sort.c" "$source_dir/lib/sort.c" "$source_dir/lib/rbtree.c" \
     "$source_dir/lib/find_bit.c" "$source_dir/lib/hweight.c" \
     -o "$work/test"
