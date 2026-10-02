@@ -130,6 +130,28 @@ def verify_sdk_closure(root: Path) -> None:
         raise SystemExit("Private runtime lacks Steam client dependencies: " + ", ".join(sorted(missing)))
 
 
+def overlay_translator(source: Path, root: Path) -> None:
+    binary = source / "usr/bin/qemu-x86_64"
+    with binary.open("rb") as stream:
+        header = stream.read(64)
+    if (len(header) != 64 or header[:7] != b"\x7fELF\x02\x01\x01" or
+            header[18:20] != b"\xb7\x00" or not os.access(binary, os.X_OK)):
+        raise SystemExit(f"Expected an executable native ARM64 translator: {binary}")
+    # Kernel helper exec and partial-page madvise recognize this standard path.
+    install(binary, root / "usr/bin/qemu-x86_64")
+    for directory in ("lib", "usr/lib"):
+        for path in sorted((source / directory).rglob("*")):
+            target = root / path.relative_to(source)
+            if path.is_symlink():
+                target.parent.mkdir(parents=True, exist_ok=True)
+                if target.exists() or target.is_symlink():
+                    target.unlink()
+                target.symlink_to(os.readlink(path))
+            elif path.is_file():
+                install(path, target)
+    complete_native_closure(root, [root / "usr/bin/qemu-x86_64"])
+
+
 def prepare(args, work: Path) -> tuple[Path, Path]:
     root = work / "root"
     if not root.exists():
@@ -142,6 +164,8 @@ def prepare(args, work: Path) -> tuple[Path, Path]:
             shutil.copytree(args.base_root, root, symlinks=True)
     refresh_runtime(args, root)
     trim_runtime(root / "usr/libexec/vinix-dota2/root")
+    if args.translator_staging is not None:
+        overlay_translator(args.translator_staging, root)
     for name in ("sh", "cat", "mkdir", "chmod", "sleep", "kill", "tail", "uname",
                  "mount", "od", "tr", "ps", "grep", "ln", "ls", "readlink", "date"):
         target = root / "bin" / name
@@ -267,6 +291,8 @@ def main() -> None:
                         default=REPO / "build-aarch64-steam/preseed-home/.local/share/Steam/steamrt64")
     parser.add_argument("--gldriverquery", type=Path,
                         default=REPO / "build-aarch64-steam/preseed-home/.local/share/Steam/ubuntu12_64/gldriverquery")
+    parser.add_argument("--translator-staging", type=Path,
+                        help="Overlay a native translator and its libraries at the standard guest paths")
     parser.add_argument("--export-state", type=Path, default=REPO / "build/dota2/linux-export")
     parser.add_argument("--kernel-dir", type=Path, default=REPO / "kernel")
     parser.add_argument("--game-env", action="append", default=[], metavar="NAME=VALUE")
@@ -280,6 +306,8 @@ def main() -> None:
     for name in ("base_root", "work", "desktop", "host_source", "steamclient", "gldriverquery",
                  "export_state", "kernel_dir"):
         setattr(args, name, getattr(args, name).resolve())
+    if args.translator_staging is not None:
+        args.translator_staging = args.translator_staging.resolve()
     work = args.work
     work.mkdir(parents=True, exist_ok=True)
     root, archive = prepare(args, work)
@@ -378,6 +406,7 @@ def main() -> None:
         "kernel_sha256": sha256(work / "kernel/bin/vinix"),
         "desktop_sha256": sha256(root / "usr/bin/vinix-desktop"),
         "translator_sha256": sha256(root / "usr/bin/qemu-x86_64"),
+        "translator_staging": str(args.translator_staging) if args.translator_staging else None,
         "steamclient_sha256": sha256(root / "home/dota2/.steam/sdk64/steamclient.so"),
         "export_manifest_sha256": sha256(args.export_state / "manifest.json"),
         "captures": captures, "log": str(work / "vinix.log"),
