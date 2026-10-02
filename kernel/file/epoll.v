@@ -448,8 +448,19 @@ pub fn syscall_epoll_pwait(_ voidptr, epfd int, events_buf u64, maxevents int, t
 		if voidptr(timer) != unsafe { nil } {
 			ev_list << &timer.event
 		}
-
-		result := event.await(mut ev_list, true)
+		mut generations := []u64{cap: ev_list.len} @[freed]
+		for mut ev in ev_list { generations << event.generation(mut ev) }
+		// Sample before the final scan: even if another waiter consumes the
+		// wake, a readiness transition during registration cannot be missed.
+		mut ready_now := epoll_res.collect_ready(maxevents) or { []EpollEvent{} }
+		mut which := u64(-1)
+		mut interrupted := false
+		if ready_now.len == 0 {
+			which = event.await_changes(mut ev_list, generations, true) or {
+				interrupted = true
+				u64(-1)
+			}
+		}
 		for i in 0 .. watched.len {
 			mut watched_res := watched[i]
 			resource.release_resource(mut watched_res)
@@ -457,8 +468,21 @@ pub fn syscall_epoll_pwait(_ voidptr, epfd int, events_buf u64, maxevents int, t
 		unsafe {
 			watched.free()
 			ev_list.free()
+			generations.free()
 		}
-		which := result or { return errno.err, errno.eintr }
+		if ready_now.len != 0 {
+			for out_event in ready_now {
+				if !write_epoll_event(events_buf + ret * epoll_event_size, out_event) {
+					unsafe { ready_now.free() }
+					return errno.err, errno.efault
+				}
+				ret++
+			}
+			unsafe { ready_now.free() }
+			return ret, 0
+		}
+		unsafe { ready_now.free() }
+		if interrupted { return errno.err, errno.eintr }
 
 		// Readiness is read from the set as it is now; the entries may have
 		// moved while this slept.

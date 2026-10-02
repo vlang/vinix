@@ -99,11 +99,11 @@ pub fn prepare_syscall_restart(context &cpulocal.GPRState) {
 	t.restarting_syscall = true
 }
 
-// Whether `t` has a signal it does not block waiting for it, or has been told
-// to exit: what an interrupt returning to userspace sends it into the kernel
-// for.
+// An interrupt returning to userspace sends `t` into the kernel for an
+// unblocked signal, a pending exit, or a process stop that must park it.
 fn owes_async_work(t &proc.Thread) bool {
-	if katomic.load(&t.must_exit) {
+	if katomic.load(&t.must_exit) || (t.process != unsafe { nil }
+		&& katomic.load(&t.process.job_stopped)) {
 		return true
 	}
 	pending := katomic.load(&t.pending_signals)
@@ -171,6 +171,10 @@ fn bad_segment_entry() {
 fn async_signal_entry() {
 	mut t := proc.current_thread()
 	mut context := t.async_context
+	exit_if_told_to()
+	// A stopped thread can finish an IRQ's kernel frame. Park on its own
+	// stack before that frame can return to userspace again.
+	sched.park_for_cgroup()
 	exit_if_told_to()
 	dispatch_signal(&context, 0, 0, 0)
 	// Nothing was delivered after all: go back where the thread was.
@@ -477,6 +481,7 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 		// in is replaced, and before the close-on-exec descriptors go. POSIX
 		// timers do not survive an exec either.
 		kill_sibling_threads(mut process, t)
+		begin_exec_signals(mut process, t)
 		posixtimer.remove_process_timers(process)
 
 		// Close the O_CLOEXEC descriptors, as execve(2) promises. A pipe end
@@ -538,7 +543,10 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 		kernel_pagemap.switch_to()
 		t.process = kernel_process
 
-		mmap.delete_pagemap(mut old_pagemap)?
+		mmap.delete_pagemap(mut old_pagemap) or {
+			free_exec_arguments(path, argv, envp)
+			abort_exec(mut process, mut t)
+		}
 
 		process.thread_stack_top = elf.initial_stack_top()
 		process.mmap_anon_non_fixed_base = elf.initial_mmap_base()
@@ -558,15 +566,17 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 		// The program that comes out of exec has one thread, the group leader,
 		// which takes the pid as its tid. A thread other than the leader that
 		// called execve gives its own number back.
-		if t.tid != process.pid {
-			proc.free_tid(t.tid)
-		}
-
 		// The program keeps the scheduling policy of the thread that execs it,
 		// installed before the thread is enqueued: `chrt -f 50 ./program`.
 		inherited_sched := t.sched
 		mut new_thread := sched.new_user_thread(process, true, entry_point, unsafe { nil },
-			0, argv, envp, auxval, false)?
+			0, argv, envp, auxval, false) or {
+			free_exec_arguments(path, argv, envp)
+			abort_exec(mut process, mut t)
+		}
+		if t.tid != process.pid {
+			proc.free_tid(t.tid)
+		}
 		proc.set_thread_sched_params(new_thread.tid, inherited_sched)
 
 		// execve keeps the signal mask and what was ignored; only handlers,
@@ -577,7 +587,7 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 				new_thread.sigactions[i].sa_sigaction = voidptr(linux_sig_ign)
 			}
 		}
-		sched.enqueue_thread(new_thread, false)
+		finish_exec_signals(mut process, mut new_thread, t, false)
 
 		// This never returns, so the caller cannot free what the exec was
 		// handed; the path was lost with every exec.

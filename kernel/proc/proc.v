@@ -244,6 +244,19 @@ pub mut:
 	fs_lock           klock.Lock
 	event             eventstruct.Event
 	status            int
+	// Published only after group teardown; exit status zero also means a
+	// successful exit, so pidfd readiness cannot use status as its predicate.
+	exit_published bool
+	pidfd_slot int = -1
+	pidfd_cookie u64
+	exit_user_ns u64
+	pidfd_openable bool
+	// Process-directed signals wait here while exec replaces its only thread.
+	exec_transition bool
+	exec_pending_signals u64
+	// Borrowed while exec's original thread remains on its CPU. Cleared under
+	// threads_lock before the replacement is enqueued and the original dies.
+	exec_signal_thread &Thread = unsafe { nil }
 	// Set once exit_group() (or a fatal fault) has started tearing the
 	// process down, so late-arriving threads do not try to do it again.
 	exiting bool
@@ -556,6 +569,7 @@ pub fn free_pid(pid int) {
 	}
 
 	mut reaped := processes[pid]
+	if reaped != unsafe { nil } { reap_pidfd_locked(mut reaped) }
 	release_process_number(reaped)
 	processes[pid] = unsafe { nil }
 	remember_released_id(pid)

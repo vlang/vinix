@@ -34,6 +34,15 @@ fn inherited_sched_params(source &proc.Thread) proc.SchedParams {
 	return inherited
 }
 
+// Publish the identity and first runnable thread together. A signal through
+// the new pidfd may otherwise finish and free t before the creator enqueues it.
+pub fn publish_user_thread(mut process proc.Process, t &proc.Thread) {
+	proc.lock_table()
+	proc.publish_pidfd_identity_locked(mut process)
+	enqueue_thread(t, false)
+	proc.unlock_table()
+}
+
 fn attach_thread(mut process proc.Process, mut t proc.Thread) ?int {
 	return proc.attach_thread(mut process, mut t)
 }

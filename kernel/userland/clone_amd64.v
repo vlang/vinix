@@ -84,6 +84,9 @@ pub fn syscall_clone3(gpr_state voidptr, uargs u64, size u64) (u64, u64) {
 }
 
 fn do_clone(state &cpulocal.GPRState, flags u64, child_stack u64, parent_tid u64, child_tid u64, tls u64, into_cgroup bool, cgroup voidptr) (u64, u64) {
+	// Returning a PID while leaving the requested pidfd word untouched would
+	// falsely report success. Descriptor construction/rollback is unsupported.
+	if flags & clone_pidfd != 0 { return errno.err, errno.einval }
 	// The TLS pointer becomes the child's FS base. A non-canonical one would
 	// fault the kernel's own WRMSR, so it is refused as Linux refuses it.
 	if flags & clone_settls != 0 && tls >= memory.user_address_limit() {
@@ -165,7 +168,6 @@ fn clone_new_process(state &cpulocal.GPRState, flags u64, child_stack u64, paren
 	}
 
 	new_process.name = proc.process_name(old_process.name, new_process.pid)
-	new_process.executable_path = old_process.executable_path.clone()
 	new_process.exe_node = old_process.exe_node
 	fs.fork_namespaces(mut new_process, flags)
 	if into_cgroup {
@@ -242,9 +244,11 @@ fn clone_new_process(state &cpulocal.GPRState, flags u64, child_stack u64, paren
 	parent_process.children << new_process
 	parent_process.children_lock.release()
 
-	sched.enqueue_thread(new_thread, false)
+	// Another parent thread can reap the child as soon as it runs.
+	pid := proc.pid_in(new_process, viewer)
+	sched.publish_user_thread(mut new_process, new_thread)
 
-	return u64(proc.pid_in(new_process, viewer)), 0
+	return u64(pid), 0
 }
 
 // Give back a process clone_new_process() made but could not start.

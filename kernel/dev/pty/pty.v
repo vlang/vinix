@@ -12,6 +12,7 @@ import ioctl
 import katomic
 import klock
 import lib
+import posixtimer
 import proc
 import resource
 import stat
@@ -514,19 +515,31 @@ fn signal_group(pgid int, signal u8) {
 	if pgid <= 0 {
 		return
 	}
+	// Timer expiry and pidfd delivery take this before the process table.
+	// Holding the table and then clearing timer metadata in sendsig would
+	// deadlock a concurrent pidfd send or timer expiry on another CPU.
+	posixtimer.lock_signal_info()
 	proc.lock_table()
 	defer {
 		proc.unlock_table()
+		posixtimer.unlock_signal_info()
 	}
 	for pid := 1; pid < proc.max_pid; pid++ {
 		mut target := proc.process_at(pid)
 		if target == unsafe { nil } || target.pgid != pgid {
 			continue
 		}
-		target_thread := proc.get_main_thread(target)
-		if target_thread != unsafe { nil } {
-			userland.sendsig(target_thread, signal)
-			proc.unpin_thread(target_thread)
+		_, changed := userland.signal_process_locked(mut target, int(signal))
+		if changed {
+			proc.pin_process(target)
+			proc.unlock_table()
+			posixtimer.unlock_signal_info()
+			userland.notify_signal_parent(target)
+			proc.unpin_process(target)
+			// Resume the numeric scan with no old target borrowed. Releasing
+			// locks only for notifications keeps the common PTY path bounded.
+			posixtimer.lock_signal_info()
+			proc.lock_table()
 		}
 	}
 }

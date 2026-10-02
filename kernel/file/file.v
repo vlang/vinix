@@ -210,6 +210,7 @@ fn ppoll(fds &PollFD, nfds u64, tmo_p &time.TimeSpec, sigmask &u64) (u64, u64) {
 	mut fdlist := []&FD{cap: int(nfds)} @[freed]
 	mut fdnums := []u64{cap: int(nfds)} @[freed]
 	mut events := []&eventstruct.Event{cap: int(nfds) + 1} @[freed]
+	mut generations := []u64{cap: int(nfds) + 1} @[freed]
 
 	defer {
 		for mut f in fdlist {
@@ -217,6 +218,7 @@ fn ppoll(fds &PollFD, nfds u64, tmo_p &time.TimeSpec, sigmask &u64) (u64, u64) {
 		}
 		unsafe {
 			events.free()
+			generations.free()
 			fdnums.free()
 			fdlist.free()
 		}
@@ -278,7 +280,17 @@ fn ppoll(fds &PollFD, nfds u64, tmo_p &time.TimeSpec, sigmask &u64) (u64, u64) {
 	}
 
 	for {
-		which := event.await(mut events, true) or { return errno.err, errno.eintr }
+		generations.clear()
+		for mut ev in events { generations << event.generation(mut ev) }
+		// Recheck after sampling generations. Exit readiness is permanent,
+		// whereas an event's pending wake can be consumed by another poller.
+		for i in 0 .. fdlist.len {
+			mut fdd := unsafe { &fds[fdnums[i]] }
+			fdd.revents = poll_revents(fdlist[i].handle.resource.status, fdd.events)
+			if fdd.revents != 0 { ret++ }
+		}
+		if ret != 0 { return ret, 0 }
+		which := event.await_changes(mut events, generations, true) or { return errno.err, errno.eintr }
 
 		if voidptr(timer) != unsafe { nil } {
 			if which == u64(events.len) - 1 {
@@ -320,24 +332,25 @@ pub fn syscall_ppoll(_ voidptr, user_fds u64, nfds u64, user_timeout u64, user_s
 		return errno.err, errno.efault
 	}
 
-	mut timeout_storage := [time.TimeSpec{}]!
+	// Fixed-array locals escape to the heap when their elements' addresses
+	// reach another function, even through unsafe. The wait is synchronous;
+	// these explicit caller-stack slots remain live across its sleep.
+	timeout_storage := unsafe { &time.TimeSpec(C.vinix_stack_alloc(sizeof(time.TimeSpec))) }
 	mut timeout_ptr := &time.TimeSpec(unsafe { nil })
 	if user_timeout != 0 {
-		if !usercopy.copy_from_user(unsafe { voidptr(&timeout_storage[0]) }, user_timeout, sizeof(time.TimeSpec)) {
+		if !usercopy.copy_from_user(voidptr(timeout_storage), user_timeout, sizeof(time.TimeSpec)) {
 			return errno.err, errno.efault
 		}
-		// In unsafe, so that timeout stays on the stack: see getdents64.
-		timeout_ptr = unsafe { &timeout_storage[0] }
+		timeout_ptr = timeout_storage
 	}
 
-	mut sigmask_storage := [u64(0)]!
+	sigmask_storage := unsafe { &u64(C.vinix_stack_alloc(sizeof(u64))) }
 	mut sigmask_ptr := &u64(unsafe { nil })
 	if user_sigmask != 0 {
-		if !usercopy.copy_from_user(unsafe { voidptr(&sigmask_storage[0]) }, user_sigmask, sizeof(u64)) {
+		if !usercopy.copy_from_user(voidptr(sigmask_storage), user_sigmask, sizeof(u64)) {
 			return errno.err, errno.efault
 		}
-		// In unsafe, so that sigmask stays on the stack: see getdents64.
-		sigmask_ptr = unsafe { &sigmask_storage[0] }
+		sigmask_ptr = sigmask_storage
 	}
 	ret, err := poll_user_fds(pagemap, user_fds, mut pollfds, nfds, timeout_ptr, sigmask_ptr)
 	return ret, err
@@ -362,14 +375,14 @@ pub fn syscall_poll(_ voidptr, user_fds u64, nfds u64, timeout_ms u64) (u64, u64
 
 	// The C int arrives in a 64-bit register; only its low half is defined.
 	milliseconds := i64(i32(u32(timeout_ms)))
-	timeout_storage := [time.TimeSpec{
+	timeout_storage := unsafe { &time.TimeSpec(C.vinix_stack_alloc(sizeof(time.TimeSpec))) }
+	unsafe { *timeout_storage = time.TimeSpec{
 		tv_sec: milliseconds / 1000
 		tv_nsec: (milliseconds % 1000) * 1000000
-	}]!
+	} }
 	mut timeout_ptr := &time.TimeSpec(unsafe { nil })
 	if milliseconds >= 0 {
-		// In unsafe, so that timeout stays on the stack: see getdents64.
-		timeout_ptr = unsafe { &timeout_storage[0] }
+		timeout_ptr = timeout_storage
 	}
 	ret, err := poll_user_fds(pagemap, user_fds, mut pollfds, nfds, timeout_ptr, unsafe { nil })
 	return ret, err

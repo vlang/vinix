@@ -40,26 +40,25 @@ pub fn syscall_getppid(_ voidptr) (u64, u64) {
 }
 
 pub fn sendsig(_thread &proc.Thread, signal u8) {
+	if signal == 0 || signal > 64 { return }
+	mut t := unsafe { _thread }
+	if t.process != unsafe { nil } && (signal == u8(sigcont) || is_stop_signal(int(signal))) {
+		mut target := t.process
+		target.threads_lock.acquire()
+		changed := apply_job_signal_locked(mut target, int(signal))
+		if changed { proc.pin_process(target) }
+		target.threads_lock.release()
+		if changed { notify_parent(target); proc.unpin_process(target) }
+	}
+	if signal == u8(sigstop) { return }
+	sendsig_with_timer_lock(_thread, signal, false)
+}
+
+fn sendsig_with_timer_lock(_thread &proc.Thread, signal u8, timer_locked bool) {
 	mut t := unsafe { _thread }
 
 	if signal == 0 || signal > 64 {
 		return
-	}
-	// SIGCONT resumes even when blocked or ignored. SIGSTOP cannot be caught
-	// and stops every sibling, including threads which are not the recipient.
-	if signal == u8(sigcont) {
-		change_job_state(t.process, false, int(signal))
-	} else if signal == u8(sigstop) {
-		change_job_state(t.process, true, int(signal))
-		return
-	} else if is_stop_signal(int(signal)) && t.process != unsafe { nil } {
-		mut process := t.process
-		process.threads_lock.acquire()
-		for sibling in process.threads {
-			mut sibling_thread := unsafe { sibling }
-			katomic.btr(mut &sibling_thread.pending_signals, u8(sigcont - 1))
-		}
-		process.threads_lock.release()
 	}
 
 	// An ignored signal is dropped, unless the thread blocks it: as on Linux,
@@ -74,7 +73,11 @@ pub fn sendsig(_thread &proc.Thread, signal u8) {
 		return
 	}
 
-	posixtimer.clear_signal_info(mut t, int(signal))
+	if timer_locked {
+		posixtimer.acknowledge_signal_locked(mut t, int(signal))
+	} else {
+		posixtimer.clear_signal_info(mut t, int(signal))
+	}
 	katomic.bts(mut &t.pending_signals, signal - 1)
 	if t.process != unsafe { nil } {
 		notify_signalfds(t.process.pid, int(signal))
@@ -101,9 +104,88 @@ pub fn sendsig(_thread &proc.Thread, signal u8) {
 // its own pid to stop the thread that sigwait()s for it, and that thread
 // never saw it on the main thread, so the server never stopped.
 fn signal_process(mut target proc.Process, signal int) bool {
+	accepted, changed := signal_process_with_timer_lock(mut target, signal, false)
+	// The unlocked delivery path pins a changed process before dropping its
+	// thread-list lock. Locked callers retain it under the table lock instead.
+	if changed { notify_parent(&target); proc.unpin_process(&target) }
+	return accepted
+}
+
+// The caller holds signal-info and process-table locks, in that order.
+// Keep the thread list locked through delivery to exclude group teardown.
+// A true second result requires the caller to pin target under the table,
+// then notify its parent and unpin only after releasing all delivery locks.
+pub fn signal_process_locked(mut target proc.Process, signal int) (bool, bool) {
+	return signal_process_with_timer_lock(mut target, signal, true)
+}
+
+fn begin_exec_signals(mut target proc.Process, old_thread &proc.Thread) {
+	proc.lock_table()
+	target.threads_lock.acquire()
+	target.exec_transition = true
+	target.exec_pending_signals = katomic.load(&old_thread.pending_signals)
+	target.exec_signal_thread = unsafe { old_thread }
+	target.threads_lock.release()
+	proc.unlock_table()
+}
+
+// The old thread stays alive until exec's final dequeue. The replacement is
+// fully initialized before it becomes signalable or runnable, and no pidfd
+// delivery can select a thread temporarily carrying kernel_process.
+fn finish_exec_signals(mut target proc.Process, mut replacement proc.Thread,
+	old_thread &proc.Thread, trace bool) bool {
+	posixtimer.lock_signal_info()
+	proc.lock_table()
+	target.threads_lock.acquire()
+	replacement.pending_signals = target.exec_pending_signals
+		| katomic.load(&old_thread.pending_signals)
+	target.exec_pending_signals = 0
+	target.exec_transition = false
+	target.exec_signal_thread = unsafe { nil }
+	for signal := 1; signal <= 64; signal++ {
+		bit := u64(1) << (signal - 1)
+		if replacement.pending_signals & bit == 0 { continue }
+		handler := replacement.sigactions[signal].sa_sigaction
+		if replacement.masked_signals & bit == 0 && (handler == sig_ign
+			|| (handler == sig_dfl && (has_default_ignore_action(signal) || signal == sigcont))) {
+			replacement.pending_signals &= ~bit
+			continue
+		}
+		notify_signalfds(target.pid, signal)
+	}
+	mut enqueued := false
+	$if arm64 {
+		enqueued = if trace { sched.enqueue_thread_traced(&replacement, false) }
+			else { sched.enqueue_thread(&replacement, false) }
+	} $else {
+		enqueued = sched.enqueue_thread(&replacement, false)
+	}
+	target.threads_lock.release()
+	proc.unlock_table()
+	posixtimer.unlock_signal_info()
+	return enqueued
+}
+
+fn signal_process_with_timer_lock(mut target proc.Process, signal int, timer_locked bool) (bool, bool) {
 	bit := u64(1) << (signal - 1)
 	unblockable := signal == sigkill || signal == sigstop
 	target.threads_lock.acquire()
+	if timer_locked && target.exiting {
+		target.threads_lock.release()
+		return false, false
+	}
+	changed := apply_job_signal_locked(mut target, signal)
+	if changed && !timer_locked { proc.pin_process(&target) }
+	// STOP changes scheduler eligibility immediately and has no queued signal.
+	if signal == sigstop {
+		target.threads_lock.release()
+		return true, changed
+	}
+	if target.exec_transition {
+		target.exec_pending_signals |= bit
+		target.threads_lock.release()
+		return true, changed
+	}
 	mut chosen := &proc.Thread(unsafe { nil })
 	mut waiting := &proc.Thread(unsafe { nil })
 	for t in target.threads {
@@ -127,16 +209,21 @@ fn signal_process(mut target proc.Process, signal int) bool {
 	}
 	if chosen != unsafe { nil } {
 		proc.pin_thread(chosen)
+		if timer_locked {
+			// Keep claim_teardown out until delivery finishes: exit changes
+			// the final thread's Process before clearing this thread list.
+			sendsig_with_timer_lock(chosen, u8(signal), true)
+		}
 	}
 	target.threads_lock.release()
 
 	if chosen == unsafe { nil } {
-		return false
+		return false, changed
 	}
 
-	sendsig(chosen, u8(signal))
+	if !timer_locked { sendsig_with_timer_lock(chosen, u8(signal), false) }
 	proc.unpin_thread(chosen)
-	return true
+	return true, changed
 }
 
 // Send `signal` to process `pid` from inside the kernel: cgroup.kill, the death

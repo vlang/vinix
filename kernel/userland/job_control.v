@@ -13,10 +13,8 @@ fn is_stop_signal(signal int) bool {
 // STOP and CONT cancel their opposite pending dispositions in every sibling.
 // Stopping uses scheduler eligibility, never a thread's exit/dead state: its
 // saved context, wait listeners and address space remain intact to resume.
-fn change_job_state(target &proc.Process, stop bool, signal int) {
-	if target == unsafe { nil } || target.exiting { return }
-	mut p := unsafe { target }
-	p.threads_lock.acquire()
+fn change_job_state_locked(mut p proc.Process, stop bool, signal int) bool {
+	if p.exiting { return false }
 	p.job_lock.acquire()
 	was_stopped := katomic.load(&p.job_stopped)
 	changed := was_stopped != stop
@@ -37,6 +35,24 @@ fn change_job_state(target &proc.Process, stop bool, signal int) {
 		clear_mask = (u64(1) << (sigstop - 1)) | (u64(1) << (sigtstp - 1))
 			| (u64(1) << (sigttin - 1)) | (u64(1) << (sigttou - 1))
 	}
+	clear_job_signals_locked(mut p, clear_mask)
+	$if amd64 {
+		if changed && stop {
+			// Ask busy siblings to check their new eligibility at an interrupt.
+			// The IPI never parks a thread while this delivery lock is held.
+			for t in p.threads {
+				on := katomic.load(&t.running_on)
+				if on != u64(-1) { sched.wake_cpu(u32(on)) }
+			}
+		}
+	}
+	return changed
+}
+
+// Process-directed delivery may hold signal-info and table locks too. Never
+// notify the parent here: that lookup and SIGCHLD delivery acquire them again.
+fn clear_job_signals_locked(mut p proc.Process, clear_mask u64) {
+	p.exec_pending_signals &= ~clear_mask
 	for t in p.threads {
 		mut sibling_thread := unsafe { t }
 		for bit := u8(0); bit < 64; bit++ {
@@ -45,10 +61,44 @@ fn change_job_state(target &proc.Process, stop bool, signal int) {
 			}
 		}
 	}
+	// Exec can already have replaced its thread list. Its original thread is
+	// still live until finish_exec_signals hands off and clears this borrow.
+	if p.exec_transition && p.exec_signal_thread != unsafe { nil } {
+		mut original := p.exec_signal_thread
+		for bit := u8(0); bit < 64; bit++ {
+			if clear_mask & (u64(1) << bit) != 0 {
+				katomic.btr(mut &original.pending_signals, bit)
+			}
+		}
+	}
+}
+
+// Caller holds threads_lock. STOP and CONT take effect even while exec has
+// no signalable replacement; other stopping signals only cancel pending CONT.
+fn apply_job_signal_locked(mut p proc.Process, signal int) bool {
+	if signal == sigcont { return change_job_state_locked(mut p, false, signal) }
+	if signal == sigstop { return change_job_state_locked(mut p, true, signal) }
+	if is_stop_signal(signal) { clear_job_signals_locked(mut p, u64(1) << (sigcont - 1)) }
+	return false
+}
+
+fn change_job_state(target &proc.Process, stop bool, signal int) {
+	if target == unsafe { nil } { return }
+	mut p := unsafe { target }
+	p.threads_lock.acquire()
+	changed := change_job_state_locked(mut p, stop, signal)
+	if changed { proc.pin_process(p) }
 	p.threads_lock.release()
 	if changed {
 		notify_parent(p)
+		proc.unpin_process(p)
 	}
+}
+
+// The caller owns a process reference and has released signal-info, table,
+// and thread-list locks before publishing the parent's wait notification.
+pub fn notify_signal_parent(target &proc.Process) {
+	notify_parent(target)
 }
 
 // Called only for an uncaught default stopping disposition, once a blocked

@@ -84,6 +84,9 @@ fn do_clone(state &cpulocal.GPRState, flags u64, child_stack u64, parent_tid u64
 }
 
 fn do_clone_into(state &cpulocal.GPRState, flags u64, child_stack u64, parent_tid u64, tls u64, child_tid u64, into_cgroup bool, cgroup voidptr) (u64, u64) {
+	// Returning a PID while leaving the requested pidfd word untouched would
+	// falsely report success. Descriptor construction/rollback is unsupported.
+	if flags & clone_pidfd != 0 { return errno.err, errno.einval }
 	// A new namespace other than a user namespace takes CAP_SYS_ADMIN, and none
 	// can be made for a thread, which shares its process' namespaces.
 	if flags & proc.clone_namespace_flags != 0 {
@@ -239,9 +242,11 @@ fn clone_new_process(state &cpulocal.GPRState, flags u64, child_stack u64, paren
 	parent_process.children << new_process
 	parent_process.children_lock.release()
 
-	sched.enqueue_thread(new_thread, false)
+	// Another parent thread can reap the child as soon as it runs.
+	pid := proc.pid_in(new_process, viewer)
+	sched.publish_user_thread(mut new_process, new_thread)
 
-	return u64(proc.pid_in(new_process, viewer)), 0
+	return u64(pid), 0
 }
 
 // What exit gives back of the process' x86 segments: nothing, on arm64.

@@ -641,6 +641,8 @@ pub fn init_syscall_table() {
 	syscall_table[322] = voidptr(userland.syscall_execveat) // execveat
 	syscall_table[334] = voidptr(syscall_linux_rseq) // rseq
 	syscall_table[435] = voidptr(userland.syscall_clone3) // clone3
+	syscall_table[424] = voidptr(userland.syscall_pidfd_send_signal)
+	syscall_table[434] = voidptr(userland.syscall_pidfd_open)
 
 	// Sockets
 	syscall_table[41] = voidptr(socket.syscall_socket) // socket

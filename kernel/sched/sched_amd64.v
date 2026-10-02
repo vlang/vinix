@@ -778,7 +778,10 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 
 	if want_elf == true {
 		t.gpr_state.rsp = build_initial_stack(mut process, stack_vma, stack_bottom_vma, argv, envp,
-			auxval)?
+			auxval) or {
+			free_thread_memory(t)
+			return none
+		}
 	}
 
 	// Published processes (proc.allocate_pid()/new_process()) can be visible
@@ -788,13 +791,14 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 	// the identical lock; attach_thread() holds it across the append. The
 	// thread is numbered before it can run, so gettid() never sees it bare.
 	attach_thread(mut process, mut t) or {
+		free_thread_memory(t)
 		errno.set(errno.eagain)
 		return none
 	}
 	proc.linuxkpi_init_task(mut t, unsafe { nil })
 
 	if autoenqueue == true {
-		enqueue_thread(t, false)
+		publish_user_thread(mut process, t)
 	}
 
 	return t

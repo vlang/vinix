@@ -121,7 +121,23 @@ fn claim_teardown(mut process proc.Process) bool {
 		return false
 	}
 	process.exiting = true
+	process.exec_transition = false
+	process.exec_pending_signals = 0
+	process.exec_signal_thread = unsafe { nil }
 	return true
+}
+
+// Once exec has installed the replacement page map, its old image cannot
+// resume after an error. Keep signal selection excluded until exit claims
+// teardown, then report a fatal signal through the ordinary exit path.
+@[noreturn]
+fn abort_exec(mut process proc.Process, mut old_thread proc.Thread) {
+	proc.lock_table()
+	process.threads_lock.acquire()
+	old_thread.process = &process
+	process.threads_lock.release()
+	proc.unlock_table()
+	exit_with_fatal_signal(u8(9))
 }
 
 @[noreturn]
@@ -213,6 +229,7 @@ fn exit_process(mut current_process proc.Process, mut current_thread proc.Thread
 	}
 	unsafe { orphans.free() }
 
+	proc.save_pidfd_exit_identity(mut current_process)
 	fs.release_process_namespaces(mut current_process)
 
 	mmap.delete_pagemap(mut old_pagemap) or {}
@@ -225,7 +242,7 @@ fn exit_process(mut current_process proc.Process, mut current_thread proc.Thread
 
 	proc.free_tid(current_thread.tid)
 
-	katomic.store(mut &current_process.status, status)
+	proc.publish_pidfd_exit(mut current_process, status)
 	// Wakes a parent blocked in wait4()/waitid()...
 	event.trigger(mut &current_process.event, false)
 	// ...and tells one that is not waiting yet, which is how a daemon reaps.

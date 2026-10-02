@@ -1210,6 +1210,7 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 		// descriptor it was called on.
 		gpu_exec_trace(trace_gpu, 'stopping sibling threads')
 		kill_sibling_threads(mut curr_process, t)
+		begin_exec_signals(mut curr_process, t)
 		gpu_exec_trace(trace_gpu, 'sibling threads stopped')
 
 		// Close O_CLOEXEC file descriptors before exec.
@@ -1276,9 +1277,17 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 
 		gpu_exec_trace(trace_gpu, 'deleting old process page map')
 		if trace_gpu {
-			mmap.delete_pagemap_traced(mut old_pagemap)?
+			mmap.delete_pagemap_traced(mut old_pagemap) or {
+				if omit_foreign_preload { unsafe { program_envp.free() } }
+				free_exec_arguments(path, argv, envp)
+				abort_exec(mut curr_process, mut t)
+			}
 		} else {
-			mmap.delete_pagemap(mut old_pagemap)?
+			mmap.delete_pagemap(mut old_pagemap) or {
+				if omit_foreign_preload { unsafe { program_envp.free() } }
+				free_exec_arguments(path, argv, envp)
+				abort_exec(mut curr_process, mut t)
+			}
 		}
 		gpu_exec_trace(trace_gpu, 'old process page map deleted')
 
@@ -1297,10 +1306,6 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 		// The program that comes out of exec has one thread and it is the group
 		// leader, so it takes over the pid as its tid. Anything else this
 		// thread was holding goes back to the namespace.
-		if t.tid != curr_process.pid {
-			proc.free_tid(t.tid)
-		}
-
 		// The program keeps the scheduling policy of the thread that execs it.
 		// `chrt -f 50 ./program` is one process: it gives itself the priority
 		// and then becomes the program that was meant to have it. Installed
@@ -1309,23 +1314,33 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 		inherited_sched := t.sched
 		gpu_exec_trace(trace_gpu, 'building replacement user thread and stack')
 		mut new_thread := sched.new_user_thread(curr_process, true, entry_point, unsafe { nil },
-			0, argv, program_envp, auxval, false)?
+			0, argv, program_envp, auxval, false) or {
+			if omit_foreign_preload { unsafe { program_envp.free() } }
+			free_exec_arguments(path, argv, envp)
+			abort_exec(mut curr_process, mut t)
+		}
+		if t.tid != curr_process.pid {
+			proc.free_tid(t.tid)
+		}
 		if trace_gpu {
 			C.kprintf(c'exec[gpu]: replacement thread built pc=0x%llx sp=0x%llx tid=%lld\n',
 				u64(new_thread.gpr_state.pc), u64(new_thread.gpr_state.sp), i64(new_thread.tid))
 		}
 		proc.set_thread_sched_params(new_thread.tid, inherited_sched)
 		gpu_exec_trace(trace_gpu, 'inherited scheduler parameters')
+		// exec keeps blocked and ignored signals, as the x86 handoff does.
+		new_thread.masked_signals = t.masked_signals
+		for i := 0; i < t.sigactions.len; i++ {
+			if t.sigactions[i].sa_sigaction == sig_ign {
+				new_thread.sigactions[i].sa_sigaction = sig_ign
+			}
+		}
 		if trace_gpu {
 			gpu_exec_trace(trace_gpu, 'disabling interrupts for atomic same-CPU handoff')
 			cpu.interrupt_toggle(false)
 			gpu_exec_trace(trace_gpu, 'handoff interrupts disabled')
 		}
-		enqueued := if trace_gpu {
-			sched.enqueue_thread_traced(new_thread, false)
-		} else {
-			sched.enqueue_thread(new_thread, false)
-		}
+		enqueued := finish_exec_signals(mut curr_process, mut new_thread, t, trace_gpu)
 		if enqueued {
 			gpu_exec_trace(trace_gpu, 'replacement thread enqueued')
 		} else {

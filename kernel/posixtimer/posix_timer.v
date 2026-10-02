@@ -441,6 +441,18 @@ pub fn signal_info(thrd &proc.Thread, signum int) SignalInfo {
 }
 
 pub fn acknowledge_signal(mut thrd proc.Thread, signum int) {
+	posix_timers_lock.acquire()
+	acknowledge_signal_locked(mut thrd, signum)
+	posix_timers_lock.release()
+}
+
+// Pidfd delivery holds this before the process table lock, matching timer
+// expiry's lock order. Its authorization and delivery then share one live
+// process lookup without recursively taking the timer lock.
+pub fn lock_signal_info() { posix_timers_lock.acquire() }
+pub fn unlock_signal_info() { posix_timers_lock.release() }
+
+pub fn acknowledge_signal_locked(mut thrd proc.Thread, signum int) {
 	if signum <= 0 || signum > 64 {
 		return
 	}
@@ -452,7 +464,6 @@ pub fn acknowledge_signal(mut thrd proc.Thread, signum int) {
 		return
 	}
 
-	posix_timers_lock.acquire()
 	for i := 0; i < max_posix_timers; i++ {
 		mut timer := unsafe { &posix_timers[i] }
 		if timer.in_use && timer.pending && timer.signum == signum
@@ -462,7 +473,6 @@ pub fn acknowledge_signal(mut thrd proc.Thread, signum int) {
 			break
 		}
 	}
-	posix_timers_lock.release()
 }
 
 // An ordinary tkill/kill for the same signal must not inherit stale SI_TIMER

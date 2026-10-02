@@ -149,7 +149,7 @@ fn next_event_below(events []&eventstruct.Event, bound u64) int {
 }
 
 fn await_internal(mut events []&eventstruct.Event, block bool, watch_generation bool,
-	watched_index u64, generation u64) ?u64 {
+	watched_index u64, generation u64, generations []u64) ?u64 {
 	mut t := proc.current_thread()
 
 	interrupt_toggle(false)
@@ -168,6 +168,15 @@ fn await_internal(mut events []&eventstruct.Event, block bool, watch_generation 
 	if watch_generation && events[watched_index].generation != generation {
 		unlock_events(mut events)
 		return watched_index
+	}
+	// Pollers sample every generation before rechecking readiness. A wake
+	// consumed by another waiter between that scan and registration must
+	// still cause a rescan, even when no consumable pending count remains.
+	for i in 0 .. generations.len {
+		if events[i].generation != generations[i] {
+			unlock_events(mut events)
+			return u64(i)
+		}
 	}
 
 	// A thread its process has told to exit must not go to sleep again: the
@@ -236,10 +245,10 @@ fn await_internal(mut events []&eventstruct.Event, block bool, watch_generation 
 // this wait's list. Handing such an index back had callers index their own
 // lists out of range, which panicked the kernel.
 fn await_valid(mut events []&eventstruct.Event, block bool, watch_generation bool,
-	watched_index u64, generation u64) ?u64 {
+	watched_index u64, generation u64, generations []u64) ?u64 {
 	for {
 		which := await_internal(mut events, block, watch_generation, watched_index,
-			generation)?
+			generation, generations)?
 		if which < u64(events.len) {
 			return which
 		}
@@ -248,12 +257,17 @@ fn await_valid(mut events []&eventstruct.Event, block bool, watch_generation boo
 }
 
 pub fn await(mut events []&eventstruct.Event, block bool) ?u64 {
-	return await_valid(mut events, block, false, 0, 0)
+	return await_valid(mut events, block, false, 0, 0, []u64{})
 }
 
 pub fn await_from_generation(mut events []&eventstruct.Event, block bool, watched_index u64,
 	generation u64) ?u64 {
-	return await_valid(mut events, block, true, watched_index, generation)
+	return await_valid(mut events, block, true, watched_index, generation, []u64{})
+}
+
+pub fn await_changes(mut events []&eventstruct.Event, generations []u64, block bool) ?u64 {
+	if generations.len != events.len { return none }
+	return await_valid(mut events, block, false, 0, 0, generations)
 }
 
 pub fn generation(mut e eventstruct.Event) u64 {

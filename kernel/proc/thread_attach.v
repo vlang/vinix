@@ -25,6 +25,9 @@ pub fn attach_thread(mut process Process, mut t Thread) ?int {
 		t.sigactions = process.threads[0].sigactions
 	}
 
+	// Readers hold threads_lock and never retain slices of this owned buffer.
+	// Free its previous capacity when the thread list grows.
+	process.threads.flags |= .noslices
 	process.threads << t
 	return t.tid
 }

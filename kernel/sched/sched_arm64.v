@@ -1386,7 +1386,10 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 			uart.putc(`\n`)
 		}
 		t.gpr_state.sp = build_initial_stack(mut process, stack_vma, stack_bottom_vma, argv, envp,
-			auxval)?
+			auxval) or {
+			free_thread_memory(t)
+			return none
+		}
 		if trace_gpu_exec {
 			C.kprintf(c'exec[gpu]/thread: initial ELF stack complete sp=0x%llx\n', u64(t.gpr_state.sp))
 		}
@@ -1395,7 +1398,10 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 	if trace_gpu_exec {
 		println('exec[gpu]/thread: attaching replacement thread to process')
 	}
-	attach_thread(mut process, mut t)?
+	attach_thread(mut process, mut t) or {
+		free_thread_memory(t)
+		return none
+	}
 	if trace_gpu_exec {
 		C.kprintf(c'exec[gpu]/thread: replacement thread attached tid=%lld\n', i64(t.tid))
 	}
@@ -1404,7 +1410,7 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 		if trace_gpu_exec {
 			println('exec[gpu]/thread: auto-enqueueing replacement thread')
 		}
-		enqueue_thread(t, false)
+		publish_user_thread(mut process, t)
 		if trace_gpu_exec {
 			println('exec[gpu]/thread: auto-enqueue complete')
 		}
