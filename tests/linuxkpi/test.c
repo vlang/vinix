@@ -29,10 +29,14 @@
 static size_t live_pages;
 static size_t permanent_pages;
 static bool fail_allocation;
+static int allocation_failure_after = -1;
+static int worker_bind_failure_after = -1;
+static unsigned int worker_bind_failures;
 static bool last_reclaim;
 static _Thread_local bool interrupts = true;
 static _Thread_local unsigned int preempt_depth;
 static _Thread_local unsigned int current_cpu;
+static _Thread_local int current_worker_nice;
 static _Thread_local void (*host_irq_restore_hook)(void);
 static _Thread_local unsigned int *timer_sync_spins;
 static atomic_t refcount_warnings = ATOMIC_INIT(0);
@@ -114,9 +118,11 @@ void vinix_linuxkpi_task_park(void)
     struct native_task_model *task = native_task;
     assert(task && vinix_linuxkpi_may_sleep());
     __atomic_store_n(&task->parked, task->iteration, __ATOMIC_RELEASE);
+    vinix_linuxkpi_workqueue_task_sleep(task->storage);
     assert(!pthread_mutex_lock(&task->queue_lock));
     while (!task->queued) assert(!pthread_cond_wait(&task->queue_changed, &task->queue_lock));
     assert(!pthread_mutex_unlock(&task->queue_lock));
+    vinix_linuxkpi_workqueue_task_resume(task->storage);
 }
 
 struct task_struct *vinix_linuxkpi_current_task(void)
@@ -293,6 +299,12 @@ void *vinix_linuxkpi_alloc_pages(size_t pages, bool reclaim)
 {
     __atomic_store_n(&last_reclaim, reclaim, __ATOMIC_RELAXED);
     if (fail_allocation) return NULL;
+    int remaining = __atomic_load_n(&allocation_failure_after, __ATOMIC_RELAXED);
+    while (remaining >= 0) {
+        if (!remaining) return NULL;
+        if (__atomic_compare_exchange_n(&allocation_failure_after, &remaining,
+                remaining - 1, false, __ATOMIC_RELAXED, __ATOMIC_RELAXED)) break;
+    }
     void *ptr = NULL;
     if (posix_memalign(&ptr, 4096, pages * 4096)) return NULL;
     memset(ptr, 0xa5, pages * 4096);
@@ -341,7 +353,32 @@ void vinix_linuxkpi_preempt_enable_no_resched(void) { assert(preempt_depth); pre
 unsigned int vinix_linuxkpi_preempt_count(void) { return preempt_depth; }
 void vinix_linuxkpi_preempt_check_resched(void) { }
 unsigned int vinix_linuxkpi_cpu_id(void) { return current_cpu; }
+int vinix_linuxkpi_worker_bind(unsigned int cpu)
+{
+    if (!vinix_linuxkpi_may_sleep()) return -EWOULDBLOCK;
+    if (cpu >= vinix_linuxkpi_percpu_count() || cpu >= 64) return -EINVAL;
+    int remaining = __atomic_load_n(&worker_bind_failure_after, __ATOMIC_RELAXED);
+    while (remaining >= 0) {
+        if (!remaining) {
+            __atomic_fetch_add(&worker_bind_failures, 1, __ATOMIC_RELEASE);
+            return -EIO;
+        }
+        if (__atomic_compare_exchange_n(&worker_bind_failure_after, &remaining,
+                remaining - 1, false, __ATOMIC_RELAXED, __ATOMIC_RELAXED)) break;
+    }
+    current_cpu = cpu;
+    return 0;
+}
 bool vinix_linuxkpi_may_sleep(void) { return interrupts && !preempt_depth; }
+int vinix_linuxkpi_worker_set_nice(int nice)
+{
+    if (!vinix_linuxkpi_may_sleep()) return -EWOULDBLOCK;
+    if (nice < -20 || nice > 19) return -EINVAL;
+    current_worker_nice = nice;
+    return 0;
+}
+int vinix_linuxkpi_worker_nice(void) { return current_worker_nice; }
+u64 vinix_linuxkpi_worker_timeslice(void) { return 5000 * (20 - current_worker_nice) / 20; }
 void vinix_linuxkpi_refcount_warning(int kind)
 {
     assert(kind >= REFCOUNT_ADD_NOT_ZERO_OVF && kind <= REFCOUNT_DEC_LEAK);
@@ -982,6 +1019,7 @@ static void reference_tests(void)
 #include "workqueue_test.h"
 #include "delayed_work_test.h"
 #include "unbound_work_test.h"
+#include "bound_work_test.h"
 
 int main(void)
 {
@@ -1009,6 +1047,7 @@ int main(void)
     workqueue_tests();
     delayed_work_tests();
     unbound_work_tests();
+    bound_work_tests();
     list_tests();
     tree_tests();
     concurrency_tests();
@@ -1016,6 +1055,6 @@ int main(void)
     reference_tests();
     vinix_linuxkpi_percpu_destroy_for_test();
     assert(live_pages == 0);
-    puts("LinuxKPI: PASS (Linux helpers, allocation/OOM, strings, bitmaps, SMP/IRQ locks, per-CPU storage, task references, wake races, sleeping mutexes, queues, completions, clocks, timed waits, timer callbacks, ordered/delayed/concurrent unbound work and system_unbound_wq)");
+    puts("LinuxKPI: PASS (Linux helpers, allocation/OOM, strings, bitmaps, SMP/IRQ locks, per-CPU storage, task references, wake races, synchronization, clocks, timers, ordered/delayed/unbound/bound work, runnable concurrency, priority and system queues)");
     return 0;
 }

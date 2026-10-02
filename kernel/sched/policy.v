@@ -20,7 +20,7 @@ fn may_run_here(t &proc.Thread, cpu_number u64) bool {
 	if cpu_number >= 64 {
 		return true
 	}
-	return t.affinity_mask & (u64(1) << cpu_number) != 0
+	return katomic.load(&t.affinity_mask) & (u64(1) << cpu_number) != 0
 }
 
 // ── Real-time scheduling ─────────────────────────────────────────────────────
@@ -392,6 +392,11 @@ fn scan_run_queue_ranked(cpu_number u64, last_index &int, want_node int) &proc.T
 	return unsafe { nil }
 }
 
+// Expose the actual scheduler entitlement for native worker validation.
+pub fn thread_timeslice(t &proc.Thread) u64 {
+	return effective_timeslice(t)
+}
+
 fn effective_timeslice(t &proc.Thread) u64 {
 	mut slice := u64(0)
 
@@ -415,7 +420,11 @@ fn effective_timeslice(t &proc.Thread) u64 {
 			slice = idle_policy_slice_us
 		}
 		else {
-			weight := u64(20 - t.process.nice)
+			mut nice := t.process.nice
+			if katomic.load(&t.sched_has_nice_override) {
+				nice = katomic.load(&t.sched_nice_override)
+			}
+			weight := u64(20 - nice)
 			slice = t.timeslice * weight / 20
 		}
 	}

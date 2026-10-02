@@ -4,13 +4,14 @@ void vinix_linuxkpi_workqueue_shutdown_for_test(void);
 bool vinix_linuxkpi_host_workqueue_stopped(struct workqueue_struct *wq);
 struct pool_publish_gate {
     struct workqueue_struct *wq;
+    unsigned int cpu;
     unsigned int entered, release;
 };
 static struct pool_publish_gate *publish_gate;
-void vinix_linuxkpi_host_pool_publish_gate(struct workqueue_struct *wq)
+void vinix_linuxkpi_host_pool_publish_gate(struct workqueue_struct *wq, unsigned int cpu)
 {
     struct pool_publish_gate *gate = __atomic_load_n(&publish_gate, __ATOMIC_ACQUIRE);
-    if (!gate || gate->wq != wq) return;
+    if (!gate || gate->wq != wq || gate->cpu != cpu) return;
     __atomic_store_n(&gate->entered, 1, __ATOMIC_RELEASE);
     while (!__atomic_load_n(&gate->release, __ATOMIC_ACQUIRE)) sched_yield();
 }

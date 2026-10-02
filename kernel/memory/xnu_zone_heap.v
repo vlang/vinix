@@ -59,7 +59,6 @@
 // kernel/modules/xnualloc/APPLE_LICENSE.
 // These translations retain APSL 2.0; they are NOT relicensed as GPL.
 
-
 @[has_globals; manualfree]
 module memory
 
@@ -85,11 +84,11 @@ mut:
 
 struct XnuHeapHeader {
 mut:
-	magic      u64
-	class      u64
-	chunk      xnualloc.ZoneChunk
-	free_bits  [4]u64
-	live_bits  [4]u64
+	magic     u64
+	class     u64
+	chunk     xnualloc.ZoneChunk
+	free_bits [4]u64
+	live_bits [4]u64
 }
 
 __global (
@@ -201,12 +200,20 @@ fn (mut h XnuHeapClass) drain_locked() {
 }
 
 fn xnu_heap_alloc(size u64) voidptr {
+	return xnu_heap_alloc_inner(size, true)
+}
+
+fn xnu_heap_alloc_fallible(size u64) voidptr {
+	return xnu_heap_alloc_inner(size, false)
+}
+
+fn xnu_heap_alloc_inner(size u64, panic_oom bool) voidptr {
 	mut index := 0
 	for index < 14 && xnu_heap_classes[index].zone.elem_size < size {
 		index++
 	}
 	if index == 14 {
-		return big_alloc(size)
+		return big_alloc_inner(size, panic_oom)
 	}
 	mut h := &xnu_heap_classes[index]
 	h.@lock.acquire()
@@ -223,6 +230,9 @@ fn xnu_heap_alloc(size u64) voidptr {
 	capacity := h.zone.elem_size
 	h.@lock.release()
 	if addr == 0 {
+		if !panic_oom {
+			return unsafe { nil }
+		}
 		// Preserve Vinix's existing infallible small malloc OOM behavior.
 		lib.kpanic(unsafe { nil }, c'XNU zone heap exhausted')
 		return unsafe { nil }

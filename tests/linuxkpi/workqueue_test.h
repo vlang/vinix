@@ -218,11 +218,13 @@ static void workqueue_tests(void)
     sync_model_init(&parent, 20);
     native_task = &parent;
     size_t before = live_pages;
-    assert(!alloc_workqueue("concurrent", 0, 0));
+    struct workqueue_struct *bound = alloc_workqueue("concurrent", 0, 0);
+    assert(bound); destroy_workqueue(bound);
     struct workqueue_struct *unbound = alloc_workqueue("unbound", WQ_UNBOUND, 8);
     assert(unbound); destroy_workqueue(unbound);
     assert(!alloc_ordered_workqueue("reclaim", WQ_MEM_RECLAIM));
-    assert(!alloc_ordered_workqueue("priority", WQ_HIGHPRI));
+    struct workqueue_struct *priority = alloc_ordered_workqueue("priority", WQ_HIGHPRI);
+    assert(priority); destroy_workqueue(priority);
     assert(!alloc_ordered_workqueue("freezer", WQ_FREEZABLE));
     fail_allocation = true;
     assert(!alloc_ordered_workqueue("oom-%u", 0, 1));
@@ -231,7 +233,7 @@ static void workqueue_tests(void)
     struct workqueue_struct *b = alloc_ordered_workqueue("test-%u", 0, 2);
     assert(a && b);
     int warnings = atomic_read(&time_warnings);
-    assert(!queue_work_on(1, a, &static_work) && !work_pending(&static_work));
+    assert(!queue_work_on(4, a, &static_work) && !work_pending(&static_work));
     assert(atomic_read(&time_warnings) == warnings + 1);
     unsigned long irq_flags = vinix_linuxkpi_irq_save();
     assert(queue_work(a, &static_work) && !interrupts && !preempt_depth);

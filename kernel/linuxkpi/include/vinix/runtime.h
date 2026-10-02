@@ -56,7 +56,18 @@ int vinix_linuxkpi_timer_selftest(void);
 int vinix_linuxkpi_timer_native_selftest(void);
 int vinix_linuxkpi_workqueue_native_selftest(void);
 int vinix_linuxkpi_workqueue_bootstrap(void);
+/* Called outside native queue/task locks at blocked/resuming switches. */
+void vinix_linuxkpi_workqueue_task_sleep(void *task_view);
+void vinix_linuxkpi_workqueue_task_resume(void *task_view);
+int vinix_linuxkpi_worker_bind(unsigned int cpu);
+int vinix_linuxkpi_worker_set_nice(int nice);
+int vinix_linuxkpi_worker_nice(void);
+u64 vinix_linuxkpi_worker_timeslice(void);
 int vinix_linuxkpi_unbound_work_native_selftest(void);
+int vinix_linuxkpi_bound_work_native_selftest(void);
+void vinix_linuxkpi_test_park_preempt(void);
+void vinix_linuxkpi_test_worker_oom(int stage);
+int vinix_linuxkpi_worker_native_selftest(void);
 int vinix_linuxkpi_delayed_work_native_selftest(void);
 void vinix_linuxkpi_refcount_warning(int kind);
 bool vinix_linuxkpi_cpu_has(unsigned int feature);

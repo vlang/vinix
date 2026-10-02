@@ -157,8 +157,8 @@ static void delayed_queue_tests(struct workqueue_struct *a, struct workqueue_str
 
     delayed_init(&test, a);
     int warnings = atomic_read(&time_warnings);
-    assert(!queue_delayed_work_on(1, a, &test.work, 1));
-    assert(!mod_delayed_work_on(1, a, &test.work, 1));
+    assert(!queue_delayed_work_on(4, a, &test.work, 1));
+    assert(!mod_delayed_work_on(4, a, &test.work, 1));
     assert(atomic_read(&time_warnings) == warnings + 2 && !delayed_work_pending(&test.work));
     unsigned long flags = vinix_linuxkpi_irq_save();
     assert(queue_delayed_work(a, &test.work, 10));

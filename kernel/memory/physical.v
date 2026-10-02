@@ -667,9 +667,9 @@ pub fn malloc(size u64) voidptr {
 // out, for a caller with something else to fall back on.
 pub fn malloc_packed_fallible(size u64) voidptr {
 	$if xnu_zone ? {
-		return xnu_heap_alloc(size)
+		return xnu_heap_alloc_fallible(size)
 	}
-	mut slab := slab_for(size, slabs.len) or { return big_alloc(size) }
+	mut slab := slab_for(size, slabs.len) or { return big_alloc_inner(size, false) }
 
 	return slab.alloc_fallible()
 }
@@ -684,6 +684,10 @@ pub fn malloc_packed(size u64) voidptr {
 }
 
 fn big_alloc(size u64) voidptr {
+	return big_alloc_inner(size, true)
+}
+
+fn big_alloc_inner(size u64, panic_oom bool) voidptr {
 	// Include the metadata page without overflowing rounding or byte counts.
 	if size > (u64(-1) / page_size - 1) * page_size {
 		return unsafe { nil }
@@ -693,7 +697,9 @@ fn big_alloc(size u64) voidptr {
 	mut base := u64(0)
 	$if vmap_always ? {
 		// Testing only: every allocation that can, takes the fallback below.
-		base = u64(vmap_alloc(page_count + 1))
+		if panic_oom {
+			base = u64(vmap_alloc(page_count + 1))
+		}
 	}
 	if base == 0 {
 		ptr := pmm_alloc_fallible(page_count + 1)
@@ -702,6 +708,12 @@ fn big_alloc(size u64) voidptr {
 		}
 	}
 	if base == 0 {
+		// Mapping the fragmented fallback can retain new shared page tables
+		// even when allocation fails. Checked callers require full rollback,
+		// so this path may return nil when no contiguous run is available.
+		if !panic_oom {
+			return unsafe { nil }
+		}
 		// No free run is that long, which says little about how much memory is
 		// free. Take the pages one at a time and map them side by side.
 		base = u64(vmap_alloc(page_count + 1))

@@ -131,12 +131,11 @@ the complete i915 source tree is not evidence that the driver runs.
   freeing a work item or destroying its queue, keep the queue alive throughout
   cancellation/flushing, and avoid holding locks needed by its callbacks.
   Waiting for the current callback or flushing/draining its own ordered
-  queue fails explicitly. CPU-bound queues, other system queues and RCU work,
-  CPU placement, priority, reclaim rescuers, freezer support and attribute
-  changes remain pending. Unsupported allocation flags/modes return `NULL`;
-  explicit CPU queueing returns false with a warning. This first backend
-  covers i915's ordinary ordered queues, while its unordered and high-priority
-  flip queues still need implementations.
+  queue fails explicitly. RCU work, reclaim rescuers, freezer support and
+  attribute changes remain pending. Unsupported allocation flags/modes return
+  `NULL`.
+  Explicit `_on` requests accept valid boot CPU IDs; invalid IDs return false
+  with a warning. Ordered queues remain unbound regardless of that request.
 - Concurrent `alloc_workqueue(..., WQ_UNBOUND, max_active)` queues and
   `system_unbound_wq` use a native worker pool that grows on demand. A separate
   manager allocates and creates workers with interrupts enabled; enqueueing
@@ -154,12 +153,41 @@ the complete i915 source tree is not evidence that the driver runs.
   not consume worker slots. Item flushing from a different callback on the
   same concurrent queue is supported when the active limit permits progress.
   This backend uses one affinity domain for the current target; NUMA/cache
-  affinity pools and attribute changes remain pending. CPU-bound allocation
-  (`flags=0`), explicit CPU placement, reclaim rescuers, priority and freezer
-  support remain unsupported. i915's default CPU-bound unordered queue and
-  high-priority flip queue therefore still cannot be allocated.
+  affinity pools and attribute changes remain pending. Reclaim rescuers and
+  freezer support remain unsupported.
+- CPU-bound `alloc_workqueue(..., 0, max_active)` queues use aligned metadata
+  per boot CPU and lazily created workers that bind before publishing readiness.
+  Default queueing captures the producer CPU with IRQ/preemption protection;
+  `_on` variants route to valid CPUs. Same-item requeue on its running public
+  queue preserves the execution CPU, including requests from another CPU.
+  Sleeping callbacks retain their per-CPU active slots. Normal bound queues
+  share one runnable-concurrency domain per CPU; high-priority queues share a
+  separate domain. Scheduler notifications account actual blocking switches,
+  resume and wake-before-switch races; ordinary yields/preemption keep workers
+  runnable. Only idle workers/managers receive pool wakeups, so callback waits
+  remain controlled by their own conditions. The public queue has one pending
+  list/generation across all CPU pools, preserving atomic whole-queue flush
+  boundaries. Bound support currently requires at most 64 boot-online CPUs;
+  hotplug and CPU masks beyond the native 64-bit mask are unsupported.
+- `WQ_HIGHPRI` works for bound, unbound and ordered queues with a per-thread
+  ordinary nice override of -20. It uses the native scheduler's existing nice
+  weighting (twice the normal quantum at -20), without changing the shared
+  kernel process or selecting a real-time policy. The existing scheduler cap
+  when real-time policies are in use still applies. `system_wq`,
+  `system_highpri_wq` and `system_unbound_wq` initialize together at boot; partial
+  initialization releases every worker and publishes none of the system pointers.
+  Required i915 default/unordered and high-priority queue allocations now work,
+  while their GPU, memory and device dependencies remain incomplete. Workers
+  remain privately owned by each queue and retain its peak count until teardown;
+  Linux's cross-queue worker sharing/idle retirement is not implemented.
+- Native pthread creation has fallible stack/FPU/Thread construction on both
+  architectures, returns `EAGAIN` and leaves the output handle untouched on
+  failure. Every partial allocation is freed before publication. Checked large
+  native heap allocations may fail on fragmentation rather than retain newly
+  created shared page tables; ordinary heap allocation keeps its existing mapped
+  fallback. Unrelated boot kernel-thread creation retains its existing API.
 - Unmodified `delayed_work` and its static/stack initialization macros use
-  the timer backend and ordered/concurrent unbound queues. `queue_delayed_work`,
+  the timer backend and ordered/unbound/bound queues. `queue_delayed_work`,
   `mod_delayed_work`, asynchronous/synchronous cancellation and
   `flush_delayed_work` support immediate execution, deadline extension or
   reduction, queue migration, sleeping callbacks and self-rearming.
@@ -173,7 +201,8 @@ the complete i915 source tree is not evidence that the driver runs.
   its queue. Timer transfer and work dispatch both permit a detached work
   callback to free its enclosing object. External producers must have stopped
   before freeing the object; its queue must remain alive through cancellation
-  and flushing. Explicit CPU placement remains unsupported.
+  and flushing. Bound delayed work retains its selected CPU through timer
+  transfer, including explicit `_on` placement.
 - Static `DEFINE_PER_CPU` variables preserve their initializers and alignment
   in a separate copy for every boot CPU. Dynamic `alloc_percpu`,
   `alloc_percpu_gfp` and `free_percpu` use zeroed, aligned slots, with checked
@@ -384,6 +413,20 @@ sleeping/rearming callbacks, nested item flushes and 24 self-free objects per
 batch. System-queue workers are warmed to a fixed eight-worker peak before
 the measured batch; temporary queues release every worker and native page.
 
+Bound host tests cover per-CPU active limits, busy-versus-sleep scheduling across
+queue owners, separate high-priority domains, same-item migration, delayed CPU
+routing, overlapping whole-queue snapshots, cancellation, 200 self-freeing
+callbacks, constructor/manager failures and boot-system rollback. The manager
+publication gate identifies its CPU so an earlier lazy worker cannot trap the
+wrong publication. Native tests also force preemption between task dequeue and
+its explicit park, validate real CPU identity after sleep/yield, reject invalid
+or atomic-context affinity/nice changes, and test isolated worker nice weights.
+They inject failure at every native stack/FPU/Thread construction stage and
+verify pthread handles, successful recovery, queue rollback and page recovery.
+Three warmed batches precede each measured fourth batch. These measurements
+cover the new feature; existing broader kernel allocation failures remain
+outside this support claim.
+
 An enabled kernel runs the allocator/list/sort/tree/IRQ-lock tests 200 times
 and verifies that the physical free-page count returns to its initial value.
 The same repeated test also checks raw locks, bit searches, byte-order helpers,
@@ -435,10 +478,8 @@ runtime subsystems:
 2. MMIO mapping with correct cache attributes, DMA/scatter-gather APIs,
    page/shmem management, GPU address spaces and TTM/GEM memory management.
 3. Remaining lock/wait variants (including wound/wait mutexes and I/O waits),
-   CPU-bound/priority/freezable/reclaim workqueues, remaining system queues,
-   RCU work, remaining timer modes,
-   high-resolution timers and RCU lifetime
-   rules.
+   freezable/reclaim workqueues, remaining system queues, RCU work, remaining
+   timer modes, high-resolution timers and RCU lifetime rules.
 4. Linux IRQ registration, interrupt synchronization and safe GPU reset paths.
 5. C DRM core integration, device nodes, file ownership, ioctl/mmap handling,
    DMA fences, sync objects and dma-buf lifetime handling. The existing V DRM

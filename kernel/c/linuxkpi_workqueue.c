@@ -24,16 +24,18 @@ int vsnprintf(char *, size_t, const char *, va_list);
 void vinix_linuxkpi_host_worker_enter(void);
 void vinix_linuxkpi_host_worker_leave(void);
 void vinix_linuxkpi_host_delayed_timer_gate(struct timer_list *timer);
-void vinix_linuxkpi_host_pool_publish_gate(struct workqueue_struct *wq);
+void vinix_linuxkpi_host_pool_publish_gate(struct workqueue_struct *wq, unsigned int cpu);
 #else
 #include <pthread.h>
 int npf_vsnprintf(char *, size_t, const char *, va_list);
 #endif
 
-/* Ordered queues retain one worker; unbound queues grow a private pool on
- * demand. CPU-bound queues, reclaim, priority, freezer and RCU-work APIs stay
- * unsupported. The upstream work/timer layouts and macros are unchanged. */
+/* Ordered queues retain one worker. Other queues grow workers on demand,
+ * with one unbound pool or one pool per boot CPU. A single owner pending list
+ * preserves whole-queue flush snapshots across those pools. Reclaim, freezer,
+ * CPU hotplug and RCU-work APIs remain unsupported. Upstream layouts stay intact. */
 struct native_worker;
+struct native_pool;
 struct workqueue_struct {
     struct list_head all;
     struct list_head pending;
@@ -41,20 +43,31 @@ struct workqueue_struct {
     struct list_head sleepers;
     struct list_head workers;
     struct native_worker *manager;
+    struct native_pool *pools;
     u64 sequence, generation;
-    unsigned int drainers, nr_workers, nr_running, max_active;
-    bool stop, destroying, ordered, system;
+    unsigned int drainers, nr_pools, max_active;
+    bool stop, destroying, ordered, unbound, highpri, system;
     char name[32];
+} __aligned(1UL << WORK_STRUCT_FLAG_BITS);
+
+/* work.data points at a pool, never a queue. Each array element retains the
+ * alignment required by upstream WORK_STRUCT_WQ_DATA_MASK. Metadata is made
+ * once at queue allocation; atomic enqueue/timer-arm paths never allocate. */
+struct native_pool {
+    struct workqueue_struct *wq;
+    unsigned int cpu, nr_workers, nr_active, nr_runnable;
 } __aligned(1UL << WORK_STRUCT_FLAG_BITS);
 
 struct native_worker {
     struct list_head entry;
     struct workqueue_struct *wq;
+    struct native_pool *pool;
     struct task_struct *task;
     pthread_t thread;
+    int start_result;
     struct completion ready;
 };
-struct workqueue_struct *system_unbound_wq;
+struct workqueue_struct *system_wq, *system_highpri_wq, *system_unbound_wq;
 
 struct work_barrier {
     struct work_struct work;
@@ -68,6 +81,10 @@ static DEFINE_RAW_SPINLOCK(work_lock);
 static LIST_HEAD(running_works);
 static LIST_HEAD(canceling_works);
 static LIST_HEAD(all_queues);
+/* Linux bound worker pools share runnable concurrency across public queues.
+ * Private metadata/workers below still observe the same per-CPU normal and
+ * high-priority domains; active limits remain per public queue and CPU. */
+static unsigned int bound_runnable[2][64];
 
 struct work_wait {
     struct list_head entry;
@@ -77,9 +94,11 @@ struct work_wait {
 struct work_run {
     struct list_head entry, waiters;
     struct workqueue_struct *wq;
+    struct native_pool *pool;
     struct work_struct *work;
     struct task_struct *task;
     u64 sequence, generation;
+    bool runnable;
 };
 struct work_cancel {
     struct list_head entry;
@@ -93,14 +112,15 @@ static struct work_run *running_locked(struct work_struct *work)
         if (run->work == work) return run;
     return NULL;
 }
-static struct work_run *current_locked(void)
+static struct work_run *task_running_locked(struct task_struct *task)
 {
     struct work_run *run;
-    struct task_struct *task = current;
     list_for_each_entry(run, &running_works, entry)
         if (run->task == task) return run;
     return NULL;
 }
+static struct work_run *current_locked(void)
+{ return task_running_locked(current); }
 static bool canceling_locked(struct work_struct *work)
 {
     struct work_cancel *cancel;
@@ -108,35 +128,74 @@ static bool canceling_locked(struct work_struct *work)
         if (cancel->work == work) return true;
     return false;
 }
-static struct workqueue_struct *queued_locked(struct work_struct *work)
+static struct native_pool *queued_pool_locked(struct work_struct *work)
 {
     unsigned long data = atomic_long_read(&work->data);
     return (data & (WORK_STRUCT_PWQ | WORK_STRUCT_INACTIVE)) == WORK_STRUCT_PWQ ?
         (void *)(data & WORK_STRUCT_WQ_DATA_MASK) : NULL;
 }
+static struct workqueue_struct *queued_locked(struct work_struct *work)
+{
+    struct native_pool *pool = queued_pool_locked(work);
+    return pool ? pool->wq : NULL;
+}
 /* INACTIVE distinguishes a timer reservation from executable work. Both use
  * the original entry/data fields, without an allocation for each timer arm. */
-static struct workqueue_struct *delayed_locked(struct work_struct *work)
+static struct native_pool *delayed_pool_locked(struct work_struct *work)
 {
     unsigned long data = atomic_long_read(&work->data);
     return (data & (WORK_STRUCT_PWQ | WORK_STRUCT_INACTIVE)) ==
         (WORK_STRUCT_PWQ | WORK_STRUCT_INACTIVE) ?
         (void *)(data & WORK_STRUCT_WQ_DATA_MASK) : NULL;
 }
-static void mark_data_locked(struct workqueue_struct *wq, struct work_struct *work,
+static struct workqueue_struct *delayed_locked(struct work_struct *work)
+{
+    struct native_pool *pool = delayed_pool_locked(work);
+    return pool ? pool->wq : NULL;
+}
+static void mark_data_locked(struct native_pool *pool, struct work_struct *work,
                              bool inactive)
 {
-    BUG_ON((unsigned long)wq & WORK_STRUCT_FLAG_MASK);
-    atomic_long_set(&work->data, (unsigned long)wq | WORK_STRUCT_PENDING | WORK_STRUCT_PWQ |
+    BUG_ON((unsigned long)pool & WORK_STRUCT_FLAG_MASK);
+    atomic_long_set(&work->data, (unsigned long)pool | WORK_STRUCT_PENDING | WORK_STRUCT_PWQ |
                     (inactive ? WORK_STRUCT_INACTIVE : 0));
 }
-static void mark_queued_locked(struct workqueue_struct *wq, struct work_struct *work)
-{ mark_data_locked(wq, work, false); }
+static void mark_queued_locked(struct native_pool *pool, struct work_struct *work)
+{ mark_data_locked(pool, work, false); }
+static bool cpu_request_valid(int cpu)
+{
+    return cpu == WORK_CPU_UNBOUND ||
+        (cpu >= 0 && (unsigned int)cpu < vinix_linuxkpi_percpu_count());
+}
+static struct native_pool *route_locked(int cpu, struct workqueue_struct *wq,
+                                        struct work_struct *work)
+{
+    if (wq->unbound) return &wq->pools[0];
+    struct work_run *run = running_locked(work);
+    /* Linux preserves the running pool for same-queue requeues, even when
+     * another CPU requests the work. This also prevents self-overlap. */
+    if (run && run->wq == wq) return run->pool;
+    unsigned int selected = cpu == WORK_CPU_UNBOUND ? vinix_linuxkpi_cpu_id() : (unsigned int)cpu;
+    BUG_ON(selected >= wq->nr_pools);
+    return &wq->pools[selected];
+}
 static void wake_workers_locked(struct workqueue_struct *wq)
 {
     struct native_worker *worker;
-    list_for_each_entry(worker, &wq->workers, entry) wake_up_process(worker->task);
+    list_for_each_entry(worker, &wq->workers, entry)
+        /* Callback waits are woken by their own condition. Enqueue/waking a
+         * replacement must not enqueue a callback that is going to sleep,
+         * especially the callback currently notifying the sleep hook. */
+        if (!task_running_locked(worker->task)) wake_up_process(worker->task);
     if (wq->manager) wake_up_process(wq->manager->task);
+}
+static void wake_bound_domain_locked(struct native_pool *pool)
+{
+    struct list_head *entry;
+    list_for_each(entry, &all_queues) {
+        struct workqueue_struct *wq = list_entry(entry, struct workqueue_struct, all);
+        if (!wq->unbound && wq->highpri == pool->wq->highpri) wake_workers_locked(wq);
+    }
 }
 static void wake_sleepers_locked(struct workqueue_struct *wq)
 {
@@ -166,7 +225,7 @@ static bool accepting_locked(struct workqueue_struct *wq)
 bool queue_work_on(int cpu, struct workqueue_struct *wq, struct work_struct *work)
 {
     BUG_ON(!wq || !work->func);
-    if (WARN_ON_ONCE(cpu != WORK_CPU_UNBOUND)) return false;
+    if (WARN_ON_ONCE(!cpu_request_valid(cpu))) return false;
     unsigned long flags;
     raw_spin_lock_irqsave(&work_lock, flags);
     if (work_pending(work) || canceling_locked(work) ||
@@ -174,7 +233,7 @@ bool queue_work_on(int cpu, struct workqueue_struct *wq, struct work_struct *wor
         raw_spin_unlock_irqrestore(&work_lock, flags);
         return false;
     }
-    mark_queued_locked(wq, work);
+    mark_queued_locked(route_locked(cpu, wq, work), work);
     list_add_tail(&work->entry, &wq->pending);
     wake_workers_locked(wq);
     raw_spin_unlock_irqrestore(&work_lock, flags);
@@ -184,10 +243,15 @@ bool queue_work_on(int cpu, struct workqueue_struct *wq, struct work_struct *wor
 static void promote_delayed_locked(struct delayed_work *dwork)
 {
     struct work_struct *work = &dwork->work;
-    struct workqueue_struct *wq = delayed_locked(work);
-    if (!wq) return;
+    struct native_pool *pool = delayed_pool_locked(work);
+    if (!pool) return;
+    struct workqueue_struct *wq = pool->wq;
     list_del_init(&work->entry);
-    mark_queued_locked(wq, work);
+    /* The explicit delayed CPU survives timer execution on the global timer
+     * worker. Running same-owner work is redirected only at transfer time,
+     * as in Linux __queue_work(), not when the timer reservation was armed. */
+    pool = route_locked(dwork->cpu, wq, work);
+    mark_queued_locked(pool, work);
     list_add_tail(&work->entry, &wq->pending);
     wake_workers_locked(wq);
 }
@@ -210,9 +274,15 @@ static void arm_delayed_locked(int cpu, struct workqueue_struct *wq,
 {
     BUG_ON(dwork->timer.function != delayed_work_timer_fn ||
            dwork->timer.flags != TIMER_IRQSAFE);
+    unsigned int selected = cpu == WORK_CPU_UNBOUND ? vinix_linuxkpi_cpu_id() : (unsigned int)cpu;
+    struct native_pool *pool = delay ? &wq->pools[wq->unbound ? 0 : selected] :
+        route_locked(cpu, wq, &dwork->work);
     dwork->wq = wq;
-    dwork->cpu = cpu;
-    mark_data_locked(wq, &dwork->work, delay != 0);
+    /* Native timers have one dispatcher rather than Linux's per-CPU wheels.
+     * Preserve the default caller CPU, corresponding to the local Linux timer,
+     * and the explicit CPU; neither may become the dispatcher's current CPU. */
+    dwork->cpu = wq->unbound ? cpu : (int)selected;
+    mark_data_locked(pool, &dwork->work, delay != 0);
     if (!delay) {
         list_add_tail(&dwork->work.entry, &wq->pending);
         wake_workers_locked(wq);
@@ -225,7 +295,7 @@ bool queue_delayed_work_on(int cpu, struct workqueue_struct *wq,
                            struct delayed_work *dwork, unsigned long delay)
 {
     BUG_ON(!wq || !dwork->work.func);
-    if (WARN_ON_ONCE(cpu != WORK_CPU_UNBOUND)) return false;
+    if (WARN_ON_ONCE(!cpu_request_valid(cpu))) return false;
     unsigned long flags;
     raw_spin_lock_irqsave(&work_lock, flags);
     bool accepted = !work_pending(&dwork->work) &&
@@ -264,7 +334,7 @@ bool mod_delayed_work_on(int cpu, struct workqueue_struct *wq,
                          struct delayed_work *dwork, unsigned long delay)
 {
     BUG_ON(!wq || !dwork->work.func);
-    if (WARN_ON_ONCE(cpu != WORK_CPU_UNBOUND)) return false;
+    if (WARN_ON_ONCE(!cpu_request_valid(cpu))) return false;
     unsigned long flags;
     raw_spin_lock_irqsave(&work_lock, flags);
     bool pending = true;
@@ -314,8 +384,11 @@ static void capture_markers_locked(struct workqueue_struct *wq)
         }
     }
 }
-static struct work_struct *select_work_locked(struct workqueue_struct *wq, u64 *generation)
+static struct work_struct *select_work_locked(struct native_pool *pool, u64 *generation)
 {
+    struct workqueue_struct *wq = pool->wq;
+    if (pool->nr_active >= wq->max_active ||
+        (!wq->unbound && bound_runnable[wq->highpri][pool->cpu])) return NULL;
     u64 epoch = wq->generation;
     struct work_struct *work;
     list_for_each_entry(work, &wq->pending, entry) {
@@ -330,6 +403,7 @@ static struct work_struct *select_work_locked(struct workqueue_struct *wq, u64 *
             if (barrier->queue) epoch = barrier->generation + 1;
             continue;
         }
+        if (queued_pool_locked(work) != pool) continue;
         if (!running_locked(work)) {
             if (generation) *generation = epoch;
             return work;
@@ -365,13 +439,17 @@ static void wait_marker_locked(struct workqueue_struct *wq, struct work_barrier 
     list_del_init(&wait.entry);
     BUG_ON(!detach_locked(&barrier->work));
 }
-static void worker_enter(struct native_worker *worker)
+static bool worker_enter(struct native_worker *worker)
 {
 #ifdef VINIX_LINUXKPI_HOST_TEST
     vinix_linuxkpi_host_worker_enter();
 #endif
     worker->task = get_task_struct(current); /* Owned until join and final exit. */
+    worker->start_result = vinix_linuxkpi_worker_set_nice(worker->wq->highpri ? -20 : 0);
+    if (!worker->start_result && worker->pool && !worker->wq->unbound)
+        worker->start_result = vinix_linuxkpi_worker_bind(worker->pool->cpu);
     complete(&worker->ready);
+    return !worker->start_result;
 }
 static void worker_leave(void)
 {
@@ -385,14 +463,15 @@ static void *work_worker(void *argument)
 {
     struct native_worker *worker = argument;
     struct workqueue_struct *wq = worker->wq;
-    worker_enter(worker);
+    if (!worker_enter(worker)) { worker_leave(); return NULL; }
+    struct native_pool *pool = worker->pool;
     unsigned long flags;
     for (;;) {
-        struct work_run run = { .wq = wq, .task = current };
+        struct work_run run = { .wq = wq, .pool = pool, .task = current };
         INIT_LIST_HEAD(&run.waiters);
         raw_spin_lock_irqsave(&work_lock, flags);
         struct work_struct *work;
-        while (!(work = select_work_locked(wq, &run.generation)) && !wq->stop) {
+        while (!(work = select_work_locked(pool, &run.generation)) && !wq->stop) {
             set_current_state(TASK_UNINTERRUPTIBLE);
             raw_spin_unlock_irqrestore(&work_lock, flags);
             schedule();
@@ -407,7 +486,12 @@ static void *work_worker(void *argument)
         BUG_ON(++wq->sequence == 0);
         run.sequence = wq->sequence;
         detach_locked(work);
-        wq->nr_running++;
+        pool->nr_active++;
+        if (!wq->unbound) {
+            pool->nr_runnable++;
+            bound_runnable[wq->highpri][pool->cpu]++;
+            run.runnable = true;
+        }
         list_add_tail(&run.entry, &running_works);
         wake_workers_locked(wq);
         raw_spin_unlock_irqrestore(&work_lock, flags);
@@ -423,8 +507,13 @@ static void *work_worker(void *argument)
             wake_up_process(wait->task);
         }
         list_del_init(&run.entry);
-        BUG_ON(!wq->nr_running);
-        wq->nr_running--;
+        BUG_ON(!pool->nr_active);
+        pool->nr_active--;
+        if (!wq->unbound) {
+            BUG_ON(!run.runnable || !pool->nr_runnable || !bound_runnable[wq->highpri][pool->cpu]);
+            pool->nr_runnable--;
+            bound_runnable[wq->highpri][pool->cpu]--;
+        }
         wake_sleepers_locked(wq);
         /* A requeued item may now belong to a different worker pool. */
         struct list_head *entry;
@@ -437,19 +526,39 @@ static void *work_worker(void *argument)
     worker_leave();
     return NULL;
 }
-static struct native_worker *start_worker(struct workqueue_struct *wq,
-                                          void *(*function)(void *))
+/* Called on the native scheduler's blocked/resuming transition, with no
+ * scheduler or task wait lock held. Merely changing TASK state, preemption and ordinary
+ * yields do not release runnable concurrency. Sleeping callbacks keep their
+ * active slot; only another active slot can be dispatched after this hook. */
+void vinix_linuxkpi_workqueue_task_sleep(void *task_view)
 {
-    struct native_worker *worker = kzalloc(sizeof(*worker), GFP_KERNEL);
-    if (!worker) return NULL;
-    worker->wq = wq;
-    init_completion(&worker->ready);
-    if (pthread_create(&worker->thread, NULL, function, worker)) {
-        kfree(worker);
-        return NULL;
+    unsigned long flags;
+    raw_spin_lock_irqsave(&work_lock, flags);
+    struct work_run *run;
+    list_for_each_entry(run, &running_works, entry) {
+        if (run->task != task_view || run->wq->unbound || !run->runnable) continue;
+        BUG_ON(!run->pool->nr_runnable || !bound_runnable[run->wq->highpri][run->pool->cpu]);
+        run->runnable = false;
+        run->pool->nr_runnable--;
+        bound_runnable[run->wq->highpri][run->pool->cpu]--;
+        wake_bound_domain_locked(run->pool);
+        break;
     }
-    wait_for_completion(&worker->ready);
-    return worker;
+    raw_spin_unlock_irqrestore(&work_lock, flags);
+}
+void vinix_linuxkpi_workqueue_task_resume(void *task_view)
+{
+    unsigned long flags;
+    raw_spin_lock_irqsave(&work_lock, flags);
+    struct work_run *run;
+    list_for_each_entry(run, &running_works, entry) {
+        if (run->task != task_view || run->wq->unbound || run->runnable) continue;
+        run->pool->nr_runnable++;
+        bound_runnable[run->wq->highpri][run->pool->cpu]++;
+        run->runnable = true;
+        break;
+    }
+    raw_spin_unlock_irqrestore(&work_lock, flags);
 }
 static void join_worker(struct native_worker *worker)
 {
@@ -458,16 +567,41 @@ static void join_worker(struct native_worker *worker)
     put_task_struct(worker->task);
     kfree(worker);
 }
+static struct native_worker *start_worker(struct workqueue_struct *wq, struct native_pool *pool,
+                                          void *(*function)(void *))
+{
+    struct native_worker *worker = kzalloc(sizeof(*worker), GFP_KERNEL);
+    if (!worker) return NULL;
+    worker->wq = wq;
+    worker->pool = pool;
+    init_completion(&worker->ready);
+    if (pthread_create(&worker->thread, NULL, function, worker)) {
+        kfree(worker);
+        return NULL;
+    }
+    wait_for_completion(&worker->ready);
+    if (worker->start_result) { join_worker(worker); return NULL; }
+    return worker;
+}
+static struct native_pool *pool_needing_worker_locked(struct workqueue_struct *wq)
+{
+    for (unsigned int cpu = 0; cpu < wq->nr_pools; cpu++) {
+        struct native_pool *pool = &wq->pools[cpu];
+        if (pool->nr_workers < wq->max_active && pool->nr_active >= pool->nr_workers &&
+            select_work_locked(pool, NULL)) return pool;
+    }
+    return NULL;
+}
 static void *pool_manager(void *argument)
 {
     struct native_worker *manager = argument;
     struct workqueue_struct *wq = manager->wq;
-    worker_enter(manager);
+    if (!worker_enter(manager)) { worker_leave(); return NULL; }
     unsigned long flags;
     for (;;) {
         raw_spin_lock_irqsave(&work_lock, flags);
-        while (!wq->stop && (wq->nr_workers >= wq->max_active ||
-               wq->nr_running < wq->nr_workers || !select_work_locked(wq, NULL))) {
+        struct native_pool *pool;
+        while (!wq->stop && !(pool = pool_needing_worker_locked(wq))) {
             set_current_state(TASK_UNINTERRUPTIBLE);
             raw_spin_unlock_irqrestore(&work_lock, flags);
             schedule();
@@ -476,16 +610,16 @@ static void *pool_manager(void *argument)
         bool stop = wq->stop;
         raw_spin_unlock_irqrestore(&work_lock, flags);
         if (stop) break;
-        /* Only this manager grows its pool. Allocation/thread creation happen
+        /* Only this manager grows pools. Allocation/thread creation happen
          * with IRQs enabled, never on the atomic producer's enqueue path. */
-        struct native_worker *worker = start_worker(wq, work_worker);
+        struct native_worker *worker = start_worker(wq, pool, work_worker);
         if (!worker) { msleep(1); continue; }
 #ifdef VINIX_LINUXKPI_HOST_TEST
-        vinix_linuxkpi_host_pool_publish_gate(wq);
+        vinix_linuxkpi_host_pool_publish_gate(wq, pool->cpu);
 #endif
         raw_spin_lock_irqsave(&work_lock, flags);
         list_add_tail(&worker->entry, &wq->workers);
-        wq->nr_workers++;
+        pool->nr_workers++;
         wake_workers_locked(wq);
         raw_spin_unlock_irqrestore(&work_lock, flags);
     }
@@ -495,15 +629,18 @@ static void *pool_manager(void *argument)
 
 struct workqueue_struct *alloc_workqueue(const char *fmt, unsigned int flags, int max_active, ...)
 {
-    const unsigned int supported = WQ_UNBOUND | __WQ_ORDERED | __WQ_ORDERED_EXPLICIT;
+    const unsigned int supported = WQ_UNBOUND | WQ_HIGHPRI | __WQ_ORDERED | __WQ_ORDERED_EXPLICIT;
     bool ordered = flags & __WQ_ORDERED;
-    if ((flags & ~supported) || !(flags & WQ_UNBOUND) ||
-        (ordered && max_active != 1) || max_active < 0 ||
+    bool unbound = flags & WQ_UNBOUND;
+    unsigned int nr_pools = unbound ? 1 : vinix_linuxkpi_percpu_count();
+    if ((flags & ~supported) || (!unbound && (!nr_pools || nr_pools > 64)) ||
+        (ordered && (!unbound || max_active != 1)) || max_active < 0 ||
         (!ordered && (flags & __WQ_ORDERED_EXPLICIT))) return NULL;
     if (!max_active) max_active = WQ_DFL_ACTIVE;
-    if (max_active > WQ_UNBOUND_MAX_ACTIVE) {
+    unsigned int active_limit = unbound ? WQ_UNBOUND_MAX_ACTIVE : WQ_MAX_ACTIVE;
+    if ((unsigned int)max_active > active_limit) {
         WARN_ON_ONCE(true);
-        max_active = WQ_UNBOUND_MAX_ACTIVE;
+        max_active = active_limit;
     }
     might_sleep();
     struct workqueue_struct *wq = kzalloc(sizeof(*wq), GFP_KERNEL);
@@ -515,6 +652,15 @@ struct workqueue_struct *alloc_workqueue(const char *fmt, unsigned int flags, in
     INIT_LIST_HEAD(&wq->workers);
     wq->max_active = max_active;
     wq->ordered = ordered;
+    wq->unbound = unbound;
+    wq->highpri = flags & WQ_HIGHPRI;
+    wq->nr_pools = nr_pools;
+    wq->pools = kcalloc(nr_pools, sizeof(*wq->pools), GFP_KERNEL);
+    if (!wq->pools) { kfree(wq); return NULL; }
+    for (unsigned int cpu = 0; cpu < nr_pools; cpu++) {
+        wq->pools[cpu].wq = wq;
+        wq->pools[cpu].cpu = cpu;
+    }
     va_list arguments;
     va_start(arguments, max_active);
 #ifdef VINIX_LINUXKPI_HOST_TEST
@@ -523,12 +669,12 @@ struct workqueue_struct *alloc_workqueue(const char *fmt, unsigned int flags, in
     npf_vsnprintf(wq->name, sizeof(wq->name), fmt, arguments);
 #endif
     va_end(arguments);
-    struct native_worker *worker = start_worker(wq, work_worker);
-    if (!worker) { kfree(wq); return NULL; }
+    struct native_worker *worker = start_worker(wq, &wq->pools[0], work_worker);
+    if (!worker) { kfree(wq->pools); kfree(wq); return NULL; }
     list_add_tail(&worker->entry, &wq->workers);
-    wq->nr_workers = 1;
-    if (!ordered && max_active > 1) {
-        wq->manager = start_worker(wq, pool_manager);
+    wq->pools[0].nr_workers = 1;
+    if (!ordered && (!unbound || max_active > 1)) {
+        wq->manager = start_worker(wq, NULL, pool_manager);
         if (!wq->manager) { destroy_workqueue(wq); return NULL; }
     }
     unsigned long irq_flags;
@@ -540,10 +686,22 @@ struct workqueue_struct *alloc_workqueue(const char *fmt, unsigned int flags, in
 
 int vinix_linuxkpi_workqueue_bootstrap(void)
 {
-    if (system_unbound_wq) return 0; /* Serialized boot initialization. */
-    system_unbound_wq = alloc_workqueue("events_unbound", WQ_UNBOUND, 0);
-    if (!system_unbound_wq) return -ENOMEM;
-    system_unbound_wq->system = true;
+    if (system_unbound_wq) { /* Serialized boot initialization. */
+        BUG_ON(!system_wq || !system_highpri_wq);
+        return 0;
+    }
+    struct workqueue_struct *normal = alloc_workqueue("events", 0, 0);
+    if (!normal) return -ENOMEM;
+    struct workqueue_struct *highpri = alloc_workqueue("events_highpri", WQ_HIGHPRI, 0);
+    if (!highpri) { destroy_workqueue(normal); return -ENOMEM; }
+    struct workqueue_struct *unbound = alloc_workqueue("events_unbound", WQ_UNBOUND, 0);
+    if (!unbound) { destroy_workqueue(highpri); destroy_workqueue(normal); return -ENOMEM; }
+    /* Publish only the complete set. Failed boot attempts reclaim every
+     * started worker/manager/task and permit a subsequent initialization. */
+    normal->system = highpri->system = unbound->system = true;
+    system_wq = normal;
+    system_highpri_wq = highpri;
+    system_unbound_wq = unbound;
     return 0;
 }
 #ifdef VINIX_LINUXKPI_HOST_TEST
@@ -557,9 +715,10 @@ bool vinix_linuxkpi_host_workqueue_stopped(struct workqueue_struct *wq)
 }
 void vinix_linuxkpi_workqueue_shutdown_for_test(void)
 {
-    struct workqueue_struct *wq = system_unbound_wq;
-    system_unbound_wq = NULL;
-    if (wq) { wq->system = false; destroy_workqueue(wq); }
+    struct workqueue_struct *queues[] = { system_wq, system_highpri_wq, system_unbound_wq };
+    system_wq = system_highpri_wq = system_unbound_wq = NULL;
+    for (unsigned int i = 0; i < ARRAY_SIZE(queues); i++)
+        if (queues[i]) { queues[i]->system = false; destroy_workqueue(queues[i]); }
 }
 #endif
 
@@ -661,14 +820,16 @@ static bool flush_work_common(struct work_struct *work, struct delayed_work *dwo
     struct workqueue_struct *wq = queued_locked(work);
     if (wq) {
         struct work_run *caller = current_locked();
-        BUG_ON(caller && caller->wq == wq && (wq->ordered || wq->max_active == 1));
+        struct native_pool *pool = queued_pool_locked(work);
+        BUG_ON(caller && caller->wq == wq &&
+               (wq->ordered || (caller->pool == pool && wq->max_active == 1)));
         /* A prior instance can still run on another queue. If the queued
          * instance is canceled, its barrier alone does not wait for that
          * callback; retain a separate stack waiter on its running record. */
         struct work_wait running;
         attach_running_locked(running_locked(work), &running);
         barrier.target = work;
-        mark_queued_locked(wq, &barrier.work);
+        mark_queued_locked(pool, &barrier.work);
         list_add(&barrier.work.entry, &work->entry);
         wake_workers_locked(wq);
         wait_marker_locked(wq, &barrier, &flags);
@@ -698,7 +859,7 @@ void __flush_workqueue(struct workqueue_struct *wq)
     BUG_ON((caller && caller->wq == wq) || wq->stop);
     barrier.generation = wq->generation;
     BUG_ON(++wq->generation == 0);
-    mark_queued_locked(wq, &barrier.work);
+    mark_queued_locked(&wq->pools[0], &barrier.work);
     list_add_tail(&barrier.work.entry, &wq->pending);
     wait_marker_locked(wq, &barrier, &flags);
     raw_spin_unlock_irqrestore(&work_lock, flags);
@@ -762,6 +923,7 @@ void destroy_workqueue(struct workqueue_struct *wq)
         list_del_init(&worker->entry);
         join_worker(worker);
     }
+    kfree(wq->pools);
     kfree(wq);
 }
 
@@ -1142,6 +1304,208 @@ out:
             else drain_workqueue(queues[q]);
         }
     }
+    return result;
+}
+
+struct native_bound_test {
+    struct delayed_work delayed;
+    struct workqueue_struct *wq, *requeue_wq;
+    struct native_bound_test *dependency;
+    struct completion entered, gate, done;
+    struct native_delayed_frees *frees;
+    int *free_result;
+    atomic_t active;
+    unsigned int expected_cpu[2], calls, requeue_cpu;
+    int expected_nice, result;
+    bool hold, spin, release_spin;
+};
+static void native_bound_callback(struct work_struct *work)
+{
+    struct native_bound_test *test = container_of(to_delayed_work(work), struct native_bound_test, delayed);
+    unsigned int call = test->calls++;
+    unsigned int expected = test->expected_cpu[call ? 1 : 0];
+    if (atomic_inc_return(&test->active) != 1 || !vinix_linuxkpi_may_sleep() ||
+        current_work() != work || (expected != WORK_CPU_UNBOUND && vinix_linuxkpi_cpu_id() != expected) ||
+        vinix_linuxkpi_worker_nice() != test->expected_nice ||
+        vinix_linuxkpi_worker_timeslice() != (test->expected_nice == -20 ? 10000 : 5000))
+        test->result = -EIO;
+    complete(&test->entered);
+    while (test->spin && !__atomic_load_n(&test->release_spin, __ATOMIC_ACQUIRE)) cond_resched();
+    if (test->hold) wait_for_completion(&test->gate);
+    if (test->dependency) {
+        if (!queue_work_on(expected, test->wq, &test->dependency->delayed.work)) test->result = -EIO;
+        /* Force preemption on task-dequeue's IRQ restore, before the explicit
+         * park call. The actual scheduler sleep hook must enable replacement. */
+        vinix_linuxkpi_test_park_preempt();
+        if (!wait_for_completion_timeout(&test->dependency->done, 500)) test->result = -EIO;
+    }
+    cond_resched();
+    msleep(1);
+    if (expected != WORK_CPU_UNBOUND && vinix_linuxkpi_cpu_id() != expected) test->result = -EIO;
+    if (!call && test->requeue_wq && !queue_work_on(test->requeue_cpu, test->requeue_wq, work))
+        test->result = -EIO;
+    if (atomic_dec_return(&test->active)) test->result = -EIO;
+    if (test->frees) {
+        struct native_delayed_frees *frees = test->frees;
+        *test->free_result = test->result;
+        kfree(test);
+        if (atomic_inc_return(&frees->count) == 16) complete(&frees->done);
+        return;
+    }
+    if (!test->requeue_wq || call) complete(&test->done);
+}
+static void native_bound_init(struct native_bound_test *test, struct workqueue_struct *wq,
+                               unsigned int cpu, bool highpri)
+{
+    *test = (struct native_bound_test){ .wq = wq, .expected_cpu = { cpu, cpu },
+                                      .expected_nice = highpri ? -20 : 0 };
+    INIT_DELAYED_WORK_ONSTACK(&test->delayed, native_bound_callback);
+    init_completion(&test->entered);
+    init_completion(&test->gate);
+    init_completion(&test->done);
+    atomic_set(&test->active, 0);
+}
+static int native_bound_finish(struct native_bound_test *test)
+{
+    int result = wait_for_completion_timeout(&test->done, 500) ? 0 : -EIO;
+    cancel_delayed_work_sync(&test->delayed);
+    if (test->result || atomic_read(&test->active)) result = -EIO;
+    return result;
+}
+int vinix_linuxkpi_bound_work_native_selftest(void)
+{
+    unsigned int cpus = min_t(unsigned int, vinix_linuxkpi_percpu_count(), 4);
+    struct workqueue_struct *queues[4] = {0};
+    struct native_bound_test tests[4], held[4][2], extra[4], spin, blocked, priority;
+    struct native_bound_test *heap[16] = {0};
+    int free_results[16] = {0};
+    struct native_delayed_frees frees;
+    bool held_initialized = false, heap_submitted = false;
+    int result = 0;
+    queues[0] = alloc_workqueue("vinix-bound", 0, 2);
+    queues[1] = alloc_workqueue("vinix-bound-one", 0, 1);
+    queues[2] = alloc_workqueue("vinix-unbound-high", WQ_UNBOUND | WQ_HIGHPRI, 2);
+    queues[3] = alloc_workqueue("vinix-bound-high", WQ_HIGHPRI, 1);
+    for (unsigned int q = 0; q < ARRAY_SIZE(queues); q++)
+        if (!queues[q]) { result = -ENOMEM; goto out; }
+    /* Every online test CPU must remain the same across native sleep/yield. */
+    for (unsigned int cpu = 0; cpu < cpus; cpu++) {
+        native_bound_init(&tests[cpu], queues[0], cpu, false);
+        BUG_ON(!queue_work_on(cpu, queues[0], &tests[cpu].delayed.work));
+    }
+    for (unsigned int cpu = 0; cpu < cpus; cpu++)
+        if (native_bound_finish(&tests[cpu]) || tests[cpu].calls != 1) result = -EIO;
+    unsigned int caller_cpu = get_cpu();
+    native_bound_init(&tests[0], queues[0], caller_cpu, false);
+    if (!queue_work(queues[0], &tests[0].delayed.work)) result = -EIO;
+    put_cpu();
+    if (native_bound_finish(&tests[0])) result = -EIO;
+    native_bound_init(&tests[0], queues[2], WORK_CPU_UNBOUND, true);
+    BUG_ON(!queue_work(queues[2], &tests[0].delayed.work));
+    if (native_bound_finish(&tests[0])) result = -EIO;
+    /* Delayed explicit routing persists despite the global timer worker. */
+    native_bound_init(&tests[0], queues[0], cpus - 1, false);
+    unsigned long irq_flags = vinix_linuxkpi_irq_save();
+    if (!queue_delayed_work_on(0, queues[0], &tests[0].delayed, 100000) ||
+        !mod_delayed_work_on(cpus - 1, queues[0], &tests[0].delayed, 2)) result = -EIO;
+    vinix_linuxkpi_irq_restore(irq_flags);
+    if (native_bound_finish(&tests[0])) result = -EIO;
+    for (unsigned int migration = 0; migration < 2; migration++) {
+        native_bound_init(&tests[0], queues[0], 0, false);
+        tests[0].requeue_wq = queues[migration];
+        tests[0].requeue_cpu = cpus - 1;
+        tests[0].expected_cpu[1] = migration ? cpus - 1 : 0;
+        BUG_ON(!queue_work_on(0, queues[0], &tests[0].delayed.work));
+        if (native_bound_finish(&tests[0]) || tests[0].calls != 2) result = -EIO;
+    }
+    native_bound_init(&tests[0], queues[0], 0, false);
+    native_bound_init(&tests[1], queues[0], 0, false);
+    tests[0].dependency = &tests[1];
+    BUG_ON(!queue_work_on(0, queues[0], &tests[0].delayed.work));
+    if (native_bound_finish(&tests[0])) result = -EIO;
+    cancel_delayed_work_sync(&tests[1].delayed);
+    if (tests[1].calls != 1 || tests[1].result) result = -EIO;
+    /* Sleeping callbacks retain active slots, independently on every CPU. */
+    for (unsigned int cpu = 0; cpu < cpus; cpu++) {
+        for (unsigned int slot = 0; slot < 2; slot++) {
+            native_bound_init(&held[cpu][slot], queues[0], cpu, false);
+            held[cpu][slot].hold = true;
+        }
+        native_bound_init(&extra[cpu], queues[0], cpu, false);
+    }
+    held_initialized = true;
+    for (unsigned int cpu = 0; cpu < cpus; cpu++) {
+        for (unsigned int slot = 0; slot < 2; slot++) {
+            BUG_ON(!queue_work_on(cpu, queues[0], &held[cpu][slot].delayed.work));
+            if (!wait_for_completion_timeout(&held[cpu][slot].entered, 500)) { result = -EIO; goto out; }
+        }
+        BUG_ON(!queue_work_on(cpu, queues[0], &extra[cpu].delayed.work));
+    }
+    msleep(2);
+    for (unsigned int cpu = 0; cpu < cpus; cpu++) {
+        if (READ_ONCE(extra[cpu].calls)) result = -EIO;
+        complete(&held[cpu][0].gate);
+        if (native_bound_finish(&extra[cpu])) result = -EIO;
+        complete(&held[cpu][1].gate);
+        for (unsigned int slot = 0; slot < 2; slot++)
+            if (native_bound_finish(&held[cpu][slot])) result = -EIO;
+    }
+    held_initialized = false;
+    /* Normal bound owners share runnable concurrency; high priority uses a
+     * separate domain. Only an actual sleep permits blocked normal work. */
+    native_bound_init(&spin, queues[0], 0, false);
+    native_bound_init(&blocked, queues[1], 0, false);
+    native_bound_init(&priority, queues[3], 0, true);
+    spin.spin = spin.hold = true;
+    BUG_ON(!queue_work_on(0, queues[0], &spin.delayed.work));
+    if (!wait_for_completion_timeout(&spin.entered, 500)) result = -EIO;
+    BUG_ON(!queue_work_on(0, queues[1], &blocked.delayed.work));
+    BUG_ON(!queue_work_on(0, queues[3], &priority.delayed.work));
+    if (native_bound_finish(&priority)) result = -EIO;
+    if (READ_ONCE(blocked.calls)) result = -EIO;
+    __atomic_store_n(&spin.release_spin, true, __ATOMIC_RELEASE);
+    if (native_bound_finish(&blocked)) result = -EIO;
+    complete(&spin.gate);
+    if (native_bound_finish(&spin)) result = -EIO;
+    /* Warm both permanent bound system queues on each CPU before allocation
+     * measurement. Temporary self-freeing objects exercise detached records. */
+    for (unsigned int cpu = 0; cpu < cpus; cpu++) {
+        native_bound_init(&tests[cpu], system_wq, cpu, false);
+        BUG_ON(!schedule_work_on(cpu, &tests[cpu].delayed.work));
+    }
+    for (unsigned int cpu = 0; cpu < cpus; cpu++)
+        if (native_bound_finish(&tests[cpu])) result = -EIO;
+    for (unsigned int cpu = 0; cpu < cpus; cpu++) {
+        native_bound_init(&tests[cpu], system_highpri_wq, cpu, true);
+        BUG_ON(!queue_work_on(cpu, system_highpri_wq, &tests[cpu].delayed.work));
+    }
+    for (unsigned int cpu = 0; cpu < cpus; cpu++)
+        if (native_bound_finish(&tests[cpu])) result = -EIO;
+    atomic_set(&frees.count, 0);
+    init_completion(&frees.done);
+    for (unsigned int i = 0; i < ARRAY_SIZE(heap); i++) {
+        heap[i] = kzalloc(sizeof(*heap[i]), GFP_KERNEL);
+        if (!heap[i]) { result = -ENOMEM; goto out; }
+        native_bound_init(heap[i], queues[0], i % cpus, false);
+        heap[i]->frees = &frees;
+        heap[i]->free_result = &free_results[i];
+    }
+    heap_submitted = true;
+    for (unsigned int i = 0; i < ARRAY_SIZE(heap); i++)
+        BUG_ON(!queue_work_on(i % cpus, queues[0], &heap[i]->delayed.work));
+    if (!wait_for_completion_timeout(&frees.done, 500)) { result = -EIO; wait_for_completion(&frees.done); }
+    flush_workqueue(queues[0]);
+    if (atomic_read(&frees.count) != ARRAY_SIZE(heap)) result = -EIO;
+    for (unsigned int i = 0; i < ARRAY_SIZE(heap); i++)
+        if (free_results[i]) result = -EIO;
+out:
+    if (held_initialized)
+        for (unsigned int cpu = 0; cpu < cpus; cpu++)
+            for (unsigned int slot = 0; slot < 2; slot++) complete(&held[cpu][slot].gate);
+    if (!heap_submitted)
+        for (unsigned int i = 0; i < ARRAY_SIZE(heap); i++) kfree(heap[i]);
+    for (unsigned int q = 0; q < ARRAY_SIZE(queues); q++)
+        if (queues[q]) destroy_workqueue(queues[q]);
     return result;
 }
 

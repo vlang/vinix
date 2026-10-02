@@ -56,26 +56,26 @@ pub mut:
 	// Movable members
 	// Borrowed Linux current-task view, owned by this Thread. Its C layout
 	// and alignment are checked in c/linuxkpi_task.c; it adds no allocation.
-	linuxkpi_task       [8]u64
-	tid                int
-	ns_tid             int
-	is_in_queue        bool
+	linuxkpi_task [8]u64
+	tid           int
+	ns_tid        int
+	is_in_queue   bool
 	// A filesystem change this thread made during its syscall that is not on
 	// the device yet. It is flushed on the way back to userspace, or once an
 	// exiting process' descriptors are closed, where no lock is held; see
 	// flush_on_return in fs/ext2.
-	owes_sync          bool
-	l                  klock.Lock
-	process            &Process = unsafe { nil }
-	gpr_state          cpulocal.GPRState
-	gs_base            u64
-	fs_base            u64
+	owes_sync bool
+	l         klock.Lock
+	process   &Process = unsafe { nil }
+	gpr_state cpulocal.GPRState
+	gs_base   u64
+	fs_base   u64
 	// The selectors the thread had in FS and GS when it came off its CPU,
 	// and the TLS descriptors set_thread_area(2) gave it, GDT entries
 	// gdt.tls_first_entry on. See sched/segments_amd64.v.
-	fs_selector u16
-	gs_selector u16
-	tls         [3]u64
+	fs_selector        u16
+	gs_selector        u16
+	tls                [3]u64
 	pf_stack           u64
 	cr3                u64
 	fpu_storage        voidptr
@@ -99,11 +99,11 @@ pub mut:
 	pending_signal_codes    [64]int
 	pending_signal_values   [64]u64
 	pending_signal_overruns [64]int
-	stacks             []voidptr
+	stacks                  []voidptr
 	// The name PR_SET_NAME gave the thread; empty for one never named.
-	comm string
-	attached_events    [max_events]&eventstruct.Event
-	attached_events_i  u64
+	comm              string
+	attached_events   [max_events]&eventstruct.Event
+	attached_events_i u64
 	// Monotonic reading taken when this thread was last put on a CPU, or 0
 	// when it is not running. What it owes is charged to its process at the
 	// moment it is switched away, so the running total never counts a span
@@ -116,12 +116,18 @@ pub mut:
 	// Set while the thread waits on its way back to userspace for its frozen or
 	// throttled cgroup, so the scheduler treats it as stopped in userspace.
 	at_user_boundary bool
-	affinity_mask   u64 = u64(-1)
+	affinity_mask    u64 = u64(-1)
 	// Scheduling policy, priority and, under SCHED_DEADLINE, the budget left
 	// in this period. Inherited by fork and by every thread a process clones,
 	// and kept across exec, so `chrt -f 50 ./program` gives the program the
 	// priority and not just the shell that asked for it.
 	sched SchedParams
+	// Kernel workers can request an ordinary nice weight without changing
+	// the shared kernel Process or the scheduling policy of other threads.
+	sched_nice_override     int
+	sched_has_nice_override bool
+	// Native constructor fault injection belongs to its calling task.
+	kernel_thread_fail_stage int
 	// Set by a thread that has asked to give up the rest of its turn. It is
 	// what tells the scheduler that an equally ranked thread may take the CPU
 	// from a policy which otherwise runs to completion.
@@ -245,4 +251,3 @@ pub fn get_main_thread(process &Process) &Thread {
 
 // What a seccomp program sees as seccomp_data.arch.
 pub const seccomp_audit_arch = audit_arch_x86_64
-

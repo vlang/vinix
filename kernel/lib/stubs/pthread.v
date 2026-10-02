@@ -17,7 +17,9 @@ pub fn pthread_create(t &&C.__thread_data, attr &C.__threadattr, start_routine f
 		lib.kpanic(unsafe { nil }, c'pthread_create() called with non-NULL attr')
 	}
 
-	mut thrd := sched.new_kernel_thread(voidptr(start_routine), arg, false)
+	mut thrd := sched.try_new_kernel_thread(voidptr(start_routine), arg) or {
+		return errno.eagain
+	}
 	proc.pin_thread(thrd)
 	thrd.pthread_joinable = 1
 	if !sched.enqueue_thread(thrd, false) {

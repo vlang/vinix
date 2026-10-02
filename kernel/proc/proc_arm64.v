@@ -23,10 +23,10 @@ pub mut:
 	user_stack   u64
 	syscall_num  u64
 	// Movable members
-	tid                int
+	tid int
 	// The tid as the thread's pid namespace numbers it; see Process.ns_pid.
-	ns_tid             int
-	is_in_queue        bool
+	ns_tid      int
+	is_in_queue bool
 	// A filesystem change this thread made during its syscall that is not on
 	// the device yet. It is flushed on the way back to userspace, or once an
 	// exiting process' descriptors are closed, where no lock is held; see
@@ -35,8 +35,8 @@ pub mut:
 	l                  klock.Lock
 	process            &Process = unsafe { nil }
 	gpr_state          cpulocal.GPRState
-	tpidr_el0          u64 // user TLS pointer (saved/restored on context switch)
-	ttbr0              u64 // user page table root
+	tpidr_el0          u64     // user TLS pointer (saved/restored on context switch)
+	ttbr0              u64     // user page table root
 	fpu_storage        voidptr // NEON/FP register state
 	yield_await        klock.Lock
 	timeslice          u64
@@ -58,13 +58,13 @@ pub mut:
 	pending_signal_codes    [64]int
 	pending_signal_values   [64]u64
 	pending_signal_overruns [64]int
-	stacks             []voidptr
+	stacks                  []voidptr
 	// The name PR_SET_NAME gave the thread, which a new thread takes from the
 	// one that made it; empty for one never named, which goes by its
 	// process's.
-	comm string
-	attached_events    [max_events]&eventstruct.Event
-	attached_events_i  u64
+	comm              string
+	attached_events   [max_events]&eventstruct.Event
+	attached_events_i u64
 	// Linux thread bookkeeping
 	clear_child_tid  u64  // set_tid_address()/CLONE_CHILD_CLEARTID futex word
 	robust_list_head u64  // set_robust_list() head, walked on thread exit
@@ -94,12 +94,16 @@ pub mut:
 	// Set while the thread waits on its way back to userspace for its frozen or
 	// throttled cgroup, so the scheduler treats it as stopped in userspace.
 	at_user_boundary bool
-	affinity_mask   u64 = u64(-1)
+	affinity_mask    u64 = u64(-1)
 	// Scheduling policy, priority and, under SCHED_DEADLINE, the budget left
 	// in this period. Inherited by fork and by every thread a process clones,
 	// and kept across exec, so `chrt -f 50 ./program` gives the program the
 	// priority and not just the shell that asked for it.
 	sched SchedParams
+	// Per-thread kernel-worker weight; userspace retains Process.nice.
+	sched_nice_override      int
+	sched_has_nice_override  bool
+	kernel_thread_fail_stage int
 	// Set by a thread that has asked to give up the rest of its turn. It is
 	// what tells the scheduler that an equally ranked thread may take the CPU
 	// from a policy which otherwise runs to completion.
@@ -248,4 +252,3 @@ pub fn get_main_thread(process &Process) &Thread {
 
 // What a seccomp program sees as seccomp_data.arch.
 pub const seccomp_audit_arch = audit_arch_aarch64
-

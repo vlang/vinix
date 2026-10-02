@@ -18,6 +18,7 @@ __global (
 	preempt_depth     [256]u32
 	preempt_pending   [256]bool
 	preempt_deferrals [256]u64
+	park_preempt_test [256]voidptr
 	fpu_borrowed      [256]bool
 )
 
@@ -169,6 +170,25 @@ fn task_enqueue(owner voidptr) bool {
 fn task_dequeue(owner voidptr) {
 	assert owner == voidptr(proc.current_thread())
 	sched.dequeue_thread(unsafe { &proc.Thread(owner) })
+	index := cpulocal.current().cpu_number
+	if park_preempt_test[index] == owner {
+		park_preempt_test[index] = unsafe { nil }
+		preempt_pending[index] = true
+	}
+}
+
+// Exercise a reschedule during IRQ restoration after schedule() dequeues a
+// task, before it reaches its explicit park call. Used only by native tests.
+@[export: 'vinix_linuxkpi_test_park_preempt']
+fn test_park_preempt() {
+	ints := cpu.interrupt_toggle(false)
+	park_preempt_test[cpulocal.current().cpu_number] = voidptr(proc.current_thread())
+	cpu.interrupt_toggle(ints)
+}
+
+@[export: 'vinix_linuxkpi_test_worker_oom']
+fn test_worker_oom(stage i32) {
+	sched.test_kernel_thread_failure(int(stage))
 }
 
 @[export: 'vinix_linuxkpi_task_park']
@@ -355,6 +375,8 @@ fn C.vinix_linuxkpi_timer_native_selftest() int
 fn C.vinix_linuxkpi_workqueue_native_selftest() int
 fn C.vinix_linuxkpi_workqueue_bootstrap() int
 fn C.vinix_linuxkpi_unbound_work_native_selftest() int
+fn C.vinix_linuxkpi_bound_work_native_selftest() int
+fn C.vinix_linuxkpi_worker_native_selftest() int
 fn C.vinix_linuxkpi_delayed_work_native_selftest() int
 fn C.vinix_linuxkpi_percpu_bootstrap(u32) int
 
@@ -572,6 +594,44 @@ pub fn initialise() {
 			lib.kpanic(unsafe { nil }, c'Linux concurrent unbound work self-test retained native pages')
 		}
 		C.kprintf(c'linuxkpi: concurrent unbound workqueues, active limits, system_unbound_wq and teardown passed; no pages retained\n')
+		for _ in 0 .. 3 {
+			if C.vinix_linuxkpi_bound_work_native_selftest() != 0 {
+				lib.kpanic(unsafe { nil }, c'Linux bound and priority work self-test failed')
+			}
+		}
+		bound_before := selftest_free_baseline()
+		if C.vinix_linuxkpi_bound_work_native_selftest() != 0 {
+			lib.kpanic(unsafe { nil }, c'Linux bound and priority work self-test failed')
+		}
+		bound_reap_start := hpet_clock.nanoseconds()
+		for memory.free_bytes() != bound_before && hpet_clock.nanoseconds() - bound_reap_start < 1000000000 {
+			sched.reap_deferred()
+			sched.reschedule()
+		}
+		if memory.free_bytes() != bound_before {
+			C.kprintf(c'linuxkpi: bound work free-byte baseline=%llu after=%llu\n', bound_before, memory.free_bytes())
+			lib.kpanic(unsafe { nil }, c'Linux bound and priority work self-test retained native pages')
+		}
+		C.kprintf(c'linuxkpi: bound CPU routing, runnable concurrency, per-CPU active limits, priority and system queues passed; no pages retained\n')
+		for _ in 0 .. 3 {
+			if C.vinix_linuxkpi_worker_native_selftest() != 0 {
+				lib.kpanic(unsafe { nil }, c'Linux native worker failure self-test failed')
+			}
+		}
+		worker_before := selftest_free_baseline()
+		if C.vinix_linuxkpi_worker_native_selftest() != 0 {
+			lib.kpanic(unsafe { nil }, c'Linux native worker failure self-test failed')
+		}
+		worker_reap_start := hpet_clock.nanoseconds()
+		for memory.free_bytes() != worker_before && hpet_clock.nanoseconds() - worker_reap_start < 1000000000 {
+			sched.reap_deferred()
+			sched.reschedule()
+		}
+		if memory.free_bytes() != worker_before {
+			C.kprintf(c'linuxkpi: worker free-byte baseline=%llu after=%llu\n', worker_before, memory.free_bytes())
+			lib.kpanic(unsafe { nil }, c'Linux native worker failure self-test retained native pages')
+		}
+		C.kprintf(c'linuxkpi: native worker allocation rollback, affinity validation and isolated nice weights passed; no pages retained\n')
 		// Exercise a real scheduler interrupt with preemption disabled and
 		// IRQs still enabled, rather than relying only on host lock tests.
 		preempt_disable()

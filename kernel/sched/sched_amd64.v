@@ -17,6 +17,8 @@ import krandom
 import klock
 
 fn C.vinix_call_void_fn(f voidptr)
+fn C.vinix_linuxkpi_workqueue_task_sleep(task voidptr)
+fn C.vinix_linuxkpi_workqueue_task_resume(task voidptr)
 
 __global (
 	// Hardware that this kernel drives without interrupts -- a network card --
@@ -154,6 +156,7 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 	krandom.add_event(now_ns)
 
 	mut current_thread := proc.current_thread()
+	from_idle := current_thread == unsafe { nil }
 
 	// Charge the turn that has just ended against the real-time entitlements it
 	// was spending, and against its cgroup's cpu.max, before the pick below: a
@@ -161,6 +164,15 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 	account_realtime_time(cpu_local.cpu_number, current_thread, now_ns)
 	if unsafe { current_thread != 0 } {
 		proc.charge_cgroup_cpu(mut current_thread, now_ns)
+		$if linuxkpi ? {
+			// Notify at the actual switch boundary. IRQ restoration after a
+			// Linux task dequeues can preempt it before its explicit park call.
+			// The preemption guard has excluded compatibility lock holders;
+			// neither the native queue nor the task wait lock is held here.
+			if !katomic.load(&current_thread.is_in_queue) {
+				C.vinix_linuxkpi_workqueue_task_sleep(voidptr(&current_thread.linuxkpi_task[0]))
+			}
+		}
 	}
 
 	mut next_thread := get_next_thread()
@@ -197,6 +209,11 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 			}
 		}
 		if keeps_cpu && !preset {
+			$if linuxkpi ? {
+				// A wake can re-enqueue the thread after the blocked
+				// notification and before entitlement is checked below.
+				C.vinix_linuxkpi_workqueue_task_resume(voidptr(&current_thread.linuxkpi_task[0]))
+			}
 			current_thread.yield_requested = false
 			// An LDT another thread of the process has made since, which
 			// set_ldt_entry() may be waiting for this CPU to take up.
@@ -223,8 +240,32 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 		save_fs_gs(mut current_thread)
 		current_thread.cr3 = cpu.read_cr3()
 		fpu_save(current_thread.fpu_storage)
+		$if linuxkpi ? {
+			if next_thread != unsafe { nil } {
+				// The outgoing GS view still names this CPU here. After
+				// running_on is cleared, native lock helpers cannot use it.
+				C.vinix_linuxkpi_workqueue_task_resume(voidptr(&next_thread.linuxkpi_task[0]))
+			}
+		}
 		katomic.store(mut &current_thread.running_on, u64(-1))
+		// Capture the destination before releasing the thread: another CPU can
+		// take it immediately after the unlock. An earlier affinity IPI may have
+		// found its scheduling lock still held and gone back to sleep.
+		mut migration_cpu := u32(-1)
+		if katomic.load(&current_thread.is_in_queue)
+			&& !may_run_here(current_thread, cpu_local.cpu_number) {
+			for entry in cpu_locals {
+				if katomic.load(&entry.online) != 0
+					&& may_run_here(current_thread, entry.cpu_number) {
+					migration_cpu = u32(entry.cpu_number)
+					break
+				}
+			}
+		}
 		current_thread.l.release()
+		if migration_cpu != u32(-1) {
+			wake_cpu(migration_cpu)
+		}
 	}
 
 	if unsafe { next_thread == nil } {
@@ -243,6 +284,11 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 	}
 
 	current_thread = next_thread
+	$if linuxkpi ? {
+		if from_idle {
+			C.vinix_linuxkpi_workqueue_task_resume(voidptr(&current_thread.linuxkpi_task[0]))
+		}
+	}
 	proc.begin_cpu_time(mut current_thread, now_ns)
 
 	// The first CPU to run a thread claims it for its node, so that the pages
@@ -336,6 +382,16 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 	}
 }
 
+// Wake a specific boot-online CPU, including a target whose affinity was
+// just published while its thread is still running elsewhere.
+pub fn wake_cpu(number u32) bool {
+	if number >= u32(cpu_locals.len) || katomic.load(&cpu_locals[number].online) == 0 {
+		return false
+	}
+	apic.lapic_send_ipi(cpu_locals[number].lapic_id, scheduler_vector)
+	return true
+}
+
 pub fn enqueue_thread(_thread &proc.Thread, by_signal bool) bool {
 	mut t := unsafe { _thread }
 
@@ -365,10 +421,13 @@ pub fn enqueue_thread(_thread &proc.Thread, by_signal bool) bool {
 		if katomic.cas[&proc.Thread](mut &scheduler_running_queue[i], unsafe { nil }, t) {
 			katomic.store(mut &t.is_in_queue, true)
 
-			// Check if any CPU is idle and wake it up
+			// Wake an idle CPU that can actually run this thread. A bound
+			// worker must not leave its target asleep by waking another CPU.
 			for cpu_entry in cpu_locals {
-				if katomic.load(&cpu_entry.is_idle) == true {
-					apic.lapic_send_ipi(u8(cpu_entry.lapic_id), scheduler_vector)
+				if katomic.load(&cpu_entry.online) != 0
+					&& may_run_here(t, cpu_entry.cpu_number)
+					&& katomic.load(&cpu_entry.is_idle) {
+					apic.lapic_send_ipi(cpu_entry.lapic_id, scheduler_vector)
 					break
 				}
 			}
@@ -588,26 +647,26 @@ pub fn new_kernel_thread(pc voidptr, arg voidptr, autoenqueue bool) &proc.Thread
 	unsafe { C.memset(voidptr(entry_stack), 0, 8) }
 
 	gpr_state := cpulocal.GPRState{
-		cs: kernel_code_seg
-		ds: kernel_data_seg
-		es: kernel_data_seg
-		ss: kernel_data_seg
+		cs:     kernel_code_seg
+		ds:     kernel_data_seg
+		es:     kernel_data_seg
+		ss:     kernel_data_seg
 		rflags: 0x202
-		rip: u64(pc)
-		rdi: u64(arg)
-		rbp: u64(0)
-		rsp: entry_stack
+		rip:    u64(pc)
+		rdi:    u64(arg)
+		rbp:    u64(0)
+		rsp:    entry_stack
 	}
 
 	mut t := &proc.Thread{
-		process: kernel_process
-		cr3: u64(kernel_process.pagemap.top_level)
-		gpr_state: gpr_state
-		timeslice: 5000
-		running_on: u64(-1)
+		process:      kernel_process
+		cr3:          u64(kernel_process.pagemap.top_level)
+		gpr_state:    gpr_state
+		timeslice:    5000
+		running_on:   u64(-1)
 		kernel_stack: stack
-		pf_stack: u64(pf_stack_phys) + stack_size + higher_half
-		fpu_storage: voidptr(u64(memory.pmm_alloc(lib.div_roundup(fpu_storage_size, page_size))) + higher_half)
+		pf_stack:     u64(pf_stack_phys) + stack_size + higher_half
+		fpu_storage:  voidptr(u64(memory.pmm_alloc(lib.div_roundup(fpu_storage_size, page_size))) + higher_half)
 	}
 
 	t.self = voidptr(t)
@@ -647,26 +706,26 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 	pf_stack := u64(pf_stack_phys) + stack_size + higher_half
 
 	gpr_state := cpulocal.GPRState{
-		cs: user_code_seg
-		ds: user_data_seg
-		es: user_data_seg
-		ss: user_data_seg
+		cs:     user_code_seg
+		ds:     user_data_seg
+		es:     user_data_seg
+		ss:     user_data_seg
 		rflags: 0x202
-		rip: u64(pc)
-		rdi: u64(arg)
-		rsp: u64(stack_vma)
+		rip:    u64(pc)
+		rdi:    u64(arg)
+		rsp:    u64(stack_vma)
 	}
 
 	mut t := &proc.Thread{
-		process: process
-		cr3: u64(process.pagemap.top_level)
-		gpr_state: gpr_state
-		timeslice: 5000
-		running_on: u64(-1)
+		process:      process
+		cr3:          u64(process.pagemap.top_level)
+		gpr_state:    gpr_state
+		timeslice:    5000
+		running_on:   u64(-1)
 		kernel_stack: kernel_stack
-		pf_stack: pf_stack
-		stacks: stacks
-		fpu_storage: voidptr(u64(memory.pmm_alloc(lib.div_roundup(fpu_storage_size, page_size))) + higher_half)
+		pf_stack:     pf_stack
+		stacks:       stacks
+		fpu_storage:  voidptr(u64(memory.pmm_alloc(lib.div_roundup(fpu_storage_size, page_size))) + higher_half)
 	}
 
 	t.self = voidptr(t)
