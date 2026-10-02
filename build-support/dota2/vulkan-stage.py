@@ -52,7 +52,8 @@ def main() -> None:
     # vulkan-tools also carries a Python report utility; vulkaninfo and
     # vkcube are ELF programs, so neither Python nor dpkg is needed here.
     selected = resolver.resolve(resolver.parse_index(index),
-                                ["libvulkan1", "mesa-vulkan-drivers", "vulkan-tools"],
+                                ["libvulkan1", "mesa-vulkan-drivers", "vulkan-tools",
+                                 "libpipewire-0.3-0", "libopenal1", "libnm0"],
                                 existing | {"python3", "dpkg"})
     rows = [{"package": p.name, "version": p.version, "filename": p.filename,
              "sha256": p.sha256} for p in selected]

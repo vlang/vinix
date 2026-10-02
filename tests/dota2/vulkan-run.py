@@ -1,0 +1,232 @@
+#!/usr/bin/env python3
+"""Boot actual ARM64 Vinix and exercise translated glibc lavapipe/X11."""
+from __future__ import annotations
+
+import argparse
+import base64
+import hashlib
+import json
+import os
+from pathlib import Path
+import pty
+import re
+import select
+import shutil
+import signal
+import struct
+import subprocess
+import sys
+import tarfile
+import time
+
+REPO = Path(__file__).resolve().parents[2]
+
+
+def copy_layer(source: Path, target: Path) -> None:
+    target.mkdir(parents=True, exist_ok=True)
+    for entry in source.iterdir():
+        destination = target / entry.name
+        if entry.is_symlink():
+            if destination.exists() or destination.is_symlink():
+                if destination.is_dir() and not destination.is_symlink():
+                    continue
+                destination.unlink()
+            destination.symlink_to(os.readlink(entry))
+        elif entry.is_dir():
+            copy_layer(entry, destination)
+        else:
+            if destination.is_symlink():
+                destination.unlink()
+            shutil.copy2(entry, destination)
+
+
+def complete_native_closure(root: Path) -> None:
+    userland = REPO / "build-aarch64-userland/staging"
+    queue = [root / "usr/bin/Xvfb", root / "usr/bin/xkbcomp"]
+    seen = set()
+    while queue:
+        binary = queue.pop()
+        if binary in seen or not binary.exists():
+            continue
+        seen.add(binary)
+        output = subprocess.check_output(["aarch64-linux-musl-readelf", "-d", str(binary)], text=True)
+        for name in re.findall(r"\(NEEDED\).*\[([^]]+)\]", output):
+            library = next((root / directory / name for directory in ("usr/lib", "lib")
+                            if (root / directory / name).exists()), None)
+            if library is None:
+                source = next((userland / directory / name for directory in ("usr/lib", "lib")
+                               if (userland / directory / name).exists()), None)
+                if source is None:
+                    raise SystemExit(f"native Xvfb dependency is missing: {name}")
+                library = root / "usr/lib" / name
+                if library.is_symlink():
+                    library.unlink()
+                shutil.copy2(source, library)
+            queue.append(library)
+
+
+def prepare(args, work: Path) -> Path:
+    root = work / "root"
+    if not (root / ".prepared").exists():
+        copy_layer(REPO / "build-aarch64-x11/staging", root)
+        native = REPO / "build-aarch64-x86-translation/staging"
+        for directory in ("usr/lib", "lib"):
+            copy_layer(native / directory, root / directory)
+        (root / "usr/bin").mkdir(parents=True, exist_ok=True)
+        shutil.copy2(native / "usr/bin/qemu-x86_64", root / "usr/bin/qemu-x86_64")
+        (root / "bin").mkdir(exist_ok=True)
+        userland = REPO / "build-aarch64-userland/staging"
+        shutil.copy2(userland / "bin/busybox", root / "bin/busybox")
+        loader = root / "lib/ld-musl-aarch64.so.1"
+        if loader.is_symlink():
+            loader.unlink()
+        shutil.copy2(userland / "lib/ld-musl-aarch64.so.1", loader)
+        for name in ("sh", "cat", "mkdir", "chmod", "sleep", "kill", "base64", "uname", "grep"):
+            target = root / "bin" / name
+            if target.exists() or target.is_symlink():
+                target.unlink()
+            target.symlink_to("busybox")
+        for directory in ("sbin", "proc", "dev", "sys", "tmp", "root", "run", "etc"):
+            (root / directory).mkdir(parents=True, exist_ok=True)
+        (root / "etc/passwd").write_text("root:x:0:0:root:/root:/bin/sh\n")
+        (root / "etc/group").write_text("root:x:0:root\n")
+        (root / ".prepared").touch()
+    source = args.staging / "usr/libexec/vinix-dota2/root"
+    generation = (source / ".vinix-dota2-vulkan-generation").read_text()
+    marker = root / ".vulkan-runtime-generation"
+    guest = root / "usr/libexec/vinix-dota2/root"
+    if not marker.exists() or marker.read_text() != generation or not guest.exists():
+        if guest.exists():
+            shutil.rmtree(guest)
+        guest.parent.mkdir(parents=True, exist_ok=True)
+        if sys.platform == "darwin":
+            subprocess.run(["/bin/cp", "-cRp", str(source), str(guest)], check=True)
+        else:
+            shutil.copytree(source, guest, symlinks=True)
+        marker.write_text(generation)
+    shutil.copy2(Path(__file__).with_name("vulkan-init.sh"), root / "sbin/init")
+    (root / "sbin/init").chmod(0o755)
+    complete_native_closure(root)
+    # This probe never starts Steam, Wine or a GL client. Keep its RAM root
+    # small by leaving the 32-bit runtime and unused DRI drivers out.
+    for path in (guest / "usr/lib/i386-linux-gnu", guest / "lib/i386-linux-gnu",
+                 guest / "usr/lib/x86_64-linux-gnu/dri", guest / "usr/share/doc",
+                 guest / "usr/share/man", guest / "usr/share/locale"):
+        if path.exists():
+            shutil.rmtree(path)
+    return root
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--staging", type=Path, default=REPO / "build/dota2-vulkan/staging")
+    parser.add_argument("--work", type=Path, default=REPO / "build/dota2-vulkan/test")
+    parser.add_argument("--kernel-dir", type=Path, default=REPO / "kernel")
+    parser.add_argument("--timeout", type=int, default=600)
+    args = parser.parse_args()
+    args.staging = args.staging.resolve()
+    args.kernel_dir = args.kernel_dir.resolve()
+    work = args.work.resolve()
+    work.mkdir(parents=True, exist_ok=True)
+    root = prepare(args, work)
+    archive = work / "initramfs.tar.gz"
+    with tarfile.open(archive, "w:gz", compresslevel=1, format=tarfile.USTAR_FORMAT) as tar:
+        tar.add(root, arcname=".")
+    pinned_kernel = work / "kernel/bin"
+    pinned_kernel.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(args.kernel_dir / "bin/vinix", pinned_kernel / "vinix")
+    socket_path = work / "qmp.sock"
+    if socket_path.exists():
+        socket_path.unlink()
+    environment = {**os.environ,
+        "VINIX_KERNEL_DIR": str(pinned_kernel.parent), "VINIX_INITRAMFS": str(archive),
+        "VINIX_INITRAMFS_COMPRESSED": "1", "VINIX_QEMU_ROOT_DISK": "0",
+        "VINIX_BOOT_DISK": str(work / "boot.img"), "VINIX_EFIVARS": str(work / "efivars.fd"),
+        "VINIX_BOOT_DISK_SIZE_MB": "2048", "VINIX_QEMU_PACKAGE_STORE": str(work / "packages.tar"),
+        "VINIX_QEMU_PACKAGE_PERSIST": "0", "VINIX_QEMU_HOST_SOURCE": "0",
+        "VINIX_QEMU_AUDIO": "off", "VINIX_QEMU_SMP": "4", "VINIX_KEEP_TEMP_BOOT_DISK": "1",
+        "VINIX_QEMU_EXTRA": f"-qmp unix:{socket_path},server=on,wait=off",
+    }
+    command = [str(REPO / "run-aarch64.sh"), "--no-build", "--serial", "--no-persist", "--mem=8192"]
+    pid, master = pty.fork()
+    if pid == 0:
+        os.chdir(REPO)
+        os.execvpe(command[0], command, environment)
+    transcript = bytearray()
+    deadline = time.monotonic() + args.timeout
+    try:
+        with (work / "vinix.log").open("wb") as log:
+            while time.monotonic() < deadline:
+                if not select.select([master], [], [], 1)[0]:
+                    continue
+                try:
+                    data = os.read(master, 65536)
+                except OSError:
+                    break
+                if not data:
+                    break
+                transcript.extend(data)
+                log.write(data)
+                log.flush()
+                # Keep binary capture data out of the host's progress output.
+                if any(marker in transcript for marker in
+                       (b"VINIX-DOTA2-VULKAN-PASS", b"VINIX-DOTA2-VULKAN-FAIL", b"KERNEL PANIC")):
+                    break
+    finally:
+        try:
+            os.write(master, b"\x01x")
+            os.killpg(pid, signal.SIGTERM)
+        except (OSError, ProcessLookupError):
+            pass
+        stop = time.monotonic() + 5
+        while time.monotonic() < stop:
+            if os.waitpid(pid, os.WNOHANG)[0] == pid:
+                break
+            time.sleep(0.1)
+        else:
+            try:
+                os.killpg(pid, signal.SIGKILL)
+            except OSError:
+                try:
+                    os.kill(pid, signal.SIGKILL)
+                except OSError:
+                    pass
+            os.waitpid(pid, os.WNOHANG)
+        os.close(master)
+    normalized = bytes(transcript).replace(b"\r", b"")
+    passed = b"VINIX-DOTA2-VULKAN-PASS" in normalized
+    colors = 0
+    if b"VINIX-DOTA2-VULKAN-SHOT-END" in normalized:
+        capture = normalized.split(b"VINIX-DOTA2-VULKAN-SHOT-BEGIN\n", 1)[1]
+        capture = capture.split(b"VINIX-DOTA2-VULKAN-SHOT-END", 1)[0]
+        lines = [line for line in capture.splitlines() if re.fullmatch(rb"[A-Za-z0-9+/]+={0,2}", line)]
+        xwd = work / "vkcube.xwd"
+        contents = base64.b64decode(b"".join(lines), validate=True)
+        xwd.write_bytes(contents)
+        header = struct.unpack(">25I", contents[:100])
+        if header[1] != 7 or header[11] != 32:
+            raise SystemExit("unexpected Xvfb XWD format")
+        begin = header[0] + header[19] * 12
+        pixels = contents[begin:begin + header[12] * header[5]]
+        colors = len({pixels[i:i + 4] for i in range(0, len(pixels), 4)})
+        # A cleared Xvfb root can survive after a successful cube exits.
+        # Require an actual rendered scene in the captured surface too.
+        if shutil.which("ffmpeg"):
+            subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", str(xwd),
+                            "-frames:v", "1", str(work / "vkcube.png")], check=True)
+    passed = passed and colors > 8
+    report = {"passed": passed, "requested_frames": 3000, "cpu": "Haswell",
+        "kernel_sha256": hashlib.sha256((pinned_kernel / "vinix").read_bytes()).hexdigest(),
+        "translator_sha256": hashlib.sha256((root / "usr/bin/qemu-x86_64").read_bytes()).hexdigest(),
+        "icd_sha256": hashlib.sha256((root / "usr/libexec/vinix-dota2/root/usr/lib/x86_64-linux-gnu/libvulkan_lvp.so").read_bytes()).hexdigest(),
+        "enumerated": b"VINIX-DOTA2-VULKAN-ENUMERATE-PASS" in normalized,
+        "captured_colors": colors,
+        "log": str(work / "vinix.log")}
+    (work / "results.json").write_text(json.dumps(report, indent=2) + "\n")
+    print(json.dumps(report, indent=2))
+    if not passed:
+        raise SystemExit(1)
+
+
+if __name__ == "__main__":
+    main()
