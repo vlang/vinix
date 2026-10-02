@@ -60,6 +60,9 @@ pub fn initialise() {
 	$if heap_benchmark ? {
 		memory.heap_benchmark()
 	}
+	$if heap_c_benchmark ? {
+		memory.heap_c_benchmark()
+	}
 	smp_ready = true
 
 	print('smp: All CPUs online!\n')

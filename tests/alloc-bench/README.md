@@ -21,6 +21,22 @@ allocation and page faults. `pipe` includes syscall and kernel-object costs.
 These are useful allocation workloads, but none directly times XNU's `kalloc`
 or Vinix's kernel slab allocator.
 
+`kernel/c/heap_benchmark.c` supplies a separate, shared kernel workload. It
+calls Vinix's kernel `malloc/free` and macOS's exported
+`kern_os_malloc/kern_os_free` through a diagnostic kext. Both must return
+zeroed memory; warmup checks every requested byte. Five recorded samples
+measure 100,000 64-byte allocation/free pairs and 48 batches of 256 objects
+across all fourteen Vinix slab classes, plus 128 whole-page 256 KiB heap
+allocation/free pairs. Timed samples verify the two payload
+endpoints and use serialized x86 TSC reads. Allocation and free policies,
+including Vinix's poison checks, remain enabled.
+
+Vinix runs this sampler on the boot CPU before the scheduler starts, after
+SMP publishes heap-cache readiness. macOS runs it from a loaded kext. This
+execution-context difference and TCG's timing limit the interpretation;
+retain raw ranges and repeat runs. These are actual kernel API timings, not
+native hardware throughput or a comparison of every allocator path.
+
 Vinix's existing `-d heap_benchmark` workload directly exercises its kernel
 heap. Its optional `-d xnu_zone` backend is a partial XNU-inspired port running
 inside Vinix; it is **not a macOS guest**. See
@@ -106,6 +122,72 @@ Vinix's 1 ms reported clock resolution needs reasonably long samples. The
 recommended 200,000 base iterations reduce quantization compared with
 `--quick`; large allocations, mmap and pipes use 10,000 pairs per sample.
 The short mode is for smoke testing.
+
+## Direct kernel workload
+
+The shared sampler uses only freestanding integer headers. Compile this
+translation unit with genuine GCC 14 on both targets. On Vinix, first clean
+the isolated kernel build, copy the sampler and wrapper changes into that
+worktree, and prebuild its C object with the cross compiler:
+
+```sh
+cd /absolute/worktree/kernel
+make clean
+mkdir -p obj/c
+x86_64-linux-musl-gcc -std=c11 -O2 -Wall -Wextra -Werror \
+  -fno-builtin -ffreestanding -fno-stack-protector -mno-red-zone \
+  -mno-80387 -mno-mmx -mno-sse -mno-sse2 -fno-PIC -mcmodel=kernel \
+  -nostdinc -isystem freestnd-c-hdrs -MMD -MP \
+  -c c/heap_benchmark.c -o obj/c/heap_benchmark.c.o
+make ARCH=x86_64 VFLAGS='-d heap_c_benchmark -d heap_selftest'
+```
+
+Use the repository's normal architecture-appropriate build tools for the
+rest of the kernel. The prebuilt object must remain newer than its source
+and `GNUmakefile`; verify `KALLOC-META compiler=gcc` in the resulting log.
+The runner accepts an already built kernel. Its source hash and prescribed
+flags are build requirements, not authenticated binary provenance; retain
+the compiler command and verify the kernel came from that build. The runner
+validates the complete three-phase sampler output before reporting success.
+
+```sh
+python3 tests/alloc-bench/run-kernel-vinix.py \
+  --kernel /absolute/worktree/kernel/bin/vinix \
+  --cc /path/to/x86_64-linux-musl-gcc \
+  --state-dir build/kernel-alloc-vinix
+```
+
+The direct-kernel runner defaults to one vCPU on both guests, with the other
+common QEMU options unchanged. Vinix's secondary CPUs spin waiting for the
+scheduler during this boot-time test; two vCPUs under single-thread TCG cause
+large timing variance. `--cpus` can select another count, which must also be
+used by macOS. The runner boots a tiny untimed init and terminates its private
+VM after `KALLOC-DONE`. Its manifest records the
+sampler hash, kernel hash, common compiler flags, and execution context.
+On macOS, `kernel-bench.c` includes the exact same sampler and supplies kext
+start/stop functions. `macos-kext-info.c` supplies the kmod ABI descriptor,
+and `build-macos-kext.py` creates the bundle and records exact build commands:
+
+```sh
+python3 tests/alloc-bench/build-macos-kext.py \
+  --gcc /opt/local/bin/gcc-mp-14 \
+  --vm-config /path/to/actual-one-cpu-qemu-config.json \
+  --state-dir build/kernel-alloc-macos
+```
+
+This packager needs Apple's assembler/linker. If those are available only on
+the host, compile both C files to assembly with the guest's GCC and the
+recorded common flags, transfer assembly while the guest disk is unmounted,
+then assemble/link on the host and return the kext to the disposable guest.
+Record target-specific assembly/link flags separately from common C flags.
+Use a disposable guest for diagnostic-kext setup.
+
+Compare complete direct-kernel logs with:
+
+```sh
+python3 tests/alloc-bench/compare-kernel.py \
+  build/kernel-alloc-vinix/serial.log build/kernel-alloc-macos/serial.log
+```
 
 ## Compare and verify
 
