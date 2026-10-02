@@ -2,6 +2,7 @@
 module pagecache
 
 import klock
+import katomic
 import memory
 
 const max_registered_caches = 16
@@ -45,7 +46,7 @@ pub fn register_cache(cache &Cache, context voidptr, store IO) bool {
 	target.writeback_context = context
 	target.writeback = store
 	registered_caches[registered_caches_len] = target
-	registered_caches_len++
+	katomic.store(mut &registered_caches_len, registered_caches_len + 1)
 	return true
 }
 
@@ -53,7 +54,7 @@ pub fn register_cache(cache &Cache, context voidptr, store IO) bool {
 // Cached line.
 pub fn resident_bytes() u64 {
 	registered_caches_lock.acquire()
-	count := registered_caches_len
+	count := katomic.load(&registered_caches_len)
 	registered_caches_lock.release()
 	mut total := u64(0)
 	for i := 0; i < count; i++ {
@@ -72,7 +73,7 @@ pub fn resident_bytes() u64 {
 // device cannot strand the others, and the failure is still reported.
 pub fn sync_all() bool {
 	registered_caches_lock.acquire()
-	count := registered_caches_len
+	count := katomic.load(&registered_caches_len)
 	registered_caches_lock.release()
 
 	mut ok := true
@@ -88,10 +89,15 @@ pub fn sync_all() bool {
 
 fn reclaim_caches(wanted u64) u64 {
 	mut reclaimed := u64(0)
-	count := registered_caches_len
-	for i := 0; i < count && reclaimed < wanted; i++ {
+	// PMM budgets are physical pages; cache pages are always 4 KiB. Four
+	// cached pages share a 16 KiB backing frame on arm64, so reclaiming only
+	// `wanted` cache entries there under-reclaims by a factor of four.
+	ratio := page_size / page_bytes
+	cache_budget := if wanted > u64(-1) / ratio { u64(-1) } else { wanted * ratio }
+	count := katomic.load(&registered_caches_len)
+	for i := 0; i < count && reclaimed < cache_budget; i++ {
 		mut cache := registered_caches[i]
-		reclaimed += cache.reclaim_clean(wanted - reclaimed)
+		reclaimed += cache.reclaim_clean(cache_budget - reclaimed)
 	}
-	return reclaimed
+	return reclaimed / (page_size / page_bytes)
 }

@@ -622,6 +622,8 @@ pub fn init_syscall_table() {
 	syscall_table[274] = voidptr(userland.syscall_get_robust_list) // get_robust_list
 	syscall_table[302] = voidptr(syscall_linux_prlimit64) // prlimit64
 	syscall_table[309] = voidptr(numa.syscall_getcpu) // getcpu
+	syscall_table[310] = voidptr(syscall_linux_process_vm_readv) // process_vm_readv
+	syscall_table[311] = voidptr(syscall_linux_process_vm_writev) // process_vm_writev
 	syscall_table[314] = voidptr(syscall_linux_sched_setattr) // sched_setattr
 	syscall_table[315] = voidptr(syscall_linux_sched_getattr) // sched_getattr
 	syscall_table[318] = voidptr(syscall_linux_getrandom) // getrandom

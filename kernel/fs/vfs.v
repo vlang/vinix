@@ -101,6 +101,7 @@ pub fn add_filesystem(filesystem &FileSystem, identifier string) {
 pub fn initialise() {
 	vfs_root = create_node(&TmpFS(unsafe { nil }), &VFSNode(unsafe { nil }), '', false)
 	file.on_handle_released(release_handle_node)
+	file.on_mount_flags(mount_flags)
 
 	filesystems = map[string]&FileSystem{}
 
@@ -118,17 +119,30 @@ fn reduce_node(node &VFSNode, follow_symlinks bool) &VFSNode {
 }
 
 fn reduce_node_bounded(node &VFSNode, follow_symlinks bool, depth int, effective bool) &VFSNode {
+	identity := unsafe { &voidptr(C.vinix_stack_alloc(sizeof(voidptr))) }
+	unsafe { *identity = starting_mount(node) }
+	return reduce_node_on_mount(node, follow_symlinks, depth, effective, identity)
+}
+
+fn reduce_node_on_mount(node &VFSNode, follow_symlinks bool, depth int, effective bool, identity &voidptr) &VFSNode {
 	if depth > 64 { errno.set(errno.eloop); return unsafe { nil } }
 	if node == unsafe { nil } { errno.set(errno.enoent); return unsafe { nil } }
 	if unsafe { node.redir != 0 } {
-		return reduce_node_bounded(node.redir, follow_symlinks, depth + 1, effective)
+		return reduce_node_on_mount(node.redir, follow_symlinks, depth + 1, effective, identity)
 	}
+	unsafe { *identity = self_mount_at(node, *identity) }
 	mounted := mount_of(node)
 	if mounted != unsafe { nil } {
-		return reduce_node_bounded(mounted, follow_symlinks, depth + 1, effective)
+		unsafe { *identity = mount_at(node, mounted) }
+		return reduce_node_on_mount(mounted, follow_symlinks, depth + 1, effective, identity)
+	}
+	if follow_symlinks && !procfs_may_follow(node) {
+		errno.set(errno.eacces)
+		return unsafe { nil }
 	}
 	if follow_symlinks && node.magic_target != unsafe { nil } {
-		return reduce_node_bounded(node.magic_target, follow_symlinks, depth + 1, effective)
+		unsafe { *identity = voidptr(namespace_mount(magic_link_mount(node))) }
+		return reduce_node_on_mount(node.magic_target, follow_symlinks, depth + 1, effective, identity)
 	}
 	if follow_symlinks && procfs_is_dynamic_link(node) {
 		// /proc/self and /proc/thread-self name the reading process, so their
@@ -138,14 +152,14 @@ fn reduce_node_bounded(node &VFSNode, follow_symlinks bool, depth int, effective
 			errno.set(errno.enoent)
 			return 0
 		}
-		_, next_node, _ := walk_path(node.parent, target, depth + 1, effective)
+		_, next_node, _ := walk_path_on_mount(node.parent, target, depth + 1, effective, identity)
 		// Made afresh for every walk through the link, and nothing the walk
 		// returned points into it.
 		unsafe { target.free() }
 		if unsafe { next_node == 0 } {
 			return 0
 		}
-		return reduce_node_bounded(next_node, follow_symlinks, depth + 1, effective)
+		return reduce_node_on_mount(next_node, follow_symlinks, depth + 1, effective, identity)
 	}
 	// A descriptor that no name leads to is reached through the link itself.
 	if follow_symlinks && is_anonymous_descriptor_link(node) {
@@ -153,12 +167,12 @@ fn reduce_node_bounded(node &VFSNode, follow_symlinks bool, depth int, effective
 	}
 	if node.symlink_target.len != 0 && follow_symlinks == true {
 		target := node.symlink_target
-		_, next_node, _ := walk_path(node.parent, target, depth + 1,
-			effective)
+		_, next_node, _ := walk_path_on_mount(node.parent, target, depth + 1,
+			effective, identity)
 		if unsafe { next_node == 0 } {
 			return 0
 		}
-		return reduce_node_bounded(next_node, follow_symlinks, depth + 1, effective)
+		return reduce_node_on_mount(next_node, follow_symlinks, depth + 1, effective, identity)
 	}
 	return unsafe { node }
 }
@@ -168,6 +182,12 @@ fn reduce_node_bounded(node &VFSNode, follow_symlinks bool, depth int, effective
 // into `path`: a caller that makes a node with it gives the node a copy, and
 // copying it for every lookup left the copies behind on every other path.
 fn walk_path(parent &VFSNode, path string, depth int, effective bool) (&VFSNode, &VFSNode, string) {
+	identity := unsafe { &voidptr(C.vinix_stack_alloc(sizeof(voidptr))) }
+	unsafe { *identity = starting_mount(parent) }
+	return walk_path_on_mount(parent, path, depth, effective, identity)
+}
+
+fn walk_path_on_mount(parent &VFSNode, path string, depth int, effective bool, identity &voidptr) (&VFSNode, &VFSNode, string) {
 	if depth > 64 { errno.set(errno.eloop); return 0, 0, '' }
 	if path.len > 4096 { errno.set(errno.einval); return 0, 0, '' }
 	if path.len == 0 {
@@ -175,10 +195,11 @@ fn walk_path(parent &VFSNode, path string, depth int, effective bool) (&VFSNode,
 		return 0, 0, ''
 	}
 	mut index := u64(0)
-	mut current_node := reduce_node_bounded(parent, false, depth + 1, effective)
+	mut current_node := reduce_node_on_mount(parent, false, depth + 1, effective, identity)
 
 	if path[index] == `/` {
-		current_node = reduce_node_bounded(calling_root(), false, depth + 1, effective)
+		unsafe { *identity = starting_mount(calling_root()) }
+		current_node = reduce_node_on_mount(calling_root(), false, depth + 1, effective, identity)
 		for path[index] == `/` {
 			if index == u64(path.len) - 1 {
 				return current_node, current_node, ''
@@ -203,7 +224,7 @@ fn walk_path(parent &VFSNode, path string, depth int, effective bool) (&VFSNode,
 
 		last := index == u64(path.len)
 
-		current_node = reduce_node_bounded(current_node, false, depth + 1, effective)
+		current_node = reduce_node_on_mount(current_node, false, depth + 1, effective, identity)
 
 		if current_node == unsafe { nil } || current_node.resource == unsafe { nil }
 			|| current_node.children == unsafe { nil } || !stat.isdir(current_node.resource.stat.mode) {
@@ -218,8 +239,8 @@ fn walk_path(parent &VFSNode, path string, depth int, effective bool) (&VFSNode,
 		if elem_str == '..' {
 			// The way out of a directory depends on how it was reached: see
 			// logical_parent().
-			new_node = reduce_node_bounded(logical_parent(current_node), false, depth + 1,
-				effective)
+			new_node = reduce_node_on_mount(parent_on_mount(current_node, identity), false, depth + 1,
+				effective, identity)
 		} else {
 			procfs_lookup_refresh(current_node, elem_str)
 			overlay_lookup_refresh(current_node)
@@ -231,8 +252,8 @@ fn walk_path(parent &VFSNode, path string, depth int, effective bool) (&VFSNode,
 				return 0, 0, ''
 			}
 
-			new_node = reduce_node_bounded(unsafe { current_node.children[elem_str] }, false,
-				depth + 1, effective)
+			new_node = reduce_node_on_mount(unsafe { current_node.children[elem_str] }, false,
+				depth + 1, effective, identity)
 		}
 
 		if last == true {
@@ -243,7 +264,7 @@ fn walk_path(parent &VFSNode, path string, depth int, effective bool) (&VFSNode,
 		current_node = new_node
 
 		if stat.islnk(current_node.resource.stat.mode) {
-			current_node = reduce_node_bounded(current_node, true, depth + 1, effective)
+			current_node = reduce_node_on_mount(current_node, true, depth + 1, effective, identity)
 			if voidptr(current_node) == unsafe { nil } {
 				return 0, 0, ''
 			}
@@ -311,12 +332,14 @@ pub fn get_node(parent &VFSNode, path string, follow_links bool) ?&VFSNode {
 
 fn get_node_with_credentials(parent &VFSNode, path string, follow_links bool,
 	effective bool) ?&VFSNode {
-	_, node, _ := walk_path(parent, path, 0, effective)
+	identity := unsafe { &voidptr(C.vinix_stack_alloc(sizeof(voidptr))) }
+	unsafe { *identity = starting_mount(parent) }
+	_, node, _ := walk_path_on_mount(parent, path, 0, effective, identity)
 	if voidptr(node) == unsafe { nil } {
 		return none
 	}
 	if follow_links == true {
-		ret := reduce_node_bounded(node, true, 0, effective)
+		ret := reduce_node_on_mount(node, true, 0, effective, identity)
 		if unsafe { ret == 0 } {
 			return none
 		}
@@ -663,7 +686,7 @@ fn internal_create_checked(parent &VFSNode, name string, mode u32, access u32) ?
 	return target_node
 }
 
-fn fdnum_create_from_node(mut node VFSNode, flags int, oldfd int, specific bool) ?int {
+fn fdnum_create_from_node(mut node VFSNode, flags int, oldfd int, specific bool, identity voidptr) ?int {
 	current_process := proc.current_thread().process
 	mut opened_resource := node.resource
 	mut node_resource := node.resource
@@ -672,6 +695,7 @@ fn fdnum_create_from_node(mut node VFSNode, flags int, oldfd int, specific bool)
 	}
 	mut fd := file.fd_create_from_resource(mut opened_resource, flags) or { return none }
 	fd.handle.node = voidptr(node)
+	fd.handle.mount = identity
 	katomic.inc(mut &node.handles)
 	return file.fdnum_create_from_fd(current_process, fd, oldfd, specific) or {
 		// In particular, roll back a /dev/ptmx allocation or slave-open count if
@@ -819,6 +843,9 @@ pub fn syscall_readlinkat(_ voidptr, dirfd int, _path charptr, buf voidptr, limi
 	if stat.islnk(node.resource.stat.mode) == false {
 		return errno.err, errno.einval
 	}
+	if !procfs_may_follow(node) {
+		return errno.err, errno.eacces
+	}
 
 	if procfs_is_dynamic_link(node) {
 		self_target := procfs_dynamic_link_target(node)
@@ -879,7 +906,10 @@ pub fn syscall_openat(_ voidptr, dirfd int, _path charptr, flags int, mode u32) 
 	follow_links := flags & resource.o_nofollow == 0
 
 	mut created := false
-	mut node := get_node(parent, path, follow_links) or {
+	start_mount := parent_mount_for(dirfd, path) or { return errno.err, errno.get() }
+	open_mount := unsafe { &voidptr(C.vinix_stack_alloc(sizeof(voidptr))) }
+	unsafe { *open_mount = start_mount }
+	resolved := get_node_with_mount_cursor(parent, path, follow_links, open_mount) or {
 		if creat_flags & resource.o_creat == 0 {
 			return errno.err, errno.get()
 		}
@@ -894,8 +924,9 @@ pub fn syscall_openat(_ voidptr, dirfd int, _path charptr, flags int, mode u32) 
 			return errno.err, errno.get()
 		}
 		created = true
-		new_node
+		ResolvedNode{node: new_node, mount: unsafe { *open_mount }}
 	}
+	mut node := resolved.node
 	if !created && creat_flags & resource.o_creat != 0 && creat_flags & resource.o_excl != 0 {
 		return errno.err, errno.eexist
 	}
@@ -908,7 +939,7 @@ pub fn syscall_openat(_ voidptr, dirfd int, _path charptr, flags int, mode u32) 
 		return errno.err, errno.eloop
 	}
 
-	node = reduce_node(node, true)
+	node = reduce_node_on_mount(node, true, 0, true, open_mount)
 	if unsafe { node == 0 } {
 		return errno.err, errno.enoent
 	}
@@ -920,6 +951,11 @@ pub fn syscall_openat(_ voidptr, dirfd int, _path charptr, flags int, mode u32) 
 		return open_anonymous_descriptor(descriptor, flags)
 	}
 
+	// O_PATH names a device without opening it; other opens must respect nodev.
+	if flags & resource.o_path == 0 && mount_flags(unsafe { *open_mount }) & ms_nodev != 0
+		&& (stat.ischr(node.resource.stat.mode) || stat.isblk(node.resource.stat.mode)) {
+		return errno.err, errno.eacces
+	}
 	if !stat.isdir(node.resource.stat.mode) && flags & resource.o_directory != 0 {
 		return errno.err, errno.enotdir
 	}
@@ -963,7 +999,7 @@ pub fn syscall_openat(_ voidptr, dirfd int, _path charptr, flags int, mode u32) 
 		mut res := node.resource
 		res.grow(unsafe { nil }, 0) or { return errno.err, errno.get() }
 	}
-	fdnum := fdnum_create_from_node(mut node, flags, 0, false) or { return errno.err, errno.get() }
+	fdnum := fdnum_create_from_node(mut node, flags, 0, false, unsafe { *open_mount }) or { return errno.err, errno.get() }
 	inotify_emit(node, '', in_open, 0)
 
 	return u64(fdnum), 0
@@ -980,16 +1016,14 @@ fn is_anonymous_descriptor_link(node &VFSNode) bool {
 // caller may reach into that process: its own, or one of its user's, or any
 // with CAP_SYS_PTRACE.
 fn anonymous_descriptor_fd(descriptor AnonymousDescriptor) ?&file.FD {
-	current := proc.current_thread().process
 	proc.lock_table()
+	defer { proc.unlock_table() }
 	owner := proc.process_at(descriptor.pid)
-	proc.unlock_table()
 	if owner == unsafe { nil } {
 		errno.set(errno.enoent)
 		return none
 	}
-	if voidptr(owner) != voidptr(current) && owner.euid != current.euid
-		&& !proc.current_has_capability(proc.cap_sys_ptrace) {
+	if !proc.may_inspect_locked(owner) {
 		errno.set(errno.eacces)
 		return none
 	}
@@ -1554,9 +1588,10 @@ pub fn syscall_chdir(_ voidptr, _path charptr) (u64, u64) {
 		return errno.err, errno.enoent
 	}
 
-	mut node := get_node(proc.current_directory_of(process), path, true) or {
+	resolved := get_node_and_mount(proc.current_directory_of(process), path, true) or {
 		return errno.err, errno.get()
 	}
+	node := resolved.node
 	if !policy_check(node, proc.policy_inspect) {
 		return errno.err, errno.get()
 	}
@@ -1569,6 +1604,7 @@ pub fn syscall_chdir(_ voidptr, _path charptr) (u64, u64) {
 	}
 
 	proc.set_current_directory(mut process, node)
+	proc.set_current_mount(mut process, resolved.mount)
 
 	return 0, 0
 }
@@ -2064,6 +2100,7 @@ pub fn syscall_fchdir(_ voidptr, fdnum int) (u64, u64) {
 	}
 
 	proc.set_current_directory(mut process, voidptr(node))
+	proc.set_current_mount(mut process, fd.handle.mount)
 
 	return 0, 0
 }
@@ -2470,6 +2507,7 @@ pub fn syscall_memfd_create(_ voidptr, name u64, flags u32) (u64, u64) {
 	}
 	mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or { return u64(fdnum), 0 }
 	fd.handle.node = voidptr(node)
+	fd.handle.mount = unsafe { nil }
 	katomic.inc(mut &node.handles)
 	fd.unref()
 

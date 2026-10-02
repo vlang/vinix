@@ -8,6 +8,7 @@ module virtio_blk
 // volume is attached by run-aarch64.sh when --persist is requested.
 import aarch64.cpu
 import aarch64.uart
+import aarch64.timer
 import errno
 import event.eventstruct
 import fs
@@ -18,7 +19,6 @@ import limine
 import memory
 import resource
 import stat
-import time
 
 const reg_magic = u64(0x000)
 const reg_device_id = u64(0x008)
@@ -44,6 +44,8 @@ const status_driver_ok = u32(4)
 const status_failed = u32(128)
 const descriptor_next = u16(1)
 const descriptor_write = u16(2)
+const feature_flush = u32(1 << 9)
+const request_flush = u32(4)
 
 const mmio_base = u64(0x0a000000)
 const mmio_slot_size = u64(0x200)
@@ -72,20 +74,21 @@ pub mut:
 	status   int
 	can_mmap bool
 
-	base           u64
-	hhdm           u64
-	queue_size     u16
-	desc           u64
-	avail          u64
-	used           u64
-	last_used      u16
-	next_available u16
-	request_phys   u64
-	request_virt   u64
-	data_phys      u64
-	data_virt      u64
-	ready          bool
-	name           string
+	base            u64
+	hhdm            u64
+	queue_size      u16
+	desc            u64
+	avail           u64
+	used            u64
+	last_used       u16
+	next_available  u16
+	request_phys    u64
+	request_virt    u64
+	data_phys       u64
+	data_virt       u64
+	ready           bool
+	flush_supported bool
+	name            string
 }
 
 __global (
@@ -162,7 +165,7 @@ fn setup_queue(mut device VirtioBlockDevice) bool {
 // polled rather than waited on, and `last_used` counts what this driver has
 // collected; the caller submits at most one at a time.
 fn (mut device VirtioBlockDevice) collect_one() bool {
-	deadline := time.monotonic_ns() + request_timeout_ns
+	deadline := timer.get_ns() + request_timeout_ns
 	mut spins := u64(0)
 	for {
 		cpu.dmb_ish()
@@ -170,7 +173,7 @@ fn (mut device VirtioBlockDevice) collect_one() bool {
 			break
 		}
 		spins++
-		if spins > 1_000_000_000 || time.monotonic_ns() >= deadline {
+		if spins > 1_000_000_000 || timer.get_ns() >= deadline {
 			uart.puts(c'virtio-blk: request timed out\n')
 			return false
 		}
@@ -239,6 +242,47 @@ fn (mut device VirtioBlockDevice) transfer(buffer voidptr, sector u64, count u64
 		unsafe { C.memcpy(buffer, voidptr(device.data_virt), count) }
 	}
 	return true
+}
+
+fn (mut device VirtioBlockDevice) sync(_handle voidptr) ? {
+	device.l.acquire()
+	defer { device.l.release() }
+	if !device.ready {
+		errno.set(errno.eio)
+		return none
+	}
+	// A device that did not offer FLUSH may complete volatile writes. The
+	// specification does not guarantee persistence in that case.
+	if !device.flush_supported {
+		errno.set(errno.eio)
+		return none
+	}
+	for device.last_used != device.next_available {
+		if !device.collect_one() {
+			errno.set(errno.eio)
+			return none
+		}
+	}
+	mut header := unsafe { &RequestHeader(device.request_virt) }
+	header.type_ = request_flush
+	header.reserved = 0
+	header.sector = 0
+	unsafe { *&u8(device.request_virt + sizeof(RequestHeader)) = 0xff }
+	// FLUSH has only a header and status, with no data descriptor.
+	write_descriptor(device, 0, device.request_phys, sizeof(RequestHeader), descriptor_next, 2)
+	write_descriptor(device, 2, device.request_phys + sizeof(RequestHeader), 1, descriptor_write, 0)
+	position := u64(device.next_available % device.queue_size)
+	unsafe { *&u16(device.avail + 4 + position * 2) = 0 }
+	device.next_available++
+	cpu.dmb_ish()
+	unsafe { *&u16(device.avail + 2) = device.next_available }
+	mmio_w32(device.base + reg_queue_notify, 0)
+	// A timeout keeps these permanent buffers outstanding; the next caller
+	// collects the late completion before overwriting either descriptor.
+	if !device.collect_one() || unsafe { *&u8(device.request_virt + sizeof(RequestHeader)) } != 0 {
+		errno.set(errno.eio)
+		return none
+	}
 }
 
 fn (mut device VirtioBlockDevice) read(_handle voidptr, buffer voidptr, loc u64, count u64) ?i64 {
@@ -318,10 +362,11 @@ pub fn initialise(hhdm u64) {
 		mmio_w32(base + reg_status, 0)
 		mmio_w32(base + reg_status, status_acknowledge)
 		mmio_w32(base + reg_status, status_acknowledge | status_driver)
-		// This legacy transport accepts feature bit zero as a direct 32-bit mask.
-		// No block features are required for the synchronous request path.
-		_ = mmio_r32(base + reg_host_features)
-		mmio_w32(base + reg_guest_features, 0)
+		// Legacy feature registers are 32-bit masks. Negotiate FLUSH before
+		// DRIVER_OK so a cache barrier may be submitted on this queue.
+		features := mmio_r32(base + reg_host_features) & feature_flush
+		device.flush_supported = features != 0
+		mmio_w32(base + reg_guest_features, features)
 		mmio_w32(base + reg_guest_page_size, u32(memory.page_size))
 		if !setup_queue(mut device) {
 			mmio_w32(base + reg_status, status_acknowledge | status_driver | status_failed)

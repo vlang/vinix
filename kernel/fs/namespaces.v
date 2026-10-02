@@ -364,7 +364,10 @@ pub fn syscall_setns(_ voidptr, fdnum int, nstype int) (u64, u64) {
 			} else {
 				voidptr(root)
 			})
-			proc.set_current_directory(mut process, voidptr(reduce_node(root, false)))
+			proc.set_root_mount(mut process, table.root_hint_mount)
+			resolved := get_node_and_mount(root, '.', true) or { return errno.err, errno.get() }
+			proc.set_current_directory(mut process, voidptr(resolved.node))
+			proc.set_current_mount(mut process, resolved.mount)
 		}
 		proc.clone_newuts {
 			mut old := process.ns.uts

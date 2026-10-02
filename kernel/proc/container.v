@@ -103,6 +103,7 @@ pub const cap_sys_boot = 22
 pub const cap_sys_resource = 24
 pub const cap_mknod = 27
 pub const cap_setfcap = 31
+pub const cap_audit_read = 37
 
 __global (
 	namespace_id_counter = u64(4026532000)
@@ -174,6 +175,8 @@ pub struct ThreadFS {
 pub mut:
 	root_directory    voidptr
 	current_directory voidptr
+	root_mount        voidptr
+	current_mount     voidptr
 	mnt               &Namespace = unsafe { nil }
 }
 
@@ -196,6 +199,8 @@ pub fn own_thread_fs() &ThreadFS {
 		mut own := &ThreadFS{
 			root_directory:    process.root_directory
 			current_directory: process.current_directory
+			root_mount: process.root_mount
+			current_mount: process.current_mount
 		}
 		if process.ns.mnt != unsafe { nil } {
 			own.mnt = get_namespace(mut process.ns.mnt)
@@ -222,9 +227,11 @@ pub fn set_root_directory(mut process Process, directory voidptr) {
 	mut own := thread_fs_of(process)
 	if own != unsafe { nil } {
 		own.root_directory = directory
+		own.root_mount = unsafe { nil }
 		return
 	}
 	process.root_directory = directory
+	process.root_mount = unsafe { nil }
 }
 
 pub fn current_directory_of(process &Process) voidptr {
@@ -242,9 +249,11 @@ pub fn set_current_directory(mut process Process, directory voidptr) {
 	mut own := thread_fs_of(process)
 	if own != unsafe { nil } {
 		own.current_directory = directory
+		own.current_mount = unsafe { nil }
 		return
 	}
 	process.current_directory = directory
+	process.current_mount = unsafe { nil }
 }
 
 pub fn mount_namespace_of(process &Process) &Namespace {
@@ -283,6 +292,9 @@ pub fn inherit_container_state(mut child Process, parent &Process) {
 		time:             get_namespace(mut parent.ns.time)
 	}
 	child.root_directory = root_directory_of(parent)
+	child.root_mount = root_mount_of(parent)
+	child.current_mount = current_mount_of(parent)
+	child.exe_mount = parent.exe_mount
 	child.caps = parent.caps
 	child.no_new_privs = parent.no_new_privs
 	child.seccomp_mode = parent.seccomp_mode
@@ -335,6 +347,9 @@ pub fn capabilities_after_exec(mut process Process) {
 // of zero keeps none, unless it asked to keep them; dropping the effective uid
 // alone clears only the effective set. Called after every credential change.
 pub fn capabilities_after_setuid(mut process Process, old_ruid u32, old_euid u32, old_suid u32) {
+	if old_euid != process.euid {
+		process.dumpable = false
+	}
 	had_root := old_ruid == 0 || old_euid == 0 || old_suid == 0
 	has_root := process.uid == 0 || process.euid == 0 || process.suid == 0
 	if had_root && !has_root && !process.caps.keep {

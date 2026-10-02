@@ -49,7 +49,7 @@ pub fn register_reclaimer(reclaimer fn (u64) u64) bool {
 		return false
 	}
 	reclaimers[reclaimers_len] = reclaimer
-	reclaimers_len++
+	katomic.store(mut &reclaimers_len, reclaimers_len + 1)
 	return true
 }
 
@@ -61,10 +61,15 @@ fn reclaim_pages(wanted u64) u64 {
 	}
 	defer { katomic.store(mut &reclaim_inflight, u32(0)) }
 
+	katomic.inc(mut &pressure_reclaim_runs)
 	mut reclaimed := u64(0)
-	count := reclaimers_len
+	count := katomic.load(&reclaimers_len)
 	for i := 0; i < count && reclaimed < wanted; i++ {
 		reclaimed += reclaimers[i](wanted - reclaimed)
+	}
+	mut previous := katomic.load(&pressure_reclaimed_pages)
+	for !katomic.cas(mut &pressure_reclaimed_pages, previous, previous + reclaimed) {
+		previous = katomic.load(&pressure_reclaimed_pages)
 	}
 	return reclaimed
 }
@@ -321,6 +326,7 @@ fn try_alloc_nozero(count u64) voidptr {
 
 		ret = inner_alloc(count, last)
 		if ret == 0 {
+			katomic.inc(mut &pressure_allocation_failures)
 			return unsafe { nil }
 		}
 	}

@@ -111,6 +111,7 @@ fn pledge_needs(nr u64, a [6]u64) u64 {
 		260 { pledge_stdio } // wait4
 		261 { pledge_rlimit(a[2]) } // prlimit64
 		267 { pledge_stdio } // syncfs
+		270, 271 { p_proc } // process_vm_readv/writev: unrestricted process inspection
 		274 { pledge_sched_target(a[0]) } // sched_setattr
 		275 { pledge_stdio } // sched_getattr
 		276 { p_cpath } // renameat2

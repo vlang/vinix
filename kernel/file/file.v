@@ -63,6 +63,9 @@ pub mut:
 	l             klock.Lock
 	resource      &resource.Resource = unsafe { nil }
 	node          voidptr
+	// Identity of the mount traversed at open, rather than the inode's aliases.
+	// Mount entries are permanent; fs resolves namespace copies by mount id.
+	mount         voidptr
 	refcount      int
 	loc           i64
 	flags         int
@@ -81,12 +84,17 @@ pub mut:
 
 __global (
 	handle_released fn (voidptr)
+	mount_policy_flags fn (voidptr) u64
 )
 
 // on_handle_released has `f` called with a handle's node as the handle is
 // freed: the VFS counts the handles that lead to each node.
 pub fn on_handle_released(f fn (voidptr)) {
 	handle_released = f
+}
+
+pub fn on_mount_flags(f fn (voidptr) u64) {
+	mount_policy_flags = f
 }
 
 // A Handle is the open-file description shared by dup() and fork(). Its
@@ -1409,8 +1417,13 @@ pub fn syscall_mmap(_ voidptr, addr voidptr, length u64, prot_and_flags u64, fdn
 	if flags & mmap.map_anonymous == 0 && voidptr(resource_) == unsafe { nil } {
 		return errno.err, errno.ebadf
 	}
-	mut map_flags := flags & ~mmap.map_no_write
+	mut map_flags := flags & ~(mmap.map_no_write | mmap.map_no_exec)
 	if flags & mmap.map_anonymous == 0 {
+		if mount_policy_flags != unsafe { nil }
+			&& mount_policy_flags(fd.handle.mount) & u64(0x8) != 0 {
+			if prot & mmap.prot_exec != 0 { return errno.err, errno.eperm }
+			map_flags |= mmap.map_no_exec
+		}
 		// O_PATH opens a file without any permission to it, and so lent its
 		// contents to anyone mapping it, as Linux does not.
 		if fd.handle.flags & resource.o_path != 0 {

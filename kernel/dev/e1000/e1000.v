@@ -68,6 +68,8 @@ const status_lu = u32(1) << 1
 // zero with BSEX clear, which is 2048-byte buffers, and long packets are off,
 // so every frame fits one buffer.
 const rctl_en = u32(1) << 1
+// IPv6 neighbor discovery and router advertisements use multicast MACs.
+const rctl_mpe = u32(1) << 4
 const rctl_bam = u32(1) << 15
 const rctl_secrc = u32(1) << 26
 
@@ -201,7 +203,7 @@ pub fn initialise() bool {
 
 	mut other_mac := [6]u8{}
 	mut other_mtu := u32(0)
-	if inet.link_info(mut other_mac, unsafe { &other_mtu }) {
+	if inet.link_info(unsafe { &other_mac }, unsafe { &other_mtu }) {
 		C.kprintf(c'e1000: %.*s left alone: another network interface is attached\n',
 			i32(name.len), name.str)
 		return false
@@ -315,7 +317,7 @@ fn setup_rx() bool {
 	// Every descriptor but one belongs to the card. The one at the tail is
 	// ours; head reaching it means the ring is full, not empty.
 	reg_write(reg_rdt, rx_descriptors - 1)
-	reg_write(reg_rctl, rctl_en | rctl_bam | rctl_secrc)
+	reg_write(reg_rctl, rctl_en | rctl_mpe | rctl_bam | rctl_secrc)
 	return true
 }
 

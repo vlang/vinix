@@ -89,7 +89,7 @@ Run the production cache module on a host with V installed:
 V=/path/to/v sh tests/pagecache/run.sh
 ```
 
-The harness substitutes only the kernel lock and errno modules. The actual cache
+The harness substitutes the kernel lock, errno, and physical-storage allocator modules. The actual cache
 source is copied unchanged and exercised with an instrumented byte-array backing
 store. Tests cover hits, partial/cross-page writes, tail pages, LRU and bounded
 prefetch, clean-only discard, invalid/overflowing ranges, backing identity,

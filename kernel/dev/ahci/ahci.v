@@ -13,6 +13,7 @@ import fs
 import katomic
 import lib
 import time.sys
+import x86.hpet as hpet_clock
 
 const ahci_class = 0x1
 const ahci_subclass = 0x6
@@ -37,6 +38,8 @@ const sector_size = 0x200
 // The most one command moves: the size of each disk's bounce buffer. A
 // command has one PRDT entry, which would take up to 4 MiB.
 const max_transfer = u64(1024 * 1024)
+const command_timeout_ns = u64(30_000_000_000)
+const port_error_mask = u32((1 << 30) | (1 << 29) | (1 << 28) | (1 << 27) | (1 << 26) | (1 << 24))
 
 @[packed]
 struct AHCIRegisters {
@@ -180,6 +183,10 @@ pub mut:
 	// Where every transfer is staged: max_transfer bytes, physically
 	// contiguous, taken once while memory still has runs that long.
 	bounce voidptr = unsafe { nil }
+	// A timed-out command may still own the permanent bounce buffer and
+	// command tables. Keep them allocated and refuse to reuse this port.
+	failed        bool
+	flush_command u8
 }
 
 __global (
@@ -192,6 +199,40 @@ fn (mut dev AHCIDevice) read(_handle voidptr, buffer voidptr, loc u64, count u64
 
 fn (mut dev AHCIDevice) write(_handle voidptr, buffer voidptr, loc u64, count u64) ?i64 {
 	return dev.transfer(buffer, loc, count, true)
+}
+
+fn (mut dev AHCIDevice) sync(_handle voidptr) ? {
+	dev.l.acquire()
+	defer { dev.l.release() }
+	if dev.failed || dev.flush_command == 0 {
+		errno.set(errno.eio)
+		return none
+	}
+	slot := dev.find_cmd_slot() or {
+		errno.set(errno.eio)
+		return none
+	}
+	mut volatile regs := dev.regs
+	mut volatile header := unsafe {
+		&AHCIHBACommand((u64(regs.clb) | (u64(regs.clbu) << 32)) + higher_half +
+			slot * sizeof(AHCIHBACommand))
+	}
+	// FLUSH CACHE is a non-data command: there is no PRDT or write flag.
+	header.flags = u16(sizeof(AHCIFISh2d) / 4)
+	header.prdtl = 0
+	header.prdbc = 0
+	mut volatile table := unsafe {
+		&AHCIHBACommandTable((u64(header.ctba) | (u64(header.ctbau) << 32)) + higher_half)
+	}
+	mut volatile fis := unsafe { &AHCIFISh2d(&table.cfis) }
+	unsafe { C.memset(fis, 0, sizeof(AHCIFISh2d)) }
+	fis.fis_type = fis_reg_h2d
+	fis.flags = 1 << 7
+	fis.command = dev.flush_command
+	if !dev.send_cmd(slot) {
+		errno.set(errno.eio)
+		return none
+	}
 }
 
 // Move `count` bytes at `loc` through the bounce buffer, a chunk per
@@ -244,6 +285,11 @@ fn (mut dev AHCIDevice) transfer(buffer voidptr, loc u64, count u64, write bool)
 			unsafe { C.memcpy(staging, caller, chunk) }
 		}
 		dev.l.acquire()
+		if dev.failed {
+			dev.l.release()
+			errno.set(errno.eio)
+			return none
+		}
 		if write {
 			unsafe { C.memcpy(dev.bounce, near, chunk) }
 		}
@@ -290,6 +336,7 @@ fn (mut dev AHCIDevice) mmap(_handle voidptr, _page u64, _flags int) voidptr {
 }
 
 fn (mut d AHCIDevice) find_cmd_slot() ?u32 {
+	if d.failed { return none }
 	mut volatile regs := d.regs
 	for i := u32(0); i < d.parent_controller.cmd_slots; i++ {
 		if ((regs.sact | regs.ci) & (1 << i)) == 0 {
@@ -311,32 +358,73 @@ fn (mut d AHCIDevice) set_prdt(cmd_hdr &AHCIHBACommand, buffer u64, interrupt u3
 	return cmd_table
 }
 
-fn (mut d AHCIDevice) send_cmd(slot u32) {
+fn (mut d AHCIDevice) send_cmd(slot u32) bool {
 	// The registers are read through a volatile local. V does not carry
 	// `volatile` on a struct field into C, and in a -prod kernel each loop
 	// below then read its register once and spun for good.
 	mut volatile regs := d.regs
-	for (regs.tfd & (0x88)) != 0 {}
+	if d.failed { return false }
+	deadline := hpet_clock.nanoseconds() + command_timeout_ns
+	for (regs.tfd & (0x88)) != 0 {
+		if hpet_clock.nanoseconds() >= deadline {
+			d.failed = true
+			return false
+		}
+		klock.spin_hint()
+	}
 
 	regs.cmd &= ~hba_cmd_st
 
-	for (regs.cmd & hba_cmd_cr) != 0 {}
+	for (regs.cmd & hba_cmd_cr) != 0 {
+		if hpet_clock.nanoseconds() >= deadline {
+			d.failed = true
+			return false
+		}
+		klock.spin_hint()
+	}
 
 	// FIS receive before start, as the specification orders them. This set
 	// hba_cmd_fr, the read-only "FIS receive running" bit, so from the second
 	// command on the port ran without it.
 	regs.cmd |= hba_cmd_fre
 	regs.cmd |= hba_cmd_st
+	regs.ints = u32(-1)
+	regs.serr = u32(-1)
+	katomic.sync()
 	regs.ci = 1 << slot
 
-	for regs.ci & (1 << slot) != 0 {}
+	for regs.ci & (1 << slot) != 0 {
+		if regs.ints & port_error_mask != 0 || hpet_clock.nanoseconds() >= deadline {
+			// Stop issuing work. Do not reuse DMA memory even if this engine
+			// fails to stop; all device-owned allocations are permanent.
+			regs.cmd &= ~hba_cmd_st
+			d.failed = true
+			return false
+		}
+		klock.spin_hint()
+	}
+	katomic.sync()
+	ok := regs.ints & port_error_mask == 0 && regs.tfd & 1 == 0
 
 	// Stopped when the list engine says so (CR), and FIS receive the same
 	// way (FR); this waited on the bits it had just cleared.
 	regs.cmd &= ~hba_cmd_st
-	for (regs.cmd & hba_cmd_cr) != 0 {}
+	for (regs.cmd & hba_cmd_cr) != 0 {
+		if hpet_clock.nanoseconds() >= deadline {
+			d.failed = true
+			return false
+		}
+		klock.spin_hint()
+	}
 	regs.cmd &= ~hba_cmd_fre
-	for (regs.cmd & hba_cmd_fr) != 0 {}
+	for (regs.cmd & hba_cmd_fr) != 0 {
+		if hpet_clock.nanoseconds() >= deadline {
+			d.failed = true
+			return false
+		}
+		klock.spin_hint()
+	}
+	return ok
 }
 
 fn (mut d AHCIDevice) rw_lba(buffer voidptr, start u64, cnt u64, rw bool) int {
@@ -353,7 +441,9 @@ fn (mut d AHCIDevice) rw_lba(buffer voidptr, start u64, cnt u64, rw bool) int {
 
 	cmd_hdr.flags &= ~(0b11111 | (1 << 6))
 	cmd_hdr.flags |= u16(sizeof(AHCIFISh2d) / 4)
+	if rw { cmd_hdr.flags |= 1 << 6 }
 	cmd_hdr.prdtl = 1
+	cmd_hdr.prdbc = 0
 
 	mut volatile cmd_table := d.set_prdt(cmd_hdr, u64(buffer) - higher_half, 1, u32(cnt * sector_size - 1))
 
@@ -380,7 +470,7 @@ fn (mut d AHCIDevice) rw_lba(buffer voidptr, start u64, cnt u64, rw bool) int {
 	cmd_ptr.countl = u8(cnt & 0xff)
 	cmd_ptr.counth = u8((cnt >> 8) & 0xff)
 
-	d.send_cmd(cmd_slot)
+	if !d.send_cmd(cmd_slot) { return -1 }
 
 	return 0
 }
@@ -436,7 +526,20 @@ fn (mut d AHCIDevice) initialise() ?int {
 	cmd_ptr.flags = (1 << 7)
 	cmd_ptr.fis_type = fis_reg_h2d
 
-	d.send_cmd(cmd_slot)
+	if !d.send_cmd(cmd_slot) {
+		// IDENTIFY may still be writing; retain its page on failure.
+		return none
+	}
+	// ATA IDENTIFY word 83 declares FLUSH CACHE/FLUSH CACHE EXT support.
+	// Do not silently report a persistence barrier on an unsupported disk.
+	commands := unsafe { identity[83] }
+	if commands & 0xc000 == 0x4000 {
+		if commands & (1 << 13) != 0 {
+			d.flush_command = 0xea
+		} else if commands & (1 << 12) != 0 {
+			d.flush_command = 0xe7
+		}
+	}
 
 	mut sector_cnt := unsafe { *(&u64(&identity[100])) }
 
@@ -486,6 +589,7 @@ fn (mut d AHCIDevice) initialise() ?int {
 	d.stat.size = sector_cnt * sector_size
 	d.stat.rdev = resource.create_dev_id()
 	d.stat.mode = 0o644 | stat.ifblk
+	memory.pmm_free(voidptr(u64(identity) - higher_half), 1)
 
 	return 0
 }

@@ -11,6 +11,9 @@
 #include <lwip/inet_chksum.h>
 #include <lwip/init.h>
 #include <lwip/ip.h>
+#include <lwip/ethip6.h>
+#include <lwip/ip6_addr.h>
+#include <lwip/ip6_zone.h>
 #include <lwip/mem.h>
 #include <lwip/netif.h>
 #include <lwip/pbuf.h>
@@ -54,11 +57,15 @@ struct packet {
     struct packet *next;
     struct pbuf *p;
     uint16_t offset;
-    uint32_t address;
+    ip_addr_t address;
     uint16_t port;
+    uint32_t charge;
 };
 
 struct vinix_socket {
+    int family;
+    int v6only;
+    int bound;
     int type;
     int protocol;
     int error;
@@ -73,10 +80,13 @@ struct vinix_socket {
     int keepalive;
     /* TCP_NODELAY on a listening socket, for the connections it accepts. */
     int nodelay;
+    uint32_t keep_idle, keep_interval, keep_count;
+    uint32_t send_limit, receive_limit, send_queued, receive_queued;
+    int abort_on_close;
     struct tcp_pcb *tcp;
     struct udp_pcb *udp;
     /* tcp_err releases the PCB before user space can query this socket. */
-    uint32_t last_local_address;
+    ip_addr_t last_local_address;
     uint16_t last_local_port;
     struct packet *rx_head;
     struct packet *rx_tail;
@@ -179,24 +189,38 @@ static void free_packets(struct vinix_socket *socket) {
         free_packet(packet);
     }
     socket->rx_tail = NULL;
+    socket->receive_queued = 0;
 }
 
 static int queue_packet(struct vinix_socket *socket, struct pbuf *p,
-                        uint32_t address, uint16_t port) {
-    struct packet *packet = (struct packet *)mem_malloc(sizeof(*packet));
+                        const ip_addr_t *address, uint16_t port) {
+    struct packet *packet;
+    uint32_t charge = p->tot_len + sizeof(*packet) + 64;
+    if ((charge > socket->receive_limit ||
+         socket->receive_queued > socket->receive_limit - charge) &&
+        !(socket->type == VINIX_NET_STREAM && socket->receive_queued == 0)) {
+        return 0;
+    }
+    /* TCP may coalesce an entire advertised window into one pbuf chain.
+     * Permit that one chain in an empty queue even after SO_RCVBUF shrinks;
+     * rejecting it forever would deadlock the stream. Further chains still
+     * apply backpressure. UDP drops datagrams that exceed its budget. */
+    packet = (struct packet *)mem_malloc(sizeof(*packet));
     if (!packet) {
         return 0;
     }
     memset(packet, 0, sizeof(*packet));
     packet->p = p;
-    packet->address = address;
+    if (address) ip_addr_copy(packet->address, *address);
     packet->port = port;
+    packet->charge = charge;
     if (socket->rx_tail) {
         socket->rx_tail->next = packet;
     } else {
         socket->rx_head = packet;
     }
     socket->rx_tail = packet;
+    socket->receive_queued += charge;
     return 1;
 }
 
@@ -222,7 +246,7 @@ static err_t tcp_received(void *argument, struct tcp_pcb *pcb,
         pbuf_free(p);
         return ERR_OK;
     }
-    if (!queue_packet(socket, p, 0, 0)) {
+    if (!queue_packet(socket, p, &pcb->remote_ip, pcb->remote_port)) {
         /* Keeping lwIP's ownership by refusing the packet applies TCP
          * backpressure instead of silently losing stream bytes. */
         return ERR_MEM;
@@ -231,9 +255,12 @@ static err_t tcp_received(void *argument, struct tcp_pcb *pcb,
 }
 
 static err_t tcp_sent_data(void *argument, struct tcp_pcb *pcb, uint16_t length) {
-    (void)argument;
+    struct vinix_socket *socket = (struct vinix_socket *)argument;
     (void)pcb;
-    (void)length;
+    if (socket) {
+        socket->send_queued = length >= socket->send_queued ?
+            0 : socket->send_queued - length;
+    }
     return ERR_OK;
 }
 
@@ -285,12 +312,26 @@ static err_t accept_callback(void *argument, struct tcp_pcb *pcb, err_t error) {
         tcp_abort(pcb);
         return ERR_ABRT;
     }
+    child->family = listener->family;
+    child->v6only = listener->v6only;
+    child->bound = 1;
     child->type = VINIX_NET_STREAM;
     child->protocol = 6;
     child->connected = 1;
     child->tcp = pcb;
     child->reuseaddr = ip_get_option(pcb, SOF_REUSEADDR) != 0;
-    child->keepalive = ip_get_option(pcb, SOF_KEEPALIVE) != 0;
+    child->keepalive = listener->keepalive;
+    if (child->keepalive) ip_set_option(pcb, SOF_KEEPALIVE);
+    else ip_reset_option(pcb, SOF_KEEPALIVE);
+    child->keep_idle = listener->keep_idle;
+    child->keep_interval = listener->keep_interval;
+    child->keep_count = listener->keep_count;
+    pcb->keep_idle = child->keep_idle;
+    pcb->keep_intvl = child->keep_interval;
+    pcb->keep_cnt = child->keep_count;
+    child->send_limit = listener->send_limit;
+    child->receive_limit = listener->receive_limit;
+    child->abort_on_close = listener->abort_on_close;
     /* A connection takes TCP_NODELAY from the socket it was accepted on. */
     if (listener->nodelay) {
         tcp_nagle_disable(pcb);
@@ -311,7 +352,7 @@ static void udp_received(void *argument, struct udp_pcb *pcb, struct pbuf *p,
     struct vinix_socket *socket = (struct vinix_socket *)argument;
     (void)pcb;
     if (!socket || socket->read_shutdown ||
-        !queue_packet(socket, p, ip_2_ip4(address)->addr, port)) {
+        !queue_packet(socket, p, address, port)) {
         pbuf_free(p);
     }
 }
@@ -322,7 +363,7 @@ void vinix_net_init(void) {
     }
     lwip_init();
     stack_initialised = 1;
-    printf("net: lwIP 2.2.1, IPv4 TCP/UDP loopback ready\n");
+    printf("net: lwIP 2.2.1, IPv4/IPv6 TCP/UDP loopback ready\n");
 }
 
 static int driver_output(const void *frame, size_t length) {
@@ -373,6 +414,8 @@ static err_t physical_init(struct netif *netif) {
     netif->mtu = 1500;
     netif->flags = NETIF_FLAG_BROADCAST | NETIF_FLAG_ETHARP | NETIF_FLAG_ETHERNET;
     netif->output = output_ipv4;
+    netif->output_ip6 = ethip6_output;
+    netif->flags |= NETIF_FLAG_MLD6;
     netif->linkoutput = link_output;
     return ERR_OK;
 }
@@ -397,6 +440,7 @@ int vinix_net_attach(const uint8_t mac[6], int driver) {
         active_driver = DRIVER_NONE;
         return -12;
     }
+    netif_create_ip6_linklocal_address(&physical_netif, 1);
     netif_set_default(&physical_netif);
     netif_set_link_up(&physical_netif);
     netif_set_up(&physical_netif);
@@ -500,11 +544,12 @@ int vinix_net_link(uint8_t mac[6], uint32_t *mtu) {
     return 1;
 }
 
-struct vinix_socket *vinix_socket_new(int type, int protocol) {
+struct vinix_socket *vinix_socket_new_family(int family, int type, int protocol) {
     struct vinix_socket *socket;
     if (!stack_initialised) {
         vinix_net_init();
     }
+    if (family != 2 && family != 10) return NULL;
     if ((type == VINIX_NET_STREAM && protocol != 0 && protocol != 6) ||
         (type == VINIX_NET_DGRAM && protocol != 0 && protocol != 17)) {
         return NULL;
@@ -513,17 +558,24 @@ struct vinix_socket *vinix_socket_new(int type, int protocol) {
     if (!socket) {
         return NULL;
     }
+    socket->family = family;
+    ip_addr_set_any(family == 10, &socket->last_local_address);
     socket->type = type;
     socket->protocol = protocol ? protocol : (type == VINIX_NET_STREAM ? 6 : 17);
+    socket->send_limit = type == VINIX_NET_STREAM ? TCP_SND_BUF : 212992;
+    socket->receive_limit = type == VINIX_NET_STREAM ? TCP_WND + 4096 : 212992;
+    socket->keep_idle = TCP_KEEPIDLE_DEFAULT;
+    socket->keep_interval = TCP_KEEPINTVL_DEFAULT;
+    socket->keep_count = TCP_KEEPCNT_DEFAULT;
     if (type == VINIX_NET_STREAM) {
-        socket->tcp = tcp_new_ip_type(IPADDR_TYPE_V4);
+        socket->tcp = tcp_new_ip_type(family == 10 ? IPADDR_TYPE_ANY : IPADDR_TYPE_V4);
         if (!socket->tcp) {
             mem_free(socket);
             return NULL;
         }
         install_tcp_callbacks(socket);
     } else if (type == VINIX_NET_DGRAM) {
-        socket->udp = udp_new_ip_type(IPADDR_TYPE_V4);
+        socket->udp = udp_new_ip_type(family == 10 ? IPADDR_TYPE_ANY : IPADDR_TYPE_V4);
         if (!socket->udp) {
             mem_free(socket);
             return NULL;
@@ -560,7 +612,7 @@ void vinix_socket_free(struct vinix_socket *socket) {
         tcp_recv(socket->tcp, NULL);
         tcp_sent(socket->tcp, NULL);
         tcp_err(socket->tcp, NULL);
-        if (tcp_close(socket->tcp) != ERR_OK) {
+        if (socket->abort_on_close || tcp_close(socket->tcp) != ERR_OK) {
             tcp_abort(socket->tcp);
         }
         socket->tcp = NULL;
@@ -578,6 +630,102 @@ static ip_addr_t ipv4(uint32_t address) {
     IP_SET_TYPE_VAL(result, IPADDR_TYPE_V4);
     ip_2_ip4(&result)->addr = address;
     return result;
+}
+
+/* The IPv4 ABI remains available to procfs and existing consumers. */
+struct vinix_socket *vinix_socket_new(int type, int protocol) {
+    return vinix_socket_new_family(2, type, protocol);
+}
+
+static struct vinix_ip_address public_ipv4(uint32_t address) {
+    struct vinix_ip_address result = { .family = 2 };
+    memcpy(result.bytes, &address, 4);
+    return result;
+}
+
+static int decode_address(struct vinix_socket *socket,
+                          const struct vinix_ip_address *address, ip_addr_t *ip,
+                          int binding) {
+    if (!address || !socket) return 22;
+    if (address->family == 2) {
+        if (socket->family != 2) return 97;
+        *ip = ipv4(0);
+        memcpy(&ip_2_ip4(ip)->addr, address->bytes, 4);
+        return 0;
+    }
+    if (address->family != 10 || socket->family != 10) return 97;
+    ip_addr_set_zero_ip6(ip);
+    memcpy(ip_2_ip6(ip)->addr, address->bytes, 16);
+    if (ip6_addr_isipv4mappedipv6(ip_2_ip6(ip))) {
+        if (socket->v6only) return binding ? 22 : 101;
+        uint32_t mapped = ip_2_ip6(ip)->addr[3];
+        *ip = ipv4(mapped);
+        return 0;
+    }
+    if (ip6_addr_has_scope(ip_2_ip6(ip), IP6_UNKNOWN)) {
+        if (!address->scope) return 22;
+        if (address->scope != 2 || !link_attached) return 19;
+        ip6_addr_assign_zone(ip_2_ip6(ip), IP6_UNKNOWN, &physical_netif);
+    } else if (address->scope > 2) {
+        return 19;
+    }
+    if (binding && !ip6_addr_isany(ip_2_ip6(ip)) &&
+        !ip6_addr_isloopback(ip_2_ip6(ip)) && !ip6_addr_ismulticast(ip_2_ip6(ip))) {
+        int found = 0;
+        if (link_attached) {
+            for (unsigned i = 0; i < LWIP_IPV6_NUM_ADDRESSES; ++i) {
+                if (ip6_addr_isvalid(netif_ip6_addr_state(&physical_netif, i)) &&
+                    ip6_addr_cmp(ip_2_ip6(ip), netif_ip6_addr(&physical_netif, i))) found = 1;
+            }
+        }
+        if (!found) return 99;
+    }
+    if (binding && !socket->v6only && ip6_addr_isany(ip_2_ip6(ip))) {
+        IP_SET_TYPE(ip, IPADDR_TYPE_ANY);
+    }
+    return 0;
+}
+
+static void encode_address(struct vinix_socket *socket, const ip_addr_t *ip,
+                           struct vinix_ip_address *address) {
+    if (!address) return;
+    memset(address, 0, sizeof(*address));
+    address->family = (uint32_t)socket->family;
+    if (socket->family == 10) {
+        if (IP_IS_V4(ip)) {
+            address->bytes[10] = address->bytes[11] = 0xff;
+            memcpy(address->bytes + 12, &ip_2_ip4(ip)->addr, 4);
+        } else if (IP_IS_V6(ip)) {
+            memcpy(address->bytes, ip_2_ip6(ip)->addr, 16);
+            if (ip6_addr_has_zone(ip_2_ip6(ip))) address->scope = 2;
+        }
+    } else if (IP_IS_V4(ip)) {
+        memcpy(address->bytes, &ip_2_ip4(ip)->addr, 4);
+    }
+}
+
+int vinix_net_ipv6_address(unsigned index, unsigned slot,
+                           struct vinix_ip_address *address,
+                           unsigned *prefix, unsigned *flags) {
+    if (!address || !prefix || !flags) return 0;
+    memset(address, 0, sizeof(*address));
+    address->family = 10;
+    if (index == 1 && slot == 0) {
+        address->bytes[15] = 1;
+        *prefix = 128;
+        *flags = 0x80; /* IFA_F_PERMANENT */
+        return 1;
+    }
+    if (index != 2 || !link_attached || slot >= LWIP_IPV6_NUM_ADDRESSES) return 0;
+    unsigned state = netif_ip6_addr_state(&physical_netif, slot);
+    if (state == IP6_ADDR_INVALID) return 0;
+    const ip6_addr_t *ip = netif_ip6_addr(&physical_netif, slot);
+    memcpy(address->bytes, ip->addr, 16);
+    address->scope = ip6_addr_islinklocal(ip) ? 2 : 0;
+    *prefix = 64; /* lwIP SLAAC and EUI-64 link-local prefixes. */
+    *flags = ip6_addr_istentative(state) ? 0x40 : 0;
+    if (state == IP6_ADDR_DEPRECATED) *flags |= 0x20;
+    return 1;
 }
 
 static int tcp_port_taken(uint16_t port, void *context) {
@@ -621,34 +769,40 @@ static int bind_ephemeral(struct vinix_socket *socket, const ip_addr_t *address)
                               : udp_bind(socket->udp, address, port));
 }
 
-int vinix_socket_bind(struct vinix_socket *socket, uint32_t address, uint16_t port) {
+int vinix_socket_bind_ip(struct vinix_socket *socket, const struct vinix_ip_address *address, uint16_t port) {
     ip_addr_t ip;
     err_t error;
     if (!socket) {
         return 88;
     }
-    ip = ipv4(address);
+    int decoded = decode_address(socket, address, &ip, 1);
+    if (decoded) return decoded;
+    if (socket->bound) return 22;
     if (socket->type == VINIX_NET_STREAM && !socket->tcp) {
         return socket->error ? socket->error : 107;
     }
     if (port == 0) {
-        return bind_ephemeral(socket, &ip);
+        int result = bind_ephemeral(socket, &ip);
+        if (!result) socket->bound = 1;
+        return result;
     }
     if (socket->type == VINIX_NET_STREAM) {
         error = tcp_bind(socket->tcp, &ip, lwip_ntohs(port));
     } else {
         error = udp_bind(socket->udp, &ip, lwip_ntohs(port));
     }
+    if (error == ERR_OK) socket->bound = 1;
     return linux_error(error);
 }
 
-int vinix_socket_connect(struct vinix_socket *socket, uint32_t address, uint16_t port) {
+int vinix_socket_connect_ip(struct vinix_socket *socket, const struct vinix_ip_address *address, uint16_t port) {
     ip_addr_t ip;
     err_t error;
     if (!socket) {
         return 88;
     }
-    ip = ipv4(address);
+    int decoded = decode_address(socket, address, &ip, 0);
+    if (decoded) return decoded;
     if (socket->type == VINIX_NET_STREAM) {
         if (!socket->tcp) return socket->error ? socket->error : 107;
         if (socket->connected) {
@@ -669,7 +823,7 @@ int vinix_socket_connect(struct vinix_socket *socket, uint32_t address, uint16_t
             socket->connecting = 0;
             return linux_error(error);
         }
-        socket->last_local_address = ip_2_ip4(&socket->tcp->local_ip)->addr;
+        ip_addr_copy(socket->last_local_address, socket->tcp->local_ip);
         socket->last_local_port = lwip_htons(socket->tcp->local_port);
         /* NO_SYS loopback queues packets until netif_poll_all().  A busy
          * nonblocking client may never let the scheduler reach its idle
@@ -740,8 +894,8 @@ struct vinix_socket *vinix_socket_accept(struct vinix_socket *socket) {
     return child;
 }
 
-int vinix_socket_send(struct vinix_socket *socket, const void *data, size_t length,
-                      uint32_t address, uint16_t port, int has_address) {
+int vinix_socket_send_ip(struct vinix_socket *socket, const void *data, size_t length,
+                      const struct vinix_ip_address *address, uint16_t port, int has_address) {
     err_t error;
     if (!socket || (!data && length)) {
         return -22;
@@ -762,6 +916,10 @@ int vinix_socket_send(struct vinix_socket *socket, const void *data, size_t leng
             return 0;
         }
         amount = tcp_sndbuf(socket->tcp);
+        if (socket->send_queued >= socket->send_limit) return -11;
+        if (amount > socket->send_limit - socket->send_queued) {
+            amount = (uint16_t)(socket->send_limit - socket->send_queued);
+        }
         if (amount > length) {
             amount = (uint16_t)length;
         }
@@ -772,10 +930,11 @@ int vinix_socket_send(struct vinix_socket *socket, const void *data, size_t leng
         if (error != ERR_OK) {
             return -linux_error(error);
         }
-        error = tcp_output(socket->tcp);
-        if (error != ERR_OK) {
-            return -linux_error(error);
-        }
+        socket->send_queued += amount;
+        /* tcp_write accepted these bytes. Output failure leaves them queued
+         * for retransmission; reporting failure would let callers duplicate
+         * the same bytes on retry. */
+        (void)tcp_output(socket->tcp);
         netif_poll_all();
         return amount;
     } else {
@@ -783,7 +942,7 @@ int vinix_socket_send(struct vinix_socket *socket, const void *data, size_t leng
         if (!has_address && !socket->connected) {
             return -89;
         }
-        if (length > 65507) {
+        if (length > 65507 || length > socket->send_limit) {
             return -90;
         }
         if (socket->udp->local_port == 0) {
@@ -801,7 +960,9 @@ int vinix_socket_send(struct vinix_socket *socket, const void *data, size_t leng
             return -12;
         }
         if (has_address) {
-            ip_addr_t ip = ipv4(address);
+            ip_addr_t ip;
+            int decoded = decode_address(socket, address, &ip, 0);
+            if (decoded) { pbuf_free(p); return -decoded; }
             error = udp_sendto(socket->udp, p, &ip, lwip_ntohs(port));
         } else {
             error = udp_send(socket->udp, p);
@@ -817,8 +978,8 @@ int vinix_socket_send(struct vinix_socket *socket, const void *data, size_t leng
     }
 }
 
-int vinix_socket_recv(struct vinix_socket *socket, void *data, size_t length,
-                      uint32_t *address, uint16_t *port) {
+int vinix_socket_recv_ip(struct vinix_socket *socket, void *data, size_t length,
+                      struct vinix_ip_address *address, uint16_t *port) {
     struct packet *packet;
     uint16_t available;
     uint16_t amount;
@@ -844,15 +1005,16 @@ int vinix_socket_recv(struct vinix_socket *socket, void *data, size_t length,
         pbuf_copy_partial(packet->p, data, amount, packet->offset);
     }
     if (address) {
-        *address = packet->address;
+        encode_address(socket, &packet->address, address);
     }
     if (port) {
         *port = lwip_htons(packet->port);
     }
-    if (socket->tcp) {
+    if (socket->type == VINIX_NET_STREAM) {
         packet->offset = (uint16_t)(packet->offset + amount);
-        tcp_recved(socket->tcp, amount);
+        if (socket->tcp) tcp_recved(socket->tcp, amount);
         if (packet->offset == packet->p->tot_len) {
+            socket->receive_queued -= packet->charge;
             socket->rx_head = packet->next;
             if (!socket->rx_head) {
                 socket->rx_tail = NULL;
@@ -861,6 +1023,7 @@ int vinix_socket_recv(struct vinix_socket *socket, void *data, size_t length,
         }
     } else {
         /* recvfrom consumes one datagram, including a truncated tail. */
+        socket->receive_queued -= packet->charge;
         socket->rx_head = packet->next;
         if (!socket->rx_head) {
             socket->rx_tail = NULL;
@@ -895,34 +1058,64 @@ int vinix_socket_shutdown(struct vinix_socket *socket, int how) {
     return 0;
 }
 
-int vinix_socket_local(struct vinix_socket *socket, uint32_t *address, uint16_t *port) {
-    if (!socket) {
-        return 88;
-    }
+int vinix_socket_local_ip(struct vinix_socket *socket,
+                           struct vinix_ip_address *address, uint16_t *port) {
+    if (!socket) return 88;
     if (socket->type == VINIX_NET_STREAM) {
-        if (address) *address = socket->tcp ?
-            ip_2_ip4(&socket->tcp->local_ip)->addr : socket->last_local_address;
-        if (port) *port = socket->tcp ?
-            lwip_htons(socket->tcp->local_port) : socket->last_local_port;
+        encode_address(socket, socket->tcp ? &socket->tcp->local_ip :
+                        &socket->last_local_address, address);
+        if (port) *port = socket->tcp ? lwip_htons(socket->tcp->local_port) : socket->last_local_port;
     } else {
-        if (address) *address = ip_2_ip4(&socket->udp->local_ip)->addr;
+        encode_address(socket, &socket->udp->local_ip, address);
         if (port) *port = lwip_htons(socket->udp->local_port);
     }
     return 0;
 }
 
-int vinix_socket_peer(struct vinix_socket *socket, uint32_t *address, uint16_t *port) {
-    if (!socket || !socket->connected) {
-        return 107;
-    }
+int vinix_socket_peer_ip(struct vinix_socket *socket,
+                          struct vinix_ip_address *address, uint16_t *port) {
+    if (!socket || !socket->connected) return 107;
     if (socket->tcp) {
-        if (address) *address = ip_2_ip4(&socket->tcp->remote_ip)->addr;
+        encode_address(socket, &socket->tcp->remote_ip, address);
         if (port) *port = lwip_htons(socket->tcp->remote_port);
     } else {
-        if (address) *address = ip_2_ip4(&socket->udp->remote_ip)->addr;
+        encode_address(socket, &socket->udp->remote_ip, address);
         if (port) *port = lwip_htons(socket->udp->remote_port);
     }
     return 0;
+}
+
+int vinix_socket_bind(struct vinix_socket *socket, uint32_t address, uint16_t port) {
+    struct vinix_ip_address ip = public_ipv4(address);
+    return vinix_socket_bind_ip(socket, &ip, port);
+}
+int vinix_socket_connect(struct vinix_socket *socket, uint32_t address, uint16_t port) {
+    struct vinix_ip_address ip = public_ipv4(address);
+    return vinix_socket_connect_ip(socket, &ip, port);
+}
+int vinix_socket_send(struct vinix_socket *socket, const void *data, size_t length,
+                      uint32_t address, uint16_t port, int has_address) {
+    struct vinix_ip_address ip = public_ipv4(address);
+    return vinix_socket_send_ip(socket, data, length, &ip, port, has_address);
+}
+int vinix_socket_recv(struct vinix_socket *socket, void *data, size_t length,
+                      uint32_t *address, uint16_t *port) {
+    struct vinix_ip_address ip = {0};
+    int result = vinix_socket_recv_ip(socket, data, length, &ip, port);
+    if (result >= 0 && address) memcpy(address, ip.bytes, 4);
+    return result;
+}
+int vinix_socket_local(struct vinix_socket *socket, uint32_t *address, uint16_t *port) {
+    struct vinix_ip_address ip;
+    int result = vinix_socket_local_ip(socket, &ip, port);
+    if (!result && address) memcpy(address, ip.bytes, 4);
+    return result;
+}
+int vinix_socket_peer(struct vinix_socket *socket, uint32_t *address, uint16_t *port) {
+    struct vinix_ip_address ip;
+    int result = vinix_socket_peer_ip(socket, &ip, port);
+    if (!result && address) memcpy(address, ip.bytes, 4);
+    return result;
 }
 
 int vinix_socket_ready(struct vinix_socket *socket) {
@@ -935,7 +1128,8 @@ int vinix_socket_ready(struct vinix_socket *socket) {
         ready |= VINIX_NET_READABLE;
     }
     if (!socket->write_shutdown &&
-        ((socket->tcp && socket->connected && tcp_sndbuf(socket->tcp) > 0) ||
+        ((socket->tcp && socket->connected && tcp_sndbuf(socket->tcp) > 0 &&
+          socket->send_queued < socket->send_limit) ||
          socket->udp)) {
         ready |= VINIX_NET_WRITABLE;
     }
@@ -993,21 +1187,29 @@ int vinix_socket_set_option(struct vinix_socket *socket, int level, int option,
         switch (option) {
         case 2:  /* SO_REUSEADDR */
         case 15: /* SO_REUSEPORT: lwIP shares address-reuse semantics. */
-            socket->reuseaddr = value;
+            socket->reuseaddr = value != 0;
             if (pcb) {
                 if (value) ip_set_option(pcb, SOF_REUSEADDR);
                 else ip_reset_option(pcb, SOF_REUSEADDR);
             }
             return 0;
         case 6: /* SO_BROADCAST */
-            socket->broadcast = value;
+            socket->broadcast = value != 0;
             if (pcb) {
                 if (value) ip_set_option(pcb, SOF_BROADCAST);
                 else ip_reset_option(pcb, SOF_BROADCAST);
             }
             return 0;
+        case 7: /* SO_SNDBUF: Linux doubles the requested size. */
+        case 8: /* SO_RCVBUF */
+            if (value < 0) return 22;
+            if (value > 2 * 1024 * 1024) value = 2 * 1024 * 1024;
+            value = value < 2048 ? 4096 : value * 2;
+            if (option == 7) socket->send_limit = (uint32_t)value;
+            else socket->receive_limit = (uint32_t)value;
+            return 0;
         case 9: /* SO_KEEPALIVE */
-            socket->keepalive = value;
+            socket->keepalive = value != 0;
             if (pcb) {
                 if (value) ip_set_option(pcb, SOF_KEEPALIVE);
                 else ip_reset_option(pcb, SOF_KEEPALIVE);
@@ -1016,6 +1218,25 @@ int vinix_socket_set_option(struct vinix_socket *socket, int level, int option,
         default:
             return 92;
         }
+    }
+    if (level == 41 && socket->family == 10) {
+        if (!pcb) return 107;
+        if (option == 26) { /* IPV6_V6ONLY, before binding or connecting. */
+            if (value != 0 && value != 1) return 22;
+            if (socket->bound || socket->connected || socket->connecting || socket->listening ||
+                (socket->tcp && socket->tcp->local_port) ||
+                (socket->udp && socket->udp->local_port)) return 22;
+            socket->v6only = value;
+            ip_addr_set_any(value, &pcb->local_ip);
+            if (!value) IP_SET_TYPE(&pcb->local_ip, IPADDR_TYPE_ANY);
+            return 0;
+        }
+        if (option == 16) { /* IPV6_UNICAST_HOPS */
+            if (value < -1 || value > 255) return 22;
+            pcb->ttl = value == -1 ? 64 : (uint8_t)value;
+            return 0;
+        }
+        return 92;
     }
     if (level == 0) { /* IPPROTO_IP */
         if (!pcb) return 107;
@@ -1035,7 +1256,22 @@ int vinix_socket_set_option(struct vinix_socket *socket, int level, int option,
         }
     }
     if (level == 6) { /* IPPROTO_TCP */
+        if (socket->type != VINIX_NET_STREAM) return 92;
         switch (option) {
+        case 4: /* TCP_KEEPIDLE */
+        case 5: /* TCP_KEEPINTVL */
+        case 6: /* TCP_KEEPCNT */
+            if (value < 1 || value > (option == 6 ? 127 : 32767)) return 22;
+            if (option == 4) socket->keep_idle = (uint32_t)value * 1000;
+            else if (option == 5) socket->keep_interval = (uint32_t)value * 1000;
+            else socket->keep_count = (uint32_t)value;
+            if (socket->tcp && socket->tcp->state != LISTEN) {
+                socket->tcp->keep_idle = socket->keep_idle;
+                socket->tcp->keep_intvl = socket->keep_interval;
+                socket->tcp->keep_cnt = socket->keep_count;
+                socket->tcp->keep_cnt_sent = 0;
+            }
+            return 0;
         case 1: /* TCP_NODELAY */
             if (!socket->tcp) return 92;
             /* A listening pcb is lwIP's smaller tcp_pcb_listen, which has no
@@ -1043,8 +1279,8 @@ int vinix_socket_set_option(struct vinix_socket *socket, int level, int option,
              * setting TF_NODELAY there turned the callback into a pointer
              * to nowhere, which the next connection to finish its handshake
              * called. Varnish sets it on its listening socket. */
+            socket->nodelay = value != 0;
             if (socket->tcp->state == LISTEN) {
-                socket->nodelay = value != 0;
                 return 0;
             }
             if (value) tcp_nagle_disable(socket->tcp);
@@ -1069,9 +1305,16 @@ int vinix_socket_get_option(struct vinix_socket *socket, int level, int option,
         case 2:
         case 15: *value = socket->reuseaddr; return 0;
         case 6: *value = socket->broadcast; return 0;
+        case 7: *value = (int)socket->send_limit; return 0;
+        case 8: *value = (int)socket->receive_limit; return 0;
         case 9: *value = socket->keepalive; return 0;
         default: return 92;
         }
+    }
+    if (level == 41 && socket->family == 10) {
+        if (option == 26) { *value = socket->v6only; return 0; }
+        if (option == 16 && pcb) { *value = pcb->ttl; return 0; }
+        return 92;
     }
     if (level == 0) { /* IPPROTO_IP */
         if (!pcb) return 107;
@@ -1082,7 +1325,11 @@ int vinix_socket_get_option(struct vinix_socket *socket, int level, int option,
         }
     }
     if (level == 6) { /* IPPROTO_TCP */
+        if (socket->type != VINIX_NET_STREAM) return 92;
         switch (option) {
+        case 4: *value = (int)(socket->keep_idle / 1000); return 0;
+        case 5: *value = (int)(socket->keep_interval / 1000); return 0;
+        case 6: *value = (int)socket->keep_count; return 0;
         case 1:
             if (!socket->tcp) return 92;
             if (socket->tcp->state == LISTEN) {
@@ -1095,4 +1342,15 @@ int vinix_socket_get_option(struct vinix_socket *socket, int level, int option,
         }
     }
     return 92;
+}
+
+/* The V descriptor remains registered while close waits for acknowledgments.
+ * Abort is also used after a linger timeout, before freeing callbacks. */
+int vinix_socket_pending(struct vinix_socket *socket) {
+    return socket && socket->tcp && !socket->listening ?
+        (int)socket->send_queued : 0;
+}
+
+void vinix_socket_abort_close(struct vinix_socket *socket) {
+    if (socket) socket->abort_on_close = 1;
 }

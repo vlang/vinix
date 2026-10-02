@@ -7,7 +7,7 @@ module krandom
 fn test_chacha20_known_block() {
 	mut rng := Generator{}
 	mut words := [16]u32{}
-	rng.block(mut words)
+	rng.block(unsafe { &words })
 	assert words == [u32(0xade0b876), 0x903df1a0, 0xe56a5d40, 0x28bd8653,
 		0xb819d2bd, 0x1aed8da0, 0xccef36a8, 0xc70d778b, 0x7c5941da, 0x8d485751,
 		0x3fe02477, 0x374ad8b8, 0xf4b8436a, 0x1ca11815, 0x69b687c3, 0x8665eeb2]!

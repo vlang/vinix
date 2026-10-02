@@ -248,17 +248,15 @@ pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, 
 	// resolves that to this process's program, but the new process must record
 	// where the program really is: keeping the literal path would make the
 	// child's own /proc/self/exe point back at itself forever.
+	resolved := fs.get_node_and_mount(dir, _path, true) or {
+		if execve { free_exec_arguments(_path, argv, envp) }
+		return none
+	}
 	path := fs.resolve_self_reference(_path)
 	if execve && path.str != _path.str && !argv.any(it.str == _path.str) {
 		unsafe { _path.free() }
 	}
-	prog_node := fs.get_node(dir, path, true) or {
-		if execve {
-			free_exec_arguments(path, argv, envp)
-		}
-		return none
-	}
-	return start_program_node(execve, dir, prog_node, path, argv, envp, stdin_path,
+	return start_program_node(execve, dir, resolved.node, resolved.mount, path, argv, envp, stdin_path,
 		stdout_path, stderr_path)
 }
 
@@ -266,11 +264,12 @@ pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, 
 // descriptor comes here directly: a memfd has no name to be found by. What an
 // exec was handed is freed here when it fails, unless load_program_image()
 // has handed it on to a script interpreter's exec, which frees it.
-pub fn start_program_node(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, path string, argv []string, envp []string, stdin_path string, stdout_path string, stderr_path string) ?&proc.Process {
-	mut handed_on := false
-	process := load_program_image(execve, dir, prog_node, path, argv, envp, stdin_path,
-		stdout_path, stderr_path, unsafe { &handed_on }) or {
-		if execve && !handed_on {
+pub fn start_program_node(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_mount voidptr, path string, argv []string, envp []string, stdin_path string, stdout_path string, stderr_path string) ?&proc.Process {
+	handed_on := unsafe { &bool(C.vinix_stack_alloc(sizeof(bool))) }
+	unsafe { *handed_on = false }
+	process := load_program_image(execve, dir, prog_node, prog_mount, path, argv, envp, stdin_path,
+		stdout_path, stderr_path, handed_on) or {
+		if execve && !unsafe { *handed_on } {
 			free_exec_arguments(path, argv, envp)
 		}
 		return none
@@ -278,18 +277,24 @@ pub fn start_program_node(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, p
 	return process
 }
 
-fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, path string, argv []string, envp []string, stdin_path string, stdout_path string, stderr_path string, handed_on &bool) ?&proc.Process {
+fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_mount voidptr, path string, argv []string, envp []string, stdin_path string, stdout_path string, stderr_path string, handed_on &bool) ?&proc.Process {
 	// The program, or a script's interpreter, is subject to pledge(2) and
 	// unveil(2); the ELF interpreter the kernel loads for it is not.
 	if execve && !fs.policy_check(prog_node, proc.policy_exec) {
 		return none
 	}
 	if !stat.isreg(prog_node.resource.stat.mode)
+		|| fs.mount_flags(prog_mount) & fs.ms_noexec != 0
 		|| !fs.check_access(prog_node, fs.access_exec, true) {
 		errno.set(errno.eacces)
 		return none
 	}
 	mut prog := prog_node.resource
+	allow_wx := envp.contains('VINIX_ALLOW_WX=1')
+	if allow_wx && !fs.wx_exec_allowed(prog_mount) {
+		errno.set(errno.eperm)
+		return none
+	}
 
 	// Check for shebang before proceeding as if it was an ELF.
 	mut shebang := [2]char{}
@@ -351,7 +356,6 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, path 
 	mut new_pagemap := memory.new_pagemap()
 
 	mut auxval, ld_path := elf.load(new_pagemap, prog, 0) or { return exec_format_error(err) }
-	allow_wx := envp.contains('VINIX_ALLOW_WX=1')
 
 	mut entry_point := unsafe { nil }
 
@@ -360,9 +364,19 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, path 
 	} else {
 		// Found from the root of the process that runs it -- a container's,
 		// after pivot_root -- as on arm64.
-		ld_node := fs.get_node(fs.process_root(proc.current_thread().process), ld_path, true)?
+		ld_resolved := fs.get_node_and_mount(fs.process_root(proc.current_thread().process), ld_path, true) or {
+			failure := errno.get()
+			unsafe { ld_path.free() }
+			mmap.delete_pagemap(mut new_pagemap) or {}
+			errno.set(failure)
+			return none
+		}
+		ld_node := ld_resolved.node
 		if !stat.isreg(ld_node.resource.stat.mode)
+			|| fs.mount_flags(ld_resolved.mount) & fs.ms_noexec != 0
 			|| !fs.check_access(ld_node, fs.access_exec, true) {
+			unsafe { ld_path.free() }
+			mmap.delete_pagemap(mut new_pagemap) or {}
 			errno.set(errno.eacces)
 			return none
 		}
@@ -388,6 +402,7 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, path 
 		new_process.name = proc.process_name(path, new_process.pid)
 		new_process.executable_path = fs.program_path(prog_node, path)
 		new_process.exe_node = voidptr(prog_node)
+		new_process.exe_mount = prog_mount
 		new_process.allow_wx = allow_wx
 		new_process.sigcookie = proc.new_sigcookie()
 
@@ -466,6 +481,7 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, path 
 		proc.lock_table()
 		mut old_pagemap := process.pagemap
 		process.pagemap = new_pagemap
+		process.dumpable = process.uid == process.euid && process.gid == process.egid
 		proc.unlock_table()
 		// The LDT goes with the program, as on Linux; the new thread's TLS
 		// descriptors start empty.
@@ -482,6 +498,7 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, path 
 		// through a descriptor.
 		process.executable_path = program_path
 		process.exe_node = voidptr(prog_node)
+		process.exe_mount = prog_mount
 		process.allow_wx = allow_wx
 		// execve recomputes the capability sets from the new credentials and
 		// the bounding set, which is how a container's root ends up with only
@@ -601,6 +618,7 @@ pub fn syscall_execveat(_ voidptr, dirfd int, _path charptr, _argv &charptr, _en
 	mut target := path
 
 	mut direct_node := &fs.VFSNode(unsafe { nil })
+	mut direct_mount := voidptr(0)
 	if path.len == 0 {
 		// The descriptor's name below takes the empty path's place.
 		unsafe { path.free() }
@@ -611,6 +629,7 @@ pub fn syscall_execveat(_ voidptr, dirfd int, _path charptr, _argv &charptr, _en
 		// is what a relative interpreter path then resolves against.
 		mut fd := file.fd_from_fdnum(process, dirfd) or { return errno.err, errno.ebadf }
 		node := unsafe { &fs.VFSNode(fd.handle.node) }
+		direct_mount = fd.handle.mount
 		fd.unref()
 		if node == unsafe { nil } {
 			return errno.err, errno.eacces
@@ -630,6 +649,16 @@ pub fn syscall_execveat(_ voidptr, dirfd int, _path charptr, _argv &charptr, _en
 			unsafe { path.free() }
 			return errno.err, errno.get()
 		}
+		start_mount := fs.parent_mount_for(dirfd, path) or {
+			unsafe { path.free() }
+			return errno.err, errno.get()
+		}
+		resolved := fs.get_node_on_mount(directory, path, flags & fs.at_symlink_nofollow == 0, start_mount) or {
+			unsafe { path.free() }
+			return errno.err, errno.get()
+		}
+		direct_node = resolved.node
+		direct_mount = resolved.mount
 	}
 
 	mut argv := exec_strings_from_user(u64(_argv), exec_total_max) or {
@@ -645,7 +674,7 @@ pub fn syscall_execveat(_ voidptr, dirfd int, _path charptr, _argv &charptr, _en
 	// The path and both vectors are the exec's now, freed whether it works or
 	// not.
 	if direct_node != unsafe { nil } {
-		start_program_node(true, directory, direct_node, target, argv, envp, '', '', '') or {
+		start_program_node(true, directory, direct_node, direct_mount, target, argv, envp, '', '', '') or {
 			return errno.err, errno.get()
 		}
 		return errno.err, errno.get()

@@ -81,6 +81,7 @@ enum ProcFSKind {
 	sysctl
 	sysrq_trigger
 	securelevel
+	security_audit
 	net_tcp
 }
 
@@ -152,7 +153,9 @@ pub fn register_net_tcp_snapshot(snapshot NetTcpSnapshot) {
 }
 
 fn (this ProcFS) instantiate() &FileSystem {
-	return &ProcFS{}
+	// ProcFS carries no per-instance state. Its roots are cached by PID
+	// namespace, so repeated mounts use the permanent registered backend.
+	return unsafe { filesystems['procfs'] }
 }
 
 fn (this ProcFS) populate(_node &VFSNode) {}
@@ -238,6 +241,15 @@ fn (mut this ProcFS) build_root(parent &VFSNode, name string, view voidptr) &VFS
 	// sysconf() counts processors through sched_getaffinity(2), which is
 	// accurate.
 	add_procfs_file(mut root, 'meminfo', .meminfo)
+	mut pressure := create_node(root.filesystem, root, 'vmpressure', false)
+	pressure.resource = file.new_memory_pressure_source(stat.Stat{
+		mode: stat.ifreg | 0o444
+		dev: procfs_dev_id
+		ino: procfs_inode_counter++
+		nlink: 1
+		blksize: 512
+	})
+	unsafe { root.children['vmpressure'] = pressure }
 	add_procfs_file(mut root, 'slabinfo', .slabinfo)
 	$if alloc_track ? {
 		add_procfs_file(mut root, 'allocstart', .allocstart)
@@ -245,6 +257,8 @@ fn (mut this ProcFS) build_root(parent &VFSNode, name string, view voidptr) &VFS
 	}
 	add_procfs_file(mut root, 'uptime', .uptime)
 	add_procfs_file(mut root, 'version', .version)
+	mut audit_node := add_procfs_file(mut root, 'security_audit', .security_audit)
+	audit_node.resource.stat.mode = stat.ifreg | 0o400
 	mut sysrq := add_procfs_file(mut root, 'sysrq-trigger', .sysrq_trigger)
 	sysrq.resource.stat.mode = stat.ifreg | 0o200
 
@@ -508,19 +522,19 @@ fn (this &ProcFSResource) contents() string {
 			// the kernel heap has, the page caches' own storage included.
 			cached_kb := pagecache.resident_bytes() / 1024
 			slab_kb := heap_pages() * page_size / 1024
-			mut text := lib.new_text(256)
-			text.add('MemTotal:       ')
-			text.add_unsigned(total_kb)
-			text.add(' kB\nMemFree:        ')
-			text.add_unsigned(free_kb)
-			text.add(' kB\nMemAvailable:   ')
-			text.add_unsigned(free_kb)
-			text.add(' kB\nBuffers:               0 kB\nCached:         ')
-			text.add_unsigned(cached_kb)
-			text.add(' kB\nSwapTotal:             0 kB\nSwapFree:              0 kB\nSlab:           ')
-			text.add_unsigned(slab_kb)
-			text.add(' kB\n')
-			return text.str()
+			mut meminfo_builder := lib.new_text(256)
+			meminfo_builder.add('MemTotal:       ')
+			meminfo_builder.add_unsigned(total_kb)
+			meminfo_builder.add(' kB\nMemFree:        ')
+			meminfo_builder.add_unsigned(free_kb)
+			meminfo_builder.add(' kB\nMemAvailable:   ')
+			meminfo_builder.add_unsigned(free_kb)
+			meminfo_builder.add(' kB\nBuffers:               0 kB\nCached:         ')
+			meminfo_builder.add_unsigned(cached_kb)
+			meminfo_builder.add(' kB\nSwapTotal:             0 kB\nSwapFree:              0 kB\nSlab:           ')
+			meminfo_builder.add_unsigned(slab_kb)
+			meminfo_builder.add(' kB\n')
+			return lib.finish_text(meminfo_builder)
 		}
 		.slabinfo {
 			return slabinfo_text()
@@ -664,6 +678,9 @@ fn (this &ProcFSResource) contents() string {
 			text.add_byte(`\n`)
 			return text.str()
 		}
+		.security_audit {
+			return security.audit_text()
+		}
 		else {
 			return ''
 		}
@@ -711,11 +728,16 @@ fn (mut this ProcFSResource) read(_handle voidptr, buf voidptr, loc u64, count u
 		errno.set(errno.eisdir)
 		return none
 	}
+	if this.kind == .security_audit && !security.audit_may_read() {
+		errno.set(errno.eacces)
+		return none
+	}
 	if this.shows_layout() && !proc.may_inspect(this.pid) {
 		errno.set(errno.eacces)
 		return none
 	}
-	if (this.kind == .maps || this.kind == .smaps || this.kind == .net_tcp)
+	if (this.kind == .maps || this.kind == .smaps || this.kind == .net_tcp
+		|| this.kind == .security_audit)
 		&& _handle != unsafe { nil } {
 		return this.snapshot_read(_handle, buf, loc, count)
 	}
@@ -951,7 +973,7 @@ fn slabinfo_text() string {
 	text.add('\n# written after free ')
 	text.add_unsigned(memory.heap_written_after_free())
 	text.add_byte(`\n`)
-	return text.str()
+	return lib.finish_text(text)
 }
 
 // What a process maps and has resident; see mmap.process_memory. The table
@@ -1306,7 +1328,9 @@ fn set_link_text(mut link VFSNode, text string) {
 }
 
 fn is_procfs_resource(res &resource.Resource) bool {
-	return res.stat.dev == procfs_dev_id && procfs_dev_id != 0
+	// /proc also hosts openable resources such as vmpressure. Sharing its
+	// device number does not give them ProcFSResource's kind/view layout.
+	return res is ProcFSResource && res.stat.dev == procfs_dev_id && procfs_dev_id != 0
 }
 
 // One directory per live process `view` can see, named by the number it
@@ -1621,6 +1645,17 @@ pub struct AnonymousDescriptor {
 pub:
 	pid   int
 	fdnum int
+}
+
+// Process magic links reveal files and descriptors as well as addresses.
+// Recheck on every follow/readlink so an already-listed node cannot bypass
+// a later PR_SET_DUMPABLE or credential change.
+fn procfs_may_follow(node &VFSNode) bool {
+	if node.resource == unsafe { nil } || !is_procfs_resource(node.resource) {
+		return true
+	}
+	link := unsafe { &ProcFSResource(node.resource) }
+	return link.kind != .symlink || link.pid == 0 || proc.may_inspect(link.pid)
 }
 
 pub fn procfs_anonymous_descriptor(node &VFSNode) ?AnonymousDescriptor {

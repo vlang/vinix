@@ -33,6 +33,37 @@ pub:
 	gateway u32
 }
 
+pub struct IPv6InterfaceAddress {
+pub:
+	bytes  [16]u8
+	prefix u8
+	flags  u8
+	scope  u8
+}
+
+// A fixed lwIP address slot avoids allocating a second interface registry.
+pub fn ipv6_address(index u32, slot u32) ?IPv6InterfaceAddress {
+	mut address := C.vinix_ip_address{}
+	mut prefix := u32(0)
+	mut flags := u32(0)
+	net_lock.acquire()
+	ret := C.vinix_net_ipv6_address(index, slot, unsafe { &address }, unsafe { &prefix }, unsafe { &flags })
+	net_lock.release()
+	if ret == 0 { return none }
+	return IPv6InterfaceAddress{
+		bytes:  address.bytes
+		prefix: u8(prefix)
+		flags:  u8(flags)
+		scope:  if index == 1 {
+			u8(254)
+		} else if address.scope != 0 {
+			u8(253)
+		} else {
+			u8(0)
+		}
+	}
+}
+
 // The caller frees the list.
 pub fn interfaces() []Interface {
 	mut list := []Interface{cap: 2} @[freed]
@@ -47,12 +78,12 @@ pub fn interfaces() []Interface {
 	}
 	mut mac := [6]u8{}
 	mut mtu := u32(0)
-	if link_info(mut mac, unsafe { &mtu }) {
+	if link_info(unsafe { &mac }, unsafe { &mtu }) {
 		mut address := u32(0)
 		mut netmask := u32(0)
 		mut gateway := u32(0)
 		dns := [3]u32{}
-		configuration(&address, &netmask, &gateway, &dns)
+		configuration(&address, &netmask, &gateway, unsafe { &dns })
 		list << Interface{
 			index:   2
 			name:    'eth0'

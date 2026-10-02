@@ -84,6 +84,12 @@ fn (mut this Partition) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 	return this.parent_device.ioctl(handle, request, argp)
 }
 
+// A partition has no separate write cache. Its persistence barrier is the
+// parent's, including errors from the hardware cache flush.
+fn (mut this Partition) sync(handle voidptr) ? {
+	resource.sync_resource(mut this.parent_device, handle)?
+}
+
 fn (mut this Partition) unref(handle voidptr) ? {
 	return this.parent_device.unref(handle)
 }

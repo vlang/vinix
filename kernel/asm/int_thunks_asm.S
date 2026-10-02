@@ -49,6 +49,8 @@ interrupt_thunk_\num:
     clac
 5:
 
+    mov %rsp, %rdi
+    call interrupt_enter
     mov $\num, %rdi
     mov $(\num * 8), %rax
     lea interrupt_table(%rip), %rbx

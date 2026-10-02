@@ -11,9 +11,6 @@ const exec_string_max = 128 * 1024
 const exec_total_max = u64(2 * 1024 * 1024)
 
 fn free_exec_strings(mut strings []string) {
-	for text in strings {
-		unsafe { text.free() }
-	}
 	unsafe { strings.free() }
 }
 
@@ -63,7 +60,9 @@ fn exec_strings_from_user(vector u64, budget u64) ?[]string {
 			errno.set(errno.e2big)
 			return none
 		}
+		// Appending clones a string; the array owns that copy, not this buffer.
 		strings << text
+		unsafe { text.free() }
 	}
 	return strings
 }

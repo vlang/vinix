@@ -17,6 +17,7 @@ import sys
 import time
 
 
+TEST_LABEL = "OpenBSD security"
 PASS_MARKER = b"VINIX OPENBSD SECURITY: PASS"
 FAIL_MARKERS = (
     b"VINIX OPENBSD SECURITY: FAIL",
@@ -217,7 +218,7 @@ def main() -> int:
         arguments.state_dir.mkdir(parents=True, exist_ok=True)
     command, environment = command_for(arguments, root)
 
-    print(f"==> Booting the {arguments.arch} OpenBSD security test")
+    print(f"==> Booting the {arguments.arch} {TEST_LABEL} test")
     pid, master = pty.fork()
     if pid == 0:
         os.chdir(root)
@@ -269,7 +270,7 @@ def main() -> int:
         print(f"ERROR: observed failure: {item}", file=sys.stderr)
     if missing or failures:
         return 1
-    print(f"==> {arguments.arch} OpenBSD security test passed")
+    print(f"==> {arguments.arch} {TEST_LABEL} test passed")
     return 0
 
 

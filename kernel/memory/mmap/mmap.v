@@ -7,6 +7,7 @@ import resource
 import proc
 import errno
 import lib
+import event
 
 pub const prot_none = 0x00
 pub const prot_read = 0x01
@@ -24,9 +25,9 @@ const ms_async = 1
 const ms_invalidate = 2
 const ms_sync = 4
 
-// OpenBSD-style W^X remains the default. Compatibility launchers can opt a
-// process into simultaneous write/execute mappings before exec; fork inherits
-// the decision, while the next exec replaces it from that program's environment.
+// OpenBSD-style W^X remains the default. exec permits an explicit environment
+// request only through an administrator's launch or executable mount policy.
+// Fork inherits that decision; each exec validates its request again.
 fn validate_protection(prot int) ? {
 	if prot & ~prot_mask != 0 {
 		errno.set(errno.einval)
@@ -48,6 +49,8 @@ const map_brk_reservation = 0x20000000
 // Asked by the caller for a shared mapping of a file opened without write
 // access, which mprotect() then may not make writable; see no_write.
 pub const map_no_write = 0x40000000
+// Internal permission ceiling for files mapped through a noexec mount.
+pub const map_no_exec = 0x10000000
 
 // Runtimes such as JavaScriptCore reserve multi-gigabyte anonymous arenas but
 // commit only a small fraction of them. Keep large reservations sparse and let
@@ -139,6 +142,7 @@ pub mut:
 	// file write it, through a mapping made read-only. Linux clears
 	// VM_MAYWRITE for the same reason.
 	no_write bool
+	no_exec bool
 }
 
 struct MmapOptions {
@@ -148,6 +152,7 @@ mut:
 	file_data_start  u64
 	file_data_length u64
 	no_write         bool
+	no_exec          bool
 }
 
 pub fn list_ranges(pagemap &memory.Pagemap) {
@@ -502,7 +507,20 @@ fn delete_pagemap_impl(mut pagemap memory.Pagemap, trace bool) ? {
 	if trace {
 		println('exec[gpu]/vm: acquiring old page-map lock')
 	}
-	pagemap.l.acquire()
+	// New inspection references are acquired under the process-table lock;
+	// callers detached this map there before reaching destruction. Wait for
+	// copies already resolving its pages without holding either lock.
+	for {
+		pagemap.l.acquire()
+		if pagemap.inspection_refs == 0 {
+			break
+		}
+		generation := event.generation(mut pagemap.inspection_drained)
+		pagemap.l.release()
+		mut storage := [&pagemap.inspection_drained]!
+		mut drained := unsafe { event.stack_list(&storage[0], storage.len) }
+		event.await_from_generation(mut drained, true, 0, generation) or {}
+	}
 	if trace {
 		C.kprintf(c'exec[gpu]/vm: old page-map lock acquired; ranges=%lld\n', i64(pagemap.mmap_ranges.len))
 	}
@@ -665,6 +683,8 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap) ?&memory.Pagemap {
 					pte_extra: global_range.pte_extra
 					owns_resource_ref: global_range.owns_resource_ref
 					owns_mapping_ref: global_range.owns_mapping_ref
+					no_write: global_range.no_write
+					no_exec: global_range.no_exec
 					lazy_file: global_range.lazy_file
 					segmented_file: global_range.segmented_file
 					file_data_start: global_range.file_data_start
@@ -1138,7 +1158,13 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
 	options MmapOptions) ?voidptr {
 	mut pagemap := unsafe { _pagemap }
 	mut resource_ := unsafe { _resource }
-	flags := requested_flags & ~map_no_write
+	flags := requested_flags & ~(map_no_write | map_no_exec)
+	no_exec := (options.no_exec || requested_flags & map_no_exec != 0)
+		&& flags & map_anonymous == 0
+	if no_exec && prot & prot_exec != 0 {
+		errno.set(errno.eperm)
+		return none
+	}
 	no_write := (options.no_write || requested_flags & map_no_write != 0)
 		&& flags & map_shared != 0 && flags & map_anonymous == 0
 	if no_write && prot & prot_write != 0 {
@@ -1268,6 +1294,7 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
 		file_data_start: options.file_data_start
 		file_data_length: options.file_data_length
 		no_write: no_write
+		no_exec: no_exec
 		shadow_pagemap: memory.Pagemap{
 			top_level: unsafe { &u64(0) }
 		}
@@ -1551,6 +1578,11 @@ pub fn mprotect(mut pagemap memory.Pagemap, addr voidptr, len u64, prot int) ? {
 		errno.set(errno.eperm)
 		return none
 	}
+	if prot & prot_exec != 0 && no_exec_overlap_unlocked(pagemap, u64(addr), length) {
+		pagemap.l.release()
+		errno.set(errno.eacces)
+		return none
+	}
 	if prot & prot_write != 0 && no_write_overlap_unlocked(pagemap, u64(addr), length) {
 		pagemap.l.release()
 		errno.set(errno.eacces)
@@ -1730,6 +1762,10 @@ pub fn mprotect_unlocked(mut pagemap memory.Pagemap, addr voidptr, _length u64, 
 	}
 	if immutable_overlap_unlocked(pagemap, u64(addr), length) {
 		errno.set(errno.eperm)
+		return none
+	}
+	if prot & prot_exec != 0 && no_exec_overlap_unlocked(pagemap, u64(addr), length) {
+		errno.set(errno.eacces)
 		return none
 	}
 	if prot & prot_write != 0 && no_write_overlap_unlocked(pagemap, u64(addr), length) {

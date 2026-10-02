@@ -343,11 +343,22 @@ fn syscall_linux_prctl(_ voidptr, option int, arg2 u64, _arg3 u64, _arg4 u64, _a
 			return 0, 0
 		}
 		pr_get_dumpable {
-			return 1, 0
+			proc.lock_table()
+			value := if process.dumpable { u64(1) } else { u64(0) }
+			proc.unlock_table()
+			return value, 0
 		}
-		pr_set_dumpable, pr_set_timerslack {
-			// Accepted and remembered nowhere: there is no core dump to
-			// suppress and no timer slack to apply.
+		pr_set_dumpable {
+			if arg2 > 1 {
+				return errno.err, errno.einval
+			}
+			proc.lock_table()
+			process.dumpable = arg2 == 1
+			proc.unlock_table()
+			return 0, 0
+		}
+		pr_set_timerslack {
+			// Timer slack is not applied yet.
 			return 0, 0
 		}
 		pr_get_timerslack {
@@ -437,6 +448,7 @@ fn syscall_linux_prlimit64(_ voidptr, local_pid int, res int, new_rlim u64, old_
 			return errno.err, errno.eperm
 		}
 		process.rlimits[res] = wanted
+		if res == proc.rlimit_cpu { proc.set_cpu_limit(mut process, wanted) }
 	}
 
 	return 0, 0
@@ -548,69 +560,66 @@ fn syscall_linux_pwrite64(gpr_state voidptr, fdnum int, buf voidptr, count u64, 
 	return file.syscall_pwrite(gpr_state, fdnum, buf, count, offset)
 }
 
-// setitimer / getitimer: ITIMER_REAL delivers SIGALRM via scheduler tick.
-// struct itimerval layout (aarch64):
-//   0: it_interval.tv_sec  (i64)
-//   8: it_interval.tv_usec (i64)
-//  16: it_value.tv_sec     (i64)
-//  24: it_value.tv_usec    (i64)
+// Both supported Linux ABIs use four signed 64-bit timeval words.
+fn itimer_timeval_us(seconds i64, microseconds i64) ?u64 {
+	if seconds < 0 || microseconds < 0 || microseconds >= 1000000 {
+		return none
+	}
+	if u64(seconds) > (u64(0x7fffffffffffffff) - u64(microseconds)) / 1000000 {
+		return none
+	}
+	return u64(seconds) * 1000000 + u64(microseconds)
+}
+
 fn syscall_linux_setitimer(_ voidptr, which int, new_value u64, old_value u64) (u64, u64) {
-	if which != 0 {
-		// Only ITIMER_REAL (0) supported; ITIMER_VIRTUAL (1) and
-		// ITIMER_PROF (2) are no-ops.
-		if old_value != 0 {
-			zero := [4]i64{}
-			if !usercopy.copy_to_user(old_value, unsafe { voidptr(&zero[0]) }, 32) {
-				return errno.err, errno.efault
-			}
-		}
-		return 0, 0
+	if which < 0 || which > 2 { return errno.err, errno.einval }
+	mut incoming := [4]i64{}
+	// Linux's historical NULL new_value extension disarms the timer.
+	if new_value != 0 && !usercopy.copy_from_user(voidptr(&incoming[0]), new_value, 32) {
+		return errno.err, errno.efault
 	}
-
-	mut current_thread := proc.current_thread()
-
-	mut value_us := i64(0)
-	mut interval_us := i64(0)
-	if new_value != 0 {
-		mut iv := [4]i64{}
-		if !usercopy.copy_from_user(unsafe { voidptr(&iv[0]) }, new_value, 32) {
-			return errno.err, errno.efault
-		}
-		interval_us = iv[0] * 1000000 + iv[1]
-		value_us = iv[2] * 1000000 + iv[3]
+	interval := itimer_timeval_us(incoming[0], incoming[1]) or { return errno.err, errno.einval }
+	value := itimer_timeval_us(incoming[2], incoming[3]) or { return errno.err, errno.einval }
+	mut current := proc.current_thread()
+	mut previous_value := u64(0)
+	mut previous_interval := u64(0)
+	if which == 0 {
+		v, i := sched.set_itimer_real(current, i64(value), i64(interval))
+		previous_value = u64(v)
+		previous_interval = u64(i)
+	} else {
+		v, i := proc.set_cpu_itimer(mut current.process, which, value, interval)
+		previous_value = v
+		previous_interval = i
 	}
-
-	old_val, old_int := sched.set_itimer_real(current_thread, value_us, interval_us)
-
 	if old_value != 0 {
-		ov := [old_int / 1000000, old_int % 1000000, old_val / 1000000, old_val % 1000000]!
-		if !usercopy.copy_to_user(old_value, unsafe { voidptr(&ov[0]) }, 32) {
+		previous := [i64(previous_interval / 1000000), i64(previous_interval % 1000000),
+			i64(previous_value / 1000000), i64(previous_value % 1000000)]!
+		if !usercopy.copy_to_user(old_value, voidptr(&previous[0]), 32) {
 			return errno.err, errno.efault
 		}
 	}
-
 	return 0, 0
 }
 
 fn syscall_linux_getitimer(_ voidptr, which int, curr_value u64) (u64, u64) {
-	if which != 0 || curr_value == 0 {
-		if curr_value != 0 {
-			zero := [4]i64{}
-			if !usercopy.copy_to_user(curr_value, unsafe { voidptr(&zero[0]) }, 32) {
-				return errno.err, errno.efault
-			}
-		}
-		return 0, 0
+	if which < 0 || which > 2 { return errno.err, errno.einval }
+	if curr_value == 0 { return errno.err, errno.efault }
+	current := proc.current_thread()
+	mut value := u64(0)
+	mut interval := u64(0)
+	if which == 0 {
+		v, i := sched.get_itimer_real(current)
+		value = u64(v)
+		interval = u64(i)
+	} else {
+		value, interval = proc.get_cpu_itimer(current.process, which)
 	}
-
-	current_thread := proc.current_thread()
-	val, intv := sched.get_itimer_real(current_thread)
-
-	cv := [intv / 1000000, intv % 1000000, val / 1000000, val % 1000000]!
-	if !usercopy.copy_to_user(curr_value, unsafe { voidptr(&cv[0]) }, 32) {
+	result := [i64(interval / 1000000), i64(interval % 1000000),
+		i64(value / 1000000), i64(value % 1000000)]!
+	if !usercopy.copy_to_user(curr_value, voidptr(&result[0]), 32) {
 		return errno.err, errno.efault
 	}
-
 	return 0, 0
 }
 

@@ -125,7 +125,7 @@ pub fn seccomp_check(instructions []SockFilter) bool {
 }
 
 // Run a checked program over `data`, struct seccomp_data as sixteen words.
-fn seccomp_run(instructions []SockFilter, data &[16]u32) u32 {
+fn seccomp_run(instructions []SockFilter, data [16]u32) u32 {
 	mut a := u32(0)
 	mut x := u32(0)
 	mut scratch := [16]u32{}
@@ -210,7 +210,9 @@ pub fn seccomp_verdict(filter &SeccompFilter, nr u64, ip u64, args [6]u64) u32 {
 	mut verdict := seccomp_ret_allow
 	mut current := unsafe { filter }
 	for current != unsafe { nil } {
-		answer := seccomp_run(current.instructions, &data)
+		// Fixed-array value passing keeps the seccomp_data words on the stack.
+		// Taking &data makes V box 64 bytes on every filtered syscall.
+		answer := seccomp_run(current.instructions, data)
 		if i32(answer & seccomp_ret_action_full) < i32(verdict & seccomp_ret_action_full) {
 			verdict = answer
 		}

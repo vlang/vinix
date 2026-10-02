@@ -495,7 +495,7 @@ fn syscall_linux_rt_sigpending(_ voidptr, set u64, sigsetsize u64) (u64, u64) {
 // ── times ────────────────────────────────────────────────────────────────────
 
 // times(buf): the CPU time of the process and of the children it reaped, in
-// clock ticks, all of it as user time, which is how it is charged. The fields
+// clock ticks, with separate user and kernel execution. The fields
 // were zero, and openssl speed, which times its runs with tms_utime, reported
 // every rate as infinite.
 // A clock tick, USER_HZ, is a hundredth of a second.
@@ -505,8 +505,11 @@ fn syscall_linux_times(_ voidptr, buf u64) (u64, u64) {
 	if buf != 0 {
 		process := proc.current_thread().process
 		mut fields := [4]i64{}
-		fields[0] = i64(proc.process_cpu_time(process, time.monotonic_ns()) / ns_per_tick)
-		fields[2] = i64(katomic.load(&process.children_cpu_time_ns) / ns_per_tick)
+		user, system := proc.process_cpu_times(process, time.monotonic_ns())
+		fields[0] = i64(user / ns_per_tick)
+		fields[1] = i64(system / ns_per_tick)
+		fields[2] = i64(katomic.load(&process.children_cpu_user_ns) / ns_per_tick)
+		fields[3] = i64(katomic.load(&process.children_cpu_system_ns) / ns_per_tick)
 		if !usercopy.copy_to_user(buf, voidptr(&fields[0]), sizeof(i64) * 4) {
 			return errno.err, errno.efault
 		}

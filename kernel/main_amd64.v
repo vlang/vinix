@@ -14,6 +14,7 @@ import initramfs
 import numa
 import fs
 import sched
+import proc
 import stat
 import dev.console
 import userland
@@ -59,6 +60,7 @@ fn kmain_thread() {
 	table.init_storage_syscalls()
 	// cgroup.kill sends a signal, which lives above fs; hand it the entry point.
 	fs.set_cgroup_signal_hook(voidptr(userland.cgroup_kill_process))
+	proc.register_cpu_signal_hook(voidptr(userland.cpu_signal_process))
 	// What an interrupt returning to userspace does for a thread with a signal
 	// to take; the scheduler cannot import userland.
 	sched.register_user_signal_hook(voidptr(userland.interrupt_return))

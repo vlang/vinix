@@ -114,6 +114,7 @@ pub fn syscall_mremap(_ voidptr, old_address u64, old_size u64, new_size u64, fl
 		lazy_file: global.lazy_file
 		segmented_file: global.segmented_file
 		no_write: global.no_write
+		no_exec: global.no_exec
 	}
 	if global.segmented_file {
 		source_relative := old_address - global.base

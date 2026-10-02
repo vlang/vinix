@@ -27,6 +27,7 @@ fn leave(context &cpulocal.GPRState) {
 	sched.park_for_cgroup()
 	userland.dispatch_a_signal(context)
 	userland.end_wait_mask()
+	proc.cpu_leave_kernel()
 }
 
 // Called by the interrupt thunks in asm/int_thunks_asm.S on the way back to
@@ -34,6 +35,12 @@ fn leave(context &cpulocal.GPRState) {
 @[export: 'interrupt_leave']
 fn interrupt_leave(context &cpulocal.GPRState) {
 	userland.interrupt_return(proc.current_thread(), context)
+	if context.cs & 3 == 3 { proc.cpu_leave_kernel() }
+}
+
+@[export: 'interrupt_enter']
+fn interrupt_enter(context &cpulocal.GPRState) {
+	if context.cs & 3 == 3 { proc.cpu_enter_kernel() }
 }
 
 // Called by syscall32_entry in asm/x86_64/segment.S for SYSCALL made from

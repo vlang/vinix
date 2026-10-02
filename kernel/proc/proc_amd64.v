@@ -2,6 +2,7 @@
 module proc
 
 import klock
+import x86.hpet as hpetclock
 import katomic
 import lib
 import x86.cpu.local as cpulocal
@@ -59,6 +60,8 @@ pub mut:
 	linuxkpi_task [8]u64
 	tid           int
 	ns_tid        int
+	// Correlates a selected seccomp action with this syscall's result.
+	audit_sequence u64
 	is_in_queue   bool
 	// A filesystem change this thread made during its syscall that is not on
 	// the device yet. It is flushed on the way back to userspace, or once an
@@ -110,6 +113,9 @@ pub mut:
 	// twice and never counts one that has not finished.
 	scheduled_at_ns u64
 	cpu_time_ns     u64
+	cpu_user_ns     u64
+	cpu_system_ns   u64
+	cpu_in_kernel   bool
 	// When this thread's CPU time was last charged to its cgroup, or 0 when it
 	// is off the CPU. See charge_cgroup_cpu().
 	cgroup_charged_ns u64
@@ -253,3 +259,15 @@ pub fn get_main_thread(process &Process) &Thread {
 
 // What a seccomp program sees as seccomp_data.arch.
 pub const seccomp_audit_arch = audit_arch_x86_64
+
+fn saved_context_in_kernel(t &Thread) bool {
+	return t.gpr_state.cs & 3 != 3
+}
+
+pub fn cpu_time_now_ns() u64 {
+	// The PIT-maintained clock only changes inside its interrupt. Using it
+	// at IRQ entry/exit charges a whole userspace tick to the interrupt and
+	// leaves a pure userspace loop with no user CPU time. Read the hardware
+	// counter at every accounting boundary instead.
+	return hpetclock.nanoseconds()
+}

@@ -175,7 +175,7 @@ pub fn family_of(fdnum int) int {
 		return sock_pub.af_unix
 	}
 	if mut res is sock_inet.InetSocket {
-		return sock_pub.af_inet
+		return res.family
 	}
 	if mut res is sock_netlink.NetlinkSocket {
 		return sock_pub.af_netlink
@@ -191,7 +191,7 @@ fn socketpair_create(domain int, @type int, _protocol int) ?(&resource.Resource,
 		}
 		// Linux's IPv4 has no socketpair(2); a family there is none of has
 		// no sockets at all.
-		sock_pub.af_inet {
+		sock_pub.af_inet, sock_pub.af_inet6 {
 			errno.set(errno.eopnotsupp)
 			return none
 		}
@@ -209,8 +209,8 @@ fn socket_create(domain int, @type int, protocol int) ?&resource.Resource {
 			mut ret := sock_unix.create(@type)?
 			return ret.boxed()
 		}
-		sock_pub.af_inet {
-			ret := sock_inet.create(@type, protocol)?
+		sock_pub.af_inet, sock_pub.af_inet6 {
+			ret := sock_inet.create(domain, @type, protocol)?
 			return ret.box
 		}
 		sock_pub.af_netlink {
@@ -218,9 +218,7 @@ fn socket_create(domain int, @type int, protocol int) ?&resource.Resource {
 			return ret.box
 		}
 		else {
-			// A family there are no sockets of, IPv6 among them, as Linux built
-			// without it says. Servers that listen on both families look for
-			// this answer to go on with IPv4 alone, as redis and postgres do.
+			// Linux reports unsupported families to callers explicitly.
 			C.printf(c'socket: Unknown domain: %d\n', domain)
 			errno.set(errno.eafnosupport)
 			return none
@@ -1226,7 +1224,7 @@ pub fn syscall_setsockopt(_ voidptr, fdnum int, level int, optname int, optval u
 				return errno.err, errno.get()
 			}
 			if optname == sock_pub.so_linger {
-				res.set_linger(on, seconds)
+				res.set_linger(on, seconds) or { return errno.err, errno.get() }
 			} else {
 				res.set_timeout(send, ns)
 			}

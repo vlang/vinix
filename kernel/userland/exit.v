@@ -145,8 +145,13 @@ fn exit_process(mut current_process proc.Process, mut current_thread proc.Thread
 
 	mut old_pagemap := current_process.pagemap
 
+	// Finish the original process's last turn before its Thread starts
+	// carrying kernel_process; the final dequeue must not bill it there.
+	proc.charge_cpu_time(mut current_thread, proc.cpu_time_now_ns())
 	kernel_pagemap.switch_to()
 	current_thread.process = kernel_process
+	proc.begin_cpu_time(mut current_thread, proc.cpu_time_now_ns())
+	proc.cpu_enter_kernel()
 	// Detached under the process table lock, which cgroup memory accounting
 	// and /proc hold while they walk a process' page map, so none is still
 	// walking the one freed below, and none finds it on the zombie afterwards.

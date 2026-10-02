@@ -17,8 +17,8 @@ import socket.public as sock_pub
 // addresses and routes: lo, and eth0 once a network driver has attached and
 // DHCP has configured it. That is what `ip addr` and `ip route` ask, and what
 // runc asks when it brings lo up in a container (RTM_GETLINK by name, then an
-// RTM_NEWLINK). Changes are acknowledged but not applied: there is one network
-// stack, configured by DHCP, and no routing control.
+// RTM_NEWLINK). Unsupported changes fail with EOPNOTSUPP: acknowledging a
+// change that did not reach the stack would mislead network administrators.
 
 // nlmsghdr types.
 const nlmsg_noop = u16(1)
@@ -39,6 +39,7 @@ const nlm_f_ack = u16(4)
 const nlm_f_dump = u16(0x300) // NLM_F_ROOT | NLM_F_MATCH
 
 const af_inet = u8(2)
+const af_inet6 = u8(10)
 const enodev = 19
 const eopnotsupp = 95
 
@@ -94,7 +95,10 @@ pub mut:
 	groups   u32
 	bound    bool
 	// Reply datagrams waiting to be received, one per request sent.
-	rx [][]u8
+	rx            [][]u8
+	receive_limit int = 262144
+	send_limit    int = 262144
+	queued_bytes  int
 	// The interface box its descriptor is made with, freed with the socket.
 	box &resource.Resource = unsafe { nil }
 }
@@ -252,6 +256,17 @@ fn put_address(mut m []u8, iface inet.Interface, seq u32, pid u32) {
 	finish_message(mut m, start)
 }
 
+fn put_ipv6_address(mut m []u8, index u32, address inet.IPv6InterfaceAddress, seq u32, pid u32) {
+	start := start_message(mut m, rtm_newaddr, nlm_f_multi, seq, pid)
+	m << af_inet6
+	m << address.prefix
+	m << address.flags
+	m << address.scope
+	put_u32(mut m, index)
+	put_attr_bytes(mut m, ifa_address, unsafe { &address.bytes[0] }, 16)
+	finish_message(mut m, start)
+}
+
 fn put_route(mut m []u8, iface inet.Interface, seq u32, pid u32, default_route bool) {
 	start := start_message(mut m, rtm_newroute, nlm_f_multi, seq, pid)
 	// rtmsg.
@@ -336,7 +351,7 @@ fn put_done(mut m []u8, seq u32, pid u32) {
 }
 
 // Turn one request datagram into its reply datagram and queue it.
-fn (mut this NetlinkSocket) handle_request(buf voidptr, count u64) {
+fn (mut this NetlinkSocket) handle_request(buf voidptr, count u64) bool {
 	// Queued on rx, or freed here when empty; read() and recvmsg() free it.
 	// Nothing slices it, so growing can free each outgrown block.
 	mut reply := []u8{cap: 1024} @[freed]
@@ -375,10 +390,18 @@ fn (mut this NetlinkSocket) handle_request(buf voidptr, count u64) {
 			}
 			unsafe { list.free() }
 		} else if msg_type == rtm_getaddr && is_dump {
+			family := if msg_len > 16 { unsafe { *(&u8(u64(req) + 16)) } } else { u8(0) }
 			list := inet.interfaces()
 			for iface in list {
-				if iface.address != 0 {
+				if iface.address != 0 && (family == 0 || family == af_inet) {
 					put_address(mut reply, iface, seq, pid)
+				}
+				if family == 0 || family == af_inet6 {
+					for slot := u32(0); slot < 6; slot++ {
+						if address := inet.ipv6_address(iface.index, slot) {
+							put_ipv6_address(mut reply, iface.index, address, seq, pid)
+						}
+					}
 				}
 			}
 			unsafe { list.free() }
@@ -403,22 +426,31 @@ fn (mut this NetlinkSocket) handle_request(buf voidptr, count u64) {
 			// A lookup that is not answered would leave its caller waiting.
 			put_ack(mut reply, seq, pid, -eopnotsupp, req, u64(msg_len))
 		} else {
-			// RTM_NEWLINK/RTM_SETLINK/RTM_NEWADDR and the rest: acknowledge when
-			// asked, which is what LinkSetUp waits for.
-			if (msg_flags & nlm_f_ack) != 0 {
-				put_ack(mut reply, seq, pid, 0, req, u64(msg_len))
-			}
+			// Failed requests always receive NLMSG_ERROR, even without NLM_F_ACK.
+			// No mutable interface/route API exists yet; never report a change
+			// as successful when the packet stack did not apply it.
+			put_ack(mut reply, seq, pid, -eopnotsupp, req, u64(msg_len))
 		}
 		off += u64((msg_len + 3) & u32(0xfffffffc))
 	}
 	if reply.len == 0 {
 		unsafe { reply.free() }
-		return
+		return true
 	}
+	// Charge retained capacity plus reply-array metadata, so tiny requests
+	// cannot keep a kilobyte allocation for every 36-byte error indefinitely.
+	charge := reply.cap + 64
+	if charge > this.receive_limit || this.queued_bytes > this.receive_limit - charge {
+		unsafe { reply.free() }
+		return false
+	}
+	this.queued_bytes += charge
 	this.rx.flags |= .noslices
-	this.rx << reply
+	// Transfer the buffer header. Appending a nested array clones its data.
+	this.rx.insert(this.rx.len, unsafe { &reply })
 	this.status |= file.pollin
 	event.trigger(mut this.event, false)
+	return true
 }
 
 // ── resource methods ─────────────────────────────────────────────────────────
@@ -428,7 +460,14 @@ fn (mut this NetlinkSocket) write(_handle voidptr, buf voidptr, _loc u64, count 
 	defer {
 		this.l.release()
 	}
-	this.handle_request(buf, count)
+	if count > u64(this.send_limit) {
+		errno.set(errno.emsgsize)
+		return none
+	}
+	if !this.handle_request(buf, count) {
+		errno.set(errno.enobufs)
+		return none
+	}
 	return i64(count)
 }
 
@@ -451,6 +490,7 @@ fn (mut this NetlinkSocket) read(_handle voidptr, buf voidptr, _loc u64, count u
 		this.l.acquire()
 	}
 	mut datagram := this.rx[0]
+	this.queued_bytes -= datagram.cap + 64
 	this.rx.delete(0)
 	if this.rx.len == 0 {
 		this.status &= ~file.pollin
@@ -511,6 +551,7 @@ pub fn (mut this NetlinkSocket) recvmsg(_handle voidptr, msg &sock_pub.MsgHdr, f
 		this.l.acquire()
 	}
 	mut datagram := this.rx[0]
+	this.queued_bytes -= datagram.cap + 64
 	this.rx.delete(0)
 	if this.rx.len == 0 {
 		this.status &= ~file.pollin
@@ -575,13 +616,39 @@ pub fn (mut this NetlinkSocket) accept(_handle voidptr) ?&resource.Resource {
 }
 
 pub fn (mut this NetlinkSocket) getsockopt(_handle voidptr, level int, optname int) ?int {
-	// Buffer sizes and the like are reported back as a plausible value; nothing
-	// here acts on them.
-	return 0
+	this.l.acquire()
+	defer { this.l.release() }
+	if level == sock_pub.sol_socket {
+		if optname == sock_pub.so_sndbuf { return this.send_limit }
+		if optname == sock_pub.so_rcvbuf { return this.receive_limit }
+	}
+	errno.set(errno.enoprotoopt)
+	return none
 }
 
 pub fn (mut this NetlinkSocket) setsockopt(_handle voidptr, level int, optname int, value int) ? {
-	// Accept SO_SNDBUF/SO_RCVBUF, NETLINK_EXT_ACK and friends without acting.
+	this.l.acquire()
+	defer { this.l.release() }
+	if level != sock_pub.sol_socket || (optname != sock_pub.so_sndbuf && optname != sock_pub.so_rcvbuf) {
+		errno.set(errno.enoprotoopt)
+		return none
+	}
+	if value < 0 {
+		errno.set(errno.einval)
+		return none
+	}
+	limit := if value < 2048 {
+		4096
+	} else if value > 2097152 {
+		4194304
+	} else {
+		value * 2
+	}
+	if optname == sock_pub.so_sndbuf {
+		this.send_limit = limit
+	} else {
+		this.receive_limit = limit
+	}
 }
 
 // Write the address a received datagram came from: the kernel, pid 0. runc's

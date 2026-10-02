@@ -23,6 +23,7 @@ fn leave(context &cpulocal.GPRState) {
 	sched.park_for_cgroup()
 	userland.dispatch_a_signal(context)
 	userland.end_wait_mask()
+	proc.cpu_leave_kernel()
 }
 
 // On the way back to userspace from an interrupt. A thread that only computes
@@ -41,6 +42,7 @@ fn interrupt_leave(context &cpulocal.GPRState) {
 	if context.pstate & 0xf != 0 {
 		return
 	}
+	defer { proc.cpu_leave_kernel() }
 	told_to_exit := userland.told_to_exit()
 	if !told_to_exit && !userland.async_signal_deliverable() {
 		return

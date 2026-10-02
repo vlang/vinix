@@ -9,6 +9,7 @@ module table
 
 import errno
 import proc
+import security
 import userland
 import x86.cpu.local as cpulocal
 
@@ -30,8 +31,10 @@ fn syscall_seccomp_verdict(_ voidptr) (u64, u64) {
 // whose verdict is death does not come back from here.
 @[export: 'syscall_trace']
 pub fn syscall_trace(frame &cpulocal.GPRState) u64 {
+	proc.cpu_enter_kernel()
 	nr := frame.rax
 	mut t := proc.current_thread()
+	t.audit_sequence = 0
 	t.syscall_nr = i64(nr)
 	t.restart_nr = nr
 	t.syscall_x0 = frame.rdi
@@ -56,6 +59,8 @@ pub fn syscall_trace(frame &cpulocal.GPRState) u64 {
 @[export: 'syscall_trace_ret']
 pub fn syscall_trace_ret(ret u64, err u64) {
 	mut t := proc.current_thread()
+	security.audit_complete(t.audit_sequence, ret, err)
+	t.audit_sequence = 0
 	t.syscall_nr = -1
 }
 
@@ -68,11 +73,15 @@ fn seccomp_entry(mut t proc.Thread, frame &cpulocal.GPRState, nr u64) u64 {
 		if nr == 0 || nr == 1 || nr == 60 || nr == 15 {
 			return nr
 		}
+		security.audit_seccomp(nr, frame.rip, proc.seccomp_ret_kill_process)
 		userland.exit_with_fatal_signal(u8(9))
 	}
 	// The instruction after the syscall is what Linux reports as its address.
 	verdict := proc.seccomp_verdict(process.seccomp, nr, frame.rip, [frame.rdi, frame.rsi,
 		frame.rdx, frame.r10, frame.r8, frame.r9]!)
+	if verdict & proc.seccomp_ret_action_full != proc.seccomp_ret_allow {
+		t.audit_sequence = security.audit_seccomp(nr, frame.rip, verdict)
+	}
 	match verdict & proc.seccomp_ret_action_full {
 		proc.seccomp_ret_allow, proc.seccomp_ret_log {
 			return nr

@@ -352,10 +352,13 @@ fn write_child_rusage(rusage_ptr u64, child &proc.Process) bool {
 		return true
 	}
 
-	ns := katomic.load(&child.cpu_time_ns)
+	user := katomic.load(&child.cpu_user_ns)
+	system := katomic.load(&child.cpu_system_ns)
 	usage := Rusage{
-		ru_utime_sec:  i64(ns / 1000000000)
-		ru_utime_usec: i64((ns % 1000000000) / 1000)
+		ru_utime_sec:  i64(user / 1000000000)
+		ru_utime_usec: i64((user % 1000000000) / 1000)
+		ru_stime_sec: i64(system / 1000000000)
+		ru_stime_usec: i64((system % 1000000000) / 1000)
 	}
 	return usercopy.copy_to_user(rusage_ptr, voidptr(&usage), sizeof(Rusage))
 }

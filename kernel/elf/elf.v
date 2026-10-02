@@ -186,9 +186,10 @@ pub fn architecture(_res &resource.Resource) !u16 {
 	mut res := unsafe { _res }
 	// On the stack: `&Header{}` was a heap block that nothing freed, one for
 	// every exec, as was each program header below.
-	mut header := Header{}
+	mut header := unsafe { &Header(C.vinix_stack_alloc(sizeof(Header))) }
+	unsafe { *header = Header{} }
 
-	read_exact(mut res, unsafe { &header }, 0, sizeof(Header))!
+	read_exact(mut res, header, 0, sizeof(Header))!
 	if unsafe { C.memcmp(&header.ident, c'\177ELF', 4) } != 0 {
 		return error('elf: Invalid magic')
 	}
@@ -226,10 +227,11 @@ fn load_impl(_pagemap &memory.Pagemap, _res &resource.Resource, _base u64, trace
 	mut pagemap := unsafe { _pagemap }
 	mut base := _base
 
-	mut header := Header{}
+	mut header := unsafe { &Header(C.vinix_stack_alloc(sizeof(Header))) }
+	unsafe { *header = Header{} }
 
 	exec_trace(trace, image, 'reading ELF header')
-	read_exact(mut res, unsafe { &header }, 0, sizeof(Header))!
+	read_exact(mut res, header, 0, sizeof(Header))!
 	exec_trace(trace, image, 'ELF header read')
 
 	if unsafe { C.memcmp(&header.ident, c'\177ELF', 4) } != 0 {
@@ -259,7 +261,7 @@ fn load_impl(_pagemap &memory.Pagemap, _res &resource.Resource, _base u64, trace
 	// when no explicit base is given (base=0 means "auto" for ET_DYN).
 	if base == 0 && header.@type == u16(et_dyn) {
 		exec_trace(trace, image, 'choosing PIE load base')
-		extent := load_extent(mut res, header)!
+		extent := load_extent(mut res, *header)!
 		base = pie_base + random_offset(pie_span(extent), image_alignment)
 	}
 	if trace {

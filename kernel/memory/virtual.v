@@ -4,6 +4,7 @@ module memory
 import lib
 import limine
 import klock
+import event.eventstruct
 
 fn C.text_start()
 
@@ -81,6 +82,10 @@ pub mut:
 	// Being torn down: no CPU runs it any more, so pages come out of it with
 	// no TLB maintenance each, and one flush follows (flush_tlb_everywhere).
 	dying bool
+	// Address-space inspection survives exec/exit detaching this map from
+	// its process. The counter and final wake are protected by l.
+	inspection_refs int
+	inspection_drained eventstruct.Event
 }
 
 fn C.get_kernel_end_addr() u64

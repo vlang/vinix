@@ -55,7 +55,8 @@ fn qr(a &u32, b &u32, c &u32, d &u32) {
 }
 
 // Generate one RFC 8439 ChaCha20 block. The caller serialises access.
-fn (mut this Generator) block(mut out [16]u32) {
+// The output is borrowed only for this call; mut fixed-array arguments box callers.
+fn (mut this Generator) block(out &[16]u32) {
 	mut state := [16]u32{}
 	state[0] = 0x61707865
 	state[1] = 0x3320646e
@@ -82,7 +83,7 @@ fn (mut this Generator) block(mut out [16]u32) {
 		qr(&x[3], &x[4], &x[9], &x[14])
 	}
 	for i := 0; i < 16; i++ {
-		out[i] = x[i] + state[i]
+		unsafe { out[i] = x[i] + state[i] }
 	}
 	// Both working copies hold the key.
 	explicit_bzero(&x[0], sizeof(x))
@@ -91,7 +92,7 @@ fn (mut this Generator) block(mut out [16]u32) {
 
 fn (mut this Generator) rekey() {
 	mut block := [16]u32{}
-	this.block(mut block)
+	this.block(unsafe { &block })
 	for i := 0; i < 8; i++ {
 		this.key[i] = block[i]
 	}
@@ -107,7 +108,7 @@ fn (mut this Generator) fill_locked(buf voidptr, count u64) {
 	mut target := buf
 	mut block := [16]u32{}
 	for remaining != 0 {
-		this.block(mut block)
+		this.block(unsafe { &block })
 		chunk := if remaining > 64 { u64(64) } else { remaining }
 		unsafe { C.memcpy(target, &block[0], chunk) }
 		target = voidptr(u64(target) + chunk)

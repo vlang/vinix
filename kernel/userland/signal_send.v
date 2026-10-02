@@ -270,3 +270,10 @@ fn signal_thread(tgid int, tid int, signal int) (u64, u64) {
 
 	return 0, 0
 }
+
+// CPU timers and limits use process-directed delivery, including a sibling
+// that can receive a signal the charging thread blocks.
+pub fn cpu_signal_process(target &proc.Process, signal int) {
+	mut p := unsafe { target }
+	if !p.exiting { signal_process(mut p, signal) }
+}

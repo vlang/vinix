@@ -17,6 +17,7 @@ import memory
 
 // Interrupt IDs
 const intid_timer = u32(27) // EL1 Virtual Timer PPI (INTID 27)
+const intid_reschedule = u32(1) // Scheduler SGI, Group 1 Non-Secure
 const intid_spurious = u32(1023)
 
 // QEMU virt GIC addresses (from DTB: intc@8000000)
@@ -335,6 +336,26 @@ pub fn set_timer_handler(handler fn (voidptr)) {
 	gic_timer_callback = handler
 }
 
+// ICC_SGI1R_EL1 names the complete MPIDR affinity path. RS=0 supports
+// Aff0 0..15 without depending on the optional Range Selector extension.
+pub fn send_reschedule(mpidr u64) bool {
+	if !is_initialised() || mpidr & 0xff >= 16 { return false }
+	value := ((mpidr >> 32) & 0xff) << 48
+		| ((mpidr >> 16) & 0xff) << 32
+		| u64(intid_reschedule) << 24
+		| ((mpidr >> 8) & 0xff) << 16
+		| u64(1) << (mpidr & 0xf)
+	// Publish the queue before the destination observes the interrupt.
+	cpu.dsb_ish()
+	asm volatile aarch64 {
+		msr icc_sgi1r_el1, value
+		isb
+		; ; r (value)
+		; memory
+	}
+	return true
+}
+
 // Poll ICC_IAR1 (acknowledge interrupt) - for polled mode
 pub fn poll_iar1() u32 {
 	return read_icc_iar1()
@@ -343,8 +364,8 @@ pub fn poll_iar1() u32 {
 // Handle an interrupt in polled mode (bypass exception vector).
 // Used as HVF workaround since QEMU+HVF doesn't inject IRQs to guest.
 pub fn dispatch_polled(intid u32, gpr_state voidptr) {
-	if intid == intid_timer {
-		cpu.write_cntv_ctl_el0(0x2) // Mask timer to clear level IRQ
+	if intid == intid_timer || intid == intid_reschedule {
+		if intid == intid_timer { cpu.write_cntv_ctl_el0(0x2) }
 		write_icc_eoir1(intid)
 
 		if gic_timer_callback != unsafe { nil } {
@@ -363,8 +384,8 @@ fn gic_dispatch(gpr_state voidptr) {
 		return
 	}
 
-	if intid == intid_timer {
-		cpu.write_cntv_ctl_el0(0x2) // Mask timer to clear level IRQ
+	if intid == intid_timer || intid == intid_reschedule {
+		if intid == intid_timer { cpu.write_cntv_ctl_el0(0x2) }
 		write_icc_eoir1(intid)
 
 		if gic_timer_callback != unsafe { nil } {

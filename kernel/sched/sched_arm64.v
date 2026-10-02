@@ -428,19 +428,15 @@ pub fn register_user_signal_hook(hook voidptr) {
 	user_signal_hook = hook
 }
 
-// A thread that never makes a syscall -- a loop that only computes -- would
-// otherwise never take a signal, since the syscall exit and the fault handlers
-// are the only places one is delivered: kill -9 could not stop it, and a
-// container spinning like that could never be removed. So a tick that
-// interrupts a thread in userspace ends it if it has a fatal signal pending.
-// `state` is the frame the thread was interrupted in.
+// Redirect a userspace return to the thread's own kernel stack when it owes
+// a signal or a sibling-requested exit. Both outgoing IRQ frames and selected
+// saved frames need this: a context switch bypasses interrupt_leave entirely.
 fn deliver_signal_on_tick(t &proc.Thread, state &cpulocal.GPRState) {
 	if user_signal_hook == unsafe { nil } || state.pstate & 0xf != 0 {
 		return
 	}
-	// SIGKILL gets through whatever the mask says.
-	deliverable := ~t.masked_signals | (u64(1) << 8)
-	if katomic.load(&t.pending_signals) & deliverable == 0 {
+	deliverable := ~t.masked_signals | (u64(1) << 8) | (u64(1) << 18)
+	if !katomic.load(&t.must_exit) && katomic.load(&t.pending_signals) & deliverable == 0 {
 		return
 	}
 	hook := unsafe { UserSignalHook(user_signal_hook) }
@@ -474,6 +470,7 @@ fn get_next_thread() &proc.Thread {
 
 fn scheduler_timer_handler(_gpr_state voidptr) {
 	dispatch_cpu := cpu.read_tpidr_el1()
+	consume_reschedule(dispatch_cpu)
 	trace_gpu_switch := katomic.load(&gpu_exec_switch_state) != 0
 		&& katomic.load(&gpu_exec_switch_cpu) == dispatch_cpu
 	trace_gpu_interrupt := gpu_exec_interrupt_trace_active(dispatch_cpu)
@@ -562,6 +559,7 @@ fn scheduler_timer_handler(_gpr_state voidptr) {
 	// goes, not only when it gives the CPU up.
 	if unsafe { current_thread != 0 } {
 		proc.charge_cgroup_cpu(mut current_thread, now_ns)
+		proc.tick_cpu_time(mut current_thread, now_ns)
 		if unsafe { _gpr_state != nil } {
 			deliver_signal_on_tick(current_thread, gpr_state)
 		}
@@ -613,6 +611,7 @@ fn scheduler_timer_handler(_gpr_state voidptr) {
 		}
 
 		if keeps_cpu {
+			publish_dispatch_priority(cpu_local.cpu_number, current_thread, now_ns)
 			// This thread is still entitled to the CPU and nothing is taking it
 			// away, so it keeps it. The two exceptions fall through instead: a
 			// blocked thread, or a later wakeup would select that same stale
@@ -681,6 +680,7 @@ fn scheduler_timer_handler(_gpr_state voidptr) {
 		}
 		cpu.write_tpidr_el1(cpu_local.cpu_number)
 		proc.set_current_thread(cpu_local.cpu_number, unsafe { nil })
+		publish_dispatch_priority(cpu_local.cpu_number, unsafe { nil }, now_ns)
 		katomic.store(mut &cpu_local.is_idle, true)
 		kernel_pagemap.switch_to()
 		evict_to_idle(cpu_local.cpu_number, current_thread)
@@ -695,6 +695,7 @@ fn scheduler_timer_handler(_gpr_state voidptr) {
 		// thread. Go idle and return to await()'s polling loop.
 		cpu.write_tpidr_el1(cpu_local.cpu_number)
 		proc.set_current_thread(cpu_local.cpu_number, unsafe { nil })
+		publish_dispatch_priority(cpu_local.cpu_number, unsafe { nil }, now_ns)
 		katomic.store(mut &cpu_local.is_idle, true)
 		kernel_pagemap.switch_to()
 		// Nothing was running here: this is await()'s own poll asking for work
@@ -703,6 +704,7 @@ fn scheduler_timer_handler(_gpr_state voidptr) {
 	}
 
 	current_thread = next_thread
+	publish_dispatch_priority(cpu_local.cpu_number, current_thread, now_ns)
 	trace_gpu_restore := trace_gpu_next || trace_gpu_interrupt
 	if trace_gpu_restore {
 		println('exec[gpu]/sched: publishing replacement as CPU current thread')
@@ -763,6 +765,7 @@ fn scheduler_timer_handler(_gpr_state voidptr) {
 		println('exec[gpu]/sched: FPU state restored; publishing running CPU')
 	}
 	katomic.store(mut &current_thread.running_on, cpu_local.cpu_number)
+	deliver_signal_on_tick(current_thread, &current_thread.gpr_state)
 	if trace_gpu_restore {
 		println('exec[gpu]/sched: running CPU published; preparing timeslice')
 	}
@@ -796,6 +799,16 @@ fn scheduler_timer_handler(_gpr_state voidptr) {
 
 pub fn enqueue_thread(_thread &proc.Thread, by_signal bool) bool {
 	return enqueue_thread_impl(_thread, by_signal, false)
+}
+
+fn send_reschedule(number u64) bool {
+	if gic.is_initialised() {
+		return gic.send_reschedule(cpu_locals[number].mpidr)
+	}
+	// Apple AIC currently lacks a validated targeted scheduler-IPI path.
+	// Preserve its event wake and timer fallback until that path exists.
+	cpu.sev()
+	return false
 }
 
 pub fn enqueue_thread_traced(_thread &proc.Thread, by_signal bool) bool {
@@ -853,12 +866,7 @@ fn enqueue_thread_impl(_thread &proc.Thread, by_signal bool, trace bool) bool {
 			// pinned to its current CPU until that CPU has acquired the new
 			// thread, avoiding a cross-CPU race while diagnosing the M1 path.
 			if !trace {
-				for cpu_entry in cpu_locals {
-					if katomic.load(&cpu_entry.is_idle) == true {
-						cpu.sev()
-						break
-					}
-				}
+				request_enqueue_preemption(t)
 			}
 
 			scheduler_queue_lock.release()
@@ -1481,9 +1489,9 @@ pub fn new_cloned_thread(_process &proc.Process, _source &proc.Thread, state &cp
 	return t
 }
 
-// idle_tick_hz is how often the idle loop dispatches the scheduler. It bounds
-// the wakeup latency of every sleeping thread: nothing that is waiting on a
-// timer can run again sooner than the next tick, so a 20 Hz idle tick made
+// idle_tick_hz is how often the idle loop dispatches the scheduler when there
+// is no enqueue SGI. Timer sleepers still depend on that interval, so a 20 Hz
+// idle tick made
 // every nanosleep cost about 50 ms however short it asked for. Physical
 // bring-up still polls at 1 kHz. HVF's WFI handler deliberately skips host
 // sleep below 2 ms, so stock virtual idle uses 4 ms to park its vCPU.
@@ -1533,6 +1541,17 @@ fn await_impl(trace_gpu_handoff bool) {
 	mut first_poll := true
 
 	for {
+		// Idle masks IRQ delivery around WFI. A scheduler SGI must therefore
+		// be acknowledged immediately after WFI wakes, even before the idle
+		// timer has expired; otherwise an idle enqueue still waits for a tick.
+		if virtual_idle {
+			intid := gic.poll_iar1()
+			if intid < 1020 {
+				gic.dispatch_polled(intid, unsafe { nil })
+				cpu.write_cntv_tval_el0(ticks)
+				cpu.write_cntv_ctl_el0(1)
+			}
+		}
 		vctl := cpu.read_cntv_ctl_el0()
 		if trace_gpu_handoff && first_poll {
 			C.kprintf(c'exec[gpu]/sched: first idle timer status=0x%llx\n', u64(vctl))

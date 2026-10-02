@@ -9,6 +9,7 @@ import fs
 import krandom
 import lib.stubs
 import limine
+import memory
 import pagecache
 import socket.inet
 import time
@@ -46,12 +47,15 @@ fn writeback_thread() {
 	mut seconds := i64(0)
 	for {
 		mut interval := time.new_timer(time.TimeSpec{
-			tv_sec: writeback_interval_seconds
+			tv_sec: 1
 			tv_nsec: 0
 		})
 		event.await_one(mut interval.event, true) or {}
 		interval.disarm()
 		unsafe { free(interval) }
+		memory.pressure_maintenance()
+		seconds++
+		if seconds % writeback_interval_seconds != 0 { continue }
 		// A device that cannot take the write keeps its pages dirty and
 		// retryable, so the next round tries again rather than giving up.
 		pagecache.sync_all()
@@ -63,7 +67,6 @@ fn writeback_thread() {
 		fs.reap_removed()
 		// Reseed the random generator half a minute after boot, once the
 		// boot's own events are in its pool, and every five minutes after.
-		seconds += writeback_interval_seconds
 		if seconds == 30 || seconds % 300 == 0 {
 			krandom.stir()
 		}

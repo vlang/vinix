@@ -429,11 +429,9 @@ fn effective_timeslice(t &proc.Thread) u64 {
 		}
 	}
 
-	// An ordinary thread gives the CPU back promptly while anything on this
-	// machine is scheduled by policy. Lacking a way to interrupt another CPU on
-	// demand, the next time it comes through here is the soonest a real-time
-	// thread that has just woken can be given the CPU it is sitting on -- so
-	// this interval is the machine's worst-case dispatch latency under load.
+	// Keep a bounded timer fallback when a targeted reschedule is unavailable
+	// on this platform or a compatibility lock defers the scheduler interrupt.
+	// The enqueue IPI normally dispatches urgent work before this tick.
 	if !t.sched.is_special() && proc.scheduling_policies_in_use()
 		&& slice > realtime_preempt_slice_us {
 		slice = realtime_preempt_slice_us

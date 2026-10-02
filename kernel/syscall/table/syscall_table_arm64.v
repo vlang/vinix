@@ -19,6 +19,7 @@ import sched
 import errno
 import usercopy
 import proc
+import security
 import stat
 import aarch64.cpu.local as cpulocal
 import aarch64.uart
@@ -88,11 +89,15 @@ fn seccomp_entry(mut t proc.Thread, gpr &cpulocal.GPRState, nr u64) u64 {
 		if nr == 63 || nr == 64 || nr == 93 || nr == 139 {
 			return nr
 		}
+		security.audit_seccomp(nr, gpr.pc, proc.seccomp_ret_kill_process)
 		userland.exit_with_fatal_signal(u8(9))
 		return seccomp_verdict_nr
 	}
 	verdict := proc.seccomp_verdict(process.seccomp, nr, gpr.pc, [gpr.x0, gpr.x1, gpr.x2, gpr.x3,
 		gpr.x4, gpr.x5]!)
+	if verdict & proc.seccomp_ret_action_full != proc.seccomp_ret_allow {
+		t.audit_sequence = security.audit_seccomp(nr, gpr.pc, verdict)
+	}
 	match verdict & proc.seccomp_ret_action_full {
 		proc.seccomp_ret_allow, proc.seccomp_ret_log {
 			return nr
@@ -125,6 +130,7 @@ fn seccomp_entry(mut t proc.Thread, gpr &cpulocal.GPRState, nr u64) u64 {
 // Called on every syscall's way in. Answers the table slot to run.
 @[export: 'syscall_trace']
 pub fn syscall_trace(gpr_state voidptr) u64 {
+	proc.cpu_enter_kernel()
 	gpr := unsafe { &cpulocal.GPRState(gpr_state) }
 	nr := gpr.x8
 	// A busy userspace workload can keep the HVF scheduler out of its normal
@@ -132,6 +138,7 @@ pub fn syscall_trace(gpr_state voidptr) u64 {
 	// responsive while translated applications occupy every virtual CPU.
 	sched.poll_syscall_input()
 	mut current_thread := proc.current_thread()
+	current_thread.audit_sequence = 0
 	current_thread.syscall_x0 = gpr.x0
 	current_thread.syscall_nr = i64(nr)
 	current_thread.syscall_x1 = gpr.x1
@@ -179,6 +186,8 @@ pub fn syscall_trace(gpr_state voidptr) u64 {
 @[export: 'syscall_trace_ret']
 pub fn syscall_trace_ret(ret u64, err u64) {
 	mut current_thread := proc.current_thread()
+	security.audit_complete(current_thread.audit_sequence, ret, err)
+	current_thread.audit_sequence = 0
 	current_thread.syscall_nr = -1
 	if !sc_trace_active {
 		return
@@ -541,6 +550,8 @@ pub fn init_syscall_table() {
 	syscall_table[155] = voidptr(syscall_linux_getpgid) // __NR_getpgid
 	syscall_table[165] = voidptr(sys.syscall_getrusage) // __NR_getrusage
 	syscall_table[167] = voidptr(syscall_linux_prctl) // __NR_prctl
+	syscall_table[270] = voidptr(syscall_linux_process_vm_readv) // process_vm_readv
+	syscall_table[271] = voidptr(syscall_linux_process_vm_writev) // process_vm_writev
 	syscall_table[38] = voidptr(fs.syscall_renameat) // __NR_renameat
 	syscall_table[276] = voidptr(fs.syscall_renameat2) // __NR_renameat2
 	syscall_table[43] = voidptr(fs.syscall_statfs) // __NR_statfs

@@ -73,6 +73,10 @@ fn copy_user(kernel_address voidptr, user_address u64, length u64, to_user bool)
 }
 
 fn copy_pagemap(_pagemap &memory.Pagemap, kernel_address voidptr, user_address u64, length u64, to_user bool) bool {
+	return copy_pagemap_policy(_pagemap, kernel_address, user_address, length, to_user, true, true)
+}
+
+fn copy_pagemap_policy(_pagemap &memory.Pagemap, kernel_address voidptr, user_address u64, length u64, to_user bool, fault_missing bool, cow bool) bool {
 	if length == 0 {
 		return true
 	}
@@ -107,10 +111,10 @@ fn copy_pagemap(_pagemap &memory.Pagemap, kernel_address voidptr, user_address u
 			// PROT_NONE -- is a genuine EFAULT.
 			if attempts < 3 {
 				attempts++
-				if to_user && memory.resolve_cow(pagemap, address) {
+				if to_user && cow && memory.resolve_cow(pagemap, address) {
 					continue
 				}
-				if memory.resolve_missing_page(pagemap, address) {
+				if fault_missing && memory.resolve_missing_page(pagemap, address) {
 					continue
 				}
 			}
@@ -196,6 +200,21 @@ pub fn copy_to_user(destination u64, source voidptr, length u64) bool {
 // a freshly forked child, whose pages were already copied away from ours.
 pub fn copy_to_pagemap(pagemap &memory.Pagemap, destination u64, source voidptr, length u64) bool {
 	return copy_pagemap(pagemap, source, destination, length, true)
+}
+
+// The caller owns an inspection reference when this is a remote map.
+pub fn copy_from_pagemap(pagemap &memory.Pagemap, destination voidptr, source u64, length u64) bool {
+	return copy_pagemap(pagemap, destination, source, length, false)
+}
+
+// Cross-process demand faults need a pinned mapping-range lifetime. Copies
+// also preserve cgroup limits by refusing remote COW when it cannot be charged.
+pub fn copy_remote_from(pagemap &memory.Pagemap, destination voidptr, source u64, length u64, fault_missing bool) bool {
+	return copy_pagemap_policy(pagemap, destination, source, length, false, fault_missing, false)
+}
+
+pub fn copy_remote_to(pagemap &memory.Pagemap, destination u64, source voidptr, length u64, fault_missing bool) bool {
+	return copy_pagemap_policy(pagemap, source, destination, length, true, fault_missing, fault_missing)
 }
 
 pub fn read_u32(address u64) ?u32 {

@@ -18,6 +18,8 @@ uint16_t vinix_ip_randomid(void);
 
 uint32_t vinix_tcp_isn(uint32_t local_address, uint16_t local_port,
                        uint32_t remote_address, uint16_t remote_port);
+uint32_t vinix_tcp_isn_bytes(const void *local, uint16_t local_port,
+                            const void *remote, uint16_t remote_port, unsigned length);
 uint32_t vinix_tcp_isn_at(uint64_t now_ns, uint32_t local_address, uint16_t local_port,
                           uint32_t remote_address, uint16_t remote_port);
 

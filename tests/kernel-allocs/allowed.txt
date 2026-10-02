@@ -4,6 +4,8 @@ dev/fbdev/fbdev.v string interpolation	1
 devicetree/devicetree.v array initialization	3
 drm/simple/simple.v array initialization	1
 event/event_arm64.v array initialization	1
+file/memory_pressure.v cast to interface	1
+file/memory_pressure.v struct on the heap	1
 fs/cgroup.v array initialization	1
 fs/devtmpfs.v cast to interface	1
 fs/devtmpfs.v string interpolation	1

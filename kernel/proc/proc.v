@@ -233,6 +233,7 @@ pub mut:
 	brk_base          u64
 	brk_current       u64
 	current_directory voidptr
+	current_mount     voidptr
 	event             eventstruct.Event
 	status            int
 	// Set once exit_group() (or a fatal fault) has started tearing the
@@ -245,6 +246,9 @@ pub mut:
 	// Some compatibility runtimes require an RWX probe even when their generated
 	// code runs interpreted. Exec replaces this opt-in; fork preserves it.
 	allow_wx bool
+	// Linux PR_SET_DUMPABLE: also gates unprivileged process inspection.
+	// Fork inherits it; exec and effective credential changes replace it.
+	dumpable bool = true
 	// Where a signal handler returns to when it names no SA_RESTORER of its
 	// own; see install_sigreturn_page() in userland.
 	sigreturn_page u64
@@ -273,8 +277,19 @@ pub mut:
 	// stays counted. It only ever grows, so a reader that wants a rate takes
 	// two samples and divides the difference by the wall clock between them.
 	cpu_time_ns u64
+	cpu_user_ns u64
+	cpu_system_ns u64
+	// Serializes per-thread accounting and the shared CPU timers, including
+	// simultaneous ticks from threads running on different CPUs.
+	cpu_lock klock.Lock
+	cpu_timers [2]CPUIntervalTimer
+	cpu_limit RLimit = RLimit{cur: rlim_infinity, max: rlim_infinity}
+	cpu_xcpu_next_second u64
+	cpu_kill_sent bool
 	// CPU time from children this process has successfully waited for.
 	children_cpu_time_ns u64
+	children_cpu_user_ns u64
+	children_cpu_system_ns u64
 	// POSIX nice value. The scheduler scales this process' timeslices from
 	// -20 (highest normal priority) through 19 (lowest).
 	nice int
@@ -291,6 +306,8 @@ pub mut:
 	// from (nil means the system root), the namespaces this process is in,
 	// its capability sets and its cgroup.
 	root_directory  voidptr
+	root_mount      voidptr
+	exe_mount       voidptr
 	ns              NamespaceSet
 	caps            Capabilities
 	no_new_privs    bool
@@ -616,79 +633,6 @@ fn release_thread_slot(tid int) {
 	threads_by_tid[tid] = unsafe { nil }
 }
 
-// ── CPU time accounting ────────────────────────────────────────────
-// A thread's time is charged to its process at the moment the scheduler takes
-// it off a CPU, so the total is only ever moved forward by a span that has
-// already finished. Both calls sit on the one path every context switch goes
-// through. Neither takes a lock: `scheduled_at_ns` is touched only by the CPU
-// the thread is running on, and the running total is added to atomically —
-// see charge_cpu_time.
-
-// begin_cpu_time marks a thread as having started a turn on a CPU.
-pub fn begin_cpu_time(mut t Thread, now_ns u64) {
-	t.scheduled_at_ns = now_ns
-	t.cgroup_charged_ns = now_ns
-}
-
-// charge_cpu_time bills the turn that has just ended to the thread's process
-// and clears the mark, so a thread that is switched away twice without running
-// in between is charged once. A clock that has not moved, or has moved
-// backwards because the reading raced a tick, is charged nothing rather than a
-// nonsense span.
-//
-// The addition is a compare-and-swap rather than a `+=`. Two threads of one
-// process can come off two CPUs at the same moment, each holding only its own
-// thread's lock, and a lost update there would undercount exactly the
-// multi-threaded processes worth measuring. Taking the process' lock instead
-// would put it underneath the scheduler, which is not somewhere it can go.
-pub fn charge_cpu_time(mut t Thread, now_ns u64) {
-	charge_cgroup_cpu(mut t, now_ns)
-	t.cgroup_charged_ns = 0
-	started := t.scheduled_at_ns
-	t.scheduled_at_ns = 0
-	if started == 0 || now_ns <= started {
-		return
-	}
-	if unsafe { t.process == nil } {
-		return
-	}
-	span := now_ns - started
-	for {
-		total := katomic.load(&t.cpu_time_ns)
-		if katomic.cas(mut &t.cpu_time_ns, total, total + span) {
-			break
-		}
-	}
-	mut process := t.process
-	for {
-		total := katomic.load(&process.cpu_time_ns)
-		if katomic.cas(mut &process.cpu_time_ns, total, total + span) {
-			return
-		}
-	}
-}
-
-pub fn thread_cpu_time(t &Thread, now_ns u64) u64 {
-	mut total := katomic.load(&t.cpu_time_ns)
-	started := t.scheduled_at_ns
-	if started != 0 && now_ns > started {
-		total += now_ns - started
-	}
-	return total
-}
-
-pub fn process_cpu_time(process &Process, now_ns u64) u64 {
-	mut total := katomic.load(&process.cpu_time_ns)
-	current := current_thread()
-	if unsafe { current != nil } && voidptr(current.process) == voidptr(process) {
-		started := current.scheduled_at_ns
-		if started != 0 && now_ns > started {
-			total += now_ns - started
-		}
-	}
-	return total
-}
-
 // The CPU time of the thread `id`, which has to be one of the caller's
 // process, or of the process `id`, for the clocks pthread_getcpuclockid(3)
 // and clock_getcpuclockid(3) name; 0 is the caller's. None when `id` names
@@ -730,9 +674,13 @@ pub fn account_reaped_child(mut parent Process, child &Process) {
 	for {
 		total := katomic.load(&parent.children_cpu_time_ns)
 		if katomic.cas(mut &parent.children_cpu_time_ns, total, total + child_time) {
-			return
+			break
 		}
 	}
+	add_cpu_counter(&parent.children_cpu_user_ns,
+		katomic.load(&child.cpu_user_ns) + katomic.load(&child.children_cpu_user_ns))
+	add_cpu_counter(&parent.children_cpu_system_ns,
+		katomic.load(&child.cpu_system_ns) + katomic.load(&child.children_cpu_system_ns))
 }
 
 pub fn process_count() u16 {
@@ -1281,12 +1229,16 @@ pub fn process_stat_line(pid int, viewer &Namespace) string {
 	text.add_decimal(shown_pgid)
 	text.add_byte(` `)
 	text.add_decimal(shown_sid)
-	// utime and cutime, in clock ticks; all CPU time is charged as user time.
+	// User/system and reaped children CPU time, in clock ticks.
 	text.add(' 0 -1 0 0 0 0 0 ')
-	text.add_unsigned(katomic.load(&process.cpu_time_ns) / 10000000)
-	text.add(' 0 ')
-	text.add_unsigned(katomic.load(&process.children_cpu_time_ns) / 10000000)
-	text.add(' 0 ')
+	text.add_unsigned(katomic.load(&process.cpu_user_ns) / 10000000)
+	text.add_byte(` `)
+	text.add_unsigned(katomic.load(&process.cpu_system_ns) / 10000000)
+	text.add_byte(` `)
+	text.add_unsigned(katomic.load(&process.children_cpu_user_ns) / 10000000)
+	text.add_byte(` `)
+	text.add_unsigned(katomic.load(&process.children_cpu_system_ns) / 10000000)
+	text.add_byte(` `)
 	text.add_decimal(priority)
 	text.add_byte(` `)
 	text.add_decimal(process.nice)

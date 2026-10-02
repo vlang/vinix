@@ -141,6 +141,9 @@ fn from_userspace(gpr_state &cpulocal.GPRState) bool {
 // Called from vectors.S for synchronous exceptions
 @[export: 'exception__sync_handler']
 pub fn sync_handler(esr u64, far u64, gpr_state &cpulocal.GPRState) {
+	user_entry := from_userspace(gpr_state)
+	if user_entry { proc.cpu_enter_kernel() }
+	defer { if user_entry { proc.cpu_leave_kernel() } }
 	ec := (esr >> 26) & 0x3f // Exception Class
 
 	match ec {
@@ -640,6 +643,7 @@ fn uart_put_hex(val u64) {
 // Called from vectors.S for IRQ exceptions
 @[export: 'exception__irq_handler']
 pub fn irq_handler(gpr_state &cpulocal.GPRState) {
+	if from_userspace(gpr_state) { proc.cpu_enter_kernel() }
 	irq_dispatch(gpr_state)
 }
 

@@ -135,6 +135,7 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 
 	mut cpu_local := cpulocal.current()
 
+	consume_reschedule(cpu_local.cpu_number)
 	katomic.store(mut &cpu_local.is_idle, false)
 	if preemption_guard != unsafe { nil } {
 		guard := unsafe { PreemptionGuard(preemption_guard) }
@@ -164,6 +165,7 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 	account_realtime_time(cpu_local.cpu_number, current_thread, now_ns)
 	if unsafe { current_thread != 0 } {
 		proc.charge_cgroup_cpu(mut current_thread, now_ns)
+		proc.tick_cpu_time(mut current_thread, now_ns)
 		$if linuxkpi ? {
 			// Notify at the actual switch boundary. IRQ restoration after a
 			// Linux task dequeues can preempt it before its explicit park call.
@@ -209,6 +211,7 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 			}
 		}
 		if keeps_cpu && !preset {
+			publish_dispatch_priority(cpu_local.cpu_number, current_thread, now_ns)
 			$if linuxkpi ? {
 				// A wake can re-enqueue the thread after the blocked
 				// notification and before entitlement is checked below.
@@ -269,6 +272,7 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 	}
 
 	if unsafe { next_thread == nil } {
+		publish_dispatch_priority(cpu_local.cpu_number, unsafe { nil }, now_ns)
 		apic.lapic_eoi()
 		cpu.set_gs_base(u64(&cpu_local.cpu_number))
 		cpu.set_kernel_gs_base(u64(&cpu_local.cpu_number))
@@ -284,6 +288,7 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 	}
 
 	current_thread = next_thread
+	publish_dispatch_priority(cpu_local.cpu_number, current_thread, now_ns)
 	$if linuxkpi ? {
 		if from_idle {
 			C.vinix_linuxkpi_workqueue_task_resume(voidptr(&current_thread.linuxkpi_task[0]))
@@ -392,6 +397,10 @@ pub fn wake_cpu(number u32) bool {
 	return true
 }
 
+fn send_reschedule(number u64) bool {
+	return wake_cpu(u32(number))
+}
+
 pub fn enqueue_thread(_thread &proc.Thread, by_signal bool) bool {
 	mut t := unsafe { _thread }
 
@@ -421,16 +430,7 @@ pub fn enqueue_thread(_thread &proc.Thread, by_signal bool) bool {
 		if katomic.cas[&proc.Thread](mut &scheduler_running_queue[i], unsafe { nil }, t) {
 			katomic.store(mut &t.is_in_queue, true)
 
-			// Wake an idle CPU that can actually run this thread. A bound
-			// worker must not leave its target asleep by waking another CPU.
-			for cpu_entry in cpu_locals {
-				if katomic.load(&cpu_entry.online) != 0
-					&& may_run_here(t, cpu_entry.cpu_number)
-					&& katomic.load(&cpu_entry.is_idle) {
-					apic.lapic_send_ipi(cpu_entry.lapic_id, scheduler_vector)
-					break
-				}
-			}
+			request_enqueue_preemption(t)
 
 			return true
 		}

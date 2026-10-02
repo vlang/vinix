@@ -43,9 +43,12 @@ pub const ms_slave = u64(0x80000)
 pub const ms_shared = u64(0x100000)
 pub const ms_relatime = u64(0x200000)
 pub const ms_strictatime = u64(0x1000000)
+// Internal executable policy, set only by the administrator's wxallowed
+// mount option. It is not an additional userspace mount flag.
+pub const ms_wxallowed = u64(1) << 63
 
 const ms_propagation = ms_unbindable | ms_private | ms_slave | ms_shared
-const ms_per_mount = ms_rdonly | ms_nosuid | ms_nodev | ms_noexec | ms_noatime | ms_nodiratime | ms_relatime | ms_strictatime
+const ms_per_mount = ms_rdonly | ms_nosuid | ms_nodev | ms_noexec | ms_noatime | ms_nodiratime | ms_relatime | ms_strictatime | ms_wxallowed
 
 const mnt_detach = 2
 const umount_nofollow = 8
@@ -56,6 +59,8 @@ pub mut:
 	id      int
 	covered &VFSNode = unsafe { nil }
 	root    &VFSNode = unsafe { nil }
+	parent  &Mount = unsafe { nil }
+	detached bool
 	source  string
 	fstype  string
 	flags   u64
@@ -72,6 +77,7 @@ pub mut:
 	// The root pivot_root(2) last installed here: where setns(2) into this
 	// namespace puts the joining process.
 	root_hint &VFSNode = unsafe { nil }
+	root_hint_mount voidptr
 }
 
 __global (
@@ -83,6 +89,7 @@ fn init_mount_tables() {
 	initial_mount_table = &MountTable{
 		initial: true
 	}
+	initial_mount_table.mounts.flags |= .noslices
 }
 
 fn calling_process() &proc.Process {
@@ -134,6 +141,9 @@ fn mount_of(node &VFSNode) &VFSNode {
 }
 
 fn attach_mount(mut table MountTable, mut covered VFSNode, root &VFSNode) {
+	// Singleton pseudo filesystems can return the already-mounted root.
+	// Their mount record carries the new policy; a self redirect would loop.
+	if voidptr(covered) == voidptr(root) { return }
 	if table.initial {
 		covered.mountpoint = unsafe { root }
 		return
@@ -174,11 +184,12 @@ fn detach_mount(mut table MountTable, mut covered VFSNode) {
 // An entry and its strings are never freed: the copies other namespaces take
 // of a table share them, and /proc/<pid>/mountinfo reads them unlocked.
 fn record_mount(mut table MountTable, covered &VFSNode, root &VFSNode, source string,
-	fstype string, flags u64, options string) &Mount {
+	fstype string, flags u64, options string, parent_mount voidptr) &Mount {
 	entry := &Mount{
 		id:      katomic.inc(mut &mount_id_counter) + 1
 		covered: unsafe { covered }
 		root:    unsafe { root }
+		parent:  unsafe { &Mount(parent_mount) }
 		source:  source.clone()
 		fstype:  fstype.clone()
 		flags:   flags & ms_per_mount
@@ -203,13 +214,18 @@ fn record_mount(mut table MountTable, covered &VFSNode, root &VFSNode, source st
 // The mount table a new mount namespace starts with: a copy of its parent's.
 pub fn copy_mount_table(parent &MountTable) &MountTable {
 	mut table := &MountTable{}
+	table.mounts.flags |= .noslices
 	mut source := unsafe { parent }
 	source.lock.acquire()
+	table.root_hint = source.root_hint
+	table.root_hint_mount = source.root_hint_mount
 	for entry in source.mounts {
 		table.mounts << &Mount{
 			id:      entry.id
 			covered: entry.covered
 			root:    entry.root
+			parent:  entry.parent
+			detached: entry.detached
 			source:  entry.source
 			fstype:  entry.fstype
 			flags:   entry.flags
@@ -254,7 +270,7 @@ fn covered_by(node &VFSNode) &VFSNode {
 	}
 	for i := table.mounts.len - 1; i >= 0; i-- {
 		entry := table.mounts[i]
-		if voidptr(entry.root) == voidptr(node) && voidptr(entry.covered) != voidptr(node) {
+		if !entry.detached && voidptr(entry.root) == voidptr(node) && voidptr(entry.covered) != voidptr(node) {
 			return entry.covered
 		}
 	}
@@ -400,7 +416,10 @@ fn calling_directory() &VFSNode {
 	return unsafe { &VFSNode(directory) }
 }
 
-fn mount_request(parent &VFSNode, source string, target string, fstype string, flags u64, options string) ? {
+fn mount_request(parent &VFSNode, source string, target string, fstype string, _flags u64, options string) ? {
+	flags := (_flags & ~ms_wxallowed) | if mount_option_present(options, 'wxallowed') {
+		ms_wxallowed
+	} else { u64(0) }
 	if flags & ms_remount != 0 {
 		return remount(parent, target, flags, options)
 	}
@@ -466,7 +485,8 @@ fn new_mount(parent &VFSNode, source string, target string, fstype string, flags
 		}
 	}
 
-	parent_of_tgt_node, mut target_node, final_component := walk_path(parent, target, 0, true)
+	mut target_mount := starting_mount(parent)
+	parent_of_tgt_node, mut target_node, final_component := walk_path_on_mount(parent, target, 0, true, unsafe { &target_mount })
 	if target_node == unsafe { nil } {
 		errno.set(errno.enoent)
 		return none
@@ -474,7 +494,7 @@ fn new_mount(parent &VFSNode, source string, target string, fstype string, flags
 	// The mount point is reached through normal path resolution, so a final
 	// symlink is followed too. runc mounts onto /proc/self/fd/<n>, a magic link
 	// to the real directory it opened, to avoid a TOCTOU on the path.
-	target_node = reduce_node(target_node, true)
+	target_node = reduce_node_on_mount(target_node, true, 0, true, unsafe { &target_mount })
 	if target_node == unsafe { nil } {
 		errno.set(errno.enoent)
 		return none
@@ -525,7 +545,7 @@ fn new_mount(parent &VFSNode, source string, target string, fstype string, flags
 	attach_mount(mut table, mut target_node, mount_node)
 	shown := if fstype == kind { display_fstype(kind) } else { fstype }
 	record_mount(mut table, target_node, mount_node, if source.len > 0 { source } else { shown },
-		shown, mount_flags, options)
+		shown, mount_flags, options, target_mount)
 
 	if source.len > 0 {
 		C.kprintf(c'vfs: Mounted `%.*s` to `%.*s` with filesystem `%.*s`\n', i32(source.len),
@@ -586,12 +606,13 @@ fn mount_devpts(parent &VFSNode, target string, flags u64, options string) ? {
 	} else {
 		pts = internal_create(devtmpfs_root, 'pts', stat.ifdir | 0o755)?
 	}
-	_, mut target_node, _ := walk_path(parent, target, 0, true)
+	mut target_mount := starting_mount(parent)
+	_, mut target_node, _ := walk_path_on_mount(parent, target, 0, true, unsafe { &target_mount })
 	if target_node == unsafe { nil } {
 		errno.set(errno.enoent)
 		return none
 	}
-	target_node = reduce_node(target_node, true)
+	target_node = reduce_node_on_mount(target_node, true, 0, true, unsafe { &target_mount })
 	if target_node == unsafe { nil } {
 		errno.set(errno.enoent)
 		return none
@@ -604,20 +625,22 @@ fn mount_devpts(parent &VFSNode, target string, flags u64, options string) ? {
 	if voidptr(target_node) != voidptr(pts) {
 		attach_mount(mut table, mut target_node, pts)
 	}
-	record_mount(mut table, target_node, pts, 'devpts', 'devpts', flags, options)
+	record_mount(mut table, target_node, pts, 'devpts', 'devpts', flags, options, target_mount)
 }
 
 // mount --bind: make `target` lead to what `source` names. Everything mounted
 // below the source is part of what it names, so every bind here behaves as a
 // recursive one.
 fn bind_mount(parent &VFSNode, source string, target string, flags u64) ? {
-	source_node := get_node(parent, source, true)?
-	_, mut target_node, _ := walk_path(parent, target, 0, true)
+	resolved_source := get_node_and_mount(parent, source, true)?
+	source_node := resolved_source.node
+	mut target_mount := starting_mount(parent)
+	_, mut target_node, _ := walk_path_on_mount(parent, target, 0, true, unsafe { &target_mount })
 	if target_node == unsafe { nil } {
 		errno.set(errno.enoent)
 		return none
 	}
-	target_node = reduce_node(target_node, true)
+	target_node = reduce_node_on_mount(target_node, true, 0, true, unsafe { &target_mount })
 	if target_node == unsafe { nil } {
 		errno.set(errno.enoent)
 		return none
@@ -641,13 +664,14 @@ fn bind_mount(parent &VFSNode, source string, target string, flags u64) ? {
 	table.lock.acquire()
 	for i := table.mounts.len - 1; i >= 0; i-- {
 		entry := table.mounts[i]
-		if is_beneath(source_node, entry.root) {
+		if !entry.detached && is_beneath(source_node, entry.root) {
 			fstype = entry.fstype
 			break
 		}
 	}
 	table.lock.release()
-	record_mount(mut table, target_node, source_node, origin, fstype, flags, 'bind')
+	record_mount(mut table, target_node, source_node, origin, fstype,
+		mount_flags(resolved_source.mount) | flags, 'bind', target_mount)
 	unsafe { origin.free() }
 }
 
@@ -685,7 +709,7 @@ fn in_read_only_mount(node &VFSNode) bool {
 			return false
 		}
 		for i := table.mounts.len - 1; i >= 0; i-- {
-			if voidptr(table.mounts[i].root) == voidptr(current) {
+			if !table.mounts[i].detached && voidptr(table.mounts[i].root) == voidptr(current) {
 				return table.mounts[i].flags & ms_rdonly != 0
 			}
 		}
@@ -700,7 +724,7 @@ fn find_mount(mut table MountTable, root &VFSNode) &Mount {
 		table.lock.release()
 	}
 	for i := table.mounts.len - 1; i >= 0; i-- {
-		if voidptr(table.mounts[i].root) == voidptr(root) {
+		if !table.mounts[i].detached && voidptr(table.mounts[i].root) == voidptr(root) {
 			return table.mounts[i]
 		}
 	}
@@ -708,16 +732,22 @@ fn find_mount(mut table MountTable, root &VFSNode) &Mount {
 }
 
 fn move_mount(parent &VFSNode, source string, target string) ? {
-	source_root := get_node(parent, source, true)?
+	resolved := get_node_and_mount(parent, source, true)?
+	source_root := resolved.node
 	mut table := table_of(calling_process())
-	mut entry := find_mount(mut table, source_root)
-	if entry == unsafe { nil } {
+	mut entry := namespace_mount(resolved.mount)
+	if entry == unsafe { nil } || voidptr(entry.root) != voidptr(source_root) {
 		errno.set(errno.einval)
 		return none
 	}
-	_, mut target_node, _ := walk_path(parent, target, 0, true)
+	mut target_mount := starting_mount(parent)
+	_, mut target_node, _ := walk_path_on_mount(parent, target, 0, true, unsafe { &target_mount })
 	if target_node == unsafe { nil } {
 		errno.set(errno.enoent)
+		return none
+	}
+	target_node = reduce_node_on_mount(target_node, true, 0, true, unsafe { &target_mount })
+	if target_node == unsafe { nil } {
 		return none
 	}
 	mut old_covered := entry.covered
@@ -726,18 +756,18 @@ fn move_mount(parent &VFSNode, source string, target string) ? {
 	}
 	attach_mount(mut table, mut target_node, entry.root)
 	entry.covered = target_node
+	entry.parent = unsafe { &Mount(target_mount) }
 }
 
 fn remount(parent &VFSNode, target string, flags u64, options string) ? {
-	node := get_node(parent, target, true)?
-	mut table := table_of(calling_process())
-	mut entry := find_mount(mut table, node)
-	if entry == unsafe { nil } {
+	resolved := get_node_and_mount(parent, target, true)?
+	mut entry := namespace_mount(resolved.mount)
+	if entry == unsafe { nil } || voidptr(entry.root) != voidptr(resolved.node) {
 		errno.set(errno.einval)
 		return none
 	}
 	entry.flags = flags & ms_per_mount
-	if flags & ms_bind == 0 && options.len > 0 {
+	if flags & ms_bind == 0 && options.len > 0 && options != entry.options {
 		// The old options may be another namespace's too, so they stay.
 		entry.options = options.clone()
 	}
@@ -763,10 +793,11 @@ pub fn syscall_umount(_ voidptr, tgt charptr, flags u64) (u64, u64) {
 }
 
 fn unmount(parent &VFSNode, target string, flags u64) ? {
-	node := get_node(parent, target, flags & umount_nofollow == 0)?
+	resolved := get_node_and_mount(parent, target, flags & umount_nofollow == 0)?
+	node := resolved.node
 	mut table := table_of(calling_process())
-	entry := find_mount(mut table, node)
-	if entry == unsafe { nil } {
+	mut entry := namespace_mount(resolved.mount)
+	if entry == unsafe { nil } || voidptr(entry.root) != voidptr(node) {
 		errno.set(errno.einval)
 		return none
 	}
@@ -775,10 +806,9 @@ fn unmount(parent &VFSNode, target string, flags u64) ? {
 		detach_mount(mut table, mut covered)
 	}
 	table.lock.acquire()
-	index := table.mounts.index(entry)
-	if index >= 0 {
-		table.mounts.delete(index)
-	}
+	// Keep detached identities for descriptors and cwd references, including
+	// namespace copies. The entries themselves were already permanent.
+	entry.detached = true
 	table.lock.release()
 
 	// A lazy unmount takes everything mounted inside the tree with it. What
@@ -789,7 +819,7 @@ fn unmount(parent &VFSNode, target string, flags u64) ? {
 		mut stale := []&Mount{}
 		table.lock.acquire()
 		for candidate in table.mounts {
-			if is_beneath(candidate.covered, entry.root) {
+			if !candidate.detached && is_beneath(candidate.covered, entry.root) {
 				stale << candidate
 			}
 		}
@@ -800,10 +830,8 @@ fn unmount(parent &VFSNode, target string, flags u64) ? {
 				continue
 			}
 			table.lock.acquire()
-			i := table.mounts.index(candidate)
-			if i >= 0 {
-				table.mounts.delete(i)
-			}
+			mut removed := unsafe { candidate }
+			removed.detached = true
 			table.lock.release()
 			if voidptr(candidate.covered) != voidptr(candidate.root) {
 				mut covered := candidate.covered
@@ -827,7 +855,8 @@ pub fn syscall_chroot(_ voidptr, _path charptr) (u64, u64) {
 	if path.len == 0 {
 		return errno.err, errno.enoent
 	}
-	node := get_node(calling_directory(), path, true) or { return errno.err, errno.get() }
+	resolved := get_node_and_mount(calling_directory(), path, true) or { return errno.err, errno.get() }
+	node := resolved.node
 	if !stat.isdir(node.resource.stat.mode) {
 		return errno.err, errno.enotdir
 	}
@@ -836,6 +865,7 @@ pub fn syscall_chroot(_ voidptr, _path charptr) (u64, u64) {
 	}
 	mut process := calling_process()
 	proc.set_root_directory(mut process, voidptr(node))
+	proc.set_root_mount(mut process, resolved.mount)
 	return 0, 0
 }
 
@@ -856,7 +886,8 @@ pub fn syscall_pivot_root(_ voidptr, _new_root charptr, _put_old charptr) (u64, 
 		unsafe { old_path.free() }
 	}
 	directory := calling_directory()
-	mut new_root := get_node(directory, new_path, true) or { return errno.err, errno.get() }
+	new_resolved := get_node_and_mount(directory, new_path, true) or { return errno.err, errno.get() }
+	mut new_root := new_resolved.node
 	mut put_old := get_node(directory, old_path, true) or { return errno.err, errno.get() }
 	if !stat.isdir(new_root.resource.stat.mode) || !stat.isdir(put_old.resource.stat.mode) {
 		return errno.err, errno.enotdir
@@ -880,9 +911,11 @@ pub fn syscall_pivot_root(_ voidptr, _new_root charptr, _put_old charptr) (u64, 
 		old_entry.source
 	} else {
 		'rootfs'
-	}, if old_entry != unsafe { nil } { old_entry.fstype } else { 'rootfs' }, 0, '')
+	}, if old_entry != unsafe { nil } { old_entry.fstype } else { 'rootfs' },
+		if old_entry != unsafe { nil } { old_entry.flags } else { u64(0) }, '', new_resolved.mount)
 
 	table.root_hint = new_root
+	table.root_hint_mount = new_resolved.mount
 
 	// Every process of this namespace that was rooted, or standing, at the
 	// old root moves to the new one. These are the processes' own roots, not
@@ -901,9 +934,11 @@ pub fn syscall_pivot_root(_ voidptr, _new_root charptr, _put_old charptr) (u64, 
 		}
 		if voidptr(other_root) == voidptr(old_root) || voidptr(other_root) == voidptr(old_top) {
 			other.root_directory = voidptr(new_root)
+			other.root_mount = new_resolved.mount
 		}
 		if other.current_directory == voidptr(old_root) || other.current_directory == voidptr(old_top) {
 			other.current_directory = voidptr(new_root)
+			other.current_mount = new_resolved.mount
 		}
 	}
 	proc.unlock_table()
@@ -917,9 +952,11 @@ pub fn syscall_pivot_root(_ voidptr, _new_root charptr, _put_old charptr) (u64, 
 		}
 		if voidptr(own_root) == voidptr(old_root) || voidptr(own_root) == voidptr(old_top) {
 			own.root_directory = voidptr(new_root)
+			own.root_mount = new_resolved.mount
 		}
 		if own.current_directory == voidptr(old_root) || own.current_directory == voidptr(old_top) {
 			own.current_directory = voidptr(new_root)
+			own.current_mount = new_resolved.mount
 		}
 	}
 	return 0, 0
@@ -937,6 +974,9 @@ fn add_mount_options(mut text lib.Text, flags u64) {
 	}
 	if flags & ms_noexec != 0 {
 		text.add(',noexec')
+	}
+	if flags & ms_wxallowed != 0 {
+		text.add(',wxallowed')
 	}
 	if flags & ms_noatime != 0 {
 		text.add(',noatime')
@@ -978,6 +1018,7 @@ fn visible_mounts(pid int) []VisibleMount {
 	// Freed, with the paths in it, by free_visible_mounts().
 	mut visible := []VisibleMount{cap: entries.len} @[freed]
 	for entry in entries {
+		if entry.detached { continue }
 		path := path_from_root(entry.covered, root) or { continue }
 		visible << VisibleMount{
 			entry: entry
@@ -1047,10 +1088,7 @@ pub fn mountinfo_text(pid int) string {
 		text.add_byte(` `)
 		add_mount_field(mut text, entry.source)
 		text.add(' rw')
-		if entry.options.len > 0 && entry.options != 'bind' {
-			text.add_byte(`,`)
-			text.add(entry.options)
-		}
+		add_superblock_options(mut text, entry.options)
 		text.add_byte(`\n`)
 	}
 	return text.str()
@@ -1085,7 +1123,7 @@ pub fn record_root_switch(root &VFSNode, fstype string) {
 	old := table.mounts.clone()
 	table.mounts.clear()
 	table.lock.release()
-	record_mount(mut table, root, root, '/dev/root', fstype, 0, '')
+	record_mount(mut table, root, root, '/dev/root', fstype, 0, '', unsafe { nil })
 	mut names := root.children.keys()
 	defer {
 		unsafe {
@@ -1107,7 +1145,7 @@ pub fn record_root_switch(root &VFSNode, fstype string) {
 				shown = entry.fstype
 			}
 		}
-		record_mount(mut table, child, child.mountpoint, shown, shown, 0, '')
+		record_mount(mut table, child, child.mountpoint, shown, shown, 0, '', native_mount(child))
 	}
 }
 

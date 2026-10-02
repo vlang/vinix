@@ -175,6 +175,26 @@ uint32_t vinix_tcp_isn(uint32_t local_address, uint16_t local_port, uint32_t rem
 				remote_port);
 }
 
+/* IPv6 hashes all 128 address bits, rather than silently retaining the IPv4
+ * hook's first word. The family is separated by the tuple length. */
+uint32_t vinix_tcp_isn_bytes(const void *local, uint16_t local_port,
+			    const void *remote, uint16_t remote_port, unsigned length)
+{
+	uint8_t tuple[36];
+	if (length != 4 && length != 16)
+		return 0;
+	if (!isn_keyed) {
+		vinix_net_random_bytes(isn_key, sizeof isn_key);
+		isn_keyed = 1;
+	}
+	memcpy(tuple, local, length);
+	memcpy(tuple + length, remote, length);
+	memcpy(tuple + length * 2, &local_port, 2);
+	memcpy(tuple + length * 2 + 2, &remote_port, 2);
+	return (uint32_t)(time__monotonic_ns() / 4000) +
+		(uint32_t)vinix_siphash24(isn_key, tuple, length * 2 + 4);
+}
+
 /*
  * OpenBSD's in_pcbpickport(): start at a random port of the range and take
  * the first one from there that nothing has bound. 0 when every one has.

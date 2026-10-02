@@ -112,3 +112,12 @@ pub fn (mut t Text) str() string {
 	t.bytes = []u8{}
 	return s
 }
+
+// Consume a Text value into one owned string. The caller must not reuse the
+// builder afterwards: its byte buffer is freed. Passing the value avoids the
+// compiler boxing a local whose mut str() receiver appears to escape.
+pub fn finish_text(t Text) string {
+	s := t.bytes.bytestr()
+	unsafe { t.bytes.free() }
+	return s
+}

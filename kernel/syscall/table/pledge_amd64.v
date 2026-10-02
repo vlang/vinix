@@ -105,6 +105,7 @@ fn pledge_needs(nr u64, a [6]u64) u64 {
 		289...296 { pledge_stdio }
 		299, 306, 307, 309 { pledge_stdio } // recvmmsg, syncfs, sendmmsg, getcpu
 		302 { pledge_rlimit(a[2]) } // prlimit64
+		310, 311 { p_proc } // process_vm_readv/writev: unrestricted process inspection
 		315 { pledge_stdio } // sched_getattr
 		// seccomp (only narrows), getrandom, memfd_create.
 		317, 318, 319 { pledge_stdio }

@@ -5,6 +5,7 @@ import klock
 import katomic
 import lib
 import aarch64.cpu
+import aarch64.timer
 import aarch64.cpu.local as cpulocal
 import event.eventstruct
 
@@ -26,6 +27,8 @@ pub mut:
 	tid int
 	// The tid as the thread's pid namespace numbers it; see Process.ns_pid.
 	ns_tid      int
+	// Correlates a selected seccomp action with this syscall's result.
+	audit_sequence u64
 	is_in_queue bool
 	// A filesystem change this thread made during its syscall that is not on
 	// the device yet. It is flushed on the way back to userspace, or once an
@@ -88,6 +91,11 @@ pub mut:
 	// twice and never counts one that has not finished.
 	scheduled_at_ns u64
 	cpu_time_ns     u64
+	cpu_user_ns     u64
+	cpu_system_ns   u64
+	cpu_in_kernel   bool
+	// Interrupted user context retained while async work runs on our stack.
+	async_context cpulocal.GPRState
 	// When this thread's CPU time was last charged to its cgroup, or 0 when it
 	// is off the CPU. See charge_cgroup_cpu().
 	cgroup_charged_ns u64
@@ -253,3 +261,13 @@ pub fn get_main_thread(process &Process) &Thread {
 
 // What a seccomp program sees as seccomp_data.arch.
 pub const seccomp_audit_arch = audit_arch_aarch64
+
+fn saved_context_in_kernel(t &Thread) bool {
+	return t.gpr_state.pstate & 0xf != 0
+}
+
+// Accounting and scheduler timestamps share the architectural counter,
+// independently of the wall clock epoch and its adjustment discipline.
+pub fn cpu_time_now_ns() u64 {
+	return timer.get_ns()
+}

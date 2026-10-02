@@ -8,7 +8,14 @@
 #define LWIP_NO_CTYPE_H 1
 
 #define LWIP_IPV4 1
-#define LWIP_IPV6 0
+#define LWIP_IPV6 1
+#define LWIP_IPV6_AUTOCONFIG 1
+#define LWIP_IPV6_SEND_ROUTER_SOLICIT 1
+#define LWIP_IPV6_MLD 1
+#define LWIP_IPV6_NUM_ADDRESSES 6
+/* The reassembly helper includes pointers and exceeds the 8-byte wire
+ * fragmentation header on both 64-bit targets. */
+#define IPV6_FRAG_COPYHEADER 1
 #define LWIP_ARP 1
 #define LWIP_ETHERNET 1
 #define LWIP_ICMP 1
@@ -23,6 +30,9 @@
 #define LWIP_NETCONN 0
 #define LWIP_SOCKET 0
 #define TCP_LISTEN_BACKLOG 1
+#define LWIP_TCP_KEEPALIVE 1
+#define LWIP_TCP_SACK_OUT 1
+#define LWIP_TCP_TIMESTAMPS 1
 #define SO_REUSE 1
 #define IP_SOF_BROADCAST 1
 
@@ -59,9 +69,14 @@
 #include <stdint.h>
 uint32_t vinix_tcp_isn(uint32_t local_address, uint16_t local_port,
                        uint32_t remote_address, uint16_t remote_port);
+uint32_t vinix_tcp_isn_bytes(const void *local, uint16_t local_port,
+                            const void *remote, uint16_t remote_port, unsigned length);
 #define LWIP_HOOK_TCP_ISN(local_ip, local_port, remote_ip, remote_port) \
-    vinix_tcp_isn(ip4_addr_get_u32(ip_2_ip4(local_ip)), (local_port), \
-                  ip4_addr_get_u32(ip_2_ip4(remote_ip)), (remote_port))
+    vinix_tcp_isn_bytes(IP_IS_V6(local_ip) ? (const void *)ip_2_ip6(local_ip)->addr : \
+                         (const void *)&ip_2_ip4(local_ip)->addr, (local_port), \
+                       IP_IS_V6(remote_ip) ? (const void *)ip_2_ip6(remote_ip)->addr : \
+                         (const void *)&ip_2_ip4(remote_ip)->addr, (remote_port), \
+                       IP_IS_V6(local_ip) ? 16 : 4)
 
 #define LWIP_STATS 0
 #define LWIP_DEBUG 0

@@ -179,6 +179,20 @@ int main(void)
 	test_siphash();
 	test_ids();
 	test_isn();
+	uint8_t local6[16] = {0x20, 1, 0x0d, 0xb8}, remote6[16] = {0x20, 1, 0x0d, 0xb8};
+	uint32_t first6 = vinix_tcp_isn_bytes(local6, 50000, remote6, 443, 16);
+	for (unsigned i = 0; i < 16; ++i) {
+		remote6[i] ^= 1;
+		check(first6 != vinix_tcp_isn_bytes(local6, 50000, remote6, 443, 16),
+		      "isn: IPv6 remote address byte left out");
+		remote6[i] ^= 1;
+		local6[i] ^= 1;
+		check(first6 != vinix_tcp_isn_bytes(local6, 50000, remote6, 443, 16),
+		      "isn: IPv6 local address byte left out");
+		local6[i] ^= 1;
+	}
+	check(first6 != vinix_tcp_isn_bytes(local6, 50000, remote6, 443, 4),
+	      "isn: IPv4 and IPv6 tuples not separated");
 	test_ports();
 	test_uniform();
 	test_pooling();

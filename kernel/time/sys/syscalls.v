@@ -98,22 +98,28 @@ pub const rusage_children = -1
 pub const rusage_thread = 1
 
 // Linux struct rusage consists of 18 signed machine words on both supported
-// 64-bit architectures. CPU time is currently charged as user time because
-// Vinix does not yet split scheduler accounting at the user/kernel boundary.
+// 64-bit architectures. User/system time comes from the same counters that
+// drive ITIMER_VIRTUAL/PROF and the process CPU clocks.
 pub fn syscall_getrusage(_ voidptr, who int, usage u64) (u64, u64) {
 	if usage == 0 { return errno.err, errno.efault }
 	now_ns := time.monotonic_ns()
 	current := proc.current_thread()
-	mut ns := u64(0)
+	mut user_ns := u64(0)
+	mut system_ns := u64(0)
 	match who {
-		rusage_self { ns = proc.process_cpu_time(current.process, now_ns) }
-		rusage_children { ns = current.process.children_cpu_time_ns }
-		rusage_thread { ns = proc.thread_cpu_time(current, now_ns) }
+		rusage_self { user_ns, system_ns = proc.process_cpu_times(current.process, now_ns) }
+		rusage_children {
+			user_ns = current.process.children_cpu_user_ns
+			system_ns = current.process.children_cpu_system_ns
+		}
+		rusage_thread { user_ns, system_ns = proc.thread_cpu_times(current, now_ns) }
 		else { return errno.err, errno.einval }
 	}
 	mut result := [18]i64{}
-	result[0] = i64(ns / 1000000000)
-	result[1] = i64((ns % 1000000000) / 1000)
+	result[0] = i64(user_ns / 1000000000)
+	result[1] = i64((user_ns % 1000000000) / 1000)
+	result[2] = i64(system_ns / 1000000000)
+	result[3] = i64((system_ns % 1000000000) / 1000)
 	if !usercopy.copy_to_user(usage, voidptr(&result[0]), sizeof(i64) * 18) {
 		return errno.err, errno.efault
 	}

@@ -53,6 +53,8 @@ pub fn syscall_getegid(_ voidptr) (u64, u64) {
 // program drop privilege temporarily and take it back.
 pub fn syscall_setuid(_ voidptr, uid u32) (u64, u64) {
 	mut process := current_process()
+	proc.lock_table()
+	defer { proc.unlock_table() }
 	old_ruid, old_euid, old_suid := process.uid, process.euid, process.suid
 
 	if may_set_uids(process) {
@@ -74,6 +76,14 @@ pub fn syscall_setuid(_ voidptr, uid u32) (u64, u64) {
 
 pub fn syscall_setgid(_ voidptr, gid u32) (u64, u64) {
 	mut process := current_process()
+	proc.lock_table()
+	defer { proc.unlock_table() }
+	old_egid := process.egid
+	defer {
+		if process.egid != old_egid {
+			process.dumpable = false
+		}
+	}
 
 	if may_set_gids(process) {
 		process.gid = gid
@@ -97,6 +107,8 @@ fn unchanged(id u32) bool {
 
 pub fn syscall_setreuid(_ voidptr, ruid u32, euid u32) (u64, u64) {
 	mut process := current_process()
+	proc.lock_table()
+	defer { proc.unlock_table() }
 	old_ruid, old_euid, old_suid := process.uid, process.euid, process.suid
 	privileged := may_set_uids(process)
 
@@ -131,6 +143,14 @@ pub fn syscall_setreuid(_ voidptr, ruid u32, euid u32) (u64, u64) {
 
 pub fn syscall_setregid(_ voidptr, rgid u32, egid u32) (u64, u64) {
 	mut process := current_process()
+	proc.lock_table()
+	defer { proc.unlock_table() }
+	old_egid := process.egid
+	defer {
+		if process.egid != old_egid {
+			process.dumpable = false
+		}
+	}
 	privileged := may_set_gids(process)
 
 	if !unchanged(rgid) {
@@ -163,6 +183,8 @@ pub fn syscall_setregid(_ voidptr, rgid u32, egid u32) (u64, u64) {
 // three-argument call landing in a two-argument handler.
 pub fn syscall_setresuid(_ voidptr, ruid u32, euid u32, suid u32) (u64, u64) {
 	mut process := current_process()
+	proc.lock_table()
+	defer { proc.unlock_table() }
 	old_ruid, old_euid, old_suid := process.uid, process.euid, process.suid
 
 	if !may_set_uids(process) {
@@ -192,6 +214,14 @@ pub fn syscall_setresuid(_ voidptr, ruid u32, euid u32, suid u32) (u64, u64) {
 
 pub fn syscall_setresgid(_ voidptr, rgid u32, egid u32, sgid u32) (u64, u64) {
 	mut process := current_process()
+	proc.lock_table()
+	defer { proc.unlock_table() }
+	old_egid := process.egid
+	defer {
+		if process.egid != old_egid {
+			process.dumpable = false
+		}
+	}
 
 	if !may_set_gids(process) {
 		for wanted in [rgid, egid, sgid]! {
