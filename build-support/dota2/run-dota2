@@ -79,7 +79,9 @@ export VINIX_I386_ROOT="$runtime"
 export VINIX_X86_64_ROOT="$runtime"
 export VINIX_X86_MULTIARCH=1
 export VINIX_ALLOW_WX=1
-export QEMU_CPU="${QEMU_CPU:-max}"
+# QEMU's max CPU confuses Mesa 22's LLVM target detection on Vinix. Haswell
+# supplies the 64-bit target flags required by the actual Lavapipe draw probe.
+export QEMU_CPU="${QEMU_CPU:-Haswell}"
 export SteamAppId=570
 export SteamGameId=570
 export ENABLE_PATHMATCH=1

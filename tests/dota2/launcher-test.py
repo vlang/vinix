@@ -115,7 +115,7 @@ class LauncherTest(unittest.TestCase):
             "VINIX_I386_ROOT": str(self.runtime),
             "VINIX_X86_64_ROOT": str(self.runtime),
             "VINIX_X86_MULTIARCH": "1", "VINIX_ALLOW_WX": "1",
-            "QEMU_CPU": "max", "SteamAppId": "570", "SteamGameId": "570",
+            "QEMU_CPU": "Haswell", "SteamAppId": "570", "SteamGameId": "570",
             "ENABLE_PATHMATCH": "1", "SDL_VIDEO_DRIVER": "x11",
             "VK_ICD_FILENAMES": str(self.icd),
         }.items():
