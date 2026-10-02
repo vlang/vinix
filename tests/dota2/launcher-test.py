@@ -27,6 +27,7 @@ class LauncherTest(unittest.TestCase):
             "usr/lib/x86_64-linux-gnu/libvulkan.so.1",
             "usr/lib/x86_64-linux-gnu/libvulkan_lvp.so",
             "usr/lib/x86_64-linux-gnu/libvinix-steam-robust.so",
+            "usr/lib/x86_64-linux-gnu/libvinix-dota2-mmap32.so",
             "usr/lib/x86_64-linux-gnu/libmpg123.so.0",
             "usr/share/vulkan/icd.d/lvp_icd.x86_64.json",
         ):
@@ -106,6 +107,7 @@ class LauncherTest(unittest.TestCase):
             "-E", f"LD_LIBRARY_PATH={libraries}",
             "-E", (f"LD_PRELOAD=/guest/only/preload.so:"
                    f"{self.runtime}/usr/lib/x86_64-linux-gnu/libvinix-steam-robust.so:"
+                   f"{self.runtime}/usr/lib/x86_64-linux-gnu/libvinix-dota2-mmap32.so:"
                    f"{self.runtime}/usr/lib/x86_64-linux-gnu/libmpg123.so.0"),
             str(self.game), "-windowed", "-w", "1280", "-h", "720",
             "+map", "path with spaces", "-w", "960",
@@ -183,6 +185,7 @@ class LauncherTest(unittest.TestCase):
     def test_runtime_compatibility_preloads_are_guest_only(self):
         launch = self.run_launcher()
         preloads = (f"{self.runtime}/usr/lib/x86_64-linux-gnu/libvinix-steam-robust.so:"
+                    f"{self.runtime}/usr/lib/x86_64-linux-gnu/libvinix-dota2-mmap32.so:"
                     f"{self.runtime}/usr/lib/x86_64-linux-gnu/libmpg123.so.0")
         self.assertIn(f"LD_PRELOAD={preloads}", launch["args"])
         self.assertEqual(launch["env"]["VINIX_X86_64_PRELOAD"], preloads)

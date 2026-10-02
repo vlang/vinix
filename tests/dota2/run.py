@@ -163,6 +163,13 @@ def prepare(args, work: Path) -> tuple[Path, Path]:
         install(source, root / "home/dota2/.steam/sdk64" / name)
     install(args.gldriverquery, root / "home/dota2/.steam/ubuntu12_64/gldriverquery")
     verify_sdk_closure(root)
+    runtime = root / "usr/libexec/vinix-dota2/root"
+    subprocess.run(["clang", "--target=x86_64-linux-gnu", "-fPIE", "-pie",
+                    "-fno-stack-protector", "-nostdlib", "-fuse-ld=lld", "-Wall", "-Wextra", "-Werror",
+                    "-Wl,--dynamic-linker=/lib64/ld-linux-x86-64.so.2", "-Wl,-e,_start",
+                    str(REPO / "tests/dota2/mmap32-probe.c"),
+                    str(runtime / "lib/x86_64-linux-gnu/libc.so.6"),
+                    "-o", str(root / "usr/libexec/vinix-dota2/mmap32-probe")], check=True)
     game_environment = {
         "HOME": "/home/dota2", "XDG_RUNTIME_DIR": "/run/user/0", "VALVE_TESTMODE": "1",
         "LP_NUM_THREADS": "2", "MESA_SHADER_CACHE_DISABLE": "true",

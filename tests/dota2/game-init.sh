@@ -10,6 +10,12 @@ mkdir -p /tmp/.X11-unix /run/user/0 /home/dota2 /usr/share/games/dota2
 chmod 1777 /tmp /tmp/.X11-unix
 echo VINIX-DOTA2-PROBE-START
 uname -a
+runtime=/usr/libexec/vinix-dota2/root
+export VINIX_ALLOW_WX=1
+QEMU_CPU=Haswell /usr/bin/qemu-x86_64 -B 0x100000000 -L "$runtime" \
+    -E "LD_LIBRARY_PATH=$runtime/lib/x86_64-linux-gnu" \
+    -E "LD_PRELOAD=$runtime/usr/lib/x86_64-linux-gnu/libvinix-dota2-mmap32.so" \
+    /usr/libexec/vinix-dota2/mmap32-probe
 
 # The kernel automatically mounts the game's NBD volume at /root. Move that
 # read-only mount to the game path, exposing the desktop's writable RAM home.

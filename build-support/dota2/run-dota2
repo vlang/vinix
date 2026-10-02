@@ -99,10 +99,12 @@ fi
 # audio dependencies also need the runtime's newer mpg123 ABI: the game's
 # bundled decoder lacks mpg123_info2 required by Bookworm's libsndfile.
 robust_shim="$runtime/usr/lib/x86_64-linux-gnu/libvinix-steam-robust.so"
+low_address_shim="$runtime/usr/lib/x86_64-linux-gnu/libvinix-dota2-mmap32.so"
 decoder="$runtime/usr/lib/x86_64-linux-gnu/libmpg123.so.0"
 [ -e "$robust_shim" ] || fail "the x86-64 robust-list shim is missing: $robust_shim"
+[ -e "$low_address_shim" ] || fail "the x86-64 low-address mapping shim is missing: $low_address_shim"
 [ -e "$decoder" ] || fail "the runtime mpg123 decoder is missing: $decoder"
-guest_preloads="$robust_shim:$decoder"
+guest_preloads="$robust_shim:$low_address_shim:$decoder"
 if [ -n "${VINIX_X86_64_PRELOAD:-}" ]; then
     guest_preloads="$VINIX_X86_64_PRELOAD:$guest_preloads"
 fi
