@@ -121,7 +121,7 @@ the complete i915 source tree is not evidence that the driver runs.
   to another ordered queue. Enqueueing and waiting need no extra allocation.
   `queue_work`, nonblocking/synchronous cancellation, `work_busy`,
   `current_work`, work/queue flushing, draining and destruction have native
-  implementations. Stack flush barriers preserve the queueing boundary;
+  implementations. Stack flush markers preserve the queueing boundary;
   flushing a queued item also retains an earlier running instance when
   cancellation removes the queued copy. Synchronous cancellation suppresses
   self-requeueing until the running callback ends. Drain/destruction allow
@@ -131,14 +131,35 @@ the complete i915 source tree is not evidence that the driver runs.
   freeing a work item or destroying its queue, keep the queue alive throughout
   cancellation/flushing, and avoid holding locks needed by its callbacks.
   Waiting for the current callback or flushing/draining its own ordered
-  queue fails explicitly. Concurrent/per-CPU/system queues and RCU work,
+  queue fails explicitly. CPU-bound queues, other system queues and RCU work,
   CPU placement, priority, reclaim rescuers, freezer support and attribute
   changes remain pending. Unsupported allocation flags/modes return `NULL`;
   explicit CPU queueing returns false with a warning. This first backend
   covers i915's ordinary ordered queues, while its unordered and high-priority
   flip queues still need implementations.
+- Concurrent `alloc_workqueue(..., WQ_UNBOUND, max_active)` queues and
+  `system_unbound_wq` use a native worker pool that grows on demand. A separate
+  manager allocates and creates workers with interrupts enabled; enqueueing
+  remains allocation-free and usable with interrupts disabled. Limits from
+  1 to 512 are supported, with Linux's default of 256 when zero is requested.
+  Workers remain in their queue until destruction, which joins the manager
+  before reclaiming every published worker and retained task. The system queue
+  has boot lifetime. Independent sleeping callbacks can run concurrently, but
+  a work item never overlaps itself, including migration between queues.
+  A blocked migrated item does not prevent independent items from running.
+  Each queue flush places its own stack marker at the call's queueing boundary;
+  running records carry the generation determined by their position relative
+  to those markers. Overlapping flushes exclude later work even when an older
+  queued item starts after a later callback. Item and queue flush markers do
+  not consume worker slots. Item flushing from a different callback on the
+  same concurrent queue is supported when the active limit permits progress.
+  This backend uses one affinity domain for the current target; NUMA/cache
+  affinity pools and attribute changes remain pending. CPU-bound allocation
+  (`flags=0`), explicit CPU placement, reclaim rescuers, priority and freezer
+  support remain unsupported. i915's default CPU-bound unordered queue and
+  high-priority flip queue therefore still cannot be allocated.
 - Unmodified `delayed_work` and its static/stack initialization macros use
-  the timer backend and explicit ordered queues. `queue_delayed_work`,
+  the timer backend and ordered/concurrent unbound queues. `queue_delayed_work`,
   `mod_delayed_work`, asynchronous/synchronous cancellation and
   `flush_delayed_work` support immediate execution, deadline extension or
   reduction, queue migration, sleeping callbacks and self-rearming.
@@ -348,6 +369,21 @@ changes/cancellation and 32 self-freeing objects per batch. After worker
 teardown and timer dispatch retirement, the measured batch restores the
 physical-page baseline.
 
+Concurrent unbound host tests check active limits of one, two and four,
+independent callbacks passing a blocked migrated item, nested item flushing,
+snapshot flushing with later sleeping callbacks, and 20 overlapping queue
+flushers. A held old queued copy starts after a later callback to verify
+generation assignment. A controlled manager-publication gate forces queue
+destruction while a new worker exists but has not joined the published list;
+teardown waits for the manager and releases that worker too. Tests also run
+shared delayed-work producer races, synchronous cancellation, 200 self-free
+callbacks, and system-queue initialization, failure, reuse and release.
+The native four-CPU guest runs four batches using active limits of two/four
+and eight simultaneously blocked system-queue callbacks. It checks real
+sleeping/rearming callbacks, nested item flushes and 24 self-free objects per
+batch. System-queue workers are warmed to a fixed eight-worker peak before
+the measured batch; temporary queues release every worker and native page.
+
 An enabled kernel runs the allocator/list/sort/tree/IRQ-lock tests 200 times
 and verifies that the physical free-page count returns to its initial value.
 The same repeated test also checks raw locks, bit searches, byte-order helpers,
@@ -399,7 +435,8 @@ runtime subsystems:
 2. MMIO mapping with correct cache attributes, DMA/scatter-gather APIs,
    page/shmem management, GPU address spaces and TTM/GEM memory management.
 3. Remaining lock/wait variants (including wound/wait mutexes and I/O waits),
-   concurrent/system workqueues, RCU work, remaining timer modes,
+   CPU-bound/priority/freezable/reclaim workqueues, remaining system queues,
+   RCU work, remaining timer modes,
    high-resolution timers and RCU lifetime
    rules.
 4. Linux IRQ registration, interrupt synchronization and safe GPU reset paths.

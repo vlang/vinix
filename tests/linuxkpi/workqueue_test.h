@@ -219,7 +219,8 @@ static void workqueue_tests(void)
     native_task = &parent;
     size_t before = live_pages;
     assert(!alloc_workqueue("concurrent", 0, 0));
-    assert(!alloc_workqueue("unbound", WQ_UNBOUND, 8));
+    struct workqueue_struct *unbound = alloc_workqueue("unbound", WQ_UNBOUND, 8);
+    assert(unbound); destroy_workqueue(unbound);
     assert(!alloc_ordered_workqueue("reclaim", WQ_MEM_RECLAIM));
     assert(!alloc_ordered_workqueue("priority", WQ_HIGHPRI));
     assert(!alloc_ordered_workqueue("freezer", WQ_FREEZABLE));
