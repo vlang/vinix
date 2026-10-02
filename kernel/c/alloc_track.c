@@ -50,8 +50,22 @@ static uint64_t slot_of(uintptr_t p) {
 	return (h >> 20) & (TRACK_SLOTS - 1);
 }
 
-static int kaddr(uintptr_t a) {
-	return a >= 0xffff000000000000ull && (a & 7) == 0;
+static uintptr_t kernel_address_min(void) {
+#if defined(__x86_64__)
+	// Limine places the direct map in the wider canonical upper half when
+	// five-level paging is active. Thread stacks live in that map, rather
+	// than the kernel image's fixed 0xffffffff80000000 region.
+	uintptr_t cr4;
+	__asm__ volatile("mov %%cr4, %0" : "=r"(cr4));
+	return (cr4 & (1ul << 12)) ? 0xff00000000000000ull
+	                            : 0xffff800000000000ull;
+#else
+	return 0xffff000000000000ull;
+#endif
+}
+
+static int kaddr(uintptr_t a, uintptr_t minimum) {
+	return a >= minimum && (a & 7) == 0;
 }
 
 void alloc_track(void *ptr, uint64_t size) {
@@ -59,8 +73,9 @@ void alloc_track(void *ptr, uint64_t size) {
 		return;
 	uintptr_t pc[TRACK_DEPTH];
 	uintptr_t *fp = __builtin_frame_address(0);
+	uintptr_t minimum = kernel_address_min();
 	for (int i = 0; i < TRACK_DEPTH; i++) {
-		if (!kaddr((uintptr_t)fp)) {
+		if (!kaddr((uintptr_t)fp, minimum)) {
 			pc[i] = 0;
 			continue;
 		}

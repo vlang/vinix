@@ -165,7 +165,11 @@ fn (mut this EXT2Resource) mmap(_handle voidptr, page u64, flags int) voidptr {
 		errno.set(errno.enomem)
 		return unsafe { nil }
 	}
-	mut inode := EXT2Inode{}
+	// The device reads complete synchronously. Keep this scratch inode on
+	// the faulting thread's stack: V otherwise boxes it and retains 128 bytes
+	// for every file-backed page fault with manual memory management.
+	mut inode := unsafe { &EXT2Inode(C.__builtin_alloca(sizeof(EXT2Inode))) }
+	unsafe { *inode = EXT2Inode{} }
 	inode.read_entry(mut this.filesystem, u32(this.stat.ino)) or {
 		memory.pmm_free(physical, 1)
 		return unsafe { nil }

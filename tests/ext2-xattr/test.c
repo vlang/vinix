@@ -28,16 +28,24 @@ static int heap_snapshot(struct heap *heap)
  FILE *file = fopen("/proc/slabinfo", "r");
  CHECK(file != NULL);
  char line[256];
+ int saw_large = 0;
  memset(heap, 0, sizeof(*heap));
  while (fgets(line, sizeof(line), file)) {
-  long size, objects, pages;
-  if (sscanf(line, "size-%*ld %ld %ld %ld", &size, &objects, &pages) == 3 && heap->count < 32) {
+  long label, size, objects, pages;
+  if (sscanf(line, "size-%ld %ld %ld %ld", &label, &size, &objects, &pages) == 4 && label == size && heap->count < 32) {
    heap->size[heap->count] = size;
    heap->objects[heap->count++] = objects;
-  } else if (sscanf(line, "large - - %ld", &pages) == 1) heap->large = pages;
+  } else if (sscanf(line, "large - - %ld", &pages) == 1) {
+   heap->large = pages;
+   saw_large = 1;
+  }
  }
  fclose(file);
- CHECK(heap->count > 0);
+#if defined(__aarch64__)
+ CHECK(heap->count == 18 && saw_large);
+#else
+ CHECK(heap->count == 14 && saw_large);
+#endif
  return 0;
 }
 
@@ -115,7 +123,7 @@ static int exercise(const char *path, int persistent)
  }
  int status = 0;
  CHECK(waitpid(child, &status, 0) == child && WIFEXITED(status) && WEXITSTATUS(status) == 0);
- CHECK(operations(fd, 50) == 0);
+ CHECK(operations(fd, 200) == 0);
  struct heap before, after;
  CHECK(heap_snapshot(&before) == 0);
  CHECK(operations(fd, 200) == 0);
@@ -124,7 +132,7 @@ static int exercise(const char *path, int persistent)
  for (int i = 0; i < before.count; i++) {
   long kept = after.objects[i] - before.objects[i];
   printf("PERF-XATTR %s class=%ld objects=%ld kept-bytes=%ld\n", persistent ? "ext2" : "tmpfs", before.size[i], kept, kept * before.size[i]);
-  CHECK(kept <= 2);
+  CHECK(kept <= 0);
  }
  printf("PERF-XATTR %s large-pages=%ld\n", persistent ? "ext2" : "tmpfs", after.large - before.large);
  CHECK(after.large <= before.large);
@@ -243,6 +251,9 @@ int main(void)
  puts("XATTR: START");
  struct statfs filesystem;
  CHECK(statfs("/root", &filesystem) == 0 && filesystem.f_type == 0xef53);
+ // A persistent x86 root keeps /tmp on ext2. Mount the intended tmpfs
+ // backend explicitly so both architectures exercise the same copy-up case.
+ CHECK(mount("tmpfs", "/tmp", "tmpfs", 0, "") == 0);
  int fd = open("/root/xattr-marker", O_RDONLY);
  if (fd >= 0) {
   unsigned char got[32];

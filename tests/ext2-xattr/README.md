@@ -30,11 +30,13 @@ Run the production codec and I/O fault tests on the host:
 V=/path/to/v VEXE=/path/to/v python3 tests/ext2-xattr/host.py
 ```
 
-Build the ARM64 kernel, then run the native test with an existing musl sysroot:
+Build each kernel in a separate worktree, then run the native test with an
+existing musl sysroot or x86 musl cross compiler:
 
 ```sh
 VEXE=/path/to/v make -C kernel -j4 CC=clang V=/path/to/v ARCH=aarch64 LIMINE_MP=1
 python3 tests/ext2-xattr/run.py
+python3 tests/ext2-xattr/run.py --arch=x86_64 --kernel-dir=/absolute/x86/kernel
 ```
 
 The guest checks binary and empty values, create/replace/remove flags, size
@@ -44,8 +46,14 @@ thread removes and reinserts lower-layer attributes while overlay copy-up
 copies their names and values into 64 upper-layer files. It then
 restarts itself and checks persisted attributes and a short symlink. After
 QEMU exits, `e2fsck -fn` must pass and `debugfs` must read the attributes.
-The retained-object check permits at most two transient objects per class;
-an allocation retained once per operation exceeds this tolerance. All raw
-deltas are printed, including overhead from reading `/proc/slabinfo` itself.
+The retained-object check rejects growth in every size class and in large
+pages. Integrated ARM64 and x86 guests retain exactly zero objects over 200
+iterations on each backend after correcting the procfs metric reader and
+the temporary inode allocation in ext2 file-backed faults. The parser must
+read all 18 ARM64 or 14 x86 classes and the large-page row before accepting
+the measurement. Both guests
+also pass concurrent copy-up, real reboot, `e2fsck -fn`, and host attribute
+readback. The test explicitly mounts tmpfs on `/tmp`, since a persistent x86
+root otherwise keeps that directory on ext2. All raw deltas are printed.
 `--state-dir` keeps the disk and serial log for inspection and requires a
 fresh disk to prevent a previous marker from skipping the initial checks.
