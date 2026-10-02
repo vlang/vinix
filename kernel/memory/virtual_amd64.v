@@ -512,6 +512,12 @@ pub fn (pagemap &Pagemap) next_present(start u64, end u64) u64 {
 // not global, and there are no PCIDs.
 pub fn flush_tlb_everywhere() {}
 
+// No retained address-space tags on this architecture yet. Loading another
+// CR3 on every former user of the map already dropped its translations.
+pub fn (pagemap &Pagemap) prepare_tlb_teardown() {}
+
+pub fn (mut pagemap Pagemap) release_tlb_tag() {}
+
 // ── TLB shootdown ────────────────────────────────────────────────────────────
 //
 // x86 has no broadcast invalidation, as arm64's TLBI ...IS has: INVLPG drops a

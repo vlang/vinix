@@ -12,6 +12,7 @@ import memory
 import memory.mmap
 import time
 import usercopy
+import lib
 
 pub const f_dupfd = 0
 pub const f_dupfd_cloexec = 1030
@@ -65,7 +66,7 @@ pub mut:
 	node          voidptr
 	// Identity of the mount traversed at open, rather than the inode's aliases.
 	// Mount entries are permanent; fs resolves namespace copies by mount id.
-	mount         voidptr
+	mount         lib.MountContext
 	refcount      int
 	loc           i64
 	flags         int
@@ -84,7 +85,7 @@ pub mut:
 
 __global (
 	handle_released fn (voidptr)
-	mount_policy_flags fn (voidptr) u64
+	mount_policy_flags fn (&lib.MountContext) u64
 )
 
 // on_handle_released has `f` called with a handle's node as the handle is
@@ -93,7 +94,7 @@ pub fn on_handle_released(f fn (voidptr)) {
 	handle_released = f
 }
 
-pub fn on_mount_flags(f fn (voidptr) u64) {
+pub fn on_mount_flags(f fn (&lib.MountContext) u64) {
 	mount_policy_flags = f
 }
 
@@ -1420,7 +1421,7 @@ pub fn syscall_mmap(_ voidptr, addr voidptr, length u64, prot_and_flags u64, fdn
 	mut map_flags := flags & ~(mmap.map_no_write | mmap.map_no_exec)
 	if flags & mmap.map_anonymous == 0 {
 		if mount_policy_flags != unsafe { nil }
-			&& mount_policy_flags(fd.handle.mount) & u64(0x8) != 0 {
+			&& mount_policy_flags(&fd.handle.mount) & u64(0x8) != 0 {
 			if prot & mmap.prot_exec != 0 { return errno.err, errno.eperm }
 			map_flags |= mmap.map_no_exec
 		}

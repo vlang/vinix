@@ -3,6 +3,7 @@ module memory
 
 import lib
 import limine
+import klock
 import aarch64.cpu
 
 fn C.vinix_arm64_switch_granule(mair u64, root u64, tcr u64)
@@ -27,6 +28,7 @@ const arm64_pte_af = u64(1) << 10
 const arm64_pte_sh_inner = u64(3) << 8
 const arm64_pte_ap_ro = u64(1) << 7 // AP[2]=1 -> read-only
 const arm64_pte_ap_user = u64(1) << 6 // AP[1]=1 -> EL0 access
+const arm64_pte_ng = u64(1) << 11 // user translations belong to their ASID
 const arm64_pte_pxn = u64(1) << 53
 const arm64_pte_uxn = u64(1) << 54
 const arm64_pte_attr_normal = u64(0) << 2 // MAIR index 0 (Normal Write-Back Cacheable)
@@ -47,6 +49,12 @@ fn portable_to_arm64_pte(phys u64, flags u64, address_mask u64) u64 {
 		sh = u64(2) << 8 // Outer Shareable
 	}
 	mut pte := (phys & address_mask) | arm64_pte_valid | arm64_pte_af | sh | attr
+
+	// All TTBR0 leaves are non-global, including PROT_NONE entries that
+	// intentionally lack AP[1]/pte_user. TTBR1 kernel entries remain global.
+	if address_mask == pte_flags_mask {
+		pte |= arm64_pte_ng
+	}
 
 	// OpenBSD marks every userspace mapping privileged-XN: EL0 executable pages
 	// may still execute at EL0, but EL1 must never fetch instructions from them.
@@ -80,6 +88,7 @@ pub fn new_pagemap() &Pagemap {
 	mut pagemap := &Pagemap{
 		top_level:   top_level
 		mmap_ranges: []voidptr{}
+		tlb_tag:     arm64_take_asid()
 	}
 	// Nothing keeps a copy of the list, so growing it can give back the
 	// storage it outgrew; V keeps that for arrays that might be sliced, and
@@ -262,10 +271,112 @@ fn next_table_boundary(virt u64, shift u64) ?u64 {
 }
 
 pub fn (mut pagemap Pagemap) switch_to() {
-	top_level := u64(pagemap.top_level)
-	cpu.write_ttbr0_el1(top_level)
-	cpu.isb()
-	cpu.tlbi_vmalle1()
+	switch_ttbr0(pagemap.tagged_root())
+}
+
+// A tag has exactly one live page-map owner on all CPUs. Exhaustion falls
+// back to ASID zero; it never recycles a tag while its owner can still run.
+// Using eight bits also works on CPUs that implement sixteen ASID bits.
+__global (
+	arm64_asid_lock klock.Lock
+	arm64_asid_used [4]u64
+)
+
+fn arm64_take_asid() u16 {
+	arm64_asid_lock.acquire()
+	defer { arm64_asid_lock.release() }
+	for asid := u16(1); asid < 256; asid++ {
+		word := asid / 64
+		bit := u64(1) << (asid % 64)
+		if arm64_asid_used[word] & bit == 0 {
+			// Complete stale translation/walk invalidation before publishing
+			// ownership. No other live map can use this ASID meanwhile.
+			cpu.tlbi_aside1is(asid)
+			arm64_asid_used[word] |= bit
+			return asid
+		}
+	}
+	return 0
+}
+
+pub fn (pagemap &Pagemap) tagged_root() u64 {
+	return u64(pagemap.top_level) | (u64(pagemap.tlb_tag) << 48)
+}
+
+// Thread context saves the complete hardware TTBR0 value, whereas the
+// Pagemap owns only the physical root and its separate ASID.
+pub fn switch_ttbr0(root u64) {
+	cpu.dsb_ishst()
+	cpu.write_ttbr0_el1(root)
+	if (root >> 48) & 0xff == 0 {
+		cpu.tlbi_vmalle1()
+	}
+}
+
+// Destruction starts only after every thread detached from this address
+// space. Flush cached leaf/walk entries before freeing any of its tables.
+pub fn (pagemap &Pagemap) prepare_tlb_teardown() {
+	if pagemap.tlb_tag != 0 {
+		cpu.tlbi_aside1is(pagemap.tlb_tag)
+	} else {
+		flush_tlb_everywhere()
+	}
+}
+
+pub fn (mut pagemap Pagemap) release_tlb_tag() {
+	if pagemap.tlb_tag == 0 {
+		return
+	}
+	asid := pagemap.tlb_tag
+	arm64_give_asid(asid)
+	pagemap.tlb_tag = 0
+}
+
+fn arm64_give_asid(asid u16) {
+	arm64_asid_lock.acquire()
+	// Defensive completion before another allocator can claim this tag.
+	cpu.tlbi_aside1is(asid)
+	arm64_asid_used[asid / 64] &= ~(u64(1) << (asid % 64))
+	arm64_asid_lock.release()
+}
+
+// The actual bounded pool, tested before any userspace map or AP can use it.
+// No allocation is needed to exercise exhaustion, reuse, and zero reservation.
+fn arm64_asid_selftest() {
+	if cpu.read_tcr_el1() & ((u64(1) << 22) | (u64(1) << 36)) != 0 {
+		panic('TLB self-test: TTBR0 must select an eight-bit ASID')
+	}
+	if portable_to_arm64_pte(0, pte_present | pte_noexec, pte_flags_mask) & arm64_pte_ng == 0 {
+		panic('TLB self-test: PROT_NONE user leaves must be non-global')
+	}
+	for i := u16(1); i < 256; i++ {
+		if arm64_take_asid() != i {
+			panic('TLB self-test: duplicate or missing ASID')
+		}
+	}
+	if arm64_take_asid() != 0 || arm64_asid_used[0] & 1 != 0 {
+		panic('TLB self-test: pool exhaustion or zero reservation')
+	}
+	arm64_give_asid(127)
+	if arm64_take_asid() != 127 || arm64_take_asid() != 0 {
+		panic('TLB self-test: ASID reuse did not preserve live owners')
+	}
+	for i := u16(1); i < 256; i++ {
+		arm64_give_asid(i)
+	}
+	for i := 0; i < 4; i++ {
+		if arm64_asid_used[i] != 0 {
+			panic('TLB self-test: leaked ASID ownership')
+		}
+	}
+	for i := 0; i < 2000; i++ {
+		asid := arm64_take_asid()
+		if asid != 1 {
+			panic('TLB self-test: repeated ASID reuse')
+		}
+		arm64_give_asid(asid)
+	}
+	println('TLB: ASID pool exhaustion and reuse PASS')
 }
 
 fn get_next_level(current_level &u64, index u64, allocate bool) ?&u64 {
@@ -390,8 +501,9 @@ pub fn (mut pagemap Pagemap) flag_page(virt u64, flags u64) ? {
 	}
 	phys := unsafe { *pte_p } & pte_flags_mask
 	new_pte := portable_to_arm64_pte(phys, flags, pte_flags_mask)
-	active := cpu.read_ttbr0_el1() & pte_flags_mask == u64(pagemap.top_level) & pte_flags_mask
-	install_arm64_pte(mut pte_p, virt, new_pte, active)
+	// Tagged maps retain translations while inactive; zero-tag maps can also
+	// be active on another CPU. A present user entry always requires BBM.
+	install_arm64_pte(mut pte_p, virt, new_pte, true)
 }
 
 // Install a page descriptor in an active page table. Replacing a valid
@@ -404,11 +516,9 @@ fn install_arm64_pte(mut entry &u64, virt u64, new_pte u64, active bool) {
 	if old_pte == new_pte {
 		return
 	}
-	// A page table which is not installed in TTBR0 cannot have cached
-	// translations. ELF loading builds a fresh table and can contain tens of
-	// thousands of pages, so issuing TLBI and barrier instructions per page is
-	// both unnecessary and prohibitively expensive for large static binaries.
-	// switch_to() performs the required whole-VM invalidation before use.
+	// ASID-zero maps flush on every switch; an inactive tagged map may still
+	// have translations on any CPU and must use break-before-make as well.
+	// Fresh invalid entries need only descriptor publication below.
 	if !vmm_initialised || !active {
 		unsafe {
 			*entry = new_pte
@@ -463,8 +573,7 @@ pub fn (mut pagemap Pagemap) map_page_unlocked(virt u64, phys u64, flags u64) ? 
 	mut entry := unsafe { &u64(u64(l3) + higher_half + l3_entry * 8) }
 
 	new_pte := portable_to_arm64_pte(phys, flags, pte_flags_mask)
-	active := cpu.read_ttbr0_el1() & pte_flags_mask == u64(pagemap.top_level) & pte_flags_mask
-	install_arm64_pte(mut entry, virt, new_pte, active)
+	install_arm64_pte(mut entry, virt, new_pte, true)
 }
 
 fn remap_hhdm_span(phys u64, len u64, flags u64, failure string) u64 {
@@ -708,6 +817,11 @@ pub fn vmm_init() {
 
 	vmm_initialised = true
 
+	println('vmm: user TLB uses 255 exclusive 8-bit ASIDs')
+	$if tlb_selftest ? {
+		arm64_asid_selftest()
+	}
+
 	$if vmap_selftest ? {
 		vmap_selftest()
 	}
@@ -735,6 +849,10 @@ pub fn vmm_activate_on_cpu() {
 	// address size from
 	// this CPU's ID_AA64MMFR0_EL1.PARange. PARange and TCR.IPS share an encoding.
 	mmfr0 := cpu.read_id_aa64mmfr0_el1()
+	asid_bits := (mmfr0 >> 4) & 0xf
+	if asid_bits != 0 && asid_bits != 2 {
+		panic('ARM64 CPU advertises an unsupported ASID width')
+	}
 	if (mmfr0 >> 20) & 0xf == 0xf {
 		panic('ARM64 CPU does not support 16 KiB translation granules')
 	}
@@ -743,6 +861,8 @@ pub fn vmm_activate_on_cpu() {
 		// Fallback to 48-bit PA if the encoding is unknown/reserved.
 		tcr_ips = 5
 	}
+	// A1=0 selects the ASID in TTBR0, AS=0 uses its low eight bits.
+	// These settings are programmed on the BSP and every secondary CPU.
 	tcr := u64(17) | // T0SZ = 17 -> 47-bit user VA
 	(u64(16) << 16) | // T1SZ = 16 -> 48-bit kernel VA
 	(u64(0b10) << 14) | // TG0 = 16 KiB granule (TTBR0)

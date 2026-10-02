@@ -280,7 +280,11 @@ pub fn syscall_getgroups(_ voidptr, size int, list u64) (u64, u64) {
 		return errno.err, errno.einval
 	}
 
+	mut groups := [max_groups]u32{}
+	proc.lock_table()
 	count := process.groups.len
+	for i, group in process.groups { groups[i] = group }
+	proc.unlock_table()
 
 	if size == 0 {
 		return u64(count), 0
@@ -295,7 +299,7 @@ pub fn syscall_getgroups(_ voidptr, size int, list u64) (u64, u64) {
 		return errno.err, errno.efault
 	}
 
-	if !usercopy.copy_to_user(list, unsafe { voidptr(&process.groups[0]) }, u64(count) * sizeof(u32)) {
+	if !usercopy.copy_to_user(list, unsafe { voidptr(&groups[0]) }, u64(count) * sizeof(u32)) {
 		return errno.err, errno.efault
 	}
 
@@ -327,8 +331,17 @@ pub fn syscall_setgroups(_ voidptr, size int, list u64) (u64, u64) {
 		}
 	}
 
+	// Queue permission checks snapshot supplementary groups under this lock.
+	// Do the user copy before locking, then recheck authority before replacing.
+	proc.lock_table()
+	if !may_set_gids(process) {
+		proc.unlock_table()
+		unsafe { incoming.free() }
+		return errno.err, errno.eperm
+	}
 	unsafe { process.groups.free() }
 	process.groups = incoming
+	proc.unlock_table()
 
 	return 0, 0
 }

@@ -34,10 +34,21 @@ an unauthorized original program. An unprivileged script or translated
 program requesting the exception therefore needs `wxallowed` on every mount
 carrying an executable in that chain, including its interpreter or translator.
 
-The current VFS shares child mounts between bind aliases of an inode. `..`
-from a child reached through multiple nested aliases still uses the child's
-single recorded parent. Correcting that case needs an owned mount context;
-the regression suite does not claim that it is resolved.
+Nested shared child mounts retain the actual alias route used to enter them,
+so `..` restores that alias's policy. Open descriptions and filesystem state
+store a bounded context inline; namespace copies resolve its mount identities
+by stable ID, and moves rebase held descriptors and cwd to the new attachment.
+Each context holds at most 64 mount entries (1032 bytes on both architectures).
+A path exceeding that bound fails with `ELOOP`. Path walks use one stack cursor
+shared across recursive link resolution, with no allocated view cache.
+Filesystem state and mount attachment snapshots serialize node/context pairs
+so concurrent cwd, chroot and move operations cannot mix their policy.
+
+A relative `#!` interpreter name resolves from the caller's current working
+directory, including when `execveat` reaches the script through another
+directory descriptor. This follows the Linux ABI; older Vinix versions used
+the descriptor's directory in that case. The interpreter's actual cwd mount
+route receives the same execution and W^X checks as other executable images.
 
 `tests/mount-policy/run.sh` exercises the implemented rules on both
 architectures, including repeated denied execs measured through slab counters.

@@ -14,6 +14,8 @@
 #include <sys/syscall.h>
 #include <sys/wait.h>
 #include <stdint.h>
+#include <pthread.h>
+#include <stdatomic.h>
 #include <unistd.h>
 
 #define CHECK(x) do { if (!(x)) { \
@@ -24,6 +26,8 @@ static char *const probe_argv[] = { "probe", "--probe", NULL };
 static char *const empty_env[] = { NULL };
 static char *const wx_env[] = { "VINIX_ALLOW_WX=1", NULL };
 static int copy_file(const char *from, const char *to);
+static unsigned long slab_kb(void);
+static void allocation_sites(int start);
 
 static int wx_probe(int allowed)
 {
@@ -144,6 +148,196 @@ static int run_wx_tests(void)
     CHECK(mount("none", "/mp/wx", NULL, MS_REMOUNT, "wxallowed") == 0);
     CHECK(mounts_have_wx("/proc/self/mounts") == 1 && wx_exec_result("/mp/wx/probe", 1, 1) == 0);
     puts("MOUNT POLICY PASS: W^X exceptions require administrator launch or executable mount policy");
+    return 0;
+}
+
+static int run_nested_alias_tests(void)
+{
+    CHECK(mkdir("/mp/nested-source", 0755) == 0 && mkdir("/mp/nested-alias", 0755) == 0);
+    CHECK(mount("tmpfs", "/mp/nested-source", "tmpfs", 0, "") == 0);
+    CHECK(mkdir("/mp/nested-source/child", 0755) == 0);
+    CHECK(copy_file("/sbin/init", "/mp/nested-source/probe") == 0);
+    CHECK(mknod("/mp/nested-source/block", S_IFBLK | 0600, 0) == 0);
+    CHECK(mount("/mp/nested-source", "/mp/nested-alias", NULL, MS_BIND, "") == 0);
+    CHECK(mount("none", "/mp/nested-alias", NULL, MS_REMOUNT | MS_BIND | MS_NOEXEC | MS_NODEV, "") == 0);
+    CHECK(mount("tmpfs", "/mp/nested-source/child", "tmpfs", 0, "") == 0);
+    CHECK(exec_result("/mp/nested-source/child/../probe", AT_FDCWD, -1, NULL) == 0);
+    CHECK(exec_result("/mp/nested-alias/child/../probe", AT_FDCWD, -1, NULL) == EACCES);
+    CHECK(exec_result("../probe", AT_FDCWD, -1, "/mp/nested-alias/child") == EACCES);
+    int directory = open("/mp/nested-alias/child", O_RDONLY | O_DIRECTORY);
+    CHECK(directory >= 0);
+    CHECK(exec_result("../probe", directory, -1, NULL) == EACCES);
+    CHECK(openat(directory, "../block", O_RDONLY) == -1 && errno == EACCES);
+    int device = openat(directory, "../block", O_PATH);
+    CHECK(device >= 0 && close(device) == 0);
+    /* Linux resolves a relative #! interpreter from cwd even when the
+     * script itself is reached through a directory descriptor. */
+    int script = open("/mp/nested-source/child/script", O_CREAT | O_WRONLY, 0755);
+    const char shebang[] = "#!probe --relative-interpreter\n";
+    CHECK(script >= 0 && write(script, shebang, sizeof shebang - 1) == sizeof shebang - 1
+        && close(script) == 0);
+    CHECK(exec_result("script", directory, -1, "/mp/plain") == 0);
+    CHECK(exec_result("script", directory, -1, "/mp/nested-alias") == EACCES);
+    CHECK(exec_result("script", directory, -1, "/mp/nested-source/child") == ENOENT);
+    char path[64];
+    snprintf(path, sizeof path, "/proc/self/fd/%d/../probe", directory);
+    CHECK(exec_result(path, AT_FDCWD, -1, NULL) == EACCES);
+    pid_t child = fork();
+    CHECK(child >= 0);
+    if (!child) {
+        if (fchdir(directory)) _exit(1);
+        execve("../probe", probe_argv, empty_env);
+        _exit(errno == EACCES ? 0 : 1);
+    }
+    CHECK(status_of(child) == 0);
+    child = fork();
+    CHECK(child >= 0);
+    if (!child) {
+        if (unshare(CLONE_NEWNS) || mount("none", "/mp/nested-alias", NULL,
+            MS_REMOUNT | MS_BIND, "")) _exit(1);
+        syscall(SYS_execveat, directory, "../probe", probe_argv, empty_env, 0);
+        _exit(errno);
+    }
+    CHECK(status_of(child) == 0);
+    CHECK(exec_result("../probe", directory, -1, NULL) == EACCES);
+    for (int i = 0; i < 16; ++i)
+        CHECK(execve("/mp/nested-alias/child/../probe", probe_argv, empty_env) == -1
+            && errno == EACCES);
+    unsigned long before = slab_kb();
+    allocation_sites(1);
+    for (int i = 0; i < 200; ++i)
+        CHECK(execve("/mp/nested-alias/child/../probe", probe_argv, empty_env) == -1
+            && errno == EACCES);
+    unsigned long after = slab_kb();
+    allocation_sites(0);
+    printf("MOUNT POLICY NESTED SLAB: before=%lu after=%lu KiB\n", before, after);
+    CHECK(after <= before + 64);
+    CHECK(mkdir("/mp/nested-moved", 0755) == 0);
+    CHECK(mount("/mp/nested-source/child", "/mp/nested-moved", NULL, MS_MOVE, "") == 0);
+    CHECK(exec_result("../plain/probe", directory, -1, NULL) == 0);
+    CHECK(mount("/mp/nested-moved", "/mp/nested-source/child", NULL, MS_MOVE, "") == 0);
+    CHECK(exec_result("../probe", directory, -1, NULL) == 0); /* move epoch changed twice */
+    CHECK(exec_result("/mp/nested-alias/child/../probe", AT_FDCWD, -1, NULL) == EACCES);
+    CHECK(close(directory) == 0);
+    child = fork();
+    CHECK(child >= 0);
+    if (!child) {
+        if (chdir("/mp/nested-source") || chroot("/mp/nested-alias")) _exit(1);
+        execve("/probe", probe_argv, empty_env);
+        _exit(errno == EACCES ? 0 : 1);
+    }
+    CHECK(status_of(child) == 0);
+    puts("MOUNT POLICY PASS: nested shared mounts retain the alias used to enter them");
+    return 0;
+}
+
+static int run_context_depth_tests(void)
+{
+    char path[512] = "/mp/deep";
+    CHECK(mkdir(path, 0755) == 0);
+    int reached_limit = 0;
+    for (int i = 0; i < 70; ++i) {
+        CHECK(mount("tmpfs", path, "tmpfs", 0, "") == 0);
+        int directory = open(path, O_RDONLY | O_DIRECTORY);
+        if (directory < 0) {
+            CHECK(errno == ELOOP);
+            reached_limit = 1;
+            break;
+        }
+        CHECK(close(directory) == 0);
+        strcat(path, "/next");
+        CHECK(mkdir(path, 0755) == 0);
+    }
+    CHECK(reached_limit);
+    strcat(path, "/probe");
+    for (int i = 0; i < 16; ++i)
+        CHECK(execve(path, probe_argv, empty_env) == -1 && errno == ELOOP);
+    unsigned long before = slab_kb();
+    allocation_sites(1);
+    for (int i = 0; i < 200; ++i)
+        CHECK(execve(path, probe_argv, empty_env) == -1 && errno == ELOOP);
+    unsigned long after = slab_kb();
+    allocation_sites(0);
+    printf("MOUNT POLICY DEPTH SLAB: before=%lu after=%lu KiB\n", before, after);
+    CHECK(after <= before + 64);
+    puts("MOUNT POLICY PASS: bounded mount context overflow fails closed with ELOOP");
+    return 0;
+}
+
+struct race_state {
+    atomic_int running;
+    atomic_int failed;
+    int kind;
+};
+
+static void *change_filesystem_state(void *argument)
+{
+    struct race_state *state = argument;
+    while (atomic_load(&state->running)) {
+        int result;
+        if (state->kind == 1)
+            result = chdir("/mp/race-plain") || chdir("/mp/race-source");
+        else if (state->kind == 2)
+            result = chroot("mp/race-plain") || chroot("mp/race-source");
+        else
+            result = mount("/mp/race-source/child", "/mp/race-plain/child", NULL, MS_MOVE, "")
+                || mount("/mp/race-plain/child", "/mp/race-source/child", NULL, MS_MOVE, "");
+        if (result) {
+            atomic_store(&state->failed, 1);
+            break;
+        }
+        sched_yield();
+    }
+    return NULL;
+}
+
+static int run_filesystem_race_tests(void)
+{
+    CHECK(mkdir("/mp/race-source", 0755) == 0 && mkdir("/mp/race-plain", 0755) == 0);
+    CHECK(mount("tmpfs", "/mp/race-source", "tmpfs", 0, "") == 0);
+    CHECK(mount("tmpfs", "/mp/race-plain", "tmpfs", 0, "") == 0);
+    CHECK(copy_file("/sbin/init", "/mp/race-source/probe") == 0);
+    CHECK(mkdir("/mp/race-source/child", 0755) == 0 && mkdir("/mp/race-plain/child", 0755) == 0);
+    CHECK(mount("tmpfs", "/mp/race-source/child", "tmpfs", 0, "") == 0);
+    CHECK(mount("none", "/mp/race-source", NULL, MS_REMOUNT | MS_NOEXEC, "") == 0);
+    for (int kind = 1; kind <= 3; ++kind) {
+        pid_t child = fork();
+        CHECK(child >= 0);
+        if (!child) {
+            if (chdir(kind == 1 ? "/mp/race-source" : "/")) _exit(1);
+            int directory = -1;
+            if (kind == 3 && (directory = open("/mp/race-source/child", O_RDONLY | O_DIRECTORY)) < 0)
+                _exit(1);
+            struct race_state state = { .kind = kind };
+            atomic_init(&state.running, 1);
+            atomic_init(&state.failed, 0);
+            pthread_t changer;
+            if (pthread_create(&changer, NULL, change_filesystem_state, &state)) _exit(1);
+            char *arguments[] = { "probe", "--unexpected-exec", NULL };
+            for (int i = 0; i < 400; ++i) {
+                if (kind == 3)
+                    syscall(SYS_execveat, directory, "../probe", arguments, empty_env, 0);
+                else
+                    execve(kind == 1 ? "probe" : "/probe", arguments, empty_env);
+                if (errno != ENOENT && errno != EACCES) _exit(2);
+                /* Opening the executable is allowed, but its route must keep
+                 * the noexec ceiling even as cwd/root changes underneath us. */
+                int image = kind == 3 ? openat(directory, "../probe", O_RDONLY)
+                    : open(kind == 1 ? "probe" : "/probe", O_RDONLY);
+                if (image >= 0) {
+                    errno = 0;
+                    void *executable = mmap(NULL, 4096, PROT_READ | PROT_EXEC, MAP_PRIVATE, image, 0);
+                    if (executable != MAP_FAILED || errno != EPERM || close(image)) _exit(4);
+                } else if (errno != ENOENT) _exit(5);
+                sched_yield();
+            }
+            atomic_store(&state.running, 0);
+            if (pthread_join(changer, NULL) || atomic_load(&state.failed)) _exit(3);
+            _exit(0);
+        }
+        CHECK(status_of(child) == 0); /* accidental successful exec exits 222 */
+    }
+    puts("MOUNT POLICY PASS: shared cwd, root and mount moves keep node and policy snapshots consistent");
     return 0;
 }
 
@@ -385,13 +579,18 @@ static int run_tests(void)
     }
     CHECK(status_of(child) == 0);
     puts("MOUNT POLICY PASS: repeated procfs mounts preserve readable namespace paths");
+    CHECK(run_nested_alias_tests() == 0);
     CHECK(run_wx_tests() == 0);
+    CHECK(run_context_depth_tests() == 0);
+    CHECK(run_filesystem_race_tests() == 0);
     return 0;
 }
 
 int main(int argc, char **argv)
 {
+    if (argc >= 2 && !strcmp(argv[1], "--relative-interpreter")) return 0;
     if (argc == 2 && !strcmp(argv[1], "--probe")) return 0;
+    if (argc == 2 && !strcmp(argv[1], "--unexpected-exec")) return 222;
     if (argc == 2 && !strcmp(argv[1], "--wx")) return wx_probe(1);
     if (argc == 2 && !strcmp(argv[1], "--no-wx")) return wx_probe(0);
     int console = open("/dev/com1", O_WRONLY);

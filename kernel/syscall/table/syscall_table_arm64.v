@@ -25,6 +25,7 @@ import aarch64.cpu.local as cpulocal
 import aarch64.uart
 import sysvshm
 import sysvsem
+import sysvmsg
 import krandom
 
 // Linux aarch64 syscall numbers (from asm-generic/unistd.h).
@@ -583,6 +584,10 @@ pub fn init_syscall_table() {
 	// Memory
 	syscall_table[194] = voidptr(sysvshm.syscall_shmget) // __NR_shmget
 	syscall_table[190] = voidptr(sysvsem.syscall_semget) // __NR_semget
+	syscall_table[186] = voidptr(sysvmsg.syscall_msgget)
+	syscall_table[187] = voidptr(sysvmsg.syscall_msgctl)
+	syscall_table[188] = voidptr(sysvmsg.syscall_msgrcv)
+	syscall_table[189] = voidptr(sysvmsg.syscall_msgsnd)
 	syscall_table[191] = voidptr(sysvsem.syscall_semctl) // __NR_semctl
 	syscall_table[192] = voidptr(sysvsem.syscall_semtimedop) // __NR_semtimedop
 	syscall_table[193] = voidptr(sysvsem.syscall_semop) // __NR_semop

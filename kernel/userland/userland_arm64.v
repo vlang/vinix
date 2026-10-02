@@ -733,7 +733,12 @@ pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, 
 	// resolves that to this process's program, but the new process must record
 	// where the program really is: keeping the literal path would make the
 	// child's own /proc/self/exe point back at itself forever.
-	resolved := fs.get_node_and_mount(dir, _path, true) or {
+	prog_mount := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
+	parent := if execve {
+		fs.parent_and_mount_for(fs.at_fdcwd, _path, prog_mount) or { free_exec_arguments(_path, argv, envp); return none }
+	} else { unsafe { dir } }
+	prog_node := if execve { fs.get_node_on_mount(parent, _path, true, prog_mount) }
+		else { fs.get_node_and_mount(parent, _path, true, prog_mount) } or {
 		if execve { free_exec_arguments(_path, argv, envp) }
 		return none
 	}
@@ -741,7 +746,7 @@ pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, 
 	if execve && path.str != _path.str && !argv.any(it.str == _path.str) {
 		unsafe { _path.free() }
 	}
-	return start_program_node(execve, dir, resolved.node, resolved.mount, path, argv, envp, stdin_path,
+	return start_program_node(execve, dir, prog_node, prog_mount, path, argv, envp, stdin_path,
 		stdout_path, stderr_path)
 }
 
@@ -759,7 +764,7 @@ fn env_entry_is(entry string, name string, value string) bool {
 
 // The part of exec that follows finding the program. execveat(2) on a
 // descriptor comes here directly: a memfd has no name to be found by.
-pub fn start_program_node(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_mount voidptr, path string, argv []string, envp []string, stdin_path string, stdout_path string, stderr_path string) ?&proc.Process {
+pub fn start_program_node(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_mount &lib.MountContext, path string, argv []string, envp []string, stdin_path string, stdout_path string, stderr_path string) ?&proc.Process {
 	// What the caller names is subject to pledge(2) and unveil(2), a script's
 	// interpreter included. What the kernel picks itself -- the ELF
 	// interpreter, the x86 translator -- is not, as OpenBSD does not judge
@@ -774,7 +779,7 @@ pub fn start_program_node(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, p
 
 // Frees what an exec was handed when it fails, unless load_program_image()
 // has handed that on to an interpreter or translator's exec, which frees it.
-fn load_program_node(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_mount voidptr, path string, argv []string, envp []string, stdin_path string, stdout_path string, stderr_path string) ?&proc.Process {
+fn load_program_node(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_mount &lib.MountContext, path string, argv []string, envp []string, stdin_path string, stdout_path string, stderr_path string) ?&proc.Process {
 	handed_on := unsafe { &bool(C.vinix_stack_alloc(sizeof(bool))) }
 	unsafe { *handed_on = false }
 	process := load_program_image(execve, dir, prog_node, prog_mount, path, argv, envp, stdin_path,
@@ -787,7 +792,7 @@ fn load_program_node(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_m
 	return process
 }
 
-fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_mount voidptr, path string, argv []string, envp []string, stdin_path string, stdout_path string, stderr_path string, handed_on &bool) ?&proc.Process {
+fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_mount &lib.MountContext, path string, argv []string, envp []string, stdin_path string, stdout_path string, stderr_path string, handed_on &bool) ?&proc.Process {
 	trace_gpu := execve && path == gpu_desktop_executable
 	gpu_exec_trace(trace_gpu, 'resolved executable path')
 	gpu_exec_trace(trace_gpu, 'opened executable node')
@@ -875,8 +880,8 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 		}
 		// Looked up first: past it nothing can fail, and what this exec was
 		// handed is handed on or freed below.
-		translator_resolved := fs.get_node_and_mount(root, translator, true)?
-		translator_node := translator_resolved.node
+		translator_mount := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
+		translator_node := fs.get_node_and_mount(root, translator, true, translator_mount)?
 		// The environment can name another root, the way the shell launchers
 		// let it: Steam runs in a glibc tree whose loader knows where its
 		// libraries are. The default musl roots are told through
@@ -995,11 +1000,11 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 				*handed_on = true
 			}
 			free_exec_arguments(path, argv, envp)
-			return load_program_node(true, root, translator_node, translator_resolved.mount, translator, translated_argv,
+			return load_program_node(true, root, translator_node, translator_mount, translator, translated_argv,
 				translated_envp, stdin_path, stdout_path, stderr_path)
 		}
 		// Starting init, which keeps what it gave.
-		process := load_program_node(false, root, translator_node, translator_resolved.mount, translator, translated_argv,
+		process := load_program_node(false, root, translator_node, translator_mount, translator, translated_argv,
 			translated_envp, stdin_path, stdout_path, stderr_path) or {
 			unsafe {
 				translated_argv.free()
@@ -1072,16 +1077,16 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 		gpu_exec_trace(trace_gpu, 'using program entry point (no interpreter)')
 	} else {
 		gpu_exec_trace(trace_gpu, 'opening ELF interpreter')
-		ld_resolved := fs.get_node_and_mount(root, ld_path, true) or {
+		ld_mount := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
+		ld_node := fs.get_node_and_mount(root, ld_path, true, ld_mount) or {
 			failure := errno.get()
 			unsafe { ld_path.free() }
 			mmap.delete_pagemap(mut new_pagemap) or {}
 			errno.set(failure)
 			return none
 		}
-		ld_node := ld_resolved.node
 		if !stat.isreg(ld_node.resource.stat.mode)
-			|| fs.mount_flags(ld_resolved.mount) & fs.ms_noexec != 0
+			|| fs.mount_flags(ld_mount) & fs.ms_noexec != 0
 			|| !fs.check_access(ld_node, fs.access_exec, true) {
 			unsafe { ld_path.free() }
 			mmap.delete_pagemap(mut new_pagemap) or {}
@@ -1127,8 +1132,7 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 
 		new_process.name = proc.process_name(path, new_process.pid)
 		new_process.executable_path = fs.program_path(prog_node, path)
-		new_process.exe_node = voidptr(prog_node)
-		new_process.exe_mount = prog_mount
+		proc.set_executable_fs(mut new_process, voidptr(prog_node), prog_mount)
 		new_process.allow_wx = allow_wx
 		new_process.sigreturn_page = sigreturn_page
 		new_process.sigcookie = proc.new_sigcookie()
@@ -1225,8 +1229,7 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 		}
 		curr_process.name = proc.process_name(path, curr_process.pid)
 		curr_process.executable_path = program_path
-		curr_process.exe_node = voidptr(prog_node)
-		curr_process.exe_mount = prog_mount
+		proc.set_executable_fs(mut curr_process, voidptr(prog_node), prog_mount)
 		curr_process.allow_wx = allow_wx
 		curr_process.sigreturn_page = sigreturn_page
 		// Frames the old program was given must not return into the new one.
@@ -1375,18 +1378,19 @@ pub fn syscall_execveat(_ voidptr, dirfd int, _path charptr, _argv &charptr, _en
 	mut target := path
 
 	mut direct_node := &fs.VFSNode(unsafe { nil })
-	mut direct_mount := voidptr(0)
+	direct_mount := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
+	lib.copy_mount_context(direct_mount, unsafe { nil })
 	if path.len == 0 {
 		// The descriptor's name below takes the empty path's place.
 		unsafe { path.free() }
 		if flags & fs.at_empty_path == 0 {
 			return errno.err, errno.enoent
 		}
-		// Run whatever the descriptor is open on. Its parent, when it has one,
-		// is what a relative interpreter path then resolves against.
+		// Run the descriptor's image with its actual mount route. A relative
+		// shebang interpreter is resolved from cwd, as for ordinary execve.
 		mut fd := file.fd_from_fdnum(process, dirfd) or { return errno.err, errno.ebadf }
 		node := unsafe { &fs.VFSNode(fd.handle.node) }
-		direct_mount = fd.handle.mount
+		lib.copy_mount_context(direct_mount, &fd.handle.mount)
 		fd.unref()
 		if node == unsafe { nil } {
 			return errno.err, errno.eacces
@@ -1402,20 +1406,14 @@ pub fn syscall_execveat(_ voidptr, dirfd int, _path charptr, _argv &charptr, _en
 		name.add_decimal(i64(dirfd))
 		target = name.str()
 	} else {
-		directory = fs.parent_dir_for(dirfd, path) or {
+		directory = fs.parent_and_mount_for(dirfd, path, direct_mount) or {
 			unsafe { path.free() }
 			return errno.err, errno.get()
 		}
-		start_mount := fs.parent_mount_for(dirfd, path) or {
+		direct_node = fs.get_node_on_mount(directory, path, flags & fs.at_symlink_nofollow == 0, direct_mount) or {
 			unsafe { path.free() }
 			return errno.err, errno.get()
 		}
-		resolved := fs.get_node_on_mount(directory, path, flags & fs.at_symlink_nofollow == 0, start_mount) or {
-			unsafe { path.free() }
-			return errno.err, errno.get()
-		}
-		direct_node = resolved.node
-		direct_mount = resolved.mount
 	}
 
 	mut argv := exec_strings_from_user(u64(_argv), exec_total_max) or {

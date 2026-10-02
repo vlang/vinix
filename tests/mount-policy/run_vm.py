@@ -20,6 +20,9 @@ runner.FEATURE_MARKERS = (
     b"MOUNT POLICY PASS: nodev blocks character and block devices, with O_PATH and ordinary files usable",
     b"MOUNT POLICY PASS: namespace remounts and self binds preserve mount identity",
     b"MOUNT POLICY PASS: W^X exceptions require administrator launch or executable mount policy",
+    b"MOUNT POLICY PASS: nested shared mounts retain the alias used to enter them",
+    b"MOUNT POLICY PASS: bounded mount context overflow fails closed with ELOOP",
+    b"MOUNT POLICY PASS: shared cwd, root and mount moves keep node and policy snapshots consistent",
 )
 # These tests exercise mount policy and never trigger a pledge violation.
 runner.REPORT_MARKER = b""

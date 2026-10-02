@@ -7,14 +7,16 @@
 // A namespace here is an identity and whatever state the kernel keeps apart
 // for it. The UTS namespace owns a hostname, the mount namespace a mount table
 // (kept by fs), and the pid namespace remembers its init so that its members
-// can be killed together when that init dies, as Linux does. Process ids are
-// not renumbered inside a pid namespace, and network, IPC, cgroup and time
-// namespaces are identities only: their members share the system's stack.
+// can be killed together when that init dies, as Linux does.
+// System V message queues have separate IPC registries; existing semaphores
+// and shared-memory segments still use global registries. Network, cgroup
+// and time namespace identities do not alone separate their subsystems.
 @[has_globals]
 module proc
 
 import katomic
 import klock
+import lib
 
 // clone(2)/unshare(2) flags that name a namespace.
 pub const clone_newtime = u64(0x00000080)
@@ -34,6 +36,9 @@ pub mut:
 	kind     u64
 	id       u64
 	refcount int
+	// Immutable user-namespace identity that governs IPC capabilities. A user
+	// namespace alone must not transfer ownership of an inherited IPC one.
+	ipc_user_ns u64 = 4026531837
 	// UTS namespaces.
 	hostname   string
 	domainname string
@@ -155,6 +160,18 @@ pub fn get_namespace(mut ns Namespace) &Namespace {
 	return ns
 }
 
+// An nsfs open may race the final process leaving. It may retain a live
+// namespace, but cannot bring back state already destroyed at refcount zero.
+pub fn try_get_namespace(mut ns Namespace) bool {
+	if is_initial_namespace(ns) { return true }
+	for {
+		count := katomic.load(&ns.refcount)
+		if count <= 0 { return false }
+		if katomic.cas(mut &ns.refcount, count, count + 1) { return true }
+	}
+	return false
+}
+
 // Drop a reference, reporting whether it was the last one.
 pub fn put_namespace(mut ns Namespace) bool {
 	if unsafe { ns == nil } || is_initial_namespace(ns) {
@@ -173,10 +190,11 @@ pub fn put_namespace(mut ns Namespace) bool {
 @[heap]
 pub struct ThreadFS {
 pub mut:
+	lock              klock.Lock
 	root_directory    voidptr
 	current_directory voidptr
-	root_mount        voidptr
-	current_mount     voidptr
+	root_mount        lib.MountContext
+	current_mount     lib.MountContext
 	mnt               &Namespace = unsafe { nil }
 }
 
@@ -196,12 +214,14 @@ pub fn own_thread_fs() &ThreadFS {
 	mut t := current_thread()
 	if t.fs == unsafe { nil } {
 		mut process := t.process
+		process.fs_lock.acquire()
 		mut own := &ThreadFS{
 			root_directory:    process.root_directory
 			current_directory: process.current_directory
 			root_mount: process.root_mount
 			current_mount: process.current_mount
 		}
+		process.fs_lock.release()
 		if process.ns.mnt != unsafe { nil } {
 			own.mnt = get_namespace(mut process.ns.mnt)
 		}
@@ -213,47 +233,19 @@ pub fn own_thread_fs() &ThreadFS {
 // Where `process` resolves absolute paths from, as the calling thread sees it.
 // Nil is the global root.
 pub fn root_directory_of(process &Process) voidptr {
-	if unsafe { process == nil } {
-		return unsafe { nil }
-	}
-	own := thread_fs_of(process)
-	if own != unsafe { nil } {
-		return own.root_directory
-	}
-	return process.root_directory
+	return snapshot_root_directory(process, unsafe { nil })
 }
 
 pub fn set_root_directory(mut process Process, directory voidptr) {
-	mut own := thread_fs_of(process)
-	if own != unsafe { nil } {
-		own.root_directory = directory
-		own.root_mount = unsafe { nil }
-		return
-	}
-	process.root_directory = directory
-	process.root_mount = unsafe { nil }
+	set_root_fs(mut process, directory, unsafe { nil })
 }
 
 pub fn current_directory_of(process &Process) voidptr {
-	if unsafe { process == nil } {
-		return unsafe { nil }
-	}
-	own := thread_fs_of(process)
-	if own != unsafe { nil } {
-		return own.current_directory
-	}
-	return process.current_directory
+	return snapshot_current_directory(process, unsafe { nil })
 }
 
 pub fn set_current_directory(mut process Process, directory voidptr) {
-	mut own := thread_fs_of(process)
-	if own != unsafe { nil } {
-		own.current_directory = directory
-		own.current_mount = unsafe { nil }
-		return
-	}
-	process.current_directory = directory
-	process.current_mount = unsafe { nil }
+	set_current_fs(mut process, directory, unsafe { nil })
 }
 
 pub fn mount_namespace_of(process &Process) &Namespace {
@@ -270,9 +262,11 @@ pub fn mount_namespace_of(process &Process) &Namespace {
 // Everything a child takes from its parent at fork. The caller owns the
 // references this takes and gives them back through release_namespaces().
 pub fn inherit_container_state(mut child Process, parent &Process) {
+	lock_table()
 	if unsafe { parent == nil } || unsafe { parent.ns.mnt == nil } {
 		child.ns = initial_namespace_set()
 		child.caps = full_capabilities()
+		unlock_table()
 		return
 	}
 	// A thread with a view of its own passes that on, as on Linux.
@@ -291,18 +285,19 @@ pub fn inherit_container_state(mut child Process, parent &Process) {
 		user:             get_namespace(mut parent.ns.user)
 		time:             get_namespace(mut parent.ns.time)
 	}
-	child.root_directory = root_directory_of(parent)
-	child.root_mount = root_mount_of(parent)
-	child.current_mount = current_mount_of(parent)
-	child.exe_mount = parent.exe_mount
 	child.caps = parent.caps
+	unlock_table()
+	// Snapshot filesystem node and route under their own locks, after the
+	// namespace reference transaction has released the process-table lock.
+	child.root_directory = snapshot_root_directory(parent, &child.root_mount)
+	child.current_directory = snapshot_current_directory(parent, &child.current_mount)
+	child.exe_node = snapshot_executable(parent, &child.exe_mount)
 	child.no_new_privs = parent.no_new_privs
 	child.seccomp_mode = parent.seccomp_mode
 	child.seccomp = parent.seccomp
 	child.cgroup = parent.cgroup
 	child.cgroup_account = parent.cgroup_account
 	child.oom_score_adj = parent.oom_score_adj
-	child.exe_node = parent.exe_node
 	pledge_inherit(mut child, parent)
 	child.sigcookie = parent.sigcookie
 }

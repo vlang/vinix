@@ -6,6 +6,7 @@ import term
 import lib.stubs
 import acpi
 import uacpi
+import acpisync
 import x86.gdt
 import x86.idt
 import x86.isr
@@ -53,6 +54,8 @@ fn poll_network() {
 }
 
 fn kmain_thread() {
+	acpisync.scheduler_ready()
+	acpisync.test_native()
 	term.framebuffer_init()
 	linuxkpi.initialise()
 
@@ -175,6 +178,7 @@ fn kmain() {
 	// ACPI init
 	acpi.initialise()
 	hpet.initialise()
+	acpisync.test_boot()
 
 	pci.initialise()
 

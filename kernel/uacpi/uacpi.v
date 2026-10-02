@@ -1,9 +1,6 @@
 module uacpi
 
 import klock
-import event
-import event.eventstruct
-import time
 import x86.kio
 import memory
 import lib
@@ -13,6 +10,7 @@ import lib.stubs
 // `hpet.nanoseconds()` against the variable in a -prod build.
 import x86.hpet as hpet_clock
 import pci
+import acpisync
 
 pub enum UACPIStatus {
 	ok                      = 0
@@ -129,96 +127,66 @@ pub fn uacpi_kernel_unlock_spinlock(handle voidptr, cpu_flags u64) {
 
 @[export: 'uacpi_kernel_acquire_mutex']
 pub fn uacpi_kernel_acquire_mutex(handle voidptr, timeout u16) UACPIStatus {
-	return UACPIStatus.ok
+	return unsafe { UACPIStatus(acpisync.wait(handle, timeout)) }
 }
 
 @[export: 'uacpi_kernel_release_mutex']
 pub fn uacpi_kernel_release_mutex(handle voidptr) {
+	if !acpisync.signal(handle) {
+		C.kprintf(c'uacpi: rejected mutex release by a non-owner\n')
+	}
 }
 
 @[export: 'uacpi_kernel_create_mutex']
 pub fn uacpi_kernel_create_mutex() voidptr {
-	return unsafe { malloc(1) }
+	return acpisync.create(true)
 }
 
 @[export: 'uacpi_kernel_free_mutex']
 pub fn uacpi_kernel_free_mutex(handle voidptr) {
-	unsafe { free(handle) }
+	if !acpisync.destroy(handle) {
+		C.kprintf(c'uacpi: refused to destroy an active mutex\n')
+	}
 }
 
 @[export: 'uacpi_kernel_create_event']
 pub fn uacpi_kernel_create_event() voidptr {
-	mut e := &eventstruct.Event{}
-	return unsafe { voidptr(e) }
+	return acpisync.create(false)
 }
 
 @[export: 'uacpi_kernel_free_event']
 pub fn uacpi_kernel_free_event(handle voidptr) {
-	mut e := unsafe { &eventstruct.Event(handle) }
-	unsafe {
-		e.free()
-		free(e)
+	if !acpisync.destroy(handle) {
+		C.kprintf(c'uacpi: refused to destroy an active event\n')
 	}
 }
 
 @[export: 'uacpi_kernel_signal_event']
 pub fn uacpi_kernel_signal_event(handle voidptr) {
-	mut e := unsafe { &eventstruct.Event(handle) }
-	event.trigger(mut e, false)
+	acpisync.signal(handle)
 }
 
 @[export: 'uacpi_kernel_wait_for_event']
 pub fn uacpi_kernel_wait_for_event(handle voidptr, timeout u16) bool {
-	target_time := time.TimeSpec{
-		tv_sec:  u64(timeout) / 1000
-		tv_nsec: (u64(timeout) % 1000) * 1000000
-	}
-	mut timer := time.new_timer(target_time)
-	defer {
-		timer.disarm()
-		unsafe {
-			timer.free()
-			free(timer)
-		}
-	}
-	// uACPI waits here on every AML Wait; a list literal leaked on each one.
-	mut e := unsafe { &eventstruct.Event(handle) }
-	if timeout == 0xffff {
-		event.await_one(mut e, true) or { return false }
-		return true
-	}
-	mut storage := [e, &timer.event]!
-	mut events := unsafe { event.stack_list(&storage[0], storage.len) }
-	event.await(mut events, true) or { return false }
-	return true
+	return acpisync.wait(handle, timeout) == 0
 }
 
 @[export: 'uacpi_kernel_reset_event']
 pub fn uacpi_kernel_reset_event(handle voidptr) {
+	acpisync.reset(handle)
 }
 
 @[export: 'uacpi_kernel_stall']
 pub fn uacpi_kernel_stall(usec u8) {
-	for i := 0; i < usec; i++ {
-		kio.port_in[u8](0x80)
+	started := hpet_clock.nanoseconds()
+	for hpet_clock.nanoseconds() - started < u64(usec) * 1000 {
+		klock.spin_hint()
 	}
 }
 
 @[export: 'uacpi_kernel_sleep']
 pub fn uacpi_kernel_sleep(msec u64) {
-	target_time := time.TimeSpec{
-		tv_sec:  u64(msec) / 1000
-		tv_nsec: (u64(msec) % 1000) * 1000000
-	}
-	mut timer := time.new_timer(target_time)
-	defer {
-		timer.disarm()
-		unsafe {
-			timer.free()
-			free(timer)
-		}
-	}
-	event.await_one(mut timer.event, true) or {}
+	acpisync.sleep(msec)
 }
 
 @[export: 'uacpi_kernel_alloc']
@@ -335,7 +303,7 @@ pub fn uacpi_kernel_io_write32(handle voidptr, offset u64, value u32) UACPIStatu
 
 @[export: 'uacpi_kernel_get_thread_id']
 pub fn uacpi_kernel_get_thread_id() voidptr {
-	return unsafe { nil }
+	return voidptr(acpisync.thread_id())
 }
 
 struct UACPIPCIAddress {

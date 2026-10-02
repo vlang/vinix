@@ -56,7 +56,7 @@ pub fn try_new_kernel_thread(pc voidptr, arg voidptr) ?&proc.Thread {
 	unsafe {
 		*t = proc.Thread{
 			process:          kernel_process
-			ttbr0:            u64(kernel_process.pagemap.top_level)
+			ttbr0:            kernel_process.pagemap.tagged_root()
 			gpr_state:        cpulocal.GPRState{
 				pc:     u64(pc)
 				x0:     u64(arg)

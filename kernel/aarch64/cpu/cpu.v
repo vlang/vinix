@@ -600,6 +600,21 @@ pub fn tlbi_vmalle1is() {
 	}
 }
 
+// Invalidate one ASID, including intermediate walk caches, on every PE in
+// the inner-shareable domain. TCR.A1=0 selects TTBR0's ASID and TCR.AS=0
+// limits it to eight bits. Completion precedes tag reuse or page-table free.
+pub fn tlbi_aside1is(asid u16) {
+	operand := u64(asid) << 48
+	asm volatile aarch64 {
+		dsb ishst
+		tlbi aside1is, operand
+		dsb ish
+		isb
+		; ; r (operand)
+		; memory
+	}
+}
+
 pub fn tlbi_vale1(addr u64) {
 	asm volatile aarch64 {
 		dsb ishst

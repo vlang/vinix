@@ -453,7 +453,7 @@ fn (mut this EXT2Filesystem) populate(node &vfs.VFSNode) {
 
 		vfs_node.resource = resource.boxed()
 		if stat.islnk(mode) && inode.size32l != 0 {
-			if target := inode.fast_symlink_target() {
+			if target := inode.fast_symlink_target(this.block_size) {
 				vfs_node.symlink_target = target
 			} else {
 				target_buffer := memory.calloc(u64(inode.size32l) + 1, 1)
@@ -566,8 +566,9 @@ fn (mut this EXT2Filesystem) mount(parent &vfs.VFSNode, name string, source &vfs
 // volume prepared on the host has to be recognised rather than followed.
 //
 // Read the inline form used by ext2 tools and by this driver's symlink writer.
-fn (inode &EXT2Inode) fast_symlink_target() ?string {
-	if inode.sector_cnt != 0 || inode.size32l == 0
+fn (inode &EXT2Inode) fast_symlink_target(block_size u64) ?string {
+	attribute_sectors := if inode.eab != 0 { u32(block_size / 512) } else { u32(0) }
+	if inode.sector_cnt != attribute_sectors || inode.size32l == 0
 		|| inode.size32l > u32(sizeof(inode.blocks)) {
 		return none
 	}
@@ -584,7 +585,8 @@ fn (mut inode EXT2Inode) read(mut filesystem EXT2Filesystem, buf voidptr, off u6
 	if (off + count) > inode.size32l {
 		count = inode.size32l - off
 	}
-	if stat.islnk(u32(inode.permissions)) && inode.sector_cnt == 0
+	attribute_sectors := if inode.eab != 0 { u32(filesystem.block_size / 512) } else { u32(0) }
+	if stat.islnk(u32(inode.permissions)) && inode.sector_cnt == attribute_sectors
 		&& inode.size32l <= u32(sizeof(inode.blocks)) {
 		unsafe { C.memcpy(buf, voidptr(u64(&inode.blocks[0]) + off), count) }
 		return i64(count)
@@ -732,6 +734,7 @@ fn (mut inode EXT2Inode) free_entry(mut filesystem EXT2Filesystem, inode_index u
 	if stat.isdir(u32(inode.permissions)) {
 		filesystem.count_directory(inode_index, false)
 	}
+	inode.delete_ea(mut filesystem, inode_index)?
 	inode.size32l = 0
 	inode.size32h = 0
 	inode.sector_cnt = 0
@@ -1083,7 +1086,7 @@ fn (mut bgd EXT2BlockGroupDescriptor) read_entry(mut filesystem EXT2Filesystem, 
 		bgd_offset = filesystem.block_size * 2
 	}
 
-	filesystem.raw_device_read(voidptr(&bgd), bgd_offset + sizeof(EXT2BlockGroupDescriptor) * bgd_index, sizeof(EXT2BlockGroupDescriptor)) or {
+	filesystem.raw_device_read(unsafe { voidptr(&bgd) }, bgd_offset + sizeof(EXT2BlockGroupDescriptor) * bgd_index, sizeof(EXT2BlockGroupDescriptor)) or {
 		print('ext2: unable to read bgd entry\n')
 		return -1
 	}
@@ -1100,7 +1103,7 @@ fn (mut bgd EXT2BlockGroupDescriptor) write_entry(mut filesystem EXT2Filesystem,
 		bgd_offset = filesystem.block_size * 2
 	}
 
-	filesystem.raw_device_write(voidptr(&bgd), bgd_offset + sizeof(EXT2BlockGroupDescriptor) * bgd_index, sizeof(EXT2BlockGroupDescriptor)) or {
+	filesystem.raw_device_write(unsafe { voidptr(&bgd) }, bgd_offset + sizeof(EXT2BlockGroupDescriptor) * bgd_index, sizeof(EXT2BlockGroupDescriptor)) or {
 		print('ext2: unable to read bgd entry\n')
 		return -1
 	}
@@ -1200,10 +1203,14 @@ fn (mut inode EXT2Inode) read_entry(mut filesystem EXT2Filesystem, inode_index u
 	inode_table_index := (inode_index - 1) % filesystem.superblock.inodes_per_group
 	bgd_index := (inode_index - 1) / filesystem.superblock.inodes_per_group
 
-	mut bgd := EXT2BlockGroupDescriptor{}
-	bgd.read_entry(mut filesystem, bgd_index)
+	mut bgd := unsafe { &EXT2BlockGroupDescriptor(C.__builtin_alloca(sizeof(EXT2BlockGroupDescriptor))) }
+	unsafe { *bgd = EXT2BlockGroupDescriptor{} }
+	if bgd.read_entry(mut filesystem, bgd_index) < 0 {
+		errno.set(errno.eio)
+		return none
+	}
 
-	filesystem.raw_device_read(voidptr(&inode), bgd.inode_table_block * filesystem.block_size + filesystem.superblock.inode_size * inode_table_index, sizeof(EXT2Inode)) or {
+	filesystem.raw_device_read(unsafe { voidptr(&inode) }, bgd.inode_table_block * filesystem.block_size + filesystem.superblock.inode_size * inode_table_index, sizeof(EXT2Inode)) or {
 		print('ext2: unable to read inode entry\n')
 		return none
 	}
@@ -1215,10 +1222,14 @@ fn (mut inode EXT2Inode) write_entry(mut filesystem EXT2Filesystem, inode_index 
 	inode_table_index := (inode_index - 1) % filesystem.superblock.inodes_per_group
 	bgd_index := (inode_index - 1) / filesystem.superblock.inodes_per_group
 
-	mut bgd := EXT2BlockGroupDescriptor{}
-	bgd.read_entry(mut filesystem, bgd_index)
+	mut bgd := unsafe { &EXT2BlockGroupDescriptor(C.__builtin_alloca(sizeof(EXT2BlockGroupDescriptor))) }
+	unsafe { *bgd = EXT2BlockGroupDescriptor{} }
+	if bgd.read_entry(mut filesystem, bgd_index) < 0 {
+		errno.set(errno.eio)
+		return none
+	}
 
-	filesystem.raw_device_write(voidptr(&inode), bgd.inode_table_block * filesystem.block_size + filesystem.superblock.inode_size * inode_table_index, sizeof(EXT2Inode)) or {
+	filesystem.raw_device_write(unsafe { voidptr(&inode) }, bgd.inode_table_block * filesystem.block_size + filesystem.superblock.inode_size * inode_table_index, sizeof(EXT2Inode)) or {
 		print('ext2: unable to read inode entry\n')
 		return none
 	}

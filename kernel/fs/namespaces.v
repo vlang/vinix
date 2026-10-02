@@ -17,6 +17,7 @@ import net
 import proc
 import resource
 import stat
+import sysvmsg
 
 @[heap]
 struct NsFSResource {
@@ -115,8 +116,19 @@ fn (mut this NsFSResource) grow(_handle voidptr, _new_size u64) ? {
 	return none
 }
 
+fn (mut this NsFSResource) open(_flags int) ?&resource.Resource {
+	if this.ns.kind == proc.clone_newipc && !proc.try_get_namespace(mut this.ns) {
+		errno.set(errno.enoent)
+		return none
+	}
+	// The namespace node owns one permanent interface box; each new handle
+	// owns an IPC namespace pin, while dup/fork retain that existing handle.
+	return unsafe { &VFSNode(this.ns.node) }.resource
+}
+
 fn (mut this NsFSResource) unref(_handle voidptr) ? {
 	katomic.dec(mut &this.refcount)
+	if this.ns.kind == proc.clone_newipc { release_namespace(mut this.ns) }
 }
 
 fn (mut this NsFSResource) link(_handle voidptr) ? {
@@ -185,6 +197,9 @@ fn refresh_ns_directory(mut dir VFSNode, pid int) {
 fn replace_namespace(process &proc.Process, mut old proc.Namespace) &proc.Namespace {
 	mut ns := proc.copy_namespace(old)
 	match old.kind {
+		proc.clone_newipc {
+			ns.ipc_user_ns = if process.ns.user == unsafe { nil } { u64(4026531837) } else { process.ns.user.id }
+		}
 		proc.clone_newns {
 			ns.data = voidptr(copy_mount_table(table_of(process)))
 		}
@@ -205,7 +220,11 @@ fn replace_namespace(process &proc.Process, mut old proc.Namespace) &proc.Namesp
 }
 
 fn release_namespace(mut ns proc.Namespace) {
-	if proc.put_namespace(mut ns) && ns.kind == proc.clone_newns && ns.data != unsafe { nil } {
+	if !proc.put_namespace(mut ns) { return }
+	if ns.kind == proc.clone_newipc {
+		sysvmsg.destroy_namespace(ns.id)
+	}
+	if ns.kind == proc.clone_newns && ns.data != unsafe { nil } {
 		mut table := unsafe { &MountTable(ns.data) }
 		release_mount_table(mut table)
 	}
@@ -214,23 +233,28 @@ fn release_namespace(mut ns proc.Namespace) {
 // Move `process` into new namespaces of every kind `flags` names. For clone
 // the process is the child, which has just taken its parent's references.
 pub fn create_namespaces(mut process proc.Process, flags u64, for_child bool) {
+	// Linux creates the user namespace first when both flags are supplied;
+	// subsequently created IPC namespaces belong to that new user identity.
+	// Pair these swaps with queue permission snapshots and fork inheritance.
+	proc.lock_table()
+	if flags & proc.clone_newuser != 0 {
+		process.ns.user = replace_namespace(process, mut process.ns.user)
+	}
+	if flags & proc.clone_newipc != 0 {
+		process.ns.ipc = replace_namespace(process, mut process.ns.ipc)
+	}
+	proc.unlock_table()
 	if flags & proc.clone_newns != 0 {
 		process.ns.mnt = replace_namespace(process, mut process.ns.mnt)
 	}
 	if flags & proc.clone_newuts != 0 {
 		process.ns.uts = replace_namespace(process, mut process.ns.uts)
 	}
-	if flags & proc.clone_newipc != 0 {
-		process.ns.ipc = replace_namespace(process, mut process.ns.ipc)
-	}
 	if flags & proc.clone_newnet != 0 {
 		process.ns.net = replace_namespace(process, mut process.ns.net)
 	}
 	if flags & proc.clone_newcgroup != 0 {
 		process.ns.cgroup = replace_namespace(process, mut process.ns.cgroup)
-	}
-	if flags & proc.clone_newuser != 0 {
-		process.ns.user = replace_namespace(process, mut process.ns.user)
 	}
 	if flags & proc.clone_newtime != 0 {
 		process.ns.time = replace_namespace(process, mut process.ns.time)
@@ -260,11 +284,14 @@ pub fn fork_namespaces(mut child proc.Process, flags u64) {
 
 // Everything a process held goes when it dies.
 pub fn release_process_namespaces(mut process proc.Process) {
+	proc.lock_table()
 	if process.ns.mnt == unsafe { nil } {
+		proc.unlock_table()
 		return
 	}
 	set := process.ns
 	process.ns = proc.NamespaceSet{}
+	proc.unlock_table()
 	// A fixed array: a literal one was allocated, and lost, at every exit.
 	for ns_ptr in [set.mnt, set.uts, set.ipc, set.net, set.pid, set.pid_for_children,
 		set.cgroup, set.user, set.time]! {
@@ -353,21 +380,24 @@ pub fn syscall_setns(_ voidptr, fdnum int, nstype int) (u64, u64) {
 				release_namespace(mut old)
 			}
 			// Joining a mount namespace puts the caller at its root.
-			table := table_of(process)
+			mut table := table_of(process)
+			identity := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
+			table.lock.acquire()
 			root := if table.initial || table.root_hint == unsafe { nil } {
 				vfs_root
 			} else {
 				table.root_hint
 			}
-			proc.set_root_directory(mut process, if voidptr(root) == voidptr(vfs_root) {
+			lib.copy_mount_context(identity, &table.root_hint_mount)
+			table.lock.release()
+			if identity.depth == 0 && !native_context(root, identity) { return errno.err, errno.get() }
+			proc.set_root_fs(mut process, if voidptr(root) == voidptr(vfs_root) {
 				unsafe { nil }
 			} else {
 				voidptr(root)
-			})
-			proc.set_root_mount(mut process, table.root_hint_mount)
-			resolved := get_node_and_mount(root, '.', true) or { return errno.err, errno.get() }
-			proc.set_current_directory(mut process, voidptr(resolved.node))
-			proc.set_current_mount(mut process, resolved.mount)
+			}, identity)
+			node := get_node_on_mount(root, '.', true, identity) or { return errno.err, errno.get() }
+			proc.set_current_fs(mut process, voidptr(node), identity)
 		}
 		proc.clone_newuts {
 			mut old := process.ns.uts
@@ -375,8 +405,20 @@ pub fn syscall_setns(_ voidptr, fdnum int, nstype int) (u64, u64) {
 			release_namespace(mut old)
 		}
 		proc.clone_newipc {
+			proc.lock_table()
+			if !proc.has_capability(process, proc.cap_sys_admin)
+				|| (!proc.is_initial_namespace(process.ns.user)
+					&& process.ns.user.id != ns.ipc_user_ns) {
+				proc.unlock_table()
+				return errno.err, errno.eperm
+			}
 			mut old := process.ns.ipc
-			process.ns.ipc = proc.get_namespace(mut ns)
+			if !proc.try_get_namespace(mut ns) {
+				proc.unlock_table()
+				return errno.err, errno.enoent
+			}
+			process.ns.ipc = ns
+			proc.unlock_table()
 			release_namespace(mut old)
 		}
 		proc.clone_newnet {
@@ -395,8 +437,10 @@ pub fn syscall_setns(_ voidptr, fdnum int, nstype int) (u64, u64) {
 			release_namespace(mut old)
 		}
 		proc.clone_newuser {
+			proc.lock_table()
 			mut old := process.ns.user
 			process.ns.user = proc.get_namespace(mut ns)
+			proc.unlock_table()
 			release_namespace(mut old)
 		}
 		proc.clone_newtime {

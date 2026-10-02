@@ -22,10 +22,15 @@ an effective-root launcher with and without CAP_SYS_ADMIN, and a wxallowed
 executable mount. Bind inheritance, administrator remounts, rejected user
 remounts and an unauthorized script using an authorized interpreter are checked.
 
-The VFS still shares child mounts between bind aliases of an inode. Traversing
-`..` from such a shared child uses the mount's recorded parent, which can differ
-from the alias used to enter it. This nested alias case needs further mount
-context work; these tests do not claim to cover it.
+Nested shared child mounts preserve the actual bind alias used to enter them,
+including `..`, cwd, fchdir, directory descriptors and proc magic links. Tests
+also cover namespace copies, moved mounts, chroot through an alias of the
+current root, and the fixed mount-context limit: overflow returns `ELOOP`.
+Repeated nested and overflow denials measure slab memory after warmup.
+Concurrent pthread tests change shared cwd, chroot and mount attachments while
+checking exec denials and the executable-mapping ceiling on opened files.
+Relative shebang interpreter tests check Linux cwd semantics for directory-fd
+exec, with allowed, noexec and missing interpreters.
 
 The runner requires every feature marker and the final PASS exactly once;
 ENOSYS, kernel faults, guest failures and timeouts fail the run. It reuses the

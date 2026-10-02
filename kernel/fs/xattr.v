@@ -3,8 +3,8 @@
 //
 // Extended attributes: named values kept with a file, set and read with
 // (l|f)setxattr, (l|f)getxattr, (l|f)listxattr and (l|f)removexattr. tmpfs
-// keeps them, as Linux's does; every other filesystem answers ENOTSUP, which
-// is what one without them says on Linux. Docker's overlay2 storage driver
+// and ext2 keep them; ext2 stores Linux-compatible external attribute blocks.
+// Docker's overlay2 storage driver
 // marks the directories of a layer that hide what is below them with
 // trusted.overlay.opaque, and images carry security.capability on the
 // programs they grant capabilities to.
@@ -80,7 +80,7 @@ fn xattr_target_of_fd(fd &file.FD) XAttrTarget {
 }
 
 // An attribute name, checked as Linux checks one: 1 to 255 bytes, in a
-// namespace the filesystem keeps. There are no ACLs to keep system.* in.
+// namespace the filesystem keeps.
 fn xattr_name(_name charptr) ?string {
 	name := usercopy.copy_cstring_from_user(u64(_name), xattr_name_max + 1) or {
 		if errno.get() == errno.enametoolong {
@@ -99,11 +99,16 @@ fn xattr_name(_name charptr) ?string {
 		errno.set(errno.enotsup)
 		return none
 	}
+	if name == 'user.' || name == 'trusted.' || name == 'security.' {
+		unsafe { name.free() }
+		errno.set(errno.einval)
+		return none
+	}
 	return name
 }
 
-// The tmpfs file behind a resource, or nil: the only kind that keeps
-// attributes.
+// The tmpfs file behind the in-memory overlay helpers, or nil. Syscalls use
+// the backend interface below, which also supports persistent ext2 storage.
 fn tmpfs_resource_of(res &resource.Resource) &TmpFSResource {
 	mut r := unsafe { res }
 	if r != unsafe { nil } {
@@ -112,15 +117,6 @@ fn tmpfs_resource_of(res &resource.Resource) &TmpFSResource {
 		}
 	}
 	return unsafe { nil }
-}
-
-fn xattr_store(target XAttrTarget) ?&TmpFSResource {
-	res := tmpfs_resource_of(target.res)
-	if res == unsafe { nil } {
-		errno.set(errno.enotsup)
-		return none
-	}
-	return res
 }
 
 // trusted.* is for the administrator alone, to read as well as to write. An
@@ -153,7 +149,7 @@ fn xattr_target_to_change(target XAttrTarget, name string) ?XAttrTarget {
 }
 
 // What setting or removing `name` on `target` needs, as on Linux.
-fn xattr_may_change(target XAttrTarget, res &TmpFSResource, name string) ? {
+fn xattr_may_change(target XAttrTarget, name string) ? {
 	if target.node != unsafe { nil } && read_only(target.node) {
 		errno.set(errno.erofs)
 		return none
@@ -178,13 +174,18 @@ fn xattr_may_change(target XAttrTarget, res &TmpFSResource, name string) ? {
 	}
 	// user.* is only for regular files and directories, and whoever may
 	// write the file may change them.
-	if !stat.isreg(res.stat.mode) && !stat.isdir(res.stat.mode) {
+	if !stat.isreg(target.res.stat.mode) && !stat.isdir(target.res.stat.mode) {
+		errno.set(errno.eperm)
+		return none
+	}
+	if stat.isdir(target.res.stat.mode) && target.res.stat.mode & 0o1000 != 0
+		&& !owns_resource(target.res.stat.uid) {
 		errno.set(errno.eperm)
 		return none
 	}
 	if target.node != unsafe { nil } {
 		require_access(target.node, access_write)?
-	} else if !owns_resource(res.stat.uid) {
+	} else if !owns_resource(target.res.stat.uid) {
 		errno.set(errno.eacces)
 		return none
 	}
@@ -203,150 +204,74 @@ fn xattr_find(set &XAttrSet, name string) int {
 }
 
 fn xattr_set(given XAttrTarget, _name charptr, value voidptr, size u64, flags int) (u64, u64) {
-	if flags & ~(xattr_create | xattr_replace) != 0 {
-		return errno.err, errno.einval
-	}
-	if size > xattr_size_max {
-		return errno.err, errno.e2big
-	}
+	if flags & ~(xattr_create | xattr_replace) != 0 { return errno.err, errno.einval }
+	if size > xattr_size_max { return errno.err, errno.e2big }
 	name := xattr_name(_name) or { return errno.err, errno.get() }
-	target := xattr_target_to_change(given, name) or {
-		unsafe { name.free() }
-		return errno.err, errno.get()
-	}
-	mut res := xattr_store(target) or {
-		unsafe { name.free() }
-		return errno.err, errno.get()
-	}
-	xattr_may_change(target, res, name) or {
-		unsafe { name.free() }
-		return errno.err, errno.get()
-	}
-	// Freed on every failure below, and otherwise kept as the value, which
-	// free_xattrs() frees with the file.
+	defer { unsafe { name.free() } }
+	target := xattr_target_to_change(given, name) or { return errno.err, errno.get() }
+	xattr_may_change(target, name) or { return errno.err, errno.get() }
+	mut res := target.res
+	if !resource.has_xattrs(mut res) { return errno.err, errno.enotsup }
 	mut data := []u8{len: int(size)} @[freed]
+	defer { unsafe { data.free() } }
 	if size > 0 && !usercopy.copy_from_user(unsafe { &data[0] }, u64(value), size) {
-		unsafe {
-			name.free()
-			data.free()
-		}
 		return errno.err, errno.efault
 	}
-
-	res.l.acquire()
-	index := xattr_find(res.xattrs, name)
-	if index >= 0 && flags & xattr_create != 0 {
-		res.l.release()
-		unsafe {
-			name.free()
-			data.free()
-		}
-		return errno.err, errno.eexist
-	}
-	if index < 0 && flags & xattr_replace != 0 {
-		res.l.release()
-		unsafe {
-			name.free()
-			data.free()
-		}
-		return errno.err, errno.enodata
-	}
-	if res.xattrs == unsafe { nil } {
-		res.xattrs = new_xattr_set()
-	}
-	if index >= 0 {
-		unsafe {
-			res.xattrs.entries[index].value.free()
-			name.free()
-		}
-		res.xattrs.entries[index].value = data
-	} else {
-		res.xattrs.entries << XAttr{
-			name:  name
-			value: data
-		}
-	}
-	res.stat.ctim = realtime_clock
-	res.l.release()
-	if target.node != unsafe { nil } {
-		inotify_emit(target.node, '', in_attrib, 0)
-	}
+	resource.set_xattr(mut res, name, data, flags) or { return errno.err, errno.get() }
+	if target.node != unsafe { nil } { inotify_emit(target.node, '', in_attrib, 0) }
 	return 0, 0
 }
 
+fn xattr_may_read(target XAttrTarget, name string) ? {
+	if name.starts_with('user.') {
+		if !stat.isreg(target.res.stat.mode) && !stat.isdir(target.res.stat.mode) {
+			errno.set(errno.enodata)
+			return none
+		}
+		if target.node != unsafe { nil } { require_access(target.node, access_read)? }
+	}
+}
+
 fn xattr_get(target XAttrTarget, _name charptr, value voidptr, size u64) (u64, u64) {
-	mut res := xattr_store(target) or { return errno.err, errno.get() }
 	name := xattr_name(_name) or { return errno.err, errno.get() }
-	defer {
-		unsafe { name.free() }
-	}
-	if !xattr_visible(target, name) {
-		return errno.err, errno.enodata
-	}
-	// Copied out under the lock and to the caller after it: the caller's
-	// buffer could be this very file mapped, and faulting it in takes the lock.
-	res.l.acquire()
-	index := xattr_find(res.xattrs, name)
-	if index < 0 {
-		res.l.release()
-		return errno.err, errno.enodata
-	}
-	copied := res.xattrs.entries[index].value.clone()
-	res.l.release()
-	defer {
-		unsafe { copied.free() }
-	}
+	defer { unsafe { name.free() } }
+	if !xattr_visible(target, name) { return errno.err, errno.enodata }
+	xattr_may_read(target, name) or { return errno.err, errno.get() }
+	mut res := target.res
+	mut copied := []u8{} @[freed]
+	copied.flags |= .noslices
+	defer { unsafe { copied.free() } }
+	resource.get_xattr(mut res, name, mut copied) or { return errno.err, errno.get() }
 	length := u64(copied.len)
-	if size == 0 {
-		return length, 0
-	}
-	if size < length {
-		return errno.err, errno.erange
-	}
+	if size == 0 { return length, 0 }
+	if size < length { return errno.err, errno.erange }
 	if length > 0 && !usercopy.copy_to_user(u64(value), copied.data, length) {
 		return errno.err, errno.efault
 	}
 	return length, 0
 }
 
-// The names, each followed by a NUL, that the caller may see.
 fn xattr_list(target XAttrTarget, list voidptr, size u64) (u64, u64) {
-	mut res := xattr_store(target) or {
-		// A file on a filesystem without attributes has none to list.
-		if errno.get() == errno.enotsup {
-			return 0, 0
+	mut res := target.res
+	mut all_names := []u8{} @[freed]
+	all_names.flags |= .noslices
+	defer { unsafe { all_names.free() } }
+	resource.xattr_names(mut res, mut all_names) or { return errno.err, errno.get() }
+	mut names := []u8{cap: all_names.len} @[freed]
+	defer { unsafe { names.free() } }
+	mut start := 0
+	for i, c in all_names {
+		if c != 0 { continue }
+		// Borrow the backend's name while its owned list is alive.
+		name := unsafe { tos(&u8(u64(all_names.data) + u64(start)), i - start) }
+		if xattr_visible(target, name) {
+			for j in start .. i + 1 { names << all_names[j] }
 		}
-		return errno.err, errno.get()
+		start = i + 1
 	}
-	mut names := []u8{}
-	// Nothing slices it, so growing frees each outgrown buffer; they were
-	// left behind by every listxattr(2).
-	names.flags |= .noslices
-	defer {
-		unsafe { names.free() }
-	}
-	// Gathered under the lock and copied to the caller after it, as in
-	// xattr_get().
-	res.l.acquire()
-	if res.xattrs != unsafe { nil } {
-		for entry in res.xattrs.entries {
-			if !xattr_visible(target, entry.name) {
-				continue
-			}
-			for c in entry.name {
-				names << c
-			}
-			names << 0
-		}
-	}
-	res.l.release()
 	length := u64(names.len)
-	if size == 0 {
-		return length, 0
-	}
-	if size < length {
-		return errno.err, errno.erange
-	}
+	if size == 0 { return length, 0 }
+	if size < length { return errno.err, errno.erange }
 	if length > 0 && !usercopy.copy_to_user(u64(list), names.data, length) {
 		return errno.err, errno.efault
 	}
@@ -355,29 +280,56 @@ fn xattr_list(target XAttrTarget, list voidptr, size u64) (u64, u64) {
 
 fn xattr_remove(given XAttrTarget, _name charptr) (u64, u64) {
 	name := xattr_name(_name) or { return errno.err, errno.get() }
-	defer {
-		unsafe { name.free() }
-	}
+	defer { unsafe { name.free() } }
 	target := xattr_target_to_change(given, name) or { return errno.err, errno.get() }
-	mut res := xattr_store(target) or { return errno.err, errno.get() }
-	xattr_may_change(target, res, name) or { return errno.err, errno.get() }
+	xattr_may_change(target, name) or { return errno.err, errno.get() }
+	mut res := target.res
+	resource.remove_xattr(mut res, name) or { return errno.err, errno.get() }
+	if target.node != unsafe { nil } { inotify_emit(target.node, '', in_attrib, 0) }
+	return 0, 0
+}
+
+// tmpfs owns the copied names/values until replacement, deletion, or unlink.
+fn (mut res TmpFSResource) read_xattr(name string, mut value []u8) ? {
 	res.l.acquire()
+	defer { res.l.release() }
 	index := xattr_find(res.xattrs, name)
-	if index < 0 {
-		res.l.release()
-		return errno.err, errno.enodata
+	if index < 0 { errno.set(errno.enodata); return none }
+	for c in res.xattrs.entries[index].value { value << c }
+}
+
+fn (mut res TmpFSResource) write_xattr(name string, value []u8, flags int) ? {
+	res.l.acquire()
+	defer { res.l.release() }
+	index := xattr_find(res.xattrs, name)
+	if index >= 0 && flags & xattr_create != 0 { errno.set(errno.eexist); return none }
+	if index < 0 && flags & xattr_replace != 0 { errno.set(errno.enodata); return none }
+	xattr_put_bytes(mut res, name, value.clone())
+	res.stat.ctim = realtime_clock
+}
+
+fn (mut res TmpFSResource) list_xattrs(mut names []u8) ? {
+	res.l.acquire()
+	defer { res.l.release() }
+	if res.xattrs != unsafe { nil } {
+		for entry in res.xattrs.entries {
+			for c in entry.name { names << c }
+			names << 0
+		}
 	}
+}
+
+fn (mut res TmpFSResource) delete_xattr(name string) ? {
+	res.l.acquire()
+	defer { res.l.release() }
+	index := xattr_find(res.xattrs, name)
+	if index < 0 { errno.set(errno.enodata); return none }
 	unsafe {
 		res.xattrs.entries[index].name.free()
 		res.xattrs.entries[index].value.free()
 	}
 	res.xattrs.entries.delete(index)
 	res.stat.ctim = realtime_clock
-	res.l.release()
-	if target.node != unsafe { nil } {
-		inotify_emit(target.node, '', in_attrib, 0)
-	}
-	return 0, 0
 }
 
 // Whether a tmpfs file has the attribute `name` set to `expected`.
@@ -441,23 +393,29 @@ fn xattr_put(res &resource.Resource, name string, value string) {
 fn copy_xattrs(from &resource.Resource, to &resource.Resource, skip string) {
 	mut source := tmpfs_resource_of(from)
 	mut dest := tmpfs_resource_of(to)
-	if source == unsafe { nil } || dest == unsafe { nil } || source.xattrs == unsafe { nil } {
+	if source == unsafe { nil } || dest == unsafe { nil } {
 		return
 	}
-	mut copied := []XAttr{}
+	mut copied := []XAttr{} @[freed]
+	copied.flags |= .noslices
 	source.l.acquire()
-	for entry in source.xattrs.entries {
-		if !entry.name.starts_with(skip) {
-			copied << XAttr{
-				name:  entry.name
-				value: entry.value.clone()
+	if source.xattrs != unsafe { nil } {
+		for i in 0 .. source.xattrs.entries.len {
+			if !source.xattrs.entries[i].name.starts_with(skip) {
+				copied << XAttr{
+					name:  source.xattrs.entries[i].name.clone()
+					value: source.xattrs.entries[i].value.clone()
+				}
 			}
 		}
 	}
 	source.l.release()
 	dest.l.acquire()
-	for entry in copied {
-		xattr_put_bytes(mut dest, entry.name, entry.value)
+	for i in 0 .. copied.len {
+		xattr_put_bytes(mut dest, copied[i].name, copied[i].value)
+		// The destination clones new names and takes ownership of values.
+		// Source removals can run after its lock is released above.
+		unsafe { copied[i].name.free() }
 	}
 	dest.l.release()
 	unsafe { copied.free() }

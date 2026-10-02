@@ -59,7 +59,9 @@ pub mut:
 	id      int
 	covered &VFSNode = unsafe { nil }
 	root    &VFSNode = unsafe { nil }
-	parent  &Mount = unsafe { nil }
+	parent  lib.MountContext
+	move_epoch u64
+	lock klock.Lock
 	detached bool
 	source  string
 	fstype  string
@@ -77,7 +79,7 @@ pub mut:
 	// The root pivot_root(2) last installed here: where setns(2) into this
 	// namespace puts the joining process.
 	root_hint &VFSNode = unsafe { nil }
-	root_hint_mount voidptr
+	root_hint_mount lib.MountContext
 }
 
 __global (
@@ -184,17 +186,17 @@ fn detach_mount(mut table MountTable, mut covered VFSNode) {
 // An entry and its strings are never freed: the copies other namespaces take
 // of a table share them, and /proc/<pid>/mountinfo reads them unlocked.
 fn record_mount(mut table MountTable, covered &VFSNode, root &VFSNode, source string,
-	fstype string, flags u64, options string, parent_mount voidptr) &Mount {
+	fstype string, flags u64, options string, parent_mount &lib.MountContext) &Mount {
 	entry := &Mount{
 		id:      katomic.inc(mut &mount_id_counter) + 1
 		covered: unsafe { covered }
 		root:    unsafe { root }
-		parent:  unsafe { &Mount(parent_mount) }
 		source:  source.clone()
 		fstype:  fstype.clone()
 		flags:   flags & ms_per_mount
 		options: options.clone()
 	}
+	lib.copy_mount_context(&entry.parent, parent_mount)
 	if voidptr(covered) != voidptr(root) {
 		mut root_node := unsafe { root }
 		root_node.mount_root = true
@@ -220,17 +222,21 @@ pub fn copy_mount_table(parent &MountTable) &MountTable {
 	table.root_hint = source.root_hint
 	table.root_hint_mount = source.root_hint_mount
 	for entry in source.mounts {
+		mut original := unsafe { entry }
+		original.lock.acquire()
 		table.mounts << &Mount{
 			id:      entry.id
 			covered: entry.covered
 			root:    entry.root
 			parent:  entry.parent
+			move_epoch: entry.move_epoch
 			detached: entry.detached
 			source:  entry.source
 			fstype:  entry.fstype
 			flags:   entry.flags
 			options: entry.options
 		}
+		original.lock.release()
 	}
 	if !source.initial {
 		for key, value in source.overrides {
@@ -485,8 +491,9 @@ fn new_mount(parent &VFSNode, source string, target string, fstype string, flags
 		}
 	}
 
-	mut target_mount := starting_mount(parent)
-	parent_of_tgt_node, mut target_node, final_component := walk_path_on_mount(parent, target, 0, true, unsafe { &target_mount })
+	target_mount := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
+	if !starting_mount(parent, target_mount) { return none }
+	parent_of_tgt_node, mut target_node, final_component := walk_path_on_mount(parent, target, 0, true, target_mount)
 	if target_node == unsafe { nil } {
 		errno.set(errno.enoent)
 		return none
@@ -494,7 +501,7 @@ fn new_mount(parent &VFSNode, source string, target string, fstype string, flags
 	// The mount point is reached through normal path resolution, so a final
 	// symlink is followed too. runc mounts onto /proc/self/fd/<n>, a magic link
 	// to the real directory it opened, to avoid a TOCTOU on the path.
-	target_node = reduce_node_on_mount(target_node, true, 0, true, unsafe { &target_mount })
+	target_node = reduce_node_on_mount(target_node, true, 0, true, target_mount)
 	if target_node == unsafe { nil } {
 		errno.set(errno.enoent)
 		return none
@@ -606,13 +613,14 @@ fn mount_devpts(parent &VFSNode, target string, flags u64, options string) ? {
 	} else {
 		pts = internal_create(devtmpfs_root, 'pts', stat.ifdir | 0o755)?
 	}
-	mut target_mount := starting_mount(parent)
-	_, mut target_node, _ := walk_path_on_mount(parent, target, 0, true, unsafe { &target_mount })
+	target_mount := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
+	if !starting_mount(parent, target_mount) { return none }
+	_, mut target_node, _ := walk_path_on_mount(parent, target, 0, true, target_mount)
 	if target_node == unsafe { nil } {
 		errno.set(errno.enoent)
 		return none
 	}
-	target_node = reduce_node_on_mount(target_node, true, 0, true, unsafe { &target_mount })
+	target_node = reduce_node_on_mount(target_node, true, 0, true, target_mount)
 	if target_node == unsafe { nil } {
 		errno.set(errno.enoent)
 		return none
@@ -632,15 +640,16 @@ fn mount_devpts(parent &VFSNode, target string, flags u64, options string) ? {
 // below the source is part of what it names, so every bind here behaves as a
 // recursive one.
 fn bind_mount(parent &VFSNode, source string, target string, flags u64) ? {
-	resolved_source := get_node_and_mount(parent, source, true)?
-	source_node := resolved_source.node
-	mut target_mount := starting_mount(parent)
-	_, mut target_node, _ := walk_path_on_mount(parent, target, 0, true, unsafe { &target_mount })
+	source_mount := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
+	source_node := get_node_and_mount(parent, source, true, source_mount)?
+	target_mount := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
+	if !starting_mount(parent, target_mount) { return none }
+	_, mut target_node, _ := walk_path_on_mount(parent, target, 0, true, target_mount)
 	if target_node == unsafe { nil } {
 		errno.set(errno.enoent)
 		return none
 	}
-	target_node = reduce_node_on_mount(target_node, true, 0, true, unsafe { &target_mount })
+	target_node = reduce_node_on_mount(target_node, true, 0, true, target_mount)
 	if target_node == unsafe { nil } {
 		errno.set(errno.enoent)
 		return none
@@ -671,7 +680,7 @@ fn bind_mount(parent &VFSNode, source string, target string, flags u64) ? {
 	}
 	table.lock.release()
 	record_mount(mut table, target_node, source_node, origin, fstype,
-		mount_flags(resolved_source.mount) | flags, 'bind', target_mount)
+		mount_flags(source_mount) | flags, 'bind', target_mount)
 	unsafe { origin.free() }
 }
 
@@ -732,21 +741,22 @@ fn find_mount(mut table MountTable, root &VFSNode) &Mount {
 }
 
 fn move_mount(parent &VFSNode, source string, target string) ? {
-	resolved := get_node_and_mount(parent, source, true)?
-	source_root := resolved.node
+	source_mount := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
+	source_root := get_node_and_mount(parent, source, true, source_mount)?
 	mut table := table_of(calling_process())
-	mut entry := namespace_mount(resolved.mount)
+	mut entry := namespace_mount(lib.mount_context_top(source_mount))
 	if entry == unsafe { nil } || voidptr(entry.root) != voidptr(source_root) {
 		errno.set(errno.einval)
 		return none
 	}
-	mut target_mount := starting_mount(parent)
-	_, mut target_node, _ := walk_path_on_mount(parent, target, 0, true, unsafe { &target_mount })
+	target_mount := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
+	if !starting_mount(parent, target_mount) { return none }
+	_, mut target_node, _ := walk_path_on_mount(parent, target, 0, true, target_mount)
 	if target_node == unsafe { nil } {
 		errno.set(errno.enoent)
 		return none
 	}
-	target_node = reduce_node_on_mount(target_node, true, 0, true, unsafe { &target_mount })
+	target_node = reduce_node_on_mount(target_node, true, 0, true, target_mount)
 	if target_node == unsafe { nil } {
 		return none
 	}
@@ -755,17 +765,23 @@ fn move_mount(parent &VFSNode, source string, target string) ? {
 		detach_mount(mut table, mut old_covered)
 	}
 	attach_mount(mut table, mut target_node, entry.root)
+	entry.lock.acquire()
 	entry.covered = target_node
-	entry.parent = unsafe { &Mount(target_mount) }
+	lib.copy_mount_context(&entry.parent, target_mount)
+	entry.move_epoch++
+	entry.lock.release()
 }
 
 fn remount(parent &VFSNode, target string, flags u64, options string) ? {
-	resolved := get_node_and_mount(parent, target, true)?
-	mut entry := namespace_mount(resolved.mount)
-	if entry == unsafe { nil } || voidptr(entry.root) != voidptr(resolved.node) {
+	identity := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
+	node := get_node_and_mount(parent, target, true, identity)?
+	mut entry := namespace_mount(lib.mount_context_top(identity))
+	if entry == unsafe { nil } || voidptr(entry.root) != voidptr(node) {
 		errno.set(errno.einval)
 		return none
 	}
+	entry.lock.acquire()
+	defer { entry.lock.release() }
 	entry.flags = flags & ms_per_mount
 	if flags & ms_bind == 0 && options.len > 0 && options != entry.options {
 		// The old options may be another namespace's too, so they stay.
@@ -793,10 +809,10 @@ pub fn syscall_umount(_ voidptr, tgt charptr, flags u64) (u64, u64) {
 }
 
 fn unmount(parent &VFSNode, target string, flags u64) ? {
-	resolved := get_node_and_mount(parent, target, flags & umount_nofollow == 0)?
-	node := resolved.node
+	identity := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
+	node := get_node_and_mount(parent, target, flags & umount_nofollow == 0, identity)?
 	mut table := table_of(calling_process())
-	mut entry := namespace_mount(resolved.mount)
+	mut entry := namespace_mount(lib.mount_context_top(identity))
 	if entry == unsafe { nil } || voidptr(entry.root) != voidptr(node) {
 		errno.set(errno.einval)
 		return none
@@ -855,8 +871,8 @@ pub fn syscall_chroot(_ voidptr, _path charptr) (u64, u64) {
 	if path.len == 0 {
 		return errno.err, errno.enoent
 	}
-	resolved := get_node_and_mount(calling_directory(), path, true) or { return errno.err, errno.get() }
-	node := resolved.node
+	identity := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
+	node := get_node_and_mount(calling_directory(), path, true, identity) or { return errno.err, errno.get() }
 	if !stat.isdir(node.resource.stat.mode) {
 		return errno.err, errno.enotdir
 	}
@@ -864,8 +880,7 @@ pub fn syscall_chroot(_ voidptr, _path charptr) (u64, u64) {
 		return errno.err, errno.eacces
 	}
 	mut process := calling_process()
-	proc.set_root_directory(mut process, voidptr(node))
-	proc.set_root_mount(mut process, resolved.mount)
+	proc.set_root_fs(mut process, voidptr(node), identity)
 	return 0, 0
 }
 
@@ -886,8 +901,8 @@ pub fn syscall_pivot_root(_ voidptr, _new_root charptr, _put_old charptr) (u64, 
 		unsafe { old_path.free() }
 	}
 	directory := calling_directory()
-	new_resolved := get_node_and_mount(directory, new_path, true) or { return errno.err, errno.get() }
-	mut new_root := new_resolved.node
+	new_mount := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
+	mut new_root := get_node_and_mount(directory, new_path, true, new_mount) or { return errno.err, errno.get() }
 	mut put_old := get_node(directory, old_path, true) or { return errno.err, errno.get() }
 	if !stat.isdir(new_root.resource.stat.mode) || !stat.isdir(put_old.resource.stat.mode) {
 		return errno.err, errno.enotdir
@@ -912,10 +927,12 @@ pub fn syscall_pivot_root(_ voidptr, _new_root charptr, _put_old charptr) (u64, 
 	} else {
 		'rootfs'
 	}, if old_entry != unsafe { nil } { old_entry.fstype } else { 'rootfs' },
-		if old_entry != unsafe { nil } { old_entry.flags } else { u64(0) }, '', new_resolved.mount)
+		if old_entry != unsafe { nil } { old_entry.flags } else { u64(0) }, '', new_mount)
 
+	table.lock.acquire()
 	table.root_hint = new_root
-	table.root_hint_mount = new_resolved.mount
+	table.root_hint_mount = unsafe { *new_mount }
+	table.lock.release()
 
 	// Every process of this namespace that was rooted, or standing, at the
 	// old root moves to the new one. These are the processes' own roots, not
@@ -927,6 +944,7 @@ pub fn syscall_pivot_root(_ voidptr, _new_root charptr, _put_old charptr) (u64, 
 		if other == unsafe { nil } || voidptr(other.ns.mnt) != voidptr(ns) {
 			continue
 		}
+		other.fs_lock.acquire()
 		other_root := if other.root_directory == unsafe { nil } {
 			vfs_root
 		} else {
@@ -934,17 +952,19 @@ pub fn syscall_pivot_root(_ voidptr, _new_root charptr, _put_old charptr) (u64, 
 		}
 		if voidptr(other_root) == voidptr(old_root) || voidptr(other_root) == voidptr(old_top) {
 			other.root_directory = voidptr(new_root)
-			other.root_mount = new_resolved.mount
+			other.root_mount = unsafe { *new_mount }
 		}
 		if other.current_directory == voidptr(old_root) || other.current_directory == voidptr(old_top) {
 			other.current_directory = voidptr(new_root)
-			other.current_mount = new_resolved.mount
+			other.current_mount = unsafe { *new_mount }
 		}
+		other.fs_lock.release()
 	}
 	proc.unlock_table()
 	// A thread with a view of its own moves by itself.
 	mut own := proc.thread_fs_of(process)
 	if own != unsafe { nil } {
+		own.lock.acquire()
 		own_root := if own.root_directory == unsafe { nil } {
 			vfs_root
 		} else {
@@ -952,12 +972,13 @@ pub fn syscall_pivot_root(_ voidptr, _new_root charptr, _put_old charptr) (u64, 
 		}
 		if voidptr(own_root) == voidptr(old_root) || voidptr(own_root) == voidptr(old_top) {
 			own.root_directory = voidptr(new_root)
-			own.root_mount = new_resolved.mount
+			own.root_mount = unsafe { *new_mount }
 		}
 		if own.current_directory == voidptr(old_root) || own.current_directory == voidptr(old_top) {
 			own.current_directory = voidptr(new_root)
-			own.current_mount = new_resolved.mount
+			own.current_mount = unsafe { *new_mount }
 		}
+		own.lock.release()
 	}
 	return 0, 0
 }
@@ -1131,6 +1152,7 @@ pub fn record_root_switch(root &VFSNode, fstype string) {
 			old.free()
 		}
 	}
+	identity := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
 	for name in names {
 		if is_dot_name(name) {
 			continue
@@ -1145,7 +1167,8 @@ pub fn record_root_switch(root &VFSNode, fstype string) {
 				shown = entry.fstype
 			}
 		}
-		record_mount(mut table, child, child.mountpoint, shown, shown, 0, '', native_mount(child))
+		if !starting_mount(child, identity) { continue }
+		record_mount(mut table, child, child.mountpoint, shown, shown, 0, '', identity)
 	}
 }
 

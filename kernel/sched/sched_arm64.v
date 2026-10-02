@@ -741,17 +741,9 @@ fn scheduler_timer_handler(_gpr_state voidptr) {
 		if trace_gpu_restore {
 			println('exec[gpu]/sched: writing replacement TTBR0')
 		}
-		cpu.write_ttbr0_el1(current_thread.ttbr0)
+		memory.switch_ttbr0(current_thread.ttbr0)
 		if trace_gpu_restore {
-			println('exec[gpu]/sched: replacement TTBR0 written; executing ISB')
-		}
-		cpu.isb()
-		if trace_gpu_restore {
-			println('exec[gpu]/sched: ISB complete; invalidating local TLB')
-		}
-		cpu.tlbi_vmalle1()
-		if trace_gpu_restore {
-			println('exec[gpu]/sched: local TLB invalidation complete')
+			println('exec[gpu]/sched: TTBR0 switch complete')
 		}
 	} else if trace_gpu_restore {
 		println('exec[gpu]/sched: replacement TTBR0 already active')
@@ -1068,9 +1060,7 @@ pub fn yield(save_ctx bool) {
 		proc.begin_cpu_time(mut current_thread, timer.get_ns())
 		cpu.write_tpidr_el0(current_thread.tpidr_el0)
 		if cpu.read_ttbr0_el1() != current_thread.ttbr0 {
-			cpu.write_ttbr0_el1(current_thread.ttbr0)
-			cpu.isb()
-			cpu.tlbi_vmalle1()
+			memory.switch_ttbr0(current_thread.ttbr0)
 		}
 		fpu_restore(current_thread.fpu_storage)
 		katomic.store(mut &current_thread.running_on, cpu_local.cpu_number)
@@ -1268,7 +1258,7 @@ pub fn new_kernel_thread(pc voidptr, arg voidptr, autoenqueue bool) &proc.Thread
 
 	mut t := &proc.Thread{
 		process: kernel_process
-		ttbr0: u64(kernel_process.pagemap.top_level)
+		ttbr0: kernel_process.pagemap.tagged_root()
 		gpr_state: gpr_state
 		timeslice: 5000
 		running_on: u64(-1)
@@ -1359,7 +1349,7 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 
 	mut t := &proc.Thread{
 		process: process
-		ttbr0: u64(process.pagemap.top_level)
+		ttbr0: process.pagemap.tagged_root()
 		gpr_state: gpr_state
 		timeslice: 5000
 		running_on: u64(-1)
@@ -1451,7 +1441,7 @@ pub fn new_cloned_thread(_process &proc.Process, _source &proc.Thread, state &cp
 
 	mut t := &proc.Thread{
 		process: process
-		ttbr0: u64(process.pagemap.top_level)
+		ttbr0: process.pagemap.tagged_root()
 		gpr_state: state
 		timeslice: source.timeslice
 		running_on: u64(-1)

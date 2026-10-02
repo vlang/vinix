@@ -79,13 +79,16 @@ pub mut:
 	mmap_ranges []voidptr
 	// Search tree for mmap ranges; its nodes are owned by mmap_ranges.
 	mmap_root   voidptr
-	// Being torn down: no CPU runs it any more, so pages come out of it with
-	// no TLB maintenance each, and one flush follows (flush_tlb_everywhere).
+	// Being torn down: no CPU runs it any more, retained translations were
+	// invalidated before its pages/tables are returned to the allocator.
 	dying bool
 	// Address-space inspection survives exec/exit detaching this map from
 	// its process. The counter and final wake are protected by l.
 	inspection_refs int
 	inspection_drained eventstruct.Event
+	// ARM64: exclusive ownership of a nonzero 8-bit ASID until destruction.
+	// Zero uses the conservative flush-on-switch path; x86 does not use it.
+	tlb_tag u16
 }
 
 fn C.get_kernel_end_addr() u64

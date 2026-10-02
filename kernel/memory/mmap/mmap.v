@@ -529,8 +529,9 @@ fn delete_pagemap_impl(mut pagemap memory.Pagemap, trace bool) ? {
 	// to reclaim immutable ranges after the process can no longer observe them.
 	// Every caller has taken the page map off every CPU first: exit and exec
 	// switch to the kernel's and have stopped the other threads, and a failed
-	// fork never ran it. So its pages come out without TLB maintenance each,
-	// and one flush follows.
+	// fork never ran it. Retained tagged translations are invalidated first;
+	// its pages then come out without TLB maintenance each.
+	pagemap.prepare_tlb_teardown()
 	pagemap.dying = true
 	mut range_index := u64(0)
 	for pagemap.mmap_ranges.len != 0 {
@@ -563,7 +564,7 @@ fn delete_pagemap_impl(mut pagemap memory.Pagemap, trace bool) ? {
 		range_index++
 	}
 
-	memory.flush_tlb_everywhere()
+	pagemap.release_tlb_tag()
 	top_level := pagemap.top_level
 	pagemap.l.release()
 	if trace {

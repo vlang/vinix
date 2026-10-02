@@ -233,7 +233,8 @@ pub mut:
 	brk_base          u64
 	brk_current       u64
 	current_directory voidptr
-	current_mount     voidptr
+	current_mount     lib.MountContext
+	fs_lock           klock.Lock
 	event             eventstruct.Event
 	status            int
 	// Set once exit_group() (or a fatal fault) has started tearing the
@@ -306,8 +307,8 @@ pub mut:
 	// from (nil means the system root), the namespaces this process is in,
 	// its capability sets and its cgroup.
 	root_directory  voidptr
-	root_mount      voidptr
-	exe_mount       voidptr
+	root_mount      lib.MountContext
+	exe_mount       lib.MountContext
 	ns              NamespaceSet
 	caps            Capabilities
 	no_new_privs    bool

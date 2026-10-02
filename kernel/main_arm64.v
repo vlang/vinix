@@ -2,6 +2,7 @@
 module main
 
 import memory
+import acpisync
 import term
 import lib.stubs
 import aarch64.cpu
@@ -182,6 +183,8 @@ fn bootstrap_cpu0() {
 }
 
 fn kmain_thread(qemu_platform bool, acpi_platform bool) {
+	acpisync.scheduler_ready()
+	acpisync.test_native()
 	boot_stage(11)
 	print('kmain_thread: started\n')
 
@@ -982,6 +985,7 @@ fn kmain() {
 	numa.attach_cpus()
 
 	print('init time...\n')
+	acpisync.test_boot()
 	time.initialise()
 	print('time done\n')
 

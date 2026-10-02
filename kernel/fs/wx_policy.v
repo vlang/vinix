@@ -36,7 +36,7 @@ fn add_superblock_options(mut text lib.Text, options string) {
 
 // An environment request alone cannot disable W^X. The administrator may
 // authorize a launcher, or the mount carrying the requested executable.
-pub fn wx_exec_allowed(identity voidptr) bool {
+pub fn wx_exec_allowed(identity &lib.MountContext) bool {
 	current := proc.current_thread()
 	if current != unsafe { nil } {
 		process := current.process

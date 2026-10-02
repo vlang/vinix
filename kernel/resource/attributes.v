@@ -21,7 +21,10 @@ mut:
 
 pub fn attributes(mut res Resource) u32 {
 	if mut res is AttributeResource {
-		return res.attribute_bits()
+		mut backend := AttributeResource(res)
+		mut stack := unsafe { &backend }
+		bits := stack.attribute_bits()
+		return bits
 	}
 	return 0
 }
@@ -32,7 +35,10 @@ pub fn can_have_attributes(mut res Resource) bool {
 
 pub fn set_attributes(mut res Resource, bits u32) ? {
 	if mut res is AttributeResource {
-		return res.set_attribute_bits(bits)
+		mut backend := AttributeResource(res)
+		mut stack := unsafe { &backend }
+		stack.set_attribute_bits(bits)?
+		return
 	}
 	return none
 }
