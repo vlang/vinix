@@ -122,6 +122,25 @@ fn main() {
 	unsafe { partial_header.free() }
 	desktop_close(int(partial_pipe[0]))
 	desktop_close(int(partial_pipe[1]))
+	// A deadline recheck must still accept a reply already in the pipe, and
+	// readiness from a closed writer must not count as a successful response.
+	mut ready_pipe := [2]i32{}
+	assert C.pipe(&ready_pipe[0]) == 0
+	assert desktop_set_nonblocking(int(ready_pipe[0]), true)
+	assert send_app_response(int(ready_pipe[1]), true, AppWireState{}, [u8(7)])
+	ready_reply := receive_app_response_with_timeout(int(ready_pipe[0]), 0) or {
+		panic(err)
+	}
+	assert ready_reply.ok && ready_reply.payload == [u8(7)]
+	unsafe { ready_reply.payload.free() }
+	desktop_close(int(ready_pipe[1]))
+	mut closed_response_rejected := false
+	receive_app_response_with_timeout(int(ready_pipe[0]), 10) or {
+		assert err.msg() == 'application response header timed out or pipe closed'
+		closed_response_rejected = true
+	}
+	assert closed_response_rejected
+	desktop_close(int(ready_pipe[0]))
 	// A cold persistent home can make Files' initial directory scan slower
 	// than a normal interaction. Boot-started apps get that larger budget;
 	// requests after startup still fail promptly through the timeout above.
@@ -131,7 +150,7 @@ fn main() {
 	// short fallback cadence because its PTY echo can arrive just after the
 	// immediate poll forced by a keystroke. Activity Monitor can remain slow.
 	assert available_apps[3].poll_interval_ms == 100
-	assert available_apps[5].poll_interval_ms == 1000
+	assert available_apps[5].poll_interval_ms == 250
 	assert available_apps[8].poll_interval_ms == 100
 	assert available_apps[9].poll_interval_ms == 0
 	assert remote_app_poll_due(50, false, 0, 1_000)
@@ -225,7 +244,9 @@ fn main() {
 	settings.handle('${settings_action_category}1') or { panic(err) }
 	settings.handle('${settings_action_theme}1') or { panic(err) }
 	assert desktop.settings.theme == .macos
-	settings.handle('${settings_action_category}4') or { panic(err) }
+	settings.handle('${settings_action_category}${settings_categories.index(SettingsCategory.display)}') or {
+		panic(err)
+	}
 	settings.handle(settings_scale_200_action) or { panic(err) }
 	assert desktop_requested_scale() == desktop_scale_200
 	settings_tree := settings.build(ui2.rect(0, 0, 620, 386)) or { panic(err) }

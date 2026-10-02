@@ -833,9 +833,25 @@ fn app_response_ready(fd int, timeout_ms int) bool {
 	mut retried_after_pause := false
 	for {
 		started := desktop_monotonic_ms()
-		ready := C.poll(&descriptor, 1, timeout_ms)
+		mut ready := C.poll(&descriptor, 1, timeout_ms)
 		if ready < 0 && C.errno == C.EINTR {
 			continue
+		}
+		// Under load the response and the deadline can both become ready before
+		// this process runs again. A timeout notification does not prove that
+		// the pipe is still empty: check its current state without waiting before
+		// terminating an application that already answered.
+		if ready == 0 {
+			ready = C.poll(&descriptor, 1, 0)
+			for ready < 0 && C.errno == C.EINTR {
+				ready = C.poll(&descriptor, 1, 0)
+			}
+			if ready > 0 && descriptor.revents & i16(C.POLLIN | C.POLLHUP | C.POLLERR) != 0 {
+				finished := desktop_monotonic_ms()
+				if started != ~u64(0) && finished != ~u64(0) && finished >= started {
+					eprintln('vinix-desktop: application response pipe fd ${fd} is ready after a ${finished - started} ms timed wait')
+				}
+			}
 		}
 		// A host sleep or a paused QEMU can advance the guest's monotonic
 		// clock far past this poll's deadline without scheduling the app at
@@ -1201,12 +1217,17 @@ fn (mut a RemoteApp) transact(command AppCommand, width int, height int, payload
 	} else {
 		AppWireState{}
 	}
+	started := desktop_monotonic_ms()
 	if !send_app_request(a.request_fd, command, width, height, state, payload) {
 		a.remember_transport_failure('application request pipe closed')
 		a.abort_transport()
 		return error(a.failure_reason)
 	}
 	reply := receive_app_response(a.response_fd) or {
+		finished := desktop_monotonic_ms()
+		if started != ~u64(0) && finished != ~u64(0) && finished >= started {
+			eprintln('vinix-desktop: ${a.title} (pid ${a.pid}) ${command} request failed after ${finished - started} ms')
+		}
 		a.remember_transport_failure(err.msg())
 		a.abort_transport()
 		return error(a.failure_reason)
