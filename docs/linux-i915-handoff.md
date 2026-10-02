@@ -1,7 +1,7 @@
 # Linux i915 next-session handoff
 
 Prepared 2026-10-02 for `/Users/alex/code/vinix`, on macOS ARM64 with zsh.
-Implementation baseline: **`de5db8a3`**. Recheck HEAD and the worktree before
+Committed implementation baseline: **`bfbb99a6`** (including native SRCU). Recheck HEAD and the worktree before
 starting; other sessions use this checkout. The main status document is
 [linux-i915.md](linux-i915.md).
 
@@ -14,8 +14,8 @@ starting; other sessions use this checkout. The main status document is
 > parallel agents across implementation, tests, subsystem research and
 > independent lifetime review, within the available concurrency limit.
 > Assign disjoint file ownership and coordinate shared integration centrally.
-> Start with the missing CPU-bound and high-priority workqueues, then continue
-> through the remaining driver dependencies. Keep upstream sources unchanged,
+> Continue through the remaining synchronization, device, memory and DRM
+> dependencies; bound and high-priority workqueues are already implemented. Keep upstream sources unchanged,
 > implement real native semantics, measure retained allocations in isolated
 > worktrees, test both architectures, and commit each completed change using
 > only its own paths. Preserve other sessions' staged and unstaged edits.
@@ -48,15 +48,22 @@ Vinix hardware test setup or isolated GPU passthrough setup. QEMU VGA cannot
 validate i915. Keep coding and testing the compatibility runtime while that
 information is pending; final hardware completion depends on it.
 
-The previous coding turn stopped after a transient missing command-runner
-binary (`codex-code-mode-host`). Repository tools recovered during this
-handoff. **No CPU-binding or CPU-bound workqueue implementation was written
-after `de5db8a3`.** Do not treat the proposed design below as existing code.
+Bound and high-priority queues are now implemented and committed. The earlier
+final-ELF artifact gap was closed by fresh normal/SSE guest runs using the
+handoff's rebuilt ELF. Ten distinct agents contributed in waves, within the
+four-active-agent limit including root. SRCU is now committed and tested in
+fresh normal/SSE guests. Wound/wait mutexes are the next implementation; inspect
+HEAD and owned diffs before assuming their completion.
 
 ## Committed progress
 
 | Commit | Completed runtime change |
 | --- | --- |
+| `bfbb99a6` | Native SRCU readers, persistent grace periods, callbacks/barriers and teardown |
+| `30ac90ae` | Timer self-test failure diagnostics and finite scheduler-tolerant watchdog |
+| `06410c39` | Allocation gate rejects missing reports and checks both architectures even with populated objects |
+| `19789348` | Native multiword bitmap operations, conversions and checked allocation |
+| `da886cde` | CPU-bound and high-priority workqueues, default/high-priority system queues, affinity-aware wakeups and checked worker constructors |
 | `de5db8a3` | Concurrent unbound workqueues, active limits, `system_unbound_wq`, manager/worker teardown |
 | `5ca6734d` | Native delayed work, timer transfer, cancellation and flush semantics |
 | `ef29dedd` | Native ordered workqueues and worker lifetimes |
@@ -118,15 +125,15 @@ archive into another separate reference directory, never into the import.
 ### Workqueues and worker ownership
 
 - Original Linux `work_struct`, `delayed_work` layouts and initialization
-  macros are used. Native queues are aligned to 256 bytes so their pointers
-  can be encoded in `work.data`. `PENDING|PWQ` means queued; `INACTIVE` also
+  macros are used. Native per-CPU pool objects are aligned to 256 bytes so their pointers
+  can be encoded in `work.data`; each pool retains its public queue owner. `PENDING|PWQ` means queued; `INACTIVE` also
   means a delayed timer reservation. Do not change upstream layouts.
 - Explicit `alloc_ordered_workqueue(..., 0)` has one FIFO worker. Concurrent
   `alloc_workqueue(..., WQ_UNBOUND, max_active)` supports limits 1 through 512,
-  with zero selecting 256. The current implementation has one affinity domain.
+  with zero selecting 256. Unbound queues use one affinity domain; bound queues enforce limits per CPU.
 - Unordered queues with `max_active > 1` have a manager that creates workers
-  with interrupts enabled, outside `work_lock`. Single-active and ordered
-  queues need only one worker. Enqueue and delayed-arm paths allocate nothing
+  with interrupts enabled, outside `work_lock`. Ordered and single-active unbound
+  queues need only one worker. Bound pools create workers lazily. Enqueue and delayed-arm paths allocate nothing
   and can run with interrupts disabled. Workers stay until destruction, so
   an unbound queue retains its peak worker count during its lifetime.
 - Each `native_worker` owns a pthread, retained task and ready completion.
@@ -134,9 +141,9 @@ archive into another separate reference directory, never into the import.
   before traversing its final worker list**, then joins/releases every worker.
   The manager can publish a just-created worker during destruction. Preserve
   this ordering and test partial construction/OOM rollback.
-- `system_unbound_wq` is initialized at boot and has boot lifetime. Warm its
-  peak before measuring temporary retained allocations. Other system queues
-  remain unresolved, including default and high-priority queues.
+- `system_wq`, `system_highpri_wq` and `system_unbound_wq` are initialized
+  together at boot, with all-or-nothing rollback. Warm their peak before
+  measuring temporary retained allocations.
 - A work item never overlaps itself, including migration across queues.
   A migrated pending item blocked by an old callback cannot prevent later
   independent work from running. Completion wakes workers on all queues.
@@ -207,111 +214,68 @@ archive into another separate reference directory, never into the import.
   work callback finishes on another CPU. Native tests allow a bounded
   500-tick wait before asserting the timer-active count is zero.
 
-## Immediate next feature: bound and high-priority queues
+### SRCU lifetime contracts
 
-Actual upstream requirements still fail:
+- Keep the original Linux `srcu_struct`, `srcu_usage`, `srcu_data` and static
+  initializers. Static readers can enter before updater initialization; never
+  reset their counters, replace their storage or reset `srcu_idx` lazily.
+- Reader lock/unlock paths allocate nothing and pin only the counter update.
+  Readers may sleep/migrate. Quiescence sums every CPU's unlock counts first,
+  then a full barrier and lock counts; per-CPU subtraction is incorrect.
+- A private boot unbound queue owns two independent embedded work items:
+  `sup->work` is the delayed GP updater, CPU 0's `sdp->work` dispatches callbacks.
+  Failed reader scans persist their phase, rearm one tick and return the active
+  slot. A held callback cannot block independent GP/cookie progress. Sharing
+  a saturated public/system queue would deadlock synchronous callers.
+- GP cookies use Linux's two-bit sequence and full-period snapshot rules.
+  Callback registration/ready/completed counts remain independent of GP
+  completion. Pop/copy the next pointer and callback function before invoking;
+  never read a head after its callback, which may free or requeue it.
+- Barrier snapshots occur under the usage lock before taking the waiter mutex.
+  Count a callback completed only after its function returns. Empty barriers
+  do not request a GP; later submissions must not move earlier callers' boundaries.
+- Owners stop readers/producers/API users before cleanup. Finish a full GP and
+  callback barrier, synchronously cancel delayed GP activity, then flush/cancel
+  callback work before freeing per-CPU data or usage. Static cleanup is forbidden.
+- Ordinary RCU, NMI-safe and context-independent down/up SRCU remain unresolved.
+  Do not treat explicit SRCU counters as ordinary RCU implicit read protection.
 
-| Driver use | Current result |
-| --- | --- |
-| `i915_driver.c`: `alloc_workqueue("i915-unordered", 0, 0)` | CPU-bound allocation unsupported |
-| `intel_display_driver.c`: high-priority unbound flip queue | `WQ_HIGHPRI` unsupported |
-| Ordinary ordered i915/DP/modeset/GSC queues | Supported subset |
-| Cleanup/TTM/PXP/GUC/display-power `system_unbound_wq` work | Queue API available; those subsystems remain incomplete |
-| Heartbeat/timestamp/log/commit high-priority system work | `system_highpri_wq` unresolved |
-| `schedule_work`, `_on` variants and default system work | Default bound system queue unresolved |
+## Bound and high-priority contracts
 
-`WQ_FREEZABLE`, `WQ_MEM_RECLAIM`, reclaim rescuers, CPU-intensive/sysfs and
-attribute modes, explicit CPU queueing and RCU work remain unsupported.
-Review exact pinned Linux semantics before accepting additional flags.
+- Bound support explicitly requires at most 64 online CPUs, matching native
+  affinity masks. Default routing captures the calling CPU while pinned;
+  explicit `_on` routing rejects invalid CPUs. Delayed reservations retain
+  their selected CPU. Requeueing a running item on the same public queue
+  preserves its original execution pool.
+- Active callbacks stay counted while sleeping. Separate scheduler runnable
+  accounting spans public queue owners on each CPU and priority domain.
+  Sleep/wake transitions come from actual native scheduling boundaries.
+- Public queue generations and pending lists cover every pool together, so a
+  queue flush snapshots all CPUs under one lock. Per-pool sequential flushing
+  would move the boundary and remains incorrect.
+- Workers bind themselves before readiness publication. Affinity-aware idle
+  wake selection and explicit target wakes prevent sleeping target CPUs from
+  stranding work. Native checks verify placement after sleep and yield.
+- `WQ_HIGHPRI` uses a per-thread nice override of -20 without changing the
+  shared kernel process. Vinix's native linear nice weights increase its
+  ordinary scheduling quantum; this is not Linux's exact CFS weighting.
+- Checked constructors roll back stack, FPU and Thread allocations before
+  publication. Partial manager/worker failure and destruction are tested.
+- Hotplug, freezer/reclaim/rescuers, CPU-intensive/sysfs/attribute modes and
+  RCU work remain unsupported. Additional system queues remain unresolved.
 
-The following is a **proposal**, not committed code:
+## Parallel-agent execution
 
-1. Implement an internal native helper for a kernel worker to bind itself to
-   an online CPU before publishing readiness. Validate IRQ/preemption state
-   and CPU range, publish the affinity mask, wake the selected CPU, reschedule
-   until actually running there, and test identity after sleep/yield.
-   `proc.set_thread_affinity(tid, mask)` cannot simply be reused: anonymous
-   kernel pthreads have TID 0 and public lookup requires a positive TID.
-2. Existing `Thread.affinity_mask` is a 64-bit mask on both architectures;
-   `sched/policy.v:may_run_here` does not constrain CPUs above 63. Do not claim
-   bindings beyond that range. `CONFIG_NR_CPUS` is 256; either explicitly
-   restrict bound support to machines with at most 64 online CPUs or extend
-   the scheduler masks. Inspect enqueue wake selection: waking the
-   first idle CPU without checking affinity may leave the actual target asleep.
-   Clear/update NUMA hints consistently when moving a worker.
-3. Provide bound pools with `max_active` enforced per CPU. Default queueing
-   chooses the calling CPU under IRQ/preemption protection; explicit `_on`
-   selects a valid CPU. If executing work is requeued on its same public queue,
-   preserve Linux's selection of its original execution pool even when the
-   producer runs on another CPU. One candidate is aligned pool objects encoded
-   in `work.data`, each carrying a public queue owner and CPU. Choose the
-   representation deliberately; this has not been implemented or finalized.
-   Create workers on demand: each x86 kernel pthread currently owns two
-   2 MiB stacks, and the native runnable queue has 512 slots shared with other
-   threads. Eagerly creating 256/512 workers per CPU would be impractical.
-   Keep sleeping callbacks counted toward per-CPU `max_active`. Current
-   `wq->nr_running` counts in-flight callbacks, whereas Linux bound pool
-   `nr_running` tracks runnable workers for concurrency management. Full
-   bound semantics need distinct runnable accounting and sleep/wake hooks;
-   do not release an active slot just because its callback sleeps.
-4. Public queue flush must snapshot all pools atomically. Flushing each child
-   pool sequentially would take different boundaries and include later work.
-   Preserve cross-queue no-overlap, owner-based chaining, stack markers and
-   partial construction/destruction safety. Delayed transfer must retain its
-   selected CPU without allocating on each arm.
-5. Implement real high-priority worker scheduling. Current nice is stored in
-   `Process.nice`, and all kernel workers share a kernel process. Changing its
-   nice would affect unrelated kernel threads. Consider a per-thread native
-   weight/nice override with appropriate scheduler tests. SCHED_FIFO/RR is
-   not Linux `WQ_HIGHPRI` negative-nice semantics; do not substitute it.
-6. Add default/high-priority system queues only once their actual semantics,
-   bootstrap failure handling and boot lifetimes are covered. Keep unsupported
-   hotplug, reclaim/freezer and attribute behavior explicit.
+There are four active slots including root. Use three workers continuously
+and recycle completed tasks across implementation, host tests, native tests,
+research and independent review. Ten distinct agents have contributed to the
+current milestones; this does not mean ten were simultaneously active.
 
-## Parallel-agent execution plan
-
-The last environment allowed **four active agents including root**. Use root
-plus three workers continuously, then recycle completed workers into further
-waves. If a new session has more slots, split research/review/build jobs
-further. Spawn fresh agents; prior session names do not imply live agents.
-Give every agent a concrete result, file ownership, ABI contracts, baseline
-commit and validation requirements. They share the checkout.
-
-### Wave 1: CPU-bound queues
-
-Start by booting the final saved ELF in fresh normal/SSE guests, or boot a
-fresh baseline build, to close the artifact gap described below while agents
-inspect the next feature. Use current checkout harnesses rather than the
-older scripts left in the temporary worktrees.
-
-| Owner | Responsibility | Exclusive files / boundaries |
-| --- | --- | --- |
-| Root | Design contracts, shared integration, native test integration, build/boot, commit | `bridge_amd64.v`, `include/vinix/runtime.h`, `GNUmakefile`, `run.sh`, shared process/scheduler changes and docs |
-| Agent A | Bound pool backend, routing, cross-pool flush/cancel/destroy | `kernel/c/linuxkpi_workqueue.c`; coordinate new bridge declarations with root |
-| Agent B | Kernel-worker CPU binding and targeted wake support | New `kernel/linuxkpi/worker_amd64.v`; propose scheduler edits to root instead of concurrently editing shared files |
-| Agent C | Independent bound-queue host model and regression tests | New `tests/linuxkpi/bound_work_test.h`; send integration changes to root |
-
-Agree on the binding helper and queue/pool encoding before dependent edits.
-Agent C should test externally observable semantics, not duplicate backend
-logic. Essential cases: actual CPU placement through sleep/yield, idle target
-wakeup, per-CPU active limits, explicit CPU routing, delayed routing, same-item
-migration, atomic enqueue paths, whole-queue snapshots, cancellation/rearm,
-partial failure and full native teardown. Root measures pages in a fresh
-worktree and reviews generated V C for hidden allocations.
-
-### Wave 2: review, priority and next dependency research
-
-Recycle an available agent into independent read-only lifetime review before
-committing new allocation/reclamation paths. Use another for high-priority
-worker semantics and tests, and the third for a pinned-source RCU/SRCU and
-audit dependency inventory. Keep workqueue backend changes under one owner;
-parallelize priority bridge and test work, then integrate sequentially.
-
-After each integrated feature, run the relevant host checks, builds and native
-measurement. One agent can inspect audit diagnostics while another validates
-an isolated architecture build and a third reviews lifetimes. Each build must
-have its own writable objects/caches. Do not commit implementation fragments
-that lack functioning integration or claim tests someone has not run.
+Root owns shared bridge/header/build/harness integration and commits.
+Assign each backend and each new test file to one owner. Freeze ABI contracts
+before dependent edits, and keep reviewers independent of implementation.
+Every architecture build needs its own writable objects and compiler cache.
+Do not commit fragments without functioning integration and actual tests.
 
 ### Later waves: subsystem teams
 
@@ -336,7 +300,7 @@ driver goal rather than stopping after a plan or an improved audit count.
 | --- | --- |
 | `docs/linux-i915.md` | Truthful current support/limitations and tests |
 | `kernel/c/linuxkpi_workqueue.c` | Ordered, delayed and concurrent unbound implementation plus native tests |
-| `kernel/c/linuxkpi_{timer,time,sync,task,percpu}.c` | Native runtime backends |
+| `kernel/c/linuxkpi_{srcu,timer,time,sync,task,percpu}.c` | Native runtime backends |
 | `kernel/linuxkpi/bridge_amd64.v` | Native V exports, initialization and measured guest tests |
 | `kernel/linuxkpi/include/vinix/runtime.h` | Internal bridge declarations |
 | `kernel/linuxkpi/include/linux/`, `include/asm/` | Compatibility overlays; many remaining headers stay upstream |
@@ -356,69 +320,68 @@ or rewrite upstream headers to make a false success.
 
 ## Validation already completed
 
-These are the previous implementation's recorded results, not fresh tests
-run for this documentation-only handoff:
+Fresh continuation checks cover these committed changes:
 
 | Check | Result and artifact |
 | --- | --- |
-| Host runtime + import tests | ASan/UBSan and strict warnings pass; `/tmp/vinix-linuxkpi-unbound-host-final.log` |
-| x86-64 `LINUXKPI=1` build | Pass; `/tmp/vinix-linuxkpi-unbound-enabled-build-final.log` and exact-source `...-enabled-build-commit.log` |
-| arm64 `LINUXKPI=0` build | Pass; `/tmp/vinix-linuxkpi-unbound-arm-build.log`, `...-final.log`, `...-commit.log` |
-| Default x86-64 build | Pass; `/tmp/vinix-linuxkpi-unbound-default-build.log` |
-| Four-CPU default QEMU | Linux-ABI startup pass with no LinuxKPI markers; `/tmp/vinix-linuxkpi-unbound-default-vm/serial.log` |
-| Four-CPU enabled QEMU, CPU `max` | Earlier saved ELF passed; `/tmp/vinix-linuxkpi-unbound-vm/serial.log` and sibling harness log |
-| Four-CPU enabled QEMU, `max,hypervisor=off` | Earlier saved ELF passed including original SSE4.1 copy/FPU path; `/tmp/vinix-linuxkpi-unbound-sse-vm/serial.log` |
-| Full i915 syntax audit | Expected exit 1, **1/269**; `/tmp/vinix-linuxkpi-unbound-audit.log`, `build/linuxkpi/i915-audit.json` |
+| Strict host runtime/import tests | Clean ASan/UBSan; `/tmp/vinix-linuxkpi-bound-host-gatefixed.log`, `/tmp/vinix-linuxkpi-bitmap-integrated-host.log` |
+| Enabled x86 builds | Pass; `/tmp/vinix-linuxkpi-bound-x86-build-final.log`, `/tmp/vinix-linuxkpi-bitmap-x86-build.log` |
+| Disabled arm64 builds | Pass; `/tmp/vinix-linuxkpi-bound-arm-build-final.log`, `/tmp/vinix-linuxkpi-bitmap-arm-build.log` |
+| Default x86 build/guest | Pass; `/tmp/vinix-linuxkpi-bitmap-default-build.log`, `/tmp/vinix-linuxkpi-bitmap-default-vm/serial.log` |
+| Four-CPU enabled normal/SSE guests | Pass; `/tmp/vinix-linuxkpi-bitmap-vm/serial.log`, `/tmp/vinix-linuxkpi-bitmap-sse-vm/serial.log` |
+| Optional XNU allocator build/guest | Pass; `/tmp/vinix-linuxkpi-bound-xnu-build.log`, `/tmp/vinix-linuxkpi-bound-xnu-vm/serial.log` |
+| Full i915 syntax audit | Expected exit 1, still **1/269** |
+| Import verification | **7,668** unchanged pinned files |
 
-The enabled guest logs contain the required new marker:
+The enabled bitmap ELF used by both normal/SSE guests is
+`/tmp/vinix-linuxkpi-bitmap-enabled.elf`, SHA256
+`69abc50a0752aee53a3a0e9594f0baa3573d74c6caab7f0fd108f98926d364e4`.
+Both guest logs contain the bound/priority, worker-rollback and multiword
+bitmap markers and exact per-feature physical-page recovery. The earlier
+rebuilt unbound ELF also booted in fresh baseline normal/SSE guests at
+`/tmp/vinix-linuxkpi-next-baseline-{vm,sse-vm}/serial.log`.
 
-```text
-linuxkpi: concurrent unbound workqueues, active limits, system_unbound_wq and teardown passed; no pages retained
-```
+Independent reviews approved committed worker, scheduler, constructor,
+bitmap, allocation-check and SRCU lifetimes. SRCU final strict host tests pass
+in `/tmp/vinix-linuxkpi-srcu-host-final.log`; fresh enabled x86 and disabled ARM
+builds pass in `/tmp/vinix-linuxkpi-srcu-{x86,arm}-build-tested.log`. Final normal
+and SSE guests pass in `/tmp/vinix-linuxkpi-srcu-final-{vm,sse-vm}/serial.log`,
+including the new SRCU marker and exact page recovery. Default x86 startup
+passes in `/tmp/vinix-linuxkpi-srcu-default-vm/serial.log`. The final enabled ELF
+is `/tmp/vinix-linuxkpi-srcu-enabled-final.elf`, SHA256
+`7942f62276e324036df6e4f6655cd063271ade00ecf52faa62f14bafae16f824`.
 
-The recorded harness PASS headline predates the wording update that mentions
-unbound work; verify the serial marker itself. Both enabled guest runs used
-the earlier saved ELF, not the final rebuilt ELF. Their hashes are:
+Initial enabled SRCU guests intermittently failed the old timer self-test
+watchdog before SRCU ran. Diagnostic records established timeout/incomplete
+call count with no callback context/ordering violation, at 100–140 elapsed
+ticks. The committed timer test now permits 500 ticks, retains every correctness
+check and prints fixed-stack failure records after shutdown/join. Final guests
+above use that exact source. Failed logs remain as evidence, including
+`/tmp/vinix-linuxkpi-srcu-timer-diagnostic-sse-vm/serial.log`; do not count them
+as successful boots.
 
-```text
-tested enabled.elf:
-35913d5a06aeca78dd2d87e41efd304d450a5be516a6f99abec84e9266891545
-rebuilt enabled-final.elf:
-fcf2ac20f1036dc278b536a9c28b951cd04600250219f7de35772618644781ef
-```
+The corrected allocation gate reports the same baseline and feature results:
+ARM **293 source files / 361 sites**, x86 **224 files / 253 sites**, combined
+**425 unique sites / 182 file-kind groups / 155 pre-existing failures**.
+Fresh and populated architecture object directories give identical results.
+Missing make output and compiler reports now fail explicitly. Evidence:
+`/tmp/vinix-linuxkpi-bound-alloc-fixed-{fresh,populated-arm,populated-x86}.log`.
+The fresh SRCU overlay matches every count and failure group as well:
+`/tmp/vinix-linuxkpi-srcu-alloc.log` and
+`/tmp/vinix-linuxkpi-srcu-alloc-comparison.json`. Generated x86/ARM constructors
+initialize the caller-local allocation-failure field to -1, and its successful
+allocator bridge path adds no hidden V allocation. Do not change `allowed.txt`
+to hide these baseline failures.
 
-The subsequent source change was host-test-only, and the final compile/link
-passed, but the available logs do not establish a guest boot of the final
-ELF. Make that rerun an early next-session check. Older `host-initial.log`
-printed PASS despite a UBSan alignment diagnostic; use the clean final host
-log as evidence, not the earlier headline.
-
-Native workqueue batches use three warmups plus a measured fourth batch.
-The permanent system queue is
-deterministically warmed to eight simultaneously held callbacks. Temporary
-queues at limits two/four exercise real sleep/rearm, nested item flush and
-24 self-freeing objects per batch; measured pages return exactly to baseline.
-Host coverage includes limits one/two/four, 20 overlapping flushers, late-start
-old work, manager-publication-versus-destroy races, 200 self-freeing objects,
-shared delayed producers and system initialization failure/reuse/release.
-
-Independent lifetime reviewers approved the committed task, sync, time,
-timer, ordered/delayed and unbound changes. The final unbound review also
-checked native OOM and timeout cleanup, publication, stack result ownership,
-the manager gate and overlapping flush models. New changes need new review.
-
-Do not claim the entire kernel allocation gate passes: previous broader
-allocation checks had existing baseline failures outside this work. The
-new per-feature page recovery measurements passed. Read/measure the current
-baseline before diagnosing or claiming a global result.
-
-The audit's prominent first-error groups include unknown SRCU implementation,
-`WARN_ONCE`, `pr_warn`, `is_power_of_2`, `ktime_t`, `PF_VCPU`, `current`,
-`clamp_val`, `add_taint`, missing `asm/kmap_size.h` and incomplete timer types.
-These reflect compilation paths and missing integration, not a complete
-runtime dependency inventory. Read full per-unit diagnostics and real callers.
-Even 269/269 syntax success would still need actual object linking, symbol
-closure, hardware operation and userspace validation.
+Broader required ARM ops/churn/cache and desktop idle/apps/drag workloads
+completed without panic. They test LinuxKPI disabled with one online CPU.
+Logs: `/tmp/vinix-linuxkpi-bound-perf-ops-churn-cache-rerun.log` and
+`/tmp/vinix-linuxkpi-bound-perf-idle-apps-drag.log`; parsed results are in
+`/tmp/vinix-linuxkpi-bound-perf-retained-summary.json`. They still show large
+retained allocations (including readdir, proc listing/reads and program
+churn). There was no before/after runtime comparison for those operations;
+do not attribute them to this feature or claim the whole kernel is leak-free.
+Per-feature page recovery is a separate measured result.
 
 ## Repeatable commands and build isolation
 
@@ -506,7 +469,7 @@ Existing temporary artifacts are convenient references, not clean worktrees:
   milestones. Start fresh for new changes; never infer exact source from their
   detached HEAD alone.
 
-Read-only handoff verification found that both unbound worktrees' tracked
+The earlier handoff's read-only verification found that both unbound worktrees' tracked
 kernel sources match `de5db8a3`, although their detached HEADs are older and
 three implementation files are locally modified. Their docs/test harnesses
 are older. Use current root test scripts against an explicitly chosen kernel.
@@ -519,8 +482,8 @@ there; preserve known baselines and clearly scope feature-specific evidence.
 
 ## Remaining path to completion
 
-1. Bound/priority and required system workqueues; remaining synchronization,
-   RCU/SRCU, SMP/context and timer interfaces.
+1. Remaining synchronization (ordinary RCU and wound/wait), SMP/context,
+   additional system workqueues and timer interfaces.
 2. Linux device/PCI registration/configuration/removal and devres ownership.
 3. MMIO cache attributes, DMA/SG, page/shmem, GPU address spaces and TTM/GEM.
 4. IRQ registration/synchronization and safe reset/recovery paths.
