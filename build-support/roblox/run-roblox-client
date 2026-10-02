@@ -40,6 +40,9 @@ export XDG_RUNTIME_DIR="$session" WAYLAND_DISPLAY=wayland-roblox
 export XKB_CONFIG_ROOT="$wl/usr/share/X11/xkb"
 export WESTON_MODULE_MAP="x11-backend.so=$wl/usr/lib/libweston-14/x11-backend.so;kiosk-shell.so=$wl/usr/lib/weston/kiosk-shell.so"
 export CORDIAL_RESOLUTION=1280x720 CORDIAL_WINDOW_POS=0,0
+# Weston withholds frame callbacks from GTK while the engine canvas covers it.
+# Cordial's supported legacy ordering lets those hidden editors become visible.
+export CORDIAL_STACKING_GATE="${CORDIAL_STACKING_GATE:-off}"
 unset CORDIAL_X11
 LD_LIBRARY_PATH="$wl/lib:$wl/usr/lib:$wl/usr/lib/weston" \
     "$wl/lib/ld-musl-aarch64.so.1" --library-path "$wl/lib:$wl/usr/lib:$wl/usr/lib/weston" \

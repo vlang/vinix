@@ -30,6 +30,14 @@ The launcher owns a private compositor and socket for each application, and
 stops that compositor when Roblox exits or its window closes. Weston uses
 Vinix's SysV shared memory through the app's Xvfb MIT-SHM extension.
 
+The native launcher defaults Cordial's supported `CORDIAL_STACKING_GATE` to
+`off`. Weston withholds frame callbacks from a GTK surface fully covered by
+the engine canvas, so waiting for that callback before revealing an editor
+would leave both waiting. This uses Cordial's earlier stacking order for this
+compositor. An explicit caller value is preserved; `run-roblox` itself keeps
+Cordial's default. The earlier order can expose a stale GTK buffer if GTK
+fails to paint.
+
 From an existing X11 session, launch the complete desktop path at another local path:
 
 ```sh
@@ -78,9 +86,16 @@ The default staging output is
 and the desktop builder's `VINIX_ROBLOX_STAGING` for another location.
 
 The measured Vinix test launched the unchanged Roblox **2.738.1397** APK
-(`com.roblox.client`, version code 3092) and rendered its real **Create Account /
-Sign In** landing screen. The APK's signature and complete contents digest
-were verified separately with Cordial's upstream APK verifier:
+(`com.roblox.client`, version code 3092) in a native Vinix desktop window. It
+rendered the real **Create Account / Sign In** landing screen, and clicking
+**Sign In** opened the form with **Username/Email/Phone** and **Password**
+fields. Repeated characters entered through the keyboard remained in the
+APK's username field after it lost focus. No password was entered or
+authentication attempted. The tested guest had 8 GiB of RAM. Cold software
+rendering can take several minutes before the first application frame appears.
+
+The APK's signature and complete contents digest were verified separately
+with Cordial's upstream APK verifier:
 
 ```text
 APK SHA256: bbe00ae306cc251c4ea55b7a932d9c524ecb0d6d9203c2a6161bcf0fae792742
@@ -88,7 +103,7 @@ Signing certificate SHA256: 44932ea35a17a267372d71b54d1a0cb3da0dca5113e94406ae2f
 ```
 
 These hashes identify the tested APK, rather than a signature check performed
-by `run-roblox` on every supplied file. Sign-in and gameplay have not been
+by `run-roblox` on every supplied file. Authentication and gameplay have not been
 verified on Vinix. Support is experimental; the pinned
 [upstream release notes](https://github.com/luohoa97/cordial/releases/tag/v0.23.2)
 also list a signed-in startup freeze and intermittent movement input issues.
