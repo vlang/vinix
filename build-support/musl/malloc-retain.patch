@@ -26,10 +26,38 @@
  	size_t usage_by_class[48];
  	uint8_t unmap_seq[32], bounces[32];
  	uint8_t seq;
-@@ -246,6 +258,18 @@
- 	return 0;
+@@ -116,8 +128,14 @@
+ {
+ 	assert(!m->avail_mask);
+ 	uint32_t mask, act = (2u<<m->mem->active_idx)-1;
+-	do mask = m->freed_mask;
+-	while (a_cas(&m->freed_mask, mask, mask&~act)!=mask);
++	/* No other thread can publish frees while need_locks is zero. */
++	if (!MT) {
++		mask = m->freed_mask;
++		m->freed_mask = mask & ~act;
++	} else {
++		do mask = m->freed_mask;
++		while (a_cas(&m->freed_mask, mask, mask&~act)!=mask);
++	}
+ 	return m->avail_mask = mask & act;
  }
  
+@@ -231,7 +249,7 @@
+ 	n = (n+IB-1)>>4;
+ 	if (n<10) return n;
+ 	n++;
+-	int i = (28-a_clz_32(n))*4 + 8;
++	int i = (28-__builtin_clz(n))*4 + 8;
+ 	if (n>size_classes[i+1]) i+=2;
+ 	if (n>size_classes[i]) i++;
+ 	return i;
+@@ -244,6 +262,18 @@
+ 		return 1;
+ 	}
+ 	return 0;
++}
++
 +/* One mapping in each power-of-two bucket, from 128 KiB to 2 MiB.
 + * Their combined upper bounds total 3968 KiB. A larger mapping is never
 + * cached. Metadata stays owned by the cache until it is reused or trimmed. */
@@ -40,11 +68,9 @@
 +	int i = 0;
 +	for (size_t upper = 32; maplen > upper; upper <<= 1) i++;
 +	return i;
-+}
-+
+ }
+ 
  static inline void step_seq(void)
- {
- 	if (ctx.seq==255) {
 --- a/src/malloc/mallocng/malloc.c
 +++ b/src/malloc/mallocng/malloc.c
 @@ -201,6 +201,13 @@
@@ -70,6 +96,15 @@
  		account_bounce(sc);
  		step_seq();
  
+@@ -286,7 +293,7 @@
+ static int alloc_slot(int sc, size_t req)
+ {
+ 	uint32_t first = try_avail(&ctx.active[sc]);
+-	if (first) return a_ctz_32(first);
++	if (first) return __builtin_ctz(first);
+ 
+ 	struct meta *g = alloc_group(sc, req);
+ 	if (!g) return -1;
 @@ -307,6 +314,20 @@
  
  	if (n >= MMAP_THRESHOLD) {
@@ -91,7 +126,29 @@
  		void *p = mmap(0, needed, PROT_READ|PROT_WRITE,
  			MAP_PRIVATE|MAP_ANON, -1, 0);
  		if (p==MAP_FAILED) return 0;
-@@ -382,6 +403,8 @@
+@@ -341,7 +362,11 @@
+ 	// any groups of desired size. this allows counts of 2 or 3
+ 	// to be allocated at first rather than having to start with
+ 	// 7 or 5, the min counts for even size classes.
+-	if (!g && sc>=4 && sc<32 && sc!=6 && !(sc&1) && !ctx.usage_by_class[sc]) {
++	/* Every coarse-eligible class is below 32, with stride at most
++	 * 8176 bytes. The 128 KiB retained budget gives each at least eight
++	 * slots, so coarsening saves no storage under this policy. */
++	if (!VINIX_MALLOC_RETAIN && !g && sc>=4 && sc<32 && sc!=6 && !(sc&1)
++	    && !ctx.usage_by_class[sc]) {
+ 		size_t usage = ctx.usage_by_class[sc|1];
+ 		// if a new group may be allocated, count it toward
+ 		// usage in deciding if we can use coarse class.
+@@ -361,7 +386,7 @@
+ 			g->avail_mask = mask-first;
+ 		else if (a_cas(&g->avail_mask, mask, mask-first)!=mask)
+ 			continue;
+-		idx = a_ctz_32(first);
++		idx = __builtin_ctz(first);
+ 		goto success;
+ 	}
+ 	upgradelock();
+@@ -382,6 +407,8 @@
  int is_allzero(void *p)
  {
  	struct meta *g = get_meta(p);
@@ -147,7 +204,36 @@
  	// always free groups allocated inside another group's slot
  	// since recreating them should not be expensive and they
  	// might be blocking freeing of a much larger group.
-@@ -149,3 +177,45 @@
+@@ -94,7 +122,8 @@
+ 			queue(&ctx.active[sc], g);
+ 		}
+ 	}
+-	a_or(&g->freed_mask, self);
++	if (!MT) g->freed_mask |= self;
++	else a_or(&g->freed_mask, self);
+ 	return (struct mapinfo){ 0 };
+ }
+ 
+@@ -113,6 +142,18 @@
+ 	// invalidate offset to group header, and cycle offset of
+ 	// used region within slot if current offset is zero.
+ 	*(uint16_t *)((char *)p-2) = 0;
++
++	/* With one thread, the sole retained ordinary group cannot need
++	 * queue maintenance or reclamation. Keep the normal freed-mask
++	 * publication so activation still rotates through all its slots.
++	 * Metadata, redzones and the caller header were checked above. */
++	if (VINIX_MALLOC_RETAIN && !MT && g->sizeclass < 48 && g->next == g &&
++	    stride >= UNIT*size_classes[g->sizeclass] &&
++	    (g->maplen ? g->maplen*4096UL : UNIT + stride*(g->last_idx+1))
++	    <= RETAIN_GROUP_MAX_BYTES) {
++		g->freed_mask |= self;
++		return;
++	}
+ 
+ 	// release any whole pages contained in the slot to be freed
+ 	// unless it's a single-slot group that will be unmapped.
+@@ -149,3 +190,45 @@
  		errno = e;
  	}
  }
@@ -206,6 +292,17 @@
  #endif
  
  #define brk(p) ((uintptr_t)__syscall(SYS_brk, p))
+@@ -75,7 +77,9 @@
+ }
+ static inline void unlock()
+ {
+-	UNLOCK(__malloc_lock);
++/* LOCK can turn negative need_locks into zero while still taking
++	 * this lock. Its actual state, not MT, decides whether to unlock. */
++	if (*(volatile int *)__malloc_lock < 0) UNLOCK(__malloc_lock);
+ }
+ static inline void upgradelock()
+ {
 --- a/include/malloc.h
 +++ b/include/malloc.h
 @@ -17,6 +17,7 @@

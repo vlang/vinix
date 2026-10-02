@@ -29,3 +29,16 @@ monotonic and realtime timerfds, absolute sleep, and absolute futex timeout.
 Compile with `gcc -std=c11 -O2 -Wall -Wextra -Werror -fno-builtin clock.c -o clock`
 and run in the guest; a pass prints `CLOCK-DONE`. This test requires the
 corrected counter-based clock before allocation timings are meaningful.
+
+`verify-all-classes.c` adds bursts at all 48 ordinary class boundaries, trimming
+while allocations stay live, dirty reuse followed by `calloc`, and repeated
+thread creation and teardown with allocations transferred between threads.
+Run it against each staged allocator alongside `verify.c`, with both linkage
+modes. A pass prints `UALLOC-SUPPLEMENT-DONE`:
+
+```sh
+gcc -std=c11 -O2 -Wall -Wextra -Werror -fno-builtin -pthread verify-all-classes.c -o verify-all-classes
+./verify-all-classes
+gcc -std=c11 -O2 -Wall -Wextra -Werror -fno-builtin -pthread -static verify-all-classes.c -o verify-all-classes-static
+./verify-all-classes-static
+```
