@@ -786,10 +786,16 @@ fn (mut this ProcFSResource) write(_handle voidptr, buf voidptr, _loc u64, count
 			if count == 0 {
 				return i64(0)
 			}
+			if count > u64(security.securelevel_write_max) {
+				errno.set(errno.einval)
+				return none
+			}
 			written := unsafe { tos(&u8(buf), int(count)) }
-			trimmed := written.trim_space()
-			value := trimmed.int()
-			unsafe { trimmed.free() }
+			value, valid := security.parse_securelevel_value(written)
+			if !valid {
+				errno.set(errno.einval)
+				return none
+			}
 			security.set_securelevel(value) or { return none }
 			return i64(count)
 		}

@@ -16,6 +16,8 @@ pub const attributes_kept = attribute_immutable | attribute_append
 pub interface AttributeResource {
 mut:
 	attribute_bits() u32
+	// Backend owns publication and persistence together. A failed disk write
+	// must not expose a writable state if protected bits may be on disk.
 	set_attribute_bits(bits u32) ?
 }
 

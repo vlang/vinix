@@ -706,7 +706,7 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap) ?&memory.Pagemap {
 				if new_global_range.owns_mapping_ref {
 					mut retained := new_global_range.resource
 					if !resource.retain_mapping_range(mut retained, new_global_range.handle,
-						u64(new_global_range.offset), new_global_range.length) {
+						u64(new_global_range.offset), new_global_range.length, local_range.flags) {
 						return none
 					}
 				}
@@ -1249,7 +1249,7 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
 	defer {
 		if !published {
 			if mapping_retained {
-				resource.release_mapping_range(mut resource_, range_handle, u64(offset), length)
+				resource.release_mapping_range(mut resource_, range_handle, u64(offset), length, flags)
 			}
 			if handle_retained {
 				handle_unref(range_handle)
@@ -1266,9 +1266,8 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
 		resource_retained = true
 	}
 	if flags & map_anonymous == 0 && voidptr(resource_) != unsafe { nil } {
-		if !resource.retain_mapping_range(mut resource_, range_handle, u64(offset), length) {
+		if !resource.retain_mapping_range(mut resource_, range_handle, u64(offset), length, flags) {
 			unsafe { free(range_local) }
-			errno.set(errno.einval)
 			return none
 		}
 		mapping_retained = true
@@ -1994,7 +1993,7 @@ fn munmap_unlocked_impl(mut pagemap memory.Pagemap, addr voidptr, _length u64,
 				if global_range.owns_mapping_ref {
 					mut retained := global_range.resource
 					resource.release_mapping_range(mut retained, global_range.handle,
-						u64(global_range.offset), global_range.length)
+						u64(global_range.offset), global_range.length, local_range.flags)
 				}
 				if global_range.handle != unsafe { nil }
 					&& global_range.handle_unref != unsafe { nil } {

@@ -517,17 +517,31 @@ pub fn (mut this Handle) write(buf voidptr, count u64) ?i64 {
 	defer {
 		this.l.release()
 	}
+	// Recheck file policy for every operation, including descriptions opened
+	// before chattr sealed the inode. All write/writev/sendfile/splice paths
+	// pass through here; testing only at open lets an old FD bypass the seal.
+	mut res := this.resource
+	bits := resource.attributes(mut res)
+	if bits & resource.attribute_immutable != 0
+		|| (bits & resource.attribute_append != 0 && this.flags & resource.o_append == 0) {
+		errno.set(errno.eperm)
+		return none
+	}
 	// O_APPEND chooses the end of the file for every write, rather than only
 	// setting the descriptor's initial offset. Go's builder relies on this when
 	// it adds native objects to the archive produced by the compiler.
-	if this.flags & resource.o_append != 0 {
-		this.loc = this.resource.stat.size
+	mut ret := i64(0)
+	if this.flags & resource.o_append != 0 && stat.isreg(this.resource.stat.mode) {
+		limit := proc.soft_limit(proc.current_thread().process, proc.rlimit_fsize)
+		appended := resource.append_write(mut res, voidptr(this), buf, count, limit)?
+		ret = appended.written
+		this.loc = i64(appended.end)
+	} else {
+		allowed := limited_write_count(this.resource, u64(this.loc), count)?
+		ret = this.resource.write(voidptr(this), buf, u64(this.loc), allowed)?
+		this.loc += ret
 	}
-	allowed := limited_write_count(this.resource, u64(this.loc), count)?
-	ret := this.resource.write(voidptr(this), buf, u64(this.loc), allowed) or { return none }
-	this.loc += ret
 	if this.flags & resource.o_dsync != 0 {
-		mut res := this.resource
 		resource.sync_resource(mut res, voidptr(this)) or { return none }
 	}
 	return ret

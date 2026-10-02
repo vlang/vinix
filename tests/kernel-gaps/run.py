@@ -75,6 +75,7 @@ def boot(command: list[str], env: dict[str, str], state: Path,
     os.set_blocking(master, False)
     status = None
     verdict_at = None
+    timed_out = False
     deadline = time.monotonic() + timeout
 
     def drain() -> None:
@@ -108,6 +109,8 @@ def boot(command: list[str], env: dict[str, str], state: Path,
                     verdict_at = time.monotonic()
                 elif time.monotonic() - verdict_at >= 2:
                     break
+        else:
+            timed_out = True
     finally:
         try:
             if status is None:
@@ -120,11 +123,22 @@ def boot(command: list[str], env: dict[str, str], state: Path,
     observed = [marker for marker in failures if marker.encode() in output]
     if status not in (None, 0):
         observed.append(f"QEMU runner exited {status}")
+    if timed_out:
+        observed.append("QEMU runner timed out")
     if missing or observed:
         print(f"Missing verdicts: {missing}; failures: {observed}", flush=True)
         return 1
     print("All requested guest verdicts passed.", flush=True)
     return 0
+
+
+def verdict_policy(expected: list[str], failures: list[str], expect_panic: bool) -> tuple[list[str], list[str]]:
+    """Keep negative boot tests opt-in and reject entry into userspace."""
+    rejected = ["FATAL EXCEPTION", "FAIL:", *failures]
+    if expect_panic:
+        rejected += ["USERSPACE ENTERED", "INIT ENTERED", "Entering userspace"]
+        return ["KERNEL PANIC", *expected], rejected
+    return expected.copy(), ["KERNEL PANIC", *rejected]
 
 
 def main() -> int:
@@ -134,6 +148,8 @@ def main() -> int:
     parser.add_argument("--kernel-dir", type=Path, default=ROOT / "kernel")
     parser.add_argument("--expect", action="append", required=True)
     parser.add_argument("--fail", action="append", default=[])
+    parser.add_argument("--expect-panic", action="store_true",
+                        help="Negative boot test: require a panic and the requested verdicts")
     parser.add_argument("--timeout", type=int, default=180)
     parser.add_argument("--state-dir", type=Path)
     args = parser.parse_args()
@@ -203,8 +219,8 @@ def main() -> int:
                    "-qmp", f"unix:{state / 'qmp.sock'},server=on,wait=off",
                    "-serial", "mon:stdio", "-no-reboot"]
     print(f"Guest artifacts: {state}", flush=True)
-    failures = ["KERNEL PANIC", "FATAL EXCEPTION", "FAIL:", *args.fail]
-    return boot(command, env, state, args.expect, failures, args.timeout)
+    expected, failures = verdict_policy(args.expect, args.fail, args.expect_panic)
+    return boot(command, env, state, expected, failures, args.timeout)
 
 
 if __name__ == "__main__":

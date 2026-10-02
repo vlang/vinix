@@ -501,7 +501,7 @@ fn (mut this DrmNode) mmap(handle voidptr, page u64, flags int) voidptr {
 	return this.dev.driver.mmap(this.dev, handle, page, flags)
 }
 
-fn (mut this DrmNode) retain_mapping_range(handle voidptr, offset u64, length u64) bool {
+fn (mut this DrmNode) retain_mapping_range(handle voidptr, offset u64, length u64, _flags int) bool {
 	if handle == unsafe { nil } || this.dev == unsafe { nil }
 		|| this.dev.driver == unsafe { nil } {
 		return false
@@ -512,7 +512,7 @@ fn (mut this DrmNode) retain_mapping_range(handle voidptr, offset u64, length u6
 	return this.dev.driver.mmap_retain(this.dev, handle, offset, length)
 }
 
-fn (mut this DrmNode) release_mapping_range(handle voidptr, offset u64, length u64) {
+fn (mut this DrmNode) release_mapping_range(handle voidptr, offset u64, length u64, _flags int) {
 	if handle != unsafe { nil } && this.dev != unsafe { nil }
 		&& this.dev.driver != unsafe { nil }
 		&& this.dev.driver.mmap_release != unsafe { nil } {

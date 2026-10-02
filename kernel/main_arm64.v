@@ -60,6 +60,7 @@ import dev.random
 import dev.streams
 import time
 import userland
+import security
 
 #include "apple_display_hotplug.h"
 
@@ -799,6 +800,7 @@ fn kmain() {
 		uart.initialise(memory.get_hhdm_offset() + 0x09000000)
 		uart.puts(c'\n=== Vinix aarch64 booting (qemu mode) ===\n')
 	}
+	security.initialise_boot_policy()
 
 	// Set up exception vectors (replaces x86 GDT/IDF/ISR)
 	exception.initialise()

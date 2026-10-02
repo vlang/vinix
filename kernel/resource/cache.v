@@ -1,6 +1,42 @@
 module resource
 
 import katomic
+import errno
+
+pub struct AppendResult {
+pub:
+	written i64
+	end     u64
+}
+
+// A regular file chooses EOF, checks its size limit, and writes while one
+// backend lock is held. Return the actual end so the open description does
+// not retain an earlier EOF snapshot when another appender won the race.
+pub interface AppendWriteResource {
+mut:
+	append_data(handle voidptr, buf voidptr, count u64, limit u64, end &u64) ?i64
+}
+
+pub fn append_write(mut res Resource, handle voidptr, buf voidptr, count u64, limit u64) ?AppendResult {
+	if mut res is AppendWriteResource {
+		// Returning a composite directly from the interface method makes V
+		// promote its receiver. Primitive result plus a synchronous output
+		// pointer keeps the borrowed interface and EOF value on the stack.
+		mut writer := AppendWriteResource(res)
+		mut stack_writer := unsafe { &writer }
+		mut end := u64(0)
+		written := stack_writer.append_data(handle, buf, count, limit, unsafe { &end })?
+		return AppendResult{written: written, end: end}
+	}
+	location := u64(res.stat.size)
+	if count != 0 && location >= limit {
+		errno.set(errno.efbig)
+		return none
+	}
+	allowed := if count != 0 && count > limit - location { limit - location } else { count }
+	written := res.write(handle, buf, location, allowed)?
+	return AppendResult{ written: written, end: location + u64(written) }
+}
 
 // Optional capabilities keep stream/device resources and in-memory files from
 // needing dummy callbacks merely because disk-backed resources cache writes.
@@ -48,25 +84,26 @@ mut:
 // gone, including after GEM_CLOSE or a fork.
 pub interface MappingLifetimeResource {
 mut:
-	retain_mapping_range(handle voidptr, offset u64, length u64) bool
-	release_mapping_range(handle voidptr, offset u64, length u64)
+	retain_mapping_range(handle voidptr, offset u64, length u64, flags int) bool
+	release_mapping_range(handle voidptr, offset u64, length u64, flags int)
 }
 
-pub fn retain_mapping_range(mut res Resource, handle voidptr, offset u64, length u64) bool {
+pub fn retain_mapping_range(mut res Resource, handle voidptr, offset u64, length u64, flags int) bool {
 	if mut res is MappingLifetimeResource {
+		errno.set(errno.einval)
 		mut lifetime := MappingLifetimeResource(res)
 		mut stack_lifetime := unsafe { &lifetime }
-		retained := stack_lifetime.retain_mapping_range(handle, offset, length)
+		retained := stack_lifetime.retain_mapping_range(handle, offset, length, flags)
 		return retained
 	}
 	return true
 }
 
-pub fn release_mapping_range(mut res Resource, handle voidptr, offset u64, length u64) {
+pub fn release_mapping_range(mut res Resource, handle voidptr, offset u64, length u64, flags int) {
 	if mut res is MappingLifetimeResource {
 		mut lifetime := MappingLifetimeResource(res)
 		mut stack_lifetime := unsafe { &lifetime }
-		stack_lifetime.release_mapping_range(handle, offset, length)
+		stack_lifetime.release_mapping_range(handle, offset, length, flags)
 	}
 }
 

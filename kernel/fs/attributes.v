@@ -40,7 +40,7 @@ fn file_flags_ioctl(mut node VFSNode, request u64, argp voidptr) ?int {
 	}
 	if request == fs_ioc_getflags {
 		value := i32(resource.attributes(mut res))
-		if !usercopy.copy_to_user(u64(argp), voidptr(&value), sizeof(i32)) {
+		if !usercopy.copy_to_user(u64(argp), unsafe { voidptr(&value) }, sizeof(i32)) {
 			errno.set(errno.efault)
 			return none
 		}
@@ -48,7 +48,7 @@ fn file_flags_ioctl(mut node VFSNode, request u64, argp voidptr) ?int {
 	}
 	// FS_IOC_SETFLAGS.
 	mut wanted := i32(0)
-	if !usercopy.copy_from_user(voidptr(&wanted), u64(argp), sizeof(i32)) {
+	if !usercopy.copy_from_user(unsafe { voidptr(&wanted) }, u64(argp), sizeof(i32)) {
 		errno.set(errno.efault)
 		return none
 	}
@@ -59,7 +59,8 @@ fn file_flags_ioctl(mut node VFSNode, request u64, argp voidptr) ?int {
 		return none
 	}
 	process := proc.current_thread().process
-	if !proc.has_capability(process, proc.cap_linux_immutable) {
+	if !proc.is_initial_namespace(process.ns.user)
+		|| !proc.has_capability(process, proc.cap_linux_immutable) {
 		errno.set(errno.eperm)
 		return none
 	}
@@ -78,11 +79,6 @@ fn file_flags_ioctl(mut node VFSNode, request u64, argp voidptr) ?int {
 		return 0
 	}
 	resource.set_attributes(mut res, new_bits) or {
-		errno.set(errno.eopnotsupp)
-		return none
-	}
-	resource.persist_metadata(mut res) or {
-		resource.set_attributes(mut res, old_bits) or {}
 		return none
 	}
 	return 0

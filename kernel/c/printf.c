@@ -41,12 +41,10 @@ static void _putchar(int character, void *extra_arg) {
 
 static void _putchar_panic(int character, void *extra_arg) {
     (void)extra_arg;
-#ifndef PROD
 #ifdef __AARCH64__
     aarch64__uart__putc((uint8_t)character);
 #else
     serial__panic_out(character);
-#endif
 #endif
     term__print((char *)&character, 1);
 }

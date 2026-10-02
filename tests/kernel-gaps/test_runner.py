@@ -17,11 +17,11 @@ spec.loader.exec_module(runner)
 
 
 class VerdictTests(unittest.TestCase):
-    def verdict(self, script, expected):
+    def verdict(self, script, expected, failures=None, timeout=3):
         with tempfile.TemporaryDirectory() as directory, contextlib.redirect_stdout(io.StringIO()):
             state = Path(directory)
             result = runner.boot([sys.executable, "-c", script], os.environ.copy(),
-                                 state, expected, ["FAIL:"], 3)
+                                 state, expected, failures or ["FAIL:"], timeout)
             return result, (state / "serial.log").read_bytes()
 
     def test_requires_all_verdicts(self):
@@ -44,6 +44,43 @@ class VerdictTests(unittest.TestCase):
 
     def test_silent_guest_times_out(self):
         result, _ = self.verdict("import time; time.sleep(30)", ["ONE: PASS"])
+        self.assertEqual(result, 1)
+
+    def test_default_policy_rejects_panic(self):
+        expected, failures = runner.verdict_policy(["ONE: PASS"], [], False)
+        result, _ = self.verdict("print('ONE: PASS'); print('KERNEL PANIC')", expected, failures)
+        self.assertEqual(result, 1)
+
+    def test_expected_panic_requires_panic_marker(self):
+        expected, failures = runner.verdict_policy(["policy rejected"], [], True)
+        result, _ = self.verdict("print('policy rejected')", expected, failures)
+        self.assertEqual(result, 1)
+
+    def test_expected_panic_requires_reason(self):
+        expected, failures = runner.verdict_policy(["policy rejected"], [], True)
+        result, _ = self.verdict("print('KERNEL PANIC')", expected, failures)
+        self.assertEqual(result, 1)
+
+    def test_expected_panic_rejects_userspace(self):
+        expected, failures = runner.verdict_policy(["policy rejected"], [], True)
+        for marker in ("USERSPACE ENTERED", "INIT ENTERED", "Entering userspace"):
+            result, _ = self.verdict(f"print('KERNEL PANIC'); print('policy rejected'); print({marker!r})",
+                                     expected, failures)
+            self.assertEqual(result, 1)
+
+    def test_expected_panic_rejects_late_failure(self):
+        expected, failures = runner.verdict_policy(["policy rejected"], [], True)
+        result, _ = self.verdict("import time; print('KERNEL PANIC', flush=True); print('policy rejected', flush=True); time.sleep(0.3); print('FAIL: late', flush=True)", expected, failures)
+        self.assertEqual(result, 1)
+
+    def test_expected_panic_timeout_before_settled_verdict(self):
+        expected, failures = runner.verdict_policy(["policy rejected"], [], True)
+        result, _ = self.verdict("import time; print('KERNEL PANIC', flush=True); print('policy rejected', flush=True); time.sleep(30)", expected, failures, timeout=1)
+        self.assertEqual(result, 1)
+
+    def test_expected_panic_rejects_launcher_failure(self):
+        expected, failures = runner.verdict_policy(["policy rejected"], [], True)
+        result, _ = self.verdict("print('KERNEL PANIC'); print('policy rejected'); raise SystemExit(7)", expected, failures)
         self.assertEqual(result, 1)
 
 

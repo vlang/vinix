@@ -9,6 +9,7 @@ import resource
 import lib
 import event.eventstruct
 import katomic
+import file
 
 @[heap]
 struct TmpFSResource {
@@ -47,14 +48,47 @@ pub mut:
 	xattrs &XAttrSet = unsafe { nil }
 	// chattr's immutable and append-only bits; see fs/attributes.v.
 	attr_bits u32
+	shared_mapping_ranges u64
 }
 
 fn (mut this TmpFSResource) attribute_bits() u32 {
-	return this.attr_bits
+	return katomic.load(&this.attr_bits)
 }
 
 fn (mut this TmpFSResource) set_attribute_bits(bits u32) ? {
-	this.attr_bits = bits & resource.attributes_kept
+	this.l.acquire()
+	defer { this.l.release() }
+	if bits & resource.attributes_kept != 0 && this.shared_mapping_ranges != 0 {
+		errno.set(errno.ebusy)
+		return none
+	}
+	katomic.store(mut &this.attr_bits, bits & resource.attributes_kept)
+}
+
+// Admission counts entire shared ranges, including pages not yet faulted.
+// Conservatively exclude read-only shared aliases as well: they can otherwise
+// gain write permission later. Private ELF/COW mappings do not change the file.
+fn (mut this TmpFSResource) retain_mapping_range(_handle voidptr, _offset u64, _length u64, flags int) bool {
+	if flags & mmap.map_shared == 0 { return true }
+	this.l.acquire()
+	defer { this.l.release() }
+	if this.attr_bits & resource.attributes_kept != 0 {
+		errno.set(errno.eperm)
+		return false
+	}
+	this.shared_mapping_ranges++
+	return true
+}
+
+fn (mut this TmpFSResource) release_mapping_range(_handle voidptr, _offset u64, _length u64, flags int) {
+	if flags & mmap.map_shared == 0 { return }
+	this.l.acquire()
+	defer { this.l.release() }
+	if this.shared_mapping_ranges == 0 {
+		lib.kpanic(unsafe { nil }, c'tmpfs: shared mapping reference underflow')
+		return
+	}
+	this.shared_mapping_ranges--
 }
 
 // A file larger than this lives in individual pages rather than in one buffer.
@@ -406,17 +440,42 @@ fn (mut this TmpFSResource) paged_copy(buf voidptr, loc u64, count u64, to_file 
 
 fn (mut this TmpFSResource) write(_handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
 	this.l.acquire()
-	defer {
-		this.l.release()
-	}
+	defer { this.l.release() }
+	return this.write_locked(_handle, buf, loc, count)
+}
 
-	if count > u64(-1) - loc {
+fn (mut this TmpFSResource) append_data(handle voidptr, buf voidptr, count u64, limit u64, end &u64) ?i64 {
+	this.l.acquire()
+	defer { this.l.release() }
+	location := u64(this.stat.size)
+	if count != 0 && location >= limit {
+		errno.set(errno.efbig)
+		return none
+	}
+	allowed := if count != 0 && count > limit - location { limit - location } else { count }
+	written := this.write_locked(handle, buf, location, allowed)?
+	unsafe { *end = location + u64(written) }
+	return written
+}
+
+// Caller holds the resource lock through policy checks and data publication.
+fn (mut this TmpFSResource) write_locked(_handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
+	append := _handle != unsafe { nil }
+		&& unsafe { &file.Handle(_handle) }.flags & resource.o_append != 0
+	if this.attr_bits & resource.attribute_immutable != 0
+		|| (this.attr_bits & resource.attribute_append != 0 && !append) {
+		errno.set(errno.eperm)
+		return none
+	}
+	write_at := if append { u64(this.stat.size) } else { loc }
+
+	if count > u64(-1) - write_at {
 		return none
 	}
 	if count == 0 {
 		return 0
 	}
-	write_end := loc + count
+	write_end := write_at + count
 	if this.seals & (f_seal_write | f_seal_future_write) != 0
 		|| (this.seals & f_seal_grow != 0 && write_end > u64(this.stat.size)) {
 		errno.set(errno.eperm)
@@ -430,20 +489,20 @@ fn (mut this TmpFSResource) write(_handle voidptr, buf voidptr, loc u64, count u
 		// A hole from a seek past EOF reads back as zero: freshly allocated
 		// pages already are, and pages kept from before a truncation are
 		// cleared.
-		if loc > u64(this.stat.size) {
-			this.zero_pages_locked(u64(this.stat.size), loc)
+		if write_at > u64(this.stat.size) {
+			this.zero_pages_locked(u64(this.stat.size), write_at)
 		}
 		if !this.grow_pages_locked(lib.div_roundup(write_end, page_size)) {
 			errno.set(errno.enospc)
 			return none
 		}
-		for index := int(loc / page_size); index <= int((write_end - 1) / page_size); index++ {
+		for index := int(write_at / page_size); index <= int((write_end - 1) / page_size); index++ {
 			if !this.materialize_page_locked(index) {
 				errno.set(errno.enospc)
 				return none
 			}
 		}
-		this.paged_copy(buf, loc, count, true)
+		this.paged_copy(buf, write_at, count, true)
 	} else {
 		if !this.storage_owned || write_end > this.capacity {
 			if !this.materialize_locked(write_end) {
@@ -451,11 +510,11 @@ fn (mut this TmpFSResource) write(_handle voidptr, buf voidptr, loc u64, count u
 			}
 		}
 		old_size := u64(this.stat.size)
-		if loc > old_size {
+		if write_at > old_size {
 			// A write after a seek beyond EOF creates a zero-filled sparse hole.
-			unsafe { C.memset(&this.storage[old_size], 0, loc - old_size) }
+			unsafe { C.memset(&this.storage[old_size], 0, write_at - old_size) }
 		}
-		unsafe { C.memcpy(&this.storage[loc], buf, count) }
+		unsafe { C.memcpy(&this.storage[write_at], buf, count) }
 	}
 
 	if write_end > this.stat.size {
@@ -532,6 +591,10 @@ fn (mut this TmpFSResource) grow(_handle voidptr, new_size u64) ? {
 	this.l.acquire()
 	defer {
 		this.l.release()
+	}
+	if this.attr_bits & resource.attributes_kept != 0 {
+		errno.set(errno.eperm)
+		return none
 	}
 
 	old_size := u64(this.stat.size)

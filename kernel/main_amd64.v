@@ -45,6 +45,7 @@ import x86.hpet
 import x86.hypervisor
 import limine
 import linuxkpi
+import security
 
 // The scheduler's device poll: hand what the network card received to the IP
 // stack, then run the stack's timers -- DHCP, ARP, TCP retransmission.
@@ -169,6 +170,7 @@ fn kmain() {
 	// Init terminal
 	term.initialise()
 	serial.early_initialise()
+	security.initialise_boot_policy()
 
 	// a dummy call to avoid V warning about an unused `stubs` module
 	_ := stubs.toupper(0)

@@ -31,5 +31,20 @@ pub fn permitted(selector string) bool {
 		}
 	}
 	process := proc.current_thread().process
+	// Namespace-local capabilities do not authorize changes to host state.
+	// Private mount and UTS namespaces retain their existing controls.
+	if !proc.is_initial_namespace(process.ns.user) {
+		host_operation := match selector {
+			system_securelevel_set, system_reboot { true }
+			system_hostname_set, system_domainname_set {
+				proc.is_initial_namespace(process.ns.uts)
+			}
+			filesystem_mount, filesystem_unmount {
+				proc.is_initial_namespace(proc.mount_namespace_of(process))
+			}
+			else { false }
+		}
+		if host_operation { return false }
+	}
 	return process.euid == 0 && proc.has_capability(process, capability)
 }

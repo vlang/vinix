@@ -112,17 +112,61 @@ pub mut:
 	// chattr's immutable and append-only bits, the EXT2_*_FL on-disk flags of
 	// the same value; see fs/attributes.v.
 	attr_bits u32
+	shared_mapping_ranges u64
 	// The interface box its nodes and descriptors hold, made once and freed
 	// with it; a box per conversion was 384 bytes nothing freed.
 	box &resource_mod.Resource = unsafe { nil }
 }
 
 fn (mut this EXT2Resource) attribute_bits() u32 {
-	return this.attr_bits
+	return katomic.load(&this.attr_bits)
 }
 
 fn (mut this EXT2Resource) set_attribute_bits(bits u32) ? {
-	this.attr_bits = bits & resource_mod.attributes_kept
+	this.l.acquire()
+	defer { this.l.release() }
+	if bits & resource_mod.attributes_kept != 0 && this.shared_mapping_ranges != 0 {
+		errno.set(errno.ebusy)
+		return none
+	}
+	new_bits := bits & resource_mod.attributes_kept
+	this.filesystem.l.acquire()
+	defer { this.filesystem.l.release() }
+	mut inode := unsafe { &EXT2Inode(C.__builtin_alloca(sizeof(EXT2Inode))) }
+	unsafe { C.memset(inode, 0, sizeof(EXT2Inode)) }
+	inode.read_entry(mut this.filesystem, u32(this.stat.ino))?
+	inode.flags = (inode.flags & ~resource_mod.attributes_kept) | new_bits
+	inode.write_entry(mut this.filesystem, u32(this.stat.ino)) or {
+		// A short/error completion may already have published the new bits.
+		// Keep every possible protection until a successful retry resolves it.
+		katomic.store(mut &this.attr_bits, this.attr_bits | new_bits)
+		return none
+	}
+	katomic.store(mut &this.attr_bits, new_bits)
+	flush_on_return()
+}
+
+fn (mut this EXT2Resource) retain_mapping_range(_handle voidptr, _offset u64, _length u64, flags int) bool {
+	if flags & mmap_mod.map_shared == 0 { return true }
+	this.l.acquire()
+	defer { this.l.release() }
+	if this.attr_bits & resource_mod.attributes_kept != 0 {
+		errno.set(errno.eperm)
+		return false
+	}
+	this.shared_mapping_ranges++
+	return true
+}
+
+fn (mut this EXT2Resource) release_mapping_range(_handle voidptr, _offset u64, _length u64, flags int) {
+	if flags & mmap_mod.map_shared == 0 { return }
+	this.l.acquire()
+	defer { this.l.release() }
+	if this.shared_mapping_ranges == 0 {
+		lib.kpanic(unsafe { nil }, c'ext2: shared mapping reference underflow')
+		return
+	}
+	this.shared_mapping_ranges--
 }
 
 fn (mut this EXT2Resource) boxed() &resource_mod.Resource {
@@ -238,12 +282,40 @@ fn (mut this EXT2Resource) read(_handle voidptr, buf voidptr, loc u64, count u64
 fn (mut this EXT2Resource) write(_handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
 	this.l.acquire()
 	defer { this.l.release() }
+	return this.write_locked(_handle, buf, loc, count)
+}
+
+fn (mut this EXT2Resource) append_data(handle voidptr, buf voidptr, count u64, limit u64, end &u64) ?i64 {
+	this.l.acquire()
+	defer { this.l.release() }
+	location := u64(this.stat.size)
+	if count != 0 && location >= limit {
+		errno.set(errno.efbig)
+		return none
+	}
+	allowed := if count != 0 && count > limit - location { limit - location } else { count }
+	written := this.write_locked(handle, buf, location, allowed)?
+	unsafe { *end = location + u64(written) }
+	return written
+}
+
+// Caller holds the resource lock through policy checks and data publication.
+fn (mut this EXT2Resource) write_locked(_handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
+	append := _handle != unsafe { nil }
+		&& unsafe { &file.Handle(_handle) }.flags & resource_mod.o_append != 0
+	if this.attr_bits & resource_mod.attribute_immutable != 0
+		|| (this.attr_bits & resource_mod.attribute_append != 0 && !append) {
+		errno.set(errno.eperm)
+		return none
+	}
+	write_at := if append { u64(this.stat.size) } else { loc }
+	if count == 0 { return 0 }
 	this.filesystem.l.acquire()
 	defer { this.filesystem.l.release() }
 	mut current_inode := EXT2Inode{}
 
 	current_inode.read_entry(mut this.filesystem, u32(this.stat.ino)) or { return none }
-	written := current_inode.write(mut this.filesystem, buf, u32(this.stat.ino), loc, count)?
+	written := current_inode.write(mut this.filesystem, buf, u32(this.stat.ino), write_at, count)?
 	// A writer far enough ahead of the device catches up before its call
 	// returns, but not here, with EXT2's lock held.
 	if this.filesystem.cache.over_dirty_limit() {
@@ -251,7 +323,7 @@ fn (mut this EXT2Resource) write(_handle voidptr, buf voidptr, loc u64, count u6
 	}
 	mut done := u64(0)
 	for done < u64(written) {
-		offset := loc + done
+		offset := write_at + done
 		page := offset / page_size
 		in_page := offset % page_size
 		chunk := if u64(written) - done < page_size - in_page {
@@ -326,6 +398,10 @@ fn (mut this EXT2Resource) grow(handle voidptr, new_size u64) ? {
 	defer {
 		this.filesystem.l.release()
 		this.l.release()
+	}
+	if this.attr_bits & resource_mod.attributes_kept != 0 {
+		errno.set(errno.eperm)
+		return none
 	}
 
 	mut current_inode := EXT2Inode{}
