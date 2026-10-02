@@ -98,6 +98,10 @@ set -- "$game" -windowed -w "$width" -h "$height" "$@"
 if [ -n "${VINIX_X86_64_PRELOAD:-}" ]; then
     set -- -E "LD_PRELOAD=$VINIX_X86_64_PRELOAD" "$@"
 fi
+# Match dota.sh's descriptor allowance and default per-thread stack size.
+# Change only the soft limits, leaving the caller's hard limits available.
+ulimit -Sn 2048 || fail 'could not set the game descriptor limit'
+ulimit -Ss 2048 || fail 'could not set the game stack limit'
 cd "$game_root"
 exec "$emulator" -B "${VINIX_X86_64_GUEST_BASE:-0x100000000}" -L "$runtime" \
     -E "LD_LIBRARY_PATH=$guest_libraries" "$@"

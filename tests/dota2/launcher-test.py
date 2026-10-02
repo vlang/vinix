@@ -45,9 +45,11 @@ class LauncherTest(unittest.TestCase):
         self.emulator = self.base / "fake-qemu-x86_64"
         self.emulator.write_text(
             "#!/usr/bin/env python3\n"
-            "import json, os, sys\n"
+            "import json, os, resource, sys\n"
             "with open(os.environ['VINIX_DOTA_TEST_LOG'], 'w') as stream:\n"
-            "    json.dump({'args': sys.argv[1:], 'env': dict(os.environ), 'cwd': os.getcwd()}, stream)\n"
+            "    json.dump({'args': sys.argv[1:], 'env': dict(os.environ), 'cwd': os.getcwd(),\n"
+            "               'nofile': resource.getrlimit(resource.RLIMIT_NOFILE)[0],\n"
+            "               'stack': resource.getrlimit(resource.RLIMIT_STACK)[0]}, stream)\n"
             "sys.exit(int(os.environ.get('VINIX_DOTA_TEST_STATUS', '0')))\n"
         )
         self.emulator.chmod(0o755)
@@ -105,6 +107,8 @@ class LauncherTest(unittest.TestCase):
             "+map", "path with spaces", "-w", "960",
         ])
         self.assertEqual(launch["cwd"], str(self.game_root))
+        self.assertEqual(launch["nofile"], 2048)
+        self.assertEqual(launch["stack"], 2048 * 1024)
         for key in ("LD_LIBRARY_PATH", "LD_PRELOAD", "QEMU_LD_PREFIX", "QEMU_SET_ENV"):
             self.assertNotIn(key, launch["env"])
         for key, value in {
