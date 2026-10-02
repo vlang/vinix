@@ -12,14 +12,14 @@ The game probe saves the actual guest framebuffer for inspection.
 ## Build the runtime and desktop
 
 ```sh
-./build-x86-translation-aarch64.sh --translator-only
 ./build-steam-aarch64.sh
 ./build-dota2-aarch64.sh
 ./build-desktop-aarch64.sh --compact-initramfs --with-dota2
 ```
 
-The Dota layer contains the launcher and libraries. Supply the full Linux game
-installation separately at `/usr/share/games/dota2`, including its `game/`
+The Dota layer contains the launcher, libraries and its patched native
+translator. The shared Wine translator staging is unchanged. Supply the full
+Linux game installation separately at `/usr/share/games/dota2`, including its `game/`
 directory, or set `VINIX_DOTA2_DIR`. Run `run-dota2` on an X11 display or open
 **Dota 2** on the desktop. The default window is 1280 by 720; game arguments
 are passed through. `VINIX_DOTA2_ROOT` selects another private runtime.
@@ -53,10 +53,18 @@ bundled decoder from breaking the distro audio dependency's `mpg123_info2`
 reference. Caller additions in `VINIX_X86_64_PRELOAD` retain precedence.
 
 A third guest library preserves x86 `MAP_32BIT` bounds that QEMU 9.1.2 drops
-when translating mmap flags. It rejects an impossible 2 GiB reservation and
-uses non-replacing mappings for smaller low-address ranges, without replacing
-existing memory. The actual Vinix contract probe covers both mmap entry points,
-occupied hints, boundary and overflow cases, and fixed mappings.
+when translating mmap flags. It rejects an impossible 2 GiB reservation,
+skips occupied ranges using the translated process's maps, and requests
+non-replacing mappings for smaller low-address ranges.
+
+The Dota translator also checks guest-page collisions under QEMU's existing
+mapping lock before handling a partial host page. Without this correction,
+QEMU's unreserved mapping path can accept `MAP_FIXED_NOREPLACE` over an existing
+4 KiB guest mapping inside a 16 KiB Vinix page and erase its contents. The
+contract probe checks both mmap entry points, adjacent guest pages and retained
+contents, occupied hints, boundary and overflow cases, fixed mappings, and
+large reservations with small holes. The translator build cache can be selected
+with `VINIX_DOTA2_QEMU_BUILD_DIR`.
 
 ## Reuse an existing installation without another full data copy
 
@@ -110,6 +118,7 @@ After the file and graphics probes, capture the real game:
 ```sh
 python3 tests/dota2/run.py \
     --base-root build/dota2-vulkan/test/root \
+    --translator-staging build/dota2-runtime/staging \
     --desktop build/vinix-desktop \
     --export-state build/dota2/game-export \
     --steamclient /path/to/Steam/steamrt64 \
