@@ -26,6 +26,7 @@ import threading
 import time
 
 REPO = Path(__file__).resolve().parents[2]
+SOFTWARE_GL_DRIVERS = ("swrast_dri.so", "kms_swrast_dri.so")
 
 
 def module(name: str, path: Path):
@@ -56,11 +57,21 @@ def install(source: Path, target: Path) -> None:
 def trim_runtime(root: Path) -> None:
     # Xvfb/SDL and the game supply their own graphics and UI assets.
     for relative in ("usr/lib/i386-linux-gnu", "lib/i386-linux-gnu",
-                     "usr/lib/x86_64-linux-gnu/dri", "usr/share/doc",
+                     "usr/share/doc",
                      "usr/share/man", "usr/share/locale", "usr/share/icons"):
         path = root / relative
         if path.exists():
             shutil.rmtree(path)
+    dri = root / "usr/lib/x86_64-linux-gnu/dri"
+    if dri.is_dir():
+        # Steam's real gldriverquery uses EGL/GL even when the game uses Vulkan.
+        for path in dri.iterdir():
+            if path.name in SOFTWARE_GL_DRIVERS:
+                continue
+            if path.is_dir() and not path.is_symlink():
+                shutil.rmtree(path)
+            else:
+                path.unlink()
 
 
 def refresh_runtime(args, root: Path) -> None:
@@ -69,7 +80,14 @@ def refresh_runtime(args, root: Path) -> None:
     target = root / relative
     stamp = ".vinix-dota2-vulkan-generation"
     generation = (source / stamp).read_text()
-    if (target / stamp).is_file() and (target / stamp).read_text() == generation:
+    dri = "usr/lib/x86_64-linux-gnu/dri"
+    drivers_present = all(
+        not (source / dri / name).is_file() or
+        ((target / dri / name).is_file() and
+         (target / dri / name).stat().st_size == (source / dri / name).stat().st_size)
+        for name in SOFTWARE_GL_DRIVERS)
+    if ((target / stamp).is_file() and (target / stamp).read_text() == generation and
+            drivers_present):
         return
     pending = target.with_name(f"root-refresh-{os.getpid()}")
     if platform.system() == "Darwin":
@@ -111,6 +129,17 @@ def verify_sdk_closure(root: Path) -> None:
                  runtime / "lib/x86_64-linux-gnu", runtime / "lib64"]
     queue = list(sdk.glob("*.so"))
     queue.append(root / "home/dota2/.steam/ubuntu12_64/gldriverquery")
+    for name in SOFTWARE_GL_DRIVERS:
+        driver = runtime / "usr/lib/x86_64-linux-gnu/dri" / name
+        if driver.is_file():
+            queue.append(driver)
+        elif name == "swrast_dri.so":
+            raise SystemExit(f"Steam's GPU helper needs the software GL driver: {driver}")
+    for name in ("libEGL_mesa.so.0", "libGLX_mesa.so.0"):
+        library = runtime / "usr/lib/x86_64-linux-gnu" / name
+        if not library.is_file():
+            raise SystemExit(f"Steam's GPU helper needs the private GL library: {library}")
+        queue.append(library)
     seen = set()
     missing = set()
     while queue:
