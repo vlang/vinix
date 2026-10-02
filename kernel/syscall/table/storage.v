@@ -19,9 +19,9 @@ fn storage_fsync(_ voidptr, fdnum int) (u64, u64) {
 	// The descriptor's own sync is what folds a shared file mapping back into
 	// the inode; a flush driven from the cache registry cannot find those pages.
 	// It also performs the EBADF and EINVAL checks fsync(2) owes its caller.
-	ret, code := file.syscall_fsync(unsafe { nil }, fdnum)
-	if ret != 0 { return ret, code }
-	return storage_sync(unsafe { nil })
+	// Each resource owns its backing-store flush. An unrelated disk failure
+	// must not turn a successful tmpfs/file sync into an I/O error.
+	return file.syscall_fsync(unsafe { nil }, fdnum)
 }
 
 fn storage_syncfs(_ voidptr, fdnum int) (u64, u64) {

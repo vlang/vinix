@@ -117,6 +117,15 @@ fn (mut this AnsDataResource) write(_handle voidptr, buf voidptr, loc u64, count
 	return result
 }
 
+fn (mut this AnsDataResource) sync(_handle voidptr) ? {
+	// File contents and metadata are written through by the C filesystem.
+	// Complete the controller's durability barrier for this backing store.
+	if !flush() {
+		errno.set(errno.eio)
+		return none
+	}
+}
+
 fn (mut this AnsDataResource) grow(_handle voidptr, new_size u64) ? {
 	if !stat.isreg(this.stat.mode) {
 		errno.set(errno.eisdir)

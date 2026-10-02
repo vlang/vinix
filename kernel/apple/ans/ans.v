@@ -161,6 +161,15 @@ fn (mut this AnsBlock) write(_handle voidptr, buffer voidptr, loc u64, count u64
 	return i64(bytes)
 }
 
+fn (mut this AnsBlock) sync(_handle voidptr) ? {
+	// The controller lock in flush() serializes with complete read/write
+	// transactions, including partition-scoped read-modify-write operations.
+	if !flush() {
+		errno.set(errno.eio)
+		return none
+	}
+}
+
 // A block geometry query's answer, copied out to the caller.
 fn block_ioctl_result(argp voidptr, value voidptr, size u64) ? {
 	if !usercopy.copy_to_user(u64(argp), value, size) {
