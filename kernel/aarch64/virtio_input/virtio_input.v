@@ -734,7 +734,8 @@ pub fn poll() {
 	defer {
 		vi_poll_lock.release()
 	}
-	vi_outlen = 0
+	// Syscall-only polls may queue keys before the console gets to run.
+	// Preserve them until the console drains the buffer under input_poll_lock.
 
 	for i := 0; i < vi_dev_count; i++ {
 		poll_device(i)
