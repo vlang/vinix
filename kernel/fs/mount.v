@@ -538,6 +538,7 @@ fn new_mount(parent &VFSNode, source string, target string, fstype string, flags
 			return none
 		}
 	}
+	if mount_node.read_only { mount_flags |= ms_rdonly }
 	if mount_node.name.str != basename.str {
 		unsafe { basename.free() }
 	}
@@ -778,6 +779,10 @@ fn remount(parent &VFSNode, target string, flags u64, options string) ? {
 	mut entry := namespace_mount(lib.mount_context_top(identity))
 	if entry == unsafe { nil } || voidptr(entry.root) != voidptr(node) {
 		errno.set(errno.einval)
+		return none
+	}
+	if node.read_only && flags & ms_rdonly == 0 {
+		errno.set(errno.erofs)
 		return none
 	}
 	entry.lock.acquire()
@@ -1142,7 +1147,8 @@ pub fn record_root_switch(root &VFSNode, fstype string) {
 	old := table.mounts.clone()
 	table.mounts.clear()
 	table.lock.release()
-	record_mount(mut table, root, root, '/dev/root', fstype, 0, '', unsafe { nil })
+	flags := if root.read_only { ms_rdonly } else { u64(0) }
+	record_mount(mut table, root, root, '/dev/root', fstype, flags, '', unsafe { nil })
 	mut names := root.children.keys()
 	defer {
 		unsafe {

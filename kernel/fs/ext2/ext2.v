@@ -435,6 +435,9 @@ pub mut:
 
 	backing_device &vfs.VFSNode
 	cache          &pagecache.Cache = unsafe { nil }
+	// An immutable backing Resource cannot become writable through remount,
+	// a second mount, or an inherited descriptor.
+	read_only bool
 	// The filesystem as the VFS holds it, boxed once; see as_filesystem().
 	box &vfs.FileSystem = unsafe { nil }
 }
@@ -449,21 +452,32 @@ fn (mut this EXT2Filesystem) as_filesystem() &vfs.FileSystem {
 }
 
 fn (mut this EXT2Filesystem) populate(node &vfs.VFSNode) {
+	this.populate_checked(node) or {}
+}
+
+fn (mut this EXT2Filesystem) populate_checked(node &vfs.VFSNode) ? {
 	mut parent := EXT2Inode{}
-	parent.read_entry(mut this, u32(node.resource.stat.ino)) or { return }
+	parent.read_entry(mut this, u32(node.resource.stat.ino))?
 
 	buffer := memory.calloc(parent.size32l, 1)
 	if buffer == unsafe { nil } {
-		return
+		errno.set(errno.enomem)
+		return none
 	}
 	defer { memory.free(buffer) }
-	parent.read(mut this, buffer, 0, parent.size32l) or { return }
+	parent.read(mut this, buffer, 0, parent.size32l)?
 
 	for i := u32(0); i < parent.size32l;  {
+		if parent.size32l - i < sizeof(EXT2DirectoryEntry) {
+			errno.set(errno.eio)
+			return none
+		}
 		dir_entry := &EXT2DirectoryEntry(u64(buffer) + i)
 		if dir_entry.entry_size < sizeof(EXT2DirectoryEntry)
-			|| u32(dir_entry.entry_size) > parent.size32l - i {
-			break
+			|| u32(dir_entry.entry_size) > parent.size32l - i
+			|| u32(dir_entry.name_length) > u32(dir_entry.entry_size) - u32(sizeof(EXT2DirectoryEntry)) {
+			errno.set(errno.eio)
+			return none
 		}
 		if dir_entry.inode_index == 0 {
 			i += dir_entry.entry_size
@@ -471,6 +485,10 @@ fn (mut this EXT2Filesystem) populate(node &vfs.VFSNode) {
 		}
 
 		name_buffer := memory.calloc(dir_entry.name_length + 1, 1)
+		if name_buffer == unsafe { nil } {
+			errno.set(errno.enomem)
+			return none
+		}
 		unsafe {
 			C.memcpy(name_buffer, voidptr(u64(dir_entry) + sizeof(EXT2DirectoryEntry)), u64(dir_entry.name_length))
 		}
@@ -483,7 +501,10 @@ fn (mut this EXT2Filesystem) populate(node &vfs.VFSNode) {
 		}
 
 		mut inode := EXT2Inode{}
-		inode.read_entry(mut this, dir_entry.inode_index) or { return }
+		inode.read_entry(mut this, dir_entry.inode_index) or {
+			memory.free(name_buffer)
+			return none
+		}
 
 		mut mode := inode.permissions
 
@@ -513,6 +534,7 @@ fn (mut this EXT2Filesystem) populate(node &vfs.VFSNode) {
 		}
 
 		mut vfs_node := vfs.create_node(this.as_filesystem(), node, name, stat.isdir(mode))
+		vfs_node.read_only = this.read_only
 		mut resource := &EXT2Resource{
 			filesystem: unsafe { this }
 			refcount: 1
@@ -538,13 +560,18 @@ fn (mut this EXT2Filesystem) populate(node &vfs.VFSNode) {
 				vfs_node.symlink_target = target
 			} else {
 				target_buffer := memory.calloc(u64(inode.size32l) + 1, 1)
-				if target_buffer != unsafe { nil } {
-					inode.read(mut this, target_buffer, 0, inode.size32l) or {}
-					vfs_node.symlink_target = unsafe {
-						tos(&u8(target_buffer), int(inode.size32l)).clone()
-					}
-					memory.free(target_buffer)
+				if target_buffer == unsafe { nil } {
+					errno.set(errno.enomem)
+					return none
 				}
+				inode.read(mut this, target_buffer, 0, inode.size32l) or {
+					memory.free(target_buffer)
+					return none
+				}
+				vfs_node.symlink_target = unsafe {
+					tos(&u8(target_buffer), int(inode.size32l)).clone()
+				}
+				memory.free(target_buffer)
 			}
 		}
 
@@ -553,12 +580,11 @@ fn (mut this EXT2Filesystem) populate(node &vfs.VFSNode) {
 		}
 		if stat.isdir(mode) && name != '.' && name != '..' {
 			vfs_node.create_dotentries(node)
-			this.populate(vfs_node)
+			this.populate_checked(vfs_node)?
 		}
 		i += dir_entry.entry_size
 	}
 
-	memory.free(buffer)
 }
 
 fn (mut bro EXT2Filesystem) instantiate() &vfs.FileSystem {
@@ -567,6 +593,7 @@ fn (mut bro EXT2Filesystem) instantiate() &vfs.FileSystem {
 		superblock: bro.superblock
 		root_inode: bro.root_inode
 		cache: bro.cache
+		read_only: bro.read_only
 	}
 
 	this.block_size = 1024 << this.superblock.block_size
@@ -609,9 +636,16 @@ fn (mut this EXT2Filesystem) link(parent &vfs.VFSNode, path string, mut old_node
 }
 
 fn (mut this EXT2Filesystem) mount(parent &vfs.VFSNode, name string, source &vfs.VFSNode) ?&vfs.VFSNode {
+	if this.read_only && source != unsafe { nil }
+		&& (source.resource == unsafe { nil }
+			|| voidptr(source.resource) != voidptr(this.backing_device.resource)) {
+		errno.set(errno.enodev)
+		return none
+	}
 	this.dev_id = resource_mod.create_dev_id()
 
 	mut target := vfs.create_node(this.as_filesystem(), parent, name, true)
+	target.read_only = this.read_only
 
 	mut resource := &EXT2Resource{
 		filesystem: unsafe { this }
@@ -635,7 +669,7 @@ fn (mut this EXT2Filesystem) mount(parent &vfs.VFSNode, name string, source &vfs
 	target.filesystem = this.as_filesystem()
 	target.resource = resource.boxed()
 
-	this.populate(target)
+	this.populate_checked(target)?
 
 	return target
 }
@@ -1342,11 +1376,13 @@ pub fn ext2_init(backing_device &vfs.VFSNode) (&EXT2Filesystem, bool) {
 		return 0, false
 	}
 	reserve_bounce()
+	mut backend := backing_device.resource
 	mut new_filesystem := &EXT2Filesystem{
 		backing_device: unsafe { backing_device }
 		superblock: &EXT2Superblock{}
 		root_inode: &EXT2Inode{}
 		cache: pagecache.new_cache(u64(backing_device.resource.stat.size))
+		read_only: resource_mod.backend_is_read_only(mut backend)
 	}
 
 	// The EXT2 superblock is at byte 1024, regardless of device sector size.

@@ -48,6 +48,7 @@ import gpu.dcp
 import syscall as _
 import syscall.table
 import sysdisk
+import block.verity
 import dev.console
 import dev.e1000
 import dev.fbdev
@@ -225,7 +226,9 @@ fn kmain_thread(qemu_platform bool, acpi_platform bool) {
 	//
 	// A machine booted from an installer image does the same with a disk of
 	// its own, installing the image onto a blank one first; see sysdisk.
-	mut disk_root := qemu_platform && virtio_blk.mount_persistent_root()
+	verified_root := verity.requested()
+	if verified_root { verity.mount_root() }
+	mut disk_root := verified_root || (qemu_platform && virtio_blk.mount_persistent_root())
 	mut unpacked := false
 	if !disk_root && sysdisk.requested() {
 		outcome := sysdisk.mount_or_install()
@@ -235,7 +238,7 @@ fn kmain_thread(qemu_platform bool, acpi_platform bool) {
 	if disk_root {
 		// The image itself is already installed on the volume; the per-run
 		// overlay modules after it are not, and still have to be applied.
-		if !unpacked {
+		if !unpacked && !verified_root {
 			initramfs.initialise_overlays()
 		}
 		print('kmain_thread: persistent root done\n')

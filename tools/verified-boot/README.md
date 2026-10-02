@@ -2,9 +2,11 @@
 
 This optional build path authenticates the EFI loader, its complete boot
 configuration (including the command line), the kernel, every initramfs overlay,
-and an optional device tree. It boots the root supplied by those authenticated
-archives in memory. It refuses the current disk root and persistent home
-selectors, which would bring unauthenticated disk contents into the boot path.
+and an optional device tree. By default it boots the root supplied by those
+authenticated archives in memory. Its optional verified block-root profile
+pins the device, data block count and SHA-256 Merkle root in the authenticated
+command line. It refuses ordinary disk root and persistent home selectors,
+which would bring unauthenticated disk contents into the boot path.
 The normal ISO and desktop builders still produce development images.
 
 The trust chain is:
@@ -16,6 +18,9 @@ The trust chain is:
 3. That configuration contains BLAKE2b-512 digests for the kernel, each root
    archive/overlay in order, and any supplied DTB. Limine verifies them before
    handing control to the kernel.
+4. With the verified block-root profile, the kernel checks every block read
+   from the selected root device against the SHA-256 root pinned in that
+   configuration and exposes the filesystem read-only.
 
 The hashes are not themselves trust anchors. Authentication requires Secure
 Boot enabled outside Setup Mode and the signing certificate authorized in the
@@ -63,6 +68,19 @@ authenticated overlays are specified with repeated `--initramfs` arguments.
 options. Root/disk/persistence options and configuration/macro injection are
 rejected. All loaded paths carry hashes even when Secure Boot is disabled.
 The private key and certificate are never copied into the bundle.
+
+For a verified block root, first build a
+[Merkle image](../verified-root/README.md) from a trusted, completed ext2
+filesystem. Add `--verity-root IMAGE`, `--verity-device /dev/vda`,
+`--verity-data-blocks N` and `--verity-root-hash HASH` to the build command.
+The count and hash must be trusted outputs of that local build, supplied
+separately from the image being checked. The builder fully verifies the copied
+image, then generates the canonical `vinix.verity=1,DEVICE,N,HASH` token inside
+the enrolled configuration. Supplying it manually through `--cmdline` is
+rejected. The authenticated initramfs remains a bootstrap module; the verified
+device supplies the system files. The image is included as
+`boot/verity-root.img`; deploy it as a raw block device named by the policy,
+rather than expecting Limine to load that filename as a module.
 
 The output is an EFI system partition tree with `EFI/BOOT/BOOTX64.EFI` (or
 `BOOTAA64.EFI`) and `boot/limine.conf` plus its authenticated payloads. Copy that
@@ -124,9 +142,11 @@ Secure Boot. The test states when firmware authentication was not exercised.
 
 ## Scope
 
-The initial root contents are authenticated; they remain writable tmpfs after
-unpacking. This path does not implement dm-verity, ongoing disk integrity,
-runtime MAC policy, antirollback, attestation, firmware certificate enrollment,
+The default archive root is authenticated initially and remains writable tmpfs
+after unpacking. The optional Merkle block root provides ongoing read-only
+disk integrity; writable RAM mounts and other storage need separate policy.
+This path does not implement runtime MAC policy, antirollback, attestation,
+firmware certificate enrollment,
 or production key/revocation management. A signing key authorizes all bundles
 signed by it; preventing rollback to an earlier signed bundle needs a separately
 deployed version/revocation policy. Trusted firmware, signing infrastructure,

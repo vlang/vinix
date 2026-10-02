@@ -38,6 +38,7 @@ import dev.pty
 import dev.tty
 import syscall.table
 import sysdisk
+import block.verity
 import socket
 import socket.inet
 import time
@@ -94,17 +95,24 @@ fn kmain_thread() {
 	// unpacked, and the image goes onto the disk rather than into RAM when
 	// there is one to take it. See sysdisk. IDE and SATA only: the NVMe
 	// driver is not fit for a release kernel yet.
-	disk_requested := sysdisk.requested()
+	verified_root := verity.requested()
+	disk_requested := sysdisk.requested() || verified_root
 	mut outcome := sysdisk.Outcome.in_memory
 	if disk_requested {
 		ata.initialise()
 		ahci.initialise()
-		outcome = sysdisk.mount_or_install()
+		if verified_root {
+			verity.mount_root()
+		} else {
+			outcome = sysdisk.mount_or_install()
+		}
 	}
-	match outcome {
-		.in_memory { initramfs.initialise() }
-		.booted { initramfs.initialise_overlays() }
-		else {}
+	if !verified_root {
+		match outcome {
+			.in_memory { initramfs.initialise() }
+			.booted { initramfs.initialise_overlays() }
+			else {}
+		}
 	}
 
 	// Shared-memory files need tmpfs's paged backing, as on arm64: a regular

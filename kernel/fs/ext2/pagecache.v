@@ -114,6 +114,12 @@ fn (mut filesystem EXT2Filesystem) raw_device_read(buf voidptr, loc u64, count u
 }
 
 fn (mut filesystem EXT2Filesystem) raw_device_write(buf voidptr, loc u64, count u64) ?i64 {
+	// Refuse before touching the coherent cache. Letting a write merely fail
+	// at later writeback would leave unauthenticated data readable in RAM.
+	if filesystem.read_only {
+		errno.set(errno.erofs)
+		return none
+	}
 	ret := filesystem.cache.write(voidptr(filesystem.backing_device), device_read, device_write, buf, loc, count, u64(filesystem.backing_device.resource.stat.size)) or {
 		return none
 	}

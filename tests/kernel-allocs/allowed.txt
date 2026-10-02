@@ -1,6 +1,8 @@
 aarch64/virtio_gpu/virtio_gpu.v array initialization	1
 apple/smc/smc.v conversion to interface	2
 apple/smc/smc.v struct on the heap	2
+block/verity/verity.v cast to interface	1
+block/verity/verity.v struct on the heap	1
 dev/console/console_arm64.v cast to interface	1
 dev/fbdev/fbdev.v string interpolation	1
 devicetree/devicetree.v array initialization	3
@@ -19,6 +21,7 @@ fs/mount.v array initialization	1
 fs/procfs.v array initialization	1
 fs/procfs.v string concatenation	1
 fs/tmpfs.v cast to interface	1
+fs/verified_root.v struct on the heap	1
 gpu/agx/fake/driver.v array initialization	1
 gpu/agx/file/file.v array initialization	1
 gpu/agx/fw/g13_initdata_layout.v array initialization	1

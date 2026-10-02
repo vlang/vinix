@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.util
 import os
 from pathlib import Path
 import re
@@ -19,6 +20,10 @@ CONFIG_MARKER = b"++CONFIG_B2SUM_SIGNATURE++"
 ARCHES = {"x86_64": (0x8664, 62, "BOOTX64.EFI"), "aarch64": (0xAA64, 183, "BOOTAA64.EFI")}
 DISK_OPTIONS = ("vinix.disk=", "vinix.qemu_persist=", "vinix.qemu_root=",
                 "vinix.apple_ans=", "vinix.ans_rw=", "vinix.persist=", "vinix.root", "root=")
+_verity_spec = importlib.util.spec_from_file_location(
+    "vinix_verified_root", Path(__file__).resolve().parent.parent / "verified-root/build.py")
+verity = importlib.util.module_from_spec(_verity_spec)
+_verity_spec.loader.exec_module(verity)
 
 
 class InvalidBundle(ValueError):
@@ -33,7 +38,7 @@ def digest(path: Path) -> str:
     return result.hexdigest()
 
 
-def check_cmdline(value: str) -> str:
+def check_cmdline(value: str, verity_token: str | None = None) -> str:
     # Limine expands ${macros} and accepts multiline configuration. Accept only
     # literal, printable tokens; no shell quoting or config/macros are needed.
     if len(value) > 2048 or not re.fullmatch(r"[A-Za-z0-9_.,=+:/ -]*", value):
@@ -42,7 +47,22 @@ def check_cmdline(value: str) -> str:
     # token prefixes would allow e.g. x=vinix.disk=auto to bypass this profile.
     if any(option in value for option in DISK_OPTIONS):
         raise InvalidBundle("verified initramfs profile forbids disk root and persistence selectors")
+    if verity_token:
+        root_call(verity.parse_command_line, verity_token)
+        tokens = value.split()
+        if (not tokens or tokens[-1] != verity_token or tokens.count(verity_token) != 1
+                or "vinix.verity" in " ".join(tokens[:-1])):
+            raise InvalidBundle("verified root policy must contain exactly one generated final token")
+    elif "vinix.verity" in value:
+        raise InvalidBundle("verified block roots require the explicit --verity-root options")
     return value.strip()
+
+
+def root_call(function, *args):
+    try:
+        return function(*args)
+    except verity.InvalidImage as error:
+        raise InvalidBundle(str(error)) from error
 
 
 def pe_info(data: bytes, arch: str) -> tuple[int, int]:
@@ -99,11 +119,11 @@ def check_kernel(path: Path, arch: str) -> None:
 
 
 def config_text(kernel_hash: str, module_hashes: list[str], cmdline: str,
-                dtb_hash: str | None = None) -> str:
+                dtb_hash: str | None = None, verity_token: str | None = None) -> str:
     lines = ["timeout: 0", "verbose: yes", "serial: yes", "editor_enabled: no", "hash_mismatch_panic: yes",
              "", "/Vinix verified initramfs", "    protocol: limine",
              f"    path: boot():/boot/vinix#{kernel_hash}",
-             f"    cmdline: {check_cmdline(cmdline)}", "    resolution: 1024x768x32", "    kaslr: yes"]
+             f"    cmdline: {check_cmdline(cmdline, verity_token)}", "    resolution: 1024x768x32", "    kaslr: yes"]
     for index, module_hash in enumerate(module_hashes):
         lines.append(f"    module_path: boot():/boot/root-{index}.tar#{module_hash}")
     if dtb_hash:
@@ -171,24 +191,45 @@ def verify_bundle(bundle: Path, arch: str, certificate: Path | None, backend: st
         raise InvalidBundle("configuration is not a verified initramfs profile")
     if [index for index, _ in modules] != [str(index) for index in range(len(modules))]:
         raise InvalidBundle("initramfs modules must have consecutive indexes")
+    root_tokens = [token for token in cmdline_match[1].split() if token.startswith(verity.TOKEN_PREFIX)]
+    if len(root_tokens) > 1:
+        raise InvalidBundle("duplicate verified-root command-line policy")
+    root_token = root_tokens[0] if root_tokens else None
     expected = config_text(kernel_match[1], [value for _, value in modules],
-                           cmdline_match[1], dtb[1] if dtb else None)
+                           cmdline_match[1], dtb[1] if dtb else None, root_token)
     if text != expected:
         raise InvalidBundle("unexpected configuration directive or command line")
     hashes = {"boot/vinix": kernel_match[1]}
     hashes.update({f"boot/root-{index}.tar": value for index, value in modules})
     if dtb:
         hashes["boot/platform.dtb"] = dtb[1]
-    if files != {loader_relative, "boot/limine.conf", *hashes}:
+    expected_files = {loader_relative, "boot/limine.conf", *hashes}
+    if root_token:
+        expected_files.add("boot/verity-root.img")
+    if files != expected_files:
         raise InvalidBundle("bundle contains missing or unexpected boot files")
     check_kernel(bundle / "boot/vinix", arch)
     for filename, expected_hash in hashes.items():
         if digest(regular_file(bundle / filename)) != expected_hash:
             raise InvalidBundle(f"boot artifact checksum mismatch: {filename}")
+    if root_token:
+        _, count, root_digest = root_call(verity.parse_command_line, root_token)
+        root_call(verity.verify, regular_file(bundle / "boot/verity-root.img"), count, root_digest)
 
 
 def build_bundle(args: argparse.Namespace) -> None:
     cmdline = check_cmdline(args.cmdline)
+    root_image = getattr(args, "verity_root", None)
+    root_device = getattr(args, "verity_device", None)
+    root_count = getattr(args, "verity_data_blocks", None)
+    root_digest = getattr(args, "verity_root_hash", None)
+    root_token = None
+    if any(value is not None for value in (root_image, root_device, root_count, root_digest)):
+        if any(value is None for value in (root_image, root_device, root_count, root_digest)):
+            raise InvalidBundle("verified block root requires --verity-root, --verity-device, "
+                                "--verity-data-blocks and --verity-root-hash")
+        root_token = root_call(verity.command_line, root_device, root_count, root_digest)
+        cmdline = check_cmdline(f"{cmdline} {root_token}".strip(), root_token)
     output = args.output.absolute()
     if output.exists():
         raise InvalidBundle("output already exists; choose a new bundle directory")
@@ -211,6 +252,9 @@ def build_bundle(args: argparse.Namespace) -> None:
         check_kernel(boot / "vinix", args.arch)
         for index, source in enumerate(args.initramfs):
             shutil.copyfile(source, boot / f"root-{index}.tar")
+        if root_image:
+            shutil.copyfile(root_image, boot / "verity-root.img")
+            root_call(verity.verify, boot / "verity-root.img", root_count, root_digest)
         dtb_hash = None
         if args.dtb:
             shutil.copyfile(args.dtb, boot / "platform.dtb")
@@ -218,7 +262,7 @@ def build_bundle(args: argparse.Namespace) -> None:
         config = boot / "limine.conf"
         config.write_text(config_text(digest(boot / "vinix"),
                                      [digest(boot / f"root-{index}.tar")
-                                      for index in range(len(args.initramfs))], cmdline, dtb_hash),
+                                      for index in range(len(args.initramfs))], cmdline, dtb_hash, root_token),
                           encoding="ascii")
         # This is Limine's enroll-config format. Patching this field BEFORE
         # Authenticode signing puts the config hash inside the firmware's
@@ -253,6 +297,10 @@ def main() -> int:
     build.add_argument("--output", type=Path, required=True)
     build.add_argument("--key", type=Path, help="PEM private signing key; never copied to the output")
     build.add_argument("--cmdline", default="")
+    build.add_argument("--verity-root", type=Path, help="block-root image with appended SHA-256 tree")
+    build.add_argument("--verity-device", help="exact guest /dev block-device path for the image")
+    build.add_argument("--verity-data-blocks", type=int, help="separately trusted count from verified-root build")
+    build.add_argument("--verity-root-hash", help="separately trusted SHA-256 root from verified-root build")
     verify = commands.add_parser("verify", help="check signatures, enrolled policy, and every boot artifact")
     verify.add_argument("bundle", type=Path)
     for subcommand in (build, verify):

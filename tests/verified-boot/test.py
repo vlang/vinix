@@ -56,7 +56,9 @@ class Policy(unittest.TestCase):
 
     def test_commandline_injection(self):
         for value in ("quiet\n    cmdline: vinix.disk=auto", "quiet\rhidden", "${ARCH}",
-                      "quiet\0hidden", "é", "a" * 2049):
+                      "quiet\0hidden", "é", "a" * 2049,
+                      "vinix.verity=1,/dev/vda,2," + "0" * 64,
+                      "x=vinix.verity=1,/dev/vda,2," + "0" * 64):
             with self.subTest(value=value):
                 with self.assertRaises(boot.InvalidBundle):
                     boot.check_cmdline(value)
@@ -117,6 +119,49 @@ class Policy(unittest.TestCase):
             with self.assertRaises(boot.InvalidBundle):
                 boot.verify_bundle(output, "x86_64", None, "sbsign", True)
 
+    def test_block_root_binds_geometry_and_all_hash_levels(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            work = Path(temporary)
+            (work / "loader").write_bytes(pe())
+            (work / "kernel").write_bytes(elf("x86_64"))
+            (work / "bootstrap").write_bytes(b"authenticated bootstrap archive")
+            (work / "data").write_bytes(b"x" * (129 * 4096))
+            metadata = boot.verity.build(work / "data", work / "root-image")
+            options = dict(arch="x86_64", loader=work / "loader", kernel=work / "kernel",
+                           initramfs=[work / "bootstrap"], output=work / "bundle", cmdline="quiet",
+                           dtb=None, developer_unsigned=True, key=None, certificate=None,
+                           backend="sbsign", verity_root=work / "root-image", verity_device="/dev/vda",
+                           verity_data_blocks=metadata["data_blocks"], verity_root_hash=metadata["root_hash"])
+            boot.build_bundle(argparse.Namespace(**options))
+            boot.verify_bundle(work / "bundle", "x86_64", None, "sbsign", True)
+            token = boot.verity.command_line("/dev/vda", 129, metadata["root_hash"])
+            config = work / "bundle/boot/limine.conf"
+            self.assertIn(f"cmdline: quiet {token}\n", config.read_text())
+            image = work / "bundle/boot/verity-root.img"
+            original = image.read_bytes()
+            for offset in (0, 129 * 4096, 130 * 4096, len(original) - 1):
+                corrupt = bytearray(original)
+                corrupt[offset] ^= 1
+                image.write_bytes(corrupt)
+                with self.subTest(offset=offset), self.assertRaises(boot.InvalidBundle):
+                    boot.verify_bundle(work / "bundle", "x86_64", None, "sbsign", True)
+            image.write_bytes(original)
+            image.write_bytes(original[:-1])
+            with self.assertRaises(boot.InvalidBundle):
+                boot.verify_bundle(work / "bundle", "x86_64", None, "sbsign", True)
+            image.write_bytes(original)
+            for key in ("verity_root", "verity_device", "verity_data_blocks", "verity_root_hash"):
+                incomplete = {**options, "output": work / "incomplete", key: None}
+                with self.subTest(missing=key), self.assertRaises(boot.InvalidBundle):
+                    boot.build_bundle(argparse.Namespace(**incomplete))
+            for key, value in (("verity_data_blocks", 128), ("verity_root_hash", "0" * 64)):
+                wrong = {**options, "output": work / "wrong", key: value}
+                with self.subTest(key=key), self.assertRaises(boot.InvalidBundle):
+                    boot.build_bundle(argparse.Namespace(**wrong))
+            for value in (f"{token} {token}", f"x={token} {token}", f"{token} quiet"):
+                with self.subTest(cmdline=value), self.assertRaises(boot.InvalidBundle):
+                    boot.check_cmdline(value, token)
+
 
 def integration(args):
     if not shutil.which("openssl"):
@@ -163,6 +208,24 @@ def integration(args):
                 path.write_bytes(original_artifact)
             boot.verify_bundle(output, arch, work / "trusted.crt", args.backend)
             print(f"PASS {arch}: real PE signature, wrong certificate, signed-field tampering, config/kernel/initramfs tampering")
+            (work / "block-data").write_bytes(b"verified block contents".ljust(8192, b"\0"))
+            metadata = boot.verity.build(work / "block-data", work / f"block-image-{arch}")
+            options.output = work / f"block-root-{arch}"
+            options.verity_root = work / f"block-image-{arch}"
+            options.verity_device = "/dev/vda"
+            options.verity_data_blocks = metadata["data_blocks"]
+            options.verity_root_hash = metadata["root_hash"]
+            boot.build_bundle(options)
+            boot.verify_bundle(options.output, arch, work / "trusted.crt", args.backend)
+            root = options.output / "boot/verity-root.img"
+            original_root = root.read_bytes()
+            corrupt = bytearray(original_root)
+            corrupt[0] ^= 1
+            root.write_bytes(corrupt)
+            with unittest.TestCase().assertRaises(boot.InvalidBundle):
+                boot.verify_bundle(options.output, arch, work / "trusted.crt", args.backend)
+            root.write_bytes(original_root)
+            print(f"PASS {arch}: real PE signature authenticates block-root geometry and digest; tampered block image rejected")
 
 
 if __name__ == "__main__":

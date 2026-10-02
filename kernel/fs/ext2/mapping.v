@@ -49,9 +49,14 @@ fn (mut this EXT2Resource) release_mapping(_handle voidptr, _page u64,
 		if mapped.refs != 0 {
 			return
 		}
-		mut inode := EXT2Inode{}
-		inode.read_entry(mut this.filesystem, u32(this.stat.ino)) or { return }
-		this.write_mapped_page_locked(mut inode, mapped) or { return }
+		// Immutable mounts never grant shared writes. Their final mapping
+		// reference can drop its clean page without attempting writeback;
+		// EROFS would otherwise pin an unreferenced page forever.
+		if !this.filesystem.read_only {
+			mut inode := EXT2Inode{}
+			inode.read_entry(mut this.filesystem, u32(this.stat.ino)) or { return }
+			this.write_mapped_page_locked(mut inode, mapped) or { return }
+		}
 		this.mapped_pages.delete(index)
 		memory.pmm_free(mapped.physical, 1)
 		unsafe { free(mapped) }
@@ -61,6 +66,7 @@ fn (mut this EXT2Resource) release_mapping(_handle voidptr, _page u64,
 
 fn (mut this EXT2Resource) write_mapped_page_locked(mut inode EXT2Inode,
 	mapped &EXT2MappedPage) ? {
+	if this.filesystem.read_only { return }
 	file_size := u64(inode.size32l) | (u64(inode.size32h) << 32)
 	page_offset := mapped.page * page_size
 	if page_offset >= file_size {
@@ -79,7 +85,7 @@ fn (mut this EXT2Resource) write_mapped_page_locked(mut inode EXT2Inode,
 // deliberately conservative: a page remains eligible on every later fsync or
 // msync, ensuring writes made after an earlier synchronization are not lost.
 fn (mut this EXT2Resource) sync_mapping(_handle voidptr, offset u64, length u64) ? {
-	if length == 0 {
+	if length == 0 || this.filesystem.read_only {
 		return
 	}
 	this.write_mapped_pages(offset, length)?
@@ -93,6 +99,7 @@ fn (mut this EXT2Resource) sync_mapping(_handle voidptr, offset u64, length u64)
 // Put the shared pages mapped over [offset, offset + length) into the block
 // cache, where a flush finds them.
 fn (mut this EXT2Resource) write_mapped_pages(offset u64, length u64) ? {
+	if this.filesystem.read_only { return }
 	end := if length > u64(-1) - offset { u64(-1) } else { offset + length }
 	this.l.acquire()
 	defer { this.l.release() }

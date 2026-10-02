@@ -60,6 +60,26 @@ mut:
 	open(flags int) ?&Resource
 }
 
+// An immutable backend stays read-only through every mount alias. Mode bits
+// and per-mount flags alone cannot describe that guarantee to a filesystem.
+pub interface ReadOnlyResource {
+	read_only_backend() bool
+}
+
+struct ReadOnlyScratch {
+mut:
+	backend ReadOnlyResource
+}
+
+pub fn backend_is_read_only(mut res Resource) bool {
+	if mut res is ReadOnlyResource {
+		mut scratch := unsafe { &ReadOnlyScratch(C.__builtin_alloca(sizeof(ReadOnlyScratch))) }
+		unsafe { scratch.backend = ReadOnlyResource(res) }
+		return scratch.backend.read_only_backend()
+	}
+	return false
+}
+
 __global (
 	dev_id_counter = u64(1)
 )
