@@ -1,9 +1,14 @@
 # Allocation benchmark in Vinix and macOS
 
-See the [user-space comparison and preserved raw records](results/2026-10-02-userspace/README.md)
-for the default musl optimizations and corrected-clock Catalina comparison.
-The [earlier kernel measurements](results/2026-10-02/README.md) preserve the
-direct kernel allocator comparison and qualify the old user-space timings.
+The [completed user-space comparison and all raw samples](results/2026-10-03-userspace-v6/README.md)
+show Vinix faster than Catalina on all six workloads in both matched QEMU
+cohorts and when all samples are pooled. These are single-thread QEMU TCG
+measurements; the report records compiler/toolchain differences and validation.
+The complete [v5](results/2026-10-03-userspace-v5/README.md) and
+[v4](results/2026-10-02-userspace/README.md) campaigns preserve their slower
+captures and failed targets. The
+[earlier kernel measurements](results/2026-10-02/README.md) preserve the direct
+kernel allocator comparison and qualify the old user-space timings.
 
 `bench.c` runs identical single-thread C workloads on both guests. Compile
 with genuine GNU GCC: Apple's `/usr/bin/gcc` is Clang, and the benchmark records
