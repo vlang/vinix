@@ -106,9 +106,16 @@ while :; do sleep 60; done
     env = dict(os.environ, VINIX_AMD64_ISO_BUILD_DIR=str(state / "iso-build"),
                VINIX_AMD64_KERNEL=str(kernel), VINIX_AMD64_INITRAMFS=str(initramfs),
                VINIX_AMD64_ISO=str(iso))
+    boot_kernel = state / "boot-kernel"
     with (state / "image-build.log").open("wb") as log:
         subprocess.run([str(ROOT / "build-support/build-amd64-iso.sh")],
                        env=env, check=True, stdout=log, stderr=log)
+        subprocess.run(["xorriso", "-osirrox", "on", "-indev", str(iso),
+                        "-extract", "/boot/vinix", str(boot_kernel)],
+                       check=True, stdout=log, stderr=log)
+    kernel_hash = hashlib.sha256(boot_kernel.read_bytes()).hexdigest()
+    if kernel_hash != hashlib.sha256(kernel.read_bytes()).hexdigest():
+        raise RuntimeError("kernel embedded in completed ISO differs from supplied kernel")
     serial = state / "serial.log"
     command = [str(qemu), "-machine", MACHINE, "-accel", ACCELERATOR, "-cpu", CPU,
                "-smp", SMP, "-m", "4096", "-display", "none", "-monitor", "none",
@@ -119,7 +126,8 @@ while :; do sleep 60; done
         "machine": MACHINE, "accelerator": ACCELERATOR, "cpu": CPU,
         "smp": SMP, "memory_mb": 4096,
         "source_sha256": source_hash,
-        "kernel_sha256": hashlib.sha256((state / "iso-build/iso-root/boot/vinix").read_bytes()).hexdigest(),
+        "kernel_sha256": kernel_hash,
+        "kernel_verification": "extracted from completed ISO and matched supplied kernel",
         "compile_flags": FLAGS, "iterations": args.iterations, "samples": args.samples,
         "argv": command,
     }

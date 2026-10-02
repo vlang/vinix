@@ -61,9 +61,16 @@ def main() -> int:
     env = dict(os.environ, VINIX_AMD64_ISO_BUILD_DIR=str(state / "iso-build"),
                VINIX_AMD64_KERNEL=str(kernel), VINIX_AMD64_INITRAMFS=str(initramfs),
                VINIX_AMD64_ISO=str(iso))
+    boot_kernel = state / "boot-kernel"
     with (state / "image-build.log").open("wb") as log:
         subprocess.run([str(ROOT / "build-support/build-amd64-iso.sh")], env=env,
                        check=True, stdout=log, stderr=log)
+        subprocess.run(["xorriso", "-osirrox", "on", "-indev", str(iso),
+                        "-extract", "/boot/vinix", str(boot_kernel)],
+                       check=True, stdout=log, stderr=log)
+    kernel_hash = hashlib.sha256(boot_kernel.read_bytes()).hexdigest()
+    if kernel_hash != hashlib.sha256(kernel.read_bytes()).hexdigest():
+        raise RuntimeError("kernel embedded in completed ISO differs from supplied kernel")
     serial = state / "serial.log"
     machine = "q35,vmport=off"
     accelerator = "tcg,thread=single,tb-size=1024"
@@ -77,7 +84,8 @@ def main() -> int:
         "qemu_version": subprocess.check_output([str(qemu), "--version"], text=True).splitlines()[0],
         "machine": machine, "accelerator": accelerator, "cpu": cpu, "smp": smp,
         "memory_mb": 4096, "source_sha256": hashlib.sha256(source.read_bytes()).hexdigest(),
-        "kernel_sha256": hashlib.sha256((state / "iso-build/iso-root/boot/vinix").read_bytes()).hexdigest(),
+        "kernel_sha256": kernel_hash,
+        "kernel_verification": "extracted from completed ISO and matched supplied kernel",
         "compile_flags": FLAGS, "platform_compile_flags": ["-fno-PIC", "-mcmodel=kernel"],
         "sampler_build_provenance": "caller must verify supplied kernel used the recorded source and flags",
         "execution_context": "pre-scheduler", "argv": command,
