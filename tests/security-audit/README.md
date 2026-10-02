@@ -21,7 +21,9 @@ only by effective UID 0 with CAP_AUDIT_READ in the initial user namespace.
 Authorization is checked on every read, including inherited descriptors.
 Seek to zero to refresh the snapshot. The first line gives format version,
 capacity, total records, retained records, and records overwritten by newer
-events. The next line names the decimal fields. PID/TID are kernel IDs;
+events, followed by `boot=<32 hex digits>`. This stable boot identity survives
+collector restarts and is an identifier, not an authentication token. The next
+line names the decimal fields. PID/TID are kernel IDs;
 identity fields record real/effective UID/GID at the decision. IP is the
 syscall instruction address reported by the architecture's entry hook.
 
@@ -33,7 +35,11 @@ or successful exec), and a still-running call have `completed=0`; their result
 and errno fields are not a completed outcome. Results are unsigned kernel
 ABI values. A sequence that was overwritten cannot update a newer record.
 
-This is initial structured security auditing, not a Linux audit netlink ABI,
-a persistent collector, login/session attribution, or coverage of every
-security decision. Collection does not block producers; overload overwrites
-old records and increments the dropped counter.
+[`vinix-security-audit`](../../tools/security-audit/README.md) adds a userspace
+persistent collector with explicit loss and completion records. Run its parser,
+collection, filesystem-permission and rotation regressions with
+`tests/security-audit/collector-run.sh`. Persistence requires a persistent log
+filesystem. This remains initial structured seccomp auditing, not a Linux audit
+netlink ABI, login/session attribution, or coverage of every security decision.
+Collection does not block producers; overload overwrites old records and
+increments the dropped counter.

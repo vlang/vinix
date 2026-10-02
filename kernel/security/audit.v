@@ -4,6 +4,7 @@
 module security
 
 import klock
+import krandom
 import lib
 import proc
 import time
@@ -37,6 +38,8 @@ __global (
 	audit_records [audit_capacity]AuditRecord
 	audit_total   u64
 	audit_dropped u64
+	audit_boot_id [16]u8
+	audit_boot_identified bool
 )
 
 // Return a correlation number for the syscall exit hook. This copies scalar
@@ -108,6 +111,13 @@ pub fn audit_may_read() bool {
 pub fn audit_text() string {
 	mut records := [audit_capacity]AuditRecord{}
 	audit_lock.acquire()
+	// An identity, not a secret or an authentication token. The boot RNG's
+	// timing seed is sufficient here when hardware entropy is unavailable.
+	// Initialise once so collector restarts share the same sequence domain.
+	if !audit_boot_identified {
+		audit_boot_identified = krandom.fill(unsafe { &audit_boot_id[0] }, 16, true)
+	}
+	boot_id := audit_boot_id
 	total := audit_total
 	dropped := audit_dropped
 	retained := if total < u64(audit_capacity) { total } else { u64(audit_capacity) }
@@ -125,6 +135,10 @@ pub fn audit_text() string {
 	text.add_unsigned(retained)
 	text.add(' dropped=')
 	text.add_unsigned(dropped)
+	text.add(' boot=')
+	for byte in boot_id {
+		text.add_radix(u64(byte), 16, 2)
+	}
 	text.add('\n# sequence ns arch syscall ip pid tid uid euid gid egid action completed result errno\n')
 	for i := u64(0); i < retained; i++ {
 		r := records[i]

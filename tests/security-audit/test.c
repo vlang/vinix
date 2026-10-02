@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 #define _GNU_SOURCE
 #include <errno.h>
+#include <ctype.h>
 #include <fcntl.h>
 #include <sched.h>
 #include <signal.h>
@@ -26,6 +27,19 @@ struct program { unsigned short length; struct filter *instructions; };
 struct cap_header { uint32_t version; int pid; };
 struct cap_data { uint32_t effective, permitted, inheritable; };
 static char buffer[65536];
+static char boot_id[33];
+
+static int check_boot_id(void)
+{
+	char *id = strstr(buffer, " boot=");
+	CHECK(id != NULL);
+	id += 6;
+	for (int i = 0; i < 32; i++) CHECK(isxdigit((unsigned char)id[i]));
+	CHECK(id[32] == '\n');
+	if (boot_id[0]) CHECK(memcmp(boot_id, id, 32) == 0);
+	else { memcpy(boot_id, id, 32); boot_id[32] = 0; }
+	return 0;
+}
 
 static int install(unsigned nr, unsigned action)
 {
@@ -139,6 +153,7 @@ static int tests(void)
 	CHECK(install(SYS_getpid, RET_LOG) == 0);
 	CHECK(syscall(SYS_getpid) == own);
 	CHECK(read_all("/proc/security_audit", 4096, 0) > 0);
+	CHECK(check_boot_id() == 0);
 	char *line = strtok(buffer, "\n");
 	CHECK(line && strstr(line, "version=1 capacity=128"));
 	CHECK((line = strtok(NULL, "\n")) != NULL);
@@ -213,6 +228,7 @@ static int tests(void)
 	CHECK(found);
 	for (int i = 0; i < 1000; i++) CHECK(syscall(SYS_getpid) == own);
 	CHECK(read_all("/proc/security_audit", 17, 1) > 0);
+	CHECK(check_boot_id() == 0);
 	unsigned long long total, retained, dropped;
 	line = strtok(buffer, "\n");
 	CHECK(sscanf(line, "version=1 capacity=128 total=%llu retained=%llu dropped=%llu",
