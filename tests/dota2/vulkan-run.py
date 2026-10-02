@@ -58,7 +58,7 @@ def complete_native_closure(root: Path) -> None:
                 source = next((userland / directory / name for directory in ("usr/lib", "lib")
                                if (userland / directory / name).exists()), None)
                 if source is None:
-                    raise SystemExit(f"native Xvfb dependency is missing: {name}")
+                    raise SystemExit(f"native probe dependency is missing: {name}")
                 library = root / "usr/lib" / name
                 if library.is_symlink():
                     library.unlink()
@@ -82,6 +82,26 @@ def install_native_translator(staging: Path, root: Path) -> None:
     if target.is_symlink():
         target.unlink()
     shutil.copy2(binary, target)
+
+
+def retain_software_gl(source: Path, guest: Path) -> None:
+    relative = "usr/lib/x86_64-linux-gnu/dri"
+    destination = guest / relative
+    destination.mkdir(parents=True, exist_ok=True)
+    keep = {"swrast_dri.so", "kms_swrast_dri.so"}
+    for name in keep:
+        library = source / relative / name
+        if library.is_file():
+            target = destination / name
+            if target.is_symlink():
+                target.unlink()
+            shutil.copy2(library, target)
+    for entry in destination.iterdir():
+        if entry.name not in keep:
+            if entry.is_dir() and not entry.is_symlink():
+                shutil.rmtree(entry)
+            else:
+                entry.unlink()
 
 
 def prepare(args, work: Path) -> Path:
@@ -128,11 +148,11 @@ def prepare(args, work: Path) -> Path:
     shutil.copy2(Path(__file__).with_name("vulkan-init.sh"), root / "sbin/init")
     (root / "sbin/init").chmod(0o755)
     complete_native_closure(root)
-    # This probe never starts Steam, Wine or a GL client. Keep its RAM root
-    # small by leaving the 32-bit runtime and unused DRI drivers out.
+    # This root also supplies the real game probe. Steam's gldriverquery needs
+    # software GL even when the game itself renders through Vulkan.
+    retain_software_gl(source, guest)
     for path in (guest / "usr/lib/i386-linux-gnu", guest / "lib/i386-linux-gnu",
-                 guest / "usr/lib/x86_64-linux-gnu/dri", guest / "usr/share/doc",
-                 guest / "usr/share/man", guest / "usr/share/locale"):
+                 guest / "usr/share/doc", guest / "usr/share/man", guest / "usr/share/locale"):
         if path.exists():
             shutil.rmtree(path)
     return root
