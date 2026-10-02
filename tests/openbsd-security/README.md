@@ -6,6 +6,13 @@ a child process, so a pledge violation that kills the child is something the
 parent can check. The test runs as PID 1 and prints
 `VINIX OPENBSD SECURITY: PASS` or `FAIL` on the serial console.
 
+The memory-layout cases check that changing credentials disables inspection
+by another process, including one with the same UID. A target may explicitly
+restore dumpability with `PR_SET_DUMPABLE`; this permits a matching UID/GID
+sibling to read its maps, smaps and auxiliary vector, while a different user
+remains denied. Self inspection and inspection with `CAP_SYS_PTRACE` remain
+available for a non-dumpable target.
+
 Build the kernel for the architecture under test, then boot it with the test:
 
 ```sh

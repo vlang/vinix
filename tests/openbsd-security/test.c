@@ -23,6 +23,7 @@
 #include <sys/mman.h>
 #include <sys/ioctl.h>
 #include <sys/mount.h>
+#include <sys/prctl.h>
 #include <sys/sendfile.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
@@ -1020,28 +1021,37 @@ static int become(uid_t id)
 	return setresgid(id, id, id) == 0 && setresuid(id, id, id) == 0 ? 0 : -1;
 }
 
-/* Processes of users 1000 and 1001, waiting to be told to exit. */
-static pid_t layout_same, layout_other;
+/* Same-UID targets with and without an inspection opt-in, and another user. */
+static pid_t layout_same, layout_private, layout_other;
 
-static pid_t user_process(uid_t id, const int ready[2], const int done[2])
+static pid_t user_process(uid_t id, int dumpable, const int ready[2], const int done[2])
 {
 	fflush(stdout);
 	pid_t child = fork();
 	if (child == 0) {
-		char byte = 0;
+		close(ready[0]);
 		close(done[1]);
-		_exit(become(id) == 0 && write(ready[1], &byte, 1) == 1 && read(done[0], &byte, 1) >= 0 ? 0 : 1);
+		/* A credential change disables inspection until the target opts in. */
+		char byte = become(id) != 0 || prctl(PR_GET_DUMPABLE, 0L, 0L, 0L, 0L) != 0
+		    || (dumpable && (prctl(PR_SET_DUMPABLE, 1L, 0L, 0L, 0L) != 0
+		                    || prctl(PR_GET_DUMPABLE, 0L, 0L, 0L, 0L) != 1));
+		if (write(ready[1], &byte, 1) != 1 || byte != 0)
+			_exit(1);
+		close(ready[1]);
+		_exit(read(done[0], &byte, 1) >= 0 ? 0 : 1);
 	}
 	char byte;
-	return child > 0 && read(ready[0], &byte, 1) == 1 ? child : -1;
+	return child > 0 && read(ready[0], &byte, 1) == 1 && byte == 0 ? child : -1;
 }
 
 static int layout_reader(void)
 {
 	static const char *const layout[] = {"maps", "smaps", "auxv"};
 	CHECK(become(1000) == 0);
+	CHECK(prctl(PR_GET_DUMPABLE, 0L, 0L, 0L, 0L) == 0);
 	for (int i = 0; i < 3; i++) {
 		CHECK(proc_readable(getpid(), layout[i]) == 1);
+		CHECK(proc_readable(layout_private, layout[i]) == -EACCES);
 		CHECK(proc_readable(layout_same, layout[i]) == 1);
 		CHECK(proc_readable(1, layout[i]) == -EACCES);
 		CHECK(proc_readable(layout_other, layout[i]) == -EACCES);
@@ -1057,12 +1067,16 @@ static int run_layout_tests(void)
 {
 	int ready[2], done[2];
 	CHECK(pipe(ready) == 0 && pipe(done) == 0);
-	layout_same = user_process(1000, ready, done);
-	layout_other = user_process(1001, ready, done);
-	CHECK(layout_same > 0 && layout_other > 0);
+	layout_private = user_process(1000, 0, ready, done);
+	layout_same = user_process(1000, 1, ready, done);
+	layout_other = user_process(1001, 1, ready, done);
+	CHECK(layout_private > 0 && layout_same > 0 && layout_other > 0);
+	/* CAP_SYS_PTRACE still permits inspection of a non-dumpable target. */
+	CHECK(proc_readable(layout_private, "maps") == 1);
 	CHECK(proc_readable(layout_other, "maps") == 1);
 	int status = in_child(layout_reader);
 	close(done[1]);
+	CHECK(exited_ok(reap(layout_private)));
 	CHECK(exited_ok(reap(layout_same)));
 	CHECK(exited_ok(reap(layout_other)));
 	CHECK(exited_ok(status));
