@@ -13,6 +13,9 @@ PID
 activity.cpu.decimal
 {0},{1}
 -----
+activity.error.kill
+No se pudo terminar el proceso seleccionado.
+-----
 activity.error.missing
 {0} no existe.
 -----
@@ -24,6 +27,9 @@ No se pudo leer {0}.
 -----
 activity.error.version
 {0} usa la versión {1}, no la {2}.
+-----
+activity.kill
+Terminar proceso
 -----
 activity.memory.mb
 {0} MB

@@ -13,6 +13,9 @@ PID
 activity.cpu.decimal
 {0}.{1}
 -----
+activity.error.kill
+Could not kill the selected process.
+-----
 activity.error.missing
 {0} is not there.
 -----
@@ -24,6 +27,9 @@ Could not read {0}.
 -----
 activity.error.version
 {0} speaks version {1}, not {2}.
+-----
+activity.kill
+Kill process
 -----
 activity.memory.mb
 {0} MB

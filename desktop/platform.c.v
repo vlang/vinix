@@ -1150,6 +1150,12 @@ fn desktop_spawn_wine_host(directory string, width int, height int, command stri
 	}
 }
 
+// Activity Monitor signals arbitrary processes without waiting or reaping them.
+// Reject init and the special kill() PIDs that would signal entire groups.
+fn desktop_kill_process(pid int) bool {
+	return pid > 1 && C.kill(pid, C.SIGKILL) == 0
+}
+
 fn desktop_terminate_child(pid int) int {
 	if pid <= 0 {
 		return -1

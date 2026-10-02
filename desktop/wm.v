@@ -643,7 +643,8 @@ fn (mut d Desktop) window_element(window_index int) ui2.Element {
 
 	mut window_children := frame_elements(9)
 	// The body goes first: a toolbar's title bar reaches down over its top.
-	window_children << body
+	// Transfer the app tree without cloning its borrowed text and pooled arrays.
+	window_children << ui2.Element{ ...body }
 	window_children << title_bar
 	window_children << divider
 	// Arranged windows already fill a desktop-defined region. A normal window

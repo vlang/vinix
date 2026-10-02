@@ -362,6 +362,10 @@ their stable executable names (`vinix-calculator`, `vinix-editor`, and so on)
 to the labels shown elsewhere in the desktop. Like the file browser it reads
 the real system.
 
+Click a process row to select it, then use the icon-only kill button at the
+top left to send SIGKILL. Selection follows the PID through sorting and refresh;
+the button is disabled without a selection or for the init process (PID 1).
+
 Vinix has no procfs, so this needed a kernel interface. `/dev/processes`
 answers a read with one snapshot of the whole table — a short header, then a
 fixed-size record per process — taken under the process table's own lock, so a

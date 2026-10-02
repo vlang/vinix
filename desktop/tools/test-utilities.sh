@@ -39,6 +39,13 @@ cp "$root/desktop/tools/tests/terminal_utf8_test.v" "$work/ui/"
     -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/terminal_utf8_test.v"
 rm -f "$work/ui/terminal_utf8_test.v"
 
+# Activity Monitor keeps process selection across snapshots and sends SIGKILL
+# without waiting for an arbitrary process. Exercise it with owned children.
+cp "$root/desktop/tools/tests/activity_kill_test.v" "$work/ui/"
+"$v" -new-compiler -nocache -gc none -manualfree -enable-globals -stats -d ui2_headless \
+    -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/activity_kill_test.v"
+rm -f "$work/ui/activity_kill_test.v"
+
 # The staged Calculator uses ui2's compile-time `$vml` lowering, which is
 # provided by V's current compiler. Keep test and production compilation on
 # the same frontend.

@@ -13,6 +13,9 @@ PID
 activity.cpu.decimal
 {0},{1}
 -----
+activity.error.kill
+Не удалось завершить выбранный процесс.
+-----
 activity.error.missing
 {0} отсутствует.
 -----
@@ -24,6 +27,9 @@ activity.error.read
 -----
 activity.error.version
 {0} использует версию {1}, а не {2}.
+-----
+activity.kill
+Завершить процесс
 -----
 activity.memory.mb
 {0} МБ

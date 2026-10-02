@@ -70,13 +70,14 @@ const activity_mb_bytes = u64(1_000_000)
 // collector to clean up the difference.
 struct ActivityRow {
 mut:
-	pid          int
-	cpu_percent  f64
-	memory_bytes u64
-	name         string
-	pid_text     string
-	cpu_text     string
-	mem_text     string
+	pid           int
+	cpu_percent   f64
+	memory_bytes  u64
+	name          string
+	pid_text      string
+	select_action string
+	cpu_text      string
+	mem_text      string
 }
 
 // previous holds what a pid's CPU counter read last time round, so the next
@@ -110,6 +111,8 @@ mut:
 	descending   bool = true
 	scroll       int
 	visible_rows int = 1
+	// Selection follows the process when sorting or sampling moves its row.
+	selected_pid int
 	// Summary text, rebuilt with the rows for the same reason.
 	summary       string
 	error         string
@@ -207,6 +210,7 @@ fn (mut m ActivityMonitor) apply_snapshot(header &ActivityTable, records &Activi
 		} else {
 			row.pid = pid
 			row.pid_text = pid.str()
+			row.select_action = '${activity_action_select}${row.pid_text}'
 		}
 		row.pid = pid
 		row.cpu_percent = cpu_percent
@@ -214,7 +218,8 @@ fn (mut m ActivityMonitor) apply_snapshot(header &ActivityTable, records &Activi
 		row.name = replace_activity_text(row.name, activity_name_of(record))
 		row.cpu_text = replace_activity_text(row.cpu_text, percent_text(cpu_percent))
 		row.mem_text = replace_activity_text(row.mem_text, memory_mb_text(record.memory_bytes))
-		m.scratch_rows << row
+		// Transfer ownership: appending a bare struct variable clones its strings.
+		m.scratch_rows << ActivityRow{ ...row }
 	}
 
 	for index in 0 .. m.rows.len {
@@ -228,6 +233,9 @@ fn (mut m ActivityMonitor) apply_snapshot(header &ActivityTable, records &Activi
 	m.remember(records, count)
 	m.sampled_ns = header.sample_ns
 	m.sort_rows()
+	if m.process_row_index(m.selected_pid) < 0 {
+		m.selected_pid = 0
+	}
 	m.clamp_scroll()
 
 	mut used := if header.total_memory > header.free_memory {
@@ -255,6 +263,10 @@ fn (m &ActivityMonitor) process_row_index(pid int) int {
 		}
 	}
 	return -1
+}
+
+fn (m &ActivityMonitor) can_kill_selected() bool {
+	return m.error == '' && m.selected_pid > 1 && m.process_row_index(m.selected_pid) >= 0
 }
 
 fn replace_activity_text(current string, next string) string {
@@ -408,6 +420,7 @@ fn (mut m ActivityMonitor) fail(message string) bool {
 	m.rows = []ActivityRow{}
 	m.previous.clear()
 	m.sampled_ns = 0
+	m.selected_pid = 0
 	m.set_error(message)
 	m.language = desktop_language
 	return changed
@@ -424,6 +437,7 @@ fn (mut m ActivityMonitor) free_rows() {
 		unsafe {
 			m.scratch_rows[index].name.free()
 			m.scratch_rows[index].pid_text.free()
+			m.scratch_rows[index].select_action.free()
 			m.scratch_rows[index].cpu_text.free()
 			m.scratch_rows[index].mem_text.free()
 		}
@@ -442,6 +456,7 @@ fn (mut m ActivityMonitor) free_row(index int) {
 	unsafe {
 		m.rows[index].name.free()
 		m.rows[index].pid_text.free()
+		m.rows[index].select_action.free()
 		m.rows[index].cpu_text.free()
 		m.rows[index].mem_text.free()
 	}
@@ -650,8 +665,11 @@ const activity_action_name = 'activity.sort.name'
 const activity_action_pid = 'activity.sort.pid'
 const activity_action_scroll_up = 'activity.scroll.up'
 const activity_action_scroll_down = 'activity.scroll.down'
+const activity_action_kill = 'activity.kill'
+const activity_action_select = 'activity.select.'
 
 const activity_row_height = 22
+const activity_toolbar_height = 34
 const activity_header_height = 26
 const activity_footer_height = 26
 const activity_padding = 10
@@ -664,7 +682,8 @@ const activity_pid_column = 52
 
 struct ActivityApp {
 mut:
-	monitor ActivityMonitor
+	monitor     ActivityMonitor
+	kill_failed bool
 }
 
 fn open_activity(mut _ Desktop) !NativeApp {
@@ -697,7 +716,7 @@ fn (mut a ActivityApp) build(size ui2.Rect) !ui2.Element {
 	height := int(size.height)
 	inner := width - 2 * activity_padding
 
-	list_top := activity_header_height
+	list_top := activity_toolbar_height + activity_header_height
 	list_height := height - list_top - activity_footer_height
 	a.monitor.visible_rows = if list_height > activity_row_height {
 		list_height / activity_row_height
@@ -709,7 +728,24 @@ fn (mut a ActivityApp) build(size ui2.Rect) !ui2.Element {
 		a.monitor.relocalize()
 	}
 
-	mut children := frame_elements(a.monitor.visible_rows + 18)
+	mut children := frame_elements(a.monitor.visible_rows + 20)
+	children << ui2.view('', ui2.rect(0, 0, f64(width), f64(activity_toolbar_height)), ui2.BoxStyle{
+		bg: body_panel
+	}, [])
+	can_kill := a.monitor.can_kill_selected()
+	label := tr('activity.kill')
+	children << ui2.Element{
+		...ui2.button_with_image(activity_action_kill, '', 'builtin:close',
+			ui2.rect(f64(activity_padding), 4, 28, 26), ui2.BoxStyle{
+			bg: if can_kill { files_up } else { files_up_disabled }
+			radius: 4
+		}, ui2.TextStyle{
+			color: if can_kill { app_on_accent } else { body_muted }
+		})
+		enabled:             can_kill
+		tooltip:             label
+		accessibility_label: label
+	}
 
 	// Column headings, then the rule the list hangs from.
 	activity_header(mut children, width, a.monitor.sort, a.monitor.descending)
@@ -731,9 +767,10 @@ fn (mut a ActivityApp) build(size ui2.Rect) !ui2.Element {
 		y := list_top + row * activity_row_height
 		// A quiet stripe every other row. With twenty-odd rows of four columns
 		// it is the difference between reading across a line and losing it.
-		children << ui2.view('', ui2.rect(0, f64(y), f64(width), f64(activity_row_height)), ui2.BoxStyle{
-			bg: activity_row_alt
-			transparent: index % 2 == 0
+		selected := entry.pid == a.monitor.selected_pid
+		children << ui2.clickable_view(entry.select_action, ui2.rect(0, f64(y), f64(width), f64(activity_row_height)), ui2.BoxStyle{
+			bg: if selected { files_sidebar_selected } else { activity_row_alt }
+			transparent: !selected && index % 2 == 0
 		}, activity_row_cells(entry, width))
 		row++
 	}
@@ -767,8 +804,11 @@ fn (mut a ActivityApp) build(size ui2.Rect) !ui2.Element {
 		})
 		summary_width -= 2 * button_size + 12
 	}
-	children << ui2.label('', a.monitor.summary, ui2.rect(f64(activity_padding), f64(footer_y + 5), f64(summary_width), 16), ui2.TextStyle{
-		color: body_muted
+	if a.monitor.selected_pid == 0 {
+		a.kill_failed = false
+	}
+	children << ui2.label('', if a.kill_failed { tr('activity.error.kill') } else { a.monitor.summary }, ui2.rect(f64(activity_padding), f64(footer_y + 5), f64(summary_width), 16), ui2.TextStyle{
+		color: if a.kill_failed { files_error } else { body_muted }
 		size: 11
 	})
 
@@ -785,7 +825,7 @@ const activity_sort_arrow_gap = 4
 // run right up to the next column, so a rule on the boundary would touch them.
 const activity_rule_gap = 6
 
-// activity_header lays the column headings along the top, as Files' list view
+// activity_header lays the column headings below the toolbar, as Files' list view
 // does: clicking a heading sorts the list by that column, the one in use is
 // darker and has an arrow for its direction, and a rule between headings
 // shows where one target ends and the next begins.
@@ -794,7 +834,7 @@ fn activity_header(mut children []ui2.Element, width int, sort ActivitySort, des
 	pid_x := activity_padding + name_width
 	cpu_x := pid_x + activity_pid_column
 	mem_x := cpu_x + activity_cpu_column
-	children << ui2.view('', ui2.rect(0, 0, f64(width), f64(activity_header_height)), ui2.BoxStyle{
+	children << ui2.view('', ui2.rect(0, f64(activity_toolbar_height), f64(width), f64(activity_header_height)), ui2.BoxStyle{
 		bg: body_panel
 	}, [])
 	// Each target reaches to the next rule, and the outer two to the window's
@@ -816,7 +856,7 @@ fn activity_heading(mut children []ui2.Element, column ActivitySort, x int, widt
 	target_x int, target_end int, sort ActivitySort, descending bool) {
 	selected := column == sort
 	if column != .name {
-		children << ui2.view('', ui2.rect(f64(target_x), 5, 1, f64(activity_header_height - 10)), ui2.BoxStyle{
+		children << ui2.view('', ui2.rect(f64(target_x), f64(activity_toolbar_height + 5), 1, f64(activity_header_height - 10)), ui2.BoxStyle{
 			bg: body_rule
 		}, [])
 	}
@@ -824,7 +864,7 @@ fn activity_heading(mut children []ui2.Element, column ActivitySort, x int, widt
 	text_width := if selected { arrow_x - activity_sort_arrow_gap - x } else { width }
 	// Every heading is bold, the sorted one only darker: the atlas has no bold
 	// face this small, and a heading that grew when clicked would jog the row.
-	children << ui2.label('', activity_column_title(column), ui2.rect(f64(x), 0, f64(text_width), f64(activity_header_height)), ui2.TextStyle{
+	children << ui2.label('', activity_column_title(column), ui2.rect(f64(x), f64(activity_toolbar_height), f64(text_width), f64(activity_header_height)), ui2.TextStyle{
 		color: if selected { body_heading } else { body_muted }
 		size: 11
 		bold: true
@@ -833,7 +873,7 @@ fn activity_heading(mut children []ui2.Element, column ActivitySort, x int, widt
 	if selected {
 		children << ui2.Element{
 			...ui2.image('', if descending { 'builtin:arrow_down' } else { 'builtin:arrow_up' },
-				ui2.rect(f64(arrow_x + (activity_sort_arrow - activity_sort_arrow_box) / 2), f64((activity_header_height - activity_sort_arrow_box) / 2), f64(activity_sort_arrow_box), f64(activity_sort_arrow_box)))
+				ui2.rect(f64(arrow_x + (activity_sort_arrow - activity_sort_arrow_box) / 2), f64(activity_toolbar_height + (activity_header_height - activity_sort_arrow_box) / 2), f64(activity_sort_arrow_box), f64(activity_sort_arrow_box)))
 			text_style: ui2.TextStyle{
 				color: body_heading
 			}
@@ -841,7 +881,7 @@ fn activity_heading(mut children []ui2.Element, column ActivitySort, x int, widt
 	}
 	label := activity_sort_label(column)
 	children << ui2.Element{
-		...ui2.clickable_view(activity_action_of(column), ui2.rect(f64(target_x), 0, f64(target_end - target_x), f64(activity_header_height)), ui2.BoxStyle{
+		...ui2.clickable_view(activity_action_of(column), ui2.rect(f64(target_x), f64(activity_toolbar_height), f64(target_end - target_x), f64(activity_header_height)), ui2.BoxStyle{
 			transparent: true
 		}, [])
 		tooltip: label
@@ -926,6 +966,17 @@ fn activity_row_cells(entry ActivityRow, width int) []ui2.Element {
 
 fn (mut a ActivityApp) handle(event_id string) ! {
 	match event_id {
+		activity_action_kill {
+			if !a.monitor.can_kill_selected() {
+				return
+			}
+			a.kill_failed = !desktop_kill_process(a.monitor.selected_pid)
+			if !a.kill_failed {
+				a.monitor.selected_pid = 0
+				// Pick up the exit on the next poll without waiting for the process.
+				a.monitor.last_poll_ms = monotonic_millis() - activity_interval_ms
+			}
+		}
 		activity_action_cpu {
 			a.set_sort(.cpu)
 		}
@@ -946,7 +997,17 @@ fn (mut a ActivityApp) handle(event_id string) ! {
 			a.monitor.scroll += a.monitor.visible_rows
 			a.monitor.clamp_scroll()
 		}
-		else {}
+		else {
+			if event_id.starts_with(activity_action_select) {
+				pid_text := event_id[activity_action_select.len..]
+				pid := pid_text.int()
+				unsafe { pid_text.free() }
+				if pid > 0 && a.monitor.process_row_index(pid) >= 0 {
+					a.monitor.selected_pid = pid
+					a.kill_failed = false
+				}
+			}
+		}
 	}
 }
 
