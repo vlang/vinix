@@ -489,6 +489,12 @@ def main() -> None:
         "desktop_sha256": sha256(root / "usr/bin/vinix-desktop"),
         "translator_sha256": sha256(root / "usr/bin/qemu-x86_64"),
         "translator_staging": str(args.translator_staging) if args.translator_staging else None,
+        "launcher_sha256": sha256(root / "usr/libexec/vinix-dota2/run-dota2"),
+        "runtime_generation": (
+            root / "usr/libexec/vinix-dota2/root/.vinix-dota2-vulkan-generation"
+        ).read_text().strip(),
+        "extra_game_arguments": args.extra_game_arg,
+        "extra_game_environment": dict(setting.split("=", 1) for setting in args.game_env),
         "extra_preloads": args.preload_records,
         "steamclient_sha256": sha256(root / "home/dota2/.steam/sdk64/steamclient.so"),
         "vulkandriverquery_sha256": (
