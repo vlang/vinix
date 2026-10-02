@@ -26,6 +26,8 @@ class LauncherTest(unittest.TestCase):
             "lib64/ld-linux-x86-64.so.2",
             "usr/lib/x86_64-linux-gnu/libvulkan.so.1",
             "usr/lib/x86_64-linux-gnu/libvulkan_lvp.so",
+            "usr/lib/x86_64-linux-gnu/libvinix-steam-robust.so",
+            "usr/lib/x86_64-linux-gnu/libmpg123.so.0",
             "usr/share/vulkan/icd.d/lvp_icd.x86_64.json",
         ):
             path = self.runtime / relative
@@ -102,7 +104,9 @@ class LauncherTest(unittest.TestCase):
         self.assertEqual(launch["args"], [
             "-B", "0x100000000", "-L", str(self.runtime),
             "-E", f"LD_LIBRARY_PATH={libraries}",
-            "-E", "LD_PRELOAD=/guest/only/preload.so",
+            "-E", (f"LD_PRELOAD=/guest/only/preload.so:"
+                   f"{self.runtime}/usr/lib/x86_64-linux-gnu/libvinix-steam-robust.so:"
+                   f"{self.runtime}/usr/lib/x86_64-linux-gnu/libmpg123.so.0"),
             str(self.game), "-windowed", "-w", "1280", "-h", "720",
             "+map", "path with spaces", "-w", "960",
         ])
@@ -175,6 +179,23 @@ class LauncherTest(unittest.TestCase):
         self.env["VINIX_DOTA_TEST_STATUS"] = "42"
         result = self.run_launcher()
         self.assertEqual(result.returncode, 42)
+
+    def test_runtime_compatibility_preloads_are_guest_only(self):
+        launch = self.run_launcher()
+        preloads = (f"{self.runtime}/usr/lib/x86_64-linux-gnu/libvinix-steam-robust.so:"
+                    f"{self.runtime}/usr/lib/x86_64-linux-gnu/libmpg123.so.0")
+        self.assertIn(f"LD_PRELOAD={preloads}", launch["args"])
+        self.assertEqual(launch["env"]["VINIX_X86_64_PRELOAD"], preloads)
+        self.assertNotIn("LD_PRELOAD", launch["env"])
+
+    def test_missing_robust_list_shim_is_rejected(self):
+        (self.runtime / "usr/lib/x86_64-linux-gnu/libvinix-steam-robust.so").unlink()
+        self.assert_rejected("x86-64 robust-list shim is missing")
+
+    def test_explicit_cpu_model_is_preserved(self):
+        self.env["QEMU_CPU"] = "Nehalem"
+        launch = self.run_launcher()
+        self.assertEqual(launch["env"]["QEMU_CPU"], "Nehalem")
 
 
 if __name__ == "__main__":

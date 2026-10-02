@@ -94,12 +94,23 @@ guest_libraries="$game_bin:$runtime/usr/lib/x86_64-linux-gnu:$runtime/lib/x86_64
 if [ -n "${VINIX_DOTA2_LD_LIBRARY_PATH:-}" ]; then
     guest_libraries="$guest_libraries:$VINIX_DOTA2_LD_LIBRARY_PATH"
 fi
+# Steamclient uses get_robust_list, which QEMU linux-user does not implement.
+# Use the existing shim built for this runtime's glibc pthread layout. Its
+# audio dependencies also need the runtime's newer mpg123 ABI: the game's
+# bundled decoder lacks mpg123_info2 required by Bookworm's libsndfile.
+robust_shim="$runtime/usr/lib/x86_64-linux-gnu/libvinix-steam-robust.so"
+decoder="$runtime/usr/lib/x86_64-linux-gnu/libmpg123.so.0"
+[ -e "$robust_shim" ] || fail "the x86-64 robust-list shim is missing: $robust_shim"
+[ -e "$decoder" ] || fail "the runtime mpg123 decoder is missing: $decoder"
+guest_preloads="$robust_shim:$decoder"
+if [ -n "${VINIX_X86_64_PRELOAD:-}" ]; then
+    guest_preloads="$VINIX_X86_64_PRELOAD:$guest_preloads"
+fi
+export VINIX_X86_64_PRELOAD="$guest_preloads"
 # The translator itself is native. QEMU's -E applies these foreign library
 # settings only after it has loaded, so the AArch64 loader never sees them.
 set -- "$game" -windowed -w "$width" -h "$height" "$@"
-if [ -n "${VINIX_X86_64_PRELOAD:-}" ]; then
-    set -- -E "LD_PRELOAD=$VINIX_X86_64_PRELOAD" "$@"
-fi
+set -- -E "LD_PRELOAD=$guest_preloads" "$@"
 # Match dota.sh's descriptor allowance and default per-thread stack size.
 # Change only the soft limits, leaving the caller's hard limits available.
 ulimit -Sn 2048 || fail 'could not set the game descriptor limit'
