@@ -13,6 +13,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -153,6 +154,38 @@ class ExportTests(unittest.TestCase):
                 with self.package.open("r+b") as output:
                     output.write(b"changed")
                 self.assertEqual(client.request(0, block * 4096, 16)[0], errno.EIO)
+            finally:
+                client.close()
+                server.shutdown()
+                thread.join()
+
+    def test_idle_transmission_survives_negotiation_timeout(self):
+        # Use real sockets and the real protocol, shortening only the initial
+        # negotiation deadline so a long shader compilation needs no slow test.
+        observed_timeouts = []
+
+        class ShortNegotiationHandler(EXPORTER.Handler):
+            def negotiate(self):
+                observed_timeouts.append(self.request.gettimeout())
+                self.request.settimeout(0.1)
+                return super().negotiate()
+
+        block = self.bmap("nested/package.vpk", 0)
+        original = bytes([0xA5]) * 16
+        with EXPORTER.Server(self.state, 0) as server:
+            server.RequestHandlerClass = ShortNegotiationHandler
+            thread = threading.Thread(target=server.serve_forever)
+            thread.start()
+            client = Client(server.server_address[1])
+            try:
+                self.assertEqual(client.request(0, block * 4096, 16), (0, original))
+                time.sleep(0.3)
+                self.assertEqual(client.request(0, block * 4096, 16), (0, original))
+                # An unfinished handshake still expires and releases its socket.
+                with socket.create_connection(server.server_address, timeout=1) as unfinished:
+                    self.assertEqual(len(EXPORTER.receive(unfinished, 18)), 18)
+                    self.assertEqual(unfinished.recv(1), b"")
+                self.assertEqual(observed_timeouts, [120, 120])
             finally:
                 client.close()
                 server.shutdown()

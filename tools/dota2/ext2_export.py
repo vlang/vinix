@@ -470,6 +470,10 @@ class Handler(socketserver.BaseRequestHandler):
         try:
             if not self.negotiate():
                 return
+            # The guest can spend minutes compiling shaders between reads.
+            # Keep the handshake bounded, then let the negotiated disk remain
+            # available until the client disconnects.
+            self.request.settimeout(None)
             while True:
                 magic, flags, command, handle, offset, length = struct.unpack(">IHH8sQI", receive(self.request, 28))
                 if magic != REQUEST_MAGIC or length > MAX_REQUEST:
