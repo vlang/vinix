@@ -980,6 +980,7 @@ static void reference_tests(void)
 #include "time_test.h"
 #include "timer_test.h"
 #include "workqueue_test.h"
+#include "delayed_work_test.h"
 
 int main(void)
 {
@@ -1005,6 +1006,7 @@ int main(void)
     time_tests();
     timer_tests();
     workqueue_tests();
+    delayed_work_tests();
     list_tests();
     tree_tests();
     concurrency_tests();
@@ -1012,6 +1014,6 @@ int main(void)
     reference_tests();
     vinix_linuxkpi_percpu_destroy_for_test();
     assert(live_pages == 0);
-    puts("LinuxKPI: PASS (Linux helpers, allocation/OOM, strings, bitmaps, SMP/IRQ locks, per-CPU storage, task references, wake races, sleeping mutexes, queues, completions, clocks, timed waits, timer callbacks and ordered workqueues)");
+    puts("LinuxKPI: PASS (Linux helpers, allocation/OOM, strings, bitmaps, SMP/IRQ locks, per-CPU storage, task references, wake races, sleeping mutexes, queues, completions, clocks, timed waits, timer callbacks, ordered queues and delayed work)");
     return 0;
 }

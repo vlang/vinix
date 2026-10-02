@@ -131,12 +131,28 @@ the complete i915 source tree is not evidence that the driver runs.
   freeing a work item or destroying its queue, keep the queue alive throughout
   cancellation/flushing, and avoid holding locks needed by its callbacks.
   Waiting for the current callback or flushing/draining its own ordered
-  queue fails explicitly. Concurrent/per-CPU/system queues, delayed/RCU work,
+  queue fails explicitly. Concurrent/per-CPU/system queues and RCU work,
   CPU placement, priority, reclaim rescuers, freezer support and attribute
   changes remain pending. Unsupported allocation flags/modes return `NULL`;
   explicit CPU queueing returns false with a warning. This first backend
   covers i915's ordinary ordered queues, while its unordered and high-priority
   flip queues still need implementations.
+- Unmodified `delayed_work` and its static/stack initialization macros use
+  the timer backend and explicit ordered queues. `queue_delayed_work`,
+  `mod_delayed_work`, asynchronous/synchronous cancellation and
+  `flush_delayed_work` support immediate execution, deadline extension or
+  reduction, queue migration, sleeping callbacks and self-rearming.
+  Pending timer reservations use the work item's existing list/data fields;
+  arming needs no extra allocation. IRQ-off modification/cancellation drops
+  the work lock before retrying an in-flight timer transfer. Synchronous
+  cancellation suppresses rearming and waits for both timer transfer and
+  work execution. Delayed flushing forces the captured timer into execution,
+  while preserving a later self-rearm. Queue flushing/draining excludes
+  unexpired timers; owners must cancel all delayed work before destroying
+  its queue. Timer transfer and work dispatch both permit a detached work
+  callback to free its enclosing object. External producers must have stopped
+  before freeing the object; its queue must remain alive through cancellation
+  and flushing. Explicit CPU placement remains unsupported.
 - Static `DEFINE_PER_CPU` variables preserve their initializers and alignment
   in a separate copy for every boot CPU. Dynamic `alloc_percpu`,
   `alloc_percpu_gfp` and `free_percpu` use zeroed, aligned slots, with checked
@@ -317,6 +333,21 @@ Native thread-test baselines require 50 ms of stable free pages while yielding
 and reaping warmup workers, with a one-second bound. The measured batch still
 must return exactly to that baseline; a mismatch prints both byte counts.
 
+Delayed-work host tests cover pre-expiry/promoted cancellation, deadline
+changes, immediate execution, migration, static initialization and IRQ-state
+balance. Controlled timer transfers force atomic modification/cancellation
+and synchronous cancellation/flushing to retry while the transfer is running.
+Sleeping callbacks check cancellation suppressing rearm and flush boundaries
+preserving a later timer. Four producers perform 2,000 shared-item
+enqueue/modify/cancel cycles across two ordered queues while ticks advance;
+callbacks assert that execution never overlaps. Two hundred callbacks free
+their enclosing delayed-work object under ASan, with every page returned.
+The native four-CPU guest runs four batches of four ordered workers, checking
+timed self-rearm, sleeping callbacks, forced execution, IRQ-off deadline
+changes/cancellation and 32 self-freeing objects per batch. After worker
+teardown and timer dispatch retirement, the measured batch restores the
+physical-page baseline.
+
 An enabled kernel runs the allocator/list/sort/tree/IRQ-lock tests 200 times
 and verifies that the physical free-page count returns to its initial value.
 The same repeated test also checks raw locks, bit searches, byte-order helpers,
@@ -368,7 +399,7 @@ runtime subsystems:
 2. MMIO mapping with correct cache attributes, DMA/scatter-gather APIs,
    page/shmem management, GPU address spaces and TTM/GEM memory management.
 3. Remaining lock/wait variants (including wound/wait mutexes and I/O waits),
-   concurrent/system/delayed workqueues, remaining timer modes,
+   concurrent/system workqueues, RCU work, remaining timer modes,
    high-resolution timers and RCU lifetime
    rules.
 4. Linux IRQ registration, interrupt synchronization and safe GPU reset paths.

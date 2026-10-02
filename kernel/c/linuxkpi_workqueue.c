@@ -22,6 +22,7 @@
 int vsnprintf(char *, size_t, const char *, va_list);
 void vinix_linuxkpi_host_worker_enter(void);
 void vinix_linuxkpi_host_worker_leave(void);
+void vinix_linuxkpi_host_delayed_timer_gate(struct timer_list *timer);
 #else
 #include <pthread.h>
 int npf_vsnprintf(char *, size_t, const char *, va_list);
@@ -29,12 +30,13 @@ int npf_vsnprintf(char *, size_t, const char *, va_list);
 
 /* First workqueue backend: explicit ordered queues only. A dedicated native
  * worker guarantees FIFO execution even when a callback sleeps. Concurrent,
- * per-CPU, reclaim, priority, freezer and delayed-work APIs remain unresolved
+ * per-CPU, reclaim, priority, freezer and RCU-work APIs remain unresolved
  * or allocation fails; they must not silently inherit single-thread behavior.
  * The upstream work_struct layout and initialization macros are unchanged. */
 struct workqueue_struct {
     struct list_head all;
     struct list_head pending;
+    struct list_head delayed;
     struct list_head sleepers;
     struct task_struct *task;
     pthread_t thread;
@@ -90,7 +92,16 @@ static bool canceling_locked(struct work_struct *work)
 static struct workqueue_struct *queued_locked(struct work_struct *work)
 {
     unsigned long data = atomic_long_read(&work->data);
-    return (data & WORK_STRUCT_PWQ) ?
+    return (data & (WORK_STRUCT_PWQ | WORK_STRUCT_INACTIVE)) == WORK_STRUCT_PWQ ?
+        (void *)(data & WORK_STRUCT_WQ_DATA_MASK) : NULL;
+}
+/* INACTIVE distinguishes a timer reservation from executable work. Both use
+ * the original entry/data fields, without an allocation for each timer arm. */
+static struct workqueue_struct *delayed_locked(struct work_struct *work)
+{
+    unsigned long data = atomic_long_read(&work->data);
+    return (data & (WORK_STRUCT_PWQ | WORK_STRUCT_INACTIVE)) ==
+        (WORK_STRUCT_PWQ | WORK_STRUCT_INACTIVE) ?
         (void *)(data & WORK_STRUCT_WQ_DATA_MASK) : NULL;
 }
 static void mark_queued_locked(struct workqueue_struct *wq, struct work_struct *work)
@@ -114,24 +125,136 @@ static bool detach_locked(struct work_struct *work)
     return true;
 }
 
+static bool accepting_locked(struct workqueue_struct *wq)
+{
+    BUG_ON(wq->stop);
+    if (!wq->drainers && !wq->destroying) return true;
+    struct work_run *run = current_locked();
+    return run && run->wq == wq;
+}
 bool queue_work_on(int cpu, struct workqueue_struct *wq, struct work_struct *work)
 {
     BUG_ON(!wq || !work->func);
     if (WARN_ON_ONCE(cpu != WORK_CPU_UNBOUND)) return false;
     unsigned long flags;
     raw_spin_lock_irqsave(&work_lock, flags);
-    struct work_run *run = current_locked();
     if (work_pending(work) || canceling_locked(work) ||
-        ((wq->drainers || wq->destroying) && (!run || run->wq != wq))) {
+        !accepting_locked(wq)) {
         raw_spin_unlock_irqrestore(&work_lock, flags);
         return false;
     }
-    BUG_ON(wq->stop);
     mark_queued_locked(wq, work);
     list_add_tail(&work->entry, &wq->pending);
     wake_up_process(wq->task);
     raw_spin_unlock_irqrestore(&work_lock, flags);
     return true;
+}
+
+static void promote_delayed_locked(struct delayed_work *dwork)
+{
+    struct work_struct *work = &dwork->work;
+    struct workqueue_struct *wq = delayed_locked(work);
+    if (!wq) return;
+    list_del_init(&work->entry);
+    mark_queued_locked(wq, work);
+    list_add_tail(&work->entry, &wq->pending);
+    wake_up_process(wq->task);
+}
+void delayed_work_timer_fn(struct timer_list *timer)
+{
+    struct delayed_work *dwork = from_timer(dwork, timer, timer);
+#ifdef VINIX_LINUXKPI_HOST_TEST
+    vinix_linuxkpi_host_delayed_timer_gate(timer);
+#endif
+    BUG_ON(vinix_linuxkpi_irq_flags() & (1UL << 9));
+    unsigned long flags;
+    raw_spin_lock_irqsave(&work_lock, flags);
+    promote_delayed_locked(dwork);
+    raw_spin_unlock_irqrestore(&work_lock, flags);
+    /* An executable work callback may free the enclosing delayed_work as
+     * soon as we release work_lock. Never access dwork or timer afterward. */
+}
+static void arm_delayed_locked(int cpu, struct workqueue_struct *wq,
+                               struct delayed_work *dwork, unsigned long delay)
+{
+    BUG_ON(dwork->timer.function != delayed_work_timer_fn ||
+           dwork->timer.flags != TIMER_IRQSAFE);
+    dwork->wq = wq;
+    dwork->cpu = cpu;
+    mark_queued_locked(wq, &dwork->work);
+    if (!delay) {
+        list_add_tail(&dwork->work.entry, &wq->pending);
+        wake_up_process(wq->task);
+        return;
+    }
+    atomic_long_or(WORK_STRUCT_INACTIVE, &dwork->work.data);
+    list_add_tail(&dwork->work.entry, &wq->delayed);
+    BUG_ON(mod_timer(&dwork->timer, jiffies + delay));
+}
+bool queue_delayed_work_on(int cpu, struct workqueue_struct *wq,
+                           struct delayed_work *dwork, unsigned long delay)
+{
+    BUG_ON(!wq || !dwork->work.func);
+    if (WARN_ON_ONCE(cpu != WORK_CPU_UNBOUND)) return false;
+    unsigned long flags;
+    raw_spin_lock_irqsave(&work_lock, flags);
+    bool accepted = !work_pending(&dwork->work) &&
+        !canceling_locked(&dwork->work) && accepting_locked(wq);
+    if (accepted) arm_delayed_locked(cpu, wq, dwork, delay);
+    raw_spin_unlock_irqrestore(&work_lock, flags);
+    return accepted;
+}
+/* work_lock -> timer_lock is the only nested order. A timer callback never
+ * holds timer_lock while taking work_lock. If its transfer is in flight, drop
+ * work_lock before retrying; IRQ-off/atomic callers cannot sleep here. */
+static int grab_delayed_locked(struct delayed_work *dwork)
+{
+    if (canceling_locked(&dwork->work)) return -ENOENT;
+    struct workqueue_struct *wq = delayed_locked(&dwork->work);
+    if (!wq) return detach_locked(&dwork->work);
+    int result = try_to_del_timer_sync(&dwork->timer);
+    if (result < 0) return -EAGAIN;
+    BUG_ON(!result);
+    list_del_init(&dwork->work.entry);
+    atomic_long_set(&dwork->work.data, WORK_STRUCT_NO_POOL);
+    return 1;
+}
+static int grab_delayed_retry_locked(struct delayed_work *dwork, unsigned long *flags)
+{
+    int result;
+    while ((result = grab_delayed_locked(dwork)) == -EAGAIN) {
+        raw_spin_unlock_irqrestore(&work_lock, *flags);
+        vinix_linuxkpi_spin_wait();
+        cond_resched();
+        raw_spin_lock_irqsave(&work_lock, *flags);
+    }
+    return result;
+}
+bool mod_delayed_work_on(int cpu, struct workqueue_struct *wq,
+                         struct delayed_work *dwork, unsigned long delay)
+{
+    BUG_ON(!wq || !dwork->work.func);
+    if (WARN_ON_ONCE(cpu != WORK_CPU_UNBOUND)) return false;
+    unsigned long flags;
+    raw_spin_lock_irqsave(&work_lock, flags);
+    bool pending = true;
+    if (!canceling_locked(&dwork->work) && accepting_locked(wq)) {
+        int grabbed = grab_delayed_retry_locked(dwork, &flags);
+        pending = grabbed != 0;
+        /* A concurrent synchronous canceller can claim it during a retry. */
+        if (grabbed >= 0 && !canceling_locked(&dwork->work) && accepting_locked(wq))
+            arm_delayed_locked(cpu, wq, dwork, delay);
+    }
+    raw_spin_unlock_irqrestore(&work_lock, flags);
+    return pending;
+}
+bool cancel_delayed_work(struct delayed_work *dwork)
+{
+    unsigned long flags;
+    raw_spin_lock_irqsave(&work_lock, flags);
+    bool pending = grab_delayed_retry_locked(dwork, &flags) > 0;
+    raw_spin_unlock_irqrestore(&work_lock, flags);
+    return pending;
 }
 
 static void *ordered_worker(void *argument)
@@ -209,6 +332,7 @@ struct workqueue_struct *alloc_workqueue(const char *fmt, unsigned int flags, in
     struct workqueue_struct *wq = kzalloc(sizeof(*wq), GFP_KERNEL);
     if (!wq) return NULL;
     INIT_LIST_HEAD(&wq->pending);
+    INIT_LIST_HEAD(&wq->delayed);
     INIT_LIST_HEAD(&wq->sleepers);
     init_completion(&wq->ready);
     va_list arguments;
@@ -266,21 +390,31 @@ bool cancel_work(struct work_struct *work)
     return pending;
 }
 
-bool cancel_work_sync(struct work_struct *work)
+static bool cancel_sync(struct work_struct *work, struct delayed_work *dwork)
 {
     might_sleep();
     struct work_cancel cancel = { .work = work };
     unsigned long flags;
     raw_spin_lock_irqsave(&work_lock, flags);
-    bool pending = detach_locked(work);
+    BUG_ON(!dwork && delayed_locked(work));
+    bool pending = dwork ? grab_delayed_retry_locked(dwork, &flags) > 0 : detach_locked(work);
     list_add_tail(&cancel.entry, &canceling_works);
     atomic_long_set(&work->data, WORK_STRUCT_NO_POOL | WORK_STRUCT_PENDING | WORK_OFFQ_CANCELING);
+    if (dwork) {
+        raw_spin_unlock_irqrestore(&work_lock, flags);
+        /* The guard prevents rearming while the old timer callback finishes.
+         * Never wait for it under work_lock: it needs that lock to return. */
+        timer_delete_sync(&dwork->timer);
+        raw_spin_lock_irqsave(&work_lock, flags);
+    }
     wait_running_locked(running_locked(work), &flags);
     list_del_init(&cancel.entry);
     if (!canceling_locked(work)) atomic_long_set(&work->data, WORK_STRUCT_NO_POOL);
     raw_spin_unlock_irqrestore(&work_lock, flags);
     return pending;
 }
+bool cancel_work_sync(struct work_struct *work) { return cancel_sync(work, NULL); }
+bool cancel_delayed_work_sync(struct delayed_work *dwork) { return cancel_sync(&dwork->work, dwork); }
 
 struct work_barrier { struct work_struct work; struct completion done; };
 static void barrier_callback(struct work_struct *work)
@@ -294,13 +428,29 @@ static void init_barrier(struct work_barrier *barrier)
     init_completion(&barrier->done);
 }
 
-bool flush_work(struct work_struct *work)
+static bool flush_work_common(struct work_struct *work, struct delayed_work *dwork)
 {
     might_sleep();
     struct work_barrier barrier;
     init_barrier(&barrier);
     unsigned long flags;
     raw_spin_lock_irqsave(&work_lock, flags);
+    if (dwork) {
+        /* Cancel only a still-reserved timer. Conversion and flush snapshot
+         * stay under work_lock, so rearming cannot strand a new reservation. */
+        while (delayed_locked(work)) {
+            int result = try_to_del_timer_sync(&dwork->timer);
+            if (result >= 0) {
+                BUG_ON(!result);
+                promote_delayed_locked(dwork);
+                break;
+            }
+            raw_spin_unlock_irqrestore(&work_lock, flags);
+            vinix_linuxkpi_spin_wait();
+            cond_resched();
+            raw_spin_lock_irqsave(&work_lock, flags);
+        }
+    }
     struct workqueue_struct *wq = queued_locked(work);
     if (wq) {
         BUG_ON(wq->task == current);
@@ -326,6 +476,8 @@ bool flush_work(struct work_struct *work)
     raw_spin_unlock_irqrestore(&work_lock, flags);
     return busy;
 }
+bool flush_work(struct work_struct *work) { return flush_work_common(work, NULL); }
+bool flush_delayed_work(struct delayed_work *dwork) { return flush_work_common(&dwork->work, dwork); }
 
 void __flush_workqueue(struct workqueue_struct *wq)
 {
@@ -380,8 +532,12 @@ void destroy_workqueue(struct workqueue_struct *wq)
     unsigned long flags;
     raw_spin_lock_irqsave(&work_lock, flags);
     BUG_ON(wq->destroying);
+    /* Linux requires owners to cancel delayed timers before queue teardown.
+     * Queue flushing/draining intentionally ignores unexpired reservations. */
+    BUG_ON(!list_empty(&wq->delayed));
     wq->destroying = true;
     drain_locked(wq, &flags);
+    BUG_ON(!list_empty(&wq->delayed));
     BUG_ON(!list_empty(&wq->sleepers));
     wq->stop = true;
     list_del_init(&wq->all);
@@ -503,6 +659,123 @@ out:
         if (queues[cpu]) destroy_workqueue(queues[cpu]);
         if (results[cpu]) result = results[cpu];
     }
+    return result;
+}
+
+struct native_delayed_frees { atomic_t count; struct completion done; };
+struct native_delayed_test {
+    struct delayed_work work;
+    struct workqueue_struct *wq;
+    struct completion done;
+    struct native_delayed_frees *frees;
+    unsigned long earliest;
+    unsigned int calls, limit;
+    int *result;
+};
+static void native_delayed_callback(struct work_struct *work)
+{
+    struct native_delayed_test *test = container_of(to_delayed_work(work), struct native_delayed_test, work);
+    if (!vinix_linuxkpi_may_sleep() || current_work() != work ||
+        time_before(jiffies, test->earliest)) *test->result = -EIO;
+    test->calls++;
+    msleep(1);
+    if (test->frees) {
+        struct native_delayed_frees *frees = test->frees;
+        kfree(test);
+        if (atomic_inc_return(&frees->count) == 8) complete(&frees->done);
+        return;
+    }
+    if (test->calls < test->limit) {
+        test->earliest = jiffies + 2;
+        if (!queue_delayed_work(test->wq, &test->work, 2)) *test->result = -EIO;
+    } else complete(&test->done);
+}
+static void native_delayed_init(struct native_delayed_test *test,
+                                struct workqueue_struct *wq, int *result)
+{
+    *test = (struct native_delayed_test){ .wq = wq, .result = result, .earliest = jiffies };
+    INIT_DELAYED_WORK_ONSTACK(&test->work, native_delayed_callback);
+    init_completion(&test->done);
+}
+int vinix_linuxkpi_delayed_work_native_selftest(void)
+{
+    struct workqueue_struct *queues[4] = {0};
+    struct native_delayed_test tests[4];
+    struct native_delayed_test *heap[4][8] = {0};
+    struct native_delayed_frees frees[4];
+    int results[4] = {0}, result = 0;
+    bool submitted = false;
+    for (unsigned int i = 0; i < ARRAY_SIZE(queues); i++) {
+        queues[i] = alloc_ordered_workqueue("vinix-delayed-%u", 0, i);
+        if (!queues[i]) { result = -ENOMEM; goto out; }
+    }
+    for (unsigned int i = 0; i < ARRAY_SIZE(queues); i++) {
+        native_delayed_init(&tests[i], queues[i], &results[i]);
+        tests[i].limit = 4;
+        if (!queue_delayed_work(queues[i], &tests[i].work, 1000)) results[i] = -EIO;
+        tests[i].earliest = jiffies + 2;
+        if (!mod_delayed_work(queues[i], &tests[i].work, 2)) results[i] = -EIO;
+    }
+    for (unsigned int i = 0; i < ARRAY_SIZE(queues); i++) {
+        if (!wait_for_completion_timeout(&tests[i].done, 500)) results[i] = -EIO;
+        cancel_delayed_work_sync(&tests[i].work);
+        if (tests[i].calls != 4 || work_busy(&tests[i].work.work)) results[i] = -EIO;
+
+        native_delayed_init(&tests[i], queues[i], &results[i]);
+        if (!queue_delayed_work(queues[i], &tests[i].work, 100000) ||
+            !flush_delayed_work(&tests[i].work)) results[i] = -EIO;
+        if (tests[i].calls != 1 || timer_pending(&tests[i].work.timer)) results[i] = -EIO;
+        cancel_delayed_work_sync(&tests[i].work);
+
+        native_delayed_init(&tests[i], queues[i], &results[i]);
+        unsigned long flags = vinix_linuxkpi_irq_save();
+        if (!queue_delayed_work(queues[i], &tests[i].work, 100000) ||
+            !mod_delayed_work(queues[i], &tests[i].work, 200000) ||
+            !cancel_delayed_work(&tests[i].work) ||
+            (vinix_linuxkpi_irq_flags() & (1UL << 9))) results[i] = -EIO;
+        vinix_linuxkpi_irq_restore(flags);
+        if (tests[i].calls || work_busy(&tests[i].work.work)) results[i] = -EIO;
+        if (!queue_delayed_work(queues[i], &tests[i].work, 100000) ||
+            !cancel_delayed_work_sync(&tests[i].work)) results[i] = -EIO;
+    }
+    /* Allocate the entire batch before publishing any object. Allocation
+     * failure can then free only unsubmitted objects with no callback race. */
+    for (unsigned int i = 0; i < ARRAY_SIZE(queues); i++) {
+        atomic_set(&frees[i].count, 0);
+        init_completion(&frees[i].done);
+        for (unsigned int j = 0; j < ARRAY_SIZE(heap[i]); j++) {
+            heap[i][j] = kzalloc(sizeof(*heap[i][j]), GFP_KERNEL);
+            if (!heap[i][j]) { result = -ENOMEM; goto out; }
+            native_delayed_init(heap[i][j], queues[i], &results[i]);
+            heap[i][j]->frees = &frees[i];
+        }
+    }
+    submitted = true;
+    for (unsigned int i = 0; i < ARRAY_SIZE(queues); i++)
+        for (unsigned int j = 0; j < ARRAY_SIZE(heap[i]); j++) {
+            heap[i][j]->earliest = jiffies + 2;
+            BUG_ON(!queue_delayed_work(queues[i], &heap[i][j]->work, 2));
+        }
+    for (unsigned int i = 0; i < ARRAY_SIZE(queues); i++) {
+        if (!wait_for_completion_timeout(&frees[i].done, 500)) {
+            results[i] = -EIO;
+            wait_for_completion(&frees[i].done);
+        }
+        flush_workqueue(queues[i]);
+        if (atomic_read(&frees[i].count) != 8) results[i] = -EIO;
+    }
+out:
+    for (unsigned int i = 0; i < ARRAY_SIZE(queues); i++) {
+        if (!submitted)
+            for (unsigned int j = 0; j < ARRAY_SIZE(heap[i]); j++) kfree(heap[i][j]);
+        if (queues[i]) destroy_workqueue(queues[i]);
+        if (results[i]) result = results[i];
+    }
+    /* A self-freeing work callback can finish on another CPU before the
+     * timer dispatcher retires its pointer-only transfer record. */
+    unsigned long retire_by = jiffies + 500;
+    while (vinix_linuxkpi_timer_active() && time_before(jiffies, retire_by)) msleep(1);
+    if (vinix_linuxkpi_timer_active()) result = -EIO;
     return result;
 }
 #endif

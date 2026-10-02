@@ -353,6 +353,7 @@ fn C.vinix_linuxkpi_timer_bootstrap() int
 fn C.vinix_linuxkpi_timer_selftest() int
 fn C.vinix_linuxkpi_timer_native_selftest() int
 fn C.vinix_linuxkpi_workqueue_native_selftest() int
+fn C.vinix_linuxkpi_delayed_work_native_selftest() int
 fn C.vinix_linuxkpi_percpu_bootstrap(u32) int
 
 // join/TASK_DEAD can precede the final switch away and scheduler reaping.
@@ -528,6 +529,25 @@ pub fn initialise() {
 			lib.kpanic(unsafe { nil }, c'Linux ordered workqueue self-test retained native pages')
 		}
 		C.kprintf(c'linuxkpi: ordered workqueues, sleeping callbacks, cancellation, flush and teardown passed on 4 workers; no pages retained\n')
+		for _ in 0 .. 3 {
+			if C.vinix_linuxkpi_delayed_work_native_selftest() != 0 {
+				lib.kpanic(unsafe { nil }, c'Linux delayed work self-test failed')
+			}
+		}
+		delayed_before := selftest_free_baseline()
+		if C.vinix_linuxkpi_delayed_work_native_selftest() != 0 {
+			lib.kpanic(unsafe { nil }, c'Linux delayed work self-test failed')
+		}
+		delayed_reap_start := hpet_clock.nanoseconds()
+		for memory.free_bytes() != delayed_before && hpet_clock.nanoseconds() - delayed_reap_start < 1000000000 {
+			sched.reap_deferred()
+			sched.reschedule()
+		}
+		if memory.free_bytes() != delayed_before {
+			C.kprintf(c'linuxkpi: delayed work free-byte baseline=%llu after=%llu\n', delayed_before, memory.free_bytes())
+			lib.kpanic(unsafe { nil }, c'Linux delayed work self-test retained native pages')
+		}
+		C.kprintf(c'linuxkpi: delayed work timers, modification, cancellation, flush and self-free callbacks passed on 4 workers; no pages retained\n')
 		// Exercise a real scheduler interrupt with preemption disabled and
 		// IRQs still enabled, rather than relying only on host lock tests.
 		preempt_disable()

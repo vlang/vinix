@@ -55,6 +55,7 @@ int vinix_linuxkpi_timer_bootstrap(void);
 int vinix_linuxkpi_timer_selftest(void);
 int vinix_linuxkpi_timer_native_selftest(void);
 int vinix_linuxkpi_workqueue_native_selftest(void);
+int vinix_linuxkpi_delayed_work_native_selftest(void);
 void vinix_linuxkpi_refcount_warning(int kind);
 bool vinix_linuxkpi_cpu_has(unsigned int feature);
 void vinix_linuxkpi_fpu_begin(void);
