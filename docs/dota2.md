@@ -93,8 +93,8 @@ startup crash. The early load resolves all eight client coroutine imports to
 the actual SDK while preserving the global libc compatibility preloads. It
 retains the client for the process lifetime to prevent the measured libnm/GLib
 unload and reload failure. A startup marker is consumed before loading the
-client, so child helpers skip this early load. Valve's ELFs and Steam API
-implementations remain unchanged.
+client, so child helpers skip this early load. Valve's loaded ELF contents and
+Steam API implementations remain unchanged.
 
 The Dota translator also checks guest-page collisions under QEMU's existing
 mapping lock before handling a partial host page. Without this correction,
@@ -122,6 +122,11 @@ quit
 The manifest must match the installed assets; these identifiers describe the
 tested build, rather than a permanent latest version. Keep the source files
 unchanged while an export is in use.
+
+The tested depot's seven platform shader archives matched Valve's manifest
+hashes. Three library files retained small unmapped trailers after SteamCMD
+downloaded two manifests into the same directory; their complete official-length
+contents matched Valve byte for byte. No loaded headers or code were patched.
 
 ```sh
 python3 tools/dota2/ext2_export.py build '/path/to/dota 2 beta' \
