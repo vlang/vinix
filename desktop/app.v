@@ -260,18 +260,18 @@ const available_apps = [
 		open: open_gimp
 	},
 	AppFactory{
-		title: 'VSpace'
-		icon: 'asset:vspace'
+		title: 'Disk Usage'
+		icon: 'asset:disk_usage'
 		// Two ranking panels side by side, each wide enough for a name, a size
 		// and a path that is not cut in half.
 		width: 880
 		height: 580
-		process_name: 'vinix-vspace'
+		process_name: 'vinix-disk-usage'
 		// A scan is a state machine the compositor advances; without polling
 		// the walk would only move when the window was clicked.
 		polling: true
 		poll_interval_ms: 33
-		open: open_vspace
+		open: open_disk_usage
 	},
 	AppFactory{
 		title:            'VOffice Writer'

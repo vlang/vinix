@@ -1450,112 +1450,112 @@ Wi-Fi: нет подключения
 tray.wifi.off
 Wi-Fi: выключен
 -----
-vspace.button.rescan
+disk_usage.button.rescan
 Обновить
 -----
-vspace.button.stop
+disk_usage.button.stop
 Стоп
 -----
-vspace.button.up
+disk_usage.button.up
 Вверх
 -----
-vspace.duration.milliseconds
+disk_usage.duration.milliseconds
 {0} мс
 -----
-vspace.duration.minutes
+disk_usage.duration.minutes
 {0} мин {1} с
 -----
-vspace.duration.seconds
+disk_usage.duration.seconds
 {0},{1} с
 -----
-vspace.error.cannot_open
+disk_usage.error.cannot_open
 Не удалось открыть {0}
 -----
-vspace.metric.files
+disk_usage.metric.files
 ФАЙЛЫ
 -----
-vspace.metric.folders
+disk_usage.metric.folders
 ПАПКИ
 -----
-vspace.metric.size
+disk_usage.metric.size
 ОБЩИЙ РАЗМЕР
 -----
-vspace.metric.skipped
+disk_usage.metric.skipped
 ПРОПУЩЕНО
 -----
-vspace.panel.empty
+disk_usage.panel.empty
 Результаты появятся здесь по мере обхода диска.
 -----
-vspace.panel.files
+disk_usage.panel.files
 Самые большие файлы
 -----
-vspace.panel.folders
+disk_usage.panel.folders
 Самые большие папки
 -----
-vspace.panel.nothing_yet
+disk_usage.panel.nothing_yet
 пока пусто
 -----
-vspace.panel.ranked
+disk_usage.panel.ranked
 {0} позиция|{0} позиции|{0} позиций
 -----
-vspace.phase.complete
+disk_usage.phase.complete
 ГОТОВО
 -----
-vspace.phase.scanning
+disk_usage.phase.scanning
 АНАЛИЗ
 -----
-vspace.phase.stopped
+disk_usage.phase.stopped
 ПРЕРВАНО
 -----
-vspace.phase.unreadable
+disk_usage.phase.unreadable
 НЕДОСТУПНО
 -----
-vspace.scope.home
+disk_usage.scope.home
 Домашняя
 -----
-vspace.scope.system
+disk_usage.scope.system
 Система
 -----
-vspace.scope.whole_disk
+disk_usage.scope.whole_disk
 Весь диск
 -----
-vspace.size.bytes
+disk_usage.size.bytes
 {0} Б
 -----
-vspace.size.decimal
+disk_usage.size.decimal
 {0},{1} {2}
 -----
-vspace.size.whole
+disk_usage.size.whole
 {0} {1}
 -----
-vspace.status.scanned
+disk_usage.status.scanned
 Папка {0} просканирована за {1}.
 -----
-vspace.status.scanned_skipped
+disk_usage.status.scanned_skipped
 Папка {1} просканирована за {2}. Пропущен {0} защищённый или недоступный объект.|Папка {1} просканирована за {2}. Пропущено {0} защищённых или недоступных объекта.|Папка {1} просканирована за {2}. Пропущено {0} защищённых или недоступных объектов.
 -----
-vspace.status.stopped
+disk_usage.status.stopped
 Остановлено. В списках ниже — то, что успели подсчитать.
 -----
-vspace.status.walking
+disk_usage.status.walking
 Обход: {0}
 -----
-vspace.subtitle
+disk_usage.subtitle
 Анализ диска
 -----
-vspace.unit.gb
+disk_usage.unit.gb
 ГБ
 -----
-vspace.unit.kb
+disk_usage.unit.kb
 КБ
 -----
-vspace.unit.mb
+disk_usage.unit.mb
 МБ
 -----
-vspace.unit.pb
+disk_usage.unit.pb
 ПБ
 -----
-vspace.unit.tb
+disk_usage.unit.tb
 ТБ
 -----
 window.external_app

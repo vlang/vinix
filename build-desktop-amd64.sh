@@ -189,7 +189,7 @@ install -m644 "$SCRIPT_DIR/desktop/assets/blender.qoi" \
     "$STAGING/usr/share/vinix/icons/blender.qoi"
 install -m644 "$SCRIPT_DIR/desktop/assets/minecraft.qoi" \
     "$STAGING/usr/share/vinix/icons/minecraft.qoi"
-for app_icon in terminal settings activity calculator vspace editor files clock calendar capture doom steam; do
+for app_icon in terminal settings activity calculator disk_usage editor files clock calendar capture doom steam; do
     install -m644 "$SCRIPT_DIR/desktop/assets/${app_icon}.qoi" \
         "$STAGING/usr/share/vinix/icons/${app_icon}.qoi"
 done
@@ -263,7 +263,7 @@ done
 # the aarch64 desktop image.
 for app_name in vinix-files vinix-calculator vinix-terminal vinix-settings \
     vinix-activity vinix-editor vinix-calendar vinix-clock \
-    vinix-vspace \
+    vinix-disk-usage \
     vinix-firefox vinix-chromium vinix-gimp vinix-libreoffice \
     vinix-minecraft vinix-wine-calculator vinix-wine-notepad vinix-wine-word2010 \
     vinix-capture; do

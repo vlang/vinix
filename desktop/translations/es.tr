@@ -1450,112 +1450,112 @@ Wi-Fi: sin conexión
 tray.wifi.off
 Wi-Fi: desactivado
 -----
-vspace.button.rescan
+disk_usage.button.rescan
 Actualizar
 -----
-vspace.button.stop
+disk_usage.button.stop
 Detener
 -----
-vspace.button.up
+disk_usage.button.up
 Subir
 -----
-vspace.duration.milliseconds
+disk_usage.duration.milliseconds
 {0} ms
 -----
-vspace.duration.minutes
+disk_usage.duration.minutes
 {0} min {1} s
 -----
-vspace.duration.seconds
+disk_usage.duration.seconds
 {0},{1} s
 -----
-vspace.error.cannot_open
+disk_usage.error.cannot_open
 No se puede abrir {0}
 -----
-vspace.metric.files
+disk_usage.metric.files
 ARCHIVOS
 -----
-vspace.metric.folders
+disk_usage.metric.folders
 CARPETAS
 -----
-vspace.metric.size
+disk_usage.metric.size
 TAMAÑO INDEXADO
 -----
-vspace.metric.skipped
+disk_usage.metric.skipped
 OMITIDOS
 -----
-vspace.panel.empty
+disk_usage.panel.empty
 Los resultados aparecen aquí mientras se recorre el disco.
 -----
-vspace.panel.files
+disk_usage.panel.files
 Archivos más grandes
 -----
-vspace.panel.folders
+disk_usage.panel.folders
 Carpetas más grandes
 -----
-vspace.panel.nothing_yet
+disk_usage.panel.nothing_yet
 nada todavía
 -----
-vspace.panel.ranked
+disk_usage.panel.ranked
 {0} en la lista|{0} en la lista
 -----
-vspace.phase.complete
+disk_usage.phase.complete
 COMPLETADO
 -----
-vspace.phase.scanning
+disk_usage.phase.scanning
 ANALIZANDO
 -----
-vspace.phase.stopped
+disk_usage.phase.stopped
 DETENIDO
 -----
-vspace.phase.unreadable
+disk_usage.phase.unreadable
 SIN ACCESO
 -----
-vspace.scope.home
+disk_usage.scope.home
 Personal
 -----
-vspace.scope.system
+disk_usage.scope.system
 Sistema
 -----
-vspace.scope.whole_disk
+disk_usage.scope.whole_disk
 Todo el disco
 -----
-vspace.size.bytes
+disk_usage.size.bytes
 {0} B
 -----
-vspace.size.decimal
+disk_usage.size.decimal
 {0},{1} {2}
 -----
-vspace.size.whole
+disk_usage.size.whole
 {0} {1}
 -----
-vspace.status.scanned
+disk_usage.status.scanned
 Se analizó {0} en {1}.
 -----
-vspace.status.scanned_skipped
+disk_usage.status.scanned_skipped
 Se analizó {1} en {2}. Se omitió {0} elemento protegido o ilegible.|Se analizó {1} en {2}. Se omitieron {0} elementos protegidos o ilegibles.
 -----
-vspace.status.stopped
+disk_usage.status.stopped
 Detenido. Las listas de abajo muestran lo contado hasta entonces.
 -----
-vspace.status.walking
+disk_usage.status.walking
 Recorriendo {0}
 -----
-vspace.subtitle
+disk_usage.subtitle
 Inventario del disco
 -----
-vspace.unit.gb
+disk_usage.unit.gb
 GB
 -----
-vspace.unit.kb
+disk_usage.unit.kb
 KB
 -----
-vspace.unit.mb
+disk_usage.unit.mb
 MB
 -----
-vspace.unit.pb
+disk_usage.unit.pb
 PB
 -----
-vspace.unit.tb
+disk_usage.unit.tb
 TB
 -----
 window.external_app

@@ -1450,112 +1450,112 @@ Wi-Fi: not connected
 tray.wifi.off
 Wi-Fi: off
 -----
-vspace.button.rescan
+disk_usage.button.rescan
 Rescan
 -----
-vspace.button.stop
+disk_usage.button.stop
 Stop
 -----
-vspace.button.up
+disk_usage.button.up
 Up
 -----
-vspace.duration.milliseconds
+disk_usage.duration.milliseconds
 {0} ms
 -----
-vspace.duration.minutes
+disk_usage.duration.minutes
 {0} min {1} sec
 -----
-vspace.duration.seconds
+disk_usage.duration.seconds
 {0}.{1} sec
 -----
-vspace.error.cannot_open
+disk_usage.error.cannot_open
 cannot open {0}
 -----
-vspace.metric.files
+disk_usage.metric.files
 FILES
 -----
-vspace.metric.folders
+disk_usage.metric.folders
 FOLDERS
 -----
-vspace.metric.size
+disk_usage.metric.size
 INDEXED SIZE
 -----
-vspace.metric.skipped
+disk_usage.metric.skipped
 SKIPPED
 -----
-vspace.panel.empty
+disk_usage.panel.empty
 Results appear here while the disk is walked.
 -----
-vspace.panel.files
+disk_usage.panel.files
 Largest files
 -----
-vspace.panel.folders
+disk_usage.panel.folders
 Largest folders
 -----
-vspace.panel.nothing_yet
+disk_usage.panel.nothing_yet
 nothing yet
 -----
-vspace.panel.ranked
+disk_usage.panel.ranked
 {0} ranked|{0} ranked
 -----
-vspace.phase.complete
+disk_usage.phase.complete
 COMPLETE
 -----
-vspace.phase.scanning
+disk_usage.phase.scanning
 SCANNING
 -----
-vspace.phase.stopped
+disk_usage.phase.stopped
 STOPPED
 -----
-vspace.phase.unreadable
+disk_usage.phase.unreadable
 UNREADABLE
 -----
-vspace.scope.home
+disk_usage.scope.home
 Home
 -----
-vspace.scope.system
+disk_usage.scope.system
 System
 -----
-vspace.scope.whole_disk
+disk_usage.scope.whole_disk
 Whole disk
 -----
-vspace.size.bytes
+disk_usage.size.bytes
 {0} B
 -----
-vspace.size.decimal
+disk_usage.size.decimal
 {0}.{1} {2}
 -----
-vspace.size.whole
+disk_usage.size.whole
 {0} {1}
 -----
-vspace.status.scanned
+disk_usage.status.scanned
 Scanned {0} in {1}.
 -----
-vspace.status.scanned_skipped
+disk_usage.status.scanned_skipped
 Scanned {1} in {2}. {0} protected or unreadable item was skipped.|Scanned {1} in {2}. {0} protected or unreadable items were skipped.
 -----
-vspace.status.stopped
+disk_usage.status.stopped
 Stopped. The rankings below hold what had been counted.
 -----
-vspace.status.walking
+disk_usage.status.walking
 Walking {0}
 -----
-vspace.subtitle
+disk_usage.subtitle
 Disk inventory
 -----
-vspace.unit.gb
+disk_usage.unit.gb
 GB
 -----
-vspace.unit.kb
+disk_usage.unit.kb
 KB
 -----
-vspace.unit.mb
+disk_usage.unit.mb
 MB
 -----
-vspace.unit.pb
+disk_usage.unit.pb
 PB
 -----
-vspace.unit.tb
+disk_usage.unit.tb
 TB
 -----
 window.external_app

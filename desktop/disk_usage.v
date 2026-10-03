@@ -3,7 +3,7 @@
 // that can be found in the LICENSE file.
 
 // SPDX-License-Identifier: GPL-2.0-or-later
-// VSpace, a disk inventory, built into the desktop.
+// Disk Usage, a disk inventory, built into the desktop.
 //
 // The application is the standalone V/ui2 program of the same name: the same
 // four metrics, the same two ranked panels with a proportion bar under every
@@ -27,24 +27,24 @@ import ui2
 // How many entries each panel ranks. The window shows seven or eight rows;
 // the rest is what the ranking falls back on when a scan is restarted deeper
 // in the tree, and what makes the floor below worth having.
-const vspace_rank_limit = 24
+const disk_usage_rank_limit = 24
 
 // A tree deeper than this is a loop the identity check missed, or something no
 // inventory needs to open. Each level also holds an open directory handle.
-const vspace_max_depth = 64
+const disk_usage_max_depth = 64
 
 // One slice of the walk. The compositor is waiting on the poll that runs it,
 // so this is the longest a scan may delay a frame.
-const vspace_slice_ms = u64(20)
+const disk_usage_slice_ms = u64(20)
 
 // A hard ceiling on one slice, for a filesystem fast enough that the clock
 // never advances far enough to stop it.
-const vspace_slice_entries = 20000
+const disk_usage_slice_entries = 20000
 
 // Longer than any name the kernel's Dirent can hold.
-const vspace_name_max = 256
+const disk_usage_name_max = 256
 
-const vspace_identity_slots = 2048
+const disk_usage_identity_slots = 2048
 
 // ── Identity set ──────────────────────────────────────────────────
 // A scan must not descend into the same directory twice and must count a file
@@ -53,13 +53,13 @@ const vspace_identity_slots = 2048
 // answers it without allocating the string per file that a keyed map would,
 // and the desktop has no garbage collector to clean up after one.
 
-struct VSpaceIdentitySet {
+struct DiskUsageIdentitySet {
 mut:
 	slots []u64
 	used  int
 }
 
-fn vspace_identity_key(device u64, inode u64) u64 {
+fn disk_usage_identity_key(device u64, inode u64) u64 {
 	key := (device << 48) ^ inode
 	// Zero marks a free slot, so the one identity that would collide with it
 	// is folded onto a neighbour. Two entries sharing a key is only ever a
@@ -67,9 +67,9 @@ fn vspace_identity_key(device u64, inode u64) u64 {
 	return if key == 0 { u64(1) } else { key }
 }
 
-fn (mut s VSpaceIdentitySet) reset() {
+fn (mut s DiskUsageIdentitySet) reset() {
 	if s.slots.len == 0 {
-		s.slots = []u64{len: vspace_identity_slots}
+		s.slots = []u64{len: disk_usage_identity_slots}
 		unsafe { s.slots.flags |= .noslices }
 	} else {
 		for index in 0 .. s.slots.len {
@@ -80,7 +80,7 @@ fn (mut s VSpaceIdentitySet) reset() {
 }
 
 // add reports whether the key had not been seen before.
-fn (mut s VSpaceIdentitySet) add(key u64) bool {
+fn (mut s DiskUsageIdentitySet) add(key u64) bool {
 	if s.slots.len == 0 {
 		s.reset()
 	}
@@ -102,7 +102,7 @@ fn (mut s VSpaceIdentitySet) add(key u64) bool {
 	return true
 }
 
-fn (mut s VSpaceIdentitySet) grow() {
+fn (mut s DiskUsageIdentitySet) grow() {
 	old := s.slots
 	mut slots := []u64{len: old.len * 2}
 	unsafe { slots.flags |= .noslices }
@@ -121,7 +121,7 @@ fn (mut s VSpaceIdentitySet) grow() {
 	unsafe { old.free() }
 }
 
-fn (mut s VSpaceIdentitySet) release() {
+fn (mut s DiskUsageIdentitySet) release() {
 	if s.slots.cap > 0 {
 		unsafe { s.slots.free() }
 	}
@@ -131,34 +131,34 @@ fn (mut s VSpaceIdentitySet) release() {
 
 // ── Rankings ──────────────────────────────────────────────────────
 
-struct VSpaceEntry {
+struct DiskUsageEntry {
 mut:
 	name  string
 	path  string
 	bytes u64
 }
 
-// VSpaceRanking is the largest few of something, kept in order. Below the
+// DiskUsageRanking is the largest few of something, kept in order. Below the
 // floor nothing can enter, which is what stops a hundred thousand files from
 // each costing an insertion.
-struct VSpaceRanking {
+struct DiskUsageRanking {
 mut:
-	entries []VSpaceEntry
+	entries []DiskUsageEntry
 	floor   u64
 }
 
 // consider always takes ownership of the two strings: it either keeps them in
 // the ranking or releases them. A caller that had to know which would have to
 // repeat the floor test it is here to avoid.
-fn (mut r VSpaceRanking) consider(name string, path string, bytes u64) {
-	if r.entries.len >= vspace_rank_limit && bytes <= r.floor {
+fn (mut r DiskUsageRanking) consider(name string, path string, bytes u64) {
+	if r.entries.len >= disk_usage_rank_limit && bytes <= r.floor {
 		unsafe {
 			name.free()
 			path.free()
 		}
 		return
 	}
-	entry := VSpaceEntry{
+	entry := DiskUsageEntry{
 		name: name
 		path: path
 		bytes: bytes
@@ -172,7 +172,7 @@ fn (mut r VSpaceRanking) consider(name string, path string, bytes u64) {
 		index--
 	}
 	r.entries[index] = entry
-	if r.entries.len > vspace_rank_limit {
+	if r.entries.len > disk_usage_rank_limit {
 		dropped := r.entries.last()
 		unsafe {
 			dropped.name.free()
@@ -180,14 +180,14 @@ fn (mut r VSpaceRanking) consider(name string, path string, bytes u64) {
 		}
 		r.entries.delete_last()
 	}
-	r.floor = if r.entries.len >= vspace_rank_limit {
+	r.floor = if r.entries.len >= disk_usage_rank_limit {
 		r.entries.last().bytes
 	} else {
 		u64(0)
 	}
 }
 
-fn (mut r VSpaceRanking) release() {
+fn (mut r DiskUsageRanking) release() {
 	for index in 0 .. r.entries.len {
 		unsafe {
 			r.entries[index].name.free()
@@ -197,11 +197,11 @@ fn (mut r VSpaceRanking) release() {
 	if r.entries.cap > 0 {
 		unsafe { r.entries.free() }
 	}
-	r.entries = []VSpaceEntry{}
+	r.entries = []DiskUsageEntry{}
 	r.floor = 0
 }
 
-fn (r &VSpaceRanking) largest() u64 {
+fn (r &DiskUsageRanking) largest() u64 {
 	if r.entries.len == 0 {
 		return 0
 	}
@@ -210,7 +210,7 @@ fn (r &VSpaceRanking) largest() u64 {
 
 // ── The walk ──────────────────────────────────────────────────────
 
-enum VSpacePhase {
+enum DiskUsagePhase {
 	scanning
 	complete
 	cancelled
@@ -220,7 +220,7 @@ enum VSpacePhase {
 // One open directory, and what its subtree has added up to so far. The stack
 // of these is the recursion the standalone program does with the C stack; made
 // explicit, it can be left in the middle and resumed on the next poll.
-struct VSpaceFrame {
+struct DiskUsageFrame {
 mut:
 	path  string
 	name  string
@@ -228,15 +228,15 @@ mut:
 	bytes u64
 }
 
-struct VSpaceScanner {
+struct DiskUsageScanner {
 mut:
 	root        string = '/'
-	phase       VSpacePhase = .complete
-	stack       []VSpaceFrame
-	files_rank  VSpaceRanking
-	dirs_rank   VSpaceRanking
-	seen_dirs   VSpaceIdentitySet
-	seen_links  VSpaceIdentitySet
+	phase       DiskUsagePhase = .complete
+	stack       []DiskUsageFrame
+	files_rank  DiskUsageRanking
+	dirs_rank   DiskUsageRanking
+	seen_dirs   DiskUsageIdentitySet
+	seen_links  DiskUsageIdentitySet
 	total_bytes u64
 	files       u64
 	directories u64
@@ -246,13 +246,13 @@ mut:
 	error       string
 	// The language the error is worded in.
 	error_language DesktopLanguage
-	name_buffer    [vspace_name_max]u8
+	name_buffer    [disk_usage_name_max]u8
 }
 
 // begin restarts the walk at `path`. The new root is copied before anything is
 // released, so a rescan of the current root and a descent into a ranked folder
 // can both hand in a string the reset is about to free.
-fn (mut s VSpaceScanner) begin(path string) {
+fn (mut s DiskUsageScanner) begin(path string) {
 	next := path.clone()
 	s.reset()
 	unsafe { s.root.free() }
@@ -267,9 +267,9 @@ fn (mut s VSpaceScanner) begin(path string) {
 		return
 	}
 	if info := desktop_lstat(s.root) {
-		s.seen_dirs.add(vspace_identity_key(info.device, info.inode))
+		s.seen_dirs.add(disk_usage_identity_key(info.device, info.inode))
 	}
-	s.stack << VSpaceFrame{
+	s.stack << DiskUsageFrame{
 		path: s.root.clone()
 		name: s.root.clone()
 		dir: dir
@@ -280,22 +280,22 @@ fn (mut s VSpaceScanner) begin(path string) {
 
 // step advances the walk by one bounded slice and reports whether the window
 // has anything new to show.
-fn (mut s VSpaceScanner) step() bool {
+fn (mut s DiskUsageScanner) step() bool {
 	if s.phase != .scanning {
 		return false
 	}
 	started := desktop_monotonic_ms()
 	mut worked := 0
-	for s.stack.len > 0 && worked < vspace_slice_entries {
+	for s.stack.len > 0 && worked < disk_usage_slice_entries {
 		s.advance()
 		worked++
 		// The clock is only read every 64 entries: on a fast filesystem the
 		// call itself would otherwise be a measurable share of the walk.
-		if worked & 63 == 0 && vspace_elapsed(started, desktop_monotonic_ms()) >= vspace_slice_ms {
+		if worked & 63 == 0 && disk_usage_elapsed(started, desktop_monotonic_ms()) >= disk_usage_slice_ms {
 			break
 		}
 	}
-	s.elapsed_ms = vspace_elapsed(s.started_ms, desktop_monotonic_ms())
+	s.elapsed_ms = disk_usage_elapsed(s.started_ms, desktop_monotonic_ms())
 	if s.stack.len == 0 {
 		s.phase = .complete
 	}
@@ -305,9 +305,9 @@ fn (mut s VSpaceScanner) step() bool {
 // advance consumes exactly one directory entry, or leaves a directory that has
 // none left. Everything the walk does is one of those two things, which is
 // what makes it interruptible between any two of them.
-fn (mut s VSpaceScanner) advance() {
+fn (mut s DiskUsageScanner) advance() {
 	depth := s.stack.len - 1
-	mut names := unsafe { (&s.name_buffer[0]).vbytes(vspace_name_max) }
+	mut names := unsafe { (&s.name_buffer[0]).vbytes(disk_usage_name_max) }
 	if !desktop_readdir(s.stack[depth].dir, mut names) {
 		s.leave()
 		return
@@ -335,7 +335,7 @@ fn (mut s VSpaceScanner) advance() {
 	// link, a device node, a socket — occupies no bytes anyone can free, and
 	// following a link would count its target a second time.
 	if info.is_file
-		&& (info.links < 2 || s.seen_links.add(vspace_identity_key(info.device, info.inode))) {
+		&& (info.links < 2 || s.seen_links.add(disk_usage_identity_key(info.device, info.inode))) {
 		s.files++
 		s.total_bytes += info.size
 		s.stack[depth].bytes += info.size
@@ -348,9 +348,9 @@ fn (mut s VSpaceScanner) advance() {
 	}
 }
 
-fn (mut s VSpaceScanner) enter(name string, path string, info DesktopNodeInfo) {
-	if !s.seen_dirs.add(vspace_identity_key(info.device, info.inode))
-		|| s.stack.len >= vspace_max_depth {
+fn (mut s DiskUsageScanner) enter(name string, path string, info DesktopNodeInfo) {
+	if !s.seen_dirs.add(disk_usage_identity_key(info.device, info.inode))
+		|| s.stack.len >= disk_usage_max_depth {
 		unsafe {
 			name.free()
 			path.free()
@@ -367,7 +367,7 @@ fn (mut s VSpaceScanner) enter(name string, path string, info DesktopNodeInfo) {
 		return
 	}
 	s.directories++
-	s.stack << VSpaceFrame{
+	s.stack << DiskUsageFrame{
 		path: path
 		name: name
 		dir: dir
@@ -376,7 +376,7 @@ fn (mut s VSpaceScanner) enter(name string, path string, info DesktopNodeInfo) {
 
 // leave closes a finished directory and gives its subtree total to the parent
 // that will be ranked against its own siblings.
-fn (mut s VSpaceScanner) leave() {
+fn (mut s DiskUsageScanner) leave() {
 	frame := s.stack.last()
 	desktop_closedir(frame.dir)
 	s.stack.delete_last()
@@ -392,16 +392,16 @@ fn (mut s VSpaceScanner) leave() {
 	s.dirs_rank.consider(frame.name, frame.path, frame.bytes)
 }
 
-fn (mut s VSpaceScanner) cancel() {
+fn (mut s DiskUsageScanner) cancel() {
 	if s.phase != .scanning {
 		return
 	}
-	s.elapsed_ms = vspace_elapsed(s.started_ms, desktop_monotonic_ms())
+	s.elapsed_ms = disk_usage_elapsed(s.started_ms, desktop_monotonic_ms())
 	s.close_stack()
 	s.phase = .cancelled
 }
 
-fn (mut s VSpaceScanner) close_stack() {
+fn (mut s DiskUsageScanner) close_stack() {
 	for index in 0 .. s.stack.len {
 		desktop_closedir(s.stack[index].dir)
 		unsafe {
@@ -412,7 +412,7 @@ fn (mut s VSpaceScanner) close_stack() {
 	s.stack.clear()
 }
 
-fn (mut s VSpaceScanner) reset() {
+fn (mut s DiskUsageScanner) reset() {
 	s.close_stack()
 	s.files_rank.release()
 	s.dirs_rank.release()
@@ -425,7 +425,7 @@ fn (mut s VSpaceScanner) reset() {
 	s.set_error('')
 }
 
-fn (mut s VSpaceScanner) release() {
+fn (mut s DiskUsageScanner) release() {
 	s.reset()
 	s.seen_dirs.release()
 	s.seen_links.release()
@@ -435,7 +435,7 @@ fn (mut s VSpaceScanner) release() {
 
 // set_error replaces the reason a scan produced nothing, releasing the one
 // before it. Assigning over a string built by interpolation would strand it.
-fn (mut s VSpaceScanner) set_error(message string) {
+fn (mut s DiskUsageScanner) set_error(message string) {
 	if s.error == message {
 		unsafe { message.free() }
 		return
@@ -446,22 +446,22 @@ fn (mut s VSpaceScanner) set_error(message string) {
 
 // word_error says, in the desktop's language, why the root could not be
 // scanned. The window asks again when the language has changed since.
-fn (mut s VSpaceScanner) word_error() {
+fn (mut s DiskUsageScanner) word_error() {
 	s.error_language = desktop_language
-	s.set_error(tr_fill('vspace.error.cannot_open', s.root))
+	s.set_error(tr_fill('disk_usage.error.cannot_open', s.root))
 }
 
 // current_path is what the walk is inside of right now. The string belongs to
 // the frame that owns the open directory, and the element tree is encoded and
 // thrown away before that frame can be popped.
-fn (s &VSpaceScanner) current_path() string {
+fn (s &DiskUsageScanner) current_path() string {
 	if s.stack.len == 0 {
 		return s.root
 	}
 	return s.stack[s.stack.len - 1].path
 }
 
-fn vspace_elapsed(from u64, to u64) u64 {
+fn disk_usage_elapsed(from u64, to u64) u64 {
 	if from == ~u64(0) || to == ~u64(0) || to < from {
 		return 0
 	}
@@ -471,34 +471,34 @@ fn vspace_elapsed(from u64, to u64) u64 {
 // ── Formatting ────────────────────────────────────────────────────
 
 // KB, MB, GB, TB and PB.
-const vspace_size_unit_count = 5
+const disk_usage_size_unit_count = 5
 
-// vspace_size_unit is a unit's symbol in the desktop's language.
-fn vspace_size_unit(unit int) string {
+// disk_usage_size_unit is a unit's symbol in the desktop's language.
+fn disk_usage_size_unit(unit int) string {
 	return match unit {
-		0 { tr('vspace.unit.kb') }
-		1 { tr('vspace.unit.mb') }
-		2 { tr('vspace.unit.gb') }
-		3 { tr('vspace.unit.tb') }
-		else { tr('vspace.unit.pb') }
+		0 { tr('disk_usage.unit.kb') }
+		1 { tr('disk_usage.unit.mb') }
+		2 { tr('disk_usage.unit.gb') }
+		3 { tr('disk_usage.unit.tb') }
+		else { tr('disk_usage.unit.pb') }
 	}
 }
 
-// vspace_size_text is the standalone program's byte formatter: a compact
+// disk_usage_size_text is the standalone program's byte formatter: a compact
 // binary unit carrying three significant figures. The arithmetic is integer
 // because V's floating-point formatter keeps scratch storage alive under
 // -manualfree, and this runs for every row of both panels every frame. The
 // decimal point and the units are the language's own.
-fn vspace_size_text(bytes u64) string {
+fn disk_usage_size_text(bytes u64) string {
 	if bytes < 1024 {
 		count := bytes.str()
-		text := tr_fill('vspace.size.bytes', count)
+		text := tr_fill('disk_usage.size.bytes', count)
 		unsafe { count.free() }
 		return text
 	}
 	mut value := bytes
 	mut unit := 0
-	for value >= 1024 * 1024 && unit + 1 < vspace_size_unit_count {
+	for value >= 1024 * 1024 && unit + 1 < disk_usage_size_unit_count {
 		value /= 1024
 		unit++
 	}
@@ -507,7 +507,7 @@ fn vspace_size_text(bytes u64) string {
 	hundredths := (value * 100 + 512) / 1024
 	if hundredths >= 10000 {
 		whole := ((hundredths + 50) / 100).str()
-		text := tr_fill2('vspace.size.whole', whole, vspace_size_unit(unit))
+		text := tr_fill2('disk_usage.size.whole', whole, disk_usage_size_unit(unit))
 		unsafe { whole.free() }
 		return text
 	}
@@ -515,7 +515,7 @@ fn vspace_size_text(bytes u64) string {
 		tenths := (hundredths + 5) / 10
 		whole := (tenths / 10).str()
 		fraction := (tenths % 10).str()
-		text := tr_fill3('vspace.size.decimal', whole, fraction, vspace_size_unit(unit))
+		text := tr_fill3('disk_usage.size.decimal', whole, fraction, disk_usage_size_unit(unit))
 		unsafe {
 			whole.free()
 			fraction.free()
@@ -524,7 +524,7 @@ fn vspace_size_text(bytes u64) string {
 	}
 	whole := (hundredths / 100).str()
 	fraction := pad2(int(hundredths % 100))
-	text := tr_fill3('vspace.size.decimal', whole, fraction, vspace_size_unit(unit))
+	text := tr_fill3('disk_usage.size.decimal', whole, fraction, disk_usage_size_unit(unit))
 	unsafe {
 		whole.free()
 		fraction.free()
@@ -532,9 +532,9 @@ fn vspace_size_text(bytes u64) string {
 	return text
 }
 
-// vspace_group_separator is what a language writes between groups of three
+// disk_usage_group_separator is what a language writes between groups of three
 // digits: Russian and Spanish write a comma as their decimal point.
-fn vspace_group_separator() u8 {
+fn disk_usage_group_separator() u8 {
 	return match desktop_language {
 		.en { `,` }
 		.ru { ` ` }
@@ -542,11 +542,11 @@ fn vspace_group_separator() u8 {
 	}
 }
 
-// vspace_count_text groups an integer into thousands. Six hundred thousand
+// disk_usage_count_text groups an integer into thousands. Six hundred thousand
 // files is unreadable as a run of digits and obvious with two commas in it.
-fn vspace_count_text(value u64) string {
+fn disk_usage_count_text(value u64) string {
 	digits := value.str()
-	separator := vspace_group_separator()
+	separator := disk_usage_group_separator()
 	mut out := []u8{cap: digits.len + digits.len / 3}
 	for index in 0 .. digits.len {
 		if index > 0 && (digits.len - index) % 3 == 0 {
@@ -562,10 +562,10 @@ fn vspace_count_text(value u64) string {
 	return text
 }
 
-fn vspace_duration_text(milliseconds u64) string {
+fn disk_usage_duration_text(milliseconds u64) string {
 	if milliseconds < 1000 {
 		count := milliseconds.str()
-		text := tr_fill('vspace.duration.milliseconds', count)
+		text := tr_fill('disk_usage.duration.milliseconds', count)
 		unsafe { count.free() }
 		return text
 	}
@@ -573,7 +573,7 @@ fn vspace_duration_text(milliseconds u64) string {
 	if seconds < 60 {
 		whole := seconds.str()
 		tenth := (milliseconds % 1000 / 100).str()
-		text := tr_fill2('vspace.duration.seconds', whole, tenth)
+		text := tr_fill2('disk_usage.duration.seconds', whole, tenth)
 		unsafe {
 			whole.free()
 			tenth.free()
@@ -582,7 +582,7 @@ fn vspace_duration_text(milliseconds u64) string {
 	}
 	minutes := (seconds / 60).str()
 	remaining := (seconds % 60).str()
-	text := tr_fill2('vspace.duration.minutes', minutes, remaining)
+	text := tr_fill2('disk_usage.duration.minutes', minutes, remaining)
 	unsafe {
 		minutes.free()
 		remaining.free()
@@ -592,58 +592,58 @@ fn vspace_duration_text(milliseconds u64) string {
 
 // ── The native application ────────────────────────────────────────
 
-const vspace_action_rescan = 'vspace.rescan'
-const vspace_action_stop = 'vspace.stop'
-const vspace_action_up = 'vspace.up'
-const vspace_action_dirs_back = 'vspace.dirs.back'
-const vspace_action_dirs_next = 'vspace.dirs.next'
-const vspace_action_files_back = 'vspace.files.back'
-const vspace_action_files_next = 'vspace.files.next'
+const disk_usage_action_rescan = 'disk_usage.rescan'
+const disk_usage_action_stop = 'disk_usage.stop'
+const disk_usage_action_up = 'disk_usage.up'
+const disk_usage_action_dirs_back = 'disk_usage.dirs.back'
+const disk_usage_action_dirs_next = 'disk_usage.dirs.next'
+const disk_usage_action_files_back = 'disk_usage.files.back'
+const disk_usage_action_files_next = 'disk_usage.files.next'
 
 // The scopes the standalone program's Whole disk and Home buttons stand for,
 // plus the one directory on a Vinix image that is worth a button of its own.
-const vspace_scope_count = 3
-const vspace_scope_paths = ['/', '/root', '/usr']
-const vspace_scope_actions = ['vspace.scope.0', 'vspace.scope.1', 'vspace.scope.2']
+const disk_usage_scope_count = 3
+const disk_usage_scope_paths = ['/', '/root', '/usr']
+const disk_usage_scope_actions = ['disk_usage.scope.0', 'disk_usage.scope.1', 'disk_usage.scope.2']
 
-fn vspace_scope_title(index int) string {
+fn disk_usage_scope_title(index int) string {
 	return match index {
-		0 { tr('vspace.scope.whole_disk') }
-		1 { tr('vspace.scope.home') }
-		else { tr('vspace.scope.system') }
+		0 { tr('disk_usage.scope.whole_disk') }
+		1 { tr('disk_usage.scope.home') }
+		else { tr('disk_usage.scope.system') }
 	}
 }
 
 // Row actions are literals because the tree is rebuilt on every frame and this
 // target has no garbage collector. They name a row of the window, not an entry
 // of the ranking: the page offset is what turns one into the other.
-const vspace_dir_actions = ['vspace.dir.0', 'vspace.dir.1', 'vspace.dir.2', 'vspace.dir.3',
-	'vspace.dir.4', 'vspace.dir.5', 'vspace.dir.6', 'vspace.dir.7', 'vspace.dir.8', 'vspace.dir.9',
-	'vspace.dir.10', 'vspace.dir.11']
+const disk_usage_dir_actions = ['disk_usage.dir.0', 'disk_usage.dir.1', 'disk_usage.dir.2', 'disk_usage.dir.3',
+	'disk_usage.dir.4', 'disk_usage.dir.5', 'disk_usage.dir.6', 'disk_usage.dir.7', 'disk_usage.dir.8', 'disk_usage.dir.9',
+	'disk_usage.dir.10', 'disk_usage.dir.11']
 
-const vspace_pad = 12
-const vspace_row_height = 48
-const vspace_metric_height = 62
-const vspace_panel_header = 34
+const disk_usage_pad = 12
+const disk_usage_row_height = 48
+const disk_usage_metric_height = 62
+const disk_usage_panel_header = 34
 
-struct VSpaceApp {
+struct DiskUsageApp {
 mut:
-	scanner   VSpaceScanner
+	scanner   DiskUsageScanner
 	dir_page  int
 	file_page int
 	dir_rows  int = 1
 	file_rows int = 1
 }
 
-fn open_vspace(mut _ Desktop) !NativeApp {
-	mut app := &VSpaceApp{}
+fn open_disk_usage(mut _ Desktop) !NativeApp {
+	mut app := &DiskUsageApp{}
 	// A disk inventory that opened on an empty window and waited to be told
 	// what to look at would be asking a question with one sensible answer.
 	app.scanner.begin('/')
 	return app
 }
 
-fn (mut a VSpaceApp) poll() bool {
+fn (mut a DiskUsageApp) poll() bool {
 	changed := a.scanner.step()
 	// A walk has no known end, so its button shows indeterminate progress,
 	// and an error bar if the walk failed.
@@ -658,59 +658,59 @@ fn (mut a VSpaceApp) poll() bool {
 	return changed
 }
 
-fn (mut a VSpaceApp) close_app() {
+fn (mut a DiskUsageApp) close_app() {
 	a.scanner.release()
 }
 
-fn (mut a VSpaceApp) scan(path string) {
+fn (mut a DiskUsageApp) scan(path string) {
 	a.scanner.begin(path)
 	a.dir_page = 0
 	a.file_page = 0
 }
 
-fn (mut a VSpaceApp) handle(event_id string) ! {
+fn (mut a DiskUsageApp) handle(event_id string) ! {
 	match event_id {
-		vspace_action_rescan {
+		disk_usage_action_rescan {
 			a.scan(a.scanner.root)
 			return
 		}
-		vspace_action_stop {
+		disk_usage_action_stop {
 			a.scanner.cancel()
 			return
 		}
-		vspace_action_up {
+		disk_usage_action_up {
 			if a.scanner.root != '/' {
 				a.scan(parent_path(a.scanner.root))
 			}
 			return
 		}
-		vspace_action_dirs_back {
-			a.dir_page = vspace_page_back(a.dir_page, a.dir_rows)
+		disk_usage_action_dirs_back {
+			a.dir_page = disk_usage_page_back(a.dir_page, a.dir_rows)
 			return
 		}
-		vspace_action_dirs_next {
-			a.dir_page = vspace_page_next(a.dir_page, a.dir_rows, a.scanner.dirs_rank.entries.len)
+		disk_usage_action_dirs_next {
+			a.dir_page = disk_usage_page_next(a.dir_page, a.dir_rows, a.scanner.dirs_rank.entries.len)
 			return
 		}
-		vspace_action_files_back {
-			a.file_page = vspace_page_back(a.file_page, a.file_rows)
+		disk_usage_action_files_back {
+			a.file_page = disk_usage_page_back(a.file_page, a.file_rows)
 			return
 		}
-		vspace_action_files_next {
-			a.file_page = vspace_page_next(a.file_page, a.file_rows, a.scanner.files_rank.entries.len)
+		disk_usage_action_files_next {
+			a.file_page = disk_usage_page_next(a.file_page, a.file_rows, a.scanner.files_rank.entries.len)
 			return
 		}
 		else {}
 	}
-	for index, action in vspace_scope_actions {
+	for index, action in disk_usage_scope_actions {
 		if event_id == action {
-			a.scan(vspace_scope_paths[index])
+			a.scan(disk_usage_scope_paths[index])
 			return
 		}
 	}
 	// Descending into a ranked folder rescans it, which is the only way to
 	// learn what is inside a folder the ranking only gives a total for.
-	for row, action in vspace_dir_actions {
+	for row, action in disk_usage_dir_actions {
 		if event_id != action {
 			continue
 		}
@@ -722,60 +722,60 @@ fn (mut a VSpaceApp) handle(event_id string) ! {
 	}
 }
 
-fn vspace_page_back(page int, rows int) int {
+fn disk_usage_page_back(page int, rows int) int {
 	next := page - rows
 	return if next < 0 { 0 } else { next }
 }
 
-fn vspace_page_next(page int, rows int, total int) int {
+fn disk_usage_page_next(page int, rows int, total int) int {
 	next := page + rows
 	return if next >= total { page } else { next }
 }
 
-fn (a &VSpaceApp) phase_color() u32 {
+fn (a &DiskUsageApp) phase_color() u32 {
 	return match a.scanner.phase {
-		.scanning { vspace_phase_scanning }
-		.complete { vspace_phase_complete }
-		.cancelled { vspace_phase_stopped }
+		.scanning { disk_usage_phase_scanning }
+		.complete { disk_usage_phase_complete }
+		.cancelled { disk_usage_phase_stopped }
 		.failed { files_error }
 	}
 }
 
-fn (a &VSpaceApp) phase_title() string {
+fn (a &DiskUsageApp) phase_title() string {
 	return match a.scanner.phase {
-		.scanning { tr('vspace.phase.scanning') }
-		.complete { tr('vspace.phase.complete') }
-		.cancelled { tr('vspace.phase.stopped') }
-		.failed { tr('vspace.phase.unreadable') }
+		.scanning { tr('disk_usage.phase.scanning') }
+		.complete { tr('disk_usage.phase.complete') }
+		.cancelled { tr('disk_usage.phase.stopped') }
+		.failed { tr('disk_usage.phase.unreadable') }
 	}
 }
 
 // status_text is the sentence along the bottom of the window. It is built for
 // this frame and released with the tree, like every other formatted string
 // here; only the paths inside it belong to the scanner.
-fn (a &VSpaceApp) status_text() string {
+fn (a &DiskUsageApp) status_text() string {
 	match a.scanner.phase {
 		.scanning {
-			return tr_fill('vspace.status.walking', a.scanner.current_path())
+			return tr_fill('disk_usage.status.walking', a.scanner.current_path())
 		}
 		.failed {
 			return a.scanner.error.clone()
 		}
 		.cancelled {
 			// The label owns and frees its text; the table's is not its to free.
-			return tr('vspace.status.stopped').clone()
+			return tr('disk_usage.status.stopped').clone()
 		}
 		.complete {
-			duration := vspace_duration_text(a.scanner.elapsed_ms)
+			duration := disk_usage_duration_text(a.scanner.elapsed_ms)
 			if a.scanner.unreadable == 0 {
-				text := tr_fill2('vspace.status.scanned', a.scanner.root, duration)
+				text := tr_fill2('disk_usage.status.scanned', a.scanner.root, duration)
 				unsafe { duration.free() }
 				return text
 			}
 			// The count is grouped into thousands, so the form is chosen for
 			// it and then filled rather than left to tr_count.
-			skipped := vspace_count_text(a.scanner.unreadable)
-			text := tr_substitute(tr_plural_form('vspace.status.scanned_skipped', i64(a.scanner.unreadable)),
+			skipped := disk_usage_count_text(a.scanner.unreadable)
+			text := tr_substitute(tr_plural_form('disk_usage.status.scanned_skipped', i64(a.scanner.unreadable)),
 				skipped, a.scanner.root, duration)
 			unsafe {
 				duration.free()
@@ -786,11 +786,11 @@ fn (a &VSpaceApp) status_text() string {
 	}
 }
 
-fn vspace_owned_label(text string, frame ui2.Rect, style ui2.TextStyle) ui2.Element {
+fn disk_usage_owned_label(text string, frame ui2.Rect, style ui2.TextStyle) ui2.Element {
 	return ui2.label(frame_owned_text_id, text, frame, style)
 }
 
-fn vspace_button(action string, title string, x int, y int, width int, enabled bool) ui2.Element {
+fn disk_usage_button(action string, title string, x int, y int, width int, enabled bool) ui2.Element {
 	return ui2.button(action, title, ui2.rect(f64(x), f64(y), f64(width), 24), ui2.BoxStyle{
 		bg: if enabled { files_up } else { files_up_disabled }
 		radius: 6
@@ -801,9 +801,9 @@ fn vspace_button(action string, title string, x int, y int, width int, enabled b
 	})
 }
 
-fn vspace_metric(title string, value string, x int, y int, width int, accent u32) ui2.Element {
+fn disk_usage_metric(title string, value string, x int, y int, width int, accent u32) ui2.Element {
 	mut children := frame_elements(3)
-	children << ui2.view('', ui2.rect(0, 0, 4, f64(vspace_metric_height)), ui2.BoxStyle{
+	children << ui2.view('', ui2.rect(0, 0, 4, f64(disk_usage_metric_height)), ui2.BoxStyle{
 		bg: accent
 		radius: 2
 	}, [])
@@ -812,12 +812,12 @@ fn vspace_metric(title string, value string, x int, y int, width int, accent u32
 		size: 11
 		bold: true
 	})
-	children << vspace_owned_label(value, ui2.rect(16, 29, f64(width - 26), 24), ui2.TextStyle{
+	children << disk_usage_owned_label(value, ui2.rect(16, 29, f64(width - 26), 24), ui2.TextStyle{
 		color: body_heading
 		size: 17
 		bold: true
 	})
-	return ui2.view('', ui2.rect(f64(x), f64(y), f64(width), f64(vspace_metric_height)), ui2.BoxStyle{
+	return ui2.view('', ui2.rect(f64(x), f64(y), f64(width), f64(disk_usage_metric_height)), ui2.BoxStyle{
 		bg: 0xffffff
 		radius: 10
 		border_color: body_rule
@@ -828,12 +828,12 @@ fn vspace_metric(title string, value string, x int, y int, width int, accent u32
 	}, children)
 }
 
-// vspace_row is one ranked entry: where it is, how much it holds, and a bar
+// disk_usage_row is one ranked entry: where it is, how much it holds, and a bar
 // proportional to the largest entry in the same panel. The bar is what turns
 // a column of numbers into a picture of the disk.
-fn vspace_row(action string, rank int, entry &VSpaceEntry, y int, width int, largest u64, accent u32, clickable bool) ui2.Element {
+fn disk_usage_row(action string, rank int, entry &DiskUsageEntry, y int, width int, largest u64, accent u32, clickable bool) ui2.Element {
 	number := rank.str()
-	size_text := vspace_size_text(entry.bytes)
+	size_text := disk_usage_size_text(entry.bytes)
 	track := width - 50
 	mut bar := 0
 	if largest > 0 && entry.bytes > 0 && track > 0 {
@@ -843,7 +843,7 @@ fn vspace_row(action string, rank int, entry &VSpaceEntry, y int, width int, lar
 		}
 	}
 	mut children := frame_elements(5)
-	children << vspace_owned_label(number, ui2.rect(10, 5, 22, 16), ui2.TextStyle{
+	children << disk_usage_owned_label(number, ui2.rect(10, 5, 22, 16), ui2.TextStyle{
 		color: body_muted
 		size: 11
 		bold: true
@@ -854,7 +854,7 @@ fn vspace_row(action string, rank int, entry &VSpaceEntry, y int, width int, lar
 		size: 13
 		bold: true
 	})
-	children << vspace_owned_label(size_text, ui2.rect(f64(width - 90), 3, 80, 18), ui2.TextStyle{
+	children << disk_usage_owned_label(size_text, ui2.rect(f64(width - 90), 3, 80, 18), ui2.TextStyle{
 		color: body_heading
 		size: 13
 		bold: true
@@ -870,7 +870,7 @@ fn vspace_row(action string, rank int, entry &VSpaceEntry, y int, width int, lar
 		bg: accent
 		radius: 1
 	}, [])
-	frame := ui2.rect(0, f64(y), f64(width), f64(vspace_row_height - 2))
+	frame := ui2.rect(0, f64(y), f64(width), f64(disk_usage_row_height - 2))
 	box := ui2.BoxStyle{
 		bg: if rank % 2 == 1 { u32(0xffffff) } else { activity_row_alt }
 		radius: 6
@@ -881,7 +881,7 @@ fn vspace_row(action string, rank int, entry &VSpaceEntry, y int, width int, lar
 	return ui2.clickable_view(action, frame, box, children)
 }
 
-fn (a &VSpaceApp) panel(title string, ranking &VSpaceRanking, page int, rows int, actions []string, back string, next string, x int, y int, width int, height int, accent u32, clickable bool) ui2.Element {
+fn (a &DiskUsageApp) panel(title string, ranking &DiskUsageRanking, page int, rows int, actions []string, back string, next string, x int, y int, width int, height int, accent u32, clickable bool) ui2.Element {
 	// The two page buttons live in the header rather than under the rows: the
 	// list is sized to fill the panel, so anything below it would sit on the
 	// last row.
@@ -900,13 +900,13 @@ fn (a &VSpaceApp) panel(title string, ranking &VSpaceRanking, page int, rows int
 		align: .right
 	}
 	if ranking.entries.len == 0 {
-		children << ui2.label('', tr('vspace.panel.nothing_yet'), summary_frame, summary_style)
+		children << ui2.label('', tr('disk_usage.panel.nothing_yet'), summary_frame, summary_style)
 	} else {
-		// A ranking holds at most vspace_rank_limit entries, too few to group.
-		children << vspace_owned_label(tr_count('vspace.panel.ranked', ranking.entries.len),
+		// A ranking holds at most disk_usage_rank_limit entries, too few to group.
+		children << disk_usage_owned_label(tr_count('disk_usage.panel.ranked', ranking.entries.len),
 			summary_frame, summary_style)
 	}
-	children << ui2.view('', ui2.rect(0, f64(vspace_panel_header - 1), f64(width), 1), ui2.BoxStyle{
+	children << ui2.view('', ui2.rect(0, f64(disk_usage_panel_header - 1), f64(width), 1), ui2.BoxStyle{
 		bg: body_rule
 	}, [])
 
@@ -930,8 +930,8 @@ fn (a &VSpaceApp) panel(title string, ranking &VSpaceRanking, page int, rows int
 	}
 
 	if ranking.entries.len == 0 {
-		children << ui2.label('', tr('vspace.panel.empty'), ui2.rect(14,
-			f64(vspace_panel_header + 10), f64(width - 28), 18), ui2.TextStyle{
+		children << ui2.label('', tr('disk_usage.panel.empty'), ui2.rect(14,
+			f64(disk_usage_panel_header + 10), f64(width - 28), 18), ui2.TextStyle{
 			color: body_muted
 			size: 11
 		})
@@ -942,8 +942,8 @@ fn (a &VSpaceApp) panel(title string, ranking &VSpaceRanking, page int, rows int
 		// Only the folder panel's rows can be descended into, and only then do
 		// they need an action to be recognised by.
 		action := if clickable && row < actions.len { actions[row] } else { '' }
-		children << vspace_row(action, index + 1, &ranking.entries[index], vspace_panel_header +
-			row * vspace_row_height, width, largest, accent, action.len > 0)
+		children << disk_usage_row(action, index + 1, &ranking.entries[index], disk_usage_panel_header +
+			row * disk_usage_row_height, width, largest, accent, action.len > 0)
 		row++
 	}
 
@@ -958,35 +958,35 @@ fn (a &VSpaceApp) panel(title string, ranking &VSpaceRanking, page int, rows int
 	}, children)
 }
 
-fn (mut a VSpaceApp) build(size ui2.Rect) !ui2.Element {
+fn (mut a DiskUsageApp) build(size ui2.Rect) !ui2.Element {
 	if a.scanner.phase == .failed && a.scanner.error_language != desktop_language {
 		a.scanner.word_error()
 	}
 	width := int(size.width)
 	height := int(size.height)
-	inner := width - vspace_pad * 2
+	inner := width - disk_usage_pad * 2
 	scanning := a.scanner.phase == .scanning
 
 	panel_y := 178
 	panel_height := height - panel_y - 34
-	rows := if panel_height > vspace_panel_header + vspace_row_height {
-		(panel_height - vspace_panel_header - 8) / vspace_row_height
+	rows := if panel_height > disk_usage_panel_header + disk_usage_row_height {
+		(panel_height - disk_usage_panel_header - 8) / disk_usage_row_height
 	} else {
 		1
 	}
 	a.dir_rows = rows
 	a.file_rows = rows
-	a.dir_page = vspace_clamp_page(a.dir_page, rows, a.scanner.dirs_rank.entries.len)
-	a.file_page = vspace_clamp_page(a.file_page, rows, a.scanner.files_rank.entries.len)
+	a.dir_page = disk_usage_clamp_page(a.dir_page, rows, a.scanner.dirs_rank.entries.len)
+	a.file_page = disk_usage_clamp_page(a.file_page, rows, a.scanner.files_rank.entries.len)
 
 	mut children := frame_elements(16)
 
-	children << ui2.label('', 'VSpace', ui2.rect(f64(vspace_pad), 5, 84, 24), ui2.TextStyle{
+	children << ui2.label('', 'Disk Usage', ui2.rect(f64(disk_usage_pad), 5, 116, 24), ui2.TextStyle{
 		color: body_heading
 		size: 18
 		bold: true
 	})
-	children << ui2.label('', tr('vspace.subtitle'), ui2.rect(f64(vspace_pad + 78), 12, 160, 16),
+	children << ui2.label('', tr('disk_usage.subtitle'), ui2.rect(f64(disk_usage_pad + 110), 12, 160, 16),
 		ui2.TextStyle{
 		color: body_muted
 		size: 11
@@ -999,7 +999,7 @@ fn (mut a VSpaceApp) build(size ui2.Rect) !ui2.Element {
 		bold: true
 		align: .center
 	})
-	children << ui2.view('', ui2.rect(f64(width - vspace_pad - 104), 7, 104, 22), ui2.BoxStyle{
+	children << ui2.view('', ui2.rect(f64(width - disk_usage_pad - 104), 7, 104, 22), ui2.BoxStyle{
 		bg: 0xffffff
 		radius: 11
 		border_color: a.phase_color()
@@ -1011,21 +1011,21 @@ fn (mut a VSpaceApp) build(size ui2.Rect) !ui2.Element {
 
 	// Scope: the presets, the way back out of a folder that was descended
 	// into, and the two controls that start and stop a walk.
-	mut scope_x := vspace_pad
-	for index in 0 .. vspace_scope_count {
+	mut scope_x := disk_usage_pad
+	for index in 0 .. disk_usage_scope_count {
 		button_width := if index == 0 { 92 } else { 72 }
-		children << vspace_button(vspace_scope_actions[index], vspace_scope_title(index), scope_x,
+		children << disk_usage_button(disk_usage_scope_actions[index], disk_usage_scope_title(index), scope_x,
 			40, button_width, true)
 		scope_x += button_width + 6
 	}
-	children << vspace_button(vspace_action_up, tr('vspace.button.up'), scope_x, 40, 48,
+	children << disk_usage_button(disk_usage_action_up, tr('disk_usage.button.up'), scope_x, 40, 48,
 		a.scanner.root != '/')
-	children << vspace_button(vspace_action_stop, tr('vspace.button.stop'), width - vspace_pad - 68,
+	children << disk_usage_button(disk_usage_action_stop, tr('disk_usage.button.stop'), width - disk_usage_pad - 68,
 		40, 68, scanning)
-	children << vspace_button(vspace_action_rescan, tr('vspace.button.rescan'), width - vspace_pad -
+	children << disk_usage_button(disk_usage_action_rescan, tr('disk_usage.button.rescan'), width - disk_usage_pad -
 		144, 40, 72, !scanning)
 
-	children << ui2.label('', a.scanner.root, ui2.rect(f64(vspace_pad), 72, f64(inner), 16),
+	children << ui2.label('', a.scanner.root, ui2.rect(f64(disk_usage_pad), 72, f64(inner), 16),
 		ui2.TextStyle{
 		color: body_text
 		size: 11
@@ -1044,40 +1044,40 @@ fn (mut a VSpaceApp) build(size ui2.Rect) !ui2.Element {
 		}, [])
 	} else if a.scanner.phase == .complete {
 		bar << ui2.view('', ui2.rect(0, 0, f64(inner), 3), ui2.BoxStyle{
-			bg: vspace_phase_complete
+			bg: disk_usage_phase_complete
 			radius: 1
 		}, [])
 	}
-	children << ui2.view('', ui2.rect(f64(vspace_pad), 94, f64(inner), 3), ui2.BoxStyle{
+	children << ui2.view('', ui2.rect(f64(disk_usage_pad), 94, f64(inner), 3), ui2.BoxStyle{
 		bg: body_rule
 		radius: 1
 	}, bar)
 
 	gap := 10
 	metric_width := (inner - gap * 3) / 4
-	children << vspace_metric(tr('vspace.metric.size'), vspace_size_text(a.scanner.total_bytes),
-		vspace_pad, 106, metric_width, app_accent)
-	children << vspace_metric(tr('vspace.metric.files'), vspace_count_text(a.scanner.files),
-		vspace_pad + metric_width + gap, 106, metric_width, vspace_files_accent)
-	children << vspace_metric(tr('vspace.metric.folders'), vspace_count_text(a.scanner.directories),
-		vspace_pad + (metric_width + gap) * 2, 106, metric_width, vspace_folders_accent)
-	children << vspace_metric(tr('vspace.metric.skipped'), vspace_count_text(a.scanner.unreadable),
-		vspace_pad + (metric_width + gap) * 3, 106, metric_width, files_error)
+	children << disk_usage_metric(tr('disk_usage.metric.size'), disk_usage_size_text(a.scanner.total_bytes),
+		disk_usage_pad, 106, metric_width, app_accent)
+	children << disk_usage_metric(tr('disk_usage.metric.files'), disk_usage_count_text(a.scanner.files),
+		disk_usage_pad + metric_width + gap, 106, metric_width, disk_usage_files_accent)
+	children << disk_usage_metric(tr('disk_usage.metric.folders'), disk_usage_count_text(a.scanner.directories),
+		disk_usage_pad + (metric_width + gap) * 2, 106, metric_width, disk_usage_folders_accent)
+	children << disk_usage_metric(tr('disk_usage.metric.skipped'), disk_usage_count_text(a.scanner.unreadable),
+		disk_usage_pad + (metric_width + gap) * 3, 106, metric_width, files_error)
 
 	panel_width := (inner - gap) / 2
-	children << a.panel(tr('vspace.panel.folders'), &a.scanner.dirs_rank, a.dir_page, rows,
-		vspace_dir_actions, vspace_action_dirs_back, vspace_action_dirs_next, vspace_pad, panel_y,
-		panel_width, panel_height, vspace_folders_accent, !scanning)
-	children << a.panel(tr('vspace.panel.files'), &a.scanner.files_rank, a.file_page, rows,
-		vspace_dir_actions, vspace_action_files_back, vspace_action_files_next, vspace_pad +
-		panel_width + gap, panel_y, panel_width, panel_height, vspace_files_accent, false)
+	children << a.panel(tr('disk_usage.panel.folders'), &a.scanner.dirs_rank, a.dir_page, rows,
+		disk_usage_dir_actions, disk_usage_action_dirs_back, disk_usage_action_dirs_next, disk_usage_pad, panel_y,
+		panel_width, panel_height, disk_usage_folders_accent, !scanning)
+	children << a.panel(tr('disk_usage.panel.files'), &a.scanner.files_rank, a.file_page, rows,
+		disk_usage_dir_actions, disk_usage_action_files_back, disk_usage_action_files_next, disk_usage_pad +
+		panel_width + gap, panel_y, panel_width, panel_height, disk_usage_files_accent, false)
 
 	mut status := frame_elements(1)
-	status << vspace_owned_label(a.status_text(), ui2.rect(10, 5, f64(inner - 20), 14), ui2.TextStyle{
+	status << disk_usage_owned_label(a.status_text(), ui2.rect(10, 5, f64(inner - 20), 14), ui2.TextStyle{
 		color: body_text
 		size: 11
 	})
-	children << ui2.view('', ui2.rect(f64(vspace_pad), f64(height - 28), f64(inner), 22),
+	children << ui2.view('', ui2.rect(f64(disk_usage_pad), f64(height - 28), f64(inner), 22),
 		ui2.BoxStyle{
 		bg: body_panel
 		radius: 6
@@ -1086,7 +1086,7 @@ fn (mut a VSpaceApp) build(size ui2.Rect) !ui2.Element {
 	return ui2.screen(app_surface, children)
 }
 
-fn vspace_clamp_page(page int, rows int, total int) int {
+fn disk_usage_clamp_page(page int, rows int, total int) int {
 	if page + rows > total {
 		last := total - rows
 		return if last < 0 { 0 } else { last }

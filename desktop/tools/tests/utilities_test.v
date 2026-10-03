@@ -664,9 +664,9 @@ fn test_available_utility_applications_and_shortcut_layouts() {
 	assert available_apps[16].height == gimp_window_height + default_title_height
 	assert available_apps[16].keyboard && available_apps[16].pointer
 	assert available_apps[16].polling && available_apps[16].poll_interval_ms == 50
-	assert available_apps[17].title == 'VSpace'
-	assert available_apps[17].process_name == 'vinix-vspace'
-	assert available_apps[17].icon == 'asset:vspace'
+	assert available_apps[17].title == 'Disk Usage'
+	assert available_apps[17].process_name == 'vinix-disk-usage'
+	assert available_apps[17].icon == 'asset:disk_usage'
 	assert available_apps[17].polling && available_apps[17].poll_interval_ms == 33
 	assert !available_apps[17].keyboard && !available_apps[17].pointer
 	assert available_apps[18].title == 'VOffice Writer'
@@ -1541,10 +1541,10 @@ fn test_application_tree_protocol_round_trip() {
 	unsafe { encoded.free() }
 }
 
-// ── VSpace ─────────────────────────────────────────────────────────
+// ── DiskUsage ─────────────────────────────────────────────────────────
 
-fn vspace_test_tree() string {
-	root := os.join_path(os.temp_dir(), 'vinix-vspace-test')
+fn disk_usage_test_tree() string {
+	root := os.join_path(os.temp_dir(), 'vinix-disk-usage-test')
 	os.rmdir_all(root) or {}
 	os.mkdir_all(os.join_path(root, 'big', 'nested')) or { panic(err) }
 	os.mkdir_all(os.join_path(root, 'small')) or { panic(err) }
@@ -1559,7 +1559,7 @@ fn vspace_test_tree() string {
 	return root
 }
 
-fn vspace_scan_to_completion(mut app VSpaceApp, root string) {
+fn disk_usage_scan_to_completion(mut app DiskUsageApp, root string) {
 	app.scan(root)
 	for step := 0; app.scanner.phase == .scanning && step < 1000; step++ {
 		assert app.poll()
@@ -1567,16 +1567,16 @@ fn vspace_scan_to_completion(mut app VSpaceApp, root string) {
 	assert app.scanner.phase == .complete
 }
 
-fn test_vspace_walk_counts_a_real_tree_once() {
-	root := vspace_test_tree()
+fn test_disk_usage_walk_counts_a_real_tree_once() {
+	root := disk_usage_test_tree()
 	defer {
 		os.rmdir_all(root) or {}
 	}
-	mut app := VSpaceApp{}
+	mut app := DiskUsageApp{}
 	defer {
 		app.close_app()
 	}
-	vspace_scan_to_completion(mut app, root)
+	disk_usage_scan_to_completion(mut app, root)
 
 	// Three regular files: the hard link is the same bytes under a second name
 	// and the symbolic link is followed by nothing.
@@ -1608,12 +1608,12 @@ fn test_vspace_walk_counts_a_real_tree_once() {
 	assert files[2].name in ['c.bin', 'c-link.bin']
 }
 
-fn test_vspace_scan_is_resumable_and_can_be_stopped() {
-	root := vspace_test_tree()
+fn test_disk_usage_scan_is_resumable_and_can_be_stopped() {
+	root := disk_usage_test_tree()
 	defer {
 		os.rmdir_all(root) or {}
 	}
-	mut app := VSpaceApp{}
+	mut app := DiskUsageApp{}
 	defer {
 		app.close_app()
 	}
@@ -1628,37 +1628,37 @@ fn test_vspace_scan_is_resumable_and_can_be_stopped() {
 	// Nothing polls a stopped scan forward.
 	assert !app.poll()
 
-	vspace_scan_to_completion(mut app, root)
+	disk_usage_scan_to_completion(mut app, root)
 	assert !app.poll()
 	assert app.scanner.files == 3
 }
 
-fn test_vspace_reports_an_unreadable_root_instead_of_failing() {
-	mut app := VSpaceApp{}
+fn test_disk_usage_reports_an_unreadable_root_instead_of_failing() {
+	mut app := DiskUsageApp{}
 	defer {
 		app.close_app()
 	}
-	app.scan('/vinix-vspace-does-not-exist')
+	app.scan('/vinix-disk-usage-does-not-exist')
 	assert app.scanner.phase == .failed
-	assert app.scanner.error == 'cannot open /vinix-vspace-does-not-exist'
+	assert app.scanner.error == 'cannot open /vinix-disk-usage-does-not-exist'
 	tree := app.build(ui2.rect(0, 0, 880, 546)) or { panic(err) }
 	assert utility_tree_has_text(tree, 'UNREADABLE')
-	assert utility_tree_has_text(tree, 'cannot open /vinix-vspace-does-not-exist')
+	assert utility_tree_has_text(tree, 'cannot open /vinix-disk-usage-does-not-exist')
 }
 
-fn test_vspace_window_ranks_folders_and_descends_into_one() {
-	root := vspace_test_tree()
+fn test_disk_usage_window_ranks_folders_and_descends_into_one() {
+	root := disk_usage_test_tree()
 	defer {
 		os.rmdir_all(root) or {}
 	}
-	mut app := VSpaceApp{}
+	mut app := DiskUsageApp{}
 	defer {
 		app.close_app()
 	}
-	vspace_scan_to_completion(mut app, root)
+	disk_usage_scan_to_completion(mut app, root)
 
 	tree := app.build(ui2.rect(0, 0, 880, 546)) or { panic(err) }
-	assert utility_tree_has_text(tree, 'VSpace')
+	assert utility_tree_has_text(tree, 'Disk Usage')
 	assert utility_tree_has_text(tree, 'Largest folders')
 	assert utility_tree_has_text(tree, 'Largest files')
 	assert utility_tree_has_text(tree, 'COMPLETE')
@@ -1666,76 +1666,76 @@ fn test_vspace_window_ranks_folders_and_descends_into_one() {
 	assert utility_tree_has_text(tree, 'a.bin')
 	// A completed scan's folder rows are what a pointer descends with; a
 	// running one's are not, because the ranking moves underneath the click.
-	assert utility_element_named(tree, 'vspace.dir.0') != none
+	assert utility_element_named(tree, 'disk_usage.dir.0') != none
 
-	app.handle('vspace.dir.0') or { panic(err) }
+	app.handle('disk_usage.dir.0') or { panic(err) }
 	assert app.scanner.root == os.join_path(root, 'big')
-	vspace_scan_to_completion(mut app, os.join_path(root, 'big'))
+	disk_usage_scan_to_completion(mut app, os.join_path(root, 'big'))
 	assert app.scanner.files == 2
 	assert app.scanner.total_bytes == 4096 + 2048
 
-	app.handle('vspace.up') or { panic(err) }
+	app.handle('disk_usage.up') or { panic(err) }
 	assert app.scanner.root == root
 }
 
-fn test_vspace_formats_sizes_counts_and_durations() {
+fn test_disk_usage_formats_sizes_counts_and_durations() {
 	// The standalone program's formatter, to the digit.
-	assert vspace_size_text(0) == '0 B'
-	assert vspace_size_text(1023) == '1023 B'
-	assert vspace_size_text(1024) == '1.00 KB'
-	assert vspace_size_text(1536) == '1.50 KB'
-	assert vspace_size_text(10 * 1024) == '10.0 KB'
-	assert vspace_size_text(100 * 1024) == '100 KB'
-	assert vspace_size_text(1024 * 1024) == '1.00 MB'
-	assert vspace_size_text(u64(3) * 1024 * 1024 * 1024) == '3.00 GB'
+	assert disk_usage_size_text(0) == '0 B'
+	assert disk_usage_size_text(1023) == '1023 B'
+	assert disk_usage_size_text(1024) == '1.00 KB'
+	assert disk_usage_size_text(1536) == '1.50 KB'
+	assert disk_usage_size_text(10 * 1024) == '10.0 KB'
+	assert disk_usage_size_text(100 * 1024) == '100 KB'
+	assert disk_usage_size_text(1024 * 1024) == '1.00 MB'
+	assert disk_usage_size_text(u64(3) * 1024 * 1024 * 1024) == '3.00 GB'
 
-	assert vspace_count_text(0) == '0'
-	assert vspace_count_text(999) == '999'
-	assert vspace_count_text(1000) == '1,000'
-	assert vspace_count_text(1234567) == '1,234,567'
+	assert disk_usage_count_text(0) == '0'
+	assert disk_usage_count_text(999) == '999'
+	assert disk_usage_count_text(1000) == '1,000'
+	assert disk_usage_count_text(1234567) == '1,234,567'
 
-	assert vspace_duration_text(940) == '940 ms'
-	assert vspace_duration_text(1500) == '1.5 sec'
-	assert vspace_duration_text(65000) == '1 min 5 sec'
+	assert disk_usage_duration_text(940) == '940 ms'
+	assert disk_usage_duration_text(1500) == '1.5 sec'
+	assert disk_usage_duration_text(65000) == '1 min 5 sec'
 }
 
-fn test_vspace_ranking_keeps_only_the_largest_entries() {
-	mut ranking := VSpaceRanking{}
+fn test_disk_usage_ranking_keeps_only_the_largest_entries() {
+	mut ranking := DiskUsageRanking{}
 	defer {
 		ranking.release()
 	}
 	// More candidates than the ranking holds, offered smallest first so every
 	// one of them has to displace the floor to get in.
-	for index in 0 .. vspace_rank_limit * 2 {
+	for index in 0 .. disk_usage_rank_limit * 2 {
 		ranking.consider('name'.clone(), 'path'.clone(), u64(index + 1))
 	}
-	assert ranking.entries.len == vspace_rank_limit
-	assert ranking.entries[0].bytes == u64(vspace_rank_limit * 2)
-	assert ranking.entries[vspace_rank_limit - 1].bytes == u64(vspace_rank_limit + 1)
-	assert ranking.floor == u64(vspace_rank_limit + 1)
+	assert ranking.entries.len == disk_usage_rank_limit
+	assert ranking.entries[0].bytes == u64(disk_usage_rank_limit * 2)
+	assert ranking.entries[disk_usage_rank_limit - 1].bytes == u64(disk_usage_rank_limit + 1)
+	assert ranking.floor == u64(disk_usage_rank_limit + 1)
 	// Anything at or below the floor is rejected without disturbing the order.
 	ranking.consider('name'.clone(), 'path'.clone(), 1)
-	assert ranking.entries[vspace_rank_limit - 1].bytes == u64(vspace_rank_limit + 1)
+	assert ranking.entries[disk_usage_rank_limit - 1].bytes == u64(disk_usage_rank_limit + 1)
 }
 
-fn test_vspace_identity_set_answers_each_device_and_inode_once() {
-	mut seen := VSpaceIdentitySet{}
+fn test_disk_usage_identity_set_answers_each_device_and_inode_once() {
+	mut seen := DiskUsageIdentitySet{}
 	defer {
 		seen.release()
 	}
 	seen.reset()
-	assert seen.add(vspace_identity_key(1, 2))
-	assert !seen.add(vspace_identity_key(1, 2))
-	assert seen.add(vspace_identity_key(2, 2))
+	assert seen.add(disk_usage_identity_key(1, 2))
+	assert !seen.add(disk_usage_identity_key(1, 2))
+	assert seen.add(disk_usage_identity_key(2, 2))
 	// Past its load factor the table rehashes, and every key it already held
 	// has to still be in it afterwards.
-	for inode in 0 .. u64(vspace_identity_slots * 2) {
-		seen.add(vspace_identity_key(9, inode))
+	for inode in 0 .. u64(disk_usage_identity_slots * 2) {
+		seen.add(disk_usage_identity_key(9, inode))
 	}
-	assert !seen.add(vspace_identity_key(1, 2))
-	assert !seen.add(vspace_identity_key(2, 2))
-	for inode in 0 .. u64(vspace_identity_slots * 2) {
-		assert !seen.add(vspace_identity_key(9, inode))
+	assert !seen.add(disk_usage_identity_key(1, 2))
+	assert !seen.add(disk_usage_identity_key(2, 2))
+	for inode in 0 .. u64(disk_usage_identity_slots * 2) {
+		assert !seen.add(disk_usage_identity_key(9, inode))
 	}
 }
 

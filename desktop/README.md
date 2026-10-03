@@ -45,7 +45,7 @@ What it does:
 - a **text editor** for plain files, with an editable path, open/save controls,
   cursor navigation and keyboard shortcuts
 - a **calendar** with month navigation, date selection and a jump back to today
-- **VSpace**, a disk usage analyzer: the largest folders and files on the
+- **Disk Usage**, a disk usage analyzer: the largest folders and files on the
   machine, ranked and measured while the walk runs
 - a **clock** with a large local-time display and a tenth-second stopwatch
 - **Capture**, a native screenshot and screen-recording app with delayed PNG
@@ -98,7 +98,7 @@ typing any word with a q in it drop the user back to the console.
     vinix_surface.v       shared XRGB surface validation and presentation
     files.v        the file browser
     activity.v     the activity monitor, over /dev/processes
-    vspace.v       the disk inventory: a resumable walk and its two rankings
+    disk_usage.v   the disk inventory: a resumable walk and its two rankings
     editor.v       the plain-text editor and its keyboard editing model
     calendar.v     Gregorian month layout and the calendar application
     clock_app.v    the large clock and stopwatch application
@@ -411,11 +411,11 @@ kernels still run the app and show unavailable data where appropriate.
 lifetimes. `tests/activity-monitor/run.py` boots architecture-specific syscall,
 resource-accounting and repeated-process-read allocation regressions in QEMU.
 
-## VSpace, the disk inventory
+## Disk Usage, the disk inventory
 
-![VSpace measuring a Vinix image under QEMU](../vinix-vspace-qemu.png)
+![Disk Usage measuring a Vinix image under QEMU](../vinix-disk-usage-qemu.png)
 
-`vspace.v` is a port of the standalone V/ui2 program of the same name — a disk
+`disk_usage.v` is a port of the standalone V/ui2 program of the same name — a disk
 usage analyzer: four metrics across the top, and below them the largest folders
 and the largest files found so far, each row carrying a bar proportional to the
 largest entry in its panel. Its accounting is the original's. Symbolic links
@@ -577,7 +577,7 @@ shell in Terminal, can write to it:
 
 The compositor reads it once a second and tints the button with the progress,
 draws the badge in its corner and turns it orange for attention. Terminal
-translates the OSC 9;4 progress sequence and the bell into this file, VSpace
+translates the OSC 9;4 progress sequence and the bell into this file, Disk Usage
 reports its walk as indeterminate progress, and a recording Capture window
 carries a REC badge.
 

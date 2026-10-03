@@ -11,7 +11,7 @@ its framebuffer compositor.
 - Minecraft: [official Minecraft client asset](https://resources.download.minecraft.net/f0/f00657542252858a721e715a2e888a9226404e35), `minecraft.icns` (1024 × 1024)
 - DOOM: `M_DOOM` menu logo from a locally supplied DOOM WAD, decoded with its `PLAYPAL` palette and scaled without smoothing.
 - Steam: [Valve's Steam installer package](https://cdn.fastly.steamstatic.com/client/installer/steam.deb), `usr/share/icons/hicolor/256x256/apps/steam.png`, resampled to 512 × 512
-- Terminal, Settings, Activity Monitor, Calculator, VSpace, Text Editor, Files,
+- Terminal, Settings, Activity Monitor, Calculator, Disk Usage, Text Editor, Files,
   Clock, Calendar, and Capture: user-provided 1254 × 1254 PNG artwork,
   preserved without visual edits before QOI encoding.
 

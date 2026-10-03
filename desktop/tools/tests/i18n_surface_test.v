@@ -3,7 +3,7 @@
 // that can be found in the LICENSE file.
 
 // SPDX-License-Identifier: GPL-2.0-or-later
-// The notification area, the desktop's context menus and VSpace in Russian
+// The notification area, the desktop's context menus and DiskUsage in Russian
 // and Spanish.
 module main
 
@@ -120,34 +120,34 @@ fn test_context_menu_rows_are_worded_when_drawn() {
 	assert context_entry_title(ui2.MenuEntry{ id: start_context_open, title: 'Open' }) == 'Open'
 }
 
-fn test_vspace_formats_numbers_the_way_each_language_writes_them() {
+fn test_disk_usage_formats_numbers_the_way_each_language_writes_them() {
 	defer {
 		set_desktop_language(.en)
 	}
 	set_desktop_language(.ru)
-	assert vspace_size_text(1023) == '1023 Б'
-	assert vspace_size_text(1536) == '1,50 КБ'
-	assert vspace_size_text(10 * 1024) == '10,0 КБ'
-	assert vspace_size_text(100 * 1024) == '100 КБ'
-	assert vspace_size_text(u64(3) * 1024 * 1024 * 1024) == '3,00 ГБ'
-	assert vspace_count_text(1234567) == '1 234 567'
-	assert vspace_duration_text(940) == '940 мс'
-	assert vspace_duration_text(1500) == '1,5 с'
-	assert vspace_duration_text(65000) == '1 мин 5 с'
+	assert disk_usage_size_text(1023) == '1023 Б'
+	assert disk_usage_size_text(1536) == '1,50 КБ'
+	assert disk_usage_size_text(10 * 1024) == '10,0 КБ'
+	assert disk_usage_size_text(100 * 1024) == '100 КБ'
+	assert disk_usage_size_text(u64(3) * 1024 * 1024 * 1024) == '3,00 ГБ'
+	assert disk_usage_count_text(1234567) == '1 234 567'
+	assert disk_usage_duration_text(940) == '940 мс'
+	assert disk_usage_duration_text(1500) == '1,5 с'
+	assert disk_usage_duration_text(65000) == '1 мин 5 с'
 	set_desktop_language(.es)
-	assert vspace_size_text(1536) == '1,50 KB'
-	assert vspace_count_text(1234567) == '1.234.567'
-	assert vspace_duration_text(1500) == '1,5 s'
+	assert disk_usage_size_text(1536) == '1,50 KB'
+	assert disk_usage_count_text(1234567) == '1.234.567'
+	assert disk_usage_duration_text(1500) == '1,5 s'
 	set_desktop_language(.en)
-	assert vspace_size_text(1536) == '1.50 KB'
-	assert vspace_count_text(1234567) == '1,234,567'
+	assert disk_usage_size_text(1536) == '1.50 KB'
+	assert disk_usage_count_text(1234567) == '1,234,567'
 }
 
-fn test_vspace_status_counts_skipped_items_in_each_language() {
+fn test_disk_usage_status_counts_skipped_items_in_each_language() {
 	defer {
 		set_desktop_language(.en)
 	}
-	mut app := VSpaceApp{}
+	mut app := DiskUsageApp{}
 	app.scanner.phase = .complete
 	app.scanner.elapsed_ms = 1500
 	app.scanner.unreadable = 1
@@ -165,28 +165,28 @@ fn test_vspace_status_counts_skipped_items_in_each_language() {
 	assert app.status_text() == 'Se analizó / en 1,5 s.'
 }
 
-fn test_vspace_rewords_a_failed_scan_after_the_language_changes() {
+fn test_disk_usage_rewords_a_failed_scan_after_the_language_changes() {
 	defer {
 		set_desktop_language(.en)
 	}
 	set_desktop_language(.en)
-	mut app := VSpaceApp{}
+	mut app := DiskUsageApp{}
 	defer {
 		app.close_app()
 	}
-	app.scan('/vinix-vspace-does-not-exist')
-	assert app.scanner.error == 'cannot open /vinix-vspace-does-not-exist'
+	app.scan('/vinix-disk-usage-does-not-exist')
+	assert app.scanner.error == 'cannot open /vinix-disk-usage-does-not-exist'
 	set_desktop_language(.ru)
 	tree := app.build(ui2.rect(0, 0, 880, 546)) or { panic(err) }
-	assert app.scanner.error == 'Не удалось открыть /vinix-vspace-does-not-exist'
+	assert app.scanner.error == 'Не удалось открыть /vinix-disk-usage-does-not-exist'
 	assert i18n_surface_has_text(tree, 'НЕДОСТУПНО')
-	assert i18n_surface_has_text(tree, 'Не удалось открыть /vinix-vspace-does-not-exist')
+	assert i18n_surface_has_text(tree, 'Не удалось открыть /vinix-disk-usage-does-not-exist')
 	assert i18n_surface_has_text(tree, 'Самые большие папки')
 	assert i18n_surface_has_text(tree, 'Весь диск')
 	assert i18n_surface_has_text(tree, 'пока пусто')
 	assert i18n_surface_has_text(tree, '0 Б')
 	set_desktop_language(.es)
 	spanish := app.build(ui2.rect(0, 0, 880, 546)) or { panic(err) }
-	assert i18n_surface_has_text(spanish, 'No se puede abrir /vinix-vspace-does-not-exist')
+	assert i18n_surface_has_text(spanish, 'No se puede abrir /vinix-disk-usage-does-not-exist')
 	assert i18n_surface_has_text(spanish, 'SIN ACCESO')
 }

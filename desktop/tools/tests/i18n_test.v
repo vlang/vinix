@@ -113,7 +113,7 @@ const i18n_text_first = ['settings_heading', 'settings_note', 'heading', 'body_l
 const i18n_text_second = ['ui2.label', 'ui2.button', 'ui2.button_with_image', 'settings_choice',
 	'settings_toggle', 'editor_toolbar_button']
 // Names that read the same in every language.
-const i18n_untranslated_names = ['Vinix', 'VSpace']
+const i18n_untranslated_names = ['Vinix', 'Disk Usage']
 
 // i18n_literal_after is the single-quoted literal starting at index, after
 // any spaces, or none.

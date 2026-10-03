@@ -262,7 +262,7 @@ fn load_app_icon(name string) AppIcon {
 // Their artwork is /usr/share/vinix/icons/<name>.qoi.
 const bundled_icon_paths = ['asset:firefox', 'asset:chromium', 'asset:blender', 'asset:minecraft',
 	'asset:doom', 'asset:steam', 'asset:terminal', 'asset:settings', 'asset:activity',
-	'asset:calculator', 'asset:vspace', 'asset:editor', 'asset:files', 'asset:clock',
+	'asset:calculator', 'asset:disk_usage', 'asset:editor', 'asset:files', 'asset:clock',
 	'asset:calendar', 'asset:capture']
 
 // How many scaled icons are kept. The desktop draws each icon at a handful of
