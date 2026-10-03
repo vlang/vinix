@@ -69,12 +69,14 @@ class StageTests(unittest.TestCase):
             "libpipewire-0.3-0": {}, "libopenal1": {}, "libnm0": {},
             "ca-certificates": {"usr/share/ca-certificates/mozilla/public.crt": b"PUBLIC CERTIFICATE\n"},
         }
+        self.mesa_version = stage.lavapipe_inputs()["debian_version"]
         records = []
         for name, files in packages.items():
             filename = name + "_1_amd64.deb"
             data = deb_bytes(files)
             (self.cache / filename).write_bytes(data)
-            records.append(f"Package: {name}\nVersion: 1\nArchitecture: amd64\n"
+            version = self.mesa_version if name == "mesa-vulkan-drivers" else "1"
+            records.append(f"Package: {name}\nVersion: {version}\nArchitecture: amd64\n"
                            f"Filename: pool/{filename}\nSize: {len(data)}\n"
                            f"SHA256: {hashlib.sha256(data).hexdigest()}\n")
         self.write(self.steam / "downloads/bookworm_amd64_Packages", "\n".join(records).encode())
@@ -91,9 +93,18 @@ class StageTests(unittest.TestCase):
         def compile_library(command, **kwargs):
             self.assertEqual(command[0], "clang", "cached fixture must never fetch the network")
             self.write(Path(command[command.index("-o") + 1]), b"compiled private shim")
+        self.lavapipe_bases = []
+        def build_lavapipe(base, work):
+            # The real build links Bookworm's libc; record what it would see.
+            self.lavapipe_bases.append((base / "lib/x86_64-linux-gnu/libc.so.6").read_bytes())
+            self.assertEqual(work, (self.build / "mesa").resolve())
+            library = self.base / "lavapipe/libvulkan_lvp.so"
+            self.write(library, b"patched Lavapipe")
+            return library
         arguments = [str(stage.__file__), "--steam-build", str(self.steam), "--build", str(self.build), *extra]
         with patch.object(sys, "argv", arguments), patch.object(stage, "load_glibc_pin", return_value=self.pin), \
                 patch.object(stage.subprocess, "run", side_effect=compile_library), \
+                patch.object(stage, "build_lavapipe", side_effect=build_lavapipe), \
                 patch.object(stage.sys, "platform", "linux"), redirect_stdout(io.StringIO()):
             stage.main()
         self.assertEqual(stage.package_files(self.source), self.before)
@@ -108,7 +119,7 @@ class StageTests(unittest.TestCase):
             self.assertTrue(legacy.is_symlink())
             self.assertEqual(legacy.resolve(), canonical.resolve())
         self.assertEqual((self.root / "usr/lib/x86_64-linux-gnu/libLLVM-15.so.1").read_bytes(), b"keep LLVM")
-        self.assertEqual((self.root / "usr/lib/x86_64-linux-gnu/libvulkan_lvp.so").read_bytes(), b"keep Mesa")
+        self.assertEqual((self.root / "usr/lib/x86_64-linux-gnu/libvulkan_lvp.so").read_bytes(), b"patched Lavapipe")
         self.assertEqual((self.root / "usr/lib/x86_64-linux-gnu/libvinix-steam-robust.so").read_bytes(), b"keep robust shim")
         self.assertEqual((self.root / "usr/share/doc/libc6/copyright").read_bytes(), b"package copyright")
 
@@ -170,6 +181,41 @@ class StageTests(unittest.TestCase):
         self.assertEqual((self.root / "lib64/ld-linux-x86-64.so.2").read_bytes(), b"old loader")
         self.assertEqual((self.root / "lib/x86_64-linux-gnu/libc.so.6").read_bytes(), b"old libc.so.6")
         self.assertFalse((self.root / stage.GLIBC_MARKER).exists())
+
+    def test_patched_lavapipe_links_bookworm_libc_and_replaces_only_its_driver(self):
+        self.run_stage()
+        self.assertEqual(self.lavapipe_bases, [b"old libc.so.6"])
+        self.assertTrue(stage.lavapipe_valid(self.root, stage.lavapipe_inputs()))
+        icd = json.loads((self.root / "usr/share/vulkan/icd.d/lvp_icd.x86_64.json").read_text())
+        self.assertEqual(icd["ICD"]["library_path"],
+                         "/usr/libexec/vinix-dota2/root/usr/lib/x86_64-linux-gnu/libvulkan_lvp.so")
+        self.assertEqual((self.root / "usr/lib/x86_64-linux-gnu/libvulkan.so.1").read_bytes(), b"old Vulkan loader")
+
+    def test_replaced_lavapipe_is_not_a_cache_hit(self):
+        self.run_stage()
+        self.run_stage()
+        self.assertEqual(self.lavapipe_bases, [])
+        (self.root / stage.LAVAPIPE_LIBRARY).write_bytes(b"keep Mesa")
+        self.assertFalse(stage.lavapipe_valid(self.root, stage.lavapipe_inputs()))
+        self.run_stage()
+        self.assertEqual((self.root / stage.LAVAPIPE_LIBRARY).read_bytes(), b"patched Lavapipe")
+
+    def test_baseline_option_keeps_debian_lavapipe(self):
+        self.run_stage(["--debian-lavapipe"])
+        self.assertEqual(self.lavapipe_bases, [])
+        self.assertEqual((self.root / stage.LAVAPIPE_LIBRARY).read_bytes(), b"keep Mesa")
+        self.assertFalse((self.root / stage.LAVAPIPE_MARKER).exists())
+        stamp = (self.root / ".vinix-dota2-vulkan-generation").read_text()
+        self.run_stage()
+        self.assertNotEqual((self.root / ".vinix-dota2-vulkan-generation").read_text(), stamp)
+        self.assertEqual((self.root / stage.LAVAPIPE_LIBRARY).read_bytes(), b"patched Lavapipe")
+
+    def test_other_debian_mesa_version_is_rejected(self):
+        with patch.object(stage, "lavapipe_inputs",
+                          return_value={**stage.lavapipe_inputs(), "debian_version": "22.3.6-1+deb12u3"}), \
+                self.assertRaisesRegex(SystemExit, "pinned to 22.3.6-1\\+deb12u3"):
+            self.run_stage()
+        self.assertFalse(self.root.exists())
 
     def test_corrupt_cached_package_fails_before_cloning_payload_into_root(self):
         spec = importlib.util.spec_from_file_location("test_debian_root", REPO / "build-support/debian-root.py")

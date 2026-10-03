@@ -49,6 +49,13 @@ caller. Native ARM64 Venus libraries cannot be loaded by the
 translated x86-64 process. This software path does not provide the GPU
 acceleration used by native OpenGothic.
 
+The staged Lavapipe is rebuilt from Debian's own Mesa 22.3.6 source and
+patches, with one [local patch](../build-support/dota2/mesa/README.md) for null
+descriptor sets. Only `libvulkan_lvp.so` changes; it links against the runtime's
+Debian LLVM 15. `build-dota2-aarch64.sh` cross-builds it with clang, lld, ninja
+and pkg-config, and a private Meson. `vulkan-stage.py --debian-lavapipe` keeps
+Debian's unpatched driver for baseline comparisons.
+
 The default translated CPU is `Haswell`. In the actual Vinix probe, Mesa
 22/LLVM 15 enumerated with QEMU's `max` CPU but aborted at shader compilation
 with `64-bit code requested on a subtarget that doesn't support it`. `Haswell`
@@ -241,7 +248,14 @@ and complete owning mappings locate this fault in Mesa 22.3.6 Lavapipe's
 in `lvp_execute.c`. The instruction reads `set->layout` from a null descriptor
 set (`RDX = 0`, fault address `0x40`). Matching Debian debug symbols confirm
 the source location; the graphics descriptor-set handler already checks for
-null sets. The driver fix is being tested. This launch served 4,808,656,896
+null sets. `VK_EXT_graphics_pipeline_library` makes null sets valid, and the
+staged driver now handles them in both paths. On Vinix, the
+[paired regression](../tests/dota2/README.md) terminated with `SIGSEGV` under
+Debian's driver and an unpatched build from the same source in all three
+null-set modes. The patched driver stored through the correct descriptor slot
+in all four modes. An earlier candidate that only skipped null sets avoided
+one crash but lost the store, because a skipped set moves the sets after it.
+This launch served 4,808,656,896
 bytes with no exporter errors and retained about 5 GiB of available guest
 memory. Its log, captures and failed report are preserved under
 `build/dota2/game-glibc241-local-map-test`.

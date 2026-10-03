@@ -33,3 +33,29 @@ work directory and writes `provenance.json`. A booted run also writes
 A pair which passes on both runtimes fails this regression because the
 negative control did not reproduce the defect. This test verifies libc
 compatibility; it does not establish Dota's environment writer or gameplay.
+
+`lavapipe-run.py` checks Lavapipe's compute descriptor-set binding, which Dota
+reached while loading a local map. With `VK_EXT_graphics_pipeline_library`
+enabled, a program may bind `VK_NULL_HANDLE` sets and its independent-set
+pipeline layouts may omit set layouts. `lavapipe-null-sets.c` binds storage
+buffers in sets 0 and 2 around set 1 and dispatches a hand-assembled SPIR-V
+shader that stores a marker through set 2. Its four modes bind every set,
+bind a null set 1, omit set 1's layout, and bind set 2 in a later call past
+the omitted layout. The marker must reach set 2's buffer and nothing else.
+
+Every driver runs the same probe, Vulkan loader, glibc, translator and kernel
+in one boot. Each `--control` must pass the ordinary binding and terminate with
+`SIGSEGV` in the three null modes; the `--fixed` driver must pass all four.
+
+```sh
+python3 tests/dota2/lavapipe-run.py \
+  --fixed build/dota2-runtime/mesa/out/libvulkan_lvp.so \
+  --control /path/to/debian/libvulkan_lvp.so \
+  --kernel-dir=/path/to/built-aarch64-kernel \
+  --work build/dota2-lavapipe-test/fresh-run
+```
+
+`--runtime-root` selects the private runtime that supplies glibc, the Vulkan
+loader and the drivers' libraries, and `--vulkan-include` the headers from the
+prepared Mesa source. Repeat `--control` to compare several unfixed drivers,
+such as Debian's binary and an unpatched build from the same source.

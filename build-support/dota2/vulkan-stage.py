@@ -29,6 +29,9 @@ EARLY_CLIENT_LIBRARY = "usr/lib/x86_64-linux-gnu/libvinix-dota2-steam-loader.so"
 EARLY_CLIENT_COMPILE = ["clang", "--target=x86_64-linux-gnu", "-fPIC", "-shared",
                         "-nostdlib", "-fuse-ld=lld", "-Wall", "-Wextra", "-Werror",
                         "-Wl,-soname,libvinix-dota2-steam-loader.so"]
+MESA_BUILDER = REPO / "build-support/dota2/mesa-build.py"
+LAVAPIPE_LIBRARY = "usr/lib/x86_64-linux-gnu/libvulkan_lvp.so"
+LAVAPIPE_MARKER = ".vinix-dota2-lavapipe.json"
 
 
 def clone_tree(source: Path, destination: Path) -> None:
@@ -160,6 +163,51 @@ def glibc_package_valid(root: Path, pin: dict) -> bool:
         return False
 
 
+def load_mesa_builder():
+    spec = importlib.util.spec_from_file_location("vinix_dota2_mesa_build", MESA_BUILDER)
+    builder = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = builder
+    spec.loader.exec_module(builder)
+    return builder
+
+
+def lavapipe_inputs() -> dict:
+    builder = load_mesa_builder()
+    inputs = builder.load_inputs()
+    return {"debian_version": inputs["debian_version"], "builder": file_sha256(MESA_BUILDER),
+            "inputs": file_sha256(builder.SUPPORT / "inputs.json"),
+            "patches": {name: file_sha256(builder.SUPPORT / name) for name in inputs["patches"]}}
+
+
+def build_lavapipe(base: Path, work: Path) -> Path:
+    return load_mesa_builder().build(base, work)
+
+
+def stage_lavapipe(selected, root: Path, work: Path, expected: dict) -> None:
+    # Debian's 22.3.6 Lavapipe dereferences null descriptor sets, which Dota
+    # binds for compute while loading a map. Replace only that library, with
+    # one built from the same Debian source and linked against this root.
+    mesa = next(p for p in selected if p.name == "mesa-vulkan-drivers")
+    if mesa.version != expected["debian_version"]:
+        raise SystemExit(f"Debian's mesa-vulkan-drivers is {mesa.version}; the Lavapipe "
+                         f"patch is pinned to {expected['debian_version']}")
+    library = build_lavapipe(root, work)
+    destination = root / LAVAPIPE_LIBRARY
+    shutil.copy2(library, destination)
+    destination.chmod(0o644)
+    marker = {"inputs": expected, "sha256": file_sha256(destination)}
+    (root / LAVAPIPE_MARKER).write_text(json.dumps(marker, sort_keys=True, indent=2) + "\n")
+
+
+def lavapipe_valid(root: Path, expected: dict) -> bool:
+    try:
+        marker = json.loads((root / LAVAPIPE_MARKER).read_text())
+        return (marker["inputs"] == expected and
+                file_sha256(root / LAVAPIPE_LIBRARY) == marker["sha256"])
+    except (OSError, ValueError, KeyError, TypeError):
+        return False
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--steam-build", type=Path, default=REPO / "build-aarch64-steam")
@@ -171,6 +219,8 @@ def main() -> None:
     parser.add_argument("--release", default="bookworm")
     parser.add_argument("--keep-steam-libc", action="store_true",
                         help="retain Steam's original libc for baseline reproductions")
+    parser.add_argument("--debian-lavapipe", action="store_true",
+                        help="retain Debian's unpatched Lavapipe for baseline reproductions")
     args = parser.parse_args()
     steam = args.steam_build.resolve()
     build = args.build.resolve()
@@ -203,11 +253,13 @@ def main() -> None:
     rows = [{"package": p.name, "version": p.version, "filename": p.filename,
              "sha256": p.sha256} for p in selected]
     glibc_pin = None if args.keep_steam_libc else load_glibc_pin()
+    lavapipe = None if args.debian_lavapipe else lavapipe_inputs()
     inputs = {"format": 5, "source": str(source), "guest_root": args.guest_root,
               "release": args.release, "packages": rows,
               "builder_sha256": file_sha256(Path(__file__)),
               "glibc_package": glibc_pin,
               "glibc_alias_policy": GLIBC_ALIAS_POLICY,
+              "lavapipe": lavapipe,
               "amd64": manifest.read_text(),
               "i386": (steam / "i386-packages").read_text(),
               "mmap32_source": hashlib.sha256(MMAP32_SOURCE.read_bytes()).hexdigest(),
@@ -228,7 +280,8 @@ def main() -> None:
     (build / "vulkan-packages.json").write_text(json.dumps(reported_packages, indent=2) + "\n")
     if (stamp.exists() and stamp.read_text().strip() == generation and
             all((root / p).exists() for p in required) and
-            (glibc_pin is None or glibc_package_valid(root, glibc_pin))):
+            (glibc_pin is None or glibc_package_valid(root, glibc_pin)) and
+            (lavapipe is None or lavapipe_valid(root, lavapipe))):
         print(root)
         return
     pending = root.with_name(root.name + f".vulkan-stage-{os.getpid()}")
@@ -238,6 +291,9 @@ def main() -> None:
     for package in selected:
         archive = resolver.download(args.mirror, package, cache)
         resolver.extract_deb(archive, pending)
+    if lavapipe is not None:
+        # Link against Bookworm's libc, before Dota's newer libc replaces it.
+        stage_lavapipe(selected, pending, build / "mesa", lavapipe)
     if glibc_pin is not None:
         stage_glibc_package(resolver, glibc_pin, cache, pending)
     # Resolve libc symbols only inside the translated process. No native
@@ -260,6 +316,8 @@ def main() -> None:
     icd.write_text(json.dumps(data, indent=2) + "\n")
     if glibc_pin is not None and not glibc_package_valid(pending, glibc_pin):
         raise SystemExit("staged Dota libc6 package or loader aliases do not match the pin")
+    if lavapipe is not None and not lavapipe_valid(pending, lavapipe):
+        raise SystemExit("staged Lavapipe does not match its patched build")
     (pending / stamp.name).write_text(generation + "\n")
     if root.exists():
         old = root.with_name(root.name + f".vulkan-old-{os.getpid()}")

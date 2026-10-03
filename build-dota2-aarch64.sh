@@ -13,6 +13,8 @@ case "${1:-}" in
         echo "usage: $0"
         echo "Stages the private x86-64 glibc/Vulkan runtime and run-dota2."
         echo "First build Steam's library layer with ./build-steam-aarch64.sh."
+        echo "Lavapipe is cross-built from Debian's Mesa source with clang, lld, ninja"
+        echo "and pkg-config; VINIX_DOTA2_LLVM_BIN selects the LLVM tools."
         echo "VINIX_DOTA2_BUILD_DIR and VINIX_STEAM_BUILD_DIR override the builds."
         echo "VINIX_DOTA2_QEMU_BUILD_DIR overrides the native translator build cache."
         exit 0
