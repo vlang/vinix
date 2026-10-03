@@ -18,6 +18,7 @@ static size_t (*checked_fread)(void *, size_t, size_t, FILE *, size_t);
 static ssize_t (*checked_readlink)(const char *, char *, size_t, size_t);
 static ssize_t (*checked_sendto)(int, const void *, size_t, size_t, int,
                                  const struct sockaddr *, socklen_t);
+static size_t (*checked_strlcpy)(char *, const char *, size_t, size_t);
 static void (*android_assert)(const char *, int, const char *);
 static FILE *input;
 static char link_path[128];
@@ -53,6 +54,19 @@ static void sendto_overrun(void)
 {
     char buffer[2] = { 0 };
     checked_sendto(sockets[0], buffer, 3, sizeof(buffer), 0, NULL, 0);
+}
+
+static void strlcpy_overrun(void)
+{
+    char buffer[2];
+    // The destination check must abort before it tries to read the source.
+    checked_strlcpy(buffer, NULL, 3, sizeof(buffer));
+}
+
+static void strlcpy_count_overflow(void)
+{
+    char buffer[2];
+    checked_strlcpy(buffer, NULL, SIZE_MAX, sizeof(buffer));
 }
 
 static void assertion_failure(void)
@@ -117,9 +131,10 @@ int main(int argc, char **argv)
     checked_fread = dlsym(RTLD_DEFAULT, "bionic___fread_chk");
     checked_readlink = dlsym(RTLD_DEFAULT, "bionic___readlink_chk");
     checked_sendto = dlsym(RTLD_DEFAULT, "bionic___sendto_chk");
+    checked_strlcpy = dlsym(RTLD_DEFAULT, "bionic___strlcpy_chk");
     android_assert = dlsym(RTLD_DEFAULT, "bionic___assert");
     require(checked_fread != NULL && checked_readlink != NULL && checked_sendto != NULL
-            && android_assert != NULL, "native Android ABI exports");
+            && checked_strlcpy != NULL && android_assert != NULL, "native Android ABI exports");
 
     input = tmpfile();
     require(input != NULL && fwrite("abcdefgh", 1, 8, input) == 8, "fread fixture");
@@ -174,8 +189,33 @@ int main(int argc, char **argv)
     errno = 0;
     require(checked_sendto(-1, target, 2, sizeof(target), 0, NULL, 0) == -1
             && errno == EBADF, "sendto preserves I/O error");
+
+    memset(buffer, '#', sizeof(buffer));
+    errno = E2BIG;
+    require(checked_strlcpy(buffer, "android", 8, 8) == 7
+            && memcmp(buffer, "android\0", 8) == 0 && buffer[8] == '#'
+            && errno == E2BIG, "strlcpy bounded copy and errno");
+    memset(buffer, '#', sizeof(buffer));
+    errno = E2BIG;
+    require(checked_strlcpy(buffer, "android", 4, 4) == 7
+            && memcmp(buffer, "and\0", 4) == 0 && buffer[4] == '#'
+            && errno == E2BIG, "strlcpy truncation and source length");
+    memset(buffer, '#', sizeof(buffer));
+    errno = E2BIG;
+    require(checked_strlcpy(buffer, "android", 0, 0) == 7
+            && buffer[0] == '#' && errno == E2BIG, "strlcpy zero destination bound");
+    require(checked_strlcpy(buffer, "android", 1, 1) == 7
+            && buffer[0] == '\0' && buffer[1] == '#', "strlcpy one-byte destination");
+    memset(buffer, '#', sizeof(buffer));
+    errno = E2BIG;
+    require(checked_strlcpy(buffer, "native", sizeof(buffer), SIZE_MAX) == 6
+            && memcmp(buffer, "native\0", 7) == 0 && buffer[7] == '#'
+            && errno == E2BIG, "strlcpy unknown destination size");
+    require_abort(strlcpy_overrun, "strlcpy rejects undersized destination before copy");
+    require_abort(strlcpy_count_overflow, "strlcpy rejects count above destination size");
+
     require_abort(assertion_failure, "Android assert aborts");
-    printf("ANDROID-FORTIFY-PASS fread=verified readlink=verified sendto=verified assert=verified standard-stream=%s\n",
+    printf("ANDROID-FORTIFY-PASS fread=verified readlink=verified sendto=verified strlcpy=verified assert=verified standard-stream=%s\n",
            standard_stream_checked ? "verified" : "skipped");
     return 0;
 }

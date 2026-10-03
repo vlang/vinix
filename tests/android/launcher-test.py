@@ -123,6 +123,10 @@ class NativeLauncherTest(unittest.TestCase):
             "android-translation-layer",
         ])
         self.assertEqual(calls[-1]["argv"][4:], [
+            "-X", "-Djavax.net.ssl.trustStore="
+            + str(self.runtime / "etc/ssl/certs/java/cacerts"),
+            "-X", "-Djavax.net.ssl.trustStoreType=JKS",
+            "-X", "-Djavax.net.ssl.trustStorePassword=changeit",
             str(self.apk), *options, "-X", "-Xnoimage-dex2oat", "-X", "-Xusejit:false",
         ])
         for call in calls:
@@ -146,6 +150,22 @@ class NativeLauncherTest(unittest.TestCase):
                 self.assertNotIn(key, env)
         self.assertEqual((self.directory / "session").stat().st_mode & 0o777, 0o700)
         self.assertTrue((self.home / ".local/share/vinix/android").is_dir())
+
+    def test_explicit_trust_properties_follow_private_defaults(self) -> None:
+        custom = self.directory / "caller trusted roots.jks"
+        properties = ["-X", "-Djavax.net.ssl.trustStore=" + str(custom),
+                      "-X", "-Djavax.net.ssl.trustStoreType=PKCS12",
+                      "-X", "-Djavax.net.ssl.trustStorePassword=caller-password"]
+        result = self.launch(str(self.apk), *properties)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        arguments = self.executions()[-1]["argv"][4:]
+        self.assertEqual(arguments[:6], [
+            "-X", "-Djavax.net.ssl.trustStore="
+            + str(self.runtime / "etc/ssl/certs/java/cacerts"),
+            "-X", "-Djavax.net.ssl.trustStoreType=JKS",
+            "-X", "-Djavax.net.ssl.trustStorePassword=changeit",
+        ])
+        self.assertEqual(arguments[6:13], [str(self.apk), *properties])
 
     def test_existing_caches_skip_helpers_and_propagate_runtime_exit(self) -> None:
         for relative in (

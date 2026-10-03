@@ -21,3 +21,272 @@ diff --git a/libc/libc.c b/libc/libc.c
 +#undef PAGE_SIZE
 +#define PAGE_SIZE BIONIC_PAGE_SIZE
 +#elif !defined(PAGE_SIZE)
+diff --git a/linker/linker_debug.h b/linker/linker_debug.h
+--- a/linker/linker_debug.h
++++ b/linker/linker_debug.h
+@@ -70,2 +70,5 @@
+-#define _PRINTVF(v, x...)					 \
+-		android_log_printf((v), "[bionic_linker]", x);
++#define _PRINTVF(v, x...)                      \
++	do {                                      \
++		if (apkenv_debug_verbosity > (v)) \
++			android_log_printf((v), "[bionic_linker]", x); \
++	} while (0)
+@@ -83,0 +87,8 @@
++
++/* Opt-in progress and constructor diagnostics leave normal loads quiet. */
++int apkenv_linker_diagnostics_enabled(void);
++#define LINKER_DIAGNOSTIC(x...)                \
++	do {                                      \
++		if (apkenv_linker_diagnostics_enabled()) \
++			fprintf(stderr, "VINIX-ANDROID-LINKER " x); \
++	} while (0)
+diff --git a/linker/linker.c b/linker/linker.c
+--- a/linker/linker.c
++++ b/linker/linker.c
+@@ -161,0 +162,6 @@
++
++int apkenv_linker_diagnostics_enabled(void)
++{
++	const char *value = getenv("VINIX_ANDROID_LINKER_DIAGNOSTICS");
++	return value != NULL && strcmp(value, "1") == 0;
++}
+@@ -2148,0 +2155,2 @@
++	LINKER_DIAGNOSTIC("relocations-begin library=%s count=%zu packed_bytes=%zu\n",
++	                  si->name, num_relocs, packed_relocs_size);
+@@ -2205 +2213 @@
+-			fprintf(stderr, "calling apkenv_reloc_library with packed reloc: {.offset = 0x%lx, .r_info = 0x%lx, .r_addend = 0x%lx}\n", reloc.r_offset, reloc.r_info, reloc.r_addend);
++			TRACE("calling apkenv_reloc_library with packed reloc: {.offset = 0x%lx, .r_info = 0x%lx, .r_addend = 0x%lx}\n", reloc.r_offset, reloc.r_info, reloc.r_addend);
+@@ -2207 +2215 @@
+-			fprintf(stderr, "calling apkenv_reloc_library with packed reloc: {.offset = 0x%lx, .r_info = 0x%lx}\n", reloc.r_offset, reloc.r_info);
++			TRACE("calling apkenv_reloc_library with packed reloc: {.offset = 0x%lx, .r_info = 0x%lx}\n", reloc.r_offset, reloc.r_info);
+@@ -2211,0 +2220,3 @@
++			if (((idx + i + 1) & 65535) == 0)
++				LINKER_DIAGNOSTIC("relocations-progress library=%s completed=%zu/%zu\n",
++				                  si->name, idx + i + 1, num_relocs);
+@@ -2216,0 +2228 @@
++	LINKER_DIAGNOSTIC("relocations-complete library=%s count=%zu\n", si->name, num_relocs);
+@@ -2254 +2266 @@
+-static void apkenv_call_array(intptr_t *ctor, int count, int reverse)
++static void apkenv_call_array(soinfo *si, const char *kind, intptr_t *ctor, int count, int reverse)
+@@ -2271,0 +2284,3 @@
++		LINKER_DIAGNOSTIC("array-call library=%s kind=%s index=%d/%d address=%p offset=0x%lx\n",
++		                  si->name, kind, reverse ? n - 1 : count - n, count,
++		                  (void *)func, (unsigned long)((uintptr_t)func - si->base));
+@@ -2273,0 +2289 @@
++	LINKER_DIAGNOSTIC("array-complete library=%s kind=%s count=%d\n", si->name, kind, count);
+@@ -2292,0 +2309 @@
++	LINKER_DIAGNOSTIC("constructors-begin library=%s base=0x%lx\n", si->name, si->base);
+@@ -2297 +2314 @@
+-	apkenv_call_array(si->preinit_array, si->preinit_array_count, 0);
++	apkenv_call_array(si, "preinit", si->preinit_array, si->preinit_array_count, 0);
+@@ -2316,0 +2334,2 @@
++		LINKER_DIAGNOSTIC("init-call library=%s address=%p offset=0x%lx\n", si->name,
++		                  (void *)si->init_func, (unsigned long)((uintptr_t)si->init_func - si->base));
+@@ -2324 +2343 @@
+-		apkenv_call_array(si->init_array, si->init_array_count, 0);
++		apkenv_call_array(si, "init", si->init_array, si->init_array_count, 0);
+@@ -2326,0 +2346 @@
++	LINKER_DIAGNOSTIC("constructors-complete library=%s\n", si->name);
+@@ -2334 +2354 @@
+-		apkenv_call_array(si->fini_array, si->fini_array_count, 1);
++		apkenv_call_array(si, "fini", si->fini_array, si->fini_array_count, 1);
+diff --git a/linker/dlfcn.c b/linker/dlfcn.c
+--- a/linker/dlfcn.c
++++ b/linker/dlfcn.c
+@@ -67,0 +68 @@
++	LINKER_DIAGNOSTIC("dlopen-wait file=%s flags=%d\n", filename ? filename : "(null)", flag);
+@@ -68,0 +70 @@
++	LINKER_DIAGNOSTIC("dlopen-locked file=%s\n", filename ? filename : "(null)");
+@@ -70,0 +73,2 @@
++	LINKER_DIAGNOSTIC("dlopen-linked file=%s handle=%p host=%p\n",
++	                  filename ? filename : "(null)", (void *)ret, glibc_handle);
+@@ -80,0 +85 @@
++	LINKER_DIAGNOSTIC("dlopen-complete file=%s handle=%p\n", filename ? filename : "(null)", (void *)ret);
+diff --git a/libc/libc.c b/libc/libc.c
+--- a/libc/libc.c
++++ b/libc/libc.c
+@@ -422,0 +423,108 @@
++/* Android's public netdb flags and EAI enum are a different ABI from
++ * glibc/musl. Keep translation at the Bionic boundary; native ART continues
++ * to use its host constants and result codes. */
++enum {
++	BIONIC_AI_PASSIVE = 1, BIONIC_AI_CANONNAME = 2,
++	BIONIC_AI_NUMERICHOST = 4, BIONIC_AI_NUMERICSERV = 8,
++	BIONIC_AI_ALL = 0x100, BIONIC_AI_ADDRCONFIG = 0x400,
++	BIONIC_AI_V4MAPPED = 0x800,
++	BIONIC_NI_NOFQDN = 1, BIONIC_NI_NUMERICHOST = 2,
++	BIONIC_NI_NAMEREQD = 4, BIONIC_NI_NUMERICSERV = 8,
++	BIONIC_NI_DGRAM = 16, BIONIC_NI_WITHSCOPEID = 32,
++	BIONIC_EAI_ADDRFAMILY = 1, BIONIC_EAI_AGAIN = 2,
++	BIONIC_EAI_BADFLAGS = 3, BIONIC_EAI_FAIL = 4,
++	BIONIC_EAI_FAMILY = 5, BIONIC_EAI_MEMORY = 6,
++	BIONIC_EAI_NODATA = 7, BIONIC_EAI_NONAME = 8,
++	BIONIC_EAI_SERVICE = 9, BIONIC_EAI_SOCKTYPE = 10,
++	BIONIC_EAI_SYSTEM = 11, BIONIC_EAI_BADHINTS = 12,
++	BIONIC_EAI_PROTOCOL = 13, BIONIC_EAI_OVERFLOW = 14
++};
++
++static int bionic_eai_from_host(int error)
++{
++	if (!error) return 0;
++	if (error == EAI_AGAIN) return BIONIC_EAI_AGAIN;
++	if (error == EAI_BADFLAGS) return BIONIC_EAI_BADFLAGS;
++	if (error == EAI_FAIL) return BIONIC_EAI_FAIL;
++	if (error == EAI_FAMILY) return BIONIC_EAI_FAMILY;
++	if (error == EAI_MEMORY) return BIONIC_EAI_MEMORY;
++	if (error == EAI_NONAME) return BIONIC_EAI_NONAME;
++	if (error == EAI_SERVICE) return BIONIC_EAI_SERVICE;
++	if (error == EAI_SOCKTYPE) return BIONIC_EAI_SOCKTYPE;
++	if (error == EAI_SYSTEM) return BIONIC_EAI_SYSTEM;
++	if (error == EAI_OVERFLOW) return BIONIC_EAI_OVERFLOW;
++#ifdef EAI_ADDRFAMILY
++	if (error == EAI_ADDRFAMILY) return BIONIC_EAI_ADDRFAMILY;
++#endif
++#ifdef EAI_NODATA
++	if (error == EAI_NODATA) return BIONIC_EAI_NODATA;
++#endif
++#ifdef EAI_BADHINTS
++	if (error == EAI_BADHINTS) return BIONIC_EAI_BADHINTS;
++#endif
++#ifdef EAI_PROTOCOL
++	if (error == EAI_PROTOCOL) return BIONIC_EAI_PROTOCOL;
++#endif
++	return BIONIC_EAI_FAIL;
++}
++
++const char *bionic_gai_strerror(int error)
++{
++	switch (error) {
++	case 0: return "Success";
++#ifdef EAI_ADDRFAMILY
++	case BIONIC_EAI_ADDRFAMILY: return gai_strerror(EAI_ADDRFAMILY);
++#else
++	case BIONIC_EAI_ADDRFAMILY: return gai_strerror(EAI_FAMILY);
++#endif
++	case BIONIC_EAI_AGAIN: return gai_strerror(EAI_AGAIN);
++	case BIONIC_EAI_BADFLAGS: return gai_strerror(EAI_BADFLAGS);
++	case BIONIC_EAI_FAIL: return gai_strerror(EAI_FAIL);
++	case BIONIC_EAI_FAMILY: return gai_strerror(EAI_FAMILY);
++	case BIONIC_EAI_MEMORY: return gai_strerror(EAI_MEMORY);
++#ifdef EAI_NODATA
++	case BIONIC_EAI_NODATA: return gai_strerror(EAI_NODATA);
++#else
++	case BIONIC_EAI_NODATA: return gai_strerror(EAI_NONAME);
++#endif
++	case BIONIC_EAI_NONAME: return gai_strerror(EAI_NONAME);
++	case BIONIC_EAI_SERVICE: return gai_strerror(EAI_SERVICE);
++	case BIONIC_EAI_SOCKTYPE: return gai_strerror(EAI_SOCKTYPE);
++	case BIONIC_EAI_SYSTEM: return gai_strerror(EAI_SYSTEM);
++	case BIONIC_EAI_BADHINTS: return "Invalid value for hints";
++	case BIONIC_EAI_PROTOCOL: return "Resolved protocol is unknown";
++	case BIONIC_EAI_OVERFLOW: return gai_strerror(EAI_OVERFLOW);
++	default: return "Unknown error";
++	}
++}
++
++int bionic_getnameinfo(const struct sockaddr *address, socklen_t length,
++	char *host, size_t host_length, char *service, size_t service_length,
++	int flags)
++{
++	const int known = BIONIC_NI_NOFQDN | BIONIC_NI_NUMERICHOST |
++		BIONIC_NI_NAMEREQD | BIONIC_NI_NUMERICSERV | BIONIC_NI_DGRAM |
++		BIONIC_NI_WITHSCOPEID;
++	if (flags & ~known) return BIONIC_EAI_BADFLAGS;
++	int host_flags = 0;
++	if (flags & BIONIC_NI_NOFQDN) host_flags |= NI_NOFQDN;
++	if (flags & BIONIC_NI_NUMERICHOST) host_flags |= NI_NUMERICHOST;
++	if (flags & BIONIC_NI_NAMEREQD) host_flags |= NI_NAMEREQD;
++	if (flags & BIONIC_NI_NUMERICSERV) host_flags |= NI_NUMERICSERV;
++	if (flags & BIONIC_NI_DGRAM) host_flags |= NI_DGRAM;
++	/* glibc/musl already append a scoped numeric IPv6 address's interface
++	 * identifier. Platforms with an explicit scope flag receive it too. */
++#ifdef NI_WITHSCOPEID
++	if (flags & BIONIC_NI_WITHSCOPEID) host_flags |= NI_WITHSCOPEID;
++#endif
++	/* Android's LP64 ABI uses size_t for these bounds; the host uses
++	 * socklen_t. Capping a wider bound preserves every possible resolver
++	 * output while preventing a valid large bound from wrapping to zero. */
++#if SIZE_MAX > UINT_MAX
++	if (host_length > UINT_MAX) host_length = UINT_MAX;
++	if (service_length > UINT_MAX) service_length = UINT_MAX;
++#endif
++	return bionic_eai_from_host(getnameinfo(address, length, host,
++		(socklen_t)host_length, service, (socklen_t)service_length, host_flags));
++}
++
+@@ -437 +545 @@
+-	struct addrinfo hints;
++	struct addrinfo hints = {0};
+@@ -439,3 +547,15 @@
+-		memcpy(&hints, bionic_hints, sizeof(hints));
+-		hints.ai_canonname = bionic_hints->ai_canonname;
+-		hints.ai_addr = bionic_hints->ai_addr;
++		int flags = bionic_hints->ai_flags;
++		const int known = BIONIC_AI_PASSIVE | BIONIC_AI_CANONNAME |
++			BIONIC_AI_NUMERICHOST | BIONIC_AI_NUMERICSERV |
++			BIONIC_AI_ALL | BIONIC_AI_ADDRCONFIG | BIONIC_AI_V4MAPPED;
++		if (flags & ~known) return BIONIC_EAI_BADFLAGS;
++		if (flags & BIONIC_AI_PASSIVE) hints.ai_flags |= AI_PASSIVE;
++		if (flags & BIONIC_AI_CANONNAME) hints.ai_flags |= AI_CANONNAME;
++		if (flags & BIONIC_AI_NUMERICHOST) hints.ai_flags |= AI_NUMERICHOST;
++		if (flags & BIONIC_AI_NUMERICSERV) hints.ai_flags |= AI_NUMERICSERV;
++		if (flags & BIONIC_AI_ALL) hints.ai_flags |= AI_ALL;
++		if (flags & BIONIC_AI_ADDRCONFIG) hints.ai_flags |= AI_ADDRCONFIG;
++		if (flags & BIONIC_AI_V4MAPPED) hints.ai_flags |= AI_V4MAPPED;
++		hints.ai_family = bionic_hints->ai_family;
++		hints.ai_socktype = bionic_hints->ai_socktype;
++		hints.ai_protocol = bionic_hints->ai_protocol;
+@@ -455 +575 @@
+-	return result;
++	return bionic_eai_from_host(result);
+diff --git a/linker/dlfcn.c b/linker/dlfcn.c
+--- a/linker/dlfcn.c
++++ b/linker/dlfcn.c
+@@ -55 +55,25 @@
+-static pthread_mutex_t apkenv_dl_lock = PTHREAD_MUTEX_INITIALIZER;
++/* Constructors may legitimately call dlopen/dlsym/dlclose recursively. */
++static pthread_mutex_t apkenv_dl_lock;
++static pthread_once_t apkenv_dl_lock_once = PTHREAD_ONCE_INIT;
++
++static void apkenv_init_dl_lock(void)
++{
++	pthread_mutexattr_t attributes;
++	int error = pthread_mutexattr_init(&attributes);
++	if (error == 0) {
++		error = pthread_mutexattr_settype(&attributes, PTHREAD_MUTEX_RECURSIVE);
++		if (error == 0)
++			error = pthread_mutex_init(&apkenv_dl_lock, &attributes);
++		pthread_mutexattr_destroy(&attributes);
++	}
++	if (error != 0) {
++		fprintf(stderr, "bionic loader mutex initialization failed: %s\n", strerror(error));
++		abort();
++	}
++}
++
++static void apkenv_lock_loader(void)
++{
++	pthread_once(&apkenv_dl_lock_once, apkenv_init_dl_lock);
++	pthread_mutex_lock(&apkenv_dl_lock);
++}
+@@ -69 +93 @@
+-	pthread_mutex_lock(&apkenv_dl_lock);
++	apkenv_lock_loader();
+@@ -128 +152 @@
+-	pthread_mutex_lock(&apkenv_dl_lock);
++	apkenv_lock_loader();
+@@ -207 +231 @@
+-	pthread_mutex_lock(&apkenv_dl_lock);
++	apkenv_lock_loader();
+@@ -248 +272 @@
+-	pthread_mutex_lock(&apkenv_dl_lock);
++	apkenv_lock_loader();
+diff --git a/linker/dlfcn.c b/linker/dlfcn.c
+--- a/linker/dlfcn.c
++++ b/linker/dlfcn.c
+@@ -100,0 +101,2 @@
++		/* Retain before callbacks can open and close this same DSO. */
++		ret->refcount++;
+@@ -102 +103,0 @@
+-		ret->refcount++;

@@ -5,9 +5,10 @@ export HOME=/root USER=root LOGNAME=root SHELL=/bin/sh TERM=linux
 export LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules
 export XDG_RUNTIME_DIR=/run/user/0
 . /opt/android-test/config.sh
-export VINIX_ANDROID_EXPECTED_RESULT VINIX_ROBLOX_APK
+export VINIX_ANDROID_EXPECTED_RESULT VINIX_ROBLOX_APK VINIX_ANDROID_LINKER_DIAGNOSTICS
 
 application_logs() {
+    [ "${TEST_INTERACTIVE:-0}" = 1 ] && return
     for log in /tmp/android-boot-probe.log /tmp/android-launch.log /tmp/android-desktop.log /tmp/android-text.log \
         /tmp/vinix-"$TEST_HOSTED_NAME"-*.log /run/vinix-hosted-x11/vinix-"$TEST_HOSTED_NAME"-*.log; do
         [ -f "$log" ] || continue
@@ -32,6 +33,7 @@ application_logs() {
     done
 }
 diagnostics() {
+    [ "${TEST_INTERACTIVE:-0}" = 1 ] && return
     echo ANDROID-DIAGNOSTICS-BEGIN
     uname -a
     ps
@@ -42,6 +44,9 @@ diagnostics() {
 fail() {
     echo "ANDROID-FAIL $*"
     diagnostics
+    if [ "${TEST_INTERACTIVE:-0}" = 1 ]; then
+        while :; do sleep 30; done
+    fi
     exec /bin/sh </dev/console >/dev/console 2>&1
 }
 
@@ -83,7 +88,11 @@ else
             "$runtime/usr/libexec/vinix-android/atl-configuration-test" || exit 1
         "$loader" --library-path "$LD_LIBRARY_PATH" /opt/android-test/runtime-fortify-probe \
             "$runtime/usr/lib/libvinix-android-compat.so" "$runtime/usr/lib/libc_bio.so.0" || exit 1
-    ) || fail "native ART stack, memory, fork callback, configuration or fortified I/O prerequisites failed"
+        "$loader" --library-path "$LD_LIBRARY_PATH" /opt/android-test/runtime-mallinfo-probe \
+            "$runtime/usr/lib/libvinix-android-compat.so" || exit 1
+        "$loader" --library-path "$LD_LIBRARY_PATH" /opt/android-test/runtime-netdb-probe \
+            "$runtime/usr/lib/libc_bio.so.0" || exit 1
+    ) || fail "native ART stack, memory, fork callback, configuration, fortified I/O, allocator or netdb prerequisites failed"
 fi
 if [ -n "${TEST_ART_BOOT_PROBE:-}" ]; then
     [ "$TEST_RUNTIME_ARCH" = aarch64 ] || fail "Java bootclasspath probe requires native ARM64 ART"
@@ -110,8 +119,90 @@ if [ -n "${TEST_ART_BOOT_PROBE:-}" ]; then
         || fail "native Java bootclasspath probe did not report its assertions passing"
     echo ANDROID-BOOTCLASSPATH-VERIFIED
 fi
+if [ -n "${TEST_LAYOUT_PROBE:-}" ]; then
+    echo ANDROID-LAYOUT-FOCUS-START
+    (
+        runtime=/opt/vinix-android-aarch64
+        unset ANDROID_ROOT ANDROID_DATA LD_LIBRARY_PATH LD_PRELOAD
+        export VINIX_ALLOW_WX=1
+        export LD_LIBRARY_PATH="$runtime/lib:$runtime/usr/lib:$runtime/usr/lib/art:$runtime/usr/lib/java/dex/art/natives"
+        export LD_PRELOAD="$runtime/usr/lib/libvinix-android-compat.so"
+        framework="$runtime/usr/lib/java/dex/android_translation_layer"
+        for icu_data_file in "$runtime"/usr/share/icu/*/icudt*l.dat; do
+            if [ -f "$icu_data_file" ]; then
+                export ICU_DATA="${icu_data_file%/*}"
+                break
+            fi
+        done
+        exec "$runtime/lib/ld-musl-aarch64.so.1" --library-path "$LD_LIBRARY_PATH" \
+            "$runtime/usr/bin/dalvikvm" -Xnoimage-dex2oat -Xusejit:false \
+            -cp "$TEST_LAYOUT_PROBE:$framework/api-impl.jar:$framework/gstub.jar:$framework/ghax.jar" \
+            android.view.AndroidLayoutFocusProbe
+    ) >/tmp/android-layout-focus-probe.log 2>&1 || {
+        cat /tmp/android-layout-focus-probe.log
+        fail "native framework layout focus probe failed"
+    }
+    cat /tmp/android-layout-focus-probe.log
+    grep -q '^ANDROID-LAYOUT-FOCUS-PASS ' /tmp/android-layout-focus-probe.log \
+        || fail "native framework layout focus probe did not report its assertions passing"
+    echo ANDROID-LAYOUT-FOCUS-VERIFIED
+fi
+if [ -n "${TEST_BIONIC_LOADER_PROBE:-}" ]; then
+    (
+        runtime=/opt/vinix-android-aarch64
+        unset LD_LIBRARY_PATH LD_PRELOAD
+        export LD_LIBRARY_PATH="$runtime/lib:$runtime/usr/lib"
+        export LD_PRELOAD="$runtime/usr/lib/libvinix-android-compat.so"
+        export BIONIC_LD_LIBRARY_PATH="$TEST_BIONIC_LOADER_PROBE"
+        "$runtime/lib/ld-musl-aarch64.so.1" --library-path "$LD_LIBRARY_PATH" \
+            "$TEST_BIONIC_LOADER_PROBE/loader-test" "$runtime/usr/lib/libdl_bio.so.0" \
+            "$TEST_BIONIC_LOADER_PROBE/packed-relocation-probe.so"
+    ) || fail "packed relocations or nested native loader callbacks failed"
+    echo ANDROID-BIONIC-LOADER-VERIFIED
+fi
 [ -x /usr/bin/run-android ] || fail "run-android is missing"
 [ -f "$TEST_APK" ] || fail "APK is missing: $TEST_APK"
+
+if [ "$TEST_DESKTOP_APP" = Roblox ] || [ -n "${TEST_TLS_PROBE:-}" ]; then
+    # DHCP publishes the resolver file asynchronously. Launching the online
+    # client before that write can cache a failed first lookup in Java.
+    i=0
+    while ! grep -q '^nameserver ' /etc/resolv.conf 2>/dev/null; do
+        [ "$i" -lt 30 ] || fail "guest DHCP did not publish DNS configuration"
+        sleep 1
+        i=$((i + 1))
+    done
+    echo "ANDROID-NETWORK-READY wait_seconds=$i"
+fi
+
+if [ -n "${TEST_TLS_PROBE:-}" ]; then
+    echo ANDROID-TLS-START
+    (
+        runtime=/opt/vinix-android-aarch64
+        unset ANDROID_ROOT ANDROID_DATA LD_LIBRARY_PATH LD_PRELOAD
+        export VINIX_ALLOW_WX=1
+        export LD_LIBRARY_PATH="$runtime/lib:$runtime/usr/lib:$runtime/usr/lib/art:$runtime/usr/lib/java/dex/art/natives"
+        export LD_PRELOAD="$runtime/usr/lib/libvinix-android-compat.so"
+        for icu_data_file in "$runtime"/usr/share/icu/*/icudt*l.dat; do
+            if [ -f "$icu_data_file" ]; then
+                export ICU_DATA="${icu_data_file%/*}"
+                break
+            fi
+        done
+        exec "$runtime/lib/ld-musl-aarch64.so.1" --library-path "$LD_LIBRARY_PATH" \
+            "$runtime/usr/bin/dalvikvm" -Xnoimage-dex2oat -Xusejit:false \
+            "-Djavax.net.ssl.trustStore=$runtime/etc/ssl/certs/java/cacerts" \
+            -Djavax.net.ssl.trustStoreType=JKS -Djavax.net.ssl.trustStorePassword=changeit \
+            -cp "$TEST_TLS_PROBE" AndroidTlsProbe
+    ) >/tmp/android-tls-probe.log 2>&1 || {
+        cat /tmp/android-tls-probe.log
+        fail "native Java HTTPS trust probe failed"
+    }
+    cat /tmp/android-tls-probe.log
+    grep -q '^ANDROID-TLS-PASS ' /tmp/android-tls-probe.log \
+        || fail "native Java HTTPS trust probe did not report its assertions passing"
+    echo ANDROID-TLS-VERIFIED
+fi
 
 if [ "$TEST_MODE" = direct ]; then
     mkfifo /tmp/android-events
@@ -180,6 +271,13 @@ if [ "$TEST_MODE" = direct ]; then
 fi
 rm -f /tmp/android-result
 echo ANDROID-READY
+if [ "${TEST_INTERACTIVE:-0}" = 1 ]; then
+    echo "ANDROID-INTERACTIVE functionality=unchecked"
+    # The desktop owns /dev/console for its keyboard. A second shell on that
+    # console would consume the user's login input. Keep init quiet instead.
+    while kill -0 "$app_pid" 2>/dev/null; do sleep 1; done
+    fail "application host exited during interactive session"
+fi
 if [ "$TEST_OBSERVE" = 1 ]; then
     i=0
     while [ "$i" -lt "$TEST_OBSERVATION_SECONDS" ]; do

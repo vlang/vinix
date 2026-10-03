@@ -64,6 +64,12 @@ def main() -> int:
     parser.add_argument("--build-dir", type=Path,
                         default=Path(os.environ.get("VINIX_MUSL_BUILD_DIR", ROOT / "build/musl")))
     parser.add_argument("--cc", help="target Linux C compiler command")
+    parser.add_argument("--extra-patch", type=Path, action="append", default=[],
+                        help="additional source patch for a private runtime, recorded in the build receipt")
+    parser.add_argument("--max-page-size", type=int,
+                        help="minimum ELF load-segment alignment for a private runtime")
+    parser.add_argument("--require-export", action="append", default=[],
+                        help="fail if a private runtime API is absent from the rebuilt libc")
     parser.add_argument("--jobs", type=int,
                         default=int(os.environ.get("NPROC", "8")))
     args = parser.parse_args()
@@ -72,6 +78,9 @@ def main() -> int:
         parser.error("staging must be an existing Alpine root for the requested architecture")
     if args.jobs < 1:
         parser.error("jobs must be positive")
+    if args.max_page_size is not None and (args.max_page_size < 4096 or
+                                          args.max_page_size & (args.max_page_size - 1)):
+        parser.error("max-page-size must be a power of two of at least 4096")
     if os.environ.get("VINIX_OPTIMIZED_MUSL", "1") == "0":
         print("    keeping Alpine's packaged musl (VINIX_OPTIMIZED_MUSL=0)")
         return 0
@@ -113,9 +122,14 @@ def main() -> int:
             raise RuntimeError(f"Alpine musl patch checksum mismatch: {patch}")
         patches.append(patch)
     patches.append(SUPPORT / "malloc-retain.patch")
+    patches.extend(path.expanduser().resolve(strict=True) for path in args.extra_patch)
+    if len({path.name for path in patches}) != len(patches):
+        parser.error("patch filenames must be distinct")
     patch_inputs = [(p.name, p.read_bytes()) for p in patches]
     cflags = f"-fstack-protector-strong -DVINIX_MALLOC_RETAIN={retain}"
     ldflags = f"-Wl,-soname,libc.musl-{args.arch}.so.1"
+    if args.max_page_size is not None:
+        ldflags += f" -Wl,-z,max-page-size={args.max_page_size}"
     optimization = "internal,malloc,malloc/mallocng/*.c,string"
     manifest = {"version": VERSION, "alpine_package": package,
                 "arch": args.arch, "source_url": SOURCE_URL,
@@ -203,6 +217,9 @@ def main() -> int:
         missing = exports(loader) - exports(objects / "lib/libc.so")
         if missing:
             raise RuntimeError("rebuilt libc would remove existing exports: " + ", ".join(sorted(missing)))
+        missing = set(args.require_export) - exports(objects / "lib/libc.so")
+        if missing:
+            raise RuntimeError("rebuilt libc lacks required runtime exports: " + ", ".join(sorted(missing)))
         install(objects / "lib/libc.so", stage / f"lib/ld-musl-{args.arch}.so.1", 0o755)
         replace_link(stage / f"lib/libc.musl-{args.arch}.so.1", f"ld-musl-{args.arch}.so.1")
         if (stage / "usr/include/stdlib.h").is_file():

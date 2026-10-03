@@ -494,3 +494,34 @@
 - */
 -int32_t AConfiguration_isBetterThan(AConfiguration *base, AConfiguration *test,
 -                                    AConfiguration *requested);
+--- a/src/api-impl/android/view/LayoutInflater.java
++++ b/src/api-impl/android/view/LayoutInflater.java
+@@ -257,0 +258,1 @@
++		boolean pendingRequestFocus = false;
+@@ -271,2 +272,2 @@
+-				throw new Exception("<requestFocus /> not supported atm");
+-				// parseRequestFocus(parser, parent);
++				pendingRequestFocus = true;
++				consumeChildElements(parser);
+@@ -301,0 +303,4 @@
++		// Children are attached before restoring focus, regardless of tag order.
++		if (pendingRequestFocus)
++			parent.restoreDefaultFocus();
++
+@@ -303,0 +309,10 @@
++	}
++
++	private static void consumeChildElements(XmlPullParser parser) throws Exception {
++		final int depth = parser.getDepth();
++		int type;
++		while (((type = parser.next()) != XmlPullParser.END_TAG
++		        || parser.getDepth() > depth)
++		       && type != XmlPullParser.END_DOCUMENT) {
++			// A requestFocus tag is metadata; none of its children are views.
++		}
+--- a/src/api-impl/android/view/View.java
++++ b/src/api-impl/android/view/View.java
+@@ -1293,0 +1294,3 @@
++	public boolean restoreDefaultFocus() {
++		return requestFocus(View.FOCUS_DOWN);
++	}

@@ -33,7 +33,7 @@ apk add --upgrade build-base bash python3 zip curl pkgconf patch \
 ln -sf python3 /usr/bin/python
 ```
 
-The tested runtime ABI uses musl `1.2.6-r4`, GCC/libstdc++ `15.2.0-r9`,
+The pinned dependency ABI uses musl `1.2.6-r4`, GCC/libstdc++ `15.2.0-r9`,
 ICU `78.1-r0` and VIXL `8.0.0-r0`. Match the package lock when rebuilding;
 the build script and manifest record the exact source, patch, compiler and
 dependency packages. `--dependency-cache DIR` records available package
@@ -88,6 +88,19 @@ to APK processes. It installs no CPU translator. `packages.lock.json`,
 `bionic-runtime-manifest.json` and `atl-runtime-manifest.json` preserve provenance.
 `--update-lock` explicitly regenerates the Alpine package selection.
 
+The private libc is rebuilt from checksum-pinned musl 1.2.6 with the recorded
+Alpine patches, heap retention and Android allocation accounting. Its build
+must preserve the packaged libc's exports and use 16 KiB-compatible ELF
+segments. `usr/share/vinix/musl-build.json` records its source, patch and payload
+hashes; Android, Roblox and desktop staging verify that receipt.
+
+Android's 80-byte ARM64 `mallinfo` reports actual live payload bytes, reusable
+slot capacity, anonymous allocation-group mappings and peak mapped bytes.
+Allocator metadata arenas are excluded. This private allocator leaves unused
+ELF image-page space with its image so borrowed library backing cannot distort
+heap statistics. Counters and allocation state share musl's fork lock. The
+ordinary desktop allocator keeps its existing behavior.
+
 Open **Android Calculator** from Start or Quick Launch. The sample is the
 developer's unchanged Arity 1.1 APK, extracted from its
 [official source archive](https://code.google.com/archive/p/arity-calculator/).
@@ -126,13 +139,17 @@ an architecture-specific native payload. Modern Android APIs, services and
 resource qualifiers can require additional ATL implementation; the presence
 of an APK launcher does not establish compatibility with every application.
 The unchanged Roblox 2.738.1397 APK initializes its content providers and
-reaches its ARM64 engine load through native ATL/ART. The coherent framework,
-fork callbacks, real NDK configuration API and fortified I/O wrappers resolve
-its earlier startup dependencies. The measured native guest launch now stops
-at the missing `mallinfo` allocator statistics API. The engine consumes its
-live, free and high-water allocation fields; musl has no public implementation
-of that Android ABI. No native Roblox application frame, authentication or
-gameplay has been verified. The [Roblox desktop entry](roblox.md) uses this
+completes the ARM64 engine's `JNI_OnLoad` through native ATL/ART. The coherent
+framework, fork callbacks, real NDK configuration API, fortified I/O wrappers
+and private allocator statistics resolve its earlier missing native imports.
+Android resolver flags and EAI errors are translated at the Bionic boundary;
+its native loader permits recursive constructor loads and retains the DSO
+through callbacks. The launcher selects the private JKS trust store for Java
+HTTPS. Native Vinix fixtures verify real public HTTPS and rejection of an
+untrusted local certificate. XML `<requestFocus />` tags are consumed during
+inflation and restore focus once children attach, respecting hidden views. The latest client launch then
+aborts on the missing `View.OnCapturedPointerListener` API. A usable Roblox
+screen, authentication and gameplay remain unverified. The [Roblox desktop entry](roblox.md) uses this
 same native ATL/ART runtime.
 
 Run the real guest test after building the runtime, desktop and kernel:
@@ -141,6 +158,7 @@ Run the real guest test after building the runtime, desktop and kernel:
 python3 tests/android/launcher-test.py
 python3 tests/android/art-runtime-test.py
 python3 tests/android/bootclasspath-test.py
+python3 tests/android/musl-runtime-test.py
 python3 tests/android/run.py --memory 12288
 ```
 

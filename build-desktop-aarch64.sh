@@ -716,16 +716,21 @@ spec = importlib.util.spec_from_file_location("vinix_art_runtime", support / "ar
 assert spec and spec.loader
 art = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(art)
+spec = importlib.util.spec_from_file_location("vinix_android_musl", support / "musl-runtime.py")
+assert spec and spec.loader
+musl = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(musl)
 runtime = staging / "opt/vinix-android-aarch64"
 verified = art.read_manifest(runtime)
 bionic = art.read_bionic_manifest(runtime)
 atl = art.read_atl_manifest(runtime)
+libc = musl.read_manifest(runtime)
 art.validate_atl_art_pair(verified, atl)
 manifest = json.loads((runtime / "runtime-manifest.json").read_text())
 if (manifest.get("architecture") != "aarch64" or manifest.get("execution") != "native"
         or manifest.get("page_size") != 16384 or manifest.get("art") != verified
         or not verified.get("bootclasspath") or manifest.get("bionic") != bionic
-        or manifest.get("atl") != atl):
+        or manifest.get("atl") != atl or manifest.get("musl") != libc):
     raise SystemExit("--with-android requires the verified native ARM64 Android runtime")
 PY
 fi

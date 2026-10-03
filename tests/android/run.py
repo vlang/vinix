@@ -205,6 +205,22 @@ def prepare(args: argparse.Namespace) -> Path | None:
         subprocess.run([compiler, "-O2", "-Wall", "-Wextra", "-Werror",
                         str(ROOT / "tests/android/fortify-test.c"), "-ldl",
                         "-o", str(test / "runtime-fortify-probe")], check=True)
+        subprocess.run([compiler, "-O2", "-Wall", "-Wextra", "-Werror",
+                        "-I" + str(ROOT / "build-support/android"),
+                        str(ROOT / "tests/android/mallinfo-test.c"), "-ldl", "-pthread",
+                        "-o", str(test / "runtime-mallinfo-probe")], check=True)
+    if args.runtime_arch == "aarch64":
+        subprocess.run([compiler, "-O2", "-Wall", "-Wextra", "-Werror",
+                        "-I" + str(ROOT / "build-support/android"),
+                        str(ROOT / "tests/android/netdb-test.c"), "-ldl",
+                        "-o", str(test / "runtime-netdb-probe")], check=True)
+    if args.loader_probe:
+        loader_test = test / "loader"
+        loader_test.mkdir()
+        args.loader_probe_sha256 = {}
+        for name in ("loader-test", "packed-relocation-probe.so"):
+            shutil.copy2(args.loader_probe / name, loader_test / name)
+            args.loader_probe_sha256[name] = hashlib.sha256((loader_test / name).read_bytes()).hexdigest()
     subprocess.run([compiler, "-O2", "-Wall", "-Wextra", "-Werror", "-static",
                     str(ROOT / "tests/android/memory-probe.c"),
                     "-o", str(test / "memory-probe")], check=True)
@@ -225,6 +241,12 @@ def prepare(args: argparse.Namespace) -> Path | None:
         shutil.copy2(icon, icons / icon.name)
     apk = overlay / "opt/android-test/application.apk"
     shutil.copy2(args.apk, apk)
+    if args.layout_probe:
+        shutil.copy2(args.layout_probe, test / "android-layout-focus-probe.jar")
+        args.layout_probe_sha256 = hashlib.sha256((test / "android-layout-focus-probe.jar").read_bytes()).hexdigest()
+    if args.tls_probe:
+        shutil.copy2(args.tls_probe, test / "android-tls-probe.jar")
+        args.tls_probe_sha256 = hashlib.sha256((test / "android-tls-probe.jar").read_bytes()).hexdigest()
     if args.boot_probe:
         shutil.copy2(args.boot_probe, test / "art-boot-probe.jar")
         args.boot_probe_sha256 = hashlib.sha256((test / "art-boot-probe.jar").read_bytes()).hexdigest()
@@ -234,6 +256,10 @@ def prepare(args: argparse.Namespace) -> Path | None:
         "TEST_HOSTED_NAME": "roblox" if args.launcher == "roblox" and args.mode == "desktop" else "android",
         "TEST_GEOMETRY": "1280x720x24" if args.launcher == "roblox" else "480x640x24",
         "VINIX_ROBLOX_APK": "/opt/android-test/application.apk",
+        "VINIX_ANDROID_LINKER_DIAGNOSTICS": "1" if args.linker_diagnostics else "0",
+        "TEST_BIONIC_LOADER_PROBE": "/opt/android-test/loader" if args.loader_probe else "",
+        "TEST_LAYOUT_PROBE": "/opt/android-test/android-layout-focus-probe.jar" if args.layout_probe else "",
+        "TEST_TLS_PROBE": "/opt/android-test/android-tls-probe.jar" if args.tls_probe else "",
         "TEST_ART_BOOT_PROBE": "/opt/android-test/art-boot-probe.jar" if args.boot_probe else "",
         "TEST_INPUT": args.input, "TEST_KEYS": args.keys, "TEST_TITLE": args.title,
         "TEST_TIMEOUT": str(args.startup_timeout), "VINIX_ANDROID_EXPECTED_RESULT": args.expect,
@@ -241,6 +267,7 @@ def prepare(args: argparse.Namespace) -> Path | None:
         "TEST_FOCUS_X": str(args.focus[0]), "TEST_FOCUS_Y": str(args.focus[1]),
         "TEST_WAIT_FOR_RESUME": "1" if hashlib.sha256(args.apk.read_bytes()).hexdigest() == CALCULATOR_SHA256 else "0",
         "TEST_OBSERVE": "1" if args.observe else "0",
+        "TEST_INTERACTIVE": "1" if args.interactive else "0",
         "TEST_OBSERVATION_SECONDS": str(args.observation_seconds),
     }
     (test / "config.sh").write_text("".join(f"{key}={shlex.quote(value)}\n" for key, value in configuration.items()))
@@ -408,8 +435,12 @@ def run(args: argparse.Namespace, overlay: Path | None) -> int:
         environment.pop("VINIX_QEMU_OVERLAY", None)
     if platform.system() != "Darwin":
         environment["USE_TCG"] = "1"
-    command = [str(args.repo / "run-aarch64.sh"), "--no-build", "--no-persist", "--serial",
+    elif args.interactive:
+        environment["QEMU_DISPLAY_BACKEND"] = "cocoa"
+    command = [str(args.repo / "run-aarch64.sh"), "--no-build", "--no-persist",
                f"--mem={args.memory}", f"--guest-init={ROOT / 'tests/android/guest-init.sh'}"]
+    if not args.interactive:
+        command.append("--serial")
     pid, master = pty.fork()
     if pid == 0:
         os.chdir(args.repo)
@@ -425,7 +456,7 @@ def run(args: argparse.Namespace, overlay: Path | None) -> int:
     serial_errors = []
     reader_stop = threading.Event()
     failure = "timeout"
-    deadline = time.monotonic() + args.timeout
+    deadline = float("inf") if args.interactive else time.monotonic() + args.timeout
 
     def read_serial() -> None:
         try:
@@ -471,7 +502,7 @@ def run(args: argparse.Namespace, overlay: Path | None) -> int:
     try:
         while time.monotonic() < deadline:
             if os.waitpid(pid, os.WNOHANG)[0] == pid:
-                failure = "VM exited before passing"
+                failure = "VM exited before observing a window" if args.interactive else "VM exited before passing"
                 break
             time.sleep(0.1)
             recent = bytes(transcript[-262144:])
@@ -486,13 +517,20 @@ def run(args: argparse.Namespace, overlay: Path | None) -> int:
             if any(marker in recent for marker in FAILURES):
                 guest_failed = True
                 failure = "guest reported a failure"
-                # Allow the diagnostic tail to reach the serial transcript.
-                deadline = min(deadline, time.monotonic() + 4)
-            if b"ANDROID-PASS" in recent and not guest_failed:
+                if args.interactive:
+                    observed = False
+                else:
+                    # Allow the diagnostic tail to reach the serial transcript.
+                    deadline = min(deadline, time.monotonic() + 4)
+            if args.interactive and b"ANDROID-READY" in recent and not observed and not guest_failed:
+                observed = True
+                print("Interactive APK window ready; application functionality is unchecked. "
+                      "Use the QEMU window locally; Ctrl-C stops the session.", flush=True)
+            if not args.interactive and b"ANDROID-PASS" in recent and not guest_failed:
                 passed = True
                 time.sleep(2)
                 break
-            if b"ANDROID-OBSERVED" in recent and args.observe and not guest_failed:
+            if not args.interactive and b"ANDROID-OBSERVED" in recent and args.observe and not guest_failed:
                 observed = True
                 time.sleep(2)
                 break
@@ -501,9 +539,18 @@ def run(args: argparse.Namespace, overlay: Path | None) -> int:
             if input_thread.is_alive() or input_errors:
                 passed = False
                 failure = f"keyboard input failed: {input_errors[0] if input_errors else 'timeout'}"
+    except KeyboardInterrupt:
+        if not args.interactive:
+            raise
+        if not observed and not guest_failed:
+            failure = "interactive session stopped before observing a window"
     finally:
         try:
-            if socket_path.exists():
+            if args.interactive:
+                # Login and account screens belong to the local user. Capture
+                # only through an explicit external QMP request, never here.
+                pass
+            elif socket_path.exists():
                 try:
                     screenshot(socket_path, args.screenshot)
                 except (OSError, RuntimeError, ImportError) as error:
@@ -522,6 +569,9 @@ def run(args: argparse.Namespace, overlay: Path | None) -> int:
             os.close(master)
             socket_path.unlink(missing_ok=True)
     boot_probe_passed = None
+    loader_probe_passed = None
+    tls_probe_passed = None
+    layout_probe_passed = None
     guest_failures = [line.split(b"ANDROID-FAIL ", 1)[1].strip().decode(errors="replace")
                       for line in bytes(transcript).replace(b"\r", b"").splitlines()
                       if b"ANDROID-FAIL " in line]
@@ -534,17 +584,50 @@ def run(args: argparse.Namespace, overlay: Path | None) -> int:
             if passed or observed:
                 failure = "native Java bootclasspath probe did not pass"
             passed = observed = False
-    result = {"passed": None if args.observe and observed else passed,
-              "observed": observed, "check": "window-observation" if args.observe else "calculator",
+    if args.loader_probe:
+        loader_probe_passed = b"ANDROID-BIONIC-LOADER-VERIFIED" in transcript
+        if not loader_probe_passed:
+            if passed or observed:
+                failure = "native Bionic nested loader probe did not pass"
+            passed = observed = False
+    if args.tls_probe:
+        tls_probe_passed = b"ANDROID-TLS-VERIFIED" in transcript
+        if not tls_probe_passed:
+            if passed or observed:
+                failure = "native Java HTTPS trust probe did not pass"
+            passed = observed = False
+    if args.layout_probe:
+        layout_probe_passed = b"ANDROID-LAYOUT-FOCUS-VERIFIED" in transcript
+        if not layout_probe_passed:
+            if passed or observed:
+                failure = "native framework layout focus probe did not pass"
+            passed = observed = False
+    result = {"passed": None if args.interactive or (args.observe and observed) else passed,
+              "observed": observed,
+              "check": ("interactive-observation" if args.interactive else
+                        "window-observation" if args.observe else "calculator"),
               "failure": None if passed or observed else failure,
               "mode": args.mode, "launcher": args.launcher, "apk": str(args.apk),
               "apk_sha256": hashlib.sha256(args.apk.read_bytes()).hexdigest(),
               "initramfs": str(args.initramfs), "runtime_arch": args.runtime_arch,
               "memory_mb": args.memory, "desktop": str(args.desktop), "kernel_dir": str(args.kernel_dir),
               "keys": None if args.observe else args.keys,
-              "expected": None if args.observe else args.expect, "screenshot": str(args.screenshot),
+              "expected": None if args.observe else args.expect,
+              "screenshot": None if args.interactive else str(args.screenshot),
               "key_retries": input_retries[0] if input_retries else None,
               "runtime_arguments": args.runtime_arg,
+              "layout_probe": str(args.layout_probe) if args.layout_probe else None,
+              "layout_probe_sha256": args.layout_probe_sha256 if args.layout_probe else None,
+              "layout_probe_passed": layout_probe_passed,
+              "tls_probe": str(args.tls_probe) if args.tls_probe else None,
+              "tls_probe_sha256": args.tls_probe_sha256 if args.tls_probe else None,
+              "tls_probe_passed": tls_probe_passed,
+              "linker_diagnostics": args.linker_diagnostics,
+              "loader_probe": str(args.loader_probe) if args.loader_probe else None,
+              "loader_probe_sha256": args.loader_probe_sha256 if args.loader_probe else None,
+              "loader_probe_passed": loader_probe_passed,
+              "netdb_probe_passed": (b"ANDROID-NETDB-PASS " in transcript
+                                       if args.runtime_arch == "aarch64" else None),
               "boot_probe": str(args.boot_probe) if args.boot_probe else None,
               "boot_probe_sha256": args.boot_probe_sha256 if args.boot_probe else None,
               "boot_probe_passed": boot_probe_passed,
@@ -552,13 +635,21 @@ def run(args: argparse.Namespace, overlay: Path | None) -> int:
                                                if args.runtime_arch == "aarch64" else None),
               "fortify_probe_passed": (b"ANDROID-FORTIFY-PASS " in transcript
                                          if args.runtime_arch == "aarch64" else None),
+              "mallinfo_probe_passed": (b"ANDROID-MALLINFO-PASS " in transcript
+                                          if args.runtime_arch == "aarch64" else None),
               "serial_log": str(state / "serial.log")}
+    if args.interactive:
+        result["functionality"] = "unchecked"
     (state / "result.json").write_text(json.dumps(result, indent=2) + "\n")
+    if args.interactive:
+        print(f"Interactive Android session ended; application functionality is unchecked. "
+              f"Status: {state / 'result.json'}")
+        return 0 if observed and not guest_failed else 1
     if not passed and not observed:
         print(f"Android smoke test failed ({failure}); inspect {state / 'serial.log'}", file=sys.stderr)
         return 1
     if observed:
-        print(f"Observed the APK's painted window; application functionality was not checked. Screenshot: {args.screenshot}")
+        print(f"Observed the APK's X11 window; application functionality was not checked. Screenshot: {args.screenshot}")
     else:
         print(f"Android calculator displayed {args.expect}; screenshot: {args.screenshot}")
     return 0
@@ -575,6 +666,14 @@ def main() -> int:
     parser.add_argument("--apk", type=Path)
     parser.add_argument("--boot-probe", type=Path,
                         help="DEX JAR containing ArtBootProbe; require native Java preflight before the APK")
+    parser.add_argument("--layout-probe", type=Path,
+                        help="DEX JAR containing android.view.AndroidLayoutFocusProbe; require real inflater focus assertions")
+    parser.add_argument("--tls-probe", type=Path,
+                        help="DEX JAR containing AndroidTlsProbe; require public HTTPS and untrusted local rejection")
+    parser.add_argument("--loader-probe", type=Path,
+                        help="directory with native loader-test and packed-relocation-probe.so fixtures")
+    parser.add_argument("--linker-diagnostics", action="store_true",
+                        help="enable bounded native Bionic linker diagnostics")
     parser.add_argument("--launcher", choices=("android", "roblox"), default="android",
                         help="exercise run-android or the production native Roblox launcher")
     parser.add_argument("--roblox-staging", type=Path,
@@ -601,12 +700,19 @@ def main() -> int:
     parser.add_argument("--strace", action="store_true", help="trace translated runtime syscalls for bring-up diagnostics")
     parser.add_argument("--observe", action="store_true",
                         help="capture a generic APK window and logs without input or a functional pass claim")
+    parser.add_argument("--interactive", action="store_true",
+                        help="keep the desktop QEMU window open until Ctrl-C, without automatic screenshots or application-log export")
     parser.add_argument("--observation-seconds", type=int, default=30,
                         help="seconds a generic APK's painted window must remain visible (default: 30)")
     args = parser.parse_args()
     if args.observation_seconds < 1:
         parser.error("--observation-seconds must be positive")
-    if not args.prepare_only:
+    if args.interactive:
+        if not args.observe or args.mode != "desktop":
+            parser.error("--interactive requires --observe and --mode desktop")
+        if args.screenshot is not None:
+            parser.error("--interactive disables automatic screenshots; capture explicitly through QMP")
+    if not args.prepare_only and not args.interactive:
         try:
             import PIL
         except ImportError:
@@ -619,6 +725,12 @@ def main() -> int:
         args.runtime_arch = "x86_64" if "x86_64" in architectures else "aarch64"
     if args.boot_probe and args.runtime_arch != "aarch64":
         parser.error("--boot-probe requires a native aarch64 runtime")
+    if args.layout_probe and args.runtime_arch != "aarch64":
+        parser.error("--layout-probe requires a native aarch64 runtime")
+    if args.tls_probe and args.runtime_arch != "aarch64":
+        parser.error("--tls-probe requires a native aarch64 runtime")
+    if args.loader_probe and args.runtime_arch != "aarch64":
+        parser.error("--loader-probe requires a native aarch64 runtime")
     if args.launcher == "roblox":
         if args.runtime_arch != "aarch64" or not args.observe or args.apk is None:
             parser.error("--launcher roblox requires --runtime-arch aarch64, --observe and --apk")
@@ -632,6 +744,9 @@ def main() -> int:
     args.initramfs = args.initramfs.resolve() if args.initramfs else None
     args.apk = (args.apk or args.runtime / "usr/share/vinix/android/Arity-1.1.apk").resolve()
     args.boot_probe = args.boot_probe.resolve() if args.boot_probe else None
+    args.layout_probe = args.layout_probe.resolve() if args.layout_probe else None
+    args.tls_probe = args.tls_probe.resolve() if args.tls_probe else None
+    args.loader_probe = args.loader_probe.resolve() if args.loader_probe else None
     args.screenshot = (args.screenshot or args.state_dir / ("application.png" if args.observe else "calculator.png")).resolve()
     args.input = args.input or ("xtest" if args.mode == "direct" else "qmp")
     base = args.initramfs or args.repo / "build-aarch64-userland/downloads/alpine-minirootfs-3.21.7-aarch64.tar.gz"
@@ -640,8 +755,19 @@ def main() -> int:
             raise SystemExit(f"Missing Android smoke test input: {path}")
     if args.boot_probe and not args.boot_probe.is_file():
         raise SystemExit(f"Missing native Java bootclasspath probe: {args.boot_probe}")
-    args.state_dir.mkdir(parents=True, exist_ok=True)
-    args.screenshot.parent.mkdir(parents=True, exist_ok=True)
+    if args.layout_probe and not args.layout_probe.is_file():
+        raise SystemExit(f"Missing native framework layout focus probe: {args.layout_probe}")
+    if args.tls_probe and not args.tls_probe.is_file():
+        raise SystemExit(f"Missing native Java HTTPS trust probe: {args.tls_probe}")
+    if args.loader_probe:
+        for name in ("loader-test", "packed-relocation-probe.so"):
+            if not (args.loader_probe / name).is_file():
+                raise SystemExit(f"Missing native Bionic loader probe: {args.loader_probe / name}")
+    args.state_dir.mkdir(parents=True, exist_ok=True, mode=0o700 if args.interactive else 0o777)
+    if args.interactive:
+        args.state_dir.chmod(0o700)
+    if not args.interactive:
+        args.screenshot.parent.mkdir(parents=True, exist_ok=True)
     overlay = prepare(args)
     if args.prepare_only:
         print(f"Prepared Android smoke image: {args.initramfs or overlay}")

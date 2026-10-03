@@ -13,6 +13,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/mman.h>
 #include <sys/resource.h>
 #include <sys/socket.h>
@@ -20,6 +21,40 @@
 
 #if defined(__aarch64__) && defined(__linux__)
 #include <stdio_ext.h>
+#include "musl-statistics.h"
+
+// ART's external diagnostic utilities inherit this preload while using the
+// host libc. They do not call the Android allocator API. Only that API requires
+// the private provider; never fabricate statistics if a caller lacks it.
+extern int __vinix_malloc_stats(struct vinix_malloc_stats *, size_t)
+    __attribute__((weak));
+
+// Bionic's LP64 mallinfo uses size_t fields, unlike glibc's legacy int ABI.
+// These values describe the real private mallocng allocator. Its allocation
+// groups use mmap; separately guarded allocator metadata is not user storage.
+struct android_mallinfo {
+    size_t arena, ordblks, smblks, hblks, hblkhd;
+    size_t usmblks, fsmblks, uordblks, fordblks, keepcost;
+};
+_Static_assert(sizeof(struct android_mallinfo) == 80, "Bionic ARM64 mallinfo ABI");
+
+struct android_mallinfo bionic_mallinfo(void)
+{
+    struct vinix_malloc_stats statistics;
+    if (__vinix_malloc_stats == NULL ||
+        __vinix_malloc_stats(&statistics, sizeof(statistics)) != 0) {
+        fputs("Android allocator statistics ABI mismatch\n", stderr);
+        abort();
+    }
+    return (struct android_mallinfo){
+        .ordblks = statistics.free_blocks,
+        .hblks = statistics.mapped_blocks,
+        .hblkhd = statistics.mapped_bytes,
+        .usmblks = statistics.peak_mapped_bytes,
+        .uordblks = statistics.live_bytes,
+        .fordblks = statistics.free_bytes,
+    };
+}
 
 // The Bionic linker prefers bionic_ names for Android relocations. These
 // checks keep the NDK calling conventions while doing the actual I/O through
@@ -98,6 +133,17 @@ ssize_t bionic___sendto_chk(int socket, const void *buffer, size_t size,
         android_buffer_overflow("sendto", "read from", size, buffer_size);
     }
     return sendto(socket, buffer, size, flags, address, address_size);
+}
+
+size_t bionic___strlcpy_chk(char *destination, const char *source, size_t size,
+                           size_t destination_size)
+{
+    // AOSP fortify.cpp checks the supplied bound before calling strlcpy.
+    // The real copy retains its source-length return value and truncation.
+    if (size > destination_size) {
+        android_buffer_overflow("strlcpy", "write into", size, destination_size);
+    }
+    return strlcpy(destination, source, size);
 }
 #endif
 

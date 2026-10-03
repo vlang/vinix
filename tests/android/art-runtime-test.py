@@ -494,6 +494,8 @@ class AtlTests(unittest.TestCase):
         )
         lock = {"architecture": "aarch64", "mirror": "https://example.invalid", "packages": []}
         with (patch.object(builder, "art_tools", return_value=tools),
+              patch.object(builder, "musl_tools", return_value=SimpleNamespace(
+                  read_manifest=lambda root: {"verified": True})),
               patch.object(builder.shutil, "which", return_value="isolated-test-compiler"),
               patch.object(builder.subprocess, "run", side_effect=run) as commands):
             staging = builder.stage(args, lock, args.build_dir / "downloads")

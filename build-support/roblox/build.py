@@ -36,6 +36,15 @@ def art_tools():
     return module
 
 
+def musl_tools():
+    specification = importlib.util.spec_from_file_location(
+        "vinix_roblox_musl_runtime", ROOT / "build-support/android/musl-runtime.py")
+    assert specification and specification.loader
+    module = importlib.util.module_from_spec(specification)
+    specification.loader.exec_module(module)
+    return module
+
+
 def provenance(android_stage: Path) -> dict:
     """Require the same verified native Android layer used by other APKs."""
     android_stage = Path(android_stage)
@@ -49,6 +58,7 @@ def provenance(android_stage: Path) -> dict:
     art_manifest = art.read_manifest(runtime)
     bionic_manifest = art.read_bionic_manifest(runtime)
     atl_manifest = art.read_atl_manifest(runtime)
+    musl_manifest = musl_tools().read_manifest(runtime)
     art.validate_atl_art_pair(art_manifest, atl_manifest)
     receipt = runtime / "runtime-manifest.json"
     manifest = json.loads(receipt.read_text())
@@ -57,7 +67,8 @@ def provenance(android_stage: Path) -> dict:
             or manifest.get("runtime_prefix") != "/" + PREFIX
             or (runtime / "architecture").read_text().strip() != "aarch64"
             or manifest.get("art") != art_manifest or not art_manifest.get("bootclasspath")
-            or manifest.get("bionic") != bionic_manifest or manifest.get("atl") != atl_manifest):
+            or manifest.get("bionic") != bionic_manifest or manifest.get("atl") != atl_manifest
+            or manifest.get("musl") != musl_manifest):
         raise RuntimeError("Roblox requires the verified native ARM64 Android runtime")
     compatibility = runtime / "usr/lib/libvinix-android-compat.so"
     if not compatibility.is_file():
@@ -70,6 +81,7 @@ def provenance(android_stage: Path) -> dict:
         "android_runtime_manifest_sha256": digest(receipt),
         "android_launcher_sha256": digest(android_launcher),
         "android_compatibility_sha256": digest(compatibility),
+        "android_libc_sha256": musl_manifest["libc_so_sha256"],
         "art_source_commit": art_manifest["source_commit"],
         "art_patch_sha256": art_manifest["patch_sha256"],
         "bionic_source_commit": bionic_manifest["source_commit"],

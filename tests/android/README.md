@@ -95,7 +95,7 @@ python3 tests/android/run.py --launcher roblox --apk /path/to/Roblox.apk \
     --state-dir /tmp/vinix-roblox-observation
 ```
 
-`--observe` requires a painted APK window to remain visible for 30 seconds
+`--observe` requires a drawable APK X11 window to remain mapped for 30 seconds
 (`--observation-seconds` changes this duration). It captures `application.png`
 and records `observed: true` with `passed: null` in `result.json`; this only
 establishes that a window was observed, not that the application's functionality
@@ -116,3 +116,126 @@ real **Roblox** entry and supplies the APK through `VINIX_ROBLOX_APK`. Use
 observation command exercises its Java activity through native ATL/ART. The
 regular Roblox desktop entry uses the same native ATL/ART runtime
 described in [Roblox APK](../../docs/roblox.md).
+
+## Native loader and HTTPS preflights
+
+Every native ARM64 run checks the actual Bionic resolver's Android flags,
+positive EAI error codes, address layout, scoped IPv6, 64-bit reverse-lookup
+bounds and freeing returned lists. These numeric-address checks need no network.
+`--linker-diagnostics` enables bounded loader phase, relocation progress and
+constructor diagnostics; normal library loading stays quiet.
+
+`--loader-probe DIR` also runs a native `loader-test` executable and
+`packed-relocation-probe.so` built from [bionic-loader-test.c](bionic-loader-test.c)
+against the pinned Bionic sources. Compile the payload with
+`-DBIONIC_LOADER_PAYLOAD -shared -fPIC -nostdlib -Wl,--pack-dyn-relocs=android`
+and `-Wl,-z,max-page-size=65536` using Clang/LLD. Link the executable with the
+pinned `main_executable/bionic_compat.c` and `-ldl`; it needs the real Android
+TLS bootstrap. The constructor opens and closes itself, then loads libc,
+resolves and calls its page-size query and closes it. The fixture proves packed
+relocation and recursive loader lifetimes inside Vinix.
+
+`--tls-probe /path/to/android-tls-probe.jar` runs
+[AndroidTlsProbe.java](AndroidTlsProbe.java) before the APK. Compile it with
+Java 8, then convert its class files with the pinned D8 8.3.37 and `--min-api 26`.
+The guest waits for DHCP's resolver configuration and selects the same private
+JKS file as the launcher. It requires nonempty default trusted issuers, rejects
+a local self-signed certificate, and requests the genuine
+`https://clientsettingscdn.roblox.com/` endpoint with chain and hostname
+verification. The endpoint's normal HTTP error response still proves TLS;
+no authentication or APK change is involved. Each optional preflight requires
+zero exit status plus its assertion marker. Results record fixture hashes and
+verdicts; neither preflight establishes gameplay.
+
+`--layout-probe /path/to/android-layout-focus-probe.jar` checks the actual
+framework's inflater and default-focus dispatch before the APK. Build it on
+the native framework build host with [layout-focus-test.py](layout-focus-test.py):
+
+```sh
+python3 tests/android/layout-focus-test.py \
+    --framework-classes /path/to/atl/output/src/api-impl/hax.jar \
+    --stub-classes /path/to/atl/output/src/gstub/gstub.jar \
+    --r8 /path/to/r8-8.3.37.jar --output /path/to/android-layout-focus-probe.jar
+```
+
+The fixture uses observing ViewGroups without GTK constructors and a separate
+logging adapter. The real inflater, default-focus delegate and hidden-view gate
+run unchanged. Assertions cover tag order, attached children, nested parents,
+metadata subtree consumption, repeated tags, hidden views and merge roots.
+Fixture classes are used only in a separate preflight VM; they never enter the
+runtime overlay or APK. A zero exit status and assertion marker are required,
+and `result.json` records its hash and verdict.
+
+## Interactive Roblox session
+
+After staging the native Android runtime and Roblox launcher, keep the real
+desktop window open for a local user to sign in:
+
+```sh
+python3 tests/android/run.py --launcher roblox --apk /path/to/Roblox.apk \
+    --observe --mode desktop --interactive \
+    --state-dir /tmp/vinix-roblox-interactive
+```
+
+Supply `--runtime`, `--roblox-staging`, `--desktop`, `--kernel-dir` and
+`--initramfs` when using separately built inputs. On macOS this opens QEMU's
+Cocoa window. The supervisor continues draining the serial console until
+Ctrl-C or the QEMU window is closed; it stays attached for the whole session.
+`--timeout` does not end an interactive session; `--startup-timeout` still
+bounds the guest's initial window check. Its state directory is private
+(mode 0700), including when an existing session directory is reused.
+`--interactive` requires `--observe --mode desktop` and retains the normal
+native runtime preflights and X11 window check. Its guest does not open a
+second console shell, so the desktop keeps receiving keyboard input.
+
+This mode does not send keys, load the calculator text observer, capture any
+screenshots, or copy application diagnostic logs to the host, including on
+failure and shutdown. The local user signs in through the QEMU window.
+`serial.log` contains the guest's preflight and status output. After stopping,
+`result.json` records `check: "interactive-observation"`, `passed: null` and
+`functionality: "unchecked"`; an observed login window is not gameplay proof.
+
+Once the user confirms that sign-in is finished and an experience is open,
+capture a frame explicitly through the session's local QMP socket:
+
+```sh
+python3 - <<'PY'
+import importlib.util
+from pathlib import Path
+spec = importlib.util.spec_from_file_location("android_test", "tests/android/run.py")
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+state = Path("/tmp/vinix-roblox-interactive")
+module.screenshot(state / "qmp.sock", state / "gameplay-before.png")
+PY
+```
+
+The explicit capture command needs Python Pillow. Use the actual frame size
+and choose control coordinates from that frame. These examples assume a
+1024×768 desktop: a left-button drag holds the mobile movement control,
+a click presses jump, and a drag on an empty part of the world moves the
+mobile camera. Replace the example coordinates with the visible controls:
+
+```sh
+python3 desktop/tools/input.py --socket /tmp/vinix-roblox-interactive/qmp.sock \
+    --size 1024x768 --settle 1 drag 140 650 140 570
+python3 desktop/tools/input.py --socket /tmp/vinix-roblox-interactive/qmp.sock \
+    --size 1024x768 click 900 650
+python3 desktop/tools/input.py --socket /tmp/vinix-roblox-interactive/qmp.sock \
+    --size 1024x768 drag 750 350 650 350
+```
+
+These gestures exercise the production desktop pointer bridge. Capture
+separate before/after frames for movement, jump and camera changes, verify
+that they show a joined experience and an avatar reacting to input, and
+check that leaving and rejoining works. Pixel changes alone can also come
+from a loading screen and do not establish gameplay. Keyboard holding is a
+separate check: the desktop currently forwards text, and its Roblox host
+deliberately taps each character to support login fields. QMP down/up events
+therefore do not establish held WASD behavior through this bridge.
+
+Host lifecycle checks use a real PTY and a mock VM process, without booting:
+
+```sh
+python3 tests/android/interactive-test.py
+```

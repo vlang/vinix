@@ -51,6 +51,14 @@ def art_tools():
     return module
 
 
+def musl_tools():
+    spec = importlib.util.spec_from_file_location("vinix_android_musl", SUPPORT / "musl-runtime.py")
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as stream:
@@ -206,6 +214,7 @@ def stage(args: argparse.Namespace, lock: dict, downloads: Path) -> Path:
     staging = args.build_dir / "staging"
     runtime = staging / PREFIX.lstrip("/")
     art = art_tools()
+    musl = musl_tools()
     if not args.art_runtime.is_dir():
         raise RuntimeError(f"missing native 16 KiB ART overlay: {args.art_runtime}; "
                            "run build-support/android/build-art.sh on ARM64 Alpine Linux first")
@@ -231,6 +240,10 @@ def stage(args: argparse.Namespace, lock: dict, downloads: Path) -> Path:
                    SUPPORT / "art-runtime.py", SUPPORT / "art16k.patch", SUPPORT / "build-art.sh",
                    SUPPORT / "art-bootclasspath.py", SUPPORT / "bionic16k.patch", SUPPORT / "build-bionic.sh",
                    SUPPORT / "build-atl.sh", SUPPORT / "atl-dex.py",
+                   SUPPORT / "musl-runtime.py", SUPPORT / "musl-mallinfo.patch",
+                   SUPPORT / "musl-statistics.h",
+                   ROOT / "build-support/musl/stage.py", ROOT / "build-support/musl/malloc-retain.patch",
+                   ROOT / "build-support/musl/alpine-1.2.6/manifest.json",
                    ROOT / "build-support/java-cacerts.py"):
         inputs += source.read_bytes()
     cache_key = hashlib.sha256(inputs).hexdigest()
@@ -243,6 +256,7 @@ def stage(args: argparse.Namespace, lock: dict, downloads: Path) -> Path:
             cached_art = art.read_manifest(runtime)
             cached_bionic = art.read_bionic_manifest(runtime)
             cached_atl = art.read_atl_manifest(runtime)
+            cached_musl = musl.read_manifest(runtime)
             art.validate_atl_art_pair(cached_art, cached_atl)
             cached_runtime = json.loads((runtime / "runtime-manifest.json").read_text())
             metadata_matches = (
@@ -255,7 +269,8 @@ def stage(args: argparse.Namespace, lock: dict, downloads: Path) -> Path:
                 cached_runtime.get("packages") == lock["packages"] and
                 cached_runtime.get("art") == art_manifest and
                 cached_runtime.get("bionic") == bionic_manifest and
-                cached_runtime.get("atl") == atl_manifest
+                cached_runtime.get("atl") == atl_manifest and
+                cached_runtime.get("musl") == cached_musl
             )
         except (RuntimeError, OSError, ValueError):
             cached_art = None
@@ -283,6 +298,16 @@ def stage(args: argparse.Namespace, lock: dict, downloads: Path) -> Path:
     for archive in archives:
         extract_apk(archive, runtime)
     materialize_library_links(runtime)
+    # Android's mallinfo ABI needs genuine live, retained and peak values.
+    # Keep this source-built statistics provider private to APK processes.
+    subprocess.run(["python3", str(ROOT / "build-support/musl/stage.py"),
+                    "--arch", "aarch64", "--staging", str(runtime),
+                    "--build-dir", str(args.build_dir / "musl-build"), "--cc", compiler,
+                    "--extra-patch", str(SUPPORT / "musl-mallinfo.patch"),
+                    "--max-page-size", "65536", "--require-export", "__vinix_malloc_stats"],
+                   env=dict(os.environ, VINIX_OPTIMIZED_MUSL="1", VINIX_MUSL_RETAIN="1"), check=True)
+    materialize_library_links(runtime)
+    musl_manifest = musl.read_manifest(runtime)
     # Alpine's ART assumes 4 KiB pages. Replace it with the verified native
     # source build before launching anything on Vinix's 16 KiB kernel.
     art.apply(args.art_runtime, runtime, art_manifest)
@@ -318,6 +343,7 @@ def stage(args: argparse.Namespace, lock: dict, downloads: Path) -> Path:
     manifest["art"] = art_manifest
     manifest["bionic"] = bionic_manifest
     manifest["atl"] = atl_manifest
+    manifest["musl"] = musl_manifest
     manifest["upstream"] = "https://gitlab.com/android_translation_layer/android_translation_layer"
     if args.with_calculator:
         apk = calculator_apk(downloads)

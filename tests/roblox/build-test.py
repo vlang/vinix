@@ -54,6 +54,7 @@ class StagingTest(unittest.TestCase):
                     "bootclasspath": {"verified": True}}
         self.bionic = {"source_commit": "bionic-source", "patch_sha256": "bionic-patch"}
         self.atl = {"source_commit": "atl-source", "builder_sha256": "atl-builder"}
+        self.musl = {"libc_so_sha256": "native-libc"}
         self.readers = SimpleNamespace(read_manifest=lambda root: deepcopy(self.art),
                                        read_bionic_manifest=lambda root: deepcopy(self.bionic),
                                        read_atl_manifest=lambda root: deepcopy(self.atl),
@@ -61,9 +62,13 @@ class StagingTest(unittest.TestCase):
         patched = patch.object(BUILDER, "art_tools", return_value=self.readers)
         patched.start()
         self.addCleanup(patched.stop)
+        patched_musl = patch.object(BUILDER, "musl_tools", return_value=SimpleNamespace(
+            read_manifest=lambda root: deepcopy(self.musl)))
+        patched_musl.start()
+        self.addCleanup(patched_musl.stop)
         self.manifest = {"architecture": "aarch64", "execution": "native", "page_size": 16384,
                          "runtime_prefix": "/" + BUILDER.PREFIX, "art": self.art,
-                         "bionic": self.bionic, "atl": self.atl}
+                         "bionic": self.bionic, "atl": self.atl, "musl": self.musl}
         self.write_runtime_manifest()
         self.write("architecture", b"aarch64\n")
         self.write("lib/ld-musl-aarch64.so.1", elf())
