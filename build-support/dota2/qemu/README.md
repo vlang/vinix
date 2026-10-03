@@ -27,3 +27,20 @@ records its hash and build inputs. The helper preserves the staged private glibc
 runtime. The translated `tests/dota2/mmap32-probe.c` contract checks collisions,
 sentinel preservation, large reservations, a free sibling page and an interior
 hole on actual Vinix.
+
+`wake-op.patch` validates and unprotects a writable guest secondary word before
+the native `FUTEX_WAKE_OP` atomic write. Translated code can make its containing
+16 KiB native page read-only even when that 4 KiB guest data page remains
+writable. A kernel write cannot enter QEMU's userspace fault handler, so the
+previous translator returned `EFAULT` for such valid writes. The patch retains
+`mmap_lock` through this nonblocking operation to serialize concurrent code
+protection. It checks guest write permission alone, preserving write-only
+mappings and errors for read-only, inaccessible and unaligned operands.
+Blocking futex operations retain their existing path.
+
+The paired [WAKE_OP regression](../../../tests/dota2/wake-op-README.md) runs
+an explicitly selected old and new translator on the same Vinix kernel and
+fixture. It verifies the reproduced write fault, preserved permissions and
+128 successful writes with acknowledged worker code execution between steps.
+It does not trace native page protection at every step or certify the separate
+full futex contract.

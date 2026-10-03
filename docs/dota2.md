@@ -118,6 +118,16 @@ contents, occupied hints, boundary and overflow cases, fixed mappings, and
 large reservations with small holes. The translator build cache can be selected
 with `VINIX_DOTA2_QEMU_BUILD_DIR`.
 
+The translator also prepares writable guest data for native `FUTEX_WAKE_OP`
+writes when QEMU has protected its shared 16 KiB native page for translated
+code. The old translator returned `EFAULT` for a valid writable 4 KiB guest
+page in this case. The [paired regression](../tests/dota2/wake-op-README.md)
+reproduces that error and verifies 128 successful writes with the fix, with
+worker code execution acknowledged after every write. Read-only, inaccessible
+and unaligned operands retain their errors; write-only secondary memory
+remains supported. This verifies the focused translator fix, without
+certifying the separate full futex contract or changing the game-test kernel.
+
 ## Reuse an existing installation without another full data copy
 
 Steam's macOS installation supplies the common assets, but its executable is
