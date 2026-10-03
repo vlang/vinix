@@ -1,0 +1,130 @@
+--- a/linux-user/syscall.c
++++ b/linux-user/syscall.c
+@@ -5562,8 +5562,115 @@
+     { TARGET_ ## cmd, 0, #cmd },
+ #include "ioctls.h"
+     { 0, 0, },
++};
++
++#ifdef HAVE_DRM_H
++/*
++ * Vinix: Mesa's Venus driver in a translated x86-64 process drives the host
++ * virtio-gpu render node. DRM structures use fixed-width fields, so x86-64
++ * and AArch64 share their layouts and command numbers; only the user
++ * pointers inside them need the guest base added. These are the pointer
++ * fields of the virtio-gpu private ioctls and the syncobj ioctls Venus
++ * uses, by command number and byte offset. Other DRM ioctls pass through
++ * unchanged.
++ */
++static const struct {
++    uint8_t nr, count, offsets[4];
++} drm_pointer_fields[] = {
++    { DRM_COMMAND_BASE + 0x02, 4, { 8, 16, 48, 56 } }, /* VIRTGPU_EXECBUFFER */
++    { DRM_COMMAND_BASE + 0x03, 1, { 8 } },     /* VIRTGPU_GETPARAM value */
++    { DRM_COMMAND_BASE + 0x09, 1, { 8 } },     /* VIRTGPU_GET_CAPS addr */
++    { DRM_COMMAND_BASE + 0x0a, 1, { 32 } },    /* VIRTGPU_RESOURCE_CREATE_BLOB cmd */
++    { DRM_COMMAND_BASE + 0x0b, 1, { 8 } },     /* VIRTGPU_CONTEXT_INIT params */
++    { 0xc3, 1, { 0 } },                        /* SYNCOBJ_WAIT handles */
++    { 0xc4, 1, { 0 } },                        /* SYNCOBJ_RESET handles */
++    { 0xc5, 1, { 0 } },                        /* SYNCOBJ_SIGNAL handles */
++    { 0xca, 2, { 0, 8 } },                     /* SYNCOBJ_TIMELINE_WAIT */
++    { 0xcb, 2, { 0, 8 } },                     /* SYNCOBJ_QUERY */
++    { 0xcd, 2, { 0, 8 } },                     /* SYNCOBJ_TIMELINE_SIGNAL */
+ };
++
++static bool drm_output_ok(CPUState *cpu, uint64_t addr, uint64_t len)
++{
++    return !len || (len <= UINT32_MAX && access_ok(cpu, VERIFY_WRITE, addr, len));
++}
++
++static abi_long do_ioctl_drm_passthrough(int fd, unsigned int cmd,
++                                         abi_ulong arg)
++{
++    CPUState *cpu = thread_cpu;
++    unsigned int nr = _IOC_NR(cmd), size = _IOC_SIZE(cmd);
++    uint64_t buf[32], guest_pointers[4] = { 0 };
++    uint32_t count;
++    abi_long ret;
++    bool ok = true;
++    int fields = -1;
++
++    if (size > sizeof(buf)) {
++        return -TARGET_EINVAL;
++    }
++    if (size && copy_from_user(buf, arg, size)) {
++        return -TARGET_EFAULT;
++    }
++    for (int i = 0; i < ARRAY_SIZE(drm_pointer_fields); i++) {
++        if (drm_pointer_fields[i].nr == nr) {
++            fields = i;
++        }
++    }
++    for (int i = 0; fields >= 0 && i < drm_pointer_fields[fields].count; i++) {
++        unsigned int offset = drm_pointer_fields[fields].offsets[i];
++        uint64_t host;
+ 
++        /* Older, shorter versions of a structure lack later fields. */
++        if (offset + sizeof(uint64_t) > size) {
++            continue;
++        }
++        memcpy(&guest_pointers[i], (uint8_t *)buf + offset, sizeof(uint64_t));
++        if (!guest_pointers[i]) {
++            continue;
++        }
++        if (!guest_addr_valid_untagged(guest_pointers[i])) {
++            return -TARGET_EFAULT;
++        }
++        host = (uintptr_t)g2h_untagged(guest_pointers[i]);
++        memcpy((uint8_t *)buf + offset, &host, sizeof(uint64_t));
++    }
++    /*
++     * The kernel's writes cannot run TCG's SIGSEGV handler, so unprotect
++     * output pages that also hold translated code, as for FUTEX_WAKE_OP.
++     * Fence waits can block, so the memory lock is not held across the call.
++     */
++    mmap_lock();
++    if (nr == DRM_COMMAND_BASE + 0x03) {
++        ok = drm_output_ok(cpu, guest_pointers[0], sizeof(int));
++    } else if (nr == DRM_COMMAND_BASE + 0x09 && size >= 24) {
++        memcpy(&count, (uint8_t *)buf + 16, sizeof(count));
++        ok = drm_output_ok(cpu, guest_pointers[0], count);
++    } else if (nr == 0xcb && size >= 24) {
++        memcpy(&count, (uint8_t *)buf + 16, sizeof(count));
++        ok = drm_output_ok(cpu, guest_pointers[1], (uint64_t)count * sizeof(uint64_t));
++    }
++    mmap_unlock();
++    if (!ok) {
++        return -TARGET_EFAULT;
++    }
++    ret = get_errno(safe_ioctl(fd, cmd, size ? buf : NULL));
++    if (!is_error(ret) && size && (_IOC_DIR(cmd) & _IOC_READ)) {
++        for (int i = 0; fields >= 0 && i < drm_pointer_fields[fields].count; i++) {
++            unsigned int offset = drm_pointer_fields[fields].offsets[i];
++
++            if (offset + sizeof(uint64_t) <= size) {
++                memcpy((uint8_t *)buf + offset, &guest_pointers[i], sizeof(uint64_t));
++            }
++        }
++        if (copy_to_user(arg, buf, size)) {
++            return -TARGET_EFAULT;
++        }
++    }
++    return ret;
++}
++#endif
++
+ /* ??? Implement proper locking for ioctls.  */
+ /* do_ioctl() Must return target values and target errnos. */
+ static abi_long do_ioctl(int fd, int cmd, abi_long arg)
+@@ -5578,6 +5685,11 @@
+     ie = ioctl_entries;
+     for(;;) {
+         if (ie->target_cmd == 0) {
++#ifdef HAVE_DRM_H
++            if (_IOC_TYPE(cmd) == DRM_IOCTL_BASE) {
++                return do_ioctl_drm_passthrough(fd, cmd, arg);
++            }
++#endif
+             qemu_log_mask(
+                 LOG_UNIMP, "Unsupported ioctl: cmd=0x%04lx\n", (long)cmd);
+             return -TARGET_ENOTTY;

@@ -51,3 +51,14 @@ SIGSEGV" report. That report previously gave only the data address, which
 cannot locate a fault in the translator itself. The static translator keeps its
 symbols, so `llvm-addr2line` or `nm` names the reported addresses; the printed
 image address gives any load bias. The patch changes only this fatal path.
+
+`drm-passthrough.patch` lets the translated game drive Vinix's virtio-gpu
+render node, which Mesa's Venus driver needs on KekVM. QEMU 9.1.2 translates
+only `DRM_IOCTL_VERSION` and an i915 query; other DRM ioctls failed with
+`ENOTTY`. DRM structures have the same layout and command numbers on x86-64
+and AArch64, so the patch passes them through a host copy of the structure.
+The user pointers inside virtio-gpu's private ioctls and the syncobj ioctls
+gain the guest base (Vinix starts x86-64 programs with `-B 0x100000000`);
+null pointers stay null. As for `FUTEX_WAKE_OP`, output buffers are made
+writable first, in case translated code protects their 16 KiB native page,
+but the memory lock is not held across calls that wait for fences.
