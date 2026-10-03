@@ -271,9 +271,8 @@ reported one of one players loaded and entered
 `DOTA_GAMERULES_STATE_HERO_SELECTION`, and the client showed the
 hero-selection screen with the map's minimap. The game was still running when
 the 30-minute probe ended, after 5,387,728,896 exported bytes with no read
-errors. The first local-map request after startup failed the same way in a
-second launch, so retry from the console. Inputs and captures, including
-`hero-selection-01.png`, are under `build/dota2/game-mesa-null-sets-repeat`.
+errors. Inputs and captures, including `hero-selection-01.png`, are under
+`build/dota2/game-mesa-null-sets-repeat`.
 
 The runtime staged by `build-dota2-aarch64.sh`, with the committed driver
 (`a6a4972d...`), reached the menu about 150 seconds after the game started.
@@ -288,6 +287,33 @@ the faulting thread's stack. Captures and inputs are under
 `build/dota2/game-product-console-map`.
 
 ![Dota 2 team selection on a local map in a Vinix window](../vinix-dota2-team-select-qemu.png)
+
+The first local map of a session failed in all three launches that did not
+change network timeouts, including one that waited four minutes at the menu.
+A first level load stalls the game loop past the 30-second NetChan timeout of
+the client's loopback connection to its own server; during the load the
+console reports `timing out, last received ... (10.00 seconds ago)` on both
+ends. Entering `cl_timeout 1800` and `sv_timeout 1800` before `map dota` let
+the first load connect and reach team selection in about 12 minutes. In the
+pregame, frames take seconds to minutes and Dota advances game time by at most
+100 ms per frame (`Excessive frame time ... clamped`). `sv_cheats 1` and
+`host_timescale 10` make its timers usable; `jointeam good` joins Radiant.
+
+Committing a hero then crashed every time: clicking LOCK IN on Io, RANDOM, and
+`dota_start_game` each ended with `SIGSEGV` at the same code in Valve's
+`libserver.so`. The library is loaded as an anonymous mapping, matched by its
+text segment size, at a bias of `0x3aec000` below the mapping; that bias puts a
+`call rax` right before the faulting thread's return address. The function
+updates `CDOTA_PlayerResource` team slots and fires `dota_player_team_changed`.
+It calls through the vtable of an object it was passed, and that vtable pointer
+was zero in one crash and pointed into heap data in the others. Joining a team
+through the same path did not crash. The player in this probe is Valve's
+anonymous engine test mode, without a Steam account or Game Coordinator
+session, and the cause is not established. The kernel's partial-page
+`madvise`, which could have cleared live neighbours of a discarded 4 KiB guest
+page, clears only the requested range. Gameplay therefore still stops at hero
+selection. Inputs, captures and fault reports are under
+`build/dota2/game-product-small-window` and `build/dota2/game-product-pick-hero`.
 
 One otherwise identical launch ended at startup with
 `QEMU internal SIGSEGV {code=MAPERR, addr=0x8005334e890}`, a fault in the
