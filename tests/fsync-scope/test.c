@@ -21,8 +21,8 @@ int main(void)
     CHECK(fsync(ram) == 0 && fdatasync(ram) == 0);
     puts("FSYNC-SCOPE BASELINE-RAM-PASS");
 
-    /* The filesystem is mounted normally, but its real NBD backend rejects
-     * writes. Dirty pages remain retryable after that underlying I/O error. */
+    /* The NBD disk advertises writable storage but rejects every WRITE.
+     * Dirty pages remain retryable after that underlying I/O error. */
     int disk = open("/root/disk-probe.bin", O_RDWR);
     CHECK(disk >= 0);
     unsigned char bytes[8192];

@@ -45,6 +45,7 @@ const status_driver_ok = u32(4)
 const status_failed = u32(128)
 const descriptor_next = u16(1)
 const descriptor_write = u16(2)
+const feature_read_only = u32(1 << 5)
 const feature_flush = u32(1 << 9)
 const request_flush = u32(4)
 
@@ -88,6 +89,7 @@ pub mut:
 	data_phys       u64
 	data_virt       u64
 	ready           bool
+	read_only       bool
 	flush_supported bool
 	name            string
 }
@@ -306,6 +308,10 @@ fn (mut device VirtioBlockDevice) read(_handle voidptr, buffer voidptr, loc u64,
 }
 
 fn (mut device VirtioBlockDevice) write(_handle voidptr, buffer voidptr, loc u64, count u64) ?i64 {
+	if device.read_only {
+		errno.set(errno.erofs)
+		return none
+	}
 	if loc % 512 != 0 || count % 512 != 0 || loc + count > u64(device.stat.size) {
 		errno.set(errno.eio)
 		return none
@@ -325,6 +331,10 @@ fn (mut device VirtioBlockDevice) write(_handle voidptr, buffer voidptr, loc u64
 
 fn (device &VirtioBlockDevice) block_identity() resource.BlockIdentity {
 	return resource.BlockIdentity{is_block: true, disk_id: device.stat.rdev, length: u64(device.stat.size)}
+}
+
+fn (device &VirtioBlockDevice) read_only_backend() bool {
+	return device.read_only
 }
 
 fn (mut device VirtioBlockDevice) ioctl(handle voidptr, request u64, argp voidptr) ?int {
@@ -370,10 +380,11 @@ pub fn initialise(hhdm u64) {
 		mmio_w32(base + reg_status, 0)
 		mmio_w32(base + reg_status, status_acknowledge)
 		mmio_w32(base + reg_status, status_acknowledge | status_driver)
-		// Legacy feature registers are 32-bit masks. Negotiate FLUSH before
-		// DRIVER_OK so a cache barrier may be submitted on this queue.
-		features := mmio_r32(base + reg_host_features) & feature_flush
-		device.flush_supported = features != 0
+		// Accept the backend's immutable write protection before filesystems
+		// inspect it, independently of support for cache flush commands.
+		features := mmio_r32(base + reg_host_features) & (feature_read_only | feature_flush)
+		device.read_only = features & feature_read_only != 0
+		device.flush_supported = features & feature_flush != 0
 		mmio_w32(base + reg_guest_features, features)
 		mmio_w32(base + reg_guest_page_size, u32(memory.page_size))
 		if !setup_queue(mut device) {
