@@ -50,8 +50,16 @@ while [ "$attempt" -lt 120 ]; do
     sleep 1
 done
 [ "$attempt" -lt 120 ]
+# Kernel messages from other CPUs can land inside this long serial output.
+# Send a fixed snapshot twice with numbered lines; the host keeps intact lines
+# and checks the reassembled image against its hash.
+/bin/busybox cat /tmp/vulkan/Xvfb_screen0 >/tmp/vkcube.xwd
+shot=$(/bin/busybox sha256sum /tmp/vkcube.xwd | /bin/busybox cut -d' ' -f1)
 echo VINIX-DOTA2-VULKAN-SHOT-BEGIN
-base64 /tmp/vulkan/Xvfb_screen0
+for copy in 1 2; do
+    echo "VINIX-DOTA2-VULKAN-SHOT-SHA256: $shot"
+    base64 /tmp/vkcube.xwd | /bin/busybox awk '{ print "S" NR " " $0 }'
+done
 echo VINIX-DOTA2-VULKAN-SHOT-END
 status=0
 wait "$cpid" || status=$?
