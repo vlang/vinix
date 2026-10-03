@@ -359,11 +359,13 @@ succeeded, and so did SKIP AHEAD in the strategy phase. The crashing function
 updates the team slots that `jointeam` also changes, but that command has not
 been shown to be the cause. About 13 minutes after SKIP AHEAD the client drew
 the Dire base. F1 selected the hero several minutes after it was sent, and the
-HUD then showed Marci with 626 health, 303 mana and 600 gold, as in the
-unedited capture below. The pregame's last 83 seconds of game time took about
-20 minutes. The server then entered `DOTA_GAMERULES_STATE_GAME_IN_PROGRESS`,
-and the hero's gold began to rise. Inputs and captures are under
-`build/dota2/game-software-hero`.
+HUD then showed Marci with 626 health, 303 mana and 600 gold. Her model and
+health bar appeared on the map four minutes after the HUD, so a capture taken
+as soon as the HUD shows the hero has no hero in it. In the unedited capture
+below, she stands under her health bar, next to her courier. The pregame's
+last 83 seconds of game time took about 20 minutes. The server then entered
+`DOTA_GAMERULES_STATE_GAME_IN_PROGRESS`, and the hero's gold began to rise.
+Inputs and captures are under `build/dota2/game-software-hero`.
 
 ![Marci at the Dire base in a local Dota 2 match in a Vinix window](../vinix-dota2-hero-map-qemu.png)
 
