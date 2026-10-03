@@ -10,8 +10,10 @@ window. In the verified run, mouse input opened the Hotkeys settings and
 closed them to return to the menu. A subsequent normal-launch run verified
 keyboard input by opening the engine console and typing commands. Loading a
 local map first crashed in the Lavapipe Vulkan driver. With the patched driver,
-a local map now loads to hero selection, with Dota's own game server running
-in the same process. In-match play and online matches have not been verified.
+a local map now loads, with Dota's own game server running in the same process.
+A hero can be picked, and the match starts with the hero at its team's base.
+Under software rendering, frames take a quarter of a second to minutes. Playing
+a match and online matches have not been verified.
 The game probe saves the actual guest framebuffer for inspection.
 
 ![Dota 2 main menu running in a Vinix window](../vinix-dota2-qemu.png)
@@ -320,34 +322,63 @@ A first level load stalls the game loop past the 30-second NetChan timeout of
 the client's loopback connection to its own server; during the load the
 console reports `timing out, last received ... (10.00 seconds ago)` on both
 ends. Entering `cl_timeout 1800` and `sv_timeout 1800` before `map dota` let
-the first load connect and reach team selection in about 12 minutes. In the
-pregame, frames take seconds to minutes and Dota advances game time by at most
-100 ms per frame (`Excessive frame time ... clamped`). `sv_cheats 1` and
-`host_timescale 10` make its timers usable; `jointeam good` joins Radiant.
+the first load connect and reach team selection in about 12 minutes. Three
+minutes is also enough: the guest can drop the second of two identical keys
+typed over QMP, and in a later run the console read back `cl_timeout = 180`
+after the same input. In the pregame, frames take seconds to minutes and Dota
+advances game time by at most 100 ms per frame
+(`Excessive frame time ... clamped`). `sv_cheats 1` and `host_timescale 10`
+make its timers usable; `jointeam good` joins Radiant, but see below.
 
-Committing a hero then crashed every time: clicking LOCK IN on Io, RANDOM, and
-`dota_start_game` each ended with `SIGSEGV` at the same code in Valve's
-`libserver.so`. The library is loaded as an anonymous mapping, matched by its
-text segment size, at a bias of `0x3aec000` below the mapping; that bias puts a
-`call rax` right before the faulting thread's return address. The function
-updates `CDOTA_PlayerResource` team slots and fires `dota_player_team_changed`.
+In the first probes, committing a hero crashed every time: clicking LOCK IN on
+Io, RANDOM, and `dota_start_game` each ended with `SIGSEGV` at the same code
+in Valve's `libserver.so`. The library is loaded as an anonymous mapping,
+matched by its text segment size, at a bias of `0x3aec000` below the mapping;
+that bias puts a `call rax` right before the faulting thread's return address.
+The function updates `CDOTA_PlayerResource` team slots and fires
+`dota_player_team_changed`.
 It calls through the vtable of an object it was passed, and that vtable pointer
 was zero in one crash and pointed into heap data in the others. Joining a team
 through the same path did not crash. The player in this probe is Valve's
 anonymous engine test mode, without a Steam account or Game Coordinator
 session, and the cause is not established. The kernel's partial-page
 `madvise`, which could have cleared live neighbours of a discarded 4 KiB guest
-page, clears only the requested range. Gameplay therefore still stops at hero
-selection. Inputs, captures and fault reports are under
-`build/dota2/game-product-small-window` and `build/dota2/game-product-pick-hero`.
+page, clears only the requested range. Inputs, captures and fault reports are
+under `build/dota2/game-product-small-window` and
+`build/dota2/game-product-pick-hero`.
 
 One otherwise identical launch ended at startup with
 `QEMU internal SIGSEGV {code=MAPERR, addr=0x8005334e890}`, a fault in the
 translator itself; the repeat did not reproduce it. The translator now also
 reports the host PC and frame chain for such faults.
 
-The tested artifacts are recorded below. The runtime value is its build-input
-generation fingerprint; the other values are SHA-256 hashes of the binaries.
+All three crashed probes had joined their team by typing `jointeam good`, two
+of them also with `host_timescale 10`. A later run joined Dire by clicking its
+team card and typed neither command. Picking Marci and clicking LOCK IN then
+succeeded, and so did SKIP AHEAD in the strategy phase. The crashing function
+updates the team slots that `jointeam` also changes, but that command has not
+been shown to be the cause. About 13 minutes after SKIP AHEAD the client drew
+the Dire base. F1 selected the hero several minutes after it was sent, and the
+HUD then showed Marci with 626 health, 303 mana and 600 gold, as in the
+unedited capture below. The pregame's last 83 seconds of game time took about
+20 minutes. The server then entered `DOTA_GAMERULES_STATE_GAME_IN_PROGRESS`,
+and the hero's gold began to rise. Inputs and captures are under
+`build/dota2/game-software-hero`.
+
+![Marci at the Dire base in a local Dota 2 match in a Vinix window](../vinix-dota2-hero-map-qemu.png)
+
+That run used Lavapipe at 854 by 480 with the kernel and desktop listed below.
+The other artifacts were newer:
+
+| Artifact | SHA-256 or generation |
+| --- | --- |
+| Native QEMU translator, with the DRM passthrough | `1a73b7ab2d03a7395d0c5beb8dea28bad0e7eec716ac015c83938d6a7d2987be` |
+| Private Dota runtime generation | `a9f25f0d31fb1a3e948913ce160ebd9a033883a7578084f0b275522e80e41599` |
+| Normal-run launcher | `de09f08d498239bc1831291650b8a1c5d10f91a19a42f21d9fd711faaf51423d` |
+
+The artifacts of the earlier runs are recorded below. The runtime value is its
+build-input generation fingerprint; the other values are SHA-256 hashes of the
+binaries.
 
 | Artifact | Tested hash or generation |
 | --- | --- |
