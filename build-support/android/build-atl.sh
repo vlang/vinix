@@ -123,6 +123,11 @@ if [ ! -f "$BUILD_OUTPUT/build.ninja" ]; then
         "-Dc_args=$COMPILE_ARGS" "-Dc_link_args=$LINK_ARGS"
 fi
 echo "Building native ARM64 ATL $COMMIT in $SOURCE_DIR"
+# AAPT rewrites internal R.java, and javac regenerates the native JNI headers.
+# Upstream Meson does not declare these generated-file ordering dependencies.
+# Finish both generators before parallel Java/native consumers read their files.
+meson compile -C "$BUILD_OUTPUT" -j "$JOBS" framework-res.apk
+meson compile -C "$BUILD_OUTPUT" -j "$JOBS" hax
 meson compile -C "$BUILD_OUTPUT" -j "$JOBS"
 INSTALL_ROOT="$BUILD_DIR/install"
 rm -rf "$INSTALL_ROOT"
