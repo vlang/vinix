@@ -304,6 +304,10 @@ that the platform reports no Autofill feature, focuses a real EditText, and call
 `cancel()`, `requestAutofill(View)` and `notifyValueChanged(View)` repeatedly on
 the main thread and a worker without a Looper. A later main Handler callback
 checks that input text is preserved and the feature remains disabled.
+The same fixture verifies View hint metadata: ordered values, null and empty
+arrays, unfiltered elements, the Android 26 shared-array behavior of the setter
+and getter, and independent properties on separate views. Manager calls preserve
+that metadata while the platform still reports no Autofill feature.
 
 Build the fixture on the native framework host with the coherent production
 class archive and resource APK:

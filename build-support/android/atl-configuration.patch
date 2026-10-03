@@ -2593,3 +2593,34 @@ diff --git a/src/api-impl/android/webkit/CookieManager.java b/src/api-impl/andro
  	public void registerCallback(AutofillCallback callback) {}
  
  	public void unregisterCallback(AutofillCallback callback) {}
+--- a/src/api-impl/android/view/View.java
++++ b/src/api-impl/android/view/View.java
+@@ -930,6 +930,7 @@
+ 	public AttributeSet attrs;
+ 	protected ViewGroup.LayoutParams layout_params;
+ 	private Context context;
++	private String[] mAutofillHints;
+ 	private Map<Integer, Object> tags = new HashMap<>();
+ 	private Object tag;
+ 	int gravity = -1; // fallback gravity for layout children
+@@ -2358,6 +2359,20 @@
+ 	}
+ 
+ 	public void setTooltipText(CharSequence tooltip) {}
++
++	/** Return the hint array retained by this view, or null when no hints are set. */
++	@Nullable public String[] getAutofillHints() {
++		return mAutofillHints;
++	}
++
++	/** Store hint metadata using Android 26 array ownership and empty-array semantics. */
++	public void setAutofillHints(@Nullable String... autofillHints) {
++		if (autofillHints == null || autofillHints.length == 0) {
++			mAutofillHints = null;
++		} else {
++			mAutofillHints = autofillHints;
++		}
++	}
+ 
+ 	public int getImportantForAutofill() { return 0; }
+ 

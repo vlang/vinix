@@ -19,10 +19,13 @@ Direct and desktop ATL runs have kept that screen drawing for 60 seconds.
 The desktop uses Xvfb-glx for Roblox: the lean server crashes while drawing
 the welcome screen, including when MIT-SHM is disabled. Maximizing the
 window and opening Sign In work. The autofill APIs used by Roblox now follow
-Android's behavior when no service is available; a normal fixture verifies
-focus, all three APIs and input preservation on Vinix. The real username-field
-interaction still exits and is under investigation. Authentication and
-gameplay remain unverified.
+Android's behavior when no service is available, and View retains autofill
+hint metadata with Android 26's array ownership and clearing behavior. A
+normal fixture verifies focus, all three APIs, hint metadata and input
+preservation on Vinix. The unchanged client accepts and clears username text,
+updates the Next button, and returns to the welcome screen without crashing
+during a three-minute desktop observation.
+Authentication and gameplay remain unverified.
 
 Build the coherent native Android runtime described in [Android APKs](android.md),
 then stage the Roblox launchers and include both layers in the desktop:
