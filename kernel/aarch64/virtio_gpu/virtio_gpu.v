@@ -241,6 +241,7 @@ mut:
 	blob_mem      u32
 	host_offset   u64
 	host_reserved bool
+	host_mapping  bool // first mapping in progress; see map_host_blob
 	host_mapped   bool
 }
 
@@ -594,19 +595,29 @@ fn map_handler(_dev &drm.DrmDevice, handle voidptr, data voidptr) int {
 		file.lock.release()
 		return -2
 	}
-	if object.gem_object.external && !object.host_mapped {
+	if object.gem_object.external && !object.host_reserved {
 		file.lock.release()
 		return -22
 	}
-	request.offset = gem.create_mmap_offset(object.gem_object)
+	// The object must outlive its first mapping, which runs without the
+	// file lock because it waits for the host.
+	retain_object(object)
 	file.lock.release()
-	return 0
+	result := map_host_blob(object)
+	if result == 0 {
+		request.offset = gem.create_mmap_offset(object.gem_object)
+	}
+	release_object(object)
+	return result
 }
 
 fn mapping_covers(object &VirtioObject, offset u64, length u64) bool {
 	if object == unsafe { nil } || object.gem_object == unsafe { nil } || length == 0 || (object.gem_object.external && !object.host_mapped) {
 		return false
 	}
+	// Pairs with map_host_blob_unlocked: callers next read the blob's address
+	// and cache attributes, published before host_mapped.
+	cpu.dmb_ishld()
 	base := object.gem_object.mmap_offset
 	size := object.gem_object.size
 	return offset >= base && offset - base < size && length <= size - (offset - base)
@@ -966,6 +977,12 @@ fn export_object(_dev &drm.DrmDevice, handle voidptr, object_handle u32) ?&gem.G
 	}
 	retain_object(object)
 	file.lock.release()
+	// A dma-buf fd can be mapped without DRM_IOCTL_VIRTGPU_MAP, and that path
+	// reads the blob's address and cache attributes without host_mapped.
+	if map_host_blob(object) != 0 {
+		release_object(object)
+		return none
+	}
 	return object.gem_object
 }
 
