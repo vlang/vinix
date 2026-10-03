@@ -15,9 +15,12 @@ contract, and `CookieManager` supplies real cookie storage, caller-Looper
 callbacks and checked persistence. ATL now loads separate base and ARM64
 configuration APKs. The current release draws Roblox's welcome screen with
 **Create Account** and **Sign In** on Vinix.
-Direct ATL runs have kept that screen drawing for 60 seconds. The desktop
-launch still has an Xvfb crash under investigation. Authentication and
-gameplay remain unverified.
+Direct and desktop ATL runs have kept that screen drawing for 60 seconds.
+The desktop uses Xvfb-glx for Roblox: the lean server crashes while drawing
+the welcome screen, including when MIT-SHM is disabled. Maximizing the
+window and opening Sign In work. Activating the username field currently
+hits a missing `AutofillManager.cancel()` API. Authentication and gameplay
+remain unverified.
 
 Build the coherent native Android runtime described in [Android APKs](android.md),
 then stage the Roblox launchers and include both layers in the desktop:

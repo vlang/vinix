@@ -194,7 +194,8 @@ static const char *claim_display(const char *requested, char *storage,
 }
 
 static pid_t spawn_xvfb(const char *display_name, const char *directory,
-                        const char *geometry, int game_input, int obs_capture, int shm_present) {
+                        const char *geometry, int game_input, int obs_capture, int shm_present,
+                        int glx_server) {
     pid_t pid = fork();
     const char *xvfb;
     if (pid != 0)
@@ -204,7 +205,9 @@ static pid_t spawn_xvfb(const char *display_name, const char *directory,
     setenv("LIBGL_ALWAYS_SOFTWARE", "1", 1);
     setenv("LIBGL_DRIVERS_PATH", "/usr/lib/xorg/modules/dri", 1);
     setenv("GALLIUM_DRIVER", "softpipe", 1);
-    xvfb = !game_input && access("/usr/bin/Xvfb-glx", X_OK) == 0
+    /* Keep Roblox on the proven direct ATL server with its game input bridge.
+     * The lean server crashes while drawing the current client's welcome UI. */
+    xvfb = (!game_input || glx_server) && access("/usr/bin/Xvfb-glx", X_OK) == 0
                ? "/usr/bin/Xvfb-glx" : "/usr/bin/Xvfb";
     /* Preserve the proven ordinary X11 transport for existing hosted apps.
      * OBS needs MIT-SHM for Display Capture, so only its private server
@@ -1107,6 +1110,7 @@ int main(int argc, char **argv) {
     }
     xvfb_pid = spawn_xvfb(display_name, directory, geometry, game_input,
                           obs_capture, strcmp(command, "/usr/bin/run-opengothic") == 0 ||
+                                       strcmp(command, "/usr/bin/run-roblox-client") == 0,
                                        strcmp(command, "/usr/bin/run-roblox-client") == 0);
     if (xvfb_pid < 0) {
         perror("vinix-wine-host: fork Xvfb");
