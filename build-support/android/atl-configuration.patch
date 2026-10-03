@@ -1345,3 +1345,13 @@ index 8e9679a..50721d2 100644
 @@ -1880,0 +1916,2 @@ public class View implements Drawable.Callback {
 +		if (isEnabled() && on_generic_motion_listener != null
 +		    && on_generic_motion_listener.onGenericMotion(this, event)) return true;
+diff --git a/src/api-impl/android/view/Display.java b/src/api-impl/android/view/Display.java
+index 01d86ee..c7edae8 100644
+--- a/src/api-impl/android/view/Display.java
++++ b/src/api-impl/android/view/Display.java
+@@ -46,0 +47,5 @@ public final class Display {
++	public float[] getSupportedRefreshRates() {
++		// ATL currently exposes one virtual window configuration.
++		return new float[] {getRefreshRate()};
++	}
++

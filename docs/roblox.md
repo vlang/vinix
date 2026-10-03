@@ -7,7 +7,9 @@ loader loads the APK's ARM64 engine and completes `JNI_OnLoad` on Vinix.
 Roblox compatibility is still being implemented. HTTPS startup requests now
 pass certificate verification and layout inflation handles `<requestFocus />`.
 The framework now supplies `View.OnCapturedPointerListener` and native mouse
-capture. The latest launch aborts at the missing `Display.getSupportedRefreshRates()` API.
+capture and the virtual display's supported refresh-rate query. The latest
+launch aborts during main-activity startup because its lifecycle reaches
+`STARTED` before activity-result registration completes.
 A usable Roblox screen, authentication and gameplay remain unverified.
 
 Build the coherent native Android runtime described in [Android APKs](android.md),
@@ -94,7 +96,10 @@ The production-framework Java event probe passes on Vinix's 16 KiB ART, and
 the desktop calculator still displays `579` after `123+456`, with zero retries.
 The launcher prevents GTK's GLX fallback with `GDK_DISABLE=glx`, preserving
 caller feature flags, so GTK can share ATL's EGL images. The latest real APK
-run passes the pointer class resolution and aborts at the missing
-`Display.getSupportedRefreshRates()` method before a usable client screen.
+run passes pointer class resolution and `Display.getSupportedRefreshRates()`.
+That query returns the existing virtual display's nominal refresh rate; it
+does not report a physical monitor mode or prove a rendered frame rate. The
+client then aborts because its main activity reaches `STARTED` before
+activity-result registration completes, before a usable client screen.
 Host launcher and shared-runtime validation checks are in `tests/roblox/launcher-test.py` and
 `tests/roblox/build-test.py`.
