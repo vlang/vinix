@@ -5,9 +5,13 @@ QEMU user-mode translator. It uses a private Debian glibc/Vulkan runtime;
 the Alpine musl runtime used by Wine cannot load these binaries. Proton is
 not needed for the Linux client.
 
-This is a bring-up path. Passing the Vulkan or file-access probes does not
-establish that Dota 2 launches, renders its menu, or supports online matches.
-The game probe saves the actual guest framebuffer for inspection.
+The native Linux client now renders its main menu inside a Vinix desktop
+window. In the verified run, mouse input opened the Hotkeys settings and
+closed them to return to the menu. Keyboard input, gameplay and online
+matches have not been verified. The game probe saves the actual guest
+framebuffer for inspection.
+
+![Dota 2 main menu running in a Vinix window](../vinix-dota2-qemu.png)
 
 ## Build the runtime and desktop
 
@@ -47,6 +51,13 @@ The default translated CPU is `Haswell`. In the actual Vinix probe, Mesa
 22/LLVM 15 enumerated with QEMU's `max` CPU but aborted at shader compilation
 with `64-bit code requested on a subtarget that doesn't support it`. `Haswell`
 completed the Vulkan rendering probe. `QEMU_CPU` remains overridable.
+
+The launcher passes Valve's `-noassert` option by default. The translated
+SteamNetworkingSockets service thread can exceed a debug assertion's lock
+wait threshold on this software graphics path; the same assertion occurred
+with one and four guest CPUs. This option changes Valve's assertion response
+policy, while fatal errors remain active. Set `VINIX_DOTA2_ASSERTS=1` to use
+the normal assertion policy.
 
 The launcher enters the Linux ELF directly because Valve's `dota.sh` insists
 on the `sniper` distribution. It does not change Vinix's `/etc/os-release`.
@@ -141,14 +152,11 @@ establish authenticated matchmaking support.
 
 With the early loader, the real Steam API test passes anonymous initialization,
 callbacks and clean shutdown even with Source 2's tier0 loaded globally. The
-full game probe has rendered its [startup logo inside a Vinix window](../vinix-dota2-startup-qemu.png).
-That QEMU framebuffer capture is from the actual game, not the desktop's launch
-placeholder. Subsequent runs load the material, font and networking systems,
-then encounter a SteamNetworkingSockets assertion when a translated service
-thread waits too long for its lock. The same assertion occurs with one and
-four CPUs. Valve's actual `-noassert` option allows startup past that assertion;
-fatal errors remain active. A later run terminated through tier0's fatal path
-with `Error reading from loaded packed store`, before a menu appeared.
+[startup-logo capture](../vinix-dota2-startup-qemu.png) records an earlier
+milestone. The main-menu image above is a later, genuine QEMU framebuffer
+capture from the full game, including its menu artwork and 3D character.
+It was copied without image edits or overlays. Mouse clicks opened and closed
+the game's settings; keyboard input and a playable match remain untested.
 
 The host export previously disconnected after 120 seconds without a request,
 which can occur during shader compilation. It now keeps a negotiated disk
@@ -157,9 +165,41 @@ idle reads and the retained handshake timeout. The kernel also now scopes
 `fsync` to the descriptor's backing resource: an unrelated failing disk no
 longer makes a writable RAM configuration file return `EIO`. The
 [native regression](../tests/fsync-scope/README.md) preserves errors and dirty
-data on the failing disk. The effect of these fixes on the game's packed-store
-failure still needs a completed game run. A rendered menu and online matches
-are not yet verified.
+data on the failing disk.
+
+A further failure was traced to the VirtIO block driver's missing read-only
+capability. Although the game disk was mounted read-only, EXT2 saw its backend
+as writable. Failed shader-cache writes left a dirty cache page that could
+not be evicted. Unrelated inode reads and a demand-paged SDL read then returned
+`EIO`, causing a fault at a valid mapped address. The driver now negotiates
+VirtIO's read-only feature, exposes that immutable property to EXT2 and returns
+`EROFS` before submitting a write. The [native read-only regression](../tests/virtio-ro/README.md)
+reproduces the old cache and inode failure, verifies full cache churn and cold
+reads with the fix, checks mount aliases and raw writes, and confirms that the
+host files remain unchanged.
+
+The successful main-menu run used four ARM64 guest CPUs, 8 GiB of guest RAM,
+Mesa 22/LLVM 15 Lavapipe, the `Haswell` translated CPU and Valve's anonymous
+engine mode. It also passed `-noassert` and `-nobreakpad` and loaded a diagnostic
+signal observer. It reached the fully drawn menu and accepted the settings
+mouse interaction. The menu still reported that it was searching for the
+Dota 2 game coordinator, so this is not an authenticated online-match result.
+
+The tested artifacts are recorded below. The runtime value is its build-input
+generation fingerprint; the other values are SHA-256 hashes of the binaries.
+
+| Artifact | Tested hash or generation |
+| --- | --- |
+| ARM64 SMP kernel | `63ed08e26058355f4c0f02e9d1cee06fe1ef82f43b405a9350bbd331b3c28ac0` |
+| Vinix desktop | `140ce22b1f6a4ffe4399e7b7fe8905558efb2553f2d512defce67e6f87ace79e` |
+| Native QEMU translator | `d41f4ed1eb30cd11ced87c436502852df1c1762b9049c1b771a7105e4613e54b` |
+| Private Dota runtime generation | `58be6e668672138ad07cd3e67104019473a6a5eef62734daf09d697641c0ed52` |
+
+The 8 GiB run encountered guest memory pressure while loading the menu.
+For further testing, 16 GiB is recommended if the host has enough memory;
+that larger configuration has not yet been verified. Software translation
+and Lavapipe make startup and interaction slow. A rendered menu does not
+establish playable frame rates, keyboard input or online support.
 
 After the file and graphics probes, capture the real game:
 
@@ -171,6 +211,7 @@ python3 tests/dota2/run.py \
     --export-state build/dota2/game-export \
     --steamclient /path/to/Steam/steamrt64 \
     --gldriverquery /path/to/Steam/ubuntu12_64/gldriverquery \
+    --memory-mib=8192 --timeout=1500 \
     --extra-game-arg=-noassert
 ```
 
@@ -184,3 +225,14 @@ leaves both the desktop's and game's settings in writable RAM. Captures and
 serial output are saved under `build/dota2/game-test`. The report requires
 visual review: an engine crash or the desktop's launch/error placeholder is
 not evidence that the game rendered.
+
+The verified run's logs and separate visual review are under
+`build/dota2/game-ro-fixed-test`. Its immutable kernel is under
+`build/dota2-virtio-ro/kernel-aarch64-smp`, its desktop is under
+`build/dota2-ui-integration/pins/140ce22b1f6a4ffe4399e7b7fe8905558efb2553f2d512defce67e6f87ace79e`,
+and its translator staging is `build/dota2-qemu/staging`. Supply those paths
+with `--kernel-dir`, `--desktop` and `--translator-staging` to use the tested
+artifacts locally; `--host-source` should select `vinix-wine-host.c` from the
+same desktop pin. The probe's automatic report deliberately leaves
+`rendering_verified` false until a human reviews the captures; this run's
+`visual-review.json` records the confirmed menu and mouse interaction.
