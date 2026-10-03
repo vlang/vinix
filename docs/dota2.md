@@ -154,8 +154,8 @@ On Vinix in KekVM, translated `vulkaninfo` reports
 logo and main menu on the host GPU at roughly 5 to 10 frames per second, against
 seconds to minutes per frame with Lavapipe. Dota maps more Vulkan memory than
 QEMU/Hypervisor.framework has memory slots for when every blob is mapped at
-creation; QEMU then aborts with `No free slots`. A kernel that maps blobs on
-first use is needed (being reviewed separately).
+creation; QEMU then aborts with `No free slots`. The kernel therefore maps a
+blob on its first `DRM_IOCTL_VIRTGPU_MAP` or dma-buf export, not at creation.
 
 **Caution:** both Dota runs that got past the menu on the host GPU were
 followed by a restart of the Mac. The first was a macOS watchdog panic,
