@@ -44,3 +44,10 @@ fixture. It verifies the reproduced write fault, preserved permissions and
 128 successful writes with acknowledged worker code execution between steps.
 It does not trace native page protection at every step or certify the separate
 full futex contract.
+
+`internal-fault.patch` adds the faulting host PC, link register, stack pointer,
+guest PC and frame-pointer return addresses to QEMU's existing "QEMU internal
+SIGSEGV" report. That report previously gave only the data address, which
+cannot locate a fault in the translator itself. The static translator keeps its
+symbols, so `llvm-addr2line` or `nm` names the reported addresses; the printed
+image address gives any load bias. The patch changes only this fatal path.

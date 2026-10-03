@@ -134,7 +134,7 @@ def main() -> None:
     for path, description in zip(patches, configuration["alpine_patches"]):
         if digest(path) != description["sha256"]:
             raise SystemExit(f"the inherited Alpine patch has an unexpected hash: {path}")
-    patches.extend(SUPPORT / name for name in ("noreplace.patch", "wake-op.patch"))
+    patches.extend(SUPPORT / name for name in ("noreplace.patch", "wake-op.patch", "internal-fault.patch"))
     static_inputs = set(path for path in base.rglob("*.a") if path.is_file())
     static_inputs.update(path for path in gcc.rglob("*.a") if path.is_file())
     static_inputs.update(path for path in (base / "usr/lib").glob("*crt*.o") if path.is_file())
