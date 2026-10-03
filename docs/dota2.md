@@ -275,6 +275,20 @@ errors. The first local-map request after startup failed the same way in a
 second launch, so retry from the console. Inputs and captures, including
 `hero-selection-01.png`, are under `build/dota2/game-mesa-null-sets-repeat`.
 
+The runtime staged by `build-dota2-aarch64.sh`, with the committed driver
+(`a6a4972d...`), reached the menu about 150 seconds after the game started.
+Its first `map dota`, typed as the menu appeared, failed the same way; the
+second loaded the map. The client joined the local server over UDP at
+`127.0.0.1:27015` and showed the team selection screen below, an unedited
+QEMU framebuffer capture. Rendering there is
+extremely slow: all four guest CPUs were busy and the pregame timer advanced
+about one second per two minutes. The cheat command `dota_start_game` then
+crashed the game with a null-pointer read in game code, with that command on
+the faulting thread's stack. Captures and inputs are under
+`build/dota2/game-product-console-map`.
+
+![Dota 2 team selection on a local map in a Vinix window](../vinix-dota2-team-select-qemu.png)
+
 One otherwise identical launch ended at startup with
 `QEMU internal SIGSEGV {code=MAPERR, addr=0x8005334e890}`, a fault in the
 translator itself; the repeat did not reproduce it. The translator now also
