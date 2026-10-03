@@ -54,6 +54,19 @@ The default translated CPU is `Haswell`. In the actual Vinix probe, Mesa
 with `64-bit code requested on a subtarget that doesn't support it`. `Haswell`
 completed the Vulkan rendering probe. `QEMU_CPU` remains overridable.
 
+Dota's private runtime uses the complete pinned Debian libc6
+`2.41-12+deb13u4` package, including its matching loader. The shared Steam
+runtime retains its original libc; Mesa 22 and LLVM 15 also stay together.
+glibc 2.41 fixes concurrent `getenv` and environment updates
+([upstream bug 15607](https://sourceware.org/pipermail/glibc-bugs/2025-July/059702.html)).
+On Vinix, the same regression executable terminated with `SIGSEGV` under
+glibc 2.36 and completed all 32 rounds under 2.41. Valve's real anonymous
+Steam API initialization, callbacks, shutdown and reinitialization also
+passed with the new runtime. This fixes that measured runtime failure;
+local-map loading still fails separately. The staging cache verifies the
+whole libc package and loader aliases. `vulkan-stage.py --keep-steam-libc`
+retains the original libc for baseline comparisons.
+
 The launcher passes Valve's `-noassert` option by default. The translated
 SteamNetworkingSockets service thread can exceed a debug assertion's lock
 wait threshold on this software graphics path; the same assertion occurred
@@ -210,6 +223,18 @@ pending a diagnostic run. The host exporter served 5,006,002,176 bytes across
 sample still had more than 5 GiB available and `VinixMemoryPressure: 0`.
 The completed harness report is therefore failed despite the separately
 verified menu and console input; gameplay is currently blocked by this crash.
+
+A subsequent diagnostic launch queued the same local map with the matched
+glibc 2.41 runtime. It again exited with status 139. The captured instruction
+and complete owning mappings locate this fault in Mesa 22.3.6 Lavapipe's
+`handle_compute_descriptor_sets`, at ELF address `0x1f59ff`, source line 1307
+in `lvp_execute.c`. The instruction reads `set->layout` from a null descriptor
+set (`RDX = 0`, fault address `0x40`). Matching Debian debug symbols confirm
+the source location; the graphics descriptor-set handler already checks for
+null sets. The driver fix is being tested. This launch served 4,808,656,896
+bytes with no exporter errors and retained about 5 GiB of available guest
+memory. Its log, captures and failed report are preserved under
+`build/dota2/game-glibc241-local-map-test`.
 
 The tested artifacts are recorded below. The runtime value is its build-input
 generation fingerprint; the other values are SHA-256 hashes of the binaries.

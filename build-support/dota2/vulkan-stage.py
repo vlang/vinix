@@ -11,8 +11,14 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+import tempfile
 
 REPO = Path(__file__).resolve().parents[2]
+GLIBC_PIN = REPO / "build-support/dota2/glibc-package.json"
+GLIBC_MARKER = ".vinix-dota2-glibc-package.json"
+GLIBC_ALIAS_POLICY = "bookworm-lib-to-usrmerged-libc-relative-v1"
+GLIBC_LIBRARIES = ("ld-linux-x86-64.so.2", "libc.so.6", "libm.so.6",
+                   "libresolv.so.2", "libpthread.so.0", "libdl.so.2")
 MMAP32_SOURCE = REPO / "build-support/dota2/mmap32.c"
 MMAP32_LIBRARY = "usr/lib/x86_64-linux-gnu/libvinix-dota2-mmap32.so"
 MMAP32_COMPILE = ["clang", "--target=x86_64-linux-gnu", "-fPIC", "-shared",
@@ -33,6 +39,127 @@ def clone_tree(source: Path, destination: Path) -> None:
         shutil.copytree(source, destination, symlinks=True)
 
 
+def file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1 << 20), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def load_glibc_pin(path: Path = GLIBC_PIN) -> dict:
+    pin = json.loads(path.read_text())
+    if (pin.get("package") != "libc6" or pin.get("architecture") != "amd64" or
+            not isinstance(pin.get("version"), str) or not pin["version"] or
+            not isinstance(pin.get("size"), int) or pin["size"] <= 0 or
+            not isinstance(pin.get("sha256"), str) or len(pin["sha256"]) != 64 or
+            any(c not in "0123456789abcdef" for c in pin["sha256"]) or
+            not isinstance(pin.get("mirror"), str) or not pin["mirror"].startswith("https://") or
+            not isinstance(pin.get("filename"), str) or
+            not pin["filename"] or
+            Path(pin["filename"]).is_absolute() or ".." in Path(pin["filename"]).parts):
+        raise SystemExit(f"invalid pinned amd64 libc6 package: {path}")
+    return pin
+
+
+def package_files(root: Path) -> dict:
+    files = {}
+    for path in sorted(root.rglob("*")):
+        relative = path.relative_to(root).as_posix()
+        if path.is_symlink():
+            files[relative] = {"target": os.readlink(path)}
+        elif path.is_file():
+            files[relative] = {"sha256": file_sha256(path),
+                               "mode": path.stat().st_mode & 0o7777}
+    return files
+
+
+def stage_glibc_package(resolver, pin: dict, cache: Path, root: Path) -> None:
+    # Keep the proven Mesa/LLVM and Steam library closure. Only Dota's private
+    # libc family advances: glibc 2.41 retains environment arrays while getenv
+    # is reading them on another thread (upstream glibc bug 15607).
+    package = resolver.Package(pin["package"], pin["version"], pin["architecture"],
+                               pin["filename"], pin["sha256"], pin["size"], (), ())
+    archive = resolver.download(pin["mirror"], package, cache)
+    if archive.stat().st_size != pin["size"] or file_sha256(archive) != pin["sha256"]:
+        raise SystemExit(f"checksum or size mismatch for pinned libc6: {archive}")
+    with tempfile.TemporaryDirectory(prefix="dota2-libc6-", dir=cache) as directory:
+        payload = Path(directory)
+        resolver.extract_deb(archive, payload)
+        canonical = payload / "usr/lib/x86_64-linux-gnu"
+        if not all((canonical / name).is_file() and not (canonical / name).is_symlink()
+                   for name in GLIBC_LIBRARIES):
+            raise SystemExit("pinned libc6 must contain the complete usrmerged amd64 family")
+        files = package_files(payload)
+        resolver.extract_deb(archive, root)
+        aliases = {}
+        # The existing Bookworm root has distinct /lib and /usr/lib directories.
+        # Redirect old lookup paths to the same new files, including the loader.
+        for path in sorted(canonical.iterdir()):
+            if not path.is_file() or path.is_symlink():
+                continue
+            legacy = root / "lib/x86_64-linux-gnu" / path.name
+            if not legacy.exists() and not legacy.is_symlink():
+                continue
+            legacy.unlink()
+            target = "../../usr/lib/x86_64-linux-gnu/" + path.name
+            legacy.symlink_to(target)
+            aliases[legacy.relative_to(root).as_posix()] = target
+        loader = root / "lib64/ld-linux-x86-64.so.2"
+        loader.parent.mkdir(parents=True, exist_ok=True)
+        if loader.exists() or loader.is_symlink():
+            loader.unlink()
+        target = "../usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2"
+        loader.symlink_to(target)
+        aliases[loader.relative_to(root).as_posix()] = target
+        marker = {"package": pin, "alias_policy": GLIBC_ALIAS_POLICY,
+                  "files": files, "aliases": aliases}
+        (root / GLIBC_MARKER).write_text(json.dumps(marker, sort_keys=True, indent=2) + "\n")
+
+
+def glibc_package_valid(root: Path, pin: dict) -> bool:
+    # A generation stamp alone cannot detect a copied-back Bookworm loader or
+    # libc. Verify the whole package and legacy aliases before reusing a root.
+    try:
+        marker = json.loads((root / GLIBC_MARKER).read_text())
+        if marker["package"] != pin or marker["alias_policy"] != GLIBC_ALIAS_POLICY:
+            return False
+        files, aliases = marker["files"], marker["aliases"]
+        if not isinstance(files, dict) or not isinstance(aliases, dict):
+            return False
+        required = ["usr/lib/x86_64-linux-gnu/" + name for name in GLIBC_LIBRARIES]
+        if not all(name in files and "sha256" in files[name] for name in required):
+            return False
+        if aliases.get("lib64/ld-linux-x86-64.so.2") != "../usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2":
+            return False
+        for name in GLIBC_LIBRARIES:
+            relative = "lib/x86_64-linux-gnu/" + name
+            legacy = root / relative
+            if ((legacy.exists() or legacy.is_symlink()) and
+                    aliases.get(relative) != "../../usr/lib/x86_64-linux-gnu/" + name):
+                return False
+        for relative, expected in files.items():
+            if Path(relative).is_absolute() or ".." in Path(relative).parts:
+                return False
+            path = root / relative
+            if "target" in expected:
+                if not path.is_symlink() or os.readlink(path) != expected["target"]:
+                    return False
+            elif (path.is_symlink() or not path.is_file() or
+                  path.stat().st_mode & 0o7777 != expected["mode"] or
+                  file_sha256(path) != expected["sha256"]):
+                return False
+        for relative, target in aliases.items():
+            path = root / relative
+            if (Path(relative).is_absolute() or ".." in Path(relative).parts or
+                    not path.is_symlink() or os.readlink(path) != target or
+                    not path.resolve().is_relative_to(root.resolve())):
+                return False
+        return True
+    except (OSError, ValueError, KeyError, TypeError, RuntimeError):
+        return False
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--steam-build", type=Path, default=REPO / "build-aarch64-steam")
@@ -42,6 +169,8 @@ def main() -> None:
     parser.add_argument("--refresh", action="store_true", help="replace an existing destination without a generation stamp")
     parser.add_argument("--mirror", default="https://deb.debian.org/debian")
     parser.add_argument("--release", default="bookworm")
+    parser.add_argument("--keep-steam-libc", action="store_true",
+                        help="retain Steam's original libc for baseline reproductions")
     args = parser.parse_args()
     steam = args.steam_build.resolve()
     build = args.build.resolve()
@@ -73,8 +202,12 @@ def main() -> None:
                       key=lambda p: p.name)
     rows = [{"package": p.name, "version": p.version, "filename": p.filename,
              "sha256": p.sha256} for p in selected]
-    inputs = {"format": 4, "source": str(source), "guest_root": args.guest_root,
+    glibc_pin = None if args.keep_steam_libc else load_glibc_pin()
+    inputs = {"format": 5, "source": str(source), "guest_root": args.guest_root,
               "release": args.release, "packages": rows,
+              "builder_sha256": file_sha256(Path(__file__)),
+              "glibc_package": glibc_pin,
+              "glibc_alias_policy": GLIBC_ALIAS_POLICY,
               "amd64": manifest.read_text(),
               "i386": (steam / "i386-packages").read_text(),
               "mmap32_source": hashlib.sha256(MMAP32_SOURCE.read_bytes()).hexdigest(),
@@ -91,8 +224,11 @@ def main() -> None:
                 "usr/lib/x86_64-linux-gnu/libfreetype.so.6",
                 MMAP32_LIBRARY, EARLY_CLIENT_LIBRARY]
     build.mkdir(parents=True, exist_ok=True)
-    (build / "vulkan-packages.json").write_text(json.dumps(rows, indent=2) + "\n")
-    if stamp.exists() and stamp.read_text().strip() == generation and all((root / p).exists() for p in required):
+    reported_packages = rows + ([glibc_pin] if glibc_pin is not None else [])
+    (build / "vulkan-packages.json").write_text(json.dumps(reported_packages, indent=2) + "\n")
+    if (stamp.exists() and stamp.read_text().strip() == generation and
+            all((root / p).exists() for p in required) and
+            (glibc_pin is None or glibc_package_valid(root, glibc_pin))):
         print(root)
         return
     pending = root.with_name(root.name + f".vulkan-stage-{os.getpid()}")
@@ -102,6 +238,8 @@ def main() -> None:
     for package in selected:
         archive = resolver.download(args.mirror, package, cache)
         resolver.extract_deb(archive, pending)
+    if glibc_pin is not None:
+        stage_glibc_package(resolver, glibc_pin, cache, pending)
     # Resolve libc symbols only inside the translated process. No native
     # headers, startup files, or x86 development packages are required.
     subprocess.run([*MMAP32_COMPILE, str(MMAP32_SOURCE), "-o", str(pending / MMAP32_LIBRARY)],
@@ -120,6 +258,8 @@ def main() -> None:
     data = json.loads(icd.read_text())
     data["ICD"]["library_path"] = args.guest_root.rstrip("/") + "/usr/lib/x86_64-linux-gnu/libvulkan_lvp.so"
     icd.write_text(json.dumps(data, indent=2) + "\n")
+    if glibc_pin is not None and not glibc_package_valid(pending, glibc_pin):
+        raise SystemExit("staged Dota libc6 package or loader aliases do not match the pin")
     (pending / stamp.name).write_text(generation + "\n")
     if root.exists():
         old = root.with_name(root.name + f".vulkan-old-{os.getpid()}")
