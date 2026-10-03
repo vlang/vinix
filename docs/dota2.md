@@ -9,9 +9,10 @@ The native Linux client now renders its main menu inside a Vinix desktop
 window. In the verified run, mouse input opened the Hotkeys settings and
 closed them to return to the menu. A subsequent normal-launch run verified
 keyboard input by opening the engine console and typing commands. Loading a
-local map then crashed, so gameplay is currently blocked. In-match controls
-and online matches have not been verified. The game probe saves the actual
-guest framebuffer for inspection.
+local map first crashed in the Lavapipe Vulkan driver. With the patched driver,
+a local map now loads to hero selection, with Dota's own game server running
+in the same process. In-match play and online matches have not been verified.
+The game probe saves the actual guest framebuffer for inspection.
 
 ![Dota 2 main menu running in a Vinix window](../vinix-dota2-qemu.png)
 
@@ -239,7 +240,7 @@ pending a diagnostic run. The host exporter served 5,006,002,176 bytes across
 290,620 read requests with zero reported read errors. The last guest memory
 sample still had more than 5 GiB available and `VinixMemoryPressure: 0`.
 The completed harness report is therefore failed despite the separately
-verified menu and console input; gameplay is currently blocked by this crash.
+verified menu and console input; this crash blocked gameplay.
 
 A subsequent diagnostic launch queued the same local map with the matched
 glibc 2.41 runtime. It again exited with status 139. The captured instruction
@@ -259,6 +260,25 @@ This launch served 4,808,656,896
 bytes with no exporter errors and retained about 5 GiB of available guest
 memory. Its log, captures and failed report are preserved under
 `build/dota2/game-glibc241-local-map-test`.
+
+A repeat of that launch with only the driver replaced passed the former crash
+point and reached the main menu. Its driver was an earlier build of the same
+patched source (`fd5dfbf6...`), differing from the staged build only in
+embedded source paths. Its queued `+map dota` ended with Dota's
+"Unable to establish a connection with the gameserver" dialog. Typing
+`map dota` into the console at the menu then loaded the map: the server
+reported one of one players loaded and entered
+`DOTA_GAMERULES_STATE_HERO_SELECTION`, and the client showed the
+hero-selection screen with the map's minimap. The game was still running when
+the 30-minute probe ended, after 5,387,728,896 exported bytes with no read
+errors. The first local-map request after startup failed the same way in a
+second launch, so retry from the console. Inputs and captures, including
+`hero-selection-01.png`, are under `build/dota2/game-mesa-null-sets-repeat`.
+
+One otherwise identical launch ended at startup with
+`QEMU internal SIGSEGV {code=MAPERR, addr=0x8005334e890}`, a fault in the
+translator itself; the repeat did not reproduce it. The translator now also
+reports the host PC and frame chain for such faults.
 
 The tested artifacts are recorded below. The runtime value is its build-input
 generation fingerprint; the other values are SHA-256 hashes of the binaries.
