@@ -5,6 +5,8 @@ import errno
 import io
 from pathlib import Path
 import tempfile
+import subprocess
+import sys
 import unittest
 from contextlib import redirect_stdout
 from types import SimpleNamespace
@@ -88,6 +90,19 @@ class ExportReadTests(unittest.TestCase):
         self.assertEqual(report["failures"][0]["offset"], 0)
         self.assertEqual(report["failures"][0]["errno"], errno.EIO)
         self.assertEqual(len(output.getvalue().splitlines()), 32)
+
+
+class ArgumentTests(unittest.TestCase):
+    def test_invalid_memory_does_not_create_a_fixture(self):
+        with tempfile.TemporaryDirectory() as directory:
+            work = Path(directory) / "fixture"
+            for memory in ("0", "-1"):
+                result = subprocess.run([sys.executable, str(Path(__file__).with_name("run.py")),
+                                         "--prepare-only", "--work", str(work),
+                                         f"--memory-mib={memory}"], capture_output=True, text=True)
+                self.assertEqual(result.returncode, 2)
+                self.assertIn("memory must be positive", result.stderr)
+                self.assertFalse(work.exists())
 
 
 if __name__ == "__main__":

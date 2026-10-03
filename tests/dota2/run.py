@@ -421,11 +421,13 @@ def main() -> None:
                         help="Copy a measured x86-64 loader probe into the guest preloads; repeatable")
     parser.add_argument("--extra-game-arg", action="append", default=[])
     parser.add_argument("--timeout", type=int, default=900)
+    parser.add_argument("--memory-mib", type=int, default=8192,
+                        help="Guest RAM in MiB; translated software rendering can need more than 8 GiB")
     parser.add_argument("--capture-interval", type=int, default=60)
     parser.add_argument("--prepare-only", action="store_true")
     args = parser.parse_args()
-    if args.timeout <= 0 or args.capture_interval <= 0:
-        parser.error("Timeout and capture interval must be positive")
+    if args.timeout <= 0 or args.capture_interval <= 0 or args.memory_mib <= 0:
+        parser.error("Timeout, capture interval and memory must be positive")
     args.preload_records, args.preload_contents = probe_preloads(args.extra_preload)
     for name in ("base_root", "work", "desktop", "host_source", "steamclient", "gldriverquery",
                  "export_state", "kernel_dir"):
@@ -468,7 +470,8 @@ def main() -> None:
                 environment.update(VINIX_OVMF_CODE=str(firmware), VINIX_QEMU_RESOLUTION="2048x1536x32")
             if platform.system() != "Darwin":
                 environment.setdefault("USE_TCG", "1")
-            command = [str(REPO / "run-aarch64.sh"), "--no-build", "--serial", "--mem=8192"]
+            command = [str(REPO / "run-aarch64.sh"), "--no-build", "--serial",
+                       f"--mem={args.memory_mib}"]
             print(f"Real game probe artifacts: {work}; read-only game disk: {uri}", flush=True)
             pid, master = pty.fork()
             if pid == 0:
@@ -523,6 +526,7 @@ def main() -> None:
             thread.join()
     report = {
         "status": "failed" if failure else "captured_for_review",
+        "guest_memory_mib": args.memory_mib,
         "failure": failure, "rendering_verified": False,
         "game_started": b"VINIX-DOTA2-GAME-STARTED:" in transcript,
         "anonymous_steam_initialized": b"initialized steam in anonymous user mode" in transcript,
